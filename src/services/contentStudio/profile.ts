@@ -45,6 +45,11 @@ export interface ContentProfile {
    */
   /** 후기 수 · 평점('네이버 후기 1,240개 · 평점 4.8') */
   reviews: string
+  /**
+   * D-234 후기 출처('자사몰' · '매장 방명록' · '네이버 플레이스') — 규칙집 ⟲4차 2-3:
+   * 출처가 없으면 다른 도구가 후기 위치를 지어내거나 계정 업체의 판매 플랫폼 이름을 넣었다.
+   */
+  reviewSource: string
   /** 실제 고객 한마디(고객 동의를 받은 말) */
   voice: string
   /** 이번 달 혜택 — 기한이 지났으면 '' (지난 혜택을 글에 쓰지 않는다) */
@@ -83,6 +88,8 @@ export interface ProfileOverrides {
   objection?: string
   /** D-228 재료 */
   reviews?: string
+  /** D-234 */
+  reviewSource?: string
   voice?: string
   offer?: string
   offerUntil?: string
@@ -194,6 +201,7 @@ export function buildProfile(record: ClientOpsRecord, today: string, ov: Profile
       channel: ov.channel?.trim() ?? '',
       objection: ov.objection?.trim() ?? '',
       reviews: ov.reviews?.trim() ?? '',
+      reviewSource: ov.reviewSource?.trim() ?? '',
       voice: (ov.voice?.trim() ?? '').replace(/^["“”'‘’]+|["“”'‘’]+$/g, ''),
       offer: expired ? '' : offerText,
       offerUntil: expired ? '' : offerUntil,
@@ -251,6 +259,8 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
   if (objection) out.objection = objection
   const reviews = str(r.reviews, 60)
   if (reviews) out.reviews = reviews
+  const reviewSource = str(r.reviewSource, 60)
+  if (reviewSource) out.reviewSource = reviewSource
   const voice = str(r.voice, 120)
   if (voice) out.voice = voice
   const offer = str(r.offer, 80)
@@ -273,7 +283,12 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
  * D-207 '이 칸만 채우면 글이 좋아져요' — 글 곳곳의 [대괄호] 를 줄이는 칸(마케팅의 핵심은 차별점을 손님 눈높이로 전하는 것).
  * 중요한 순서대로. 화면은 첫 몇 개만 보여 준다.
  */
-export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'speaker' | 'reviews' | 'voice' | 'offer'
+export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'speaker' | 'reviews' | 'reviewSource' | 'voice' | 'offer' | 'price'
+
+/** D-234 규칙집 0-12 — 가격에 숫자는 있는데 단위(1회 · 월 · 공임 · 1인분 · 개 · 부터 …)가 없으면 다른 도구가 '월 N원' 처럼 바꿔 썼다 */
+export function priceWithoutUnit(price: string): boolean {
+  return /\d/.test(price) && !/월|회|공임|별도|인분|인당|1인|개|세트|박스|kg|ml|g\b|시간|박|부터|평|건|장|당|병|송이|다발|코스|부가세|VAT|분|년|주/i.test(price)
+}
 
 export function profileGaps(p: ContentProfile): { key: GapKey; label: string; why: string }[] {
   const out: { key: GapKey; label: string; why: string }[] = []
@@ -287,6 +302,9 @@ export function profileGaps(p: ContentProfile): { key: GapKey; label: string; wh
   else if (TITLE_ONLY.test(p.speaker)) out.push({ key: 'speaker', label: '말하는 사람 이름', why: `'${p.speaker}' 처럼 직함만 적으면 다른 도구가 엉뚱한 실명을 붙일 수 있어요 — 이름도 적어 주세요` })
   // D-228 재료 — 없으면 숫자 · 후기 · 혜택 자리를 [대괄호] 로 비워 둬요(지어내지 않음)
   if (!p.reviews) out.push({ key: 'reviews', label: '후기 수 · 평점', why: '카드뉴스 첫 장 · 블로그 소개 표에 믿음을 주는 숫자로 들어가요' })
+  // D-234 규칙집 ⟲4차 — 후기 출처 · 가격 단위가 비면 다른 도구가 지어내거나 바꿔 쓴다
+  else if (!p.reviewSource) out.push({ key: 'reviewSource', label: '후기 출처', why: '자사몰 · 매장 · 플레이스처럼 — 비우면 다른 도구가 후기 위치를 지어내거나 다른 플랫폼 이름을 넣어요' })
+  if (p.price && priceWithoutUnit(p.price)) out.push({ key: 'price', label: '가격 단위', why: `'${p.price}' 에 단위가 없어요 — '1회' · '월' · '공임' 처럼 적지 않으면 '월 ○원' 같은 오해 문구가 나와요` })
   if (!p.voice) out.push({ key: 'voice', label: '실제 고객 한마디', why: '카드뉴스 · 블로그에 고객의 말로 들어가요(동의 받은 말만)' })
   // 기한 지난 혜택은 맨 앞에 — 날짜가 걸린 일이라 위 3개 안에 보여야 한다
   if (p.offerExpired) out.unshift({ key: 'offer', label: '이번 달 혜택', why: `적어 둔 혜택("${p.offerExpired}")의 기한이 지났어요 — 새 기한을 적거나 지워 주세요` })
@@ -299,9 +317,10 @@ const TITLE_ONLY = /^(?:대표|대표님|원장|원장님|실장|팀장|이사|�
 /**
  * D-229 규칙집 0장 — 브리프 6칸(업체 / 독자 / 알리는 것 / 화자+이름 / 사실 목록 / 넣지 말 것).
  * '넣지 말 것' 은 기본 금지 목록이 늘 붙으므로 비지 않는다. 독자가 업종 견본이면 채운 것으로 세되 '견본' 이라고 알린다.
+ * D-234 규칙집 ⟲4차 — 7칸(+ 구매·문의처): 구매처가 비면 다른 도구가 계정 기본 업체의 판매 플랫폼 이름으로 채웠다(꽃집 카드 5/5).
  */
 export interface BriefSlot {
-  key: 'company' | 'target' | 'item' | 'speaker' | 'facts' | 'avoid'
+  key: 'company' | 'target' | 'item' | 'speaker' | 'facts' | 'contact' | 'avoid'
   label: string
   ok: boolean
   note: string
@@ -311,7 +330,7 @@ export interface BriefSlot {
 export function materialList(p: ContentProfile): string[] {
   return [
     p.years !== null && p.years >= 1 ? `경력 ${p.years}년` : '',
-    p.reviews,
+    p.reviews ? (p.reviewSource ? `${p.reviews} (후기 출처: ${p.reviewSource})` : p.reviews) : '',
     p.voice,
     p.offer,
     p.price,
@@ -319,6 +338,11 @@ export function materialList(p: ContentProfile): string[] {
     p.differ,
     ...p.strengths.filter((s) => !/^설립 \d+년째$/.test(s)),
   ].filter(Boolean)
+}
+
+/** D-234 구매·문의처 — 실제로 받을 곳(전화 · 판매 채널 · 홈페이지 · 주소) */
+export function contactOf(p: ContentProfile): string[] {
+  return [p.phone, p.channel, p.homepage, p.address].map((x) => x.trim()).filter(Boolean)
 }
 
 /** 규칙집 0-5 — 재료 7개 이상이면 카드 5안 · 영상 5자리가 서로 다른 각도로 산다 */
@@ -332,6 +356,7 @@ export function briefSlots(p: ContentProfile, source: ProfileSource): BriefSlot[
     { key: 'item', label: '알리는 것', ok: source.item !== 'industry', note: source.item === 'industry' ? '업종 말뿐이에요 — 대표 상품을 적어 주세요' : p.item },
     { key: 'speaker', label: '화자 · 이름', ok: !!p.speaker && !TITLE_ONLY.test(p.speaker), note: !p.speaker ? '비어 있어요' : TITLE_ONLY.test(p.speaker) ? '직함만 있어요 — 이름도' : p.speaker },
     { key: 'facts', label: '사실 목록', ok: facts >= 1, note: `재료 ${facts}/${MATERIAL_GOAL}` },
+    { key: 'contact', label: '구매·문의처', ok: contactOf(p).length > 0, note: contactOf(p).join(' · ') || '비어 있어요 — 전화 · 매장 · 링크 중 하나' },
     { key: 'avoid', label: '넣지 말 것', ok: true, note: p.avoid.length ? `기본 금지 + 업체가 막은 것 ${p.avoid.length}개` : '기본 금지 목록' },
   ]
 }

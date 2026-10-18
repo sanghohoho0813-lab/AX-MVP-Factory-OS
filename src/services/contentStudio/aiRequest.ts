@@ -8,11 +8,18 @@
  * 그래서 홍보 정보로 6줄을 만들어 준다. 비어 있는 사실은 적지 않는다(지어낸 값을 넣지 않게).
  * D-229 콘텐츠 작성 규칙집(1~3차 합본) — 브리프 보조 칸(채널 · 길이 · 지역 방침 · 걱정 · 흔한 반박)과 업종별 마지막 제안,
  *        업체가 막은 말을 함께 적는다. 길이는 숫자로(규칙집 0-9: 길이 선택만으로는 넘친 적이 있다).
+ * D-234 규칙집 ⟲4차(이상한AI 4차 실험 — 규칙집을 그대로 넣어 본 검증):
+ *  - 7칸(+ 구매·문의처) — 구매처가 비면 계정 기본 업체의 판매 플랫폼 이름이 들어왔다(꽃집 카드 5/5). 후기에는 출처까지.
+ *  - 이름표 줄 그대로 — '화자는 ~입니다' 처럼 문장으로 쓰면 블로그 작성자 소개 표가 계정 업체 정보로 채워졌다(2/2), 이름표 줄은 4/4 바뀌었다.
+ *  - 받은 숫자의 뜻을 바꾸지 말라고 적는다(후기 N개 → 'N명이 선택' 이 10/12) · 가격은 단위 그대로.
+ *  - 규제 업종 4곳(건강기능식품 · 보험 · 부동산 중개 · 법률) 금지 목록 + 필수 안내 문구 + 카드뉴스는 두 안만.
  */
 import { industryDef } from '../siteBuilder/industry'
 import type { ContentProfile } from './profile'
 import { contentLib } from './library'
-import { isB2B, offerLine, withoutArea, type BlogType, type ContentKind, type ShortLen } from './generate'
+import { cardFiveTypes, isB2B, noOfferAd, noPriceAd, noReviewAd, noVoiceAd, offerLine, withoutArea, AD_TYPE_LABEL, type BlogType, type ContentKind, type ShortLen } from './generate'
+import { contactOf } from './profile'
+import { regulatedOf } from './regulated'
 
 /** 계정 업종이 끼어들던 것 + 우리 규칙(지어낸 출처 · 깎아내리기) */
 const NEVER = [
@@ -23,13 +30,44 @@ const NEVER = [
   '다른 업체 · 다른 상품을 깎아내리는 말',
 ]
 
-/** 업종마다 광고 규정 — 의료는 예약 · 상담만 */
-function ruleLine(p: ContentProfile): string {
-  if (p.industry === 'health') return '의료광고 규정: 가격 · 할인 · 비교 · 순위 · 전후 사진 · 후기 · 효과 보장은 쓰지 마세요. 끝맺음은 예약 · 상담만.'
-  if (p.industry === 'professional') return '전문직 광고 규정: 승소율 · 성공률 장담, 의뢰인 후기, 다른 사무소 비교는 쓰지 마세요.'
-  if (p.industry === 'education') return '교육 광고: 합격률 · 성적 향상 장담은 쓰지 마세요.'
-  if (p.industry === 'food') return '식품 광고: 건강 · 치료 효과(면역력 · 다이어트에 좋은)는 쓰지 마세요.'
-  return ''
+/** 업종마다 광고 규정 — 의료는 예약 · 상담만. D-234 규제 업종은 규칙집 5장 표(금지 · 꼭 넣을 문구 · 카드뉴스 두 안) */
+function ruleLines(p: ContentProfile, kind?: ContentKind): string[] {
+  const rule = regulatedOf(p)
+  if (rule && rule.kind !== 'medical' && rule.kind !== 'education') {
+    const keep = cardFiveTypes(p).map((a) => AD_TYPE_LABEL[a].replace(/형$/, ''))
+    return [
+      `${rule.label} 광고 규정 — 넣지 말 것: ${rule.never.join(', ')}.`,
+      ...(rule.notice ? [`꼭 넣을 안내 문구(글 끝에 그대로): "${rule.notice}"`] : []),
+      ...(!kind || kind === 'cards' ? [`카드뉴스는 ${keep.join(' · ')} 안만 만드세요(전후 변화 · 문제 해결 · 권위 안은 쓰지 않기).`] : []),
+      '금지한 것을 다른 이름으로 바꿔 넣지 마세요(할인 → 1+1, 대출 알선 → 원스톱 안내, 상담 건수 → 경력 · 인원).',
+    ]
+  }
+  if (p.industry === 'health') return [`의료광고 규정: 가격 · 할인 · 비교 · 순위 · 전후 사진 · 후기 · 효과 보장은 쓰지 마세요. 끝맺음은 예약 · 상담만. 꼭 넣을 안내 문구: "${rule?.notice ?? ''}"`]
+  if (p.industry === 'professional') return ['전문직 광고 규정: 승소율 · 성공률 장담, 의뢰인 후기, 다른 사무소 비교는 쓰지 마세요.']
+  if (p.industry === 'education') return ["교육 광고: 합격률 · 성적 향상 장담, 압박하는 말('지금 안 하면 후회')은 쓰지 마세요."]
+  if (p.industry === 'food') return ['식품 광고: 건강 · 치료 효과(면역력 · 다이어트에 좋은)는 쓰지 마세요.']
+  return []
+}
+
+/** 직함 낱말 — '대표 김한솔' · '김한솔 대표' 둘 다 읽는다 */
+const TITLE_WORD = /^(?:대표|원장|실장|팀장|이사|사장|소장|관장|점장|매니저|디자이너|선생님|강사|MD|변호사|세무사|노무사|약사|부장|과장|차장|주임|셰프|플로리스트|중개사|공인중개사|설계사|코치|에디터)(?:님)?$/
+
+/** D-234 이름표 줄의 화자 — `화자: [업체명]의 [직함] '[이름]'` (규칙집 0장 필수 7칸) */
+export function speakerLine(p: ContentProfile): string {
+  const sp = p.speaker.trim()
+  if (!sp) return `화자: ${p.company} (사람 이름은 쓰지 마세요).`
+  const t = sp.split(/\s+/)
+  if (t.length === 1) return TITLE_WORD.test(sp) ? `화자: ${p.company}의 ${sp} (사람 이름은 쓰지 마세요).` : `화자: ${p.company}의 '${sp}' (이름은 이것만 쓰세요).`
+  const nameFirst = TITLE_WORD.test(t[t.length - 1]) && !TITLE_WORD.test(t[0])
+  const title = nameFirst ? t[t.length - 1] : t.slice(0, -1).join(' ')
+  const name = nameFirst ? t.slice(0, -1).join(' ') : t[t.length - 1]
+  return `화자: ${p.company}의 ${title} '${name}' (이름은 이것만 쓰세요).`
+}
+
+/** D-234 구매·문의처 줄 — 비면 판매처 · 플랫폼 이름을 넣지 말라고 적는다(빈칸을 계정 업체 플랫폼으로 채웠다) */
+export function contactLine(p: ContentProfile): string {
+  const c = contactOf(p)
+  return c.length ? `구매·문의처: ${[p.phone ? `전화 ${p.phone}` : '', p.channel, p.homepage, p.address ? `매장 ${p.address}` : ''].filter(Boolean).join(' / ')}${p.hours ? ` (${p.hours})` : ''}.` : '구매·문의처: (아직 없음 — 판매처 · 플랫폼 이름을 넣지 마세요).'
 }
 
 export function aiRequestFacts(p: ContentProfile): string[] {
@@ -38,12 +76,12 @@ export function aiRequestFacts(p: ContentProfile): string[] {
     ...p.strengths.filter((s) => !/^설립 \d+년째$/.test(s)).slice(0, 5),
     p.services.length ? `하는 일: ${p.services.slice(0, 5).join(' · ')}` : '',
     p.differ ? `다른 곳과 다른 점: ${p.differ}` : '',
-    p.reviews ? `후기: ${p.reviews}` : '',
-    p.voice && p.industry !== 'health' && p.industry !== 'professional' ? `실제 고객 한마디: "${p.voice}"` : '',
-    offerLine(p) && p.industry !== 'health' ? `이번 달 혜택: ${offerLine(p)}` : '',
-    p.price ? `가격 · 조건: ${p.price}` : '',
+    // D-234 후기는 출처까지(출처가 없으면 다른 도구가 후기 위치를 지어냈다) · 의료 · 건강기능식품 · 법률은 후기를 싣지 않는다
+    p.reviews && !noReviewAd(p) ? `후기·평점: ${p.reviews} / 후기 출처: ${p.reviewSource || '(적지 않음 — 후기를 볼 수 있는 곳을 쓰지 마세요)'}` : '',
+    p.voice && !noVoiceAd(p) ? `실제 고객 한마디: "${p.voice}"` : '',
+    offerLine(p) && !noOfferAd(p) ? `이번 달 혜택: ${offerLine(p)}` : '',
+    p.price && !noPriceAd(p) ? `가격: ${p.price} (단위 그대로 — 1회 가격을 '월' 로 바꾸지 마세요)` : '',
     p.shipping ? `배송 · 교환 조건: ${p.shipping}` : '',
-    p.phone ? `연락: ${p.phone}${p.hours ? ` · ${p.hours}` : ''}${p.channel ? ` · ${p.channel}` : ''}` : '',
   ].filter(Boolean)
 }
 
@@ -108,12 +146,13 @@ function regionLine(p: ContentProfile, o: AiRequestOpts): string {
   }
 }
 
-/** 붙여 넣을 글(브리프 6칸 + 고른 채널이면 채널 · 길이 · 지역 · 걱정 · 반박 · 마지막 제안 + 규정 한 줄) */
+/**
+ * 붙여 넣을 글 — 규칙집 ⟲4차 필수 7칸을 이름표 줄 그대로(업체 / 독자 / 알리는 것 / 화자 / 사실 목록 / 구매·문의처 / 넣지 말 것)
+ * + 고른 채널이면 채널 · 길이 · 지역 · 걱정 · 반박 · 마지막 제안 + 업종 규정.
+ */
 export function aiRequestText(p: ContentProfile, o: AiRequestOpts = {}): string {
   const where = [p.region, industryDef(p.industry).label].filter(Boolean).join(', ')
   const facts = aiRequestFacts(p)
-  const rule = ruleLine(p)
-  const titleOnly = /^(?:대표|대표님|원장|원장님|실장|팀장|이사|사장|소장|관장|점장|매니저|디자이너|선생님|강사|MD)$/.test(p.speaker)
   const len = lengthLine(p, o)
   const region = regionLine(p, o)
   const never = [...NEVER, ...p.avoid.map((w) => `"${w}"`)]
@@ -121,22 +160,28 @@ export function aiRequestText(p: ContentProfile, o: AiRequestOpts = {}): string 
     `업체: ${p.company}${where ? `(${where})` : ''}.`,
     `독자(보는 사람): ${p.target}.`,
     `알리는 것: ${p.company}의 ${p.item}${p.services.length ? `(${p.services.slice(0, 3).join(' · ')})` : ''}.`,
-    p.speaker && !titleOnly ? `화자: ${p.company} ${p.speaker}(이름은 이것만 쓰세요).` : `화자: ${p.company}${p.speaker ? ` ${p.speaker}` : ''}(사람 이름은 쓰지 마세요).`,
+    speakerLine(p),
     ...(o.kind ? [`채널 · 종류: ${o.kind === 'blog' && o.blogType === 'review' ? '네이버 블로그 체험단 후기' : AI_CHANNEL_LABEL[o.kind]}.`] : []),
     ...(len ? [`길이: ${len}.`] : []),
     ...(region ? [`지역: ${region}.`] : []),
     ...(p.objection ? [`독자의 걱정 1개: "${p.objection}"`] : []),
     ...(p.rebuttal ? [`흔한 반박 1개: "${p.rebuttal}" — 이 생각을 풀어 주며 시작하세요.`] : []),
-    `사실 목록 — 이 목록 밖의 숫자 · 혜택 · 후기는 쓰지 마세요:\n${facts.length ? facts.map((f) => `- ${f}`).join('\n') : '- (적어 둔 사실이 없어요 — 숫자 · 혜택 · 후기를 넣지 마세요)'}`,
+    `사실 목록 — 이 목록 밖의 숫자 · 혜택 · 후기 · 정책 · 사례는 쓰지 마세요. 받은 숫자의 뜻(후기 수 · 평점 · 가격 단위)을 바꾸지 마세요:\n${facts.length ? facts.map((f) => `- ${f}`).join('\n') : '- (적어 둔 사실이 없어요 — 숫자 · 혜택 · 후기를 넣지 마세요)'}`,
+    contactLine(p),
     ...(o.kind && o.kind !== 'keywords' ? [`${contentLib(p.industry).offerRule}.`] : []),
-    `넣지 마세요: ${never.join(', ')}.`,
-    ...(rule ? [rule] : []),
+    `넣지 말 것: ${never.join(', ')}.`,
+    ...ruleLines(p, o.kind),
   ].join('\n')
 }
 
-/** 화면에만 보이는 쓰는 법(복사에는 안 들어감) */
+/** 화면에만 보이는 쓰는 법(복사에는 안 들어감) — D-234 규칙집 ⟲4차 부록 A 를 더했다 */
 export const AI_REQUEST_TIPS = [
-  '다음 단계로 넘길 때마다(주제 → 본문, 기획 → 대본) 이 요청문을 다시 붙여 넣으세요 — "넣지 마세요" 는 다음 단계로 넘어가지 않아요.',
+  '다음 단계로 넘길 때마다(주제 → 본문, 기획 → 대본) 이 요청문을 줄 이름 그대로 다시 붙여 넣으세요 — "넣지 말 것" 은 다음 단계로 넘어가지 않아요.',
+  '넘기기 전에 넘어가는 칸의 숫자부터 고치세요 — 앞 단계에서 비틀린 숫자(\'고객 620명\')는 요청문을 다시 붙여도 고쳐지지 않았어요.',
+  '한 번 깨끗하게 나왔다고 요청문을 빼지 마세요 — 같은 입력도 다른 업종 이야기가 나왔다 안 나왔다 해요. 릴스 · 영상 기획은 요청문 없이 쓰지 마세요.',
   '계정 업종만 쓰는 기능(영상 광고 · 맞춤 추천)은 다른 업체 글에 쓰지 마세요 — 요청문을 무시하고 계정 업종으로 만들어요.',
-  '받은 글은 아래 [받은 글 점검] 에 붙여 넣어 한 번 더 보세요 — 숫자의 뜻이 바뀌거나 주지 않은 혜택 · 후기가 끼어들 수 있어요.',
+  '카드뉴스(광고 기획)에는 수정 요청 단추가 없어요 — 다시 만들거나 사람이 고치고, 기간 한정 문구(\'3월 한정\')는 실제 날짜로 고치세요.',
+  '영상 기획 · 대본은 숫자(% · 배수 · 기간)를 가장 많이 지어내요 — 숫자를 두 번 확인하세요.',
+  '키워드 검색량 조회는 하루 500번 한도에서 빠져요 — 한 번에 여러 개(최대 50개)를 같이 조회하세요.',
+  '받은 글은 아래 [받은 글 점검] 에 붙여 넣어 한 번 더 보세요 — 숫자의 뜻 · 가격 단위 · 판매처 이름이 바뀌거나 주지 않은 혜택 · 후기가 끼어들 수 있어요.',
 ]

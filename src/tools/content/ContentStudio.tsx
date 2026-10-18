@@ -38,6 +38,8 @@ import {
   angleVideoTitle,
   applyTone,
   cardFive,
+  cardFiveTypes,
+  riskyAdTypes,
   materialList,
   performanceBy,
   titleCandidates,
@@ -107,6 +109,7 @@ import {
   type Tone,
   type TopicType,
   type VolumeTier,
+  regulatedOf,
 } from '../../services/contentStudio'
 import { INDUSTRIES, type IndustryKey } from '../../services/siteBuilder'
 import { KR_PUBLIC_HOLIDAYS } from '../../services/daysOff'
@@ -162,11 +165,14 @@ function cardFivePack(profile: ContentProfile, keyword: string, topicType: Topic
   const ts = topicsFor(profile, keyword, today, variant)
   const items = cardFive(profile, { keyword, topic: ts.find((x) => x.type === topicType) ?? ts[0], pages, variant }, today)
   const mats = materialList(profile).length
+  const types = cardFiveTypes(profile)
+  // D-234 규제 업종은 두 안(교육 세 안) — 나머지 틀이 금지 표현을 다시 만든다(규칙집 ⟲4차 5-2)
+  const cut = types.length < CARD_FIVE.length ? ` 규제 업종이라 ${CARD_FIVE.filter((a) => !types.includes(a)).map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' · ')} 안은 뺐어요(사례 · 손실 압박 · 실적을 다시 만들기 쉬워요).` : ''
   return {
     key: 'cards5',
-    label: '카드뉴스 5안',
+    label: `카드뉴스 ${types.length}안`,
     fill: [],
-    note: mats < MATERIAL_GOAL ? `글 재료가 ${mats}개예요 — ${MATERIAL_GOAL}개 이상이면 5안이 서로 덜 비슷해져요(홍보 정보 › 글 재료).` : `글 재료 ${mats}개로 만들었어요. ${CARD_FIVE.map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')} 순서예요.`,
+    note: `${mats < MATERIAL_GOAL ? `글 재료가 ${mats}개예요 — ${MATERIAL_GOAL}개 이상이면 안끼리 덜 비슷해져요(홍보 정보 › 글 재료).` : `글 재료 ${mats}개로 만들었어요. ${types.map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')} 순서예요.`}${cut}`,
     items,
     saved: items.map(() => null),
     touched: items.map(() => false),
@@ -233,6 +239,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const made = useMemo(() => store.items.map((i) => ({ kind: i.kind, topicType: i.input.topicType, purpose: i.input.purpose, createdAt: i.createdAt })), [store.items])
   const picks = useMemo(() => firstPicks(profile, today, made), [profile, today, made])
   const findWords = useMemo(() => keywordGroups(profile).find((g) => g.key === 'find')?.words.slice(0, 4) ?? [], [profile])
+  // D-234 규제 업종 — 카드뉴스 유형 중 권하지 않는 것(규칙집 ⟲4차 5-2)
+  const regulated = useMemo(() => regulatedOf(profile), [profile])
+  const riskyCards = useMemo(() => riskyAdTypes(profile), [profile])
   const archiveRows = useMemo(() => latestByRoot(store.items), [store.items])
   const situationNow = useMemo(() => situationsFor(profile, today, holidays).filter((x) => x.now).length, [profile, today, holidays])
   // D-230 제목 각도 — 블로그(우리 글) · 긴 영상만. 이 키워드로 저장한 글의 각도는 빼고 후보 5개
@@ -707,10 +716,18 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           {kind === 'cards' && (
             <fieldset className="flex flex-col gap-1.5" data-testid="content-adtype">
               <legend className="t-sub mb-1 font-semibold text-slate-700">어떤 마음을 움직일까요?</legend>
+              {riskyCards.length > 0 && (
+                <p className="t-meta mb-1 rounded-(--radius-control) bg-amber-50 px-3 py-2 break-keep text-amber-900 ring-1 ring-amber-200" data-testid="content-adtype-regulated">
+                  {regulated?.label} 업종 — {riskyCards.map((a) => AD_TYPE_LABEL[a]).join(' · ')}은 금지한 표현(사례 · 금액 · 손실 압박 · 실적)을 다시 만들기 쉬워요. {cardFiveTypes(profile).map((a) => AD_TYPE_LABEL[a]).join(' · ')}을 권해요.
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {AD_TYPES.map((a) => (
-                  <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? TONE.fuchsia.on : `border-slate-200 bg-white ${TONE.fuchsia.hover}`}`}>
-                    <span className={`t-sub font-semibold break-keep ${adType === a ? 'text-fuchsia-900' : 'text-slate-800'}`}>{AD_TYPE_LABEL[a]}</span>
+                  <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} data-risky={riskyCards.includes(a) ? '1' : undefined} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? TONE.fuchsia.on : `border-slate-200 bg-white ${TONE.fuchsia.hover}`}`}>
+                    <span className={`t-sub inline-flex flex-wrap items-center gap-1.5 font-semibold break-keep ${adType === a ? 'text-fuchsia-900' : 'text-slate-800'}`}>
+                      {AD_TYPE_LABEL[a]}
+                      {riskyCards.includes(a) && <span className="t-meta rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">권하지 않음</span>}
+                    </span>
                     <span className="t-meta break-keep text-slate-500">{AD_TYPE_HINT[a]}</span>
                   </button>
                 ))}
@@ -753,9 +770,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
             <button type="button" onClick={openCardFive} className="tap flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border-2 border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-center hover:border-fuchsia-500" data-testid="content-cards5">
               <span className="t-body inline-flex items-center gap-1.5 font-semibold text-fuchsia-900">
                 <Layers className="size-4" aria-hidden="true" />
-                5안 한 번에 만들기
+                {cardFiveTypes(profile).length}안 한 번에 만들기
               </span>
-              <span className="t-meta break-keep text-fuchsia-800">{CARD_FIVE.map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')}</span>
+              <span className="t-meta break-keep text-fuchsia-800">{cardFiveTypes(profile).map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')}</span>
             </button>
           )}
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
@@ -1138,6 +1155,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
   // D-228 글 재료 — 적어 둔 것만(칸 수 · '채운 칸' 에는 세지 않는다)
   const material = [
     { label: '후기', value: profile.reviews },
+    { label: '후기 출처', value: profile.reviews ? profile.reviewSource : '' },
     { label: '고객 한마디', value: profile.voice ? `"${profile.voice}"` : '' },
     { label: '이번 달 혜택', value: offerLine(profile) },
     { label: '가격 · 조건', value: profile.price },
@@ -1145,7 +1163,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
   ].filter((m) => m.value)
   // D-227 칸 7개는 접어 둔다 — 머리 띠(숫자) · 채울 칸 안내만 늘 보이게. 펼침은 이 기기에 기억
   const [open, setOpen] = useFold('content.profile', false)
-  // D-229 규칙집 0장 — 브리프 6칸 · 재료 n/7
+  // D-229 규칙집 0장 — 브리프 칸 · 재료 n/7 (D-234 ⟲4차: 구매·문의처를 더해 7칸)
   const slots = briefSlots(profile, source)
   const filled = slots.filter((x) => x.ok).length
   return (
@@ -1182,7 +1200,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       <div className="flex flex-col gap-3 p-4 sm:p-5">
       <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
         <span className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-keep">
-          <b className="font-bold text-violet-900">브리프 6칸 · {filled}/6</b>
+          <b className="font-bold text-violet-900">브리프 {slots.length}칸 · {filled}/{slots.length}</b>
           <span className="t-meta font-semibold text-violet-700">{slots.find((x) => x.key === 'facts')?.note}</span>
           <span className="t-meta text-slate-500">모든 글이 이 한 장에서 시작해요</span>
         </span>
@@ -1632,7 +1650,7 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
       .filter(Boolean)
   const [servicesText, setServicesText] = useState((overrides.services ?? []).join(', '))
   const [extraText, setExtraText] = useState((overrides.extraStrengths ?? []).join(', '))
-  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection' | 'reviews' | 'voice' | 'offer' | 'price' | 'speaker' | 'rebuttal' | 'shipping' | 'avoid', placeholder: string) => (
+  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection' | 'reviews' | 'reviewSource' | 'voice' | 'offer' | 'price' | 'speaker' | 'rebuttal' | 'shipping' | 'avoid', placeholder: string) => (
     <label className="flex flex-col gap-1.5">
       <span className="t-sub font-semibold text-slate-700">{label}</span>
       <input className={inputClass} value={ov[key] ?? ''} placeholder={placeholder} onChange={(e) => setOv((p) => ({ ...p, [key]: e.target.value }))} data-testid={`content-ov-${key}`} />
@@ -1701,6 +1719,8 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
           <p className="t-meta break-keep text-slate-600">적어 둔 것만 블로그 · 카드뉴스 · 카톡에 들어가요. 비워 두면 숫자 · 후기 · 혜택을 지어내지 않고 뺍니다.</p>
         </div>
         {field('후기 수 · 평점', 'reviews', '예: 네이버 후기 320개 · 평점 4.8')}
+        {/* D-234 규칙집 ⟲4차 — 후기 출처가 비면 다른 도구가 후기 위치를 지어내거나 다른 플랫폼 이름을 넣었다 */}
+        {field('후기 출처(손님이 어디서 볼 수 있나요)', 'reviewSource', '예: 자사몰 · 매장 방명록 · 네이버 플레이스')}
         {field('실제 고객 한마디(받은 그대로)', 'voice', '예: 끝나고도 먼저 연락 주셔서 놀랐어요')}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
           {field('이번 달 혜택', 'offer', '예: 첫 방문 견적 무료')}
@@ -1710,7 +1730,8 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
           </label>
         </div>
         <p className="t-meta -mt-2 break-keep text-slate-500">끝나는 날이 지나면 혜택은 글에서 저절로 빠져요.</p>
-        {field('가격 · 조건', 'price', '예: 욕실 리모델링 300만 원부터 · 자재 포함')}
+        {field('가격 · 조건(단위까지)', 'price', '예: 1회 32,000원 · 공임 3만 원(부품값 별도) · 300만 원부터')}
+        <p className="t-meta -mt-2 break-keep text-slate-500">'1회' · '월' · '공임' 처럼 단위를 같이 적어 주세요 — 단위가 없으면 다른 도구가 '월 ○원' 처럼 바꿔 써요.</p>
         {field('배송 · 교환 조건', 'shipping', '예: 전국 택배 · 3만 원 이상 무료 배송 · 7일 안 교환')}
         {field('글에서 말하는 사람(직함과 이름)', 'speaker', '예: 대표 김OO · 원장 이OO')}
         <p className="t-meta -mt-2 break-keep text-slate-500">직함만 적으면 다른 도구가 엉뚱한 실명을 붙일 수 있어요 — 이름까지 적어 주세요.</p>
@@ -1812,7 +1833,7 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
   const resultRef = useRef<HTMLDivElement | null>(null)
   const req = useMemo(() => aiRequestText(profile, { kind: gotKind, keyword: mainKeyword(profile) }), [profile, gotKind])
   // 사실 목록이 얇으면 먼저 채우라고 — 재료가 없을수록 바깥 도구가 지어낸다
-  const thin = profileGaps(profile).filter((g) => ['differ', 'reviews', 'voice', 'offer'].includes(g.key))
+  const thin = profileGaps(profile).filter((g) => ['differ', 'reviews', 'reviewSource', 'price', 'voice', 'offer'].includes(g.key))
   const warn = result?.filter((c) => c.level !== 'info') ?? []
   const run = () => {
     setResult(draftChecks(gotKind, [{ label: '', text: got.trim() }], profile.industry, undefined, profile))

@@ -82,6 +82,14 @@ import {
   type ContentProfile,
   type KakaoPurpose,
   type MadeItem,
+  regulatedOf,
+  cardFiveTypes,
+  riskyAdTypes,
+  noticeOf,
+  speakerLine,
+  contactLine,
+  priceWithoutUnit,
+  AI_REQUEST_TIPS,
 } from '../contentStudio'
 import type { IndustryKey, SiteDoc } from '../siteBuilder'
 
@@ -554,7 +562,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   check('C105 글 점검(draftChecks)에 사실 대조가 붙음 · 프로필 없이 부르면 예전 그대로', dc.includes('source') && dc.includes('holes') && !draftChecks('blog', [{ label: '', text: bad }], mp.industry).some((x) => x.key === 'source'), dc)
   check('C106 검색량 등급 — 1,000↑ 많이 · 100↑ 보통 · 10↑ 적게 · 10 아래 · "< 10" 거의 안 찾음 · 숫자 없음', volumeTier({ total: 5790, small: false }) === 'high' && volumeTier({ total: 100, small: false }) === 'mid' && volumeTier({ total: 99, small: false }) === 'low' && volumeTier({ total: 9, small: false }) === 'tiny' && volumeTier({ total: 0, small: true }) === 'tiny' && volumeTier({ total: null, small: false }) === 'none')
   const req = aiRequestText(mp)
-  check('C107 다른 AI 도구 요청문 — 업체 · 독자 · 알리는 것 · 화자(이름 하나) · 사실 목록(밖은 금지) · 넣지 말 것(자금 · 컨설팅 · 지어낸 출처)', /^업체: 한솔정밀\(주\)\(경기 화성시, /.test(req) && req.includes('독자(보는 사람):') && req.includes('알리는 것: 한솔정밀(주)의 정밀 금속부품') && req.includes('화자: 한솔정밀(주) 대표 김한솔(이름은 이것만 쓰세요)') && req.includes('이 목록 밖의 숫자 · 혜택 · 후기는 쓰지 마세요') && req.includes('- 설립 12년째(2014년)') && req.includes('- 후기: 네이버 후기 1,240개 · 평점 4.8') && req.includes('- 이번 달 혜택: 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && req.includes('정책자금 · 지원금 · 컨설팅') && !req.includes('010-9999-8888'), req)
+  check('C107 다른 AI 도구 요청문 — 업체 · 독자 · 알리는 것 · 화자(이름 하나) · 사실 목록(밖은 금지) · 넣지 말 것(자금 · 컨설팅 · 지어낸 출처)', /^업체: 한솔정밀\(주\)\(경기 화성시, /.test(req) && req.includes('독자(보는 사람):') && req.includes('알리는 것: 한솔정밀(주)의 정밀 금속부품') && req.includes("화자: 한솔정밀(주)의 대표 '김한솔' (이름은 이것만 쓰세요)") && req.includes('이 목록 밖의 숫자 · 혜택 · 후기 · 정책 · 사례는 쓰지 마세요') && req.includes('- 설립 12년째(2014년)') && req.includes('- 후기·평점: 네이버 후기 1,240개 · 평점 4.8 / 후기 출처:') && req.includes('- 이번 달 혜택: 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && req.includes('정책자금 · 지원금 · 컨설팅') && !req.includes('010-9999-8888'), req)
   const reqE = aiRequestText(ep)
   const reqH = aiRequestText(hp)
   check('C108 요청문 — 사실 없는 업체는 "숫자 · 혜택 · 후기를 넣지 마세요" · 이름 없으면 "사람 이름은 쓰지 마세요" · 의료는 규정 줄 · 혜택 · 한마디 빼기 · 설립 연수 줄 하나만', reqE.includes('숫자 · 혜택 · 후기를 넣지 마세요') && reqE.includes('사람 이름은 쓰지 마세요') && reqH.includes('의료광고 규정') && !reqH.includes('무상') && !reqH.includes('납기를') && aiRequestFacts(mp).filter((f) => f.startsWith('설립')).length === 1, reqE)
@@ -568,7 +576,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const { profile: rp, source: rs } = buildProfile(full, today, rov)
   check('C110 브리프 새 칸 — 흔한 반박(따옴표 벗김) · 배송 · 교환 조건 · 넣지 말 것(쉼표로 나눔 · 한 글자 버림)', rp.rebuttal === '소량은 아무 데나 맡겨도 똑같다' && rp.shipping.startsWith('전국 택배') && rp.avoid.join() === '최저가,할인' && normalizeOverrides({ avoid: 'x'.repeat(300) }).avoid?.length === 200, { r: rp.rebuttal, a: rp.avoid })
   const slots = briefSlots(rp, rs)
-  check('C111 브리프 6칸 — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 넣지 말 것 / 직함만 적은 화자는 비었다고 · 재료 n/7', slots.map((x) => x.key).join() === 'company,target,item,speaker,facts,avoid' && slots.find((x) => x.key === 'speaker')!.ok === false && slots.find((x) => x.key === 'speaker')!.note.includes('이름') && /재료 \d+\/7/.test(slots.find((x) => x.key === 'facts')!.note) && slots.find((x) => x.key === 'avoid')!.note.includes('2개') && profileGaps(rp).some((g) => g.key === 'speaker' && g.why.includes('이름도')), slots)
+  check('C111 브리프 7칸(D-234 ⟲4차) — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 / 직함만 적은 화자는 비었다고 · 재료 n/7', slots.map((x) => x.key).join() === 'company,target,item,speaker,facts,contact,avoid' && slots.find((x) => x.key === 'speaker')!.ok === false && slots.find((x) => x.key === 'speaker')!.note.includes('이름') && /재료 \d+\/7/.test(slots.find((x) => x.key === 'facts')!.note) && slots.find((x) => x.key === 'avoid')!.note.includes('2개') && profileGaps(rp).some((g) => g.key === 'speaker' && g.why.includes('이름도')), slots)
   check('C112 재료 목록 — 경력 · 배송 조건 · 차별점 · 인증(설립 N년째는 경력으로 한 번만)', materialList(rp).includes('경력 12년') && materialList(rp).some((m) => m.startsWith('전국 택배')) && !materialList(rp).some((m) => /^설립/.test(m)) && materialList(ep).length === 0, materialList(rp))
 
   // 블로그 — 규칙집 3-1
@@ -732,8 +740,8 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
 
   const five = cardFive(fp, { keyword: kw, topic: tp, pages: 7 }, today)
   const fiveH = cardFive(hp, { keyword: kw, topic: topicsFor(hp, kw, today)[0] }, today)
-  check('C133 카드뉴스 5안 — 순서 고정(망설임 → 고민 → 전후 → 궁금증 → 기록) · 탭 이름 = 유형 · 5안 모두 다른 글 · 첫 장 모두 다름 · 7장 · 제목 끝에 유형 · 의료 전후는 과정만 안내',
-    CARD_FIVE.join() === 'objection,problem,before,curious,proof' && five.map((x) => x.draft.input.adType).join() === CARD_FIVE.join() && five.map((x) => x.tab).join() === '망설임 풀기,고민 공감,전후 변화,궁금증,기록 증명' && new Set(five.map((x) => contentHash('cards', x.draft.blocks))).size === 5 && new Set(five.map((x) => x.draft.blocks[0].text)).size === 5 && five.every((x) => x.draft.input.pages === 7 && x.draft.title.endsWith(AD_TYPE_LABEL[x.draft.input.adType!])) && fiveH[2].draft.notes.some((n) => n.includes('전후 비교를 쓰지 않아요')),
+  check('C133 카드뉴스 5안 — 순서 고정(망설임 → 고민 → 전후 → 궁금증 → 기록) · 탭 이름 = 유형 · 5안 모두 다른 글 · 첫 장 모두 다름 · 7장 · 제목 끝에 유형 · 의료는 두 안(D-234) · 의료 전후는 과정만 안내',
+    CARD_FIVE.join() === 'objection,problem,before,curious,proof' && five.map((x) => x.draft.input.adType).join() === CARD_FIVE.join() && five.map((x) => x.tab).join() === '망설임 풀기,고민 공감,전후 변화,궁금증,기록 증명' && new Set(five.map((x) => contentHash('cards', x.draft.blocks))).size === 5 && new Set(five.map((x) => x.draft.blocks[0].text)).size === 5 && five.every((x) => x.draft.input.pages === 7 && x.draft.title.endsWith(AD_TYPE_LABEL[x.draft.input.adType!])) && fiveH.map((x) => x.draft.input.adType).join() === 'objection,curious' && makeDraft(hp, { kind: 'cards', keyword: kw, adType: 'before' }, today).notes.some((n) => n.includes('전후 비교를 쓰지 않아요')),
     five.map((x) => `${x.tab}: ${x.draft.blocks[0].text}`))
 
   const ns = normalizeStats({ views: 1200.7, saves: -3, inquiries: '5', at: '2026-10-16T09:00:00Z' })
@@ -752,6 +760,147 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   ]
   const perf = performanceBy(perfItems)
   check('C136 무엇이 잘 됐나 — 각도 · 카드 유형 · 주제별로 더함 · 문의 → 저장 → 조회 순 · 숫자 없는 글은 빼고', perf.length === 2 && perf[0].key === 'angle:fail' && perf[0].n === 2 && perf[0].inquiries === 3 && perf[0].views === 800 && perf[1].key === 'ad:objection' && perfKey(perfItems[3]).key === 'topic:blog:faq' && perfKey(perfItems[0]).label.includes('실패'), perf)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-234 콘텐츠 작성 규칙집 ⟲4차(이상한AI 4차 실험 — 규칙집 실전 검증 · 규제 업종 4곳) 대조                    */
+/* ------------------------------------------------------------------ */
+{
+  const rec = (id: string, companyName: string, businessCategory: string, businessItem: string) => normalizeClientOps({ id, companyName, businessCategory, businessItem, businessAddress: '서울특별시 강남구 테헤란로 1', companyPhone: '02-555-1234', establishedAt: '2018-04-01' })
+  const regOv = normalizeOverrides({ reviews: '후기 620개 · 평점 4.8', reviewSource: '자사몰', price: '1회 32,000원', speaker: '대표 박하나', offer: '첫 구매 1+1', offerUntil: '2026-10-31', voice: '먹고 나서 편해졌어요' })
+  const mk = (r: ReturnType<typeof rec>, ov = regOv) => buildProfile(r, today, ov).profile
+  const hf = mk(rec('r-hf', '바른장연구소', '도매 및 소매업', '유산균 · 건강기능식품'))
+  const ins = mk(rec('r-ins', '든든보험상담', '보험대리점', '보험 상담 · 보장 분석'))
+  const rl = mk(rec('r-rl', '햇살공인중개사사무소', '부동산업', '아파트 매매 · 전월세 중개'))
+  const lw = mk(rec('r-lw', '정의법률사무소', '법무 서비스', '교통사고 · 손해배상 소송'))
+  const md = buildProfile(full, today, { ...regOv, industry: 'health' }).profile
+  const edu = buildProfile(full, today, { ...regOv, industry: 'education' }).profile
+  const notReg = [
+    mk(rec('r-tax', '바른세무회계', '세무 서비스', '법인 기장 · 부동산 양도세 상담')),
+    mk(rec('r-cl', '맑은피부의원', '의원', '피부 관리 · 실손보험 청구 안내')),
+    mk(rec('r-food', '할매삼계탕', '음식점업', '홍삼 삼계탕')),
+    mk(rec('r-arch', '공간건축', '건축 설계', '건축 설계사무소 · 인테리어')),
+    mk(rec('r-labor', '한빛노무법인', '노무 서비스', '4대보험 신고 · 급여 아웃소싱')),
+  ]
+  check('D234-1 규제 업종 알아보기 — 건강기능식품 · 보험 · 부동산 중개 · 법률(상품 · 하는 일 · 이름) / 의료 · 교육은 업종 칸 / 세무사 부동산 양도세 · 병원 실손 청구 · 식당 홍삼 · 건축 설계사무소 · 4대보험은 규제 업종 아님(병원은 의료)',
+    regulatedOf(hf)?.kind === 'hfood' && regulatedOf(ins)?.kind === 'insurance' && regulatedOf(rl)?.kind === 'realty' && regulatedOf(lw)?.kind === 'law' && regulatedOf(md)?.kind === 'medical' && regulatedOf(edu)?.kind === 'education' && regulatedOf(fp) === null &&
+    regulatedOf(notReg[0]) === null && regulatedOf(notReg[1])?.kind === 'medical' && regulatedOf(notReg[2]) === null && regulatedOf(notReg[3]) === null && regulatedOf(notReg[4]) === null,
+    [hf, ins, rl, lw, ...notReg].map((x) => `${x.company}:${x.industry}:${regulatedOf(x)?.kind ?? '-'}`))
+
+  const regs = [hf, ins, rl, lw]
+  const noticeBad: string[] = []
+  for (const pp of [...regs, md]) {
+    const n = noticeOf(pp)
+    const t = topicsFor(pp, '', today)
+    const blog = plainText('blog', makeDraft(pp, { kind: 'blog', topic: t[0] }, today).blocks)
+    const intro = plainText('blog', makeDraft(pp, { kind: 'blog', topic: t.find((x) => x.type === 'intro') ?? t[1] }, today).blocks)
+    const cards = makeDraft(pp, { kind: 'cards', topic: t[0], adType: 'objection' }, today)
+    const vid = makeDraft(pp, { kind: 'video', topic: t[0] }, today)
+    const sh = plainText('shorts', makeDraft(pp, { kind: 'shorts', topic: t[0] }, today).blocks)
+    const end = vid.blocks.find((b) => b.label.endsWith('· 마무리'))!.text
+    const ok = !!n && blog.includes(n) && intro.includes(n) && plainText('cards', cards.blocks).includes(n) && sh.includes(n) && vid.blocks.find((b) => b.label === '설명란')!.text.includes(n) && (regulatedOf(pp)!.kind === 'realty' ? end.includes(`화면 아래 작은 글자: ${n}`) && !/^말:.*등록번호/m.test(end) : end.includes(n)) && (pp === md || cards.notes.some((x) => x.includes('필수 안내 문구')))
+    if (!ok) noticeBad.push(pp.company)
+  }
+  check('D234-2 필수 안내 문구 — 블로그(규칙집 · 소개 틀) · 카드 마지막 장 · 쇼츠 캡션 · 영상 마무리 · 설명란에 그대로(의료 개인차 · 의약품 아님 · 약관 · 중개사무소 정보 · 사실관계) · 부동산 정보는 말이 아니라 화면 글자 · 카드 메모에 "사람이 직접 넣기"', noticeBad.length === 0 && noticeOf(hf).includes('의약품이 아닙니다') && noticeOf(ins).includes('약관') && noticeOf(rl).startsWith('중개사무소 정보: 햇살공인중개사사무소 / 소재지 서울') && noticeOf(rl).includes('[중개사무소 등록번호]') && noticeOf(lw).includes('사실관계에 따라') && noticeOf(edu) === '' && noticeOf(fp) === '', noticeBad)
+
+  const promoBad: string[] = []
+  for (const pp of regs) {
+    for (const kind of CONTENT_KINDS) {
+      if (kind === 'keywords') continue
+      const t = topicsFor(pp, '', today)
+      const tx = plainText(kind, makeDraft(pp, { kind, topic: t[0], adType: 'proof', purpose: 'event' }, today).blocks)
+      const reviewHidden = regulatedOf(pp)!.kind === 'insurance' || regulatedOf(pp)!.kind === 'realty' || !tx.includes('620')
+      if (tx.includes('1+1') || (regulatedOf(pp)!.kind !== 'insurance' && regulatedOf(pp)!.kind !== 'realty' && tx.includes('편해졌어요')) || !reviewHidden) promoBad.push(`${pp.company}:${kind}`)
+    }
+  }
+  const mdBlog = plainText('blog', makeDraft(md, { kind: 'blog', topic: topicsFor(md, '', today)[0] }, today).blocks)
+  check('D234-3 판촉 · 후기 — 건강기능식품 · 보험 · 부동산 · 법률 글에 혜택(1+1) 0 · 건강기능식품 · 법률은 고객 한마디 · 후기 수 0 · 의료는 가격 0(가격 표시 금지)', promoBad.length === 0 && !mdBlog.includes('32,000') && plainText('blog', makeDraft(fp, { kind: 'blog', topic: topicsFor(fp, '', today)[0] }, today).blocks).length > 0, promoBad.slice(0, 5))
+
+  const regFive = cardFive(hf, { pages: 7 }, today)
+  check('D234-4 규제 업종 카드뉴스 — 망설임 풀기 · 궁금증 두 안만(교육은 + 고민 공감) · 권하지 않는 유형 = 고민 공감 · 전후 변화 · 기록 증명 · 손해 피하기 · 일반 업체는 5안 그대로 · 권하지 않는 유형으로 만들면 메모',
+    regFive.map((x) => x.draft.input.adType).join() === 'objection,curious' && cardFiveTypes(edu).join() === 'objection,problem,curious' && cardFiveTypes(fp).join() === CARD_FIVE.join() && riskyAdTypes(hf).join() === 'problem,before,proof,loss' && riskyAdTypes(edu).join() === 'before,proof,loss' && riskyAdTypes(fp).length === 0 &&
+    makeDraft(lw, { kind: 'cards', adType: 'proof' }, today).notes.some((n) => n.includes("'기록 증명형' 틀이 금지한 표현")) && !makeDraft(lw, { kind: 'cards', adType: 'objection' }, today).notes.some((n) => n.includes('틀이 금지한 표현')) &&
+    makeDraft(ins, { kind: 'kakao', purpose: 'event' }, today).notes.some((n) => n.includes('혜택 광고를 하지 않아요')),
+    regFive.map((x) => x.tab))
+
+  // 우리 엔진이 만든 글은 규제 업종에서도 거짓 경보 0
+  const regAlarm: unknown[] = []
+  let regDrafts = 0
+  for (const pp of [...regs, ...regs.map((x) => ({ ...x, reviews: '', reviewSource: '', price: '', offer: '', voice: '', speaker: '' }))]) {
+    for (const kind of CONTENT_KINDS) {
+      for (const topic of topicsFor(pp, '', today)) {
+        for (const adType of AD_TYPES) {
+          if (kind !== 'cards' && adType !== 'info') continue
+          const d = makeDraft(pp, { kind, topic, adType, purpose: 'event', shortLen: '30-60' }, today)
+          regDrafts += 1
+          const f = factChecks(plainText(d.kind, d.blocks), pp)
+          const dc = draftChecks(d.kind, d.blocks, pp.industry, undefined, pp).filter((c) => c.key === 'notice' || c.key === 'care')
+          if (f.length || dc.length) regAlarm.push({ co: pp.company, kind, adType, keys: [...f, ...dc].map((x) => x.key), text: (f[0] ?? dc[0]).text })
+        }
+      }
+    }
+  }
+  check(`D234-5 규제 업종 4곳에서 우리가 만든 글 ${regDrafts}편(재료 있음/없음)에는 거짓 경보 0 · 필수 안내 빠짐 0`, regAlarm.length === 0 && regDrafts > 150, regAlarm.slice(0, 3))
+
+  const pr = buildProfile(full, today, normalizeOverrides({ reviews: '후기 620개 · 평점 4.8', reviewSource: '자사몰', price: '1회 32,000원' })).profile
+  const bad4 = "지금 스마트스토어에서 신청하세요. 포털에서 누구나 후기 확인 가능해요. 월 3만 원이면 충분! 100명 중 96명이 만족, 만족도 96%. 효과는 두 배. 놓치면 3만 2천 원 손해예요.\n'OO 보장 범위' 꼭 보세요. 김OO님 부부도 그랬어요. 1+1 행사 중."
+  const k4 = factChecks(bad4, pr).map((x) => x.key)
+  const frame = factChecks('[상품] [유형] 카드 1 - [상품] [유형] 메시지 1', pr).map((x) => x.key)
+  const kong = buildProfile(full, today, normalizeOverrides({ price: '공임 3만 원(오일값 별도)' })).profile
+  const kongBad = factChecks('엔진오일 교환 3만 원? 11월까지만!', kong).map((x) => x.key)
+  const kongOk = factChecks('엔진오일 교환 공임 3만 원(오일값 별도)이에요.', kong).map((x) => x.key)
+  const okBrief = factChecks('자사몰 후기 620개 · 평점 4.8 이에요. 1회 32,000원이에요.', pr).map((x) => x.key)
+  check('D234-6 받은 글 점검(⟲4차) — 브리프에 없는 판매처 · 지어낸 후기 출처 · 1회 → 월 · 평점 → 만족 비율 · 한글 숫자 · 손해 금액 · OO 빈칸(꼭) · 가린 이름 사례 · 1+1 · 빈 틀(꼭) · 공임 뺀 가격 / 브리프대로 쓴 글은 경보 0',
+    ['platform', 'review-source', 'price-unit', 'stat', 'rating-stat', 'korean-num', 'loss', 'oo-hole', 'case-made', 'policy-1+1'].every((k) => k4.includes(k)) && frame.includes('blank-frame') && kongBad.includes('price-unit') && !kongOk.includes('price-unit') && okBrief.length === 0 &&
+    factChecks(bad4, pr).find((x) => x.key === 'oo-hole')!.level === 'must' && !factChecks('네이버 스마트스토어 후기 1,240개', buildProfile(full, today, normalizeOverrides({ channel: '네이버 스마트스토어', reviews: '네이버 스마트스토어 후기 1,240개' })).profile).some((x) => x.key === 'platform' || x.key === 'review-source'),
+    { k4, frame, kongBad, okBrief })
+
+  const rk = (txt: string, pp: ContentProfile) => factChecks(txt, pp).map((x) => x.key)
+  check('D234-7 규제 업종 표현 — 보험(가입 압박 · 갈아타기 · 최저 보험료) · 부동산(원스톱 대출 · 수수료 할인 · 급매) · 법률(승소율 · 합의금 숫자) · 건강기능식품(변비 해결 · 식약처 인정) · 일반 업체엔 이 점검 없음',
+    ['reg-가입 압박', 'reg-갈아타기', 'reg-최저 · 원금 보장'].every((k) => rk('그대로 두면 손해예요. 지금 갈아타세요. 최저 보험료!', ins).includes(k)) &&
+    ['reg-대출 알선 · 원스톱', 'reg-수수료 할인', 'reg-급매 · 마지막 기회'].every((k) => rk('대출·세금 원스톱 안내, 중개수수료 50% 할인, 급매 나왔어요', rl).includes(k)) &&
+    ['reg-승소율 · 건수', 'reg-금액 사례'].every((k) => rk('승소율 98%! 합의금 300만 원 → 1,200만 원', lw).includes(k)) &&
+    ['reg-질병 예방 · 치료', 'reg-특허 · 식약처 인정'].every((k) => rk('변비 해결에 좋아요. 식약처 인정 원료', hf).includes(k)) &&
+    !rk('그대로 두면 손해예요. 승소율 98%', fp).some((k) => k.startsWith('reg-')),
+    rk('대출·세금 원스톱 안내, 중개수수료 50% 할인, 급매 나왔어요', rl))
+
+  const dkn = (pp: ContentProfile, kind: ContentKind, text: string) => draftChecks(kind, [{ label: '', text }], pp.industry, undefined, pp)
+  const insCard = dkn(ins, 'cards', '보장 분석 이야기')
+  check('D234-8 필수 안내 빠짐 점검 — 보험 카드뉴스에 약관 문구 없으면 "직접 넣기" · 넣으면 통과 · 카톡 · 플레이스는 안 봄 · 의료는 예전 그대로(개인차)',
+    insCard.some((c) => c.key === 'notice' && c.text.includes('카드뉴스는 다른 도구가')) && !dkn(ins, 'cards', `보장 분석 ${noticeOf(ins)}`).some((c) => c.key === 'notice') && !dkn(ins, 'kakao', '보장 분석').some((c) => c.key === 'notice') && dkn(md, 'blog', '치료 이야기').some((c) => c.key === 'care'), insCard.map((c) => c.key))
+
+  const reqHf = aiRequestText(hf)
+  const reqNo = aiRequestText(ep)
+  const lines = reqHf.split('\n')
+  const at = (prefix: string) => lines.findIndex((l) => l.startsWith(prefix))
+  const order = ['업체:', '독자(보는 사람):', '알리는 것:', '화자:', '사실 목록', '구매·문의처:', '넣지 말 것:'].map(at)
+  check('D234-9 요청문 7칸 이름표 줄 — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 순서 · 화자 = "업체의 직함 \'이름\'" · 숫자 뜻 바꾸지 않기 · 가격 단위 그대로 · 구매처 없으면 "플랫폼 이름 넣지 마세요" · 규제 업종 금지 · 필수 문구 · 카드 두 안',
+    order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])) && reqHf.includes("화자: 바른장연구소의 대표 '박하나' (이름은 이것만 쓰세요).") && reqHf.includes('받은 숫자의 뜻(후기 수 · 평점 · 가격 단위)을 바꾸지 마세요') &&
+    reqHf.includes('구매·문의처: 전화 02-555-1234') && reqNo.includes('구매·문의처: (아직 없음 — 판매처 · 플랫폼 이름을 넣지 마세요).') &&
+    reqHf.includes('건강기능식품 광고 규정 — 넣지 말 것: 질병의 예방') && reqHf.includes('"이 제품은 질병의 예방 및 치료를 위한 의약품이 아닙니다.') && reqHf.includes('카드뉴스는 망설임 풀기 · 궁금증 안만') && reqHf.includes('할인 → 1+1') &&
+    !reqHf.includes('620') && !reqHf.includes('1+1 ') && aiRequestText(ins).includes('- 후기·평점: 후기 620개 · 평점 4.8 / 후기 출처: 자사몰') && aiRequestText(fp, {}).includes('후기 출처') === false && aiRequestText(pr).includes("- 가격: 1회 32,000원 (단위 그대로") &&
+    speakerLine({ ...fp, speaker: '김한솔 대표' }) === "화자: 한솔정밀(주)의 대표 '김한솔' (이름은 이것만 쓰세요)." && speakerLine({ ...fp, speaker: 'MD 지은' }).includes("의 MD '지은'") && speakerLine({ ...fp, speaker: '원장' }).includes('(사람 이름은 쓰지 마세요)') && speakerLine({ ...fp, speaker: '' }) === '화자: 한솔정밀(주) (사람 이름은 쓰지 마세요).' && contactLine(ep).includes('아직 없음') &&
+    AI_REQUEST_TIPS.length === 8 && AI_REQUEST_TIPS.some((x) => x.includes('500번')) && AI_REQUEST_TIPS.some((x) => x.includes('수정 요청 단추가 없어요')) && AI_REQUEST_TIPS.some((x) => x.includes('넘어가는 칸의 숫자부터')),
+    reqHf)
+
+  const noSrc = buildProfile(full, today, normalizeOverrides({ reviews: '후기 620개', price: '32,000원' })).profile
+  const { profile: srcP, source: srcS } = buildProfile(full, today, normalizeOverrides({ reviews: '후기 620개', reviewSource: '자사몰', price: '1회 32,000원' }))
+  const { source: eS } = buildProfile(empty, today)
+  check('D234-10 홍보 정보 — 후기 출처 칸(60자) · 후기만 있고 출처 없으면 "후기 출처" 채울 칸 · 단위 없는 가격은 "가격 단위" 채울 칸 · 사실 목록에 출처 · 구매·문의처 칸(전화 있으면 채움 · 없으면 비었다고)',
+    normalizeOverrides({ reviewSource: 'x'.repeat(90) }).reviewSource?.length === 60 && profileGaps(noSrc).some((g) => g.key === 'reviewSource') && profileGaps(noSrc).some((g) => g.key === 'price') && !profileGaps(srcP).some((g) => g.key === 'reviewSource' || g.key === 'price') &&
+    priceWithoutUnit('32,000원') && !priceWithoutUnit('1회 32,000원') && !priceWithoutUnit('공임 3만 원(부품값 별도)') && !priceWithoutUnit('300만 원부터') && !priceWithoutUnit('월 9,900원') && !priceWithoutUnit('') &&
+    materialList(srcP).includes('후기 620개 (후기 출처: 자사몰)') && briefSlots(srcP, srcS).find((x) => x.key === 'contact')!.ok && briefSlots(srcP, srcS).find((x) => x.key === 'contact')!.note.includes('031-123-4567') && !briefSlots(ep, eS).find((x) => x.key === 'contact')!.ok,
+    { gaps: profileGaps(noSrc).map((g) => g.key), slot: briefSlots(ep, eS).find((x) => x.key === 'contact') })
+
+  const rcl = (kind: ContentKind, keys: string[], pp: ContentProfile, guide = false) => reviewChecklist(kind, keys.map((key) => ({ key, level: 'should' as const, text: '' })), pp, { guide })
+  const st = (items: ReturnType<typeof rcl>, part: string) => items.find((x) => x.text.includes(part))?.state ?? null
+  const okCl = rcl('blog', [], fp)
+  const badCl = rcl('blog', ['price-unit', 'platform', 'oo-hole', 'korean-num'], fp)
+  const insCl = rcl('cards', ['notice', 'reg-가입 압박'], ins)
+  check('D234-11 검수표(⟲4차 6장) — 가격 단위 · 평점 통계 · 한글 숫자 · 구매처 · 후기 출처 · OO 빈칸 · 빈 틀 · 블로그 작성자 표(사람) · 영상 숫자 두 번(사람) · 규제 업종: 금지 표현 · 필수 문구(카드는 사람이) · 전후 · 문제 해결 · 권위 · 다른 이름 판촉 · 지어낸 사례',
+    st(okCl, '단위째로') === 'pass' && st(badCl, '단위째로') === 'warn' && st(badCl, '구매처 · 후기를 볼 수 있는 곳') === 'warn' && st(badCl, "'OO'") === 'warn' && st(badCl, '한글로 쓴 숫자') === 'warn' && st(okCl, '한글로 쓴 숫자') === 'manual' && st(okCl, '작성자 소개 표') === 'manual' && st(rcl('blog', [], fp, true), '작성자 소개 표') === null &&
+    st(rcl('video', [], fp), '두 번') === 'manual' && st(insCl, '보험 금지 표현') === 'warn' && st(insCl, '필수 안내 문구가 들어갔는가(카드뉴스는 사람이 직접 넣었는가)') === 'warn' && st(insCl, "'문제 해결'(손실 압박)") === 'manual' && st(rcl('blog', [], lw), "지어낸 '실제 사례'") === 'pass' && st(rcl('blog', ['case-made'], lw), "지어낸 '실제 사례'") === 'warn' && st(okCl, '보험 금지') === null,
+    [st(okCl, '단위째로'), st(badCl, '단위째로'), st(badCl, '구매처 · 후기를 볼 수 있는 곳'), st(badCl, "'OO'"), st(badCl, '한글로 쓴 숫자'), st(okCl, '한글로 쓴 숫자'), st(okCl, '작성자 소개 표'), st(rcl('blog', [], fp, true), '작성자 소개 표'), st(rcl('video', [], fp), '두 번'), st(insCl, '보험 금지 표현'), st(insCl, '필수 안내 문구가 들어갔는가(카드뉴스는 사람이 직접 넣었는가)'), st(insCl, "'문제 해결'(손실 압박)"), st(rcl('blog', [], lw), "지어낸 '실제 사례'"), st(rcl('blog', ['case-made'], lw), "지어낸 '실제 사례'"), st(okCl, '보험 금지')])
 }
 
 if (SHOW) {

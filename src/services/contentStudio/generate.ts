@@ -20,6 +20,7 @@ import { contentLib, RISKY_WORDS, type ContentLib } from './library'
 import type { ContentProfile } from './profile'
 import { applyTone, type Tone } from './tone'
 import { angleTitle, angleVideoTitle, type AngleId } from './angles'
+import { CARE_NOTE, noPrice, noPromo, noTestimonial, regulatedOf } from './regulated'
 
 export type ContentKind = 'keywords' | 'blog' | 'shorts' | 'video' | 'cards' | 'kakao' | 'place'
 
@@ -353,8 +354,13 @@ export function bridgeLine(p: ContentProfile, c: number): string {
   return p.differ ? `이 ${c}가지 기준, ${j(p.company, '은/는')} 이렇게 지켜요 — ${p.differ}` : `[앞의 ${c}가지 기준을 우리가 어떻게 지키는지 한 문장 — 사실만]`
 }
 
-/** 의료 — 개인차 · 부작용 안내(규칙집 5장 규제 업종: 꼭 넣을 것) */
-export const CARE_NOTE = '개인에 따라 결과가 다를 수 있고 부작용이 생길 수 있어요. 자세한 주의 사항은 상담 때 꼭 안내받으세요.'
+/** 의료 — 개인차 · 부작용 안내(규칙집 5장 규제 업종: 꼭 넣을 것) — D-234 부터 규제 업종 규칙(regulated.ts)에 둔다 */
+export { CARE_NOTE }
+
+/** D-234 업종 필수 안내 문구(의료 개인차 · 건강기능식품 '의약품 아님' · 보험 약관 · 부동산 중개사무소 정보 · 법률 결과 차이) — 없으면 '' */
+export function noticeOf(p: ContentProfile): string {
+  return regulatedOf(p)?.notice ?? ''
+}
 
 /* ------------------------------------------------------------------ */
 /* 글감(점) — 주제마다 본문에 쓰는 항목                                    */
@@ -415,10 +421,14 @@ export function offerLine(p: ContentProfile): string {
   return m ? `${p.offer}(${Number(m[1])}월 ${Number(m[2])}일까지)` : p.offer
 }
 
-/** D-228 의료 · 건강은 혜택 · 할인을 홍보에 싣지 않는다(의료법 광고 · 예약 · 상담만) */
-export const noOfferAd = (p: ContentProfile) => p.industry === 'health'
-/** D-228 고객 후기 · 체험담을 홍보에 싣지 않는 업종(의료 · 전문직 광고 규정) */
-export const noVoiceAd = (p: ContentProfile) => p.industry === 'health' || p.industry === 'professional'
+/** D-228 의료 · 건강은 혜택 · 할인을 홍보에 싣지 않는다(의료법 광고 · 예약 · 상담만) — D-234 건강기능식품 · 보험 · 부동산 중개 · 법률도(할인 · 1+1 · 선물 · 수수료 할인 · 무료 상담 미끼) */
+export const noOfferAd = (p: ContentProfile) => p.industry === 'health' || noPromo(regulatedOf(p))
+/** D-228 고객 후기 · 체험담을 홍보에 싣지 않는 업종(의료 · 전문직 광고 규정) — D-234 건강기능식품 체험기도 */
+export const noVoiceAd = (p: ContentProfile) => p.industry === 'health' || p.industry === 'professional' || noTestimonial(regulatedOf(p))
+/** D-234 후기 수 · 평점도 싣지 않는 업종(의료 후기 수 · 건강기능식품 체험기 · 의뢰인 후기) */
+export const noReviewAd = (p: ContentProfile) => noTestimonial(regulatedOf(p))
+/** D-234 가격을 싣지 않는 업종(의료 — 가격 표시 · 가격 비교) */
+export const noPriceAd = (p: ContentProfile) => noPrice(regulatedOf(p))
 
 /** D-228 '이 글을 쓴 곳' 표 — 넣어 준 사실만(지어내지 않는다). 두 줄이 안 되면 넣지 않는다 */
 function authorRows(p: ContentProfile): [string, string][] {
@@ -427,7 +437,7 @@ function authorRows(p: ContentProfile): [string, string][] {
   rows.push(['회사', p.since ? `${p.company} · ${p.since}년부터` : p.company])
   if (p.services.length) rows.push(['하는 일', p.services.slice(0, 3).join(' · ')])
   if (p.strengths.length) rows.push(['기록', p.strengths.slice(0, 3).join(' · ')])
-  if (p.reviews) rows.push(['후기', p.reviews])
+  if (p.reviews && !noReviewAd(p)) rows.push(['후기', p.reviews])
   return rows
 }
 
@@ -447,7 +457,7 @@ function companyBlock(p: ContentProfile): DraftBlock {
   const lines = [introSentence(p)]
   if (p.services.length) lines.push(`하는 일: ${p.services.join(' · ')}`)
   if (p.strengths.length) lines.push(`이런 기록을 갖고 있어요.\n${p.strengths.map((s) => `• ${s}`).join('\n')}`)
-  if (p.reviews) lines.push(`후기 — ${p.reviews}`)
+  if (p.reviews && !noReviewAd(p)) lines.push(`후기 — ${p.reviews}`)
   if (p.voice && !noVoiceAd(p)) lines.push(`고객 한마디 — "${p.voice}"`)
   lines.push(p.differ ? `다른 곳과 다른 점 — ${p.differ}` : DIFFER_HOLE)
   return { label: `${j(p.company, '을/를')} 소개해요`, text: lines.join('\n') }
@@ -456,7 +466,7 @@ function companyBlock(p: ContentProfile): DraftBlock {
 function ctaBlock(p: ContentProfile, kw: string, hint?: string): DraftBlock {
   const lib = contentLib(p.industry)
   // D-228 실제 혜택 · 가격 조건이 있을 때만(지어내지 않음 · 의료는 혜택을 싣지 않음)
-  const extra = [!noOfferAd(p) && offerLine(p) ? `이번 달 혜택 — ${offerLine(p)}` : '', p.price ? `가격 · 조건 — ${p.price}` : ''].filter(Boolean).join('\n')
+  const extra = [!noOfferAd(p) && offerLine(p) ? `이번 달 혜택 — ${offerLine(p)}` : '', p.price && !noPriceAd(p) ? `가격 · 조건 — ${p.price}` : ''].filter(Boolean).join('\n')
   return { label: lib.ctaTitle, text: `${kw ? `${j(kw, '을/를')} 알아보고 계신다면 편하게 연락 주세요. ` : ''}${lib.ctaBody}${extra ? `\n\n${extra}` : ''}\n\n${contactLines(p)}`, ...(hint ? { hint } : {}) }
 }
 
@@ -528,7 +538,8 @@ function blogRulebook(p: ContentProfile, topic: Topic, variant: number): DraftBl
   blocks.push({ label: `정리 — 이 ${c}가지만 기억하세요`, text: summary.join('\n'), hint: '소제목 — 정리' })
   blocks.push({ label: '', text: '(구분선)', hint: '구분선' })
   const soft = topic.type === 'faq' ? '더 궁금한 점은 편하게 물어봐 주세요.' : `${kw}, 처음엔 막막해도 이 ${c}가지만 챙기면 훨씬 수월해요.`
-  blocks.push({ label: '', text: `${soft} ${bridgeLine(p, c)}\n${lib.softAsk}${p.industry === 'health' ? `\n${CARE_NOTE}` : ''}`, hint: '끝 — 부드러운 정리 · 다리 문장 · 가벼운 첫 행동(직접 명령은 쓰지 않아요)' })
+  const notice = noticeOf(p)
+  blocks.push({ label: '', text: `${soft} ${bridgeLine(p, c)}\n${lib.softAsk}${notice ? `\n${notice}` : ''}`, hint: '끝 — 부드러운 정리 · 다리 문장 · 가벼운 첫 행동(직접 명령은 쓰지 않아요)' })
   blocks.push(photo(at(visuals, 3)))
   const cta = ctaBlock(p, '', '연락처 · 지도 — 실제 값만')
   blocks.push({ ...cta, text: `관련 글 [함께 보면 좋은 글 링크 — 없으면 이 줄을 지워 주세요]\n${cta.text}` })
@@ -590,7 +601,8 @@ function blogDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock
     blocks.push(companyBlock(p))
   }
   blocks.push(photo(at(visuals, 2)))
-  if (p.industry === 'health') blocks.push({ label: '', text: CARE_NOTE, hint: '의료 안내 — 개인차 · 부작용' })
+  const rule = regulatedOf(p)
+  if (rule?.notice) blocks.push({ label: '', text: rule.notice, hint: rule.kind === 'medical' ? '의료 안내 — 개인차 · 부작용' : `필수 안내 — ${rule.label}` })
   blocks.push(ctaBlock(p, kw))
   blocks.push({ label: '', text: hashtags(p).join(' '), hint: '해시태그' })
   return blocks
@@ -755,7 +767,7 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
     { label: '구조', text: `도입부: ${painFor(topic)}\n중반부: ${points.map((pt) => pt.title).join(' · ')}\n후반부: ${cta}` },
     ...script,
     // 릴스 캡션 — 해시태그 5개(지역 + 업종 + 고민) · 의료는 개인차 안내
-    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}${p.industry === 'health' ? `\n${CARE_NOTE}` : ''}\n${hashtags(p, 5).join(' ')}` },
+    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}${noticeOf(p) ? `\n${noticeOf(p)}` : ''}\n${hashtags(p, 5).join(' ')}` },
   ]
 }
 
@@ -867,12 +879,16 @@ function videoDraft(p: ContentProfile, topic: Topic, variant: number, titleOverr
   })
   const endMin = c + 1
   const summary = points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')
+  // D-234 필수 안내 — 말로 하는 문구는 말에, 부동산 중개사무소 정보(등록번호 · 대표자)는 화면 아래 글자로
+  const rule = regulatedOf(p)
+  const said = rule?.notice && rule.kind !== 'realty' ? ` ${rule.notice}` : ''
+  const shownNote = rule?.notice && rule.kind === 'realty' ? `\n화면 아래 작은 글자: ${rule.notice}` : ''
   blocks.push({
     label: `${endMin}:00 · 마무리`,
-    text: `말: 오늘 말한 ${summary}, 이 ${c}가지를 다시 짚어 봐요. 결국 처음에 꼼꼼히 확인하는 게 시간과 비용을 아끼는 길이에요. ${bridgeLine(p, c)}${p.industry === 'health' ? ` ${CARE_NOTE}` : ''} ${lib.ctaShort.replace('{company}', p.company)}\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}`,
+    text: `말: 오늘 말한 ${summary}, 이 ${c}가지를 다시 짚어 봐요. 결국 처음에 꼼꼼히 확인하는 게 시간과 비용을 아끼는 길이에요. ${bridgeLine(p, c)}${said} ${lib.ctaShort.replace('{company}', p.company)}\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}${shownNote}`,
     hint: `소제목 — ${p.speaker ? `${p.speaker}의 ` : ''}마지막 조언 · 요약 → 다리 문장 → CTA 하나. 구독 · 댓글 · 다음 영상 예고는 채널 방침에 따라 붙이거나 빼요`,
   })
-  blocks.push({ label: '설명란', text: `${title}\n\n${contactLines(p)}\n\n${hashtags(p, 8).join(' ')}` })
+  blocks.push({ label: '설명란', text: `${title}\n\n${contactLines(p)}${rule?.notice ? `\n\n${rule.notice}` : ''}\n\n${hashtags(p, 8).join(' ')}` })
   blocks.push({ label: '이 주제로 이어 찍을 5편', text: videoSeries(p, topic).map((x, i) => `${i + 1}편 · ${x.title}\n(${x.role})`).join('\n'), hint: '1편 깊게 → 2편 손해 피하기 → 3편 넓히기 → 4편 결정 직전 → 5편 우리 업체 — 5편 자리는 꼭 이 업체로(다른 업체가 들어가지 않게)' })
   return blocks
 }
@@ -908,7 +924,7 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
   } else if (adType === 'proof') {
     const facts = p.strengths.length ? p.strengths : ['[업력 · 진행 건수 같은 숫자]', '[인증 · 자격]', '[고객 수 · 재방문 같은 기록]']
     // D-228 첫 장 — 재료(후기 수 · 연수)가 있으면 그 숫자로, 없으면 지어내지 않고 '기록으로 보는'
-    cover = p.reviews
+    cover = p.reviews && !noReviewAd(p)
       ? page(1, '표지', p.reviews, `${p.company} · ${clean(`${p.area} ${p.item}`)}`, `${at(visuals, 0)} · 큰 숫자`)
       : p.years !== null && p.years >= 3
         ? page(1, '표지', clean(`${p.area} ${p.years}년, ${p.item}`), `기록으로 보는 ${p.company}`, `${at(visuals, 0)} · 큰 숫자`)
@@ -960,7 +976,7 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
   inner = inner.map((b, i) => ({ ...b, label: b.label.replace(/^\d+장/, `${i + 2}장`) }))
   const offer = noOfferAd(p) ? '' : offerLine(p)
   const reach = `${p.phone || '[연락처]'}${p.channel ? ` · ${p.channel}` : p.region ? ` · ${p.region}` : ''}`
-  const care = p.industry === 'health' ? `\n${CARE_NOTE}` : ''
+  const care = noticeOf(p) ? `\n${noticeOf(p)}` : ''
   const last = offer ? page(inner.length + 2, '마무리 · 혜택', lib.ctaTitle, `${offer}\n연락: ${reach}`, '로고 · 혜택 · 연락처 화면') : page(inner.length + 2, '마무리', lib.ctaTitle, `${reach}${care}`, '로고 · 연락처 · 지도 화면')
   const caption = `${topic.title}\n\n${inner.map((b) => /큰 글자: (.*)/.exec(b.text)?.[1] ?? '').filter(Boolean).map((t) => `• ${t}`).join('\n')}\n\n${lib.ctaShort.replace('{company}', p.company)}${care}\n\n${hashtags(p).join(' ')}`
   return [{ ...cover, hint: AD_TYPE_LABEL[adType] }, ...inner, last, { label: '올릴 때 쓰는 글', text: caption }]
@@ -980,7 +996,7 @@ function kakaoDraft(p: ContentProfile, purpose: KakaoPurpose, today: string, var
     // D-228 홍보 정보에 실제 혜택 · 기한이 있으면 그대로(의료는 혜택 광고를 하지 않으므로 빈칸 그대로)
     const real = noOfferAd(p) ? '' : p.offer
     const until = /^\d{4}-(\d{2})-(\d{2})$/.exec(real ? p.offerUntil : '')
-    text = `(광고) ${p.company} ${m}월 혜택 안내\n\n${real || '[혜택 내용 — 예: 첫 상담 고객 ○○]'}\n기간: [시작일] ~ ${until ? `${Number(until[1])}월 ${Number(until[2])}일` : '[끝나는 날]'}\n대상: [대상]\n${p.price ? `가격 · 조건: ${p.price}\n` : ''}\n${lib.ctaBody}\n${phone}`
+    text = `(광고) ${p.company} ${m}월 혜택 안내\n\n${real || '[혜택 내용 — 예: 첫 상담 고객 ○○]'}\n기간: [시작일] ~ ${until ? `${Number(until[1])}월 ${Number(until[2])}일` : '[끝나는 날]'}\n대상: [대상]\n${p.price && !noPriceAd(p) ? `가격 · 조건: ${p.price}\n` : ''}\n${lib.ctaBody}\n${phone}`
   } else if (purpose === 'season') {
     const s = seasonHook(lib, today)
     const tip = at(lib.tips, variant)
@@ -996,7 +1012,7 @@ function placeDraft(p: ContentProfile): DraftBlock[] {
   return [
     { label: '한 줄 소개', text: `${introSentence(p)} ${lib.ctaBody}` },
     { label: '하는 일', text: p.services.length ? p.services.map((s) => `• ${s}`).join('\n') : `• ${p.item}\n• [하는 일 두세 가지]` },
-    { label: '이런 점을 챙겨요', text: [...(p.differ ? [`• ${p.differ}`] : []), ...p.strengths.map((s) => `• ${s}`), ...(p.reviews ? [`• 후기 ${p.reviews}`] : []), ...(p.differ ? [] : ['• [다른 곳과 다른 점 한 가지]'])].join('\n') },
+    { label: '이런 점을 챙겨요', text: [...(p.differ ? [`• ${p.differ}`] : []), ...p.strengths.map((s) => `• ${s}`), ...(p.reviews && !noReviewAd(p) ? [`• 후기 ${p.reviews}`] : []), ...(p.differ ? [] : ['• [다른 곳과 다른 점 한 가지]'])].join('\n') },
     { label: '이용 안내', text: `• 시간: ${p.hours || '[운영 시간 · 쉬는 날]'}\n• 주차: [주차 안내]\n• 예약 · 문의: ${p.phone || '[대표 전화]'}${p.channel ? ` · ${p.channel}` : ''}` },
     { label: '찾아오시는 길', text: `${p.address || '[주소]'}\n[가까운 역 · 큰 건물 기준 길 안내]` },
   ]
@@ -1066,6 +1082,14 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
   }
   if (lib.caution && req.kind !== 'keywords') notes.push(lib.caution)
   if (req.kind === 'cards' && req.adType === 'before') notes.push(noOfferAd(p) ? '의료 · 규제 업종은 전후 비교를 쓰지 않아요 — 과정만 보여 주는 안으로 만들었어요.' : '전후 사진 · 숫자는 실제 사례(고객 동의)만 — [대괄호] 를 실제 값으로 채우거나, 사례가 없으면 이 안은 쓰지 마세요.')
+  // D-234 규칙집 ⟲4차 5-2 · 5-6 — 규제 업종 카드뉴스는 ①반박 없애기 · ④궁금증에서 고르고, 필수 안내 문구는 사람이 확인해 넣는다
+  const rule = regulatedOf(p)
+  if (rule && req.kind === 'cards') {
+    const adType = req.adType ?? 'info'
+    if (riskyAdTypes(p).includes(adType)) notes.push(`${rule.label} 업종은 '${AD_TYPE_LABEL[adType]}' 틀이 금지한 표현(사례 · 금액 · 손실 압박 · 실적)을 다시 만들기 쉬워요 — ${cardFiveTypes(p).map((a) => AD_TYPE_LABEL[a]).join(' · ')}을 권해요.`)
+    if (rule.notice) notes.push('필수 안내 문구를 마지막 장 · 올릴 때 쓰는 글에 넣었어요. 다른 도구로 만든 카드뉴스는 이 문구가 자주 빠지니 사람이 직접 넣어 주세요.')
+  }
+  if (rule && noOfferAd(p) && req.kind === 'kakao' && req.purpose === 'event') notes.push(`${rule.label} 업종은 할인 · 선물 · 1+1 같은 혜택 광고를 하지 않아요 — 소식 · 안내로 바꿔 보내세요.`)
   const toned = blocks.map((b) => ({ ...b, label: applyTone(b.label, p.tone), text: applyTone(b.text, p.tone) }))
   return {
     kind: req.kind,
@@ -1088,9 +1112,25 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
 /** D-230 규칙집 3-5 — 카드뉴스 5안, 순서 고정(반박 없애기 → 문제 해결 → 전후 변화 → 궁금증 → 권위) */
 export const CARD_FIVE: AdType[] = ['objection', 'problem', 'before', 'curious', 'proof']
 
-/** 한 상품 · 한 주제로 카드뉴스 5안 — 탭 이름은 유형(번호는 탭이 붙인다), 보관함에서 갈리게 제목 끝에 유형을 붙인다 */
+/**
+ * D-234 규칙집 ⟲4차 5-2 — 규제 업종은 5안 중 ①반박 없애기 · ④궁금증만(교육은 ②문제 해결까지).
+ * 전후 변화는 사례 · 금액 · 체험을, 문제 해결은 손실 압박을, 권위는 실적 · 최상급을 금지 목록과 상관없이 다시 만들었다(4차 4업종 모두).
+ */
+export function cardFiveTypes(p: ContentProfile): AdType[] {
+  const keep = regulatedOf(p)?.cardsKeep as readonly string[] | undefined
+  return keep ? CARD_FIVE.filter((a) => keep.includes(a)) : CARD_FIVE
+}
+
+/** D-234 규제 업종에서 쓰지 않기를 권하는 카드 유형(5안에서 뺀 것 + 손해 피하기형) — 규제 업종이 아니면 [] */
+export function riskyAdTypes(p: ContentProfile): AdType[] {
+  if (!regulatedOf(p)) return []
+  const keep = cardFiveTypes(p)
+  return AD_TYPES.filter((a) => a !== 'info' && !keep.includes(a))
+}
+
+/** 한 상품 · 한 주제로 카드뉴스 5안(규제 업종은 줄인 안) — 탭 이름은 유형(번호는 탭이 붙인다), 보관함에서 갈리게 제목 끝에 유형을 붙인다 */
 export function cardFive(p: ContentProfile, req: { keyword?: string; topic?: Topic; pages?: 5 | 7; variant?: number }, today: string): { tab: string; draft: Draft }[] {
-  return CARD_FIVE.map((a) => {
+  return cardFiveTypes(p).map((a) => {
     const d = makeDraft(p, { kind: 'cards', keyword: req.keyword, topic: req.topic, pages: req.pages ?? 7, variant: req.variant ?? 0, adType: a }, today)
     return { tab: AD_TYPE_LABEL[a].replace(/형$/, ''), draft: { ...d, title: `${d.title} · ${AD_TYPE_LABEL[a]}` } }
   })
@@ -1194,6 +1234,8 @@ const POLICY_WORDS: { re: RegExp; what: string }[] = [
   { re: /증정|사은품|덤으로/, what: '증정' },
   { re: /선착순/, what: '선착순' },
   { re: /오늘만|오늘\s*하루만|마감\s*임박/, what: '오늘만 · 마감 임박' },
+  // D-234 규칙집 ⟲4차 5-3 — 할인을 막으면 1+1 로 돌아온다
+  { re: /1\s*\+\s*1|원\s*플러스\s*원|하나\s*더\s*(?:드려요|드립니다)/, what: '1+1' },
 ]
 const SOURCE_RE = /(?:연구소|연구원|협회|학회|소비자원|기관|교수|박사|전문가)(?:에서|가|이|의|도)?\s?[^\n.]{0,10}(?:권고|권장|발표|분석|밝혔|추천한|인정한)/
 const BASH_RE = /(?:다른|타)\s?(?:업체|곳|가게|회사)[^\n.]{0,12}(?:보다\s*(?:못|비싸|나쁘|떨어)|와\s*달리|과\s*달리)|(?:편의점|대형\s?마트|인터넷\s?최저가)[^\n.]{0,10}(?:덩어리|위험|최악|못\s*믿)/
@@ -1202,6 +1244,31 @@ const STAT_RE = /\d+\s*명\s*중\s*\d+(?:\s*[~∼-]\s*\d+)?\s*명/
 const MONTH_LIMIT_RE = /(\d{1,2})\s*월\s*(?:한정|까지만|만\s*특가)/
 const ROUNDUP_RE = /(?:업체|가게|병원|학원|맛집|매장)\s*\d+\s*곳|\d+\s*곳\s*(?:총정리|비교|추천|모음)/
 const PRESSURE_RE = /지금\s*(?:안\s*하면|아니면|놓치면|시작하지\s*않으면)[^\n.]{0,20}(?:후회|늦)|후회\s*(?:하기\s*전에|하지\s*않으려면)/
+
+/*
+ * D-234 규칙집 ⟲4차(이상한AI 4차 실험) — 브리프를 다 넣어도 남은 비틀림:
+ *  - 구매처 · 후기 출처 빈칸을 계정 기본 업체의 판매 플랫폼 · 포털로 채움(꽃집 카드 5/5)
+ *  - 1회 가격 → '월 N원', 공임 → 전체 가격, 평점 4.8 → '100명 중 96명', 구독료 → 'N원 손해'
+ *  - 한글로 쓴 숫자('두 배' · '절반' · '수백 명'), 소제목의 'OO' 빈칸, 카드뉴스 빈 틀('카드 1 - … 메시지 1')
+ *  - 가린 이름 사례('김OO님 부부') · 금액 붙은 '실제 사례'(규제 업종 본문)
+ */
+const PLATFORM_RE = /스마트\s*스토어|쿠팡(?:\s*이츠)?|11번가|지마켓|G\s*마켓|옥션|위메프|티몬|배달의\s*민족|배민|요기요|땡겨요|아이디어스|오늘의\s*집|무신사|29CM|에이블리|지그재그|마켓\s*컬리|카카오(?:톡)?\s*선물하기|네이버\s*(?:쇼핑|예약|스토어)|당근\s*마켓|크몽|숨고|와디즈|텀블벅/i
+const PORTAL_RE = /포털|네이버|카카오\s*맵|카카오|구글|인스타(?:그램)?/
+const REVIEW_PLACE_RE = /(?:포털|네이버|카카오\s*맵|카카오|구글|인스타(?:그램)?)[^\n.]{0,10}(?:후기|리뷰|별점)|(?:후기|리뷰|별점)[^\n.]{0,12}(?:포털|네이버|카카오\s*맵|구글)/
+const KOREAN_NUM_RE = /두\s*배|세\s*배|열\s*배|절반|수십\s*(?:명|건|곳|개|년)|수백\s*(?:명|건|곳|개)|수천\s*(?:명|건|곳|개)|수만\s*(?:명|건)/
+const MASKED_RE = /[가-힣](?:OO|○○|ㅇㅇ|\*\*?)\s?(?:님|씨|고객|원장|대표|사장)/
+const OO_RE = /(?:^|[^A-Za-z])(?:OO|○○|ㅇㅇ|△△)(?![A-Za-z])/
+const BLANK_FRAME_RE = /카드\s*\d+\s*[-–—:]\s*[^\n]{0,40}메시지\s*\d+/
+const LOSS_RE = /[\d,]+\s*(?:만\s*)?(?:천\s*)?원\s*(?:을|를|이나|씩)?\s*손해|손해\s*(?:가|를)?\s*[\d,]+\s*(?:만\s*)?원/
+const MONTHLY_RE = /(?:^|[^\d])((?:월|매달|한\s*달(?:에)?)\s*[\d,]+\s*(?:만\s*)?(?:천\s*)?원)/
+const CASE_MONEY_RE = /(?:실제\s*사례|사례|의뢰인)[^\n]{0,40}?[\d,]+\s*(?:만|억|천)?\s*원|[\d,]+\s*(?:만|억)?\s*원\s*(?:을|를)?\s*(?:받아\s*냈|돌려\s*받|보상\s*받|아꼈)/
+const SATISFY_RE = /\d+\s*%\s*(?:가|이|의)?\s*(?:만족|추천|재구매)|만족도\s*\d+\s*%/
+const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
+
+/** D-234 브리프(홍보 정보)에 적은 글 — 이 안에 있는 판매처 · 숫자 · 말은 경보하지 않는다 */
+function briefText(p: ContentProfile): string {
+  return [p.company, p.item, ...p.services, p.channel, p.homepage, p.reviews, p.reviewSource, p.price, p.shipping, p.offer, p.differ, ...p.strengths, p.voice].join(' ')
+}
 
 /** [대괄호] 자리는 빼고 본다 — 채울 자리 안내 글은 사실 주장이 아니다 */
 const withoutHoles = (t: string) => t.replace(/\[[^\]\n]{1,80}\]/g, ' ')
@@ -1267,6 +1334,58 @@ export function factChecks(rawText: string, p: ContentProfile): DraftCheck[] {
       }
     }
   }
+  out.push(...rulebook4Checks(text, rawText, p, given))
+  return out
+}
+
+/** D-234 규칙집 ⟲4차 점검 — 판매처 · 후기 출처 · 가격 단위 · 평점 통계 · 한글 숫자 · 손해 금액 · 빈칸 · 빈 틀 · 지어낸 사례 · 규제 업종 표현 */
+function rulebook4Checks(text: string, rawText: string, p: ContentProfile, given: string): DraftCheck[] {
+  const out: DraftCheck[] = []
+  const brief = briefText(p)
+  const briefN = norm(brief)
+  const pf = PLATFORM_RE.exec(text)
+  if (pf && !briefN.includes(norm(pf[0]))) out.push({ key: 'platform', level: 'should', text: `'${pf[0]}' — 홍보 정보의 구매·문의처에 없는 판매처예요. 다른 도구가 계정 기본 업체의 플랫폼을 넣었을 수 있어요 — 실제로 받는 곳(전화 · 매장 · 우리 링크)으로 바꿔 주세요.` })
+  const rp = REVIEW_PLACE_RE.exec(text)
+  const portal = rp ? PORTAL_RE.exec(rp[0])?.[0] : undefined
+  if (rp && portal && !brief.includes(portal)) out.push({ key: 'review-source', level: 'should', text: `'${rp[0]}' — 후기 출처가 홍보 정보(${p.reviewSource ? `후기 출처: ${p.reviewSource}` : '후기 출처 비어 있음'})와 달라요. 후기를 볼 수 있는 곳을 지어내지 말고 실제 출처만 써 주세요.` })
+  // 가격 단위 — 1회 가격을 '월' 로, 공임을 전체 가격으로(규칙집 0-12)
+  if (p.price) {
+    const mo = MONTHLY_RE.exec(text)
+    if (mo && !/월|매달|한\s*달|개월|구독|정기/.test(p.price)) out.push({ key: 'price-unit', level: 'should', text: `'${mo[1]}' — 홍보 정보의 가격은 '${p.price}' 예요. 단위(1회 · 공임 · 월)를 바꾸지 마세요.` })
+    else if (/공임|별도/.test(p.price)) {
+      const hit = (p.price.match(/[\d,]+\s*(?:만|천)?\s*원/g) ?? [])
+        .map((tok) => new RegExp(tok.replace(/\s+/g, '').split('').map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*'), 'g'))
+        .flatMap((re) => [...text.matchAll(re)])
+        .find((m) => !/공임|별도|부품/.test(text.slice(Math.max(0, (m.index ?? 0) - 16), (m.index ?? 0) + m[0].length + 16)))
+      if (hit) out.push({ key: 'price-unit', level: 'should', text: `'${hit[0]}' — 홍보 정보에는 '${p.price}' 로 적혀 있어요. 공임 · 별도 조건을 빼면 전체 가격처럼 읽혀요.` })
+    }
+  }
+  // 평점 → 통계('100명 중 96명 만족' · '만족도 96%')
+  const sat = SATISFY_RE.exec(text)
+  if (sat && !SATISFY_RE.test(given)) out.push({ key: 'rating-stat', level: 'should', text: `'${sat[0]}' — ${/\d\.\d|평점|별점/.test(p.reviews) ? `홍보 정보의 평점('${p.reviews}')을` : '평점 · 후기 수를'} 만족 비율 같은 통계로 바꿔 말하지 마세요.` })
+  const kn = KOREAN_NUM_RE.exec(text)
+  if (kn && !KOREAN_NUM_RE.test(brief)) out.push({ key: 'korean-num', level: 'should', text: `'${kn[0]}' — 한글로 쓴 숫자도 숫자예요. 사실 목록에 있는 숫자인지 맞춰 보고, 아니면 지워 주세요.` })
+  const loss = LOSS_RE.exec(text)
+  if (loss) out.push({ key: 'loss', level: 'should', text: `'${loss[0]}' — 손해 금액으로 겁주는 말은 사실 목록에 없는 숫자예요. 빼 주세요.` })
+  // 빈칸 · 빈 틀 — 다시 만들거나 사람이 고친다
+  const masked = MASKED_RE.exec(text)
+  const oo = OO_RE.exec(text.replace(new RegExp(MASKED_RE.source, 'g'), ' '))
+  if (oo) out.push({ key: 'oo-hole', level: 'must', text: `'${oo[0].trim()}' 같은 빈칸이 남아 있어요 — 실제 말로 바꾸거나 다시 만들어 주세요.` })
+  if (BLANK_FRAME_RE.test(rawText)) out.push({ key: 'blank-frame', level: 'must', text: "'카드 1 - … 메시지 1' 같은 빈 틀이 그대로 나왔어요 — 이 결과는 쓰지 말고 다시 만들어 주세요." })
+  // 지어낸 사례 — 가린 이름(김OO님) · 금액 붙은 사례(규제 업종 본문은 금지를 이긴다 — 규칙집 5-5)
+  const rule = regulatedOf(p)
+  const caseMoney = rule ? CASE_MONEY_RE.exec(text) : null
+  const made = masked ?? caseMoney
+  if (made) out.push({ key: 'case-made', level: 'should', text: `'${made[0].trim()}' — 사실 목록에 없는 사례 같아요. 실제 사례(고객 동의)가 아니면 그 문단을 지워 주세요.` })
+  // 규제 업종 표현(규칙집 5장 표 — 실험에서 본 최소 목록)
+  if (rule) {
+    // 필수 안내 문구('질병의 예방 및 치료를 위한 의약품이 아닙니다') 자체는 위험 표현이 아니다
+    const body = text.replace(/[^\n.]*의약품이\s*아닙니다[^\n.]*/g, ' ').split(rule.notice || '\u0000').join(' ')
+    for (const r of rule.risky) {
+      const m = r.re.exec(body)
+      if (m && !r.re.test(given + ' ' + brief)) out.push({ key: `reg-${r.word}`, level: 'should', text: `'${m[0]}' — ${rule.label} 광고: ${r.why}.` })
+    }
+  }
   return out
 }
 
@@ -1283,9 +1402,13 @@ export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], in
   // D-229 규칙집 3-1 · 6장 — 연락처 · 링크 자리에 '정보 없음' 을 남기지 않는다
   const none = /정보\s*없음/.exec(text)
   if (none) out.push({ key: 'no-info', level: 'must', text: "'정보 없음' 이 남아 있어요 — 실제 값을 넣거나 그 줄을 지워 주세요." })
-  // 의료 — 개인차 · 부작용 안내(규칙집 5장)
-  if (industry === 'health' && (kind === 'blog' || kind === 'video' || kind === 'shorts' || kind === 'cards') && !/개인차|개인에\s*따라/.test(text))
-    out.push({ key: 'care', level: 'should', text: '의료 글에는 개인차 · 부작용 안내를 넣어 주세요(예: 개인에 따라 결과가 다를 수 있어요).' })
+  // 의료 — 개인차 · 부작용 안내(규칙집 5장) · D-234 건강기능식품 · 보험 · 부동산 중개 · 법률 필수 안내 문구(⟲4차 5장 표)
+  const rule = p ? regulatedOf(p) : null
+  const noticeRe = rule ? rule.noticeRe : industry === 'health' ? /개인차|개인에\s*따라/ : null
+  if (noticeRe && (kind === 'blog' || kind === 'video' || kind === 'shorts' || kind === 'cards') && !noticeRe.test(text)) {
+    if (!rule || rule.kind === 'medical') out.push({ key: 'care', level: 'should', text: '의료 글에는 개인차 · 부작용 안내를 넣어 주세요(예: 개인에 따라 결과가 다를 수 있어요).' })
+    else out.push({ key: 'notice', level: 'should', text: `${rule.label} 글에는 필수 안내 문구를 넣어 주세요 — "${rule.notice}"${kind === 'cards' ? ' · 카드뉴스는 다른 도구가 이 문구를 자주 빠뜨려요(마지막 장에 직접)' : ''}` })
+  }
   const lib = contentLib(industry)
   if (lib.caution && kind !== 'keywords') out.push({ key: 'caution', level: 'info', text: lib.caution })
   const guide = blocks.some((b) => b.hint === '가이드 제목')
@@ -1367,7 +1490,8 @@ export function reviewChecklist(kind: ContentKind, checks: readonly DraftCheck[]
   if (kind === 'keywords') return []
   const has = (re: RegExp) => checks.some((c) => c.level !== 'info' && re.test(c.key))
   const auto = (bad: boolean): ReviewItem['state'] => (bad ? 'warn' : 'pass')
-  const regulated = p.industry === 'health' || p.industry === 'food' || p.industry === 'education' || p.industry === 'professional'
+  const rule = regulatedOf(p)
+  const regulated = !!rule || p.industry === 'health' || p.industry === 'food' || p.industry === 'education' || p.industry === 'professional'
   const items: ReviewItem[] = [
     { group: '사람 · 업체', text: '말하는 사람이 업종과 맞는가(의료 정보는 의료인이)', state: 'manual' },
     { group: '사람 · 업체', text: p.speaker ? `사람 이름이 '${p.speaker}' 그대로인가 — 다른 실명이 들어가지 않았는가` : '사람 이름이 들어가지 않았는가(말하는 사람을 정하지 않았어요)', state: 'manual' },
@@ -1375,22 +1499,31 @@ export function reviewChecklist(kind: ContentKind, checks: readonly DraftCheck[]
     { group: '사람 · 업체', text: '다른 업종 · 관계없는 사업 이야기가 섞이지 않았는가 — 끝 문단 · 캡션 · 영상 5편의 마지막 자리를 특히', state: 'manual' },
     { group: '사람 · 업체', text: '실명 브랜드를 고객사 · 거래처처럼 쓰지 않았는가', state: 'manual' },
     { group: '사람 · 업체', text: '다른 업체 · 다른 상품군을 모아 소개하거나 깎아내리지 않았는가', state: auto(has(/^(bash|roundup)$/)) },
-    { group: '숫자 · 사실', text: '모든 숫자가 사실 목록에 있는가(하나씩 맞춰 보기)', state: has(/^(stat|years)$/) ? 'warn' : 'manual' },
+    { group: '숫자 · 사실', text: '모든 숫자가 사실 목록에 있는가(하나씩 맞춰 보기)', state: has(/^(stat|years|loss)$/) ? 'warn' : 'manual' },
     { group: '숫자 · 사실', text: '준 숫자의 뜻이 바뀌지 않았는가(후기 수 ↔ 고객 수 ↔ 재구매)', state: auto(has(/^reviews-meaning$/)) },
-    { group: '숫자 · 사실', text: '주지 않은 후기 문장 · 정책(교환 · 배송 · 할인)이 없는가', state: auto(has(/^(policy-|voice-made|avoid-)/)) },
+    // D-234 규칙집 ⟲4차 6장
+    { group: '숫자 · 사실', text: "가격이 단위째로 맞는가('1회' → '월' · '공임' → 전체 가격) · 평점 · 후기 수를 통계('100명 중 96명')로 바꾸지 않았는가", state: auto(has(/^(price-unit|rating-stat)$/) || (has(/^stat$/) && /\d\.\d|평점|별점/.test(p.reviews))) },
+    { group: '숫자 · 사실', text: "한글로 쓴 숫자('두 배' · '절반' · '수백 명')도 사실 목록과 맞춰 봤는가", state: has(/^korean-num$/) ? 'warn' : 'manual' },
+    { group: '숫자 · 사실', text: '구매처 · 후기를 볼 수 있는 곳이 홍보 정보에 적은 곳인가(다른 판매 플랫폼 · 포털 이름이 없는가)', state: auto(has(/^(platform|review-source)$/)) },
+    { group: '숫자 · 사실', text: '주지 않은 후기 문장 · 정책(교환 · 배송 · 할인)이 없는가', state: auto(has(/^(policy-|voice-made|avoid-|case-made)/)) },
     { group: '숫자 · 사실', text: '기관 · 전문가 출처를 지어내지 않았는가', state: auto(has(/^source$/)) },
     { group: '숫자 · 사실', text: '기한이 실제 날짜이고 올리는 날에 유효한가', state: auto(has(/^month-limit$/) || !!p.offerExpired) },
     { group: '숫자 · 사실', text: '같은 업체의 다른 글과 숫자가 맞는가(업력 · 후기 수)', state: auto(has(/^years$/)) },
     { group: '형식', text: '길이 · 장 수 · 컷 수가 정한 값대로인가', state: has(/^(fixed-len|kw-many)$/) || checks.some((c) => c.key === 'title-len') ? 'warn' : 'manual' },
     { group: '형식', text: '틀의 빈칸 이름이 남지 않았는가([주제 내용] · [○년] 같은 것)', state: auto(has(/^holes$/)) },
+    { group: '형식', text: "소제목에 'OO' 같은 빈칸이 없는가 · 카드뉴스가 '카드 1 - … 메시지 1' 같은 빈 틀이 아닌가(그러면 다시 만들기)", state: auto(has(/^(oo-hole|blank-frame)$/)) },
     { group: '형식', text: "연락처 · 링크 자리에 실제 값이 있거나 지웠는가('정보 없음' 없음)", state: auto(has(/^(no-info|holes)$/)) },
     { group: '형식', text: `채널 고정점 — ${FIXED_POINT[kind]}`, state: kind === 'kakao' || kind === 'place' || kind === 'cards' ? 'manual' : auto(has(/^(kw-front|kw-title|kw-first|video-area|thumb-num|shorts-hello)$/)) },
+    ...(kind === 'blog' && !opts.guide ? [{ group: '형식' as const, text: p.speaker ? `블로그 작성자 소개 표가 '${p.company} ${p.speaker}' 인가(계정 업체 정보로 바뀌지 않았는가)` : '블로그 작성자 소개 표가 이 업체 정보인가(계정 업체 정보로 바뀌지 않았는가)', state: 'manual' as const }] : []),
+    ...(kind === 'video' || kind === 'shorts' ? [{ group: '숫자 · 사실' as const, text: '영상 기획 · 대본의 숫자(% · 배수 · 기간)를 두 번 봤는가 — 영상 쪽이 숫자를 가장 많이 지어내요', state: 'manual' as const }] : []),
   ]
-  if (regulated || has(/^risky-/)) items.push({ group: '규제 · 표시', text: '광고 규정에 걸리는 말이 없는가(최고 · 1위 · 보장 · 100% …)', state: auto(has(/^risky-/)) })
-  if (p.industry === 'health') {
-    items.push({ group: '규제 · 표시', text: '개인차 · 부작용 안내가 들어갔는가', state: auto(has(/^care$/)) })
-    if (kind === 'cards') items.push({ group: '규제 · 표시', text: "카드 '전후 변화' 안은 버리거나 사람이 다시 썼는가", state: 'manual' })
-  }
+  if (regulated || has(/^risky-/)) items.push({ group: '규제 · 표시', text: '광고 규정에 걸리는 말이 없는가(최고 · 1위 · 보장 · 100% …)', state: auto(has(/^(risky-|reg-)/)) })
+  if (rule && rule.kind !== 'education') items.push({ group: '규제 · 표시', text: `${rule.label} 금지 표현이 없는가 — ${rule.never.slice(0, 4).join(' · ')} …`, state: auto(has(/^(reg-|policy-1\+1)/)) })
+  if (p.industry === 'health' || rule?.kind === 'medical') items.push({ group: '규제 · 표시', text: '개인차 · 부작용 안내가 들어갔는가', state: auto(has(/^care$/)) })
+  else if (rule?.notice && kind !== 'kakao' && kind !== 'place') items.push({ group: '규제 · 표시', text: `필수 안내 문구가 들어갔는가${kind === 'cards' ? '(카드뉴스는 사람이 직접 넣었는가)' : ''} — "${rule.notice.length > 40 ? `${rule.notice.slice(0, 40)}…` : rule.notice}"`, state: auto(has(/^notice$/)) })
+  if (rule && kind === 'cards') items.push({ group: '규제 · 표시', text: "카드 '전후 변화'(사례 · 금액) · '문제 해결'(손실 압박) · '권위'(실적 · 최상급) 안은 버리거나 사람이 다시 썼는가 · 금지한 판촉의 다른 이름(1+1 · 원스톱 대출 안내)이 없는가", state: 'manual' })
+  else if (p.industry === 'health' && kind === 'cards') items.push({ group: '규제 · 표시', text: "카드 '전후 변화' 안은 버리거나 사람이 다시 썼는가", state: 'manual' })
+  if (rule && rule.kind !== 'education' && (kind === 'blog' || kind === 'video')) items.push({ group: '규제 · 표시', text: "본문에 지어낸 '실제 사례'(금액 · 가린 이름 포함)가 없는가", state: auto(has(/^case-made$/)) })
   if (p.industry === 'health' || p.industry === 'education') items.push({ group: '규제 · 표시', text: '압박하는 말(지금 안 하면 후회)이 없는가', state: auto(has(/^pressure$/)) })
   if (opts.guide) items.push({ group: '규제 · 표시', text: '체험단 — 광고 표시 문구가 맨 위에 있는가', state: auto(has(/^disclose$/)) })
   items.push({ group: '고친 뒤 · 올린 뒤', text: '크게 고쳤거나 다시 만들었다면 이 표를 처음부터 다시 봤는가', state: 'manual' })
