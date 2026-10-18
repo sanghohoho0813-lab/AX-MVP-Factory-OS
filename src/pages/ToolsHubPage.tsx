@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ModuleAccessPanel } from '../components/tools/ModuleAccessPanel'
 import { Badge } from '../components/ui/primitives'
+import { HelpHeading } from '../components/ui/fold'
 import { REVIEW_HUB_PATH, TOOLS, type ToolDefinition } from '../config/toolRegistry'
 import { isPilotHiddenPath } from '../config/moduleRegistry'
 import { featuresOfModule, visibleModules, type CatalogModule } from '../config/productCatalog'
@@ -117,9 +118,9 @@ export function ToolsHubPage() {
       />
 
       <section aria-labelledby="modules-list" className="flex flex-col gap-3">
-        <h2 id="modules-list" className="t-section text-slate-900">
+        <HelpHeading id="modules-list" label="모듈 목록" className="t-section text-slate-900">
           모듈 <span className="t-meta font-medium text-slate-500">{modules.length}개</span>
-        </h2>
+        </HelpHeading>
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-cards">
           {modules.map((m) => (
             <ModuleCard key={m.key} m={m} />
@@ -154,9 +155,9 @@ export function ToolsHubPage() {
       {review.length > 0 && (
         <section aria-labelledby="tools-review" className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 id="tools-review" className="t-section text-slate-900">
+            <HelpHeading id="tools-review" label="도입 검토중" className="t-section text-slate-900">
               도입 검토중 <span className="t-meta font-medium text-slate-500">{review.length}개</span>
-            </h2>
+            </HelpHeading>
             <Link to={REVIEW_HUB_PATH} className="t-sub font-medium text-brand-700 hover:underline">
               왜 검토중인가
             </Link>

@@ -9,6 +9,7 @@
  * 로컬 모드에는 AuthProvider 가 없으므로 다른 화면과 같이 데이터 모드로 갈라 부른다.
  */
 
+import { lastClientTab, rememberClientNames } from '../../lib/crumbStore'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Building2 } from 'lucide-react'
@@ -117,6 +118,12 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
   )
 
   const clientName = client?.companyName ?? ''
+  // D-235 경로 줄 — 업체 이름 기억 · 돌아가기는 업체 화면에서 보던 탭으로(맞춤 추천에서 왔으면 맞춤 추천)
+  useEffect(() => {
+    if (clientId && clientName) rememberClientNames([{ id: clientId, companyName: clientName }])
+  }, [clientId, clientName])
+  const last = clientId ? lastClientTab() : null
+  const backTab = last && last.clientId === clientId && last.tab && last.tab !== 'overview' ? `?tab=${encodeURIComponent(last.tab)}` : ''
   const value = useMemo<ToolClientValue>(
     () => ({ clientId, clientName, clientRecord: client, workspaceId, loadClients, replaceClient }),
     [clientId, clientName, client, workspaceId, loadClients, replaceClient],
@@ -136,10 +143,11 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
             {/* D-166: 업체 이름이 길면(띄어쓰기 없는 긴 이름) 말줄임 — 전에는 '← 업체로' 와 겹쳤다 */}
             <span className="t-sub min-w-0 flex-1 truncate text-slate-700 sm:flex-none sm:whitespace-normal">
               <b className="font-bold text-slate-900">{clientName || '이 업체'}</b> 일로 열었습니다.
-              <span className="max-sm:hidden"> 결과는 이 업체 기록으로 갑니다.</span>
+              {/* D-235: 예전 '결과는 이 업체 기록으로 갑니다' 는 사실과 달랐다 — [기록에 붙이기] 를 눌러야 남는다 */}
+              <span className="max-sm:hidden"> 결과는 [기록에 붙이기] 를 누르면 이 업체에 남습니다.</span>
             </span>
             <Link
-              to={`/ops/clients/${clientId}`}
+              to={`/ops/clients/${clientId}${backTab}`}
               className="tap t-sub ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-brand-700 hover:underline"
             >
               <ArrowLeft aria-hidden="true" className="size-4" /> 업체로<span className="max-sm:sr-only"> 돌아가기</span>

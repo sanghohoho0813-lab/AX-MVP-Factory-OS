@@ -5,9 +5,11 @@
  * 그래서 기업컨설팅 OS 의 여러 화면(보드 · 미팅 준비 · 상품·견적 · 전략)은 사이드바 한 줄('영업 관리') 아래 탭으로 둔다.
  * 일정 안의 탭(ScheduleTabs, D-103)과 같은 모양이다.
  */
-import { NavLink, useSearchParams } from 'react-router-dom'
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import { SALES_TABS } from '../../config/salesTabs'
 import { rampAt } from './salesColor'
+import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
+import { StepGuide } from '../ui/StepGuide'
 
 /** 업체를 골라 보는 탭 — 옮겨 가도 보던 업체를 그대로 (D-124) */
 const CLIENT_TABS = new Set(['/sales/meeting', '/sales/proposal'])
@@ -15,8 +17,14 @@ const CLIENT_TABS = new Set(['/sales/meeting', '/sales/proposal'])
 export function SalesTabs() {
   const [params] = useSearchParams()
   const client = params.get('client')
+  const { pathname } = useLocation()
   if (SALES_TABS.length < 2) return null
+  // D-235: 영업 순서 — 지금 몇 번째 · 무엇을 위한 화면인지 · 이전/다음(업체를 골라 보던 중이면 그 업체를 들고)
+  const flowKey = SALES_FLOW.steps.find((st) => pathname.startsWith(st.key))?.key ?? Object.keys(SALES_FLOW.aside ?? {}).find((k) => pathname.startsWith(k)) ?? ''
+  const pos = flowPosition(SALES_FLOW, flowKey)
+  const hrefOf = (to: string) => (client && CLIENT_TABS.has(to) ? `${to}?client=${encodeURIComponent(client)}` : to)
   return (
+    <>
     <nav aria-label="영업 관리 보기" data-testid="sales-tabs" className="no-print">
       <ul
         className="grid gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto"
@@ -45,5 +53,7 @@ export function SalesTabs() {
         ))}
       </ul>
     </nav>
+    <StepGuide pos={pos} hrefOf={hrefOf} />
+    </>
   )
 }

@@ -10,6 +10,7 @@
  */
 
 import { CheckCircle2 } from 'lucide-react'
+import { HelpHeading } from '../ui/fold'
 import type { ClientOpsRecord, ServiceKey } from '../../types/clientOps'
 import { doneWorks } from '../../services/contractSummary'
 
@@ -29,7 +30,7 @@ export function WorkHistoryCard({
     <section data-testid="work-history" className={hideTitle ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}>
       {!hideTitle && (
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="t-section text-slate-900">해 드린 일</h2>
+          <HelpHeading className="t-section text-slate-900">해 드린 일</HelpHeading>
           {done.length > 0 && <span className="t-sub text-slate-500">끝낸 일 {done.length}건</span>}
         </div>
       )}

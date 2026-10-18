@@ -6,6 +6,7 @@ import { FUNDING_STATUS_LABEL } from '../../content/clientOpsCatalog'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { Panel } from '../ui/Panel'
 import { GrantApplyChecklist } from '../grants/GrantApplyChecklist'
 import { ApplyStageBar } from '../grants/ApplyStageBar'
@@ -95,10 +96,10 @@ export function FundingSection({
   return (
     <section aria-labelledby="funding" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="funding" className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900">
+        <HelpHeading id="funding" label="정책자금 · 정부지원금 신청" className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900">
           <Landmark aria-hidden="true" className="size-5 text-slate-400" />
           정책자금 · 정부지원금 신청
-        </h2>
+        </HelpHeading>
         <p className="text-[0.95rem] text-slate-600">
           공고마다 건을 추가하세요.
           {selectedTotal > 0 && (

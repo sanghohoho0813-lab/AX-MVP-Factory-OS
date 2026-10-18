@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { ClipboardCopy, Copy, Send } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading } from '../../components/ui/fold'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText } from '../../components/consulting/studioParts'
 import { ownerPlaceholder, type Sourced } from '../core/answerGuide'
@@ -28,7 +29,9 @@ function useCopy() {
 function Block({ title, children, testid }: { title: string; children: ReactNode; testid: string }) {
   return (
     <section className="flex flex-col gap-1.5" data-testid={testid}>
-      <h4 className="t-sub font-bold text-slate-900">{title}</h4>
+      <HelpHeading as="h4" tight className="t-sub font-bold text-slate-900">
+        {title}
+      </HelpHeading>
       {children}
     </section>
   )

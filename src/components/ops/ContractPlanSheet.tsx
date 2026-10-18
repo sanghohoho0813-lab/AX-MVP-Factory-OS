@@ -13,6 +13,7 @@ import { moneyPlanOf } from '../../services/feeStatus'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 
 const chip = (on: boolean) =>
   `tap t-body inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 font-semibold whitespace-nowrap ${
@@ -224,7 +225,7 @@ export function ContractPlanSheet({
       <div className="flex flex-col gap-6" data-testid="contract-plan">
         {/* 1 얼마짜리 계약 */}
         <section className="flex flex-col gap-2.5">
-          <h3 className={STEP}>① 얼마짜리 계약인가요?</h3>
+          <HelpHeading as="h3" tight label="얼마짜리 계약인가요?" className={STEP}>① 얼마짜리 계약인가요?</HelpHeading>
           {fixedTotal !== null ? (
             <p className="t-body break-keep text-slate-700" data-testid="plan-fixed">
               계약금액 <b className="text-slate-900">{formatKrw(fixedTotal)}</b> 중 {formatKrw(m.planned)}은 이미 수금 계획이 있습니다 — 남은{' '}
@@ -253,7 +254,7 @@ export function ContractPlanSheet({
           <>
             {/* 2 어떻게 받나 */}
             <section className="flex flex-col gap-2.5">
-              <h3 className={STEP}>② 어떻게 받나요?</h3>
+              <HelpHeading as="h3" tight label="어떻게 받나요?" className={STEP}>② 어떻게 받나요?</HelpHeading>
               <div className="flex flex-wrap gap-2" role="group" aria-label="수금 방식" data-testid="plan-method">
                 {(Object.keys(PAY_METHOD_LABEL) as PayMethod[]).map((k) => (
                   <button
@@ -278,14 +279,14 @@ export function ContractPlanSheet({
               <>
                 {/* 3 지금 받은 돈 */}
                 <section className="flex flex-col gap-2.5">
-                  <h3 className={STEP}>③ 지금 받은 돈</h3>
+                  <HelpHeading as="h3" tight label="지금 받은 돈" className={STEP}>③ 지금 받은 돈</HelpHeading>
                   <p className="t-sub break-keep text-slate-500">실제로 들어온 돈만 고르세요 — 고른 만큼만 '입금 완료' 로 적습니다.</p>
                   <AmountChips testId="plan-paid" extra="받은 돈" options={paidOptions} value={paid} onChange={(n) => setPaid(Math.min(n, portion))} />
                 </section>
 
                 {effMethod === 'upfront_rest' && paid === 0 && (
                   <section className="flex flex-col gap-2.5">
-                    <h3 className={STEP}>선금은 얼마로 할까요?</h3>
+                    <HelpHeading as="h3" tight className={STEP}>선금은 얼마로 할까요?</HelpHeading>
                     <AmountChips
                       testId="plan-upfront"
                       extra="선금"
@@ -299,16 +300,16 @@ export function ContractPlanSheet({
                 {/* 4 남은 돈 언제 */}
                 {effMethod !== 'full_upfront' && paid !== null && remaining > 0 && (
                   <section className="flex flex-col gap-2.5">
-                    <h3 className={STEP}>
+                    <HelpHeading as="h3" tight label="남은 돈은 언제 받나요?" className={STEP}>
                       ④ 남은 <span className="text-brand-800">{money(remaining)}</span>은 언제 받나요?
-                    </h3>
+                    </HelpHeading>
                     <WhenPicker value={effRest} onChange={setRest} today={today} testId="plan-when" />
                   </section>
                 )}
               </>
             ) : (
               <section className="flex flex-col gap-3" data-testid="plan-split">
-                <h3 className={STEP}>③ 나눠 받기</h3>
+                <HelpHeading as="h3" tight label="나눠 받기" className={STEP}>③ 나눠 받기</HelpHeading>
                 {effLines.map((l, i) => (
                   <div key={i} className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 p-3">
                     <div className="flex flex-wrap items-center gap-2">

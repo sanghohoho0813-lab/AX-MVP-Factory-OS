@@ -16,6 +16,7 @@ import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, type AdvisorAnswe
 import { INSIGHT_TONE_LABEL, type Insight, type InsightTone } from '../../services/clientInsights'
 import { copyText } from '../../services/grants/grantView'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { Badge, Surface, type Tone } from '../ui/primitives'
 import { AiSoonButton } from '../ui/AiSoonButton'
 import { useToast } from '../ui/toastContext'
@@ -92,9 +93,9 @@ export function ClientAdvisor({
       {!bare && (
         <div className="flex flex-wrap items-center gap-2">
           <MessageCircleQuestion aria-hidden="true" className="size-5 text-brand-600" />
-          <h2 id="advisor-title" className="text-[1.15rem] font-bold text-slate-900">
+          <HelpHeading id="advisor-title" className="text-[1.15rem] font-bold text-slate-900">
             맞춤 상담
-          </h2>
+          </HelpHeading>
           <span className="t-sub text-slate-500">— {record.companyName || '이 회사'} 기록으로 답해요</span>
         </div>
       )}

@@ -14,6 +14,7 @@ import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
+import { HelpHeading } from '../components/ui/fold'
 import { TaxPlanner } from '../components/tax/TaxPlanner'
 import type { CalcOpen } from '../services/taxPlan'
 import { calcPrefill } from '../services/taxCalcPrefill'
@@ -527,7 +528,7 @@ export function TaxCalculatorsPage() {
             <div className="flex flex-col gap-4">
               {groups.map((g) => (
                 <div key={g.title} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-                  <h3 className="mb-3 border-b border-slate-100 pb-2 text-[0.98rem] font-bold text-slate-900">{g.title}</h3>
+                  <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[0.98rem] font-bold text-slate-900">{g.title}</HelpHeading>
                   <div className={`grid gap-3 ${g.fields.some(isRowsField) ? '' : 'sm:grid-cols-2'}`}>{g.fields.map(renderField)}</div>
                 </div>
               ))}
@@ -541,7 +542,7 @@ export function TaxCalculatorsPage() {
                 data-block={b.id}
                 className={`rounded-(--radius-panel) border p-4 ${b.tone === 'light' ? 'border-slate-200 bg-white' : 'border-navy-900 bg-navy-900 text-slate-100'}`}
               >
-                <h3 className={`mb-2 border-b pb-2 text-[0.98rem] font-bold ${b.tone === 'light' ? 'border-slate-100 text-slate-900' : 'border-white/15 text-amber-200'}`}>{b.title}</h3>
+                <HelpHeading as="h3" tight onDark={b.tone !== 'light'} wrapClassName={`mb-2 border-b pb-2 ${b.tone === 'light' ? 'border-slate-100' : 'border-white/15'}`} className={`text-[0.98rem] font-bold ${b.tone === 'light' ? 'text-slate-900' : 'text-amber-200'}`}>{b.title}</HelpHeading>
                 {b.lines.map((l, i) =>
                   l.cls === 'divider' ? (
                     <p key={i} className={`mt-3 mb-1 t-meta font-bold tracking-wide uppercase ${b.tone === 'light' ? 'text-brand-700' : 'text-amber-300'}`}>
@@ -584,7 +585,7 @@ export function TaxCalculatorsPage() {
 
         {(out.tables ?? []).map((t) => (
           <div key={t.id} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 border-b border-slate-100 pb-2 text-[0.98rem] font-bold text-slate-900">{t.title}</h3>
+            <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[0.98rem] font-bold text-slate-900">{t.title}</HelpHeading>
             {/* D-102: 인쇄하면 오른쪽 칸이 잘렸다 — 종이에서는 가로 넘김 대신 글자를 줄여 한 폭에 */}
             <div className="overflow-x-auto print:overflow-visible">
               <table data-table={t.id} className="w-full min-w-[640px] text-[0.875rem] print:min-w-0 print:text-[7pt]">

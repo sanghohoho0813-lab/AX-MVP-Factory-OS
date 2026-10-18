@@ -12,6 +12,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { ArrowRight, Check, Circle, Lock, Route, Wrench } from 'lucide-react'
 import { Badge } from '../ui/primitives'
+import { HelpHeading } from '../ui/fold'
 import { stageReached } from '../../services/salesPipeline'
 import { buildJourney, SALES_PATH_INFO, type JourneyStepKey } from '../../services/salesJourney'
 import { useEntitlements } from '../../lib/entitlementsStore'
@@ -100,7 +101,7 @@ export function SalesJourneyCard({
   return (
     <section data-testid="sales-journey" aria-label="영업 흐름" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h2 className="t-card inline-flex items-center gap-2 font-bold text-slate-900">
+        <HelpHeading label="영업 흐름" className="t-card inline-flex items-center gap-2 font-bold text-slate-900">
           <Route aria-hidden="true" className="size-5 text-brand-600" />
           영업 흐름
           <span className="t-sub font-medium text-slate-500">· 지금 {journey.steps.find((s) => s.key === journey.current)?.label}</span>
@@ -109,7 +110,7 @@ export function SalesJourneyCard({
               접기
             </button>
           )}
-        </h2>
+        </HelpHeading>
       </div>
       {/* D-123: 계약 경로 — 처음 보는 사람도 알게: 무엇을 고르는지 · 고르면 무엇이 바뀌는지 · 다시 누르면 풀린다
           D-124: 2차 미팅 걸음부터만 — 무엇으로 계약할지는 2 · 3차 미팅에서 정해지는 것이라 1차 준비 때는 보이지 않는다(이미 정했으면 보인다) */}
@@ -195,9 +196,9 @@ export function SalesJourneyCard({
       {/* 고른 걸음 — 할 일 · 작업실 도구 */}
       <div data-testid="journey-open" data-step={open.key} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-1.5">
-          <h3 className="t-meta font-semibold text-slate-500">
+          <HelpHeading as="h3" label="이 단계 할 일" className="t-meta font-semibold text-slate-500">
             {openIndex + 1}. {open.label} — 할 일
-          </h3>
+          </HelpHeading>
           <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
             {open.tasks.map((t) => {
               const body = (
@@ -237,10 +238,10 @@ export function SalesJourneyCard({
         </div>
         <div className="flex flex-col gap-1.5">
           {/* D-123: '작업실 도구' 가 무엇인지 몰랐다 — 쉬운 말로 무엇이고 누르면 어떻게 되는지 */}
-          <h3 className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-700">
+          <HelpHeading as="h3" label="이 단계에서 쓰면 좋은 계산기 · 분석 도구" className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-700">
             <Wrench aria-hidden="true" className="size-4" />
             이 단계에서 쓰면 좋은 계산기 · 분석 도구
-          </h3>
+          </HelpHeading>
           <p className="t-meta -mt-0.5 break-keep text-slate-500">누르면 이 업체 정보가 채워진 채로 열리고, 나온 결과는 이 업체 기록에 붙습니다. 안 써도 영업은 그대로 진행됩니다.</p>
           {open.tools.length === 0 ? (
             <p className="t-sub rounded-(--radius-control) border border-dashed border-slate-200 px-3 py-3 break-keep text-slate-500">

@@ -10,6 +10,7 @@ import { DocFileActions } from './DocFileActions'
 import { filePortalDocument, shelfCellOf } from '../../services/docShelf'
 import { readStoredText } from '../../services/docStoredText'
 import { useToast } from '../ui/toastContext'
+import { HelpHeading } from '../ui/fold'
 
 /**
  * 서류 탭 아래 — 서류 칸 밖의 파일 (D-129, 예전 '파일' 탭).
@@ -70,9 +71,9 @@ export function ClientSharedFiles({
 
   return (
     <section aria-labelledby="files" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="client-shared-files">
-      <h3 id="files" className="t-card flex items-center gap-2 font-bold text-slate-900">
+      <HelpHeading as="h3" tight id="files" label="고객과 주고받은 파일" className="t-card flex items-center gap-2 font-bold text-slate-900">
         <Paperclip aria-hidden="true" className="size-4 text-slate-400" /> 고객과 주고받은 파일 <span className="t-sub font-medium text-slate-500">{portalDocs.length}</span>
-      </h3>
+      </HelpHeading>
       {portalDocs.length === 0 ? (
         <p className="t-sub break-keep text-slate-500">주고받은 파일이 없습니다.</p>
       ) : (
@@ -117,7 +118,9 @@ export function ClientSharedFiles({
 
       {orphans.length > 0 && (
         <>
-          <h3 className="t-card mt-2 font-bold text-slate-900">칸이 없어진 서류의 파일 <span className="t-sub font-medium text-slate-500">{orphans.length}</span></h3>
+          <HelpHeading as="h3" tight wrapClassName="mt-2" label="칸이 없어진 서류의 파일" className="t-card font-bold text-slate-900">
+            칸이 없어진 서류의 파일 <span className="t-sub font-medium text-slate-500">{orphans.length}</span>
+          </HelpHeading>
           <ul className="flex flex-col divide-y divide-slate-100">
             {orphans.map(([key, v]) => (
               <li key={key} className="flex flex-col gap-2 py-2.5">

@@ -19,6 +19,8 @@ import type { NavAccent } from '../../config/moduleRegistry'
 import { useBackToClose } from '../../lib/backToClose'
 import { catalogFeature, catalogModule } from '../../config/productCatalog'
 import { withClient } from '../../components/modules/moduleText'
+import { TOOL_FLOWS, flowPosition } from '../../content/flowSteps'
+import { StepGuide, StepNext } from '../../components/ui/StepGuide'
 
 /**
  * 목차 아이콘 색 (D-92) — OS 왼쪽 메뉴와 같은 8색.
@@ -106,6 +108,10 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   }
 
   const ModuleIcon = tool.icon
+  const flowDef = TOOL_FLOWS[tool.key]
+  const flow = flowDef ? flowPosition(flowDef, current.key, (k) => sections.some((s) => s.key === k)) : null
+  const client = new URLSearchParams(location.search).get('client')
+  const hrefOf = (key: string) => (client ? `${tool.path}/${key}?client=${encodeURIComponent(client)}` : `${tool.path}/${key}`)
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
@@ -159,7 +165,12 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
         </div>
       )}
 
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        {/* D-235: 이 모듈을 처음 쓰는 순서 — 몇 번째 화면 · 무엇을 위한 것인지 · 이전/다음 */}
+        {flow && <StepGuide pos={flow} hrefOf={hrefOf} className="mb-4" />}
+        {children}
+        {flow && <StepNext pos={flow} hrefOf={hrefOf} className="mt-6" />}
+      </div>
     </div>
   )
 }

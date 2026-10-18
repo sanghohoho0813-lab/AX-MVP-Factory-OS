@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { Filter, RotateCcw } from 'lucide-react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { AMOUNT_STEPS, DAY_STEPS, DEFAULT_GRANT_FILTER, SLOT_STEPS, manText, settingsLine, type GrantFilterSettings } from '../../services/grants/grantFilter'
 
 export interface FunnelCounts {
@@ -48,9 +49,9 @@ export function GrantFunnel({
   return (
     <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-3 sm:p-4" aria-label="공고 거르기" data-testid="grant-funnel">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="t-body inline-flex items-center gap-1.5 font-bold text-violet-900">
+        <HelpHeading as="h3" tight label="볼 만한 공고만 거르기" className="t-body inline-flex items-center gap-1.5 font-bold text-violet-900">
           <Filter aria-hidden="true" className="size-4" /> 볼 만한 공고만 거르기
-        </h3>
+        </HelpHeading>
         <Button variant="secondary" onClick={onOpenSettings} data-testid="grant-filter-open">
           기준 바꾸기
         </Button>

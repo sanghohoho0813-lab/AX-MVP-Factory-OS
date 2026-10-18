@@ -83,6 +83,7 @@ import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
 import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
+import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 
 /** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
@@ -125,6 +126,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const extra = useYtExtra(addedIds, extraKey, yt.feed?.fetchedAt ?? '')
   const [params, setParams] = useSearchParams()
   const view = viewOf(params.get('view'))
+  // D-235 경로 줄 끝에 지금 보는 탭(영업 › 마케팅 · 브랜딩 › 콘텐츠 레이더 › 이번 주 찍을 것)
+  usePageCrumbs([{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
   const kw = params.get('kw') ?? ''
   const [type, setType] = useState<YtType>('all')

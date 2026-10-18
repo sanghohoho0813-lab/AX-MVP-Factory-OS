@@ -11,6 +11,7 @@
  *        블록 · 꾸밈 · 점검 탭을 ① 내용 고치기 → ② 꾸미기 → ③ 점검 · 내려받기 단계로(아무 단계나 눌러 가도 된다),
  *        단계 끝마다 [다음 단계] 단추, ③ 에 [HTML 내려받기] 를 크게. 점수 카드는 '이것만 하면' 첫 칸만 보이고 나머지는 접는다.
  */
+import { usePageCrumbs } from '../../lib/crumbStore'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Globe, LayoutGrid, Maximize2, Minimize2, Monitor, Palette, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react'
@@ -200,6 +201,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const { showToast } = useToast()
   const phone = useIsPhone()
   const [tab, setTab] = useState<Tab>('blocks')
+  // D-235 경로 줄 끝에 지금 단계(… › 홈페이지 만들기 › 업체 › 2 꾸미기)
+  usePageCrumbs([{ label: tab === 'blocks' ? '① 내용 고치기' : tab === 'style' ? '② 꾸미기' : '③ 내려받기' }])
   const [selected, setSelected] = useState<string | null>(null)
   const [device, setDevice] = useState<Device>('pc')
   const [pane, setPane] = useState<'edit' | 'preview'>('edit')

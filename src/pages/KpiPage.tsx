@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Badge, Blank, Disclosure, Section, type Tone } from '../components/ui/primitives'
+import { hintFor } from '../content/sectionHints'
 import { useToast } from '../components/ui/toastContext'
 import { listClients } from '../services/clientOpsService'
 import { listJournal } from '../services/journalService'
@@ -111,7 +112,8 @@ function KpiContent({ workspaceId }: { workspaceId: string | null }) {
         <Blank title="아직 업체 기록이 없어 잴 것이 없습니다. 업체를 등록하고 상태를 바꾸기 시작하면 여기에 숫자가 생깁니다." />
       ) : (
         groups.map((g) => (
-          <Section key={g.group} title={KPI_GROUP_LABEL[g.group]}>
+          // '영업' 처럼 다른 화면 목차와 이름이 같아도 이 화면 뜻으로 — 사전에서 '핵심 숫자 · …' 로 찾는다
+          <Section key={g.group} title={KPI_GROUP_LABEL[g.group]} hint={hintFor(`핵심 숫자 · ${KPI_GROUP_LABEL[g.group]}`)}>
             <ul className="grid gap-3 lg:grid-cols-2">
               {g.items.map((m) => (
                 <MetricCard key={m.key} m={m} />

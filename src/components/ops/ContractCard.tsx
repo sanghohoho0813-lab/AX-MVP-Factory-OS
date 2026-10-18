@@ -24,6 +24,7 @@ import { contractGap } from '../../services/salesContract'
 import { formatKrw, wonOf } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 
 /** 숫자 입력 — 빈 칸이면 null(모름), 숫자면 원 단위 */
 function amountOf(text: string): number | null {
@@ -80,7 +81,7 @@ export function ContractCard({
   return (
     <section data-testid="contract-card" className={hideTitle ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}>
       <div className={`flex flex-wrap items-start gap-x-3 gap-y-2 ${hideTitle ? 'justify-end' : 'justify-between'}`}>
-        {!hideTitle && <h2 className="t-section text-slate-900">계약</h2>}
+        {!hideTitle && <HelpHeading className="t-section text-slate-900">계약</HelpHeading>}
         <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
           <Pencil aria-hidden="true" className="size-3.5" />
           {s.hasAny ? '계약 고치기' : '계약 정보 적기'}

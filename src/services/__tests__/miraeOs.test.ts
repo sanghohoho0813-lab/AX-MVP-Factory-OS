@@ -13,6 +13,9 @@ import { uiPreferencesRepository } from '../../repositories/uiPreferencesReposit
 import { readRaw, writeRaw } from '../../storage/localStore'
 import { MODULES, MODULE_GROUPS, NAV_SHORTCUTS, enabledModulesByGroup, isPilotHiddenPath, moduleForPath, navParentForPath, navPathForSidebar, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../../auth/currentUser'
+import { routeCrumbs } from '../../lib/wayfinding'
+import { CLIENT_FLOW, TOOL_FLOWS, flowPosition } from '../../content/flowSteps'
+import { CLIENT_DETAIL_TABS } from '../../config/clientDetailTabs'
 import { FUTURE_ITEMS } from '../../config/capabilityStatus'
 import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools, searchTools } from '../../config/toolRegistry'
 import { formatClockDate, formatClockTime } from '../../components/layout/HeaderClock'
@@ -2374,6 +2377,60 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const rows = agentLedger([{ id: 'z', companyName: '끝난업체', archivedAt: '2026-10-11T00:00:00.000Z', fees: [fee('z1', '2026-10-10', null), fee('z2', null, null), fee('z3', '2026-09-01', '2026-09-05')] }])
   check('D-213 정산: 보관한 업체의 줄 돈 100만은 남고(보관 표시) · 입금 전 · 이미 준 것은 빠짐', rows.length === 1 && rows[0].payable === 1_000_000 && rows[0].items.length === 1 && rows[0].items[0].archived === true && agentLedgerTotals(rows).payable === 1_000_000, JSON.stringify(rows))
 }
+/* ---------------- D-235 경로 줄 ---------------- */
+{
+  const names: Record<string, string> = { c1: '(주)샤인디자인', c2: '한솔정밀(주)' }
+  const cr = (pathname: string, search = '', extra: Partial<Parameters<typeof routeCrumbs>[0]> = {}) => routeCrumbs({ pathname, search, clientName: (id) => names[id] ?? null, ...extra })
+  const lab = (list: { label: string }[]) => list.map((c) => c.label).join(' › ')
+  const detail = cr('/ops/clients/c1', '?tab=smart')
+  check('D-235 경로 줄: 업체 화면 — 고객 관리 › 업체 이름 › 탭(맞춤 추천) · 앞 칸은 누를 곳 · 마지막은 지금 자리', lab(detail) === '고객 관리 › (주)샤인디자인 › 맞춤 추천' && detail[0].to === '/ops/clients' && detail[1].to === '/ops/clients/c1' && !detail[2].to, lab(detail))
+  check('D-235 경로 줄: 탭이 없으면 개요 · 영업에서 왔으면 영업 관리부터 · 이름 모르면 업체', lab(cr('/ops/clients/c1')) === '고객 관리 › (주)샤인디자인 › 개요' && lab(cr('/ops/clients/c1', '?tab=docs', { fromSales: true })) === '영업 관리 › (주)샤인디자인 › 서류' && lab(cr('/ops/clients/zz')) === '고객 관리 › 업체 › 개요')
+  const emp = cr('/tools/employment/diagnosis', '?client=c1', { lastClientTab: { clientId: 'c1', tab: 'smart' } })
+  check('D-235 경로 줄: 업체로 연 모듈 — 고객 관리 › 업체 › 맞춤 추천(마지막 탭) › 고용지원금 관리 › 채용 진단 · 탭 칸은 그 탭 주소', lab(emp) === '고객 관리 › (주)샤인디자인 › 맞춤 추천 › 고용지원금 관리 › 채용 진단' && emp[2].to === '/ops/clients/c1?tab=smart' && emp[3].to === '/tools/employment?client=c1', lab(emp))
+  check('D-235 경로 줄: 모듈 입구가 없는 탭(업무 일기 · 수금)에서 왔으면 가운데 칸 없이 업체 › 모듈', !lab(cr('/tools/employment/roster', '?client=c1', { lastClientTab: { clientId: 'c1', tab: 'journal' } })).includes('업무 일기') && lab(cr('/tools/employment', '?client=c1', { lastClientTab: { clientId: 'c1', tab: 'work' } })).includes('› 업무 ›'), lab(cr('/tools/employment/roster', '?client=c1', { lastClientTab: { clientId: 'c1', tab: 'journal' } })))
+  check('D-235 경로 줄: 다른 업체 탭 기억은 쓰지 않음 · 화면 없는 모듈 첫 화면', lab(cr('/tools/policy-funding', '?client=c1', { lastClientTab: { clientId: 'c2', tab: 'smart' } })) === '고객 관리 › (주)샤인디자인 › ' + (TOOLS.find((t) => t.key === 'policy-funding')?.label ?? ''), lab(cr('/tools/policy-funding', '?client=c1')))
+  const mk = cr('/tools/content/build', '?client=c2', { extras: [{ label: '짧은 영상 대본' }] })
+  check('D-235 경로 줄: 마케팅 — 영업 › 마케팅 · 브랜딩 › 홍보 글 만들기 › 업체 › 글 종류(화면이 붙인 꼬리)', lab(mk) === '영업 › 마케팅 · 브랜딩 › 홍보 글 만들기 › 한솔정밀(주) › 짧은 영상 대본' && mk[1].to === '/marketing' && mk[2].to === '/tools/content', lab(mk))
+  check('D-235 경로 줄: 콘텐츠 레이더 · 홈페이지', lab(cr('/marketing/youtube', '', { extras: [{ label: '이번 주 찍을 것' }] })) === '영업 › 마케팅 · 브랜딩 › 콘텐츠 레이더 › 이번 주 찍을 것' && lab(cr('/tools/homepage')) === '영업 › 마케팅 · 브랜딩 › 홈페이지 만들기', lab(cr('/tools/homepage')))
+  check('D-235 경로 줄: 오늘은 없음 · 일정 = 오늘 › 일정 · 고객 관리 목록 = 고객 › 없이 한 칸이라 없음', cr('/').length === 0 && lab(cr('/ops/calendar')) === '오늘 › 일정' && cr('/ops/clients').length === 0, [lab(cr('/ops/calendar')), lab(cr('/ops/clients'))])
+  check('D-235 경로 줄: 영업 탭 — 영업 › 영업 관리 › 미팅 준비', lab(cr('/sales/meeting')) === '영업 › 영업 관리 › 미팅 준비', lab(cr('/sales/meeting')))
+  const toolNoClient = cr('/tools/employment/diagnosis')
+  check('D-235 경로 줄: 업체 없이 연 모듈 — 분야 › 모듈 › 화면(분야 칸은 모듈 묶음 주소)', toolNoClient.length >= 2 && toolNoClient[toolNoClient.length - 1].label === '채용 진단' && toolNoClient.some((c) => c.label === '고용지원금 관리'), lab(toolNoClient))
+  // 모든 메뉴 주소에서 경로 줄이 깨지지 않는다(빈 칸 · 같은 이름 연달아 · 마지막 칸에 갈 곳 없음)
+  const bad: string[] = []
+  for (const m of [...MODULES.filter((x) => x.enabled), ...TOOLS.filter((t) => t.path).map((t) => ({ path: t.path as string }))]) {
+    for (const search of ['', '?client=c1']) {
+      const list = cr(m.path, search)
+      if (list.some((c) => !c.label.trim()) || list.some((c, i) => i > 0 && list[i - 1].label === c.label) || (list.length && list[list.length - 1].to)) bad.push(`${m.path}${search}: ${lab(list)}`)
+    }
+  }
+  check(`D-235 경로 줄: 메뉴 · 모듈 주소 전부(업체 있음/없음) — 빈 칸 · 같은 이름 연달아 · 마지막 칸 링크 0`, bad.length === 0, bad.slice(0, 5))
+}
+
+/* ---------------- D-235 일 순서(단계 안내 줄) ---------------- */
+{
+  const tabKeys = CLIENT_DETAIL_TABS.map((t) => t.key as string)
+  const c2 = flowPosition(CLIENT_FLOW, 'overview')
+  check('D-235 일 순서: 업체 — 서류 → 회사 정보 → 맞춤 추천 → 업무 → 고객에게 보내기 → 수금 · 회사 정보는 2/6 · 앞뒤 단계', CLIENT_FLOW.steps.map((x) => x.key).join(',') === 'docs,overview,smart,work,portal,fees' && c2.index === 1 && c2.prev?.key === 'docs' && c2.next?.key === 'smart' && c2.flow.steps.length === 6, c2)
+  check('D-235 일 순서: 업체 순서 · 순서 밖 탭은 모두 실제 탭 · 탭마다 순서 또는 설명이 있다', [...CLIENT_FLOW.steps.map((x) => x.key), ...Object.keys(CLIENT_FLOW.aside ?? {})].every((k) => tabKeys.includes(k)) && tabKeys.every((k) => flowPosition(CLIENT_FLOW, k).here !== null), tabKeys.filter((k) => !flowPosition(CLIENT_FLOW, k).here))
+  const pilotPos = flowPosition(CLIENT_FLOW, 'work', (k) => k !== 'portal')
+  check('D-235 일 순서: 팀장 화면(고객 플랫폼 없음) — 5단계 · 업무 다음은 수금', pilotPos.flow.steps.length === 5 && pilotPos.next?.key === 'fees' && pilotPos.index === 3, pilotPos)
+  const j = flowPosition(CLIENT_FLOW, 'journal')
+  check('D-235 일 순서: 업무 일기는 순서 밖 — 번호 없이 언제 여는지만', j.index === -1 && !j.prev && !j.next && !!j.here?.why.includes('고객에게는 보이지 않아요'), j)
+  // 모듈 순서 — 모든 단계 · 순서 밖 화면 키가 그 모듈 목차에 실제로 있다(이름이 바뀌면 여기서 걸린다)
+  const flowBad: string[] = []
+  for (const [key, f] of Object.entries(TOOL_FLOWS)) {
+    const tool = TOOLS.find((t) => t.key === key)
+    const secs = (tool?.sections ?? []).map((x) => x.key)
+    if (!tool) flowBad.push(`${key}: 도구 없음`)
+    for (const k of [...f.steps.map((x) => x.key), ...Object.keys(f.aside ?? {})]) if (!secs.includes(k)) flowBad.push(`${key}/${k}`)
+    for (const st of f.steps) if (!st.why.trim() || st.why.length > 90 || /AI/.test(st.why)) flowBad.push(`${key}/${st.key}: 설명`)
+  }
+  check('D-235 일 순서: 모듈 순서 키 = 목차 화면 · 설명 있음(90자 안 · 규칙 계산을 AI 라 부르지 않음)', flowBad.length === 0, flowBad)
+  const emp = flowPosition(TOOL_FLOWS.employment, 'roster')
+  check('D-235 일 순서: 고용지원금 — 명부 진단은 2/5 · 이전 채용 진단 · 다음 회차 일정 · 한눈에 보기는 순서 밖 설명', emp.index === 1 && emp.prev?.key === 'diagnosis' && emp.next?.key === 'schedule' && flowPosition(TOOL_FLOWS.employment, 'dashboard').index === -1 && !!flowPosition(TOOL_FLOWS.employment, 'dashboard').here, emp)
+}
+
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 void (0 as unknown as ClientOpsRecord)

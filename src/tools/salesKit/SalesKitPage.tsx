@@ -16,6 +16,7 @@ import { useModuleSection } from '../shared/ModuleRoute'
 import { useToolClient } from '../shared/toolClientContext'
 import SalesApp, { emptyData } from './orig/SalesApp.jsx'
 import { hydrateSalesStore } from './orig/store'
+import { HelpHeading } from '../../components/ui/fold'
 
 /** 이 OS 목차 키 ↔ 원본 화면 키 (다른 것은 '미팅 준비' 하나뿐) */
 const TO_TAB: Record<string, string> = { meeting: 'meetings' }
@@ -60,7 +61,7 @@ export function SalesKitPage() {
       <SalesApp tab={tab} onTab={onTab} focus={clientId ?? null} />
       {tab === 'briefing' && (
         <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
-          <h2 className="t-section text-slate-900">고객 관리 업체와 연결</h2>
+          <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
           <ModuleDashboard toolKey="sales-kit" />
         </section>
       )}

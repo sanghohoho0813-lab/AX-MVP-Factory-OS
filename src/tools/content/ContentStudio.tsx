@@ -29,6 +29,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { usePageCrumbs } from '../../lib/crumbStore'
 import {
   AD_TYPES,
   AD_TYPE_HINT,
@@ -212,6 +213,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [angleRound, setAngleRound] = useState(0)
   const [angleOpen, setAngleOpen] = useState(false)
   const [shown, setShown] = useState<Shown | null>(null)
+  // D-235 경로 줄 끝에 지금 만드는 글 종류(마케팅 · 브랜딩 › 홍보 글 만들기 › 업체 › 짧은 영상 대본)
+  usePageCrumbs(shown ? [{ label: KIND_LABEL[shown.draft.kind] }] : [])
   /** 고친 글(저장 전) — 고치기 칸을 닫아도 남는다 */
   const [editing, setEditing] = useState<DraftBlock[] | null>(null)
   /** D-209 고치기 칸이 열려 있는지 — '고치기 그만' 은 칸만 닫고 고친 글은 남긴다(전에는 말없이 버렸다) */

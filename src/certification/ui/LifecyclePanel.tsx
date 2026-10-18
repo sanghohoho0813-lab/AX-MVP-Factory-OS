@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { CalendarCheck, ChevronRight, ClipboardCheck } from 'lucide-react'
 import { Badge, Disclosure } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading } from '../../components/ui/fold'
 import { useToast } from '../../components/ui/toastContext'
 import { CERT_RULES } from '../rules/officialRules'
 import { CERT_STATUS_LABEL, CERT_STATUS_ORDER, COMPLETION_PROBLEM_LABEL, completionProblems, validUntilByYears, type CertLifecycle, type CertStatus, type CompletionInput } from '../core/lifecycle'
@@ -118,9 +119,9 @@ export function LifecyclePanel({
   return (
     <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-slate-50/60 p-3 sm:p-4" data-testid="cert-life" data-status={life.status}>
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="t-body inline-flex items-center gap-1.5 font-bold text-slate-900">
+        <HelpHeading as="h3" tight label="인증 진행 기록" className="t-body inline-flex items-center gap-1.5 font-bold text-slate-900">
           <ClipboardCheck aria-hidden="true" className="size-4 text-brand-600" /> 진행 기록
-        </h3>
+        </HelpHeading>
         <Badge tone={done ? 'success' : 'brand'}>
           <span data-testid="cert-life-status">{CERT_STATUS_LABEL[life.status]}</span>
           {viaProfile && <span className="sr-only">(회사 정보 인증서 칸)</span>}

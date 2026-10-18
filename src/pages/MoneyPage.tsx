@@ -287,6 +287,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           )}
           <Section
             title={`${Number(ym.slice(5, 7))}월 나간 돈`}
+            hint={hintFor('나간 돈 상세')}
             count={sum.cost.lines.length}
             action={
               sum.cost.lines.length > 0 ? (

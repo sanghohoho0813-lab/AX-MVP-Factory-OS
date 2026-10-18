@@ -1,4 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CLIENT_DETAIL_TABS as DETAIL_TABS, type ClientDetailTab } from '../config/clientDetailTabs'
+import { rememberClientNames, rememberClientTab } from '../lib/crumbStore'
 import { useIsPilot } from '../auth/osAccess'
 import { useOwnerAiAccess } from '../auth/ownerAiAccess'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
@@ -187,6 +189,8 @@ import { activeApplications, withApplyDocDone } from '../services/grants/grantAp
 import { usePortalDocRequests } from '../components/grants/usePortalDocRequests'
 import { ClientReportSheet } from '../components/ops/ClientReportSheet'
 import type { ReportPeriod } from '../services/clientReport'
+import { CLIENT_FLOW, flowPosition } from '../content/flowSteps'
+import { StepGuide, StepNext } from '../components/ui/StepGuide'
 
 
 
@@ -198,27 +202,7 @@ function hasContractInfo(r: ClientOpsRecord): boolean {
   return r.contract.signedAt !== '' || r.contract.kind !== '' || (r.contract.cashAmount ?? 0) > 0 || r.contract.policies.length > 0
 }
 
-type DetailTab = 'smart' | 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'ai'
-/**
- * D-129: 매일 쓰는 순서 — 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금.
- * 컨설팅(특허·MVP) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
- * 예전 '파일' 탭은 서류 탭 안으로 들어갔다(?tab=files 는 서류로 연다).
- */
-const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
-  // D-144: 개요 왼쪽 — 서류를 올리면 모든 모듈 판정 · 다음 행동이 여기 먼저(규칙 계산이라 'AI' 라고 부르지 않는다)
-  { key: 'smart', label: '맞춤 추천' },
-  { key: 'overview', label: '개요' },
-  { key: 'docs', label: '서류' },
-  { key: 'work', label: '업무' },
-  { key: 'journal', label: '업무 일기' },
-  { key: 'portal', label: '고객 플랫폼' },
-  { key: 'fees', label: '수금' },
-  { key: 'consulting', label: '컨설팅', hidden: true },
-  // D-151: 공고에서 '신청 준비' 를 건 업체는 줄에 보인다(아래 showTab)
-  { key: 'funding', label: '지원사업 신청', hidden: true },
-  // 대표 AI 작업실 — 기본 줄에 없고(탭 순서 그대로) 더보기에서 연다. 대표 전용
-  { key: 'ai', label: 'AI 작업실', hidden: true },
-]
+type DetailTab = ClientDetailTab
 const PILOT_HIDDEN_TABS = new Set<DetailTab>(['portal', 'consulting', 'ai'])
 function isDetailTab(v: string | null): v is DetailTab {
   return DETAIL_TABS.some((t) => t.key === v)
@@ -252,12 +236,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     else navigate(navFrom.path)
   }
   const focusedService = searchParams.get('svc')
+  // D-235: 업체 일 순서 — 팀장 화면에 없는 탭(고객 플랫폼)은 순서에서도 뺀다
+  const flowPos = flowPosition(CLIENT_FLOW, tab, (k) => !(pilot && PILOT_HIDDEN_TABS.has(k as DetailTab)))
   const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
   // D-152: 지원사업 신청 탭에서만 고객 플랫폼 연결 · 요청해 둔 서류를 읽는다
   const portalReq = usePortalDocRequests(workspaceId, clientId, '지원사업 신청에 필요한 서류입니다', tab === 'funding')
   const [record, setRecord] = useState<ClientOpsRecord | null>(null)
+  // D-235: 경로 줄 — 이 업체 이름 · 지금 탭을 기억(이 업체의 모듈로 가면 '고객 관리 › 업체 › 맞춤 추천 › 모듈' 로 잇는다)
+  const recordName = record?.companyName ?? ''
+  useEffect(() => {
+    if (clientId && recordName) rememberClientNames([{ id: clientId, companyName: recordName }])
+  }, [clientId, recordName])
+  useEffect(() => {
+    if (clientId) rememberClientTab(clientId, tab)
+  }, [clientId, tab])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -820,6 +814,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           )
         })}
       </ScrollHintRow>
+
+      {/* D-235: 지금 몇 번째 단계 · 무엇을 위한 것인지 · 이전/다음(탭 순서는 그대로 — 처음 쓰는 사람이 따라갈 순서만) */}
+      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
 
       {tab === 'smart' && (
         <Suspense fallback={<p className="t-sub text-slate-500">맞춤 추천을 계산하는 중…</p>}>
@@ -1834,6 +1831,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           />
         </>
       )}
+
+      <StepNext pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
 
 
       {reportOpen && (

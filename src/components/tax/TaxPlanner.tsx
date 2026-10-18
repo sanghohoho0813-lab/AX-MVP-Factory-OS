@@ -11,6 +11,8 @@ import { useSearchParams } from 'react-router-dom'
 import { scenarioPreset } from '../../services/scenarioPresets'
 import { BadgeCheck, ChevronDown, ClipboardCopy, ExternalLink, Plus, Printer, Save, Search, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { HelpHeading, HintTip } from '../ui/fold'
+import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../ui/toastContext'
 import { copyText } from '../consulting/studioParts'
 import { useToolClient } from '../../tools/shared/toolClientContext'
@@ -487,9 +489,9 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       )}
       {/* ① 원하는 것 */}
       <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
-        <h2 id="plan-want" className="t-card font-bold text-slate-900">
+        <HelpHeading id="plan-want" label="원하는 결과를 적으세요" className="t-card font-bold text-slate-900">
           원하는 결과를 적으세요{clientName ? ` — ${clientName}` : ''}
-        </h2>
+        </HelpHeading>
         {st.goals.length === 0 && (
           <p className="t-sub break-keep text-slate-600">
           예) &ldquo;1억 현금화하고 싶어&rdquo; · &ldquo;급여 실효세율 20%로&rdquo; · &ldquo;자녀에게 지분 10% 증여&rdquo;. 적은 낱말로 목표를 고르고, 세금 계산기 9종의 식으로 거꾸로 계산합니다.
@@ -579,7 +581,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
             </p>
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 id="plan-result" className="t-card font-bold text-slate-900">결과</h2>
+            <HelpHeading id="plan-result" label="절세 설계 결과" className="t-card font-bold text-slate-900">결과</HelpHeading>
             <p className="t-sub text-slate-600">
               <b className="font-bold text-amber-800">★</b> = 확실하지 않아 세무사 검증이 필요한 부분
             </p>
@@ -811,9 +813,9 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       {/* ② 현황 */}
       <section className="no-print flex flex-col gap-3" aria-labelledby="plan-now">
         <div className="flex flex-col gap-1.5">
-          <h2 id="plan-now" className="t-card font-bold text-slate-900">
+          <HelpHeading id="plan-now" label="이 회사 현황" className="t-card font-bold text-slate-900">
             이 회사 현황 <span className="t-sub font-normal text-slate-500">— 고치면 위 결과가 바로 바뀝니다</span>
-          </h2>
+          </HelpHeading>
           <div className="flex items-center gap-3" data-testid="plan-filled">
             <span className="t-sub shrink-0 font-semibold text-slate-700 tabular-nums">
               채운 칸 {filled}/{core.length}
@@ -1214,8 +1216,16 @@ function Fold({ title, open, testId, children }: { title: string; open: boolean;
   const [isOpen, setOpen] = useState(open)
   return (
     <details open={isOpen} onToggle={(e) => setOpen(e.currentTarget.open)} className="group rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
-      <summary className="tap flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[1rem] font-semibold text-slate-900">
-        <span className="min-w-0 break-keep">{title}</span>
+      <summary
+        className="tap flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[1rem] font-semibold text-slate-900"
+        // ? 를 눌러 설명을 볼 때는 접고 펴지 않는다(브라우저마다 다르게 굴지 않게)
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('[data-testid="hint-dot"]')) e.preventDefault()
+        }}
+      >
+        <HintTip tip={hintFor(title)} label={title} tight>
+          <span className="min-w-0 break-keep">{title}</span>
+        </HintTip>
         <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-slate-100 px-4 py-4">{children}</div>
@@ -1337,7 +1347,9 @@ function Holders({ st, setSt, totalShares, perShare }: { st: PlanState; setSt: (
 function ResultCard({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid={testId}>
-      <h3 className="t-card border-b-2 border-navy-900 pb-2 font-bold text-slate-900">{title}</h3>
+      <HelpHeading as="h3" tight wrapClassName="border-b-2 border-navy-900 pb-2" className="t-card font-bold text-slate-900">
+        {title}
+      </HelpHeading>
       {children}
     </section>
   )

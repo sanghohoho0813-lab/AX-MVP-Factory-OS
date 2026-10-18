@@ -7,6 +7,8 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading, HintTip } from '../../components/ui/fold'
+import { hintFor } from '../../content/sectionHints'
 import { ANSWER_LABEL, ITEM_VERDICT_LABEL, runSelfCheck, type Answer, type SelfCheckItem } from '../core/selfCheck'
 import { inspectionCards, mockInspection, PREP_STATE_LABEL, type InspectionQuestion, type PreparedAnswer } from '../core/inspection'
 import type { CertificationClientContext } from '../core/types'
@@ -56,7 +58,9 @@ export function SelfCheckFlow({ rule, items, ctx, answers, onAnswer, onDone }: {
       <Surface>
         <div className="flex flex-col gap-3" data-testid="selfcheck-result">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="t-section font-bold text-slate-900">{rule.label} MIRAE 사전진단 결과</h3>
+            <HelpHeading as="h3" label="사전진단 결과" className="t-section font-bold text-slate-900">
+              {rule.label} MIRAE 사전진단 결과
+            </HelpHeading>
             <ReadinessBadge r={result.readiness} />
           </div>
           <p className="t-sub break-keep text-slate-600">MIRAE 사전진단(자체 5단계)입니다 — 공식 자가진단이 아닙니다. 공식 점수는 아래 공식 기준으로 확인하세요.</p>
@@ -110,7 +114,9 @@ export function SelfCheckFlow({ rule, items, ctx, answers, onAnswer, onDone }: {
 function Block({ title, tone, lines }: { title: string; tone: string; lines: string[] }) {
   return (
     <div>
-      <p className={`t-sub font-semibold ${tone}`}>{title}</p>
+      <HintTip tip={hintFor(title)} label={title} tight>
+        <p className={`t-sub font-semibold ${tone}`}>{title}</p>
+      </HintTip>
       <ul className="mt-0.5 flex flex-col gap-0.5">
         {lines.map((l) => (
           <li key={l} className="t-sub break-keep text-slate-700">
@@ -134,7 +140,7 @@ export function InspectionFlow({ qs, ctx, labelOf, prep, onPrep }: { qs: Inspect
       <Surface>
         <div className="flex flex-col gap-3" data-testid="mock-result">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="t-section font-bold text-slate-900">실사 대비 상태</h3>
+            <HelpHeading as="h3" className="t-section font-bold text-slate-900">실사 대비 상태</HelpHeading>
             <ReadinessBadge r={result.readiness} />
           </div>
           <p className="t-sub text-slate-600">

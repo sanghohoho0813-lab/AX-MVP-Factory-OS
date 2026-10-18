@@ -9,6 +9,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronRight, FileText, Lightbulb } from 'lucide-react'
 import { Blank, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading, HintTip } from '../../components/ui/fold'
+import { hintFor } from '../../content/sectionHints'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -94,7 +96,9 @@ function Hero({ a, clientId }: { a: CertificationAssessment; clientId: string | 
   return (
     <Surface showEdge edge={a.recommendation === 'now' || a.recommendation === 'held' ? 'success' : 'brand'}>
       <div className="flex flex-col gap-2.5" data-testid="cert-hero" data-key={a.key}>
-        <span className="t-sub font-semibold text-brand-700">먼저 할 인증</span>
+        <HintTip tip={hintFor('먼저 할 인증')} label="먼저 할 인증" tight>
+          <span className="t-sub font-semibold text-brand-700">먼저 할 인증</span>
+        </HintTip>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="t-section font-bold text-slate-900">{a.label}</h2>
           <RecBadge rec={a.recommendation} />
@@ -275,7 +279,9 @@ export function CertOverview({
       <RoadmapLine roadmap={roadmap} />
       {rest.length > 0 && (
         <Surface padded={false}>
-          <h3 className="t-sub border-b border-slate-100 px-4 py-2.5 font-semibold text-slate-500 sm:px-5">{hero ? '다른 인증' : '인증별 상태'}</h3>
+          <HelpHeading as="h3" tight wrapClassName="border-b border-slate-100 px-4 sm:px-5" className="t-sub py-2.5 font-semibold text-slate-500">
+            {hero ? '다른 인증' : '인증별 상태'}
+          </HelpHeading>
           <ul className="flex flex-col divide-y divide-slate-100" data-testid="cert-rows">
             {rest.map((a) => (
               <CertRow key={a.key} a={a} clientId={clientId} />

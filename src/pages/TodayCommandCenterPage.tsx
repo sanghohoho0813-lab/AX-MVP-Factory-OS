@@ -57,7 +57,7 @@ import { agendaWhen, buildAgenda, type AgendaItem } from '../services/upcomingAg
 import { localDateOf, nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
-import { Fold } from '../components/ui/fold'
+import { Fold, HelpHeading } from '../components/ui/fold'
 import { useIsPilot } from '../auth/osAccess'
 import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -838,7 +838,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           ] as const
         ).map(([title, items, cls]) => (
           <div key={title} className="mt-4">
-            <h3 className={`text-[0.95rem] font-bold ${cls}`}>{title} <span className="font-semibold text-slate-400">{items.length}</span></h3>
+            <HelpHeading as="h3" tight label={title} className={`text-[0.95rem] font-bold ${cls}`}>
+              {title} <span className="font-semibold text-slate-400">{items.length}</span>
+            </HelpHeading>
             {items.length === 0 ? (
               <p className="mt-1 text-[0.9rem] text-slate-400">없음</p>
             ) : (

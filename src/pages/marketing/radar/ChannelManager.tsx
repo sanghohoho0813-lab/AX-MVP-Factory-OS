@@ -9,7 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Plus, Search, X } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
-import { Fold } from '../../../components/ui/fold'
+import { Fold, HelpHeading } from '../../../components/ui/fold'
 import { fmt, shortNum, type YtChannel } from '../../../services/marketing/ytBench'
 import { GROUPS, GROUP_LABEL, GROUP_PURPOSE, groupOf, type BenchmarkChannelGroup } from '../../../services/marketing/ytRadar'
 import { MAX_ADDED, type RadarPrefs } from '../../../services/marketing/radarStore'
@@ -78,9 +78,9 @@ export function ChannelManager({
       <div className="flex flex-col gap-5" data-testid="yt-channel-table">
         <section className="flex flex-col gap-3" aria-labelledby="radar-default-h" data-testid="radar-default-channels" data-count={defaultCount}>
           <div className="flex flex-col gap-0.5">
-            <h3 id="radar-default-h" className="t-card font-bold text-slate-900">
+            <HelpHeading as="h3" tight id="radar-default-h" label="기본 벤치마킹 채널" className="t-card font-bold text-slate-900">
               기본 벤치마킹 채널 <span className="t-sub font-semibold text-slate-500">{defaultCount}곳</span>
-            </h3>
+            </HelpHeading>
             <p className="t-meta break-keep text-slate-500">MIRAE 가 미리 골라 둔 채널입니다 — 채널마다 '왜 보는 채널인지' 를 적어 두었습니다.</p>
           </div>
           {GROUPS.map((g) => {
@@ -112,9 +112,9 @@ export function ChannelManager({
 
         <section className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="radar-added-h" data-testid="radar-added-channels" data-count={addedRows.length}>
           <div className="flex flex-col gap-0.5">
-            <h3 id="radar-added-h" className="t-card font-bold text-slate-900">
+            <HelpHeading as="h3" tight id="radar-added-h" label="내가 추가한 채널" className="t-card font-bold text-slate-900">
               내가 추가한 채널 <span className="t-sub font-semibold text-slate-500">{addedRows.length}곳</span>
-            </h3>
+            </HelpHeading>
             <p className="t-meta break-keep text-slate-500">[채널 추가] 로 직접 더한 채널 — 기본 채널과 똑같이 계산에 들어갑니다(최대 {MAX_ADDED}곳).</p>
           </div>
           {addedRows.length === 0 ? (

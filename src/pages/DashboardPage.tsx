@@ -23,6 +23,7 @@ import { MetricStrip } from '../components/dashboard/MetricStrip'
 import { PortfolioHealth } from '../components/dashboard/PortfolioHealth'
 import { ConsultingOpsBoard } from '../components/dashboard/ConsultingOpsBoard'
 import { Button } from '../components/ui/Button'
+import { HelpHeading } from '../components/ui/fold'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../components/ui/toastContext'
@@ -131,7 +132,7 @@ export function DashboardPage() {
       {continueList.length > 0 && (
         <section aria-labelledby="home-continue" data-tour="home-projects" className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h2 id="home-continue" className="text-[1.25rem] font-bold text-slate-900">이어서 할 프로젝트</h2>
+            <HelpHeading id="home-continue" className="text-[1.25rem] font-bold text-slate-900">이어서 할 프로젝트</HelpHeading>
             <button type="button" onClick={() => navigate('/clients')} className="text-[0.95rem] font-medium text-brand-700 hover:underline">
               전체 보기
             </button>
@@ -176,7 +177,7 @@ export function DashboardPage() {
       {/* C. 확인이 필요한 항목 */}
       {attention.length > 0 && (
         <section aria-labelledby="home-attention" className="flex flex-col gap-3">
-          <h2 id="home-attention" className="text-[1.25rem] font-bold text-slate-900">확인이 필요한 항목</h2>
+          <HelpHeading id="home-attention" className="text-[1.25rem] font-bold text-slate-900">확인이 필요한 항목</HelpHeading>
           <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
             {attention.map((j) => (
               <li key={j.project.id}>

@@ -8,6 +8,7 @@ import { withDocument } from '../../services/clientOpsService'
 import { filePortalDocument } from '../../services/docShelf'
 import type { CustomerEvent, PortalClientLink, PortalDocument, PortalProjection, PortalRequest, PortalUpdate } from '../../types/bridge'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { Modal } from '../ui/Modal'
 import { useToast } from '../ui/toastContext'
 import { EventCard } from './EventCard'
@@ -190,9 +191,9 @@ export function PortalTab({
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="flex items-center gap-2 text-[1.05rem] font-bold text-slate-900">
+            <HelpHeading as="h3" tight label="고객 화면 연결" className="flex items-center gap-2 text-[1.05rem] font-bold text-slate-900">
               <Link2 aria-hidden="true" className="size-4 text-slate-400" /> {brand.customerPlatformLabel} 연결
-            </h3>
+            </HelpHeading>
             {loading ? (
               <p className="mt-1 text-[0.92rem] text-slate-500">확인 중…</p>
             ) : link ? (
@@ -273,7 +274,7 @@ export function PortalTab({
           {/* 공유 서류 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-[1.05rem] font-bold text-slate-900">고객과 주고받는 서류 <span className="text-slate-400">{documents.length}</span></h3>
+              <HelpHeading as="h3" tight label="고객과 주고받는 서류" className="text-[1.05rem] font-bold text-slate-900">고객과 주고받는 서류 <span className="text-slate-400">{documents.length}</span></HelpHeading>
               <Button variant="secondary" onClick={() => setDocForm((f) => ({ ...f, open: true }))}>
                 <Plus aria-hidden="true" className="size-4" /> 서류 요청
               </Button>
@@ -367,7 +368,7 @@ export function PortalTab({
           {/* 고객 요청 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-[1.05rem] font-bold text-slate-900">고객이 보낸 요청 <span className="text-slate-400">{openRequests.length} 열림</span></h3>
+              <HelpHeading as="h3" tight label="고객이 보낸 요청" className="text-[1.05rem] font-bold text-slate-900">고객이 보낸 요청 <span className="text-slate-400">{openRequests.length} 열림</span></HelpHeading>
               {isLocal && (
                 <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoRequest(link.id, workspaceId), '샘플 요청을 만들었습니다 (연습용).')}>
                   <Sparkles aria-hidden="true" className="size-4" /> 샘플 요청 (연습용)
@@ -417,7 +418,7 @@ export function PortalTab({
 
           {/* 공개한 업데이트 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
-            <h3 className="text-[1.05rem] font-bold text-slate-900">고객에게 공개한 업데이트 <span className="text-slate-400">{published.length}</span></h3>
+            <HelpHeading as="h3" tight label="고객에게 공개한 업데이트" className="text-[1.05rem] font-bold text-slate-900">고객에게 공개한 업데이트 <span className="text-slate-400">{published.length}</span></HelpHeading>
             {published.length === 0 ? (
               <p className="mt-2 text-[0.92rem] text-slate-500">아직 공개한 업데이트가 없습니다. 내부 상태는 자동으로 나가지 않으니, "고객에게 업데이트"로 알려 주세요.</p>
             ) : (
@@ -454,7 +455,7 @@ export function PortalTab({
       {/* 고객 이벤트 */}
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[1.05rem] font-bold text-slate-900">이 고객의 상담신청 · 요청 <span className="text-slate-400">{events.length}</span></h3>
+          <HelpHeading as="h3" tight label="이 고객의 상담신청 · 요청" className="text-[1.05rem] font-bold text-slate-900">이 고객의 상담신청 · 요청 <span className="text-slate-400">{events.length}</span></HelpHeading>
           <Link to="/ops/inbox" className="text-[0.9rem] font-medium text-brand-700 hover:underline">상담신청함</Link>
         </div>
         {events.length === 0 ? (

@@ -24,6 +24,7 @@ import {
   type FactDecision,
 } from '../../services/customerFacts'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { Badge, Surface } from '../ui/primitives'
 import { josa } from '../../lib/josa'
 
@@ -107,7 +108,7 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
       <div className="flex flex-col gap-3" data-testid="fact-inbox" id="fact-inbox">
         <div className="flex flex-wrap items-center gap-2">
           <FileSearch aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-          <h2 className="t-card font-bold break-keep text-slate-900">확인이 필요한 정보</h2>
+          <HelpHeading className="t-card font-bold break-keep text-slate-900">확인이 필요한 정보</HelpHeading>
           <Badge tone="brand">{pending.length}건</Badge>
         </div>
         <p className="t-sub break-keep text-slate-600">서류에서 읽었지만 확실하지 않은 것만 남겼어요(확실한 것은 이미 넣었어요). 확인하면 모든 전문 모듈이 이 값을 씁니다.</p>
@@ -270,7 +271,11 @@ export function FactNumbersCard({ record, now, onCommit, hideTitle = false }: { 
 
   return (
     <section aria-labelledby={hideTitle ? undefined : 'fact-numbers'} className="flex flex-col gap-2" data-testid="fact-numbers">
-      {!hideTitle && <h2 id="fact-numbers" className="t-section text-slate-900">숫자 · 인증</h2>}
+      {!hideTitle && (
+        <HelpHeading id="fact-numbers" className="t-section text-slate-900">
+          숫자 · 인증
+        </HelpHeading>
+      )}
       {filled.length > 0 ? (
         <ul className="flex flex-col divide-y divide-slate-100">{filled.map((f) => row(f.key))}</ul>
       ) : (

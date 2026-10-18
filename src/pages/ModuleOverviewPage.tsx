@@ -21,6 +21,7 @@ import { clientEntryHref, featureDesc, featureIcon, featureLabel, featurePath } 
 import { notifyEntitlementsChanged, useEntitlements } from '../lib/entitlementsStore'
 import { todayLocalDate } from '../lib/appClock'
 import { setAccess, TRIAL_DAYS } from '../services/moduleAccess'
+import { MODULE_GUIDES } from '../content/flowSteps'
 
 export function ModuleOverviewPage() {
   const { moduleKey = '' } = useParams()
@@ -63,6 +64,39 @@ export function ModuleOverviewPage() {
           )}
         </div>
       </Surface>
+
+      {/* D-235: 처음 여는 사람이 따라 할 세 걸음 — 무엇을 위한 걸음인지까지 */}
+      {MODULE_GUIDES[m.key] && (
+        <Section title="이렇게 쓰세요">
+          <ol className="grid gap-2.5 md:grid-cols-3" data-testid="module-guide">
+            {MODULE_GUIDES[m.key].map((g, i) => {
+              const inner = (
+                <>
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className="t-card min-w-0 flex-1 font-bold break-keep text-slate-900">{g.title}</span>
+                    {g.to && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+                  </span>
+                  <span className="t-sub mt-1.5 block break-keep text-slate-600">{g.why}</span>
+                </>
+              )
+              return (
+                <li key={g.title} data-step={i + 1}>
+                  {g.to ? (
+                    <Link to={withClient(g.to, clientId)} className="ax-lift tap flex h-full flex-col rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 px-4 py-3.5 hover:border-brand-300">
+                      {inner}
+                    </Link>
+                  ) : (
+                    <div className="flex h-full flex-col rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 px-4 py-3.5">{inner}</div>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        </Section>
+      )}
 
       <Section title="들어 있는 기능" count={features.filter((f) => featurePath(f)).length}>
         <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-features">

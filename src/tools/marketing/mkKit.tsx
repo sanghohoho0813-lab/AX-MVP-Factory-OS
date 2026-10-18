@@ -13,6 +13,8 @@ import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { ContentKind } from '../../services/contentStudio'
+import { HintTip } from '../../components/ui/fold'
+import { hintFor } from '../../content/sectionHints'
 import { HERO, KIND_STYLE, TONE, type MkTone } from './mkTheme'
 
 /** 구역 제목 앞 색 아이콘 */
@@ -26,15 +28,21 @@ export function MkIcon({ icon: Icon, tone, size = 'md' }: { icon: LucideIcon; to
   )
 }
 
-/** 구역 제목줄 — 색 아이콘 + 제목 + 오른쪽 한 줄 */
-export function MkHead({ icon, tone, title, aside, children }: { icon: LucideIcon; tone: MkTone; title: ReactNode; aside?: ReactNode; children?: ReactNode }) {
+/**
+ * 구역 제목줄 — 색 아이콘 + 제목 + ? 설명 + 오른쪽 한 줄.
+ * 설명은 help 를 주거나, 제목이 글자면 목차 설명 사전에서 찾는다(없으면 ? 없이).
+ */
+export function MkHead({ icon, tone, title, aside, help, children }: { icon: LucideIcon; tone: MkTone; title: ReactNode; aside?: ReactNode; help?: string; children?: ReactNode }) {
+  const name = typeof title === 'string' ? title : ''
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-      <h2 className="t-section flex min-w-0 items-center gap-2.5 text-slate-900">
-        <MkIcon icon={icon} tone={tone} />
-        <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{title}</span>
-        {children}
-      </h2>
+      <HintTip tip={help ?? (name ? hintFor(name) : undefined)} label={name}>
+        <h2 className="t-section flex min-w-0 items-center gap-2.5 text-slate-900">
+          <MkIcon icon={icon} tone={tone} />
+          <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{title}</span>
+          {children}
+        </h2>
+      </HintTip>
       {aside && <span className="t-sub break-keep text-slate-600">{aside}</span>}
     </div>
   )

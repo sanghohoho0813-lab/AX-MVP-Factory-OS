@@ -15,6 +15,7 @@ import type {
   ConsultingOpsRecommendation,
 } from '../../services/consultingOpsService'
 import { StatusBadge } from '../ui/StatusBadge'
+import { HelpHeading } from '../ui/fold'
 
 interface ConsultingOpsBoardProps {
   brief: ConsultingOpsBrief
@@ -72,7 +73,7 @@ function OpsLane({ title, items, emptyText }: { title: string; items: Consulting
   return (
     <div className="min-w-0">
       <div className="border-b border-slate-100 px-5 py-3">
-        <h3 className="text-[0.95rem] font-semibold text-slate-800">{title}</h3>
+        <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">{title}</HelpHeading>
       </div>
       {items.length > 0 ? (
         <ul className="divide-y divide-slate-100">
@@ -127,7 +128,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
     <section aria-labelledby="consulting-ops" className="rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
-          <h2 id="consulting-ops" className="text-[0.9375rem] font-semibold text-slate-900">컨설팅 관제실</h2>
+          <HelpHeading id="consulting-ops" className="text-[0.9375rem] font-semibold text-slate-900">컨설팅 관제실</HelpHeading>
           <p className="mt-1 text-[0.875rem] text-slate-500">
             고객 답변, 마감, 정책자금 준비, 월 처리량을 한 번에 점검합니다.
           </p>
@@ -180,7 +181,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         <div className="min-w-0 border-b border-slate-100 px-5 py-4 xl:border-r xl:border-b-0">
           <div className="mb-3 flex items-center gap-2">
             <ListChecks aria-hidden="true" className="size-4 text-slate-400" />
-            <h3 className="text-[0.95rem] font-semibold text-slate-800">자동 운영 판단</h3>
+            <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">자동 운영 판단</HelpHeading>
           </div>
           {brief.recommendations.length > 0 ? (
             <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-1">
@@ -196,7 +197,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         <div className="min-w-0 px-5 py-4">
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp aria-hidden="true" className="size-4 text-slate-400" />
-            <h3 className="text-[0.95rem] font-semibold text-slate-800">단계별 부하</h3>
+            <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">단계별 부하</HelpHeading>
           </div>
           {brief.stageLoads.length > 0 ? (
             <ul className="flex flex-col gap-3">

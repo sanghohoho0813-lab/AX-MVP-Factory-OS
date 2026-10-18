@@ -162,7 +162,7 @@ export function ScreenTitle({
   )
 }
 
-/** 구역 제목 + 오른쪽 보조 행동 (예: 모두 보기). D-192: 마우스를 올리거나 ⓘ 를 누르면 무슨 기능인지(사전) */
+/** 구역 제목 + 오른쪽 보조 행동 (예: 모두 보기). D-192: 마우스를 올리거나 ? 를 누르면 무슨 기능인지(사전) */
 export function SectionTitle({
   title,
   count,
@@ -378,11 +378,13 @@ export function Disclosure({
   const [open, setOpen] = useState(defaultOpen)
   const id = useId()
   const longHint = !!hint && hint.length > 18
-  const tip = longHint ? hint : hintFor(title)
+  // ? 설명 — 무엇인지(사전) 먼저, 긴 현재 상황(hint)은 다음 줄에
+  const meaning = hintFor(title)
+  const tip = longHint ? (meaning ? `${meaning}\n${hint}` : hint) : meaning
   return (
     <div className="rounded-(--radius-panel) border border-slate-200 bg-white">
       <HintTip tip={tip} label={title} className="w-full pr-2">
-      {/* D-192: 한 줄로 — ▸ 제목 · 짧은 말(건수). 긴 설명은 ⓘ · 마우스를 올리면 */}
+      {/* D-192: 한 줄로 — ▸ 제목 · 짧은 말(건수). 긴 설명은 ? · 마우스를 올리면 */}
       <button
         type="button"
         aria-expanded={open}

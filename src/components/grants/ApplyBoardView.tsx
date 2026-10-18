@@ -12,6 +12,7 @@ import { dueText } from '../../services/clientOpsAlerts'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 
 const md = (iso: string | null | undefined) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
@@ -75,9 +76,9 @@ function Row({ row, record, today }: { row: BoardRow; record: ClientOpsRecord | 
 function Group({ title, rows, records, today, empty, testId }: { title: string; rows: BoardRow[]; records: Map<string, ClientOpsRecord>; today: string; empty: string; testId: string }) {
   return (
     <section className="flex flex-col gap-2" data-testid={testId}>
-      <h3 className="t-body font-semibold text-slate-900">
+      <HelpHeading as="h3" tight label={title} className="t-body font-semibold text-slate-900">
         {title} <span className="text-brand-700">{rows.length}</span>
-      </h3>
+      </HelpHeading>
       {rows.length === 0 ? (
         <p className="t-sub rounded-(--radius-control) border border-dashed border-slate-200 px-3 py-3 text-slate-500">{empty}</p>
       ) : (

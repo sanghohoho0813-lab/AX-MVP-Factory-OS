@@ -16,6 +16,7 @@ import { ChevronRight, FileSignature, PackageSearch, Search } from 'lucide-react
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle, Surface, type Tone } from '../../components/ui/primitives'
+import { HelpHeading } from '../../components/ui/fold'
 import { AiSoonButton } from '../../components/ui/AiSoonButton'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
@@ -329,7 +330,7 @@ function ProposalWork({
       {/* 고른 상품 */}
       <Surface className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="t-section text-slate-900">제안 상품</h2>
+          <HelpHeading className="t-section text-slate-900">제안 상품</HelpHeading>
           <p className="t-sub text-slate-500">
             <span data-testid="proposal-count">{picked.length}개</span> · 합계 <strong data-testid="proposal-sum" className="font-bold text-slate-900 tabular-nums">{sum.toLocaleString('ko-KR')}만원</strong>
             <span data-testid="proposal-split" className="tabular-nums"> (월납 {split.insurance.toLocaleString('ko-KR')}만 · 수수료 {split.fee.toLocaleString('ko-KR')}만)</span>
@@ -410,7 +411,7 @@ function ProposalWork({
 
       {/* 문서 */}
       <Surface className="flex flex-col gap-3">
-        <h2 className="t-section text-slate-900">문서 · 문구</h2>
+        <HelpHeading className="t-section text-slate-900">문서 · 문구</HelpHeading>
         <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7">
           {DOCS.map((x) => (
             <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border px-2 py-2 text-[0.875rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
@@ -441,7 +442,7 @@ function ProposalWork({
 
       {/* 월납 제안 */}
       <Surface className="flex flex-col gap-3" >
-        <h2 className="t-section text-slate-900">월납 보험료 제안</h2>
+        <HelpHeading className="t-section text-slate-900">월납 보험료 제안</HelpHeading>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block text-[0.875rem] text-slate-500">
             월납 (만원)

@@ -13,6 +13,7 @@ import {
 import { sortedNotes } from '../../services/clientOpsService'
 import { digitsOf, numberSegments } from '../../lib/format'
 import { Button } from '../ui/Button'
+import { HelpHeading } from '../ui/fold'
 import { useSessionDraft } from '../../lib/useSessionDraft'
 
 /** 번호 칸만 조각으로 나눈다 — 주소·회사명 같은 글자는 나누지 않는다 */
@@ -158,12 +159,12 @@ export function CompanyProfileCard({
             {filled}/{fields.length} 입력됨
           </span>
         ) : (
-          <h2 id="profile" className="t-section min-w-0 text-slate-900">
+          <HelpHeading id="profile" label="회사 기본 정보" className="t-section min-w-0 text-slate-900">
             회사 기본 정보
             <span className="t-meta ml-2 font-medium text-slate-500">
               {filled}/{fields.length} 입력됨
             </span>
-          </h2>
+          </HelpHeading>
         )}
         {/* 글자를 크게 쓰는 설정에서는 단추 두 개가 한 줄을 넘는다 — 줄여도 되고 접혀도 되게 둔다 */}
         {/* D-124: 휴대폰에서는 두 줄 격자(불러오기 한 줄 · 복사 둘) — 크기가 제각각인 단추 셋이 들쭉날쭉 쌓였다 */}
@@ -585,9 +586,9 @@ export function NotesSection({
   return (
     <section aria-labelledby="notes" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="notes" className="text-[1.3rem] font-bold text-slate-900">
+        <HelpHeading id="notes" className="text-[1.3rem] font-bold text-slate-900">
           메모
-        </h2>
+        </HelpHeading>
         <p className="text-[0.9rem] text-slate-500">{allowAdd ? '통화 내용 · 요청사항을 적어 두세요. 고치거나 지울 수 있습니다.' : '예전에 적은 메모입니다. 새로 적을 것은 위 기록 칸에 적으세요.'}</p>
       </div>
 

@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { ScreenTitle, Surface } from '../../components/ui/primitives'
+import { HelpHeading } from '../../components/ui/fold'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { NumberedList, PillList } from '../../components/sales/salesParts'
 import { listClients } from '../../services/clientOpsService'
@@ -204,7 +205,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
       <SalesTabs />
 
       <Surface className="flex flex-col gap-3">
-        <h2 className="t-section text-slate-900">주제별 — 지금 연락할 고객</h2>
+        <HelpHeading className="t-section text-slate-900">주제별 — 지금 연락할 고객</HelpHeading>
         {/* D-122: 연락할 곳이 있는 주제만 칸으로 — 없는 주제는 한 줄에 모은다(휴대폰에서 8칸이 화면 두 장이었다) */}
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-testid="topic-list">
           {topics.map(({ t, list: cs }, ti) => cs.length === 0 ? null : (
@@ -239,7 +240,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
 
       <div className="flex flex-col gap-3">
         {/* D-167: 영업 전략 · 크레탑 무기 · 절세 전략을 주제 하나로 합쳤다 — 종류 고르기 대신 찾기 하나 */}
-        <h2 className="t-section text-slate-900">컨설팅 주제 <span className="t-sub font-medium text-slate-500">· 같은 주제는 하나로 합침</span></h2>
+        <HelpHeading label="컨설팅 주제" className="t-section text-slate-900">컨설팅 주제 <span className="t-sub font-medium text-slate-500">· 같은 주제는 하나로 합침</span></HelpHeading>
         <div className="relative w-full sm:max-w-md">
           <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가지급금 · 승계 · 연구소 … 로 찾기" aria-label="전략 찾기" className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.95rem] focus:border-brand-500 focus:outline-none" />

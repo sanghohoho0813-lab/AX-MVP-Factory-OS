@@ -20,6 +20,7 @@ import { useCapabilitySet } from '../../auth/ownerAiAccess'
 import { NotFoundState } from '../ui/NotFoundState'
 import { FrameBridge } from './DeviceView'
 import { ViewingPilotBanner } from './ViewAsSwitch'
+import { Breadcrumbs } from './Breadcrumbs'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 
@@ -86,6 +87,8 @@ export function AppShell() {
             <StorageFullNotice />
             {/* D-164: 대표가 팀장 화면을 보는 동안 */}
             <ViewingPilotBanner />
+            {/* D-235: 경로 줄 — 어디를 눌러 들어와도 지금 어디 안에 있는지(앞 칸을 누르면 그 단계로) */}
+            <Breadcrumbs />
             <div key={shellKeyOf(location.pathname)} className="ax-rise">
               {/* D-95: 한 화면이 넘어져도 사이드바·머리줄은 남는다. 다른 화면으로 옮기면 풀린다 */}
               <ContentErrorBoundary resetKey={location.pathname}>

@@ -19,6 +19,7 @@ import { Building2, FileUp, ScanSearch, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, ScreenTitle, type Tone } from '../../components/ui/primitives'
+import { HelpHeading } from '../../components/ui/fold'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { PillList, StageBadge } from '../../components/sales/salesParts'
@@ -241,7 +242,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
       {/* ① 보고서 넣기 */}
       {!ui ? (
         <section data-testid="intake-input" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="t-card font-bold text-slate-900">크레탑 기업종합보고서를 넣어 주세요</h2>
+          <HelpHeading className="t-card font-bold text-slate-900">크레탑 기업종합보고서를 넣어 주세요</HelpHeading>
           <p className="t-sub -mt-1 break-keep text-slate-500">PDF 는 이 브라우저 안에서 글로 읽습니다(바깥으로 보내지 않음). 클라우드 저장을 쓰면 등록할 때 업체 서류함에도 올립니다.</p>
           <div role="group" aria-label="넣는 방법" className="inline-flex self-start rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1">
             {(
@@ -369,10 +370,10 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
 
               {/* 먼저 볼 것 · 추천 전략 · 관심사 */}
               <section data-testid="intake-insight" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
-                <h2 className="t-card inline-flex items-center gap-2 font-bold text-slate-900">
+                <HelpHeading label="1차 미팅 전에 먼저 볼 것" className="t-card inline-flex items-center gap-2 font-bold text-slate-900">
                   <Sparkles aria-hidden="true" className="size-5 text-brand-600" />
                   1차 미팅 전에 먼저 볼 것
-                </h2>
+                </HelpHeading>
                 <ul className="flex flex-col gap-1">
                   {digest.diagnosis.slice(0, 5).map((l) => (
                     <li key={l.text} className="t-sub flex items-start gap-2 break-keep text-slate-700">

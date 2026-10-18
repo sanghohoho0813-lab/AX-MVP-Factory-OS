@@ -14,6 +14,7 @@ import { clientTypeOf } from '../../services/clientType'
 import { emptyTrial, TRIAL_KIND_LABEL, type TrialKind, type TrialProfile } from '../../services/marketingTrial'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { useToast } from '../../components/ui/toastContext'
+import { HelpHeading } from '../../components/ui/fold'
 import { inputClass } from '../homepage/BlockFields'
 import { TrialForm } from './TrialForm'
 import { TONE } from './mkTheme'
@@ -132,10 +133,10 @@ export function SubjectPicker({
   return (
     <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5 shadow-sm" data-testid={testPrefix}>
       <div>
-        <h2 className="t-section flex items-center gap-2.5 text-slate-900">
+        <HelpHeading label={title} className="t-section flex items-center gap-2.5 text-slate-900">
           {headIcon && <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${t.solid}`}>{headIcon}</span>}
           {title}
-        </h2>
+        </HelpHeading>
         <p className="t-sub mt-1 break-keep text-slate-600">{desc}</p>
       </div>
 

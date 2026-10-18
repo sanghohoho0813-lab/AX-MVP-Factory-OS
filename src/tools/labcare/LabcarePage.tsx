@@ -23,6 +23,7 @@ import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { OrigLabcare } from './orig/OrigLabcare'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading } from '../../components/ui/fold'
 import { Badge, MetricTile, Section, Surface } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import type { Client } from './types'
@@ -183,7 +184,9 @@ function Bullets({ items, tone = 'neutral' }: { items: string[]; tone?: 'neutral
 function CardTitle({ children, badge }: { children: ReactNode; badge?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="t-card font-bold break-keep text-slate-900">{children}</h3>
+      <HelpHeading as="h3" tight className="t-card font-bold break-keep text-slate-900">
+        {children}
+      </HelpHeading>
       {badge}
     </div>
   )
@@ -223,7 +226,7 @@ export function LabcarePage() {
         <>
           <OrigLabcare section="dashboard" />
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
-            <h2 className="t-section text-slate-900">고객 관리 업체와 연결</h2>
+            <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
             <ModuleDashboard toolKey="labcare" />
           </section>
         </>
