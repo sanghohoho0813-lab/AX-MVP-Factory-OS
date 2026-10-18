@@ -28,6 +28,8 @@ const go = async (page, path) => {
   await page.goto(BASE + path, { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
 }
+/** 탭을 옮긴 뒤 단계 안내가 그 단계로 바뀔 때까지(맞춤 추천 탭은 판정 계산이 많아 0.5초 안에 다 그려지지 않을 때가 있다) */
+const settle = (page, step) => page.waitForFunction((s) => document.querySelector('[data-testid="step-guide"]')?.getAttribute('data-step') === s, step, { timeout: 5000 }).then(() => page.waitForTimeout(300)).catch(() => {})
 const over = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
@@ -52,10 +54,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const g = guide(page)
   check('W2 맞춤 추천 = 업체 일 순서 3 / 6단계 · 무엇을 위한 단계인지 한 문장', (await g.getAttribute('data-index')) === '3' && (await g.getAttribute('data-total')) === '6' && /맞춤 추천 — .+/.test(await page.getByTestId('step-why').innerText()), await g.innerText())
   await page.getByTestId('step-next-top').click()
-  await page.waitForTimeout(500)
+  await settle(page, 'work')
   check('W2 [다음: 업무 진행] → 업무 탭 · 4 / 6 · 경로 줄 끝 = 업무', /tab=work/.test(page.url()) && (await guide(page).getAttribute('data-index')) === '4' && (await crumbText(page)).endsWith('› 업무'), [page.url(), await crumbText(page)])
   await page.getByTestId('step-prev').click()
-  await page.waitForTimeout(500)
+  await settle(page, 'smart')
   check('W2 [이전] → 맞춤 추천으로 돌아옴', /tab=smart/.test(page.url()) && (await guide(page).getAttribute('data-index')) === '3', page.url())
 
   // 화면 끝 '다음 단계'
