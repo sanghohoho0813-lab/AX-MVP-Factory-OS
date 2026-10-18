@@ -17,12 +17,12 @@ import { SCENARIO_MODULE_LABEL, SCENARIO_PRESETS, scenarioPath, type ScenarioMod
 import {
   GOAL_LABEL,
   cashPlan,
+  filledTaxProfile,
   giftPlan,
   goalNeeds,
   inheritancePlan,
   loanPlan,
   parseGoalText,
-  profileSuggestions,
   retirePlan,
   salaryPlan,
   shareValueOf,
@@ -108,11 +108,8 @@ const TAX_CORE: Partial<Record<GoalKey, string[]>> = {
 
 /** 절세 현황 — 비어 있는 칸은 회사 정보로(절세 설계 '채우기' 와 같은 값) */
 export function scenarioTaxProfile(record: ClientOpsRecord, today: string): { profile: TaxProfile; filledFrom: string[] } {
-  const base: TaxProfile = Object.fromEntries(Object.entries(record.taxProfile ?? {}).filter(([, v]) => typeof v === 'string' && v.trim() !== ''))
-  const sug = profileSuggestions(record, base, today)
-  const profile: TaxProfile = { ...base }
-  for (const s of sug) profile[s.key] = s.value
-  return { profile, filledFrom: sug.map((s) => s.from) }
+  const { profile, filledFrom } = filledTaxProfile(record, today)
+  return { profile, filledFrom }
 }
 
 function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit<ScenarioRun, 'id' | 'module' | 'moduleLabel' | 'title' | 'when' | 'openPath' | 'request' | 'fit'> {

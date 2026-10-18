@@ -48,6 +48,7 @@ import {
 } from '../marketing/ytRadar'
 import { briefText, confirmInput, customIdea, ideaFromOpportunity, lateOf, listIdeas, loadPrefs, normalizeIdea, normalizePrefs, removeIdea, saveIdea, savePrefs, selectedIdeas, stageCounts, weekRange, weekSchedule } from '../marketing/radarStore'
 import { kitText, shootKit } from '../marketing/shootKit'
+import { learnFromMine, linkedVideo, matchScore, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl } from '../marketing/myPerformance'
 import {
   boardOf,
   byHour,
@@ -1050,6 +1051,62 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const sp = prepareFeed(sampleFeed(NOW), NOW)
   const tps = extractTopics(periodVideos(sp.videos, 'month'), sp.channelWords)
   check("E9 단어로 본 주목 주제 'n개 채널' = 센 영상 속 채널 수 · 편수 = 목록 길이 · 최고 조회수 = 목록 첫 영상", tps.length > 0 && tps.every((t) => t.hits.length === t.videos && chCount(t.hits) === t.channels && t.hits[0]?.views === t.topViews), tps.map((t) => `${t.keyword}:${t.videos}/${t.hits.length}`))
+}
+
+/* ---------------- D-232 내 콘텐츠 성과 — 올린 영상 ↔ 내 채널 영상(피드 안에서만) ---------------- */
+{
+  check(
+    'P1 유튜브 주소 → 영상 번호(watch · youtu.be · shorts · live · embed · m.) · 유튜브 아님/모양 틀림은 빈 글',
+    youtubeIdOf('https://www.youtube.com/watch?v=mineVid0001&t=3s') === 'mineVid0001' &&
+      youtubeIdOf('https://youtu.be/mineVid0002?si=x') === 'mineVid0002' &&
+      youtubeIdOf('https://youtube.com/shorts/mineVid0003') === 'mineVid0003' &&
+      youtubeIdOf('https://m.youtube.com/watch?v=mineVid0004') === 'mineVid0004' &&
+      youtubeIdOf('https://www.youtube.com/live/mineVid0005') === 'mineVid0005' &&
+      youtubeIdOf('https://www.youtube.com/embed/mineVid0006') === 'mineVid0006' &&
+      youtubeIdOf('https://blog.naver.com/abc/123') === '' &&
+      youtubeIdOf('https://youtu.be/short') === '' &&
+      youtubeIdOf('javascript:alert(1)') === '' &&
+      youtubeIdOf('') === '' &&
+      youtubeWatchUrl('mineVid0001') === 'https://www.youtube.com/watch?v=mineVid0001',
+  )
+  const meBase = Array.from({ length: 5 }, (_, i) => vid(`meBase0000${i}`, 'me', `평범한 경영 이야기 ${i}`, (12 + i * 3) * D, 1_000 + i))
+  const otherBase = Array.from({ length: 5 }, (_, i) => vid(`otBase0000${i}`, 'ot', `다른 채널 ${i}`, (12 + i * 3) * D, 50_000))
+  const feed = {
+    channels: [ch('me', '내 채널', 3_000, 1, true), ch('ot', '벤치마킹', 90_000, 1)],
+    videos: [
+      ...meBase,
+      ...otherBase,
+      vid('mineVid0001', 'me', '정책자금 상담 전 꼭 준비할 서류 5가지', 3 * D, 3_000),
+      vid('mineVid0002', 'me', 'Claude로 계약서 5분 요약했더니', 20 * D, 800),
+      vid('mineVid0007', 'me', '정책자금 서류 준비 한 번에 정리', 60 * D, 1_200),
+      vid('otherVid001', 'ot', '정책자금 상담 전 준비할 서류', 2 * D, 90_000),
+    ],
+  }
+  const rvMine = radarVideos(prepareFeed(feed, NOW), { now: NOW })
+  const mine = rvMine.filter((v) => v.mine)
+  const byId = new Map(mine.map((v) => [v.id, v]))
+  const idea = (id: string, topic: string, extra: Record<string, unknown> = {}) => normalizeIdea({ topic, savedAt: '2026-10-05T00:00:00.000Z', status: 'filmed', ...extra }, id)!
+  const A = idea('A', '정책자금 상담 전 준비할 서류', { source: 'custom', key: 'custom:A' })
+  const B = idea('B', 'Claude 활용', { type: 'axai', link: 'https://youtu.be/mineVid0002', savedAt: '2026-09-20T00:00:00.000Z' })
+  const C = idea('C', '연구소 설립', { link: 'https://www.youtube.com/shorts/mineVid0003' })
+  check('P2 내 채널 영상만 — 벤치마킹 채널 영상은 성과 후보가 아님', mine.length === 8 && !mine.some((v) => v.id === 'otherVid001'), mine.length)
+  check('P3 올린 주소의 영상이 내 채널 피드에 있으면 이어짐 · 없으면 없음(짐작 안 함)', linkedVideo(B, byId)?.id === 'mineVid0002' && linkedVideo(C, byId) === null && linkedVideo(A, byId) === null)
+  const p1 = perfOf(byId.get('mineVid0001')!)
+  const p2 = perfOf(byId.get('mineVid0002')!)
+  check('P4 평소 대비 = 레이더와 같은 식(나이 보정) · 잘 됨/보통/낮음 · 올린 지 · 조회', p1.x !== null && p1.x > 1.5 && p1.tone === 'good' && p1.label.startsWith('평소 ') && p1.meta.includes('올린 지 3일') && p1.meta.includes('조회 3,000') && p2.tone !== 'good', { p1: [p1.x, p1.tone, p1.label, p1.meta], p2: [p2.x, p2.tone] })
+  const sug = suggestMatches([A, B, C], mine)
+  check("P5 주소가 없는 줄에 '이 영상인가요?' — 주제가 들어간 내 영상(담은 뒤 올린 것) · 벤치마킹 채널 같은 제목은 아님", sug.get('A')?.id === 'mineVid0001' && !sug.has('B') && !sug.has('C'), [...sug.entries()].map(([k, v]) => `${k}:${v.id}`))
+  check('P6 담기 30일보다 전에 올린 영상(담기 51일 전)은 후보가 아님', ![...sug.values()].some((v) => v.id === 'mineVid0007'))
+  const A2 = idea('A2', '정책자금 서류 준비', { savedAt: '2026-08-01T00:00:00.000Z' })
+  const sug2 = suggestMatches([A, A2], mine)
+  check('P7 같은 영상은 한 줄에만(점수 높은 줄) · 다른 줄은 다음 후보', sug2.get('A')?.id === 'mineVid0001' && sug2.get('A2')?.id !== 'mineVid0001', [...sug2.entries()].map(([k, v]) => `${k}:${v.id}`))
+  check('P8 낱말이 1개만 겹치면 묻지 않음(점수 2 이상) · 주제가 통째로 들어가면 10', matchScore(idea('Z', '세무조사 대응'), '정책자금 상담 전 꼭 준비할 서류') < 2 && matchScore(A, '정책자금 상담 전 준비할 서류 총정리') === 10)
+  const one = learnFromMine([A, B, C], mine)
+  check("P9 이어진 영상 1편 — '아직 한 편' (비교는 두 편부터)", one.linked === 1 && one.measured === 1 && one.lines.length === 1 && one.lines[0].startsWith('아직 한 편'), one.lines)
+  const A3 = { ...A, link: youtubeWatchUrl('mineVid0001') }
+  const two = learnFromMine([A3, B, C], mine)
+  check('P10 두 편부터 — 축별 평균 평소 대비(높은 순) · 가장 잘 된 영상 · 직접 담은 주제는 따로', two.measured === 2 && two.byAxis[0].label === '직접 담은 주제' && two.byAxis.some((r) => r.label === 'AX · AI') && two.best?.idea.id === 'A' && two.lines[0].startsWith('우리 채널에서는 직접 담은 주제') && two.lines.some((l) => l.startsWith('가장 잘 된 영상')), two.lines)
+  check('P11 내 채널 영상이 없으면 아무것도 잇지 않음(빈 결과)', suggestMatches([A], []).size === 0 && learnFromMine([A3], []).linked === 0)
 }
 
 console.log(`\nyoutube: ${passed} passed, ${failed} failed`)

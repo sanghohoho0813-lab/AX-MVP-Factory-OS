@@ -23,6 +23,7 @@ import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
+import { filledTaxProfile, loanPlan, retirePlan, viewProfile } from './taxPlan'
 
 export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
 
@@ -63,6 +64,8 @@ export interface InsightContext {
   today: string
   facts: ClientFacts
   notices: readonly GrantNotice[]
+  /** D-232 고객 관리 카드 띠처럼 판정 색만 필요할 때 — 무거운 계산(세금 계산기)은 건너뛴다(판정 색은 같다) */
+  light?: boolean
 }
 
 type Provider = (c: InsightContext) => Insight | null
@@ -204,23 +207,49 @@ const employmentInsight: Provider = ({ record }) => {
   const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
   const fromText = /최대\s*([\d,]+)\s*만원/.exec(roster.summary)?.[1]
   const total = typeof saved === 'number' && saved > 0 ? saved : fromText ? Number(fromText.replace(/,/g, '')) * 10_000 : 0
+  // D-232 통합고용세액공제 — 명부 진단 화면이 전년 인원까지 넣고 계산해 붙인 값만(짐작하지 않음). 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
+  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown } } | null
+  const credit = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
+  const newHires = typeof data?.counts?.newHireCount === 'number' ? data.counts.newHireCount : 0
+  const creditLine = credit > 0 ? `통합고용세액공제 예상 약 ${manwonText(credit)}(1차 추정 · 세무사 확인)` : newHires > 0 ? `최근 1년 새로 들어온 직원 ${newHires}명 — 전년 직원 수를 넣으면 통합고용세액공제도 계산해요` : ''
+  const candidates = roster.verdict === 'candidates'
+  const amount = candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)` : credit > 0 ? `세액공제 약 ${manwonText(credit)}(1차 추정)` : undefined
+  const first = hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, '')
   return {
-    amount: roster.verdict === 'candidates' && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)` : undefined,
+    amount,
     key: 'employment',
     label: '고용지원금',
-    tone: roster.verdict === 'candidates' ? 'good' : 'no',
-    headline: roster.verdictLabel || roster.title,
-    detail: hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, ''),
+    // 지원금 후보가 없어도 세액공제를 계산해 둔 업체는 제안할 거리가 있다(검토해 볼 만함)
+    tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
+    headline: candidates || credit === 0 ? roster.verdictLabel || roster.title : `통합고용세액공제 예상 약 ${manwonText(credit)}`,
+    detail: [first, creditLine].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',
-    action: roster.verdict === 'candidates' ? `고용지원금 — ${roster.verdictLabel}` : null,
+    action: candidates ? `고용지원금 — ${roster.verdictLabel}` : credit > 0 ? '통합고용세액공제 — 세무사와 신고 확인' : null,
   }
+}
+
+/** D-191 연구소 도구가 붙인 가장 최근 세액공제 계산(연간 · 원) — 없으면 0 */
+function labCreditOf(record: ClientOpsRecord): number {
+  for (const r of record.toolResults) {
+    if (r.toolKey !== 'labcare') continue
+    const d = r.data as { kind?: unknown; estimate?: { annual?: unknown } } | null
+    if (d?.kind === 'tax' && typeof d.estimate?.annual === 'number' && d.estimate.annual > 0) return d.estimate.annual
+  }
+  return 0
 }
 
 const labInsight: Provider = ({ record, facts }) => {
   const open = `/tools/labcare${q(record)}`
-  if (usableFactValue(record, 'researchLab')) return { key: 'labcare', label: '연구소', tone: 'done', headline: '연구소(전담부서)가 있어요 — 사후관리 · 세액공제를 챙길 때', detail: String(usableFactValue(record, 'researchLab')), missing: [], openPath: open, openLabel: '연구소 관리', action: null }
+  const lab = usableFactValue(record, 'researchLab')
+  if (lab) {
+    // D-232: 연구소가 있으면 '연구개발비 세액공제를 챙겼나' 가 다음 제안이다(못 받은 해는 경정청구 5년) — 계산이 붙어 있으면 그 금액
+    const credit = labCreditOf(record)
+    const taxOpen = `/tools/labcare/tax${q(record)}`
+    if (credit > 0) return { key: 'labcare', label: '연구소', tone: 'good', headline: `연구소가 있어요 — 연구개발비 세액공제 연간 약 ${manwonText(credit)}`, detail: `${String(lab)} · 신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)`, missing: [], openPath: taxOpen, openLabel: '세액공제 계산 보기', action: '연구소 — 연구개발비 세액공제 챙기기', amount: `세액공제 연간 약 ${manwonText(credit)}` }
+    return { key: 'labcare', label: '연구소', tone: 'maybe', headline: '연구소(전담부서)가 있어요 — 연구개발비 세액공제를 챙겼는지 볼 때', detail: `${String(lab)} · 연구원 인건비를 넣으면 연간 공제액을 바로 계산해요`, missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 확인' }
+  }
   const last = latestToolResult(record, 'labcare')
   if (last) {
     // D-191: 세액공제 계산 결과가 붙어 있으면 연간 금액
@@ -249,12 +278,66 @@ const cretopInsight: Provider = ({ record }) => {
   return { key: 'cretop', label: '크레탑', tone: 'done', headline: last.verdictLabel || last.title, detail: last.summary.split('\n').find((l) => l.trim()) ?? '', missing: [], openPath: last.openPath || open, openLabel: '크레탑 분석 보기', action: null }
 }
 
-const taxInsight: Provider = ({ record }) => {
+/*
+ * D-232 절세 — 절세 설계 엔진(세금 계산기 9종 식 그대로)으로 업체 숫자에서 바로 나오는 금액까지.
+ *  - 가지급금 잔액이 있으면: 07 가지급금 계산기로 해마다 손해 → 가능성 높음(지금 새는 돈).
+ *  - 대표 취임일 · 월 급여가 있으면: 02 퇴직급여 한도 · 03 퇴직소득세 → 검토해 볼 만함.
+ *  - 숫자가 없으면 짐작하지 않는다(예전처럼 '찾아볼 수 있어요' + 받을 것).
+ *  - light(고객 관리 카드 띠) — 판정 색만 필요해 계산은 건너뛴다(가지급금이 있으면 가능성 높음 · 같은 답).
+ */
+const taxInsight: Provider = ({ record, today, light }) => {
   const open = `/tools/tax${q(record)}`
   const hasShares = record.shareholderRegister.length > 0
   const filled = Object.values(record.taxProfile ?? {}).filter((v) => String(v).trim() !== '').length
   if (!hasShares && filled === 0) return { key: 'tax', label: '절세 설계', tone: 'need', headline: '주주명부 · 대표 급여를 알면 급여 · 배당 · 퇴직금 절세를 계산해요', detail: '', missing: ['주주명부', '대표 급여'], openPath: open, openLabel: '절세 설계', action: null }
-  return { key: 'tax', label: '절세 설계', tone: 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — 원하는 결과로 절세 방법을 찾아볼 수 있어요`, detail: '', missing: hasShares ? [] : ['주주명부'], openPath: open, openLabel: '절세 설계 열기', action: null }
+  const { profile, filledKeys } = filledTaxProfile(record, today)
+  const p = viewProfile(profile)
+  const preset = (id: string) => `${open}&preset=${id}`
+  const found: { tone: InsightTone; headline: string; short: string; amount: string; action: string | null; openPath: string; openLabel: string; note: string }[] = []
+  if (p.loanBalance > 0) {
+    const loan = light ? null : loanPlan(p)
+    const year = loan?.ok ? loan.yearLoss : 0
+    found.push({
+      tone: 'good',
+      // 금액은 바로 아래 초록 줄(amount)에 — 머리글에 같은 숫자를 두 번 쓰지 않는다
+      headline: year > 0 ? `가지급금 ${manwonText(p.loanBalance)} — 그대로 두면 인정이자 · 세금으로 해마다 새요` : `가지급금 ${manwonText(p.loanBalance)} — 정리하는 길을 찾아볼 때`,
+      short: year > 0 ? `가지급금 해마다 약 ${manwonText(year)} 손해` : `가지급금 ${manwonText(p.loanBalance)}`,
+      amount: year > 0 ? `해마다 약 ${manwonText(year)} 손해` : '',
+      action: '가지급금 정리 — 갚는 가장 싼 길 찾기',
+      openPath: preset('tax-loan'),
+      openLabel: '가지급금 정리 설계',
+      note: p.monthlySalary > 0 ? '' : '대표 급여를 모르면 한계세율을 낮게 잡아 손해가 작게 나와요',
+    })
+  }
+  if (!light && p.ceoStartDate && p.monthlySalary > 0) {
+    const ret = retirePlan(p, today)
+    if (ret.ok && ret.limit > 0)
+      found.push({
+        tone: 'maybe',
+        headline: `대표 퇴직금 — 지금 한도까지 받으면 세후 약 ${manwonText(ret.net)}`,
+        short: `퇴직금 한도 약 ${manwonText(ret.limit)}`,
+        amount: `퇴직금 한도 약 ${manwonText(ret.limit)}`,
+        action: null,
+        openPath: preset('tax-retire'),
+        openLabel: '퇴직금 설계',
+        note: filledKeys.includes('ceoStartDate') ? '취임일은 설립일로 보고 계산' : '',
+      })
+  }
+  const top = found[0]
+  if (!top) return { key: 'tax', label: '절세 설계', tone: 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — 원하는 결과로 절세 방법을 찾아볼 수 있어요`, detail: '', missing: hasShares ? [] : ['주주명부'], openPath: open, openLabel: '절세 설계 열기', action: null }
+  const others = found.slice(1).map((f) => f.short)
+  return {
+    key: 'tax',
+    label: '절세 설계',
+    tone: top.tone,
+    headline: top.headline,
+    detail: [others.length ? `그 밖에 · ${others.join(' · ')}` : '', top.note, '세금 계산기 식 그대로 · 실행 전 세무사 검토'].filter(Boolean).join(' · '),
+    missing: [!hasShares ? '주주명부' : '', p.monthlySalary > 0 ? '' : '대표 급여'].filter(Boolean),
+    openPath: top.openPath,
+    openLabel: top.openLabel,
+    action: top.action,
+    amount: top.amount || undefined,
+  }
 }
 
 /**
@@ -281,11 +364,11 @@ export const INSIGHT_PROVIDERS: { key: string; run: Provider }[] = [
 const TONE_RANK: Record<InsightTone, number> = { good: 0, maybe: 1, done: 2, need: 3, no: 4 }
 
 /** 업체 하나 → 모듈별 판정(좋은 것 먼저). 한 모듈이 실패해도 나머지는 보인다 */
-export function buildInsights(record: ClientOpsRecord, today: string, notices: readonly GrantNotice[], usable: (key: string) => boolean = () => true): Insight[] {
+export function buildInsights(record: ClientOpsRecord, today: string, notices: readonly GrantNotice[], usable: (key: string) => boolean = () => true, light = false): Insight[] {
   const base = clientFacts(record, new Date(`${today}T00:00:00`))
   // 업종 칸이 비어 있으면 사업자등록증의 업태 · 종목으로(서류만 올려도 판정이 나오게)
   const facts = base.industryText ? base : { ...base, industryText: [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' ') }
-  const ctx: InsightContext = { record, today, facts, notices }
+  const ctx: InsightContext = { record, today, facts, notices, light }
   const out: Insight[] = []
   for (const p of INSIGHT_PROVIDERS) {
     if (!usable(p.key)) continue
@@ -327,7 +410,7 @@ export interface RecoChip {
  * (업체마다 공고 1,000건을 다시 대 보지 않는다).
  */
 export function cardRecoChips(record: ClientOpsRecord, today: string, grantFit: number, usable: (key: string) => boolean = () => true): RecoChip[] {
-  const ins = buildInsights(record, today, [], (k) => k !== 'grants' && usable(k)).filter(isPick)
+  const ins = buildInsights(record, today, [], (k) => k !== 'grants' && usable(k), true).filter(isPick)
   const chips: RecoChip[] = ins.map((i) => ({ key: i.key, label: i.label, tone: i.tone as RecoChip['tone'] }))
   if (grantFit > 0 && usable('grants')) chips.unshift({ key: 'grants', label: `지원사업 ${grantFit}건`, tone: 'good' })
   return chips.map((c, i) => ({ c, i })).sort((a, b) => TONE_RANK[a.c.tone] - TONE_RANK[b.c.tone] || a.i - b.i).map((v) => v.c)

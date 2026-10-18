@@ -252,6 +252,15 @@ export function profileSuggestions(record: ClientOpsRecord | null, profile: TaxP
   return out
 }
 
+/** 절세 현황 — 비어 있는 칸은 회사 정보로(절세 설계 '채우기' 와 같은 값). 상황 예시 · 맞춤 추천이 같은 값을 쓴다 */
+export function filledTaxProfile(record: ClientOpsRecord, today: string): { profile: TaxProfile; filledFrom: string[]; filledKeys: ProfileKey[] } {
+  const base: TaxProfile = Object.fromEntries(Object.entries(record.taxProfile ?? {}).filter(([, v]) => typeof v === 'string' && v.trim() !== ''))
+  const sug = profileSuggestions(record, base, today)
+  const profile: TaxProfile = { ...base }
+  for (const s of sug) profile[s.key] = s.value
+  return { profile, filledFrom: sug.map((s) => s.from), filledKeys: sug.map((s) => s.key) }
+}
+
 /* ------------------------------------------------------------------ */
 /* 주주명부                                                              */
 /* ------------------------------------------------------------------ */

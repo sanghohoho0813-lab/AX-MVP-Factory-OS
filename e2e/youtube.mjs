@@ -1063,6 +1063,81 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await ctx.close()
 }
 
+// D-232 내 콘텐츠 성과 — 올린 영상 ↔ 내 채널 영상(레이더가 받은 피드 안에서만 · 유튜브 더 부르지 않음).
+// 주소가 없으면 '이 영상인가요?' → [맞아요] 한 번에 주소 · 게시 완료 · 평소 대비 숫자. 스크린샷: SHOTS232=<폴더>
+const SHOT232 = process.env.SHOTS232 || ''
+const FEED232 = {
+  ...FOCUS,
+  videos: [
+    ...FOCUS.videos,
+    v('myVid232a01', 'UCme', '정책자금 상담 전 꼭 준비할 서류 5가지 총정리', 1 * D, 2_400),
+    v('myVid232b01', 'UCme', 'Claude 업무 활용 실제로 써 봤습니다', 2 * D, 450),
+    v('myVid232c01', 'UCme', '노란우산공제 해지 전에 꼭 볼 것', 3 * D, 320),
+  ],
+}
+const J232 = JSON.stringify(FEED232)
+for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) })
+  const page = await ctx.newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(e.message))
+  await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: J232 }))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const T = vp.tag
+  const rowOf = (t) => page.locator('[data-testid="radar-idea"]').filter({ hasText: t })
+  const add = async (t) => {
+    await page.getByTestId('make-add-input').fill(t)
+    await page.getByTestId('make-add').click()
+    await page.waitForTimeout(500)
+  }
+  await add('정책자금 상담 전 꼭 준비할 서류 5가지')
+  const learn = page.getByTestId('make-learn')
+  const r1 = rowOf('정책자금 상담 전 꼭 준비할 서류 5가지')
+  const sug = r1.getByTestId('make-suggest')
+  check(`D232-1 ${T} 내 콘텐츠 › '우리 채널 성과' 칸(아직 이은 영상 0) · 줄에 '이 영상인가요?' — 담은 주제가 들어간 내 채널 영상(벤치마킹 영상 아님)`, (await learn.getAttribute('data-linked')) === '0' && (await page.getByTestId('make-learn-empty').count()) === 1 && (await sug.count()) === 1 && (await sug.innerText()).includes('총정리') && (await page.getByTestId('make-learn-suggest').count()) === 1)
+  const yesH = await r1.getByTestId('make-suggest-yes').evaluate((e) => Math.round(e.getBoundingClientRect().height))
+  if (SHOT232) await page.screenshot({ path: `${SHOT232}/suggest-${T}.png`, fullPage: false })
+  await r1.getByTestId('make-suggest-yes').click()
+  await page.waitForTimeout(600)
+  const perf = r1.getByTestId('make-perf')
+  const perfTxt = (await perf.count()) ? await perf.innerText() : ''
+  check(`D232-2 ${T} [맞아요] 한 번 → 게시 완료 · 평소 대비 숫자(잘 됨) · 조회 · 올린 지 · 제안은 사라짐 · 단추 높이(휴대폰 44 · PC 40)`, (await r1.getAttribute('data-status')) === 'published' && perfTxt.includes('평소') && perfTxt.includes('조회 2,400') && (await perf.getAttribute('data-tone')) === 'good' && (await r1.getByTestId('make-suggest').count()) === 0 && yesH >= (vp.mobile ? 44 : 40), { perfTxt, yesH })
+  check(`D232-3 ${T} '우리 채널 성과' — 한 편이면 '아직 한 편 · 두 편부터 비교'`, (await learn.getAttribute('data-linked')) === '1' && (await page.getByTestId('make-learn-line').first().innerText()).startsWith('아직 한 편'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const r1b = rowOf('정책자금 상담 전 꼭 준비할 서류 5가지')
+  const pubDay = await r1b.getByTestId('make-publish-date').inputValue()
+  check(`D232-4 ${T} 새로고침해도 이어진 채(주소 저장 · 게시일 = 그 영상 올린 날로 채움)`, (await r1b.getByTestId('make-perf').count()) === 1 && /^\d{4}-\d{2}-\d{2}$/.test(pubDay), pubDay)
+  // 직접 주소 적기
+  await add('Claude 업무 활용')
+  const r2 = rowOf('Claude 업무 활용')
+  await r2.getByTestId('make-row-toggle').click()
+  await r2.getByTestId('make-link').fill('https://youtu.be/myVid232b01')
+  await r2.getByTestId('make-link').blur()
+  await page.waitForTimeout(600)
+  check(`D232-5 ${T} 올린 주소(youtu.be)를 직접 적어도 그 영상 숫자가 붙음`, (await r2.getByTestId('make-perf').count()) === 1 && (await r2.getByTestId('make-perf').innerText()).includes('조회 450'))
+  const lines = await page.getByTestId('make-learn-line').allInnerTexts()
+  check(`D232-6 ${T} 두 편부터 — '우리 채널에서는 … 평소의 n배(2편)' · '가장 잘 된 영상'`, lines.some((l) => l.startsWith('우리 채널에서는') && l.includes('(2편)')) && lines.some((l) => l.startsWith('가장 잘 된 영상')), lines)
+  // 아니에요
+  await add('노란우산공제 해지')
+  const r3 = rowOf('노란우산공제 해지')
+  const had = await r3.getByTestId('make-suggest').count()
+  await r3.getByTestId('make-suggest-no').click()
+  await page.waitForTimeout(300)
+  check(`D232-7 ${T} [아니에요] → 그 제안만 숨김(주소 · 단계 그대로)`, had === 1 && (await r3.getByTestId('make-suggest').count()) === 0 && (await r3.getAttribute('data-status')) === 'selected' && (await page.getByTestId('make-learn-suggest').count()) === 0)
+  if (SHOT232) {
+    await learn.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOT232}/learn-${T}.png`, fullPage: T === 'PC' })
+  }
+  const ov = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D232-8 ${T} 가로 넘침 0(${ov}) · 오류 0`, ov <= 0 && errs.length === 0, { ov, errs })
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\nyoutube: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -118,6 +118,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await seed(page)
   await openSmart(page, 'cli_scen')
 
+  // D-232 판정 넓히기 — 가지급금 1.2억이 있는 업체: 절세가 '가능성 높음' + 07 가지급금 계산기 금액 · 퇴직금 한도는 '그 밖에'
+  const taxIns = page.locator('[data-testid="smart-insight"][data-key="tax"]')
+  const taxTxt = await taxIns.innerText()
+  check('D-232 모듈별 판정 › 절세 — 가지급금 1.2억 → 가능성 높음 · "해마다 약 n 손해" · 퇴직금 한도 · 세무사 검토 · [가지급금 정리 설계]', (await taxIns.getAttribute('data-tone')) === 'good' && /해마다 약 .+ 손해/.test(await taxIns.getByTestId('smart-insight-amount').innerText()) && taxTxt.includes('퇴직금 한도') && taxTxt.includes('세무사 검토') && taxTxt.includes('가지급금 정리 설계'), taxTxt.slice(0, 200))
+  const taxHref = (await taxIns.getByRole('link').getAttribute('href')) ?? ''
+  check('D-232 절세 판정 → 가지급금 정리 상황 예시로 열림(같은 업체 · preset=tax-loan)', taxHref.includes('/tools/tax') && taxHref.includes('client=cli_scen') && taxHref.includes('preset=tax-loan'), taxHref)
+
   const box = page.getByTestId('smart-scenarios')
   const count = Number(await box.getAttribute('data-count'))
   const ready = Number(await box.getAttribute('data-ready'))

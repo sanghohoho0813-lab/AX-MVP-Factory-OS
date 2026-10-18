@@ -53,6 +53,7 @@ import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recom
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText } from '../clientInsights'
+import { loanPlan, retirePlan, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
 import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
@@ -867,6 +868,56 @@ await (async () => {
   const cert = requestItemsFrom([mk('cert-os', '기업인증', 'need', ['연구조직', '연구개발비', '매출 · 재무', '특허 등록 여부'])]).items
   check('D-191 기업인증 빠진 항목도 고객이 알아듣는 서류 이름 · 어디서(연구소 인정서 · 연구개발비 · 재무제표 · 특허)', cert.map((x) => x.label).join() === '연구소(전담부서) 인정서,연구개발비 · 하고 있는 연구 내용,최근 재무제표(표준재무제표증명),특허 · 상표 등록 현황' && cert.every((x) => x.where !== ''), JSON.stringify(cert))
   check('D-191 받을 것이 없으면 빈 문구(단추 없음)', recoRequestMessage(base, [mk('grants', '지원사업', 'good', [])]) === '')
+}
+
+// D-232: 판정 넓히기 — 절세 · 연구소 · 통합고용세액공제도 엔진이 계산한 금액(짐작 없음)
+{
+  const T = '2026-10-18'
+  const NOW232 = '2026-10-18T00:00:00.000Z'
+  const base = normalizeClientOps({ id: 'w232', companyName: '넓힘정밀', establishedAt: '2016-03-02', businessCategory: '제조업', businessAddress: '경기도 화성시 동탄대로 1', contactName: '박대표', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const withTax = (tp: Record<string, string>) => normalizeClientOps({ ...base, taxProfile: tp } as never)
+  const taxOf = (r: ClientOpsRecord) => buildInsights(r, T, []).find((i) => i.key === 'tax')
+
+  const loanRec = withTax({ loanBalance: '3억', monthlySalary: '1000만' })
+  const loan = taxOf(loanRec)
+  const lp = loanPlan(viewProfile({ loanBalance: '3억', monthlySalary: '1000만' }))
+  check('D-232 절세: 가지급금 3억 → 가능성 높음 · "해마다 약 n 손해"(07 가지급금 계산기 값 그대로)', loan?.tone === 'good' && lp.ok && lp.yearLoss > 0 && loan?.amount === `해마다 약 ${manwonText(lp.yearLoss)} 손해`, JSON.stringify({ loan, year: lp.yearLoss }))
+  check('D-232 절세: 가지급금 → 가지급금 정리 상황 예시로 열림 · 다음 행동 한 줄', !!loan?.openPath.includes('preset=tax-loan') && loan?.action === '가지급금 정리 — 갚는 가장 싼 길 찾기')
+
+  const retRec = withTax({ monthlySalary: '1000만' })
+  const ret = taxOf(retRec)
+  const rp = retirePlan(viewProfile({ monthlySalary: '1000만', ceoStartDate: '2016-03-02' }), T)
+  check('D-232 절세: 대표 급여 + 설립일 → 퇴직금 한도(02 · 03 계산기) · 검토해 볼 만함', ret?.tone === 'maybe' && rp.ok && ret?.amount === `퇴직금 한도 약 ${manwonText(rp.limit)}` && !!ret?.openPath.includes('preset=tax-retire'), JSON.stringify({ ret, limit: rp.limit }))
+  check('D-232 절세: 취임일을 설립일로 본 것은 가정이라고 밝힘', !!ret?.detail.includes('취임일은 설립일로 보고 계산'), ret?.detail)
+  const retOwn = taxOf(withTax({ monthlySalary: '1000만', ceoStartDate: '2020-01-01' }))
+  check('D-232 절세: 취임일을 직접 적었으면 가정 표시 없음', !!retOwn && !retOwn.detail.includes('설립일로'), retOwn?.detail)
+
+  check('D-232 절세: 둘 다 되면 새는 돈(가지급금) 먼저 · 퇴직금은 "그 밖에"', !!loan?.headline.startsWith('가지급금') && !!loan?.detail.includes('그 밖에 · 퇴직금 한도 약'), loan?.detail)
+  check('D-232 절세: 세무사 검토 문구', !!loan?.detail.includes('실행 전 세무사 검토'))
+
+  const shareOnly = normalizeClientOps({ ...base, shareholderRegister: [{ id: 'h1', name: '박대표', relation: 'ceo', shares: 10000, acquirePrice: 5000 }] } as never)
+  const so = taxOf(shareOnly)
+  check('D-232 절세: 계산할 숫자가 없으면 금액을 짐작하지 않음(예전 문구 · 금액 없음)', so?.tone === 'maybe' && so?.amount === undefined && !!so?.headline.includes('찾아볼 수 있어요'), JSON.stringify(so))
+  const loanNoSalary = taxOf(withTax({ loanBalance: '1억' }))
+  check('D-232 절세: 대표 급여를 모르면 가지급금 손해가 작게 나온다고 알림 · 받을 것에 대표 급여', !!loanNoSalary?.detail.includes('대표 급여를 모르면') && !!loanNoSalary?.missing.includes('대표 급여'), JSON.stringify(loanNoSalary))
+  check('D-232 고객 관리 카드 띠(계산 건너뜀)도 같은 판정 색 — 가지급금이면 가능성 높음', cardRecoChips(loanRec, T, 0).find((c) => c.key === 'tax')?.tone === 'good' && cardRecoChips(retRec, T, 0).find((c) => c.key === 'tax')?.tone === 'maybe')
+
+  const labRec = withFactValue(base, 'researchLab', '기업부설연구소(2024 인정)', { source: 'meeting', status: 'entered', now: NOW232 })
+  const lab = buildInsights(labRec, T, []).find((i) => i.key === 'labcare')
+  check('D-232 연구소: 연구소가 있으면 "연구개발비 세액공제를 챙겼는지" — 검토해 볼 만함 · 세액공제 계산으로 열림', lab?.tone === 'maybe' && !!lab?.openPath.startsWith('/tools/labcare/tax') && lab?.amount === undefined, JSON.stringify(lab))
+  const labCalc = normalizeClientOps({ ...labRec, toolResults: [{ id: 'tr-lab', toolKey: 'labcare', title: '세액공제 예상', verdict: null, verdictLabel: '연간 약 2,500만원', summary: '', data: { kind: 'tax', estimate: { annual: 25_000_000 } }, deadlines: [], createdAt: NOW232, publishedUpdateId: null }] } as never)
+  const lab2 = buildInsights(labCalc, T, []).find((i) => i.key === 'labcare')
+  check('D-232 연구소: 연구소 + 세액공제 계산이 붙어 있으면 그 금액 · 가능성 높음 · 경정청구 안내', lab2?.tone === 'good' && lab2?.amount === '세액공제 연간 약 2,500만원' && !!lab2?.detail.includes('경정청구'), JSON.stringify(lab2))
+
+  const roster = (data: Record<string, unknown>, verdict: string) => ({ id: 'tr-emp', toolKey: 'employment', title: '4대보험 명부 진단', verdict, verdictLabel: verdict === 'candidates' ? '후보 지원금 2건 · 확인 항목 1' : '후보 지원금 0건 · 확인 항목 0', summary: '[4대보험 명부 진단] 8명', data: { tab: 'roster', ...data }, deadlines: [], createdAt: NOW232, publishedUpdateId: null })
+  const credRec = normalizeClientOps({ ...base, toolResults: [roster({ estimate: { computable: true, creditTotal: 23_000_000, incTotal: 2 }, counts: { newHireCount: 3 } }, 'none')] } as never)
+  const cred = buildInsights(credRec, T, []).find((i) => i.key === 'employment')
+  check('D-232 고용: 지원금 후보가 없어도 통합고용세액공제를 계산해 뒀으면 그 금액 · 검토해 볼 만함', cred?.tone === 'maybe' && cred?.amount === '세액공제 약 2,300만원(1차 추정)' && !!cred?.headline.includes('통합고용세액공제'), JSON.stringify(cred))
+  const hiresRec = normalizeClientOps({ ...base, toolResults: [roster({ subsidyTotal: 14_400_000, counts: { newHireCount: 3 } }, 'candidates')] } as never)
+  const hires = buildInsights(hiresRec, T, []).find((i) => i.key === 'employment')
+  check('D-232 고용: 세액공제를 아직 안 했으면 금액 없이 "새로 들어온 직원 3명 — 전년 직원 수를 넣으면" 안내(지원금 금액은 그대로)', hires?.tone === 'good' && hires?.amount === '최대 1,440만원 검토(1차 추정)' && !!hires?.detail.includes('새로 들어온 직원 3명'), JSON.stringify(hires))
+  const noneRec = normalizeClientOps({ ...base, toolResults: [roster({}, 'none')] } as never)
+  check('D-232 고용: 후보도 세액공제도 새 직원도 없으면 예전처럼 "지금은 어려움"', buildInsights(noneRec, T, []).find((i) => i.key === 'employment')?.tone === 'no')
 }
 
 /* D-192 목차 설명 사전 — 목차 이름(숫자가 붙어도)으로 찾는다 */

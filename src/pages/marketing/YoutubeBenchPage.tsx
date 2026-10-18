@@ -148,6 +148,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted }), [prefs.overrides, prefs.mix, prefs.muted])
   const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
+  // D-232 내 콘텐츠 성과 — 레이더가 이미 받은 내 채널 영상만(유튜브를 더 부르지 않음)
+  const mineVideos = useMemo(() => rvideos.filter((v) => v.mine), [rvideos])
   const plan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
   const rising = useMemo(() => (prepared && plan ? risingTopics(prepared, rvideos, plan.clusters) : []), [prepared, rvideos, plan])
   const breakouts = useMemo(() => breakoutVideos(rvideos), [rvideos])
@@ -233,11 +235,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     }
   }
   /** D-231 내 콘텐츠 — 메모 · 촬영일 · 게시일 · 체크 · 올린 주소 */
-  const patchIdea = async (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link'>>, what: string) => {
+  const patchIdea = async (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'status'>>, what: string) => {
     if (fields.link !== undefined && fields.link && !/^https:\/\/\S{4,}$/.test(fields.link)) return showToast('올린 주소는 https:// 로 시작하는 주소만 적을 수 있습니다.')
     try {
       await notebook.patch(i.id, fields)
       if (what === '메모' || what === '올린 주소') showToast(`${what}${particle(what, '을/를')} 저장했습니다.`)
+      // D-232 '이 영상인가요?' [맞아요] — 주소 · 게시 완료 · 게시일을 한 번에 잇는다
+      if (what === '올린 영상') showToast(`${q(i.topic, '을/를')} 올린 영상과 이었습니다 — 평소 대비 숫자가 이 줄과 '우리 채널 성과' 에 보여요.`)
     } catch {
       showToast(`${what}${particle(what, '을/를')} 저장하지 못했습니다 — 적은 것은 화면에 그대로 있습니다.`)
     }
@@ -321,6 +325,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           ideas={notebook.ideas}
           readOnly={readOnly}
           failed={notebook.failed}
+          mine={mineVideos}
+          feedReady={!!prepared}
+          sample={yt.sample}
           onStatus={(i, s) => void setStatus(i, s)}
           onPatch={(i, f, what) => void patchIdea(i, f, what)}
           onRemove={(i) => void removeIdea(i)}

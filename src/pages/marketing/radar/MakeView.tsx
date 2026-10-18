@@ -11,10 +11,12 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, NotebookPen, PenLine, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, NotebookPen, PenLine, Plus, Trash2, TrendingUp, Tv } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { todayLocalDate } from '../../../lib/appClock'
 import { IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
+import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl, type PerfTone } from '../../../services/marketing/myPerformance'
+import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { AxisBadge, IconChip } from './RadarParts'
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
@@ -32,15 +34,38 @@ const STAGE_TONE: Record<IdeaStatus, string> = {
 
 export interface MakeActions {
   onStatus: (i: ContentIdea, s: IdeaStatus) => void
-  onPatch: (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link'>>, what: string) => void
+  onPatch: (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'status'>>, what: string) => void
   onRemove: (i: ContentIdea) => void
   onCopy: (text: string, what: string) => void
   onAdd: (topic: string) => Promise<boolean>
 }
 
-export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string } & MakeActions) {
+/** D-232 내 채널 영상 — 레이더 데이터를 받았을 때만(못 받았으면 성과 칸을 그리지 않는다) */
+interface MineProps {
+  mine?: readonly RadarVideo[]
+  feedReady?: boolean
+  sample?: boolean
+}
+
+const PERF_TONE: Record<PerfTone, string> = {
+  good: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  normal: 'border-slate-200 bg-slate-50 text-slate-700',
+  low: 'border-amber-300 bg-amber-50 text-amber-800',
+  unknown: 'border-slate-200 bg-white text-slate-600',
+}
+const dayOf = (ms: number) => {
+  const d = new Date(ms + 9 * 3_600_000)
+  return d.toISOString().slice(0, 10)
+}
+
+export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mine = [], feedReady = false, sample = false, ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string } & MineProps & MakeActions) {
   const [stage, setStage] = useState<IdeaStatus | 'all'>('all')
   const [topic, setTopic] = useState('')
+  // '아니에요' 를 누른 제안 — 이 화면에서만 숨긴다(다음에 열면 다시 물어도 된다)
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
+  const mineById = useMemo(() => new Map(mine.map((v) => [v.id, v])), [mine])
+  const suggestions = useMemo(() => (feedReady ? suggestMatches(ideas, mine) : new Map<string, RadarVideo>()), [feedReady, ideas, mine])
+  const learning = useMemo(() => learnFromMine(ideas, mine), [ideas, mine])
   const counts = useMemo(() => stageCounts(ideas), [ideas])
   const week = useMemo(() => weekSchedule(ideas, today), [ideas, today])
   const range = weekRange(today)
@@ -140,6 +165,36 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), ..
         </section>
       </div>
 
+      {/* D-232 우리 채널 성과 — 올린 영상이 평소보다 어땠나 · 어떤 축 · 제목 틀이 잘 됐나 */}
+      {feedReady && ideas.length > 0 && (
+        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-3 sm:p-4" data-testid="make-learn" data-linked={learning.linked} data-measured={learning.measured}>
+          <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
+            <TrendingUp aria-hidden="true" className="size-4 text-emerald-600" /> 우리 채널 성과
+            <span className="t-meta font-normal text-slate-500">내 채널 최근 영상 {mine.length}편 기준{sample ? ' · 예시 데이터' : ''} · 평소 대비(레이더와 같은 식)</span>
+          </p>
+          {learning.lines.length > 0 ? (
+            <ul className="flex flex-col gap-1">
+              {learning.lines.map((l) => (
+                <li key={l} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="make-learn-line">
+                  {l}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="t-sub break-keep text-slate-600" data-testid="make-learn-empty">
+              올린 유튜브 주소를 적거나 아래 '이 영상인가요?' 에서 [맞아요] 를 누르면, 평소보다 잘 됐는지가 여기 모여요.
+            </p>
+          )}
+          {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length > 0 && (
+            <p className="t-meta font-semibold text-rose-700" data-testid="make-learn-suggest">
+              이 영상인가요? 확인할 것 {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length}건 — 아래 줄에서 [맞아요] 한 번이면 이어져요
+            </p>
+          )}
+          {mine.length === 0 && <p className="t-meta break-keep text-slate-500">채널 탭에서 '내 채널' 을 정하면 올린 영상의 숫자를 저절로 찾아요.</p>}
+          <p className="t-meta break-keep text-slate-500">노출 · 클릭률 · 시청 지속시간은 공개 숫자에 없어 어림하지 않아요(YouTube Analytics 연결 뒤).</p>
+        </section>
+      )}
+
       {/* 콘텐츠 줄 */}
       <section className="flex flex-col" data-testid="radar-notebook">
         {ideas.length === 0 ? (
@@ -151,7 +206,17 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), ..
         ) : (
           <ul className="flex flex-col gap-2.5">
             {shown.map((i) => (
-              <MakeRow key={i.id} i={i} readOnly={readOnly} today={today} {...act} />
+              <MakeRow
+                key={i.id}
+                i={i}
+                readOnly={readOnly}
+                today={today}
+                video={linkedVideo(i, mineById)}
+                missingVideo={feedReady && mine.length > 0 && !!youtubeIdOf(i.link) && !linkedVideo(i, mineById)}
+                suggestion={dismissed.has(i.id) ? null : (suggestions.get(i.id) ?? null)}
+                onDismiss={() => setDismissed((s) => new Set([...s, i.id]))}
+                {...act}
+              />
             ))}
           </ul>
         )}
@@ -160,9 +225,28 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), ..
   )
 }
 
-function MakeRow({ i, readOnly, today, onStatus, onPatch, onRemove, onCopy }: { i: ContentIdea; readOnly: boolean; today: string } & MakeActions) {
+function MakeRow({
+  i,
+  readOnly,
+  today,
+  video,
+  missingVideo,
+  suggestion,
+  onDismiss,
+  onStatus,
+  onPatch,
+  onRemove,
+  onCopy,
+}: { i: ContentIdea; readOnly: boolean; today: string; video: RadarVideo | null; missingVideo: boolean; suggestion: RadarVideo | null; onDismiss: () => void } & MakeActions) {
   const [memo, setMemo] = useState(i.memo)
   const [link, setLink] = useState(i.link)
+  const perf = video ? perfOf(video) : null
+  // [맞아요] — 주소 · 게시 완료 · 게시일(비어 있으면 그 영상 올린 날)을 한 번에(따로 저장하면 서로 덮을 수 있다)
+  const accept = (v: RadarVideo) => {
+    const url = youtubeWatchUrl(v.id)
+    setLink(url)
+    onPatch(i, { link: url, status: 'published', ...(i.publishDate ? {} : { publishDate: dayOf(v.publishedAt) }) }, '올린 영상')
+  }
   const [confirm, setConfirm] = useState(false)
   const [open, setOpen] = useState(false)
   const late = lateOf(i, today)
@@ -202,6 +286,36 @@ function MakeRow({ i, readOnly, today, onStatus, onPatch, onRemove, onCopy }: { 
           </span>
         )}
       </div>
+
+      {/* D-232 올린 영상 성과 · '이 영상인가요?' */}
+      {perf && (
+        <p className={`t-sub flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-control) border px-3 py-2 ${PERF_TONE[perf.tone]}`} data-testid="make-perf" data-tone={perf.tone}>
+          <Tv aria-hidden="true" className="size-4 shrink-0" />
+          <b className="font-extrabold">{perf.label}</b>
+          <span className="t-meta">{perf.meta}</span>
+          {perf.tone === 'good' && <span className="t-meta font-bold">· 이 틀 · 주제를 한 번 더</span>}
+        </p>
+      )}
+      {missingVideo && (
+        <p className="t-meta break-keep text-slate-500" data-testid="make-perf-missing">
+          올린 주소의 영상을 내 채널 최근 영상에서 찾지 못했어요(오래된 영상이거나 다른 채널).
+        </p>
+      )}
+      {suggestion && !i.link && (
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-rose-200 bg-rose-50/70 px-3 py-2.5" data-testid="make-suggest">
+          <p className="t-sub min-w-0 break-keep text-slate-800 [overflow-wrap:anywhere]">
+            <span className="font-bold text-rose-700">이 영상인가요? </span>'{suggestion.title}' <span className="t-meta text-slate-500">· {shortDay(dayOf(suggestion.publishedAt))} 올림</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => accept(suggestion)} disabled={readOnly} data-testid="make-suggest-yes">
+              맞아요 — 이 줄과 잇기
+            </Button>
+            <Button variant="ghost" onClick={onDismiss} data-testid="make-suggest-no">
+              아니에요
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 체크리스트 */}
       <div className="flex min-w-0 flex-col gap-1.5">
