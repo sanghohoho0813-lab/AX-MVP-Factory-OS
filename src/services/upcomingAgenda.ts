@@ -12,7 +12,7 @@
 import type { JournalEntry } from '../types/bridge'
 import { SCHEDULE_KIND_LABEL, type ScheduleEvent, type ScheduleKind } from './clientOpsSchedule'
 
-export type AgendaKind = ScheduleKind | 'todo'
+export type AgendaKind = ScheduleKind | 'todo' | 'content'
 
 export interface AgendaItem {
   id: string
@@ -43,10 +43,12 @@ export function buildAgenda(o: {
   prospectIds: ReadonlySet<string>
   today: string
   days?: number
+  /** D-237 이미 거른 다른 날짜 일(내 콘텐츠 촬영 · 게시 예정) — 날짜 순에 같이 섞는다 */
+  extra?: readonly AgendaItem[]
 }): AgendaItem[] {
   const { schedule, journal, clientNames, prospectIds, today } = o
   const days = o.days ?? 14
-  const out: AgendaItem[] = []
+  const out: AgendaItem[] = [...(o.extra ?? [])]
   for (const e of schedule) {
     if (e.done || e.daysLeft === null) continue
     const left = e.daysLeft
@@ -82,6 +84,41 @@ export function buildAgenda(o: {
     })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.clientName.localeCompare(b.clientName) || a.title.localeCompare(b.title))
+}
+
+/**
+ * D-237 내 콘텐츠(콘텐츠 레이더)의 촬영일 · 게시일 — 오늘부터 3일 안. 업체와 상관없는 대표의 일이다(마케팅은 대표 전용).
+ * 촬영은 아직 찍기 전(아이디어 · 제작 예정 · 대본 준비)일 때만, 게시는 아직 안 올렸을 때만. 지난 날짜는 내 콘텐츠 탭이 빨갛게 알린다.
+ */
+export function contentAgenda(
+  ideas: readonly { id: string; topic: string; status: string; shootDate: string; publishDate: string }[],
+  today: string,
+  days = 3,
+): AgendaItem[] {
+  const out: AgendaItem[] = []
+  const day = /^\d{4}-\d{2}-\d{2}$/
+  for (const i of ideas) {
+    const due: [string, 'shoot' | 'publish'][] = []
+    if (day.test(i.shootDate) && (i.status === 'idea' || i.status === 'selected' || i.status === 'script')) due.push([i.shootDate, 'shoot'])
+    if (day.test(i.publishDate) && i.status !== 'published') due.push([i.publishDate, 'publish'])
+    for (const [date, what] of due) {
+      const left = daysFrom(today, date)
+      if (left < 0 || left > days) continue
+      out.push({
+        id: `content:${what}:${i.id}`,
+        date,
+        daysLeft: left,
+        kind: 'content',
+        kindLabel: what === 'shoot' ? '촬영 예정' : '게시 예정',
+        clientId: null,
+        clientName: '',
+        title: i.topic.slice(0, 80),
+        detail: '내 콘텐츠',
+        href: '/marketing?view=make',
+      })
+    }
+  }
+  return out
 }
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']

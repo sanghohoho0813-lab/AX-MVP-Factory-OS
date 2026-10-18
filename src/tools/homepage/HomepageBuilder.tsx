@@ -64,10 +64,14 @@ import {
   type ScoreItem,
   type SiteBlock,
   type SiteDoc,
+  type SitePromo,
 } from '../../services/siteBuilder'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
-import { isTrialId, subjectQuery } from '../../services/marketingTrial'
+import { useToolClient } from '../shared/toolClientContext'
+import { listRows } from '../../services/moduleData'
+import { CONTENT_MODULE, PROFILE_BUCKET, promoForSite } from '../../services/contentStudio'
+import { isTrialId, rowSubjectId, subjectQuery } from '../../services/marketingTrial'
 import { BlockFields, IconBtn, inputClass } from './BlockFields'
 import { SitePreview, type Device } from './SitePreview'
 import type { SiteStore } from './useSiteDoc'
@@ -118,11 +122,36 @@ function download(name: string, html: string) {
 /* 처음 — 업체 기록으로 무엇이 채워지나                                    */
 /* ------------------------------------------------------------------ */
 
-function StartCard({ record, onStart }: { record: ClientOpsRecord; onStart: (industry: IndustryKey) => void }) {
+/**
+ * D-237 홍보 글 만들기에 적어 둔 홍보 정보(전화 · 영업시간 · 후기 · 고객 한마디) — 초안 · 새 블록의 빈 칸에만 쓴다.
+ * 홍보 글 만들기와 같은 저장 줄(모듈 기록 'content' · 'profile')을 읽기만 한다. 못 읽으면 없이 만든다.
+ */
+function usePromo(subjectId: string): SitePromo | undefined {
+  const { workspaceId } = useToolClient()
+  const [promo, setPromo] = useState<SitePromo | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    setPromo(undefined)
+    listRows(workspaceId, CONTENT_MODULE, PROFILE_BUCKET)
+      .then((rows) => {
+        const row = rows.find((r) => rowSubjectId(r) === subjectId)
+        if (alive && row) setPromo(promoForSite(row.data.overrides))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [workspaceId, subjectId])
+  return promo
+}
+
+function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?: SitePromo; onStart: (industry: IndustryKey) => void }) {
   const today = todayLocalDate()
   const f = siteFacts(record, today)
   const detected = industryForRecord(record)
   const [industry, setIndustry] = useState<IndustryKey>(detected)
+  // D-237 홍보 글에 적어 둔 것 중 이 초안에 들어갈 것(대표 전화가 있으면 전화는 그것)
+  const fromPromo = [!f.phone && promo?.phone ? '전화' : '', promo?.hours ? '영업시간' : '', promo?.voice ? '고객 한마디' : ''].filter(Boolean)
   const rows: [string, string][] = [
     ['회사명', f.companyName],
     ['대표', f.representative],
@@ -171,7 +200,12 @@ function StartCard({ record, onStart }: { record: ClientOpsRecord; onStart: (ind
             </div>
           ))}
         </dl>
-        {!f.phone && f.contactPhone && <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-800">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
+        {!f.phone && !promo?.phone && f.contactPhone && <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-800">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
+        {fromPromo.length > 0 && (
+          <p className="t-sub break-keep rounded-(--radius-control) bg-violet-50 px-3 py-2 text-violet-900" data-testid="site-start-promo">
+            홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
+          </p>
+        )}
         <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 sm:flex-row sm:items-end">
           <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
             <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
@@ -216,6 +250,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const docRef = useRef(doc)
   docRef.current = doc
   const today = todayLocalDate()
+  const promo = usePromo(record.id)
 
   const change = useCallback((next: SiteDoc, group?: string) => store.change(next, group), [store])
 
@@ -253,8 +288,9 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     return (
       <StartCard
         record={record}
+        promo={promo}
         onStart={(industry) => {
-          const d = draftSite(record, { industry, today, now: nowIso(), makeId: generateId })
+          const d = draftSite(record, { industry, today, now: nowIso(), makeId: generateId, promo })
           store.change(d)
           setSelected(d.blocks[1]?.id ?? null)
           showToast(`${industryDef(industry).label} 견본으로 초안을 만들었어요 — 견본 문구는 업체와 확인해 주세요.`)
@@ -267,7 +303,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const onDownload = async () => {
     await store.flush()
     download(siteFileName(doc), html())
-    showToast(must ? `내려받았어요 — 꼭 고칠 것 ${must}개가 남아 있어요.` : '홈페이지 HTML 을 내려받았어요.')
+    showToast(must ? `내려받았어요 — 꼭 고칠 것 ${must}개가 남아 있어요.` : '홈페이지 HTML 을 내려받았어요 — 인터넷에 올리는 법은 ③ 내려받기 단계 아래에 있어요.')
   }
   const onOpen = () => {
     const url = URL.createObjectURL(new Blob([html()], { type: 'text/html;charset=utf-8' }))
@@ -283,7 +319,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   /** D-208 블록 하나 더하기(맨 아래 줄 · 연락처 바로 위) — 업종 맞춤 · 점수에서 */
   const addBlock = (type: BlockType) => {
-    const b = newBlock(type, record, doc.industry, today, generateId())
+    const b = newBlock(type, record, doc.industry, today, generateId(), promo)
     const contact = doc.blocks.find((x) => x.type === 'contact')
     const before = contact ? doc.blocks[doc.blocks.indexOf(contact) - 1] : undefined
     change(insertBlock(doc, b, before?.id ?? selected, nowIso()))
@@ -650,6 +686,18 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
           </Button>
         </div>
+        {/* D-237 내려받은 뒤 어떻게 올리는지 — 접어 둔 세 줄 */}
+        <details className="group rounded-(--radius-control) bg-white/70 px-3 py-1" data-testid="site-howto">
+          <summary className="tap t-sub flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-semibold text-emerald-900">
+            <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+            인터넷에 올리는 법
+          </summary>
+          <ol className="t-sub mb-2 flex list-decimal flex-col gap-1 pl-5 break-keep text-slate-700">
+            <li>내려받은 HTML 파일 하나가 홈페이지 전부예요.</li>
+            <li>쓰는 호스팅(카페24 · 아임웹 등)의 ‘HTML 올리기’ 에 넣거나, 업체 홈페이지 관리자에게 이 파일을 보내 주세요.</li>
+            <li>고칠 일이 생기면 여기서 고친 뒤 다시 내려받아 같은 자리에 바꿔 올리면 돼요.</li>
+          </ol>
+        </details>
       </div>
     )
 
@@ -799,7 +847,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                 key={d.type}
                 type="button"
                 onClick={() => {
-                  const b = newBlock(d.type as BlockType, record, doc.industry, today, generateId())
+                  const b = newBlock(d.type as BlockType, record, doc.industry, today, generateId(), promo)
                   change(insertBlock(doc, b, selected, nowIso()))
                   setSelected(b.id)
                   setAdding(false)
@@ -839,7 +887,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         confirmLabel="다시 만들기"
         onConfirm={() => {
           if (redraft) {
-            const d = draftSite(record, { industry: redraft, today, now: nowIso(), makeId: generateId })
+            const d = draftSite(record, { industry: redraft, today, now: nowIso(), makeId: generateId, promo })
             change({ ...d, createdAt: doc.createdAt })
             setSelected(null)
             setTab('blocks')

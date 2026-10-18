@@ -7,7 +7,7 @@
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { industryOf } from '../siteBuilder/industry'
-import { siteFacts } from '../siteBuilder/draft'
+import { siteFacts, type SitePromo } from '../siteBuilder/draft'
 import type { IndustryKey, SiteDoc } from '../siteBuilder/types'
 import { contentLib } from './library'
 import type { Tone } from './tone'
@@ -277,6 +277,12 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
   const avoid = str(r.avoid, 200)
   if (avoid) out.avoid = avoid
   return out
+}
+
+/** D-237 홈페이지 초안에 넘길 홍보 정보 — 사람이 적은 칸만(전화 · 영업시간 · 후기 수 · 받은 곳 · 고객 한마디) */
+export function promoForSite(raw: unknown): SitePromo {
+  const clean = normalizeOverrides(raw)
+  return { phone: clean.phone, hours: clean.hours, reviews: clean.reviews, reviewSource: clean.reviewSource, voice: clean.voice }
 }
 
 /**

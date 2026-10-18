@@ -56,19 +56,28 @@ function SaveCustomerBar({
       {saved ? (
         <div className="flex flex-col items-center gap-3">
           <p className="font-semibold text-blue-900">
-            이 업체 상담으로 저장했습니다. 업체 목록에서 이어서 볼 수 있습니다.
+            이 업체 상담으로 저장했습니다. 업체 목록 · 결과서에서 이어서 볼 수 있습니다.
           </p>
-          <Link
-            href={`/customers/${clientId}`}
-            className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-          >
-            업체 목록 보기
-          </Link>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              href={`/customers/${clientId}`}
+              className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              업체 목록 보기
+            </Link>
+            <Link
+              href={`/customers/${clientId}/report`}
+              className="rounded-xl border border-blue-200 bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-400"
+              data-testid="pf-save-report"
+            >
+              결과서 보기
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2">
-          <p className="text-sm text-slate-600">
-            이 진단 결과를 이 업체 상담으로 저장하면 진행 상태 · 메모를 이어서 관리합니다.
+          <p className="break-keep text-sm text-slate-600">
+            업체 기록에는 붙이지 않고 정책자금 업체 목록(진행 단계 · 메모)과 결과서에만 저장해요. 위 ‘기록에 붙이기’ 를 눌렀으면 이미 함께 저장돼 있어 또 누르지 않아도 돼요.
           </p>
           <label className="flex w-full max-w-md flex-col gap-1 text-left text-sm font-medium text-slate-700">
             저장할 고객 관리 업체
@@ -99,9 +108,9 @@ function SaveCustomerBar({
             onClick={handleSave}
             disabled={!clientId || saving}
             data-testid="pf-save-consult"
-            className="rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-xl border border-blue-300 bg-white px-6 py-3 text-base font-semibold text-blue-700 transition-colors hover:border-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? "저장하는 중…" : "이 업체 상담으로 저장"}
+            {saving ? "저장하는 중…" : "이 업체 상담으로 저장(업체 목록 · 결과서만)"}
           </button>
         </div>
       )}

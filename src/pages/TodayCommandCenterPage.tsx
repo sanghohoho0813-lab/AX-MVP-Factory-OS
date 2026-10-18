@@ -53,7 +53,8 @@ import {
   hardDeadlineActions,
   daySummaryText,
 } from '../services/dailyBriefService'
-import { agendaWhen, buildAgenda, type AgendaItem } from '../services/upcomingAgenda'
+import { agendaWhen, buildAgenda, contentAgenda, type AgendaItem } from '../services/upcomingAgenda'
+import { listIdeas, type ContentIdea } from '../services/marketing/radarStore'
 import { localDateOf, nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
@@ -209,6 +210,22 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     void load()
   }, [load])
 
+  // D-237 내 콘텐츠(콘텐츠 레이더)의 촬영 · 게시 예정 — 대표 화면에만(팀장은 마케팅이 없다). 못 읽으면 없이 그린다
+  const [ideas, setIdeas] = useState<ContentIdea[]>([])
+  useEffect(() => {
+    if (pilot) {
+      setIdeas([])
+      return
+    }
+    let alive = true
+    listIdeas(workspaceId)
+      .then((list) => alive && setIdeas(list))
+      .catch(() => alive && setIdeas([]))
+    return () => {
+      alive = false
+    }
+  }, [workspaceId, pilot])
+
   // 계약 완료(끝남)·보관을 뺀 곳이 '지금 챙기는 업체'
   // D-168: 할 일에 붙일 업체 — 보관하지 않은 업체 전부. 예전에는 예전 '끝남'(completed) 업체를 뺐는데,
   // D-157 부터 그 업체도 화면에는 '계약 완료' 로 보여 8곳 중 6곳만 고를 수 있었다(대표 지적).
@@ -275,7 +292,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * D-143: '지금 이것부터'(규칙이 고른 셋) 대신 날짜가 정해진 실제 일 — 고객과 약속한 기한 · 미팅 · 업무 마감 · 신청 마감.
    * 위 칸(오늘 할 일 · 업체 약속 · 놓치면 끝나는 기한)에 이미 있는 것은 뺀다.
    */
-  const agendaAll = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14 }), [schedule, journal, clientNames, prospectIds, today])
+  const contentDue = useMemo(() => contentAgenda(ideas, today), [ideas, today])
+  const agendaAll = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14, extra: contentDue }), [schedule, journal, clientNames, prospectIds, today, contentDue])
   // 앞으로 올 것을 먼저 — 마감이 지난 업무 · 신청은 아래 한 줄로 접는다(다가오는 것을 밀어내지 않게)
   const agenda = useMemo(() => agendaAll.filter((a) => a.daysLeft >= 0), [agendaAll])
   const agendaLate = useMemo(() => agendaAll.filter((a) => a.daysLeft < 0).sort((a, b) => b.date.localeCompare(a.date)), [agendaAll])

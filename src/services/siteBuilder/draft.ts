@@ -144,6 +144,20 @@ function block(type: BlockType, id: string, props: Record<string, PropValue>, sa
   return { id, type, props: ordered, ...(sample.length ? { sample } : {}) }
 }
 
+/**
+ * D-237 홍보 글 만들기에서 사람이 적어 둔 홍보 정보(전화 · 영업시간 · 후기 수 · 고객 한마디).
+ * 홈페이지 칸이 비어 있을 때만 쓴다 — 업체 기록의 대표 전화가 있으면 그것이 먼저, 견본 영업시간 대신 적은 시간.
+ */
+export interface SitePromo {
+  phone?: string
+  hours?: string
+  /** '네이버 후기 1,240개 · 평점 4.8' */
+  reviews?: string
+  reviewSource?: string
+  /** 실제 고객 한마디(동의 받은 말) */
+  voice?: string
+}
+
 export interface DraftOptions {
   /** 업종을 직접 고르면 그것으로(안 고르면 업체 기록으로 알아봄) */
   industry?: IndustryKey
@@ -151,6 +165,19 @@ export interface DraftOptions {
   now: string
   /** 블록 id 만들기(시험에서 고정) */
   makeId?: () => string
+  /** D-237 홍보 정보 — 빈 칸만 채운다 */
+  promo?: SitePromo
+}
+
+/** D-237 홍보 정보에서 쓸 값 — 빈 값은 '' */
+function promoOf(p: SitePromo | undefined) {
+  const s = (v: string | undefined, max: number) => (v ?? '').trim().slice(0, max)
+  return { phone: s(p?.phone, 30), hours: s(p?.hours, 60), reviews: s(p?.reviews, 60), reviewSource: s(p?.reviewSource, 40), voice: s(p?.voice, 300).replace(/^["“”'‘’]+|["“”'‘’]+$/g, '') }
+}
+
+/** D-237 고객 한마디가 있으면 후기 블록 — 지어내지 않고 적힌 말 그대로(이름은 비워 두고 받은 곳만) */
+function promoReviews(id: string, pr: ReturnType<typeof promoOf>): SiteBlock {
+  return block('reviews', id, { title: '고객 후기', intro: pr.reviews, items: [{ text: pr.voice, name: '', meta: pr.reviewSource }] })
 }
 
 let seq = 0
@@ -167,6 +194,9 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
   const company = f.companyName || '회사 이름'
   const item = shortItem(f.item, ind.fallbackItem)
   const fill = (s: string) => s.replace(/\{item\}/g, item).replace(/\{company\}/g, company)
+  // D-237 업체 기록의 대표 전화가 없을 때만 홍보 글에 적어 둔 전화
+  const pr = promoOf(opts.promo)
+  const phone = f.phone || pr.phone
 
   const blocks: SiteBlock[] = []
   blocks.push(block('header', makeId(), { logoText: company, logoImage: '', showMenu: true, ctaLabel: '문의하기' }))
@@ -224,7 +254,13 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
   const servicesFromRecord = ownItems.length >= 2 && !ownItems.some((x) => /업$/.test(x))
   const services: ListItem[] = servicesFromRecord ? ownItems.map((name) => ({ name, desc: '' })) : ind.services.map((s) => ({ ...s }))
 
+  let reviewsAdded = !pr.voice
   for (const t of ind.include) {
+    // D-237 고객 한마디는 문의 띠 · 연락처 바로 위에
+    if (!reviewsAdded && (t === 'cta' || t === 'contact')) {
+      blocks.push(promoReviews(makeId(), pr))
+      reviewsAdded = true
+    }
     if (t === 'about') {
       blocks.push(block('about', makeId(), { title: '회사 소개', body: `${first}\n${ind.aboutPromise}`, image: '', facts }, ['body']))
       if (numbers.length >= 2) blocks.push(block('numbers', makeId(), { layout: 'band', title: `숫자로 보는 ${company}`, items: numbers }))
@@ -242,12 +278,13 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
         block(
           'contact',
           makeId(),
-          { title: '연락처 · 오시는 길', address: f.address, phone: f.phone, email: f.email, hours: ind.hours, showMapLink: Boolean(f.address), floatBar: Boolean(f.phone) },
-          ['hours'],
+          { title: '연락처 · 오시는 길', address: f.address, phone, email: f.email, hours: pr.hours || ind.hours, showMapLink: Boolean(f.address), floatBar: Boolean(phone) },
+          pr.hours ? [] : ['hours'],
         ),
       )
     }
   }
+  if (!reviewsAdded) blocks.push(promoReviews(makeId(), pr))
   blocks.push(
     block('footer', makeId(), {
       companyName: company === '회사 이름' ? '' : company,
@@ -255,13 +292,13 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
       businessNumber: f.businessNumber,
       showBusinessNumber: true,
       address: f.address,
-      phone: f.phone,
+      phone,
       email: f.email,
       extra: '',
     }),
   )
 
-  const description = `${first} ${f.region ? `${f.region} · ` : ''}${item} 문의는 ${f.phone ? `${f.phone}${particle(f.phone, '으로/로')}` : '홈페이지 연락처로'}.`.slice(0, 150)
+  const description = `${first} ${f.region ? `${f.region} · ` : ''}${item} 문의는 ${phone ? `${phone}${particle(phone, '으로/로')}` : '홈페이지 연락처로'}.`.slice(0, 150)
   return {
     v: 1,
     industry,
@@ -274,10 +311,13 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
 }
 
 /** 블록 하나를 새로 더할 때의 기본값 (견본 표시 포함) */
-export function newBlock(type: BlockType, record: ClientOpsRecord | null, industry: IndustryKey, today: string, id: string): SiteBlock {
+export function newBlock(type: BlockType, record: ClientOpsRecord | null, industry: IndustryKey, today: string, id: string, promo?: SitePromo): SiteBlock {
   const ind = industryDef(industry)
   const f = record ? siteFacts(record, today) : null
   const company = f?.companyName || '회사 이름'
+  // D-237 홍보 정보 — 빈 칸만(대표 전화가 있으면 그것)
+  const pr = promoOf(promo)
+  const phone = f?.phone || pr.phone
   switch (type) {
     case 'header':
       return block(type, id, { logoText: company, logoImage: '', showMenu: true, ctaLabel: '문의하기' })
@@ -302,14 +342,14 @@ export function newBlock(type: BlockType, record: ClientOpsRecord | null, indust
     case 'cta':
       return block(type, id, { title: ind.ctaTitle, body: ind.ctaBody, buttonLabel: '문의하기', showPhone: true }, ['body'])
     case 'contact':
-      return block(type, id, { title: '연락처 · 오시는 길', address: f?.address ?? '', phone: f?.phone ?? '', email: f?.email ?? '', hours: ind.hours, showMapLink: Boolean(f?.address), floatBar: Boolean(f?.phone) }, ['hours'])
+      return block(type, id, { title: '연락처 · 오시는 길', address: f?.address ?? '', phone, email: f?.email ?? '', hours: pr.hours || ind.hours, showMapLink: Boolean(f?.address), floatBar: Boolean(phone) }, pr.hours ? [] : ['hours'])
     case 'footer':
-      return block(type, id, { companyName: f?.companyName ?? '', representative: f?.representative ?? '', businessNumber: f?.businessNumber ?? '', showBusinessNumber: true, address: f?.address ?? '', phone: f?.phone ?? '', email: f?.email ?? '', extra: '' })
+      return block(type, id, { companyName: f?.companyName ?? '', representative: f?.representative ?? '', businessNumber: f?.businessNumber ?? '', showBusinessNumber: true, address: f?.address ?? '', phone, email: f?.email ?? '', extra: '' })
     // D-207 — 사진 · 후기 · 로고는 지어낼 수 없다: 빈 칸으로 시작(채우기 전에는 홈페이지에 안 나온다)
     case 'gallery':
       return block(type, id, { layout: 'grid', title: GALLERY_TITLE[industry], intro: '', ratio: '4:3', items: [{ image: '', title: '', desc: '' }, { image: '', title: '', desc: '' }, { image: '', title: '', desc: '' }] })
     case 'reviews':
-      return block(type, id, { title: '고객 후기', intro: '', items: [{ text: '', name: '', meta: '' }] })
+      return pr.voice ? promoReviews(id, pr) : block(type, id, { title: '고객 후기', intro: '', items: [{ text: '', name: '', meta: '' }] })
     case 'logos':
       return block(type, id, { title: '함께한 곳', intro: '', gray: true, items: [{ name: '', image: '' }] })
   }

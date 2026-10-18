@@ -73,6 +73,8 @@ export interface ToolResultAttachProps {
    * 붙일 업체와 이름·사업자번호가 다르면 한 번 더 묻는다(다른 회사 보고서를 잘못 붙이지 않게).
    */
   subject?: ToolSubject
+  /** D-237: 붙이고 나서 도구가 더 할 일(정책자금 — 같은 진단을 상담 · 결과서에도 저장). 붙인 업체 id 를 받는다 */
+  onAttached?: (clientId: string) => void
 }
 
 export function ToolResultAttach(props: ToolResultAttachProps) {
@@ -188,6 +190,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
       }
       const deadlineNote = (props.deadlines?.length ?? 0) > 0 ? ` · 기한 ${props.deadlines?.length}건이 달력에 올라갔습니다` : ''
       setDone({ id: target.id, name: target.companyName, resultId: next.toolResults[0]?.id ?? '' })
+      props.onAttached?.(target.id)
       setFollowState('ask')
       setOpen(false)
       showToast(`${target.companyName} 기록에 붙였습니다${deadlineNote}${publishedNote}`)

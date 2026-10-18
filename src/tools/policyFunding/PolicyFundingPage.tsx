@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState, type ReactNode, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AiSoonButton } from '../../components/ui/AiSoonButton'
+import { useToast } from '../../components/ui/toastContext'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
@@ -27,7 +28,7 @@ import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetField
 import { PresetNote } from '../shared/PresetNote'
 import { REPORT_DISCLAIMER } from './report'
 import type { DiagnosisInput, DiagnosisResult } from './types'
-import { getStoredCustomers, hydratePolicyStore } from './orig/storage'
+import { buildCustomerFromDiagnosis, getStoredCustomers, hydratePolicyStore, reportCustomerFor, saveCustomer } from './orig/storage'
 import DiagnosisSection from './orig/components/DiagnosisSection'
 import DashboardView from './orig/components/DashboardView'
 import CustomerDetailView from './orig/components/CustomerDetailView'
@@ -111,6 +112,7 @@ function OrigPolicy({ children }: { children: ReactNode }) {
 function DiagnosisScreen() {
   const [params, setParams] = useSearchParams()
   const { clientId, clientRecord } = useToolClient()
+  const { showToast } = useToast()
   const autoSample = params.get('sample') === '1'
   // D-199 상황 예시(?preset=) — 그 상황의 가정(자금 목적 · 채용 계획)을 업체 값 위에 얹고 바로 진단한다
   const [preset, setPreset] = useState(() => {
@@ -261,11 +263,17 @@ function DiagnosisScreen() {
           verdictLabel={`진행 가능성 ${result.likelihoodLevel} · 1순위 ${result.topAgency}`}
           summary={buildSummary(input, result)}
           data={{ input, agencies: result.agencies, tracks: result.specialTracks, documents: result.documents }}
+          // D-237 저장은 이 단추 하나로 — 업체 기록에 붙이면서 상담(업체 목록 · 결과서)에도 같은 진단을 저장한다
+          onAttached={(cid) =>
+            void saveCustomer(buildCustomerFromDiagnosis(input, result, { quickInput: input, clientId: cid })).then((ok) => {
+              if (!ok) showToast('업체 기록에는 붙였지만 정책자금 업체 목록 저장은 못 했어요 — 아래 [이 업체 상담으로 저장] 을 눌러 주세요.')
+            })
+          }
         />
-        <span className="text-sm text-slate-500">진단 결과를 고객 관리 업체 기록(달력·오늘 포함)에 붙입니다.</span>
+        <span className="break-keep text-sm text-slate-500">이것 하나만 누르면 돼요 — 업체 기록(달력 · 오늘)에 붙고, 정책자금 업체 목록 · 결과서에도 같이 저장돼요.</span>
       </div>
     ),
-    [],
+    [showToast],
   )
 
   return (
@@ -328,7 +336,7 @@ function ReportPicker() {
       <p className="mt-2 text-slate-600">고객을 고르면 대표님용 한 페이지 요약 + 상세 리포트가 열립니다.</p>
       {list.length === 0 ? (
         <p className="mt-8 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
-          아직 상담 중인 업체가 없습니다. <Link to="/tools/policy-funding/diagnosis" className="font-semibold text-blue-700 underline">진단하기</Link> 에서 결과를 고객으로 저장하세요.
+          아직 상담 중인 업체가 없습니다. <Link to="/tools/policy-funding/diagnosis" className="font-semibold text-blue-700 underline">진단하기</Link> 에서 진단한 뒤 결과 아래 ‘기록에 붙이기’ 를 눌러 주세요.
         </p>
       ) : (
         <ul className="mt-6 grid gap-3 @min-[640px]:grid-cols-2">
@@ -354,16 +362,18 @@ function ReportPicker() {
 
 /** D-98: 업체에서 연 인쇄 리포트 — 그 업체로 저장한 상담이 없으면 '고객을 찾을 수 없습니다' 로 막히지 않고 진단하기로 잇는다 */
 function ClientReport({ id }: { id: string }) {
-  const { clientName } = useToolClient()
-  if (getStoredCustomers().some((c) => c.id === id)) return <ReportView id={id} initialCustomer={null} />
+  const { clientName, clientRecord } = useToolClient()
+  // D-237: 상담으로 저장한 진단이 없어도 업체 기록에 붙인 마지막 진단으로 결과서를 그린다
+  const customer = reportCustomerFor(id, clientRecord?.id === id ? clientRecord.toolResults : undefined)
+  if (customer) return <ReportView id={id} initialCustomer={customer} />
   return (
     <>
       <section className="mx-auto w-full max-w-6xl px-2 pt-6" data-testid="pf-report-none">
         <div className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm">
           <p className="break-keep font-semibold text-slate-800">
-            {clientName || '이 업체'}로 저장한 정책자금 상담이 아직 없습니다.
+            {clientName || '이 업체'}의 정책자금 진단을 먼저 저장해 주세요.
           </p>
-          <p className="mt-1 break-keep text-sm text-slate-500">진단한 뒤 ‘이 업체 상담으로 저장’을 누르면 여기서 리포트를 뽑을 수 있습니다.</p>
+          <p className="mt-1 break-keep text-sm text-slate-500">진단한 뒤 결과 아래 ‘기록에 붙이기’ 를 누르면 여기서 결과서를 뽑을 수 있어요.</p>
           <Link
             to={`/tools/policy-funding/diagnosis?client=${encodeURIComponent(id)}`}
             className="mt-4 inline-block rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"

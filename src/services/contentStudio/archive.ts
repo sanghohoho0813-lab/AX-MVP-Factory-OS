@@ -184,6 +184,26 @@ export function planSlotStates(slots: readonly { date: string; kind: ContentKind
   })
 }
 
+const PLAN_DOW = ['일', '월', '화', '수', '목', '금', '토']
+
+/**
+ * D-237 한 달 계획 [모두 복사] — 올릴 날 순서로 '날짜 — 형식 — 제목' 과 본문(복사할 글 모양 그대로), 글 사이는 줄로 나눈다.
+ * 본문이 없으면 머리 줄만. 같은 날은 계획에 적힌 순서 그대로.
+ */
+export function planCopyText(rows: readonly { date: string; kind: ContentKind; title: string; blocks?: readonly DraftBlock[] | null }[]): string {
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => a.r.date.localeCompare(b.r.date) || a.i - b.i)
+    .map(({ r }) => {
+      const [, m, d] = r.date.split('-').map(Number)
+      const dow = PLAN_DOW[new Date(`${r.date}T00:00:00Z`).getUTCDay()] ?? ''
+      const head = `${m}/${d} (${dow}) — ${KIND_LABEL[r.kind]} — ${r.title.trim()}`
+      const body = r.blocks?.length ? plainText(r.kind, r.blocks) : ''
+      return body ? `${head}\n\n${body}` : head
+    })
+    .join('\n\n────────\n\n')
+}
+
 /** 올렸어요 / 아직 — 사슬 전체에 같은 표시(새 판을 만들어도 남게) */
 export function withPosted(items: readonly ContentItem[], rootId: string, at: string | null): ContentItem[] {
   return items

@@ -7,6 +7,7 @@
 import { normalizeClientOps } from '../clientOpsService'
 import { adoptRow, isTrialId, normalizeTrial, registerInput, rowSubjectId, sameNameClient, subjectQuery, subjectRow, trialRecord, TRIAL_SAMPLES, withoutProvisional, withTrialDetails, type TrialProfile } from '../marketingTrial'
 import { industryForRecord, siteFacts } from '../siteBuilder'
+import { promoForSite } from '../contentStudio'
 import {
   ALL_ART,
   BLOCK_DEFS,
@@ -514,6 +515,35 @@ check('H83 믿음 기록이 없으면 업종에 맞는 블록 더하기(병의�
     [descOf('02-123-4560'), telHref('02-123-4567~8')])
   check('D220-14 가상 업체 업종은 업태 칸으로(회사 기본 정보에 보임) · 임시등록 때도 업태 채움 · 이미 있는 업태는 그대로',
     trialRecord(bakery).businessCategory === '베이커리 카페' && det.businessCategory === '베이커리 카페' && withTrialDetails({ ...base, businessCategory: '음식점업' }, bakery, at).businessCategory === '음식점업')
+}
+
+/* ---------------- D-237 홍보 글 만들기의 홍보 정보 → 홈페이지 빈 칸 ---------------- */
+{
+  // 홍보 글 만들기에 저장된 모양(고친 칸) 그대로 — 이상한 칸 · 빈 칸은 버린다
+  const promo = promoForSite({ phone: ' 031-555-0000 ', hours: '평일 9시~6시 · 토 10시~2시', reviews: '네이버 후기 320개 · 평점 4.9', reviewSource: '네이버 플레이스', voice: '“아이가 매일 가고 싶어 해요”', price: '안 씀', junk: 1 })
+  check('D237-1 홍보 정보 → 홈페이지에 쓸 다섯 칸만(전화 · 영업시간 · 후기 수 · 받은 곳 · 한마디)', JSON.stringify(Object.keys(promo).sort()) === JSON.stringify(['hours', 'phone', 'reviewSource', 'reviews', 'voice']) && promo.phone === '031-555-0000' && promoForSite(null).phone === undefined, promo)
+  const noPhone = normalizeClientOps({ id: 'p1', companyName: '해솔수학', businessCategory: '교육 서비스업', businessItem: '입시 학원', contactPhone: '010-1111-2222' })
+  const pd = draftSite(noPhone, { today, now, makeId, promo })
+  const pc = pd.blocks.find((b) => b.type === 'contact')
+  const pf = pd.blocks.find((b) => b.type === 'footer')
+  const pr = pd.blocks.find((b) => b.type === 'reviews')
+  check('D237-2 대표 전화가 없으면 홍보 글에 적은 전화 — 연락처 · 바닥 · 고정 단추 · 소개 글(담당자 휴대폰은 여전히 안 넣음)', pc?.props.phone === '031-555-0000' && pf?.props.phone === '031-555-0000' && pc?.props.floatBar === true && pd.seo.description.includes('031-555-0000') && !JSON.stringify(pd).includes('010-1111-2222'), pc?.props)
+  check('D237-3 적어 둔 영업시간은 견본 표시 없이 · 고객 한마디는 후기 블록으로(따옴표 떼고 · 받은 곳 · 후기 수)', pc?.props.hours === '평일 9시~6시 · 토 10시~2시' && !pc?.sample?.includes('hours') && !!pr && (pr.props.items as { text: string; name: string; meta: string }[])[0].text === '아이가 매일 가고 싶어 해요' && (pr.props.items as { meta: string }[])[0].meta === '네이버 플레이스' && pr.props.intro === '네이버 후기 320개 · 평점 4.9' && hasContent(pr), pr?.props)
+  const order = pd.blocks.map((b) => b.type)
+  check('D237-4 후기 블록은 문의 띠 · 연락처 바로 위 · 하나만', order.filter((t) => t === 'reviews').length === 1 && order.indexOf('reviews') === Math.min(...['cta', 'contact'].map((t) => order.indexOf(t)).filter((i) => i >= 0)) - 1, order)
+  const fd = draftSite(full, { today, now, makeId, promo })
+  check('D237-5 업체 기록의 대표 전화가 있으면 그것이 먼저(홍보 전화로 덮지 않음)', fd.blocks.find((b) => b.type === 'contact')?.props.phone === '031-123-4567' && fd.blocks.find((b) => b.type === 'footer')?.props.phone === '031-123-4567')
+  n = 0
+  const plainDoc = draftSite(full, { today, now, makeId })
+  n = 0
+  const emptyPromoDoc = draftSite(full, { today, now, makeId, promo: {} })
+  check('D237-6 홍보 정보가 없으면 예전 초안 그대로(후기 블록 없음 · 견본 영업시간)', JSON.stringify(plainDoc) === JSON.stringify(emptyPromoDoc) && !plainDoc.blocks.some((b) => b.type === 'reviews') && !!plainDoc.blocks.find((b) => b.type === 'contact')?.sample?.includes('hours'))
+  const nb = newBlock('reviews', noPhone, 'education', today, 'nb1', promo)
+  const nbEmpty = newBlock('reviews', noPhone, 'education', today, 'nb2')
+  const nc = newBlock('contact', noPhone, 'education', today, 'nb3', promo)
+  check('D237-7 나중에 더하는 후기 · 연락처 블록도 홍보 정보로(없으면 빈 칸 그대로)', (nb.props.items as { text: string }[])[0].text === '아이가 매일 가고 싶어 해요' && (nbEmpty.props.items as { text: string }[])[0].text === '' && nc.props.phone === '031-555-0000' && nc.props.hours === '평일 9시~6시 · 토 10시~2시')
+  const html = renderSiteHtml(pd)
+  check('D237-8 HTML 에 후기 · 영업시간이 나오고 공격 글은 막힘', html.includes('아이가 매일 가고 싶어 해요') && html.includes('평일 9시~6시') && !/<script/i.test(renderSiteHtml(draftSite(noPhone, { today, now, makeId, promo: { voice: '<script>alert(1)</script>' } }))))
 }
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)

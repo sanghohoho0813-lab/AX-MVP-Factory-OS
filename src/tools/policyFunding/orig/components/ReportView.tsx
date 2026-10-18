@@ -650,7 +650,9 @@ export default function ReportView({
     );
   }
 
-  const customer = stored.find((c) => c.id === id) ?? initialCustomer;
+  // [D-237] 저장한 상담에 진단이 없고 넘겨받은 진단(업체 기록에 붙인 것)이 있으면 그것으로
+  const found = stored.find((c) => c.id === id);
+  const customer = found?.diagnosisResult || !initialCustomer ? found ?? initialCustomer : initialCustomer;
 
   if (!customer) {
     return (

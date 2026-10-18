@@ -7,7 +7,7 @@
  * 실행: npm run test:tools
  */
 
-import { buildAgenda } from '../../services/upcomingAgenda'
+import { buildAgenda, contentAgenda } from '../../services/upcomingAgenda'
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
 import { subjectMismatch } from '../shared/toolSubject'
 import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
@@ -22,7 +22,7 @@ import { mapHref as labHref } from '../labcare/orig/nav'
 import { sharedToolKey } from '../shared/toolStorage'
 import { osCompanyDefaults } from '../employment/orig/store'
 import { mapHref as pfHref } from '../policyFunding/orig/nav'
-import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest, saveCustomer, todayStr } from '../policyFunding/orig/storage'
+import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, reportCustomerFor, resetPolicyStoreForTest, saveCustomer, todayStr } from '../policyFunding/orig/storage'
 import { aiReasoning, oneLineConclusion, todayTasks } from '../policyFunding/coach'
 import { assessHeadlineFor, buildProfile, inferIndustryCategory } from '../policyFunding/engine/knowledgeEngine'
 import { blockerApplies, hardBlockers, screenIndustry, smallBizStatus } from '../policyFunding/engine/eligibility'
@@ -1237,6 +1237,48 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
     .join('\n')
   const awkward = texts.match(/이\(가\)|을\(를\)|은\(는\)|과\(와\)|(기금|재단|공단|금융)(가|는|와) /g) ?? []
   check('D-224 진단 문장: 이(가) · 을(를) · 받침과 안 맞는 조사 0', awkward.length === 0, awkward.slice(0, 5).join(' | '))
+}
+
+/* ---- D-237: 정책자금 결과서 — [기록에 붙이기] 만 누른 업체도 마지막 진단으로 ---- */
+{
+  const os = { id: 'cli_rp', companyName: '사바(주)', industry: '제조업' } as never
+  resetPolicyStoreForTest([], [os])
+  check('D-237 결과서: 저장한 상담도 붙인 진단도 없으면 null(진단하기 안내로)', reportCustomerFor('cli_rp', []) === null && reportCustomerFor('cli_rp', undefined) === null)
+  const tr = (toolKey: string, input: unknown, createdAt: string) => ({ id: `r_${createdAt}`, toolKey, title: '', verdict: null, verdictLabel: '', summary: '', data: { input }, deadlines: [], createdAt, publishedUpdateId: null })
+  const newer: DiagnosisInput = { ...SAMPLE_INPUT, companyName: '사바' }
+  // 새것이 앞(withToolResult 가 앞에 붙인다) — 다른 모듈 결과 · 입력 없는 결과는 건너뛴다
+  const results = [tr('employment', { x: 1 }, '2026-10-17T01:00:00.000Z'), tr('policy-funding', null, '2026-10-16T05:00:00.000Z'), tr('policy-funding', newer, '2026-10-16T01:00:00.000Z'), tr('policy-funding', DEFAULT_INPUT, '2026-10-01T01:00:00.000Z')] as never
+  const fromAttach = reportCustomerFor('cli_rp', results)
+  const want = runDiagnosis(newer)
+  check('D-237 결과서: 붙이기만 했어도 마지막으로 붙인 정책자금 진단으로', !!fromAttach?.diagnosisResult && fromAttach.id === 'cli_rp' && fromAttach.companyName === '사바(주)' && fromAttach.recommendedAgency === want.topAgency && fromAttach.score === want.overallScore, fromAttach?.recommendedAgency)
+  check('D-237 결과서: 진단일은 붙인 날(오늘 아님)', fromAttach?.lastContactedAt === todayStr(new Date('2026-10-16T01:00:00.000Z')), fromAttach?.lastContactedAt)
+  check('D-237 결과서: 붙인 진단으로 그려도 명단(상담 저장)은 그대로', getStoredCustomerById('cli_rp') === undefined)
+  const saved = buildCustomerFromDiagnosis(DEFAULT_INPUT, runDiagnosis(DEFAULT_INPUT), { clientId: 'cli_rp' })
+  resetPolicyStoreForTest([saved], [os])
+  check('D-237 결과서: 상담으로 저장한 진단이 있으면 그것이 먼저', reportCustomerFor('cli_rp', results) === saved)
+  resetPolicyStoreForTest([customerFromRow('cli_rp', { stage: '서류 요청', memo: '옛 메모' }, os)], [os])
+  const merged = reportCustomerFor('cli_rp', results)
+  check('D-237 결과서: 진단 없는 옛 상담 줄 + 붙인 진단 → 진단은 붙인 것 · 단계 · 메모는 상담 줄', !!merged?.diagnosisResult && merged.stage === '서류 요청' && merged.memo === '옛 메모', merged?.stage)
+  resetPolicyStoreForTest([], [])
+}
+
+/* ---- D-237: 내 콘텐츠 촬영일 · 게시일 → 오늘 화면 '다가오는 마감 · 약속'(3일 안) ---- */
+{
+  const T = '2026-10-18'
+  const idea = (id: string, status: string, shootDate: string, publishDate: string) => ({ id, topic: `주제 ${id}`, status, shootDate, publishDate })
+  const ideas = [
+    idea('a', 'selected', '2026-10-18', '2026-10-21'),
+    idea('b', 'filmed', '2026-10-19', '2026-10-20'),
+    idea('c', 'published', '2026-10-19', '2026-10-19'),
+    idea('d', 'script', '2026-10-22', ''),
+    idea('e', 'idea', '2026-10-17', 'nope'),
+  ]
+  const items = contentAgenda(ideas, T)
+  const got = items.map((x) => `${x.title}|${x.kindLabel}|${x.date}`).sort()
+  check('D-237 내 콘텐츠: 3일 안 촬영(찍기 전만) · 게시(올리기 전만) — 찍은 것 촬영 · 올린 것 · 3일 넘은 것 · 지난 날 · 이상한 날짜 뺌', JSON.stringify(got) === JSON.stringify(['주제 a|게시 예정|2026-10-21', '주제 a|촬영 예정|2026-10-18', '주제 b|게시 예정|2026-10-20']), got)
+  check('D-237 내 콘텐츠: 누르면 내 콘텐츠 탭 · 업체 없음 · 오늘은 daysLeft 0', items.every((x) => x.href === '/marketing?view=make' && x.clientId === null && x.kind === 'content') && items.find((x) => x.kindLabel === '촬영 예정')?.daysLeft === 0)
+  const agenda = buildAgenda({ schedule: [], journal: [], clientNames: new Map(), prospectIds: new Set(), today: T, extra: items })
+  check('D-237 오늘 화면: 업체 일과 같은 날짜 순으로 섞임', agenda.map((x) => x.date).join() === '2026-10-18,2026-10-20,2026-10-21', agenda.map((x) => x.date))
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

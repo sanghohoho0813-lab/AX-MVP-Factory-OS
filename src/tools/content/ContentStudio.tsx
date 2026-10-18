@@ -65,6 +65,7 @@ import {
   monthPlan,
   monthPlanFrom,
   parseKeywordVolumes,
+  planCopyText,
   planDrafts,
   planSlotStates,
   sameContent,
@@ -620,6 +621,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         today={today}
         store={store}
         onOpen={openItem}
+        onCopy={copy}
         onPick={(slot) =>
           guard(() => {
             setKind(slot.kind)
@@ -1299,7 +1301,7 @@ function shortDate(d: string): string {
   return `${m}/${dd} (${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]})`
 }
 
-function PlanCard({ record, profile, today, store, onPick, onOpen, startOpen = false }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; today: string; store: ContentStore; onPick: (slot: PlanSlot) => void; onOpen: (it: ContentItem) => void; startOpen?: boolean }) {
+function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, startOpen = false }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; today: string; store: ContentStore; onPick: (slot: PlanSlot) => void; onOpen: (it: ContentItem) => void; onCopy: (t: string, what?: string) => void; startOpen?: boolean }) {
   const { showToast } = useToast()
   // D-227 '한 달 계획' 을 골라 들어오면 바로 펼친 채로(누른 뒤 또 누르지 않게)
   const [open, setOpen] = useState(startOpen)
@@ -1329,6 +1331,19 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, startOpen = f
     } finally {
       setBusy(false)
     }
+  }
+
+  /** D-237 [모두 복사] — 올릴 날 순서로 날짜 · 형식 · 제목 + 본문. 만든 글은 보관함의 새 판, 안 만든 칸은 [한 번에 만들기] 와 같은 글 */
+  const copyAll = () => {
+    const todo = slots.filter((_, i) => !states[i].item)
+    const drafts = planDrafts(profile, todo, today, (d) => !!sameContent(store.items, d.kind, d.blocks))
+    let k = 0
+    const rows = slots.map((sl, i) => {
+      const it = states[i].item
+      const d = it ? null : drafts[k++]
+      return { date: sl.date, kind: sl.kind, title: it?.title ?? d?.title ?? sl.title, blocks: it?.blocks ?? d?.blocks ?? null }
+    })
+    onCopy(planCopyText(rows), `한 달 치 ${slots.length}편`)
   }
 
   return (
@@ -1430,6 +1445,10 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, startOpen = f
             <button type="button" className={MK_PRIMARY.violet} onClick={() => void makeAll()} disabled={busy || made === slots.length} data-testid="content-plan-make-all">
               <Wand2 className="size-4" aria-hidden="true" />
               {made === slots.length ? `${slots.length}편 모두 만들었어요` : made ? `남은 ${slots.length - made}편 한 번에 만들기` : `한 달 치 ${slots.length}편 한 번에 만들기`}
+            </button>
+            <button type="button" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:border-violet-400" onClick={copyAll} data-testid="content-plan-copy-all">
+              <Copy className="size-4" aria-hidden="true" />
+              모두 복사
             </button>
             <span className="t-meta break-keep text-slate-500">보관함에 날짜를 달아 넣어요 · 같은 글은 두 번 넣지 않아요.</span>
           </div>

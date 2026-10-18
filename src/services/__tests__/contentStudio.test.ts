@@ -57,6 +57,8 @@ import {
   titleOf,
   planDrafts,
   planSlotStates,
+  planCopyText,
+  KIND_LABEL,
   withPosted,
   situationPack,
   situationsFor,
@@ -406,6 +408,17 @@ const st2 = planSlotStates(slots2, posted2)
 const run2 = activePlan(posted2, '2026-10-29')
 const run4 = activePlan(asItems(pd4), today)
 check('C70 계획 칸 형편 — 만듦 8 · 올림 2 · 날이 지나도(10/29) 같은 계획(월요일 · 주 2회 · 같은 날짜) · 주 4회 알아봄 · 끝난 계획은 null · 날짜 없는 글뿐이면 null', st2.filter((x) => x.item).length === 8 && st2.filter((x) => x.posted).length === 2 && st2[0].posted && st2[3].posted && run2?.monday === '2026-10-19' && run2.perWeek === 2 && monthPlanFrom(fp, run2.monday, 2, '2026-10-29').map((x) => x.date).join() === slots2.map((x) => x.date).join() && run4?.perWeek === 4 && activePlan(posted2, '2026-11-30') === null && activePlan([item], today) === null, { run2, run4, st: st2.map((x) => [!!x.item, x.posted]) })
+// D-237 한 달 계획 [모두 복사] — 올릴 날 순서 · '날짜 — 형식 — 제목' + 본문 · 본문 없으면 머리 줄만
+{
+  const rows = pd2.map((d, i) => ({ date: slots2[i].date, kind: d.kind, title: d.title, blocks: i === 1 ? null : d.blocks })).reverse()
+  const txt = planCopyText(rows)
+  const parts = txt.split('\n\n────────\n\n')
+  const heads = parts.map((x) => x.split('\n')[0])
+  const [, m0, d0] = slots2[0].date.split('-').map(Number)
+  check('C-D237 모두 복사 — 8편 · 날짜 순(거꾸로 넣어도) · 머리 줄 날짜(요일) — 형식 — 제목 · 본문은 복사할 글 모양 · 안 만든 칸은 머리 줄만',
+    parts.length === 8 && heads[0] === `${m0}/${d0} (화) — ${KIND_LABEL[pd2[0].kind]} — ${pd2[0].title}` && parts[0].endsWith(plainText(pd2[0].kind, pd2[0].blocks)) && parts[1] === heads[1] && heads.every((h, i) => h.includes(pd2[i].title)) && !/undefined|NaN/.test(txt) && planCopyText([]) === '',
+    heads)
+}
 // D-221 계획 정보를 글에 남김 — 주 4회 계획에서 화요일 글 하나 · 둘째 주 글 하나만 저장해도 같은 계획
 const tue4 = asItems(pd4).filter((x) => x.input.planDate === slots4[1].date)
 const wk2 = asItems(pd4).filter((x) => x.input.planDate === slots4[5].date)

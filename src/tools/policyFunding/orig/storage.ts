@@ -11,9 +11,10 @@
 
 import type { Customer, CustomerStage, DiagnosisInput, DiagnosisResult } from '../types'
 import { CUSTOMER_STAGES } from '../types'
+import { DEFAULT_INPUT, runDiagnosis } from '../diagnosis'
 import { deleteRow, listRows, saveRow } from '../../../services/moduleData'
 import { generateId } from '../../../storage/localStore'
-import type { ClientOpsRecord } from '../../../types/clientOps'
+import type { ClientOpsRecord, ToolResult } from '../../../types/clientOps'
 
 const MODULE = 'policy-funding'
 const BUCKET = 'consults'
@@ -166,6 +167,26 @@ export function buildCustomerFromDiagnosis(
     likelihoodLevel: result.likelihoodLevel,
     specialFundingTracks: result.specialTracks,
   }
+}
+
+/**
+ * D-237 결과서가 읽을 이 업체의 진단 — 상담으로 저장한 진단이 먼저, 없으면 업체 기록에 마지막으로 붙인 진단(그 입력으로 다시 계산).
+ * 예전에는 [업체 기록에 붙이기] 만 누른 업체의 결과서가 '저장한 상담이 없습니다' 로 비었다. 둘 다 없으면 null.
+ */
+export function reportCustomerFor(clientId: string, toolResults: readonly ToolResult[] | undefined): Customer | null {
+  const stored = getStoredCustomerById(clientId)
+  if (stored?.diagnosisResult) return stored
+  // 새것이 앞에 붙는다(withToolResult)
+  const last = (toolResults ?? [])
+    .filter((r) => r.toolKey === 'policy-funding')
+    .map((r) => ({ at: r.createdAt, input: (r.data as { input?: Partial<DiagnosisInput> } | null)?.input }))
+    .find((x): x is { at: string; input: Partial<DiagnosisInput> } => !!x.input && typeof x.input === 'object')
+  if (!last) return stored ?? null
+  const input: DiagnosisInput = { ...DEFAULT_INPUT, ...last.input }
+  const day = Number.isNaN(Date.parse(last.at)) ? todayStr() : todayStr(new Date(last.at))
+  const c = buildCustomerFromDiagnosis(input, runDiagnosis(input), { clientId })
+  // 진단일 = 붙인 날(오늘이 아니라) · 상담으로 저장한 적 없으면 단계는 '1차 상담 완료' 그대로
+  return { ...c, lastContactedAt: stored?.lastContactedAt || day, updatedAt: day }
 }
 
 /* ───────── 이 OS 쪽 ───────── */

@@ -68,7 +68,7 @@ export function PolicyDashboardExtra() {
           <Link to={clientId ? `/tools/policy-funding/diagnosis?client=${clientId}` : '/tools/policy-funding/diagnosis'} className="font-bold text-brand-700 hover:underline">
             진단하기
           </Link>{' '}
-          에서 업체를 물고 진단한 뒤 <b>이 업체 상담으로 저장</b> 을 누르면 여기에 단계별로 모입니다.
+          에서 업체를 물고 진단한 뒤 결과 아래 <b>기록에 붙이기</b>(또는 <b>이 업체 상담으로 저장</b>)를 누르면 여기에 단계별로 모입니다.
         </p>
       </Surface>
     )
