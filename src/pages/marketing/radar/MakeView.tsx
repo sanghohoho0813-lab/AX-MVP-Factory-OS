@@ -92,7 +92,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
         <p className="t-sub break-keep text-slate-600">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
       </div>
       {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
-      {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
+      {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
 
       {/* 단계판 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
@@ -191,7 +191,8 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
               이 영상인가요? 확인할 것 {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length}건 — 아래 줄에서 [맞아요] 한 번이면 이어져요
             </p>
           )}
-          {mine.length === 0 && <p className="t-meta break-keep text-slate-500">채널 탭에서 '내 채널' 을 정하면 올린 영상의 숫자를 저절로 찾아요.</p>}
+          {/* D-236: 내 채널을 고르는 단추는 없다 — 미리 정해 둔 한 채널(예전 글은 '채널 탭에서 정하라' 고 했다) */}
+          {mine.length === 0 && <p className="t-meta break-keep text-slate-500">아직 받아 온 내 채널 영상이 없어요. 내 채널은 따로 고르지 않아도 미리 정해져 있어요(채널 탭의 '내 채널' 표시) — 그 영상이 들어오면 올린 영상의 숫자를 저절로 찾아요.</p>}
           <p className="t-meta break-keep text-slate-500">노출 · 클릭률 · 시청 지속시간은 공개 숫자에 없어 어림하지 않아요(YouTube Analytics 연결 뒤).</p>
         </section>
       )}
@@ -405,7 +406,7 @@ function MakeRow({
         )}
         {confirm ? (
           <span className="flex flex-wrap items-center gap-2" data-testid="radar-idea-confirm">
-            <span className="t-sub font-semibold text-danger-700">수첩에서 뺄까요?</span>
+            <span className="t-sub font-semibold text-danger-700">내 콘텐츠에서 뺄까요?</span>
             <Button size="sm" variant="danger" onClick={() => onRemove(i)} disabled={readOnly}>
               빼기
             </Button>
@@ -414,7 +415,7 @@ function MakeRow({
             </Button>
           </span>
         ) : (
-          <Button size="sm" variant="ghost" onClick={() => setConfirm(true)} disabled={readOnly} aria-label={`수첩에서 빼기 — ${i.topic}`} data-testid="radar-idea-remove">
+          <Button size="sm" variant="ghost" onClick={() => setConfirm(true)} disabled={readOnly} aria-label={`내 콘텐츠에서 빼기 — ${i.topic}`} data-testid="radar-idea-remove">
             <Trash2 aria-hidden="true" className="size-4" /> 빼기
           </Button>
         )}

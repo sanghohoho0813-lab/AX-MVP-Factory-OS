@@ -72,7 +72,8 @@ export function ClientToolsCard({
               <span className="t-card font-bold break-keep text-slate-900">
                 도구를 돌리려면 서류 {missingAll.length}건이 더 필요합니다
               </span>
-              <Badge tone="danger">{blockedCount}개 도구가 막혀 있음</Badge>
+              {/* D-236: '막혀 있음' 은 아래 '서류가 없어도 열립니다' 와 맞지 않았다 — 막지 않는다(직접 적어 쓰는 길) */}
+              <Badge tone="danger">서류가 모자란 도구 {blockedCount}개</Badge>
             </div>
             <p className="t-body break-keep text-slate-700" data-testid="client-tools-missing">
               {missingDocsText(missingAll)}
@@ -136,7 +137,7 @@ export function ClientToolsCard({
         )}
 
         <p className="t-meta break-keep text-slate-500">
-          업체 정보는 다시 적지 않습니다. 결과는 단추 한 번으로 이 업체 기록에 붙습니다. 서류가 없어도 열립니다.
+          업체 정보는 다시 적지 않습니다. 결과는 단추 한 번으로 이 업체 기록에 붙습니다. 서류가 모자라도 열립니다 — 그때는 빈 칸을 직접 적어 씁니다.
         </p>
       </div>
     </Section>

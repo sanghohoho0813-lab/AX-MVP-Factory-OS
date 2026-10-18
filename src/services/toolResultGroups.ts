@@ -49,3 +49,25 @@ export function withToolResultDeadline(record: ClientOpsRecord, resultId: string
     `할 일 · ${item.title} · ${item.date}`,
   )
 }
+
+/**
+ * D-236: 모듈 기한 하나를 '했음' / '아직' 으로 — 홍보 글 '올렸어요' 를 누르면 그날 '홍보 글 올리기' 가
+ * 오늘 화면에 30일 동안 '늦음' 으로 남았다. 같은 날 · 같은 제목인 기한만 바꾼다. 맞는 기한이 없으면 그대로 돌려준다.
+ */
+export function withToolDeadlineDone(record: ClientOpsRecord, toolKey: string, match: { date: string; title: string }, on: boolean): ClientOpsRecord {
+  let hit = false
+  const toolResults = record.toolResults.map((r) => {
+    if (r.toolKey !== toolKey || !r.deadlines.some((d) => d.date === match.date && d.title === match.title && !!d.done !== on)) return r
+    hit = true
+    return {
+      ...r,
+      deadlines: r.deadlines.map((d) => {
+        if (d.date !== match.date || d.title !== match.title) return d
+        if (on) return { ...d, done: true as const }
+        const { done: _done, ...rest } = d
+        return rest
+      }),
+    }
+  })
+  return hit ? { ...record, toolResults } : record
+}

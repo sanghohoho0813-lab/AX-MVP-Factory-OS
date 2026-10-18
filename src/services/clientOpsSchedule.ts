@@ -189,7 +189,8 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
         serviceKey: null,
         // D-210: 도구 기한은 '했다' 는 기록이 없다 — 날짜가 지났다고 '처리됨' 이 아니다(못 낸 고용지원금 회차가 줄 긋고 사라졌다).
         // 지나면 '지남' 으로 남고, 오늘 화면에도 30일 동안 늦은 일로 보인다
-        done: false,
+        // D-236: 다만 '했다' 고 표시한 기한(홍보 글 '올렸어요')은 처리됨 — 올린 글이 늦은 일로 남았다
+        done: d.done === true,
         daysLeft: daysLeftFrom(today, d.date),
         ...(d.hard ? { hard: true } : {}),
       })

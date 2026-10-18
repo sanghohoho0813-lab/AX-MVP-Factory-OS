@@ -117,6 +117,9 @@ import { KR_PUBLIC_HOLIDAYS } from '../../services/daysOff'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { copyToClipboard, useOwnerAiIdentity, useOwnerAiRepo } from '../../pages/ownerAi/shared'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { useToolClient } from '../shared/toolClientContext'
+import { listClients, saveClient } from '../../services/clientOpsService'
+import { withToolDeadlineDone } from '../../services/toolResultGroups'
 import { inputClass } from '../homepage/BlockFields'
 import { sendDraftToOwnerAi } from './aiHandoff'
 import { isTrialId, subjectQuery } from '../../services/marketingTrial'
@@ -193,6 +196,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const ownerAi = useOwnerAiAccess()
   const aiRepo = useOwnerAiRepo()
   const aiIdent = useOwnerAiIdentity()
+  const toolClient = useToolClient()
   const { profile, source } = useMemo(() => buildProfile(record, today, store.overrides, store.site), [record, today, store.overrides, store.site])
 
   // D-231 콘텐츠 레이더 › 내 콘텐츠 [홍보 글로] — 주제를 키워드에 넣고 '직접 고르기 › 블로그' 로 연다
@@ -477,6 +481,20 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     if (!(await store.setPosted(it.rootId, on))) return showToast('바꾸지 못했어요. 다시 눌러 주세요.')
     showToast(on ? '올렸어요로 표시했어요.' : '아직 안 올린 글로 바꿨어요.')
     setShown((cur) => (cur?.item && cur.item.rootId === it.rootId ? { ...cur, item: { ...cur.item, ...(on ? { postedAt: new Date().toISOString() } : { postedAt: undefined }) } } : cur))
+    if (it.input.planDate && !isTrialId(record.id)) void syncPlanDone(it.input.planDate, it.kind, on)
+  }
+
+  /** D-236: 업체 일정에 건 '홍보 글 올리기' 도 같이 처리됨으로 — 올린 글이 오늘 화면에 30일 동안 '늦음' 으로 남았다 */
+  const syncPlanDone = async (date: string, k: ContentKind, on: boolean) => {
+    try {
+      const list = await listClients(toolClient.workspaceId).catch(() => toolClient.loadClients())
+      const target = list.find((c) => c.id === record.id)
+      if (!target) return
+      const next = withToolDeadlineDone(target, 'content', { date, title: planDeadlineTitle(k) }, on)
+      if (next !== target) toolClient.replaceClient(await saveClient(next))
+    } catch {
+      // 글의 '올림' 표시는 이미 저장됐다 — 업체 일정만 다음에 다시 누르면 맞춰진다
+    }
   }
 
   /** D-230 올린 뒤 숫자 — 사슬 전체에 적는다 */
@@ -1274,6 +1292,8 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
 /* ------------------------------------------------------------------ */
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
+/** 업체 일정에 거는 올릴 날 한 줄 — '올렸어요' 를 누르면 이 제목으로 찾아 처리됨으로 바꾼다(D-236) */
+const planDeadlineTitle = (k: ContentKind) => `홍보 글 올리기 · ${KIND_LABEL[k]}`
 function shortDate(d: string): string {
   const [, m, dd] = d.split('-').map(Number)
   return `${m}/${dd} (${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]})`
@@ -1295,7 +1315,8 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, startOpen = f
   // D-209 접어 둬도 다음에 올릴 글 하나는 보이게 · 지난 날인데 안 올린 글 수
   const nextAt = running ? slots.findIndex((sl, i) => !states[i].posted && sl.date >= today) : -1
   const late = running ? slots.filter((sl, i) => !states[i].posted && sl.date < today).length : 0
-  const deadlines = slots.map((sl) => ({ date: sl.date, title: `홍보 글 올리기 · ${KIND_LABEL[sl.kind]}`, note: sl.title }))
+  // D-236: 이미 올린 칸은 처리됨으로 걸어 둔다(다시 걸어도 '늦음' 으로 안 돌아가게)
+  const deadlines = slots.map((sl, i) => ({ date: sl.date, title: planDeadlineTitle(sl.kind), note: sl.title, ...(states[i].posted ? { done: true as const } : {}) }))
 
   const makeAll = async () => {
     if (busy) return

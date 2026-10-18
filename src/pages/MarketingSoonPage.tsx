@@ -34,7 +34,7 @@ const LIVE_TOOLS: LiveTool[] = [
     testId: 'marketing-youtube',
     icon: BarChart3,
     title: '콘텐츠 레이더',
-    text: 'YouTube 벤치마킹 — 이번 주에 찍을 주제 후보와 근거 · 평소보다 터진 영상 · 콘텐츠 수첩',
+    text: 'YouTube 벤치마킹 — 이번 주에 찍을 주제 후보와 근거 · 평소보다 터진 영상 · 내 콘텐츠',
     can: ['이번 주 찍을 것', '터진 영상', '급상승 주제'],
     band: 'from-red-600 to-rose-700',
     border: 'border-red-200 hover:border-red-400',

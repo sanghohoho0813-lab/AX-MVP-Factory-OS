@@ -111,9 +111,10 @@ export function isStale(c: Pick<YtCache, 'fetchedAt' | 'feedRevision'> | null, s
 }
 
 const MESSAGE: Record<string, string> = {
-  no_key: '유튜브 API 키가 아직 서버에 없습니다. 키를 넣으면 6시간마다 저절로 받아 옵니다.',
+  // D-236: 대표 화면에 'API 키 · 서버' 같은 말 대신 — 설정 방법은 아래 담당자용 3단계에
+  no_key: '유튜브에서 숫자를 받아 오는 연결이 아직 설정되지 않았어요. 설정을 마치면 6시간마다 저절로 받아 와요.',
   quota: '오늘 유튜브 사용 한도를 다 썼습니다. 한도는 한국 시간 오후 4~5시에 다시 채워집니다.',
-  bad_key: '유튜브가 키를 받아 주지 않았습니다(키가 틀렸거나 YouTube Data API v3 가 켜져 있지 않음).',
+  bad_key: '유튜브 연결 설정이 맞지 않아 받지 못했어요 — 설정 담당자에게 확인을 부탁해 주세요(담당자용: 키가 틀렸거나 YouTube Data API v3 가 꺼져 있음).',
   timeout: '유튜브 응답이 늦어 이번에는 못 받았습니다. 잠시 뒤 다시 눌러 주세요.',
   upstream_empty: '유튜브에서 영상을 하나도 받지 못했습니다. 잠시 뒤 다시 눌러 주세요.',
 }

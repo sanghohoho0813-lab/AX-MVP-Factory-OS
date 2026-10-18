@@ -191,19 +191,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 
   const saveOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
-    if (notebook.failed) return showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
-    if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`${q(o.topic, '은/는')} 이미 수첩에 있습니다.`)
+    if (notebook.failed) return showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
+    if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`${q(o.topic, '은/는')} 이미 [내 콘텐츠] 에 있습니다.`)
     try {
       if (!(await notebook.save(ideaFromOpportunity(o)))) return showToast('담는 중입니다 — 잠시만 기다려 주세요.')
       showToast(`${q(o.topic, '을/를')} 아이디어로 담았습니다 — [내 콘텐츠] 에 있습니다.`)
     } catch {
-      showToast('수첩에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+      showToast('내 콘텐츠에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
   }
   /** [이번 주로 확정] — 수첩에 '제작 예정' 으로(이미 있으면 그 줄의 단계만 · D-195) */
   const confirmOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
-    if (notebook.failed) return showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
+    if (notebook.failed) return showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
     const c = confirmInput(o, notebook.ideas)
     if (!c.changed) return showToast(`${q(o.topic, '은/는')} 이미 '${IDEA_STATUS_LABEL[c.input.status ?? 'idea']}' 단계입니다.`)
     try {
@@ -251,7 +251,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }
   const addCustom = async (topic: string): Promise<boolean> => {
     if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), false)
-    if (notebook.failed) return (showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요.'), false)
+    if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요.'), false)
     if (notebook.ideas.some((i) => i.topic === topic.trim())) return (showToast(`${q(topic.trim(), '은/는')} 이미 담겨 있습니다.`), false)
     try {
       const saved = await notebook.save(customIdea(topic))
@@ -266,7 +266,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const removeIdea = async (i: ContentIdea) => {
     try {
       await notebook.remove(i.id)
-      showToast(`${q(i.topic, '을/를')} 수첩에서 뺐습니다.`)
+      showToast(`${q(i.topic, '을/를')} 내 콘텐츠에서 뺐습니다.`)
     } catch {
       showToast('빼지 못했습니다.')
     }
@@ -416,11 +416,17 @@ function SetupCard({ status, message, onSample }: { status: string; message: str
         <span>{message || '유튜브 데이터를 아직 받지 못했습니다.'}</span>
       </p>
       {status === 'no_key' && (
-        <ol className="t-sub flex list-decimal flex-col gap-1 pl-6 break-keep text-slate-600" data-testid="yt-key-steps">
-          <li>Google Cloud 콘솔에서 'YouTube Data API v3' 를 켜고 API 키를 만듭니다(예전 대시보드에 쓰던 키도 됩니다).</li>
-          <li>Vercel › 이 프로젝트 › Settings › Environment Variables 에 이름 YOUTUBE_API_KEY 로 넣습니다.</li>
-          <li>다시 배포(Redeploy)하면 이 화면이 실제 벤치마킹 채널로 바뀝니다.</li>
-        </ol>
+        <>
+          {/* D-236: 아래 3단계는 개발 말이라 — 누가 할 일인지 먼저 쉬운 말로 */}
+          <p className="t-sub break-keep text-slate-700" data-testid="yt-key-who">
+            아래는 사이트를 설정하는 담당자가 할 일이에요 — 이 화면을 그대로 보여 주세요. 그전에도 [예시로 보기] 로 둘러볼 수 있어요.
+          </p>
+          <ol className="t-sub flex list-decimal flex-col gap-1 pl-6 break-keep text-slate-600" data-testid="yt-key-steps">
+            <li>Google Cloud 콘솔에서 'YouTube Data API v3' 를 켜고 API 키를 만듭니다(예전 대시보드에 쓰던 키도 됩니다).</li>
+            <li>Vercel › 이 프로젝트 › Settings › Environment Variables 에 이름 YOUTUBE_API_KEY 로 넣습니다.</li>
+            <li>다시 배포(Redeploy)하면 이 화면이 실제 벤치마킹 채널로 바뀝니다.</li>
+          </ol>
+        </>
       )}
       <div>
         <Button variant="primary" onClick={onSample} data-testid="yt-sample">
@@ -452,7 +458,7 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
     <div className="flex flex-col gap-2">
       {sample && (
         <p className="t-body rounded-(--radius-control) border border-amber-300 bg-amber-50 px-4 py-3 font-semibold break-keep text-amber-900" data-testid="yt-sample-banner">
-          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 키를 넣으면 실제 벤치마킹 채널로 바뀝니다.
+          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 벤치마킹 채널로 바뀝니다.
         </p>
       )}
       {message && (

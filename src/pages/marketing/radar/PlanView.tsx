@@ -274,7 +274,7 @@ function ConfirmButton({ o, status, readOnly, onConfirm, quiet }: Pick<CardProps
       </span>
     )
   return (
-    <Button variant={quiet ? 'secondary' : 'primary'} onClick={() => onConfirm(o)} disabled={readOnly} data-testid="radar-confirm" title={readOnly ? '팀장 화면을 보는 중에는 저장하지 않습니다' : '콘텐츠 수첩에 제작 예정으로 담습니다'}>
+    <Button variant={quiet ? 'secondary' : 'primary'} onClick={() => onConfirm(o)} disabled={readOnly} data-testid="radar-confirm" title={readOnly ? '팀장 화면을 보는 중에는 저장하지 않습니다' : '내 콘텐츠에 제작 예정으로 담습니다'}>
       <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주로 확정
     </Button>
   )
@@ -677,7 +677,7 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
       <div className="flex flex-wrap items-center gap-2">
         {inNotebook ? (
           <span className="t-sub inline-flex min-h-[44px] items-center gap-1.5 font-semibold text-success-700" data-testid="radar-saved">
-            <BookmarkCheck aria-hidden="true" className="size-4" /> 수첩에 있음
+            <BookmarkCheck aria-hidden="true" className="size-4" /> 내 콘텐츠에 있음
           </span>
         ) : (
           <Button variant="secondary" onClick={() => onSave(o)} disabled={readOnly} data-testid="radar-save" title="이번 주가 아니어도 나중에 볼 아이디어로 담습니다">

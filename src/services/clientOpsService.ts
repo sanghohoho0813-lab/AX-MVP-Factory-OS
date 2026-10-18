@@ -1187,6 +1187,7 @@ function normalizeToolDeadlines(value: unknown): ToolDeadline[] {
       note: typeof d.note === 'string' ? d.note : '',
       ...(d.todo === true ? { todo: true as const } : {}),
       ...(d.hard === true ? { hard: true as const } : {}),
+      ...(d.done === true ? { done: true as const } : {}),
     })
   }
   return out.slice(0, TOOL_DEADLINE_LIMIT)

@@ -212,7 +212,7 @@ try {
     await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm').click()
     await page.waitForTimeout(600)
     const t = await toastText(page)
-    check('D-222 3 수첩 목록을 못 읽음 → [이번 주로 확정] 저장 요청 0 · "수첩을 읽지 못했습니다 — 새로고침"(예전: 빈 목록으로 보고 이미 있는 주제를 또 담음)', ideaWrites(writes).length === 0 && t.includes('수첩을 읽지 못했습니다'), { n: ideaWrites(writes).length, t })
+    check('D-222 3 수첩 목록을 못 읽음 → [이번 주로 확정] 저장 요청 0 · "내 콘텐츠를 읽지 못했습니다 — 새로고침"(예전: 빈 목록으로 보고 이미 있는 주제를 또 담음)', ideaWrites(writes).length === 0 && t.includes('내 콘텐츠를 읽지 못했습니다'), { n: ideaWrites(writes).length, t })
     check('D-222 3 JS 오류 없음', errors.length === 0, errors)
     await ctx.close()
   }

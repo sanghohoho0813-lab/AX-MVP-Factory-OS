@@ -15,6 +15,7 @@ import { CLIENT_TYPE_LABEL, rememberClientTypeView } from '../../services/client
 import { useToolClient } from '../shared/toolClientContext'
 import { TrialForm } from './TrialForm'
 import { registerTrial, type TrialStore } from './trialStore'
+import { quoted } from '../../lib/josa'
 
 export function TrialBanner({
   trial,
@@ -136,9 +137,9 @@ export function TrialBanner({
         message={
           half
             ? '이미 임시등록한 업체로 남은 홈페이지 · 홍보 글을 옮깁니다.'
-            : `'${trial.name}' 을 고객 관리에 ${target}(임시등록 표시)으로 올리고, ${keepNote} 임시등록 표시는 업체 상세 [더보기] 에서 지울 수 있어요.`
+            : `${quoted(trial.name, '을/를')} 고객 관리에 ${target}(임시등록 표시)으로 올리고, ${keepNote} 임시등록 표시는 업체 상세 [더보기] 에서 지울 수 있어요.`
         }
-        warning={dupName ? `고객 관리에 이름이 같은 '${dupName}' 이(가) 이미 있어요. 같은 곳이면 그만두고 그 업체에서 만드세요.` : undefined}
+        warning={dupName ? `고객 관리에 이름이 같은 ${quoted(dupName, '이/가')} 이미 있어요. 같은 곳이면 그만두고 그 업체에서 만드세요.` : undefined}
         confirmLabel={half ? '마저 옮기기' : dupName ? '그래도 새로 임시등록' : '임시등록'}
         busy={busy}
         onConfirm={() => void doRegister()}

@@ -509,6 +509,8 @@ export interface ToolDeadline {
   todo?: true
   /** D-138: 지나면 신청할 수 없는 기한(예: 청년도약 참여신청 — 입사 후 3개월) — 7일 안이면 오늘 화면 '놓치면 끝나는 기한' 에 */
   hard?: true
+  /** D-236: 이미 한 일(홍보 글 '올렸어요') — 지나도 오늘 화면 '늦음' · 다가오는 일에 뜨지 않는다 */
+  done?: true
 }
 
 export interface ToolResult {

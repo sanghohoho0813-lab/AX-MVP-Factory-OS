@@ -26,6 +26,7 @@ import { subjectMismatch, type ToolSubject } from './toolSubject'
 import { withToolResultDeadline } from '../../services/toolResultGroups'
 import { addDaysLocal, friendlyDate, withNextAction } from '../../services/clientOpsNextAction'
 import { todayLocalDate } from '../../lib/appClock'
+import { useIsPilot } from '../../auth/osAccess'
 
 /** D-134: 붙인 뒤 걸 다음 할 일 — 모듈마다 자주 하는 다음 걸음(고칠 수 있다) */
 const FOLLOW_UP: Record<string, { text: string; days: number }> = {
@@ -78,6 +79,8 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
   const { clientId, clientName, workspaceId, loadClients, replaceClient } = useToolClient()
   const presetId = props.presetClientId ?? clientId ?? ''
   const { showToast } = useToast()
+  // D-236: 팀장(Pilot)은 고객 플랫폼이 없다(업체 상세 '고객 플랫폼' 탭도 숨김) — 발행 단추 · 칸을 보이지 않는다
+  const pilot = useIsPilot()
   const [open, setOpen] = useState(false)
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -246,7 +249,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
             <Paperclip aria-hidden="true" className="size-4" /> {busy ? '붙이는 중…' : `${quickName} 기록에 붙이기`}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid="tool-attach-open">
-            다른 업체 · 발행까지
+            {pilot ? '다른 업체에 붙이기' : '다른 업체 · 발행까지'}
           </Button>
         </>
       ) : (
@@ -300,11 +303,13 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
           title="어느 업체에 붙일까요?"
           onClose={() => setOpen(false)}
           footer={
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label className="t-sub flex items-center gap-2 text-slate-600">
-                <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} className="size-4" />
-                고객 플랫폼에 요약도 발행 (연결된 고객 계정이 있을 때만)
-              </label>
+            <div className={`flex flex-col gap-2 sm:flex-row sm:items-center ${pilot ? 'sm:justify-end' : 'sm:justify-between'}`}>
+              {!pilot && (
+                <label className="t-sub flex items-center gap-2 text-slate-600">
+                  <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} className="size-4" />
+                  고객 플랫폼에 요약도 발행 (연결된 고객 계정이 있을 때만)
+                </label>
+              )}
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
                   닫기
@@ -313,7 +318,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
                   size="sm"
                   variant="primary"
                   disabled={!pickedId || busy}
-                  onClick={() => void attachTo(pickedId, publish)}
+                  onClick={() => void attachTo(pickedId, publish && !pilot)}
                   data-testid="tool-attach-confirm"
                 >
                   {busy ? '붙이는 중…' : '이 업체에 붙이기'}

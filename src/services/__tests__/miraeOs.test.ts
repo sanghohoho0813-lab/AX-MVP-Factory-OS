@@ -107,6 +107,7 @@ import { withToolResult } from '../clientOpsService'
 import { NEXT_QUICK_DAYS, addDaysLocal, friendlyDate, nextSuggestions, relativeDay, suggestsFirstMeeting, withNextAction } from '../clientOpsNextAction'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { agendaWhen, buildAgenda } from '../upcomingAgenda'
+import { withToolDeadlineDone } from '../toolResultGroups'
 import { localDateOf } from '../../lib/appClock'
 import { KR_PUBLIC_HOLIDAYS, addDaysOff, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, rangeDates, removeDayOff, toDayOff, weekdayOf } from '../daysOff'
 import { repeatDates } from '../repeatDates'
@@ -2225,6 +2226,34 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('다가오는: 끝낸 할 일 · 14일 넘는 것 뺌', !titles.includes('할 일 c') && !titles.includes('할 일 d') && !titles.includes('먼 기한'))
   check('다가오는: 잠재고객 약속은 미팅 준비로', agenda.find((a) => a.kind === 'next')?.href === '/sales/meeting?client=ag1')
   check('다가오는: 날짜 글자 — 내일 · D-6 · 요일', agendaWhen({ date: '2026-10-03', daysLeft: 1 }).label === '내일' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).label === 'D-6' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).date === '10/8 목')
+}
+
+// D-236: 홍보 글 '올렸어요' 한 칸은 오늘 화면 '늦음' · 다가오는 일에 안 뜬다(올리지 않은 칸만 늦음)
+{
+  const T = '2026-10-18'
+  const base = normalizeClientOps({ id: 'pc1', companyName: '홍보올림', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const plan = withToolResult(base, {
+    toolKey: 'content',
+    title: '홍보 글 한 달 계획',
+    verdict: 'ready',
+    verdictLabel: '',
+    summary: '',
+    data: null,
+    deadlines: [
+      { date: '2026-10-13', title: '홍보 글 올리기 · 블로그', note: '올린 글', done: true },
+      { date: '2026-10-15', title: '홍보 글 올리기 · 카드뉴스', note: '안 올린 글' },
+      { date: '2026-10-20', title: '홍보 글 올리기 · 블로그', note: '다음 글' },
+    ],
+  })
+  const kept = normalizeClientOps(JSON.parse(JSON.stringify(plan)))
+  const agendaOf = (r: ClientOpsRecord) => buildAgenda({ schedule: buildClientSchedule(r, T), journal: [], clientNames: new Map(), prospectIds: new Set(), today: T }).map((a) => a.detail)
+  const sch = buildClientSchedule(kept, T)
+  check('올림 표시(done)가 저장 · 다시 읽기에서 남고, 그 칸은 처리됨 · 안 올린 칸은 아직', kept.toolResults[0].deadlines[0].done === true && sch.find((e) => e.detail === '올린 글')?.done === true && sch.find((e) => e.detail === '안 올린 글')?.done === false)
+  check("오늘 화면: 올린 칸은 '늦음' 에 없음 · 안 올린 지난 칸 · 다음 칸은 그대로", JSON.stringify(agendaOf(kept)) === JSON.stringify(['안 올린 글', '다음 글']), JSON.stringify(agendaOf(kept)))
+  const posted = withToolDeadlineDone(kept, 'content', { date: '2026-10-15', title: '홍보 글 올리기 · 카드뉴스' }, true)
+  check("'올렸어요' 를 누르면 그 칸도 처리됨 — 늦음에서 빠짐", JSON.stringify(agendaOf(posted)) === JSON.stringify(['다음 글']), JSON.stringify(agendaOf(posted)))
+  const undone = withToolDeadlineDone(posted, 'content', { date: '2026-10-13', title: '홍보 글 올리기 · 블로그' }, false)
+  check("'아직' 으로 되돌리면 다시 늦음 · 다른 모듈 · 맞는 칸이 없으면 기록 그대로", JSON.stringify(agendaOf(undone)) === JSON.stringify(['올린 글', '다음 글']) && withToolDeadlineDone(kept, 'employment', { date: '2026-10-15', title: '홍보 글 올리기 · 카드뉴스' }, true) === kept && withToolDeadlineDone(kept, 'content', { date: '2026-10-13', title: '홍보 글 올리기 · 블로그' }, true) === kept, JSON.stringify(agendaOf(undone)))
 }
 
 /* D-150: 영업 · 할 일 검토로 찾은 것 */

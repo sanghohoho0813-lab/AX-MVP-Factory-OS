@@ -786,8 +786,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
         {DETAIL_TABS.filter((t) => !(pilot && PILOT_HIDDEN_TABS.has(t.key)) && (!t.hidden || t.key === tab || (t.key === 'funding' && activeApplications(record).length > 0))).map((t) => {
+          // D-236: 맞춤 추천 숫자 = 탭 안 · 개요 줄과 같은 것(확인할 정보 + 지금 챙길 것). 예전에는 '심각' 만 세어 개요 줄 숫자와 달랐다 — 빨간색은 확인할 정보 · 심각이 있을 때만
+          const smartRed = t.key === 'smart' && pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length > 0
           const badge =
-            t.key === 'smart' ? pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length
+            t.key === 'smart' ? pendingFacts(record).length + alerts.length
               : t.key === 'overview' ? 0
               : t.key === 'docs' ? urgentDocs.size
                 : t.key === 'fees' ? record.fees.filter((f) => !f.receivedAt && !isWaiting(f, fundingFactsOf(record.fundingApplications))).length
@@ -806,7 +808,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             >
               {t.label}
               {badge > 0 && (
-                <span className={`t-meta rounded-full px-1.5 font-semibold ${t.key === 'smart' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`t-meta rounded-full px-1.5 font-semibold ${smartRed ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>
                   {badge}
                 </span>
               )}

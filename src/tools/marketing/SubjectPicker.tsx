@@ -16,6 +16,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { useToast } from '../../components/ui/toastContext'
 import { HelpHeading } from '../../components/ui/fold'
 import { inputClass } from '../homepage/BlockFields'
+import { josa } from '../../lib/josa'
 import { TrialForm } from './TrialForm'
 import { TONE } from './mkTheme'
 import { useTrials } from './trialStore'
@@ -24,6 +25,8 @@ type Group = 'contract' | 'lead' | 'consultant' | 'trial'
 type Filter = 'all' | Group
 
 const GROUP_LABEL: Record<Group, string> = { contract: '계약 고객', lead: '잠재고객', consultant: '컨설턴트', trial: '가상' }
+/** 한 번에 그리는 줄 수 — 넘으면 '몇 곳 더' 와 찾기 칸으로 */
+const LIST_MAX = 60
 
 function groupOf(c: ClientOpsRecord): Group {
   if (clientTypeOf(c) === 'consultant') return 'consultant'
@@ -181,10 +184,25 @@ export function SubjectPicker({
       {loading ? (
         <p className="t-sub text-slate-400">목록을 읽는 중…</p>
       ) : list.length === 0 ? (
-        <p className="t-sub break-keep text-slate-500">{filter === 'trial' ? '아직 가상으로 만든 곳이 없어요. 위의 [가상 업체로 만들기] 를 눌러 보세요.' : '맞는 곳이 없어요.'}</p>
+        <p className="t-sub break-keep text-slate-500" data-testid={`${testPrefix}-empty`}>
+          {filter === 'trial' ? (
+            '아직 가상으로 만든 곳이 없어요. 위의 [가상 업체로 만들기] 를 눌러 보세요.'
+          ) : q.trim() || counts[filter] > 0 ? (
+            '맞는 곳이 없어요.'
+          ) : (
+            // D-236: 업체가 하나도 없을 때 무엇을 하면 되는지
+            <>
+              {filter === 'all' ? '아직 등록한 업체가 없어요.' : `아직 ${josa(GROUP_LABEL[filter], '이/가')} 없어요.`}{' '}
+              <Link to="/ops/clients" className={`font-semibold underline underline-offset-2 ${t.text}`}>
+                고객 관리
+              </Link>
+              에서 업체를 먼저 등록하거나, 위의 [가상 업체로 만들기] 로 먼저 만들어 보세요.
+            </>
+          )}
+        </p>
       ) : (
         <ul className="flex flex-col divide-y divide-slate-100">
-          {list.slice(0, 60).map((r) => (
+          {list.slice(0, LIST_MAX).map((r) => (
             <li key={r.id}>
               <Link to={r.href} className="tap flex min-h-12 items-center gap-3 py-2 hover:bg-slate-50" data-testid={`${testPrefix}-item`} data-group={r.group}>
                 {icon(made.has(r.id))}
@@ -202,6 +220,12 @@ export function SubjectPicker({
             </li>
           ))}
         </ul>
+      )}
+      {/* D-236: 60곳에서 말없이 잘렸다 */}
+      {!loading && list.length > LIST_MAX && (
+        <p className="t-meta break-keep text-slate-500" data-testid={`${testPrefix}-more`}>
+          {list.length - LIST_MAX}곳 더 있어요 — 위 찾기 칸에 이름을 적어 찾으세요.
+        </p>
       )}
 
       {form && <TrialForm initial={form} busy={saving} onClose={() => setForm(null)} onSave={(p) => void saveTrial(p)} />}
