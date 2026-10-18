@@ -11,11 +11,13 @@
  * D-227: 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 토스처럼 다음 단계로" —
  *        길잡이 ① 고르기 → ② 다듬기 → ③ 저장 · 올리기, '무엇을 만들까요' 는 네 길(추천 · 상황 · 직접 · 한 달 계획) 중
  *        고른 하나만 펼친다. 홍보 정보 칸 · 보관함은 접어 둔다(펼침은 이 기기에 기억). 지운 기능은 없다.
+ * D-228: 이상한AI 3차 관찰 — 홍보 정보에 '글 재료'(후기 · 고객 한마디 · 이번 달 혜택+끝나는 날 · 가격 · 말하는 사람),
+ *        다른 AI 도구에 붙여 넣을 요청문 + 받은 글 점검(주지 않은 혜택 · 지어낸 출처 · 숫자 뜻 바뀜), 검색량 등급 · 월 100 이상만.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Archive, Award, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Archive, Award, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardCheck, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Send, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -26,6 +28,11 @@ import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
   AD_TYPES,
   AD_TYPE_HINT,
+  AI_REQUEST_TIPS,
+  VOLUME_TIER_LABEL,
+  aiRequestText,
+  offerLine,
+  volumeTier,
   AD_TYPE_LABEL,
   BLOG_TYPE_HINT,
   BLOG_TYPE_LABEL,
@@ -65,8 +72,10 @@ import {
   type ContentItem,
   type ContentKind,
   type ContentPick,
+  type ContentProfile,
   type Draft,
   type DraftBlock,
+  type DraftCheck,
   type KakaoPurpose,
   type KeywordVolume,
   type PlanSlot,
@@ -77,6 +86,7 @@ import {
   type SituationKey,
   type Tone,
   type TopicType,
+  type VolumeTier,
 } from '../../services/contentStudio'
 import { INDUSTRIES, type IndustryKey } from '../../services/siteBuilder'
 import { KR_PUBLIC_HOLIDAYS } from '../../services/daysOff'
@@ -152,6 +162,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   }, [editing])
   const [busy, setBusy] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  /** D-228 다른 AI 도구에 맡길 때 — 요청문 복사 · 받은 글 점검 */
+  const [aiReqOpen, setAiReqOpen] = useState(false)
+  /** 받은 글 점검에 붙여 넣은 글 — 창을 닫았다 열어도 남게 여기 둔다 */
+  const [aiGot, setAiGot] = useState('')
   /** D-227 무엇을 만들까요 — 네 길 중 지금 펼친 하나 */
   const [mode, setMode] = useState<Mode>('pick')
   const [pack, setPack] = useState<PackState | null>(null)
@@ -266,7 +280,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   }
 
   const blocks = editing ?? shown?.draft.blocks ?? []
-  const checks = shown ? draftChecks(shown.draft.kind, blocks, profile.industry, shown.draft.input.keyword) : []
+  // D-228 홍보 정보와 맞지 않는 혜택 · 출처 · 숫자도 같이 본다(고치다 넣은 말까지)
+  const checks = shown ? draftChecks(shown.draft.kind, blocks, profile.industry, shown.draft.input.keyword, profile) : []
   const text = shown ? plainText(shown.draft.kind, blocks) : ''
   // D-209 [대괄호] 한 번에 채우기 — 묶음이면 지금 글 + 저장 전 탭 모두
   const fillNames = shown ? holeNames(pack ? [blocks, ...pack.items.filter((_, j) => j !== pack.at && !pack.saved[j]).map((x) => x.draft.blocks)] : [blocks]) : []
@@ -396,7 +411,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   return (
     <div className="flex flex-col gap-4" data-testid="content-studio">
-      <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} />
+      <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} onAiReq={() => setAiReqOpen(true)} />
 
       {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 · 네 길 중 하나 */}
       <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-guide">
@@ -946,6 +961,24 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         onCancel={() => leaveRoute.reset?.()}
       />
 
+      {aiReqOpen && (
+        <AiRequestSheet
+          profile={profile}
+          store={store}
+          got={aiGot}
+          setGot={setAiGot}
+          onClose={() => setAiReqOpen(false)}
+          onEditProfile={() => {
+            setAiReqOpen(false)
+            setProfileOpen(true)
+          }}
+          onSaved={(it) => {
+            setAiReqOpen(false)
+            setAiGot('')
+            show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)
+          }}
+        />
+      )}
       {profileOpen && (
         <ProfileSheet
           overrides={store.overrides}
@@ -966,7 +999,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 /* 업체 홍보 정보                                                        */
 /* ------------------------------------------------------------------ */
 
-function ProfileCard({ record, profile, source, saved, posted, onEdit }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; source: ReturnType<typeof buildProfile>['source']; saved: number; posted: number; onEdit: () => void }) {
+function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; source: ReturnType<typeof buildProfile>['source']; saved: number; posted: number; onEdit: () => void; onAiReq: () => void }) {
   const ind = INDUSTRIES.find((i) => i.key === profile.industry)
   const rows: { label: string; value: string; from?: string; missing?: boolean; icon: LucideIcon; tone: MkTone }[] = [
     { label: '업종', value: ind?.label ?? '기타', icon: Factory, tone: 'indigo' },
@@ -979,6 +1012,14 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
   ]
   const missing = rows.filter((r) => r.missing).length
   const gaps = profileGaps(profile)
+  // D-228 글 재료 — 적어 둔 것만(칸 수 · '채운 칸' 에는 세지 않는다)
+  const material = [
+    { label: '후기', value: profile.reviews },
+    { label: '고객 한마디', value: profile.voice ? `"${profile.voice}"` : '' },
+    { label: '이번 달 혜택', value: offerLine(profile) },
+    { label: '가격 · 조건', value: profile.price },
+    { label: '말하는 사람', value: profile.speaker },
+  ].filter((m) => m.value)
   // D-227 칸 7개는 접어 둔다 — 머리 띠(숫자) · 채울 칸 안내만 늘 보이게. 펼침은 이 기기에 기억
   const [open, setOpen] = useFold('content.profile', false)
   return (
@@ -1005,6 +1046,10 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
               <PencilLine className="size-4 text-violet-700" aria-hidden="true" />
               고치기
             </button>
+            <button type="button" onClick={onAiReq} className={HERO_BTN} data-testid="content-ai-req">
+              <Send className="size-4 text-sky-700" aria-hidden="true" />
+              다른 AI 도구에 맡기기
+            </button>
           </>
         }
       />
@@ -1029,6 +1074,17 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
           </div>
         ))}
       </dl>
+      )}
+      {open && material.length > 0 && (
+        <dl className="flex flex-col gap-1 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-2.5" data-testid="content-profile-material">
+          <span className="t-meta font-bold text-violet-900">글 재료 · 적어 둔 것만 글에 들어가요</span>
+          {material.map((m) => (
+            <div key={m.label} className="t-sub flex min-w-0 flex-wrap gap-x-2 break-keep">
+              <dt className="shrink-0 font-semibold text-slate-600">{m.label}</dt>
+              <dd className="min-w-0 break-words text-slate-900">{m.value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
       {gaps.length > 0 && (
         <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-profile-gaps">
@@ -1349,10 +1405,24 @@ function FillBox({ names, scope, onApply }: { names: string[]; scope: string; on
 /* 키워드 검색량 정리                                                      */
 /* ------------------------------------------------------------------ */
 
+/** D-228 검색량 등급 색 — 많이 찾음은 진하게, 거의 안 찾음은 흐리게 */
+const TIER_CHIP: Record<VolumeTier, string> = {
+  high: 'bg-emerald-100 text-emerald-900',
+  mid: 'bg-sky-100 text-sky-900',
+  low: 'bg-amber-100 text-amber-900',
+  tiny: 'bg-slate-200 text-slate-700',
+  none: 'bg-slate-100 text-slate-600',
+}
+
 function KeywordVolumeBox({ onPick }: { onPick: (word: string) => void }) {
   const [text, setText] = useState('')
   const [rows, setRows] = useState<KeywordVolume[] | null>(null)
+  // D-228 월 100 아래는 따로 글을 쓰기보다 다른 글 안에 — 걸러 보기(숫자 없는 줄은 남긴다)
+  const [min100, setMin100] = useState(false)
   const fmt = (n: number | null, small: boolean) => (n === null ? '—' : small && n === 0 ? '< 10' : n.toLocaleString('ko-KR'))
+  const hasNum = !!rows?.some((r) => r.total !== null)
+  const under = rows ? rows.filter((r) => r.total !== null && (r.total < 100 || r.small)).length : 0
+  const list = rows ? (min100 ? rows.filter((r) => r.total === null || (r.total >= 100 && !r.small)) : rows) : []
   return (
     <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="content-volume">
       <h3 className="t-sub flex items-center gap-1.5 font-semibold text-slate-800">
@@ -1366,15 +1436,33 @@ function KeywordVolumeBox({ onPick }: { onPick: (word: string) => void }) {
           <ListOrdered className="size-4" aria-hidden="true" />
           정리하기
         </Button>
-        {rows && <span className="t-meta text-slate-500" data-testid="content-volume-count">{rows.length}개{rows.length > 30 ? ' · 위 30개만 보여요' : ''}</span>}
+        {rows && (
+          <span className="t-meta text-slate-500" data-testid="content-volume-count">
+            {min100 ? `${rows.length}개 중 ${list.length}개` : `${rows.length}개`}
+            {list.length > 30 ? ' · 위 30개만 보여요' : ''}
+          </span>
+        )}
+        {hasNum && (
+          <button type="button" aria-pressed={min100} onClick={() => setMin100(!min100)} className={`${chip(min100)} ml-auto inline-flex items-center gap-1.5`} data-testid="content-volume-min100">
+            {min100 && <Check className="size-4" aria-hidden="true" />}월 100 이상만
+          </button>
+        )}
       </div>
-      {rows && rows.length > 0 && (
+      {hasNum && under > 0 && (
+        <p className="t-meta break-keep text-slate-600" data-testid="content-volume-tip">
+          한 달 검색이 100 아래인 말 {under}개는 따로 글을 쓰기보다 다른 글의 본문 · 해시태그에 같이 넣는 편이 나아요.
+        </p>
+      )}
+      {rows && list.length > 0 && (
         <ol className="flex flex-col divide-y divide-slate-200 rounded-(--radius-control) border border-slate-200 bg-white">
-          {rows.slice(0, 30).map((r, i) => (
-            <li key={r.word} className="flex min-w-0 items-center gap-2 px-3 py-2" data-testid="content-volume-row">
+          {list.slice(0, 30).map((r, i) => (
+            <li key={r.word} className="flex min-w-0 items-center gap-2 px-3 py-2" data-testid="content-volume-row" data-tier={volumeTier(r)}>
               <span className="t-meta w-5 shrink-0 text-right tabular-nums text-slate-400">{i + 1}</span>
               <span className="min-w-0 flex-1">
-                <span className="t-sub block break-keep text-slate-800">{r.word}</span>
+                <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 break-keep text-slate-800">
+                  <span className="min-w-0 break-words">{r.word}</span>
+                  {r.total !== null && <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${TIER_CHIP[volumeTier(r)]}`} data-testid="content-volume-tier">{VOLUME_TIER_LABEL[volumeTier(r)]}</span>}
+                </span>
                 {r.total !== null && (
                   <span className="t-meta block tabular-nums text-slate-500">
                     합 <b className="font-semibold text-slate-700">{fmt(r.total, r.small)}</b> · PC {fmt(r.pc, r.small)} · 모바일 {fmt(r.mobile, r.small)}
@@ -1403,7 +1491,7 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
       .filter(Boolean)
   const [servicesText, setServicesText] = useState((overrides.services ?? []).join(', '))
   const [extraText, setExtraText] = useState((overrides.extraStrengths ?? []).join(', '))
-  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection', placeholder: string) => (
+  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection' | 'reviews' | 'voice' | 'offer' | 'price' | 'speaker', placeholder: string) => (
     <label className="flex flex-col gap-1.5">
       <span className="t-sub font-semibold text-slate-700">{label}</span>
       <input className={inputClass} value={ov[key] ?? ''} placeholder={placeholder} onChange={(e) => setOv((p) => ({ ...p, [key]: e.target.value }))} data-testid={`content-ov-${key}`} />
@@ -1461,6 +1549,169 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         {field('차별점(다른 곳과 다른 한 가지 · 사실만)', 'differ', '예: 시공 뒤 1년 무상 점검을 계약서에 적어 드려요')}
         {field('판매 채널(어디서 사거나 예약하나요)', 'channel', '예: 네이버 예약 · 스마트스토어 · 전화')}
         {field('손님이 망설이는 점', 'objection', '예: 공사 기간 동안 생활이 불편할까 봐')}
+        {/* D-228 글 재료 — 적어 둔 것만 글에 넣는다(비우면 숫자 · 후기 · 혜택을 지어내지 않고 뺀다) */}
+        <div className="flex flex-col gap-1 border-t border-slate-200 pt-4" data-testid="content-ov-material">
+          <h3 className="t-sub flex items-center gap-1.5 font-bold text-violet-900">
+            <Star className="size-4 text-violet-600" aria-hidden="true" />
+            글 재료 — 있는 것만 · 사실만
+          </h3>
+          <p className="t-meta break-keep text-slate-600">적어 둔 것만 블로그 · 카드뉴스 · 카톡에 들어가요. 비워 두면 숫자 · 후기 · 혜택을 지어내지 않고 뺍니다.</p>
+        </div>
+        {field('후기 수 · 평점', 'reviews', '예: 네이버 후기 320개 · 평점 4.8')}
+        {field('실제 고객 한마디(받은 그대로)', 'voice', '예: 끝나고도 먼저 연락 주셔서 놀랐어요')}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
+          {field('이번 달 혜택', 'offer', '예: 첫 방문 견적 무료')}
+          <label className="flex flex-col gap-1.5">
+            <span className="t-sub font-semibold text-slate-700">혜택 끝나는 날</span>
+            <input type="date" className={inputClass} value={ov.offerUntil ?? ''} onChange={(e) => setOv((p) => ({ ...p, offerUntil: e.target.value || undefined }))} data-testid="content-ov-offerUntil" />
+          </label>
+        </div>
+        <p className="t-meta -mt-2 break-keep text-slate-500">끝나는 날이 지나면 혜택은 글에서 저절로 빠져요.</p>
+        {field('가격 · 조건', 'price', '예: 욕실 리모델링 300만 원부터 · 자재 포함')}
+        {field('글에서 말하는 사람', 'speaker', '예: 대표 · 실장 · 원장 김OO')}
+      </div>
+    </BottomSheet>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* D-228 다른 AI 도구에 맡기기 — 요청문 복사 → 받은 글 점검                     */
+/* ------------------------------------------------------------------ */
+
+const GOT_KINDS: ContentKind[] = ['blog', 'shorts', 'video', 'cards', 'kakao', 'place']
+
+function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, onSaved }: { profile: ContentProfile; store: ContentStore; got: string; setGot: (v: string) => void; onClose: () => void; onEditProfile: () => void; onSaved: (it: ContentItem) => void }) {
+  const { showToast } = useToast()
+  const [stage, setStage] = useState(got.trim() ? 1 : 0)
+  const [gotKind, setGotKind] = useState<ContentKind>('blog')
+  const [result, setResult] = useState<DraftCheck[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const resultRef = useRef<HTMLDivElement | null>(null)
+  const req = useMemo(() => aiRequestText(profile), [profile])
+  // 사실 목록이 얇으면 먼저 채우라고 — 재료가 없을수록 바깥 도구가 지어낸다
+  const thin = profileGaps(profile).filter((g) => ['differ', 'reviews', 'voice', 'offer'].includes(g.key))
+  const warn = result?.filter((c) => c.level !== 'info') ?? []
+  const run = () => {
+    setResult(draftChecks(gotKind, [{ label: '', text: got.trim() }], profile.industry, undefined, profile))
+    // 휴대폰에서는 결과가 창 아래로 밀린다 — 결과 첫 줄이 보이게
+    window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60)
+  }
+  const save = async () => {
+    const text = got.trim()
+    if (!text || busy) return
+    setBusy(true)
+    try {
+      const first = text.split('\n').map((l) => l.replace(/^[#>*\-\s]+/, '').trim()).find(Boolean) ?? ''
+      const title = first.length > 40 ? `${first.slice(0, 40)}…` : first || '다른 AI 도구에서 받은 글'
+      const r = await store.addDraft({ kind: gotKind, title, blocks: [{ label: '', text }], notes: [], input: { variant: 0, tone: profile.tone } })
+      if (!r) return showToast('저장하지 못했어요. 붙여 넣은 글은 그대로 있어요 — 다시 눌러 주세요.')
+      showToast(r.dup ? '같은 글이 이미 보관함에 있어요.' : '보관함에 저장했어요 — 아래 결과 칸에 열어 뒀어요.')
+      onSaved(r.item)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <BottomSheet
+      title="다른 AI 도구에 맡기기"
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={onClose}>닫기</Button>
+          {stage === 0 ? (
+            <Button variant="primary" onClick={() => setStage(1)} data-testid="content-ai-next">
+              글을 받았으면 · 점검하기
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !got.trim()} data-testid="content-ai-save">
+              <Save className="size-4" aria-hidden="true" />
+              보관함에 저장
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4" data-testid="content-ai-sheet" data-stage={stage === 0 ? 'copy' : 'check'}>
+        <div className="mx-auto w-full max-w-sm">
+          <MkSteps
+            steps={[
+              { key: 'copy', label: '요청문 복사' },
+              { key: 'check', label: '받은 글 점검' },
+            ]}
+            current={stage}
+            tone="sky"
+            onGo={(k) => setStage(k === 'copy' ? 0 : 1)}
+            testId="content-ai-steps"
+          />
+        </div>
+        {stage === 0 ? (
+          <>
+            <p className="t-sub break-keep text-slate-700">다른 AI 글쓰기 도구의 '추가 요청' 칸에 이 글을 그대로 붙여 넣으세요. 업체 · 독자 · 쓸 수 있는 사실 · 넣지 말 것을 적어 두면 엉뚱한 업종 이야기와 지어낸 숫자가 줄어요. 여기서는 AI 를 부르지 않아요 — 복사만 해요.</p>
+            <pre className="t-sub max-h-72 overflow-auto rounded-(--radius-control) border border-sky-200 bg-sky-50/60 p-3 font-sans break-words whitespace-pre-wrap text-slate-800" data-testid="content-ai-req-text">
+              {req}
+            </pre>
+            <button type="button" className={MK_PRIMARY.sky} onClick={async () => showToast((await copyToClipboard(req)) ? '요청문을 복사했어요 — 다른 AI 도구의 추가 요청 칸에 붙여 넣으세요.' : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요.')} data-testid="content-ai-req-copy">
+              <Copy className="size-4" aria-hidden="true" />
+              요청문 복사
+            </button>
+            {thin.length > 0 && (
+              <button type="button" onClick={onEditProfile} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-amber-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-ai-thin">
+                <MkIcon icon={Sparkles} tone="amber" size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="t-sub block font-bold break-keep text-amber-900">사실 목록이 얇아요 — {thin.map((g) => g.label).join(' · ')}</span>
+                  <span className="t-meta block break-keep text-slate-700">채워 두면 요청문의 사실 목록에 들어가요. 없으면 바깥 도구가 숫자 · 후기를 지어내기 쉬워요.</span>
+                </span>
+                <ChevronRight className="mt-1 size-5 shrink-0 text-amber-700" aria-hidden="true" />
+              </button>
+            )}
+            <div className="flex flex-col gap-1.5 rounded-(--radius-control) bg-slate-50 p-3" data-testid="content-ai-tips">
+              <span className="t-sub font-bold text-slate-800">쓰는 법</span>
+              <ol className="flex flex-col gap-1">
+                {AI_REQUEST_TIPS.map((tip, i) => (
+                  <li key={tip} className="t-meta flex gap-1.5 break-keep text-slate-700">
+                    <span className="shrink-0 font-bold text-sky-700 tabular-nums">{i + 1}</span>
+                    <span className="min-w-0">{tip}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="t-sub break-keep text-slate-700">받은 글을 붙여 넣고 [점검하기] 를 누르세요. 홍보 정보에 없는 혜택 · 지어낸 출처 · 뜻이 바뀐 숫자 · 광고 규정에 걸리는 말을 찾아 드려요.</p>
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="content-ai-kind">
+              <span className="t-sub w-full font-semibold text-slate-700">무슨 글인가요?</span>
+              {GOT_KINDS.map((k) => (
+                <button key={k} type="button" aria-pressed={gotKind === k} onClick={() => setGotKind(k)} className={mkChip(gotKind === k, 'sky')} data-testid="content-ai-kind-btn" data-kind={k}>
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
+            <textarea className={`${inputClass} min-h-40`} value={got} onChange={(e) => (setGot(e.target.value), setResult(null))} placeholder="다른 AI 도구에서 받은 글을 여기에 붙여 넣으세요." aria-label="받은 글 붙여 넣기" data-testid="content-ai-check-input" />
+            <button type="button" className={MK_PRIMARY.sky} onClick={run} disabled={!got.trim()} data-testid="content-ai-check-run">
+              <ClipboardCheck className="size-4" aria-hidden="true" />
+              점검하기
+            </button>
+            {result && (
+              <div ref={resultRef} className="flex scroll-mt-4 flex-col gap-1.5" data-testid="content-ai-check-result" data-warn={warn.length}>
+                <p className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold break-keep ${warn.length ? 'bg-warning-50 text-warning-700' : 'bg-success-50 text-success-700'}`}>
+                  {warn.length ? <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
+                  <span className="min-w-0">{warn.length ? `확인할 곳 ${warn.length}개 — 고친 뒤 다시 [점검하기] 를 눌러 보세요.` : '걸리는 곳이 없어요. 그래도 숫자 · 이름 · 날짜는 한 번 더 눈으로 봐 주세요.'}</span>
+                </p>
+                <ul className="flex flex-col gap-1.5">
+                  {result.map((c) => (
+                    <li key={c.key} data-level={c.level} data-key={c.key} className={`t-sub flex items-start gap-2 rounded-(--radius-control) px-3 py-2 break-keep ${c.level === 'must' ? 'bg-danger-50 text-danger-700' : c.level === 'should' ? 'bg-warning-50 text-warning-700' : 'bg-slate-50 text-slate-600'}`} data-testid="content-ai-check-item">
+                      {c.level === 'info' ? <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
+                      <span className="min-w-0">{c.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="t-meta break-keep text-slate-500">[보관함에 저장] 하면 우리 글처럼 고치기 · 올렸어요 표시 · 한 달 계획에 쓸 수 있어요.</p>
+          </>
+        )}
       </div>
     </BottomSheet>
   )

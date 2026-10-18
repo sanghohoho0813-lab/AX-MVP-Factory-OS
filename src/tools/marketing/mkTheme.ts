@@ -90,9 +90,11 @@ export const HERO: Record<'violet' | 'emerald' | 'red' | 'hub', string> = {
 export const HERO_BTN = 'tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-white px-3 font-semibold text-slate-900 shadow-sm hover:bg-white/90'
 
 /** 도구마다 큰 단추 — 테마 색 대신 도구 색 */
-export const MK_PRIMARY: Record<'violet' | 'emerald', string> = {
+export const MK_PRIMARY: Record<'violet' | 'emerald' | 'sky', string> = {
   violet: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-violet-600 to-fuchsia-700 px-4 font-semibold text-white shadow-sm hover:from-violet-700 hover:to-fuchsia-800 disabled:cursor-not-allowed disabled:opacity-50',
   emerald: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-emerald-700 to-teal-700 px-4 font-semibold text-white shadow-sm hover:from-emerald-800 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50',
+  // D-228 다른 AI 도구에 맡기기(요청문 · 받은 글 점검)
+  sky: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-sky-700 to-blue-700 px-4 font-semibold text-white shadow-sm hover:from-sky-800 hover:to-blue-800 disabled:cursor-not-allowed disabled:opacity-50',
 }
 
 /** 고르는 칩(켜짐/꺼짐) */

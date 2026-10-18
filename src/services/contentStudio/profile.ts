@@ -39,6 +39,24 @@ export interface ContentProfile {
   channel: string
   /** 손님이 가장 많이 망설이는 점(사람이 적은 것만) — 카드뉴스 '망설임 풀기' 에 */
   objection: string
+  /**
+   * D-228 '재료' — 공식은 사실을 먹고 산다(이상한AI 3차 관찰: 재료가 없으면 도구가 숫자 · 후기 · 혜택을 지어낸다).
+   * 사람이 적은 것만 쓰고, 없으면 글에 [대괄호] 로 비워 둔다. 우리는 지어내지 않는다.
+   */
+  /** 후기 수 · 평점('네이버 후기 1,240개 · 평점 4.8') */
+  reviews: string
+  /** 실제 고객 한마디(고객 동의를 받은 말) */
+  voice: string
+  /** 이번 달 혜택 — 기한이 지났으면 '' (지난 혜택을 글에 쓰지 않는다) */
+  offer: string
+  /** 혜택 기한 YYYY-MM-DD(없으면 '') */
+  offerUntil: string
+  /** 기한이 지나 쓰지 않은 혜택(화면 안내용 · 글에는 안 씀) */
+  offerExpired: string
+  /** 가격 · 배송 · 이용 조건('1인분 6,500원 · 3만 원 이상 무료 배송') */
+  price: string
+  /** 글을 말하는 사람('대표 김한솔' · 'MD 지은') — 없으면 이름을 쓰지 않는다 */
+  speaker: string
 }
 
 /** 사람이 고친 칸 — 비어 있지 않은 것만 저장한다 */
@@ -56,6 +74,13 @@ export interface ProfileOverrides {
   differ?: string
   channel?: string
   objection?: string
+  /** D-228 재료 */
+  reviews?: string
+  voice?: string
+  offer?: string
+  offerUntil?: string
+  price?: string
+  speaker?: string
 }
 
 export interface ProfileSource {
@@ -132,6 +157,10 @@ export function buildProfile(record: ClientOpsRecord, today: string, ov: Profile
   const services = ov.services?.length ? ov.services : siteServices.length ? siteServices : recordServices.length >= 2 ? recordServices.slice(0, 6) : []
   const servicesSource: ProfileSource['services'] = ov.services?.length ? 'override' : siteServices.length ? 'site' : recordServices.length >= 2 ? 'record' : 'none'
   const strengths = [...strengthsFromRecord(record, today), ...(ov.extraStrengths ?? []).map((s) => s.trim()).filter(Boolean)].filter((s, i, all) => all.indexOf(s) === i).slice(0, 8)
+  // D-228 혜택은 기한이 지나면 쓰지 않는다(지난 혜택을 '이번 달' 로 알리면 거짓 광고)
+  const offerUntil = /^\d{4}-\d{2}-\d{2}$/.test(ov.offerUntil ?? '') ? (ov.offerUntil as string) : ''
+  const offerText = ov.offer?.trim() ?? ''
+  const expired = !!offerText && !!offerUntil && offerUntil < today
 
   return {
     profile: {
@@ -153,6 +182,13 @@ export function buildProfile(record: ClientOpsRecord, today: string, ov: Profile
       differ: ov.differ?.trim() ?? '',
       channel: ov.channel?.trim() ?? '',
       objection: ov.objection?.trim() ?? '',
+      reviews: ov.reviews?.trim() ?? '',
+      voice: (ov.voice?.trim() ?? '').replace(/^["“”'‘’]+|["“”'‘’]+$/g, ''),
+      offer: expired ? '' : offerText,
+      offerUntil: expired ? '' : offerUntil,
+      offerExpired: expired ? offerText : '',
+      price: ov.price?.trim() ?? '',
+      speaker: ov.speaker?.trim() ?? '',
     },
     source: { item: itemSource, services: servicesSource, target: ov.target?.trim() ? 'override' : 'industry' },
   }
@@ -195,6 +231,17 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
   if (channel) out.channel = channel
   const objection = str(r.objection, 120)
   if (objection) out.objection = objection
+  const reviews = str(r.reviews, 60)
+  if (reviews) out.reviews = reviews
+  const voice = str(r.voice, 120)
+  if (voice) out.voice = voice
+  const offer = str(r.offer, 80)
+  if (offer) out.offer = offer
+  if (typeof r.offerUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.offerUntil)) out.offerUntil = r.offerUntil
+  const price = str(r.price, 80)
+  if (price) out.price = price
+  const speaker = str(r.speaker, 30)
+  if (speaker) out.speaker = speaker
   return out
 }
 
@@ -202,12 +249,19 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
  * D-207 '이 칸만 채우면 글이 좋아져요' — 글 곳곳의 [대괄호] 를 줄이는 칸(마케팅의 핵심은 차별점을 손님 눈높이로 전하는 것).
  * 중요한 순서대로. 화면은 첫 몇 개만 보여 준다.
  */
-export function profileGaps(p: ContentProfile): { key: 'differ' | 'phone' | 'services' | 'hours' | 'objection'; label: string; why: string }[] {
-  const out: { key: 'differ' | 'phone' | 'services' | 'hours' | 'objection'; label: string; why: string }[] = []
+export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'reviews' | 'voice' | 'offer'
+
+export function profileGaps(p: ContentProfile): { key: GapKey; label: string; why: string }[] {
+  const out: { key: GapKey; label: string; why: string }[] = []
   if (!p.differ) out.push({ key: 'differ', label: '차별점', why: '다른 곳과 다른 점 한 가지 — 모든 글의 중심이에요' })
   if (!p.phone) out.push({ key: 'phone', label: '대표 전화', why: '글 끝 문의 칸 · 카톡 · 플레이스에 들어가요' })
   if (!p.services.length) out.push({ key: 'services', label: '하는 일', why: '소개 · 플레이스 · 해시태그에 들어가요' })
   if (!p.hours) out.push({ key: 'hours', label: '운영 시간', why: '문의 칸 · 플레이스 이용 안내에 들어가요' })
   if (!p.objection) out.push({ key: 'objection', label: '손님이 망설이는 점', why: '카드뉴스 · 블로그에서 그 걱정을 먼저 풀어 줘요' })
+  // D-228 재료 — 없으면 숫자 · 후기 · 혜택 자리를 [대괄호] 로 비워 둬요(지어내지 않음)
+  if (!p.reviews) out.push({ key: 'reviews', label: '후기 수 · 평점', why: '카드뉴스 첫 장 · 블로그 소개 표에 믿음을 주는 숫자로 들어가요' })
+  if (!p.voice) out.push({ key: 'voice', label: '실제 고객 한마디', why: '카드뉴스 · 블로그에 고객의 말로 들어가요(동의 받은 말만)' })
+  // 기한 지난 혜택은 맨 앞에 — 날짜가 걸린 일이라 위 3개 안에 보여야 한다
+  if (p.offerExpired) out.unshift({ key: 'offer', label: '이번 달 혜택', why: `적어 둔 혜택("${p.offerExpired}")의 기한이 지났어요 — 새 기한을 적거나 지워 주세요` })
   return out
 }

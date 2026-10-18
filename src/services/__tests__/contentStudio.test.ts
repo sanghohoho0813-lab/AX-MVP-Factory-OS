@@ -15,6 +15,12 @@ import {
   buildProfile,
   contentHash,
   draftChecks,
+  factChecks,
+  volumeTier,
+  videoSeries,
+  offerLine,
+  aiRequestText,
+  aiRequestFacts,
   firstPicks,
   formalWord,
   hashtags,
@@ -227,7 +233,8 @@ const ov7 = normalizeOverrides({ differ: '  시공 뒤 1년 무상 점검을 계
 check('C46 차별점 · 판매 채널 · 망설이는 점 칸 읽기(앞뒤 빈칸 · 길이 상한)', ov7.differ === '시공 뒤 1년 무상 점검을 계약서에 적어 드려요' && ov7.channel === '네이버 예약' && ov7.objection === '공사 기간이 길까 봐' && (normalizeOverrides({ differ: 'x'.repeat(500) }).differ ?? '').length === 200 && normalizeOverrides({ differ: 3 }).differ === undefined, ov7)
 const gp = profileGaps(fp)
 const fp7 = buildProfile(full, today, ov7).profile
-check('C47 이 칸만 채우면 — 차별점이 맨 앞 · 채우면 빠짐 · 꽉 찬 업체는 0', gp[0]?.key === 'differ' && gp.some((g) => g.key === 'objection') && !gp.some((g) => g.key === 'phone') && profileGaps(fp7).length === 0 && profileGaps(ep).map((g) => g.key).join() === 'differ,phone,services,hours,objection', gp.map((g) => g.key))
+// D-228 재료(후기 수 · 고객 한마디)도 '이 칸만 채우면' 에 — 차별점 등 D-207 칸 뒤에
+check('C47 이 칸만 채우면 — 차별점이 맨 앞 · 채우면 빠짐 · D-207 칸을 다 채우면 재료 칸만 남음', gp[0]?.key === 'differ' && gp.some((g) => g.key === 'objection') && !gp.some((g) => g.key === 'phone') && profileGaps(fp7).map((g) => g.key).join() === 'reviews,voice' && profileGaps(ep).map((g) => g.key).join() === 'differ,phone,services,hours,objection,reviews,voice', gp.map((g) => g.key))
 check('C48 주제마다 전략 한 줄', topics.every((t) => t.strategy.length > 10) && new Set(topics.map((t) => t.strategy)).size === topics.length)
 const bChoose = makeDraft(fp7, { kind: 'blog', topic: topicsFor(fp7, '', today).find((t) => t.type === 'choose') }, today)
 const bTips = makeDraft(fp, { kind: 'blog', topic: topics[0] }, today)
@@ -451,6 +458,84 @@ const kstPicks = firstPicks(fp, '2026-11-15', doneMost)
 if (prevTz === undefined) delete process.env.TZ
 else process.env.TZ = prevTz
 check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 11/15 에 "30일 안" (UTC 날짜 10/15 로 세어 다시 권하지 않음)', !kstPicks.some((p) => p.key === 'shorts'), kstPicks.map((p) => p.key))
+
+/* ------------------------------------------------------------------ */
+/* D-228 재료 · 공식 · 사실 대조 · 다른 AI 도구 요청문                        */
+/* ------------------------------------------------------------------ */
+{
+  const mat = normalizeOverrides({ reviews: '네이버 후기 1,240개 · 평점 4.8', voice: '“납기를 하루도 안 넘겨요”', offer: '첫 견적 고객 시제품 1개 무상', offerUntil: '2026-10-31', price: '시제품 1개 5만 원부터', speaker: '대표 김한솔', differ: '도면 받은 날 바로 회신해요' })
+  check('C90 재료 칸 읽기 — 후기 · 한마디 · 혜택 · 기한 · 가격 · 말하는 사람(이상한 기한은 버림)', mat.reviews === '네이버 후기 1,240개 · 평점 4.8' && mat.offerUntil === '2026-10-31' && mat.speaker === '대표 김한솔' && normalizeOverrides({ offerUntil: '10월 31일' }).offerUntil === undefined && normalizeOverrides({ reviews: 'x'.repeat(200) }).reviews?.length === 60, mat)
+  const mp = buildProfile(full, today, mat).profile
+  check('C91 프로필 — 한마디 따옴표 벗김 · 혜택 기한 그대로 · 혜택 한 줄에 기한(10월 31일까지)', mp.voice === '납기를 하루도 안 넘겨요' && offerLine(mp) === '첫 견적 고객 시제품 1개 무상(10월 31일까지)' && mp.offerExpired === '', { voice: mp.voice, offer: offerLine(mp) })
+  const old = buildProfile(full, '2026-11-02', mat).profile
+  check('C92 기한 지난 혜택은 글에 안 씀 · "이 칸만 채우면" 맨 앞에 기한 지남 안내', old.offer === '' && offerLine(old) === '' && old.offerExpired === '첫 견적 고객 시제품 1개 무상' && profileGaps(old)[0].key === 'offer' && profileGaps(old)[0].why.includes('기한이 지났'), profileGaps(old))
+  const t0 = topicsFor(mp, '', today)
+  const choose = t0.find((x) => x.type === 'choose')!
+  const blog = makeDraft(mp, { kind: 'blog', topic: { ...choose }, variant: 0 }, today)
+  const blogT = plainText('blog', blog.blocks)
+  const author = blog.blocks.find((b) => b.label === '이 글을 쓴 곳')
+  check('C93 블로그 — 고객 속마음 인용 없음(망설이는 점 비어 있음) · 이 글을 쓴 곳 표 = 넣은 사실만(쓴 사람 · 회사 · 하는 일 · 기록 · 후기)', !!author && author.text.includes('쓴 사람 | 한솔정밀(주) 대표 김한솔') && author.text.includes('후기 | 네이버 후기 1,240개 · 평점 4.8') && author.text.includes('2014년부터') && !blogT.startsWith('"'), author?.text)
+  const mpObj = buildProfile(full, today, { ...mat, objection: '처음 맡기면 비싸지 않을까' }).profile
+  const blogQ = makeDraft(mpObj, { kind: 'blog', topic: choose, variant: 0 }, today)
+  const first = blogQ.blocks.find((b) => b.hint?.startsWith('첫 문단'))!.text
+  check('C94 블로그 첫 문단 — 망설이는 점을 고객 속마음 한 줄로 시작 · 키워드는 그대로', first.startsWith('"처음 맡기면 비싸지 않을까"') && first.includes(choose.keyword), first)
+  check('C95 블로그 문의 칸 — 이번 달 혜택(기한) · 가격 조건 · 소개 칸에 후기 · 고객 한마디', blogT.includes('이번 달 혜택 — 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && blogT.includes('가격 · 조건 — 시제품 1개 5만 원부터') && blogT.includes('고객 한마디 — "납기를 하루도 안 넘겨요"'))
+  const proof = makeDraft(mp, { kind: 'cards', topic: t0[0], adType: 'proof', pages: 7 }, today)
+  const pages = proof.blocks.filter((b) => /^\d+장/.test(b.label))
+  check('C96 카드뉴스 기록 증명형 — 첫 장 = 후기 수(재료) · 고객 한마디 장 · 장 번호 이어짐 · 마지막 장 = 혜택 + 기한', pages[0].text.includes('큰 글자: 네이버 후기 1,240개 · 평점 4.8') && pages.some((b) => b.label.includes('고객 한마디') && b.text.includes('"납기를 하루도 안 넘겨요"')) && pages.map((b) => Number(/^(\d+)장/.exec(b.label)![1])).join() === '1,2,3,4,5,6,7' && pages.at(-1)!.text.includes('첫 견적 고객 시제품 1개 무상(10월 31일까지)'), pages.map((b) => b.label))
+  const noMatProof = makeDraft(fp, { kind: 'cards', topic: topicsFor(fp, '', today)[0], adType: 'proof', pages: 7 }, today)
+  const nmp = noMatProof.blocks.filter((b) => /^\d+장/.test(b.label))
+  check('C97 재료 없으면 지어내지 않음 — 첫 장 = 설립 연수(업체 기록) · 마지막 장 혜택 없음 · 선착순 · 할인 0', nmp[0].text.includes('화성 12년, 정밀 금속부품') && !/혜택|선착순|할인|증정/.test(plainText('cards', noMatProof.blocks)), nmp[0].text)
+  const hp = buildProfile(full, today, { ...mat, industry: 'health' }).profile
+  const hCards = plainText('cards', makeDraft(hp, { kind: 'cards', topic: topicsFor(hp, '', today)[0], adType: 'proof', pages: 7 }, today).blocks)
+  const hBlog = plainText('blog', makeDraft(hp, { kind: 'blog', topic: topicsFor(hp, '', today)[1], variant: 0 }, today).blocks)
+  check('C98 의료 — 혜택 · 고객 한마디를 카드 · 블로그에 싣지 않음(의료광고)', !hCards.includes('무상') && !hCards.includes('납기를') && !hBlog.includes('이번 달 혜택') && !hBlog.includes('고객 한마디'), hCards.slice(0, 120))
+  const ev = plainText('kakao', makeDraft(mp, { kind: 'kakao', purpose: 'event' }, today).blocks)
+  check('C99 카톡 혜택 — 적어 둔 혜택 · 끝나는 날(10월 31일) 그대로 · 시작일은 빈칸 · (광고) 맨 앞', ev.startsWith('(광고) ') && ev.includes('첫 견적 고객 시제품 1개 무상') && ev.includes('[시작일] ~ 10월 31일') && ev.includes('가격 · 조건: 시제품 1개 5만 원부터'), ev)
+  const vid = makeDraft(mp, { kind: 'video', topic: choose, variant: 0 }, today)
+  const series = videoSeries(mp, choose)
+  const end = vid.blocks.find((b) => b.label.endsWith('· 마무리'))!.text
+  check('C100 영상 — 5편 순서(깊게 → 손해 피하기 → 넓히기 → 결정 직전 → 우리 업체) · 1편에 업력(기록) · 마무리 전 다리 문장', series.length === 5 && series[0].title.includes('(12년 차 한솔정밀(주))') && series[4].title.startsWith('한솔정밀(주)만의 진행 방식') && ['깊게', '손해 피하기', '넓히기', '결정 직전', '우리 업체'].every((r, i) => series[i].role.startsWith(r)) && vid.blocks.some((b) => b.label === '이 주제로 이어 찍을 5편') && end.includes('오늘 말한') && end.includes('이 기준대로') && end.includes('도면 받은 날 바로 회신해요'), series.map((x) => x.title))
+  const s60 = makeDraft(mp, { kind: 'shorts', topic: choose, shortLen: '30-60' }, today)
+  const s60t = plainText('shorts', s60.blocks)
+  check('C101 쇼츠 30~60초 — 첫째 · 둘째 · "셋째가 제일 중요한데요"(끝까지 보는 고리) · "그럼 … 냐고요?"(질문으로 넘기기) · 저장 · 6구간 45초 그대로', s60t.includes('첫째,') && s60t.includes('둘째,') && s60t.includes('셋째가 제일 중요한데요.') && /그럼 뭘 확인하면 되냐고요\?/.test(s60t) && s60t.includes('저장해 두고') && s60t.includes('0:38 - 0:45'), s60t.slice(0, 300))
+  // 사실 대조 — 우리 엔진이 만든 글은 거짓 경보 0(전 업종 · 전 형식)
+  const falseAlarm: unknown[] = []
+  let drafts = 0
+  for (const ind of INDUSTRIES) {
+    const ip = buildProfile(full, today, { ...mat, industry: ind }).profile
+    const ip0 = buildProfile(full, today, { industry: ind }).profile
+    for (const pp of [ip, ip0]) {
+      for (const kind of CONTENT_KINDS) {
+        for (const topic of topicsFor(pp, '', today)) {
+          for (const adType of AD_TYPES) {
+            if (kind !== 'cards' && adType !== 'info') continue
+            const d = makeDraft(pp, { kind, topic, adType, purpose: 'event', shortLen: '30-60' }, today)
+            drafts += 1
+            const f = factChecks(plainText(d.kind, d.blocks), pp)
+            if (f.length) falseAlarm.push({ ind, kind, adType, keys: f.map((x) => x.key), text: f[0].text })
+          }
+        }
+      }
+    }
+  }
+  check(`C102 사실 대조 — 우리가 만든 글 ${drafts}편(9업종 · 7형식 · 재료 있음/없음)에는 거짓 경보 0`, falseAlarm.length === 0 && drafts > 300, falseAlarm.slice(0, 3))
+  const bad = '[주제 내용]\n10년 차 전문가가 직접 골랐어요. 1,240명이 매달 재구매! 무료 배송 · 오늘만 30% 할인, 선착순 100명 사은품 증정. 식품연구소에서 권장한 방법으로, 편의점 도시락은 나트륨 덩어리예요. 다른 업체보다 못한 곳은 없어요? 고객 후기 "여기 아니면 안 맡겨요" 라는 말이 많아요.'
+  const keys = factChecks(bad, mp).map((x) => x.key)
+  check('C103 받은 글 점검 — 주지 않은 무료 배송 · 할인 · 증정 · 선착순 · 오늘만 / 지어낸 출처 / 다른 상품 깎기 / 업력 모순(10년 ≠ 12년) / 후기 수 → 재구매 고객 수 / 주지 않은 후기 문장', ['policy-무료 배송', 'policy-할인', 'policy-증정', 'policy-선착순', 'policy-오늘만 · 마감 임박', 'source', 'bash', 'years', 'reviews-meaning', 'voice-made'].every((k) => keys.includes(k)), keys)
+  const okGiven = factChecks('첫 견적 고객 시제품 1개 무상 · 증정은 없어요', buildProfile(full, today, { ...mat, offer: '첫 주문 사은품 증정' }).profile).map((x) => x.key)
+  check('C104 홍보 정보에 적힌 혜택은 경보 없음(증정을 적어 두면 증정 경보 0)', !okGiven.includes('policy-증정'), okGiven)
+  const okVoice = factChecks('고객 후기 "납기를 하루도 안 넘겨요" 라는 말을 자주 들어요.', mp).map((x) => x.key)
+  check('C104b 적어 둔 고객 한마디를 그대로 쓴 후기는 경보 없음', !okVoice.includes('voice-made'), okVoice)
+  const dc = draftChecks('blog', [{ label: '', text: bad }], mp.industry, undefined, mp).map((x) => x.key)
+  check('C105 글 점검(draftChecks)에 사실 대조가 붙음 · 프로필 없이 부르면 예전 그대로', dc.includes('source') && dc.includes('holes') && !draftChecks('blog', [{ label: '', text: bad }], mp.industry).some((x) => x.key === 'source'), dc)
+  check('C106 검색량 등급 — 1,000↑ 많이 · 100↑ 보통 · 10↑ 적게 · 10 아래 · "< 10" 거의 안 찾음 · 숫자 없음', volumeTier({ total: 5790, small: false }) === 'high' && volumeTier({ total: 100, small: false }) === 'mid' && volumeTier({ total: 99, small: false }) === 'low' && volumeTier({ total: 9, small: false }) === 'tiny' && volumeTier({ total: 0, small: true }) === 'tiny' && volumeTier({ total: null, small: false }) === 'none')
+  const req = aiRequestText(mp)
+  check('C107 다른 AI 도구 요청문 — 업체 · 독자 · 알리는 것 · 화자(이름 하나) · 사실 목록(밖은 금지) · 넣지 말 것(자금 · 컨설팅 · 지어낸 출처)', /^업체: 한솔정밀\(주\)\(경기 화성시, /.test(req) && req.includes('독자(보는 사람):') && req.includes('알리는 것: 한솔정밀(주)의 정밀 금속부품') && req.includes('화자: 한솔정밀(주) 대표 김한솔(이름은 이것만 쓰세요)') && req.includes('이 목록 밖의 숫자 · 혜택 · 후기는 쓰지 마세요') && req.includes('- 설립 12년째(2014년)') && req.includes('- 후기: 네이버 후기 1,240개 · 평점 4.8') && req.includes('- 이번 달 혜택: 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && req.includes('정책자금 · 지원금 · 컨설팅') && !req.includes('010-9999-8888'), req)
+  const reqE = aiRequestText(ep)
+  const reqH = aiRequestText(hp)
+  check('C108 요청문 — 사실 없는 업체는 "숫자 · 혜택 · 후기를 넣지 마세요" · 이름 없으면 "사람 이름은 쓰지 마세요" · 의료는 규정 줄 · 혜택 · 한마디 빼기 · 설립 연수 줄 하나만', reqE.includes('숫자 · 혜택 · 후기를 넣지 마세요') && reqE.includes('사람 이름은 쓰지 마세요') && reqH.includes('의료광고 규정') && !reqH.includes('무상') && !reqH.includes('납기를') && aiRequestFacts(mp).filter((f) => f.startsWith('설립')).length === 1, reqE)
+}
 
 if (SHOW) {
   const show = (p: ContentProfile, kind: ContentKind, extra: Record<string, unknown> = {}) => {

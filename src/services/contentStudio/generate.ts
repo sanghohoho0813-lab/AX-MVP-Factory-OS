@@ -346,6 +346,29 @@ function pointsFor(p: ContentProfile, topic: Topic, variant: number): Point[] {
 
 export const DIFFER_HOLE = '[다른 곳과 다른 점 한 가지 — 업체와 확인해 적어 주세요]'
 
+/** D-228 혜택 한 줄 — '첫 주문 반찬 1종 증정(10월 31일까지)' · 없으면 '' (기한 지난 혜택은 프로필에서 이미 뺐다) */
+export function offerLine(p: ContentProfile): string {
+  if (!p.offer) return ''
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(p.offerUntil)
+  return m ? `${p.offer}(${Number(m[1])}월 ${Number(m[2])}일까지)` : p.offer
+}
+
+/** D-228 의료 · 건강은 혜택 · 할인을 홍보에 싣지 않는다(의료법 광고 · 예약 · 상담만) */
+export const noOfferAd = (p: ContentProfile) => p.industry === 'health'
+/** D-228 고객 후기 · 체험담을 홍보에 싣지 않는 업종(의료 · 전문직 광고 규정) */
+export const noVoiceAd = (p: ContentProfile) => p.industry === 'health' || p.industry === 'professional'
+
+/** D-228 '이 글을 쓴 곳' 표 — 넣어 준 사실만(지어내지 않는다). 두 줄이 안 되면 넣지 않는다 */
+function authorRows(p: ContentProfile): [string, string][] {
+  const rows: [string, string][] = []
+  if (p.speaker) rows.push(['쓴 사람', `${p.company} ${p.speaker}`])
+  rows.push(['회사', p.since ? `${p.company} · ${p.since}년부터` : p.company])
+  if (p.services.length) rows.push(['하는 일', p.services.slice(0, 3).join(' · ')])
+  if (p.strengths.length) rows.push(['기록', p.strengths.slice(0, 3).join(' · ')])
+  if (p.reviews) rows.push(['후기', p.reviews])
+  return rows
+}
+
 export function contactLines(p: ContentProfile): string {
   return [
     `전화 ${p.phone || '[대표 전화]'}`,
@@ -362,13 +385,17 @@ function companyBlock(p: ContentProfile): DraftBlock {
   const lines = [introSentence(p)]
   if (p.services.length) lines.push(`하는 일: ${p.services.join(' · ')}`)
   if (p.strengths.length) lines.push(`이런 기록을 갖고 있어요.\n${p.strengths.map((s) => `• ${s}`).join('\n')}`)
+  if (p.reviews) lines.push(`후기 — ${p.reviews}`)
+  if (p.voice && !noVoiceAd(p)) lines.push(`고객 한마디 — "${p.voice}"`)
   lines.push(p.differ ? `다른 곳과 다른 점 — ${p.differ}` : DIFFER_HOLE)
   return { label: `${j(p.company, '을/를')} 소개해요`, text: lines.join('\n') }
 }
 
 function ctaBlock(p: ContentProfile, kw: string): DraftBlock {
   const lib = contentLib(p.industry)
-  return { label: lib.ctaTitle, text: `${kw ? `${j(kw, '을/를')} 알아보고 계신다면 편하게 연락 주세요. ` : ''}${lib.ctaBody}\n\n${contactLines(p)}` }
+  // D-228 실제 혜택 · 가격 조건이 있을 때만(지어내지 않음 · 의료는 혜택을 싣지 않음)
+  const extra = [!noOfferAd(p) && offerLine(p) ? `이번 달 혜택 — ${offerLine(p)}` : '', p.price ? `가격 · 조건 — ${p.price}` : ''].filter(Boolean).join('\n')
+  return { label: lib.ctaTitle, text: `${kw ? `${j(kw, '을/를')} 알아보고 계신다면 편하게 연락 주세요. ` : ''}${lib.ctaBody}${extra ? `\n\n${extra}` : ''}\n\n${contactLines(p)}` }
 }
 
 /**
@@ -411,7 +438,11 @@ function blogDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock
     })(),
   }
   // 도입부 → 사진 → 소제목 구간(가운데 사진) → 한눈에 정리 → 걱정 풀기 → 소개 → 사진 → 문의 → 해시태그
-  const blocks: DraftBlock[] = [{ label: '', text: topic.title, hint: '제목' }, { label: '', text: at(opener[topic.type], variant), hint: '첫 문단(도입부)' }, photo(at(visuals, 0))]
+  // D-228 고객 속마음 한 줄로 시작(업체가 적은 '망설이는 점'만 · 지어내지 않음) → 도입부 → 사진 → 이 글을 쓴 곳(사실만)
+  const quote = p.objection && (topic.type === 'tips' || topic.type === 'choose') ? `"${p.objection}"\n${lib.field}에서 자주 듣는 말이에요. ` : ''
+  const blocks: DraftBlock[] = [{ label: '', text: topic.title, hint: '제목' }, { label: '', text: `${quote}${at(opener[topic.type], variant)}`, hint: '첫 문단(도입부)' }, photo(at(visuals, 0))]
+  const author = authorRows(p)
+  if (topic.type !== 'intro' && author.length >= 3) blocks.push({ label: '이 글을 쓴 곳', text: ['항목 | 내용', ...author.map(([k, v]) => `${k} | ${v}`)].join('\n'), hint: '표로 넣으면 좋아요 — 넣어 준 사실만' })
   if (topic.type === 'intro') {
     // 소개 글: 사실 · 하는 일 · 기록(줄마다) · 다른 점 · 진행 순서(설명까지)
     blocks.push({ label: points[0].title, text: points[0].body })
@@ -541,11 +572,22 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
   // 구간(초) — 20~30초: 3 · 5 · 7 · 7 · 5 = 27초 / 30~60초: 3 · 5 · 10 · 10 · 10 · 7 = 45초
   const spans = len === '20-30' ? [3, 5, 7, 7, 5] : [3, 5, 10, 10, 10, 7]
   const ts = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+  // D-228 30~60초는 '셋째가 제일 중요한데요'(끝까지 보게 하는 고리) → '그럼 뭘 보냐고요?'(질문으로 넘기기) → 세 가지 다시 + 저장
+  const say = (pt: Point) => `${/[.?!]$/.test(pt.title) ? pt.title : `${pt.title}.`} ${firstSentence(pt.body)}`
+  const ord = ['첫째', '둘째', '셋째']
   const rows: { nar: string; sub: string; scene: string }[] = [
     { nar: hook, sub: fixed, scene: `${at(visuals, 0)} — 첫 장면은 움직임이 있게` },
-    { nar: painFor(topic), sub: painFor(topic), scene: at(visuals, 1) },
-    ...points.map((pt, i) => ({ nar: `${/[.?!]$/.test(pt.title) ? pt.title : `${pt.title}.`} ${firstSentence(pt.body)}`, sub: `${i + 1}. ${pt.title}`, scene: at(visuals, i + 2) })),
-    { nar: cta, sub: `${p.company} · ${p.phone || '[연락처]'}`, scene: '로고 · 연락처 화면' },
+    { nar: n === 3 ? `많은 분이 여기서 놓쳐요. ${painFor(topic)}` : painFor(topic), sub: painFor(topic), scene: at(visuals, 1) },
+    ...points.map((pt, i) => ({
+      nar: n === 3 ? (i === 2 ? `셋째가 제일 중요한데요. ${say(pt)}` : `${ord[i]}, ${say(pt)}`) : say(pt),
+      sub: `${i + 1}. ${pt.title}`,
+      scene: at(visuals, i + 2),
+    })),
+    {
+      nar: n === 3 ? `그럼 뭘 확인하면 되냐고요? 이 ${points.length}가지만 기억하세요 — ${points.map((pt) => pt.title.replace(/[.?!]$/, '')).join(' · ')}. 저장해 두고 필요할 때 다시 보세요. ${cta}` : cta,
+      sub: `${p.company} · ${p.phone || '[연락처]'}`,
+      scene: n === 3 ? '세 가지 체크 목록 → 로고 · 연락처 화면' : '로고 · 연락처 화면',
+    },
   ]
   let t = 0
   const script: DraftBlock[] = rows.map((r, i) => {
@@ -560,6 +602,24 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
     { label: '구조', text: `도입부: ${painFor(topic)}\n중반부: ${points.map((pt) => pt.title).join(' · ')}\n후반부: ${cta}` },
     ...script,
     { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}\n${hashtags(p, 8).join(' ')}` },
+  ]
+}
+
+/**
+ * D-228 영상 5편 순서 — 이상한AI 3차 관찰의 '자리 퍼널'(심화 → 부정 선언 → 넓히기 → 구매 직전 고객 → 구매 직전 우리 업체)을
+ * 우리 업종 견본 · 업체 기록으로 새로 짰다. 숫자는 업체 기록(설립 연수)만 쓴다.
+ */
+export function videoSeries(p: ContentProfile, topic: Topic): { title: string; role: string }[] {
+  const lib = contentLib(p.industry)
+  const kw = topic.keyword
+  const check = lib.checks[0]?.title.replace(/[.?!]$/, '') ?? '기본'
+  const ask = lib.ctaTitle.split(' · ')[0]
+  return [
+    { title: `${kw}, 고를 때 꼭 확인할 3가지${p.years !== null && p.years >= 3 ? `(${p.years}년 차 ${p.company})` : ''}`, role: '깊게 — 이 주제를 제대로 알려 믿음을 쌓아요' },
+    { title: `${check}, 안 보고 고르면 생기는 일`, role: '손해 피하기 — "이것만 믿으면 안 돼요" 로 놓치면 손해인 점을 짚어요' },
+    { title: `${kw} 맡긴 뒤에 꼭 챙길 것`, role: '넓히기 — 고르는 법에서 쓰는 법 · 관리하는 법으로 보는 사람을 넓혀요' },
+    { title: `${ask} 전에 꼭 물어볼 3가지`, role: '결정 직전 — 마음을 정하기 직전인 분께 질문 목록을 줘요' },
+    { title: `${p.company}만의 진행 방식 공개 — ${lib.process.map((x) => x.name).slice(0, 3).join(' → ')}`, role: '우리 업체 — 마지막에 우리가 어떻게 하는지 보여 줘요' },
   ]
 }
 
@@ -584,8 +644,11 @@ function videoDraft(p: ContentProfile, topic: Topic, variant: number): DraftBloc
   })
   const endMin = points.length + 1
   blocks.push({ label: `${endMin}:00 · 정리`, text: `말: 오늘 이야기한 ${points.length}가지를 다시 짚어 봐요.\n화면: ${points.map((pt, i) => `${i + 1}. ${pt.title}`).join(' / ')}` })
-  blocks.push({ label: `${endMin}:30 · 마무리`, text: `말: ${lib.ctaShort.replace('{company}', p.company)} 궁금한 점은 댓글로 남겨 주세요.\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}` })
+  // D-228 다리 문장 — '영상에서 말한 기준 = 우리가 지키는 기준' 을 먼저 말하고 문의로(갑자기 광고로 넘어가지 않게)
+  const bridge = `오늘 말한 ${points.length}가지, ${j(p.company, '은/는')} 이 기준대로 하나하나 확인하며 진행해요.${p.differ ? ` ${p.differ}` : ''}`
+  blocks.push({ label: `${endMin}:30 · 마무리`, text: `말: ${bridge} ${lib.ctaShort.replace('{company}', p.company)} 궁금한 점은 댓글로 남겨 주세요.\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}` })
   blocks.push({ label: '설명란', text: `${topic.title}\n\n${contactLines(p)}\n\n${hashtags(p, 8).join(' ')}` })
+  blocks.push({ label: '이 주제로 이어 찍을 5편', text: videoSeries(p, topic).map((x, i) => `${i + 1}편 · ${x.title}\n(${x.role})`).join('\n'), hint: '1편 깊게 → 2편 손해 피하기 → 3편 넓히기 → 4편 결정 직전 → 5편 우리 업체 — 순서대로 올리면 보는 사람이 한 걸음씩 다가와요' })
   return blocks
 }
 
@@ -612,15 +675,22 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
     inner = [
       page(2, '공감', '많은 분이 같은 걱정을 하세요', `${kw} 알아볼 때 가장 많이 묻는 것`, '고개를 갸웃하는 사람 · 물음표'),
       page(3, '이렇게 챙겨요', '[이 걱정을 어떻게 덜어 드리는지 한 문장]', p.differ || '[다른 곳과 다른 점 한 가지]', at(visuals, 1)),
+      ...(p.voice && !noVoiceAd(p) ? [page(4, '고객 한마디', `"${p.voice}"`, '실제 고객이 해 주신 말이에요', '따옴표 · 말풍선')] : []),
       ...(p.strengths.length ? [page(4, '기록', p.strengths[0], p.strengths.slice(1, 3).join(' · ') || `${p.company}의 기록`, '인증서 · 숫자 강조')] : [page(4, '순서', '진행은 이렇게', lib.process.map((s) => s.name).join(' → '), '진행 장면')]),
       page(5, '자주 묻는 질문', lib.faq[0]?.q ?? '자주 묻는 질문', lib.faq[0]?.a ?? '', at(visuals, 2)),
       page(6, '순서', '진행은 이렇게', lib.process.map((s) => s.name).join(' → '), '진행 장면'),
     ].slice(0, body)
   } else if (adType === 'proof') {
     const facts = p.strengths.length ? p.strengths : ['[업력 · 진행 건수 같은 숫자]', '[인증 · 자격]', '[고객 수 · 재방문 같은 기록]']
-    cover = page(1, '표지', `기록으로 보는 ${p.company}`, `${clean(`${p.area} ${p.item}`)}`, `${at(visuals, 0)} · 큰 숫자`)
+    // D-228 첫 장 — 재료(후기 수 · 연수)가 있으면 그 숫자로, 없으면 지어내지 않고 '기록으로 보는'
+    cover = p.reviews
+      ? page(1, '표지', p.reviews, `${p.company} · ${clean(`${p.area} ${p.item}`)}`, `${at(visuals, 0)} · 큰 숫자`)
+      : p.years !== null && p.years >= 3
+        ? page(1, '표지', clean(`${p.area} ${p.years}년, ${p.item}`), `기록으로 보는 ${p.company}`, `${at(visuals, 0)} · 큰 숫자`)
+        : page(1, '표지', `기록으로 보는 ${p.company}`, `${clean(`${p.area} ${p.item}`)}`, `${at(visuals, 0)} · 큰 숫자`)
     // 기록이 모자라면 진행 순서 · 자주 묻는 질문으로 장 수를 채운다(지어내지 않는다)
     const rows: [string, string, string, string][] = [
+      ...(p.voice && !noVoiceAd(p) ? [['고객 한마디', `"${p.voice}"`, '실제 고객이 해 주신 말이에요', '따옴표 · 말풍선'] as [string, string, string, string]] : []),
       ...facts.slice(0, body - 1).map((f, i): [string, string, string, string] => ['기록', f, i === 0 ? '말보다 기록으로 보여 드려요' : '사실만 적었어요', '숫자 · 인증 마크 강조']),
       ['다른 점', p.differ || '[다른 곳과 다른 점 한 가지]', `${kw}, ${j(p.company, '이/가')} 함께해요`, at(visuals, 1)],
       ['순서', '진행은 이렇게', lib.process.map((s) => s.name).join(' → '), '진행 장면'],
@@ -637,7 +707,11 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
     cover = page(1, '표지', thumb, `${p.company}${p.area ? ` · ${p.area}` : ''}`, `${visuals[0] ?? ''} 위에 큰 글자`)
     inner = points.map((pt, i) => page(i + 2, '', `${i + 1}. ${pt.title}`, firstSentence(pt.body), `${at(visuals, i + 1)} 또는 아이콘 하나`))
   }
-  const last = page(inner.length + 2, '마무리', lib.ctaTitle, `${p.phone || '[연락처]'}${p.channel ? ` · ${p.channel}` : p.region ? ` · ${p.region}` : ''}`, '로고 · 연락처 · 지도 화면')
+  // D-228 마지막 장 — 실제 혜택(기한 포함)이 있으면 '바로 행동 + 혜택 + 기한', 없으면 문의만(지어낸 선착순 · 할인 없음 · 의료는 혜택 빼고)
+  inner = inner.map((b, i) => ({ ...b, label: b.label.replace(/^\d+장/, `${i + 2}장`) }))
+  const offer = noOfferAd(p) ? '' : offerLine(p)
+  const reach = `${p.phone || '[연락처]'}${p.channel ? ` · ${p.channel}` : p.region ? ` · ${p.region}` : ''}`
+  const last = offer ? page(inner.length + 2, '마무리 · 혜택', lib.ctaTitle, `${offer}\n연락: ${reach}`, '로고 · 혜택 · 연락처 화면') : page(inner.length + 2, '마무리', lib.ctaTitle, reach, '로고 · 연락처 · 지도 화면')
   const caption = `${topic.title}\n\n${inner.map((b) => /큰 글자: (.*)/.exec(b.text)?.[1] ?? '').filter(Boolean).map((t) => `• ${t}`).join('\n')}\n\n${lib.ctaShort.replace('{company}', p.company)}\n\n${hashtags(p).join(' ')}`
   return [{ ...cover, hint: AD_TYPE_LABEL[adType] }, ...inner, last, { label: '올릴 때 쓰는 글', text: caption }]
 }
@@ -653,7 +727,10 @@ function kakaoDraft(p: ContentProfile, purpose: KakaoPurpose, today: string, var
   if (purpose === 'news') {
     text = `(광고) ${p.company}\n\n${hello}\n[전하고 싶은 소식 — 새 서비스 · 새 메뉴 · 바뀐 운영 시간]\n\n${p.services.length ? `하는 일: ${p.services.join(' · ')}\n` : ''}${phone}`
   } else if (purpose === 'event') {
-    text = `(광고) ${p.company} ${m}월 혜택 안내\n\n[혜택 내용 — 예: 첫 상담 고객 ○○]\n기간: [시작일] ~ [끝나는 날]\n대상: [대상]\n\n${lib.ctaBody}\n${phone}`
+    // D-228 홍보 정보에 실제 혜택 · 기한이 있으면 그대로(의료는 혜택 광고를 하지 않으므로 빈칸 그대로)
+    const real = noOfferAd(p) ? '' : p.offer
+    const until = /^\d{4}-(\d{2})-(\d{2})$/.exec(real ? p.offerUntil : '')
+    text = `(광고) ${p.company} ${m}월 혜택 안내\n\n${real || '[혜택 내용 — 예: 첫 상담 고객 ○○]'}\n기간: [시작일] ~ ${until ? `${Number(until[1])}월 ${Number(until[2])}일` : '[끝나는 날]'}\n대상: [대상]\n${p.price ? `가격 · 조건: ${p.price}\n` : ''}\n${lib.ctaBody}\n${phone}`
   } else if (purpose === 'season') {
     const s = seasonHook(lib, today)
     const tip = at(lib.tips, variant)
@@ -669,7 +746,7 @@ function placeDraft(p: ContentProfile): DraftBlock[] {
   return [
     { label: '한 줄 소개', text: `${introSentence(p)} ${lib.ctaBody}` },
     { label: '하는 일', text: p.services.length ? p.services.map((s) => `• ${s}`).join('\n') : `• ${p.item}\n• [하는 일 두세 가지]` },
-    { label: '이런 점을 챙겨요', text: [...(p.differ ? [`• ${p.differ}`] : []), ...p.strengths.map((s) => `• ${s}`), ...(p.differ ? [] : ['• [다른 곳과 다른 점 한 가지]'])].join('\n') },
+    { label: '이런 점을 챙겨요', text: [...(p.differ ? [`• ${p.differ}`] : []), ...p.strengths.map((s) => `• ${s}`), ...(p.reviews ? [`• 후기 ${p.reviews}`] : []), ...(p.differ ? [] : ['• [다른 곳과 다른 점 한 가지]'])].join('\n') },
     { label: '이용 안내', text: `• 시간: ${p.hours || '[운영 시간 · 쉬는 날]'}\n• 주차: [주차 안내]\n• 예약 · 문의: ${p.phone || '[대표 전화]'}${p.channel ? ` · ${p.channel}` : ''}` },
     { label: '찾아오시는 길', text: `${p.address || '[주소]'}\n[가까운 역 · 큰 건물 기준 길 안내]` },
   ]
@@ -835,7 +912,70 @@ export function fillHoles(blocks: readonly DraftBlock[], values: Readonly<Record
   return { blocks: out, filled }
 }
 
-export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], industry: ContentProfile['industry'], keyword?: string): DraftCheck[] {
+/* ------------------------------------------------------------------ */
+/* D-228 사실 대조 — 이상한AI 3차 관찰에서 본 위험(준 적 없는 혜택 · 지어낸 출처 · 깎아내리기 · 숫자 뜻 바꾸기 · 모순)을 */
+/* 우리 글 · 다른 도구에서 받은 글 모두에 대 본다. 규칙 검사다(AI 아님).                                       */
+/* ------------------------------------------------------------------ */
+
+const POLICY_WORDS: { re: RegExp; what: string }[] = [
+  { re: /무료\s*배송|배송비\s*무료/, what: '무료 배송' },
+  { re: /무료\s*교환|교환\s*(?:보장|무조건)|무조건\s*교환|환불\s*(?:보장|100)/, what: '교환 · 환불 약속' },
+  { re: /\d+\s*%\s*할인|할인\s*(?:쿠폰|이벤트)/, what: '할인' },
+  { re: /증정|사은품|덤으로/, what: '증정' },
+  { re: /선착순/, what: '선착순' },
+  { re: /오늘만|오늘\s*하루만|마감\s*임박/, what: '오늘만 · 마감 임박' },
+]
+const SOURCE_RE = /(?:연구소|연구원|협회|학회|소비자원|기관|교수|박사|전문가)(?:에서|가|이|의|도)?\s?[^\n.]{0,10}(?:권고|권장|발표|분석|밝혔|추천한|인정한)/
+const BASH_RE = /(?:다른|타)\s?(?:업체|곳|가게|회사)[^\n.]{0,12}(?:보다\s*(?:못|비싸|나쁘|떨어)|와\s*달리|과\s*달리)|(?:편의점|대형\s?마트|인터넷\s?최저가)[^\n.]{0,10}(?:덩어리|위험|최악|못\s*믿)/
+
+/** [대괄호] 자리는 빼고 본다 — 채울 자리 안내 글은 사실 주장이 아니다 */
+const withoutHoles = (t: string) => t.replace(/\[[^\]\n]{1,80}\]/g, ' ')
+
+export function factChecks(rawText: string, p: ContentProfile): DraftCheck[] {
+  const text = withoutHoles(rawText)
+  const out: DraftCheck[] = []
+  const given = `${p.offer} ${p.price} ${p.strengths.join(' ')} ${p.differ}`
+  for (const w of POLICY_WORDS) {
+    const m = w.re.exec(text)
+    if (m && !w.re.test(given)) out.push({ key: `policy-${w.what}`, level: 'should', text: `'${m[0]}' — 홍보 정보(이번 달 혜택 · 가격 조건)에 없는 ${w.what}이에요. 업체가 실제로 하는 것인지 확인하고, 아니면 지워 주세요.` })
+  }
+  const src = SOURCE_RE.exec(text)
+  if (src) out.push({ key: 'source', level: 'should', text: `'${src[0]}' — 기관 · 전문가 출처는 이름 · 날짜를 확인할 수 있을 때만 쓰세요(지어낸 출처는 거짓 광고예요).` })
+  const bash = BASH_RE.exec(text)
+  if (bash) out.push({ key: 'bash', level: 'should', text: `'${bash[0]}' — 다른 업체 · 다른 상품을 깎아내리면 비교 광고 문제가 될 수 있어요. 우리 장점만 말해 주세요.` })
+  // 업력 숫자 — 업체 기록(설립 N년째)과 다른 '○년 차 · ○년째 · 경력 ○년' 은 모순(같은 업체 글끼리 숫자가 엇갈리면 믿음이 깨진다)
+  const yearsSaid = [...text.matchAll(/(\d{1,3})\s*년\s*(?:차|째)|(?:경력|업력)\s*(\d{1,3})\s*년/g)].map((m) => Number(m[1] ?? m[2]))
+  const odd = yearsSaid.filter((n) => p.years === null || n !== p.years)
+  if (odd.length) out.push({ key: 'years', level: 'should', text: p.years === null ? `'${odd[0]}년' — 업체 기록에 설립 연도가 없어요. 업력 숫자는 확인한 뒤에만 써 주세요.` : `'${odd[0]}년' — 업체 기록은 설립 ${p.years}년째예요. 다른 글과 숫자가 엇갈리지 않게 맞춰 주세요.` })
+  // 주지 않은 후기 문장 — 따옴표 말을 고객 · 후기 말로 소개하는데 적어 둔 고객 한마디(또는 망설이는 점)가 아니면
+  for (const m of text.matchAll(/["“]([^"”\n]{4,80})["”]/g)) {
+    const q = m[1].trim()
+    if ((p.voice && (q.includes(p.voice) || p.voice.includes(q))) || (p.objection && q === p.objection)) continue
+    const before = text.slice(Math.max(0, (m.index ?? 0) - 14), m.index ?? 0)
+    const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 10)
+    // '손님은 "무엇이 맛있는 집인지" 를 찾아요' 같은 설명은 후기가 아니다 — 후기 · 한마디 · 말씀으로 소개하거나 "…라고 하셨" 일 때만
+    if (/(?:후기|리뷰|한마디|말씀)[^\n]{0,6}$/.test(before) || /^\s*(?:라는\s*(?:후기|리뷰|말)|라고\s*(?:하셨|해\s*주셨|말씀)|는\s*(?:후기|리뷰))/.test(after)) {
+      out.push({ key: 'voice-made', level: 'should', text: `'${q.length > 24 ? `${q.slice(0, 24)}…` : q}' — 홍보 정보에 적힌 고객 한마디가 아니에요. 실제로 받은 후기만, 받은 그대로 써 주세요.` })
+      break
+    }
+  }
+  // 후기 수의 뜻 바꾸기 — '후기 1,240개' 를 '1,240명 재구매' 처럼
+  if (p.reviews && !/명|고객|재구매/.test(p.reviews)) {
+    for (const raw of p.reviews.match(/\d[\d,]*/g) ?? []) {
+      const n = raw.replace(/,/g, '')
+      if (n.length < 2) continue
+      const re = new RegExp(`(?:${n}|${Number(n).toLocaleString('ko-KR')})\\s*(?:명|분|고객|재구매)`)
+      const m = re.exec(text)
+      if (m) {
+        out.push({ key: 'reviews-meaning', level: 'should', text: `'${m[0]}' — 홍보 정보에는 '${p.reviews}' 로 적혀 있어요. 후기 수를 고객 수 · 재구매로 바꿔 쓰지 마세요.` })
+        break
+      }
+    }
+  }
+  return out
+}
+
+export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], industry: ContentProfile['industry'], keyword?: string, p?: ContentProfile): DraftCheck[] {
   const text = plainText(kind, blocks)
   const out: DraftCheck[] = []
   // D-209 고침: 영상 · 카드뉴스는 복사할 때 칸 이름을 [0:00 - 0:03] · [1장] 으로 감싼다 — 칸 이름은 채울 자리로 세지 않는다
@@ -877,8 +1017,20 @@ export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], in
       if (m) out.push({ key: 'dur', level: 'info', text: `전체 약 ${Number(m[1]) * 60 + Number(m[2])}초 · 세로 영상 — 첫 3초 안에 붙잡는 말이 나와요.` })
     }
   }
+  if (p && kind !== 'keywords') out.push(...factChecks(text, p))
   if (kind !== 'keywords') out.push({ key: 'len', level: 'info', text: `${text.length.toLocaleString('ko-KR')}자(공백 포함)` })
   return out
+}
+
+/** D-228 키워드 검색량 등급 — 월 100 아래는 롱테일, 10 아래는 거의 안 찾음(이상한AI 키워드 추천 30개 중 13개가 100 미만이었다) */
+export type VolumeTier = 'high' | 'mid' | 'low' | 'tiny' | 'none'
+export const VOLUME_TIER_LABEL: Record<VolumeTier, string> = { high: '많이 찾음', mid: '보통', low: '적게 찾음', tiny: '거의 안 찾음', none: '숫자 없음' }
+export function volumeTier(v: Pick<KeywordVolume, 'total' | 'small'>): VolumeTier {
+  if (v.total === null) return 'none'
+  if (v.total >= 1000) return 'high'
+  if (v.total >= 100) return 'mid'
+  if (v.total >= 10 && !v.small) return 'low'
+  return 'tiny'
 }
 
 /* ------------------------------------------------------------------ */

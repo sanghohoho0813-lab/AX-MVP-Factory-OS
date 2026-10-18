@@ -13,6 +13,9 @@
  *         계획 칸 만듦/올림 · 올렸어요 · 거르기 · 새로고침해도 진행 중 계획 · 홈페이지로 바로 가기 · 휴대폰 넘침 0
  *  D-226  색 — 홍보 정보 머리 띠(테마와 상관없이 보라) · 먼저 만들 것 · 형식 · 상황마다 색 아이콘 · 결과 색 띠 · 마케팅 첫 화면 색 띠 3 ·
  *         360/390 상황 이름 칸 짜부라짐 0
+ *  D-228  글 재료(후기 · 한마디 · 혜택+끝나는 날 · 가격 · 말하는 사람) → 카드뉴스 · 카톡에 그대로 · 기한 지나면 빠짐 · 고친 글 사실 대조 ·
+ *         다른 AI 도구 요청문(복사 · 사실 목록) → 받은 글 점검(주지 않은 혜택 · 지어낸 출처 · 업력 모순) → 보관함 · 검색량 등급 · 월 100 이상만 ·
+ *         390 넘침 0 · 44px
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -917,6 +920,170 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const labelW = await p.locator('[data-testid="content-mode"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check(`D227-C7 ${T} 길 칸 44px 이상 · 이름 칸 짜부라짐 0(폭 ≥ 100) · 가로 넘침 0 · 오류 0`, pickH.every((h) => h >= 44) && labelW.every((w) => w >= 100) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { pickH, labelW, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
   await ctx.close()
+}
+
+// D-228 — 이상한AI 3차 관찰: 재료를 준 만큼만 쓰고, 바깥 AI 도구에는 사실 목록 · 넣지 말 것을 붙여 보내고, 받은 글은 사실과 대조한다
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => errors.push(`D228 ${e.message}`))
+  await seed(p)
+  await p.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await p.getByTestId('content-studio').waitFor()
+  // 안내에는 위 3개만 보이고 제목 줄에 모두 몇 개인지 — 재료 2칸(후기 · 한마디)을 채우면 2개 줄어든다
+  const gapN = async () => Number(/· (\d+)개/.exec(await p.getByTestId('content-profile-gaps').innerText())?.[1] ?? -1)
+  const gaps0 = await gapN()
+  await p.getByTestId('content-profile-edit').click()
+  await p.getByTestId('content-ov-material').scrollIntoViewIfNeeded()
+  await p.getByTestId('content-ov-reviews').fill('네이버 후기 1,240개 · 평점 4.8')
+  await p.getByTestId('content-ov-voice').fill('“납기를 하루도 안 넘겨요”')
+  await p.getByTestId('content-ov-offer').fill('첫 견적 고객 시제품 1개 무상')
+  await p.getByTestId('content-ov-offerUntil').fill('2099-12-31')
+  await p.getByTestId('content-ov-price').fill('시제품 1개 5만 원부터')
+  await p.getByTestId('content-ov-speaker').fill('대표 김한솔')
+  await wait(900) // 창이 0.7초에 걸쳐 나타난다 — 다 뜬 뒤에 찍는다
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d228-material.png`, fullPage: false })
+  await p.getByTestId('content-ov-save').click()
+  await wait(500)
+  const mat = await p.getByTestId('content-profile-material').innerText()
+  const gaps1 = await gapN()
+  check('D228-1 글 재료 칸 → 홍보 정보에 "적어 둔 것만" 줄(후기 · 한마디 따옴표 하나 · 혜택 끝나는 날 · 가격 · 말하는 사람) · 채운 2칸은 안내에서 빠짐', mat.includes('네이버 후기 1,240개') && mat.includes('"납기를 하루도 안 넘겨요"') && mat.includes('첫 견적 고객 시제품 1개 무상(12월 31일까지)') && mat.includes('시제품 1개 5만 원부터') && mat.includes('대표 김한솔') && gaps0 >= 5 && gaps1 === gaps0 - 2, { mat, gaps0, gaps1 })
+
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  await p.locator('[data-testid="content-adtype-btn"][data-value="proof"]').click()
+  await p.getByTestId('content-maker').getByRole('button', { name: '7장', exact: true }).click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const cards = await resultText(p)
+  check('D228-2 카드뉴스 기록 증명형 — 첫 장 후기 수 · 고객 한마디 장 · 마지막 장 혜택 + 끝나는 날', cards.includes('큰 글자: 네이버 후기 1,240개 · 평점 4.8') && cards.includes('"납기를 하루도 안 넘겨요"') && cards.includes('첫 견적 고객 시제품 1개 무상(12월 31일까지)'), cards.slice(0, 300))
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="kakao"]').click()
+  await p.locator('[data-testid="content-purpose"][data-purpose="event"]').click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const ev = await resultText(p)
+  check('D228-3 카톡 혜택 — 적어 둔 혜택 · 끝나는 날 그대로 · 시작일만 빈칸 · 가격 조건', ev.includes('첫 견적 고객 시제품 1개 무상') && ev.includes('[시작일] ~ 12월 31일') && ev.includes('가격 · 조건: 시제품 1개 5만 원부터'), ev.slice(0, 300))
+  await p.getByTestId('content-edit').click()
+  const inp = p.getByTestId('content-block-input').first()
+  await inp.fill(`${await inp.inputValue()} 오늘만 30% 할인, 식품연구소에서 권장한 방법이에요.`)
+  await wait(200)
+  const chk = await p.getByTestId('content-checks').innerText()
+  check('D228-4 고친 글도 사실 대조 — 홍보 정보에 없는 할인 · 오늘만 · 지어낸 출처를 알림', /30% 할인/.test(chk) && /오늘만/.test(chk) && /출처/.test(chk), chk.slice(0, 400))
+  await p.getByTestId('content-edit').click()
+
+  // 다른 AI 도구에 맡기기
+  await p.getByTestId('content-ai-req').click()
+  await p.getByTestId('content-ai-sheet').waitFor()
+  await wait(900)
+  const req = await p.getByTestId('content-ai-req-text').innerText()
+  check('D228-5 요청문 — 업체 · 독자 · 알리는 것 · 화자(대표 김한솔) · 사실 목록(후기 · 혜택) · 넣지 마세요(정책자금 · 컨설팅) · 담당자 휴대폰 없음', /^업체: 한솔정밀\(주\)/.test(req) && req.includes('독자(보는 사람):') && req.includes('화자: 한솔정밀(주) 대표 김한솔') && req.includes('- 후기: 네이버 후기 1,240개 · 평점 4.8') && req.includes('- 이번 달 혜택: 첫 견적 고객 시제품 1개 무상(12월 31일까지)') && req.includes('정책자금') && req.includes('넣지 마세요') && !req.includes('010-9999-8888'), req)
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d228-request.png`, fullPage: false })
+  await p.getByTestId('content-ai-req-copy').click()
+  await wait(200)
+  const clip = await p.evaluate(() => navigator.clipboard.readText())
+  check('D228-6 [요청문 복사] → 클립보드에 요청문 그대로 · 쓰는 법 3줄', clip.trim() === req.trim() && (await p.getByTestId('content-ai-tips').locator('li').count()) === 3, clip.slice(0, 80))
+  await p.getByTestId('content-ai-next').click()
+  check('D228-7 [글을 받았으면 · 점검하기] → 2단계(받은 글 점검)', (await p.getByTestId('content-ai-sheet').getAttribute('data-stage')) === 'check' && (await p.getByTestId('content-ai-steps').getAttribute('data-current')) === 'check')
+  const bad = '[주제 내용]\n10년 차 전문가가 직접 만든 부품이에요. 1,240명이 재구매! 무료 배송 · 선착순 100명 사은품 증정. 식품연구소에서 권장한 방법이에요.'
+  await p.getByTestId('content-ai-check-input').fill(bad)
+  await p.getByTestId('content-ai-check-run').click()
+  const keys = await p.getByTestId('content-ai-check-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  check('D228-8 받은 글 점검 — 대괄호 · 무료 배송 · 선착순 · 증정 · 지어낸 출처 · 업력 모순(10년 ≠ 12년) · 후기 수가 재구매 고객 수로', ['holes', 'policy-무료 배송', 'policy-선착순', 'policy-증정', 'source', 'years', 'reviews-meaning'].every((k) => keys.includes(k)) && Number(await p.getByTestId('content-ai-check-result').getAttribute('data-warn')) >= 7, keys)
+  await wait(400)
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d228-check.png`, fullPage: false })
+  // 창을 닫았다 열어도 붙여 넣은 글이 남는다
+  await p.getByTestId('sheet-backdrop').getByRole('button', { name: '닫기', exact: true }).last().click()
+  await p.getByTestId('content-ai-req').click()
+  const kept = await p.getByTestId('content-ai-check-input').inputValue()
+  check('D228-9 창을 닫았다 열어도 붙여 넣은 글 그대로 · 바로 점검 단계로', kept === bad && (await p.getByTestId('content-ai-sheet').getAttribute('data-stage')) === 'check')
+  const good = '한솔정밀(주) 대표 김한솔입니다.\n2014년부터 화성에서 정밀 금속부품을 만들어 왔어요. 네이버 후기 1,240개 · 평점 4.8을 받았어요.\n이번 달은 첫 견적 고객 시제품 1개 무상이에요(12월 31일까지). 문의 031-123-4567'
+  await p.getByTestId('content-ai-check-input').fill(good)
+  await p.getByTestId('content-ai-check-run').click()
+  check('D228-10 사실만 쓴 글 → 걸리는 곳 0', (await p.getByTestId('content-ai-check-result').getAttribute('data-warn')) === '0', await p.getByTestId('content-ai-check-result').innerText())
+  const before = (await items(p)).length
+  await p.getByTestId('content-ai-save').click()
+  await p.getByTestId('content-ai-sheet').waitFor({ state: 'detached' })
+  await wait(400)
+  const after = await items(p)
+  check('D228-11 [보관함에 저장] → 보관함 1편 늘고(블로그 · 첫 줄 제목) 결과 칸에 열림', after.length === before + 1 && after.some((x) => x.data.kind === 'blog' && x.data.title === '한솔정밀(주) 대표 김한솔입니다.') && (await p.getByTestId('content-result-title').innerText()) === '한솔정밀(주) 대표 김한솔입니다.', after.map((x) => x.data?.title))
+
+  // 검색량 등급 · 월 100 이상만
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="keywords"]').click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  await p.getByTestId('content-volume-input').fill('연관키워드\t월간검색수(PC)\t월간검색수(모바일)\n화성 금형\t1,230\t4,560\n화성 정밀가공\t< 10\t< 10\n동탄 시제품 제작\t40\t60\n화성 금형 수리\t20\t30')
+  await p.getByTestId('content-volume-run').click()
+  const tiers = await p.getByTestId('content-volume-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-tier')))
+  const tierTxt = await p.getByTestId('content-volume-tier').allInnerTexts()
+  const tip = await p.getByTestId('content-volume-tip').innerText()
+  check('D228-12 검색량 등급 — 많이 찾음 · 보통(딱 100) · 적게 찾음 · 거의 안 찾음 + 100 아래 안내(2개)', tiers.join() === 'high,mid,low,tiny' && tierTxt.join() === '많이 찾음,보통,적게 찾음,거의 안 찾음' && tip.includes('2개'), { tiers, tierTxt, tip })
+  await p.getByTestId('content-volume-min100').click()
+  const after100 = await p.getByTestId('content-volume-row').count()
+  check('D228-13 [월 100 이상만] → 2줄 · "4개 중 2개" · 다시 누르면 4줄', after100 === 2 && /4개 중 2개/.test(await p.getByTestId('content-volume-count').innerText()) && (await p.getByTestId('content-volume-min100').getAttribute('aria-pressed')) === 'true', after100)
+  if (SHOTS) {
+    await p.getByTestId('content-volume').scrollIntoViewIfNeeded()
+    await wait(400)
+    await p.screenshot({ path: `${SHOTS}/content-pc-d228-volume.png`, fullPage: false })
+  }
+  await p.getByTestId('content-volume-min100').click()
+  const back = await p.getByTestId('content-volume-row').count()
+
+  // 기한 지난 혜택
+  await p.getByTestId('content-profile-edit').click()
+  await p.getByTestId('content-ov-offerUntil').fill('2020-01-31')
+  await p.getByTestId('content-ov-save').click()
+  await wait(500)
+  const gaps2 = await p.getByTestId('content-profile-gap').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  const gapTxt = await p.getByTestId('content-profile-gaps').innerText()
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="kakao"]').click()
+  await p.locator('[data-testid="content-purpose"][data-purpose="event"]').click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const ev2 = await resultText(p)
+  check('D228-14 혜택 끝나는 날이 지나면 글에서 빠지고(카톡은 [혜택 내용] · [끝나는 날] 빈칸) "기한이 지났" 안내가 맨 앞', back === 4 && gaps2[0] === 'offer' && /기한이 지났/.test(gapTxt) && !ev2.includes('시제품 1개 무상') && ev2.includes('[혜택 내용') && ev2.includes('[끝나는 날]'), { gaps2, ev2: ev2.slice(0, 200) })
+  await ctx.close()
+
+  for (const vp of [390, 360]) {
+    const c2 = await browser.newContext({ viewport: { width: vp, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+    const m = await c2.newPage()
+    m.on('pageerror', (e) => errors.push(`D228 m${vp} ${e.message}`))
+    await seed(m)
+    await m.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+    await m.getByTestId('content-studio').waitFor()
+    const over = () => m.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    const heroH = await m.locator('[data-testid="content-to-site"], [data-testid="content-profile-edit"], [data-testid="content-ai-req"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    await m.getByTestId('content-profile-edit').click()
+    await m.getByTestId('content-ov-material').scrollIntoViewIfNeeded()
+    await wait(900)
+    const sheetOver1 = await over()
+    const dateW = await m.getByTestId('content-ov-offerUntil').evaluate((e) => Math.round(e.getBoundingClientRect().width))
+    if (SHOTS && vp === 390) await m.screenshot({ path: `${SHOTS}/content-m390-d228-material.png`, fullPage: false })
+    await m.getByTestId('sheet-backdrop').getByRole('button', { name: '닫기', exact: true }).last().click()
+    await m.getByTestId('content-ai-req').click()
+    await m.getByTestId('content-ai-sheet').waitFor()
+    await wait(500) // 창이 뜨는 동안(살짝 커지는 움직임) 재면 1px 작게 나온다
+    const preOver = await m.getByTestId('content-ai-req-text').evaluate((e) => e.scrollWidth - e.clientWidth)
+    const btnH = await m.locator('[data-testid="content-ai-sheet"] button:visible').evaluateAll((els) => els.map((e) => ({ t: (e.textContent || '').trim().slice(0, 16), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h > 0 && x.h < 44))
+    if (SHOTS && vp === 390) {
+      await wait(400)
+      await m.screenshot({ path: `${SHOTS}/content-m390-d228-request.png`, fullPage: false })
+    }
+    await m.getByTestId('content-ai-next').click()
+    await m.getByTestId('content-ai-check-input').fill('아주아주긴띄어쓰기없는문장이들어와도옆으로넘치지않아야해요오늘만무료배송선착순증정식품연구소에서권장한방법이에요'.repeat(3))
+    await m.getByTestId('content-ai-check-run').click()
+    await wait(600)
+    const resTop = await m.getByTestId('content-ai-check-result').evaluate((e) => Math.round(e.getBoundingClientRect().top))
+    const sheetOver2 = await over()
+    const kindH = await m.getByTestId('content-ai-kind-btn').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    if (SHOTS && vp === 390) await m.screenshot({ path: `${SHOTS}/content-m390-d228-check.png`, fullPage: false })
+    check(`D228-M${vp} 머리 띠 단추 3개 44px · 재료 칸(날짜 칸 ${dateW}px) · 요청문 · 받은 글 점검 — 가로 넘침 0 · 단추 44px · 점검하면 결과가 화면 안으로`, heroH.length === 3 && heroH.every((h) => h >= 44) && sheetOver1 <= 0 && dateW >= 140 && preOver <= 0 && btnH.length === 0 && sheetOver2 <= 0 && kindH.every((h) => h >= 44) && resTop < 844 - 80, { heroH, sheetOver1, dateW, preOver, btnH, sheetOver2, kindH, resTop })
+    await c2.close()
+  }
+  check('D228-15 화면 오류 0', !errors.some((e) => e.startsWith('D228')), errors.filter((e) => e.startsWith('D228')))
 }
 
 await browser.close()
