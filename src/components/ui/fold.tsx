@@ -116,22 +116,24 @@ export function HintTip({
   const id = useId()
   // D-235: 설명 상자가 화면 오른쪽 밖으로 나가면(휴대폰 · 카드 안쪽 소제목) 그만큼 왼쪽으로 당긴다
   const tipRef = useRef<HTMLSpanElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [shift, setShift] = useState(0)
+  // 상자는 소제목 줄 왼쪽 끝(left-0)에서 시작한다 — 그 자리와 상자 폭만으로 계산해 여러 번 불려도 같은 값
   const fit = () =>
     window.requestAnimationFrame(() => {
       const el = tipRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      if (r.width === 0) return
-      setShift((cur) => {
-        const left = r.left - cur
-        const over = left + r.width - (window.innerWidth - 8)
-        return over > 0 ? -Math.min(over, Math.max(0, left - 8)) : 0
-      })
+      const wrap = wrapRef.current
+      if (!el || !wrap) return
+      const width = el.getBoundingClientRect().width
+      if (width === 0) return
+      const left = wrap.getBoundingClientRect().left
+      // innerWidth 는 상자가 넘친 순간 휴대폰에서 같이 늘어난다 — 화면 폭은 clientWidth 로
+      const over = left + width - (document.documentElement.clientWidth - 8)
+      setShift(over > 0 ? -Math.min(over, Math.max(0, left - 8)) : 0)
     })
   if (!tip) return <>{children}</>
   return (
-    <div className={`group/hint relative flex min-w-0 items-center ${className}`} onMouseEnter={fit} onFocusCapture={fit} onMouseLeave={() => setShown(false)}>
+    <div ref={wrapRef} className={`group/hint relative flex min-w-0 items-center ${className}`} onMouseEnter={fit} onFocusCapture={fit} onMouseLeave={() => setShown(false)}>
       {children}
       {dot && (
       <button

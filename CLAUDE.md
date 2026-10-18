@@ -73,6 +73,7 @@ npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB 
 npm run qa:isolation                              # 팀장 격리 집중(진짜 RLS · 모든 표 API 공격 · 저장소 조작 · 무작위 80걸음 — 팀장은 대표 화면/자료 0) — pg_ctlcluster 16 main start 먼저
 npm run qa:ownerai -- http://localhost:4390       # 대표 AI 작업실(진짜 서버 함수 + 가짜 공급자 · 시나리오 A~E · 기억 판 · 채택 · 제안서/화면 스튜디오 · 키 노출 0 · 360/390)
 npm run qa:phone -- http://localhost:4390         # 휴대폰 전반(360 · 390 · 430 · 긴 이름 · 공고 300건 — 넘침 · 글자가 칸보다 넓음 · 짜부라짐 · 칩 겹침 0)
+npm run qa:wayfinding -- http://localhost:4390    # 길잡이(경로 줄 · 단계 안내 이전/다음 · 순서 밖 화면 · 설명 접기 · 모듈 '이렇게 쓰세요' · ? 설명 화면 안 · 360/390)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).
