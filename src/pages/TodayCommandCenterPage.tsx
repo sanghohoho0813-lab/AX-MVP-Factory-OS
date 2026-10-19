@@ -444,7 +444,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </div>
         </div>
         {/* D-239: 오늘 화면의 AI 도우미 — 오늘 제일 중요한 것만 · 놓치면 끝나는 것 · 순서 · 연락할 곳(대표 계정에서만) */}
-        {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} />}
+        {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
       </section>
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}

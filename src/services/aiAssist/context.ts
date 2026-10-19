@@ -42,6 +42,8 @@ export interface AssistContext {
 export interface AssistBundle {
   context: AssistContext
   links: Record<string, string>
+  /** D-241 ref → 원래 번호(RefBook.ids) */
+  ids?: Record<string, string>
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,10 +87,22 @@ export function wonText(won: number | null | undefined): string {
 /* ref 붙이기                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * D-241 모델이 돌려준 ref 를 자료의 ref 모양으로 — ' C3 ', '[c3]', '#c3', 'c-3' 도 c3.
+ * 모양이 아니면 '' (없는 번호를 만들어 오면 이어 주지 않는다).
+ */
+export function normRef(ref: unknown): string {
+  if (typeof ref !== 'string') return ''
+  const t = ref.trim().toLowerCase().replace(/^[[(#\s]+|[\])\s.,]+$/g, '').replace(/^([a-z]{1,3})[-_\s]+(\d)/, '$1$2')
+  return /^[a-z]{1,3}\d{1,4}$/.test(t) ? t : ''
+}
+
 export class RefBook {
   private n = new Map<string, number>()
   private byKey = new Map<string, string>()
   readonly links: Record<string, string> = {}
+  /** D-241 ref → 원래 번호(업체 번호 · 후보 키 · 콘텐츠 번호) — 답의 [할 일로 넣기 · 담기] 가 무엇을 가리키는지 */
+  readonly ids: Record<string, string> = {}
   /** 같은 key 는 같은 ref(한 업체가 여러 줄에 나와도 c3 하나) */
   ref(prefix: string, key: string, href?: string): string {
     const k = `${prefix}:${key}`
@@ -98,6 +112,7 @@ export class RefBook {
     this.n.set(prefix, next)
     const ref = `${prefix}${next}`
     this.byKey.set(k, ref)
+    this.ids[ref] = key
     if (href) this.links[ref] = href
     return ref
   }

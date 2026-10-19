@@ -13,8 +13,11 @@
  *  - D-231: 마케팅 · 브랜딩(/marketing)을 누르면 바로 이 화면. 목차 한 줄에 '내 콘텐츠'(일정 · 체크리스트 · 예전 콘텐츠 수첩) ·
  *    홍보 글 만들기 · 홈페이지 만들기까지(MarketingTabs). 후보 카드마다 미래AI랩 관점 상자 + 이번 주 찍기 키트.
  */
-import { AiAssist } from '../../components/ai/AiAssist'
+import { AiAssist, answerText, type AssistActionResult, type AssistCtx, type AssistItemAction, type AssistResultAction } from '../../components/ai/AiAssist'
 import { radarBundle } from '../../services/aiAssist/builders'
+import { refKind } from '../../services/aiAssist/actions'
+import type { AssistItem } from '../../services/aiAssist/client'
+import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -32,7 +35,7 @@ import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
-import { IDEA_STATUS_LABEL, confirmInput, customIdea, ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -85,6 +88,7 @@ import { IconChip, RatioChip, VideoDetail } from './radar/RadarParts'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
+import { BriefCard } from './radar/BriefCard'
 import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
 import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
@@ -124,6 +128,10 @@ const RADAR_ASSIST: Record<string, string[]> = {
   analysis: ['bench.why', 'bench.copy', 'radar.top5'],
   make: ['mine.detail', 'mine.next', 'radar.top5'],
 }
+
+/** D-241 기획이 나오는 질문 — 답 한 줄마다 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지] */
+const PLAN_ASSISTS = new Set(['radar.top5', 'radar.view', 'bench.copy', 'rising.shorts', 'rising.ref', 'mine.next'])
+const ideaHref = (id: string) => `/marketing?view=make&idea=${encodeURIComponent(id)}`
 
 function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const yt = useYtFeed()
@@ -182,9 +190,11 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }, [prepared, plan, rvideos])
   const loading = yt.status === 'loading'
   const assistBuild = useCallback(
-    () => radarBundle({ today: todayLocalDate(), view, plan, rising, breakouts, videos: rvideos, ideas: notebook.ideas, mine: mineVideos }),
-    [view, plan, rising, breakouts, rvideos, notebook.ideas, mineVideos],
+    () => radarBundle({ today: todayLocalDate(), view, plan, rising, breakouts, videos: rvideos, ideas: notebook.ideas, mine: mineVideos, brief: prefs.brief }),
+    [view, plan, rising, breakouts, rvideos, notebook.ideas, mineVideos, prefs.brief],
   )
+  // D-241 답의 후보 번호(o#) → 레이더 후보(같은 주제 줄에 합치고 · 찍기 키트를 대본 자료로)
+  const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
 
   const refresh = () => {
     void yt.refresh()
@@ -295,6 +305,95 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     return ok
   }
 
+  /**
+   * D-241 AI 기획 한 줄 → 내 콘텐츠 '제작 예정'. 레이더 후보(o#)에서 나온 기획이면 그 후보 줄에 합치고(두 줄 안 생김),
+   * 내 콘텐츠 줄(i#)을 가리키면 그 줄에. 대표: "열어보기를 누르면 진짜 뭔가 열리던지 뭔가 기록이 되든지".
+   */
+  const putPlan = async (item: AssistItem, ctx: AssistCtx, quiet = false): Promise<ContentIdea | null> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), null)
+    if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).'), null)
+    const key = ctx.idOf(item.ref)
+    const kind = refKind(item.ref)
+    const opp = kind === 'o' && key ? (oppByKey.get(key) ?? null) : null
+    const { input, existed } = aiPlanInput(item, opp, notebook.ideas, todayLocalDate(), kind === 'i' ? key : undefined)
+    const saved = await notebook.save(input)
+    if (!saved) return (showToast('담는 중입니다 — 잠시만 기다려 주세요.'), null)
+    if (!quiet) showToast(existed ? `'${saved.topic}' 줄에 AI 기획을 더했습니다 — 제목 후보 · 메모에 있습니다.` : `${q(saved.topic, '을/를')} 제작 예정으로 담았습니다.`)
+    return saved
+  }
+  const planActions: AssistItemAction[] = [
+    {
+      id: 'take',
+      label: '내 콘텐츠에 담기',
+      doneLabel: '내 콘텐츠에 담음',
+      primary: true,
+      once: true,
+      run: async (item, ctx): Promise<AssistActionResult> => {
+        const saved = await putPlan(item, ctx)
+        return saved ? { to: ideaHref(saved.id), label: '내 콘텐츠에서 보기' } : false
+      },
+    },
+    {
+      id: 'script',
+      label: '이 기획으로 대본 끝까지',
+      // 먼저 담아 두고(대본을 저장할 줄) — 같은 판에서 대본을 이어 쓴다. 고른 기획 · 후보의 찍기 키트를 자료 맨 앞에.
+      run: async (item, ctx): Promise<AssistActionResult> => {
+        const saved = await putPlan(item, ctx, true)
+        const key = ctx.idOf(item.ref)
+        const opp = refKind(item.ref) === 'o' && key ? oppByKey.get(key) : undefined
+        const kit = opp ? shootKit(opp) : null
+        ctx.follow('radar.script', {
+          title: item.title.slice(0, 40),
+          targetId: saved?.id,
+          section: {
+            name: '고른 기획(이 기획 하나로 대본을 끝까지)',
+            rows: [
+              {
+                제목: item.title,
+                형식: item.tag ?? '',
+                기획: item.detail ?? '',
+                구성: item.outline ?? [],
+                첫15초: item.body ?? '',
+                ...(opp && kit
+                  ? { 후보주제: opp.topic, 왜지금: opp.summary, 근거: opp.facts.slice(0, 3), 잘된영상: opp.benchmarks.slice(0, 3).map((b) => b.title), 구성_규칙: kit.outline.map((st) => `${st.at} ${st.what}`), 쇼츠3컷_규칙: kit.shorts.map((st) => `${st.at} ${st.what}`) }
+                  : {}),
+                ...(saved ? { 내콘텐츠_메모: saved.memo, 내콘텐츠_첫문장: saved.hook } : {}),
+              },
+            ],
+          },
+        })
+        return true
+      },
+    },
+  ]
+  /** D-241 대본 답 → 그 기획 줄의 대본 칸(단계 '대본 준비' · 체크 '대본 · 첫 문장') */
+  const scriptActions: AssistResultAction[] = [
+    {
+      id: 'save-script',
+      label: '이 대본을 내 콘텐츠에 저장',
+      doneLabel: '내 콘텐츠에 저장됨',
+      run: async (ans, ctx): Promise<AssistActionResult> => {
+        if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), false)
+        if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요.'), false)
+        const text = answerText(ans.structured, ans.raw).slice(0, SCRIPT_MAX)
+        let idea = ctx.entry.follow?.targetId ? notebook.ideas.find((i) => i.id === ctx.entry.follow?.targetId) : undefined
+        if (!idea) idea = (await notebook.save(customIdea(ctx.entry.follow?.title || ans.structured?.headline || 'AI 대본'))) ?? undefined
+        if (!idea) return false
+        const status: IdeaStatus = idea.status === 'idea' || idea.status === 'selected' ? 'script' : idea.status
+        const checks: MakeCheckId[] = idea.checks.includes('script') ? idea.checks : [...idea.checks, 'script']
+        const saved = await notebook.patch(idea.id, { script: text, status, checks })
+        if (!saved) return false
+        showToast(`'${saved.topic}' 줄에 대본을 저장했습니다 — 단계 '대본 준비'.`)
+        return { to: ideaHref(saved.id), label: '내 콘텐츠에서 대본 보기' }
+      },
+    },
+  ]
+  const saveBrief = async (next: ChannelBrief | null) => {
+    const ok = await savePrefs({ ...prefs, brief: next })
+    if (ok) showToast(next ? '채널 설계 기준을 저장했습니다 — 다음 AI 기획 · 대본부터 이 기준으로 씁니다.' : '채널 설계 기준을 기본값으로 되돌렸습니다.')
+    return ok
+  }
+
   const benchChannels = prepared ? prepared.channels.filter((c) => !c.mine).length : 0
   const aiAx = prepared ? prepared.channels.filter((c) => !c.mine && ['ai', 'ax'].includes(groupOf(c, prefs.overrides))).length : 0
   const recent30 = rvideos.filter((v) => !v.mine && v.ageDays <= 30).length
@@ -341,10 +440,21 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
       </div>
       {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(이번 주 찍을 것 · 인기 급상승 · 분석 · 내 콘텐츠). 순위가 바뀌면 다시 누르면 새 순위로 */}
-      {!readOnly && (prepared || view === 'make') && <AiAssist page="radar" scope={`radar:${view}`} title={`마케팅 · ${RADAR_VIEWS.find((v) => v.key === view)?.label ?? ''}`} presets={RADAR_ASSIST[view] ?? RADAR_ASSIST.plan} build={assistBuild} />}
+      {!readOnly && (prepared || view === 'make') && (
+        <AiAssist
+          page="radar"
+          scope={`radar:${view}`}
+          title={`마케팅 · ${RADAR_VIEWS.find((v) => v.key === view)?.label ?? ''}`}
+          presets={RADAR_ASSIST[view] ?? RADAR_ASSIST.plan}
+          build={assistBuild}
+          itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
+          resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
+        />
+      )}
 
       {view === 'make' ? (
         <MakeView
+          focusId={params.get('idea') ?? ''}
           ideas={notebook.ideas}
           readOnly={readOnly}
           failed={notebook.failed}
@@ -411,6 +521,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         </PeekProvider>
       )}
 
+      {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 설정이라 화면 맨 아래(이번 주 찍을 것 · 내 콘텐츠) */}
+      {!readOnly && (view === 'plan' || view === 'make') && <BriefCard brief={briefOf(prefs)} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} />}
       <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} />
     </div>
   )

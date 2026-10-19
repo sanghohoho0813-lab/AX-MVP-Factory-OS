@@ -199,8 +199,8 @@ export async function publicCatalog({ withLive = false } = {}) {
     let live = null
     if (withLive && ready.has(id)) live = await liveModels(id)
     const liveSet = live ? new Set(live) : null
-    const models = list.map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, verified: liveSet ? liveSet.has(m.id) : null }))
-    if (live) for (const extra of live) if (!models.some((m) => m.id === extra)) models.push({ id: extra, label: extra, note: '이 키로 열리는 다른 모델', price: null, verified: true })
+    const models = list.map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, tier: m.tier ?? null, verified: liveSet ? liveSet.has(m.id) : null }))
+    if (live) for (const extra of live) if (!models.some((m) => m.id === extra)) models.push({ id: extra, label: extra, note: '이 키로 열리는 다른 모델', price: null, tier: null, verified: true })
     providers.push({ id, label: PROVIDERS[id].label, configured: ready.has(id), keyName: PROVIDERS[id].keyNames[0], models: models.slice(0, 40), checked: !!live })
   }
   return { providers, defaultChoice: defaultChoice() }

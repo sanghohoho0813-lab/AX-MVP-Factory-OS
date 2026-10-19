@@ -5,12 +5,18 @@
  */
 import handler, { __resetAiAssistState } from '../../../api/ai-assist.js'
 import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
-import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, buildAssistPrompt } from '../../../api/_ai/assists.js'
+import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, RADAR_RULES, assistSystem, buildAssistPrompt } from '../../../api/_ai/assists.js'
 import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf } from '../../../api/_ai/providers.js'
 import { aiConfig, validate } from '../../../api/_ai/core.js'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
-import { safeText, personNames, RefBook, clientRow } from '../aiAssist/context'
-import { agentsBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, salesBundle } from '../aiAssist/builders'
+import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
+import { betterModel, dueFromWhen, isSamePage, refLabel, todoText } from '../aiAssist/actions'
+import type { AssistStatus } from '../aiAssist/client'
+import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
+import { prepareFeed } from '../marketing/ytBench'
+import { radarPlan, radarVideos } from '../marketing/ytRadar'
+import { sampleFeed } from '../marketing/ytSample'
+import { agentsBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, radarBundle, salesBundle } from '../aiAssist/builders'
 import { contextHash } from '../aiAssist/store'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -278,7 +284,91 @@ function bundleTests() {
   check('B11 프롬프트 예산 — 4만 자 안 · 줄인 건수 표시', pr.user.length <= 41000 && pr.sent.rowsCut > 0 && pr.user.includes('줄임'), { len: pr.user.length, cut: pr.sent.rowsCut })
 }
 
+/* ------------------------------------------------------------------ */
+/* D-241 답 → 다음 단계 · 레이더 기획을 내 채널 기준으로                       */
+/* ------------------------------------------------------------------ */
+
+function d241Tests() {
+  // 번호(ref) — 모델이 모양을 조금 바꿔 돌려줘도 같은 번호로
+  check('N1 normRef — " C3 " · "[c3]" · "#c3" · "c-3" → c3', ['c3', ' C3 ', '[c3]', '#c3', 'c-3', '(c3).'].every((r) => normRef(r) === 'c3'), ['c3', ' C3 ', '[c3]', '#c3', 'c-3', '(c3).'].map(normRef))
+  check('N2 normRef — 번호 모양이 아니면 빈 글(없는 번호로 잇지 않음)', ['abc', 'c12345', '', '3', 'https://x', 'c 3 4'].every((r) => normRef(r) === '') && normRef(3) === '' && normRef(null) === '')
+  { const book = new RefBook(); const r1 = book.ref('o', 'market:정책자금'); const r2 = book.ref('c', 'cli_1', '/ops/clients/cli_1'); const again = book.ref('o', 'market:정책자금'); check('N3 RefBook.ids — 번호 → 원래 번호(후보 키 · 업체 번호) · 같은 키는 같은 번호', r1 === 'o1' && again === 'o1' && book.ids.o1 === 'market:정책자금' && book.ids.c1 === 'cli_1' && r2 === 'c1' && !('o1' in book.links), book.ids) }
+
+  // 이동 단추 이름 · 같은 화면이면 안 냄
+  check('L1 단추 이름 — c 업체 열기 · g 공고 보기 · e 상담신청 보기 · t 업무 일기에서 보기 · i 내 콘텐츠에서 보기 · v 영상 보기 · 그 밖 열어 보기',
+    refLabel('c2') === '업체 열기' && refLabel('g1') === '공고 보기' && refLabel('e4') === '상담신청 보기' && refLabel('t1') === '업무 일기에서 보기' && refLabel('i3') === '내 콘텐츠에서 보기' && refLabel('v9') === '영상 보기' && refLabel('o1') === '열어 보기')
+  check('L2 같은 화면 — /marketing 을 /marketing?view=make 에서 누르면 같은 화면(D-239 마케팅 "열어 보기" 가 판만 닫던 것)', isSamePage('/marketing', { pathname: '/marketing', search: '?view=make' }))
+  check('L3 다른 화면 — 내 콘텐츠 줄(?idea=) · 다른 주소 · 바깥 주소는 같은 화면 아님',
+    !isSamePage('/marketing?view=make&idea=x1', { pathname: '/marketing', search: '?view=make' }) && !isSamePage('/ops/clients/a', { pathname: '/', search: '' }) && !isSamePage('https://youtu.be/x', { pathname: '/', search: '' }) && isSamePage('/marketing?view=make', { pathname: '/marketing', search: '?view=make&p=week' }))
+
+  // 할 일로 넣기 — 기한 · 글
+  const T = '2026-10-19'
+  check('D1 기한 — 날짜가 있으면 그날 · 지났으면 오늘 · 내일 · 모레 · 다음 주 · 그 밖 오늘',
+    dueFromWhen('2026-10-25 마감', T) === '2026-10-25' && dueFromWhen('2026.11.3', T) === '2026-11-03' && dueFromWhen('2026-10-01', T) === T && dueFromWhen('내일 오전', T) === '2026-10-20' && dueFromWhen('모레', T) === '2026-10-21' && dueFromWhen('다음 주 중', T) === '2026-10-26' && dueFromWhen('', T) === T && dueFromWhen(undefined, T) === T,
+    [dueFromWhen('2026.11.3', T), dueFromWhen('다음 주 중', T)])
+  check('D2 할 일 글 — 짧은 제목엔 설명 첫 문장을 붙이고 · 긴 제목은 그대로 · 200자 안',
+    todoText({ title: '한솔 전화', detail: '서류 보완 안내. 다음 주 접수.' }) === '한솔 전화 — 서류 보완 안내.' && todoText({ title: '한솔정밀 정책자금 서류 보완 요청하기', detail: '자세히' }) === '한솔정밀 정책자금 서류 보완 요청하기' && todoText({ title: '가'.repeat(300) }).length === 200)
+
+  // 더 잘 쓰는 모델로 다시
+  const st = (configured: boolean): AssistStatus => ({ defaultChoice: { provider: 'gemini', model: 'g-cheap' }, providers: [{ id: 'gemini', label: 'Gemini', configured, keyName: 'GEMINI_API_KEY', checked: false, models: [{ id: 'g-cheap', label: '싼', note: '', price: null, verified: null, tier: 'cheap' }, { id: 'g-std', label: '보통', note: '', price: null, verified: null, tier: 'standard' }, { id: 'g-deep', label: '깊게', note: '', price: null, verified: null, tier: 'deep' }] }] })
+  check('M1 더 잘 쓰는 모델 — 빠르게 → 보통 → 깊게 · 가장 위면 없음 · 키 없으면 없음 · 목록에 없는 모델은 빠르게로 보고 보통',
+    betterModel(st(true), { provider: 'gemini', model: 'g-cheap' })?.model === 'g-std' && betterModel(st(true), { provider: 'gemini', model: 'g-std' })?.model === 'g-deep' && betterModel(st(true), { provider: 'gemini', model: 'g-deep' }) === null && betterModel(st(false), { provider: 'gemini', model: 'g-cheap' }) === null && betterModel(st(true), { provider: 'gemini', model: 'other' })?.model === 'g-std' && betterModel(null, { provider: 'gemini', model: 'g-cheap' }) === null)
+
+  // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지
+  const radarSys = assistSystem(ASSISTS['radar.top5'])
+  check('S1 마케팅 단추 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 후보 번호 · 미래AI랩 일 · 상투어 금지) — 다른 화면엔 없음',
+    RADAR_RULES.every((r: string) => radarSys.includes(r)) && !assistSystem(ASSISTS['today.top3']).includes('[마케팅 규칙]') && radarSys.includes('채널 설계 기준') && radarSys.includes('N분 컷'))
+  check('S2 [대본 끝까지 쓰기] — 서버 · 화면 단추 같은 이름 · 글쓰기 · 레이더 · 구간별 대사 · 공식 자료 확인 칸',
+    ASSISTS['radar.script']?.page === 'radar' && ASSISTS['radar.script']?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'radar.script' && p.label === ASSISTS['radar.script'].label && p.kind === 'write') && ASSISTS['radar.script'].instruction.join(' ').includes('[공식 자료 확인'))
+  check('S3 공통 규칙 — 모르는 칸은 비워 둠("자료에 없음" 으로 채우지 않음) · 없는 번호를 만들지 않음', ASSIST_RULES.some((r: string) => r.includes('빈 글로 둔다')) && ASSIST_RULES.some((r: string) => r.includes('없는 번호를 만들지 않고')) && !ASSIST_RULES.some((r: string) => r.includes('모르면 "자료에 없음"')))
+  check('S4 TOP5 기획 — 후보 번호를 ref 로 · next 는 비움(화면에 담기 · 대본 단추)', ASSISTS['radar.top5'].instruction.join(' ').includes('ref = 고른 후보 번호') && ASSISTS['radar.top5'].instruction.join(' ').includes('next 는 비워'))
+
+  // 레이더 자료 — 채널 설계 기준 · 내 채널 · 후보 번호 · 찍기 키트
+  const NOW = Date.parse('2026-10-19T00:00:00Z')
+  const prep = prepareFeed(sampleFeed(NOW), NOW)
+  const vids = radarVideos(prep, { now: NOW })
+  const plan = radarPlan(prep, { now: NOW }, vids)
+  const mine = vids.filter((v) => v.mine)
+  const brief = { ...DEFAULT_BRIEF, avoid: '연예 · 코인 · 주식 종목 추천은 다루지 않는다' }
+  const idea = normalizeIdea({ ...ideaFromOpportunity(plan.picks[0]), savedAt: '2026-10-18T00:00:00Z', status: 'selected', memo: '화요일 촬영', script: '0:00 오프닝 …' }, 'idea_1') as ContentIdea
+  const rb = radarBundle({ today: T, view: 'plan', plan, rising: [], breakouts: [], videos: vids, ideas: [idea], mine, brief })
+  const sec = (n: string) => rb.context.sections.find((x) => x.name.startsWith(n))
+  check('R1 레이더 자료 맨 앞 — 채널 설계 기준(대표가 고친 값 그대로 · 8칸)', rb.context.sections[0].name.startsWith('채널 설계 기준') && rb.context.sections[0].rows.length === 8 && JSON.stringify(rb.context.sections[0]).includes('코인'), rb.context.sections[0].rows.length)
+  check('R2 내 채널 최근 영상 · 내 채널 숫자 한 줄(facts)', !!sec('내 채널 최근 영상') && (sec('내 채널 최근 영상')?.rows.length ?? 0) === Math.min(20, mine.length) && (rb.context.facts ?? []).some((f) => f.startsWith('내 채널')), { mine: mine.length })
+  const cand = sec('이번 주 찍을 후보')
+  check('R3 후보 — o1… 번호 · 주소 없음(같은 화면) · ids 로 후보 키 · 찍기 키트(첫 문장 · 구성 · 쇼츠 3컷)',
+    !!cand && cand.rows[0].ref === 'o1' && !('o1' in rb.links) && rb.ids?.o1 === plan.picks[0].key && 'Hook' !== '' && typeof cand.rows[0].첫문장_규칙 === 'string' && Array.isArray(cand.rows[0].구성_규칙) && Array.isArray(cand.rows[0].쇼츠3컷_규칙),
+    cand?.rows[0])
+  const mineSec = sec('내 콘텐츠')
+  check('R4 내 콘텐츠 줄 — i1 → /marketing?view=make&idea=번호(그 줄이 펼쳐짐) · 대본 있음 표시', !!mineSec && rb.links.i1 === '/marketing?view=make&idea=idea_1' && rb.ids?.i1 === 'idea_1' && String(mineSec.rows[0].대본).startsWith('있음'), mineSec?.rows[0])
+  const rb0 = radarBundle({ today: T, view: 'plan', plan, rising: [], breakouts: [], videos: vids, ideas: [], mine: [], brief: null })
+  check('R5 기준을 안 고쳤으면 기본값(김팀장의 경영노트) · 내 채널 영상 없으면 그렇다고 한 줄', JSON.stringify(rb0.context.sections[0]).includes('김팀장의 경영노트') && (rb0.context.facts ?? []).some((f) => f.includes('아직 없다')))
+
+  // AI 기획 → 내 콘텐츠
+  const opp = plan.picks[0]
+  const item = { title: '정책자금 거절된 회사의 공통점 3가지', tag: '롱폼', detail: '상담에서 본 실수', outline: ['0:00 오프닝', '1:00 사례'], body: '대표님, 정책자금이 거절되는 회사에는 공통점이 있습니다.' }
+  const fresh = aiPlanInput(item, opp, [], '10/19')
+  check('P1 새 기획(후보에서) — 그 후보 키로 · 제작 예정 · 제목 후보 맨 앞 · 첫 문장 · 메모에 [AI 기획] 구성',
+    !fresh.existed && fresh.input.key === opp.key && fresh.input.status === 'selected' && fresh.input.titleCandidates[0] === item.title && fresh.input.hook.startsWith('대표님') && (fresh.input.memo ?? '').startsWith('[AI 기획 10/19] 롱폼') && (fresh.input.memo ?? '').includes('- 1:00 사례'), fresh.input)
+  const merged = aiPlanInput(item, opp, [idea], '10/19')
+  check('P2 같은 후보가 이미 있으면 그 줄에 합침 — 새 줄 안 생김 · 옛 메모 남김 · 첫 문장은 있던 것 그대로',
+    merged.existed && merged.input.id === 'idea_1' && (merged.input.memo ?? '').includes('화요일 촬영') && (merged.input.memo ?? '').startsWith('[AI 기획') && merged.input.titleCandidates[0] === item.title && merged.input.status === 'selected', merged.input)
+  const scripted = { ...idea, status: 'script' as const }
+  check('P3 이미 대본 준비 · 촬영 · 게시면 단계를 되돌리지 않음', aiPlanInput(item, opp, [scripted], '10/19').input.status === 'script')
+  const other = normalizeIdea({ ...ideaFromOpportunity(plan.picks[1] ?? opp), key: 'custom:x', topic: '다른 줄', savedAt: '2026-10-18T00:00:00Z', status: 'idea', memo: '' }, 'idea_2') as ContentIdea
+  check('P4 답이 내 콘텐츠 줄(i#)을 가리키면 그 줄에(targetId)', aiPlanInput(item, null, [idea, other], '10/19', 'idea_2').input.id === 'idea_2')
+  const custom = aiPlanInput({ title: '직접 기획' }, null, [], '10/19')
+  check('P5 후보 없는 기획 — 직접 담음 줄 · 제작 예정', !custom.existed && custom.input.source === 'custom' && custom.input.topic === '직접 기획' && custom.input.status === 'selected')
+
+  // 채널 설계 기준 · 대본 칸 저장 모양
+  const nb = normalizeBrief({ tone: '  짧게  ', avoid: 'x'.repeat(500) })
+  check('B1 채널 설계 기준 — 빈 것은 null(기본값 씀) · 일부만 고치면 나머지는 기본값 · 300자 안', normalizeBrief({}) === null && normalizeBrief(null) === null && nb?.tone === '짧게' && nb?.channel === DEFAULT_BRIEF.channel && nb?.avoid.length === 300, nb)
+  const big = normalizeIdea({ ...ideaFromOpportunity(opp), savedAt: '2026-10-18T00:00:00Z', script: '가'.repeat(SCRIPT_MAX + 50) }, 'idea_3') as ContentIdea
+  check('B2 내 콘텐츠 대본 칸 — 저장 · 2만 자에서 자름 · 예전 줄은 빈 대본', big.script.length === SCRIPT_MAX && (normalizeIdea({ ...ideaFromOpportunity(opp), savedAt: '2026-10-18T00:00:00Z' }, 'idea_4') as ContentIdea).script === '')
+}
+
 await serverTests()
 bundleTests()
+d241Tests()
 console.log(`\naiAssist: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

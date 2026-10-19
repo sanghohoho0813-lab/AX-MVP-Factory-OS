@@ -58,6 +58,8 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'rising.shorts', page: 'radar', label: '급상승 키워드로 쇼츠 아이디어 5', kind: 'write', hint: '제목 · 3컷 · 첫 3초' },
   { id: 'mine.detail', page: 'radar', label: '내 콘텐츠 — 만든 것 자세히 정리', kind: 'list', hint: '다룬 것 · 단계 · 메모 · 숫자' },
   { id: 'mine.next', page: 'radar', label: '잘 된 것 기준 다음에 찍을 것', kind: 'write', hint: '공통점에서 다음 3개' },
+  // D-241 기획 답의 [대본 끝까지] 로만 부른다(띠 · 판 단추 목록에는 넣지 않는다)
+  { id: 'radar.script', page: 'radar', label: '대본 끝까지 쓰기', kind: 'write', hint: '구간별 대사 · 화면 글 · 제목 · 썸네일 · 설명란' },
   { id: 'content.blog', page: 'content', label: '블로그 글 한 번에 (규칙집 반영)', kind: 'write', hint: '제목 각도 · 구성 · 본문 전체' },
   { id: 'content.place', page: 'content', label: '플레이스 소개글 한 번에', kind: 'write', hint: '한 줄 소개 · 소개글 · 소식 아이디어' },
   { id: 'content.titles', page: 'content', label: '제목 후보 5개 (각도 다르게)', kind: 'list', hint: '검색 의도가 다르게' },

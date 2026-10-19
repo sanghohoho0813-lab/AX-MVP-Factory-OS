@@ -267,7 +267,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       />
       <ScheduleTabs />
       {/* D-239: 일정 AI 도우미 — 이번 주 한눈에 · 빡빡한 날 · 이번 달 꼭 지킬 마감 */}
-      <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} />
+      <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
 
       {/* 월 이동 + 종류 필터 */}
       <div className="flex flex-wrap items-center justify-between gap-3">

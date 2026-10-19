@@ -7,22 +7,33 @@
  * 누르면 그 화면 자료를 작은 묶음으로 만들어(사람 이름 · 연락처 빼고) 서버 함수(/api/ai-assist)로 보낸다.
  * 브라우저는 AI 공급자를 직접 부르지 않는다. 대표 계정에서만 보인다(팀장 화면 · 팀장 보기에는 없음).
  * 기본 모델은 Gemini 의 가장 싼 모델 — 판 안 '모델 바꾸기' 에서 GPT · Claude 로 바꿀 수 있다(이 브라우저에 기억).
+ *
+ * D-241 답은 다음 단계로 이어진다 — 대표: "열어보기를 누르면 진짜 뭔가 열리던지 뭔가 기록이 되든지 해야".
+ *   - 번호 단추는 무엇이 열리는지 이름으로(업체 열기 · 공고 보기 …). 지금 보고 있는 화면과 같으면 내지 않는다.
+ *   - [할 일로 넣기] — 업무 일기 할 일로(업체 번호면 그 업체에 · 언제가 있으면 그날 기한) → 오늘 · 달력에 보인다.
+ *   - 화면이 붙이는 단추(itemActions · resultActions) — 예: 마케팅 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지].
+ *   - [더 잘 쓰는 모델로 다시] — 같은 회사의 한 단계 위 모델로 이번 한 번만.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, History, Loader2, RefreshCw, Settings2, Sparkles, X } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, ChevronUp, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
+import { AuthContext } from '../../auth/authContext'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { todayLocalDate } from '../../lib/appClock'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
 import { activityTimeText } from '../../services/clientOpsActivity'
+import { createJournalEntry } from '../../services/journalService'
+import { betterModel, dueFromWhen, isSamePage, refKind, refLabel, todoText } from '../../services/aiAssist/actions'
 import { AssistError, assistMessage, callAssist, fetchAssistStatus } from '../../services/aiAssist/client'
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
+import { normRef } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { contextHash, historyOf, newRequestId, pushHistory, readChoice, saveChoice } from '../../services/aiAssist/store'
-import type { AiChoice, HistoryEntry } from '../../services/aiAssist/store'
+import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
@@ -30,6 +41,42 @@ const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: '
 const FALLBACK_DEFAULT: AiChoice = { provider: 'gemini', model: 'gemini-3.1-flash-lite' }
 
 type Shown = (HistoryEntry & { links: Record<string, string> }) | null
+
+/** D-241 화면이 붙이는 단추가 받는 것 */
+export interface AssistCtx {
+  assistId: string
+  entry: HistoryEntry
+  /** 답의 번호(ref) → 화면 저장소의 원래 번호(업체 번호 · 후보 키 …). 없는 번호면 undefined */
+  idOf: (ref: string | undefined) => string | undefined
+  /** 같은 판에서 다른 질문을 이어서 — 고른 항목을 자료 맨 앞에 붙여 보낸다 */
+  follow: (presetId: string, meta: FollowMeta) => void
+  close: () => void
+}
+
+/** true · {to,label}(끝난 뒤 그곳으로 가는 링크) = 됨 · false = 못 함(다시 누를 수 있게) */
+export type AssistActionResult = boolean | { to: string; label: string } | void
+
+export interface AssistItemAction {
+  id: string
+  label: string
+  /** 끝난 뒤 단추 글(없으면 '✓ ' + label) */
+  doneLabel?: string
+  /** 진하게(그 화면의 첫 다음 단계) */
+  primary?: boolean
+  /** 한 번 하면 끝인가(담기 · 저장) — 아니면 여러 번 누를 수 있다(이어 쓰기) */
+  once?: boolean
+  run: (item: AssistItem, ctx: AssistCtx) => Promise<AssistActionResult> | AssistActionResult
+}
+
+export interface AssistResultAction {
+  id: string
+  label: string
+  doneLabel?: string
+  run: (answer: { structured: AssistAnswer | null; raw: string }, ctx: AssistCtx) => Promise<AssistActionResult> | AssistActionResult
+}
+
+/** 답 항목에 [할 일로 넣기] 를 붙일 화면 — 일하는 화면만(마케팅 · 홍보 글은 그 화면 단추가 대신) */
+const RECORD_PAGES: ReadonlySet<AssistPage> = new Set<AssistPage>(['today', 'sales', 'clients', 'inbox', 'agents', 'money', 'calendar', 'grants', 'client', 'module'])
 
 
 export interface AiAssistProps {
@@ -47,6 +94,14 @@ export interface AiAssistProps {
   className?: string
   /** 글 쓰기 답(본문 있는 항목)을 그 화면 보관함에 저장 — 있으면 '보관함에 저장' 단추가 붙는다 */
   onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>
+  /** D-241 답 항목마다 붙는 다음 단계 단추(질문마다 다르게 · 없으면 null) */
+  itemActions?: (assistId: string) => AssistItemAction[] | null
+  /** D-241 답 전체에 붙는 단추(예: 이 대본을 내 콘텐츠에 저장) */
+  resultActions?: (assistId: string) => AssistResultAction[] | null
+  /** D-241 [할 일로 넣기] — 기본은 일하는 화면에서 켜짐 */
+  record?: boolean
+  /** 할 일을 넣은 뒤(그 화면 목록 다시 읽기) */
+  onRecorded?: () => void
 }
 
 export function AiAssist(props: AiAssistProps) {
@@ -55,13 +110,15 @@ export function AiAssist(props: AiAssistProps) {
   return <AiAssistInner {...props} />
 }
 
-function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem }: AiAssistProps) {
+function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<AssistStatus | null>(null)
   const [choice, setChoice] = useState<AiChoice | null>(() => readChoice())
   const [pendingRun, setPendingRun] = useState<string | null>(null)
+  // 할 일을 넣었으면 판을 닫을 때 화면 목록을 다시 읽는다 — 열린 채 다시 읽으면 방금 답에 '자료가 바뀌었어요' 가 떠서
+  const recorded = useRef(false)
 
   const loadStatus = useCallback(async (withModels = false) => {
     try {
@@ -128,9 +185,19 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
           }}
           autoRun={pendingRun}
           onSaveItem={onSaveItem}
+          itemActions={itemActions}
+          resultActions={resultActions}
+          record={record ?? RECORD_PAGES.has(page)}
+          onRecorded={() => {
+            recorded.current = true
+          }}
           onClose={() => {
             setOpen(false)
             setPendingRun(null)
+            if (recorded.current) {
+              recorded.current = false
+              onRecorded?.()
+            }
           }}
         />
       )}
@@ -170,6 +237,7 @@ function labelOf(status: AssistStatus | null, c: AiChoice): string {
   return m ? m.label : prettyModel(c.model)
 }
 
+
 /* ------------------------------------------------------------------ */
 /* 판                                                                    */
 /* ------------------------------------------------------------------ */
@@ -187,9 +255,17 @@ function AssistPanel({
   setChoice,
   autoRun,
   onSaveItem,
+  itemActions,
+  resultActions,
+  record,
+  onRecorded,
   onClose,
 }: {
   onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>
+  itemActions?: (assistId: string) => AssistItemAction[] | null
+  resultActions?: (assistId: string) => AssistResultAction[] | null
+  record: boolean
+  onRecorded?: () => void
   page: AssistPage
   scope: string
   title: string
@@ -241,18 +317,22 @@ function AssistPanel({
     }
   }, [build])
 
+  /**
+   * opts.choice — 이번 한 번만 다른 모델(더 잘 쓰는 모델로 다시) · opts.follow — 고른 항목을 자료 맨 앞에 붙여 이어 쓰기.
+   * 지문(hash)은 화면 자료로만 — 이어 쓴 답도 '화면 자료가 바뀌었어요' 를 같은 기준으로 판단한다.
+   */
   const run = useCallback(
-    async (preset: AssistPreset, askText = '') => {
+    async (preset: AssistPreset, askText = '', opts: { choice?: AiChoice; follow?: FollowMeta } = {}) => {
       if (running) return
       setRunning(preset.id)
       setError(null)
       try {
         const bundle = await Promise.resolve(build())
-        const json = JSON.stringify(bundle.context)
-        const hash = contextHash(json)
+        const hash = contextHash(JSON.stringify(bundle.context))
         setNowHash(hash)
-        const runResult: AssistRun = await callAssist({ requestId: newRequestId(), assistId: preset.id, page, choice: choice ?? (status ? status.defaultChoice : null), context: bundle.context, ask: askText })
-        const entry = { scope, assistId: preset.id, label: preset.label, ask: askText, hash, run: runResult, links: bundle.links }
+        const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : bundle.context
+        const runResult: AssistRun = await callAssist({ requestId: newRequestId(), assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: askText })
+        const entry = { scope, assistId: preset.id, label: opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.label, ask: askText, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
         setShown(entry)
@@ -266,6 +346,36 @@ function AssistPanel({
     },
     [running, build, page, choice, status, scope],
   )
+
+  /** 판의 단추에 없는 질문(이어 쓰기 전용 — 예: 대본 끝까지)도 찾는다 */
+  const presetOf = useCallback((id: string) => presets.find((x) => x.id === id) ?? presetsFor([id])[0], [presets])
+
+  const rerun = useCallback(
+    (entry: NonNullable<Shown>, choiceOverride?: AiChoice) => {
+      const p = presetOf(entry.assistId)
+      if (p) void run(p, entry.ask, { choice: choiceOverride, follow: entry.follow })
+    },
+    [presetOf, run],
+  )
+
+  const ctxFor = useCallback(
+    (entry: NonNullable<Shown>): AssistCtx => ({
+      assistId: entry.assistId,
+      entry,
+      idOf: (ref) => {
+        const r = normRef(ref)
+        return r ? entry.ids?.[r] : undefined
+      },
+      follow: (presetId, meta) => {
+        const p = presetOf(presetId)
+        if (p) void run(p, '', { follow: meta })
+      },
+      close: onClose,
+    }),
+    [presetOf, run, onClose],
+  )
+
+  const better = useMemo(() => (shown ? betterModel(status, shown.run) : null), [status, shown])
 
   // 띠의 질문 단추로 열었으면 바로 묻는다(한 번만)
   useEffect(() => {
@@ -368,12 +478,34 @@ function AssistPanel({
               </div>
             )}
 
+            {running && shown && (
+              <div className="flex items-center gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2.5" data-testid="ai-assist-running">
+                <Loader2 aria-hidden="true" className="size-4 animate-spin text-violet-700" />
+                <span className="t-sub text-violet-900">{presetOf(running)?.label ?? '답'} — 만드는 중…(긴 글은 20~60초)</span>
+              </div>
+            )}
+
             {shown && (
               <div ref={resultRef} className="scroll-mt-2">
-                <ResultView entry={shown} stale={stale} running={!!running} onClose={onClose} onSaveItem={onSaveItem} onSaved={(ok) => showToast(ok ? '보관함에 저장했어요 — 화면 아래 보관함에 쌓여요' : '저장하지 못했어요. 다시 눌러 주세요.')} onRerun={() => {
-                  const p = presets.find((x) => x.id === shown.assistId)
-                  if (p) void run(p, shown.ask)
-                }} onCopied={() => showToast('복사했어요')} />
+                <ResultView
+                  key={shown.run.requestId}
+                  entry={shown}
+                  stale={stale}
+                  running={!!running}
+                  onClose={onClose}
+                  onSaveItem={onSaveItem}
+                  onSaved={(ok) => showToast(ok ? '보관함에 저장했어요 — 화면 아래 보관함에 쌓여요' : '저장하지 못했어요. 다시 눌러 주세요.')}
+                  onRerun={() => rerun(shown)}
+                  better={better}
+                  onBetter={() => better && rerun(shown, { provider: better.provider, model: better.model })}
+                  onCopied={() => showToast('복사했어요')}
+                  ctx={ctxFor(shown)}
+                  itemActions={itemActions?.(shown.assistId) ?? []}
+                  resultActions={resultActions?.(shown.assistId) ?? []}
+                  record={record}
+                  onRecorded={onRecorded}
+                  toast={showToast}
+                />
               </div>
             )}
 
@@ -589,9 +721,54 @@ function costText(run: AssistRun): string {
   return krw < 1 ? ' · 1원 안 됨' : ` · 약 ${Math.round(krw).toLocaleString('ko-KR')}원`
 }
 
-function ResultView({ entry, stale, running, onRerun, onClose, onCopied, onSaveItem, onSaved }: { entry: NonNullable<Shown>; stale: boolean; running: boolean; onRerun: () => void; onClose: () => void; onCopied: () => void; onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>; onSaved: (ok: boolean) => void }) {
+interface ResultViewProps {
+  entry: NonNullable<Shown>
+  stale: boolean
+  running: boolean
+  onRerun: () => void
+  better: (AiChoice & { label: string }) | null
+  onBetter: () => void
+  onClose: () => void
+  onCopied: () => void
+  onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>
+  onSaved: (ok: boolean) => void
+  ctx: AssistCtx
+  itemActions: AssistItemAction[]
+  resultActions: AssistResultAction[]
+  record: boolean
+  onRecorded?: () => void
+  toast: (msg: string) => void
+}
+
+function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose, onCopied, onSaveItem, onSaved, ctx, itemActions, resultActions, record, onRecorded, toast }: ResultViewProps) {
   const { run } = entry
   const a = run.structured
+  const here = useLocation()
+  // 로컬 모드에는 AuthProvider 가 없다 — 그때는 작업공간 · 사용자 없이(업무 일기는 이 브라우저에)
+  const auth = useContext(AuthContext)
+
+  /** 답 한 줄 → 업무 일기 할 일(업체 번호면 그 업체에 · 언제가 있으면 그날 기한) */
+  const addTodo = async (item: Pick<AssistItem, 'title' | 'detail' | 'ref' | 'when'>): Promise<AssistActionResult> => {
+    const today = todayLocalDate()
+    const r = normRef(item.ref)
+    const clientId = r && refKind(r) === 'c' ? ctx.idOf(r) : undefined
+    const due = dueFromWhen(item.when, today)
+    try {
+      await createJournalEntry(auth?.currentWorkspaceId ?? null, auth?.session?.user.id ?? null, {
+        entryType: 'follow_up',
+        entryDate: today,
+        content: todoText(item),
+        clientId: clientId ?? null,
+        dueDate: due,
+      })
+      onRecorded?.()
+      toast(due === today ? '오늘 할 일에 넣었어요' : `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')}`)
+      return { to: due === today ? '/' : '/ops/calendar', label: due === today ? '오늘 할 일에서 보기' : '일정에서 보기' }
+    } catch {
+      return false
+    }
+  }
+
   return (
     <section aria-label="AI 답" className="flex flex-col gap-3 rounded-(--radius-panel) border border-violet-300 bg-white p-3.5 shadow-sm" data-testid="ai-assist-result" data-assist={entry.assistId}>
       <div className="flex flex-wrap items-center gap-2">
@@ -651,26 +828,28 @@ function ResultView({ entry, stale, running, onRerun, onClose, onCopied, onSaveI
                     </div>
                   </div>
                 )}
-                {it.ref && entry.links[it.ref] && (/^https:\/\//.test(entry.links[it.ref]) ? (
-                  <a href={entry.links[it.ref]} target="_blank" rel="noopener noreferrer" className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref">
-                    영상 열기 ↗
-                  </a>
-                ) : (
-                  <Link to={entry.links[it.ref]} onClick={onClose} className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref">
-                    열어 보기 →
-                  </Link>
-                ))}
+                <ItemActionRow
+                  item={it}
+                  entry={entry}
+                  here={here}
+                  onClose={onClose}
+                  actions={itemActions}
+                  ctx={ctx}
+                  onTodo={record ? () => addTodo(it) : undefined}
+                  toast={toast}
+                />
               </li>
             ))}
           </ol>
           {a.next && a.next.length > 0 && (
             <div className="flex flex-col gap-1 rounded-(--radius-control) bg-violet-50 px-3 py-2.5">
               <p className="t-sub font-semibold text-violet-900">바로 할 일</p>
-              <ul className="flex flex-col gap-0.5">
+              <ul className="flex flex-col gap-1">
                 {a.next.map((n, i) => (
-                  <li key={i} className="t-body flex gap-1.5 break-keep text-violet-950">
+                  <li key={i} className="t-body flex flex-wrap items-start gap-x-1.5 gap-y-1 break-keep text-violet-950" data-testid="ai-assist-next">
                     <Check aria-hidden="true" className="mt-1 size-4 shrink-0 text-violet-700" />
-                    {n}
+                    <span className="min-w-0 grow basis-40">{n}</span>
+                    {record && <ActionButton id="todo-next" label="할 일로" doneLabel="할 일에 넣음" once small onRun={() => addTodo({ title: n })} toast={toast} />}
                   </li>
                 ))}
               </ul>
@@ -682,6 +861,13 @@ function ResultView({ entry, stale, running, onRerun, onClose, onCopied, onSaveI
         <div className="flex flex-col gap-1">
           <p className="t-sub text-slate-600">정리된 모양으로 오지 않아 받은 글을 그대로 보여 드려요.</p>
           <p className="t-body break-keep whitespace-pre-line text-slate-900">{run.raw}</p>
+        </div>
+      )}
+      {resultActions.length > 0 && (
+        <div className="flex flex-wrap gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-2.5" data-testid="ai-assist-result-actions">
+          {resultActions.map((act) => (
+            <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary once onRun={() => act.run({ structured: a, raw: run.raw }, ctx)} onNavigate={onClose} toast={toast} />
+          ))}
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5">
@@ -698,6 +884,19 @@ function ResultView({ entry, stale, running, onRerun, onClose, onCopied, onSaveI
         <button type="button" disabled={running} onClick={onRerun} className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-violet-300 bg-white px-2.5 font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-60" data-testid="ai-assist-rerun">
           <RefreshCw aria-hidden="true" className={`size-4 ${running ? 'animate-spin' : ''}`} /> 다시 만들기
         </button>
+        {better && (
+          <button
+            type="button"
+            disabled={running}
+            onClick={onBetter}
+            title={`이번 한 번만 ${better.label} 로 — 고른 모델은 그대로`}
+            className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-violet-400 bg-violet-50 px-2.5 font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
+            data-testid="ai-assist-better"
+            data-model={better.model}
+          >
+            <Wand2 aria-hidden="true" className="size-4" /> 더 잘 쓰는 모델로 다시 · {better.label}
+          </button>
+        )}
         <span className="t-meta ml-auto break-keep text-slate-500" data-testid="ai-assist-meta">
           {PROVIDER_LABEL[run.provider] ?? run.provider} · {run.model} · {(run.ms / 1000).toFixed(1)}초 · 토큰 {run.usage.total.toLocaleString('ko-KR')}
           {costText(run)} · 보낸 줄 {run.sent.rows}
@@ -726,5 +925,132 @@ function SaveItemButton({ onSave, onSaved }: { onSave: () => Promise<boolean>; o
       {state === 'done' ? <Check aria-hidden="true" className="size-4" /> : state === 'busy' ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}
       {state === 'done' ? '보관함에 저장됨' : '보관함에 저장'}
     </button>
+  )
+}
+
+/**
+ * D-241 답 한 줄 아래 단추 줄 — 화면이 붙인 다음 단계 · [할 일로 넣기] · 이름 붙은 이동 단추.
+ * 이동 단추는 무엇이 열리는지 말한다(업체 열기 · 공고 보기 …). 지금 보고 있는 화면과 같은 곳이면 내지 않는다
+ * (D-239 마케팅 답의 '열어 보기' 는 지금 화면 주소여서 눌러도 판만 닫혔다).
+ */
+function ItemActionRow({
+  item,
+  entry,
+  here,
+  onClose,
+  actions,
+  ctx,
+  onTodo,
+  toast,
+}: {
+  item: AssistItem
+  entry: NonNullable<Shown>
+  here: { pathname: string; search: string }
+  onClose: () => void
+  actions: AssistItemAction[]
+  ctx: AssistCtx
+  onTodo?: () => Promise<AssistActionResult>
+  toast: (msg: string) => void
+}) {
+  const r = normRef(item.ref)
+  const href = r ? entry.links[r] : undefined
+  const external = !!href && /^https:\/\//.test(href)
+  const showRef = !!href && (external || !isSamePage(href, here))
+  if (!showRef && !onTodo && actions.length === 0) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="ai-assist-item-actions">
+      {actions.map((act) => (
+        <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary={act.primary} once={act.once} onRun={() => act.run(item, ctx)} onNavigate={onClose} toast={toast} />
+      ))}
+      {onTodo && <ActionButton id="todo" label="할 일로 넣기" doneLabel="할 일에 넣음" once onRun={onTodo} onNavigate={onClose} toast={toast} />}
+      {showRef &&
+        href &&
+        (external ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref">
+            {refKind(r) === 'v' ? '영상 보기' : '새 창에서 보기'} <ExternalLink aria-hidden="true" className="size-3.5" />
+          </a>
+        ) : (
+          <Link to={href} onClick={onClose} className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref" data-ref={r}>
+            {refLabel(r)} <ArrowRight aria-hidden="true" className="size-3.5" />
+          </Link>
+        ))}
+    </div>
+  )
+}
+
+/** 한 번 누르면 하는 단추 — 하는 중 · 됨 · 못 함(다시 누를 수 있게). 됨이 '그곳으로' 를 돌려주면 옆에 이동 링크 */
+function ActionButton({
+  id,
+  label,
+  doneLabel,
+  primary = false,
+  once = false,
+  small = false,
+  onRun,
+  onNavigate,
+  toast,
+}: {
+  id: string
+  label: string
+  doneLabel?: string
+  primary?: boolean
+  once?: boolean
+  small?: boolean
+  onRun: () => Promise<AssistActionResult> | AssistActionResult
+  onNavigate?: () => void
+  toast: (msg: string) => void
+}) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle')
+  const [go, setGo] = useState<{ to: string; label: string } | null>(null)
+  const done = once && state === 'done'
+  const tone = done ? 'border-success-200 bg-success-50 text-success-800' : primary ? 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-white text-violet-800 hover:bg-violet-50'
+  return (
+    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        disabled={state === 'busy' || done}
+        data-testid="ai-assist-action"
+        data-action={id}
+        data-state={state}
+        onClick={async () => {
+          setState('busy')
+          let res: AssistActionResult
+          try {
+            res = await onRun()
+          } catch {
+            res = false
+          }
+          if (res === false) {
+            setState('idle')
+            toast('하지 못했어요. 잠시 뒤 다시 눌러 주세요.')
+            return
+          }
+          setState(once ? 'done' : 'idle')
+          if (res && typeof res === 'object') setGo(res)
+        }}
+        className={`tap inline-flex max-w-full min-w-0 items-center gap-1 rounded-(--radius-control) border px-2.5 font-semibold break-keep disabled:cursor-default ${small ? 't-meta min-h-9' : 't-sub min-h-10'} ${tone}`}
+      >
+        {state === 'busy' ? (
+          <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
+        ) : done ? (
+          <Check aria-hidden="true" className="size-4 shrink-0" />
+        ) : id.startsWith('todo') ? (
+          <ClipboardList aria-hidden="true" className="size-4 shrink-0" />
+        ) : (
+          <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+        )}
+        {done ? (doneLabel ?? label) : label}
+      </button>
+      {go &&
+        (/^https:\/\//.test(go.to) ? (
+          <a href={go.to} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-action-go">
+            {go.label} <ExternalLink aria-hidden="true" className="size-3.5" />
+          </a>
+        ) : (
+          <Link to={go.to} onClick={onNavigate} className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-action-go">
+            {go.label} <ArrowRight aria-hidden="true" className="size-3.5" />
+          </Link>
+        ))}
+    </span>
   )
 }

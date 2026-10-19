@@ -8,10 +8,11 @@
  *  - 줄마다: 단계 · 촬영일 · 게시일 · 체크리스트 7칸 · 메모 · 올린 주소 · 첫 문장 · 제목 후보 · 브리프 복사 · [홍보 글로](주제를 키워드로) · 빼기(한 번 더 묻기).
  *  - 레이더에 없는 주제도 직접 적어 담는다.
  * 예전 '콘텐츠 수첩'(D-194)의 줄 · 단계 · 메모 · 브리프 · 빼기는 그대로 여기로 옮겼다(지운 것 없음). 저장은 같은 수첩 줄.
+ * D-241 AI 도우미에서 담은 기획 · 대본이 여기로 온다 — 주소 ?idea=번호 로 오면 그 줄을 펼쳐 보여 주고, 대본은 줄 안에서 읽고 복사.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, NotebookPen, PenLine, Plus, Trash2, TrendingUp, Tv } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, FileText, NotebookPen, PenLine, Plus, Trash2, TrendingUp, Tv } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { HelpHeading } from '../../../components/ui/fold'
 import { todayLocalDate } from '../../../lib/appClock'
@@ -59,7 +60,7 @@ const dayOf = (ms: number) => {
   return d.toISOString().slice(0, 10)
 }
 
-export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mine = [], feedReady = false, sample = false, ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string } & MineProps & MakeActions) {
+export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mine = [], feedReady = false, sample = false, focusId = '', ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string; focusId?: string } & MineProps & MakeActions) {
   const [stage, setStage] = useState<IdeaStatus | 'all'>('all')
   const [topic, setTopic] = useState('')
   // '아니에요' 를 누른 제안 — 이 화면에서만 숨긴다(다음에 열면 다시 물어도 된다)
@@ -217,6 +218,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
                 missingVideo={feedReady && mine.length > 0 && !!youtubeIdOf(i.link) && !linkedVideo(i, mineById)}
                 suggestion={dismissed.has(i.id) ? null : (suggestions.get(i.id) ?? null)}
                 onDismiss={() => setDismissed((s) => new Set([...s, i.id]))}
+                focus={i.id === focusId}
                 {...act}
               />
             ))}
@@ -235,13 +237,26 @@ function MakeRow({
   missingVideo,
   suggestion,
   onDismiss,
+  focus = false,
   onStatus,
   onPatch,
   onRemove,
   onCopy,
-}: { i: ContentIdea; readOnly: boolean; today: string; video: RadarVideo | null; missingVideo: boolean; suggestion: RadarVideo | null; onDismiss: () => void } & MakeActions) {
+}: { i: ContentIdea; readOnly: boolean; today: string; video: RadarVideo | null; missingVideo: boolean; suggestion: RadarVideo | null; onDismiss: () => void; focus?: boolean } & MakeActions) {
   const [memo, setMemo] = useState(i.memo)
+  // D-241 AI 기획을 담으면 메모가 밖에서 바뀐다 — 고치는 중이 아니면 새 메모로(옛 메모로 덮어쓰지 않게)
+  const [memoEdited, setMemoEdited] = useState(false)
+  useEffect(() => {
+    if (!memoEdited) setMemo(i.memo)
+  }, [i.memo, memoEdited])
   const [link, setLink] = useState(i.link)
+  const rowRef = useRef<HTMLLIElement | null>(null)
+  // ?idea= 로 온 줄 — 펼쳐서 그 자리로(AI 도우미 [내 콘텐츠에서 보기])
+  useEffect(() => {
+    if (!focus) return
+    const t = window.setTimeout(() => rowRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120)
+    return () => window.clearTimeout(t)
+  }, [focus])
   const perf = video ? perfOf(video) : null
   // [맞아요] — 주소 · 게시 완료 · 게시일(비어 있으면 그 영상 올린 날)을 한 번에(따로 저장하면 서로 덮을 수 있다)
   const accept = (v: RadarVideo) => {
@@ -250,17 +265,22 @@ function MakeRow({
     onPatch(i, { link: url, status: 'published', ...(i.publishDate ? {} : { publishDate: dayOf(v.publishedAt) }) }, '올린 영상')
   }
   const [confirm, setConfirm] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(focus)
   const late = lateOf(i, today)
   const done = i.checks.length
   const toggle = (id: MakeCheckId) => onPatch(i, { checks: i.checks.includes(id) ? i.checks.filter((c) => c !== id) : [...i.checks, id] }, '체크')
   return (
-    <li className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border bg-white p-3 sm:p-4 ${late ? 'border-danger-300' : 'border-slate-200'}`} data-testid="radar-idea" data-status={i.status}>
+    <li ref={rowRef} className={`flex min-w-0 scroll-mt-20 flex-col gap-2.5 rounded-(--radius-card) border bg-white p-3 sm:p-4 ${late ? 'border-danger-300' : focus ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`} data-testid="radar-idea" data-status={i.status} data-focus={focus ? '1' : undefined}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {i.source === 'custom' ? <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">직접 담음</span> : <AxisBadge axis={i.type} />}
         <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-body min-w-0 flex-[1_1_12rem] text-left font-bold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-rose-700" data-testid="make-row-toggle">
           {i.topic}
         </button>
+        {i.script && (
+          <button type="button" onClick={() => setOpen(true)} className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900" data-testid="make-script-badge">
+            <FileText aria-hidden="true" className="size-3.5" /> 대본 있음
+          </button>
+        )}
         <label className="flex items-center gap-1.5">
           <span className="sr-only">단계</span>
           <select value={i.status} disabled={readOnly} onChange={(e) => onStatus(i, e.target.value as IdeaStatus)} className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5 text-slate-800" data-testid="radar-idea-status">
@@ -361,13 +381,35 @@ function MakeRow({
             </ol>
           )}
           {i.benchmarkTitles.length > 0 && <p className="t-meta break-keep text-slate-500">참고 영상 {i.benchmarkTitles.length}편 — {i.benchmarkTitles[0]}</p>}
+          {i.script && (
+            <div className="flex min-w-0 flex-col gap-1.5 rounded-(--radius-control) border border-amber-200 bg-white p-2.5" data-testid="make-script">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="t-sub inline-flex items-center gap-1 font-bold text-amber-900">
+                  <FileText aria-hidden="true" className="size-4" /> 대본
+                </span>
+                <span className="t-meta text-slate-500">{i.script.length.toLocaleString('ko-KR')}자 · AI 도우미에서 저장</span>
+                <Button size="sm" variant="secondary" className="ml-auto" onClick={() => onCopy(i.script, '대본')} data-testid="make-script-copy">
+                  <ClipboardCopy aria-hidden="true" className="size-4" /> 대본 복사
+                </Button>
+              </div>
+              <p className="t-sub max-h-96 overflow-y-auto break-keep whitespace-pre-line text-slate-800 [overflow-wrap:anywhere]">{i.script}</p>
+            </div>
+          )}
           <label className="flex flex-col gap-1">
             <span className="t-meta font-semibold text-slate-600">메모</span>
-            <input
+            <textarea
               value={memo}
+              rows={memo.includes('\n') ? 5 : 2}
+              maxLength={1000}
               disabled={readOnly}
-              onChange={(e) => setMemo(e.target.value)}
-              onBlur={() => memo !== i.memo && onPatch(i, { memo }, '메모')}
+              onChange={(e) => {
+                setMemoEdited(true)
+                setMemo(e.target.value)
+              }}
+              onBlur={() => {
+                if (memoEdited && memo !== i.memo) onPatch(i, { memo }, '메모')
+                setMemoEdited(false)
+              }}
               placeholder="예: 화요일 오전 촬영 · 사례는 A사(이름 빼고)"
               className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2"
               data-testid="radar-idea-memo"

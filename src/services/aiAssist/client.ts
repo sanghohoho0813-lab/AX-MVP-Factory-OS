@@ -19,6 +19,8 @@ export interface ModelInfo {
   price: [number, number] | null
   /** 키로 공급자 목록을 물었을 때 그 목록에 있었나(못 물었으면 null) */
   verified: boolean | null
+  /** 이 공급자에서 빠르게(cheap) · 보통(standard) · 깊게(deep) 기본 모델 — D-241 '더 잘 쓰는 모델로 다시' */
+  tier?: 'cheap' | 'standard' | 'deep' | null
 }
 
 export interface ProviderInfo {

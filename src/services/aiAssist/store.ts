@@ -3,6 +3,7 @@
  * 'axmvp.' 키라 로그인 경계에서 사람마다 금고로 옮겨진다(D-162). 못 읽으면 기본값으로 — 화면은 그대로 그린다.
  */
 import type { AssistRun, ProviderId } from './client'
+import type { AssistSection } from './context'
 
 const CHOICE_KEY = 'axmvp.ai.choice.v1'
 const HISTORY_KEY = 'axmvp.ai.history.v1'
@@ -43,6 +44,19 @@ export interface HistoryEntry {
   run: AssistRun
   /** ref → 화면 주소(이 브라우저에만) */
   links?: Record<string, string>
+  /** D-241 ref → 원래 번호(업체 · 후보 · 콘텐츠) */
+  ids?: Record<string, string>
+  /** D-241 이어 쓰기(예: 고른 기획으로 대본) — 무엇을 이어 썼는지 · 다시 만들 때 같은 자료로 */
+  follow?: FollowMeta
+}
+
+export interface FollowMeta {
+  /** 이어 쓴 대상 이름(예: 기획 제목) */
+  title: string
+  /** 화면 저장소의 번호(예: 내 콘텐츠 줄 번호) */
+  targetId?: string
+  /** 덧붙여 보낸 자료 한 묶음 — 다시 만들기 · 더 좋은 모델로 다시에 그대로 */
+  section: AssistSection
 }
 
 function readAll(): HistoryEntry[] {

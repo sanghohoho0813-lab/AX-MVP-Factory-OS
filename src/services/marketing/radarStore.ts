@@ -57,6 +57,8 @@ export interface ContentIdea {
   link: string
   /** D-231 레이더에서 담음 · 직접 적음 */
   source: 'radar' | 'custom'
+  /** D-241 AI 도우미 [대본 끝까지] 로 쓴 대본(이 줄에 저장 · 없으면 '') */
+  script: string
 }
 
 /** D-231 만들기 체크리스트 — 찍고 올리고 나눠 올리기까지 */
@@ -103,8 +105,12 @@ export function normalizeIdea(raw: Record<string, unknown>, id: string): Content
     checks: Array.isArray(raw.checks) ? [...new Set(raw.checks.filter((c): c is MakeCheckId => typeof c === 'string' && CHECK_IDS.includes(c)))] : [],
     link: typeof raw.link === 'string' && /^https:\/\/[^\s<>"']{4,}$/.test(raw.link) ? raw.link.slice(0, 300) : '',
     source: raw.source === 'custom' ? 'custom' : 'radar',
+    script: str(raw.script, SCRIPT_MAX),
   }
 }
+
+/** D-241 대본 한 편 — 12분 롱폼 대사 + 화면 글 + 제목 · 썸네일 · 설명란이 넉넉히 들어가게 */
+export const SCRIPT_MAX = 20000
 
 /** D-231 레이더에 없는 주제를 직접 적어 담기 */
 export function customIdea(topic: string, memo = ''): Omit<ContentIdea, 'id' | 'savedAt'> {
@@ -112,7 +118,7 @@ export function customIdea(topic: string, memo = ''): Omit<ContentIdea, 'id' | '
   return { ...EMPTY_EXTRA, key: `custom:${generateId()}`, topic: t, topicId: '', angle: '', type: 'market', benchmarkVideoIds: [], benchmarkTitles: [], titleCandidates: [], thumbnailCandidates: [], whyNow: [], status: 'selected', memo: memo.trim().slice(0, 1000), source: 'custom' }
 }
 
-const EMPTY_EXTRA = { hook: '', shootDate: '', publishDate: '', checks: [] as MakeCheckId[], link: '', source: 'radar' as const }
+const EMPTY_EXTRA = { hook: '', shootDate: '', publishDate: '', checks: [] as MakeCheckId[], link: '', source: 'radar' as const, script: '' }
 
 /** D-231 이번 주(월~일) 일정 — 촬영일 · 게시일이 이번 주인 것, 날짜 순 */
 export interface WeekItem {
@@ -153,7 +159,7 @@ export function lateOf(i: ContentIdea, today = todayLocalDate()): 'shoot' | 'pub
 }
 
 /** 후보 카드 → 수첩에 담을 모양 */
-export function ideaFromOpportunity(o: Opportunity): Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'> & Partial<Pick<ContentIdea, 'source'>> {
+export function ideaFromOpportunity(o: Opportunity): Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source' | 'script'> & Partial<Pick<ContentIdea, 'source'>> {
   return {
     key: o.key,
     hook: shootKit(o).hook,
@@ -195,8 +201,8 @@ export async function listIdeas(workspaceId: string | null): Promise<ContentIdea
 }
 
 /** 저장할 때 받는 모양 — D-231 새 칸은 없어도 된다(예전 줄 · 예전 부르는 곳 그대로) */
-export type IdeaInput = Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'> &
-  Partial<Pick<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'>>
+export type IdeaInput = Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source' | 'script'> &
+  Partial<Pick<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source' | 'script'>>
 
 export async function saveIdea(workspaceId: string | null, input: IdeaInput): Promise<ContentIdea> {
   const id = input.id ?? `idea_${generateId()}`
@@ -279,6 +285,60 @@ export interface AddedChannel {
   addedAt: string
 }
 
+/**
+ * D-241 채널 설계 기준 — AI 도우미가 기획 · 대본을 쓸 때 늘 따르는 것(대표가 고친다).
+ * 대표: "기획을 할 거면 정확히 내 컨텐츠에 맞게 설계". 처음에는 아래 기본값 — 고치면 그것이 기준.
+ */
+export interface ChannelBrief {
+  channel: string
+  host: string
+  audience: string
+  covers: string
+  avoid: string
+  tone: string
+  format: string
+  ending: string
+}
+
+export const BRIEF_FIELDS: ReadonlyArray<{ key: keyof ChannelBrief; label: string; hint: string }> = [
+  { key: 'channel', label: '채널', hint: '이름 · 무엇을 하는 채널인지' },
+  { key: 'host', label: '화자', hint: '누가 말하나(이름 · 경력)' },
+  { key: 'audience', label: '시청자', hint: '누가 보나' },
+  { key: 'covers', label: '다루는 것', hint: '이 채널의 주제' },
+  { key: 'avoid', label: '다루지 않는 것 · 쓰지 않는 말', hint: '기획에서 빼야 할 것' },
+  { key: 'tone', label: '말투', hint: '어떻게 말하나' },
+  { key: 'format', label: '형식 · 길이', hint: '롱폼 · 쇼츠 · 분량 · 구성' },
+  { key: 'ending', label: '끝맺음', hint: '영상 끝에 시청자에게 바라는 행동' },
+]
+
+export const DEFAULT_BRIEF: ChannelBrief = {
+  channel: '김팀장의 경영노트 — 미래AI랩이 운영하는 중소기업 경영 채널',
+  host: '김팀장(미래AI랩) — 중소기업 대표를 수백 곳 상담해 온 경영 컨설턴트',
+  audience: '중소기업 · 소상공인 대표(50~60대 포함)와 경리 · 실무자',
+  covers: '정책자금 · 고용지원금 · 기업부설연구소 · 창업감면 · 절세 · 지원사업 · 기업인증, 그리고 이 일들에 AI 를 붙여 실제로 시간을 줄이는 법(AX)',
+  avoid: '일반적인 AI 도구 기능 소개 · "N배 빨라진다 · N분 컷 · 퇴근이 빨라진다 · 꿀팁 · 충격" 같은 상투어 · 근거 없는 금액 약속 · 남의 영상 제목 · 대사 베끼기',
+  tone: '상담실에서 대표님께 말하듯 — 쉬운 말, 과장 없이, 실제 상담에서 본 장면과 숫자로',
+  format: '롱폼 8~12분(문제 → 왜 생기나 → 실제 사례 → 해결 순서 → 체크리스트) + 롱폼에서 자른 쇼츠 1~2편',
+  ending: '"우리 회사는 해당되는지" 궁금하면 설명란 링크로 무료 상담 신청',
+}
+
+const BRIEF_MAX = 300
+
+export function normalizeBrief(raw: unknown): ChannelBrief | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const out = {} as ChannelBrief
+  let any = false
+  for (const f of BRIEF_FIELDS) {
+    const v = str(r[f.key], BRIEF_MAX).trim()
+    out[f.key] = v || DEFAULT_BRIEF[f.key]
+    if (v) any = true
+  }
+  return any ? out : null
+}
+
+export const briefOf = (prefs: Pick<RadarPrefs, 'brief'>): ChannelBrief => prefs.brief ?? DEFAULT_BRIEF
+
 export interface RadarPrefs {
   /** 정해 둔 채널의 묶음 바꿈 · 사용 여부(끄면 계산에서 뺀다) */
   overrides: Record<string, { group?: BenchmarkChannelGroup; enabled?: boolean }>
@@ -287,11 +347,13 @@ export interface RadarPrefs {
   mix: MixGuide
   /** [관심 없음] 으로 숨긴 후보 — Opportunity.key('축:주제') 그대로. 정확히 그 후보만 빠진다(D-195) */
   muted: string[]
+  /** D-241 채널 설계 기준(null = 기본값 DEFAULT_BRIEF) */
+  brief: ChannelBrief | null
 }
 
 export const MAX_ADDED = 10
 export const MAX_MUTED = 60
-export const EMPTY_PREFS: RadarPrefs = { overrides: {}, added: [], mix: normalizeMix(null), muted: [] }
+export const EMPTY_PREFS: RadarPrefs = { overrides: {}, added: [], mix: normalizeMix(null), muted: [], brief: null }
 /** 숨긴 후보 키 — '시장수요 · AX·AI · BRIDGE : 주제 번호' 모양만 */
 const MUTED_KEY = /^(market|axai|bridge):[a-z_]{1,40}$/
 
@@ -331,7 +393,7 @@ export function normalizePrefs(raw: unknown): RadarPrefs {
     }
   }
   const muted = Array.isArray(r.muted) ? [...new Set((r.muted as unknown[]).filter((k): k is string => typeof k === 'string' && MUTED_KEY.test(k)))].slice(0, MAX_MUTED) : []
-  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined), muted }
+  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined), muted, brief: normalizeBrief(r.brief) }
 }
 
 /** 작업공간마다 한 줄 — 번호는 작업공간 번호로(클라우드 표의 번호는 모든 작업공간에서 하나여야 한다) */
@@ -347,4 +409,52 @@ export async function savePrefs(workspaceId: string | null, prefs: RadarPrefs): 
   const clean = normalizePrefs(prefs)
   await saveRow(workspaceId, MODULE, PREFS, { id: prefsId(workspaceId), data: clean as unknown as Record<string, unknown> })
   return clean
+}
+
+/* ------------------------------------------------------------------ */
+/* D-241 AI 기획 → 내 콘텐츠 · 대본                                        */
+/* ------------------------------------------------------------------ */
+
+/** AI 답의 기획 한 개(AssistItem 과 같은 모양 — 여기서는 쓰는 칸만) */
+export interface AiPlanItem {
+  title: string
+  detail?: string
+  tag?: string
+  outline?: string[]
+  body?: string
+}
+
+/** 담을 때 메모 — 무엇을 왜 · 구성(1,000자 안) */
+export function aiPlanMemo(item: AiPlanItem, stamp: string): string {
+  const lines = [`[AI 기획 ${stamp}]${item.tag ? ` ${item.tag}` : ''}`]
+  if (item.detail) lines.push(item.detail.trim())
+  if (item.outline?.length) lines.push('구성', ...item.outline.slice(0, 10).map((o) => `- ${o.trim()}`))
+  return lines.join('\n').slice(0, 1000)
+}
+
+/**
+ * AI 기획 → 내 콘텐츠 '제작 예정' 줄.
+ * 레이더 후보(opp)에서 나온 기획이면 그 후보 줄(같은 key)에 합친다 — 이미 있으면 새 줄을 만들지 않고 제목 후보 · 첫 문장 · 메모만 더한다.
+ * 이미 대본 준비 · 촬영 · 게시까지 갔으면 단계를 되돌리지 않는다.
+ */
+export function aiPlanInput(item: AiPlanItem, opp: Opportunity | null, ideas: readonly ContentIdea[], stamp: string, targetId?: string): { input: IdeaInput; existed: boolean } {
+  const title = item.title.trim().slice(0, 120)
+  const memo = aiPlanMemo(item, stamp)
+  const hook = (item.body ?? '').trim().slice(0, 200)
+  // targetId — 답이 '내 콘텐츠' 줄 번호(i#)를 가리키면 그 줄에
+  const old = (targetId ? ideas.find((i) => i.id === targetId) : undefined) ?? (opp ? ideas.find((i) => i.key === opp.key) : undefined) ?? ideas.find((i) => i.topic === title || i.titleCandidates[0] === title)
+  if (old) {
+    const titles = [title, ...old.titleCandidates.filter((t) => t !== title)].slice(0, 5)
+    const mergedMemo = old.memo.includes(memo.split('\n')[0]) ? old.memo : [memo, old.memo].filter(Boolean).join('\n\n').slice(0, 1000)
+    return { input: { ...old, titleCandidates: titles, hook: old.hook || hook, memo: mergedMemo, status: old.status === 'idea' ? 'selected' : old.status }, existed: true }
+  }
+  if (opp) {
+    const base = ideaFromOpportunity(opp)
+    return {
+      input: { ...base, titleCandidates: [title, ...base.titleCandidates.filter((t) => t !== title)].slice(0, 5), hook: hook || base.hook, memo, status: 'selected' },
+      existed: false,
+    }
+  }
+  const c = customIdea(title, memo)
+  return { input: { ...c, angle: (item.detail ?? '').trim().slice(0, 400), hook, titleCandidates: [title] }, existed: false }
 }
