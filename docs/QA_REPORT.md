@@ -3325,3 +3325,16 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   고객 관리 띠(몇 달 연락 안 된 곳 + 그때 메모 · 계약 가능성 높은 순 · 추천 많은 업체부터) · 마케팅 내 콘텐츠 띠 · 업체 상세 판(한 장 요약 · 다음 할 일 · 미팅 질문 10 · 제안 순서) · 블로그 글 한 번에(규칙집) + 보관함에 저장 · 390 판 넘침 0.
 - 확인하지 못한 것: **실제 공급자 답의 품질** — 이 환경에는 키가 없어 진짜 서버 함수 + 가짜 공급자로만 시험(요청 모양 · 오류 · 비용 계산 · PII 지움은 확인). 모델 이름 · 가격은 2026-10-19 공식 가격 페이지 기준이고,
   키를 넣은 뒤 [키로 쓸 수 있는 모델 확인] 으로 실제 목록과 맞춰 봐야 한다. Production DB 0021 적용 여부(대표 권한) 확인하지 못함.
+
+## §164 D-240 할 일 창 배치 — 맨 위 한 줄(할 일 · 업체 고르기 · 업체 열기) → 내용 → 어떻게 할까요 → 언제까지 (2026-10-19) + D-239 병합 기록
+
+- **D-239 병합(main 1cc0510)** — §163 게이트.
+- **D-240 게이트 48단계 — 1차 45/48** — 빨강 셋(studio · real · squeeze) 모두 `net::ERR_INSUFFICIENT_RESOURCES`(같은 탭에서 화면을 20번 넘게 옮긴 뒤 · 매번 컨설팅 작업실 벤처/증빙 쪽).
+  이미 병합된 D-239 빌드로 squeeze 를 돌려도 같은 자리에서 같은 오류 → 코드가 아니라 시험 환경.
+  **까닭을 찾음**: 시험 브라우저(Playwright Chromium, `--disable-dev-shm-usage`)는 공유 메모리를 `/tmp` 에 2MB 파일로 만들고 지운 채 열어 둔다. 한 탭에서 요청 1,000건을 넘기면 2GB 가 넘게 쌓이는데
+  디스크 여유가 3.4GB 뿐이라 모자랐다(측정: 렌더러가 연 지운 파일 1,010개 × 2MB). 옛 작업 폴더의 시험 산출물(`.*-out` · `dist-qa-*` · 옛 `dist`, 모두 git 무시 · 시험이 다시 만듦)을 지워 6.6GB 로 늘린 뒤
+  셋만 다시 — studio 63/63 · real 188/188 · squeeze 짜부라짐 0. 코드 고친 것 없음 → **48/48 녹색**.
+  앞으로: 디스크 여유가 5GB 아래면 게이트 전에 시험 산출물부터 지운다.
+- 1차에서 녹색이던 45단계(같은 커밋 6d9a2c4) — tsc · oxlint · build · test:all · simple · board · **todos 50**(D-240 6개 새로) · mobile · tools · tax · shell · modules · sales · journey · easy · steady · flow · phone · wayfinding ·
+  facts · detail · files · folder · taxplan · scenarios · site · content · ownerai · calendar · connect · enroll · planner · contract · grants · money · youtube · radar · session · matrix · modsafe · db · pilot · isolation · cert · assist.
+- **화면 사진(PC 1440 · 390)** — 업체 없는 창(맨 위 줄에 '할 일 · 업체 없음' · [업체 열기] 없음) · 업체 고른 창(맨 위 줄 '할 일 · 한솔테크(주) · → 업체 열기') → 내용 → 어떻게 할까요 4칸 → 언제까지 + 오늘/내일/1주/2주/1개월. 가로 넘침 0(PC · 390).
