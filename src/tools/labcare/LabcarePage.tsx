@@ -11,7 +11,7 @@
 
 import { useToolClient } from '../shared/toolClientContext'
 import { useSearchParams } from 'react-router-dom'
-import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { labPresetFor, presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
 import { PresetNote } from '../shared/PresetNote'
 import { clientFacts } from '../shared/clientPrefill'
 import { sharedToolKey } from '../shared/toolStorage'
@@ -310,7 +310,9 @@ function TaxTab() {
   useEffect(() => {
     if (presetDone.current || !presetId || (clientId && !clientRecord)) return
     presetDone.current = true
-    const preset = scenarioPreset(presetId)
+    // D-244: 설계서에서 연구원 수(n)를 골라 왔으면 인건비를 그 사람 수로 — 예전엔 5명 설계서도 2명(8,000만원)으로 열렸다
+    const found = scenarioPreset(presetId)
+    const preset = found ? labPresetFor(found, Number(params.get('n'))) : null
     if (!preset || preset.module !== 'labcare' || !preset.lab) return
     const lab = preset.lab
     const bt = clientRecord ? clientFacts(clientRecord, new Date()).businessType : ''
@@ -321,6 +323,7 @@ function TaxTab() {
     setPresetUsed({ title: preset.title, applied, before, chips: presetAssumptions(preset), cleared: false })
     const next = new URLSearchParams(params)
     next.delete('preset')
+    next.delete('n')
     setParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetId, clientRecord, clientId])

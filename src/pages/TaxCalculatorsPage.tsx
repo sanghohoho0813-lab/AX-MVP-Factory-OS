@@ -197,22 +197,26 @@ export function TaxCalculatorsPage() {
   const mode: 'plan' | 'calc' = params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
   const loadKey = `${mode}|${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
   const loadedFor = useRef(loadKey)
+  /** D-244: 지금 values 가 어느 읽기(loadKey)의 값인지 — 읽은 바로 그 커밋에는 아직 앞 값이라 저장하지 않는다
+   *  (예전엔 업체 기록이 늦게 오면 예시값을 한 번 저장해, 상황 예시의 '넣기 전 값' 이 계산기 예시가 됐다) */
+  const [valuesKey, setValuesKey] = useState(loadKey)
   useEffect(() => {
     if (mode === 'plan') return
     if (loadedFor.current === loadKey) return
     loadedFor.current = loadKey
     const r = loadValuesWithPrefill(calc, clientId, clientRecord)
     setValues(r.values)
+    setValuesKey(loadKey)
     setPrefilled(r.prefilled)
   }, [calc, clientId, clientRecord, loadKey, mode])
   useEffect(() => {
-    if (mode === 'plan' || !recordReady || loadedFor.current !== loadKey) return
+    if (mode === 'plan' || !recordReady || loadedFor.current !== loadKey || valuesKey !== loadKey) return
     try {
       localStorage.setItem(storeKey(calc, clientId), JSON.stringify(values))
     } catch {
       /* 저장 못 해도 계산은 된다 */
     }
-  }, [values, calc, clientId, recordReady, loadKey, mode])
+  }, [values, calc, clientId, recordReady, loadKey, mode, valuesKey])
 
   /*
    * D-243 상황 예시(?preset=) — 05 · 06 계산기: 이 업체 숫자(주주명부 · 순이익 · 1주 가치)에 상황 값(빌려준 돈 · 누가 몇 주)을 넣어 바로 계산.
@@ -230,10 +234,17 @@ export function TaxCalculatorsPage() {
     const pv = calcPresetValues(preset, clientRecord, todayLocalDate())
     // 지금 칸(저장한 값 · 업체 숫자) 위에 — 위 읽기 효과와 같은 값에서 시작한다
     const base = loadValuesWithPrefill(calc, clientId, clientRecord).values
-    const applied = prefillShown(calc, pv.applied)
-    const before: Values = Object.fromEntries(Object.keys(applied).map((k) => [k, base[k]]))
+    const nextValues: Values = { ...base, ...prefillShown(calc, pv.values) }
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+    // D-244: 상황 값 + 업체 숫자로 다시 채워 바뀐 칸(예전에 직접 적은 순이익 · 시가 등)도 [가정 빼기]로 돌아오게 —
+    // 같은 상황을 두 번 눌러도 '넣기 전 값' 은 처음 것(지금 칸이 아직 앞서 넣은 값 그대로일 때)
+    const prev = presetUsed && presetUsed.calcKey === calc.key && !presetUsed.cleared ? presetUsed : null
+    const keys = [...new Set([...Object.keys(prefillShown(calc, pv.applied)), ...Object.keys(nextValues).filter((k) => !same(nextValues[k], base[k]))])]
+    const applied: Values = Object.fromEntries(keys.map((k) => [k, nextValues[k]]))
+    const before: Values = Object.fromEntries(keys.map((k) => [k, prev && k in prev.before && same(base[k], prev.applied[k]) ? prev.before[k] : base[k]]))
     loadedFor.current = loadKey
-    setValues({ ...base, ...prefillShown(calc, pv.values) })
+    setValues(nextValues)
+    setValuesKey(loadKey)
     setPrefilled(pv.filled)
     setPresetUsed({ calcKey: calc.key, title: preset.title, applied, before, chips: presetAssumptions(preset), missing: pv.missing, cleared: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,6 +298,7 @@ export function TaxCalculatorsPage() {
     }
     loadedFor.current = `calc|${target.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
     setValues(merged)
+    setValuesKey(loadedFor.current)
     setPrefilled([])
     const next = new URLSearchParams()
     const client = params.get('client')

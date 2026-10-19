@@ -141,6 +141,25 @@ export function priceOf(provider, model) {
   return hit && Array.isArray(hit.price) ? { in: hit.price[0], out: hit.price[1] } : null
 }
 
+/**
+ * D-244 모델 → 단계(cheap · standard · deep) — 속도 제한(깊게 하루 한도)을 세려고.
+ * 목록에 단계가 있으면 그것, 없으면 가격(입력+출력)을 그 회사의 보통 · 깊게 모델과 견준다. 목록에 없거나 가격을 모르면 cheap.
+ */
+export function tierOf(provider, model) {
+  const list = catalogOf(provider)
+  const hit = list.find((m) => m.id === model)
+  if (!hit) return 'cheap'
+  if (hit.tier) return hit.tier
+  if (!Array.isArray(hit.price)) return 'cheap'
+  const cost = (p) => p[0] + p[1]
+  const at = (t) => {
+    const m = list.find((x) => x.tier === t && Array.isArray(x.price))
+    return m ? cost(m.price) : Infinity
+  }
+  const c = cost(hit.price)
+  return c >= at('deep') ? 'deep' : c >= at('standard') ? 'standard' : 'cheap'
+}
+
 /* ------------------------------------------------------------------ */
 /* 키로 공급자에게 모델 목록 묻기(10분 기억) — 글 만드는 모델만 남긴다                       */
 /* ------------------------------------------------------------------ */

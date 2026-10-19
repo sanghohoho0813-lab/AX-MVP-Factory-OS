@@ -3,7 +3,8 @@
  *
  * 지키는 것
  *   - 사람 이름(대표자 · 담당자 · 소개한 사람 · 요청자) · 연락처 · 이메일 · 사업자/법인번호 · 주소(시/도만) · 주민번호 · 계좌는 보내지 않는다.
- *     자유 글(메모 · 할 일)은 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰을 가리고, 그 업체의 사람 이름은 '(이름)' 으로 바꾼다.
+ *     자유 글(메모 · 할 일 · 직접 적은 질문)은 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰 · 유선 전화를 가리고, 그 업체의 사람 이름은 '(이름)' 으로 바꾼다.
+ *   - 영업자 이름은 '영업자 A · B …' 별칭으로 보낸다 — 별칭 → 이름은 aliases 로 브라우저에만(D-244).
  *   - 줄마다 ref(c1 · t3 …)를 붙인다 — AI 가 고른 줄을 화면이 그 업체 · 그 일로 이어 준다(links 는 브라우저에만 남는다).
  *   - 많아도 화면이 보여 주는 만큼만(업체 80 · 할 일 60 …) — 서버가 4만 자로 한 번 더 자른다.
  */
@@ -44,15 +45,28 @@ export interface AssistBundle {
   links: Record<string, string>
   /** D-241 ref → 원래 번호(RefBook.ids) */
   ids?: Record<string, string>
+  /** D-244 별칭(영업자 A) → 실제 이름 — 보내지 않고 답을 보여 줄 때만 되돌린다 */
+  aliases?: Record<string, string>
 }
 
 /* ------------------------------------------------------------------ */
 /* 개인정보 거르기                                                        */
 /* ------------------------------------------------------------------ */
 
-/** 자유 글 — 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰을 가리고, 알려 준 사람 이름을 '(이름)' 으로 */
+/**
+ * D-244 privacyFilter 에 없는 전화 모양 — +82 국제 번호 · 유선 전화(02 · 031~064 · 070 · 050x).
+ * 서버 scrubText(api/_ai/core.js)와 같은 규칙. 사업자번호(123-45-67890) · 날짜 · 금액은 모양이 달라 걸리지 않는다.
+ */
+const PHONE_MORE: readonly [RegExp, string][] = [
+  [/\+\s*82[\s-]*(?:\(0\)[\s-]*|0)?\d{1,2}[\s-]*\d{3,4}[\s-]*\d{4}(?!\d)/g, '[가림:전화]'],
+  [/(?<![\d-])0(?:2|3[1-3]|4[1-4]|5[1-5]|6[1-4]|70|50\d)\s*[-.)]?\s*\d{3,4}\s*[-.]?\s*\d{4}(?!\d)/g, '[가림:전화]'],
+]
+
+/** 자유 글 — 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰 · 유선 전화를 가리고, 알려 준 사람 이름을 '(이름)' 으로 */
 export function safeText(s: string | null | undefined, names: readonly string[] = [], max = 300): string {
-  let out = redactSensitive(stripRrn(String(s ?? ''))).text.replace(/\s+/g, ' ').trim()
+  let out = String(s ?? '')
+  for (const [re, rep] of PHONE_MORE) out = out.replace(re, rep)
+  out = redactSensitive(stripRrn(out)).text.replace(/\s+/g, ' ').trim()
   for (const n of names) {
     const name = n.trim()
     if (name.length < 2) continue

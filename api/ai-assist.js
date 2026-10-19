@@ -10,7 +10,7 @@
 import { ASSISTS, ASSIST_OUTPUT_SCHEMA, assistOf, assistSystem, buildAssistPrompt } from './_ai/assists.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
-import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel } from './_ai/providers.js'
+import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
 const inflight = new Map()
@@ -104,7 +104,8 @@ export default async function handler(req, res) {
     }
   }
 
-  const rate = rateCheck(`${who.userId}:assist`, 'cheap', now, assistLimits())
+  // D-244: 고른 모델의 단계로 센다 — 예전엔 모두 cheap 이라 깊게 하루 한도가 걸리지 않았다
+  const rate = rateCheck(`${who.userId}:assist`, tierOf(choice.provider, choice.model), now, assistLimits())
   if (!rate.ok) {
     res.setHeader('Retry-After', String(rate.retryAfter))
     return fail(res, 429, 'rate_limited', { retryAfter: rate.retryAfter })

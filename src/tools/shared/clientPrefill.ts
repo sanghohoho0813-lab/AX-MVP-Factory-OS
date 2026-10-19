@@ -156,7 +156,8 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
     businessType: businessTypeOf(record),
     representativeBirth: birth,
     establishedAt: established,
-    industry: industryValueOf(record.industry || record.businessItem || record.businessCategory),
+    // D-244: 앞 칸 글이 있어도 아는 업종이 아니면 다음 칸으로 — 업태 '제조업' · 종목 '정밀기계 부품' 이 예전엔 '모름' 이었다
+    industry: industryValueOf(record.industry) || industryValueOf(record.businessItem) || industryValueOf(record.businessCategory),
     // D-165: 업종 칸이 비면 사업자등록증의 업태 · 종목으로 — 업체 상세 판정 카드와 도구가 같은 업종을 쓴다
     industryText: (record.industry ?? '').trim() || [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' '),
     employeeCount: employeeCountOf(usableFactValue(record, 'employeeCount')),

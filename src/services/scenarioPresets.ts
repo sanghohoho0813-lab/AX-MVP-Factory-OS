@@ -35,6 +35,16 @@ export interface LabPreset {
   material: number
   other: number
   category: '일반 R&D' | '신성장·원천기술' | '국가전략기술' | '미정'
+  /** 인건비가 몇 명 몫인지 — 주소의 n(연구원 수)으로 인건비를 1명 몫 × n 으로 바꿀 수 있다(D-244 설계서 '연구원 5명') */
+  heads?: number
+}
+
+/** D-244: 연구원 수를 바꾼 연구소 상황(설계서에서 연 n명) — heads 가 없거나 n 이 1~50 밖이면 그대로 */
+export function labPresetFor(s: ScenarioPreset, n: number): ScenarioPreset {
+  const lab = s.lab
+  if (!lab?.heads || !Number.isInteger(n) || n < 1 || n > 50 || n === lab.heads) return s
+  const per = lab.payroll / lab.heads
+  return { ...s, title: s.title.replace(`연구원 ${lab.heads}명`, `연구원 ${n}명`), lab: { ...lab, payroll: per * n, heads: n } }
 }
 
 export type HiringPreset = Pick<HiringAnswers, 'situation' | 'cats' | 'specials' | 'age' | 'gender' | 'empType'>
@@ -104,7 +114,7 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'emp-childcare', module: 'employment', title: '직원 육아휴직 · 대체인력 채용', when: '직원이 육아휴직을 쓰고 빈자리를 채울 때', hiring: { situation: 'childcare', cats: ['육아'], specials: ['육아휴직', '대체인력'], age: null, gender: null, empType: '정규직' } }),
   p({ id: 'emp-convert', module: 'employment', title: '계약직 → 정규직 전환', when: '계약직 직원을 정규직으로 바꿀 때', hiring: { situation: 'retain', cats: ['재직'], specials: ['정규직전환'], age: null, gender: null, empType: '계약직' } }),
   // 연구소 2 — 연구개발비 세액공제(같은 엔진)
-  p({ id: 'lab-two', module: 'labcare', title: '연구원 2명(연봉 각 4,000만원)으로 연구소 설립', when: '연구소(전담부서)를 새로 만들 때 — 인건비 세액공제', lab: { payroll: 80_000_000, material: 0, other: 0, category: '일반 R&D' } }),
+  p({ id: 'lab-two', module: 'labcare', title: '연구원 2명(연봉 각 4,000만원)으로 연구소 설립', when: '연구소(전담부서)를 새로 만들 때 — 인건비 세액공제', lab: { payroll: 80_000_000, material: 0, other: 0, category: '일반 R&D', heads: 2 } }),
   p({ id: 'lab-material', module: 'labcare', title: '연구원 1명 + 시제품 재료비 3,000만원', when: '시제품 · 개발 재료비가 드는 해', lab: { payroll: 40_000_000, material: 30_000_000, other: 0, category: '일반 R&D' } }),
   // 창업감면 3 — 판정기(같은 엔진)
   p({ id: 'startup-new', module: 'startup-tax', title: '새로 창업한 경우 — 지금 감면 판정', when: '신규 창업(이어받지 않음) — 이 회사 숫자 그대로', startup: { startupForm: 'brand_new' } }),

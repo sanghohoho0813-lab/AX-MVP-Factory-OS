@@ -318,7 +318,8 @@ function runLab(s: ScenarioPreset, facts: ClientFacts): ReturnType<typeof runTax
 /* 창업감면                                                              */
 /* ------------------------------------------------------------------ */
 
-function startupFormOf(facts: ClientFacts, over: ScenarioPreset['startup']): StartupForm {
+/** 창업감면 판정기 입력 — 업체 사실 + 상황 값(상황별 설계서 '창업 5년 안 채용' 도 같이 쓴다) */
+export function startupFormOf(facts: ClientFacts, over: ScenarioPreset['startup']): StartupForm {
   const { region, over: oc } = startupRegion(facts.address)
   return {
     ...EMPTY_FORM,

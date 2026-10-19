@@ -246,8 +246,16 @@ function MakeRow({
   const [memo, setMemo] = useState(i.memo)
   // D-241 AI 기획을 담으면 메모가 밖에서 바뀐다 — 고치는 중이 아니면 새 메모로(옛 메모로 덮어쓰지 않게)
   const [memoEdited, setMemoEdited] = useState(false)
+  // D-244 저장을 보낸 메모(to)와 그 전 메모(from) — 저장이 실패해 from 으로 되돌아오면 적은 글을 지우지 않고 '고치는 중' 으로 둔다
+  // (예전: 칸을 벗어나면 고치는 중을 풀어, 실패해 되돌아온 옛 메모가 적은 글을 덮었다 — 알림은 '그대로 있습니다')
+  const sentMemo = useRef<{ from: string; to: string } | null>(null)
   useEffect(() => {
-    if (!memoEdited) setMemo(i.memo)
+    const s = sentMemo.current
+    if (s && i.memo === s.from) setMemoEdited(true)
+    else if (!memoEdited && !(s && i.memo === s.to)) {
+      sentMemo.current = null
+      setMemo(i.memo)
+    }
   }, [i.memo, memoEdited])
   const [link, setLink] = useState(i.link)
   const rowRef = useRef<HTMLLIElement | null>(null)
@@ -407,7 +415,10 @@ function MakeRow({
                 setMemo(e.target.value)
               }}
               onBlur={() => {
-                if (memoEdited && memo !== i.memo) onPatch(i, { memo }, '메모')
+                if (memoEdited && memo !== i.memo) {
+                  sentMemo.current = { from: i.memo, to: memo }
+                  onPatch(i, { memo }, '메모')
+                } else sentMemo.current = null
                 setMemoEdited(false)
               }}
               placeholder="예: 화요일 오전 촬영 · 사례는 A사(이름 빼고)"

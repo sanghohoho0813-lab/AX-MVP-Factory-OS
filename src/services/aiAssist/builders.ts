@@ -11,7 +11,7 @@ import type { SalesRecontact, SalesRisk } from '../salesSignals'
 import type { CareItem } from '../clientCare'
 import { lastSalesTouch } from '../salesSignals'
 import { daysInStage, isContractClient, isProspect, salesStageOf } from '../salesPipeline'
-import { agentLedger, agentLedgerTotals } from '../feeMath'
+import { UNNAMED_AGENT, agentLedger, agentLedgerTotals } from '../feeMath'
 import { isOpenEvent, waitingDays } from '../customerBridgeService'
 import { regionOf } from '../clientOpsProfile'
 import { COST_CATEGORY_LABEL, PAY_METHOD_LABEL, isActiveSub, monthlyEquivalent, nextCharge, outlook, toKrw } from '../finance/financeCore'
@@ -44,6 +44,11 @@ export function todayLabel(today: string): string {
 /** 도구 기한 제목의 직원 이름('청년도약 참여신청 — 홍길동')을 가린다 */
 export function maskStaff(title: string): string {
   return title.replace(/(참여신청|신청|직원)\s*[—–-]\s*[^\s·(),]{2,12}/g, '$1 — (직원)')
+}
+
+/** D-244 0 → A · 25 → Z · 26 → A2 … */
+function agentLetter(k: number): string {
+  return `${String.fromCharCode(65 + (k % 26))}${k >= 26 ? Math.floor(k / 26) + 1 : ''}`
 }
 
 function namesOf(byId: Map<string, ClientOpsRecord>, id: string | null | undefined): string[] {
@@ -119,8 +124,9 @@ export function todayBundle(i: TodayInput): AssistBundle {
           rows: i.money.overdue.items.slice(0, 20).map((m) => ({ ref: clientRef(m.clientId), 업체: m.clientName, 항목: safeText(m.label, namesOf(byId, m.clientId), 80), 금액: wonText(m.amount), 받을날: m.dueDate })),
           total: i.money.overdue.count,
         },
-        { name: '영업 — 챙길 곳', rows: i.salesRisks.slice(0, 15).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: s.reason, 할일: s.action })) },
-        { name: '영업 — 다시 연락할 곳', rows: i.recontacts.slice(0, 12).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: s.reasons.join(' · '), 조용한날: s.days })) },
+        // D-244: 규칙이 만든 글도 한 번 더 거른다(뒤에 자유 글이 섞여도 연락처가 나가지 않게)
+        { name: '영업 — 챙길 곳', rows: i.salesRisks.slice(0, 15).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: safeText(s.reason, personNames(s.record), 120), 할일: safeText(s.action, personNames(s.record), 80) })) },
+        { name: '영업 — 다시 연락할 곳', rows: i.recontacts.slice(0, 12).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: safeText(s.reasons.join(' · '), personNames(s.record), 160), 조용한날: s.days })) },
         { name: '안부 챙길 계약 고객', rows: i.care.slice(0, 12).map((c) => ({ ref: clientRef(c.clientId), 업체: c.companyName, 이유: c.reason === 'anniversary' ? '계약 1주년' : `${c.quietDays}일 조용`, 급함: c.urgent ? '급함' : '' })) },
         ...(i.charges && i.charges.length ? [{ name: '3일 안 정기 결제', rows: i.charges.map((c) => ({ 결제: safeText(c.name, [], 60), 날짜: c.date, 금액: c.amount })) }] : []),
       ],
@@ -150,8 +156,8 @@ export function salesBundle(records: ClientOpsRecord[], today: string, risks: Sa
       notes: 2,
       extra: (x) => ({
         단계에머문날: daysInStage(x) ?? '',
-        제안: x.sales?.proposal ? `${(x.sales.proposal.packages ?? []).slice(0, 4).join(' · ')}${x.sales.proposal.feeManwon ? ` · ${x.sales.proposal.feeManwon}만원` : ''}` : '',
-        걸림돌: riskOf.get(x.id)?.reason ?? '',
+        제안: x.sales?.proposal ? `${safeText((x.sales.proposal.packages ?? []).slice(0, 4).join(' · '), personNames(x), 160)}${x.sales.proposal.feeManwon ? ` · ${x.sales.proposal.feeManwon}만원` : ''}` : '',
+        걸림돌: safeText(riskOf.get(x.id)?.reason, personNames(x), 120),
         유입: safeText(x.sales?.source, [], 30),
       }),
     }),
@@ -263,6 +269,16 @@ export function agentsBundle(records: ClientOpsRecord[], today: string): AssistB
   const totals = agentLedgerTotals(rows)
   const byId = new Map(records.map((r) => [r.id, r]))
   const year = today.slice(0, 4)
+  // D-244 영업자 이름은 보내지 않는다 — 가나다순으로 '영업자 A · B …'(같은 사람들이면 같은 별칭). 별칭 → 이름은 aliases 로 브라우저에만
+  const aliasOf = new Map<string, string>()
+  const aliases: Record<string, string> = {}
+  const names = [...new Set(rows.map((a) => a.name))].filter((n) => n !== UNNAMED_AGENT).sort((a, b) => a.localeCompare(b, 'ko'))
+  names.forEach((n, k) => {
+    const al = `영업자 ${agentLetter(k)}`
+    aliasOf.set(n, al)
+    aliases[al] = n
+  })
+  const who = (n: string) => aliasOf.get(n) ?? n
   const items: AssistRow[] = []
   for (const a of rows) {
     for (const it of a.items) {
@@ -270,26 +286,26 @@ export function agentsBundle(records: ClientOpsRecord[], today: string): AssistB
       const fee = rec?.fees.find((f) => f.id === it.feeId)
       items.push({
         ref: rec ? book.client(rec) : undefined,
-        영업자: a.name,
+        영업자: who(a.name),
         업체: it.clientName,
-        항목: safeText(it.label, rec ? personNames(rec) : [], 60),
+        항목: safeText(it.label, [...(rec ? personNames(rec) : []), ...names], 60),
         고객금액: wonText(it.amount),
         영업자몫: wonText(it.agentFee),
         상태: it.agentPaidAt ? `줌 ${it.agentPaidAt.slice(0, 10)}` : it.receivedAt ? `줄 돈(고객 입금 ${it.receivedAt.slice(0, 10)})` : '고객 입금 기다림',
         고객입금예정: fee?.dueDate ?? '',
-        조건: fee?.conditionText ? safeText(fee.conditionText, [], 60) : '',
+        조건: fee?.conditionText ? safeText(fee.conditionText, names, 60) : '',
       })
     }
   }
   const paidThisYear = rows.flatMap((a) => a.items).filter((it) => it.agentPaidAt && it.agentPaidAt.slice(0, 4) === year).reduce((n, it) => n + (it.agentFee ?? 0), 0)
   return {
-    links: book.links, ids: book.ids,
+    links: book.links, ids: book.ids, aliases,
     context: {
       title: '영업자 정산',
       today: todayLabel(today),
       purpose: '영업자에게 줄 돈과 줄 날을 놓치지 않게',
       sections: [
-        { name: '영업자별 합계', rows: rows.map((a) => ({ 영업자: a.name, 줄돈: wonText(a.payable), 준돈: wonText(a.paid), 기다리는돈: wonText(a.waiting), 업체수: new Set(a.items.map((x) => x.clientId)).size })) },
+        { name: '영업자별 합계', rows: rows.map((a) => ({ 영업자: who(a.name), 줄돈: wonText(a.payable), 준돈: wonText(a.paid), 기다리는돈: wonText(a.waiting), 업체수: new Set(a.items.map((x) => x.clientId)).size })) },
         { name: '정산 항목', rows: items.slice(0, 120), total: items.length },
       ],
       facts: [`전체 — 줄 돈 ${wonText(totals.payable) || '0원'} · 준 돈 ${wonText(totals.paid) || '0원'} · 기다리는 돈 ${wonText(totals.waiting) || '0원'}`, `올해(${year}) 이미 준 돈 ${wonText(paidThisYear) || '0원'}`],
@@ -456,7 +472,8 @@ export function clientBundle(record: ClientOpsRecord, today: string, insights: r
   const f = clientFacts(record, new Date(`${today}T00:00:00`))
   const ref = book.client(record)
   const row = clientRow(book, record, { today, notes: 6 })
-  const docs = Object.entries(record.documents ?? {}).map(([k, d]) => `${k}: ${(d as { status?: string }).status ?? ''}`)
+  // D-244: 서류 칸 이름은 서류 제목에서 오기도 해서(예: '홍길동 등본') 한 번 거른다
+  const docs = Object.entries(record.documents ?? {}).map(([k, d]) => safeText(`${k}: ${(d as { status?: string }).status ?? ''}`, names, 120))
   return {
     links: book.links, ids: book.ids,
     context: {
@@ -641,8 +658,8 @@ export function radarBundle(i: RadarInput): AssistBundle {
           촬영일: x.shootDate,
           게시일: x.publishDate,
           체크: `${x.checks.length}/${MAKE_CHECKS.length}`,
-          제목후보: x.titleCandidates.slice(0, 3),
-          참고영상: x.benchmarkTitles.slice(0, 3),
+          제목후보: x.titleCandidates.slice(0, 3).map((t) => safeText(t, [], 120)),
+          참고영상: x.benchmarkTitles.slice(0, 3).map((t) => safeText(t, [], 120)),
           대본: x.script ? `있음(${x.script.length.toLocaleString('ko-KR')}자)` : '',
           성과: linked ? `${perfOf(linked).label} · 조회 ${linked.views}` : x.link ? '올린 주소 있음(내 채널 숫자 없음)' : '',
         }

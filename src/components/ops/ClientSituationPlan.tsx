@@ -2,7 +2,7 @@
  * 업체 상세 '맞춤 추천' › 상황별 한 장 설계서 (D-242 · 로드맵 7단계).
  *
  * 대표 지시(고도화 목표 3): 계산기는 상황 예시로 — 한 번 누르면 그 업체 숫자로 설계까지.
- * 상황 하나(청년 채용 · 만 60세 이상 채용 · 연구소 만들기)와 사람 수만 고르면
+ * 상황 하나(청년 채용 · 만 60세 이상 채용 · 연구소 만들기 · 창업 5년 안 채용 — D-244)와 사람 수만 고르면
  * 고용지원금 · 세액공제 · 정책자금을 이 업체 숫자로 한 장에 모은다 — 세 화면을 따로 열어 더하지 않는다.
  *  1. 맨 위에 '1년 안에 받을 수 있는 돈'(크게) — 정책자금(대출)은 따로
  *  2. 모듈별 근거(같은 엔진) · 빠진 숫자 · 모듈 화면에서 이어서
@@ -28,6 +28,7 @@ import { buildSituationPlan, planSummary, situationChoices, type BlockState, typ
 
 const BLOCK_TONE: Record<BlockState, Tone> = { ok: 'success', need: 'warning', none: 'neutral' }
 const BLOCK_LABEL: Record<BlockState, string> = { ok: '계산됨', need: '받으면 계산', none: '해당 없음' }
+const NONE: ReadonlySet<string> = new Set()
 
 export function ClientSituationPlan({
   record,
@@ -45,25 +46,24 @@ export function ClientSituationPlan({
   focus?: { id: PlanId; n: number } | null
   /** 대표 답 저장(상황 예시와 같은 칸) — null 이면 지움(답 바꾸기) */
   onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void | Promise<unknown>
-  /** 업체 기록에 붙이기(고른 행동은 할 일로) — 저장되면 true */
-  onAttach: (plan: SituationPlan, actionIds: string[]) => Promise<boolean>
+  /** 업체 기록에 붙이기(고른 행동은 할 일로) — 저장되면 새로 건 할 일 수, 못 하면 false */
+  onAttach: (plan: SituationPlan, actionIds: string[]) => Promise<number | false>
   onRequestText?: (text: string) => void
 }) {
   const { showToast } = useToast()
   const choices = useMemo(() => situationChoices(record, today, usable), [record, today, usable])
   const [picked, setPicked] = useState<PlanId | null>(null)
   const [counts, setCounts] = useState<Partial<Record<PlanId, number>>>({})
-  /** 빼 둔 행동(기본은 모두 고름) — 상황 · 사람 수가 바뀌면 다시 모두 */
-  const [off, setOff] = useState<Set<string>>(new Set())
+  /** 빼 둔 행동(기본은 모두 고름) — 어느 상황 · 사람 수의 것인지 함께(D-244: 바뀌면 저절로 다시 모두 — 답한 뒤 판이 바뀌어도 앞 체크가 따라가지 않게) */
+  const [offBy, setOffBy] = useState<{ key: string; ids: ReadonlySet<string> }>({ key: '', ids: new Set() })
   const [busy, setBusy] = useState(false)
-  const [attached, setAttached] = useState<{ key: string; todos: number } | null>(null)
+  const [attached, setAttached] = useState<{ key: string; todos: number; asked: number } | null>(null)
   const [printing, setPrinting] = useState(false)
   const answering = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!focus) return
     setPicked(focus.id)
-    setOff(new Set())
     openFold('smart.plan')
     requestAnimationFrame(() => boxRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
   }, [focus])
@@ -73,21 +73,25 @@ export function ClientSituationPlan({
   const plan = useMemo(() => (def ? buildSituationPlan(def.id, record, today, count) : null), [def, record, today, count])
   if (!def || !plan || !current) return null
   const key = `${plan.id}:${plan.count}`
+  const off = offBy.key === key ? offBy.ids : NONE
+  const toggleOff = (id: string) =>
+    setOffBy((s) => {
+      const n = new Set(s.key === key ? s.ids : NONE)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return { key, ids: n }
+    })
   const chosen = plan.actions.filter((a) => !off.has(a.id)).map((a) => a.id)
   const fit = plan.fit
   const showPlan = fit.kind !== 'no'
 
-  const pick = (id: PlanId) => {
-    setPicked(id)
-    setOff(new Set())
-  }
-  const setCount = (n: number) => {
-    setCounts((c) => ({ ...c, [def.id]: n }))
-    setOff(new Set())
-  }
+  const pick = (id: PlanId) => setPicked(id)
+  const setCount = (n: number) => setCounts((c) => ({ ...c, [def.id]: n }))
   const answer = async (q: QuestionKey, a: 'yes' | 'no' | null) => {
     if (!onAnswer || answering.current) return
     answering.current = true
+    // D-244: 답하면 고르는 판 순서가 바뀐다 — 고르지 않은 채 맨 앞 상황에 답해도 그 상황에 머문다(예전엔 다른 상황으로 넘어가 '답 바꾸기' 를 못 봤다)
+    setPicked(def.id)
     setBusy(true)
     try {
       await onAnswer(q, a)
@@ -100,19 +104,25 @@ export function ClientSituationPlan({
     if (busy) return
     setBusy(true)
     try {
-      if (await onAttach(plan, chosen)) setAttached({ key, todos: chosen.length })
+      const n = await onAttach(plan, chosen)
+      if (n !== false) setAttached({ key, todos: n, asked: chosen.length })
     } finally {
       setBusy(false)
     }
   }
   const print = () => {
     // 인쇄 종이는 찍는 동안만 둔다 — 늘 두면 이 화면의 다른 인쇄(서류 · 보고서)가 이 종이만 찍는다(index.css .print-document)
+    // D-244: 휴대폰 크롬은 print() 가 바로 돌아온다 — 다 찍은 뒤(afterprint)에 치운다 · 그 신호가 없는 브라우저는 1분 뒤
     flushSync(() => setPrinting(true))
-    try {
-      window.print()
-    } finally {
+    let timer = 0
+    const done = () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', done)
       setPrinting(false)
     }
+    window.addEventListener('afterprint', done)
+    timer = window.setTimeout(done, 60_000)
+    window.print()
   }
   const copy = async () => {
     showToast((await copyText(planSummary(plan, record.companyName))) ? '설계서 요약을 복사했어요 — 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')
@@ -226,6 +236,7 @@ export function ClientSituationPlan({
                   .filter((b) => b.state === 'ok' && b.won > 0)
                   .map((b) => `${b.label} ${b.amount}`)
                   .join(' + ') || '계산된 금액이 아직 없어요'}
+                {plan.blocks.some((b) => b.key === 'startup' && b.state === 'ok') ? ' · 창업감면은 판정만(금액은 세무사와)' : ''}
                 {plan.blocks.some((b) => b.key === 'policy') ? ' · 정책자금(대출)은 따로' : ''}
               </span>
             </div>
@@ -247,19 +258,7 @@ export function ClientSituationPlan({
                   return (
                     <li key={a.id}>
                       <label className="tap flex min-w-0 cursor-pointer items-start gap-2.5 rounded-(--radius-control) px-1 py-1 hover:bg-slate-50" data-testid="plan-action" data-id={a.id} data-on={on ? '1' : '0'}>
-                        <input
-                          type="checkbox"
-                          checked={on}
-                          onChange={() =>
-                            setOff((s) => {
-                              const n = new Set(s)
-                              if (n.has(a.id)) n.delete(a.id)
-                              else n.add(a.id)
-                              return n
-                            })
-                          }
-                          className="mt-1 size-4 shrink-0"
-                        />
+                        <input type="checkbox" checked={on} onChange={() => toggleOff(a.id)} className="mt-1 size-4 shrink-0" />
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="t-sub break-keep text-slate-900 [overflow-wrap:anywhere]">
                             <b className="mr-1 font-semibold text-slate-500">{i + 1}.</b>
@@ -296,7 +295,8 @@ export function ClientSituationPlan({
             {attached?.key === key && (
               <p className="t-sub flex flex-wrap items-center gap-x-2 break-keep text-success-800" role="status" data-testid="plan-attached">
                 <Check aria-hidden="true" className="size-4 shrink-0" />
-                업체 기록에 붙였어요{attached.todos ? ` — 할 일 ${attached.todos}개가 달력에 올라갔어요` : ''}.
+                업체 기록에 붙였어요
+                {attached.todos ? ` — 할 일 ${attached.todos}개가 달력에 올라갔어요` : attached.asked ? ' — 고른 할 일은 앞서 붙일 때 이미 걸려 있어 다시 걸지 않았어요' : ''}.
                 <Link to="?tab=overview#tool-results" className="tap font-semibold text-brand-700 hover:underline" data-testid="plan-attached-go">
                   도구 결과에서 보기
                 </Link>
@@ -318,7 +318,8 @@ function PlanBlockRow({ b }: { b: PlanBlock }) {
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3" data-testid="plan-block" data-key={b.key} data-state={b.state}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="t-card font-bold text-slate-900">{b.label}</span>
-        <Badge tone={BLOCK_TONE[b.state]}>{BLOCK_LABEL[b.state]}</Badge>
+        {/* D-244: 창업감면은 금액 없이 판정만 — '계산됨' 대신 '판정됨' */}
+        <Badge tone={BLOCK_TONE[b.state]}>{b.key === 'startup' && b.state === 'ok' ? '판정됨' : BLOCK_LABEL[b.state]}</Badge>
         {b.amount && (
           <span className="t-sub ml-auto font-bold break-keep text-success-700" data-testid="plan-block-amount">
             {b.amount}

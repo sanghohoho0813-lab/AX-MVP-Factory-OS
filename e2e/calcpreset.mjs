@@ -7,6 +7,7 @@
  *        · 넣은 가정 칩 · [가정 빼기] · 칸을 고치면 그 칩은 사라짐 · '상황 예시로 바로' 단추로 같은 계산기 다른 상황
  *        · 06 증자: 자녀 줄 신주 20% · 인수가 = 액면가 · 시가 = 09 식 · 06 감자: 대표 줄 30%
  *        · 주주명부 없는 업체: 상황 값만 넣고 '주주명부가 없어' 안내 · 업체 없이 연 계산기엔 상황 단추 없음
+ *  D-244  처음 연 06 [가정 빼기] → 업체 주주명부(예시 주주로 안 바뀜) · 직접 적은 칸을 상황 단추가 바꿔도 [가정 빼기]로 돌아옴
  *  360 · 390 × 1.0 · 1.30  가로 넘침 0 · 상황 단추 · 가정 빼기 44px · 단추 글자 넘침 0
  *
  *   node e2e/calcpreset.mjs http://localhost:4390 [스크린샷 폴더]
@@ -154,6 +155,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.reload({ waitUntil: 'networkidle' })
   await page.locator('[data-block="w2_out"]').waitFor()
   check('새로고침해도 칸 값은 남음(업체별 저장) · 상황 알림은 다시 덮지 않음', (await page.locator('#w2_amount').inputValue()) === '300,000,000' && (await page.getByTestId('calc-preset-note').count()) === 0)
+  // D-244 상황 단추가 업체 숫자로 다시 채운 칸(예전에 직접 적은 소득금액)도 [가정 빼기]로 돌아옴
+  await page.locator('#w2_income').fill('123,456,789')
+  await page.locator('#w2_income').blur()
+  await page.waitForTimeout(200)
+  await page.locator('[data-testid="calc-preset"][data-id="calc-t7-forgive"]').click()
+  await page.waitForFunction(() => document.querySelector('#w2_income')?.value === '400,000,000')
+  await page.getByTestId('preset-clear').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="calc-preset-note"]')?.getAttribute('data-cleared') === '1')
+  check('직접 적은 소득금액(123,456,789)을 상황 단추가 업체 숫자로 바꿔도 [가정 빼기]로 돌아옴', (await page.locator('#w2_income').inputValue()) === '123,456,789', await page.locator('#w2_income').inputValue())
 
   // 06 증자 — 자녀 줄 신주 20% · 인수가 = 액면가
   await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t8&s=x1&preset=calc-t8-issue')
@@ -164,6 +174,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('06 증자 — 주주 표 = 주주명부 · 김자녀 신주 20,000(10만 주의 20%) · 인수가 5,000(액면가) · 시가 = 09 식(액면가보다 큼)', x1.length === 3 && kid && kid[3] === '20,000' && (await page.locator('#x1_issue').inputValue()) === '5,000' && fair > 5000, JSON.stringify(x1))
   const judge = await page.locator('table[data-table="x1_judge"] tbody tr').allInnerTexts()
   check('06 증자 판정 표에 김자녀 한 줄', judge.length === 1 && judge[0].includes('김자녀'), judge.join(' | '))
+  // D-244 처음 연 06 에서 [가정 빼기] — 주주 표는 이 업체 주주명부(신주만 0) · 계산기 예시 주주(김XX)로 바뀌지 않음
+  await page.getByTestId('preset-clear').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="calc-preset-note"]')?.getAttribute('data-cleared') === '1')
+  const x1c = await rowsOf(page, 'x1_rows')
+  check('06 처음 연 계산기에서 [가정 빼기] → 주주 표는 업체 주주명부 그대로 · 김자녀 신주 0 · 예시 주주(김XX) 없음', x1c.length === 3 && x1c.every((r) => !r[0].includes('XX')) && x1c.find((r) => r[0] === '김자녀')?.[3] === '0', JSON.stringify(x1c))
   const btn8 = await page.getByTestId('calc-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
   check('06 상황 단추 — 자녀만 증자 · 대표만 감자', JSON.stringify(btn8) === JSON.stringify(['calc-t8-issue', 'calc-t8-reduce']), JSON.stringify(btn8))
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/calc-1440-t8-issue.png`, fullPage: false })

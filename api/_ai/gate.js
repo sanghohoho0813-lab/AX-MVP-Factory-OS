@@ -8,6 +8,7 @@ const CAP = 'can_use_owner_ai_workspace'
 const SUPA_URL_NAMES = ['SUPABASE_URL', 'VITE_SUPABASE_URL']
 const SUPA_ANON_NAMES = ['SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY']
 const MAX_BODY = 256 * 1024
+const AUTH_TIMEOUT_MS = 4000
 
 function envAny(names) {
   for (const n of names) {
@@ -43,8 +44,11 @@ export async function whoCan(req) {
   const hit = authCache.get(token)
   if (hit && hit.until > Date.now()) return hit.value
   let value
+  // D-244: 로그인 · 권한 확인 두 번을 합쳐 4초까지 — 모델 대기(최대 55초)와 더해도 함수 한도(60초) 안
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), AUTH_TIMEOUT_MS)
   try {
-    const ur = await fetch(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${token}` } })
+    const ur = await fetch(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: ctrl.signal })
     const u = ur.ok ? await ur.json() : null
     if (!u || typeof u.id !== 'string' || !u.id) value = { ok: false, status: 401, code: 'login_required' }
     else {
@@ -52,6 +56,7 @@ export async function whoCan(req) {
         method: 'POST',
         headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_cap: CAP }),
+        signal: ctrl.signal,
       })
       if (cr.status === 404) value = { ok: false, status: 403, code: 'db_setup_needed' }
       else {
@@ -60,7 +65,10 @@ export async function whoCan(req) {
       }
     }
   } catch {
-    return { ok: false, status: 503, code: 'setup_needed' }
+    // 시간 초과는 '설정 필요' 가 아니다(D-244)
+    return ctrl.signal.aborted ? { ok: false, status: 504, code: 'auth_unreachable' } : { ok: false, status: 503, code: 'setup_needed' }
+  } finally {
+    clearTimeout(timer)
   }
   authCache.set(token, { until: Date.now() + 60_000, value })
   if (authCache.size > 200) authCache.delete(authCache.keys().next().value)

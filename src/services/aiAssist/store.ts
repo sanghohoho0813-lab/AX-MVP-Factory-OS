@@ -8,6 +8,8 @@ import type { AssistSection } from './context'
 const CHOICE_KEY = 'axmvp.ai.choice.v1'
 const HISTORY_KEY = 'axmvp.ai.history.v1'
 const PER_PAGE = 6
+/** D-244 모델을 바꾸면 같은 화면의 다른 AI 도우미도 따라 바꾸게 알리는 이름 */
+export const CHOICE_EVENT = 'axmvp:ai-choice'
 
 export interface AiChoice {
   provider: ProviderId
@@ -31,6 +33,11 @@ export function saveChoice(c: AiChoice | null): void {
   } catch {
     // 저장 못 해도 이번 화면에서는 그대로 쓴다
   }
+  try {
+    window.dispatchEvent(new CustomEvent(CHOICE_EVENT, { detail: c }))
+  } catch {
+    // 알림을 못 보내도 이 도우미는 그대로
+  }
 }
 
 export interface HistoryEntry {
@@ -48,6 +55,10 @@ export interface HistoryEntry {
   ids?: Record<string, string>
   /** D-241 이어 쓰기(예: 고른 기획으로 대본) — 무엇을 이어 썼는지 · 다시 만들 때 같은 자료로 */
   follow?: FollowMeta
+  /** D-244 별칭(영업자 A) → 실제 이름(이 브라우저에만) */
+  aliases?: Record<string, string>
+  /** D-244 [할 일로 넣기] 를 마친 항목('item:0' · 'next:1') — 판을 다시 열어도 같은 할 일을 또 넣지 않게 */
+  done?: string[]
 }
 
 export interface FollowMeta {
@@ -89,6 +100,20 @@ export function pushHistory(e: HistoryEntry): void {
       // 가득 차면 이번 답은 화면에만
     }
   }
+}
+
+/** D-244 이 답의 이 항목은 했음 — 저장된 지난 답에 적는다. 고친 답(없으면 null) */
+export function markDone(requestId: string, key: string): HistoryEntry | null {
+  const all = readAll()
+  const hit = all.find((x) => x.run.requestId === requestId)
+  if (!hit) return null
+  if (!(hit.done ?? []).includes(key)) hit.done = [...(hit.done ?? []), key].slice(-100)
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(all))
+  } catch {
+    // 가득 차면 이번 화면에서만 기억
+  }
+  return hit
 }
 
 /** 자료 지문 — 같은 자료면 같은 글자(짧게) */

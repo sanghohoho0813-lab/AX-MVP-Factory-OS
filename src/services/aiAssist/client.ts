@@ -94,10 +94,26 @@ const MESSAGE: Record<string, string> = {
   provider_unreachable: 'AI 답을 받지 못했습니다(시간 초과). 다시 눌러 주세요.',
   provider_error: 'AI 쪽 오류로 답을 받지 못했습니다. 다시 눌러 주세요.',
   network: '서버에 닿지 못했습니다. 인터넷 연결을 확인해 주세요.',
+  auth_unreachable: '로그인 확인이 늦어 멈췄습니다. 잠시 뒤 다시 눌러 주세요.',
+  not_deployed: 'AI 서버 함수가 없는 곳입니다(로컬 미리보기 등). 배포된 주소에서 눌러 주세요.',
 }
 
 export function assistMessage(code: string): string {
   return MESSAGE[code] ?? MESSAGE.provider_error
+}
+
+/**
+ * D-244 JSON 이 아닌 오류(Vercel 504 · 502 · 413 화면 등) → 상태 번호로. 예전엔 모두 '키가 아직' 이라 키를 다시 넣게 했다.
+ * '키 설정 필요(setup_needed)' 는 서버가 그렇게 말할 때만.
+ */
+export function codeOfStatus(status: number): string {
+  if (status === 502 || status === 503 || status === 504) return 'provider_unreachable'
+  if (status === 413) return 'too_large'
+  if (status === 401) return 'login_required'
+  if (status === 403) return 'forbidden'
+  if (status === 429) return 'rate_limited'
+  if (status === 404 || status === 405) return 'not_deployed'
+  return 'provider_error'
 }
 
 async function authHeader(): Promise<Record<string, string>> {
@@ -111,7 +127,7 @@ async function authHeader(): Promise<Record<string, string>> {
   }
 }
 
-/** 서버 함수가 없는 곳(로컬 미리보기)은 화면 HTML 이 돌아온다 — '키 설정 필요' 로 */
+/** 서버 함수가 없는 곳(로컬 미리보기)은 화면 HTML 이 돌아온다 — '서버 함수 없음' 으로(D-244: 예전엔 '키 설정 필요') */
 function notJson(res: Response): boolean {
   return !/json/i.test(res.headers.get('content-type') ?? '')
 }
@@ -121,7 +137,8 @@ async function readError(res: Response): Promise<AssistError> {
   try {
     body = await res.json()
   } catch {
-    return new AssistError('setup_needed', MESSAGE.setup_needed)
+    const code = codeOfStatus(res.status)
+    return new AssistError(code, assistMessage(code))
   }
   const code = typeof body.code === 'string' ? body.code : 'provider_error'
   return new AssistError(code, assistMessage(code), Array.isArray(body.missing) ? body.missing.map(String) : [])
@@ -135,7 +152,7 @@ export async function fetchAssistStatus(withModels = false): Promise<AssistStatu
     throw new AssistError('network', MESSAGE.network)
   }
   if (!res.ok) throw await readError(res)
-  if (notJson(res)) throw new AssistError('setup_needed', MESSAGE.setup_needed)
+  if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as AssistStatus & { ok: boolean }
   return { providers: Array.isArray(b.providers) ? b.providers : [], defaultChoice: b.defaultChoice }
 }
@@ -152,7 +169,7 @@ export async function callAssist(req: { requestId: string; assistId: string; pag
     throw new AssistError('network', MESSAGE.network)
   }
   if (!res.ok) throw await readError(res)
-  if (notJson(res)) throw new AssistError('setup_needed', MESSAGE.setup_needed)
+  if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as { ok: boolean; run?: AssistRun }
   if (!b || !b.run) throw new AssistError('provider_error', MESSAGE.provider_error)
   return b.run

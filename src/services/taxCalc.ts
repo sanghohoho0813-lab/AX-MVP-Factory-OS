@@ -918,7 +918,9 @@ function calc6p3(v: Values): Output {
 /* 7. 특정법인 증여의제                                                  */
 /* ------------------------------------------------------------------ */
 
+// D-244: 소득이 0 이하(결손)면 법인세도 0 — 예전엔 음수 세금이 나와 결손 법인 채무면제 · 증여 이익이 부풀었다
 export function corpTaxNational(x: number): number {
+  if (!(x > 0)) return 0
   if (x <= 200000000) return x * 0.09
   if (x <= 20000000000) return x * 0.19 - 20000000
   if (x <= 300000000000) return x * 0.21 - 420000000
@@ -926,6 +928,7 @@ export function corpTaxNational(x: number): number {
 }
 
 export function corpTaxLocal(x: number): number {
+  if (!(x > 0)) return 0
   if (x <= 200000000) return x * 0.1
   if (x <= 20000000000) return x * 0.2 - 20000000
   if (x <= 300000000000) return x * 0.22 - 420000000
@@ -949,7 +952,9 @@ function shareholdersOf(v: Values) {
   const qtys = list.map((r) => cleanNum(r.qty) || 0)
   const total = qtys.reduce((a, b) => a + b, 0)
   const ratios = qtys.map((q) => (total > 0 ? q / total : 0))
-  return { names, cats, qtys, ratios, maxRatio: Math.max(...ratios), total }
+  // D-244: '여러 명 합침' 줄(업체 숫자로 채울 때 10명 넘는 주주)은 한 사람이 아니라 최대주주 지분율에서 뺀다
+  const single = ratios.filter((_, i) => !cats[i].startsWith('여러 명 합침'))
+  return { names, cats, qtys, ratios, maxRatio: Math.max(0, ...single), total }
 }
 
 function judgeTable(id: string, title: string, sh: ReturnType<typeof shareholdersOf>, unitGiftAmount: number): TableOut {
@@ -1006,7 +1011,7 @@ function calc7w2(v: Values): Output {
   const w2taxBefore = corpTaxLocal(w2income)
   const w2taxAfter = corpTaxLocal(w2after)
   const w2taxIncrease = w2taxAfter - w2taxBefore
-  const w2corpEquiv = w2taxAfter * Math.min(w2amount / w2after, 1)
+  const w2corpEquiv = w2after > 0 ? w2taxAfter * Math.min(w2amount / w2after, 1) : 0
   const w2net = w2amount - w2corpEquiv
   const w2limit =
     sh.maxRatio > 0
@@ -1014,7 +1019,7 @@ function calc7w2(v: Values): Output {
           (a) => {
             const after = w2income + a
             const tax = corpTaxLocal(after)
-            const equiv = tax * Math.min(a / after, 1)
+            const equiv = after > 0 ? tax * Math.min(a / after, 1) : 0
             return (a - equiv) * sh.maxRatio
           },
           100000000,
@@ -1052,7 +1057,7 @@ function calc7w3(v: Values): Output {
   const w3taxBefore = corpTaxLocal(w3income)
   const w3taxAfter = corpTaxLocal(w3after)
   const w3taxIncrease = w3taxAfter - w3taxBefore
-  const w3corpEquiv = w3taxAfter * Math.min(w3amount / w3after, 1)
+  const w3corpEquiv = w3after > 0 ? w3taxAfter * Math.min(w3amount / w3after, 1) : 0
   const w3net = w3amount - w3corpEquiv
   const w3limit =
     sh.maxRatio > 0
@@ -1060,7 +1065,7 @@ function calc7w3(v: Values): Output {
           (a) => {
             const after = w3income + a
             const tax = corpTaxLocal(after)
-            const equiv = tax * Math.min(a / after, 1)
+            const equiv = after > 0 ? tax * Math.min(a / after, 1) : 0
             return (a - equiv) * sh.maxRatio
           },
           100000000,

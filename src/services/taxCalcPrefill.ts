@@ -57,8 +57,11 @@ export function t7Category(r: ShareholderRow, top: ShareholderRow | null): strin
 
 /** 05 주주 표 — 10명이 넘으면 9명 + '그 외 n명'(지분율 합이 맞게) */
 export function t7ShareRows(reg: readonly ShareholderRow[]): RowValues[] {
-  const list = holdersWithShares(reg)
   const top = controllingHolder(reg)
+  // D-244: 10명이 넘으면 지배주주 · 친족을 먼저(합친 줄에 묻히지 않게) · 나머지는 주식 많은 순 — 10명까지는 명부 순서 그대로
+  const rank = (r: ShareholderRow) => (top && r.id === top.id ? 0 : r.relation === 'ceo' || FAMILY.has(r.relation) ? 1 : 2)
+  const all = holdersWithShares(reg)
+  const list = all.length > T7_ROWS ? [...all].sort((a, b) => rank(a) - rank(b) || b.shares - a.shares) : all
   const shown = list.length > T7_ROWS ? list.slice(0, T7_ROWS - 1) : list
   const rows: RowValues[] = shown.map((r) => ({ name: r.name.trim() || '이름 없음', cat: t7Category(r, top), qty: s(r.shares) }))
   if (list.length > T7_ROWS) {

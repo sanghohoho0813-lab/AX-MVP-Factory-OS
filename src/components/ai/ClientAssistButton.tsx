@@ -16,5 +16,5 @@ export function ClientAssistButton({ record, today }: { record: ClientOpsRecord;
     () => clientBundle(record, today, buildInsights(record, today, [], (k) => k === 'grants' || ent.feature(k).usable), buildClientSchedule(record, today)),
     [record, today, ent],
   )
-  return <AiAssist variant="button" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={build} />
+  return <AiAssist variant="button" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={build} defaultClientId={record.id} />
 }

@@ -6,18 +6,19 @@
 import handler, { __resetAiAssistState } from '../../../api/ai-assist.js'
 import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, RADAR_RULES, assistSystem, buildAssistPrompt } from '../../../api/_ai/assists.js'
-import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf } from '../../../api/_ai/providers.js'
-import { aiConfig, validate } from '../../../api/_ai/core.js'
+import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, tierOf } from '../../../api/_ai/providers.js'
+import { aiConfig, scrubText, validate } from '../../../api/_ai/core.js'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
-import { betterModel, dueFromWhen, isSamePage, refLabel, todoText } from '../aiAssist/actions'
-import type { AssistStatus } from '../aiAssist/client'
+import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
+import { AssistError, callAssist } from '../aiAssist/client'
+import type { AssistRun, AssistStatus } from '../aiAssist/client'
 import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan, radarVideos } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
 import { agentsBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, radarBundle, salesBundle } from '../aiAssist/builders'
-import { contextHash } from '../aiAssist/store'
+import { contextHash, historyOf, markDone, pushHistory } from '../aiAssist/store'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { CustomerEvent } from '../../types/bridge'
@@ -240,6 +241,47 @@ async function serverTests() {
     })()
     check('S21 예전 OpenAI 설정(AI_MODEL_*)이 다 있으면 예전 그대로', legacy.legacy === true && legacy.models.deep === 'm-d' && legacy.missing.length === 0)
   }
+  // D-244 직접 적은 질문 · 깊게 하루 한도 · JSON 아닌 오류
+  setEnv()
+  {
+    const ask = '김대표 kim.dae@corp.co.kr · 9001011234567 · 900101 1234567 · 02-123-4567 · 031-1234-5678 · +82 10-1234-5678 · +82-2-123-4567 확인'
+    const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX, ask })
+    const sent = JSON.stringify(calls.find((c) => c.url.includes(':generateContent'))?.body ?? {})
+    check('S22 직접 적은 질문(ask) — 이메일 · 붙은/띄운 주민번호 · 유선 전화 · +82 번호를 서버가 한 번 더 가림',
+      r.statusCode === 200 && !/kim\.dae@|9001011234567|900101 1234567|123-4567|1234-5678|\+82/.test(sent) && sent.includes('[가림:이메일]') && sent.includes('[가림:주민번호]') && sent.includes('[가림:전화]'), sent.slice(0, 800))
+  }
+  setEnv({ AI_RATE_DEEP_PER_DAY: '1' })
+  {
+    const deep = { provider: 'gemini', model: 'gemini-4-argon' }
+    const d1 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: deep, context: CTX })
+    const d2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: deep, context: CTX })
+    const c3 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'gemini', model: 'gemini-3.1-flash-lite' }, context: CTX })
+    check('S23 깊게 모델은 깊게 하루 한도로 셈(예전엔 모두 cheap) — 한도 1 → 두 번째 429 · 싼 모델은 그대로', d1.statusCode === 200 && d2.statusCode === 429 && c3.statusCode === 200, [d1.statusCode, d2.statusCode, c3.statusCode])
+    check('S24 모델 단계 — 목록 tier · 단계 없는 모델은 가격으로(3.1 Pro 미리보기 · Fable → 깊게 · 3.6 Flash → 보통 · 2.5 Flash-Lite → 빠르게) · 모르는 모델 cheap',
+      tierOf('gemini', 'gemini-4-argon') === 'deep' && tierOf('gemini', 'gemini-3.1-pro-preview') === 'deep' && tierOf('anthropic', 'claude-fable-5-1') === 'deep' && tierOf('gemini', 'gemini-3.6-flash') === 'standard' && tierOf('gemini', 'gemini-2.5-flash-lite') === 'cheap' && tierOf('gemini', 'gemini-9-x') === 'cheap')
+  }
+  setEnv()
+  {
+    const codeOf = async (status: number, body: string) => {
+      reply = () => ({ status, body })
+      try {
+        await callAssist({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: null, context: CTX as never })
+        return 'ok'
+      } catch (e) {
+        return e instanceof AssistError ? e.code : 'other'
+      }
+    }
+    const got = [
+      await codeOf(504, 'An error occurred with your deployment FUNCTION_INVOCATION_TIMEOUT'),
+      await codeOf(502, '<html>Bad gateway</html>'),
+      await codeOf(413, 'Request Entity Too Large'),
+      await codeOf(401, 'Unauthorized'),
+      await codeOf(404, '<html>Not found</html>'),
+      await codeOf(503, JSON.stringify({ ok: false, code: 'setup_needed', missing: ['GEMINI_API_KEY'] })),
+    ]
+    check("S25 JSON 아닌 오류는 상태 번호로(504 · 502 → 시간 초과/연결 · 413 → 너무 큼 · 401 → 로그인 · 404 → 서버 함수 없음) · '키 설정 필요' 는 서버가 말할 때만",
+      JSON.stringify(got) === JSON.stringify(['provider_unreachable', 'provider_unreachable', 'too_large', 'login_required', 'not_deployed', 'setup_needed']), got)
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -275,7 +317,32 @@ function bundleTests() {
   check('B7 상담신청 — 회사 · 문의는 보내고 이름 · 전화 · 이메일 칸은 읽지도 않음', ib.includes('새싹기업') && ib.includes('정책자금 상담') && !/홍길동|1111-2222|a@b\.c/.test(ib), ib.slice(0, 400))
   const agentRec = rec({ companyName: '정산상사', fees: [{ id: 'f1', label: '정책자금 성공보수', amount: 10_000_000, dueDate: '2026-11-01', receivedAt: '2026-10-01', agentName: '박영업', agentFee: 2_000_000, agentPaidAt: null }] as never })
   const ab = agentsBundle([agentRec], today)
-  check('B8 영업자 정산 — 영업자별 줄 돈 · 항목 · 올해 준 돈', JSON.stringify(ab.context).includes('박영업') && JSON.stringify(ab.context).includes('200만원') && (ab.context.facts ?? []).some((f) => f.includes('올해')))
+  const abText = JSON.stringify(ab.context)
+  check('B8 영업자 정산 — 영업자별 줄 돈 · 항목 · 올해 준 돈 · 영업자 이름은 별칭(영업자 A)으로만 · 별칭 → 이름은 브라우저에만(aliases)',
+    abText.includes('영업자 A') && !abText.includes('박영업') && abText.includes('200만원') && (ab.context.facts ?? []).some((f) => f.includes('올해')) && ab.aliases?.['영업자 A'] === '박영업', abText.slice(0, 400))
+  {
+    const two = rec({ companyName: '둘상사', fees: [{ id: 'f1', label: '성공보수 최영업 소개', amount: 10_000_000, dueDate: '2026-11-01', receivedAt: '2026-10-01', agentName: '최영업', agentFee: 3_000_000, agentPaidAt: null }, { id: 'f2', label: '착수금', amount: 2_000_000, dueDate: '2026-11-01', receivedAt: null, agentName: '김영업', agentFee: 200_000, agentPaidAt: null }] as never })
+    const tb = agentsBundle([two], today)
+    const t = JSON.stringify(tb.context)
+    const back = unaliasAnswer({ headline: '영업자 A 에게 먼저', items: [{ title: '영업자B 정산', detail: '영업자 A · 영업자 B' }], next: ['영업자 B 에게 전화'] }, tb.aliases)
+    check('B12 별칭은 가나다순(줄 돈 순서와 무관 — 같은 사람들이면 같은 별칭) · 항목 글 속 영업자 이름도 가림 · 답을 보여 줄 때만 이름으로 되돌림',
+      tb.aliases?.['영업자 A'] === '김영업' && tb.aliases?.['영업자 B'] === '최영업' && !/최영업|김영업/.test(t) && back?.headline === '김영업 에게 먼저' && back?.items[0].title === '최영업 정산' && back?.items[0].detail === '김영업 · 최영업' && back?.next?.[0] === '최영업 에게 전화', { aliases: tb.aliases, back })
+  }
+  {
+    const pii = '메일 kim.dae@corp.co.kr · 주민 9001011234567 · 띄움 900101 1234567 · 유선 02-123-4567 · 031-1234-5678 · 괄호 (02)123-4567 · 국제 +82 10-1234-5678 · +82-2-123-4567'
+    const keep = '수수료 1,234,567원 · 2026-10-19 · 사업자 123-45-67890 · 기한 2026.11.03 · 조회 1727654400000'
+    const leaked = (x: string) => /kim\.dae|9001011234567|900101 1234567|123-4567|1234-5678|\+82/.test(x)
+    const kept = (x: string) => ['1,234,567원', '2026-10-19', '123-45-67890', '2026.11.03', '1727654400000'].every((k) => x.includes(k))
+    const sv = scrubText(`${pii} / ${keep}`)
+    const st = safeText(`${pii} / ${keep}`, [], 1000)
+    check('B13 서버 scrubText — 이메일 · 붙은/띄운 주민번호 · 유선 전화 · +82 가림 · 금액 · 날짜 · 사업자번호 · 긴 숫자는 그대로', !leaked(sv) && kept(sv) && sv.includes('[가림:이메일]') && sv.includes('[가림:전화]'), sv)
+    check('B14 화면 safeText — 같은 모양을 같이 가림 · 금액 · 날짜 · 사업자번호는 그대로', !leaked(st) && kept(st) && st.includes('[가림:전화]'), st)
+  }
+  {
+    const riskRec = rec({ companyName: '걸림상사', status: 'waiting', sales: { stage: 'closing', expectedFee: 1_000_000, source: '', referrer: '', interests: [], concern: '', history: [], movedAt: '2026-10-01T00:00:00Z' } as never })
+    const sb = JSON.stringify(salesBundle([riskRec], today, [{ record: riskRec, reason: '담당 010-3333-4444 · kim@x.com 약속 지남', action: '연락하기' }]).context)
+    check('B15 영업 — 걸림돌 같은 규칙 글도 한 번 더 거름(연락처 · 이메일 없음)', sb.includes('약속 지남') && !/3333-4444|kim@x\.com/.test(sb), sb.slice(0, 400))
+  }
   const mb = moduleBundle({ today, records: [rec({ companyName: '모듈상사', employeeCount: '12' })], features: ['employment', 'labcare'], notices: [], usable: () => true, title: '고용 · 연구소' })
   check('B9 전문 모듈 → 고객 전체 — 업체 × 모듈 판정(규칙 계산 그대로) · 그 모듈만', mb.context.sections[0].rows.every((x) => ['고용지원금', '기업부설연구소', '연구소'].some((l) => String(x.모듈).includes(l)) || String(x.모듈).length > 0) && (mb.context.facts ?? []).some((f) => f.includes('규칙 계산')))
   check('B10 자료 지문 — 같은 자료면 같은 값 · 다르면 다른 값', contextHash('{"a":1}') === contextHash('{"a":1}') && contextHash('{"a":1}') !== contextHash('{"a":2}'))
@@ -306,13 +373,45 @@ function d241Tests() {
   check('D1 기한 — 날짜가 있으면 그날 · 지났으면 오늘 · 내일 · 모레 · 다음 주 · 그 밖 오늘',
     dueFromWhen('2026-10-25 마감', T) === '2026-10-25' && dueFromWhen('2026.11.3', T) === '2026-11-03' && dueFromWhen('2026-10-01', T) === T && dueFromWhen('내일 오전', T) === '2026-10-20' && dueFromWhen('모레', T) === '2026-10-21' && dueFromWhen('다음 주 중', T) === '2026-10-26' && dueFromWhen('', T) === T && dueFromWhen(undefined, T) === T,
     [dueFromWhen('2026.11.3', T), dueFromWhen('다음 주 중', T)])
+  {
+    const got = ['2026-13-45', '2026-11-31 마감', 'D-3', '마감 D-10', '10/25', '10/25(토)', '10월 25일까지', '3/2', '1월 5일', '10/19', '13/40', '2월 30일', '12/31'].map((w) => dueFromWhen(w, T))
+    check('D3 기한 — 없는 날짜(2026-13-45 · 2026-11-31 · 13/40 · 2월 30일)는 오늘 · D-3 · 10/25 · 10/25(토) · 10월 25일 · 지난 달/일은 내년',
+      JSON.stringify(got) === JSON.stringify([T, T, '2026-10-22', '2026-10-29', '2026-10-25', '2026-10-25', '2026-10-25', '2027-03-02', '2027-01-05', T, T, T, '2026-12-31']), got)
+  }
   check('D2 할 일 글 — 짧은 제목엔 설명 첫 문장을 붙이고 · 긴 제목은 그대로 · 200자 안',
     todoText({ title: '한솔 전화', detail: '서류 보완 안내. 다음 주 접수.' }) === '한솔 전화 — 서류 보완 안내.' && todoText({ title: '한솔정밀 정책자금 서류 보완 요청하기', detail: '자세히' }) === '한솔정밀 정책자금 서류 보완 요청하기' && todoText({ title: '가'.repeat(300) }).length === 200)
 
   // 더 잘 쓰는 모델로 다시
   const st = (configured: boolean): AssistStatus => ({ defaultChoice: { provider: 'gemini', model: 'g-cheap' }, providers: [{ id: 'gemini', label: 'Gemini', configured, keyName: 'GEMINI_API_KEY', checked: false, models: [{ id: 'g-cheap', label: '싼', note: '', price: null, verified: null, tier: 'cheap' }, { id: 'g-std', label: '보통', note: '', price: null, verified: null, tier: 'standard' }, { id: 'g-deep', label: '깊게', note: '', price: null, verified: null, tier: 'deep' }] }] })
-  check('M1 더 잘 쓰는 모델 — 빠르게 → 보통 → 깊게 · 가장 위면 없음 · 키 없으면 없음 · 목록에 없는 모델은 빠르게로 보고 보통',
-    betterModel(st(true), { provider: 'gemini', model: 'g-cheap' })?.model === 'g-std' && betterModel(st(true), { provider: 'gemini', model: 'g-std' })?.model === 'g-deep' && betterModel(st(true), { provider: 'gemini', model: 'g-deep' }) === null && betterModel(st(false), { provider: 'gemini', model: 'g-cheap' }) === null && betterModel(st(true), { provider: 'gemini', model: 'other' })?.model === 'g-std' && betterModel(null, { provider: 'gemini', model: 'g-cheap' }) === null)
+  check('M1 더 잘 쓰는 모델 — 빠르게 → 보통 → 깊게 · 가장 위면 없음 · 키 없으면 없음 · 목록에 없는(가격 모르는) 모델은 단추 없음(D-244)',
+    betterModel(st(true), { provider: 'gemini', model: 'g-cheap' })?.model === 'g-std' && betterModel(st(true), { provider: 'gemini', model: 'g-std' })?.model === 'g-deep' && betterModel(st(true), { provider: 'gemini', model: 'g-deep' }) === null && betterModel(st(false), { provider: 'gemini', model: 'g-cheap' }) === null && betterModel(st(true), { provider: 'gemini', model: 'other' }) === null && betterModel(null, { provider: 'gemini', model: 'g-cheap' }) === null)
+  {
+    const m = (id: string, price: [number, number] | null, tier: 'cheap' | 'standard' | 'deep' | null) => ({ id, label: id, note: '', price, verified: null, tier })
+    const st2: AssistStatus = { defaultChoice: { provider: 'gemini', model: 'g-cheap' }, providers: [{ id: 'gemini', label: 'Gemini', configured: true, keyName: 'GEMINI_API_KEY', checked: false, models: [m('g-cheap', [0.25, 1.5], 'cheap'), m('g-std', [0.75, 3.75], 'standard'), m('g-deep', [2, 10], 'deep'), m('g-old-lite', [0.1, 0.4], null), m('g-mid', [0.3, 2.5], null), m('g-pro', [2, 12], null), m('g-live', null, null)] }] }
+    const b = (model: string) => betterModel(st2, { provider: 'gemini', model })?.model ?? null
+    check('M2 단계 모르는 모델 — 가격으로 견줘 더 비싼 단계 모델 중 가장 싼 것 · 가장 비싸거나 가격을 모르면 단추 없음(더 약한 모델을 권하지 않음)',
+      b('g-old-lite') === 'g-cheap' && b('g-mid') === 'g-std' && b('g-pro') === null && b('g-live') === null, ['g-old-lite', 'g-mid', 'g-pro', 'g-live'].map(b))
+  }
+  check('T1 이미 있는 할 일(t# · 업무 일기)을 가리키는 줄엔 [할 일로 넣기] 없음 — 업체(c#) · 업무 일기가 아닌 t#(기한 화면)은 냄',
+    pointsAtTodo('t2', { t2: '/journal' }) && pointsAtTodo(' T3 ', {}) && !pointsAtTodo('c1', { c1: '/ops/clients/a' }) && !pointsAtTodo('t4', { t4: '/tools/employment' }) && !pointsAtTodo(undefined, {}))
+  {
+    const mem = new Map<string, string>()
+    ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, String(v)),
+      removeItem: (k: string) => void mem.delete(k),
+      clear: () => mem.clear(),
+      key: () => null,
+      length: 0,
+    }
+    const run = { requestId: 'as_done_000001', assistId: 'today.top3', page: 'today', provider: 'gemini', model: 'g', status: 'succeeded', structured: null, raw: '', usage: { input: 0, output: 0, total: 0 }, estimatedCostUsd: null, ms: 0, sent: { userChars: 0, rows: 0, rowsCut: 0 }, createdAt: '2026-10-19T00:00:00Z' } as AssistRun
+    pushHistory({ scope: 'today', assistId: 'today.top3', label: '오늘', ask: '', hash: 'h', run })
+    markDone(run.requestId, 'item:0')
+    markDone(run.requestId, 'item:0')
+    markDone(run.requestId, 'next:1')
+    const again = historyOf('today')[0]
+    check('H1 [할 일로 넣기] 한 항목은 지난 답에 적힘 — 판을 다시 열어 다시 읽어도 그대로 · 같은 것 한 번 · 없는 답이면 null', JSON.stringify(again?.done) === '["item:0","next:1"]' && markDone('as_no_such_0001', 'item:0') === null, again?.done)
+  }
 
   // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지
   const radarSys = assistSystem(ASSISTS['radar.top5'])

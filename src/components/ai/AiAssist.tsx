@@ -25,14 +25,14 @@ import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { createJournalEntry } from '../../services/journalService'
-import { betterModel, dueFromWhen, isSamePage, refKind, refLabel, todoText } from '../../services/aiAssist/actions'
+import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refKind, refLabel, todoText, unalias, unaliasAnswer } from '../../services/aiAssist/actions'
 import { AssistError, assistMessage, callAssist, fetchAssistStatus } from '../../services/aiAssist/client'
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
-import { normRef } from '../../services/aiAssist/context'
+import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
-import { contextHash, historyOf, newRequestId, pushHistory, readChoice, saveChoice } from '../../services/aiAssist/store'
+import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice } from '../../services/aiAssist/store'
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 
@@ -102,6 +102,8 @@ export interface AiAssistProps {
   record?: boolean
   /** 할 일을 넣은 뒤(그 화면 목록 다시 읽기) */
   onRecorded?: () => void
+  /** D-244 한 업체 화면 — 답 항목에 업체 번호(c#)가 없어도 [할 일로 넣기] 를 이 업체에 */
+  defaultClientId?: string
 }
 
 export function AiAssist(props: AiAssistProps) {
@@ -110,12 +112,24 @@ export function AiAssist(props: AiAssistProps) {
   return <AiAssistInner {...props} />
 }
 
-function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded }: AiAssistProps) {
+function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<AssistStatus | null>(null)
   const [choice, setChoice] = useState<AiChoice | null>(() => readChoice())
+  // D-244 한 화면에 도우미가 여럿이면(머리줄 단추 · 탭 띠) 한 곳에서 모델을 바꿔도 모두 따라오게 — 다른 탭에서 바꾼 것도
+  useEffect(() => {
+    // 알림에 담긴 선택을 그대로(저장 공간이 막혀도 같은 화면은 맞춘다) · 다른 탭은 저장된 것을 다시 읽는다
+    const fromEvent = (e: Event) => setChoice(((e as CustomEvent<AiChoice | null>).detail ?? null) as AiChoice | null)
+    const fromStorage = () => setChoice(readChoice())
+    window.addEventListener(CHOICE_EVENT, fromEvent)
+    window.addEventListener('storage', fromStorage)
+    return () => {
+      window.removeEventListener(CHOICE_EVENT, fromEvent)
+      window.removeEventListener('storage', fromStorage)
+    }
+  }, [])
   const [pendingRun, setPendingRun] = useState<string | null>(null)
   // 할 일을 넣었으면 판을 닫을 때 화면 목록을 다시 읽는다 — 열린 채 다시 읽으면 방금 답에 '자료가 바뀌었어요' 가 떠서
   const recorded = useRef(false)
@@ -188,6 +202,7 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
           itemActions={itemActions}
           resultActions={resultActions}
           record={record ?? RECORD_PAGES.has(page)}
+          defaultClientId={defaultClientId}
           onRecorded={() => {
             recorded.current = true
           }}
@@ -258,6 +273,7 @@ function AssistPanel({
   itemActions,
   resultActions,
   record,
+  defaultClientId,
   onRecorded,
   onClose,
 }: {
@@ -265,6 +281,7 @@ function AssistPanel({
   itemActions?: (assistId: string) => AssistItemAction[] | null
   resultActions?: (assistId: string) => AssistResultAction[] | null
   record: boolean
+  defaultClientId?: string
   onRecorded?: () => void
   page: AssistPage
   scope: string
@@ -331,8 +348,10 @@ function AssistPanel({
         const hash = contextHash(JSON.stringify(bundle.context))
         setNowHash(hash)
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : bundle.context
-        const runResult: AssistRun = await callAssist({ requestId: newRequestId(), assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: askText })
-        const entry = { scope, assistId: preset.id, label: opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.label, ask: askText, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(opts.follow ? { follow: opts.follow } : {}) }
+        // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
+        const masked = askText ? safeText(askText, [], 500) : ''
+        const runResult: AssistRun = await callAssist({ requestId: newRequestId(), assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
+        const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label: opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
         setShown(entry)
@@ -376,6 +395,15 @@ function AssistPanel({
   )
 
   const better = useMemo(() => (shown ? betterModel(status, shown.run) : null), [status, shown])
+
+  // D-244 할 일로 넣은 항목을 지난 답에 적었으면 목록 · 보이는 답을 새것으로(다시 눌러도 같은 할 일이 두 번 안 생기게)
+  const onMarked = useCallback(
+    (updated: HistoryEntry) => {
+      setHistory(historyOf(scope))
+      setShown((s) => (s && s.run.requestId === updated.run.requestId ? { ...s, done: updated.done } : s))
+    },
+    [scope],
+  )
 
   // 띠의 질문 단추로 열었으면 바로 묻는다(한 번만)
   useEffect(() => {
@@ -503,7 +531,9 @@ function AssistPanel({
                   itemActions={itemActions?.(shown.assistId) ?? []}
                   resultActions={resultActions?.(shown.assistId) ?? []}
                   record={record}
+                  defaultClientId={defaultClientId}
                   onRecorded={onRecorded}
+                  onMarked={onMarked}
                   toast={showToast}
                 />
               </div>
@@ -736,22 +766,28 @@ interface ResultViewProps {
   itemActions: AssistItemAction[]
   resultActions: AssistResultAction[]
   record: boolean
+  defaultClientId?: string
   onRecorded?: () => void
+  onMarked?: (updated: HistoryEntry) => void
   toast: (msg: string) => void
 }
 
-function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose, onCopied, onSaveItem, onSaved, ctx, itemActions, resultActions, record, onRecorded, toast }: ResultViewProps) {
+function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose, onCopied, onSaveItem, onSaved, ctx, itemActions, resultActions, record, defaultClientId, onRecorded, onMarked, toast }: ResultViewProps) {
   const { run } = entry
-  const a = run.structured
+  // D-244 별칭(영업자 A)은 보여 줄 때 실제 이름으로 — 이 브라우저에서만
+  const a = useMemo(() => unaliasAnswer(run.structured, entry.aliases), [run.structured, entry.aliases])
+  const raw = useMemo(() => unalias(run.raw, entry.aliases), [run.raw, entry.aliases])
+  const done = useMemo(() => new Set(entry.done ?? []), [entry.done])
   const here = useLocation()
   // 로컬 모드에는 AuthProvider 가 없다 — 그때는 작업공간 · 사용자 없이(업무 일기는 이 브라우저에)
   const auth = useContext(AuthContext)
 
-  /** 답 한 줄 → 업무 일기 할 일(업체 번호면 그 업체에 · 언제가 있으면 그날 기한) */
-  const addTodo = async (item: Pick<AssistItem, 'title' | 'detail' | 'ref' | 'when'>): Promise<AssistActionResult> => {
+  /** 답 한 줄 → 업무 일기 할 일(업체 번호면 그 업체에 · 언제가 있으면 그날 기한). key = 지난 답에 '했음' 으로 적을 이름 */
+  const addTodo = async (item: Pick<AssistItem, 'title' | 'detail' | 'ref' | 'when'>, key: string): Promise<AssistActionResult> => {
     const today = todayLocalDate()
     const r = normRef(item.ref)
-    const clientId = r && refKind(r) === 'c' ? ctx.idOf(r) : undefined
+    // D-244 업체 상세처럼 한 업체 화면이면 번호가 없는 항목도 그 업체에
+    const clientId = (r && refKind(r) === 'c' ? ctx.idOf(r) : undefined) ?? defaultClientId
     const due = dueFromWhen(item.when, today)
     try {
       await createJournalEntry(auth?.currentWorkspaceId ?? null, auth?.session?.user.id ?? null, {
@@ -761,6 +797,8 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
         clientId: clientId ?? null,
         dueDate: due,
       })
+      const updated = markDone(run.requestId, key)
+      if (updated) onMarked?.(updated)
       onRecorded?.()
       toast(due === today ? '오늘 할 일에 넣었어요' : `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')}`)
       return { to: due === today ? '/' : '/ops/calendar', label: due === today ? '오늘 할 일에서 보기' : '일정에서 보기' }
@@ -835,7 +873,8 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
                   onClose={onClose}
                   actions={itemActions}
                   ctx={ctx}
-                  onTodo={record ? () => addTodo(it) : undefined}
+                  onTodo={record && !pointsAtTodo(it.ref, entry.links) ? () => addTodo(it, `item:${i}`) : undefined}
+                  todoDone={done.has(`item:${i}`)}
                   toast={toast}
                 />
               </li>
@@ -849,7 +888,7 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
                   <li key={i} className="t-body flex flex-wrap items-start gap-x-1.5 gap-y-1 break-keep text-violet-950" data-testid="ai-assist-next">
                     <Check aria-hidden="true" className="mt-1 size-4 shrink-0 text-violet-700" />
                     <span className="min-w-0 grow basis-40">{n}</span>
-                    {record && <ActionButton id="todo-next" label="할 일로" doneLabel="할 일에 넣음" once small onRun={() => addTodo({ title: n })} toast={toast} />}
+                    {record && <ActionButton id="todo-next" label="할 일로" doneLabel="할 일에 넣음" once small initiallyDone={done.has(`next:${i}`)} onRun={() => addTodo({ title: n }, `next:${i}`)} toast={toast} />}
                   </li>
                 ))}
               </ul>
@@ -860,13 +899,13 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
       ) : (
         <div className="flex flex-col gap-1">
           <p className="t-sub text-slate-600">정리된 모양으로 오지 않아 받은 글을 그대로 보여 드려요.</p>
-          <p className="t-body break-keep whitespace-pre-line text-slate-900">{run.raw}</p>
+          <p className="t-body break-keep whitespace-pre-line text-slate-900">{raw}</p>
         </div>
       )}
       {resultActions.length > 0 && (
         <div className="flex flex-wrap gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-2.5" data-testid="ai-assist-result-actions">
           {resultActions.map((act) => (
-            <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary once onRun={() => act.run({ structured: a, raw: run.raw }, ctx)} onNavigate={onClose} toast={toast} />
+            <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary once onRun={() => act.run({ structured: a, raw }, ctx)} onNavigate={onClose} toast={toast} />
           ))}
         </div>
       )}
@@ -874,7 +913,7 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
         <button
           type="button"
           onClick={async () => {
-            if (await copy(answerText(a, run.raw))) onCopied()
+            if (await copy(answerText(a, raw))) onCopied()
           }}
           className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
           data-testid="ai-assist-copy"
@@ -941,6 +980,7 @@ function ItemActionRow({
   actions,
   ctx,
   onTodo,
+  todoDone = false,
   toast,
 }: {
   item: AssistItem
@@ -950,6 +990,8 @@ function ItemActionRow({
   actions: AssistItemAction[]
   ctx: AssistCtx
   onTodo?: () => Promise<AssistActionResult>
+  /** D-244 이 항목은 이미 할 일로 넣었음(지난 답에 적힌 것) */
+  todoDone?: boolean
   toast: (msg: string) => void
 }) {
   const r = normRef(item.ref)
@@ -962,7 +1004,7 @@ function ItemActionRow({
       {actions.map((act) => (
         <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary={act.primary} once={act.once} onRun={() => act.run(item, ctx)} onNavigate={onClose} toast={toast} />
       ))}
-      {onTodo && <ActionButton id="todo" label="할 일로 넣기" doneLabel="할 일에 넣음" once onRun={onTodo} onNavigate={onClose} toast={toast} />}
+      {onTodo && <ActionButton id="todo" label="할 일로 넣기" doneLabel="할 일에 넣음" once initiallyDone={todoDone} onRun={onTodo} onNavigate={onClose} toast={toast} />}
       {showRef &&
         href &&
         (external ? (
@@ -986,6 +1028,7 @@ function ActionButton({
   primary = false,
   once = false,
   small = false,
+  initiallyDone = false,
   onRun,
   onNavigate,
   toast,
@@ -996,11 +1039,13 @@ function ActionButton({
   primary?: boolean
   once?: boolean
   small?: boolean
+  /** D-244 판을 다시 열어도 '됨' 그대로(지난 답에 적힌 것) */
+  initiallyDone?: boolean
   onRun: () => Promise<AssistActionResult> | AssistActionResult
   onNavigate?: () => void
   toast: (msg: string) => void
 }) {
-  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle')
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>(once && initiallyDone ? 'done' : 'idle')
   const [go, setGo] = useState<{ to: string; label: string } | null>(null)
   const done = once && state === 'done'
   const tone = done ? 'border-success-200 bg-success-50 text-success-800' : primary ? 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-white text-violet-800 hover:bg-violet-50'

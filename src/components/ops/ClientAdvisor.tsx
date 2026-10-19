@@ -187,7 +187,7 @@ export function ClientAdvisor({
               <Send aria-hidden="true" className="size-4" /> 묻기
             </Button>
             {/* D-239: 예전 'AI 자리 · 준비 중' — 이제 실제로 이 업체 자료로 AI 에 묻는다(대표 계정에서만) */}
-            <AiAssist variant="button" label="AI에게 묻기" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} />
+            <AiAssist variant="button" label="AI에게 묻기" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} defaultClientId={record.id} />
           </form>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="t-meta break-keep text-slate-500">위 대화는 정해 둔 규칙으로 답해요(AI 아님 · 밖으로 보내는 것 없음). 'AI에게 묻기' 를 누를 때만 이 업체 자료를 AI 로 보냅니다.</p>

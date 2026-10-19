@@ -45,7 +45,10 @@ export function calcPresetValues(s: Pick<ScenarioPreset, 'calc'>, record: Client
   const holders = holdersWithShares(reg)
   const p = viewProfile(profile)
   if (holders.length === 0) out.missing.push('주주명부(주식 수)')
+  /** D-244: 계산기 기본값으로 되돌려 둘 칸 — 예전에 이 업체 계산기에서 바꾼 이율이 남아 있으면 상황 카드와 계산기 숫자가 달랐다 */
+  const keep: Values = {}
   if (c.key === 't7') {
+    if (c.sub === 'w1') keep.w1_rate = defaultValues(calculatorOf('t7')!).w1_rate
     if (c.amount) out.applied[CALC_AMOUNT_FIELD[c.sub]] = String(c.amount)
     const income = pf.values[`${c.sub}_income`]
     if (c.sub !== 'w1' && income === '0') out.notes.push('회사 순이익을 몰라 소득금액 0 으로 계산 — 법인세상당액이 작게 잡혀 증여 금액이 크게 보일 수 있어요')
@@ -81,7 +84,7 @@ export function calcPresetValues(s: Pick<ScenarioPreset, 'calc'>, record: Client
       }
     }
   }
-  out.values = { ...pf.values, ...out.applied }
+  out.values = { ...pf.values, ...keep, ...out.applied }
   out.filled = pf.names
   return out
 }
@@ -154,7 +157,10 @@ export function runCalcScenario(s: ScenarioPreset, record: ClientOpsRecord, toda
     const table = tableOf(o, `${c.sub}_table`)
     // 표: 주주 · 구분 · 지분율 · 증여의제이익 · 판정 — 증여로 보는 사람(지배주주와 친족)만 결론에 쓴다
     const fam = (table?.rows ?? []).filter((r) => isFamilyCat(r.cells[1]))
-    const kin = fam.filter((r) => r.cells[1] !== '지배주주')
+    // D-244: 빌려주고 · 준 사람은 대표 — 대표가 주식이 없으면 최대주주(지배주주 줄)도 받는 가족이다(예전엔 그 줄을 빼고 '비과세' 라고 했다)
+    const giver = holders.find((r) => r.relation === 'ceo')?.name.trim() || null
+    const isGiver = (r: { cells: string[] }) => giver !== null && r.cells[1] === '지배주주' && r.cells[0] === giver
+    const kin = fam.filter((r) => !isGiver(r))
     const taxed = kin.filter((r) => r.cells[4].startsWith('O'))
     const gain = c.sub === 'w1' ? lineOf(o, 'w1_out', '특정법인의 이익(대여원금×적정이자율)') : lineOf(o, `${c.sub}_out`, '정산증여액')
     const limitKey = c.sub === 'w1' ? '과세되지 않는 대여원금 한도' : c.sub === 'w2' ? '과세되지 않는 채무면제액 한도(지배주주 기준)' : '과세되지 않는 증여가액 한도(지배주주 기준)'
@@ -164,7 +170,7 @@ export function runCalcScenario(s: ScenarioPreset, record: ClientOpsRecord, toda
     else headline = `비과세 — 가족 주주 몫이 가장 커도 ${w(largest(kin.map((r) => r.cells[3])))}(1억 미만)`
     lines.push(c.sub === 'w1' ? `회사가 얻는 이익(1년 이자) ${w(gain)}` : `회사가 얻은 이익(법인세상당액 뺀 것) ${w(gain)}`)
     // 지배주주 줄은 상황에서 빌려주고 · 준 본인 — 계산기 판정을 그대로 '과세' 라고 쓰면 위 결론(가족 몫)과 엇갈려 보인다
-    for (const r of fam) lines.push(r.cells[1] === '지배주주' ? `${r.cells[0]} · 지배주주(준 사람 본인) ${r.cells[2]} → ${w(r.cells[3])} — 본인 몫은 ★ 세무사 확인` : `${r.cells[0]} · ${r.cells[1]} ${r.cells[2]} → ${w(r.cells[3])} ${r.cells[4].startsWith('O') ? '과세' : '비과세'}`)
+    for (const r of fam) lines.push(isGiver(r) ? `${r.cells[0]} · 지배주주(준 사람 본인) ${r.cells[2]} → ${w(r.cells[3])} — 본인 몫은 ★ 세무사 확인` : `${r.cells[0]} · ${r.cells[1]} ${r.cells[2]} → ${w(r.cells[3])} ${r.cells[4].startsWith('O') ? '과세' : '비과세'}`)
     if (limit) lines.push(`${c.sub === 'w1' ? '이자 없이 빌려줘도 되는 한도' : c.sub === 'w2' ? '증여세 없이 면제할 수 있는 한도' : '증여세 없이 넣을 수 있는 한도'}(계산기 · 최대주주 지분율 기준) ${w(limit)}`)
     amount = limit ? `한도 ${w(limit)}` : w(gain)
     assumptions.push('★ 빌려준 · 준 사람 본인 몫을 빼고 보는지 · 실제 과세 대상(지배주주와 친족 · 지분 30% 이상)은 세무사 확인')

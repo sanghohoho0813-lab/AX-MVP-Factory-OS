@@ -128,14 +128,16 @@ export default function ClientSmartTab({
     if (def) setPlanFocus((f) => ({ id: def.id, n: (f?.n ?? 0) + 1 }))
   }
   // D-242: 설계서를 업체 기록에 한 줄로 — 고른 행동은 할 일(달력 · 오늘). 다음 할 일이 비어 있으면 첫 행동을 거기에도
-  const attachPlan = async (plan: SituationPlan, ids: string[]): Promise<boolean> => {
+  // D-244: 새로 건 할 일 수를 돌려준다(앞서 붙인 설계서와 같은 할 일은 다시 걸지 않음) — 저장 못 하면 false
+  const attachPlan = async (plan: SituationPlan, ids: string[]): Promise<number | false> => {
     const base = recordRef.current
-    let next = withToolResult(base, planResultInput(plan, base.companyName, ids))
+    const input = planResultInput(plan, base.companyName, ids, base.toolResults)
+    let next = withToolResult(base, input)
     const first = plan.actions.find((a) => ids.includes(a.id))
     if (first && !base.nextAction.trim()) next = withNextAction(next, first.text, first.date)
-    if (onCommitQuiet) return onCommitQuiet(next)
+    if (onCommitQuiet) return (await onCommitQuiet(next)) ? input.deadlines.length : false
     await onCommit(next, `${plan.title} 설계서를 업체 기록에 붙였어요`)
-    return true
+    return input.deadlines.length
   }
 
   return (
@@ -147,7 +149,7 @@ export default function ClientSmartTab({
         }} />
 
       {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
-      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} />
+      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} />
 
       {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
       <FoldAllButton className="-my-2 self-end" />
