@@ -20,6 +20,10 @@ import type { CalcOpen } from '../services/taxPlan'
 import { calcPrefill } from '../services/taxCalcPrefill'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { PrefillNote } from '../tools/shared/PrefillNote'
+import { PresetNote } from '../tools/shared/PresetNote'
+import { SCENARIO_PRESETS, presetAssumptions, scenarioPreset, type PresetAssumption, type ScenarioPreset } from '../services/scenarioPresets'
+import { calcPresetValues } from '../services/calcScenario'
+import { todayLocalDate } from '../lib/appClock'
 import {
   TAX_CALCULATORS,
   calculatorOf,
@@ -63,12 +67,22 @@ function displayDefaults(calc: Calculator): Values {
 /** D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 앞 업체 숫자가 남지 않는다 */
 const storeKey = (calc: Calculator, clientId: string | null | undefined) => (clientId ? `${STORAGE_PREFIX}${calc.key}.${clientId}` : sharedToolKey(STORAGE_PREFIX + calc.key))
 
-/** 업체 숫자도 기본값처럼 금액 칸은 쉼표로 보여 준다 */
-function prefillShown(calc: Calculator, values: Record<string, string>): Values {
+/** 업체 숫자도 기본값처럼 금액 칸은 쉼표로 보여 준다 — D-243: 주주 표(05 · 06)의 주식 수 칸도 */
+function prefillShown(calc: Calculator, values: Values): Values {
   const fields = [...(calc.shared ?? []), ...calc.subs.flatMap((s) => s.groups)].flatMap((g) => g.fields)
   const amount = new Set(fields.filter((f) => !isRowsField(f) && f.type === 'amount').map((f) => f.id))
-  return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, amount.has(k) ? withCommas(v) : v]))
+  const rowAmount = new Map(fields.filter(isRowsField).map((f) => [f.id, f.columns.filter((c) => c.type === 'amount').map((c) => c.key)]))
+  return Object.fromEntries(
+    Object.entries(values).map(([k, v]) => {
+      if (!Array.isArray(v)) return [k, amount.has(k) ? withCommas(v) : v]
+      const cols = rowAmount.get(k) ?? []
+      return [k, v.map((r) => Object.fromEntries(Object.entries(r).map(([c, x]) => [c, cols.includes(c) ? withCommas(x) : x])))]
+    }),
+  )
 }
+
+/** D-243 계산기마다 상황 예시(05 · 06) */
+const presetsOf = (calcKey: string): ScenarioPreset[] => SCENARIO_PRESETS.filter((p) => p.calc?.key === calcKey)
 
 /** 처음 여는 계산기면(저장한 값 없음) 업체 숫자로 채운 칸 이름도 함께 — 그 외에는 빈 배열 */
 function loadValuesWithPrefill(calc: Calculator, clientId: string | null | undefined, record: ClientOpsRecord | null): { values: Values; prefilled: string[] } {
@@ -199,6 +213,47 @@ export function TaxCalculatorsPage() {
       /* 저장 못 해도 계산은 된다 */
     }
   }, [values, calc, clientId, recordReady, loadKey, mode])
+
+  /*
+   * D-243 상황 예시(?preset=) — 05 · 06 계산기: 이 업체 숫자(주주명부 · 순이익 · 1주 가치)에 상황 값(빌려준 돈 · 누가 몇 주)을 넣어 바로 계산.
+   * 넣은 상황 값만 칩으로 · [가정 빼기]는 아직 그 값 그대로인 칸만 넣기 전 값으로. 주소의 preset 은 한 번 쓰고 지운다(새로고침해도 다시 덮지 않게).
+   */
+  const presetId = params.get('preset')
+  const [presetUsed, setPresetUsed] = useState<{ calcKey: string; title: string; applied: Values; before: Values; chips: PresetAssumption[]; missing: string[]; cleared: boolean } | null>(null)
+  useEffect(() => {
+    if (!presetId || mode !== 'calc' || !recordReady) return
+    const preset = scenarioPreset(presetId)
+    const next = new URLSearchParams(params)
+    next.delete('preset')
+    setParams(next, { replace: true })
+    if (!preset?.calc || preset.calc.key !== calc.key) return
+    const pv = calcPresetValues(preset, clientRecord, todayLocalDate())
+    // 지금 칸(저장한 값 · 업체 숫자) 위에 — 위 읽기 효과와 같은 값에서 시작한다
+    const base = loadValuesWithPrefill(calc, clientId, clientRecord).values
+    const applied = prefillShown(calc, pv.applied)
+    const before: Values = Object.fromEntries(Object.keys(applied).map((k) => [k, base[k]]))
+    loadedFor.current = loadKey
+    setValues({ ...base, ...prefillShown(calc, pv.values) })
+    setPrefilled(pv.filled)
+    setPresetUsed({ calcKey: calc.key, title: preset.title, applied, before, chips: presetAssumptions(preset), missing: pv.missing, cleared: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId, mode, recordReady, calc.key])
+  /** 상황 예시가 넣은 칸 중 아직 그 값 그대로인 칸 — 그 뒤에 직접 고친 칸은 대표 값이라 빼지 않는다 */
+  // 다른 계산기로 옮기면 그 계산기에는 넣은 가정이 없다
+  const presetShown = presetUsed && presetUsed.calcKey === calc.key ? presetUsed : null
+  const presetKept = presetShown ? Object.keys(presetShown.applied).filter((k) => JSON.stringify(values[k]) === JSON.stringify(presetShown.applied[k])) : []
+  const calcPresets = clientId ? presetsOf(calc.key) : []
+  const applyPreset = (p: ScenarioPreset) => {
+    if (!p.calc) return
+    const next = new URLSearchParams()
+    const client = params.get('client')
+    if (client) next.set('client', client)
+    next.set('m', 'calc')
+    next.set('c', p.calc.key)
+    next.set('s', p.calc.sub)
+    next.set('preset', p.id)
+    setParams(next)
+  }
 
   const out = useMemo(() => {
     try {
@@ -503,6 +558,40 @@ export function TaxCalculatorsPage() {
           </div>
         </div>
         {prefilled.length > 0 && <PrefillNote note={`이 업체 기록(절세 설계 현황 · 주주명부)에서 채웠습니다: ${prefilled.join(' · ')}`} />}
+        {presetShown && (
+          <PresetNote
+            testId="calc-preset-note"
+            title={presetShown.title}
+            done={presetShown.missing.length > 0 ? `${presetShown.missing.join(' · ')}이(가) 없어 상황 값만 넣었어요 — 받으면 이 업체 숫자로 계산해요` : '이 업체 숫자로 바로 계산했어요(아래 칸을 바꾸면 다시 계산)'}
+            chips={presetShown.chips.filter((c) => !c.field || presetKept.includes(c.field)).map((c) => c.text)}
+            cleared={presetShown.cleared}
+            clearedText="상황 값을 넣기 전 값으로 돌렸어요(직접 고친 칸은 그대로)."
+            onClear={() => {
+              setValues((cur) => ({ ...cur, ...Object.fromEntries(presetKept.map((k) => [k, presetShown.before[k]])) }))
+              setPresetUsed({ ...presetShown, cleared: true })
+            }}
+          />
+        )}
+        {calcPresets.length > 0 && (
+          <div className="no-print flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2.5" data-testid="calc-presets">
+            <p className="t-sub font-semibold break-keep text-brand-900">상황 예시로 바로 — 누르면 이 업체 숫자(주주명부 · 순이익 · 1주 가치)로 계산</p>
+            <div className="flex flex-wrap gap-1.5">
+              {calcPresets.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-testid="calc-preset"
+                  data-id={p.id}
+                  title={p.when}
+                  onClick={() => applyPreset(p)}
+                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.92rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                >
+                  {p.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {calc.subs.length > 1 && (
           <div role="tablist" aria-label={`${calc.title} 소탭`} className="flex flex-wrap gap-1.5">

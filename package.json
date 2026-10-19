@@ -67,6 +67,7 @@
     "qa:folder": "node e2e/folder-cloud.mjs",
     "qa:scenarios": "node e2e/scenarios.mjs",
     "qa:plan": "node e2e/plan.mjs",
+    "qa:calcpreset": "node e2e/calcpreset.mjs",
     "qa:ownerai": "node e2e/ownerai.mjs",
     "qa:assist": "node e2e/assist.mjs",
     "qa:calendar": "node e2e/calendar.mjs",

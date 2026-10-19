@@ -7,7 +7,7 @@
  */
 
 import { normalizeClientOps } from '../clientOpsService'
-import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, koreanWon, pct, unlistedShareValuation } from '../taxCalc'
+import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, koreanWon, pct, unlistedShareValuation, type RowValues, type Values } from '../taxCalc'
 import {
   ASSUMPTIONS,
   calcDefault,
@@ -34,7 +34,7 @@ import {
 } from '../taxPlan'
 import type { ClientOpsRecord, ShareholderRow } from '../../types/clientOps'
 import { parseTypedDate } from '../../lib/typedDate'
-import { calcPrefill } from '../taxCalcPrefill'
+import { ZERO_NOTE, calcPrefill } from '../taxCalcPrefill'
 
 let pass = 0
 let fail = 0
@@ -360,9 +360,9 @@ check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원
   check('미리 채움: 이율 · 공제 · 배수 같은 계산기 기본값은 건드리지 않는다', !allKeys.some((k) => /rate|_ins|_borrow|_years|_mult|personalDed|basicDed|_corp$|_inc$/.test(k) && k !== 'v_rate'), allKeys)
   check('미리 채움: 환원율은 대표가 적었을 때만(적었으니 그 값)', calcPrefill('t3', rec).values.v_rate === '10' && calcPrefill('t3', { ...rec, taxProfile: { ...rec.taxProfile, vRate: '' } }).values.v_rate === undefined)
   check('미리 채움: 모르는 값은 채우지 않는다(0 · 빈 칸)', calcPrefill('t1', { ...rec, taxProfile: { ...rec.taxProfile, loanBalance: '' } }).names.length === 0)
-  check('미리 채움: 업체 없음 · 7 · 8번은 비움', calcPrefill('t2', null).names.length === 0 && calcPrefill('t7', rec).names.length === 0 && calcPrefill('t8', rec).names.length === 0)
+  check('미리 채움: 업체 없음은 비움 · D-243 05 · 06 은 주주명부가 없으면 비움', calcPrefill('t2', null).names.length === 0 && calcPrefill('t7', { ...rec, shareholderRegister: [] }).names.length === 0 && calcPrefill('t8', { ...rec, shareholderRegister: [] }).names.length === 0)
   // 같은 업체를 계산기로 열면 절세 설계와 같은 숫자 — 채운 값으로 계산기 식을 그대로 돌려 본다
-  const runWith = (c: string, sub: string, v: Record<string, string>) => {
+  const runWith = (c: string, sub: string, v: Values) => {
     const calc = calculatorOf(c)!
     return (calc.subs.find((x) => x.key === sub) ?? calc.subs[0]).compute({ ...defaultValues(calc), ...v })
   }
@@ -376,8 +376,33 @@ check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원
   check('미리 채움: 08 상속세 계산기 = 절세 설계 "지금 상속되면"', inhNow.ok && Math.abs(lineWon(t4out, 'h_out', '납부할 상속세') - inhNow.taxNow) <= 1, [lineWon(t4out, 'h_out', '납부할 상속세'), inhNow.taxNow])
   check('미리 채움: 모르는 칸을 0 으로 둔 것을 알린다', calcPrefill('t3', rec).names.includes('모르는 칸은 0(절세 설계와 같게)'))
   const calcIds = new Set<string>()
-  for (const c of ['t1', 't2', 't3', 't4', 't5', 't6', 't9']) for (const k of Object.keys(defaultValues(calculatorOf(c)!))) calcIds.add(k)
+  for (const c of ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9']) for (const k of Object.keys(defaultValues(calculatorOf(c)!))) calcIds.add(k)
   check('미리 채움: 채우는 칸은 모두 계산기에 있는 칸', allKeys.every((k) => calcIds.has(k)), allKeys.filter((k) => !calcIds.has(k)))
+
+  /* ---- D-243 05 특정법인 · 06 불균등 증자 · 감자 ---- */
+  const t7 = calcPrefill('t7', rec)
+  const rows7 = t7.values.w_share_rows as RowValues[]
+  check(
+    'D-243 05 주주 표 = 주주명부(주식 있는 3명 · 주식 0 인 자녀 빼고) · 10줄 · 대표 지배주주 · 배우자 친족 · 임원 대상 아님 · 빈 줄은 계산기 이름(D~J)',
+    rows7.length === 10 && rows7[0].name === '김대표' && rows7[0].cat === '지배주주' && rows7[0].qty === '60000' && rows7[1].name === '이배우' && rows7[1].cat === '지배주주의 친족' && rows7[2].name === '박이사' && rows7[2].cat.startsWith('임원') && rows7[3].name === 'D' && rows7[3].qty === '0' && rows7[9].name === 'J',
+    rows7.slice(0, 4),
+  )
+  check('D-243 05 소득금액 = 결산 연도 순손익(6억) — 무상대여 탭엔 없음 · 이율 4.6% 는 계산기 기본 그대로', t7.values.w2_income === '600000000' && t7.values.w3_income === '600000000' && t7.values.w4_income === '600000000' && t7.values.w1_rate === undefined && t7.values.w1_principal === undefined, t7.values)
+  const t7fv = calcPrefill('t7', { ...rec, taxProfile: { ...rec.taxProfile, vInc2: '' }, factValues: { netIncome: '-1.2억' } })
+  check('D-243 05 순손익이 절세 현황에 없으면 회사 정보 순이익(결손 -1.2억도 그대로) · 둘 다 없으면 0(모르는 칸 알림)', t7fv.values.w2_income === '-120000000' && t7fv.names.some((n) => n.includes('회사 정보 순이익')) && calcPrefill('t7', { ...rec, taxProfile: { ...rec.taxProfile, vInc2: '' } }).values.w2_income === '0' && calcPrefill('t7', { ...rec, taxProfile: { ...rec.taxProfile, vInc2: '' } }).names.includes(ZERO_NOTE), t7fv)
+  const out7 = runWith('t7', 'w1', { ...t7.values, w1_principal: '1000000000' })
+  const tab7 = (out7.tables ?? [])[0]
+  check('D-243 05 채운 표로 계산기 식 그대로 — 지분율 60% · 이익 4,600만원 · 주주 3줄(대상 아님도 지분율엔 들어감)', lineWon(out7, 'w1_out', '특정법인의 이익(대여원금×적정이자율)') === 46_000_000 && tab7.rows.length === 3 && tab7.rows[0].cells[2] === '60.0%' && tab7.rows[2].cells[2] === '15.0%', tab7.rows.map((r) => r.cells.join('/')))
+  const many = Array.from({ length: 13 }, (_, i) => ({ id: `m${i}`, name: `주주${i + 1}`, relation: (i === 0 ? 'ceo' : i < 4 ? 'child' : 'other') as ShareholderRow['relation'], shares: 1000 + i * 10, acquirePrice: 0 }))
+  const rowsMany = calcPrefill('t7', { ...rec, shareholderRegister: many }).values.w_share_rows as RowValues[]
+  check('D-243 05 주주가 10명 넘으면 9명 + "그 외 n명"(주식 수 합은 그대로)', rowsMany.length === 10 && rowsMany[9].name === '그 외 4명' && rowsMany.reduce((a, r) => a + Number(r.qty), 0) === many.reduce((a, r) => a + r.shares, 0), rowsMany.map((r) => `${r.name}:${r.qty}`))
+  const t8 = calcPrefill('t8', rec)
+  const rows8 = t8.values.x1_rows as RowValues[]
+  check('D-243 06 증자 · 감자 표 = 주주명부 기존 주식 수(인수 · 감자 주식은 0) · 1주 시가 = 09 식 · 인수가 · 감자대가는 상황 값이라 안 채움', rows8.length === 3 && rows8.every((r) => r.extra === '0' && r.cat === '개인') && rows8[0].qty === '60000' && JSON.stringify(t8.values.x2_rows) === JSON.stringify(rows8) && t8.values.x1_fair === String(sv.perShare) && t8.values.x2_fair === String(sv.perShare) && t8.values.x1_issue === undefined && t8.values.x2_redeem === undefined, t8.values)
+  const t8corp = calcPrefill('t8', { ...rec, shareholderRegister: [...reg, { id: 'e', name: '(주)홀딩스', relation: 'corp', shares: 5000, acquirePrice: 0 }] }).values.x1_rows as RowValues[]
+  check('D-243 06 법인 주주는 구분 "법인"(계산기가 법인세상당액을 뺀다)', t8corp[3].cat === '법인', t8corp)
+  const t8none = calcPrefill('t8', { ...rec, taxProfile: { par: '5000' } })
+  check('D-243 06 1주 가치를 모르면 시가 0 + 모르는 칸 알림(남의 회사 예시 시가 220,000원을 남기지 않음)', t8none.values.x1_fair === '0' && t8none.names.includes(ZERO_NOTE), t8none)
 }
 
 if (process.env.SHOW) {

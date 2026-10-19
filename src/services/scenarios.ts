@@ -43,6 +43,7 @@ import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { fitContext, scenarioFit, type FitContext, type FitKind, type ScenarioFit } from './scenarioFit'
 import { placeOf } from './grants/grantMatch'
+import { runCalcScenario } from './calcScenario'
 
 export interface ScenarioNeed {
   /** 화면에 쓰는 이름 */
@@ -81,6 +82,8 @@ export interface ScenarioRun {
   assumptions: string[]
   /** 모듈 화면 — 같은 가정 · 같은 업체로 열린다 */
   openPath: string
+  /** D-243 이어서 단추 글(없으면 '모듈에서 이어서') — 계산기 상황은 '세금 계산기 05에서 이어서' */
+  openLabel?: string
   /** 대표님께 보낼 요청 문구(빠진 것만 · 없으면 '') */
   request: string
   /** D-201: 이 업체에 맞는 상황인가 — 맞음(근거) · 물어볼 것 · 받을 자료 · 안 맞음(까닭) */
@@ -387,7 +390,7 @@ export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: s
   const facts = clientFacts(record, new Date(`${today}T00:00:00`))
   const f = facts.industryText ? facts : { ...facts, industryText: [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' ') }
   const body =
-    s.module === 'tax' ? runTax(s, record, today) : s.module === 'employment' ? runHiring(s, f) : s.module === 'labcare' ? runLab(s, f) : s.module === 'startup-tax' ? runStartup(s, f, today) : runPolicy(s, f)
+    s.calc ? runCalcScenario(s, record, today) : s.module === 'tax' ? runTax(s, record, today) : s.module === 'employment' ? runHiring(s, f) : s.module === 'labcare' ? runLab(s, f) : s.module === 'startup-tax' ? runStartup(s, f, today) : runPolicy(s, f)
   const moduleLabel = SCENARIO_MODULE_LABEL[s.module]
   const items = body.needs.filter((n) => !n.ok).map((n) => requestItemFor(n.label, `${moduleLabel} · ${s.title}`)).filter((x): x is RequestItem => x !== null)
   return {
@@ -398,6 +401,7 @@ export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: s
     when: s.when,
     ...body,
     openPath: scenarioPath(s, record.id),
+    ...(s.calc ? { openLabel: `세금 계산기 ${s.calc.key === 't7' ? '05' : '06'}에서 이어서` } : {}),
     request: items.length ? requestMessage(record, items) : '',
     fit: scenarioFit(s, ctx),
   }

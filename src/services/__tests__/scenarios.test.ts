@@ -14,6 +14,9 @@ import { businessTypeOf } from '../../tools/shared/clientPrefill'
 import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSummary, planTitle, situationChoices, smeConfirmed } from '../situationPlan'
 import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
+import { formatWon } from '../customerFacts'
+import { calcPresetValues, runCalcScenario } from '../calcScenario'
+import { calculatorOf, defaultValues, type RowValues } from '../taxCalc'
 
 let passed = 0
 let failed = 0
@@ -52,15 +55,15 @@ const empty = normalizeClientOps({ id: 'empty', companyName: '빈회사', create
 // S1 카탈로그
 const by = (m: string) => SCENARIO_PRESETS.filter((s) => s.module === m).length
 check(
-  'S1 카탈로그 23개 — 절세 11 · 고용 4 · 연구소 2 · 창업감면 3 · 정책자금 3 · 아이디 겹침 없음 · 주소에 업체 · 가정',
-  SCENARIO_PRESETS.length === 23 && by('tax') === 11 && by('employment') === 4 && by('labcare') === 2 && by('startup-tax') === 3 && by('policy-funding') === 3 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 23 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
+  'S1 카탈로그 28개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 4 · 연구소 2 · 창업감면 3 · 정책자금 3 · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기 상황은 그 계산기 · 그 탭으로',
+  SCENARIO_PRESETS.length === 28 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 4 && by('labcare') === 2 && by('startup-tax') === 3 && by('policy-funding') === 3 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 28 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
   SCENARIO_PRESETS.map((s) => s.id),
 )
 
 // S2 숫자가 다 있는 업체
 const runs = runScenarios(full, today)
 const r = (id: string) => runs.find((x) => x.id === id)!
-check('S2 숫자가 다 있는 업체 — 23개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 23 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
+check('S2 숫자가 다 있는 업체 — 28개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 28 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
 const cash = r('tax-cash-1e')
 const p = viewProfile(scenarioTaxProfile(full, today).profile)
 const direct = cashPlan(p, full.shareholderRegister, shareValueOf(p, full.shareholderRegister), 100_000_000, today)
@@ -170,7 +173,7 @@ check(
   gyRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('2024-05-01') && gyRuns.find((x) => x.id === 'policy-working')!.fit.why.includes('1억 5,000만원') && gyRuns.find((x) => x.id === 'startup-move')!.fit.why.includes('서울'),
   gyRuns.filter((x) => x.fit.kind === 'fit').map((x) => x.fit.why),
 )
-check('F7 가연 — 맞는 상황이 맨 앞(23개 중 3개 · 정렬)', gyRuns.slice(0, 3).every((x) => x.fit.kind === 'fit') && gyRuns.length === 23)
+check('F7 가연 — 맞는 상황이 맨 앞(28개 중 3개 · 정렬)', gyRuns.slice(0, 3).every((x) => x.fit.kind === 'fit') && gyRuns.length === 28)
 
 // 대표가 답하면 — 같은 질문을 쓰는 상황이 함께 열린다
 const gyAns = withScenarioAnswer(withScenarioAnswer(withScenarioAnswer(gy, 'hireSenior', 'yes', '2026-10-15T00:00:00.000Z'), 'contract', 'no', '2026-10-15T00:00:00.000Z'), 'hireYouth', 'yes', '2026-10-15T00:00:00.000Z')
@@ -242,7 +245,7 @@ const eRuns = runScenarios(empty, today)
 check('F18 빈 업체 — 맞는 상황 0개(짐작해서 붙이지 않음) · 물어볼 것과 받을 자료로만', eRuns.every((x) => x.fit.kind === 'ask' || x.fit.kind === 'data'), kinds(eRuns))
 const eReq = fitDataRequest(empty, eRuns)
 check('F19 받을 자료 요청 문구 — 같은 자료는 한 번(재무제표 · 사업자등록증) · 주민등록번호 요구 없음', (eReq.match(/^\d+\. 최근 재무제표/gm) ?? []).length === 1 && (eReq.match(/^\d+\. 사업자등록증 사본/gm) ?? []).length === 1 && !eReq.includes('주민등록번호를'), eReq)
-check('F20 질문 11가지 — 모두 예/아니요로 답할 수 있는 한 문장(물음표로 끝남)', Object.values(SCENARIO_QUESTIONS).length === 11 && Object.values(SCENARIO_QUESTIONS).every((q) => q.endsWith('?')))
+check('F20 질문 13가지(D-243 회사에 빌려준 돈 · 재산 넣어 주기 더함) — 모두 예/아니요로 답할 수 있는 한 문장(물음표로 끝남)', Object.values(SCENARIO_QUESTIONS).length === 13 && Object.values(SCENARIO_QUESTIONS).every((q) => q.endsWith('?')))
 
 // 무작위 업체 2,000곳 — 기록이 반대를 말하는데 '맞음' 이 나오지 않는가
 let seed = 20261015
@@ -291,7 +294,7 @@ for (let i = 0; i < 2000; i++) {
   const runs = SCENARIO_PRESETS.map((s) => ({ id: s.id, module: s.module, fit: scenarioFit(s, ctx) }))
   if (i % 20 === 0) {
     const full = runScenarios(rec, today)
-    if (full.length !== 23) bad.push(`${rec.id}: ${full.length}개`)
+    if (full.length !== SCENARIO_PRESETS.length) bad.push(`${rec.id}: ${full.length}개`)
     if (JSON.stringify(full.map((x) => x.fit)) !== JSON.stringify(runs.map((x) => x.fit))) bad.push(`${rec.id}: 계산까지 돌린 판단과 다름`)
   }
   if (JSON.stringify(SCENARIO_PRESETS.map((s) => scenarioFit(s, fitContext(rec, today)))) !== JSON.stringify(runs.map((x) => x.fit))) bad.push(`${rec.id}: 같은 입력 다른 판단`)
@@ -303,7 +306,14 @@ for (let i = 0; i < 2000; i++) {
     if (fk === 'data' && !(r.fit.dataNeeds ?? []).length) bad.push(`${rec.id} ${r.id}: 자료 없음`)
     if (r.fit.answered && scenarioAnswer(rec, r.fit.answered) !== (fk === 'fit' ? 'yes' : 'no')) bad.push(`${rec.id} ${r.id}: 답과 판단이 다름`)
     if (fk !== 'fit') continue
-    if (ctx.entity !== 'corporation' && corpOnlyIds.includes(r.id)) bad.push(`${rec.id} ${r.id}: 법인 아닌데 맞음`)
+    if (ctx.entity !== 'corporation' && (corpOnlyIds.includes(r.id) || r.id.startsWith('calc-'))) bad.push(`${rec.id} ${r.id}: 법인 아닌데 맞음`)
+    // D-243 계산기 05 · 06 — 친족 주주가 있어야 · 회사에 빌려줌/넣어 줌은 대표가 '예' 해야
+    const kin = rec.shareholderRegister.filter((h) => h.shares > 0 && h.relation !== 'ceo')
+    if (r.id.startsWith('calc-t7') && kin.length === 0) bad.push(`${rec.id} ${r.id}: 친족 주주 없는데 맞음`)
+    if ((r.id === 'calc-t7-loan' || r.id === 'calc-t7-forgive') && scenarioAnswer(rec, 'lendToCorp') !== 'yes') bad.push(`${rec.id} ${r.id}: 빌려준 돈 '예' 없이 맞음`)
+    if (r.id === 'calc-t7-gift' && scenarioAnswer(rec, 'giftToCorp') !== 'yes') bad.push(`${rec.id} ${r.id}: 재산 넣어 주기 '예' 없이 맞음`)
+    if (r.id === 'calc-t8-reduce' && (kin.length === 0 || scenarioAnswer(rec, 'succession') !== 'yes')) bad.push(`${rec.id} ${r.id}: 친족 주주 · 승계 '예' 없이 맞음`)
+    if (r.id === 'calc-t8-issue' && !((ctx.children ?? 0) > 0 || scenarioAnswer(rec, 'succession') === 'yes')) bad.push(`${rec.id} ${r.id}: 자녀 · 승계 계획 없이 맞음`)
     if (ctx.facts.months !== null && ctx.facts.months >= 60 && r.module === 'startup-tax') bad.push(`${rec.id} ${r.id}: 창업 5년 지났는데 맞음`)
     if (ctx.hasLab && r.id === 'lab-two') bad.push(`${rec.id}: 연구소 있는데 설립 맞음`)
     if (ctx.facts.employeeCount === 0 && (r.id === 'emp-childcare' || r.id === 'emp-convert')) bad.push(`${rec.id} ${r.id}: 직원 0명인데 맞음`)
@@ -323,7 +333,7 @@ for (let i = 0; i < 2000; i++) {
     if (r.id === 'tax-succession' && !((ctx.facts.months ?? 0) >= 120 && (ctx.facts.representativeAge ?? 0) >= 50)) bad.push(`${rec.id}: 업력 · 나이 안 되는데 가업승계 맞음`)
   }
 }
-check('F21 무작위 업체 2,000곳 × 23 상황 — 기록이 반대를 말하는데 "맞음" 0건 · 까닭 없는 판단 0 · 같은 입력 같은 판단 · 답과 판단 일치', bad.length === 0, bad.slice(0, 8))
+check('F21 무작위 업체 2,000곳 × 28 상황 — 기록이 반대를 말하는데 "맞음" 0건 · 까닭 없는 판단 0 · 같은 입력 같은 판단 · 답과 판단 일치', bad.length === 0, bad.slice(0, 8))
 check('F22 무작위 업체에서 "맞음" 도 실제로 나온다(전부 숨기는 것이 아님)', fitCount > 2000, fitCount)
 check('F23 무작위 업체 2,000곳 — 계산기(사실 창고)와 상황 예시의 법인 · 개인 판단이 모두 같음', entityMismatch.length === 0, entityMismatch.slice(0, 6))
 
@@ -355,9 +365,9 @@ check('G3 본점 이전 — 새로 창업 · 본점 기타 지방 · 과밀억�
 check('G4 정책자금 청년 채용 — 운전자금 · 채용 계획 있음 · 청년 채용 예정', JSON.stringify(chipsOf('policy-hiring')) === JSON.stringify(['운전자금', '채용 계획 있음', '청년 채용 예정']), chipsOf('policy-hiring'))
 check('G5 고용 육아휴직 — 같은 말 한 번씩(육아휴직이 상황 · 구체 상황 둘 다여도 하나)', new Set(chipsOf('emp-childcare')).size === chipsOf('emp-childcare').length && chipsOf('emp-childcare').includes('대체인력'), chipsOf('emp-childcare'))
 check('G6 고용 청년 — 신규 채용 · 청년 · 만 29세 · 정규직(진단 화면 단추와 같은 말)', JSON.stringify(chipsOf('emp-youth')) === JSON.stringify(['신규 채용', '청년', '만 29세', '정규직']), chipsOf('emp-youth'))
-const noTaxChips = SCENARIO_PRESETS.filter((x) => x.module === 'tax').every((x) => presetAssumptions(x).length === 0)
-const allOthers = SCENARIO_PRESETS.filter((x) => x.module !== 'tax').every((x) => presetAssumptions(x).length > 0)
-check('G7 절세는 칩 없음(상황 문장이 칸에 그대로) · 나머지 12 상황은 칩이 하나 이상', noTaxChips && allOthers)
+const noTaxChips = SCENARIO_PRESETS.filter((x) => x.module === 'tax' && !x.calc).every((x) => presetAssumptions(x).length === 0)
+const allOthers = SCENARIO_PRESETS.filter((x) => x.module !== 'tax' || x.calc).every((x) => presetAssumptions(x).length > 0)
+check('G7 절세 설계 상황은 칩 없음(상황 문장이 칸에 그대로) · 계산기 05 · 06 5 + 나머지 12 상황은 칩이 하나 이상', noTaxChips && allOthers)
 check('G8 칩에 업체 숫자(직원 수 · 매출 · 주소)는 없음 — 가정만', SCENARIO_PRESETS.flatMap(presetAssumptions).every((c) => !/직원 ?수|매출|피보험자|주소/.test(c.text)), SCENARIO_PRESETS.flatMap(presetAssumptions).map((c) => c.text))
 type LabF = { payroll: number | ''; material: number | ''; category: string; rate: number | '' }
 const applied: Partial<LabF> = { payroll: 80_000_000, material: 0, category: '일반 R&D', rate: '' }
@@ -563,6 +573,134 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   }
   check(`Z1 무작위 업체 ${N.toLocaleString()}곳 × 23 상황(${runsSeen}번 계산) — 멈춤 0 · 조용히 빠진 상황 0 · NaN/undefined/Infinity 0 · 한 곳 1.5초 넘게 걸림 0`, throws === 0 && dropped === 0 && badText === 0 && slow.length === 0, { throws, dropped, droppedEx, badText, firstBad, slow })
   check(`Z2 D-242 무작위 업체 × 상황별 설계서 3가지(${plansSeen}장) — 깨진 글자 0 · 금액 음수/NaN 0 · 유지 합계 ≥ 1년 합계 · 사람 수 1~50 · 할 일 날짜 오늘 이후 · 평일`, plansSeen === N * SITUATION_PLANS.length && badPlan === 0, { plansSeen, badPlan, badPlanEx })
+}
+
+/** 계산기 글('46,000,000원') → 화면 금액(4,600만원) */
+const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) || 0)
+
+/* ---------------- D-243 세금 계산기 05 특정법인 · 06 불균등 증자 · 감자 상황 ---------------- */
+{
+  const famBase = {
+    id: 'fam',
+    companyName: '(주)가족정밀',
+    corporateNumber: '110111-1111111',
+    establishedAt: '2010-03-02',
+    representativeBirth: '1962-01-01',
+    businessCategory: '제조업',
+    businessAddress: '경기도 화성시 동탄대로 1',
+    taxProfile: { par: '5000', vAsset: '5,000,000,000', vDebt: '2,000,000,000', vInc0: '300,000,000', vInc1: '350,000,000', vInc2: '400,000,000' },
+    shareholderRegister: [
+      { id: 'h1', name: '김대표', relation: 'ceo', shares: 60000, acquirePrice: 5000 },
+      { id: 'h2', name: '이배우', relation: 'spouse', shares: 25000, acquirePrice: 5000 },
+      { id: 'h3', name: '김자녀', relation: 'child', shares: 15000, acquirePrice: 5000 },
+    ],
+  }
+  const yes = { a: 'yes' as const, at: '2026-10-01T00:00:00.000Z' }
+  const fam = mk({ ...famBase, decided: { 'scn.lendToCorp': yes, 'scn.giftToCorp': yes, 'scn.succession': yes } })
+  const famAsk = mk(famBase)
+  const P = (id: string) => scenarioPreset(id)!
+  const CALC = ['calc-t7-loan', 'calc-t7-forgive', 'calc-t7-gift', 'calc-t8-issue', 'calc-t8-reduce']
+  const fitOf = (rec: ClientOpsRecord) => Object.fromEntries(CALC.map((id) => [id, scenarioFit(P(id), fitContext(rec, today))]))
+  const fy = fitOf(fam)
+  const fa = fitOf(famAsk)
+  check('C1 가족 주주 회사 + 대표 답 "예" → 계산기 상황 5가지 모두 맞음(왜: 대표 답 · 자녀)', CALC.every((id) => fy[id].kind === 'fit' && fy[id].why.length > 0), Object.fromEntries(CALC.map((id) => [id, `${fy[id].kind}:${fy[id].why}`])))
+  check(
+    'C2 답이 없으면 — 빌려주기 · 면제는 "빌려준 돈 있나요?" · 재산은 "넣어 줄 계획?" · 감자는 승계 계획을 묻고(친족 주주 이름 함께) · 증자는 주주명부 자녀로 맞음',
+    fa['calc-t7-loan'].kind === 'ask' && fa['calc-t7-loan'].question === 'lendToCorp' && fa['calc-t7-forgive'].question === 'lendToCorp' && fa['calc-t7-gift'].question === 'giftToCorp' && fa['calc-t8-reduce'].question === 'succession' && fa['calc-t8-reduce'].why.includes('이배우') && fa['calc-t8-issue'].kind === 'fit',
+    fa,
+  )
+  const solo = mk({ ...famBase, id: 'solo', shareholderRegister: [{ id: 'h1', name: '김대표', relation: 'ceo', shares: 100000, acquirePrice: 5000 }], decided: { 'scn.lendToCorp': yes, 'scn.giftToCorp': yes } })
+  const fs = fitOf(solo)
+  check('C3 대표 혼자 주주 — 05 세 가지 · 감자는 안 맞음(까닭: 친족 주주 없음 · 대표 답 "예" 여도)', ['calc-t7-loan', 'calc-t7-forgive', 'calc-t7-gift', 'calc-t8-reduce'].every((id) => fs[id].kind === 'no' && fs[id].why.includes('친족 주주')), fs)
+  const indiv = mk({ id: 'ind', companyName: '정밀상회', businessNumber: '123-45-67890', establishedAt: '2020-01-01' })
+  const noReg = mk({ id: 'noreg', companyName: '(주)명부없음', corporateNumber: '110111-2222222', establishedAt: '2020-01-01' })
+  const fi = fitOf(indiv)
+  const fn = fitOf(noReg)
+  check('C4 개인사업자는 5가지 모두 안 맞음 · 주주명부 없는 법인은 "주주명부를 받으면 판단"', CALC.every((id) => fi[id].kind === 'no') && CALC.every((id) => fn[id].kind === 'data' && (fn[id].dataNeeds ?? []).some((d) => d.includes('주주명부'))), { fi, fn })
+  const needRun = runScenario(P('calc-t7-loan'), noReg, today)
+  check('C5 주주명부가 없으면 짐작하지 않음 — 결과 없이 "주주명부를 받으면 바로 계산" · 요청 문구에 주주명부', needRun.state === 'need' && needRun.lines.length === 0 && needRun.amount === '' && needRun.headline.includes('주주명부') && needRun.request.includes('주주명부(최근 것)'), needRun)
+
+  // 계산기 식 그대로 — 업체 상세 숫자 = 계산기 화면 숫자
+  const calcOut = (presetId: string, rec: ClientOpsRecord) => {
+    const pr = P(presetId)
+    const c = calculatorOf(pr.calc!.key)!
+    const pv = calcPresetValues(pr, rec, today)
+    return { pv, out: c.subs.find((x) => x.key === pr.calc!.sub)!.compute({ ...defaultValues(c), ...pv.values }) }
+  }
+  const loan = runCalcScenario(P('calc-t7-loan'), fam, today)
+  const loanCalc = calcOut('calc-t7-loan', fam)
+  const lim = loanCalc.out.blocks.find((b) => b.id === 'w1_out')!.lines.find((l) => l.k === '과세되지 않는 대여원금 한도')!.v
+  check(
+    'C6 대표가 10억 무이자 — 회사 이익 4,600만원 · 배우자 25% 1,150만원 · 자녀 15% 690만원 비과세 · 한도(계산기 · 지분율 60%) 36억 2,319만원',
+    loan.state === 'ready' && loan.headline === '비과세 — 가족 주주 몫이 가장 커도 1,150만원(1억 미만)' && loan.lines[0] === '회사가 얻는 이익(1년 이자) 4,600만원' && loan.lines.some((l) => l.startsWith('이배우 · 지배주주의 친족 25.0% → 1,150만원 비과세')) && loan.amount === '한도 36억 2,319만원' && lim === '3,623,188,406원',
+    loan,
+  )
+  const big = runCalcScenario({ ...P('calc-t7-loan'), calc: { key: 't7', sub: 'w1', amount: 10_000_000_000 } }, fam, today)
+  check('C7 100억이면 — 배우자 몫 1억 1,500만원 1억 이상 → 과세(이름 · 지분율 · 금액)', big.headline.startsWith('과세 — 이배우(25.0%) 1억 1,500만원') && !big.headline.includes('김자녀'), big.headline)
+  const fg = runCalcScenario(P('calc-t7-forgive'), fam, today)
+  const fgCalc = calcOut('calc-t7-forgive', fam)
+  const fgNet = fgCalc.out.blocks.find((b) => b.id === 'w2_out')!.lines.find((l) => l.k === '정산증여액')!.v
+  check('C8 채무면제 3억 — 회사 소득금액 = 결산 순손익 4억(✓) · 정산증여액이 계산기와 같은 숫자', fg.state === 'ready' && fgCalc.pv.values.w2_income === '400000000' && fg.needs.some((n) => n.label.includes('순이익') && n.ok) && fg.lines[0].endsWith(formatWonText(fgNet)), { fg: fg.lines[0], fgNet })
+  const fgNoInc = runCalcScenario(P('calc-t7-forgive'), mk({ ...famBase, id: 'noinc', taxProfile: { par: '5000' } }), today)
+  check('C9 순이익을 모르면 0 으로 계산하되 "더 정확히"(partial) + 까닭(증여 금액이 크게 보일 수 있음) · 요청 문구에 재무제표', fgNoInc.state === 'partial' && fgNoInc.assumptions.some((a) => a.includes('소득금액 0')) && fgNoInc.needs.some((n) => !n.ok && n.label.includes('순이익')), fgNoInc)
+  const iss = runCalcScenario(P('calc-t8-issue'), fam, today)
+  const issCalc = calcOut('calc-t8-issue', fam)
+  const kidRow = (issCalc.pv.values.x1_rows as RowValues[]).find((r) => r.name === '김자녀')!
+  const issJudge = (issCalc.out.tables ?? [])[0].rows.find((r) => r.cells[0] === '김자녀')!
+  check(
+    'C10 자녀만 신주 20% — 기존 10만 주의 20% = 2만 주 · 인수가 = 액면가 5,000원 · 시가 = 09 식 1주 가치 · 계산기 표의 이익과 같은 금액',
+    kidRow.extra === '20000' && issCalc.pv.values.x1_issue === '5000' && Number(issCalc.pv.values.x1_fair) > 5000 && iss.headline.startsWith('김자녀 이익') && iss.amount === `이익 ${formatWonText(issJudge.cells[5])}`,
+    { iss: iss.headline, kidRow, judge: issJudge.cells },
+  )
+  const noKid = calcPresetValues(P('calc-t8-issue'), solo, today)
+  check('C11 주주명부에 자녀가 없으면 "자녀(새 주주)" 줄을 더하고 알림(실제 받을 사람으로 바꾸기)', (noKid.values.x1_rows as RowValues[]).some((r) => r.name === '자녀(새 주주)' && r.extra === '20000' && r.qty === '0') && noKid.notes.some((n) => n.includes('자녀(새 주주)')), noKid)
+  const red = runCalcScenario(P('calc-t8-reduce'), fam, today)
+  const redCalc = calcOut('calc-t8-reduce', fam)
+  const ceoRow = (redCalc.pv.values.x2_rows as RowValues[])[0]
+  check('C12 대표 주식 30% 감자 — 6만 주의 30% = 1만 8천 주 · 감자대가 = 액면가 · 지분이 늘어나는 배우자 · 자녀 두 줄', ceoRow.extra === '18000' && redCalc.pv.values.x2_redeem === '5000' && red.lines.filter((l) => /^(이배우|김자녀) — 지분/.test(l)).length === 2 && /^(과세|비과세)/.test(red.headline), red)
+  const noVal = runCalcScenario(P('calc-t8-issue'), mk({ ...famBase, id: 'noval', taxProfile: { par: '5000' } }), today)
+  check('C13 06 은 1주 가치를 모르면 짐작하지 않음 — "주식가치를 받으면 바로 계산"', noVal.state === 'need' && noVal.headline.includes('주식가치') && noVal.lines.length === 0, noVal)
+  const ap = (id: string) => Object.keys(calcPresetValues(P(id), fam, today).applied).sort().join(',')
+  check('C14 넣은 가정(칩 · 가정 빼기 대상)은 상황 값만 — 05 금액 한 칸 · 06 인수가/감자대가 + 그 표', ap('calc-t7-loan') === 'w1_principal' && ap('calc-t7-gift') === 'w3_amount' && ap('calc-t8-issue') === 'x1_issue,x1_rows' && ap('calc-t8-reduce') === 'x2_redeem,x2_rows', [ap('calc-t7-loan'), ap('calc-t8-issue'), ap('calc-t8-reduce')])
+  const chipFields = CALC.flatMap((id) => presetAssumptions(P(id)).map((c) => ({ id, f: c.field })))
+  check('C15 칩마다 칸 이름이 넣은 가정과 맞음(그 칸이 바뀌면 칩이 사라지게) · 칸 없는 칩은 "이자 없이" 하나', chipFields.every(({ id, f }) => !f || Object.keys(calcPresetValues(P(id), fam, today).applied).includes(f)) && chipFields.filter((x) => !x.f).length === 1, chipFields)
+  const famRuns = runScenarios(fam, today, () => true, true)
+  check('C16 업체 상세 목록에도 — 계산기 5가지가 절세로 · 단추 "세금 계산기 05/06에서 이어서" · 열면 그 계산기 · 그 탭 · 같은 업체', CALC.every((id) => { const x = famRuns.find((r) => r.id === id); return !!x && x.moduleLabel === '절세' && x.openLabel === `세금 계산기 ${P(id).calc!.key === 't7' ? '05' : '06'}에서 이어서` && x.openPath.includes('m=calc') && x.openPath.includes(`c=${P(id).calc!.key}`) && x.openPath.includes('client=fam') }), famRuns.filter((r) => r.id.startsWith('calc')).map((r) => r.openPath))
+
+  const chipText = (id: string) => presetAssumptions(P(id)).map((c) => c.text)
+  check('C18 칩 글 — "빌려준 돈 10억원"(만원으로 "100,000만원" 아님) · "면제한 빚 3억원" · "자녀 신주 — 기존 주식의 20%" · "대표 주식 30% 감자"', JSON.stringify(chipText('calc-t7-loan')) === JSON.stringify(['빌려준 돈 10억원', '이자 없이']) && chipText('calc-t7-forgive')[0] === '면제한 빚 3억원' && chipText('calc-t8-issue')[0] === '자녀 신주 — 기존 주식의 20%' && chipText('calc-t8-reduce')[0] === '대표 주식 30% 감자', CALC.map(chipText))
+  // 무작위 주주명부 600곳 × 5 상황 — 멈춤 · NaN · 지분 합 어긋남 0
+  let calcBad: string[] = []
+  const REL = ['ceo', 'spouse', 'child', 'minor_child', 'parent', 'relative', 'executive', 'corp', 'other'] as const
+  for (let i = 0; i < 600; i++) {
+    const n = Math.floor(rnd() * 15)
+    const holders = Array.from({ length: n }, (_, k) => ({ id: `x${k}`, name: rnd() < 0.1 ? '' : `주주${k}`, relation: k === 0 && rnd() < 0.8 ? 'ceo' : pick(REL), shares: rnd() < 0.1 ? 0 : Math.floor(rnd() * 50000), acquirePrice: 0 }))
+    const rec = mk({
+      id: `cr${i}`,
+      companyName: `(주)무작위계산${i}`,
+      corporateNumber: '110111-3333333',
+      taxProfile: Object.fromEntries(Object.entries({ par: rnd() < 0.8 ? pick(['100', '500', '5000', '10000']) : '', vAsset: rnd() < 0.6 ? won(rnd() * 1e10) : '', vDebt: rnd() < 0.6 ? won(rnd() * 5e9) : '', vInc2: rnd() < 0.6 ? (rnd() < 0.2 ? '-' : '') + won(rnd() * 2e9) : '' }).filter(([, v]) => v !== '')),
+      shareholderRegister: holders,
+    })
+    const total = holders.filter((h) => h.shares > 0).reduce((a, h) => a + h.shares, 0)
+    for (const id of CALC) {
+      try {
+        const run = runCalcScenario(P(id), rec, today)
+        const text = [run.headline, ...run.lines, run.amount].join(' ')
+        if (/NaN|undefined|Infinity/.test(text)) calcBad.push(`${rec.id} ${id}: ${text.slice(0, 80)}`)
+        if (!run.headline) calcBad.push(`${rec.id} ${id}: 머리글 없음`)
+        const pv = calcPresetValues(P(id), rec, today)
+        if (id.startsWith('calc-t7') && total > 0) {
+          const rows = pv.values.w_share_rows as RowValues[]
+          if (rows.length !== 10 || rows.reduce((a, r) => a + Number(r.qty), 0) !== total) calcBad.push(`${rec.id} ${id}: 05 표 ${rows.length}줄 · 합 어긋남`)
+        }
+        if (id === 'calc-t8-issue' && total > 0 && !(pv.applied.x1_rows as RowValues[]).some((r) => Number(r.extra) > 0)) calcBad.push(`${rec.id}: 신주 받는 줄 없음`)
+      } catch (e) {
+        calcBad.push(`${rec.id} ${id}: ${String(e)}`)
+      }
+    }
+  }
+  check('C17 무작위 주주명부 600곳 × 5 상황 — 멈춤 · NaN 0 · 05 표 10줄 · 주식 수 합 그대로 · 증자엔 받는 줄', calcBad.length === 0, calcBad.slice(0, 6))
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
