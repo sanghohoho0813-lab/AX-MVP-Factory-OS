@@ -1,3 +1,5 @@
+import { AiAssist } from '../components/ai/AiAssist'
+import { calendarBundle } from '../services/aiAssist/builders'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
@@ -112,6 +114,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
 
   const offMap = useMemo(() => daysOffByDate(daysOff), [daysOff])
   const offSet = useMemo(() => new Set(daysOff.map((d) => d.date)), [daysOff])
+  const assistBuild = useCallback(() => calendarBundle({ today, events: buildAllSchedule(records, today), journal, clients: records, daysOff }), [today, records, journal, daysOff])
   const workdays = useMemo(() => monthWorkdays(ym[0], ym[1], offSet), [ym, offSet])
   const missingHolidays = useMemo(() => missingPublicHolidays(ym[0], daysOff), [ym, daysOff])
   const pickedOff = picked ? (offMap.get(picked) ?? []) : []
@@ -263,6 +266,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         }
       />
       <ScheduleTabs />
+      {/* D-239: 일정 AI 도우미 — 이번 주 한눈에 · 빡빡한 날 · 이번 달 꼭 지킬 마감 */}
+      <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} />
 
       {/* 월 이동 + 종류 필터 */}
       <div className="flex flex-wrap items-center justify-between gap-3">

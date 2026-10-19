@@ -10,6 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AiAssist } from '../../components/ai/AiAssist'
+import { salesBundle } from '../../services/aiAssist/builders'
 import { useIsPhone } from '../../lib/useIsPhone'
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
@@ -317,6 +319,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
 
   const risks = useMemo(() => salesRisks(records, today), [records, today])
   const recontacts = useMemo(() => salesRecontacts(records), [records])
+  const assistBuild = useCallback(() => salesBundle(records, today, risks), [records, today, risks])
 
   /** D-122: '계약 완료' 로 옮기면 확인 시트 — 수금 항목 · 받을 날 · 영업자 · 계약 방식까지 한 번에 */
   const [closing, setClosing] = useState<{ record: ClientOpsRecord; draft: ContractCloseDraft } | null>(null)
@@ -473,6 +476,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
       <SalesTabs />
+      {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
+      {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
 
       {error && (
         <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">

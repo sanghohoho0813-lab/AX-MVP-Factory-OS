@@ -14,7 +14,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
-import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { EmploymentOrig } from './orig/EmploymentOrig'
 import { Button } from '../../components/ui/Button'
@@ -246,11 +246,13 @@ export function EmploymentPage() {
         <h1 className="sr-only" data-testid="emp-module-eyebrow">
           고용지원금 관리
         </h1>
+        {/* D-239: 한눈에 보기 맨 위 — 명부가 있는 업체 전체의 지원금을 AI 가 한 번에(원래 대시보드가 길어 아래에 두면 안 보인다) */}
+        {section === 'dashboard' && <ModuleAssistBar toolKey="employment" />}
         <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} focusClient={clientId} />
         {section === 'dashboard' && (
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
             <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="employment" />
+            <ModuleDashboard toolKey="employment" assist={false} />
           </section>
         )}
         <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>

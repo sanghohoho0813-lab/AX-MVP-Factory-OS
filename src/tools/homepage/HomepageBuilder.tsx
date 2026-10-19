@@ -203,7 +203,7 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
         {!f.phone && !promo?.phone && f.contactPhone && <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-800">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
         {fromPromo.length > 0 && (
           <p className="t-sub break-keep rounded-(--radius-control) bg-violet-50 px-3 py-2 text-violet-900" data-testid="site-start-promo">
-            홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
+            블로그 · 플레이스 홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
           </p>
         )}
         <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 sm:flex-row sm:items-end">

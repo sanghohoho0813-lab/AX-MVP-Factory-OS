@@ -160,7 +160,7 @@ async function serverTests() {
   {
     const st = mkRes()
     await handler({ method: 'GET', url: '/api/ai-run?status=1', headers: { authorization: OWNER } }, st)
-    check('A1 키 없음 — 상태: 설정 안 됨 · 빠진 이름만(값 없음)', st.statusCode === 200 && st.body.configured === false && (st.body.missing as string[]).includes('OPENAI_API_KEY') && !st.raw.includes('m-deep'), st.body)
+    check('A1 키 없음 — 상태: 설정 안 됨 · 빠진 이름만(값 없음)', st.statusCode === 200 && st.body.configured === false && (st.body.missing as string[]).some((m) => m.includes('OPENAI_API_KEY')) && !st.raw.includes('m-deep'), st.body)
     const r = await post({ requestId: reqId(), skillId: 'CONSULTANT_MESSAGE', caseId: CASE, input: {}, context: {} })
     check('A2 키 없음 — 실행: 503 "AI 기능 설정이 필요합니다." · 공급자 안 부름', r.statusCode === 503 && r.body.code === 'setup_needed' && r.body.message === 'AI 기능 설정이 필요합니다.' && llmCalls.length === 0, r.body)
   }

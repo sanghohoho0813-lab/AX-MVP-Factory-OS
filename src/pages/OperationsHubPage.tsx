@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
-import { AiClientAssistantButton } from '../components/ops/AiClientAssistant'
+import { AiAssist } from '../components/ai/AiAssist'
+import { clientsBundle } from '../services/aiAssist/builders'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryInUrl } from '../lib/useQueryInUrl'
@@ -377,6 +378,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       /* 저장 못 해도 화면은 돈다 */
     }
   }, [segment])
+  const assistBuild = useCallback(() => clientsBundle(typed, today, reco, segment), [typed, today, reco, segment])
   const contractCount = typed.filter(isContractClient).length
   const prospectCount = typed.filter(isProspect).length
   const moneyWords = useMoneyWords()
@@ -576,8 +578,6 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <span className="hidden sm:inline">{!pilot && ctype === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</span>
               <span className="sm:hidden">등록</span>
             </Button>
-            {/* D-169: AI 비서 자리 — 이번 주 고객 · 우선순위 · PDF · 메일(연결 준비 중) */}
-            <AiClientAssistantButton />
             {/* D-122: 점 세 개만 두지 않는다 — 백업 · 일정 · 정산이 여기 숨어 있었다 */}
             <Button variant="ghost" onClick={() => setMoreOpen(true)}>
               <MoreHorizontal aria-hidden="true" className="size-5" />
@@ -586,6 +586,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
+      {/* D-239: 고객 관리 AI 도우미(예전 'AI 비서 · 준비 중' 자리) — 고른 구분(계약 고객 · 잠재고객)에 맞춘 질문 */}
+      {typed.length > 0 && (
+        <AiAssist
+          page="clients"
+          scope={`clients:${segment}`}
+          title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
+          presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
+          build={assistBuild}
+        />
+      )}
 
       {moreOpen && (
         <BottomSheet title="고객 관리 도구" onClose={() => setMoreOpen(false)}>

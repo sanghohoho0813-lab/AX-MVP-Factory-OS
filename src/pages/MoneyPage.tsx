@@ -7,12 +7,13 @@
  *  정기 결제  매월/해마다 며칠 · 다음 결제일 · 한 달 · 1년 합계 · 달러 환율
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AiAssist } from '../components/ai/AiAssist'
+import { moneyBundle } from '../services/aiAssist/builders'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Plus, Repeat } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
-import { AiSoonButton } from '../components/ui/AiSoonButton'
 import { Blank, MetricTile, ScreenTitle, Section } from '../components/ui/primitives'
 import { ExpenseSheet, RateSheet, SubscriptionSheet } from '../components/money/MoneySheets'
 import { listClients } from '../services/clientOpsService'
@@ -90,6 +91,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
   const sum = useMemo(() => monthSummary(input, ym, today), [input, ym, today])
   const ahead = useMemo(() => outlook(input, today, 6), [input, today])
   const undated = useMemo(() => undatedRevenue(records, today), [records, today])
+  const assistBuild = useCallback(() => moneyBundle({ today, ym, records, subscriptions: subs, expenses, settings }), [today, ym, records, subs, expenses, settings])
   const clientName = useCallback((id: string) => records.find((r) => r.id === id)?.companyName ?? '', [records])
   const isPast = ym < ymOf(today)
   const isNow = ym === ymOf(today)
@@ -134,6 +136,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
+      {/* D-239: 매출 · 비용 AI 도우미 — 가장 큰 비용 · 1년 예상 지출 · 줄일 비용 · 들어올 돈(예전 'AI 자리 · 준비 중' 단추를 실제로) */}
+      <AiAssist page="money" title="매출 · 비용" presets={['money.top', 'money.year', 'money.cut', 'money.in']} build={assistBuild} />
 
       {error && (
         <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
@@ -336,9 +340,6 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
               </ul>
             )}
           </Section>
-          <div className="flex flex-wrap gap-2">
-            <AiSoonButton label="이 달 비용 정리해 보기" what="이 달 비용을 분류별로 요약하고 줄일 수 있는 구독을 짚어 줍니다" />
-          </div>
         </>
       )}
 

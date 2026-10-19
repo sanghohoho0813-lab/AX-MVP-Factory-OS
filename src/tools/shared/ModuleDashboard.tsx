@@ -11,7 +11,10 @@
  * 모듈마다 다른 것(이번 달 회차·연구노트 밀린 수 같은 것)은 `children` 으로 아래에 더한다.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AiAssist } from '../../components/ai/AiAssist'
+import { moduleBundle } from '../../services/aiAssist/builders'
+import { useEntitlements } from '../../lib/entitlementsStore'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Building2, CalendarClock, FileWarning } from 'lucide-react'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
@@ -100,13 +103,49 @@ function dueTone(daysLeft: number | null): { tone: Tone; text: string } {
   return { tone: 'neutral', text: `${daysLeft}일 남음` }
 }
 
+const MODULE_PRESETS = ['module.all', 'module.first', 'module.missing']
+
+/**
+ * D-239: 모듈 → 고객 전체를 거꾸로(예: 4대보험 명부가 있는 업체마다 받을 수 있는 지원금) — 규칙 판정을 AI 가 정리.
+ * 업체가 없으면 그리지 않는다. clients 를 주지 않으면 스스로 읽는다(원래 대시보드가 위에 길게 있는 고용지원금 · 연구소는 화면 맨 위에 따로 둔다).
+ */
+export function ModuleAssistBar({ toolKey, clients: given }: { toolKey: string; clients?: ClientOpsRecord[] | null }) {
+  const { loadClients } = useToolClient()
+  const { ent } = useEntitlements()
+  const [loaded, setLoaded] = useState<ClientOpsRecord[] | null>(null)
+  const clients = given !== undefined ? given : loaded
+  const today = todayLocalDate()
+  const title = `${toolOf(toolKey)?.label ?? toolKey} · 고객 전체`
+
+  useEffect(() => {
+    if (given !== undefined) return
+    let alive = true
+    void loadClients().then((list) => {
+      if (alive) setLoaded(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [given, loadClients])
+
+  const count = useMemo(() => summarizeModule(clients ?? [], toolKey, today).clients.length, [clients, toolKey, today])
+  const build = useCallback(
+    () => moduleBundle({ today, records: clients ?? [], features: [toolKey], notices: [], usable: (k) => ent.feature(k).usable, title }),
+    [today, clients, toolKey, ent, title],
+  )
+  if (count === 0) return null
+  return <AiAssist page="module" scope={`module:${toolKey}`} title={title} presets={MODULE_PRESETS} build={build} />
+}
+
 export interface ModuleDashboardProps {
   toolKey: string
   /** 모듈이 직접 더하는 칸 — 위(칸 아래)에 그대로 놓인다 */
   children?: ReactNode
+  /** false — AI 도우미 띠를 그리지 않는다(화면 맨 위에 ModuleAssistBar 를 따로 둔 모듈) */
+  assist?: boolean
 }
 
-export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
+export function ModuleDashboard({ toolKey, children, assist = true }: ModuleDashboardProps) {
   const { loadClients } = useToolClient()
   // D-166: 휴대폰은 서류 빠진 업체를 4곳만(같은 사유가 수십 줄 반복됐다) — 나머지는 '몇 곳 더'
   const phone = useIsPhone()
@@ -140,6 +179,7 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
 
   return (
     <div className="flex flex-col gap-5" data-testid="module-dashboard" data-module={toolKey}>
+      {assist && <ModuleAssistBar toolKey={toolKey} clients={clients} />}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 관리에 있는 업체" />
         <MetricTile

@@ -198,7 +198,7 @@ export const MODULE_CATALOG: CatalogModule[] = [
     key: 'web-studio',
     name: '웹 스튜디오',
     description: '업체 홈페이지와 홍보 글(블로그 · 영상 대본 · 카드뉴스 · 카톡 · 플레이스 소개)을 업체 기록으로 바로 만듭니다.',
-    covers: ['홈페이지 만들기', '홍보 글 만들기', '홈페이지 설계'],
+    covers: ['홈페이지 만들기', '블로그 · 플레이스 홍보 글 만들기', '홈페이지 설계'],
     upcoming: [],
     category: 'web',
     route: '/modules/web-studio',

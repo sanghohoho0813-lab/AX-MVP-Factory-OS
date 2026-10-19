@@ -7,7 +7,7 @@
  *
  * 답은 규칙으로 만든다(clientAdvisor — LLM 호출 0). 묻은 질문만 이 브라우저에 남기고(업체마다), 답은 열 때마다 지금 기록으로 다시 만든다.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, ChevronDown, Copy, MessageCircleQuestion, Send, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -18,7 +18,8 @@ import { copyText } from '../../services/grants/grantView'
 import { Button } from '../ui/Button'
 import { HelpHeading } from '../ui/fold'
 import { Badge, Surface, type Tone } from '../ui/primitives'
-import { AiSoonButton } from '../ui/AiSoonButton'
+import { AiAssist } from '../ai/AiAssist'
+import { clientBundle } from '../../services/aiAssist/builders'
 import { useToast } from '../ui/toastContext'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
@@ -69,6 +70,7 @@ export function ClientAdvisor({
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns(record.id))
   const [openGroup, setOpenGroup] = useState<string>(ADVISOR_GROUPS[0].key)
   const [draft, setDraft] = useState('')
+  const assistBuild = useCallback(() => clientBundle(record, today, insights), [record, today, insights])
   const endRef = useRef<HTMLDivElement>(null)
   const [seen, setSeen] = useState(record.id)
   if (seen !== record.id) {
@@ -184,10 +186,11 @@ export function ClientAdvisor({
             <Button type="submit" variant="primary" disabled={!draft.trim()} data-testid="advisor-send">
               <Send aria-hidden="true" className="size-4" /> 묻기
             </Button>
-            <AiSoonButton label="AI에게 묻기" what="목차에 없는 질문도 이 회사 정보로 답하고, 컨설팅 결과 · 절차를 글로 써 줍니다" />
+            {/* D-239: 예전 'AI 자리 · 준비 중' — 이제 실제로 이 업체 자료로 AI 에 묻는다(대표 계정에서만) */}
+            <AiAssist variant="button" label="AI에게 묻기" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} />
           </form>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="t-meta break-keep text-slate-500">지금은 정해 둔 규칙으로 답해요(AI 아님 · 밖으로 보내는 것 없음).</p>
+            <p className="t-meta break-keep text-slate-500">위 대화는 정해 둔 규칙으로 답해요(AI 아님 · 밖으로 보내는 것 없음). 'AI에게 묻기' 를 누를 때만 이 업체 자료를 AI 로 보냅니다.</p>
             {turns.length > 0 && (
               <button type="button" onClick={() => setTurns([])} className="tap t-sub inline-flex items-center gap-1 text-slate-500 hover:text-slate-800" data-testid="advisor-clear">
                 <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기

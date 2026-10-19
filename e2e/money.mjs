@@ -147,11 +147,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   check('지운 뒤 택시 줄 없음', !(await page.locator('main').innerText()).includes('미팅 택시'))
 
-  // AI 단추
-  await page.getByTestId('ai-soon').first().click()
-  await page.waitForTimeout(300)
-  check('AI 단추: 누르면 준비 중 안내', /AI 연결 준비 중/.test(await page.locator('body').innerText()))
-  const color = await page.getByTestId('ai-soon').first().evaluate((el) => getComputedStyle(el).backgroundImage)
+  // AI 단추 — D-239: 예전 '준비 중' 자리가 실제 AI 도우미로(가장 큰 비용 · 1년 지출 · 줄일 비용 · 들어올 돈)
+  check('AI 도우미: 매출 · 비용 띠 · 첫 질문 가장 큰 비용 TOP5 · 예전 준비 중 단추 없음', (await page.getByTestId('ai-assist-bar').count()) === 1 && (await page.getByTestId('ai-assist-chip').first().getAttribute('data-assist')) === 'money.top' && (await page.getByTestId('ai-soon').filter({ hasText: '이 달 비용 정리해 보기' }).count()) === 0)
+  const color = await page.getByTestId('ai-assist-open').first().evaluate((el) => getComputedStyle(el).backgroundImage)
   check('AI 단추: 보라색', /gradient/.test(color), color)
 
   // 해지

@@ -89,6 +89,20 @@ export function normalizeTrial(raw: unknown, at = new Date().toISOString()): Tri
   }
 }
 
+/**
+ * D-239 '미래AI랩으로 만들기' — 우리 회사 자신을 홍보하는 글 · 홈페이지. 늘 같은 id 라 만든 글이 한 곳(보관함)에 쌓인다.
+ * 사람 이름 · 연락처 · 주소는 비워 둔다(지어내지 않는다 — 대표가 홍보 정보에서 채운다).
+ */
+export const MIRAE_TRIAL_ID = 'trial_miraeailab'
+
+export function isMiraeSubject(id: string | null | undefined): boolean {
+  return id === MIRAE_TRIAL_ID
+}
+
+export function miraeTrial(at = new Date().toISOString()): TrialProfile {
+  return { id: MIRAE_TRIAL_ID, kind: 'company', name: '미래AI랩', industry: '경영 컨설팅', person: '', region: '', phone: '', email: '', homepage: '', intro: '정책자금 · 고용지원금 · 연구소 · 절세 · AX 컨설팅', requestedBy: '', createdAt: at, updatedAt: at }
+}
+
 /** 빈 칸 하나 — 고르는 화면의 '직접 넣기' 시작값 */
 export function emptyTrial(kind: TrialKind, at = new Date().toISOString()): TrialProfile {
   return { id: newTrialId(), kind, name: '', industry: '', person: '', region: '', phone: '', email: '', homepage: '', intro: '', requestedBy: '', createdAt: at, updatedAt: at }

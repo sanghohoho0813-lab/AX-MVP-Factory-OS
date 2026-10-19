@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState, type ReactNode, useRef } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
-import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { OrigLabcare } from './orig/OrigLabcare'
 import { Button } from '../../components/ui/Button'
@@ -224,10 +224,12 @@ export function LabcarePage() {
       <p className="sr-only" data-testid="lab-module-eyebrow">기업부설연구소 관리</p>
       {section === 'dashboard' ? (
         <>
+          {/* D-239: 한눈에 보기 맨 위 — 고객 전체의 연구소 판정을 AI 가 한 번에 */}
+          <ModuleAssistBar toolKey="labcare" />
           <OrigLabcare section="dashboard" />
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
             <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="labcare" />
+            <ModuleDashboard toolKey="labcare" assist={false} />
           </section>
         </>
       ) : (

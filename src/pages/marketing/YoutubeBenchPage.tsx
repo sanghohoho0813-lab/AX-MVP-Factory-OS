@@ -13,6 +13,9 @@
  *  - D-231: 마케팅 · 브랜딩(/marketing)을 누르면 바로 이 화면. 목차 한 줄에 '내 콘텐츠'(일정 · 체크리스트 · 예전 콘텐츠 수첩) ·
  *    홍보 글 만들기 · 홈페이지 만들기까지(MarketingTabs). 후보 카드마다 미래AI랩 관점 상자 + 이번 주 찍기 키트.
  */
+import { AiAssist } from '../../components/ai/AiAssist'
+import { radarBundle } from '../../services/aiAssist/builders'
+import { todayLocalDate } from '../../lib/appClock'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
@@ -113,6 +116,15 @@ function withoutDisabled(feed: YtFeed, overrides: Readonly<Record<string, { enab
   return { ...feed, channels: keep, videos: feed.videos.filter((v) => ids.has(v.ch)) }
 }
 
+/** D-239 탭마다 AI 도우미 질문 — 대표 지시: 이번 주 찍을 것 TOP5 · 벤치마킹 · 인기 급상승 참고 · 내 콘텐츠 자세히 */
+const RADAR_ASSIST: Record<string, string[]> = {
+  plan: ['radar.top5', 'radar.view', 'bench.copy'],
+  top: ['rising.ref', 'rising.shorts', 'bench.why'],
+  channels: ['bench.why', 'bench.copy', 'radar.top5'],
+  analysis: ['bench.why', 'bench.copy', 'radar.top5'],
+  make: ['mine.detail', 'mine.next', 'radar.top5'],
+}
+
 function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const yt = useYtFeed()
   const { showToast } = useToast()
@@ -169,6 +181,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [prepared, plan, rvideos])
   const loading = yt.status === 'loading'
+  const assistBuild = useCallback(
+    () => radarBundle({ today: todayLocalDate(), view, plan, rising, breakouts, videos: rvideos, ideas: notebook.ideas, mine: mineVideos }),
+    [view, plan, rising, breakouts, rvideos, notebook.ideas, mineVideos],
+  )
 
   const refresh = () => {
     void yt.refresh()
@@ -324,6 +340,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       <div role="tablist" data-testid="yt-views">
         <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
       </div>
+      {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(이번 주 찍을 것 · 인기 급상승 · 분석 · 내 콘텐츠). 순위가 바뀌면 다시 누르면 새 순위로 */}
+      {!readOnly && (prepared || view === 'make') && <AiAssist page="radar" scope={`radar:${view}`} title={`마케팅 · ${RADAR_VIEWS.find((v) => v.key === view)?.label ?? ''}`} presets={RADAR_ASSIST[view] ?? RADAR_ASSIST.plan} build={assistBuild} />}
 
       {view === 'make' ? (
         <MakeView

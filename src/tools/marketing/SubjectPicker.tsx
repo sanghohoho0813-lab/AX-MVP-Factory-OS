@@ -6,12 +6,12 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { BriefcaseBusiness, Plus, Search, Sparkles } from 'lucide-react'
+import { BriefcaseBusiness, Building, Plus, Search, Sparkles } from 'lucide-react'
 import { useToolClient } from '../shared/toolClientContext'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isContractClient } from '../../services/salesPipeline'
 import { clientTypeOf } from '../../services/clientType'
-import { emptyTrial, TRIAL_KIND_LABEL, type TrialKind, type TrialProfile } from '../../services/marketingTrial'
+import { emptyTrial, MIRAE_TRIAL_ID, miraeTrial, TRIAL_KIND_LABEL, type TrialKind, type TrialProfile } from '../../services/marketingTrial'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { useToast } from '../../components/ui/toastContext'
 import { HelpHeading } from '../../components/ui/fold'
@@ -102,7 +102,7 @@ export function SubjectPicker({
     // 임시등록까지 마친 가상은 이제 고객 관리에 있다 — 여기서는 뺀다
     for (const t of trialsStore.trials.filter((x) => !x.registeredAt)) {
       const hay = [t.name, t.person, t.industry, t.phone, t.region].join(' ').toLowerCase()
-      out.push({ id: t.id, name: t.name, group: 'trial', href: `${buildPath}?trial=${encodeURIComponent(t.id)}${carry}`, provisional: false, kindLabel: TRIAL_KIND_LABEL[t.kind], search: (s: string) => hay.includes(s.trim().toLowerCase()) })
+      out.push({ id: t.id, name: t.name, group: 'trial', href: `${buildPath}?trial=${encodeURIComponent(t.id)}${carry}`, provisional: false, kindLabel: t.id === MIRAE_TRIAL_ID ? '우리 회사' : TRIAL_KIND_LABEL[t.kind], search: (s: string) => hay.includes(s.trim().toLowerCase()) })
     }
     return out
   }, [clients, trialsStore.trials, buildPath, carry])
@@ -131,6 +131,18 @@ export function SubjectPicker({
     navigate(`${buildPath}?trial=${encodeURIComponent(saved.id)}${carry}`)
   }
 
+  /** D-239 '미래AI랩으로 만들기' — 늘 같은 자리(우리 회사)라 만든 글 · 홈페이지가 한 보관함에 쌓인다. 처음 한 번만 만든다 */
+  const openMirae = async () => {
+    if (saving) return
+    if (!trialsStore.trials.some((x) => x.id === MIRAE_TRIAL_ID)) {
+      setSaving(true)
+      const saved = await trialsStore.save(miraeTrial())
+      setSaving(false)
+      if (!saved) return showToast('미래AI랩 자리를 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.')
+    }
+    navigate(`${buildPath}?trial=${encodeURIComponent(MIRAE_TRIAL_ID)}${carry}`)
+  }
+
   const loading = clients === null || trialsStore.status === 'loading'
 
   return (
@@ -157,9 +169,13 @@ export function SubjectPicker({
       <div className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${t.line} ${t.soft}`} data-testid="trial-start">
         <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>
           <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
-          고객 관리에 없어도 돼요 — 잠재고객 · 동료 컨설턴트 · 가상의 업체로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
+          고객 관리에 없어도 돼요 — 우리 회사(미래AI랩) · 잠재고객 · 동료 컨설턴트 · 가상의 업체로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
         </p>
         <div className="flex flex-wrap gap-2">
+          {/* D-239 대표 "미래AI랩으로 만들기도 있었으면 — 기록이 다 쌓이게" */}
+          <button type="button" onClick={() => void openMirae()} disabled={saving || trialsStore.status === 'loading'} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-transparent px-3 font-semibold shadow-sm disabled:opacity-60 ${t.solid}`} data-testid="trial-mirae">
+            <Building className="size-4" aria-hidden="true" /> 미래AI랩으로 만들기
+          </button>
           <button type="button" onClick={() => openForm('company')} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border bg-white px-3 font-semibold ${t.line} ${t.deep} ${t.hover}`} data-testid="trial-new-company">
             <Plus className="size-4" aria-hidden="true" /> 가상 업체로 만들기
           </button>

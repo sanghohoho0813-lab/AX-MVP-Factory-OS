@@ -322,7 +322,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: 'content',
-    label: '홍보 글 만들기',
+    label: '블로그 · 플레이스 홍보 글 만들기',
     desc: '업체 기록과 업종 견본으로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 소식 · 플레이스 소개 · 키워드를 바로 만들고, 업체별 보관함에 남깁니다.',
     navHint: '업체 기록 → 먼저 만들 글 3개 → 복사 · 보관',
     path: '/tools/content',

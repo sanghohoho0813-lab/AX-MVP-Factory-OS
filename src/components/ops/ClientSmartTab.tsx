@@ -11,6 +11,9 @@
  *
  * 판정은 규칙 계산이다(모듈 화면과 같은 엔진) — 'AI' 라고 부르지 않는다. 선정 · 승인 가능성을 보장하지 않는다.
  */
+import { AiAssist } from '../ai/AiAssist'
+import { clientBundle } from '../../services/aiAssist/builders'
+import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History } from 'lucide-react'
@@ -113,6 +116,7 @@ export default function ClientSmartTab({
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
   // D-199: 상황 예시도 요금제에 있는 모듈만(모듈 키 = 기능 권한 키)
   const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
+  const assistBuild = useCallback(() => clientBundle(record, today, insights, buildClientSchedule(record, today)), [record, today, insights])
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
@@ -121,6 +125,9 @@ export default function ClientSmartTab({
           openFold('smart.verdicts')
           window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
         }} />
+
+      {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
+      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} />
 
       {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
       <FoldAllButton className="-my-2 self-end" />

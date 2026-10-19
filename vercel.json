@@ -4,7 +4,8 @@
   "functions": {
     "api/grants-feed.js": { "maxDuration": 30 },
     "api/yt-bench.js": { "maxDuration": 30 },
-    "api/ai-run.js": { "maxDuration": 60 }
+    "api/ai-run.js": { "maxDuration": 60 },
+    "api/ai-assist.js": { "maxDuration": 60 }
   },
   "rewrites": [
     {

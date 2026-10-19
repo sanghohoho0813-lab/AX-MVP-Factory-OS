@@ -192,7 +192,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   const topics = page.getByTestId('yt-topic')
   check('콘텐츠 추천: 이번 주 · 이번 달 주목 주제(1위 가업승계 증여특례 · 2개 채널 · 대표 영상)', (await topics.count()) >= 3 && ((await topics.first().innerText()) ?? '').includes('가업승계 증여특례') && ((await topics.first().innerText()) ?? '').includes('2개 채널') && ((await topics.first().innerText()) ?? '').includes('가업승계 증여특례 한눈에'), await topics.count())
-  check('제목 아이디어 3개씩 · 대본 만들기(AI) 단추 없음', (await topics.first().getByTestId('yt-idea').count()) === 3 && !/AI/.test((await page.locator('main').innerText()) ?? ''))
+  check('제목 아이디어 3개씩 · 대본 만들기(AI) 단추 없음', (await topics.first().getByTestId('yt-idea').count()) === 3 && !/AI/.test(await page.locator('main').evaluate((m) => { const c = m.cloneNode(true); c.querySelectorAll('[data-ai-assist]').forEach((e) => e.remove()); return c.textContent ?? '' })))
   const firstIdea = ((await topics.first().getByTestId('yt-idea').first().innerText()) ?? '').replace(/\s*복사\s*$/, '').trim()
   await topics.first().getByTestId('yt-idea-copy').first().click()
   await page.waitForTimeout(300)

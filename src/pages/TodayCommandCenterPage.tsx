@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AiAssist } from '../components/ai/AiAssist'
+import { todayBundle } from '../services/aiAssist/builders'
+import { careList } from '../services/clientCare'
+import { listSubscriptions } from '../services/finance/financeStore'
+import { upcomingCharges } from '../services/finance/financeCore'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useIsPhone } from '../lib/useIsPhone'
 import { TodayCharges } from '../components/money/TodayCharges'
@@ -335,6 +340,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   )
   const todoCount = openTodos.length
 
+  /** D-239: AI 도우미에 보낼 오늘 자료 — 화면이 이미 계산한 목록 그대로 */
+  const assistBuild = useCallback(async () => {
+    let charges: { name: string; date: string; amount: string }[] = []
+    try {
+      const subs = await listSubscriptions(workspaceId)
+      charges = upcomingCharges(subs, today, 3).map((c) => ({ name: c.sub.name, date: c.date, amount: `${c.sub.currency === 'USD' ? '$' : ''}${c.sub.amount.toLocaleString('ko-KR')}${c.sub.currency === 'USD' ? '' : '원'}` }))
+    } catch {
+      charges = []
+    }
+    return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges })
+  }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable])
+
   const clientNameOf = (id: string) => clientNames.get(id)
 
   /** 할 일 시트에서 고른 것을 실행한다 */
@@ -426,6 +443,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </span>
           </div>
         </div>
+        {/* D-239: 오늘 화면의 AI 도우미 — 오늘 제일 중요한 것만 · 놓치면 끝나는 것 · 순서 · 연락할 곳(대표 계정에서만) */}
+        {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} />}
       </section>
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}

@@ -142,3 +142,28 @@ V1 은 업체마다 **기억(Current Context)** 을 판(v1, v2 …)으로 쌓고
 - `qa:ownerai` 59 — 시나리오 A~E 를 실제 화면에서 끝까지(설정 없음 안내 · 등록 · 중복 · PDF/URL/메모 · 주민번호 지움 · 두 번 눌러도 1번 · 깊게 모델 · 일부 채택 → 기억 v1 · 동료 문구 복사 · 새로고침 뒤 그대로 · 특허 경고 · 기억 v2 · 벤처에 지난 판단 자동 · 제안서 5쪽 SVG 글자 · 점검 · 한 쪽 고침 · 맞춤법 · PDF 다시(AI 다시 안 부름) · PNG · AX 화면 PC 1 + 모바일 2 · 글 고침 유지 · 공급자 실패 · 형식 다름 · ChatGPT 붙여넣기 · 업체 상세 탭 줄 그대로 · 고객과 이어진 작업실 · Partner 주소 · 사용량 · 360/390 넘침 0 · 번들 · 요청 · 저장소에 키 없음).
 - `qa:pilot` — 팀장: AI 작업실 주소 5곳 막힘 · REST(company_cases · ai_runs = [] · 권한 = [] · 넣기 막힘) · DB 권한은 대표 한 사람 / 대표 → 팀장 화면: 메뉴 없음 · /ai 막힘 / 대표: 메뉴 · /ai 열림.
 - 숫자 · 게이트 결과는 docs/QA_REPORT.md §137.
+
+## 14. 공급자 셋 · AI 도우미(D-239 · 2026-10-19)
+
+- 공급자: **Gemini(기본)** · OpenAI(GPT) · Anthropic(Claude). 서버 함수 둘이 같은 설정을 쓴다 — AI 작업실 `/api/ai-run` · 화면마다 AI 도우미 `/api/ai-assist`.
+- 키(서버 환경변수 · 하나만 있어도 된다 · `VITE_` 이름은 읽지 않음):
+  - `GEMINI_API_KEY`(또는 `GOOGLE_API_KEY` · `GOOGLE_GENERATIVE_AI_API_KEY`) — Google AI Studio 키
+  - `OPENAI_API_KEY`(예전 이름 `AI_API_KEY` 도 읽음)
+  - `ANTHROPIC_API_KEY`(또는 `CLAUDE_API_KEY`)
+- 기본 모델: 키가 있는 공급자 중 Gemini → OpenAI → Anthropic 순서의 '빠르게(cheap)' 모델. Gemini 는 `gemini-3.1-flash-lite`.
+  바꾸기: `AI_DEFAULT_PROVIDER`(gemini|openai|anthropic) · `AI_DEFAULT_MODEL` · 목록 `AI_MODELS_GEMINI|OPENAI|ANTHROPIC`("모델,모델" — 앞에서부터 빠르게 · 보통 · 깊게).
+  주소(프록시 등): `AI_GEMINI_BASE_URL` · `AI_OPENAI_BASE_URL`(또는 `AI_BASE_URL`) · `AI_ANTHROPIC_BASE_URL` — https 만.
+- 화면에서 고르기: AI 도우미 패널 아래 '모델' → 공급자 탭(키 있음/없음) → 모델(100만 토큰당 입력/출력 달러). 고른 것은 그 사람 브라우저에 기억 · AI 작업실도 그 공급자를 따른다.
+  [키로 쓸 수 있는 모델 확인] — 공급자에 모델 목록을 물어(10분 기억) 실제로 있는 모델에 '확인됨'.
+- 가격표(2026-10-19 공식 가격 페이지 기준 · 입력/출력 USD per 100만 토큰): gemini-3.1-flash-lite 0.25/1.5 · gemini-3.8-flash 0.75/3.75 · gemini-4-argon 2/10 ·
+  gpt-5-nano 0.05/0.4 · gpt-5.4-mini 0.75/4.5 · gpt-6.1-sol 2/10 · claude-haiku-5-5 0.1/0.5 · claude-sonnet-5-5 2/10 · claude-opus-5-5 4/20 (그 밖의 모델은 패널 목록).
+  비용은 예상치(토큰 × 가격) — 공급자 청구서와 다를 수 있다.
+- AI 도우미 속도 제한: `AI_ASSIST_RATE_PER_MIN`(10) · `AI_ASSIST_RATE_PER_HOUR`(120). 같은 요청 번호 15분 = 공급자 한 번. 자료 글 양 40,000자(넘으면 뒤 줄부터 '(n건 더 — 줄임)').
+- AI 도우미 답은 DB 에 남기지 않는다 — 그 브라우저에 화면마다 6개(전체 60개)까지. 사용량 화면(/ai/usage)은 AI 작업실 실행만 센다.
+
+### Vercel 에 키 넣기(대표가 할 일)
+
+1. Vercel › 프로젝트 › Settings › Environment Variables → `GEMINI_API_KEY` = Google AI Studio(aistudio.google.com) 에서 만든 키 · Production + Preview. (선택) `OPENAI_API_KEY` · `ANTHROPIC_API_KEY`.
+2. 절대 `VITE_` 로 시작하는 이름에 넣지 않는다(화면 번들에 들어간다).
+3. Deployments › 맨 위 › Redeploy. AI 도우미 패널의 '키 있음' 이 켜지면 끝.
+4. AI 작업실 권한(0021)이 Production DB 에 없으면 띠는 보이지만 누르면 'DB 설정 필요' 안내가 나온다 — 12번 1을 먼저.

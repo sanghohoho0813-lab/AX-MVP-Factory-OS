@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AiAssist } from '../components/ai/AiAssist'
+import { inboxBundle } from '../services/aiAssist/builders'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -114,6 +116,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   // D-182: 연결된 업체가 컨설턴트 고객이면 카드에 표시(대표 화면)
   const consultantIds = useMemo(() => new Set(pilot ? [] : clients.filter((c) => clientTypeOf(c) === 'consultant').map((c) => c.id)), [clients, pilot])
 
+  const assistBuild = useCallback(() => inboxBundle(events, clients, todayLocalDate()), [events, clients])
   const visible = useMemo(() => {
     const list = events.filter((e) => matchesStatus(e, filter) && (typeFilter === 'all' || e.eventType === typeFilter))
     if (!waitingFirst) return list
@@ -186,6 +189,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
+      {/* D-239: 상담신청함 AI 도우미 — 전환 가능성 높은 순 · 먼저 연락할 곳 · 오래 기다린 신청 */}
+      {events.length > 0 && <AiAssist page="inbox" title="잠재고객 상담신청" presets={['inbox.rank', 'inbox.first', 'inbox.waiting']} build={assistBuild} />}
 
       {notReady && (
         <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">

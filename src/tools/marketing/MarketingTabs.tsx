@@ -18,6 +18,8 @@ interface Item {
   label: string
   short: string
   icon: LucideIcon
+  /** D-239 넓은 화면에서 이름 아래 작은 글 */
+  sub?: string
 }
 
 export const RADAR_VIEWS: Item[] = [
@@ -28,7 +30,8 @@ export const RADAR_VIEWS: Item[] = [
   { key: 'make', label: '내 콘텐츠', short: '내 콘텐츠', icon: NotebookPen },
 ]
 const TOOLS: Array<Item & { to: string; on: string }> = [
-  { key: 'content', label: '홍보 글 만들기', short: '홍보 글', icon: PenLine, to: '/tools/content', on: 'from-violet-700 to-fuchsia-700' },
+  // D-239 대표 "홍보 글 만들기 이름이 별로 — 블로그 · 플레이스 홍보 글 만들기, 아래에 (키워드 · 플레이스 · 블로그 등)"
+  { key: 'content', label: '블로그 · 플레이스 홍보 글 만들기', short: '블로그 · 플레이스', sub: '(키워드 · 플레이스 · 블로그 등)', icon: PenLine, to: '/tools/content', on: 'from-violet-700 to-fuchsia-700' },
   { key: 'homepage', label: '홈페이지 만들기', short: '홈페이지', icon: Globe, to: '/tools/homepage', on: 'from-emerald-700 to-teal-700' },
 ]
 
@@ -42,7 +45,14 @@ function Label({ it }: { it: Item }) {
     <>
       <Icon aria-hidden="true" className="size-4 shrink-0" />
       <span className="lg:hidden">{it.short}</span>
-      <span className="hidden lg:inline">{it.label}</span>
+      {it.sub ? (
+        <span className="hidden flex-col items-start leading-tight lg:flex">
+          <span>{it.label}</span>
+          <span className="t-meta font-normal opacity-80">{it.sub}</span>
+        </span>
+      ) : (
+        <span className="hidden lg:inline">{it.label}</span>
+      )}
     </>
   )
 }

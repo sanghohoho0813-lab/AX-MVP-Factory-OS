@@ -6,6 +6,7 @@ import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AiContextPayload } from './context'
 import type { AiRunInput, SkillId, Tier } from './types'
+import { readChoice } from '../aiAssist/store'
 
 export const AI_ENDPOINT = '/api/ai-run'
 
@@ -86,7 +87,9 @@ async function readError(res: Response): Promise<AiCallError> {
 export async function fetchAiStatus(): Promise<AiStatus> {
   let res: Response
   try {
-    res = await fetch(`${AI_ENDPOINT}?status=1`, { headers: { ...(await authHeader()) } })
+    // D-239: 화면에서 고른 AI 회사(Gemini · GPT · Claude)로 상태를 본다 — 고른 게 없으면 서버 기본
+    const pick = readChoice()
+    res = await fetch(`${AI_ENDPOINT}?status=1${pick ? `&provider=${encodeURIComponent(pick.provider)}` : ''}`, { headers: { ...(await authHeader()) } })
   } catch {
     throw new AiCallError('network', MESSAGE.network)
   }
@@ -102,7 +105,8 @@ export async function callAi(req: { requestId: string; skillId: SkillId; caseId:
     res = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify(req),
+      // D-239: 고른 AI 회사를 같이 보낸다 — 서버가 그 회사의 빠르게 · 보통 · 깊게 모델을 쓴다
+      body: JSON.stringify({ ...req, ...(readChoice() ? { choice: { provider: readChoice()?.provider } } : {}) }),
     })
   } catch {
     throw new AiCallError('network', MESSAGE.network)

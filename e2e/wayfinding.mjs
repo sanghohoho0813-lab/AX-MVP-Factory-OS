@@ -124,7 +124,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 마케팅 경로 줄
   await go(page, '/tools/content/build?client=cli_hansol')
-  check('W10 마케팅 — 영업 › 마케팅 · 브랜딩 › 홍보 글 만들기 › 한솔테크(주)', (await crumbText(page)).startsWith('영업 › 마케팅 · 브랜딩 › 홍보 글 만들기 › 한솔테크(주)'), await crumbText(page))
+  check('W10 마케팅 — 영업 › 마케팅 · 브랜딩 › 홍보 글 만들기 › 한솔테크(주)', (await crumbText(page)).startsWith('영업 › 마케팅 · 브랜딩 › 블로그 · 플레이스 홍보 글 만들기 › 한솔테크(주)'), await crumbText(page))
 
   // ? 설명 — 마우스를 올리면 뜨고 화면 안
   await go(page, '/ops/clients/cli_hansol?tab=smart')

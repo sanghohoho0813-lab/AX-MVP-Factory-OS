@@ -45,7 +45,7 @@ const LIVE_TOOLS: LiveTool[] = [
     to: '/tools/content',
     testId: 'marketing-content',
     icon: PenLine,
-    title: '홍보 글 만들기',
+    title: '블로그 · 플레이스 홍보 글 만들기',
     text: '업체 기록으로 키워드 · 블로그 · 짧은/긴 영상 대본 · 카드뉴스 · 카톡 소식 · 플레이스 소개 — 먼저 만들 글 3개 추천',
     can: ['블로그', '쇼츠 대본', '카드뉴스', '카톡 소식', '한 달 계획'],
     band: 'from-violet-700 to-fuchsia-700',

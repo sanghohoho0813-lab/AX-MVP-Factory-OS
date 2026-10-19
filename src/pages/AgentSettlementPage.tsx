@@ -8,6 +8,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AiAssist } from '../components/ai/AiAssist'
+import { agentsBundle } from '../services/aiAssist/builders'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Handshake } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -47,6 +49,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
 
   const rows = useMemo(() => agentLedger(records), [records])
   const totals = useMemo(() => agentLedgerTotals(rows), [rows])
+  const assistBuild = useCallback(() => agentsBundle(records, today), [records, today])
 
   /*
    * D-213: 저장은 한 번에 하나씩, 저장 직전에 그 업체 기록을 새로 읽어 그 위에 체크만 얹는다.
@@ -84,6 +87,8 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
           </Button>
         }
       />
+      {/* D-239: 영업자 정산 AI 도우미 — 곧 줄 정산 · 올해 총 지급 예상 · 영업자별 */}
+      {rows.length > 0 && <AiAssist page="agents" title="영업자 정산" presets={['agents.soon', 'agents.year', 'agents.by']} build={assistBuild} />}
 
       {error && (
         <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">

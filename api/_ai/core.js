@@ -1,10 +1,13 @@
 /**
  * 대표 AI 작업실 — 서버 쪽 공통(설정 · 개인정보 지우기 · 결과 검사 · 프롬프트 · 공급자 · 비용).
  *
- * 비밀 키는 이 파일과 api/ai-run.js 안에서만 읽는다(서버 환경변수). VITE_ 로 시작하는 이름은 읽지 않는다 — 번들에 들어가는 이름이라서.
- * 공급자는 바꿔 끼울 수 있게 한 곳(callProvider)으로 모았다. 지금은 OpenAI 호환(chat completions · JSON 응답)만.
- * 모델 이름은 코드에 적지 않는다 — AI_MODEL_CHEAP · AI_MODEL_STANDARD · AI_MODEL_DEEP(없으면 AI_MODEL)에서만.
+ * 비밀 키는 서버 환경변수에서만 읽는다. VITE_ 로 시작하는 이름은 읽지 않는다 — 번들에 들어가는 이름이라서.
+ * 공급자는 세 곳(Gemini · GPT · Claude — providers.js). 예전 설정(AI_PROVIDER=openai + AI_MODEL_*)이 다 있으면 그대로 쓰고,
+ * 아니면 화면에서 고른 공급자(없으면 기본 Gemini)의 빠르게/보통/깊게 모델을 쓴다(D-239).
  */
+import { PROVIDERS, ProviderError, callModel, cleanChoice, configuredProviders, defaultChoice, priceOf, providerBase, providerKey, tierModel } from './providers.js'
+
+export { ProviderError }
 
 export const TIERS = ['cheap', 'standard', 'deep']
 
@@ -26,7 +29,8 @@ function parsePrice(v) {
 const DEFAULT_MAX_OUT = { cheap: 1500, standard: 5000, deep: 12000 }
 const CONTEXT_BUDGET = { cheap: 9000, standard: 18000, deep: 30000 }
 
-export function aiConfig() {
+/** 예전 설정(OpenAI 하나 · 단계별 모델 이름)이 모두 들어 있으면 그 설정 */
+function legacyConfig() {
   const provider = (env(['AI_PROVIDER']) || 'openai').toLowerCase()
   const key = env(['OPENAI_API_KEY', 'AI_API_KEY'])
   const baseRaw = env(['AI_BASE_URL']) || 'https://api.openai.com/v1'
@@ -34,27 +38,54 @@ export function aiConfig() {
   const fallback = env(['AI_MODEL'])
   const models = {}
   const prices = {}
-  const maxOut = {}
   for (const t of TIERS) {
     const T = t.toUpperCase()
     models[t] = env([`AI_MODEL_${T}`]) || fallback
     prices[t] = parsePrice(env([`AI_PRICE_${T}`]))
-    const n = Number(env([`AI_MAX_OUTPUT_${T}`]))
-    maxOut[t] = Number.isFinite(n) && n >= 256 && n <= 64000 ? Math.floor(n) : DEFAULT_MAX_OUT[t]
   }
-  const timeoutMs = Math.min(Math.max(Number(env(['AI_TIMEOUT_MS'])) || 55000, 5000), 295000)
   const missing = []
   if (provider !== 'openai') missing.push('AI_PROVIDER(지금은 openai 만)')
   if (!key) missing.push('OPENAI_API_KEY')
   if (!base) missing.push('AI_BASE_URL(https 주소)')
   for (const t of TIERS) if (!models[t]) missing.push(`AI_MODEL_${t.toUpperCase()}`)
-  return { provider, key, base, models, prices, maxOut, timeoutMs, missing }
+  return { provider, key, base, models, prices, missing }
+}
+
+/**
+ * choice = 화면에서 고른 { provider, model }(없으면 기본). 예전 OpenAI 설정이 완전하고 고른 것이 없거나 OpenAI 면 예전 그대로.
+ * 고른 공급자에 키가 없으면 missing 에 그 키 이름 — 다른 공급자로 몰래 바꾸지 않는다.
+ */
+export function aiConfig(choiceIn) {
+  const maxOut = {}
+  for (const t of TIERS) {
+    const n = Number(env([`AI_MAX_OUTPUT_${t.toUpperCase()}`]))
+    maxOut[t] = Number.isFinite(n) && n >= 256 && n <= 64000 ? Math.floor(n) : DEFAULT_MAX_OUT[t]
+  }
+  const timeoutMs = Math.min(Math.max(Number(env(['AI_TIMEOUT_MS'])) || 55000, 5000), 295000)
+  const choice = cleanChoice(choiceIn)
+  const legacy = legacyConfig()
+  if (legacy.missing.length === 0 && (!choice || choice.provider === 'openai')) return { ...legacy, maxOut, timeoutMs, legacy: true }
+
+  const anyKey = configuredProviders()
+  const provider = choice ? choice.provider : anyKey.includes(defaultChoice().provider) ? defaultChoice().provider : anyKey[0] || defaultChoice().provider
+  const key = providerKey(provider)
+  const base = providerBase(provider)
+  const models = {}
+  const prices = {}
+  for (const t of TIERS) {
+    models[t] = tierModel(provider, t)
+    prices[t] = (provider === 'openai' && parsePrice(env([`AI_PRICE_${t.toUpperCase()}`]))) || priceOf(provider, models[t])
+  }
+  const missing = []
+  if (!key) missing.push(anyKey.length === 0 && !choice ? 'GEMINI_API_KEY(또는 OPENAI_API_KEY · ANTHROPIC_API_KEY)' : PROVIDERS[provider].keyNames[0])
+  if (!base) missing.push(`${PROVIDERS[provider].baseNames[0]}(https 주소)`)
+  return { provider, key, base, models, prices, maxOut, timeoutMs, missing, legacy: false }
 }
 
 /** 화면에 알려도 되는 설정 상태(키 · 모델 이름 값은 빼고) */
 export function publicStatus(cfg) {
   const tiers = {}
-  for (const t of TIERS) tiers[t] = !!(cfg.key && cfg.base && cfg.provider === 'openai' && cfg.models[t])
+  for (const t of TIERS) tiers[t] = !!(cfg.key && cfg.base && cfg.models[t])
   return {
     configured: cfg.missing.length === 0,
     provider: cfg.provider,
@@ -208,61 +239,14 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 공급자 — OpenAI 호환 chat completions(JSON 응답)                                */
+/* 공급자 — 세 곳 같은 모양(providers.js)                                         */
 /* ------------------------------------------------------------------ */
 
-export class ProviderError extends Error {
-  constructor(code, status) {
-    super(code)
-    this.code = code
-    this.status = status
-  }
-}
-
 export async function callProvider(cfg, tier, system, user) {
-  if (cfg.provider !== 'openai') throw new ProviderError('setup_needed', 503)
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs)
-  let res
-  try {
-    res = await fetch(`${cfg.base}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.models[tier],
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        response_format: { type: 'json_object' },
-        max_completion_tokens: cfg.maxOut[tier],
-      }),
-      signal: ctrl.signal,
-    })
-  } catch {
-    throw new ProviderError('provider_unreachable', 502)
-  } finally {
-    clearTimeout(timer)
-  }
-  if (res.status === 401 || res.status === 403) throw new ProviderError('provider_auth', 503)
-  if (res.status === 429) throw new ProviderError('provider_busy', 503)
-  if (res.status === 400 || res.status === 404) throw new ProviderError('provider_rejected', 502)
-  if (!res.ok) throw new ProviderError('provider_error', 502)
-  let data
-  try {
-    data = await res.json()
-  } catch {
-    throw new ProviderError('provider_error', 502)
-  }
-  const choice = data && Array.isArray(data.choices) ? data.choices[0] : null
-  const content = choice && choice.message && typeof choice.message.content === 'string' ? choice.message.content : ''
-  const u = data && data.usage ? data.usage : {}
-  return {
-    content,
-    finish: choice && choice.finish_reason ? String(choice.finish_reason) : '',
-    model: typeof data.model === 'string' && data.model ? data.model : cfg.models[tier],
-    usage: { input: Number(u.prompt_tokens) || 0, output: Number(u.completion_tokens) || 0 },
-  }
+  if (!cfg.key || !cfg.base || !cfg.models[tier]) throw new ProviderError('setup_needed', 503)
+  // 예전 OpenAI 설정은 출력 상한을 그대로(시험이 본다) · 새 공급자는 '생각' 토큰 몫까지 두 배
+  const maxOut = cfg.legacy ? cfg.maxOut[tier] : cfg.maxOut[tier] * 2
+  return callModel({ provider: cfg.provider, key: cfg.key, base: cfg.base, model: cfg.models[tier], system, user, maxOut, timeoutMs: cfg.timeoutMs })
 }
 
 export function costOf(cfg, tier, usage) {

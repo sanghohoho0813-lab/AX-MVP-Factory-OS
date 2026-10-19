@@ -580,7 +580,7 @@ for (const width of [1440, 390]) {
   await page.getByTestId('advisor-send').click()
   await page.waitForTimeout(300)
   const sug = page.getByTestId('advisor-suggest').last()
-  check(`${width} 정해 둔 답이 없으면: 비슷한 질문 · AI 자리`, (await sug.locator('button').count()) > 0 && (await page.getByTestId('advisor').getByTestId('ai-soon').count()) === 1)
+  check(`${width} 정해 둔 답이 없으면: 비슷한 질문 · [AI에게 묻기](D-239 실제 AI)`, (await sug.locator('button').count()) > 0 && (await page.getByTestId('advisor').getByTestId('ai-assist-open').count()) === 1)
   await sug.locator('button').first().click()
   await page.waitForTimeout(300)
   check(`${width} 비슷한 질문 누르면 바로 답`, (await page.getByTestId('advisor-answer').count()) === 4)

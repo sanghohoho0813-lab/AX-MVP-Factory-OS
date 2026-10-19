@@ -18,7 +18,10 @@
  * D-230: 규칙집 남은 것 — 제목 각도 17개 중 후보 5개(검색 의도 다르게 · 이 키워드로 쓴 각도는 빼고), 카드뉴스 5안 한 번에(순서 고정),
  *        올린 글에 조회 · 저장 · 문의 숫자 적기 → 보관함 '무엇이 잘 됐나'(각도 · 카드 유형별).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { AiAssist } from '../../components/ai/AiAssist'
+import { contentBundle } from '../../services/aiAssist/builders'
+import { isMiraeSubject } from '../../services/marketingTrial'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Archive, Award, BarChart3, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardCheck, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Send, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
@@ -199,6 +202,20 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const aiIdent = useOwnerAiIdentity()
   const toolClient = useToolClient()
   const { profile, source } = useMemo(() => buildProfile(record, today, store.overrides, store.site), [record, today, store.overrides, store.site])
+  // D-239 AI 도우미 — 이 업체 홍보 정보 + 규칙집. 미래AI랩이면 우리 회사 소개를 더한다
+  const assistBuild = useCallback(
+    () => contentBundle({ today, profile, source, keyword: mainKeyword(profile), mirae: isMiraeSubject(record.id), items: store.items.map((x) => ({ title: x.title, kind: x.kind, createdAt: x.createdAt })) }),
+    [today, profile, source, record.id, store.items],
+  )
+  const saveAssistItem = useCallback(
+    async (item: { title: string; body?: string }, assistId: string) => {
+      const text = (item.body ?? '').trim()
+      if (!text) return false
+      const r = await store.addDraft({ kind: assistId === 'content.place' ? 'place' : 'blog', title: item.title.slice(0, 60) || 'AI 도우미로 쓴 글', blocks: [{ label: '', text }], notes: ['AI 도우미로 쓴 글 — 올리기 전에 사실 · 혜택 · 숫자를 한 번 확인하세요'], input: { variant: 0, tone: profile.tone } })
+      return !!r
+    },
+    [store, profile.tone],
+  )
 
   // D-231 콘텐츠 레이더 › 내 콘텐츠 [홍보 글로] — 주제를 키워드에 넣고 '직접 고르기 › 블로그' 로 연다
   const [urlParams] = useSearchParams()
@@ -530,6 +547,15 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   return (
     <div className="flex flex-col gap-4" data-testid="content-studio">
       <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} onAiReq={() => setAiReqOpen(true)} />
+      {/* D-239: 규칙집(제목 각도 17 · 블로그 구성 · 넣지 말 것)을 그대로 지켜 AI 가 한 번에 쓰는 블로그 · 플레이스 글 — 만든 글은 보관함에 쌓인다 */}
+      <AiAssist
+        page="content"
+        scope={`content:${record.id}`}
+        title={`블로그 · 플레이스 홍보 글 · ${record.companyName}`}
+        presets={['content.blog', 'content.place', 'content.titles', 'content.keywords']}
+        build={assistBuild}
+        onSaveItem={saveAssistItem}
+      />
 
       {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 · 네 길 중 하나 */}
       <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-guide">

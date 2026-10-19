@@ -6,6 +6,7 @@ import { useOwnerAiAccess } from '../auth/ownerAiAccess'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
+import { ClientAssistButton } from '../components/ai/ClientAssistButton'
 import { navFromOf } from '../lib/navFrom'
 import {
   ArrowLeft,
@@ -762,6 +763,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <ClipboardCopy aria-hidden="true" className="size-4" />
             진행 상황 보고
           </Button>
+          {/* D-239: 이 업체 AI 도우미 — 대표 계정에서만(팀장 화면 · 팀장 보기에는 없음) */}
+          <ClientAssistButton record={record} today={today} />
           <Button variant="ghost" onClick={() => setMoreOpen(true)}>
             <MoreHorizontal aria-hidden="true" className="size-4" />
             더보기

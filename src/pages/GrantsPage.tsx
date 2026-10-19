@@ -8,6 +8,8 @@
  * 영업: 잠재고객에게 "대표님 회사 조건으로 지금 신청 가능한 사업 N건" — 연락할 이유가 된다.
  * 가망고객 스스로: 찾기 링크(/grants/find) — 로그인 없이 자기 조건으로 보고 알림을 신청한다.
  */
+import { AiAssist } from '../components/ai/AiAssist'
+import { grantsBundle } from '../services/aiAssist/builders'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BellRing, Link2, Plus, Search } from 'lucide-react'
@@ -145,6 +147,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   // 업체 × 공고는 한 번만 계산한다(오늘 · 업체 상세 · 고객 관리가 같은 결과를 다시 쓴다)
   const index = useMemo(() => grantIndex(notices, clients, today), [notices, clients, today])
   const reach = index.byNotice
+  const assistBuild = useCallback(() => grantsBundle({ today, notices, clients, index, records }), [today, notices, clients, index, records])
 
   const regional = useMemo(() => notices.filter((n) => inRegion(n, region, '')), [notices, region])
   const open = useMemo(() => regional.filter((n) => deadlineOf(n, today).state !== 'closed'), [regional, today])
@@ -230,6 +233,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
+      {/* D-239: 지원사업 AI 도우미 — 맞는 공고 TOP5 · 업체별 도전할 공고 · 마감 임박 */}
+      {notices.length > 0 && <AiAssist page="grants" title="지원사업 알림" presets={['grants.best', 'grants.client', 'grants.soon']} build={assistBuild} />}
 
       {(error || loadError) && (
         <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">

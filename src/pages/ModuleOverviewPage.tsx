@@ -6,6 +6,10 @@
  * 사는 단추 · 가격은 없다 — 결제가 붙기 전이다.
  */
 
+import { useCallback } from 'react'
+import { AiAssist } from '../components/ai/AiAssist'
+import { moduleBundle } from '../services/aiAssist/builders'
+import { listClients } from '../services/clientOpsService'
 import { useIsPilot } from '../auth/osAccess'
 import { isPilotHiddenPath } from '../config/moduleRegistry'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -45,6 +49,8 @@ export function ModuleOverviewPage() {
   return (
     <div className="flex flex-col gap-6" data-testid="module-overview" data-module-key={m.key}>
       <PageHeader title={`${m.name} 모듈`} description={m.description} />
+      {/* D-239: 이 분야 고객 전체를 거꾸로 — 업체마다 받을 수 있는 것(규칙 판정)을 AI 가 정리 */}
+      {e.usable && <ModuleAssist moduleName={m.name} moduleKey={m.key} features={features.map((f) => f.key).filter((k) => k !== 'grants')} workspaceId={workspaceId} usable={(k) => ent.feature(k).usable} />}
 
       <Surface edge={e.usable ? 'success' : 'warning'} showEdge>
         <div className="flex flex-col gap-2" data-testid="module-status" data-usable={e.usable ? 'yes' : 'no'}>
@@ -174,4 +180,14 @@ export function ModuleOverviewPage() {
       </nav>
     </div>
   )
+}
+
+function ModuleAssist({ moduleName, moduleKey, features, workspaceId, usable }: { moduleName: string; moduleKey: string; features: string[]; workspaceId: string | null; usable: (key: string) => boolean }) {
+  const key = features.join(',')
+  const build = useCallback(async () => {
+    const records = await listClients(workspaceId).catch(() => [])
+    return moduleBundle({ today: todayLocalDate(), records, features: key.split(','), notices: [], usable, title: `${moduleName} 모듈 · 고객 전체` })
+  }, [workspaceId, key, moduleName]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (features.length === 0) return null
+  return <AiAssist page="module" scope={`module:${moduleKey}`} title={`${moduleName} 모듈 · 고객 전체`} presets={['module.all', 'module.first', 'module.missing']} build={build} />
 }
