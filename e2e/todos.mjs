@@ -69,6 +69,24 @@ check('할 일 시트가 열린다', (await page.getByRole('dialog').count()) > 
 check('D-201 할 일 창: [내용 고치기] 단추 없이 칸이 바로 열려 있다', (await page.getByRole('button', { name: '내용 고치기' }).count()) === 0 && (await page.getByLabel('할 일 내용 고치기').count()) === 1 && (await page.getByLabel('할 일 기한 고치기').count()) === 1)
 check('D-201 할 일 창: 같은 창에 진행 중 · 완료 · 내일로 미루기 · 지우기', (await page.getByTestId('todo-actions').locator('[data-todo-action]').count()) === 4)
 check('D-201 할 일 창: 아무것도 안 고쳤으면 [저장] 은 꺼져 있다', await page.getByTestId('todo-save').isDisabled())
+// D-240(대표 요청): 맨 위 한 줄 '할 일 · 업체 고르기 · 업체 열기' → 내용 → 어떻게 할까요 → 언제까지
+{
+  const head = page.getByTestId('todo-head')
+  const topOf = async (loc) => (await loc.boundingBox())?.y ?? -1
+  const yHead = await topOf(head)
+  const yText = await topOf(page.getByLabel('할 일 내용 고치기'))
+  const yActs = await topOf(page.getByTestId('todo-actions'))
+  const yDue = await topOf(page.getByLabel('할 일 기한 고치기'))
+  check('D-240 할 일 창: 업체 고르는 칸이 맨 위 「할 일」 줄에', (await head.getByLabel('할 일 업체 고치기').count()) === 1 && /할 일/.test(await head.innerText()))
+  check('D-240 할 일 창: 순서 — 맨 위 줄 → 내용 → 어떻게 할까요 → 언제까지', yHead >= 0 && yHead < yText && yText < yActs && yActs < yDue, [yHead, yText, yActs, yDue])
+  check('D-240 할 일 창: 업체가 없으면 [업체 열기] 없음', (await page.getByTestId('todo-open-client').count()) === 0)
+  await head.getByLabel('할 일 업체 고치기').selectOption('cli_daum')
+  const open = head.getByTestId('todo-open-client')
+  check('D-240 할 일 창: 업체를 고르면 그 옆에 [업체 열기](고른 업체 이름으로)', (await open.count()) === 1 && / 열기$/.test((await open.getAttribute('aria-label')) ?? ''), await open.getAttribute('aria-label'))
+  await head.getByLabel('할 일 업체 고치기').selectOption('')
+  await page.waitForTimeout(150)
+  check('D-240 할 일 창: 업체를 다시 비우면 [업체 열기] 사라지고 [저장] 꺼짐', (await page.getByTestId('todo-open-client').count()) === 0 && (await page.getByTestId('todo-save').isDisabled()))
+}
 await page.getByLabel('할 일 내용 고치기').fill('고쳐 적은 할 일')
 check('D-201 할 일 창: 고치면 [저장] 이 켜진다', await page.getByTestId('todo-save').isEnabled())
 await page.getByTestId('todo-save').click()
@@ -147,6 +165,21 @@ check('D-201 할 일 창: 저장하면 창이 닫힌다', (await page.getByRole(
   await page.waitForTimeout(900)
   const keptOld = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').some((x) => x.content === '고쳐 적은 할 일'))
   check('D-210 할 일 창: [저장 안 하고 열기] → 업체 화면으로 · 원래 글 그대로', page.url().includes('/ops/clients/cli_daum') && keptOld, page.url())
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+}
+
+// D-240: 창에서 업체를 바꾼 뒤 [업체 열기] → 바꾼 업체가 열린다(저장하고 열기)
+{
+  await page.getByText('고쳐 적은 할 일').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('할 일 업체 고치기').selectOption('cli_hansol')
+  await page.getByTestId('todo-open-client').click()
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: /저장하고 .*열기/ }).click()
+  await page.waitForTimeout(900)
+  const moved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((x) => x.content === '고쳐 적은 할 일'))
+  check('D-240 할 일 창: 업체를 바꾸고 [업체 열기] → [저장하고 열기] → 바꾼 업체 화면 · 업체도 저장', page.url().includes('/ops/clients/cli_hansol') && moved?.clientId === 'cli_hansol', `${page.url()} ${moved?.clientId}`)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
 }

@@ -637,9 +637,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             if (ok) setTodoPick(null)
             return ok
           }}
-          onOpenClient={
-            todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
-          }
+          onOpenClient={(cid) => navigate(`/ops/clients/${cid}`)}
           onClose={() => setTodoPick(null)}
         />
       )}
