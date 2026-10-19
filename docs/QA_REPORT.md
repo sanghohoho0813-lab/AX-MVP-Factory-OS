@@ -3393,7 +3393,7 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **D-243 병합(main 5bcbbae)** — §167 게이트. Production 확인: index-CLRxyouu · TaxCalculatorsPage 조각에 `calc-preset-note` · `calc-presets` · ClientSmartTab 조각에 `세금 계산기 ${…}에서 이어서` · scenarioPresets 조각에 `calc-t8-reduce` 있음.
 - **D-244 게이트 50단계 — 50/50 녹색 한 번에**(HEAD a7f5c18 · dirty 0) — tsc · oxlint(src · api) · build · test:all(**scenarios 112**(75 → 112) · **aiAssist 80**(68 → 80) · tax-plan 141 · customer-facts 323 · tools 439 · employment 337 · labcare 183 · startup-tax 1,918,771 · ownerAi 91 …) ·
   simple 88 · studio 63 · todos 50 · flow 171 · real 188 · squeeze 짜부라짐 0 · phone 174 · detail 316 · taxplan 72 · **scenarios 69**(바로 설계됨 10 → 11 — 업태로 업종) · **plan 63**(41 → 63) · **calcpreset 32**(30 → 32) ·
-  tax 74(원본 대조 그대로 — 법인세 식은 소득 0 이하만 바뀜) · connect 45 · content 146 · site 106 · grants 365 · matrix 526 · modules 896 · pilot 140/241 · isolation · cert 271 · assist 64 · db 녹색 외 전부.
+  tax 74(원본 대조 그대로 — 법인세 식은 소득 0 이하만 바뀜) · connect 45 · content 184 · grants 152 · matrix 526 · pilot 241 · isolation 24 · cert 271 · assist 64 · db 녹색 외 전부.
 - **새 · 바뀐 시험**
   - 단위 Q1~Q11(창업 5년 안 채용 — 맞는지 · 한 장 순서 · 창업감면 판정 · 감면 기간 · 청년 채용과 같은 돈 · 세액공제 ★ · 생년월일 없을 때 · 청년 아닌 대표 50% · 60개월 안 · 상황 예시 줄 · 업태 업종) ·
     R1~R7(대표 주식 0 · 결손 법인 · 주주 12명 · 1년 안 회차(12개월 넘는 회차 있는 사업 포함) · 다시 붙이기 · 연구원 n명 · 무이자 대여 이율).
