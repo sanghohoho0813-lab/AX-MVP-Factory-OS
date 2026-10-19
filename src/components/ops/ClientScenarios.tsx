@@ -14,7 +14,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, ChevronDown, MessageSquareText, Minus } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, ChevronDown, FileStack, MessageSquareText, Minus } from 'lucide-react'
+import { SITUATION_PLANS } from '../../services/situationPlan'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, type Tone } from '../ui/primitives'
@@ -49,12 +50,15 @@ export function ClientScenarios({
   onRequestText,
   onSetNext,
   onAnswer,
+  onPlan,
 }: {
   record: ClientOpsRecord
   today: string
   usable: (module: ScenarioModule) => boolean
   onRequestText?: (text: string) => void
   onSetNext: (text: string) => void
+  /** D-242: 이 상황을 '상황별 한 장 설계서' 로(여러 모듈을 한 장에) — 설계서가 있는 상황만 단추가 생긴다 */
+  onPlan?: (presetId: string) => void
   /** 대표 답 저장(null 이면 지움 — 답 바꾸기). 없으면 질문만 보여 준다. 약속을 돌려주면 저장이 끝날 때까지 다른 답을 막는다 */
   onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void | Promise<unknown>
 }) {
@@ -211,6 +215,7 @@ export function ClientScenarios({
                   onRequestText={onRequestText}
                   onSetNext={onSetNext}
                   onUndo={r.fit.answered && onAnswer ? () => void answer(r.fit.answered!, null) : undefined}
+                  onPlan={onPlan && SITUATION_PLANS.some((d) => d.preset === r.id) ? () => onPlan(r.id) : undefined}
                   fresh={flash.includes(r.id)}
                   busy={busy !== null}
                 />
@@ -336,6 +341,7 @@ function ScenarioRow({
   onRequestText,
   onSetNext,
   onUndo,
+  onPlan,
   fresh = false,
   busy = false,
 }: {
@@ -345,6 +351,7 @@ function ScenarioRow({
   onRequestText?: (text: string) => void
   onSetNext: (text: string) => void
   onUndo?: () => void
+  onPlan?: () => void
   /** 방금 '예' 로 열린 상황 */
   fresh?: boolean
   busy?: boolean
@@ -445,6 +452,11 @@ function ScenarioRow({
             <Link to={r.openPath} className="tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700" data-testid="scenario-open">
               {r.moduleLabel}에서 이어서 <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
+            {onPlan && (
+              <Button size="sm" variant="secondary" onClick={onPlan} data-testid="scenario-plan">
+                <FileStack aria-hidden="true" className="size-4" /> 한 장 설계서로(지원금 · 세액공제 · 정책자금)
+              </Button>
+            )}
             {r.request && onRequestText && (
               <Button size="sm" variant="secondary" onClick={() => onRequestText(r.request)} data-testid="scenario-request">
                 <MessageSquareText aria-hidden="true" className="size-4" /> 빠진 것 요청 문구

@@ -42,6 +42,7 @@ import type { FormData as StartupForm } from '../tools/startupTax/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { fitContext, scenarioFit, type FitContext, type FitKind, type ScenarioFit } from './scenarioFit'
+import { placeOf } from './grants/grantMatch'
 
 export interface ScenarioNeed {
   /** 화면에 쓰는 이름 */
@@ -240,7 +241,8 @@ function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit
 const CAPITAL = new Set(['서울', '경기', '인천'])
 
 function regionOf(facts: ClientFacts): { region: HiringAnswers['region']; known: boolean } {
-  const sido = facts.address.match(/^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/)?.[1] ?? ''
+  // D-242: '전라남도 · 충청북도 · 경상남도 …' 긴 이름도 — 예전에는 짧은 이름만 알아 이 업체들이 '주소 모름 → 수도권' 으로 계산됐다
+  const sido = placeOf(facts.address).sido
   if (!sido) return { region: '수도권', known: false }
   return { region: CAPITAL.has(sido) ? '수도권' : '비수도권', known: true }
 }

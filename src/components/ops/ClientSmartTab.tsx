@@ -6,6 +6,7 @@
  *  2. 방금 올린 서류 — 바로 넣은 정보 · 확인할 정보(까닭) · 크레탑 · 명부 진단
  *  3. 확인이 필요한 정보 — 확실하지 않은 것만(사진 글자 · 지금 값과 다름 …)
  *  4. 다음 행동 추천 — 누르면 그 모듈로 · '다음 약속으로' 한 번에
+ *  4-0. D-242 상황별 한 장 설계서 — 청년 채용 · 만 60세 이상 채용 · 연구소(사람 수) → 여러 모듈을 한 장 · 붙이면 할 일로
  *  5. 모듈별 판정 — 정책자금 · 고용지원금 · 창업감면 · 연구소 · 크레탑 · 절세 · 지원사업(요금제에 있는 것만)
  *  6. 지금 챙길 것 · 맞는 지원사업
  *
@@ -14,7 +15,7 @@
 import { AiAssist } from '../ai/AiAssist'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History } from 'lucide-react'
 import { activityTimeText } from '../../services/clientOpsActivity'
@@ -29,6 +30,9 @@ import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
 import { ClientScenarios } from './ClientScenarios'
+import { ClientSituationPlan } from './ClientSituationPlan'
+import { SITUATION_PLANS, planResultInput, type PlanId, type SituationPlan } from '../../services/situationPlan'
+import { withToolResult } from '../../services/clientOpsService'
 import { withScenarioAnswer } from '../../services/scenarioFit'
 import { Fold, FoldAllButton, HintTip, openFold } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
@@ -117,6 +121,22 @@ export default function ClientSmartTab({
   // D-199: 상황 예시도 요금제에 있는 모듈만(모듈 키 = 기능 권한 키)
   const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
   const assistBuild = useCallback(() => clientBundle(record, today, insights, buildClientSchedule(record, today)), [record, today, insights])
+  // D-242: 아래 상황 예시 줄의 '한 장 설계서로' → 위 설계서가 그 상황으로 펼쳐진다
+  const [planFocus, setPlanFocus] = useState<{ id: PlanId; n: number } | null>(null)
+  const openPlan = (presetId: string) => {
+    const def = SITUATION_PLANS.find((d) => d.preset === presetId)
+    if (def) setPlanFocus((f) => ({ id: def.id, n: (f?.n ?? 0) + 1 }))
+  }
+  // D-242: 설계서를 업체 기록에 한 줄로 — 고른 행동은 할 일(달력 · 오늘). 다음 할 일이 비어 있으면 첫 행동을 거기에도
+  const attachPlan = async (plan: SituationPlan, ids: string[]): Promise<boolean> => {
+    const base = recordRef.current
+    let next = withToolResult(base, planResultInput(plan, base.companyName, ids))
+    const first = plan.actions.find((a) => ids.includes(a.id))
+    if (first && !base.nextAction.trim()) next = withNextAction(next, first.text, first.date)
+    if (onCommitQuiet) return onCommitQuiet(next)
+    await onCommit(next, `${plan.title} 설계서를 업체 기록에 붙였어요`)
+    return true
+  }
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
@@ -203,7 +223,20 @@ export default function ClientSmartTab({
         )}
       </Section>
 
-      {/* 4-0. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
+      {/* 4-0. D-242 상황별 한 장 설계서 — 상황 하나 · 사람 수 → 고용지원금 · 세액공제 · 정책자금을 한 장에 · 붙이면 할 일로 */}
+      <ClientSituationPlan
+        record={record}
+        today={today}
+        usable={scenarioUsable}
+        onRequestText={onRequestText}
+        onAnswer={(q, a) =>
+          onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 설계서 · 상황 예시를 다시 맞췄어요.')
+        }
+        onAttach={attachPlan}
+        focus={planFocus}
+      />
+
+      {/* 4-1. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
       <ClientScenarios
         record={record}
         today={today}
@@ -213,6 +246,7 @@ export default function ClientSmartTab({
         onAnswer={(q, a) =>
           onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
         }
+        onPlan={openPlan}
       />
 
       {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}

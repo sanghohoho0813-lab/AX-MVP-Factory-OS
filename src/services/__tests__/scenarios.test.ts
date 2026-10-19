@@ -1,7 +1,7 @@
 /**
  * D-199 상황 예시로 바로 설계 — 카탈로그 · 업체 숫자로 계산 · 필요한 숫자 ✓/✗ · 요청 문구 · 모듈 엔진과 같은 답.
  */
-import { normalizeClientOps } from '../clientOpsService'
+import { normalizeClientOps, withToolResult } from '../clientOpsService'
 import { SCENARIO_PRESETS, presetAssumptions, presetFieldsKept, scenarioPath, scenarioPreset, withoutPresetFields } from '../scenarioPresets'
 import { fitDataRequest, runScenario, runScenarios, scenarioTaxProfile, scenariosRequest, type ScenarioRun } from '../scenarios'
 import { SCENARIO_QUESTIONS, fitContext, scenarioAnswer, scenarioFit, withScenarioAnswer, type QuestionKey } from '../scenarioFit'
@@ -11,6 +11,8 @@ import { diagnoseHiring } from '../../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../../tools/employment/lib/programs'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { businessTypeOf } from '../../tools/shared/clientPrefill'
+import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSummary, planTitle, situationChoices, smeConfirmed } from '../situationPlan'
+import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
 
 let passed = 0
@@ -369,6 +371,104 @@ check('G11 [가정 빼기] — 원래 객체는 바꾸지 않음', afterEdit.pay
 const emptyBefore = withoutPresetFields({ purpose: '운전자금', revenue: '10억' }, { purpose: '운전자금' }, { purpose: '' })
 check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우지 않음) · 다른 칸 그대로', emptyBefore.purpose === '' && emptyBefore.revenue === '10억', emptyBefore)
 
+// ---------------- D-242 상황별 한 장 설계서(로드맵 7) — 여러 모듈을 한 장에 · 같은 엔진 · 합계 · 추천 행동 → 붙이기 ----------------
+{
+  check(
+    'P1 설계서 3가지(청년 채용 · 만 60세 이상 채용 · 연구소) · 제목 · 상황 예시 기준과 같은 preset',
+    SITUATION_PLANS.length === 3 && planTitle('hire-youth', 2) === '청년 2명 채용' && planDef('lab-start')?.preset === 'lab-two' && planDef('nope') === null && SITUATION_PLANS.every((d) => scenarioPreset(d.preset) !== null),
+  )
+  const youth2 = buildSituationPlan('hire-youth', full, today, 2)
+  const sub = youth2.blocks.find((b) => b.key === 'subsidy')!
+  const cred = youth2.blocks.find((b) => b.key === 'credit')!
+  const pol = youth2.blocks.find((b) => b.key === 'policy')!
+  const top = (rows.find((x) => x.status === 'recommend') ?? rows.find((x) => x.status === 'maybe'))!
+  check(
+    'P2 청년 2명 — 고용지원금은 채용 진단과 같은 1순위 × 2명(받는 때 회차도 × 2)',
+    sub.state === 'ok' && sub.headline.includes(top.program.name) && sub.won === top.program.totalAmount * 2 && sub.lines.some((l) => l.startsWith('받는 때:')) && sub.openPath.includes('preset=emp-youth'),
+    { headline: sub.headline, won: sub.won, lines: sub.lines },
+  )
+  const unit = defaultTaxUnits('metro', 'sme').youth * 10_000
+  check(
+    'P3 통합고용세액공제 — 명부 화면과 같은 식(경기 = 수도권 중소 청년 단가 × 2명) · 3년 유지 · 중소기업 가정 ★',
+    cred.state === 'ok' && cred.won === unit * 2 && cred.laterWon === unit * 2 * 2 && cred.assumptions.some((a) => a.includes('중소기업으로 보고')) && cred.openPath.startsWith('/tools/employment/roster'),
+    { won: cred.won, unit, later: cred.laterWon, a: cred.assumptions },
+  )
+  check(
+    'P4 합계 — 1년 안 = 지원금 + 세액공제 1년 차 · 유지하면 + 2·3년 차 · 정책자금(대출)은 합계에 안 넣음',
+    youth2.firstWon === sub.won + cred.won && youth2.keepWon === youth2.firstWon + cred.laterWon && pol.won === 0 && youth2.totalText.startsWith('약 ') && pol.assumptions.some((a) => a.includes('합계에 넣지 않았어요')),
+    { first: youth2.firstWon, keep: youth2.keepWon, total: youth2.totalText },
+  )
+  const youth5 = buildSituationPlan('hire-youth', full, today, 5)
+  check('P5 사람 수를 바꾸면 그 숫자로 다시(2명 → 5명 = 지원금 · 세액공제 모두 2.5배)', youth5.count === 5 && youth5.blocks[0].won === sub.won * 2.5 && youth5.blocks[1].won === cred.won * 2.5 && youth5.title === '청년 5명 채용')
+  check(
+    'P6 정책자금 — 같은 진단 엔진(채용 계획 · 청년 채용 예정) · 진행 가능성 · 추천 기관 · 가점 한 줄',
+    pol.state === 'ok' && pol.headline.startsWith('진행 가능성') && pol.lines[0].includes('채용 계획(청년)이 가점') && pol.openPath.includes('preset=policy-hiring'),
+    { headline: pol.headline, lines: pol.lines },
+  )
+  const acts = youth2.actions.map((a) => a.id)
+  check(
+    'P7 추천 행동 — 뽑기 전 참여신청 → 계약 · 4대보험 → n개월 뒤 1차 신청 → 결산 전 세무사 → 정책자금 · 날짜는 오늘 이후 · 주말이면 월요일 · 결산 전은 12월 1일',
+    acts.join(',') === 'apply,contract,round1,tax,policy' && youth2.actions[0].when === '뽑기 전' && youth2.actions.every((a) => a.date > today && ![0, 6].includes(new Date(`${a.date}T00:00:00`).getDay())) && youth2.actions.find((a) => a.id === 'tax')!.date === '2026-12-01' && buildSituationPlan('hire-youth', full, '2026-12-05', 2).actions.find((a) => a.id === 'tax')!.date === '2027-12-01',
+    youth2.actions,
+  )
+  // 지방 · 주소 없음 · 중소기업 확인 · 300명 넘음
+  const local = normalizeClientOps({ ...full, id: 'local', businessAddress: '전라남도 순천시 중앙로 1' } as unknown as Partial<ClientOpsRecord>)
+  const noAddr = normalizeClientOps({ ...full, id: 'noaddr', businessAddress: '' } as unknown as Partial<ClientOpsRecord>)
+  const smeRec = normalizeClientOps({ ...full, id: 'sme', customFields: [{ id: 'cf1', group: 'credential', label: '중소기업 확인', value: '소기업 · 2027-03-31까지' }] } as unknown as Partial<ClientOpsRecord>)
+  const big = normalizeClientOps({ ...full, id: 'big', employeeCount: '420' } as unknown as Partial<ClientOpsRecord>)
+  const credOf = (rec: ClientOpsRecord) => buildSituationPlan('hire-youth', rec, today, 1).blocks.find((b) => b.key === 'credit')!
+  check(
+    'P8 세액공제 단가 — 지방은 지방 단가 · 주소 없으면 수도권(낮은 쪽) + 가정 표시 · 중소기업 확인서 있으면 ★ 없음 · 300명 넘고 확인서 없으면 계산 안 함',
+    credOf(local).won === defaultTaxUnits('local', 'sme').youth * 10_000 &&
+      credOf(noAddr).won === unit && credOf(noAddr).assumptions.some((a) => a.includes('주소를 몰라')) &&
+      smeConfirmed(smeRec) && !credOf(smeRec).assumptions.some((a) => a.includes('중소기업으로 보고')) &&
+      credOf(big).state === 'need' && credOf(big).won === 0,
+    { local: credOf(local).won, big: credOf(big) },
+  )
+  // 맞는지 — 상황 예시와 같은 기준(채용 계획은 묻는다 → '예' 면 맞음)
+  const askFit = buildSituationPlan('hire-youth', full, today, 2).fit
+  const yes = withScenarioAnswer(full, 'hireYouth', 'yes', '2026-10-01T00:00:00.000Z')
+  check('P9 맞는지 — 채용 계획을 모르면 묻기(ask) · 대표 답 예 → 맞음 · 아니요 → 안 맞음', askFit.kind === 'ask' && askFit.question === 'hireYouth' && buildSituationPlan('hire-youth', yes, today, 2).fit.kind === 'fit' && buildSituationPlan('hire-youth', withScenarioAnswer(full, 'hireYouth', 'no', '2026-10-01T00:00:00.000Z'), today, 2).fit.kind === 'no')
+  // 연구소 — 연구개발비 세액공제(같은 엔진) · 전담부서/연구소 기준 · 이미 연구소가 있으면 안 맞음
+  const lab = buildSituationPlan('lab-start', full, today, 2)
+  const rnd = lab.blocks.find((b) => b.key === 'rnd')!
+  check(
+    'P10 연구소 2명 — 인건비 8,000만원 × 공제율 25% = 해마다 약 2,000만원 · 업력 3년 넘어 연구소는 3명 → 2명이면 전담부서 · 3년 이어 가면 × 3',
+    rnd.state === 'ok' && rnd.won === 20_000_000 && rnd.lines.some((l) => l.includes('연구개발전담부서 기준')) && lab.keepWon === 60_000_000 && lab.actions[0].id === 'staff' && lab.actions.some((a) => a.text.includes('KOITA')),
+    { rnd, keep: lab.keepWon },
+  )
+  const hasLab = normalizeClientOps({ ...full, id: 'haslab', factValues: { ...(full.factValues ?? {}), researchLab: '기업부설연구소 2024-01-02' } } as unknown as Partial<ClientOpsRecord>)
+  check('P11 이미 연구소가 있으면 연구소 만들기는 안 맞음(상황 예시와 같은 까닭)', buildSituationPlan('lab-start', hasLab, today, 2).fit.kind === 'no')
+  // 빈 업체 — 멈추지 않고 받을 것을 말한다
+  const emptyPlan = buildSituationPlan('hire-youth', empty, today, 2)
+  check(
+    'P12 빈 업체 — 멈추지 않음 · 정책자금은 받을 것 · 요청 문구(같은 자료는 하나로) · 숫자 없는 칸은 합계 0',
+    emptyPlan.blocks.find((b) => b.key === 'policy')!.state === 'need' && emptyPlan.request.includes('대표님') && emptyPlan.firstWon >= 0 && !/undefined|NaN/.test(planSummary(emptyPlan, empty.companyName)),
+    { request: emptyPlan.request, blocks: emptyPlan.blocks.map((b) => `${b.key}:${b.state}`) },
+  )
+  // 붙이기 — 업체 기록 한 줄 · 고른 행동만 할 일로(달력 · 오늘) · 요약에 금액 · 행동
+  const input = planResultInput(youth2, full.companyName, ['apply', 'tax'])
+  const attached = withToolResult(full, input)
+  check(
+    'P13 업체에 붙이기 — situation-plan 결과 한 줄 · 고른 행동 2개만 할 일(todo) · 요약에 제목 · 금액 · 진행 순서',
+    attached.toolResults[0].toolKey === 'situation-plan' && attached.toolResults[0].title === '상황별 설계서 · 청년 2명 채용' && attached.toolResults[0].deadlines.length === 2 && attached.toolResults[0].deadlines.every((d) => d.todo) && input.summary.includes('청년 2명 채용') && input.summary.includes('■ 이렇게 진행해요') && input.verdictLabel.includes('1년 안'),
+    { title: attached.toolResults[0].title, deadlines: attached.toolResults[0].deadlines, label: input.verdictLabel },
+  )
+  check(
+    'P14 고르는 판 — 맞는 상황이 먼저 · 요금제에 없는 모듈(연구소)은 빠짐',
+    situationChoices(yes, today)[0].def.id === 'hire-youth' && situationChoices(yes, today, (m) => m !== 'labcare').every((c) => c.def.id !== 'lab-start'),
+    situationChoices(yes, today).map((c) => `${c.def.id}:${c.fit.kind}`),
+  )
+  const longName = runScenario(scenarioPreset('emp-youth')!, normalizeClientOps({ ...full, id: 'jn', businessAddress: '충청북도 청주시 흥덕구 1' } as unknown as Partial<ClientOpsRecord>), today)
+  check(
+    'P16 긴 시 · 도 이름(충청북도 · 전라남도) — 상황 예시 채용도 비수도권으로(예전: 주소 모름 → 수도권)',
+    longName.needs.find((x) => x.label.startsWith('회사 주소'))?.value === '비수도권' && !longName.assumptions.some((a) => a.includes('주소를 몰라')),
+    longName.needs,
+  )
+  const senior = buildSituationPlan('hire-senior', full, today, 1)
+  check('P15 만 60세 이상 1명 — 세액공제는 청년 등 단가(만 60세 이상 포함) · 제목', senior.title === '만 60세 이상 1명 채용' && senior.blocks.find((b) => b.key === 'credit')!.won === unit && senior.blocks.find((b) => b.key === 'credit')!.headline.includes('만 60세 이상'), senior.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`))
+}
+
 // ---------------- D-224 무작위 업체(기본 150곳 · FUZZ_N=1500 으로 크게) — 23 상황 × 5 모듈이 멈추거나 깨진 글자를 내지 않는지 ----------------
 {
   let seed = 20241017
@@ -392,6 +492,9 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   const slow: unknown[] = []
   let dropped = 0
   const droppedEx: unknown[] = []
+  let plansSeen = 0
+  let badPlan = 0
+  const badPlanEx: unknown[] = []
   // 업체 한 곳에 0.3초 남짓(23 상황 · 5 모듈 엔진) — 게이트에서는 150곳, 크게 볼 때는 FUZZ_N=1500
   const N = Number(process.env.FUZZ_N ?? 150)
   for (let i = 0; i < N; i += 1) {
@@ -442,12 +545,24 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
         }
       }
       scenariosRequest(rec, rs)
+      // D-242 상황별 설계서 — 같은 업체로 3가지 · 아무 사람 수(0 · 음수 · NaN · 너무 큼 포함)
+      for (const d of SITUATION_PLANS) {
+        const plan = buildSituationPlan(d.id, rec, today, pick([0, 1, 2, 5, 99, -3, NaN]))
+        plansSeen += 1
+        const txt = planSummary(plan, rec.companyName) + plan.request + JSON.stringify(planResultInput(plan, rec.companyName, plan.actions.map((a) => a.id)).deadlines)
+        const bad = BAD.test(txt) || !Number.isFinite(plan.firstWon) || plan.firstWon < 0 || plan.keepWon < plan.firstWon || plan.count < 1 || plan.count > 50 || plan.actions.some((a) => !/^\d{4}-\d{2}-\d{2}$/.test(a.date) || a.date < today || [0, 6].includes(new Date(`${a.date}T00:00:00`).getDay()))
+        if (bad) {
+          badPlan += 1
+          if (badPlanEx.length < 3) badPlanEx.push({ i, id: d.id, at: txt.match(BAD)?.[0], first: plan.firstWon, keep: plan.keepWon, count: plan.count, raw })
+        }
+      }
     } catch (e) {
       throws += 1
       if (firstBad.length < 3) firstBad.push({ i, error: String(e).slice(0, 200), raw })
     }
   }
   check(`Z1 무작위 업체 ${N.toLocaleString()}곳 × 23 상황(${runsSeen}번 계산) — 멈춤 0 · 조용히 빠진 상황 0 · NaN/undefined/Infinity 0 · 한 곳 1.5초 넘게 걸림 0`, throws === 0 && dropped === 0 && badText === 0 && slow.length === 0, { throws, dropped, droppedEx, badText, firstBad, slow })
+  check(`Z2 D-242 무작위 업체 × 상황별 설계서 3가지(${plansSeen}장) — 깨진 글자 0 · 금액 음수/NaN 0 · 유지 합계 ≥ 1년 합계 · 사람 수 1~50 · 할 일 날짜 오늘 이후 · 평일`, plansSeen === N * SITUATION_PLANS.length && badPlan === 0, { plansSeen, badPlan, badPlanEx })
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
