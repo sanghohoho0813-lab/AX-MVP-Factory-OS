@@ -46,6 +46,8 @@ export const SCENARIO_QUESTIONS = {
   succession: '자녀에게 회사 지분을 넘길 계획이 있나요?',
   loan: '가지급금(대표가 회사 돈을 가져다 쓴 것)이 있나요?',
   retire: '대표 퇴임이나 퇴직금 중간정산을 생각하고 있나요?',
+  lendToCorp: '대표가 회사에 빌려준 돈(가수금)이 있거나 빌려줄 계획이 있나요?',
+  giftToCorp: '대표가 회사에 현금 · 부동산을 넣어 줄 계획이 있나요?',
 } as const
 
 export type QuestionKey = keyof typeof SCENARIO_QUESTIONS
@@ -209,6 +211,23 @@ function salaryRoom(c: FitContext, s: ScenarioPreset): ScenarioFit {
   return no(`${basis} — 이 급여(월 ${krw(plan.monthly)} · 연 약 ${krw(yearly)})를 주기엔 이익이 모자라요`)
 }
 
+/** D-243 대표 말고 주식을 가진 친족 주주(배우자 · 자녀 · 부모 · 친족) — 05 · 06 계산기 상황은 이들이 있어야 뜻이 있다 */
+function familyHolders(c: FitContext): ShareholderRow[] {
+  return c.reg.filter((r) => r.shares > 0 && (r.relation === 'spouse' || r.relation === 'child' || r.relation === 'minor_child' || r.relation === 'parent' || r.relation === 'relative'))
+}
+
+const holderText = (rows: ShareholderRow[]) => rows.slice(0, 3).map((r) => r.name.trim() || '이름 없음').join(' · ') + (rows.length > 3 ? ` 외 ${rows.length - 3}명` : '')
+
+/** 05 특정법인 — 법인 · 주주명부 · 친족 주주가 있어야, 그다음 대표에게 묻는다 */
+function specialCorpFit(c: FitContext, what: string, q: QuestionKey, yes: string, noWhy: string): ScenarioFit {
+  const corp = corpOnly(c, what)
+  if (corp) return corp
+  if (!c.reg.some((r) => r.shares > 0)) return data('주주명부를 알면 판단해요 — 가족이 주주인 회사에서만 생기는 일이에요', ['주주명부'])
+  const fam = familyHolders(c)
+  if (fam.length === 0) return no('주주명부에 대표 말고 친족 주주가 없어요 — 주주 가족에게 갈 이익이 없어요')
+  return byAnswer(c, q, yes, noWhy, `친족 주주 ${holderText(fam)}`)
+}
+
 /** 연구소를 둘 만한 업종인가(제조 · IT · 연구 · 설계 …) — 서비스 · 도소매도 전담부서는 되지만 묻는다 */
 const RND_INDUSTRY = /제조|소프트웨어|정보통신|정보서비스|IT|아이티|연구|개발|엔지니어링|바이오|전자|기계|화학|의료기기|반도체|설계|플랫폼|인공지능|AI|데이터|부품|소재|장비|시스템/i
 
@@ -277,6 +296,32 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (corp) return corp
       if (age !== null && age >= 60) return fit(`대표 만 ${age}세 — 퇴임 · 퇴직금을 준비할 때`)
       return byAnswer(c, 'retire', '퇴임 · 중간정산 생각 있음', '퇴임 · 중간정산 생각 없음')
+    }
+    /* D-243 세금 계산기 05 · 06 — 가족이 주주인 회사 */
+    case 'calc-t7-loan':
+    case 'calc-t7-forgive':
+      return specialCorpFit(c, '특정법인 증여의제', 'lendToCorp', '회사에 빌려준 돈(가수금) 있음 · 계획 있음', '회사에 빌려준 돈 없음')
+    case 'calc-t7-gift':
+      return specialCorpFit(c, '특정법인 증여의제', 'giftToCorp', '회사에 재산을 넣어 줄 계획 있음', '회사에 재산을 넣어 줄 계획 없음')
+    case 'calc-t8-issue': {
+      const corp = corpOnly(c, '유상증자')
+      if (corp) return corp
+      if (!c.reg.some((r) => r.shares > 0)) return data('주주명부를 알면 판단해요(지금 주주 · 주식 수)', ['주주명부'])
+      const a = scenarioAnswer(c.record, 'succession')
+      if (a === 'no') return no('대표 답: 자녀에게 지분을 넘길 계획 없음', 'succession')
+      if (c.children !== null && c.children > 0) return fit(c.reg.some((r) => r.relation === 'child' || r.relation === 'minor_child') ? `주주명부에 자녀 ${c.children}명 — 증여 대신 증자로 지분을 넘길 때 비교` : `자녀 ${c.children}명(절세 현황) — 증자로 지분을 넘길 때 비교`)
+      if (c.children === 0) return no('자녀 없음(절세 현황)')
+      if (a === 'yes') return fit('대표 답: 자녀에게 지분을 넘길 계획 있음', 'succession')
+      return ask('succession')
+    }
+    case 'calc-t8-reduce': {
+      const corp = corpOnly(c, '유상감자')
+      if (corp) return corp
+      if (!c.reg.some((r) => r.shares > 0)) return data('주주명부를 알면 판단해요(대표 · 가족 주식 수)', ['주주명부'])
+      if (!c.reg.some((r) => r.relation === 'ceo' && r.shares > 0)) return data('주주명부에 대표가 표시돼 있어야 판단해요', ['주주명부(대표 표시)'])
+      const fam = familyHolders(c)
+      if (fam.length === 0) return no('주주명부에 대표 말고 친족 주주가 없어요 — 감자로 이익을 볼 가족 주주가 없어요')
+      return byAnswer(c, 'succession', '자녀에게 지분을 넘길 계획 있음', '자녀에게 지분을 넘길 계획 없음', `친족 주주 ${holderText(fam)}`)
     }
     /* 고용지원금 — 채용 계획은 기록에 없다 → 묻는다 */
     case 'emp-youth':

@@ -39,6 +39,23 @@ export interface LabPreset {
 
 export type HiringPreset = Pick<HiringAnswers, 'situation' | 'cats' | 'specials' | 'age' | 'gender' | 'empType'>
 
+/**
+ * D-243 세금 계산기 05 · 06 상황 — 계산기 화면(`?m=calc&c=…&s=…`)이 같은 가정으로 열린다.
+ * 업체 숫자(주주명부 · 순이익 · 1주 가치 · 액면가)는 calcPrefill 이, 여기는 상황 값만 — 금액(원) 또는 누가 몇 % 주식을 받거나(증자) 돌려주는지(감자).
+ */
+export interface CalcPreset {
+  key: 't7' | 't8'
+  /** 계산기 안 탭 — w1 무상대여 · w2 채무면제 · w3 증여 · x1 유상증자 · x2 유상감자 */
+  sub: 'w1' | 'w2' | 'w3' | 'x1' | 'x2'
+  /** 빌려준 돈 · 면제한 빚 · 준 재산(원) */
+  amount?: number
+  /** 증자: 자녀가 기존 주식 수의 pct% 만큼 신주 · 감자: 대표 주식의 pct% */
+  share?: { who: 'child' | 'ceo'; pct: number }
+}
+
+/** 05 계산기 탭마다 금액 칸 */
+export const CALC_AMOUNT_FIELD: Record<string, string> = { w1: 'w1_principal', w2: 'w2_amount', w3: 'w3_amount' }
+
 export interface ScenarioPreset {
   id: string
   module: ScenarioModule
@@ -56,6 +73,8 @@ export interface ScenarioPreset {
   lab?: LabPreset
   startup?: Partial<Pick<StartupForm, 'startupForm' | 'region' | 'overconcentration'>>
   policy?: Partial<DiagnosisInput>
+  /** D-243 세금 계산기 05 · 06 */
+  calc?: CalcPreset
 }
 
 const p = (x: ScenarioPreset) => x
@@ -73,6 +92,12 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'tax-inherit', module: 'tax', title: '지금 상속되면 상속세는?', when: '대표 연세가 있거나 재산이 클 때', taxText: '상속세 미리 보기' }),
   p({ id: 'tax-loan', module: 'tax', title: '가지급금 정리', when: '가지급금 이자 · 인정상여가 쌓일 때', taxText: '가지급금 정리' }),
   p({ id: 'tax-retire', module: 'tax', title: '대표 퇴직금 한도 · 세금', when: '퇴임 · 중간정산을 생각할 때', taxText: '퇴직금 얼마까지 되나' }),
+  // D-243 세금 계산기 05 특정법인 증여의제 3 · 06 불균등 증자 · 감자 2 — 가족이 주주인 회사
+  p({ id: 'calc-t7-loan', module: 'tax', title: '대표가 회사에 10억 무이자로 빌려주기 — 얼마까지 괜찮나', when: '가족이 주주인 회사에 대표 돈(가수금)을 넣어 둘 때 — 주주 가족의 증여세(특정법인)', calc: { key: 't7', sub: 'w1', amount: 1_000_000_000 } }),
+  p({ id: 'calc-t7-forgive', module: 'tax', title: '대표가 회사에 빌려준 3억 받지 않기(채무면제)', when: '가수금을 회사 이익으로 돌릴 때 — 주주 가족에게 증여세가 붙는지', calc: { key: 't7', sub: 'w2', amount: 300_000_000 } }),
+  p({ id: 'calc-t7-gift', module: 'tax', title: '대표가 회사에 2억 재산 넣어 주기(증여)', when: '현금 · 부동산을 회사에 줄 때 — 주주 가족에게 증여세가 붙는지', calc: { key: 't7', sub: 'w3', amount: 200_000_000 } }),
+  p({ id: 'calc-t8-issue', module: 'tax', title: '자녀만 액면가로 새 주식 받기(유상증자 20%)', when: '다른 주주는 신주를 포기하고 자녀만 싸게 받을 때 — 자녀 증여세', calc: { key: 't8', sub: 'x1', share: { who: 'child', pct: 20 } } }),
+  p({ id: 'calc-t8-reduce', module: 'tax', title: '대표 주식 30%만 액면가로 감자', when: '대표 주식 일부를 회사가 액면가로 사서 없앨 때 — 남은 가족 주주의 이익', calc: { key: 't8', sub: 'x2', share: { who: 'ceo', pct: 30 } } }),
   // 고용지원금 4 — 채용 진단(같은 엔진)
   p({ id: 'emp-youth', module: 'employment', title: '청년(만 29세) 정규직 1명 채용', when: '청년을 새로 뽑을 계획이 있을 때 — 채용 전에 참여신청', hiring: { situation: 'new', cats: ['청년'], specials: [], age: 29, gender: null, empType: '정규직' } }),
   p({ id: 'emp-senior', module: 'employment', title: '만 60세 이상 고령자 채용', when: '경력직 고령자를 뽑을 때', hiring: { situation: 'new', cats: ['고령자'], specials: [], age: 61, gender: null, empType: '정규직' } }),
@@ -100,6 +125,12 @@ export interface PresetAssumption {
 }
 
 const man = (won: number) => `${Math.round(won / 10_000).toLocaleString('ko-KR')}만원`
+/** 1억 넘는 금액은 '10억원' · '3억 5,000만원'(만원으로만 쓰면 '100,000만원') */
+const big = (won: number) => {
+  const eok = Math.floor(won / 100_000_000)
+  const rest = Math.round((won % 100_000_000) / 10_000)
+  return eok > 0 ? `${eok.toLocaleString('ko-KR')}억${rest > 0 ? ` ${rest.toLocaleString('ko-KR')}만` : ''}원` : man(won)
+}
 // 고용지원금 진단 화면의 '1. 상황' 단추와 같은 말
 const SITUATION_LABEL: Record<string, string> = { new: '신규 채용', retain: '재직자 처우개선', childcare: '출산·육아' }
 const STARTUP_FORM_LABEL: Record<string, string> = { brand_new: '새로 창업', conversion: '개인 → 법인전환', acquisition: '사업 양수', reopen_same: '같은 업종 재창업', succession: '사업 승계' }
@@ -126,6 +157,13 @@ export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
     if (s.policy.hiringPlan === '있음') out.push({ field: 'hiringPlan', text: '채용 계획 있음' })
     if (s.policy.youthEmployment === '예정') out.push({ field: 'youthEmployment', text: '청년 채용 예정' })
   }
+  if (s.calc) {
+    const c = s.calc
+    if (c.amount) out.push({ field: CALC_AMOUNT_FIELD[c.sub] ?? '', text: `${c.sub === 'w1' ? '빌려준 돈' : c.sub === 'w2' ? '면제한 빚' : '넣어 준 재산'} ${big(c.amount)}` })
+    if (c.sub === 'w1') out.push({ field: '', text: '이자 없이' })
+    if (c.share?.who === 'child') out.push({ field: 'x1_rows', text: `자녀 신주 — 기존 주식의 ${c.share.pct}%` }, { field: 'x1_issue', text: '인수가 = 액면가' })
+    if (c.share?.who === 'ceo') out.push({ field: 'x2_rows', text: `대표 주식 ${c.share.pct}% 감자` }, { field: 'x2_redeem', text: '감자대가 = 액면가' })
+  }
   if (s.hiring) {
     const h = s.hiring
     const words = [SITUATION_LABEL[h.situation] ?? '', ...h.cats.filter((c) => c !== '육아' && c !== '재직'), ...h.specials, h.age !== null ? `만 ${h.age}세` : '', h.empType ?? '']
@@ -151,7 +189,8 @@ export function scenarioPreset(id: string | null | undefined): ScenarioPreset | 
   return SCENARIO_PRESETS.find((s) => s.id === id) ?? null
 }
 
-/** 모듈 화면 주소 — 업체 · 가정 */
-export function scenarioPath(s: Pick<ScenarioPreset, 'id' | 'module'>, clientId: string): string {
-  return `${SCENARIO_MODULE_PATH[s.module]}?client=${encodeURIComponent(clientId)}&preset=${encodeURIComponent(s.id)}`
+/** 모듈 화면 주소 — 업체 · 가정. D-243: 계산기 상황은 그 계산기 · 그 탭으로 */
+export function scenarioPath(s: Pick<ScenarioPreset, 'id' | 'module' | 'calc'>, clientId: string): string {
+  const calc = s.calc ? `&m=calc&c=${s.calc.key}&s=${s.calc.sub}` : ''
+  return `${SCENARIO_MODULE_PATH[s.module]}?client=${encodeURIComponent(clientId)}${calc}&preset=${encodeURIComponent(s.id)}`
 }

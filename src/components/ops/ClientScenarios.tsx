@@ -450,7 +450,7 @@ function ScenarioRow({
           )}
           <div className="flex flex-wrap gap-2">
             <Link to={r.openPath} className="tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700" data-testid="scenario-open">
-              {r.moduleLabel}에서 이어서 <ArrowRight aria-hidden="true" className="size-4" />
+              {r.openLabel ?? `${r.moduleLabel}에서 이어서`} <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
             {onPlan && (
               <Button size="sm" variant="secondary" onClick={onPlan} data-testid="scenario-plan">
