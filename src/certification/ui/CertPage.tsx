@@ -5,6 +5,7 @@
  *
  * 판정은 전부 `src/certification/core` (OS 를 모르는 Core) — 이 화면은 어댑터(integration)로 업체를 넘기고 결과를 보여 줄 뿐.
  */
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useModuleSection } from '../../tools/shared/ModuleRoute'
 import { toolOf } from '../../config/toolRegistry'
@@ -16,12 +17,18 @@ import { CertWorkspace } from './CertWorkspace'
 import { IsoScreen } from './IsoScreen'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
+import { VenturePlanWorkbench } from './VenturePlanWorkbench'
+import { sectionHref } from './certNav'
 
 export default function CertPage() {
   const section = useModuleSection()
   const meta = toolOf('cert-os')?.sections?.find((s) => s.key === section)
   const d = useCertData()
   const { showToast } = useToast()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  // D-246 벤처 사업계획서 쓰기 — 같은 벤처 기록(notes) 위에서
+  const planOpen = section === 'venture' && params.get('plan') === '1'
   // D-225 저장이 안 되면 알린다 — 예전에는 칩 · 답 저장 실패를 삼켜 '✓ 확인했습니다' 만 보였다
   const saveFailed = (e: unknown) => {
     const why = e instanceof Error && e.message ? e.message : '연결을 확인하세요'
@@ -68,7 +75,8 @@ export default function CertPage() {
       {head}
       {section === 'overview' && <CertOverview ctx={d.ctx} list={d.list} roadmap={d.roadmap} profile={d.profile} onProfile={(p) => void d.saveProfile(p).catch(saveFailed)} clientId={d.clientId} pendingFacts={pendingFacts} onConfirmFacts={d.confirmFacts} />}
       {section === 'iso' && <IsoScreen list={d.list} ctx={d.ctx} />}
-      {a && work && (
+      {a && work && planOpen && <VenturePlanWorkbench ctx={d.ctx} notes={work.notes} onSave={(patch) => d.saveWork(a.key, { notes: patch })} onBack={() => navigate(sectionHref('venture', d.clientId))} />}
+      {a && work && !planOpen && (
         <CertWorkspace
           key={a.key}
           a={a}

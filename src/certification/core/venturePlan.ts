@@ -11,6 +11,8 @@
  * 글자 수는 막지 않고 알린다: 실제 제출본에서 '시장진입 추진경과' 가 1,599자로 들어간 적이 있어 사이트 한도가 칸마다 같은지 확인하지 못했다.
  */
 
+import type { CertificationClientContext } from './types'
+
 export type VPlanPart = 'summary' | 'core' | 'problem' | 'growth'
 export type VPlanKind = 'line' | 'text' | 'rows' | 'choice'
 
@@ -161,6 +163,9 @@ export function isEdited(s: VPlanState, id: string): boolean {
   return !!ai.trim() && !!t.trim() && t.trim() !== ai.trim()
 }
 
+/** 문장 틀만 넣고 아직 안 채운 칸 — 빈 칸처럼 본다(AI 가 채워도 된다) */
+const isBareTemplate = (id: string, text: string) => !!VPLAN_FIELD[id]?.template && text.trim() === VPLAN_FIELD[id].template!.trim()
+
 /* ------------------------------------------------------------------ */
 /* AI 결과 합치기 — 사람이 고친 칸은 덮지 않는다                           */
 /* ------------------------------------------------------------------ */
@@ -169,6 +174,8 @@ export interface DraftItem {
   id: string
   text: string
   checks?: string[]
+  /** AI 가 '확인해 달라' 고 남긴 점(본문 아님 · 화면에만) */
+  note?: string
 }
 
 /**
@@ -187,7 +194,7 @@ export function mergeDraft(s: VPlanState, items: readonly DraftItem[]): { patch:
     const text = clean(it.text)
     if (!text) continue
     const cur = (s.text[f.id] ?? '').trim()
-    const human = !!cur && cur !== (s.ai[f.id] ?? '').trim()
+    const human = !!cur && cur !== (s.ai[f.id] ?? '').trim() && !isBareTemplate(f.id, cur)
     if (human) {
       patch[VK.suggestion(f.id)] = text
       kept.push(f.id)
@@ -235,6 +242,17 @@ export interface VPlanFacts {
   /** 올린 명세서의 발명의 명칭(없으면 '') */
   patentTitle: string
   industryText: string
+}
+
+/** 재료(명세서 요약)의 첫 줄 '[발명의 명칭] 한글 (영문)' 에서 한글 명칭만 — 사람이 고친 재료에서도 읽는다 */
+export function patentTitleOf(material: string): string {
+  const line = /^\s*\[발명의 명칭\]\s*(.+)$/m.exec(material ?? '')?.[1]?.trim() ?? ''
+  return line.replace(/\s*\([A-Za-z0-9][A-Za-z0-9 ,.;:'"&/-]*\)\s*$/, '').trim()
+}
+
+/** 기업인증 업체 정보 + 재료 → 사실(회사 기록에 있는 것만) */
+export function planFactsOf(ctx: Pick<CertificationClientContext, 'companyName' | 'patents' | 'researchUnit' | 'researchers' | 'rndExpense' | 'industryText'>, s: VPlanState): VPlanFacts {
+  return { companyName: ctx.companyName, patents: ctx.patents, researchUnit: ctx.researchUnit, researchers: ctx.researchers, rndExpense: ctx.rndExpense, patentTitle: patentTitleOf(s.materials.patent), industryText: ctx.industryText }
 }
 
 /** 줄 칸을 줄 배열로 */

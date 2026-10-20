@@ -35,7 +35,8 @@ import { MAINBIZ_BANK } from '../mainbiz/mainbizGuides'
 import { useSenderLine } from '../../components/layout/useCurrentUser'
 import { BasisBox } from './BasisBox'
 import { RulesInfoButton } from './RulesSheet'
-import { sectionHref } from './certNav'
+import { sectionHref, venturePlanHref } from './certNav'
+import { planProgress, readPlan } from '../core/venturePlan'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
 const labelOf = (id: string) => EVIDENCE_LABEL[id] ?? id
@@ -132,7 +133,10 @@ export function CertWorkspace({
     setFlow('venture')
   }
   const vRoutes = a.key === 'venture' ? ventureRoutes(ctx) : []
-  const vProg = venture ? ventureProgress({ sections: venture, notes, hasBizPlan: a.haveEvidence.some((x) => /사업계획/.test(x)) || (!!ctx.legacyVenture && ctx.legacyVenture.planDone >= ctx.legacyVenture.planTotal), status: done ? 'done' : submitted ? 'submitted' : 'preparing' }) : null
+  // D-246 기업인증 안에서 쓴 사업계획서(서술 10칸 · 핵심 요약 · 기술명)도 '사업계획 있음'
+  const plan = useMemo(() => (a.key === 'venture' ? planProgress(readPlan(notes)) : null), [a.key, notes])
+  const openPlan = () => navigate(venturePlanHref(clientId))
+  const vProg = venture ? ventureProgress({ sections: venture, notes, hasBizPlan: a.haveEvidence.some((x) => /사업계획/.test(x)) || (!!ctx.legacyVenture && ctx.legacyVenture.planDone >= ctx.legacyVenture.planTotal) || !!plan?.complete, status: done ? 'done' : submitted ? 'submitted' : 'preparing' }) : null
   const ventureNext: Next | null = !vProg
     ? null
     : vProg.stage === 'done'
@@ -144,7 +148,7 @@ export function CertWorkspace({
           : vProg.stage === 'owner'
             ? { stage: VENTURE_STAGE_LABEL.owner, label: `대표 확인 ${vProg.ownerLeft}개`, testid: 'cert-venture-owner', go: openVenturePack }
             : vProg.stage === 'plan'
-              ? { stage: VENTURE_STAGE_LABEL.plan, label: '사업계획 준비', testid: 'cert-venture-plan', go: () => setStep(1) }
+              ? { stage: VENTURE_STAGE_LABEL.plan, label: plan && plan.filled > 0 ? `사업계획서 이어 쓰기 · 서술 ${plan.narrativeFilled}/${plan.narrativeTotal}` : '사업계획서 쓰기', testid: 'cert-venture-plan', go: openPlan }
               : { stage: VENTURE_STAGE_LABEL.submit, label: '제출 전 확인', testid: 'cert-venture-check', go: () => setFlow('vcheck') }
   // 연구소는 기존 연구소 관리가 다음 행동(아래) — 진행 기록은 완료 · 심사 중이면 펼쳐 둔다
   const next: Next | null = ventureNext ?? (!(selfItems && pkg)
@@ -279,6 +283,16 @@ export function CertWorkspace({
                   </ul>
                 </section>
               ))}
+            {a.key === 'venture' && plan && (
+              <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="cert-venture-plan-row">
+                <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
+                  <b className="font-semibold">사업계획서</b> · 받지 않고 여기서 바로 쓸 수 있어요 — 신청 사이트와 같은 순서 · 특허 명세서 · AX 와 한 이야기로{plan.filled > 0 ? ` · 지금 서술 ${plan.narrativeFilled}/${plan.narrativeTotal}칸` : ''}
+                </p>
+                <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={openPlan} data-testid="cert-venture-plan-step1">
+                  사업계획서 쓰기
+                </Button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {a.missingEvidence.length > 0 && (
                 <Button variant="primary" onClick={() => void requestDocs()} data-testid="cert-request-docs">
@@ -352,6 +366,11 @@ export function CertWorkspace({
                       {!['cert-venture-start', 'cert-venture-owner'].includes(next.testid) && (
                         <Button variant="secondary" size="sm" onClick={openVenturePack} data-testid="cert-venture-pack">
                           벤처 준비 보기
+                        </Button>
+                      )}
+                      {next.testid !== 'cert-venture-plan' && (
+                        <Button variant="secondary" size="sm" onClick={openPlan} data-testid="cert-venture-plan-open">
+                          사업계획서 쓰기{plan && plan.filled > 0 ? ` · 서술 ${plan.narrativeFilled}/${plan.narrativeTotal}` : ''}
                         </Button>
                       )}
                       {next.testid !== 'cert-venture-check' && (
@@ -441,10 +460,11 @@ export function CertWorkspace({
       )}
       {step === 2 && flow === 'vcheck' && venture && vProg && (
         <VentureCheckPanel
-          rows={ventureSubmitCheck({ routes: vRoutes, progress: vProg, missingEvidence: a.missingEvidence, haveEvidence: a.haveEvidence })}
+          rows={ventureSubmitCheck({ routes: vRoutes, progress: vProg, missingEvidence: a.missingEvidence, haveEvidence: a.haveEvidence, written: plan ?? undefined })}
           applied={submitted || done}
           onRequestDocs={() => void requestDocs()}
           onOwner={openVenturePack}
+          onPlan={openPlan}
           onApplied={() => void onStatus('applied').then(() => showToast('벤처기업 — 신청(활동 기록에 남김)')).then(() => { setFlow('none'); setLifeOpen(true) })}
           onClose={() => setFlow('none')}
         />

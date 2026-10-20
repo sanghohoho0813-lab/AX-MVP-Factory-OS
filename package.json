@@ -64,6 +64,7 @@
     "qa:detail": "node e2e/detail.mjs",
     "qa:files": "node e2e/files-cloud.mjs",
     "qa:taxplan": "node e2e/taxplan.mjs",
+    "qa:ventureplan": "node e2e/ventureplan.mjs",
     "qa:speccheck": "node e2e/speccheck.mjs",
     "qa:site": "node e2e/site.mjs",
     "qa:content": "node e2e/content.mjs",

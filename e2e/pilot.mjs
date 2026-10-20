@@ -601,6 +601,11 @@ try {
   check('팀장(D-188): 업무 탭을 열고 저장해도 업체 기록의 기본 6종 칸은 그대로(DB)', ['incorporation', 'businessScope', 'patent', 'venture', 'ax', 'policyFund'].every((k) => JSON.parse(sql(`select payload::text from public.operations_clients where id = '${pc}'`) || '{}').services?.[k] !== undefined) && pkBefore.length > 0)
   await shot(page, 'pilot-06-work-items')
 
+  // D-246: 팀장 — 기업인증 › 벤처 사업계획서 쓰기는 열리지만 AI 초안 단추는 없다(대표만 · 서버도 막음)
+  await go(page, `/tools/cert-os/venture?client=${pc}&plan=1`)
+  await page.waitForTimeout(900)
+  check('팀장(D-246): 벤처 사업계획서 쓰기 화면 열림 · AI 초안 단추 없음 · 대표 자료 0', (await page.getByTestId('vplan').count()) === 1 && (await page.getByTestId('vplan-ai-open').count()) === 0 && leaked(await bodyText(page)).length === 0, (await bodyText(page)).slice(0, 200))
+
   // D-188: 사이드바 아래 — 버전 글자 대신 [개발자에게 피드백](이번 회차 아직이면 '새 설문')
   const side = (await page.locator('aside').first().innerText()) ?? ''
   const fbBtn = page.locator('aside [data-testid="feedback-open"]').first()

@@ -15,6 +15,7 @@ import {
   factFill,
   isEdited,
   mergeDraft,
+  patentTitleOf,
   planMarkdown,
   planProgress,
   quotedName,
@@ -25,6 +26,7 @@ import { VPLAN_BATCHES, buildBatchContext, draftItemsOf, fieldsOfBatch } from '.
 import { parseSpecText } from '../patent/specParse'
 import { specDigest } from '../patent/specDigest'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
+import { buildVenturePack, ventureProgress, ventureRoutes, ventureSubmitCheck } from '../../certification/core/venturePack'
 
 let passed = 0
 let failed = 0
@@ -86,6 +88,15 @@ const long = (n: number) => '가'.repeat(n)
   check('M4 글이 바뀌면 "사이트 입력함" 표시를 내림(다시 넣어야 하니까)', r.patch[VK.status('competitiveness_strategy')] === '')
   check('M5 빈 칸 → 채움 · 모르는 칸 · 빈 글은 버림', r.replaced.includes('market_target') && !r.replaced.includes('technology_progress') && !Object.keys(r.patch).some((k) => k.includes('unknown_field')))
   check('M6 체크 — 사람이 고른 칸은 그대로, 비어 있으면 선택지에 맞는 것만', !(VK.checks('development_background') in r.patch) && r.patch[VK.checks('competitiveness_strategy')] === '기존 제품 대비 편리함')
+}
+
+{
+  const tpl = VPLAN_FIELDS.find((f) => f.id === 'core_problem')!.template!
+  const r = mergeDraft(readPlan({ [VK.text('core_problem')]: tpl, [VK.text('core_solution')]: tpl.replace('［무엇］', '공구') }), [
+    { id: 'core_problem', text: '채운 문장' },
+    { id: 'core_solution', text: '채운 문장 2' },
+  ])
+  check('M7 문장 틀만 넣은 칸은 빈 칸처럼 채움 · 틀을 고치기 시작한 칸은 보호', r.replaced.join() === 'core_problem' && r.kept.join() === 'core_solution')
 }
 
 /* ---------------- 사실로 채우기 ---------------- */
@@ -161,6 +172,7 @@ const long = (n: number) => '가'.repeat(n)
   check('D1 명칭 한글 · 영문 나눔', d.title === '공구 마모 예측 기반 교체시점 산출 시스템 및 방법' && d.titleEn.startsWith('SYSTEM AND METHOD'), d)
   check('D2 청구항 3 · 독립 2(인용 안 하는 것)', d.claims.total === 3 && d.claims.independent === 2, d.claims)
   check('D3 재료 — 기술분야 · 과제 · 해결 수단 · 효과 · 독립 청구항 · 구성요소, 문단 번호 뗌', ['[기술분야]', '[해결하려는 과제]', '[과제의 해결 수단]', '[발명의 효과]', '[독립 청구항 1]', '[독립 청구항 3]', '[구성요소(부호의 설명)] 공구관리 시스템 · 신호 정규화부'].every((x) => d.text.includes(x)) && !d.text.includes('[0001]'), d.text)
+  check('D5 재료 첫 줄에서 특허 명칭만(영문 괄호 뗌 · 사람이 고친 재료에서도)', patentTitleOf(d.text) === '공구 마모 예측 기반 교체시점 산출 시스템 및 방법' && patentTitleOf('메모\n[발명의 명칭] 측정 장치(제1 실시예)') === '측정 장치(제1 실시예)' && patentTitleOf('') === '')
   check('D4 길이 상한', specDigest(parseSpecText(md.replace('마모량을 예측하는 것을 목적으로 한다.', long(5000)), 'x.md'), 1500).text.length <= 1600)
 }
 
@@ -193,8 +205,17 @@ const long = (n: number) => '가'.repeat(n)
     },
     'p1',
   )
-  check('A10 답 읽기 — id · 칸 이름으로 찾음 · tag → 체크 · 다른 묶음 칸 · 빈 본문 버림 · detail 은 본문 아님', items.length === 2 && items[0].id === 'development_background' && items[0].checks?.length === 2 && items[1].id === 'competitiveness_strategy' && items[1].text === '경쟁력 본문', items)
+  check('A10 답 읽기 — id · 칸 이름으로 찾음 · tag → 체크 · 다른 묶음 칸 · 빈 본문 버림 · detail 은 본문 아님(확인할 점으로만)', items.length === 2 && items[0].id === 'development_background' && items[0].checks?.length === 2 && items[0].note === '확인할 점' && items[1].id === 'competitiveness_strategy' && items[1].text === '경쟁력 본문' && !items[1].note, items)
   check('A11 답이 없으면 빈 목록', draftItemsOf(null, 'p1').length === 0)
+}
+
+/* ---------------- 벤처 제출 전 확인 — 기업인증 안에서 쓴 사업계획서 ---------------- */
+{
+  const vctx = { companyName: '공구랩', entity: 'corporation', years: 3, months: 40, industryText: '소프트웨어 개발', industryGroup: 'software', employees: 5, size: 'small', revenue: 300_000_000, operatingProfit: null, netIncome: null, totalAssets: null, totalLiabilities: null, rndExpense: 26_400_000, researchUnit: 'dept', researchers: 2, patents: 1, held: [], b2b: null, procurement: null, exportPlan: null, policyFundPlan: null, rndPlan: null, exclusionFlags: [], evidence: [], today: '2026-10-20' } as never
+  const routes = ventureRoutes(vctx)
+  const prog = ventureProgress({ sections: buildVenturePack(vctx, {}), notes: {}, hasBizPlan: false, status: 'preparing' })
+  const row = (w?: Parameters<typeof ventureSubmitCheck>[0]['written']) => ventureSubmitCheck({ routes, progress: prog, missingEvidence: ['사업계획서'], haveEvidence: [], written: w }).find((r) => r.key === 'plan')!
+  check('W1 사업계획 줄 — 안 썼으면 쓰기 또는 받기 · 반쯤 썼으면 몇 칸 · 다 썼으면 ✓(서류 없어도)', /사업계획서 쓰기/.test(row().text) && row({ narrativeFilled: 4, narrativeTotal: 10, complete: false, entered: 0, total: 28 }).text.includes('4/10') && row({ narrativeFilled: 10, narrativeTotal: 10, complete: true, entered: 3, total: 28 }).mark === 'ok', [row().text, row({ narrativeFilled: 10, narrativeTotal: 10, complete: true, entered: 3, total: 28 })])
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

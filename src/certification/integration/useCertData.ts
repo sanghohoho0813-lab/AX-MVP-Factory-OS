@@ -197,22 +197,32 @@ export function useCertData() {
     [clientId, works.rows],
   )
 
+  /*
+   * D-246: 저장할 때 쓰는 '지금 기록' 은 화면이 그려질 때의 값이 아니라 가장 최근 값 — 줄이 비면(latest 비움) 예전엔
+   *   부른 쪽이 가진 옛 화면의 기록 위에 덧붙여, 오래 걸리는 일(AI 초안 여섯 번 저장)에서 앞 저장을 덮었다.
+   */
+  const worksRows = useRef(works.rows)
+  worksRows.current = works.rows
+
   /** 바뀐 칸만 넘긴다 — 저장할 때 바로 앞 값(answers · prep · notes) 위에 덧붙인다 */
   const saveWork = useCallback(
     async (cert: CertificationKey, patch: { answers?: Record<string, Answer>; prep?: Record<string, PreparedAnswer>; notes?: Record<string, string> }) => {
       if (!clientId || !loaded) return
       const k = `work|${clientId}|${cert}`
-      const cur = workOf(cert)
       await serial(async () => {
         const prev = latest.current.get(k) as { id?: string; data: WorkRow } | undefined
-        const base: WorkRow = prev?.data ?? { ...(cur.row?.data ?? {}), cert, answers: cur.answers, prep: cur.prep, notes: cur.notes }
+        const curRow = (worksRows.current ?? []).find((r) => r.clientId === clientId && r.data.cert === cert) ?? null
+        const base: WorkRow = prev?.data ?? { ...(curRow?.data ?? {}), cert, answers: curRow?.data.answers ?? {}, prep: curRow?.data.prep ?? {}, notes: curRow?.data.notes ?? {} }
         // P2: 대표 답(notes) — 다른 칸을 저장할 때 지워지지 않게 늘 같이 쓴다
         const next: WorkRow = { ...base, cert, answers: { ...base.answers, ...patch.answers }, prep: { ...base.prep, ...patch.prep }, notes: { ...(base.notes ?? {}), ...patch.notes } }
-        const row = await works.save({ id: prev?.id ?? cur.row?.id, clientId, data: next })
+        const row = await works.save({ id: prev?.id ?? curRow?.id, clientId, data: next })
         latest.current.set(k, { id: row.id, data: next })
+        // 화면이 다시 그려지기 전에 다음 저장이 와도 방금 저장한 줄 위에 덧붙이게
+        const list = worksRows.current ?? []
+        worksRows.current = list.some((r) => r.id === row.id) ? list.map((r) => (r.id === row.id ? row : r)) : [row, ...list]
       })
     },
-    [clientId, loaded, serial, works, workOf],
+    [clientId, loaded, serial, works],
   )
 
   const lifeOf = useCallback(

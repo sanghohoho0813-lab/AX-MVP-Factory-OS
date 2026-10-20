@@ -120,7 +120,8 @@ export function draftItemsOf(answer: AssistAnswer | null, batch: VPlanBatch): Dr
     const body = (it.body ?? '').trim()
     if (!body) continue
     const checks = (it.tag ?? '').split(/[,，·|]/).map((x) => x.trim()).filter(Boolean)
-    out.push({ id: f.id, text: body, checks: f.checks ? checks : undefined })
+    const note = (it.detail ?? '').trim()
+    out.push({ id: f.id, text: body, checks: f.checks ? checks : undefined, note: note || undefined })
   }
   return out
 }

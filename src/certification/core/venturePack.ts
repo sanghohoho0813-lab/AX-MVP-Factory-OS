@@ -192,16 +192,31 @@ export interface VentureCheckRow {
 }
 
 /** 벤처 제출 전 확인 — 네 줄(신청 유형 · 기본 자료 · 대표 확인 · 사업계획). 공식 점수 · 확률 없음 */
-export function ventureSubmitCheck(input: { routes: readonly VentureRoute[]; progress: VentureProgress; missingEvidence: readonly string[]; haveEvidence: readonly string[] }): VentureCheckRow[] {
+export function ventureSubmitCheck(input: {
+  routes: readonly VentureRoute[]
+  progress: VentureProgress
+  missingEvidence: readonly string[]
+  haveEvidence: readonly string[]
+  /** D-246 기업인증 안에서 쓴 사업계획서(서술 10칸 · 핵심 요약 · 기술명) */
+  written?: { narrativeFilled: number; narrativeTotal: number; complete: boolean; entered: number; total: number }
+}): VentureCheckRow[] {
   const fit = input.routes.filter((r) => r.state === 'fit')
   const basicMissing = input.missingEvidence.filter((m) => /사업자등록증|재무제표/.test(m))
   const planMissing = input.missingEvidence.some((m) => /사업계획/.test(m))
+  const w = input.written
+  const planRow: VentureCheckRow = w?.complete
+    ? { key: 'plan', label: '사업계획', mark: 'ok', text: `사업계획서 칸 모두 씀 · 사이트 입력 ${w.entered}/${w.total}칸` }
+    : !planMissing
+      ? { key: 'plan', label: '사업계획', mark: 'ok', text: '사업계획서 있음' }
+      : w && w.narrativeFilled > 0
+        ? { key: 'plan', label: '사업계획', mark: 'todo', text: `사업계획서 서술 ${w.narrativeFilled}/${w.narrativeTotal}칸 씀 — 마저 쓰기` }
+        : { key: 'plan', label: '사업계획', mark: 'todo', text: '사업계획서 쓰기(기업인증 안) 또는 최근 사업계획서 받기 — 혁신성장유형 평가 자료' }
   return [
     fit.length
       ? { key: 'route', label: '신청 유형', mark: 'ok', text: `${fit.map((r) => r.label).join(' · ')} 검토` }
       : { key: 'route', label: '신청 유형', mark: 'check', text: '유형을 정할 정보가 모자람 — 연구조직 · 연구개발비 · 투자 확인' },
     basicMissing.length ? { key: 'docs', label: '기본 자료', mark: 'check', text: `${basicMissing.join(' · ')} 받기` } : { key: 'docs', label: '기본 자료', mark: 'ok', text: '사업자등록증 · 재무제표 있음' },
     input.progress.ownerLeft ? { key: 'owner', label: '대표 확인', mark: 'todo', text: `사업 이야기 ${input.progress.ownerLeft}칸 대표 답 필요` } : { key: 'owner', label: '대표 확인', mark: 'ok', text: '대표 답 모두 받음' },
-    planMissing ? { key: 'plan', label: '사업계획', mark: 'todo', text: '사업계획서(최근 것) 받기 — 혁신성장유형 평가 자료' } : { key: 'plan', label: '사업계획', mark: 'ok', text: '사업계획서 있음' },
+    planRow,
   ]
 }

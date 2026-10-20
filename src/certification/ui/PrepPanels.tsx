@@ -459,6 +459,7 @@ export function VentureCheckPanel({
   applied,
   onRequestDocs,
   onOwner,
+  onPlan,
   onApplied,
   onClose,
 }: {
@@ -466,12 +467,14 @@ export function VentureCheckPanel({
   applied: boolean
   onRequestDocs: () => void
   onOwner: () => void
+  /** D-246 사업계획서 쓰기(기업인증 안) */
+  onPlan?: () => void
   onApplied: () => void
   onClose: () => void
 }) {
   const first = rows.find((r) => r.mark === 'check') ?? rows.find((r) => r.mark === 'todo') ?? null
   const ready = !rows.some((r) => r.mark === 'check')
-  const act = (r: VentureCheckRow) => (r.key === 'owner' ? onOwner() : r.key === 'route' ? onClose() : onRequestDocs())
+  const act = (r: VentureCheckRow) => (r.key === 'owner' ? onOwner() : r.key === 'route' ? onClose() : r.key === 'plan' && onPlan ? onPlan() : onRequestDocs())
   return (
     <Surface>
       <div className="flex flex-col gap-4" data-testid="cert-venture-gate" data-ready={ready}>
@@ -496,7 +499,7 @@ export function VentureCheckPanel({
               <b className="font-semibold">먼저 할 것</b> · {first.text}
             </p>
             <Button variant={ready ? 'secondary' : 'primary'} size="sm" onClick={() => act(first)}>
-              {first.key === 'owner' ? '대표 답 적기' : first.key === 'route' ? '판단 다시 보기' : '자료 요청'}
+              {first.key === 'owner' ? '대표 답 적기' : first.key === 'route' ? '판단 다시 보기' : first.key === 'plan' && onPlan ? '사업계획서 쓰기' : '자료 요청'}
             </Button>
           </div>
         )}
