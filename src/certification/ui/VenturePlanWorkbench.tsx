@@ -1,5 +1,5 @@
 /**
- * D-246 벤처 사업계획서 쓰기 — 기업인증 › 벤처 안(`?plan=1`).
+ * D-246 벤처 사업계획서 쓰기 — 기업인증 › 벤처 안(`?plan=1`) · D-247 부터 메뉴 '특허 · 벤처'(/patent-venture/plan)에서도 같은 기록.
  *
  *   1 재료(특허 명세서 · AX/MVP · 메모) → 2 요약 → 3 핵심 요약 7 → 4 [1] 문제정의 → 5 [2] 성장전략 → 6 점검 · 내보내기
  *
@@ -46,7 +46,7 @@ const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'check', label: '점검 · 내보내기' },
 ]
 
-export function VenturePlanWorkbench({ ctx, notes, onSave, onBack }: { ctx: CertificationClientContext; notes: Record<string, string>; onSave: (patch: Record<string, string>) => Promise<void>; onBack: () => void }) {
+export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '벤처 진행으로' }: { ctx: CertificationClientContext; notes: Record<string, string>; onSave: (patch: Record<string, string>) => Promise<void>; onBack: () => void; backLabel?: string }) {
   const { showToast } = useToast()
   const ai = useOwnerAiAccess()
   const [tab, setTab] = useState<Tab>(() => (notes[VK.patent] || notes[VK.ax] ? 'summary' : 'mat'))
@@ -106,7 +106,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack }: { ctx: Cert
       <Surface>
         <div className="flex flex-col gap-3">
           <Button variant="ghost" size="sm" className="self-start" onClick={onBack} data-testid="vplan-back">
-            <ArrowLeft aria-hidden="true" className="size-4" /> 벤처 진행으로
+            <ArrowLeft aria-hidden="true" className="size-4" /> {backLabel}
           </Button>
           <div className="flex flex-col gap-1">
             <h2 className="t-section font-bold break-keep text-slate-900">벤처 사업계획서 쓰기 · 혁신성장유형</h2>

@@ -158,7 +158,8 @@ function CodeHelper() {
   )
 }
 
-export function PatentSpecCheckPage() {
+/** back: 어디서 왔는지(D-247 메뉴 '특허 · 벤처' 에서 열면 그리로) — 없으면 특허·MVP */
+export function PatentSpecCheckPage({ back = { to: '/studio', label: '특허·MVP' } }: { back?: { to: string; label: string } } = {}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [doc, setDoc] = useState<SpecDoc | null>(null)
   const [report, setReport] = useState<SpecReport | null>(null)
@@ -204,9 +205,9 @@ export function PatentSpecCheckPage() {
         title="명세서 점검"
         sub="특허로에 넣기 전에 형식 · 도면 · 청구항이 서로 맞는지 봅니다. 규칙 점검이라 AI 를 쓰지 않습니다."
         back={
-          <Link to="/studio" className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-500 hover:text-slate-800">
+          <Link to={back.to} className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-500 hover:text-slate-800" data-testid="spec-back">
             <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
-            특허·MVP
+            {back.label}
           </Link>
         }
       />

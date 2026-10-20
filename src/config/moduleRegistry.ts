@@ -30,6 +30,7 @@ import {
   Rocket,
   CircleDashed,
   Sparkles,
+  Stamp,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -243,6 +244,8 @@ export const MODULES: ModuleDefinition[] = [
   // D-162: 공개 사이트(고객 플랫폼) 상담신청은 대표 작업공간으로만 들어온다 — Pilot 에게는 없다
   // 대표 AI 작업실(Company Case Intelligence) — 기능 권한 can_use_owner_ai_workspace 가 있는 사람만(지금은 대표). 팀장 · 팀장 화면 보기에는 없다
   { key: 'ai-workspace', label: 'AI 작업실', path: '/ai', icon: Sparkles, group: 'clients', accent: 'ai', enabled: true, hint: '대표 전용 — 업체별 AX 분석 · 특허 · 벤처 · 자금 · 제안서 · 동료 전달문구 · 기억', ownerOnly: true, capability: 'can_use_owner_ai_workspace' },
+  // D-247 대표 "어디 있는지 못 찾겠다 — 기업인증 밖으로": 벤처 사업계획서 쓰기 · 특허 명세서 점검을 한 줄로(대표만). 기업인증 › 벤처 · 특허·MVP 안 입구도 그대로
+  { key: 'patent-venture', label: '특허 · 벤처', path: '/patent-venture', icon: Stamp, group: 'clients', accent: 'ai', enabled: true, hint: '벤처 사업계획서 쓰기 · 특허 명세서 점검 — 바로 열기', ownerOnly: true },
   { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함', ownerOnly: true },
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭

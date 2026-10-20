@@ -407,7 +407,7 @@ try {
   }
   await go(page, `/ops/clients/${OWNER_CLIENT}`)
   check('Pilot 교차: 대표 업체 주소 → "찾지 못했습니다"', /찾지 못|없는 업체|없습니다/.test(await bodyText(page)))
-  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/studio/spec-check', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month', '/ai', '/ai/new', '/ai/usage', '/ai/cases/case_qa_owner_01', '/ai/cases/case_qa_owner_01/proposal/x']) {
+  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/studio/spec-check', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month', '/ai', '/ai/new', '/ai/usage', '/ai/cases/case_qa_owner_01', '/ai/cases/case_qa_owner_01/proposal/x', '/patent-venture', '/patent-venture/plan?client=' + OWNER_CLIENT, '/patent-venture/spec-check']) {
     await go(page, p)
     check(`Pilot 주소 막힘: ${p}`, (await bodyText(page)).includes('화면을 찾지 못했습니다'), (await bodyText(page)).slice(0, 120))
   }
@@ -831,6 +831,7 @@ try {
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
   check('AI 대표 → 팀장 화면: AI 작업실 메뉴 없음', !pnav.includes('AI 작업실'), pnav.replace(/\n/g, '|').slice(0, 300))
+  check('D-247 대표 → 팀장 화면: 특허 · 벤처 메뉴 없음', !pnav.includes('특허 · 벤처'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ai')
   check('AI 대표 → 팀장 화면: /ai 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다') && (await page.getByTestId('case-workspace').count()) === 0)
   for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']) {

@@ -3,7 +3,7 @@
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent'
 
 export interface AssistPreset {
   id: string
@@ -71,6 +71,12 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'venture.g2', page: 'venture', label: '벤처 사업계획서 — 시장진입 경과 · 3년 계획', kind: 'write', hint: '[2] 3' },
   { id: 'venture.x', page: 'venture', label: '벤처 사업계획서 — 기업가정신 · 자금운용', kind: 'write', hint: '[1] 4 · [2] 5' },
   { id: 'venture.sum', page: 'venture', label: '벤처 사업계획서 — 요약 · 핵심 요약', kind: 'write', hint: '기술명 · 요약 · 핵심 요약 7칸' },
+  // D-247 특허 명세서 — 특허·MVP › 명세서 쓰기의 [AI 초안] 이 차례로 부른다(띠 · 판 단추에는 없음)
+  { id: 'spec.a', page: 'patent', label: '명세서 — 기술분야 · 배경 · 과제 · 효과', kind: 'write', hint: '앞부분 네 칸' },
+  { id: 'spec.b', page: 'patent', label: '명세서 — 과제의 해결 수단 · 요약', kind: 'write', hint: '해결 수단 · 요약 400자' },
+  { id: 'spec.c', page: 'patent', label: '명세서 — 구체적인 내용 ① 구성', kind: 'write', hint: '도 1 · 구성요소마다' },
+  { id: 'spec.d', page: 'patent', label: '명세서 — 구체적인 내용 ② 흐름 · 도면', kind: 'write', hint: '도 2 이후 · 단계 · 변형예' },
+  { id: 'spec.e', page: 'patent', label: '명세서 — 청구항', kind: 'write', hint: '시스템 · 종속 · 방법' },
 ]
 
 export function presetOf(id: string): AssistPreset | undefined {

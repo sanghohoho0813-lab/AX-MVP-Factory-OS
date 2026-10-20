@@ -83,6 +83,8 @@ const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ def
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
 const PatentSpecCheckPage = lazy(() => import('../pages/PatentSpecCheckPage').then((m) => ({ default: m.PatentSpecCheckPage })))
+const PatentVentureHomePage = lazy(() => import('../pages/PatentVenturePage').then((m) => ({ default: m.PatentVentureHomePage })))
+const VenturePlanPage = lazy(() => import('../pages/PatentVenturePage').then((m) => ({ default: m.VenturePlanPage })))
 const ConsultingStudioPage = lazy(() => import('../pages/ConsultingStudioPage').then((m) => ({ default: m.ConsultingStudioPage })))
 const ConsultingProjectPage = lazy(() => import('../pages/ConsultingProjectPage').then((m) => ({ default: m.ConsultingProjectPage })))
 
@@ -451,6 +453,10 @@ export const appRouteChildren = [
       { path: 'studio', element: <ConsultingStudioPage /> },
       // D-245: 명세서 점검(규칙 · AI 없음) — /studio 밑이라 팀장 화면에는 없다
       { path: 'studio/spec-check', element: <PatentSpecCheckPage /> },
+      // D-247 대표 "기업인증 밖으로" — 특허 · 벤처 한 곳(대표만: 메뉴 표 ownerOnly 가 팀장 주소도 막는다). 기업인증 › 벤처 안 입구도 그대로
+      { path: 'patent-venture', element: toolRoute(<PatentVentureHomePage />) },
+      { path: 'patent-venture/plan', element: toolRoute(<VenturePlanPage />) },
+      { path: 'patent-venture/spec-check', element: <PatentSpecCheckPage back={{ to: '/patent-venture', label: '특허 · 벤처' }} /> },
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
       // D-127: 모듈 살펴보기 — 잠겨 있어도 늘 열린다. 업체에서 왔으면(?client=) 그 업체 띠가 뜬다
