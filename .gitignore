@@ -54,6 +54,7 @@ dist-qa*/
 .xlsx-out
 .catalog-out
 .pilot-out
+.patent-out
 .facts-out
 .taxplan-out
 .scenarios-out

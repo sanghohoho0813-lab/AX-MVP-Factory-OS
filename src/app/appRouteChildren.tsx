@@ -82,6 +82,7 @@ const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.
 const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ default: m.RoadmapPage })))
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
+const PatentSpecCheckPage = lazy(() => import('../pages/PatentSpecCheckPage').then((m) => ({ default: m.PatentSpecCheckPage })))
 const ConsultingStudioPage = lazy(() => import('../pages/ConsultingStudioPage').then((m) => ({ default: m.ConsultingStudioPage })))
 const ConsultingProjectPage = lazy(() => import('../pages/ConsultingProjectPage').then((m) => ({ default: m.ConsultingProjectPage })))
 
@@ -448,6 +449,8 @@ export const appRouteChildren = [
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },
+      // D-245: 명세서 점검(규칙 · AI 없음) — /studio 밑이라 팀장 화면에는 없다
+      { path: 'studio/spec-check', element: <PatentSpecCheckPage /> },
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
       // D-127: 모듈 살펴보기 — 잠겨 있어도 늘 열린다. 업체에서 왔으면(?client=) 그 업체 띠가 뜬다

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LegacyVentureNotice } from '../components/consulting/LegacyVentureNotice'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Plus, Workflow, X } from 'lucide-react'
+import { ArrowRight, FileSearch, Plus, Workflow, X } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { Badge, Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
@@ -120,12 +120,19 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
         title="특허·MVP"
         sub="특허 → MVP → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
         actions={
-          !missing && (
-            <Button variant="primary" onClick={() => setCreating(true)}>
-              <Plus aria-hidden="true" className="size-4" />
-              새 프로젝트
+          <>
+            {/* D-245: 명세서 점검 — 프로젝트 표가 없어도 쓸 수 있다(파일만 읽음) */}
+            <Button variant="secondary" onClick={() => navigate('/studio/spec-check')}>
+              <FileSearch aria-hidden="true" className="size-4" />
+              명세서 점검
             </Button>
-          )
+            {!missing && (
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Plus aria-hidden="true" className="size-4" />
+                새 프로젝트
+              </Button>
+            )}
+          </>
         }
       />
       {/* LEGACY — 새 벤처 업무는 cert-os/venture 사용 */}
