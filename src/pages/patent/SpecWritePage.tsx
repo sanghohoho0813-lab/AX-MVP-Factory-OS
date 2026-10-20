@@ -6,12 +6,15 @@
  *
  * 규칙은 엔진(services/patent/specDraft) · AI 는 대표만(SpecWriteAi). 저장은 모듈 기록 'patent-draft/draft' 한 줄 = 초안 하나(회사 없이도).
  * 출원(제출)은 대표가 특허로에서 직접 — 이 화면은 붙여 넣을 글을 만든다.
+ *
+ * D-249: ?step= 로 그 단계 바로 열기(진행판 [이어서 하기]) · 견본으로 연습 · 지우기/바꾸기 뒤 [되돌리기] ·
+ *   PC 오른쪽 고정판(진행 · 고칠 것 · 저장) · 작은 화면 고정 단계 줄(이전 · n/6 · 다음) · 제출 준비 묶음(ZIP).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Download, FilePlus2, Import, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Download, FilePlus2, GraduationCap, Import, Sparkles } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Blank, Surface } from '../../components/ui/primitives'
+import { Badge, Blank, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { InlineConfirm } from '../../components/ui/InlineConfirm'
 import { useToast } from '../../components/ui/toastContext'
@@ -20,7 +23,7 @@ import { downloadText } from '../../components/consulting/studioParts'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket, type BucketRow } from '../../tools/shared/useModuleBucket'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
-import { todayLocalDate } from '../../lib/appClock'
+import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { checkDraft, draftProgress, emptyDraft, normalizeDraft, specMarkdown, type DraftStep, type SpecDraft } from '../../services/patent/specDraft'
 import { checkSpec } from '../../services/patent/specCheck'
@@ -28,13 +31,18 @@ import { parseSpecText } from '../../services/patent/specParse'
 import { specDigest } from '../../services/patent/specDigest'
 import { useCertData } from '../../certification/integration/useCertData'
 import { VK } from '../../certification/core/venturePlan'
-import { BodyStep, CheckStep, ClaimsStep, FiguresStep, IdeaStep, PartsStep } from './SpecWriteSteps'
+import { PV_HOME, specHref } from '../../services/patent/pvBoard'
+import { SAMPLE_SOURCE, sampleDraft, submitChecklist } from '../../services/patent/specCoach'
+import { blockSvg, flowSvg } from '../../services/patent/specFigureSvg'
+import { zipStore } from '../../services/patent/zip'
+import { BodyStep, CheckStep, ClaimsStep, FiguresStep, IdeaStep, PartsStep, type Act } from './SpecWriteSteps'
 import { IdeaImportPanel, SpecAiPanel } from './SpecWriteAi'
+import { downloadBytes, svgToPngBytes } from './specFigureFile'
 
 type Row = { draft: SpecDraft } & Record<string, unknown>
-const HOME = '/patent-venture'
+const HOME = PV_HOME
 const WRITE = `${HOME}/write`
-const hrefOf = (id: string, clientId: string) => `${WRITE}?draft=${encodeURIComponent(id)}${clientId ? `&client=${encodeURIComponent(clientId)}` : ''}`
+const hrefOf = (id: string, clientId: string, step?: DraftStep) => specHref(id, clientId, step)
 
 /** short — 휴대폰(큰 글자)에서 탭이 세 줄로 늘어나지 않게 */
 const TABS: readonly { key: DraftStep; label: string; short: string }[] = [
@@ -75,7 +83,7 @@ function ClientSelect({ value, onChange, clients, label, testId }: { value: stri
 /* 목록                                                                  */
 /* ------------------------------------------------------------------ */
 
-function DraftList({ rows, onNew, onRemove }: { rows: BucketRow<Row>[]; onNew: (clientId: string) => Promise<void>; onRemove: (id: string) => Promise<void> }) {
+function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]; onNew: (clientId: string) => Promise<void>; onSample: () => Promise<void>; onRemove: (id: string) => Promise<void> }) {
   const { clientId } = useToolClient()
   const clients = useClients()
   const [pick, setPick] = useState(clientId ?? '')
@@ -91,7 +99,7 @@ function DraftList({ rows, onNew, onRemove }: { rows: BucketRow<Row>[]; onNew: (
             <p className="t-sub break-keep text-slate-600">아이디어 → 구성요소 → 도면 → 청구항 → 본문 순서로 칸을 채우면 특허로 편집기에 붙일 글이 나옵니다. 회사는 나중에 골라도 됩니다(벤처 사업계획서 재료로 보낼 때 필요).</p>
           </div>
           <ClientSelect value={pick} onChange={setPick} clients={clients} label="어느 회사 특허인가요?" testId="spec-new-client" />
-          <div>
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="primary"
               disabled={busy}
@@ -107,7 +115,23 @@ function DraftList({ rows, onNew, onRemove }: { rows: BucketRow<Row>[]; onNew: (
             >
               <FilePlus2 aria-hidden="true" className="size-4" /> 새 명세서 쓰기
             </Button>
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await onSample()
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              data-testid="spec-sample"
+            >
+              <GraduationCap aria-hidden="true" className="size-4" /> 견본으로 연습해 보기
+            </Button>
           </div>
+          <p className="t-meta break-keep text-slate-500">견본은 '공구 마모 예측' 연습용 발명(실제 고객 발명 아님)입니다. 1~4단계가 채워져 있어 무엇을 어떻게 적는지 보면서 5 본문을 직접 써 볼 수 있어요.</p>
         </div>
       </Surface>
       <section className="flex flex-col gap-2">
@@ -119,15 +143,22 @@ function DraftList({ rows, onNew, onRemove }: { rows: BucketRow<Row>[]; onNew: (
             {sorted.map((r) => {
               const d = normalizeDraft(r.data.draft)
               const p = draftProgress(d)
+              const sample = d.source === SAMPLE_SOURCE
               return (
-                <li key={r.id} className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center" data-testid="spec-row">
-                  <Link to={hrefOf(r.id, r.clientId)} className="tap min-w-0 flex-1" data-testid="spec-row-open">
-                    <p className="t-body font-semibold break-keep text-slate-900">{d.title.trim() || '(명칭 아직 없음)'}</p>
-                    <p className="t-sub break-keep text-slate-600">
-                      {nameOf(r.clientId) || '회사 고르지 않음'} · {p.done}/{p.total}단계 · {r.updatedAt.slice(0, 10)}
-                    </p>
+                <li key={r.id} className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center" data-testid="spec-row" data-sample={sample ? '1' : '0'}>
+                  <Link to={hrefOf(r.id, r.clientId)} className="tap flex min-w-0 flex-1 flex-col gap-1" data-testid="spec-row-open">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="t-body min-w-0 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{d.title.trim() || '(명칭 아직 없음)'}</span>
+                      {sample && <Badge tone="warning">견본 · 연습용</Badge>}
+                    </span>
+                    <span className="t-sub break-keep text-slate-600">
+                      {nameOf(r.clientId) || '회사 고르지 않음'} · {p.done}/{p.total}단계 · {localDateOf(r.updatedAt)}
+                    </span>
+                    <span className="block h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+                      <span className={`block h-full rounded-full ${p.done === p.total ? 'bg-success-600' : 'bg-brand-600'}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
+                    </span>
                   </Link>
-                  <InlineConfirm question="이 명세서 초안을 지울까요? 되돌릴 수 없습니다." onConfirm={() => void onRemove(r.id)} testId="spec-row-remove" className="self-end sm:self-auto" />
+                  <InlineConfirm question="이 명세서 초안을 지울까요? 지운 바로 뒤에는 알림의 [되돌리기]로 살릴 수 있어요." onConfirm={() => void onRemove(r.id)} testId="spec-row-remove" className="self-end sm:self-auto" />
                 </li>
               )
             })}
@@ -197,15 +228,126 @@ function VentureSend({ title, md }: { title: string; md: string }) {
 /* ------------------------------------------------------------------ */
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'failed'
+const SAVE_TEXT: Record<SaveState, string> = { saved: '저장됨', saving: '저장 중…', failed: '저장 못 함', dirty: '고치는 중' }
+type NextHint = { text: string; step: DraftStep; label: string }
 
-function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void }) {
+/** 작은 화면(PC 넓은 화면 아래) — 내려도 따라오는 단계 줄: 이전 · n/6 · 다음 */
+function StepBar({ idx, state, errs, done, onPrev, onNext }: { idx: number; state: SaveState; errs: number; done: number; onPrev: () => void; onNext: () => void }) {
+  const t = TABS[idx]
+  const last = idx >= TABS.length - 1
+  return (
+    <div className="sticky top-16 z-20 -mx-4 border-b border-slate-200 bg-slate-50/95 px-4 py-1.5 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 xl:hidden" data-testid="spec-bar" data-step={t.key}>
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={onPrev} disabled={idx === 0} aria-label="이전 단계" data-testid="spec-bar-prev">
+          <ChevronLeft aria-hidden="true" className="size-4" />
+          <span className="hidden sm:inline">이전</span>
+        </Button>
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+          <p className="t-sub flex flex-wrap items-baseline justify-center gap-x-1.5 font-semibold text-slate-900" data-testid="spec-bar-title">
+            <span className="tabular-nums">
+              {idx + 1}/{TABS.length}
+            </span>
+            <span className="break-keep sm:hidden">{t.short}</span>
+            <span className="hidden break-keep sm:inline">{t.label}</span>
+          </p>
+          <span className="block h-1 w-full max-w-48 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+            <span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.round((done / TABS.length) * 100)}%` }} />
+          </span>
+          <p className={`t-meta text-center ${state === 'failed' || errs ? 'text-danger-700' : 'text-slate-500'}`} data-testid="spec-bar-state">
+            {SAVE_TEXT[state]}
+            {errs ? ` · 고칠 것 ${errs}` : ''}
+          </p>
+        </div>
+        <Button variant={last ? 'secondary' : 'primary'} size="sm" onClick={onNext} disabled={last} aria-label="다음 단계" data-testid="spec-bar-next">
+          <span className="hidden sm:inline">다음</span>
+          <ChevronRight aria-hidden="true" className="size-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** PC 넓은 화면 — 오른쪽에 붙어 따라오는 판: 진행 · 단계로 가기 · 고칠 것 · 지금 할 것 · 저장 */
+function SideRail({ tab, prog, errs, state, next, onGo }: { tab: DraftStep; prog: ReturnType<typeof draftProgress>; errs: { id: string; text: string; step: DraftStep }[]; state: SaveState; next: NextHint; onGo: (s: DraftStep) => void }) {
+  return (
+    <aside className="hidden xl:block" aria-label="명세서 진행 상황" data-testid="spec-rail">
+      <div className="sticky top-20 flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 shadow-(--shadow-card)">
+        <div className="flex flex-col gap-1.5">
+          <p className="t-meta flex items-center justify-between gap-2 font-semibold text-slate-500">
+            <span>진행</span>
+            <span className={state === 'failed' ? 'text-danger-700' : ''} data-testid="spec-rail-save">
+              {SAVE_TEXT[state]}
+            </span>
+          </p>
+          <p className="t-body font-bold text-slate-900 tabular-nums">
+            {prog.done}/{prog.total}단계
+          </p>
+          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+            <span className={`block h-full rounded-full ${prog.done === prog.total ? 'bg-success-600' : 'bg-brand-600'}`} style={{ width: `${Math.round((prog.done / prog.total) * 100)}%` }} />
+          </span>
+        </div>
+        <ol className="flex flex-col gap-0.5">
+          {TABS.map((t, i) => {
+            const ok = prog.steps[t.key]
+            return (
+              <li key={t.key}>
+                <button type="button" onClick={() => onGo(t.key)} aria-current={tab === t.key ? 'step' : undefined} className={`tap t-sub flex w-full items-center gap-2 rounded-[8px] px-2 py-1.5 text-left ${tab === t.key ? 'bg-brand-50 font-semibold text-brand-800' : 'text-slate-700 hover:bg-slate-50'}`} data-testid={`spec-rail-${t.key}`}>
+                  <span className={`t-meta grid size-5 shrink-0 place-items-center rounded-full font-bold ${ok ? 'bg-success-600 text-white' : 'bg-slate-200 text-slate-600'}`} aria-hidden="true">
+                    {ok ? <Check className="size-3" /> : i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 break-keep">{t.label}</span>
+                  <span className="sr-only">{ok ? '다 됨' : '아직'}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+        {errs.length > 0 && (
+          <div className="flex flex-col gap-1 border-t border-slate-100 pt-2" data-testid="spec-rail-errors">
+            <p className="t-meta font-semibold text-danger-700">고칠 것 {errs.length}개</p>
+            <ul className="flex flex-col gap-0.5">
+              {errs.slice(0, 3).map((e) => (
+                <li key={e.id}>
+                  <button type="button" onClick={() => onGo(e.step)} className="t-meta w-full break-keep rounded-[6px] px-1 py-1 text-left text-slate-700 hover:bg-slate-50">
+                    ✕ {e.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2">
+          <p className="t-meta break-keep text-slate-700">
+            <b className="font-semibold text-slate-900">지금 할 것</b> · {next.text}
+          </p>
+          <Button variant="primary" size="sm" onClick={() => onGo(next.step)} data-testid="spec-rail-next">
+            {next.label}
+          </Button>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+const STEP_KEYS = TABS.map((t) => t.key)
+const isStep = (x: string | null): x is DraftStep => !!x && (STEP_KEYS as string[]).includes(x)
+
+function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const ai = useOwnerAiAccess()
   const { clientId: urlClient, clientName } = useToolClient()
   const clients = useClients()
   const [d, setD] = useState<SpecDraft>(() => normalizeDraft(row.data.draft))
-  const [tab, setTab] = useState<DraftStep>(() => (normalizeDraft(row.data.draft).title.trim() ? 'parts' : 'idea'))
+  const [tab, setTab] = useState<DraftStep>(() => initialStep ?? (normalizeDraft(row.data.draft).title.trim() ? 'parts' : 'idea'))
+  const [packing, setPacking] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const [state, setState] = useState<SaveState>('saved')
   const [aiOpen, setAiOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -283,6 +425,45 @@ function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: 
     [commit],
   )
 
+  /** 지우기 · 바꾸기 — 바로 저장하고 [되돌리기]. 되돌리면 이 동작이 바꾼 칸만 앞 값으로(그 사이 다른 칸에 적은 글은 그대로) */
+  const offerUndo = useCallback(
+    (label: string, before: SpecDraft, after: SpecDraft) => {
+      const keys = (Object.keys(after) as (keyof SpecDraft)[]).filter((k) => after[k] !== before[k])
+      if (!keys.length) {
+        showToast(label)
+        return
+      }
+      showToast(label, {
+        label: '되돌리기',
+        onClick: () => {
+          if (!alive.current) {
+            showToast('명세서 화면을 떠나서 되돌리지 못했습니다 — 다시 열어 고쳐 주세요')
+            return
+          }
+          update((cur) => {
+            const back = { ...cur } as Record<string, unknown>
+            for (const k of keys) back[k] = before[k]
+            return back as unknown as SpecDraft
+          })
+          flush()
+          showToast('되돌렸습니다')
+        },
+      })
+    },
+    [update, flush, showToast],
+  )
+  const act = useCallback<Act>(
+    (label, fn) => {
+      const before = dRef.current
+      const after = fn(before)
+      if (after === before) return
+      update(() => after)
+      flush()
+      offerUndo(label, before, after)
+    },
+    [update, flush, offerUndo],
+  )
+
   const setClient = async (id: string) => {
     clientRef.current = id
     await commit()
@@ -294,7 +475,7 @@ function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: 
   const errs = issues.filter((i) => i.level === 'error')
   const mdFull = useMemo(() => (tab === 'check' ? specMarkdown(d) : ''), [d, tab])
   const report = useMemo(() => (tab === 'check' ? checkSpec(parseSpecText(specMarkdown(d, { notice: false }), 'draft.md')) : null), [d, tab])
-  const next = !prog.steps.idea
+  const next: NextHint = !prog.steps.idea
     ? { text: '명칭(한글 · 영문)과 아이디어 질문 셋 이상을 적어 주세요', step: 'idea' as DraftStep, label: '1 아이디어로' }
     : !prog.steps.parts
       ? { text: '권리축으로 구성요소 · 단계 뼈대를 만드세요(단추 하나)', step: 'parts' as DraftStep, label: '2 구성요소로' }
@@ -315,6 +496,26 @@ function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: 
   }
   const idx = TABS.findIndex((t) => t.key === tab)
   const stepIssues = (s: DraftStep) => issues.filter((i) => i.step === s)
+
+  const checklist = useMemo(() => (tab === 'check' ? submitChecklist(d, report, today) : ''), [d, report, today, tab])
+  const pack = async () => {
+    flush()
+    setPacking(true)
+    try {
+      const files: { name: string; data: Uint8Array | string }[] = [{ name: 'spec.md', data: specMarkdown(d) }]
+      const figs = [blockSvg(d), flowSvg(d)]
+      for (let i = 0; i < figs.length; i += 1) {
+        if (figs[i].boxes > 0) files.push({ name: `fig${i + 1}-draft.png`, data: await svgToPngBytes(figs[i].svg, figs[i].height) })
+      }
+      files.push({ name: 'checklist.txt', data: checklist || submitChecklist(d, report, today) })
+      downloadBytes(`patent-pack-${today.replace(/-/g, '')}.zip`, zipStore(files), 'application/zip')
+      showToast(`제출 준비 묶음을 받았습니다 — 파일 ${files.length}개(${files.map((f) => f.name).join(' · ')})`)
+    } catch (e) {
+      showToast(`묶음을 만들지 못했습니다: ${e instanceof Error && e.message ? e.message : '잠시 뒤 다시 해 주세요'} — [MD 내려받기] 는 그대로 됩니다`)
+    } finally {
+      setPacking(false)
+    }
+  }
 
   const download = () => {
     downloadText(`patent-spec-${today.replace(/-/g, '')}.md`, mdFull || specMarkdown(d))
@@ -386,10 +587,11 @@ function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: 
           clientId={clientRef.current}
           onClose={() => setImportOpen(false)}
           onPick={(fn, label) => {
-            void apply((cur) => ({ draft: fn(cur) })).then(() => {
+            const before = dRef.current
+            void apply((cur) => ({ draft: fn(cur) })).then((m) => {
               setImportOpen(false)
               setTab('idea')
-              showToast(`${label ? `'${label}' — ` : ''}빈 칸만 채웠습니다. 이미 적은 칸은 그대로입니다.`)
+              offerUndo(`${label ? `'${label}' — ` : ''}빈 칸만 채웠습니다. 이미 적은 칸은 그대로입니다.`, before, m.draft)
             })
           }}
         />
@@ -397,67 +599,77 @@ function SpecEditor({ row, save, onBack }: { row: BucketRow<Row>; save: (input: 
 
       {aiPanel}
 
-      <div role="tablist" className="grid grid-cols-3 gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1 sm:grid-cols-6" data-testid="spec-tabs">
-        {TABS.map((t, i) => {
-          const errN = t.key === 'check' ? errs.length : 0
-          return (
-            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => goStep(t.key)} className={`tap t-sub flex min-h-11 flex-col items-center justify-center rounded-[8px] px-1.5 font-semibold break-keep ${tab === t.key ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`} data-testid={`spec-tab-${t.key}`}>
-              <span>
-                {i + 1} <span className="sm:hidden">{t.short}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </span>
-              <span className={`t-meta font-normal ${errN ? 'text-danger-700' : 'text-slate-500'}`}>{t.key === 'check' ? (errN ? `${errN}` : '') : prog.steps[t.key] ? '✓' : ''}</span>
-            </button>
-          )
-        })}
-      </div>
+      <StepBar idx={idx} state={state} errs={errs.length} done={prog.done} onPrev={() => idx > 0 && goStep(TABS[idx - 1].key)} onNext={() => idx < TABS.length - 1 && goStep(TABS[idx + 1].key)} />
 
-      {tab === 'idea' && <IdeaStep d={d} update={update} flush={flush} />}
-      {tab === 'parts' && <PartsStep d={d} update={update} flush={flush} issues={stepIssues('parts')} />}
-      {tab === 'figures' && <FiguresStep d={d} update={update} flush={flush} issues={stepIssues('figures')} onError={showToast} />}
-      {tab === 'claims' && <ClaimsStep d={d} update={update} flush={flush} issues={stepIssues('claims')} />}
-      {tab === 'body' && <BodyStep d={d} update={update} flush={flush} issues={stepIssues('body')} />}
-      {tab === 'check' && report && (
-        <CheckStep
-          d={d}
-          update={update}
-          report={report}
-          md={mdFull}
-          onGo={goStep}
-          onDownload={download}
-          onCopy={() => void copy()}
-          venture={
-            <Surface>
-              <section className="flex flex-col gap-3" data-testid="spec-venture-card">
-                <h3 className="t-body font-bold text-slate-900">벤처 사업계획서로 잇기</h3>
-                {urlClient ? (
-                  <VentureSend title={d.title} md={specMarkdown(d, { notice: false })} />
-                ) : (
-                  <ClientSelect value="" onChange={(id) => void setClient(id)} clients={clients} label="어느 회사 사업계획서 재료로 보낼까요?" testId="spec-venture-client" />
-                )}
-              </section>
-            </Surface>
-          }
-        />
-      )}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_16.5rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div role="tablist" className="grid grid-cols-3 gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1 sm:grid-cols-6" data-testid="spec-tabs">
+            {TABS.map((t, i) => {
+              const errN = t.key === 'check' ? errs.length : 0
+              return (
+                <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => goStep(t.key)} className={`tap t-sub flex min-h-11 flex-col items-center justify-center rounded-[8px] px-1.5 font-semibold break-keep ${tab === t.key ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`} data-testid={`spec-tab-${t.key}`}>
+                  <span>
+                    {i + 1} <span className="sm:hidden">{t.short}</span>
+                    <span className="hidden sm:inline">{t.label}</span>
+                  </span>
+                  <span className={`t-meta font-normal ${errN ? 'text-danger-700' : 'text-slate-500'}`}>{t.key === 'check' ? (errN ? `${errN}` : '') : prog.steps[t.key] ? '✓' : ''}</span>
+                </button>
+              )
+            })}
+          </div>
 
-      <div className="flex justify-between gap-2">
-        {idx > 0 ? (
-          <Button variant="secondary" onClick={() => goStep(TABS[idx - 1].key)} data-testid="spec-prev">
-            ← 이전
-          </Button>
-        ) : (
-          <span />
-        )}
-        {idx < TABS.length - 1 ? (
-          <Button variant="primary" onClick={() => goStep(TABS[idx + 1].key)} data-testid="spec-next-step">
-            다음 →
-          </Button>
-        ) : (
-          <Button variant="primary" onClick={download}>
-            <Download aria-hidden="true" className="size-4" /> MD 내려받기
-          </Button>
-        )}
+          {tab === 'idea' && <IdeaStep d={d} update={update} flush={flush} act={act} />}
+          {tab === 'parts' && <PartsStep d={d} update={update} flush={flush} issues={stepIssues('parts')} act={act} />}
+          {tab === 'figures' && <FiguresStep d={d} update={update} flush={flush} issues={stepIssues('figures')} onError={showToast} act={act} />}
+          {tab === 'claims' && <ClaimsStep d={d} update={update} flush={flush} issues={stepIssues('claims')} act={act} />}
+          {tab === 'body' && <BodyStep d={d} update={update} flush={flush} issues={stepIssues('body')} act={act} />}
+          {tab === 'check' && report && (
+            <CheckStep
+              d={d}
+              update={update}
+              report={report}
+              md={mdFull}
+              onGo={goStep}
+              onDownload={download}
+              onCopy={() => void copy()}
+              onPack={() => void pack()}
+              packing={packing}
+              checklist={checklist}
+              venture={
+                <Surface>
+                  <section className="flex flex-col gap-3" data-testid="spec-venture-card">
+                    <h3 className="t-body font-bold text-slate-900">벤처 사업계획서로 잇기</h3>
+                    {urlClient ? (
+                      <VentureSend title={d.title} md={specMarkdown(d, { notice: false })} />
+                    ) : (
+                      <ClientSelect value="" onChange={(id) => void setClient(id)} clients={clients} label="어느 회사 사업계획서 재료로 보낼까요?" testId="spec-venture-client" />
+                    )}
+                  </section>
+                </Surface>
+              }
+            />
+          )}
+
+          <div className="flex justify-between gap-2">
+            {idx > 0 ? (
+              <Button variant="secondary" onClick={() => goStep(TABS[idx - 1].key)} data-testid="spec-prev">
+                ← 이전
+              </Button>
+            ) : (
+              <span />
+            )}
+            {idx < TABS.length - 1 ? (
+              <Button variant="primary" onClick={() => goStep(TABS[idx + 1].key)} data-testid="spec-next-step">
+                다음 →
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={download}>
+                <Download aria-hidden="true" className="size-4" /> MD 내려받기
+              </Button>
+            )}
+          </div>
+        </div>
+        <SideRail tab={tab} prog={prog} errs={errs} state={state} next={next} onGo={goStep} />
       </div>
     </div>
   )
@@ -473,6 +685,7 @@ export function SpecWritePage() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const draftId = params.get('draft')
+  const stepParam = params.get('step')
   const head = <PageHeader title="특허 명세서 쓰기" description="아이디어부터 칸을 채우면 특허로 편집기에 붙일 명세서가 나옵니다. 규칙으로 뼈대를 만들고, AI 초안은 대표만." descriptionAsHint />
 
   const create = async (clientId: string) => {
@@ -483,10 +696,32 @@ export function SpecWritePage() {
       showToast(`만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
   }
+  const sample = async () => {
+    try {
+      const r = await bucket.save({ clientId: '', data: { draft: sampleDraft() } })
+      showToast('견본을 열었습니다 — 1~4단계는 채워져 있어요. 단계를 넘기며 보고 5 본문을 직접 써 보세요')
+      navigate(hrefOf(r.id, '', 'idea'))
+    } catch (e) {
+      showToast(`견본을 만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
+    }
+  }
   const remove = async (id: string) => {
+    const gone = bucket.rows?.find((r) => r.id === id)
     try {
       await bucket.remove(id)
-      showToast('지웠습니다')
+      showToast(
+        '명세서 초안을 지웠습니다',
+        gone
+          ? {
+              label: '되돌리기',
+              onClick: () =>
+                void bucket.save({ id: gone.id, clientId: gone.clientId, data: gone.data }).then(
+                  () => showToast('되살렸습니다'),
+                  (e: unknown) => showToast(`되살리지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`),
+                ),
+            }
+          : undefined,
+      )
     } catch (e) {
       showToast(`지우지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
@@ -509,11 +744,11 @@ export function SpecWritePage() {
       </p>
     )
   } else if (!draftId) {
-    body = <DraftList rows={bucket.rows} onNew={create} onRemove={remove} />
+    body = <DraftList rows={bucket.rows} onNew={create} onSample={sample} onRemove={remove} />
   } else {
     const row = bucket.rows.find((r) => r.id === draftId)
     body = row ? (
-      <SpecEditor key={row.id} row={row} save={bucket.save} onBack={() => navigate(WRITE)} />
+      <SpecEditor key={row.id} row={row} save={bucket.save} onBack={() => navigate(WRITE)} initialStep={isStep(stepParam) ? stepParam : null} />
     ) : (
       <div className="flex flex-col gap-2" data-testid="spec-missing">
         <Blank title="이 명세서를 찾지 못했습니다(지웠거나 다른 작업공간)." />

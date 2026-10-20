@@ -32,8 +32,12 @@ import {
   type VPlanState,
   type VPlanStatus,
 } from '../core/venturePlan'
-import { parseSpecFile } from '../../services/patent/specParse'
+import { parseSpecFile, parseSpecText } from '../../services/patent/specParse'
 import { specDigest } from '../../services/patent/specDigest'
+import { draftProgress, normalizeDraft, specMarkdown, type SpecDraft } from '../../services/patent/specDraft'
+import { useModuleBucket } from '../../tools/shared/useModuleBucket'
+import { useToolClient } from '../../tools/shared/toolClientContext'
+import { localDateOf } from '../../lib/appClock'
 import { VenturePlanAi } from './VenturePlanAi'
 
 type Tab = 'mat' | VPlanPart | 'check'
@@ -438,6 +442,35 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
   const [info, setInfo] = useState('')
   const [undo, setUndo] = useState<{ text: string; file: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // D-249 같은 회사의 '명세서 쓰기' 초안 — 파일 없이 바로 재료로
+  const { clientId } = useToolClient()
+  const drafts = useModuleBucket<{ draft: SpecDraft } & Record<string, unknown>>('patent-draft', 'draft')
+  const mine = useMemo(
+    () =>
+      clientId
+        ? (drafts.rows ?? [])
+            .filter((r) => r.clientId === clientId)
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+            .map((r) => {
+              const d = normalizeDraft(r.data.draft)
+              return { id: r.id, d, prog: draftProgress(d), updatedAt: r.updatedAt }
+            })
+        : [],
+    [drafts.rows, clientId],
+  )
+  const takeDraftSpec = async (d: SpecDraft) => {
+    const dg = specDigest(parseSpecText(specMarkdown(d, { notice: false }), 'draft.md'))
+    if (!dg.text.trim()) {
+      showToast('이 명세서에는 아직 재료로 쓸 글이 없습니다 — 명세서 쓰기에서 칸을 더 채워 주세요')
+      return
+    }
+    if (s.materials.patent.trim()) setUndo({ text: s.materials.patent, file: s.materials.patentFile })
+    patent.setDraft(dg.text)
+    patent.flush()
+    await save({ [VK.patentFile]: `명세서 쓰기 · ${d.title.trim().slice(0, 40) || '명칭 없음'}` })
+    setInfo(`${dg.title || '명칭 없음'} · 청구항 ${dg.claims.total}개(독립 ${dg.claims.independent}개)`)
+    showToast('같은 회사 명세서 요약을 재료로 넣었습니다')
+  }
 
   const readFile = async (file: File | undefined) => {
     if (!file) return
@@ -505,6 +538,23 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
                 </Button>
               )}
             </div>
+            {mine.length > 0 && (
+              <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-2" data-testid="vplan-spec-drafts">
+                <p className="t-sub break-keep font-semibold text-slate-800">이 회사 명세서 {mine.length}건 — 파일 없이 바로 가져오기</p>
+                <ul className="flex flex-col gap-1.5">
+                  {mine.slice(0, 3).map((m) => (
+                    <li key={m.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-center" data-testid="vplan-spec-draft">
+                      <p className="t-sub min-w-0 flex-1 break-keep text-slate-700 [overflow-wrap:anywhere]">
+                        <b className="font-semibold text-slate-900">{m.d.title.trim() || '(명칭 아직 없음)'}</b> · {m.prog.done}/{m.prog.total}단계 · {localDateOf(m.updatedAt)}
+                      </p>
+                      <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={() => void takeDraftSpec(m.d)} data-testid="vplan-spec-draft-use">
+                        이 명세서를 재료로
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {info && <p className="t-sub break-keep font-semibold text-success-700" data-testid="vplan-spec-info">✓ {info}</p>}
           </div>
           {area('특허 재료(고칠 수 있음)', '출원 전이면 "출원 예정", 출원했으면 출원번호를 [1] 7 지식재산권 칸에 넣으세요. 등록 전에는 "등록 · 보유" 라고 쓰지 않습니다.', patent, 'vplan-mat-patent', 8, '[발명의 명칭] …\n[과제의 해결 수단] …')}

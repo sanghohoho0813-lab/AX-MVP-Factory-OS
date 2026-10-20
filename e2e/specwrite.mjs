@@ -118,9 +118,13 @@ let draftUrl = ''
   // 3 도면
   await page.getByTestId('spec-tab-figures').click()
   await page.getByTestId('spec-step-figures').waitFor()
-  const fig1Boxes = await page.locator('[data-testid="spec-fig-1"] svg[role="img"] rect').count()
-  const fig2Text = await page.locator('[data-testid="spec-fig-2"] svg[role="img"]').textContent()
-  check('도 1 블록도: 바탕 + 시스템 + 구성요소 6 상자 · 도 2 순서도: 시작 · S110 · 끝', fig1Boxes === 8 && /시작/.test(fig2Text) && /S110/.test(fig2Text) && /끝/.test(fig2Text), { fig1Boxes })
+  // D-249: 그림은 SVG 글을 이미지로(같은 글이 PNG · 제출 준비 묶음에 들어간다)
+  const svgOf = async (n) => decodeURIComponent(((await page.getByTestId(`spec-fig-${n}-img`).getAttribute('src')) ?? '').split(',').slice(1).join(','))
+  const fig1Svg = await svgOf(1)
+  const fig2Text = await svgOf(2)
+  const fig1Boxes = (fig1Svg.match(/<rect /g) ?? []).length
+  const fig1Loaded = await page.getByTestId('spec-fig-1-img').evaluate((img) => img.complete && img.naturalWidth > 0)
+  check('도 1 블록도: 바탕 + 시스템 + 구성요소 6 상자(그림 열림) · 도 2 순서도: 시작 · S110 · 끝', fig1Boxes === 8 && (await page.getByTestId('spec-fig-1').getAttribute('data-boxes')) === '6' && fig1Loaded && /시작/.test(fig2Text) && /S110/.test(fig2Text) && /끝/.test(fig2Text), { fig1Boxes, fig1Loaded })
   const desc = await page.getByTestId('spec-fig-desc').innerText()
   check('도면의 간단한 설명: 도 1은 … 블록도이다 · 도 2는 … 순서도이다 · 도 3 마모판정부', /도 1은 본 발명의 일 실시예에 따른 공구관리 시스템\(100\)의 전체 구성을 나타낸 블록도이다/.test(desc) && /도 2는 .*순서도이다/.test(desc) && /마모판정부\(140\)/.test(desc), desc.slice(0, 300))
   check('부호의 설명: 100 시스템 · 140 마모판정부', /100: 공구관리 시스템/.test(await page.getByTestId('spec-signs').innerText()) && /140: 마모판정부/.test(await page.getByTestId('spec-signs').innerText()))
