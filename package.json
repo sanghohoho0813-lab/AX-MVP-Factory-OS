@@ -67,6 +67,7 @@
     "qa:taxplan": "node e2e/taxplan.mjs",
     "qa:ventureplan": "node e2e/ventureplan.mjs",
     "qa:pvmenu": "node e2e/pvmenu.mjs",
+    "qa:specwrite": "node e2e/specwrite.mjs",
     "qa:speccheck": "node e2e/speccheck.mjs",
     "qa:site": "node e2e/site.mjs",
     "qa:content": "node e2e/content.mjs",

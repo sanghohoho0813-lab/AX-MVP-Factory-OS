@@ -1,7 +1,8 @@
 /**
  * D-247 특허 · 벤처 — 대표 "어디 있는지 못 찾겠다, 기업인증 밖으로 빼 줘(지금 기능들만)".
  *
- *   /patent-venture             첫 화면 — 벤처 사업계획서 쓰기(회사 고르기) · 특허 명세서 점검
+ *   /patent-venture             첫 화면 — 특허 명세서 쓰기(D-248) · 벤처 사업계획서 쓰기(회사 고르기) · 특허 명세서 점검
+ *   /patent-venture/write       특허 명세서 쓰기(D-248 · pages/patent/SpecWritePage)
  *   /patent-venture/plan        벤처 사업계획서 쓰기(?client=) — 기업인증 › 벤처 안 화면과 같은 기록
  *   /patent-venture/spec-check  명세서 점검(특허·MVP 안 화면과 같은 것)
  *
@@ -9,7 +10,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, FileSearch, PenLine } from 'lucide-react'
+import { ChevronRight, FilePen, FileSearch, PenLine } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Blank, Surface } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
@@ -95,8 +96,21 @@ function ToolCard({ testId, icon, title, line, steps, children }: { testId: stri
 export function PatentVentureHomePage() {
   return (
     <div className="flex flex-col gap-5" data-testid="pv-home">
-      <PageHeader title="특허 · 벤처" description="벤처 사업계획서 쓰기와 특허 명세서 점검을 여기서 바로 엽니다." showOnPhone />
+      <PageHeader title="특허 · 벤처" description="특허 명세서 쓰기 → 점검 → 벤처 사업계획서까지 여기서 바로 엽니다." showOnPhone />
       <div className="grid gap-4 lg:grid-cols-2">
+        <ToolCard
+          testId="pv-card-write"
+          icon={<FilePen className="size-5" />}
+          title="특허 명세서 쓰기"
+          line="아이디어 다섯 질문과 권리축 일곱 줄을 적으면 구성요소 · 도면 · 청구항 · 본문 뼈대가 나옵니다. 특허로 편집기에 붙일 MD 로 내려받습니다."
+          steps={['아이디어', '구성요소 · 도면', '청구항 · 본문', '점검 · 내보내기']}
+        >
+          <div>
+            <Link to={`${HOME}/write`} className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 py-2.5 t-body font-semibold text-white hover:bg-brand-700" data-testid="pv-write-open">
+              <FilePen aria-hidden="true" className="size-4 shrink-0" /> 명세서 쓰기 열기
+            </Link>
+          </div>
+        </ToolCard>
         <ToolCard
           testId="pv-card-plan"
           icon={<PenLine className="size-5" />}
