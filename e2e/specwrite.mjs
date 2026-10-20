@@ -60,8 +60,8 @@ let draftUrl = ''
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
 
-  // 입구 — 특허 · 벤처 첫 카드
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  // 입구 — 특허 · 벤처 [자세히](예전 첫 화면) 첫 카드 · D-250 첫 화면은 대화창
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   const cards = await page.locator('[data-testid^="pv-card-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
   check('특허 · 벤처: 카드 셋 — 명세서 쓰기가 맨 앞', cards.join() === 'pv-card-write,pv-card-plan,pv-card-spec', cards)

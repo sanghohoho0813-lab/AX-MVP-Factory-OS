@@ -84,6 +84,7 @@ const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ def
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
 const PatentSpecCheckPage = lazy(() => import('../pages/PatentSpecCheckPage').then((m) => ({ default: m.PatentSpecCheckPage })))
 const PatentVentureHomePage = lazy(() => import('../pages/PatentVenturePage').then((m) => ({ default: m.PatentVentureHomePage })))
+const PatentVentureChatPage = lazy(() => import('../pages/patent/PatentVentureChat').then((m) => ({ default: m.PatentVentureChatPage })))
 const VenturePlanPage = lazy(() => import('../pages/PatentVenturePage').then((m) => ({ default: m.VenturePlanPage })))
 const SpecWritePage = lazy(() => import('../pages/patent/SpecWritePage').then((m) => ({ default: m.SpecWritePage })))
 const ConsultingStudioPage = lazy(() => import('../pages/ConsultingStudioPage').then((m) => ({ default: m.ConsultingStudioPage })))
@@ -455,7 +456,9 @@ export const appRouteChildren = [
       // D-245: 명세서 점검(규칙 · AI 없음) — /studio 밑이라 팀장 화면에는 없다
       { path: 'studio/spec-check', element: <PatentSpecCheckPage /> },
       // D-247 대표 "기업인증 밖으로" — 특허 · 벤처 한 곳(대표만: 메뉴 표 ownerOnly 가 팀장 주소도 막는다). 기업인증 › 벤처 안 입구도 그대로
-      { path: 'patent-venture', element: toolRoute(<PatentVentureHomePage />) },
+      // D-250 첫 화면은 대화창 — 예전 진행판 · 도구 카드는 /more([자세히])
+      { path: 'patent-venture', element: toolRoute(<PatentVentureChatPage />) },
+      { path: 'patent-venture/more', element: toolRoute(<PatentVentureHomePage />) },
       { path: 'patent-venture/plan', element: toolRoute(<VenturePlanPage />) },
       // D-248 특허 명세서 쓰기(?draft= · ?client=) — 아이디어 → 구성요소 → 도면 → 청구항 → 본문 → 점검 · MD · 벤처 재료로
       { path: 'patent-venture/write', element: toolRoute(<SpecWritePage />) },

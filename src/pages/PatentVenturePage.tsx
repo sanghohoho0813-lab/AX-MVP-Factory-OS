@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Check, ChevronRight, FilePen, FileSearch, GraduationCap, PenLine } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, FilePen, FileSearch, GraduationCap, PenLine } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Badge, Blank, Surface, type Tone } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
@@ -307,7 +307,7 @@ function Board({ rows, today, onSample, busy }: { rows: PvBoardRow[]; today: str
 export function PatentVentureHomePage() {
   const drafts = useModuleBucket<DraftRow>('patent-draft', 'draft')
   const works = useModuleBucket<CertWorkRow>('cert-os', 'work')
-  const { loadClients } = useToolClient()
+  const { loadClients, clientId: urlClient } = useToolClient()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
@@ -349,7 +349,12 @@ export function PatentVentureHomePage() {
   const loadError = drafts.error || works.error
   return (
     <div className="flex flex-col gap-5" data-testid="pv-home">
-      <PageHeader title="특허 · 벤처" description="특허 명세서 쓰기 → 점검 → 벤처 사업계획서까지 여기서 바로 엽니다." showOnPhone />
+      <PageHeader title="특허 · 벤처 — 전체 화면" description="회사별 진행판과 도구 카드 — 대화창의 [자세히]에서 왔어요." descriptionAsHint showOnPhone />
+      <div>
+        <Link to={urlClient ? `${HOME}?client=${encodeURIComponent(urlClient)}` : HOME} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-2 py-2 font-semibold text-brand-700 hover:bg-brand-50" data-testid="pv-back-chat">
+          <ArrowLeft aria-hidden="true" className="size-4" /> 대화창으로
+        </Link>
+      </div>
       {loadError ? (
         <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center" data-testid="pv-board-error">
           <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">진행 상황을 읽지 못했습니다. 저장해 둔 기록은 그대로 있어요. 아래 도구는 그대로 쓸 수 있습니다.</p>

@@ -61,6 +61,10 @@ const GROUP_BAR: Record<NavAccent, string> = {
   system: 'bg-nav-system',
 }
 
+const CHAT_HOME = new Set(['cert-os'])
+/** 대화창이 첫 화면인 모듈의 목차 첫 줄('인증 한눈에')은 예전 전체 화면(?detail=1)으로 */
+const detailHref = (tool: ToolDefinition, key: string, href: string) => (CHAT_HOME.has(tool.key) && key === tool.sections?.[0]?.key ? `${href}${href.includes('?') ? '&' : '?'}detail=1` : href)
+
 export interface ModuleShellProps {
   tool: ToolDefinition
   /** 지금 보고 있는 화면 키 */
@@ -97,6 +101,8 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   }, [drawer])
 
   if (sections.length <= 1) return <>{children}</>
+  // D-250 대화창이 첫 화면인 모듈 — 목차 · 순서 띠 없이 대화창만([자세히] = ?detail=1 은 예전 그대로)
+  if (CHAT_HOME.has(tool.key) && section === sections[0].key && new URLSearchParams(location.search).get('detail') !== '1') return <>{children}</>
 
   const current = sections.find((s) => s.key === section) ?? sections[0]
   const groups: { name: string; items: typeof sections }[] = []
@@ -111,7 +117,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   const flowDef = TOOL_FLOWS[tool.key]
   const flow = flowDef ? flowPosition(flowDef, current.key, (k) => sections.some((s) => s.key === k)) : null
   const client = new URLSearchParams(location.search).get('client')
-  const hrefOf = (key: string) => (client ? `${tool.path}/${key}?client=${encodeURIComponent(client)}` : `${tool.path}/${key}`)
+  const hrefOf = (key: string) => detailHref(tool, key, client ? `${tool.path}/${key}?client=${encodeURIComponent(client)}` : `${tool.path}/${key}`)
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
@@ -205,7 +211,7 @@ function ModuleNavList({
             return (
               <Link
                 key={item.key}
-                to={withClient(`${tool.path}/${item.key}`)}
+                to={detailHref(tool, item.key, withClient(`${tool.path}/${item.key}`))}
                 data-section={item.key}
                 data-accent={accent}
                 aria-current={on ? 'page' : undefined}

@@ -372,7 +372,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   page.removeAllListeners('dialog')
 
   // 기업인증 — 저장이 안 되면 알린다(예전: 실패를 삼키고 '✓ 확인했습니다' 만)
-  await page.goto(BASE + '/tools/cert-os?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_hansol&detail=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   await blockWrites(page, 'cert-os')
   if (await page.getByTestId('cert-cta').count()) await page.getByTestId('cert-cta').first().click().catch(() => {})

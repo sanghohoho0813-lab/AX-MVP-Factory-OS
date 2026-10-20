@@ -1,7 +1,7 @@
 /**
  * qa:pvmenu — D-247 메뉴 '특허 · 벤처'(기업인증 밖). 실행: npm run qa:pvmenu -- http://localhost:4390 [사진 폴더]
  *  - 사이드바 고객 묶음(AI 작업실 다음)에 '특허 · 벤처' · 누르면 첫 화면 · 불 켜짐
- *  - 첫 화면: 벤처 사업계획서 쓰기(회사 고르기 → 쓰기) · 특허 명세서 점검 열기
+ *  - 첫 화면 = 대화창(D-250) · [자세히](/patent-venture/more): 벤처 사업계획서 쓰기(회사 고르기 → 쓰기) · 특허 명세서 점검 열기
  *  - /patent-venture/plan?client= 에서 쓴 칸 = 기업인증 › 벤처 › 사업계획서 쓰기의 같은 칸(같은 기록) · 새로고침해도 그대로
  *  - 돌아가기 → 특허 · 벤처 · 회사 없이 열면 고르기 · 명세서 점검(같은 화면, 돌아가기만 특허 · 벤처로)
  *  - 예전 입구 그대로: 기업인증 › 벤처 사업계획서 쓰기 · /studio/spec-check(돌아가기 특허·MVP)
@@ -60,8 +60,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('aside').first().getByRole('link', { name: /특허 · 벤처/ }).click()
   await page.waitForURL(/\/patent-venture$/)
   await page.waitForTimeout(400)
-  check('메뉴 → /patent-venture · 첫 화면 · 카드 둘', (await page.getByTestId('pv-home').count()) === 1 && (await page.getByTestId('pv-card-plan').count()) === 1 && (await page.getByTestId('pv-card-spec').count()) === 1)
+  // D-250 첫 화면 = 대화창 · 예전 진행판 · 카드는 [자세히](/patent-venture/more)
+  check('메뉴 → /patent-venture · 첫 화면 = 대화창', (await page.getByTestId('pv-chat-page').count()) === 1)
   check('메뉴 불 켜짐(지금 화면)', (await page.locator('aside').first().locator('a[aria-current="page"]').innerText()).includes('특허 · 벤처'))
+  await page.getByTestId('chat-detail').click()
+  await page.waitForURL(/\/patent-venture\/more$/)
+  await page.getByTestId('pv-home').waitFor()
+  check('[자세히] → 예전 첫 화면 · 카드 둘', (await page.getByTestId('pv-home').count()) === 1 && (await page.getByTestId('pv-card-plan').count()) === 1 && (await page.getByTestId('pv-card-spec').count()) === 1)
+  check('[자세히]에서도 메뉴 불은 특허 · 벤처', (await page.locator('aside').first().locator('a[aria-current="page"]').innerText()).includes('특허 · 벤처'))
   check('첫 화면: 기업인증 › 벤처기업 안내 한 줄', /기업인증 › 벤처기업/.test(await page.getByTestId('pv-note').innerText()))
   check('회사 고르기 전에는 [사업계획서 쓰기] 꺼짐', await page.getByTestId('pv-plan-open').isDisabled())
   await shot(page, 'pv-01-home')
@@ -105,14 +111,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   await page.getByTestId('vplan-back').click()
   await page.waitForURL(/\/patent-venture$/)
-  await page.getByTestId('pv-home').waitFor({ timeout: 5000 }).catch(() => {})
-  check('돌아가기 → 특허 · 벤처 첫 화면', (await page.getByTestId('pv-home').count()) === 1)
+  await page.getByTestId('pv-chat-page').waitFor({ timeout: 5000 }).catch(() => {})
+  check('돌아가기 → 특허 · 벤처 첫 화면(대화창)', (await page.getByTestId('pv-chat-page').count()) === 1)
   await page.goto(BASE + '/patent-venture/plan', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('회사 없이 열면 회사 고르기', (await page.getByTestId('pv-plan-pick').count()) === 1 && (await page.getByTestId('vplan').count()) === 0)
 
   // 명세서 점검
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-spec-open').click()
   await page.waitForURL(/\/patent-venture\/spec-check$/)
   await page.waitForTimeout(400)
@@ -146,20 +152,24 @@ for (const width of [360, 390, 430]) {
     await link.click()
     await page.waitForURL(/\/patent-venture$/)
     await page.waitForTimeout(400)
-    check('390: 서랍 → 첫 화면', (await page.getByTestId('pv-home').count()) === 1)
+    check('390: 서랍 → 첫 화면(대화창)', (await page.getByTestId('pv-chat-page').count()) === 1)
   }
   for (const scale of ['', 'extra_large']) {
     await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
     if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
     await page.waitForTimeout(300)
-    const o1 = await overflowX(page)
+    const o0 = await overflowX(page)
+    await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
+    if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
+    await page.waitForTimeout(300)
+    const o1 = Math.max(o0, await overflowX(page))
     if (width === 390 && !scale) await shot(page, 'pv-04-home-390')
     await page.goto(BASE + `/patent-venture/plan?client=${CLIENT}`, { waitUntil: 'networkidle' })
     if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
     await page.waitForTimeout(800)
     const o2 = await overflowX(page)
     if (width === 390 && !scale) await shot(page, 'pv-05-plan-390', false)
-    check(`${width}${scale ? ' 글자 아주 크게' : ''}: 첫 화면 · 사업계획서 가로 넘침 0`, o1 <= 0 && o2 <= 0, { o1, o2 })
+    check(`${width}${scale ? ' 글자 아주 크게' : ''}: 대화창 · 자세히 · 사업계획서 가로 넘침 0`, o1 <= 0 && o2 <= 0, { o1, o2 })
   }
   check(`${width}: JS 오류 0`, errors.length === 0, errors)
   await ctx.close()

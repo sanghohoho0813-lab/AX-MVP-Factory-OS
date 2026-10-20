@@ -194,7 +194,7 @@ try {
   /* ===== 3. 무작위 UI 두드리기 — 허용 · 숨김 · 대표 전용 주소를 섞어 ===== */
   const PILOT_OK = ['/', '/ops/clients', '/ops/decide', '/ops/calendar', '/journal', '/money', '/grants', '/settings', '/tools', '/tools/tax', '/tools/employment', '/tools/labcare', '/tools/cert-os', '/tools/startup-tax', '/tools/policy-funding']
   const OWNER_ONLY = ['/studio', '/diagnosis', '/validation', '/selection', '/mvp-design', '/deliverables', '/website-studio', '/funding', '/reports', '/cases', '/sales/board', '/sales/first-meeting', '/ops/inbox', '/kpi', '/roadmap', '/why', '/getting-started', '/tools/cretop', '/tools/sales-kit', '/tools/review', '/modules/tech-biz', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']
-  const DEEP = [`/ops/clients/${OWNER_CLIENT}`, `/tools/tax?client=${OWNER_CLIENT}`, `/tools/cert-os?client=${OWNER_CLIENT}`, `/ops/clients/${OWNER_CLIENT}?tab=consulting`, `/ops/clients/${OWNER_CLIENT}?tab=portal`, `/journal/day`, `/ops/clients?new=1`]
+  const DEEP = [`/ops/clients/${OWNER_CLIENT}`, `/tools/tax?client=${OWNER_CLIENT}`, `/tools/cert-os?client=${OWNER_CLIENT}`, `/tools/cert-os?client=${OWNER_CLIENT}&detail=1`, `/ops/clients/${OWNER_CLIENT}?tab=consulting`, `/ops/clients/${OWNER_CLIENT}?tab=portal`, `/journal/day`, `/ops/clients?new=1`]
   const POOL = [...PILOT_OK, ...OWNER_ONLY, ...DEEP]
   const STEPS = Number(process.env.ISO_STEPS ?? 80)
   let worst = 0

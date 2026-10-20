@@ -1,6 +1,6 @@
 /**
  * qa:pvux — D-249 특허 · 벤처 진행판 · 명세서 쓰기 길잡이. 실행: npm run qa:pvux -- http://localhost:4390 [사진 폴더]
- *  - 첫 화면: 처음이면 순서 안내(명세서 → 점검 → 사업계획서) + [견본으로 연습] · 도구 카드 셋 그대로
+ *  - [자세히](/patent-venture/more · D-250 첫 화면은 대화창): 처음이면 순서 안내(명세서 → 점검 → 사업계획서) + [견본으로 연습] · 도구 카드 셋 그대로
  *  - 견본 → 1~4단계 채워진 연습 초안 · 주소 step=idea · 견본 표시
  *  - 1 아이디어: [예시 보기] · 마케팅 말/짧은 답 알림 · 권리축 '~하는' 끝맺음 한 줄/한 번에 고치기 · [되돌리기]
  *  - 2 구성요소: 지우기 → 알림 [되돌리기] → 그대로 살아남 · 3 도면: 줄이기 → 되돌리기
@@ -53,7 +53,7 @@ let sampleId = ''
   await page.evaluate(seedScript())
 
   // 첫 화면 — 처음이면 순서 안내
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-empty').waitFor()
   const flow = await page.getByTestId('pv-flow').locator('li').allInnerTexts()
   check('처음: 순서 안내 셋(명세서 쓰기 → 점검 · 내보내기 → 벤처 사업계획서) · 진행판은 아직 없음', flow.length === 3 && /특허 명세서 쓰기/.test(flow[0]) && /점검/.test(flow[1]) && /벤처 사업계획서/.test(flow[2]) && (await page.getByTestId('pv-board').count()) === 0, flow)
@@ -167,7 +167,7 @@ let sampleId = ''
   await page.waitForTimeout(400)
 
   // 진행판
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-board').waitFor()
   const row = page.locator(`[data-testid="pv-row"][data-key="${CLIENT}"]`)
   check('진행판: 회사 줄 하나 · 견본(연습용) 이름이 아닌 회사 이름 · 명세서 쓰는 중', (await page.getByTestId('pv-row').count()) === 1 && (await row.count()) === 1 && (await row.getAttribute('data-stage')) === 'spec' && !/견본\(연습용\)/.test(await row.getByTestId('pv-row-name').innerText()))
@@ -199,7 +199,7 @@ let sampleId = ''
   const mat = await page.getByTestId('vplan-mat-patent').inputValue()
   check('[이 명세서를 재료로] → 특허 재료에 명칭 · 청구항 · 파일 이름 자리에 "명세서 쓰기 · …"', /공구 진동정보 기반/.test(mat) && /청구항/.test(mat) && /명세서 쓰기 · 공구 진동정보/.test(await page.getByTestId('vplan-spec-file').innerText()) && /청구항 \d+개/.test(await page.getByTestId('vplan-spec-info').innerText()), mat.slice(0, 200))
   await shot(page, 'pvux-07-plan-material')
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-board').waitFor()
   check('진행판: 사업계획서 칸에 "특허 재료 있음"', /특허 재료 있음/.test(await page.locator(`[data-testid="pv-row"][data-key="${CLIENT}"]`).getByTestId('pv-row-plan').innerText()))
 
@@ -233,7 +233,7 @@ for (const [width, scale] of [
   await page.evaluate(seedScript())
   if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
   const tag = `${width}${scale ? ' 글자 아주 크게' : ''}`
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
   await page.getByTestId('pv-empty').waitFor()
   check(`${tag}: 첫 화면 가로 넘침 0`, (await overflowX(page)) <= 0, await overflowX(page))
@@ -277,7 +277,7 @@ for (const [width, scale] of [
     check(`${tag}: 1 아이디어 예시 · 고치기 띠 열어도 가로 넘침 0`, (await overflowX(page)) <= 0, await overflowX(page))
     await shot(page, 'pvux-14-idea-360-xl')
   }
-  await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/patent-venture/more', { waitUntil: 'networkidle' })
   if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
   await page.getByTestId('pv-board').waitFor()
   check(`${tag}: 진행판 가로 넘침 0`, (await overflowX(page)) <= 0, await overflowX(page))

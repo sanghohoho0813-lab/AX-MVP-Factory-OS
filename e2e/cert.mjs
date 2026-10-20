@@ -41,10 +41,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForURL(/\/tools\/cert-os/)
   await page.waitForTimeout(500)
   check('메뉴: 기업성장 › 기업인증', page.url().includes('/tools/cert-os'))
-  check('업체 없이 열면 업체부터 고른다', (await page.getByTestId('cert-pick-client').count()) === 1)
-  await page.getByTestId('cert-client-select').selectOption('cli_hansol')
+  // D-250 첫 화면 = 대화창(회사 칸 '회사 고르기') · 예전 '인증 한눈에'는 [자세히](?detail=1)에 그대로
+  check('업체 없이 열면 대화창 · 회사부터 고른다', (await page.getByTestId('cert-chat-page').count()) === 1 && (await page.getByTestId('chat-client').inputValue()) === '')
+  await page.getByTestId('chat-client').selectOption('cli_hansol')
+  await page.waitForURL(/client=cli_hansol/)
+  await page.waitForTimeout(500)
+  await page.getByTestId('chat-detail').click()
+  await page.waitForURL(/detail=1/)
   await page.waitForTimeout(800)
-  check('업체 고르면 그 업체로(주소 ?client=) · 1순위 자리 하나', page.url().includes('client=cli_hansol') && (await page.getByTestId('cert-hero').count()) === 1)
+  check('업체 고르면 그 업체로(주소 ?client=) · [자세히] → 1순위 자리 하나', page.url().includes('client=cli_hansol') && (await page.getByTestId('cert-hero').count()) === 1)
 
   // AX: 첫 화면 — 1순위 하나(또는 '판단하려면 N가지') + 나머지는 한 줄씩. 큰 카드 반복 · 혜택 칩 · 근거 목록 없음
   const heroKey = await page.getByTestId('cert-hero').getAttribute('data-key')
@@ -226,7 +231,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const now = new Date().toISOString()
     localStorage.setItem('axmvp.module.labcare.orig', JSON.stringify([{ id: 'lr1', clientId: '', data: { key: 'pmsaas:clients:v1', value: [{ id: 'cli_wooil', labType: '기업부설연구소', certifiedDate: '2024-05-10', labRegistrationNumber: '2024-123', labName: '우일연구소', researcherCount: 4 }] }, createdAt: now, updatedAt: now }]))
   })
-  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil&detail=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
   check('A 연구소 관리 기록 → 연구소 보유 중(다시 묻지 않음)', (await recOfKey('lab')) === 'held')
   await page.getByTestId('cert-profile-toggle').click()
@@ -284,7 +289,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-214: 계산한 날짜엔 '할 일(todo)' 표시를 붙이지 않는다(사람이 건 할 일만 — 다시 붙여도 줄이 늘지 않게)
   check('C 갱신 일정: 갱신 준비 시기(D-120) · 갱신 서류 준비(D-90) · 유효기간 끝 — 계산한 줄은 todo 아님', !!tr && tr.deadlines.length === 3 && tr.deadlines[0].date === '2028-11-14' && tr.deadlines[1].date === '2028-12-14' && tr.deadlines.every((d) => !d.todo) && tr.deadlines[2].hard === true, tr?.deadlines)
   check('C 완료 뒤: 진행 기록 인증 완료 · 갱신 줄 · 다음 할 일 1~3(정책자금 먼저)', (await page.getByTestId('cert-life-status').innerText()) === '인증 완료' && (await page.getByTestId('cert-renewal').count()) === 1 && (await page.getByTestId('cert-after-item').count()) >= 1 && (await page.getByTestId('cert-after-item').count()) <= 3 && /정책자금/.test(await page.getByTestId('cert-after-item').first().innerText()))
-  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil&detail=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   check('C 한눈에: 이노비즈 보유 중', (await recOfKey('innobiz')) === 'held')
   await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_wooil', { waitUntil: 'networkidle' })
@@ -359,7 +364,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const states = await page.getByTestId('venture-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
   check('J 벤처 준비 패키지: 9칸 · ✓/△/? · 해결 문제는 대표 확인(지어내지 않음)', states.length === 9 && states.every((x) => ['ok', 'partly', 'ask'].includes(x)) && (await page.locator('[data-testid="venture-section"][data-id="problem"]').getAttribute('data-state')) === 'ask', states)
   // 고객용 진단 요약
-  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil&detail=1', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-summary-open').click()
   await page.waitForTimeout(300)
   const sumText = await page.getByTestId('cert-summary-preview').innerText()
@@ -376,7 +381,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     c.customFields = [...(c.customFields ?? []), { id: 'cf_v', group: 'credential', label: '벤처기업확인서', value: '확인번호 20230101 · 확인일 2023-01-01 · 2025-12-31까지' }]
     localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
   })
-  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil&detail=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   const vCard = page.locator('[data-testid="cert-hero"][data-key="venture"], [data-testid="cert-row"][data-key="venture"]').first()
   check('E 벤처 만료(2025-12-31): 보유 중 아님 · 이전 인증 만료 표시', (await vCard.getByTestId('cert-rec').getAttribute('data-rec')) !== 'held' && (await vCard.getByTestId('cert-expired').count()) === 1 && /이전 인증 만료/.test(await vCard.getByTestId('cert-oneline').innerText()))
@@ -479,7 +484,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const legacyBefore = await page.evaluate(() => localStorage.getItem('axmvp.v1.consulting_projects'))
 
   // V1 — 한눈에 → 벤처기업 → 진행: 예전 화면 주소로 가지 않는다
-  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil&detail=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   const vEntry = page.locator('[data-testid="cert-hero"][data-key="venture"] [data-testid="cert-cta"], [data-testid="cert-row"][data-key="venture"]').first()
   await vEntry.click()
@@ -598,7 +603,7 @@ for (const vp of [
     )
 
   for (const sec of ['overview', 'innobiz', 'mainbiz', 'venture', 'lab', 'iso']) {
-    await page.goto(`${BASE}/tools/cert-os/${sec}?client=cli_hansol`, { waitUntil: 'networkidle' })
+    await page.goto(`${BASE}/tools/cert-os/${sec}?client=cli_hansol${sec === 'overview' ? '&detail=1' : ''}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
     if (sec === 'overview') {
       if ((await page.getByTestId('cert-hero').getAttribute('data-key')) === 'need_info') await page.getByTestId('cert-cta').click()

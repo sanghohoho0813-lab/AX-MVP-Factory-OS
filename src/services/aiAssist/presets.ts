@@ -3,7 +3,7 @@
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent' | 'cert'
 
 export interface AssistPreset {
   id: string
@@ -77,6 +77,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'spec.c', page: 'patent', label: '명세서 — 구체적인 내용 ① 구성', kind: 'write', hint: '도 1 · 구성요소마다' },
   { id: 'spec.d', page: 'patent', label: '명세서 — 구체적인 내용 ② 흐름 · 도면', kind: 'write', hint: '도 2 이후 · 단계 · 변형예' },
   { id: 'spec.e', page: 'patent', label: '명세서 — 청구항', kind: 'write', hint: '시스템 · 종속 · 방법' },
+  // D-250 대화창 — 질문창에 직접 쓴 말에 답(띠 · 판 단추에는 없음)
+  { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
+  { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
 ]
 
 export function presetOf(id: string): AssistPreset | undefined {

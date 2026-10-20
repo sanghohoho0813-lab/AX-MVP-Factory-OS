@@ -235,7 +235,7 @@ try {
   check('대표(D-188): 내 화면 업무 탭에는 기본 6종(법인설립 · 특허 출원 · AX 기획 및 개발 …) 그대로', ['법인설립', '특허 출원', 'AX 기획 및 개발', '업종 추가'].every((w) => ownWork.includes(w)), ownWork.slice(0, 300))
   // P1 릴리스: 클라우드(진짜 RLS)에서 연구소 관리 기록 → 기업인증 판정 · 진행 기록 · 인증 완료가 DB 로
   sql(`insert into public.module_data (id, workspace_id, module_key, bucket, client_id, payload) values ('qa-lab-orig', '${OWNER_WS}', 'labcare', 'orig', null, '{"key":"pmsaas:clients:v1","value":[{"id":"${OWNER_CLIENT}","labType":"기업부설연구소","labName":"대표비밀연구소","certifiedDate":"2024-05-10","labRegistrationNumber":"2024-777","researcherCount":4}]}'::jsonb) on conflict (id) do nothing`)
-  await go(page, `/tools/cert-os?client=${OWNER_CLIENT}`)
+  await go(page, `/tools/cert-os?client=${OWNER_CLIENT}&detail=1`)
   await page.waitForTimeout(900)
   check('클라우드(P1): 연구소 관리 기록 → 기업인증 연구소 보유(다시 묻지 않음)', (await page.locator('[data-testid="cert-hero"][data-key="lab"] [data-testid="cert-rec"], [data-testid="cert-row"][data-key="lab"] [data-testid="cert-rec"]').first().getAttribute('data-rec').catch(() => '')) === 'held')
   await go(page, `/tools/cert-os/innobiz?client=${OWNER_CLIENT}`)

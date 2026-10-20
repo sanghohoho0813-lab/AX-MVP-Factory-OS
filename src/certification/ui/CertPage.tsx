@@ -4,8 +4,11 @@
  *   인증 한눈에 · 이노비즈 · 메인비즈 · 벤처기업 · 기업부설연구소 · ISO
  *
  * 판정은 전부 `src/certification/core` (OS 를 모르는 Core) — 이 화면은 어댑터(integration)로 업체를 넘기고 결과를 보여 줄 뿐.
+ *
+ * D-250: 첫 화면(overview)은 대화창(CertChat) — 대표 "아주 간단하게". 예전 '인증 한눈에' 는 ?detail=1([자세히])에 그대로.
  */
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useModuleSection } from '../../tools/shared/ModuleRoute'
 import { toolOf } from '../../config/toolRegistry'
@@ -19,6 +22,7 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { VenturePlanWorkbench } from './VenturePlanWorkbench'
 import { sectionHref } from './certNav'
+import { CertChat } from './CertChat'
 
 export default function CertPage() {
   const section = useModuleSection()
@@ -37,10 +41,28 @@ export default function CertPage() {
   }
   const head = <PageHeader title={d.clientName ? `${d.clientName} 기업인증` : '기업인증'} description={meta?.hint ? `${meta.label} — ${meta.hint}` : '어떤 인증을 왜 · 언제 · 무엇을 준비해서'} />
 
+  // D-250 예전 '인증 한눈에'(?detail=1) → 대화창으로 돌아가는 길
+  const backChat =
+    section === 'overview' ? (
+      <Link to={d.clientId ? `/tools/cert-os?client=${encodeURIComponent(d.clientId)}` : '/tools/cert-os'} className="tap t-sub inline-flex items-center gap-1.5 self-start rounded-(--radius-control) px-2 py-2 font-semibold text-brand-700 hover:bg-brand-50" data-testid="cert-back-chat">
+        <ArrowLeft aria-hidden="true" className="size-4" /> 대화창으로
+      </Link>
+    ) : null
+
+  // D-250 첫 화면은 대화창 — 회사 고르기도 대화창 안에서
+  if (section === 'overview' && params.get('detail') !== '1') {
+    return (
+      <div className="flex flex-col gap-4" data-testid="cert-chat-page">
+        <CertChat d={d} />
+      </div>
+    )
+  }
+
   if (!d.clientId) {
     return (
       <div className="flex flex-col gap-5">
         {head}
+        {backChat}
         <PickClient />
       </div>
     )
@@ -73,6 +95,7 @@ export default function CertPage() {
   return (
     <div className="flex flex-col gap-5" data-testid="cert-page">
       {head}
+      {backChat}
       {section === 'overview' && <CertOverview ctx={d.ctx} list={d.list} roadmap={d.roadmap} profile={d.profile} onProfile={(p) => void d.saveProfile(p).catch(saveFailed)} clientId={d.clientId} pendingFacts={pendingFacts} onConfirmFacts={d.confirmFacts} />}
       {section === 'iso' && <IsoScreen list={d.list} ctx={d.ctx} />}
       {a && work && planOpen && <VenturePlanWorkbench ctx={d.ctx} notes={work.notes} onSave={(patch) => d.saveWork(a.key, { notes: patch })} onBack={() => navigate(sectionHref('venture', d.clientId))} />}
