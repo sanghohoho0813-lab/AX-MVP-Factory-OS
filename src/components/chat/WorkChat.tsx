@@ -274,7 +274,7 @@ export function WorkChat(p: WorkChatProps) {
             }
           }}
           rows={1}
-          placeholder={clientMissing ? '먼저 위에서 회사를 골라 주세요' : p.placeholder}
+          placeholder={docked ? (clientMissing ? '먼저 회사를 고르세요' : '여기에 물어보세요') : clientMissing ? '먼저 위에서 회사를 골라 주세요' : p.placeholder}
           aria-label="질문"
           className="t-body max-h-40 min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent px-1.5 py-2.5 leading-snug outline-none [field-sizing:content]"
           data-testid="chat-input"
