@@ -3,7 +3,7 @@
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture'
 
 export interface AssistPreset {
   id: string
@@ -64,6 +64,13 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'content.place', page: 'content', label: '플레이스 소개글 한 번에', kind: 'write', hint: '한 줄 소개 · 소개글 · 소식 아이디어' },
   { id: 'content.titles', page: 'content', label: '제목 후보 5개 (각도 다르게)', kind: 'list', hint: '검색 의도가 다르게' },
   { id: 'content.keywords', page: 'content', label: '키워드 · 해시태그 정리', kind: 'list', hint: '키워드 10 · 해시태그 15' },
+  // D-246 벤처 사업계획서 — 기업인증 › 벤처 › 사업계획서 쓰기의 [AI 초안] 이 차례로 부른다(띠 · 판 단추에는 없음)
+  { id: 'venture.p1', page: 'venture', label: '벤처 사업계획서 — 개발 배경 · 경쟁력', kind: 'write', hint: '[1] 1 · 2' },
+  { id: 'venture.p2', page: 'venture', label: '벤처 사업계획서 — 기술개발 경과 · 3년 계획', kind: 'write', hint: '[1] 3-1 · 3-2' },
+  { id: 'venture.g1', page: 'venture', label: '벤처 사업계획서 — 목표시장 · 경쟁사', kind: 'write', hint: '[2] 1 · 2' },
+  { id: 'venture.g2', page: 'venture', label: '벤처 사업계획서 — 시장진입 경과 · 3년 계획', kind: 'write', hint: '[2] 3' },
+  { id: 'venture.x', page: 'venture', label: '벤처 사업계획서 — 기업가정신 · 자금운용', kind: 'write', hint: '[1] 4 · [2] 5' },
+  { id: 'venture.sum', page: 'venture', label: '벤처 사업계획서 — 요약 · 핵심 요약', kind: 'write', hint: '기술명 · 요약 · 핵심 요약 7칸' },
 ]
 
 export function presetOf(id: string): AssistPreset | undefined {

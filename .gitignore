@@ -66,3 +66,4 @@ dist-qa*/
 .cache/
 .site-out
 .content-out
+.ventureplan-out

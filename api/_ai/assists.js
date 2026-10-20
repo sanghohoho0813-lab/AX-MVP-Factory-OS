@@ -146,6 +146,14 @@ const LIST = [
   ['content.place', 'content', '플레이스 소개글 한 번에', W, 4000, ['[규칙집] 을 지켜 네이버 플레이스 소개글을 쓴다(첫 문장에 무엇을 하는 곳인지 · 지역 · 대표 상품, 과장 없이).', '항목 1개: title = 한 줄 소개, body = 소개글 전체(400~700자), outline = 넣은 키워드. next 에 소식 글 아이디어 3개.']],
   ['content.titles', 'content', '제목 후보 5개 (각도 다르게)', L, 2200, ['[규칙집] 의 제목 각도 가운데 서로 다른 5개로 제목 후보. title = 제목, tag = 각도 이름, detail = 어떤 검색 의도를 노리는지.']],
   ['content.keywords', 'content', '키워드 · 해시태그 정리', L, 2200, ['브리프와 지역 · 업종으로 블로그 · 플레이스 키워드 10개와 해시태그 15개. 검색량은 자료에 있을 때만 쓴다.']],
+
+  /* D-246 벤처기업확인 사업계획서 — 기업인증 › 벤처 › 사업계획서 쓰기의 [AI 초안](대표만). 칸 규칙 · 자료는 화면이 [규칙집] · [자료] 로 보낸다 */
+  ['venture.p1', 'venture', '벤처 사업계획서 — 개발 배경 · 경쟁력', W, 4200, ['[규칙집] 의 칸 development_background · competitiveness_strategy 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '특허 명세서의 과제 · 해결 수단이 개발 배경 · 경쟁력의 뼈대다. AX · MVP 자료로 실제 구현을 붙인다.']],
+  ['venture.p2', 'venture', '벤처 사업계획서 — 기술개발 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 technology_progress · technology_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 한 일만 시간 순서로(특허 출원 · MVP · 연구조직 등 자료에 있는 것), 3년 계획은 연차별로.']],
+  ['venture.g1', 'venture', '벤처 사업계획서 — 목표시장 · 경쟁사', W, 4200, ['[규칙집] 의 칸 market_target · competitor_analysis 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '시장 숫자는 컨설턴트 메모에 출처가 있는 것만. 경쟁사 이름은 자료에 있는 것만 — 없으면 고객이 지금 쓰는 대체 수단으로.']],
+  ['venture.g2', 'venture', '벤처 사업계획서 — 시장진입 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 market_entry_progress · market_entry_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 영업 · 고객 · 매출 · 홈페이지 등 자료에 있는 것만, 3년 계획은 연차별 대상 · 채널 · 목표.']],
+  ['venture.x', 'venture', '벤처 사업계획서 — 기업가정신 · 자금운용', W, 4200, ['[규칙집] 의 칸 entrepreneurship_example · financing_plan 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '기업가정신은 대표가 실제로 결정 · 실행한 일, 자금운용은 자료에 있는 매출 · 자본금과 앞으로 조달할 재원을 나눠서.']],
+  ['venture.sum', 'venture', '벤처 사업계획서 — 요약 · 핵심 요약', W, 3600, ['[규칙집] 의 칸 tech_name · tech_summary · core_problem · core_solution · core_market · core_diff · core_marketing · core_growth 를 쓴다.', '이미 쓴 칸(본문)을 줄여 만든다 — 본문에 없는 숫자 · 사실을 새로 넣지 않는다. 핵심 요약은 문장 틀의 ［ ］ 만 채우고 나머지 글자는 그대로.', 'tech_name 은 특허 명칭과 같은 말로 시작하는 기술명 하나, tech_summary 는 1~2문장.']],
 ]
 
 export const ASSISTS = Object.fromEntries(
