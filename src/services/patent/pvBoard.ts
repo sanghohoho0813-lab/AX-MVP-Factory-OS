@@ -10,6 +10,8 @@ import { checkDraft, draftProgress, normalizeDraft, type DraftStep } from './spe
 export const PV_HOME = '/patent-venture'
 export const specHref = (draftId: string, clientId: string, step?: DraftStep) =>
   `${PV_HOME}/write?draft=${encodeURIComponent(draftId)}${clientId ? `&client=${encodeURIComponent(clientId)}` : ''}${step ? `&step=${step}` : ''}`
+/** D-261 새로 만든 명세서 — 열자마자 AI 가 처음부터 끝까지(대표) */
+export const specAutoHref = (draftId: string, clientId: string) => `${specHref(draftId, clientId)}&auto=1`
 export const planHref = (clientId: string) => `${PV_HOME}/plan?client=${encodeURIComponent(clientId)}`
 
 export const STEP_TITLE: Record<DraftStep, string> = { idea: '1 아이디어', parts: '2 구성요소 · 단계', figures: '3 도면', claims: '4 청구항', body: '5 본문', check: '6 점검 · 내보내기' }

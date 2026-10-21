@@ -16,7 +16,7 @@ import { chromium } from 'playwright'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { seedScript } from './seed.mjs'
 
-// D-252 AI 판이 기본 화면 — 칸을 직접 고치는 예전 시험은 [직접 고치기] 로 바꾼 뒤에(주소에 step 이 있으면 이미 직접 고치기)
+// D-252 AI 판이 기본 화면 — 칸을 직접 고치는 예전 시험은 [직접 고치기] 로 바꾼 뒤에(D-261 주소에 step 이 있어도 대표는 AI 판 먼저 — step 은 [직접 고치기] 를 누르면 열릴 탭)
 const toEdit = async (p) => {
   const t = p.getByTestId('spec-view-edit')
   if ((await t.count()) && (await t.getAttribute('aria-selected')) !== 'true') {
@@ -188,11 +188,15 @@ let sampleId = ''
   check('[이어서 하기] 주소 = 그 명세서 · 그 회사 · 5 본문', nextHref.includes(`draft=${sampleId}`) && nextHref.includes(`client=${CLIENT}`) && nextHref.endsWith('step=body'), nextHref)
   await shot(page, 'pvux-06-board')
   await row.getByTestId('pv-row-next').click()
+  await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   await page.getByTestId('spec-step-body').waitFor()
   check('[이어서 하기] → 5 본문 탭 바로', (await page.getByTestId('spec-tab-body').getAttribute('aria-selected')) === 'true')
 
   // 주소 step=claims
   await page.goto(`${BASE}/patent-venture/write?draft=${sampleId}&client=${CLIENT}&step=claims`, { waitUntil: 'networkidle' })
+  await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   await page.getByTestId('spec-step-claims').waitFor()
   check('주소 step=claims → 4 청구항 바로', (await page.getByTestId('spec-tab-claims').getAttribute('aria-selected')) === 'true')
   await page.goto(`${BASE}/patent-venture/write?draft=${sampleId}&step=oops`, { waitUntil: 'networkidle' })

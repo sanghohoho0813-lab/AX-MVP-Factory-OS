@@ -45,7 +45,7 @@ export function ScrollTopButton() {
       title="맨 위로"
       data-testid="scroll-top"
       style={lift !== null ? { bottom: lift } : undefined}
-      className="no-print tap fixed right-4 bottom-[calc(4.35rem+env(safe-area-inset-bottom))] z-30 inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-brand-700 shadow-(--shadow-overlay) hover:bg-slate-50 lg:right-[calc(var(--dock-float,0px)+1.5rem)] lg:bottom-6"
+      className="no-print tap fixed right-4 bottom-[calc(4.35rem+env(safe-area-inset-bottom))] z-30 inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-brand-700 shadow-(--shadow-overlay) hover:bg-slate-50 lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)] lg:bottom-6"
     >
       <ArrowUp aria-hidden="true" className="size-5" />
     </button>

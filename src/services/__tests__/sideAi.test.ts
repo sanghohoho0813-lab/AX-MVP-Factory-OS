@@ -2,8 +2,9 @@
  * D-254 AI 옆 창 — 화면 자리 계산(오른쪽에 붙이기 · 왼쪽 OS 창 · 본문 비키기) · 기억한 설정 읽기.
  * D-256 주소 칸(주소 · 검색어 · 막을 것) · 왼쪽 메뉴 폭(끌기 · 키보드 · 기억).
  * D-258 OS 안 오른쪽 판 — 안에 띄울 수 있는 곳 · Google igu · 놓는 법(붙이기 · 덮기 · 없음) · 기억 · 대화 기록.
+ * D-261 옆 창 자리(이 OS 창 안 · 머리줄 아래) · 연결을 끊는 곳(ChatGPT 등)을 닫힘으로 오해하지 않기.
  */
-import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, featuresOf, parsePrefs, reserveFor, sideLayout } from '../../lib/sideAi'
+import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, cutsOpener, featuresOf, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn } from '../../lib/sideAi'
 import { NAV_ICONS, NAV_MAX, NAV_MIN, navMaxFor, navPx, parseNavSize, sizeAtDrag, stepNav, type NavSize } from '../../lib/navWidth'
 import { DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockChatContext, dockLayout, frameUrlOf, parseDock, parseDockChat } from '../../lib/sideDock'
 
@@ -100,6 +101,25 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   check('K8 대화 기록 — 30개까지 · 모양 틀린 줄 버림 · 기다리던 중 닫힌 것은 다시 묻기로', list.length === DOCK_CHAT_MAX && list[list.length - 1].id === 'p' && list[list.length - 1].status === 'error' && !!list[list.length - 1].error && list[0].items?.length === 1 && parseDockChat('깨짐').length === 0 && parseDockChat('{"a":1}').length === 0, list.slice(-2))
   const ctx = dockChatContext(list, '2026-10-21', '오늘')
   check('K9 보낼 것 — 앞선 대화(끝난 것) 4줄 · 지금 화면 이름만(회사 기록 없음)', ctx.sections.length === 1 && ctx.sections[0].rows.length === 4 && ctx.sections[0].rows[3].q === '질문 39' && ctx.facts[0] === '지금 보고 있는 화면: 오늘' && dockChatContext([], '2026-10-21', '').sections.length === 0 && dockChatContext([], '2026-10-21', '').facts.length === 0)
+}
+
+// D-261 옆 창 자리 · 끊긴 창
+{
+  const max = { screenX: 0, screenY: 0, outerWidth: 1920, outerHeight: 1040, innerWidth: 1920, innerHeight: 953 }
+  const r = sideRectIn(max, FHD, 'twofifths', 64)
+  const reserve = reserveFor(max, r)
+  check('C1 최대화 1920 창 — 옆 창은 OS 창 오른쪽 768px · 머리줄 아래(브라우저 윗줄 87 + 머리줄 64 = 151)부터 창 아래 끝까지 · 본문이 768 비킴', r.left === 1152 && r.width === 768 && r.top === 151 && r.top + r.height === 1040 && reserve === 768, { r, reserve })
+  const win = { screenX: 200, screenY: 100, outerWidth: 1216, outerHeight: 816, innerWidth: 1200, innerHeight: 721 }
+  const w = sideRectIn(win, FHD, 'third', 64)
+  check('C2 창을 줄여 둔 OS(가운데) — 그 창 안 오른쪽 끝(테두리 8 안) · 창 위 끝이 아니라 머리줄 아래 · 그 창 아래 끝까지 · 본문이 옆 창 폭만큼 비킴', w.left + w.width === 200 + 1216 - 8 && w.width === 400 && w.top === 100 + (816 - 721 - 8) + 64 && w.top + w.height === 100 + 816 - 8 && reserveFor(win, w) === 400, { w, reserve: reserveFor(win, w) })
+  const edge = sideRectIn({ screenX: 1500, screenY: 0, outerWidth: 1000, outerHeight: 1040, innerWidth: 1000, innerHeight: 960 }, FHD, 'half', 64)
+  check('C3 화면 밖으로 삐져나간 창 — 옆 창은 화면 안으로', edge.left + edge.width <= 1920 && edge.left >= 0, edge)
+  const tiny = sideRectIn({ screenX: 0, screenY: 0, outerWidth: 900, outerHeight: 700, innerWidth: 900, innerHeight: 620 }, FHD, 'third', 64)
+  check('C4 좁은 창 — 옆 창은 380px 아래로 안 줄이고, 본문은 640 아래로 안 비킴', tiny.width === 380 && reserveFor({ screenX: 0, outerWidth: 900, innerWidth: 900 }, tiny) === 260, tiny)
+  check('C5 연결을 끊는 곳 — ChatGPT · Claude · Gemini · Google(검색 포함) / 네이버 · 기업마당은 아님 · 깨진 주소 아님',
+    ['https://chatgpt.com/', 'https://claude.ai/new', 'https://gemini.google.com/app', 'https://www.google.com/search?q=a', 'https://chat.openai.com/'].every(cutsOpener) && !cutsOpener('https://www.naver.com/') && !cutsOpener('https://www.bizinfo.go.kr/') && !cutsOpener('https://evilgoogle.com/') && !cutsOpener('깨짐'))
+  check('C6 닫힘으로 보인 때 — ChatGPT 는 연 지 20초 안이면 끊긴 것(자리 그대로) · 네이버는 3초 안만 · 그 뒤는 진짜 닫음',
+    looksCut('https://chatgpt.com/', 0, 1500) && looksCut('https://chatgpt.com/', 0, 19_000) && !looksCut('https://chatgpt.com/', 0, 21_000) && looksCut('https://www.naver.com/', 0, 2000) && !looksCut('https://www.naver.com/', 0, 3500))
 }
 
 console.log(`\nsideAi: ${pass} passed, ${fail} failed`)

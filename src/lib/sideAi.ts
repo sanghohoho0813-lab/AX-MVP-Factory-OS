@@ -9,6 +9,11 @@
  *  - 팝업이 막히면 알려 준다(주소창 오른쪽 '팝업 차단' → 항상 허용)
  * 로그인 · 대화는 그 서비스 창에서 그대로 — OS 는 내용을 보내거나 읽지 않는다(LLM 호출 0 그대로).
  * 고른 서비스 · 폭은 이 브라우저에 기억.
+ * D-261 대표: "AI 들 띄우면 잠깐 비켰다가 원상태로 돌아가 절반 이상이 가려진다 · 네이버는 잘 된다 · 현재 시각 나오는 데까지 침범하지 않게".
+ *   - ChatGPT · Claude 는 Cross-Origin-Opener-Policy: same-origin, Gemini · Google 은 same-origin-allow-popups 를 보낸다(실측) —
+ *     브라우저가 OS 와 옆 창 사이 연결을 끊어 OS 쪽에서는 창이 열려 있어도 '닫힘' 으로 보였고, 그래서 비켜 준 자리를 되돌렸다.
+ *     이제 연 지 얼마 안 돼 '닫힘' 이 되면 끊긴 것(cut)으로 보고 자리를 그대로 둔다. 그 뒤로는 창이 닫혀도 알 수 없어 판에 [원래대로].
+ *   - 옆 창 자리는 화면 끝이 아니라 이 OS 창 안 오른쪽, 머리줄 아래부터(sideRectIn) — 머리줄(시각 · 찾기)은 그대로 보이고 본문만 비킨다.
  * D-256 대표: "주소창도 적을 수 있게 · 구글 기본" — 팝업 창의 주소창은 브라우저가 고칠 수 없게 막아 두므로, 판의 주소 칸에
  *   주소(google.com · naver.com …)나 검색어를 적으면 같은 옆 창이 그리로 간다(주소가 아니면 구글 검색 · http/https 만).
  */
@@ -107,6 +112,49 @@ export function reserveFor(win: { screenX: number; outerWidth: number; innerWidt
   return Math.max(0, Math.min(px, win.innerWidth - MIN_MAIN))
 }
 
+export interface WinBox {
+  screenX: number
+  screenY: number
+  outerWidth: number
+  outerHeight: number
+  innerWidth: number
+  innerHeight: number
+}
+
+/**
+ * D-261 옆 창 자리 — 이 OS 창 안 오른쪽, 머리줄 아래(topInset)부터 창 아래 끝까지. 화면(작업 영역) 밖으로는 나가지 않게.
+ * 창 테두리는 좌우 차이의 반으로 본다(최대화면 0).
+ */
+export function sideRectIn(win: WinBox, screen: ScreenBox, width: SideWidth, topInset: number): Rect {
+  const edge = Math.max(0, Math.round((win.outerWidth - win.innerWidth) / 2))
+  const innerRight = Math.round(win.screenX + win.outerWidth - edge)
+  const innerW = Math.max(0, Math.round(win.outerWidth - edge * 2))
+  const want = Math.round(innerW * SIDE_WIDTHS[width].ratio)
+  const w = Math.min(Math.max(want, MIN_SIDE), Math.max(MIN_SIDE, innerW - MIN_SIDE))
+  const sTop = Math.round(screen.top)
+  const sBottom = Math.round(screen.top + screen.height)
+  const sRight = Math.round(screen.left + screen.width)
+  const contentTop = Math.round(win.screenY + Math.max(0, win.outerHeight - win.innerHeight - edge))
+  const top = Math.max(sTop, Math.min(contentTop + Math.max(0, Math.round(topInset)), sBottom - 200))
+  const bottom = Math.min(Math.round(win.screenY + win.outerHeight - edge), sBottom)
+  const left = Math.max(Math.round(screen.left), Math.min(innerRight - w, sRight - w))
+  return { left, top, width: w, height: Math.max(200, bottom - top) }
+}
+
+/** D-261 창을 열면 OS 와 연결을 끊는 곳(COOP) — 열려 있어도 OS 쪽에서는 '닫힘' 으로 보인다 */
+const CUT_HOSTS = /(^|\.)(chatgpt\.com|openai\.com|claude\.ai|google\.com)$/i
+export function cutsOpener(url: string): boolean {
+  try {
+    return CUT_HOSTS.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+/** '닫힘' 으로 보인 때가 연 지 이만큼 안이면 끊긴 것(진짜 닫은 것이 아님) — 끊는 곳은 늦게 열려도 20초, 그 밖은 3초(끊김은 첫 응답에서 일어난다) */
+export function looksCut(url: string, openedAt: number, now: number): boolean {
+  return now - openedAt < (cutsOpener(url) ? 20_000 : 3_000)
+}
+
 /** 팝업 창 모양(window.open 세 번째 값) */
 export function featuresOf(r: Rect): string {
   return `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`
@@ -141,6 +189,8 @@ interface State extends Prefs {
   blocked: boolean
   /** 옆 창에 띄운 것(서비스 이름 · 'naver.com' · 'Google 검색') — 단추에 '… 옆 창 열림' */
   at: string
+  /** D-261 옆 창이 OS 와 연결을 끊음(ChatGPT 등) — 열려 있는지 알 수 없어 [원래대로] 를 눌러야 자리를 되돌린다 */
+  cut: boolean
 }
 
 function readPrefs(): Prefs {
@@ -151,7 +201,7 @@ function readPrefs(): Prefs {
   }
 }
 
-let state: State = { ...(typeof window === 'undefined' ? parsePrefs(null) : readPrefs()), open: false, reserve: 0, blocked: false, at: '' }
+let state: State = { ...(typeof window === 'undefined' ? parsePrefs(null) : readPrefs()), open: false, reserve: 0, blocked: false, at: '', cut: false }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => {
   state = { ...state, ...patch }
@@ -161,6 +211,7 @@ let sideWin: Window | null = null
 /** 옆 창에 마지막으로 연 주소 — 폭만 바꿀 때는 보던 곳 그대로 */
 let lastUrl = ''
 let watch: ReturnType<typeof setInterval> | null = null
+let openedAt = 0
 
 function savePrefs() {
   try {
@@ -184,16 +235,31 @@ function screenBox(): ScreenBox {
   return { left: s.availLeft ?? 0, top: s.availTop ?? 0, width: s.availWidth || window.outerWidth, height: s.availHeight || window.outerHeight }
 }
 
+/** 머리줄 아래 끝(화면 안 px) — 옆 창은 여기부터 */
+function headerBottom(): number {
+  try {
+    const h = document.querySelector('header')
+    return h ? Math.max(0, Math.min(160, Math.round(h.getBoundingClientRect().bottom))) : 0
+  } catch {
+    return 0
+  }
+}
+
+function sideRect(): Rect {
+  return sideRectIn(window, screenBox(), state.width, headerBottom())
+}
+
 function startWatch() {
   if (watch) return
-  // 옆 창을 사용자가 닫으면 비켜 준 여백을 되돌린다
+  // 옆 창을 사용자가 닫으면 비켜 준 여백을 되돌린다 — 단, 연 지 얼마 안 돼 '닫힘' 이면 그 사이트가 연결을 끊은 것(자리는 그대로)
   watch = setInterval(() => {
-    if (!sideWin || sideWin.closed) {
-      sideWin = null
-      if (watch) clearInterval(watch)
-      watch = null
-      set({ open: false, reserve: 0 })
-    }
+    if (sideWin && !sideWin.closed) return
+    const cut = !!sideWin && looksCut(lastUrl, openedAt, Date.now())
+    sideWin = null
+    if (watch) clearInterval(watch)
+    watch = null
+    if (cut) set({ cut: true })
+    else set({ open: false, reserve: 0, cut: false })
   }, 1200)
 }
 
@@ -221,7 +287,7 @@ export function addressLabel(url: string): string {
 
 /** D-258 판에서도 — 막는 사이트를 같은 옆 창으로 */
 export function openInSide(url: string, label: string): boolean {
-  const { side } = sideLayout(screenBox(), state.width)
+  const side = sideRect()
   const w = window.open(url, SIDE_WIN_NAME, featuresOf(side))
   if (!w) {
     set({ blocked: true })
@@ -240,13 +306,15 @@ export function openInSide(url: string, label: string): boolean {
     /* 무시 */
   }
   lastUrl = url
-  set({ open: true, blocked: false, reserve: reserveFor(window, side), at: label })
+  openedAt = Date.now()
+  set({ open: true, blocked: false, reserve: reserveFor(window, side), at: label, cut: false })
   startWatch()
   return true
 }
 
-/** 옆 창을 앞으로(다른 창 뒤에 숨었을 때) */
+/** 옆 창을 앞으로(다른 창 뒤에 숨었을 때) — 연결이 끊긴 창(cut)은 OS 가 부를 수 없다(새 창이 하나 더 생기므로 하지 않음) */
 export function focusSideAi(): boolean {
+  if (state.cut) return false
   if (!sideWin || sideWin.closed) return openSideAi()
   try {
     sideWin.focus()
@@ -265,7 +333,7 @@ export function closeSideAi(): void {
   sideWin = null
   if (watch) clearInterval(watch)
   watch = null
-  set({ open: false, reserve: 0 })
+  set({ open: false, reserve: 0, cut: false })
 }
 
 /** 이 화면을 왼쪽 나머지 자리에 새 창으로 — 옆 창과 반반 딱 맞게. 막히면 false */
@@ -284,8 +352,7 @@ export function openOsLeft(href: string): boolean {
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', () => {
     if (!state.open) return
-    const { side } = sideLayout(screenBox(), state.width)
-    set({ reserve: reserveFor(window, side) })
+    set({ reserve: reserveFor(window, sideRect()) })
   })
 }
 

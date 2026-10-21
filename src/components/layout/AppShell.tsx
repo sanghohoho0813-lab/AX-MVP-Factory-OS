@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -58,6 +58,12 @@ export function AppShell() {
   const contentWidth = useContentWidth()
   // D-254 오른쪽에 AI 옆 창을 붙였으면 덮이는 만큼 화면을 왼쪽으로 비킨다(창이 닫히면 0)
   const sideAi = useSideAi()
+  // 맨 위로 단추 · 알림도 옆 창 밑에 숨지 않게(fixed 라 본문 여백을 모른다)
+  useEffect(() => {
+    const root = document.documentElement.style
+    root.setProperty('--side-reserve', `${sideAi.reserve}px`)
+    return () => root.setProperty('--side-reserve', '0px')
+  }, [sideAi.reserve])
 
   // 화면이 바뀌면 모바일 메뉴를 닫고 맨 위로 — 뒤로 · 앞으로 온 것이면 보던 자리로 (D-124)
   useScrollMemory(() => setMobileOpen(false))
@@ -72,12 +78,13 @@ export function AppShell() {
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
       <TutorialProvider>
-      {/* D-258 OS 안 오른쪽 판(AI 대화 · 웹)이 옆에 붙으면 --dock-w 만큼 비킨다(덮어 띄울 때 · 휴대폰은 0) */}
-      <div className="flex min-h-screen lg:pr-(--dock-w)" style={sideAi.reserve ? { paddingRight: `calc(${sideAi.reserve}px + var(--dock-w, 0px))` } : undefined} data-side-reserve={sideAi.reserve || undefined}>
+      <div className="flex min-h-screen">
         {/* D-256 메뉴 폭(넓게 · 아이콘 · 숨김)은 메뉴가 스스로 기억한다 — 경계선 끌기 · [사이드바 접기] */}
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
+          {/* D-261 오른쪽 판(--dock-w) · 옆 창(reserve)은 머리줄(시각 · 찾기) 아래에만 놓인다 — 머리줄은 그대로, 본문만 그만큼 비킨다 */}
+          <div className="flex min-w-0 flex-1 flex-col lg:pr-(--dock-w)" style={sideAi.reserve ? { paddingRight: `calc(${sideAi.reserve}px + var(--dock-w, 0px))` } : undefined} data-side-reserve={sideAi.reserve || undefined}>
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
           {/* pb-safe-nav: 하단 내비게이션과 iOS 홈 인디케이터가 본문 마지막 줄을 가리지 않게 한다 */}
           {/* D-201: PC 본문 폭 — 머리줄 [폭] 단추로 좁게 · 보통(기본) · 넓게. 화면이 더 좁으면 바뀌는 것 없음 */}
@@ -108,6 +115,7 @@ export function AppShell() {
               </ContentErrorBoundary>
             </div>
           </main>
+          </div>
         </div>
         <MobileNav onOpenMore={() => setMobileOpen(true)} />
         <ScrollTopButton />

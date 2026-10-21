@@ -6,6 +6,10 @@
  * OS 도 왼쪽 창으로 · 팝업이 막혔을 때 푸는 법 · 창 정리 단축키. PC 에서만(휴대폰은 앱을 오가는 편이 빠르다).
  * 자리는 왼쪽 메뉴 맨 아래 — 머리줄은 이미 꽉 차 1024 · 1440 · 1600 · 1900px 에서 옆으로 넘쳤다(실측). 메뉴를 접으면 아이콘만.
  * 판은 메뉴 오른쪽에 화면 고정(메뉴 칸이 잘라 먹지 않게). 보기 무대(iframe) 안에서는 숨긴다(바깥에 하나만).
+ * D-261 대표: "옆에 열기 누르면 그 안에서 떴으면 · 새 창 말고". ChatGPT · Claude · Gemini 사이트는 그 회사가 다른 화면 안에 넣지 못하게
+ *   막아 두어(브라우저가 지킨다) 사이트 그대로는 옆 창으로만 열린다. 그래서 맨 위에서 AI 를 고르면
+ *   ① [OS 안에서 이 AI 로 대화] — 같은 회사 모델(GPT · Claude · Gemini)로 OS 안 오른쪽 판에서 묻고 답한다(새 창 없음)
+ *   ② [사이트 그대로 옆 창] — 로그인 · 대화 기록이 필요할 때. 끊긴 창(cut)이면 [원래대로] 로 자리를 되돌린다.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
@@ -13,6 +17,13 @@ import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X }
 import { inFrame } from '../../lib/deviceView'
 import { closeDock, openDock, useDock } from '../../lib/sideDock'
 import { SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
+import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
+import { allowedProviders, readChoice, saveChoice } from '../../services/aiAssist/store'
+import { useToast } from '../ui/toastContext'
+
+/** 옆 창 서비스 → OS 안 대화에 쓸 AI 회사 */
+const PROVIDER_OF: Partial<Record<SideService, ProviderId>> = { chatgpt: 'openai', claude: 'anthropic', gemini: 'gemini' }
+const MODEL_NAME: Partial<Record<SideService, string>> = { chatgpt: 'GPT', claude: 'Claude', gemini: 'Gemini' }
 
 export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
   const s = useSideAi()
@@ -24,6 +35,31 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
   const box = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const btn = useRef<HTMLButtonElement>(null)
+  const { showToast } = useToast()
+  const [starting, setStarting] = useState(false)
+
+  /** D-261 OS 안 오른쪽 판에서 고른 AI 회사 모델로 대화 — 그 회사 모델을 아직 안 골랐으면 보통(standard) 모델로 바꿔 둔다 */
+  const chatInside = async () => {
+    const want = PROVIDER_OF[s.service]
+    if (want && readChoice()?.provider !== want) {
+      if (!allowedProviders().includes(want)) showToast('이 계정은 Gemini 로 대화해요 — OS 안 판을 Gemini 로 엽니다')
+      else {
+        setStarting(true)
+        try {
+          const p = (await fetchAssistStatus(true)).providers.find((x) => x.id === want)
+          const m = p?.configured ? (p.models.find((x) => x.tier === 'standard') ?? p.models[0]) : undefined
+          if (m) saveChoice({ provider: want, model: m.id })
+          else showToast(`${MODEL_NAME[s.service]} 키가 아직 없어요 — 지금 고른 모델로 엽니다(판 위 [모델] 에서 바꿀 수 있어요)`)
+        } catch {
+          /* 목록을 못 읽으면 지금 고른 모델로 연다 */
+        } finally {
+          setStarting(false)
+        }
+      }
+    }
+    openDock('chat')
+    setOpen(false)
+  }
   const toggle = () => {
     const r = btn.current?.getBoundingClientRect()
     if (r) {
@@ -80,32 +116,63 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
               <X aria-hidden="true" className="size-4" />
             </button>
           </div>
-          {/* D-258 새 창 없이 OS 안 오른쪽 판으로 — AI 대화(우리 서버 · 팀장은 Gemini) · Google 검색 */}
+          {/* D-261 무엇을 — 먼저 고르고, 아래에서 'OS 안에서' 또는 '사이트 그대로 옆 창' */}
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="무엇을 띄울까요">
+            {(Object.keys(SIDE_SERVICES) as SideService[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={s.service === id}
+                onClick={() => setSidePrefs({ service: id })}
+                data-testid="side-ai-service"
+                data-id={id}
+                className={`tap t-sub min-h-10 rounded-full border px-3 font-semibold ${s.service === id ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                {SIDE_SERVICES[id].label}
+              </button>
+            ))}
+          </div>
+          {/* D-258 새 창 없이 OS 안 오른쪽 판으로 — 머리줄 아래 본문 칸 안에 뜬다(우리 서버 · 팀장은 Gemini) */}
           <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 py-2.5" data-testid="side-ai-inside">
-            <span className="t-meta font-semibold text-violet-900">OS 안에서 열기 (새 창 없이)</span>
+            <span className="t-meta font-semibold text-violet-900">OS 안에서 열기 (새 창 없이 · 화면 오른쪽 칸)</span>
             <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  openDock('chat')
-                  setOpen(false)
-                }}
-                className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800"
-                data-testid="side-ai-dock-chat"
-              >
-                <Sparkles aria-hidden="true" className="size-4" /> AI 대화
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  openDock('web')
-                  setOpen(false)
-                }}
-                className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-white px-3 font-semibold text-violet-900 hover:bg-violet-100"
-                data-testid="side-ai-dock-web"
-              >
-                <Search aria-hidden="true" className="size-4" /> Google 검색
-              </button>
+              {s.service === 'google' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openDock('web')
+                    setOpen(false)
+                  }}
+                  className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800"
+                  data-testid="side-ai-dock-web"
+                >
+                  <Search aria-hidden="true" className="size-4" /> Google 검색
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={starting}
+                    onClick={() => void chatInside()}
+                    className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-60"
+                    data-testid="side-ai-dock-chat"
+                  >
+                    <Sparkles aria-hidden="true" className="size-4" /> {MODEL_NAME[s.service] ?? 'AI'} 로 대화
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openDock('web')
+                      setOpen(false)
+                    }}
+                    className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-white px-3 font-semibold text-violet-900 hover:bg-violet-100"
+                    data-testid="side-ai-dock-web"
+                  >
+                    <Search aria-hidden="true" className="size-4" /> Google
+                  </button>
+                </>
+              )}
             </div>
             {dock.open && (
               <button type="button" onClick={() => closeDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
@@ -113,28 +180,8 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
               </button>
             )}
           </div>
-          <p className="t-meta -mb-1 font-semibold text-slate-600">새 옆 창으로 (ChatGPT · Claude · Gemini 사이트 그대로)</p>
-          <div className="flex flex-col gap-1.5">
-            <span className="t-meta font-semibold text-slate-600">무엇을 띄울까요</span>
-            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="무엇을 띄울까요">
-              {(Object.keys(SIDE_SERVICES) as SideService[]).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={s.service === id}
-                  onClick={() => setSidePrefs({ service: id })}
-                  data-testid="side-ai-service"
-                  data-id={id}
-                  className={`tap t-sub min-h-10 rounded-full border px-3 font-semibold ${s.service === id ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                >
-                  {SIDE_SERVICES[id].label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="t-meta font-semibold text-slate-600">옆 창 폭</span>
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2.5" data-testid="side-ai-site-box">
+            <span className="t-meta font-semibold text-slate-700">{name} 사이트 그대로 옆 창 (로그인 · 대화 기록이 필요할 때)</span>
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="옆 창 폭">
               {(Object.keys(SIDE_WIDTHS) as SideWidth[]).map((id) => (
                 <button
@@ -145,26 +192,31 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
                   onClick={() => setSidePrefs({ width: id })}
                   data-testid="side-ai-width"
                   data-id={id}
-                  className={`tap t-sub min-h-10 rounded-full border px-3 font-semibold ${s.width === id ? 'border-violet-600 bg-violet-50 text-violet-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                  className={`tap t-meta min-h-9 rounded-full border px-2.5 font-semibold ${s.width === id ? 'border-violet-600 bg-violet-50 text-violet-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
                 >
                   {SIDE_WIDTHS[id].label}
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => openSideAi()} className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800" data-testid="side-ai-open">
-              <PanelRight aria-hidden="true" className="size-4" /> {s.open ? '다시 붙이기' : `${name} 옆에 열기`}
-            </button>
-            {s.open && (
-              <>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => openSideAi()} className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-400 bg-white px-3 font-semibold text-violet-900 hover:bg-violet-50" data-testid="side-ai-open">
+                <PanelRight aria-hidden="true" className="size-4" /> {s.open ? '다시 붙이기' : `${name} 옆 창으로`}
+              </button>
+              {s.open && !s.cut && (
                 <button type="button" onClick={() => focusSideAi()} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="side-ai-front">
                   <ArrowUpRight aria-hidden="true" className="size-4" /> 앞으로
                 </button>
+              )}
+              {s.open && (
                 <button type="button" onClick={() => closeSideAi()} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="side-ai-close">
-                  <X aria-hidden="true" className="size-4" /> 닫기
+                  <X aria-hidden="true" className="size-4" /> {s.cut ? '원래대로' : '닫기'}
                 </button>
-              </>
+              )}
+            </div>
+            {s.cut && (
+              <p className="t-meta break-keep text-slate-600" data-testid="side-ai-cut-note">
+                {shown} 창은 OS 가 볼 수 없게 막혀 있어 닫혀도 모릅니다 — 다 쓰셨으면 그 창의 X 로 닫고 <b>원래대로</b>를 눌러 주세요.
+              </p>
             )}
           </div>
           <form
@@ -232,7 +284,7 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
             </p>
           )}
           <p className="t-meta break-keep text-slate-500">
-            ChatGPT · Claude · Gemini 사이트는 OS 안에 넣을 수 없게 막혀 있어 옆 창으로 엽니다(OS 안에서는 위 <b>AI 대화</b>). 옆 창 주소는 위 <b>주소 칸</b>에서 바꿉니다. 창 나란히: Windows <b>Win+←</b> · <b>Win+→</b>, Mac 초록 단추 길게.
+            ChatGPT · Claude · Gemini <b>사이트</b>는 그 회사가 다른 화면 안에 넣지 못하게 막아 두어(브라우저가 지킵니다) 사이트 그대로는 옆 창으로만 열려요 — OS 안에서는 위 <b>로 대화</b>. 옆 창 주소는 위 <b>주소 칸</b>에서 바꿉니다. 창 나란히: Windows <b>Win+←</b> · <b>Win+→</b>, Mac 초록 단추 길게.
           </p>
         </div>,
         document.body,

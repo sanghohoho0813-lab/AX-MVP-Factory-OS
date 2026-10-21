@@ -48,7 +48,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, screen: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
 // 밖 사이트(AI · 구글 · 네이버 · 기업마당 …) 대신 가짜 쪽 — 어느 주소로 열렸는지만 본다
 const outside = (u) => !u.href.startsWith(new URL(BASE).origin)
-await ctx.route(outside, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: `<html><body><h1>${new URL(r.request().url()).host}</h1></body></html>` }))
+// D-261 coop 를 켜면 가짜 ChatGPT 가 진짜처럼 Cross-Origin-Opener-Policy: same-origin 을 보낸다(브라우저가 OS ↔ 옆 창 연결을 끊음)
+let coop = false
+await ctx.route(outside, (r) => {
+  const host = new URL(r.request().url()).host
+  const headers = coop && (host === 'chatgpt.com' || host === 'claude.ai') ? { 'Cross-Origin-Opener-Policy': 'same-origin' } : {}
+  return r.fulfill({ status: 200, contentType: 'text/html', headers, body: `<html><body><h1>${host}</h1></body></html>` })
+})
 const page = await ctx.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -70,6 +76,15 @@ const sites = await page.getByTestId('side-ai-site').evaluateAll((els) => els.ma
 check('S2 판 — 넷(ChatGPT 기본 · Claude · Gemini · Google) · 폭 셋(보통 기본) · 주소 칸 · 바로 가기 넷 · 열기 · OS 왼쪽 창 · 단축키 안내', services.join() === 'chatgpt:true,claude:false,gemini:false,google:false' && (await page.getByTestId('side-ai-address').count()) === 1 && sites.join() === 'naver,bizinfo,kstartup,hometax' && widths.join() === 'third:false,twofifths:true,half:false' && (await page.getByTestId('side-ai-open').count()) === 1 && (await page.getByTestId('side-ai-os-left').count()) === 1 && (await panel.innerText()).includes('Win+'), { services, widths, sites })
 await shot(page, 'S2-panel')
 
+// 옆 창을 어디에 열라고 했는지 적어 둔다(머리 없는 브라우저는 창 자리를 따르지 않아 창에서 못 잰다)
+await page.evaluate(() => {
+  const real = window.open.bind(window)
+  window.__opens = []
+  window.open = (u, n, f) => {
+    window.__opens.push(String(f ?? ''))
+    return real(u, n, f)
+  }
+})
 const [popup] = await Promise.all([ctx.waitForEvent('page'), page.getByTestId('side-ai-open').click()])
 await popup.waitForLoadState()
 await page.waitForTimeout(300)
@@ -77,6 +92,16 @@ const name = await popup.evaluate(() => window.name)
 const reserve = Number((await page.locator('[data-side-reserve]').getAttribute('data-side-reserve').catch(() => '0')) ?? 0)
 const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 check(`S3 [옆에 열기] → ChatGPT 창 하나(이름 mirae-side-ai) · OS 본문 오른쪽 ${reserve}px 비킴 · 가로 넘침 0 · 단추가 '열림'`, popup.url().startsWith('https://chatgpt.com/') && name === 'mirae-side-ai' && reserve > 0 && over <= 0 && (await btn.getAttribute('data-open')) === '1', { url: popup.url(), name, reserve, over })
+// D-261 머리줄(시각 · 찾기)은 그대로 — 비키는 것은 머리줄 아래 본문만 · 옆 창은 머리줄 아래부터
+const hdrBox = await page.evaluate(() => {
+  const h = document.querySelector('header').getBoundingClientRect()
+  const m = document.querySelector('main').getBoundingClientRect()
+  return { hRight: Math.round(h.right), vw: document.documentElement.clientWidth, mainRight: Math.round(m.right), hBottom: Math.round(h.bottom) }
+})
+const feat = await page.evaluate(() => window.__opens.at(-1) ?? '')
+const popTop = Number(/top=(\d+)/.exec(feat)?.[1] ?? -1)
+const popLeft = Number(/left=(\d+)/.exec(feat)?.[1] ?? -1)
+check(`S3b 머리줄은 그대로(오른쪽 ${hdrBox.hRight}) · 그 아래 본문만 옆 창 폭만큼 비킴(본문 오른쪽 ${hdrBox.mainRight}) · 옆 창은 머리줄 아래(top ${popTop})부터 · 본문이 끝나는 곳에서(left ${popLeft})`, Math.abs(hdrBox.hRight - reserve - hdrBox.mainRight) <= 2 && hdrBox.hRight >= hdrBox.vw - 20 && popTop >= hdrBox.hBottom && Math.abs(popLeft - (hdrBox.vw - reserve)) <= 20, { hdrBox, feat, reserve })
 await shot(page, 'S3-reserved')
 
 const pagesBefore = ctx.pages().length
@@ -120,11 +145,27 @@ await page.getByTestId('side-ai-close').click()
 await page.waitForTimeout(400)
 check('S5a [닫기] → 창 닫힘 · 비킨 여백 0', popup.isClosed() && (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
 
-const [popup2] = await Promise.all([ctx.waitForEvent('page'), page.getByTestId('side-ai-open').click()])
+// 연결을 끊지 않는 곳(네이버)을 열어 두었다가 사용자가 직접 닫음 — 연 지 3초가 지나 닫으면 진짜 닫힌 것
+const [popup2] = await Promise.all([ctx.waitForEvent('page'), page.locator('[data-testid="side-ai-site"][data-id="naver"]').click()])
 await popup2.waitForLoadState()
+await page.waitForTimeout(3500)
 await popup2.close()
 await page.waitForTimeout(1800)
-check('S5b 사용자가 AI 창을 직접 닫아도 → 여백 0 · 단추 원래대로', (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
+check('S5b 사용자가 옆 창을 직접 닫아도 → 여백 0 · 단추 원래대로', (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
+
+// D-261 진짜 ChatGPT 처럼 연결을 끊는 창(COOP) — 예전에는 곧바로 '닫힘' 으로 보여 비킨 자리가 사라졌다(대표: "잠깐 비켰다가 원상태로")
+coop = true
+const [popup3] = await Promise.all([ctx.waitForEvent('page'), page.getByTestId('side-ai-open').click()])
+await popup3.waitForLoadState()
+await page.waitForTimeout(3500)
+const cutReserve = Number((await page.locator('[data-side-reserve]').getAttribute('data-side-reserve').catch(() => '0')) ?? 0)
+check(`S5c AI 사이트가 연결을 끊어도(COOP · ChatGPT · Claude 실측과 같게) 3.5초 뒤에도 본문이 ${cutReserve}px 비킨 그대로 · 단추 '열림' · [앞으로] 대신 안내 · [원래대로]`, cutReserve > 0 && (await btn.getAttribute('data-open')) === '1' && (await page.getByTestId('side-ai-cut-note').isVisible()) && (await page.getByTestId('side-ai-front').count()) === 0 && (await page.getByTestId('side-ai-close').innerText()).includes('원래대로'), { cutReserve })
+await shot(page, 'S5c-cut')
+await page.getByTestId('side-ai-close').click()
+await page.waitForTimeout(300)
+check('S5d [원래대로] → 비킨 자리 0 · 단추 원래대로', (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
+await popup3.close().catch(() => {})
+coop = false
 
 // 팝업 막힘 — 브라우저가 새 창을 주지 않는 경우
 await page.evaluate(() => {
@@ -271,7 +312,8 @@ await ctx.close()
       const r = d ? d.getBoundingClientRect() : null
       const m = document.querySelector('main').getBoundingClientRect()
       const h = document.querySelector('header')
-      return { dock: r ? Math.round(r.width) : 0, dockX: r ? Math.round(r.x) : null, mode: d ? d.dataset.mode : '', mainRight: Math.round(m.right), main: Math.round(m.width), over: document.documentElement.scrollWidth - document.documentElement.clientWidth, hdr: h.scrollWidth - h.clientWidth, pad: getComputedStyle(document.documentElement).getPropertyValue('--dock-w').trim() }
+      const hb = h.getBoundingClientRect()
+      return { dock: r ? Math.round(r.width) : 0, dockX: r ? Math.round(r.x) : null, dockTop: r ? Math.round(r.top) : null, hdrBottom: Math.round(hb.bottom), hdrRight: Math.round(hb.right), mode: d ? d.dataset.mode : '', mainRight: Math.round(m.right), main: Math.round(m.width), over: document.documentElement.scrollWidth - document.documentElement.clientWidth, hdr: h.scrollWidth - h.clientWidth, pad: getComputedStyle(document.documentElement).getPropertyValue('--dock-w').trim() }
     })
 
   await p.getByTestId('side-ai-button').click()
@@ -283,6 +325,7 @@ await ctx.close()
   await p.waitForTimeout(300)
   let g = await geo()
   check(`D2 [AI 대화] → 새 창 없이 오른쪽 판(${g.dock}px · 옆에 붙임) · 본문이 판 왼쪽에서 끝남(본문 ${g.main}px) · 화면 · 머리줄 넘침 0 · 판 위 메뉴 판 닫힘`, g.mode === 'dock' && g.dock === 384 && g.mainRight <= g.dockX + 1 && g.over <= 0 && g.hdr <= 0 && c.pages().length === 1 && (await p.getByTestId('side-ai-panel').count()) === 0, g)
+  check(`D2b 판은 머리줄(시각 · 찾기) 아래부터(판 위 ${g.dockTop} · 머리줄 아래 ${g.hdrBottom}) · 머리줄은 판 위까지 그대로(오른쪽 ${g.hdrRight})`, g.dockTop >= g.hdrBottom && g.hdrRight > g.dockX + 100, g)
   const starters = await p.getByTestId('dock-starter').count()
   check('D3 처음 — "무엇이든 물어보세요" · 예시 질문 4개 · 모델 고르기 단추', (await p.getByTestId('dock-chat-empty').isVisible()) && starters === 4 && (await p.getByTestId('dock-model').isVisible()), starters)
   await shot(p, 'D3-chat-empty')
@@ -363,6 +406,7 @@ await ctx.close()
   await p.waitForTimeout(300)
   const withSide = await p.evaluate(() => ({ dock: document.querySelectorAll('[data-testid="side-dock"]').length, reserve: Number(document.querySelector('[data-side-reserve]')?.getAttribute('data-side-reserve') ?? 0), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
   check('D13 [네이버 ↗](막는 곳) → 옆 창으로 · 옆 창이 오른쪽을 차지하는 동안 판은 비켜 줌(겹치지 않음) · 넘침 0', pop1.url() === 'https://www.naver.com/' && withSide.dock === 0 && withSide.reserve > 0 && withSide.over <= 0, { url: pop1.url(), withSide })
+  await p.waitForTimeout(3200) // 연 지 3초 안에 '닫힘' 이면 끊긴 창으로 본다(D-261) — 사람처럼 조금 쓰다 닫는다
   await pop1.close()
   await p.getByTestId('side-dock').waitFor({ timeout: 5000 })
   check('D14 옆 창을 닫으면 판이 돌아오고 보던 곳(기업마당) 그대로', (await p.getByTestId('dock-web-frame').getAttribute('src')) === 'https://www.bizinfo.go.kr/' && (await p.locator('[data-side-reserve]').count()) === 0)
@@ -370,8 +414,15 @@ await ctx.close()
   const [pop2] = await Promise.all([c.waitForEvent('page'), p.getByTestId('dock-web-go').click()])
   await pop2.waitForLoadState()
   check('D14b 주소 칸 "chatgpt.com" → 판에 넣지 않고 옆 창이 ChatGPT 로', pop2.url() === 'https://chatgpt.com/', pop2.url())
+  // ChatGPT 는 연결을 끊는 곳이라 닫혀도 OS 가 모른다(D-261) — 사람이 판의 [원래대로] 를 누르면 오른쪽 판이 돌아온다
   await pop2.close()
+  await p.waitForTimeout(1500)
+  const stillAside = (await p.locator('[data-side-reserve]').count()) === 1
+  await p.getByTestId('side-ai-button').click()
+  await p.getByTestId('side-ai-close').click()
+  await p.keyboard.press('Escape')
   await p.getByTestId('side-dock').waitFor({ timeout: 5000 })
+  check('D14c ChatGPT 옆 창을 닫아도 비킨 자리는 남고(끊는 곳이라 OS 가 모름) · [원래대로] → 오른쪽 판이 돌아옴', stillAside && (await p.locator('[data-side-reserve]').count()) === 0)
   await p.waitForTimeout(200)
   const dlg = []
   p.on('dialog', (d) => {

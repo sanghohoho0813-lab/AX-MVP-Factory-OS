@@ -5,6 +5,9 @@
  *   칸 여섯 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검 — 칸마다 [○○ 써줘 / 다시] · 결과 미리보기 · [직접 고치기]
  *   재료   회사 기록 · AI 작업실 자료 · 끌어다 놓은 파일(읽은 글만) — 타자 칠 칸이 없다
  * 기준 문서(Master v2.9 · AX펭귄)는 서버가 단추마다 붙인다. 대표 계정에서만(편집기가 ai === 'yes' 일 때만 그린다).
+ * D-261 대표: "버튼 한 번만 눌러도 처음부터 끝까지 · 너무 뭐가 많아". 새 명세서는 만들자마자 [전부 써줘] 가 저절로(autoStart) —
+ *   회사 기록 · AI 작업실 자료를 다 읽은 뒤 시작한다. 맨 위 한 칸에 진행 → 다 쓰면 명칭 · 청구항 · 내려받기.
+ *   칸 여섯(고르기 · 칸별 다시 쓰기 · 직접 고치기)은 [칸별로 보기] 안으로 접었다(지운 것 없음).
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
@@ -79,6 +82,9 @@ export function SpecAiBoard({
   onDownload,
   onPack,
   packing,
+  autoStart = false,
+  onAutoStarted,
+  wantClient = '',
 }: {
   draftId: string
   d: SpecDraft
@@ -91,6 +97,11 @@ export function SpecAiBoard({
   onDownload: () => void
   onPack: () => void
   packing: boolean
+  /** D-261 새로 만든 빈 명세서 — 재료를 다 읽으면 [전부 써줘] 를 저절로 */
+  autoStart?: boolean
+  onAutoStarted?: () => void
+  /** 이 명세서의 회사(기록을 읽기 전에는 record 가 비어 있다) */
+  wantClient?: string
 }) {
   const { showToast } = useToast()
   useSyncExternalStore(subscribeSpecRun, specRunVersion)
@@ -99,12 +110,18 @@ export function SpecAiBoard({
   const [caseMats, setCaseMats] = useState<AgentCompany['materials']>([])
   const [priorIdeas, setPriorIdeas] = useState<string[]>([])
   const [reading, setReading] = useState('')
+  const [matsReady, setMatsReady] = useState(false)
+  const [showCards, setShowCards] = useState(false)
+  const autoDone = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const clientId = record?.id ?? ''
 
   // AI 작업실 — 이 회사와 이어진 작업실의 자료 · '특허 아이디어' 결과를 재료로(실패하면 없이)
   useEffect(() => {
-    if (!clientId) return
+    if (!clientId) {
+      setMatsReady(true)
+      return
+    }
     let alive = true
     void (async () => {
       try {
@@ -124,6 +141,8 @@ export function SpecAiBoard({
         }
       } catch {
         /* 작업실을 못 읽어도 회사 기록 · 올린 자료로 쓴다 */
+      } finally {
+        if (alive) setMatsReady(true)
       }
     })()
     return () => {
@@ -188,22 +207,44 @@ export function SpecAiBoard({
     }
   }
 
+  // D-261 새 명세서 — 회사 기록(고른 회사면) · AI 작업실 자료를 다 읽은 뒤 한 번만 저절로 시작
+  useEffect(() => {
+    if (!autoStart || autoDone.current || busy || !matsReady) return
+    if (wantClient && !record) return
+    autoDone.current = true
+    onAutoStarted?.()
+    if (d.title.trim()) return
+    const plan = planAll(d)
+    if (startSpecRun(draftId, plan, { company, others, today, forceParts: false })) showToast(`AI 가 명세서를 처음부터 끝까지 씁니다(${plan.length}단계 · 4~5분) — 이 화면을 떠나도 계속 씁니다`)
+  }, [autoStart, busy, matsReady, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
+
   const errs = checkDraft(d).filter((i) => i.level === 'error')
   const stagesShown = (Object.keys(run.stages) as AgentStage[]).sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b))
   const doneCards = CARDS.filter((c) => cardState(c, d).done).length
+  const finished = !busy && doneCards >= 5 && !!d.title.trim()
 
   return (
     <div className="flex flex-col gap-4" data-testid="spec-board" data-busy={busy ? 'yes' : 'no'}>
       <Surface>
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-              <Sparkles className="size-5" />
+            <span aria-hidden="true" className={`flex size-10 shrink-0 items-center justify-center rounded-full ${finished ? 'bg-success-100 text-success-700' : 'bg-violet-100 text-violet-700'}`}>
+              {finished ? <CheckCircle2 className="size-5" /> : busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <h3 className="t-section font-bold break-keep text-slate-900">AI 가 처음부터 끝까지 씁니다</h3>
+              <h3 className="t-section font-bold break-keep text-slate-900" data-testid="spec-board-head">
+                {busy ? 'AI 가 쓰는 중이에요 — 화면을 떠나도 계속 씁니다' : finished ? '명세서를 다 썼어요' : 'AI 가 처음부터 끝까지 씁니다'}
+              </h3>
               <p className="t-sub break-keep text-slate-700">
-                회사 기록 · 자료 · <b className="font-semibold">미래AI랩 기준 문서(Master v2.9 · AX펭귄)</b>로 씁니다. 타자 칠 칸은 없습니다 — 결과를 보고 고르기만 하세요.
+                {finished ? (
+                  <>
+                    <b className="font-semibold">{titleLine(d)}</b> · 청구항 {d.claims.length || claimsOf(d).length}개 · 본문 {SECTION_KEYS.filter((k) => (d.text[k] ?? '').trim()).length}/7칸 · {errs.length ? `고칠 것 ${errs.length}개` : '고칠 것 없음'}
+                  </>
+                ) : (
+                  <>
+                    단추 하나면 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(<b className="font-semibold">미래AI랩 기준 문서</b>대로). 타자 칠 칸은 없어요.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -214,20 +255,34 @@ export function SpecAiBoard({
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700" data-testid="spec-board-mats">올린 자료 {d.materials.length}개</li>
           </ul>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button variant="primary" className="min-h-12 sm:min-w-56" disabled={busy} onClick={all} data-testid="spec-board-all">
-              {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Sparkles aria-hidden="true" className="size-5" />}
-              {busy ? 'AI 가 쓰는 중…' : doneCards >= 5 ? '빠진 곳 전부 다시 써줘' : '전부 써줘'}
-            </Button>
-            <Button variant="secondary" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-file">
-              <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
-            </Button>
-            <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.hwpx,.txt,.md,.xlsx,.png,.jpg,.jpeg" onChange={(e) => {
-              void addFiles(e.target.files)
-              e.target.value = ''
-            }} data-testid="spec-board-file-input" />
-          </div>
-          <p className="t-meta break-keep text-slate-500">한 번에 4~5분쯤 · 화면을 떠나도 계속 씁니다 · 직접 고치신 글은 덮지 않고 새 안으로 둡니다. 누르면 이 내용이 고른 AI 회사로 갑니다(출원 전 발명).</p>
+          {finished ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" data-testid="spec-board-finished">
+              <Button variant="primary" className="min-h-12" onClick={onDownload} data-testid="spec-board-done-download">
+                <Download aria-hidden="true" className="size-5" /> MD 내려받기(특허로에 붙일 글)
+              </Button>
+              <Button variant="secondary" disabled={packing} onClick={onPack} data-testid="spec-board-done-pack">
+                {packing ? '묶는 중…' : '제출 준비 묶음(ZIP)'}
+              </Button>
+              <Button variant="ghost" disabled={busy} onClick={all} data-testid="spec-board-all">
+                <Sparkles aria-hidden="true" className="size-4" /> 빠진 곳 다시 써줘
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button variant="primary" className="min-h-12 sm:min-w-56" disabled={busy} onClick={all} data-testid="spec-board-all">
+                {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Sparkles aria-hidden="true" className="size-5" />}
+                {busy ? 'AI 가 쓰는 중…' : doneCards > 0 ? '이어서 끝까지 써줘' : '처음부터 끝까지 써줘'}
+              </Button>
+              <Button variant="secondary" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-file">
+                <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
+              </Button>
+            </div>
+          )}
+          <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.hwpx,.txt,.md,.xlsx,.png,.jpg,.jpeg" onChange={(e) => {
+            void addFiles(e.target.files)
+            e.target.value = ''
+          }} data-testid="spec-board-file-input" />
+          <p className="t-meta break-keep text-slate-500">한 번에 4~5분쯤 · 직접 고치신 글은 덮지 않고 새 안으로 둡니다 · 이 내용이 고른 AI 회사로 갑니다(출원 전 발명).</p>
 
           {stagesShown.length > 0 && (
             <ol className="flex flex-col gap-1 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2" data-testid="spec-board-rows" aria-live="polite">
@@ -259,7 +314,21 @@ export function SpecAiBoard({
         </div>
       </Surface>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <button
+        type="button"
+        onClick={() => setShowCards((v) => !v)}
+        aria-expanded={showCards}
+        className="tap t-sub flex min-h-11 items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
+        data-testid="spec-cards-toggle"
+      >
+        <span className="min-w-0 break-keep">칸별로 보기 · 다른 아이디어 고르기 · 칸만 다시 쓰기</span>
+        <span className="t-meta shrink-0 text-slate-500">
+          {doneCards}/6 {showCards ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {showCards && (
+      <div className="grid gap-3 lg:grid-cols-2" data-testid="spec-cards">
         {CARDS.map((card) => {
           const meta = CARD_META[card]
           const st = cardState(card, d)
@@ -312,6 +381,7 @@ export function SpecAiBoard({
           )
         })}
       </div>
+      )}
     </div>
   )
 }

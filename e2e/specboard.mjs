@@ -1,11 +1,12 @@
 /**
  * qa:specboard — D-252 명세서 AI 작업판(AI 가 다 쓰는 명세서). 실행: npm run qa:specboard -- http://localhost:4390 [사진 폴더]
- *  - 새 명세서 → AI 작업판이 먼저(대표) · 모델 고르기 단추 · 칸 여섯 · 타자 칠 칸 0
+ *  - D-261 새 명세서 = 회사 고르기 + 단추 한 번 → 만들자마자 처음부터 끝까지(전부 써줘를 또 누르지 않음) · 다 쓰면 맨 위에 내려받기
+ *  - 새 명세서 → AI 작업판이 먼저(대표) · 모델 고르기 단추 · 칸 여섯(접어 둠) · 타자 칠 칸 0
  *  - [전부 써줘] 한 번 → 아이디어 → 조사 → 구성 → 본문 a~d → 청구항 → 점검대로 고치기 차례로 · 칸마다 결과
  *  - 아이디어 후보 3 · 추천 1번이 바로 들어감 · 다른 것 고르기(한 번 더 묻기 · 구성 이후 비움 · 되돌리기)
  *  - 조사: 검색 근거 · 출처 · KIPRIS 검색어 · 청구항 묶음에 차별화가 감
  *  - 쓰는 중에 목록으로 나갔다 와도 그 사이 받은 글이 들어감 · 다시 부르지 않음
- *  - [직접 고치기] = 예전 단계 화면 · ?step= 으로 열면 바로 단계 화면 · 자료 넣기(파일 → 읽은 글만)
+ *  - [직접 고치기] = 예전 단계 화면 · ?step= 으로 열어도 대표는 작업판 먼저(D-261) · 자료 넣기(파일 → 읽은 글만)
  *  - 360 · 390 넘침 0 · JS 오류 0
  */
 import { chromium } from 'playwright'
@@ -117,34 +118,28 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await routeAi(page)
 
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
+  // 고른 모델(GPT)은 이 브라우저에 기억된 것 — 새 명세서도 그 모델로 쓴다
+  await page.evaluate(() => localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' })))
+  await page.reload({ waitUntil: 'networkidle' })
+  const listTyping = await page.locator('[data-testid="spec-new-ai"] textarea, [data-testid="spec-new-ai"] input[type="text"]').count()
+  check('B0 새 명세서 칸 — 회사 고르기 + 단추 하나 · 타자 칠 칸 0 · 견본은 작은 글자 단추로', (await page.getByTestId('spec-new-ai').isVisible()) && listTyping === 0 && (await page.getByTestId('spec-sample').isVisible()), listTyping)
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
+  check('B0b 회사를 고르면 단추에 그 회사 이름 — "○○ 명세서 AI 로 처음부터 끝까지"', /한솔테크.*처음부터 끝까지/.test(await page.getByTestId('spec-new').innerText()), await page.getByTestId('spec-new').innerText())
+  await shot(page, 'B-start', false)
   await page.getByTestId('spec-new').click()
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-board').waitFor()
-  check('B1 새 명세서 → AI 작업판이 먼저(대표) · [AI 작업판] 선택됨 · 예전 단계 칸 안 보임', (await page.getByTestId('spec-view-ai').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-tabs').count()) === 0)
-  check('B2 칸 여섯(아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검) · 모델 고르기 단추', (await page.getByTestId('spec-card').count()) === 6 && (await page.getByTestId('model-pick').count()) === 1)
+  await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
+  check('B1 단추 한 번으로 바로 처음부터 끝까지 쓰기 시작([전부 써줘] 를 또 누르지 않음) · AI 작업판 먼저 · 단계 칸 안 보임 · 주소에서 auto 지움', (await page.getByTestId('spec-board').getAttribute('data-busy')) === 'yes' && (await page.getByTestId('spec-view-ai').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-tabs').count()) === 0 && !page.url().includes('auto=1'), page.url())
+  check('B7 쓰는 중 — 맨 위에 진행 줄(8단계 이상) · "AI 가 쓰는 중"', (await page.getByTestId('spec-board-row').count()) >= 8 && /쓰는 중/.test(await page.getByTestId('spec-board-head').innerText()))
+  check('B2 칸 여섯은 [칸별로 보기] 안에 접혀 있음 · 모델 고르기 단추', (await page.getByTestId('spec-card').count()) === 0 && (await page.getByTestId('spec-cards-toggle').isVisible()) && (await page.getByTestId('model-pick').count()) === 1)
   const typing = await page.locator('[data-testid="spec-board"] textarea, [data-testid="spec-board"] input[type="text"]').count()
   check('B3 작업판에 타자 칠 칸 0', typing === 0, typing)
-  check('B4 아이디어 전에는 조사 · 구성 · 본문 · 청구항 · 점검 단추가 막힘(이유 글)', (await page.locator('[data-testid="spec-card-run"][data-card="body"]').isDisabled()) && (await page.locator('[data-testid="spec-card-run"][data-card="check"]').isDisabled()) && /아이디어부터/.test(await page.locator('[data-testid="spec-card-run"][data-card="body"]').innerText()))
   check('B5 회사 기록이 재료로 보임', /기록 \d+줄/.test(await page.getByTestId('spec-board-sources').innerText()))
-  await shot(page, 'B-empty')
-
-  // 모델 고르기
-  await page.getByTestId('model-pick').click()
-  await page.getByTestId('model-pick-panel').waitFor()
-  await page.locator('[data-testid="ai-assist-settings"] [data-provider="openai"]').click()
-  await page.locator('[data-testid="ai-assist-model-option"][data-model="gpt-5.4-mini"]').click()
-  await page.waitForTimeout(200)
-  check('B6 모델 고르기 → GPT 로 바꾸면 단추에 그 모델 · 이 브라우저에 기억', (await page.getByTestId('model-pick').getAttribute('data-model')) === 'gpt-5.4-mini' && (await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes('ai.choice') && localStorage.getItem(k).includes('gpt-5.4-mini')))))
-  await shot(page, 'B-model', false)
-  await page.getByTestId('model-pick').click()
-
-  // 전부 써줘
-  await page.getByTestId('spec-board-all').click()
-  await page.waitForTimeout(300)
-  check('B7 누르면 바로 쓰는 중(단추 막힘 · 단계 줄)', (await page.getByTestId('spec-board').getAttribute('data-busy')) === 'yes' && (await page.getByTestId('spec-board-row').count()) >= 8)
+  await shot(page, 'B-running')
   await waitIdle(page)
   await page.waitForTimeout(500)
+  await page.getByTestId('spec-cards-toggle').click()
   const order = sent.map((r) => r.assistId).join()
   check('B8 차례 — 아이디어 → 조사 → 구성 → 본문 a~d → 청구항 → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.a,spec.b,spec.c,spec.d,spec.e,spec.fix', order)
   check('B9 고른 모델로 부름(GPT)', sent.every((r) => r.choice?.provider === 'openai' && r.choice?.model === 'gpt-5.4-mini'), sent.map((r) => r.choice))
@@ -167,6 +162,20 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   const doneCards = await page.getByTestId('spec-card').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-card')}:${e.getAttribute('data-done')}`))
   check('B21 칸 다섯 이상 다 됨 표시', doneCards.filter((x) => x.endsWith(':yes')).length >= 5, doneCards)
   await shot(page, 'B-done')
+  await page.getByTestId('spec-cards-toggle').click()
+  check('B21b 다 쓰면 맨 위에 "다 썼어요" · 명칭 · 청구항 수 · [MD 내려받기] · [제출 준비 묶음] (칸을 열지 않아도)', /다 썼어요/.test(await page.getByTestId('spec-board-head').innerText()) && (await page.getByTestId('spec-board-done-download').isVisible()) && (await page.getByTestId('spec-board-done-pack').isVisible()) && /청구항 3개/.test(await page.getByTestId('spec-board').innerText()))
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.getByTestId('spec-board-done-download').click()])
+  check('B21c 맨 위 [MD 내려받기] 한 번에 파일', !!dl && /\.md$/.test(dl.suggestedFilename()), dl?.suggestedFilename())
+  await shot(page, 'B-finished', false)
+  // 모델 고르기 — 다 쓴 뒤에도 바꿀 수 있음
+  await page.getByTestId('model-pick').click()
+  await page.getByTestId('model-pick-panel').waitFor()
+  await page.locator('[data-testid="ai-assist-settings"] [data-provider="gemini"]').click()
+  await page.locator('[data-testid="ai-assist-model-option"][data-model="gemini-3.8-flash"]').click()
+  await page.waitForTimeout(200)
+  check('B6 모델 고르기 → 바꾸면 단추에 그 모델 · 이 브라우저에 기억', (await page.getByTestId('model-pick').getAttribute('data-model')) === 'gemini-3.8-flash' && (await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes('ai.choice') && localStorage.getItem(k).includes('gemini-3.8-flash')))))
+  await page.getByTestId('model-pick').click()
+  await page.getByTestId('spec-cards-toggle').click()
 
   // 직접 고치기 = 예전 단계 화면에 AI 글이 그대로
   await page.locator('[data-testid="spec-card-edit"][data-card="body"]').click()
@@ -174,6 +183,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B22 [직접 고치기] → 예전 단계 화면(본문) · AI 글이 칸에', (await page.getByTestId('spec-tab-body').getAttribute('aria-selected')) === 'true' && (await page.locator('[data-testid="spec-section"][data-key="field"] [data-testid="spec-section-text"]').inputValue()).startsWith('본 발명은 공구 마모 판정'))
   await page.getByTestId('spec-view-ai').click()
   await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-cards-toggle').click()
 
   // 다른 아이디어로 바꾸기 → 한 번 더 묻고 · 구성 이후 비움 · 되돌리기
   dialogs.length = 0
@@ -205,12 +215,16 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   const draft = new URL(url).searchParams.get('draft')
   await page.goto(`${BASE}/patent-venture/write?draft=${draft}&client=${CLIENT}&step=claims`, { waitUntil: 'networkidle' })
   await page.getByTestId('spec-editor').waitFor()
-  check('B26 ?step= 로 열면 바로 단계 화면(청구항)', (await page.getByTestId('spec-tab-claims').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-board').count()) === 0)
+  await page.getByTestId('spec-board').waitFor()
+  const boardFirst = (await page.getByTestId('spec-tabs').count()) === 0
+  await page.getByTestId('spec-view-edit').click()
+  check('B26 ?step= (진행판 [이어서 하기]) 로 열어도 대표는 AI 작업판 먼저(타자 칸 없음) · [직접 고치기] 를 누르면 그 단계(청구항)', boardFirst && (await page.getByTestId('spec-tab-claims').getAttribute('aria-selected')) === 'true')
   await page.getByTestId('spec-tab-body').click()
   const field2 = await page.locator('[data-testid="spec-section"][data-key="field"] [data-testid="spec-section-text"]').inputValue()
   check('B27 새로 열어도 나가 있는 동안 쓴 AI 글이 저장돼 있음(본문 2차)', field2.includes('(2차)'), field2.slice(0, 80))
   await page.getByTestId('spec-view-ai').click()
   await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-cards-toggle').click()
 
   // 자료 넣기 — 글 파일 → 읽은 글만 · 개인정보 가림 (한글 파일 이름은 버퍼로 — 이 시험 기계는 LANG 이 비어 경로가 깨짐)
   await page.getByTestId('spec-board-file-input').setInputFiles({ name: '현장메모.txt', mimeType: 'text/plain', buffer: Buffer.from('공구 교체를 감으로 합니다. 담당자 연락처 010-1234-5678. 불량이 한 달에 20건 나옵니다.') })
@@ -239,7 +253,7 @@ for (const width of [360, 390]) {
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
   await page.getByTestId('spec-new').click()
   await page.getByTestId('spec-board').waitFor()
-  await page.getByTestId('spec-board-all').click()
+  await page.waitForTimeout(1500)
   await waitIdle(page)
   await page.waitForTimeout(400)
   check(`M${width} 작업판 넘침 0 · JS 오류 0`, (await overflowX(page)) <= 0 && errors.length === 0, { o: await overflowX(page), errors })

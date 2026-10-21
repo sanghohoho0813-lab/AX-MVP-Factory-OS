@@ -9,6 +9,9 @@
  *
  * D-249: ?step= 로 그 단계 바로 열기(진행판 [이어서 하기]) · 견본으로 연습 · 지우기/바꾸기 뒤 [되돌리기] ·
  *   PC 오른쪽 고정판(진행 · 고칠 것 · 저장) · 작은 화면 고정 단계 줄(이전 · n/6 · 다음) · 제출 준비 묶음(ZIP).
+ * D-261 대표: "처음 명세서 시작하는데 너무 뭐가 많아 · 타자 치는 거 없애 · 버튼 한 번에 처음부터 끝까지".
+ *   대표는 어디서 열어도(?step= 포함) AI 작업판이 먼저 — 타자 칸은 [직접 고치기] 를 눌렀을 때만.
+ *   새 명세서 = 회사 고르기(고르면 그 기록으로) + [AI 로 처음부터 끝까지] 한 번 → 만들고 바로 전부 써줘(?auto=1).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -34,7 +37,7 @@ import { parseSpecText } from '../../services/patent/specParse'
 import { specDigest } from '../../services/patent/specDigest'
 import { useCertData } from '../../certification/integration/useCertData'
 import { VK } from '../../certification/core/venturePlan'
-import { PV_HOME, specHref } from '../../services/patent/pvBoard'
+import { PV_HOME, specAutoHref, specHref } from '../../services/patent/pvBoard'
 import { SAMPLE_SOURCE, sampleDraft, submitChecklist } from '../../services/patent/specCoach'
 import { blockSvg, flowSvg } from '../../services/patent/specFigureSvg'
 import { zipStore } from '../../services/patent/zip'
@@ -89,12 +92,39 @@ function ClientSelect({ value, onChange, clients, label, testId }: { value: stri
 function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]; onNew: (clientId: string) => Promise<void>; onSample: () => Promise<void>; onRemove: (id: string) => Promise<void> }) {
   const { clientId } = useToolClient()
   const clients = useClients()
+  const ai = useOwnerAiAccess()
   const [pick, setPick] = useState(clientId ?? '')
   const [busy, setBusy] = useState(false)
   const nameOf = (id: string) => clients?.find((c) => c.id === id)?.companyName ?? ''
   const sorted = [...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const go = async (fn: () => Promise<void>) => {
+    setBusy(true)
+    try {
+      await fn()
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className="flex flex-col gap-4" data-testid="spec-list">
+      {ai === 'yes' ? (
+        <Surface showEdge edge="brand">
+          <div className="flex flex-col gap-3" data-testid="spec-new-ai">
+            <div className="flex flex-col gap-1">
+              <h2 className="t-section font-bold break-keep text-slate-900">AI 가 명세서를 처음부터 끝까지 써요</h2>
+              <p className="t-sub break-keep text-slate-600">회사만 고르고 단추 한 번 — 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(4~5분). 타자 칠 칸은 없어요.</p>
+            </div>
+            <ClientSelect value={pick} onChange={setPick} clients={clients} label="어느 회사 특허인가요?" testId="spec-new-client" />
+            <Button variant="primary" className="min-h-12 self-start" disabled={busy} onClick={() => void go(() => onNew(pick))} data-testid="spec-new">
+              <Sparkles aria-hidden="true" className="size-5" /> {pick ? `${nameOf(pick) || '이 회사'} 명세서 AI 로 처음부터 끝까지` : 'AI 로 처음부터 끝까지 쓰기'}
+            </Button>
+            {!pick && <p className="t-meta break-keep text-slate-500">회사를 고르면 그 회사 기록 · 상담 메모로 아이디어를 냅니다(안 고르면 일반 아이디어).</p>}
+            <button type="button" disabled={busy} onClick={() => void go(onSample)} className="tap t-meta self-start font-semibold text-slate-600 underline underline-offset-2" data-testid="spec-sample">
+              견본(연습용 발명)으로 둘러보기
+            </button>
+          </div>
+        </Surface>
+      ) : (
       <Surface showEdge edge="brand">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -137,6 +167,7 @@ function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]
           <p className="t-meta break-keep text-slate-500">견본은 '공구 마모 예측' 연습용 발명(실제 고객 발명 아님)입니다. 1~4단계가 채워져 있어 무엇을 어떻게 적는지 보면서 5 본문을 직접 써 볼 수 있어요.</p>
         </div>
       </Surface>
+      )}
       <section className="flex flex-col gap-2">
         <h2 className="t-body font-bold text-slate-900">쓰던 명세서 {rows.length ? `${rows.length}건` : ''}</h2>
         {rows.length === 0 ? (
@@ -335,15 +366,15 @@ function SideRail({ tab, prog, errs, state, next, onGo }: { tab: DraftStep; prog
 const STEP_KEYS = TABS.map((t) => t.key)
 const isStep = (x: string | null): x is DraftStep => !!x && (STEP_KEYS as string[]).includes(x)
 
-function SpecEditor({ row, save, onBack, initialStep, others }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null; others: string[] }) {
+function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAutoStarted }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null; others: string[]; auto?: boolean; onAutoStarted?: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const ai = useOwnerAiAccess()
   const { clientId: urlClient, clientName, clientRecord } = useToolClient()
   const clients = useClients()
   const [d, setD] = useState<SpecDraft>(() => normalizeDraft(row.data.draft))
-  // D-252 대표 계정은 AI 작업판이 먼저 — ?step= 으로 열었거나 [직접 고치기] 를 누르면 예전 단계 화면
-  const [view, setView] = useState<'ai' | 'edit'>(initialStep ? 'edit' : 'ai')
+  // D-252 대표 계정은 AI 작업판이 먼저. D-261 ?step= 으로 열어도 작업판 먼저(타자 칸 없음) — [직접 고치기] 를 누르면 그 단계 화면
+  const [view, setView] = useState<'ai' | 'edit'>('ai')
   const record = (clients ?? []).find((c) => c.id === row.clientId) ?? (clientRecord && clientRecord.id === row.clientId ? clientRecord : null)
   const [tab, setTab] = useState<DraftStep>(() => initialStep ?? (normalizeDraft(row.data.draft).title.trim() ? 'parts' : 'idea'))
   const [packing, setPacking] = useState(false)
@@ -636,6 +667,9 @@ function SpecEditor({ row, save, onBack, initialStep, others }: { row: BucketRow
           onDownload={download}
           onPack={() => void pack()}
           packing={packing}
+          autoStart={auto}
+          onAutoStarted={onAutoStarted}
+          wantClient={row.clientId}
         />
       )}
 
@@ -747,12 +781,22 @@ export function SpecWritePage() {
   const { showToast } = useToast()
   const draftId = params.get('draft')
   const stepParam = params.get('step')
+  const auto = params.get('auto') === '1'
+  const ai = useOwnerAiAccess()
+  // 저절로 쓰기를 시작했으면 주소에서 auto 를 지운다(새로 고쳐도 두 번 시작하지 않게)
+  const dropAuto = useCallback(() => {
+    const next = new URLSearchParams(window.location.search)
+    if (!next.has('auto')) return
+    next.delete('auto')
+    navigate(`${WRITE}?${next.toString()}`, { replace: true })
+  }, [navigate])
   const head = <PageHeader title="특허 명세서 쓰기" description="아이디어부터 칸을 채우면 특허로 편집기에 붙일 명세서가 나옵니다. 규칙으로 뼈대를 만들고, AI 초안은 대표만." descriptionAsHint />
 
   const create = async (clientId: string) => {
     try {
       const r = await bucket.save({ clientId, data: { draft: emptyDraft() } })
-      navigate(hrefOf(r.id, clientId))
+      // D-261 대표(AI)면 열자마자 처음부터 끝까지 — 아니면 예전처럼 빈 명세서
+      navigate(ai === 'yes' ? specAutoHref(r.id, clientId) : hrefOf(r.id, clientId))
     } catch (e) {
       showToast(`만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
@@ -816,6 +860,8 @@ export function SpecWritePage() {
         onBack={() => navigate(WRITE)}
         initialStep={isStep(stepParam) ? stepParam : null}
         others={bucket.rows.filter((r) => r.id !== row.id && r.clientId === row.clientId).map((r) => normalizeDraft(r.data.draft).title.trim()).filter(Boolean)}
+        auto={auto}
+        onAutoStarted={dropAuto}
       />
     ) : (
       <div className="flex flex-col gap-2" data-testid="spec-missing">

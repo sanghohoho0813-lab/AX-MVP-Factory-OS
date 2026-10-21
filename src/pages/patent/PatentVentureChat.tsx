@@ -8,12 +8,12 @@ import { useToast } from '../../components/ui/toastContext'
 import { WorkChat } from '../../components/chat/WorkChat'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
-import { useAiAssistAccess } from '../../auth/ownerAiAccess'
+import { useAiAssistAccess, useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { emptyDraft, type SpecDraft } from '../../services/patent/specDraft'
 import { sampleDraft } from '../../services/patent/specCoach'
-import { PV_HOME, specHref } from '../../services/patent/pvBoard'
+import { PV_HOME, specAutoHref, specHref } from '../../services/patent/pvBoard'
 import { parseSpecFile } from '../../services/patent/specParse'
 import { checkSpec } from '../../services/patent/specCheck'
 import { topicOf } from '../../services/workChat/chatTypes'
@@ -61,11 +61,13 @@ export function PatentVentureChatPage() {
   const ready = (!!drafts.rows || !!drafts.error) && (!!works.rows || !!works.error) && !!clients
   const owner = access !== 'no'
 
-  const createDraft = async (draft: SpecDraft, msg: string) => {
+  const specAi = useOwnerAiAccess()
+  const createDraft = async (draft: SpecDraft, msg: string, auto = false) => {
     try {
       const r = await drafts.save({ clientId, data: { draft } })
       if (msg) showToast(msg)
-      navigate(specHref(r.id, clientId, 'idea'))
+      // D-261 대표(AI)의 새 명세서는 열자마자 AI 가 처음부터 끝까지 — 타자 치는 단계 화면으로 보내지 않는다
+      navigate(auto && specAi === 'yes' ? specAutoHref(r.id, clientId) : specHref(r.id, clientId, 'idea'))
     } catch (e) {
       showToast(`만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
@@ -101,7 +103,7 @@ export function PatentVentureChatPage() {
         assistId="pv.chat"
         page="patent"
         onAct={(k) => {
-          if (k === 'new-spec') void createDraft(emptyDraft(), '')
+          if (k === 'new-spec') void createDraft(emptyDraft(), '', true)
           else if (k === 'sample') void createDraft(sampleDraft(), '견본을 열었습니다 — 1~4단계는 채워져 있어요. 단계를 넘기며 보고 5 본문을 직접 써 보세요')
         }}
         onFile={async (f) => pvFileAnswer(f.name, checkSpec(await parseSpecFile(f.name, new Uint8Array(await f.arrayBuffer()))))}

@@ -5,6 +5,7 @@
  *   [웹]       Google(igu=1) · 기업마당 · 홈택스처럼 막지 않는 곳은 판 안에. ChatGPT · Gemini · 네이버처럼 막는 곳은 [옆 창] 으로.
  *
  * 놓는 법(dockLayout): 본문이 768px 이상 남으면 옆에 붙이고(본문이 비킨다) · 좁으면 본문 위에 덮어 띄운다 · 1024 아래는 없음.
+ * D-261 머리줄(시각 · 찾기 · 알림) 아래부터 — 머리줄은 그대로 다 보이고 본문 칸 안에만 뜬다.
  * 폭은 왼쪽 경계선을 끌어서(320~720) · 키보드 ←/→ · 두 번 누르면 처음 폭. 보기 무대(iframe) 안에서는 그리지 않는다.
  */
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
@@ -396,7 +397,7 @@ export function SideDock() {
   return (
     <aside
       aria-label="오른쪽 판"
-      className={`no-print fixed top-0 bottom-0 z-40 flex flex-col border-l border-slate-200 bg-white ${lay.mode === 'over' ? 'shadow-(--shadow-overlay)' : ''}`}
+      className={`no-print fixed top-16 bottom-0 z-40 flex flex-col border-l border-slate-200 bg-white ${lay.mode === 'over' ? 'shadow-(--shadow-overlay)' : ''}`}
       style={{ width: lay.width, right: sideReserve }}
       data-testid="side-dock"
       data-mode={lay.mode}
@@ -423,7 +424,7 @@ export function SideDock() {
       </div>
       {/* 끄는 동안 판 안 iframe 이 마우스를 먹지 않게 */}
       {dragging && <div aria-hidden="true" className="fixed inset-0 z-20 cursor-col-resize" />}
-      <div className="flex h-16 shrink-0 items-center gap-1 border-b border-slate-200 px-2">
+      <div className="flex h-14 shrink-0 items-center gap-1 border-b border-slate-200 px-2">
         <div role="tablist" aria-label="오른쪽 판" className="flex min-w-0 flex-1 gap-1">
           {TABS.map((t) => {
             const Icon = t.icon
