@@ -21,6 +21,9 @@ import { useToast } from '../../components/ui/toastContext'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
 import { downloadText } from '../../components/consulting/studioParts'
 import { useToolClient } from '../../tools/shared/toolClientContext'
+import { SpecAiBoard } from './SpecAiBoard'
+import { ModelPicker } from '../../components/ai/ModelPicker'
+import { attachSpecHost } from '../../services/patent/specRun'
 import { useModuleBucket, type BucketRow } from '../../tools/shared/useModuleBucket'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { localDateOf, todayLocalDate } from '../../lib/appClock'
@@ -332,13 +335,16 @@ function SideRail({ tab, prog, errs, state, next, onGo }: { tab: DraftStep; prog
 const STEP_KEYS = TABS.map((t) => t.key)
 const isStep = (x: string | null): x is DraftStep => !!x && (STEP_KEYS as string[]).includes(x)
 
-function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null }) {
+function SpecEditor({ row, save, onBack, initialStep, others }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null; others: string[] }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const ai = useOwnerAiAccess()
-  const { clientId: urlClient, clientName } = useToolClient()
+  const { clientId: urlClient, clientName, clientRecord } = useToolClient()
   const clients = useClients()
   const [d, setD] = useState<SpecDraft>(() => normalizeDraft(row.data.draft))
+  // D-252 대표 계정은 AI 작업판이 먼저 — ?step= 으로 열었거나 [직접 고치기] 를 누르면 예전 단계 화면
+  const [view, setView] = useState<'ai' | 'edit'>(initialStep ? 'edit' : 'ai')
+  const record = (clients ?? []).find((c) => c.id === row.clientId) ?? (clientRecord && clientRecord.id === row.clientId ? clientRecord : null)
   const [tab, setTab] = useState<DraftStep>(() => initialStep ?? (normalizeDraft(row.data.draft).title.trim() ? 'parts' : 'idea'))
   const [packing, setPacking] = useState(false)
   const alive = useRef(true)
@@ -423,6 +429,18 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
       return m
     },
     [commit],
+  )
+
+  // D-252 AI 진행(화면 밖)과 잇기 — 이 화면이 열려 있는 동안 받은 답은 바로 저장, 닫혀 있던 사이 받은 답은 열 때 넣는다
+  useEffect(
+    () =>
+      attachSpecHost(row.id, {
+        get: () => dRef.current,
+        apply: async (p) => {
+          await apply((cur) => ({ draft: p(cur) }))
+        },
+      }),
+    [row.id, apply],
   )
 
   /** 지우기 · 바꾸기 — 바로 저장하고 [되돌리기]. 되돌리면 이 동작이 바꾼 칸만 앞 값으로(그 사이 다른 칸에 적은 글은 그대로) */
@@ -530,6 +548,12 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
     }
   }
 
+  const boardView = ai === 'yes' && view === 'ai'
+  const openEdit = (s: DraftStep) => {
+    setView('edit')
+    goStep(s)
+  }
+
   // 단계를 바꿔도 AI 진행이 보이게 — 탭 위에 둔다
   const aiPanel = ai === 'yes' && aiOpen ? <SpecAiPanel d={d} today={today} apply={apply} onClose={() => setAiOpen(false)} /> : null
 
@@ -553,6 +577,20 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
               {urlClient ? clientName || '회사' : '회사 고르지 않음'} · {prog.done}/{prog.total}단계{d.source ? ` · ${d.source}` : ''}
             </p>
           </div>
+          {ai === 'yes' && (
+            <div className="flex flex-wrap items-start gap-2">
+              <div role="tablist" aria-label="쓰는 방법" className="inline-flex rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1">
+                <button type="button" role="tab" aria-selected={view === 'ai'} onClick={() => setView('ai')} className={`tap t-sub inline-flex min-h-10 items-center gap-1.5 rounded-[8px] px-3 font-semibold ${view === 'ai' ? 'bg-white text-violet-900 shadow-(--shadow-card)' : 'text-slate-600'}`} data-testid="spec-view-ai">
+                  <Sparkles aria-hidden="true" className="size-4" /> AI 작업판
+                </button>
+                <button type="button" role="tab" aria-selected={view === 'edit'} onClick={() => setView('edit')} className={`tap t-sub inline-flex min-h-10 items-center gap-1.5 rounded-[8px] px-3 font-semibold ${view === 'edit' ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`} data-testid="spec-view-edit">
+                  직접 고치기
+                </button>
+              </div>
+              {boardView && <ModelPicker className="min-w-0" />}
+            </div>
+          )}
+          {!boardView && (
           <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-next">
             <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
               <b className="font-semibold">지금 할 것</b> · {next.text}
@@ -561,7 +599,8 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
               {next.label}
             </Button>
           </div>
-          {ai === 'yes' && (
+          )}
+          {ai === 'yes' && !boardView && (
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={() => setImportOpen((v) => !v)} aria-expanded={importOpen} data-testid="spec-import-open">
                 <Import aria-hidden="true" className="size-4" /> AI 작업실에서 가져오기
@@ -582,7 +621,25 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
         </div>
       </Surface>
 
-      {ai === 'yes' && importOpen && (
+      {boardView && (
+        <SpecAiBoard
+          draftId={row.id}
+          d={d}
+          act={act}
+          apply={async (fn) => {
+            await apply((cur) => ({ draft: fn(cur) }))
+          }}
+          record={record}
+          others={others}
+          today={today}
+          onEdit={openEdit}
+          onDownload={download}
+          onPack={() => void pack()}
+          packing={packing}
+        />
+      )}
+
+      {!boardView && ai === 'yes' && importOpen && (
         <IdeaImportPanel
           clientId={clientRef.current}
           onClose={() => setImportOpen(false)}
@@ -597,8 +654,10 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
         />
       )}
 
-      {aiPanel}
+      {!boardView && aiPanel}
 
+      {!boardView && (
+      <>
       <StepBar idx={idx} state={state} errs={errs.length} done={prog.done} onPrev={() => idx > 0 && goStep(TABS[idx - 1].key)} onNext={() => idx < TABS.length - 1 && goStep(TABS[idx + 1].key)} />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_16.5rem]">
@@ -671,6 +730,8 @@ function SpecEditor({ row, save, onBack, initialStep }: { row: BucketRow<Row>; s
         </div>
         <SideRail tab={tab} prog={prog} errs={errs} state={state} next={next} onGo={goStep} />
       </div>
+      </>
+      )}
     </div>
   )
 }
@@ -748,7 +809,14 @@ export function SpecWritePage() {
   } else {
     const row = bucket.rows.find((r) => r.id === draftId)
     body = row ? (
-      <SpecEditor key={row.id} row={row} save={bucket.save} onBack={() => navigate(WRITE)} initialStep={isStep(stepParam) ? stepParam : null} />
+      <SpecEditor
+        key={row.id}
+        row={row}
+        save={bucket.save}
+        onBack={() => navigate(WRITE)}
+        initialStep={isStep(stepParam) ? stepParam : null}
+        others={bucket.rows.filter((r) => r.id !== row.id && r.clientId === row.clientId).map((r) => normalizeDraft(r.data.draft).title.trim()).filter(Boolean)}
+      />
     ) : (
       <div className="flex flex-col gap-2" data-testid="spec-missing">
         <Blank title="이 명세서를 찾지 못했습니다(지웠거나 다른 작업공간)." />

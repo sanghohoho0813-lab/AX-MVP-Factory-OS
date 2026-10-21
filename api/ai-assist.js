@@ -37,7 +37,17 @@ async function runOnce(assist, choice, body) {
   const { user, sent } = buildAssistPrompt(assist, context, ask)
   const started = Date.now()
   // '생각' 토큰까지 세는 공급자가 있어 글 몫의 두 배를 상한으로
-  const out = await callModel({ provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, timeoutMs: timeoutMs() })
+  const call = { provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, timeoutMs: timeoutMs() }
+  // D-252 조사 단추는 웹 검색을 붙여 본다 — 공급자 · 모델이 검색을 거절(400)하면 검색 없이 한 번 더(화면에 '검색 근거 없음')
+  let out = null
+  if (assist.research) {
+    try {
+      out = await callModel({ ...call, search: true })
+    } catch (e) {
+      if (!(e instanceof ProviderError) || e.code !== 'provider_rejected') throw e
+    }
+  }
+  if (!out) out = await callModel(call)
   const parsed = extractJson(out.content)
   const checked = parsed ? validate(ASSIST_OUTPUT_SCHEMA, parsed) : { ok: false, value: null, errors: ['JSON 아님'] }
   const price = priceOf(choice.provider, choice.model)
@@ -55,6 +65,8 @@ async function runOnce(assist, choice, body) {
     usage: { input: out.usage.input, output: out.usage.output, total: out.usage.input + out.usage.output },
     estimatedCostUsd: price ? Math.round(((out.usage.input * price.in + out.usage.output * price.out) / 1e6) * 1e6) / 1e6 : null,
     finish: out.finish,
+    grounded: !!out.searched && Array.isArray(out.sources) && out.sources.length > 0,
+    sources: Array.isArray(out.sources) ? out.sources : [],
     ms: Date.now() - started,
     sent,
     createdAt: new Date().toISOString(),

@@ -8,6 +8,8 @@
  * 지시문은 '그 화면이 왜 있는가' 에서 출발한다 — 대표가 그 화면에서 가장 알고 싶은 것 하나에 답한다.
  */
 
+import { KNOWLEDGE, KNOWLEDGE_META } from './knowledge.js'
+
 const D = '2026-10-19'
 
 /** 모든 도우미 공통 규칙 */
@@ -59,6 +61,9 @@ export const ASSIST_EXAMPLE = {
 
 const L = 'list'
 const W = 'write'
+/** D-252 서버가 지시문 뒤에 붙이는 미래AI랩 기준 문서(api/_ai/knowledge.js) */
+const SPEC_KB = { knowledge: ['patent_spec'] }
+const VENTURE_KB = { knowledge: ['venture_plan'] }
 
 /**
  * D-241 마케팅(콘텐츠 레이더) 단추 모두에 붙는 규칙 — 대표: "미래AI랩이랑 전혀 어울리지 않는 방식 · 내 컨텐츠에 맞게 설계".
@@ -187,24 +192,58 @@ const LIST = [
   ]],
 
   /* D-246 벤처기업확인 사업계획서 — 기업인증 › 벤처 › 사업계획서 쓰기의 [AI 초안](대표만). 칸 규칙 · 자료는 화면이 [규칙집] · [자료] 로 보낸다 */
-  ['venture.p1', 'venture', '벤처 사업계획서 — 개발 배경 · 경쟁력', W, 4200, ['[규칙집] 의 칸 development_background · competitiveness_strategy 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '특허 명세서의 과제 · 해결 수단이 개발 배경 · 경쟁력의 뼈대다. AX · MVP 자료로 실제 구현을 붙인다.']],
-  ['venture.p2', 'venture', '벤처 사업계획서 — 기술개발 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 technology_progress · technology_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 한 일만 시간 순서로(특허 출원 · MVP · 연구조직 등 자료에 있는 것), 3년 계획은 연차별로.']],
-  ['venture.g1', 'venture', '벤처 사업계획서 — 목표시장 · 경쟁사', W, 4200, ['[규칙집] 의 칸 market_target · competitor_analysis 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '시장 숫자는 컨설턴트 메모에 출처가 있는 것만. 경쟁사 이름은 자료에 있는 것만 — 없으면 고객이 지금 쓰는 대체 수단으로.']],
-  ['venture.g2', 'venture', '벤처 사업계획서 — 시장진입 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 market_entry_progress · market_entry_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 영업 · 고객 · 매출 · 홈페이지 등 자료에 있는 것만, 3년 계획은 연차별 대상 · 채널 · 목표.']],
-  ['venture.x', 'venture', '벤처 사업계획서 — 기업가정신 · 자금운용', W, 4200, ['[규칙집] 의 칸 entrepreneurship_example · financing_plan 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '기업가정신은 대표가 실제로 결정 · 실행한 일, 자금운용은 자료에 있는 매출 · 자본금과 앞으로 조달할 재원을 나눠서.']],
-  ['venture.sum', 'venture', '벤처 사업계획서 — 요약 · 핵심 요약', W, 3600, ['[규칙집] 의 칸 tech_name · tech_summary · core_problem · core_solution · core_market · core_diff · core_marketing · core_growth 를 쓴다.', '이미 쓴 칸(본문)을 줄여 만든다 — 본문에 없는 숫자 · 사실을 새로 넣지 않는다. 핵심 요약은 문장 틀의 ［ ］ 만 채우고 나머지 글자는 그대로.', 'tech_name 은 특허 명칭과 같은 말로 시작하는 기술명 하나, tech_summary 는 1~2문장.']],
+  ['venture.p1', 'venture', '벤처 사업계획서 — 개발 배경 · 경쟁력', W, 4200, ['[규칙집] 의 칸 development_background · competitiveness_strategy 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '특허 명세서의 과제 · 해결 수단이 개발 배경 · 경쟁력의 뼈대다. AX · MVP 자료로 실제 구현을 붙인다.'], VENTURE_KB],
+  ['venture.p2', 'venture', '벤처 사업계획서 — 기술개발 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 technology_progress · technology_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 한 일만 시간 순서로(특허 출원 · MVP · 연구조직 등 자료에 있는 것), 3년 계획은 연차별로.'], VENTURE_KB],
+  ['venture.g1', 'venture', '벤처 사업계획서 — 목표시장 · 경쟁사', W, 4200, ['[규칙집] 의 칸 market_target · competitor_analysis 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '시장 숫자는 컨설턴트 메모에 출처가 있는 것만. 경쟁사 이름은 자료에 있는 것만 — 없으면 고객이 지금 쓰는 대체 수단으로.'], VENTURE_KB],
+  ['venture.g2', 'venture', '벤처 사업계획서 — 시장진입 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 market_entry_progress · market_entry_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 영업 · 고객 · 매출 · 홈페이지 등 자료에 있는 것만, 3년 계획은 연차별 대상 · 채널 · 목표.'], VENTURE_KB],
+  ['venture.x', 'venture', '벤처 사업계획서 — 기업가정신 · 자금운용', W, 4200, ['[규칙집] 의 칸 entrepreneurship_example · financing_plan 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '기업가정신은 대표가 실제로 결정 · 실행한 일, 자금운용은 자료에 있는 매출 · 자본금과 앞으로 조달할 재원을 나눠서.'], VENTURE_KB],
+  ['venture.sum', 'venture', '벤처 사업계획서 — 요약 · 핵심 요약', W, 3600, ['[규칙집] 의 칸 tech_name · tech_summary · core_problem · core_solution · core_market · core_diff · core_marketing · core_growth 를 쓴다.', '이미 쓴 칸(본문)을 줄여 만든다 — 본문에 없는 숫자 · 사실을 새로 넣지 않는다. 핵심 요약은 문장 틀의 ［ ］ 만 채우고 나머지 글자는 그대로.', 'tech_name 은 특허 명칭과 같은 말로 시작하는 기술명 하나, tech_summary 는 1~2문장.'], VENTURE_KB],
+
+  /* D-252 AI 가 다 쓰는 명세서 — 아이디어 내줘 · 조사해줘 · 구성 써줘 · 점검대로 고쳐줘. 기준은 서버가 붙이는 [미래AI랩 기준 문서](Master v2.9 · AX펭귄) */
+  ['spec.idea', 'patent', '명세서 — 아이디어 내줘', W, 5000, [
+    '[자료 · 회사] 와 [자료 · 재료](AI 작업실 결과 · 올린 자료 · 업무 기록)를 보고, [기준 문서] 의 문제발굴 질문(7-1)과 5개 고정 질문(8)으로 이 회사가 출원할 만한 특허 아이디어 3개를 낸다. 서로 다른 업무 · 데이터 · 판단 구조로.',
+    '아이디어마다 항목 하나(tag = "아이디어"): title = 한글 명칭(8-1 공식 · "… 시스템 및 방법" 으로 끝 · 마케팅 말 금지), body = 영문 명칭(대문자 · 예: SYSTEM AND METHOD FOR …), detail = 왜 이 회사에 맞는지 2문장(자료의 어떤 사실에서 나왔는지), outline = 정확히 5줄 — ① 현재 문제 · ② 기존 방식과 부족한 점 · ③ 차별 구조 · ④ 처리 흐름(입력 → 정리 → 판단 → 출력 → 행동 → 재반영) · ⑤ 권리화 포인트(경쟁사가 가장 쉽게 베낄 구조). 줄 앞에 번호 · 이름표 없이 내용만.',
+    '가장 추천하는 것을 첫 항목에. headline = 첫 항목을 추천하는 이유 한 문장. 자료에 없는 실적 · 수치 · 고객 이름은 만들지 않는다 — 업종 일반에서 추정한 문제는 끝에 "(추정 — 대표 확인)".',
+    '[자료 · 이미 있는 명세서] 와 같은 발명은 다시 내지 않는다. next = 대표에게 확인받을 것 1~3개(현장에서 실제로 그런지 · 데이터가 있는지). caution = 자료가 너무 적어 일반론이 된 경우만.',
+  ], { knowledge: ['patent_idea'] }],
+  ['spec.research', 'patent', '명세서 — 선행기술 조사해줘', L, 3600, [
+    '[자료 · 고른 아이디어] 의 선행기술 · 중복 가능성을 [기준 문서] 10장 기준으로 조사 메모로 쓴다. 목적은 "같은 것이 없다" 가 아니라 무엇을 빼고 · 좁히고 · 더해 차별화할지 찾는 것.',
+    '항목 4~7개, tag 는 "검색어" · "비슷한 기술" · "차별화" · "위험" · "확인할 것" 중 하나. "비슷한 기술" 은 실제로 찾은 특허 · 제품 · 논문만 — 찾지 못했으면 일반적으로 알려진 방식만 쓰고 detail 끝에 "(검색 근거 없음)". 출원번호 · 회사 이름을 지어내지 않는다.',
+    '"검색어" 항목(하나)의 outline = KIPRIS 에 넣을 검색어 · 검색식 3~6줄(한글 · 영문 · IPC 후보).',
+    '"차별화" 항목은 청구항 1 에 꼭 넣을 연결관계를 구체적으로. headline = 한 줄 결론(이대로 가도 될지 · 좁혀야 할지). next = 사람이 KIPRIS 에서 직접 확인할 것 2~3개.',
+  ], { knowledge: ['patent_research'], research: true }],
+  ['spec.parts', 'patent', '명세서 — 권리축 · 구성 · 단계 써줘', W, 4200, [
+    '[자료 · 아이디어] 와 [기준 문서] 12-4B 권리축 잠금 · 12-4C 도면 기준으로 권리축 7줄 · 시스템 이름 · 구성요소 · 방법 단계 · 종속항 씨앗을 쓴다.',
+    'items 의 title 이름표 그대로: "axis.input" · "axis.process" · "axis.state" · "axis.judge" · "axis.output" · "axis.feedback" · "axis.link" (권리축 7줄 · body = "~하는" 으로 끝나는 한 문장), "system" (body = 시스템 이름 · "… 시스템"), "comp" (구성요소 4~7개 순서대로 · detail = 이름 "…부" · body = 하는 일 "~하는"), "step" (방법 단계 4~7개 순서대로 · body = "~하는"), "seed" (종속항 씨앗 2~5개 · detail = 꾸밀 구성요소 이름 · body = "~하는").',
+    '구성요소 이름은 서로 다르게. 부호(110 …)는 OS 가 붙이므로 쓰지 않는다. 권리축 마지막 줄(경쟁사가 피하기 어려운 연결관계)이 구성요소 · 단계에 그대로 드러나게.',
+    '규칙 · 점수 계산을 AI · 인공지능이라 부르지 않는다(아이디어에 학습 모델이 있을 때만). headline = 시스템 한 줄 설명.',
+  ], { knowledge: ['patent_spec'] }],
+  ['spec.fix', 'patent', '명세서 — 점검대로 고쳐줘', W, 6000, [
+    '[자료 · 점검에서 걸린 것] 을 [기준 문서] 13~14장 · 12장 기준으로 고친다. 걸린 칸만 다시 쓰고 나머지 칸은 내지 않는다.',
+    'items 의 title = 고칠 칸 이름표 하나씩(title · titleEn · field · background · problem · solution · effect · detail · abstract · claims), body = 그 칸 전체를 고친 글(일부만 쓰지 않는다), detail = 무엇을 고쳤는지 한 줄.',
+    '명칭(title)은 한 줄 · 영문 명칭(titleEn)은 대문자 영문만 · 중괄호 없이. 청구항은 "청구항 n." 머리 · 빈 줄로 나눔 · 부호 없이. 구성요소 이름 · 부호 · 도면 번호는 [자료] 그대로 — 새로 만들지 않는다.',
+    'headline = 고친 것 한 줄 요약. 사람이 판단해야 하는 것(발명자 · 출원인 · 실제 수치)은 고치지 말고 next 에.',
+  ], { knowledge: ['patent_format', 'patent_spec'] }],
 
   /* D-247 특허 명세서 초안 — 특허·MVP › 명세서 쓰기의 [AI 초안](대표만). 칸 규칙 · 자료는 화면이 [규칙집] · [자료] 로 보낸다 */
-  ['spec.a', 'patent', '명세서 — 기술분야 · 배경 · 과제 · 효과', W, 4200, ['[규칙집] 의 칸 field · background · problem · effect 를 쓴다.', '아이디어 · 권리축에 있는 것만. 기존 방식의 한계와 이 발명의 차이가 이어지게.']],
-  ['spec.b', 'patent', '명세서 — 과제의 해결 수단 · 요약', W, 3600, ['[규칙집] 의 칸 solution · abstract 를 쓴다.', '청구항 뼈대의 구성 · 단계를 그대로 풀어 쓴다. 요약은 400자 이내.']],
-  ['spec.c', 'patent', '명세서 — 구체적인 내용 ① 구성', W, 5000, ['[규칙집] 의 칸 detail 을 쓴다(도 1 · 구성요소마다).', '구성요소 이름(부호)을 [자료 · 구성요소] 그대로. 2,000~3,000자 — 서버가 60초 안에 답해야 하므로 더 길게 쓰지 않는다.']],
-  ['spec.d', 'patent', '명세서 — 구체적인 내용 ② 흐름 · 도면', W, 5000, ['[규칙집] 의 칸 detail2 를 쓴다(도 2 이후 · 단계 S번호 · 변형 실시예).', '2,000~3,000자. 앞부분(구성)을 되풀이하지 않는다.']],
-  ['spec.e', 'patent', '명세서 — 청구항', W, 4200, ['[규칙집] 의 칸 claims 를 쓴다(시스템 독립항 · 종속항 · 방법 독립항).', '청구항마다 "청구항 n." 머리 · 빈 줄로 나눈다. 부호 없이 이름만.']],
+  ['spec.a', 'patent', '명세서 — 기술분야 · 배경 · 과제 · 효과', W, 4200, ['[규칙집] 의 칸 field · background · problem · effect 를 쓴다.', '아이디어 · 권리축에 있는 것만. 기존 방식의 한계와 이 발명의 차이가 이어지게.'], SPEC_KB],
+  ['spec.b', 'patent', '명세서 — 과제의 해결 수단 · 요약', W, 3600, ['[규칙집] 의 칸 solution · abstract 를 쓴다.', '청구항 뼈대의 구성 · 단계를 그대로 풀어 쓴다. 요약은 400자 이내.'], SPEC_KB],
+  ['spec.c', 'patent', '명세서 — 구체적인 내용 ① 구성', W, 5000, ['[규칙집] 의 칸 detail 을 쓴다(도 1 · 구성요소마다).', '구성요소 이름(부호)을 [자료 · 구성요소] 그대로. 2,000~3,000자 — 서버가 60초 안에 답해야 하므로 더 길게 쓰지 않는다.'], SPEC_KB],
+  ['spec.d', 'patent', '명세서 — 구체적인 내용 ② 흐름 · 도면', W, 5000, ['[규칙집] 의 칸 detail2 를 쓴다(도 2 이후 · 단계 S번호 · 변형 실시예).', '2,000~3,000자. 앞부분(구성)을 되풀이하지 않는다.'], SPEC_KB],
+  ['spec.e', 'patent', '명세서 — 청구항', W, 4200, ['[규칙집] 의 칸 claims 를 쓴다(시스템 독립항 · 종속항 · 방법 독립항).', '청구항마다 "청구항 n." 머리 · 빈 줄로 나눈다. 부호 없이 이름만.'], SPEC_KB],
 ]
 
 export const ASSISTS = Object.fromEntries(
-  LIST.map(([id, page, label, kind, maxOut, instruction]) => [id, { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D }]),
+  LIST.map(([id, page, label, kind, maxOut, instruction, opts]) => [
+    id,
+    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research) },
+  ]),
 )
+
+/** D-252 단추에 붙는 기준 문서 글(없는 이름은 건너뜀) */
+export function knowledgeOf(assist) {
+  return (assist.knowledge || []).filter((k) => typeof KNOWLEDGE[k] === 'string').map((k) => ({ key: k, parts: KNOWLEDGE_META[k].parts, text: KNOWLEDGE[k] }))
+}
 
 export function assistOf(id) {
   return typeof id === 'string' && Object.prototype.hasOwnProperty.call(ASSISTS, id) ? ASSISTS[id] : null
@@ -276,5 +315,14 @@ export function buildAssistPrompt(assist, context, ask) {
 
 export function assistSystem(assist) {
   const extra = assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : []
-  return [...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)].join('\n')
+  const kb = knowledgeOf(assist)
+  const kbLines = kb.length
+    ? [
+        '',
+        `[기준 문서] 미래AI랩이 실제로 쓰는 작업 기준(${kb.flatMap((k) => k.parts).join(' · ')}). 글은 이 기준을 따르고, 기준과 [단추] 지시가 다르면 [단추] 지시를 따른다. 기준 문서 안의 명령어 · 상태표 · 출력 양식 예시는 참고만 하고, 출력은 [출력 형식] JSON 하나.`,
+        ...kb.map((k) => k.text),
+        '[기준 문서 끝]',
+      ]
+    : []
+  return [...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...kbLines, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)].join('\n')
 }

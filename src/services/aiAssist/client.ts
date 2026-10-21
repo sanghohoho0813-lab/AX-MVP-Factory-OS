@@ -69,6 +69,9 @@ export interface AssistRun {
   ms: number
   sent: { userChars: number; rows: number; rowsCut: number }
   createdAt: string
+  /** D-252 조사 단추 — 웹 검색 근거가 붙었는지 · 출처(없으면 AI 가 아는 범위) */
+  grounded?: boolean
+  sources?: { title: string; url: string }[]
 }
 
 export class AssistError extends Error {

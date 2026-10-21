@@ -122,6 +122,27 @@ export const SECTION_LABEL: Record<SectionKey, string> = {
 
 export const SECTION_KEYS: readonly SectionKey[] = ['field', 'background', 'problem', 'solution', 'effect', 'detail', 'abstract']
 
+/** D-252 AI 가 낸 아이디어 후보 — 고르면 1단계(명칭 · 5개 질문)에 들어간다 */
+export interface IdeaPick {
+  title: string
+  titleEn: string
+  /** 왜 이 회사에 맞는지 */
+  why: string
+  idea: SpecIdea
+}
+
+/** D-252 선행기술 조사 메모(조사해줘) — 검색 근거가 붙었는지 · 출처 */
+export interface SpecResearch {
+  at: string
+  /** 어느 명칭으로 조사했나 — 명칭이 바뀌면 다시 조사 */
+  forTitle: string
+  headline: string
+  items: { tag: string; title: string; detail: string; outline: string[] }[]
+  next: string[]
+  grounded: boolean
+  sources: { title: string; url: string }[]
+}
+
 export interface SpecDraft {
   v: 1
   /** 한글 명칭(시스템 및 방법까지) */
@@ -149,7 +170,22 @@ export interface SpecDraft {
   numbered: boolean
   /** 어디서 왔나(AI 작업실 특허 아이디어 등) */
   source: string
+  /** D-252 AI 아이디어 후보 · 조사 메모 */
+  ideas: IdeaPick[]
+  research: SpecResearch | null
+  /** D-252 작업판에 끌어다 놓은 자료(읽은 글만 · 개인정보 가림 · 파일 4개 · 6천 자까지) — 아이디어 내줘가 재료로 쓴다 */
+  materials: SpecMaterial[]
 }
+
+export interface SpecMaterial {
+  title: string
+  kind: string
+  text: string
+  at: string
+}
+
+export const MATERIAL_MAX = 4
+export const MATERIAL_CHARS = 6000
 
 export function emptyDraft(): SpecDraft {
   return {
@@ -170,7 +206,34 @@ export function emptyDraft(): SpecDraft {
     suggestion: {},
     numbered: true,
     source: '',
+    ideas: [],
+    research: null,
+    materials: [],
   }
+}
+
+function readIdeas(v: unknown): IdeaPick[] {
+  if (!Array.isArray(v)) return []
+  const str = (x: unknown) => (typeof x === 'string' ? x : '')
+  return v
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+    .map((x) => {
+      const i = (x.idea && typeof x.idea === 'object' ? x.idea : {}) as Record<string, unknown>
+      return { title: str(x.title), titleEn: str(x.titleEn), why: str(x.why), idea: { problem: str(i.problem), prior: str(i.prior), distinct: str(i.distinct), flow: str(i.flow), point: str(i.point) } }
+    })
+    .filter((x) => x.title.trim())
+    .slice(0, 6)
+}
+
+function readResearch(v: unknown): SpecResearch | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const str = (x: unknown) => (typeof x === 'string' ? x : '')
+  const strs = (x: unknown) => (Array.isArray(x) ? x.map(str).filter(Boolean) : [])
+  const items = Array.isArray(o.items) ? o.items.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map((x) => ({ tag: str(x.tag), title: str(x.title), detail: str(x.detail), outline: strs(x.outline) })) : []
+  const sources = Array.isArray(o.sources) ? o.sources.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map((x) => ({ title: str(x.title), url: str(x.url) })).filter((x) => /^https?:\/\//.test(x.url)) : []
+  if (!items.length && !str(o.headline)) return null
+  return { at: str(o.at), forTitle: str(o.forTitle), headline: str(o.headline), items, next: strs(o.next), grounded: o.grounded === true, sources }
 }
 
 /** 저장된 것을 안전하게 읽는다(모르는 값 · 빠진 칸 채움) */
@@ -202,6 +265,15 @@ export function normalizeDraft(v: unknown): SpecDraft {
     suggestion: o.suggestion && typeof o.suggestion === 'object' ? Object.fromEntries(Object.entries(o.suggestion).map(([k, x]) => [k, str(x)]).filter(([, x]) => x)) : {},
     numbered: o.numbered !== false,
     source: str(o.source),
+    ideas: readIdeas(o.ideas),
+    research: readResearch(o.research),
+    materials: Array.isArray(o.materials)
+      ? o.materials
+          .filter((x): x is SpecMaterial => !!x && typeof x === 'object')
+          .map((x) => ({ title: str(x.title), kind: str(x.kind) || '자료', text: str(x.text).slice(0, MATERIAL_CHARS), at: str(x.at) }))
+          .filter((x) => x.text.trim())
+          .slice(0, MATERIAL_MAX)
+      : [],
   }
 }
 

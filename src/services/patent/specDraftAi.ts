@@ -83,6 +83,13 @@ function batchRules(b: SpecBatch, d: SpecDraft): string[] {
   }
 }
 
+/** D-252 조사 메모의 차별화 · 위험 — 해결 수단 · 청구항 묶음에 같이 보낸다(명칭이 바뀌었으면 옛 조사는 안 씀) */
+export function researchRows(d: SpecDraft): AssistRow[] {
+  const r = d.research
+  if (!r || r.forTitle !== d.title) return []
+  return r.items.filter((it) => /차별|위험/.test(it.tag)).slice(0, 4).map((it) => ({ part: it.tag || '조사', memo: `${it.title}${it.detail ? ` — ${it.detail}` : ''}`.slice(0, 560) }))
+}
+
 /** 묶음 하나의 보낼 자료 */
 export function buildSpecContext(input: { batch: SpecBatch; draft: SpecDraft; today: string }): AssistContext {
   const { batch, draft: d, today } = input
@@ -100,6 +107,8 @@ export function buildSpecContext(input: { batch: SpecBatch; draft: SpecDraft; to
     { name: '도면', rows: figRows },
   ]
   if (batch === 'b' || batch === 'e') sections.push({ name: '청구항 뼈대', rows: claimSkeleton(d).map((c, i) => ({ part: `청구항 ${i + 1}`, memo: c.slice(0, 560) })) })
+  const research = batch === 'b' || batch === 'e' ? researchRows(d) : []
+  if (research.length) sections.push({ name: '조사에서 나온 차별화', rows: research })
   // 이야기가 이어지게 — 이미 쓴 다른 칸(이번 묶음 칸은 빼고)
   const mine = new Set<string>(SPEC_BATCHES.find((x) => x.key === batch)?.keys ?? [])
   const written: AssistRow[] = []

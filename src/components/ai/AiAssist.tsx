@@ -246,7 +246,7 @@ export function prettyModel(id: string): string {
     .replace(/Flash Lite$/, 'Flash-Lite')
 }
 
-function labelOf(status: AssistStatus | null, c: AiChoice): string {
+export function labelOf(status: AssistStatus | null, c: AiChoice): string {
   const p = status?.providers.find((x) => x.id === c.provider)
   const m = p?.models.find((x) => x.id === c.model)
   return m ? m.label : prettyModel(c.model)
@@ -580,7 +580,7 @@ function priceText(m: ModelInfo): string {
   return m.price ? `입력 $${m.price[0]} · 출력 $${m.price[1]} (100만 토큰)` : '가격 정보 없음'
 }
 
-function ModelRow({
+export function ModelRow({
   status,
   effective,
   choice,

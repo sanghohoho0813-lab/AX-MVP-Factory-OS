@@ -248,7 +248,27 @@ function statusError(status) {
  * one call. json=true 면 JSON 한 덩어리를 달라고 공급자 기능으로도 요청한다(OpenAI · Gemini).
  * maxOut 은 '생각' 토큰까지 포함하는 공급자가 있어 넉넉히 넘긴다.
  */
-export async function callModel({ provider, key, base, model, system, user, maxOut, timeoutMs, json = true }) {
+/** D-252 검색 근거에서 고른 출처(웹 주소만 · 8개까지) */
+function cleanSources(list) {
+  const seen = new Set()
+  const out = []
+  for (const s of list) {
+    const url = s && typeof s.url === 'string' ? s.url.trim() : ''
+    if (!/^https?:\/\//.test(url) || seen.has(url)) continue
+    seen.add(url)
+    out.push({ title: String((s && s.title) || '').trim().slice(0, 120) || url.replace(/^https?:\/\//, '').slice(0, 60), url: url.slice(0, 500) })
+    if (out.length >= 8) break
+  }
+  return out
+}
+
+/**
+ * search=true(D-252 조사해줘) — 공급자의 웹 검색을 붙인다: Gemini google_search · Claude web_search. OpenAI 는 붙이지 않는다(searched=false).
+ * 검색을 붙이면 JSON 모드는 끈다(함께 못 쓰는 모델이 있다) — 글에서 JSON 을 뽑는다.
+ */
+export async function callModel({ provider, key, base, model, system, user, maxOut, timeoutMs, json = true, search = false }) {
+  const withSearch = search && (provider === 'gemini' || provider === 'anthropic')
+  if (withSearch) json = false
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   let res
@@ -261,6 +281,7 @@ export async function callModel({ provider, key, base, model, system, user, maxO
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: 'user', parts: [{ text: user }] }],
           generationConfig: { maxOutputTokens: maxOut, ...(json ? { responseMimeType: 'application/json' } : {}) },
+          ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
         }),
         signal: ctrl.signal,
       })
@@ -268,7 +289,7 @@ export async function callModel({ provider, key, base, model, system, user, maxO
       res = await fetch(`${base}/messages`, {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: maxOut, system, messages: [{ role: 'user', content: user }] }),
+        body: JSON.stringify({ model, max_tokens: maxOut, system, messages: [{ role: 'user', content: user }], ...(withSearch ? { tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }] } : {}) }),
         signal: ctrl.signal,
       })
     } else {
@@ -304,8 +325,12 @@ export async function callModel({ provider, key, base, model, system, user, maxO
     const parts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : []
     const content = parts.filter((p) => p && typeof p.text === 'string' && !p.thought).map((p) => p.text).join('')
     const u = (data && data.usageMetadata) || {}
+    const chunks = cand && cand.groundingMetadata && Array.isArray(cand.groundingMetadata.groundingChunks) ? cand.groundingMetadata.groundingChunks : []
+    const sources = cleanSources(chunks.map((c) => ({ url: c && c.web && c.web.uri, title: c && c.web && c.web.title })))
     return {
       content,
+      searched: withSearch,
+      sources,
       finish: cand && cand.finishReason ? String(cand.finishReason) : '',
       model: typeof data.modelVersion === 'string' && data.modelVersion ? data.modelVersion : model,
       usage: { input: Number(u.promptTokenCount) || 0, output: (Number(u.candidatesTokenCount) || 0) + (Number(u.thoughtsTokenCount) || 0) },
@@ -315,8 +340,11 @@ export async function callModel({ provider, key, base, model, system, user, maxO
     const blocks = data && Array.isArray(data.content) ? data.content : []
     const content = blocks.filter((b) => b && b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('')
     const u = (data && data.usage) || {}
+    const found = blocks.filter((b) => b && b.type === 'web_search_tool_result' && Array.isArray(b.content)).flatMap((b) => b.content.map((r) => ({ url: r && r.url, title: r && r.title })))
     return {
       content,
+      searched: withSearch,
+      sources: cleanSources(found),
       finish: data && data.stop_reason ? String(data.stop_reason) : '',
       model: typeof data.model === 'string' && data.model ? data.model : model,
       usage: { input: Number(u.input_tokens) || 0, output: Number(u.output_tokens) || 0 },
@@ -327,6 +355,8 @@ export async function callModel({ provider, key, base, model, system, user, maxO
   const u = (data && data.usage) || {}
   return {
     content,
+    searched: false,
+    sources: [],
     finish: choice && choice.finish_reason ? String(choice.finish_reason) : '',
     model: typeof data.model === 'string' && data.model ? data.model : model,
     usage: { input: Number(u.prompt_tokens) || 0, output: Number(u.completion_tokens) || 0 },
