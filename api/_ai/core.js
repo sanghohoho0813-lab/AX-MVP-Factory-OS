@@ -63,8 +63,15 @@ export function aiConfig(choiceIn) {
   }
   const timeoutMs = Math.min(Math.max(Number(env(['AI_TIMEOUT_MS'])) || 55000, 5000), 295000)
   const choice = cleanChoice(choiceIn)
+  // D-255 대표 "AI 작업실도 내가 고른 모델로" — 화면에서 모델까지 골랐으면 빠르게 · 보통 · 깊게 모두 그 모델(안 골랐으면 전처럼 단계별)
+  const pinned = choice && choice.model ? choice.model : ''
   const legacy = legacyConfig()
-  if (legacy.missing.length === 0 && (!choice || choice.provider === 'openai')) return { ...legacy, maxOut, timeoutMs, legacy: true }
+  if (legacy.missing.length === 0 && (!choice || choice.provider === 'openai')) {
+    if (!pinned) return { ...legacy, maxOut, timeoutMs, legacy: true }
+    const models = Object.fromEntries(TIERS.map((t) => [t, pinned]))
+    const prices = Object.fromEntries(TIERS.map((t) => [t, priceOf('openai', pinned) || legacy.prices[t]]))
+    return { ...legacy, models, prices, maxOut, timeoutMs, legacy: true, pinned }
+  }
 
   const anyKey = configuredProviders()
   const provider = choice ? choice.provider : anyKey.includes(defaultChoice().provider) ? defaultChoice().provider : anyKey[0] || defaultChoice().provider
@@ -73,13 +80,13 @@ export function aiConfig(choiceIn) {
   const models = {}
   const prices = {}
   for (const t of TIERS) {
-    models[t] = tierModel(provider, t)
-    prices[t] = (provider === 'openai' && parsePrice(env([`AI_PRICE_${t.toUpperCase()}`]))) || priceOf(provider, models[t])
+    models[t] = pinned || tierModel(provider, t)
+    prices[t] = (!pinned && provider === 'openai' && parsePrice(env([`AI_PRICE_${t.toUpperCase()}`]))) || priceOf(provider, models[t])
   }
   const missing = []
   if (!key) missing.push(anyKey.length === 0 && !choice ? 'GEMINI_API_KEY(또는 OPENAI_API_KEY · ANTHROPIC_API_KEY)' : PROVIDERS[provider].keyNames[0])
   if (!base) missing.push(`${PROVIDERS[provider].baseNames[0]}(https 주소)`)
-  return { provider, key, base, models, prices, maxOut, timeoutMs, missing, legacy: false }
+  return { provider, key, base, models, prices, maxOut, timeoutMs, missing, legacy: false, pinned }
 }
 
 /** 화면에 알려도 되는 설정 상태(키 · 모델 이름 값은 빼고) */

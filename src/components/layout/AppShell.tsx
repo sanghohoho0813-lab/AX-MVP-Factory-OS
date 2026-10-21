@@ -23,6 +23,7 @@ import { ViewingPilotBanner } from './ViewAsSwitch'
 import { Breadcrumbs } from './Breadcrumbs'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
+import { useSideAi } from '../../lib/sideAi'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -51,6 +52,8 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const contentWidth = useContentWidth()
+  // D-254 오른쪽에 AI 옆 창을 붙였으면 덮이는 만큼 화면을 왼쪽으로 비킨다(창이 닫히면 0)
+  const sideAi = useSideAi()
 
   // 화면이 바뀌면 모바일 메뉴를 닫고 맨 위로 — 뒤로 · 앞으로 온 것이면 보던 자리로 (D-124)
   useScrollMemory(() => setMobileOpen(false))
@@ -65,7 +68,7 @@ export function AppShell() {
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
       <TutorialProvider>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen" style={sideAi.reserve ? { paddingRight: sideAi.reserve } : undefined} data-side-reserve={sideAi.reserve || undefined}>
         <Sidebar
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((v) => !v)}

@@ -15,6 +15,7 @@ import { MATERIAL_KIND_LABEL, type AiRunInput, type SkillId } from '../../../ser
 import { BottomSheet, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { TierBadge, type AiSetup } from '../shared'
+import { ModelPicker } from '../../../components/ai/ModelPicker'
 
 export interface RunRequest {
   skill: SkillId
@@ -44,9 +45,13 @@ export function QuickActions({
   const [open, setOpen] = useState<QuickAction | null>(null)
   return (
     <Surface className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="t-section break-keep text-slate-900">빠른 작업</h2>
-        <span className="t-sub break-keep text-slate-500">모두 이 업체 기억 · 자료를 같이 씁니다</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="t-section break-keep text-slate-900">빠른 작업</h2>
+          <span className="t-sub break-keep text-slate-500">모두 이 업체 기억 · 자료를 같이 씁니다</span>
+        </div>
+        {/* D-255 AI 작업실도 고른 모델로 — 고르지 않으면 일마다 빠르게 · 보통 · 깊게 모델(전과 같음) */}
+        <ModelPicker popover testId="owner-ai-model" />
       </div>
       {/* 칸 폭이 좁아도 이름이 한 줄씩 읽히게 — 최소 10.5rem 칸을 들어가는 만큼(휴대폰 2칸 · PC 3~5칸) */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]" data-testid="quick-actions">

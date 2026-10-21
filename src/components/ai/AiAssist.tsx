@@ -35,6 +35,7 @@ import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice } from '../../services/aiAssist/store'
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
+import { ModelPicker } from './ModelPicker'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
 /** 서버 상태를 못 받았을 때 보일 기본 이름(서버 목록이 오면 그것으로) */
@@ -145,7 +146,6 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
   }, [])
 
   const effective: AiChoice = choice ?? status?.defaultChoice ?? FALLBACK_DEFAULT
-  const modelLabel = labelOf(status, effective)
 
   const openWith = (id: string | null) => {
     setPendingRun(id)
@@ -174,10 +174,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
               {p.label}
             </button>
           ))}
-          <span className="t-meta ml-auto hidden min-w-0 items-center gap-1 text-violet-700 lg:inline-flex" data-testid="ai-assist-model-chip">
-            <Sparkles aria-hidden="true" className="size-3.5 shrink-0" />
-            {modelLabel}
-          </span>
+          {/* D-255 대표 "곳곳에 제미나이 3.1 플래시 라이트만 — 어디서든 내가 원하는 모델로": 이름만 보이던 칩 → 누르면 고르는 단추 */}
+          <ModelPicker popover className="ml-auto" testId="ai-assist-model-chip" />
         </section>
       ) : (
         <OpenButton label={label} onClick={() => openWith(null)} className={className} />
@@ -427,6 +425,8 @@ function AssistPanel({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="flex flex-col gap-4">
+            {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게(전에는 질문 단추 아래) */}
+            <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
             <section aria-label="무엇을 도와드릴까요" className="flex flex-col gap-2">
               <p className="t-sub font-semibold text-slate-700">무엇을 도와드릴까요? — 누르면 바로 답해요</p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -494,8 +494,6 @@ function AssistPanel({
                 </div>
               )}
             </section>
-
-            <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
 
             {error && <ErrorBox error={error} />}
 
@@ -606,10 +604,10 @@ export function ModelRow({
     <section aria-label="모델" className="rounded-(--radius-control) border border-slate-200" data-testid="ai-assist-model">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
         <span className="t-sub text-slate-600">쓰는 모델</span>
-        <span className="t-sub min-w-0 font-semibold break-keep text-slate-900" data-testid="ai-assist-model-label">
+        <button type="button" onClick={() => setOpen(!open)} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label">
           {current}
           {isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
-        </span>
+        </button>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
         </button>
@@ -691,7 +689,7 @@ export function ModelRow({
               </button>
             )}
           </div>
-          <p className="t-meta break-keep text-slate-500">고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 도우미에 쓰여요. AI 작업실은 같은 회사의 빠르게 · 보통 · 깊게 모델을 일에 맞춰 씁니다.</p>
+          <p className="t-meta break-keep text-slate-500">고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서 · 마케팅 · AI 작업실)가 같이 써요.</p>
         </div>
       )}
     </section>

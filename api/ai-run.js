@@ -3,7 +3,8 @@
  *
  *   GET  /api/ai-run?status=1   설정 상태(키 · 모델 이름 값은 빼고 '있다/없다' 만)
  *   POST /api/ai-run            { requestId, skillId, caseId, contextVersion, input, context, choice? } → 결과(구조 JSON · 토큰 · 비용)
- *                               choice = { provider: 'gemini'|'openai'|'anthropic' } — 그 공급자의 빠르게/보통/깊게 모델(D-239)
+ *                               choice = { provider: 'gemini'|'openai'|'anthropic', model? } — 모델이 없으면 그 공급자의 빠르게/보통/깊게 모델(D-239),
+ *                               있으면 모든 일에 그 모델(D-255 대표 "어디서든 내가 고른 모델로")
  *
  * 문지기(순서대로)
  *   1) 로그인(Supabase JWT) — 없으면 401
@@ -16,7 +17,7 @@
 import { SKILLS, COMMON_RULES, skillOf } from './_ai/skills.js'
 import { ProviderError, aiConfig, buildPrompt, callProvider, costOf, extractJson, publicStatus, scrubDeep, validate } from './_ai/core.js'
 import { __resetGateState, fail, limits, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
-import { __resetProviderCache } from './_ai/providers.js'
+import { __resetProviderCache, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
 const inflight = new Map()
@@ -106,7 +107,8 @@ export default async function handler(req, res) {
     }
   }
 
-  const rate = rateCheck(who.userId, skill.tier, now)
+  // D-255 모델을 골랐으면 그 모델 값으로 센다(비싼 모델을 골라 놓고 '빠르게' 일로 깊게 하루 한도를 비켜 가지 않게)
+  const rate = rateCheck(who.userId, cfg.pinned ? tierOf(cfg.provider || 'openai', cfg.pinned) : skill.tier, now)
   if (!rate.ok) {
     res.setHeader('Retry-After', String(rate.retryAfter))
     return fail(res, 429, 'rate_limited', { retryAfter: rate.retryAfter })

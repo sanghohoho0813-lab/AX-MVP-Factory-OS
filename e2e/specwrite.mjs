@@ -14,6 +14,16 @@ import { chromium } from 'playwright'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { seedScript } from './seed.mjs'
 
+// D-252 AI 판이 기본 화면 — 칸을 직접 고치는 예전 시험은 [직접 고치기] 로 바꾼 뒤에(주소에 step 이 있으면 이미 직접 고치기)
+const toEdit = async (p) => {
+  const t = p.getByTestId('spec-view-edit')
+  if ((await t.count()) && (await t.getAttribute('aria-selected')) !== 'true') {
+    await t.click()
+    await p.waitForTimeout(150)
+  }
+}
+
+
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -73,6 +83,7 @@ let draftUrl = ''
   await page.getByTestId('spec-new').click()
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   draftUrl = page.url()
   check('새 명세서 → 주소에 draft · client · 1 아이디어부터', draftUrl.includes(`client=${CLIENT}`) && (await page.getByTestId('spec-tab-idea').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-editor').getAttribute('data-progress')) === '1/6')
   check('대표(로컬): AI 작업실에서 가져오기 · AI 초안 단추', (await page.getByTestId('spec-import-open').count()) === 1 && (await page.getByTestId('spec-ai-open').count()) === 1)
@@ -179,6 +190,7 @@ let draftUrl = ''
   check('사업계획서 재료(특허)에 명세서 요약 — 명칭 · 독립 청구항', mat.startsWith('[발명의 명칭] 공구 진동정보 기반') && mat.includes('[독립 청구항 1]') && !mat.includes('[0001]'), mat.slice(0, 200))
   await page.goto(draftUrl, { waitUntil: 'networkidle' })
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   check('새로고침(다시 열기)해도 그대로 — 명칭 · 6/6', (await page.getByTestId('spec-editor-title').innerText()).startsWith('공구 진동정보 기반') && (await page.getByTestId('spec-editor').getAttribute('data-progress')) === '6/6')
   await page.getByTestId('spec-tab-idea').click()
   await page.getByTestId('spec-title').fill('공구 진동정보 기반 마모 예측 시스템 및 방법')
@@ -256,6 +268,7 @@ let draftUrl = ''
   await page.getByTestId('spec-new').click()
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   check('회사 없이 새 명세서 → 주소에 client 없음', !page.url().includes('client='))
   await page.getByTestId('spec-import-open').click()
   await page.getByTestId('spec-import-case').selectOption('case_spec_e2e')
@@ -292,6 +305,7 @@ for (const width of [360, 390, 430]) {
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
   await page.getByTestId('spec-new').click()
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   await page.getByTestId('spec-title').fill('공구 진동정보 기반 마모상태 판정 및 교체시점 산출 시스템 및 방법')
   for (const [k, v] of Object.entries(AXIS)) await page.getByTestId(`spec-axis-${k}`).fill(v)
   await page.getByTestId('spec-tab-parts').click()

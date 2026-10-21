@@ -17,6 +17,8 @@ import { useToast } from '../ui/toastContext'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { callAssist } from '../../services/aiAssist/client'
+import { readChoice } from '../../services/aiAssist/store'
+import { ModelPicker } from '../ai/ModelPicker'
 import type { AssistPage } from '../../services/aiAssist/presets'
 import type { AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
@@ -190,7 +192,7 @@ export function WorkChat(p: WorkChatProps) {
     commit((cur) => [...cur, { id, at: new Date().toISOString(), q: shown, a: null, status: 'pending' }], key)
     setBusy(true)
     try {
-      const run = await callAssist({ requestId: uid('ch'), assistId: p.assistId, page: p.page, choice: null, context: ctx, ask: q })
+      const run = await callAssist({ requestId: uid('ch'), assistId: p.assistId, page: p.page, choice: readChoice(), context: ctx, ask: q })
       const a = answerFromAi(run.structured, run.raw, run.model)
       a.actions = p.actionsFor(q)
       commit((cur) => cur.map((t) => (t.id === id ? { ...t, a, status: 'done' } : t)), key)
@@ -284,9 +286,13 @@ export function WorkChat(p: WorkChatProps) {
           <span className="hidden sm:inline">{sendLabel}</span>
         </Button>
       </div>
-      <p className={`t-meta px-2 break-keep text-slate-500 ${docked ? 'hidden lg:block' : ''}`} data-testid="chat-mode">
-        {aiReady ? '✨ AI 연결됨 — 쓴 질문은 AI가 이 회사 기록 요약을 보고 답해요(Enter)' : access === 'setup' ? 'AI 연결 준비 중 — 지금은 정해진 답으로 바로 알려 드려요' : '쓴 질문은 정해진 답으로 바로 알려 드려요(Enter)'}
-      </p>
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-2 ${docked ? 'hidden lg:flex' : ''}`}>
+        <p className="t-meta min-w-0 flex-1 basis-56 break-keep text-slate-500" data-testid="chat-mode">
+          {aiReady ? '✨ AI 연결됨 — 쓴 질문은 AI가 이 회사 기록 요약을 보고 답해요(Enter)' : access === 'setup' ? 'AI 연결 준비 중 — 지금은 정해진 답으로 바로 알려 드려요' : '쓴 질문은 정해진 답으로 바로 알려 드려요(Enter)'}
+        </p>
+        {/* D-255 대화창도 고른 모델로(전에는 늘 기본 모델) — 여기서 바꿔도 모든 AI 단추가 같이 */}
+        {aiReady && <ModelPicker popover testId="chat-model" />}
+      </div>
     </div>
   )
 

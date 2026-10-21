@@ -106,7 +106,8 @@ export async function callAi(req: { requestId: string; skillId: SkillId; caseId:
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
       // D-239: 고른 AI 회사를 같이 보낸다 — 서버가 그 회사의 빠르게 · 보통 · 깊게 모델을 쓴다
-      body: JSON.stringify({ ...req, ...(readChoice() ? { choice: { provider: readChoice()?.provider } } : {}) }),
+      // D-255 고른 모델까지 보낸다 — 고르지 않았으면 서버가 일마다 빠르게 · 보통 · 깊게 모델을 고른다
+      body: JSON.stringify({ ...req, ...(readChoice() ? { choice: readChoice() } : {}) }),
     })
   } catch {
     throw new AiCallError('network', MESSAGE.network)

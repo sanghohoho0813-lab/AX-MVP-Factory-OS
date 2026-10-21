@@ -16,6 +16,16 @@ import { chromium } from 'playwright'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { seedScript } from './seed.mjs'
 
+// D-252 AI 판이 기본 화면 — 칸을 직접 고치는 예전 시험은 [직접 고치기] 로 바꾼 뒤에(주소에 step 이 있으면 이미 직접 고치기)
+const toEdit = async (p) => {
+  const t = p.getByTestId('spec-view-edit')
+  if ((await t.count()) && (await t.getAttribute('aria-selected')) !== 'true') {
+    await t.click()
+    await p.waitForTimeout(150)
+  }
+}
+
+
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -65,6 +75,7 @@ let sampleId = ''
   await page.getByTestId('pv-empty-sample').click()
   await page.waitForURL(/\/patent-venture\/write\?draft=.*step=idea/)
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   sampleId = new URL(page.url()).searchParams.get('draft') ?? ''
   check('견본 → 주소 step=idea · 1 아이디어 탭 · 5/6단계 · 견본 표시 · 명칭 채워짐', (await page.getByTestId('spec-tab-idea').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-editor').getAttribute('data-progress')) === '5/6' && /견본/.test(await page.getByTestId('spec-editor').innerText()) && (await page.getByTestId('spec-title').inputValue()).startsWith('공구 진동정보'))
   check('PC 넓은 화면: 오른쪽 고정판 보임 · 작은 화면 단계 줄 숨김', await page.getByTestId('spec-rail').isVisible() && !(await page.getByTestId('spec-bar').isVisible()))
@@ -186,6 +197,7 @@ let sampleId = ''
   check('주소 step=claims → 4 청구항 바로', (await page.getByTestId('spec-tab-claims').getAttribute('aria-selected')) === 'true')
   await page.goto(`${BASE}/patent-venture/write?draft=${sampleId}&step=oops`, { waitUntil: 'networkidle' })
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   check('주소 step 이상한 값 → 평소처럼(명칭 있으면 2 구성요소)', (await page.getByTestId('spec-tab-parts').getAttribute('aria-selected')) === 'true')
 
   // 사업계획서 재료 ← 같은 회사 명세서
@@ -240,6 +252,7 @@ for (const [width, scale] of [
   if (width === 390) await shot(page, 'pvux-11-home-390')
   await page.getByTestId('pv-empty-sample').click()
   await page.getByTestId('spec-editor').waitFor()
+  await toEdit(page)
   if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
   check(`${tag}: 단계 줄 보임 · 오른쪽 판 숨김 · 1/6`, (await page.getByTestId('spec-bar').isVisible()) && !(await page.getByTestId('spec-rail').isVisible()) && /1\/6/.test(await page.getByTestId('spec-bar-title').innerText()))
   await page.evaluate(() => window.scrollTo(0, 1500))

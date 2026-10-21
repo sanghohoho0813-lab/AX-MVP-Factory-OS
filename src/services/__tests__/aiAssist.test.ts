@@ -240,6 +240,14 @@ async function serverTests() {
       return aiConfig()
     })()
     check('S21 예전 OpenAI 설정(AI_MODEL_*)이 다 있으면 예전 그대로', legacy.legacy === true && legacy.models.deep === 'm-d' && legacy.missing.length === 0)
+    // D-255 대표 "AI 작업실도 내가 고른 모델로" — 모델까지 고르면 빠르게 · 보통 · 깊게 모두 그 모델, 회사만 고르면 전처럼 단계별
+    setEnv()
+    const pinned = aiConfig({ provider: 'anthropic', model: 'claude-sonnet-5-5' })
+    check('S21a AI 작업실 모델까지 고름 → 모든 일에 그 모델 · 값도 그 모델 값', pinned.pinned === 'claude-sonnet-5-5' && pinned.models.cheap === 'claude-sonnet-5-5' && pinned.models.deep === 'claude-sonnet-5-5' && pinned.prices.cheap?.in === 2, pinned.models)
+    const free = aiConfig({ provider: 'anthropic' })
+    check('S21b 회사만 고르면 전처럼 단계별(고른 모델 없음)', !free.pinned && free.models.cheap === 'claude-haiku-5-5' && free.models.deep === 'claude-opus-5-5')
+    const bad = aiConfig({ provider: 'anthropic', model: 'x; DROP' })
+    check('S21c 잘못된 모양의 모델 이름은 버리고 단계별', !bad.pinned && bad.models.standard === 'claude-sonnet-5-5')
   }
   // D-244 직접 적은 질문 · 깊게 하루 한도 · JSON 아닌 오류
   setEnv()

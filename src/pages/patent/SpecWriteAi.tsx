@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
+import { ModelPicker } from '../../components/ai/ModelPicker'
 import { SECTION_LABEL, cleanAiText, draftFromIdea, mergeSpecAi, type PatentIdeaLike, type SectionKey, type SpecDraft } from '../../services/patent/specDraft'
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from '../../services/patent/specDraftAi'
 import { useOwnerAiRepo } from '../ownerAi/shared'
@@ -28,7 +29,6 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
   const [rows, setRows] = useState<Record<string, RowState>>({})
   const [busy, setBusy] = useState(false)
   const [asks, setAsks] = useState<{ key: string; text: string }[]>([])
-  const choice = readChoice()
   const ready = !!d.title.trim() && d.components.filter((c) => c.name.trim()).length >= 2
   // 다섯 번 부르는 동안 화면이 바뀌어도 늘 가장 최근 초안으로
   const dRef = useRef(d)
@@ -42,7 +42,7 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
     const b = SPEC_BATCHES.find((x) => x.key === key)!
     setRow(key, { phase: 'run', text: '쓰는 중…(30초쯤)' })
     try {
-      const run = await callAssist({ requestId: newRequestId(), assistId: b.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context: buildSpecContext({ batch: key, draft: dRef.current, today }) })
+      const run = await callAssist({ requestId: newRequestId(), assistId: b.assistId, page: 'patent', choice: readChoice(), context: buildSpecContext({ batch: key, draft: dRef.current, today }) })
       const items = specItemsOf(run.structured, key)
       if (!items.length) throw new AssistError('provider_error', 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
       const m = await applyRef.current((cur) => {
@@ -101,7 +101,8 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
             앞 단계(아이디어 · 권리축 · 구성요소 · 단계 · 도면)만 보고 다섯 번에 나눠 씁니다. 이름 · 부호 · 도면 번호는 정해 둔 그대로 쓰게 했고, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
           </p>
           <p className="t-sub break-keep text-warning-800">누르면 위 내용이 고른 AI 회사로 갑니다. 출원 전 발명이므로, 밖으로 보내면 안 되는 경우엔 누르지 마세요.</p>
-          <p className="t-meta text-slate-500">모델 · {choice ? choice.model : '기본 모델(AI 도우미에서 고른 것)'}</p>
+          {/* D-255 모델 이름만 보이던 줄 → 누르면 고르는 단추(고른 모델은 모든 AI 단추가 같이) */}
+          <ModelPicker className="mt-1" />
         </div>
         {!ready ? (
           <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-900" data-testid="spec-ai-need">
