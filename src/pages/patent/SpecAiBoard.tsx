@@ -110,7 +110,8 @@ export function SpecAiBoard({
   const [caseMats, setCaseMats] = useState<AgentCompany['materials']>([])
   const [priorIdeas, setPriorIdeas] = useState<string[]>([])
   const [reading, setReading] = useState('')
-  const [matsReady, setMatsReady] = useState(false)
+  /** 자료를 다 읽은 회사(빈 글 = 회사 없음) — 회사 기록이 늦게 와도 그 회사 자료를 읽기 전에는 저절로 시작하지 않게 */
+  const [matsFor, setMatsFor] = useState<string | null>(null)
   const [showCards, setShowCards] = useState(false)
   const autoDone = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -119,7 +120,7 @@ export function SpecAiBoard({
   // AI 작업실 — 이 회사와 이어진 작업실의 자료 · '특허 아이디어' 결과를 재료로(실패하면 없이)
   useEffect(() => {
     if (!clientId) {
-      setMatsReady(true)
+      setMatsFor('')
       return
     }
     let alive = true
@@ -142,7 +143,7 @@ export function SpecAiBoard({
       } catch {
         /* 작업실을 못 읽어도 회사 기록 · 올린 자료로 쓴다 */
       } finally {
-        if (alive) setMatsReady(true)
+        if (alive) setMatsFor(clientId)
       }
     })()
     return () => {
@@ -207,16 +208,31 @@ export function SpecAiBoard({
     }
   }
 
-  // D-261 새 명세서 — 회사 기록(고른 회사면) · AI 작업실 자료를 다 읽은 뒤 한 번만 저절로 시작
+  // D-261 새 명세서 — 회사 기록(고른 회사면) · 그 회사의 AI 작업실 자료를 다 읽은 뒤 한 번만 저절로 시작
   useEffect(() => {
-    if (!autoStart || autoDone.current || busy || !matsReady) return
+    if (!autoStart || autoDone.current || busy) return
     if (wantClient && !record) return
+    if (matsFor !== clientId) return
     autoDone.current = true
     onAutoStarted?.()
     if (d.title.trim()) return
     const plan = planAll(d)
     if (startSpecRun(draftId, plan, { company, others, today, forceParts: false })) showToast(`AI 가 명세서를 처음부터 끝까지 씁니다(${plan.length}단계 · 4~5분) — 이 화면을 떠나도 계속 씁니다`)
-  }, [autoStart, busy, matsReady, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
+  }, [autoStart, busy, matsFor, clientId, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
+
+  // 회사 기록을 끝내 못 읽으면(목록 실패 등) 기다리기만 하지 않는다 — 알리고 [처음부터 끝까지 써줘] 로
+  const autoGiveUp = useRef({ onAutoStarted, showToast })
+  autoGiveUp.current = { onAutoStarted, showToast }
+  useEffect(() => {
+    if (!autoStart || !wantClient || record || autoDone.current) return
+    const t = setTimeout(() => {
+      if (autoDone.current) return
+      autoDone.current = true
+      autoGiveUp.current.onAutoStarted?.()
+      autoGiveUp.current.showToast('회사 기록을 읽지 못해 저절로 시작하지 못했어요 — [처음부터 끝까지 써줘] 를 눌러 주세요')
+    }, 15_000)
+    return () => clearTimeout(t)
+  }, [autoStart, wantClient, record])
 
   const errs = checkDraft(d).filter((i) => i.level === 'error')
   const stagesShown = (Object.keys(run.stages) as AgentStage[]).sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b))

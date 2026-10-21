@@ -103,13 +103,36 @@ export function sideLayout(screen: ScreenBox, width: SideWidth): { side: Rect; o
  * 옆 창이 이 브라우저 창을 얼마나 덮는가 → 본문을 그만큼 왼쪽으로 비킨다(오른쪽 여백 px).
  * 창이 안 겹치면(다른 모니터 · 창을 줄여 둠) 0. 본문이 MIN_MAIN 보다 좁아지게는 비키지 않는다.
  */
-export function reserveFor(win: { screenX: number; outerWidth: number; innerWidth: number }, side: Rect): number {
+export function reserveFor(win: { screenX: number; outerWidth: number; innerWidth: number; outerHeight?: number; innerHeight?: number }, side: Rect): number {
   const right = win.screenX + win.outerWidth
   const overlap = right - side.left
   if (!(overlap > 0) || side.left <= win.screenX) return 0
-  const border = Math.max(0, win.outerWidth - win.innerWidth)
-  const px = Math.round(overlap - border / 2)
-  return Math.max(0, Math.min(px, win.innerWidth - MIN_MAIN))
+  // 화면 px(옆 창) → 이 페이지 px(본문 여백) — 브라우저를 확대해 두었으면 그만큼 나눈다
+  const z = zoomOf(win)
+  const px = Math.round((overlap - borderOf(win, z) / 2) / z)
+  return Math.max(0, Math.min(px, Math.round(win.innerWidth - MIN_MAIN)))
+}
+
+/**
+ * D-261 브라우저 확대 배율 — 바깥 폭(화면 px) ÷ 안쪽 폭(이 페이지 px). 몇 px 차이는 창 테두리(확대 아님).
+ * 확대면 높이도 같은 비율로 줄어 위 머리(탭 · 주소창)가 0~200px 로 남는다 — 크롬 옆 패널 등으로 안쪽만 좁아진 것은 확대로 보지 않는다.
+ */
+export function zoomOf(win: { outerWidth: number; innerWidth: number; outerHeight?: number; innerHeight?: number }): number {
+  const { outerWidth: ow, innerWidth: iw } = win
+  if (!(ow > 0) || !(iw > 0) || Math.abs(ow - iw) <= 20) return 1
+  const z = ow / iw
+  if (!(z >= 0.25 && z <= 5)) return 1
+  if (win.outerHeight && win.innerHeight) {
+    const chrome = win.outerHeight - win.innerHeight * z
+    if (chrome < 0 || chrome > 200) return 1
+  }
+  return z
+}
+
+/** 창 테두리(좌우 합) — 확대를 빼고 남은 차이가 20px 안일 때만(그 이상은 테두리가 아님) */
+function borderOf(win: { outerWidth: number; innerWidth: number }, z: number): number {
+  const diff = win.outerWidth - win.innerWidth * z
+  return diff > 0 && diff <= 20 ? diff : 0
 }
 
 export interface WinBox {
@@ -122,11 +145,12 @@ export interface WinBox {
 }
 
 /**
- * D-261 옆 창 자리 — 이 OS 창 안 오른쪽, 머리줄 아래(topInset)부터 창 아래 끝까지. 화면(작업 영역) 밖으로는 나가지 않게.
- * 창 테두리는 좌우 차이의 반으로 본다(최대화면 0).
+ * D-261 옆 창 자리 — 이 OS 창 안 오른쪽, 머리줄 아래(topInset · 이 페이지 px)부터 창 아래 끝까지. 화면(작업 영역) 밖으로는 나가지 않게.
+ * 창 테두리는 좌우 차이의 반으로 본다(최대화면 0). 브라우저를 확대해 두었으면 페이지 px 를 화면 px 로 바꿔 잰다.
  */
 export function sideRectIn(win: WinBox, screen: ScreenBox, width: SideWidth, topInset: number): Rect {
-  const edge = Math.max(0, Math.round((win.outerWidth - win.innerWidth) / 2))
+  const z = zoomOf(win)
+  const edge = Math.round(borderOf(win, z) / 2)
   const innerRight = Math.round(win.screenX + win.outerWidth - edge)
   const innerW = Math.max(0, Math.round(win.outerWidth - edge * 2))
   const want = Math.round(innerW * SIDE_WIDTHS[width].ratio)
@@ -134,8 +158,8 @@ export function sideRectIn(win: WinBox, screen: ScreenBox, width: SideWidth, top
   const sTop = Math.round(screen.top)
   const sBottom = Math.round(screen.top + screen.height)
   const sRight = Math.round(screen.left + screen.width)
-  const contentTop = Math.round(win.screenY + Math.max(0, win.outerHeight - win.innerHeight - edge))
-  const top = Math.max(sTop, Math.min(contentTop + Math.max(0, Math.round(topInset)), sBottom - 200))
+  const contentTop = Math.round(win.screenY + Math.max(0, win.outerHeight - win.innerHeight * z - edge))
+  const top = Math.max(sTop, Math.min(contentTop + Math.max(0, Math.round(topInset * z)), sBottom - 200))
   const bottom = Math.min(Math.round(win.screenY + win.outerHeight - edge), sBottom)
   const left = Math.max(Math.round(screen.left), Math.min(innerRight - w, sRight - w))
   return { left, top, width: w, height: Math.max(200, bottom - top) }
@@ -225,7 +249,8 @@ export function setSidePrefs(p: Partial<Prefs>): void {
   set(p)
   savePrefs()
   // 열려 있으면 바로 그 서비스로 · 폭만 바꾸면 보던 곳 그대로
-  if (!state.open) return
+  // 연결이 끊긴 창(cut)은 OS 가 다시 잡을 수 없다 — 새 창이 하나 더 생기므로 고른 것만 기억(다음에 열 때)
+  if (!state.open || state.cut) return
   if (p.service || !lastUrl) openSideAi()
   else openInSide(lastUrl, state.at)
 }

@@ -120,6 +120,11 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   // 고른 모델(GPT)은 이 브라우저에 기억된 것 — 새 명세서도 그 모델로 쓴다
   await page.evaluate(() => localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' })))
+  // 이 회사와 이어진 AI 작업실 자료 — 저절로 쓰기에도 재료로 들어가야 한다(회사 기록이 늦게 와도 자료를 읽은 뒤 시작)
+  await page.evaluate((cid) => {
+    const at = new Date().toISOString()
+    localStorage.setItem('axmvp.v1.owner_ai.cases', JSON.stringify([{ id: 'case_spec_mat', workspaceId: null, ownerId: null, companyName: '(주)한솔테크', relation: 'client', clientId: cid, bizNo: '', homepageUrl: '', requester: '', industry: '', memo: '', materials: [{ id: 'm1', kind: 'memo', title: '현장 메모', text: '작업실재료표식 — 절삭 공구 교체를 작업자 감으로 함', chars: 30, hash: 'h1' }], facts: {}, activity: [], contextVersion: 0, origin: '', createdAt: at, updatedAt: at, archivedAt: null }]))
+  }, CLIENT)
   await page.reload({ waitUntil: 'networkidle' })
   const listTyping = await page.locator('[data-testid="spec-new-ai"] textarea, [data-testid="spec-new-ai"] input[type="text"]').count()
   check('B0 새 명세서 칸 — 회사 고르기 + 단추 하나 · 타자 칠 칸 0 · 견본은 작은 글자 단추로', (await page.getByTestId('spec-new-ai').isVisible()) && listTyping === 0 && (await page.getByTestId('spec-sample').isVisible()), listTyping)
@@ -147,6 +152,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B10 단계 줄 모두 다 씀', phases.every((p) => p === 'done'), phases)
   const ideaCtx = JSON.stringify(sent[0].context)
   check('B11 아이디어 자료 = 회사 기록(업종 등) · 이름 · 연락처 없음', /업종|종목|설립/.test(ideaCtx) && !/010-\d{4}-\d{4}/.test(ideaCtx), ideaCtx.slice(0, 300))
+  check('B11b 저절로 쓰기도 그 회사 AI 작업실 자료를 읽은 뒤 시작 — 첫 부름부터 자료가 들어감', ideaCtx.includes('작업실재료표식'), ideaCtx.slice(0, 400))
   check('B12 추천 1번이 명칭 · 영문으로 바로 들어감', (await page.getByTestId('spec-board-title').innerText()).includes('공구 진동정보 기반 마모 단계 판정') && (await page.getByTestId('spec-board-title').innerText()).includes('{SYSTEM AND METHOD FOR JUDGING'))
   const ideas = await page.getByTestId('spec-idea').evaluateAll((els) => els.map((e) => e.getAttribute('data-current')))
   check('B13 지금 쓰는 것은 위에 하나(추천 표시) · 다른 후보 2개만 아래(겹치지 않음)', ideas.join() === 'no,no' && /추천/.test(await page.getByTestId('spec-board-title').innerText()), ideas)
@@ -237,6 +243,38 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B29 다음 아이디어 내줘에 올린 자료가 감 · 휴대폰 번호는 가림', ideaCtx2.includes('공구 교체를 감으로') && !ideaCtx2.includes('010-1234-5678'), ideaCtx2.slice(0, 200))
   check('B30 이미 명칭이 있으면 후보만 바뀌고 명칭은 그대로', (await page.getByTestId('spec-board-title').innerText()).includes('공구 진동정보 기반'))
   check('B31 JS 오류 0', errors.length === 0, errors)
+  await ctx.close()
+}
+
+/* ---------------- 대화창 [새 명세서] — 명세서 화면을 새로 여는 길(회사 기록이 늦게 옴) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate((cid) => {
+    const at = new Date().toISOString()
+    localStorage.setItem('axmvp.v1.owner_ai.cases', JSON.stringify([{ id: 'case_chat_mat', workspaceId: null, ownerId: null, companyName: '(주)한솔테크', relation: 'client', clientId: cid, bizNo: '', homepageUrl: '', requester: '', industry: '', memo: '', materials: [{ id: 'm1', kind: 'memo', title: '현장 메모', text: '대화창재료표식 — 설비 진동 기록이 쌓여 있음', chars: 24, hash: 'h2' }], facts: {}, activity: [], contextVersion: 0, origin: '', createdAt: at, updatedAt: at, archivedAt: null }]))
+  }, CLIENT)
+  await routeAi(page)
+  await page.goto(`${BASE}/patent-venture?client=${CLIENT}`, { waitUntil: 'networkidle' })
+  await page.getByTestId('pv-chat-page').waitFor()
+  await page.getByTestId('chat-hero').getByTestId('chat-starter').first().click()
+  const act = page.locator('[data-testid="chat-action"][data-id="new-spec"]').last()
+  await act.waitFor()
+  const before = sent.length
+  await act.click()
+  await page.getByTestId('spec-board').waitFor()
+  await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(400)
+  const first = sent[before]
+  const firstCtx = JSON.stringify(first?.context ?? '')
+  check('C1 대화창 [새 명세서] → 명세서 화면이 새로 열려도 단추 한 번으로 바로 시작(주소 auto 지움)', !page.url().includes('auto=1') && first?.assistId === 'spec.idea' && sent.length > before, { url: page.url(), id: first?.assistId })
+  check('C2 회사 기록 · 그 회사 AI 작업실 자료를 다 읽은 뒤 시작 — 첫 부름부터 회사 기록 + 작업실 자료', firstCtx.includes('대화창재료표식') && /업종|종목|설립/.test(firstCtx), firstCtx.slice(0, 400))
+  await waitIdle(page)
+  check('C3 JS 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
 

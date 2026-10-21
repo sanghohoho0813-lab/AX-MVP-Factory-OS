@@ -4,7 +4,7 @@
  * D-258 OS 안 오른쪽 판 — 안에 띄울 수 있는 곳 · Google igu · 놓는 법(붙이기 · 덮기 · 없음) · 기억 · 대화 기록.
  * D-261 옆 창 자리(이 OS 창 안 · 머리줄 아래) · 연결을 끊는 곳(ChatGPT 등)을 닫힘으로 오해하지 않기.
  */
-import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, cutsOpener, featuresOf, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn } from '../../lib/sideAi'
+import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, cutsOpener, featuresOf, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
 import { NAV_ICONS, NAV_MAX, NAV_MIN, navMaxFor, navPx, parseNavSize, sizeAtDrag, stepNav, type NavSize } from '../../lib/navWidth'
 import { DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockChatContext, dockLayout, frameUrlOf, parseDock, parseDockChat } from '../../lib/sideDock'
 
@@ -120,6 +120,19 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
     ['https://chatgpt.com/', 'https://claude.ai/new', 'https://gemini.google.com/app', 'https://www.google.com/search?q=a', 'https://chat.openai.com/'].every(cutsOpener) && !cutsOpener('https://www.naver.com/') && !cutsOpener('https://www.bizinfo.go.kr/') && !cutsOpener('https://evilgoogle.com/') && !cutsOpener('깨짐'))
   check('C6 닫힘으로 보인 때 — ChatGPT 는 연 지 20초 안이면 끊긴 것(자리 그대로) · 네이버는 3초 안만 · 그 뒤는 진짜 닫음',
     looksCut('https://chatgpt.com/', 0, 1500) && looksCut('https://chatgpt.com/', 0, 19_000) && !looksCut('https://chatgpt.com/', 0, 21_000) && looksCut('https://www.naver.com/', 0, 2000) && !looksCut('https://www.naver.com/', 0, 3500))
+  // 브라우저 확대 — 안쪽 폭 · 높이가 같은 비율로 줄어든다(창 위치 · 바깥 크기는 화면 px 그대로)
+  const z125 = { screenX: 0, screenY: 0, outerWidth: 1920, outerHeight: 1040, innerWidth: 1536, innerHeight: 762 }
+  const r125 = sideRectIn(z125, FHD, 'twofifths', 64)
+  check('C7 확대 125% 최대화 — 옆 창은 여전히 화면 오른쪽 끝 768 · 아래 끝까지 · 머리줄 아래(윗줄 88 + 머리줄 64×1.25) · 본문 여백은 페이지 px 로 614(=768÷1.25)',
+    zoomOf(z125) === 1.25 && r125.left === 1152 && r125.width === 768 && r125.top === 168 && r125.top + r125.height === 1040 && reserveFor(z125, r125) === 614, { r125, reserve: reserveFor(z125, r125) })
+  const z90 = { screenX: 0, screenY: 0, outerWidth: 1920, outerHeight: 1040, innerWidth: 2133, innerHeight: 1059 }
+  const r90 = sideRectIn(z90, FHD, 'twofifths', 64)
+  check('C8 축소 90% — 옆 창 화면 오른쪽 끝 768 · 머리줄 아래(87 + 58) · 본문 여백 853(=768÷0.9)',
+    Math.abs(zoomOf(z90) - 0.9) < 0.01 && r90.left === 1152 && r90.top === 145 && r90.top + r90.height === 1040 && Math.abs(reserveFor(z90, r90) - 853) <= 1, { r90, reserve: reserveFor(z90, r90) })
+  const panel = { screenX: 0, screenY: 0, outerWidth: 1920, outerHeight: 1040, innerWidth: 1600, innerHeight: 953 }
+  const rp = sideRectIn(panel, FHD, 'twofifths', 64)
+  check('C9 크롬 옆 패널로 안쪽만 좁아짐(높이는 그대로) — 확대로 보지 않음 · 테두리로도 보지 않음',
+    zoomOf(panel) === 1 && zoomOf({ outerWidth: 1216, innerWidth: 1200 }) === 1 && rp.left === 1152 && rp.top === 151 && reserveFor(panel, rp) === 768, { rp })
 }
 
 console.log(`\nsideAi: ${pass} passed, ${fail} failed`)
