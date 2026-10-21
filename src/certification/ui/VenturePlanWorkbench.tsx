@@ -6,9 +6,11 @@
  * 칸 순서 · 체크박스 · 문장 틀은 실제 신청 사이트와 같다(엔진 certification/core/venturePlan). 칸마다 [복사] 해서 사이트에 붙인다.
  * 저장은 기업인증 벤처 기록(notes)에 칸마다 — 다른 칸 · 대표 답과 섞이지 않게 'vplan:' 이름표.
  * AI 초안은 대표만(VenturePlanAi) — 없어도 이 화면만으로 쓸 수 있다.
+ * D-252 대표: "하나하나 타자로 입력하는 건 절대 없어야 돼" — 대표 화면에서는 AI 판이 처음부터 펼쳐져 있고([전부 써줘] · 묶음마다 [써줘]),
+ *   칸마다 [AI로 이 칸 쓰기] 가 그 칸이 든 묶음을 쓴다. 손으로 고치는 것은 그대로(고친 칸은 AI 가 덮지 않고 새 안으로).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronDown, Copy, FileUp } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Copy, FileUp, Sparkles } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
@@ -38,7 +40,8 @@ import { draftProgress, normalizeDraft, specMarkdown, type SpecDraft } from '../
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { localDateOf } from '../../lib/appClock'
-import { VenturePlanAi } from './VenturePlanAi'
+import { VenturePlanAi, type AiRow } from './VenturePlanAi'
+import type { VPlanBatch } from '../core/venturePlan'
 
 type Tab = 'mat' | VPlanPart | 'check'
 const TABS: readonly { key: Tab; label: string }[] = [
@@ -54,7 +57,10 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
   const { showToast } = useToast()
   const ai = useOwnerAiAccess()
   const [tab, setTab] = useState<Tab>(() => (notes[VK.patent] || notes[VK.ax] ? 'summary' : 'mat'))
-  const [aiOpen, setAiOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(true)
+  // D-252 칸마다 [AI로 이 칸 쓰기] → 그 칸이 든 묶음을 AI 판이 쓴다 · 판의 진행을 칸에도 보여 준다
+  const [aiReq, setAiReq] = useState<{ batch: VPlanBatch; n: number } | null>(null)
+  const [aiRows, setAiRows] = useState<Record<string, AiRow>>({})
   const s = useMemo(() => readPlan(notes), [notes])
   const prog = planProgress(s)
   const issues = useMemo(() => checkPlan(s), [s])
@@ -142,14 +148,14 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
             </Button>
             {ai === 'yes' && (
               <Button variant="secondary" size="sm" onClick={() => setAiOpen((v) => !v)} aria-expanded={aiOpen} data-testid="vplan-ai-open">
-                AI 초안 만들기
+                {aiOpen ? 'AI 판 접기' : 'AI 판 펼치기'}
               </Button>
             )}
           </div>
         </div>
       </Surface>
 
-      {ai === 'yes' && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} />}
+      {ai === 'yes' && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} request={aiReq} onRows={setAiRows} />}
 
       <div role="tablist" className="grid grid-cols-3 gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1 sm:grid-cols-6" data-testid="vplan-tabs">
         {TABS.map((t, i) => {
@@ -172,7 +178,29 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
         <div className="flex flex-col gap-3" data-testid={`vplan-part-${tab}`}>
           <h3 className="t-body font-bold text-slate-900">{VPLAN_PART_LABEL[tab]}</h3>
           {VPLAN_FIELDS.filter((f) => f.part === tab).map((f) => (
-            <FieldCard key={f.id} f={f} s={s} issues={issues.filter((i) => i.field === f.id)} save={save} />
+            <FieldCard
+              key={f.id}
+              f={f}
+              s={s}
+              issues={issues.filter((i) => i.field === f.id)}
+              save={save}
+              ai={
+                ai === 'yes' && f.batch
+                  ? {
+                      phase: aiRows[f.batch]?.phase,
+                      run: () => {
+                        if (!hasMaterial) {
+                          showToast('먼저 재료 — 특허 명세서나 AX 내용이 있어야 AI 가 지어내지 않고 씁니다')
+                          setTab('mat')
+                          return
+                        }
+                        setAiOpen(true)
+                        setAiReq({ batch: f.batch as VPlanBatch, n: Date.now() })
+                      },
+                    }
+                  : undefined
+              }
+            />
           ))}
         </div>
       )}
@@ -255,7 +283,7 @@ const SAVE_LABEL: Record<SaveState, string> = { idle: '', saving: '저장 중…
 /* 칸 하나                                                               */
 /* ------------------------------------------------------------------ */
 
-function FieldCard({ f, s, issues, save }: { f: VPlanField; s: VPlanState; issues: VPlanIssue[]; save: (patch: Record<string, string>) => Promise<boolean> }) {
+function FieldCard({ f, s, issues, save, ai }: { f: VPlanField; s: VPlanState; issues: VPlanIssue[]; save: (patch: Record<string, string>) => Promise<boolean>; ai?: { phase?: AiRow['phase']; run: () => void } }) {
   const { showToast } = useToast()
   const value = s.text[f.id] ?? ''
   const d = useDraft(value, (v) => save({ [VK.text(f.id)]: v }))
@@ -351,6 +379,12 @@ function FieldCard({ f, s, issues, save }: { f: VPlanField; s: VPlanState; issue
           {fromAi && status !== 'checked' && status !== 'entered' && <span className="t-meta rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">AI 초안 · 읽고 고쳐 주세요</span>}
           {d.state !== 'idle' && <span className={`t-meta ${d.state === 'error' ? 'font-semibold text-danger-700' : 'text-slate-500'}`} data-testid="vplan-save-state">{SAVE_LABEL[d.state]}</span>}
           <span className="flex-1" />
+          {/* D-252 칸마다 AI — 이 칸이 든 묶음을 쓴다(고친 칸은 덮지 않고 새 안으로) */}
+          {ai && (
+            <Button variant="secondary" size="sm" disabled={ai.phase === 'run' || ai.phase === 'wait'} onClick={ai.run} data-testid="vplan-field-ai">
+              <Sparkles aria-hidden="true" className="size-4" /> {ai.phase === 'run' ? 'AI 가 쓰는 중…' : ai.phase === 'wait' ? '차례 기다림' : d.draft.trim() ? 'AI로 다시 쓰기' : 'AI로 이 칸 쓰기'}
+            </Button>
+          )}
           {f.template && !d.draft.trim() && (
             <Button variant="ghost" size="sm" onClick={() => d.setDraft(f.template!)} data-testid="vplan-template">
               문장 틀 넣기

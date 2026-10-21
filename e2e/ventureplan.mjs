@@ -68,10 +68,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('예전 화면(특허+벤처 · /studio) 링크 없음', !/특허\+벤처/.test(await page.locator('main').innerText()) && (await page.locator('main a[href*="/studio"]').count()) === 0)
   await shot(page, 'vplan-01-materials-empty')
 
-  // AI — 재료 없으면 막는다
-  await page.getByTestId('vplan-ai-open').click()
-  check('AI: 재료 없으면 막고 재료 넣기로', (await page.getByTestId('vplan-ai-need').count()) === 1 && (await page.getByTestId('vplan-ai-run').count()) === 0)
-  await page.getByTestId('vplan-ai-open').click()
+  // AI — D-252 대표 화면은 AI 판이 처음부터 펼쳐져 있다 · 재료 없으면 막는다
+  check('AI: 판이 처음부터 펼쳐짐 · 재료 없으면 막고 재료 넣기로', (await page.getByTestId('vplan-ai').count()) === 1 && (await page.getByTestId('vplan-ai-need').count()) === 1 && (await page.getByTestId('vplan-ai-run').count()) === 0)
 
   // 재료 — 명세서 MD 올리기
   await page.getByTestId('vplan-spec-input').setInputFiles({ name: 'spec-test.md', mimeType: 'text/markdown', buffer: Buffer.from(SPEC_MD, 'utf8') })
@@ -192,7 +190,6 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items: ITEMS[req.assistId] ?? [] }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString() }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
-  await page.getByTestId('vplan-ai-open').click()
   await page.getByTestId('vplan-ai-run').click()
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="vplan-ai-row"][data-phase="done"], [data-testid="vplan-ai-row"][data-phase="fail"]').length === 6, null, { timeout: 20000 })
   await page.waitForTimeout(600)

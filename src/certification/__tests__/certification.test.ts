@@ -32,6 +32,8 @@ import { factPatchOf, withCertCompletion } from '../integration/useCertData'
 import { factCandidatesFromDocText } from '../../services/docFacts'
 import { withFactCandidates, withFactDecisions } from '../../services/customerFacts'
 import { buildInspectionPackage, inspectionPackageText, ownerKey, ownerQuestionMessage } from '../core/inspectionPackage'
+import { replyPicksOfAi, splitReply } from '../core/replySplit'
+import { buildReplyContext, buildSayContext, ownerAsks, sayItemsOf, sayKey } from '../integration/certAi'
 import { BANNED_WORDS } from '../core/answerGuide'
 import { buildSubmitGate, gateFirst, gateRows, missingDocsRequest, submissionDocs } from '../core/submitGate'
 import { buildVenturePack, VENTURE_OWNER_SECTIONS, VENTURE_REVIEWED_KEY, ventureProgress, ventureRoutes, ventureSubmitCheck } from '../core/venturePack'
@@ -757,6 +759,46 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('D-225 특허 10건 → 10(예전 0)', withPat('특허 10건') === 10, withPat('특허 10건'))
   check('D-225 등록 20 건 → 20 · 30건 → 30', withPat('등록 20 건') === 20 && withPat('30건') === 30, [withPat('등록 20 건'), withPat('30건')])
   check('D-225 0건 · 없음 → 0', withPat('0건') === 0 && withPat('없음') === 0, [withPat('0건'), withPat('없음')])
+}
+
+/* ---- D-252 대표님 답장 한 번에 넣기 · 실사 말할 답(AI) — 타자 없이 ---- */
+{
+  const asks = [
+    { key: 'a1', text: '연구전담인력은 몇 명인가요?' },
+    { key: 'a2', text: '최근 3년 체납이 있나요?' },
+    { key: 'a3', text: '중소기업확인서가 있나요?' },
+  ]
+  const r1 = splitReply('1. 네 2명입니다\n2) 없어요\n③ 있습니다', asks)
+  check('R1 번호(1. 2) ③)로 나눔 — 3개 · 번호대로', r1.how === 'number' && r1.picks.map((p) => `${p.key}=${p.answer}`).join('|') === 'a1=네 2명입니다|a2=없어요|a3=있습니다', r1)
+  const r2 = splitReply('[김대표] [오후 3:12] 안녕하세요\n[김대표] [오후 3:12] 1. 네\n[김대표] [오후 3:13] 2. 없음\n감사합니다', asks)
+  check('R2 카톡 머리(이름 · 시각) · 인사 걷어 냄', r2.picks.map((p) => p.answer).join('|') === '네|없음' && r2.leftover === '', r2)
+  const r3 = splitReply('1. 네\n추가로 석사 1명 채용 예정\n2. 없음', asks)
+  check('R3 번호 없는 다음 줄은 앞 번호 답에 이어 붙임', r3.picks[0].answer === '네 추가로 석사 1명 채용 예정' && r3.picks[1].answer === '없음', r3.picks)
+  const r4 = splitReply('1. 연구전담인력은 몇 명인가요? → 2명\n3. 중소기업확인서가 있나요? 있음', asks)
+  check('R4 질문을 그대로 옮겨 적은 답 → 질문 부분 걷어 냄', r4.picks.map((p) => p.answer).join('|') === '2명|있음', r4.picks)
+  const r5 = splitReply('네\n없어요\n있습니다', asks)
+  check('R5 번호 없어도 줄 수 = 질문 수면 순서대로(표시: 순서)', r5.how === 'order' && r5.picks.length === 3 && r5.picks[2].answer === '있습니다')
+  const r6 = splitReply('네 다 맞고 체납 없고 확인서 있어요', asks)
+  check('R6 번호도 없고 줄 수도 다르면 나누지 않음(지어내지 않음) · 남은 글', r6.picks.length === 0 && r6.how === null && r6.leftover.includes('체납'), r6)
+  const r7 = splitReply('1. 매출 1.5억 정도\n2. 10:30 미팅 때 확인', asks)
+  check('R7 "1.5억" · "10:30" 은 번호로 안 봄', r7.picks.map((p) => p.answer).join('|') === '매출 1.5억 정도|10:30 미팅 때 확인', r7.picks)
+  const ai = replyPicksOfAi([{ title: 'q2', body: '체납 없음' }, { title: 'q9', body: '없는 질문' }, { ref: 'q1', title: '연구', body: '없음' }, { title: 'q3', body: '', detail: '있음(2026-05 발급)' }], asks)
+  check('R8 AI 답 → q번호로만 · 범위 밖 · "없음" 은 버림 · body 없으면 detail', ai.map((p) => `${p.key}=${p.answer}`).join('|') === 'a2=체납 없음|a3=있음(2026-05 발급)' && ai.every((p) => p.how === 'ai'), ai)
+  const rc = buildReplyContext({ asks, reply: '1. 네 2명(담당 010-1234-5678)\n2. 없음', certLabel: '이노비즈', today: TODAY })
+  check('R9 AI 로 보내는 것 — 보낸 질문 q1~q3 · 답장 · 휴대폰은 가림', rc.sections[0].rows.map((r) => r.ref).join() === 'q1,q2,q3' && !JSON.stringify(rc).includes('010-1234-5678') && JSON.stringify(rc).includes('2명'), rc.sections)
+  check('R10 대표 질문 → 나눠 담을 목록(이름표 = 저장 이름표)', ownerAsks(['체납이 있나요?']).every((a) => a.key === ownerKey('체납이 있나요?')))
+
+  const sparseCtx = ctx({ companyName: '말할답상사', basis: [] })
+  const pk = buildInspectionPackage({ cert: 'innobiz', bank: INNOBIZ_BANK, selfCheck: INNOBIZ_CHECK, answers: {}, ctx: sparseCtx, prep: {}, labelOf: label })
+  const msg = ownerQuestionMessage('말할답상사', '이노비즈', pk.ownerQuestions, '홍길동 팀장')
+  check('R11 질문 보내기 문구에 번호(□ 1. · □ 2.) — 답장을 번호대로 받기', msg.split('\n').filter((l) => /^□ \d+\. /.test(l)).length === pk.ownerQuestions.length && msg.includes('번호대로'))
+  const sc = buildSayContext({ pkg: pk, today: TODAY })
+  const qs = sc.sections.find((x) => x.name === '예상 질문')!
+  check('R12 말할 답 자료 — 질문마다 q번호 · 묻는 이유 · 근거 칸', qs.rows.length === pk.questions.length && qs.rows[0].ref === 'q1' && typeof qs.rows[0]['묻는이유'] === 'string')
+  const said = sayItemsOf({ headline: 'x', items: [{ title: 'q1', body: '저희는 [대표 확인: 연구 인력 수] 명이 연구합니다.' }, { title: 'q99', body: 'x' }, { title: 'q2', body: '' }] }, pk)
+  check('R13 AI 말할 답 → 질문 id 로(범위 밖 · 빈 답 버림)', said.length === 1 && said[0].qid === pk.questions[0].q.id, said)
+  const txt = inspectionPackageText(pk, { [said[0].qid]: said[0].text })
+  check('R14 실사 준비 복사 글에 말할 답 · 저장 이름표 say:', txt.includes('말할 답: 저희는 [대표 확인: 연구 인력 수]') && sayKey('x') === 'say:x')
 }
 
 console.log(`\ncert: ${pass} passed, ${fail} failed`)

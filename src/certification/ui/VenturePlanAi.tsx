@@ -3,8 +3,9 @@
  *
  * 여섯 번으로 나눠 차례로 부른다(서버 함수 60초 안 · 요약은 마지막). 묶음마다 받는 대로 저장 — 중간에 실패해도 앞의 것은 남고
  * 실패한 묶음만 다시 누를 수 있다. 사람이 고친 칸은 덮지 않고 '새 안' 으로 따로 둔다(mergeDraft).
+ * D-252: 대표 화면에서는 처음부터 펼쳐 둔다 — [전부 써줘] · 묶음마다 [이것만 써줘] · 칸에서 누른 [AI로 이 칸 쓰기](request) 도 여기서 쓴다.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
@@ -14,7 +15,8 @@ import { ModelPicker } from '../../components/ai/ModelPicker'
 import { VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
 import { VPLAN_BATCHES, buildBatchContext, draftItemsOf, fieldsOfBatch } from '../integration/venturePlanAi'
 
-type RowState = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string }
+export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string }
+type RowState = AiRow
 
 /** 이 오류면 다음 묶음도 똑같이 실패한다 — 거기서 멈춘다 */
 const STOP_CODES = new Set(['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'not_deployed', 'provider_auth', 'rate_limited', 'network'])
@@ -28,6 +30,8 @@ export function VenturePlanAi({
   onGoMaterials,
   onGoField,
   onClose,
+  request,
+  onRows,
 }: {
   notes: Record<string, string>
   facts: VPlanFacts
@@ -37,6 +41,10 @@ export function VenturePlanAi({
   onGoMaterials: () => void
   onGoField: (id: string) => void
   onClose: () => void
+  /** 칸에서 누른 [AI로 이 칸 쓰기] — n 이 바뀔 때마다 그 묶음 하나를 쓴다 */
+  request?: { batch: VPlanBatch; n: number } | null
+  /** 묶음 진행을 칸에도 보여 주려고 */
+  onRows?: (rows: Record<string, AiRow>) => void
 }) {
   const { showToast } = useToast()
   const [rows, setRows] = useState<Record<string, RowState>>({})
@@ -104,11 +112,26 @@ export function VenturePlanAi({
 
   const failedKeys = VPLAN_BATCHES.filter((b) => rows[b.key]?.phase === 'fail').map((b) => b.key)
 
+  const onRowsRef = useRef(onRows)
+  onRowsRef.current = onRows
+  useEffect(() => {
+    onRowsRef.current?.(rows)
+  }, [rows])
+  const runRef = useRef(runAll)
+  runRef.current = runAll
+  const lastReq = useRef(0)
+  useEffect(() => {
+    // 같은 요청을 두 번 쓰지 않게(화면이 다시 그려져도) · 다른 묶음을 쓰는 중이면 끝난 뒤에 이어서
+    if (!request || request.n === lastReq.current || !hasMaterial || busy) return
+    lastReq.current = request.n
+    void runRef.current([request.batch])
+  }, [request, hasMaterial, busy])
+
   return (
     <Surface>
       <div className="flex flex-col gap-3" data-testid="vplan-ai">
         <div className="flex flex-col gap-1">
-          <h3 className="t-body font-bold text-slate-900">AI 초안 만들기 · 대표만</h3>
+          <h3 className="t-body font-bold text-slate-900">AI 가 씁니다 — 버튼만 누르세요 · 대표만</h3>
           <p className="t-sub break-keep text-slate-700">
             재료(특허 · AX · 메모)와 회사 기록만 보고 여섯 번에 나눠 씁니다(한 번에 1~2칸 · 요약은 마지막). 받는 대로 저장하고, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
           </p>
@@ -126,7 +149,7 @@ export function VenturePlanAi({
         ) : (
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" size="sm" disabled={busy} onClick={() => void runAll(VPLAN_BATCHES.map((b) => b.key))} data-testid="vplan-ai-run">
-              {busy ? '쓰는 중…' : '여섯 묶음 모두 쓰기'}
+              {busy ? '쓰는 중…' : '전부 써줘 (6묶음)'}
             </Button>
             {failedKeys.length > 0 && !busy && (
               <Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="vplan-ai-retry">
@@ -150,7 +173,7 @@ export function VenturePlanAi({
                 </p>
                 {hasMaterial && (
                   <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy} onClick={() => void runAll([b.key])} data-testid="vplan-ai-one">
-                    {r?.phase === 'done' ? '다시 쓰기' : '이것만 쓰기'}
+                    {r?.phase === 'done' ? '다시 써줘' : '이것만 써줘'}
                   </Button>
                 )}
               </li>

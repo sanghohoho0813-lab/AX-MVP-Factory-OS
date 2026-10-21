@@ -1,6 +1,7 @@
 /**
  * 기업인증 P2 — 준비 묶음 화면들. 문구 · 판단은 전부 Core(inspectionPackage · submitGate · venturePack · handoff)가 만든다.
- * 이 파일은 보여 주고, 복사하고, 대표 답을 받아 적을 뿐이다(AI 호출 없음).
+ * 이 파일은 보여 주고, 복사하고, 대표 답을 받아 적는다. D-252: 대표 답은 카톡 답장을 통째로 붙여 넣어 한 번에(ReplyPaste),
+ * 실사 '말할 답' 은 대표 화면에서 [AI로 말할 답 쓰기](cert.say) — 근거 없는 말은 [대표 확인: …] 으로 남긴다.
  *
  *   InspectionPackPanel — [실사 준비하기]: A 업체 핵심정보 · B/C 예상 질문과 말하기 가이드 · D 가져갈 자료 · E 전날 체크 · 대표 확인
  *   SubmitGatePanel     — [제출 전 최종 확인]: 제출 준비 가능 / 먼저 확인 필요 · 제출자료 정리 · 모자란 것만 요청
@@ -8,7 +9,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardCopy, Copy, Send } from 'lucide-react'
+import { ClipboardCopy, Copy, Send, Sparkles } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { HelpHeading } from '../../components/ui/fold'
@@ -20,6 +21,13 @@ import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, gateFirst, gateRows, missingDocsR
 import { EVIDENCE_BASIS_LABEL } from '../rules/officialRules'
 import { PACK_LABEL, PACK_MARK, venturePackText, type VentureCheckRow, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
+import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
+import { newRequestId, readChoice } from '../../services/aiAssist/store'
+import { ModelPicker } from '../../components/ai/ModelPicker'
+import { todayLocalDate } from '../../lib/appClock'
+import { buildSayContext, ownerAsks, sayItemsOf, sayKey } from '../integration/certAi'
+import { ReplyPaste } from './ReplyPaste'
 
 function useCopy() {
   const { showToast } = useToast()
@@ -129,6 +137,16 @@ export function OwnerAskBox({
       <Button variant="secondary" className="self-start" onClick={() => void copy(ownerQuestionMessage(companyName, certLabel, questions, sender), '대표님께 보낼 카톡 · 문자 문구를 복사했습니다')} data-testid="owner-ask-send">
         <Send aria-hidden="true" className="size-4" /> 대표에게 질문 보내기(문구 복사)
       </Button>
+      {/* D-252 답장이 오면 통째로 붙여 넣기 — 질문마다 [답 적기] 를 누르지 않아도 */}
+      <ReplyPaste
+        asks={ownerAsks(questions)}
+        certLabel={certLabel}
+        today={todayLocalDate()}
+        onSave={async (picks) => {
+          for (const p of picks) await onNote(p.key, p.text)
+        }}
+        testId="owner-reply"
+      />
     </div>
   )
 }
@@ -137,8 +155,9 @@ export function OwnerAskBox({
 /* 실사 준비 패키지                                                       */
 /* ------------------------------------------------------------------ */
 
-function QuestionCard({ x, n }: { x: PackageQuestion; n: number }) {
+function QuestionCard({ x, n, say, onSay }: { x: PackageQuestion; n: number; say: string; onSay: (text: string) => Promise<void> }) {
   const g = x.guide
+  const [edit, setEdit] = useState<string | null>(null)
   return (
     <details className="rounded-(--radius-control) border border-slate-200 bg-white" data-testid="pack-question" data-needs-owner={g.needsOwner}>
       <summary className="tap flex cursor-pointer items-start gap-2 px-3 py-2.5">
@@ -152,6 +171,33 @@ function QuestionCard({ x, n }: { x: PackageQuestion; n: number }) {
         </span>
       </summary>
       <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2.5">
+        {/* D-252 말할 답(AI 초안 · 고칠 수 있음) — [대표 확인: …] 자리는 대표님께 물어 채운다 */}
+        {(say || edit !== null) && (
+          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2" data-testid="pack-say">
+            <p className="t-meta font-semibold text-violet-900">말할 답 · AI 초안</p>
+            {edit === null ? (
+              <>
+                <p className="t-sub break-keep whitespace-pre-line text-slate-900" data-testid="pack-say-text">{say}</p>
+                {/\[대표 확인/.test(say) && <p className="t-meta break-keep font-semibold text-danger-700">[대표 확인] 자리는 대표님께 물어 채워 주세요.</p>}
+                <Button size="sm" variant="ghost" className="self-start" onClick={() => setEdit(say)} data-testid="pack-say-edit">
+                  고치기
+                </Button>
+              </>
+            ) : (
+              <>
+                <textarea value={edit} onChange={(e) => setEdit(e.target.value)} rows={4} className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" aria-label={`${x.q.question} — 말할 답`} />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="primary" onClick={() => void onSay(edit.trim()).then(() => setEdit(null))} data-testid="pack-say-save">
+                    저장
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEdit(null)}>
+                    닫기
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <p className="t-meta break-keep text-slate-600">
           <b className="font-semibold">묻는 이유</b> · {x.q.intent}
         </p>
@@ -216,6 +262,27 @@ export function InspectionPackPanel({
   onClose: () => void
 }) {
   const copy = useCopy()
+  const { showToast } = useToast()
+  const ai = useOwnerAiAccess()
+  const [saying, setSaying] = useState(false)
+  const [sayErr, setSayErr] = useState('')
+  const said = pkg.questions.filter((x) => (notes[sayKey(x.q.id)] ?? '').trim()).length
+  /** D-252 질문마다 말할 답 — 한 번에(cert.say) · 받은 대로 저장 · 이미 있던 답은 새 답으로 바뀐다(고친 것도) */
+  const writeSays = async () => {
+    setSaying(true)
+    setSayErr('')
+    try {
+      const run = await callAssist({ requestId: newRequestId(), assistId: 'cert.say', page: 'cert', choice: readChoice(), context: buildSayContext({ pkg, today: todayLocalDate() }) })
+      const items = sayItemsOf(run.structured, pkg)
+      if (!items.length) throw new AssistError('provider_error', 'AI 답에서 질문별 답을 찾지 못했습니다 — 다시 눌러 주세요')
+      for (const it of items) await onNote(sayKey(it.qid), it.text)
+      showToast(`말할 답 ${items.length}개를 썼습니다 — 질문을 눌러 보세요${items.some((i) => i.text.includes('[대표 확인')) ? ' · [대표 확인] 자리는 대표님께 물어 채워 주세요' : ''}`)
+    } catch (e) {
+      setSayErr(e instanceof AssistError ? e.message || assistMessage(e.code) : `저장하지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
+    } finally {
+      setSaying(false)
+    }
+  }
   return (
     <Surface>
       <div className="flex flex-col gap-4" data-testid="cert-pack">
@@ -247,9 +314,27 @@ export function InspectionPackPanel({
         </Block>
 
         <Block title={`예상 핵심질문 ${pkg.questions.length}개 — 눌러서 말하기 가이드`} testid="pack-questions">
+          {ai === 'yes' && pkg.questions.length > 0 && (
+            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5" data-testid="pack-say-ai">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="primary" disabled={saying} onClick={() => void writeSays()} data-testid="pack-say-run">
+                  <Sparkles aria-hidden="true" className="size-4" /> {saying ? 'AI 가 쓰는 중…(30초쯤)' : said ? `AI로 말할 답 다시 쓰기 (${pkg.questions.length}개)` : `AI로 말할 답 쓰기 (${pkg.questions.length}개)`}
+                </Button>
+                <ModelPicker popover testId="pack-say-model" />
+              </div>
+              <p className="t-meta break-keep text-slate-600">
+                확인된 사실 · 대표님 답 · 증빙만 근거로 대표님이 그대로 말할 답을 씁니다. 근거가 모자란 자리는 지어내지 않고 [대표 확인: …] 으로 남깁니다.{said ? ` 지금 ${said}개 써 둠.` : ''}
+              </p>
+              {sayErr && (
+                <p role="alert" className="t-sub break-keep text-danger-700" data-testid="pack-say-error">
+                  {sayErr}
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             {pkg.questions.map((x, i) => (
-              <QuestionCard key={x.q.id} x={x} n={i + 1} />
+              <QuestionCard key={x.q.id} x={x} n={i + 1} say={notes[sayKey(x.q.id)] ?? ''} onSay={(t) => onNote(sayKey(x.q.id), t)} />
             ))}
           </div>
         </Block>
@@ -279,7 +364,7 @@ export function InspectionPackPanel({
         </Block>
 
         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-          <Button variant="secondary" onClick={() => void copy(inspectionPackageText(pkg), '실사 준비 자료를 복사했습니다')} data-testid="pack-copy">
+          <Button variant="secondary" onClick={() => void copy(inspectionPackageText(pkg, Object.fromEntries(pkg.questions.map((x) => [x.q.id, notes[sayKey(x.q.id)] ?? '']))), '실사 준비 자료를 복사했습니다')} data-testid="pack-copy">
             <Copy aria-hidden="true" className="size-4" /> 복사
           </Button>
           <HandoffButton pkg={handoff} />
@@ -606,6 +691,16 @@ export function VenturePackPanel({
             닫기
           </Button>
         </div>
+        {/* D-252 답장이 오면 통째로 붙여 넣기 — 칸마다 [대표 답 적기] 를 누르지 않아도(보낸 질문과 같은 순서 · 번호) */}
+        <ReplyPaste
+          asks={sections.filter((s) => s.state !== 'ok').map((s) => ({ key: `venture:${s.id}`, text: s.ask }))}
+          certLabel="벤처기업 확인"
+          today={todayLocalDate()}
+          onSave={async (picks) => {
+            for (const p of picks) await onNote(p.key, p.text)
+          }}
+          testId="venture-reply"
+        />
       </div>
     </Surface>
   )

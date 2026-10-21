@@ -178,13 +178,14 @@ export function ownerQuestionMessage(companyName: string, certLabel: string, que
   return [
     `대표님, ${consultant}입니다.`,
     `${companyName || '대표님 회사'} ${certLabel} 준비로 몇 가지 여쭙니다. 아시는 것만 짧게 답 주셔도 됩니다.`,
-    ...questions.map((q) => `□ ${q}`),
-    '답 주시면 실사 준비 자료에 바로 정리하겠습니다.',
+    // D-252 번호를 붙인다 — 대표님이 번호대로 답하면 답장을 통째로 붙여 넣어 질문마다 나눠 담는다(replySplit)
+    ...questions.map((q, i) => `□ ${i + 1}. ${q}`),
+    '번호대로 짧게 답 주시면(예: 1. 네 / 2. 2명) 실사 준비 자료에 바로 정리하겠습니다.',
   ].join('\n')
 }
 
 /** 패키지 → 복사 · 인쇄용 한 장(내부용 — 고객에게 보내는 글 아님) */
-export function inspectionPackageText(p: InspectionPackage): string {
+export function inspectionPackageText(p: InspectionPackage, says: Record<string, string> = {}): string {
   const lines: string[] = [`[내부] ${p.companyName} ${p.certLabel} 실사 준비`, '', '■ 업체 핵심정보(확인된 것만)', ...p.company.map((x) => `· ${x.text}`)]
   if (p.strengths.length) lines.push('', '■ 강점', ...p.strengths.map((x) => `· ${x.text}`))
   lines.push('', '■ 예상 핵심질문')
@@ -192,6 +193,8 @@ export function inspectionPackageText(p: InspectionPackage): string {
     lines.push(`${i + 1}. ${x.q.question}`)
     if (x.guide.core.length) lines.push(`   핵심 답: ${x.guide.core.map((s) => s.text).join(' ')}`)
     else lines.push(`   핵심 답: ${ownerPlaceholder(x.q)}`)
+    // D-252 말할 답(AI 초안 · 고친 것) — 있으면 같이
+    if ((says[x.q.id] ?? '').trim()) lines.push(`   말할 답: ${says[x.q.id].trim().replace(/\s*\n\s*/g, ' ')}`)
     if (x.guide.points.length) lines.push(`   꼭 말할 것: ${x.guide.points.map((s) => s.text).join(' / ')}`)
     if (x.guide.evidenceHave.length) lines.push(`   증빙: ${x.guide.evidenceHave.join(' · ')}`)
     if (x.guide.ownerAsk.length && !x.prepared) lines.push(`   대표 확인: ${x.guide.ownerAsk.join(' / ')}`)
