@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { MAIN_MIN, NAV_MIN, navMaxFor, navPx, setNavSize, showNav, sizeAtDrag, stepNav, toggleNavIcons, useNavSize, type NavSize } from '../../lib/navWidth'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
@@ -32,8 +33,6 @@ import { useBackToClose } from '../../lib/backToClose'
 import { useEntitlements } from '../../lib/entitlementsStore'
 
 interface SidebarProps {
-  collapsed: boolean
-  onToggleCollapsed: () => void
   mobileOpen: boolean
   onCloseMobile: () => void
 }
@@ -281,14 +280,38 @@ function SidebarContent({
   )
 }
 
-export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   // D-124: 서랍 메뉴가 열렸을 때 휴대폰 뒤로가기는 서랍만 닫는다
   useBackToClose(mobileOpen, onCloseMobile)
+  // D-256 메뉴 폭 — 넓게(끈 폭) · 아이콘 · 숨김. 끈 적 없으면 예전 폭(256 · 큰 화면 288) 그대로
+  const nav = useNavSize()
+  const px = navPx(nav)
+  const [dragging, setDragging] = useState(false)
+  const asideRef = useRef<HTMLElement>(null)
   return (
     <>
-      <aside className={`no-print sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${collapsed ? 'w-[80px]' : 'w-64 xl:w-72'}`}>
-        <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
+      <aside
+        ref={asideRef}
+        // 큰 화면에서 넓혀 둔 폭도 좁은 화면에서는 본문 768px 을 남기고 줄여 보인다
+        style={{ ...(px == null ? {} : { width: px }), ...(nav.mode === 'full' ? { maxWidth: `max(${NAV_MIN}px, calc(100vw - ${MAIN_MIN}px))` } : {}) }}
+        data-nav-mode={nav.mode}
+        className={`no-print sticky top-0 z-30 hidden h-screen shrink-0 lg:block ${dragging ? '' : 'transition-[width] duration-200'} ${px == null ? 'w-64 xl:w-72' : ''}`}
+      >
+        {nav.mode !== 'hidden' && <SidebarContent collapsed={nav.mode === 'icons'} onToggleCollapsed={toggleNavIcons} />}
+        <NavResizeHandle nav={nav} asideRef={asideRef} onDragging={setDragging} />
       </aside>
+      {nav.mode === 'hidden' && (
+        <button
+          type="button"
+          onClick={showNav}
+          aria-label="메뉴 다시 보이기"
+          title="메뉴 다시 보이기 — 왼쪽 끝 경계선을 끌어도 돌아와요"
+          data-testid="nav-show"
+          className="no-print fixed top-24 left-0 z-40 hidden h-14 w-7 cursor-pointer items-center justify-center rounded-r-(--radius-control) border border-l-0 border-navy-700 bg-navy-900 text-navy-100 shadow-(--shadow-card) hover:bg-navy-800 hover:text-white lg:flex"
+        >
+          <ChevronsRight aria-hidden="true" className="size-4" />
+        </button>
+      )}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="메뉴 배경 닫기" onClick={onCloseMobile} className="absolute inset-0 cursor-default bg-navy-950/50" />
@@ -298,6 +321,94 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * D-256 메뉴 경계선 — 끌면 폭이 따라오고, 왼쪽 끝으로 끌면 아이콘 → 숨김. 두 번 누르면 예전 폭.
+ * 끄는 동안은 저장하지 않고(화면만) 손을 놓을 때 한 번 저장. 숨김이어도 왼쪽 끝 6px 는 잡힌다.
+ */
+function NavResizeHandle({ nav, asideRef, onDragging }: { nav: NavSize; asideRef: RefObject<HTMLElement | null>; onDragging: (v: boolean) => void }) {
+  const shown = () => Math.round(asideRef.current?.getBoundingClientRect().width ?? navPx(nav) ?? 256)
+  const max = () => navMaxFor(window.innerWidth)
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    const el = e.currentTarget
+    const start = nav
+    const left = asideRef.current?.getBoundingClientRect().left ?? 0
+    const limit = max()
+    let last = start
+    let frame = 0
+    let x = e.clientX
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {
+      /* 잡기가 안 돼도 끌기는 된다 */
+    }
+    onDragging(true)
+    const body = document.body.style
+    const before = { cursor: body.cursor, select: body.userSelect }
+    body.cursor = 'col-resize'
+    body.userSelect = 'none'
+    const move = (ev: PointerEvent) => {
+      x = ev.clientX
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        last = sizeAtDrag(x - left, start, limit)
+        setNavSize(last, false)
+      })
+    }
+    const up = () => {
+      if (frame) cancelAnimationFrame(frame)
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+      body.cursor = before.cursor
+      body.userSelect = before.select
+      onDragging(false)
+      setNavSize(last)
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+  }
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      setNavSize(stepNav(nav, e.key === 'ArrowLeft' ? -1 : 1, shown(), max()))
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setNavSize({ mode: 'hidden', width: nav.width })
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setNavSize({ mode: 'full', width: max() })
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      setNavSize({ mode: 'full', width: null })
+    }
+  }
+  const now = navPx(nav)
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="메뉴 폭 — 끌어서 넓히기 · 좁히기 · 숨기기(←/→ · Enter 는 원래 폭)"
+      aria-valuemin={0}
+      aria-valuemax={typeof window === 'undefined' ? 440 : navMaxFor(window.innerWidth)}
+      aria-valuenow={now ?? undefined}
+      tabIndex={0}
+      title="끌어서 메뉴 폭 바꾸기 — 왼쪽 끝까지 끌면 숨김 · 두 번 누르면 원래 폭"
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => setNavSize({ mode: 'full', width: null })}
+      onKeyDown={onKeyDown}
+      data-testid="nav-resize"
+      className="group absolute top-0 -right-1.5 z-40 h-full w-3 cursor-col-resize touch-none outline-none"
+    >
+      <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-transparent transition-colors group-hover:bg-brand-400 group-focus-visible:bg-brand-500 group-active:bg-brand-500" />
+      <span aria-hidden="true" className="absolute top-1/2 left-1/2 hidden h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500 group-hover:block group-focus-visible:block" />
+    </div>
   )
 }
 

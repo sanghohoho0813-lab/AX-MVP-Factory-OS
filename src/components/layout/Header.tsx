@@ -13,7 +13,7 @@ import {
   Settings,
   UserRound,
 } from 'lucide-react'
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { CURRENT_USER, WORKSPACES } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
@@ -159,7 +159,39 @@ function UserMenu() {
   )
 }
 
+/**
+ * D-256 왼쪽 메뉴를 끌어 넓히면 머리줄 자리가 화면 폭 기준(1360 · 1440 · 1600 …)보다 좁아진다 — 실제로 넘칠 때만
+ * 덜 중요한 것부터 뺀다(data-fit 1: 넓은 찾기 칸 → 찾기 단추 · 폭 · 저장 글 / 2: 시계 / 3: 고객 플랫폼 · 설정 아이콘). index.css
+ * 머리줄 크기나 안 내용이 바뀔 때마다 0 부터 다시 재므로 메뉴를 좁히면 도로 보인다. 한 번에 재고 그려서 깜박이지 않는다.
+ */
+function useHeaderFit(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let frame = 0
+    const fit = () => {
+      frame = 0
+      for (let level = 0; level <= 3; level++) {
+        el.dataset.fit = String(level)
+        if (el.scrollWidth <= el.clientWidth + 1) return
+      }
+    }
+    const ro = new ResizeObserver(() => {
+      if (!frame) frame = requestAnimationFrame(fit)
+    })
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    fit()
+    return () => {
+      ro.disconnect()
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [ref])
+}
+
 export function Header({ onOpenMobileMenu }: HeaderProps) {
+  const headerRef = useRef<HTMLElement>(null)
+  useHeaderFit(headerRef)
   const isSupabase = getDataModeConfig().mode === 'supabase'
   const pilot = useIsPilot()
   // D-124: 영업에서 온 업체 화면은 머리줄도 '영업 관리' 그대로
@@ -167,7 +199,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
   const screenGroup = screenGroupForPath(pathname)
   return (
-    <header className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
+    <header ref={headerRef} className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
         type="button"
         aria-label="메뉴 열기"

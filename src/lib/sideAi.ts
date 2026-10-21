@@ -9,16 +9,54 @@
  *  - 팝업이 막히면 알려 준다(주소창 오른쪽 '팝업 차단' → 항상 허용)
  * 로그인 · 대화는 그 서비스 창에서 그대로 — OS 는 내용을 보내거나 읽지 않는다(LLM 호출 0 그대로).
  * 고른 서비스 · 폭은 이 브라우저에 기억.
+ * D-256 대표: "주소창도 적을 수 있게 · 구글 기본" — 팝업 창의 주소창은 브라우저가 고칠 수 없게 막아 두므로, 판의 주소 칸에
+ *   주소(google.com · naver.com …)나 검색어를 적으면 같은 옆 창이 그리로 간다(주소가 아니면 구글 검색 · http/https 만).
  */
 import { useSyncExternalStore } from 'react'
 
-export type SideService = 'chatgpt' | 'claude' | 'gemini'
+export type SideService = 'chatgpt' | 'claude' | 'gemini' | 'google'
 export type SideWidth = 'third' | 'twofifths' | 'half'
 
 export const SIDE_SERVICES: Record<SideService, { label: string; url: string }> = {
   chatgpt: { label: 'ChatGPT', url: 'https://chatgpt.com/' },
   claude: { label: 'Claude', url: 'https://claude.ai/new' },
   gemini: { label: 'Gemini', url: 'https://gemini.google.com/app' },
+  google: { label: 'Google', url: 'https://www.google.com/' },
+}
+export const GOOGLE_HOME = 'https://www.google.com/'
+/** 주소 칸 아래 바로 가기 — 컨설팅하며 자주 여는 곳 */
+export const SIDE_SITES: { id: string; label: string; url: string }[] = [
+  { id: 'naver', label: '네이버', url: 'https://www.naver.com/' },
+  { id: 'bizinfo', label: '기업마당', url: 'https://www.bizinfo.go.kr/' },
+  { id: 'kstartup', label: 'K-Startup', url: 'https://www.k-startup.go.kr/' },
+  { id: 'hometax', label: '홈택스', url: 'https://www.hometax.go.kr/' },
+]
+
+/**
+ * 주소 칸 글 → 열 주소. 비면 null(부른 쪽이 구글로).
+ *   http(s):// 로 시작 → 그대로(http · https 만 · 깨진 주소면 검색) / 'naver.com/…' 처럼 점 있는 한 덩어리 → https:// 를 붙여 /
+ *   그 밖(띄어쓰기 · 한글 · javascript: 같은 것) → 구글 검색. 다른 방식(javascript · data · file …)은 절대 열지 않는다.
+ */
+export function addressToUrl(input: string): string | null {
+  const t = (input ?? '').trim()
+  if (!t) return null
+  const search = `https://www.google.com/search?q=${encodeURIComponent(t)}`
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t)
+      return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : search
+    } catch {
+      return search
+    }
+  }
+  if (/^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(:\d{2,5})?([/?#]\S*)?$/i.test(t)) {
+    try {
+      return new URL(`https://${t}`).href
+    } catch {
+      return search
+    }
+  }
+  return search
 }
 export const SIDE_WIDTHS: Record<SideWidth, { label: string; ratio: number }> = {
   third: { label: '좁게(1/3)', ratio: 1 / 3 },
@@ -101,6 +139,8 @@ interface State extends Prefs {
   reserve: number
   /** 마지막으로 팝업이 막힘 */
   blocked: boolean
+  /** 옆 창에 띄운 것(서비스 이름 · 'naver.com' · 'Google 검색') — 단추에 '… 옆 창 열림' */
+  at: string
 }
 
 function readPrefs(): Prefs {
@@ -111,13 +151,15 @@ function readPrefs(): Prefs {
   }
 }
 
-let state: State = typeof window === 'undefined' ? { ...parsePrefs(null), open: false, reserve: 0, blocked: false } : { ...readPrefs(), open: false, reserve: 0, blocked: false }
+let state: State = { ...(typeof window === 'undefined' ? parsePrefs(null) : readPrefs()), open: false, reserve: 0, blocked: false, at: '' }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => {
   state = { ...state, ...patch }
   listeners.forEach((l) => l())
 }
 let sideWin: Window | null = null
+/** 옆 창에 마지막으로 연 주소 — 폭만 바꿀 때는 보던 곳 그대로 */
+let lastUrl = ''
 let watch: ReturnType<typeof setInterval> | null = null
 
 function savePrefs() {
@@ -131,8 +173,10 @@ function savePrefs() {
 export function setSidePrefs(p: Partial<Prefs>): void {
   set(p)
   savePrefs()
-  // 열려 있으면 바로 그 서비스 · 폭으로
-  if (state.open) openSideAi()
+  // 열려 있으면 바로 그 서비스로 · 폭만 바꾸면 보던 곳 그대로
+  if (!state.open) return
+  if (p.service || !lastUrl) openSideAi()
+  else openInSide(lastUrl, state.at)
 }
 
 function screenBox(): ScreenBox {
@@ -155,8 +199,29 @@ function startWatch() {
 
 /** 옆에 열기 — 이미 열린 창이면 같은 창을 그 자리 · 서비스로. 막히면 blocked */
 export function openSideAi(): boolean {
+  return openInSide(SIDE_SERVICES[state.service].url, SIDE_SERVICES[state.service].label)
+}
+
+/** D-256 주소 칸 — 주소나 검색어로 같은 옆 창을 연다(비면 구글). label = 단추에 보일 이름(없으면 주소에서) */
+export function openSideAddress(input: string, label?: string): boolean {
+  const url = addressToUrl(input) ?? GOOGLE_HOME
+  return openInSide(url, label || addressLabel(url))
+}
+
+/** 단추에 보일 이름 — 'naver.com' · 'Google 검색' · 'Google' */
+export function addressLabel(url: string): string {
+  try {
+    const u = new URL(url)
+    if (u.hostname === 'www.google.com') return u.pathname === '/search' ? 'Google 검색' : 'Google'
+    return u.hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+function openInSide(url: string, label: string): boolean {
   const { side } = sideLayout(screenBox(), state.width)
-  const w = window.open(SIDE_SERVICES[state.service].url, SIDE_WIN_NAME, featuresOf(side))
+  const w = window.open(url, SIDE_WIN_NAME, featuresOf(side))
   if (!w) {
     set({ blocked: true })
     return false
@@ -173,7 +238,8 @@ export function openSideAi(): boolean {
   } catch {
     /* 무시 */
   }
-  set({ open: true, blocked: false, reserve: reserveFor(window, side) })
+  lastUrl = url
+  set({ open: true, blocked: false, reserve: reserveFor(window, side), at: label })
   startWatch()
   return true
 }

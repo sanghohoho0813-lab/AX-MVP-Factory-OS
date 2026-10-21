@@ -48,7 +48,6 @@ function ShellFallback() {
 export function AppShell() {
   // D-188: 머리줄 · 메뉴 숫자까지 같은 목록을 보게 — 화면을 그리는 맨 위에서 먼저 정한다
   setBuiltinServicesHidden(useIsPilot())
-  const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const contentWidth = useContentWidth()
@@ -69,12 +68,8 @@ export function AppShell() {
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
       <TutorialProvider>
       <div className="flex min-h-screen" style={sideAi.reserve ? { paddingRight: sideAi.reserve } : undefined} data-side-reserve={sideAi.reserve || undefined}>
-        <Sidebar
-          collapsed={collapsed}
-          onToggleCollapsed={() => setCollapsed((v) => !v)}
-          mobileOpen={mobileOpen}
-          onCloseMobile={() => setMobileOpen(false)}
-        />
+        {/* D-256 메뉴 폭(넓게 · 아이콘 · 숨김)은 메뉴가 스스로 기억한다 — 경계선 끌기 · [사이드바 접기] */}
+        <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
