@@ -83,7 +83,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
   await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
   // 이 시험은 처음 연 모양(분석은 접힘 · 한 줄 요약)을 본다 — 시드의 '모두 펼치기' 를 지운다
-  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
 
   // 1. 마케팅 · 브랜딩 입구 — D-231 부터 /marketing 은 바로 콘텐츠 레이더 · 예전 안내 화면은 /marketing/more
   await page.goto(BASE + '/marketing/more', { waitUntil: 'networkidle' })
@@ -122,7 +122,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('주소: 처음엔 6시간 칸(?win=…) — D-196 전에는 하루 칸(?slot=)', feedAsked().length === 1 && /[?&]win=\d+$/.test(feedAsked()[0]), asked.join(' '))
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
-  check('D-194 · D-233 첫 화면 = 이번 주 찍을 것 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 "콘텐츠 레이더 · YouTube 벤치마킹"', (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
+  // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
+  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 "콘텐츠 레이더 · YouTube 벤치마킹"', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 3 && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
   await page.getByTestId('yt-view-top').click()
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
@@ -285,7 +286,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.evaluate(seedScript())
   // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
   await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
-  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
 
@@ -524,7 +525,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.evaluate(seedScript())
   // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
   await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
-  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   const T = vp.tag
@@ -603,7 +604,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
     await page.evaluate(seedScript())
     // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
     await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
-    await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+    await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
     await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
     const T = vp.tag
@@ -937,7 +938,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   const T = vp.tag
@@ -991,7 +992,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   const T = vp.tag

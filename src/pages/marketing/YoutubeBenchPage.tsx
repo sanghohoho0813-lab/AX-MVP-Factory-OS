@@ -12,6 +12,9 @@
  *  - D-195 UX 3.0: 첫 화면은 1순위 하나만 크게 · 받은 때 · 채널 수는 작은 글로 · 비중 가이드는 [추천 기준] 안으로.
  *  - D-231: 마케팅 · 브랜딩(/marketing)을 누르면 바로 이 화면. 목차 한 줄에 '내 콘텐츠'(일정 · 체크리스트 · 예전 콘텐츠 수첩) ·
  *    홍보 글 만들기 · 홈페이지 만들기까지(MarketingTabs). 후보 카드마다 미래AI랩 관점 상자 + 이번 주 찍기 키트.
+ *  - D-251 대표 "첫 화면에 너무 많이 보인다 · 이번 주 키워드 단추만 · 누르면 유튜브 대본부터 릴스 · 블로그까지 한 번에":
+ *    첫 화면 = 이번 주 키워드 단추(KeywordHome) + 직접 주제 한 줄. 누르면 ?pack=키 — 콘텐츠 묶음(PackView · 대표는 AI 가 세 갈래 동시에).
+ *    1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 새로 가져오기 · CSV · 채널 설계 기준은 아래 [자세히 보기] 한 곳에(지운 것 없음).
  */
 import { AiAssist, answerText, type AssistActionResult, type AssistCtx, type AssistItemAction, type AssistResultAction } from '../../components/ai/AiAssist'
 import { radarBundle } from '../../services/aiAssist/builders'
@@ -19,8 +22,8 @@ import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
@@ -36,6 +39,9 @@ import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
+import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
+import { packAiKeys } from '../../services/marketing/packStore'
+import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -84,7 +90,9 @@ import {
   type RadarVideo,
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData } from './radar/PlanView'
-import { IconChip, RatioChip, VideoDetail } from './radar/RadarParts'
+import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
+import { KeywordHome } from './radar/KeywordHome'
+import { PackView } from './radar/PackView'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
@@ -154,6 +162,15 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const [channel, setChannel] = useState('')
   const [topN, setTopN] = useState(30)
   const [detail, setDetail] = useState<RadarVideo | null>(null)
+  // D-251 이번 주 키워드 하나 → 콘텐츠 묶음(?pack=키 · 직접 쓴 주제는 custom:주제)
+  const packKey = view === 'plan' ? (params.get('pack') ?? '') : ''
+  const location = useLocation()
+  const navigate = useNavigate()
+  const access = useOwnerAiAccess()
+  const [aiDone, setAiDone] = useState<Set<string>>(() => packAiKeys())
+  useEffect(() => {
+    if (!packKey) setAiDone(packAiKeys())
+  }, [packKey])
 
   const setParam = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params)
@@ -195,6 +212,21 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   // D-241 답의 후보 번호(o#) → 레이더 후보(같은 주제 줄에 합치고 · 찍기 키트를 대본 자료로)
   const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
+  const packOpp = packKey && !packKey.startsWith('custom:') ? (oppByKey.get(packKey) ?? null) : null
+  const packSource = useMemo<PackSource | null>(() => (packKey.startsWith('custom:') ? customSource(packKey.slice(7)) : packOpp ? packSourceOf(packOpp) : null), [packKey, packOpp])
+  const packIdea = packKey ? (notebook.ideas.find((i) => i.key === packKey) ?? null) : null
+  /** 키워드 단추 → 묶음(뒤로 가기로 첫 화면에 돌아오게 기록을 하나 쌓는다) */
+  const openPack = (key: string) => {
+    const next = new URLSearchParams(params)
+    next.delete('view')
+    next.set('pack', key)
+    setParams(next, { state: { mkHome: true } })
+    window.scrollTo({ top: 0 })
+  }
+  const closePack = () => {
+    if ((location.state as { mkHome?: boolean } | null)?.mkHome) navigate(-1)
+    else setParam({ pack: '' })
+  }
 
   const refresh = () => {
     void yt.refresh()
@@ -388,6 +420,32 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       },
     },
   ]
+  /** D-251 묶음 전체를 내 콘텐츠 대본 칸에(이미 있는 줄이면 그 줄에 · 단계 '대본 준비') — 돌려주는 값은 그 줄 주소 */
+  const savePack = async (p: ContentPack): Promise<string | null> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), null)
+    if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).'), null)
+    const script = packText(p).slice(0, SCRIPT_MAX)
+    const withScript = (c: MakeCheckId[]): MakeCheckId[] => (c.includes('script') ? c : [...c, 'script'])
+    try {
+      const existing = notebook.ideas.find((i) => i.key === p.key)
+      if (existing) {
+        const status: IdeaStatus = existing.status === 'idea' || existing.status === 'selected' ? 'script' : existing.status
+        const saved = await notebook.patch(existing.id, { script, status, checks: withScript(existing.checks) })
+        if (!saved) return (showToast('저장하지 못했습니다 — 잠시 뒤 다시 눌러 주세요.'), null)
+        showToast(`'${saved.topic}' 줄에 이 묶음을 대본으로 저장했습니다 — 단계 '대본 준비'.`)
+        return ideaHref(saved.id)
+      }
+      const opp = oppByKey.get(p.key)
+      const base = opp ? ideaFromOpportunity(opp) : { ...customIdea(p.topic), key: p.key }
+      const saved = await notebook.save({ ...base, hook: p.source.hook, status: 'script', script, checks: ['script'] })
+      if (!saved) return (showToast('담는 중입니다 — 잠시만 기다려 주세요.'), null)
+      showToast(`${q(saved.topic, '을/를')} 내 콘텐츠에 담았습니다 — 대본 칸에 묶음 전체가 있습니다.`)
+      return ideaHref(saved.id)
+    } catch {
+      showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+      return null
+    }
+  }
   const saveBrief = async (next: ChannelBrief | null) => {
     const ok = await savePrefs({ ...prefs, brief: next })
     if (ok) showToast(next ? '채널 설계 기준을 저장했습니다 — 다음 AI 기획 · 대본부터 이 기준으로 씁니다.' : '채널 설계 기준을 기본값으로 되돌렸습니다.')
@@ -398,6 +456,21 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const aiAx = prepared ? prepared.channels.filter((c) => !c.mine && ['ai', 'ax'].includes(groupOf(c, prefs.overrides))).length : 0
   const recent30 = rvideos.filter((v) => !v.mine && v.ageDays <= 30).length
 
+  const feedButtons = (
+    <>
+      <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
+        <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
+      </Button>
+      <Button variant="secondary" onClick={csv} disabled={!prepared} data-testid="yt-csv">
+        <Download aria-hidden="true" className="size-4" /> CSV
+      </Button>
+    </>
+  )
+  const briefCard = !readOnly ? <BriefCard brief={briefOf(prefs)} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
+  const home = view === 'plan' && !packKey
+  const homeKeys = plan ? plan.picks.map((o) => ({ key: o.key, topic: o.topic, axis: o.axis })) : null
+  const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5" data-testid="yt-page">
       <div className="flex flex-col gap-1">
@@ -406,25 +479,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           title="마케팅 · 브랜딩"
           showOnPhone
           descriptionAsHint
-          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고르고(콘텐츠 레이더), 찍고 올린 것의 성과까지 봅니다. 업체 홍보 글 · 홈페이지도 같은 목차에서. 벤치마킹 채널의 최근 영상을 6시간마다 저절로 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
-          actions={
-            <>
-              <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
-                <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
-              </Button>
-              <Button variant="secondary" onClick={csv} disabled={!prepared} data-testid="yt-csv">
-                <Download aria-hidden="true" className="size-4" /> CSV
-              </Button>
-            </>
-          }
+          description="이번 주 키워드 하나를 누르면 제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글이 한 번에 나옵니다. 키워드는 벤치마킹 채널의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 주제를 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다."
+          // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
+          actions={view === 'plan' && (prepared || packKey) ? undefined : feedButtons}
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
-        <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
-          <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
-            콘텐츠 레이더 · YouTube 벤치마킹
-          </span>
-          {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
-        </p>
+        {!packKey && (
+          <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
+            <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
+              콘텐츠 레이더 · YouTube 벤치마킹
+            </span>
+            {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
+          </p>
+        )}
       </div>
       {prefsFailed && !readOnly && (
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="radar-prefs-failed">
@@ -435,12 +502,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      {/* D-231 목차는 데이터를 받기 전에도 — 내 콘텐츠 · 홍보 글 · 홈페이지는 유튜브 데이터 없이도 쓴다 */}
-      <div role="tablist" data-testid="yt-views">
-        <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
-      </div>
-      {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(이번 주 찍을 것 · 인기 급상승 · 분석 · 내 콘텐츠). 순위가 바뀌면 다시 누르면 새 순위로 */}
-      {!readOnly && (prepared || view === 'make') && (
+      {/* D-231 목차는 데이터를 받기 전에도 — 내 콘텐츠 · 홍보 글 · 홈페이지는 유튜브 데이터 없이도 쓴다. 묶음 화면에서는 [← 이번 주 키워드] 하나로 */}
+      {!packKey && (
+        <div role="tablist" data-testid="yt-views">
+          <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
+        </div>
+      )}
+      {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(인기 급상승 · 분석 · 내 콘텐츠). 이번 주 찍을 것의 질문 판은 D-251 부터 [자세히 보기] 안 */}
+      {!readOnly && view !== 'plan' && (prepared || view === 'make') && (
         <AiAssist
           page="radar"
           scope={`radar:${view}`}
@@ -452,7 +521,58 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         />
       )}
 
-      {view === 'make' ? (
+      {packKey ? (
+        packSource ? (
+          <PackView
+            source={packSource}
+            brief={briefOf(prefs)}
+            rank={packOpp ? (plan?.picks.indexOf(packOpp) ?? -1) + 1 : 0}
+            readOnly={readOnly}
+            ownerAi={access === 'yes'}
+            savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
+            onBack={closePack}
+            onCopy={(t, what) => copy(t, what)}
+            onSave={savePack}
+            briefSlot={briefCard}
+            whySlot={
+              packOpp ? (
+                <div className="flex flex-col gap-2.5" data-testid="mk-pack-why-body">
+                  <p className="t-sub break-keep text-slate-800">
+                    <b>왜 지금</b> — {packOpp.summary}
+                  </p>
+                  <p className="t-sub break-keep rounded-lg bg-amber-50 px-3 py-2 text-amber-950">
+                    <b>미래AI랩 관점</b> — {packOpp.view}
+                  </p>
+                  {packOpp.facts.length > 0 && (
+                    <ul className="t-sub flex list-disc flex-col gap-0.5 pl-5 break-keep text-slate-700">
+                      {packOpp.facts.map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {packOpp.benchmarks.length > 0 && (
+                    <>
+                      <p className="t-sub font-semibold text-slate-800">참고한 잘된 영상 — 구조만 참고하고 제목 · 대사는 그대로 쓰지 않아요</p>
+                      <ul className="flex flex-col">
+                        {packOpp.benchmarks.slice(0, 3).map((v) => (
+                          <VideoRow key={v.id} v={v} onOpen={openVideo} noThumb={yt.sample} />
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ) : null
+            }
+          />
+        ) : (
+          <div className="flex flex-col items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="mk-pack-missing">
+            <p className="t-body break-keep text-slate-800">{!prepared && homeStatus === 'loading' ? '이번 주 키워드를 불러오는 중이에요…' : '이 키워드는 이번 주 목록에 없어요 — 새로 받은 데이터로 순위가 바뀌었을 수 있어요.'}</p>
+            <Button variant="secondary" onClick={() => setParam({ pack: '' })} data-testid="mk-pack-missing-back">
+              이번 주 키워드 보기
+            </Button>
+          </div>
+        )
+      ) : view === 'make' ? (
         <MakeView
           focusId={params.get('idea') ?? ''}
           ideas={notebook.ideas}
@@ -467,36 +587,66 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           onCopy={(t, what) => copy(t, what)}
           onAdd={addCustom}
         />
+      ) : home ? (
+        <>
+          {prepared && <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />}
+          <KeywordHome keywords={homeKeys} status={homeStatus} aiDone={aiDone} onPick={openPack} onCustom={(t) => openPack(`custom:${t}`)} />
+          {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
+          {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
+          {!prepared && briefCard}
+          {/* D-251 대표 "키워드 1등이 뭐고 왜 그런 거고 관련 영상은 뭐고 이런 건 다 아래에 몰아서" — 예전 첫 화면 전부를 여기 한 곳에 */}
+          {prepared && plan && focus && (
+            <Fold
+              id="mk-more"
+              title="자세히 보기 — 왜 이 키워드인지 · 관련 영상 · 시장 신호"
+              hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · CSV · 채널 설계 기준."
+              summary="1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 채널 설계 기준"
+              panel
+              testId="mk-more"
+            >
+              <div className="flex flex-wrap gap-2">{feedButtons}</div>
+              {!readOnly && (
+                <AiAssist
+                  page="radar"
+                  scope="radar:plan"
+                  title="마케팅 · 이번 주 찍을 것"
+                  presets={RADAR_ASSIST.plan}
+                  build={assistBuild}
+                  itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
+                  resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
+                />
+              )}
+              <PeekProvider value={peekEnv}>
+                <PlanView
+                  plan={plan}
+                  // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
+                  rising={rising.filter((r) => r.fit)}
+                  breakouts={breakouts}
+                  focus={focus}
+                  basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
+                  ideas={notebook.ideas}
+                  readOnly={readOnly}
+                  noThumb={yt.sample}
+                  onConfirm={(o) => void confirmOpp(o)}
+                  onSave={(o) => void saveOpp(o)}
+                  onMute={(o) => void muteOpp(o)}
+                  onUnmute={(k) => void unmute(k)}
+                  onCopy={(t, what) => copy(t, what)}
+                  onOpenVideo={openVideo}
+                  onMix={(mix) => void savePrefs({ ...prefs, mix })}
+                  onGoChannels={() => setParam({ view: 'channels' })}
+                  onGoNotebook={goNotebook}
+                />
+              </PeekProvider>
+              {briefCard}
+            </Fold>
+          )}
+        </>
       ) : !prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
       ) : (
         <PeekProvider value={peekEnv}>
           <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
-
-          {view === 'plan' && plan && focus && (
-            <>
-              <PlanView
-                plan={plan}
-                // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
-                rising={rising.filter((r) => r.fit)}
-                breakouts={breakouts}
-                focus={focus}
-                basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
-                ideas={notebook.ideas}
-                readOnly={readOnly}
-                noThumb={yt.sample}
-                onConfirm={(o) => void confirmOpp(o)}
-                onSave={(o) => void saveOpp(o)}
-                onMute={(o) => void muteOpp(o)}
-                onUnmute={(k) => void unmute(k)}
-                onCopy={(t, what) => copy(t, what)}
-                onOpenVideo={openVideo}
-                onMix={(mix) => void savePrefs({ ...prefs, mix })}
-                onGoChannels={() => setParam({ view: 'channels' })}
-                onGoNotebook={goNotebook}
-              />
-            </>
-          )}
 
           {view === 'top' && (
             <>
@@ -521,8 +671,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         </PeekProvider>
       )}
 
-      {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 설정이라 화면 맨 아래(이번 주 찍을 것 · 내 콘텐츠) */}
-      {!readOnly && (view === 'plan' || view === 'make') && <BriefCard brief={briefOf(prefs)} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} />}
+      {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 내 콘텐츠 맨 아래(이번 주 찍을 것에서는 [자세히 보기] · 묶음 화면 안) */}
+      {view === 'make' && briefCard}
       <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} />
     </div>
   )

@@ -78,6 +78,10 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'spec.d', page: 'patent', label: '명세서 — 구체적인 내용 ② 흐름 · 도면', kind: 'write', hint: '도 2 이후 · 단계 · 변형예' },
   { id: 'spec.e', page: 'patent', label: '명세서 — 청구항', kind: 'write', hint: '시스템 · 종속 · 방법' },
   // D-250 대화창 — 질문창에 직접 쓴 말에 답(띠 · 판 단추에는 없음)
+  // D-251 마케팅 첫 화면 키워드 묶음 — 묶음 화면이 세 갈래를 동시에 부른다(띠에는 없음)
+  { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
+  { id: 'radar.pack.short', page: 'radar', label: '키워드 묶음 — 릴스 · 카드뉴스 · 올릴 때 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
+  { id: 'radar.pack.blog', page: 'radar', label: '키워드 묶음 — 블로그 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
 ]

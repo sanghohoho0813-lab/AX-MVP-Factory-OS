@@ -108,6 +108,8 @@ async function open(vp, o) {
   await ctx.addInitScript(([ref, s, ws]) => {
     localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
     localStorage.setItem('axmvp.active_workspace', ws)
+    // D-251 예전 첫 화면(1순위 카드 · 관심 없음 · 수첩 담기)은 [자세히 보기] 안 — 이 시험은 펼친 채로 본다
+    localStorage.setItem('axmvp.fold.mk-more', '1')
     localStorage.setItem('axmvp.onboarding.prefs', '{"tutorialVersion":1,"autoShowEnabled":false,"firstSeenAt":"2026-01-01T00:00:00.000Z","lastShownDate":"2099-01-01","snoozedUntilDate":"2099-12-31","completedChapterIds":["system"],"lastOpenedChapterId":"system","selectedLearningPath":"ax","guideMode":"core","updatedAt":"2026-01-01T00:00:00.000Z"}')
   }, [REF, session, WS])
   const writes = []

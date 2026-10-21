@@ -31,6 +31,7 @@ import { BRIEF_FIELDS, DEFAULT_BRIEF, IDEA_STATUS_LABEL, MAKE_CHECKS } from '../
 import type { ChannelBrief, ContentIdea } from '../marketing/radarStore'
 import { shootKit } from '../marketing/shootKit'
 import { linkedVideo, perfOf } from '../marketing/myPerformance'
+import { PACK_RULES, PACK_SECTIONS, type ContentPack } from '../marketing/contentPack'
 import { ANGLES, RISKY_WORDS, aiRequestFacts, aiRequestText, briefSlots } from '../contentStudio'
 import type { ContentProfile, ProfileSource } from '../contentStudio'
 
@@ -685,6 +686,49 @@ export function radarBundle(i: RadarInput): AssistBundle {
     facts.push('내 채널 영상 자료가 아직 없다 — 채널 설계 기준(형식 · 말투)만으로 맞춘다.')
   }
   return { links: book.links, ids: book.ids, context: { title: '마케팅 · 브랜딩 · 콘텐츠 레이더', today: todayLabel(i.today), purpose: '내 채널(채널 설계 기준)에 맞게, 지금 잘되는 주제로 이번 주 찍을 영상을 정하고 대본까지 이어 간다', sections, facts } }
+}
+
+/**
+ * D-251 이번 주 키워드 하나 → 콘텐츠 묶음을 AI 로(대표만 · 갈래 셋을 같은 자료로).
+ * 순서: ① 고른 키워드(관점 · 제목 · 첫 문장 · 근거) ② 채널 설계 기준 ③ 규칙 초안(구성만 — 다듬을 뼈대) + [규칙집] = 이상한AI 규칙집(미래AI랩 채널용).
+ */
+export function packBundle(i: { today: string; pack: ContentPack; brief?: ChannelBrief | null }): AssistBundle {
+  const p = i.pack
+  const s = p.source
+  const brief = i.brief ?? DEFAULT_BRIEF
+  const outline = p.sections
+    .filter((x) => x.id !== 'checks')
+    .map((x) => ({ 칸: x.label, 구성: x.blocks.map((b) => safeText(b.label, [], 80)), 예시: safeText(x.blocks[1]?.text ?? x.blocks[0]?.text ?? '', [], 400) }))
+  return {
+    links: {},
+    context: {
+      title: `마케팅 · 콘텐츠 묶음 · ${p.topic}`,
+      today: todayLabel(i.today),
+      purpose: '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글을 이상한AI 규칙집대로 한 번에',
+      sections: [
+        {
+          name: '고른 키워드(이 주제 하나로)',
+          rows: [
+            {
+              주제: safeText(s.topic, [], 80),
+              왜지금: safeText(s.why, [], 240),
+              미래AI랩관점: safeText(s.view, [], 300),
+              제목후보_규칙: s.titles.slice(0, 5).map((t) => safeText(t, [], 80)),
+              썸네일_규칙: s.thumbs.slice(0, 3).map((t) => safeText(t, [], 60)),
+              첫문장_규칙: safeText(s.hook, [], 160),
+              근거_우리만: s.facts.slice(0, 3).map((f) => safeText(f, [], 120)),
+              참고영상_제목은베끼지않기: s.refs.slice(0, 3).map((t) => safeText(t, [], 80)),
+              직접고른주제: s.custom ? '예' : '',
+            },
+          ],
+        },
+        { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
+        { name: `규칙 초안 뼈대(${PACK_SECTIONS.length - 1}칸 — 이 순서 · 칸 이름을 살려 다듬기)`, rows: outline },
+      ],
+      facts: [...MIRAE_PROFILE],
+      rules: [...PACK_RULES],
+    },
+  }
 }
 
 /* ------------------------------------------------------------------ */
