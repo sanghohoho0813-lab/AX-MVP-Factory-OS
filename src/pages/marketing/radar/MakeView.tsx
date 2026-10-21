@@ -372,7 +372,7 @@ function MakeRow({
         <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) bg-slate-50 px-3 py-2.5" data-testid="make-row-body">
           {i.angle && (
             <p className="t-sub break-keep text-slate-800">
-              <span className="t-meta font-bold text-indigo-800">미래AI랩 관점 </span>
+              <span className="t-meta font-bold text-indigo-800">이렇게 말해요 </span>
               {i.angle}
             </p>
           )}

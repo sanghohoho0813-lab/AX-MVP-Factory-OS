@@ -51,7 +51,7 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'module.first', page: 'module', label: '먼저 연락할 업체 3곳', kind: 'list', hint: '가장 빨리 돈이 되는 곳' },
   { id: 'module.missing', page: 'module', label: '서류만 받으면 되는 업체', kind: 'list', hint: '받을 서류 이름까지' },
   { id: 'radar.top5', page: 'radar', label: '미래AI랩 맞춤 이번 주 TOP5 기획', kind: 'write', hint: '주제 · 구성 · 첫 15초 대본' },
-  { id: 'radar.view', page: 'radar', label: '지금 순위로 미래AI랩 관점 새로 쓰기', kind: 'write', hint: '순위가 바뀌면 관점도 새로' },
+  { id: 'radar.view', page: 'radar', label: '지금 순위로 "이렇게 말해요" 새로 쓰기', kind: 'write', hint: '순위가 바뀌면 관점도 새로' },
   { id: 'bench.why', page: 'radar', label: '잘 나가는 채널 · 영상 왜 잘 됐나', kind: 'list', hint: '제목 틀 · 길이 · 주제 · 때' },
   { id: 'bench.copy', page: 'radar', label: '미래AI랩이 따라 할 틀 3개', kind: 'write', hint: '우리 주제로 바꾼 예시' },
   { id: 'rising.ref', page: 'radar', label: '인기 급상승 — 미래AI랩이 참고할 것', kind: 'list', hint: '우리 고객과 이어지는 것만' },

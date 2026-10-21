@@ -22,8 +22,6 @@ export const IDLE_RUN: PackRun = { parts: { video: 'idle', short: 'idle', blog: 
 
 const runs = new Map<string, PackRun>()
 const memory = new Map<string, PackAiSaved>()
-/** 이번 접속에서 저절로 불러 본 키워드 — 실패해도 열 때마다 다시 부르지 않게 */
-const autoTried = new Set<string>()
 const subs = new Set<() => void>()
 let version = 0
 
@@ -49,13 +47,6 @@ export const isRunning = (key: string) => Object.values(packRun(key).parts).incl
 /** 이번 접속에서 쓴 것 먼저, 없으면 이 브라우저에 남긴 것 */
 export function packSaved(key: string): PackAiSaved | null {
   return memory.get(key) ?? readPackStore()[key] ?? null
-}
-
-/** 처음 여는 키워드면 한 번만 true(대표 · 결과 없음 · 이번 접속에서 처음) */
-export function takeAutoRun(key: string): boolean {
-  if (autoTried.has(key) || packSaved(key)) return false
-  autoTried.add(key)
-  return true
 }
 
 /** 서버가 '조금 전에 많이 눌렀어요'(1분 10번)로 막으면 그 갈래만 한 번 다시(1분 뒤) */

@@ -704,7 +704,7 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
     context: {
       title: `마케팅 · 콘텐츠 묶음 · ${p.topic}`,
       today: todayLabel(i.today),
-      purpose: '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글을 이상한AI 규칙집대로 한 번에',
+      purpose: '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글을 검증된 방법대로 한 번에',
       sections: [
         {
           name: '고른 키워드(이 주제 하나로)',

@@ -31,7 +31,7 @@ export interface PackSource {
   why: string
   /** 근거(레이더가 센 숫자 — 우리만 보는 것) */
   facts: string[]
-  /** 미래AI랩 관점 */
+  /** 이렇게 말해요(찍을 때 말할 각도) */
   view: string
   titles: string[]
   thumbs: string[]
@@ -496,7 +496,7 @@ export function sectionText(x: PackSection): string {
 }
 
 export function packText(p: ContentPack): string {
-  return [`[콘텐츠 묶음] ${p.topic}`, `추천 제목: ${p.headline}`, `미래AI랩 관점: ${p.view}`, '', ...p.sections.map((x) => `${sectionText(x)}\n`)].join('\n').trim()
+  return [`[콘텐츠 묶음] ${p.topic}`, `추천 제목: ${p.headline}`, `이렇게 말해요: ${p.view}`, '', ...p.sections.map((x) => `${sectionText(x)}\n`)].join('\n').trim()
 }
 
 /* ------------------------------------------------------------------ */

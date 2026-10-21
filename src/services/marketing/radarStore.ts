@@ -254,7 +254,7 @@ export function briefText(i: ContentIdea): string {
   return [
     `[콘텐츠 브리프] ${b.topic}`,
     `유형: ${AXIS_WORD[b.type]} · 시청자: ${b.audience}`,
-    `미래AI랩 관점: ${b.angle}`,
+    `이렇게 말해요: ${b.angle}`,
     ...(i.hook ? [`첫 문장: ${i.hook}`] : []),
     ...(i.shootDate || i.publishDate ? [`일정: ${i.shootDate ? `촬영 ${i.shootDate}` : ''}${i.shootDate && i.publishDate ? ' · ' : ''}${i.publishDate ? `게시 ${i.publishDate}` : ''}`] : []),
     '',

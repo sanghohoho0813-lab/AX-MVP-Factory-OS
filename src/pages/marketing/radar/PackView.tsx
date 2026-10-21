@@ -1,21 +1,22 @@
 /**
  * D-251 콘텐츠 묶음 — 이번 주 키워드 하나를 누르면 한 번에(제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글).
- * 대표: "버튼 누르면 이상한AI 방식을 활용해서 유튜브 대본부터 릴스 대본 · 블로그 글 등 다 한 번에 쫙".
+ * 대표: "버튼 누르면 검증된 방식으로 유튜브 대본부터 릴스 대본 · 블로그 글 등 다 한 번에 쫙".
  *
  *  - 먼저 규칙 초안(contentPack · AI 아님)을 바로 보여 준다 — 기다리지 않게.
- *  - 대표 계정이면 같은 때 AI 가 세 갈래(유튜브 · 릴스 묶음 · 블로그)를 동시에 다시 쓴다(서버 /api/ai-assist · 규칙집을 함께 보냄).
+ *  - D-253: AI 는 [AI로 다 쓰기] 를 눌렀을 때만(모델은 바로 옆에서 고른다) — 세 갈래(유튜브 · 릴스 묶음 · 블로그)를 동시에 다시 쓴다.
  *    갈래 하나가 끝날 때마다 그 칸이 바뀐다. 실패한 갈래는 규칙 초안 그대로 + 이유 한 줄.
  *  - AI 결과는 이 브라우저(로그인한 사람별 금고)에 키워드별로 남긴다 — 다시 열어도 다시 부르지 않는다. [AI로 다시 쓰기] 로만 다시.
  *  - 팀장 화면을 보는 중이면 AI 를 부르지 않는다(규칙 초안만 · 저장 안 함).
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, BookmarkPlus, ClipboardCopy, ExternalLink, FileText, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, BookmarkPlus, ChevronDown, ClipboardCopy, ExternalLink, FileText, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
 import { packBundle } from '../../../services/aiAssist/builders'
 import { todayLocalDate } from '../../../lib/appClock'
-import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, takeAutoRun, type PartState } from '../../../services/marketing/packAi'
+import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
+import { ModelPicker } from '../../../components/ai/ModelPicker'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { PACK_AI_PARTS, PACK_LABEL, makePack, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
 
@@ -40,7 +41,6 @@ export function PackView({
   rank,
   readOnly,
   ownerAi,
-  autoAi,
   savedIdeaHref,
   onBack,
   onCopy,
@@ -55,8 +55,6 @@ export function PackView({
   readOnly: boolean
   /** 대표 AI 를 쓸 수 있음 */
   ownerAi: boolean
-  /** 열자마자 AI 를 불러도 됨(대표 권한 확인 · 채널 설계 기준을 다 읽음) — 아니면 [AI로 다 쓰기] 를 눌러야 */
-  autoAi: boolean
   /** 이미 내 콘텐츠에 있으면 그 줄 주소 */
   savedIdeaHref: string | null
   onBack: () => void
@@ -64,7 +62,7 @@ export function PackView({
   onSave: (pack: ContentPack) => Promise<string | null>
   /** 채널 설계 기준 카드(인사 · 말투 · 끝맺음) */
   briefSlot?: ReactNode
-  /** 이 키워드를 고른 이유(레이더 후보 카드) */
+  /** 이 키워드를 고른 이유 · 관련 영상(레이더 후보) — 빨간 머리 상자 안 [펼쳐보기] 로(D-253) */
   whySlot?: ReactNode
 }) {
   const rule = useMemo(() => makePack(source, brief), [source, brief])
@@ -84,11 +82,8 @@ export function PackView({
     if (canAi) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
   }
 
-  // 키워드를 누르면 AI 도 바로(대표 · 아직 AI 결과가 없고 · 이번 접속에서 처음일 때만)
-  // 채널 설계 기준을 다 읽기 전에는 부르지 않는다(기본 말투로 써서 남는 일이 없게)
-  useEffect(() => {
-    if (canAi && autoAi && takeAutoRun(source.key)) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
-  }, [canAi, autoAi, source.key, rule, brief])
+  // D-253 대표 "들어가면 바로 AI 로 써지게 말고 내가 눌렀을 때만" — 열 때 저절로 부르지 않는다. 모델을 고르고 [AI로 다 쓰기] 를 눌러야.
+  const [whyOpen, setWhyOpen] = useState(false)
 
   const save = async () => {
     setSaving(true)
@@ -133,6 +128,18 @@ export function PackView({
               <ExternalLink aria-hidden="true" className="size-4" /> 내 콘텐츠에서 보기
             </Link>
           ) : null}
+          {whySlot && (
+            <button
+              type="button"
+              onClick={() => setWhyOpen((v) => !v)}
+              aria-expanded={whyOpen}
+              aria-controls="mk-pack-why"
+              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-white/15 px-3 font-semibold text-white ring-1 ring-white/40 hover:bg-white/25"
+              data-testid="mk-pack-why-toggle"
+            >
+              <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${whyOpen ? 'rotate-180' : ''}`} /> {whyOpen ? '접기' : '왜 이 키워드? · 관련 영상 펼쳐보기'}
+            </button>
+          )}
           {!readOnly && (
             <button
               type="button"
@@ -145,6 +152,11 @@ export function PackView({
             </button>
           )}
         </div>
+        {whySlot && whyOpen && (
+          <div id="mk-pack-why" className="relative mt-3 rounded-xl bg-white p-3 text-slate-900 shadow-sm sm:p-4" data-testid="mk-pack-why">
+            {whySlot}
+          </div>
+        )}
       </header>
 
       <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} onRun={runAi} />
@@ -203,11 +215,6 @@ export function PackView({
         )
       })}
 
-      {whySlot && (
-        <Fold id="mk-pack-why" title="이 키워드를 고른 이유 · 관련 영상" hint="레이더가 이 주제를 고른 근거(채널 · 영상 숫자)와 미래AI랩 관점 — 시청자에게 하는 말에는 넣지 않아요." panel testId="mk-pack-why">
-          {whySlot}
-        </Fold>
-      )}
       {briefSlot && (
         <Fold id="mk-pack-brief" title="채널 설계 기준 — 인사 · 말투 · 끝맺음" hint="대본의 인사 · 끝맺음과 AI 가 쓰는 말투가 이 기준을 따릅니다. 바꾸면 다음 묶음부터 바뀌어요." panel testId="mk-pack-brief">
           {briefSlot}
@@ -252,15 +259,18 @@ function AiBar({
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
         <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
           {running
-            ? 'AI 가 이상한AI 규칙집대로 쓰는 중이에요(20~60초) — 그동안 아래 초안을 먼저 보세요.'
+            ? 'AI 가 검증된 방법대로 쓰는 중이에요(20~60초) — 그동안 아래 초안을 먼저 보세요.'
             : saved
               ? `AI 가 쓴 글이에요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-              : 'AI 로 다 쓰면 제목 · 대본 · 블로그 · 카드뉴스를 이상한AI 규칙집대로 다시 써요.'}
+              : '모델을 고르고 [AI로 다 쓰기] 를 누르면 제목 · 대본 · 블로그 · 카드뉴스를 검증된 방법대로 다시 써요. 누르기 전에는 부르지 않아요.'}
         </p>
-        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={onRun} disabled={running} data-testid="mk-pack-ai-run">
-          {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
-          {running ? '쓰는 중…' : saved ? 'AI로 다시 쓰기' : 'AI로 다 쓰기'}
-        </Button>
+        <div className="flex flex-wrap items-start gap-2">
+          <ModelPicker />
+          <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={onRun} disabled={running} data-testid="mk-pack-ai-run">
+            {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
+            {running ? '쓰는 중…' : saved ? 'AI로 다시 쓰기' : 'AI로 다 쓰기'}
+          </Button>
+        </div>
       </div>
       {(running || Object.values(parts).some((s) => s !== 'idle')) && (
         <ul className="flex flex-wrap gap-1.5" data-testid="mk-pack-ai-parts">

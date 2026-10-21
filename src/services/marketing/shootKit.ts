@@ -108,7 +108,7 @@ export function shootKit(o: Opportunity): ShootKit {
       { at: '0:30', what: '어떤 일에 쓰나 — 대표님 회사에서 매주 반복되는 업무 한 장면' },
       { at: '1:00', what: '따라 하기 ① 준비 → ② 설정 → ③ 실행(화면 녹화 · 단계마다 자막)' },
       { at: '4:00', what: '막히는 곳 · 주의할 점 2가지(실제로 써 보며 겪은 것만)' },
-      { at: '5:00', what: `미래AI랩 관점 — ${view}` },
+      { at: '5:00', what: `이렇게 말해요 — ${view}` },
       { at: '6:00', what: '마무리 — 3줄 요약 + 회사 업무에 붙이는 상담 · 자료 안내 한 줄' },
     ]
     prep = ['실제로 돌려 볼 계정 · 예시 파일(고객 정보는 지우기)', '완성 결과 화면 캡처 · 녹화', `썸네일 문구 고르기 — "${thumb}"`]
@@ -121,7 +121,7 @@ export function shootKit(o: Opportunity): ShootKit {
       { at: '1:30', what: `장치 보여 주기 — ${device || '자동화 장치'} 완성 화면` },
       { at: '3:00', what: '만드는 순서 3단계(화면 녹화)' },
       { at: '5:00', what: '달라진 점 — 시간 · 놓침이 어떻게 줄었나(우리 실제 기록만)' },
-      { at: '6:00', what: `미래AI랩 관점 + 마무리 — ${view}` },
+      { at: '6:00', what: `이렇게 말해요 + 마무리 — ${view}` },
     ]
     prep = ['자동화 완성 화면(시연)', '손으로 할 때 걸린 시간 · 놓친 일(실제 기록)', `썸네일 문구 고르기 — "${thumb}"`]
     effort = { label: '장치 시연이 필요해요', minutes: 90 }
@@ -133,7 +133,7 @@ export function shootKit(o: Opportunity): ShootKit {
       { at: '1:00', what: '핵심 ① 무엇이 바뀌나 — 뉴스 한 줄 요약(숫자는 공식 자료로 확인)' },
       { at: '2:30', what: '핵심 ② 우리 회사에는 — 예시 회사 하나로 계산해 보이기' },
       { at: '4:00', what: '핵심 ③ 지금 할 일 — 체크리스트 3개' },
-      { at: '5:30', what: `미래AI랩 관점 — ${view}` },
+      { at: '5:30', what: `이렇게 말해요 — ${view}` },
       { at: '6:30', what: '마무리 — 3줄 요약 + "회사 상황마다 달라 상담으로 확인해 드립니다" 한 줄' },
     ]
     prep = ['공식 자료 한 장(보도자료 · 공고문) — 영상 속 숫자는 여기서만', '예시 회사 숫자 하나(매출 · 직원 수 — 실제 고객이면 이름은 빼기)', `썸네일 문구 고르기 — "${thumb}"`]
@@ -159,11 +159,11 @@ export function shootKit(o: Opportunity): ShootKit {
   return { hook, frames, titles: o.titles.map((t) => t.text), thumbs: [...o.thumbs], outline, shorts, keep, change, prep, effort, format }
 }
 
-/** 키트 전체 — 복사해서 대본 메모 · 다른 도구에 붙여 쓰는 글 */
+/** 이번 주 찍을 것 — 복사해서 대본 메모 · 다른 도구에 붙여 쓰는 글(D-253: 화면에 남긴 것만 — 말할 각도 · 제목 · 첫 문장 · 잘 된 틀 · 썸네일) */
 export function kitText(o: Opportunity, k: ShootKit = shootKit(o)): string {
   return [
-    `[이번 주 찍기 키트] ${o.topic}`,
-    `미래AI랩 관점: ${o.view}`,
+    `[이번 주 이렇게 찍으세요] ${o.topic}`,
+    `이렇게 말해요: ${o.view}`,
     `준비: ${k.effort.label}(${k.effort.minutes}분쯤) · ${k.format}`,
     '',
     `첫 문장: ${k.hook}`,
@@ -174,16 +174,6 @@ export function kitText(o: Opportunity, k: ShootKit = shootKit(o)): string {
     '',
     '잘 된 틀 → 우리 제목',
     ...k.frames.map((f) => `- ${f.label}: ${f.mine}${f.ref ? `  (참고: ${f.ref.title} · ${f.ref.channel}${f.ref.ratio ? ` · ${f.ref.ratio}` : ''})` : ''}`),
-    '',
-    '긴 영상 구성',
-    ...k.outline.map((s) => `${s.at}  ${s.what}`),
-    '',
-    '쇼츠 3컷',
-    ...k.shorts.map((s) => `${s.at}  ${s.what}`),
-    '',
-    `그대로 가져올 것: ${k.keep.join(' / ')}`,
-    `내 스타일로 바꿀 것: ${k.change.join(' / ')}`,
-    `찍기 전 준비: ${k.prep.join(' / ')}`,
     '',
     '참고 영상은 주제 · 구조만 참고 — 제목 · 대사를 그대로 쓰지 않는다.',
   ].join('\n')

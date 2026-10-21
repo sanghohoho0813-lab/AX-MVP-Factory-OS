@@ -328,7 +328,7 @@ export const TOOLS: ToolDefinition[] = [
     path: '/tools/content',
     icon: PenLine,
     status: 'live',
-    origin: 'D-203 — 콘텐츠 생성 흐름만 참고(이상한 AI 분해) · 규칙 + 업종 견본으로 자체 구현',
+    origin: 'D-203 — 콘텐츠 생성 흐름만 참고(검증된 방법 분석) · 규칙 + 업종 견본으로 자체 구현',
     keywords: '홍보 마케팅 블로그 글 인스타 카드뉴스 쇼츠 릴스 유튜브 대본 기획 썸네일 카톡 채널 소식 플레이스 소개글 키워드 해시태그',
     recommendedDocs: ['businessRegistration'],
     sections: [{ key: 'build', label: '만들기', icon: PenLine, hint: '먼저 만들 것 · 형식 · 키워드 · 주제 · 보관함' }],

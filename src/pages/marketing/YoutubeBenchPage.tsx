@@ -109,6 +109,22 @@ const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
 
 
+/**
+ * D-253 대표 "관련 영상이 더 나왔으면" — 대표 벤치마킹(평소보다 잘된 것) 먼저, 같은 주제 30일 영상을 평소 대비 배수 순으로 이어 8편까지.
+ */
+function relatedVideos(o: { benchmarks: readonly RadarVideo[]; cluster: { hits: readonly RadarVideo[] } }): RadarVideo[] {
+  const seen = new Set<string>()
+  const out: RadarVideo[] = []
+  const byRatio = [...o.cluster.hits].sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0))
+  for (const v of [...o.benchmarks, ...byRatio]) {
+    if (seen.has(v.id) || v.mine) continue
+    seen.add(v.id)
+    out.push(v)
+    if (out.length >= 8) break
+  }
+  return out
+}
+
 export default function YoutubeBenchPage() {
   return <WorkspaceScope>{(ctx) => <RadarPage workspaceId={ctx.workspaceId} />}</WorkspaceScope>
 }
@@ -534,7 +550,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             rank={packOpp ? (plan?.picks.indexOf(packOpp) ?? -1) + 1 : 0}
             readOnly={readOnly}
             ownerAi={access !== 'no'}
-            autoAi={access === 'yes' && prefsReady}
             savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
             onBack={closePack}
             onCopy={(t, what) => copy(t, what)}
@@ -542,31 +557,40 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             briefSlot={briefCard}
             whySlot={
               packOpp ? (
-                <div className="flex flex-col gap-2.5" data-testid="mk-pack-why-body">
-                  <p className="t-sub break-keep text-slate-800">
-                    <b>왜 지금</b> — {packOpp.summary}
-                  </p>
-                  <p className="t-sub break-keep rounded-lg bg-amber-50 px-3 py-2 text-amber-950">
-                    <b>미래AI랩 관점</b> — {packOpp.view}
-                  </p>
-                  {packOpp.facts.length > 0 && (
-                    <ul className="t-sub flex list-disc flex-col gap-0.5 pl-5 break-keep text-slate-700">
-                      {packOpp.facts.map((f) => (
-                        <li key={f}>{f}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {packOpp.benchmarks.length > 0 && (
-                    <>
-                      <p className="t-sub font-semibold text-slate-800">참고한 잘된 영상 — 구조만 참고하고 제목 · 대사는 그대로 쓰지 않아요</p>
-                      <ul className="flex flex-col">
-                        {packOpp.benchmarks.slice(0, 3).map((v) => (
-                          <VideoRow key={v.id} v={v} onOpen={openVideo} noThumb={yt.sample} />
+                <PeekProvider value={peekEnv}>
+                  <div className="flex flex-col gap-2.5" data-testid="mk-pack-why-body">
+                    <p className="t-sub break-keep text-slate-800">
+                      <b>왜 지금</b> — {packOpp.summary}
+                    </p>
+                    {/* D-253: '미래AI랩 관점' 대신 — 찍을 때 말할 각도 */}
+                    <p className="t-sub break-keep rounded-lg bg-rose-50 px-3 py-2 text-rose-950">
+                      <b>이렇게 말해요</b> — {packOpp.view}
+                    </p>
+                    {packOpp.facts.length > 0 && (
+                      <ul className="flex flex-wrap gap-1.5" aria-label="핵심 근거" data-testid="mk-pack-facts">
+                        {packOpp.facts.map((f, i) => (
+                          <li key={f} className="t-sub min-w-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-semibold break-keep text-slate-700">
+                            <Peek videos={packOpp.factHits[i] ?? []} title={packOpp.topic} basis={f} kind="fact">
+                              {f}
+                            </Peek>
+                          </li>
                         ))}
                       </ul>
-                    </>
-                  )}
-                </div>
+                    )}
+                    {relatedVideos(packOpp).length > 0 && (
+                      <>
+                        <p className="t-sub font-semibold text-slate-800">
+                          관련 영상 {relatedVideos(packOpp).length}편 — 평소보다 잘된 순 · 구조만 참고하고 제목 · 대사는 그대로 쓰지 않아요
+                        </p>
+                        <ul className="grid grid-cols-1 gap-x-3 lg:grid-cols-2" data-testid="mk-pack-videos">
+                          {relatedVideos(packOpp).map((v) => (
+                            <VideoRow key={v.id} v={v} onOpen={openVideo} noThumb={yt.sample} />
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                </PeekProvider>
               ) : null
             }
           />

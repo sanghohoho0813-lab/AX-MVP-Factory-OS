@@ -453,11 +453,11 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     check('K1 찍기 키트 — 첫 문장 · 제목 3 · 썸네일 · 긴 영상 구성 6~7단 · 쇼츠 3컷 · 그대로/바꿀 것 · 준비물 · 준비 시간', kit.hook.length > 15 && kit.titles.length === 3 && kit.thumbs.length === 2 && kit.outline.length >= 6 && kit.outline.length <= 7 && kit.shorts.length === 3 && kit.keep.length === 4 && kit.change.length === 4 && kit.prep.length === 3 && kit.effort.minutes > 0, kit)
     check('K2 잘 된 틀 — 벤치마킹 영상의 제목 구조 → 같은 구조의 우리 제목(우리 제목 후보 안에서만 · 경쟁 제목 그대로 안 씀)', kit.frames.length > 0 && kit.frames.every((f) => o.titles.some((t) => t.text === f.mine) && (!f.ref || f.ref.title !== f.mine)) && new Set(kit.frames.map((f) => f.pattern)).size === kit.frames.length, kit.frames)
     const kt = kitText(o, kit)
-    check('K3 키트 복사 글 — 관점 · 첫 문장 · 제목 · 구성 · 쇼츠 · 준비 · 그대로 쓰지 않는다는 말', kt.includes(`미래AI랩 관점: ${o.view}`) && kt.includes(kit.hook) && kt.includes('긴 영상 구성') && kt.includes('쇼츠 3컷') && kt.includes('그대로 쓰지 않는다'))
+    check('K3 복사 글(D-253 줄임) — 이렇게 말해요 · 첫 문장 · 제목 후보 · 썸네일 · 잘 된 틀 · 그대로 쓰지 않는다는 말 / 구성 · 쇼츠 · 그대로/바꿀 것 · 준비 줄 없음', kt.startsWith(`[이번 주 이렇게 찍으세요] ${o.topic}`) && kt.includes(`이렇게 말해요: ${o.view}`) && kt.includes(kit.hook) && kt.includes('제목 후보') && kt.includes('잘 된 틀 → 우리 제목') && kt.includes('그대로 쓰지 않는다') && !/긴 영상 구성|쇼츠 3컷|그대로 가져올 것|내 스타일로 바꿀 것|찍기 전 준비|미래AI랩 관점/.test(kt), kt)
     const sp2 = prepareFeed(sampleFeed(NOW), NOW)
     const allPicks = radarPlan(sp2, { now: NOW }).picks
     const kitBad = allPicks.map((x) => ({ x, k: shootKit(x) })).filter(({ x, k }) => !k.hook || k.outline.length < 6 || k.shorts.length !== 3 || k.frames.some((f) => !f.mine) || !k.outline.some((st) => st.what.includes(x.view)) || /undefined|\[object/.test(kitText(x, k)))
-    check(`K4 예시 데이터 후보 ${allPicks.length}개 모두 키트가 선다(미래AI랩 관점이 구성에 들어감 · 빈칸 · undefined 없음)`, allPicks.length >= 3 && kitBad.length === 0, kitBad.map(({ x }) => x.topic))
+    check(`K4 예시 데이터 후보 ${allPicks.length}개 모두 키트가 선다(말할 각도가 구성에 들어감 · 빈칸 · undefined 없음)`, allPicks.length >= 3 && kitBad.length === 0, kitBad.map(({ x }) => x.topic))
     check('K5 축마다 다른 구성 — AI 실무형은 결과 먼저 · 화면 녹화, BRIDGE 는 장치 시연, 시장형은 자료 + 3가지', allPicks.filter((x) => x.axis === 'axai').every((x) => shootKit(x).outline[0].what.includes('결과 먼저')) && allPicks.filter((x) => x.axis === 'bridge').every((x) => shootKit(x).effort.label.includes('시연')) && allPicks.filter((x) => x.axis === 'market').every((x) => shootKit(x).hook.includes('3가지')))
     const c = await saveIdea('ws-A', customIdea('  정책자금 상담 전 준비할 서류  ', '화요일'))
     const cBack = (await listIdeas('ws-A')).find((x) => x.id === c.id)
@@ -470,7 +470,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const sched = weekSchedule(ideasW, '2026-10-16')
     check('K8 이번 주(월~일) 일정 — 10/18(일) 의 주는 10/12~10/18 · 촬영 · 게시 날짜 순 · 게시 끝난 촬영은 빼고 · 다음 주는 빼고', wk.from === '2026-10-12' && wk.to === '2026-10-18' && sched.map((w) => `${w.idea.topic}:${w.what}`).join() === 'a:shoot,c:publish,a:publish', sched.map((w) => `${w.date}:${w.idea.topic}:${w.what}`))
     check('K9 날짜가 지난 일 · 단계마다 몇 개', lateOf(ideasW[0], '2026-10-18') === 'publish' && lateOf(ideasW[1], '2026-10-20') === 'shoot' && lateOf(ideasW[2], '2026-12-01') === null && lateOf(ideasW[3], '2026-12-01') === null && stageCounts(ideasW).published === 1 && stageCounts(ideasW).selected === 1)
-    check('K10 브리프에 첫 문장 · 일정이 따라간다', briefText({ ...ideasW[0], hook: '오늘 딱 3가지만' }).includes('첫 문장: 오늘 딱 3가지만') && briefText(ideasW[0]).includes('촬영 2026-10-13 · 게시 2026-10-17') && briefText(ideasW[0]).includes('미래AI랩 관점'))
+    check('K10 브리프에 첫 문장 · 일정이 따라간다', briefText({ ...ideasW[0], hook: '오늘 딱 3가지만' }).includes('첫 문장: 오늘 딱 3가지만') && briefText(ideasW[0]).includes('촬영 2026-10-13 · 게시 2026-10-17') && briefText(ideasW[0]).includes('이렇게 말해요:') && !briefText(ideasW[0]).includes('미래AI랩 관점'))
     await removeIdea('ws-A', c.id)
   }
 }
