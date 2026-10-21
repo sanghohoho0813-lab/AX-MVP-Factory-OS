@@ -161,13 +161,20 @@ export async function fetchAssistStatus(withModels = false): Promise<AssistStatu
   return { providers: Array.isArray(b.providers) ? b.providers : [], defaultChoice: b.defaultChoice }
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string }): Promise<AssistRun> {
+/** D-260 영상 단추(radar.transcript) — 영상 번호 · 구간(초). 주소는 서버가 만든다 */
+export interface AssistVideo {
+  id: string
+  start: number
+  end: number
+}
+
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo }): Promise<AssistRun> {
   let res: Response
   try {
     res = await fetch(ASSIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '' }),
+      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}) }),
     })
   } catch {
     throw new AssistError('network', MESSAGE.network)

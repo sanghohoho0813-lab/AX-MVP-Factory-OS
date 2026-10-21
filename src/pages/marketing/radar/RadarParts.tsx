@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { ExternalLink, Flame, PlayCircle, UserRound, type LucideIcon } from 'lucide-react'
 import { Modal } from '../../../components/ui/Modal'
+import { VideoStudy, type StudyProps } from './VideoStudy'
 import { Badge } from '../../../components/ui/primitives'
 import { dateKo, fmt, shortNum } from '../../../services/marketing/ytBench'
 import { TOPIC_BY_ID } from '../../../services/marketing/radarPlaybook'
@@ -143,8 +144,11 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 const lengthText = (sec: number) => (sec < 60 ? `${sec}초` : sec < 3600 ? `${Math.floor(sec / 60)}분 ${sec % 60 ? `${sec % 60}초` : ''}`.trim() : `${Math.floor(sec / 3600)}시간 ${Math.floor((sec % 3600) / 60)}분`)
 
-/** 벤치마킹 영상 상세 — 숫자 · 평소 대비 · 조회 속도 · 채널 안 순위 · 주제 · 제목 구조 · 참고할 것(규칙 문장) */
-export function VideoDetail({ v, clusters, onClose, noThumb }: { v: RadarVideo | null; clusters: readonly Cluster[]; onClose: () => void; noThumb?: boolean }) {
+/**
+ * 벤치마킹 영상 상세 — 숫자 · 평소 대비 · 조회 속도 · 채널 안 순위 · 주제 · 제목 구조 · 참고할 것(규칙 문장).
+ * D-259 · D-260 study 를 주면(대표) 아래에 [대본 받아 적기] · [AI로 우리 회사 버전 만들기].
+ */
+export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: RadarVideo | null; clusters: readonly Cluster[]; onClose: () => void; noThumb?: boolean; study?: StudyProps }) {
   if (!v) return null
   const lessons = lessonsOf(v, clusters)
   const share = Math.round(expectedShare(v.ageDays) * 100)
@@ -229,6 +233,8 @@ export function VideoDetail({ v, clusters, onClose, noThumb }: { v: RadarVideo |
           </ul>
           <p className="t-meta text-slate-400">제목 · 대사를 그대로 쓰지 않고 주제 · 구조 · 표현 방식만 참고합니다.</p>
         </div>
+
+        {study && <VideoStudy key={v.id} v={v} lessons={lessons} study={study} />}
 
         <a href={v.url} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex items-center justify-center gap-1.5 self-start rounded-(--radius-control) border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-800 hover:border-brand-400" data-testid="radar-open-youtube">
           <ExternalLink aria-hidden="true" className="size-4" /> 유튜브에서 보기

@@ -265,8 +265,9 @@ function cleanSources(list) {
 /**
  * search=true(D-252 조사해줘) — 공급자의 웹 검색을 붙인다: Gemini google_search · Claude web_search. OpenAI 는 붙이지 않는다(searched=false).
  * 검색을 붙이면 JSON 모드는 끈다(함께 못 쓰는 모델이 있다) — 글에서 JSON 을 뽑는다.
+ * video={ uri, start, end }(D-260 · Gemini 만) — 영상을 글 앞에 붙인다 · lowRes 면 화면을 낮은 해상도로(토큰 ↓).
  */
-export async function callModel({ provider, key, base, model, system, user, maxOut, timeoutMs, json = true, search = false }) {
+export async function callModel({ provider, key, base, model, system, user, maxOut, timeoutMs, json = true, search = false, video = null, lowRes = false }) {
   const withSearch = search && (provider === 'gemini' || provider === 'anthropic')
   if (withSearch) json = false
   const ctrl = new AbortController()
@@ -279,8 +280,9 @@ export async function callModel({ provider, key, base, model, system, user, maxO
         headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: user }] }],
-          generationConfig: { maxOutputTokens: maxOut, ...(json ? { responseMimeType: 'application/json' } : {}) },
+          // D-260 영상 — 공개 YouTube 주소(서버가 만든 것)를 글 앞에 붙이고 구간만 보게 한다
+          contents: [{ role: 'user', parts: [...(video ? [{ fileData: { fileUri: video.uri }, videoMetadata: { startOffset: `${video.start}s`, endOffset: `${video.end}s` } }] : []), { text: user }] }],
+          generationConfig: { maxOutputTokens: maxOut, ...(json ? { responseMimeType: 'application/json' } : {}), ...(video && lowRes ? { mediaResolution: 'MEDIA_RESOLUTION_LOW' } : {}) },
           ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
         }),
         signal: ctrl.signal,

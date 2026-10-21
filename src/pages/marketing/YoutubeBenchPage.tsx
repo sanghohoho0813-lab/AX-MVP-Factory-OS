@@ -38,7 +38,7 @@ import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
-import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
@@ -467,6 +467,24 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       return null
     }
   }
+  /** D-259 영상 창 [AI로 우리 회사 버전] → 내 콘텐츠(같은 영상은 같은 줄 · 다른 대본이 있으면 먼저 묻기 · 지난 단계는 그대로) */
+  const saveAdapt = async (input: IdeaInput): Promise<string | null> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), null)
+    if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 영상이 두 번 담기지 않게).'), null)
+    try {
+      const existing = notebook.ideas.find((i) => i.key === input.key)
+      if (existing?.script.trim() && existing.script !== input.script && !window.confirm(`'${existing.topic}' 줄에 이미 대본이 있어요.\n이 우리 버전으로 바꿀까요? (지금 대본은 지워집니다)`)) return null
+      const status: IdeaStatus = existing && !(existing.status === 'idea' || existing.status === 'selected') ? existing.status : 'script'
+      const checks: MakeCheckId[] = existing ? (existing.checks.includes('script') ? existing.checks : [...existing.checks, 'script']) : ['script']
+      const saved = await notebook.save({ ...input, status, checks })
+      if (!saved) return (showToast('담는 중입니다 — 잠시만 기다려 주세요.'), null)
+      showToast(`${q(saved.topic, '을/를')} 내 콘텐츠에 담았습니다 — 대본 칸에 우리 버전 전체가 있습니다.`)
+      return ideaHref(saved.id)
+    } catch {
+      showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+      return null
+    }
+  }
   const saveBrief = async (next: ChannelBrief | null) => {
     const ok = await savePrefs({ ...prefs, brief: next })
     if (ok) showToast(next ? '채널 설계 기준을 저장했습니다 — 다음 AI 기획 · 대본부터 이 기준으로 씁니다.' : '채널 설계 기준을 기본값으로 되돌렸습니다.')
@@ -703,7 +721,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 
       {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 내 콘텐츠 맨 아래(이번 주 찍을 것에서는 [자세히 보기] · 묶음 화면 안) */}
       {view === 'make' && briefCard}
-      <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} />
+      <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} study={{ brief, readOnly, sample: yt.sample, onSave: saveAdapt }} />
     </div>
   )
 }

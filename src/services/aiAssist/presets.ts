@@ -87,6 +87,8 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'radar.pack.short', page: 'radar', label: '키워드 묶음 — 릴스 · 카드뉴스 · 올릴 때 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'radar.pack.blog', page: 'radar', label: '키워드 묶음 — 블로그 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
+  { id: 'radar.transcript', page: 'radar', label: '영상 대본 받아 적기', kind: 'write', hint: '벤치마킹 영상 창에서만 — Gemini 가 영상을 보고 10분씩' },
+  { id: 'radar.adapt', page: 'radar', label: '이 영상 → 우리 회사 버전 만들기', kind: 'write', hint: '벤치마킹 영상 창에서만 — 틀만 가져오고 제목 · 대사는 새로' },
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
   { id: 'side.chat', page: 'side', label: 'AI 대화 — 무엇이든 물어보기', kind: 'list', hint: 'OS 안 오른쪽 판에서 — 어느 화면에서나' },

@@ -77,6 +77,7 @@ npm run qa:ownerai -- http://localhost:4390       # 대표 AI 작업실(진짜 �
 npm run qa:phone -- http://localhost:4390         # 휴대폰 전반(360 · 390 · 430 · 긴 이름 · 공고 300건 — 넘침 · 글자가 칸보다 넓음 · 짜부라짐 · 칩 겹침 0)
 npm run qa:specboard -- http://localhost:4390    # 명세서 AI 작업판(타자 0 · 칸 6 · 전부 써줘 · 모델 고르기 · 떠나도 계속 · 고친 글 보호)
 npm run qa:sideai -- http://localhost:4390        # AI 옆 창(왼쪽 메뉴 아래 단추 · ChatGPT · Claude · Gemini · Google 오른쪽 창 · 주소 칸 · OS 비키기 · 팝업 막힘 · 왼쪽 OS 창 · 휴대폰 없음) · 메뉴 경계선 끌기(넓게 · 아이콘 · 숨김 · 기억) · 머리줄 넘침 0 · OS 안 오른쪽 판(AI 대화 · Google igu · 막는 곳은 옆 창 · 폭 끌기 · 좁은 PC 덮기)
+npm run qa:vstudy -- http://localhost:4390        # 벤치마킹 영상 창(대본 받아 적기 10분씩 · 실패 구간 다시 · 시각 링크 · 복사 · AI로 우리 회사 버전 8칸 · 내 콘텐츠에 담기 · 다시 열어도 그대로 · 360/390)
 npm run qa:certai -- http://localhost:4390        # 기업인증 · 벤처 타자 없이(대표님 답장 한 번에 나눠 넣기 · 실사 말할 답 AI · 사업계획서 AI 판 처음부터 · 칸마다 AI)
 npm run qa:wording                                # 화면 번들 · AI 지시문에 내부 별칭 0 · '검증된 방법' (npm run build 다음에)
 npm run qa:wayfinding -- http://localhost:4390    # 길잡이(경로 줄 · 단계 안내 이전/다음 · 순서 밖 화면 · 설명 접기 · 모듈 '이렇게 쓰세요' · ? 설명 화면 안 · 360/390)

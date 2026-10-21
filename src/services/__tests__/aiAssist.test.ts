@@ -238,6 +238,49 @@ async function serverTests() {
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
     check('P7 기본 회사를 Claude 로 바꿔 둬도 팀장 기본은 Gemini', (st.body.defaultChoice as { provider: string }).provider === 'gemini' && r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini', { def: st.body.defaultChoice, run: (r.body.run as { provider?: string } | undefined)?.provider })
   }
+  // D-260 영상 대본 받아 적기 — 서버가 만든 YouTube 주소 · 구간 · 낮은 해상도 · Gemini 만
+  setEnv()
+  {
+    const VCTX = { title: '벤치마킹 영상', today: '2026-10-21', sections: [{ name: '영상', rows: [{ 제목: '세무 기장 수수료 전부 공개', 채널: '로뎀세무법인', 길이: '롱폼 23분' }] }] }
+    const r = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', choice: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 600, end: 1200 } })
+    const call = calls.find((c) => c.url.includes(':generateContent'))
+    const parts = ((call?.body.contents as { parts: Record<string, unknown>[] }[] | undefined)?.[0]?.parts ?? []) as Record<string, { fileUri?: string; startOffset?: string; endOffset?: string }>[]
+    const cfg = (call?.body.generationConfig ?? {}) as Record<string, unknown>
+    const text = String((parts[1] as unknown as { text?: string })?.text ?? '')
+    check('V1 대본 받아 적기 — Claude 를 골라 둬도 Gemini · 영상 주소는 서버가 만든 YouTube 주소 · 구간 10:00~20:00 · 낮은 해상도 · 글에 [구간]',
+      r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && !!call && calls.every((c) => !c.url.includes('/messages')) && parts[0]?.fileData?.fileUri === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' && parts[0]?.videoMetadata?.startOffset === '600s' && parts[0]?.videoMetadata?.endOffset === '1200s' && cfg.mediaResolution === 'MEDIA_RESOLUTION_LOW' && text.includes('[구간] 10:00 ~ 20:00') && text.includes('로뎀세무법인'),
+      { status: r.statusCode, parts: JSON.stringify(parts[0] ?? {}).slice(0, 200), cfg })
+    calls = []
+    const g = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', choice: { provider: 'gemini', model: 'gemini-3.8-flash' }, context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } })
+    check('V2 Gemini 모델을 골라 두면 그 모델로', g.statusCode === 200 && (g.body.run as { model: string }).model === 'gemini-3.8-flash' && calls.some((c) => c.url.includes('gemini-3.8-flash:generateContent')))
+    calls = []
+    const bad = await Promise.all([
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX }),
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'https://evil.example/x', start: 0, end: 600 } }),
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 1801 } }),
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 600, end: 600 } }),
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: -5, end: 60 } }),
+      post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 1.5, end: 60 } }),
+    ])
+    check('V3 영상 번호 · 구간이 틀리면 400 · 공급자 안 부름(없음 · 다른 주소 · 15분 넘음 · 길이 0 · 음수 · 소수)', bad.every((b) => b.statusCode === 400) && calls.length === 0, bad.map((b) => b.statusCode))
+    // 낮은 해상도를 모델이 거절(400)하면 기본 해상도로 한 번 더
+    setEnv()
+    reply = (c) => (c.url.includes(':generateContent') && (c.body.generationConfig as Record<string, unknown>)?.mediaResolution ? { status: 400, body: { error: { message: 'mediaResolution not supported' } } } : { status: 200, body: okFor(c.url) })
+    const lr = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } })
+    const gens = calls.filter((c) => c.url.includes(':generateContent'))
+    check('V4 낮은 해상도 거절 → 기본 해상도로 한 번 더 · 답 받음', lr.statusCode === 200 && gens.length === 2 && !(gens[1].body.generationConfig as Record<string, unknown>).mediaResolution, { s: lr.statusCode, n: gens.length })
+    setEnv({ GEMINI_API_KEY: undefined })
+    const nk = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', choice: { provider: 'anthropic' }, context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } })
+    check('V5 Gemini 키가 없으면 Claude 키가 있어도 503 · 넣을 이름 GEMINI_API_KEY · 공급자 안 부름', nk.statusCode === 503 && nk.body.code === 'setup_needed' && JSON.stringify(nk.body.missing) === '["GEMINI_API_KEY"]' && calls.length === 0, nk.body)
+    setEnv()
+    const pl = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } }, PILOT)
+    const other = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } })
+    const otherParts = ((calls.find((c) => c.url.includes(':generateContent'))?.body.contents as { parts: unknown[] }[] | undefined)?.[0]?.parts ?? []).length
+    check('V6 팀장은 403(대표 전용 마케팅) · 다른 단추에 영상을 붙여 보내도 무시(글만 감)', pl.statusCode === 403 && other.statusCode === 200 && otherParts === 1, { pl: pl.statusCode, otherParts })
+    calls = []
+    const ad = await post({ requestId: rid(), assistId: 'radar.adapt', page: 'radar', choice: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, context: VCTX })
+    check('V7 우리 회사 버전 만들기 — 고른 회사(Claude) 그대로 · 영상은 붙이지 않음(글 · 대본 자료로)', ad.statusCode === 200 && (ad.body.run as { provider: string }).provider === 'anthropic' && calls.some((c) => c.url.includes('/messages')) && !calls.some((c) => c.url.includes(':generateContent')), ad.statusCode)
+  }
   setEnv()
   {
     const id = rid()

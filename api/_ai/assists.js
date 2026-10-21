@@ -168,6 +168,23 @@ const LIST = [
     'headline = 제목. next 에 블로그 태그 10개를 한 줄씩.',
   ]],
 
+  /* D-260 벤치마킹 영상 대본 받아 적기 — Gemini 가 공개 YouTube 영상을 직접 본다(서버가 영상 번호로 주소를 만들고 10분 구간씩) */
+  ['radar.transcript', 'radar', '영상 대본 받아 적기', W, 8000, [
+    '[영상] 으로 붙인 공개 YouTube 영상에서 [구간] 에 나오는 말을 들리는 그대로 받아 적는다 — 요약 · 고쳐 쓰기 · 덧붙이기 없이 말한 순서대로.',
+    '항목 하나 = 말이 이어지는 한 덩어리(20~60초): title = 그 덩어리가 시작하는 시각(영상 처음부터 센 "m:ss" · 1시간 넘으면 "h:mm:ss"), body = 그 사이 말 전부(군말 "음 · 어" 만 뺀다).',
+    '말 없이 음악 · 화면만 나오는 곳은 항목을 만들지 않는다. 말은 없고 화면 글만 있으면 그 글을 body 에 두고 detail = "화면 글".',
+    '알아듣기 어려운 낱말은 [불분명]. 사람 이름은 "진행자 · 출연자" 처럼 역할로, 전화번호 · 계좌는 [가림].',
+    'headline = 이 구간에서 다룬 내용 한 줄. next 는 비운다. 알아듣지 못한 곳이 많을 때만 caution 에 한 줄.',
+  ], { video: true }],
+  /* D-259 벤치마킹 영상 하나 → 미래AI랩 채널 버전 기획(틀만 가져오고 제목 · 대사는 새로) */
+  ['radar.adapt', 'radar', '이 영상 → 우리 회사 버전 만들기', W, 6000, [
+    '[자료 · 참고 영상] 이 왜 잘 됐는지(건드린 시청자 고민 · 제목 틀 · 첫 30초 · 구성 · 숫자)를 읽고, 같은 고민을 [자료 · 채널 설계 기준] 에 맞는 우리 채널 영상 한 편으로 다시 기획한다. 제목 · 대사는 베끼지 않는다 — 틀만 가져온다.',
+    '[자료 · 참고 영상 대본] 이 있으면 구성 · 흐름 · 사례 넣는 자리를 거기서 읽는다. 없으면 제목 · 숫자 · 참고할 것만으로 짐작하고 caution 에 "대본 없이 제목 · 숫자로만 짐작".',
+    '항목 순서(tag 그대로): "분석" title "왜 잘 됐나" (outline 3~5줄) · "제목" title "제목 후보" (outline 5개 · 괄호 없이 25~35자 · 서로 다른 각도 · 참고 영상 제목과 다른 낱말) · "썸네일" title "썸네일 문구" (outline 3개 · 20~35자) · "첫 문장" title "첫 문장" (body 3~5문장 · 시청자가 얻는 것 먼저).',
+    '이어서: "구성" title "구성 시간표" (outline 6~8줄 · "0:00 오프닝 — …" 처럼 8~12분) · "재료" title "우리가 보여 줄 재료" (outline · 상담 장면 · OS 화면 · 체크리스트처럼 우리가 실제로 가진 것 · 실제 사례는 "[실제 사례 — …]" 로 비움) · "쇼츠" title "쇼츠로 자르기" (outline 1~2편 · 컷 시간 + 말 한 줄) · "차별" title "그대로 가져올 것 · 바꿀 것" (outline).',
+    'headline = 우리 버전 확정 제목 한 줄. next = 찍기 전 준비물 2~3개. 금액 · 비율 · 날짜 · 통계는 [자료] 에 있는 것만 — 없으면 "[공식 자료 확인: ○○]".',
+  ]],
+
   /* 블로그 · 플레이스 홍보 글 — 규칙집 그대로 한 번에 */
   ['content.blog', 'content', '블로그 글 한 번에 (규칙집 반영)', W, 7000, ['[규칙집] 을 모두 지켜 네이버 블로그 글 한 편을 쓴다. 브리프에 없는 혜택 · 숫자 · 후기는 지어내지 않는다.', '항목 1개: title = 제목(규칙집 제목 각도 중 하나 · 키워드 앞쪽), tag = 쓴 각도 이름, outline = 소제목 순서, body = 본문 전체(소제목 포함 · 1,500~2,500자).', 'next 에 제목 후보 4개를 더(각도 다르게), caution 에 브리프에서 모자란 재료.']],
   ['content.place', 'content', '플레이스 소개글 한 번에', W, 4000, ['[규칙집] 을 지켜 네이버 플레이스 소개글을 쓴다(첫 문장에 무엇을 하는 곳인지 · 지역 · 대표 상품, 과장 없이).', '항목 1개: title = 한 줄 소개, body = 소개글 전체(400~700자), outline = 넣은 키워드. next 에 소식 글 아이디어 3개.']],
@@ -260,7 +277,7 @@ const LIST = [
 export const ASSISTS = Object.fromEntries(
   LIST.map(([id, page, label, kind, maxOut, instruction, opts]) => [
     id,
-    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research) },
+    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video) },
   ]),
 )
 
