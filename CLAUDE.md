@@ -75,13 +75,16 @@ npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB 
 npm run qa:isolation                              # 팀장 격리 집중(진짜 RLS · 모든 표 API 공격 · 저장소 조작 · 무작위 80걸음 — 팀장은 대표 화면/자료 0) — pg_ctlcluster 16 main start 먼저
 npm run qa:ownerai -- http://localhost:4390       # 대표 AI 작업실(진짜 서버 함수 + 가짜 공급자 · 시나리오 A~E · 기억 판 · 채택 · 제안서/화면 스튜디오 · 키 노출 0 · 360/390)
 npm run qa:phone -- http://localhost:4390         # 휴대폰 전반(360 · 390 · 430 · 긴 이름 · 공고 300건 — 넘침 · 글자가 칸보다 넓음 · 짜부라짐 · 칩 겹침 0)
+npm run qa:specboard -- http://localhost:4390    # 명세서 AI 작업판(타자 0 · 칸 6 · 전부 써줘 · 모델 고르기 · 떠나도 계속 · 고친 글 보호)
+npm run qa:sideai -- http://localhost:4390        # AI 옆 창(ChatGPT · Claude · Gemini 오른쪽 창 · OS 비키기 · 팝업 막힘 · 왼쪽 OS 창 · 휴대폰 없음)
+npm run qa:wording                                # 화면 번들 · AI 지시문에 내부 별칭 0 · '검증된 방법' (npm run build 다음에)
 npm run qa:wayfinding -- http://localhost:4390    # 길잡이(경로 줄 · 단계 안내 이전/다음 · 순서 밖 화면 · 설명 접기 · 모듈 '이렇게 쓰세요' · ? 설명 화면 안 · 360/390)
 npm run qa:ventureplan -- http://localhost:4390   # 벤처 사업계획서 쓰기(기업인증 › 벤처 · 사이트 순서 · 명세서 재료 · 회사 기록으로 채우기 · 글자 수 · 점검 · MD · AI 초안 고친 칸 보호 · 360~430)
 npm run qa:pvmenu -- http://localhost:4390         # 메뉴 '특허 · 벤처'(기업인증 밖 · 회사 고르고 사업계획서 쓰기 = 기업인증 안과 같은 기록 · 명세서 점검 · 팀장 화면엔 없음 · 360~430)
 npm run qa:specwrite -- http://localhost:4390      # 특허 명세서 쓰기(아이디어 → 권리축 뼈대 → 도면 그림 → 청구항 → 본문 → 점검 0 · MD · 벤처 재료로 · AI 초안 고친 칸 보호 · AI 작업실 가져오기 · 360~430)
 npm run qa:pvux -- http://localhost:4390          # 특허 · 벤처 진행판 · 명세서 길잡이(처음 안내 · 견본 연습 · 예시 · '~하는' 고치기 · 되돌리기 · 길이 막대 · 오른쪽 고정판 · 휴대폰 단계 줄 · 제출 준비 ZIP · 이어서 하기 step= · 사업계획서 재료 바로 · 360~430)
 npm run qa:chat -- http://localhost:4390          # 대화창(특허 · 벤처 · 기업인증 첫 화면 — 단추 → 바로 답 · 쓴 질문 → AI(대표) · AI 실패 → 정해진 답 · 📎 명세서 점검 · 인증 칩 · [자세히] 예전 화면 · 회사마다 대화 · 지우기 되돌리기 · 360~430 질문창 안 가림)
-npm run qa:mkpack -- http://localhost:4390        # 마케팅 첫 화면(이번 주 키워드 단추만 · [자세히 보기] 접힘에 예전 판) → 키워드 하나 → 콘텐츠 묶음 7칸(규칙 초안 먼저 → AI 세 갈래 동시에 · 한 갈래 실패해도 나머지) · 복사 · 내 콘텐츠에 담기 · 다시 열면 AI 안 부름 · 뒤로 가기 · 360~430 · 큰 글자
+npm run qa:mkpack -- http://localhost:4390        # 마케팅 첫 화면(이번 주 키워드 단추 10개 · [자세히 보기] 접힘에 예전 판) → 키워드 하나 → 콘텐츠 묶음 7칸(규칙 초안 · AI 는 [AI로 다 쓰기] 누를 때만 · 고른 모델로 세 갈래 · 한 갈래 실패해도 나머지) · 왜 이 키워드/관련 영상 펼쳐보기 · 복사 · 내 콘텐츠에 담기 · 뒤로 가기 · 360~430 · 큰 글자
 npm run qa:assist -- http://localhost:4390        # AI 도우미(진짜 서버 함수 + 가짜 공급자 · 키 없음 안내 · 기본 Gemini · 모델 바꾸기 · 이름/주민번호 안 나감 · 번호 → 업체 · 화면 10곳 띠 · 홍보 글 규칙집 · 보관함 · 할 일로 넣기 · 레이더 기획 → 내 콘텐츠 → 대본 → 저장 · 더 좋은 모델로 다시 · 360/390)
 ```
 
