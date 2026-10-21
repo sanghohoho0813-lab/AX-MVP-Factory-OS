@@ -167,6 +167,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const location = useLocation()
   const navigate = useNavigate()
   const access = useOwnerAiAccess()
+  // 묶음 화면이 다시 그려질 때마다 규칙 초안을 새로 만들지 않게(채널 설계 기준이 바뀔 때만)
+  const brief = useMemo(() => briefOf(prefs), [prefs])
   const [aiDone, setAiDone] = useState<Set<string>>(() => packAiKeys())
   useEffect(() => {
     if (!packKey) setAiDone(packAiKeys())
@@ -466,7 +468,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       </Button>
     </>
   )
-  const briefCard = !readOnly ? <BriefCard brief={briefOf(prefs)} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
+  const briefCard = !readOnly ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey
   const homeKeys = plan ? plan.picks.map((o) => ({ key: o.key, topic: o.topic, axis: o.axis })) : null
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
@@ -525,10 +527,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         packSource ? (
           <PackView
             source={packSource}
-            brief={briefOf(prefs)}
+            brief={brief}
             rank={packOpp ? (plan?.picks.indexOf(packOpp) ?? -1) + 1 : 0}
             readOnly={readOnly}
-            ownerAi={access === 'yes'}
+            ownerAi={access !== 'no'}
             savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
             onBack={closePack}
             onCopy={(t, what) => copy(t, what)}

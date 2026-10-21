@@ -244,6 +244,25 @@ check('R5 [AI로 다시 쓰기] → 세 갈래 다시 한 번씩', packCalls().l
 await page.getByTestId('mk-pack-back').click()
 await page.getByTestId('mk-home').waitFor()
 
+/* ---------------- L 쓰는 중에 나갔다 들어오기 ---------------- */
+delayMs = 2500
+const third = page.getByTestId('mk-key').nth(2)
+const thirdKey = await third.getAttribute('data-key')
+const nL = packCalls().length
+await third.click()
+await page.getByTestId('mk-pack').waitFor()
+await page.waitForTimeout(400)
+await page.getByTestId('mk-pack-back').click()
+await page.getByTestId('mk-home').waitFor()
+await page.waitForTimeout(3200)
+await page.locator(`[data-testid="mk-key"][data-key="${thirdKey}"]`).click()
+await page.getByTestId('mk-pack').waitFor()
+await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-pack-section"][data-ai="1"]').length === 6, null, { timeout: 8000 }).catch(() => {})
+check('L1 AI 가 쓰는 중에 첫 화면으로 나갔다 다시 들어와도 — 그 사이 온 AI 글이 보이고 · 다시 부르지 않음', (await page.locator('[data-testid="mk-pack-section"][data-ai="1"]').count()) === 6 && packCalls().length === nL + 3 && (await page.getByTestId('mk-pack-ai').getAttribute('data-state')) === 'done', { calls: packCalls().length - nL })
+delayMs = 0
+await page.getByTestId('mk-pack-back').click()
+await page.getByTestId('mk-home').waitFor()
+
 /* ---------------- E 한 갈래 실패 ---------------- */
 failing = 'radar.pack.blog'
 const second = page.getByTestId('mk-key').nth(1)

@@ -8,31 +8,16 @@
  *  - AI 결과는 이 브라우저(로그인한 사람별 금고)에 키워드별로 남긴다 — 다시 열어도 다시 부르지 않는다. [AI로 다시 쓰기] 로만 다시.
  *  - 팀장 화면을 보는 중이면 AI 를 부르지 않는다(규칙 초안만 · 저장 안 함).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ArrowLeft, BookmarkPlus, ClipboardCopy, ExternalLink, FileText, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
-import { callAssist, AssistError } from '../../../services/aiAssist/client'
-import { newRequestId, readChoice } from '../../../services/aiAssist/store'
 import { packBundle } from '../../../services/aiAssist/builders'
 import { todayLocalDate } from '../../../lib/appClock'
-import { readPackStore, writePackStore } from '../../../services/marketing/packStore'
+import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, takeAutoRun, type PartState } from '../../../services/marketing/packAi'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
-import {
-  PACK_AI_PARTS,
-  PACK_LABEL,
-  aiSections,
-  makePack,
-  packText,
-  sectionText,
-  withAi,
-  type ContentPack,
-  type PackAiPart,
-  type PackAiSaved,
-  type PackSectionId,
-  type PackSource,
-} from '../../../services/marketing/contentPack'
+import { PACK_AI_PARTS, PACK_LABEL, makePack, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
 
 const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = {
   titles: { icon: Type, chip: 'bg-violet-100 text-violet-700' },
@@ -43,11 +28,6 @@ const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = 
   upload: { icon: Send, chip: 'bg-sky-100 text-sky-700' },
   checks: { icon: ListChecks, chip: 'bg-slate-100 text-slate-600' },
 }
-
-type PartState = 'idle' | 'running' | 'done' | 'error'
-
-/** 이번 접속에서 저절로 AI 를 불러 본 키워드 — 실패해도 열 때마다 다시 부르지 않게 */
-const autoTried = new Set<string>()
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -85,63 +65,26 @@ export function PackView({
   whySlot?: ReactNode
 }) {
   const rule = useMemo(() => makePack(source, brief), [source, brief])
-  const [saved, setSaved] = useState<PackAiSaved | null>(() => readPackStore()[source.key] ?? null)
-  const [parts, setParts] = useState<Record<PackAiPart, PartState>>({ video: 'idle', short: 'idle', blog: 'idle' })
-  const [errors, setErrors] = useState<string[]>([])
-  const [storeFull, setStoreFull] = useState(false)
+  // AI 진행 · 결과는 화면 밖(packAi)에 — 나갔다 들어와도 쓰는 중 · 나간 사이에 온 답이 그대로 보인다
+  const version = useSyncExternalStore(subscribePackAi, packAiVersion)
+  const run = useMemo(() => packRun(source.key), [source.key, version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const saved = useMemo(() => packSaved(source.key), [source.key, version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const parts = run.parts
   const [savedHref, setSavedHref] = useState<string | null>(savedIdeaHref)
   const [saving, setSaving] = useState(false)
-  const keyRef = useRef(source.key)
-  keyRef.current = source.key
-
-  // 다른 키워드로 바뀌면 그 키워드의 저장된 결과로
-  useEffect(() => {
-    setSaved(readPackStore()[source.key] ?? null)
-    setParts({ video: 'idle', short: 'idle', blog: 'idle' })
-    setErrors([])
-  }, [source.key])
   useEffect(() => setSavedHref(savedIdeaHref), [savedIdeaHref])
 
   const pack = useMemo(() => (saved ? withAi(rule, saved.sections) : rule), [rule, saved])
   const running = Object.values(parts).includes('running')
   const canAi = ownerAi && !readOnly
-
-  const runAi = useCallback(() => {
-    if (!canAi || running) return
-    const key = source.key
-    const context = packBundle({ today: todayLocalDate(), pack: rule, brief }).context
-    const choice = readChoice()
-    setErrors([])
-    setParts({ video: 'running', short: 'running', blog: 'running' })
-    for (const p of PACK_AI_PARTS) {
-      void callAssist({ requestId: newRequestId(), assistId: p.assistId, page: 'radar', choice, context })
-        .then((run) => {
-          const got = run.structured ? aiSections(p.part, (p.part === 'video' && run.structured.headline?.trim()) || rule.headline, run.structured.items, run.structured.next ?? []) : {}
-          if (!Object.keys(got).length) throw new AssistError('provider_error', 'AI 답을 칸으로 나누지 못했습니다.')
-          // 저장은 키워드별로 — 그 사이 다른 키워드로 옮겨도 이 키워드 칸에 남는다
-          const prev = readPackStore()[key]
-          const next: PackAiSaved = { at: run.createdAt || new Date().toISOString(), model: run.model, sections: { ...(prev?.sections ?? {}), ...got } }
-          if (!writePackStore(key, next)) setStoreFull(true)
-          if (keyRef.current === key) {
-            setSaved((cur) => ({ at: next.at, model: next.model, sections: { ...(cur?.sections ?? {}), ...got } }))
-            setParts((s) => ({ ...s, [p.part]: 'done' }))
-          }
-        })
-        .catch((e: unknown) => {
-          if (keyRef.current !== key) return
-          setParts((s) => ({ ...s, [p.part]: 'error' }))
-          const msg = e instanceof Error ? e.message : '다시 눌러 주세요.'
-          setErrors((list) => (list.includes(msg) ? list : [...list, msg]))
-        })
-    }
-  }, [canAi, running, source.key, rule, brief])
+  const runAi = () => {
+    if (canAi) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
+  }
 
   // 키워드를 누르면 AI 도 바로(대표 · 아직 AI 결과가 없고 · 이번 접속에서 처음일 때만)
   useEffect(() => {
-    if (!canAi || saved || autoTried.has(source.key)) return
-    autoTried.add(source.key)
-    runAi()
-  }, [canAi, saved, source.key, runAi])
+    if (canAi && takeAutoRun(source.key)) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
+  }, [canAi, source.key, rule, brief])
 
   const save = async () => {
     setSaving(true)
@@ -200,7 +143,7 @@ export function PackView({
         </div>
       </header>
 
-      <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={errors} saved={saved} storeFull={storeFull} onRun={runAi} />
+      <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} onRun={runAi} />
 
       <nav aria-label="묶음 칸으로 가기" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" data-testid="mk-pack-nav">
         {pack.sections.map((x) => {
