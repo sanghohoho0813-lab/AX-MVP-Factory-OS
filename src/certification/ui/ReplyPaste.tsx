@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { ClipboardPaste, Sparkles } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { replyPicksOfAi, splitReply, type ReplyAsk, type ReplyHow, type ReplyPick } from '../core/replySplit'
@@ -28,7 +28,7 @@ export function ReplyPaste({
   testId?: string
 }) {
   const { showToast } = useToast()
-  const ai = useOwnerAiAccess()
+  const ai = useAiAssistAccess()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [picks, setPicks] = useState<ReplyPick[] | null>(null)
@@ -110,7 +110,7 @@ export function ReplyPaste({
         <Button size="sm" variant="primary" disabled={!text.trim() || !!busy} onClick={split} data-testid={`${testId}-split`}>
           나눠 보기
         </Button>
-        {ai === 'yes' && (
+        {assistOn(ai) && (
           <Button size="sm" variant="secondary" disabled={!text.trim() || !!busy} onClick={() => void splitAi()} data-testid={`${testId}-ai`}>
             <Sparkles aria-hidden="true" className="size-4" /> {busy === 'ai' ? 'AI 가 나누는 중…' : 'AI로 나눠 보기'}
           </Button>
@@ -126,7 +126,7 @@ export function ReplyPaste({
       )}
       {picks && picks.length === 0 && !err && (
         <p className="t-sub break-keep rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-900" data-testid={`${testId}-none`}>
-          번호가 없어 나누지 못했어요 — {ai === 'yes' ? '[AI로 나눠 보기] 를 누르거나 ' : ''}답장 줄 앞에 번호(1. 2.)를 붙여 다시 눌러 주세요.
+          번호가 없어 나누지 못했어요 — {assistOn(ai) ? '[AI로 나눠 보기] 를 누르거나 ' : ''}답장 줄 앞에 번호(1. 2.)를 붙여 다시 눌러 주세요.
         </p>
       )}
       {picks && picks.length > 0 && (

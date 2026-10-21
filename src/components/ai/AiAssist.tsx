@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Check, ChevronDown, ChevronUp, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
@@ -32,7 +32,7 @@ import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
-import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice } from '../../services/aiAssist/store'
+import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders } from '../../services/aiAssist/store'
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
@@ -108,7 +108,8 @@ export interface AiAssistProps {
 }
 
 export function AiAssist(props: AiAssistProps) {
-  const access = useOwnerAiAccess()
+  // D-257 팀장도 띠가 보인다(Gemini 만) — AI 작업실은 따로(대표만)
+  const access = useAiAssistAccess()
   if (access === 'no') return null
   return <AiAssistInner {...props} />
 }
@@ -615,7 +616,7 @@ export function ModelRow({
       {open && (
         <div className="flex flex-col gap-2.5 border-t border-slate-100 px-3 py-3" data-testid="ai-assist-settings">
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="AI 회사">
-            {(['gemini', 'openai', 'anthropic'] as ProviderId[]).map((id) => {
+            {allowedProviders().filter((id) => !status || status.providers.some((x) => x.id === id)).map((id) => {
               const p = status?.providers.find((x) => x.id === id)
               return (
                 <button

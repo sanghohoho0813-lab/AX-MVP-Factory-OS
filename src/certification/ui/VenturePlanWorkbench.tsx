@@ -15,7 +15,7 @@ import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { downloadText } from '../../components/consulting/studioParts'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import type { CertificationClientContext } from '../core/types'
 import {
   VK,
@@ -55,7 +55,7 @@ const TABS: readonly { key: Tab; label: string }[] = [
 
 export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '벤처 진행으로' }: { ctx: CertificationClientContext; notes: Record<string, string>; onSave: (patch: Record<string, string>) => Promise<void>; onBack: () => void; backLabel?: string }) {
   const { showToast } = useToast()
-  const ai = useOwnerAiAccess()
+  const ai = useAiAssistAccess()
   const [tab, setTab] = useState<Tab>(() => (notes[VK.patent] || notes[VK.ax] ? 'summary' : 'mat'))
   const [aiOpen, setAiOpen] = useState(true)
   // D-252 칸마다 [AI로 이 칸 쓰기] → 그 칸이 든 묶음을 AI 판이 쓴다 · 판의 진행을 칸에도 보여 준다
@@ -146,7 +146,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
             <Button variant="secondary" size="sm" onClick={() => void fillFacts()} data-testid="vplan-fact-fill">
               회사 기록으로 채우기
             </Button>
-            {ai === 'yes' && (
+            {assistOn(ai) && (
               <Button variant="secondary" size="sm" onClick={() => setAiOpen((v) => !v)} aria-expanded={aiOpen} data-testid="vplan-ai-open">
                 {aiOpen ? 'AI 판 접기' : 'AI 판 펼치기'}
               </Button>
@@ -155,7 +155,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
         </div>
       </Surface>
 
-      {ai === 'yes' && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} request={aiReq} onRows={setAiRows} />}
+      {assistOn(ai) && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} request={aiReq} onRows={setAiRows} />}
 
       <div role="tablist" className="grid grid-cols-3 gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1 sm:grid-cols-6" data-testid="vplan-tabs">
         {TABS.map((t, i) => {
@@ -185,7 +185,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
               issues={issues.filter((i) => i.field === f.id)}
               save={save}
               ai={
-                ai === 'yes' && f.batch
+                assistOn(ai) && f.batch
                   ? {
                       phase: aiRows[f.batch]?.phase,
                       run: () => {

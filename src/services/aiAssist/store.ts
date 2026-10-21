@@ -16,10 +16,24 @@ export interface AiChoice {
   model: string
 }
 
+const ALL_PROVIDERS: readonly ProviderId[] = ['gemini', 'openai', 'anthropic']
+let onlyProviders: readonly ProviderId[] | null = null
+
+/**
+ * D-257 이 화면에서 고를 수 있는 AI 회사 — 팀장(대표가 팀장 화면으로 볼 때도)은 ['gemini'] · 대표는 null(셋 다).
+ * 화면 맨 위(AppShell)에서 그리기 전에 정한다. 고른 것이 그 밖이면 고른 것 없음(= 서버 기본 Gemini)으로 읽는다.
+ */
+export function setAllowedProviders(list: readonly ProviderId[] | null): void {
+  onlyProviders = list
+}
+export function allowedProviders(): readonly ProviderId[] {
+  return onlyProviders ?? ALL_PROVIDERS
+}
+
 export function readChoice(): AiChoice | null {
   try {
     const v = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as AiChoice | null
-    if (v && (v.provider === 'gemini' || v.provider === 'openai' || v.provider === 'anthropic') && typeof v.model === 'string' && v.model) return v
+    if (v && allowedProviders().includes(v.provider) && typeof v.model === 'string' && v.model) return v
   } catch {
     // 못 읽으면 기본값
   }

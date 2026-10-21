@@ -15,7 +15,7 @@ import { Button } from '../ui/Button'
 import { BottomSheet } from '../ui/primitives'
 import { useToast } from '../ui/toastContext'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { callAssist } from '../../services/aiAssist/client'
 import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../ai/ModelPicker'
@@ -140,9 +140,10 @@ function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: 
 
 export function WorkChat(p: WorkChatProps) {
   const { showToast } = useToast()
-  const access = useOwnerAiAccess()
+  // D-257 팀장도 AI(Gemini 만)
+  const access = useAiAssistAccess()
   const owner = access !== 'no'
-  const aiReady = access === 'yes'
+  const aiReady = assistOn(access)
   const [turns, setTurns] = useState<ChatTurn[]>(() => loadTurns(p.module, p.clientId))
   const [text, setText] = useState('')
   const [guide, setGuide] = useState(false)

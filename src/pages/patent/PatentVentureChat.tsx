@@ -8,7 +8,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { WorkChat } from '../../components/chat/WorkChat'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { emptyDraft, type SpecDraft } from '../../services/patent/specDraft'
@@ -30,7 +30,7 @@ export function PatentVentureChatPage() {
   const works = useModuleBucket<CertWorkRow>('cert-os', 'work')
   const { clientId: urlClient, loadClients } = useToolClient()
   const clientId = urlClient ?? ''
-  const access = useOwnerAiAccess()
+  const access = useAiAssistAccess()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)

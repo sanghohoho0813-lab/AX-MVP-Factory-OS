@@ -278,6 +278,7 @@ export const ERROR_TEXT = {
   db_setup_needed: 'AI 작업실 DB 설정이 필요합니다(0021).',
   login_required: '다시 로그인해 주세요.',
   forbidden: '이 기능을 쓸 권한이 없습니다.',
+  provider_not_allowed: '팀장 계정은 지금 Gemini 모델만 쓸 수 있습니다.',
   rate_limited: '요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.',
   bad_request: '요청 모양이 맞지 않습니다.',
   too_large: '보낼 자료가 너무 많습니다. 자료를 줄여 주세요.',

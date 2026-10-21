@@ -6,6 +6,8 @@
  *
  * 문지기는 AI 작업실과 같다(_ai/gate.js): 로그인 → 대표 권한 → 속도(도우미 몫 따로) → 같은 요청 번호는 한 번만 → 개인정보 한 번 더 지움.
  * 오류 응답에는 공급자 원문 · 키 · 주소를 넣지 않는다.
+ * D-257 팀장(Pilot)도 연다 — 대표 지시 "일단은 Gemini 만": 모델 목록에 Gemini 만 · 다른 회사를 보내면 403(provider_not_allowed) ·
+ *   대표 전용 화면(마케팅 radar · content) 단추는 403 · 지시문의 '대표' 는 이 화면을 쓰는 팀장으로 읽게 한 줄 더.
  */
 import { ASSISTS, ASSIST_OUTPUT_SCHEMA, assistOf, assistSystem, buildAssistPrompt } from './_ai/assists.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
@@ -13,6 +15,17 @@ import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
+/** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
+export const PILOT_PROVIDERS = new Set(['gemini'])
+const PILOT_BLOCKED_PAGES = new Set(['radar', 'content'])
+const PILOT_NOTE = '[이 요청] 대표가 아니라 팀장(이 OS 를 함께 쓰는 컨설턴트)이 보냈다. 지시문 · 규칙의 "대표" 는 이 화면을 쓰는 팀장으로 읽고, 팀장이 바로 할 일로 쓴다.'
+
+/** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서 */
+function pilotCatalog(catalog) {
+  const providers = catalog.providers.filter((p) => PILOT_PROVIDERS.has(p.id))
+  const def = PILOT_PROVIDERS.has(catalog.defaultChoice.provider) ? catalog.defaultChoice : { provider: 'gemini', model: tierModel('gemini', 'cheap') }
+  return { providers, defaultChoice: def }
+}
 const inflight = new Map()
 const ID_RE = /^[A-Za-z0-9_-]{8,80}$/
 
@@ -28,12 +41,12 @@ function timeoutMs() {
   return Math.min(Math.max(Number.isFinite(v) && v > 0 ? v : 55000, 5000), 295000)
 }
 
-async function runOnce(assist, choice, body) {
+async function runOnce(assist, choice, body, role) {
   const key = providerKey(choice.provider)
   const base = providerBase(choice.provider)
   const context = scrubDeep(body.context || {})
   const ask = typeof body.ask === 'string' ? scrubText(body.ask).slice(0, 500) : ''
-  const system = assistSystem(assist)
+  const system = role === 'pilot' ? `${assistSystem(assist)}\n\n${PILOT_NOTE}` : assistSystem(assist)
   const { user, sent } = buildAssistPrompt(assist, context, ask)
   const started = Date.now()
   // '생각' 토큰까지 세는 공급자가 있어 글 몫의 두 배를 상한으로
@@ -78,15 +91,18 @@ export default async function handler(req, res) {
   const url = new URL(req.url || '/', 'http://local')
 
   if (method === 'GET' && url.searchParams.get('status') === '1') {
-    const who = await whoCan(req)
+    const who = await whoCan(req, { allowPilot: true })
     if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
-    const catalog = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
-    return send(res, 200, { ok: true, ...catalog, limits: assistLimits(), assists: Object.values(ASSISTS).map((a) => ({ id: a.id, page: a.page, version: a.version })) })
+    const full = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
+    const catalog = who.role === 'pilot' ? pilotCatalog(full) : full
+    const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !PILOT_BLOCKED_PAGES.has(a.page))
+    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
-  const who = await whoCan(req)
+  const who = await whoCan(req, { allowPilot: true })
   if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
+  const pilot = who.role === 'pilot'
 
   const { value: body, tooLarge } = await readBody(req)
   if (tooLarge) return fail(res, 413, 'too_large')
@@ -94,9 +110,12 @@ export default async function handler(req, res) {
   const assist = assistOf(body.assistId)
   if (!assist || body.page !== assist.page || typeof body.requestId !== 'string' || !ID_RE.test(body.requestId)) return fail(res, 400, 'bad_request')
 
+  if (pilot && PILOT_BLOCKED_PAGES.has(assist.page)) return fail(res, 403, 'forbidden')
+
   // 고른 것이 없으면 기본(Gemini 가장 싼 모델) · 공급자만 골랐으면 그 공급자의 가장 싼 모델
   const sent = cleanChoice(body.choice)
-  const def = defaultChoice()
+  if (pilot && sent && !PILOT_PROVIDERS.has(sent.provider)) return fail(res, 403, 'provider_not_allowed')
+  const def = pilot && !PILOT_PROVIDERS.has(defaultChoice().provider) ? { provider: 'gemini', model: tierModel('gemini', 'cheap') } : defaultChoice()
   const provider = sent ? sent.provider : def.provider
   const choice = { provider, model: (sent && sent.model) || (provider === def.provider ? def.model : tierModel(provider, 'cheap')) }
   if (!providerKey(choice.provider) || !providerBase(choice.provider)) {
@@ -123,7 +142,7 @@ export default async function handler(req, res) {
     return fail(res, 429, 'rate_limited', { retryAfter: rate.retryAfter })
   }
 
-  const promise = runOnce(assist, choice, body)
+  const promise = runOnce(assist, choice, body, who.role)
   inflight.set(idemKey, { at: now, promise, assistId: assist.id })
   if (inflight.size > 500) inflight.delete(inflight.keys().next().value)
   try {

@@ -24,6 +24,8 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 import { useSideAi } from '../../lib/sideAi'
+import { useAiAssistAccess } from '../../auth/ownerAiAccess'
+import { setAllowedProviders } from '../../services/aiAssist/store'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -48,6 +50,8 @@ function ShellFallback() {
 export function AppShell() {
   // D-188: 머리줄 · 메뉴 숫자까지 같은 목록을 보게 — 화면을 그리는 맨 위에서 먼저 정한다
   setBuiltinServicesHidden(useIsPilot())
+  // D-257 팀장(대표가 팀장 화면으로 볼 때도)은 AI 회사 Gemini 만 — 모델 고르기 · 고른 것 읽기가 같이 따른다
+  setAllowedProviders(useAiAssistAccess() === 'pilot' ? ['gemini'] : null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const contentWidth = useContentWidth()

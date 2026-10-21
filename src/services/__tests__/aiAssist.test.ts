@@ -18,7 +18,8 @@ import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan, radarVideos } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
 import { agentsBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, radarBundle, salesBundle } from '../aiAssist/builders'
-import { contextHash, historyOf, markDone, pushHistory } from '../aiAssist/store'
+import { allowedProviders, contextHash, historyOf, markDone, pushHistory, readChoice, setAllowedProviders } from '../aiAssist/store'
+import { aiAssistAccessOf, ownerAiAccessOf } from '../../auth/ownerAiAccess'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { CustomerEvent } from '../../types/bridge'
@@ -41,6 +42,8 @@ function check(name: string, ok: boolean, detail?: unknown) {
 
 const OWNER = 'Bearer owner-token-aaaaaaaaaaaaaaaaaaaa'
 const PILOT = 'Bearer pilot-token-bbbbbbbbbbbbbbbbbbbb'
+/** 로그인은 되지만 OS 접근 등급이 없는 사람(공개 사이트 가입자 등) */
+const OUTSIDER = 'Bearer outsider-token-cccccccccccccccccc'
 const G_KEY = 'gem-test-KEY-998877'
 const A_KEY = 'ant-test-KEY-665544'
 const O_KEY = 'sk-test-ASSIST-332211'
@@ -62,9 +65,11 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   if (url.startsWith('https://qa.supabase.test/auth/v1/user')) {
     if (headers.Authorization === OWNER) return new Response(JSON.stringify({ id: 'owner-1' }), { status: 200 })
     if (headers.Authorization === PILOT) return new Response(JSON.stringify({ id: 'pilot-1' }), { status: 200 })
+    if (headers.Authorization === OUTSIDER) return new Response(JSON.stringify({ id: 'outsider-1' }), { status: 200 })
     return new Response('{}', { status: 401 })
   }
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/has_capability')) return new Response(JSON.stringify(headers.Authorization === OWNER), { status: 200 })
+  if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_os_access')) return new Response(JSON.stringify(headers.Authorization === OWNER ? 'full' : headers.Authorization === PILOT ? 'pilot' : 'none'), { status: 200 })
   const c: Call = { url, headers, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {} }
   if (/models(\?|$)/.test(url) && (init?.method ?? 'GET') === 'GET') {
     calls.push(c)
@@ -144,6 +149,13 @@ const CTX = { title: '오늘 할 일', today: '2026-10-19 (월)', sections: [{ n
   setEnv({ AI_MODELS_GEMINI: 'gemini-9-pro, bad model!, gemini-3.1-flash-lite' })
   const g = catalogOf('gemini')
   check('L10 AI_MODELS_GEMINI 로 새 모델을 앞에 더함(이상한 이름은 버림 · 같은 것 한 번)', g[0].id === 'gemini-9-pro' && !g.some((m) => m.id.includes(' ')) && g.filter((m) => m.id === 'gemini-3.1-flash-lite').length === 1)
+  {
+    const base = { hasAuth: true, capabilities: ['can_use_owner_ai_workspace'] as string[] }
+    const a = (access: string | null, pilot: boolean, capabilities: string[] | null = base.capabilities) => aiAssistAccessOf({ hasAuth: true, access, pilot, capabilities })
+    check('PA1 화면 AI 단추 권한 — 대표 owner · 팀장 pilot · 대표가 팀장 화면 pilot · 권한 없는 구성원 no · 0021 전 setup · 로컬 owner',
+      a('full', false) === 'owner' && a('pilot', true, []) === 'pilot' && a('full', true) === 'pilot' && a('full', false, []) === 'no' && a('full', false, null) === 'setup' && a('none', false, []) === 'no' && aiAssistAccessOf({ hasAuth: false, access: null, pilot: false, capabilities: null }) === 'owner')
+    check('PA2 AI 작업실 권한은 그대로 — 팀장 · 대표가 팀장 화면으로 볼 때 no', ownerAiAccessOf({ ...base, access: 'pilot', pilot: true, capabilities: [] }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: true }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: false }) === 'yes')
+  }
   check('L11 화면이 보낸 선택 검사 — 모르는 회사 · 이상한 모델 이름은 버림', cleanChoice({ provider: 'evil' }) === null && cleanChoice({ provider: 'gemini', model: 'x y' })?.model === '' && cleanChoice({ provider: 'GEMINI', model: 'gemini-3.8-flash' })?.provider === 'gemini')
 }
 
@@ -191,13 +203,42 @@ async function serverTests() {
   setEnv()
   {
     const r1 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, '')
-    const r2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
-    check('S11 로그인 없음 401 · 팀장 403 · 공급자 안 부름(직접 불러도 막힘)', r1.statusCode === 401 && r2.statusCode === 403 && r2.body.code === 'forbidden' && calls.length === 0)
+    const r2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, OUTSIDER)
+    check('S11 로그인 없음 401 · OS 등급 없는 계정 403 · 공급자 안 부름(직접 불러도 막힘)', r1.statusCode === 401 && r2.statusCode === 403 && r2.body.code === 'forbidden' && calls.length === 0)
     const r3 = await post({ requestId: rid(), assistId: 'today.top3', page: 'money', context: CTX })
     const r4 = await post({ requestId: 'x', assistId: 'today.top3', page: 'today', context: CTX })
     const r5 = await post({ requestId: rid(), assistId: 'no.such', page: 'today', context: CTX })
     check('S12 단추와 화면이 다름 · 이상한 요청 번호 · 없는 단추 → 400', r3.statusCode === 400 && r4.statusCode === 400 && r5.statusCode === 400)
   }
+  /* D-257 팀장(Pilot) — AI 도우미는 Gemini 만 */
+  {
+    calls = []
+    const st = await get('/api/ai-assist?status=1', PILOT)
+    const ids = (st.body.providers as { id: string }[] | undefined)?.map((p) => p.id) ?? []
+    const assistPages = new Set(((st.body.assists as { page: string }[] | undefined) ?? []).map((a) => a.page))
+    check('P1 팀장 상태 — 회사 목록은 Gemini 하나 · 기본도 Gemini · role pilot · 마케팅 단추 없음', st.statusCode === 200 && ids.join() === 'gemini' && (st.body.defaultChoice as { provider: string }).provider === 'gemini' && st.body.role === 'pilot' && !assistPages.has('radar') && !assistPages.has('content') && assistPages.has('today'), { ids, role: st.body.role })
+    const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
+    const call = calls.find((c) => c.url.includes(':generateContent'))
+    const sys = JSON.stringify(call?.body.systemInstruction ?? '')
+    check('P2 팀장 기본(선택 없음) → Gemini 가장 싼 모델로 · 답 받음 · 지시문에 "팀장이 보냈다" 한 줄', r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && (call?.url ?? '').includes('gemini-3.1-flash-lite') && sys.includes('팀장(이 OS 를 함께 쓰는 컨설턴트)'), r.raw.slice(0, 300))
+    const g2 = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'gemini', model: 'gemini-3.1-flash' }, context: CTX }, PILOT)
+    check('P3 팀장이 다른 Gemini 모델을 골라도 됨', g2.statusCode === 200 && (g2.body.run as { model: string }).model === 'gemini-3.1-flash', g2.raw.slice(0, 200))
+    calls = []
+    const c1 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic' }, context: CTX }, PILOT)
+    const c2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX }, PILOT)
+    check('P4 팀장이 Claude · GPT 를 보내면 403 provider_not_allowed · 공급자 안 부름', c1.statusCode === 403 && c1.body.code === 'provider_not_allowed' && c2.statusCode === 403 && c2.body.code === 'provider_not_allowed' && calls.length === 0, { c1: c1.body, n: calls.length })
+    const m1 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: CTX }, PILOT)
+    check('P5 팀장이 대표 전용 마케팅 단추를 직접 불러도 403 · 공급자 안 부름', m1.statusCode === 403 && m1.body.code === 'forbidden' && calls.length === 0, m1.body)
+    const own = await get('/api/ai-assist?status=1')
+    check('P6 대표는 그대로 — 세 회사 · role owner', (own.body.providers as { id: string }[]).length === 3 && own.body.role === 'owner')
+  }
+  setEnv({ AI_DEFAULT_PROVIDER: 'anthropic' })
+  {
+    const st = await get('/api/ai-assist?status=1', PILOT)
+    const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
+    check('P7 기본 회사를 Claude 로 바꿔 둬도 팀장 기본은 Gemini', (st.body.defaultChoice as { provider: string }).provider === 'gemini' && r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini', { def: st.body.defaultChoice, run: (r.body.run as { provider?: string } | undefined)?.provider })
+  }
+  setEnv()
   {
     const id = rid()
     const [a, b] = await Promise.all([post({ requestId: id, assistId: 'today.top3', page: 'today', context: CTX }), post({ requestId: id, assistId: 'today.top3', page: 'today', context: CTX })])
@@ -419,6 +460,16 @@ function d241Tests() {
     markDone(run.requestId, 'next:1')
     const again = historyOf('today')[0]
     check('H1 [할 일로 넣기] 한 항목은 지난 답에 적힘 — 판을 다시 열어 다시 읽어도 그대로 · 같은 것 한 번 · 없는 답이면 null', JSON.stringify(again?.done) === '["item:0","next:1"]' && markDone('as_no_such_0001', 'item:0') === null, again?.done)
+    // D-257 팀장 — 화면에서 고를 수 있는 회사는 Gemini 만 · 예전에 고른 Claude 는 '고른 것 없음'(서버 기본 Gemini)으로 읽음
+    localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'anthropic', model: 'claude-haiku-5-5' }))
+    const ownerSees = readChoice()?.provider
+    setAllowedProviders(['gemini'])
+    const pilotSees = readChoice()
+    const pilotList = allowedProviders().join()
+    localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'gemini', model: 'gemini-3.8-flash' }))
+    const pilotGem = readChoice()?.model
+    setAllowedProviders(null)
+    check('PV1 팀장 화면 — 고를 수 있는 회사 Gemini 하나 · 고른 Claude 는 무시(기본 Gemini) · Gemini 모델은 그대로 · 대표로 돌아오면 셋', ownerSees === 'anthropic' && pilotSees === null && pilotList === 'gemini' && pilotGem === 'gemini-3.8-flash' && allowedProviders().join() === 'gemini,openai,anthropic', { ownerSees, pilotSees, pilotList, pilotGem })
   }
 
   // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지

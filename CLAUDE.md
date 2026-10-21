@@ -71,7 +71,7 @@ npm run qa:session                                # 로그인 · 작업공간 �
 npm run qa:matrix -- http://localhost:4390        # 모듈 × 여러 상황(업체 8유형 × 상황 예시 펼침 · 상황→모듈 · 모듈 20화면 · 상세 탭 · 390 — 화면 오류 · NaN/undefined · 넘침 0)
 npm run qa:modsafe -- http://localhost:4390       # 모듈 안전(정책자금 칸 바꾸면 알림 · 저장 실패 알림 · 연구소 CSV 덮지 않음 · 점검 달 · 연구노트 과제/버리기 묻기 · 고용 일괄등록 중복 · 지원금 바꾸면 회차 · 보고서 태그)
 npm run qa:db                                     # DB 보안(로컬 PostgreSQL · 마이그레이션 전부 · RLS · 0016~0019 공격 · 모든 표 격리) — pg_ctlcluster 16 main start 먼저
-npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB + PostgREST 진짜 RLS · 대표 ↔ Pilot ↔ 가입자 · 같은 브라우저 · 주소 · 찾기 · 업무 흐름 · 390 · 팀장 업무 항목(기본 6종 숨김 · 상품표 40) · 피드백 → 받은 피드백함)
+npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB + PostgREST 진짜 RLS · 대표 ↔ Pilot ↔ 가입자 · 같은 브라우저 · 주소 · 찾기 · 업무 흐름 · 390 · 팀장 업무 항목(기본 6종 숨김 · 상품표 40) · 피드백 → 받은 피드백함 · 팀장 AI 는 Gemini 만 — 진짜 서버 함수 · DB 가 등급 판단)
 npm run qa:isolation                              # 팀장 격리 집중(진짜 RLS · 모든 표 API 공격 · 저장소 조작 · 무작위 80걸음 — 팀장은 대표 화면/자료 0) — pg_ctlcluster 16 main start 먼저
 npm run qa:ownerai -- http://localhost:4390       # 대표 AI 작업실(진짜 서버 함수 + 가짜 공급자 · 시나리오 A~E · 기억 판 · 채택 · 제안서/화면 스튜디오 · 키 노출 0 · 360/390)
 npm run qa:phone -- http://localhost:4390         # 휴대폰 전반(360 · 390 · 430 · 긴 이름 · 공고 300건 — 넘침 · 글자가 칸보다 넓음 · 짜부라짐 · 칩 겹침 0)
@@ -99,7 +99,7 @@ npm run qa:assist -- http://localhost:4390        # AI 도우미(진짜 서버 �
 - DB 변경은 **추가만**. DROP TABLE/COLUMN · TRUNCATE · 이름 바꾸기 · PK 변경 · RLS 끄기 금지.
 - force push · history rewrite · 기존 브랜치 삭제 금지.
 - 고객 플랫폼은 내부 표를 읽지 않는다 — `portal_*` 과 고객 안전 RPC 만. 업무 일기는 고객에게 절대 안 보인다.
-- 규칙 계산을 "AI" 라고 부르지 않는다. LLM API 호출 0을 유지한다 — **예외는 대표 전용 서버 함수 둘뿐**: AI 작업실 `/api/ai-run`(D-200, 2026-10-14 대표 지시) · 화면마다 AI 도우미 `/api/ai-assist`(D-239, 2026-10-19 대표 지시). 키는 서버 환경변수에만(`VITE_` 금지) · 브라우저는 AI 공급자를 직접 부르지 않는다 · 대표 권한(`can_use_owner_ai_workspace`)이 없으면 띠도 없다 · 고객 플랫폼 · 팀장 화면은 그대로 0. 규칙 계산 결과 글에는 여전히 'AI' 라고 쓰지 않는다(AI 도우미 띠 안의 답만 AI).
+- 규칙 계산을 "AI" 라고 부르지 않는다. LLM API 호출 0을 유지한다 — **예외는 서버 함수 둘뿐**: AI 작업실 `/api/ai-run`(D-200, 2026-10-14 대표 지시 · **대표만**) · 화면마다 AI 도우미 `/api/ai-assist`(D-239, 2026-10-19 대표 지시 · D-257 2026-10-21 대표 지시로 **최은혜 팀장(Pilot)도 — Gemini 만**). 키는 서버 환경변수에만(`VITE_` 금지) · 브라우저는 AI 공급자를 직접 부르지 않는다 · 대표 권한(`can_use_owner_ai_workspace`)도 팀장 등급(`my_os_access = pilot`)도 없으면 띠도 없다 · 팀장은 서버가 Gemini 밖 회사 · 대표 전용 마케팅 단추를 403 으로 막는다 · 고객 플랫폼은 그대로 0. 팀장에게 다른 회사(GPT · Claude)를 열거나 AI 작업실을 여는 것은 대표에게 먼저 묻는다. 규칙 계산 결과 글에는 여전히 'AI' 라고 쓰지 않는다(AI 단추가 낸 답만 AI).
 - 저장소 이름 · Vercel 프로젝트 이름 · 도메인을 바꾸지 않는다.
 - 커밋·PR·코드 주석에 모델 이름을 넣지 않는다.
 

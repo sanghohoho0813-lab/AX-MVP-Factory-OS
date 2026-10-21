@@ -89,6 +89,7 @@ const MESSAGE: Record<string, string> = {
   db_setup_needed: 'AI 권한 DB 설정(0021)이 아직 안 됐습니다.',
   login_required: '다시 로그인해 주세요.',
   forbidden: '이 기능은 대표 계정에서만 쓸 수 있습니다.',
+  provider_not_allowed: '팀장 계정은 지금 Gemini 모델만 쓸 수 있습니다 — 모델을 Gemini 로 바꿔 주세요.',
   rate_limited: '조금 전에 많이 눌렀어요. 1분 뒤 다시 눌러 주세요.',
   too_large: '보낼 자료가 너무 많습니다.',
   provider_auth: 'AI 키가 맞지 않습니다. 키를 다시 확인해 주세요.',

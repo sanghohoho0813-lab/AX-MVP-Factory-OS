@@ -15,6 +15,8 @@ import { chromium } from 'playwright'
 import { spawn, execSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const SHOTS = process.argv[2] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -107,6 +109,54 @@ const whoOf = (auth) => {
   return USERS.find((u) => jwt(u) === t) ?? null
 }
 const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) })
+
+// ---------- D-257 AI 도우미 서버 함수(진짜 api/ai-assist.js) — 로그인 확인은 위 흉내, 권한 RPC 는 진짜 PostgREST(DB 가 팀장인지 판단), AI 회사만 가짜 ----------
+const { default: assistHandler } = await import(pathToFileURL(path.resolve('api/ai-assist.js')).href)
+Object.assign(process.env, { SUPABASE_URL: `https://${REF}.supabase.co`, SUPABASE_ANON_KEY: 'qa-anon', GEMINI_API_KEY: 'gem-pilot-e2e-KEY', ANTHROPIC_API_KEY: 'ant-pilot-e2e-KEY', AI_ASSIST_RATE_PER_MIN: '100', AI_ASSIST_RATE_PER_HOUR: '500' })
+const aiCalls = [] // { provider, sys, user }
+const rpcCalls = [] // { who, fn, body }
+const AI_ANSWER = { headline: '오늘은 서류 마감부터', items: [{ title: '서류 받기', tag: '마감', detail: '내일까지 받아야 신청할 수 있어요' }], next: ['오전에 전화'], caution: '' }
+const realFetch = globalThis.fetch
+globalThis.fetch = async (input, init = {}) => {
+  const url = String(input)
+  const h = init.headers ?? {}
+  if (url.startsWith(`https://${REF}.supabase.co/auth/v1/user`)) {
+    const u = whoOf(h.Authorization ?? h.authorization)
+    return new Response(JSON.stringify(u ? { id: u.id } : {}), { status: u ? 200 : 401 })
+  }
+  if (url.startsWith(`https://${REF}.supabase.co/rest/v1/rpc/`)) {
+    const fn = url.split('/rpc/')[1]
+    rpcCalls.push({ who: whoOf(h.Authorization)?.email ?? 'anon', fn, body: init.body })
+    return realFetch(`http://127.0.0.1:${PGRST_PORT}/rpc/${fn}`, { method: 'POST', headers: { Authorization: h.Authorization, 'Content-Type': 'application/json' }, body: init.body ?? '{}' })
+  }
+  if (url.includes('generativelanguage.googleapis.com') && url.includes(':generateContent')) {
+    const body = JSON.parse(String(init.body ?? '{}'))
+    aiCalls.push({ provider: 'gemini', url, sys: String(body.systemInstruction?.parts?.[0]?.text ?? ''), user: String(body.contents?.[0]?.parts?.map((x) => x.text ?? '').join('\n') ?? '') })
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(AI_ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 120 } }), { status: 200 })
+  }
+  if (url.includes('api.anthropic.com') || url.includes('api.openai.com')) {
+    aiCalls.push({ provider: url.includes('anthropic') ? 'anthropic' : 'openai', url, sys: '', user: '' })
+    return new Response('{}', { status: 500 })
+  }
+  return realFetch(input, init)
+}
+function mkRes() {
+  const r = { statusCode: 200, raw: '', body: {}, setHeader() {}, end(b) { r.raw = b ?? ''; try { r.body = JSON.parse(r.raw) } catch { r.body = {} } } }
+  return r
+}
+async function assistRoute(r) {
+  const req = r.request()
+  const u = new URL(req.url())
+  const res = mkRes()
+  await assistHandler({ method: req.method(), url: u.pathname + u.search, headers: { authorization: req.headers()['authorization'] ?? '' }, body: req.postData() ?? undefined }, res)
+  return r.fulfill({ status: res.statusCode, contentType: 'application/json', body: res.raw })
+}
+/** 서버 함수를 직접(화면 없이) — 팀장 토큰으로 */
+async function assistDirect(u, body) {
+  const res = mkRes()
+  await assistHandler({ method: 'POST', url: '/api/ai-assist', headers: { authorization: `Bearer ${jwt(u)}` }, body: JSON.stringify(body) }, res)
+  return res
+}
 
 const uploads = []
 let restLog = [] // { who, method, url, body }
@@ -208,6 +258,7 @@ async function searchFor(page, q) {
 try {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   await ctx.route(`https://${REF}.supabase.co/**`, route)
+  await ctx.route('**/api/ai-assist**', assistRoute)
   const page = await ctx.newPage()
   page.on('pageerror', (e) => errors.push(String(e)))
 
@@ -601,10 +652,33 @@ try {
   check('팀장(D-188): 업무 탭을 열고 저장해도 업체 기록의 기본 6종 칸은 그대로(DB)', ['incorporation', 'businessScope', 'patent', 'venture', 'ax', 'policyFund'].every((k) => JSON.parse(sql(`select payload::text from public.operations_clients where id = '${pc}'`) || '{}').services?.[k] !== undefined) && pkBefore.length > 0)
   await shot(page, 'pilot-06-work-items')
 
-  // D-246: 팀장 — 기업인증 › 벤처 사업계획서 쓰기는 열리지만 AI 초안 단추는 없다(대표만 · 서버도 막음)
+  // D-246 → D-257: 팀장 — 기업인증 › 벤처 사업계획서 쓰기 · AI 판도 열림(Gemini 만)
   await go(page, `/tools/cert-os/venture?client=${pc}&plan=1`)
   await page.waitForTimeout(900)
-  check('팀장(D-246): 벤처 사업계획서 쓰기 화면 열림 · AI 초안 단추 없음 · 대표 자료 0', (await page.getByTestId('vplan').count()) === 1 && (await page.getByTestId('vplan-ai-open').count()) === 0 && leaked(await bodyText(page)).length === 0, (await bodyText(page)).slice(0, 200))
+  check('팀장(D-257): 벤처 사업계획서 쓰기 화면 열림 · AI 판 단추 있음(대표 지시 — Gemini 만) · 대표 자료 0', (await page.getByTestId('vplan').count()) === 1 && (await page.getByTestId('vplan-ai-open').count()) === 1 && leaked(await bodyText(page)).length === 0, (await bodyText(page)).slice(0, 200))
+
+  // D-257: 팀장 — 오늘 AI 도우미 띠 → 질문 단추 → 진짜 서버 함수 · 진짜 DB(my_os_access = pilot) → Gemini 로만
+  aiCalls.length = 0
+  rpcCalls.length = 0
+  await go(page, '/')
+  const pBar = page.getByTestId('ai-assist-bar').first()
+  check('팀장(D-257): 오늘 화면에 AI 도우미 띠', (await pBar.count()) === 1)
+  await page.getByTestId('ai-assist-chip').first().click()
+  await page.getByTestId('ai-assist-result').first().waitFor({ timeout: 15000 }).catch(() => {})
+  const pRes = await page.getByTestId('ai-assist-result').first().innerText().catch(() => '')
+  const gem = aiCalls.filter((c) => c.provider === 'gemini')
+  check('팀장(D-257): 질문 단추 한 번 → 답 · Gemini 로만 감 · 서버가 DB 에 등급을 물어 팀장으로 판단(my_os_access)', pRes.includes('서류 마감부터') && gem.length === 1 && aiCalls.length === 1 && rpcCalls.some((c) => c.who === PILOT.email && c.fn === 'my_os_access'), { n: aiCalls.length, rpc: rpcCalls.map((c) => `${c.who}:${c.fn}`).join(), pRes: pRes.slice(0, 80) })
+  check('팀장(D-257): 지시문에 "팀장이 보냈다" 한 줄 · 보낸 자료에 대표 자료 0', (gem[0]?.sys ?? '').includes('팀장(이 OS 를 함께 쓰는 컨설턴트)') && leaked(gem[0]?.user ?? '').length === 0, leaked(gem[0]?.user ?? '').join())
+  await page.getByTestId('ai-assist-model-toggle').first().click()
+  await page.waitForTimeout(500)
+  const tabs = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
+  check('팀장(D-257): 모델 바꾸기 — 회사 탭은 Gemini 하나(GPT · Claude 없음)', tabs.join() === 'gemini', tabs.join())
+  await shot(page, 'pilot-07-ai-gemini')
+  await page.keyboard.press('Escape')
+  const d1 = await assistDirect(PILOT, { requestId: 'pilot-direct-000001', assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic' }, context: { title: '오늘', today: '2026-10-21', sections: [] } })
+  const d2 = await assistDirect(PILOT, { requestId: 'pilot-direct-000002', assistId: 'radar.top5', page: 'radar', context: { title: '마케팅', today: '2026-10-21', sections: [] } })
+  const d3 = await assistDirect(OUTSIDER, { requestId: 'pilot-direct-000003', assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-21', sections: [] } })
+  check('팀장(D-257) 서버 직접: Claude 고르면 403 provider_not_allowed · 대표 전용 마케팅 단추 403 · 등급 없는 가입자 403 · AI 회사 안 부름', d1.statusCode === 403 && d1.body.code === 'provider_not_allowed' && d2.statusCode === 403 && d3.statusCode === 403 && aiCalls.length === 1, { d1: d1.body.code, d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
 
   // D-188: 사이드바 아래 — 버전 글자 대신 [개발자에게 피드백](이번 회차 아직이면 '새 설문')
   const side = (await page.locator('aside').first().innerText()) ?? ''
@@ -831,6 +905,18 @@ try {
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
   check('AI 대표 → 팀장 화면: AI 작업실 메뉴 없음', !pnav.includes('AI 작업실'), pnav.replace(/\n/g, '|').slice(0, 300))
+  {
+    // D-257 대표가 팀장 화면으로 볼 때도 팀장과 같게 — AI 띠는 있고 회사는 Gemini 만
+    await go(page, '/')
+    const hasBar = (await page.getByTestId('ai-assist-bar').count()) >= 1
+    await page.getByTestId('ai-assist-chip').first().click()
+    await page.getByTestId('ai-assist-model-toggle').first().waitFor({ timeout: 8000 }).catch(() => {})
+    await page.getByTestId('ai-assist-model-toggle').first().click().catch(() => {})
+    await page.waitForTimeout(500)
+    const vt = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
+    check('AI 대표 → 팀장 화면(D-257): AI 도우미 띠 있음 · 회사 탭 Gemini 하나', hasBar && vt.join() === 'gemini', vt.join())
+    await page.keyboard.press('Escape')
+  }
   check('D-247 대표 → 팀장 화면: 특허 · 벤처 메뉴 없음', !pnav.includes('특허 · 벤처'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ai')
   check('AI 대표 → 팀장 화면: /ai 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다') && (await page.getByTestId('case-workspace').count()) === 0)

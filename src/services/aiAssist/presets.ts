@@ -3,7 +3,7 @@
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent' | 'cert'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent' | 'cert' | 'side'
 
 export interface AssistPreset {
   id: string
@@ -89,6 +89,7 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'radar.pack.blog', page: 'radar', label: '키워드 묶음 — 블로그 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
+  { id: 'side.chat', page: 'side', label: 'AI 대화 — 무엇이든 물어보기', kind: 'list', hint: 'OS 안 오른쪽 판에서 — 어느 화면에서나' },
   // D-252 기업인증 타자 없이 — 준비 화면의 [AI로 나눠 넣기] · [AI로 말할 답 쓰기] 가 부른다(띠 · 판 단추에는 없음)
   { id: 'cert.reply', page: 'cert', label: '기업인증 — 대표님 답장 질문마다 나누기', kind: 'list', hint: '카톡 답장 통째로 → 질문마다' },
   { id: 'cert.say', page: 'cert', label: '기업인증 — 실사 예상 질문 말할 답 쓰기', kind: 'write', hint: '확인된 사실 · 대표 답만으로' },

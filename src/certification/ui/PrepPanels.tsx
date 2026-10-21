@@ -21,7 +21,7 @@ import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, gateFirst, gateRows, missingDocsR
 import { EVIDENCE_BASIS_LABEL } from '../rules/officialRules'
 import { PACK_LABEL, PACK_MARK, venturePackText, type VentureCheckRow, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
@@ -263,7 +263,7 @@ export function InspectionPackPanel({
 }) {
   const copy = useCopy()
   const { showToast } = useToast()
-  const ai = useOwnerAiAccess()
+  const ai = useAiAssistAccess()
   const [saying, setSaying] = useState(false)
   const [sayErr, setSayErr] = useState('')
   const said = pkg.questions.filter((x) => (notes[sayKey(x.q.id)] ?? '').trim()).length
@@ -314,7 +314,7 @@ export function InspectionPackPanel({
         </Block>
 
         <Block title={`예상 핵심질문 ${pkg.questions.length}개 — 눌러서 말하기 가이드`} testid="pack-questions">
-          {ai === 'yes' && pkg.questions.length > 0 && (
+          {assistOn(ai) && pkg.questions.length > 0 && (
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5" data-testid="pack-say-ai">
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="primary" disabled={saying} onClick={() => void writeSays()} data-testid="pack-say-run">

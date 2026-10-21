@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { BadgeCheck, FileStack, ListOrdered, MessageSquareText } from 'lucide-react'
 import { WorkChat } from '../../components/chat/WorkChat'
 import { useToolClient } from '../../tools/shared/toolClientContext'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { useSenderLine } from '../../components/layout/useCurrentUser'
 import { todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -20,7 +20,7 @@ const ICONS = { can: <BadgeCheck className="size-5" />, docs: <FileStack classNa
 export function CertChat({ d }: { d: ReturnType<typeof useCertData> }) {
   const { loadClients } = useToolClient()
   const navigate = useNavigate()
-  const access = useOwnerAiAccess()
+  const access = useAiAssistAccess()
   const sender = useSenderLine()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
   const today = todayLocalDate()

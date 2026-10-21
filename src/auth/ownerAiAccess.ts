@@ -30,6 +30,31 @@ export function useOwnerAiAccess(): OwnerAiAccess {
   return ownerAiAccessOf({ hasAuth: !!auth, access: auth?.access ?? null, pilot, capabilities: auth?.capabilities ?? null })
 }
 
+/**
+ * D-257 화면마다 AI 단추(AI 도우미 띠 · 대화창 · 답장 나누기 · 실사 말할 답 · 사업계획서 AI · 오른쪽 판 AI 대화) — 대표 지시 "팀장 계정에도 열되 일단 Gemini 만".
+ *   owner  대표(모든 회사 모델) · 로컬 모드
+ *   pilot  팀장 · 대표가 팀장 화면으로 볼 때 — Gemini 만(서버 ai-assist 도 Gemini 밖은 403)
+ *   no / setup  useOwnerAiAccess 와 같은 뜻
+ * AI 작업실(/ai · 업체 'AI 작업실' 탭)은 이것이 아니라 useOwnerAiAccess 그대로 — 팀장에게 안 연다.
+ */
+export type AssistAccess = 'owner' | 'pilot' | 'no' | 'setup'
+
+export function aiAssistAccessOf(input: { hasAuth: boolean; access: string | null; pilot: boolean; capabilities: readonly string[] | null }): AssistAccess {
+  if (!input.hasAuth || input.access === null) return 'owner'
+  if (input.pilot) return 'pilot'
+  const o = ownerAiAccessOf(input)
+  return o === 'yes' ? 'owner' : o
+}
+
+export function useAiAssistAccess(): AssistAccess {
+  const auth = useContext(AuthContext)
+  const pilot = useIsPilot()
+  return aiAssistAccessOf({ hasAuth: !!auth, access: auth?.access ?? null, pilot, capabilities: auth?.capabilities ?? null })
+}
+
+/** AI 단추를 눌러 부를 수 있는가(대표 · 팀장) */
+export const assistOn = (a: AssistAccess): boolean => a === 'owner' || a === 'pilot'
+
 /** 메뉴 · 찾기에 쓰는 권한 묶음(setup 이어도 메뉴는 보여 '설정 필요' 를 안내한다) */
 export function useCapabilitySet(): ReadonlySet<string> {
   const a = useOwnerAiAccess()

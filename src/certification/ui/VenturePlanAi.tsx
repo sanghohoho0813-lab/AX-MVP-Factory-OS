@@ -131,7 +131,7 @@ export function VenturePlanAi({
     <Surface>
       <div className="flex flex-col gap-3" data-testid="vplan-ai">
         <div className="flex flex-col gap-1">
-          <h3 className="t-body font-bold text-slate-900">AI 가 씁니다 — 버튼만 누르세요 · 대표만</h3>
+          <h3 className="t-body font-bold text-slate-900">AI 가 씁니다 — 버튼만 누르세요</h3>
           <p className="t-sub break-keep text-slate-700">
             재료(특허 · AX · 메모)와 회사 기록만 보고 여섯 번에 나눠 씁니다(한 번에 1~2칸 · 요약은 마지막). 받는 대로 저장하고, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
           </p>

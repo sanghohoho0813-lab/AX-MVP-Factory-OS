@@ -1,6 +1,8 @@
 /**
  * AI 서버 함수 공통 문지기 — 로그인(Supabase JWT) · 기능 권한(대표만) · 속도 제한 · 요청 읽기 · 응답.
  * api/ai-run.js(AI 작업실)와 api/ai-assist.js(화면마다 AI 도우미)가 같이 쓴다. 속도 제한은 사람마다 같은 칸을 센다(합쳐서 막는다).
+ * D-257 AI 도우미만 팀장(Pilot · 서버 0019 my_os_access = 'pilot')도 연다 — role 'pilot' 으로 돌려주고, 어느 모델까지 되는지는 부른 쪽(ai-assist)이 정한다.
+ *   AI 작업실(ai-run)은 그대로 대표 권한만(allowPilot 없이 부른다).
  */
 import { ERROR_TEXT } from './core.js'
 
@@ -33,7 +35,7 @@ export function fail(res, status, code, extra = {}) {
 
 const authCache = new Map()
 
-export async function whoCan(req) {
+export async function whoCan(req, { allowPilot = false } = {}) {
   const raw = (req.headers && (req.headers.authorization || req.headers.Authorization)) || ''
   const m = /^Bearer\s+([\w.-]{20,4096})$/.exec(String(raw))
   if (!m) return { ok: false, status: 401, code: 'login_required' }
@@ -41,7 +43,8 @@ export async function whoCan(req) {
   const anon = envAny(SUPA_ANON_NAMES)
   if (!base || !anon) return { ok: false, status: 503, code: 'setup_needed', missing: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'] }
   const token = m[1]
-  const hit = authCache.get(token)
+  const cacheKey = allowPilot ? `p:${token}` : token
+  const hit = authCache.get(cacheKey)
   if (hit && hit.until > Date.now()) return hit.value
   let value
   // D-244: 로그인 · 권한 확인 두 번을 합쳐 4초까지 — 모델 대기(최대 55초)와 더해도 함수 한도(60초) 안
@@ -61,7 +64,18 @@ export async function whoCan(req) {
       if (cr.status === 404) value = { ok: false, status: 403, code: 'db_setup_needed' }
       else {
         const can = cr.ok ? await cr.json() : false
-        value = can === true ? { ok: true, userId: u.id } : { ok: false, status: 403, code: 'forbidden' }
+        if (can === true) value = { ok: true, userId: u.id, role: 'owner' }
+        else if (allowPilot) {
+          // 대표 권한이 없으면 — 접근 등급이 'pilot'(서버가 정함 · 이메일로 비교하지 않음)일 때만 팀장으로 연다
+          const ar = await fetch(`${base}/rest/v1/rpc/my_os_access`, {
+            method: 'POST',
+            headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: '{}',
+            signal: ctrl.signal,
+          })
+          const access = ar.ok ? await ar.json() : null
+          value = access === 'pilot' ? { ok: true, userId: u.id, role: 'pilot' } : { ok: false, status: 403, code: 'forbidden' }
+        } else value = { ok: false, status: 403, code: 'forbidden' }
       }
     }
   } catch {
@@ -70,7 +84,7 @@ export async function whoCan(req) {
   } finally {
     clearTimeout(timer)
   }
-  authCache.set(token, { until: Date.now() + 60_000, value })
+  authCache.set(cacheKey, { until: Date.now() + 60_000, value })
   if (authCache.size > 200) authCache.delete(authCache.keys().next().value)
   return value
 }
