@@ -151,7 +151,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   const dlg = page.getByRole('dialog', { name: '서류에서 정보 불러오기' })
   await dlg.locator('input[type="file"]').setInputFiles(pdfPath)
   const read = await page
-    .waitForFunction(() => /214-?88-?01234/.test(document.querySelector('[aria-label="서류에서 정보 불러오기"]')?.textContent ?? '') || /214-?88-?01234/.test([...document.querySelectorAll('[aria-label="서류에서 정보 불러오기"] input')].map((i) => i.value).join(' ')), null, { timeout: 20000 })
+    .waitForFunction(() => /214-?88-?01232/.test(document.querySelector('[aria-label="서류에서 정보 불러오기"]')?.textContent ?? '') || /214-?88-?01232/.test([...document.querySelectorAll('[aria-label="서류에서 정보 불러오기"] input')].map((i) => i.value).join(' ')), null, { timeout: 20000 })
     .then(() => true)
     .catch(() => false)
   const dlgText = (await dlg.innerText().catch(() => '')) + ' ' + (await dlg.locator('input').evaluateAll((xs) => xs.map((x) => x.value).join(' ')).catch(() => ''))
