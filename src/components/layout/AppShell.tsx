@@ -24,6 +24,7 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 import { useSideAi } from '../../lib/sideAi'
+import { SideDock } from './SideDock'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders } from '../../services/aiAssist/store'
 
@@ -71,7 +72,8 @@ export function AppShell() {
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
       <TutorialProvider>
-      <div className="flex min-h-screen" style={sideAi.reserve ? { paddingRight: sideAi.reserve } : undefined} data-side-reserve={sideAi.reserve || undefined}>
+      {/* D-258 OS 안 오른쪽 판(AI 대화 · 웹)이 옆에 붙으면 --dock-w 만큼 비킨다(덮어 띄울 때 · 휴대폰은 0) */}
+      <div className="flex min-h-screen lg:pr-(--dock-w)" style={sideAi.reserve ? { paddingRight: `calc(${sideAi.reserve}px + var(--dock-w, 0px))` } : undefined} data-side-reserve={sideAi.reserve || undefined}>
         {/* D-256 메뉴 폭(넓게 · 아이콘 · 숨김)은 메뉴가 스스로 기억한다 — 경계선 끌기 · [사이드바 접기] */}
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -109,6 +111,7 @@ export function AppShell() {
         </div>
         <MobileNav onOpenMore={() => setMobileOpen(true)} />
         <ScrollTopButton />
+        <SideDock />
       </div>
       </TutorialProvider>
       </DemoTourProvider>

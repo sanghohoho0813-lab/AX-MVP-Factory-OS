@@ -1,4 +1,5 @@
 /**
+ * D-258 판 맨 위 'OS 안에서 열기' — [AI 대화] · [Google 검색] 을 새 창 없이 OS 오른쪽 판(SideDock)으로.
  * D-256 판에 주소 칸 — 주소(google.com · naver.com …)나 검색어를 적고 [열기] → 같은 옆 창이 그리로(비우면 Google).
  *   옆 창의 주소창은 브라우저가 고칠 수 없게 막아 두므로 여기서 바꾼다. 바로 가기: 네이버 · 기업마당 · K-Startup · 홈택스.
  * D-254 [ChatGPT 옆에 띄우기] — 누르면 작은 판: 어느 AI(ChatGPT · Claude · Gemini) · 폭 3단계 · 옆에 열기 · 앞으로 · 닫기 ·
@@ -7,17 +8,21 @@
  * 판은 메뉴 오른쪽에 화면 고정(메뉴 칸이 잘라 먹지 않게). 보기 무대(iframe) 안에서는 숨긴다(바깥에 하나만).
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
+import { closeDock, openDock, useDock } from '../../lib/sideDock'
 import { SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 
 export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
   const s = useSideAi()
+  const dock = useDock()
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState<CSSProperties>({})
   const [osOpened, setOsOpened] = useState(false)
   const [addr, setAddr] = useState('')
   const box = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const toggle = () => {
     const r = btn.current?.getBoundingClientRect()
@@ -25,14 +30,17 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
       const w = Math.min(384, window.innerWidth - 16)
       // 메뉴 칸 오른쪽 끝에서 띄운다(단추 끝이 아니라 — 판이 메뉴 경계에 걸치지 않게)
       const edge = box.current?.closest('aside')?.getBoundingClientRect().right ?? r.right
-      setAt({ left: Math.max(8, Math.min(edge + 8, window.innerWidth - w - 8)), bottom: Math.max(8, window.innerHeight - r.bottom), width: w, maxHeight: window.innerHeight - 16 })
+      // 아래 끝은 단추 끝에 맞추고, 위로는 화면 안까지만(넘치면 판 안에서 굴린다)
+      const bottom = Math.max(8, window.innerHeight - r.bottom)
+      setAt({ left: Math.max(8, Math.min(edge + 8, window.innerWidth - w - 8)), bottom, width: w, maxHeight: window.innerHeight - bottom - 8 })
     }
     setOpen((v) => !v)
   }
   useEffect(() => {
     if (!open) return
     const away = (e: PointerEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (box.current && !box.current.contains(t) && !panelRef.current?.contains(t)) setOpen(false)
     }
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -63,14 +71,49 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
         <PanelRight aria-hidden="true" className="size-[18px] shrink-0" />
         {!collapsed && <span className="min-w-0 truncate">{s.open ? `${shown} 옆 창 열림` : `${name} 옆에 띄우기`}</span>}
       </button>
-      {open && (
-        <div role="dialog" aria-label="AI 옆 창" style={at} className="fixed z-50 flex flex-col gap-3 overflow-y-auto rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-slate-900 shadow-(--shadow-card)" data-testid="side-ai-panel">
+      {/* D-258 판은 body 에 — 메뉴 칸(sticky z-30) 안에 두면 머리줄(z-30)이 판 윗부분을 덮었다(실측) */}
+      {open && createPortal(
+        <div ref={panelRef} role="dialog" aria-label="AI 옆 창" style={at} className="fixed z-50 flex flex-col gap-3 overflow-y-auto rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-slate-900 shadow-(--shadow-card)" data-testid="side-ai-panel">
           <div className="flex items-start gap-2">
-            <p className="t-body min-w-0 flex-1 font-bold break-keep">옆 창에 띄우기</p>
+            <p className="t-body min-w-0 flex-1 font-bold break-keep">AI · 웹 옆에 띄우기</p>
             <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="tap -mt-1 -mr-1 flex size-9 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100">
               <X aria-hidden="true" className="size-4" />
             </button>
           </div>
+          {/* D-258 새 창 없이 OS 안 오른쪽 판으로 — AI 대화(우리 서버 · 팀장은 Gemini) · Google 검색 */}
+          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 py-2.5" data-testid="side-ai-inside">
+            <span className="t-meta font-semibold text-violet-900">OS 안에서 열기 (새 창 없이)</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  openDock('chat')
+                  setOpen(false)
+                }}
+                className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800"
+                data-testid="side-ai-dock-chat"
+              >
+                <Sparkles aria-hidden="true" className="size-4" /> AI 대화
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  openDock('web')
+                  setOpen(false)
+                }}
+                className="tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-white px-3 font-semibold text-violet-900 hover:bg-violet-100"
+                data-testid="side-ai-dock-web"
+              >
+                <Search aria-hidden="true" className="size-4" /> Google 검색
+              </button>
+            </div>
+            {dock.open && (
+              <button type="button" onClick={() => closeDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
+                오른쪽 판 닫기
+              </button>
+            )}
+          </div>
+          <p className="t-meta -mb-1 font-semibold text-slate-600">새 옆 창으로 (ChatGPT · Claude · Gemini 사이트 그대로)</p>
           <div className="flex flex-col gap-1.5">
             <span className="t-meta font-semibold text-slate-600">무엇을 띄울까요</span>
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="무엇을 띄울까요">
@@ -189,9 +232,10 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
             </p>
           )}
           <p className="t-meta break-keep text-slate-500">
-            ChatGPT · Claude · Gemini · 다른 사이트는 보안 때문에 OS 화면 안에는 넣을 수 없어 옆 창으로 엽니다. 옆 창 위 주소창은 브라우저가 막아 두어 고칠 수 없으니 다른 곳은 위 <b>주소 칸</b>에 적으세요. 창을 겹치지 않게 놓으려면 Windows 는 창을 누르고 <b>Win+←</b> · <b>Win+→</b>, Mac 은 초록 단추를 길게 눌러 왼쪽/오른쪽에 타일.
+            ChatGPT · Claude · Gemini 사이트는 OS 안에 넣을 수 없게 막혀 있어 옆 창으로 엽니다(OS 안에서는 위 <b>AI 대화</b>). 옆 창 주소는 위 <b>주소 칸</b>에서 바꿉니다. 창 나란히: Windows <b>Win+←</b> · <b>Win+→</b>, Mac 초록 단추 길게.
           </p>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

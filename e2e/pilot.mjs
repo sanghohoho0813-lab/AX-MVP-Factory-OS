@@ -680,6 +680,19 @@ try {
   const d3 = await assistDirect(OUTSIDER, { requestId: 'pilot-direct-000003', assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-21', sections: [] } })
   check('팀장(D-257) 서버 직접: Claude 고르면 403 provider_not_allowed · 대표 전용 마케팅 단추 403 · 등급 없는 가입자 403 · AI 회사 안 부름', d1.statusCode === 403 && d1.body.code === 'provider_not_allowed' && d2.statusCode === 403 && d3.statusCode === 403 && aiCalls.length === 1, { d1: d1.body.code, d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
 
+  // D-258: 팀장 — OS 안 오른쪽 판 AI 대화 → 진짜 서버 함수(side.chat) → Gemini 로만 · 보낸 것에 대표 자료 0
+  await page.getByTestId('side-ai-button').click()
+  await page.getByTestId('side-ai-dock-chat').click()
+  await page.getByTestId('side-dock').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.getByTestId('dock-chat-input').fill('정책자금 신청 순서 알려 줘')
+  await page.getByTestId('dock-chat-input').press('Enter')
+  await page.getByTestId('dock-answer').first().waitFor({ timeout: 15000 }).catch(() => {})
+  const dockAns = await page.getByTestId('dock-answer').first().innerText().catch(() => '')
+  const gem2 = aiCalls.filter((c) => c.provider === 'gemini')
+  check('팀장(D-258): 오른쪽 판 AI 대화 → 판 안에 답 · Gemini 로만 · 팀장 한 줄 · 보낸 것에 대표 자료 0', dockAns.includes('서류 마감부터') && gem2.length === 2 && aiCalls.length === 2 && gem2[1].sys.includes('팀장(이 OS 를 함께 쓰는 컨설턴트)') && gem2[1].user.includes('정책자금 신청 순서') && leaked(gem2[1].user).length === 0, { n: aiCalls.length, dockAns: dockAns.slice(0, 80) })
+  await shot(page, 'pilot-08-dock-chat')
+  await page.getByTestId('dock-close').click()
+
   // D-188: 사이드바 아래 — 버전 글자 대신 [개발자에게 피드백](이번 회차 아직이면 '새 설문')
   const side = (await page.locator('aside').first().innerText()) ?? ''
   const fbBtn = page.locator('aside [data-testid="feedback-open"]').first()

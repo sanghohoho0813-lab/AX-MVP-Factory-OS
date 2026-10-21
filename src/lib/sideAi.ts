@@ -219,7 +219,8 @@ export function addressLabel(url: string): string {
   }
 }
 
-function openInSide(url: string, label: string): boolean {
+/** D-258 판에서도 — 막는 사이트를 같은 옆 창으로 */
+export function openInSide(url: string, label: string): boolean {
   const { side } = sideLayout(screenBox(), state.width)
   const w = window.open(url, SIDE_WIN_NAME, featuresOf(side))
   if (!w) {

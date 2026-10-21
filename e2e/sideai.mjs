@@ -226,6 +226,187 @@ await handle.dblclick()
 check('PC JS 오류 0', errors.length === 0, errors.join(' | '))
 await ctx.close()
 
+// D-258 OS 안 오른쪽 판 — AI 대화(서버 함수는 가짜 답) · 웹(Google igu · 기업마당 안에 · 막는 곳은 옆 창)
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, screen: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  await c.route(outside, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<html><head><meta charset="utf-8"></head><body><h1 id="host">${new URL(r.request().url()).host}</h1><p id="q">${new URL(r.request().url()).searchParams.get('q') ?? ''}</p></body></html>` }))
+  const posts = []
+  let failNext = 0
+  await c.route('**/api/ai-assist**', async (r) => {
+    const req = r.request()
+    if (req.method() === 'GET') {
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, providers: [{ id: 'gemini', label: 'Gemini', configured: true, keyName: 'GEMINI_API_KEY', checked: false, models: [{ id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', note: '', price: null, verified: null, tier: 'cheap' }] }], defaultChoice: { provider: 'gemini', model: 'gemini-3.1-flash-lite' } }) })
+    }
+    const body = JSON.parse(req.postData() ?? '{}')
+    posts.push(body)
+    if (failNext > 0) {
+      failNext--
+      return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'provider_busy' }) })
+    }
+    const n = posts.length
+    return r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, run: { requestId: body.requestId, assistId: body.assistId, page: body.page, provider: 'gemini', model: 'gemini-3.1-flash-lite', status: 'succeeded', structured: { headline: `답 ${n} — 정책자금은 진단 → 서류 → 신청 순서예요.`, items: [{ title: '1단계 진단', detail: '기업 상황을 먼저 봅니다. (공식 확인 필요)' }, { title: '보낼 문자', body: `대표님 안녕하세요 ${n}` }], next: ['필요 서류 알려 줘', '기한은 언제야'], caution: '' }, raw: '', usage: { input: 10, output: 10, total: 20 }, estimatedCostUsd: 0, ms: 5, sent: { userChars: 1, rows: 0, rowsCut: 0 }, createdAt: new Date().toISOString() } }),
+    })
+  })
+  const p = await c.newPage()
+  const errs = []
+  p.on('pageerror', (e) => errs.push(String(e)))
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.evaluate(seedScript())
+  await p.evaluate(() => ['axmvp.ui.side_dock', 'axmvp.ui.side_dock.chat', 'axmvp.ui.nav.size'].forEach((k) => localStorage.removeItem(k)))
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.waitForTimeout(500)
+  const geo = () =>
+    p.evaluate(() => {
+      const d = document.querySelector('[data-testid="side-dock"]')
+      const r = d ? d.getBoundingClientRect() : null
+      const m = document.querySelector('main').getBoundingClientRect()
+      const h = document.querySelector('header')
+      return { dock: r ? Math.round(r.width) : 0, dockX: r ? Math.round(r.x) : null, mode: d ? d.dataset.mode : '', mainRight: Math.round(m.right), main: Math.round(m.width), over: document.documentElement.scrollWidth - document.documentElement.clientWidth, hdr: h.scrollWidth - h.clientWidth, pad: getComputedStyle(document.documentElement).getPropertyValue('--dock-w').trim() }
+    })
+
+  await p.getByTestId('side-ai-button').click()
+  await p.getByTestId('side-ai-inside').waitFor()
+  check('D1 판 맨 위 "OS 안에서 열기" — [AI 대화] · [Google 검색]', (await p.getByTestId('side-ai-dock-chat').isVisible()) && (await p.getByTestId('side-ai-dock-web').isVisible()))
+  await shot(p, 'D1-panel')
+  await p.getByTestId('side-ai-dock-chat').click()
+  await p.getByTestId('side-dock').waitFor()
+  await p.waitForTimeout(300)
+  let g = await geo()
+  check(`D2 [AI 대화] → 새 창 없이 오른쪽 판(${g.dock}px · 옆에 붙임) · 본문이 판 왼쪽에서 끝남(본문 ${g.main}px) · 화면 · 머리줄 넘침 0 · 판 위 메뉴 판 닫힘`, g.mode === 'dock' && g.dock === 384 && g.mainRight <= g.dockX + 1 && g.over <= 0 && g.hdr <= 0 && c.pages().length === 1 && (await p.getByTestId('side-ai-panel').count()) === 0, g)
+  const starters = await p.getByTestId('dock-starter').count()
+  check('D3 처음 — "무엇이든 물어보세요" · 예시 질문 4개 · 모델 고르기 단추', (await p.getByTestId('dock-chat-empty').isVisible()) && starters === 4 && (await p.getByTestId('dock-model').isVisible()), starters)
+  await shot(p, 'D3-chat-empty')
+  await p.getByTestId('dock-starter').nth(1).click()
+  await p.getByTestId('dock-answer').first().waitFor()
+  const a1 = await p.getByTestId('dock-answer').first().innerText()
+  check('D4 예시 질문 한 번 → side.chat(page side)로 묻고 판 안에 답 · 핵심 · 단계 · 복사할 글 · 모델 이름 · 이어 묻기 칩', posts.length === 1 && posts[0].assistId === 'side.chat' && posts[0].page === 'side' && posts[0].ask.includes('정책자금') && a1.includes('답 1') && a1.includes('1단계 진단') && a1.includes('대표님 안녕하세요 1') && a1.includes('gemini-3.1-flash-lite') && (await p.getByTestId('dock-next').count()) === 2, { posts: posts.length, a1 })
+  await p.getByTestId('dock-chat-input').fill('고용지원금은?')
+  await p.getByTestId('dock-chat-input').press('Enter')
+  await p.getByTestId('dock-answer').nth(1).waitFor()
+  const ctx2 = posts[1]?.context ?? {}
+  check('D5 질문 칸 + Enter → 두 번째 답 · 앞선 대화 1줄 · 지금 보는 화면 이름만 보냄(회사 기록 없음)', posts.length === 2 && posts[1].ask === '고용지원금은?' && ctx2.sections?.[0]?.name === '앞선 대화' && ctx2.sections[0].rows.length === 1 && ctx2.sections.length === 1 && (ctx2.facts ?? []).length === 1 && ctx2.facts[0].startsWith('지금 보고 있는 화면'), ctx2)
+  await p.getByTestId('dock-next').last().click()
+  await p.getByTestId('dock-answer').nth(2).waitFor()
+  check('D6 이어 묻기 칩 → 세 번째 질문으로 바로', posts.length === 3 && posts[2].ask === '기한은 언제야', posts.map((x) => x.ask))
+  failNext = 1
+  await p.getByTestId('dock-chat-input').fill('실패해 볼 질문')
+  await p.getByTestId('dock-chat-send').click()
+  await p.getByTestId('dock-error').waitFor()
+  const errText = await p.getByTestId('dock-error').innerText()
+  await p.getByTestId('dock-retry').click()
+  await p.waitForFunction(() => document.querySelectorAll('[data-testid="dock-answer"]').length === 4)
+  check('D7 AI 가 붐비면 사람 말로 · [다시] → 같은 질문으로 답', errText.includes('붐비') && posts.length === 5 && posts[4].ask === '실패해 볼 질문', { errText, n: posts.length })
+  // 알림이 판에 가리지 않게 — 복사 알림은 판 왼쪽에
+  await p.getByTestId('dock-copy').first().click()
+  const toast = p.getByText(/복사했어요|복사하지 못했어요/).first()
+  await toast.waitFor()
+  const tb = await toast.boundingBox()
+  g = await geo()
+  check('D8 복사 알림이 판에 가리지 않음(판 왼쪽)', tb && tb.x + tb.width <= g.dockX + 1, { tb, dockX: g.dockX })
+  await shot(p, 'D8-chat-answers')
+  await p.reload({ waitUntil: 'networkidle' })
+  await p.waitForTimeout(500)
+  check('D9 다시 열어도 판 · 대화(4개 답) 그대로', (await p.getByTestId('side-dock').isVisible()) && (await p.getByTestId('dock-answer').count()) === 4 && (await p.getByTestId('dock-turn').count()) === 5)
+
+  // 웹
+  await p.locator('[data-testid="dock-tab"][data-id="web"]').click()
+  const frame = p.getByTestId('dock-web-frame')
+  await frame.waitFor()
+  const src0 = await frame.getAttribute('src')
+  const inner = p.frameLocator('[data-testid="dock-web-frame"]')
+  await inner.locator('#host').waitFor()
+  check('D10 [웹] → 판 안에 Google(igu=1 · 다른 곳 안에 들어가는 Google 주소)', src0 === 'https://www.google.com/webhp?igu=1' && (await inner.locator('#host').innerText()) === 'www.google.com', src0)
+  await p.getByTestId('dock-web-address').fill('청년도약 장려금 2026')
+  await p.getByTestId('dock-web-address').press('Enter')
+  await p.waitForFunction(() => (document.querySelector('[data-testid="dock-web-frame"]')?.getAttribute('src') ?? '').includes('/search?'))
+  const src1 = await frame.getAttribute('src')
+  await inner.locator('#q', { hasText: '청년도약' }).waitFor()
+  check('D11 검색어 + Enter → 판 안에서 Google 검색(새 창 없음)', src1.startsWith('https://www.google.com/search?') && src1.includes('igu=1') && decodeURIComponent(new URL(src1).searchParams.get('q')) === '청년도약 장려금 2026' && (await inner.locator('#q').innerText()) === '청년도약 장려금 2026' && c.pages().length === 1, src1)
+  await p.locator('[data-testid="dock-web-site"][data-id="bizinfo"]').click()
+  await p.waitForTimeout(300)
+  check('D12 바로 가기 [기업마당] → 판 안에(막지 않는 곳)', (await frame.getAttribute('src')) === 'https://www.bizinfo.go.kr/' && c.pages().length === 1)
+  await shot(p, 'D12-web-bizinfo')
+  const [pop1] = await Promise.all([c.waitForEvent('page'), p.locator('[data-testid="dock-web-side"][data-id="naver"]').click()])
+  await pop1.waitForLoadState()
+  await p.waitForTimeout(300)
+  const withSide = await p.evaluate(() => ({ dock: document.querySelectorAll('[data-testid="side-dock"]').length, reserve: Number(document.querySelector('[data-side-reserve]')?.getAttribute('data-side-reserve') ?? 0), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
+  check('D13 [네이버 ↗](막는 곳) → 옆 창으로 · 옆 창이 오른쪽을 차지하는 동안 판은 비켜 줌(겹치지 않음) · 넘침 0', pop1.url() === 'https://www.naver.com/' && withSide.dock === 0 && withSide.reserve > 0 && withSide.over <= 0, { url: pop1.url(), withSide })
+  await pop1.close()
+  await p.getByTestId('side-dock').waitFor({ timeout: 5000 })
+  check('D14 옆 창을 닫으면 판이 돌아오고 보던 곳(기업마당) 그대로', (await p.getByTestId('dock-web-frame').getAttribute('src')) === 'https://www.bizinfo.go.kr/' && (await p.locator('[data-side-reserve]').count()) === 0)
+  await p.getByTestId('dock-web-address').fill('chatgpt.com')
+  const [pop2] = await Promise.all([c.waitForEvent('page'), p.getByTestId('dock-web-go').click()])
+  await pop2.waitForLoadState()
+  check('D14b 주소 칸 "chatgpt.com" → 판에 넣지 않고 옆 창이 ChatGPT 로', pop2.url() === 'https://chatgpt.com/', pop2.url())
+  await pop2.close()
+  await p.getByTestId('side-dock').waitFor({ timeout: 5000 })
+  await p.waitForTimeout(200)
+  const dlg = []
+  p.on('dialog', (d) => {
+    dlg.push(d.message())
+    d.dismiss()
+  })
+  await p.getByTestId('dock-web-address').fill('javascript:alert(1)')
+  await p.getByTestId('dock-web-go').click()
+  await p.waitForTimeout(300)
+  const srcJs = await frame.getAttribute('src')
+  check('D15 "javascript:…" → 실행 안 함 · Google 검색으로', srcJs.startsWith('https://www.google.com/search?') && dlg.length === 0, srcJs)
+  const sb = await frame.getAttribute('sandbox')
+  check('D16 판 안 사이트는 OS 화면을 바꾸지 못함(sandbox 에 top 이동 없음)', sb.includes('allow-scripts') && !sb.includes('allow-top-navigation'), sb)
+
+  // 폭 — 끌기 · 키보드 · 두 번 누르기
+  const hd = await p.getByTestId('dock-resize').boundingBox()
+  await p.mouse.move(hd.x + hd.width / 2, hd.y + 300)
+  await p.mouse.down()
+  await p.mouse.move(hd.x + hd.width / 2 + 40, hd.y + 300, { steps: 4 })
+  await p.mouse.move(hd.x + hd.width / 2 + 60, hd.y + 300, { steps: 2 })
+  await p.mouse.up()
+  await p.waitForTimeout(200)
+  g = await geo()
+  const dragged = g.dock
+  await p.getByTestId('dock-resize').focus()
+  await p.keyboard.press('ArrowRight')
+  await p.waitForTimeout(100)
+  const keyed = (await geo()).dock
+  await p.keyboard.press('Home')
+  await p.waitForTimeout(100)
+  const homed = await geo()
+  check(`D17 경계선 끌기 60px → ${dragged}px · 키보드 → 24px 좁게 · Home 320 · 본문이 따라 넓어짐 · 넘침 0`, dragged === 324 && keyed === 320 && homed.dock === 320 && homed.mainRight <= homed.dockX + 1 && homed.over <= 0, { dragged, keyed, homed })
+  await p.getByTestId('dock-resize').dblclick()
+  await p.waitForTimeout(150)
+  check('D18 두 번 누르면 처음 폭(이 화면에서는 384 — 본문 768 남김)', (await geo()).dock === 384)
+  check('D19 판 JS 오류 0', errs.length === 0, errs.join(' | '))
+
+  // 좁은 PC — 덮어 띄움 · 휴대폰 — 없음 · 닫기
+  await p.setViewportSize({ width: 1280, height: 800 })
+  await p.waitForTimeout(300)
+  g = await geo()
+  check(`D20 1280 화면(메뉴 288) — 본문을 줄이지 않고 판을 덮어 띄움(${g.mode}) · 본문 비킴 0 · 넘침 0`, g.mode === 'over' && g.pad === '0px' && g.over <= 0 && g.hdr <= 0, g)
+  await shot(p, 'D20-over-1280')
+  await p.setViewportSize({ width: 1440, height: 900 })
+  await p.getByTestId('dock-close').click()
+  await p.waitForTimeout(200)
+  g = await geo()
+  check('D21 [닫기] → 판 없음 · 본문 비킴 0 · 다시 열어도 닫힘', g.dock === 0 && g.pad === '0px' && g.over <= 0, g)
+  await p.reload({ waitUntil: 'networkidle' })
+  check('D21b 다시 열어도 닫혀 있음', (await p.getByTestId('side-dock').count()) === 0)
+  await c.close()
+
+  const mc = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const mpg = await mc.newPage()
+  await mpg.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mpg.evaluate(seedScript())
+  await mpg.evaluate(() => localStorage.setItem('axmvp.ui.side_dock', JSON.stringify({ open: true, tab: 'chat', width: 420 })))
+  await mpg.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mpg.waitForTimeout(400)
+  const mo = await mpg.evaluate(() => ({ dock: document.querySelectorAll('[data-testid="side-dock"]').length, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
+  check('D22 휴대폰(390) — 열어 둔 기억이 있어도 판 없음 · 넘침 0', mo.dock === 0 && mo.over <= 0, mo)
+  await mc.close()
+}
+
 // 머리줄은 그대로 — 단추를 메뉴로 옮긴 까닭(머리줄에 두면 1024 · 1440 · 1600 · 1900 에서 넘쳤다)
 const hdr = []
 for (const width of [1024, 1440, 1600, 1920, 2300]) {
