@@ -805,9 +805,23 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await page.getByTestId('new-client-from-doc-companyName').waitFor({ timeout: 25000 })
   await page.waitForFunction(() => !document.querySelector('[data-testid="new-client-docs-reading"]'), null, { timeout: 25000 })
   const cName = await page.locator('form input[required]').first().inputValue()
-  check(`D-187 크레탑만 넣어도 업체명 · 대표자 · 사업자번호 ${tag}`, cName.includes('한빛정밀') && (await val('대표자·담당자')) === '김한빛' && (await val('사업자등록번호')) === '214-87-35291', JSON.stringify({ cName, c: await val('대표자·담당자'), b: await val('사업자등록번호') }))
+  // D-255 크레탑 견본의 번호(214-87-35291)는 국세청 검증 숫자가 안 맞는다 — 예전엔 그대로 채우고 작은 경고, 이제는 채우지 않고 후보 단추
+  check(`D-187 크레탑만 넣어도 업체명 · 대표자 ${tag}`, cName.includes('한빛정밀') && (await val('대표자·담당자')) === '김한빛', JSON.stringify({ cName, c: await val('대표자·담당자') }))
   check(`D-187 크레탑 칸 밑에 '크레탑 보고서에서 채움' ${tag}`, ((await page.getByTestId('new-client-from-doc-companyName').innerText()) ?? '').includes('크레탑 보고서'))
-  check(`D-187 검증이 안 맞는 사업자번호는 '한 글자씩 비교' 안내 ${tag}`, ((await page.getByTestId('new-client-from-doc-businessNumber').innerText()) ?? '').includes('번호 검증이 맞지 않아요'))
+  const bizChoices = page.getByTestId('new-client-choices-businessNumber')
+  const picks = await bizChoices.getByTestId('new-client-choice').evaluateAll((els) => els.map((e) => e.textContent.trim()))
+  const nts = (v) => {
+    const d = v.replace(/\D/g, '').split('').map(Number)
+    if (d.length !== 10) return false
+    const w = [1, 3, 7, 1, 3, 7, 1, 3, 5]
+    let sum = w.reduce((acc, k, i) => acc + d[i] * k, 0) + Math.floor((d[8] * 5) / 10)
+    return (10 - (sum % 10)) % 10 === d[9]
+  }
+  check(`D-255 검증이 안 맞는 사업자번호 → 칸은 비워 두고 읽은 번호(214-87-35291) · 검증 맞는 후보 단추 ${picks.length}개 ${tag}`, (await val('사업자등록번호')) === '' && (await bizChoices.innerText()).includes('214-87-35291') && picks.length >= 1 && picks.every(nts), { picks, field: await val('사업자등록번호') })
+  const want = picks.includes('214-87-35297') ? '214-87-35297' : picks[0]
+  await bizChoices.getByTestId('new-client-choice').filter({ hasText: want }).first().click()
+  await page.waitForTimeout(150)
+  check(`D-255 후보를 누르면 그 번호로 채워짐 · 안내 사라짐 ${tag}`, (await val('사업자등록번호')) === want && (await page.getByTestId('new-client-choices-businessNumber').count()) === 0, await val('사업자등록번호'))
   // 취소하면 넣은 서류 · 서류로 채운 값은 버린다
   await page.getByRole('button', { name: '취소' }).click()
   await page.getByTestId('clients-add').click()
