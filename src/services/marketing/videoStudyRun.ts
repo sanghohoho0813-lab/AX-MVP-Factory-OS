@@ -91,10 +91,14 @@ function putPart(id: string, base: { title: string; duration: number }, part: Tr
 const TRANSCRIPT_MESSAGE: Record<string, string> = {
   provider_rejected: '이 영상은 받아 적지 못했어요 — 비공개 · 연령 제한 · 실시간 방송이거나 너무 길 수 있어요. 유튜브에서 직접 확인해 주세요.',
   provider_unreachable: '이 구간은 시간이 오래 걸려 멈췄어요 — [못 받은 구간 다시] 를 눌러 주세요.',
+  rate_limited: '한꺼번에 너무 많이 불러 잠시 막혔어요 — 1분 뒤 [못 받은 구간 다시] 를 눌러 주세요.',
 }
 
+/** 서버가 '조금 전에 많이 눌렀어요'(1분 10번)로 막으면 그 구간만 한 번 다시(1분 뒤) */
+export const STUDY_RATE_RETRY_MS = 65_000
+
 /** 대본 받아 적기 — 받을 구간만(only) 또는 아직 못 받은 구간 전부 · 세 구간씩 동시에 */
-export function startTranscript(v: { id: string; title: string; durationSec: number }, context: AssistContext, only?: readonly Segment[]): void {
+export function startTranscript(v: { id: string; title: string; durationSec: number }, context: AssistContext, only?: readonly Segment[], rateRetryMs = STUDY_RATE_RETRY_MS): void {
   if (studyRun(v.id).running > 0) return
   const have = transcriptOf(v.id)
   const all = transcriptSegments(v.durationSec)
@@ -104,10 +108,17 @@ export function startTranscript(v: { id: string; title: string; durationSec: num
   const choice = readChoice()
   setRun(v.id, (r) => ({ ...r, running: todo.length, total: todo.length }))
   const queue = [...todo]
+  const call = (seg: Segment) => callAssist({ requestId: newRequestId(), assistId: 'radar.transcript', page: 'radar', choice, context, video: { id: v.id, start: seg.start, end: seg.end } })
+  // 서버가 '1분 10번' 으로 막으면(긴 영상 · 셋 동시에) 그 구간만 1분 뒤 한 번 더
+  const callOnce = (seg: Segment) =>
+    call(seg).catch((e: unknown) => {
+      if (!(e instanceof AssistError) || e.code !== 'rate_limited') throw e
+      return new Promise<void>((ok) => setTimeout(ok, rateRetryMs)).then(() => call(seg))
+    })
   const next = (): Promise<void> => {
     const seg = queue.shift()
     if (!seg) return Promise.resolve()
-    return callAssist({ requestId: newRequestId(), assistId: 'radar.transcript', page: 'radar', choice, context, video: { id: v.id, start: seg.start, end: seg.end } })
+    return callOnce(seg)
       .then((run) => {
         const s = run.structured
         const lines = partLines(s?.items, seg)

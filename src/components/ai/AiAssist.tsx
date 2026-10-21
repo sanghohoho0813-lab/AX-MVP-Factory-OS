@@ -690,7 +690,11 @@ export function ModelRow({
               </button>
             )}
           </div>
-          <p className="t-meta break-keep text-slate-500">고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서 · 마케팅 · AI 작업실)가 같이 써요.</p>
+          <p className="t-meta break-keep text-slate-500">
+            {/* D-257 팀장 화면에는 없는 마케팅 · AI 작업실은 말하지 않는다 */}
+            고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 ? ' · 마케팅 · AI 작업실' : ' · 오른쪽 판 AI 대화'})가 같이 써요.
+            {allowedProviders().length === 1 && ' 팀장 계정은 지금 Gemini 모델만 쓸 수 있어요.'}
+          </p>
         </div>
       )}
     </section>
