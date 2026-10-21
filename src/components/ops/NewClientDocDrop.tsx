@@ -37,7 +37,8 @@ interface Item {
   method: ReadMethod
 }
 
-export function NewClientDocDrop({ onChange }: { onChange: (read: NewClientDocsRead) => void }) {
+/** title · hint — 부르는 곳마다 다른 안내(D-255 AI 작업실은 서류함이 아니라 '자료' 로 들어간다) */
+export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증 · 크레탑 보고서 · 등기부등본 — 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
   const { showToast } = useToast()
   const [items, setItems] = useState<Item[]>([])
   const [cretop, setCretop] = useState<CretopCompanyLite[]>([])
@@ -189,8 +190,8 @@ export function NewClientDocDrop({ onChange }: { onChange: (read: NewClientDocsR
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <FileUp aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-brand-600" />
           <div className="min-w-0">
-            <p className="text-[0.98rem] font-bold break-keep text-slate-900">서류만 넣어도 칸이 채워집니다</p>
-            <p className="t-meta break-keep text-slate-600">사업자등록증 · 크레탑 보고서 · 등기부등본 — 등록하면 서류함에도 들어갑니다</p>
+            <p className="text-[0.98rem] font-bold break-keep text-slate-900">{title}</p>
+            <p className="t-meta break-keep text-slate-600">{hint}</p>
           </div>
         </div>
         <Button type="button" variant="secondary" className="w-full shrink-0 sm:w-auto" onClick={() => fileRef.current?.click()} data-testid="new-client-docs-pick">

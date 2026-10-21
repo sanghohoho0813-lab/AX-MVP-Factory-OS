@@ -566,6 +566,45 @@ let caseId = ''
   await page.getByTestId('case-name').waitFor()
   check('F Partner OS 요청 주소 → 빠른 등록 칸 채움(동료 컨설턴트 요청)', (await page.getByTestId('case-name').inputValue()) === '파트너상사' && (await page.getByTestId('case-requester').inputValue()) === '이○○' && (await page.getByTestId('case-relation-new').inputValue()) === 'peer_request')
 
+  // D-255 바로 시작 — 대표 "기존 고객도 여기서 바로 · PDF 만 넣어도 시작 · 타자는 거의 없게"
+  await page.goto(BASE + '/ai', { waitUntil: 'networkidle' })
+  await page.getByTestId('case-quick').waitFor()
+  const quickIds = () => page.getByTestId('case-quick-client').evaluateAll((els) => els.map((e) => e.dataset.id))
+  const q0 = await quickIds()
+  check(`G 바로 시작: '고객 관리에서 고르기' 가 처음 · 아직 작업실 없는 고객 ${q0.length}곳 · 이미 이은 한솔테크 · 우일은 없음`, q0.length >= 1 && !q0.includes('cli_hansol') && !q0.includes('cli_wooil') && (await page.getByTestId('case-quick-tab-client').getAttribute('aria-selected')) === 'true', q0)
+  await shot(page, 'G1-quick-clients', false)
+  const pickId = q0[0]
+  const nBefore = (await cases()).length
+  await page.locator(`[data-testid="case-quick-client"][data-id="${pickId}"]`).click()
+  await page.waitForURL(/\/ai\/cases\//, { timeout: 10000 })
+  await page.getByTestId('case-workspace').waitFor()
+  const pickedCase = (await cases()).find((c) => c.clientId === pickId && !c.archivedAt)
+  check('G 고객 하나 누르면 그 고객과 이은 작업실이 바로(타자 0 · 하나만 늘어남)', !!pickedCase && (await cases()).length === nBefore + 1, { pickId, n: (await cases()).length - nBefore })
+  await page.goto(BASE + '/ai', { waitUntil: 'networkidle' })
+  await page.getByTestId('case-quick').waitFor()
+  check('G 이은 고객은 고르기 목록에서 빠짐', !(await quickIds()).includes(pickId))
+
+  // 서류 한 장 — 가짜 회사 · 가짜 번호(검증 숫자는 맞음)
+  await page.getByTestId('case-quick-tab-docs').click()
+  const bizDoc = { name: '사업자등록증_푸른하늘.txt', mimeType: 'text/plain', buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 214-88-01232', '법인명(단체명) : 푸른하늘(주)', '대표자 : 하늘이', '개업연월일 : 2023 년 03 월 02 일', '사업장 소재지 : 서울특별시 마포구 하늘로 1', '업태 : 정보통신업  종목 : 응용 소프트웨어 개발', '연락처 010-1234-5678'].join('\n'), 'utf8') }
+  await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([bizDoc])
+  await page.getByTestId('case-quick-found').waitFor({ timeout: 25000 })
+  const found = await page.getByTestId('case-quick-found').innerText()
+  check('G 서류 한 장 → 업체명 · 대표 · 사업자번호를 읽어 보여 줌 · [이 서류로 AI 작업실 만들기]', found.includes('푸른하늘') && found.includes('하늘이') && found.includes('214-88-01232') && (await page.getByTestId('case-quick-create').count()) === 1, found)
+  await shot(page, 'G2-quick-docs', false)
+  await page.getByTestId('case-quick-create').click()
+  await page.waitForURL(/\/ai\/cases\//, { timeout: 10000 })
+  await page.getByTestId('case-workspace').waitFor()
+  const docCase = (await cases()).find((c) => c.companyName.includes('푸른하늘'))
+  const mat = docCase?.materials?.[0]
+  check('G 서류로 만든 작업실 — 이름 · 사업자번호 · 대표 메모 · 읽은 글이 자료 1건(휴대폰은 지움)', !!docCase && docCase.bizNo === '2148801232' && (docCase.memo ?? '').includes('하늘이') && (docCase.materials ?? []).length === 1 && !!mat && mat.text.includes('응용 소프트웨어') && !mat.text.includes('010-1234-5678'), docCase && { bizNo: docCase.bizNo, memo: docCase.memo, mats: (docCase.materials ?? []).length, text: mat?.text?.slice(0, 200) })
+  // 같은 서류를 또 넣으면 새로 만들지 않고 그 작업실을 연다
+  await page.goto(BASE + '/ai', { waitUntil: 'networkidle' })
+  await page.getByTestId('case-quick-tab-docs').click()
+  await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([bizDoc])
+  await page.getByTestId('case-quick-found').waitFor({ timeout: 25000 })
+  check('G 같은 서류를 또 넣으면 → 이미 작업실 있음 · [작업실 열기](새로 안 만듦)', (await page.getByTestId('case-quick-open-case').count()) === 1 && (await page.getByTestId('case-quick-create').count()) === 0)
+
   // 사용량
   await page.goto(BASE + '/ai/usage', { waitUntil: 'networkidle' })
   const tiles = await page.getByTestId('usage-tiles').innerText()

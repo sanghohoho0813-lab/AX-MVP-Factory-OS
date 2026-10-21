@@ -15,7 +15,7 @@ import { proposeFromRun } from './memory'
 import { renderStructured, runSummary } from './render'
 import type { OwnerAiRepo } from './repo'
 import { SKILL_META, skillName } from './skillCatalog'
-import { EVALUATION_LABEL, RELATION_LABEL, type AiRevision, type AiRun, type AiRunInput, type CaseRelation, type CompanyCase, type ContextSnapshot, type CurrentContext, type Evaluation, type SkillId } from './types'
+import { EVALUATION_LABEL, RELATION_LABEL, type AiRevision, type AiRun, type AiRunInput, type CaseMaterial, type CaseRelation, type CompanyCase, type ContextSnapshot, type CurrentContext, type Evaluation, type SkillId } from './types'
 
 export interface CaseBundle {
   c: CompanyCase
@@ -50,6 +50,8 @@ export interface RegisterInput {
   memo?: string
   clientId?: string | null
   origin?: string
+  /** D-255 서류로 시작하면 읽은 글을 자료로 같이(makeMaterial 로 개인정보를 지운 것) */
+  materials?: CaseMaterial[]
   workspaceId: string | null
   userId: string | null
 }
@@ -66,6 +68,7 @@ export async function registerCase(repo: OwnerAiRepo, input: RegisterInput, at =
     memo: (input.memo ?? '').trim().slice(0, 4000),
     clientId: input.clientId ?? null,
     origin: input.origin ?? '',
+    materials: (input.materials ?? []).slice(0, 200),
   }
   const where = input.origin?.startsWith('partner:') ? ' — Partner OS 요청' : input.clientId ? ' — 고객 관리 업체와 이어 만듦' : ''
   return repo.saveCase(withCaseActivity(c, `AI 작업실에 등록(${RELATION_LABEL[c.relation]})${input.requester ? ` · 요청 ${input.requester.trim()}` : ''}${where}`, at))

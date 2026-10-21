@@ -8,7 +8,7 @@ import handler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { aiConfig, buildPrompt, extractJson, scrubDeep, validate } from '../../../api/_ai/core.js'
 import { SKILL_META, QUICK_ACTIONS } from '../ownerAi/skillCatalog'
-import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient } from '../ownerAi/caseUtil'
+import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient, clientsToStart } from '../ownerAi/caseUtil'
 import { buildAiContext, caseSnapshot, UNKNOWN } from '../ownerAi/context'
 import { renderStructured, revisedText, runSummary, PATENT_WARNING, fundingBasis } from '../ownerAi/render'
 import { proposeFromRun, contextDiff, applyContext } from '../ownerAi/memory'
@@ -326,6 +326,17 @@ async function engineTests() {
     const blogCase = { ...c1, id: 'blog1', companyName: '그린로직스', bizNo: '', homepageUrl: 'https://blog.naver.com/greenlogis' }
     check('D-219 중복 업체 — 같은 블로그 주소(blog.naver.com)여도 블로그 이름이 다르면 다른 회사', findDuplicates({ name: '한빛식품', url: 'blog.naver.com/hanbitfood' }, [blogCase], []).length === 0, findDuplicates({ name: '한빛식품', url: 'blog.naver.com/hanbitfood' }, [blogCase], []))
     check('D-219 중복 업체 — 같은 블로그(m. 주소 · 대소문자 달라도)는 홈페이지 같음', findDuplicates({ name: '그린', url: 'https://m.blog.naver.com/GreenLogis' }, [blogCase], []).some((d) => d.reason.includes('홈페이지')))
+  }
+  {
+    // D-255 AI 작업실 '고객 관리에서 고르기' — 아직 작업실과 잇지 않은 고객만 · 최근 순 · 찾기
+    const mk = (id: string, name: string, biz: string, upd: string, extra: Partial<ClientOpsRecord> = {}) => normalizeClientOps({ id, companyName: name, businessNumber: biz, contactName: `${name} 대표`, createdAt: at, updatedAt: upd, ...extra } as unknown as Partial<ClientOpsRecord>)
+    const cl = [mk('a', '가람상사', '111-11-11111', '2026-10-10T00:00:00Z'), mk('b', '나래식품', '222-22-22222', '2026-10-12T00:00:00Z'), mk('c', '다온테크', '333-33-33333', '2026-10-11T00:00:00Z'), mk('d', '라온물산', '', '2026-10-13T00:00:00Z', { archivedAt: '2026-10-13T00:00:00Z' } as Partial<ClientOpsRecord>), mk('e', '마루건설', '555-55-55555', '2026-10-09T00:00:00Z')]
+    const linkedCase = { ...emptyCase({ companyName: '가람상사', at }), clientId: 'a' }
+    const bizCase = { ...emptyCase({ companyName: '마루', at }), bizNo: '5555555555' }
+    const s1 = clientsToStart(cl, [linkedCase, bizCase])
+    check('QS1 고르기 목록 — 이은 고객(가람) · 같은 사업자번호 작업실이 있는 고객(마루) · 보관한 고객(라온) 빼고 · 최근 순', s1.list.map((c) => c.id).join() === 'b,c' && s1.total === 2, s1.list.map((c) => c.id))
+    check('QS2 찾기 — 회사명 · 대표 · 사업자번호 숫자 3자리 이상', clientsToStart(cl, [], '나래').list.map((c) => c.id).join() === 'b' && clientsToStart(cl, [], '다온테크 대표').list.map((c) => c.id).join() === 'c' && clientsToStart(cl, [], '333-3').list.map((c) => c.id).join() === 'c' && clientsToStart(cl, [], '없는회사').total === 0)
+    check('QS3 많으면 8개까지(전체 수는 따로)', clientsToStart(Array.from({ length: 12 }, (_, i) => mk(`x${i}`, `회사${i}`, '', `2026-10-${String(10 + i).padStart(2, '0')}T00:00:00Z`)), []).list.length === 8 && clientsToStart(Array.from({ length: 12 }, (_, i) => mk(`x${i}`, `회사${i}`, '', at)), []).total === 12)
   }
   {
     const m = makeMaterial({ kind: 'memo', title: '메모', text: '대표 900101-1234567 비밀번호: qwer1234 매출 50억' }, at)

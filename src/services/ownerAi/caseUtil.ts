@@ -80,6 +80,29 @@ export function findCaseForClient(cases: readonly CompanyCase[], client: { id: s
   return { linked, sameBiz }
 }
 
+/**
+ * D-255 대표 "기존 고객도 여기서 바로 · 타자 없이" — AI 작업실 첫 화면의 '고객 관리에서 고르기' 목록.
+ * 아직 작업실과 잇지 않은 고객만(같은 사업자번호로 만든 작업실이 있으면 그것도 이은 것으로 본다) · 보관한 고객 빼고 · 최근에 손댄 순.
+ * q 가 있으면 회사명 · 대표/담당자 · 사업자번호(숫자만)로 거른다.
+ */
+export function clientsToStart<T extends Pick<ClientOpsRecord, 'id' | 'companyName' | 'contactName' | 'businessNumber' | 'archivedAt' | 'updatedAt'>>(
+  clients: readonly T[],
+  cases: readonly CompanyCase[],
+  q = '',
+  limit = 8,
+): { list: T[]; total: number } {
+  const live = cases.filter((c) => !c.archivedAt)
+  const linkedIds = new Set(live.map((c) => c.clientId).filter((x): x is string => !!x))
+  const caseBiz = new Set(live.map((c) => c.bizNo).filter(Boolean))
+  const nq = normalizeCompany(q)
+  const dq = q.replace(/\D/g, '')
+  const open = clients
+    .filter((c) => !c.archivedAt && !linkedIds.has(c.id) && !caseBiz.has(normalizeBizNo(c.businessNumber ?? '')))
+    .filter((c) => !q.trim() || (nq && normalizeCompany(c.companyName).includes(nq)) || (c.contactName ?? '').includes(q.trim()) || (dq.length >= 3 && (c.businessNumber ?? '').replace(/\D/g, '').includes(dq)))
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+  return { list: open.slice(0, Math.max(1, limit)), total: open.length }
+}
+
 export function normalizeUrl(v: string): string {
   const t = (v ?? '').trim()
   if (!t) return ''

@@ -10,12 +10,13 @@ import { BarChart3, Plus, Search, Sparkles } from 'lucide-react'
 import { findDuplicates, normalizeCompany, relationForClient, type DuplicateHit } from '../../services/ownerAi/caseUtil'
 import { parsePartnerHandoff, PARTNER_EVENT } from '../../services/ownerAi/partnerBridge'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
-import { CASE_RELATIONS, RELATION_LABEL, type CaseRelation, type CompanyCase } from '../../services/ownerAi/types'
+import { CASE_RELATIONS, RELATION_LABEL, type CaseMaterial, type CaseRelation, type CompanyCase } from '../../services/ownerAi/types'
 import { registerCase } from '../../services/ownerAi/workflow'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, ListRow, ListSurface, ScreenTitle, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { AiSetupBanner, OwnerAiGate, fmtDateTime, useAiSetup, useClientList, useOwnerAiIdentity, useOwnerAiRepo } from './shared'
+import { CaseQuickStart } from './parts/CaseQuickStart'
 
 export default function OwnerAiHomePage() {
   return (
@@ -54,6 +55,7 @@ function Home() {
   const [showArchived, setShowArchived] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState<Draft>(EMPTY)
+  const draftNow = draft
   const [saving, setSaving] = useState(false)
   const [partnerText, setPartnerText] = useState('')
 
@@ -97,11 +99,14 @@ function Home() {
       .filter((c) => !nq || normalizeCompany(c.companyName).includes(nq) || (c.requester ?? '').includes(q.trim()))
   }, [cases, q, rel, showArchived])
 
-  const create = async (opts: { clientId?: string | null } = {}) => {
-    if (saving || !draft.companyName.trim()) return
+  // D-255 서류로 시작했는데 이름을 못 찾아 직접 적는 경우 — 읽은 글을 자료로 들고 간다
+  const [pendingMaterials, setPendingMaterials] = useState<CaseMaterial[]>([])
+  const create = async (opts: { clientId?: string | null; from?: Partial<Draft>; materials?: CaseMaterial[] } = {}) => {
+    const linked = opts.clientId ? clients.find((c) => c.id === opts.clientId) : null
+    const draft = { ...draftNow, ...(opts.from ?? {}) }
+    if (saving || !(linked?.companyName ?? draft.companyName).trim()) return
     setSaving(true)
     try {
-      const linked = opts.clientId ? clients.find((c) => c.id === opts.clientId) : null
       const c = await registerCase(repo, {
         ...draft,
         companyName: linked?.companyName ?? draft.companyName,
@@ -110,9 +115,11 @@ function Home() {
         relation: linked && draft.relation === 'reviewed' ? relationForClient(linked) : draft.relation,
         clientId: opts.clientId ?? null,
         origin: draft.origin,
+        materials: opts.materials ?? (pendingMaterials.length ? pendingMaterials : undefined),
         workspaceId: ident.workspaceId,
         userId: ident.userId,
       })
+      setPendingMaterials([])
       showToast(`${c.companyName} — AI 작업실을 만들었습니다.`)
       navigate(`/ai/cases/${c.id}`)
     } catch (e) {
@@ -227,6 +234,21 @@ function Home() {
             </div>
           </details>
         </Surface>
+      )}
+
+      {cases !== null && !dbSetup && !formOpen && (
+        <CaseQuickStart
+          cases={cases}
+          clients={clients}
+          busy={saving}
+          onPickClient={(id, materials) => void create({ clientId: id, materials })}
+          onStartDocs={(d) => void create({ from: { companyName: d.companyName, bizNo: d.bizNo, memo: d.contactName ? `대표 ${d.contactName}` : '', origin: 'docs' }, materials: d.materials })}
+          onOpenCase={(id) => navigate(`/ai/cases/${id}`)}
+          onTypeIt={(materials) => {
+            setPendingMaterials(materials)
+            setFormOpen(true)
+          }}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
