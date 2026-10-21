@@ -91,14 +91,20 @@ export interface TranscriptDoc {
  * 빈 말은 버린다.
  */
 export function partLines(items: AssistAnswer['items'] | undefined, seg: Segment): TranscriptLine[] {
-  const out: TranscriptLine[] = []
+  const raw: { t: number | null; text: string; screen: boolean }[] = []
   for (const it of items ?? []) {
     const text = (it.body ?? it.detail ?? '').trim()
     if (!text) continue
-    const t0 = parseClock(it.title ?? '') ?? seg.start
-    const t = Math.min(Math.max(t0, seg.start), Math.max(seg.start, seg.end - 1))
-    out.push({ t, text: text.slice(0, 4000), ...(/화면\s*글/.test(it.detail ?? '') && it.body ? { screen: true } : {}) })
+    raw.push({ t: parseClock(it.title ?? ''), text: text.slice(0, 4000), screen: /화면\s*글/.test(it.detail ?? '') && !!it.body })
   }
+  // 뒷 구간인데 시각이 모두 구간 처음보다 앞이면(구간 처음부터 센 시각으로 답함) 구간 처음을 더한다 — 모두 구간 처음으로 몰리지 않게
+  const known = raw.map((r) => r.t).filter((t): t is number => t !== null)
+  const shift = seg.start > 0 && known.length > 0 && known.every((t) => t < seg.start) && Math.max(...known) <= seg.end - seg.start ? seg.start : 0
+  const out = raw.map((r) => {
+    const t0 = r.t === null ? seg.start : r.t + shift
+    const t = Math.min(Math.max(t0, seg.start), Math.max(seg.start, seg.end - 1))
+    return { t, text: r.text, ...(r.screen ? { screen: true } : {}) }
+  })
   return out.sort((a, b) => a.t - b.t)
 }
 
@@ -210,6 +216,19 @@ export function transcriptRows(d: TranscriptDoc | null, budget = 20000): { 시�
 }
 
 const ratioText = (v: RadarVideo) => (v.ratio === null ? '기준 부족' : `평소의 ${(v.adjusted ?? v.ratio).toFixed(1)}배`)
+
+/**
+ * 대본 받아 적기에 보낼 자료 — 영상 이름 · 채널 · 길이만. 채널 설계 기준 · 규칙집 · 앞서 받은 대본은 보내지 않는다
+ * (받아 적기는 '들린 그대로' — 마케팅 규칙이 섞이면 고쳐 쓸 수 있다).
+ */
+export function transcriptContext(v: Pick<RadarVideo, 'title' | 'channelName' | 'durationSec'>, today: string): AssistContext {
+  return {
+    title: `마케팅 · 벤치마킹 영상 대본 받아 적기 · ${safeText(v.title, [], 60)}`,
+    today,
+    purpose: '공개 YouTube 영상의 말을 들리는 그대로 받아 적는다',
+    sections: [{ name: '영상', rows: [{ 제목: safeText(v.title, [], 160), 채널: safeText(v.channelName, [], 60), 길이: clockOf(v.durationSec) }] }],
+  }
+}
 
 export function adaptContext(i: { v: RadarVideo; lessons: readonly string[]; brief?: ChannelBrief | null; transcript: TranscriptDoc | null; today: string }): AssistContext {
   const { v } = i

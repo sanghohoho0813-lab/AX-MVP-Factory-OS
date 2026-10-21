@@ -152,6 +152,8 @@ const openTop = async (page) => {
   const starts = tposts.map((p) => p.video?.start).sort((a, b) => a - b)
   const firstThree = tposts.slice(0, 3).map((p) => p.at)
   check('V2 [대본 받아 적기] → 진행 막대 · 10분씩 3구간(0 · 600 · 1200 ~ 1421) · 영상 번호 · 구간만 보냄(주소 아님) · 셋 동시에', progressSeen && tposts.length === 3 && starts.join() === '0,600,1200' && tposts.every((p) => p.video.id === TOP && p.page === 'radar' && !JSON.stringify(p).includes('youtube.com/watch')) && tposts.find((p) => p.video.start === 1200)?.video.end === 1421 && Math.max(...firstThree) - Math.min(...firstThree) < 300, { starts, n: tposts.length })
+  // 점검: 받아 적기에 규칙집 · 채널 기준이 섞이면 '들린 그대로' 와 부딪힌다 — 영상 이름 · 채널 · 길이만
+  check('V2b 받아 적기 자료는 영상 이름 · 채널 · 길이만(규칙집 · 채널 설계 기준 · 회사 소개 · 앞서 받은 대본 없음)', tposts.every((p) => p.context.sections.length === 1 && p.context.sections[0].name === '영상' && !p.context.rules && !p.context.facts && !JSON.stringify(p.context).includes('채널 설계 기준')), tposts.map((p) => p.context.sections.map((x) => x.name)))
   const failedNote = await page.getByTestId('vs-failed').innerText().catch(() => '')
   const lines1 = await page.getByTestId('vs-lines').locator('li').count()
   check('V3 한 구간(10:00~20:00)이 멈추면 받은 구간(6줄)은 보이고 그 구간만 안내', lines1 === 6 && failedNote.includes('10:00~20:00') && (await page.getByTestId('vs-retry').isVisible()), { lines1, failedNote })

@@ -1,7 +1,7 @@
 /**
  * D-259 · D-260 벤치마킹 영상 깊게 보기 — 대본 구간 나누기 · 시각 읽기 · 줄 만들기 · 저장 읽기 · 우리 버전 자료 · 내 콘텐츠 줄.
  */
-import { ADAPT_KEY, STUDY_KEEP, TRANSCRIPT_KEY, TRANSCRIPT_MAX_SEC, adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, keepLatest, parseAdapts, parseClock, parseTranscripts, partLines, transcriptDone, transcriptLines, transcriptRows, transcriptSegments, transcriptText, type TranscriptDoc } from '../marketing/videoStudy'
+import { ADAPT_KEY, STUDY_KEEP, TRANSCRIPT_KEY, TRANSCRIPT_MAX_SEC, adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, keepLatest, parseAdapts, parseClock, parseTranscripts, partLines, transcriptDone, transcriptLines, transcriptRows, transcriptContext, transcriptSegments, transcriptText, type TranscriptDoc } from '../marketing/videoStudy'
 import { PACK_RULES } from '../marketing/contentPack'
 import { DEFAULT_BRIEF } from '../marketing/radarStore'
 import type { RadarVideo } from '../marketing/ytRadar'
@@ -115,6 +115,22 @@ check('VS7 받아 적기 되는 영상 — 11자 번호만(예시 영상 sample_
   check('VS11 칸 찾기 — tag 띄어쓰기 달라도("첫 문장") · 없으면 제목으로 · 글 복사에 참고 영상 출처', adaptItem(A, '첫문장')?.body?.startsWith('오늘은') === true && adaptItem({ ...A, items: [{ title: '제목 후보', outline: ['x'] }] }, '제목', /제목/)?.outline?.[0] === 'x' && adaptText(A, V).includes('(참고: 로뎀세무법인') && adaptText(null, V) === '')
   const saved = parseAdapts(JSON.stringify({ [V.id]: { at: 'x', model: 'm', withTranscript: true, answer: A }, bad: { answer: { headline: 1 } }, x2: 'nope' }))
   check('VS12 우리 버전 저장 읽기 — 맞는 것만 · 깨진 글은 빈 것', Object.keys(saved).join() === V.id && saved[V.id].answer.items.length === 6 && saved[V.id].withTranscript && Object.keys(parseAdapts('깨짐')).length === 0)
+}
+
+// 점검 결과 고침 — 뒷 구간 시각을 구간 처음부터 센 것으로 답한 때 · 받아 적기 자료는 영상 정보만
+{
+  const seg = { start: 600, end: 1200 }
+  const rel = partLines([{ title: '0:00', body: '첫 말' }, { title: '2:30', body: '둘째 말' }, { title: '9:50', body: '끝 말' }], seg)
+  const abs = partLines([{ title: '10:05', body: '첫 말' }, { title: '12:30', body: '둘째 말' }], seg)
+  const mixed = partLines([{ title: '3:00', body: '앞' }, { title: '15:00', body: '뒤' }], seg)
+  check('VS13 뒷 구간 — 시각이 모두 구간 처음보다 앞이면 구간 처음을 더함(10:00 · 12:30 · 19:50) · 영상 처음부터 센 시각은 그대로 · 섞이면 더하지 않음(앞은 구간 처음으로)',
+    rel.map((l) => l.t).join() === '600,750,1190' && abs.map((l) => l.t).join() === '605,750' && mixed.map((l) => l.t).join() === '600,900' && partLines([{ title: '0:30', body: 'x' }], { start: 0, end: 600 })[0].t === 30,
+    { rel, abs, mixed })
+  const tc = transcriptContext({ title: '세무 기장 수수료 전부 공개', channelName: '로뎀세무법인', durationSec: 1395 }, '2026-10-21')
+  const flat = JSON.stringify(tc)
+  check('VS14 받아 적기 자료 — 영상 이름 · 채널 · 길이(23:15)만 · 규칙집 · 채널 기준 · 회사 소개 · 앞서 받은 대본 없음',
+    tc.sections.length === 1 && tc.sections[0].rows[0].길이 === '23:15' && flat.includes('로뎀세무법인') && !tc.rules && !tc.facts && !flat.includes(PACK_RULES[0]) && !flat.includes('채널 설계 기준') && !flat.includes('참고 영상 대본'),
+    tc)
 }
 
 console.log(`\nvideoStudy: ${pass} passed, ${fail} failed`)

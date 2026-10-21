@@ -7,22 +7,20 @@
  * 놓는 법(dockLayout): 본문이 768px 이상 남으면 옆에 붙이고(본문이 비킨다) · 좁으면 본문 위에 덮어 띄운다 · 1024 아래는 없음.
  * 폭은 왼쪽 경계선을 끌어서(320~720) · 키보드 ←/→ · 두 번 누르면 처음 폭. 보기 무대(iframe) 안에서는 그리지 않는다.
  */
-import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { navPx, useNavSize } from '../../lib/navWidth'
-import { DOCK_CHAT_KEY, DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, closeDock, dockChatContext, dockLayout, frameUrlOf, parseDockChat, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
+import { DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, closeDock, dockLayout, frameUrlOf, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
 import { SIDE_SITES, addressLabel, addressToUrl, openInSide, useSideAi } from '../../lib/sideAi'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
-import { callAssist } from '../../services/aiAssist/client'
-import { readChoice } from '../../services/aiAssist/store'
+import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../../services/aiAssist/dockChat'
 import { copyText } from '../../services/grants/grantView'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
 
 const DOCK_DEFAULT_W = 420
 const STEP = 24
-const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 
 const STARTERS = ['고객에게 보낼 안부 문자 써 줘', '정책자금 신청 순서를 쉽게 정리해 줘', '이 문장을 더 쉽게 고쳐 줘: ', '고용지원금 종류를 한눈에 비교해 줘']
 
@@ -45,22 +43,6 @@ function useViewport(): number {
   return w
 }
 
-function loadChat(): DockTurn[] {
-  try {
-    return parseDockChat(localStorage.getItem(DOCK_CHAT_KEY))
-  } catch {
-    return []
-  }
-}
-
-function saveChat(turns: readonly DockTurn[]) {
-  try {
-    localStorage.setItem(DOCK_CHAT_KEY, JSON.stringify(turns.slice(-DOCK_CHAT_MAX)))
-  } catch {
-    /* 저장 공간이 가득 차도 대화는 화면에 남는다 */
-  }
-}
-
 function turnText(t: DockTurn): string {
   const out = [t.headline ?? '']
   for (const i of t.items ?? []) out.push(`\n■ ${i.title}${i.detail ? `\n${i.detail}` : ''}${i.body ? `\n${i.body}` : ''}`)
@@ -77,60 +59,23 @@ function ChatTab() {
   const access = useAiAssistAccess()
   const ready = assistOn(access)
   const { showToast } = useToast()
-  const [turns, setTurns] = useState<DockTurn[]>(loadChat)
+  const { turns, busy } = useDockChat()
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const turnsRef = useRef(turns)
-  turnsRef.current = turns
   const endRef = useRef<HTMLLIElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const commit = useCallback((fn: (cur: DockTurn[]) => DockTurn[]) => {
-    setTurns((cur) => {
-      const next = fn(cur).slice(-DOCK_CHAT_MAX)
-      saveChat(next)
-      return next
-    })
-  }, [])
+  useEffect(() => syncDockChat(), [])
 
   const lastKey = `${turns.length}:${turns[turns.length - 1]?.status ?? ''}`
   useEffect(() => {
     if (lastKey !== '0:') endRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }, [lastKey])
 
-  const ask = async (q: string) => {
-    const question = q.trim()
-    if (!question || busy || !ready) return
-    const id = uid('d')
+  // 답은 판 밖(dockChat)에서 받는다 — [웹] 으로 가거나 판을 닫아도 답이 오면 저장되고 돌아오면 보인다
+  const ask = (q: string) => {
+    if (!ready) return
     const screen = (document.querySelector('main h1')?.textContent ?? '').trim().slice(0, 60)
-    const today = new Date().toLocaleDateString('sv-SE')
-    const context = dockChatContext(turnsRef.current, today, screen)
-    commit((cur) => [...cur, { id, at: new Date().toISOString(), q: question, status: 'pending' }])
-    setBusy(true)
-    try {
-      const run = await callAssist({ requestId: uid('dk'), assistId: 'side.chat', page: 'side', choice: readChoice(), context, ask: question })
-      const s = run.structured
-      commit((cur) =>
-        cur.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                status: 'done',
-                headline: s?.headline || run.raw.slice(0, 2000),
-                items: (s?.items ?? []).map((i) => ({ title: i.title, detail: i.detail, body: i.body })),
-                next: s?.next ?? [],
-                caution: s?.caution || undefined,
-                model: run.model,
-              }
-            : t,
-        ),
-      )
-    } catch (e) {
-      const why = e instanceof Error && e.message ? e.message : 'AI 연결을 확인해 주세요'
-      commit((cur) => cur.map((t) => (t.id === id ? { ...t, status: 'error', error: why } : t)))
-    } finally {
-      setBusy(false)
-    }
+    void askDock(q, screen)
   }
 
   const send = (e?: FormEvent) => {
@@ -138,13 +83,13 @@ function ChatTab() {
     if (!text.trim() || busy) return
     const q = text
     setText('')
-    void ask(q)
+    ask(q)
   }
 
   const clear = () => {
-    const before = turnsRef.current
-    commit(() => [])
-    showToast('대화를 지웠어요', { label: '되돌리기', onClick: () => commit(() => before) })
+    const before = dockTurns()
+    setDockTurns([])
+    showToast('대화를 지웠어요', { label: '되돌리기', onClick: () => setDockTurns(before) })
   }
 
   const copy = async (t: string) => showToast((await copyText(t)) ? '복사했어요' : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요')
@@ -182,7 +127,7 @@ function ChatTab() {
                     if (s.endsWith(': ')) {
                       setText(s)
                       inputRef.current?.focus()
-                    } else void ask(s)
+                    } else ask(s)
                   }}
                   className="tap t-sub flex min-h-11 items-center gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 text-left font-semibold text-violet-900 hover:bg-violet-100"
                   data-testid="dock-starter"
@@ -204,7 +149,7 @@ function ChatTab() {
             {t.status === 'error' && (
               <div className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" role="alert" data-testid="dock-error">
                 <span className="min-w-0 flex-1 break-keep">{t.error}</span>
-                <button type="button" onClick={() => void ask(t.q)} disabled={busy} className="tap inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-amber-300 bg-white px-2.5 font-semibold disabled:opacity-50" data-testid="dock-retry">
+                <button type="button" onClick={() => ask(t.q)} disabled={busy} className="tap inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-amber-300 bg-white px-2.5 font-semibold disabled:opacity-50" data-testid="dock-retry">
                   <RotateCcw aria-hidden="true" className="size-4" /> 다시
                 </button>
               </div>
@@ -234,7 +179,7 @@ function ChatTab() {
                 {t.caution && <p className="t-sub break-keep text-warning-800">△ {t.caution}</p>}
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                   {(t.next ?? []).slice(0, 3).map((n) => (
-                    <button key={n} type="button" onClick={() => void ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
+                    <button key={n} type="button" onClick={() => ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
                       {n}
                     </button>
                   ))}
@@ -391,15 +336,22 @@ export function SideDock() {
   const shown = dock.open && lay.mode !== 'none' && !inFrame()
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ x: number; w: number; raf: number; next: number } | null>(null)
+  const [webSeen, setWebSeen] = useState(dock.tab === 'web')
+  if (dock.tab === 'web' && !webSeen) setWebSeen(true)
 
-  // 본문 · 맨 위로 단추 · 알림이 판만큼 비키게(옆에 붙일 때만) — 바깥 부품은 CSS 변수 하나만 읽는다
+  // 본문이 판만큼 비키게(옆에 붙일 때만) — 바깥 부품은 CSS 변수만 읽는다
+  // 맨 위로 단추 · 알림은 덮어 띄울 때도 판 왼쪽으로(--dock-float) — 판 밑에 숨지 않게
   const reserve = shown && lay.mode === 'dock' ? lay.width : 0
+  const float = shown ? lay.width : 0
   useEffect(() => {
-    document.documentElement.style.setProperty('--dock-w', `${reserve}px`)
+    const root = document.documentElement.style
+    root.setProperty('--dock-w', `${reserve}px`)
+    root.setProperty('--dock-float', `${float}px`)
     return () => {
-      document.documentElement.style.setProperty('--dock-w', '0px')
+      root.setProperty('--dock-w', '0px')
+      root.setProperty('--dock-float', '0px')
     }
-  }, [reserve])
+  }, [reserve, float])
 
   if (!shown) return null
 
@@ -496,7 +448,13 @@ export function SideDock() {
           <X aria-hidden="true" className="size-5" />
         </button>
       </div>
-      {dock.tab === 'chat' ? <ChatTab /> : <WebTab url={dock.webUrl} />}
+      {dock.tab === 'chat' && <ChatTab />}
+      {/* 웹은 한 번 연 뒤로는 숨기기만 — 대화로 갔다 와도 보던 쪽이 처음부터 다시 열리지 않게 */}
+      {webSeen && (
+        <div className={dock.tab === 'web' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+          <WebTab url={dock.webUrl} />
+        </div>
+      )}
     </aside>
   )
 }

@@ -354,8 +354,14 @@ export function buildAssistPrompt(assist, context, ask) {
   return { user, sent: { userChars: user.length, rows: rowsSent, rowsCut } }
 }
 
+/* D-260 영상 받아 적기 — 마케팅 규칙(제목 · 각도 · 쓰기 규칙)은 '들린 그대로' 와 부딪히므로 넣지 않고, 영상이 자료라는 것만 */
+export const VIDEO_RULES = [
+  '이 단추에서는 맨 앞에 붙인 영상이 [자료] 다 — 영상에서 들린 숫자 · 금액 · 날짜 · 이름 붙은 제도는 들린 그대로 적는다(빼거나 고치지 않는다).',
+  '받아 적기만 한다 — 다듬기 · 요약 · 마케팅 문장으로 바꾸기 없이. 시각은 영상 처음부터 센 시각.',
+]
+
 export function assistSystem(assist) {
-  const extra = assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : []
+  const extra = assist.video ? ['', '[영상 받아 적기]', ...VIDEO_RULES] : assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : []
   const kb = knowledgeOf(assist)
   const kbLines = kb.length
     ? [

@@ -229,9 +229,15 @@ await ctx.close()
 // D-258 OS 안 오른쪽 판 — AI 대화(서버 함수는 가짜 답) · 웹(Google igu · 기업마당 안에 · 막는 곳은 옆 창)
 {
   const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, screen: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
-  await c.route(outside, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<html><head><meta charset="utf-8"></head><body><h1 id="host">${new URL(r.request().url()).host}</h1><p id="q">${new URL(r.request().url()).searchParams.get('q') ?? ''}</p></body></html>` }))
+  const hits = {}
+  await c.route(outside, (r) => {
+    const host = new URL(r.request().url()).host
+    hits[host] = (hits[host] ?? 0) + 1
+    return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<html><head><meta charset="utf-8"></head><body><h1 id="host">${host}</h1><p id="q">${new URL(r.request().url()).searchParams.get('q') ?? ''}</p></body></html>` })
+  })
   const posts = []
   let failNext = 0
+  let hold = null
   await c.route('**/api/ai-assist**', async (r) => {
     const req = r.request()
     if (req.method() === 'GET') {
@@ -239,6 +245,7 @@ await ctx.close()
     }
     const body = JSON.parse(req.postData() ?? '{}')
     posts.push(body)
+    if (hold) await hold
     if (failNext > 0) {
       failNext--
       return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'provider_busy' }) })
@@ -310,6 +317,22 @@ await ctx.close()
   await p.reload({ waitUntil: 'networkidle' })
   await p.waitForTimeout(500)
   check('D9 다시 열어도 판 · 대화(4개 답) 그대로', (await p.getByTestId('side-dock').isVisible()) && (await p.getByTestId('dock-answer').count()) === 4 && (await p.getByTestId('dock-turn').count()) === 5)
+  // 점검: 답을 기다리는 사이 [웹] 으로 가면 답이 버려졌다 — 이제 판 밖에서 받아 저장 · 돌아오면 보임
+  const errBefore = await p.getByTestId('dock-error').count()
+  let release = () => {}
+  hold = new Promise((ok) => (release = ok))
+  await p.getByTestId('dock-chat-input').fill('웹 보러 가는 사이 올 답')
+  await p.getByTestId('dock-chat-send').click()
+  await p.getByTestId('dock-pending').waitFor()
+  await p.locator('[data-testid="dock-tab"][data-id="web"]').click()
+  await p.getByTestId('dock-web-frame').waitFor()
+  release()
+  hold = null
+  await p.waitForFunction(() => (JSON.parse(localStorage.getItem('axmvp.ui.side_dock.chat') ?? '[]').at(-1) ?? {}).status === 'done')
+  await p.locator('[data-testid="dock-tab"][data-id="chat"]').click()
+  await p.getByTestId('dock-answer').nth(4).waitFor()
+  const last = await p.getByTestId('dock-turn').last()
+  check('D9b 답을 기다리는 사이 [웹] 으로 갔다 와도 답이 그대로 들어옴(버려지지 않음 · 저장됨)', posts.length === 6 && (await last.getAttribute('data-status')) === 'done' && (await last.innerText()).includes('답 6') && (await p.getByTestId('dock-error').count()) === errBefore, { n: posts.length, st: await last.getAttribute('data-status'), txt: (await last.innerText()).slice(0, 120), errs: await p.getByTestId('dock-error').count() })
 
   // 웹
   await p.locator('[data-testid="dock-tab"][data-id="web"]').click()
@@ -329,6 +352,12 @@ await ctx.close()
   await p.waitForTimeout(300)
   check('D12 바로 가기 [기업마당] → 판 안에(막지 않는 곳)', (await frame.getAttribute('src')) === 'https://www.bizinfo.go.kr/' && c.pages().length === 1)
   await shot(p, 'D12-web-bizinfo')
+  const bizHits = hits['www.bizinfo.go.kr'] ?? 0
+  await p.locator('[data-testid="dock-tab"][data-id="chat"]').click()
+  await p.getByTestId('dock-chat-input').waitFor()
+  await p.locator('[data-testid="dock-tab"][data-id="web"]').click()
+  await p.waitForTimeout(300)
+  check('D12b [AI 대화] 로 갔다 [웹] 으로 돌아와도 보던 곳 그대로 · 다시 불러오지 않음', (await frame.getAttribute('src')) === 'https://www.bizinfo.go.kr/' && (hits['www.bizinfo.go.kr'] ?? 0) === bizHits && bizHits >= 1, { bizHits, now: hits['www.bizinfo.go.kr'] })
   const [pop1] = await Promise.all([c.waitForEvent('page'), p.locator('[data-testid="dock-web-side"][data-id="naver"]').click()])
   await pop1.waitForLoadState()
   await p.waitForTimeout(300)
@@ -386,6 +415,15 @@ await ctx.close()
   g = await geo()
   check(`D20 1280 화면(메뉴 288) — 본문을 줄이지 않고 판을 덮어 띄움(${g.mode}) · 본문 비킴 0 · 넘침 0`, g.mode === 'over' && g.pad === '0px' && g.over <= 0 && g.hdr <= 0, g)
   await shot(p, 'D20-over-1280')
+  // 덮어 띄울 때도 알림이 판 밑에 숨지 않게(--dock-float)
+  await p.locator('[data-testid="dock-tab"][data-id="chat"]').click()
+  await p.getByTestId('dock-copy').first().click()
+  const toast2 = p.getByText(/복사했어요|복사하지 못했어요/).first()
+  await toast2.waitFor()
+  const tb2 = await toast2.boundingBox()
+  g = await geo()
+  await shot(p, 'D20b-over-toast')
+  check('D20b 덮어 띄운 판에서도 복사 알림이 판 왼쪽에(판 밑에 숨지 않음)', g.mode === 'over' && tb2 && tb2.x + tb2.width <= g.dockX + 1, { tb2, dockX: g.dockX })
   await p.setViewportSize({ width: 1440, height: 900 })
   await p.getByTestId('dock-close').click()
   await p.waitForTimeout(200)

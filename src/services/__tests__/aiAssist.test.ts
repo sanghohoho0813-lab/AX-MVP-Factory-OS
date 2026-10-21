@@ -280,6 +280,11 @@ async function serverTests() {
     calls = []
     const ad = await post({ requestId: rid(), assistId: 'radar.adapt', page: 'radar', choice: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, context: VCTX })
     check('V7 우리 회사 버전 만들기 — 고른 회사(Claude) 그대로 · 영상은 붙이지 않음(글 · 대본 자료로)', ad.statusCode === 200 && (ad.body.run as { provider: string }).provider === 'anthropic' && calls.some((c) => c.url.includes('/messages')) && !calls.some((c) => c.url.includes(':generateContent')), ad.statusCode)
+    // 점검: 받아 적기에 마케팅 규칙(제목 · 쓰기 규칙)이 섞이면 '들린 그대로' 와 부딪힌다 — 받아 적기엔 영상 규칙만, 우리 버전엔 마케팅 규칙 그대로
+    const tSys = assistSystem(ASSISTS['radar.transcript'])
+    const aSys = assistSystem(ASSISTS['radar.adapt'])
+    check('V8 받아 적기 지시문 — [영상 받아 적기] 있음 · [마케팅 규칙] 없음 · 들린 숫자는 그대로 / 우리 버전 지시문엔 [마케팅 규칙] 그대로',
+      tSys.includes('[영상 받아 적기]') && !tSys.includes('[마케팅 규칙]') && !tSys.includes(RADAR_RULES[0]) && tSys.includes('들린 그대로') && aSys.includes('[마케팅 규칙]') && !aSys.includes('[영상 받아 적기]'))
   }
   setEnv()
   {

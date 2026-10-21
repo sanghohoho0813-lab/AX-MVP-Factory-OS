@@ -13,7 +13,7 @@ import { copyText } from '../../../components/consulting/studioParts'
 import { todayLocalDate } from '../../../lib/appClock'
 import type { ChannelBrief, IdeaInput } from '../../../services/marketing/radarStore'
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
-import { adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, transcriptDone, transcriptLines, transcriptSegments, transcriptText } from '../../../services/marketing/videoStudy'
+import { adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, transcriptContext, transcriptDone, transcriptLines, transcriptSegments, transcriptText } from '../../../services/marketing/videoStudy'
 import { adaptOf, resetTranscript, startAdapt, startTranscript, studyRun, studyVersion, subscribeStudy, transcriptOf } from '../../../services/marketing/videoStudyRun'
 
 export interface StudyProps {
@@ -60,7 +60,8 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
   const copy = async (t: string, what: string) => showToast((await copyText(t)) ? `${what} 복사했어요` : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요')
   const ctxBase = () => adaptContext({ v, lessons, brief: study.brief, transcript: transcriptOf(v.id), today: todayLocalDate() })
 
-  const getTranscript = (onlyFailed = false) => startTranscript({ id: v.id, title: v.title, durationSec: v.durationSec }, ctxBase(), onlyFailed ? failed.map((p) => ({ start: p.start, end: p.end })) : undefined)
+  // 받아 적기에는 영상 이름 · 채널 · 길이만(규칙집 · 채널 기준 · 앞서 받은 대본 없이 — 들린 그대로)
+  const getTranscript = (onlyFailed = false) => startTranscript({ id: v.id, title: v.title, durationSec: v.durationSec }, transcriptContext(v, todayLocalDate()), onlyFailed ? failed.map((p) => ({ start: p.start, end: p.end })) : undefined)
   const makeAdapt = async () => {
     setSavedHref(null)
     const got = await startAdapt(v.id, ctxBase(), lines.length > 0)
@@ -241,6 +242,11 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
           </div>
         )}
       </div>
+      {run.storeFull && (
+        <p role="status" className="t-meta break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" data-testid="vs-store-full">
+          이 브라우저 저장 공간이 가득 차 대본 · 우리 버전을 남기지 못했어요 — 지금 화면의 글은 [복사] 로 가져가세요(창을 새로 열면 사라져요).
+        </p>
+      )}
     </section>
   )
 }
