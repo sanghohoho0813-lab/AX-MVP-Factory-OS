@@ -22,7 +22,7 @@ import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -40,7 +40,7 @@ import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
-import { packAiKeys } from '../../services/marketing/packStore'
+import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
   PERIOD_HINT,
@@ -169,10 +169,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const access = useOwnerAiAccess()
   // 묶음 화면이 다시 그려질 때마다 규칙 초안을 새로 만들지 않게(채널 설계 기준이 바뀔 때만)
   const brief = useMemo(() => briefOf(prefs), [prefs])
-  const [aiDone, setAiDone] = useState<Set<string>>(() => packAiKeys())
-  useEffect(() => {
-    if (!packKey) setAiDone(packAiKeys())
-  }, [packKey])
+  // 첫 화면 'AI로 써 둠' — 첫 화면에 있는 동안 도착한 AI 답도 바로
+  const aiVersion = useSyncExternalStore(subscribePackAi, packAiVersion)
+  const aiDone = useMemo(() => packDoneKeys(), [aiVersion, packKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setParam = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params)
@@ -216,7 +215,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
   const packOpp = packKey && !packKey.startsWith('custom:') ? (oppByKey.get(packKey) ?? null) : null
   const packSource = useMemo<PackSource | null>(() => (packKey.startsWith('custom:') ? customSource(packKey.slice(7)) : packOpp ? packSourceOf(packOpp) : null), [packKey, packOpp])
-  const packIdea = packKey ? (notebook.ideas.find((i) => i.key === packKey) ?? null) : null
+  /** 이 묶음이 담긴 내 콘텐츠 줄 — 직접 쓴 주제는 '내 콘텐츠' 탭에서 같은 이름으로 담은 줄도(키가 달라도) */
+  const ideaOfPack = (key: string, topic: string, custom: boolean) => notebook.ideas.find((i) => i.key === key) ?? (custom ? notebook.ideas.find((i) => i.topic.trim() === topic.trim()) : undefined)
+  const packIdea = packSource ? (ideaOfPack(packSource.key, packSource.topic, packSource.custom) ?? null) : null
   /** 키워드 단추 → 묶음(뒤로 가기로 첫 화면에 돌아오게 기록을 하나 쌓는다) */
   const openPack = (key: string) => {
     const next = new URLSearchParams(params)
@@ -429,8 +430,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     const script = packText(p).slice(0, SCRIPT_MAX)
     const withScript = (c: MakeCheckId[]): MakeCheckId[] => (c.includes('script') ? c : [...c, 'script'])
     try {
-      const existing = notebook.ideas.find((i) => i.key === p.key)
+      const existing = ideaOfPack(p.key, p.topic, p.source.custom)
       if (existing) {
+        // 그 줄에 다른 대본(AI 대본 끝까지 · 손으로 고친 것)이 있으면 바꾸기 전에 묻는다
+        if (existing.script.trim() && existing.script !== script && !window.confirm(`'${existing.topic}' 줄에 이미 대본이 있어요.\n이 묶음으로 바꿀까요? (지금 대본은 지워집니다 — 남기려면 [취소] 뒤 내 콘텐츠에서 먼저 복사해 두세요)`)) return null
         const status: IdeaStatus = existing.status === 'idea' || existing.status === 'selected' ? 'script' : existing.status
         const saved = await notebook.patch(existing.id, { script, status, checks: withScript(existing.checks) })
         if (!saved) return (showToast('저장하지 못했습니다 — 잠시 뒤 다시 눌러 주세요.'), null)
@@ -531,6 +534,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             rank={packOpp ? (plan?.picks.indexOf(packOpp) ?? -1) + 1 : 0}
             readOnly={readOnly}
             ownerAi={access !== 'no'}
+            autoAi={access === 'yes' && prefsReady}
             savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
             onBack={closePack}
             onCopy={(t, what) => copy(t, what)}

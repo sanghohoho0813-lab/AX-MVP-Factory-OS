@@ -20,6 +20,7 @@ import {
   aiSections,
   cleanTopic,
   countHoles,
+  fit,
   customSource,
   makePack,
   packSourceOf,
@@ -130,6 +131,22 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('D4 직접 주제는 근거 칸 없음 · 왜 지금은 "요즘 상담에서"', !sec(dp, 'checks').blocks.some((b) => b.label.includes('우리만')) && /요즘 상담에서/.test(sec(dp, 'video').blocks[2].text))
   const briefed = makePack(customs[0], { ...DEFAULT_BRIEF, host: '박대표(미래AI랩)', channel: '돈 되는 경영 — 설명', ending: '설명란 상담 신청서로 남겨 주세요.' })
   check('D5 채널 설계 기준을 고치면 인사 · 끝맺음이 따라감', /돈 되는 경영 박대표입니다/.test(sec(briefed, 'video').blocks[1].text) && allText(briefed).includes('설명란 상담 신청서로 남겨 주세요.'), sec(briefed, 'video').blocks[1].text.slice(0, 160))
+}
+
+/* ---------------- 점검에서 고친 것 ---------------- */
+{
+  check('F1 줄이기가 빈칸 한가운데서 자르지 않음([공식 자료 확인: … 가 닫히지 않은 채 남지 않음)', fit('대상은 [공식 자료 확인: 정책자금 2027 개편 대상 · 조건] 에 해당합니다', 20) === '대상은…' && fit('짧은 글', 20) === '짧은 글')
+  const unclosed = packs.flatMap((p) => viewer(p).flatMap((x) => x.blocks.filter((b) => (b.text.match(/\[/g)?.length ?? 0) !== (b.text.match(/\]/g)?.length ?? 0)).map((b) => `${p.topic}/${x.id}/${b.label}`)))
+  check('F2 모든 키워드 · 모든 칸에서 [ ] 짝이 맞음(카드뉴스 60자 줄임 포함)', unclosed.length === 0, unclosed)
+  const ai = packs.find((p) => p.source.axis === 'axai')!
+  const market = packs.find((p) => p.source.axis === 'market')!
+  const aiShort = sec(ai, 'shorts').blocks.map((b) => b.text).join('\n')
+  check('F3 AI 주제 쇼츠 · 카드는 AI 말로(시장 주제의 "서류는 미리 · 시기 · 마감" 이 안 섞임)', !/서류는 미리|시기 · 마감/.test(aiShort + sec(ai, 'cards').blocks[5].text) && /예시 하나/.test(aiShort) && sec(ai, 'shorts').blocks[1].label.startsWith('② 먼저 해 볼 것'), aiShort.slice(0, 300))
+  check('F4 시장 주제는 예전 그대로(해당되는지 확인 · 시기 먼저 · 서류는 미리 · 놓치는 것 하나)', /해당되는지 확인, 시기 먼저, 서류는 미리/.test(sec(market, 'shorts').blocks[0].text) && sec(market, 'shorts').blocks[1].label.startsWith('② 놓치는 것 하나'))
+  const merged = withAi(market, { upload: [{ label: '유튜브 설명란', text: 'AI 설명' }, { label: '고정 댓글', text: 'AI 댓글' }], titles: [{ label: '제목 후보', text: 'AI 제목' }] })
+  const up = sec(merged, 'upload').blocks.map((b) => b.label)
+  const ti = sec(merged, 'titles').blocks.map((b) => b.label)
+  check('F5 AI 가 일부만 쓴 칸(올릴 때 글 · 제목)은 안 쓴 블록을 규칙 초안으로 남김 — 인스타 캡션 · 블로그 태그 · 다른 제목 · 썸네일 · 첫 문장', up.join() === '유튜브 설명란,고정 댓글,인스타 캡션,블로그 태그 10개,다른 제목 후보' && sec(merged, 'upload').blocks[0].text === 'AI 설명' && ti.join() === '제목 후보,썸네일 문구,첫 문장 (영상 시작 3초)', { up, ti })
 }
 
 /* ---------------- 복사 글 ---------------- */

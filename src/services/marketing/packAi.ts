@@ -58,12 +58,15 @@ export function takeAutoRun(key: string): boolean {
   return true
 }
 
+/** 서버가 '조금 전에 많이 눌렀어요'(1분 10번)로 막으면 그 갈래만 한 번 다시(1분 뒤) */
+export const RATE_RETRY_MS = 65_000
+
 /** 세 갈래 동시에 — 이미 쓰는 중이면 그대로 둔다. headline = 규칙 초안 추천 제목(AI 가 확정 제목을 안 주면 이것) */
-export function startPackAi(key: string, context: AssistContext, headline: string): void {
+export function startPackAi(key: string, context: AssistContext, headline: string, retryMs = RATE_RETRY_MS): void {
   if (isRunning(key)) return
   const choice = readChoice()
   setRun(key, () => ({ parts: { video: 'running', short: 'running', blog: 'running' }, errors: [], storeFull: false }))
-  for (const p of PACK_AI_PARTS) {
+  const callPart = (p: (typeof PACK_AI_PARTS)[number], attempt: number) =>
     void callAssist({ requestId: newRequestId(), assistId: p.assistId, page: 'radar', choice, context })
       .then((run) => {
         const s = run.structured
@@ -76,8 +79,17 @@ export function startPackAi(key: string, context: AssistContext, headline: strin
         setRun(key, (r) => ({ ...r, parts: { ...r.parts, [p.part]: 'done' }, storeFull: r.storeFull || !kept }))
       })
       .catch((e: unknown) => {
+        if (e instanceof AssistError && e.code === 'rate_limited' && attempt === 0) {
+          setTimeout(() => callPart(p, 1), retryMs)
+          return
+        }
         const msg = e instanceof Error ? e.message : '다시 눌러 주세요.'
         setRun(key, (r) => ({ ...r, parts: { ...r.parts, [p.part]: 'error' }, errors: r.errors.includes(msg) ? r.errors : [...r.errors, msg] }))
       })
-  }
+  for (const p of PACK_AI_PARTS) callPart(p, 0)
+}
+
+/** 첫 화면 'AI로 써 둠' — 이번 접속에서 쓴 것 + 이 브라우저에 남긴 것 */
+export function packDoneKeys(): Set<string> {
+  return new Set([...memory.keys(), ...Object.keys(readPackStore())])
 }

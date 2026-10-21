@@ -21,8 +21,3 @@ export function writePackStore(key: string, saved: PackAiSaved): boolean {
     return false
   }
 }
-
-/** 첫 화면 키워드 단추의 'AI로 써 둠' 표시 */
-export function packAiKeys(): Set<string> {
-  return new Set(Object.keys(readPackStore()))
-}

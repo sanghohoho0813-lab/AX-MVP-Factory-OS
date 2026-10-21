@@ -40,6 +40,7 @@ export function PackView({
   rank,
   readOnly,
   ownerAi,
+  autoAi,
   savedIdeaHref,
   onBack,
   onCopy,
@@ -54,6 +55,8 @@ export function PackView({
   readOnly: boolean
   /** 대표 AI 를 쓸 수 있음 */
   ownerAi: boolean
+  /** 열자마자 AI 를 불러도 됨(대표 권한 확인 · 채널 설계 기준을 다 읽음) — 아니면 [AI로 다 쓰기] 를 눌러야 */
+  autoAi: boolean
   /** 이미 내 콘텐츠에 있으면 그 줄 주소 */
   savedIdeaHref: string | null
   onBack: () => void
@@ -82,9 +85,10 @@ export function PackView({
   }
 
   // 키워드를 누르면 AI 도 바로(대표 · 아직 AI 결과가 없고 · 이번 접속에서 처음일 때만)
+  // 채널 설계 기준을 다 읽기 전에는 부르지 않는다(기본 말투로 써서 남는 일이 없게)
   useEffect(() => {
-    if (canAi && takeAutoRun(source.key)) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
-  }, [canAi, source.key, rule, brief])
+    if (canAi && autoAi && takeAutoRun(source.key)) startPackAi(source.key, packBundle({ today: todayLocalDate(), pack: rule, brief }).context, rule.headline)
+  }, [canAi, autoAi, source.key, rule, brief])
 
   const save = async () => {
     setSaving(true)

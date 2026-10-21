@@ -209,6 +209,42 @@ function points(s: PackSource): Point[] {
   ]
 }
 
+/** 축마다 다른 짧은 말 — 쇼츠 3줄 요약 · 25초 쇼츠 · 카드뉴스 체크리스트(시장 주제 말이 AI 주제에 섞이지 않게) */
+function axisLines(s: PackSource, ps: Point[]) {
+  const first = (t: string) => t.split('. ')[0].replace(/\.$/, '')
+  if (s.axis === 'axai') {
+    return {
+      recap: ['매주 반복되는 일 하나 고르기', '예시 하나 같이 넣기', '결과는 사람이 한 번 확인'],
+      labelB: '② 먼저 해 볼 것 하나 (25초)',
+      fixedB: fit(`${s.topic} 먼저 해 볼 것 하나`, 22),
+      hookB: `${s.topic}, 어디부터 쓰면 될까요? 딱 하나만 말씀드릴게요.`,
+      sayB: '맡길 일을 한 문장으로 적고, 예시 자료 하나를 같이 넣어 보세요',
+      sceneB: ps[2].screen,
+      check: ['□ 매주 반복되는 일 하나 고르기', '□ 예시 자료 하나 준비', '□ 회사 기밀 · 개인정보는 넣지 않기'],
+    }
+  }
+  if (s.axis === 'bridge') {
+    return {
+      recap: ['손으로 챙기면 놓친다', '조건 한 번 넣어 두기', '일주일 돌려 보고 고치기'],
+      labelB: '② 손으로 하면 생기는 일 (25초)',
+      fixedB: fit(`${split(s.topic).market} 손으로 하면 놓쳐요`, 22),
+      hookB: `${split(s.topic).market}, 아직 손으로 챙기세요? 이것 때문에 놓칩니다.`,
+      sayB: first(ps[0].say),
+      sceneB: ps[0].screen,
+      check: ['□ 우리 회사 조건(업종 · 지역 · 업력) 정리', '□ 받을 곳 · 알림 방법 정하기', '□ 일주일 돌려 보고 빠진 것 고치기'],
+    }
+  }
+  return {
+    recap: ['해당되는지 확인', '시기 먼저', '서류는 미리'],
+    labelB: '② 놓치는 것 하나 (25초)',
+    fixedB: fit(`${s.topic} 가장 많이 놓치는 것`, 22),
+    hookB: `${s.topic}, 이것 때문에 놓치는 회사가 제일 많습니다.`,
+    sayB: first(ps[1].say),
+    sceneB: ps[1].screen,
+    check: ['□ 회사 기본 숫자 정리', '□ 시기 · 마감 확인', '□ 애매하면 확인 먼저'],
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* 칸마다                                                               */
 /* ------------------------------------------------------------------ */
@@ -252,12 +288,20 @@ function videoBlocks(s: PackSource, b: ChannelBrief, headline: string): PackBloc
   ]
 }
 
-const fit = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`)
+/** 길면 줄이되 '[공식 자료 확인: …]' 같은 빈칸 한가운데서 자르지 않는다(닫는 ] 가 없으면 빈칸으로 안 세짐) */
+export function fit(text: string, max: number): string {
+  if (text.length <= max) return text
+  let cut = text.slice(0, max - 1)
+  const open = cut.lastIndexOf('[')
+  if (open >= 0 && cut.indexOf(']', open) < 0) cut = cut.slice(0, open)
+  return `${cut.trimEnd()}…`
+}
 
 function shortsBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
   const ps = points(s)
+  const ax = axisLines(s, ps)
   const fixedA = fit(`${s.topic}, 이것만 보세요`, 22)
-  const fixedB = fit(`${s.topic} 가장 많이 놓치는 것`, 22)
+  const fixedB = ax.fixedB
   const a = [
     `상단 고정 문구: ${fixedA}`,
     '',
@@ -265,13 +309,13 @@ function shortsBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
     `3~15초  말: "첫째, ${ps[0].head}."  /  자막: ① ${ps[0].head}  /  장면: ${ps[0].screen}`,
     `15~30초  말: "둘째, ${ps[1].head}."  /  자막: ② ${ps[1].head}  /  장면: ${ps[1].screen}`,
     `30~45초  말: "셋째, ${ps[2].head}."  /  자막: ③ ${ps[2].head}  /  장면: ${ps[2].screen}`,
-    `45~52초  말: "정리하면 — 해당되는지 확인, 시기 먼저, 서류는 미리. 자세한 건 긴 영상에서."  /  자막: 3줄 요약  /  장면: 정면`,
+    `45~52초  말: "정리하면 — ${ax.recap.join(', ')}. 자세한 건 긴 영상에서."  /  자막: 3줄 요약  /  장면: 정면`,
   ].join('\n')
   const bText = [
     `상단 고정 문구: ${fixedB}`,
     '',
-    `0~3초  말: "${s.topic}, 이것 때문에 놓치는 회사가 제일 많습니다."  /  자막: ${fixedB}  /  장면: 손가락으로 화면 가리키기`,
-    `3~18초  말: "${ps[1].say.split('. ')[0]}."  /  자막: 놓치는 것 하나  /  장면: ${ps[1].screen}`,
+    `0~3초  말: "${ax.hookB}"  /  자막: ${fixedB}  /  장면: 손가락으로 화면 가리키기`,
+    `3~18초  말: "${ax.sayB}."  /  자막: ${ax.labelB.replace(/^② | \(25초\)$/g, '')}  /  장면: ${ax.sceneB}`,
     `18~25초  말: "우리 회사는 해당되는지 — 설명란에서 확인해 보세요."  /  자막: 설명란 확인  /  장면: 정면`,
   ].join('\n')
   const caption = [
@@ -282,7 +326,7 @@ function shortsBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
   ].join('\n')
   return [
     { label: '① 핵심 셋 (50초)', text: a },
-    { label: '② 놓치는 것 하나 (25초)', text: bText },
+    { label: ax.labelB, text: bText },
     { label: '캡션 (릴스 · 쇼츠 공통)', text: `${caption}\n\n${hashtags(s, 5).join(' ')}` },
   ]
 }
@@ -335,13 +379,14 @@ function blogBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
 
 function cardsBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
   const ps = points(s)
+  const ax = axisLines(s, ps)
   const cards: [string, string, string][] = [
     [`${s.topic}\n우리 회사도 될까?`, '대표님이 먼저 볼 3가지', '표지 — 큰 글자 두 줄 · 회사 로고'],
     ['"우리는 안 되겠지"', '상담에서 가장 많이 듣는 말이에요', '고민하는 대표님 그림'],
     [`① ${ps[0].head}`, fit(ps[0].say.split('. ')[0], 60), ps[0].screen],
     [`② ${ps[1].head}`, fit(ps[1].say.split('. ')[0], 60), ps[1].screen],
     [`③ ${ps[2].head}`, fit(ps[2].say.split('. ')[0], 60), ps[2].screen],
-    ['지금 할 일 체크', '□ 회사 기본 숫자 정리\n□ 시기 · 마감 확인\n□ 애매하면 확인 먼저', '체크리스트 그림'],
+    ['지금 할 일 체크', ax.check.join('\n'), '체크리스트 그림'],
     ['우리 회사는 해당될까?', fit(b.ending, 60), '미래AI랩 상담 안내(실제로 하는 일만 · 혜택 약속 없이)'],
   ]
   return cards.map(([big, small, img], i) => ({ label: `${i + 1}장`, text: `큰 글자: ${big}\n작은 글자: ${small}\n그림: ${img}` }))
@@ -532,8 +577,20 @@ export function aiSections(part: PackAiPart, headline: string, items: readonly P
 }
 
 /** 규칙 초안 위에 AI 칸을 덮는다(AI 가 안 쓴 칸은 규칙 초안 그대로 · 발행 전 확인은 다시 센다) */
+/** 제목 · 썸네일 · 올릴 때 글은 AI 가 일부만 쓴다 — AI 가 안 쓴 블록(인스타 캡션 · 블로그 태그 · 첫 문장 …)은 규칙 초안을 남긴다 */
+const MERGE_SECTIONS: readonly PackSectionId[] = ['titles', 'upload']
+const blockKind = (label: string) => label.replace(/\(.*?\)/g, '').replace(/\s+/g, '').slice(0, 4)
+
 export function withAi(p: ContentPack, ai: Partial<Record<PackSectionId, PackBlock[]>>): ContentPack {
-  const base = p.sections.filter((x) => x.id !== 'checks').map((x) => (ai[x.id]?.length ? { ...x, blocks: ai[x.id]! } : x))
+  const base = p.sections
+    .filter((x) => x.id !== 'checks')
+    .map((x) => {
+      const got = ai[x.id]
+      if (!got?.length) return x
+      if (!MERGE_SECTIONS.includes(x.id)) return { ...x, blocks: got }
+      const kinds = new Set(got.map((b) => blockKind(b.label)))
+      return { ...x, blocks: [...got, ...x.blocks.filter((b) => !kinds.has(blockKind(b.label)))] }
+    })
   const holes = countHoles(base)
   // AI 가 확정한 제목(유튜브 갈래 맨 앞 '확정 제목')이 있으면 머리 제목도 그것으로
   const top = ai.video?.[0]
