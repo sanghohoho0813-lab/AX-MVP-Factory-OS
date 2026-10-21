@@ -1,18 +1,31 @@
 /**
- * D-254 머리줄 [ChatGPT 옆에] — 누르면 작은 판: 어느 AI(ChatGPT · Claude · Gemini) · 폭 3단계 · 옆에 열기 · 앞으로 · 닫기 ·
+ * D-254 [ChatGPT 옆에 띄우기] — 누르면 작은 판: 어느 AI(ChatGPT · Claude · Gemini) · 폭 3단계 · 옆에 열기 · 앞으로 · 닫기 ·
  * OS 도 왼쪽 창으로 · 팝업이 막혔을 때 푸는 법 · 창 정리 단축키. PC 에서만(휴대폰은 앱을 오가는 편이 빠르다).
- * 보기 무대(iframe) 안에서는 숨긴다(바깥 머리줄에 하나만).
+ * 자리는 왼쪽 메뉴 맨 아래 — 머리줄은 이미 꽉 차 1024 · 1440 · 1600 · 1900px 에서 옆으로 넘쳤다(실측). 메뉴를 접으면 아이콘만.
+ * 판은 메뉴 오른쪽에 화면 고정(메뉴 칸이 잘라 먹지 않게). 보기 무대(iframe) 안에서는 숨긴다(바깥에 하나만).
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ArrowUpRight, PanelRight, PanelsLeftRight, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { SIDE_SERVICES, SIDE_WIDTHS, closeSideAi, focusSideAi, openOsLeft, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 
-export function SideAiButton() {
+export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
   const s = useSideAi()
   const [open, setOpen] = useState(false)
+  const [at, setAt] = useState<CSSProperties>({})
   const [osOpened, setOsOpened] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+  const toggle = () => {
+    const r = btn.current?.getBoundingClientRect()
+    if (r) {
+      const w = Math.min(352, window.innerWidth - 16)
+      // 메뉴 칸 오른쪽 끝에서 띄운다(단추 끝이 아니라 — 판이 메뉴 경계에 걸치지 않게)
+      const edge = box.current?.closest('aside')?.getBoundingClientRect().right ?? r.right
+      setAt({ left: Math.max(8, Math.min(edge + 8, window.innerWidth - w - 8)), bottom: Math.max(8, window.innerHeight - r.bottom), width: w, maxHeight: window.innerHeight - 16 })
+    }
+    setOpen((v) => !v)
+  }
   useEffect(() => {
     if (!open) return
     const away = (e: PointerEvent) => {
@@ -31,22 +44,23 @@ export function SideAiButton() {
   if (inFrame()) return null
   const name = SIDE_SERVICES[s.service].label
   return (
-    <div ref={box} className="relative">
+    <div ref={box}>
       <button
+        ref={btn}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         aria-expanded={open}
         aria-label={`${name} 옆에 띄우기`}
         title={`${name} 옆에 띄우기 — OS 를 보면서 오른쪽에 AI 창`}
         data-testid="side-ai-button"
         data-open={s.open ? '1' : '0'}
-        className={`inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border px-2 text-[0.85rem] font-semibold whitespace-nowrap min-[1900px]:px-2.5 ${s.open ? 'border-violet-500 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+        className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) border py-2 text-[0.9rem] font-semibold ${collapsed ? 'justify-center px-0' : 'px-3'} ${s.open ? 'border-violet-500 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-400/40 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25'}`}
       >
-        <PanelRight aria-hidden="true" className="size-4" />
-        <span aria-hidden="true" className="hidden min-[1900px]:inline">{name} 옆에</span>
+        <PanelRight aria-hidden="true" className="size-[18px] shrink-0" />
+        {!collapsed && <span className="min-w-0 truncate">{s.open ? `${name} 옆 창 열림` : `${name} 옆에 띄우기`}</span>}
       </button>
       {open && (
-        <div role="dialog" aria-label="AI 옆 창" className="absolute right-0 z-50 mt-2 flex w-[22rem] flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-slate-900 shadow-(--shadow-card)" data-testid="side-ai-panel">
+        <div role="dialog" aria-label="AI 옆 창" style={at} className="fixed z-50 flex flex-col gap-3 overflow-y-auto rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-slate-900 shadow-(--shadow-card)" data-testid="side-ai-panel">
           <div className="flex items-start gap-2">
             <p className="t-body min-w-0 flex-1 font-bold break-keep">AI 를 옆에 띄우기</p>
             <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="tap -mt-1 -mr-1 flex size-9 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100">

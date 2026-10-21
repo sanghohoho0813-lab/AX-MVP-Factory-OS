@@ -260,14 +260,14 @@ void fetched
 // 파일 교체 — 사업자등록증 글자 파일로
 const beforePatches = patches.length
 const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: '사업자등록증 파일 교체' }).first().click()])
-await chooser.setFiles({ name: '사업자등록증_새.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증 (법인사업자)\n등록번호 : 214-88-01234\n법인명(단체명) : 클라우드정밀(주)\n대표자 : 이대표', 'utf8') })
+await chooser.setFiles({ name: '사업자등록증_새.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증 (법인사업자)\n등록번호 : 214-88-01232\n법인명(단체명) : 클라우드정밀(주)\n대표자 : 이대표', 'utf8') })
 await page.waitForTimeout(2500)
 const lastUpload = uploads[uploads.length - 1] ?? ''
 check('파일 교체: 비공개 저장소 client-documents 에 올린다', lastUpload.startsWith(`${WS}/${CID}/businessRegistration/`) && lastUpload.endsWith('.txt'), lastUpload)
 const saved = row.payload?.documents?.businessRegistration ?? {}
 check('파일 교체: 업체 기록의 파일 이름 · 경로가 바뀐다', patches.length > beforePatches && saved.fileName === '사업자등록증_새.txt' && saved.storagePath === lastUpload, JSON.stringify(saved))
 const inbox = row.payload?.factInbox ?? []
-check('파일 교체: 글자에서 회사 정보 후보(사업자등록번호) — 확정하지 않는다', inbox.some((c) => c.key === 'businessNumber' && c.value === '214-88-01234') && row.payload.businessNumber === '123-45-67890', JSON.stringify(inbox).slice(0, 300))
+check('파일 교체: 글자에서 회사 정보 후보(사업자등록번호) — 확정하지 않는다', inbox.some((c) => c.key === 'businessNumber' && c.value === '214-88-01232') && row.payload.businessNumber === '123-45-67890', JSON.stringify(inbox).slice(0, 300))
 const shown = (await page.locator('main').innerText()) ?? ''
 check('파일 교체: 화면에 새 파일 이름', shown.includes('사업자등록증_새.txt'))
 check('D-209 파일 교체: 옛 발급일(2026-09-01)을 물려받지 않음 · 올린 때 기록', !saved.issuedAt && !saved.validUntil && !!saved.uploadedAt, JSON.stringify(saved))

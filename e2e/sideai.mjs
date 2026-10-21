@@ -1,9 +1,9 @@
 /**
- * qa:sideai — D-254 AI 옆 창(머리줄 [ChatGPT 옆에]).
+ * qa:sideai — D-254 AI 옆 창(왼쪽 메뉴 맨 아래 [ChatGPT 옆에 띄우기]).
  * 대표: "모니터가 하나라서 OS 를 보면서 ChatGPT 를 옆에 띄워 놓고 싶다".
  * 밖(ChatGPT · Claude · Gemini)은 이 상자에서 못 가므로 가짜 쪽 하나로 바꿔 받는다 — 창이 열리는 자리 · 이름 · OS 비키기만 본다.
  *
- *   S1 PC 머리줄에 단추 · 휴대폰에는 없음
+ *   S1 PC 왼쪽 메뉴 아래에 단추(글자 그대로) · 휴대폰에는 없음
  *   S2 누르면 판 — AI 셋 · 폭 셋 · 기본 ChatGPT · 보통
  *   S3 [옆에 열기] → 창 하나(이름 mirae-side-ai) · 화면 오른쪽 · OS 본문이 그만큼 왼쪽으로 비킴 · 가로 넘침 0
  *   S4 Claude 로 바꾸면 같은 창이 Claude 로(창이 둘이 되지 않음)
@@ -11,6 +11,8 @@
  *   S6 팝업이 막히면 푸는 법 안내
  *   S7 [OS 도 왼쪽 창으로] → 같은 주소의 OS 창이 왼쪽에
  *   S8 고른 AI · 폭은 다시 열어도 기억
+ *   S10 머리줄은 그대로 — 1024 · 1440 · 1600 · 1920 · 2300 에서 머리줄 넘침 0(머리줄에 두었을 때 넘쳤다)
+ *   S11 메뉴를 접어도 아이콘으로 남고 판이 화면 안에 열린다
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -53,7 +55,8 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
 
 const btn = page.getByTestId('side-ai-button')
-check('S1 PC 머리줄에 [ChatGPT 옆에] 단추', (await btn.isVisible()) && (await btn.getAttribute('aria-label')).includes('ChatGPT'))
+const btnBox = await btn.boundingBox()
+check('S1 PC 왼쪽 메뉴 아래에 [ChatGPT 옆에 띄우기] 단추(글자 그대로)', (await btn.isVisible()) && (await btn.getAttribute('aria-label')).includes('ChatGPT') && (await btn.innerText()).includes('ChatGPT 옆에 띄우기') && btnBox.x < 300 && btnBox.y > 600, btnBox)
 await btn.click()
 const panel = page.getByTestId('side-ai-panel')
 await panel.waitFor()
@@ -113,8 +116,36 @@ check('S8 다시 열어도 고른 AI(Claude) · 폭(반반) 기억 · 단추 이
 await page.keyboard.press('Escape')
 await page.waitForTimeout(150)
 check('S8b Esc 로 판 닫힘', (await page.getByTestId('side-ai-panel').count()) === 0)
+// 메뉴 접기 → 아이콘만 · 판은 화면 안
+await page.getByRole('button', { name: '사이드바 접기' }).click()
+await page.waitForTimeout(400)
+await page.getByTestId('side-ai-button').click()
+const pb = await page.getByTestId('side-ai-panel').boundingBox()
+check('S11 메뉴를 접어도 아이콘 단추 · 판이 화면 안에 열림', (await page.getByTestId('side-ai-button').innerText()).trim() === '' && pb && pb.x >= 0 && pb.y >= 0 && pb.x + pb.width <= 1440 && pb.y + pb.height <= 900, pb)
+await shot(page, 'S11-collapsed')
+await page.keyboard.press('Escape')
+await page.getByRole('button', { name: '사이드바 펼치기' }).click()
 check('PC JS 오류 0', errors.length === 0, errors.join(' | '))
 await ctx.close()
+
+// 머리줄은 그대로 — 단추를 메뉴로 옮긴 까닭(머리줄에 두면 1024 · 1440 · 1600 · 1900 에서 넘쳤다)
+const hdr = []
+for (const width of [1024, 1440, 1600, 1920, 2300]) {
+  const c = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR' })
+  const p = await c.newPage()
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.evaluate(seedScript())
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.waitForTimeout(400)
+  const r = await p.evaluate(() => {
+    const h = document.querySelector('header')
+    return { hdr: h.scrollWidth - h.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+  })
+  const vis = await p.getByTestId('side-ai-button').isVisible()
+  hdr.push({ width, ...r, vis })
+  await c.close()
+}
+check('S10 머리줄 넘침 0 · 화면 넘침 0 · 단추는 어느 폭에서나 메뉴에 보임(1024 · 1440 · 1600 · 1920 · 2300)', hdr.every((h) => h.hdr <= 0 && h.page <= 0 && h.vis), hdr)
 
 // 휴대폰에는 없음(앱을 오가는 편이 빠르다)
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })

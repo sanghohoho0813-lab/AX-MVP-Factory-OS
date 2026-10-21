@@ -23,6 +23,7 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { ViewAsSwitch } from './ViewAsSwitch'
+import { SideAiButton } from './SideAiButton'
 import { AccountSwitchItems } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
@@ -246,6 +247,12 @@ function SidebarContent({
         {!collapsed && (
           <div className="mb-2 px-1.5 lg:hidden">
             <ViewAsSwitch stacked />
+          </div>
+        )}
+        {/* D-254 대표 "모니터 하나 — ChatGPT 를 옆에": 오른쪽에 AI 창(팝업) · OS 는 비켜 줌. PC 만 — OS 는 아무것도 보내지 않아 팀장 화면에도 같이 */}
+        {!onCloseMobile && (
+          <div className="mb-2 hidden lg:block">
+            <SideAiButton collapsed={collapsed} />
           </div>
         )}
         <SidebarAccount collapsed={collapsed} />

@@ -3,7 +3,6 @@ import { useIsPilot } from '../../auth/osAccess'
 import { useNavPath } from '../../lib/navFrom'
 import { DeviceSwitch, DeviceSwitchCompact } from './DeviceView'
 import { ContentWidthButton } from './ContentWidthButton'
-import { SideAiButton } from './SideAiButton'
 import { ViewAsSwitch, ViewAsSwitchCompact } from './ViewAsSwitch'
 import {
   Building,
@@ -265,10 +264,6 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         </span>
         <span className="hidden lg:max-[1440px]:inline-flex">
           <DeviceSwitchCompact />
-        </span>
-        {/* D-254 대표 "모니터 하나 — ChatGPT 를 옆에": 오른쪽에 AI 창(팝업) · OS 는 비켜 줌. PC 만 — OS 는 아무것도 보내지 않아 팀장 화면에도 같이 */}
-        <span className="hidden lg:inline-flex">
-          <SideAiButton />
         </span>
         {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
         <span className="hdr-compact-search inline-flex min-[1360px]:hidden">

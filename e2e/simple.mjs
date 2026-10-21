@@ -269,7 +269,7 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   await page.getByLabel('서류 글자 붙여넣기').fill(
     [
       '사업자등록증 ( 법인사업자 )',
-      '등록번호 : 214-88-01234',
+      '등록번호 : 214-88-01232',
       '법인명(단체명) : 주식회사 대한정밀',
       '대표자 : 박정밀',
       '개업연월일 : 2018 년 05 월 14 일',
@@ -282,7 +282,7 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   await wait(600)
   check('서류: 읽은 항목을 목록으로 보여준다', (await sheet.getByText(/에서 \d+개를 읽었습니다/).count()) > 0)
   check('서류: 회사명을 읽었다', (await sheet.getByText('주식회사 대한정밀').count()) > 0)
-  check('서류: 사업자등록번호를 읽었다', (await sheet.getByText('214-88-01234').count()) > 0)
+  check('서류: 사업자등록번호를 읽었다', (await sheet.getByText('214-88-01232').count()) > 0)
   check('서류: 대표자를 읽었다', (await sheet.getByText('박정밀').count()) > 0)
 
   const applyBtn = sheet.getByRole('button', { name: /개 채우기/ })
@@ -296,7 +296,7 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   )
   check('서류: 회사명이 사실표에 들어갔다', saved.companyName?.value === '주식회사 대한정밀', JSON.stringify(saved.companyName))
   check('서류: 출처가 서류 이름으로 남는다', saved.companyName?.source === '사업자등록증', saved.companyName?.source)
-  check('서류: 본점·설립일·사업자번호도 함께 채워진다', !!saved.headOffice?.value && !!saved.establishedAt?.value && saved.businessNumber?.value === '214-88-01234')
+  check('서류: 본점·설립일·사업자번호도 함께 채워진다', !!saved.headOffice?.value && !!saved.establishedAt?.value && saved.businessNumber?.value === '214-88-01232')
   check('서류: 종목에서 옮긴 주요제품은 미확인으로 둔다', saved.mainProducts?.status === 'unverified', saved.mainProducts?.status)
 
   await page.getByRole('tab', { name: '기록' }).click()
