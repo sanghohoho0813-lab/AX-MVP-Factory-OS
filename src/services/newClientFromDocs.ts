@@ -19,7 +19,8 @@ import type { DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { placeDocument } from './docClassify'
 import { factCandidatesFromDocText } from './docFacts'
-import { bizNoChecksumOk, type ReadMethod } from './docAutoFill'
+import { type ReadMethod } from './docAutoFill'
+import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 import { looksLikeCretop } from './docAutoAnalyze'
 import type { HandoffDoc } from './docHandoff'
 
@@ -40,6 +41,11 @@ export interface NewClientFound {
   docLabel: string
   /** 한 번 봐야 하는 까닭 — 없으면 '' */
   note: string
+  /**
+   * D-255: 사업자등록번호를 확실히 못 읽었을 때 — 칸은 비워 두고(value '') 고를 후보만 보인다(국세청 검증 숫자가 맞는 것).
+   * 하나를 누르면 그 번호가 들어간다. 숫자 하나 틀리면 컨설턴트에게 치명적이라 저절로 넣지 않는다.
+   */
+  choices?: string[]
 }
 
 export type NewClientGuess = Partial<Record<NewClientField, NewClientFound>>
@@ -80,6 +86,7 @@ export const EMPTY_DOCS_READ: NewClientDocsRead = { docs: [], guess: {}, files: 
 
 export const NOTE_FROM_PHOTO = '사진 · 스캔에서 읽은 글자라 틀릴 수 있어요 — 한 번 봐 주세요'
 export const NOTE_BIZNO_CHECK = '번호 검증이 맞지 않아요 — 서류와 한 글자씩 비교해 주세요'
+export const NOTE_BIZNO_UNREAD = '번호를 또렷하게 읽지 못했어요 — 서류를 보고 적어 주세요'
 export const NOTE_DOC_UNSURE = '서류 종류가 확실하지 않아요 — 맞는지 봐 주세요'
 export const NOTE_DIFFERS = '서류마다 적힌 값이 달라요 — 맞는 것으로 고쳐 주세요'
 
@@ -115,12 +122,18 @@ interface Hit {
   rank: number
   method: ReadMethod
   docSure: boolean
+  /** D-255: 읽기가 확실하지 않은 까닭(스캔 한 번만 맞음 · 검증 숫자 안 맞음) */
+  preNote?: string
+  choices?: string[]
+  /** 다른 서류와 맞춰 볼 후보 전부(화면에는 choices 만) */
+  alts?: string[]
 }
 
 function noteOf(hit: Hit): string {
   if (hit.field === 'businessNumber') {
-    // 검증 숫자가 맞으면 사진에서 읽었어도 믿는다(틀린 글자가 끼면 맞지 않는다)
     if (!bizNoChecksumOk(hit.value)) return NOTE_BIZNO_CHECK
+    // D-255: 스캔이면 번호 줄을 두 번 읽어 같아야 믿는다(bizNoRead) — 한 번만 맞으면 까닭이 붙어 온다
+    if (hit.preNote) return hit.preNote
     return hit.docSure ? '' : NOTE_DOC_UNSURE
   }
   if (!hit.docSure) return NOTE_DOC_UNSURE
@@ -176,6 +189,8 @@ export function guessNewClientFromDocs(
         rank: biz.key === 'businessRegistration' ? 0 : 1,
         method: doc.method,
         docSure: placed.sure,
+        ...(field === 'businessNumber' && cand.note ? { preNote: cand.note } : {}),
+        ...(field === 'businessNumber' && cand.choices?.length ? { choices: cand.choices, alts: readBusinessNumber(doc.text).alternatives } : {}),
       })
       if (!note.found.includes(field)) note.found.push(field)
     }
@@ -187,6 +202,11 @@ export function guessNewClientFromDocs(
   for (const field of NEW_CLIENT_FIELDS) {
     const mine = hits.filter((h) => h.field === field)
     if (mine.length === 0) continue
+    if (field === 'businessNumber') {
+      const g = guessBizNo(mine)
+      if (g) guess[field] = g
+      continue
+    }
     // 믿는 순서 → 같은 순서면 먼저 넣은 파일. 다른 서류가 같은 값을 말하면 사진 · 종류 까닭은 지운다
     const best = [...mine].sort((a, b) => a.rank - b.rank)[0]
     const agreed = mine.filter((h) => h !== best && sameKey(field, h.value) === sameKey(field, best.value)).length > 0
@@ -197,6 +217,33 @@ export function guessNewClientFromDocs(
     guess[field] = { value: best.value, fileName: best.fileName, docLabel: best.docLabel, note }
   }
   return { guess, files }
+}
+
+/**
+ * D-255: 사업자등록번호 고르기 — 확실한 것(PDF 글자 · 크레탑 · 두 번 읽어 같은 스캔)이 먼저.
+ * 확실한 게 없으면 칸은 비우고 후보만(하나를 누르게). 확실하지 않은 스캔의 후보 가운데 다른 서류 번호와 같은 게 있으면 그걸로.
+ */
+function guessBizNo(mine: readonly Hit[]): NewClientFound | undefined {
+  const byRank = (a: Hit, b: Hit) => a.rank - b.rank
+  const k = (v: string) => sameKey('businessNumber', v)
+  // 검증 숫자가 틀린 번호(크레탑 등)는 헷갈리기 쉬운 숫자를 바꿔 본 후보를 붙인다
+  const optionsOf = (h: Hit) => [h.value, ...(h.choices ?? []), ...(h.alts ?? []), ...(bizNoChecksumOk(h.value) ? [] : readBusinessNumber(`등록번호 : ${h.value}`).alternatives)]
+  const sure = mine.filter((h) => !h.preNote && bizNoChecksumOk(h.value)).sort(byRank)
+  const unsure = mine.filter((h) => !sure.includes(h)).sort(byRank)
+  if (sure.length) {
+    const best = sure[0]
+    const key = k(best.value)
+    const differs = sure.some((h) => k(h.value) !== key) || unsure.some((h) => !optionsOf(h).some((v) => k(v) === key))
+    const agreed = mine.some((h) => h !== best && optionsOf(h).some((v) => k(v) === key))
+    const note = differs ? NOTE_DIFFERS : agreed ? '' : noteOf(best)
+    return { value: best.value, fileName: best.fileName, docLabel: best.docLabel, note }
+  }
+  const best = unsure[0]
+  if (!best) return undefined
+  const all = [...new Set(unsure.flatMap((h) => [h.value, ...(h.choices ?? []), ...(bizNoChecksumOk(h.value) ? [] : readBusinessNumber(`등록번호 : ${h.value}`).candidates)]).filter((v) => bizNoChecksumOk(v)).map((v) => formatBizNo(v)))]
+  const choices = all.slice(0, 4)
+  const note = best.preNote ?? (choices.length ? `${NOTE_BIZNO_CHECK} (읽힌 글자: ${best.value})` : `${NOTE_BIZNO_UNREAD} (읽힌 글자: ${best.value})`)
+  return { value: '', fileName: best.fileName, docLabel: best.docLabel, note, ...(choices.length ? { choices } : {}) }
 }
 
 /**
@@ -221,6 +268,16 @@ export function applyNewClientGuess<F extends Record<NewClientField, string>>(
     const untouched = !locked.has(field) && (now.trim() === '' || (prev !== undefined && now === prev.value))
     if (!g) {
       if (prev && now === prev.value && !locked.has(field)) next[field] = '' as F[typeof field]
+      continue
+    }
+    if (g.value === '') {
+      // D-255: 고를 후보만 — 칸은 채우지 않는다. 이미 후보 하나를 골라 두었으면 그대로 확인됨
+      const picked = (g.choices ?? []).find((c) => sameKey(field, c) === sameKey(field, now))
+      if (picked && now.trim() !== '') filled[field] = { ...g, value: now, note: '', choices: undefined }
+      else if (now.trim() === '' || (prev !== undefined && now === prev.value && !locked.has(field))) {
+        if (now.trim() !== '') next[field] = '' as F[typeof field]
+        filled[field] = g
+      } else differs[field] = g
       continue
     }
     if (untouched) {

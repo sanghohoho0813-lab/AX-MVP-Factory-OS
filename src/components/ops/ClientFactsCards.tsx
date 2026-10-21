@@ -22,6 +22,7 @@ import {
   withFactDecisions,
   withFactValue,
   type FactDecision,
+  type PendingFact,
 } from '../../services/customerFacts'
 import { Button } from '../ui/Button'
 import { HelpHeading } from '../ui/fold'
@@ -67,9 +68,14 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
     )
   }
 
+  // D-255: 고를 후보가 있는 것(확실히 못 읽은 사업자등록번호)은 '모두 확인' 으로 넣지 않는다 — 하나를 눌러야 들어간다
+  const plain = pending.filter((p) => !p.choices?.length)
   const acceptAll = async () => {
-    const decisions: FactDecision[] = pending.map((p) => ({ id: p.id, action: 'accept' }))
-    await onCommit(withFactDecisions(record, decisions, now), `자료에서 찾은 정보 ${pending.length}건을 확인했습니다. 모든 전문 모듈이 이 값을 씁니다.`)
+    const decisions: FactDecision[] = plain.map((p) => ({ id: p.id, action: 'accept' }))
+    await onCommit(withFactDecisions(record, decisions, now), `자료에서 찾은 정보 ${plain.length}건을 확인했습니다. 모든 전문 모듈이 이 값을 씁니다.${plain.length < pending.length ? ' 사업자등록번호는 위에서 맞는 번호를 골라 주세요.' : ''}`)
+  }
+  const pickChoice = async (p: PendingFact, value: string) => {
+    await onCommit(withFactDecisions(record, [{ id: p.id, action: 'fix', value }], now), `${p.label}를 ${value} 로 넣었습니다.`)
   }
 
   const saveFixes = async () => {
@@ -127,6 +133,16 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
                 </span>
               )}
               {p.current && !fixing && <span className="t-sub break-keep text-amber-800">지금 적힌 값: {p.current}</span>}
+              {p.choices?.length && !fixing ? (
+                <div className="flex flex-wrap items-center gap-1.5" data-testid="fact-choices">
+                  <span className="t-sub break-keep text-slate-700">원본 서류와 비교해 맞는 번호를 누르세요:</span>
+                  {p.choices.map((c) => (
+                    <button key={c} type="button" onClick={() => void pickChoice(p, c)} className="tap t-sub rounded-(--radius-control) border border-warning-400 bg-white px-3 font-bold tracking-wide text-slate-900 tabular-nums hover:bg-warning-50" data-testid="fact-choice">
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {fixing && (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
@@ -161,9 +177,11 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => void acceptAll()} data-testid="fact-accept-all">
-              <Check aria-hidden="true" className="size-4" /> 모두 확인
-            </Button>
+            {plain.length > 0 && (
+              <Button variant="primary" onClick={() => void acceptAll()} data-testid="fact-accept-all">
+                <Check aria-hidden="true" className="size-4" /> {plain.length < pending.length ? `나머지 ${plain.length}건 확인` : '모두 확인'}
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => setFixing(true)} data-testid="fact-fix">
               <Pencil aria-hidden="true" className="size-4" /> 틀린 것만 고치기
             </Button>

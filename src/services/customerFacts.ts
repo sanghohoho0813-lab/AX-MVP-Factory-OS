@@ -239,6 +239,8 @@ export interface PendingFact {
   customGroup?: ProfileGroupKey
   /** D-144: 확인을 묻는 까닭(사진 글자 · 지금 값과 다름 …) */
   note?: string
+  /** D-255: 고를 후보(사업자등록번호를 확실히 못 읽었을 때) — '모두 확인' 으로 넣지 않고 하나를 눌러야 한다 */
+  choices?: string[]
 }
 
 /** D-129: 'cf:<칸 이름>' — 직접 만든 칸으로 가는 후보 */
@@ -317,7 +319,7 @@ export function cretopFacts(record: ClientOpsRecord): { key: string; value: stri
 export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
   const out: PendingFact[] = []
   const seen = new Set<string>()
-  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string; label?: string; group?: ProfileGroupKey; note?: string }, from: PendingFact['from']) => {
+  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string; label?: string; group?: ProfileGroupKey; note?: string; choices?: string[] }, from: PendingFact['from']) => {
     if (!c.value.trim()) return
     if (isCustomFactKey(c.key)) {
       // 직접 만든 칸으로 가는 후보 — 같은 이름의 칸에 같은 값이면 묻지 않는다(같은 인증서를 또 올려도 칸이 늘지 않는다)
@@ -351,6 +353,7 @@ export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
       current: cur ? displayFact(def, cur) : '',
       from,
       ...(c.note ? { note: c.note } : {}),
+      ...(c.choices?.length ? { choices: c.choices } : {}),
     })
   }
   for (const c of record.factInbox ?? []) consider(c, 'inbox')

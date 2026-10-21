@@ -8,6 +8,10 @@
  * (잘못된 값을 자동으로 채우는 것보다 비워두는 편이 안전하다.)
  */
 
+import { readBusinessNumber } from './bizNoRead'
+
+export { readBusinessNumber }
+
 export type DocSource = 'business_registration' | 'corporate_registry' | 'unknown'
 
 export interface ParsedCompanyInfo {
@@ -211,12 +215,12 @@ export function detectDocSource(text: string): DocSource {
 /* 파서                                                                 */
 /* ------------------------------------------------------------------ */
 
-/** 사업자등록번호 (000-00-00000) */
+/**
+ * 사업자등록번호 (000-00-00000) — D-255: 국세청 검증 숫자가 맞는 번호만 돌려준다(bizNoRead).
+ * 안 맞으면 비운다 — 후보 · 확실한지는 받는 쪽이 readBusinessNumber 로 따로 본다.
+ */
 function findBusinessNumber(t: string): string | undefined {
-  const labeled = /(?:사업자)?\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{3}\s*-\s*\d{2}\s*-\s*\d{5})/.exec(t)
-  if (labeled) return formatBusinessNumber(labeled[1])
-  const loose = /\b(\d{3}\s*-\s*\d{2}\s*-\s*\d{5})\b/.exec(t)
-  return loose ? formatBusinessNumber(loose[1]) : undefined
+  return readBusinessNumber(t).value || undefined
 }
 
 /** 법인등록번호 검증 숫자 — 앞 12자리에 1 · 2 를 번갈아 곱한 합 → (10 - 합 % 10) % 10 */

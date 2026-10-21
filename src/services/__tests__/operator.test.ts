@@ -218,7 +218,7 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
    * (S0 회사 기본정보는 서류 한 장으로 채울 수 있으므로 서류를 올린 것으로 친다.)
    */
   const REGISTRATION = [
-    '사업자등록증 ( 법인사업자 )', '등록번호 : 214-88-01234', '법인명(단체명) : 주식회사 대한정밀',
+    '사업자등록증 ( 법인사업자 )', '등록번호 : 214-88-01232', '법인명(단체명) : 주식회사 대한정밀',
     '대표자 : 박정밀', '개업연월일 : 2018 년 05 월 14 일', '사업장 소재지 : 경기도 화성시 동탄산단6길 22',
     '업태 : 제조업', '종목 : 자동차부품 제조',
   ].join('\n')
@@ -428,7 +428,7 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   const REGISTRATION = [
     '사업자등록증',
     '( 법인사업자 )',
-    '등록번호 : 214-88-01234',
+    '등록번호 : 214-88-01232',
     '법인명(단체명) : 주식회사 대한정밀',
     '대표자 : 박정밀',
     '개업연월일 : 2018 년 05 월 14 일',
@@ -471,7 +471,7 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   const src = (k: string) => both.find((f) => f.key === k)?.source
   check('두 장: 본점은 등기부 것을 쓴다', val('headOffice')?.includes('3층') === true, val('headOffice'))
   check('두 장: 설립일은 등기부의 회사성립연월일', val('establishedAt') === '2018-03-02', val('establishedAt'))
-  check('두 장: 사업자등록번호는 등록증 것을 쓴다', val('businessNumber') === '214-88-01234' && src('businessNumber') === '사업자등록증', `${val('businessNumber')} / ${src('businessNumber')}`)
+  check('두 장: 사업자등록번호는 등록증 것을 쓴다', val('businessNumber') === '214-88-01232' && src('businessNumber') === '사업자등록증', `${val('businessNumber')} / ${src('businessNumber')}`)
   check('두 장: 법인등록번호도 함께 채워진다', val('corporateNumber') === '110111-1234567', val('corporateNumber'))
   check('두 장: 사람이 읽을 출처 한 줄', documentsSummary([fromReg, fromRegistry]) === '사업자등록증 · 법인등기부등본', documentsSummary([fromReg, fromRegistry]))
 

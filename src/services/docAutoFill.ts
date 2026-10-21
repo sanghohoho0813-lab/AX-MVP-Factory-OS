@@ -16,6 +16,7 @@
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
 import { pendingFacts, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
+import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'none'
 
@@ -52,16 +53,7 @@ export const NOTE_DOC_UNSURE = '서류 종류가 확실하지 않아 확인이 �
 export const NOTE_SHAPE = '읽은 값의 모양이 이상해요 — 원본과 비교해 주세요'
 export const NOTE_CONFLICT = '지금 적힌 값과 달라요 — 어느 쪽이 맞는지 골라 주세요'
 
-/** 사업자등록번호 검증 숫자(국세청 규칙) — 글자 하나만 틀려도 맞지 않는다 */
-export function bizNoChecksumOk(value: string): boolean {
-  const d = value.replace(/\D/g, '').split('').map(Number)
-  if (d.length !== 10) return false
-  const w = [1, 3, 7, 1, 3, 7, 1, 3, 5]
-  let sum = 0
-  for (let i = 0; i < 9; i += 1) sum += d[i] * w[i]
-  sum += Math.floor((d[8] * 5) / 10)
-  return (10 - (sum % 10)) % 10 === d[9]
-}
+export { bizNoChecksumOk }
 
 /** 값 모양 검사 — 틀린 글자가 낀 값은 넣지 않는다 */
 function shapeOk(key: string, value: string): boolean {
@@ -112,10 +104,18 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
   const agreed = agreedFacts(docs)
+  // D-255: 다른 서류가 확실하게 말한 사업자등록번호(크레탑 · 등기 · PDF 글자) — 스캔 후보 가운데 이것과 같은 게 있으면 그걸로
+  const sureNos = docs.map((d) => factCandidatesFromDocText(d.key, d.text, 'sure').filter((c) => c.key === 'businessNumber' && !c.note && bizNoChecksumOk(c.value)).map((c) => c.value.replace(/\D/g, '')))
   docs.forEach((doc, i) => {
     const ref = `doc:${doc.key}:${now}:${i}`
+    const others = new Set(sureNos.filter((_, j) => j !== i).flat())
     const found = factCandidatesFromDocText(doc.key, doc.text, ref).map((c) => {
-      const note = noteFor(doc, c.key, c.value, agreed.has(`${c.key}|${sameKey(c.key, c.value)}`))
+      const pick = c.key === 'businessNumber' && c.note ? [c.value, ...(c.choices ?? []), ...readBusinessNumber(doc.text).alternatives].find((v) => others.has(v.replace(/\D/g, ''))) : undefined
+      if (pick) return { key: c.key, value: pick, source: c.source, asOf: c.asOf, ref: c.ref }
+      const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`)
+      const note = noteFor(doc, c.key, c.value, isAgreed)
+      // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
+      if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
     })
     if (found.length === 0) return

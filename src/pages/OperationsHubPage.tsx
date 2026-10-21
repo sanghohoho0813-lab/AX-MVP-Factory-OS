@@ -199,6 +199,35 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   /** 칸 밑 한 줄 — 서류에서 채움 · 한 번 봐 주세요 · 서류 값과 다름 */
   const docLine = (field: NewClientField) => {
     const f = docFilled[field]
+    // D-255: 번호를 확실히 못 읽었으면 칸은 비우고 후보만 — 원본과 비교해 하나를 누른다(숫자 하나 틀리면 치명적)
+    const g = f && f.value === '' ? f : docDiffers[field]?.value === '' ? docDiffers[field] : undefined
+    if (g && (g.choices?.length || g.note)) {
+      const pick = (v: string) => {
+        touchedRef.current.delete(field)
+        setForm((cur) => ({ ...cur, [field]: v }))
+        setDocFilled((cur) => ({ ...cur, [field]: { ...g, value: v, note: '', choices: undefined } }))
+        setDocDiffers((cur) => {
+          const next = { ...cur }
+          delete next[field]
+          return next
+        })
+      }
+      return (
+        <span data-testid={`new-client-choices-${field}`} className="t-meta mt-1 flex flex-col gap-1.5 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-2.5 py-2 font-normal break-keep text-warning-900">
+          <span className="font-semibold">⚠ {g.note}</span>
+          {g.choices?.length ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span>{g.docLabel} 원본과 비교해 맞는 번호를 누르세요:</span>
+              {g.choices.map((c) => (
+                <button key={c} type="button" onClick={() => pick(c)} className="tap t-sub rounded-(--radius-control) border border-warning-400 bg-white px-2.5 font-bold tracking-wide text-slate-900 tabular-nums hover:bg-warning-100" data-testid="new-client-choice">
+                  {c}
+                </button>
+              ))}
+            </span>
+          ) : null}
+        </span>
+      )
+    }
     if (f && form[field] === f.value) {
       return (
         <span data-testid={`new-client-from-doc-${field}`} className={`t-meta mt-1 block break-keep font-normal ${f.note ? 'text-warning-800' : 'text-success-700'}`}>

@@ -10,6 +10,7 @@
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
 import { parseKoreanBusinessDocument } from './koreanDocParser'
+import { readBusinessNumber } from './bizNoRead'
 import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
@@ -36,6 +37,14 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       ['businessItem', p.businessItem],
     ]
     for (const [k, v] of pairs) if (typeof v === 'string' && v.trim() !== '') out.push({ key: k, value: v, source: bizSource, asOf: '', ref })
+    // D-255: 사업자등록번호 — 확실하지 않으면(스캔 한 번만 맞음 · 검증 숫자 안 맞음) 까닭 · 고를 후보를 붙인다(저절로 넣지 않는다)
+    const bn = readBusinessNumber(text)
+    const at = out.findIndex((c) => c.key === 'businessNumber')
+    if (!bn.sure && (bn.value || bn.candidates.length)) {
+      const cand = { key: 'businessNumber', value: bn.value || bn.candidates[0], source: bizSource, asOf: '', ref, note: bn.reason, ...(bn.candidates.length ? { choices: bn.candidates } : {}) }
+      if (at >= 0) out[at] = cand
+      else out.splice(1, 0, cand)
+    }
     return out
   }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)

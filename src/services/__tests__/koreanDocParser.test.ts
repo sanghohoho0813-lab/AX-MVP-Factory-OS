@@ -13,6 +13,7 @@ import {
   parseKoreanBusinessDocument,
   parseKoreanDate,
 } from '../koreanDocParser'
+import { REREAD_MARK, bizKindFromText, bizNoChecksumOk, normalizeNumberText, readBusinessNumber } from '../bizNoRead'
 
 let passed = 0
 let failed = 0
@@ -57,7 +58,7 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   const text = `
 사업자등록증
 ( 법인사업자 )
-등록번호 : 214-88-01234
+등록번호 : 214-88-01232
 
 법인명(단체명) : 주식회사 대한정밀
 대 표 자 : 김영수
@@ -72,7 +73,7 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   const r = parseKoreanBusinessDocument(text)
   check('사등: 종류 판별', r.source === 'business_registration', r.source)
   check('사등: 회사명', r.companyName === '주식회사 대한정밀', r.companyName)
-  check('사등: 사업자번호', r.businessNumber === '214-88-01234', r.businessNumber)
+  check('사등: 사업자번호', r.businessNumber === '214-88-01232', r.businessNumber)
   check('사등: 법인번호', r.corporateNumber === '110111-7654321', r.corporateNumber)
   check('사등: 대표자', r.representativeName === '김영수', r.representativeName)
   check('사등: 개업일', r.establishedAt === '2019-03-05', r.establishedAt)
@@ -113,11 +114,11 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
 /* ---------------- 한 줄에 여러 항목이 붙어 있는 경우 ---------------- */
 {
   const text = `사업자등록증
-등록번호 : 111-22-33333  법인등록번호 : 110111-1111111
+등록번호 : 111-22-33332  법인등록번호 : 110111-1111111
 상호 : 주식회사 테스트  대표자 : 홍길동
 업태 : 도매업  종목 : 전자부품`
   const r = parseKoreanBusinessDocument(text)
-  check('혼합: 사업자번호', r.businessNumber === '111-22-33333', r.businessNumber)
+  check('혼합: 사업자번호', r.businessNumber === '111-22-33332', r.businessNumber)
   check('혼합: 법인번호', r.corporateNumber === '110111-1111111', r.corporateNumber)
   check('혼합: 회사명에 뒤 라벨 안 섞임', r.companyName === '주식회사 테스트', r.companyName)
   check('혼합: 대표자', r.representativeName === '홍길동', r.representativeName)
@@ -127,12 +128,12 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
 /* ---------------- OCR 잡음 내성 ---------------- */
 {
   const text = `사업자등록증
-등 록 번 호 :  214 - 88 - 01234
+등 록 번 호 :  214 - 88 - 01232
 상   호 :  주식회사 노이즈
 대 표 자 :  최민호
 개 업 연 월 일 :  2020 . 11 . 02`
   const r = parseKoreanBusinessDocument(text)
-  check('잡음: 공백 섞인 사업자번호', r.businessNumber === '214-88-01234', r.businessNumber)
+  check('잡음: 공백 섞인 사업자번호', r.businessNumber === '214-88-01232', r.businessNumber)
   check('잡음: 회사명', r.companyName === '주식회사 노이즈', r.companyName)
   check('잡음: 대표자', r.representativeName === '최민호', r.representativeName)
   check('잡음: 개업일', r.establishedAt === '2020-11-02', r.establishedAt)
@@ -146,11 +147,11 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
 대표자
 정우성
 등록번호
-777-88-99999`
+777-88-99993`
   const r = parseKoreanBusinessDocument(text)
   check('줄바꿈: 회사명', r.companyName === '주식회사 줄바꿈', r.companyName)
   check('줄바꿈: 대표자', r.representativeName === '정우성', r.representativeName)
-  check('줄바꿈: 사업자번호', r.businessNumber === '777-88-99999', r.businessNumber)
+  check('줄바꿈: 사업자번호', r.businessNumber === '777-88-99993', r.businessNumber)
 }
 
 /* ---------------- 못 읽으면 비워둔다 (틀린 값 채우지 않기) ---------------- */
@@ -218,6 +219,43 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   check('D210 등기부 이름표 없는 13자리 — 검증 숫자가 틀리면 넣지 않음', regBad.corporateNumber === undefined, regBad.corporateNumber)
   check('D210 법인번호 검증 숫자(실제 번호 3개)', corpNoChecksumOk('130111-0006246') && corpNoChecksumOk('110111-0085450') && corpNoChecksumOk('110111-2487050') && !corpNoChecksumOk('110111-1234567'))
   check('D210 사업자 종류', bizNoKind('124-81-00998') === 'corp' && bizNoKind('123-45-67891') === 'individual' && bizNoKind('123-80-12345') === 'unknown' && bizNoKind('') === 'unknown')
+}
+
+/* ---------------- D-255 사업자등록번호 읽기 — 검증 숫자 · 다시 읽기 · 헷갈리는 숫자 후보 ---------------- */
+{
+  const corp = (no: string, extra: string[] = []) => ['사업자등록증', '(법인사업자)', `등록번호 : ${no}`, '법인명(단체명) : 주식회사 한빛정밀', '개업연월일 : 2018 년 03 월 15 일  법인등록번호 : 110111-0085450', ...extra].join('\n')
+  check('N1 검증 숫자(실제 규칙)', bizNoChecksumOk('124-81-00998') && bizNoChecksumOk('178-81-47888') && !bizNoChecksumOk('118-81-47888'))
+  const txt = readBusinessNumber(corp('178-81-47888'))
+  check('N2 PDF 글자 · 검증 숫자 맞음 → 확실', txt.value === '178-81-47888' && txt.sure && txt.candidates.length === 0, JSON.stringify(txt))
+  const ocrOnce = readBusinessNumber(corp('178-81-47888', [REREAD_MARK]))
+  check('N3 스캔 · 다시 읽기 못함 → 값은 있어도 확인(저절로 안 넣음)', ocrOnce.value === '178-81-47888' && !ocrOnce.sure, JSON.stringify(ocrOnce))
+  const ocrTwice = readBusinessNumber(corp('178-81-47888', [`${REREAD_MARK} 178-81-47888`, `${REREAD_MARK} 178-81-47888`]))
+  check('N4 스캔 · 두 번 읽어 같음 → 확실', ocrTwice.value === '178-81-47888' && ocrTwice.sure, JSON.stringify(ocrTwice))
+  // 7 을 1 로 잘못 읽음(팀장 사례) — 검증 숫자가 안 맞는다 → 넣지 않고 후보에 정답
+  const wrong = readBusinessNumber(corp('118-81-47888', [REREAD_MARK]))
+  check('N5 7→1 오독 → 값 비움 · 후보에 정답(178-81-47888)', wrong.value === '' && !wrong.sure && wrong.candidates.includes('178-81-47888'), JSON.stringify(wrong))
+  check('N6 오독 후보는 모두 검증 숫자가 맞고 4개 이하', wrong.candidates.length <= 4 && wrong.candidates.every((c) => bizNoChecksumOk(c)))
+  check('N7 법인 서류면 가운데 두 자리 81~88 후보만', wrong.candidates.every((c) => { const m = Number(c.slice(4, 6)); return m >= 81 && m <= 88 }))
+  // 본문은 틀리고 다시 읽기(숫자만)는 맞음 → 다시 읽기 쪽 번호가 1순위 후보(확실은 아님 — 본문과 다름)
+  const fixedByReread = readBusinessNumber(corp('118-81-47888', [`${REREAD_MARK} 178-81-47888`]))
+  check('N8 본문 오독 + 다시 읽기 맞음 → 맞는 번호를 값으로 · 확인으로', fixedByReread.value === '178-81-47888' && !fixedByReread.sure, JSON.stringify(fixedByReread))
+  // 대시가 점으로 · 대시가 빠짐 · 띄어 읽힘(예전에는 아예 못 찾았다)
+  check('N9 대시가 점(361-45.70187)', readBusinessNumber(['사업자등록증', '(일반과세자)', '등록번호 : 361-45.70187'].join('\n')).value === '361-45-70187')
+  check('N10 대시 빠짐(18481-71078)', readBusinessNumber(['사업자등록증', '(법인사업자)', '등록번호 : 18481-71078'].join('\n')).value === '184-81-71078')
+  check('N11 띄어 읽힘(178 - 81 - 47888)', readBusinessNumber(corp('178 - 81 - 47888')).value === '178-81-47888')
+  check('N12 전각 숫자 · 긴 대시', readBusinessNumber(corp('１７８–８１—４７８８８')).value === '178-81-47888')
+  check('N13 숫자 사이 O/l → 0/1', normalizeNumberText('l24-8l-OO998') === '124-81-00998' && readBusinessNumber(corp('l24-8l-OO998')).value === '124-81-00998')
+  // 한 자리 더 낌(117 사례처럼 숫자가 늘어남) — 하나 빼서 맞는 후보
+  const extra = readBusinessNumber(corp('178-81-478188', [REREAD_MARK]))
+  check('N14 숫자 하나 더 낌 → 넣지 않음 · 후보에 정답', extra.value === '' && extra.candidates.includes('178-81-47888'), JSON.stringify(extra))
+  // 같은 줄의 다른 숫자 · 전화 · 발급번호 · 법인등록번호를 번호로 착각하지 않는다
+  const noisy = readBusinessNumber(['발급번호 3650-366-2611-554', '사업자등록증', '(법인사업자)', '등록번호 : 178-81-47888   2018 년 03 월 15 일', '대표전화 02-1234-5678', '법인등록번호 : 110111-0085450'].join('\n'))
+  check('N15 같은 줄 날짜 · 전화 · 발급번호 · 법인번호 섞여도 등록번호만', noisy.value === '178-81-47888' && noisy.sure, JSON.stringify(noisy))
+  check('N16 등록번호 없는 글 → 빈 값', readBusinessNumber('대표전화 02-1234-5678\n2019 년 11 월 07 일').value === '')
+  check('N17 서류 종류(법인/개인)', bizKindFromText('( 법인사업자 )') === 'corp' && bizKindFromText('(일반과세자)') === 'individual' && bizKindFromText('사업자등록증') === 'unknown')
+  // 파서는 검증 숫자가 맞는 것만 돌려준다(틀린 숫자를 칸에 넣지 않게)
+  check('N18 파서 — 오독 번호는 비움', parseKoreanBusinessDocument(corp('118-81-47888')).businessNumber === undefined)
+  check('N19 파서 — 맞는 번호는 그대로', parseKoreanBusinessDocument(corp('178-81-47888')).businessNumber === '178-81-47888')
 }
 
 console.log(`\ndoc-parser: ${passed} passed, ${failed} failed`)

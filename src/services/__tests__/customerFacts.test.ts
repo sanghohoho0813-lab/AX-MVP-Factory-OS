@@ -44,6 +44,7 @@ import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
+import { bizNoChecksumOk } from '../bizNoRead'
 import { pdfItemsToText } from '../pdfTextLines'
 import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
@@ -257,8 +258,8 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('새 번호: 지금 값과 함께 묻는다', !!p3 && p3.current.includes('2024-1234') && p3.value.includes('2025-9999'))
   const r4 = withFactDecisions(r3, [{ id: p3!.id, action: 'accept' }], NOW)
   check('새 번호 확인: 칸은 하나 · 값만 바뀐다', r4.customFields.filter((f) => f.label === '연구개발전담부서').length === 1 && r4.customFields.find((f) => f.label === '연구개발전담부서')!.value.includes('2025-9999'))
-  const biz = factCandidatesFromDocText('businessRegistration', '사업자등록증\n등록번호 : 214-88-01234\n상호 : 주식회사 대한정밀', 'doc:b')
-  check('사업자등록증: 공통 사실 후보(번호 · 회사명)', biz.some((x) => x.key === 'businessNumber' && x.value === '214-88-01234') && biz.some((x) => x.key === 'companyName'))
+  const biz = factCandidatesFromDocText('businessRegistration', '사업자등록증\n등록번호 : 214-88-01232\n상호 : 주식회사 대한정밀', 'doc:b')
+  check('사업자등록증: 공통 사실 후보(번호 · 회사명)', biz.some((x) => x.key === 'businessNumber' && x.value === '214-88-01232') && biz.some((x) => x.key === 'companyName'))
   check('미리보기 종류: pdf · 사진 · HWP 는 못 봄', previewKindOf('a.PDF') === 'pdf' && previewKindOf('사진.jpeg') === 'image' && previewKindOf('계약서.hwp') === null && previewKindOf('자료.zip') === null)
   const g = normalizeClientOps({ id: 'g', companyName: 'x', representativeGender: 'female' } as Partial<ClientOpsRecord>)
   const g2 = normalizeClientOps({ id: 'g2', companyName: 'x', representativeGender: '여자' } as unknown as Partial<ClientOpsRecord>)
@@ -756,7 +757,21 @@ await (async () => {
   const photo = guessNewClientFromDocs([{ fileName: '사업자.jpg', text: BIZ, method: 'ocr' }])
   check('D-187 사진(OCR) → 이름 · 대표자는 "한 번 봐 주세요", 검증 맞는 사업자번호는 그대로', photo.guess.companyName?.note === NOTE_FROM_PHOTO && photo.guess.contactName?.note === NOTE_FROM_PHOTO && photo.guess.businessNumber?.note === '')
   const badNo = guessNewClientFromDocs([{ fileName: 'a.pdf', text: BIZ.replace('124-81-00998', '124-81-00999'), method: 'pdf_text' }])
-  check('D-187 검증 숫자가 틀린 사업자번호 → 채우되 "번호 검증이 맞지 않아요"', badNo.guess.businessNumber?.value === '124-81-00999' && badNo.guess.businessNumber?.note === NOTE_BIZNO_CHECK)
+  // D-255: 검증 숫자가 틀린 번호는 칸에 넣지 않는다(숫자 하나 틀리면 치명적) — 비워 두고 고를 후보(검증 맞는 것)만
+  check('D-255 검증 숫자가 틀린 사업자번호 → 칸 비움 · 후보(검증 맞음) · 읽힌 글자 보임', badNo.guess.businessNumber?.value === '' && (badNo.guess.businessNumber?.choices?.length ?? 0) > 0 && badNo.guess.businessNumber!.choices!.every((c) => bizNoChecksumOk(c)) && /124-81-00999/.test(badNo.guess.businessNumber?.note ?? ''), JSON.stringify(badNo.guess.businessNumber))
+  const filledBad = applyNewClientGuess({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' }, badNo.guess, {})
+  check('D-255 등록 창 — 후보만 있으면 번호 칸은 비어 있음', filledBad.form.businessNumber === '' && filledBad.filled.businessNumber?.value === '')
+  const pickOne = applyNewClientGuess({ companyName: '', contactName: '', contactPhone: '', businessNumber: badNo.guess.businessNumber!.choices![0] }, badNo.guess, filledBad.filled, new Set(['businessNumber']))
+  check('D-255 후보 하나를 고르면 확인됨(까닭 없음)', pickOne.filled.businessNumber?.note === '' && pickOne.form.businessNumber === badNo.guess.businessNumber!.choices![0])
+  // 스캔 사업자등록증이 흐려 번호가 애매해도 — 크레탑(PDF 글자)이 같은 후보를 말하면 그걸로 바로
+  const scanBad = BIZ.replace('124-81-00998', '124-81-00999') + '\n[번호 다시 읽기]'
+  const cross = guessNewClientFromDocs(
+    [{ fileName: '사업자.jpg', text: scanBad, method: 'ocr' }, { fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }],
+    [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '미래바이오랩', bizNo: '1248100998', ceo: '이대표' }],
+  )
+  check('D-255 스캔 번호 애매 + 크레탑 번호가 후보에 있음 → 크레탑 번호로 · 까닭 없음', cross.guess.businessNumber?.value === '124-81-00998' && cross.guess.businessNumber?.note === '', JSON.stringify(cross.guess.businessNumber))
+  const badCret = guessNewClientFromDocs([{ fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '한빛정밀', bizNo: '2148735291', ceo: '김한빛' }])
+  check('D-255 크레탑 번호도 검증 숫자가 틀리면 넣지 않고 후보', badCret.guess.businessNumber?.value === '' && (badCret.guess.businessNumber?.choices?.length ?? 0) > 0, JSON.stringify(badCret.guess.businessNumber))
   const both = guessNewClientFromDocs([
     { fileName: '등기.pdf', text: REG, method: 'pdf_text' },
     { fileName: '사업자.jpg', text: BIZ, method: 'ocr' },
@@ -768,8 +783,8 @@ await (async () => {
     { fileName: '등기.pdf', text: REG.replace('미래바이오랩', '미래바이오'), method: 'pdf_text' },
   ])
   check('D-187 서류마다 이름이 다르면 사업자등록증 값 + "서류마다 달라요"', diff.guess.companyName?.value === '미래바이오랩' && diff.guess.companyName?.note === NOTE_DIFFERS)
-  const cret = guessNewClientFromDocs([{ fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '한빛정밀', bizNo: '2148735291', ceo: '김한빛' }])
-  check('D-187 크레탑 보고서 → 업체명 · 대표자 · 사업자번호(하이픈 넣어서)', cret.guess.companyName?.value === '한빛정밀' && cret.guess.contactName?.value === '김한빛' && cret.guess.businessNumber?.value === '214-87-35291' && cret.files[0]?.docLabel === '크레탑 보고서', JSON.stringify(cret.guess))
+  const cret = guessNewClientFromDocs([{ fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '한빛정밀', bizNo: '2148735297', ceo: '김한빛' }])
+  check('D-187 크레탑 보고서 → 업체명 · 대표자 · 사업자번호(하이픈 넣어서)', cret.guess.companyName?.value === '한빛정밀' && cret.guess.contactName?.value === '김한빛' && cret.guess.businessNumber?.value === '214-87-35297' && cret.files[0]?.docLabel === '크레탑 보고서', JSON.stringify(cret.guess))
   const mixed = guessNewClientFromDocs([{ fileName: '사업자등록증.pdf', text: BIZ, method: 'pdf_text' }, { fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '미래바이오랩', bizNo: '124-81-00998', ceo: '이대표' }])
   check('D-187 사업자등록증 + 크레탑 같은 회사 → 사업자등록증 값 · 까닭 없음', mixed.guess.companyName?.fileName === '사업자등록증.pdf' && mixed.guess.businessNumber?.note === '')
   const memo = guessNewClientFromDocs([{ fileName: '메모.txt', text: '회의 메모 — 다음 주 화요일 다시 연락', method: 'text' }, { fileName: '빈.jpg', text: '', method: 'none' }])

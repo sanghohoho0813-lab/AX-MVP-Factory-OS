@@ -11,6 +11,8 @@
 
 import { isXlsxFile, readXlsxText } from './xlsxText'
 import { pdfItemsToText } from './pdfTextLines'
+import { REREAD_MARK } from './bizNoRead'
+import { ensureMapUpsert } from '../lib/mapUpsert'
 
 export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx'
 
@@ -25,6 +27,7 @@ export type ProgressFn = (ratio: number, label: string) => void
 
 /** PDF에서 텍스트 추출 (스캔본이면 빈 문자열에 가깝다) */
 async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<string> {
+  ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   // 워커를 번들에서 함께 제공한다 (CDN 의존 없음)
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
@@ -47,29 +50,121 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
   return chunks.join('\n')
 }
 
-/** PDF 첫 장을 이미지로 렌더링 (스캔본 OCR용) */
-async function renderPdfFirstPage(file: File): Promise<Blob | null> {
+/**
+ * 글자 인식에 넘길 그림 폭 — 스캔 A4 를 300dpi 쯤으로(약 2,480px).
+ * D-255: 예전에는 PDF 첫 장을 144dpi(2배)로만 그려, 300dpi 로 잘 스캔한 서류도 절반 크기로 뭉개져
+ * 작은 숫자(7 · 1)가 헷갈렸다. 사진도 작으면 키운다(글자 높이가 20px 은 넘어야 잘 읽힌다).
+ */
+const OCR_WIDTH = 2480
+const OCR_MAX_WIDTH = 3300
+
+/** PDF 첫 장을 그림으로 (스캔본 OCR용) — 300dpi 쯤으로 그린다 */
+async function renderPdfFirstPage(file: File): Promise<HTMLCanvasElement | null> {
+  ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
   const buf = await file.arrayBuffer()
   // pdf.js 6: 문서 닫기는 불러오기 작업(task)이 맡는다 (6 판부터 글꼴 코드 실행 자체가 없다)
   const task = pdfjs.getDocument({ data: buf })
-  const doc = await task.promise
-  const page = await doc.getPage(1)
-  const viewport = page.getViewport({ scale: 2 })
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.floor(viewport.width)
-  canvas.height = Math.floor(viewport.height)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-  await page.render({ canvas, canvasContext: ctx, viewport }).promise
-  await task.destroy()
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'))
+  try {
+    const doc = await task.promise
+    const page = await doc.getPage(1)
+    const base = page.getViewport({ scale: 1 })
+    const scale = Math.min(OCR_MAX_WIDTH / base.width, Math.max(2, OCR_WIDTH / base.width))
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.floor(viewport.width)
+    canvas.height = Math.floor(viewport.height)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise
+    return canvas
+  } finally {
+    await task.destroy()
+  }
 }
 
-/** 한국어 OCR */
-async function ocrImage(input: Blob, onProgress?: ProgressFn): Promise<string> {
+/** 사진 → 그림판(작으면 키우고 너무 크면 줄인다) */
+async function imageToCanvas(input: Blob): Promise<HTMLCanvasElement | null> {
+  try {
+    const bmp = await createImageBitmap(input)
+    const scale = bmp.width < 1600 ? Math.min(2, OCR_WIDTH / bmp.width) : bmp.width > OCR_MAX_WIDTH ? OCR_MAX_WIDTH / bmp.width : 1
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bmp.width * scale))
+    canvas.height = Math.max(1, Math.round(bmp.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    bmp.close()
+    return canvas
+  } catch {
+    return null
+  }
+}
+
+interface Box {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+interface OcrWord {
+  text: string
+  bbox: Box
+}
+interface OcrLine {
+  text: string
+  bbox: Box
+  words: OcrWord[]
+}
+
+/** 번호가 있는 줄의 숫자 부분 — '등록번호' 줄(법인등록번호 빼고), 없으면 3-2-5 모양 숫자가 있는 줄 */
+export function numberBoxes(lines: readonly OcrLine[]): Box[] {
+  const flat = (t: string) => t.replace(/\s+/g, '')
+  const isLabel = (t: string) => /등록번호/.test(flat(t)) && !/법인등록번호/.test(flat(t).replace(/사업자등록번호/, ''))
+  const looksNumber = (t: string) => /\d{3}\s*[-.]?\s*\d{2}\s*[-.]?\s*\d{5}/.test(t)
+  let picked = lines.filter((l) => isLabel(l.text) && /\d/.test(l.text))
+  if (picked.length === 0) picked = lines.filter((l) => looksNumber(l.text))
+  const out: Box[] = []
+  for (const l of picked.slice(0, 2)) {
+    // 숫자가 든 낱말만 감싼다 — 앞의 '등록번호 :' 글자는 빼야 숫자만 읽기가 된다
+    const ws = l.words.filter((w) => /\d/.test(w.text))
+    const src = ws.length ? ws : [l]
+    const b = { x0: Math.min(...src.map((w) => w.bbox.x0)), y0: Math.min(...src.map((w) => w.bbox.y0)), x1: Math.max(...src.map((w) => w.bbox.x1)), y1: Math.max(...src.map((w) => w.bbox.y1)) }
+    const h = b.y1 - b.y0
+    out.push({ x0: b.x0 - h * 0.6, y0: b.y0 - h * 0.35, x1: b.x1 + h * 0.6, y1: b.y1 + h * 0.35 })
+  }
+  return out
+}
+
+/** 그림판 일부를 잘라 키운 흑백 그림 */
+function cropScaled(src: HTMLCanvasElement, b: Box, scale: number): HTMLCanvasElement {
+  const x0 = Math.max(0, Math.floor(b.x0))
+  const y0 = Math.max(0, Math.floor(b.y0))
+  const w = Math.max(1, Math.min(src.width, Math.ceil(b.x1)) - x0)
+  const h = Math.max(1, Math.min(src.height, Math.ceil(b.y1)) - y0)
+  const c = document.createElement('canvas')
+  c.width = Math.round(w * scale)
+  c.height = Math.round(h * scale)
+  const ctx = c.getContext('2d')
+  if (!ctx) return c
+  ctx.imageSmoothingQuality = 'high'
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, c.width, c.height)
+  ctx.filter = 'grayscale(1) contrast(1.35)'
+  ctx.drawImage(src, x0, y0, w, h, 0, 0, c.width, c.height)
+  return c
+}
+
+/**
+ * 한국어 OCR — 전체를 한 번 읽고, 번호 줄은 숫자만 다시 두 번(크기 다르게) 읽어 끝에 붙인다.
+ * 번호 고르기(bizNoRead)는 본문과 다시 읽은 것이 같은 번호를 말할 때만 '확실' 로 본다.
+ */
+async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
   const { createWorker } = await import('tesseract.js')
   const worker = await createWorker('kor+eng', undefined, {
     logger: (m: { status?: string; progress?: number }) => {
@@ -78,8 +173,24 @@ async function ocrImage(input: Blob, onProgress?: ProgressFn): Promise<string> {
     },
   })
   try {
-    const { data } = await worker.recognize(input)
-    return data.text ?? ''
+    const canvas = input instanceof Blob ? await imageToCanvas(input) : input
+    const { data } = await worker.recognize(canvas ?? input, {}, { text: true, blocks: true })
+    const text = data.text ?? ''
+    if (!canvas) return text
+    const lines: OcrLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.map((l) => ({ text: l.text, bbox: l.bbox, words: l.words.map((w) => ({ text: w.text, bbox: w.bbox })) }))))
+    const boxes = numberBoxes(lines)
+    if (boxes.length === 0) return `${text}\n${REREAD_MARK}`
+    onProgress?.(0.95, '번호를 한 번 더 읽는 중')
+    await worker.setParameters({ tessedit_char_whitelist: '0123456789-', tessedit_pageseg_mode: '7' as never })
+    const reads: string[] = []
+    for (const b of boxes) {
+      for (const scale of [2, 3]) {
+        const r = await worker.recognize(cropScaled(canvas, b, scale))
+        const t = (r.data.text ?? '').replace(/\s+/g, ' ').trim()
+        if (t) reads.push(t)
+      }
+    }
+    return `${text}\n${reads.length ? reads.map((t) => `${REREAD_MARK} ${t}`).join('\n') : REREAD_MARK}`
   } finally {
     await worker.terminate()
   }
@@ -112,9 +223,9 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     if (hasEnoughText(text)) return { text, method: 'pdf_text' }
     // 스캔본 → 첫 장을 이미지로 만들어 OCR
     onProgress?.(0, '스캔본으로 보입니다. 글자 인식으로 전환합니다')
-    const png = await renderPdfFirstPage(file)
-    if (!png) return { text, method: 'pdf_text' }
-    return { text: await ocrImage(png, onProgress), method: 'ocr' }
+    const page = await renderPdfFirstPage(file)
+    if (!page) return { text, method: 'pdf_text' }
+    return { text: await ocrImage(page, onProgress), method: 'ocr' }
   }
 
   onProgress?.(0, '이미지 여는 중')

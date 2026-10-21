@@ -742,6 +742,8 @@ export interface FactCandidate {
   group?: ProfileGroupKey
   /** D-144: 왜 바로 넣지 않고 확인을 묻는가 — '사진 글자라 확인 필요' · '지금 값과 다름' 등 */
   note?: string
+  /** D-255: 사업자등록번호를 확실히 못 읽었을 때 고를 후보(국세청 검증 숫자가 맞는 것만) — 하나를 눌러야 들어간다 */
+  choices?: string[]
 }
 
 export interface ClientOpsRecord {
