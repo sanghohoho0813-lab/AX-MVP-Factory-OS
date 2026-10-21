@@ -351,6 +351,22 @@ export function asAdnominal(text: string): string {
   if (/되다$/.test(t)) return t.replace(/되다$/, '되는')
   if (/함$/.test(t)) return t.replace(/함$/, '하는')
   if (/됨$/.test(t)) return t.replace(/됨$/, '되는')
+  // D-262 AI 가 흔히 쓰는 다른 끝맺음 — 예전엔 "요청을 받는다를 수행하는" 처럼 됐다
+  if (/(?:합니다|됩니다)$/.test(t)) return t.replace(/합니다$/, '하는').replace(/됩니다$/, '되는')
+  if (/습니다$/.test(t)) return t.replace(/습니다$/, '는') // 받습니다 → 받는
+  if (/는다$/.test(t)) return t.replace(/는다$/, '는') // 받는다 → 받는
+  const dropJong = (ch: string, jong: number) => {
+    const c = ch.charCodeAt(0) - 0xac00
+    return c >= 0 && c < 11172 && c % 28 === jong ? String.fromCharCode(ch.charCodeAt(0) - jong) : null
+  }
+  // 받침 ㄴ + 다(모은다 · 쓴다 · 본다 · 만든다) → 받침을 떼고 는(모으는 · 쓰는 · 보는 · 만드는)
+  let m = /(.)다$/.exec(t)
+  const nDa = m ? dropJong(m[1], 4) : null
+  if (m && nDa) return `${t.slice(0, -2)}${nDa}는`
+  // 받침 ㅂ + 니다(모읍니다) → 모으는
+  m = /(.)니다$/.exec(t)
+  const bNida = m ? dropJong(m[1], 17) : null
+  if (m && bNida) return `${t.slice(0, -3)}${bNida}는`
   return `${w(t, '을/를')} 수행하는`
 }
 

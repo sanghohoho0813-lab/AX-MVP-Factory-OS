@@ -219,22 +219,191 @@ export interface PartsAnswer {
 
 const AXIS_KEYS: (keyof SpecAxis)[] = ['input', 'process', 'state', 'judge', 'output', 'feedback', 'link']
 
-export function partsOf(answer: AssistAnswer | null): PartsAnswer {
+/*
+ * D-262 답 모양이 조금 달라도 읽는다 — 예전엔 title 이 정확히 "comp" 이고 이름이 detail 에 있어야만 읽혀,
+ * 모델이 이름표를 tag 에 넣거나("title: 요청 수집부 · tag: comp") · 번호를 붙이거나("comp1") · 이름을 본문 앞에 쓰면("요청 수집부: …")
+ * 구성요소 0개 → '구성요소를 찾지 못했습니다' 로 멈췄다(모델을 바꿔도 같았다).
+ */
+type PartLabel = { kind: 'axis'; key: keyof SpecAxis } | { kind: 'system' | 'comp' | 'step' | 'seed' }
+const squash = (s: unknown) =>
+  String(s ?? '')
+    .toLowerCase()
+    .replace(/[\s_\-:：·.,/()[\]#*'"`]/g, '')
+const PART_WORDS: Record<string, PartLabel> = {
+  system: { kind: 'system' },
+  systemname: { kind: 'system' },
+  시스템: { kind: 'system' },
+  시스템이름: { kind: 'system' },
+  시스템명: { kind: 'system' },
+  comp: { kind: 'comp' },
+  comps: { kind: 'comp' },
+  component: { kind: 'comp' },
+  components: { kind: 'comp' },
+  구성요소: { kind: 'comp' },
+  구성: { kind: 'comp' },
+  step: { kind: 'step' },
+  steps: { kind: 'step' },
+  단계: { kind: 'step' },
+  방법단계: { kind: 'step' },
+  s: { kind: 'step' },
+  seed: { kind: 'seed' },
+  seeds: { kind: 'seed' },
+  종속항: { kind: 'seed' },
+  종속항씨앗: { kind: 'seed' },
+  dependent: { kind: 'seed' },
+}
+for (const k of AXIS_KEYS) {
+  PART_WORDS[`axis${k}`] = { kind: 'axis', key: k }
+  PART_WORDS[`권리축${k}`] = { kind: 'axis', key: k }
+  PART_WORDS[squash(AXIS_LABEL[k])] = { kind: 'axis', key: k }
+}
+
+/** 글 하나가 이름표인가 — 대소문자 · 띄어쓰기 · 기호 · 끝 번호(comp1 · S110 · 단계 2) 무시 */
+export function partLabelOf(v: unknown): PartLabel | null {
+  const s = squash(v)
+  if (!s || s.length > 30) return null
+  return PART_WORDS[s] ?? PART_WORDS[s.replace(/\d+$/, '')] ?? null
+}
+
+/** "요청 수집부(110): 채널별 요청을 받는" · "요청 수집부 — …" · "요청 수집부는 …" → 이름 · 하는 일 */
+function splitNamed(text: string): { name: string; rest: string } | null {
+  const m = /^\s*(?:[①-⑳]|\d{1,3}[.)]|[-•*])?\s*([^:：—–(\n]{1,30}?(?:부|모듈|엔진|유닛|장치|서버|단말|DB|데이터베이스))\s*(?:\(\s*\d{2,4}\s*\))?\s*(?:[:：—–]\s*|-\s+|는\s+|은\s+|가\s+|이\s+)(.+)$/s.exec(text)
+  return m ? { name: m[1].trim(), rest: m[2].trim() } : null
+}
+const cleanName = (s: string) =>
+  s
+    .replace(/\(\s*\d{2,4}\s*\)/g, '')
+    .replace(/^\s*(?:[①-⑳]|\d{1,3}[.)])\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+const oneLine = (s: unknown) => cleanAiText(String(s ?? '')).replace(/\s+/g, ' ').trim()
+
+function pushComp(out: PartsAnswer, name: string, does: string) {
+  const n = cleanName(name)
+  if (!n || n.length > 30 || out.components.length >= 8 || out.components.some((c) => c.name === n)) return
+  out.components.push({ name: n, does: does ? asAdnominal(does) : '' })
+}
+function pushStep(out: PartsAnswer, text: string) {
+  const t = oneLine(text)
+    .replace(/^S?\d{2,4}[.:)]?\s*/, '')
+    .replace(/^(?:[①-⑳]|\d{1,2}[.)])\s*/, '')
+    .replace(/\s*단계$/, '')
+    .trim()
+  if (t && out.steps.length < 8) out.steps.push(asAdnominal(t))
+}
+function pushSeed(out: PartsAnswer, comp: string, text: string) {
+  const t = oneLine(text)
+  if (t && out.seeds.length < 6) out.seeds.push({ comp: cleanName(comp), text: asAdnominal(t) })
+}
+
+/** 항목 모양 답(items) → 권리축 · 시스템 · 구성요소 · 단계 · 종속항 씨앗. rawObj = 항목 모양이 아닌 답(components 배열 등)도 읽기 */
+export function partsOf(answer: AssistAnswer | null, rawObj?: Record<string, unknown> | null): PartsAnswer {
   const out: PartsAnswer = { axis: {}, systemName: '', components: [], steps: [], seeds: [] }
-  if (!answer) return out
-  for (const it of answer.items ?? []) {
-    const t = String(it.title ?? '').trim().toLowerCase()
-    const body = cleanAiText(String(it.body ?? '')).replace(/\s+/g, ' ').trim()
-    const detail = String(it.detail ?? '').replace(/\(\s*\d{2,4}\s*\)/g, '').trim()
-    if (!body && !detail) continue
-    const ax = /^axis\.(\w+)$/.exec(t)
-    if (ax && (AXIS_KEYS as string[]).includes(ax[1])) out.axis[ax[1] as keyof SpecAxis] = asAdnominal(body)
-    else if (t === 'system') out.systemName = body.replace(/\(\s*100\s*\)/, '').trim()
-    else if (t === 'comp' && detail && out.components.length < 8 && !out.components.some((c) => c.name === detail)) out.components.push({ name: detail, does: asAdnominal(body) })
-    else if (t === 'step' && body && out.steps.length < 8) out.steps.push(asAdnominal(body.replace(/^S?\d{2,4}[.:)]?\s*/, '')))
-    else if (t === 'seed' && body && out.seeds.length < 6) out.seeds.push({ comp: detail, text: asAdnominal(body) })
+  for (const it of answer?.items ?? []) {
+    const byTitle = partLabelOf(it.title)
+    const label = byTitle ?? partLabelOf(it.tag) ?? partLabelOf(it.ref)
+    if (!label) continue
+    // 이름표가 title 이 아닌 곳에 있으면 title 이 곧 이름(구성요소 · 종속항이 꾸밀 구성요소)
+    const titleName = byTitle ? '' : oneLine(it.title)
+    const body = oneLine(it.body)
+    const detail = oneLine(it.detail)
+    const lines = (it.outline ?? []).map(oneLine).filter(Boolean)
+    switch (label.kind) {
+      case 'axis': {
+        const t = body || detail || lines[0] || ''
+        if (t) out.axis[label.key] = asAdnominal(t)
+        break
+      }
+      case 'system': {
+        const t = (body || detail || titleName).replace(/\(\s*100\s*\)/, '').trim()
+        if (t && !out.systemName) out.systemName = t
+        break
+      }
+      case 'comp': {
+        // 한 항목에 여러 개(outline 줄마다 "이름: 하는 일")
+        if (lines.length > 1) {
+          for (const ln of lines) {
+            const s = splitNamed(ln)
+            if (s) pushComp(out, s.name, s.rest)
+          }
+          break
+        }
+        const named = titleName || (detail && cleanName(detail).length <= 30 ? detail : '')
+        if (named) pushComp(out, named, body || (titleName ? detail : ''))
+        else {
+          const s = splitNamed(body) ?? splitNamed(detail)
+          if (s) pushComp(out, s.name, s.rest)
+        }
+        break
+      }
+      case 'step': {
+        if (lines.length > 1) lines.forEach((ln) => pushStep(out, ln))
+        else pushStep(out, body || detail || titleName)
+        break
+      }
+      case 'seed': {
+        if (lines.length > 1) lines.forEach((ln) => pushSeed(out, titleName || detail, ln))
+        else pushSeed(out, titleName || detail, body || (titleName ? detail : ''))
+        break
+      }
+    }
   }
+  if (rawObj && out.components.length < 2) partsFromObject(out, rawObj)
   return out
+}
+
+const pick = (o: Record<string, unknown>, keys: string[]): unknown => {
+  for (const k of keys) if (o[k] != null && o[k] !== '') return o[k]
+  return undefined
+}
+const asObj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
+const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
+
+/** 항목 모양이 아닌 답 — { system, axis: {...} | [...], components: [{ name, does }], steps: [...], seeds: [...] } (한글 키도) */
+function partsFromObject(out: PartsAnswer, raw: Record<string, unknown>) {
+  const o = asObj(raw.result) ?? asObj(raw.data) ?? raw
+  const sys = pick(o, ['system', 'systemName', 'system_name', '시스템', '시스템이름'])
+  if (typeof sys === 'string' && !out.systemName) out.systemName = sys.replace(/\(\s*100\s*\)/, '').trim()
+  const axis = pick(o, ['axis', 'axes', '권리축'])
+  if (Array.isArray(axis)) {
+    axis.slice(0, 7).forEach((v, i) => {
+      if (typeof v === 'string' && v.trim() && !out.axis[AXIS_KEYS[i]]) out.axis[AXIS_KEYS[i]] = asAdnominal(oneLine(v))
+    })
+  } else {
+    const ax = asObj(axis)
+    if (ax) for (const k of AXIS_KEYS) if (typeof ax[k] === 'string' && !out.axis[k]) out.axis[k] = asAdnominal(oneLine(ax[k]))
+  }
+  for (const c of asList(pick(o, ['components', 'comps', 'component', '구성요소', 'parts']))) {
+    if (typeof c === 'string') {
+      const s = splitNamed(c)
+      if (s) pushComp(out, s.name, s.rest)
+      else if (c.trim().length <= 30) pushComp(out, c, '')
+      continue
+    }
+    const x = asObj(c)
+    if (!x) continue
+    const name = pick(x, ['name', 'title', 'label', '이름', '구성요소'])
+    const does = pick(x, ['does', 'role', 'function', 'body', 'description', 'desc', '역할', '하는일', '기능'])
+    if (typeof name === 'string') pushComp(out, name, typeof does === 'string' ? oneLine(does) : '')
+  }
+  if (!out.steps.length)
+    for (const s of asList(pick(o, ['steps', 'methodSteps', 'method', '단계', '방법단계']))) {
+      const x = asObj(s)
+      const t = typeof s === 'string' ? s : x ? pick(x, ['text', 'body', 'step', 'description', '내용']) : ''
+      if (typeof t === 'string') pushStep(out, t)
+    }
+  if (!out.seeds.length)
+    for (const s of asList(pick(o, ['seeds', 'dependents', 'dependentClaims', '종속항']))) {
+      if (typeof s === 'string') {
+        pushSeed(out, '', s)
+        continue
+      }
+      const x = asObj(s)
+      if (!x) continue
+      const comp = pick(x, ['comp', 'component', 'target', '구성요소'])
+      const text = pick(x, ['text', 'body', 'claim', '내용'])
+      if (typeof text === 'string') pushSeed(out, typeof comp === 'string' ? comp : '', text)
+    }
 }
 
 /** 구성 칸이 사람이 고친 것인지 — AI 가 마지막으로 넣은 모양(ai.parts)과 다르면 사람 */
@@ -298,9 +467,13 @@ export function buildFixContext(input: { draft: SpecDraft; issues: string[]; tod
 export function fixItemsOf(answer: AssistAnswer | null): { key: FixKey; text: string; note?: string }[] {
   if (!answer) return []
   const out: { key: FixKey; text: string; note?: string }[] = []
+  // D-262 이름표가 title 이 아닌 tag · ref 에 있거나 대소문자가 달라도(titleen) 읽는다
+  const keyOf = (v: unknown) => {
+    const t = String(v ?? '').trim()
+    return FIX_KEYS.find((k) => k.toLowerCase() === t.toLowerCase()) ?? (SECTION_KEYS as readonly string[]).find((k) => SECTION_LABEL[k as SectionKey] === t)
+  }
   for (const it of answer.items ?? []) {
-    const t = String(it.title ?? '').trim()
-    const key = FIX_KEYS.find((k) => k === t) ?? (SECTION_KEYS as readonly string[]).find((k) => SECTION_LABEL[k as SectionKey] === t)
+    const key = keyOf(it.title) ?? keyOf(it.tag) ?? keyOf(it.ref)
     const body = String(it.body ?? '').trim()
     if (!key || !body || out.some((o) => o.key === key)) continue
     out.push({ key: key as FixKey, text: body, note: String(it.detail ?? '').trim() || undefined })

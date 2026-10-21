@@ -88,6 +88,23 @@ const answer = (id) => {
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const sent = []
+let partsMode = 'normal'
+let partsCalls = 0
+const MESSY_PARTS =
+  '아래는 결과입니다.\n```json\n{"items":[' +
+  [
+    { title: 'axis.input', body: '공구의 진동신호를 받는다' },
+    { title: '공구 마모 판정 시스템', tag: 'system' },
+    { title: '진동 수집부', tag: 'comp', body: '공구의 진동신호를 모은다' },
+    { title: '특징 추출부', tag: 'Comp', body: '진동신호에서 특징값을 뽑는다' },
+    { title: '마모 지수 갱신부', tag: 'component', body: '마모 지수를 누적 갱신한다' },
+    { title: '교체시점 산출부', tag: 'comp', body: '작업 일정과 함께 교체 시점을 산출한다' },
+    { title: 'step 1', body: '진동신호를 수집하는 단계' },
+    { title: 'step 2', body: '특징값을 뽑는 단계' },
+  ]
+    .map((x) => JSON.stringify(x))
+    .join(',') +
+  ',{"title":"step 3","body":"교체 시점을 산'
 let delayMs = 30
 async function routeAi(page) {
   await page.route('**/api/ai-assist**', async (route) => {
@@ -96,6 +113,13 @@ async function routeAi(page) {
     sent.push(req)
     if (req.assistId === 'spec.a') bodyRound += 1
     await new Promise((r) => setTimeout(r, delayMs))
+    // D-262 실제 모델처럼 어긋난 답 — 1번째는 JSON 없음, 2번째는 머리글 없음 · 이름표가 tag 에 · 끝 잘림(서버가 parse_fallback 으로 원문만 보냄)
+    if (req.assistId === 'spec.parts' && partsMode === 'messy') {
+      partsCalls += 1
+      const raw = partsCalls === 1 ? '죄송합니다. 구성요소를 정리하면 진동 수집부, 마모 판정부 등이 있습니다.' : MESSY_PARTS
+      const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'parse_fallback', structured: null, raw, usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString() }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
+    }
     const research = req.assistId === 'spec.research'
     const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [] }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
@@ -275,6 +299,48 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('C2 회사 기록 · 그 회사 AI 작업실 자료를 다 읽은 뒤 시작 — 첫 부름부터 회사 기록 + 작업실 자료', firstCtx.includes('대화창재료표식') && /업종|종목|설립/.test(firstCtx), firstCtx.slice(0, 400))
   await waitIdle(page)
   check('C3 JS 오류 0', errors.length === 0, errors)
+  await ctx.close()
+}
+
+/* ---------------- D-262 구성요소 단계 — 모델 답 모양이 어긋나도 멈추지 않음 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await routeAi(page)
+  delayMs = 30
+  partsMode = 'messy'
+  partsCalls = 0
+  await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
+  await page.getByTestId('spec-new-client').selectOption(CLIENT)
+  const before = sent.length
+  await page.getByTestId('spec-new').click()
+  await page.getByTestId('spec-board').waitFor()
+  await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
+  await waitIdle(page, 60000)
+  await page.waitForTimeout(400)
+  const mine = sent.slice(before)
+  const partsReq = mine.filter((r) => r.assistId === 'spec.parts')
+  const partsRow = page.locator('[data-testid="spec-board-row"][data-stage="parts"]')
+  const rowText = (await partsRow.count()) ? await partsRow.innerText() : ''
+  check('E1 1번째 답은 JSON 없음 → 멈추지 않고 이름표를 다시 알려 주며 2번째 부름(ask 에 comp · detail 안내)', partsReq.length === 2 && !partsReq[0].ask && /comp/.test(partsReq[1].ask ?? '') && /detail/.test(partsReq[1].ask ?? ''), partsReq.map((r) => r.ask))
+  check('E2 2번째 답(머리글 없음 · 이름표가 tag 에 · 끝 잘림 · 코드 블록) → 구성요소 4 · 단계 2 로 읽고 다 씀', /구성요소 4개/.test(rowText) && /단계 2개/.test(rowText) && (await partsRow.getAttribute('data-phase')) === 'done', rowText)
+  await partsRow.scrollIntoViewIfNeeded().catch(() => {})
+  await shot(page, 'E-messy-board', false)
+  check('E3 그 뒤 단계도 끝까지(본문 a~d · 청구항 · 고치기)', ['spec.a', 'spec.b', 'spec.c', 'spec.d', 'spec.e'].every((id) => mine.some((r) => r.assistId === id)), mine.map((r) => r.assistId))
+  await page.getByTestId('spec-view-edit').click()
+  await page.getByTestId('spec-tab-parts').click().catch(() => {})
+  await page.waitForTimeout(300)
+  const comps = await page.locator('[data-testid="spec-comp-name"]').evaluateAll((els) => els.map((e) => e.value)).catch(() => [])
+  const does = await page.locator('[data-testid="spec-comp-does"]').evaluateAll((els) => els.map((e) => e.value)).catch(() => [])
+  check('E4 직접 고치기 화면에도 구성요소 이름 그대로(진동 수집부 …) · 하는 일은 "~하는"(모은다 → 모으는 · "…를 수행하는" 없음)', comps.includes('진동 수집부') && comps.includes('교체시점 산출부') && does.includes('공구의 진동신호를 모으는') && does.every((x) => !/수행하는/.test(x)), { comps, does })
+  await page.locator('[data-testid="spec-comp"]').first().scrollIntoViewIfNeeded().catch(() => {})
+  await shot(page, 'E-messy-parts', false)
+  check('E5 JS 오류 0', errors.length === 0, errors)
+  partsMode = 'normal'
   await ctx.close()
 }
 

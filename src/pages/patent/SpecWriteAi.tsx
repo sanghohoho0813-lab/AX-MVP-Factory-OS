@@ -9,6 +9,7 @@ import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
+import { answerOf } from '../../services/aiAssist/looseJson'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 import { SECTION_LABEL, cleanAiText, draftFromIdea, mergeSpecAi, type PatentIdeaLike, type SectionKey, type SpecDraft } from '../../services/patent/specDraft'
@@ -43,7 +44,7 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
     setRow(key, { phase: 'run', text: '쓰는 중…(30초쯤)' })
     try {
       const run = await callAssist({ requestId: newRequestId(), assistId: b.assistId, page: 'patent', choice: readChoice(), context: buildSpecContext({ batch: key, draft: dRef.current, today }) })
-      const items = specItemsOf(run.structured, key)
+      const items = specItemsOf(answerOf(run), key)
       if (!items.length) throw new AssistError('provider_error', 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
       const m = await applyRef.current((cur) => {
         // 구체적인 내용은 앞(c) · 뒤(d) 두 번에 나눠 받아 한 칸으로 잇는다 — 앞 · 뒤를 따로 기억해 다시 받아도 겹치지 않게

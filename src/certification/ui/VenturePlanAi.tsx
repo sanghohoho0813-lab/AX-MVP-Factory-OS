@@ -10,6 +10,7 @@ import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
+import { answerOf } from '../../services/aiAssist/looseJson'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 import { VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
@@ -67,7 +68,7 @@ export function VenturePlanAi({
     try {
       const state = readPlan({ ...notesRef.current, ...pending.current })
       const run = await callAssist({ requestId: newRequestId(), assistId: b.assistId, page: 'venture', choice: readChoice(), context: buildBatchContext({ batch: key, state, facts, today }) })
-      const items = draftItemsOf(run.structured, key)
+      const items = draftItemsOf(answerOf(run), key)
       if (!items.length) throw new AssistError('provider_error', 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
       const m = mergeDraft(readPlan({ ...notesRef.current, ...pending.current }), items)
       await saveRef.current(m.patch)

@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
+import { answerOf } from '../../services/aiAssist/looseJson'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { replyPicksOfAi, splitReply, type ReplyAsk, type ReplyHow, type ReplyPick } from '../core/replySplit'
 import { buildReplyContext } from '../integration/certAi'
@@ -56,7 +57,7 @@ export function ReplyPaste({
     setErr('')
     try {
       const run = await callAssist({ requestId: newRequestId(), assistId: 'cert.reply', page: 'cert', choice: readChoice(), context: buildReplyContext({ asks, reply: text, certLabel, today }) })
-      const p = replyPicksOfAi(run.structured?.items ?? [], asks)
+      const p = replyPicksOfAi(answerOf(run)?.items ?? [], asks)
       reset(p, 'ai')
       if (!p.length) setErr('AI 도 답을 찾지 못했어요 — 답장이 맞는지 봐 주세요')
     } catch (e) {

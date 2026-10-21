@@ -6,6 +6,7 @@
  * 다시 열 때 차례로 넣는다. 넣는 함수는 늘 '그 순간의 최신 초안' 을 받아 바꾸므로 사이에 고친 글을 덮지 않는다.
  */
 import { AssistError, assistMessage, callAssist } from '../aiAssist/client'
+import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import { cleanAiText, mergeSpecAi, type SectionKey, type SpecDraft } from './specDraft'
 import { buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from './specDraftAi'
@@ -130,6 +131,33 @@ export function __setRetryMs(ms: number) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/*
+ * D-262 단계가 한 번 어긋나도 멈추지 않게 — 대표: "저기 단계에서 자꾸 막히네. llm 모델이 문제가 아닌 것 같아".
+ * 예전엔 답 모양이 어긋나면(이름표가 다른 칸 · 머리글 빠짐 · 끝 잘림) 곧바로 '실패' 였다(다시 부르기는 '많이 불렀음' 때만).
+ * 이제 같은 단계를 3번까지 — 두 번째부터는 무엇이 어긋났는지 · 이름표를 다시 알려 준다. 잠깐 끊긴 연결(시간 초과 · 붐빔)도 잠시 쉬었다 다시.
+ */
+const TRIES = 3
+const PARSE_MISS = 'parse_miss'
+const TRANSIENT = new Set(['provider_unreachable', 'provider_busy', 'provider_error'])
+let transientMs = 3_000
+/** 시험용 — 잠깐 끊겼을 때 쉬는 시간 */
+export function __setTransientMs(ms: number) {
+  transientMs = ms
+}
+/** 다시 부를 때 함께 보내는 말(대표가 더 묻는 것 자리 · 500자 안) */
+const FORMAT_HINT: Record<AgentStage, string> = {
+  idea: '앞 답을 읽지 못했습니다. items 마다 title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, outline = 정확히 5줄로 다시 써 주세요. JSON 한 덩어리만.',
+  research: '앞 답을 읽지 못했습니다. items 4~7개, 항목마다 tag(검색어 · 비슷한 기술 · 차별화 · 위험 · 확인할 것 중 하나) · title · detail 로 다시 써 주세요. JSON 한 덩어리만.',
+  parts:
+    '앞 답에서 구성요소를 읽지 못했습니다. items 의 title 에 이름표만 정확히: axis.input · axis.process · axis.state · axis.judge · axis.output · axis.feedback · axis.link · system · comp · step · seed. comp 항목은 4개 이상 — detail = 구성요소 이름("…부"), body = 하는 일("~하는"). step 4개 이상. JSON 한 덩어리만.',
+  a: '앞 답을 읽지 못했습니다. items 의 title = 칸 이름표(field · background · problem · effect) 그대로, body = 그 칸 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
+  b: '앞 답을 읽지 못했습니다. items 의 title = 칸 이름표(solution · abstract) 그대로, body = 그 칸 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
+  c: '앞 답을 읽지 못했습니다. items 하나 — title = "detail", body = 구체적인 내용 앞부분 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
+  d: '앞 답을 읽지 못했습니다. items 하나 — title = "detail2", body = 구체적인 내용 뒷부분 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
+  e: '앞 답을 읽지 못했습니다. items 하나 — title = "claims", body = 청구항 전체(청구항 n. 머리 · 빈 줄로 나눔)로 다시 써 주세요. JSON 한 덩어리만.',
+  fix: '앞 답을 읽지 못했습니다. items 의 title = 고칠 칸 이름표(title · titleEn · field · background · problem · solution · effect · detail · abstract · claims), body = 그 칸 전체를 고친 글로 다시 써 주세요. JSON 한 덩어리만.',
+}
+
 const KEY_LABEL: Record<string, string> = { field: '기술분야', background: '배경기술', problem: '해결하려는 과제', solution: '해결 수단', effect: '발명의 효과', detail: '구체적인 내용', abstract: '요약', claims: '청구항' }
 
 /** 단계 하나 — 'ok' | 'fail' | 'stop' */
@@ -166,14 +194,18 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
             ? buildFixContext({ draft: d0, issues: fixable(fixIssues(d0)), today: env.today })
             : buildSpecContext({ batch: stage as SpecBatch, draft: d0, today: env.today })
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    setStage(id, stage, { phase: 'run', text: attempt ? '다시 쓰는 중…' : `쓰는 중…(${s.seconds}초쯤)` })
+  let hint = ''
+  let rateWaited = false
+  for (let attempt = 0; attempt < TRIES; attempt += 1) {
+    if (!attempt) setStage(id, stage, { phase: 'run', text: `쓰는 중…(${s.seconds}초쯤)` })
     try {
-      const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context })
+      const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}) })
+      // 서버가 모양 검사에서 떨어뜨린 답(머리글 빠짐 · 끝 잘림 · 코드 블록)도 원문에서 다시 읽는다
+      const ans = answerOf(run)
       switch (stage) {
         case 'idea': {
-          const ideas = ideasOf(run.structured)
-          if (!ideas.length) throw new AssistError('provider_error', 'AI 답에서 아이디어를 찾지 못했습니다 — 다시 눌러 주세요')
+          const ideas = ideasOf(ans)
+          if (!ideas.length) throw new AssistError(PARSE_MISS, 'AI 답에서 아이디어를 찾지 못했습니다 — 다시 눌러 주세요')
           let filled = false
           await patch(id, (cur) => {
             filled = !cur.title.trim()
@@ -184,15 +216,15 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           return 'ok'
         }
         case 'research': {
-          const res = researchOf(run, d0.title)
-          if (!res) throw new AssistError('provider_error', 'AI 답에서 조사 메모를 찾지 못했습니다 — 다시 눌러 주세요')
+          const res = researchOf({ ...run, structured: ans }, d0.title)
+          if (!res) throw new AssistError(PARSE_MISS, 'AI 답에서 조사 메모를 찾지 못했습니다 — 다시 눌러 주세요')
           await patch(id, (cur) => ({ ...cur, research: { ...res, forTitle: cur.title } }))
           setStage(id, stage, { phase: 'done', text: res.grounded ? `메모 ${res.items.length}개 · 검색 근거 ${res.sources.length}곳` : `메모 ${res.items.length}개 · AI 가 아는 범위(검색 근거 없음 — KIPRIS 확인 필요)` })
           return 'ok'
         }
         case 'parts': {
-          const p = partsOf(run.structured)
-          if (p.components.length < 2) throw new AssistError('provider_error', 'AI 답에서 구성요소를 찾지 못했습니다 — 다시 눌러 주세요')
+          const p = partsOf(ans, rawObjectOf(run))
+          if (p.components.length < 2) throw new AssistError(PARSE_MISS, 'AI 답에서 구성요소를 찾지 못했습니다 — 다시 눌러 주세요')
           let res: ReturnType<typeof applyParts> | null = null
           await patch(id, (cur) => {
             res = applyParts(cur, p, { force: env.forceParts })
@@ -203,8 +235,8 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           return 'ok'
         }
         case 'fix': {
-          const items = fixItemsOf(run.structured)
-          if (!items.length) throw new AssistError('provider_error', 'AI 답에서 고친 칸을 찾지 못했습니다 — 다시 눌러 주세요')
+          const items = fixItemsOf(ans)
+          if (!items.length) throw new AssistError(PARSE_MISS, 'AI 답에서 고친 칸을 찾지 못했습니다 — 다시 눌러 주세요')
           let m: ReturnType<typeof applyFix> | null = null
           await patch(id, (cur) => {
             m = applyFix(cur, items)
@@ -216,8 +248,8 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
         }
         default: {
           const key = stage as SpecBatch
-          const items = specItemsOf(run.structured, key)
-          if (!items.length) throw new AssistError('provider_error', 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
+          const items = specItemsOf(ans, key)
+          if (!items.length) throw new AssistError(PARSE_MISS, 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
           let m: { replaced: string[]; kept: string[] } = { replaced: [], kept: [] }
           await patch(id, (cur) => {
             if (key === 'c' || key === 'd') {
@@ -239,9 +271,21 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
       }
     } catch (e) {
       const code = e instanceof AssistError ? e.code : 'save'
-      if (code === 'rate_limited' && attempt === 0) {
+      const left = attempt < TRIES - 1
+      if (code === 'rate_limited' && !rateWaited && left) {
+        rateWaited = true
         setStage(id, stage, { phase: 'run', text: '잠깐 많이 불러서 1분 쉬었다 다시 씁니다' })
         await sleep(retryMs)
+        continue
+      }
+      if (code === PARSE_MISS && left) {
+        hint = FORMAT_HINT[stage]
+        setStage(id, stage, { phase: 'run', text: `답 모양이 어긋나 이름표를 다시 알려 주고 씁니다(${attempt + 2}/${TRIES})` })
+        continue
+      }
+      if (TRANSIENT.has(code) && left) {
+        setStage(id, stage, { phase: 'run', text: `연결이 잠깐 끊겨 다시 씁니다(${attempt + 2}/${TRIES})` })
+        await sleep(transientMs)
         continue
       }
       const why = e instanceof AssistError ? e.message || assistMessage(e.code) : `저장하지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`

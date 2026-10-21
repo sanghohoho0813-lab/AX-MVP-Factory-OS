@@ -253,9 +253,10 @@ const LIST = [
     '"검색어" 항목(하나)의 outline = KIPRIS 에 넣을 검색어 · 검색식 3~6줄(한글 · 영문 · IPC 후보).',
     '"차별화" 항목은 청구항 1 에 꼭 넣을 연결관계를 구체적으로. headline = 한 줄 결론(이대로 가도 될지 · 좁혀야 할지). next = 사람이 KIPRIS 에서 직접 확인할 것 2~3개.',
   ], { knowledge: ['patent_research'], research: true }],
-  ['spec.parts', 'patent', '명세서 — 권리축 · 구성 · 단계 써줘', W, 4200, [
+  ['spec.parts', 'patent', '명세서 — 권리축 · 구성 · 단계 써줘', W, 6000, [
     '[자료 · 아이디어] 와 [기준 문서] 12-4B 권리축 잠금 · 12-4C 도면 기준으로 권리축 7줄 · 시스템 이름 · 구성요소 · 방법 단계 · 종속항 씨앗을 쓴다.',
     'items 의 title 이름표 그대로: "axis.input" · "axis.process" · "axis.state" · "axis.judge" · "axis.output" · "axis.feedback" · "axis.link" (권리축 7줄 · body = "~하는" 으로 끝나는 한 문장), "system" (body = 시스템 이름 · "… 시스템"), "comp" (구성요소 4~7개 순서대로 · detail = 이름 "…부" · body = 하는 일 "~하는"), "step" (방법 단계 4~7개 순서대로 · body = "~하는"), "seed" (종속항 씨앗 2~5개 · detail = 꾸밀 구성요소 이름 · body = "~하는").',
+    '이 단추는 아래 [출력 형식] 예시와 달리 title 에 이름표만 쓴다(구성요소 이름을 title 에 넣지 않는다). 예: {"title":"comp","detail":"요청 수집부","body":"여러 채널의 요청을 받아 한 형식으로 모으는"} · {"title":"step","body":"요청을 받아 한 형식으로 모으는"}. 항목은 30개 안 · 문장은 짧게.',
     '구성요소 이름은 서로 다르게. 부호(110 …)는 OS 가 붙이므로 쓰지 않는다. 권리축 마지막 줄(경쟁사가 피하기 어려운 연결관계)이 구성요소 · 단계에 그대로 드러나게.',
     '규칙 · 점수 계산을 AI · 인공지능이라 부르지 않는다(아이디어에 학습 모델이 있을 때만). headline = 시스템 한 줄 설명.',
   ], { knowledge: ['patent_spec'] }],

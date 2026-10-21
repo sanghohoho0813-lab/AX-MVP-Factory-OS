@@ -134,9 +134,13 @@ export function specItemsOf(answer: AssistAnswer | null, batch: SpecBatch): { ke
   const mine = SPEC_BATCHES.find((x) => x.key === batch)?.keys ?? []
   const label: Record<string, string> = { ...SECTION_LABEL, claims: '청구범위', detail2: '구체적인 내용 뒷부분' }
   const out: { key: SpecAiKey; text: string; note?: string }[] = []
+  // D-262 이름표가 title 이 아닌 tag · ref 에 있거나 대소문자가 달라도 읽는다
+  const keyOf = (v: unknown) => {
+    const t = String(v ?? '').trim()
+    return mine.find((k) => k.toLowerCase() === t.toLowerCase()) ?? mine.find((k) => t && (label[k].includes(t) || t.includes(label[k])))
+  }
   for (const it of answer.items ?? []) {
-    const t = (it.title ?? '').trim()
-    const key = mine.find((k) => k === t) ?? mine.find((k) => t && (label[k].includes(t) || t.includes(label[k])))
+    const key = keyOf(it.title) ?? keyOf(it.tag) ?? keyOf(it.ref)
     if (!key) continue
     const body = (it.body ?? '').trim()
     if (!body) continue

@@ -35,6 +35,8 @@ import {
   type SpecDraft,
 } from '../patent/specDraft'
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf } from '../patent/specDraftAi'
+import { fixItemsOf, partLabelOf, partsOf } from '../patent/specAgent'
+import { answerOf, looseJson, rawObjectOf } from '../aiAssist/looseJson'
 
 let passed = 0
 let failed = 0
@@ -98,6 +100,7 @@ function fullDraft(): SpecDraft {
 /* ---------------- 권리축 → 뼈대 ---------------- */
 {
   check('A1 ~하는 꼴 — 그대로 · 한다 · 하다 · 함 · 명사', asAdnominal('수집하는') === '수집하는' && asAdnominal('정규화한다.') === '정규화하는' && asAdnominal('비교하다') === '비교하는' && asAdnominal('알림 발송함') === '알림 발송하는' && asAdnominal('마모 판정') === '마모 판정을 수행하는')
+  check('A1b D-262 다른 끝맺음 — 받는다 · 모은다 · 쓴다 · 본다 · 만든다 · 보여준다 · 받습니다 · 정리합니다 · 모읍니다("…를 수행하는" 으로 만들지 않음)', asAdnominal('요청을 받는다') === '요청을 받는' && asAdnominal('요청을 모은다.') === '요청을 모으는' && asAdnominal('결과를 쓴다') === '결과를 쓰는' && asAdnominal('긴급도를 본다') === '긴급도를 보는' && asAdnominal('목록을 만든다') === '목록을 만드는' && asAdnominal('화면에 보여준다') === '화면에 보여주는' && asAdnominal('요청을 받습니다') === '요청을 받는' && asAdnominal('요청을 정리합니다') === '요청을 정리하는' && asAdnominal('요청을 모읍니다') === '요청을 모으는' && asAdnominal('담당자') === '담당자를 수행하는')
   const sk = skeletonFromAxis({ input: '진동신호를 수집하는', process: '', state: '지수를 갱신한다', judge: '단계를 판정하는', output: '', feedback: '', link: '연결' })
   check('A2 빈 줄 건너뛰고 110 · 120 · 130 / S110 …', sk.components.map((c) => `${c.no}:${c.name}`).join() === '110:데이터 수집부,120:상태 갱신부,130:판정부' && sk.steps.map((s) => s.no).join() === 'S110,S120,S130' && sk.components[1].does === '지수를 갱신하는', sk)
 }
@@ -213,6 +216,53 @@ function fullDraft(): SpecDraft {
   const n = normalizeDraft({ title: 3, components: [{ no: '110', name: '가', does: 1 }], figures: [{ role: 'weird', subject: 's' }], repFig: -1, text: { field: '가', bad: '나' }, numbered: false })
   check('R1 이상한 값 → 안전하게(빈 글 · 기본 도면 · 대표도 1 · 모르는 칸 버림)', n.title === '' && n.components[0].does === '' && n.figures[0].role === 'custom' && n.repFig === 1 && Object.keys(n.text).join() === 'field' && n.numbered === false)
   check('R2 아무것도 아니면 빈 초안', normalizeDraft(null).figures.length === 4 && normalizeDraft('x').numbered === true)
+}
+
+/* ---------------- D-262 답 모양이 달라도 읽기(구성요소 단계에서 자꾸 멈춤) ---------------- */
+{
+  const names = (p: ReturnType<typeof partsOf>) => p.components.map((c) => c.name).join()
+  // 예전에 읽던 모양 그대로
+  const exact = partsOf({ headline: 'x', items: [{ title: 'axis.input', body: '채널별 요청을 받는다' }, { title: 'system', body: '업무 요청 통합 시스템(100)' }, { title: 'comp', detail: '요청 수집부(110)', body: '여러 채널의 요청을 모은다' }, { title: 'comp', detail: '분류부', body: '요청을 분류한다' }, { title: 'step', body: 'S110 요청을 받는다' }, { title: 'seed', detail: '분류부', body: '긴급도를 더 본다' }] })
+  check('P1 예전 모양 그대로 — 구성요소 2 · 시스템 이름(부호 뺌) · 권리축 ~하는 · 단계 번호 뺌 · 씨앗', names(exact) === '요청 수집부,분류부' && exact.systemName === '업무 요청 통합 시스템' && exact.axis.input === '채널별 요청을 받는' && exact.steps[0] === '요청을 받는' && exact.seeds[0].comp === '분류부', exact)
+  // 이름표가 tag 에(제목 = 구성요소 이름) — [출력 형식] 예시를 따라 쓴 모양
+  const byTag = partsOf({ headline: 'x', items: [{ title: '요청 수집부', tag: 'comp', body: '요청을 모으는' }, { title: '분류부', tag: 'Comp', detail: '요청을 분류하는' }, { title: '할당부', tag: 'component' }, { title: '요청을 받는 단계', tag: 'step' }] })
+  check('P2 이름표가 tag 에 · 제목이 이름 — 구성요소 3(하는 일은 body · 없으면 detail) · 단계', names(byTag) === '요청 수집부,분류부,할당부' && byTag.components[1].does === '요청을 분류하는' && byTag.steps.length === 1)
+  // 번호 · 대문자 · 띄어쓰기 · 한글 이름표
+  const numbered = partsOf({ headline: 'x', items: [{ title: 'comp1', detail: '수집부', body: '모은다' }, { title: 'COMP 2', detail: '판정부', body: '판정한다' }, { title: '구성요소_3', detail: '출력부', body: '보여준다' }, { title: 'Step-1', body: '모으는' }, { title: '단계 2', body: '판정하는' }, { title: 'axis_link', body: '판정 결과를 할당에 바로 쓴다' }, { title: '핵심 판정', body: '긴급도를 판정한다' }] })
+  check('P3 comp1 · COMP 2 · 구성요소_3 · Step-1 · 단계 2 · axis_link · 한글 권리축 이름표 모두 읽음', names(numbered) === '수집부,판정부,출력부' && numbered.steps.length === 2 && numbered.axis.link === '판정 결과를 할당에 바로 쓰는' && numbered.axis.judge === '긴급도를 판정하는', numbered)
+  // 이름이 본문 앞에("이름: 하는 일") · detail 비어 있음
+  const inBody = partsOf({ headline: 'x', items: [{ title: 'comp', body: '요청 수집부(110): 채널별 요청을 모으는' }, { title: 'comp', body: '우선순위 판정부 — 긴급도를 매기는' }, { title: 'comp', body: '담당자 할당부는 담당자를 정하는' }, { title: 'comp', body: '이름 없는 설명만 있는 글' }] })
+  check('P4 이름이 본문 앞(: · — · 는) — 이름 3개 · 부호 뺌 · 하는 일만 남김 · 이름 없는 글은 버림', names(inBody) === '요청 수집부,우선순위 판정부,담당자 할당부' && inBody.components[0].does === '채널별 요청을 모으는', inBody.components)
+  // 한 항목에 여러 개(outline 줄마다)
+  const lines = partsOf({ headline: 'x', items: [{ title: 'comp', outline: ['1. 요청 수집부: 모으는', '2. 분류부: 나누는', '3. 할당부: 정하는'] }, { title: 'step', outline: ['S110 모으는', 'S120 나누는', 'S130 정하는'] }] })
+  check('P5 한 항목 outline 에 여러 개 — 구성요소 3 · 단계 3(번호 뺌)', names(lines) === '요청 수집부,분류부,할당부' && lines.steps.join('|') === '모으는|나누는|정하는')
+  // 항목 모양이 아닌 답(자기식 묶음)
+  const obj = partsOf({ headline: '', items: [] }, { system: '통합 시스템', axis: ['입력을 받는다', '정리한다'], components: [{ name: '요청 수집부', role: '모으는' }, '분류부: 나누는', { 이름: '할당부', 역할: '정하는' }], steps: ['모으는', { text: '나누는' }], seeds: [{ component: '분류부', text: '긴급도를 보는' }] })
+  check('P6 { components · steps · axis 배열 · 한글 키 } 모양도 — 구성요소 3 · 단계 2 · 권리축 2 · 씨앗', names(obj) === '요청 수집부,분류부,할당부' && obj.steps.length === 2 && obj.axis.input === '입력을 받는' && obj.axis.process === '정리하는' && obj.seeds[0].comp === '분류부' && obj.systemName === '통합 시스템', obj)
+  check('P7 이름표 판정 — comp · S110 · 종속항 · axis.feedback 은 이름표, 구성요소 이름 · 긴 글은 아님', partLabelOf('comp')?.kind === 'comp' && partLabelOf('S110')?.kind === 'step' && partLabelOf('종속항')?.kind === 'seed' && partLabelOf('axis.feedback')?.kind === 'axis' && !partLabelOf('요청 수집부') && !partLabelOf('채널별 요청을 받아 한 형식으로 모으는 아주 긴 설명 문장입니다'))
+  // 같은 이름 두 번 · 8개 넘게 · 이상한 값
+  const many = partsOf({ headline: 'x', items: [...Array.from({ length: 12 }, (_, i) => ({ title: 'comp', detail: `가${i % 9}부`, body: '하는' })), { title: 'comp', detail: '' }, { title: 'comp' } as never] })
+  check('P8 같은 이름은 한 번 · 8개까지 · 빈 항목 무시', many.components.length === 8 && new Set(many.components.map((c) => c.name)).size === 8)
+
+  // 원문(raw)에서 다시 읽기 — 서버 모양 검사에서 떨어진 답
+  const full = JSON.stringify({ items: [{ title: 'comp', detail: '수집부', body: '모으는' }, { title: 'comp', detail: '판정부', body: '판정하는' }] })
+  const noHead = answerOf({ structured: null, raw: full })
+  check('J1 머리글(headline) 빠져 서버가 버린 답 → 원문에서 항목 2개', noHead?.items.length === 2 && noHead.headline === '')
+  const fenced = answerOf({ structured: null, raw: '아래와 같습니다.\n```json\n' + JSON.stringify({ headline: 'h', items: [{ title: 'step', body: '모으는' }] }) + '\n```\n끝' })
+  check('J2 코드 블록 · 앞뒤 말 → 읽음', fenced?.items[0]?.title === 'step' && fenced.headline === 'h')
+  const cut = '{"headline":"h","items":[{"title":"comp","detail":"수집부","body":"모으는"},{"title":"comp","detail":"판정부","body":"판정하는"},{"title":"comp","detail":"할당부","bo'
+  const fromCut = answerOf({ structured: null, raw: cut })
+  check('J3 끝이 잘린 답(길이 한도) → 온전한 항목 2개까지 살림', fromCut?.items.length === 2 && partsOf(fromCut).components.length === 2, fromCut)
+  const cutInString = '{"headline":"h","items":[{"title":"comp","detail":"수집부","body":"모으는"},{"title":"comp","detail":"판정부","body":"판정하는 중에 { 괄호가'
+  check('J4 글 안의 괄호에 속지 않음 — 잘린 글 안 { 무시', answerOf({ structured: null, raw: cutInString })?.items.length === 1)
+  check('J5 서버가 통과시킨 답은 그대로 · 아무 것도 못 읽으면 null', answerOf({ structured: { headline: 'a', items: [{ title: 'x' }] }, raw: '' })?.headline === 'a' && answerOf({ structured: null, raw: '죄송합니다. 답을 만들 수 없습니다.' }) === null && looseJson('') === null)
+  check('J6 rawObjectOf — 항목 모양이 아닌 묶음도 꺼냄', (rawObjectOf({ raw: '{"components":[{"name":"가부"}]}' })?.components as unknown[]).length === 1)
+
+  // 본문 · 고치기 단계도 이름표가 tag 에 있거나 대소문자가 달라도
+  check('J7 본문 칸 — 이름표가 tag 에 · 대문자', specItemsOf({ headline: '', items: [{ title: '기술 분야 설명', tag: 'field', body: '가' }, { title: 'BACKGROUND', body: '나' }] }, 'a').map((i) => i.key).join() === 'field,background')
+  check('J8 고치기 — titleen · tag 이름표', fixItemsOf({ headline: '', items: [{ title: 'titleen', body: 'SYSTEM AND METHOD' }, { title: '요약 고침', tag: 'abstract', body: '요약' }] }).map((i) => i.key).join() === 'titleEn,abstract')
+  // 다시 부를 때 보내는 말 — 서버 지시문에 예시(이름표는 title · 이름은 detail)
+  check('J9 서버 지시문 — 구성요소 예시(title 은 이름표만) · 길이 상한 올림', ASSISTS['spec.parts'].instruction.join(' ').includes('"title":"comp","detail":"요청 수집부"') && ASSISTS['spec.parts'].maxOut >= 6000)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

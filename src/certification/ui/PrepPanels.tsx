@@ -23,6 +23,7 @@ import { PACK_LABEL, PACK_MARK, venturePackText, type VentureCheckRow, type Vent
 import { handoffText, type HandoffPackage } from '../core/handoff'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { AssistError, assistMessage, callAssist } from '../../services/aiAssist/client'
+import { answerOf } from '../../services/aiAssist/looseJson'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 import { todayLocalDate } from '../../lib/appClock'
@@ -273,7 +274,7 @@ export function InspectionPackPanel({
     setSayErr('')
     try {
       const run = await callAssist({ requestId: newRequestId(), assistId: 'cert.say', page: 'cert', choice: readChoice(), context: buildSayContext({ pkg, today: todayLocalDate() }) })
-      const items = sayItemsOf(run.structured, pkg)
+      const items = sayItemsOf(answerOf(run), pkg)
       if (!items.length) throw new AssistError('provider_error', 'AI 답에서 질문별 답을 찾지 못했습니다 — 다시 눌러 주세요')
       for (const it of items) await onNote(sayKey(it.qid), it.text)
       showToast(`말할 답 ${items.length}개를 썼습니다 — 질문을 눌러 보세요${items.some((i) => i.text.includes('[대표 확인')) ? ' · [대표 확인] 자리는 대표님께 물어 채워 주세요' : ''}`)
