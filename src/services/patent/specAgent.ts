@@ -268,7 +268,11 @@ export function partLabelOf(v: unknown): PartLabel | null {
 /** "요청 수집부(110): 채널별 요청을 받는" · "요청 수집부 — …" · "요청 수집부는 …" → 이름 · 하는 일 */
 function splitNamed(text: string): { name: string; rest: string } | null {
   const m = /^\s*(?:[①-⑳]|\d{1,3}[.)]|[-•*])?\s*([^:：—–(\n]{1,30}?(?:부|모듈|엔진|유닛|장치|서버|단말|DB|데이터베이스))\s*(?:\(\s*\d{2,4}\s*\))?\s*(?:[:：—–]\s*|-\s+|는\s+|은\s+|가\s+|이\s+)(.+)$/s.exec(text)
-  return m ? { name: m[1].trim(), rest: m[2].trim() } : null
+  if (!m) return null
+  const name = m[1].trim()
+  // "수신된 데이터를 처리부" 같은 문장 조각은 이름이 아니다(목적격 · 꾸밈말 · 네 낱말 넘음)
+  if (/(?:[을를]|에서|에게|으로|[된한던])\s/.test(name) || name.split(/\s+/).length > 3) return null
+  return { name, rest: m[2].trim() }
 }
 const cleanName = (s: string) =>
   s
@@ -320,7 +324,13 @@ export function partsOf(answer: AssistAnswer | null, rawObj?: Record<string, unk
         break
       }
       case 'comp': {
-        // 한 항목에 여러 개(outline 줄마다 "이름: 하는 일")
+        // 자기 이름(title · detail)이 있으면 그 이름이 구성요소 하나 — outline 은 하는 일을 덧붙인 것일 뿐
+        const named = titleName || (detail && cleanName(detail).length <= 30 ? detail : '')
+        if (named) {
+          pushComp(out, named, body || (titleName ? detail : '') || lines[0] || '')
+          break
+        }
+        // 이름 없이 outline 줄마다 "이름: 하는 일" — 한 항목에 여러 개
         if (lines.length > 1) {
           for (const ln of lines) {
             const s = splitNamed(ln)
@@ -328,22 +338,22 @@ export function partsOf(answer: AssistAnswer | null, rawObj?: Record<string, unk
           }
           break
         }
-        const named = titleName || (detail && cleanName(detail).length <= 30 ? detail : '')
-        if (named) pushComp(out, named, body || (titleName ? detail : ''))
-        else {
-          const s = splitNamed(body) ?? splitNamed(detail)
-          if (s) pushComp(out, s.name, s.rest)
-        }
+        const s = splitNamed(body) ?? splitNamed(lines[0] ?? '')
+        if (s) pushComp(out, s.name, s.rest)
         break
       }
       case 'step': {
-        if (lines.length > 1) lines.forEach((ln) => pushStep(out, ln))
-        else pushStep(out, body || detail || titleName)
+        // 본문이 있으면 단계 하나(outline 은 그 단계의 세부) · 본문 없이 줄만 있으면 줄마다 단계
+        const one = body || (lines.length > 1 ? '' : detail || lines[0] || titleName)
+        if (one) pushStep(out, one)
+        else lines.forEach((ln) => pushStep(out, ln))
         break
       }
       case 'seed': {
-        if (lines.length > 1) lines.forEach((ln) => pushSeed(out, titleName || detail, ln))
-        else pushSeed(out, titleName || detail, body || (titleName ? detail : ''))
+        const comp = titleName || detail
+        const one = body || (lines.length > 1 ? '' : (titleName ? detail : '') || lines[0] || '')
+        if (one) pushSeed(out, comp, one)
+        else lines.forEach((ln) => pushSeed(out, comp, ln))
         break
       }
     }

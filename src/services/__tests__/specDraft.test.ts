@@ -263,6 +263,16 @@ function fullDraft(): SpecDraft {
   check('J8 고치기 — titleen · tag 이름표', fixItemsOf({ headline: '', items: [{ title: 'titleen', body: 'SYSTEM AND METHOD' }, { title: '요약 고침', tag: 'abstract', body: '요약' }] }).map((i) => i.key).join() === 'titleEn,abstract')
   // 다시 부를 때 보내는 말 — 서버 지시문에 예시(이름표는 title · 이름은 detail)
   check('J9 서버 지시문 — 구성요소 예시(title 은 이름표만) · 길이 상한 올림', ASSISTS['spec.parts'].instruction.join(' ').includes('"title":"comp","detail":"요청 수집부"') && ASSISTS['spec.parts'].maxOut >= 6000)
+
+  // D-262 점검 뒤 — 자기 이름이 있는 항목에 outline(세부)이 붙어 와도 그 이름이 구성요소
+  const withOutline = partsOf({ headline: 'x', items: [{ title: 'comp', detail: '요청 수집부', body: '요청을 받는', outline: ['채널별 요청 수신', '형식 통일'] }, { title: 'comp', detail: '판정부', body: '긴급도를 매기는', outline: ['점수 계산', '순서 정렬'] }, { title: 'step', body: '요청을 받아 모으는', outline: ['채널 확인', '형식 변환'] }, { title: 'seed', detail: '판정부', body: '시간대별로 가중치를 두는', outline: ['야간', '주말'] }] })
+  check('R1 이름 + outline 세부 — 구성요소 2(이름 그대로) · 단계 1(본문) · 씨앗 1', names(withOutline) === '요청 수집부,판정부' && withOutline.components[0].does === '요청을 받는' && withOutline.steps.join('|') === '요청을 받아 모으는' && withOutline.seeds.length === 1 && withOutline.seeds[0].text === '시간대별로 가중치를 두는', withOutline)
+  const frag = partsOf({ headline: 'x', items: [{ title: 'comp', body: '수신된 데이터를 처리부가 가공하는' }, { title: 'comp', body: '요청을 받아 저장하는 아주 긴 이름의 데이터 처리부는 일을 하는' }, { title: 'comp', body: '사용자 단말: 요청을 보내는' }] })
+  check('R2 문장 조각은 이름이 아님("수신된 데이터를 처리부") · "이름: 하는 일" 은 그대로', names(frag) === '사용자 단말', frag.components)
+  check('R3 tag 의 자유 꼬리표("기술")는 칸 이름 일부로 찾지 않음 · 한 칸에 둘이면 정확히 맞은 것', specItemsOf({ headline: '', items: [{ title: '배경 기술', tag: '기술', body: 'B' }] }, 'a').every((i) => i.key !== 'field') && specItemsOf({ headline: '', items: [{ title: '기술분야 이야기', body: '느슨' }, { title: 'field', body: '정확' }] }, 'a').find((i) => i.key === 'field')?.text === '정확')
+  const fenceInBody = '```json\n' + JSON.stringify({ headline: 'h', items: [{ title: 'claims', body: '예: ```code``` 안' }] }) + '\n```'
+  check('R4 본문 안에 ``` 가 있어도 읽음(코드 블록 잘림 → 원문 전체로)', answerOf({ structured: null, raw: fenceInBody })?.items[0]?.body === '예: ```code``` 안')
+  check('R5 끝맺음 — 입니다 → 인 · 했습니다 → 한 · 됐습니다 → 된', asAdnominal('요청 수집부입니다') === '요청 수집부인' && asAdnominal('요청을 정리했습니다') === '요청을 정리한' && asAdnominal('목록이 갱신됐습니다') === '목록이 갱신된')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

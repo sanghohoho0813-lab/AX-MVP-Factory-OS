@@ -353,6 +353,8 @@ export function asAdnominal(text: string): string {
   if (/됨$/.test(t)) return t.replace(/됨$/, '되는')
   // D-262 AI 가 흔히 쓰는 다른 끝맺음 — 예전엔 "요청을 받는다를 수행하는" 처럼 됐다
   if (/(?:합니다|됩니다)$/.test(t)) return t.replace(/합니다$/, '하는').replace(/됩니다$/, '되는')
+  if (/입니다$/.test(t)) return t.replace(/입니다$/, '인') // 수집부입니다 → 수집부인
+  if (/(?:했|됐|되었|하였)습니다$/.test(t)) return t.replace(/(?:했|하였)습니다$/, '한').replace(/(?:됐|되었)습니다$/, '된')
   if (/습니다$/.test(t)) return t.replace(/습니다$/, '는') // 받습니다 → 받는
   if (/는다$/.test(t)) return t.replace(/는다$/, '는') // 받는다 → 받는
   const dropJong = (ch: string, jong: number) => {

@@ -134,19 +134,31 @@ export function specItemsOf(answer: AssistAnswer | null, batch: SpecBatch): { ke
   const mine = SPEC_BATCHES.find((x) => x.key === batch)?.keys ?? []
   const label: Record<string, string> = { ...SECTION_LABEL, claims: '청구범위', detail2: '구체적인 내용 뒷부분' }
   const out: { key: SpecAiKey; text: string; note?: string }[] = []
-  // D-262 이름표가 title 이 아닌 tag · ref 에 있거나 대소문자가 달라도 읽는다
-  const keyOf = (v: unknown) => {
+  // D-262 이름표가 title 이 아닌 tag · ref 에 있거나 대소문자가 달라도 읽는다.
+  // 칸 이름 일부로 찾기는 title 에서만(tag 는 자유 꼬리표라 "기술" 같은 말이 기술분야로 가면 안 됨) · 한 칸에 여러 답이면 정확히 맞은 것 먼저
+  const exactOf = (v: unknown) => {
+    const t = String(v ?? '').trim().toLowerCase()
+    return t ? mine.find((k) => k.toLowerCase() === t) : undefined
+  }
+  const looseOf = (v: unknown) => {
     const t = String(v ?? '').trim()
-    return mine.find((k) => k.toLowerCase() === t.toLowerCase()) ?? mine.find((k) => t && (label[k].includes(t) || t.includes(label[k])))
+    return t ? mine.find((k) => label[k].includes(t) || t.includes(label[k])) : undefined
   }
-  for (const it of answer.items ?? []) {
-    const key = keyOf(it.title) ?? keyOf(it.tag) ?? keyOf(it.ref)
-    if (!key) continue
+  const picks: { key: SpecAiKey; exact: boolean; i: number; text: string; note?: string }[] = []
+  ;(answer.items ?? []).forEach((it, i) => {
+    const exact = exactOf(it.title) ?? exactOf(it.tag) ?? exactOf(it.ref)
+    const key = exact ?? looseOf(it.title)
     const body = (it.body ?? '').trim()
-    if (!body) continue
+    if (!key || !body) return
     const note = (it.detail ?? '').trim()
-    out.push({ key, text: body, note: note || undefined })
+    picks.push({ key, exact: !!exact, i, text: body, note: note || undefined })
+  })
+  const best = new Map<SpecAiKey, (typeof picks)[number]>()
+  for (const p of picks) {
+    const cur = best.get(p.key)
+    if (!cur || (p.exact && !cur.exact)) best.set(p.key, p)
   }
+  for (const p of [...best.values()].sort((a, b) => a.i - b.i)) out.push({ key: p.key, text: p.text, note: p.note })
   // 하나뿐인 칸 묶음인데 이름표가 어긋났으면 첫 본문을 그 칸으로
   if (!out.length && mine.length === 1) {
     const first = (answer.items ?? []).find((it) => (it.body ?? '').trim())

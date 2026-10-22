@@ -39,9 +39,18 @@ function openAt(t: string, end: number): { inString: boolean; stack: string[] } 
 /** 글 → JSON(코드 블록 · 앞뒤 말 · 끝 잘림까지). 못 읽으면 null */
 export function looseJson(text: unknown): unknown {
   if (typeof text !== 'string') return null
-  let t = text.trim()
-  const fence = /```(?:json)?\s*([\s\S]*?)(?:```|$)/i.exec(t)
-  if (fence && fence[1].includes('{')) t = fence[1].trim()
+  const whole = text.trim()
+  // 코드 블록 안을 먼저 — 글 안에 ``` 가 또 있어 잘못 잘렸으면 원문 전체로 다시
+  const fence = /```(?:json)?\s*([\s\S]*?)(?:```|$)/i.exec(whole)
+  if (fence && fence[1].includes('{')) {
+    const v = jsonIn(fence[1].trim())
+    if (v !== null) return v
+  }
+  return jsonIn(whole)
+}
+
+function jsonIn(src: string): unknown {
+  let t = src
   const a = t.indexOf('{')
   if (a < 0) return null
   t = t.slice(a)
