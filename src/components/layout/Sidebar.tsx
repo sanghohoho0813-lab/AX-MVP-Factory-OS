@@ -24,7 +24,6 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { ViewAsSwitch } from './ViewAsSwitch'
-import { SideAiButton } from './SideAiButton'
 import { AccountSwitchItems } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
@@ -248,12 +247,7 @@ function SidebarContent({
             <ViewAsSwitch stacked />
           </div>
         )}
-        {/* D-254 대표 "모니터 하나 — ChatGPT 를 옆에": 오른쪽에 AI 창(팝업) · OS 는 비켜 줌. PC 만 — OS 는 아무것도 보내지 않아 팀장 화면에도 같이 */}
-        {!onCloseMobile && (
-          <div className="mb-2 hidden lg:block">
-            <SideAiButton collapsed={collapsed} />
-          </div>
-        )}
+        {/* D-254 [ChatGPT 옆에 띄우기] 는 D-265 에 본문 오른쪽 위로 옮겼다(AppShell — 대표 "우측 상단 여백에") */}
         <SidebarAccount collapsed={collapsed} />
         {/* D-184: 휴대폰 서랍 — 다른 계정으로 바꾸기 · 로그아웃(PC 는 머리줄 오른쪽 위 사용자 메뉴) */}
         {onCloseMobile && (

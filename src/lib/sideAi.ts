@@ -14,6 +14,7 @@
  *     브라우저가 OS 와 옆 창 사이 연결을 끊어 OS 쪽에서는 창이 열려 있어도 '닫힘' 으로 보였고, 그래서 비켜 준 자리를 되돌렸다.
  *     이제 연 지 얼마 안 돼 '닫힘' 이 되면 끊긴 것(cut)으로 보고 자리를 그대로 둔다. 그 뒤로는 창이 닫혀도 알 수 없어 판에 [원래대로].
  *   - 옆 창 자리는 화면 끝이 아니라 이 OS 창 안 오른쪽, 머리줄 아래부터(sideRectIn) — 머리줄(시각 · 찾기)은 그대로 보이고 본문만 비킨다.
+ * D-265 끊긴 창도 닫으면 가운데로 — 비켜 준 자리에 마우스가 오면 그 창이 거기 없는 것(inVacated) · 다시 보이면 다시 비킴(atSideEdge).
  * D-256 대표: "주소창도 적을 수 있게 · 구글 기본" — 팝업 창의 주소창은 브라우저가 고칠 수 없게 막아 두므로, 판의 주소 칸에
  *   주소(google.com · naver.com …)나 검색어를 적으면 같은 옆 창이 그리로 간다(주소가 아니면 구글 검색 · http/https 만).
  */
@@ -179,6 +180,41 @@ export function looksCut(url: string, openedAt: number, now: number): boolean {
   return now - openedAt < (cutsOpener(url) ? 20_000 : 3_000)
 }
 
+/*
+ * D-265 대표: "GPT 를 끄면 원상태로 가운데 정렬로 딱 돌아와야 하는데, 꺼도 왼쪽에 그대로 있어 별로".
+ * 연결을 끊는 창(ChatGPT 등)은 닫혀도 OS 가 알 수 없다 — 그래서 마우스로 안다.
+ *   옆 창이 덮고 있어야 할 자리(비켜 준 오른쪽)에서 이 화면이 마우스를 받으면 그 창은 거기 없다(닫음 · 내림 · 옮김 · 뒤로 감) → 가운데로.
+ *   거꾸로 화면 가장자리가 아닌 곳, 옆 창 왼쪽 끝 근처에서 마우스가 이 화면을 나가거나 들어오면 그 창이 다시 그 자리에 보인다 → 다시 비켜 줌.
+ */
+/** 옆 창 테두리 · 화면 배율 오차(Windows 는 창 둘레에 보이지 않는 테두리 약 7px) — 이만큼 안쪽부터 본다 */
+const EDGE_X = 24
+const EDGE_Y = 6
+/** 연 뒤 창이 화면에 나타나기까지 — 그 사이 마우스는 세지 않는다 */
+export const SETTLE_MS = 2000
+
+/** 비켜 준 자리에서 이 화면이 마우스를 받았나(= 옆 창이 거기 없음). vw = 창 안쪽 폭 · top = 옆 창 위 끝(머리줄 아래) */
+export function inVacated(p: { x: number; y: number }, vw: number, reserve: number, top: number): boolean {
+  return reserve > 0 && p.x >= vw - reserve + EDGE_X && p.y >= top + EDGE_Y
+}
+
+/** 마우스가 이 화면을 나가거나 들어온 곳이 화면 가장자리가 아니라 옆 창 왼쪽 끝 근처인가(= 옆 창이 다시 그 자리에 보임) */
+export function atSideEdge(p: { x: number; y: number }, vw: number, vh: number, reserve: number, top: number): boolean {
+  if (!(reserve > 0)) return false
+  const inside = p.x > 30 && p.x < vw - 30 && p.y > top + 30 && p.y < vh - 30
+  return inside && Math.abs(p.x - (vw - reserve)) <= 48
+}
+
+/**
+ * D-265 [ChatGPT 옆에 띄우기] 단추 자리 — 대표: "PC 기준 우측 상단 여백에".
+ * 본문 글 오른쪽 끝(textRight)과 쓸 수 있는 오른쪽 끝(limit — 화면 끝 · 옆 창 · 오른쪽 판 왼쪽) 사이에 단추(btnW)가 들어가면 그 여백(margin),
+ * 모자라면 본문 맨 위 줄 오른쪽(inline). 둘 다 이 페이지 px.
+ */
+export const CORNER_GAP = 12
+export function cornerSpot(limit: number, textRight: number, btnW: number): 'margin' | 'inline' {
+  // 1920 화면 · 메뉴 288 · 본문 보통(1280)에서 여백 약 224px — 단추(약 194px)가 양쪽 12px 띄우고 들어간다(실측)
+  return btnW > 0 && limit - CORNER_GAP - btnW >= textRight + CORNER_GAP ? 'margin' : 'inline'
+}
+
 /** 팝업 창 모양(window.open 세 번째 값) */
 export function featuresOf(r: Rect): string {
   return `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`
@@ -213,7 +249,7 @@ interface State extends Prefs {
   blocked: boolean
   /** 옆 창에 띄운 것(서비스 이름 · 'naver.com' · 'Google 검색') — 단추에 '… 옆 창 열림' */
   at: string
-  /** D-261 옆 창이 OS 와 연결을 끊음(ChatGPT 등) — 열려 있는지 알 수 없어 [원래대로] 를 눌러야 자리를 되돌린다 */
+  /** D-261 옆 창이 OS 와 연결을 끊음(ChatGPT 등) — 열려 있는지 알 수 없다. D-265 비켜 준 자리에 마우스가 오면 가운데로(또는 [원래대로]) */
   cut: boolean
 }
 
@@ -236,6 +272,10 @@ let sideWin: Window | null = null
 let lastUrl = ''
 let watch: ReturnType<typeof setInterval> | null = null
 let openedAt = 0
+/** D-265 옆 창을 놓은 자리(화면 px) */
+let placed: Rect | null = null
+/** D-265 그 자리에 없다고 본 옆 창 — 다시 그 자리에 보이면 비켜 준다(연결이 끊긴 창은 닫혔는지 몰라 남겨 둔다) */
+let parked: { rect: Rect; label: string; cut: boolean } | null = null
 
 function savePrefs() {
   try {
@@ -283,9 +323,31 @@ function startWatch() {
     sideWin = null
     if (watch) clearInterval(watch)
     watch = null
-    if (cut) set({ cut: true })
-    else set({ open: false, reserve: 0, cut: false })
+    if (cut) {
+      // 비켜 준 사이 마우스로 '없음' 을 이미 봤으면 다시 볼 때 쓸 수 있게 끊긴 창으로 남긴다
+      if (parked) parked = { ...parked, cut: true }
+      else set({ cut: true })
+      return
+    }
+    placed = null
+    parked = null
+    set({ open: false, reserve: 0, cut: false })
   }, 1200)
+}
+
+/** D-265 옆 창이 그 자리에 없다 → 가운데로(단추도 '옆에 띄우기' 로) */
+function sideAway() {
+  parked = placed ? { rect: placed, label: state.at, cut: state.cut } : null
+  set({ open: false, reserve: 0, cut: false })
+}
+
+/** D-265 옆 창이 다시 그 자리에 보인다 → 다시 비켜 줌. 손잡이가 있는 창이 닫혔으면 잊는다 */
+function sideBack() {
+  const p = parked
+  if (!p) return
+  parked = null
+  if (!p.cut && (!sideWin || sideWin.closed)) return
+  set({ open: true, reserve: reserveFor(window, p.rect), at: p.label, cut: p.cut })
 }
 
 /** 옆에 열기 — 이미 열린 창이면 같은 창을 그 자리 · 서비스로. 막히면 blocked */
@@ -332,6 +394,8 @@ export function openInSide(url: string, label: string): boolean {
   }
   lastUrl = url
   openedAt = Date.now()
+  placed = side
+  parked = null
   set({ open: true, blocked: false, reserve: reserveFor(window, side), at: label, cut: false })
   startWatch()
   return true
@@ -358,6 +422,8 @@ export function closeSideAi(): void {
   sideWin = null
   if (watch) clearInterval(watch)
   watch = null
+  placed = null
+  parked = null
   set({ open: false, reserve: 0, cut: false })
 }
 
@@ -379,6 +445,28 @@ if (typeof window !== 'undefined') {
     if (!state.open) return
     set({ reserve: reserveFor(window, sideRect()) })
   })
+  // D-265 비켜 준 자리에서 마우스를 받으면 옆 창이 거기 없다 — 단추를 누른 채 끄는 중(이 화면이 마우스를 잡고 있음)과 막 연 때는 빼고
+  const seen = (e: PointerEvent) => {
+    if (!state.open || !state.reserve) return
+    if (e.type === 'pointermove' && e.buttons !== 0) return
+    if (Date.now() - openedAt < SETTLE_MS) return
+    if (inVacated({ x: e.clientX, y: e.clientY }, window.innerWidth, state.reserve, headerBottom())) sideAway()
+  }
+  window.addEventListener('pointermove', seen, { capture: true, passive: true })
+  window.addEventListener('pointerdown', seen, { capture: true, passive: true })
+  // 옆 창 왼쪽 끝 근처에서 마우스가 이 화면을 나가거나 들어옴 → 그 창이 다시 보인다(이 화면 안 다른 칸 · 판 안 사이트로 옮긴 것은 빼고)
+  const edge = (e: MouseEvent) => {
+    if (e.relatedTarget || state.open || !parked) return
+    const p = { x: e.clientX, y: e.clientY }
+    const nearFrame = Array.from(document.querySelectorAll('iframe')).some((f) => {
+      const r = f.getBoundingClientRect()
+      return p.x >= r.left - 12 && p.x <= r.right + 12 && p.y >= r.top - 12 && p.y <= r.bottom + 12
+    })
+    if (nearFrame) return
+    if (atSideEdge(p, window.innerWidth, window.innerHeight, reserveFor(window, parked.rect), headerBottom())) sideBack()
+  }
+  document.addEventListener('mouseout', edge)
+  document.addEventListener('mouseover', edge)
 }
 
 function subscribe(l: () => void): () => void {

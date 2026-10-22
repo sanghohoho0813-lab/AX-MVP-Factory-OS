@@ -25,6 +25,7 @@ import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 import { useSideAi } from '../../lib/sideAi'
 import { SideDock } from './SideDock'
+import { SideAiButton } from './SideAiButton'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders } from '../../services/aiAssist/store'
 
@@ -99,7 +100,13 @@ export function AppShell() {
             {/* D-164: 대표가 팀장 화면을 보는 동안 */}
             <ViewingPilotBanner />
             {/* D-235: 경로 줄 — 어디를 눌러 들어와도 지금 어디 안에 있는지(앞 칸을 누르면 그 단계로) */}
-            <Breadcrumbs />
+            {/* D-265 [ChatGPT 옆에 띄우기] — 본문 오른쪽 여백에 들어가면 그 여백(화면 고정), 아니면 이 줄 오른쪽(PC 만) */}
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <Breadcrumbs />
+              </div>
+              <SideAiButton />
+            </div>
             <div key={shellKeyOf(location.pathname)} className="ax-rise">
               {/* D-95: 한 화면이 넘어져도 사이드바·머리줄은 남는다. 다른 화면으로 옮기면 풀린다 */}
               <ContentErrorBoundary resetKey={location.pathname}>

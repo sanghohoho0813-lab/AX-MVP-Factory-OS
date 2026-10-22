@@ -1,9 +1,9 @@
 /**
- * qa:sideai — D-254 AI 옆 창(왼쪽 메뉴 맨 아래 [ChatGPT 옆에 띄우기]).
+ * qa:sideai — D-254 AI 옆 창([ChatGPT 옆에 띄우기] — D-265 부터 본문 오른쪽 위).
  * 대표: "모니터가 하나라서 OS 를 보면서 ChatGPT 를 옆에 띄워 놓고 싶다".
  * 밖(ChatGPT · Claude · Gemini)은 이 상자에서 못 가므로 가짜 쪽 하나로 바꿔 받는다 — 창이 열리는 자리 · 이름 · OS 비키기만 본다.
  *
- *   S1 PC 왼쪽 메뉴 아래에 단추(글자 그대로) · 휴대폰에는 없음
+ *   S1 PC 본문 오른쪽 위에 단추(글자 그대로 · 1440 은 여백이 없어 맨 위 줄 오른쪽) · 휴대폰에는 없음
  *   S2 누르면 판 — AI 셋 · 폭 셋 · 기본 ChatGPT · 보통
  *   S3 [옆에 열기] → 창 하나(이름 mirae-side-ai) · 화면 오른쪽 · OS 본문이 그만큼 왼쪽으로 비킴 · 가로 넘침 0
  *   S4 Claude 로 바꾸면 같은 창이 Claude 로(창이 둘이 되지 않음)
@@ -12,7 +12,12 @@
  *   S7 [OS 도 왼쪽 창으로] → 같은 주소의 OS 창이 왼쪽에
  *   S8 고른 AI · 폭은 다시 열어도 기억
  *   S10 머리줄은 그대로 — 1024 · 1440 · 1600 · 1920 · 2300 에서 머리줄 넘침 0(머리줄에 두었을 때 넘쳤다)
- *   S11 메뉴를 접어도 아이콘으로 남고 판이 화면 안에 열린다
+ *   S11 메뉴를 접어도 단추는 오른쪽 위 그대로 · 판은 단추 아래 화면 안
+ * D-265 대표: "단추는 우측 상단 여백에" · "GPT 를 끄면 원상태로 가운데 정렬로 딱 돌아와야 하는데 꺼도 왼쪽에 그대로"
+ *   S5f~S5j 연결을 끊는 창(ChatGPT) — 비켜 준 자리에 마우스가 오면(창이 거기 없음) 가운데로 · 본문 · 끄는 중 · 막 연 때는 그대로 ·
+ *           옆 창 왼쪽 끝에서 마우스가 나가면(창이 다시 보임) 다시 비킴 · [원래대로] 뒤에는 다시 비키지 않음
+ *   S5k   끊지 않는 창(네이버)도 같게 — 뒤로 간 창이 다시 보이면 비킴
+ *   S10   1024 · 1440 · 1600 은 맨 위 줄 오른쪽 · 1920 · 2300 은 오른쪽 여백(본문 글과 안 겹침 · 화면 고정)
  * D-256 대표: "주소창도 적을 수 있게 · 구글 기본" · "목차 칸 경계선을 끌어 줄였다 커졌다 · 아예 사라졌다"
  *   A1~A6 주소 칸 — 주소 → 같은 옆 창이 그리로 · 검색어 → 구글 검색 · javascript: 는 검색으로(실행 안 됨) · 비우면 구글 ·
  *         바로 가기(기업마당) · 폭만 바꾸면 보던 곳 그대로 · 단추 이름이 띄운 곳으로
@@ -66,7 +71,8 @@ await page.waitForTimeout(600)
 
 const btn = page.getByTestId('side-ai-button')
 const btnBox = await btn.boundingBox()
-check('S1 PC 왼쪽 메뉴 아래에 [ChatGPT 옆에 띄우기] 단추(글자 그대로)', (await btn.isVisible()) && (await btn.getAttribute('aria-label')).includes('ChatGPT') && (await btn.innerText()).includes('ChatGPT 옆에 띄우기') && btnBox.x < 300 && btnBox.y > 600, btnBox)
+const spot0 = await page.getByTestId('side-ai-corner').getAttribute('data-spot')
+check(`S1 PC 본문 오른쪽 위에 [ChatGPT 옆에 띄우기](글자 그대로 · 왼쪽 메뉴에는 없음 · 1440 은 맨 위 줄 오른쪽 ${spot0})`, (await btn.isVisible()) && (await btn.getAttribute('aria-label')).includes('ChatGPT') && (await btn.innerText()).includes('ChatGPT 옆에 띄우기') && btnBox.x > 1000 && btnBox.x + btnBox.width >= 1440 - 80 && btnBox.y < 140 && spot0 === 'inline' && (await page.locator('aside [data-testid="side-ai-button"]').count()) === 0, btnBox)
 await btn.click()
 const panel = page.getByTestId('side-ai-panel')
 await panel.waitFor()
@@ -74,6 +80,10 @@ const services = await page.getByTestId('side-ai-service').evaluateAll((els) => 
 const widths = await page.getByTestId('side-ai-width').evaluateAll((els) => els.map((e) => `${e.dataset.id}:${e.getAttribute('aria-checked')}`))
 const sites = await page.getByTestId('side-ai-site').evaluateAll((els) => els.map((e) => e.dataset.id))
 check('S2 판 — 넷(ChatGPT 기본 · Claude · Gemini · Google) · 폭 셋(보통 기본) · 주소 칸 · 바로 가기 넷 · 열기 · OS 왼쪽 창 · 단축키 안내', services.join() === 'chatgpt:true,claude:false,gemini:false,google:false' && (await page.getByTestId('side-ai-address').count()) === 1 && sites.join() === 'naver,bizinfo,kstartup,hometax' && widths.join() === 'third:false,twofifths:true,half:false' && (await page.getByTestId('side-ai-open').count()) === 1 && (await page.getByTestId('side-ai-os-left').count()) === 1 && (await panel.innerText()).includes('Win+'), { services, widths, sites })
+{
+  const pb0 = await panel.boundingBox()
+  check('S2b 판은 단추 바로 아래 · 오른쪽 끝을 단추에 맞춤 · 화면 안', pb0 && pb0.y >= btnBox.y + btnBox.height && pb0.y <= btnBox.y + btnBox.height + 16 && Math.abs(pb0.x + pb0.width - (btnBox.x + btnBox.width)) <= 2 && pb0.x >= 0 && pb0.y + pb0.height <= 900, { pb0, btnBox })
+}
 await shot(page, 'S2-panel')
 
 // 옆 창을 어디에 열라고 했는지 적어 둔다(머리 없는 브라우저는 창 자리를 따르지 않아 창에서 못 잰다)
@@ -145,10 +155,30 @@ await page.getByTestId('side-ai-close').click()
 await page.waitForTimeout(400)
 check('S5a [닫기] → 창 닫힘 · 비킨 여백 0', popup.isClosed() && (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
 
+// D-265 도우미 — 비킨 폭 · 본문 가운데 · 옆 창 왼쪽 끝에서 마우스가 이 화면을 나감(창 겹침은 머리 없는 브라우저에서 못 만들어 사건만 보낸다)
+const reserveNow = async () => Number((await page.locator('[data-side-reserve]').getAttribute('data-side-reserve', { timeout: 300 }).catch(() => '0')) ?? 0)
+const centered = () =>
+  page.evaluate(() => {
+    const m = document.querySelector('main').getBoundingClientRect()
+    const col = document.querySelector('main').parentElement.getBoundingClientRect()
+    return Math.abs(m.left - col.left - (col.right - m.right)) <= 2
+  })
+const leaveAt = (x, y) => page.evaluate(([cx, cy]) => document.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: cx, clientY: cy, relatedTarget: null })), [x, y])
+
 // 연결을 끊지 않는 곳(네이버)을 열어 두었다가 사용자가 직접 닫음 — 연 지 3초가 지나 닫으면 진짜 닫힌 것
 const [popup2] = await Promise.all([ctx.waitForEvent('page'), page.locator('[data-testid="side-ai-site"][data-id="naver"]').click()])
 await popup2.waitForLoadState()
 await page.waitForTimeout(3500)
+{
+  // D-265 끊지 않는 창도 — 비켜 준 자리에 마우스(창이 뒤로 감) → 가운데 · 그 창이 다시 보이면(왼쪽 끝에서 마우스가 나감) 다시 비킴
+  const r0 = await reserveNow()
+  await page.mouse.move(1440 - r0 / 2, 520)
+  await page.waitForTimeout(250)
+  const away = { reserve: await reserveNow(), open: await btn.getAttribute('data-open'), centered: await centered() }
+  await leaveAt(1440 - r0 + 3, 520)
+  await page.waitForTimeout(250)
+  check(`S5k 네이버 옆 창(${r0}px)이 그 자리에 없으면(마우스가 그 자리로) 가운데 · 단추 원래대로 → 다시 보이면 ${await reserveNow()}px 다시 비킴 · 단추 '열림'`, r0 > 0 && away.reserve === 0 && away.open === '0' && away.centered && (await reserveNow()) === r0 && (await btn.getAttribute('data-open')) === '1', { r0, away })
+}
 await popup2.close()
 await page.waitForTimeout(1800)
 check('S5b 사용자가 옆 창을 직접 닫아도 → 여백 0 · 단추 원래대로', (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
@@ -161,6 +191,34 @@ await page.waitForTimeout(3500)
 const cutReserve = Number((await page.locator('[data-side-reserve]').getAttribute('data-side-reserve').catch(() => '0')) ?? 0)
 check(`S5c AI 사이트가 연결을 끊어도(COOP · ChatGPT · Claude 실측과 같게) 3.5초 뒤에도 본문이 ${cutReserve}px 비킨 그대로 · 단추 '열림' · [앞으로] 대신 안내 · [원래대로]`, cutReserve > 0 && (await btn.getAttribute('data-open')) === '1' && (await page.getByTestId('side-ai-cut-note').isVisible()) && (await page.getByTestId('side-ai-front').count()) === 0 && (await page.getByTestId('side-ai-close').innerText()).includes('원래대로'), { cutReserve })
 await shot(page, 'S5c-cut')
+{
+  // D-265 마우스로 안다 — 본문 안 · 끄는 중은 그대로, 비켜 준 자리에 오면 가운데
+  await page.mouse.move(300, 500)
+  await page.mouse.move(1440 - cutReserve - 60, 520)
+  await page.waitForTimeout(250)
+  check('S5f 본문 안(옆 창 왼쪽)에서 마우스를 움직여도 비킨 그대로', (await reserveNow()) === cutReserve)
+  const ph = await page.getByTestId('side-ai-panel').locator('p').first().boundingBox()
+  await page.mouse.move(ph.x + 10, ph.y + 5)
+  await page.mouse.down()
+  await page.mouse.move(1440 - cutReserve / 2, 520, { steps: 5 })
+  await page.waitForTimeout(250)
+  const whileDrag = await reserveNow()
+  await page.mouse.up()
+  await page.waitForTimeout(150)
+  check('S5g 단추를 누른 채 끄는 중(이 화면이 마우스를 잡고 있음)에는 옆 창 자리로 가도 그대로', whileDrag === cutReserve && (await reserveNow()) === cutReserve, { whileDrag })
+  await page.mouse.move(1440 - cutReserve / 2, 560)
+  await page.waitForTimeout(300)
+  check(`S5h AI 사이트 창(끊는 곳)을 닫고 마우스가 그 자리로 오면 → 비킨 자리 0 · 본문 가운데 · 단추 'ChatGPT 옆에 띄우기'`, (await reserveNow()) === 0 && (await centered()) && (await btn.getAttribute('data-open')) === '0' && (await btn.innerText()).includes('옆에 띄우기'), { reserve: await reserveNow() })
+  await shot(page, 'S5h-centered')
+  // 바깥(머리줄 · 화면 끝)으로 나간 것은 창이 다시 보인 것이 아니다
+  await leaveAt(1440 - cutReserve + 3, 30)
+  await leaveAt(1435, 520)
+  await page.waitForTimeout(200)
+  const stay0 = await reserveNow()
+  await leaveAt(1440 - cutReserve + 3, 520)
+  await page.waitForTimeout(250)
+  check(`S5i 머리줄 · 화면 끝으로 나간 것은 그대로(${stay0}) · 옆 창 왼쪽 끝에서 나감(창이 다시 보임) → 다시 ${await reserveNow()}px 비킴 · 단추 '열림' · 끊긴 창 안내`, stay0 === 0 && (await reserveNow()) === cutReserve && (await btn.getAttribute('data-open')) === '1' && (await page.getByTestId('side-ai-cut-note').isVisible()), { stay0 })
+}
 // 끊긴 창은 OS 가 다시 잡지 못한다 — 서비스(OS 안 대화용) · 폭을 바꿔도 새 창을 또 열지 않고 고른 것만 기억
 const cutSvc = await page.locator('[data-testid="side-ai-service"][aria-checked="true"]').getAttribute('data-id')
 const opensBefore = await page.evaluate(() => window.__opens.length)
@@ -174,6 +232,9 @@ await page.locator('[data-testid="side-ai-width"][data-id="twofifths"]').click()
 await page.getByTestId('side-ai-close').click()
 await page.waitForTimeout(300)
 check('S5d [원래대로] → 비킨 자리 0 · 단추 원래대로', (await page.locator('[data-side-reserve]').count()) === 0 && (await btn.getAttribute('data-open')) === '0')
+await leaveAt(1440 - cutReserve + 3, 520)
+await page.waitForTimeout(250)
+check('S5j [원래대로] 를 누른 뒤에는 옆 창 끝에서 마우스가 나가도 다시 비키지 않음', (await reserveNow()) === 0 && (await centered()))
 await popup3.close().catch(() => {})
 coop = false
 
@@ -209,7 +270,8 @@ await page.getByRole('button', { name: '사이드바 접기' }).click()
 await page.waitForTimeout(400)
 await page.getByTestId('side-ai-button').click()
 const pb = await page.getByTestId('side-ai-panel').boundingBox()
-check('S11 메뉴를 접어도 아이콘 단추 · 판이 화면 안에 열림', (await page.getByTestId('side-ai-button').innerText()).trim() === '' && pb && pb.x >= 0 && pb.y >= 0 && pb.x + pb.width <= 1440 && pb.y + pb.height <= 900, pb)
+const bb11 = await page.getByTestId('side-ai-button').boundingBox()
+check('S11 메뉴를 접어도 단추는 오른쪽 위 글자 그대로 · 판은 단추 아래 화면 안', (await page.getByTestId('side-ai-button').innerText()).includes('옆에 띄우기') && bb11.x + bb11.width >= 1440 - 100 && bb11.y < 140 && pb && pb.x >= 0 && pb.y >= bb11.y + bb11.height && pb.x + pb.width <= 1440 && pb.y + pb.height <= 900, { pb, bb11 })
 await shot(page, 'S11-collapsed')
 await page.keyboard.press('Escape')
 await page.getByRole('button', { name: '사이드바 펼치기' }).click()
@@ -238,7 +300,7 @@ const r2 = { w1, mode: await mode(), btn: await page.getByTestId('side-ai-button
 check(`R2 끌어 넓히기 → ${w1}px(360 근처) · 메뉴 이름 그대로 · 머리줄 · 화면 넘침 0(자리가 모자라면 넓은 찾기 칸부터 단추로 · 지금 단계 ${r2.fit})`, Math.abs(w1 - 360) <= 3 && r2.mode === 'full' && r2.btn.includes('옆에 띄우기') && r2.over <= 0 && r2.hdr <= 0, r2)
 await shot(page, 'R2-wide')
 await drag(100)
-check('R3 왼쪽으로(150px 안) → 아이콘만(80px) · 단추 글자 없음', (await asideW()) === 80 && (await mode()) === 'icons' && (await page.getByTestId('side-ai-button').innerText()).trim() === '', await asideW())
+check('R3 왼쪽으로(150px 안) → 아이콘만(80px) · 옆 창 단추는 본문 오른쪽 위라 글자 그대로', (await asideW()) === 80 && (await mode()) === 'icons' && (await page.getByTestId('side-ai-button').innerText()).includes('옆에 띄우기'), await asideW())
 await drag(8)
 const navLinks = await page.getByRole('navigation', { name: '주 메뉴' }).count()
 check('R4 왼쪽 끝까지 → 메뉴 사라짐(0px) · 왼쪽 끝 [메뉴 다시 보이기] 탭 · 넘침 0', (await asideW()) === 0 && (await mode()) === 'hidden' && navLinks === 0 && (await page.getByTestId('nav-show').isVisible()) && (await pageOver()) <= 0, { w: await asideW(), navLinks })
@@ -271,7 +333,8 @@ await drag(300)
 check('R9 숨긴 뒤 왼쪽 끝 경계선을 끌어 바로 꺼내기(300px)', hidW === 0 && Math.abs((await asideW()) - 300) <= 3 && (await mode()) === 'full', { hidW, w: await asideW() })
 await page.getByTestId('side-ai-button').click()
 const pb2 = await page.getByTestId('side-ai-panel').boundingBox()
-check('R10 넓힌 메뉴에서도 옆 창 판이 메뉴 오른쪽 · 화면 안', pb2 && pb2.x >= 300 && pb2.x + pb2.width <= 1440 && pb2.y >= 0, pb2)
+const bb2 = await page.getByTestId('side-ai-button').boundingBox()
+check('R10 넓힌 메뉴에서도 옆 창 판이 메뉴 오른쪽 · 단추 아래 · 화면 안', pb2 && pb2.x >= 300 && pb2.x + pb2.width <= 1440 && pb2.y >= bb2.y + bb2.height, { pb2, bb2 })
 await page.keyboard.press('Escape')
 await handle.dblclick()
 check('PC JS 오류 0', errors.length === 0, errors.join(' | '))
@@ -506,7 +569,7 @@ await ctx.close()
   await mc.close()
 }
 
-// 머리줄은 그대로 — 단추를 메뉴로 옮긴 까닭(머리줄에 두면 1024 · 1440 · 1600 · 1900 에서 넘쳤다)
+// 머리줄은 그대로(머리줄에 두면 1024 · 1440 · 1600 · 1900 에서 넘쳤다) · D-265 단추는 오른쪽 여백에 들어가면 여백, 아니면 맨 위 줄 오른쪽
 const hdr = []
 for (const width of [1024, 1440, 1600, 1920, 2300]) {
   const c = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR' })
@@ -520,10 +583,23 @@ for (const width of [1024, 1440, 1600, 1920, 2300]) {
     return { hdr: h.scrollWidth - h.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, fit: h.dataset.fit }
   })
   const vis = await p.getByTestId('side-ai-button').isVisible()
-  hdr.push({ width, ...r, vis })
+  const spot = await p.getByTestId('side-ai-corner').getAttribute('data-spot')
+  const g = await p.evaluate(() => {
+    const b = document.querySelector('[data-testid="side-ai-button"]').getBoundingClientRect()
+    const m = document.querySelector('main')
+    const textRight = m.getBoundingClientRect().right - parseFloat(getComputedStyle(m).paddingRight)
+    return { gap: Math.round(b.left - textRight), right: Math.round(b.right), top: Math.round(b.top), cw: document.querySelector('main').parentElement.getBoundingClientRect().right }
+  })
+  // 화면 고정 — 굴려도 그 자리
+  await p.mouse.wheel(0, 600)
+  await p.waitForTimeout(300)
+  const topAfter = Math.round((await p.getByTestId('side-ai-button').boundingBox()).y)
+  hdr.push({ width, ...r, vis, spot, ...g, topAfter })
+  if (width === 1920) await shot(p, 'S10-1920-margin')
   await c.close()
 }
-check('S10 머리줄 넘침 0 · 화면 넘침 0 · 단추는 어느 폭에서나 메뉴에 보임 · 메뉴 기본 폭이면 머리줄에서 빼는 것 없음(1024 · 1440 · 1600 · 1920 · 2300)', hdr.every((h) => h.hdr <= 0 && h.page <= 0 && h.vis && h.fit === '0'), hdr)
+check('S10 머리줄 넘침 0 · 화면 넘침 0 · 단추는 어느 폭에서나 보임 · 메뉴 기본 폭이면 머리줄에서 빼는 것 없음(1024 · 1440 · 1600 · 1920 · 2300)', hdr.every((h) => h.hdr <= 0 && h.page <= 0 && h.vis && h.fit === '0'), hdr)
+check('S10b 1024 · 1440 · 1600 은 맨 위 줄 오른쪽 · 1920 · 2300 은 오른쪽 여백(본문 글과 12px 넘게 떨어짐 · 화면 안 · 굴려도 그 자리)', hdr.map((h) => h.spot).join() === 'inline,inline,inline,margin,margin' && hdr.filter((h) => h.spot === 'margin').every((h) => h.gap >= 12 && h.right <= h.cw && h.topAfter === h.top), hdr.map((h) => ({ w: h.width, spot: h.spot, gap: h.gap, top: h.top, topAfter: h.topAfter })))
 
 // 노트북(1024) — 메뉴를 끝까지 넓혀도 본문 768px 남김(예전 폭 256 까지) · 큰 화면에서 넓혀 둔 440 도 줄여 보임
 {

@@ -4,19 +4,22 @@
  *   옆 창의 주소창은 브라우저가 고칠 수 없게 막아 두므로 여기서 바꾼다. 바로 가기: 네이버 · 기업마당 · K-Startup · 홈택스.
  * D-254 [ChatGPT 옆에 띄우기] — 누르면 작은 판: 어느 AI(ChatGPT · Claude · Gemini) · 폭 3단계 · 옆에 열기 · 앞으로 · 닫기 ·
  * OS 도 왼쪽 창으로 · 팝업이 막혔을 때 푸는 법 · 창 정리 단축키. PC 에서만(휴대폰은 앱을 오가는 편이 빠르다).
- * 자리는 왼쪽 메뉴 맨 아래 — 머리줄은 이미 꽉 차 1024 · 1440 · 1600 · 1900px 에서 옆으로 넘쳤다(실측). 메뉴를 접으면 아이콘만.
- * 판은 메뉴 오른쪽에 화면 고정(메뉴 칸이 잘라 먹지 않게). 보기 무대(iframe) 안에서는 숨긴다(바깥에 하나만).
+ * D-265 자리는 본문 오른쪽 위 — 대표: "왼쪽 메뉴 맨 아래보다 PC 기준 우측 상단 여백에".
+ *   본문 오른쪽 여백에 단추가 들어가면 그 여백에 화면 고정(굴려도 그 자리) · 모자라면 본문 맨 위 줄(경로 줄) 오른쪽.
+ *   옆 창 · 오른쪽 판이 열리면 그 왼쪽으로 따라온다. 머리줄은 이미 꽉 차 넣지 않는다(D-254 실측 — 1024 · 1440 · 1600 · 1900 에서 넘쳤다).
+ * 판은 단추 아래에 화면 고정(오른쪽 끝을 단추에 맞춤). 보기 무대(iframe) 안에서는 숨긴다(바깥에 하나만).
  * D-261 대표: "옆에 열기 누르면 그 안에서 떴으면 · 새 창 말고". ChatGPT · Claude · Gemini 사이트는 그 회사가 다른 화면 안에 넣지 못하게
  *   막아 두어(브라우저가 지킨다) 사이트 그대로는 옆 창으로만 열린다. 그래서 맨 위에서 AI 를 고르면
  *   ① [OS 안에서 이 AI 로 대화] — 같은 회사 모델(GPT · Claude · Gemini)로 OS 안 오른쪽 판에서 묻고 답한다(새 창 없음)
  *   ② [사이트 그대로 옆 창] — 로그인 · 대화 기록이 필요할 때. 끊긴 창(cut)이면 [원래대로] 로 자리를 되돌린다.
+ *   D-265 끊긴 창도 닫으면 비켜 준 자리에 마우스가 오는 순간 가운데로 돌아온다(lib/sideAi) — [원래대로] 는 바로 돌리고 싶을 때.
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { closeDock, openDock, useDock } from '../../lib/sideDock'
-import { SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
+import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
 import { allowedProviders, readChoice, saveChoice } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
@@ -25,11 +28,31 @@ import { useToast } from '../ui/toastContext'
 const PROVIDER_OF: Partial<Record<SideService, ProviderId>> = { chatgpt: 'openai', claude: 'anthropic', gemini: 'gemini' }
 const MODEL_NAME: Partial<Record<SideService, string>> = { chatgpt: 'GPT', claude: 'Claude', gemini: 'Gemini' }
 
-export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
+/**
+ * D-265 단추 자리 재기 — 본문 글 오른쪽 끝 · 쓸 수 있는 오른쪽 끝(본문 칸 안쪽 끝 · 오른쪽 판 왼쪽) · 머리줄 아래 끝.
+ * 본문 칸의 오른쪽 여백(padding)에는 옆 창 · 붙인 판 몫이 들어 있다. 덮어 띄운 판은 그 왼쪽 끝까지.
+ */
+function measureCorner(btnW: number): { spot: 'margin' | 'inline'; left: number; top: number } {
+  const main = document.querySelector('main')
+  const col = main?.parentElement
+  if (!main || !col) return { spot: 'inline', left: 0, top: 0 }
+  const m = main.getBoundingClientRect()
+  const textRight = m.right - (parseFloat(getComputedStyle(main).paddingRight) || 0)
+  let limit = col.getBoundingClientRect().right - (parseFloat(getComputedStyle(col).paddingRight) || 0)
+  const dockEl = document.querySelector('[data-testid="side-dock"]')
+  if (dockEl) limit = Math.min(limit, dockEl.getBoundingClientRect().left)
+  const header = document.querySelector('header')
+  const top = Math.round((header?.getBoundingClientRect().bottom ?? 64) + 20)
+  // 화면 고정 자리는 왼쪽에서 잰다 — 오른쪽 기준은 스크롤 막대 자리(약 15px)만큼 어긋났다(실측)
+  return { spot: cornerSpot(limit, textRight, btnW), left: Math.round(limit - CORNER_GAP - btnW), top }
+}
+
+export function SideAiButton() {
   const s = useSideAi()
   const dock = useDock()
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState<CSSProperties>({})
+  const [corner, setCorner] = useState<{ spot: 'margin' | 'inline'; left: number; top: number }>({ spot: 'inline', left: 0, top: 0 })
   const [osOpened, setOsOpened] = useState(false)
   const [addr, setAddr] = useState('')
   const box = useRef<HTMLDivElement>(null)
@@ -60,18 +83,46 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
     openDock('chat')
     setOpen(false)
   }
-  const toggle = () => {
+  // D-265 판은 단추 바로 아래 · 오른쪽 끝을 단추에 맞춤 · 아래로는 화면 안까지만(넘치면 판 안에서 굴린다)
+  const placePanel = useCallback(() => {
     const r = btn.current?.getBoundingClientRect()
-    if (r) {
-      const w = Math.min(384, window.innerWidth - 16)
-      // 메뉴 칸 오른쪽 끝에서 띄운다(단추 끝이 아니라 — 판이 메뉴 경계에 걸치지 않게)
-      const edge = box.current?.closest('aside')?.getBoundingClientRect().right ?? r.right
-      // 아래 끝은 단추 끝에 맞추고, 위로는 화면 안까지만(넘치면 판 안에서 굴린다)
-      const bottom = Math.max(8, window.innerHeight - r.bottom)
-      setAt({ left: Math.max(8, Math.min(edge + 8, window.innerWidth - w - 8)), bottom, width: w, maxHeight: window.innerHeight - bottom - 8 })
-    }
+    if (!r) return
+    const w = Math.min(384, window.innerWidth - 16)
+    const top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - 248))
+    setAt({ left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)), top, width: w, maxHeight: window.innerHeight - top - 8 })
+  }, [])
+  const toggle = () => {
+    placePanel()
     setOpen((v) => !v)
   }
+  const label = s.open ? `${s.at || SIDE_SERVICES[s.service].label} 옆 창 열림` : `${SIDE_SERVICES[s.service].label} 옆에 띄우기`
+  // 단추 자리 — 창 크기 · 메뉴 폭 · 본문 폭 · 옆 창 · 오른쪽 판 · 단추 글이 바뀔 때마다 다시 잰다
+  const remeasure = useCallback(() => {
+    const w = btn.current?.offsetWidth ?? 0
+    if (!w) return
+    const next = measureCorner(w)
+    setCorner((c) => (c.spot === next.spot && c.left === next.left && c.top === next.top ? c : next))
+  }, [])
+  useLayoutEffect(() => {
+    remeasure()
+  }, [remeasure, label, s.reserve, dock.open, dock.width])
+  useEffect(() => {
+    const main = document.querySelector('main')
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => remeasure())
+    if (main && ro) {
+      ro.observe(main)
+      if (main.parentElement) ro.observe(main.parentElement)
+    }
+    window.addEventListener('resize', remeasure)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', remeasure)
+    }
+  }, [remeasure])
+  // 판이 열린 채 옆 창 · 오른쪽 판 · 자리가 바뀌면 판도 단추를 따라간다(옆 창 밑에 깔리지 않게)
+  useLayoutEffect(() => {
+    if (open) placePanel()
+  }, [open, placePanel, corner, s.reserve, dock.open, dock.width])
   useEffect(() => {
     if (!open) return
     const away = (e: PointerEvent) => {
@@ -91,8 +142,15 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
   if (inFrame()) return null
   const name = SIDE_SERVICES[s.service].label
   const shown = s.at || name
+  const inMargin = corner.spot === 'margin'
   return (
-    <div ref={box}>
+    <div
+      ref={box}
+      className={`no-print hidden lg:block ${inMargin ? 'fixed z-20' : 'mb-3 shrink-0 lg:mb-4'}`}
+      style={inMargin ? { top: corner.top, left: corner.left } : undefined}
+      data-testid="side-ai-corner"
+      data-spot={corner.spot}
+    >
       <button
         ref={btn}
         type="button"
@@ -102,10 +160,10 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
         title={`${name} 옆에 띄우기 — OS 를 보면서 오른쪽에 AI 창`}
         data-testid="side-ai-button"
         data-open={s.open ? '1' : '0'}
-        className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) border py-2 text-[0.9rem] font-semibold ${collapsed ? 'justify-center px-0' : 'px-3'} ${s.open ? 'border-violet-500 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-400/40 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25'}`}
+        className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3 py-2 text-[0.9rem] font-semibold whitespace-nowrap shadow-(--shadow-card) ${s.open ? 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-white text-violet-800 hover:bg-violet-50'}`}
       >
         <PanelRight aria-hidden="true" className="size-[18px] shrink-0" />
-        {!collapsed && <span className="min-w-0 truncate">{s.open ? `${shown} 옆 창 열림` : `${name} 옆에 띄우기`}</span>}
+        <span>{label}</span>
       </button>
       {/* D-258 판은 body 에 — 메뉴 칸(sticky z-30) 안에 두면 머리줄(z-30)이 판 윗부분을 덮었다(실측) */}
       {open && createPortal(
@@ -215,7 +273,7 @@ export function SideAiButton({ collapsed = false }: { collapsed?: boolean }) {
             </div>
             {s.cut && (
               <p className="t-meta break-keep text-slate-600" data-testid="side-ai-cut-note">
-                {shown} 창은 OS 가 볼 수 없게 막혀 있어 닫혀도 모릅니다 — 다 쓰셨으면 그 창의 X 로 닫고 <b>원래대로</b>를 눌러 주세요.
+                {shown} 창을 X 로 닫으면 마우스가 그 자리로 오는 순간 화면이 가운데로 돌아와요. 바로 돌리려면 <b>원래대로</b>.
               </p>
             )}
           </div>

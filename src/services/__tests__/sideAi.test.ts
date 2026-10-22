@@ -4,7 +4,7 @@
  * D-258 OS 안 오른쪽 판 — 안에 띄울 수 있는 곳 · Google igu · 놓는 법(붙이기 · 덮기 · 없음) · 기억 · 대화 기록.
  * D-261 옆 창 자리(이 OS 창 안 · 머리줄 아래) · 연결을 끊는 곳(ChatGPT 등)을 닫힘으로 오해하지 않기.
  */
-import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, cutsOpener, featuresOf, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
+import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, atSideEdge, cornerSpot, cutsOpener, featuresOf, inVacated, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
 import { NAV_ICONS, NAV_MAX, NAV_MIN, navMaxFor, navPx, parseNavSize, sizeAtDrag, stepNav, type NavSize } from '../../lib/navWidth'
 import { DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockChatContext, dockLayout, frameUrlOf, parseDock, parseDockChat } from '../../lib/sideDock'
 
@@ -133,6 +133,22 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   const rp = sideRectIn(panel, FHD, 'twofifths', 64)
   check('C9 크롬 옆 패널로 안쪽만 좁아짐(높이는 그대로) — 확대로 보지 않음 · 테두리로도 보지 않음',
     zoomOf(panel) === 1 && zoomOf({ outerWidth: 1216, innerWidth: 1200 }) === 1 && rp.left === 1152 && rp.top === 151 && reserveFor(panel, rp) === 768, { rp })
+}
+
+// D-265 닫으면 가운데로 — 비켜 준 자리에서 마우스를 받으면 그 창은 거기 없다 · 옆 창 끝에서 나가면 다시 보인다
+{
+  // 1920 창 · 옆 창 768(본문 여백 768) · 머리줄 아래 64
+  check('V1 비켜 준 자리 안(테두리 24px · 머리줄 6px 안쪽부터) → 옆 창 없음',
+    inVacated({ x: 1500, y: 500 }, 1920, 768, 64) && inVacated({ x: 1152 + 24, y: 70 }, 1920, 768, 64) && inVacated({ x: 1919, y: 1000 }, 1920, 768, 64))
+  check('V2 본문 쪽 · 옆 창 테두리 근처(24px 안) · 머리줄 · 비킨 자리 없음 → 그대로',
+    !inVacated({ x: 1100, y: 500 }, 1920, 768, 64) && !inVacated({ x: 1152 + 10, y: 500 }, 1920, 768, 64) && !inVacated({ x: 1500, y: 40 }, 1920, 768, 64) && !inVacated({ x: 1500, y: 500 }, 1920, 0, 64))
+  check('V3 옆 창 왼쪽 끝(±48) · 화면 안쪽에서 나가거나 들어옴 → 다시 보임',
+    atSideEdge({ x: 1155, y: 500 }, 1920, 1040, 768, 64) && atSideEdge({ x: 1152 - 40, y: 500 }, 1920, 1040, 768, 64))
+  check('V4 화면 끝 · 머리줄 · 아래 끝 · 옆 창 끝에서 먼 곳 · 기억한 자리 없음 → 아님',
+    !atSideEdge({ x: 1915, y: 500 }, 1920, 1040, 768, 64) && !atSideEdge({ x: 1155, y: 50 }, 1920, 1040, 768, 64) && !atSideEdge({ x: 1155, y: 1035 }, 1920, 1040, 768, 64) && !atSideEdge({ x: 900, y: 500 }, 1920, 1040, 768, 64) && !atSideEdge({ x: 1155, y: 500 }, 1920, 1040, 0, 64))
+  // 단추 자리 — 1920 · 메뉴 288 · 본문 1280(안쪽 여백 56) · 스크롤 막대 15: 쓸 수 있는 끝 1905 · 본문 글 끝 1681 · 단추 194
+  check('V5 단추 자리 — 1920 은 오른쪽 여백(194px 이 양쪽 12px 띄우고 들어감) · 1440 은 맨 위 줄 · 단추 폭을 못 재면 맨 위 줄',
+    cornerSpot(1905, 1681, 194) === 'margin' && cornerSpot(1425, 1385, 194) === 'inline' && cornerSpot(1905, 1681, 0) === 'inline' && cornerSpot(1905, 1681, 201) === 'inline')
 }
 
 console.log(`\nsideAi: ${pass} passed, ${fail} failed`)
