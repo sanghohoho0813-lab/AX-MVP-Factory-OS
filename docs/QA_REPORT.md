@@ -3670,3 +3670,15 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main a074535 → **e10e827**(fast-forward · 10:09 UTC) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(e10e827 · Production) · 새 묶음 index-Dr4QTop6.js 에 단추 새 자리(side-ai-corner) · 끊긴 창 안내 '마우스가 그 자리로 오는 순간' 있음.
 - 확인하지 못한 것: 실제 Windows · Chrome 에서 진짜 ChatGPT 창을 닫았을 때(이 상자의 브라우저는 창이 겹치지 않아 마우스 사건으로만 흉내 냄) · 대표 모니터 실제 폭에서의 단추 자리(1920 이상이면 여백).
+
+## §183 D-266 압축(.zip) 풀기 · 한글(.hwp · .hwpx) · 워드(.docx) 글 읽기 — 게이트 · 병합 · Production (2026-10-22)
+
+- **게이트 62단계 — 62/62 녹색**(HEAD 7bdd18e · dirty 0 · 실패 0). 이번 것에 걸린 숫자: 단위 test:office-docs 36(새) · test:patent 67 · test:specdraft 91(zip 읽기를 같이 씀) · test:all 전체 /
+  e2e qa:detail 329(Z1~Z10 새 10 — 압축 하나 → 서류 3개 · '스캔0003.hwp' → 사업자등록증 칸 · 한글 표에서 사업자번호 · 설립일 · 주소 · hwpx → 주주명부 · docx → 정관 · 폴더 '압축 이름/안의 폴더' · 암호 한글 까닭 · 꺼냄 표시 · 새 업체 등록 창).
+- **실제 문서 대조(저장소 밖 · 공개 한글 문서)** — .hwp 5건(각 약 330KB · 6만 자): 미리 뽑아 둔 기준 글 7,980줄 중 빠진 줄 0(빈칸 차이만) · 한 건 82~118ms(Node). 평가표 .hwp 1건 — 표 행이 탭으로 이어짐(눈으로 확인). 특허 명세서 .hwpx 3건 — 52~64ms.
+- **화면 사진** — PC 1440: 서류 탭 [한꺼번에 올리기] — 맨 위 '묶음.zip 에서 서류 1개를 꺼냈어요' · 암호 한글 줄의 까닭 · 바뀐 안내 글 / 새 업체 등록 창 — 압축 안 '스캔.hwp' 줄('새봄 서류.zip 안에서 꺼냄 · 사업자등록증 — 업체명 · 대표자 · 사업자등록번호 찾음') · 칸 셋 채워짐.
+  휴대폰 390: 같은 등록 창 — 가로 넘침 0.
+- **병합** — main 23d4f9f → **7bdd18e**(fast-forward · 13:23 UTC) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(7bdd18e · Production) · 새 묶음 index-B62A7ZVr.js · 한글 읽기('HWP Document File')는 docTextExtract 조각 · 압축 이름 CP949 읽기는 zip 조각 · '안에서 꺼냄' · '압축(zip)은 풀어서' 는 올리기 창 조각.
+- 확인하지 못한 것: 대표 · 고객이 실제로 보내는 한글 서류(사업자등록증 사본 · 주주명부 · 직원명부 .hwp)로 Production 에서 올려 본 결과(로그인 필요 — 시험 자료 · 공개 문서로만) ·
+  옛 엑셀(.xls) · 옛 워드(.doc) · .pptx 는 아직 이름으로만 · 한글 97 이전 파일 · 암호 걸린 압축(ZipCrypto · AES)은 열지 않음(원래 파일 그대로 올림).
