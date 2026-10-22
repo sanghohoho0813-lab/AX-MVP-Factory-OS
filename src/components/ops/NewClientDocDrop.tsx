@@ -16,6 +16,7 @@ import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
 import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadMethod } from '../../services/docAutoFill'
+import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
 import {
   NEW_CLIENT_FIELD_LABEL,
   guessNewClientFromDocs,
@@ -38,7 +39,7 @@ interface Item {
 }
 
 /** title · hint — 부르는 곳마다 다른 안내(D-255 AI 작업실은 서류함이 아니라 '자료' 로 들어간다) */
-export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증 · 크레탑 보고서 · 등기부등본 — 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
+export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증 · 크레탑 보고서 · 등기부등본 — PDF · 사진 · 한글 · 워드 · 압축(zip) 그대로 · 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
   const { showToast } = useToast()
   const [items, setItems] = useState<Item[]>([])
   const [cretop, setCretop] = useState<CretopCompanyLite[]>([])
@@ -123,10 +124,15 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
     }
   }
 
-  const addFiles = (list: File[]) => {
-    const picked = list.filter((f) => f.size > 0 && !isSystemFile(f))
-    const skipped = list.length - picked.length
+  const addFiles = async (list: File[]) => {
+    const kept = list.filter((f) => f.size > 0 && !isSystemFile(f))
+    const skipped = list.length - kept.length
     if (skipped > 0) showToast(`서류가 아닌 컴퓨터 파일 ${skipped}개(빈 파일 · Thumbs.db 같은 것)는 뺐습니다.`)
+    // D-266 압축(.zip)은 풀어 안의 서류를 하나씩(사업자등록증 · 등기부등본이 압축 안에 있어도 칸이 채워진다)
+    const { files: picked, notes: zipNotes } = await expandArchives(kept, MAX_FILES * 3)
+    const archived = archiveSummary(zipNotes)
+    if (archived) showToast(archived)
+    if (stoppedRef.current) return
     const room = MAX_FILES - itemsRef.current.length
     if (picked.length > room) showToast(`등록 창에서는 ${MAX_FILES}개까지 받아요 — 나머지는 업체를 연 뒤 [서류 올리기] 로 넣어 주세요.`)
     const fresh: Item[] = picked.slice(0, Math.max(0, room)).map((file) => ({
@@ -155,7 +161,7 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
     setOver(false)
     void filesFromDrop(e.dataTransfer).then(({ files, folders, capped }) => {
       if (folders > 0) showToast(`폴더 ${folders}개에서 파일 ${files.length}개를 찾았습니다${capped ? ` — 한 번에 ${DROP_FILE_LIMIT}개까지만 읽어요` : ''}.`)
-      addFiles(files)
+      return addFiles(files)
     })
   }
 
@@ -182,7 +188,7 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
         className="hidden"
         aria-label="등록할 업체 서류 고르기"
         onChange={(e) => {
-          addFiles(Array.from(e.target.files ?? []))
+          void addFiles(Array.from(e.target.files ?? []))
           e.target.value = ''
         }}
       />
@@ -213,6 +219,7 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.92rem] font-semibold text-slate-800">{it.file.name}</span>
+                  {archiveOf(it.file) && <span className="t-meta block truncate text-slate-500">{archiveOf(it.file)} 안에서 꺼냄</span>}
                   <span className="t-meta block break-keep text-slate-600" data-testid="new-client-doc-note">
                     {it.status !== 'done'
                       ? it.progress || '차례를 기다리는 중'

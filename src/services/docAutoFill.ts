@@ -18,7 +18,7 @@ import { factCandidatesFromDocText } from './docFacts'
 import { pendingFacts, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 
-export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'none'
+export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'none'
 
 export interface ReadDoc {
   key: DocumentKey

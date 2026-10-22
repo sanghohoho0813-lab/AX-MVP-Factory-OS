@@ -304,6 +304,78 @@ for (const width of [360, 390, 430]) {
   await ctx.close()
 }
 
+/* ---------------- D-266 압축(.zip) 하나에 한글(.hwp · .hwpx) · 워드(.docx) — 대충 올려도 알아서 ---------------- */
+{
+  const { makeHwp, makeHwpx, makeDocx, makeZip, CP949 } = await import(new URL('./fixtures/office.mjs', import.meta.url).href)
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae'))
+  // 이름으로는 무엇인지 모르는 파일들 — 글을 읽어야 칸을 안다
+  const BIZ = makeHwp({ lines: ['사 업 자 등 록 증', '(법인사업자)'], rows: [['등록번호', '124-81-00998'], ['법인명(단체명)', '미래바이오랩'], ['대표자', '이대표'], ['개업연월일', '2023 년 01 월 10 일'], ['사업장 소재지', '경기도 파주시 탄현면 평화로 3']] })
+  const SHARE = makeHwpx({ lines: ['주주명부', '회사명 : 미래바이오랩'], rows: [['성명', '주식 수', '지분율'], ['이대표', '6,000', '60%'], ['이배우', '4,000', '40%']] })
+  const ARTICLES = makeDocx({ lines: ['정 관', '제1장 총칙', '제1조(상호) 이 회사는 주식회사 미래바이오랩이라 한다.'] })
+  const zip = makeZip([
+    { name: '서류모음/', data: '' },
+    { name: new Uint8Array(CP949['서류모음/스캔0003.hwp']), data: BIZ, deflate: true },
+    { name: '서류모음/파일2.hwpx', data: SHARE, utf8: true },
+    { name: '서류모음/받은 파일.docx', data: ARTICLES, utf8: true, deflate: true },
+    { name: '__MACOSX/서류모음/._파일2.hwpx', data: 'mac', utf8: true },
+  ])
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([{ name: '미래바이오랩 서류.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) }])
+  const toast = await page.getByText(/미래바이오랩 서류\.zip 에서 서류 3개를 꺼냈어요/).first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+  check('Z1 압축 하나 → "서류 3개를 꺼냈어요"(맥 찌꺼기 파일 빼고)', toast)
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = (await page.getByTestId('smart-placed').innerText()) ?? ''
+  const r = await rec()
+  const labelOf = (x, key) => (x.customDocuments ?? []).find((d) => d.key === key)?.label ?? key
+  const filed = Object.entries(r.documents).filter(([, d]) => d.fileName).map(([k, d]) => `${labelOf(r, k)}=${d.fileName}`)
+  check('Z2 이름이 "스캔0003.hwp" 여도 한글 글을 읽어 사업자등록증 칸 · CP949 한글 이름 그대로', filed.includes('businessRegistration=스캔0003.hwp'), filed.join(' | '))
+  check('Z3 "파일2.hwpx" → 주주명부 칸 · "받은 파일.docx" → 정관 칸(글 제목으로)', filed.includes('주주명부=파일2.hwpx') && filed.includes('정관=받은 파일.docx'), filed.join(' | '))
+  check('Z4 서류함 3개 · 확인 필요 0(전부 글로 확실)', /서류함에 넣은 곳 3개/.test(placed) && !/확인 필요 [1-9]/.test(placed), placed.slice(0, 300))
+  check('Z5 한글 표에서 바로 입력 — 사업자번호 · 설립일 · 주소', r.businessNumber.replace(/\D/g, '') === '1248100998' && r.establishedAt === '2023-01-10' && r.businessAddress.includes('파주시'), JSON.stringify({ b: r.businessNumber, e: r.establishedAt, a: r.businessAddress }))
+  check('Z6 폴더 이름 남김 — "압축 이름/안의 폴더"', r.documents.businessRegistration?.folderPath === '미래바이오랩 서류/서류모음', r.documents.businessRegistration?.folderPath)
+  await page.keyboard.press('Escape').catch(() => {})
+  // 서류 탭 '한꺼번에 올리기' — 암호 걸린 한글 문서는 까닭을 보여 주고 이름으로 칸을 정한다
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  const LOCKED = makeHwp({ lines: ['비밀'], flags: 3 })
+  await page.getByLabel('서류 파일 고르기').setInputFiles([{ name: '용역계약서.hwp', mimeType: 'application/x-hwp', buffer: Buffer.from(LOCKED) }, { name: '묶음.zip', mimeType: 'application/zip', buffer: Buffer.from(makeZip([{ name: '정관.docx', data: ARTICLES, utf8: true }])) }])
+  await page.getByLabel('용역계약서.hwp 칸 고르기').waitFor({ timeout: 15000 })
+  await page.getByLabel('정관.docx 칸 고르기').waitFor({ timeout: 15000 })
+  await page.waitForTimeout(300)
+  const notes = await page.getByTestId('bulk-item-from').allInnerTexts()
+  check('Z7 암호 걸린 한글 문서 → "암호 … 파일 이름으로 칸을 정했어요"(멈추지 않음)', notes.some((t) => t.includes('암호') && t.includes('파일 이름으로')), notes)
+  check('Z8 압축에서 꺼낸 파일 줄에 "묶음.zip 안에서 꺼냄" · 위에 압축 알림 한 줄', notes.some((t) => t.includes('묶음.zip 안에서 꺼냄')) && ((await page.getByTestId('bulk-archive-note').innerText().catch(() => '')) ?? '').includes('묶음.zip 에서 서류 1개를 꺼냈어요'), notes)
+  const hint = (await page.getByRole('dialog').innerText()) ?? ''
+  check('Z9 안내 글 — 한글 · 워드는 내용을 읽고 압축은 풀어서', hint.includes('한글(hwp · hwpx)') && hint.includes('압축(zip)은 풀어서'))
+  if (process.env.D266_SHOTS) await page.screenshot({ path: `${process.env.D266_SHOTS}/bulk-zip-hwp.png` })
+  await page.getByTestId('bulk-discard').click().catch(() => {})
+  // 새 업체 등록 창 — 압축 안 한글 사업자등록증만 넣어도 업체명 · 대표자 · 사업자번호가 채워진다
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.getByTestId('clients-add').click()
+  const NEWBIZ = makeHwp({ lines: ['사업자등록증', '(법인사업자)'], rows: [['등록번호', '305-88-12340'], ['법인명(단체명)', '새봄바이오랩'], ['대표자', '박새봄'], ['개업연월일', '2024 년 05 월 20 일']] })
+  await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([{ name: '새봄 서류.zip', mimeType: 'application/zip', buffer: Buffer.from(makeZip([{ name: '새봄/스캔.hwp', data: NEWBIZ, utf8: true, deflate: true }])) }])
+  await page.getByTestId('new-client-from-doc-companyName').waitFor({ timeout: 20000 }).catch(() => {})
+  await page.waitForFunction(() => !document.querySelector('[data-testid="new-client-docs-reading"]'), null, { timeout: 20000 }).catch(() => {})
+  const val = (label) => page.locator('form').getByLabel(label, { exact: false }).first().inputValue()
+  const got = { name: await page.locator('form input[required]').first().inputValue(), ceo: await val('대표자·담당자'), biz: await val('사업자등록번호') }
+  const docList = (await page.getByTestId('new-client-docs-list').innerText().catch(() => '')) ?? ''
+  check('Z10 새 업체 등록 창 — 압축 안 한글 사업자등록증만으로 업체명 · 대표자 · 사업자번호 · "새봄 서류.zip 안에서 꺼냄"', got.name === '새봄바이오랩' && got.ceo === '박새봄' && got.biz === '305-88-12340' && docList.includes('스캔.hwp') && docList.includes('새봄 서류.zip 안에서 꺼냄'), { got, docList })
+  await page.screenshot({ path: process.env.D266_SHOTS ? `${process.env.D266_SHOTS}/new-client-zip.png` : '/tmp/claude-0/d266-new-client.png' })
+  await page.getByRole('button', { name: '취소' }).click().catch(() => {})
+  check('D-266 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- D-146 서류 분류 — 제목으로 칸 · 겹치면 번호 칸 · 지우기 · 다시 분류 ---------------- */
 for (const width of [1440, 390]) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })

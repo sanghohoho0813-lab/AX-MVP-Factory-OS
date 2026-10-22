@@ -27,6 +27,26 @@ export interface ZipEntry {
   name: string
   size: number
   method: number
+  /** D-266 암호가 걸린 항목(꺼낼 수 없음) */
+  encrypted?: boolean
+}
+
+/**
+ * D-266 파일 이름 — UTF-8 표시(플래그 11번)가 있으면 UTF-8, 없으면 UTF-8 로 읽어 보고 깨지면 CP949(EUC-KR).
+ * Windows 기본 압축 · 알집 · 반디집 옛 판은 한글 이름을 CP949 로 적는다(그대로 UTF-8 로 읽으면 '�' 투성이).
+ */
+const UTF8 = new TextDecoder('utf-8')
+function zipName(raw: Uint8Array, utf8: boolean): string {
+  if (utf8) return UTF8.decode(raw)
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(raw)
+  } catch {
+    try {
+      return new TextDecoder('euc-kr').decode(raw)
+    } catch {
+      return UTF8.decode(raw)
+    }
+  }
 }
 
 /** 목차만 읽는다(내용은 꺼내지 않음) */
@@ -43,11 +63,11 @@ export function zipEntries(bytes: Uint8Array): Array<ZipEntry & { localOffset: n
   const count = dv.getUint16(eocd + 10, true)
   const cdOff = dv.getUint32(eocd + 16, true)
   if (count > MAX_ENTRIES) throw new ZipError('파일 안에 든 것이 너무 많습니다.')
-  const dec = new TextDecoder('utf-8')
   const out: Array<ZipEntry & { localOffset: number; compSize: number }> = []
   let p = cdOff
   for (let n = 0; n < count; n++) {
     if (p + 46 > bytes.length || dv.getUint32(p, true) !== SIG_CEN) throw new ZipError('ZIP 목차가 깨졌습니다.')
+    const flags = dv.getUint16(p + 8, true)
     const method = dv.getUint16(p + 10, true)
     const compSize = dv.getUint32(p + 20, true)
     const size = dv.getUint32(p + 24, true)
@@ -55,16 +75,33 @@ export function zipEntries(bytes: Uint8Array): Array<ZipEntry & { localOffset: n
     const extraLen = dv.getUint16(p + 30, true)
     const commentLen = dv.getUint16(p + 32, true)
     const localOffset = dv.getUint32(p + 42, true)
-    const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen))
-    out.push({ name, size, method, localOffset, compSize })
+    const name = zipName(bytes.subarray(p + 46, p + 46 + nameLen), (flags & 0x800) !== 0)
+    out.push({ name, size, method, localOffset, compSize, encrypted: (flags & 1) !== 0 })
     p += 46 + nameLen + extraLen + commentLen
   }
   return out
 }
 
+/** D-266 항목 하나 꺼내기 — 크기 한도는 부르는 쪽이 목차(size)로 먼저 본다 */
+export async function readZipEntry(bytes: Uint8Array, e: ZipEntry & { localOffset: number; compSize: number }): Promise<Uint8Array> {
+  if (e.encrypted) throw new ZipError(`'${e.name}' 은(는) 암호가 걸려 있어 꺼낼 수 없습니다.`)
+  if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const lo = e.localOffset
+  if (lo + 30 > bytes.length || dv.getUint32(lo, true) !== SIG_LOC) throw new ZipError('ZIP 안의 파일 머리가 깨졌습니다.')
+  const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true)
+  const raw = bytes.subarray(start, start + e.compSize)
+  if (e.method === 0) return raw
+  if (e.method === 8) {
+    const data = await inflateRaw(raw)
+    if (data.length > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
+    return data
+  }
+  throw new ZipError(`지원하지 않는 압축 방식입니다(${e.method}).`)
+}
+
 /** 필요한 파일만 꺼낸다(filter 가 없으면 전부) */
 export async function unzip(bytes: Uint8Array, filter?: (name: string) => boolean): Promise<Map<string, Uint8Array>> {
-  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const files = new Map<string, Uint8Array>()
   let total = 0
   for (const e of zipEntries(bytes)) {
@@ -72,19 +109,15 @@ export async function unzip(bytes: Uint8Array, filter?: (name: string) => boolea
     if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
     total += e.size
     if (total > MAX_TOTAL) throw new ZipError('압축을 푼 크기가 너무 큽니다.')
-    const lo = e.localOffset
-    if (lo + 30 > bytes.length || dv.getUint32(lo, true) !== SIG_LOC) throw new ZipError('ZIP 안의 파일 머리가 깨졌습니다.')
-    const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true)
-    const raw = bytes.subarray(start, start + e.compSize)
-    if (e.method === 0) files.set(e.name, raw)
-    else if (e.method === 8) {
-      const data = await inflateRaw(raw)
-      if (data.length > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
-      files.set(e.name, data)
-    } else throw new ZipError(`지원하지 않는 압축 방식입니다(${e.method}).`)
+    files.set(e.name, await readZipEntry(bytes, e))
   }
   return files
 }
+
+/** D-266 압축을 푼 크기 한도(전체) — 압축 폭탄 막기 */
+export const ZIP_MAX_TOTAL = MAX_TOTAL
+/** D-266 압축(deflate-raw) 풀기 — 한글 파일(HWP) 본문도 같은 방식 */
+export { inflateRaw }
 
 /* ---------------- 쓰기(압축 안 함) ---------------- */
 

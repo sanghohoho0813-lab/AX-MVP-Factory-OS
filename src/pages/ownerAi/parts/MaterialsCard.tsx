@@ -1,5 +1,5 @@
 /**
- * 업체 자료 — 파일(PDF · 이미지 · 글 · 엑셀) · 홈페이지 주소 · 붙여넣은 글 · 메모 · 업체 서류함에서 가져오기.
+ * 업체 자료 — 파일(PDF · 이미지 · 글 · 엑셀 · D-266 한글 · 워드) · 홈페이지 주소 · 붙여넣은 글 · 메모 · 업체 서류함에서 가져오기.
  *  - 파일은 이 기기에서 글만 읽어 둔다(주민번호 · 비밀번호 · 키 · 계좌 · 휴대폰은 지운 뒤 저장). 원본 파일은 올리지 않는다
  *    — 같은 작업공간 보관함은 팀장도 열 수 있어서, 대표 전용 자료는 글로만 둔다.
  *  - 4대보험 명부 모양이면 'AI 에 보내지 않음' 으로 둔다(개인별 원문).
@@ -122,7 +122,7 @@ export function MaterialsCard({
           업체 서류함에서 가져오기
         </Button>
       )}
-      <input ref={fileRef} type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx" onChange={(e) => void onFiles(e.target.files)} data-testid="material-file-input" />
+      <input ref={fileRef} type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx,.hwp,.hwpx,.docx" onChange={(e) => void onFiles(e.target.files)} data-testid="material-file-input" />
       {reading && (
         <p className="t-sub flex items-center gap-2 text-slate-600" role="status">
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />

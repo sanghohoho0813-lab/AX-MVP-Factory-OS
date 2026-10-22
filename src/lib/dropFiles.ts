@@ -76,6 +76,11 @@ export async function filesFromDrop(dt: DataTransfer | null): Promise<{ files: F
   return { files: out, folders, capped: out.length >= DROP_FILE_LIMIT }
 }
 
+/** D-266 압축을 풀어 만든 파일의 원래 경로('서류모음/정관/정관.hwp') — 압축 파일 이름이 맨 앞 폴더가 된다 */
+export function setRelativePath(file: File, path: string): void {
+  RELATIVE.set(file, path.replace(/\\/g, '/').replace(/^\/+/, ''))
+}
+
 /** 파일의 원래 경로('비원미래/정관 개정/정관.pdf') — 폴더째 올린 게 아니면 '' */
 export function relativePathOf(file: File): string {
   const web = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? ''

@@ -28,6 +28,8 @@ import { analyzeUploadedDocs, withUploadSummary, type DocBatchSummary } from '..
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 import type { HandoffDoc } from '../../services/docHandoff'
+import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
+import { OfficeReadError } from '../../services/officeText'
 
 /** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
 function shortName(fileName: string): string {
@@ -55,6 +57,10 @@ interface Item {
   method: ReadMethod
   /** D-144: 사람이 칸을 직접 바꿨나 — 바꿨으면 서류 종류는 사람이 확인한 것 */
   manual: boolean
+  /** D-266 압축에서 꺼낸 파일이면 그 압축 이름 */
+  from: string
+  /** D-266 글자를 못 읽은 까닭(암호 걸린 한글 문서 등) — 그때는 파일 이름으로 칸을 정한다 */
+  readNote: string
 }
 
 export function BulkDocUploadSheet({
@@ -87,6 +93,8 @@ export function BulkDocUploadSheet({
   const [items, setItems] = useState<Item[]>([])
   const [busy, setBusy] = useState(false)
   const [autoNote, setAutoNote] = useState('')
+  /** D-266 압축을 푼 결과 한 줄 */
+  const [archiveNote, setArchiveNote] = useState('')
   /*
    * D-147: 무엇을 하는 중인가 — 읽는 중에 창을 닫으면 남은 파일을 올리지 않고 멈춘다.
    * 올리는 중에는 닫지 않는다(보관함에는 올라갔는데 업체 기록에 안 적힌 파일이 생긴다).
@@ -134,9 +142,17 @@ export function BulkDocUploadSheet({
     const given: HandoffDoc[] = input.map((x) => (x instanceof File ? { file: x } : x))
     const prereadOf = new Map(given.filter((g) => g.text !== undefined).map((g) => [g.file, g]))
     const files = given.map((g) => g.file)
-    const picked = files.filter((f) => f.size > 0 && !isSystemFile(f))
-    const skipped = files.length - picked.length
+    const kept = files.filter((f) => f.size > 0 && !isSystemFile(f))
+    const skipped = files.length - kept.length
     if (skipped > 0) showToast(`서류가 아닌 컴퓨터 파일 ${skipped}개(빈 파일 · Thumbs.db 같은 것)는 뺐습니다.`)
+    if (kept.length === 0) return
+    // D-266 압축(.zip)은 풀어 안의 서류를 하나씩 — 못 여는 압축은 그대로 두고 까닭을 알린다
+    const { files: picked, notes } = await expandArchives(kept)
+    const archived = archiveSummary(notes)
+    if (archived) {
+      setArchiveNote(archived)
+      showToast(archived)
+    }
     if (picked.length === 0) return
     stoppedRef.current = false
     setPhase('reading')
@@ -153,6 +169,8 @@ export function BulkDocUploadSheet({
       text: '',
       method: 'none',
       manual: false,
+      from: archiveOf(file),
+      readNote: '',
     }))
     setItems((list) => [...list, ...fresh])
     setBusy(true)
@@ -162,6 +180,7 @@ export function BulkDocUploadSheet({
       patch(it.id, { status: 'reading', progress: { ratio: 0, label: '읽는 중' } })
       let text = ''
       let method: ReadMethod = 'none'
+      let readNote = ''
       const pre = prereadOf.get(it.file)
       try {
         if (pre) {
@@ -172,15 +191,17 @@ export function BulkDocUploadSheet({
           text = res.text
           method = res.method
         }
-      } catch {
-        // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다
+      } catch (e) {
+        // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다(D-266 암호 · 배포용 한글 문서는 까닭을 보여 준다)
         text = ''
+        if (e instanceof OfficeReadError) readNote = `${e.message} 파일 이름으로 칸을 정했어요.`
       }
       // D-146: 서류 맨 위 제목으로 칸을 정한다 — 맞는 칸이 없으면 그 이름으로 새 칸, 모르면 '기타 · 확인 필요'(남는 파일 없음)
       const result = placeDocument({ text, fileName: it.file.name }, metas)
       const next: Partial<Item> = {
         text,
         method,
+        readNote,
         status: 'ready',
         progress: null,
         result,
@@ -429,6 +450,11 @@ export function BulkDocUploadSheet({
       }
     >
       <div className="flex flex-col gap-3">
+        {archiveNote && (
+          <p role="status" data-testid="bulk-archive-note" className="rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 t-sub break-keep text-brand-900 [overflow-wrap:anywhere]">
+            {archiveNote}
+          </p>
+        )}
         {autoNote && (
           <p role="status" data-testid="bulk-auto-note" className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 t-sub break-keep text-warning-800">
             {autoNote}
@@ -482,8 +508,8 @@ export function BulkDocUploadSheet({
             </Button>
           </div>
           <p className="text-[0.88rem] break-keep text-slate-500">
-            PDF·사진·글자 파일은 내용을 읽어 어느 칸인지 가립니다. 그 밖의 파일(한글·워드·압축)은 파일 이름으로만 가립니다.
-            사진과 스캔본은 처음 한 번 한글 인식 준비가 걸립니다.
+            PDF · 사진 · 엑셀 · 한글(hwp · hwpx) · 워드(docx)는 내용을 읽어 어느 칸인지 가리고, 압축(zip)은 풀어서 하나씩 넣습니다.
+            그 밖의 파일은 파일 이름으로 가립니다. 사진과 스캔본은 처음 한 번 한글 인식 준비가 걸립니다.
           </p>
         </div>
 
@@ -527,6 +553,13 @@ export function BulkDocUploadSheet({
                     )}
                   </div>
 
+                  {(it.from || it.readNote) && (
+                    <p className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]" data-testid="bulk-item-from">
+                      {it.from && <span>{it.from} 안에서 꺼냄</span>}
+                      {it.from && it.readNote && ' · '}
+                      {it.readNote && <span className="text-warning-800">{it.readNote}</span>}
+                    </p>
+                  )}
                   {it.status === 'reading' && it.progress && (
                     <p className="t-sub text-slate-500">{it.progress.label}</p>
                   )}

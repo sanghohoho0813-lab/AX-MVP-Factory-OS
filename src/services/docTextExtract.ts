@@ -7,14 +7,16 @@
  *
  * 두 라이브러리 모두 실제로 쓸 때만 내려받도록 동적 import 한다.
  *  - 엑셀(.xlsx): 칸 안의 글자를 그대로 뽑는다 (D-89). 라이브러리를 쓰지 않는다.
+ *  - 한글(.hwp · .hwpx) · 워드(.docx): 본문 글과 표를 뽑는다 (D-266 — officeText). 라이브러리를 쓰지 않는다.
  */
 
 import { isXlsxFile, readXlsxText } from './xlsxText'
 import { pdfItemsToText } from './pdfTextLines'
 import { REREAD_MARK } from './bizNoRead'
 import { ensureMapUpsert } from '../lib/mapUpsert'
+import { officeKindOf, officeText } from './officeText'
 
-export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx'
+export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx'
 
 export interface ExtractResult {
   text: string
@@ -211,6 +213,14 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     onProgress?.(1, '엑셀 읽음')
     return { text, method: 'xlsx' }
   }
+  // D-266 한글 · 워드 — 본문 글 · 표(한 행이 한 줄). 암호 · 배포용 문서는 OfficeReadError(사람 말)로 알린다
+  const office = officeKindOf(file.name, file.type)
+  if (office) {
+    onProgress?.(0.2, office === 'docx' ? '워드 문서 여는 중' : '한글 문서 여는 중')
+    const text = await officeText(office, new Uint8Array(await file.arrayBuffer()))
+    onProgress?.(1, office === 'docx' ? '워드 문서 읽음' : '한글 문서 읽음')
+    return { text, method: office === 'docx' ? 'docx' : 'hwp' }
+  }
   // 글자 파일은 그대로 읽는다 — 홈택스 텍스트 저장본, 복사해 둔 메모
   if (file.type.startsWith('text/') || /\.(txt|md|csv)$/i.test(file.name)) {
     onProgress?.(1, '글자 파일 읽는 중')
@@ -237,12 +247,15 @@ export const EXTRACT_METHOD_LABEL: Record<ExtractMethod, string> = {
   ocr: '이미지 글자 인식(OCR)',
   text: '글자 파일',
   xlsx: '엑셀 표',
+  hwp: '한글 문서',
+  docx: '워드 문서',
 }
 
 /** 판독기가 읽을 수 있는 파일인지 — 아니면 파일 이름만으로 판별한다 */
 export function canExtractText(file: File): boolean {
   return (
     isXlsxFile(file) ||
+    officeKindOf(file.name, file.type) !== null ||
     file.type === 'application/pdf' ||
     /\.pdf$/i.test(file.name) ||
     file.type.startsWith('image/') ||
