@@ -3631,3 +3631,15 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main 762c3e3 → **0a2412f**(fast-forward · 2 커밋 · 01:5x UTC) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — 새 묶음 index-BGp4_UkC.js(01:53 무렵) · 조각 430개 중 SpecWritePage 조각에 '답 모양이 어긋나 이름표를 다시 알려 주고 씁니다' 있음.
 - 확인하지 못한 것: 실제 Gemini · GPT · Claude 키로 구성 단계를 눌러 본 결과(이 환경엔 키가 없다 — D-263 모의 실행에서 같은 지시문으로 작은 모델에게 답하게 해 보니 구성요소 7 · 단계 7 · 씨앗 2~4 를 한 번에 읽었다).
+
+## §180 D-263 악마판사 · 벤처 요약 전 3가지 · 한 번에 끝내기 · 기준 문서 · 명세서 샘플 — 게이트 · 병합 · Production (2026-10-22)
+
+- **게이트 62단계 — 62/62 녹색**(HEAD 85dbd70 · dirty 0). 52단계째(ventureplan) 도중 작업 환경이 다시 시작되어 끊겼고, 같은 커밋으로 남은 10단계(ventureplan ~ vstudy)를 이어서 돌렸다 — 앞 52 + 뒤 10 모두 EXIT 0.
+  이번 것에 걸린 숫자: 단위 assist 124(DS1~DS9 · DR1~DR5 · KB1~KB9) · ventureplan 77(G1~G15 · J1~J13) · specdraft 91(DJ1~DJ12) · cert 285 /
+  e2e qa:ventureplan 68(3가지 관문 · 숫자 없는 시장조사 → 숫자 칸 · AI 추정 확인 · 출원번호 직접 · 칩 · 대표 정의 · 504 저절로 다시 · 이름표 다시 · 판사 2라운드) · qa:specboard 49(판사 ① · ② · 대표 정의 · 판사가 고친 글이 초안에) ·
+  qa:assist 64 · qa:chat 64 · qa:certai 19 · qa:specwrite 55 · qa:pvux 67 · qa:speccheck 40 · qa:mkpack 57 · qa:sideai 64. 실패 0.
+- **화면 사진** — PC 1440: 벤처 '요약 전에 반드시 — 3가지' 카드(0/3 · 1/3 · 3/3) · 숫자 없는 시장조사 → 숫자 칸 + AI 산식 · 판사 줄(93점 · 고친 뒤 다시 판정 / 94점) · 판정 상자 · 명세서 판사 카드 ① · ②.
+  휴대폰 360 · 390: 관문 카드 · 숫자 칸 · 단계 줄(요약 막힘 표시) — 가로 넘침 0 · JS 오류 0.
+- **병합** — main 0a2412f → **85dbd70**(fast-forward · 4 커밋 · 04:01:34 UTC) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — 병합 약 2분 뒤 새 묶음 index-P8WAN6wl.js(04:03) · '요약 전에 반드시 — 3가지' · '이 숫자로 확인' 은 VenturePlanWorkbench 조각에, '악마판사 기준' 은 JudgePanel 조각에, '악마판사 ② 명세서 전체' 는 SpecWritePage 조각에 있음.
+- 확인하지 못한 것: 실제 Gemini · GPT · Claude 키로 누른 결과(서버 함수 쪽 새 단추 · 지시문은 로그인이 필요해 Production 에서 열어 보지 못함 — 단위 · 계약 시험으로만) · Gemini 검색 근거가 붙은 시장조사 · 대표가 쓰던 /악마판사 정의 원문 · 받지 못한 샘플 14건.
