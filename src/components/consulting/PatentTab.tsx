@@ -33,7 +33,7 @@ export function PatentTab({ focus }: { focus?: string }) {
         </div>
       </Surface>
 
-      <Block title="S3 · 특허 아이디어 — 5개 고정 질문" hint="Master §8. 특허명은 마케팅 문구가 아니라 기술구조가 읽혀야 합니다.">
+      <Block title="S3 · 특허 아이디어 — 5개 고정 질문" hint="특허명은 마케팅 문구가 아니라 기술구조가 읽혀야 합니다.">
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="① 현재 문제" value={pt.problem} multiline rows={3} placeholder="무엇이 반복적으로 어렵거나 비효율적인가" onCommit={(v) => set({ problem: v })} />
           <TextField label="② 기존 방식" value={pt.existingMethod} multiline rows={3} placeholder="지금은 어떻게 해결하며 왜 부족한가" onCommit={(v) => set({ existingMethod: v })} />
@@ -200,7 +200,7 @@ function KipoBlock({ highlighted }: { highlighted: boolean }) {
         </ul>
       )}
 
-      <Disclosure title="사용 금지" hint="Master §11-2">
+      <Disclosure title="사용 금지" hint="쓰지 않는 표현">
         <ul className="list-disc pl-5">
           {['예시 문장을 그대로 복제', '예시의 발명구성을 고객사 기술인 것처럼 사용', '예시 특허가 있다는 이유로 신규성 판단 완료', 'KIPO 예시를 선행기술 조사 대체재로 사용'].map((t) => (
             <li key={t} className="t-sub text-slate-600">{t}</li>

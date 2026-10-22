@@ -5,8 +5,8 @@
  *  - 회사 기록으로 채우기(기술명 · 연구조직 · 지식재산권 출원중 · 핵심 요약 지식재산권 문장) · 이미 적은 칸은 그대로
  *  - 칸: 문장 틀 · 글자 수 · 넘음 · 체크박스 · 상태(확인함 · 사이트에 넣음) · 복사 · 새로고침해도 그대로
  *  - 점검 · 그 칸으로 · 한 장(MD) 내려받기 · 제출 전 확인 '사업계획' 줄
- *  - AI 초안(대표 · 서버 흉내): D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력 — 직접 넣기) → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②
- *    · 대표 /악마판사 정의 · 504 저절로 다시 · 답 모양 어긋남 다시 · 고친 칸은 덮지 않고 새 안 · 실패한 단계만 다시 · 확인할 점
+ *  - AI 초안(대표 · 서버 흉내): D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력 — 직접 넣기) → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②
+ *    · 대표 /자체점검 정의 · 504 저절로 다시 · 답 모양 어긋남 다시 · 고친 칸은 덮지 않고 새 안 · 실패한 단계만 다시 · 확인할 점
  *  - 360 · 390 · 430 · 글자 아주 크게에서 가로 넘침 0 · JS 오류 0
  */
 import { chromium } from 'playwright'
@@ -169,7 +169,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('한 장(MD): 파일 이름(영문 — 한글 이름은 일부 브라우저에서 download 로 바뀜) · 회사명 제목 · 사이트 순서 · 체크 · 글자 수', /^venture-plan-\d{8}\.md$/.test(dl.suggestedFilename()) && md.startsWith('# ') && md.indexOf('## 사업계획서 요약') < md.indexOf('## [1] 문제정의') && md.includes('체크: 시급히 해결되어야 하는 문제임 · 자주 발생하는 문제임') && /_\(\d{3}자\)_/.test(md), { name: dl.suggestedFilename(), head: md.slice(0, 120), checks: /체크: [^\n]*/.exec(md.slice(md.indexOf('개발 배경')))?.[0] })
   await shot(page, 'vplan-04-check')
 
-  // AI 초안(서버 흉내) — D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력) → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②
+  // AI 초안(서버 흉내) — D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력) → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②
   const sent = []
   let p2Calls = 0
   let g2Calls = 0
@@ -182,7 +182,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     { title: 'som', amount: '', detail: '3년 목표 고객 수 · 단가 없음 — 확인 필요' },
     { title: 'customer', detail: '공구 교체를 관리하는 제조 현장' },
   ]
-  const SKILL = '/악마판사 — 대표정의표식: 숫자 하나라도 어긋나면 P0, 출원을 보유라고 쓰면 P0'
+  const SKILL = '/자체점검 — 대표정의표식: 숫자 하나라도 어긋나면 P0, 출원을 보유라고 쓰면 P0'
   const body = (id) => '본문 ' + id + ' — 특허의 신호 정규화부가 MVP 의 휴대폰 진동 입력으로 구현됩니다.'
   const ITEMS = {
     'venture.market': [
@@ -220,7 +220,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
   const row = (k) => page.locator(`[data-testid="vplan-ai-row"][data-key="${k}"]`)
-  check('AI 차례 9줄 — 시장조사 → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②', (await page.getByTestId('vplan-ai-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')).join())) === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll')
+  check('AI 차례 9줄 — 시장조사 → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②', (await page.getByTestId('vplan-ai-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')).join())) === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll')
   check('요약 전 3가지 — 처음엔 다 모름(시장조사 · 출원번호 없음) · 요약 줄 "요약 전에 먼저" · [이것만 써줘] 막힘', (await page.getByTestId('vplan-gate').getAttribute('data-ok')) === 'no' && (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'no' && (await page.getByTestId('vplan-gate-patent').getAttribute('data-ok')) === 'no' && /요약 전에 먼저/.test(await row('sum').innerText()) && (await row('sum').getByTestId('vplan-ai-one').isDisabled()))
   // 기술인력 — 칩 두 번(전담부서 · 2명)
   await page.locator('[data-testid="vplan-gate-org"][data-org="연구개발전담부서"]').click()
@@ -228,13 +228,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-testid="vplan-gate-staff"][data-n="2"]').click()
   await page.waitForTimeout(400)
   check('기술인력 — [연구개발전담부서] [2명] 두 번 누르면 ✓ · 조직 칸(사이트 선택지)에도 같은 값', (await page.getByTestId('vplan-gate-rd').getAttribute('data-ok')) === 'yes' && /연구개발전담부서 · 연구개발 인원 2명/.test(await page.getByTestId('vplan-gate-rd').innerText()))
-  // 대표 /악마판사 정의 붙여 넣기
+  // 대표 /자체점검 정의 붙여 넣기
   await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').click()
   await page.getByTestId('judge-skill-sheet').waitFor()
   await page.getByTestId('judge-skill-text').fill(SKILL)
   await page.getByTestId('judge-skill-save').click()
   await page.waitForTimeout(400)
-  check('악마판사 기준 — 대표 정의 붙여 넣고 저장 → 단추에 "대표 정의"', /대표 정의/.test(await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').innerText()))
+  check('자체점검 기준 — 대표 기준 붙여 넣고 저장 → 단추에 "대표 기준"', /자체점검 기준 · 대표 기준/.test(await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').innerText()))
   await shot(page, 'vplan-05a-gate')
   // 출원번호 모르고 [전부 써줘] → 시장조사만 하고 요약 앞에서 멈춤
   await page.getByTestId('vplan-ai-run').click()
@@ -251,7 +251,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('vplan-gate-market-confirm').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-gate-market"]')?.getAttribute('data-ok') === 'yes', null, { timeout: 15000 })
   await page.waitForTimeout(300)
-  check('[이 숫자로 확인] → 시장조사 ✓ — TAM · SAM · SOM 숫자 · 대표 확인 숫자 · 시장조사는 대표 정의 안 보냄(판사 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원 · 대표 확인 숫자/.test(await page.getByTestId('vplan-gate-market').innerText()) && !sent[0].skill && !sent[1].skill && JSON.stringify(sent[1].context).includes('거래처 49곳'))
+  check('[이 숫자로 확인] → 시장조사 ✓ — TAM · SAM · SOM 숫자 · 대표 확인 숫자 · 시장조사는 대표 정의 안 보냄(자체점검 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원 · 대표 확인 숫자/.test(await page.getByTestId('vplan-gate-market').innerText()) && !sent[0].skill && !sent[1].skill && JSON.stringify(sent[1].context).includes('거래처 49곳'))
   await page.getByTestId('vplan-gate-patent-input').fill('10 2026 0012345')
   await page.getByTestId('vplan-gate-patent-save').click()
   await page.waitForTimeout(500)
@@ -266,24 +266,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   const run2 = sent.slice(before)
   const phases = await page.getByTestId('vplan-ai-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-phase')}`))
-  check('AI: 요약 → 악마판사 ①(고친 뒤 다시 판정) → 본문 5묶음 → 악마판사 ② · 시장조사 건너뜀 · g2 만 못 씀', run2.map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge,venture.p1,venture.p2,venture.p2,venture.g1,venture.g2,venture.g2,venture.g2,venture.x,venture.judge' && phases.join() === 'market:done,sum:done,judgeSum:done,p1:done,p2:done,g1:done,g2:fail,x:done,judgeAll:done', { sent: run2.map((r) => r.assistId), phases })
+  check('AI: 요약 → 자체점검 ①(고친 뒤 다시 판정) → 본문 5묶음 → 자체점검 ② · 시장조사 건너뜀 · g2 만 못 씀', run2.map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge,venture.p1,venture.p2,venture.p2,venture.g1,venture.g2,venture.g2,venture.g2,venture.x,venture.judge' && phases.join() === 'market:done,sum:done,judgeSum:done,p1:done,p2:done,g1:done,g2:fail,x:done,judgeAll:done', { sent: run2.map((r) => r.assistId), phases })
   const sumReq = run2[0]
   check('요약에 보낸 것 — 시장조사(TAM · 출처) · 출원번호(출원 중 · 등록 아님) · 연구개발 인원 2명 · 대표 정의', sumReq.context.sections.some((x) => x.name.startsWith('시장조사') && JSON.stringify(x.rows).includes('1조 2,000억 원') && JSON.stringify(x.rows).includes('통계청 광업제조업조사 2024')) && sumReq.context.facts.some((f) => f.includes('10-2026-0012345') && f.includes('등록 아님')) && sumReq.context.facts.some((f) => f.includes('연구개발 인원(확인): 2명')) && sumReq.skill === SKILL)
   const j1 = run2.filter((r) => r.assistId === 'venture.judge')
-  check('악마판사 — 대표 정의 같이 감 · ① 은 요약 범위 · 두 번째 판정엔 판사가 고친 글이 들어감 · ② 는 전체', j1.length === 3 && j1.every((r) => r.skill === SKILL) && j1[0].context.purpose.includes('요약') && JSON.stringify(j1[1].context.sections).includes('JUDGE 고친 차별성') && j1[2].context.purpose.includes('전체'))
+  check('자체점검 — 대표 정의 같이 감 · ① 은 요약 범위 · 두 번째 판정엔 자체점검이 고친 글이 들어감 · ② 는 전체', j1.length === 3 && j1.every((r) => r.skill === SKILL) && j1[0].context.purpose.includes('요약') && JSON.stringify(j1[1].context.sections).includes('JUDGE 고친 차별성') && j1[2].context.purpose.includes('전체'))
   check('잠깐 끊김(504) → 3초 쉬고 저절로 다시 · p2 씀(예전엔 실패로 멈춤)', run2.filter((r) => r.assistId === 'venture.p2').length === 2 && (await row('p2').getAttribute('data-phase')) === 'done')
   const g2s = run2.filter((r) => r.assistId === 'venture.g2')
   check('답 모양 어긋남 → 이름표를 알려 주고 두 번 더(ask) · 세 번 다 어긋나면 그 단계만 못 씀', g2s.length === 3 && !g2s[0].ask && g2s.slice(1).every((r) => /칸 id 그대로/.test(r.ask ?? '')), g2s.map((r) => r.ask ?? ''))
   const p1 = run2.find((r) => r.assistId === 'venture.p1')
   check('AI 보낸 것: page venture · 명세서 재료 · AX · 이번 칸 규칙 · 출원 그대로 규칙', p1.page === 'venture' && JSON.stringify(p1.context.sections[0].rows).includes('공구 마모 예측') && JSON.stringify(p1.context.sections[1].rows).includes('휴대폰 진동 입력') && p1.context.rules.some((r) => r.startsWith('칸 development_background')) && p1.context.rules.some((r) => r.includes('출원 상태 그대로')))
   check('AI 보낸 것: 앞 묶음 결과가 다음 묶음의 "이미 쓴 칸" 으로', JSON.stringify(run2.filter((r) => r.assistId === 'venture.p2')[1].context.sections[3].rows).includes('본문 경쟁력'))
-  check('악마판사 ① 줄 — 93점 · 직접 고친 칸 · 고친 뒤 다시 판정 / ② 줄 — 94점', /93점/.test(await row('judgeSum').innerText()) && /차별점/.test(await row('judgeSum').innerText()) && /고친 뒤 다시 판정/.test(await row('judgeSum').innerText()) && /94점/.test(await row('judgeAll').innerText()), [await row('judgeSum').innerText(), await row('judgeAll').innerText()])
-  check('판정 상자 — ② 94점 · 통과 · 판사가 고친 칸(목표시장) · 대표 정의 표시', (await page.getByTestId('vplan-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('vplan-judge').getAttribute('data-pass')) === 'yes' && /목표시장/.test(await page.getByTestId('vplan-judge').innerText()) && /대표 정의/.test(await page.getByTestId('vplan-judge').innerText()))
+  check('자체점검 ① 줄 — 93점 · 직접 고친 칸 · 고친 뒤 다시 판정 / ② 줄 — 94점', /93점/.test(await row('judgeSum').innerText()) && /차별점/.test(await row('judgeSum').innerText()) && /고친 뒤 다시 판정/.test(await row('judgeSum').innerText()) && /94점/.test(await row('judgeAll').innerText()), [await row('judgeSum').innerText(), await row('judgeAll').innerText()])
+  check('판정 상자 — ② 94점 · 통과 · 자체점검이 고친 칸(목표시장) · 대표 기준 표시', (await page.getByTestId('vplan-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('vplan-judge').getAttribute('data-pass')) === 'yes' && /목표시장/.test(await page.getByTestId('vplan-judge').innerText()) && /대표 기준/.test(await page.getByTestId('vplan-judge').innerText()))
   check('AI: 못 쓴 단계만 다시 단추', (await page.getByTestId('vplan-ai-retry').count()) === 1)
   await page.getByTestId('vplan-ai-retry').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="g2"]')?.getAttribute('data-phase') === 'done', null, { timeout: 15000 })
   check('AI: 다시 → g2 씀 · 마지막 요청은 g2 하나', sent[sent.length - 1].assistId === 'venture.g2' && sent.length === before + run2.length + 1)
-  check('AI: 확인해 달라는 점(본문 아님 · 판사의 대표 확인 질문) 보임', /불량률 숫자 출처 확인/.test(await page.getByTestId('vplan-ai-asks').innerText()) && /지금 거래처 49곳이 맞나요/.test(await page.getByTestId('vplan-ai-asks').innerText()))
+  check('AI: 확인해 달라는 점(본문 아님 · 자체점검의 대표 확인 질문) 보임', /불량률 숫자 출처 확인/.test(await page.getByTestId('vplan-ai-asks').innerText()) && /지금 거래처 49곳이 맞나요/.test(await page.getByTestId('vplan-ai-asks').innerText()))
   await shot(page, 'vplan-05-ai')
   await page.getByTestId('vplan-tab-problem').click()
   await page.waitForTimeout(300)
@@ -299,13 +299,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('새 안 → [이 안으로 바꾸기] → 칸이 바뀌고 새 안 사라짐 · 사이트에 넣음 내려감(다시 넣어야 하니까)', (await bg3.getByTestId('vplan-text').inputValue()) === body('배경') && (await bg3.getByTestId('vplan-suggestion').count()) === 0 && (await bg3.getAttribute('data-status')) === '')
   await page.getByTestId('vplan-tab-growth').click()
   await page.waitForTimeout(300)
-  check('악마판사 ② 가 고친 목표시장 칸(AI 글이라 바로 고침)', (await page.locator('[data-testid="vplan-field"][data-id="market_target"] [data-testid="vplan-text"]').inputValue()).startsWith('JUDGE 고친 목표시장'))
+  check('자체점검 ② 가 고친 목표시장 칸(AI 글이라 바로 고침)', (await page.locator('[data-testid="vplan-field"][data-id="market_target"] [data-testid="vplan-text"]').inputValue()).startsWith('JUDGE 고친 목표시장'))
   await page.getByTestId('vplan-tab-core').click()
   await page.waitForTimeout(300)
-  check('악마판사 ① 이 고친 핵심 요약 차별성', (await page.locator('[data-testid="vplan-field"][data-id="core_diff"] [data-testid="vplan-text"]').inputValue()).startsWith('JUDGE 고친 차별성'))
+  check('자체점검 ① 이 고친 핵심 요약 차별성', (await page.locator('[data-testid="vplan-field"][data-id="core_diff"] [data-testid="vplan-text"]').inputValue()).startsWith('JUDGE 고친 차별성'))
   await page.getByTestId('vplan-tab-summary').click()
   await page.waitForTimeout(200)
   check('AI: 사람이 고친 기술명은 덮지 않음', (await page.locator('[data-testid="vplan-field"][data-id="tech_name"] [data-testid="vplan-input"]').inputValue()) === '공구 마모 예측 교체시점 서비스' && (await page.locator('[data-testid="vplan-field"][data-id="tech_name"] [data-testid="vplan-suggestion"]').count()) === 1)
+  const BANNED = new RegExp(['\uC545\uB9C8', '\uC774\uC0C1\uD55C\\s*(?:\uB9C8\uCF00\uD305\\s*)?AI', 'Master v', 'Judge Scorecard', 'Red Flag'].join('|'), 'i')
+  check('화면 어디에도 쓰지 않는 이름 · 출처 이름 없음(자체점검 · 대표 기준으로만)', !BANNED.test(await page.locator('body').innerText()) && /자체점검/.test(await page.getByTestId('vplan-ai').innerText()))
   check('다 씀 — 서술 10 · 핵심 요약 7', /서술 10\/10/.test(await page.getByTestId('vplan-progress').innerText()) && /핵심 요약 7\/7/.test(await page.getByTestId('vplan-progress').innerText()))
   await page.unroute('**/api/ai-assist')
 

@@ -1,5 +1,5 @@
 /**
- * 홍보 글 만들기 시험 (D-203) — 이상한 AI 식 콘텐츠 흐름을 우리 OS 에(업체 기록 → 먼저 만들 것 → 글 → 보관함). 규칙 · LLM 0.
+ * 홍보 글 만들기 시험 (D-203) — 참고한 외부 방법 식 콘텐츠 흐름을 우리 OS 에(업체 기록 → 먼저 만들 것 → 글 → 보관함). 규칙 · LLM 0.
  *
  *  1440  업체 고르기 → 홍보 정보(업체 기록 · 홈페이지 하는 일 · 대표 전화 · 담당자 휴대폰 안 씀) → 먼저 만들 것 3(키워드 먼저 · 인증 근거)
  *        키워드 → 낱말 누르면 블로그로 · 주제 고르기 → 블로그(점검: 대괄호 · 키워드) · 전체 복사(클립보드) · 다른 안
@@ -929,7 +929,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await ctx.close()
 }
 
-// D-228 — 이상한AI 3차 관찰: 재료를 준 만큼만 쓰고, 바깥 AI 도구에는 사실 목록 · 넣지 말 것을 붙여 보내고, 받은 글은 사실과 대조한다
+// D-228 — 참고한 외부 방법 3차 관찰: 재료를 준 만큼만 쓰고, 바깥 AI 도구에는 사실 목록 · 넣지 말 것을 붙여 보내고, 받은 글은 사실과 대조한다
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
@@ -1371,7 +1371,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   check('D230-14 화면 오류 0', !errors.some((e) => e.startsWith('D230')), errors.filter((e) => e.startsWith('D230')))
 }
 
-// D-234 — 콘텐츠 작성 규칙집 ⟲4차(이상한AI 4차 실험): 후기 출처 · 가격 단위 · 7칸 이름표 줄 요청문 · 받은 글 점검(판매처 · 단위 · OO 빈칸) · 규제 업종 카드 두 안
+// D-234 — 콘텐츠 작성 규칙집 ⟲4차(참고한 외부 방법 4차 실험): 후기 출처 · 가격 단위 · 7칸 이름표 줄 요청문 · 받은 글 점검(판매처 · 단위 · OO 빈칸) · 규제 업종 카드 두 안
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const p = await ctx.newPage()

@@ -4,7 +4,7 @@
  * 대표: "사업계획서 요약 단계에서 TAM SOM 등 시장조사 하고 나서 작성해야 돼서 반드시 그 단계를 밟고 나서,
  *        출원된 특허번호, 기술인력(연구개발전담부서 유무)까지 반드시 파악하고 난 뒤에 사업계획서 요약을 시작해야 해.
  *        아무리 간편하게 한다 해도. 특허번호나 기술인력 유무 같은 것만큼은 내가 직접 입력해도 되게."
- * 기준 문서(Master v2.9 23-1B): Venture Factsheet → 신청기술명 → 요약 → 7개 V 문장 → 수치 · 증빙 Gate → 본문 1~7번.
+ * 기준 문서(내부 기준 문서 23-1B): Venture Factsheet → 신청기술명 → 요약 → 7개 V 문장 → 수치 · 증빙 Gate → 본문 1~7번.
  *
  *  ① 시장조사 — TAM · SAM · SOM 세 숫자가 모두 있어야(검색 근거가 있는 AI 조사 · 대표가 고치거나 확인한 숫자 — 검색 근거 없는 AI 추정은 대표가 한 번 확인)
  *  ② 출원번호 — 직접 넣은 번호 · 이전 컨설팅 기록 · [1] 7 지식재산권 칸에서 찾은 번호, 또는 대표가 '아직 출원 전' 이라고 고른 것
@@ -94,7 +94,7 @@ export function readGate(notes: Record<string, string>): GateState {
 /** 세 숫자(TAM · SAM · SOM)가 모두 있으면 시장조사를 밟은 것 */
 export const marketDone = (m: MarketResearch | null | undefined): boolean => !!m && !!m.tam.amount.trim() && !!m.sam.amount.trim() && !!m.som.amount.trim()
 
-/** 검색 근거 없이 AI 가 추정만 한 숫자 — 요약 전에 대표가 한 번 확인(또는 고침)해야 한다(악마판사 P0 'TAM/SAM/SOM 근거 부족' 을 미리 막음) */
+/** 검색 근거 없이 AI 가 추정만 한 숫자 — 요약 전에 대표가 한 번 확인(또는 고침)해야 한다(자체점검 P0 'TAM/SAM/SOM 근거 부족' 을 미리 막음) */
 export const marketNeedsConfirm = (m: MarketResearch | null | undefined): boolean => marketDone(m) && !!m && m.by === 'ai' && !m.grounded
 
 /** 대표가 'AI 숫자 그대로 확인' — 대표 확인 숫자로 바꿔 둔다 */

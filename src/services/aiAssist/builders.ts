@@ -690,7 +690,7 @@ export function radarBundle(i: RadarInput): AssistBundle {
 
 /**
  * D-251 이번 주 키워드 하나 → 콘텐츠 묶음을 AI 로(대표만 · 갈래 셋을 같은 자료로).
- * 순서: ① 고른 키워드(관점 · 제목 · 첫 문장 · 근거) ② 채널 설계 기준 ③ 규칙 초안(구성만 — 다듬을 뼈대) + [규칙집] = 이상한AI 규칙집(미래AI랩 채널용).
+ * 순서: ① 고른 키워드(관점 · 제목 · 첫 문장 · 근거) ② 채널 설계 기준 ③ 규칙 초안(구성만 — 다듬을 뼈대) + [규칙집] = 참고한 외부 방법 규칙집(미래AI랩 채널용).
  */
 export function packBundle(i: { today: string; pack: ContentPack; brief?: ChannelBrief | null }): AssistBundle {
   const p = i.pack
@@ -732,7 +732,7 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
 }
 
 /* ------------------------------------------------------------------ */
-/* 블로그 · 플레이스 홍보 글 — 규칙집(이상한 마케팅 방식) 그대로                   */
+/* 블로그 · 플레이스 홍보 글 — 규칙집(참고한 외부 방법 방식) 그대로                   */
 /* ------------------------------------------------------------------ */
 
 export function contentBundle(i: { today: string; profile: ContentProfile; source: ProfileSource; keyword: string; mirae: boolean; items: readonly { title: string; kind: string; createdAt: string }[] }): AssistBundle {

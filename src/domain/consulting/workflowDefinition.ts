@@ -1,7 +1,7 @@
 /**
  * 워크플로 정의 — 모듈 `patent_venture_mvp` 의 S0~S16.
  *
- * Master v2.0 PART 1 §2-1(단계), K5(활성 PART), 각 PART 의 체크리스트를 코드로 옮겼다.
+ * 내부 기준 문서 PART 1 §2-1(단계), K5(활성 PART), 각 PART 의 체크리스트를 코드로 옮겼다.
  * 여기 적힌 exit checklist 는 "사람이 확인하고 넘기는 것" 이다. 코드는 필요 사실·필요 산출물이
  * 비어 있으면 완료를 막는 데까지만 관여한다.
  */
@@ -137,9 +137,9 @@ export const STAGES: StageDefinition[] = [
     activeParts: 'PART 5 §33·§34 · PART 6 §36', skippable: false,
   },
   {
-    key: 'S13', code: 'FINAL QA', label: 'Judge / Devil', group: 'submit',
-    purpose: 'P0 Red Flag 12개를 없애고 Judge 10항목을 사람이 매긴다. P0 가 남으면 완료 선언 금지.',
-    exitChecklist: ['P0 12개 전부 확인', 'Judge 점수 기록', 'One Core Thread 경고 0'],
+    key: 'S13', code: 'FINAL QA', label: '자체점검', group: 'submit',
+    purpose: 'P0 금지 사항 12개를 없애고 점수표 10항목을 사람이 매긴다. P0 가 남으면 완료 선언 금지.',
+    exitChecklist: ['P0 12개 전부 확인', '점수표 기록', 'One Core Thread 경고 0'],
     requiredFacts: [],
     requiredArtifacts: ['QA_REPORT'],
     promptTypes: ['VENTURE_FULL_REVIEW', 'GENERAL_PROJECT_REVIEW'],

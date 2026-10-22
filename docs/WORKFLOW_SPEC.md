@@ -1,6 +1,6 @@
 # WORKFLOW_SPEC — 컨설팅 워크플로 엔진 v1 (특허 × 벤처 × MVP)
 
-사람용 규칙 원본은 Master v2.0 MD 다. 이 문서는 그 규칙 중 **코드가 실제로 강제하는 부분**만 적는다.
+사람용 규칙 원본은 내부 기준 문서 MD 다. 이 문서는 그 규칙 중 **코드가 실제로 강제하는 부분**만 적는다.
 코드 위치: `src/types/consulting.ts`, `src/domain/consulting/*`, `src/services/consultingStudioService.ts`.
 LLM API 는 부르지 않는다. 사람이 프롬프트를 들고 나가 결과를 붙여 넣는 **수동 왕복**이 전부다.
 

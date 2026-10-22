@@ -253,7 +253,7 @@ function bodyFor(input: BuildInput): { title: string; rules: string[]; task: str
         title: 'MVP 빌드 지시 (Claude Code)',
         rules: [
           '[필수 시작 지시 — RAPID HIGH-FIDELITY MVP v1.1] 이 프로젝트는 미래AI랩 Rapid High-Fidelity MVP System 을 Source of Truth 로 쓴다. 목표는 Production 이 아니라 사업가설 1개를 클릭 가능한 고품질 제품 경험으로 증명하는 것이다.',
-          'Hard Blocker 가 없으면 한 번의 실행에서 Strategy 확인 → Build → Desktop/Mobile Render QA → Primary Journey 클릭 QA → Polish → Judge/Devil → P0/P1 수정 → Re-test 까지 간다. "우선 구현했습니다, 다음에 고도화" 금지.',
+          'Hard Blocker 가 없으면 한 번의 실행에서 Strategy 확인 → Build → Desktop/Mobile Render QA → Primary Journey 클릭 QA → Polish → 자체점검 → P0/P1 수정 → Re-test 까지 간다. "우선 구현했습니다, 다음에 고도화" 금지.',
           'Tier A 화면은 첫 Build 부터 Premium: 강한 Hero, 큰 Typography(본문 17~19px)·낮은 Text Density, Pure White #FFFFFF Surface, Sidebar Color Icon, Premium Motion(Hover 160~220ms, Modal 220~320ms, 숫자 450~700ms), Hover/Pressed/Focus.',
           '실제 Route 8~12, 404 0, Placeholder 0, Dead CTA 0. Future Preview 는 Sheet/Modal 로. Journey Completion: 시작→선택 유지→검증→확인→완료화면→다음 행동→My/History 재진입.',
           'Mobile P0: 390/430 실측. 상단 잘림·Bottom CTA 가림·Drawer 닫기 불가·Overlay 잔존·Keyboard 가림·Journey 중단·404·Back 불가 하나라도 있으면 완료 금지.',
@@ -286,16 +286,16 @@ function bodyFor(input: BuildInput): { title: string; rules: string[]; task: str
     }
     case 'VENTURE_FULL_REVIEW':
       return {
-        title: '사업계획서 전체 검토 (Judge / Devil)',
+        title: '사업계획서 전체 검토 (자체점검)',
         rules: [
           '심사위원이 이해해야 할 8개: 실제 문제 / 왜 대표자가 잘 아는가 / 기존 방식과 무엇이 다른가 / 무엇을 실제로 만들었는가 / 특허와 MVP 가 같은 기술인가 / 누가 돈을 내는가 / 3년 성장 / 왜 이 회사가 실행할 수 있는가.',
-          'Devil 질문: ERP/CRM 기능 아닌가 / 실제 AI 어디 있나 / 특허와 MVP 관계 / 경쟁사가 바로 만들 수 있지 않나 / 대표가 직접 뭘 했나 / 외주가 다 만든 것 아닌가 / TAM 만 크고 고객 없지 않나 / SOM 근거 / 숫자 실제인가 Demo 인가 / 자금과 매출 연결.',
-          `P0 Red Flag 12개: ${RED_FLAGS.map((f) => `#${f.no} ${f.text}`).join(' / ')}`,
-          'Judge Scorecard 10축(각 10점): A Problem Reality / B Team Fit / C Technical Differentiation / D Patent↔MVP Consistency / E MVP Proof / F TAM·SAM·SOM Credibility / G Competitive Advantage / H Market Entry·Growth / I Funding Logic / J Evidence·Integrity. 점수는 근거와 함께.',
+          '공격 질문: ERP/CRM 기능 아닌가 / 실제 AI 어디 있나 / 특허와 MVP 관계 / 경쟁사가 바로 만들 수 있지 않나 / 대표가 직접 뭘 했나 / 외주가 다 만든 것 아닌가 / TAM 만 크고 고객 없지 않나 / SOM 근거 / 숫자 실제인가 Demo 인가 / 자금과 매출 연결.',
+          `P0 금지 사항 12개: ${RED_FLAGS.map((f) => `#${f.no} ${f.text}`).join(' / ')}`,
+          '점수표 10축(각 10점): A Problem Reality / B Team Fit / C Technical Differentiation / D Patent↔MVP Consistency / E MVP Proof / F TAM·SAM·SOM Credibility / G Competitive Advantage / H Market Entry·Growth / I Funding Logic / J Evidence·Integrity. 점수는 근거와 함께.',
           'P0 가 하나라도 남으면 점수와 무관하게 Final 이 아니다.',
         ],
-        task: ['맥락의 사업계획서·사실표·핵심 줄기를 읽고 P0 12개를 하나씩 판정한다(있음/없음/근거).', 'Devil 질문 10개에 대한 현재 답변 가능성과 보강 방향.', 'Judge 10축 점수(근거 포함)와 총평.'],
-        sections: ['P0 Red Flag 판정표', 'Devil 질문별 취약점', 'Judge Scorecard', '수정 우선순위 (P0 → P1)', '확인 필요'],
+        task: ['맥락의 사업계획서·사실표·핵심 줄기를 읽고 P0 12개를 하나씩 판정한다(있음/없음/근거).', '공격 질문 10개에 대한 현재 답변 가능성과 보강 방향.', '점수표 10축 점수(근거 포함)와 총평.'],
+        sections: ['P0 금지 사항 판정표', '공격 질문별 취약점', '점수표', '수정 우선순위 (P0 → P1)', '확인 필요'],
       }
     case 'EVIDENCE_REVIEW': {
       const ev = (input.evidence ?? []).filter((e) => e.projectId === p.id)

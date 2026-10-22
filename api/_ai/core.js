@@ -5,6 +5,7 @@
  * 공급자는 세 곳(Gemini · GPT · Claude — providers.js). 예전 설정(AI_PROVIDER=openai + AI_MODEL_*)이 다 있으면 그대로 쓰고,
  * 아니면 화면에서 고른 공급자(없으면 기본 Gemini)의 빠르게/보통/깊게 모델을 쓴다(D-239).
  */
+import { CONFIDENTIAL_RULES, scrubBrand } from './guard.js'
 import { PROVIDERS, ProviderError, callModel, cleanChoice, configuredProviders, defaultChoice, priceOf, providerBase, providerKey, tierModel } from './providers.js'
 
 export { ProviderError }
@@ -251,7 +252,8 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
     left -= row.length
   }
   const user = [...head, ...lines('자료(필요한 부분만)', matRows), ...task].join('\n').trim()
-  const system = [...commonRules, '', `[스킬] ${skill.name} (${skill.id} v${skill.version})`, ...skill.systemInstruction, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(skill.example)].join('\n')
+  // D-264 비공개 규칙이 맨 앞 · 스킬은 화면 이름만(내부 번호 · 판 없이) · 쓰지 않는 이름 · 출처 이름은 한 번 더 지운다
+  const system = scrubBrand([...CONFIDENTIAL_RULES, '', ...commonRules, '', `[스킬] ${skill.name}`, ...skill.systemInstruction, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(skill.example)].join('\n'))
   return { system, user, sent: { systemChars: system.length, userChars: user.length, materials: matRows.length } }
 }
 

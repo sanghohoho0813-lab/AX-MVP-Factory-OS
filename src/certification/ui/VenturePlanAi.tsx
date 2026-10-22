@@ -5,9 +5,9 @@
  * 사람이 고친 칸은 덮지 않고 '새 안' 으로 따로 둔다(mergeDraft).
  * D-252: 대표 화면에서는 처음부터 펼쳐 둔다 — [전부 써줘] · 단계마다 [이것만 써줘] · 칸에서 누른 [AI로 이 칸 쓰기](request) 도 여기서 쓴다.
  * D-263 대표: "요약은 TAM · SOM 시장조사를 하고 나서, 출원번호 · 기술인력(연구개발전담부서 유무)까지 반드시 파악하고 난 뒤에 · 아무리 간편해도"
- *   "점검을 요청하면 꼭 한두 개씩 보완하라 하더라 — 한 번에 다 끝내게" · "악마판사는 사업계획서에도 중간중간 반드시".
+ *   "점검을 요청하면 꼭 한두 개씩 보완하라 하더라 — 한 번에 다 끝내게" · "자체점검는 사업계획서에도 중간중간 반드시".
  *   → 맨 위 '요약 전에 반드시 3가지'(시장조사 · 출원번호 · 기술인력 — 번호 · 인원은 직접 넣어도 됨). 셋이 안 차면 요약을 쓰지 않는다.
- *   → [전부 써줘] = 시장조사 → (3가지 확인) → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②. 판사가 고칠 수 있는 약점은 직접 고쳐 넣는다.
+ *   → [전부 써줘] = 시장조사 → (3가지 확인) → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②. 자체점검이 고칠 수 있는 약점은 직접 고쳐 넣는다.
  */
 import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Circle } from 'lucide-react'
@@ -36,7 +36,7 @@ const JUDGE_ROUNDS = 2
 const HINT = {
   market: '앞 답을 읽지 못했습니다. items 의 title 을 "tam" · "sam" · "som" · "cagr" · "customer" · "price" · "scope" 이름표 그대로, amount = 규모, detail = 산식, tag = 출처, when = 기준연도로 다시 써 주세요. JSON 한 덩어리만.',
   batch: '앞 답을 읽지 못했습니다. items 의 title = 칸 id 그대로(예 development_background), body = 그 칸 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
-  judge: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판결은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 id","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
+  judge: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 id","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
 }
 
 export function VenturePlanAi({
@@ -90,7 +90,7 @@ export function VenturePlanAi({
     return c ? { provider: c.provider, model: c.model } : null
   }
 
-  /** 악마판사 — 판정 + 판사가 고친 칸 넣기. 90점 미만 · P0 이고 고친 칸이 있었으면 고친 글로 한 번 더(최대 2번) */
+  /** 자체점검 — 판정 + 자체점검이 고친 칸 넣기. 90점 미만 · P0 이고 고친 칸이 있었으면 고친 글로 한 번 더(최대 2번) */
   const runJudge = async (key: 'judgeSum' | 'judgeAll', skill: string): Promise<[number, number]> => {
     const scope = key === 'judgeSum' ? 'sum' : 'full'
     const label = scope === 'sum' ? '요약' : '전체'
@@ -98,7 +98,7 @@ export function VenturePlanAi({
     const kept: string[] = []
     let report: JudgeReport | null = null
     for (let round = 1; round <= JUDGE_ROUNDS; round += 1) {
-      setRow(key, { phase: 'run', text: round === 1 ? `악마판사가 ${label}을 판정하는 중…(40초쯤)` : '판사가 고친 글로 한 번 더 판정하는 중…' })
+      setRow(key, { phase: 'run', text: round === 1 ? `${label}을 자체점검하는 중…(40초쯤)` : '고친 글로 한 번 더 자체점검하는 중…' })
       const state = readPlan(now())
       const { value: j } = await callAssistRetry({
         req: { assistId: 'venture.judge', page: 'venture', choice: choiceOf(), context: buildVentureJudgeContext({ scope, state, facts, today, gate: readGate(now()) }), ...(skill ? { skill } : {}) },
@@ -214,7 +214,7 @@ export function VenturePlanAi({
   /** [전부 써줘] — 시장조사는 이미 됐으면 건너뛴다 */
   const allSteps = (): VPlanStep[] => VPLAN_STEPS.map((s) => s.key).filter((k) => k !== 'market' || !marketDone(readGate(now()).market))
   const failedKeys = VPLAN_STEPS.filter((s) => rows[s.key]?.phase === 'fail').map((s) => s.key)
-  // D-263 판사 · 시장조사 줄은 칸에 보여 줄 묶음이 아니다 — 묶음 줄만 넘긴다
+  // D-263 자체점검 · 시장조사 줄은 칸에 보여 줄 묶음이 아니다 — 묶음 줄만 넘긴다
   const onRowsRef = useRef(onRows)
   onRowsRef.current = onRows
   useEffect(() => {
@@ -236,10 +236,10 @@ export function VenturePlanAi({
         <div className="flex flex-col gap-1">
           <h3 className="t-body font-bold text-slate-900">AI 가 씁니다 — 버튼만 누르세요</h3>
           <p className="t-sub break-keep text-slate-700">
-            시장조사 → 요약 → <b className="font-semibold">악마판사</b> → 본문 5묶음 → <b className="font-semibold">악마판사</b> 차례로 씁니다. 판사가 고칠 수 있는 약점은 직접 고쳐 넣어 <b className="font-semibold">한 번에 끝내고</b>, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
+            시장조사 → 요약 → <b className="font-semibold">자체점검</b> → 본문 5묶음 → <b className="font-semibold">자체점검</b> 차례로 씁니다. 글로 고칠 수 있는 약점은 직접 고쳐 넣어 <b className="font-semibold">한 번에 끝내고</b>, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
           </p>
           <p className="t-sub break-keep text-warning-800">누르면 재료 · 이미 쓴 칸 · 회사 숫자가 고른 AI 회사로 갑니다(사람 이름 · 연락처는 서버가 한 번 더 지움). 아직 출원 전 발명을 밖으로 보내면 안 되는 경우엔 누르지 마세요.</p>
-          {/* D-255 모델 이름만 보이던 줄 → 누르면 고르는 단추(고른 모델은 모든 AI 단추가 같이) · D-263 악마판사 기준 */}
+          {/* D-255 모델 이름만 보이던 줄 → 누르면 고르는 단추(고른 모델은 모든 AI 단추가 같이) · D-263 자체점검 기준 */}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <ModelPicker />
             <JudgeSkillButton />
@@ -293,7 +293,7 @@ export function VenturePlanAi({
             )
           })}
         </ul>
-        {(gate.judge.full ?? gate.judge.sum) && <JudgeReportView report={gate.judge.full ?? gate.judge.sum} title={gate.judge.full ? '악마판사 ② 사업계획서 전체' : '악마판사 ① 요약'} testId="vplan-judge" />}
+        {(gate.judge.full ?? gate.judge.sum) && <JudgeReportView report={gate.judge.full ?? gate.judge.sum} title={gate.judge.full ? '자체점검 ② 사업계획서 전체' : '자체점검 ① 요약'} testId="vplan-judge" />}
         {asks.length > 0 && (
           <div className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="vplan-ai-asks">
             <p className="t-sub font-semibold text-slate-800">AI 가 확인해 달라는 점</p>
@@ -301,7 +301,7 @@ export function VenturePlanAi({
               {asks.map((a) => (
                 <li key={a.id} className="t-sub flex flex-wrap items-center gap-x-2 break-keep text-slate-700">
                   <span className="min-w-0 flex-1">
-                    <b className="font-semibold">{VPLAN_FIELD[a.id]?.title ?? (a.id.startsWith('judge') ? '악마판사' : a.id)}</b> · {a.text}
+                    <b className="font-semibold">{VPLAN_FIELD[a.id]?.title ?? (a.id.startsWith('judge') ? '자체점검' : a.id)}</b> · {a.text}
                   </span>
                   {VPLAN_FIELD[a.id] && (
                     <Button variant="ghost" size="sm" onClick={() => onGoField(a.id)}>

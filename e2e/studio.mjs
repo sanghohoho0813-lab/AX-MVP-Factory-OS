@@ -186,7 +186,7 @@ check('13 PDF 미첨부 안내', (await page.getByText(/PDF 를 아직 받지 �
 // 14) 벤처 — D-179 예전 벤처 기록은 읽기 전용(Red Flag · Judge 는 보이기만)
 await page.goto(projectUrl + '?adv=1&tab=venture&focus=redflags', { waitUntil: 'networkidle' })
 await wait(600)
-check('14 P0 12개 표시(읽기 전용 · 확인 0/12)', /Red Flag 확인 0\/12/.test(await page.getByTestId('legacy-venture-more').innerText()))
+check('14 P0 12개 표시(읽기 전용 · 금지 사항 확인 0/12)', /금지 사항 확인 0\/12/.test(await page.getByTestId('legacy-venture-more').innerText()))
 check('14 Judge 입력칸 없음(예전 기록 읽기 전용)', (await page.locator('input[type=number]').count()) === 0)
 
 // 15) 증빙 — 10슬롯

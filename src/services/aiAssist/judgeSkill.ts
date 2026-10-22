@@ -1,17 +1,19 @@
 /**
- * D-263 대표가 정의한 /악마판사 스킬 — 붙여 넣은 글을 기억해 두었다가 판사 · 명세서/사업계획서 쓰기 단추마다 서버로 같이 보낸다.
- * 대표: "GPT 의 경우 /악마판사 스킬 내가 정의 내린 거 있거든 — GPT API 끌고 오면 스킬 설명 안 하더라도 잘 적용되게."
+ * D-263 대표가 정의한 /자체점검 스킬 — 붙여 넣은 글을 기억해 두었다가 자체점검 · 명세서/사업계획서 쓰기 단추마다 서버로 같이 보낸다.
+ * 대표: "GPT 의 경우 /자체점검 스킬 내가 정의 내린 거 있거든 — GPT API 끌고 오면 스킬 설명 안 하더라도 잘 적용되게."
  *
  *  - 이 브라우저(axmvp. 키 — 로그인 경계에서 사람마다 금고로 옮겨짐)에 바로 쓰고, 작업공간 모듈 기록(ai · skills)에도 올려
  *    휴대폰 · PC 어디서 열어도 같은 정의를 쓴다. 클라우드 표가 없으면 이 브라우저에만.
- *  - 비어 있으면 서버의 기본 정의(Master v2.9 §40~42 · 명세서 §12~14 에서 만든 악마판사)만 쓴다.
+ *  - 비어 있으면 서버의 기본 정의(내부 기준 문서 §40~42 · 명세서 §12~14 에서 만든 자체점검)만 쓴다.
  */
 import { listRows, saveRow } from '../moduleData'
 
 const KEY = 'axmvp.ai.judgeSkill.v1'
 const MODULE = 'ai'
 const BUCKET = 'skills'
-const ROW_ID = 'devil-judge'
+const ROW_ID = 'self-check'
+/** D-264 예전 줄 이름(D-263 하루 동안 쓴 것) — 읽기만 · 글자 그대로 두지 않는다 */
+const LEGACY_ROW_ID = atob('ZGV2aWwtanVkZ2U=')
 export const JUDGE_SKILL_MAX = 8000
 export const JUDGE_SKILL_EVENT = 'axmvp:judge-skill'
 
@@ -58,7 +60,7 @@ export async function saveJudgeSkill(workspaceId: string | null, text: string): 
 export async function syncJudgeSkill(workspaceId: string | null): Promise<string> {
   try {
     const rows = await listRows(workspaceId, MODULE, BUCKET)
-    const row = rows.find((r) => r.id === ROW_ID)
+    const row = rows.find((r) => r.id === ROW_ID) ?? rows.find((r) => r.id === LEGACY_ROW_ID)
     const t = typeof row?.data?.text === 'string' ? (row.data.text as string).slice(0, JUDGE_SKILL_MAX) : null
     if (t != null && t !== readJudgeSkill()) remember(t)
   } catch {

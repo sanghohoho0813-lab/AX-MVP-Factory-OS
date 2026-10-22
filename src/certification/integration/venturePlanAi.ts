@@ -15,7 +15,7 @@ import { RD_ORG_SHORT, marketRows, patentNoOf, rdOf, type GateState } from './ve
 
 /**
  * D-263 요약을 본문보다 먼저(기준 문서 23-1B · 대표: "시장조사 → 출원번호 · 기술인력 → 요약") — 요약 묶음이 맨 앞.
- * 요약 앞에는 시장조사 · 요약 전 확인(규칙)이, 요약 뒤 · 본문 뒤에는 악마판사가 들어간다(VPLAN_STEPS).
+ * 요약 앞에는 시장조사 · 요약 전 확인(규칙)이, 요약 뒤 · 본문 뒤에는 자체점검가 들어간다(VPLAN_STEPS).
  */
 export const VPLAN_BATCHES: readonly { key: VPlanBatch; assistId: string; label: string }[] = [
   { key: 'sum', assistId: 'venture.sum', label: '요약 · 핵심 요약' },
@@ -27,17 +27,17 @@ export const VPLAN_BATCHES: readonly { key: VPlanBatch; assistId: string; label:
 ]
 
 export type VPlanStep = 'market' | VPlanBatch | 'judgeSum' | 'judgeAll'
-/** [전부 써줘] 차례 — 시장조사 → (요약 전 확인) → 요약 → 악마판사 → 본문 5묶음 → 악마판사 */
+/** [전부 써줘] 차례 — 시장조사 → (요약 전 확인) → 요약 → 자체점검 → 본문 5묶음 → 자체점검 */
 export const VPLAN_STEPS: readonly { key: VPlanStep; label: string }[] = [
   { key: 'market', label: '시장조사(TAM · SAM · SOM)' },
   { key: 'sum', label: '요약 · 핵심 요약' },
-  { key: 'judgeSum', label: '악마판사 ① 요약' },
+  { key: 'judgeSum', label: '자체점검 ① 요약' },
   { key: 'p1', label: '[1] 개발 배경 · 경쟁력' },
   { key: 'p2', label: '[1] 기술개발 경과 · 3년 계획' },
   { key: 'g1', label: '[2] 목표시장 · 경쟁사' },
   { key: 'g2', label: '[2] 시장진입 경과 · 3년 계획' },
   { key: 'x', label: '[1] 기업가정신 · [2] 자금운용' },
-  { key: 'judgeAll', label: '악마판사 ② 전체' },
+  { key: 'judgeAll', label: '자체점검 ② 전체' },
 ]
 
 export const fieldsOfBatch = (b: VPlanBatch) => VPLAN_FIELDS.filter((f) => f.batch === b)
@@ -162,7 +162,7 @@ export function buildMarketContext(input: { state: VPlanState; facts: VPlanFacts
   }
 }
 
-/** D-263 악마판사에게 보낼 자료 — 판정 범위(요약 · 전체)의 칸 · 시장조사 · 확인된 사실 · 칸 규칙(짧게) */
+/** D-263 자체점검에게 보낼 자료 — 판정 범위(요약 · 전체)의 칸 · 시장조사 · 확인된 사실 · 칸 규칙(짧게) */
 export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
   const { scope, state, facts, today, gate } = input
   const fields = VPLAN_FIELDS.filter((f) => f.kind === 'text' || f.kind === 'line').filter((f) => (scope === 'sum' ? f.part === 'summary' || f.part === 'core' : true))
@@ -177,7 +177,7 @@ export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: 
     ...fields.map((f) => `칸 ${f.id} = ${f.no} ${f.title}${f.limit ? ` (${f.limit}자 안 · 850~950자 권장)` : ''}${f.template ? ` · 문장 틀: ${f.template}` : ''}${f.checks ? ` · 체크 선택지: ${f.checks.join(' / ')}` : ''}`),
   ]
   return {
-    title: `벤처기업확인 사업계획서 — 악마판사 ${scope === 'sum' ? '①' : '②'}`,
+    title: `벤처기업확인 사업계획서 — 자체점검 ${scope === 'sum' ? '①' : '②'}`,
     today,
     purpose: `판정 범위: ${scope === 'sum' ? '요약' : '전체'}`,
     sections: [
@@ -191,7 +191,7 @@ export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: 
   }
 }
 
-/** 악마판사가 고친 칸 → 칸 초안(판정 범위 안의 글 칸만 · 사람이 고친 칸은 mergeDraft 가 새 안으로) */
+/** 자체점검가 고친 칸 → 칸 초안(판정 범위 안의 글 칸만 · 사람이 고친 칸은 mergeDraft 가 새 안으로) */
 export function judgeItemsOf(rewrites: AssistItem[], scope: 'sum' | 'full'): DraftItem[] {
   const inScope = VPLAN_FIELDS.filter((f) => f.kind === 'text' || f.kind === 'line').filter((f) => (scope === 'sum' ? f.part === 'summary' || f.part === 'core' : true))
   const out: DraftItem[] = []

@@ -67,7 +67,7 @@ export function ThreadTab({ focus }: { focus?: string }) {
       </div>
 
       <p className="t-meta break-keep text-slate-500">
-        실패 예 (Master §35-1): 특허 = 작업지연 위험 분석 / MVP = 고객 예약 플랫폼 / 사업계획서 = 재고 최적화 — 핵심이 서로 다르면 서류가 많아도 설득력이 없습니다.
+        실패 예: 특허 = 작업지연 위험 분석 / MVP = 고객 예약 플랫폼 / 사업계획서 = 재고 최적화 — 핵심이 서로 다르면 서류가 많아도 설득력이 없습니다.
       </p>
     </div>
   )

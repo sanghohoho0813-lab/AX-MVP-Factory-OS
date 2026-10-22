@@ -26,7 +26,7 @@ export function FreshnessBlock({ scope, title, ok, highlighted = false }: { scop
   const add = async () => {
     const rec: PolicyFreshness = { scope, checkedAt: todayLocalDate(), source: source.trim() || SOURCE_HINT[scope].split(' — ')[0], differences: diff.trim() }
     update((cur) => ({ ...cur, freshness: [rec, ...cur.freshness] }))
-    await decide({ stageKey: scope === 'patent_filing' ? 'S7' : 'S14', kind: 'policy', summary: `최신 공식 기준 확인 · ${rec.source}`, reason: rec.differences || '이 Master 와 차이 없음' })
+    await decide({ stageKey: scope === 'patent_filing' ? 'S7' : 'S14', kind: 'policy', summary: `최신 공식 기준 확인 · ${rec.source}`, reason: rec.differences || '이 기준 와 차이 없음' })
     setSource('')
     setDiff('')
   }
@@ -37,10 +37,10 @@ export function FreshnessBlock({ scope, title, ok, highlighted = false }: { scop
         <h3 className="t-card text-slate-900">{title}</h3>
         <Badge tone={ok ? 'success' : 'warning'}>{ok ? `${FRESHNESS_DAYS}일 이내 확인됨` : '확인 필요'}</Badge>
       </div>
-      <p className="t-sub break-keep text-slate-500">공식 최신 기준이 이 Master 보다 우선합니다. 확인처: {SOURCE_HINT[scope]}. 오래된 수치를 영구 고정값으로 취급하지 않습니다.</p>
+      <p className="t-sub break-keep text-slate-500">공식 최신 기준이 이 기준 보다 우선합니다. 확인처: {SOURCE_HINT[scope]}. 오래된 수치를 영구 고정값으로 취급하지 않습니다.</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <TextField label="확인한 곳" value={source} onCommit={setSource} placeholder={SOURCE_HINT[scope].split(' — ')[0]} />
-        <TextField label="이 Master 와 달랐던 점" value={diff} onCommit={setDiff} placeholder="없으면 비워 둡니다" />
+        <TextField label="이 기준 와 달랐던 점" value={diff} onCommit={setDiff} placeholder="없으면 비워 둡니다" />
       </div>
       <Button variant="primary" className="self-start" onClick={() => void add()}>오늘 확인했다고 기록</Button>
       {records.length > 0 && (

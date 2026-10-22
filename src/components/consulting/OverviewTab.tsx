@@ -188,7 +188,7 @@ export function OverviewTab() {
       </Disclosure>
 
       <p className="t-meta text-slate-400">
-        {STAGES.length}단계 · 현재 {p.currentStage} <StageBadge status={p.stages[p.currentStage].status} /> · Master 활성 PART: {def.activeParts}
+        {STAGES.length}단계 · 현재 {p.currentStage} <StageBadge status={p.stages[p.currentStage].status} /> · 활성 PART: {def.activeParts}
       </p>
     </div>
   )

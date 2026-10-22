@@ -86,7 +86,7 @@ const answer = (id) => {
   }
 }
 
-/* D-263 악마판사 — ① 구성: 1번째 88점(권리축 마지막 줄 고침) → 고친 글로 다시 판정 93점 · ② 전체: 94점 · 청구항 고침 · 대표 확인 하나 */
+/* D-263 자체점검 — ① 구성: 1번째 88점(권리축 마지막 줄 고침) → 고친 글로 다시 판정 93점 · ② 전체: 94점 · 청구항 고침 · 대표 확인 하나 */
 let judgeParts = 0
 const judgeAnswer = (purpose) => {
   if (/구성/.test(purpose)) {
@@ -156,8 +156,8 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   // 고른 모델(GPT)은 이 브라우저에 기억된 것 — 새 명세서도 그 모델로 쓴다
   await page.evaluate(() => localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' })))
-  // D-263 대표가 붙여 넣은 /악마판사 정의 — 판사 · 쓰기 단추마다 같이 가야 한다
-  await page.evaluate(() => localStorage.setItem('axmvp.ai.judgeSkill.v1', '/악마판사 — 대표정의표식: 심사관처럼 공격하고 점수로 판정한다'))
+  // D-263 대표가 붙여 넣은 /자체점검 정의 — 자체점검 · 쓰기 단추마다 같이 가야 한다
+  await page.evaluate(() => localStorage.setItem('axmvp.ai.judgeSkill.v1', '/자체점검 — 대표정의표식: 심사관처럼 공격하고 점수로 판정한다'))
   // 이 회사와 이어진 AI 작업실 자료 — 저절로 쓰기에도 재료로 들어가야 한다(회사 기록이 늦게 와도 자료를 읽은 뒤 시작)
   await page.evaluate((cid) => {
     const at = new Date().toISOString()
@@ -184,9 +184,9 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.waitForTimeout(500)
   await page.getByTestId('spec-cards-toggle').click()
   const order = sent.map((r) => r.assistId).join()
-  check('B8 차례 — 아이디어 → 조사 → 구성 → 악마판사 ①(88점 · 고친 뒤 다시 93점) → 본문 a~d → 청구항 → 악마판사 ② → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.judge,spec.judge,spec.a,spec.b,spec.c,spec.d,spec.e,spec.judge,spec.fix', order)
+  check('B8 차례 — 아이디어 → 조사 → 구성 → 자체점검 ①(88점 · 고친 뒤 다시 93점) → 본문 a~d → 청구항 → 자체점검 ② → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.judge,spec.judge,spec.a,spec.b,spec.c,spec.d,spec.e,spec.judge,spec.fix', order)
   const judges = sent.filter((r) => r.assistId === 'spec.judge')
-  check('B8b 악마판사 범위 — ① 구성 · ② 전체 · 대표 정의(skill)가 판사 · 쓰기 단추에 같이 감 · 아이디어 · 조사에는 안 감', /구성/.test(judges[0]?.context?.purpose) && /전체/.test(judges[2]?.context?.purpose) && judges.every((r) => /대표정의표식/.test(r.skill ?? '')) && /대표정의표식/.test(sent.find((r) => r.assistId === 'spec.a')?.skill ?? '') && !sent.find((r) => r.assistId === 'spec.idea')?.skill && !sent.find((r) => r.assistId === 'spec.research')?.skill, judges.map((r) => r.context?.purpose))
+  check('B8b 자체점검 범위 — ① 구성 · ② 전체 · 대표 정의(skill)가 자체점검 · 쓰기 단추에 같이 감 · 아이디어 · 조사에는 안 감', /구성/.test(judges[0]?.context?.purpose) && /전체/.test(judges[2]?.context?.purpose) && judges.every((r) => /대표정의표식/.test(r.skill ?? '')) && /대표정의표식/.test(sent.find((r) => r.assistId === 'spec.a')?.skill ?? '') && !sent.find((r) => r.assistId === 'spec.idea')?.skill && !sent.find((r) => r.assistId === 'spec.research')?.skill, judges.map((r) => r.context?.purpose))
   check('B9 고른 모델로 부름(GPT)', sent.every((r) => r.choice?.provider === 'openai' && r.choice?.model === 'gpt-5.4-mini'), sent.map((r) => r.choice))
   const phases = await page.getByTestId('spec-board-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-phase')))
   check('B10 단계 줄 모두 다 씀', phases.every((p) => p === 'done'), phases)
@@ -204,12 +204,14 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B17 본문 7칸 모두 씀', body.length === 7 && body.every((x) => x === 'yes'), body)
   check('B18 청구항 3개', /청구항 3개/.test(await page.getByTestId('spec-board-claims').innerText()))
   check('B19 점검대로 고치기 — 걸린 것(요약 400자 넘음)을 보냄', JSON.stringify(sent.find((r) => r.assistId === 'spec.fix')?.context ?? '').includes('요약이'))
-  check('B20 AI 가 확인해 달라는 점 따로(본문 · 악마판사 대표 확인)', /종래 기술 출처 확인/.test(await page.getByTestId('spec-board-asks').innerText()) && /현장 시험 오차/.test(await page.getByTestId('spec-board-asks').innerText()))
-  check('B20b 악마판사 판정이 맨 위에 — ② 94점 · 통과 · 직접 고친 칸 청구항 · 대표 정의 표시', (await page.getByTestId('spec-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('spec-judge').getAttribute('data-pass')) === 'yes' && /청구항/.test(await page.getByTestId('spec-judge').innerText()) && /대표 정의/.test(await page.getByTestId('spec-judge').innerText()))
+  check('B20 AI 가 확인해 달라는 점 따로(본문 · 자체점검 대표 확인)', /종래 기술 출처 확인/.test(await page.getByTestId('spec-board-asks').innerText()) && /현장 시험 오차/.test(await page.getByTestId('spec-board-asks').innerText()))
+  check('B20b 자체점검 판정이 맨 위에 — ② 94점 · 통과 · 직접 고친 칸 청구항 · 대표 기준 표시', (await page.getByTestId('spec-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('spec-judge').getAttribute('data-pass')) === 'yes' && /청구항/.test(await page.getByTestId('spec-judge').innerText()) && /대표 기준/.test(await page.getByTestId('spec-judge').innerText()))
   const store = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => /spec|patent/i.test(k)).map(([, v]) => v).join('\n'))
-  check('B20c 판사가 고친 글이 초안에 들어감 — 권리축 마지막 줄 · 청구항 1(마모 지수와 작업 일정 연결)', store.includes('마모 지수와 작업 일정을 함께 써서 교체 시점을 산출하는') && store.includes('교체 시점을 산출하는 교체시점 산출부'), store.length)
+  check('B20c 자체점검이 고친 글이 초안에 들어감 — 권리축 마지막 줄 · 청구항 1(마모 지수와 작업 일정 연결)', store.includes('마모 지수와 작업 일정을 함께 써서 교체 시점을 산출하는') && store.includes('교체 시점을 산출하는 교체시점 산출부'), store.length)
+  const BANNED = new RegExp(['\uC545\uB9C8', '\uD310\uC0AC', '\uC774\uC0C1\uD55C\\s*(?:\uB9C8\uCF00\uD305\\s*)?AI', 'Master v', 'Judge Scorecard'].join('|'), 'i')
+  check('B20e 화면 어디에도 쓰지 않는 이름 · 출처 이름 없음 — 카드 이름 "자체점검"', !BANNED.test(await page.locator('body').innerText()) && /자체점검/.test(await page.getByTestId('spec-board').innerText()))
   const judgeRows = await page.locator('[data-testid="spec-board-row"][data-stage^="judge"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-stage')}:${e.getAttribute('data-phase')}:${e.textContent}`))
-  check('B20d 진행 줄에 악마판사 ① · ② — 점수 · 고친 칸 · "고친 뒤 다시 판정"', judgeRows.length === 2 && /judge1:done:.*93점.*권리축.*고친 뒤 다시 판정/.test(judgeRows[0]) && /judge2:done:.*94점.*청구항/.test(judgeRows[1]), judgeRows)
+  check('B20d 진행 줄에 자체점검 ① · ② — 점수 · 고친 칸 · "고친 뒤 다시 판정"', judgeRows.length === 2 && /judge1:done:.*93점.*권리축.*고친 뒤 다시 판정/.test(judgeRows[0]) && /judge2:done:.*94점.*청구항/.test(judgeRows[1]), judgeRows)
   const doneCards = await page.getByTestId('spec-card').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-card')}:${e.getAttribute('data-done')}`))
   check('B21 칸 다섯 이상 다 됨 표시', doneCards.filter((x) => x.endsWith(':yes')).length >= 5, doneCards)
   await shot(page, 'B-done')

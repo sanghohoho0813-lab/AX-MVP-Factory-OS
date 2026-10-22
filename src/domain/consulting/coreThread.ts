@@ -59,7 +59,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
         out.push({
           code: `thread_drift_${k}`,
           severity: 'p1',
-          message: `${josa(CORE_THREAD_LABEL[k], '이/가')} 핵심 해결기술과 같은 낱말을 하나도 쓰지 않습니다 — 서로 다른 기술로 읽힐 수 있습니다 (Master §35-1).`,
+          message: `${josa(CORE_THREAD_LABEL[k], '이/가')} 핵심 해결기술과 같은 낱말을 하나도 쓰지 않습니다 — 서로 다른 기술로 읽힐 수 있습니다.`,
           tab: 'thread',
           focus: k,
         })
@@ -74,7 +74,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
       out.push({
         code: 'patent_registered_wording',
         severity: 'p0',
-        message: '아직 등록되지 않은 특허를 "등록" 으로 적은 곳이 있습니다. 등록 전에는 "특허출원 중" 으로 씁니다 (Master §14-2).',
+        message: '아직 등록되지 않은 특허를 "등록" 으로 적은 곳이 있습니다. 등록 전에는 "특허출원 중" 으로 씁니다.',
         tab: 'patent',
       })
     }
@@ -86,7 +86,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
     out.push({
       code: 'ax_called_ai',
       severity: 'p1',
-      message: `AX 기능 방식이 "${p.mvp.axMode}" 인데 문장에서 AI 라고 부릅니다. 분석로직·자동판단·점수기반 추천처럼 실제에 맞는 말로 바꿉니다 (Master §18-2).`,
+      message: `AX 기능 방식이 "${p.mvp.axMode}" 인데 문장에서 AI 라고 부릅니다. 분석로직·자동판단·점수기반 추천처럼 실제에 맞는 말로 바꿉니다.`,
       tab: 'mvp',
       focus: 'axCoreFeature',
     })
@@ -99,7 +99,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
       out.push({
         code: `demo_number_memorized_${k}`,
         severity: 'p0',
-        message: `시연용(demo) 값을 대표가 외울 숫자에 넣었습니다. 실사에서 실적처럼 말하게 됩니다 (Master K10·§49).`,
+        message: `시연용(demo) 값을 대표가 외울 숫자에 넣었습니다. 실사에서 실적처럼 말하게 됩니다.`,
         tab: 'review',
         focus: k,
       })

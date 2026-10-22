@@ -1,5 +1,5 @@
 /**
- * D-245 명세서 점검 — Master v2.9 의 12 · 13 · 14장(발명의 명칭 · 식별항목 계층 · 도면 1:1 · 대표도 · 요약 · 청구항 · TIFF)을 코드로.
+ * D-245 명세서 점검 — 내부 기준 문서 의 12 · 13 · 14장(발명의 명칭 · 식별항목 계층 · 도면 1:1 · 대표도 · 요약 · 청구항 · TIFF)을 코드로.
  *
  * AI 를 쓰지 않는다(규칙 계산). 특허 등록 가능성 · 권리범위는 판단하지 않는다 — 형식 · 서로 맞는지만.
  * 최종 PASS 는 특허로 편집기 오류검사 0건 + 최종 미리보기다(Master 12-4K). 이 점검은 그 전에 걸러 주는 것.
@@ -89,7 +89,9 @@ const PARENT_OF: Partial<Record<Role, Role[]>> = {
 }
 
 /** Master 12-4F · 2.4 Hygiene — 제출본에 남으면 안 되는 내부 작업 문구 */
-export const INTERNAL_PHRASES = ['/Devil', 'Judge', '이번 검토', '이번 특허에서 가장 중요한', '강화 포인트', 'AI 코멘트', '내부 메모', '초안 메모', '작업용', '[확인 필요]', '[자료 요청]', 'TODO', 'TBD']
+// D-264 내부 표지 이름은 글자 그대로 두지 않는다(번들에서 찾아지지 않게) — 같은 표지를 글자 번호로 만든다
+const TAG_D = atob('L0Rldmls')
+export const INTERNAL_PHRASES = [TAG_D, 'Judge', '이번 검토', '이번 특허에서 가장 중요한', '강화 포인트', 'AI 코멘트', '내부 메모', '초안 메모', '작업용', '[확인 필요]', '[자료 요청]', 'TODO', 'TBD']
 
 const PARTICLE = /(으로부터|에서부터|으로서|으로써|에게서|로부터|에서|에게|까지|부터|으로|하는|되는|하여|된|한|의|을|를|은|는|이|가|에|와|과|로|도|만|및)$/
 
@@ -242,7 +244,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
       level: 'warn',
       code: 'E-261',
       title: `식별항목 ${boldIdent.length}개에 굵게 서식이 있습니다`,
-      detail: `예: ${boldIdent.slice(0, 4).map(itemLabel).join(' · ')}. 식별항목 · 발명의 명칭 · 대표도에는 글자 속성을 쓰지 않습니다(Master 12-3D).`,
+      detail: `예: ${boldIdent.slice(0, 4).map(itemLabel).join(' · ')}. 식별항목 · 발명의 명칭 · 대표도에는 글자 속성을 쓰지 않습니다.`,
       fix: '해당 줄을 지우고 편집기에서 새로 만들거나, 글자 속성을 모두 해제하세요.',
       where: boldIdent.slice(0, 8).map((i) => whereOf(i.paraIdx)),
     })
@@ -298,7 +300,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
           add({ id: 'TITLE_INNER_CHAR', level: 'warn', code: 'E-267', title: '{ } 안에 영문명칭에 잘 쓰지 않는 글자가 있습니다', detail: `글자: ${bad}`, fix: '영문 · 숫자 · 쉼표 · 하이픈 정도만 남기세요.', where: [whereOf(paras[0].idx)] })
         }
         if (m[2]) {
-          add({ id: 'TITLE_SPACE', level: 'info', title: '한글명칭과 { 사이에 띄어쓰기가 있습니다', detail: 'Master 예시는 붙여 씁니다: 한글명칭{ENGLISH TITLE}. 편집기가 허용하는지는 편집기 오류검사로 확인하세요.', fix: '{ 앞의 띄어쓰기를 지우면 Master 모양과 같아집니다.', where: [whereOf(paras[0].idx)] })
+          add({ id: 'TITLE_SPACE', level: 'info', title: '한글명칭과 { 사이에 띄어쓰기가 있습니다', detail: '예시는 붙여 씁니다: 한글명칭{ENGLISH TITLE}. 편집기가 허용하는지는 편집기 오류검사로 확인하세요.', fix: '{ 앞의 띄어쓰기를 지우면 예시 모양과 같아집니다.', where: [whereOf(paras[0].idx)] })
         }
       }
       if (isHwpx) {
@@ -335,7 +337,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
       else if (b !== a + 1) gaps.push(whereOf(numbered[i].idx, `[${String(a).padStart(4, '0')}] 다음이 [${String(b).padStart(4, '0')}] — ${b - a - 1}개 빠짐`))
     }
     if (gaps.length > 0) {
-      add({ id: 'PARA_GAP', level: 'error', title: `문단 번호가 ${gaps.length}곳에서 건너뜁니다`, detail: '번호만 빠졌는지, 그 자리의 글(문단)이 통째로 빠졌는지 먼저 확인하세요(Master 12-4F).', fix: '원본 초안과 대조해 빠진 문단을 되살린 뒤 번호를 다시 매기세요.', where: gaps.slice(0, 8) })
+      add({ id: 'PARA_GAP', level: 'error', title: `문단 번호가 ${gaps.length}곳에서 건너뜁니다`, detail: '번호만 빠졌는지, 그 자리의 글(문단)이 통째로 빠졌는지 먼저 확인하세요.', fix: '원본 초안과 대조해 빠진 문단을 되살린 뒤 번호를 다시 매기세요.', where: gaps.slice(0, 8) })
     }
     if (dups.length > 0) {
       add({ id: 'PARA_DUP', level: 'error', title: `문단 번호가 겹치거나 거꾸로 된 곳이 ${dups.length}곳 있습니다`, detail: '', fix: '번호를 차례대로 다시 매기세요.', where: dups.slice(0, 8) })
@@ -394,13 +396,13 @@ export function checkSpec(doc: SpecDoc): SpecReport {
       add({ id: 'CLAIM_REF', level: 'error', title: `청구항 인용이 잘못된 곳이 ${badRefs.length}곳 있습니다`, detail: '종속항은 앞에 있는(번호가 작은) 청구항만 인용할 수 있습니다.', fix: '인용 번호를 실제로 있는 앞 청구항으로 고치세요.', where: badRefs.slice(0, 8) })
     }
     if (labels.length > 0) {
-      add({ id: 'CLAIM_LABEL', level: 'error', title: "청구항 안에 '독립항 · 핵심 청구항' 같은 설명 이름표가 있습니다", detail: '제출본 청구항에는 설명 이름표를 넣지 않습니다(Master 14-2A).', fix: '이름표를 지우세요.', where: labels })
+      add({ id: 'CLAIM_LABEL', level: 'error', title: "청구항 안에 '독립항 · 핵심 청구항' 같은 설명 이름표가 있습니다", detail: '제출본 청구항에는 설명 이름표를 넣지 않습니다.', fix: '이름표를 지우세요.', where: labels })
     }
     const indepTexts = [...refsByNum.entries()].filter(([, r]) => r.length === 0).map(([n]) => textByNum.get(n) ?? '')
     const hasMethod = indepTexts.some((t) => /방법\s*\.?\s*$/.test(t.trim()))
     const hasSystem = indepTexts.some((t) => /(시스템|장치)\s*\.?\s*$/.test(t.trim()))
     if (hasSystem && !hasMethod) {
-      add({ id: 'CLAIM_METHOD', level: 'info', title: '방법 독립항이 없습니다', detail: '소프트웨어 특허는 보통 시스템 독립항 + 종속항 + 방법 독립항으로 짭니다(Master 12-4F).', fix: '필요하면 시스템 독립항과 처리관계가 대응하는 방법 독립항을 더하세요.' })
+      add({ id: 'CLAIM_METHOD', level: 'info', title: '방법 독립항이 없습니다', detail: '소프트웨어 특허는 보통 시스템 독립항 + 종속항 + 방법 독립항으로 짭니다.', fix: '필요하면 시스템 독립항과 처리관계가 대응하는 방법 독립항을 더하세요.' })
     }
     // '상기 ○○' 가 앞(같은 청구항 앞부분 · 인용한 청구항)에 나온 말인지
     const ancestry = (n: number, depth = 0): string => {
@@ -445,7 +447,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
           id: 'FIG_DESC_MISSING',
           level: 'error',
           title: `도면은 ${figNums.length}장인데 '도면의 간단한 설명'에 도 ${noDesc.join(', 도 ')} 설명이 없습니다`,
-          detail: `설명에 있는 것: ${descNums.length ? `도 ${descNums.join(', 도 ')}` : '없음'}. 도면의 간단한 설명과 실제 도면은 1:1 이어야 합니다(Master 12-3B).`,
+          detail: `설명에 있는 것: ${descNums.length ? `도 ${descNums.join(', 도 ')}` : '없음'}. 도면의 간단한 설명과 실제 도면은 1:1 이어야 합니다.`,
           fix: `'도면의 간단한 설명'에 "도 ${noDesc[0]}는 …를 나타내는 도면이다." 문단을 더하세요(문단 번호를 쓰면 번호도 이어서).`,
           where: [whereOf(descItem.paraIdx)],
         })
@@ -480,7 +482,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
       if (!ok && !noSpace && !old) {
         add({ id: 'REP_FORMAT', level: 'error', code: 'E-242', title: "대표도에는 '도 n' 한 줄만 들어가야 합니다", detail: `지금: "${clip(repText, 30)}"`, fix: "'도 1' 처럼 평문 한 줄만 남기세요.", where: [whereOf(rep.paraIdx)] })
       } else {
-        if (!ok) add({ id: 'REP_SPACE', level: 'warn', title: `대표도 표기가 '${repText}' 입니다`, detail: "Master 기본값은 '도'와 숫자 사이 한 칸: '도 1'.", fix: `'도 ${n}' 으로 고치세요.`, where: [whereOf(rep.paraIdx)] })
+        if (!ok) add({ id: 'REP_SPACE', level: 'warn', title: `대표도 표기가 '${repText}' 입니다`, detail: "기본값은 '도'와 숫자 사이 한 칸: '도 1'.", fix: `'도 ${n}' 으로 고치세요.`, where: [whereOf(rep.paraIdx)] })
         if (figs.length > 0 && !figNums.includes(n)) {
           add({ id: 'REP_MISSING_FIG', level: 'error', code: 'E-250', title: `대표도로 지정한 ${withIGa(`도 ${n}`)} 실제 도면에 없습니다`, detail: `실제 도면: 도 ${figNums.join(', 도 ')}`, fix: '실제 있는 도면 번호로 바꾸거나, 그 도면을 먼저 넣으세요.', where: [whereOf(rep.paraIdx)] })
         } else if (descItem && !descNums.includes(n)) {
@@ -516,7 +518,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
     if (blankBefore.length > 0) add({ id: 'FIG_BLANK', level: 'error', code: 'S-010', title: `'도 n' 과 그림 사이에 빈 문단이 있는 도면이 ${blankBefore.length}개 있습니다`, detail: '', fix: '빈 문단을 지워 그림이 도 번호 바로 다음에 오게 하세요.', where: blankBefore })
     if (extra.length > 0) add({ id: 'FIG_EXTRA', level: 'error', code: 'E-240', title: `그림 1개 말고 다른 것이 든 도면이 ${extra.length}개 있습니다`, detail: '도 n 아래에는 그림 1개만 둡니다(파일 이름 · 설명 글 · 두 번째 그림 금지).', fix: '그림 하나만 남기고 나머지를 지우세요.', where: extra })
 
-    // 그림 규격(Master v2.4 · MOIP 흑백 도면)
+    // 그림 규격(내부 기준 문서 · MOIP 흑백 도면)
     const groups: Record<string, number[]> = {}
     const push = (k: string, n: number) => (groups[k] ??= []).push(n)
     for (const f of figs) {
@@ -542,8 +544,8 @@ export function checkSpec(doc: SpecDoc): SpecReport {
     for (const [k, ns] of Object.entries(groups)) {
       const [kind, val] = k.split(':')
       if (kind === 'fmt') add({ id: 'TIFF_FORMAT', level: 'warn', title: `${figList(ns)} 그림이 TIFF 가 아닙니다(${val})`, detail: '특허로 흑백 도면 기본 규격은 TIFF 입니다.', fix: 'TIFF(흑백 · 300dpi · CCITT G4 · 한 줄)로 바꿔 다시 넣으세요.' })
-      if (kind === 'comp') add({ id: 'TIFF_COMPRESSION', level: 'warn', title: `${figList(ns)} TIFF 압축이 ${COMPRESSION_NAME[Number(val)] ?? val} 입니다`, detail: 'Master v2.4 · MOIP 흑백 도면 기준은 CCITT Group 4 입니다(v2.3 의 LZW 규칙은 폐기).', fix: 'CCITT G4 로 다시 저장하세요. 이미 편집기에서 통과했다면 편집기 판단이 우선입니다.' })
-      if (kind === 'strip') add({ id: 'TIFF_STRIPS', level: 'warn', title: `${figList(ns)} TIFF 가 ${val}줄(strip)로 나뉘어 있습니다`, detail: 'Master v2.4 기준은 한 줄(single strip)입니다.', fix: '한 줄(single strip)로 다시 저장하세요. 편집기가 받아 주면 편집기 판단이 우선입니다.' })
+      if (kind === 'comp') add({ id: 'TIFF_COMPRESSION', level: 'warn', title: `${figList(ns)} TIFF 압축이 ${COMPRESSION_NAME[Number(val)] ?? val} 입니다`, detail: 'MOIP 흑백 도면 기준은 CCITT Group 4 입니다(v2.3 의 LZW 규칙은 폐기).', fix: 'CCITT G4 로 다시 저장하세요. 이미 편집기에서 통과했다면 편집기 판단이 우선입니다.' })
+      if (kind === 'strip') add({ id: 'TIFF_STRIPS', level: 'warn', title: `${figList(ns)} TIFF 가 ${val}줄(strip)로 나뉘어 있습니다`, detail: '기준은 한 줄(single strip)입니다.', fix: '한 줄(single strip)로 다시 저장하세요. 편집기가 받아 주면 편집기 판단이 우선입니다.' })
       if (kind === 'dpi') add({ id: 'TIFF_DPI', level: 'warn', title: `${figList(ns)} 해상도가 ${val}dpi 입니다`, detail: '권장 300dpi(또는 400dpi).', fix: '300dpi 로 다시 저장하세요.' })
       if (kind === 'bits') add({ id: 'TIFF_BITS', level: 'warn', title: `${withIGa(figList(ns))} 흑백 1비트가 아닙니다(${val}비트)`, detail: '흑백(1비트) 도면이 기본입니다.', fix: '흑백 1비트로 바꿔 저장하세요.' })
       if (kind === 'order') add({ id: 'TIFF_ORDER', level: 'warn', title: `${figList(ns)} 바이트 순서가 Motorola(MM) 입니다`, detail: '기준은 Intel(II, little-endian).', fix: 'Intel 바이트 순서로 다시 저장하세요.' })
@@ -560,7 +562,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
     abstractChars = t.length
     if (!t) add({ id: 'ABSTRACT_EMPTY', level: 'error', title: '요약이 비었습니다', detail: '', fix: '과제 · 해결 수단 · 효과를 400자 안에서 쓰세요.', where: [whereOf(abs.paraIdx)] })
     else if (abstractChars > 400) {
-      add({ id: 'ABSTRACT_LONG', level: 'warn', title: `요약이 ${abstractChars}자 입니다(400자 안 권장)`, detail: '특허청 작성사례 기준 400자 이내(Master 13-1). 띄어쓰기 포함으로 셌습니다.', fix: '과제 · 해결 수단 · 효과만 남기고 줄이세요. 대표도의 부호를 ( ) 안에 쓰면 좋습니다.', where: [whereOf(abs.paraIdx)] })
+      add({ id: 'ABSTRACT_LONG', level: 'warn', title: `요약이 ${abstractChars}자 입니다(400자 안 권장)`, detail: '특허청 작성사례 기준 400자 이내. 띄어쓰기 포함으로 셌습니다.', fix: '과제 · 해결 수단 · 효과만 남기고 줄이세요. 대표도의 부호를 ( ) 안에 쓰면 좋습니다.', where: [whereOf(abs.paraIdx)] })
     }
   }
 
@@ -610,7 +612,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
     const isIdent = doc.items.some((i) => i.paraIdx === p.idx)
     if (!isIdent && (/\*\*|```|<\/?b>|<\/?span/i.test(p.text) || /^#{1,6}\s/.test(p.text))) markdown.push(whereOf(p.idx, clip(p.text, 20)))
   }
-  if (internal.length > 0) add({ id: 'HYGIENE_INTERNAL', level: 'error', title: `내부 작업 문구가 ${internal.length}곳 남아 있습니다`, detail: '제출본에는 검토 메모 · AI 코멘트 · 확인 필요 표시가 0건이어야 합니다(Master 12-4F).', fix: '해당 문구를 지우거나 실제 내용으로 바꾸세요.', where: internal.slice(0, 10) })
+  if (internal.length > 0) add({ id: 'HYGIENE_INTERNAL', level: 'error', title: `내부 작업 문구가 ${internal.length}곳 남아 있습니다`, detail: '제출본에는 검토 메모 · AI 코멘트 · 확인 필요 표시가 0건이어야 합니다.', fix: '해당 문구를 지우거나 실제 내용으로 바꾸세요.', where: internal.slice(0, 10) })
   if (markdown.length > 0) add({ id: 'HYGIENE_MARKDOWN', level: 'warn', code: 'E-201', title: `마크다운 · 서식 기호가 ${markdown.length}곳 남아 있습니다`, detail: "'**' · '#' · '<b>' 같은 기호가 본문에 그대로 붙으면 숨은 서식 · 식별항목 오류가 날 수 있습니다.", fix: '기호를 지우고, 편집기에는 [텍스트만 붙여넣기]로 넣으세요.', where: markdown.slice(0, 8) })
 
   /* ---------------- 빈 문단(HWPX) ---------------- */

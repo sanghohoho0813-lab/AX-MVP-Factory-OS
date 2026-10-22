@@ -7,7 +7,7 @@
  *   parts     구성 · 단계 써줘 — 권리축 7줄 · 시스템 이름 · 구성요소 · 단계 · 종속항 씨앗(부호는 OS 가 110 부터)
  *   a~e       본문 · 청구항   — D-247 의 다섯 묶음 그대로(specDraftAi)
  *   fix       점검대로 고쳐줘 — 규칙 점검(checkDraft · checkSpec)에서 걸린 칸만 다시
- * 기준 문서(Master v2.9 · AX펭귄)는 서버가 단추마다 붙인다(api/_ai/knowledge.js) — 여기서는 자료만 보낸다.
+ * 기준 문서(내부 기준 문서 · 내부 기준 문서)는 서버가 단추마다 붙인다(api/_ai/knowledge.js) — 여기서는 자료만 보낸다.
  * 사람이 고친 칸은 덮지 않는다(본문 · 청구항은 새 안으로 · 구성은 그대로 두고 알림). 규칙 점검은 AI 가 아니다.
  */
 import type { AssistAnswer, AssistItem, AssistRun } from '../aiAssist/client'
@@ -49,10 +49,10 @@ export const STAGES: readonly { key: AgentStage; card: AgentCard; assistId: stri
   { key: 'idea', card: 'idea', assistId: 'spec.idea', label: '아이디어 3개', seconds: 30 },
   { key: 'research', card: 'research', assistId: 'spec.research', label: '선행기술 · 차별화 조사', seconds: 40 },
   { key: 'parts', card: 'parts', assistId: 'spec.parts', label: '권리축 · 구성요소 · 단계', seconds: 30 },
-  // D-263 악마판사 — 구성 뒤 · 청구항 뒤에 반드시(판정 + 직접 고침)
-  { key: 'judge1', card: 'judge', assistId: 'spec.judge', label: '악마판사 ① 구성 · 권리축', seconds: 40 },
+  // D-263 자체점검 — 구성 뒤 · 청구항 뒤에 반드시(판정 + 직접 고침)
+  { key: 'judge1', card: 'judge', assistId: 'spec.judge', label: '자체점검 ① 구성 · 권리축', seconds: 40 },
   ...SPEC_BATCHES.map((b) => ({ key: b.key as AgentStage, card: (b.key === 'e' ? 'claims' : 'body') as AgentCard, assistId: b.assistId, label: b.label, seconds: 30 })),
-  { key: 'judge2', card: 'judge', assistId: 'spec.judge', label: '악마판사 ② 명세서 전체', seconds: 50 },
+  { key: 'judge2', card: 'judge', assistId: 'spec.judge', label: '자체점검 ② 명세서 전체', seconds: 50 },
   { key: 'fix', card: 'check', assistId: 'spec.fix', label: '점검대로 고치기', seconds: 40 },
 ]
 
@@ -173,7 +173,7 @@ export function clearAfterIdea(d: SpecDraft): SpecDraft {
 }
 
 /** 구성 · 본문 · 청구항 중 하나라도 있나 */
-/** 본문 칸이나 청구항을 이미 썼나(악마판사 ① 이 구성 이름을 바꾸면 안 되는 때 · 판사 카드는 ② 만) */
+/** 본문 칸이나 청구항을 이미 썼나(자체점검 ① 이 구성 이름을 바꾸면 안 되는 때 · 자체점검 카드는 ② 만) */
 export const bodyWritten = (d: SpecDraft) => d.claims.some((c) => c.trim()) || SECTION_KEYS.some((k) => (d.text[k] ?? '').trim())
 
 export const hasLaterWork = (d: SpecDraft) => d.components.some((c) => c.name.trim()) || claimsOf(d).length > 0 && d.claims.length > 0 || SECTION_KEYS.some((k) => (d.text[k] ?? '').trim())
@@ -536,7 +536,7 @@ export function planAll(d: SpecDraft): AgentStage[] {
   if (!d.title.trim() || ideaCount(d) < 3) out.push('idea')
   if (!d.research || d.research.forTitle !== d.title || !d.title.trim()) out.push('research')
   if (d.components.filter((c) => c.name.trim()).length < 2) out.push('parts')
-  // D-263 악마판사는 구성 뒤 · 청구항 뒤에 반드시(구성을 새로 쓰거나 아직 판정 전이면 ①부터 — 본문이 이미 있으면 ② 가 함께 본다)
+  // D-263 자체점검는 구성 뒤 · 청구항 뒤에 반드시(구성을 새로 쓰거나 아직 판정 전이면 ①부터 — 본문이 이미 있으면 ② 가 함께 본다)
   if (out.includes('parts') || (!d.judge.parts && !bodyWritten(d))) out.push('judge1')
   out.push('a', 'b', 'c', 'd', 'e', 'judge2', 'fix')
   return out
@@ -581,13 +581,13 @@ export function cardState(card: AgentCard, d: SpecDraft): { done: boolean; human
 }
 
 /* ------------------------------------------------------------------ */
-/* D-263 악마판사 — 구성 뒤(①) · 청구항 뒤(②)                              */
+/* D-263 자체점검 — 구성 뒤(①) · 청구항 뒤(②)                              */
 /* ------------------------------------------------------------------ */
 
 export type JudgeScope = 'parts' | 'full'
 export const JUDGE_SCOPE_LABEL: Record<JudgeScope, string> = { parts: '구성', full: '전체' }
 
-/** 판사에게 보낼 자료 — ① 아이디어 · 조사 · 권리축 · 구성 · 단계 · 씨앗 / ② 명칭 · 본문 · 청구항(구체적인 내용은 앞부분만 — 뒷받침 확인용) */
+/** 자체점검에 보낼 자료 — ① 아이디어 · 조사 · 권리축 · 구성 · 단계 · 씨앗 / ② 명칭 · 본문 · 청구항(구체적인 내용은 앞부분만 — 뒷받침 확인용) */
 export function buildJudgeContext(input: { draft: SpecDraft; scope: JudgeScope; today: string }): AssistContext {
   const { draft: d, scope, today } = input
   const comps = d.components.filter((c) => c.name.trim())
@@ -608,13 +608,13 @@ export function buildJudgeContext(input: { draft: SpecDraft; scope: JudgeScope; 
     sections.push({ name: '청구항', rows: claimsOf(d).slice(0, 14).map((c, i) => ({ part: `claims ${i + 1}`, memo: c.slice(0, 560) })) })
     sections.push({ name: '아이디어 · 권리축', rows: ideaRows })
   }
-  return { title: `특허 명세서 — 악마판사 ${scope === 'parts' ? '①' : '②'}`, today, purpose: `판정 범위: ${JUDGE_SCOPE_LABEL[scope]}`, sections }
+  return { title: `특허 명세서 — 자체점검 ${scope === 'parts' ? '①' : '②'}`, today, purpose: `판정 범위: ${JUDGE_SCOPE_LABEL[scope]}`, sections }
 }
 
 /**
- * 판사가 고친 것 합치기 — 사람 글은 보호(구성은 partsHuman · 본문은 mergeSpecAi 새 안).
+ * 자체점검이 고친 것 합치기 — 사람 글은 보호(구성은 partsHuman · 본문은 mergeSpecAi 새 안).
  *  ① 고친 권리축 · 시스템 · 구성 · 단계 · 씨앗을 지금 구성 위에 겹쳐(일부만 와도) applyParts
- *  ② 명칭 · 본문 칸 · 청구항은 applyFix — 구체적인 내용(detail)은 판사가 앞부분만 봤으므로 덮지 않는다
+ *  ② 명칭 · 본문 칸 · 청구항은 applyFix — 구체적인 내용(detail)은 자체점검이 앞부분만 봤으므로 덮지 않는다
  */
 export function applyJudge(d: SpecDraft, scope: JudgeScope, rewrites: AssistItem[]): { draft: SpecDraft; fixed: string[]; kept: string[] } {
   if (!rewrites.length) return { draft: d, fixed: [], kept: [] }

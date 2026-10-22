@@ -1,5 +1,5 @@
 /**
- * D-263 악마판사 답 읽기 — 명세서 · 벤처 사업계획서 판사 단추(spec.judge · venture.judge)가 같은 모양으로 답한다.
+ * D-263 자체점검 답 읽기 — 명세서 · 벤처 사업계획서 자체점검 단추(spec.judge · venture.judge)가 같은 모양으로 답한다.
  *   score   — amount = 합계(100점 만점) · detail = A~J 점수 한 줄
  *   verdict — tag = P0 · 감점 · 대표 확인 · detail = 무엇이 문제 · body = 어떻게 고쳤는지(대표 확인이면 물을 질문)
  *   그 밖   — 고친 칸(title = 칸 이름표 · body = 고친 전체 글)
@@ -21,13 +21,13 @@ export interface JudgeReport {
   /** A~J 점수 한 줄 */
   scores: string
   verdicts: JudgeVerdict[]
-  /** 판사가 직접 고친 칸 이름 */
+  /** 자체점검이 직접 고친 칸 이름 */
   fixed: string[]
   /** 직접 고친 칸이라 덮지 않고 새 안으로 둔 칸 */
   kept: string[]
   /** 몇 번 판정했나(1 = 한 번에 통과 · 2 = 고친 뒤 다시 판정) */
   rounds: number
-  /** 대표가 붙여 넣은 /악마판사 정의로 판정했나 */
+  /** 대표가 붙여 넣은 /자체점검 정의로 판정했나 */
   custom: boolean
   headline: string
 }
@@ -57,7 +57,7 @@ function scoreOf(v: unknown): number | null {
   return n >= 0 && n <= 100 ? n : null
 }
 
-/** 판사 답 → 점수 · 판결 · 고친 칸 */
+/** 자체점검 답 → 점수 · 판정 · 고친 칸 */
 export function judgeOf(answer: AssistAnswer | null): { score: number | null; scores: string; verdicts: JudgeVerdict[]; rewrites: AssistItem[]; headline: string } {
   const items = answer?.items ?? []
   const s = items.find(isScore)
@@ -90,10 +90,10 @@ export function readJudgeReport(v: unknown): JudgeReport | null {
   return { at: str(o.at), scope: str(o.scope), score, scores: str(o.scores), verdicts, fixed: strs(o.fixed), kept: strs(o.kept), rounds: typeof o.rounds === 'number' && o.rounds >= 1 ? Math.min(3, Math.floor(o.rounds)) : 1, custom: o.custom === true, headline: str(o.headline) }
 }
 
-/** 화면 한 줄 — "악마판사 92점 · P0 0 · 고친 칸 2" */
+/** 화면 한 줄 — "자체점검 92점 · P0 0 · 고친 칸 2" */
 export function judgeLine(r: JudgeReport | null | undefined): string {
   if (!r) return ''
   const p0 = r.verdicts.filter((v) => v.level === 'P0').length
   const ask = r.verdicts.filter((v) => v.level === '대표 확인').length
-  return [`악마판사 ${r.score == null ? '점수 없음' : `${r.score}점`}`, `P0 ${p0}`, r.fixed.length ? `직접 고친 칸 ${r.fixed.length}` : '고친 칸 없음', ask ? `대표 확인 ${ask}` : ''].filter(Boolean).join(' · ')
+  return [`자체점검 ${r.score == null ? '점수 없음' : `${r.score}점`}`, `P0 ${p0}`, r.fixed.length ? `직접 고친 칸 ${r.fixed.length}` : '고친 칸 없음', ask ? `대표 확인 ${ask}` : ''].filter(Boolean).join(' · ')
 }

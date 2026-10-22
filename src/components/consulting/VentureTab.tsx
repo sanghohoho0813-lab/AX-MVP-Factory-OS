@@ -1,5 +1,5 @@
 /**
- * 예전 벤처 기록 (D-179 · 읽기 전용) — 사업계획서 7항목 · 신청 정보 · 제출서류 · Red Flag · Judge · 기준 확인.
+ * 예전 벤처 기록 (D-179 · 읽기 전용) — 사업계획서 7항목 · 신청 정보 · 제출서류 · 금지 사항 · 점수 · 기준 확인.
  * LEGACY — 새 벤처 업무는 cert-os/venture 사용. 여기서는 고치지 않고 보여 주기만 한다(입력칸 없음).
  * 기록은 지우지 않는다 — 기업인증의 LEGACY 어댑터가 사업계획 초안 칸 수 · 신청일 · 특허 기록을 계속 읽는다.
  */
@@ -49,7 +49,7 @@ export function VentureTab({ focus }: { focus?: string }) {
 
       <details className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="legacy-venture-more">
         <summary className="tap t-sub cursor-pointer px-4 py-3 font-semibold text-slate-700">
-          그 밖의 예전 기록 — 제출서류 {docsDone}/8 · Red Flag 확인 {cleared}/12 · Judge {total !== null ? `${total}/100` : scored.length ? `${scored.length}축 기록` : '기록 없음'}
+          그 밖의 예전 기록 — 제출서류 {docsDone}/8 · 금지 사항 확인 {cleared}/12 · 점수 {total !== null ? `${total}/100` : scored.length ? `${scored.length}축 기록` : '기록 없음'}
         </summary>
         <div className="flex flex-col gap-4 px-4 pb-4">
           <div className="flex flex-col gap-1">
@@ -63,7 +63,7 @@ export function VentureTab({ focus }: { focus?: string }) {
             </ul>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="t-sub font-semibold text-slate-700">P0 Red Flag — 문제 없음 확인 {cleared}/12</p>
+            <p className="t-sub font-semibold text-slate-700">P0 금지 사항 — 문제 없음 확인 {cleared}/12</p>
             <ul className="flex flex-col gap-0.5">
               {RED_FLAGS.map((f) => (
                 <li key={f.no} className={`t-sub break-keep ${v.redFlagsCleared[f.no] ? 'text-slate-800' : 'text-slate-400'}`}>
@@ -73,7 +73,7 @@ export function VentureTab({ focus }: { focus?: string }) {
             </ul>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="t-sub font-semibold text-slate-700">Judge Scorecard {total === null ? '' : `— ${total}/100 · ${judgeVerdict(total)}`}</p>
+            <p className="t-sub font-semibold text-slate-700">점수표 {total === null ? '' : `— ${total}/100 · ${judgeVerdict(total)}`}</p>
             {scored.length === 0 ? (
               <p className="t-sub text-slate-400">기록 없음</p>
             ) : (

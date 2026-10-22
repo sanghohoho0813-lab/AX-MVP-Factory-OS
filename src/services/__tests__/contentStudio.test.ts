@@ -777,7 +777,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
 }
 
 /* ------------------------------------------------------------------ */
-/* D-234 콘텐츠 작성 규칙집 ⟲4차(이상한AI 4차 실험 — 규칙집 실전 검증 · 규제 업종 4곳) 대조                    */
+/* D-234 콘텐츠 작성 규칙집 ⟲4차(참고한 외부 방법 4차 실험 — 규칙집 실전 검증 · 규제 업종 4곳) 대조                    */
 /* ------------------------------------------------------------------ */
 {
   const rec = (id: string, companyName: string, businessCategory: string, businessItem: string) => normalizeClientOps({ id, companyName, businessCategory, businessItem, businessAddress: '서울특별시 강남구 테헤란로 1', companyPhone: '02-555-1234', establishedAt: '2018-04-01' })

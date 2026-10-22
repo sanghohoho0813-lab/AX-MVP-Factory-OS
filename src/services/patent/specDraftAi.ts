@@ -8,7 +8,7 @@
  *   spec.d 구체적인 내용 ② 흐름 · 나머지 도면 · 변형 실시예
  *   spec.e 청구항(시스템 독립항 + 종속항 + 방법 독립항)
  * 보내는 것: 아이디어 · 권리축 · 명칭 · 구성요소(부호) · 단계 · 도면 · 청구항 뼈대 · 이미 쓴 칸. 사람 이름 · 연락처는 없다.
- * 규칙 출처: Master v2.9 PART 2(8 · 12-1A · 12-2 · 12-4B · 12-4F) — 규칙으로 정한 이름 · 부호 · 도면 번호를 AI 가 바꾸지 못하게 한다.
+ * 규칙 출처: 내부 기준 문서 PART 2(8 · 12-1A · 12-2 · 12-4B · 12-4F) — 규칙으로 정한 이름 · 부호 · 도면 번호를 AI 가 바꾸지 못하게 한다.
  */
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext, AssistRow } from '../aiAssist/context'

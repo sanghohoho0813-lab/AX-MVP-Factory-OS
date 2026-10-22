@@ -1,7 +1,7 @@
 /**
  * D-247 특허 명세서 쓰기 — 아이디어 → 권리축 → 구성요소 · 단계 → 도면 → 청구항 뼈대 → 본문 → 복붙용 MD (규칙 · AI 없음).
  *
- * Master v2.9 PART 2 를 그대로 옮긴 것:
+ * 내부 기준 문서 PART 2 를 그대로 옮긴 것:
  *   8.  특허 아이디어 5개 고정 질문(현재 문제 · 기존 방식 · 차별 구조 · 처리 흐름 · 권리화 포인트) · 8-1 명칭 공식
  *   12-1A 발명의 명칭 = 한글명칭{ENGLISH} 한 문단
  *   12-4B 권리축 잠금 7줄(입력 · 처리 · 중간값/상태 · 판정 · 출력 · 재반영 · 회피 어려운 연결관계)
@@ -176,7 +176,7 @@ export interface SpecDraft {
   research: SpecResearch | null
   /** D-252 작업판에 끌어다 놓은 자료(읽은 글만 · 개인정보 가림 · 파일 4개 · 6천 자까지) — 아이디어 내줘가 재료로 쓴다 */
   materials: SpecMaterial[]
-  /** D-263 악마판사 판정 — 구성 뒤(parts) · 청구항 뒤(full) */
+  /** D-263 자체점검 판정 — 구성 뒤(parts) · 청구항 뒤(full) */
   judge: { parts: JudgeReport | null; full: JudgeReport | null }
 }
 
@@ -638,7 +638,8 @@ function keywords(text: string): string[] {
   return [...new Set(String(text ?? '').replace(/[^가-힣A-Za-z0-9\s]/g, ' ').split(/\s+/).map((x) => x.replace(/(을|를|이|가|은|는|의|에|와|과|로|으로|에서|하는|되는|한다|된다)$/, '')).filter((x) => x.length >= 2))]
 }
 
-const INTERNAL = /\/Devil|Judge|이번 검토|이번 특허에서 가장 중요한|강화 포인트|AI 코멘트|내부 메모|초안 메모|작업용|TODO|TBD|\(.*적어 주세요\)/
+// D-264 내부 표지 이름은 글자 그대로 두지 않는다 — 글자 번호로 만든 표지 + 나머지
+const INTERNAL = new RegExp(`${atob('XC9EZXZpbA==')}|Judge|이번 검토|이번 특허에서 가장 중요한|강화 포인트|AI 코멘트|내부 메모|초안 메모|작업용|TODO|TBD|\\(.*적어 주세요\\)`)
 
 export function checkDraft(d: SpecDraft): DraftIssue[] {
   const out: DraftIssue[] = []

@@ -161,11 +161,11 @@ const FORMAT_HINT: Record<AgentStage, string> = {
   d: '앞 답을 읽지 못했습니다. items 하나 — title = "detail2", body = 구체적인 내용 뒷부분 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
   e: '앞 답을 읽지 못했습니다. items 하나 — title = "claims", body = 청구항 전체(청구항 n. 머리 · 빈 줄로 나눔)로 다시 써 주세요. JSON 한 덩어리만.',
   fix: '앞 답을 읽지 못했습니다. items 의 title = 고칠 칸 이름표(title · titleEn · field · background · problem · solution · effect · detail · abstract · claims), body = 그 칸 전체를 고친 글로 다시 써 주세요. JSON 한 덩어리만.',
-  judge1: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판결은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 것은 spec.parts 이름표(axis.* · system · comp · step · seed)로 다시 써 주세요. JSON 한 덩어리만.',
-  judge2: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판결은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 이름표(title · titleEn · field · background · problem · solution · effect · abstract · claims)","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
+  judge1: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 것은 spec.parts 이름표(axis.* · system · comp · step · seed)로 다시 써 주세요. JSON 한 덩어리만.',
+  judge2: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 이름표(title · titleEn · field · background · problem · solution · effect · abstract · claims)","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
 }
 
-/** D-263 악마판사를 다시 부르는 기준 — 90점 미만이거나 P0 가 남았는데 판사가 고친 칸이 있으면 한 번 더 판정(최대 2번) */
+/** D-263 자체점검를 다시 부르는 기준 — 90점 미만이거나 P0 가 남았는데 자체점검이 고친 칸이 있으면 한 번 더 판정(최대 2번) */
 const JUDGE_ROUNDS = 2
 
 const KEY_LABEL: Record<string, string> = { field: '기술분야', background: '배경기술', problem: '해결하려는 과제', solution: '해결 수단', effect: '발명의 효과', detail: '구체적인 내용', abstract: '요약', claims: '청구항' }
@@ -309,7 +309,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
 }
 
 /**
- * D-263 악마판사 단계 — 판정 + 판사가 직접 고친 칸을 넣는다. 90점 미만이거나 P0 가 남았고 고친 칸이 있었으면
+ * D-263 자체점검 단계 — 판정 + 자체점검이 직접 고친 칸을 넣는다. 90점 미만이거나 P0 가 남았고 고친 칸이 있었으면
  * 고친 글로 한 번 더 판정한다(최대 2번) — "점검 요청하면 꼭 한두 개씩 보완하라 하더라" 를 화면 안에서 끝낸다.
  */
 async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, choice: ReturnType<typeof readChoice>): Promise<'ok' | 'fail' | 'stop'> {
@@ -330,7 +330,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
     let got: ReturnType<typeof judgeOf> | null = null
     let rateWaited = false
     for (let attempt = 0; attempt < TRIES && !got; attempt += 1) {
-      if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `악마판사가 ${label}을 판정하는 중…(${stageOf(stage).seconds}초쯤)` : '판사가 고친 글로 한 번 더 판정하는 중…' })
+      if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `${label}을 자체점검하는 중…(${stageOf(stage).seconds}초쯤)` : '고친 글로 한 번 더 자체점검하는 중…' })
       try {
         const run = await callAssist({ requestId: newRequestId(), assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
         const j = judgeOf(answerOf(run))
@@ -371,13 +371,13 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
       const r = report
       return { ...applied.draft, judge: { ...applied.draft.judge, [scope]: r } }
     })
-    // 통과했거나 · 판사가 고친 것이 없으면(다시 물어도 같은 판정) 여기서 끝
+    // 통과했거나 · 자체점검이 고친 것이 없으면(다시 물어도 같은 판정) 여기서 끝
     if (judgePassed(report) || !applied.fixed.length) break
   }
   const r = report as JudgeReport | null
   const p0 = r?.verdicts.filter((v) => v.level === 'P0').length ?? 0
   const asks = r?.verdicts.filter((v) => v.level === '대표 확인') ?? []
-  if (asks.length) setRun(id, (x) => ({ ...x, asks: [...x.asks.filter((a) => a.key !== `악마판사 ${label}`), ...asks.map((a) => ({ key: `악마판사 ${label}`, text: a.fix || a.text }))] }))
+  if (asks.length) setRun(id, (x) => ({ ...x, asks: [...x.asks.filter((a) => a.key !== `자체점검 ${label}`), ...asks.map((a) => ({ key: `자체점검 ${label}`, text: a.fix || a.text }))] }))
   setStage(id, stage, {
     phase: 'done',
     text: `${r?.score != null ? `${r.score}점` : '점수 없음'} · P0 ${p0}${fixedAll.length ? ` · 직접 고친 칸 ${fixedAll.join(' · ')}` : ' · 고칠 것 없음'}${keptAll.length ? ` · 직접 고치신 ${keptAll.join(' · ')}은 그대로` : ''}${(r?.rounds ?? 1) > 1 ? ' · 고친 뒤 다시 판정' : ''}`,

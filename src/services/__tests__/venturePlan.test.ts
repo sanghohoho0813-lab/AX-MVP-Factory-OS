@@ -262,10 +262,10 @@ const long = (n: number) => '가'.repeat(n)
   const gGuess = summaryGate(empty, { ...FACTS, researchUnit: 'none', researchers: 0 }, { ...g0, market: guess, patentNo: PATENT_NONE })
   const gOk = summaryGate(empty, { ...FACTS, researchUnit: 'none', researchers: 0 }, { ...g0, market: marketConfirmed(guess, '2026-10-22T01:00:00Z'), patentNo: PATENT_NONE })
   check('G15 검색 근거 없는 AI 추정 숫자 → 요약 전에 대표가 한 번 확인(모자란 것 "시장조사 숫자 확인") · [이 숫자로 확인] 뒤 통과 · 검색 근거 있으면 확인 없이', marketDone(guess) && marketNeedsConfirm(guess) && !gGuess.ok && gGuess.missing.join() === '시장조사 숫자 확인' && /AI 추정/.test(gGuess.market.text) && gOk.ok && /대표 확인 숫자/.test(gOk.market.text) && !marketNeedsConfirm(market) && marketRows(marketConfirmed(guess, 'x')).some((r) => r.memo.includes('대표가 확인')), [gGuess.missing, gGuess.market.text, gOk.market.text])
-  check('G14 [전부 써줘] 차례 — 시장조사 → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②', VPLAN_STEPS.map((x) => x.key).join() === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll' && VPLAN_BATCHES[0].key === 'sum', VPLAN_STEPS.map((x) => x.key))
+  check('G14 [전부 써줘] 차례 — 시장조사 → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②', VPLAN_STEPS.map((x) => x.key).join() === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll' && VPLAN_BATCHES[0].key === 'sum', VPLAN_STEPS.map((x) => x.key))
 }
 
-/* ---------------- D-263 악마판사 — 판정 읽기 · 고친 칸 · 지시문 ---------------- */
+/* ---------------- D-263 자체점검 — 판정 읽기 · 고친 칸 · 지시문 ---------------- */
 {
   const ans = { headline: '점수 84/100 · P0 1개 · 고친 칸 2개', items: [
     { title: 'score', amount: '84', detail: 'A9 B8 C9 D7 E8 F7 G9 H9 I9 J9' },
@@ -276,7 +276,7 @@ const long = (n: number) => '가'.repeat(n)
     { title: '판정', tag: '감점', detail: '' },
   ] }
   const j = judgeOf(ans)
-  check('J1 판사 답 읽기 — 점수 84 · A~J 한 줄 · 판결 2(P0 · 대표 확인 · 빈 것 버림) · 고친 칸 2', j.score === 84 && j.scores.startsWith('A9') && j.verdicts.length === 2 && j.verdicts[0].level === 'P0' && j.verdicts[0].fix.includes('고침') && j.verdicts[1].level === '대표 확인' && j.rewrites.length === 2, j)
+  check('J1 자체점검 답 읽기 — 점수 84 · A~J 한 줄 · 판정 2(P0 · 대표 확인 · 빈 것 버림) · 고친 칸 2', j.score === 84 && j.scores.startsWith('A9') && j.verdicts.length === 2 && j.verdicts[0].level === 'P0' && j.verdicts[0].fix.includes('고침') && j.verdicts[1].level === '대표 확인' && j.rewrites.length === 2, j)
   check('J2 통과 기준 — 90점 이상 · P0 없음(84점 · P0 있음은 아님 · 92점 P0 있음도 아님)', !judgePassed({ score: j.score, verdicts: j.verdicts }) && !judgePassed({ score: 92, verdicts: j.verdicts }) && judgePassed({ score: 92, verdicts: [] }) && !judgePassed(null))
   check('J3 점수 줄이 없으면 headline 의 "점수 NN" 에서', judgeOf({ headline: '점수 91/100 · 고칠 것 없음', items: [] }).score === 91 && judgeOf({ headline: '좋음', items: [] }).score === null)
   const sumItems = judgeItemsOf(j.rewrites, 'sum')
@@ -288,17 +288,17 @@ const long = (n: number) => '가'.repeat(n)
   const jp = judgePatch(g, 'sum', r!)
   check('J6 판정 저장 — 요약 · 전체 따로 남고 다시 읽힘', readGate(jp).judge.sum?.headline === 'h' && readGate(jp).judge.full === null)
   const jctx = buildVentureJudgeContext({ scope: 'sum', state: readPlan({ [VK.text('core_diff')]: '차별성 글', [VK.text('development_background')]: '본문 글' }), facts: FACTS, today: '2026-10-22', gate: g })
-  check('J7 판사 ① 자료 — 요약 · 핵심 요약 칸만(본문 빼고) · 칸 규칙 · 판정 범위 "요약"', JSON.stringify(jctx.sections).includes('차별성 글') && !JSON.stringify(jctx.sections).includes('본문 글') && jctx.purpose.includes('요약') && jctx.rules!.some((x) => x.startsWith('칸 core_diff')))
-  const sysJ = assistSystem(ASSISTS['venture.judge'], { skill: '/악마판사 대표표식 — 숫자 하나라도 어긋나면 P0' })
-  check('J8 서버 판사 지시문 — 기본 악마판사(벤처) · 대표 정의가 기본보다 우선 · 출력 형식 그대로', sysJ.includes(VENTURE_JUDGE[0]) && sysJ.includes('대표표식') && sysJ.indexOf('대표표식') > sysJ.indexOf(VENTURE_JUDGE[0]) && sysJ.includes('우선한다') && sysJ.includes('[출력 형식]'))
+  check('J7 자체점검 ① 자료 — 요약 · 핵심 요약 칸만(본문 빼고) · 칸 규칙 · 판정 범위 "요약"', JSON.stringify(jctx.sections).includes('차별성 글') && !JSON.stringify(jctx.sections).includes('본문 글') && jctx.purpose.includes('요약') && jctx.rules!.some((x) => x.startsWith('칸 core_diff')))
+  const sysJ = assistSystem(ASSISTS['venture.judge'], { skill: '/자체점검 대표표식 — 숫자 하나라도 어긋나면 P0' })
+  check('J8 서버 자체점검 지시문 — 기본 자체점검(벤처) · 대표 정의가 기본보다 우선 · 출력 형식 그대로', sysJ.includes(VENTURE_JUDGE[0]) && sysJ.includes('대표표식') && sysJ.indexOf('대표표식') > sysJ.indexOf(VENTURE_JUDGE[0]) && sysJ.includes('우선한다') && sysJ.includes('[출력 형식]'))
   const sysSum = assistSystem(ASSISTS['venture.sum'], { skill: '대표표식' })
   const sysP1 = assistSystem(ASSISTS['venture.p1'])
-  check('J9 쓰기 단추에도 — 최종본 규칙(한 번에 끝냄 · "보완하면 좋다" 금지) + 악마판사 기준 · 대표 정의', [sysSum, sysP1].every((x) => x.includes('[최종본 규칙 — 한 번에 끝낸다]') && x.includes('보완하면 좋다') && x.includes(VENTURE_JUDGE[0])) && sysSum.includes('대표표식') && !sysP1.includes('대표표식'))
+  check('J9 쓰기 단추에도 — 최종본 규칙(한 번에 끝냄 · "보완하면 좋다" 금지) + 자체점검 기준 · 대표 정의', [sysSum, sysP1].every((x) => x.includes('[최종본 규칙 — 한 번에 끝낸다]') && x.includes('보완하면 좋다') && x.includes(VENTURE_JUDGE[0])) && sysSum.includes('대표표식') && !sysP1.includes('대표표식'))
   const sysSpec = assistSystem(ASSISTS['spec.judge'], { skill: '대표표식' })
-  check('J10 명세서 판사 · 쓰기 단추 — 특허 악마판사 · 최종본 규칙(spec.a~e · parts · fix)', sysSpec.includes(PATENT_JUDGE[0]) && sysSpec.includes('대표표식') && ['spec.a', 'spec.b', 'spec.c', 'spec.d', 'spec.e', 'spec.parts', 'spec.fix'].every((id) => assistSystem(ASSISTS[id]).includes('[최종본 규칙') && assistSystem(ASSISTS[id]).includes(PATENT_JUDGE[0])))
+  check('J10 명세서 자체점검 · 쓰기 단추 — 특허 자체점검 · 최종본 규칙(spec.a~e · parts · fix)', sysSpec.includes(PATENT_JUDGE[0]) && sysSpec.includes('대표표식') && ['spec.a', 'spec.b', 'spec.c', 'spec.d', 'spec.e', 'spec.parts', 'spec.fix'].every((id) => assistSystem(ASSISTS[id]).includes('[최종본 규칙') && assistSystem(ASSISTS[id]).includes(PATENT_JUDGE[0])))
   check('J11 다른 단추엔 붙지 않음 — 시장조사 · 아이디어 · 오늘 할 일', ['venture.market', 'spec.idea', 'today.top3'].every((id) => !assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
   check('J12 대표 정의 — 빈 글이면 아무것도 안 붙음 · 8,000자에서 자름', customSkillBlock('').length === 0 && customSkillBlock('  ').length === 0 && customSkillBlock('가'.repeat(9000))[2].length === 8000)
-  check('J13 화면 이름표 = 서버(시장조사 · 판사 둘)', ['venture.market', 'venture.judge', 'spec.judge'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)) && ASSISTS['venture.market'].research === true)
+  check('J13 화면 이름표 = 서버(시장조사 · 자체점검 둘)', ['venture.market', 'venture.judge', 'spec.judge'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)) && ASSISTS['venture.market'].research === true)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

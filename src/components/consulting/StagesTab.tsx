@@ -132,7 +132,7 @@ export function StagesTab({ focus }: { focus?: string }) {
             )}
           </div>
           <p className="t-body mt-2 break-keep text-slate-700">{def.purpose}</p>
-          <p className="t-meta mt-1 text-slate-400">Master 활성 PART: {def.activeParts}</p>
+          <p className="t-meta mt-1 text-slate-400">활성 PART: {def.activeParts}</p>
           {state.status === 'skipped' && state.skipReason && <p className="t-sub mt-2 text-slate-600">건너뛴 이유: {state.skipReason}</p>}
           {state.status === 'blocked' && state.blockedBy && <p className="t-sub mt-2 text-danger-700">막힌 이유: {state.blockedBy}</p>}
         </Surface>

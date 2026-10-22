@@ -132,7 +132,7 @@ check('thread: 낱말 겹침 없음 — 예약 플랫폼 vs 재고 최적화', s
   const stale = project({ freshness: [{ scope: 'patent_filing', checkedAt: '2026-07-01', source: '특허로', differences: '' }] })
   check('gate: 30일 지난 확인은 무효', !freshnessOk(stale, 'patent_filing', TODAY))
   const s13 = canCompleteStage(project(), 'S13', { ...ctx, artifacts: [{ ...art, type: 'QA_REPORT' }] })
-  check('gate: S13 은 P0 12개 확인 없이는 막힌다', s13.blockers.some((b) => b.includes('P0 Red Flag 미확인 12개')))
+  check('gate: S13 은 P0 12개 확인 없이는 막힌다', s13.blockers.some((b) => b.includes('P0 금지 사항 미확인 12개')))
   const s12 = canCompleteStage(project(), 'S12', { ...ctx, artifacts: [{ ...art, type: 'CLAIM_EVIDENCE_MATRIX' }] })
   check('gate: S12 는 빈 슬롯을 알려 준다', s12.blockers.some((b) => b.includes('비어 있는 첨부 슬롯: 1, 2, 3')))
   check('skip: 이유 없이 못 건너뛴다', !canSkipStage('S3', '').ok && canSkipStage('S3', '이미 등록 특허 보유').ok)

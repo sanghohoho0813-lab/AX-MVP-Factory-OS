@@ -1,7 +1,7 @@
 /**
  * D-245 도면 그림 머리 읽기 — TIFF 첫 IFD 만(픽셀은 읽지 않는다).
  *
- * 특허로(MOIP) 흑백 도면 기본 규격(Master v2.4): TIFF · 흑백 1비트 · 300dpi(또는 400) · CCITT G4 · 한 줄(single strip) · Intel(II).
+ * 특허로(MOIP) 흑백 도면 기본 규격(내부 기준 문서): TIFF · 흑백 1비트 · 300dpi(또는 400) · CCITT G4 · 한 줄(single strip) · Intel(II).
  * 권장 최대 크기 255mm × 170mm — 픽셀 수 자체를 강제하지 않는다.
  */
 

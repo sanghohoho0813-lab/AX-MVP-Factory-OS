@@ -15,6 +15,7 @@
  * 오류 응답에는 공급자 원문 · 키 · 모델 값을 넣지 않는다.
  */
 import { SKILLS, COMMON_RULES, skillOf } from './_ai/skills.js'
+import { CONFIDENTIAL_RULES, guardOutput, scrubBrandDeep, secretIndex } from './_ai/guard.js'
 import { ProviderError, aiConfig, buildPrompt, callProvider, costOf, extractJson, publicStatus, scrubDeep, validate } from './_ai/core.js'
 import { __resetGateState, fail, limits, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { __resetProviderCache, tierOf } from './_ai/providers.js'
@@ -34,15 +35,23 @@ const CASE_RE = /^case_[A-Za-z0-9_-]{6,64}$/
 
 /* ---------------- 한 번 부르기 ---------------- */
 
+/** D-264 서버만 가진 글(공통 규칙 · 스킬 지시) — 답에 통째로 나오면 막는다 */
+let SECRETS = null
+const secrets = () => (SECRETS ??= secretIndex([...CONFIDENTIAL_RULES, ...COMMON_RULES, ...Object.values(SKILLS).flatMap((k) => k.systemInstruction)]))
+
 async function runOnce(cfg, skill, body) {
   const tier = skill.tier
-  const context = scrubDeep(body.context || {})
-  const input = scrubDeep(body.input || {})
+  // D-264 업체 자료 · 입력에서도 쓰지 않는 이름 · 출처 이름을 지우고 보낸다
+  const context = scrubBrandDeep(scrubDeep(body.context || {}))
+  const input = scrubBrandDeep(scrubDeep(body.input || {}))
   const { system, user, sent } = buildPrompt(skill, context, input, tier, COMMON_RULES)
   const out = await callProvider(cfg, tier, system, user)
   const parsed = extractJson(out.content)
   const checked = parsed ? validate(skill.outputSchema, parsed) : { ok: false, value: null, errors: ['JSON 아님'] }
   const status = checked.ok ? 'succeeded' : 'parse_fallback'
+  const known = `${JSON.stringify(context)}\n${JSON.stringify(input)}`
+  const safe = checked.ok ? guardOutput(checked.value, secrets(), known) : { value: null, blocked: 0 }
+  const safeRaw = checked.ok ? { value: '', blocked: 0 } : guardOutput(String(out.content || '').slice(0, 20000), secrets(), known)
   return {
     requestId: body.requestId,
     skillId: skill.id,
@@ -51,8 +60,9 @@ async function runOnce(cfg, skill, body) {
     provider: cfg.provider,
     model: out.model,
     status,
-    structured: checked.ok ? checked.value : null,
-    raw: checked.ok ? '' : String(out.content || '').slice(0, 20000),
+    structured: safe.value,
+    raw: safeRaw.value,
+    guarded: safe.blocked + safeRaw.blocked,
     parseErrors: checked.ok ? [] : checked.errors.slice(0, 8),
     usage: { input: out.usage.input, output: out.usage.output, total: out.usage.input + out.usage.output },
     estimatedCostUsd: costOf(cfg, tier, out.usage),

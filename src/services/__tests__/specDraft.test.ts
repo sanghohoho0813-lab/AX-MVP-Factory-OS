@@ -276,10 +276,10 @@ function fullDraft(): SpecDraft {
   check('R5 끝맺음 — 입니다 → 인 · 했습니다 → 한 · 됐습니다 → 된', asAdnominal('요청 수집부입니다') === '요청 수집부인' && asAdnominal('요청을 정리했습니다') === '요청을 정리한' && asAdnominal('목록이 갱신됐습니다') === '목록이 갱신된')
 }
 
-/* ---------------- D-263 악마판사 — 구성 뒤 · 청구항 뒤 ---------------- */
+/* ---------------- D-263 자체점검 — 구성 뒤 · 청구항 뒤 ---------------- */
 {
   const fresh = planAll(emptyDraft())
-  check('DJ1 [전부 써줘] 차례 — 구성 → 악마판사 ① → 본문 · 청구항 → 악마판사 ② → 점검대로 고치기', fresh.join() === 'idea,research,parts,judge1,a,b,c,d,e,judge2,fix', fresh)
+  check('DJ1 [전부 써줘] 차례 — 구성 → 자체점검 ① → 본문 · 청구항 → 자체점검 ② → 점검대로 고치기', fresh.join() === 'idea,research,parts,judge1,a,b,c,d,e,judge2,fix', fresh)
   const full = fullDraft()
   full.text = { ...full.text, background: '종래에는 정해진 시간마다 공구를 바꾸었다.', abstract: '공구 진동으로 마모를 판정한다.', detail: '진동 수집부(110)는 진동을 모은다.' }
   full.claims = ['청구항 1. 진동 수집부와 마모판정부를 포함하는 공구관리 시스템.', '청구항 2. 청구항 1에 있어서, 마모판정부는 세 단계로 나누는 공구관리 시스템.']
@@ -293,22 +293,22 @@ function fullDraft(): SpecDraft {
   aiMade.ai = { ...aiMade.ai, parts: partsSig(aiMade) }
   const rw = [{ title: 'axis.link', body: '마모 지수와 작업 일정을 함께 써서 교체 시점을 산출하는' }, { title: 'comp', detail: '진동 수집부', body: '진동을 모으는' }, { title: 'comp', detail: '마모 판정부', body: '마모를 판정하는' }, { title: 'comp', detail: '교체시점 산출부', body: '교체 시점을 산출하는' }]
   const j1 = applyJudge(aiMade, 'parts', rw)
-  check('DJ5 판사 ① 이 고친 구성 — 본문 전이면 구성요소 · 권리축 바꿈 · 부호 다시', j1.fixed.includes('구성요소') && j1.fixed.some((x) => x.startsWith('권리축')) && j1.draft.components.map((c) => c.name).join() === '진동 수집부,마모 판정부,교체시점 산출부' && j1.draft.components[2].no === '130' && j1.draft.axis.link.startsWith('마모 지수'), j1)
+  check('DJ5 자체점검 ① 이 고친 구성 — 본문 전이면 구성요소 · 권리축 바꿈 · 부호 다시', j1.fixed.includes('구성요소') && j1.fixed.some((x) => x.startsWith('권리축')) && j1.draft.components.map((c) => c.name).join() === '진동 수집부,마모 판정부,교체시점 산출부' && j1.draft.components[2].no === '130' && j1.draft.axis.link.startsWith('마모 지수'), j1)
   const fullAi = { ...full, ai: { ...full.ai, parts: partsSig(full), abstract: full.text.abstract } }
   const j1b = applyJudge(fullAi, 'parts', rw)
   check('DJ6 본문 · 청구항이 이미 있으면 구성요소 이름은 그대로(어긋남 막기) · 권리축만 · "이름 그대로" 알림', !j1b.fixed.includes('구성요소') && j1b.draft.components.map((c) => c.name).join() === full.components.map((c) => c.name).join() && j1b.draft.axis.link.startsWith('마모 지수') && j1b.kept.length === 1, j1b)
   const human = { ...noBody, ai: { ...noBody.ai, parts: '' } }
   check('DJ7 사람이 고친 구성은 덮지 않음', applyJudge(human, 'parts', rw).kept[0] === '구성' && applyJudge(human, 'parts', rw).draft === human)
   const j2 = applyJudge(fullAi, 'full', [{ title: 'abstract', body: '고친 요약 — 진동 정보로 마모 상태를 판정하고 교체 시점을 산출한다.' }, { title: 'detail', body: '긴 본문을 다시 쓴 것 — 버림' }])
-  check('DJ8 판사 ② 가 고친 칸 — 요약은 바꿈 · 구체적인 내용(detail)은 덮지 않음', j2.fixed.includes('요약서') || j2.fixed.some((x) => /요약/.test(x)), j2.fixed)
-  check('DJ9 판사 ② 가 detail 을 바꾸지 않음', (j2.draft.text.detail ?? '') === (full.text.detail ?? ''))
+  check('DJ8 자체점검 ② 가 고친 칸 — 요약은 바꿈 · 구체적인 내용(detail)은 덮지 않음', j2.fixed.includes('요약서') || j2.fixed.some((x) => /요약/.test(x)), j2.fixed)
+  check('DJ9 자체점검 ② 가 detail 을 바꾸지 않음', (j2.draft.text.detail ?? '') === (full.text.detail ?? ''))
   const c1 = buildJudgeContext({ draft: full, scope: 'parts', today: '2026-10-22' })
   const c2 = buildJudgeContext({ draft: full, scope: 'full', today: '2026-10-22' })
-  check('DJ10 판사 자료 — ① 구성 · 권리축 · 단계 / ② 명세서 글 · 청구항 · 구성 이름', c1.purpose.includes('구성') && c1.sections.some((x) => x.name.includes('구성요소')) && c1.sections.some((x) => x.name === '방법 단계') && c2.purpose.includes('전체') && c2.sections.some((x) => x.name === '청구항' && x.rows.length > 0), [c1.purpose, c2.purpose])
+  check('DJ10 자체점검 자료 — ① 구성 · 권리축 · 단계 / ② 명세서 글 · 청구항 · 구성 이름', c1.purpose.includes('구성') && c1.sections.some((x) => x.name.includes('구성요소')) && c1.sections.some((x) => x.name === '방법 단계') && c2.purpose.includes('전체') && c2.sections.some((x) => x.name === '청구항' && x.rows.length > 0), [c1.purpose, c2.purpose])
   const passed1 = { ...full, judge: { parts: null, full: { at: '', scope: 'full', score: 95, scores: '', verdicts: [], fixed: [], kept: [], rounds: 1, custom: false, headline: '' } } }
-  check('DJ11 판사 카드 — ② 가 90점 이상 · P0 없음일 때만 다 됨', !cardState('judge', full).done && cardState('judge', passed1).done && /95점/.test(cardState('judge', passed1).summary))
+  check('DJ11 자체점검 카드 — ② 가 90점 이상 · P0 없음일 때만 다 됨', !cardState('judge', full).done && cardState('judge', passed1).done && /95점/.test(cardState('judge', passed1).summary))
   const sys = assistSystem(ASSISTS['spec.e'], { skill: '대표표식' })
-  check('DJ12 청구항 쓰기 지시문 — 최종본 규칙 · 특허 악마판사 · 대표 정의', sys.includes('[최종본 규칙') && sys.includes('[악마판사 — 특허 명세서]') && sys.includes('대표표식'))
+  check('DJ12 청구항 쓰기 지시문 — 최종본 규칙 · 특허 자체점검 · 대표 정의', sys.includes('[최종본 규칙') && sys.includes('[자체점검 — 특허 명세서]') && sys.includes('대표표식'))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

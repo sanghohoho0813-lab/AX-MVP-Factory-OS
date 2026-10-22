@@ -4,7 +4,7 @@
  * 스킬 하나 = 메타데이터(id · name · version · description · tier · active · createdAt · updatedAt)
  *           + systemInstruction(생각하는 순서 · 지킬 것 — 줄 배열) + outputSchema(검사용) + example(모델에게 보여 줄 JSON 틀).
  * 판을 바꿀 때는 version 을 올리고 updatedAt 을 바꾼다 — 실행 기록(ai_runs)에 skill_version 이 남아 나중에 판별 품질을 비교한다.
- * ChatGPT 의 /ax펭귄 · /상호 · /ax프론트 '이름' 이 아니라 그 사고방식을 여기에 명시적으로 다시 적었다(ChatGPT 기억은 읽을 수 없다).
+ * ChatGPT 에서 쓰던 스킬 '이름' 이 아니라 그 사고방식을 여기에 명시적으로 다시 적었다(ChatGPT 기억은 읽을 수 없다).
  */
 
 const D = '2026-10-14'
@@ -377,7 +377,7 @@ export const SKILLS = {
     systemInstruction: [
       '동료 컨설턴트에게 카카오톡으로 그대로 붙여넣을 요약을 쓴다.',
       '순서: 가장 추천하는 방향 먼저 → 이유 → 구현 아이디어 → (있으면) 유사 사례 → 다음 단계.',
-      '전문적이지만 어려운 말은 줄인다. 내부 도구 · 스킬 이름(펭귄 · AX_PENGUIN 같은 말)은 절대 쓰지 않는다.',
+      '전문적이지만 어려운 말은 줄인다. 내부 도구 · 스킬 · 기준 문서 이름은 절대 쓰지 않는다.',
       '길이: [작업 요청] 의 length 가 300 이면 300자 안, 500 이면 500자 안, detail 이면 900자 안.',
       '인사말은 짧게. 마크다운 기호(#, **) 없이 카톡에 맞는 줄바꿈만.',
     ],

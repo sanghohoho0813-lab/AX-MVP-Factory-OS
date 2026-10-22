@@ -93,7 +93,7 @@ export function canCompleteStage(
   if (key === 'S7') {
     if (p.patent.filingStatus === 'none') blockers.push('출원 상태가 "미출원" 입니다.')
     if (p.patent.applicationNumber.trim() === '' || p.patent.filedAt.trim() === '') blockers.push('출원번호와 출원일을 기록해 주세요.')
-    if (!freshnessOk(p, 'patent_filing', ctx.today)) blockers.push(`출원 직전 최신 공식 기준(특허로) 확인 기록이 ${FRESHNESS_DAYS}일 안에 없습니다 (Master K9).`)
+    if (!freshnessOk(p, 'patent_filing', ctx.today)) blockers.push(`출원 직전 최신 공식 기준(특허로) 확인 기록이 ${FRESHNESS_DAYS}일 안에 없습니다.`)
   }
 
   // Integrity — S8~S13
@@ -112,22 +112,22 @@ export function canCompleteStage(
   if (key === 'S12') {
     const ev = evidenceIssues(ctx.evidence.filter((e) => e.projectId === p.id))
     if (ev.emptySlots.length > 0) blockers.push(`비어 있는 첨부 슬롯: ${ev.emptySlots.join(', ')}`)
-    if (ev.noSource > 0) blockers.push(`출처가 없는 주장 ${ev.noSource}건 — 증빙을 붙이거나 표현을 약하게 하거나 향후계획으로 옮기거나 지웁니다 (Master §36-1).`)
+    if (ev.noSource > 0) blockers.push(`출처가 없는 주장 ${ev.noSource}건 — 증빙을 붙이거나 표현을 약하게 하거나 향후계획으로 옮기거나 지웁니다.`)
     if (ev.notReady > 0) notes.push(`아직 준비 안 된 첨부 ${ev.notReady}건`)
   }
 
   // QA — S13
   if (key === 'S13') {
     const remaining = redFlagsRemaining(p)
-    if (remaining.length > 0) blockers.push(`P0 Red Flag 미확인 ${remaining.length}개 (#${remaining.join(', #')}) — 하나라도 남으면 완료 선언을 하지 않습니다.`)
-    if (judgeTotal(p.venture.judgeScores) === null) blockers.push('Judge 10항목 점수를 아직 다 매기지 않았습니다.')
+    if (remaining.length > 0) blockers.push(`P0 금지 사항 미확인 ${remaining.length}개 (#${remaining.join(', #')}) — 하나라도 남으면 완료 선언을 하지 않습니다.`)
+    if (judgeTotal(p.venture.judgeScores) === null) blockers.push('점수표 10항목 점수를 아직 다 매기지 않았습니다.')
     const p1 = coreThreadWarnings(p).filter((w) => w.severity === 'p1')
     if (p1.length > 0) notes.push(`핵심 줄기 P1 경고 ${p1.length}건이 남아 있습니다.`)
   }
 
   // Submission — S14
   if (key === 'S14') {
-    if (!freshnessOk(p, 'venture_application', ctx.today)) blockers.push(`신청 직전 최신 공식 기준(벤처확인종합관리시스템) 확인 기록이 ${FRESHNESS_DAYS}일 안에 없습니다 (Master K9).`)
+    if (!freshnessOk(p, 'venture_application', ctx.today)) blockers.push(`신청 직전 최신 공식 기준(벤처확인종합관리시스템) 확인 기록이 ${FRESHNESS_DAYS}일 안에 없습니다.`)
     if (p.venture.submittedAt.trim() === '') blockers.push('신청일을 기록해 주세요.')
     const docsMissing = Object.values(p.venture.documents).filter((v) => !v).length
     if (docsMissing > 0) notes.push(`기본 제출서류 미확인 ${docsMissing}종`)
