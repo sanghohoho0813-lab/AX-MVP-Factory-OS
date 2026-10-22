@@ -243,6 +243,11 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
       noticeTopicOf(n('d', '2026 기업부설연구소 설립 컨설팅 지원')) === 'certification' &&
       noticeTopicOf(n('e', '소상공인 경영안정자금 융자', { category: 'money' })) === 'sme_subsidy' &&
       noticeTopicOf(n('f', '2026 수출바우처 2차 모집', { category: 'export' })) === 'grant_program')
+  check('N1b 분야(금융 · 인력)만으로는 아님 — 실제 공고 "품질인증 바우처"(금융) · "근로자 임대주택"(인력)은 정부지원사업 / "경영안정자금" · "일자리창출" 은 맞음',
+    noticeTopicOf(n('g', '[경남] 진주시 2026년 우수바이오제품 품질인증 맞춤형 바우처 지원사업 운영계획 변경 공고', { category: 'money' })) === 'grant_program' &&
+      noticeTopicOf(n('h', '[부산] 기장군 LH임대주택 중소기업 근로자 공공임대주택 기관공급 사업 대상기업 모집계획 공고', { category: 'hr' })) === 'grant_program' &&
+      noticeTopicOf(n('i', '[강원] 2026년 관광사업체 경영안정자금 지원계획 추가 공고', { category: 'money' })) === 'policy_fund' &&
+      noticeTopicOf(n('j', '[서울] 금천구 2026년 일자리창출 우수기업 인증 신청기업 모집 공고', { category: 'hr' })) === 'employ_subsidy')
   const list = [
     n('p1', '2026 정책자금 융자 3차 공고', { category: 'money', postedAt: '2026-10-21', applyEnd: '2026-10-27' }),
     n('p2', '신용보증 특례 지원', { category: 'money', postedAt: '2026-10-16' }),

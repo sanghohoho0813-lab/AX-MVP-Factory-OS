@@ -31,8 +31,9 @@ export function noticeTopicOf(n: Pick<GrantNotice, 'title' | 'category' | 'targe
   const t = normalizeTitle(n.title)
   const m = (id: string) => TOPIC_BY_ID.get(id)?.match.test(t) ?? false
   if (/소상공인|자영업/.test(t)) return 'sme_subsidy'
-  if (n.category === 'money' || m('policy_fund') || /융자|이차보전|보증료|정책\s?금융/.test(t)) return 'policy_fund'
-  if (n.category === 'hr' || m('employ_subsidy') || /채용|일자리|인건비|고용/.test(t)) return 'employ_subsidy'
+  // 분야(금융 · 인력)만으로는 넓다(실제 공고: '품질인증 바우처' 가 금융 · '근로자 임대주택' 이 인력) — 제목에 그 말이 있어야
+  if (m('policy_fund') || /융자|이차보전|보증료|정책\s?금융|(?:경영안정|운전|시설|육성)\s?(?:자금|기금)/.test(t)) return 'policy_fund'
+  if (m('employ_subsidy') || /채용|인건비|장려금|고용(?:유지|지원|창출)|일자리(?:창출|사업|지원)/.test(t)) return 'employ_subsidy'
   if (m('certification')) return 'certification'
   return 'grant_program'
 }
