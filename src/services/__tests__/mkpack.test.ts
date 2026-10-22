@@ -9,6 +9,9 @@ import { DEFAULT_BRIEF } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
+import { noticeKeywords, noticePackSource, noticeTopicOf, rememberWeek, weekChange, weekOf, weekWindow, withNoticeFacts, withNoticeKeywords } from '../marketing/noticeKeywords'
+import { parseBizinfoJson, postedOf } from '../grants/grantText'
+import type { GrantNotice } from '../grants/grantMatch'
 import {
   HOLE,
   PACK_AI_PARTS,
@@ -227,6 +230,60 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
     check(`P3 ${part.assistId} — 서버 질문(page radar · 긴 글) = 화면 질문 · 규칙집이 다 들어감 · 4만 자 안 · 줄임 0`, !!a && a.page === 'radar' && preset?.kind === 'write' && preset.page === 'radar' && PACK_RULES.every((r) => user.includes(r.slice(0, 40))) && meta.userChars < 40000 && meta.rowsCut === 0, { page: a?.page, chars: meta.userChars, cut: meta.rowsCut })
   }
   check('P4 radar 쪽 공통 마케팅 규칙도 같이 감(서버가 붙임)', RADAR_RULES.length > 0)
+}
+
+/* ---------------- D-267 이번 주 공고 키워드 · 지난주와 비교 ---------------- */
+{
+  const T = '2026-10-22'
+  const n = (id: string, title: string, o: Partial<GrantNotice> = {}): GrantNotice => ({ id, title, agency: '중소벤처기업부', operator: '', category: 'etc', applyStart: '', applyEnd: '2026-11-30', deadlineKind: 'date', amountText: '', target: '중소기업', summary: '', url: `https://www.bizinfo.go.kr/x?${id}`, rules: {} as GrantNotice['rules'], source: 'bizinfo', published: true, createdAt: T, updatedAt: T, ...o }) as GrantNotice
+  check('N1 공고 → 우리 분야 — 금융 분야 · 융자 → 정책자금 / 인력 · 채용 → 고용지원금 / 벤처 · 연구소 → 인증 / 소상공인 먼저 / 그 밖 지원사업',
+    noticeTopicOf(n('a', '2026년 하반기 중소기업 운전자금 융자 공고', { category: 'money' })) === 'policy_fund' &&
+      noticeTopicOf(n('b', '경기도 이차보전 지원사업')) === 'policy_fund' &&
+      noticeTopicOf(n('c', '청년 채용 인건비 지원', { category: 'hr' })) === 'employ_subsidy' &&
+      noticeTopicOf(n('d', '2026 기업부설연구소 설립 컨설팅 지원')) === 'certification' &&
+      noticeTopicOf(n('e', '소상공인 경영안정자금 융자', { category: 'money' })) === 'sme_subsidy' &&
+      noticeTopicOf(n('f', '2026 수출바우처 2차 모집', { category: 'export' })) === 'grant_program')
+  const list = [
+    n('p1', '2026 정책자금 융자 3차 공고', { category: 'money', postedAt: '2026-10-21', applyEnd: '2026-10-27' }),
+    n('p2', '신용보증 특례 지원', { category: 'money', postedAt: '2026-10-16' }),
+    n('p3', '기술보증 우대 보증', { category: 'money', postedAt: '2026-10-15' }),
+    n('p4', '시설자금 융자 — 지난주', { category: 'money', postedAt: '2026-10-10' }),
+    n('p5', '마감 지난 정책자금', { category: 'money', postedAt: '2026-10-20', applyEnd: '2026-10-21' }),
+    n('h1', '청년 일자리 도약 장려금 참여기업 모집', { category: 'hr', applyStart: '2026-10-20' }),
+    n('h2', '중장년 채용 인건비 지원', { category: 'hr', postedAt: '2026-10-19' }),
+    n('h3', '고용유지 지원', { category: 'hr', postedAt: '2026-10-22', applyEnd: '2026-10-25' }),
+    n('c1', '벤처기업 확인 설명회', { postedAt: '2026-10-20' }),
+  ]
+  const ks = noticeKeywords(list, T)
+  check('N2 이번 주(오늘까지 7일 · 10/16~10/22) 새 공고만 — 올라온 날 · 없으면 접수 시작일 · 지난주 · 마감 지난 것 빼기 · 1건(인증)은 흐름 아님 · 정책자금이 수가 적어도 먼저',
+    ks.map((k) => `${k.topicId}:${k.fresh.length}`).join() === 'policy_fund:2,employ_subsidy:3' && weekWindow(T).from === '2026-10-16', ks.map((k) => `${k.topicId}:${k.fresh.map((x) => x.id)}`))
+  const pf = ks.find((k) => k.topicId === 'policy_fund')!
+  check('N3 새 것 먼저 · 7일 안 마감은 따로(가까운 것 먼저) · 칩 "이번 주 새 공고 2건"', pf.fresh.map((x) => x.id).join() === 'p1,p2' && pf.closing.map((x) => x.id).join() === 'p1' && pf.note === '이번 주 새 공고 2건' && pf.key === 'notice:policy_fund')
+  const src = noticePackSource(pf, T)!
+  check('N4 묶음 재료 — 왜 지금(기간 · 새 공고 · 곧 마감) · 근거에 실제 공고 이름 · 소관 · 마감 · 관점 · 제목은 분류표 그대로 · 금액은 짓지 않음',
+    src.why.includes('10/16~10/22') && src.why.includes('새로 2건') && src.why.includes('1건은 7일 안에 마감') && src.facts.some((f) => f.includes('2026 정책자금 융자 3차 공고 — 중소벤처기업부 · 마감 10/27')) && src.titles.length === 3 && src.titles[0].includes('정책자금') && src.hook.includes('2건') && !/\d+\s*(억|만)\s*원/.test([src.why, ...src.facts, src.hook].join(' ')), src)
+  const pack = makePack(src)
+  check('N5 공고 키워드로도 묶음이 그대로(섹션 7 · 보이는 글에 쓰지 않는 말 0 · 근거는 우리만 보기 칸)', pack.sections.length === PACK_SECTIONS.length && !PACK_AVOID.test(allText(pack)) && packText(pack).includes('이번 주 새 공고 2건'), allText(pack).match(PACK_AVOID)?.[0])
+  type HK = { key: string; topicId?: string; notice?: boolean }
+  const base: HK[] = Array.from({ length: 10 }, (_, i) => ({ key: `axai:t${i}`, topicId: `t${i}` }))
+  const merged = withNoticeKeywords(base, ks, (k) => ({ key: k.key, topicId: k.topicId, notice: true }))
+  check('N6 첫 화면 — 공고 키워드 3번째(정책자금) · 6번째(고용지원금) 자리 · 10개 그대로(뒤에서 빠짐) · 칩', merged.list.length === 10 && merged.list[2].key === 'notice:policy_fund' && merged.list[5].key === 'notice:employ_subsidy' && merged.noteOf.get('notice:policy_fund') === '이번 주 새 공고 2건' && !merged.list.some((x) => x.key === 'axai:t9'), merged.list.map((x) => x.key))
+  const withSame = withNoticeKeywords([{ key: 'market:policy_fund', topicId: 'policy_fund' }, ...base.slice(0, 3)], ks, (k) => ({ key: k.key, topicId: k.topicId, notice: true }))
+  check('N7 같은 주제가 레이더에도 있으면 새 줄 대신 그 줄에 칩만(겹치지 않게)', !withSame.list.some((x) => x.key === 'notice:policy_fund') && withSame.noteOf.get('market:policy_fund') === '이번 주 새 공고 2건' && withSame.list[2].key === 'notice:employ_subsidy')
+  const sameFacts = withNoticeFacts({ ...customSource('정책자금')!, key: 'market:policy_fund', custom: false }, pf)
+  check('N8 레이더 묶음에 같은 주제 공고 근거 덧붙임', sameFacts.facts.some((f) => f.startsWith('이번 주 새 공고 2건')) && sameFacts.facts.some((f) => f.includes('2026 정책자금 융자 3차 공고')))
+  check('N9 공고가 없거나 적으면 키워드 없음(억지로 넣지 않음)', noticeKeywords([], T).length === 0 && noticeKeywords([list[0]], T).length === 0)
+  check('N10 주 이름 = 월요일 — 10/22(목) → 10/19 · 10/19(월) 그대로 · 10/25(일) → 10/19', weekOf('2026-10-22') === '2026-10-19' && weekOf('2026-10-19') === '2026-10-19' && weekOf('2026-10-25') === '2026-10-19' && weekOf('2026-10-26') === '2026-10-26')
+  const r1 = rememberWeek({ '2026-10-12': ['a', 'b', 'c'] }, '2026-10-22', ['a', 'x', 'y'])
+  const r2 = rememberWeek(r1.log, '2026-10-24', ['z'])
+  check('N11 주마다 처음 목록만 적음(같은 주에 다시 와도 그대로) · 지난주 목록 돌려줌', r1.log['2026-10-19'].join() === 'a,x,y' && r1.last?.join() === 'a,b,c' && r2.log['2026-10-19'].join() === 'a,x,y')
+  const many = rememberWeek({ '2026-09-14': ['1'], '2026-09-21': ['2'], '2026-09-28': ['3'], '2026-10-05': ['4'], '2026-10-12': ['5'] }, '2026-10-22', ['6'])
+  check('N12 4주까지만 둠', Object.keys(many.log).join() === '2026-09-28,2026-10-05,2026-10-12,2026-10-19')
+  const ch = weekChange(['a', 'x', 'y'], ['a', 'b', 'c'], (k) => k.toUpperCase())
+  check('N13 지난주와 비교 — 새로 2개 · 빠진 것 이름 · 같으면 그렇다고 · 지난주 기록 없으면 아무것도', ch.fresh.has('x') && ch.fresh.has('y') && !ch.fresh.has('a') && ch.line === '지난주와 비교: 새로 2개 · 빠진 것: B, C' && weekChange(['a'], ['a'], (k) => k).line.includes('같은 키워드') && weekChange(['a'], null, (k) => k).line === '' && weekChange(['a'], null, (k) => k).fresh.size === 0)
+  check('N14 기업마당 등록일시 읽기 — "2026-10-20 10:31:22" · "20261020" · 깨진 값은 빈칸', postedOf('2026-10-20 10:31:22') === '2026-10-20' && postedOf('20261020') === '2026-10-20' && postedOf('2026-13-01') === '' && postedOf('') === '')
+  const parsed = parseBizinfoJson(JSON.stringify({ jsonArray: [{ pblancId: 'X1', pblancNm: '정책자금 공고', creatPnttm: '2026-10-21 09:00:00', reqstBeginEndDe: '20261021 ~ 20261110', pldirSportRealmLclasCodeNm: '금융' }] }))
+  check('N15 받아 온 공고에 올라온 날(postedAt)이 남음', parsed.drafts[0]?.postedAt === '2026-10-21', parsed.drafts[0])
 }
 
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)

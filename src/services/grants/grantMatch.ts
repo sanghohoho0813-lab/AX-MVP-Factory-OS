@@ -130,6 +130,8 @@ export interface GrantNotice {
   externalId?: string
   /** D-151: 공고 글의 '제출서류' — 신청 준비에서 서류함과 맞춰 본다(없으면 기본 목록) */
   documents?: string[]
+  /** D-267 기업마당에 올라온 날(YYYY-MM-DD · 등록일시 creatPnttm) — 받아 온 공고만. '이번 주 새 공고' 를 센다 */
+  postedAt?: string
   createdAt: string
   updatedAt: string
 }

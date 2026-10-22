@@ -405,6 +405,12 @@ export interface BizinfoParse {
   skipped: number
 }
 
+/** D-267 등록일시 '2026-10-20 10:31:22' · '20261020' → '2026-10-20'(아니면 '') */
+export function postedOf(raw: string): string {
+  const m = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(raw.trim())
+  return m && Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[3]) >= 1 && Number(m[3]) <= 31 ? `${m[1]}-${m[2]}-${m[3]}` : ''
+}
+
 /**
  * 기업마당(bizinfo.go.kr) 지원사업정보 API 응답 — `{ jsonArray: [...] }` 또는 배열.
  * 필드: pblancNm(공고명) · jrsdInsttNm(소관) · excInsttNm(수행) · reqstBeginEndDe(신청기간)
@@ -467,6 +473,7 @@ export function parseBizinfoJson(text: string): BizinfoParse {
       rules,
       source: 'bizinfo',
       ...(s('pblancId') ? { externalId: s('pblancId').slice(0, 40) } : {}),
+      ...(postedOf(s('creatPnttm')) ? { postedAt: postedOf(s('creatPnttm')) } : {}),
     })
   }
   return { drafts, skipped }

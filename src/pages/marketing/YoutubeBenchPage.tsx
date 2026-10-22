@@ -22,7 +22,7 @@ import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -82,6 +82,7 @@ import {
   isNoiseKeyword,
   myChannelStats,
   newAiKeywords,
+  opportunityLabel,
   radarPlan,
   radarVideos,
   risingTopics,
@@ -91,7 +92,9 @@ import {
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
-import { KeywordHome } from './radar/KeywordHome'
+import { KeywordHome, type HomeKeyword } from './radar/KeywordHome'
+import { useGrantFeed } from '../../services/grants/grantFeed'
+import { noticeKeywords, noticePackSource, readWeekLog, rememberWeek, weekChange, weekWindow, withNoticeFacts, withNoticeKeywords, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
@@ -230,7 +233,17 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-241 답의 후보 번호(o#) → 레이더 후보(같은 주제 줄에 합치고 · 찍기 키트를 대본 자료로)
   const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
   const packOpp = packKey && !packKey.startsWith('custom:') ? (oppByKey.get(packKey) ?? null) : null
-  const packSource = useMemo<PackSource | null>(() => (packKey.startsWith('custom:') ? customSource(packKey.slice(7)) : packOpp ? packSourceOf(packOpp) : null), [packKey, packOpp])
+  // D-267 우리 분야(정책자금 · 지원금 · 인증) — 기업마당 공고(매일 아침 9시)에서 이번 주 새로 올라온 공고로 키워드
+  const grants = useGrantFeed()
+  const today = todayLocalDate()
+  const noticeKeys = useMemo(() => noticeKeywords(grants.notices, today), [grants.notices, today])
+  const packNotice = packKey.startsWith('notice:') ? (noticeKeys.find((k) => k.key === packKey) ?? null) : null
+  const packSource = useMemo<PackSource | null>(() => {
+    if (packKey.startsWith('custom:')) return customSource(packKey.slice(7))
+    if (packNotice) return noticePackSource(packNotice, today)
+    // 같은 주제가 레이더에도 올라왔으면 이번 주 공고 근거를 덧붙인다
+    return packOpp ? withNoticeFacts(packSourceOf(packOpp), noticeKeys.find((k) => k.topicId === packOpp.topicId && packOpp.axis === 'market')) : null
+  }, [packKey, packOpp, packNotice, noticeKeys, today])
   /** 이 묶음이 담긴 내 콘텐츠 줄 — 직접 쓴 주제는 '내 콘텐츠' 탭에서 같은 이름으로 담은 줄도(키가 달라도) */
   const ideaOfPack = (key: string, topic: string, custom: boolean) => notebook.ideas.find((i) => i.key === key) ?? (custom ? notebook.ideas.find((i) => i.topic.trim() === topic.trim()) : undefined)
   const packIdea = packSource ? (ideaOfPack(packSource.key, packSource.topic, packSource.custom) ?? null) : null
@@ -246,6 +259,29 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if ((location.state as { mkHome?: boolean } | null)?.mkHome) navigate(-1)
     else setParam({ pack: '' })
   }
+
+  // D-267 첫 화면 목록 — 레이더(유튜브) 후보 + 이번 주 공고 키워드(3번째 · 6번째 자리 · 같은 주제면 그 줄에 칩)
+  const homeData = useMemo<{ list: HomeKeyword[]; noteOf: Map<string, string> } | null>(() => {
+    if (!plan && noticeKeys.length === 0) return null
+    const base: HomeKeyword[] = (plan?.picks ?? []).map((o) => ({ key: o.key, topic: o.topic, axis: o.axis, topicId: o.topicId }))
+    return withNoticeKeywords(base, noticeKeys, (k) => ({ key: k.key, topic: k.label, axis: 'market', topicId: k.topicId, notice: true }))
+  }, [plan, noticeKeys])
+  // D-267 지난주와 비교 — 주마다 첫 목록을 이 브라우저에 적어 두고 새로 들어온 키워드에 '새로'
+  const homeKeyIds = useMemo(() => (homeData?.list ?? []).map((k) => k.key).join('|'), [homeData])
+  const [lastWeek, setLastWeek] = useState<string[] | null>(null)
+  useEffect(() => {
+    if (!prepared || !homeKeyIds) return
+    const { log, last } = rememberWeek(readWeekLog(), today, homeKeyIds.split('|'))
+    writeWeekLog(log)
+    setLastWeek(last)
+  }, [prepared, homeKeyIds, today])
+  const homeKeys = homeData ? homeData.list.map((k) => ({ ...k, note: homeData.noteOf.get(k.key) })) : null
+  // 이름표가 없는 키(예전 주제 · 지운 주제)는 앞머리('market:')를 떼고
+  const change = useMemo(() => weekChange((homeData?.list ?? []).map((k) => k.key), lastWeek, (key) => opportunityLabel(key).label.replace(/^[a-z]+:/, '')), [homeData, lastWeek])
+  /** D-267 묶음 머리 '이번 주 키워드 n번' — 첫 화면에 보인 번호 그대로(공고 키워드가 끼면 레이더 순위와 다르다) · 목록 밖은 0 */
+  const homeRank = (key: string) => (homeData?.list.findIndex((k) => k.key === key) ?? -1) + 1
+  const span = weekWindow(today)
+  const spanText = `${Number(span.from.slice(5, 7))}/${Number(span.from.slice(8, 10))}~${Number(span.to.slice(5, 7))}/${Number(span.to.slice(8, 10))}`
 
   const refresh = () => {
     void yt.refresh()
@@ -507,7 +543,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   const briefCard = !readOnly ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey
-  const homeKeys = plan ? plan.picks.map((o) => ({ key: o.key, topic: o.topic, axis: o.axis })) : null
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
 
   return (
@@ -565,7 +600,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           <PackView
             source={packSource}
             brief={brief}
-            rank={packOpp ? (plan?.picks.indexOf(packOpp) ?? -1) + 1 : 0}
+            rank={homeRank(packKey)}
             readOnly={readOnly}
             ownerAi={access !== 'no'}
             savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
@@ -609,6 +644,29 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                     )}
                   </div>
                 </PeekProvider>
+              ) : packNotice ? (
+                <div className="flex flex-col gap-2.5" data-testid="mk-pack-notices">
+                  <p className="t-sub break-keep text-slate-800">
+                    <b>왜 지금</b> — {packSource?.why}
+                  </p>
+                  <p className="t-sub font-semibold text-slate-800">이번 주 새로 올라온 공고 {packNotice.fresh.length}건 — 금액 · 자격은 공고 원문으로 확인해서 말해요</p>
+                  <ul className="flex flex-col gap-1.5">
+                    {[...packNotice.fresh.slice(0, 8), ...packNotice.closing.filter((n) => !packNotice.fresh.includes(n)).slice(0, 3)].map((n) => (
+                      <li key={n.id} className="t-sub flex min-w-0 flex-wrap items-baseline gap-x-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <span className="min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{n.title}</span>
+                        <span className="t-meta shrink-0 text-slate-600">
+                          {n.agency}
+                          {n.applyEnd ? ` · 마감 ${Number(n.applyEnd.slice(5, 7))}/${Number(n.applyEnd.slice(8, 10))}` : ''}
+                        </span>
+                        {n.url && (
+                          <a href={n.url} target="_blank" rel="noreferrer" className="t-meta inline-flex items-center gap-0.5 font-semibold text-red-700 underline underline-offset-2">
+                            공고 <ExternalLink aria-hidden="true" className="size-3.5" />
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null
             }
           />
@@ -638,7 +696,16 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       ) : home ? (
         <>
           {prepared && <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />}
-          <KeywordHome keywords={homeKeys} status={homeStatus} aiDone={aiDone} onPick={openPack} onCustom={(t) => openPack(`custom:${t}`)} />
+          <KeywordHome
+            keywords={homeKeys}
+            status={homeStatus}
+            aiDone={aiDone}
+            fresh={change.fresh}
+            basis={`기준: 벤치마킹 채널 최근 2주 영상(6시간마다 새로) · 기업마당 이번 주(${spanText}) 새 공고(매일 아침 9시)`}
+            change={change.line}
+            onPick={openPack}
+            onCustom={(t) => openPack(`custom:${t}`)}
+          />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
           {!prepared && briefCard}
