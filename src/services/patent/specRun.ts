@@ -5,7 +5,7 @@
  * 화면(명세서 편집기)이 열려 있으면 그 화면의 apply(받는 대로 저장)로 넣고, 닫혀 있으면 '넣을 것' 줄에 쌓아 두었다가
  * 다시 열 때 차례로 넣는다. 넣는 함수는 늘 '그 순간의 최신 초안' 을 받아 바꾸므로 사이에 고친 글을 덮지 않는다.
  */
-import { AssistError, assistMessage, callAssist } from '../aiAssist/client'
+import { AssistError, assistMessage, callAssist, cutOff } from '../aiAssist/client'
 import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
 import { judgeOf, judgePassed, type JudgeReport } from '../aiAssist/judge'
 import { readJudgeSkill } from '../aiAssist/judgeSkill'
@@ -165,6 +165,14 @@ const FORMAT_HINT: Record<AgentStage, string> = {
   judge2: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 이름표(title · titleEn · field · background · problem · solution · effect · abstract · claims)","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
 }
 
+/*
+ * D-268 길이 상한에서 잘린 답 — 예전엔 공급자가 '여기서 멈춤(길이)' 이라고 알려 줘도 보지 않고 잘린 글을 그대로 넣었다.
+ * 이제 한 번은 더 짧게 다시 부르고, 그래도 잘리면 넣되 단계 줄에 알린다(자체점검은 잘렸을 수 있는 마지막 고친 칸을 넣지 않는다).
+ */
+const CUT_HINT = '앞 답이 길이 상한에서 잘렸습니다. 같은 내용을 더 짧게 — 칸마다 정한 글자 수 안에서 문장을 끝까지 맺고, JSON 을 끝까지 닫아 다시 써 주세요.'
+const CUT_HINT_JUDGE = '앞 판정 답이 길이 상한에서 잘렸습니다. 고친 칸은 2개까지 · 판정은 한 줄씩 짧게, JSON 을 끝까지 닫아 다시 내 주세요.'
+export const CUT_NOTE = ' · ⚠ 답 끝이 길이 상한에서 잘렸을 수 있어요(그 칸 끝부분을 확인하세요)'
+
 /** D-263 자체점검를 다시 부르는 기준 — 90점 미만이거나 P0 가 남았는데 자체점검이 고친 칸이 있으면 한 번 더 판정(최대 2번) */
 const JUDGE_ROUNDS = 2
 
@@ -207,11 +215,20 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
 
   let hint = ''
   let rateWaited = false
+  let cutRetried = false
   for (let attempt = 0; attempt < TRIES; attempt += 1) {
     if (!attempt) setStage(id, stage, { phase: 'run', text: `쓰는 중…(${s.seconds}초쯤)` })
     try {
       const skill = stage === 'idea' || stage === 'research' ? '' : readJudgeSkill()
       const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+      if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
+        cutRetried = true
+        hint = CUT_HINT
+        setStage(id, stage, { phase: 'run', text: `답이 길이 상한에서 잘려 더 짧게 다시 씁니다(${attempt + 2}/${TRIES})` })
+        continue
+      }
+      const cutNote = cutOff(run) ? CUT_NOTE : ''
+      const done = (text: string) => setStage(id, stage, { phase: 'done', text: `${text}${cutNote}` })
       // 서버가 모양 검사에서 떨어뜨린 답(머리글 빠짐 · 끝 잘림 · 코드 블록)도 원문에서 다시 읽는다
       const ans = answerOf(run)
       switch (stage) {
@@ -224,14 +241,14 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
             const next = { ...cur, ideas }
             return filled ? applyIdea(next, ideas[0]) : next
           })
-          setStage(id, stage, { phase: 'done', text: filled ? `${ideas.length}개 — 추천 1번 '${ideas[0].title}' 로 채웠습니다(다른 것으로 바꿀 수 있어요)` : `${ideas.length}개 — 아래에서 고르면 그걸로 바뀝니다` })
+          done(filled ? `${ideas.length}개 — 추천 1번 '${ideas[0].title}' 로 채웠습니다(다른 것으로 바꿀 수 있어요)` : `${ideas.length}개 — 아래에서 고르면 그걸로 바뀝니다`)
           return 'ok'
         }
         case 'research': {
           const res = researchOf({ ...run, structured: ans }, d0.title)
           if (!res) throw new AssistError(PARSE_MISS, 'AI 답에서 조사 메모를 찾지 못했습니다 — 다시 눌러 주세요')
           await patch(id, (cur) => ({ ...cur, research: { ...res, forTitle: cur.title } }))
-          setStage(id, stage, { phase: 'done', text: res.grounded ? `메모 ${res.items.length}개 · 검색 근거 ${res.sources.length}곳` : `메모 ${res.items.length}개 · AI 가 아는 범위(검색 근거 없음 — KIPRIS 확인 필요)` })
+          done(res.grounded ? `메모 ${res.items.length}개 · 검색 근거 ${res.sources.length}곳` : `메모 ${res.items.length}개 · AI 가 아는 범위(검색 근거 없음 — KIPRIS 확인 필요)`)
           return 'ok'
         }
         case 'parts': {
@@ -243,7 +260,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
             return res.draft
           })
           const r = res as ReturnType<typeof applyParts> | null
-          setStage(id, stage, r?.kept ? { phase: 'done', text: '직접 고치신 구성은 그대로 두었습니다 — 바꾸려면 [다시 써줘]' } : { phase: 'done', text: `구성요소 ${p.components.length}개 · 단계 ${p.steps.length}개 · 종속항 씨앗 ${p.seeds.length}개` })
+          done(r?.kept ? '직접 고치신 구성은 그대로 두었습니다 — 바꾸려면 [다시 써줘]' : `구성요소 ${p.components.length}개 · 단계 ${p.steps.length}개 · 종속항 씨앗 ${p.seeds.length}개`)
           return 'ok'
         }
         case 'fix': {
@@ -255,7 +272,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
             return m.draft
           })
           const r = m as ReturnType<typeof applyFix> | null
-          setStage(id, stage, { phase: 'done', text: `${r?.replaced.length ?? 0}칸 고침${r?.kept.length ? ` · 직접 고친 ${r.kept.length}칸은 새 안으로` : ''}` })
+          done(`${r?.replaced.length ?? 0}칸 고침${r?.kept.length ? ` · 직접 고친 ${r.kept.length}칸은 새 안으로` : ''}`)
           return 'ok'
         }
         default: {
@@ -277,7 +294,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           })
           const got = items.filter((i) => i.note).map((i) => ({ key: i.key === 'detail2' ? 'detail' : i.key, text: i.note! }))
           if (got.length) setRun(id, (r) => ({ ...r, asks: [...r.asks.filter((x) => !got.some((g) => g.key === x.key)), ...got.map((g) => ({ key: KEY_LABEL[g.key] ?? g.key, text: g.text }))] }))
-          setStage(id, stage, { phase: 'done', text: `${m.replaced.length ? `${m.replaced.length}칸 씀` : '바꾼 칸 없음'}${m.kept.length ? ` · 직접 고친 ${m.kept.length}칸은 새 안으로` : ''}` })
+          done(`${m.replaced.length ? `${m.replaced.length}칸 씀` : '바꾼 칸 없음'}${m.kept.length ? ` · 직접 고친 ${m.kept.length}칸은 새 안으로` : ''}`)
           return 'ok'
         }
       }
@@ -319,6 +336,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
   const fixedAll: string[] = []
   const keptAll: string[] = []
   let report: JudgeReport | null = null
+  let cutAny = false
   for (let round = 1; round <= JUDGE_ROUNDS; round += 1) {
     const d0 = current(id)
     if (!d0) {
@@ -329,12 +347,24 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
     let hint = ''
     let got: ReturnType<typeof judgeOf> | null = null
     let rateWaited = false
+    let cutRetried = false
     for (let attempt = 0; attempt < TRIES && !got; attempt += 1) {
       if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `${label}을 자체점검하는 중…(${stageOf(stage).seconds}초쯤)` : '고친 글로 한 번 더 자체점검하는 중…' })
       try {
         const run = await callAssist({ requestId: newRequestId(), assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+        if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
+          cutRetried = true
+          hint = CUT_HINT_JUDGE
+          setStage(id, stage, { phase: 'run', text: `판정 답이 길이 상한에서 잘려 더 짧게 다시 판정합니다(${attempt + 2}/${TRIES})` })
+          continue
+        }
         const j = judgeOf(answerOf(run))
         if (j.score == null && !j.verdicts.length && !j.rewrites.length) throw new AssistError(PARSE_MISS, 'AI 답에서 판정을 찾지 못했습니다 — 다시 눌러 주세요')
+        // 잘린 답의 마지막 고친 칸은 반쯤 쓴 글일 수 있다 — 넣지 않는다
+        if (cutOff(run)) {
+          cutAny = true
+          j.rewrites = j.rewrites.slice(0, -1)
+        }
         got = j
       } catch (e) {
         const code = e instanceof AssistError ? e.code : 'save'
@@ -380,7 +410,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
   if (asks.length) setRun(id, (x) => ({ ...x, asks: [...x.asks.filter((a) => a.key !== `자체점검 ${label}`), ...asks.map((a) => ({ key: `자체점검 ${label}`, text: a.fix || a.text }))] }))
   setStage(id, stage, {
     phase: 'done',
-    text: `${r?.score != null ? `${r.score}점` : '점수 없음'} · P0 ${p0}${fixedAll.length ? ` · 직접 고친 칸 ${fixedAll.join(' · ')}` : ' · 고칠 것 없음'}${keptAll.length ? ` · 직접 고치신 ${keptAll.join(' · ')}은 그대로` : ''}${(r?.rounds ?? 1) > 1 ? ' · 고친 뒤 다시 판정' : ''}`,
+    text: `${r?.score != null ? `${r.score}점` : '점수 없음'} · P0 ${p0}${fixedAll.length ? ` · 직접 고친 칸 ${fixedAll.join(' · ')}` : ' · 고칠 것 없음'}${keptAll.length ? ` · 직접 고치신 ${keptAll.join(' · ')}은 그대로` : ''}${(r?.rounds ?? 1) > 1 ? ' · 고친 뒤 다시 판정' : ''}${cutAny ? CUT_NOTE : ''}`,
   })
   return 'ok'
 }

@@ -35,6 +35,32 @@ function chunks(text: string, size = 560): string[] {
   return out
 }
 
+/**
+ * D-268 칸 전체를 문단마다(자체점검 · 고치기 · 청구항 쓰기용). 예전엔 560자씩 · 구체적인 내용 앞 5조각(2,800자)만 · 줄바꿈 없이 보내서
+ * 자체점검이 "구체적인 내용이 문장 중간에서 끝난다" 고 판정했다(잘린 것은 우리). 서버가 메모 한 줄을 600자에서 자르고
+ * 줄바꿈을 지우므로 문단이 한 줄이 되고, 긴 문단은 문장 끝(없으면 띄어쓰기)에서 나눈다.
+ */
+export function paraChunks(text: string, size = 560): string[] {
+  const out: string[] = []
+  for (const para of String(text ?? '').split(/\n+/)) {
+    let p = para.replace(/\s+/g, ' ').trim()
+    while (p.length > size) {
+      const head = p.slice(0, size)
+      let cut = -1
+      for (const m of head.matchAll(/[.!?。](?=\s)/g)) cut = (m.index ?? -1) + 1
+      if (cut < size / 2) cut = head.lastIndexOf(' ')
+      if (cut < size / 2) cut = size
+      out.push(p.slice(0, cut).trim())
+      p = p.slice(cut).trim()
+    }
+    if (p) out.push(p)
+  }
+  return out
+}
+
+/** 같은 칸의 문단들 — "detail", "detail (이어서 2)" … */
+export const paraRows = (label: string, text: string): AssistRow[] => paraChunks(text).map((memo, i) => ({ part: i ? `${label} (이어서 ${i + 1})` : label, memo }))
+
 export const SPEC_RULES = [
   '한국 특허 명세서를 쓴다. 문체는 "~한다 · ~이다" 의 평서체, 문단 단위로 쓰고 문단 사이는 빈 줄 하나.',
   '[자료 · 구성요소] 의 이름과 부호를 그대로 쓴다 — 발명의 설명에서는 "이름(부호)" (예: 판정부(140)), 청구항에서는 부호 없이 이름만. 새 구성요소 · 새 부호를 만들지 않는다.',
@@ -116,7 +142,9 @@ export function buildSpecContext(input: { batch: SpecBatch; draft: SpecDraft; to
     if (mine.has(k)) continue
     const t = (d.text[k] ?? '').trim()
     if (!t) continue
-    chunks(t).slice(0, batch === 'd' && k === 'detail' ? 6 : 2).forEach((memo, i) => written.push({ part: `${SECTION_LABEL[k]}${i ? ' (이어서)' : ''}`, memo }))
+    // D-268 청구항(e)은 구체적인 내용 전체를 본다 — 청구항의 구성 · 단계가 본문에 그대로 있어야(뒷받침) 하므로
+    if (batch === 'e' && k === 'detail') written.push(...paraRows(SECTION_LABEL[k], t))
+    else chunks(t).slice(0, batch === 'd' && k === 'detail' ? 6 : 2).forEach((memo, i) => written.push({ part: `${SECTION_LABEL[k]}${i ? ' (이어서)' : ''}`, memo }))
   }
   if (written.length) sections.push({ name: '이미 쓴 칸', rows: written })
   return {

@@ -21,7 +21,9 @@ import {
   drawingDescLines,
   emptyDraft,
   figureSubject,
+  isSentenceName,
   josa,
+  nameFromSentence,
   mergeSpecAi,
   normalizeDraft,
   sectionSkeleton,
@@ -35,7 +37,8 @@ import {
   type SpecDraft,
 } from '../patent/specDraft'
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf } from '../patent/specDraftAi'
-import { applyJudge, bodyWritten, buildJudgeContext, cardState, fixItemsOf, partLabelOf, partsOf, partsSig, planAll, stageBlock } from '../patent/specAgent'
+import { applyFix, applyJudge, bodyWritten, buildFixContext, buildJudgeContext, cardState, fixItemsOf, paraChunks, partLabelOf, partsOf, partsSig, planAll, stageBlock } from '../patent/specAgent'
+import { cutOff } from '../aiAssist/client'
 import { assistSystem } from '../../../api/_ai/assists.js'
 import { answerOf, looseJson, rawObjectOf } from '../aiAssist/looseJson'
 
@@ -309,6 +312,59 @@ function fullDraft(): SpecDraft {
   check('DJ11 자체점검 카드 — ② 가 90점 이상 · P0 없음일 때만 다 됨', !cardState('judge', full).done && cardState('judge', passed1).done && /95점/.test(cardState('judge', passed1).summary))
   const sys = assistSystem(ASSISTS['spec.e'], { skill: '대표표식' })
   check('DJ12 청구항 쓰기 지시문 — 최종본 규칙 · 특허 자체점검 · 대표 정의', sys.includes('[최종본 규칙') && sys.includes('[자체점검 — 특허 명세서]') && sys.includes('대표표식'))
+}
+
+/* ---------------- D-268 자체점검이 글 전체를 본다 · 명칭 한 줄 · 구성요소 이름 · 잘린 답 ---------------- */
+{
+  const sentence = '판매 자료와 재고 자료를 채널마다 한 형식으로 모아 저장한다. '
+  const longPara = sentence.repeat(40).trim() // 약 1,400자 · 문장 40개
+  const detail = [`도 1 을 참조하면, 시스템(100)은 ${sentence.repeat(20).trim()}`, longPara, `도 2 를 참조하면, ${sentence.repeat(30).trim()}`, `끝 문단 — ${sentence.repeat(20).trim()}`].join('\n\n')
+  const d = fullDraft()
+  d.text = { ...d.text, detail }
+  const longClaim = `청구항 1. ${'채널별 판매 자료를 수집하는 수집부; '.repeat(40)}를 포함하는 시스템.`
+  d.claims = [longClaim, '청구항 2. 청구항 1에 있어서, 상기 수집부는 재고 자료를 함께 수집하는 것을 특징으로 하는 시스템.']
+  const pieces = paraChunks(detail)
+  const flat = (t: string) => t.replace(/\s+/g, ' ').trim()
+  check('DK1 문단마다 한 줄 · 560자 넘는 줄 0 · 이으면 글 전체(빠진 글 0)', pieces.every((p) => p.length <= 560) && flat(pieces.join(' ')) === flat(detail) && pieces.length >= 5, pieces.map((p) => p.length))
+  check('DK2 긴 문단은 문장 끝에서 나눔(조각이 마침표로 끝남)', paraChunks(longPara).slice(0, -1).every((p) => /[.]$/.test(p)), paraChunks(longPara).map((p) => p.slice(-6)))
+  const ctx = buildJudgeContext({ draft: d, scope: 'full', today: '2026-10-22' })
+  const rowsOf = (name: string) => ctx.sections.find((s) => s.name === name)?.rows ?? []
+  const body = rowsOf('명세서 지금 글')
+  const detailSent = body.filter((r) => /^detail/.test(String(r.part))).map((r) => String(r.memo)).join(' ')
+  check('DK3 자체점검 ② — 구체적인 내용 전체를 보냄(예전 2,800자에서 잘림)', detail.length > 3000 && flat(detailSent) === flat(detail), { sent: detailSent.length, all: detail.length })
+  const title = body.find((r) => r.part === 'title{titleEn}')
+  check('DK4 명칭은 출원서 그대로 "한글{ENGLISH}" 한 줄 · titleEn 따로 줄 없음', !!title && String(title.memo) === `${d.title}{${d.titleEn}}` && !body.some((r) => r.part === 'titleEn' || r.part === 'title'), body.slice(0, 2))
+  const claimSent = rowsOf('청구항').filter((r) => /^claims 1/.test(String(r.part))).map((r) => String(r.memo)).join(' ')
+  check('DK5 청구항도 전체(예전엔 청구항마다 앞 560자) · 청구항이 본문보다 앞(서버가 줄여도 남게)', flat(claimSent) === flat(longClaim) && longClaim.length > 560 && ctx.sections.findIndex((s) => s.name === '청구항') < ctx.sections.findIndex((s) => s.name === '명세서 지금 글'), { sent: claimSent.length, all: longClaim.length })
+  check('DK6 규칙 — "(이어서 n)" 은 같은 칸 · 줄인 곳은 끝남이 아님 · 명칭 한 줄은 형식 문제 아님', (ctx.rules ?? []).some((r) => /줄임/.test(r) && /중간에 끝남/.test(r)) && (ctx.rules ?? []).some((r) => /한글 명칭\{영문 명칭\}/.test(r)))
+  const prompt = buildAssistPrompt(ASSISTS['spec.judge'], ctx, '').user
+  check('DK7 서버가 만든 글에도 구체적인 내용 끝 문단 · 청구항 끝이 그대로(4만 자 안)', prompt.includes('끝 문단 —') && prompt.includes('를 포함하는 시스템.') && !/\(\d+건 더 — 줄임\)/.test(prompt), prompt.length)
+  const fx = buildFixContext({ draft: d, issues: ['고쳐야 함 · 요약'], today: '2026-10-22' })
+  const fxBody = fx.sections.find((s) => s.name === '명세서 지금 글')?.rows ?? []
+  check('DK8 점검대로 고치기도 글 전체 · 명칭 한 줄', flat(fxBody.filter((r) => /^detail/.test(String(r.part))).map((r) => String(r.memo)).join(' ')) === flat(detail) && fxBody.some((r) => r.part === 'title{titleEn}') && (fx.rules ?? []).length >= 2)
+  const eCtx = buildSpecContext({ batch: 'e', draft: d, today: '2026-10-22' })
+  const eDetail = (eCtx.sections.find((s) => s.name === '이미 쓴 칸')?.rows ?? []).filter((r) => String(r.part).includes('구체적인 내용')).map((r) => String(r.memo)).join(' ')
+  check('DK9 청구항 쓰기(e)는 구체적인 내용 전체를 봄(뒷받침) · 다른 묶음(a)은 예전처럼 앞부분만', flat(eDetail) === flat(detail) && (buildSpecContext({ batch: 'a', draft: d, today: '2026-10-22' }).sections.find((s) => s.name === '이미 쓴 칸')?.rows ?? []).filter((r) => String(r.part).includes('구체적인 내용')).length <= 2)
+
+  // 명칭을 "한글{ENGLISH}" 한 줄로 돌려줘도 두 칸으로
+  const ai = { ...fullDraft() }
+  ai.ai = { ...ai.ai, title: ai.title, titleEn: ai.titleEn }
+  const f1 = applyFix(ai, [{ key: 'title', text: '판매 재고 연계 운영상태 산출 시스템 및 방법{SYSTEM AND METHOD FOR CALCULATING OPERATION STATE}' }])
+  check('DK10 고친 명칭 "한글{ENGLISH}" → 명칭 · 영문 명칭 두 칸(영문이 한글 명칭에 붙지 않음)', f1.draft.title === '판매 재고 연계 운영상태 산출 시스템 및 방법' && f1.draft.titleEn === 'SYSTEM AND METHOD FOR CALCULATING OPERATION STATE' && f1.replaced.includes('titleEn'), [f1.draft.title, f1.draft.titleEn])
+  const f2 = applyFix(ai, [{ key: 'title', text: '가 시스템 및 방법{A}' }, { key: 'titleEn', text: 'B SYSTEM AND METHOD' }])
+  check('DK11 영문 명칭을 따로도 주면 따로 준 것이 우선', f2.draft.title === '가 시스템 및 방법' && f2.draft.titleEn === 'B SYSTEM AND METHOD', [f2.draft.title, f2.draft.titleEn])
+
+  // 구성요소 이름 — 문장은 이름이 아니다
+  check('DK12 문장 이름 알아봄 · 보통 이름은 그대로', isSentenceName('입력 자료를 수집합니다.') && isSentenceName('상태를 판단하는') && isSentenceName('결과를 보여 준다') && !isSentenceName('진동 수집부') && !isSentenceName('사용자 단말') && !isSentenceName('데이터베이스') && !isSentenceName('상태 판단 엔진(130)'))
+  check('DK13 "…를 ○○합니다" → "… ○○부"', nameFromSentence('입력 자료를 수집합니다.') === '입력 자료 수집부' && nameFromSentence('판매 데이터를 기준값과 비교하는') === '판매 데이터 비교부' && nameFromSentence('그리고 결과를 잘 보여줍니다.') === null, [nameFromSentence('입력 자료를 수집합니다.'), nameFromSentence('판매 데이터를 기준값과 비교하는')])
+  const p = partsOf({ headline: '', items: [{ title: 'comp', detail: '입력 자료를 수집합니다.', body: '' }, { title: 'comp', detail: '마모 판정부', body: '마모 단계를 판정하는' }, { title: 'comp', detail: '그리고 결과를 잘 보여줍니다.', body: '' }, { title: 'seed', detail: '입력 자료를 수집합니다.', body: '채널마다 따로 모으는' }] })
+  check('DK14 구성 답의 문장 이름 → "입력 자료 수집부"(하는 일은 그 문장) · 줄일 수 없는 문장은 버림 · 종속항 씨앗도 같은 이름', p.components.map((c) => c.name).join() === '입력 자료 수집부,마모 판정부' && p.components[0].does === '입력 자료를 수집하는' && p.seeds[0]?.comp === '입력 자료 수집부', p)
+  const bad = fullDraft()
+  bad.components = bad.components.map((c, i) => (i === 0 ? { ...c, name: '입력 자료를 수집합니다.' } : c))
+  check('DK15 이미 문장 이름이 든 초안 — 점검에 "구성요소 이름이 문장" 주의', checkDraft(bad).some((i) => i.id === 'PARTS_SENTENCE' && i.level === 'warn') && !checkDraft(fullDraft()).some((i) => i.id === 'PARTS_SENTENCE'))
+
+  // 잘린 답
+  check('DK16 길이 상한에서 잘린 답 알아봄 — Gemini MAX_TOKENS · OpenAI length · Claude max_tokens (STOP · end_turn 은 아님)', cutOff({ finish: 'MAX_TOKENS' }) && cutOff({ finish: 'length' }) && cutOff({ finish: 'max_tokens' }) && !cutOff({ finish: 'STOP' }) && !cutOff({ finish: 'end_turn' }) && !cutOff({ finish: '' }) && !cutOff(null))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

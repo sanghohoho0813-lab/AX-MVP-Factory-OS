@@ -118,6 +118,29 @@ const MESSY_PARTS =
     .join(',') +
   ',{"title":"step 3","body":"교체 시점을 산'
 let delayMs = 30
+/* D-268 실제로 본 문제 — 구성요소 이름이 문장 · 답이 길이 상한에서 잘림 · 자체점검 47점 · P0 · 명칭을 "한글{ENGLISH}" 한 줄로 */
+let trial = false
+let cutC = 0
+const SENT = '판매 자료와 재고 자료를 채널마다 한 형식으로 모아 저장한다. '
+const LONG_DETAIL = [`이하, 첨부된 도면을 참조하여 입력 자료 수집부(110)를 설명한다. ${SENT.repeat(30).trim()}`, SENT.repeat(50).trim(), `끝문단표식 — ${SENT.repeat(30).trim()}`].join('\n\n')
+const SENTENCE_PARTS = [
+  ...PARTS.filter((x) => x.title !== 'comp' && x.title !== 'seed'),
+  { title: 'comp', detail: '입력 자료를 수집합니다.', body: '' },
+  { title: 'comp', detail: '마모 판정부', body: '마모 단계를 판정하는' },
+  { title: 'comp', detail: '그리고 결과를 잘 보여줍니다.', body: '' },
+  { title: 'comp', detail: '교체시점 산출부', body: '작업 일정과 함께 교체 시점을 산출하는' },
+  { title: 'seed', detail: '입력 자료를 수집합니다.', body: '채널마다 따로 모으는' },
+]
+const LOW_JUDGE = {
+  headline: '점수 47/100 · P0 1개 · 고친 칸 3개',
+  items: [
+    { title: 'score', amount: '47', detail: 'A4 B4 C5 D5 E5 F5 G5 H5 I4 J5' },
+    { title: 'verdict', tag: 'P0', detail: '청구항 1 에 차별 구조가 없다', body: '연결관계를 청구항 1 에 넣어야 합니다' },
+    { title: 'title', body: '판매 재고 연계 운영상태 산출 시스템 및 방법{SYSTEM AND METHOD FOR CALCULATING OPERATION STATE}' },
+    { title: 'abstract', body: '본 발명은 판매 자료와 재고 자료를 채널마다 모아 운영상태를 산출하는 시스템에 관한 것이다.' },
+    { title: 'claims', body: '청구항 1. 잘린청구항표식' },
+  ],
+}
 async function routeAi(page) {
   await page.route('**/api/ai-assist**', async (route) => {
     if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, providers: [{ id: 'gemini', label: 'Gemini', configured: true, keyName: 'GEMINI_API_KEY', models: [{ id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', note: '빠르게', tier: 'cheap', price: { in: 0.1, out: 0.4 } }, { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', note: '보통', tier: 'standard', price: { in: 0.3, out: 2.5 } }] }, { id: 'openai', label: 'OpenAI', configured: true, keyName: 'OPENAI_API_KEY', models: [{ id: 'gpt-5.4-mini', label: 'GPT 5.4 Mini', note: '보통', tier: 'standard', price: { in: 0.4, out: 1.6 } }] }], defaultChoice: { provider: 'gemini', model: 'gemini-3.1-flash-lite' } }) })
@@ -133,7 +156,22 @@ async function routeAi(page) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
     }
     const research = req.assistId === 'spec.research'
-    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: req.assistId === 'spec.judge' ? judgeAnswer(req.context?.purpose ?? '') : answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [] }
+    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: req.assistId === 'spec.judge' ? judgeAnswer(req.context?.purpose ?? '') : answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [], finish: 'STOP' }
+    if (trial) {
+      const whole = req.assistId === 'spec.judge' && /전체/.test(req.context?.purpose ?? '')
+      if (req.assistId === 'spec.parts') run.structured = { headline: '문장 이름', items: SENTENCE_PARTS }
+      if (req.assistId === 'spec.c') {
+        run.structured = { headline: 'c', items: [{ title: 'detail', body: LONG_DETAIL }] }
+        // 1번째 본문 ① 은 길이 상한에서 잘림 → 더 짧게 다시
+        cutC += 1
+        if (cutC === 1) run.finish = 'MAX_TOKENS'
+      }
+      // 자체점검 ② 는 늘 잘림(다시 불러도) — 마지막 고친 칸(청구항)은 반쯤 쓴 글일 수 있어 넣지 않아야
+      if (whole) {
+        run.structured = LOW_JUDGE
+        run.finish = 'length'
+      }
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
 }
@@ -187,6 +225,10 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B8 차례 — 아이디어 → 조사 → 구성 → 자체점검 ①(88점 · 고친 뒤 다시 93점) → 본문 a~d → 청구항 → 자체점검 ② → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.judge,spec.judge,spec.a,spec.b,spec.c,spec.d,spec.e,spec.judge,spec.fix', order)
   const judges = sent.filter((r) => r.assistId === 'spec.judge')
   check('B8b 자체점검 범위 — ① 구성 · ② 전체 · 대표 정의(skill)가 자체점검 · 쓰기 단추에 같이 감 · 아이디어 · 조사에는 안 감', /구성/.test(judges[0]?.context?.purpose) && /전체/.test(judges[2]?.context?.purpose) && judges.every((r) => /대표정의표식/.test(r.skill ?? '')) && /대표정의표식/.test(sent.find((r) => r.assistId === 'spec.a')?.skill ?? '') && !sent.find((r) => r.assistId === 'spec.idea')?.skill && !sent.find((r) => r.assistId === 'spec.research')?.skill, judges.map((r) => r.context?.purpose))
+  const j2Ctx = judges[2]?.context ?? {}
+  const j2Names = (j2Ctx.sections ?? []).map((s) => s.name)
+  const j2Body = (j2Ctx.sections ?? []).find((s) => s.name === '명세서 지금 글')?.rows ?? []
+  check('B8c 자체점검 ② 자료 — 명칭은 "한글{ENGLISH}" 한 줄(따로 줄 없음) · 청구항이 본문보다 앞 · "줄인 곳은 끝남 아님" 규칙', j2Body.some((r) => r.part === 'title{titleEn}' && /\{SYSTEM AND METHOD/.test(r.memo)) && !j2Body.some((r) => r.part === 'titleEn') && j2Names.indexOf('청구항') < j2Names.indexOf('명세서 지금 글') && (j2Ctx.rules ?? []).some((r) => /중간에 끝남/.test(r)), { j2Names, rows: j2Body.slice(0, 2) })
   check('B9 고른 모델로 부름(GPT)', sent.every((r) => r.choice?.provider === 'openai' && r.choice?.model === 'gpt-5.4-mini'), sent.map((r) => r.choice))
   const phases = await page.getByTestId('spec-board-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-phase')))
   check('B10 단계 줄 모두 다 씀', phases.every((p) => p === 'done'), phases)
@@ -217,6 +259,9 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await shot(page, 'B-done')
   await page.getByTestId('spec-cards-toggle').click()
   check('B21b 다 쓰면 맨 위에 "다 썼어요" · 명칭 · 청구항 수 · [MD 내려받기] · [제출 준비 묶음] (칸을 열지 않아도)', /다 썼어요/.test(await page.getByTestId('spec-board-head').innerText()) && (await page.getByTestId('spec-board-done-download').isVisible()) && (await page.getByTestId('spec-board-done-pack').isVisible()) && /청구항 3개/.test(await page.getByTestId('spec-board').innerText()))
+  const summary = await page.getByTestId('spec-board-summary').innerText()
+  check('B21d 맨 위 줄 — 형식 점검과 자체점검을 따로("형식 점검 통과 · 자체점검 94점") · 통과면 "손볼 곳" 없음', /형식 점검 (통과|고칠 것 \d+개)/.test(summary) && /자체점검 94점/.test(summary) && (await page.getByTestId('spec-board-head').getAttribute('data-needs-work')) === 'no', summary)
+  check('B21e 회사 기록 · 작업실 자료가 있으면 "읽을 것이 거의 없어요" 안내 없음', (await page.getByTestId('spec-board-thin').count()) === 0)
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.getByTestId('spec-board-done-download').click()])
   check('B21c 맨 위 [MD 내려받기] 한 번에 파일', !!dl && /\.md$/.test(dl.suggestedFilename()), dl?.suggestedFilename())
   await shot(page, 'B-finished', false)
@@ -364,6 +409,67 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await shot(page, 'E-messy-parts', false)
   check('E5 JS 오류 0', errors.length === 0, errors)
   partsMode = 'normal'
+  await ctx.close()
+}
+
+/* ---------------- D-268 회사 없이 · 문장 이름 · 잘린 답 · 47점 P0 — 실제로 본 명세서 모양 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await routeAi(page)
+  delayMs = 30
+  trial = true
+  cutC = 0
+  await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
+  const before = sent.length
+  // 회사를 고르지 않고 시작 — AI 가 읽을 회사 이야기가 없다
+  await page.getByTestId('spec-new').click()
+  await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-board-thin').waitFor({ timeout: 8000 }).catch(() => {})
+  check('T1 읽을 회사 이야기가 없으면 맨 위에 "거의 없어요" 안내 · [자료 넣기] (멈추지는 않음)', (await page.getByTestId('spec-board-thin').isVisible()) && (await page.getByTestId('spec-board-thin-file').isVisible()) && /지어낸 발명/.test(await page.getByTestId('spec-board-thin').innerText()))
+  await waitIdle(page, 60000)
+  await page.waitForTimeout(400)
+  await page.getByTestId('spec-cards-toggle').click()
+  const mine = sent.slice(before)
+  const cReq = mine.filter((r) => r.assistId === 'spec.c')
+  const row = async (k) => {
+    const l = page.locator(`[data-testid="spec-board-row"][data-stage="${k}"]`)
+    return (await l.count()) ? l.innerText() : ''
+  }
+  check('T2 본문 ① 답이 길이 상한에서 잘림 → 한 번 더 "더 짧게" 부름 · 두 번째는 다 써서 알림 없음', cReq.length === 2 && !cReq[0].ask && /길이 상한/.test(cReq[1].ask ?? '') && !/잘렸을 수/.test(await row('c')), { asks: cReq.map((r) => r.ask), row: await row('c') })
+  const partsText = (await page.getByTestId('spec-board-parts').count()) ? await page.getByTestId('spec-board-parts').innerText() : ''
+  check('T3 구성요소 이름이 문장("입력 자료를 수집합니다.") → "입력 자료 수집부(110)" · 줄일 수 없는 문장은 빠짐', /입력 자료 수집부\(110\)/.test(partsText) && !/수집합니다/.test(partsText) && !/보여줍니다/.test(partsText) && /교체시점 산출부\(130\)/.test(partsText), partsText)
+  const j2 = mine.filter((r) => r.assistId === 'spec.judge' && /전체/.test(r.context?.purpose ?? ''))
+  const j2Detail = ((j2[0]?.context?.sections ?? []).find((s) => s.name === '명세서 지금 글')?.rows ?? []).filter((r) => /^detail/.test(r.part)).map((r) => r.memo).join(' ')
+  check('T4 자체점검 ② 가 구체적인 내용 전체를 봄(예전엔 앞 2,800자 · 끝 문단 못 봄) · 줄마다 560자 안', j2Detail.length > 3000 && j2Detail.includes('끝문단표식') && ((j2[0]?.context?.sections ?? []).find((s) => s.name === '명세서 지금 글')?.rows ?? []).every((r) => String(r.memo ?? '').length <= 560), j2Detail.length)
+  check('T5 자체점검 ② 답이 잘림 → "더 짧게" 다시 판정 · 그래도 잘리면 진행 줄에 알림', j2.length >= 2 && /길이 상한/.test(j2[1].ask ?? '') && /잘렸을 수/.test(await row('judge2')), { asks: j2.map((r) => r.ask), row: await row('judge2') })
+  const store = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => /spec|patent/i.test(k)).map(([, v]) => v).join('\n'))
+  check('T6 잘린 답의 마지막 고친 칸(청구항)은 넣지 않음 · 그 앞 고친 칸(요약)은 넣음', !store.includes('잘린청구항표식') && store.includes('채널마다 모아 운영상태를 산출하는'), store.length)
+  const title = await page.getByTestId('spec-board-title').innerText()
+  check('T7 고친 명칭 "한글{ENGLISH}" → 명칭 · 영문 두 칸(영문이 한글 명칭에 붙지 않음)', title.includes('판매 재고 연계 운영상태 산출 시스템 및 방법{SYSTEM AND METHOD FOR CALCULATING OPERATION STATE}') && !/방법 SYSTEM/.test(title), title)
+  const head = page.getByTestId('spec-board-head')
+  const summary = await page.getByTestId('spec-board-summary').innerText()
+  check('T8 맨 위 — "다 썼어요 — 출원 전에 손볼 곳이 있어요" · 형식 점검과 자체점검 47점 · P0 1개를 따로(예전엔 "고칠 것 없음" 하나)', (await head.getAttribute('data-needs-work')) === 'yes' && /손볼 곳/.test(await head.innerText()) && /형식 점검/.test(summary) && /자체점검 47점 · P0 1개/.test(summary) && !/고칠 것 없음/.test(summary), { head: await head.innerText(), summary })
+  await page.getByTestId('spec-cards-toggle').click()
+  const toHead = () => page.getByTestId('spec-board-head').evaluate((el) => {
+    el.scrollIntoView({ block: 'start' })
+    window.scrollBy(0, -90)
+  })
+  await toHead()
+  await page.waitForTimeout(200)
+  await shot(page, 'T-needs-work', false)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(400)
+  await toHead()
+  await page.waitForTimeout(200)
+  check('T10 휴대폰 390 — 안내 · 맨 위 줄 · 판정 넘침 0', (await overflowX(page)) <= 0 && (await page.getByTestId('spec-board-thin').isVisible()), await overflowX(page))
+  await shot(page, 'T-390', false)
+  check('T9 JS 오류 0', errors.length === 0, errors)
+  trial = false
   await ctx.close()
 }
 

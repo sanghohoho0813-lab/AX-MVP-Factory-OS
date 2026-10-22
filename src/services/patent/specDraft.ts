@@ -345,6 +345,25 @@ const AXIS_ORDER: readonly { key: keyof SpecAxis; name: string; label: string }[
 ]
 export const AXIS_LABEL: Record<keyof SpecAxis, string> = { ...Object.fromEntries(AXIS_ORDER.map((a) => [a.key, a.label])), link: '경쟁사가 피하기 어려운 연결관계' } as Record<keyof SpecAxis, string>
 
+/**
+ * D-268 구성요소 이름이 문장인가 — 실제로 "입력 자료를 수집합니다.(110)" 가 이름 칸에 들어가 청구항 · 본문이 그 문장으로 쓰였다.
+ * 끝맺음(…합니다 · …한다 · …하는 · 마침표)이나 목적격(…를 )이 있으면 이름이 아니다.
+ */
+export function isSentenceName(name: string): boolean {
+  const t = String(name ?? '').replace(/\(\s*\d{2,4}\s*\)/g, '').trim()
+  if (!t) return false
+  return /[.。!?]$/.test(t) || /(?:니다|한다|된다|는다|하다|되다|함|됨|하는|되는|하며|하고|하여|해서)$/.test(t) || /[을를]\s/.test(t)
+}
+
+/** 문장 이름 → "…부" 이름("입력 자료를 수집합니다" → "입력 자료 수집부"). '…를 ○○합니다' 모양이 아니면 null */
+export function nameFromSentence(text: string): string | null {
+  const t = String(text ?? '').replace(/\(\s*\d{2,4}\s*\)/g, '').trim()
+  const m = /^(.{1,24}?)\s*[을를]\s+(?:[가-힣]+\s+)?([가-힣]{2,4})(?:합니다|한다|하는|함|하고|하여|해서|하며)[.。]?$/.exec(t)
+  if (!m) return null
+  const name = `${m[1].replace(/\s+/g, ' ').trim()} ${m[2]}부`
+  return name.length <= 30 && name.split(' ').length <= 5 && !isSentenceName(name) ? name : null
+}
+
 /** 자유 글 → '~하는' 꼴(청구항 · 단계에 그대로 넣을 수 있게) */
 export function asAdnominal(text: string): string {
   let t = String(text ?? '').trim().replace(/[.。]+$/, '').trim()
@@ -655,6 +674,8 @@ export function checkDraft(d: SpecDraft): DraftIssue[] {
   if (nos.some((x) => !/^\d{2,4}[a-z]?$/.test(x))) add('PARTS_NO', 'warn', 'parts', '부호는 숫자로(110 · 120 …) 적습니다')
   if (nos.includes('100')) add('PARTS_100', 'warn', 'parts', '100번은 시스템 전체 번호입니다 — 구성요소는 110부터')
   if (comps.some((c) => !c.does.trim())) add('PARTS_DOES', 'warn', 'parts', '하는 일이 빈 구성요소가 있습니다 — 청구항이 이름만 늘어놓게 됩니다')
+  const said = comps.find((c) => isSentenceName(c.name))
+  if (said) add('PARTS_SENTENCE', 'warn', 'parts', `구성요소 이름이 문장입니다('${said.name.trim().slice(0, 30)}') — '○○ 수집부' 처럼 이름으로 고치세요(청구항 · 본문이 이 이름을 그대로 씁니다)`)
   const names = comps.map((c) => c.name.trim())
   if (new Set(names).size !== names.length) add('PARTS_NAME', 'error', 'parts', '같은 이름의 구성요소가 있습니다 — 청구항 "상기 …" 가 누구를 가리키는지 흐려집니다')
   if (d.steps.filter((s) => s.text.trim()).length < 2) add('STEPS_FEW', 'warn', 'parts', '방법 단계가 2개보다 적습니다 — 방법 독립항이 약해집니다')

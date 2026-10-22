@@ -23,6 +23,7 @@ import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, 
 import { CARD_STAGES, applyIdea, bodyWritten, cardState, clearAfterIdea, hasLaterWork, partsHuman, planAll, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage } from '../../services/patent/specAgent'
 import { specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
+import { judgePassed } from '../../services/aiAssist/judge'
 import { clientFacts } from '../../tools/shared/clientPrefill'
 import { useOwnerAiRepo } from '../ownerAi/shared'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -64,6 +65,9 @@ const CARD_META: Record<AgentCard, { n: number; title: string; icon: ReactNode; 
 }
 
 const CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'judge', 'check']
+
+/** 회사가 무엇을 하는지 알려 주는 기록 줄(매출 · 지역 · 설립만으로는 발명을 떠올릴 수 없다) */
+const DESCRIBES = /^(?:업종|업태|종목|홈페이지|상담 메모):/
 
 const PHASE_TONE: Record<StageRow['phase'], string> = { wait: 'text-slate-500', run: 'text-violet-800', done: 'text-success-700', fail: 'text-danger-700', skip: 'text-slate-600' }
 
@@ -243,23 +247,38 @@ export function SpecAiBoard({
   const stagesShown = (Object.keys(run.stages) as AgentStage[]).sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b))
   const doneCards = CARDS.filter((c) => cardState(c, d).done).length
   const finished = !busy && doneCards >= 5 && !!d.title.trim()
+  // D-268 예전엔 맨 위가 형식 점검만 보고 '고칠 것 없음' 이라 해서, 바로 아래 '자체점검 47점 · P0 1' 과 어긋났다 — 둘을 따로
+  const judged = d.judge.full
+  const judgeP0 = judged?.verdicts.filter((v) => v.level === 'P0').length ?? 0
+  const needsWork = finished && !!judged && !judgePassed(judged)
+  // D-268 AI 가 읽을 것이 거의 없으면(업종 · 종목 · 상담 메모 · 자료 모두 없음) 업종 일반으로 지어낸 발명이 된다 — 미리 알린다
+  const thin = matsFor === clientId && !facts.some((f) => DESCRIBES.test(f)) && !d.materials.length && !caseMats.length && !priorIdeas.length
 
   return (
     <div className="flex flex-col gap-4" data-testid="spec-board" data-busy={busy ? 'yes' : 'no'}>
       <Surface>
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <span aria-hidden="true" className={`flex size-10 shrink-0 items-center justify-center rounded-full ${finished ? 'bg-success-100 text-success-700' : 'bg-violet-100 text-violet-700'}`}>
-              {finished ? <CheckCircle2 className="size-5" /> : busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
+            <span aria-hidden="true" className={`flex size-10 shrink-0 items-center justify-center rounded-full ${needsWork ? 'bg-warning-100 text-warning-800' : finished ? 'bg-success-100 text-success-700' : 'bg-violet-100 text-violet-700'}`}>
+              {needsWork ? <TriangleAlert className="size-5" /> : finished ? <CheckCircle2 className="size-5" /> : busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <h3 className="t-section font-bold break-keep text-slate-900" data-testid="spec-board-head">
-                {busy ? 'AI 가 쓰는 중이에요 — 화면을 떠나도 계속 씁니다' : finished ? '명세서를 다 썼어요' : 'AI 가 처음부터 끝까지 씁니다'}
+              <h3 className="t-section font-bold break-keep text-slate-900" data-testid="spec-board-head" data-needs-work={needsWork ? 'yes' : 'no'}>
+                {busy ? 'AI 가 쓰는 중이에요 — 화면을 떠나도 계속 씁니다' : needsWork ? '명세서를 다 썼어요 — 출원 전에 손볼 곳이 있어요' : finished ? '명세서를 다 썼어요' : 'AI 가 처음부터 끝까지 씁니다'}
               </h3>
-              <p className="t-sub break-keep text-slate-700">
+              <p className="t-sub break-keep text-slate-700" data-testid="spec-board-summary">
                 {finished ? (
                   <>
-                    <b className="font-semibold">{titleLine(d)}</b> · 청구항 {d.claims.length || claimsOf(d).length}개 · 본문 {SECTION_KEYS.filter((k) => (d.text[k] ?? '').trim()).length}/7칸 · {errs.length ? `고칠 것 ${errs.length}개` : '고칠 것 없음'}
+                    <b className="font-semibold">{titleLine(d)}</b> · 청구항 {d.claims.length || claimsOf(d).length}개 · 본문 {SECTION_KEYS.filter((k) => (d.text[k] ?? '').trim()).length}/7칸 · 형식 점검 {errs.length ? `고칠 것 ${errs.length}개` : '통과'}
+                    {judged && (
+                      <>
+                        {' · '}
+                        <b className={`font-semibold whitespace-nowrap ${needsWork ? 'text-warning-900' : 'text-success-800'}`}>
+                          자체점검 {judged.score == null ? '점수 없음' : `${judged.score}점`}
+                          {judgeP0 ? ` · P0 ${judgeP0}개` : ''}
+                        </b>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -278,6 +297,17 @@ export function SpecAiBoard({
               <JudgeSkillButton />
             </li>
           </ul>
+          {thin && (
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-board-thin">
+              <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">
+                <TriangleAlert aria-hidden="true" className="mr-1 inline size-4 align-[-2px]" />
+                <b className="font-semibold">AI 가 읽을 회사 이야기가 거의 없어요</b> — 업종 · 종목 · 상담 메모 · 자료가 비어 있어, 이대로 쓰면 업종 일반으로 지어낸 발명이 됩니다. 회사 소개서 · 제품 설명 · GPT 와 나눈 대화를 먼저 넣어 주세요(.hwpx · .hwp · .docx · .pdf).
+              </p>
+              <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-auto" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-thin-file">
+                <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기'}
+              </Button>
+            </div>
+          )}
           {(d.judge.full ?? d.judge.parts) && <JudgeReportView report={d.judge.full ?? d.judge.parts} title={d.judge.full ? '자체점검 ② 명세서 전체' : '자체점검 ① 구성 · 권리축'} testId="spec-judge" />}
 
           {finished ? (

@@ -24,7 +24,9 @@ import {
   checkDraft,
   cleanAiText,
   claimsOf,
+  isSentenceName,
   mergeSpecAi,
+  nameFromSentence,
   sectionOf,
   specMarkdown,
   titleLine,
@@ -36,9 +38,9 @@ import {
   type SpecIdea,
   type SpecResearch,
 } from './specDraft'
-import { SPEC_BATCHES, researchRows, type SpecBatch } from './specDraftAi'
+import { SPEC_BATCHES, paraChunks, paraRows, researchRows, type SpecBatch } from './specDraftAi'
 
-export { researchRows }
+export { paraChunks, researchRows }
 
 export type AgentStage = 'idea' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
 
@@ -91,6 +93,14 @@ function chunks(text: string, size = 560): string[] {
   for (let i = 0; i < t.length; i += size) out.push(t.slice(i, i + size))
   return out
 }
+
+/** D-268 출원서에 들어가는 그대로 "한글 명칭{영문 명칭}" 한 줄 — 두 줄로 보냈더니 자체점검이 "영문 명칭이 분리됨" P0 를 냈다 */
+const titleRow = (d: SpecDraft): AssistRow => ({ part: 'title{titleEn}', memo: titleLine(d) || '(없음)' })
+
+const WHOLE_TEXT_RULES = [
+  '[자료 · 명세서 지금 글] 은 칸마다 글 전체를 문단 한 줄씩 보낸 것이다("(이어서 n)" = 같은 칸의 n번째 문단). 서버가 길이 때문에 줄인 곳은 "(n건 더 — 줄임)" 으로만 표시된다 — 줄인 곳을 "글이 중간에 끝남" 으로 판정하지 않는다.',
+  '명칭은 출원서에 "한글 명칭{영문 명칭}" 한 줄로 들어간다(화면은 title · titleEn 두 칸으로 받을 뿐 — 형식 문제 아님). 고칠 때는 title · titleEn 두 칸으로 나눠 낸다(중괄호 없이).',
+]
 
 const IDEA_LABEL: Record<keyof SpecIdea, string> = { problem: '① 현재 문제', prior: '② 기존 방식', distinct: '③ 차별 구조', flow: '④ 처리 흐름', point: '⑤ 권리화 포인트' }
 
@@ -291,10 +301,18 @@ const cleanName = (s: string) =>
     .trim()
 const oneLine = (s: unknown) => cleanAiText(String(s ?? '')).replace(/\s+/g, ' ').trim()
 
+/** D-268 문장 모양 이름("입력 자료를 수집합니다.")은 "입력 자료 수집부" 로 줄이고(그 문장은 하는 일로), 줄일 수 없으면 버린다 — 모자라면 단계가 이름표를 다시 알려 주고 다시 부른다 */
 function pushComp(out: PartsAnswer, name: string, does: string) {
-  const n = cleanName(name)
+  let n = cleanName(name)
+  let role = does
+  if (isSentenceName(n)) {
+    const fixed = nameFromSentence(n)
+    if (!fixed) return
+    role = does || n
+    n = fixed
+  }
   if (!n || n.length > 30 || out.components.length >= 8 || out.components.some((c) => c.name === n)) return
-  out.components.push({ name: n, does: does ? asAdnominal(does) : '' })
+  out.components.push({ name: n, does: role ? asAdnominal(role) : '' })
 }
 function pushStep(out: PartsAnswer, text: string) {
   const t = oneLine(text)
@@ -306,7 +324,8 @@ function pushStep(out: PartsAnswer, text: string) {
 }
 function pushSeed(out: PartsAnswer, comp: string, text: string) {
   const t = oneLine(text)
-  if (t && out.seeds.length < 6) out.seeds.push({ comp: cleanName(comp), text: asAdnominal(t) })
+  const c = cleanName(comp)
+  if (t && out.seeds.length < 6) out.seeds.push({ comp: isSentenceName(c) ? (nameFromSentence(c) ?? '') : c, text: asAdnominal(t) })
 }
 
 /** 항목 모양 답(items) → 권리축 · 시스템 · 구성요소 · 단계 · 종속항 씨앗. rawObj = 항목 모양이 아닌 답(components 배열 등)도 읽기 */
@@ -467,20 +486,29 @@ export const fixable = (issues: string[]) => issues.filter((t) => !/구성요소
 
 export function buildFixContext(input: { draft: SpecDraft; issues: string[]; today: string }): AssistContext {
   const { draft: d, issues, today } = input
-  const rows: AssistRow[] = [{ part: 'title', memo: d.title }, { part: 'titleEn', memo: d.titleEn || '(없음)' }]
-  for (const k of SECTION_KEYS) chunks(sectionOf(d, k)).slice(0, k === 'detail' ? 6 : 3).forEach((memo, i) => rows.push({ part: `${k}${i ? ' (이어서)' : ''}`, memo }))
-  claimsOf(d).slice(0, 12).forEach((c, i) => rows.push({ part: `claims ${i + 1}`, memo: c.slice(0, 560) }))
   const comps = d.components.filter((c) => c.name.trim())
   return {
     title: '특허 명세서 — 점검대로 고치기',
     today,
     purpose: '점검에서 걸린 칸만 고친다',
+    // D-268 청구항을 본문보다 앞에 — 글이 아주 길어 서버가 줄여도 청구항은 남게
     sections: [
       { name: '점검에서 걸린 것', rows: issues.map((memo) => ({ part: '점검', memo })) },
       { name: '구성요소', rows: comps.map((c) => ({ part: c.no, name: c.name })) },
-      { name: '지금 글', rows },
+      { name: '청구항', rows: claimRows(d) },
+      { name: '명세서 지금 글', rows: draftRows(d) },
     ],
+    rules: WHOLE_TEXT_RULES,
   }
+}
+
+/** D-268 명칭 한 줄 + 본문 일곱 칸 전체(문단마다) */
+function draftRows(d: SpecDraft): AssistRow[] {
+  return [titleRow(d), ...SECTION_KEYS.flatMap((k) => paraRows(k, sectionOf(d, k)))]
+}
+/** D-268 청구항 전체(예전엔 청구항마다 앞 560자) */
+function claimRows(d: SpecDraft): AssistRow[] {
+  return claimsOf(d).slice(0, 30).flatMap((c, i) => paraRows(`claims ${i + 1}`, c))
 }
 
 export function fixItemsOf(answer: AssistAnswer | null): { key: FixKey; text: string; note?: string }[] {
@@ -501,10 +529,16 @@ export function fixItemsOf(answer: AssistAnswer | null): { key: FixKey; text: st
 }
 
 /** 고친 글 합치기 — 명칭은 사람이 고친 명칭이면 그대로(새 안으로), 본문 · 청구항은 mergeSpecAi(사람 글 보호) */
-export function applyFix(d: SpecDraft, items: { key: FixKey; text: string }[]): { draft: SpecDraft; replaced: string[]; kept: string[] } {
+export function applyFix(d: SpecDraft, given: { key: FixKey; text: string }[]): { draft: SpecDraft; replaced: string[]; kept: string[] } {
   let next: SpecDraft = { ...d, ai: { ...d.ai }, suggestion: { ...d.suggestion } }
   const replaced: string[] = []
   const kept: string[] = []
+  // D-268 명칭을 출원서 모양 "한글{ENGLISH}" 한 줄로 돌려줘도 두 칸으로 나눈다(예전엔 중괄호만 지워 영문이 한글 명칭에 붙었다)
+  const items = given.flatMap((it) => {
+    const m = it.key === 'title' ? /^([^{}]+?)\s*\{([^{}]+)\}\s*$/.exec(it.text.trim()) : null
+    if (!m) return [it]
+    return [{ key: 'title' as FixKey, text: m[1] }, ...(given.some((g) => g.key === 'titleEn') ? [] : [{ key: 'titleEn' as FixKey, text: m[2] }])]
+  })
   for (const it of items) {
     if (it.key !== 'title' && it.key !== 'titleEn') continue
     const val = it.key === 'titleEn' ? it.text.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim().toUpperCase() : it.text.replace(/[{}\n]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -601,20 +635,19 @@ export function buildJudgeContext(input: { draft: SpecDraft; scope: JudgeScope; 
     sections.push({ name: '방법 단계', rows: d.steps.map((x) => ({ part: x.no, memo: x.text })) })
     sections.push({ name: '종속항 씨앗', rows: d.seeds.map((x) => ({ part: x.comp || '씨앗', memo: x.text })) })
   } else {
-    const rows: AssistRow[] = [{ part: 'title', memo: d.title }, { part: 'titleEn', memo: d.titleEn || '(없음)' }]
-    for (const k of SECTION_KEYS) chunks(sectionOf(d, k)).slice(0, k === 'detail' ? 5 : 3).forEach((memo, i) => rows.push({ part: `${k}${i ? ' (이어서)' : ''}`, memo }))
+    // D-268 글 전체(문단마다) · 명칭 한 줄 · 청구항 전체 — 청구항을 본문보다 앞에(아주 길어 서버가 줄여도 청구항은 남게)
     sections.push({ name: '구성요소(이름 · 부호 그대로 쓸 것)', rows: comps.map((c) => ({ part: c.no, name: c.name, does: c.does })) })
-    sections.push({ name: '명세서 지금 글', rows })
-    sections.push({ name: '청구항', rows: claimsOf(d).slice(0, 14).map((c, i) => ({ part: `claims ${i + 1}`, memo: c.slice(0, 560) })) })
+    sections.push({ name: '청구항', rows: claimRows(d) })
+    sections.push({ name: '명세서 지금 글', rows: draftRows(d) })
     sections.push({ name: '아이디어 · 권리축', rows: ideaRows })
   }
-  return { title: `특허 명세서 — 자체점검 ${scope === 'parts' ? '①' : '②'}`, today, purpose: `판정 범위: ${JUDGE_SCOPE_LABEL[scope]}`, sections }
+  return { title: `특허 명세서 — 자체점검 ${scope === 'parts' ? '①' : '②'}`, today, purpose: `판정 범위: ${JUDGE_SCOPE_LABEL[scope]}`, sections, ...(scope === 'full' ? { rules: WHOLE_TEXT_RULES } : {}) }
 }
 
 /**
  * 자체점검이 고친 것 합치기 — 사람 글은 보호(구성은 partsHuman · 본문은 mergeSpecAi 새 안).
  *  ① 고친 권리축 · 시스템 · 구성 · 단계 · 씨앗을 지금 구성 위에 겹쳐(일부만 와도) applyParts
- *  ② 명칭 · 본문 칸 · 청구항은 applyFix — 구체적인 내용(detail)은 자체점검이 앞부분만 봤으므로 덮지 않는다
+ *  ② 명칭 · 본문 칸 · 청구항은 applyFix — 구체적인 내용(detail)은 길어서(두 번에 나눠 쓴 글) 자체점검이 통째로 다시 쓰지 않는다(문제는 판정으로)
  */
 export function applyJudge(d: SpecDraft, scope: JudgeScope, rewrites: AssistItem[]): { draft: SpecDraft; fixed: string[]; kept: string[] } {
   if (!rewrites.length) return { draft: d, fixed: [], kept: [] }
