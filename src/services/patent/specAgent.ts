@@ -23,6 +23,7 @@ import {
   asAdnominal,
   checkDraft,
   cleanAiText,
+  IDEA_MAX,
   claimsOf,
   isSentenceName,
   mergeSpecAi,
@@ -42,13 +43,16 @@ import { SPEC_BATCHES, paraChunks, paraRows, researchRows, type SpecBatch } from
 
 export { paraChunks, researchRows }
 
-export type AgentStage = 'idea' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
+export type AgentStage = 'idea' | 'ideaRank' | 'ideaMore' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
 
 /** 작업판의 칸(카드) — 단계 여럿이 한 칸이 되기도 한다 */
 export type AgentCard = 'idea' | 'research' | 'parts' | 'body' | 'claims' | 'judge' | 'check'
 
 export const STAGES: readonly { key: AgentStage; card: AgentCard; assistId: string; label: string; seconds: number }[] = [
-  { key: 'idea', card: 'idea', assistId: 'spec.idea', label: '아이디어 3개', seconds: 30 },
+  { key: 'idea', card: 'idea', assistId: 'spec.idea', label: '아이디어 5개 · 순위', seconds: 40 },
+  // D-269 기획 — 후보 가운데 무엇이 가장 나은지 · 자체점검으로 더 날카로운 것 짜내기(대표가 누를 때만)
+  { key: 'ideaRank', card: 'idea', assistId: 'spec.ideaRank', label: '후보 중 가장 나은 것', seconds: 30 },
+  { key: 'ideaMore', card: 'idea', assistId: 'spec.ideaMore', label: '자체점검으로 더 짜내기', seconds: 40 },
   { key: 'research', card: 'research', assistId: 'spec.research', label: '선행기술 · 차별화 조사', seconds: 40 },
   { key: 'parts', card: 'parts', assistId: 'spec.parts', label: '권리축 · 구성요소 · 단계', seconds: 30 },
   // D-263 자체점검 — 구성 뒤 · 청구항 뒤에 반드시(판정 + 직접 고침)
@@ -108,10 +112,23 @@ function ideaRows(d: SpecDraft): AssistRow[] {
   return (Object.keys(IDEA_LABEL) as (keyof SpecIdea)[]).filter((k) => d.idea[k].trim()).flatMap((k) => chunks(d.idea[k]).map((memo) => ({ part: IDEA_LABEL[k], memo })))
 }
 
-/** 재료는 자료마다 앞쪽 2,240자(줄 4개)까지 — 자료 여섯 개 */
+/** 재료는 자료마다 앞쪽 4,480자(줄 8개)까지 — 자료 여섯 개(D-269 기획은 회사 이야기가 전부라 예전 2,240자에서 늘림) */
 function materialRows(c: AgentCompany): AssistRow[] {
-  return c.materials.slice(0, 6).flatMap((m) => chunks(safeText(m.text, [], 2240)).slice(0, 4).map((memo, i) => ({ part: `${m.kind}${i ? ' (이어서)' : ''}`, name: m.title.slice(0, 60), memo })))
+  return c.materials.slice(0, 6).flatMap((m) => chunks(safeText(m.text, [], 4480)).slice(0, 8).map((memo, i) => ({ part: `${m.kind}${i ? ' (이어서)' : ''}`, name: m.title.slice(0, 60), memo })))
 }
+
+/** 회사가 무엇을 하는지 알려 주는 기록 줄(매출 · 지역 · 설립만으로는 발명을 떠올릴 수 없다) */
+const DESCRIBES = /^(?:업종|업태|종목|홈페이지|상담 메모):/
+
+/**
+ * D-269 AI 가 읽을 회사 이야기가 없나 — 업종 · 업태 · 종목 · 홈페이지 · 상담 메모 · 자료 · AI 작업실 아이디어가 모두 없으면.
+ * 대표: "자료가 없으면 일단은 자료를 넣어 달라고 하고" — 이때는 아이디어를 내지 않고 회사 정보부터 받는다.
+ */
+export function companyThin(c: AgentCompany): boolean {
+  return !c.facts.some((f) => DESCRIBES.test(f)) && !c.materials.some((m) => m.text.trim().length >= 20) && !c.priorIdeas.length
+}
+
+export const THIN_BLOCK = '회사 정보부터 — 업종 · 종목 · 상담 메모를 채우거나 회사 소개서 · 제품 설명 · GPT 와 나눈 대화를 넣어 주세요'
 
 /* ------------------------------------------------------------------ */
 /* 아이디어 내줘                                                          */
@@ -130,10 +147,38 @@ export function buildIdeaContext(input: { draft: SpecDraft; company: AgentCompan
   return {
     title: '특허 명세서 — 아이디어',
     today,
-    purpose: '이 회사가 출원할 만한 특허 아이디어 3개(추천 순)',
+    purpose: '이 회사가 출원할 만한 특허 아이디어 5개(추천 순 · 1~3순위는 이유와 함께)',
     sections,
-    rules: ['회사 기록 · 재료에 있는 업무 · 데이터에서 출발한다. 재료가 적으면 업종에서 흔한 문제로 쓰고 "(추정 — 대표 확인)" 을 붙인다.'],
+    rules: ['회사 기록 · 재료에 있는 업무 · 데이터 · 제품 · 판매 방식에서 출발한다. 어느 회사에나 맞는 일반 아이디어는 내지 않는다 — 아이디어마다 재료의 어떤 사실에서 나왔는지 detail 에.'],
   }
+}
+
+/** D-269 후보 줄 — 명칭 · 5개 질문 · 왜 이 회사에(560자씩) */
+function candidateRows(ideas: IdeaPick[]): AssistRow[] {
+  return ideas.flatMap((p, i) =>
+    chunks(`${p.title}${p.titleEn ? `{${p.titleEn}}` : ''} — 문제: ${p.idea.problem} / 기존: ${p.idea.prior} / 차별: ${p.idea.distinct} / 흐름: ${p.idea.flow} / 포인트: ${p.idea.point} / 회사 근거: ${p.why}`).map((memo, j) => ({ part: `후보 ${i + 1}${j ? ' (이어서)' : ''}`, memo })),
+  )
+}
+
+/** D-269 [이 중 제일 좋은 게 뭐야?] — 회사 · 재료 + 지금 후보들 */
+export function buildIdeaRankContext(input: { draft: SpecDraft; company: AgentCompany; today: string }): AssistContext {
+  const { draft: d, company: c, today } = input
+  return {
+    title: '특허 명세서 — 아이디어 후보 비교',
+    today,
+    purpose: `후보 ${d.ideas.length}개 가운데 무엇이 가장 나은지 — 자체점검 기준으로 점수 · 순위 · 이유`,
+    sections: [
+      { name: '회사', rows: [{ part: '회사 이름', memo: c.name || '(회사 미정)' }, ...c.facts.slice(0, 20).map((f) => ({ part: '기록', memo: safeText(f) }))] },
+      { name: '재료', rows: materialRows(c) },
+      { name: '후보', rows: candidateRows(d.ideas) },
+    ],
+  }
+}
+
+/** D-269 [자체점검으로 더 짜내기] — 회사 · 재료 + 지금 후보들(약점을 공격한 뒤 더 날카로운 새 아이디어) */
+export function buildIdeaMoreContext(input: { draft: SpecDraft; company: AgentCompany; others: string[]; today: string }): AssistContext {
+  const base = buildIdeaContext(input)
+  return { ...base, title: '특허 명세서 — 아이디어 더 짜내기', purpose: '지금 후보들의 약점을 자체점검 기준으로 공격한 뒤, 그 약점을 피한 새 아이디어 2개', sections: [...base.sections, { name: '지금 후보', rows: candidateRows(input.draft.ideas) }] }
 }
 
 const EN_OK = /^[A-Z0-9 ,.\-'()/&;:]+$/
@@ -146,23 +191,99 @@ function stripLabel(line: string): string {
     .trim()
 }
 
-export function ideasOf(answer: AssistAnswer | null): IdeaPick[] {
+/** 점수 글 → 0~100 숫자("82점" · "82/100" · "82") */
+function scoreOf(v: unknown): number | undefined {
+  const m = /(\d{1,3}(?:\.\d+)?)/.exec(String(v ?? ''))
+  if (!m) return undefined
+  const n = Math.round(Number(m[1]))
+  return n >= 0 && n <= 100 ? n : undefined
+}
+
+/** 명칭 비교용(띄어쓰기 · 기호 무시) */
+const titleKey = (t: string) => String(t ?? '').replace(/\{[^}]*\}/g, '').replace(/[\s·,.\-()]/g, '')
+
+/**
+ * 아이디어 후보 — D-269 5개 · 추천 점수(amount) · 순위 이유(when). 점수가 있으면 점수 순(같으면 답 순서).
+ * 명칭 앞에 붙은 '1순위' · '[추천]' 같은 표지는 뗀다.
+ */
+export function ideasOf(answer: AssistAnswer | null, max = 5): IdeaPick[] {
   if (!answer) return []
   const out: IdeaPick[] = []
   for (const it of answer.items ?? []) {
-    const title = String(it.title ?? '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
+    const title = String(it.title ?? '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/[{}]/g, '')
+      .replace(/^\s*(?:\[?\s*(?:\d\s*순위|추천|후보)\s*\]?\s*[:.)·-]?\s*)/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
     const lines = (it.outline ?? []).map(stripLabel).filter(Boolean)
-    if (!title || lines.length < 3) continue
+    if (!title || lines.length < 3 || out.some((o) => titleKey(o.title) === titleKey(title))) continue
     const en = String(it.body ?? '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim().toUpperCase()
-    out.push({
+    const pick: IdeaPick = {
       title,
       titleEn: EN_OK.test(en) ? en : '',
       why: String(it.detail ?? '').trim(),
       idea: { problem: lines[0] ?? '', prior: lines[1] ?? '', distinct: lines[2] ?? '', flow: lines[3] ?? '', point: lines[4] ?? '' },
-    })
-    if (out.length >= 3) break
+    }
+    const score = scoreOf(it.amount)
+    if (score != null) pick.score = score
+    const reason = String(it.when ?? '').trim()
+    if (reason) pick.reason = reason
+    out.push(pick)
+    if (out.length >= max) break
   }
-  return out
+  return rankIdeas(out)
+}
+
+/** 점수 높은 순(점수 없는 것은 뒤 · 같으면 원래 순서) */
+export function rankIdeas(ideas: IdeaPick[]): IdeaPick[] {
+  return ideas
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (b.p.score ?? -1) - (a.p.score ?? -1) || a.i - b.i)
+    .map((x) => x.p)
+}
+
+/** 순위 표지 — 1~3순위만, 나머지는 후보 */
+export const rankLabel = (i: number) => (i < 3 ? `${i + 1}순위` : '후보')
+
+/**
+ * D-269 [이 중 제일 좋은 게 뭐야?] 의 답 → 후보마다 점수 · 이유를 고쳐 다시 줄 세움.
+ * 답의 항목은 후보 명칭(또는 '후보 n')으로 찾는다. 찾지 못한 후보는 점수를 그대로 둔다.
+ */
+export function rerankIdeas(ideas: IdeaPick[], answer: AssistAnswer | null): { ideas: IdeaPick[]; matched: number; headline: string } {
+  if (!answer) return { ideas, matched: 0, headline: '' }
+  const next = ideas.map((p) => ({ ...p }))
+  let matched = 0
+  for (const it of answer.items ?? []) {
+    const raw = String(it.title ?? '')
+    const byNo = /후보\s*(\d+)/.exec(raw) ?? /후보\s*(\d+)/.exec(String(it.ref ?? ''))
+    let idx = byNo ? Number(byNo[1]) - 1 : -1
+    if (idx < 0 || idx >= next.length) {
+      const k = titleKey(raw.replace(/^\s*\[?\s*(?:\d\s*순위|후보\s*\d+)\s*\]?\s*[:.)·-]?\s*/, ''))
+      idx = k ? next.findIndex((p) => titleKey(p.title) === k || (k.length >= 8 && (titleKey(p.title).includes(k) || k.includes(titleKey(p.title))))) : -1
+    }
+    if (idx < 0) continue
+    const score = scoreOf(it.amount)
+    if (score == null) continue
+    next[idx].score = score
+    const why = String(it.when ?? it.detail ?? '').trim()
+    if (why) next[idx].reason = why
+    matched += 1
+  }
+  return { ideas: rankIdeas(next), matched, headline: String(answer.headline ?? '').trim() }
+}
+
+/** D-269 [더 짜내기] 로 나온 새 아이디어를 후보에 더한다(같은 명칭은 빼고 · 표시 fresh · 모두 IDEA_MAX 안) */
+export function addMoreIdeas(ideas: IdeaPick[], more: IdeaPick[]): { ideas: IdeaPick[]; added: number } {
+  const fresh = more.filter((m) => !ideas.some((p) => titleKey(p.title) === titleKey(m.title))).map((m) => ({ ...m, fresh: true }))
+  const all = rankIdeas([...ideas.map((p) => ({ ...p, fresh: false })), ...fresh])
+  // 새로 나온 것은 넘쳐도 남긴다 — 점수가 가장 낮은 옛 후보부터 뺀다
+  while (all.length > IDEA_MAX) {
+    const drop = all.map((p, i) => ({ p, i })).filter((x) => !x.p.fresh).pop()
+    if (!drop) break
+    all.splice(drop.i, 1)
+  }
+  return { ideas: all.map((p) => (p.fresh ? p : { ...p, fresh: undefined })), added: fresh.length }
 }
 
 /** 아이디어 하나로 1단계를 채운다(명칭 · 영문 · 5개 질문). 고른 명칭은 ai.title 로 기억 — 사람이 고친 명칭인지 알기 위해 */
@@ -576,9 +697,45 @@ export function planAll(d: SpecDraft): AgentStage[] {
   return out
 }
 
+/*
+ * D-269 기획 먼저 — 대표: "버튼 한 번에 처음부터 끝까지 피드백 없이 다 쓰는 거는 별로 · 다섯 번 누르더라도 절차마다 버튼으로".
+ *   회사 정보(없으면 먼저 받기) → 아이디어 5개 · 고르기 → [이걸로 시작] 조사 · 구성 · 자체점검 ① → 구성 확인 → [본문 · 청구항 쓰기] → 전문
+ */
+
+/** [이걸로 시작] — 조사(명칭이 바뀌었으면) → 구성 → 자체점검 ① 까지. 여기서 멈추고 대표가 구성을 본다 */
+export function planParts(d: SpecDraft): AgentStage[] {
+  return [...(!d.research || d.research.forTitle !== d.title ? (['research'] as AgentStage[]) : []), 'parts', 'judge1']
+}
+
+/** [이 구성으로 본문 · 청구항 쓰기] — 본문 a~d · 청구항 · 자체점검 ② · 점검대로 고치기 */
+export const PLAN_BODY: readonly AgentStage[] = ['a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
+
+export type SpecPhase = 'company' | 'ideas' | 'parts' | 'review' | 'body' | 'done'
+
+const BOARD_CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'judge', 'check']
+
+/** 다 썼나 — 칸 다섯 이상 됨 · 명칭 있음 */
+export const specFinished = (d: SpecDraft): boolean => !!d.title.trim() && BOARD_CARDS.filter((c) => cardState(c, d).done).length >= 5
+
+/** 지금 어느 절차인가 — 명칭은 대표가 아이디어를 골라야(또는 직접 적어야) 생긴다 */
+export function specPhase(d: SpecDraft, thin: boolean): SpecPhase {
+  if (!d.title.trim()) return thin ? 'company' : 'ideas'
+  if (d.components.filter((c) => c.name.trim()).length < 2) return 'parts'
+  if (!bodyWritten(d)) return 'review'
+  return specFinished(d) ? 'done' : 'body'
+}
+
+/** 다른 아이디어로 돌아가기 — 명칭 · 5개 질문까지 비우고 후보 목록은 남긴다(되돌리기로 살린다) */
+export function backToIdeas(d: SpecDraft): SpecDraft {
+  const c = clearAfterIdea(d)
+  return { ...c, title: '', titleEn: '', idea: { problem: '', prior: '', distinct: '', flow: '', point: '' }, judge: { parts: null, full: null }, ai: {} }
+}
+
 /** 단계마다 부를 수 있는지(앞 단계가 모자라면 왜인지) */
 export function stageBlock(stage: AgentStage, d: SpecDraft): string {
   if (stage === 'idea') return ''
+  if (stage === 'ideaRank') return d.ideas.length >= 2 ? '' : '아이디어부터 — [아이디어 5개 내줘]'
+  if (stage === 'ideaMore') return d.ideas.length ? '' : '아이디어부터 — [아이디어 5개 내줘]'
   if (!d.title.trim()) return '아이디어부터 — [아이디어 내줘]'
   if (stage === 'research' || stage === 'parts') return ''
   if (d.components.filter((c) => c.name.trim()).length < 2) return '구성요소부터 — [구성 · 단계 써줘]'

@@ -13,6 +13,7 @@ import {
   batchimOf,
   checkDraft,
   checkTitle,
+  claimPlainLines,
   claimSkeleton,
   claimsOf,
   defaultFigures,
@@ -30,14 +31,18 @@ import {
   signLines,
   skeletonFromAxis,
   specMarkdown,
+  specPlainSections,
+  specPlainText,
   splitClaims,
+  IDEA_MAX,
   titleFromFormula,
   titleLine,
   titleParts,
   type SpecDraft,
 } from '../patent/specDraft'
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf } from '../patent/specDraftAi'
-import { applyFix, applyJudge, bodyWritten, buildFixContext, buildJudgeContext, cardState, fixItemsOf, paraChunks, partLabelOf, partsOf, partsSig, planAll, stageBlock } from '../patent/specAgent'
+import { PLAN_BODY, addMoreIdeas, applyFix, applyIdea, applyJudge, backToIdeas, bodyWritten, buildFixContext, buildIdeaMoreContext, buildIdeaRankContext, buildJudgeContext, cardState, companyThin, fixItemsOf, ideasOf, paraChunks, partLabelOf, partsOf, partsSig, planAll, planParts, rankLabel, rerankIdeas, specPhase, stageBlock } from '../patent/specAgent'
+import { modelsOf, prettyModel, withModel } from '../patent/specRun'
 import { cutOff } from '../aiAssist/client'
 import { assistSystem } from '../../../api/_ai/assists.js'
 import { answerOf, looseJson, rawObjectOf } from '../aiAssist/looseJson'
@@ -365,6 +370,59 @@ function fullDraft(): SpecDraft {
 
   // 잘린 답
   check('DK16 길이 상한에서 잘린 답 알아봄 — Gemini MAX_TOKENS · OpenAI length · Claude max_tokens (STOP · end_turn 은 아님)', cutOff({ finish: 'MAX_TOKENS' }) && cutOff({ finish: 'length' }) && cutOff({ finish: 'max_tokens' }) && !cutOff({ finish: 'STOP' }) && !cutOff({ finish: 'end_turn' }) && !cutOff({ finish: '' }) && !cutOff(null))
+}
+
+/* ---------------- D-269 기획 먼저 · 모델 · 전문 ---------------- */
+{
+  const idea = (t: string, amount: string, when = '') => ({ title: t, body: 'SYSTEM AND METHOD FOR X', detail: '자료의 판매 채널 기록에서 나옴', outline: ['문제', '기존', '차별', '흐름', '포인트'], amount, when, tag: '' })
+  const ans = { headline: '1순위 이유', items: [idea('[2순위] 나 시스템 및 방법', '71', '나 이유'), idea('가 시스템 및 방법', '88', '가 이유'), idea('다 시스템 및 방법', '64'), idea('라 시스템 및 방법', '59'), idea('마 시스템 및 방법', '52'), idea('바 시스템 및 방법', '40')] }
+  const five = ideasOf(ans)
+  check('DL1 아이디어 5개까지 · 점수 순(88 → 71 → …) · 순위 표지 뗌 · 이유(when) · 점수(amount)', five.length === 5 && five.map((p) => p.title).join() === '가 시스템 및 방법,나 시스템 및 방법,다 시스템 및 방법,라 시스템 및 방법,마 시스템 및 방법' && five[0].score === 88 && five[0].reason === '가 이유' && rankLabel(0) === '1순위' && rankLabel(3) === '후보', five.map((p) => [p.title, p.score]))
+  const re = rerankIdeas(five, { headline: '후보 3 — 회사 채널과 가장 맞음', items: [{ title: '후보 3', amount: '93', when: '다가 가장 회사와 맞다' }, { title: '가 시스템 및 방법', amount: '80점' }, { title: '후보 9', amount: '99' }] })
+  check('DL2 [제일 좋은 게 뭐야?] — "후보 n" · 명칭으로 찾아 점수 · 이유를 고치고 다시 줄 세움(없는 후보는 무시)', re.matched === 2 && re.ideas[0].title === '다 시스템 및 방법' && re.ideas[0].score === 93 && re.ideas[0].reason === '다가 가장 회사와 맞다' && re.ideas.find((p) => p.title === '가 시스템 및 방법')?.score === 80 && /후보 3/.test(re.headline), re.ideas.map((p) => [p.title, p.score]))
+  const more = ideasOf({ headline: '약점', items: [idea('새 하나 시스템 및 방법', '95'), idea('가 시스템 및 방법', '99'), idea('새 둘 시스템 및 방법', '50')] }, 3)
+  const m = addMoreIdeas(five, more)
+  check('DL3 [자체점검으로 더 짜내기] — 같은 명칭은 빼고 새것만 더함 · 새것 표시 · 점수 순', m.added === 2 && m.ideas[0].title === '새 하나 시스템 및 방법' && m.ideas[0].fresh === true && m.ideas.filter((p) => p.fresh).length === 2 && m.ideas.length === 7)
+  const many = addMoreIdeas(m.ideas, ideasOf({ headline: '', items: [idea('셋 시스템 및 방법', '10'), idea('넷 시스템 및 방법', '11'), idea('오 시스템 및 방법', '12')] }, 3))
+  check(`DL4 후보는 ${IDEA_MAX}개까지 — 넘치면 점수가 가장 낮은 옛 후보부터 빼고 새것은 남김`, many.ideas.length === IDEA_MAX && many.ideas.filter((p) => p.fresh).length === 3 && !many.ideas.some((p) => p.title === '새 둘 시스템 및 방법') && many.ideas.some((p) => p.title === '셋 시스템 및 방법'), many.ideas.map((p) => p.title))
+
+  const thin = { name: '(주)가연', facts: ['매출: 120억 원'], materials: [], priorIdeas: [] }
+  check('DL5 회사 이야기 없음(매출 한 줄뿐) → 막음 · 업종 한 줄 · 자료 하나 · 작업실 아이디어가 있으면 시작', companyThin(thin) && !companyThin({ ...thin, facts: ['업종: 화장품 제조'] }) && !companyThin({ ...thin, materials: [{ title: '회사소개.hwpx', kind: '올린 자료', text: '백화점 · 온라인 · 해외 채널로 화장품을 판다' }] }) && !companyThin({ ...thin, priorIdeas: ['채널별 재고 배분'] }) && companyThin({ ...thin, materials: [{ title: 'x', kind: 'y', text: '짧음' }] }))
+
+  const e = emptyDraft()
+  const withIdeas = { ...e, ideas: five }
+  const chosen = applyIdea(withIdeas, five[1])
+  const base = fullDraft()
+  const full = { ...base, text: Object.fromEntries((['field', 'background', 'problem', 'solution', 'effect', 'detail', 'abstract'] as const).map((k) => [k, sectionSkeleton(base, k)])), claims: claimSkeleton(base), research: { at: '', forTitle: base.title, headline: '', items: [], next: [], grounded: false, sources: [] } }
+  check('DL6 차례 — 명칭 전: 회사 이야기 없으면 회사 정보 · 있으면 아이디어 / 고르면 구성 / 구성 있으면 확인 / 본문 쓰면 끝', specPhase(e, true) === 'company' && specPhase(withIdeas, false) === 'ideas' && specPhase(chosen, false) === 'parts' && specPhase({ ...full, text: {}, claims: [] }, false) === 'review' && specPhase(full, false) === 'done' && specPhase(full, true) === 'done' && specPhase({ ...full, claims: [], text: { field: '본 발명은 공구에 관한 것이다.' } }, false) === 'body', [specPhase(e, true), specPhase(withIdeas, false), specPhase(chosen, false), specPhase({ ...full, text: {}, claims: [] }, false), specPhase(full, false)])
+  check('DL7 [이걸로 시작] — 명칭이 새로면 조사부터 · 구성 · 자체점검 ① 에서 멈춤 / [본문 · 청구항 쓰기] — a~e · 자체점검 ② · 고치기', planParts(chosen).join() === 'research,parts,judge1' && planParts({ ...full, research: { at: '', forTitle: full.title, headline: '', items: [], next: [], grounded: false, sources: [] } }).join() === 'parts,judge1' && PLAN_BODY.join() === 'a,b,c,d,e,judge2,fix')
+  const back = backToIdeas({ ...full, ideas: five })
+  check('DL8 [다른 아이디어로] — 명칭 · 구성 · 본문 · 판정 비우고 후보는 남김 → 다시 아이디어 고르기', back.title === '' && back.components.length === 0 && !bodyWritten(back) && back.ideas.length === 5 && specPhase(back, false) === 'ideas')
+  check('DL9 견주기 · 짜내기 단추는 후보가 있어야', stageBlock('ideaRank', { ...e, ideas: five.slice(0, 1) }) !== '' && stageBlock('ideaRank', withIdeas) === '' && stageBlock('ideaMore', e) !== '' && stageBlock('ideaMore', withIdeas) === '')
+  const company = { name: '(주)가연', facts: ['업종: 화장품'], materials: [{ title: '대화.txt', kind: '올린 자료', text: '해외 판매채널 재고' }], priorIdeas: [] }
+  const rc = buildIdeaRankContext({ draft: withIdeas, company, today: '2026-10-23' })
+  const mc = buildIdeaMoreContext({ draft: withIdeas, company, others: [], today: '2026-10-23' })
+  check('DL10 견주기 · 짜내기 자료 — 회사 · 재료 · 후보 n(명칭 · 5줄 · 회사 근거)', rc.sections.some((x) => x.name === '후보' && x.rows.length >= 5 && x.rows[0].part === '후보 1' && String(x.rows[0].memo).includes('가 시스템 및 방법')) && rc.sections.some((x) => x.name === '재료' && x.rows.length === 1) && mc.sections.some((x) => x.name === '지금 후보') && /2개/.test(mc.purpose))
+
+  // 모델
+  const dm = withModel(withModel(e, 'idea', 'gpt-6-luna'), 'parts', 'gpt-6-luna')
+  check('DL11 단계마다 쓴 모델을 초안에 남김 · 같은 모델은 하나로 · 읽기 쉬운 이름', modelsOf(dm).join() === 'gpt-6-luna' && modelsOf(withModel(dm, 'a', 'gemini-3.1-flash-lite')).length === 2 && prettyModel('gpt-6-luna') === 'GPT 6 Luna' && prettyModel('gemini-3.1-flash-lite') === 'Gemini 3.1 Flash Lite' && withModel(e, 'idea', '') === e)
+
+  // 전문
+  const fd = fullDraft()
+  fd.text = { ...fd.text, background: '**종래에는** 정해진 시간에 공구를 교체하였다.\n---\n- 그래서 불량이 반복되었다.' }
+  const plain = specPlainText(fd)
+  const lines = plain.split('\n')
+  check('DL12 전문 — 첨부 명세서 차례(【발명의 설명】 → 【발명의 명칭】 → 한글{영문} 한 줄 → … → 【청구범위】 → 【요약서】 → 【대표도】 → 【도면】)', lines[0] === '【발명의 설명】' && lines[1] === '【발명의 명칭】' && lines[2] === `${fd.title}{${fd.titleEn}}` && ['【기술분야】', '【발명의 배경이 되는 기술】', '【발명의 내용】', '【해결하고자 하는 과제】', '【과제의 해결 수단】', '【발명의 효과】', '【도면의 간단한 설명】', '【발명을 실시하기 위한 구체적인 내용】', '【부호의 설명】', '【청구범위】', '【청구항 1】', '【요약서】', '【요약】', '【대표도】', '【도면】', '【도 1】'].every((h, i, all) => lines.indexOf(h) > (i ? lines.indexOf(all[i - 1]) : 1)), lines.slice(0, 6))
+  check('DL13 전문에 굵게(**) · 가로선(---) · 제목(#) · 글머리표 없음 · AI 가 넣은 것도 지움 · 부호는 "100 : 이름"', !plain.includes('**') && !/^-{3,}$/m.test(plain) && !/^#/m.test(plain) && !/^- /m.test(plain) && plain.includes('종래에는 정해진 시간에') && plain.includes('그래서 불량이 반복되었다.') && /^100 : /m.test(plain) && /^110 : /m.test(plain))
+  const rep = checkSpec(parseSpecText(plain, '전문.txt'))
+  check('DL14 전문을 다시 읽어 명세서 점검 — 고쳐야 함 0', rep.findings.filter((f) => f.level === 'error').length === 0, rep.findings.filter((f) => f.level === 'error').map((f) => f.title))
+  check('DL15 청구항 줄 — "청구항 n." 머리 뗌 · 구성(;)마다 줄 · "를 포함하는 …" 끝 줄', claimPlainLines('청구항 1. 진동을 수집하는 수집부; 마모를 판정하는 판정부;를 포함하는 시스템.').join('|') === '진동을 수집하는 수집부;|마모를 판정하는 판정부;|를 포함하는 시스템.', claimPlainLines('청구항 1. 진동을 수집하는 수집부; 마모를 판정하는 판정부;를 포함하는 시스템.'))
+  check('DL16 종속항 "청구항 1에 있어서," 한 줄 · "; 및" 은 앞 줄 끝', claimPlainLines('청구항 1에 있어서, 상기 판정부는 세 단계로 나누는 것을 특징으로 하는 시스템.').join('|') === '청구항 1에 있어서,|상기 판정부는 세 단계로 나누는 것을 특징으로 하는 시스템.' && claimPlainLines('A 단계; 및 B 단계;를 포함하는 방법.').join('|') === 'A 단계; 및|B 단계;|를 포함하는 방법.', claimPlainLines('A 단계; 및 B 단계;를 포함하는 방법.'))
+  const secs = specPlainSections(fd)
+  check('DL17 나눠서 보기 — 명칭 · 기술분야 … 부호 · 청구항마다 · 요약 · 대표도(칸마다 복사)', secs[0].key === 'title' && secs[0].text === `${fd.title}{${fd.titleEn}}` && secs.some((x) => x.key === 'claim1' && x.label === '청구항 1') && secs.some((x) => x.key === 'abstract') && secs[secs.length - 1].key === 'rep' && secs.every((x) => !x.text.includes('**')))
+  const numbered = specPlainSections({ ...fd, numbered: true })
+  check('DL18 전문 · 나눠서 보기에는 문단 번호([0001]) 없음 — 첨부 명세서처럼(MD 의 문단 번호 설정을 켜 둬도)', numbered.every((x) => !/\[\d{4}\]/.test(x.text)) && !/\[\d{4}\]/.test(specPlainText({ ...fd, numbered: true })) && specMarkdown({ ...fd, numbered: true }).includes('[0001]'))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

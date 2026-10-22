@@ -5,7 +5,7 @@
  * 화면(명세서 편집기)이 열려 있으면 그 화면의 apply(받는 대로 저장)로 넣고, 닫혀 있으면 '넣을 것' 줄에 쌓아 두었다가
  * 다시 열 때 차례로 넣는다. 넣는 함수는 늘 '그 순간의 최신 초안' 을 받아 바꾸므로 사이에 고친 글을 덮지 않는다.
  */
-import { AssistError, assistMessage, callAssist, cutOff } from '../aiAssist/client'
+import { AssistError, assistMessage, callAssist, cutOff, usedModel } from '../aiAssist/client'
 import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
 import { judgeOf, judgePassed, type JudgeReport } from '../aiAssist/judge'
 import { readJudgeSkill } from '../aiAssist/judgeSkill'
@@ -13,13 +13,16 @@ import { newRequestId, readChoice } from '../aiAssist/store'
 import { cleanAiText, mergeSpecAi, type SectionKey, type SpecDraft } from './specDraft'
 import { buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from './specDraftAi'
 import {
+  addMoreIdeas,
   applyFix,
-  applyIdea,
   applyJudge,
   applyParts,
   buildFixContext,
   buildIdeaContext,
+  buildIdeaMoreContext,
+  buildIdeaRankContext,
   buildJudgeContext,
+  companyThin,
   JUDGE_SCOPE_LABEL,
   buildPartsContext,
   buildResearchContext,
@@ -28,9 +31,11 @@ import {
   fixable,
   ideasOf,
   partsOf,
+  rerankIdeas,
   researchOf,
   stageBlock,
   stageOf,
+  THIN_BLOCK,
   type AgentCompany,
   type AgentStage,
 } from './specAgent'
@@ -39,6 +44,8 @@ export type Phase = 'wait' | 'run' | 'done' | 'fail' | 'skip'
 export interface StageRow {
   phase: Phase
   text: string
+  /** D-269 이 단계를 실제로 쓴 모델 */
+  model?: string
 }
 export interface SpecRun {
   stages: Partial<Record<AgentStage, StageRow>>
@@ -125,6 +132,26 @@ async function patch(id: string, p: Patch): Promise<SpecDraft | null> {
   return shadow.get(id) ?? null
 }
 
+/** D-269 이 단계를 쓴 모델을 초안에 남긴다(ai['model:단계']) — 다시 열어도 어느 모델이 썼는지 보이게 */
+export function withModel(d: SpecDraft, stage: AgentStage, model: string): SpecDraft {
+  return model ? { ...d, ai: { ...d.ai, [`model:${stage}`]: model } } : d
+}
+
+/** 모델 번호 → 읽기 쉬운 이름("gpt-6-luna" → "GPT 6 Luna" · "gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite") */
+export function prettyModel(id: string): string {
+  return String(id ?? '')
+    .replace(/^models\//, '')
+    .split('-')
+    .filter(Boolean)
+    .map((w) => (/^(gpt|o\d)$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ')
+}
+
+/** 초안에 남은 단계별 모델 — 같은 모델이면 하나로 */
+export function modelsOf(d: Pick<SpecDraft, 'ai'>): string[] {
+  return [...new Set(Object.entries(d.ai).filter(([k, v]) => k.startsWith('model:') && v).map(([, v]) => String(v)))]
+}
+
 /** 이 오류면 다음 단계도 똑같이 실패한다 — 거기서 멈춘다 */
 const STOP_CODES = new Set(['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'not_deployed', 'provider_auth', 'network'])
 export const RATE_RETRY_MS = 65_000
@@ -151,7 +178,9 @@ export function __setTransientMs(ms: number) {
 }
 /** 다시 부를 때 함께 보내는 말(대표가 더 묻는 것 자리 · 500자 안) */
 const FORMAT_HINT: Record<AgentStage, string> = {
-  idea: '앞 답을 읽지 못했습니다. items 마다 title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, outline = 정확히 5줄로 다시 써 주세요. JSON 한 덩어리만.',
+  idea: '앞 답을 읽지 못했습니다. 아이디어 5개 — items 마다 title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, outline = 정확히 5줄, amount = 추천 점수, when = 순위 이유로 다시 써 주세요. JSON 한 덩어리만.',
+  ideaRank: '앞 답을 읽지 못했습니다. 후보마다 항목 하나 — title = "후보 n", amount = 점수(0~100 숫자만), tag = 순위, when = 이 순위인 이유 한 줄로 다시 써 주세요. JSON 한 덩어리만.',
+  ideaMore: '앞 답을 읽지 못했습니다. 새 아이디어마다 항목 하나 — title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, detail = 회사 근거, outline = 정확히 5줄, amount = 점수, when = 지금 후보보다 나은 점으로 다시 써 주세요. JSON 한 덩어리만.',
   research: '앞 답을 읽지 못했습니다. items 4~7개, 항목마다 tag(검색어 · 비슷한 기술 · 차별화 · 위험 · 확인할 것 중 하나) · title · detail 로 다시 써 주세요. JSON 한 덩어리만.',
   parts:
     '앞 답에서 구성요소를 읽지 못했습니다. items 의 title 에 이름표만 정확히: axis.input · axis.process · axis.state · axis.judge · axis.output · axis.feedback · axis.link · system · comp · step · seed. comp 항목은 4개 이상 — detail = 구성요소 이름("…부"), body = 하는 일("~하는"). step 4개 이상. JSON 한 덩어리만.',
@@ -179,7 +208,7 @@ const JUDGE_ROUNDS = 2
 const KEY_LABEL: Record<string, string> = { field: '기술분야', background: '배경기술', problem: '해결하려는 과제', solution: '해결 수단', effect: '발명의 효과', detail: '구체적인 내용', abstract: '요약', claims: '청구항' }
 
 /** 단계 하나 — 'ok' | 'fail' | 'stop' */
-async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: ReturnType<typeof readChoice>): Promise<'ok' | 'fail' | 'stop'> {
+async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok' | 'fail' | 'stop'> {
   const d0 = current(id)
   if (!d0) {
     setStage(id, stage, { phase: 'fail', text: '명세서를 찾지 못했습니다 — 다시 열어 주세요' })
@@ -190,22 +219,25 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
     setStage(id, stage, { phase: 'skip', text: block })
     return 'fail'
   }
-  // 전부 써줘 — 후보가 이미 있으면 다시 부르지 않고 추천 1번으로
-  if (stage === 'idea' && !d0.title.trim() && d0.ideas.length) {
-    await patch(id, (cur) => (cur.title.trim() ? cur : applyIdea(cur, cur.ideas[0])))
-    setStage(id, stage, { phase: 'done', text: '앞서 받은 후보 1번으로 채웠습니다' })
-    return 'ok'
+  // D-269 회사 이야기가 없으면 아이디어를 내지 않는다 — 지어낸 발명이 된다(대표: "자료가 없으면 일단은 자료를 넣어 달라고")
+  if ((stage === 'idea' || stage === 'ideaMore') && companyThin(env.company)) {
+    setStage(id, stage, { phase: 'skip', text: THIN_BLOCK })
+    return 'stop'
   }
   if (stage === 'fix' && !fixable(fixIssues(d0)).length) {
     setStage(id, stage, { phase: 'skip', text: '점검에서 고칠 글이 없습니다' })
     return 'ok'
   }
-  if (stage === 'judge1' || stage === 'judge2') return runJudge(id, stage, env, choice)
+  if (stage === 'judge1' || stage === 'judge2') return runJudge(id, stage, env)
   const s = stageOf(stage)
   const context =
     stage === 'idea'
       ? buildIdeaContext({ draft: d0, company: env.company, others: env.others, today: env.today })
-      : stage === 'research'
+      : stage === 'ideaRank'
+        ? buildIdeaRankContext({ draft: d0, company: env.company, today: env.today })
+        : stage === 'ideaMore'
+          ? buildIdeaMoreContext({ draft: d0, company: env.company, others: env.others, today: env.today })
+          : stage === 'research'
         ? buildResearchContext({ draft: d0, today: env.today })
         : stage === 'parts'
           ? buildPartsContext({ draft: d0, today: env.today })
@@ -219,7 +251,10 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
   for (let attempt = 0; attempt < TRIES; attempt += 1) {
     if (!attempt) setStage(id, stage, { phase: 'run', text: `쓰는 중…(${s.seconds}초쯤)` })
     try {
-      const skill = stage === 'idea' || stage === 'research' ? '' : readJudgeSkill()
+      // D-269 아이디어 내줘 · 견주기 · 더 짜내기도 대표 자체점검 기준을 같이 보낸다(조사만 빼고)
+      const skill = stage === 'research' ? '' : readJudgeSkill()
+      // D-269 그때그때 고른 모델 — 예전엔 시작할 때 한 번 읽어, 쓰는 중에 모델을 바꿔도 끝까지 처음 모델로 썼다
+      const choice = readChoice()
       const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
       if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
         cutRetried = true
@@ -228,26 +263,46 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
         continue
       }
       const cutNote = cutOff(run) ? CUT_NOTE : ''
-      const done = (text: string) => setStage(id, stage, { phase: 'done', text: `${text}${cutNote}` })
+      const model = usedModel(run)
+      const done = (text: string) => setStage(id, stage, { phase: 'done', text: `${text}${cutNote}`, model })
+      /** 넣는 김에 이 단계를 쓴 모델을 초안에 남긴다(다시 열어도 보이게) */
+      const put = (p: Patch) => patch(id, (cur) => withModel(p(cur), stage, model))
       // 서버가 모양 검사에서 떨어뜨린 답(머리글 빠짐 · 끝 잘림 · 코드 블록)도 원문에서 다시 읽는다
       const ans = answerOf(run)
       switch (stage) {
         case 'idea': {
+          // D-269 명칭을 저절로 채우지 않는다 — 대표가 고르고 [이걸로 시작] 을 눌러야 다음으로
           const ideas = ideasOf(ans)
-          if (!ideas.length) throw new AssistError(PARSE_MISS, 'AI 답에서 아이디어를 찾지 못했습니다 — 다시 눌러 주세요')
-          let filled = false
-          await patch(id, (cur) => {
-            filled = !cur.title.trim()
-            const next = { ...cur, ideas }
-            return filled ? applyIdea(next, ideas[0]) : next
+          if (ideas.length < 2) throw new AssistError(PARSE_MISS, 'AI 답에서 아이디어를 찾지 못했습니다 — 다시 눌러 주세요')
+          await put((cur) => ({ ...cur, ideas }))
+          done(`${ideas.length}개 — 1순위 '${ideas[0].title}'${ideas[0].score != null ? `(${ideas[0].score}점)` : ''} · 골라서 [이걸로 시작]`)
+          return 'ok'
+        }
+        case 'ideaRank': {
+          const r = rerankIdeas(d0.ideas, ans)
+          if (!r.matched) throw new AssistError(PARSE_MISS, 'AI 답에서 후보 점수를 찾지 못했습니다 — 다시 눌러 주세요')
+          await put((cur) => ({ ...cur, ideas: rerankIdeas(cur.ideas, ans).ideas }))
+          const top = r.ideas[0]
+          done(`가장 나은 것 — '${top.title}'${top.score != null ? `(${top.score}점)` : ''}${r.headline ? ` · ${r.headline}` : ''}`)
+          return 'ok'
+        }
+        case 'ideaMore': {
+          const more = ideasOf(ans, 3)
+          if (!more.length) throw new AssistError(PARSE_MISS, 'AI 답에서 새 아이디어를 찾지 못했습니다 — 다시 눌러 주세요')
+          let added = 0
+          await put((cur) => {
+            const m = addMoreIdeas(cur.ideas, more)
+            added = m.added
+            return { ...cur, ideas: m.ideas }
           })
-          done(filled ? `${ideas.length}개 — 추천 1번 '${ideas[0].title}' 로 채웠습니다(다른 것으로 바꿀 수 있어요)` : `${ideas.length}개 — 아래에서 고르면 그걸로 바뀝니다`)
+          const head = String(ans?.headline ?? '').trim()
+          done(added ? `새 아이디어 ${added}개${head ? ` — 지금 후보의 약점: ${head}` : ''}` : '새로 나온 것이 지금 후보와 같습니다 — 한 번 더 눌러 보세요')
           return 'ok'
         }
         case 'research': {
           const res = researchOf({ ...run, structured: ans }, d0.title)
           if (!res) throw new AssistError(PARSE_MISS, 'AI 답에서 조사 메모를 찾지 못했습니다 — 다시 눌러 주세요')
-          await patch(id, (cur) => ({ ...cur, research: { ...res, forTitle: cur.title } }))
+          await put((cur) => ({ ...cur, research: { ...res, forTitle: cur.title } }))
           done(res.grounded ? `메모 ${res.items.length}개 · 검색 근거 ${res.sources.length}곳` : `메모 ${res.items.length}개 · AI 가 아는 범위(검색 근거 없음 — KIPRIS 확인 필요)`)
           return 'ok'
         }
@@ -255,7 +310,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           const p = partsOf(ans, rawObjectOf(run))
           if (p.components.length < 2) throw new AssistError(PARSE_MISS, 'AI 답에서 구성요소를 찾지 못했습니다 — 다시 눌러 주세요')
           let res: ReturnType<typeof applyParts> | null = null
-          await patch(id, (cur) => {
+          await put((cur) => {
             res = applyParts(cur, p, { force: env.forceParts })
             return res.draft
           })
@@ -267,7 +322,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           const items = fixItemsOf(ans)
           if (!items.length) throw new AssistError(PARSE_MISS, 'AI 답에서 고친 칸을 찾지 못했습니다 — 다시 눌러 주세요')
           let m: ReturnType<typeof applyFix> | null = null
-          await patch(id, (cur) => {
+          await put((cur) => {
             m = applyFix(cur, items)
             return m.draft
           })
@@ -280,7 +335,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
           const items = specItemsOf(ans, key)
           if (!items.length) throw new AssistError(PARSE_MISS, 'AI 답에서 칸을 찾지 못했습니다 — 다시 눌러 주세요')
           let m: { replaced: string[]; kept: string[] } = { replaced: [], kept: [] }
-          await patch(id, (cur) => {
+          await put((cur) => {
             if (key === 'c' || key === 'd') {
               const part = cleanAiText(items[0].text)
               const ai = { ...cur.ai, [key === 'c' ? 'detailFront' : 'detailBack']: part }
@@ -329,7 +384,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
  * D-263 자체점검 단계 — 판정 + 자체점검이 직접 고친 칸을 넣는다. 90점 미만이거나 P0 가 남았고 고친 칸이 있었으면
  * 고친 글로 한 번 더 판정한다(최대 2번) — "점검 요청하면 꼭 한두 개씩 보완하라 하더라" 를 화면 안에서 끝낸다.
  */
-async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, choice: ReturnType<typeof readChoice>): Promise<'ok' | 'fail' | 'stop'> {
+async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv): Promise<'ok' | 'fail' | 'stop'> {
   const scope = stage === 'judge1' ? 'parts' : 'full'
   const label = JUDGE_SCOPE_LABEL[scope]
   const skill = readJudgeSkill()
@@ -337,6 +392,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
   const keptAll: string[] = []
   let report: JudgeReport | null = null
   let cutAny = false
+  let model = ''
   for (let round = 1; round <= JUDGE_ROUNDS; round += 1) {
     const d0 = current(id)
     if (!d0) {
@@ -351,7 +407,9 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
     for (let attempt = 0; attempt < TRIES && !got; attempt += 1) {
       if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `${label}을 자체점검하는 중…(${stageOf(stage).seconds}초쯤)` : '고친 글로 한 번 더 자체점검하는 중…' })
       try {
+        const choice = readChoice()
         const run = await callAssist({ requestId: newRequestId(), assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+        model = usedModel(run) || model
         if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
           cutRetried = true
           hint = CUT_HINT_JUDGE
@@ -399,7 +457,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
       keptAll.push(...applied.kept.filter((x) => !keptAll.includes(x)))
       report = { at: new Date().toISOString(), scope: label, score: j.score, scores: j.scores, verdicts: j.verdicts, fixed: [...fixedAll], kept: [...keptAll], rounds: round, custom: !!skill, headline: j.headline }
       const r = report
-      return { ...applied.draft, judge: { ...applied.draft.judge, [scope]: r } }
+      return withModel({ ...applied.draft, judge: { ...applied.draft.judge, [scope]: r } }, stage, model)
     })
     // 통과했거나 · 자체점검이 고친 것이 없으면(다시 물어도 같은 판정) 여기서 끝
     if (judgePassed(report) || !applied.fixed.length) break
@@ -411,6 +469,7 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
   setStage(id, stage, {
     phase: 'done',
     text: `${r?.score != null ? `${r.score}점` : '점수 없음'} · P0 ${p0}${fixedAll.length ? ` · 직접 고친 칸 ${fixedAll.join(' · ')}` : ' · 고칠 것 없음'}${keptAll.length ? ` · 직접 고치신 ${keptAll.join(' · ')}은 그대로` : ''}${(r?.rounds ?? 1) > 1 ? ' · 고친 뒤 다시 판정' : ''}${cutAny ? CUT_NOTE : ''}`,
+    model,
   })
   return 'ok'
 }
@@ -418,7 +477,6 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, cho
 /** 단계들을 차례로(이미 쓰는 중이면 무시). 단계 하나가 실패해도 다음 단계는 간다 — 설정 · 권한 오류면 멈춘다 */
 export function startSpecRun(id: string, stages: AgentStage[], env: RunEnv): boolean {
   if (isSpecRunning(id) || !stages.length) return false
-  const choice = readChoice()
   setRun(id, (r) => ({
     running: true,
     asks: stages.some((k) => ['a', 'b', 'c', 'd', 'e'].includes(k)) ? [] : r.asks,
@@ -426,7 +484,7 @@ export function startSpecRun(id: string, stages: AgentStage[], env: RunEnv): boo
   }))
   void (async () => {
     for (const [i, k] of stages.entries()) {
-      const r = await runStage(id, k, env, choice)
+      const r = await runStage(id, k, env)
       if (r === 'stop') {
         for (const rest of stages.slice(i + 1)) setStage(id, rest, { phase: 'skip', text: '멈춤 — 위 오류부터' })
         break

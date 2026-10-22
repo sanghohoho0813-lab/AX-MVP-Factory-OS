@@ -296,7 +296,9 @@ const long = (n: number) => '가'.repeat(n)
   check('J9 쓰기 단추에도 — 최종본 규칙(한 번에 끝냄 · "보완하면 좋다" 금지) + 자체점검 기준 · 대표 정의', [sysSum, sysP1].every((x) => x.includes('[최종본 규칙 — 한 번에 끝낸다]') && x.includes('보완하면 좋다') && x.includes(VENTURE_JUDGE[0])) && sysSum.includes('대표표식') && !sysP1.includes('대표표식'))
   const sysSpec = assistSystem(ASSISTS['spec.judge'], { skill: '대표표식' })
   check('J10 명세서 자체점검 · 쓰기 단추 — 특허 자체점검 · 최종본 규칙(spec.a~e · parts · fix)', sysSpec.includes(PATENT_JUDGE[0]) && sysSpec.includes('대표표식') && ['spec.a', 'spec.b', 'spec.c', 'spec.d', 'spec.e', 'spec.parts', 'spec.fix'].every((id) => assistSystem(ASSISTS[id]).includes('[최종본 규칙') && assistSystem(ASSISTS[id]).includes(PATENT_JUDGE[0])))
-  check('J11 다른 단추엔 붙지 않음 — 시장조사 · 아이디어 · 오늘 할 일', ['venture.market', 'spec.idea', 'today.top3'].every((id) => !assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
+  check('J11 다른 단추엔 붙지 않음 — 시장조사 · 선행기술 조사 · 오늘 할 일', ['venture.market', 'spec.research', 'today.top3'].every((id) => !assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
+  // D-269 아이디어 단추는 아이디어 자체점검 기준 + 대표 정의 — 최종본 규칙(본문용)은 아님
+  check('J11b 아이디어 내기 · 견주기 · 더 짜내기 — 아이디어 자체점검 기준 · 대표 정의 · 최종본 규칙 없음', ['spec.idea', 'spec.ideaRank', 'spec.ideaMore'].every((id) => assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && assistSystem(ASSISTS[id]).includes('[자체점검 — 특허 아이디어 후보]') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
   check('J12 대표 정의 — 빈 글이면 아무것도 안 붙음 · 8,000자에서 자름', customSkillBlock('').length === 0 && customSkillBlock('  ').length === 0 && customSkillBlock('가'.repeat(9000))[2].length === 8000)
   check('J13 화면 이름표 = 서버(시장조사 · 자체점검 둘)', ['venture.market', 'venture.judge', 'spec.judge'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)) && ASSISTS['venture.market'].research === true)
 }

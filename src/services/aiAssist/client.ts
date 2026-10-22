@@ -74,7 +74,12 @@ export interface AssistRun {
   sources?: { title: string; url: string }[]
   /** 공급자가 답을 멈춘 까닭(STOP · MAX_TOKENS · length · max_tokens …) */
   finish?: string
+  /** D-269 공급자가 실제로 답한 모델(고른 모델과 다를 수 있다) */
+  servedModel?: string
 }
+
+/** D-269 이 답을 실제로 쓴 모델 */
+export const usedModel = (run: Pick<AssistRun, 'model' | 'servedModel'>): string => String(run.servedModel || run.model || '').trim()
 
 /** D-268 답이 길이 상한에서 잘렸나 — Gemini MAX_TOKENS · OpenAI length · Claude max_tokens */
 export const cutOff = (run: Pick<AssistRun, 'finish'> | null | undefined): boolean => /^(?:max_tokens|length)$/i.test(String(run?.finish ?? '').trim())

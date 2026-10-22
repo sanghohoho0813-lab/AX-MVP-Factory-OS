@@ -111,12 +111,17 @@ function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]
         <Surface showEdge edge="brand">
           <div className="flex flex-col gap-3" data-testid="spec-new-ai">
             <div className="flex flex-col gap-1">
-              <h2 className="t-section font-bold break-keep text-slate-900">AI 가 명세서를 처음부터 끝까지 써요</h2>
-              <p className="t-sub break-keep text-slate-600">회사만 고르고 단추 한 번 — 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(4~5분). 타자 칠 칸은 없어요.</p>
+              <h2 className="t-section font-bold break-keep text-slate-900">AI 와 명세서를 기획부터 써요</h2>
+              <p className="t-sub break-keep text-slate-600">회사를 고르고 단추를 누르면 아이디어 5개(순위 · 이유)부터 — 고르고 · 구성을 확인하고 · 본문을 쓰는 차례마다 단추로 넘어갑니다. 타자 칠 칸은 없어요.</p>
             </div>
             <ClientSelect value={pick} onChange={setPick} clients={clients} label="어느 회사 특허인가요?" testId="spec-new-client" />
+            {/* D-269 모델은 시작하기 전에 — 예전엔 명세서를 만들자마자 쓰기 시작해, 그 뒤에 고른 모델이 적용되지 않았다 */}
+            <div className="flex flex-col gap-1">
+              <p className="t-meta font-semibold text-slate-700">어느 AI 로 쓸까요? (모든 단계가 이 모델로 · 쓰는 중에 바꾸면 다음 단계부터)</p>
+              <ModelPicker testId="spec-new-model" />
+            </div>
             <Button variant="primary" className="min-h-12 self-start" disabled={busy} onClick={() => void go(() => onNew(pick))} data-testid="spec-new">
-              <Sparkles aria-hidden="true" className="size-5" /> {pick ? `${nameOf(pick) || '이 회사'} 명세서 AI 로 처음부터 끝까지` : 'AI 로 처음부터 끝까지 쓰기'}
+              <Sparkles aria-hidden="true" className="size-5" /> {pick ? `${nameOf(pick) || '이 회사'} 명세서 — 기획부터 시작` : '명세서 기획부터 시작'}
             </Button>
             {!pick && <p className="t-meta break-keep text-slate-500">회사를 고르면 그 회사 기록 · 상담 메모로 아이디어를 냅니다(안 고르면 일반 아이디어).</p>}
             <button type="button" disabled={busy} onClick={() => void go(onSample)} className="tap t-meta self-start font-semibold text-slate-600 underline underline-offset-2" data-testid="spec-sample">

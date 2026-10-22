@@ -9,7 +9,7 @@
  */
 
 import { KNOWLEDGE, KNOWLEDGE_META } from './knowledge.js'
-import { finalRules, judgeBlock } from './judge.js'
+import { finalRules, ideaJudgeBlock, judgeBlock } from './judge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from './specSamples.js'
 import { CONFIDENTIAL_RULES, sanitizeKnowledge, scrubBrand } from './guard.js'
 
@@ -265,12 +265,24 @@ const LIST = [
   ], { knowledge: ['venture_plan'], judge: 'venture' }],
 
   /* D-252 AI 가 다 쓰는 명세서 — 아이디어 내줘 · 조사해줘 · 구성 써줘 · 점검대로 고쳐줘. 기준은 서버가 붙이는 [미래AI랩 기준 문서](내부 기준 문서 · 내부 기준 문서) */
-  ['spec.idea', 'patent', '명세서 — 아이디어 내줘', W, 5000, [
-    '[자료 · 회사] 와 [자료 · 재료](AI 작업실 결과 · 올린 자료 · 업무 기록)를 보고, [기준 문서] 의 문제발굴 질문(7-1)과 5개 고정 질문(8)으로 이 회사가 출원할 만한 특허 아이디어 3개를 낸다. 서로 다른 업무 · 데이터 · 판단 구조로.',
-    '아이디어마다 항목 하나(tag = "아이디어"): title = 한글 명칭(8-1 공식 · "… 시스템 및 방법" 으로 끝 · 마케팅 말 금지), body = 영문 명칭(대문자 · 예: SYSTEM AND METHOD FOR …), detail = 왜 이 회사에 맞는지 2문장(자료의 어떤 사실에서 나왔는지), outline = 정확히 5줄 — ① 현재 문제 · ② 기존 방식과 부족한 점 · ③ 차별 구조 · ④ 처리 흐름(입력 → 정리 → 판단 → 출력 → 행동 → 재반영) · ⑤ 권리화 포인트(경쟁사가 가장 쉽게 베낄 구조). 줄 앞에 번호 · 이름표 없이 내용만.',
-    '가장 추천하는 것을 첫 항목에. headline = 첫 항목을 추천하는 이유 한 문장. 자료에 없는 실적 · 수치 · 고객 이름은 만들지 않는다 — 업종 일반에서 추정한 문제는 끝에 "(추정 — 대표 확인)".',
-    '[자료 · 이미 있는 명세서] 와 같은 발명은 다시 내지 않는다. next = 대표에게 확인받을 것 1~3개(현장에서 실제로 그런지 · 데이터가 있는지). caution = 자료가 너무 적어 일반론이 된 경우만.',
-  ], { knowledge: ['patent_idea'] }],
+  /* D-269 기획 먼저 — 아이디어 5개(순위 · 이유) → 대표가 고름. [이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기] 도 같은 자체점검 기준 */
+  ['spec.idea', 'patent', '명세서 — 아이디어 내줘', W, 8000, [
+    '[자료 · 회사] 와 [자료 · 재료](회사 소개 · 제품 설명 · AI 작업실 결과 · 올린 자료 · 대화 · 업무 기록)를 보고, [기준 문서] 의 문제발굴 질문(7-1)과 5개 고정 질문(8)으로 이 회사가 출원할 만한 특허 아이디어 5개를 낸다. 서로 다른 업무 · 데이터 · 판단 구조로.',
+    '아이디어마다 항목 하나: title = 한글 명칭(8-1 공식 · "… 시스템 및 방법" 으로 끝 · 마케팅 말 · 순위 표지 없이), body = 영문 명칭(대문자 · 예: SYSTEM AND METHOD FOR …), detail = 왜 이 회사에 맞는지 2문장(자료의 어떤 사실에서 나왔는지 — 자료의 말을 짚어서), outline = 정확히 5줄 — ① 현재 문제 · ② 기존 방식과 부족한 점 · ③ 차별 구조 · ④ 처리 흐름(입력 → 정리 → 판단 → 출력 → 행동 → 재반영) · ⑤ 권리화 포인트(경쟁사가 가장 쉽게 베낄 구조). 줄 앞에 번호 · 이름표 없이 내용만.',
+    '추천 순서대로(1순위가 맨 앞): amount = 추천 점수(0~100 숫자만 · 아래 자체점검 기준), tag = "1순위" · "2순위" · "3순위" · "후보", when = 이 순위인 이유 한 줄(다른 후보와 견줘서 무엇이 낫고 무엇이 약한지). 점수가 같지 않게.',
+    'headline = 1순위를 추천하는 이유 한 문장. 자료에 없는 실적 · 수치 · 고객 이름은 만들지 않는다. 어느 회사에나 맞는 일반 아이디어는 내지 않는다.',
+    '[자료 · 이미 있는 명세서] 와 같은 발명은 다시 내지 않는다. next = 대표에게 확인받을 것 1~3개(현장에서 실제로 그런지 · 데이터가 있는지). caution = 자료가 적어 일반론에 가까운 후보가 있으면 그 사실.',
+  ], { knowledge: ['patent_idea'], ideaJudge: 'patent' }],
+  ['spec.ideaRank', 'patent', '명세서 — 이 중 제일 좋은 게 뭐야', L, 3000, [
+    '[자료 · 후보] 의 특허 아이디어 후보들을 아래 자체점검 기준으로 서로 견줘 점수를 매기고, 가장 나은 것을 고른다. [자료 · 회사] · [자료 · 재료] 의 사실과 맞는지가 중요하다.',
+    '후보마다 항목 하나(후보 순서 그대로): title = "후보 n"(n = [자료 · 후보] 의 번호), amount = 점수(0~100 숫자만), tag = "1순위" · "2순위" · "3순위" · "후보", when = 이 순위인 이유 한 줄(다른 후보와 견줘서), detail = 가장 큰 약점 한 줄(뻔함 · 회사와 덜 맞음 · 회피 쉬움 중 무엇인지).',
+    '점수가 같지 않게(1점이라도 차이). headline = "후보 n — 왜 이것이 가장 나은지" 한 문장. next = 1순위를 더 날카롭게 만들 방법 1~2개.',
+  ], { knowledge: ['patent_idea'], ideaJudge: 'patent' }],
+  ['spec.ideaMore', 'patent', '명세서 — 자체점검으로 더 짜내기', W, 6000, [
+    '[자료 · 지금 후보] 를 아래 자체점검 기준으로 먼저 공격한다 — 뻔한 것 · 회사 사업과 덜 맞는 것 · 경쟁사가 쉽게 피하는 것.',
+    '그 약점을 피한 새 아이디어 2개를 낸다 — 지금 후보를 조금 바꾼 것이 아니라 다른 업무 · 데이터 · 판단 구조에서. 형식은 아이디어 내줘와 같다: title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭(대문자), detail = 회사 근거 2문장, outline = 정확히 5줄(현재 문제 · 기존 방식과 부족한 점 · 차별 구조 · 처리 흐름 · 권리화 포인트), amount = 점수(0~100 · 지금 후보와 같은 기준), tag = "새 아이디어", when = 지금 후보들보다 무엇이 나은지 한 줄.',
+    'headline = 지금 후보들의 가장 큰 약점 한 줄. 지금 후보와 같은 명칭 · 같은 구조는 내지 않는다. 자료에 없는 실적 · 수치 · 고객 이름은 만들지 않는다.',
+  ], { knowledge: ['patent_idea'], ideaJudge: 'patent' }],
   ['spec.research', 'patent', '명세서 — 선행기술 조사해줘', L, 3600, [
     '[자료 · 고른 아이디어] 의 선행기술 · 중복 가능성을 [기준 문서] 10장 기준으로 조사 메모로 쓴다. 목적은 "같은 것이 없다" 가 아니라 무엇을 빼고 · 좁히고 · 더해 차별화할지 찾는 것.',
     '항목 4~7개, tag 는 "검색어" · "비슷한 기술" · "차별화" · "위험" · "확인할 것" 중 하나. "비슷한 기술" 은 실제로 찾은 특허 · 제품 · 논문만 — 찾지 못했으면 일반적으로 알려진 방식만 쓰고 detail 끝에 "(검색 근거 없음)". 출원번호 · 회사 이름을 지어내지 않는다.',
@@ -312,7 +324,7 @@ const LIST = [
 export const ASSISTS = Object.fromEntries(
   LIST.map(([id, page, label, kind, maxOut, instruction, opts]) => [
     id,
-    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video), judge: (opts && opts.judge) || '', final: (opts && opts.final) || '', topicKb: !!(opts && opts.topicKb) },
+    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video), judge: (opts && opts.judge) || '', final: (opts && opts.final) || '', ideaJudge: (opts && opts.ideaJudge) || '', topicKb: !!(opts && opts.topicKb) },
   ]),
 )
 
@@ -423,7 +435,7 @@ export function assistSystem(assist, opts = {}) {
   const extra = assist.video ? ['', '[영상 받아 적기]', ...VIDEO_RULES] : assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : []
   const skill = typeof opts.skill === 'string' ? opts.skill : ''
   const topicText = typeof opts.topicText === 'string' ? opts.topicText : ''
-  const judge = assist.judge ? ['', ...judgeBlock(assist.judge, skill)] : assist.final ? finalRules(assist.final, skill) : []
+  const judge = assist.judge ? ['', ...judgeBlock(assist.judge, skill)] : assist.final ? finalRules(assist.final, skill) : assist.ideaJudge ? ideaJudgeBlock(assist.ideaJudge, skill) : []
   const kb = knowledgeOf(assist, topicText)
   const kbLines = kb.length
     ? [

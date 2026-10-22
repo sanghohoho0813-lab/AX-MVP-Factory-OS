@@ -13,15 +13,18 @@
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Gavel, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { safeText, personNames, wonText } from '../../services/aiAssist/context'
 import { parseSpecFile } from '../../services/patent/specParse'
-import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, claimsOf, figureSubject, titleLine, type DraftStep, type IdeaPick, type SpecDraft } from '../../services/patent/specDraft'
-import { CARD_STAGES, applyIdea, bodyWritten, cardState, clearAfterIdea, hasLaterWork, partsHuman, planAll, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage } from '../../services/patent/specAgent'
-import { specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
+import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, claimsOf, figureSubject, titleLine, titleParts, type DraftStep, type IdeaPick, type SpecDraft } from '../../services/patent/specDraft'
+import { CARD_STAGES, PLAN_BODY, applyIdea, backToIdeas, bodyWritten, cardState, clearAfterIdea, companyThin, hasLaterWork, partsHuman, planAll, planParts, rankLabel, specPhase, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage, type SpecPhase } from '../../services/patent/specAgent'
+import { modelsOf, prettyModel, specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
+import { useAiChoice } from '../../components/ai/ModelPicker'
+import { SpecFullText, downloadPlain } from './SpecFullText'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { judgePassed } from '../../services/aiAssist/judge'
 import { clientFacts } from '../../tools/shared/clientPrefill'
@@ -55,7 +58,7 @@ export function companyFactLines(r: ClientOpsRecord | null): string[] {
 }
 
 const CARD_META: Record<AgentCard, { n: number; title: string; icon: ReactNode; run: string; again: string; help: string }> = {
-  idea: { n: 1, title: '아이디어', icon: <Lightbulb aria-hidden="true" className="size-5" />, run: '아이디어 내줘', again: '다른 아이디어 더', help: '회사 기록 · 자료로 출원할 만한 아이디어 3개를 냅니다. 추천 1번이 바로 들어가고, 다른 것을 누르면 그걸로 바뀝니다.' },
+  idea: { n: 1, title: '아이디어', icon: <Lightbulb aria-hidden="true" className="size-5" />, run: '아이디어 내줘', again: '다른 아이디어 더', help: '회사 기록 · 자료로 출원할 만한 아이디어 5개를 순위 · 이유와 함께 냅니다. 다른 것을 누르면 그걸로 바뀝니다.' },
   research: { n: 2, title: '선행기술 조사', icon: <Search aria-hidden="true" className="size-5" />, run: '조사해줘', again: '다시 조사', help: '비슷한 기술 · 차별화 · 위험 · KIPRIS 검색어. 검색 근거가 붙으면 출처가 같이 나옵니다.' },
   parts: { n: 3, title: '구성 · 단계 · 도면', icon: <Boxes aria-hidden="true" className="size-5" />, run: '구성 써줘', again: '다시 써줘', help: '권리축 7줄 · 구성요소(부호 110~) · 방법 단계 · 종속항 씨앗. 도면 설명은 구성에서 자동으로.' },
   body: { n: 4, title: '본문 7칸', icon: <FileText aria-hidden="true" className="size-5" />, run: '본문 써줘', again: '본문 다시', help: '기술분야 · 배경 · 과제 · 해결 수단 · 효과 · 구체적인 내용 · 요약 — 네 번에 나눠 씁니다.' },
@@ -66,8 +69,23 @@ const CARD_META: Record<AgentCard, { n: number; title: string; icon: ReactNode; 
 
 const CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'judge', 'check']
 
-/** 회사가 무엇을 하는지 알려 주는 기록 줄(매출 · 지역 · 설립만으로는 발명을 떠올릴 수 없다) */
-const DESCRIBES = /^(?:업종|업태|종목|홈페이지|상담 메모):/
+/** D-269 맨 위 차례 — 절차마다 단추로 넘어간다 */
+const STEPS: { label: string; phases: SpecPhase[] }[] = [
+  { label: '회사 정보', phases: ['company'] },
+  { label: '아이디어 고르기', phases: ['ideas'] },
+  { label: '구성 확인', phases: ['parts', 'review'] },
+  { label: '본문 · 청구항', phases: ['body'] },
+  { label: '전문 · 복사', phases: ['done'] },
+]
+
+const PHASE_HELP: Record<SpecPhase, string> = {
+  company: '이 회사가 무엇을 하는지(업종 · 종목 · 상담 메모)나 자료가 있어야 그 회사에 맞는 발명을 냅니다.',
+  ideas: '아이디어 5개를 1~3순위와 이유까지 냅니다. 하나를 눌러 고른 뒤 [이걸로 시작하자] — 마음에 안 들면 [이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기].',
+  parts: '고른 아이디어로 선행기술 조사 · 구성요소 · 단계를 짜고 자체점검 ① 이 판정합니다.',
+  review: '구성요소 · 단계 · 자체점검 ① 을 보고 맞으면 [이 구성으로 본문 · 청구항 쓰기]. 아니면 다시 짜거나 다른 아이디어로.',
+  body: '본문 · 청구항 가운데 빠진 곳이 있어요 — [이어서 끝까지 써줘].',
+  done: '',
+}
 
 const PHASE_TONE: Record<StageRow['phase'], string> = { wait: 'text-slate-500', run: 'text-violet-800', done: 'text-success-700', fail: 'text-danger-700', skip: 'text-slate-600' }
 
@@ -166,13 +184,14 @@ export function SpecAiBoard({
   )
 
   const busy = run.running
-  const start = (stages: AgentStage[], forceParts = false) => {
-    if (!startSpecRun(draftId, stages, { company, others, today, forceParts })) showToast('지금 쓰는 중입니다 — 끝나면 다시 눌러 주세요')
+  const start = (stages: AgentStage[], forceParts = false): boolean => {
+    const ok = startSpecRun(draftId, stages, { company, others, today, forceParts })
+    if (!ok) showToast('지금 쓰는 중입니다 — 끝나면 다시 눌러 주세요')
+    return ok
   }
   const all = () => {
     const plan = planAll(d)
-    start(plan)
-    showToast(`AI 가 ${plan.length}단계를 차례로 씁니다 — 이 화면을 떠나도 계속 씁니다`)
+    if (start(plan)) showToast(`빠진 곳 ${plan.length}단계를 차례로 씁니다 — 이 화면을 떠나도 계속 씁니다`)
   }
   const runCard = (card: AgentCard) => {
     if (card === 'parts' && partsHuman(d) && !window.confirm('직접 고치신 구성요소 · 단계가 있습니다. AI 가 새로 써서 바꿀까요? (바꾼 뒤 되돌리기로 살릴 수 있어요)')) return
@@ -183,7 +202,39 @@ export function SpecAiBoard({
   const pickIdea = (pick: IdeaPick) => {
     if (pick.title === d.title) return
     if (hasLaterWork(d) && !window.confirm('다른 아이디어로 바꾸면 지금 구성 · 본문 · 청구항은 새로 써야 합니다. 바꿀까요? (되돌리기로 살릴 수 있어요)')) return
-    act(`'${pick.title}' 로 바꿨습니다 — [전부 써줘] 로 이어서 쓰세요`, (cur) => applyIdea(hasLaterWork(cur) ? clearAfterIdea(cur) : cur, pick))
+    act(`'${pick.title}' 로 바꿨습니다 — [이 아이디어로 구성 짜기] 로 이어서 쓰세요`, (cur) => applyIdea(hasLaterWork(cur) ? clearAfterIdea(cur) : cur, pick))
+  }
+
+  /* D-269 기획 — 대표: "아이디어를 여러 개 내고 가장 괜찮은 거를 먼저 뽑아 주고 · 이걸로 선택할게 · 이걸로 시작하자" */
+  const [pickTitle, setPickTitle] = useState('')
+  const picked = d.ideas.find((p) => p.title === pickTitle) ?? d.ideas[0] ?? null
+  const ideasRun = () => {
+    setPickTitle('')
+    if (start(['idea'])) showToast('아이디어 5개를 내고 순위를 매깁니다(30~60초)')
+  }
+  const rankRun = () => {
+    setPickTitle('')
+    if (start(['ideaRank'])) showToast('후보를 자체점검 기준으로 견줘 가장 나은 것을 고릅니다')
+  }
+  const moreRun = () => {
+    if (start(['ideaMore'])) showToast('지금 후보의 약점을 자체점검으로 공격하고, 더 날카로운 아이디어를 짜냅니다')
+  }
+  const chooseIdea = () => {
+    if (!picked) return
+    act(`'${picked.title}' 로 시작합니다`, (cur) => applyIdea(cur, picked))
+    // act 가 초안을 곧바로 바꾸므로 다음 단계는 고른 명칭으로 부른다
+    if (start(planParts({ ...d, title: picked.title }))) showToast('선행기술 조사 → 구성 → 자체점검 ① 까지 씁니다 — 끝나면 구성을 확인해 주세요')
+  }
+  const partsRun = (again = false) => {
+    if (again && partsHuman(d) && !window.confirm('직접 고치신 구성요소 · 단계가 있습니다. AI 가 새로 짜서 바꿀까요? (되돌리기로 살릴 수 있어요)')) return
+    if (start(planParts(d), again)) showToast('선행기술 조사 → 구성 → 자체점검 ① 까지 씁니다')
+  }
+  const bodyRun = () => {
+    if (start([...PLAN_BODY])) showToast('본문 · 청구항 · 자체점검 ② · 점검대로 고치기까지 씁니다(3~4분 · 화면을 떠나도 계속)')
+  }
+  const goBackToIdeas = () => {
+    if (hasLaterWork(d) && !window.confirm('다른 아이디어로 돌아가면 지금 구성 · 본문 · 청구항은 비워집니다. 돌아갈까요? (되돌리기로 살릴 수 있어요)')) return
+    act('아이디어 고르기로 돌아갔습니다', backToIdeas)
   }
 
   const addFiles = async (files: FileList | null) => {
@@ -217,19 +268,19 @@ export function SpecAiBoard({
     }
   }
 
-  // D-261 새 명세서 — 회사 기록(고른 회사면) · 그 회사의 AI 작업실 자료를 다 읽은 뒤 한 번만 저절로 시작
+  // D-261 새 명세서 — 회사 기록 · 그 회사의 AI 작업실 자료를 다 읽은 뒤 한 번만 저절로.
+  // D-269 저절로는 '아이디어 5개' 까지만(고르는 것은 대표) · 회사 이야기가 없으면 시작하지 않고 '회사 정보부터'
   useEffect(() => {
     if (!autoStart || autoDone.current || busy) return
     if (wantClient && !record) return
     if (matsFor !== clientId) return
     autoDone.current = true
     onAutoStarted?.()
-    if (d.title.trim()) return
-    const plan = planAll(d)
-    if (startSpecRun(draftId, plan, { company, others, today, forceParts: false })) showToast(`AI 가 명세서를 처음부터 끝까지 씁니다(${plan.length}단계 · 4~5분) — 이 화면을 떠나도 계속 씁니다`)
+    if (d.title.trim() || d.ideas.length || companyThin(company)) return
+    if (startSpecRun(draftId, ['idea'], { company, others, today, forceParts: false })) showToast('아이디어 5개를 내고 순위를 매깁니다 — 골라서 [이걸로 시작] 을 누르세요')
   }, [autoStart, busy, matsFor, clientId, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
 
-  // 회사 기록을 끝내 못 읽으면(목록 실패 등) 기다리기만 하지 않는다 — 알리고 [처음부터 끝까지 써줘] 로
+  // 회사 기록을 끝내 못 읽으면(목록 실패 등) 기다리기만 하지 않는다 — 알리고 [아이디어 5개 내줘] 로
   const autoGiveUp = useRef({ onAutoStarted, showToast })
   autoGiveUp.current = { onAutoStarted, showToast }
   useEffect(() => {
@@ -238,7 +289,7 @@ export function SpecAiBoard({
       if (autoDone.current) return
       autoDone.current = true
       autoGiveUp.current.onAutoStarted?.()
-      autoGiveUp.current.showToast('회사 기록을 읽지 못해 저절로 시작하지 못했어요 — [처음부터 끝까지 써줘] 를 눌러 주세요')
+      autoGiveUp.current.showToast('회사 기록을 읽지 못해 저절로 시작하지 못했어요 — [아이디어 5개 내줘] 를 눌러 주세요')
     }, 15_000)
     return () => clearTimeout(t)
   }, [autoStart, wantClient, record])
@@ -246,25 +297,46 @@ export function SpecAiBoard({
   const errs = checkDraft(d).filter((i) => i.level === 'error')
   const stagesShown = (Object.keys(run.stages) as AgentStage[]).sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b))
   const doneCards = CARDS.filter((c) => cardState(c, d).done).length
-  const finished = !busy && doneCards >= 5 && !!d.title.trim()
-  // D-268 예전엔 맨 위가 형식 점검만 보고 '고칠 것 없음' 이라 해서, 바로 아래 '자체점검 47점 · P0 1' 과 어긋났다 — 둘을 따로
+  // D-268 · D-269 회사 이야기(업종 · 종목 · 상담 메모 · 자료)가 없으면 지어낸 발명이 된다 — 명칭 전이면 막고, 뒤면 알린다
+  const thin = matsFor === clientId && companyThin(company)
+  const phase = specPhase(d, thin)
+  const finished = !busy && phase === 'done'
+  // D-268 형식 점검과 자체점검을 따로 — 자체점검 90점 미만 · P0 면 '출원 전에 손볼 곳'
   const judged = d.judge.full
   const judgeP0 = judged?.verdicts.filter((v) => v.level === 'P0').length ?? 0
   const needsWork = finished && !!judged && !judgePassed(judged)
-  // D-268 AI 가 읽을 것이 거의 없으면(업종 · 종목 · 상담 메모 · 자료 모두 없음) 업종 일반으로 지어낸 발명이 된다 — 미리 알린다
-  const thin = matsFor === clientId && !facts.some((f) => DESCRIBES.test(f)) && !d.materials.length && !caseMats.length && !priorIdeas.length
+  const models = modelsOf(d)
+  const [choice] = useAiChoice()
+  const stepAt = STEPS.findIndex((s) => s.phases.includes(phase))
+  const head = busy
+    ? 'AI 가 쓰는 중이에요 — 화면을 떠나도 계속 씁니다'
+    : phase === 'company'
+      ? '먼저 회사 정보를 넣어 주세요'
+      : phase === 'ideas'
+        ? d.ideas.length
+          ? '아이디어를 골라 주세요'
+          : '기획부터 — 아이디어 5개를 냅니다'
+        : phase === 'parts'
+          ? '고른 아이디어로 구성을 짭니다'
+          : phase === 'review'
+            ? '구성을 확인해 주세요'
+            : phase === 'body'
+              ? '본문 · 청구항을 마저 씁니다'
+              : needsWork
+                ? '명세서를 다 썼어요 — 출원 전에 손볼 곳이 있어요'
+                : '명세서를 다 썼어요'
 
   return (
-    <div className="flex flex-col gap-4" data-testid="spec-board" data-busy={busy ? 'yes' : 'no'}>
+    <div className="flex flex-col gap-4" data-testid="spec-board" data-busy={busy ? 'yes' : 'no'} data-phase={phase}>
       <Surface>
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <span aria-hidden="true" className={`flex size-10 shrink-0 items-center justify-center rounded-full ${needsWork ? 'bg-warning-100 text-warning-800' : finished ? 'bg-success-100 text-success-700' : 'bg-violet-100 text-violet-700'}`}>
-              {needsWork ? <TriangleAlert className="size-5" /> : finished ? <CheckCircle2 className="size-5" /> : busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
+            <span aria-hidden="true" className={`flex size-10 shrink-0 items-center justify-center rounded-full ${needsWork || phase === 'company' ? 'bg-warning-100 text-warning-800' : finished ? 'bg-success-100 text-success-700' : 'bg-violet-100 text-violet-700'}`}>
+              {needsWork || phase === 'company' ? <TriangleAlert className="size-5" /> : finished ? <CheckCircle2 className="size-5" /> : busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <h3 className="t-section font-bold break-keep text-slate-900" data-testid="spec-board-head" data-needs-work={needsWork ? 'yes' : 'no'}>
-                {busy ? 'AI 가 쓰는 중이에요 — 화면을 떠나도 계속 씁니다' : needsWork ? '명세서를 다 썼어요 — 출원 전에 손볼 곳이 있어요' : finished ? '명세서를 다 썼어요' : 'AI 가 처음부터 끝까지 씁니다'}
+                {head}
               </h3>
               <p className="t-sub break-keep text-slate-700" data-testid="spec-board-summary">
                 {finished ? (
@@ -282,12 +354,30 @@ export function SpecAiBoard({
                   </>
                 ) : (
                   <>
-                    단추 하나면 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(<b className="font-semibold">미래AI랩 기준 문서</b>대로 · 중간중간 <b className="font-semibold">자체점검</b>가 판정하고 고침). 타자 칠 칸은 없어요.
+                    {(phase === 'parts' || phase === 'review' || phase === 'body') && (
+                      <>
+                        <b className="font-semibold [overflow-wrap:anywhere]">{titleLine(d)}</b> —{' '}
+                      </>
+                    )}
+                    {PHASE_HELP[phase]}
                   </>
                 )}
               </p>
             </div>
           </div>
+
+          <ol className="flex flex-wrap gap-1.5" data-testid="spec-steps" data-phase={phase} aria-label="명세서 쓰는 차례">
+            {STEPS.map((s, i) => {
+              const now = i === stepAt
+              const past = i < stepAt
+              return (
+                <li key={s.label} className={`t-meta inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${now ? 'bg-violet-600 text-white' : past ? 'bg-success-100 text-success-800' : 'bg-slate-100 text-slate-500'}`} aria-current={now ? 'step' : undefined} data-testid="spec-step" data-now={now ? 'yes' : 'no'}>
+                  {past ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <span aria-hidden="true">{i + 1}</span>}
+                  {s.label}
+                </li>
+              )
+            })}
+          </ol>
 
           <ul className="flex flex-wrap gap-1.5" data-testid="spec-board-sources">
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{record ? `${record.companyName} 기록 ${facts.length}줄` : '회사 고르지 않음'}</li>
@@ -297,7 +387,15 @@ export function SpecAiBoard({
               <JudgeSkillButton />
             </li>
           </ul>
-          {thin && (
+          <p className="t-meta break-keep text-slate-600" data-testid="spec-board-models" data-models={models.join(',')}>
+            지금 고른 모델 <b className="font-semibold text-slate-800">{choice ? prettyModel(choice.model) : '기본(Gemini 가장 싼 모델)'}</b> — 바꾸면 다음 단계부터 그 모델로 씁니다
+            {models.length > 0 && (
+              <>
+                {' · '}이 명세서를 쓴 모델 <b className="font-semibold text-slate-800">{models.map(prettyModel).join(' · ')}</b>
+              </>
+            )}
+          </p>
+          {thin && phase !== 'company' && (
             <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-board-thin">
               <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">
                 <TriangleAlert aria-hidden="true" className="mr-1 inline size-4 align-[-2px]" />
@@ -308,28 +406,152 @@ export function SpecAiBoard({
               </Button>
             </div>
           )}
-          {(d.judge.full ?? d.judge.parts) && <JudgeReportView report={d.judge.full ?? d.judge.parts} title={d.judge.full ? '자체점검 ② 명세서 전체' : '자체점검 ① 구성 · 권리축'} testId="spec-judge" />}
+          {(d.judge.full ?? d.judge.parts) && phase !== 'ideas' && <JudgeReportView report={d.judge.full ?? d.judge.parts} title={d.judge.full ? '자체점검 ② 명세서 전체' : '자체점검 ① 구성 · 권리축'} testId="spec-judge" />}
 
-          {finished ? (
+          {phase === 'company' && (
+            <div className="flex flex-col gap-2.5 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-3 py-3" data-testid="spec-gate-company">
+              <p className="t-sub break-keep text-warning-900">
+                <b className="font-semibold">AI 가 읽을 회사 이야기가 없어요.</b> 이대로 아이디어를 내면 어느 회사에나 맞는 지어낸 발명이 됩니다. 아래 둘 중 하나만 있으면 바로 시작해요.
+              </p>
+              <ul className="t-sub flex list-disc flex-col gap-0.5 pl-5 break-keep text-slate-800">
+                <li>업체 기록에 업종 · 종목 · 상담 메모(무엇을 팔고 · 어떻게 팔고 · 무엇이 불편한지)</li>
+                <li>자료 — 회사 소개서 · 제품 설명 · GPT 와 나눈 대화 · 기존 명세서(.hwpx · .hwp · .docx · .pdf · .txt)</li>
+              </ul>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button variant="primary" className="min-h-12" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-gate-file">
+                  <Upload aria-hidden="true" className="size-5" /> {reading || '자료 넣기'}
+                </Button>
+                {record ? (
+                  <Link to={`/ops/clients/${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex min-h-12 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50" data-testid="spec-gate-record">
+                    <PenLine aria-hidden="true" className="size-4" /> {record.companyName} 기록 채우기
+                  </Link>
+                ) : (
+                  <p className="t-meta self-center break-keep text-slate-600">회사를 고르지 않았어요 — 목록에서 회사를 골라 새로 만들면 그 회사 기록을 읽습니다.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {phase === 'ideas' && (
+            <div className="flex flex-col gap-2.5" data-testid="spec-plan-ideas">
+              {d.ideas.length === 0 ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Button variant="primary" className="min-h-12 sm:min-w-56" disabled={busy} onClick={ideasRun} data-testid="spec-ideas-run">
+                    {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Lightbulb aria-hidden="true" className="size-5" />} {busy ? '아이디어를 내는 중…' : '아이디어 5개 내줘'}
+                  </Button>
+                  <Button variant="secondary" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-file">
+                    <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <ul className="flex flex-col gap-2" role="radiogroup" aria-label="특허 아이디어 후보" data-testid="spec-plan-list">
+                    {d.ideas.map((p, i) => {
+                      const on = picked?.title === p.title
+                      return (
+                        <li key={`${p.title}-${i}`} className={`flex flex-col rounded-(--radius-control) border-2 ${on ? 'border-violet-500 bg-violet-50/70' : 'border-slate-200 bg-white'}`} data-testid="spec-plan-idea" data-rank={i + 1} data-picked={on ? 'yes' : 'no'} data-fresh={p.fresh ? 'yes' : 'no'}>
+                          <button type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => setPickTitle(p.title)} className="tap flex w-full min-w-0 items-start gap-2.5 px-3 pt-2.5 pb-1.5 text-left" data-testid="spec-plan-pick">
+                            <span aria-hidden="true" className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'border-violet-600 bg-violet-600' : 'border-slate-400 bg-white'}`}>
+                              {on && <span className="size-2 rounded-full bg-white" />}
+                            </span>
+                            <span className="flex min-w-0 flex-1 flex-col gap-1">
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className={`t-meta rounded-full px-2 py-0.5 font-bold ${i === 0 ? 'bg-violet-600 text-white' : i < 3 ? 'bg-violet-100 text-violet-900' : 'bg-slate-100 text-slate-600'}`}>{rankLabel(i)}</span>
+                                {p.score != null && <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{p.score}점</span>}
+                                {p.fresh && <span className="t-meta rounded-full bg-danger-600 px-2 py-0.5 font-bold text-white">새로 · 자체점검</span>}
+                              </span>
+                              <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{p.title}</span>
+                              {p.reason && <span className="t-sub break-keep text-violet-900">{i < 3 ? `${rankLabel(i)}인 이유 · ` : ''}{p.reason}</span>}
+                              {p.why && <span className="t-meta break-keep text-slate-600">회사 근거 · {clip(p.why, 180)}</span>}
+                            </span>
+                          </button>
+                          <details className="px-3 pb-2.5 pl-11">
+                            <summary className="tap t-meta cursor-pointer font-semibold text-slate-600">자세히 — 문제 · 기존 방식 · 차별 구조 · 흐름 · 권리화 포인트</summary>
+                            <dl className="t-meta mt-1 grid gap-0.5 break-keep text-slate-700">
+                              {p.titleEn && <dd className="[overflow-wrap:anywhere] text-slate-500">{p.titleEn}</dd>}
+                              <dd>① {p.idea.problem}</dd>
+                              <dd>② {p.idea.prior}</dd>
+                              <dd>③ {p.idea.distinct}</dd>
+                              {p.idea.flow && <dd>④ {p.idea.flow}</dd>}
+                              {p.idea.point && <dd>⑤ {p.idea.point}</dd>}
+                            </dl>
+                          </details>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <Button variant="primary" className="min-h-12" disabled={busy || !picked} onClick={chooseIdea} data-testid="spec-plan-start">
+                      이걸로 시작하자 <ArrowRight aria-hidden="true" className="size-5" />
+                    </Button>
+                    <Button variant="secondary" disabled={busy || d.ideas.length < 2} onClick={rankRun} data-testid="spec-plan-rank">
+                      <Gavel aria-hidden="true" className="size-4" /> 이 중 제일 좋은 게 뭐야?
+                    </Button>
+                    <Button variant="secondary" disabled={busy} onClick={moreRun} data-testid="spec-plan-more">
+                      <Sparkles aria-hidden="true" className="size-4" /> 자체점검으로 더 짜내기
+                    </Button>
+                    <Button variant="ghost" disabled={busy} onClick={ideasRun} data-testid="spec-ideas-run">
+                      5개 새로 내줘
+                    </Button>
+                  </div>
+                  <p className="t-meta break-keep text-slate-500">고른 것: <b className="font-semibold text-slate-700">{picked ? clip(picked.title, 60) : '—'}</b> · [이걸로 시작하자] 를 누르면 선행기술 조사 → 구성 → 자체점검 ① 까지 쓰고 다시 멈춥니다.</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {phase === 'parts' && !busy && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" data-testid="spec-plan-parts">
+              <Button variant="primary" className="min-h-12" onClick={() => partsRun()} data-testid="spec-plan-parts-run">
+                <Boxes aria-hidden="true" className="size-5" /> 이 아이디어로 구성 짜기
+              </Button>
+              <Button variant="ghost" onClick={goBackToIdeas} data-testid="spec-plan-back">
+                다른 아이디어로
+              </Button>
+            </div>
+          )}
+
+          {phase === 'review' && !busy && (
+            <div className="flex flex-col gap-2.5" data-testid="spec-plan-review">
+              <PartsReview d={d} />
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <Button variant="primary" className="min-h-12" onClick={bodyRun} data-testid="spec-plan-body">
+                  <FileText aria-hidden="true" className="size-5" /> 이 구성으로 본문 · 청구항 쓰기
+                </Button>
+                <Button variant="secondary" onClick={() => partsRun(true)} data-testid="spec-plan-parts-again">
+                  <Boxes aria-hidden="true" className="size-4" /> 구성 다시 짜기
+                </Button>
+                <Button variant="ghost" onClick={() => onEdit('parts')} data-testid="spec-plan-edit-parts">
+                  <PenLine aria-hidden="true" className="size-4" /> 구성 직접 고치기
+                </Button>
+                <Button variant="ghost" onClick={goBackToIdeas} data-testid="spec-plan-back">
+                  다른 아이디어로
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {phase === 'body' && !busy && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button variant="primary" className="min-h-12 sm:min-w-56" onClick={all} data-testid="spec-board-all">
+                <Sparkles aria-hidden="true" className="size-5" /> 이어서 끝까지 써줘
+              </Button>
+            </div>
+          )}
+
+          {finished && (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" data-testid="spec-board-finished">
-              <Button variant="primary" className="min-h-12" onClick={onDownload} data-testid="spec-board-done-download">
-                <Download aria-hidden="true" className="size-5" /> MD 내려받기(특허로에 붙일 글)
+              <Button variant="primary" className="min-h-12" onClick={() => downloadPlain(d)} data-testid="spec-board-done-download">
+                <Download aria-hidden="true" className="size-5" /> 전문 내려받기(.txt)
               </Button>
               <Button variant="secondary" disabled={packing} onClick={onPack} data-testid="spec-board-done-pack">
                 {packing ? '묶는 중…' : '제출 준비 묶음(ZIP)'}
               </Button>
+              <Button variant="ghost" onClick={onDownload} data-testid="spec-board-done-md">
+                MD 내려받기
+              </Button>
               <Button variant="ghost" disabled={busy} onClick={all} data-testid="spec-board-all">
                 <Sparkles aria-hidden="true" className="size-4" /> 빠진 곳 다시 써줘
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button variant="primary" className="min-h-12 sm:min-w-56" disabled={busy} onClick={all} data-testid="spec-board-all">
-                {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Sparkles aria-hidden="true" className="size-5" />}
-                {busy ? 'AI 가 쓰는 중…' : doneCards > 0 ? '이어서 끝까지 써줘' : '처음부터 끝까지 써줘'}
-              </Button>
-              <Button variant="secondary" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-file">
-                <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
               </Button>
             </div>
           )}
@@ -337,17 +559,18 @@ export function SpecAiBoard({
             void addFiles(e.target.files)
             e.target.value = ''
           }} data-testid="spec-board-file-input" />
-          <p className="t-meta break-keep text-slate-500">한 번에 4~5분쯤 · 직접 고치신 글은 덮지 않고 새 안으로 둡니다 · 이 내용이 고른 AI 회사로 갑니다(출원 전 발명).</p>
+          <p className="t-meta break-keep text-slate-500">절차마다 단추로 넘어갑니다 · 직접 고치신 글은 덮지 않고 새 안으로 둡니다 · 이 내용이 고른 AI 회사로 갑니다(출원 전 발명).</p>
 
           {stagesShown.length > 0 && (
             <ol className="flex flex-col gap-1 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2" data-testid="spec-board-rows" aria-live="polite">
               {stagesShown.map((k) => {
                 const r = run.stages[k]!
                 return (
-                  <li key={k} className="flex items-start gap-2" data-testid="spec-board-row" data-stage={k} data-phase={r.phase}>
+                  <li key={k} className="flex items-start gap-2" data-testid="spec-board-row" data-stage={k} data-phase={r.phase} data-model={r.model ?? ''}>
                     <PhaseIcon phase={r.phase} />
                     <p className="t-sub min-w-0 break-keep text-slate-800">
                       <b className="font-semibold">{stageOf(k).label}</b> <span className={PHASE_TONE[r.phase]}>· {r.text}</span>
+                      {r.model && <span className="t-meta ml-1.5 inline-block rounded bg-white px-1.5 font-semibold whitespace-nowrap text-slate-600 ring-1 ring-slate-200">{prettyModel(r.model)}</span>}
                     </p>
                   </li>
                 )
@@ -368,6 +591,8 @@ export function SpecAiBoard({
           )}
         </div>
       </Surface>
+
+      {(phase === 'done' || phase === 'body') && <SpecFullText d={d} />}
 
       <button
         type="button"
@@ -441,12 +666,44 @@ export function SpecAiBoard({
   )
 }
 
-const STAGE_ORDER: AgentStage[] = ['idea', 'research', 'parts', 'judge1', 'a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
+const STAGE_ORDER: AgentStage[] = ['idea', 'ideaRank', 'ideaMore', 'research', 'parts', 'judge1', 'a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
 const EDIT_STEP: Record<AgentCard, DraftStep> = { idea: 'idea', research: 'idea', parts: 'parts', body: 'body', claims: 'claims', judge: 'check', check: 'check' }
 
 const clip = (s: string, n: number) => {
   const t = s.replace(/\s+/g, ' ').trim()
   return t.length > n ? `${t.slice(0, n)}…` : t
+}
+
+/** D-269 구성 확인 — 조사 결론 · 시스템 · 구성요소 · 단계 · 연결관계(본문 · 청구항을 쓰기 전에 대표가 본다) */
+function PartsReview({ d }: { d: SpecDraft }) {
+  const comps = d.components.filter((c) => c.name.trim())
+  const steps = d.steps.filter((s) => s.text.trim())
+  const r = d.research
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="spec-review">
+      {r && (
+        <p className="t-sub break-keep text-slate-800">
+          <b className="font-semibold">선행기술 조사</b> · {r.headline || `메모 ${r.items.length}개`}{' '}
+          <span className={`t-meta rounded-full px-2 py-0.5 font-semibold whitespace-nowrap ${r.grounded ? 'bg-success-100 text-success-800' : 'bg-warning-100 text-warning-900'}`}>{r.grounded ? `검색 근거 ${r.sources.length}곳` : '검색 근거 없음 — KIPRIS 확인'}</span>
+        </p>
+      )}
+      <p className="t-sub font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{d.systemName || titleParts(d.title).system}(100)</p>
+      <ul className="flex flex-col gap-0.5" data-testid="spec-review-comps">
+        {comps.map((c) => (
+          <li key={c.no} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">
+            <b className="font-semibold">
+              {c.name}({c.no})
+            </b>{' '}
+            <span className="text-slate-600">— {clip(c.does, 90)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="t-meta break-keep text-slate-600">
+        방법 단계 {steps.length}개 · 종속항 씨앗 {d.seeds.length}개 · 도면 {d.figures.length}장
+      </p>
+      {d.axis.link && <p className="t-meta break-keep text-violet-900">경쟁사가 피하기 어려운 연결관계 · {d.axis.link}</p>}
+    </div>
+  )
 }
 
 function CardBody({ card, d, onPick, errs }: { card: AgentCard; d: SpecDraft; onPick: (p: IdeaPick) => void; errs: number }) {

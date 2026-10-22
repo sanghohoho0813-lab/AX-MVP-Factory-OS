@@ -601,12 +601,23 @@ async function d263Tests() {
   const specSys = sysOf(modelCall())
   check('DS2 명세서 쓰기 단추(청구항)에도 — 최종본 규칙 + 대표 정의', specSys.includes('대표정의표식') && specSys.includes('[최종본 규칙'), specSys.slice(0, 200))
   const other: string[] = []
-  for (const [assistId, page] of [['today.top3', 'today'], ['venture.market', 'venture'], ['spec.idea', 'patent']]) {
+  for (const [assistId, page] of [['today.top3', 'today'], ['venture.market', 'venture'], ['spec.research', 'patent']]) {
     calls = []
     await post({ requestId: rid(), assistId, page, context: CTX, skill: SKILL })
     if (sysOf(modelCall()).includes('대표정의표식')) other.push(assistId)
   }
-  check('DS3 다른 단추(오늘 · 시장조사 · 아이디어)에 붙여 보내도 버림', other.length === 0, other)
+  check('DS3 다른 단추(오늘 · 시장조사 · 선행기술 조사)에 붙여 보내도 버림', other.length === 0, other)
+  // D-269 대표: "악마 판사 스킬로 봤을 때 너무 뻔하지 않고 취지에 맞는 것" — 아이디어 내기 · 견주기 · 더 짜내기에는 대표 정의가 간다(최종본 규칙은 아님)
+  const ideaSeen: string[] = []
+  __resetAiAssistState()
+  for (const assistId of ['spec.idea', 'spec.ideaRank', 'spec.ideaMore']) {
+    calls = []
+    await post({ requestId: rid(), assistId, page: 'patent', context: CTX, skill: SKILL })
+    const sys = sysOf(modelCall())
+    if (sys.includes('대표정의표식') && sys.includes('[자체점검 — 특허 아이디어 후보]') && !sys.includes('[최종본 규칙')) ideaSeen.push(assistId)
+  }
+  check('DS3b 아이디어 · 견주기 · 더 짜내기 — 아이디어 자체점검 기준 + 대표 정의(최종본 규칙 없음)', ideaSeen.length === 3, ideaSeen)
+  __resetAiAssistState()
   calls = []
   await post({ requestId: rid(), assistId: 'venture.judge', page: 'venture', context: CTX, skill: 'ㄱ'.repeat(8000) + '꼬리표식' })
   check('DS4 대표 정의는 8,000자까지만', !sysOf(modelCall()).includes('꼬리표식') && sysOf(modelCall()).includes('ㄱㄱㄱ'))
@@ -692,6 +703,8 @@ async function d263Tests() {
 async function kbContractTests() {
   const WANT: Record<string, string> = {
     'spec.idea': 'patent_idea',
+    'spec.ideaRank': 'patent_idea',
+    'spec.ideaMore': 'patent_idea',
     'spec.research': 'patent_research',
     'spec.parts': 'patent_spec+patent_samples',
     'spec.a': 'patent_spec+patent_samples',

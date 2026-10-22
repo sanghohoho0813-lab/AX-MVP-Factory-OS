@@ -13,7 +13,7 @@
  */
 import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, PACKS, RADAR_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
 import { CONFIDENTIAL_RULES, guardOutput, scrubBrand, scrubBrandDeep, secretIndex } from './_ai/guard.js'
-import { PATENT_JUDGE, VENTURE_JUDGE } from './_ai/judge.js'
+import { IDEA_JUDGE, PATENT_JUDGE, VENTURE_JUDGE } from './_ai/judge.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
 import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
@@ -80,6 +80,8 @@ const secrets = () =>
     ...VIDEO_RULES,
     ...VENTURE_JUDGE,
     ...PATENT_JUDGE,
+    ...IDEA_JUDGE.patent,
+    ...IDEA_JUDGE.venture,
     ...Object.values(ASSISTS).flatMap((a) => a.instruction),
   ]))
 
@@ -90,7 +92,7 @@ async function runOnce(assist, choice, body, role, video = null) {
   const context = scrubBrandDeep(scrubDeep(body.context || {}))
   const ask = typeof body.ask === 'string' ? scrubBrand(scrubText(body.ask)).slice(0, 500) : ''
   // D-263 대표가 붙여 넣은 점검 기준 — 자체점검 · 명세서/사업계획서 쓰기 단추에만(다른 단추는 버림)
-  const skill = (assist.judge || assist.final) && typeof body.skill === 'string' ? scrubBrand(scrubText(body.skill)).slice(0, SKILL_MAX) : ''
+  const skill = (assist.judge || assist.final || assist.ideaJudge) && typeof body.skill === 'string' ? scrubBrand(scrubText(body.skill)).slice(0, SKILL_MAX) : ''
   // D-263 대화 단추 — 물어본 말로 기준 문서 장 고르기(물어본 말에 주제가 없으면 앞선 대화 끝부분으로 · 화면 제목은 늘 '특허 · 벤처' 라 쓰지 않음)
   const prev = Array.isArray(context.sections) ? context.sections.find((x) => /앞선\s*대화/.test(String(x?.name ?? ''))) : null
   const topicText = !assist.topicKb ? '' : topicPacks(ask).length ? ask : JSON.stringify(prev?.rows ?? '').slice(-2000)

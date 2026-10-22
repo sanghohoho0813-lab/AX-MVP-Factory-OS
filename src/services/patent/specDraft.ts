@@ -130,6 +130,12 @@ export interface IdeaPick {
   /** 왜 이 회사에 맞는지 */
   why: string
   idea: SpecIdea
+  /** D-269 추천 점수(0~100 · AI 가 매김 · 없으면 순서대로) */
+  score?: number
+  /** D-269 이 순위인 이유(다른 후보와 견줘서 한 줄) */
+  reason?: string
+  /** D-269 [자체점검으로 더 짜내기] 로 새로 나온 것 */
+  fresh?: boolean
 }
 
 /** D-252 선행기술 조사 메모(조사해줘) — 검색 근거가 붙었는지 · 출처 */
@@ -223,11 +229,18 @@ function readIdeas(v: unknown): IdeaPick[] {
     .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
     .map((x) => {
       const i = (x.idea && typeof x.idea === 'object' ? x.idea : {}) as Record<string, unknown>
-      return { title: str(x.title), titleEn: str(x.titleEn), why: str(x.why), idea: { problem: str(i.problem), prior: str(i.prior), distinct: str(i.distinct), flow: str(i.flow), point: str(i.point) } }
+      const pick: IdeaPick = { title: str(x.title), titleEn: str(x.titleEn), why: str(x.why), idea: { problem: str(i.problem), prior: str(i.prior), distinct: str(i.distinct), flow: str(i.flow), point: str(i.point) } }
+      if (typeof x.score === 'number' && Number.isFinite(x.score)) pick.score = x.score
+      if (str(x.reason)) pick.reason = str(x.reason)
+      if (x.fresh === true) pick.fresh = true
+      return pick
     })
     .filter((x) => x.title.trim())
-    .slice(0, 6)
+    .slice(0, IDEA_MAX)
 }
+
+/** D-269 아이디어 후보는 처음 5개 + [더 짜내기] 로 늘어난 것까지 */
+export const IDEA_MAX = 9
 
 function readResearch(v: unknown): SpecResearch | null {
   if (!v || typeof v !== 'object') return null
@@ -639,6 +652,96 @@ export function specMarkdown(d: SpecDraft, opts: { notice?: boolean } = {}): str
 }
 
 /* ------------------------------------------------------------------ */
+/* D-269 전문 · 나눠서 보기 — 특허로 명세서 작성기에 붙일 평문                     */
+/* 대표가 보여 준 출원 명세서(HWPX) 모양: 【식별항목】 줄 · 문단은 한 줄 · 명칭은 한글{영문} 한 줄 ·      */
+/* 굵게 · 제목(#) · 가로선 · 글머리표 없음 · 청구항은 '있어서,' 와 구성(;)마다 줄 · 부호는 '100 : 이름'   */
+/* ------------------------------------------------------------------ */
+
+/** 평문 문단들 — 굵게 · 제목 · 가로선 · 글머리표 · 문단 번호를 지운다 */
+export function plainParas(text: string): string[] {
+  return splitParas(cleanAiText(text))
+    .map((p) => p.replace(/^[-*•]\s+/, '').replace(/\*\*|__/g, '').trim())
+    .filter((p) => p && !/^(?:-{3,}|\*{3,}|_{3,}|={3,})$/.test(p))
+}
+
+/** 청구항 하나 → 출원서 줄 — "청구항 1에 있어서," 한 줄 · 구성마다 ';' 에서 줄("; 및" 은 앞 줄 끝에) · "를 포함하는 …" 끝 줄 */
+export function claimPlainLines(claim: string): string[] {
+  const t = cleanAiText(claim)
+    .replace(/^\s*(?:[【[]\s*청구항\s*\d+\s*[】\]]|청구항\s*\d+\s*[.:)])\s*/, '')
+    .replace(/\*\*|__/g, '')
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (!t) return []
+  const out: string[] = []
+  let rest = t
+  const lead = /^(.{2,160}?에 있어서,)\s*/.exec(rest)
+  if (lead) {
+    out.push(lead[1])
+    rest = rest.slice(lead[0].length)
+  }
+  for (const piece of rest.replace(/;\s*/g, ';\n').split('\n')) {
+    const p = piece.trim()
+    if (!p) continue
+    const and = /^및\s+(.+)$/.exec(p)
+    if (and && out.length && out[out.length - 1].endsWith(';')) {
+      out[out.length - 1] += ' 및'
+      out.push(and[1])
+    } else out.push(p)
+  }
+  return out
+}
+
+export interface PlainSection {
+  /** title · field · … · signs · claim1 … · abstract · rep */
+  key: string
+  /** 특허로 식별항목 이름 */
+  label: string
+  text: string
+}
+
+/**
+ * 나눠서 보기 — 특허로 식별항목마다 붙일 글. 문단 번호([0001])는 넣지 않는다 — 대표가 보여 준 출원 명세서에 없고,
+ * 특허로 작성기가 문단마다 스스로 붙인다(MD 내려받기의 '문단 번호' 설정과는 따로).
+ */
+export function specPlainSections(d: SpecDraft): PlainSection[] {
+  const body = (k: SectionKey) => plainParas(sectionOf(d, k)).join('\n')
+  const out: PlainSection[] = [
+    { key: 'title', label: '발명의 명칭', text: titleLine(d) },
+    { key: 'field', label: '기술분야', text: body('field') },
+    { key: 'background', label: '발명의 배경이 되는 기술', text: body('background') },
+    { key: 'problem', label: '해결하고자 하는 과제', text: body('problem') },
+    { key: 'solution', label: '과제의 해결 수단', text: body('solution') },
+    { key: 'effect', label: '발명의 효과', text: body('effect') },
+  ]
+  if (d.figures.length) out.push({ key: 'figures', label: '도면의 간단한 설명', text: drawingDescLines(d).join('\n') })
+  out.push({ key: 'detail', label: '발명을 실시하기 위한 구체적인 내용', text: body('detail') })
+  out.push({ key: 'signs', label: '부호의 설명', text: signLines(d).map((l) => l.replace(/^(\S+?)\s*:\s*/, '$1 : ')).join('\n') })
+  claimsOf(d).forEach((c, i) => out.push({ key: `claim${i + 1}`, label: `청구항 ${i + 1}`, text: claimPlainLines(c).join('\n') }))
+  out.push({ key: 'abstract', label: '요약', text: plainParas(sectionOf(d, 'abstract')).join('\n') })
+  if (d.figures.length) out.push({ key: 'rep', label: '대표도', text: `도 ${Math.min(Math.max(1, d.repFig), d.figures.length)}` })
+  return out
+}
+
+/** 전문 — 식별항목 줄까지 한 덩어리(대표가 보여 준 출원 명세서와 같은 차례) */
+export function specPlainText(d: SpecDraft): string {
+  const s = specPlainSections(d)
+  const get = (k: string) => s.find((x) => x.key === k)?.text ?? ''
+  const out: string[] = ['【발명의 설명】', '【발명의 명칭】', get('title'), '【기술분야】', get('field'), '【발명의 배경이 되는 기술】', get('background'), '【발명의 내용】']
+  out.push('【해결하고자 하는 과제】', get('problem'), '【과제의 해결 수단】', get('solution'), '【발명의 효과】', get('effect'))
+  if (d.figures.length) out.push('【도면의 간단한 설명】', get('figures'))
+  out.push('【발명을 실시하기 위한 구체적인 내용】', get('detail'), '【부호의 설명】', get('signs'), '【청구범위】')
+  const claims = s.filter((x) => /^claim\d+$/.test(x.key))
+  claims.forEach((c, i) => out.push(`【${c.label}】`, c.text, ...(i < claims.length - 1 ? [''] : [])))
+  out.push('【요약서】', '【요약】', get('abstract'))
+  if (d.figures.length) {
+    out.push('【대표도】', get('rep'), '【도면】')
+    for (const f of d.figures) out.push(`【도 ${f.n}】`, '')
+  }
+  return out.filter((x, i) => x !== '' || out[i - 1] !== '').join('\n').replace(/\n+$/, '') + '\n'
+}
+
+/* ------------------------------------------------------------------ */
 /* 진행 · 연결 점검(규칙)                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -767,6 +870,9 @@ export function cleanAiText(t: string): string {
     .replace(/\r\n?/g, '\n')
     .replace(/^#+\s*/gm, '')
     .replace(/\*\*(.+?)\*\*/g, '$1')
+    // D-269 특허로에 붙이면 걸리는 것 — 가로선 줄 · __굵게__
+    .replace(/^[ \t]*(?:-{3,}|\*{3,}|_{3,}|={3,})[ \t]*$/gm, '')
+    .replace(/__(.+?)__/g, '$1')
     .replace(/^[ \t]*(?:\[\d{4}\]|【\d{4}】)[ \t]*/gm, '')
     .replace(/^[ \t]*[【[](?:청구항\s*\d+|기술분야|요약)[】\]][ \t]*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
