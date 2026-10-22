@@ -168,13 +168,13 @@ export interface AssistVideo {
   end: number
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo }): Promise<AssistRun> {
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string }): Promise<AssistRun> {
   let res: Response
   try {
     res = await fetch(ASSIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}) }),
+      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}) }),
     })
   } catch {
     throw new AssistError('network', MESSAGE.network)

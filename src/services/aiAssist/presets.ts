@@ -71,11 +71,14 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'venture.g2', page: 'venture', label: '벤처 사업계획서 — 시장진입 경과 · 3년 계획', kind: 'write', hint: '[2] 3' },
   { id: 'venture.x', page: 'venture', label: '벤처 사업계획서 — 기업가정신 · 자금운용', kind: 'write', hint: '[1] 4 · [2] 5' },
   { id: 'venture.sum', page: 'venture', label: '벤처 사업계획서 — 요약 · 핵심 요약', kind: 'write', hint: '기술명 · 요약 · 핵심 요약 7칸' },
+  { id: 'venture.market', page: 'venture', label: '벤처 사업계획서 — 시장조사(TAM · SAM · SOM)', kind: 'list', hint: '요약 전에 반드시 — 전체 · 유효 · 3년 확보 시장' },
+  { id: 'venture.judge', page: 'venture', label: '벤처 사업계획서 — 악마판사', kind: 'write', hint: '요약 뒤 · 본문 뒤 — 점수 · P0 · 직접 고침' },
   // D-252 AI 가 다 쓰는 명세서 — 명세서 작업판의 칸 단추가 부른다(띠 · 판 단추에는 없음 · 서버가 Master v2.9 기준 문서를 붙임)
   { id: 'spec.idea', page: 'patent', label: '명세서 — 아이디어 내줘', kind: 'write', hint: '회사 기록 · 재료로 아이디어 3개' },
   { id: 'spec.research', page: 'patent', label: '명세서 — 선행기술 조사해줘', kind: 'list', hint: '검색어 · 비슷한 기술 · 차별화' },
   { id: 'spec.parts', page: 'patent', label: '명세서 — 권리축 · 구성 · 단계 써줘', kind: 'write', hint: '권리축 7줄 · 구성요소 · 단계 · 종속항' },
   { id: 'spec.fix', page: 'patent', label: '명세서 — 점검대로 고쳐줘', kind: 'write', hint: '걸린 칸만 다시' },
+  { id: 'spec.judge', page: 'patent', label: '명세서 — 악마판사', kind: 'write', hint: '구성 뒤 · 청구항 뒤 — 점수 · P0 · 직접 고침' },
   // D-247 특허 명세서 — 특허·MVP › 명세서 쓰기의 [AI 초안] 이 차례로 부른다(띠 · 판 단추에는 없음)
   { id: 'spec.a', page: 'patent', label: '명세서 — 기술분야 · 배경 · 과제 · 효과', kind: 'write', hint: '앞부분 네 칸' },
   { id: 'spec.b', page: 'patent', label: '명세서 — 과제의 해결 수단 · 요약', kind: 'write', hint: '해결 수단 · 요약 400자' },

@@ -8,9 +8,11 @@
  * D-261 대표: "버튼 한 번만 눌러도 처음부터 끝까지 · 너무 뭐가 많아". 새 명세서는 만들자마자 [전부 써줘] 가 저절로(autoStart) —
  *   회사 기록 · AI 작업실 자료를 다 읽은 뒤 시작한다. 맨 위 한 칸에 진행 → 다 쓰면 명칭 · 청구항 · 내려받기.
  *   칸 여섯(고르기 · 칸별 다시 쓰기 · 직접 고치기)은 [칸별로 보기] 안으로 접었다(지운 것 없음).
+ * D-263 대표: "악마판사 스킬은 명세서에도 항상 중간중간 들어가야 해. 반드시." — 구성 뒤(①) · 청구항 뒤(②)에 악마판사 단계가 저절로.
+ *   판사가 직접 고친 칸 · 점수 · P0 · 대표 확인을 맨 위 상자에 보여 주고, [악마판사 기준] 에서 대표 정의를 붙여 넣는다.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Gavel, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
@@ -18,8 +20,9 @@ import { canExtractText, extractTextFromFile } from '../../services/docTextExtra
 import { safeText, personNames, wonText } from '../../services/aiAssist/context'
 import { parseSpecFile } from '../../services/patent/specParse'
 import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, claimsOf, figureSubject, titleLine, type DraftStep, type IdeaPick, type SpecDraft } from '../../services/patent/specDraft'
-import { CARD_STAGES, applyIdea, cardState, clearAfterIdea, hasLaterWork, partsHuman, planAll, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage } from '../../services/patent/specAgent'
+import { CARD_STAGES, applyIdea, bodyWritten, cardState, clearAfterIdea, hasLaterWork, partsHuman, planAll, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage } from '../../services/patent/specAgent'
 import { specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
+import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { clientFacts } from '../../tools/shared/clientPrefill'
 import { useOwnerAiRepo } from '../ownerAi/shared'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -56,10 +59,11 @@ const CARD_META: Record<AgentCard, { n: number; title: string; icon: ReactNode; 
   parts: { n: 3, title: '구성 · 단계 · 도면', icon: <Boxes aria-hidden="true" className="size-5" />, run: '구성 써줘', again: '다시 써줘', help: '권리축 7줄 · 구성요소(부호 110~) · 방법 단계 · 종속항 씨앗. 도면 설명은 구성에서 자동으로.' },
   body: { n: 4, title: '본문 7칸', icon: <FileText aria-hidden="true" className="size-5" />, run: '본문 써줘', again: '본문 다시', help: '기술분야 · 배경 · 과제 · 해결 수단 · 효과 · 구체적인 내용 · 요약 — 네 번에 나눠 씁니다.' },
   claims: { n: 5, title: '청구항', icon: <BookOpenCheck aria-hidden="true" className="size-5" />, run: '청구항 써줘', again: '청구항 다시', help: '시스템 독립항 · 종속항 · 방법 독립항. 조사에서 나온 차별화를 독립항에 넣습니다.' },
-  check: { n: 6, title: '점검 · 내보내기', icon: <ShieldCheck aria-hidden="true" className="size-5" />, run: '점검대로 고쳐줘', again: '한 번 더 고쳐줘', help: '특허로 편집기 기준 점검(규칙 계산) → 걸린 글만 AI 가 고칩니다. 다 되면 MD · 제출 묶음을 받으세요.' },
+  judge: { n: 6, title: '악마판사', icon: <Gavel aria-hidden="true" className="size-5" />, run: '악마판사 불러줘', again: '다시 판정', help: '심사관 · 경쟁사 변리사 눈으로 공격하고(악마) 100점으로 판정합니다(판사). 고칠 수 있는 약점은 판사가 직접 고쳐 넣고, 구성 뒤 · 청구항 뒤에 저절로 들어갑니다.' },
+  check: { n: 7, title: '점검 · 내보내기', icon: <ShieldCheck aria-hidden="true" className="size-5" />, run: '점검대로 고쳐줘', again: '한 번 더 고쳐줘', help: '특허로 편집기 기준 점검(규칙 계산) → 걸린 글만 AI 가 고칩니다. 다 되면 MD · 제출 묶음을 받으세요.' },
 }
 
-const CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'check']
+const CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'judge', 'check']
 
 const PHASE_TONE: Record<StageRow['phase'], string> = { wait: 'text-slate-500', run: 'text-violet-800', done: 'text-success-700', fail: 'text-danger-700', skip: 'text-slate-600' }
 
@@ -168,7 +172,8 @@ export function SpecAiBoard({
   }
   const runCard = (card: AgentCard) => {
     if (card === 'parts' && partsHuman(d) && !window.confirm('직접 고치신 구성요소 · 단계가 있습니다. AI 가 새로 써서 바꿀까요? (바꾼 뒤 되돌리기로 살릴 수 있어요)')) return
-    start(CARD_STAGES[card], card === 'parts')
+    // 판사 카드 — 본문 · 청구항이 있으면 ② 만(① 이 구성 이름을 바꾸면 본문과 어긋남), 없으면 ①
+    start(card === 'judge' ? [bodyWritten(d) ? 'judge2' : 'judge1'] : CARD_STAGES[card], card === 'parts')
   }
 
   const pickIdea = (pick: IdeaPick) => {
@@ -258,7 +263,7 @@ export function SpecAiBoard({
                   </>
                 ) : (
                   <>
-                    단추 하나면 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(<b className="font-semibold">미래AI랩 기준 문서</b>대로). 타자 칠 칸은 없어요.
+                    단추 하나면 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검까지 다 씁니다(<b className="font-semibold">미래AI랩 기준 문서</b>대로 · 중간중간 <b className="font-semibold">악마판사</b>가 판정하고 고침). 타자 칠 칸은 없어요.
                   </>
                 )}
               </p>
@@ -269,7 +274,11 @@ export function SpecAiBoard({
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{record ? `${record.companyName} 기록 ${facts.length}줄` : '회사 고르지 않음'}</li>
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">AI 작업실 자료 {caseMats.length}개</li>
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700" data-testid="spec-board-mats">올린 자료 {d.materials.length}개</li>
+            <li className="ml-auto">
+              <JudgeSkillButton />
+            </li>
           </ul>
+          {(d.judge.full ?? d.judge.parts) && <JudgeReportView report={d.judge.full ?? d.judge.parts} title={d.judge.full ? '악마판사 ② 명세서 전체' : '악마판사 ① 구성 · 권리축'} testId="spec-judge" />}
 
           {finished ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" data-testid="spec-board-finished">
@@ -339,7 +348,7 @@ export function SpecAiBoard({
       >
         <span className="min-w-0 break-keep">칸별로 보기 · 다른 아이디어 고르기 · 칸만 다시 쓰기</span>
         <span className="t-meta shrink-0 text-slate-500">
-          {doneCards}/6 {showCards ? '▲' : '▼'}
+          {doneCards}/{CARDS.length} {showCards ? '▲' : '▼'}
         </span>
       </button>
 
@@ -402,8 +411,8 @@ export function SpecAiBoard({
   )
 }
 
-const STAGE_ORDER: AgentStage[] = ['idea', 'research', 'parts', 'a', 'b', 'c', 'd', 'e', 'fix']
-const EDIT_STEP: Record<AgentCard, DraftStep> = { idea: 'idea', research: 'idea', parts: 'parts', body: 'body', claims: 'claims', check: 'check' }
+const STAGE_ORDER: AgentStage[] = ['idea', 'research', 'parts', 'judge1', 'a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
+const EDIT_STEP: Record<AgentCard, DraftStep> = { idea: 'idea', research: 'idea', parts: 'parts', body: 'body', claims: 'claims', judge: 'check', check: 'check' }
 
 const clip = (s: string, n: number) => {
   const t = s.replace(/\s+/g, ' ').trim()
@@ -510,6 +519,15 @@ function CardBody({ card, d, onPick, errs }: { card: AgentCard; d: SpecDraft; on
           <p className="t-meta break-keep text-slate-600">
             단계 {d.steps.filter((s) => s.text.trim()).length}개 · 종속항 씨앗 {d.seeds.length}개 · 도면 {d.figures.length}장({d.figures.slice(0, 2).map((f) => `도 ${f.n} ${clip(figureSubject(d, f), 24)}`).join(' · ')}…)
           </p>
+        </div>
+      )
+    }
+    case 'judge': {
+      if (!d.judge.parts && !d.judge.full) return <p className="t-sub break-keep text-slate-600">구성을 쓰면 ①, 청구항까지 쓰면 ② 가 저절로 판정합니다 — 지금 바로 부르려면 [악마판사 불러줘].</p>
+      return (
+        <div className="flex flex-col gap-2" data-testid="spec-board-judge">
+          <JudgeReportView report={d.judge.parts} title="① 구성 · 권리축" testId="spec-judge-parts" />
+          <JudgeReportView report={d.judge.full} title="② 명세서 전체" testId="spec-judge-full" />
         </div>
       )
     }

@@ -5,13 +5,17 @@
  */
 import handler, { __resetAiAssistState } from '../../../api/ai-assist.js'
 import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
-import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, RADAR_RULES, assistSystem, buildAssistPrompt } from '../../../api/_ai/assists.js'
+import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, RADAR_RULES, assistSystem, buildAssistPrompt, knowledgeOf, topicPacks } from '../../../api/_ai/assists.js'
+import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
+import { SPEC_SAMPLES, SPEC_SAMPLES_META } from '../../../api/_ai/specSamples.js'
 import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, tierOf } from '../../../api/_ai/providers.js'
 import { aiConfig, scrubText, validate } from '../../../api/_ai/core.js'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
 import { AssistError, callAssist } from '../aiAssist/client'
+import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
+import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
 import type { AssistRun, AssistStatus } from '../aiAssist/client'
 import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
@@ -573,8 +577,186 @@ function d241Tests() {
   check('B2 내 콘텐츠 대본 칸 — 저장 · 2만 자에서 자름 · 예전 줄은 빈 대본', big.script.length === SCRIPT_MAX && (normalizeIdea({ ...ideaFromOpportunity(opp), savedAt: '2026-10-18T00:00:00Z' }, 'idea_4') as ContentIdea).script === '')
 }
 
+/* ------------------------------------------------------------------ */
+/* D-263 악마판사 대표 정의 · 다시 부르기                                  */
+/* ------------------------------------------------------------------ */
+
+async function d263Tests() {
+  const SKILL = '/악마판사 — 대표정의표식: 심사관처럼 공격하고 점수로 판정 · 010-9999-8888 에게 확인'
+  const sysOf = (c?: Call) => (!c ? '' : JSON.stringify(c.url.includes(':generateContent') ? c.body.systemInstruction : c.url.includes('/messages') ? c.body.system : c.body.messages))
+  const modelCall = () => calls.find((c) => /chat\/completions|:generateContent|\/messages/.test(c.url))
+  setEnv({ OPENAI_API_KEY: O_KEY, AI_OPENAI_BASE_URL: 'https://api.openai.test/v1' })
+  const seen: string[] = []
+  for (const choice of [{ provider: 'openai', model: 'gpt-5.4-mini' }, { provider: 'gemini', model: 'gemini-3.1-flash-lite' }, { provider: 'anthropic', model: 'claude-haiku-5-5' }]) {
+    calls = []
+    const r = await post({ requestId: rid(), assistId: 'venture.judge', page: 'venture', choice, context: CTX, skill: SKILL })
+    const sys = sysOf(modelCall())
+    if (r.statusCode === 200 && sys.includes('대표정의표식') && sys.includes('[악마판사 — 벤처기업확인 사업계획서]') && !sys.includes('9999-8888')) seen.push(choice.provider)
+  }
+  check('DS1 대표가 붙여 넣은 /악마판사 — GPT · Gemini · Claude 어느 것을 골라도 판사 지시문에 그대로(설명 없이) · 전화번호는 지움', seen.join() === 'openai,gemini,anthropic', seen)
+  calls = []
+  await post({ requestId: rid(), assistId: 'spec.e', page: 'patent', choice: { provider: 'openai', model: 'gpt-5.4-mini' }, context: CTX, skill: SKILL })
+  const specSys = sysOf(modelCall())
+  check('DS2 명세서 쓰기 단추(청구항)에도 — 최종본 규칙 + 대표 정의', specSys.includes('대표정의표식') && specSys.includes('[최종본 규칙'), specSys.slice(0, 200))
+  const other: string[] = []
+  for (const [assistId, page] of [['today.top3', 'today'], ['venture.market', 'venture'], ['spec.idea', 'patent']]) {
+    calls = []
+    await post({ requestId: rid(), assistId, page, context: CTX, skill: SKILL })
+    if (sysOf(modelCall()).includes('대표정의표식')) other.push(assistId)
+  }
+  check('DS3 다른 단추(오늘 · 시장조사 · 아이디어)에 붙여 보내도 버림', other.length === 0, other)
+  calls = []
+  await post({ requestId: rid(), assistId: 'venture.judge', page: 'venture', context: CTX, skill: 'ㄱ'.repeat(8000) + '꼬리표식' })
+  check('DS4 대표 정의는 8,000자까지만', !sysOf(modelCall()).includes('꼬리표식') && sysOf(modelCall()).includes('ㄱㄱㄱ'))
+
+  // 화면 쪽 — 정의 저장 · 다른 기기에서 읽기 · 서버로 같이 보내기(가짜 서버 답에 JSON 머리줄을 붙여 화면 함수가 읽게)
+  setEnv()
+  const baseFetch = globalThis.fetch
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    const r = await baseFetch(input as never, init as never)
+    if (!String(input).includes('/api/ai-assist')) return r
+    const t = await r.text()
+    return new Response(t, { status: r.status, headers: /^\s*[{[]/.test(t) ? { 'content-type': 'application/json' } : {} })
+  }) as typeof fetch
+  __resetJudgeSkill()
+  check('DS5 처음엔 대표 정의 없음(기본 악마판사)', readJudgeSkill() === '')
+  const saved = await saveJudgeSkill(null, '  /악마판사 정의\r\n둘째 줄  ')
+  check('DS6 저장 — 줄바꿈 정리 · 앞뒤 빈칸 지움 · 모듈 기록에도 올라감', saved && readJudgeSkill() === '/악마판사 정의\n둘째 줄')
+  __resetJudgeSkill()
+  check('DS7 다른 기기(이 브라우저 기억 없음)에서도 모듈 기록으로 같은 정의', (await syncJudgeSkill(null)) === '/악마판사 정의\n둘째 줄')
+  calls = []
+  reply = () => ({ status: 200, body: { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [] } } } })
+  await callAssist({ requestId: rid(), assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never, skill: readJudgeSkill() })
+  check('DS8 화면이 부를 때 정의를 같이 보냄(skill)', calls[0]?.body.skill === '/악마판사 정의\n둘째 줄', calls[0]?.body)
+  await saveJudgeSkill(null, '')
+  __resetJudgeSkill()
+  check('DS9 지우면 다시 기본', (await syncJudgeSkill(null)) === '')
+
+  // 다시 부르기 — 답 모양 어긋남 · 잠깐 끊김 · 많이 부름
+  __setRetryTimes(0, 0)
+  const good = { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [{ title: 'score', amount: '91' }] } } }
+  const empty = { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [] } } }
+  const parse = (run: { structured?: { items?: unknown[] } | null }) => (run.structured?.items?.length ? run.structured : null)
+  const seq = (list: { status: number; body: unknown }[]) => {
+    let i = 0
+    reply = () => list[Math.min(i++, list.length - 1)]
+  }
+  const whys: string[] = []
+  calls = []
+  seq([{ status: 200, body: empty }, { status: 200, body: good }])
+  const r1 = await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: '이름표 score · verdict 로', missMessage: '못 읽음', onRetry: (w) => whys.push(w) })
+  check('DR1 답 모양이 어긋나면 이름표를 알려 주고(ask) 다시 — 두 번째에 읽음', !!r1.value && whys.join() === 'parse' && calls.length === 2 && calls[1].body.ask === '이름표 score · verdict 로' && !calls[0].body.ask, calls.map((c) => c.body.ask))
+  whys.length = 0
+  calls = []
+  seq([{ status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 200, body: good }])
+  await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
+  check('DR2 잠깐 끊김(504) → 쉬었다 다시 · 같은 요청 번호 아님', whys.join() === 'transient' && calls.length === 2 && calls[0].body.requestId !== calls[1].body.requestId)
+  whys.length = 0
+  calls = []
+  seq([{ status: 429, body: JSON.stringify({ ok: false, code: 'rate_limited' }) }])
+  let code = ''
+  try {
+    await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
+  } catch (e) {
+    code = e instanceof AssistError ? e.code : 'other'
+  }
+  check('DR3 많이 불렀음(429) → 1분 쉬고 한 번만 더 · 또 그러면 멈춤', code === 'rate_limited' && whys.join() === 'rate' && calls.length === 2, { code, whys, n: calls.length })
+  calls = []
+  seq([{ status: 200, body: empty }])
+  let miss = ''
+  try {
+    await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: '판정을 읽지 못했습니다', tries: 3 })
+  } catch (e) {
+    miss = e instanceof AssistError ? `${e.code}:${e.message}` : 'other'
+  }
+  check('DR4 세 번 다 어긋나면 멈추고 알림(parse_miss)', miss === 'parse_miss:판정을 읽지 못했습니다' && calls.length === 3, miss)
+  calls = []
+  seq([{ status: 401, body: 'Unauthorized' }])
+  let c401 = ''
+  try {
+    await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm' })
+  } catch (e) {
+    c401 = e instanceof AssistError ? e.code : 'other'
+  }
+  check('DR5 로그인 문제 같은 것은 다시 부르지 않음', !!c401 && c401 !== 'parse_miss' && calls.length === 1, { c401, n: calls.length })
+  globalThis.fetch = baseFetch
+  setEnv()
+}
+
+/* ------------------------------------------------------------------ */
+/* D-263 계약 — 특허 · 벤처 · 기업인증 AI 단추마다 무엇이 같이 가나          */
+/* ------------------------------------------------------------------ */
+
+async function kbContractTests() {
+  const WANT: Record<string, string> = {
+    'spec.idea': 'patent_idea',
+    'spec.research': 'patent_research',
+    'spec.parts': 'patent_spec+patent_samples',
+    'spec.a': 'patent_spec+patent_samples',
+    'spec.b': 'patent_spec+patent_samples',
+    'spec.c': 'patent_spec+patent_samples',
+    'spec.d': 'patent_spec+patent_samples',
+    'spec.e': 'patent_spec+patent_samples',
+    'spec.fix': 'patent_format+patent_spec+patent_samples',
+    'spec.judge': 'patent_spec+patent_format+patent_samples',
+    'venture.market': 'venture_plan',
+    'venture.sum': 'venture_plan',
+    'venture.p1': 'venture_plan',
+    'venture.p2': 'venture_plan',
+    'venture.g1': 'venture_plan',
+    'venture.g2': 'venture_plan',
+    'venture.x': 'venture_plan',
+    'venture.judge': 'venture_plan',
+    'cert.say': 'inspection',
+    'cert.reply': '',
+  }
+  const list = Object.values(ASSISTS) as { id: string; page: string }[]
+  const ours = list.filter((a) => ['patent', 'venture', 'cert'].includes(a.page) && !['pv.chat', 'cert.chat'].includes(a.id))
+  const wrong = ours.filter((a) => knowledgeOf(a).map((k: { key: string }) => k.key).join('+') !== (WANT[a.id] ?? 'missing')).map((a) => `${a.id}:${knowledgeOf(a).map((k: { key: string }) => k.key).join('+')}`)
+  check(`KB1 특허 · 벤처 · 기업인증 단추 ${ours.length}개 — 단추마다 맞는 기준 문서 장(아이디어 · 조사 · 명세서 · 형식 · 샘플 · 벤처 · 실사)`, wrong.length === 0 && ours.length === Object.keys(WANT).length, wrong)
+  const missing: string[] = []
+  for (const a of ours) for (const k of knowledgeOf(a)) {
+    const head = (k.text as string).slice(0, 300)
+    if (!assistSystem(a).includes(head)) missing.push(`${a.id}/${k.key}`)
+  }
+  check('KB2 기준 문서 글이 실제로 지시문 안에 들어감(장마다 앞 300자 대조)', missing.length === 0, missing)
+  const packs = Object.keys(KNOWLEDGE)
+  const used = new Set([...ours.flatMap((a) => knowledgeOf(a).map((k: { key: string }) => k.key)), ...topicPacks('청구항 몇 개 벤처 사업계획서 실사')])
+  check(`KB3 만들어 둔 기준 문서 장 ${packs.length}개 + 샘플 — 쓰이지 않는 장 없음(예전엔 실사 장이 놀고 있었음)`, [...packs, 'patent_samples'].every((k) => used.has(k)), [...packs, 'patent_samples'].filter((k) => !used.has(k)))
+  const noJudge = ours.filter((a) => !['spec.idea', 'spec.research', 'venture.market', 'cert.say', 'cert.reply'].includes(a.id)).filter((a) => !assistSystem(a).includes('[악마판사 —')).map((a) => a.id)
+  check('KB4 악마판사 — 명세서 · 사업계획서를 쓰거나 고치거나 판정하는 단추 모두에(아이디어 · 조사 · 시장조사 · 실사 빼고)', noJudge.length === 0, noJudge)
+  const sizes = Object.fromEntries(ours.map((a) => [a.id, assistSystem(a, { skill: 'x'.repeat(8000) }).length]))
+  check('KB5 지시문 크기 — 대표 정의 8,000자를 붙여도 단추마다 4만 5천 자 안(Gemini · GPT · Claude 모두 여유)', Object.values(sizes).every((n) => n <= 45000), sizes)
+  check(`KB6 명세서 샘플 모양 — 읽은 명세서 ${SPEC_SAMPLES_META.read}건 · 칸 길이 · 청구항 수 · 문장 틀 · 회사 이름 없음`, SPEC_SAMPLES_META.read >= 75 && SPEC_SAMPLES.includes('청구항 수') && SPEC_SAMPLES.includes('기술분야') && SPEC_SAMPLES.includes('문장 틀') && !/주식회사|\(주\)|㈜/.test(SPEC_SAMPLES) && SPEC_SAMPLES.length < 4000, { meta: SPEC_SAMPLES_META })
+  check('KB7 대화 단추 주제 고르기 — 청구항 몇 개 → 명세서 · 조사 · 샘플 / 벤처 TAM → 벤처 / 실사 → 실사 / 날씨 → 없음',
+    topicPacks('청구항은 몇 개 쓰는 게 보통이야?').join() === 'patent_spec,patent_research,patent_samples' && topicPacks('벤처 사업계획서 TAM 어떻게 잡아?').join() === 'venture_plan' && topicPacks('실사 때 뭐 물어봐?').join() === 'inspection' && topicPacks('오늘 날씨 어때').length === 0,
+    [topicPacks('청구항은 몇 개 쓰는 게 보통이야?'), topicPacks('벤처 사업계획서 TAM 어떻게 잡아?'), topicPacks('실사 때 뭐 물어봐?')])
+  // 서버 끝까지 — 대화 단추에 물어본 주제의 장이 붙는지
+  setEnv()
+  const sysOf = () => JSON.stringify(calls.find((c) => c.url.includes(':generateContent'))?.body.systemInstruction ?? '')
+  const CHAT = (q: string, prevRows: unknown[] = []) => ({ title: '특허 · 벤처 — 한솔테크', today: '2026-10-22', sections: [{ name: '앞선 대화', rows: prevRows }] })
+  calls = []
+  await post({ requestId: rid(), assistId: 'pv.chat', page: 'patent', context: CHAT(''), ask: '청구항은 몇 개 쓰는 게 보통이야?' })
+  const s1 = sysOf()
+  calls = []
+  await post({ requestId: rid(), assistId: 'pv.chat', page: 'patent', context: CHAT('', [{ 질문: '벤처 사업계획서 요약은 언제 써?', 답: '시장조사 뒤에' }]), ask: '그럼 그 다음은?' })
+  const s2 = sysOf()
+  calls = []
+  await post({ requestId: rid(), assistId: 'pv.chat', page: 'patent', context: CHAT(''), ask: '고마워' })
+  const s3 = sysOf()
+  const has = (sys: string, key: string) => sys.includes(JSON.stringify(key === 'patent_samples' ? SPEC_SAMPLES.slice(0, 60) : (KNOWLEDGE as Record<string, string>)[key].slice(0, 60)).slice(1, -1))
+  check('KB8 특허 · 벤처 대화 — "청구항 몇 개" 엔 명세서 기준 + 샘플 모양 · 이어 묻는 말("그 다음은?")은 앞선 대화 주제(벤처) · 인사엔 기준 문서 없음',
+    has(s1, 'patent_spec') && has(s1, 'patent_samples') && !has(s1, 'venture_plan') && has(s2, 'venture_plan') && !has(s2, 'patent_spec') && !s3.includes('미래AI랩이 실제로 쓰는 작업 기준'),
+    { s1: [has(s1, 'patent_spec'), has(s1, 'patent_samples')], s2: has(s2, 'venture_plan'), s3: s3.includes('미래AI랩이 실제로 쓰는 작업 기준') })
+  calls = []
+  await post({ requestId: rid(), assistId: 'cert.say', page: 'cert', context: { title: '실사', today: '2026-10-22', sections: [{ name: '예상 질문', rows: [{ q: 'q1', 질문: '대표가 직접 개발했나요?' }] }] } })
+  check('KB9 실사 말할 답(cert.say) — 실사 기준 문서(대표자 설명 순서 · 금지 표현)가 같이 감', has(sysOf(), 'inspection'))
+}
+
 await serverTests()
 bundleTests()
 d241Tests()
+await d263Tests()
+await kbContractTests()
 console.log(`\naiAssist: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

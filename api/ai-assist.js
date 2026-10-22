@@ -2,7 +2,8 @@
  * AI 도우미 서버 함수(D-239) — 화면마다 미리 만든 질문 단추를 누르면 여기로 온다. 브라우저는 AI 공급자를 직접 부르지 않는다.
  *
  *   GET  /api/ai-assist?status=1[&models=1]   공급자 · 모델 목록 · 기본 선택(키 · 주소 값은 빼고). models=1 이면 키로 모델 목록을 물어 '확인됨' 표시
- *   POST /api/ai-assist                       { requestId, assistId, page, choice:{provider, model}, context, ask? } → 결과(JSON · 토큰 · 비용)
+ *   POST /api/ai-assist                       { requestId, assistId, page, choice:{provider, model}, context, ask?, skill? } → 결과(JSON · 토큰 · 비용)
+ *     skill = D-263 대표가 정의한 /악마판사(판사 · 명세서/사업계획서 쓰기 단추에만 붙인다)
  *
  * 문지기는 AI 작업실과 같다(_ai/gate.js): 로그인 → 대표 권한 → 속도(도우미 몫 따로) → 같은 요청 번호는 한 번만 → 개인정보 한 번 더 지움.
  * 오류 응답에는 공급자 원문 · 키 · 주소를 넣지 않는다.
@@ -10,8 +11,9 @@
  *   대표 전용 화면(마케팅 radar · content) 단추는 403 · 지시문의 '대표' 는 이 화면을 쓰는 팀장으로 읽게 한 줄 더.
  * D-260 영상 단추(radar.transcript) — { video: { id, start, end } } 만 받아 서버가 YouTube 주소를 만들고 Gemini 에 영상 그대로 붙인다(구간 15분까지).
  */
-import { ASSISTS, ASSIST_OUTPUT_SCHEMA, assistOf, assistSystem, buildAssistPrompt } from './_ai/assists.js'
+import { ASSISTS, ASSIST_OUTPUT_SCHEMA, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
+import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
@@ -70,7 +72,13 @@ async function runOnce(assist, choice, body, role, video = null) {
   const base = providerBase(choice.provider)
   const context = scrubDeep(body.context || {})
   const ask = typeof body.ask === 'string' ? scrubText(body.ask).slice(0, 500) : ''
-  const system = role === 'pilot' ? `${assistSystem(assist)}\n\n${PILOT_NOTE}` : assistSystem(assist)
+  // D-263 대표가 붙여 넣은 /악마판사 정의 — 판사 · 명세서/사업계획서 쓰기 단추에만(다른 단추는 버림)
+  const skill = (assist.judge || assist.final) && typeof body.skill === 'string' ? scrubText(body.skill).slice(0, SKILL_MAX) : ''
+  // D-263 대화 단추 — 물어본 말로 기준 문서 장 고르기(물어본 말에 주제가 없으면 앞선 대화 끝부분으로 · 화면 제목은 늘 '특허 · 벤처' 라 쓰지 않음)
+  const prev = Array.isArray(context.sections) ? context.sections.find((x) => /앞선\s*대화/.test(String(x?.name ?? ''))) : null
+  const topicText = !assist.topicKb ? '' : topicPacks(ask).length ? ask : JSON.stringify(prev?.rows ?? '').slice(-2000)
+  const sys = assistSystem(assist, { skill, topicText })
+  const system = role === 'pilot' ? `${sys}\n\n${PILOT_NOTE}` : sys
   const built = buildAssistPrompt(assist, context, ask)
   const { sent } = built
   // D-260 영상 단추 — 맨 앞에 붙인 영상의 어느 구간인지(시각은 영상 처음부터)

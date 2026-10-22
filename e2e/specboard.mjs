@@ -86,6 +86,18 @@ const answer = (id) => {
   }
 }
 
+/* D-263 악마판사 — ① 구성: 1번째 88점(권리축 마지막 줄 고침) → 고친 글로 다시 판정 93점 · ② 전체: 94점 · 청구항 고침 · 대표 확인 하나 */
+let judgeParts = 0
+const judgeAnswer = (purpose) => {
+  if (/구성/.test(purpose)) {
+    judgeParts += 1
+    if (judgeParts % 2 === 1)
+      return { headline: '점수 88/100 · P0 0개 · 고친 칸 1개', items: [{ title: 'score', amount: '88', detail: 'A9 B8 C8 D9 E9 F9 G9 H9 I9 J9' }, { title: 'verdict', tag: '감점', detail: '권리축 마지막 줄이 작업 일정 연결을 말하지 않아 회피가 쉽다', body: '연결관계를 권리축 마지막 줄에 넣었습니다' }, { title: 'axis.link', body: '마모 지수와 작업 일정을 함께 써서 교체 시점을 산출한다' }] }
+    return { headline: '점수 93/100 · P0 0개 · 고친 칸 0개', items: [{ title: 'score', amount: '93', detail: 'A9 B9 C9 D9 E9 F9 G10 H9 I10 J10' }] }
+  }
+  return { headline: '점수 94/100 · P0 0개 · 고친 칸 1개', items: [{ title: 'score', amount: '94' }, { title: 'verdict', tag: '대표 확인', detail: '교체 시점 오차 실측값이 없다', body: '현장 시험 오차(%)를 알려 주세요' }, { title: 'claims', body: '청구항 1. 공구의 진동신호를 수집하는 진동 수집부; 마모 지수와 작업 일정을 함께 써서 교체 시점을 산출하는 교체시점 산출부;를 포함하는 공구 마모 예측 시스템.\n\n청구항 2. 청구항 1에 있어서, 마모 단계를 세 단계로 나누는 것을 특징으로 하는 공구 마모 예측 시스템.\n\n청구항 3. 진동신호를 수집하는 단계; 교체 시점을 산출하는 단계;를 포함하는 공구 마모 예측 방법.' }] }
+}
+
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const sent = []
 let partsMode = 'normal'
@@ -121,7 +133,7 @@ async function routeAi(page) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
     }
     const research = req.assistId === 'spec.research'
-    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [] }
+    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: req.assistId === 'spec.judge' ? judgeAnswer(req.context?.purpose ?? '') : answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [] }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
 }
@@ -144,6 +156,8 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   // 고른 모델(GPT)은 이 브라우저에 기억된 것 — 새 명세서도 그 모델로 쓴다
   await page.evaluate(() => localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' })))
+  // D-263 대표가 붙여 넣은 /악마판사 정의 — 판사 · 쓰기 단추마다 같이 가야 한다
+  await page.evaluate(() => localStorage.setItem('axmvp.ai.judgeSkill.v1', '/악마판사 — 대표정의표식: 심사관처럼 공격하고 점수로 판정한다'))
   // 이 회사와 이어진 AI 작업실 자료 — 저절로 쓰기에도 재료로 들어가야 한다(회사 기록이 늦게 와도 자료를 읽은 뒤 시작)
   await page.evaluate((cid) => {
     const at = new Date().toISOString()
@@ -170,7 +184,9 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.waitForTimeout(500)
   await page.getByTestId('spec-cards-toggle').click()
   const order = sent.map((r) => r.assistId).join()
-  check('B8 차례 — 아이디어 → 조사 → 구성 → 본문 a~d → 청구항 → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.a,spec.b,spec.c,spec.d,spec.e,spec.fix', order)
+  check('B8 차례 — 아이디어 → 조사 → 구성 → 악마판사 ①(88점 · 고친 뒤 다시 93점) → 본문 a~d → 청구항 → 악마판사 ② → 점검대로 고치기', order === 'spec.idea,spec.research,spec.parts,spec.judge,spec.judge,spec.a,spec.b,spec.c,spec.d,spec.e,spec.judge,spec.fix', order)
+  const judges = sent.filter((r) => r.assistId === 'spec.judge')
+  check('B8b 악마판사 범위 — ① 구성 · ② 전체 · 대표 정의(skill)가 판사 · 쓰기 단추에 같이 감 · 아이디어 · 조사에는 안 감', /구성/.test(judges[0]?.context?.purpose) && /전체/.test(judges[2]?.context?.purpose) && judges.every((r) => /대표정의표식/.test(r.skill ?? '')) && /대표정의표식/.test(sent.find((r) => r.assistId === 'spec.a')?.skill ?? '') && !sent.find((r) => r.assistId === 'spec.idea')?.skill && !sent.find((r) => r.assistId === 'spec.research')?.skill, judges.map((r) => r.context?.purpose))
   check('B9 고른 모델로 부름(GPT)', sent.every((r) => r.choice?.provider === 'openai' && r.choice?.model === 'gpt-5.4-mini'), sent.map((r) => r.choice))
   const phases = await page.getByTestId('spec-board-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-phase')))
   check('B10 단계 줄 모두 다 씀', phases.every((p) => p === 'done'), phases)
@@ -188,7 +204,12 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B17 본문 7칸 모두 씀', body.length === 7 && body.every((x) => x === 'yes'), body)
   check('B18 청구항 3개', /청구항 3개/.test(await page.getByTestId('spec-board-claims').innerText()))
   check('B19 점검대로 고치기 — 걸린 것(요약 400자 넘음)을 보냄', JSON.stringify(sent.find((r) => r.assistId === 'spec.fix')?.context ?? '').includes('요약이'))
-  check('B20 AI 가 확인해 달라는 점 따로', /종래 기술 출처 확인/.test(await page.getByTestId('spec-board-asks').innerText()))
+  check('B20 AI 가 확인해 달라는 점 따로(본문 · 악마판사 대표 확인)', /종래 기술 출처 확인/.test(await page.getByTestId('spec-board-asks').innerText()) && /현장 시험 오차/.test(await page.getByTestId('spec-board-asks').innerText()))
+  check('B20b 악마판사 판정이 맨 위에 — ② 94점 · 통과 · 직접 고친 칸 청구항 · 대표 정의 표시', (await page.getByTestId('spec-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('spec-judge').getAttribute('data-pass')) === 'yes' && /청구항/.test(await page.getByTestId('spec-judge').innerText()) && /대표 정의/.test(await page.getByTestId('spec-judge').innerText()))
+  const store = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => /spec|patent/i.test(k)).map(([, v]) => v).join('\n'))
+  check('B20c 판사가 고친 글이 초안에 들어감 — 권리축 마지막 줄 · 청구항 1(마모 지수와 작업 일정 연결)', store.includes('마모 지수와 작업 일정을 함께 써서 교체 시점을 산출하는') && store.includes('교체 시점을 산출하는 교체시점 산출부'), store.length)
+  const judgeRows = await page.locator('[data-testid="spec-board-row"][data-stage^="judge"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-stage')}:${e.getAttribute('data-phase')}:${e.textContent}`))
+  check('B20d 진행 줄에 악마판사 ① · ② — 점수 · 고친 칸 · "고친 뒤 다시 판정"', judgeRows.length === 2 && /judge1:done:.*93점.*권리축.*고친 뒤 다시 판정/.test(judgeRows[0]) && /judge2:done:.*94점.*청구항/.test(judgeRows[1]), judgeRows)
   const doneCards = await page.getByTestId('spec-card').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-card')}:${e.getAttribute('data-done')}`))
   check('B21 칸 다섯 이상 다 됨 표시', doneCards.filter((x) => x.endsWith(':yes')).length >= 5, doneCards)
   await shot(page, 'B-done')

@@ -9,6 +9,8 @@
  */
 
 import { KNOWLEDGE, KNOWLEDGE_META } from './knowledge.js'
+import { finalRules, judgeBlock } from './judge.js'
+import { SPEC_SAMPLES, SPEC_SAMPLES_META } from './specSamples.js'
 
 const D = '2026-10-19'
 
@@ -62,8 +64,9 @@ export const ASSIST_EXAMPLE = {
 const L = 'list'
 const W = 'write'
 /** D-252 서버가 지시문 뒤에 붙이는 미래AI랩 기준 문서(api/_ai/knowledge.js) */
-const SPEC_KB = { knowledge: ['patent_spec'] }
-const VENTURE_KB = { knowledge: ['venture_plan'] }
+/** D-263 명세서 쓰기 단추 — 기준 문서 + 실제 출원 명세서 샘플에서 뽑은 모양(scripts/build-spec-samples.mjs) */
+const SPEC_KB = { knowledge: ['patent_spec', 'patent_samples'], final: 'patent' }
+const VENTURE_KB = { knowledge: ['venture_plan'], final: 'venture' }
 
 /**
  * D-241 마케팅(콘텐츠 레이더) 단추 모두에 붙는 규칙 — 대표: "미래AI랩이랑 전혀 어울리지 않는 방식 · 내 컨텐츠에 맞게 설계".
@@ -198,15 +201,16 @@ const LIST = [
     '자료에 없는 사실(출원번호 · 등록 여부 · 심사 결과 · 승인 가능성 · 금액)은 만들지 않는다. 제도 일반 설명은 써도 되지만 끝에 "(일반 설명 — 공식 확인 필요)".',
     'next 는 이 화면에서 바로 할 수 있는 다음 행동 1~2개(예: 명세서 5 본문 이어 쓰기 · 사업계획서에 특허 재료 넣기 · 명세서 점검에 파일 올리기).',
     '[자료 · 앞선 대화] 가 있으면 이어지는 질문으로 읽는다. 질문이 특허 · 벤처와 관계없으면 headline 에 짧게 답하고 이 화면에서 할 수 있는 일을 next 에.',
-  ]],
+    '[기준 문서] 가 붙어 있으면 그 기준대로 답한다(어느 장을 따랐는지 items 의 tag 에 "기준 §n" 처럼 짧게).',
+  ], { topicKb: true }],
   ['cert.chat', 'cert', '기업인증 — 물어본 것에 답', L, 2600, [
     '[대표가 더 묻는 것] 의 질문 하나에 답한다. headline 은 결론 먼저 한두 문장 — 대표가 그대로 읽고 바로 이해할 쉬운 말로.',
     'items 는 2~5개: 근거(OS 판정 · 모자란 사실 · 빠진 서류 · 로드맵) 또는 지금 할 일. 질문과 관계없는 항목은 넣지 않는다. detail 은 2문장 안. tag 는 인증 이름.',
     '인증 판정(받을 수 있음 · 지금 신청 · 고친 뒤 · 아직 이름 등)은 OS 가 규칙으로 계산한 것 — 그대로 옮기고 바꾸거나 부풀리지 않는다. 판정을 AI 판단이라고 말하지 않는다.',
     '자료에 없는 사실(매출 · 인원 · 연구비 · 인증 보유)은 만들지 않는다. 인증 기준 일반 설명은 써도 되지만 끝에 "(일반 설명 — 공식 확인 필요)".',
     'next 는 이 화면에서 바로 할 수 있는 다음 행동 1~2개(예: 빠진 서류 요청 문구 보내기 · 벤처 사업계획서 쓰기 · 대표 확인 질문 답하기).',
-    '[자료 · 앞선 대화] 가 있으면 이어지는 질문으로 읽는다.',
-  ]],
+    '[자료 · 앞선 대화] 가 있으면 이어지는 질문으로 읽는다. [기준 문서] 가 붙어 있으면 그 기준대로 답한다.',
+  ], { topicKb: true }],
 
   /* D-258 OS 안 오른쪽 판 'AI 대화' — 어느 화면에서나 쓰는 일반 대화(대표 · 팀장). 띠 · 판 단추에는 없고 오른쪽 판에서만 부른다 */
   ['side.chat', 'side', 'AI 대화 — 무엇이든 물어보기', L, 3200, [
@@ -230,7 +234,8 @@ const LIST = [
     '항목 하나 = 질문 하나(빠짐없이 순서대로): title = 질문 번호(q1 …) · ref = 같은 번호 · body = 말할 답 · detail = 같이 보여 줄 증빙 한 줄(증빙있음에서만 · 없으면 빈 글).',
     '인증 판정 · 점수를 말하지 않는다(OS 가 규칙으로 계산한 것 — 실사에서 말할 대상 아님). 과장 · 단정("반드시 · 최고 · 유일") 금지.',
     'headline = 실사 전체에서 꼭 지킬 말하기 요령 한 줄. next = 실사 전에 대표님께 먼저 확인할 것 1~3개.',
-  ]],
+    '[기준 문서] 의 현장실사 대표자 설명 순서 · 금지 표현을 따른다.',
+  ], { knowledge: ['inspection'] }],
 
   /* D-246 벤처기업확인 사업계획서 — 기업인증 › 벤처 › 사업계획서 쓰기의 [AI 초안](대표만). 칸 규칙 · 자료는 화면이 [규칙집] · [자료] 로 보낸다 */
   ['venture.p1', 'venture', '벤처 사업계획서 — 개발 배경 · 경쟁력', W, 4200, ['[규칙집] 의 칸 development_background · competitiveness_strategy 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '특허 명세서의 과제 · 해결 수단이 개발 배경 · 경쟁력의 뼈대다. AX · MVP 자료로 실제 구현을 붙인다.'], VENTURE_KB],
@@ -238,7 +243,24 @@ const LIST = [
   ['venture.g1', 'venture', '벤처 사업계획서 — 목표시장 · 경쟁사', W, 4200, ['[규칙집] 의 칸 market_target · competitor_analysis 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '시장 숫자는 컨설턴트 메모에 출처가 있는 것만. 경쟁사 이름은 자료에 있는 것만 — 없으면 고객이 지금 쓰는 대체 수단으로.'], VENTURE_KB],
   ['venture.g2', 'venture', '벤처 사업계획서 — 시장진입 경과 · 3년 계획', W, 4200, ['[규칙집] 의 칸 market_entry_progress · market_entry_plan_3y 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '경과는 실제 영업 · 고객 · 매출 · 홈페이지 등 자료에 있는 것만, 3년 계획은 연차별 대상 · 채널 · 목표.'], VENTURE_KB],
   ['venture.x', 'venture', '벤처 사업계획서 — 기업가정신 · 자금운용', W, 4200, ['[규칙집] 의 칸 entrepreneurship_example · financing_plan 두 칸을 쓴다. 칸마다 850~950자, 1,000자를 넘기지 않는다.', '기업가정신은 대표가 실제로 결정 · 실행한 일, 자금운용은 자료에 있는 매출 · 자본금과 앞으로 조달할 재원을 나눠서.'], VENTURE_KB],
-  ['venture.sum', 'venture', '벤처 사업계획서 — 요약 · 핵심 요약', W, 3600, ['[규칙집] 의 칸 tech_name · tech_summary · core_problem · core_solution · core_market · core_diff · core_marketing · core_growth 를 쓴다.', '이미 쓴 칸(본문)을 줄여 만든다 — 본문에 없는 숫자 · 사실을 새로 넣지 않는다. 핵심 요약은 문장 틀의 ［ ］ 만 채우고 나머지 글자는 그대로.', 'tech_name 은 특허 명칭과 같은 말로 시작하는 기술명 하나, tech_summary 는 1~2문장.'], VENTURE_KB],
+  ['venture.sum', 'venture', '벤처 사업계획서 — 요약 · 핵심 요약', W, 3600, ['[규칙집] 의 칸 tech_name · tech_summary · core_problem · core_solution · core_market · core_diff · core_marketing · core_growth 를 쓴다.', '[기준 문서] 23-1B 순서대로 요약을 본문보다 먼저 쓴다 — [자료 · 시장조사(TAM · SAM · SOM)] 의 숫자 · 출처와 [참고] 의 출원번호 · 연구개발 조직 · 인원, 재료(특허 · AX)로. 본문 칸이 이미 있으면 그 본문과 같은 이야기 · 같은 숫자로.', 'core_market 의 전체 시장 · 성장률은 [자료 · 시장조사] 에 있는 숫자 그대로(출처 없는 숫자 금지 · SOM 은 3년 안 확보 시장). 재료 · 시장조사 · 사실에 없는 숫자를 새로 넣지 않는다. 핵심 요약은 문장 틀의 ［ ］ 만 채우고 나머지 글자는 그대로.', 'tech_name 은 특허 명칭과 같은 말로 시작하는 기술명 하나, tech_summary 는 1~2문장. 특허는 출원 상태 그대로(출원번호가 있으면 출원 중 · 등록이라 쓰지 않음).'], VENTURE_KB],
+
+  /* D-263 벤처 요약 전에 반드시 — 시장조사(TAM · SAM · SOM). 대표: "TAM SOM 등 시장조사 하고 나서 작성해야 돼서 반드시 그 단계를 밟고 나서" */
+  ['venture.market', 'venture', '벤처 사업계획서 — 시장조사(TAM · SAM · SOM)', L, 4200, [
+    '[자료](회사 · 업종 · 재료(특허 · AX) · 컨설턴트 메모)를 보고 이 신청기술의 목표시장을 TAM → SAM → SOM 순서로 조사한다([기준 문서] §29 · 부록 7.1).',
+    '항목 이름표(title) 그대로: "tam" · "sam" · "som" · "cagr" · "customer" · "price" · "scope". 항목마다 amount = 규모(예 "1조 2,000억 원" · 고객 수면 "약 3만 곳"), detail = 산식(고객 단위 × 단가 × 비율 등 한 줄), tag = 출처(기관 · 자료명 · 연도 — 실제로 찾은 것만), when = 기준연도.',
+    'tam = 전체 잠재시장 · sam = 지금 제품 · 서비스가 실제로 닿는 시장(지역 · 업종 · 고객군) · som = 3년 안에 현실적으로 확보할 시장(회사 영업 범위 · 고객 수 × 단가 — 막연한 "TAM 의 몇 %" 금지) · cagr = 연평균 성장률(출처 있는 것) · customer = 목표 고객 정의 한 줄 · price = 단가 · 과금 방식 · scope = 지금 회사의 영업 범위.',
+    '검색으로 찾은 통계를 먼저 쓴다. 찾지 못한 숫자는 지어내지 말고 amount 를 비운 채 detail 에 "검색 근거 없음 — 확인 필요" 와 구할 곳(통계청 · 협회 · 조달 자료 등). 산식으로 추정한 값은 끝에 "(추정)".',
+    '스스로 악마 질문으로 점검하고 낸다: TAM 만 크고 실제 고객은 없지 않나 · SOM 확보율 근거가 무엇인가 · 지금 고객에서 3년 목표까지 어떻게 가나. headline = TAM · SAM · SOM 한 줄. next = 대표에게 확인할 것(단가 · 지금 고객 수 등) 1~3개.',
+  ], { knowledge: ['venture_plan'], research: true }],
+
+  /* D-263 악마판사 — 요약 뒤 · 본문 뒤에 반드시(판정 + 직접 고친 칸) */
+  ['venture.judge', 'venture', '벤처 사업계획서 — 악마판사', W, 6000, [
+    '[자료] 의 사업계획서 칸을 아래 악마판사 기준으로 판정하고, 글로 고칠 수 있는 약점은 직접 고친다. 판정 범위는 [이 화면의 목적] 에 적힌 대로("요약" 이면 요약 · 핵심 요약 칸만, "전체" 면 모든 칸).',
+    'items 는 세 가지: ① 점수 — title = "score", amount = 합계 점수(숫자만), detail = A~J 점수 한 줄(예 "A9 B8 C9 …"). ② 판결 — title = "verdict", tag = "P0" · "감점" · "대표 확인" 중 하나, detail = 무엇이 문제인지 한 줄, body = 어떻게 고쳤는지(대표 확인이면 대표에게 물을 질문 한 줄). ③ 고친 칸 — title = 칸 id 그대로(예 core_market · development_background), body = 그 칸 전체를 고친 글, tag = 고친 체크박스(체크 칸만).',
+    '고친 칸은 4개까지 — 점수를 가장 많이 깎는 것부터. 고친 글은 [규칙집] 의 칸 규칙 · 글자 수 · 문장 틀을 그대로 지키고, 다른 칸 · [자료 · 시장조사] · [참고] 와 숫자 · 이름 · 상태(출원/등록 · 완료/계획)가 맞게.',
+    'headline = "점수 NN/100 · P0 n개 · 고친 칸 n개" 한 줄. 고칠 것이 없으면 고친 칸 없이 점수 · 판결만(판결이 없으면 verdict 도 비움).',
+  ], { knowledge: ['venture_plan'], judge: 'venture' }],
 
   /* D-252 AI 가 다 쓰는 명세서 — 아이디어 내줘 · 조사해줘 · 구성 써줘 · 점검대로 고쳐줘. 기준은 서버가 붙이는 [미래AI랩 기준 문서](Master v2.9 · AX펭귄) */
   ['spec.idea', 'patent', '명세서 — 아이디어 내줘', W, 5000, [
@@ -259,13 +281,23 @@ const LIST = [
     '이 단추는 아래 [출력 형식] 예시와 달리 title 에 이름표만 쓴다(구성요소 이름을 title 에 넣지 않는다). 예: {"title":"comp","detail":"요청 수집부","body":"여러 채널의 요청을 받아 한 형식으로 모으는"} · {"title":"step","body":"요청을 받아 한 형식으로 모으는"}. 항목은 30개 안 · 문장은 짧게.',
     '구성요소 이름은 서로 다르게. 부호(110 …)는 OS 가 붙이므로 쓰지 않는다. 권리축 마지막 줄(경쟁사가 피하기 어려운 연결관계)이 구성요소 · 단계에 그대로 드러나게.',
     '규칙 · 점수 계산을 AI · 인공지능이라 부르지 않는다(아이디어에 학습 모델이 있을 때만). headline = 시스템 한 줄 설명.',
-  ], { knowledge: ['patent_spec'] }],
+  ], { knowledge: ['patent_spec', 'patent_samples'], final: 'patent' }],
   ['spec.fix', 'patent', '명세서 — 점검대로 고쳐줘', W, 6000, [
     '[자료 · 점검에서 걸린 것] 을 [기준 문서] 13~14장 · 12장 기준으로 고친다. 걸린 칸만 다시 쓰고 나머지 칸은 내지 않는다.',
     'items 의 title = 고칠 칸 이름표 하나씩(title · titleEn · field · background · problem · solution · effect · detail · abstract · claims), body = 그 칸 전체를 고친 글(일부만 쓰지 않는다), detail = 무엇을 고쳤는지 한 줄.',
     '명칭(title)은 한 줄 · 영문 명칭(titleEn)은 대문자 영문만 · 중괄호 없이. 청구항은 "청구항 n." 머리 · 빈 줄로 나눔 · 부호 없이. 구성요소 이름 · 부호 · 도면 번호는 [자료] 그대로 — 새로 만들지 않는다.',
     'headline = 고친 것 한 줄 요약. 사람이 판단해야 하는 것(발명자 · 출원인 · 실제 수치)은 고치지 말고 next 에.',
-  ], { knowledge: ['patent_format', 'patent_spec'] }],
+  ], { knowledge: ['patent_format', 'patent_spec', 'patent_samples'], final: 'patent' }],
+
+  /* D-263 악마판사 — 구성 뒤 · 청구항 뒤에 반드시(판정 + 직접 고친 칸) */
+  ['spec.judge', 'patent', '명세서 — 악마판사', W, 7000, [
+    '[자료] 의 명세서를 아래 악마판사 기준으로 판정하고, 글로 고칠 수 있는 약점은 직접 고친다. 판정 범위는 [이 화면의 목적] 에 적힌 대로("구성" 이면 권리축 · 시스템 · 구성요소 · 단계 · 종속항 씨앗, "전체" 면 명칭 · 본문 · 청구항 · 요약).',
+    'items 는 세 가지: ① 점수 — title = "score", amount = 합계 점수(숫자만), detail = A~J 점수 한 줄. ② 판결 — title = "verdict", tag = "P0" · "감점" · "대표 확인" 중 하나, detail = 무엇이 문제인지 한 줄, body = 어떻게 고쳤는지(대표 확인이면 물을 질문 한 줄). ③ 고친 것:',
+    '  "구성" 판정 — spec.parts 와 같은 이름표: axis.input · axis.process · axis.state · axis.judge · axis.output · axis.feedback · axis.link(body = "~하는" 한 문장) · system · comp(detail = 이름 "…부" · body = 하는 일) · step · seed. 구성요소나 단계를 고치면 comp · step 을 모두 다시 낸다(일부만 내지 않는다).',
+    '  "전체" 판정 — title = 칸 이름표(title · titleEn · field · background · problem · solution · effect · abstract · claims), body = 그 칸 전체를 고친 글. 구체적인 내용(detail)은 길어서 다시 쓰지 않는다 — 문제는 verdict 로. 청구항은 "청구항 n." 머리 · 빈 줄로 나눔 · 부호 없이.',
+    '고친 칸은 3개까지(구성 판정의 comp · step · axis 는 한 묶음으로 센다). 구성요소 이름 · 부호 · 도면 번호는 [자료] 그대로 — 구성 판정에서 고칠 때만 새 이름.',
+    'headline = "점수 NN/100 · P0 n개 · 고친 칸 n개" 한 줄. 고칠 것이 없으면 고친 것 없이 점수 · 판결만.',
+  ], { knowledge: ['patent_spec', 'patent_format', 'patent_samples'], judge: 'patent' }],
 
   /* D-247 특허 명세서 초안 — 특허·MVP › 명세서 쓰기의 [AI 초안](대표만). 칸 규칙 · 자료는 화면이 [규칙집] · [자료] 로 보낸다 */
   ['spec.a', 'patent', '명세서 — 기술분야 · 배경 · 과제 · 효과', W, 4200, ['[규칙집] 의 칸 field · background · problem · effect 를 쓴다.', '아이디어 · 권리축에 있는 것만. 기존 방식의 한계와 이 발명의 차이가 이어지게.'], SPEC_KB],
@@ -278,13 +310,32 @@ const LIST = [
 export const ASSISTS = Object.fromEntries(
   LIST.map(([id, page, label, kind, maxOut, instruction, opts]) => [
     id,
-    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video) },
+    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video), judge: (opts && opts.judge) || '', final: (opts && opts.final) || '', topicKb: !!(opts && opts.topicKb) },
   ]),
 )
 
 /** D-252 단추에 붙는 기준 문서 글(없는 이름은 건너뜀) */
-export function knowledgeOf(assist) {
-  return (assist.knowledge || []).filter((k) => typeof KNOWLEDGE[k] === 'string').map((k) => ({ key: k, parts: KNOWLEDGE_META[k].parts, text: KNOWLEDGE[k] }))
+/** 기준 문서 장(knowledge.js) + D-263 실제 명세서 샘플 모양(specSamples.js) */
+const PACKS = { ...KNOWLEDGE, patent_samples: SPEC_SAMPLES }
+const PACK_META = { ...KNOWLEDGE_META, patent_samples: { parts: [`실제 출원 명세서 샘플 ${SPEC_SAMPLES_META.read}건의 모양`], chars: SPEC_SAMPLES.length } }
+
+/**
+ * D-263 대화 단추(특허 · 벤처 · 기업인증 '물어본 것에 답')는 물어본 주제에 맞는 장만 붙인다 — 다 붙이면 한 번에 5만 자.
+ * 특허(명세서 · 청구항 · 출원 …) → 명세서 기준 + 선행기술(+ 길이 · 개수를 물으면 샘플 모양), 벤처(사업계획서 · 시장 …) → 벤처 기준, 실사 → 실사 기준.
+ */
+export function topicPacks(text) {
+  const t = String(text ?? '')
+  const out = []
+  if (/명세서|청구항|특허|출원|발명|선행\s*기술|권리|도면|요약서|변리/.test(t)) out.push('patent_spec', 'patent_research')
+  if (/몇\s*(?:개|자|장|줄)|길이|분량|글자|청구항\s*수|샘플|예시/.test(t) && out.length) out.push('patent_samples')
+  if (/벤처|사업\s*계획|TAM|SAM|SOM|시장|혁신\s*성장|매출\s*목표|투자|요약|핵심\s*요약/i.test(t)) out.push('venture_plan')
+  if (/실사|현장\s*(?:확인|방문|심사)|심사\s*위원|면담/.test(t)) out.push('inspection')
+  return out
+}
+
+export function knowledgeOf(assist, topicText = '') {
+  const keys = assist.topicKb ? topicPacks(topicText) : assist.knowledge || []
+  return keys.filter((k) => typeof PACKS[k] === 'string' && PACKS[k]).map((k) => ({ key: k, parts: PACK_META[k].parts, text: PACKS[k] }))
 }
 
 export function assistOf(id) {
@@ -361,9 +412,16 @@ export const VIDEO_RULES = [
   '받아 적기만 한다 — 다듬기 · 요약 · 마케팅 문장으로 바꾸기 없이. 시각은 영상 처음부터 센 시각.',
 ]
 
-export function assistSystem(assist) {
+/**
+ * 단추 하나의 시스템 지시문. opts.skill = 대표가 붙여 넣은 /악마판사 정의(판사 · 쓰기 단추에만 붙는다) · opts.topicText = 대화 단추가 물어본 말(주제에 맞는 기준 문서 장을 고른다).
+ * D-263 판사 단추는 악마판사 정의 전체, 명세서 · 사업계획서 쓰기 단추는 '한 번에 끝내기' 규칙 + 같은 정의(내기 전에 스스로 점검).
+ */
+export function assistSystem(assist, opts = {}) {
   const extra = assist.video ? ['', '[영상 받아 적기]', ...VIDEO_RULES] : assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : []
-  const kb = knowledgeOf(assist)
+  const skill = typeof opts.skill === 'string' ? opts.skill : ''
+  const topicText = typeof opts.topicText === 'string' ? opts.topicText : ''
+  const judge = assist.judge ? ['', ...judgeBlock(assist.judge, skill)] : assist.final ? finalRules(assist.final, skill) : []
+  const kb = knowledgeOf(assist, topicText)
   const kbLines = kb.length
     ? [
         '',
@@ -372,5 +430,5 @@ export function assistSystem(assist) {
         '[기준 문서 끝]',
       ]
     : []
-  return [...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...kbLines, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)].join('\n')
+  return [...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)].join('\n')
 }

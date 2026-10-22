@@ -22,7 +22,10 @@ import {
   readPlan,
   type VPlanFacts,
 } from '../../certification/core/venturePlan'
-import { VPLAN_BATCHES, buildBatchContext, draftItemsOf, fieldsOfBatch } from '../../certification/integration/venturePlanAi'
+import { VPLAN_BATCHES, VPLAN_STEPS, buildBatchContext, buildMarketContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf } from '../../certification/integration/venturePlanAi'
+import { GK, PATENT_NONE, marketDone, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, type GateState } from '../../certification/integration/ventureGate'
+import { judgeOf, judgePassed, readJudgeReport } from '../aiAssist/judge'
+import { PATENT_JUDGE, VENTURE_JUDGE, customSkillBlock } from '../../../api/_ai/judge.js'
 import { parseSpecText } from '../patent/specParse'
 import { specDigest } from '../patent/specDigest'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
@@ -216,6 +219,81 @@ const long = (n: number) => '가'.repeat(n)
   const prog = ventureProgress({ sections: buildVenturePack(vctx, {}), notes: {}, hasBizPlan: false, status: 'preparing' })
   const row = (w?: Parameters<typeof ventureSubmitCheck>[0]['written']) => ventureSubmitCheck({ routes, progress: prog, missingEvidence: ['사업계획서'], haveEvidence: [], written: w }).find((r) => r.key === 'plan')!
   check('W1 사업계획 줄 — 안 썼으면 쓰기 또는 받기 · 반쯤 썼으면 몇 칸 · 다 썼으면 ✓(서류 없어도)', /사업계획서 쓰기/.test(row().text) && row({ narrativeFilled: 4, narrativeTotal: 10, complete: false, entered: 0, total: 28 }).text.includes('4/10') && row({ narrativeFilled: 10, narrativeTotal: 10, complete: true, entered: 3, total: 28 }).mark === 'ok', [row().text, row({ narrativeFilled: 10, narrativeTotal: 10, complete: true, entered: 3, total: 28 })])
+}
+
+/* ---------------- D-263 요약 전에 반드시 — 시장조사 · 출원번호 · 기술인력 ---------------- */
+{
+  check('G1 출원번호 읽기 — 줄표 · 붙여 씀 · 띄어 씀 · 문장 안 → 10-2025-0123456', ['10-2025-0123456', '1020250123456', '10 2025 0123456', '출원번호 제10-2025-0123456호'].every((v) => normalizeAppNo(v) === '10-2025-0123456'), ['1020250123456', '출원번호 제10-2025-0123456호'].map(normalizeAppNo))
+  check('G2 출원번호 아님 — 50 으로 시작 · 연도 1980 · 앞에 숫자가 더 붙음 · 등록번호(10-1234567)', ['50-2025-0123456', '10-1980-0123456', '110202501234567', '10-1234567', ''].every((v) => normalizeAppNo(v) === ''))
+  const empty = readPlan({})
+  const g0 = readGate({})
+  const sg0 = summaryGate(empty, { ...FACTS, researchUnit: null, researchers: null }, g0)
+  check('G3 아무것도 없으면 요약 못 씀 — 모자란 것 세 가지(시장조사 · 출원번호 · 기술인력)', !sg0.ok && sg0.missing.length === 3 && sg0.missing[0].startsWith('시장조사') && sg0.missing[1] === '출원번호' && sg0.missing[2].startsWith('기술인력'), sg0.missing)
+  const market = marketOf({ headline: 'TAM 1조', items: [
+    { title: 'tam', amount: '1조 2,000억 원', detail: '제조업체 4만 곳 × 연 300만 원', tag: '통계청 2025', when: '2025' },
+    { title: 'SAM', amount: '1,800억 원', detail: '절삭 공구 쓰는 중소 제조 6천 곳' },
+    { title: '수익시장', amount: '36억 원', detail: '3년 안 120곳 × 3,000만 원' },
+    { title: 'cagr', amount: '', detail: '검색 근거 없음 — 확인 필요' },
+    { title: 'customer', body: '절삭 공구를 쓰는 중소 제조업체' },
+  ] }, { grounded: true, sources: [{ title: '통계청', url: 'https://kostat.go.kr/x' }, { title: '가짜', url: 'javascript:alert(1)' }] }, '2026-10-22')
+  check('G4 시장조사 답 읽기 — 이름표 tam/SAM/수익시장 · 출처 · 기준연도 · 근거 없음은 빈 숫자 · 이상한 주소 버림', !!market && market.tam.amount === '1조 2,000억 원' && market.tam.source === '통계청 2025' && market.tam.year === '2025' && market.sam.amount === '1,800억 원' && market.som.amount === '36억 원' && market.cagr.amount === '' && market.customer.includes('중소 제조') && market.sources.length === 1 && market.grounded && marketDone(market), market)
+  check('G5 숫자가 하나도 없는 답 → 시장조사 아님(null)', marketOf({ headline: 'x', items: [{ title: 'tam', detail: '검색 근거 없음 — 확인 필요' }] }, null, '2026-10-22') === null)
+  const half = { ...market!, som: { amount: '', basis: '', source: '', year: '' } }
+  check('G6 SOM 이 비면 시장조사를 밟지 않은 것', !marketDone(half) && !summaryGate(empty, FACTS, { ...g0, market: half }).market.ok)
+  const gNone: GateState = { ...g0, market, patentNo: PATENT_NONE }
+  const sg1 = summaryGate(empty, { ...FACTS, researchUnit: 'none', researchers: 0 }, gNone)
+  check('G7 시장조사 + "아직 출원 전" + 전담부서 없음 · 연구 인원 0명 → 요약 써도 됨(0명 · 없음도 답)', sg1.ok && sg1.patent.source === 'none' && /출원 전/.test(sg1.patent.text) && sg1.rd.org.startsWith('없음') && sg1.rd.staff === 0, sg1)
+  const withIp = readPlan({ [VK.text('ip_records')]: '특허 / 출원 / 공구 마모 예측 / 10-2025-0099999' })
+  check('G8 출원번호 찾는 순서 — 직접 넣은 것 → 이전 컨설팅 기록 → 지식재산권 칸', patentNoOf(withIp, { applicationNumber: '10-2024-0000001' }, { patentNo: '1020250123456' }).source === 'direct' && patentNoOf(withIp, { applicationNumber: '10-2024-0000001' }, { patentNo: '' }).value === '10-2024-0000001' && patentNoOf(withIp, {}, { patentNo: '' }).value === '10-2025-0099999' && patentNoOf(empty, {}, { patentNo: 'abc' }).source === '')
+  const ipWait = readPlan({ [VK.text('ip_records')]: '특허 / 출원 / 공구 마모 / (출원 뒤 입력)' })
+  const pp = patentPatch(ipWait, '10 2025 0123456')
+  check('G9 출원번호 저장 — 고친 모양으로 · 지식재산권 칸 "(출원 뒤 입력)" 자리에도 · 틀린 번호는 저장 안 함', pp[GK.patentNo] === '10-2025-0123456' && pp[VK.text('ip_records')].endsWith('10-2025-0123456') && Object.keys(patentPatch(ipWait, '12345')).length === 0 && patentPatch(ipWait, PATENT_NONE)[GK.patentNo] === PATENT_NONE, pp)
+  check('G10 연구 인원 저장 — 0명 저장 · 음수/빈칸은 지움 · 직접 넣은 인원이 사실 창고보다 먼저', researchersPatch(0)[GK.researchers] === '0' && researchersPatch(-1)[GK.researchers] === '' && researchersPatch(null)[GK.researchers] === '' && summaryGate(empty, FACTS, { ...gNone, researchers: '5' }).rd.staff === 5)
+  const sOrg = readPlan({ [VK.text('rd_org')]: '기업부설연구소(한국산업기술진흥협회 인정)' })
+  const lines = gateLines(sOrg, { ...FACTS, researchers: null }, { ...g0, patentNo: '10-2025-0123456', researchers: '3' })
+  check('G11 AI 에 보내는 사실 — 출원번호(출원 중 · 등록 아님) · 연구 조직 · 인원', lines[0].includes('10-2025-0123456') && lines[0].includes('등록 아님') && lines[1].includes('기업부설연구소') && lines[2].includes('3명'), lines)
+  const gFull: GateState = { ...g0, market, patentNo: '10-2025-0123456', researchers: '2' }
+  const sumCtx = buildBatchContext({ batch: 'sum', state: empty, facts: FACTS, today: '2026-10-22', gate: gFull })
+  check('G12 요약 묶음 자료 — 시장조사 구역(TAM 규모 · 출처) · 출원번호 사실이 같이 감', sumCtx.sections.some((x) => x.name.startsWith('시장조사') && JSON.stringify(x.rows).includes('1조 2,000억 원') && JSON.stringify(x.rows).includes('통계청 2025')) && sumCtx.facts!.some((f) => f.includes('10-2025-0123456')))
+  const mCtx = buildMarketContext({ state: readPlan({ [VK.memo]: '거래처 49곳', [VK.text('market_target')]: '중소 제조' }), facts: FACTS, today: '2026-10-22', gate: g0 })
+  check('G13 시장조사 단추 자료 — 메모 · 이미 쓴 목표시장 칸 · 회사 사실', JSON.stringify(mCtx.sections).includes('거래처 49곳') && JSON.stringify(mCtx.sections).includes('market_target') && mCtx.facts![0].includes('공구랩'))
+  check('G14 [전부 써줘] 차례 — 시장조사 → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②', VPLAN_STEPS.map((x) => x.key).join() === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll' && VPLAN_BATCHES[0].key === 'sum', VPLAN_STEPS.map((x) => x.key))
+}
+
+/* ---------------- D-263 악마판사 — 판정 읽기 · 고친 칸 · 지시문 ---------------- */
+{
+  const ans = { headline: '점수 84/100 · P0 1개 · 고친 칸 2개', items: [
+    { title: 'score', amount: '84', detail: 'A9 B8 C9 D7 E8 F7 G9 H9 I9 J9' },
+    { title: 'verdict', tag: 'P0', detail: '출원인데 "특허 보유" 라고 씀', body: 'core_diff 를 "출원(10-2025-0123456)" 으로 고침' },
+    { title: 'verdict', tag: '대표 확인', detail: '3년 고객 수 근거 없음', body: '지금 거래처가 몇 곳인가요?' },
+    { title: 'core_diff', body: '고친 차별성 문장' },
+    { title: 'development_background', body: '본문 칸 — 요약 판정이면 버림' },
+    { title: '판정', tag: '감점', detail: '' },
+  ] }
+  const j = judgeOf(ans)
+  check('J1 판사 답 읽기 — 점수 84 · A~J 한 줄 · 판결 2(P0 · 대표 확인 · 빈 것 버림) · 고친 칸 2', j.score === 84 && j.scores.startsWith('A9') && j.verdicts.length === 2 && j.verdicts[0].level === 'P0' && j.verdicts[0].fix.includes('고침') && j.verdicts[1].level === '대표 확인' && j.rewrites.length === 2, j)
+  check('J2 통과 기준 — 90점 이상 · P0 없음(84점 · P0 있음은 아님 · 92점 P0 있음도 아님)', !judgePassed({ score: j.score, verdicts: j.verdicts }) && !judgePassed({ score: 92, verdicts: j.verdicts }) && judgePassed({ score: 92, verdicts: [] }) && !judgePassed(null))
+  check('J3 점수 줄이 없으면 headline 의 "점수 NN" 에서', judgeOf({ headline: '점수 91/100 · 고칠 것 없음', items: [] }).score === 91 && judgeOf({ headline: '좋음', items: [] }).score === null)
+  const sumItems = judgeItemsOf(j.rewrites, 'sum')
+  const allItems = judgeItemsOf(j.rewrites, 'full')
+  check('J4 고친 칸 → 초안 — 요약 판정은 요약 칸만 · 전체 판정은 본문 칸도', sumItems.map((x) => x.id).join() === 'core_diff' && allItems.map((x) => x.id).join() === 'core_diff,development_background', { sumItems, allItems })
+  const r = readJudgeReport({ at: 'x', scope: 'sum', score: 140, verdicts: [{ level: '이상', text: 't' }, 'bad'], fixed: ['a'], rounds: 9, custom: true, headline: 'h' })
+  check('J5 저장된 판정 안전하게 읽기 — 100 넘는 점수 버림 · 모르는 단계는 감점 · 횟수 3까지', !!r && r.score === null && r.verdicts.length === 1 && r.verdicts[0].level === '감점' && r.rounds === 3 && r.custom && readJudgeReport(null) === null && readJudgeReport({}) === null, r)
+  const g = readGate({})
+  const jp = judgePatch(g, 'sum', r!)
+  check('J6 판정 저장 — 요약 · 전체 따로 남고 다시 읽힘', readGate(jp).judge.sum?.headline === 'h' && readGate(jp).judge.full === null)
+  const jctx = buildVentureJudgeContext({ scope: 'sum', state: readPlan({ [VK.text('core_diff')]: '차별성 글', [VK.text('development_background')]: '본문 글' }), facts: FACTS, today: '2026-10-22', gate: g })
+  check('J7 판사 ① 자료 — 요약 · 핵심 요약 칸만(본문 빼고) · 칸 규칙 · 판정 범위 "요약"', JSON.stringify(jctx.sections).includes('차별성 글') && !JSON.stringify(jctx.sections).includes('본문 글') && jctx.purpose.includes('요약') && jctx.rules!.some((x) => x.startsWith('칸 core_diff')))
+  const sysJ = assistSystem(ASSISTS['venture.judge'], { skill: '/악마판사 대표표식 — 숫자 하나라도 어긋나면 P0' })
+  check('J8 서버 판사 지시문 — 기본 악마판사(벤처) · 대표 정의가 기본보다 우선 · 출력 형식 그대로', sysJ.includes(VENTURE_JUDGE[0]) && sysJ.includes('대표표식') && sysJ.indexOf('대표표식') > sysJ.indexOf(VENTURE_JUDGE[0]) && sysJ.includes('우선한다') && sysJ.includes('[출력 형식]'))
+  const sysSum = assistSystem(ASSISTS['venture.sum'], { skill: '대표표식' })
+  const sysP1 = assistSystem(ASSISTS['venture.p1'])
+  check('J9 쓰기 단추에도 — 최종본 규칙(한 번에 끝냄 · "보완하면 좋다" 금지) + 악마판사 기준 · 대표 정의', [sysSum, sysP1].every((x) => x.includes('[최종본 규칙 — 한 번에 끝낸다]') && x.includes('보완하면 좋다') && x.includes(VENTURE_JUDGE[0])) && sysSum.includes('대표표식') && !sysP1.includes('대표표식'))
+  const sysSpec = assistSystem(ASSISTS['spec.judge'], { skill: '대표표식' })
+  check('J10 명세서 판사 · 쓰기 단추 — 특허 악마판사 · 최종본 규칙(spec.a~e · parts · fix)', sysSpec.includes(PATENT_JUDGE[0]) && sysSpec.includes('대표표식') && ['spec.a', 'spec.b', 'spec.c', 'spec.d', 'spec.e', 'spec.parts', 'spec.fix'].every((id) => assistSystem(ASSISTS[id]).includes('[최종본 규칙') && assistSystem(ASSISTS[id]).includes(PATENT_JUDGE[0])))
+  check('J11 다른 단추엔 붙지 않음 — 시장조사 · 아이디어 · 오늘 할 일', ['venture.market', 'spec.idea', 'today.top3'].every((id) => !assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
+  check('J12 대표 정의 — 빈 글이면 아무것도 안 붙음 · 8,000자에서 자름', customSkillBlock('').length === 0 && customSkillBlock('  ').length === 0 && customSkillBlock('가'.repeat(9000))[2].length === 8000)
+  check('J13 화면 이름표 = 서버(시장조사 · 판사 둘)', ['venture.market', 'venture.judge', 'spec.judge'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)) && ASSISTS['venture.market'].research === true)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

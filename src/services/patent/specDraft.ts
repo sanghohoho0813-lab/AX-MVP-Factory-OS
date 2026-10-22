@@ -12,6 +12,7 @@
  * 뼈대 문장은 사람이 고치거나 AI(대표만)가 늘려 쓰는 출발점이다. 고친 글이 있으면 뼈대 대신 그 글을 쓴다.
  * 만든 MD 는 D-245 명세서 점검(checkSpec)으로 곧바로 다시 걸러진다.
  */
+import { readJudgeReport, type JudgeReport } from '../aiAssist/judge'
 
 /* ------------------------------------------------------------------ */
 /* 조사(을/를 · 이/가 · 은/는 · 과/와 · 으로/로)                            */
@@ -175,6 +176,8 @@ export interface SpecDraft {
   research: SpecResearch | null
   /** D-252 작업판에 끌어다 놓은 자료(읽은 글만 · 개인정보 가림 · 파일 4개 · 6천 자까지) — 아이디어 내줘가 재료로 쓴다 */
   materials: SpecMaterial[]
+  /** D-263 악마판사 판정 — 구성 뒤(parts) · 청구항 뒤(full) */
+  judge: { parts: JudgeReport | null; full: JudgeReport | null }
 }
 
 export interface SpecMaterial {
@@ -209,6 +212,7 @@ export function emptyDraft(): SpecDraft {
     ideas: [],
     research: null,
     materials: [],
+    judge: { parts: null, full: null },
   }
 }
 
@@ -274,6 +278,7 @@ export function normalizeDraft(v: unknown): SpecDraft {
           .filter((x) => x.text.trim())
           .slice(0, MATERIAL_MAX)
       : [],
+    judge: { parts: readJudgeReport((o.judge as Record<string, unknown> | undefined)?.parts), full: readJudgeReport((o.judge as Record<string, unknown> | undefined)?.full) },
   }
 }
 

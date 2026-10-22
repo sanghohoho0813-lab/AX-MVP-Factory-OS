@@ -242,6 +242,8 @@ export interface VPlanFacts {
   /** 올린 명세서의 발명의 명칭(없으면 '') */
   patentTitle: string
   industryText: string
+  /** D-263 이전 컨설팅 기록의 출원번호(있으면) */
+  applicationNumber?: string
 }
 
 /** 재료(명세서 요약)의 첫 줄 '[발명의 명칭] 한글 (영문)' 에서 한글 명칭만 — 사람이 고친 재료에서도 읽는다 */
@@ -251,8 +253,8 @@ export function patentTitleOf(material: string): string {
 }
 
 /** 기업인증 업체 정보 + 재료 → 사실(회사 기록에 있는 것만) */
-export function planFactsOf(ctx: Pick<CertificationClientContext, 'companyName' | 'patents' | 'researchUnit' | 'researchers' | 'rndExpense' | 'industryText'>, s: VPlanState): VPlanFacts {
-  return { companyName: ctx.companyName, patents: ctx.patents, researchUnit: ctx.researchUnit, researchers: ctx.researchers, rndExpense: ctx.rndExpense, patentTitle: patentTitleOf(s.materials.patent), industryText: ctx.industryText }
+export function planFactsOf(ctx: Pick<CertificationClientContext, 'companyName' | 'patents' | 'researchUnit' | 'researchers' | 'rndExpense' | 'industryText'> & Partial<Pick<CertificationClientContext, 'legacyVenture'>>, s: VPlanState): VPlanFacts {
+  return { companyName: ctx.companyName, patents: ctx.patents, researchUnit: ctx.researchUnit, researchers: ctx.researchers, rndExpense: ctx.rndExpense, patentTitle: patentTitleOf(s.materials.patent), industryText: ctx.industryText, applicationNumber: (ctx.legacyVenture?.applicationNumber ?? '').trim() }
 }
 
 /** 줄 칸을 줄 배열로 */

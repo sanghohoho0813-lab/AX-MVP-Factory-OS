@@ -8,17 +8,36 @@
  * 보내는 것: 특허 명세서 요약(사람이 확인한 재료) · AX/MVP 분석 · 컨설턴트 메모 · 업체 사실 · 이미 쓴 칸(이야기가 이어지게).
  * 사람 이름 · 연락처는 보내지 않는다(서버가 한 번 더 지운다).
  */
-import type { AssistAnswer } from '../../services/aiAssist/client'
+import type { AssistAnswer, AssistItem } from '../../services/aiAssist/client'
 import type { AssistContext, AssistRow } from '../../services/aiAssist/context'
 import { VPLAN_FIELD, VPLAN_FIELDS, type DraftItem, type VPlanBatch, type VPlanFacts, type VPlanState } from '../core/venturePlan'
+import { RD_ORG_SHORT, marketRows, patentNoOf, rdOf, type GateState } from './ventureGate'
 
+/**
+ * D-263 요약을 본문보다 먼저(기준 문서 23-1B · 대표: "시장조사 → 출원번호 · 기술인력 → 요약") — 요약 묶음이 맨 앞.
+ * 요약 앞에는 시장조사 · 요약 전 확인(규칙)이, 요약 뒤 · 본문 뒤에는 악마판사가 들어간다(VPLAN_STEPS).
+ */
 export const VPLAN_BATCHES: readonly { key: VPlanBatch; assistId: string; label: string }[] = [
+  { key: 'sum', assistId: 'venture.sum', label: '요약 · 핵심 요약' },
   { key: 'p1', assistId: 'venture.p1', label: '[1] 개발 배경 · 경쟁력' },
   { key: 'p2', assistId: 'venture.p2', label: '[1] 기술개발 경과 · 3년 계획' },
   { key: 'g1', assistId: 'venture.g1', label: '[2] 목표시장 · 경쟁사' },
   { key: 'g2', assistId: 'venture.g2', label: '[2] 시장진입 경과 · 3년 계획' },
   { key: 'x', assistId: 'venture.x', label: '[1] 기업가정신 · [2] 자금운용' },
-  { key: 'sum', assistId: 'venture.sum', label: '요약 · 핵심 요약' },
+]
+
+export type VPlanStep = 'market' | VPlanBatch | 'judgeSum' | 'judgeAll'
+/** [전부 써줘] 차례 — 시장조사 → (요약 전 확인) → 요약 → 악마판사 → 본문 5묶음 → 악마판사 */
+export const VPLAN_STEPS: readonly { key: VPlanStep; label: string }[] = [
+  { key: 'market', label: '시장조사(TAM · SAM · SOM)' },
+  { key: 'sum', label: '요약 · 핵심 요약' },
+  { key: 'judgeSum', label: '악마판사 ① 요약' },
+  { key: 'p1', label: '[1] 개발 배경 · 경쟁력' },
+  { key: 'p2', label: '[1] 기술개발 경과 · 3년 계획' },
+  { key: 'g1', label: '[2] 목표시장 · 경쟁사' },
+  { key: 'g2', label: '[2] 시장진입 경과 · 3년 계획' },
+  { key: 'x', label: '[1] 기업가정신 · [2] 자금운용' },
+  { key: 'judgeAll', label: '악마판사 ② 전체' },
 ]
 
 export const fieldsOfBatch = (b: VPlanBatch) => VPLAN_FIELDS.filter((f) => f.batch === b)
@@ -44,6 +63,18 @@ function chunks(text: string, size = 560): string[] {
 }
 
 const rowsOfText = (text: string, label: string): AssistRow[] => chunks(text).map((memo, i) => ({ part: `${label} ${i + 1}`, memo }))
+
+/** D-263 요약 전 확인(출원번호 · 기술인력) — AI 에 사실로 보낸다 */
+export function gateLines(s: Pick<VPlanState, 'text'>, f: VPlanFacts, g: GateState | null | undefined): string[] {
+  if (!g) return []
+  const p = patentNoOf(s, f, g)
+  const r = rdOf(s, f, g)
+  return [
+    p.value ? `특허 출원번호: ${p.value}(출원 중 — 등록 아님)` : p.source === 'none' ? '특허: 아직 출원 전(요약 · 본문에 "출원 예정" 으로)' : '특허 출원번호: 미확인',
+    `연구개발 조직(확인): ${r.org ? (RD_ORG_SHORT[r.org] ?? r.org) : '미확인'}`,
+    `연구개발 인원(확인): ${r.staff == null ? '미확인' : `${r.staff}명`}`,
+  ]
+}
 
 export function factLines(f: VPlanFacts, extra: string[] = []): string[] {
   const out = [`회사명: ${f.companyName || '미확인'}`]
@@ -80,9 +111,9 @@ export const VENTURE_RULES = [
   '출력: items 에 칸마다 하나 — title = 칸 id 그대로(예: development_background), body = 본문, tag = 고른 체크박스(쉼표로 · 체크 칸만), detail = 근거가 모자라 확인이 필요한 점(짧게 · 없으면 빈 글).',
 ]
 
-/** 묶음 하나의 보낼 자료 */
-export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState; facts: VPlanFacts; today: string }): AssistContext {
-  const { batch, state, facts, today } = input
+/** 묶음 하나의 보낼 자료(gate = 시장조사 · 출원번호 · 기술인력 — 있으면 같이) */
+export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
+  const { batch, state, facts, today, gate } = input
   const mine = new Set(fieldsOfBatch(batch).map((f) => f.id))
   const written: AssistRow[] = []
   for (const f of VPLAN_FIELDS) {
@@ -96,15 +127,83 @@ export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState;
     { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
     { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
     { name: '이미 쓴 칸(이야기를 이어 갈 것)', rows: written },
+    ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
   ]
   return {
     title: '벤처기업확인 사업계획서',
     today,
     purpose: `이번에 쓸 칸: ${[...mine].map((id) => VPLAN_FIELD[id].title).join(' · ')}`,
     sections,
-    facts: factLines(facts),
+    facts: factLines(facts, gateLines(state, facts, gate)),
     rules: [...VENTURE_RULES, ...batchRules(batch)],
   }
+}
+
+/** D-263 시장조사 단추에 보낼 자료 — 재료 · 메모 · 회사 사실(이미 쓴 칸이 있으면 같이) */
+export function buildMarketContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
+  const { state, facts, today, gate } = input
+  const written: AssistRow[] = []
+  for (const id of ['tech_name', 'tech_summary', 'market_target', 'competitor_analysis', 'market_entry_progress']) {
+    const t = (state.text[id] ?? '').trim()
+    if (t) written.push({ part: `${id} · ${VPLAN_FIELD[id].title}`, memo: t.slice(0, 560) })
+  }
+  return {
+    title: '벤처기업확인 사업계획서 — 시장조사(TAM · SAM · SOM)',
+    today,
+    purpose: '요약을 쓰기 전에 목표시장을 TAM → SAM → SOM 으로',
+    sections: [
+      { name: '특허 명세서(출원본 · 사람이 확인한 요약)', rows: rowsOfText(state.materials.patent, '명세서') },
+      { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
+      { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
+      { name: '이미 쓴 칸', rows: written },
+      ...(gate?.market ? [{ name: '지난 시장조사(고칠 것)', rows: marketRows(gate.market) }] : []),
+    ],
+    facts: factLines(facts, gateLines(state, facts, gate)),
+  }
+}
+
+/** D-263 악마판사에게 보낼 자료 — 판정 범위(요약 · 전체)의 칸 · 시장조사 · 확인된 사실 · 칸 규칙(짧게) */
+export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
+  const { scope, state, facts, today, gate } = input
+  const fields = VPLAN_FIELDS.filter((f) => f.kind === 'text' || f.kind === 'line').filter((f) => (scope === 'sum' ? f.part === 'summary' || f.part === 'core' : true))
+  const rows: AssistRow[] = []
+  for (const f of fields) {
+    const t = (state.text[f.id] ?? '').trim()
+    if (!t) continue
+    for (const [i, c] of chunks(t).entries()) rows.push({ part: `${f.id}${i ? ' (이어서)' : ''} · ${f.title}`, memo: c })
+  }
+  const rules = [
+    ...VENTURE_RULES.slice(0, 7),
+    ...fields.map((f) => `칸 ${f.id} = ${f.no} ${f.title}${f.limit ? ` (${f.limit}자 안 · 850~950자 권장)` : ''}${f.template ? ` · 문장 틀: ${f.template}` : ''}${f.checks ? ` · 체크 선택지: ${f.checks.join(' / ')}` : ''}`),
+  ]
+  return {
+    title: `벤처기업확인 사업계획서 — 악마판사 ${scope === 'sum' ? '①' : '②'}`,
+    today,
+    purpose: `판정 범위: ${scope === 'sum' ? '요약' : '전체'}`,
+    sections: [
+      { name: '사업계획서 지금 글', rows },
+      ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
+      { name: '특허 명세서(출원본 · 요약)', rows: rowsOfText(state.materials.patent, '명세서').slice(0, 4) },
+      { name: 'AX · MVP', rows: rowsOfText(state.materials.ax, 'AX').slice(0, 3) },
+    ],
+    facts: factLines(facts, gateLines(state, facts, gate)),
+    rules,
+  }
+}
+
+/** 악마판사가 고친 칸 → 칸 초안(판정 범위 안의 글 칸만 · 사람이 고친 칸은 mergeDraft 가 새 안으로) */
+export function judgeItemsOf(rewrites: AssistItem[], scope: 'sum' | 'full'): DraftItem[] {
+  const inScope = VPLAN_FIELDS.filter((f) => f.kind === 'text' || f.kind === 'line').filter((f) => (scope === 'sum' ? f.part === 'summary' || f.part === 'core' : true))
+  const out: DraftItem[] = []
+  for (const it of rewrites) {
+    const key = String(it.title ?? '').trim()
+    const f = inScope.find((x) => x.id === key) ?? inScope.find((x) => x.title === key) ?? (key.length >= 4 ? inScope.find((x) => x.title.includes(key) || key.includes(x.title)) : undefined)
+    const body = String(it.body ?? '').trim()
+    if (!f || !body || out.some((o) => o.id === f.id)) continue
+    const checks = String(it.tag ?? '').split(/[,，·|]/).map((x) => x.trim()).filter(Boolean)
+    out.push({ id: f.id, text: body, checks: f.checks ? checks : undefined })
+  }
+  return out
 }
 
 /** 답 → 칸. title 이 id 가 아니면 칸 이름으로 찾는다 */

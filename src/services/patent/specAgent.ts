@@ -10,7 +10,8 @@
  * 기준 문서(Master v2.9 · AX펭귄)는 서버가 단추마다 붙인다(api/_ai/knowledge.js) — 여기서는 자료만 보낸다.
  * 사람이 고친 칸은 덮지 않는다(본문 · 청구항은 새 안으로 · 구성은 그대로 두고 알림). 규칙 점검은 AI 가 아니다.
  */
-import type { AssistAnswer, AssistRun } from '../aiAssist/client'
+import type { AssistAnswer, AssistItem, AssistRun } from '../aiAssist/client'
+import { judgeLine, judgePassed } from '../aiAssist/judge'
 import type { AssistContext, AssistRow } from '../aiAssist/context'
 import { safeText } from '../aiAssist/context'
 import { checkSpec, type SpecReport } from './specCheck'
@@ -27,6 +28,7 @@ import {
   sectionOf,
   specMarkdown,
   titleLine,
+  titleParts,
   type IdeaPick,
   type SectionKey,
   type SpecAxis,
@@ -38,16 +40,19 @@ import { SPEC_BATCHES, researchRows, type SpecBatch } from './specDraftAi'
 
 export { researchRows }
 
-export type AgentStage = 'idea' | 'research' | 'parts' | SpecBatch | 'fix'
+export type AgentStage = 'idea' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
 
 /** 작업판의 칸(카드) — 단계 여럿이 한 칸이 되기도 한다 */
-export type AgentCard = 'idea' | 'research' | 'parts' | 'body' | 'claims' | 'check'
+export type AgentCard = 'idea' | 'research' | 'parts' | 'body' | 'claims' | 'judge' | 'check'
 
 export const STAGES: readonly { key: AgentStage; card: AgentCard; assistId: string; label: string; seconds: number }[] = [
   { key: 'idea', card: 'idea', assistId: 'spec.idea', label: '아이디어 3개', seconds: 30 },
   { key: 'research', card: 'research', assistId: 'spec.research', label: '선행기술 · 차별화 조사', seconds: 40 },
   { key: 'parts', card: 'parts', assistId: 'spec.parts', label: '권리축 · 구성요소 · 단계', seconds: 30 },
+  // D-263 악마판사 — 구성 뒤 · 청구항 뒤에 반드시(판정 + 직접 고침)
+  { key: 'judge1', card: 'judge', assistId: 'spec.judge', label: '악마판사 ① 구성 · 권리축', seconds: 40 },
   ...SPEC_BATCHES.map((b) => ({ key: b.key as AgentStage, card: (b.key === 'e' ? 'claims' : 'body') as AgentCard, assistId: b.assistId, label: b.label, seconds: 30 })),
+  { key: 'judge2', card: 'judge', assistId: 'spec.judge', label: '악마판사 ② 명세서 전체', seconds: 50 },
   { key: 'fix', card: 'check', assistId: 'spec.fix', label: '점검대로 고치기', seconds: 40 },
 ]
 
@@ -59,6 +64,7 @@ export const CARD_STAGES: Record<AgentCard, AgentStage[]> = {
   parts: ['parts'],
   body: ['a', 'b', 'c', 'd'],
   claims: ['e'],
+  judge: ['judge1', 'judge2'],
   check: ['fix'],
 }
 
@@ -167,6 +173,9 @@ export function clearAfterIdea(d: SpecDraft): SpecDraft {
 }
 
 /** 구성 · 본문 · 청구항 중 하나라도 있나 */
+/** 본문 칸이나 청구항을 이미 썼나(악마판사 ① 이 구성 이름을 바꾸면 안 되는 때 · 판사 카드는 ② 만) */
+export const bodyWritten = (d: SpecDraft) => d.claims.some((c) => c.trim()) || SECTION_KEYS.some((k) => (d.text[k] ?? '').trim())
+
 export const hasLaterWork = (d: SpecDraft) => d.components.some((c) => c.name.trim()) || claimsOf(d).length > 0 && d.claims.length > 0 || SECTION_KEYS.some((k) => (d.text[k] ?? '').trim())
 
 /* ------------------------------------------------------------------ */
@@ -527,7 +536,9 @@ export function planAll(d: SpecDraft): AgentStage[] {
   if (!d.title.trim() || ideaCount(d) < 3) out.push('idea')
   if (!d.research || d.research.forTitle !== d.title || !d.title.trim()) out.push('research')
   if (d.components.filter((c) => c.name.trim()).length < 2) out.push('parts')
-  out.push('a', 'b', 'c', 'd', 'e', 'fix')
+  // D-263 악마판사는 구성 뒤 · 청구항 뒤에 반드시(구성을 새로 쓰거나 아직 판정 전이면 ①부터 — 본문이 이미 있으면 ② 가 함께 본다)
+  if (out.includes('parts') || (!d.judge.parts && !bodyWritten(d))) out.push('judge1')
+  out.push('a', 'b', 'c', 'd', 'e', 'judge2', 'fix')
   return out
 }
 
@@ -537,6 +548,7 @@ export function stageBlock(stage: AgentStage, d: SpecDraft): string {
   if (!d.title.trim()) return '아이디어부터 — [아이디어 내줘]'
   if (stage === 'research' || stage === 'parts') return ''
   if (d.components.filter((c) => c.name.trim()).length < 2) return '구성요소부터 — [구성 · 단계 써줘]'
+  if (stage === 'judge2' && !bodyWritten(d)) return '본문 · 청구항부터 — [본문 써줘] · [청구항 써줘]'
   return ''
 }
 
@@ -559,7 +571,84 @@ export function cardState(card: AgentCard, d: SpecDraft): { done: boolean; human
       const n = d.claims.length
       return { done: n >= 2, human: n > 0 && d.claims.join('\n\n').trim() !== (d.ai.claims ?? '').trim(), summary: n ? `청구항 ${n}개` : '' }
     }
+    case 'judge': {
+      const r = d.judge.full ?? d.judge.parts
+      return { done: judgePassed(d.judge.full), human: false, summary: judgeLine(r) }
+    }
     case 'check':
       return { done: !checkDraft(d).some((i) => i.level === 'error'), human: false, summary: '' }
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* D-263 악마판사 — 구성 뒤(①) · 청구항 뒤(②)                              */
+/* ------------------------------------------------------------------ */
+
+export type JudgeScope = 'parts' | 'full'
+export const JUDGE_SCOPE_LABEL: Record<JudgeScope, string> = { parts: '구성', full: '전체' }
+
+/** 판사에게 보낼 자료 — ① 아이디어 · 조사 · 권리축 · 구성 · 단계 · 씨앗 / ② 명칭 · 본문 · 청구항(구체적인 내용은 앞부분만 — 뒷받침 확인용) */
+export function buildJudgeContext(input: { draft: SpecDraft; scope: JudgeScope; today: string }): AssistContext {
+  const { draft: d, scope, today } = input
+  const comps = d.components.filter((c) => c.name.trim())
+  const sections: AssistContext['sections'] = []
+  const ideaRows: AssistRow[] = [{ part: '명칭', memo: d.title }, ...AXIS_KEYS.map((k) => ({ part: `axis.${k}`, memo: d.axis[k] || '(없음)' }))]
+  for (const [k, v] of Object.entries(d.idea)) if (v.trim()) ideaRows.push({ part: `아이디어 ${k}`, memo: v })
+  if (scope === 'parts') {
+    sections.push({ name: '아이디어 · 권리축', rows: ideaRows })
+    if (d.research) sections.push({ name: '선행기술 조사 메모', rows: [{ part: '결론', memo: d.research.headline }, ...d.research.items.slice(0, 7).map((i) => ({ part: i.tag || '메모', memo: `${i.title} — ${i.detail}` }))] })
+    sections.push({ name: '시스템 · 구성요소', rows: [{ part: 'system', name: d.systemName || titleParts(d.title).system }, ...comps.map((c) => ({ part: c.no, name: c.name, does: c.does }))] })
+    sections.push({ name: '방법 단계', rows: d.steps.map((x) => ({ part: x.no, memo: x.text })) })
+    sections.push({ name: '종속항 씨앗', rows: d.seeds.map((x) => ({ part: x.comp || '씨앗', memo: x.text })) })
+  } else {
+    const rows: AssistRow[] = [{ part: 'title', memo: d.title }, { part: 'titleEn', memo: d.titleEn || '(없음)' }]
+    for (const k of SECTION_KEYS) chunks(sectionOf(d, k)).slice(0, k === 'detail' ? 5 : 3).forEach((memo, i) => rows.push({ part: `${k}${i ? ' (이어서)' : ''}`, memo }))
+    sections.push({ name: '구성요소(이름 · 부호 그대로 쓸 것)', rows: comps.map((c) => ({ part: c.no, name: c.name, does: c.does })) })
+    sections.push({ name: '명세서 지금 글', rows })
+    sections.push({ name: '청구항', rows: claimsOf(d).slice(0, 14).map((c, i) => ({ part: `claims ${i + 1}`, memo: c.slice(0, 560) })) })
+    sections.push({ name: '아이디어 · 권리축', rows: ideaRows })
+  }
+  return { title: `특허 명세서 — 악마판사 ${scope === 'parts' ? '①' : '②'}`, today, purpose: `판정 범위: ${JUDGE_SCOPE_LABEL[scope]}`, sections }
+}
+
+/**
+ * 판사가 고친 것 합치기 — 사람 글은 보호(구성은 partsHuman · 본문은 mergeSpecAi 새 안).
+ *  ① 고친 권리축 · 시스템 · 구성 · 단계 · 씨앗을 지금 구성 위에 겹쳐(일부만 와도) applyParts
+ *  ② 명칭 · 본문 칸 · 청구항은 applyFix — 구체적인 내용(detail)은 판사가 앞부분만 봤으므로 덮지 않는다
+ */
+export function applyJudge(d: SpecDraft, scope: JudgeScope, rewrites: AssistItem[]): { draft: SpecDraft; fixed: string[]; kept: string[] } {
+  if (!rewrites.length) return { draft: d, fixed: [], kept: [] }
+  if (scope === 'parts') {
+    const p = partsOf({ headline: '', items: rewrites })
+    const touched = p.components.length >= 2 || p.steps.length > 0 || p.seeds.length > 0 || !!p.systemName || AXIS_KEYS.some((k) => p.axis[k])
+    if (!touched) return { draft: d, fixed: [], kept: [] }
+    if (partsHuman(d)) return { draft: d, fixed: [], kept: ['구성'] }
+    // 본문 · 청구항이 이미 있으면 구성요소 · 단계 · 시스템 이름은 그대로(바꾸면 본문 · 청구항의 이름 · 부호와 어긋난다)
+    const locked = bodyWritten(d)
+    const newComps = !locked && p.components.length >= 2
+    const newSteps = !locked && p.steps.length >= 2
+    const newSystem = !locked && !!p.systemName
+    const merged: PartsAnswer = {
+      axis: { ...d.axis, ...Object.fromEntries(AXIS_KEYS.filter((k) => p.axis[k]).map((k) => [k, p.axis[k]!])) },
+      systemName: newSystem ? p.systemName : d.systemName,
+      components: newComps ? p.components : d.components.filter((c) => c.name.trim()).map((c) => ({ name: c.name, does: c.does })),
+      steps: newSteps ? p.steps : d.steps.map((x) => x.text),
+      seeds: p.seeds.length ? p.seeds : d.seeds.map((x) => ({ comp: d.components.find((c) => c.no === x.comp)?.name ?? x.comp, text: x.text })),
+    }
+    const r = applyParts(d, merged, { force: true })
+    const fixed = [
+      ...AXIS_KEYS.filter((k) => p.axis[k]).map((k) => `권리축 ${AXIS_LABEL[k]}`),
+      ...(newSystem ? ['시스템 이름'] : []),
+      ...(newComps ? ['구성요소'] : []),
+      ...(newSteps ? ['방법 단계'] : []),
+      ...(p.seeds.length ? ['종속항 씨앗'] : []),
+    ]
+    const kept = locked && (p.components.length >= 2 || p.steps.length >= 2 || !!p.systemName) ? ['구성요소 · 단계(본문 · 청구항이 이미 있어 이름 그대로)'] : []
+    return { draft: fixed.length ? r.draft : d, fixed, kept }
+  }
+  const items = fixItemsOf({ headline: '', items: rewrites }).filter((i) => i.key !== 'detail')
+  if (!items.length) return { draft: d, fixed: [], kept: [] }
+  const m = applyFix(d, items)
+  const name = (k: string) => (k === 'title' ? '명칭' : k === 'titleEn' ? '영문 명칭' : k === 'claims' ? '청구항' : (SECTION_LABEL as Record<string, string>)[k] ?? k)
+  return { draft: m.draft, fixed: m.replaced.map(name), kept: m.kept.map(name) }
 }

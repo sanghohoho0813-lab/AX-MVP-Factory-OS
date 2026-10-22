@@ -7,15 +7,20 @@
  */
 import { AssistError, assistMessage, callAssist } from '../aiAssist/client'
 import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
+import { judgeOf, judgePassed, type JudgeReport } from '../aiAssist/judge'
+import { readJudgeSkill } from '../aiAssist/judgeSkill'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import { cleanAiText, mergeSpecAi, type SectionKey, type SpecDraft } from './specDraft'
 import { buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from './specDraftAi'
 import {
   applyFix,
   applyIdea,
+  applyJudge,
   applyParts,
   buildFixContext,
   buildIdeaContext,
+  buildJudgeContext,
+  JUDGE_SCOPE_LABEL,
   buildPartsContext,
   buildResearchContext,
   fixIssues,
@@ -156,7 +161,12 @@ const FORMAT_HINT: Record<AgentStage, string> = {
   d: '앞 답을 읽지 못했습니다. items 하나 — title = "detail2", body = 구체적인 내용 뒷부분 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
   e: '앞 답을 읽지 못했습니다. items 하나 — title = "claims", body = 청구항 전체(청구항 n. 머리 · 빈 줄로 나눔)로 다시 써 주세요. JSON 한 덩어리만.',
   fix: '앞 답을 읽지 못했습니다. items 의 title = 고칠 칸 이름표(title · titleEn · field · background · problem · solution · effect · detail · abstract · claims), body = 그 칸 전체를 고친 글로 다시 써 주세요. JSON 한 덩어리만.',
+  judge1: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판결은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 것은 spec.parts 이름표(axis.* · system · comp · step · seed)로 다시 써 주세요. JSON 한 덩어리만.',
+  judge2: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판결은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 이름표(title · titleEn · field · background · problem · solution · effect · abstract · claims)","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
 }
+
+/** D-263 악마판사를 다시 부르는 기준 — 90점 미만이거나 P0 가 남았는데 판사가 고친 칸이 있으면 한 번 더 판정(최대 2번) */
+const JUDGE_ROUNDS = 2
 
 const KEY_LABEL: Record<string, string> = { field: '기술분야', background: '배경기술', problem: '해결하려는 과제', solution: '해결 수단', effect: '발명의 효과', detail: '구체적인 내용', abstract: '요약', claims: '청구항' }
 
@@ -182,6 +192,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
     setStage(id, stage, { phase: 'skip', text: '점검에서 고칠 글이 없습니다' })
     return 'ok'
   }
+  if (stage === 'judge1' || stage === 'judge2') return runJudge(id, stage, env, choice)
   const s = stageOf(stage)
   const context =
     stage === 'idea'
@@ -199,7 +210,8 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
   for (let attempt = 0; attempt < TRIES; attempt += 1) {
     if (!attempt) setStage(id, stage, { phase: 'run', text: `쓰는 중…(${s.seconds}초쯤)` })
     try {
-      const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}) })
+      const skill = stage === 'idea' || stage === 'research' ? '' : readJudgeSkill()
+      const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
       // 서버가 모양 검사에서 떨어뜨린 답(머리글 빠짐 · 끝 잘림 · 코드 블록)도 원문에서 다시 읽는다
       const ans = answerOf(run)
       switch (stage) {
@@ -294,6 +306,83 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv, choice: Retu
     }
   }
   return 'fail'
+}
+
+/**
+ * D-263 악마판사 단계 — 판정 + 판사가 직접 고친 칸을 넣는다. 90점 미만이거나 P0 가 남았고 고친 칸이 있었으면
+ * 고친 글로 한 번 더 판정한다(최대 2번) — "점검 요청하면 꼭 한두 개씩 보완하라 하더라" 를 화면 안에서 끝낸다.
+ */
+async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv, choice: ReturnType<typeof readChoice>): Promise<'ok' | 'fail' | 'stop'> {
+  const scope = stage === 'judge1' ? 'parts' : 'full'
+  const label = JUDGE_SCOPE_LABEL[scope]
+  const skill = readJudgeSkill()
+  const fixedAll: string[] = []
+  const keptAll: string[] = []
+  let report: JudgeReport | null = null
+  for (let round = 1; round <= JUDGE_ROUNDS; round += 1) {
+    const d0 = current(id)
+    if (!d0) {
+      setStage(id, stage, { phase: 'fail', text: '명세서를 찾지 못했습니다 — 다시 열어 주세요' })
+      return 'stop'
+    }
+    const context = buildJudgeContext({ draft: d0, scope, today: env.today })
+    let hint = ''
+    let got: ReturnType<typeof judgeOf> | null = null
+    let rateWaited = false
+    for (let attempt = 0; attempt < TRIES && !got; attempt += 1) {
+      if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `악마판사가 ${label}을 판정하는 중…(${stageOf(stage).seconds}초쯤)` : '판사가 고친 글로 한 번 더 판정하는 중…' })
+      try {
+        const run = await callAssist({ requestId: newRequestId(), assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+        const j = judgeOf(answerOf(run))
+        if (j.score == null && !j.verdicts.length && !j.rewrites.length) throw new AssistError(PARSE_MISS, 'AI 답에서 판정을 찾지 못했습니다 — 다시 눌러 주세요')
+        got = j
+      } catch (e) {
+        const code = e instanceof AssistError ? e.code : 'save'
+        const left = attempt < TRIES - 1
+        if (code === 'rate_limited' && !rateWaited && left) {
+          rateWaited = true
+          setStage(id, stage, { phase: 'run', text: '잠깐 많이 불러서 1분 쉬었다 다시 판정합니다' })
+          await sleep(retryMs)
+          continue
+        }
+        if (code === PARSE_MISS && left) {
+          hint = FORMAT_HINT[stage]
+          setStage(id, stage, { phase: 'run', text: `답 모양이 어긋나 이름표를 다시 알려 주고 판정합니다(${attempt + 2}/${TRIES})` })
+          continue
+        }
+        if (TRANSIENT.has(code) && left) {
+          setStage(id, stage, { phase: 'run', text: `연결이 잠깐 끊겨 다시 판정합니다(${attempt + 2}/${TRIES})` })
+          await sleep(transientMs)
+          continue
+        }
+        const why = e instanceof AssistError ? e.message || assistMessage(e.code) : `저장하지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`
+        setStage(id, stage, { phase: 'fail', text: why })
+        return STOP_CODES.has(code) ? 'stop' : 'fail'
+      }
+    }
+    if (!got) return 'fail'
+    const j = got
+    let applied: ReturnType<typeof applyJudge> = { draft: d0, fixed: [], kept: [] }
+    await patch(id, (cur) => {
+      applied = applyJudge(cur, scope, j.rewrites)
+      fixedAll.push(...applied.fixed.filter((x) => !fixedAll.includes(x)))
+      keptAll.push(...applied.kept.filter((x) => !keptAll.includes(x)))
+      report = { at: new Date().toISOString(), scope: label, score: j.score, scores: j.scores, verdicts: j.verdicts, fixed: [...fixedAll], kept: [...keptAll], rounds: round, custom: !!skill, headline: j.headline }
+      const r = report
+      return { ...applied.draft, judge: { ...applied.draft.judge, [scope]: r } }
+    })
+    // 통과했거나 · 판사가 고친 것이 없으면(다시 물어도 같은 판정) 여기서 끝
+    if (judgePassed(report) || !applied.fixed.length) break
+  }
+  const r = report as JudgeReport | null
+  const p0 = r?.verdicts.filter((v) => v.level === 'P0').length ?? 0
+  const asks = r?.verdicts.filter((v) => v.level === '대표 확인') ?? []
+  if (asks.length) setRun(id, (x) => ({ ...x, asks: [...x.asks.filter((a) => a.key !== `악마판사 ${label}`), ...asks.map((a) => ({ key: `악마판사 ${label}`, text: a.fix || a.text }))] }))
+  setStage(id, stage, {
+    phase: 'done',
+    text: `${r?.score != null ? `${r.score}점` : '점수 없음'} · P0 ${p0}${fixedAll.length ? ` · 직접 고친 칸 ${fixedAll.join(' · ')}` : ' · 고칠 것 없음'}${keptAll.length ? ` · 직접 고치신 ${keptAll.join(' · ')}은 그대로` : ''}${(r?.rounds ?? 1) > 1 ? ' · 고친 뒤 다시 판정' : ''}`,
+  })
+  return 'ok'
 }
 
 /** 단계들을 차례로(이미 쓰는 중이면 무시). 단계 하나가 실패해도 다음 단계는 간다 — 설정 · 권한 오류면 멈춘다 */
