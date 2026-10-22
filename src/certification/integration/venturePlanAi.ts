@@ -11,7 +11,8 @@
 import type { AssistAnswer, AssistItem } from '../../services/aiAssist/client'
 import type { AssistContext, AssistRow } from '../../services/aiAssist/context'
 import { VPLAN_FIELD, VPLAN_FIELDS, type DraftItem, type VPlanBatch, type VPlanFacts, type VPlanState } from '../core/venturePlan'
-import { RD_ORG_SHORT, marketRows, patentNoOf, rdOf, type GateState } from './ventureGate'
+import { PLAN_LINE_LABEL, PLAN_MAX, RD_ORG_SHORT, chosenPlan, marketRows, patentNoOf, rdOf, type GateState, type PlanPick } from './ventureGate'
+import { addFresh, rankByScore, rerankByAnswer, scoreOf, stripRank, titleKey } from '../../services/aiAssist/candidates'
 
 /**
  * D-263 요약을 본문보다 먼저(기준 문서 23-1B · 대표: "시장조사 → 출원번호 · 기술인력 → 요약") — 요약 묶음이 맨 앞.
@@ -111,6 +112,84 @@ export const VENTURE_RULES = [
   '출력: items 에 칸마다 하나 — title = 칸 id 그대로(예: development_background), body = 본문, tag = 고른 체크박스(쉼표로 · 체크 칸만), detail = 근거가 모자라 확인이 필요한 점(짧게 · 없으면 빈 글).',
 ]
 
+/* ------------------------------------------------------------------ */
+/* D-270 기획 방향 — 대표: "벤처도 마찬가지 · 기획이 제일 중요 · 버튼 하나로 처음부터 끝까지보다 기획 단계에서 여러 개 내고 고르기" */
+/* ------------------------------------------------------------------ */
+
+/** 고른 기획 방향 → 자료 줄(쓰기 · 자체점검 · 시장조사가 이 줄거리를 따른다) */
+export function planRows(p: PlanPick | null): AssistRow[] {
+  if (!p) return []
+  return [{ part: '기획 방향', memo: p.title }, ...p.lines.map((l, i) => ({ part: PLAN_LINE_LABEL[i] ?? `줄 ${i + 1}`, memo: l })).filter((r) => r.memo.trim())]
+}
+
+/** 고른 방향이 있으면 쓰기 규칙에 한 줄 더 */
+const PLAN_RULE = '[자료 · 고른 기획 방향] 의 줄거리(핵심 기술 · 목표 고객 · 차별 · 증거 · 3년 성장)를 따라 쓴다 — 다른 방향으로 새지 않는다. 방향의 "약점 · 확인할 것" 은 사실처럼 쓰지 않는다.'
+
+/** 재료 · 메모 · 이미 쓴 칸 · 시장조사 — 기획 단추들이 같이 보는 것 */
+function materialSections(state: VPlanState, gate?: GateState | null): AssistContext['sections'] {
+  const written: AssistRow[] = []
+  for (const f of VPLAN_FIELDS) {
+    const t = (state.text[f.id] ?? '').trim()
+    if (t) written.push({ part: `${f.id} · ${f.title}`, memo: t.slice(0, 560) })
+  }
+  return [
+    { name: '특허 명세서(출원본 · 사람이 확인한 요약)', rows: rowsOfText(state.materials.patent, '명세서') },
+    { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
+    { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
+    ...(written.length ? [{ name: '이미 쓴 칸', rows: written.slice(0, 20) }] : []),
+    ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
+  ]
+}
+
+const planCandidateRows = (options: PlanPick[]): AssistRow[] =>
+  options.flatMap((p, i) => chunks(`${p.title} — ${p.lines.map((l, j) => `${PLAN_LINE_LABEL[j] ?? ''}: ${l}`).join(' / ')} / 회사 근거: ${p.why}`).map((memo, j) => ({ part: `후보 ${i + 1}${j ? ' (이어서)' : ''}`, memo })))
+
+/** [기획 방향 5개 내줘] */
+export function buildPlanContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
+  const { state, facts, today, gate } = input
+  return {
+    title: '벤처기업확인 사업계획서 — 기획 방향',
+    today,
+    purpose: '이 회사 사업계획서의 기획 방향 5개(추천 순 · 1~3순위는 이유와 함께)',
+    sections: materialSections(state, gate),
+    facts: factLines(facts, gateLines(state, facts, gate)),
+  }
+}
+
+/** [이 중 제일 좋은 게 뭐야?] */
+export function buildPlanRankContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate: GateState }): AssistContext {
+  const base = buildPlanContext(input)
+  return { ...base, title: '벤처기업확인 사업계획서 — 기획 방향 비교', purpose: `후보 ${input.gate.plan.options.length}개 가운데 무엇이 가장 나은지 — 자체점검 기준으로 점수 · 순위 · 이유`, sections: [...base.sections, { name: '후보', rows: planCandidateRows(input.gate.plan.options) }] }
+}
+
+/** [자체점검으로 더 짜내기] */
+export function buildPlanMoreContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate: GateState }): AssistContext {
+  const base = buildPlanContext(input)
+  return { ...base, title: '벤처기업확인 사업계획서 — 기획 방향 더 짜내기', purpose: '지금 후보들의 약점을 자체점검 기준으로 공격한 뒤, 그 약점을 피한 새 방향 2개', sections: [...base.sections, { name: '지금 후보', rows: planCandidateRows(input.gate.plan.options) }] }
+}
+
+/** 답 → 기획 방향 후보(점수 순 · 6줄 중 4줄 이상 있어야) */
+export function plansOf(answer: AssistAnswer | null, max = 5): PlanPick[] {
+  if (!answer) return []
+  const out: PlanPick[] = []
+  for (const it of answer.items ?? []) {
+    const title = stripRank(String(it.title ?? '').replace(/\s+/g, ' ').trim())
+    const lines = (it.outline ?? []).map((l) => String(l ?? '').replace(/^\s*(?:[①-⑥]|\d+[.)]|[-•·])\s*/, '').replace(/^(?:핵심\s*기술|목표\s*고객[^:：]*|차별[^:：]*|증거|3년\s*성장|약점[^:：]*)\s*[:：]\s*/, '').trim()).filter(Boolean)
+    if (!title || lines.length < 4 || out.some((o) => titleKey(o.title) === titleKey(title))) continue
+    const pick: PlanPick = { title, why: String(it.detail ?? '').trim(), lines: lines.slice(0, 6) }
+    const score = scoreOf(it.amount)
+    if (score != null) pick.score = score
+    const reason = String(it.when ?? '').trim()
+    if (reason) pick.reason = reason
+    out.push(pick)
+    if (out.length >= max) break
+  }
+  return rankByScore(out)
+}
+
+export const rerankPlans = (options: PlanPick[], answer: AssistAnswer | null) => rerankByAnswer(options, answer)
+export const addMorePlans = (options: PlanPick[], more: PlanPick[]) => addFresh(options, more, PLAN_MAX)
+
 /** 묶음 하나의 보낼 자료(gate = 시장조사 · 출원번호 · 기술인력 — 있으면 같이) */
 export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
   const { batch, state, facts, today, gate } = input
@@ -129,13 +208,16 @@ export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState;
     { name: '이미 쓴 칸(이야기를 이어 갈 것)', rows: written },
     ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
   ]
+  // D-270 고른 기획 방향 — 맨 앞에(줄거리를 먼저 보고 쓰게)
+  const plan = gate ? chosenPlan(gate.plan) : null
+  if (plan) sections.unshift({ name: '고른 기획 방향(이 줄거리로 쓸 것)', rows: planRows(plan) })
   return {
     title: '벤처기업확인 사업계획서',
     today,
     purpose: `이번에 쓸 칸: ${[...mine].map((id) => VPLAN_FIELD[id].title).join(' · ')}`,
     sections,
     facts: factLines(facts, gateLines(state, facts, gate)),
-    rules: [...VENTURE_RULES, ...batchRules(batch)],
+    rules: [...VENTURE_RULES, ...(plan ? [PLAN_RULE] : []), ...batchRules(batch)],
   }
 }
 
@@ -157,6 +239,7 @@ export function buildMarketContext(input: { state: VPlanState; facts: VPlanFacts
       { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
       { name: '이미 쓴 칸', rows: written },
       ...(gate?.market ? [{ name: '지난 시장조사(고칠 것)', rows: marketRows(gate.market) }] : []),
+      ...(gate && chosenPlan(gate.plan) ? [{ name: '고른 기획 방향(목표 고객 · 시장은 이 방향으로)', rows: planRows(chosenPlan(gate.plan)) }] : []),
     ],
     facts: factLines(facts, gateLines(state, facts, gate)),
   }
@@ -182,6 +265,7 @@ export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: 
     purpose: `판정 범위: ${scope === 'sum' ? '요약' : '전체'}`,
     sections: [
       { name: '사업계획서 지금 글', rows },
+      ...(gate && chosenPlan(gate.plan) ? [{ name: '고른 기획 방향(이 줄거리에서 벗어났는지도 본다)', rows: planRows(chosenPlan(gate.plan)) }] : []),
       ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
       { name: '특허 명세서(출원본 · 요약)', rows: rowsOfText(state.materials.patent, '명세서').slice(0, 4) },
       { name: 'AX · MVP', rows: rowsOfText(state.materials.ax, 'AX').slice(0, 3) },

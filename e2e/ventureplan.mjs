@@ -5,7 +5,8 @@
  *  - 회사 기록으로 채우기(기술명 · 연구조직 · 지식재산권 출원중 · 핵심 요약 지식재산권 문장) · 이미 적은 칸은 그대로
  *  - 칸: 문장 틀 · 글자 수 · 넘음 · 체크박스 · 상태(확인함 · 사이트에 넣음) · 복사 · 새로고침해도 그대로
  *  - 점검 · 그 칸으로 · 한 장(MD) 내려받기 · 제출 전 확인 '사업계획' 줄
- *  - AI 초안(대표 · 서버 흉내): D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력 — 직접 넣기) → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②
+ *  - AI 초안(대표 · 서버 흉내): D-270 기획 방향 5개(순위 · 이유 · 제일 좋은 것 · 더 짜내기 · 고르기) → D-263 요약 전 3가지(시장조사 · 출원번호 · 기술인력 — 직접 넣기)
+ *    → [요약 쓰기] 요약 → 자체점검 ① → [본문 쓰기] 본문 5묶음 → 자체점검 ②(절차마다 단추 · [전부 써줘] 없음)
  *    · 대표 /자체점검 정의 · 504 저절로 다시 · 답 모양 어긋남 다시 · 고친 칸은 덮지 않고 새 안 · 실패한 단계만 다시 · 확인할 점
  *  - 360 · 390 · 430 · 글자 아주 크게에서 가로 넘침 0 · JS 오류 0
  */
@@ -200,6 +201,19 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     'venture.g1': [{ title: 'market_target', body: body('시장') }, { title: 'competitor_analysis', body: body('경쟁사') }],
     'venture.g2': [{ title: 'market_entry_progress', body: body('진입 경과') }, { title: 'market_entry_plan_3y', body: body('진입 3년') }],
     'venture.x': [{ title: 'entrepreneurship_example', body: body('기업가') }, { title: 'financing_plan', body: body('자금'), tag: '영업이익, 정부지원(창업지원)' }],
+    // D-270 기획 방향 — 5개 · 견주기(후보 3 이 1순위) · 더 짜내기(새 2개)
+    'venture.plan': [
+      { title: '공구 마모 예측 현장 앱 — 중소 금속가공', outline: ['특허의 신호 정규화부가 MVP 의 휴대폰 진동 입력으로 구현됨', '절삭 공구를 쓰는 중소 금속가공 업체', '교체 시점을 진동으로 미리 알림', '시험 3곳 · 거래처 49곳', '3년 120곳', '실제 사용 고객 수 확인'], detail: '재료의 시험 3곳 · 메모의 거래처 49곳에서', amount: '86', tag: '1순위', when: '특허와 MVP 가 같은 이야기 · 시험 고객 있음' },
+      { title: '공구 교체 일정 SaaS — 다품종 소량 공장', outline: ['마모 판정부가 일정 화면으로', '다품종 소량 생산 공장', '교체와 일정을 함께', '시험 1곳', '3년 60곳', '일정 기능은 계획'], detail: '메모', amount: '74', tag: '2순위', when: '일정 기능이 아직 계획' },
+      { title: '설비 보전 데이터 플랫폼', outline: ['진동 데이터 수집', '설비 보전 팀', '데이터 통합', '증거 약함', '3년 확장', '특허와 거리'], detail: '메모', amount: '61', tag: '3순위', when: '특허와 MVP 가 따로 놂' },
+      { title: '공구 재고 연동 서비스', outline: ['마모 예측 + 재고', '공구 유통사', '발주 시점', '없음', '유통 확장', '고객 없음'], detail: '메모', amount: '52', tag: '후보', when: '고객 없음' },
+      { title: '작업자 안전 알림', outline: ['진동 이상 감지', '안전 관리자', '알림', '없음', '규제 수요', '특허와 무관'], detail: '메모', amount: '40', tag: '후보', when: '특허와 무관' },
+    ],
+    'venture.planRank': [{ title: '후보 1', amount: '88', tag: '2순위', when: '시험 고객은 있으나 차별이 약함' }, { title: '후보 2', amount: '93', tag: '1순위', when: '일정 연결이 경쟁사가 피하기 어려움' }, { title: '후보 3', amount: '60' }, { title: '후보 4', amount: '50' }, { title: '후보 5', amount: '35' }],
+    'venture.planMore': [
+      { title: '공구 마모 예측 + 교체 배치 대행 — 시험 고객 확장', outline: ['신호 정규화부 + 마모 판정부가 앱과 대행 서비스로', '시험 3곳의 거래처', '예측과 대행을 묶음', '시험 3곳', '3년 150곳', '대행 단가 확인'], detail: '시험 3곳에서', amount: '90', tag: '새 방향', when: '지금 고객에서 바로 넓힘' },
+      { title: '금형 공장 전용 공구 수명 리포트', outline: ['마모 판정 리포트', '금형 공장', '리포트 자동화', '없음', '3년 40곳', '금형 고객 확인'], detail: '메모', amount: '58', tag: '새 방향', when: '다른 시장' },
+    ],
     'venture.sum': ['tech_name', 'tech_summary', 'core_problem', 'core_solution', 'core_market', 'core_diff', 'core_marketing', 'core_growth'].map((id) => ({ title: id, body: id === 'tech_name' ? 'AI 가 고른 이름' : body(id) })),
   }
   const judgeItems = (req) => {
@@ -220,6 +234,43 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
   const row = (k) => page.locator(`[data-testid="vplan-ai-row"][data-key="${k}"]`)
+  const planAiRow = (k) => page.locator(`[data-testid="vplan-plan-row"][data-key="${k}"]`)
+  const vIdle = () => page.waitForFunction(() => !document.querySelector('[data-testid="vplan-ai"] button[disabled][data-testid^="vplan-plan-"]') && ![...document.querySelectorAll('[data-testid="vplan-plan-row"]')].some((e) => e.getAttribute('data-phase') === 'run'), null, { timeout: 20000 })
+
+  // D-270 기획 방향 먼저 — 대표: "벤처도 마찬가지 · 기획이 제일 중요"
+  // 대표 /자체점검 정의 — 기획 단추에도 같이 가야 한다(아래에서 한 번 더 저장해도 같음)
+  await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').click()
+  await page.getByTestId('judge-skill-sheet').waitFor()
+  await page.getByTestId('judge-skill-text').fill(SKILL)
+  await page.getByTestId('judge-skill-save').click()
+  await page.waitForTimeout(400)
+  check('V0 재료가 있으면 차례 "기획 방향" · [기획 방향 5개 내줘] · 요약 전 3가지 · 쓰기 단추 · [전부 써줘] 는 아직 없음', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'plan' && (await page.getByTestId('vplan-plan-run').isVisible()) && (await page.getByTestId('vplan-gate').count()) === 0 && (await page.getByTestId('vplan-ai-next').count()) === 0 && (await page.getByTestId('vplan-ai-run').count()) === 0 && /기획부터/.test(await page.getByTestId('vplan-ai-head').innerText()))
+  check('V0b 방향을 고르기 전에는 [이것만 써줘] 도 막힘(시장조사만 됨)', (await row('p1').getByTestId('vplan-ai-one').isDisabled()) && /기획 방향부터/.test(await row('p1').innerText()) && !(await row('market').getByTestId('vplan-ai-one').isDisabled()))
+  await page.getByTestId('vplan-plan-run').click()
+  await page.getByTestId('vplan-plan-option').first().waitFor({ timeout: 20000 })
+  await vIdle()
+  const opts = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ picked: e.getAttribute('data-picked'), text: e.textContent })))
+  check('V1 기획 방향 5개 — 1순위(86점) · 순위 이유 · 고객 · 회사 근거 · 1순위가 골라져 있음 · 모델 표시', opts.length === 5 && /1순위/.test(opts[0].text) && /86점/.test(opts[0].text) && /1순위인 이유 · 특허와 MVP 가 같은 이야기/.test(opts[0].text) && /고객 · 절삭 공구를 쓰는/.test(opts[0].text) && /회사 근거/.test(opts[0].text) && opts[0].picked === 'yes' && (await planAiRow('plan').getAttribute('data-model')) === 'test-model', opts.map((o) => o.text?.slice(0, 30)))
+  await shot(page, 'vplan-05p-plans')
+  await page.getByTestId('vplan-plan-rank').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-plan-row"][data-key="planRank"]')?.getAttribute('data-phase') === 'done', null, { timeout: 20000 })
+  const afterRank = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ picked: e.getAttribute('data-picked'), text: e.textContent })))
+  check('V2 [이 중 제일 좋은 게 뭐야?] → 후보를 보내 견줌 → 일정 SaaS 93점이 1순위 · 골라짐', /공구 교체 일정 SaaS/.test(afterRank[0].text) && /93점/.test(afterRank[0].text) && afterRank[0].picked === 'yes' && /후보 5/.test(JSON.stringify(sent.find((r) => r.assistId === 'venture.planRank')?.context ?? '')), afterRank.map((o) => o.text?.slice(0, 20)))
+  await page.getByTestId('vplan-plan-more').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-plan-row"][data-key="planMore"]')?.getAttribute('data-phase') === 'done', null, { timeout: 20000 })
+  const afterMore = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ fresh: e.getAttribute('data-fresh'), text: e.textContent })))
+  check('V3 [자체점검으로 더 짜내기] → 새 방향 2개 "새로 · 자체점검" · 점수 순(90점 2순위) · 7개', afterMore.length === 7 && afterMore.filter((o) => o.fresh === 'yes').length === 2 && /교체 배치 대행/.test(afterMore[1].text) && /새로 · 자체점검/.test(afterMore[1].text), afterMore.map((o) => o.text?.slice(0, 20)))
+  const planSkill = sent.filter((r) => /^venture\.plan/.test(r.assistId)).every((r) => r.skill === SKILL)
+  check('V3b 기획 · 견주기 · 짜내기 모두 대표 /자체점검 정의를 같이 보냄', planSkill && sent.filter((r) => /^venture\.plan/.test(r.assistId)).length === 3)
+  // 1순위가 아닌 '현장 앱'(3순위)을 골라 시작
+  const pick = page.getByTestId('vplan-plan-option').filter({ hasText: '공구 마모 예측 현장 앱' })
+  await pick.getByTestId('vplan-plan-pick').click()
+  await page.getByTestId('vplan-plan-start').click()
+  await page.getByTestId('vplan-gate').waitFor({ timeout: 10000 })
+  check('V4 [이걸로 시작하자] → 고른 방향 띠 · 다음 차례 "요약 전 3가지" · [다른 방향으로]', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'gate' && /공구 마모 예측 현장 앱/.test(await page.getByTestId('vplan-plan-chosen').innerText()) && (await page.getByTestId('vplan-plan-back').isVisible()) && (await page.getByTestId('vplan-steps').getAttribute('data-phase')) === 'gate')
+  await shot(page, 'vplan-05q-chosen', false)
+  const planEnd = sent.length
+  const mine = () => sent.slice(planEnd)
   check('AI 차례 9줄 — 시장조사 → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②', (await page.getByTestId('vplan-ai-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')).join())) === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll')
   check('요약 전 3가지 — 처음엔 다 모름(시장조사 · 출원번호 없음) · 요약 줄 "요약 전에 먼저" · [이것만 써줘] 막힘', (await page.getByTestId('vplan-gate').getAttribute('data-ok')) === 'no' && (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'no' && (await page.getByTestId('vplan-gate-patent').getAttribute('data-ok')) === 'no' && /요약 전에 먼저/.test(await row('sum').innerText()) && (await row('sum').getByTestId('vplan-ai-one').isDisabled()))
   // 기술인력 — 칩 두 번(전담부서 · 2명)
@@ -228,19 +279,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-testid="vplan-gate-staff"][data-n="2"]').click()
   await page.waitForTimeout(400)
   check('기술인력 — [연구개발전담부서] [2명] 두 번 누르면 ✓ · 조직 칸(사이트 선택지)에도 같은 값', (await page.getByTestId('vplan-gate-rd').getAttribute('data-ok')) === 'yes' && /연구개발전담부서 · 연구개발 인원 2명/.test(await page.getByTestId('vplan-gate-rd').innerText()))
-  // 대표 /자체점검 정의 붙여 넣기
-  await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').click()
-  await page.getByTestId('judge-skill-sheet').waitFor()
-  await page.getByTestId('judge-skill-text').fill(SKILL)
-  await page.getByTestId('judge-skill-save').click()
-  await page.waitForTimeout(400)
+  // 대표 /자체점검 정의 — 기획 단계 앞에서 붙여 넣었다
   check('자체점검 기준 — 대표 기준 붙여 넣고 저장 → 단추에 "대표 기준"', /자체점검 기준 · 대표 기준/.test(await page.getByTestId('vplan-ai').getByTestId('judge-skill-open').innerText()))
   await shot(page, 'vplan-05a-gate')
-  // 출원번호 모르고 [전부 써줘] → 시장조사만 하고 요약 앞에서 멈춤
-  await page.getByTestId('vplan-ai-run').click()
-  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="sum"]')?.getAttribute('data-phase') === 'fail', null, { timeout: 20000 })
+  // 출원번호 모르고 [AI로 시장조사] → 시장조사만 · 요약 쓰기 단추는 아직 없음
+  check('요약 전 3가지가 다 안 되면 [요약 쓰기] 단추가 없음', (await page.getByTestId('vplan-ai-next').count()) === 0)
+  await page.getByTestId('vplan-gate-market-run').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="market"]')?.getAttribute('data-phase') === 'fail', null, { timeout: 20000 })
   await page.waitForTimeout(400)
-  check('시장조사 숫자 · 출원번호를 모르면 [전부 써줘] 가 시장조사만 하고 요약 앞에서 멈춤 — "요약 전에 먼저 — 시장조사 · 출원번호" · 다른 단계 안 부름', sent.map((r) => r.assistId).join() === 'venture.market' && /요약 전에 먼저 — 시장조사\(TAM · SAM · SOM\) · 출원번호/.test(await row('sum').innerText()) && (await row('p1').getAttribute('data-phase')) === 'wait', { sent: sent.map((r) => r.assistId), sum: await row('sum').innerText() })
+  check('시장조사 숫자 · 출원번호를 모르면 시장조사만 하고 요약 앞에서 멈춤 — "요약 전에 먼저 — 시장조사 · 출원번호" · 다른 단계 안 부름', mine().map((r) => r.assistId).join() === 'venture.market' && /요약 전에 먼저 — 시장조사\(TAM · SAM · SOM\) · 출원번호/.test(await row('sum').innerText()) && (await row('p1').getAttribute('data-phase')) === '', { sent: mine().map((r) => r.assistId), sum: await row('sum').innerText() })
   check('숫자 없이 산식만 온 시장조사 — 다시 부르지 않고(1번) "TAM · SAM · SOM 숫자를 찾지 못했습니다" · 숫자 칸이 저절로 열리고 AI 산식이 보임', marketCalls === 1 && /TAM · SAM · SOM 숫자를 찾지 못했습니다/.test(await row('market').innerText()) && (await page.getByTestId('vplan-gate-market-form').isVisible()) && /AI 산식 · .*사업체 수 × 연 단가/.test(await page.getByTestId('vplan-gate-tam-basis').innerText()), { calls: marketCalls, row: await row('market').innerText() })
   await shot(page, 'vplan-05b-market-empty', false)
   // 두 번째 조사는 검색 근거 없이 AI 추정 숫자 → 대표가 한 번 확인해야 요약으로
@@ -251,22 +298,27 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('vplan-gate-market-confirm').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-gate-market"]')?.getAttribute('data-ok') === 'yes', null, { timeout: 15000 })
   await page.waitForTimeout(300)
-  check('[이 숫자로 확인] → 시장조사 ✓ — TAM · SAM · SOM 숫자 · 대표 확인 숫자 · 시장조사는 대표 정의 안 보냄(자체점검 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원 · 대표 확인 숫자/.test(await page.getByTestId('vplan-gate-market').innerText()) && !sent[0].skill && !sent[1].skill && JSON.stringify(sent[1].context).includes('거래처 49곳'))
+  check('[이 숫자로 확인] → 시장조사 ✓ — TAM · SAM · SOM 숫자 · 대표 확인 숫자 · 시장조사는 대표 정의 안 보냄(자체점검 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원 · 대표 확인 숫자/.test(await page.getByTestId('vplan-gate-market').innerText()) && !mine()[0].skill && !mine()[1].skill && JSON.stringify(mine()[1].context).includes('거래처 49곳') && JSON.stringify(mine()[1].context).includes('고른 기획 방향'))
   await page.getByTestId('vplan-gate-patent-input').fill('10 2026 0012345')
   await page.getByTestId('vplan-gate-patent-save').click()
   await page.waitForTimeout(500)
   check('출원번호 직접 넣기 — 띄어 써도 10-2026-0012345 로 · 3/3 · 요약 막힘 풀림', (await page.getByTestId('vplan-gate').getAttribute('data-ok')) === 'yes' && /10-2026-0012345 · 직접 넣음/.test(await page.getByTestId('vplan-gate-patent').innerText()) && (await page.getByTestId('vplan-gate-count').innerText()) === '3/3' && !(await row('sum').getByTestId('vplan-ai-one').isDisabled()))
-  // 이제 [전부 써줘] — 시장조사는 건너뜀
+  // 이제 [요약 쓰기 — 자체점검 ① 까지] → 멈춤 → [요약 확인 — 본문 쓰기]
   const before = sent.length
-  await page.getByTestId('vplan-ai-run').click()
+  check('3가지가 다 되면 차례 "요약" · [요약 쓰기 — 자체점검 ① 까지]', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'sum' && /요약 쓰기 — 자체점검 ① 까지/.test(await page.getByTestId('vplan-ai-next').innerText()))
+  await page.getByTestId('vplan-ai-next').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-next"]')?.getAttribute('data-step') === 'body' && !document.querySelector('[data-testid="vplan-ai-next"]')?.hasAttribute('disabled'), null, { timeout: 40000 })
+  check('[요약 쓰기] → 요약 · 자체점검 ①(두 번) 까지만 쓰고 멈춤 · 다음 단추 "요약 확인 — 본문 5묶음 쓰기"', sent.slice(before).map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge' && /본문 5묶음 쓰기/.test(await page.getByTestId('vplan-ai-next').innerText()) && (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'body', sent.slice(before).map((r) => r.assistId))
+  await shot(page, 'vplan-05r-sum-done', false)
+  await page.getByTestId('vplan-ai-next').click()
   await page.waitForFunction(() => {
     const rows = [...document.querySelectorAll('[data-testid="vplan-ai-row"]')]
-    return rows.length === 9 && rows.every((e) => ['done', 'fail'].includes(e.getAttribute('data-phase') ?? '')) && !document.querySelector('[data-testid="vplan-ai-run"]')?.hasAttribute('disabled')
+    return rows.length === 9 && rows.every((e) => ['done', 'fail'].includes(e.getAttribute('data-phase') ?? '')) && !document.querySelector('[data-testid="vplan-ai-next"][disabled]')
   }, null, { timeout: 40000 })
   await page.waitForTimeout(600)
   const run2 = sent.slice(before)
   const phases = await page.getByTestId('vplan-ai-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-phase')}`))
-  check('AI: 요약 → 자체점검 ①(고친 뒤 다시 판정) → 본문 5묶음 → 자체점검 ② · 시장조사 건너뜀 · g2 만 못 씀', run2.map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge,venture.p1,venture.p2,venture.p2,venture.g1,venture.g2,venture.g2,venture.g2,venture.x,venture.judge' && phases.join() === 'market:done,sum:done,judgeSum:done,p1:done,p2:done,g1:done,g2:fail,x:done,judgeAll:done', { sent: run2.map((r) => r.assistId), phases })
+  check('AI: 요약 → 자체점검 ①(고친 뒤 다시 판정) → [본문 쓰기] 본문 5묶음 → 자체점검 ② · 시장조사 건너뜀 · g2 만 못 씀', run2.map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge,venture.p1,venture.p2,venture.p2,venture.g1,venture.g2,venture.g2,venture.g2,venture.x,venture.judge' && phases.join() === 'market:done,sum:done,judgeSum:done,p1:done,p2:done,g1:done,g2:fail,x:done,judgeAll:done', { sent: run2.map((r) => r.assistId), phases })
   const sumReq = run2[0]
   check('요약에 보낸 것 — 시장조사(TAM · 출처) · 출원번호(출원 중 · 등록 아님) · 연구개발 인원 2명 · 대표 정의', sumReq.context.sections.some((x) => x.name.startsWith('시장조사') && JSON.stringify(x.rows).includes('1조 2,000억 원') && JSON.stringify(x.rows).includes('통계청 광업제조업조사 2024')) && sumReq.context.facts.some((f) => f.includes('10-2026-0012345') && f.includes('등록 아님')) && sumReq.context.facts.some((f) => f.includes('연구개발 인원(확인): 2명')) && sumReq.skill === SKILL)
   const j1 = run2.filter((r) => r.assistId === 'venture.judge')
@@ -275,8 +327,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const g2s = run2.filter((r) => r.assistId === 'venture.g2')
   check('답 모양 어긋남 → 이름표를 알려 주고 두 번 더(ask) · 세 번 다 어긋나면 그 단계만 못 씀', g2s.length === 3 && !g2s[0].ask && g2s.slice(1).every((r) => /칸 id 그대로/.test(r.ask ?? '')), g2s.map((r) => r.ask ?? ''))
   const p1 = run2.find((r) => r.assistId === 'venture.p1')
-  check('AI 보낸 것: page venture · 명세서 재료 · AX · 이번 칸 규칙 · 출원 그대로 규칙', p1.page === 'venture' && JSON.stringify(p1.context.sections[0].rows).includes('공구 마모 예측') && JSON.stringify(p1.context.sections[1].rows).includes('휴대폰 진동 입력') && p1.context.rules.some((r) => r.startsWith('칸 development_background')) && p1.context.rules.some((r) => r.includes('출원 상태 그대로')))
-  check('AI 보낸 것: 앞 묶음 결과가 다음 묶음의 "이미 쓴 칸" 으로', JSON.stringify(run2.filter((r) => r.assistId === 'venture.p2')[1].context.sections[3].rows).includes('본문 경쟁력'))
+  const secOf = (req, name) => req.context.sections.find((x) => x.name.startsWith(name))?.rows ?? []
+  check('AI 보낸 것: page venture · 맨 앞 고른 기획 방향(현장 앱) · 명세서 재료 · AX · 이번 칸 규칙 · 출원 그대로 규칙 · "그 줄거리로"', p1.page === 'venture' && p1.context.sections[0].name.startsWith('고른 기획 방향') && JSON.stringify(p1.context.sections[0].rows).includes('공구 마모 예측 현장 앱') && JSON.stringify(secOf(p1, '특허 명세서')).includes('공구 마모 예측') && JSON.stringify(secOf(p1, 'AX · MVP')).includes('휴대폰 진동 입력') && p1.context.rules.some((r) => r.startsWith('칸 development_background')) && p1.context.rules.some((r) => r.includes('출원 상태 그대로')) && p1.context.rules.some((r) => r.includes('고른 기획 방향')))
+  check('AI 보낸 것: 앞 묶음 결과가 다음 묶음의 "이미 쓴 칸" 으로', JSON.stringify(secOf(run2.filter((r) => r.assistId === 'venture.p2')[1], '이미 쓴 칸')).includes('본문 경쟁력'))
+  check('V5 요약 · 자체점검에도 고른 기획 방향이 감', JSON.stringify(sumReq.context.sections[0]).includes('공구 마모 예측 현장 앱') && run2.filter((r) => r.assistId === 'venture.judge').every((r) => r.context.sections.some((x) => x.name.startsWith('고른 기획 방향'))))
   check('자체점검 ① 줄 — 93점 · 직접 고친 칸 · 고친 뒤 다시 판정 / ② 줄 — 94점', /93점/.test(await row('judgeSum').innerText()) && /차별점/.test(await row('judgeSum').innerText()) && /고친 뒤 다시 판정/.test(await row('judgeSum').innerText()) && /94점/.test(await row('judgeAll').innerText()), [await row('judgeSum').innerText(), await row('judgeAll').innerText()])
   check('판정 상자 — ② 94점 · 통과 · 자체점검이 고친 칸(목표시장) · 대표 기준 표시', (await page.getByTestId('vplan-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('vplan-judge').getAttribute('data-pass')) === 'yes' && /목표시장/.test(await page.getByTestId('vplan-judge').innerText()) && /대표 기준/.test(await page.getByTestId('vplan-judge').innerText()))
   check('AI: 못 쓴 단계만 다시 단추', (await page.getByTestId('vplan-ai-retry').count()) === 1)

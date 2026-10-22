@@ -226,12 +226,15 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B0b 회사를 고르면 단추에 그 회사 이름 — "○○ 명세서 — 기획부터 시작"', /한솔테크.*기획부터 시작/.test(await page.getByTestId('spec-new').innerText()), await page.getByTestId('spec-new').innerText())
   await shot(page, 'B-start', false)
   const s0 = sent.length
+  // 아이디어 한 번만 부르므로 답을 천천히 — "쓰는 중" 을 볼 틈이 있게
+  delayMs = 1500
   await page.getByTestId('spec-new').click()
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-board').waitFor()
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   check('B7 쓰는 중 — "AI 가 쓰는 중"', /쓰는 중/.test(await page.getByTestId('spec-board-head').innerText()))
   await waitIdle(page)
+  delayMs = 30
   await page.waitForTimeout(300)
   const ideaReq = sent.slice(s0)
   check('B1 단추 한 번 → 아이디어 5개까지만 저절로(그다음은 대표가 고름) · 주소에서 auto 지움 · AI 작업판 먼저', ideaReq.map((r) => r.assistId).join() === 'spec.idea' && (await page.getByTestId('spec-board').getAttribute('data-phase')) === 'ideas' && (await page.getByTestId('spec-view-ai').getAttribute('aria-selected')) === 'true' && !page.url().includes('auto=1'), { ids: ideaReq.map((r) => r.assistId), url: page.url() })

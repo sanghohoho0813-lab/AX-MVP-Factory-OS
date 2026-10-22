@@ -20,6 +20,8 @@ export const GK = {
   patentNo: 'vplan:patentNo',
   researchers: 'vplan:researchers',
   judge: 'vplan:judge',
+  /** D-270 기획 방향 후보 · 고른 방향 */
+  plan: 'vplan:plan',
 } as const
 
 /** 대표가 '아직 출원 전' 이라고 고른 값 */
@@ -50,7 +52,34 @@ export interface MarketResearch {
   by: 'ai' | 'human'
 }
 
+/**
+ * D-270 사업계획서 기획 방향 — 같은 회사라도 무엇을 핵심 기술로 세우고 누구에게 파는지에 따라 달라지는 줄거리.
+ * lines = ① 핵심 기술(특허 ↔ MVP) ② 목표 고객 · 시장 ③ 차별 · 경쟁우위 ④ 증거(자료의 사실) ⑤ 3년 성장 ⑥ 약점 · 확인할 것
+ */
+export interface PlanPick {
+  title: string
+  /** 왜 이 회사에 맞는지(자료 근거) */
+  why: string
+  lines: string[]
+  score?: number
+  reason?: string
+  fresh?: boolean
+}
+
+export const PLAN_LINE_LABEL = ['핵심 기술', '목표 고객 · 시장', '차별 · 경쟁우위', '증거', '3년 성장', '약점 · 확인할 것'] as const
+
+/** 기획 방향 후보는 처음 5개 + [더 짜내기] 로 늘어난 것까지 */
+export const PLAN_MAX = 9
+
+export interface PlanState {
+  options: PlanPick[]
+  /** 고른 방향의 제목('' = 아직 안 고름) */
+  chosen: string
+}
+
 export interface GateState {
+  /** D-270 기획 방향 */
+  plan: PlanState
   market: MarketResearch | null
   /** 직접 넣은 출원번호 · 'none'(출원 전) · '' */
   patentNo: string
@@ -80,6 +109,34 @@ export function readMarket(raw: string | undefined): MarketResearch | null {
   }
 }
 
+export function readPlanState(raw: string | undefined): PlanState {
+  const empty: PlanState = { options: [], chosen: '' }
+  if (!raw) return empty
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>
+    if (!o || typeof o !== 'object') return empty
+    const options = (Array.isArray(o.options) ? o.options : [])
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+      .map((x) => {
+        const pick: PlanPick = { title: str(x.title).slice(0, 200), why: str(x.why).slice(0, 600), lines: (Array.isArray(x.lines) ? x.lines : []).map((l) => str(l).slice(0, 600)).slice(0, 6) }
+        if (typeof x.score === 'number' && Number.isFinite(x.score)) pick.score = x.score
+        if (str(x.reason)) pick.reason = str(x.reason).slice(0, 300)
+        if (x.fresh === true) pick.fresh = true
+        return pick
+      })
+      .filter((x) => x.title.trim())
+      .slice(0, PLAN_MAX)
+    return { options, chosen: str(o.chosen).slice(0, 200) }
+  } catch {
+    return empty
+  }
+}
+
+/** 고른 기획 방향(없거나 목록에서 빠졌으면 null) */
+export const chosenPlan = (p: PlanState): PlanPick | null => (p.chosen ? (p.options.find((x) => x.title === p.chosen) ?? null) : null)
+
+export const planStatePatch = (p: PlanState): Record<string, string> => ({ [GK.plan]: JSON.stringify(p) })
+
 export function readGate(notes: Record<string, string>): GateState {
   let judge: GateState['judge'] = { sum: null, full: null }
   try {
@@ -88,7 +145,7 @@ export function readGate(notes: Record<string, string>): GateState {
   } catch {
     // 못 읽으면 판정 없음
   }
-  return { market: readMarket(notes[GK.market]), patentNo: (notes[GK.patentNo] ?? '').trim(), researchers: (notes[GK.researchers] ?? '').trim(), judge }
+  return { plan: readPlanState(notes[GK.plan]), market: readMarket(notes[GK.market]), patentNo: (notes[GK.patentNo] ?? '').trim(), researchers: (notes[GK.researchers] ?? '').trim(), judge }
 }
 
 /** 세 숫자(TAM · SAM · SOM)가 모두 있으면 시장조사를 밟은 것 */

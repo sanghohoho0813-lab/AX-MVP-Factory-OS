@@ -10,6 +10,8 @@
  *   칸 여섯(고르기 · 칸별 다시 쓰기 · 직접 고치기)은 [칸별로 보기] 안으로 접었다(지운 것 없음).
  * D-263 대표: "자체점검 스킬은 명세서에도 항상 중간중간 들어가야 해. 반드시." — 구성 뒤(①) · 청구항 뒤(②)에 자체점검 단계가 저절로.
  *   자체점검이 직접 고친 칸 · 점수 · P0 · 대표 확인을 맨 위 상자에 보여 주고, [자체점검 기준] 에서 대표 정의를 붙여 넣는다.
+ * D-269 대표: "버튼 한 번에 처음부터 끝까지 피드백 없이 다 쓰는 건 별로 · 기획 단계를 거치게" — D-261 의 저절로 끝까지를 바꿈:
+ *   회사 정보(없으면 먼저 받기) → 아이디어 5개 고르기 → [이걸로 시작] 조사 · 구성 · 자체점검 ① → 구성 확인 → [본문 · 청구항 쓰기] → 전문 · 나눠서 보기.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Gavel, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'

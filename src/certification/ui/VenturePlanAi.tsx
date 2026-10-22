@@ -8,13 +8,18 @@
  *   "점검을 요청하면 꼭 한두 개씩 보완하라 하더라 — 한 번에 다 끝내게" · "자체점검는 사업계획서에도 중간중간 반드시".
  *   → 맨 위 '요약 전에 반드시 3가지'(시장조사 · 출원번호 · 기술인력 — 번호 · 인원은 직접 넣어도 됨). 셋이 안 차면 요약을 쓰지 않는다.
  *   → [전부 써줘] = 시장조사 → (3가지 확인) → 요약 → 자체점검 ① → 본문 5묶음 → 자체점검 ②. 자체점검이 고칠 수 있는 약점은 직접 고쳐 넣는다.
+ * D-270 대표: "벤처도 마찬가지 · 기획이 제일 중요 · 버튼 하나로 처음부터 끝까지보다 기획 단계에서 여러 개 내고 가장 괜찮은 것을 고르고".
+ *   [전부 써줘] 를 없애고 절차마다 단추: 기획 방향 5개(순위 · 이유 · 제일 좋은 것 · 더 짜내기) → [이걸로 시작하자] → 요약 전 3가지
+ *   → [요약 쓰기 — 자체점검 ① 까지] → [요약 확인 — 본문 쓰기](자체점검 ② 까지). 고른 방향은 모든 쓰기 · 자체점검 · 시장조사에 같이 간다.
  */
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Circle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Gavel, Loader2, Sparkles } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
-import { AssistError, assistMessage } from '../../services/aiAssist/client'
+import { AssistError, assistMessage, usedModel } from '../../services/aiAssist/client'
+import { rankLabel } from '../../services/aiAssist/candidates'
+import { prettyModel } from '../../services/patent/specRun'
 import { answerOf } from '../../services/aiAssist/looseJson'
 import { judgeOf, judgePassed, type JudgeReport } from '../../services/aiAssist/judge'
 import { readJudgeSkill } from '../../services/aiAssist/judgeSkill'
@@ -23,10 +28,10 @@ import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { RD_ORG_OPTIONS, VK, VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
-import { PATENT_NONE, RD_ORG_SHORT, judgePatch, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, marketPatch, normalizeAppNo, patentPatch, readGate, researchersPatch, summaryGate, type MarketResearch } from '../integration/ventureGate'
-import { VPLAN_BATCHES, VPLAN_STEPS, buildBatchContext, buildMarketContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, type VPlanStep } from '../integration/venturePlanAi'
+import { PATENT_NONE, PLAN_LINE_LABEL, RD_ORG_SHORT, chosenPlan, judgePatch, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, marketPatch, normalizeAppNo, patentPatch, planStatePatch, readGate, researchersPatch, summaryGate, type MarketResearch, type PlanPick } from '../integration/ventureGate'
+import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, plansOf, rerankPlans, type VPlanStep } from '../integration/venturePlanAi'
 
-export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string }
+export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string; model?: string }
 type RowState = AiRow
 
 /** 이 오류면 다음 단계도 똑같이 실패한다 — 거기서 멈춘다 */
@@ -37,6 +42,30 @@ const HINT = {
   market: '앞 답을 읽지 못했습니다. items 의 title 을 "tam" · "sam" · "som" · "cagr" · "customer" · "price" · "scope" 이름표 그대로, amount = 규모, detail = 산식, tag = 출처, when = 기준연도로 다시 써 주세요. JSON 한 덩어리만.',
   batch: '앞 답을 읽지 못했습니다. items 의 title = 칸 id 그대로(예 development_background), body = 그 칸 전체 글로 다시 써 주세요. JSON 한 덩어리만.',
   judge: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 id","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
+  plan: '앞 답을 읽지 못했습니다. 기획 방향 5개 — items 마다 title = 방향 한 줄, outline = 정확히 6줄(핵심 기술 · 목표 고객 · 시장 · 차별 · 증거 · 3년 성장 · 약점), detail = 회사 근거, amount = 점수, when = 순위 이유로 다시 써 주세요. JSON 한 덩어리만.',
+  rank: '앞 답을 읽지 못했습니다. 후보마다 항목 하나 — title = "후보 n", amount = 점수(0~100 숫자만), tag = 순위, when = 이 순위인 이유 한 줄로 다시 써 주세요. JSON 한 덩어리만.',
+}
+
+/** D-270 맨 위 차례 — 절차마다 단추로 넘어간다 */
+type VPhase = 'need' | 'plan' | 'gate' | 'sum' | 'body' | 'done'
+const VSTEPS: { label: string; phases: VPhase[] }[] = [
+  { label: '재료', phases: ['need'] },
+  { label: '기획 방향', phases: ['plan'] },
+  { label: '요약 전 3가지', phases: ['gate'] },
+  { label: '요약 · 자체점검 ①', phases: ['sum'] },
+  { label: '본문 · 자체점검 ②', phases: ['body', 'done'] },
+]
+const VHEAD: Record<VPhase, string> = {
+  need: '재료부터 — 특허 명세서나 AX · MVP',
+  plan: '기획부터 — 사업계획서 방향을 고릅니다',
+  gate: '요약 전에 3가지를 채워 주세요',
+  sum: '요약을 씁니다',
+  body: '요약을 확인하고 본문을 씁니다',
+  done: '사업계획서를 다 썼어요',
+}
+const clip = (s: string, n: number) => {
+  const t = s.replace(/\s+/g, ' ').trim()
+  return t.length > n ? `${t.slice(0, n)}…` : t
 }
 
 export function VenturePlanAi({
@@ -147,6 +176,11 @@ export function VenturePlanAi({
         return ok ? [0, 0] : 'fail'
       }
       if (key === 'judgeSum' || key === 'judgeAll') return await runJudge(key, skill)
+      // D-270 기획 방향을 고르기 전에는 사업계획서 칸을 쓰지 않는다(시장조사는 됨) — 칸에서 누른 [AI로 이 칸 쓰기] 는 그대로
+      if (!chosenPlan(readGate(now()).plan) && !requestRun.current) {
+        setRow(key, { phase: 'fail', text: '기획 방향부터 — 위에서 방향을 골라 [이걸로 시작하자]' })
+        return 'stop'
+      }
       // 요약은 세 가지(시장조사 · 출원번호 · 기술인력)를 다 안 뒤에만
       if (key === 'sum') {
         const g = summaryGate(readPlan(now()), facts, readGate(now()))
@@ -207,12 +241,10 @@ export function VenturePlanAi({
     }
     pending.current = {}
     setBusy(false)
-    if (gated) showToast('요약 전에 꼭 알아야 할 것이 있어요 — 위 칸에서 알려 주시면 [전부 써줘] 로 이어서 씁니다')
+    if (gated) showToast('요약 전에 꼭 알아야 할 것이 있어요 — 위 칸에서 알려 주시면 [요약 쓰기] 로 이어서 씁니다')
     else showToast(`AI 초안 — ${wrote}칸 썼습니다${kept ? ` · 고치신 칸 ${kept}개는 그대로 두고 새 안을 칸 아래에` : ''}${failed ? ` · ${failed}단계는 못 씀(다시 누르기)` : ''}`)
   }
 
-  /** [전부 써줘] — 시장조사는 이미 됐으면 건너뛴다 */
-  const allSteps = (): VPlanStep[] => VPLAN_STEPS.map((s) => s.key).filter((k) => k !== 'market' || !marketDone(readGate(now()).market))
   const failedKeys = VPLAN_STEPS.filter((s) => rows[s.key]?.phase === 'fail').map((s) => s.key)
   // D-263 자체점검 · 시장조사 줄은 칸에 보여 줄 묶음이 아니다 — 묶음 줄만 넘긴다
   const onRowsRef = useRef(onRows)
@@ -220,6 +252,8 @@ export function VenturePlanAi({
   useEffect(() => {
     onRowsRef.current?.(Object.fromEntries(Object.entries(rows).filter(([k]) => VPLAN_BATCHES.some((b) => b.key === k))))
   }, [rows])
+  /** 칸에서 누른 [AI로 이 칸 쓰기] 로 도는 중(기획 방향 전이어도 그 칸은 쓴다) */
+  const requestRun = useRef(false)
   const runRef = useRef(runAll)
   runRef.current = runAll
   const lastReq = useRef(0)
@@ -227,24 +261,126 @@ export function VenturePlanAi({
     // 같은 요청을 두 번 쓰지 않게(화면이 다시 그려져도) · 다른 묶음을 쓰는 중이면 끝난 뒤에 이어서
     if (!request || request.n === lastReq.current || !hasMaterial || busy) return
     lastReq.current = request.n
-    void runRef.current([request.batch])
+    requestRun.current = true
+    void runRef.current([request.batch]).finally(() => {
+      requestRun.current = false
+    })
   }, [request, hasMaterial, busy])
+
+  /* D-270 기획 방향 — [기획 방향 5개 내줘] · [이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기] · [이걸로 시작하자] */
+  const planSt = gate.plan
+  const chosen = chosenPlan(planSt)
+  const [pickTitle, setPickTitle] = useState('')
+  const picked: PlanPick | null = planSt.options.find((p) => p.title === pickTitle) ?? planSt.options[0] ?? null
+  const runPlan = async (kind: 'plan' | 'rank' | 'more') => {
+    if (busy) return
+    const key = kind === 'plan' ? 'plan' : kind === 'rank' ? 'planRank' : 'planMore'
+    setBusy(true)
+    setRow(key, { phase: 'run', text: kind === 'plan' ? '기획 방향 5개를 내고 순위를 매기는 중…(30~60초)' : kind === 'rank' ? '방향을 자체점검 기준으로 견주는 중…' : '지금 방향의 약점을 공격하고 새 방향을 짜내는 중…' })
+    try {
+      const skill = readJudgeSkill()
+      const st = readPlan(now())
+      const g = readGate(now())
+      const onRetry = (w: 'parse' | 'transient' | 'rate', n: number, t: number) => setRow(key, { phase: 'run', text: retryText(w, n, t) })
+      if (kind === 'plan') {
+        const { run, value } = await callAssistRetry({
+          req: { assistId: 'venture.plan', page: 'venture', choice: choiceOf(), context: buildPlanContext({ state: st, facts, today, gate: g }), ...(skill ? { skill } : {}) },
+          parse: (r) => {
+            const p = plansOf(answerOf(r))
+            return p.length >= 2 ? p : null
+          },
+          hint: HINT.plan,
+          missMessage: 'AI 답에서 기획 방향을 찾지 못했습니다 — 다시 눌러 주세요',
+          onRetry,
+        })
+        await save(planStatePatch({ options: value, chosen: '' }))
+        setPickTitle('')
+        setRow(key, { phase: 'done', text: `${value.length}개 — 1순위 '${value[0].title}'${value[0].score != null ? `(${value[0].score}점)` : ''} · 골라서 [이걸로 시작하자]`, model: usedModel(run) })
+      } else if (kind === 'rank') {
+        const { run, value } = await callAssistRetry({
+          req: { assistId: 'venture.planRank', page: 'venture', choice: choiceOf(), context: buildPlanRankContext({ state: st, facts, today, gate: g }), ...(skill ? { skill } : {}) },
+          parse: (r) => {
+            const x = rerankPlans(g.plan.options, answerOf(r))
+            return x.matched ? x : null
+          },
+          hint: HINT.rank,
+          missMessage: 'AI 답에서 후보 점수를 찾지 못했습니다 — 다시 눌러 주세요',
+          onRetry,
+        })
+        await save(planStatePatch({ options: value.items, chosen: '' }))
+        setPickTitle('')
+        const top = value.items[0]
+        setRow(key, { phase: 'done', text: `가장 나은 것 — '${top.title}'${top.score != null ? `(${top.score}점)` : ''}${value.headline ? ` · ${value.headline}` : ''}`, model: usedModel(run) })
+      } else {
+        const { run, value } = await callAssistRetry({
+          req: { assistId: 'venture.planMore', page: 'venture', choice: choiceOf(), context: buildPlanMoreContext({ state: st, facts, today, gate: g }), ...(skill ? { skill } : {}) },
+          parse: (r) => {
+            const p = plansOf(answerOf(r), 3)
+            return p.length ? { more: p, headline: String(answerOf(r)?.headline ?? '').trim() } : null
+          },
+          hint: HINT.plan,
+          missMessage: 'AI 답에서 새 방향을 찾지 못했습니다 — 다시 눌러 주세요',
+          onRetry,
+        })
+        const m = addMorePlans(g.plan.options, value.more)
+        await save(planStatePatch({ options: m.items, chosen: '' }))
+        setRow(key, { phase: 'done', text: m.added ? `새 방향 ${m.added}개${value.headline ? ` — 지금 방향의 약점: ${value.headline}` : ''}` : '새로 나온 것이 지금 방향과 같습니다 — 한 번 더 눌러 보세요', model: usedModel(run) })
+      }
+    } catch (e) {
+      const why = e instanceof AssistError ? e.message || assistMessage(e.code) : `저장하지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`
+      setRow(key, { phase: 'fail', text: why })
+    }
+    setBusy(false)
+  }
+  const choosePlan = async () => {
+    if (!picked) return
+    await save(planStatePatch({ ...readGate(now()).plan, chosen: picked.title }))
+    showToast(`'${clip(picked.title, 30)}' 방향으로 — 다음은 요약 전 3가지(시장조사 · 출원번호 · 기술인력)`)
+  }
+  const backToPlans = async () => {
+    if (!window.confirm('기획 방향을 다시 고릅니다. 이미 쓴 칸은 그대로 두고, 다시 쓰면 새 방향으로 씁니다. 돌아갈까요?')) return
+    await save(planStatePatch({ ...readGate(now()).plan, chosen: '' }))
+  }
+
+  // 지금 어느 절차인가 — 재료 → 기획 방향 → 요약 전 3가지 → 요약 → 본문
+  const planText = readPlan(notes).text
+  const textOf = (b: VPlanStep) => (VPLAN_BATCHES.some((x) => x.key === b) ? fieldsOfBatch(b as VPlanBatch).filter((f) => f.kind === 'text' || f.kind === 'line') : [])
+  // 요약은 자체점검 ① 까지 거쳤거나(판정이 있음) 요약 칸을 모두 썼으면 끝 — 회사 기록 · 문장 틀로 몇 칸만 찬 것은 아직
+  const sumWritten = !!gate.judge.sum || textOf('sum').every((f) => (planText[f.id] ?? '').trim())
+  const bodyLeft = VPLAN_BATCHES.filter((b) => b.key !== 'sum' && textOf(b.key).some((f) => !(planText[f.id] ?? '').trim())).map((b) => b.key)
+  const phase: VPhase = !hasMaterial ? 'need' : !chosen ? 'plan' : !sg.ok ? 'gate' : !sumWritten ? 'sum' : bodyLeft.length ? 'body' : 'done'
+  const stepAt = VSTEPS.findIndex((x) => x.phases.includes(phase))
+  const planRowsShown = (['plan', 'planRank', 'planMore'] as const).filter((k) => rows[k])
 
   return (
     <Surface>
-      <div className="flex flex-col gap-3" data-testid="vplan-ai">
+      <div className="flex flex-col gap-3" data-testid="vplan-ai" data-phase={phase}>
         <div className="flex flex-col gap-1">
-          <h3 className="t-body font-bold text-slate-900">AI 가 씁니다 — 버튼만 누르세요</h3>
+          <h3 className="t-body font-bold text-slate-900" data-testid="vplan-ai-head">
+            {busy ? 'AI 가 쓰는 중이에요…' : VHEAD[phase]}
+          </h3>
           <p className="t-sub break-keep text-slate-700">
-            시장조사 → 요약 → <b className="font-semibold">자체점검</b> → 본문 5묶음 → <b className="font-semibold">자체점검</b> 차례로 씁니다. 글로 고칠 수 있는 약점은 직접 고쳐 넣어 <b className="font-semibold">한 번에 끝내고</b>, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
+            기획 방향을 먼저 고르고 → 요약 전 3가지 → 요약(<b className="font-semibold">자체점검 ①</b>) → 본문 5묶음(<b className="font-semibold">자체점검 ②</b>) 차례로, 절차마다 단추로 넘어갑니다. 글로 고칠 수 있는 약점은 직접 고쳐 넣고, <b className="font-semibold">고치신 칸은 덮지 않고 새 안으로 따로</b> 둡니다.
           </p>
           <p className="t-sub break-keep text-warning-800">누르면 재료 · 이미 쓴 칸 · 회사 숫자가 고른 AI 회사로 갑니다(사람 이름 · 연락처는 서버가 한 번 더 지움). 아직 출원 전 발명을 밖으로 보내면 안 되는 경우엔 누르지 마세요.</p>
-          {/* D-255 모델 이름만 보이던 줄 → 누르면 고르는 단추(고른 모델은 모든 AI 단추가 같이) · D-263 자체점검 기준 */}
+          {/* D-255 모델 이름만 보이던 줄 → 누르면 고르는 단추(고른 모델은 모든 AI 단추가 같이 · 단계마다 그때 고른 모델로) · D-263 자체점검 기준 */}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <ModelPicker />
             <JudgeSkillButton />
           </div>
         </div>
+        <ol className="flex flex-wrap gap-1.5" data-testid="vplan-steps" data-phase={phase} aria-label="사업계획서 쓰는 차례">
+          {VSTEPS.map((x, i) => {
+            const now2 = i === stepAt
+            const past = i < stepAt
+            return (
+              <li key={x.label} className={`t-meta inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${now2 ? 'bg-brand-600 text-white' : past ? 'bg-success-100 text-success-800' : 'bg-slate-100 text-slate-500'}`} aria-current={now2 ? 'step' : undefined} data-testid="vplan-step" data-now={now2 ? 'yes' : 'no'}>
+                {past ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <span aria-hidden="true">{i + 1}</span>}
+                {x.label}
+              </li>
+            )
+          })}
+        </ol>
         {!hasMaterial ? (
           <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-ai-need">
             <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">재료(특허 명세서 또는 AX · MVP)가 없으면 AI 가 지어낼 수 있어 막아 두었습니다.</p>
@@ -254,38 +390,134 @@ export function VenturePlanAi({
           </div>
         ) : (
           <>
-            <SummaryGateCard key={gate.patentNo} gate={sg} market={gate.market} patentInput={gate.patentNo} busy={busy} onSave={save} onRunMarket={() => void runAll(['market'])} rowMarket={rows.market} notes={notes} />
-            <div className="flex flex-wrap gap-2">
-              <Button variant="primary" size="sm" disabled={busy} onClick={() => void runAll(allSteps())} data-testid="vplan-ai-run">
-                {busy ? '쓰는 중…' : '전부 써줘'}
-              </Button>
-              {failedKeys.length > 0 && !busy && (
-                <Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="vplan-ai-retry">
-                  못 쓴 {failedKeys.length}단계만 다시
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-                닫기
-              </Button>
-            </div>
+            {phase === 'plan' ? (
+              <section className="flex flex-col gap-2.5" data-testid="vplan-plan" aria-label="기획 방향">
+                {planSt.options.length === 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
+                      {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Sparkles aria-hidden="true" className="size-5" />} {busy ? '기획 방향을 내는 중…' : '기획 방향 5개 내줘'}
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <ul className="flex flex-col gap-2" role="radiogroup" aria-label="사업계획서 기획 방향 후보" data-testid="vplan-plan-list">
+                      {planSt.options.map((p, i) => {
+                        const on = picked?.title === p.title
+                        return (
+                          <li key={`${p.title}-${i}`} className={`flex flex-col rounded-(--radius-control) border-2 ${on ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 bg-white'}`} data-testid="vplan-plan-option" data-rank={i + 1} data-picked={on ? 'yes' : 'no'} data-fresh={p.fresh ? 'yes' : 'no'}>
+                            <button type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => setPickTitle(p.title)} className="tap flex w-full min-w-0 items-start gap-2.5 px-3 pt-2.5 pb-1.5 text-left" data-testid="vplan-plan-pick">
+                              <span aria-hidden="true" className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'border-brand-600 bg-brand-600' : 'border-slate-400 bg-white'}`}>
+                                {on && <span className="size-2 rounded-full bg-white" />}
+                              </span>
+                              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                <span className="flex flex-wrap items-center gap-1.5">
+                                  <span className={`t-meta rounded-full px-2 py-0.5 font-bold ${i === 0 ? 'bg-brand-600 text-white' : i < 3 ? 'bg-brand-100 text-brand-900' : 'bg-slate-100 text-slate-600'}`}>{rankLabel(i)}</span>
+                                  {p.score != null && <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{p.score}점</span>}
+                                  {p.fresh && <span className="t-meta rounded-full bg-danger-600 px-2 py-0.5 font-bold text-white">새로 · 자체점검</span>}
+                                </span>
+                                <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{p.title}</span>
+                                {p.reason && <span className="t-sub break-keep text-brand-900">{i < 3 ? `${rankLabel(i)}인 이유 · ` : ''}{p.reason}</span>}
+                                {p.lines[1] && <span className="t-meta break-keep text-slate-700">고객 · {clip(p.lines[1], 120)}</span>}
+                                {p.why && <span className="t-meta break-keep text-slate-600">회사 근거 · {clip(p.why, 160)}</span>}
+                              </span>
+                            </button>
+                            <details className="px-3 pb-2.5 pl-11">
+                              <summary className="tap t-meta cursor-pointer font-semibold text-slate-600">자세히 — 핵심 기술 · 고객 · 차별 · 증거 · 3년 성장 · 약점</summary>
+                              <dl className="t-meta mt-1 grid gap-0.5 break-keep text-slate-700">
+                                {p.lines.map((l, j) => (
+                                  <dd key={j}>
+                                    <b className="font-semibold">{PLAN_LINE_LABEL[j] ?? ''}</b> · {l}
+                                  </dd>
+                                ))}
+                              </dl>
+                            </details>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <Button variant="primary" className="min-h-12" disabled={busy || !picked} onClick={() => void choosePlan()} data-testid="vplan-plan-start">
+                        이걸로 시작하자 <ArrowRight aria-hidden="true" className="size-5" />
+                      </Button>
+                      <Button variant="secondary" disabled={busy || planSt.options.length < 2} onClick={() => void runPlan('rank')} data-testid="vplan-plan-rank">
+                        <Gavel aria-hidden="true" className="size-4" /> 이 중 제일 좋은 게 뭐야?
+                      </Button>
+                      <Button variant="secondary" disabled={busy} onClick={() => void runPlan('more')} data-testid="vplan-plan-more">
+                        <Sparkles aria-hidden="true" className="size-4" /> 자체점검으로 더 짜내기
+                      </Button>
+                      <Button variant="ghost" disabled={busy} onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
+                        5개 새로 내줘
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </section>
+            ) : (
+              <>
+                {chosen && (
+                  <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-plan-chosen">
+                    <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
+                      <b className="font-semibold">기획 방향</b> · <span className="[overflow-wrap:anywhere]">{chosen.title}</span>
+                    </p>
+                    <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy} onClick={() => void backToPlans()} data-testid="vplan-plan-back">
+                      다른 방향으로
+                    </Button>
+                  </div>
+                )}
+                <SummaryGateCard key={gate.patentNo} gate={sg} market={gate.market} patentInput={gate.patentNo} busy={busy} onSave={save} onRunMarket={() => void runAll(['market'])} rowMarket={rows.market} notes={notes} />
+                <div className="flex flex-wrap gap-2">
+                  {phase === 'sum' && (
+                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll(['sum', 'judgeSum'])} data-testid="vplan-ai-next" data-step="sum">
+                      {busy ? '쓰는 중…' : '요약 쓰기 — 자체점검 ① 까지'}
+                    </Button>
+                  )}
+                  {phase === 'body' && (
+                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll([...bodyLeft, 'judgeAll'])} data-testid="vplan-ai-next" data-step="body">
+                      {busy ? '쓰는 중…' : `요약 확인 — 본문 ${bodyLeft.length}묶음 쓰기`}
+                    </Button>
+                  )}
+                  {failedKeys.length > 0 && !busy && (
+                    <Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="vplan-ai-retry">
+                      못 쓴 {failedKeys.length}단계만 다시
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+                    닫기
+                  </Button>
+                </div>
+              </>
+            )}
+            {planRowsShown.length > 0 && (
+              <ul className="flex flex-col gap-0.5" data-testid="vplan-plan-rows">
+                {planRowsShown.map((k) => {
+                  const r = rows[k]!
+                  return (
+                    <li key={k} className={`t-sub break-keep ${r.phase === 'fail' ? 'text-danger-700' : r.phase === 'done' ? 'text-success-700' : 'text-slate-600'}`} data-testid="vplan-plan-row" data-key={k} data-phase={r.phase} data-model={r.model ?? ''}>
+                      <b className="font-semibold text-slate-800">{k === 'plan' ? '기획 방향' : k === 'planRank' ? '가장 나은 방향' : '자체점검으로 더 짜내기'}</b> · {r.text}
+                      {r.model && <span className="t-meta ml-1.5 inline-block rounded bg-white px-1.5 font-semibold whitespace-nowrap text-slate-600 ring-1 ring-slate-200">{prettyModel(r.model)}</span>}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </>
         )}
         <ul className="flex flex-col" data-testid="vplan-ai-rows">
           {VPLAN_STEPS.map((st) => {
             const r = rows[st.key]
             const isBatch = VPLAN_BATCHES.some((b) => b.key === st.key)
-            const blocked = st.key === 'sum' && !sg.ok
+            const blocked = (st.key === 'sum' && !sg.ok) || (!chosen && st.key !== 'market')
             const judge = st.key === 'judgeSum' || st.key === 'judgeAll'
             return (
               <li key={st.key} className="flex flex-col gap-1 border-b border-slate-100 py-2 last:border-b-0 sm:flex-row sm:items-center" data-testid="vplan-ai-row" data-key={st.key} data-phase={r?.phase ?? ''}>
                 <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
                   <b className="font-semibold">{st.label}</b>
                   {isBatch && <span className="text-slate-500"> · {fieldsOfBatch(st.key as VPlanBatch).length}칸</span>}
-                  {blocked && !r && <span className="block text-warning-800">요약 전에 먼저 — {sg.missing.join(' · ')}</span>}
+                  {blocked && !r && <span className="block text-warning-800">{!chosen && st.key !== 'market' ? '기획 방향부터 — 위에서 방향을 고르세요' : `요약 전에 먼저 — ${sg.missing.join(' · ')}`}</span>}
                   {r && <span className={`block ${r.phase === 'fail' ? 'text-danger-700' : r.phase === 'done' ? 'text-success-700' : 'text-slate-600'}`}>{r.phase === 'done' ? '✓ ' : r.phase === 'fail' ? '△ ' : ''}{r.text}</span>}
                 </p>
                 {hasMaterial && (
-                  <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy || blocked} onClick={() => void runAll([st.key])} data-testid="vplan-ai-one" title={blocked ? `요약 전에 먼저 — ${sg.missing.join(' · ')}` : undefined}>
+                  <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy || blocked} onClick={() => void runAll([st.key])} data-testid="vplan-ai-one" title={blocked ? (!chosen && st.key !== 'market' ? '기획 방향부터' : `요약 전에 먼저 — ${sg.missing.join(' · ')}`) : undefined}>
                     {judge ? (r?.phase === 'done' ? '다시 판정' : '판정해줘') : st.key === 'market' ? (r?.phase === 'done' || marketDone(gate.market) ? '다시 조사' : '조사해줘') : r?.phase === 'done' ? '다시 써줘' : '이것만 써줘'}
                   </Button>
                 )}

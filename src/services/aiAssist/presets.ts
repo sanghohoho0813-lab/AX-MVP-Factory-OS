@@ -72,6 +72,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'venture.x', page: 'venture', label: '벤처 사업계획서 — 기업가정신 · 자금운용', kind: 'write', hint: '[1] 4 · [2] 5' },
   { id: 'venture.sum', page: 'venture', label: '벤처 사업계획서 — 요약 · 핵심 요약', kind: 'write', hint: '기술명 · 요약 · 핵심 요약 7칸' },
   { id: 'venture.market', page: 'venture', label: '벤처 사업계획서 — 시장조사(TAM · SAM · SOM)', kind: 'list', hint: '요약 전에 반드시 — 전체 · 유효 · 3년 확보 시장' },
+  { id: 'venture.plan', page: 'venture', label: '벤처 사업계획서 — 기획 방향 내줘', kind: 'write', hint: '재료로 사업계획서 기획 방향 5개 · 순위 · 이유' },
+  { id: 'venture.planRank', page: 'venture', label: '벤처 사업계획서 — 이 중 제일 좋은 방향', kind: 'list', hint: '방향을 자체점검 기준으로 견줘 점수 · 순위' },
+  { id: 'venture.planMore', page: 'venture', label: '벤처 사업계획서 — 자체점검으로 방향 더 짜내기', kind: 'write', hint: '방향의 약점을 공격하고 새 방향 2개' },
   { id: 'venture.judge', page: 'venture', label: '벤처 사업계획서 — 자체점검', kind: 'write', hint: '요약 뒤 · 본문 뒤 — 점수 · P0 · 직접 고침' },
   // D-252 AI 가 다 쓰는 명세서 — 명세서 작업판의 칸 단추가 부른다(띠 · 판 단추에는 없음 · 서버가 내부 기준 문서 기준 문서를 붙임)
   { id: 'spec.idea', page: 'patent', label: '명세서 — 아이디어 내줘', kind: 'write', hint: '회사 기록 · 재료로 아이디어 5개 · 순위 · 이유' },

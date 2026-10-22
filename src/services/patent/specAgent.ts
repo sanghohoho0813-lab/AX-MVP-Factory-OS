@@ -12,6 +12,7 @@
  */
 import type { AssistAnswer, AssistItem, AssistRun } from '../aiAssist/client'
 import { judgeLine, judgePassed } from '../aiAssist/judge'
+import { addFresh, rankByScore, rankLabel, rerankByAnswer, scoreOf, stripRank, titleKey } from '../aiAssist/candidates'
 import type { AssistContext, AssistRow } from '../aiAssist/context'
 import { safeText } from '../aiAssist/context'
 import { checkSpec, type SpecReport } from './specCheck'
@@ -191,17 +192,6 @@ function stripLabel(line: string): string {
     .trim()
 }
 
-/** 점수 글 → 0~100 숫자("82점" · "82/100" · "82") */
-function scoreOf(v: unknown): number | undefined {
-  const m = /(\d{1,3}(?:\.\d+)?)/.exec(String(v ?? ''))
-  if (!m) return undefined
-  const n = Math.round(Number(m[1]))
-  return n >= 0 && n <= 100 ? n : undefined
-}
-
-/** 명칭 비교용(띄어쓰기 · 기호 무시) */
-const titleKey = (t: string) => String(t ?? '').replace(/\{[^}]*\}/g, '').replace(/[\s·,.\-()]/g, '')
-
 /**
  * 아이디어 후보 — D-269 5개 · 추천 점수(amount) · 순위 이유(when). 점수가 있으면 점수 순(같으면 답 순서).
  * 명칭 앞에 붙은 '1순위' · '[추천]' 같은 표지는 뗀다.
@@ -210,10 +200,8 @@ export function ideasOf(answer: AssistAnswer | null, max = 5): IdeaPick[] {
   if (!answer) return []
   const out: IdeaPick[] = []
   for (const it of answer.items ?? []) {
-    const title = String(it.title ?? '')
-      .replace(/\{[^}]*\}/g, '')
-      .replace(/[{}]/g, '')
-      .replace(/^\s*(?:\[?\s*(?:\d\s*순위|추천|후보)\s*\]?\s*[:.)·-]?\s*)/, '')
+    const title = stripRank(String(it.title ?? '').replace(/\{[^}]*\}/g, '').replace(/[{}]/g, ''))
+
       .replace(/\s+/g, ' ')
       .trim()
     const lines = (it.outline ?? []).map(stripLabel).filter(Boolean)
@@ -236,54 +224,20 @@ export function ideasOf(answer: AssistAnswer | null, max = 5): IdeaPick[] {
 }
 
 /** 점수 높은 순(점수 없는 것은 뒤 · 같으면 원래 순서) */
-export function rankIdeas(ideas: IdeaPick[]): IdeaPick[] {
-  return ideas
-    .map((p, i) => ({ p, i }))
-    .sort((a, b) => (b.p.score ?? -1) - (a.p.score ?? -1) || a.i - b.i)
-    .map((x) => x.p)
-}
+export const rankIdeas = (ideas: IdeaPick[]): IdeaPick[] => rankByScore(ideas)
 
-/** 순위 표지 — 1~3순위만, 나머지는 후보 */
-export const rankLabel = (i: number) => (i < 3 ? `${i + 1}순위` : '후보')
+export { rankLabel }
 
-/**
- * D-269 [이 중 제일 좋은 게 뭐야?] 의 답 → 후보마다 점수 · 이유를 고쳐 다시 줄 세움.
- * 답의 항목은 후보 명칭(또는 '후보 n')으로 찾는다. 찾지 못한 후보는 점수를 그대로 둔다.
- */
+/** D-269 [이 중 제일 좋은 게 뭐야?] 의 답 → 후보마다 점수 · 이유를 고쳐 다시 줄 세움(찾지 못한 후보는 그대로) */
 export function rerankIdeas(ideas: IdeaPick[], answer: AssistAnswer | null): { ideas: IdeaPick[]; matched: number; headline: string } {
-  if (!answer) return { ideas, matched: 0, headline: '' }
-  const next = ideas.map((p) => ({ ...p }))
-  let matched = 0
-  for (const it of answer.items ?? []) {
-    const raw = String(it.title ?? '')
-    const byNo = /후보\s*(\d+)/.exec(raw) ?? /후보\s*(\d+)/.exec(String(it.ref ?? ''))
-    let idx = byNo ? Number(byNo[1]) - 1 : -1
-    if (idx < 0 || idx >= next.length) {
-      const k = titleKey(raw.replace(/^\s*\[?\s*(?:\d\s*순위|후보\s*\d+)\s*\]?\s*[:.)·-]?\s*/, ''))
-      idx = k ? next.findIndex((p) => titleKey(p.title) === k || (k.length >= 8 && (titleKey(p.title).includes(k) || k.includes(titleKey(p.title))))) : -1
-    }
-    if (idx < 0) continue
-    const score = scoreOf(it.amount)
-    if (score == null) continue
-    next[idx].score = score
-    const why = String(it.when ?? it.detail ?? '').trim()
-    if (why) next[idx].reason = why
-    matched += 1
-  }
-  return { ideas: rankIdeas(next), matched, headline: String(answer.headline ?? '').trim() }
+  const r = rerankByAnswer(ideas, answer)
+  return { ideas: r.items, matched: r.matched, headline: r.headline }
 }
 
 /** D-269 [더 짜내기] 로 나온 새 아이디어를 후보에 더한다(같은 명칭은 빼고 · 표시 fresh · 모두 IDEA_MAX 안) */
 export function addMoreIdeas(ideas: IdeaPick[], more: IdeaPick[]): { ideas: IdeaPick[]; added: number } {
-  const fresh = more.filter((m) => !ideas.some((p) => titleKey(p.title) === titleKey(m.title))).map((m) => ({ ...m, fresh: true }))
-  const all = rankIdeas([...ideas.map((p) => ({ ...p, fresh: false })), ...fresh])
-  // 새로 나온 것은 넘쳐도 남긴다 — 점수가 가장 낮은 옛 후보부터 뺀다
-  while (all.length > IDEA_MAX) {
-    const drop = all.map((p, i) => ({ p, i })).filter((x) => !x.p.fresh).pop()
-    if (!drop) break
-    all.splice(drop.i, 1)
-  }
-  return { ideas: all.map((p) => (p.fresh ? p : { ...p, fresh: undefined })), added: fresh.length }
+  const r = addFresh(ideas, more, IDEA_MAX)
+  return { ideas: r.items, added: r.added }
 }
 
 /** 아이디어 하나로 1단계를 채운다(명칭 · 영문 · 5개 질문). 고른 명칭은 ai.title 로 기억 — 사람이 고친 명칭인지 알기 위해 */

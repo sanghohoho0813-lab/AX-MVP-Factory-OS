@@ -136,7 +136,7 @@ function JudgeSkillInner({ workspaceId, size }: { workspaceId: string | null; si
         <div className="flex flex-col gap-3" data-testid="judge-skill-sheet">
           <div className="flex flex-col gap-1">
             <p className="t-sub font-semibold text-slate-900">언제 들어가나요</p>
-            <p className="t-sub break-keep text-slate-700">명세서: 구성 · 권리축을 쓴 뒤(①) · 청구항까지 쓴 뒤(②). 벤처 사업계획서: 요약을 쓴 뒤 · 본문을 다 쓴 뒤. [전부 써줘] 에 저절로 들어가고, 90점 미만이면 자체점검이 고친 글로 한 번 더 판정합니다.</p>
+            <p className="t-sub break-keep text-slate-700">명세서: 구성 · 권리축을 쓴 뒤(①) · 청구항까지 쓴 뒤(②). 벤처 사업계획서: 요약을 쓴 뒤 · 본문을 다 쓴 뒤. 그 단계 단추에 저절로 들어가고, 90점 미만이면 자체점검이 고친 글로 한 번 더 판정합니다. 기획 단계([이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기])도 이 기준으로 후보를 봅니다.</p>
           </div>
           <div className="flex flex-col gap-1">
             <p className="t-sub font-semibold text-slate-900">기본 자체점검</p>

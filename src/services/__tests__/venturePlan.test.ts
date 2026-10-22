@@ -22,8 +22,8 @@ import {
   readPlan,
   type VPlanFacts,
 } from '../../certification/core/venturePlan'
-import { VPLAN_BATCHES, VPLAN_STEPS, buildBatchContext, buildMarketContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf } from '../../certification/integration/venturePlanAi'
-import { GK, PATENT_NONE, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, marketRows, type GateState } from '../../certification/integration/ventureGate'
+import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf, plansOf, rerankPlans } from '../../certification/integration/venturePlanAi'
+import { GK, PATENT_NONE, PLAN_MAX, chosenPlan, planStatePatch, readPlanState, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, marketRows, type GateState } from '../../certification/integration/ventureGate'
 import { judgeOf, judgePassed, readJudgeReport } from '../aiAssist/judge'
 import { PATENT_JUDGE, VENTURE_JUDGE, customSkillBlock } from '../../../api/_ai/judge.js'
 import { parseSpecText } from '../patent/specParse'
@@ -301,6 +301,38 @@ const long = (n: number) => '가'.repeat(n)
   check('J11b 아이디어 내기 · 견주기 · 더 짜내기 — 아이디어 자체점검 기준 · 대표 정의 · 최종본 규칙 없음', ['spec.idea', 'spec.ideaRank', 'spec.ideaMore'].every((id) => assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && assistSystem(ASSISTS[id]).includes('[자체점검 — 특허 아이디어 후보]') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')))
   check('J12 대표 정의 — 빈 글이면 아무것도 안 붙음 · 8,000자에서 자름', customSkillBlock('').length === 0 && customSkillBlock('  ').length === 0 && customSkillBlock('가'.repeat(9000))[2].length === 8000)
   check('J13 화면 이름표 = 서버(시장조사 · 자체점검 둘)', ['venture.market', 'venture.judge', 'spec.judge'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)) && ASSISTS['venture.market'].research === true)
+}
+
+/* ---------------- D-270 사업계획서도 기획 먼저 — 방향 5개 · 고르기 · 고른 방향이 쓰기 · 자체점검 · 시장조사에 ---------------- */
+{
+  const dir = (t: string, amount: string, when = '') => ({ title: t, outline: ['신호 정규화부가 휴대폰 진동 입력으로 구현됨', '중소 금속가공 업체', '교체 시점을 일정과 함께', '시험 3곳 · 출원 10-2026-0012345', '3년 120곳', '실제 사용 고객 수 확인'], detail: '재료의 MVP 시험 3곳에서', amount, when, tag: '' })
+  const ans = { headline: '1순위 이유', items: [dir('[2순위] 공구 교체 일정 SaaS', '71', '나 이유'), dir('공구 마모 예측 현장 앱', '86', '가 이유'), dir('설비 보전 데이터 플랫폼', '60'), dir('공구 재고 연동 서비스', '55'), dir('작업자 안전 알림', '40'), dir('여섯째', '30'), { title: '줄 모자람', outline: ['하나', '둘'], amount: '99' }] }
+  const five = plansOf(ans)
+  check('VP1 기획 방향 5개 · 점수 순 · 순위 표지 뗌 · 6줄 · 이유 · 회사 근거 · 4줄 안 되는 것은 버림', five.length === 5 && five[0].title === '공구 마모 예측 현장 앱' && five[0].score === 86 && five[0].reason === '가 이유' && five[1].title === '공구 교체 일정 SaaS' && five[0].lines.length === 6 && five[0].why.includes('시험 3곳') && !five.some((p) => p.title === '줄 모자람'), five.map((p) => [p.title, p.score]))
+  const st = readPlanState(planStatePatch({ options: five, chosen: five[1].title })[GK.plan])
+  check('VP2 저장 · 다시 읽기 · 고른 방향(목록에 없으면 없음)', st.options.length === 5 && chosenPlan(st)?.title === '공구 교체 일정 SaaS' && chosenPlan({ ...st, chosen: '없는 방향' }) === null && chosenPlan({ ...st, chosen: '' }) === null && readPlanState('깨진 글').options.length === 0)
+  const rr = rerankPlans(five, { headline: '후보 3 — 가장 단단함', items: [{ title: '후보 3', amount: '95', when: '설비 데이터가 가장 많음' }, { title: '공구 마모 예측 현장 앱', amount: '70' }] })
+  check('VP3 [이 중 제일 좋은 게 뭐야?] — 후보 n · 명칭으로 다시 매김 · 줄 세움', rr.matched === 2 && rr.items[0].title === '설비 보전 데이터 플랫폼' && rr.items[0].reason === '설비 데이터가 가장 많음', rr.items.map((p) => [p.title, p.score]))
+  const mm = addMorePlans(five, plansOf({ headline: '', items: [dir('새 방향 하나', '91'), dir('공구 마모 예측 현장 앱', '99')] }, 3))
+  check(`VP4 [자체점검으로 더 짜내기] — 같은 제목 빼고 새것만 · 새로 표시 · ${PLAN_MAX}개까지`, mm.added === 1 && mm.items[0].title === '새 방향 하나' && mm.items[0].fresh === true && mm.items.length === 6)
+  const notes = { ...planStatePatch({ options: five, chosen: five[0].title }) }
+  const g = readGate(notes)
+  const state = readPlan({ [VK.patent]: '[발명의 명칭] 공구 마모 예측', [VK.ax]: '실제로 만든 것: 휴대폰 진동 입력' })
+  const facts: VPlanFacts = { companyName: '(주)한솔테크', industryText: '금속가공', patents: 1, researchUnit: 'dept', researchers: 2, rndExpense: null, patentTitle: '공구 마모 예측', applicationNumber: '' } as VPlanFacts
+  const bc = buildBatchContext({ batch: 'p1', state, facts, today: '2026-10-23', gate: g })
+  check('VP5 방향을 고르면 쓰기 자료 맨 앞에 "고른 기획 방향"(제목 · 핵심 기술 · 고객 …) · 쓰기 규칙에 "그 줄거리로"', bc.sections[0].name.startsWith('고른 기획 방향') && JSON.stringify(bc.sections[0].rows).includes('공구 마모 예측 현장 앱') && JSON.stringify(bc.sections[0].rows).includes('목표 고객') && (bc.rules ?? []).some((r) => /고른 기획 방향/.test(r)))
+  const none = buildBatchContext({ batch: 'p1', state, facts, today: '2026-10-23', gate: readGate({}) })
+  check('VP6 방향을 안 골랐으면 그 자료 · 규칙 없음(예전과 같음)', !none.sections.some((x) => x.name.startsWith('고른 기획 방향')) && !(none.rules ?? []).some((r) => /고른 기획 방향/.test(r)))
+  const jc = buildVentureJudgeContext({ scope: 'sum', state, facts, today: '2026-10-23', gate: g })
+  const mc = buildMarketContext({ state, facts, today: '2026-10-23', gate: g })
+  check('VP7 자체점검 · 시장조사도 고른 방향을 봄', jc.sections.some((x) => x.name.startsWith('고른 기획 방향')) && mc.sections.some((x) => x.name.startsWith('고른 기획 방향')))
+  const pc = buildPlanContext({ state, facts, today: '2026-10-23', gate: readGate({}) })
+  const rc = buildPlanRankContext({ state, facts, today: '2026-10-23', gate: g })
+  const xc = buildPlanMoreContext({ state, facts, today: '2026-10-23', gate: g })
+  check('VP8 기획 자료 — 재료(명세서 · AX) · 회사 사실 / 견주기 = 후보 n / 짜내기 = 지금 후보', JSON.stringify(pc.sections).includes('휴대폰 진동 입력') && (pc.facts ?? []).some((f) => f.includes('한솔테크')) && rc.sections.some((x) => x.name === '후보' && x.rows[0].part === '후보 1') && xc.sections.some((x) => x.name === '지금 후보') && /5개/.test(pc.purpose ?? ''))
+  const sysP = assistSystem(ASSISTS['venture.plan'], { skill: '대표표식' })
+  check('VP9 기획 단추 지시문 — 벤처 기획 방향 자체점검 기준 + 대표 정의 · 최종본 규칙 없음 · 견주기 · 짜내기도', ['venture.plan', 'venture.planRank', 'venture.planMore'].every((id) => assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('[자체점검 — 벤처 사업계획서 기획 방향]') && assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')) && sysP.includes('정확히 6줄'))
+  check('VP10 화면 이름표 = 서버(기획 · 견주기 · 짜내기)', ['venture.plan', 'venture.planRank', 'venture.planMore'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

@@ -12,6 +12,7 @@
  * D-261 대표: "처음 명세서 시작하는데 너무 뭐가 많아 · 타자 치는 거 없애 · 버튼 한 번에 처음부터 끝까지".
  *   대표는 어디서 열어도(?step= 포함) AI 작업판이 먼저 — 타자 칸은 [직접 고치기] 를 눌렀을 때만.
  *   새 명세서 = 회사 고르기(고르면 그 기록으로) + [AI 로 처음부터 끝까지] 한 번 → 만들고 바로 전부 써줘(?auto=1).
+ *   D-269 새 명세서 = 회사 · 모델 고르기 + [기획부터 시작] → 아이디어 5개까지만 저절로(?auto=1) — 그다음은 절차마다 단추.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
