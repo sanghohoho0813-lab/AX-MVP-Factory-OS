@@ -23,7 +23,7 @@ import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { RD_ORG_OPTIONS, VK, VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
-import { PATENT_NONE, RD_ORG_SHORT, judgePatch, marketDone, marketOf, marketPatch, normalizeAppNo, patentPatch, readGate, researchersPatch, summaryGate, type MarketResearch } from '../integration/ventureGate'
+import { PATENT_NONE, RD_ORG_SHORT, judgePatch, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, marketPatch, normalizeAppNo, patentPatch, readGate, researchersPatch, summaryGate, type MarketResearch } from '../integration/ventureGate'
 import { VPLAN_BATCHES, VPLAN_STEPS, buildBatchContext, buildMarketContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, type VPlanStep } from '../integration/venturePlanAi'
 
 export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string }
@@ -142,7 +142,8 @@ export function VenturePlanAi({
         })
         await save(marketPatch(value))
         const ok = marketDone(value)
-        setRow(key, ok ? { phase: 'done', text: `TAM ${value.tam.amount} · SAM ${value.sam.amount} · SOM ${value.som.amount}${value.grounded ? ` · 검색 근거 ${value.sources.length}곳` : ' · 검색 근거 없음(출처 확인)'}` } : { phase: 'fail', text: "찾지 못한 숫자가 있습니다 — 위 '숫자 고치기' 로 넣거나 다시 조사" })
+        const empty = (['tam', 'sam', 'som'] as const).filter((k) => !value[k].amount.trim()).map((k) => k.toUpperCase())
+        setRow(key, ok ? { phase: 'done', text: `TAM ${value.tam.amount} · SAM ${value.sam.amount} · SOM ${value.som.amount}${value.grounded ? ` · 검색 근거 ${value.sources.length}곳` : ' · 검색 근거 없음 — 위에서 숫자를 한 번 확인해 주세요'}` } : { phase: 'fail', text: `${empty.join(' · ')} 숫자를 찾지 못했습니다 — 위에 AI 가 적은 산식을 보고 빈 숫자만 넣어 주세요` })
         return ok ? [0, 0] : 'fail'
       }
       if (key === 'judgeSum' || key === 'judgeAll') return await runJudge(key, skill)
@@ -351,8 +352,17 @@ function SummaryGateCard({
   const [patentEdit, setPatentEdit] = useState(false)
   const [patentText, setPatentText] = useState(patentInput === PATENT_NONE ? '' : patentInput)
   const [staffText, setStaffText] = useState('')
-  const [marketEdit, setMarketEdit] = useState(false)
-  const [mk, setMk] = useState({ tam: market?.tam.amount ?? '', sam: market?.sam.amount ?? '', som: market?.som.amount ?? '', source: market?.tam.source ?? '' })
+  // 숫자 고치기 — 대표가 열고 닫은 대로, 아직 안 건드렸으면 AI 가 숫자를 다 못 찾았을 때 저절로 열림
+  const [marketEditPick, setMarketEdit] = useState<boolean | null>(null)
+  const marketEdit = marketEditPick ?? (!!market && !gate.market.ok)
+  const mkOf = (m: MarketResearch | null) => ({ tam: m?.tam.amount ?? '', sam: m?.sam.amount ?? '', som: m?.som.amount ?? '', source: m?.tam.source ?? '' })
+  const [mk, setMk] = useState(() => mkOf(market))
+  // 새 조사 결과가 오면 칸도 새 숫자로(렌더 중 맞추기)
+  const [mkAt, setMkAt] = useState(market?.at ?? '')
+  if ((market?.at ?? '') !== mkAt) {
+    setMkAt(market?.at ?? '')
+    setMk(mkOf(market))
+  }
   const done = [gate.market.ok, gate.patent.ok, gate.rd.ok].filter(Boolean).length
 
   const savePatch = async (patch: Record<string, string>, msg: string) => {
@@ -374,6 +384,9 @@ function SummaryGateCard({
   }
   const saveOrg = (org: string) => void savePatch({ [VK.text('rd_org')]: org }, `연구개발 조직: ${RD_ORG_SHORT[org] ?? org}`)
   const saveStaff = (n: number) => void savePatch(researchersPatch(n), `연구개발 인원 ${n}명`)
+  const confirmMarket = async () => {
+    if (market && (await savePatch(marketPatch(marketConfirmed(market, new Date().toISOString())), 'AI 추정 숫자를 대표 확인 숫자로 두었습니다 — 출처를 알면 숫자 고치기에서 바꿔 주세요'))) setMarketEdit(false)
+  }
   const saveMarket = async () => {
     const fig = (amount: string) => ({ amount: squeeze(amount).slice(0, 80), basis: '', source: squeeze(mk.source).slice(0, 200), year: '' })
     const base: MarketResearch = market ?? { tam: fig(''), sam: fig(''), som: fig(''), cagr: fig(''), customer: '', price: '', scope: '', headline: '', grounded: false, sources: [], at: '', by: 'human' }
@@ -402,10 +415,15 @@ function SummaryGateCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 pl-7">
-          <Button variant={gate.market.ok ? 'ghost' : 'primary'} size="sm" disabled={busy} onClick={onRunMarket} data-testid="vplan-gate-market-run">
-            {gate.market.ok ? '다시 조사' : 'AI로 시장조사'}
+          {marketNeedsConfirm(market) && (
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => void confirmMarket()} data-testid="vplan-gate-market-confirm">
+              이 숫자로 확인
+            </Button>
+          )}
+          <Button variant={gate.market.ok || marketNeedsConfirm(market) ? 'ghost' : 'primary'} size="sm" disabled={busy} onClick={onRunMarket} data-testid="vplan-gate-market-run">
+            {market ? '다시 조사' : 'AI로 시장조사'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setMarketEdit((v) => !v)} data-testid="vplan-gate-market-edit">
+          <Button variant="ghost" size="sm" onClick={() => setMarketEdit(!marketEdit)} data-testid="vplan-gate-market-edit">
             {marketEdit ? '숫자 고치기 닫기' : '숫자 고치기'}
           </Button>
         </div>
@@ -415,6 +433,7 @@ function SummaryGateCard({
               <label key={k} className="t-meta flex flex-col gap-0.5 font-semibold text-slate-700">
                 {k.toUpperCase()} 규모
                 <input value={mk[k]} onChange={(e) => setMk((c) => ({ ...c, [k]: e.target.value }))} placeholder={k === 'tam' ? '예: 1조 2,000억 원' : k === 'sam' ? '예: 3,500억 원' : '예: 12억 원(3년)'} className="t-sub min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-normal text-slate-900" data-testid={`vplan-gate-${k}`} />
+                {market?.[k].basis && <span className="t-meta break-keep font-normal text-slate-600 [overflow-wrap:anywhere]" data-testid={`vplan-gate-${k}-basis`}>AI 산식 · {market[k].basis}</span>}
               </label>
             ))}
             <label className="t-meta flex flex-col gap-0.5 font-semibold text-slate-700">

@@ -174,6 +174,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   let p2Calls = 0
   let g2Calls = 0
   let judgeSumCalls = 0
+  let marketCalls = 0
+  // 첫 시장조사는 검색 근거가 없어 숫자 없이 산식만(실제 모델이 그렇게 답했다 — D-263 모의 실행)
+  const MARKET_EMPTY = [
+    { title: 'tam', amount: '', detail: '검색 근거 없음 — 확인 필요 · 산식: 금형 · 기계가공 사업체 수 × 연 단가' },
+    { title: 'sam', amount: '', detail: '검색 근거 없음 — 확인 필요' },
+    { title: 'som', amount: '', detail: '3년 목표 고객 수 · 단가 없음 — 확인 필요' },
+    { title: 'customer', detail: '공구 교체를 관리하는 제조 현장' },
+  ]
   const SKILL = '/악마판사 — 대표정의표식: 숫자 하나라도 어긋나면 P0, 출원을 보유라고 쓰면 P0'
   const body = (id) => '본문 ' + id + ' — 특허의 신호 정규화부가 MVP 의 휴대폰 진동 입력으로 구현됩니다.'
   const ITEMS = {
@@ -207,8 +215,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const req = JSON.parse(route.request().postData() || '{}')
     sent.push(req)
     if (req.assistId === 'venture.p2' && p2Calls++ === 0) return route.fulfill({ status: 504, contentType: 'text/html', body: '<html>timeout</html>' })
-    const items = req.assistId === 'venture.judge' ? judgeItems(req) : req.assistId === 'venture.g2' && g2Calls++ < 3 ? [] : (ITEMS[req.assistId] ?? [])
-    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: req.assistId === 'venture.market', sources: req.assistId === 'venture.market' ? [{ title: '통계청', url: 'https://kosis.kr/x' }] : [] }
+    const items = req.assistId === 'venture.judge' ? judgeItems(req) : req.assistId === 'venture.market' && marketCalls++ === 0 ? MARKET_EMPTY : req.assistId === 'venture.g2' && g2Calls++ < 3 ? [] : (ITEMS[req.assistId] ?? [])
+    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: req.assistId === 'venture.market' && marketCalls !== 2, sources: req.assistId === 'venture.market' && marketCalls !== 2 ? [{ title: '통계청', url: 'https://kosis.kr/x' }] : [] }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
   const row = (k) => page.locator(`[data-testid="vplan-ai-row"][data-key="${k}"]`)
@@ -232,8 +240,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('vplan-ai-run').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="sum"]')?.getAttribute('data-phase') === 'fail', null, { timeout: 20000 })
   await page.waitForTimeout(400)
-  check('출원번호를 모르면 [전부 써줘] 가 시장조사만 하고 요약 앞에서 멈춤 — "요약 전에 먼저 — 출원번호" · 다른 단계 안 부름', sent.map((r) => r.assistId).join() === 'venture.market' && /요약 전에 먼저 — 출원번호/.test(await row('sum').innerText()) && (await row('p1').getAttribute('data-phase')) === 'wait', { sent: sent.map((r) => r.assistId), sum: await row('sum').innerText() })
-  check('시장조사 — TAM · SAM · SOM 숫자 · 검색 근거 · 시장조사는 대표 정의 안 보냄(판사 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원/.test(await page.getByTestId('vplan-gate-market').innerText()) && !sent[0].skill && JSON.stringify(sent[0].context).includes('거래처 49곳'))
+  check('시장조사 숫자 · 출원번호를 모르면 [전부 써줘] 가 시장조사만 하고 요약 앞에서 멈춤 — "요약 전에 먼저 — 시장조사 · 출원번호" · 다른 단계 안 부름', sent.map((r) => r.assistId).join() === 'venture.market' && /요약 전에 먼저 — 시장조사\(TAM · SAM · SOM\) · 출원번호/.test(await row('sum').innerText()) && (await row('p1').getAttribute('data-phase')) === 'wait', { sent: sent.map((r) => r.assistId), sum: await row('sum').innerText() })
+  check('숫자 없이 산식만 온 시장조사 — 다시 부르지 않고(1번) "TAM · SAM · SOM 숫자를 찾지 못했습니다" · 숫자 칸이 저절로 열리고 AI 산식이 보임', marketCalls === 1 && /TAM · SAM · SOM 숫자를 찾지 못했습니다/.test(await row('market').innerText()) && (await page.getByTestId('vplan-gate-market-form').isVisible()) && /AI 산식 · .*사업체 수 × 연 단가/.test(await page.getByTestId('vplan-gate-tam-basis').innerText()), { calls: marketCalls, row: await row('market').innerText() })
+  await shot(page, 'vplan-05b-market-empty', false)
+  // 두 번째 조사는 검색 근거 없이 AI 추정 숫자 → 대표가 한 번 확인해야 요약으로
+  await page.getByTestId('vplan-gate-market-run').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="market"]')?.getAttribute('data-phase') === 'done', null, { timeout: 15000 })
+  await page.waitForTimeout(300)
+  check('검색 근거 없는 AI 추정 숫자 — 시장조사 ✓ 아님 · "AI 추정 · 맞으면 [이 숫자로 확인]" · 숫자 칸 열림(새 숫자)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'no' && /AI 추정\(검색 근거 없음\)/.test(await page.getByTestId('vplan-gate-market').innerText()) && (await page.getByTestId('vplan-gate-market-confirm').isVisible()) && (await page.getByTestId('vplan-gate-tam').inputValue()) === '1조 2,000억 원', await page.getByTestId('vplan-gate-market').innerText())
+  await page.getByTestId('vplan-gate-market-confirm').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="vplan-gate-market"]')?.getAttribute('data-ok') === 'yes', null, { timeout: 15000 })
+  await page.waitForTimeout(300)
+  check('[이 숫자로 확인] → 시장조사 ✓ — TAM · SAM · SOM 숫자 · 대표 확인 숫자 · 시장조사는 대표 정의 안 보냄(판사 · 쓰기 단추만)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'yes' && /TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원 · 대표 확인 숫자/.test(await page.getByTestId('vplan-gate-market').innerText()) && !sent[0].skill && !sent[1].skill && JSON.stringify(sent[1].context).includes('거래처 49곳'))
   await page.getByTestId('vplan-gate-patent-input').fill('10 2026 0012345')
   await page.getByTestId('vplan-gate-patent-save').click()
   await page.waitForTimeout(500)

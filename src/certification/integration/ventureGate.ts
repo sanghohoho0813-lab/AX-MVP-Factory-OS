@@ -6,7 +6,7 @@
  *        아무리 간편하게 한다 해도. 특허번호나 기술인력 유무 같은 것만큼은 내가 직접 입력해도 되게."
  * 기준 문서(Master v2.9 23-1B): Venture Factsheet → 신청기술명 → 요약 → 7개 V 문장 → 수치 · 증빙 Gate → 본문 1~7번.
  *
- *  ① 시장조사 — TAM · SAM · SOM 세 숫자가 모두 있어야(AI 조사 · 대표가 고친 숫자 모두 인정)
+ *  ① 시장조사 — TAM · SAM · SOM 세 숫자가 모두 있어야(검색 근거가 있는 AI 조사 · 대표가 고치거나 확인한 숫자 — 검색 근거 없는 AI 추정은 대표가 한 번 확인)
  *  ② 출원번호 — 직접 넣은 번호 · 이전 컨설팅 기록 · [1] 7 지식재산권 칸에서 찾은 번호, 또는 대표가 '아직 출원 전' 이라고 고른 것
  *  ③ 기술인력 — 연구개발 조직(기업부설연구소 · 연구개발전담부서 · … · 없음) + 연구개발 인원(0명도 답)
  * 저장은 기업인증 notes(vplan:mkt · vplan:patentNo · vplan:researchers · vplan:judge) — DB 변경 없음.
@@ -94,6 +94,12 @@ export function readGate(notes: Record<string, string>): GateState {
 /** 세 숫자(TAM · SAM · SOM)가 모두 있으면 시장조사를 밟은 것 */
 export const marketDone = (m: MarketResearch | null | undefined): boolean => !!m && !!m.tam.amount.trim() && !!m.sam.amount.trim() && !!m.som.amount.trim()
 
+/** 검색 근거 없이 AI 가 추정만 한 숫자 — 요약 전에 대표가 한 번 확인(또는 고침)해야 한다(악마판사 P0 'TAM/SAM/SOM 근거 부족' 을 미리 막음) */
+export const marketNeedsConfirm = (m: MarketResearch | null | undefined): boolean => marketDone(m) && !!m && m.by === 'ai' && !m.grounded
+
+/** 대표가 'AI 숫자 그대로 확인' — 대표 확인 숫자로 바꿔 둔다 */
+export const marketConfirmed = (m: MarketResearch, at: string): MarketResearch => ({ ...m, by: 'human', at })
+
 /* ------------------------------------------------------------------ */
 /* 출원번호                                                              */
 /* ------------------------------------------------------------------ */
@@ -164,13 +170,17 @@ export interface SummaryGate {
 export function summaryGate(s: Pick<VPlanState, 'text'>, f: VPlanFacts, g: GateState): SummaryGate {
   const mk = marketDone(g.market)
   const m = g.market
-  const market = mk && m ? { ok: true, text: `TAM ${m.tam.amount} · SAM ${m.sam.amount} · SOM ${m.som.amount}${m.grounded ? ` · 검색 근거 ${m.sources.length}곳` : m.by === 'human' ? ' · 대표가 고친 숫자' : ' · 검색 근거 없음(출처 확인)'}` } : { ok: false, text: m ? 'TAM · SAM · SOM 중 빈 숫자가 있습니다' : '아직 조사하지 않았습니다' }
+  const confirm = marketNeedsConfirm(m)
+  const nums = m ? `TAM ${m.tam.amount} · SAM ${m.sam.amount} · SOM ${m.som.amount}` : ''
+  const market = mk && m && !confirm
+    ? { ok: true, text: `${nums}${m.grounded ? ` · 검색 근거 ${m.sources.length}곳` : ' · 대표 확인 숫자'}` }
+    : { ok: false, text: confirm ? `${nums} — AI 추정(검색 근거 없음) · 맞으면 [이 숫자로 확인], 다르면 숫자 고치기` : m ? 'TAM · SAM · SOM 중 빈 숫자가 있습니다' : '아직 조사하지 않았습니다' }
   const p = patentNoOf(s, f, g)
   const patent = { ok: !!p.value || p.source === 'none', value: p.value, source: p.source, text: p.value ? `${p.value} · ${PATENT_SOURCE_LABEL[p.source]}` : p.source === 'none' ? '아직 출원 전(요약에 "출원 예정" 으로)' : '출원번호를 모릅니다' }
   const r = rdOf(s, f, g)
   const rdOk = !!r.org && r.staff != null
   const rd = { ok: rdOk, org: r.org, staff: r.staff, text: rdOk ? `${RD_ORG_SHORT[r.org] ?? r.org} · 연구개발 인원 ${r.staff}명` : !r.org && r.staff == null ? '연구개발 조직 · 인원을 모릅니다' : !r.org ? '연구개발 조직(전담부서 유무)을 모릅니다' : '연구개발 인원을 모릅니다' }
-  const missing = [!market.ok ? '시장조사(TAM · SAM · SOM)' : '', !patent.ok ? '출원번호' : '', !rd.ok ? '기술인력(연구개발 조직 · 인원)' : ''].filter(Boolean)
+  const missing = [!market.ok ? (confirm ? '시장조사 숫자 확인' : '시장조사(TAM · SAM · SOM)') : '', !patent.ok ? '출원번호' : '', !rd.ok ? '기술인력(연구개발 조직 · 인원)' : ''].filter(Boolean)
   return { ok: missing.length === 0, market, patent, rd, missing }
 }
 
@@ -224,7 +234,7 @@ const squash = (s: unknown) =>
     .toLowerCase()
     .replace(/[\s_\-:：·.()[\]]/g, '')
 
-/** 시장조사 단추 답 → 시장조사(숫자가 하나도 없으면 null). 이름표는 title · tag 어디에 있어도 */
+/** 시장조사 단추 답 → 시장조사(읽을 것이 하나도 없으면 null — 숫자만 비면 시장조사로 읽고 화면이 숫자를 묻는다). 이름표는 title · tag 어디에 있어도 */
 export function marketOf(answer: AssistAnswer | null, run: Pick<AssistRun, 'grounded' | 'sources'> | null, at: string): MarketResearch | null {
   if (!answer) return null
   const m: MarketResearch = { tam: { ...EMPTY_FIG }, sam: { ...EMPTY_FIG }, som: { ...EMPTY_FIG }, cagr: { ...EMPTY_FIG }, customer: '', price: '', scope: '', headline: str(answer.headline).slice(0, 300), grounded: !!run?.grounded, sources: (run?.sources ?? []).filter((x) => /^https?:\/\//.test(x.url)).slice(0, 8), at, by: 'ai' }
@@ -238,7 +248,9 @@ export function marketOf(answer: AssistAnswer | null, run: Pick<AssistRun, 'grou
     const amount = str(it.amount).trim() || (/[\d조억만%]/.test(str(it.body)) && str(it.body).length <= 60 ? str(it.body).trim() : '')
     m[key] = { amount: /검색\s*근거\s*없음|확인\s*필요/.test(amount) ? '' : amount.slice(0, 80), basis: (str(it.detail) || str(it.body)).trim().slice(0, 300), source: str(it.tag).replace(/^(tam|sam|som|cagr)$/i, '').trim().slice(0, 200), year: str(it.when).trim().slice(0, 20) }
   }
-  return m.tam.amount || m.sam.amount || m.som.amount || m.cagr.amount ? m : null
+  // 숫자가 없어도 산식 · 고객 · 단가를 적어 왔으면 읽은 것(대표가 숫자만 채우면 된다) — 아무것도 없을 때만 '못 읽음'
+  const any = [m.tam, m.sam, m.som, m.cagr].some((f) => f.amount || f.basis) || !!(m.customer || m.price || m.scope)
+  return any ? m : null
 }
 
 /** AI 에 보낼 시장조사 줄 */

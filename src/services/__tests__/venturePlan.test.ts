@@ -23,7 +23,7 @@ import {
   type VPlanFacts,
 } from '../../certification/core/venturePlan'
 import { VPLAN_BATCHES, VPLAN_STEPS, buildBatchContext, buildMarketContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf } from '../../certification/integration/venturePlanAi'
-import { GK, PATENT_NONE, marketDone, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, type GateState } from '../../certification/integration/ventureGate'
+import { GK, PATENT_NONE, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, marketRows, type GateState } from '../../certification/integration/ventureGate'
 import { judgeOf, judgePassed, readJudgeReport } from '../aiAssist/judge'
 import { PATENT_JUDGE, VENTURE_JUDGE, customSkillBlock } from '../../../api/_ai/judge.js'
 import { parseSpecText } from '../patent/specParse'
@@ -237,7 +237,8 @@ const long = (n: number) => '가'.repeat(n)
     { title: 'customer', body: '절삭 공구를 쓰는 중소 제조업체' },
   ] }, { grounded: true, sources: [{ title: '통계청', url: 'https://kostat.go.kr/x' }, { title: '가짜', url: 'javascript:alert(1)' }] }, '2026-10-22')
   check('G4 시장조사 답 읽기 — 이름표 tam/SAM/수익시장 · 출처 · 기준연도 · 근거 없음은 빈 숫자 · 이상한 주소 버림', !!market && market.tam.amount === '1조 2,000억 원' && market.tam.source === '통계청 2025' && market.tam.year === '2025' && market.sam.amount === '1,800억 원' && market.som.amount === '36억 원' && market.cagr.amount === '' && market.customer.includes('중소 제조') && market.sources.length === 1 && market.grounded && marketDone(market), market)
-  check('G5 숫자가 하나도 없는 답 → 시장조사 아님(null)', marketOf({ headline: 'x', items: [{ title: 'tam', detail: '검색 근거 없음 — 확인 필요' }] }, null, '2026-10-22') === null)
+  const noNum = marketOf({ headline: 'x', items: [{ title: 'tam', detail: '검색 근거 없음 — 확인 필요 · 산식: 사업체 수 × 단가' }, { title: 'customer', detail: '금형 가공 현장' }] }, null, '2026-10-22')
+  check('G5 숫자 없이 산식 · 고객만 온 답 → 시장조사로 읽되(다시 부르지 않음) 아직 안 끝남 · 읽을 것이 없으면 null', !!noNum && !marketDone(noNum) && noNum.tam.basis.includes('산식') && noNum.customer === '금형 가공 현장' && marketOf({ headline: 'x', items: [{ title: '기타', body: '모름' }] }, null, '2026-10-22') === null && marketOf(null, null, '') === null, noNum)
   const half = { ...market!, som: { amount: '', basis: '', source: '', year: '' } }
   check('G6 SOM 이 비면 시장조사를 밟지 않은 것', !marketDone(half) && !summaryGate(empty, FACTS, { ...g0, market: half }).market.ok)
   const gNone: GateState = { ...g0, market, patentNo: PATENT_NONE }
@@ -257,6 +258,10 @@ const long = (n: number) => '가'.repeat(n)
   check('G12 요약 묶음 자료 — 시장조사 구역(TAM 규모 · 출처) · 출원번호 사실이 같이 감', sumCtx.sections.some((x) => x.name.startsWith('시장조사') && JSON.stringify(x.rows).includes('1조 2,000억 원') && JSON.stringify(x.rows).includes('통계청 2025')) && sumCtx.facts!.some((f) => f.includes('10-2025-0123456')))
   const mCtx = buildMarketContext({ state: readPlan({ [VK.memo]: '거래처 49곳', [VK.text('market_target')]: '중소 제조' }), facts: FACTS, today: '2026-10-22', gate: g0 })
   check('G13 시장조사 단추 자료 — 메모 · 이미 쓴 목표시장 칸 · 회사 사실', JSON.stringify(mCtx.sections).includes('거래처 49곳') && JSON.stringify(mCtx.sections).includes('market_target') && mCtx.facts![0].includes('공구랩'))
+  const guess = marketOf({ headline: 'x', items: [{ title: 'tam', amount: '6,120억 원(추정)', detail: '사업체 10만 곳 × 612만 원', tag: 'AI 지식 — 출처 확인 필요' }, { title: 'sam', amount: '1,224억 원(추정)' }, { title: 'som', amount: '6.1억 원(추정)' }] }, { grounded: false, sources: [] }, '2026-10-22')!
+  const gGuess = summaryGate(empty, { ...FACTS, researchUnit: 'none', researchers: 0 }, { ...g0, market: guess, patentNo: PATENT_NONE })
+  const gOk = summaryGate(empty, { ...FACTS, researchUnit: 'none', researchers: 0 }, { ...g0, market: marketConfirmed(guess, '2026-10-22T01:00:00Z'), patentNo: PATENT_NONE })
+  check('G15 검색 근거 없는 AI 추정 숫자 → 요약 전에 대표가 한 번 확인(모자란 것 "시장조사 숫자 확인") · [이 숫자로 확인] 뒤 통과 · 검색 근거 있으면 확인 없이', marketDone(guess) && marketNeedsConfirm(guess) && !gGuess.ok && gGuess.missing.join() === '시장조사 숫자 확인' && /AI 추정/.test(gGuess.market.text) && gOk.ok && /대표 확인 숫자/.test(gOk.market.text) && !marketNeedsConfirm(market) && marketRows(marketConfirmed(guess, 'x')).some((r) => r.memo.includes('대표가 확인')), [gGuess.missing, gGuess.market.text, gOk.market.text])
   check('G14 [전부 써줘] 차례 — 시장조사 → 요약 → 악마판사 ① → 본문 5묶음 → 악마판사 ②', VPLAN_STEPS.map((x) => x.key).join() === 'market,sum,judgeSum,p1,p2,g1,g2,x,judgeAll' && VPLAN_BATCHES[0].key === 'sum', VPLAN_STEPS.map((x) => x.key))
 }
 

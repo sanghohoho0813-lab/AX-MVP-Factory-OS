@@ -727,7 +727,7 @@ async function kbContractTests() {
   check('KB4 악마판사 — 명세서 · 사업계획서를 쓰거나 고치거나 판정하는 단추 모두에(아이디어 · 조사 · 시장조사 · 실사 빼고)', noJudge.length === 0, noJudge)
   const sizes = Object.fromEntries(ours.map((a) => [a.id, assistSystem(a, { skill: 'x'.repeat(8000) }).length]))
   check('KB5 지시문 크기 — 대표 정의 8,000자를 붙여도 단추마다 4만 5천 자 안(Gemini · GPT · Claude 모두 여유)', Object.values(sizes).every((n) => n <= 45000), sizes)
-  check(`KB6 명세서 샘플 모양 — 읽은 명세서 ${SPEC_SAMPLES_META.read}건 · 칸 길이 · 청구항 수 · 문장 틀 · 회사 이름 없음`, SPEC_SAMPLES_META.read >= 75 && SPEC_SAMPLES.includes('청구항 수') && SPEC_SAMPLES.includes('기술분야') && SPEC_SAMPLES.includes('문장 틀') && !/주식회사|\(주\)|㈜/.test(SPEC_SAMPLES) && SPEC_SAMPLES.length < 4000, { meta: SPEC_SAMPLES_META })
+  check(`KB6 명세서 샘플 모양 — 읽은 명세서 ${SPEC_SAMPLES_META.read}건 · 칸 길이 · 청구항 수 · 문장 틀 · 회사 이름 없음`, SPEC_SAMPLES_META.read >= 100 && SPEC_SAMPLES.includes('청구항 수') && SPEC_SAMPLES.includes('기술분야') && SPEC_SAMPLES.includes('문장 틀') && !/주식회사|\(주\)|㈜/.test(SPEC_SAMPLES) && SPEC_SAMPLES.length < 4000, { meta: SPEC_SAMPLES_META })
   check('KB7 대화 단추 주제 고르기 — 청구항 몇 개 → 명세서 · 조사 · 샘플 / 벤처 TAM → 벤처 / 실사 → 실사 / 날씨 → 없음',
     topicPacks('청구항은 몇 개 쓰는 게 보통이야?').join() === 'patent_spec,patent_research,patent_samples' && topicPacks('벤처 사업계획서 TAM 어떻게 잡아?').join() === 'venture_plan' && topicPacks('실사 때 뭐 물어봐?').join() === 'inspection' && topicPacks('오늘 날씨 어때').length === 0,
     [topicPacks('청구항은 몇 개 쓰는 게 보통이야?'), topicPacks('벤처 사업계획서 TAM 어떻게 잡아?'), topicPacks('실사 때 뭐 물어봐?')])
