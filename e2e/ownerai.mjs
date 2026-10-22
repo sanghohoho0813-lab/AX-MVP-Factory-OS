@@ -145,7 +145,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.startsWith('https://api.openai.test/v1/chat/completions')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.messages?.[0]?.content ?? '')
-    const skill = /\((\w+) v\d+\)/.exec(sys)?.[1] ?? 'UNKNOWN'
+    // D-264 지시문에는 스킬 화면 이름만 간다(내부 번호 · 판 없이) — 이름으로 찾는다
+    const name = /^\[스킬\] (.+)$/m.exec(sys)?.[1]
+    const skill = Object.entries(SKILLS).find(([, s]) => s.name === name)?.[0] ?? 'UNKNOWN'
     llm.push({ skill, model: body.model, user: String(body.messages?.[1]?.content ?? ''), auth: h.Authorization })
     if (llmOverride) {
       const o = llmOverride
