@@ -49,6 +49,8 @@ const MoneyPage = lazy(() => import('../pages/MoneyPage'))
 const UpcomingPage = lazy(() => import('../pages/UpcomingPage'))
 const MarketingSoonPage = lazy(() => import('../pages/MarketingSoonPage'))
 const YoutubeBenchPage = lazy(() => import('../pages/marketing/YoutubeBenchPage'))
+const ThreadsPage = lazy(() => import('../pages/marketing/ThreadsPage'))
+const ShortsPage = lazy(() => import('../pages/marketing/ShortsPage'))
 // 대표 AI 전략실(Company Case Intelligence · V1) — 대표 전용(기능 권한 can_use_owner_ai_workspace)
 const OwnerAiHomePage = lazy(() => import('../pages/ownerAi/OwnerAiHomePage'))
 const OwnerAiCasePage = lazy(() => import('../pages/ownerAi/OwnerAiCasePage'))
@@ -434,6 +436,9 @@ export const appRouteChildren = [
       // D-231 대표 "마케팅 · 브랜딩을 누르면 바로 콘텐츠 레이더" — 예전 안내(바로 쓰기 · 도입 예정) 화면은 /marketing/more
       { path: 'marketing', element: <YoutubeBenchPage /> },
       { path: 'marketing/more', element: <MarketingSoonPage /> },
+      // D-273 스레드 — 마케팅 · 브랜딩 목차 안(주소가 /marketing 아래라 권한 · 대표 전용은 마케팅 모듈 그대로)
+      { path: 'marketing/threads', element: <ThreadsPage /> },
+      { path: 'marketing/shorts', element: <ShortsPage /> },
       // D-193: 유튜브 벤치마킹(대표가 예전에 만든 대시보드 — AI 대본만 빼고)
       { path: 'marketing/youtube', element: <YoutubeBenchPage /> },
       { path: 'ai', element: <OwnerAiHomePage /> },

@@ -1,0 +1,280 @@
+/**
+ * D-273 마케팅 · 브랜딩 › 스레드 — 실측 공식 글쓰기 · 규칙 검사 · 기록표 · 틀 23가지 · 하루 10분.
+ * 브라우저 → /api/ai-assist 는 진짜 서버 함수(api/ai-assist.js)를 이 프로세스에서 부른다(qa:mkpack 과 같은 방식). 밖으로 나가는 것만 가짜.
+ *
+ *   N  목차 — 마케팅 목차에 [스레드] · 이 화면에서 켜짐 · 안쪽 칸 4개 · 다른 마케팅 칸으로 이동
+ *   W  반응 → 맞는 틀(답글 = P 먼저) → 틀 뼈대 · 예시 글로 시작 → 글자 수 · 규칙 검사 고칠 것 0 · 태그 자동
+ *      링크 · 상담 안내 · 500자 넘김 → 고칠 것 · 빈 틀로 시작 → [대괄호] 알림
+ *   A  [AI로 글 3개 쓰기] → threads.write(스레드 규칙 · 스레드 공식 · 사실 목록 · 고른 틀 · 참고 글 줄) → 글 3개 · [이 글로 고치기] → 확인할 것 · 본인 댓글
+ *   S  저장 → 쓰다 둔 글 · [올렸어요] → 기록표 · 숫자 적기 → 점수 · 틀별 평균 · 새로고침해도 남음 · V 같은 달 두 번 → 고칠 것 · 지우기는 한 번 더 묻기
+ *   K  쓰던 글은 새로고침해도 남음(참고 글은 안 남음)
+ *   L  틀 23가지 — 반응으로 거르기 · [이 틀로 쓰기] → 쓰기 칸에 그 틀
+ *   R  하루 10분 — 체크가 오늘 동안 남음 · 태그 검색은 새 창 주소 · 전문가 답글 틀
+ *   M  360 · 390 · 430 · 큰 글자 — 네 칸 모두 가로 넘침 0 · 안쪽 칸 44px · JS 오류 0
+ */
+import { chromium } from 'playwright'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import fs from 'node:fs'
+import { seedScript } from './seed.mjs'
+
+const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
+const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
+
+const BASE = process.argv[2] ?? 'http://localhost:4390'
+const SHOTS = process.env.THREADS_SHOTS ?? ''
+let pass = 0
+let fail = 0
+const check = (n, c, d) => {
+  if (c) {
+    pass++
+    console.log('PASS ', n)
+  } else {
+    fail++
+    console.log('FAIL ', n, d === undefined ? '' : String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600))
+  }
+}
+const shot = async (page, name, full = true) => {
+  if (!SHOTS) return
+  fs.mkdirSync(SHOTS, { recursive: true })
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: full })
+}
+
+const OWNER = 'Bearer owner-e2e-token-aaaaaaaaaaaa'
+for (const k of Object.keys(process.env)) if (/^(AI_|OPENAI_|SUPABASE_|GEMINI_|GOOGLE_API|ANTHROPIC_API|CLAUDE_API)/.test(k)) delete process.env[k]
+Object.assign(process.env, { SUPABASE_URL: 'https://qa.supabase.test', SUPABASE_ANON_KEY: 'qa-anon', GEMINI_API_KEY: 'gem-e2e-SECRET-1', ANTHROPIC_API_KEY: 'ant-e2e-SECRET-2', AI_ASSIST_RATE_PER_MIN: '100', AI_ASSIST_RATE_PER_HOUR: '500' })
+__resetAiAssistState()
+
+const llm = []
+const ANSWER = {
+  headline: '창업 3년 안 벤처확인 세금',
+  items: [
+    { title: '창업 3년 안 된 대표님,', tag: 'B', body: '창업 3년 안 된 대표님,\n세금 더 내고 계실 수 있어요.\n\n벤처기업확인을 창업 3년 안에 받으면\n요건 충족 시 법인세·소득세 5년간 50% 감면.\n\n(결과는 확인기관이 정하고, 회사마다 달라요)\n\n창업 몇 년 차예요? 1년 / 2년 / 3년', when: '고르기 쉬운 질문', detail: '3분 진단은 프로필 링크에서', outline: ['[한 해 이익 1억 계산 다시 확인]', '고지 괄호 확인'] },
+    { title: '컨설턴트인 내 밥줄인데, 그냥 풀게.', tag: 'U', body: '컨설턴트인 내 밥줄인데, 그냥 풀게.\n\n1. 업종 제한\n2. 유형\n3. 기술 근거\n\n저장해 두고 1번부터 체크해 봐.', when: '그냥 끝', detail: '', outline: [] },
+    { title: '벤처기업확인 준비가 막막한 대표님.', tag: 'P', body: '벤처기업확인 준비가 막막한 대표님.\n\n필요한 대표님은 댓글에 "점검표" 남겨 줘.\nDM으로 보내 줄게.\n\n(결과는 확인기관이 정하고, 회사마다 달라)', when: '자료 나눔', detail: '', outline: [] },
+  ],
+  next: ['주제 태그: 벤처기업확인', '오전에 올리기'],
+}
+const realFetch = globalThis.fetch
+globalThis.fetch = async (input, init = {}) => {
+  const url = String(input)
+  const h = init.headers ?? {}
+  if (url.startsWith('https://qa.supabase.test/auth/v1/user')) return new Response(JSON.stringify({ id: h.Authorization === OWNER ? 'owner-1' : 'x' }), { status: h.Authorization === OWNER ? 200 : 401 })
+  if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/has_capability')) return new Response(JSON.stringify(h.Authorization === OWNER), { status: 200 })
+  if (url.includes('generativelanguage.googleapis.com') && url.includes(':generateContent')) {
+    const body = JSON.parse(String(init.body ?? '{}'))
+    const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
+    const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
+    llm.push({ sys, user })
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
+  }
+  if (url.includes('api.anthropic.com/v1/messages')) {
+    const body = JSON.parse(String(init.body ?? '{}'))
+    const sys = String(body.system ?? '')
+    llm.push({ sys, user: String(body.messages?.[0]?.content ?? '') })
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ANSWER) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
+  }
+  if (/\/models(\?|$)/.test(url)) return new Response(JSON.stringify({ models: [], data: [] }), { status: 200 })
+  return realFetch(input, init)
+}
+async function wire(page) {
+  await page.route('**/api/ai-assist**', async (route) => {
+    const req = route.request()
+    const u = new URL(req.url())
+    const res = { statusCode: 200, headers: {}, raw: '', setHeader(k, v) { this.headers[k] = v }, end(b) { this.raw = b ?? '' } }
+    await handler({ method: req.method(), url: u.pathname + u.search, headers: { authorization: OWNER }, body: req.postData() ?? undefined }, res)
+    await route.fulfill({ status: res.statusCode, headers: { 'content-type': 'application/json' }, body: res.raw })
+  })
+}
+const overflowX = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+const lintKeys = (p, level) => p.locator(`[data-testid="thr-lint"] li${level ? `[data-level="${level}"]` : ''}`).evaluateAll((xs) => xs.map((x) => x.getAttribute('data-key')))
+const open = async (p, q = '') => {
+  await p.goto(`${BASE}/marketing/threads${q}`, { waitUntil: 'networkidle' })
+  await p.getByTestId('thr-page').waitFor({ timeout: 15000 })
+}
+
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+const page = await ctx.newPage()
+const errors = []
+page.on('pageerror', (e) => errors.push(String(e)))
+page.on('dialog', (d) => void d.accept())
+await wire(page)
+await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+await page.evaluate(seedScript())
+await page.evaluate(() => {
+  localStorage.removeItem('mirae.threads.draft.v1')
+  localStorage.removeItem('mirae.threads.routine.v1')
+})
+
+/* ---------------- N 목차 ---------------- */
+await open(page)
+const mkThreads = page.getByTestId('mk-tab-threads')
+check('N1 마케팅 목차에 [스레드] · 이 화면에서 켜짐(aria-current)', (await mkThreads.count()) === 1 && (await mkThreads.getAttribute('aria-current')) === 'page')
+check('N2 안쪽 칸 4개(오늘 쓸 글 · 기록표 · 틀 23가지 · 하루 10분) · 처음은 쓰기', (await page.locator('[data-testid^="thr-tab-"]').count()) === 4 && (await page.getByTestId('thr-tab-write').getAttribute('aria-selected')) === 'true')
+const crumbs = await page.locator('nav[aria-label*="경로"], [data-testid="breadcrumbs"]').first().innerText().catch(() => '')
+check('N3 경로 줄 — 마케팅 · 브랜딩 › 스레드', !crumbs || /스레드/.test(crumbs), crumbs)
+await shot(page, 'pc-write-empty', false)
+
+/* ---------------- W 쓰기 ---------------- */
+await page.getByTestId('thr-goal-reply').click()
+const picks = await page.locator('[data-testid="thr-picks"] [data-testid^="thr-tpl-"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-testid')))
+check('W1 답글 · 문의 → 맞는 틀 6개 · P(자료 나눔 조건) 먼저', picks.length === 6 && picks[0] === 'thr-tpl-P', picks)
+await page.getByTestId('thr-tpl-P').click()
+const detail = await page.getByTestId('thr-tpl-detail').innerText()
+check('W2 틀 뼈대 · 왜 되나 · 우리가 쓰면 · 주의(자료를 실제로 만든 뒤에만)', /막막한 사람 부르기/.test(detail) && /왜 되나/.test(detail) && /우리가 쓰면/.test(detail) && /실제로 만든 뒤에만/.test(detail), detail)
+await page.getByTestId('thr-use-example').click()
+await page.waitForTimeout(200)
+const body1 = await page.getByTestId('thr-body').inputValue()
+check('W3 [예시 글로 시작] → 글 칸에 우리 버전 예시 · 글자 수 표시 · 태그 자동(벤처기업확인)', /점검표/.test(body1) && /\d+ \/ 500자/.test(await page.getByTestId('thr-count').innerText()) && (await page.getByTestId('thr-tag-벤처기업확인').getAttribute('aria-checked')) === 'true')
+check('W4 예시 글 규칙 검사 — 고칠 것 0 · 끝: 자료 나눔 조건', (await lintKeys(page, 'bad')).length === 0 && /끝: 자료 나눔 조건/.test(await page.getByTestId('thr-lint').innerText()))
+await shot(page, 'pc-write-example')
+await page.getByTestId('thr-body').fill(body1 + '\n자세한 건 https://litt.ly/kimteamjang\n상담 신청은 프로필에서')
+await page.waitForTimeout(150)
+const bad1 = await lintKeys(page, 'bad')
+check('W5 본문 링크 · 상담 안내 → 고칠 것(link · sell)', bad1.includes('link') && bad1.includes('sell'), bad1)
+await page.getByTestId('thr-body').fill('가'.repeat(510))
+await page.waitForTimeout(150)
+check('W6 500자 넘김 → 고칠 것 · 글자 수 빨간색', (await lintKeys(page, 'bad')).includes('len') && /510 \/ 500자/.test(await page.getByTestId('thr-count').innerText()) && /danger/.test((await page.getByTestId('thr-count').getAttribute('class')) ?? ''))
+await page.getByTestId('thr-use-skeleton').click()
+await page.waitForTimeout(150)
+check('W7 [빈 틀로 시작] → 뼈대 [대괄호] 칸 · 대괄호 알림', /\[막막한 사람 부르기\]/.test(await page.getByTestId('thr-body').inputValue()) && (await lintKeys(page, 'warn')).includes('brackets'))
+
+/* ---------------- A AI 글 3개 ---------------- */
+await page.getByTestId('thr-topic').fill('창업 3년 안 벤처기업확인 세금')
+await page.getByTestId('thr-ref-box').locator('summary').click()
+await page.getByTestId('thr-ref').fill('남의 글 첫 줄입니다\n남의 글 둘째 줄')
+await page.getByTestId('thr-ai').click()
+await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
+const call = llm.find((x) => x.sys.includes('(threads.write'))
+check('A1 AI 글 3개 · 틀 표시 · 글자 수 · 고칠 것 수', (await page.getByTestId('thr-ai-draft').count()) === 3 && /B 손해 \+ 숫자/.test(await page.getByTestId('thr-ai-draft').first().innerText()))
+check('A2 서버 지시 — 스레드 규칙 · 스레드 공식(틀 라이브러리) · 사실 목록 · 마케팅(유튜브) 규칙 없음', !!call && call.sys.includes('[스레드 규칙]') && call.sys.includes('[기준 문서]') && /자료 나눔 조건/.test(call.sys) && /김팀장 사실 목록/.test(call.sys) && !call.sys.includes('[마케팅 규칙]'))
+check('A3 보낸 자료 — 고른 틀 P · 소재 · 참고 글 줄 · 최근 올린 글 칸', !!call && /고른틀: P 자료 나눔 조건/.test(call.user) && /소재: 창업 3년 안 벤처기업확인 세금/.test(call.user) && /참고 글/.test(call.user) && /남의 글 첫 줄입니다/.test(call.user) && /최근 올린 글/.test(call.user), call?.user.slice(0, 500))
+check('A4 열쇠 · 비밀 글자가 화면에 없음', !/SECRET/.test(await page.locator('body').innerText()))
+await shot(page, 'pc-ai-drafts')
+await page.getByTestId('thr-ai-use').first().click()
+await page.waitForTimeout(200)
+check('A5 [이 글로 고치기] → 글 칸 · 본인 댓글 · 확인할 것 · 틀 B 로', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()) && (await page.getByTestId('thr-comment').inputValue()) === '3분 진단은 프로필 링크에서' && /이익 1억/.test(await page.getByTestId('thr-checks').innerText()) && (await page.getByTestId('thr-tpl-B').count()) <= 1)
+check('A6 AI 글 규칙 검사 — 고칠 것 0 · 끝 고르기 쉬운 질문', (await lintKeys(page, 'bad')).length === 0 && /고르기 쉬운 질문/.test(await page.getByTestId('thr-lint').innerText()))
+
+/* ---------------- S 저장 · 기록표 ---------------- */
+await page.getByTestId('thr-save').click()
+await page.waitForTimeout(400)
+await page.getByTestId('thr-tab-records').click()
+check('S1 [저장] → 기록표의 쓰다 둔 글 1', (await page.locator('[data-testid="thr-rec-drafts"] [data-testid="thr-rec-item"]').count()) === 1)
+await page.getByTestId('thr-rec-open').first().click()
+check('S2 [열어서 고치기] → 쓰기 칸에 그 글', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()))
+await page.getByTestId('thr-posted').click()
+await page.getByTestId('thr-records').waitFor()
+await page.waitForTimeout(300)
+const item = page.locator('[data-testid="thr-rec-list"] [data-testid="thr-rec-item"]').first()
+check('S3 [올렸어요] → 기록표(올린 글 1 · 쓰다 둔 글 0 · 오늘 날짜 · 쓰기 칸 비움)', (await page.locator('[data-testid="thr-rec-list"] [data-testid="thr-rec-item"]').count()) === 1 && (await page.locator('[data-testid="thr-rec-drafts"]').count()) === 0 && /올림/.test(await item.innerText()))
+for (const [k, v] of [['views', '2400'], ['likes', '9'], ['replies', '4'], ['reposts', '1'], ['shares', '7'], ['inquiries', '1']]) {
+  await item.getByTestId(`thr-stat-${k}`).fill(v)
+  await item.getByTestId(`thr-stat-${k}`).blur()
+  await page.waitForTimeout(120)
+}
+await page.waitForTimeout(300)
+check('S4 숫자 적기 → 점수 44(9 + 4×3 + 1×2 + 7×3) · 틀별 평균 B 44 · 문의 1', /점수 44/.test(await page.getByTestId('thr-rec-score').first().innerText()) && /평균 44/.test(await page.locator('[data-testid="thr-rec-template"][data-key="B"]').innerText()) && /문의 1/.test(await page.getByTestId('thr-rec-templates').innerText()))
+await shot(page, 'pc-records')
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('thr-records').waitFor()
+check('S5 새로고침해도 기록 · 숫자 남음', (await page.locator('[data-testid="thr-stat-likes"]').first().inputValue()) === '9' && /점수 44/.test(await page.getByTestId('thr-rec-score').first().innerText()))
+await page.getByTestId('thr-tab-write').click()
+check('S6 올린 뒤 쓰기 칸은 비어 있음', (await page.getByTestId('thr-body').inputValue()) === '')
+// V 같은 달 두 번
+await page.getByTestId('thr-goal-reply').click()
+await page.getByTestId('thr-tpl-V').click()
+await page.getByTestId('thr-use-example').click()
+await page.waitForTimeout(150)
+check('S7 V(대놓고 영업) 예시 — 판매 검사 빼고 고칠 것 0', (await lintKeys(page, 'bad')).length === 0)
+await page.getByTestId('thr-posted').click()
+await page.getByTestId('thr-records').waitFor()
+await page.getByTestId('thr-tab-write').click()
+await page.getByTestId('thr-goal-reply').click()
+await page.getByTestId('thr-tpl-V').click()
+await page.getByTestId('thr-use-example').click()
+await page.waitForTimeout(150)
+check('S8 같은 달 V 두 번째 → 고칠 것(한 달에 한 번)', (await lintKeys(page, 'bad')).includes('v-month'))
+await page.getByTestId('thr-new').click()
+await page.getByTestId('thr-tab-records').click()
+const before = await page.locator('[data-testid="thr-rec-item"]').count()
+await page.getByTestId('thr-rec-del').first().click()
+check('S9 지우기 → 한 번 더 묻기(아직 안 지워짐)', (await page.getByTestId('thr-rec-del-confirm').count()) === 1 && (await page.locator('[data-testid="thr-rec-item"]').count()) === before)
+await page.getByTestId('thr-rec-del-yes').click()
+await page.waitForTimeout(300)
+check('S10 [지우기] 확인 → 한 줄 줄어듦', (await page.locator('[data-testid="thr-rec-item"]').count()) === before - 1)
+
+/* ---------------- K 쓰던 글 남기기 ---------------- */
+await page.getByTestId('thr-tab-write').click()
+await page.getByTestId('thr-body').fill('솔직히 말하면, 나도 처음엔 몰랐어.\n쓰다 만 글')
+await page.getByTestId('thr-ref-box').locator('summary').click()
+await page.getByTestId('thr-ref').fill('남의 글')
+await page.waitForTimeout(150)
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('thr-write').waitFor()
+check('K1 쓰던 글은 새로고침해도 남음 · 참고 글(남의 글)은 안 남음', /쓰다 만 글/.test(await page.getByTestId('thr-body').inputValue()) && (await page.getByTestId('thr-ref').inputValue()) === '')
+
+/* ---------------- L 틀 23가지 ---------------- */
+await page.getByTestId('thr-tab-library').click()
+check('L1 틀 카드 24장(A~X) + 쓰지 않는 Z · 첫 줄 10가지 · 끝 방식', (await page.getByTestId('thr-lib-card').count()) === 24 && /남의 말 얹기/.test(await page.getByTestId('thr-library').innerText()) && (await page.locator('[data-testid="thr-first-lines"] li').count()) === 10 && (await page.locator('[data-testid="thr-endings"] li').count()) === 8)
+await shot(page, 'pc-library', false)
+await page.getByTestId('thr-lib-filter-share').click()
+const shareKeys = await page.getByTestId('thr-lib-card').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-key')).join(''))
+check('L2 공유 · 저장으로 거르기 → B · E · H · M · O · Q · U', shareKeys === 'BEHMOQU', shareKeys)
+await page.locator('[data-testid="thr-lib-card"][data-key="U"]').locator('xpath=ancestor::article').getByTestId('thr-lib-use').click()
+await page.getByTestId('thr-write').waitFor()
+check('L3 [이 틀로 쓰기] → 쓰기 칸 · U 밥줄 공개 골라짐', (await page.getByTestId('thr-tpl-detail').innerText()).includes('U 밥줄 공개'))
+
+/* ---------------- R 하루 10분 ---------------- */
+await page.getByTestId('thr-tab-routine').click()
+await page.getByTestId('thr-routine-scan').check()
+await page.waitForTimeout(100)
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('thr-routine').waitFor()
+const href = await page.getByTestId('thr-search-link').first().getAttribute('href')
+check('R1 체크가 오늘 동안 남음 · 태그 검색은 새 창 스레드 검색 주소 · 전문가 답글 틀', (await page.getByTestId('thr-routine-scan').isChecked()) && /^https:\/\/www\.threads\.com\/search\?q=/.test(href ?? '') && (await page.getByTestId('thr-search-link').first().getAttribute('target')) === '_blank' && /현장에서 보면/.test(await page.getByTestId('thr-expert').innerText()))
+await shot(page, 'pc-routine', false)
+check('R2 PC — JS 오류 0', errors.length === 0, errors)
+
+/* ---------------- M 휴대폰 ---------------- */
+for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]) {
+  const tag = `${w}${scale ? '-large' : ''}`
+  const m = await browser.newContext({ viewport: { width: w, height: 820 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', isMobile: true, hasTouch: true })
+  const mp = await m.newPage()
+  const errs = []
+  mp.on('pageerror', (e) => errs.push(String(e)))
+  mp.on('dialog', (d) => void d.accept())
+  await wire(mp)
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.evaluate(seedScript())
+  if (scale) await mp.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), scale)
+  await open(mp)
+  await mp.getByTestId('thr-goal-reply').click()
+  await mp.getByTestId('thr-tpl-P').click()
+  await mp.getByTestId('thr-use-example').click()
+  await mp.waitForTimeout(250)
+  const tabsH = await mp.locator('[data-testid^="thr-tab-"]').evaluateAll((xs) => xs.map((x) => Math.round(x.getBoundingClientRect().height)))
+  check(`M ${tag}: 쓰기 — 넘침 0 · 안쪽 칸 44px 이상`, (await overflowX(mp)) <= 0 && tabsH.every((h) => h >= 44), { over: await overflowX(mp), tabsH })
+  if (w === 390 && !scale) await shot(mp, 'm390-write')
+  if (scale) await shot(mp, 'm360-large-write')
+  await mp.getByTestId('thr-posted').click()
+  await mp.getByTestId('thr-records').waitFor()
+  await mp.waitForTimeout(250)
+  check(`M ${tag}: 기록표 — 넘침 0 · 숫자 칸 6개`, (await overflowX(mp)) <= 0 && (await mp.locator('[data-testid^="thr-stat-"]').count()) === 6, await overflowX(mp))
+  if (w === 390 && !scale) await shot(mp, 'm390-records')
+  await mp.getByTestId('thr-tab-library').click()
+  await mp.waitForTimeout(200)
+  check(`M ${tag}: 틀 23가지 — 넘침 0`, (await overflowX(mp)) <= 0, await overflowX(mp))
+  await mp.getByTestId('thr-tab-routine').click()
+  await mp.waitForTimeout(200)
+  check(`M ${tag}: 하루 10분 — 넘침 0 · JS 오류 0`, (await overflowX(mp)) <= 0 && errs.length === 0, { over: await overflowX(mp), errs })
+  if (w === 390 && !scale) await shot(mp, 'm390-routine')
+  await m.close()
+}
+
+await browser.close()
+console.log(`\n${pass} passed, ${fail} failed`)
+process.exit(fail ? 1 : 0)

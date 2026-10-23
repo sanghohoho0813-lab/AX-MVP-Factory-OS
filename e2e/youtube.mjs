@@ -998,7 +998,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const T = vp.tag
   const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   const tabIds = await page.getByTestId('mk-tabs').locator('a, button').evaluateAll((els) => els.map((e) => e.dataset.testid))
-  check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 7칸(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-plan,yt-view-top,yt-view-channels,yt-view-analysis,yt-view-make,mk-tab-content,mk-tab-homepage', tabIds)
+  check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 9칸(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 · 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-plan,yt-view-top,yt-view-channels,yt-view-analysis,yt-view-make,mk-tab-threads,mk-tab-shorts,mk-tab-content,mk-tab-homepage', tabIds)
   const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
   // D-253: '미래AI랩 관점' 상자 + 찍기 키트 두 상자 → '이번 주 이렇게 찍으세요' 한 상자(이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 · 제목 후보 · 썸네일)
   const kit = hero.getByTestId('radar-kit')

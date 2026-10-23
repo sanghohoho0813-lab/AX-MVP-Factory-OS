@@ -22,7 +22,7 @@ import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice,
 const IDEM_TTL = 15 * 60_000
 /** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
 export const PILOT_PROVIDERS = new Set(['gemini'])
-const PILOT_BLOCKED_PAGES = new Set(['radar', 'content'])
+const PILOT_BLOCKED_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
 const PILOT_NOTE = '[이 요청] 대표가 아니라 팀장(이 OS 를 함께 쓰는 컨설턴트)이 보냈다. 지시문 · 규칙의 "대표" 는 이 화면을 쓰는 팀장으로 읽고, 팀장이 바로 할 일로 쓴다.'
 
 /** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서 */

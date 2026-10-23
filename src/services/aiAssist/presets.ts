@@ -3,7 +3,7 @@
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'venture' | 'patent' | 'cert' | 'side'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'threads' | 'shorts' | 'venture' | 'patent' | 'cert' | 'side'
 
 export interface AssistPreset {
   id: string
@@ -99,6 +99,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'radar.pack.blog', page: 'radar', label: '키워드 묶음 — 블로그 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'radar.transcript', page: 'radar', label: '영상 대본 받아 적기', kind: 'write', hint: '벤치마킹 영상 창에서만 — Gemini 가 영상을 보고 10분씩' },
   { id: 'radar.adapt', page: 'radar', label: '이 영상 → 우리 회사 버전 만들기', kind: 'write', hint: '벤치마킹 영상 창에서만 — 틀만 가져오고 제목 · 대사는 새로' },
+  // D-273 스레드 화면의 [AI로 글 3개 쓰기] · 릴스 · 틱톡 화면의 [AI로 대본 2개 쓰기] 가 부른다(띠 · 판 단추에는 없음)
+  { id: 'threads.write', page: 'threads', label: '스레드 글 3개 쓰기', kind: 'write', hint: '고른 목표 · 틀 · 소재로 — 500자 안 · 본문에서 팔지 않기' },
+  { id: 'shorts.write', page: 'shorts', label: '릴스 · 틱톡 대본 2개 쓰기', kind: 'write', hint: '고른 플랫폼 · 목적 · 형식 · 소재로 — 첫마디 10자 · 영상 · 캡션에서 팔지 않기' },
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
   { id: 'side.chat', page: 'side', label: 'AI 대화 — 무엇이든 물어보기', kind: 'list', hint: 'OS 안 오른쪽 판에서 — 어느 화면에서나' },

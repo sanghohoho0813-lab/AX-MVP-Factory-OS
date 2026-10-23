@@ -71,6 +71,7 @@ dist-qa*/
 .pvux-out
 .chat-out
 .mkpack-out
+.threads-out
 .sideai-out
 .vstudy-out
 .office-docs-out

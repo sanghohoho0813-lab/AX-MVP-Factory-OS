@@ -142,14 +142,16 @@ export function ScreenTitle({
   back?: ReactNode
 }) {
   const { pathname } = useLocation()
-  const sameAsHeader = screenTitleForPath(pathname) === title
+  // D-273 메뉴 이름 뒤 괄호(예: 'AI 전략실(잠재고객)')는 빼고 견준다 — 다르게 보고 휴대폰에서 제목 칸이 단추 옆으로 밀렸다
+  const sameAsHeader = (screenTitleForPath(pathname) ?? '').replace(/\s*\([^)]*\)\s*$/, '') === title
 
   return (
     <div className="flex flex-col gap-2">
       {back}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         {/* 제목을 숨긴 폭에서는 설명 줄이 한 줄을 다 쓰게 둔다 — 버튼과 나눠 쓰면 두 줄로 접힌다 */}
-        <div className={`min-w-0 ${sameAsHeader ? 'w-full lg:w-auto lg:flex-1' : 'flex-1'}`}>
+        {/* D-273 기준폭 0(flex-1)만 주면 단추 묶음 옆에서 설명이 한 줄 4~5자로 짜부라졌다 — 15rem 아래로는 줄을 바꾼다 */}
+        <div className={sameAsHeader ? 'w-full min-w-0 lg:w-auto lg:flex-1' : 'min-w-[min(100%,15rem)] flex-1'}>
           <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
             {title}
           </h1>

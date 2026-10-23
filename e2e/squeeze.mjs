@@ -49,6 +49,41 @@ const SCREENS = [
   { name: '컨설팅 산출물', path: '/studio/proj_hansol?adv=1&tab=artifacts' },
   { name: '컨설팅 실사', path: '/studio/proj_hansol?adv=1&tab=review' },
 ]
+/*
+ * D-273 대표 휴대폰에서 AI 전략실 첫 화면 제목 '바로 시작 — 타자 없이' 가 한 글자씩 세로로 흘렀다 — 이 검사 목록에 없던 화면.
+ * --all 일 때는 메뉴에 있는 화면을 모두 본다(대표 전용 · 특허 · 벤처 · 마케팅 · 영업 · 돈 · 지원사업 · 기업인증 …).
+ */
+const MENU_SCREENS = [
+  { name: 'AI 전략실', path: '/ai' },
+  { name: 'AI 전략실 사용량', path: '/ai/usage' },
+  { name: '특허 · 벤처', path: '/patent-venture' },
+  { name: '특허 명세서', path: '/patent-venture/write' },
+  { name: '기업인증', path: '/tools/cert-os' },
+  { name: '기업인증 한솔', path: '/tools/cert-os?client=cli_hansol' },
+  { name: '마케팅', path: '/marketing' },
+  { name: '유튜브', path: '/marketing/youtube' },
+  { name: '스레드', path: '/marketing/threads' },
+  { name: '스레드 기록표', path: '/marketing/threads?tab=records' },
+  { name: '스레드 틀', path: '/marketing/threads?tab=library' },
+  { name: '스레드 10분', path: '/marketing/threads?tab=routine' },
+  { name: '릴스 · 틱톡', path: '/marketing/shorts' },
+  { name: '릴스 · 틱톡 기록표', path: '/marketing/shorts?tab=records' },
+  { name: '릴스 · 틱톡 공식', path: '/marketing/shorts?tab=guide' },
+  { name: '홍보 글', path: '/tools/content' },
+  { name: '홈페이지', path: '/tools/homepage' },
+  { name: '웹 스튜디오', path: '/website-studio' },
+  { name: '영업 보드', path: '/sales/board' },
+  { name: '1차 미팅', path: '/sales/first-meeting' },
+  { name: '매출 · 비용', path: '/money' },
+  { name: '지원사업', path: '/grants' },
+  { name: '정책자금', path: '/funding' },
+  { name: '정책자금 목록', path: '/funding/catalog' },
+  { name: '진단', path: '/diagnosis' },
+  { name: '상담신청함', path: '/ops/inbox' },
+  { name: '결정', path: '/ops/decide' },
+  { name: '업체 AI 전략실 탭', path: '/ops/clients/cli_hansol?tab=ai' },
+]
+if (ALL) SCREENS.push(...MENU_SCREENS)
 
 const VIEWPORTS = ALL
   ? [
@@ -126,14 +161,19 @@ async function run() {
       isMobile: true,
       hasTouch: true,
     })
-    const page = await ctx.newPage()
+    let page = await ctx.newPage()
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
     await page.evaluate(seedScript())
     if (vp.scale) {
       await page.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), vp.scale)
     }
 
-    for (const screen of SCREENS) {
+    for (const [i, screen] of SCREENS.entries()) {
+      // D-273 화면을 많이 돌면 한 탭이 무거워져 브라우저가 탭을 죽인다 — 열 화면마다 새 탭(같은 저장소)
+      if (i && i % 10 === 0) {
+        await page.close()
+        page = await ctx.newPage()
+      }
       await page.goto(BASE + screen.path, { waitUntil: 'networkidle' })
       if (vp.scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), vp.scale)
       await page.waitForTimeout(600)

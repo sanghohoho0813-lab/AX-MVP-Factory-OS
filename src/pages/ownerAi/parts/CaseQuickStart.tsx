@@ -67,8 +67,9 @@ export function CaseQuickStart({
     <div data-testid="case-quick">
     <Surface className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="t-section min-w-0 flex-1 break-keep text-slate-900">바로 시작 — 타자 없이</h2>
-        <div className="flex gap-1 rounded-(--radius-control) bg-slate-100 p-1" role="tablist" aria-label="어떻게 시작할까요">
+        {/* D-273 기준폭 0(flex-1)이면 옆 단추 묶음에 밀려 한 글자씩 세로로 흘렀다(대표 휴대폰) — 12rem 아래로는 줄을 바꾼다 */}
+        <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">바로 시작 — 타자 없이</h2>
+        <div className="flex max-w-full flex-wrap gap-1 rounded-(--radius-control) bg-slate-100 p-1" role="tablist" aria-label="어떻게 시작할까요">
           <button type="button" role="tab" aria-selected={mode === 'client'} onClick={() => setMode('client')} className={`tap t-sub inline-flex min-h-10 items-center gap-1.5 rounded-[8px] px-3 font-semibold ${mode === 'client' ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`} data-testid="case-quick-tab-client">
             <Users aria-hidden="true" className="size-4" /> 고객 관리에서 고르기
           </button>

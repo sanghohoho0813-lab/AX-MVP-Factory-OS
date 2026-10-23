@@ -581,7 +581,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
 
           {/* 좁은 화면 — 칸을 골라 한 칸씩 (옆으로 밀지 않는다) */}
           <div className="flex flex-col gap-3 xl:hidden">
-            <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+            <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
               {SALES_STAGE_ORDER.map((s) => {
                 const on = picked === s
                 return (

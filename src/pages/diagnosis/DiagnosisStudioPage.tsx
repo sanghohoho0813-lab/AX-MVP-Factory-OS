@@ -392,7 +392,7 @@ export function DiagnosisStudioPage() {
             ))}
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+          <dl className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-x-4 gap-y-3 border-t border-slate-100 pt-4">
             {[
               ['공통 질문', data.library.common],
               ['업종 특화', data.library.industry],

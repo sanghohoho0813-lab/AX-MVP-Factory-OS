@@ -60,6 +60,8 @@ function toolSection(pathname: string): { tool: (typeof TOOLS)[number]; section:
 /** 마케팅 · 브랜딩이 함께 맡는 화면 이름(D-233 — 화면 제목은 '마케팅 · 브랜딩' 하나라 경로 줄에서 갈라 준다) */
 function marketingTool(pathname: string): Crumb | null {
   if (under(pathname, '/marketing/youtube') || pathname === '/marketing') return { label: '콘텐츠 레이더', to: '/marketing/youtube' }
+  if (under(pathname, '/marketing/threads')) return { label: '스레드', to: '/marketing/threads' }
+  if (under(pathname, '/marketing/shorts')) return { label: '릴스 · 틱톡', to: '/marketing/shorts' }
   if (under(pathname, '/tools/content')) return { label: '블로그 · 플레이스 홍보 글 만들기', to: '/tools/content' }
   if (under(pathname, '/tools/homepage')) return { label: '홈페이지 만들기', to: '/tools/homepage' }
   if (under(pathname, '/marketing/more')) return { label: '마케팅 안내' }

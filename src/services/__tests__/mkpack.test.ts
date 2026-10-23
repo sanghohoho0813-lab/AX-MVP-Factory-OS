@@ -88,8 +88,9 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
 
   const video = sec(p, 'video').blocks
   const times = video.slice(1).map((b) => b.label.split(' ')[0])
-  check('V1 유튜브 대본 — 확정 제목 + 0:00 오프닝 → 왜 지금 → 체크포인트 3 → 7:30 마무리', video[0].label === '확정 제목' && times.join() === '0:00,0:40,1:30,3:30,5:30,7:30' && video.filter((b) => /체크포인트 [123]/.test(b.label)).length === 3, video.map((b) => b.label))
-  check('V2 오프닝은 첫 문장(찍기 키트) 그대로 시작 · 마무리는 채널 끝맺음', video[1].text.startsWith(p.source.hook) && video[6].text.includes(DEFAULT_BRIEF.ending), video[1].text.slice(0, 80))
+  // D-273 롱폼 실측 공식 — 0~15초 증거 장면 → 결론 먼저 · 번호형 챕터 · 끝은 정리 · 다음 편
+  check('V1 유튜브 대본 — 확정 제목 + 0:00 오프닝(증거 장면 · 결론 먼저) → 왜 지금 → 번호형 챕터 ①②③ → 7:30 정리 · 다음 편', video[0].label === '확정 제목' && times.join() === '0:00,0:40,1:30,3:30,5:30,7:30' && /증거 장면/.test(video[1].label) && video.filter((b) => /^\d+:\d+ [①②③] /.test(b.label)).length === 3 && video[6].label === '7:30 정리 · 다음 편', video.map((b) => b.label))
+  check('V2 오프닝은 0~15초 증거 장면 → 첫 문장(찍기 키트) · 마무리는 채널 끝맺음', video[1].text.startsWith('[0~15초 증거 장면]') && video[1].text.includes(p.source.hook) && video[6].text.includes(DEFAULT_BRIEF.ending), video[1].text.slice(0, 80))
   check('V3 구간마다 [화면] 지시', video.slice(1).every((b) => b.text.includes('[화면]')))
 
   const shorts = sec(p, 'shorts').blocks
@@ -98,7 +99,8 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('S1 릴스 2편(50초 · 25초) — 상단 고정 문구 22자 이하 · 컷 15개 이하', shorts.length === 3 && fixed.every((f) => f.length > 0 && f.length <= 22) && cuts.every((n) => n >= 3 && n <= 15), { fixed, cuts })
   check('S2 첫 컷은 인사 없이 바로 · 끝은 3줄 요약', /인사 없이 바로/.test(shorts[0].text) && /3줄 요약/.test(shorts[0].text) && !/안녕하세요/.test(shorts[0].text))
   const tags = (shorts[2].text.match(/#[0-9A-Za-z가-힣]+/g) ?? [])
-  check('S3 캡션 + 해시태그 5개(겹침 없음)', tags.length === 5 && new Set(tags).size === 5, tags)
+  // D-273 릴스 실측 — 해시태그 5개는 진 쪽에 더 많았다 → 0~3개
+  check('S3 캡션 + 해시태그 3개 이하(겹침 없음)', tags.length >= 1 && tags.length <= 3 && new Set(tags).size === tags.length, tags)
 
   const blog = sec(p, 'blog').blocks
   const blogAll = blog.map((b) => b.text).join('\n')
@@ -120,10 +122,11 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
 /* ---------------- 축마다 · 직접 주제 ---------------- */
 {
   const axes = new Set(picks.map((o) => o.axis))
-  const heads = (p: ContentPack) => sec(p, 'video').blocks.filter((b) => /체크포인트/.test(b.label)).map((b) => b.label.replace(/^\S+ 체크포인트 \d — /, ''))
+  // D-273 번호형 챕터(①②③) — 예전 '체크포인트 N —'
+  const heads = (p: ContentPack) => sec(p, 'video').blocks.filter((b) => /^\S+ [①②③] /.test(b.label)).map((b) => b.label.replace(/^\S+ [①②③] /, ''))
   const market = packs.find((p) => p.source.axis === 'market')!
   const axai = packs.find((p) => p.source.axis === 'axai')!
-  check('A1 시장 · AI 축은 체크포인트가 다름(누가 받나 ↔ 한 줄로 말하면)', !!market && !!axai && heads(market)[0].includes('누가 받을 수 있나') && heads(axai)[0].includes('한 줄로 말하면'), { axes: [...axes], m: market && heads(market), a: axai && heads(axai) })
+  check('A1 시장 · AI 축은 챕터가 다름(누가 받나 ↔ 한 줄로 말하면)', !!market && !!axai && heads(market)[0].includes('누가 받을 수 있나') && heads(axai)[0].includes('한 줄로 말하면'), { axes: [...axes], m: market && heads(market), a: axai && heads(axai) })
   const bridge = makePack({ ...customs[0], key: 'bridge:정책자금 × 공고 자동 수집', topic: '정책자금 × 공고 자동 수집', axis: 'bridge', custom: false })
   check('A2 BRIDGE(시장 × 장치) — 손으로 챙기면 → 장치로 바꾸면 → 만드는 순서', heads(bridge).join('|') === '정책자금, 손으로 챙기면 생기는 일|공고 자동 수집으로 바꾸면|만드는 순서 3단계', heads(bridge))
 
@@ -144,8 +147,8 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   const ai = packs.find((p) => p.source.axis === 'axai')!
   const market = packs.find((p) => p.source.axis === 'market')!
   const aiShort = sec(ai, 'shorts').blocks.map((b) => b.text).join('\n')
-  check('F3 AI 주제 쇼츠 · 카드는 AI 말로(시장 주제의 "서류는 미리 · 시기 · 마감" 이 안 섞임)', !/서류는 미리|시기 · 마감/.test(aiShort + sec(ai, 'cards').blocks[5].text) && /예시 하나/.test(aiShort) && sec(ai, 'shorts').blocks[1].label.startsWith('② 먼저 해 볼 것'), aiShort.slice(0, 300))
-  check('F4 시장 주제는 예전 그대로(해당되는지 확인 · 시기 먼저 · 서류는 미리 · 놓치는 것 하나)', /해당되는지 확인, 시기 먼저, 서류는 미리/.test(sec(market, 'shorts').blocks[0].text) && sec(market, 'shorts').blocks[1].label.startsWith('② 놓치는 것 하나'))
+  check('F3 AI 주제 쇼츠 · 카드는 AI 말로(시장 주제의 "서류는 미리 · 시기 · 마감" 이 안 섞임)', !/서류는 미리|시기 · 마감/.test(aiShort + sec(ai, 'cards').blocks[5].text) && /예시 하나/.test(aiShort) && sec(ai, 'shorts').blocks[1].label.startsWith('② 릴스 — 먼저 해 볼 것'), aiShort.slice(0, 300))
+  check('F4 시장 주제는 예전 그대로(해당되는지 확인 · 시기 먼저 · 서류는 미리 · 놓치는 것 하나)', /해당되는지 확인, 시기 먼저, 서류는 미리/.test(sec(market, 'shorts').blocks[0].text) && sec(market, 'shorts').blocks[1].label.startsWith('② 릴스 — 놓치는 것 하나'))
   const merged = withAi(market, { upload: [{ label: '유튜브 설명란', text: 'AI 설명' }, { label: '고정 댓글', text: 'AI 댓글' }], titles: [{ label: '제목 후보', text: 'AI 제목' }] })
   const up = sec(merged, 'upload').blocks.map((b) => b.label)
   const ti = sec(merged, 'titles').blocks.map((b) => b.label)
