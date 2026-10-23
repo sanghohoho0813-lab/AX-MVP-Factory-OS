@@ -25,6 +25,7 @@ import {
   type ShortPost,
 } from '../marketing/shorts'
 import { MK_KNOWLEDGE, MK_KNOWLEDGE_META } from '../../../api/_ai/mkKnowledge.js'
+import { hasMaterial, readWeekTopics, recommendShort, recommendThread, rememberWeekTopics, topicChips, topicTag, WEEK_TOPICS_MAX } from '../marketing/quickStart'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import {
   ENDINGS,
@@ -279,6 +280,32 @@ const wsec = wctx.sections.find((x) => x.name.startsWith('이번 주 잘 터진 
 check('WK3 AI 자료 — "이번 주 잘 터진 형식(참고만 — 기본은 우리 공식)" 칸 · 틀 이름 · 첫 줄 · 끝 방식 이름 · 없으면 칸 없음', !!wsec && wsec.name === '이번 주 잘 터진 형식(참고만 — 기본은 우리 공식)' && JSON.stringify(wsec.rows[0]).includes('P 자료 나눔 조건') && JSON.stringify(wsec.rows[0]).includes('자료 나눔 조건') && !threadsContext({ goal: '', template: '', topic: '', tag: '', facts: '', reference: '', recent: [], today: '2026-10-23' }).sections.some((x) => x.name.startsWith('이번 주')))
 check('WK4 할 일 — 매일 훑기(scan) 없음 · 월요일 이번 주 형식 · 금요일 기록표', !ROUTINE.some((r) => r.key === 'scan') && ROUTINE.find((r) => r.key === 'weekref')?.when === '월요일' && ROUTINE.find((r) => r.key === 'record')?.when === '금요일')
 check('WK5 서버 지시 — 기본은 이 공식 · 이번 주 형식은 글 하나에만 참고', /기본은 이 공식/.test(ASSISTS['threads.write'].instruction.join(' ')) && /이번 주 잘 터진 형식\] 이 있으면 그 틀 · 첫 줄 기법 · 끝 방식을 글 하나에만 참고/.test(ASSISTS['threads.write'].instruction.join(' ')))
+
+/* ---------------- QS 주제 하나 → 바로 쓰기(MUX-2 — 규칙 계산 추천 · 이번 주 키워드 칩) ---------------- */
+const qsTags = ['벤처기업확인 세금', '정책자금 한도', '고용지원금', 'Claude 활용', 'ChatGPT 업무 활용', '가업승계 · 증여', 'MAIL 정리'].map(topicTag)
+check('QS1 주제 태그 — 벤처 · 자금 · 지원금 · AI · 그 밖은 경영컨설팅 · 빈 주제는 빈칸 · 모두 정해진 태그 안', qsTags.join() === '벤처기업확인,정책자금,정부지원사업,AX,AX,경영컨설팅,경영컨설팅' && topicTag('  ') === '' && qsTags.every((t) => (TOPIC_TAGS as readonly string[]).includes(t)), qsTags)
+const qsFri = recommendThread({ topic: '고용지원금', today: '2026-10-23' })
+const qsFriP = recommendThread({ topic: '벤처기업확인 셀프 체크리스트', today: '2026-10-23' })
+check('QS2 금요일(답글 · 리드) — 자료 없는 주제는 P 빼고 A · 벤처 점검표 주제는 P(이유에 점검표) · 태그 자동', qsFri.goal === 'reply' && qsFri.template === 'A' && qsFri.tag === '정부지원사업' && qsFriP.template === 'P' && /점검표/.test(qsFriP.why) && /금/.test(qsFriP.why) && hasMaterial('벤처 점검표') && !hasMaterial('고용지원금'), [qsFri, qsFriP])
+const qsMonRef = normalizeWeekRef({ items: [{ template: 'B' }, { template: 'X' }] }, '2026-10-19')
+const qsMon = recommendThread({ topic: '세금', today: '2026-10-19' })
+const qsMonHot = recommendThread({ topic: '세금', today: '2026-10-19', weekRef: qsMonRef })
+check('QS3 월요일(저장 · 공유 U Q E B) — 기본은 첫 틀 U · 이번 주 잘 된 틀(B)이 오늘 계획 안에 있으면 B(참고만 · 계획 밖 X 는 안 씀)', qsMon.template === 'U' && qsMonHot.template === 'B' && /이번 주 잘 된 틀/.test(qsMonHot.why) && !/이번 주/.test(qsMon.why), [qsMon, qsMonHot])
+const qsSat = recommendThread({ topic: '고용지원금', today: '2026-10-24' })
+check('QS4 주말 — 답글 · 리드 · 자료 없으면 A', qsSat.goal === 'reply' && qsSat.template === 'A' && /주말/.test(qsSat.why), qsSat)
+const qsAllDays = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'].flatMap((d) => ['고용지원금', '벤처 점검표', ''].map((t) => recommendThread({ topic: t, today: d })))
+check('QS5 어느 요일 · 주제든 틀은 23가지 안 · 고른 반응이 그 틀의 반응 · 자료 없는 주제에 P 없음', qsAllDays.every((r) => !!THREAD_TEMPLATES.find((t) => t.key === r.template)?.goals.includes(r.goal)) && qsAllDays.filter((_, i) => i % 3 !== 1).every((r) => r.template !== 'P'))
+const qsPost = (aim: 'reach' | 'convert', platform: 'tiktok' | 'reels' = 'tiktok'): ShortPost => ({ ...(normalizeShortPost({ script: 'x', platform, aim, format: 'list' }, `s${Math.random()}`) as ShortPost), status: 'posted', postedOn: '2026-10-21' })
+const qsTk = (topic: string, posts: ShortPost[] = []) => recommendShort({ topic, platform: 'tiktok', posts, today: '2026-10-23' })
+check('QS6 틱톡 — 처음은 많이 보이게 · 리스트형 · 질문이면 대화형 · 화면 · 자동화면 화면 시연 · "전에 · 하지 마" 면 금지형 · 이번 주 많이 보이게 3 : 문의 0 이면 문의로(화면 시연)', qsTk('정책자금 한도').aim === 'reach' && qsTk('정책자금 한도').format === 'list' && qsTk('왜 정책자금이 거절될까?').format === 'talk' && qsTk('반복 업무 자동화 화면').format === 'demo' && qsTk('신청 전에 이것부터 하지 마세요').format === 'ban' && qsTk('정책자금', [qsPost('reach'), qsPost('reach'), qsPost('reach'), qsPost('reach')]).aim === 'convert' && qsTk('정책자금', [qsPost('reach'), qsPost('reach'), qsPost('reach'), qsPost('reach')]).format === 'demo' && /3 : 1/.test(qsTk('x').why))
+const qsRl = (topic: string, posts: ShortPost[] = []) => recommendShort({ topic, platform: 'reels', posts, today: '2026-10-23' })
+check('QS7 릴스 — 벤처 점검표 주제면 댓글 받기 · 댓글형 · 자료 없으면 많이 보이게(금지형 · 화면이면 화면 시연) · 형식은 늘 그 플랫폼 · 목적에 맞는 것', qsRl('벤처기업확인 체크리스트').aim === 'convert' && qsRl('벤처기업확인 체크리스트').format === 'comment' && qsRl('고용지원금').aim === 'reach' && qsRl('고용지원금').format === 'ban' && qsRl('자동화 화면 만들기').format === 'demo' && ['고용지원금', '벤처 점검표', '자동화 화면', '왜?', ''].every((t) => ['tiktok', 'reels'].every((pf) => { const r = recommendShort({ topic: t, platform: pf as 'tiktok' | 'reels', posts: [], today: '2026-10-23' }); return formatsFor(pf as 'tiktok' | 'reels', r.aim).some((f) => f.key === r.format) })))
+const qsChips = topicChips(['고용지원금', '정책자금 ', ' 고용 지원금', '', '가', '나', '다', '라', '마'], ['정책자금', '벤처 세금'])
+check('QS8 주제 칩 — 이번 주 키워드 먼저(6개까지 · 띄어쓰기만 다른 것 하나로) · 그다음 우리 분야(겹치면 빼기)', qsChips.filter((c) => c.from === 'week').length <= WEEK_TOPICS_MAX && qsChips[0].topic === '고용지원금' && qsChips.filter((c) => c.topic.replace(/\s/g, '') === '고용지원금').length === 1 && qsChips.filter((c) => c.topic.trim() === '정책자금').length === 1 && qsChips[qsChips.length - 1].topic === '벤처 세금' && qsChips[qsChips.length - 1].from === 'ours', qsChips)
+const qsMem = new Map<string, string>()
+;(globalThis as unknown as { localStorage: Pick<Storage, 'getItem' | 'setItem'> }).localStorage = { getItem: (k) => qsMem.get(k) ?? null, setItem: (k, v) => void qsMem.set(k, String(v)) }
+rememberWeekTopics(['고용지원금', '고용지원금', '정책자금', 'a', 'b', 'c', 'd', 'e'], '2026-10-23')
+check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘 · 다음 주 월요일엔 비어 있음 · 겹침 없이 6개까지 · 빈 목록은 덮지 않음', readWeekTopics('2026-10-25').join() === '고용지원금,정책자금,a,b,c,d' && readWeekTopics('2026-10-26').length === 0 && (rememberWeekTopics([], '2026-10-23'), readWeekTopics('2026-10-23').length === 6))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

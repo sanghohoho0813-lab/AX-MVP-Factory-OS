@@ -61,8 +61,8 @@ export function QuickStart({
         <span className="t-sub font-semibold text-slate-700">{label}</span>
         <div className="flex flex-wrap gap-1.5">
           {list.map((c) => (
-            <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} className={chip(topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
-              {c.topic}
+            <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={chip(topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
+              {c.label ?? c.topic}
             </button>
           ))}
         </div>

@@ -89,6 +89,9 @@ const lintKeys = (p, level) => p.locator(`[data-testid="sht-lint"] li${level ? `
 const open = async (p, q = '') => {
   await p.goto(`${BASE}/marketing/shorts${q}`, { waitUntil: 'networkidle' })
   await p.getByTestId('sht-page').waitFor({ timeout: 15000 })
+  // MUX-2 어디에 · 무엇을 · 형식 고르기는 '형식 직접 고르기' 안(접힘) — 이 시험은 그 안을 보므로 펼친다(펼친 상태는 기억됨)
+  const fold = p.getByTestId('sht-choose')
+  if ((await fold.count()) && (await fold.getAttribute('data-open')) === '0') await fold.getByTestId('fold-toggle').click()
 }
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
@@ -154,8 +157,8 @@ check('W9 릴스 화면 시연은 25초판(끝에 권유 없이) · 고칠 것 0
 await page.getByTestId('sht-platform-tiktok').click()
 await page.getByTestId('sht-aim-reach').click()
 await page.getByTestId('sht-format-list').click()
-await page.getByTestId('sht-topic-pick').first().click()
-await page.getByTestId('sht-ai').click()
+await page.getByTestId('sht-qs-chip').first().click()
+await page.getByTestId('sht-qs-ai').click()
 await page.getByTestId('sht-ai-drafts').waitFor({ timeout: 20000 })
 const call = llm.find((x) => x.sys.includes('(shorts.write'))
 check('A1 AI 대본 2개 · 형식 · 길이 · 고칠 것 수', (await page.getByTestId('sht-ai-draft').count()) === 2 && /리스트형/.test(await page.getByTestId('sht-ai-draft').first().innerText()) && /약 \d+초 · 고칠 것 \d/.test(await page.getByTestId('sht-ai-draft').first().innerText()))
@@ -210,10 +213,10 @@ await page.getByTestId('sht-tab-guide').click()
 await page.getByTestId('sht-guide').waitFor()
 check('G4 형식 · 공식 — 이렇게 말고 → 이렇게 표 · 나눠 줄 자료', (await page.locator('[data-testid="sht-rewrites"] li').count()) >= 10 && (await page.getByTestId('sht-guide-share-card').count()) === 6)
 await page.getByTestId('sht-tab-write').click()
-await page.getByTestId('sht-topic').fill('매일 반복되는 일 하나 화면으로 바꾸기')
+await page.getByTestId('sht-qs-topic').fill('매일 반복되는 일 하나 화면으로 바꾸기')
 await page.getByTestId('sht-to-threads').click()
 await page.getByTestId('thr-page').waitFor()
-check('G5 [같은 소재로 스레드 글] → 스레드 화면 · 소재가 채워짐', (await page.getByTestId('thr-topic').inputValue()) === '매일 반복되는 일 하나 화면으로 바꾸기')
+check('G5 [같은 소재로 스레드 글] → 스레드 화면 · 소재가 채워짐', (await page.getByTestId('thr-qs-topic').inputValue()) === '매일 반복되는 일 하나 화면으로 바꾸기')
 check('G3 PC — JS 오류 0', errors.length === 0, errors)
 
 /* ---------------- M 휴대폰 ---------------- */
@@ -227,7 +230,7 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
   await wire(mp)
   await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
   await mp.evaluate(seedScript())
-  if (scale) await mp.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), scale)
+  if (scale) await mp.evaluate((s) => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ ...JSON.parse(localStorage.getItem('axmvp.ui.preferences') ?? '{}'), textScale: s })), scale)
   await open(mp)
   await mp.getByTestId('sht-platform-tiktok').click()
   await mp.getByTestId('sht-aim-reach').click()

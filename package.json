@@ -83,6 +83,7 @@
     "qa:chat": "node e2e/chat.mjs",
     "qa:mkpack": "node e2e/mkpack.mjs",
     "qa:threads": "node e2e/threads.mjs",
+    "qa:mkquick": "node e2e/mkquick.mjs",
     "qa:shorts": "node e2e/shorts.mjs",
     "qa:vstudy": "node e2e/vstudy.mjs",
     "qa:speccheck": "node e2e/speccheck.mjs",

@@ -381,11 +381,12 @@ export const ENDINGS: ReadonlyArray<{ key: EndingKind; label: string; note: stri
 export const TOPIC_TAGS = ['정책자금', '벤처기업확인', '정부지원사업', 'AX', '경영컨설팅'] as const
 
 /** 소재가 멀면 이 순서로(우리 분야 우선 주제) */
-export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_TAGS)[number] }> = [
-  { topic: '심사 · 자금에서 우리 회사를 보여 줄 근거가 없다(작동하는 화면 = 눈에 띄는 자료)', tag: 'AX' },
-  { topic: '벤처기업확인 세금 혜택을 놓치는 손해', tag: '벤처기업확인' },
-  { topic: 'AI에 뒤처질까 걱정, 어디부터 할지 모름', tag: 'AX' },
-  { topic: '반복 입력 · 대표가 다 확인해야 돌아가는 회사', tag: 'AX' },
+/** short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다 */
+export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_TAGS)[number]; short: string }> = [
+  { topic: '심사 · 자금에서 우리 회사를 보여 줄 근거가 없다(작동하는 화면 = 눈에 띄는 자료)', tag: 'AX', short: '보여 줄 근거가 없다' },
+  { topic: '벤처기업확인 세금 혜택을 놓치는 손해', tag: '벤처기업확인', short: '벤처확인 세금 혜택' },
+  { topic: 'AI에 뒤처질까 걱정, 어디부터 할지 모름', tag: 'AX', short: 'AI 어디부터?' },
+  { topic: '반복 입력 · 대표가 다 확인해야 돌아가는 회사', tag: 'AX', short: '대표가 다 확인하는 회사' },
 ]
 
 /** 남의 글에 다는 전문가 답글(하루 3개) */

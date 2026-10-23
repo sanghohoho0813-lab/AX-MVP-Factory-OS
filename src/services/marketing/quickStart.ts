@@ -11,7 +11,7 @@
  */
 import { todayLocalDate } from '../../lib/appClock'
 import { GOALS, mondayOf, templateOf, todayPlan, type ThreadGoal, type ThreadTemplateKey, type WeekRef } from './threads'
-import { AIMS, PLATFORMS, formatOf, formatsFor, weekMix, type ShortAim, type ShortFormatKey, type ShortPlatform, type ShortPost } from './shorts'
+import { AIMS, PLATFORMS, formatsFor, weekMix, type ShortAim, type ShortFormatKey, type ShortPlatform, type ShortPost } from './shorts'
 
 /** 나눠 줄 자료가 실제로 있는 주제(지금은 벤처기업확인 셀프 체크리스트 카드 6장뿐) */
 export const hasMaterial = (topic: string): boolean => /벤처|체크\s*리스트|점검표|셀프\s*체크/.test(topic)
@@ -82,7 +82,8 @@ export function recommendShort(input: { topic: string; platform: ShortPlatform; 
   const format = (list.find((f) => f.key === want) ?? list[0])?.key ?? 'list'
   const aimName = (a: ShortAim) => AIMS[platform].find((x) => x.key === a)?.label ?? ''
   const where = PLATFORMS.find((p) => p.key === platform)?.label ?? ''
-  const why = `이번 주 ${where} — ${aimName('reach')} ${mix.reach} : ${aimName('convert')} ${mix.convert}${platform === 'tiktok' ? ' (권장 3 : 1)' : ''} · ${formatOf(format)?.how ?? ''}`
+  // 이유는 한 줄로(형식 설명 · 예시는 '형식 직접 고르기' 안에)
+  const why = `이번 주 ${where} ${aimName('reach')} ${mix.reach} : ${aimName('convert')} ${mix.convert}${platform === 'tiktok' ? ' (권장 3 : 1)' : ''}${aim === 'convert' && format === 'comment' ? ' · 나눠 줄 점검표가 있어요' : ''}`
   return { aim, format, why }
 }
 
@@ -118,19 +119,21 @@ export function readWeekTopics(today: string = todayLocalDate()): string[] {
 export interface TopicChip {
   topic: string
   from: 'week' | 'ours'
+  /** 칩에 보이는 짧은 이름(없으면 topic) */
+  label?: string
 }
 
 /** 주제 칩 — 이번 주 키워드 먼저, 그다음 우리 분야(겹치면 하나) */
-export function topicChips(week: readonly string[], ours: readonly string[]): TopicChip[] {
+export function topicChips(week: readonly string[], ours: ReadonlyArray<string | { topic: string; short?: string }>): TopicChip[] {
   const seen = new Set<string>()
   const out: TopicChip[] = []
-  const add = (topic: string, from: TopicChip['from']) => {
+  const add = (topic: string, from: TopicChip['from'], label?: string) => {
     const k = topic.replace(/\s+/g, '')
     if (!k || seen.has(k)) return
     seen.add(k)
-    out.push({ topic, from })
+    out.push({ topic, from, ...(label ? { label } : {}) })
   }
   week.slice(0, WEEK_TOPICS_MAX).forEach((t) => add(t, 'week'))
-  ours.forEach((t) => add(t, 'ours'))
+  ours.forEach((t) => (typeof t === 'string' ? add(t, 'ours') : add(t.topic, 'ours', t.short)))
   return out
 }

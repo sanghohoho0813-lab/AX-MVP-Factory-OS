@@ -63,7 +63,12 @@ const TABS = [
 ]
 const tabOf = (raw: string | null): Tab => (TABS.some((t) => t.key === raw) ? (raw as Tab) : 'write')
 
-const QUICK_TOPICS = ['창업 3년 안 벤처확인 세금', '매일 반복되는 일 하나 화면으로 바꾸기', '정책자금 전에 볼 기본 컨디션(신용 · 재무 · 체납)']
+// short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다
+const QUICK_TOPICS = [
+  { topic: '창업 3년 안 벤처확인 세금', short: '창업 3년 안 벤처확인 세금' },
+  { topic: '매일 반복되는 일 하나 화면으로 바꾸기', short: '반복 업무를 화면으로' },
+  { topic: '정책자금 전에 볼 기본 컨디션(신용 · 재무 · 체납)', short: '자금 전 기본 컨디션' },
+]
 
 interface Draft {
   id?: string
@@ -202,8 +207,9 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   const eff = effFmt ? { aim: (draft.aim || aimsOf(effFmt, draft.platform)[0]) as ShortAim, format: effFmt.key } : { aim: rec.aim, format: rec.format }
   const chips = useMemo(() => topicChips(readWeekTopics(today), QUICK_TOPICS), [today])
   const pickTopic = (t: string) => {
+    // 칩으로 새 주제를 고르면 목적 · 형식도 그 주제에 맞춰 다시 추천 — 사람이 직접 고른 형식은 덮지 않는다
+    if (draft.formatBy === 'hand' && draft.format) return set({ topic: t })
     const r = recommendShort({ topic: t, platform: draft.platform, posts: store.posts, today })
-    // 칩으로 새 주제를 고르면 목적 · 형식도 그 주제에 맞춰 다시 추천
     set({ topic: t, aim: r.aim, format: r.format, formatBy: 'rec' })
   }
   const openFormats = () => {

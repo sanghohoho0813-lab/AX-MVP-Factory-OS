@@ -22,7 +22,7 @@ import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
 import { QuickStart } from './QuickStart'
 import { Fold, openFold } from '../../components/ui/fold'
-import { readWeekTopics, recommendThread, topicChips } from '../../services/marketing/quickStart'
+import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
@@ -211,10 +211,11 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   // MUX-2 추천 형식(규칙) — 사람이 직접 고른 틀이 있으면 그것, 없으면 주제 · 오늘 계획 · 이번 주 잘 된 틀로
   const rec = useMemo(() => recommendThread({ topic: draft.topic, today, weekRef }), [draft.topic, today, weekRef])
   const eff = draft.template ? { goal: (draft.goal || templateOf(draft.template)?.goals[0] || rec.goal) as ThreadGoal, template: draft.template } : { goal: rec.goal, template: rec.template }
-  const chips = useMemo(() => topicChips(readWeekTopics(today), PRIORITY_TOPICS.map((p) => p.topic)), [today])
+  const chips = useMemo(() => topicChips(readWeekTopics(today), PRIORITY_TOPICS), [today])
   const pickTopic = (t: string) => {
+    // 칩으로 새 주제를 고르면 형식도 그 주제에 맞춰 다시 추천 — 사람이 직접 고른 틀은 덮지 않는다
+    if (draft.formatBy === 'hand' && draft.template) return set({ topic: t, tag: draft.tag || topicTag(t) })
     const r = recommendThread({ topic: t, today, weekRef })
-    // 칩으로 새 주제를 고르면 형식도 그 주제에 맞춰 다시 추천(직접 고른 틀은 '형식 직접 고르기' 에서 언제든 바꿈)
     set({ topic: t, goal: r.goal, template: r.template, tag: r.tag || draft.tag, formatBy: 'rec' })
   }
   const openFormats = () => {
@@ -309,21 +310,6 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
 
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
-      {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄 */}
-      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2.5" data-testid="thr-week-hint">
-        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
-          {hotKeys.size ? (
-            <>
-              <b className="text-slate-900">이번 주 잘 터진 형식(참고)</b> · {[...hotKeys].map((k) => `${k} ${templateOf(k)?.name ?? ''}`).join(' / ')} — 기본은 우리 공식, AI 는 글 하나에만 참고해요
-            </>
-          ) : (
-            '이번 주 잘 터진 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 형식만 적으면 돼요(매일 모을 필요 없어요)'
-          )}
-        </p>
-        <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
-          {hotKeys.size ? '고치기' : '적으러 가기'}
-        </Button>
-      </div>
       {/* MUX-2 주제 하나 → 바로 쓰기 — 형식은 오늘 계획 · 이번 주 잘 된 틀로 추천(규칙). 직접 고르기는 아래에 접어 둠(지운 것 없음) */}
       <QuickStart
         testPrefix="thr"
@@ -348,6 +334,21 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         )}
       </QuickStart>
 
+      {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
+      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2.5" data-testid="thr-week-hint">
+        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
+          {hotKeys.size ? (
+            <>
+              <b className="text-slate-900">이번 주 잘 터진 형식(참고)</b> · {[...hotKeys].map((k) => `${k} ${templateOf(k)?.name ?? ''}`).join(' / ')} — 기본은 우리 공식, AI 는 글 하나에만 참고해요
+            </>
+          ) : (
+            '이번 주 잘 터진 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 형식만 적으면 돼요(매일 모을 필요 없어요)'
+          )}
+        </p>
+        <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
+          {hotKeys.size ? '고치기' : '적으러 가기'}
+        </Button>
+      </div>
       <Fold id="thr.formats" title="형식 직접 고르기" summary={`원하는 반응 · 틀 23가지 · 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 남의 글 뼈대`} panel testId="thr-choose">
         {plan && (
           <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5" data-testid="thr-plan">
