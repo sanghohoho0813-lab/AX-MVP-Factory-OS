@@ -16,11 +16,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Download, FilePlus2, GraduationCap, Import, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Download, FilePlus2, GraduationCap, Import, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge, Blank, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { InlineConfirm } from '../../components/ui/InlineConfirm'
+import { TwoStepConfirm } from '../../components/ui/TwoStepConfirm'
+import { liveRows, trashRows, trashedAtOf, withTrash, withoutTrash } from '../../services/patent/specTrash'
 import { useToast } from '../../components/ui/toastContext'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
 import { downloadText } from '../../components/consulting/studioParts'
@@ -90,7 +92,7 @@ function ClientSelect({ value, onChange, clients, label, testId }: { value: stri
 /* 목록                                                                  */
 /* ------------------------------------------------------------------ */
 
-function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]; onNew: (clientId: string) => Promise<void>; onSample: () => Promise<void>; onRemove: (id: string) => Promise<void> }) {
+function DraftList({ rows, trash, onNew, onSample, onRemove, onRestore, onPurge }: { rows: BucketRow<Row>[]; trash: BucketRow<Row>[]; onNew: (clientId: string) => Promise<void>; onSample: () => Promise<void>; onRemove: (id: string) => Promise<void>; onRestore: (id: string) => Promise<void>; onPurge: (id: string) => Promise<void> }) {
   const { clientId } = useToolClient()
   const clients = useClients()
   const ai = useOwnerAiAccess()
@@ -113,7 +115,7 @@ function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]
           <div className="flex flex-col gap-3" data-testid="spec-new-ai">
             <div className="flex flex-col gap-1">
               <h2 className="t-section font-bold break-keep text-slate-900">AI 와 명세서를 기획부터 써요</h2>
-              <p className="t-sub break-keep text-slate-600">회사를 고르고 단추를 누르면 아이디어 5개(순위 · 이유)부터 — 고르고 · 구성을 확인하고 · 본문을 쓰는 차례마다 단추로 넘어갑니다. 타자 칠 칸은 없어요.</p>
+              <p className="t-sub break-keep text-slate-600">회사를 고르고 단추를 누르면 AI 가 그 회사 서류 · 기록을 읽고 의견과 질문을 드려요(5번 안 · 답은 누르기만). 그 답대로 아이디어 5개(순위 · 이유) — 고르고 · 구성을 확인하고 · 본문을 쓰는 차례마다 단추로 넘어갑니다.</p>
             </div>
             <ClientSelect value={pick} onChange={setPick} clients={clients} label="어느 회사 특허인가요?" testId="spec-new-client" />
             {/* D-269 모델은 시작하기 전에 — 예전엔 명세서를 만들자마자 쓰기 시작해, 그 뒤에 고른 모델이 적용되지 않았다 */}
@@ -124,7 +126,7 @@ function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]
             <Button variant="primary" className="min-h-12 self-start" disabled={busy} onClick={() => void go(() => onNew(pick))} data-testid="spec-new">
               <Sparkles aria-hidden="true" className="size-5" /> {pick ? `${nameOf(pick) || '이 회사'} 명세서 — 기획부터 시작` : '명세서 기획부터 시작'}
             </Button>
-            {!pick && <p className="t-meta break-keep text-slate-500">회사를 고르면 그 회사 기록 · 상담 메모로 아이디어를 냅니다(안 고르면 일반 아이디어).</p>}
+            {!pick && <p className="t-meta break-keep text-slate-500">회사를 고르면 그 회사 기록 · 업체 서류함 · 상담 메모를 읽고 기획합니다(안 고르면 회사 정보부터 받아요).</p>}
             <button type="button" disabled={busy} onClick={() => void go(onSample)} className="tap t-meta self-start font-semibold text-slate-600 underline underline-offset-2" data-testid="spec-sample">
               견본(연습용 발명)으로 둘러보기
             </button>
@@ -198,13 +200,42 @@ function DraftList({ rows, onNew, onSample, onRemove }: { rows: BucketRow<Row>[]
                       <span className={`block h-full rounded-full ${p.done === p.total ? 'bg-success-600' : 'bg-brand-600'}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
                     </span>
                   </Link>
-                  <InlineConfirm question="이 명세서 초안을 지울까요? 지운 바로 뒤에는 알림의 [되돌리기]로 살릴 수 있어요." onConfirm={() => void onRemove(r.id)} testId="spec-row-remove" className="self-end sm:self-auto" />
+                  <InlineConfirm label="휴지통으로" question="휴지통으로 옮길까요? 휴지통에서 언제든 되살릴 수 있어요." confirmLabel="네, 옮깁니다" onConfirm={() => void onRemove(r.id)} testId="spec-row-remove" className="self-end sm:self-auto" />
                 </li>
               )
             })}
           </ul>
         )}
       </section>
+      {/* D-271 휴지통 — 지운 명세서는 여기 남는다(되살리기) · 영구 삭제는 두 번 확인 */}
+      {trash.length > 0 && (
+        <details className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 px-3 py-2" data-testid="spec-trash">
+          <summary className="tap t-sub flex min-h-11 cursor-pointer items-center gap-1.5 font-semibold text-slate-700">
+            <Trash2 aria-hidden="true" className="size-4" /> 휴지통 {trash.length}건 — 지운 명세서(되살리기 · 영구 삭제)
+          </summary>
+          <ul className="mt-2 flex flex-col gap-2">
+            {trash.map((r) => {
+              const d = normalizeDraft(r.data.draft)
+              return (
+                <li key={r.id} className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-trash-row">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{d.title.trim() || '(명칭 아직 없음)'}</span>
+                    <span className="t-meta text-slate-500">
+                      {nameOf(r.clientId) || '회사 고르지 않음'} · 지운 날 {localDateOf(trashedAtOf(r.data))}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+                    <Button variant="secondary" size="sm" onClick={() => void onRestore(r.id)} data-testid="spec-trash-restore">
+                      <RotateCcw aria-hidden="true" className="size-4" /> 되살리기
+                    </Button>
+                    <TwoStepConfirm onConfirm={() => void onPurge(r.id)} testId="spec-trash-purge" />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
@@ -372,7 +403,30 @@ function SideRail({ tab, prog, errs, state, next, onGo }: { tab: DraftStep; prog
 const STEP_KEYS = TABS.map((t) => t.key)
 const isStep = (x: string | null): x is DraftStep => !!x && (STEP_KEYS as string[]).includes(x)
 
-function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAutoStarted }: { row: BucketRow<Row>; save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>; onBack: () => void; initialStep: DraftStep | null; others: string[]; auto?: boolean; onAutoStarted?: () => void }) {
+function SpecEditor({
+  row,
+  save,
+  onBack,
+  initialStep,
+  others,
+  auto = false,
+  onAutoStarted,
+  trashedAt = '',
+  onTrash,
+  onRestore,
+}: {
+  row: BucketRow<Row>
+  save: (input: { id?: string; clientId?: string; data: Row }) => Promise<BucketRow<Row>>
+  onBack: () => void
+  initialStep: DraftStep | null
+  others: string[]
+  auto?: boolean
+  onAutoStarted?: () => void
+  /** D-271 휴지통에 있으면 지운 때 */
+  trashedAt?: string
+  onTrash?: (data: Row, clientId: string, thenNew: boolean) => Promise<void>
+  onRestore?: () => Promise<void>
+}) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const ai = useOwnerAiAccess()
@@ -395,6 +449,8 @@ function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAu
   const [aiOpen, setAiOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const dRef = useRef(d)
+  const trashRef = useRef(trashedAt)
+  trashRef.current = trashedAt
   const clientRef = useRef(row.clientId)
   const saveRef = useRef(save)
   saveRef.current = save
@@ -408,7 +464,8 @@ function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAu
       const snap = dRef.current
       setState('saving')
       try {
-        await saveRef.current({ id: row.id, clientId: clientRef.current, data: { draft: snap } })
+        // D-271 휴지통에 있는 명세서를 열어 고쳐도 휴지통 표시는 그대로(되살리기는 [되살리기] 로만)
+        await saveRef.current({ id: row.id, clientId: clientRef.current, data: trashRef.current ? { draft: snap, trashedAt: trashRef.current } : { draft: snap } })
         setState(dRef.current === snap ? 'saved' : 'dirty')
       } catch (e) {
         setState('failed')
@@ -572,6 +629,18 @@ function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAu
     }
   }
 
+  /** D-271 휴지통으로(그다음 새로 쓰기면 같은 회사로 새 명세서) — 쌓인 저장을 먼저 끝내고, 뒤에 오는 저장도 휴지통 표시를 지킨다 */
+  const trashThis = async (thenNew: boolean) => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current)
+      timer.current = null
+      void commit()
+    }
+    await chain.current
+    trashRef.current = new Date().toISOString()
+    await onTrash?.({ draft: dRef.current }, clientRef.current, thenNew)
+  }
+
   const download = () => {
     downloadText(`patent-spec-${today.replace(/-/g, '')}.md`, mdFull || specMarkdown(d))
     showToast('MD 를 내려받았습니다 — 맨 위 입력 주의부터 읽어 주세요')
@@ -602,10 +671,27 @@ function SpecEditor({ row, save, onBack, initialStep, others, auto = false, onAu
             <Button variant="ghost" size="sm" onClick={() => { flush(); onBack() }} data-testid="spec-back-list">
               <ArrowLeft aria-hidden="true" className="size-4" /> 명세서 목록
             </Button>
+            {/* D-271 마음에 안 들면 바로 지우고 새로 — 지운 것은 휴지통에 남는다 */}
+            {!trashedAt && onTrash && (
+              <>
+                <InlineConfirm label="새로 쓰기" icon={<FilePlus2 aria-hidden="true" className="size-4" />} question="지금 글은 휴지통으로 옮기고(되살릴 수 있어요) 같은 회사로 기획부터 새로 쓸까요?" confirmLabel="네, 새로 씁니다" onConfirm={() => void trashThis(true)} testId="spec-restart" />
+                <InlineConfirm label="휴지통으로" question="이 명세서를 휴지통으로 옮길까요? 목록 아래 휴지통에서 되살릴 수 있어요." confirmLabel="네, 옮깁니다" onConfirm={() => void trashThis(false)} testId="spec-trash-this" />
+              </>
+            )}
             <span className={`t-meta ml-auto whitespace-nowrap ${state === 'failed' ? 'text-danger-700' : 'text-slate-500'}`} data-testid="spec-save-state" data-state={state}>
               {state === 'saved' ? '저장됨' : state === 'saving' ? '저장 중…' : state === 'failed' ? '저장 못 함' : '고치는 중'}
             </span>
           </div>
+          {trashedAt && (
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-300 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center" data-testid="spec-trashed-banner">
+              <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
+                <Trash2 aria-hidden="true" className="mr-1 inline size-4 align-[-2px]" /> 휴지통에 있는 명세서입니다({localDateOf(trashedAt)}에 지움). 목록에는 안 보여요.
+              </p>
+              <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={() => void onRestore?.()} data-testid="spec-trashed-restore">
+                <RotateCcw aria-hidden="true" className="size-4" /> 되살리기
+              </Button>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <h2 className="t-section font-bold break-keep text-slate-900" data-testid="spec-editor-title">
               {d.title.trim() || '새 명세서'}
@@ -816,25 +902,48 @@ export function SpecWritePage() {
       showToast(`견본을 만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
   }
+  /** D-271 지우기 = 휴지통으로(기록은 남음) — 휴지통에서 되살리거나, 두 번 확인하고 영구 삭제 */
+  const restore = async (id: string, quiet = false) => {
+    const r = bucket.rows?.find((x) => x.id === id)
+    if (!r) return
+    try {
+      await bucket.save({ id: r.id, clientId: r.clientId, data: withoutTrash(r.data) })
+      if (!quiet) showToast('휴지통에서 되살렸습니다')
+    } catch (e) {
+      showToast(`되살리지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
+    }
+  }
   const remove = async (id: string) => {
-    const gone = bucket.rows?.find((r) => r.id === id)
+    const r = bucket.rows?.find((x) => x.id === id)
+    if (!r) return
+    try {
+      await bucket.save({ id: r.id, clientId: r.clientId, data: withTrash(r.data, new Date().toISOString()) })
+      showToast('휴지통으로 옮겼습니다 — 목록 아래 휴지통에서 되살릴 수 있어요', { label: '되돌리기', onClick: () => void restore(id) })
+    } catch (e) {
+      showToast(`옮기지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
+    }
+  }
+  const purge = async (id: string) => {
     try {
       await bucket.remove(id)
-      showToast(
-        '명세서 초안을 지웠습니다',
-        gone
-          ? {
-              label: '되돌리기',
-              onClick: () =>
-                void bucket.save({ id: gone.id, clientId: gone.clientId, data: gone.data }).then(
-                  () => showToast('되살렸습니다'),
-                  (e: unknown) => showToast(`되살리지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`),
-                ),
-            }
-          : undefined,
-      )
+      showToast('영구 삭제했습니다')
     } catch (e) {
       showToast(`지우지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
+    }
+  }
+  /** 편집기 안에서 — 지금 명세서를 휴지통으로(그다음 새로 쓰기면 같은 회사로 새 명세서를 기획부터) */
+  const trashFromEditor = async (id: string, data: Row, clientId: string, thenNew: boolean) => {
+    try {
+      await bucket.save({ id, clientId, data: withTrash(data, new Date().toISOString()) })
+      if (thenNew) {
+        await create(clientId)
+        showToast('지금 명세서는 휴지통으로 옮겼어요(되살릴 수 있어요) — 새 명세서를 기획부터 시작합니다')
+      } else {
+        navigate(WRITE)
+        showToast('휴지통으로 옮겼습니다 — 목록 아래 휴지통에서 되살릴 수 있어요', { label: '되돌리기', onClick: () => void restore(id) })
+      }
+    } catch (e) {
+      showToast(`옮기지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
   }
 
@@ -855,7 +964,7 @@ export function SpecWritePage() {
       </p>
     )
   } else if (!draftId) {
-    body = <DraftList rows={bucket.rows} onNew={create} onSample={sample} onRemove={remove} />
+    body = <DraftList rows={liveRows(bucket.rows)} trash={trashRows(bucket.rows)} onNew={create} onSample={sample} onRemove={remove} onRestore={restore} onPurge={purge} />
   } else {
     const row = bucket.rows.find((r) => r.id === draftId)
     body = row ? (
@@ -865,9 +974,12 @@ export function SpecWritePage() {
         save={bucket.save}
         onBack={() => navigate(WRITE)}
         initialStep={isStep(stepParam) ? stepParam : null}
-        others={bucket.rows.filter((r) => r.id !== row.id && r.clientId === row.clientId).map((r) => normalizeDraft(r.data.draft).title.trim()).filter(Boolean)}
+        others={liveRows(bucket.rows).filter((r) => r.id !== row.id && r.clientId === row.clientId).map((r) => normalizeDraft(r.data.draft).title.trim()).filter(Boolean)}
         auto={auto}
         onAutoStarted={dropAuto}
+        trashedAt={trashedAtOf(row.data)}
+        onTrash={(data, clientId, thenNew) => trashFromEditor(row.id, data, clientId, thenNew)}
+        onRestore={() => restore(row.id)}
       />
     ) : (
       <div className="flex flex-col gap-2" data-testid="spec-missing">

@@ -225,11 +225,21 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     }
     return [{ title: 'score', amount: '94', detail: 'A10 B9 C9 D9 E9 F10 G9 H10 I9 J10' }, { title: 'verdict', tag: '대표 확인', detail: '3년 고객 수 근거', body: '지금 거래처 49곳이 맞나요?' }, { title: 'market_target', body: 'JUDGE 고친 목표시장 — TAM 1조 2,000억 원 · SAM 1,800억 원 · SOM 36억 원(3년)' }]
   }
+  // D-271 기획 대화 — 첫 번: 이해 · 의견 · 질문 / 대표가 한 번 답하면 '충분'
+  const talkItems = (req) =>
+    (JSON.stringify(req.context ?? '').match(/대표 답:/g) ?? []).length
+      ? [{ tag: '의견', title: '중소 금속가공 현장 앱', detail: '시험 3곳이 있어 증거가 됨' }, { tag: '충분', title: '고객 · 핵심 기술 · 증거가 정해져 방향을 낼 수 있습니다' }]
+      : [
+          { tag: '이해', title: '절삭 공구 마모를 휴대폰 진동으로 알려 주는 MVP 를 가진 회사', detail: '명세서 · AX 재료' },
+          { tag: '의견', title: '일반 설비 모니터링 플랫폼', detail: '너무 흔하고 특허와 거리가 멂' },
+          { tag: '의견', title: '공구 마모 예측 현장 앱', detail: '특허와 MVP 가 같은 이야기 — 다만 고객이 정해져야' },
+          { tag: '질문', title: '누구에게 먼저 파시겠어요?', detail: '목표 고객이 정해져야 줄거리가 섭니다', outline: ['중소 금속가공 업체', '대기업 협력사', '공구 유통사', '잘 모르겠어요 — AI 가 정해 주세요'] },
+        ]
   await page.route('**/api/ai-assist', async (route) => {
     const req = JSON.parse(route.request().postData() || '{}')
     sent.push(req)
     if (req.assistId === 'venture.p2' && p2Calls++ === 0) return route.fulfill({ status: 504, contentType: 'text/html', body: '<html>timeout</html>' })
-    const items = req.assistId === 'venture.judge' ? judgeItems(req) : req.assistId === 'venture.market' && marketCalls++ === 0 ? MARKET_EMPTY : req.assistId === 'venture.g2' && g2Calls++ < 3 ? [] : (ITEMS[req.assistId] ?? [])
+    const items = req.assistId === 'venture.talk' ? talkItems(req) : req.assistId === 'venture.judge' ? judgeItems(req) : req.assistId === 'venture.market' && marketCalls++ === 0 ? MARKET_EMPTY : req.assistId === 'venture.g2' && g2Calls++ < 3 ? [] : (ITEMS[req.assistId] ?? [])
     const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: req.assistId === 'venture.market' && marketCalls !== 2, sources: req.assistId === 'venture.market' && marketCalls !== 2 ? [{ title: '통계청', url: 'https://kosis.kr/x' }] : [] }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
@@ -244,11 +254,22 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('judge-skill-text').fill(SKILL)
   await page.getByTestId('judge-skill-save').click()
   await page.waitForTimeout(400)
-  check('V0 재료가 있으면 차례 "기획 방향" · [기획 방향 5개 내줘] · 요약 전 3가지 · 쓰기 단추 · [전부 써줘] 는 아직 없음', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'plan' && (await page.getByTestId('vplan-plan-run').isVisible()) && (await page.getByTestId('vplan-gate').count()) === 0 && (await page.getByTestId('vplan-ai-next').count()) === 0 && (await page.getByTestId('vplan-ai-run').count()) === 0 && /기획부터/.test(await page.getByTestId('vplan-ai-head').innerText()))
+  check('V0 재료가 있으면 차례 "기획 방향" · [AI 와 기획 시작] · [묻지 말고 방향 5개 내줘] · 요약 전 3가지 · 쓰기 단추 · [전부 써줘] 는 아직 없음', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'plan' && (await page.getByTestId('vplan-talk-start').isVisible()) && (await page.getByTestId('vplan-plan-run').isVisible()) && (await page.getByTestId('vplan-gate').count()) === 0 && (await page.getByTestId('vplan-ai-next').count()) === 0 && (await page.getByTestId('vplan-ai-run').count()) === 0 && /기획부터/.test(await page.getByTestId('vplan-ai-head').innerText()))
   check('V0b 방향을 고르기 전에는 [이것만 써줘] 도 막힘(시장조사만 됨)', (await row('p1').getByTestId('vplan-ai-one').isDisabled()) && /기획 방향부터/.test(await row('p1').innerText()) && !(await row('market').getByTestId('vplan-ai-one').isDisabled()))
-  await page.getByTestId('vplan-plan-run').click()
+  // D-271 기획 대화 — 의견 · 질문(누를 답) → 답 → '충분' → 그 대화대로 방향 5개
+  await page.getByTestId('vplan-talk-start').click()
+  await page.getByTestId('vplan-talk-option').first().waitFor({ timeout: 20000 })
+  await vIdle()
+  const vt1 = sent.filter((r) => r.assistId === 'venture.talk')
+  const vOpts = await page.getByTestId('vplan-talk-option').allInnerTexts()
+  check('V0c [AI 와 기획 시작] → 재료(명세서 · AX)를 읽고 회사 이해 · 의견 2(흔한 것 · 약한 점) · 질문 하나 · 누를 답 4개(마지막 "AI 가 정해 주세요") · 대표 /자체점검 정의 같이', vt1.length === 1 && !JSON.stringify(vt1[0].context).includes('대표 답:') && JSON.stringify(vt1[0].context).includes('휴대폰') && /휴대폰 진동/.test(await page.getByTestId('vplan-talk-understanding').innerText()) && /너무 흔하고/.test(await page.getByTestId('vplan-talk-opinions').innerText()) && /누구에게 먼저/.test(await page.getByTestId('vplan-talk-question').innerText()) && vOpts.length === 4 && /AI 가 정해/.test(vOpts[3]) && vt1[0].skill === SKILL && (await planAiRow('talk').getAttribute('data-model')) === 'test-model', vOpts)
+  await shot(page, 'vplan-04t-talk')
+  await page.getByTestId('vplan-talk-option').first().click()
   await page.getByTestId('vplan-plan-option').first().waitFor({ timeout: 20000 })
   await vIdle()
+  const vt2 = sent.filter((r) => r.assistId === 'venture.talk')
+  const vPlanReq = sent.find((r) => r.assistId === 'venture.plan')
+  check('V0d 답을 누르면 다음 부름에 "대표 답: 중소 금속가공 업체" → AI 가 "충분" → 기다리지 않고 그 대화대로 방향 5개(방향 자료에 기획 대화 · "대표 답을 반드시 따른다")', vt2.length === 2 && JSON.stringify(vt2[1].context).includes('대표 답: 중소 금속가공 업체') && (vPlanReq?.context?.sections ?? []).some((x) => x.name === '기획 대화' && JSON.stringify(x.rows).includes('대표 답: 중소 금속가공 업체')) && (vPlanReq?.context?.rules ?? []).some((r) => /대표 답을 반드시 따른다/.test(r)) && /기획 대화 1번/.test(await page.getByTestId('vplan-talk').innerText()), vt2.map((r) => r.assistId))
   const opts = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ picked: e.getAttribute('data-picked'), text: e.textContent })))
   check('V1 기획 방향 5개 — 1순위(86점) · 순위 이유 · 고객 · 회사 근거 · 1순위가 골라져 있음 · 모델 표시', opts.length === 5 && /1순위/.test(opts[0].text) && /86점/.test(opts[0].text) && /1순위인 이유 · 특허와 MVP 가 같은 이야기/.test(opts[0].text) && /고객 · 절삭 공구를 쓰는/.test(opts[0].text) && /회사 근거/.test(opts[0].text) && opts[0].picked === 'yes' && (await planAiRow('plan').getAttribute('data-model')) === 'test-model', opts.map((o) => o.text?.slice(0, 30)))
   await shot(page, 'vplan-05p-plans')

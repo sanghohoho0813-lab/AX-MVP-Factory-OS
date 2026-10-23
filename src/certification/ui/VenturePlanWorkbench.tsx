@@ -42,6 +42,7 @@ import { useToolClient } from '../../tools/shared/toolClientContext'
 import { localDateOf } from '../../lib/appClock'
 import { VenturePlanAi, type AiRow } from './VenturePlanAi'
 import type { VPlanBatch } from '../core/venturePlan'
+import { liveRows } from '../../services/patent/specTrash'
 
 type Tab = 'mat' | VPlanPart | 'check'
 const TABS: readonly { key: Tab; label: string }[] = [
@@ -482,7 +483,7 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
   const mine = useMemo(
     () =>
       clientId
-        ? (drafts.rows ?? [])
+        ? liveRows(drafts.rows)
             .filter((r) => r.clientId === clientId)
             .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
             .map((r) => {

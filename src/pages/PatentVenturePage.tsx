@@ -26,6 +26,7 @@ import { localDateOf, todayLocalDate } from '../lib/appClock'
 import type { SpecDraft } from '../services/patent/specDraft'
 import { PV_HOME, planHref, pvBoard, pvSummary, specHref, type PvBoardRow, type PvStage } from '../services/patent/pvBoard'
 import { sampleDraft } from '../services/patent/specCoach'
+import { liveRows } from '../services/patent/specTrash'
 
 const HOME = PV_HOME
 
@@ -327,7 +328,7 @@ export function PatentVentureHomePage() {
   const rows = useMemo(() => {
     if (!drafts.rows || !works.rows || !clients) return null
     return pvBoard({
-      drafts: drafts.rows.map((r) => ({ id: r.id, clientId: r.clientId, updatedAt: r.updatedAt, draft: r.data.draft })),
+      drafts: liveRows(drafts.rows).map((r) => ({ id: r.id, clientId: r.clientId, updatedAt: r.updatedAt, draft: r.data.draft })),
       plans: works.rows.filter((r) => r.data.cert === 'venture').map((r) => ({ clientId: r.clientId, updatedAt: r.updatedAt, notes: r.data.notes ?? {} })),
       clients,
     })

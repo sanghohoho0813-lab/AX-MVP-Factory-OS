@@ -41,15 +41,19 @@ import {
   type SpecResearch,
 } from './specDraft'
 import { SPEC_BATCHES, paraChunks, paraRows, researchRows, type SpecBatch } from './specDraftAi'
+import { excerptForAi } from './specMaterials'
+import { TALK_RULE, talkRows } from '../aiAssist/talk'
 
 export { paraChunks, researchRows }
 
-export type AgentStage = 'idea' | 'ideaRank' | 'ideaMore' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
+export type AgentStage = 'talk' | 'idea' | 'ideaRank' | 'ideaMore' | 'research' | 'parts' | 'judge1' | SpecBatch | 'judge2' | 'fix'
 
 /** 작업판의 칸(카드) — 단계 여럿이 한 칸이 되기도 한다 */
 export type AgentCard = 'idea' | 'research' | 'parts' | 'body' | 'claims' | 'judge' | 'check'
 
 export const STAGES: readonly { key: AgentStage; card: AgentCard; assistId: string; label: string; seconds: number }[] = [
+  // D-271 기획 대화 — 회사 이해 · 흔한 방향 의견 · 질문 하나(대표가 답을 누르면 다음 질문 · 다섯 번 안)
+  { key: 'talk', card: 'idea', assistId: 'spec.talk', label: '기획 대화', seconds: 20 },
   { key: 'idea', card: 'idea', assistId: 'spec.idea', label: '아이디어 5개 · 순위', seconds: 40 },
   // D-269 기획 — 후보 가운데 무엇이 가장 나은지 · 자체점검으로 더 날카로운 것 짜내기(대표가 누를 때만)
   { key: 'ideaRank', card: 'idea', assistId: 'spec.ideaRank', label: '후보 중 가장 나은 것', seconds: 30 },
@@ -113,9 +117,12 @@ function ideaRows(d: SpecDraft): AssistRow[] {
   return (Object.keys(IDEA_LABEL) as (keyof SpecIdea)[]).filter((k) => d.idea[k].trim()).flatMap((k) => chunks(d.idea[k]).map((memo) => ({ part: IDEA_LABEL[k], memo })))
 }
 
-/** 재료는 자료마다 앞쪽 4,480자(줄 8개)까지 — 자료 여섯 개(D-269 기획은 회사 이야기가 전부라 예전 2,240자에서 늘림) */
+/**
+ * 재료는 자료마다 4,480자(줄 8개)까지 — 자료 여섯 개(D-269 기획은 회사 이야기가 전부라 예전 2,240자에서 늘림).
+ * D-271 길면 앞 1/3 · 뒤 2/3(GPT 와 나눈 대화는 결론이 끝에) — 예전엔 앞부분만.
+ */
 function materialRows(c: AgentCompany): AssistRow[] {
-  return c.materials.slice(0, 6).flatMap((m) => chunks(safeText(m.text, [], 4480)).slice(0, 8).map((memo, i) => ({ part: `${m.kind}${i ? ' (이어서)' : ''}`, name: m.title.slice(0, 60), memo })))
+  return c.materials.slice(0, 6).flatMap((m) => chunks(excerptForAi(safeText(m.text, [], 40000))).slice(0, 8).map((memo, i) => ({ part: `${m.kind}${i ? ' (이어서)' : ''}`, name: m.title.slice(0, 60), memo })))
 }
 
 /** 회사가 무엇을 하는지 알려 주는 기록 줄(매출 · 지역 · 설립만으로는 발명을 떠올릴 수 없다) */
@@ -135,14 +142,23 @@ export const THIN_BLOCK = '회사 정보부터 — 업종 · 종목 · 상담 �
 /* 아이디어 내줘                                                          */
 /* ------------------------------------------------------------------ */
 
-export function buildIdeaContext(input: { draft: SpecDraft; company: AgentCompany; others: string[]; today: string }): AssistContext {
-  const { draft: d, company: c, others, today } = input
+/** 회사 · 재료 · AI 작업실 아이디어 · 이미 있는 명세서 — 기획 대화와 아이디어가 같이 쓴다 */
+function companySections(c: AgentCompany, others: string[]): AssistContext['sections'] {
   const sections: AssistContext['sections'] = [
     { name: '회사', rows: [{ part: '회사 이름', memo: c.name || '(회사 미정 — 업종 일반으로)' }, ...c.facts.slice(0, 20).map((f) => ({ part: '기록', memo: safeText(f) }))] },
     { name: '재료', rows: materialRows(c) },
   ]
   if (c.priorIdeas.length) sections.push({ name: 'AI 작업실 특허 아이디어', rows: c.priorIdeas.slice(0, 6).map((memo) => ({ part: '앞선 결과', memo: safeText(memo, [], 560) })) })
   if (others.length) sections.push({ name: '이미 있는 명세서', rows: others.slice(0, 10).map((t) => ({ part: '명칭', memo: t })) })
+  return sections
+}
+
+export function buildIdeaContext(input: { draft: SpecDraft; company: AgentCompany; others: string[]; today: string }): AssistContext {
+  const { draft: d, company: c, others, today } = input
+  const sections = companySections(c, others)
+  // D-271 기획 대화에서 대표가 고른 방향 · 고객 · 데이터 — 아이디어는 그 안에서
+  const talk = talkRows(d.talk)
+  if (talk.length) sections.push({ name: '기획 대화', rows: talk })
   const written = ideaRows(d)
   if (d.title.trim() || written.length) sections.push({ name: '지금 초안', rows: [...(d.title.trim() ? [{ part: '명칭', memo: d.title }] : []), ...written] })
   return {
@@ -150,7 +166,25 @@ export function buildIdeaContext(input: { draft: SpecDraft; company: AgentCompan
     today,
     purpose: '이 회사가 출원할 만한 특허 아이디어 5개(추천 순 · 1~3순위는 이유와 함께)',
     sections,
-    rules: ['회사 기록 · 재료에 있는 업무 · 데이터 · 제품 · 판매 방식에서 출발한다. 어느 회사에나 맞는 일반 아이디어는 내지 않는다 — 아이디어마다 재료의 어떤 사실에서 나왔는지 detail 에.'],
+    rules: ['회사 기록 · 재료에 있는 업무 · 데이터 · 제품 · 판매 방식에서 출발한다. 어느 회사에나 맞는 일반 아이디어는 내지 않는다 — 아이디어마다 재료의 어떤 사실에서 나왔는지 detail 에.', ...(talk.length ? [TALK_RULE] : [])],
+  }
+}
+
+/**
+ * D-271 기획 대화 한 번 — 회사 · 재료 + 지금까지의 대화. AI 는 회사 이해(첫 번) · 의견 · 질문 하나(누를 답 3~4개)를 낸다.
+ * 대표: "일반 화장품이면 이런 방법이 있을 것 같습니다 · 근데 이런 거는 너무 흔하고 · 그래서 어떤 방식으로 하는 게 좋을까요?"
+ */
+export function buildTalkContext(input: { draft: SpecDraft; company: AgentCompany; others: string[]; today: string }): AssistContext {
+  const { draft: d, company: c, others, today } = input
+  const sections = companySections(c, others)
+  const talk = talkRows(d.talk)
+  if (talk.length) sections.push({ name: '기획 대화', rows: talk })
+  const n = d.talk.filter((r) => r.answer.trim()).length
+  return {
+    title: '특허 명세서 — 기획 대화',
+    today,
+    purpose: n ? `대표 답 ${n}개를 받았다 — 다음 질문 하나(또는 충분하면 '충분')` : '이 회사를 어떻게 이해했는지 · 흔한 방향과 약한 점 · 첫 질문 하나',
+    sections,
   }
 }
 
@@ -687,7 +721,7 @@ export function backToIdeas(d: SpecDraft): SpecDraft {
 
 /** 단계마다 부를 수 있는지(앞 단계가 모자라면 왜인지) */
 export function stageBlock(stage: AgentStage, d: SpecDraft): string {
-  if (stage === 'idea') return ''
+  if (stage === 'idea' || stage === 'talk') return ''
   if (stage === 'ideaRank') return d.ideas.length >= 2 ? '' : '아이디어부터 — [아이디어 5개 내줘]'
   if (stage === 'ideaMore') return d.ideas.length ? '' : '아이디어부터 — [아이디어 5개 내줘]'
   if (!d.title.trim()) return '아이디어부터 — [아이디어 내줘]'

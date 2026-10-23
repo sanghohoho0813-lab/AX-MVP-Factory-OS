@@ -18,6 +18,7 @@ import { parseSpecFile } from '../../services/patent/specParse'
 import { checkSpec } from '../../services/patent/specCheck'
 import { topicOf } from '../../services/workChat/chatTypes'
 import { PV_GUIDE, PV_STARTERS, PV_TOPICS, pvAiContext, pvAnswer, pvFileAnswer, pvHelpAnswer, type PvChatData } from '../../services/workChat/pvChat'
+import { liveRows } from '../../services/patent/specTrash'
 
 type DraftRow = { draft: SpecDraft } & Record<string, unknown>
 type CertWorkRow = { cert?: string; notes?: Record<string, string> } & Record<string, unknown>
@@ -52,7 +53,7 @@ export function PatentVentureChatPage() {
     () => ({
       clientId,
       clientName,
-      drafts: (drafts.rows ?? []).map((r) => ({ id: r.id, clientId: r.clientId, updatedAt: r.updatedAt, draft: r.data.draft })),
+      drafts: liveRows(drafts.rows).map((r) => ({ id: r.id, clientId: r.clientId, updatedAt: r.updatedAt, draft: r.data.draft })),
       plans: (works.rows ?? []).filter((r) => r.data.cert === 'venture').map((r) => ({ clientId: r.clientId, updatedAt: r.updatedAt, notes: r.data.notes ?? {} })),
       clients: (clients ?? []).map((c) => ({ id: c.id, companyName: c.companyName })),
     }),

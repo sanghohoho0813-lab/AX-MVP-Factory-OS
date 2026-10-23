@@ -13,7 +13,7 @@
  *   → [요약 쓰기 — 자체점검 ① 까지] → [요약 확인 — 본문 쓰기](자체점검 ② 까지). 고른 방향은 모든 쓰기 · 자체점검 · 시장조사에 같이 간다.
  */
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, CheckCircle2, Circle, Gavel, Loader2, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Gavel, Loader2, MessageCircleQuestion, Sparkles } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
@@ -26,10 +26,12 @@ import { readJudgeSkill } from '../../services/aiAssist/judgeSkill'
 import { callAssistRetry, retryText } from '../../services/aiAssist/retry'
 import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../../components/ai/ModelPicker'
+import { PlanTalk } from '../../components/ai/PlanTalk'
+import { TALK_MAX, answeredCount, talkFinished, talkOf, withAnswer } from '../../services/aiAssist/talk'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { RD_ORG_OPTIONS, VK, VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
 import { PATENT_NONE, PLAN_LINE_LABEL, RD_ORG_SHORT, chosenPlan, judgePatch, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, marketPatch, normalizeAppNo, patentPatch, planStatePatch, readGate, researchersPatch, summaryGate, type MarketResearch, type PlanPick } from '../integration/ventureGate'
-import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, plansOf, rerankPlans, type VPlanStep } from '../integration/venturePlanAi'
+import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, buildVentureTalkContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, plansOf, rerankPlans, type VPlanStep } from '../integration/venturePlanAi'
 
 export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string; model?: string }
 type RowState = AiRow
@@ -44,6 +46,7 @@ const HINT = {
   judge: '앞 답을 읽지 못했습니다. items 에 {"title":"score","amount":"합계 점수"} 하나, 판정은 {"title":"verdict","tag":"P0 · 감점 · 대표 확인","detail":"문제","body":"고친 방법"}, 고친 칸은 {"title":"칸 id","body":"고친 전체 글"} 로 다시 써 주세요. JSON 한 덩어리만.',
   plan: '앞 답을 읽지 못했습니다. 기획 방향 5개 — items 마다 title = 방향 한 줄, outline = 정확히 6줄(핵심 기술 · 목표 고객 · 시장 · 차별 · 증거 · 3년 성장 · 약점), detail = 회사 근거, amount = 점수, when = 순위 이유로 다시 써 주세요. JSON 한 덩어리만.',
   rank: '앞 답을 읽지 못했습니다. 후보마다 항목 하나 — title = "후보 n", amount = 점수(0~100 숫자만), tag = 순위, when = 이 순위인 이유 한 줄로 다시 써 주세요. JSON 한 덩어리만.',
+  talk: '앞 답을 읽지 못했습니다. items — {"tag":"이해","title":"회사 한 줄"}(첫 질문만) · {"tag":"의견","title":"줄거리","detail":"흔한지 · 약한 점"} 1~3개 · {"tag":"질문","title":"질문 한 문장","detail":"왜 묻는지","outline":["답1","답2","답3","잘 모르겠어요 — AI 가 정해 주세요"]}. 충분하면 질문 대신 {"tag":"충분","title":"왜 충분한지"}. JSON 한 덩어리만.',
 }
 
 /** D-270 맨 위 차례 — 절차마다 단추로 넘어간다 */
@@ -57,7 +60,7 @@ const VSTEPS: { label: string; phases: VPhase[] }[] = [
 ]
 const VHEAD: Record<VPhase, string> = {
   need: '재료부터 — 특허 명세서나 AX · MVP',
-  plan: '기획부터 — 사업계획서 방향을 고릅니다',
+  plan: '기획부터 — AI 와 사업계획서 방향을 잡습니다',
   gate: '요약 전에 3가지를 채워 주세요',
   sum: '요약을 씁니다',
   body: '요약을 확인하고 본문을 씁니다',
@@ -293,7 +296,7 @@ export function VenturePlanAi({
           missMessage: 'AI 답에서 기획 방향을 찾지 못했습니다 — 다시 눌러 주세요',
           onRetry,
         })
-        await save(planStatePatch({ options: value, chosen: '' }))
+        await save(planStatePatch({ ...readGate(now()).plan, options: value, chosen: '' }))
         setPickTitle('')
         setRow(key, { phase: 'done', text: `${value.length}개 — 1순위 '${value[0].title}'${value[0].score != null ? `(${value[0].score}점)` : ''} · 골라서 [이걸로 시작하자]`, model: usedModel(run) })
       } else if (kind === 'rank') {
@@ -307,7 +310,7 @@ export function VenturePlanAi({
           missMessage: 'AI 답에서 후보 점수를 찾지 못했습니다 — 다시 눌러 주세요',
           onRetry,
         })
-        await save(planStatePatch({ options: value.items, chosen: '' }))
+        await save(planStatePatch({ ...readGate(now()).plan, options: value.items, chosen: '' }))
         setPickTitle('')
         const top = value.items[0]
         setRow(key, { phase: 'done', text: `가장 나은 것 — '${top.title}'${top.score != null ? `(${top.score}점)` : ''}${value.headline ? ` · ${value.headline}` : ''}`, model: usedModel(run) })
@@ -323,7 +326,7 @@ export function VenturePlanAi({
           onRetry,
         })
         const m = addMorePlans(g.plan.options, value.more)
-        await save(planStatePatch({ options: m.items, chosen: '' }))
+        await save(planStatePatch({ ...readGate(now()).plan, options: m.items, chosen: '' }))
         setRow(key, { phase: 'done', text: m.added ? `새 방향 ${m.added}개${value.headline ? ` — 지금 방향의 약점: ${value.headline}` : ''}` : '새로 나온 것이 지금 방향과 같습니다 — 한 번 더 눌러 보세요', model: usedModel(run) })
       }
     } catch (e) {
@@ -331,6 +334,58 @@ export function VenturePlanAi({
       setRow(key, { phase: 'fail', text: why })
     }
     setBusy(false)
+  }
+  /*
+   * D-271 기획 대화 — 대표: "의견을 딱 주는 거야 · 이런 거는 너무 흔하고 · 어떤 방식으로 하는 게 좋을까요? · 다섯 번 이내 ·
+   *   특허든 벤처든 버튼 하나로 기획까지". 답을 누르면 다음 질문 · 다섯 번 또는 AI 가 '충분' 이면 그 답대로 방향 5개.
+   */
+  const runTalk = async (answer?: string) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (answer) {
+        const g0 = readGate(now()).plan
+        const next = withAnswer(g0.talk, answer)
+        await save(planStatePatch({ ...g0, talk: next }))
+        if (talkFinished(next)) {
+          setBusy(false)
+          await runPlan('plan')
+          return
+        }
+      }
+      const g = readGate(now())
+      const n = answeredCount(g.plan.talk)
+      setRow('talk', { phase: 'run', text: n ? `답 ${n}개를 보고 다음 질문을 고르는 중…` : 'AI 가 재료를 읽고 의견과 첫 질문을 정리하는 중…(20초쯤)' })
+      const skill = readJudgeSkill()
+      const { run, value: round } = await callAssistRetry({
+        req: { assistId: 'venture.talk', page: 'venture', choice: choiceOf(), context: buildVentureTalkContext({ state: readPlan(now()), facts, today, gate: g }), ...(skill ? { skill } : {}) },
+        parse: (r) => talkOf(answerOf(r)),
+        hint: HINT.talk,
+        missMessage: 'AI 답에서 질문을 찾지 못했습니다 — 다시 눌러 주세요',
+        onRetry: (w, k, t) => setRow('talk', { phase: 'run', text: retryText(w, k, t) }),
+      })
+      const g1 = readGate(now()).plan
+      await save(planStatePatch({ ...g1, talk: [...g1.talk.filter((r) => r.answer.trim() || r.done), round].slice(-(TALK_MAX + 1)) }))
+      setRow('talk', { phase: 'done', text: round.done ? '충분히 좁혀졌어요 — 이 대화대로 방향 5개를 냅니다' : `질문 ${Math.min(n + 1, TALK_MAX)}/${TALK_MAX} — 답을 눌러 주세요`, model: usedModel(run) })
+      if (round.done) {
+        setBusy(false)
+        await runPlan('plan')
+        return
+      }
+    } catch (e) {
+      const why = e instanceof AssistError ? e.message || assistMessage(e.code) : `저장하지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`
+      setRow('talk', { phase: 'fail', text: why })
+    }
+    setBusy(false)
+  }
+  const talkAgain = async () => {
+    if (planSt.talk.length && !window.confirm('기획 대화를 처음부터 다시 할까요? 지금 답은 지워집니다.')) return
+    await save(planStatePatch({ ...readGate(now()).plan, talk: [] }))
+    setRows((cur) => {
+      const { talk: _drop, ...rest } = cur
+      void _drop
+      return rest
+    })
   }
   const choosePlan = async () => {
     if (!picked) return
@@ -350,7 +405,7 @@ export function VenturePlanAi({
   const bodyLeft = VPLAN_BATCHES.filter((b) => b.key !== 'sum' && textOf(b.key).some((f) => !(planText[f.id] ?? '').trim())).map((b) => b.key)
   const phase: VPhase = !hasMaterial ? 'need' : !chosen ? 'plan' : !sg.ok ? 'gate' : !sumWritten ? 'sum' : bodyLeft.length ? 'body' : 'done'
   const stepAt = VSTEPS.findIndex((x) => x.phases.includes(phase))
-  const planRowsShown = (['plan', 'planRank', 'planMore'] as const).filter((k) => rows[k])
+  const planRowsShown = (['talk', 'plan', 'planRank', 'planMore'] as const).filter((k) => rows[k])
 
   return (
     <Surface>
@@ -393,13 +448,42 @@ export function VenturePlanAi({
             {phase === 'plan' ? (
               <section className="flex flex-col gap-2.5" data-testid="vplan-plan" aria-label="기획 방향">
                 {planSt.options.length === 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
-                      {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Sparkles aria-hidden="true" className="size-5" />} {busy ? '기획 방향을 내는 중…' : '기획 방향 5개 내줘'}
-                    </Button>
-                  </div>
+                  planSt.talk.length ? (
+                    <>
+                      <PlanTalk rounds={planSt.talk} busy={busy} onAnswer={(a) => void runTalk(a)} onNext={() => void runPlan('plan')} nextLabel={talkFinished(planSt.talk) ? '이 대화대로 방향 5개 내줘' : '그만 묻고 지금 답대로 방향 5개 내줘'} testId="vplan-talk" />
+                      {!busy && (
+                        <div className="flex flex-wrap gap-2">
+                          {rows.talk?.phase === 'fail' && (
+                            <Button variant="secondary" size="sm" onClick={() => void runTalk()} data-testid="vplan-talk-retry">
+                              질문 다시 받기
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" onClick={() => void talkAgain()} data-testid="vplan-talk-again">
+                            기획 대화 처음부터
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : busy ? (
+                    <p className="t-sub flex items-center gap-1.5 text-brand-800" role="status" data-testid="vplan-talk-wait">
+                      <Loader2 aria-hidden="true" className="size-5 animate-spin" /> {rows.plan?.phase === 'run' ? '기획 방향을 내는 중…' : 'AI 가 재료를 읽고 의견을 정리하는 중…'}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <Button variant="primary" className="min-h-12" onClick={() => void runTalk()} data-testid="vplan-talk-start">
+                          <MessageCircleQuestion aria-hidden="true" className="size-5" /> AI 와 기획 시작(질문 5번 안)
+                        </Button>
+                        <Button variant="secondary" onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
+                          <Sparkles aria-hidden="true" className="size-4" /> 묻지 말고 방향 5개 내줘
+                        </Button>
+                      </div>
+                      <p className="t-meta break-keep text-slate-500">AI 가 회사를 어떻게 이해했는지 · 흔한 줄거리와 약한 점을 먼저 말하고, 무엇을 정하면 좋을지 하나씩 묻습니다. 답은 누르기만 하면 돼요.</p>
+                    </div>
+                  )
                 ) : (
                   <>
+                    {planSt.talk.some((r) => r.answer.trim()) && <PlanTalk rounds={planSt.talk} busy={false} onAnswer={() => {}} onNext={() => {}} nextLabel="" testId="vplan-talk" compact />}
                     <ul className="flex flex-col gap-2" role="radiogroup" aria-label="사업계획서 기획 방향 후보" data-testid="vplan-plan-list">
                       {planSt.options.map((p, i) => {
                         const on = picked?.title === p.title
@@ -493,7 +577,7 @@ export function VenturePlanAi({
                   const r = rows[k]!
                   return (
                     <li key={k} className={`t-sub break-keep ${r.phase === 'fail' ? 'text-danger-700' : r.phase === 'done' ? 'text-success-700' : 'text-slate-600'}`} data-testid="vplan-plan-row" data-key={k} data-phase={r.phase} data-model={r.model ?? ''}>
-                      <b className="font-semibold text-slate-800">{k === 'plan' ? '기획 방향' : k === 'planRank' ? '가장 나은 방향' : '자체점검으로 더 짜내기'}</b> · {r.text}
+                      <b className="font-semibold text-slate-800">{k === 'talk' ? '기획 대화' : k === 'plan' ? '기획 방향' : k === 'planRank' ? '가장 나은 방향' : '자체점검으로 더 짜내기'}</b> · {r.text}
                       {r.model && <span className="t-meta ml-1.5 inline-block rounded bg-white px-1.5 font-semibold whitespace-nowrap text-slate-600 ring-1 ring-slate-200">{prettyModel(r.model)}</span>}
                     </li>
                   )

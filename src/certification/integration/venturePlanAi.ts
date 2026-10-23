@@ -13,6 +13,7 @@ import type { AssistContext, AssistRow } from '../../services/aiAssist/context'
 import { VPLAN_FIELD, VPLAN_FIELDS, type DraftItem, type VPlanBatch, type VPlanFacts, type VPlanState } from '../core/venturePlan'
 import { PLAN_LINE_LABEL, PLAN_MAX, RD_ORG_SHORT, chosenPlan, marketRows, patentNoOf, rdOf, type GateState, type PlanPick } from './ventureGate'
 import { addFresh, rankByScore, rerankByAnswer, scoreOf, stripRank, titleKey } from '../../services/aiAssist/candidates'
+import { TALK_RULE, talkRows } from '../../services/aiAssist/talk'
 
 /**
  * D-263 요약을 본문보다 먼저(기준 문서 23-1B · 대표: "시장조사 → 출원번호 · 기술인력 → 요약") — 요약 묶음이 맨 앞.
@@ -144,14 +145,31 @@ function materialSections(state: VPlanState, gate?: GateState | null): AssistCon
 const planCandidateRows = (options: PlanPick[]): AssistRow[] =>
   options.flatMap((p, i) => chunks(`${p.title} — ${p.lines.map((l, j) => `${PLAN_LINE_LABEL[j] ?? ''}: ${l}`).join(' / ')} / 회사 근거: ${p.why}`).map((memo, j) => ({ part: `후보 ${i + 1}${j ? ' (이어서)' : ''}`, memo })))
 
-/** [기획 방향 5개 내줘] */
+/** [기획 방향 5개 내줘] — D-271 기획 대화가 있으면 대표가 고른 고객 · 시장 · 핵심 기술 안에서 */
 export function buildPlanContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
   const { state, facts, today, gate } = input
+  const talk = talkRows(gate?.plan.talk ?? [])
   return {
     title: '벤처기업확인 사업계획서 — 기획 방향',
     today,
     purpose: '이 회사 사업계획서의 기획 방향 5개(추천 순 · 1~3순위는 이유와 함께)',
-    sections: materialSections(state, gate),
+    sections: [...materialSections(state, gate), ...(talk.length ? [{ name: '기획 대화', rows: talk }] : [])],
+    facts: factLines(facts, gateLines(state, facts, gate)),
+    ...(talk.length ? { rules: [TALK_RULE] } : {}),
+  }
+}
+
+/** D-271 기획 대화 한 번 — 재료 + 지금까지의 대화 → 회사 이해(첫 번) · 의견 · 질문 하나(누를 답) */
+export function buildVentureTalkContext(input: { state: VPlanState; facts: VPlanFacts; today: string; gate?: GateState | null }): AssistContext {
+  const { state, facts, today, gate } = input
+  const rounds = gate?.plan.talk ?? []
+  const talk = talkRows(rounds)
+  const n = rounds.filter((r) => r.answer.trim()).length
+  return {
+    title: '벤처기업확인 사업계획서 — 기획 대화',
+    today,
+    purpose: n ? `대표 답 ${n}개를 받았다 — 다음 질문 하나(또는 충분하면 '충분')` : '이 회사를 어떻게 이해했는지 · 흔한 줄거리와 약한 점 · 첫 질문 하나',
+    sections: [...materialSections(state, gate), ...(talk.length ? [{ name: '기획 대화', rows: talk }] : [])],
     facts: factLines(facts, gateLines(state, facts, gate)),
   }
 }

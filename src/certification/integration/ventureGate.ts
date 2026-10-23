@@ -13,6 +13,7 @@
  */
 import type { AssistAnswer, AssistRun } from '../../services/aiAssist/client'
 import { readJudgeReport, type JudgeReport } from '../../services/aiAssist/judge'
+import { readTalk, type TalkRound } from '../../services/aiAssist/talk'
 import { RD_ORG_OPTIONS, VK, rowsOf, type VPlanFacts, type VPlanState } from '../core/venturePlan'
 
 export const GK = {
@@ -75,6 +76,8 @@ export interface PlanState {
   options: PlanPick[]
   /** 고른 방향의 제목('' = 아직 안 고름) */
   chosen: string
+  /** D-271 기획 대화 — AI 의견 · 질문 · 대표 답(방향 5개를 이 답대로 낸다) */
+  talk: TalkRound[]
 }
 
 export interface GateState {
@@ -110,7 +113,7 @@ export function readMarket(raw: string | undefined): MarketResearch | null {
 }
 
 export function readPlanState(raw: string | undefined): PlanState {
-  const empty: PlanState = { options: [], chosen: '' }
+  const empty: PlanState = { options: [], chosen: '', talk: [] }
   if (!raw) return empty
   try {
     const o = JSON.parse(raw) as Record<string, unknown>
@@ -126,7 +129,7 @@ export function readPlanState(raw: string | undefined): PlanState {
       })
       .filter((x) => x.title.trim())
       .slice(0, PLAN_MAX)
-    return { options, chosen: str(o.chosen).slice(0, 200) }
+    return { options, chosen: str(o.chosen).slice(0, 200), talk: readTalk(o.talk) }
   } catch {
     return empty
   }

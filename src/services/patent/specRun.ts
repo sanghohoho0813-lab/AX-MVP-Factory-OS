@@ -10,6 +10,7 @@ import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
 import { judgeOf, judgePassed, type JudgeReport } from '../aiAssist/judge'
 import { readJudgeSkill } from '../aiAssist/judgeSkill'
 import { newRequestId, readChoice } from '../aiAssist/store'
+import { TALK_MAX, answeredCount, talkFinished, talkOf } from '../aiAssist/talk'
 import { cleanAiText, mergeSpecAi, type SectionKey, type SpecDraft } from './specDraft'
 import { buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from './specDraftAi'
 import {
@@ -26,6 +27,7 @@ import {
   JUDGE_SCOPE_LABEL,
   buildPartsContext,
   buildResearchContext,
+  buildTalkContext,
   fixIssues,
   fixItemsOf,
   fixable,
@@ -178,6 +180,7 @@ export function __setTransientMs(ms: number) {
 }
 /** 다시 부를 때 함께 보내는 말(대표가 더 묻는 것 자리 · 500자 안) */
 const FORMAT_HINT: Record<AgentStage, string> = {
+  talk: '앞 답을 읽지 못했습니다. items — {"tag":"이해","title":"회사 한 줄"}(첫 질문만) · {"tag":"의견","title":"방향","detail":"흔한지 · 약한 점"} 1~3개 · {"tag":"질문","title":"질문 한 문장","detail":"왜 묻는지","outline":["답1","답2","답3","잘 모르겠어요 — AI 가 정해 주세요"]}. 충분하면 질문 대신 {"tag":"충분","title":"왜 충분한지"}. JSON 한 덩어리만.',
   idea: '앞 답을 읽지 못했습니다. 아이디어 5개 — items 마다 title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, outline = 정확히 5줄, amount = 추천 점수, when = 순위 이유로 다시 써 주세요. JSON 한 덩어리만.',
   ideaRank: '앞 답을 읽지 못했습니다. 후보마다 항목 하나 — title = "후보 n", amount = 점수(0~100 숫자만), tag = 순위, when = 이 순위인 이유 한 줄로 다시 써 주세요. JSON 한 덩어리만.',
   ideaMore: '앞 답을 읽지 못했습니다. 새 아이디어마다 항목 하나 — title = 한글 명칭(… 시스템 및 방법), body = 영문 명칭, detail = 회사 근거, outline = 정확히 5줄, amount = 점수, when = 지금 후보보다 나은 점으로 다시 써 주세요. JSON 한 덩어리만.',
@@ -220,7 +223,7 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
     return 'fail'
   }
   // D-269 회사 이야기가 없으면 아이디어를 내지 않는다 — 지어낸 발명이 된다(대표: "자료가 없으면 일단은 자료를 넣어 달라고")
-  if ((stage === 'idea' || stage === 'ideaMore') && companyThin(env.company)) {
+  if ((stage === 'talk' || stage === 'idea' || stage === 'ideaMore') && companyThin(env.company)) {
     setStage(id, stage, { phase: 'skip', text: THIN_BLOCK })
     return 'stop'
   }
@@ -231,7 +234,9 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
   if (stage === 'judge1' || stage === 'judge2') return runJudge(id, stage, env)
   const s = stageOf(stage)
   const context =
-    stage === 'idea'
+    stage === 'talk'
+      ? buildTalkContext({ draft: d0, company: env.company, others: env.others, today: env.today })
+      : stage === 'idea'
       ? buildIdeaContext({ draft: d0, company: env.company, others: env.others, today: env.today })
       : stage === 'ideaRank'
         ? buildIdeaRankContext({ draft: d0, company: env.company, today: env.today })
@@ -270,6 +275,14 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
       // 서버가 모양 검사에서 떨어뜨린 답(머리글 빠짐 · 끝 잘림 · 코드 블록)도 원문에서 다시 읽는다
       const ans = answerOf(run)
       switch (stage) {
+        case 'talk': {
+          // D-271 의견 · 질문 하나 — 대표가 답을 누르면 다음 질문(화면이 다시 부른다) · '충분' 이면 이어서 아이디어
+          const round = talkOf(ans)
+          if (!round) throw new AssistError(PARSE_MISS, 'AI 답에서 질문을 찾지 못했습니다 — 다시 눌러 주세요')
+          await put((cur) => ({ ...cur, talk: [...cur.talk.filter((r) => r.answer.trim() || r.done), round].slice(-(TALK_MAX + 1)) }))
+          done(round.done ? `충분히 좁혀졌어요 — 아이디어 5개를 냅니다` : `질문 ${Math.min(answeredCount(d0.talk) + 1, TALK_MAX)}/${TALK_MAX} — 답을 눌러 주세요`)
+          return 'ok'
+        }
         case 'idea': {
           // D-269 명칭을 저절로 채우지 않는다 — 대표가 고르고 [이걸로 시작] 을 눌러야 다음으로
           const ideas = ideasOf(ans)
@@ -483,11 +496,18 @@ export function startSpecRun(id: string, stages: AgentStage[], env: RunEnv): boo
     stages: { ...r.stages, ...Object.fromEntries(stages.map((k) => [k, { phase: 'wait', text: '차례 기다림' } as StageRow])) },
   }))
   void (async () => {
-    for (const [i, k] of stages.entries()) {
+    const queue = [...stages]
+    for (let i = 0; i < queue.length; i += 1) {
+      const k = queue[i]
       const r = await runStage(id, k, env)
       if (r === 'stop') {
-        for (const rest of stages.slice(i + 1)) setStage(id, rest, { phase: 'skip', text: '멈춤 — 위 오류부터' })
+        for (const rest of queue.slice(i + 1)) setStage(id, rest, { phase: 'skip', text: '멈춤 — 위 오류부터' })
         break
+      }
+      // D-271 AI 가 '충분' 이라고 하면 기다리지 않고 그 대화대로 아이디어 5개
+      if (k === 'talk' && r === 'ok' && !queue.includes('idea') && talkFinished(current(id)?.talk ?? [])) {
+        queue.push('idea')
+        setStage(id, 'idea', { phase: 'wait', text: '차례 기다림' })
       }
     }
     setRun(id, (r) => ({ ...r, running: false }))

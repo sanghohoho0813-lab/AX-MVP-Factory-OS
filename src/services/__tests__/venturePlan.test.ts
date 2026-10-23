@@ -22,9 +22,10 @@ import {
   readPlan,
   type VPlanFacts,
 } from '../../certification/core/venturePlan'
-import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf, plansOf, rerankPlans } from '../../certification/integration/venturePlanAi'
+import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, buildVentureTalkContext, draftItemsOf, fieldsOfBatch, gateLines, judgeItemsOf, plansOf, rerankPlans } from '../../certification/integration/venturePlanAi'
 import { GK, PATENT_NONE, PLAN_MAX, chosenPlan, planStatePatch, readPlanState, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, normalizeAppNo, patentNoOf, patentPatch, readGate, researchersPatch, summaryGate, judgePatch, marketRows, type GateState } from '../../certification/integration/ventureGate'
 import { judgeOf, judgePassed, readJudgeReport } from '../aiAssist/judge'
+import { TALK_RULE, withAnswer, type TalkRound } from '../aiAssist/talk'
 import { PATENT_JUDGE, VENTURE_JUDGE, customSkillBlock } from '../../../api/_ai/judge.js'
 import { parseSpecText } from '../patent/specParse'
 import { specDigest } from '../patent/specDigest'
@@ -333,6 +334,18 @@ const long = (n: number) => '가'.repeat(n)
   const sysP = assistSystem(ASSISTS['venture.plan'], { skill: '대표표식' })
   check('VP9 기획 단추 지시문 — 벤처 기획 방향 자체점검 기준 + 대표 정의 · 최종본 규칙 없음 · 견주기 · 짜내기도', ['venture.plan', 'venture.planRank', 'venture.planMore'].every((id) => assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('[자체점검 — 벤처 사업계획서 기획 방향]') && assistSystem(ASSISTS[id], { skill: '대표표식' }).includes('대표표식') && !assistSystem(ASSISTS[id]).includes('[최종본 규칙')) && sysP.includes('정확히 6줄'))
   check('VP10 화면 이름표 = 서버(기획 · 견주기 · 짜내기)', ['venture.plan', 'venture.planRank', 'venture.planMore'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)))
+
+  // D-271 기획 대화 — 방향 5개 전에 의견 · 질문(5번 안) · 그 답대로 방향
+  const round: TalkRound = { understanding: '금속가공 업체에 공구 마모를 알려 주는 회사', opinions: [{ title: '일반 설비 모니터링', note: '흔함' }], question: '누구에게 먼저 파시겠어요?', options: ['중소 금속가공', '대기업 협력사', '잘 모르겠어요 — AI 가 정해 주세요'], why: '고객이 정해져야 줄거리가 섬', answer: '', done: false, headline: '' }
+  const talked = withAnswer([round], '중소 금속가공')
+  const st2 = readPlanState(planStatePatch({ options: [], chosen: '', talk: talked })[GK.plan])
+  check('VP11 기획 대화 저장 · 다시 읽기 · 예전 기록은 빈 대화(방향 · 고른 것 그대로)', st2.talk.length === 1 && st2.talk[0].answer === '중소 금속가공' && st2.talk[0].options.length === 3 && readPlanState(planStatePatch({ options: five, chosen: five[0].title } as never)[GK.plan]).talk.length === 0 && readPlanState(planStatePatch({ options: five, chosen: five[0].title } as never)[GK.plan]).options.length === 5)
+  const gTalk = readGate(planStatePatch({ options: [], chosen: '', talk: talked }))
+  const pc2 = buildPlanContext({ state, facts, today: '2026-10-23', gate: gTalk })
+  check('VP12 방향 5개 자료에 기획 대화("질문 → 대표 답") + 대표 답을 따르는 규칙 · 대화가 없으면 규칙 없음', pc2.sections.some((x) => x.name === '기획 대화' && JSON.stringify(x.rows).includes('대표 답: 중소 금속가공')) && (pc2.rules ?? []).includes(TALK_RULE) && !(pc.rules ?? []).includes(TALK_RULE))
+  const tc0 = buildVentureTalkContext({ state, facts, today: '2026-10-23', gate: readGate({}) })
+  const tc1 = buildVentureTalkContext({ state, facts, today: '2026-10-23', gate: gTalk })
+  check('VP13 기획 대화 자료 — 재료(명세서 · AX) · 회사 사실 · 첫 질문 / 답 n개 뒤 다음 질문 · 화면 이름표 = 서버', JSON.stringify(tc0.sections).includes('휴대폰 진동 입력') && (tc0.facts ?? []).some((f) => f.includes('한솔테크')) && /첫 질문/.test(tc0.purpose ?? '') && /답 1개/.test(tc1.purpose ?? '') && tc1.sections.some((x) => x.name === '기획 대화') && ['venture.talk', 'spec.talk'].every((id) => ASSIST_PRESETS.some((p) => p.id === id && p.label === ASSISTS[id].label && p.kind === ASSISTS[id].kind)))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

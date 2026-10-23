@@ -13,6 +13,7 @@
  * 만든 MD 는 D-245 명세서 점검(checkSpec)으로 곧바로 다시 걸러진다.
  */
 import { readJudgeReport, type JudgeReport } from '../aiAssist/judge'
+import { readTalk, type TalkRound } from '../aiAssist/talk'
 
 /* ------------------------------------------------------------------ */
 /* 조사(을/를 · 이/가 · 은/는 · 과/와 · 으로/로)                            */
@@ -184,6 +185,8 @@ export interface SpecDraft {
   materials: SpecMaterial[]
   /** D-263 자체점검 판정 — 구성 뒤(parts) · 청구항 뒤(full) */
   judge: { parts: JudgeReport | null; full: JudgeReport | null }
+  /** D-271 기획 대화 — AI 의견 · 질문 · 대표 답(아이디어 5개를 이 답대로 낸다) */
+  talk: TalkRound[]
 }
 
 export interface SpecMaterial {
@@ -193,8 +196,9 @@ export interface SpecMaterial {
   at: string
 }
 
-export const MATERIAL_MAX = 4
-export const MATERIAL_CHARS = 6000
+/** D-271 업체 서류 · 붙여 넣은 글까지 — 여섯 개 · 자료마다 2만 자(AI 에는 앞 · 뒤를 줄여 보냄) */
+export const MATERIAL_MAX = 6
+export const MATERIAL_CHARS = 20000
 
 export function emptyDraft(): SpecDraft {
   return {
@@ -219,6 +223,7 @@ export function emptyDraft(): SpecDraft {
     research: null,
     materials: [],
     judge: { parts: null, full: null },
+    talk: [],
   }
 }
 
@@ -292,6 +297,7 @@ export function normalizeDraft(v: unknown): SpecDraft {
           .slice(0, MATERIAL_MAX)
       : [],
     judge: { parts: readJudgeReport((o.judge as Record<string, unknown> | undefined)?.parts), full: readJudgeReport((o.judge as Record<string, unknown> | undefined)?.full) },
+    talk: readTalk((o as Record<string, unknown>).talk),
   }
 }
 

@@ -41,9 +41,13 @@ import {
   type SpecDraft,
 } from '../patent/specDraft'
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf } from '../patent/specDraftAi'
-import { PLAN_BODY, addMoreIdeas, applyFix, applyIdea, applyJudge, backToIdeas, bodyWritten, buildFixContext, buildIdeaMoreContext, buildIdeaRankContext, buildJudgeContext, cardState, companyThin, fixItemsOf, ideasOf, paraChunks, partLabelOf, partsOf, partsSig, planAll, planParts, rankLabel, rerankIdeas, specPhase, stageBlock } from '../patent/specAgent'
+import { PLAN_BODY, addMoreIdeas, applyFix, applyIdea, applyJudge, backToIdeas, bodyWritten, buildFixContext, buildIdeaContext, buildIdeaMoreContext, buildIdeaRankContext, buildTalkContext, STAGES, buildJudgeContext, cardState, companyThin, fixItemsOf, ideasOf, paraChunks, partLabelOf, partsOf, partsSig, planAll, planParts, rankLabel, rerankIdeas, specPhase, stageBlock } from '../patent/specAgent'
 import { modelsOf, prettyModel, withModel } from '../patent/specRun'
 import { cutOff } from '../aiAssist/client'
+import { TALK_MAX, TALK_RULE, answeredCount, openRound, readTalk, talkFinished, talkOf, talkRows, withAnswer, type TalkRound } from '../aiAssist/talk'
+import { isTrashed, liveRows, trashRows, trashedAtOf, withTrash, withoutTrash } from '../patent/specTrash'
+import { DOC_MATERIAL_KIND, SAFE_DOC_KEYS, docsWithoutFile, excerptForAi, importableDocs } from '../patent/specMaterials'
+import type { ClientOpsRecord } from '../../types/clientOps'
 import { assistSystem } from '../../../api/_ai/assists.js'
 import { answerOf, looseJson, rawObjectOf } from '../aiAssist/looseJson'
 
@@ -423,6 +427,76 @@ function fullDraft(): SpecDraft {
   check('DL17 나눠서 보기 — 명칭 · 기술분야 … 부호 · 청구항마다 · 요약 · 대표도(칸마다 복사)', secs[0].key === 'title' && secs[0].text === `${fd.title}{${fd.titleEn}}` && secs.some((x) => x.key === 'claim1' && x.label === '청구항 1') && secs.some((x) => x.key === 'abstract') && secs[secs.length - 1].key === 'rep' && secs.every((x) => !x.text.includes('**')))
   const numbered = specPlainSections({ ...fd, numbered: true })
   check('DL18 전문 · 나눠서 보기에는 문단 번호([0001]) 없음 — 첨부 명세서처럼(MD 의 문단 번호 설정을 켜 둬도)', numbered.every((x) => !/\[\d{4}\]/.test(x.text)) && !/\[\d{4}\]/.test(specPlainText({ ...fd, numbered: true })) && specMarkdown({ ...fd, numbered: true }).includes('[0001]'))
+}
+
+/* ------------------------------------------------------------------ */
+/* D-271 기획 대화 · 휴지통 · 업체 서류 · 붙여 넣은 글                      */
+/* ------------------------------------------------------------------ */
+{
+  const ans1 = {
+    headline: '해외 채널 재고를 묶어 보는 방향',
+    items: [
+      { tag: '이해', title: '백화점 · 온라인 · 해외 채널로 기초 화장품을 파는 회사', detail: '회사소개서 1쪽' },
+      { tag: '의견', title: '일반적인 화장품 성분 배합', detail: '너무 흔하고 이 회사 강점(채널)과 덜 맞음' },
+      { tag: '의견', title: '채널별 재고 · 반품 데이터로 생산량 조절', detail: '회사 데이터가 있어 근거가 됨' },
+      { tag: '질문', title: '어느 쪽을 먼저 지키고 싶으세요?', detail: '권리화 중심을 정하려고', outline: ['① 해외 채널 판매', '② 백화점 재고', '③ 온라인 반품', '잘 모르겠어요 — AI 가 정해 주세요'] },
+    ],
+  }
+  const r1 = talkOf(ans1 as never)
+  check('DM1 기획 대화 답 읽기 — 회사 이해 · 의견 2 · 질문 하나 · 누를 답 4개(번호 뗌)', !!r1 && r1.understanding.startsWith('백화점') && r1.opinions.length === 2 && r1.opinions[0].note.includes('흔하고') && r1.question === '어느 쪽을 먼저 지키고 싶으세요?' && r1.options.length === 4 && r1.options[0] === '해외 채널 판매' && !r1.done && r1.headline.includes('해외'), r1)
+  const enough = talkOf({ headline: '해외 채널 재고 배분', items: [{ tag: '의견', title: '채널 재고 배분', detail: '좁혀짐' }, { tag: '충분', title: '고객 · 데이터 · 판단이 정해져 아이디어를 낼 수 있음' }] } as never)
+  check('DM2 "충분" 이면 질문 없이 끝 표시 · 질문도 충분도 없으면 null · 답이 1개뿐인 질문도 null', !!enough && enough.done && !enough.question && !enough.options.length && talkOf({ items: [{ tag: '의견', title: 'x' }] } as never) === null && talkOf({ items: [{ tag: '질문', title: '무엇?', outline: ['하나'] }] } as never) === null && talkOf(null) === null)
+  let rounds: TalkRound[] = [r1!]
+  check('DM3 기다리는 질문 · 답 달기 · 답한 수', openRound(rounds) === r1 && answeredCount(rounds) === 0 && !talkFinished(rounds))
+  rounds = withAnswer(rounds, '해외 채널 판매')
+  check('DM4 답을 달면 기다리는 질문 없음 · 같은 질문에 두 번 답하지 않음', openRound(rounds) === null && answeredCount(rounds) === 1 && withAnswer(rounds, '또').every((r, i) => r.answer === rounds[i].answer))
+  const five: TalkRound[] = Array.from({ length: TALK_MAX }, (_, i) => ({ ...r1!, understanding: i ? '' : r1!.understanding, question: `질문 ${i + 1}`, answer: `답 ${i + 1}` }))
+  check('DM5 다섯 번 답하면 끝 · AI 가 충분이라 해도 끝', talkFinished(five) && talkFinished([...rounds, enough!]) && TALK_MAX === 5)
+  const rows = talkRows(rounds)
+  check('DM6 AI 에 보낼 대화 줄 — 회사 이해 · 의견 · "질문 → 대표 답"', rows[0].part === 'AI 가 이해한 회사' && rows.some((x) => x.part === '의견 1' && String(x.memo).includes('흔하고')) && rows.some((x) => x.part === '질문 1' && String(x.memo).includes('→ 대표 답: 해외 채널 판매')) && rows.every((x) => String(x.memo).length <= 560))
+  const saved = normalizeDraft(JSON.parse(JSON.stringify({ ...emptyDraft(), talk: [...rounds, { junk: 1 }, 'x'] })))
+  check('DM7 초안에 대화 저장 · 다시 읽기(모르는 값은 빈 칸) · 예전 초안은 빈 대화', saved.talk.length === 2 && saved.talk[0].answer === '해외 채널 판매' && saved.talk[0].options.length === 4 && saved.talk[1].question === '' && normalizeDraft({ title: '예전' }).talk.length === 0 && readTalk('x').length === 0)
+
+  const company = { name: '(주)가연', facts: ['업종: 화장품 제조'], materials: [{ title: '회사소개서', kind: DOC_MATERIAL_KIND, text: '백화점 · 온라인 · 해외 채널로 기초 화장품을 판다. 반품 데이터가 쌓여 있다.' }], priorIdeas: [] }
+  const d = { ...emptyDraft(), talk: rounds }
+  const tc = buildTalkContext({ draft: emptyDraft(), company, others: [], today: '2026-10-23' })
+  const tc2 = buildTalkContext({ draft: d, company, others: [], today: '2026-10-23' })
+  check('DM8 기획 대화 자료 — 회사 · 업체 서류 재료 · (두 번째부터) 지금까지 대화 · 목적에 답 수', tc.sections.some((x) => x.name === '재료' && x.rows[0].part === DOC_MATERIAL_KIND) && !tc.sections.some((x) => x.name === '기획 대화') && /첫 질문/.test(tc.purpose) && tc2.sections.some((x) => x.name === '기획 대화') && /답 1개/.test(tc2.purpose))
+  const ic = buildIdeaContext({ draft: d, company, others: [], today: '2026-10-23' })
+  const ic0 = buildIdeaContext({ draft: emptyDraft(), company, others: [], today: '2026-10-23' })
+  check('DM9 아이디어 5개 자료에 기획 대화 + "대표 답을 반드시 따른다" 규칙 · 대화가 없으면 규칙도 없음', ic.sections.some((x) => x.name === '기획 대화') && (ic.rules ?? []).includes(TALK_RULE) && !(ic0.rules ?? []).includes(TALK_RULE))
+  check('DM10 단계 목록 맨 앞 기획 대화(spec.talk) · 회사 이야기 없으면 막는 단계', STAGES[0].key === 'talk' && STAGES[0].assistId === 'spec.talk' && stageBlock('talk', emptyDraft()) === '')
+  const talkAssist = ASSISTS['spec.talk'] as { instruction: string[]; ideaJudge: string } | undefined
+  const vTalk = ASSISTS['venture.talk'] as { instruction: string[]; ideaJudge: string } | undefined
+  check('DM11 서버 지시문 — 이해 · 의견 · 질문(누를 답 · 마지막은 "AI 가 정해 주세요") · 다섯 번째면 충분 · 자체점검 기준 붙음(특허 · 벤처)', !!talkAssist && !!vTalk && [talkAssist, vTalk].every((a) => { const t = a.instruction.join(' '); return /"이해"/.test(t) && /"의견"/.test(t) && /"질문"/.test(t) && /AI 가 정해 주세요/.test(t) && /다섯 번째/.test(t) && /"충분"/.test(t) }) && talkAssist.ideaJudge === 'patent' && vTalk.ideaJudge === 'venture')
+
+  // 휴지통
+  const live = { id: 'a', data: { draft: {} } }
+  const gone = { id: 'b', data: { draft: {}, trashedAt: '2026-10-23T01:00:00Z' } }
+  check('DM12 휴지통 — 지운 것은 목록에서 빠지고 휴지통에만 · 되살리면 다시 목록', isTrashed(gone.data) && !isTrashed(live.data) && liveRows([live, gone]).map((r) => r.id).join() === 'a' && trashRows([live, gone]).map((r) => r.id).join() === 'b' && trashedAtOf(gone.data) === '2026-10-23T01:00:00Z')
+  const t1 = withTrash({ draft: { title: 'x' } }, '2026-10-23T02:00:00Z')
+  const t2 = withoutTrash(t1)
+  check('DM13 휴지통으로 · 되살리기 — 글은 그대로 · 표시만 붙였다 뗌', t1.trashedAt === '2026-10-23T02:00:00Z' && (t1.draft as { title: string }).title === 'x' && !('trashedAt' in t2) && (t2.draft as { title: string }).title === 'x')
+
+  // 업체 서류함
+  const rec = {
+    documents: {
+      businessRegistration: { received: true, fileName: '사업자등록증.pdf', storagePath: 'p/1' },
+      idCard: { received: true, fileName: '신분증.jpg', storagePath: 'p/2' },
+      cretopReport: { received: true, fileName: '크레탑.pdf' },
+      custom_intro: { received: true, fileName: '회사소개서.pdf', storagePath: 'p/3' },
+      custom_roster: { received: true, fileName: '명부.xlsx', storagePath: 'p/4' },
+    },
+    customDocuments: [
+      { key: 'custom_intro', label: '회사 소개서', sensitive: false },
+      { key: 'custom_roster', label: '직원 명부', sensitive: true },
+    ],
+  } as unknown as ClientOpsRecord
+  const docs = importableDocs(rec)
+  check('DM14 업체 서류함에서 읽을 것 — 파일이 올라온 것만 · 신분증 · 개인 정보 칸(명부) 뺌 · 직접 만든 칸은 이름으로', docs.map((x) => x.label).join('|') === '사업자등록증.pdf|회사 소개서' && SAFE_DOC_KEYS.includes('businessRegistration') && !SAFE_DOC_KEYS.includes('idCard') && docsWithoutFile(rec) === 1 && importableDocs(null).length === 0, docs)
+  const chat = `${'앞부분 인사 '.repeat(1200)}결론: 채널별 재고 배분 시스템으로 간다`
+  const ex = excerptForAi(chat)
+  check('DM15 긴 GPT 대화는 앞 1/3 · 뒤 2/3 — 끝의 결론까지 AI 에 감', ex.length <= 4480 && ex.includes('결론: 채널별 재고 배분 시스템으로 간다') && ex.includes('…(가운데 줄임)…') && excerptForAi('짧은 글') === '짧은 글')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

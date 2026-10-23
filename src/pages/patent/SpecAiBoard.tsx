@@ -14,7 +14,7 @@
  *   회사 정보(없으면 먼저 받기) → 아이디어 5개 고르기 → [이걸로 시작] 조사 · 구성 · 자체점검 ① → 구성 확인 → [본문 · 청구항 쓰기] → 전문 · 나눠서 보기.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Gavel, Lightbulb, Loader2, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, Boxes, CheckCircle2, Circle, Download, ExternalLink, FileText, Gavel, Lightbulb, Loader2, MessageCircleQuestion, PenLine, Search, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
@@ -26,12 +26,18 @@ import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, 
 import { CARD_STAGES, PLAN_BODY, applyIdea, backToIdeas, bodyWritten, cardState, clearAfterIdea, companyThin, hasLaterWork, partsHuman, planAll, planParts, rankLabel, specPhase, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage, type SpecPhase } from '../../services/patent/specAgent'
 import { modelsOf, prettyModel, specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
 import { useAiChoice } from '../../components/ai/ModelPicker'
+import { PlanTalk } from '../../components/ai/PlanTalk'
+import { talkFinished, withAnswer } from '../../services/aiAssist/talk'
 import { SpecFullText, downloadPlain } from './SpecFullText'
+import { SpecMaterialsSheet } from './SpecMaterials'
+import { DOC_MATERIAL_KIND, PASTE_MATERIAL_KIND, docsWithoutFile, importableDocs } from '../../services/patent/specMaterials'
+import { fetchClientDocFile } from '../../tools/shared/clientDocFile'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { judgePassed } from '../../services/aiAssist/judge'
 import { clientFacts } from '../../tools/shared/clientPrefill'
+import { usableFactValue } from '../../services/customerFacts'
 import { useOwnerAiRepo } from '../ownerAi/shared'
-import type { ClientOpsRecord } from '../../types/clientOps'
+import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
 type Act = (label: string, fn: (cur: SpecDraft) => SpecDraft) => void
 
@@ -54,6 +60,8 @@ export function companyFactLines(r: ClientOpsRecord | null): string[] {
   if (f.revenue) add('매출', `${wonText(f.revenue.won)}${f.revenue.estimated ? '(추정)' : ''}`)
   add('지역', String(f.address || r.businessAddress || '').split(/\s+/).slice(0, 2).join(' '))
   add('홈페이지', r.homepage)
+  // D-271 사실 창고(서류에서 찾아 확인한 것)도 — 거래처 · 인증 · 특허 · 연구소가 발명 · 시장을 잡는 데 쓰인다
+  for (const [key, label] of [['mainCustomers', '주요 거래처'], ['certifications', '보유 인증'], ['patents', '특허'], ['researchLab', '연구소']] as const) add(label, safeText(usableFactValue(r, key), names, 300))
   const memo = safeText(r.notes, names, 1200)
   if (memo) out.push(`상담 메모: ${memo}`)
   return out
@@ -74,7 +82,7 @@ const CARDS: AgentCard[] = ['idea', 'research', 'parts', 'body', 'claims', 'judg
 /** D-269 맨 위 차례 — 절차마다 단추로 넘어간다 */
 const STEPS: { label: string; phases: SpecPhase[] }[] = [
   { label: '회사 정보', phases: ['company'] },
-  { label: '아이디어 고르기', phases: ['ideas'] },
+  { label: '기획 · 아이디어', phases: ['ideas'] },
   { label: '구성 확인', phases: ['parts', 'review'] },
   { label: '본문 · 청구항', phases: ['body'] },
   { label: '전문 · 복사', phases: ['done'] },
@@ -82,7 +90,7 @@ const STEPS: { label: string; phases: SpecPhase[] }[] = [
 
 const PHASE_HELP: Record<SpecPhase, string> = {
   company: '이 회사가 무엇을 하는지(업종 · 종목 · 상담 메모)나 자료가 있어야 그 회사에 맞는 발명을 냅니다.',
-  ideas: '아이디어 5개를 1~3순위와 이유까지 냅니다. 하나를 눌러 고른 뒤 [이걸로 시작하자] — 마음에 안 들면 [이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기].',
+  ideas: 'AI 가 회사 서류 · 기록을 읽고 의견과 질문을 드립니다(5번 안). 답을 누르면 그 답대로 아이디어 5개를 1~3순위와 이유까지 — 하나를 골라 [이걸로 시작하자].',
   parts: '고른 아이디어로 선행기술 조사 · 구성요소 · 단계를 짜고 자체점검 ① 이 판정합니다.',
   review: '구성요소 · 단계 · 자체점검 ① 을 보고 맞으면 [이 구성으로 본문 · 청구항 쓰기]. 아니면 다시 짜거나 다른 아이디어로.',
   body: '본문 · 청구항 가운데 빠진 곳이 있어요 — [이어서 끝까지 써줘].',
@@ -142,6 +150,11 @@ export function SpecAiBoard({
   const [matsFor, setMatsFor] = useState<string | null>(null)
   const [showCards, setShowCards] = useState(false)
   const autoDone = useRef(false)
+  // D-271 [자료 넣기] 창 · 업체 서류함에서 읽지 못한 것 · 저절로 읽기를 끝냈는지(끝나야 아이디어를 저절로 낸다)
+  const [matsOpen, setMatsOpen] = useState(false)
+  const [docFails, setDocFails] = useState<string[]>([])
+  const [docsDone, setDocsDone] = useState(false)
+  const autoDocs = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const clientId = record?.id ?? ''
 
@@ -212,7 +225,24 @@ export function SpecAiBoard({
   const picked = d.ideas.find((p) => p.title === pickTitle) ?? d.ideas[0] ?? null
   const ideasRun = () => {
     setPickTitle('')
-    if (start(['idea'])) showToast('아이디어 5개를 내고 순위를 매깁니다(30~60초)')
+    if (start(['idea'])) showToast(d.talk.some((r) => r.answer.trim()) ? '기획 대화의 답대로 아이디어 5개를 내고 순위를 매깁니다(30~60초)' : '아이디어 5개를 내고 순위를 매깁니다(30~60초)')
+  }
+  /* D-271 기획 대화 — 대표: "의견을 딱 주는 거야 · 이런 거는 너무 흔하고 · 그래서 어떤 방식으로 하는 게 좋을까요? · 다섯 번 이내" */
+  const talkRun = () => {
+    if (start(['talk'])) showToast('AI 가 회사 서류 · 기록을 읽고 의견과 첫 질문을 드립니다(20초쯤)')
+  }
+  const answerTalk = async (answer: string) => {
+    const next = withAnswer(d.talk, answer)
+    await apply((cur) => ({ ...cur, talk: withAnswer(cur.talk, answer) }))
+    if (talkFinished(next)) {
+      setPickTitle('')
+      if (start(['idea'])) showToast('답 5개가 모였어요 — 이 답대로 아이디어 5개를 냅니다')
+    } else start(['talk'])
+  }
+  const talkAgain = () => {
+    if (d.talk.length && !window.confirm('기획 대화를 처음부터 다시 할까요? 지금 답은 지워집니다(되돌리기로 살릴 수 있어요)')) return
+    act('기획 대화를 처음부터 다시 합니다', (cur) => ({ ...cur, talk: [] }))
+    setTimeout(talkRun, 0)
   }
   const rankRun = () => {
     setPickTitle('')
@@ -239,6 +269,21 @@ export function SpecAiBoard({
     act('아이디어 고르기로 돌아갔습니다', backToIdeas)
   }
 
+  /** 파일 → 읽은 글(사람 이름 · 연락처 가림). 못 읽으면 '' */
+  const readFileText = async (f: File, label: string): Promise<string> => {
+    let text = ''
+    if (/\.hwpx$/i.test(f.name)) {
+      const doc = await parseSpecFile(f.name, new Uint8Array(await f.arrayBuffer()))
+      text = doc.paras.map((p) => p.text).join('\n')
+    } else if (canExtractText(f)) text = (await extractTextFromFile(f, (_p, step) => setReading(`${label} · ${step}`))).text
+    else if (/^text\//.test(f.type) || /\.(txt|md|csv)$/i.test(f.name)) text = await f.text()
+    return safeText(text, personNames(record ?? ({} as ClientOpsRecord)), MATERIAL_CHARS)
+  }
+  const putMaterials = async (got: SpecDraft['materials'], msg: string) => {
+    if (!got.length) return
+    await apply((cur) => ({ ...cur, materials: [...cur.materials, ...got].slice(0, MATERIAL_MAX) }))
+    showToast(msg)
+  }
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return
     const room = MATERIAL_MAX - d.materials.length
@@ -250,13 +295,7 @@ export function SpecAiBoard({
     for (const f of Array.from(files).slice(0, room)) {
       setReading(`${f.name} 읽는 중…`)
       try {
-        let text = ''
-        if (/\.hwpx$/i.test(f.name)) {
-          const doc = await parseSpecFile(f.name, new Uint8Array(await f.arrayBuffer()))
-          text = doc.paras.map((p) => p.text).join('\n')
-        } else if (canExtractText(f)) text = (await extractTextFromFile(f, (_p, label) => setReading(`${f.name} · ${label}`))).text
-        else if (/^text\//.test(f.type) || /\.(txt|md|csv)$/i.test(f.name)) text = await f.text()
-        const clean = safeText(text, personNames(record ?? ({} as ClientOpsRecord)), MATERIAL_CHARS)
+        const clean = await readFileText(f, f.name)
         if (clean.length >= 20) got.push({ title: f.name.slice(0, 80), kind: '올린 자료', text: clean, at: new Date().toISOString() })
         else showToast(`${f.name} — 글자를 읽지 못했습니다(그림 · 스캔이면 PDF 로 다시)`)
       } catch {
@@ -264,23 +303,81 @@ export function SpecAiBoard({
       }
     }
     setReading('')
-    if (got.length) {
-      await apply((cur) => ({ ...cur, materials: [...cur.materials, ...got].slice(0, MATERIAL_MAX) }))
-      showToast(`자료 ${got.length}개를 재료로 넣었습니다 — 읽은 글만 남기고 원본 파일은 저장하지 않습니다`)
-    }
+    await putMaterials(got, `자료 ${got.length}개를 재료로 넣었습니다 — 읽은 글만 남기고 원본 파일은 저장하지 않습니다`)
   }
+  /** D-271 업체 서류함(고객 관리 › 업체 › 서류)의 파일을 내려받아 읽어 재료로 — 저절로(새 명세서) · [자료 넣기] 창에서 */
+  const docs = useMemo(() => importableDocs(record), [record])
+  const importDocs = async (keys: string[], auto = false) => {
+    const room = MATERIAL_MAX - d.materials.length
+    const want = docs.filter((x) => keys.includes(x.key)).slice(0, Math.max(0, room))
+    const got: SpecDraft['materials'] = []
+    const fails: string[] = []
+    for (const x of want) {
+      setReading(`업체 서류 '${x.label}' 읽는 중…`)
+      try {
+        const f = await fetchClientDocFile(record, x.key as DocumentKey)
+        const clean = f ? await readFileText(f.file, x.label) : ''
+        if (clean.length >= 20) got.push({ title: x.label.slice(0, 80), kind: DOC_MATERIAL_KIND, text: clean, at: new Date().toISOString() })
+        else fails.push(x.label)
+      } catch {
+        fails.push(x.label)
+      }
+    }
+    setReading('')
+    setDocFails(fails)
+    await putMaterials(got, auto ? `업체 서류함의 서류 ${got.length}개를 읽어 재료로 넣었습니다 — 이 서류로 회사 이야기를 잡습니다` : `업체 서류 ${got.length}개를 재료로 넣었습니다`)
+    if (!got.length && fails.length && !auto) showToast(`업체 서류 ${fails.length}개를 읽지 못했습니다 — 파일을 다시 받지 못했거나 그림 · 스캔이에요`)
+  }
+  /** D-271 GPT 와 나눈 대화 · 메모를 붙여 넣기 */
+  const addText = async (title: string, text: string): Promise<boolean> => {
+    if (d.materials.length >= MATERIAL_MAX) {
+      showToast(`자료는 ${MATERIAL_MAX}개까지 — 앞 자료를 빼고 넣어 주세요`)
+      return false
+    }
+    const clean = safeText(text, personNames(record ?? ({} as ClientOpsRecord)), MATERIAL_CHARS)
+    if (clean.length < 20) {
+      showToast('20자 이상 붙여 넣어 주세요')
+      return false
+    }
+    const n = d.materials.filter((m) => m.kind === PASTE_MATERIAL_KIND).length + 1
+    await putMaterials([{ title: (title.trim() || `붙여 넣은 글 ${n}`).slice(0, 80), kind: PASTE_MATERIAL_KIND, text: clean, at: new Date().toISOString() }], '붙여 넣은 글을 재료로 넣었습니다 — 끝부분(결론)까지 AI 가 봅니다')
+    return true
+  }
+  const removeMaterial = (i: number) => {
+    const m = d.materials[i]
+    if (!m) return
+    act(`'${m.title}' 자료를 뺐습니다`, (cur) => ({ ...cur, materials: cur.materials.filter((_, j) => j !== i) }))
+  }
+
+  // D-271 새 명세서(아직 명칭 전) — 업체 서류함에 올린 서류가 있으면 먼저 읽어 재료로(그다음 아이디어를 저절로)
+  useEffect(() => {
+    if (autoDocs.current || matsFor !== clientId) return
+    if (wantClient && !record) return
+    autoDocs.current = true
+    const todo = docs.filter((x) => !d.materials.some((m) => m.kind === DOC_MATERIAL_KIND && m.title === x.label))
+    if (d.title.trim() || !todo.length || d.materials.length >= MATERIAL_MAX) {
+      setDocsDone(true)
+      return
+    }
+    void importDocs(
+      todo.map((x) => x.key),
+      true,
+    ).finally(() => setDocsDone(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 한 번만(명세서를 열 때)
+  }, [matsFor, clientId, wantClient, record, docs])
 
   // D-261 새 명세서 — 회사 기록 · 그 회사의 AI 작업실 자료를 다 읽은 뒤 한 번만 저절로.
   // D-269 저절로는 '아이디어 5개' 까지만(고르는 것은 대표) · 회사 이야기가 없으면 시작하지 않고 '회사 정보부터'
   useEffect(() => {
     if (!autoStart || autoDone.current || busy) return
     if (wantClient && !record) return
-    if (matsFor !== clientId) return
+    if (matsFor !== clientId || !docsDone) return
     autoDone.current = true
     onAutoStarted?.()
-    if (d.title.trim() || d.ideas.length || companyThin(company)) return
-    if (startSpecRun(draftId, ['idea'], { company, others, today, forceParts: false })) showToast('아이디어 5개를 내고 순위를 매깁니다 — 골라서 [이걸로 시작] 을 누르세요')
-  }, [autoStart, busy, matsFor, clientId, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
+    if (d.title.trim() || d.ideas.length || d.talk.length || companyThin(company)) return
+    // D-271 저절로는 기획 대화의 첫 질문까지 — 아이디어는 대표 답을 받은 뒤
+    if (startSpecRun(draftId, ['talk'], { company, others, today, forceParts: false })) showToast('AI 가 회사 서류 · 기록을 읽고 의견과 첫 질문을 드립니다 — 답을 눌러 주세요')
+  }, [autoStart, busy, matsFor, clientId, docsDone, wantClient, record, d, draftId, company, others, today, onAutoStarted, showToast])
 
   // 회사 기록을 끝내 못 읽으면(목록 실패 등) 기다리기만 하지 않는다 — 알리고 [아이디어 5개 내줘] 로
   const autoGiveUp = useRef({ onAutoStarted, showToast })
@@ -300,7 +397,7 @@ export function SpecAiBoard({
   const stagesShown = (Object.keys(run.stages) as AgentStage[]).sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b))
   const doneCards = CARDS.filter((c) => cardState(c, d).done).length
   // D-268 · D-269 회사 이야기(업종 · 종목 · 상담 메모 · 자료)가 없으면 지어낸 발명이 된다 — 명칭 전이면 막고, 뒤면 알린다
-  const thin = matsFor === clientId && companyThin(company)
+  const thin = matsFor === clientId && docsDone && companyThin(company)
   const phase = specPhase(d, thin)
   const finished = !busy && phase === 'done'
   // D-268 형식 점검과 자체점검을 따로 — 자체점검 90점 미만 · P0 면 '출원 전에 손볼 곳'
@@ -317,7 +414,11 @@ export function SpecAiBoard({
       : phase === 'ideas'
         ? d.ideas.length
           ? '아이디어를 골라 주세요'
-          : '기획부터 — 아이디어 5개를 냅니다'
+          : d.talk.length
+            ? talkFinished(d.talk)
+              ? '기획이 잡혔어요 — 아이디어 5개를 냅니다'
+              : 'AI 의 질문에 답해 주세요'
+            : '기획부터 — AI 가 회사를 읽고 의견을 드립니다'
         : phase === 'parts'
           ? '고른 아이디어로 구성을 짭니다'
           : phase === 'review'
@@ -384,7 +485,15 @@ export function SpecAiBoard({
           <ul className="flex flex-wrap gap-1.5" data-testid="spec-board-sources">
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{record ? `${record.companyName} 기록 ${facts.length}줄` : '회사 고르지 않음'}</li>
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">AI 작업실 자료 {caseMats.length}개</li>
+            <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700" data-testid="spec-board-docs">
+              업체 서류 {d.materials.filter((m) => m.kind === DOC_MATERIAL_KIND).length}/{docs.length}개 읽음
+            </li>
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700" data-testid="spec-board-mats">올린 자료 {d.materials.length}개</li>
+            <li>
+              <button type="button" onClick={() => setMatsOpen(true)} className="tap t-meta inline-flex min-h-8 items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 font-semibold text-violet-900 hover:bg-violet-50" data-testid="spec-board-mats-open">
+                <Upload aria-hidden="true" className="size-3.5" /> 자료 넣기 · 보기
+              </button>
+            </li>
             <li className="ml-auto">
               <JudgeSkillButton />
             </li>
@@ -403,7 +512,7 @@ export function SpecAiBoard({
                 <TriangleAlert aria-hidden="true" className="mr-1 inline size-4 align-[-2px]" />
                 <b className="font-semibold">AI 가 읽을 회사 이야기가 거의 없어요</b> — 업종 · 종목 · 상담 메모 · 자료가 비어 있어, 이대로 쓰면 업종 일반으로 지어낸 발명이 됩니다. 회사 소개서 · 제품 설명 · GPT 와 나눈 대화를 먼저 넣어 주세요(.hwpx · .hwp · .docx · .pdf).
               </p>
-              <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-auto" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-thin-file">
+              <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-auto" disabled={!!reading} onClick={() => setMatsOpen(true)} data-testid="spec-board-thin-file">
                 <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기'}
               </Button>
             </div>
@@ -416,11 +525,18 @@ export function SpecAiBoard({
                 <b className="font-semibold">AI 가 읽을 회사 이야기가 없어요.</b> 이대로 아이디어를 내면 어느 회사에나 맞는 지어낸 발명이 됩니다. 아래 둘 중 하나만 있으면 바로 시작해요.
               </p>
               <ul className="t-sub flex list-disc flex-col gap-0.5 pl-5 break-keep text-slate-800">
+                <li>업체 서류함(고객 관리 › 업체 › 서류)에 회사 소개서 · 제품 설명 — 올려 두면 여기서 저절로 읽어요</li>
                 <li>업체 기록에 업종 · 종목 · 상담 메모(무엇을 팔고 · 어떻게 팔고 · 무엇이 불편한지)</li>
-                <li>자료 — 회사 소개서 · 제품 설명 · GPT 와 나눈 대화 · 기존 명세서(.hwpx · .hwp · .docx · .pdf · .txt)</li>
+                <li>[자료 넣기] — 파일이나 GPT 와 나눈 대화를 그대로 붙여 넣기</li>
               </ul>
+              {(docFails.length > 0 || docsWithoutFile(record) > 0) && (
+                <p className="t-meta break-keep text-warning-900" data-testid="spec-gate-docs-note">
+                  {docFails.length > 0 ? `업체 서류 ${docFails.length}개(${docFails.join(' · ')})는 읽지 못했어요 — 그림 · 스캔이거나 파일을 다시 받지 못했어요. ` : ''}
+                  {docsWithoutFile(record) > 0 ? `받았다고만 표시된 서류 ${docsWithoutFile(record)}개는 파일이 올라와 있지 않아요.` : ''}
+                </p>
+              )}
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Button variant="primary" className="min-h-12" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-gate-file">
+                <Button variant="primary" className="min-h-12" disabled={!!reading} onClick={() => setMatsOpen(true)} data-testid="spec-gate-file">
                   <Upload aria-hidden="true" className="size-5" /> {reading || '자료 넣기'}
                 </Button>
                 {record ? (
@@ -437,16 +553,43 @@ export function SpecAiBoard({
           {phase === 'ideas' && (
             <div className="flex flex-col gap-2.5" data-testid="spec-plan-ideas">
               {d.ideas.length === 0 ? (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Button variant="primary" className="min-h-12 sm:min-w-56" disabled={busy} onClick={ideasRun} data-testid="spec-ideas-run">
-                    {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <Lightbulb aria-hidden="true" className="size-5" />} {busy ? '아이디어를 내는 중…' : '아이디어 5개 내줘'}
-                  </Button>
-                  <Button variant="secondary" disabled={!!reading} onClick={() => fileRef.current?.click()} data-testid="spec-board-file">
-                    <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
-                  </Button>
-                </div>
+                d.talk.length ? (
+                  <>
+                    <PlanTalk rounds={d.talk} busy={busy} onAnswer={(a) => void answerTalk(a)} onNext={ideasRun} nextLabel={talkFinished(d.talk) ? '이 대화대로 아이디어 5개 내줘' : '그만 묻고 지금 답대로 아이디어 5개 내줘'} testId="spec-talk" />
+                    {!busy && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="ghost" size="sm" disabled={!!reading} onClick={() => setMatsOpen(true)} data-testid="spec-board-file">
+                          <Upload aria-hidden="true" className="size-4" /> {reading || '자료 더 넣기'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={talkAgain} data-testid="spec-talk-again">
+                          기획 대화 처음부터
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : busy ? (
+                  <p className="t-sub flex items-center gap-1.5 text-violet-800" role="status" data-testid="spec-talk-wait">
+                    <Loader2 aria-hidden="true" className="size-5 animate-spin" /> {run.stages.idea?.phase === 'run' ? '아이디어를 내는 중…' : 'AI 가 회사 서류 · 기록을 읽고 의견을 정리하는 중…'}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <Button variant="primary" className="min-h-12 sm:min-w-56" onClick={talkRun} data-testid="spec-talk-start">
+                        <MessageCircleQuestion aria-hidden="true" className="size-5" /> AI 와 기획 시작(질문 5번 안)
+                      </Button>
+                      <Button variant="secondary" onClick={ideasRun} data-testid="spec-ideas-run">
+                        <Lightbulb aria-hidden="true" className="size-4" /> 묻지 말고 아이디어 5개 내줘
+                      </Button>
+                      <Button variant="ghost" disabled={!!reading} onClick={() => setMatsOpen(true)} data-testid="spec-board-file">
+                        <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
+                      </Button>
+                    </div>
+                    <p className="t-meta break-keep text-slate-500">AI 가 회사를 어떻게 이해했는지 · 흔한 방향과 약한 점을 먼저 말하고, 무엇을 정하면 좋을지 하나씩 묻습니다. 답은 누르기만 하면 돼요.</p>
+                  </div>
+                )
               ) : (
                 <>
+                  {d.talk.some((r) => r.answer.trim()) && <PlanTalk rounds={d.talk} busy={false} onAnswer={() => {}} onNext={() => {}} nextLabel="" testId="spec-talk" compact />}
                   <ul className="flex flex-col gap-2" role="radiogroup" aria-label="특허 아이디어 후보" data-testid="spec-plan-list">
                     {d.ideas.map((p, i) => {
                       const on = picked?.title === p.title
@@ -556,6 +699,21 @@ export function SpecAiBoard({
                 <Sparkles aria-hidden="true" className="size-4" /> 빠진 곳 다시 써줘
               </Button>
             </div>
+          )}
+          {matsOpen && (
+            <SpecMaterialsSheet
+              open
+              onClose={() => setMatsOpen(false)}
+              d={d}
+              docs={docs}
+              missingFiles={docsWithoutFile(record)}
+              reading={reading}
+              docFails={docFails}
+              onImportDocs={(keys) => void importDocs(keys)}
+              onPickFiles={() => fileRef.current?.click()}
+              onAddText={addText}
+              onRemove={removeMaterial}
+            />
           )}
           <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.hwp,.hwpx,.docx,.txt,.md,.xlsx,.png,.jpg,.jpeg" onChange={(e) => {
             void addFiles(e.target.files)
@@ -668,7 +826,7 @@ export function SpecAiBoard({
   )
 }
 
-const STAGE_ORDER: AgentStage[] = ['idea', 'ideaRank', 'ideaMore', 'research', 'parts', 'judge1', 'a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
+const STAGE_ORDER: AgentStage[] = ['talk', 'idea', 'ideaRank', 'ideaMore', 'research', 'parts', 'judge1', 'a', 'b', 'c', 'd', 'e', 'judge2', 'fix']
 const EDIT_STEP: Record<AgentCard, DraftStep> = { idea: 'idea', research: 'idea', parts: 'parts', body: 'body', claims: 'claims', judge: 'check', check: 'check' }
 
 const clip = (s: string, n: number) => {

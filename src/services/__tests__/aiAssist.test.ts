@@ -703,6 +703,7 @@ async function d263Tests() {
 async function kbContractTests() {
   const WANT: Record<string, string> = {
     'spec.idea': 'patent_idea',
+    'spec.talk': 'patent_idea',
     'spec.ideaRank': 'patent_idea',
     'spec.ideaMore': 'patent_idea',
     'spec.research': 'patent_research',
@@ -716,6 +717,7 @@ async function kbContractTests() {
     'spec.judge': 'patent_spec+patent_format+patent_samples',
     'venture.market': 'venture_plan',
     'venture.plan': 'venture_plan',
+    'venture.talk': 'venture_plan',
     'venture.planRank': 'venture_plan',
     'venture.planMore': 'venture_plan',
     'venture.sum': 'venture_plan',

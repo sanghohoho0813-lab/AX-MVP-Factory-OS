@@ -1,5 +1,7 @@
 /**
  * qa:specboard — D-252 명세서 AI 작업판(AI 가 다 쓰는 명세서). 실행: npm run qa:specboard -- http://localhost:4390 [사진 폴더]
+ *  - D-271 기획 대화: 새 명세서 → AI 의 회사 이해 · 의견 · 질문(누를 답)까지만 저절로 → 답을 누르면 다음 질문 → '충분' 이면 그 답대로 아이디어 5개
+ *    · [자료 넣기] 창(업체 서류함 · 파일 · 글 붙여넣기 · 빼기) · 휴지통(되살리기 · 두 번 확인 영구 삭제 · 새로 쓰기)
  *  - D-269 기획 먼저: 새 명세서 → 아이디어 5개(순위 · 이유)까지만 저절로 → [제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기] → 골라 [이걸로 시작]
  *    → 조사 · 구성 · 자체점검 ① 에서 멈춤(구성 확인) → [이 구성으로 본문 · 청구항 쓰기] → 전문 보기(기본) · 나눠서 보기(칸마다 복사)
  *  - D-269 모델: 쓰는 중에 모델을 바꾸면 다음 단계부터 그 모델 · 단계마다 쓴 모델 표시 · 회사 이야기가 없으면 '회사 정보부터'
@@ -65,6 +67,23 @@ const PARTS = [
   { title: 'seed', detail: '마모 판정부', body: '마모 단계를 세 단계로 나누는' },
   { title: 'seed', detail: '교체시점 산출부', body: '다음 작업 일정의 빈 시간에 교체를 배치하는' },
 ]
+/* D-271 기획 대화 — 'ask': 질문 두 번 뒤 '충분' · 'enough': 첫 번에 '충분'(바로 아이디어로) */
+let talkMode = 'ask'
+const talkAnswer = (ctx) => {
+  const n = (JSON.stringify(ctx ?? '').match(/대표 답:/g) ?? []).length
+  if (talkMode === 'enough' || n >= 2) return { headline: '진동 마모 지수 + 작업 일정으로 교체 시점', items: [{ tag: '의견', title: '마모 지수와 작업 일정 연결', detail: '흔한 임계값 비교보다 회피가 어려움' }, { tag: '충분', title: '고객 · 데이터 · 판단이 정해져 아이디어를 낼 수 있습니다' }] }
+  if (n === 0)
+    return {
+      headline: '공구 교체를 데이터로',
+      items: [
+        { tag: '이해', title: '금속가공 라인의 절삭 공구 교체를 작업자 감으로 하는 회사', detail: '상담 메모 · 현장 메모' },
+        { tag: '의견', title: '일반적인 공구 수명 타이머', detail: '너무 흔하고 진보성이 약함' },
+        { tag: '의견', title: '진동 데이터로 마모 단계 판정', detail: '회사에 진동 기록이 있어 근거가 됨 — 다만 임계값 비교만이면 약함' },
+        { tag: '질문', title: '어느 문제를 먼저 풀고 싶으세요?', detail: '권리화 중심을 정하려고', outline: ['① 공구 교체 불량', '② 납기 지연', '③ 공구 재고 부족', '잘 모르겠어요 — AI 가 정해 주세요'] },
+      ],
+    }
+  return { headline: '교체 불량 중심', items: [{ tag: '의견', title: '교체 알림만', detail: '경쟁사가 쉽게 피함' }, { tag: '질문', title: '교체 시점을 무엇과 함께 정하면 좋을까요?', detail: '연결관계를 정하려고', outline: ['작업 일정', '공구 재고', '작업자 숙련도', '잘 모르겠어요 — AI 가 정해 주세요'] }] }
+}
 let bodyRound = 0
 const answer = (id) => {
   switch (id) {
@@ -174,7 +193,7 @@ async function routeAi(page) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
     }
     const research = req.assistId === 'spec.research'
-    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: req.choice?.provider || 'gemini', model: req.choice?.model || 'gemini-3.1-flash-lite', status: 'succeeded', structured: req.assistId === 'spec.judge' ? judgeAnswer(req.context?.purpose ?? '') : answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [], finish: 'STOP' }
+    const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: req.choice?.provider || 'gemini', model: req.choice?.model || 'gemini-3.1-flash-lite', status: 'succeeded', structured: req.assistId === 'spec.judge' ? judgeAnswer(req.context?.purpose ?? '') : req.assistId === 'spec.talk' ? talkAnswer(req.context) : answer(req.assistId), raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: research, sources: research ? [{ title: 'KIPRIS 공구 마모', url: 'https://www.kipris.or.kr/example-1' }, { title: '논문 · 진동 기반 수명', url: 'https://example.org/paper' }] : [], finish: 'STOP' }
     if (trial) {
       const whole = req.assistId === 'spec.judge' && /전체/.test(req.context?.purpose ?? '')
       if (req.assistId === 'spec.parts') run.structured = { headline: '문장 이름', items: SENTENCE_PARTS }
@@ -226,22 +245,45 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B0b 회사를 고르면 단추에 그 회사 이름 — "○○ 명세서 — 기획부터 시작"', /한솔테크.*기획부터 시작/.test(await page.getByTestId('spec-new').innerText()), await page.getByTestId('spec-new').innerText())
   await shot(page, 'B-start', false)
   const s0 = sent.length
-  // 아이디어 한 번만 부르므로 답을 천천히 — "쓰는 중" 을 볼 틈이 있게
+  // 기획 대화 첫 질문 한 번만 부르므로 답을 천천히 — "쓰는 중" 을 볼 틈이 있게
   delayMs = 1500
+  talkMode = 'ask'
   await page.getByTestId('spec-new').click()
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-board').waitFor()
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
-  check('B7 쓰는 중 — "AI 가 쓰는 중"', /쓰는 중/.test(await page.getByTestId('spec-board-head').innerText()))
+  check('B7 쓰는 중 — "AI 가 쓰는 중" · "회사 서류 · 기록을 읽고 의견을 정리하는 중"', /쓰는 중/.test(await page.getByTestId('spec-board-head').innerText()) && (await page.getByTestId('spec-talk-wait').isVisible()))
   await waitIdle(page)
   delayMs = 30
   await page.waitForTimeout(300)
-  const ideaReq = sent.slice(s0)
-  check('B1 단추 한 번 → 아이디어 5개까지만 저절로(그다음은 대표가 고름) · 주소에서 auto 지움 · AI 작업판 먼저', ideaReq.map((r) => r.assistId).join() === 'spec.idea' && (await page.getByTestId('spec-board').getAttribute('data-phase')) === 'ideas' && (await page.getByTestId('spec-view-ai').getAttribute('aria-selected')) === 'true' && !page.url().includes('auto=1'), { ids: ideaReq.map((r) => r.assistId), url: page.url() })
+  const talk1 = sent.slice(s0)
+  check('B1 단추 한 번 → 기획 대화 첫 질문까지만 저절로(아이디어는 대표가 답한 뒤) · 주소에서 auto 지움 · AI 작업판 먼저', talk1.map((r) => r.assistId).join() === 'spec.talk' && (await page.getByTestId('spec-board').getAttribute('data-phase')) === 'ideas' && (await page.getByTestId('spec-view-ai').getAttribute('aria-selected')) === 'true' && !page.url().includes('auto=1'), { ids: talk1.map((r) => r.assistId), url: page.url() })
+  const opts = await page.getByTestId('spec-talk-option').allInnerTexts()
+  check('B1a 첫 질문 — AI 가 이해한 회사 · 의견 2(흔한 것 · 약한 점) · 질문 하나 · 누를 답 4개(마지막 "AI 가 정해 주세요") · 직접 적기 · 머리 "AI 의 질문에 답해 주세요" · 질문 1/5', /금속가공 라인의 절삭 공구/.test(await page.getByTestId('spec-talk-understanding').innerText()) && /너무 흔하고/.test(await page.getByTestId('spec-talk-opinions').innerText()) && /어느 문제를 먼저/.test(await page.getByTestId('spec-talk-question').innerText()) && opts.length === 4 && opts[0] === '공구 교체 불량' && /AI 가 정해/.test(opts[3]) && (await page.getByTestId('spec-talk-own').isVisible()) && /AI 의 질문에 답해 주세요/.test(await page.getByTestId('spec-board-head').innerText()) && /질문 1\/5/.test(await page.getByTestId('spec-talk').innerText()), opts)
+  const t1Ctx = JSON.stringify(talk1[0]?.context ?? '')
+  check('B1d 기획 대화 자료 — 회사 기록 · 그 회사 AI 작업실 자료 · 대표 정의(skill) · 아직 대화 줄 없음', t1Ctx.includes('작업실재료표식') && /업종|종목|설립/.test(t1Ctx) && /대표정의표식/.test(talk1[0]?.skill ?? '') && !t1Ctx.includes('대표 답:'), t1Ctx.slice(0, 300))
+  await shot(page, 'B-talk-1')
+  const t1 = sent.length
+  await page.getByTestId('spec-talk-option').first().click()
+  await waitIdle(page)
+  await page.waitForTimeout(200)
+  const talk2 = sent.slice(t1)
+  check('B1e 답을 누르면 다음 질문 — 보낸 자료에 "질문 1 → 대표 답: 공구 교체 불량" · 답이 말풍선 · 질문 2/5', talk2.map((r) => r.assistId).join() === 'spec.talk' && JSON.stringify(talk2[0]?.context ?? '').includes('대표 답: 공구 교체 불량') && (await page.getByTestId('spec-talk-answer').count()) === 1 && (await page.getByTestId('spec-talk-round').count()) === 2 && /질문 2\/5/.test(await page.getByTestId('spec-talk').innerText()) && /무엇과 함께/.test(await page.getByTestId('spec-talk-question').last().innerText()), talk2.map((r) => r.assistId))
+  const t2 = sent.length
+  await page.getByTestId('spec-talk-own').fill('작업 일정 빈 시간에 교체하고 싶어요')
+  await page.getByTestId('spec-talk-send').click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-plan-idea"]').length === 5, null, { timeout: 20000 }).catch(() => {})
+  await waitIdle(page)
+  await page.waitForTimeout(300)
+  const talk3 = sent.slice(t2)
+  const ideaReq = talk3.filter((r) => r.assistId === 'spec.idea')
+  const i1Ctx = ideaReq[0]?.context ?? {}
+  check('B1f 직접 적은 답도 보냄 → AI 가 "충분" → 기다리지 않고 그 대화대로 아이디어 5개(자료에 기획 대화 · 두 답 · "대표 답을 반드시 따른다")', talk3.map((r) => r.assistId).join() === 'spec.talk,spec.idea' && JSON.stringify(talk3[0]?.context ?? '').includes('대표 답: 작업 일정 빈 시간에 교체하고 싶어요') && (i1Ctx.sections ?? []).some((x) => x.name === '기획 대화' && JSON.stringify(x.rows).includes('대표 답: 공구 교체 불량') && JSON.stringify(x.rows).includes('대표 답: 작업 일정 빈 시간')) && (i1Ctx.rules ?? []).some((r) => /대표 답을 반드시 따른다/.test(r)), talk3.map((r) => r.assistId))
+  check('B1g 아이디어가 나오면 기획 대화는 접어서 위에("기획 대화 2번 — 이 답대로 냈어요")', /기획 대화 2번/.test(await page.getByTestId('spec-talk').innerText()) && (await page.getByTestId('spec-talk-option').count()) === 0)
   const cards = await page.getByTestId('spec-plan-idea').evaluateAll((els) => els.map((e) => ({ rank: e.getAttribute('data-rank'), picked: e.getAttribute('data-picked'), text: e.textContent })))
   check('B1b 아이디어 5개 — 1순위(88점) · 순위 이유 · 회사 근거 · 1순위가 먼저 골라져 있음 · 명칭은 아직 비어 있음', cards.length === 5 && /1순위/.test(cards[0].text) && /88점/.test(cards[0].text) && /1순위인 이유/.test(cards[0].text) && /회사 근거/.test(cards[0].text) && cards[0].picked === 'yes' && /2순위/.test(cards[1].text) && /후보/.test(cards[3].text) && /아이디어를 골라 주세요/.test(await page.getByTestId('spec-board-head').innerText()), cards.map((c) => c.text?.slice(0, 40)))
   const steps = await page.getByTestId('spec-step').evaluateAll((els) => els.map((e) => `${e.textContent}:${e.getAttribute('data-now')}`))
-  check('B1c 맨 위 차례 — 회사 정보 ✓ → 아이디어 고르기(지금) → 구성 확인 → 본문 · 청구항 → 전문', steps.length === 5 && steps[1].includes('아이디어 고르기:yes') && steps[0].includes('회사 정보:no'), steps)
+  check('B1c 맨 위 차례 — 회사 정보 ✓ → 기획 · 아이디어(지금) → 구성 확인 → 본문 · 청구항 → 전문', steps.length === 5 && steps[1].includes('기획 · 아이디어:yes') && steps[0].includes('회사 정보:no'), steps)
   check('B2 칸 여섯은 [칸별로 보기] 안에 접혀 있음 · 모델 고르기 단추', (await page.getByTestId('spec-card').count()) === 0 && (await page.getByTestId('spec-cards-toggle').isVisible()) && (await page.getByTestId('model-pick').count()) === 1)
   const typing = await page.locator('[data-testid="spec-board"] textarea, [data-testid="spec-board"] input[type="text"]').count()
   check('B3 작업판에 타자 칠 칸 0', typing === 0, typing)
@@ -287,7 +329,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.waitForTimeout(300)
   const partsReq = sent.slice(s3)
   check('B8a [이걸로 시작하자] → 조사 → 구성 → 자체점검 ①(88점 · 고친 뒤 93점) 까지만 · 본문은 아직 안 씀 · "구성을 확인해 주세요"', partsReq.map((r) => r.assistId).join() === 'spec.research,spec.parts,spec.judge,spec.judge' && (await page.getByTestId('spec-board').getAttribute('data-phase')) === 'review' && /구성을 확인해 주세요/.test(await page.getByTestId('spec-board-head').innerText()) && (await page.getByTestId('spec-plan-body').isVisible()), partsReq.map((r) => r.assistId))
-  check('B9 바꾼 모델로 부름 — 아이디어 · 견주기 · 짜내기는 GPT, 바꾼 뒤 조사 · 구성 · 자체점검은 Gemini 3.8 Flash', sent.slice(s0, s3).every((r) => r.choice?.model === 'gpt-5.4-mini') && partsReq.every((r) => r.choice?.provider === 'gemini' && r.choice?.model === 'gemini-3.8-flash'), [...sent.slice(s0, s3), ...partsReq].map((r) => r.choice?.model))
+  check('B9 바꾼 모델로 부름 — 기획 대화 · 아이디어 · 견주기 · 짜내기는 GPT, 바꾼 뒤 조사 · 구성 · 자체점검은 Gemini 3.8 Flash', sent.slice(s0, s3).every((r) => r.choice?.model === 'gpt-5.4-mini') && partsReq.every((r) => r.choice?.provider === 'gemini' && r.choice?.model === 'gemini-3.8-flash'), [...sent.slice(s0, s3), ...partsReq].map((r) => r.choice?.model))
   const reviewText = await page.getByTestId('spec-review').innerText()
   check('B16 구성 확인 — 조사 결론 · 구성요소 5개(110~150) · 단계 · 연결관계', /진동 수집부\(110\)/.test(reviewText) && /교체시점 산출부\(150\)/.test(reviewText) && /방법 단계 5개 · 종속항 씨앗 2개/.test(reviewText) && /선행기술 조사/.test(reviewText) && /연결관계/.test(reviewText), reviewText.slice(0, 200))
   const rowModels = await page.getByTestId('spec-board-row').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-stage'), e.getAttribute('data-model')])))
@@ -431,6 +473,110 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await ctx.close()
 }
 
+/* ---------------- D-271 [자료 넣기] 창(업체 서류함 · 글 붙여넣기 · 빼기) · 휴지통(새로 쓰기 · 되살리기 · 두 번 확인 영구 삭제) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  page.on('dialog', (d) => void d.accept())
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await routeAi(page)
+  delayMs = 30
+  talkMode = 'ask'
+  await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
+  const rows0 = await page.getByTestId('spec-row').count()
+  await page.getByTestId('spec-new-client').selectOption(CLIENT)
+  await page.getByTestId('spec-new').click()
+  await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
+  await waitIdle(page)
+  check('D1 업체 서류함에 올린 파일(법인인감증명서)을 저절로 읽으려 함 — 이 시험 기기(로컬 저장)에서는 파일을 못 받아 "0/1개 읽음" · 그래도 회사 기록으로 기획 대화는 시작', /업체 서류 0\/1개 읽음/.test(await page.getByTestId('spec-board-docs').innerText()) && (await page.getByTestId('spec-talk-question').count()) === 1, await page.getByTestId('spec-board-docs').innerText())
+  await page.getByTestId('spec-board-mats-open').click()
+  await page.getByTestId('spec-mats-sheet').waitFor()
+  check('D2 [자료 넣기 · 보기] 창 — ① 업체 서류함(그 파일 · 읽지 못한 이유) ② 파일 올리기 ③ 글 붙여넣기 · 넣은 자료 0', (await page.getByTestId('spec-mats-doc').count()) === 1 && /법인인감증명서/.test(await page.getByTestId('spec-mats-docs').innerText()) && /읽지 못한 서류/.test(await page.getByTestId('spec-mats-doc-fails').innerText()) && (await page.getByTestId('spec-mats-file').isVisible()) && (await page.getByTestId('spec-mats-paste-text').isVisible()) && (await page.getByTestId('spec-mats-item').count()) === 0)
+  const chat = `나: 우리 회사 특허 뭐가 좋을까?\nGPT: ${'공구 교체 데이터를 생각해 보세요. '.repeat(260)}\n나: 담당 010-9876-5432 로 연락\nGPT: 결론 — 붙여넣기결론표식: 마모 지수와 작업 일정을 묶는 방향`
+  await page.getByTestId('spec-mats-paste-title').fill('GPT 와 나눈 대화')
+  await page.getByTestId('spec-mats-paste-text').fill(chat)
+  await shot(page, 'D-mats', false)
+  await page.getByTestId('spec-mats-paste-add').click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-mats-item"]').length === 1, null, { timeout: 5000 }).catch(() => {})
+  const item = page.getByTestId('spec-mats-item').first()
+  const store1 = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => /spec|patent/i.test(k)).map(([, v]) => v).join('\n'))
+  check('D3 GPT 대화 붙여넣기 → 넣은 자료 1개("붙여 넣은 글" · 이름) · 칸은 비워짐 · 전화번호는 가려서 저장', (await item.getAttribute('data-kind')) === '붙여 넣은 글' && /GPT 와 나눈 대화/.test(await item.innerText()) && (await page.getByTestId('spec-mats-paste-text').inputValue()) === '' && store1.includes('붙여넣기결론표식') && !store1.includes('010-9876-5432'))
+  await page.keyboard.press('Escape')
+  await page.getByTestId('spec-mats-sheet').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+  const b4 = sent.length
+  await page.getByTestId('spec-talk-again').click()
+  await page.waitForTimeout(300)
+  await waitIdle(page)
+  await page.waitForTimeout(200)
+  const again = sent.slice(b4)
+  const againCtx = JSON.stringify(again[0]?.context ?? '')
+  check('D4 [기획 대화 처음부터] → 대화를 비우고 새 첫 질문 · 붙여 넣은 대화가 재료로(긴 대화도 끝 결론까지) · 전화번호 없음', again.map((r) => r.assistId).join() === 'spec.talk' && againCtx.includes('붙여 넣은 글') && againCtx.includes('붙여넣기결론표식') && !againCtx.includes('010-9876-5432') && !againCtx.includes('대표 답:') && (await page.getByTestId('spec-talk-round').count()) === 1, again.map((r) => r.assistId))
+  await page.getByTestId('spec-board-mats-open').click()
+  await page.getByTestId('spec-mats-remove').first().click()
+  await page.waitForTimeout(300)
+  check('D5 넣은 자료 빼기 → 0개', (await page.getByTestId('spec-mats-item').count()) === 0 && /올린 자료 0개/.test(await page.getByTestId('spec-board-mats').innerText()))
+  await page.keyboard.press('Escape')
+  await page.getByTestId('spec-mats-sheet').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
+
+  // [새로 쓰기] — 지금 글은 휴지통 · 같은 회사로 새 명세서(기획 대화부터)
+  const id1 = new URL(page.url()).searchParams.get('draft')
+  await page.getByTestId('spec-restart').click()
+  await page.getByTestId('spec-restart-yes').click()
+  await page.waitForFunction((id) => !location.search.includes(id), id1, { timeout: 10000 }).catch(() => {})
+  await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
+  await waitIdle(page)
+  const u2 = new URL(page.url())
+  check('D6 [새로 쓰기] → 다른 명세서(같은 회사) · 다시 기획 대화 첫 질문부터', !!u2.searchParams.get('draft') && u2.searchParams.get('draft') !== id1 && u2.searchParams.get('client') === CLIENT && (await page.getByTestId('spec-talk-round').count()) === 1, page.url())
+  await page.getByTestId('spec-back-list').click()
+  await page.getByTestId('spec-list').waitFor()
+  await page.waitForTimeout(300)
+  check('D7 목록 — 새 명세서만(지운 것은 빠짐) · 아래 휴지통 1개', (await page.getByTestId('spec-row').count()) === rows0 + 1 && (await page.getByTestId('spec-trash-row').count()) === 1 && /휴지통/.test(await page.getByTestId('spec-trash').innerText()), { rows: await page.getByTestId('spec-row').count(), rows0 })
+  await page.locator('[data-testid="spec-trash"] summary').click()
+  await shot(page, 'D-trash', false)
+  await page.getByTestId('spec-trash-restore').first().click()
+  await page.waitForTimeout(400)
+  check('D8 휴지통 [되살리기] → 목록으로 돌아옴 · 휴지통 0', (await page.getByTestId('spec-row').count()) === rows0 + 2 && (await page.getByTestId('spec-trash-row').count()) === 0)
+  // 목록에서 휴지통으로 → 영구 삭제는 두 번 확인
+  await page.getByTestId('spec-row-remove').first().click()
+  await page.getByTestId('spec-row-remove-yes').click()
+  await page.waitForTimeout(400)
+  check('D9 목록 [휴지통으로] → 목록에서 빠지고 휴지통 1', (await page.getByTestId('spec-row').count()) === rows0 + 1 && (await page.getByTestId('spec-trash-row').count()) === 1)
+  if (!(await page.locator('[data-testid="spec-trash"]').evaluate((el) => el.open))) await page.locator('[data-testid="spec-trash"] summary').click()
+  await page.getByTestId('spec-trash-purge').first().click()
+  const ask1 = await page.getByTestId('spec-trash-purge-ask').getAttribute('data-step')
+  await page.getByTestId('spec-trash-purge-next').click()
+  const ask2 = await page.getByTestId('spec-trash-purge-ask').getAttribute('data-step')
+  const still = await page.getByTestId('spec-trash-row').count()
+  await shot(page, 'D-purge', false)
+  await page.getByTestId('spec-trash-purge-yes').click()
+  await page.waitForTimeout(400)
+  check('D10 영구 삭제 — 두 번 확인("되살릴 수 없어요" → "마지막 확인") 전에는 남아 있고 · 두 번째에 지움 · 이름을 다시 치게 하지 않음', ask1 === '1' && ask2 === '2' && still === 1 && (await page.getByTestId('spec-trash-row').count()) === 0 && (await page.getByTestId('spec-row').count()) === rows0 + 1 && (await page.locator('[data-testid="spec-trash"] input').count()) === 0, { ask1, ask2, still })
+  // 편집기 [휴지통으로] → 목록 · 되돌리기
+  await page.getByTestId('spec-row-open').first().click()
+  await page.getByTestId('spec-board').waitFor()
+  await page.getByTestId('spec-trash-this').click()
+  await page.getByTestId('spec-trash-this-yes').click()
+  await page.getByTestId('spec-list').waitFor()
+  await page.waitForTimeout(300)
+  check('D11 편집기 [휴지통으로] → 목록으로 · 그 명세서는 휴지통에', (await page.getByTestId('spec-row').count()) === rows0 && (await page.getByTestId('spec-trash-row').count()) === 1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  if (!(await page.locator('[data-testid="spec-trash"]').evaluate((el) => el.open))) await page.locator('[data-testid="spec-trash"] summary').click()
+  await page.getByTestId('spec-trash-purge').first().click()
+  await page.getByTestId('spec-trash-purge-next').click()
+  check('D12 휴지통 390 — 두 번째 확인까지 넘침 0', (await overflowX(page)) <= 0, await overflowX(page))
+  for (const b of await page.getByRole('button', { name: '알림 닫기' }).all()) await b.click().catch(() => {})
+  await page.getByTestId('spec-trash-purge-ask').scrollIntoViewIfNeeded()
+  await shot(page, 'D-390-purge', false)
+  check('D13 JS 오류 0', errors.length === 0, errors)
+  await ctx.close()
+}
+
 /* ---------------- 대화창 [새 명세서] — 명세서 화면을 새로 여는 길(회사 기록이 늦게 옴) ---------------- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
@@ -456,7 +602,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.waitForTimeout(400)
   const first = sent[before]
   const firstCtx = JSON.stringify(first?.context ?? '')
-  check('C1 대화창 [새 명세서] → 명세서 화면이 새로 열려도 단추 한 번으로 바로 시작(주소 auto 지움)', !page.url().includes('auto=1') && first?.assistId === 'spec.idea' && sent.length > before, { url: page.url(), id: first?.assistId })
+  check('C1 대화창 [새 명세서] → 명세서 화면이 새로 열려도 단추 한 번으로 바로 기획 대화 시작(주소 auto 지움)', !page.url().includes('auto=1') && first?.assistId === 'spec.talk' && sent.length > before, { url: page.url(), id: first?.assistId })
   check('C2 회사 기록 · 그 회사 AI 작업실 자료를 다 읽은 뒤 시작 — 첫 부름부터 회사 기록 + 작업실 자료', firstCtx.includes('대화창재료표식') && /업종|종목|설립/.test(firstCtx), firstCtx.slice(0, 400))
   await waitIdle(page)
   check('C3 JS 오류 0', errors.length === 0, errors)
@@ -475,6 +621,8 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   delayMs = 30
   partsMode = 'messy'
   partsCalls = 0
+  // 첫 기획 대화에서 바로 '충분' → 기다리지 않고 아이디어 5개까지 저절로
+  talkMode = 'enough'
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
   const before = sent.length
@@ -507,8 +655,10 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('E4 직접 고치기 화면에도 구성요소 이름 그대로(진동 수집부 …) · 하는 일은 "~하는"(모은다 → 모으는 · "…를 수행하는" 없음)', comps.includes('진동 수집부') && comps.includes('교체시점 산출부') && does.includes('공구의 진동신호를 모으는') && does.every((x) => !/수행하는/.test(x)), { comps, does })
   await page.locator('[data-testid="spec-comp"]').first().scrollIntoViewIfNeeded().catch(() => {})
   await shot(page, 'E-messy-parts', false)
+  check('E0 기획 대화가 첫 번에 "충분" 이면 그대로 아이디어 5개까지 저절로(대표가 누를 것 없음)', sent.slice(before, before + 2).map((r) => r.assistId).join() === 'spec.talk,spec.idea', sent.slice(before, before + 2).map((r) => r.assistId))
   check('E5 JS 오류 0', errors.length === 0, errors)
   partsMode = 'normal'
+  talkMode = 'ask'
   await ctx.close()
 }
 
@@ -622,7 +772,15 @@ for (const width of [360, 390]) {
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
   await page.getByTestId('spec-new').click()
   await page.getByTestId('spec-board').waitFor()
-  await page.waitForTimeout(1500)
+  await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
+  await waitIdle(page)
+  await page.waitForTimeout(300)
+  const tooWide = await page.getByTestId('spec-talk-option').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length)
+  check(`M${width}t 기획 대화 — 질문 · 누를 답 4개 · 직접 적기 · 넘침 0 · 답 단추 글자 잘림 0`, (await page.getByTestId('spec-talk-option').count()) === 4 && (await page.getByTestId('spec-talk-own').isVisible()) && (await overflowX(page)) <= 0 && tooWide === 0, { o: await overflowX(page), tooWide })
+  await page.getByTestId('spec-talk').scrollIntoViewIfNeeded()
+  await shot(page, `M-${width}-talk`, false)
+  await page.getByTestId('spec-talk-next').click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-plan-idea"]').length === 5, null, { timeout: 20000 }).catch(() => {})
   await waitIdle(page)
   await page.waitForTimeout(400)
   check(`M${width} 아이디어 고르기 — 후보 5개 · 단추 · 넘침 0 · JS 오류 0`, (await page.getByTestId('spec-plan-idea').count()) === 5 && (await page.getByTestId('spec-plan-start').isVisible()) && (await overflowX(page)) <= 0 && errors.length === 0, { o: await overflowX(page), errors })
