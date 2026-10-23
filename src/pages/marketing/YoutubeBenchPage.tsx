@@ -103,6 +103,7 @@ import { BriefCard } from './radar/BriefCard'
 import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
 import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
+import { rememberWeekTopics } from '../../services/marketing/quickStart'
 
 /** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
 type View = RadarView
@@ -275,6 +276,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     writeWeekLog(log)
     setLastWeek(last)
   }, [prepared, homeKeyIds, today])
+  // MUX-2 이번 주 키워드를 스레드 · 릴스 · 틱톡 쓰기의 주제 칩으로 — 예시 데이터(유튜브 연결 전)는 두지 않는다
+  const homeTopics = useMemo(() => (homeData?.list ?? []).map((k) => k.topic).join('|'), [homeData])
+  useEffect(() => {
+    if (!prepared || yt.sample || !homeTopics) return
+    rememberWeekTopics(homeTopics.split('|'), today)
+  }, [prepared, yt.sample, homeTopics, today])
   const homeKeys = homeData ? homeData.list.map((k) => ({ ...k, note: homeData.noteOf.get(k.key) })) : null
   // 이름표가 없는 키(예전 주제 · 지운 주제)는 앞머리('market:')를 떼고
   const change = useMemo(() => weekChange((homeData?.list ?? []).map((k) => k.key), lastWeek, (key) => opportunityLabel(key).label.replace(/^[a-z]+:/, '')), [homeData, lastWeek])

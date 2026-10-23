@@ -38,7 +38,8 @@ export function JudgeReportView({ report, title, testId = 'judge-report' }: { re
         {report.custom && <span className="t-meta rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">대표 기준</span>}
       </div>
       <p className="t-meta break-keep text-slate-600">
-        {pass ? `${JUDGE_PASS}점 이상 · P0 없음 — 그대로 내도 되는 판정입니다.` : p0 ? 'P0 가 남아 있습니다 — 아래 대표 확인부터.' : `${JUDGE_PASS}점 미만 — 아래 확인할 것을 채우면 올라갑니다.`}
+        {/* MUX — 특허 · 벤처는 AI 가 확정하지 않는다: 통과는 '자체점검 통과(초안)' 까지, 출원 · 신청은 사람이 정한다 */}
+        {pass ? `${JUDGE_PASS}점 이상 · P0 없음 — AI 자체점검 통과(아직 초안). 출원 · 신청 여부는 대표 · 변리사가 확인하고 정합니다.` : p0 ? 'P0 가 남아 있습니다 — 아래 대표 확인부터.' : `${JUDGE_PASS}점 미만 — 아래 확인할 것을 채우면 올라갑니다.`}
         {report.fixed.length ? ` 자체점검에서 직접 고친 칸: ${report.fixed.join(' · ')}.` : ' 고친 칸 없음.'}
         {report.kept.length ? ` 직접 고치신 ${report.kept.join(' · ')}은 덮지 않고 새 안으로 두었습니다.` : ''}
       </p>

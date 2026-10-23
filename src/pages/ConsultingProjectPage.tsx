@@ -101,6 +101,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
   const [missing, setMissing] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [saveFailed, setSaveFailed] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
   const [deleteTyped, setDeleteTyped] = useState('')
@@ -146,11 +147,14 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         setProject(saved)
       }
       setSavedAt(Date.now())
+      setSaveFailed(false)
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-      void load()
+      // MUX-P0 저장 실패 — 예전에는 서버 값을 다시 읽어 적던 내용을 덮어썼다. 이제 화면에 그대로 두고 다음 수정 · [다시 저장] 때 다시 보낸다
+      dirty.current = true
+      setSaveFailed(true)
+      showToast(`${cause instanceof Error ? cause.message : '저장하지 못했습니다.'} — 적은 내용은 이 화면에 그대로 있어요.`)
     }
-  }, [showToast, load])
+  }, [showToast])
 
   const update = useCallback(
     (fn: (p: ConsultingProject) => ConsultingProject) => {
@@ -231,9 +235,12 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         latest.current = saved
         setProject(saved)
         setSavedAt(Date.now())
+        setSaveFailed(false)
       } catch (cause) {
-        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-        void load()
+        // MUX-P0 화면 값은 그대로 두고 다시 보낼 수 있게(서버 값으로 덮어쓰지 않는다)
+        dirty.current = true
+        setSaveFailed(true)
+        showToast(`${cause instanceof Error ? cause.message : '저장하지 못했습니다.'} — 적은 내용은 이 화면에 그대로 있어요.`)
         return
       }
       for (const d of outcome.decisions.slice(0, 4)) {
@@ -246,7 +253,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
       setDecisions(await listDecisions(workspaceId, projectId).catch(() => decisions))
       window.scrollTo({ top: 0, behavior: 'smooth' })
     },
-    [artifacts, prompts, evidence, today, workspaceId, userId, projectId, decisions, showToast, load],
+    [artifacts, prompts, evidence, today, workspaceId, userId, projectId, decisions, showToast],
   )
 
   const goTo = useCallback(
@@ -396,6 +403,14 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
           </>
         )}
 
+        {saveFailed && (
+          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="cs-save-failed">
+            <p className="t-sub min-w-[12rem] flex-1 break-keep text-warning-800">저장하지 못했어요 — 적은 내용은 이 화면에 그대로 있어요. 인터넷이 돌아오면 다시 저장해 주세요.</p>
+            <Button size="sm" variant="secondary" onClick={() => void flush()} data-testid="cs-save-retry">
+              다시 저장
+            </Button>
+          </div>
+        )}
         <SavedBadge savedAt={savedAt} />
 
         {moreOpen && (

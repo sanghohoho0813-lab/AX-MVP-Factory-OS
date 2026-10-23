@@ -206,9 +206,12 @@ export function OrganizationDetailPage() {
               <Pencil aria-hidden="true" className="size-4" />
               고객사 수정
             </Button>
-            <Button variant="secondary" onClick={() => navigate(`/ops/clients/${organization.id}`)}>
-              <ListChecks aria-hidden="true" className="size-4" />운영 파일
-            </Button>
+            {/* MUX-P0 고객사 id 는 업체 id 와 다르다 — 이어진 업체(clientOpsId)가 있을 때만, 그 업체로 */}
+            {organization.clientOpsId && (
+              <Button variant="secondary" onClick={() => navigate(`/ops/clients/${organization.clientOpsId}`)} data-testid="org-ops-file">
+                <ListChecks aria-hidden="true" className="size-4" />운영 파일
+              </Button>
+            )}
             <DropdownMenu
               ariaLabel="고객사 더보기 메뉴"
               items={[

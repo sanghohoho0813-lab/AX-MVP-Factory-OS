@@ -7,9 +7,9 @@
  *  ④ 하루 10분    오늘 할 일 체크 · 태그 검색 열기 · 전문가 답글 틀 · 요일 계획
  * 대표 전용(마케팅 · 브랜딩 모듈 · 팀장에게 안 보임). 저장은 기존 모듈 기록(marketing / threads).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, NotebookPen, RefreshCw, Save, Send, Sparkles, TriangleAlert } from 'lucide-react'
+import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, NotebookPen, RefreshCw, Save, Send, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile, Surface } from '../../components/ui/primitives'
@@ -20,6 +20,9 @@ import { useViewingPilot } from '../../auth/osAccess'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
+import { QuickStart } from './QuickStart'
+import { Fold, openFold } from '../../components/ui/fold'
+import { readWeekTopics, recommendThread, topicChips } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
@@ -83,6 +86,8 @@ interface Draft {
   selfComment: string
   checks: string[]
   source: ThreadPost['source']
+  /** MUX-2 형식을 누가 정했나 — 'rec' 추천 · 'hand' 직접 고름(추천이 덮지 않음) */
+  formatBy?: 'rec' | 'hand'
 }
 const EMPTY_DRAFT: Draft = { goal: '', template: '', topic: '', tag: '', facts: '', reference: '', body: '', selfComment: '', checks: [], source: 'hand' }
 
@@ -126,8 +131,11 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
   // D-274 다른 채널에서 '같은 소재로' 를 누르고 왔으면 소재를 채운다(주소의 topic 은 한 번 쓰고 지운다)
   const [draft, setDraftState] = useState<Draft>(() => {
     const d = readDraft()
-    const t = params.get('topic')
-    return t ? { ...d, topic: t.slice(0, 200) } : d
+    const t = params.get('topic')?.slice(0, 200)
+    if (!t) return d
+    // MUX-2 주제를 들고 왔으면 형식도 그 주제에 맞춰 추천(이번 주 잘 된 틀은 읽은 뒤 화면이 다시 맞춘다)
+    const r = recommendThread({ topic: t })
+    return { ...d, topic: t, goal: r.goal, template: r.template, tag: r.tag || d.tag, formatBy: 'rec' }
   })
   useEffect(() => {
     if (!params.get('topic')) return
@@ -197,27 +205,65 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today, factsText])
   const set = (part: Partial<Draft>) => setDraft((d) => ({ ...d, ...part }))
+  const bodyNow = useRef(draft.body)
+  bodyNow.current = draft.body
 
-  const pickGoal = (g: ThreadGoal) => set({ goal: g, template: draft.template && templateOf(draft.template)?.goals.includes(g) ? draft.template : '' })
+  // MUX-2 추천 형식(규칙) — 사람이 직접 고른 틀이 있으면 그것, 없으면 주제 · 오늘 계획 · 이번 주 잘 된 틀로
+  const rec = useMemo(() => recommendThread({ topic: draft.topic, today, weekRef }), [draft.topic, today, weekRef])
+  const eff = draft.template ? { goal: (draft.goal || templateOf(draft.template)?.goals[0] || rec.goal) as ThreadGoal, template: draft.template } : { goal: rec.goal, template: rec.template }
+  const chips = useMemo(() => topicChips(readWeekTopics(today), PRIORITY_TOPICS.map((p) => p.topic)), [today])
+  const pickTopic = (t: string) => {
+    const r = recommendThread({ topic: t, today, weekRef })
+    // 칩으로 새 주제를 고르면 형식도 그 주제에 맞춰 다시 추천(직접 고른 틀은 '형식 직접 고르기' 에서 언제든 바꿈)
+    set({ topic: t, goal: r.goal, template: r.template, tag: r.tag || draft.tag, formatBy: 'rec' })
+  }
+  const openFormats = () => {
+    openFold('thr.formats')
+    window.setTimeout(() => document.querySelector('[data-testid="thr-choose"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+  const pickGoal = (g: ThreadGoal) => set({ goal: g, template: draft.template && templateOf(draft.template)?.goals.includes(g) ? draft.template : '', formatBy: 'hand' })
   const startBody = (body: string, source: Draft['source'], tag?: string) => {
     if (draft.body.trim() && draft.body.trim() !== body.trim() && !window.confirm('지금 쓰던 글을 이 글로 바꿀까요? (쓰던 글은 사라집니다)')) return
     set({ body, source, ...(tag && !draft.tag ? { tag } : {}), checks: [] })
     document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+  const startSkeleton = () => {
+    const t = templateOf(eff.template)
+    if (!t) return
+    if (!draft.template) set({ goal: eff.goal, template: eff.template, tag: draft.tag || rec.tag, formatBy: 'rec' })
+    startBody(skeletonDraft(t, draft.topic), 'hand')
+  }
 
-  const runAi = async () => {
+  /** auto — 글 칸이 비어 있으면 1안을 바로 넣는다(쓰던 글은 덮지 않는다) */
+  const runAi = async (pick?: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }, auto = false) => {
     if (ai.busy) return
     setAi({ busy: true, error: '', drafts: [] })
+    const use = pick ?? { goal: draft.goal, template: draft.template, tag: draft.tag }
     try {
-      const context = threadsContext({ goal: draft.goal, template: draft.template, topic: draft.topic, tag: draft.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef })
+      const context = threadsContext({ goal: use.goal, template: use.template, topic: draft.topic, tag: use.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef })
       const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context })
       const { drafts, tag } = parseThreadDrafts(run.structured)
       if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 글을 찾지 못했어요 — 다시 눌러 주세요.')
       setAi({ busy: false, error: '', drafts })
-      if (tag && !draft.tag) set({ tag })
+      if (tag) setDraft((d) => (d.tag ? d : { ...d, tag }))
+      if (auto) {
+        // 기다리는 사이 글 칸에 쓴 것이 있으면 덮지 않는다(가장 최근 화면 값으로 본다)
+        const first = drafts[0]
+        const fill = !bodyNow.current.trim()
+        if (fill) set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template } : {}) })
+        showToast(fill ? '1안을 글 칸에 넣었어요 — 다른 안은 "AI로 바로 쓰기" 아래에 있어요.' : '쓰던 글은 그대로 두었어요 — AI 글은 "AI로 바로 쓰기" 아래에서 골라 넣어요.')
+        if (fill) window.setTimeout(() => document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+      }
     } catch (e) {
       setAi({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', drafts: [] })
     }
+  }
+  const runQuick = () => {
+    if (!draft.topic.trim()) return
+    // 형식을 아직 안 정했으면 추천대로 정해 두고 쓴다 — '형식 직접 고르기' 에도 그대로 보인다
+    const pick = draft.template ? { goal: eff.goal, template: draft.template, tag: draft.tag || rec.tag } : { goal: rec.goal, template: rec.template, tag: draft.tag || rec.tag }
+    if (!draft.template || !draft.tag) set({ goal: pick.goal, template: pick.template, tag: pick.tag, ...(draft.template ? {} : { formatBy: 'rec' as const }) })
+    return runAi(pick, true)
   }
   const takeDraft = (d: ThreadDraft) => {
     startBody(d.body, 'ai')
@@ -278,95 +324,99 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           {hotKeys.size ? '고치기' : '적으러 가기'}
         </Button>
       </div>
-      {plan && (
-        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5" data-testid="thr-plan">
-          <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
-            <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · {plan.picks.map((k) => `${k} ${templateOf(k)?.name ?? ''}`).join(' / ')}
-          </p>
-          <Button size="sm" variant="secondary" onClick={() => set({ goal: plan.goal, template: plan.picks[0] })} data-testid="thr-plan-use">
-            이 계획으로
-          </Button>
-        </div>
-      )}
+      {/* MUX-2 주제 하나 → 바로 쓰기 — 형식은 오늘 계획 · 이번 주 잘 된 틀로 추천(규칙). 직접 고르기는 아래에 접어 둠(지운 것 없음) */}
+      <QuickStart
+        testPrefix="thr"
+        topic={draft.topic}
+        onTopic={(t) => set({ topic: t })}
+        onPick={pickTopic}
+        chips={chips}
+        recLabel={`${GOALS.find((g) => g.key === eff.goal)?.label ?? ''} · ${eff.template} ${templateOf(eff.template)?.name ?? ''}`}
+        recWhy={rec.why}
+        picked={!!draft.template && draft.formatBy !== 'rec'}
+        onChangeFormat={openFormats}
+        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
+        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
+        fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
+      >
+        {ai.drafts.length > 0 && (
+          <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">
+            {ai.drafts.map((d, i) => (
+              <AiDraftCard key={i} n={i + 1} d={d} tag={draft.tag} recent={store.posts} facts={factsText} onUse={() => takeDraft(d)} />
+            ))}
+          </ul>
+        )}
+      </QuickStart>
 
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="1">원하는 반응</StepTitle>
-        <BigChoices items={GOALS} value={draft.goal} onPick={pickGoal} label="원하는 반응" testPrefix="thr-goal" />
-      </Surface>
-
-      <Surface className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[12rem] flex-1">
-            <StepTitle n="2">틀 고르기</StepTitle>
-          </div>
-          <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
-            <BookOpen aria-hidden="true" className="size-4" /> 틀 23가지 전부
-          </Button>
-        </div>
-        <p className="t-sub break-keep text-slate-600">{goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : '반응을 고르면 그 반응에 맞는 틀만 남아요. 지금은 오늘 계획 · 자주 쓰는 틀.'}</p>
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
-          {picks.map((t) => (
-            <li key={t.key} className="min-w-0">
-              <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0] })} />
-            </li>
-          ))}
-        </ul>
-        {tpl && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="thr-tpl-detail">
-            <p className="t-body font-bold break-keep text-slate-900">
-              {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
+      <Fold id="thr.formats" title="형식 직접 고르기" summary={`원하는 반응 · 틀 23가지 · 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 남의 글 뼈대`} panel testId="thr-choose">
+        {plan && (
+          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5" data-testid="thr-plan">
+            <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
+              <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · {plan.picks.map((k) => `${k} ${templateOf(k)?.name ?? ''}`).join(' / ')}
             </p>
-            <ol className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-1 break-keep text-slate-700" aria-label="뼈대">
-              {tpl.skeleton.map((s, i) => (
-                <li key={s} className="inline-flex items-center gap-1.5">
-                  {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
-                  <span className="rounded-md bg-white px-1.5 py-0.5">{s}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="t-sub break-keep text-slate-700">
-              <b>왜 되나</b> {tpl.why}
-            </p>
-            <p className="t-sub break-keep text-slate-700">
-              <b>우리가 쓰면</b> {tpl.ours}
-            </p>
-            {tpl.caution && (
-              <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
-                <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {tpl.caution}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {tpl.example && (
-                <Button size="sm" variant="secondary" onClick={() => startBody(tpl.example ?? '', 'example', tpl.exampleTag)} data-testid="thr-use-example">
-                  <FilePlus2 aria-hidden="true" className="size-4" /> 예시 글로 시작
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => startBody(skeletonDraft(tpl, draft.topic), 'hand')} data-testid="thr-use-skeleton">
-                빈 틀로 시작
-              </Button>
-            </div>
+            <Button size="sm" variant="secondary" onClick={() => set({ goal: plan.goal, template: plan.picks[0], formatBy: 'hand' })} data-testid="thr-plan-use">
+              이 계획으로
+            </Button>
           </div>
         )}
-      </Surface>
-
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="3">소재 · 주제 태그</StepTitle>
-        <label className="flex flex-col gap-1">
-          <span className="t-sub font-semibold text-slate-700">무엇에 대해 쓸까요</span>
-          <input value={draft.topic} onChange={(e) => set({ topic: e.target.value })} placeholder="예: 창업 3년 안 벤처기업확인 세금" className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-topic" />
-        </label>
-        <div className="flex flex-col gap-1.5">
-          <span className="t-meta text-slate-500">소재가 멀면 이 순서로(우리 분야 우선 주제)</span>
-          <div className="flex flex-wrap gap-1.5">
-            {PRIORITY_TOPICS.map((p) => (
-              <button key={p.topic} type="button" onClick={() => set({ topic: p.topic, tag: draft.tag || p.tag })} className={chip(draft.topic === p.topic)} data-testid="thr-topic-pick">
-                {p.topic}
-              </button>
-            ))}
+        <div className="flex flex-col gap-3">
+          <h3 className="t-card font-bold text-slate-900">원하는 반응</h3>
+          <BigChoices items={GOALS} value={draft.goal} onPick={pickGoal} label="원하는 반응" testPrefix="thr-goal" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="t-card min-w-[12rem] flex-1 font-bold text-slate-900">틀 고르기</h3>
+            <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
+              <BookOpen aria-hidden="true" className="size-4" /> 틀 23가지 전부
+            </Button>
           </div>
+          <p className="t-sub break-keep text-slate-600">{goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : '반응을 고르면 그 반응에 맞는 틀만 남아요. 지금은 오늘 계획 · 자주 쓰는 틀.'}</p>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
+            {picks.map((t) => (
+              <li key={t.key} className="min-w-0">
+                <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0], formatBy: 'hand' })} />
+              </li>
+            ))}
+          </ul>
+          {tpl && (
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="thr-tpl-detail">
+              <p className="t-body font-bold break-keep text-slate-900">
+                {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
+              </p>
+              <ol className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-1 break-keep text-slate-700" aria-label="뼈대">
+                {tpl.skeleton.map((s, i) => (
+                  <li key={s} className="inline-flex items-center gap-1.5">
+                    {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
+                    <span className="rounded-md bg-white px-1.5 py-0.5">{s}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="t-sub break-keep text-slate-700">
+                <b>왜 되나</b> {tpl.why}
+              </p>
+              <p className="t-sub break-keep text-slate-700">
+                <b>우리가 쓰면</b> {tpl.ours}
+              </p>
+              {tpl.caution && (
+                <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
+                  <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {tpl.caution}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {tpl.example && (
+                  <Button size="sm" variant="secondary" onClick={() => startBody(tpl.example ?? '', 'example', tpl.exampleTag)} data-testid="thr-use-example">
+                    <FilePlus2 aria-hidden="true" className="size-4" /> 예시 글로 시작
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => startBody(skeletonDraft(tpl, draft.topic), 'hand')} data-testid="thr-use-skeleton">
+                  빈 틀로 시작
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="t-sub font-semibold text-slate-700">주제 태그 1개</span>
+          <h3 className="t-card font-bold text-slate-900">주제 태그 1개</h3>
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그">
             {TOPIC_TAGS.map((t) => (
               <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={chip(draft.tag === t)} data-testid={`thr-tag-${t}`}>
@@ -375,38 +425,15 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
             ))}
           </div>
         </div>
-        <FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />
         <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="thr-ref-box">
           <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">잘 된 남의 글 붙여넣기 (선택 — 뼈대만 빌림 · 저장 안 함)</summary>
           <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
         </details>
-        {aiOk ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" onClick={() => void runAi()} disabled={ai.busy} data-testid="thr-ai">
-                <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : 'AI로 글 3개 쓰기'}
-              </Button>
-              <span className="t-meta min-w-[10rem] flex-1 break-keep text-slate-500">고른 반응 · 틀 · 소재로 서로 다른 틀 3개. 쓰고 나면 아래에서 규칙 검사를 거쳐 고칩니다.</span>
-            </div>
-            {ai.error && (
-              <p role="alert" className="t-sub break-keep text-danger-700" data-testid="thr-ai-error">
-                {ai.error}
-              </p>
-            )}
-            {ai.drafts.length > 0 && (
-              <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">
-                {ai.drafts.map((d, i) => (
-                  <AiDraftCard key={i} d={d} tag={draft.tag} recent={store.posts} facts={factsText} onUse={() => takeDraft(d)} />
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-      </Surface>
+      </Fold>
 
       <Surface className="flex flex-col gap-3">
         <div id="thr-editor" className="scroll-mt-24">
-          <StepTitle n="4">고치기 · 규칙 검사</StepTitle>
+          <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" data-testid="thr-editor">
           <div className="flex min-w-0 flex-col gap-2">
@@ -499,12 +526,13 @@ function TemplateButton({ t, on, hot = false, onClick }: { t: ThreadTemplate; on
   )
 }
 
-function AiDraftCard({ d, tag, recent, facts, onUse }: { d: ThreadDraft; tag: string; recent: readonly ThreadPost[]; facts: string; onUse: () => void }) {
+function AiDraftCard({ n, d, tag, recent, facts, onUse }: { n: number; d: ThreadDraft; tag: string; recent: readonly ThreadPost[]; facts: string; onUse: () => void }) {
   const lint = lintThreadPost({ body: d.body, template: d.template, tag, recent, facts })
   const t = d.template ? templateOf(d.template) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-ai-draft">
       <div className="flex flex-wrap items-center gap-1.5">
+        <span className="t-sub font-bold text-slate-900">{n}안</span>
         {t && <Badge tone="brand">{t.key} {t.name}</Badge>}
         <Badge tone={lint.bad ? 'danger' : 'success'}>{lint.chars}자 · 고칠 것 {lint.bad}</Badge>
       </div>

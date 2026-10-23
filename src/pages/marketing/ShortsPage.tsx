@@ -6,9 +6,9 @@
  *  기록표: 조회 · 좋아요 · 댓글 · 저장 · 공유 · 문의 → 점수(좋아요 + 댓글×3) · 저장 · 공유율 · 형식별 평균.
  * 대표 전용(마케팅 · 브랜딩 모듈). 저장은 기존 모듈 기록(marketing / shorts).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, FilePlus2, RefreshCw, Save, Send, Sparkles, TriangleAlert } from 'lucide-react'
+import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, FilePlus2, RefreshCw, Save, Send, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile, Surface } from '../../components/ui/primitives'
@@ -51,6 +51,9 @@ import {
   type ShortPost,
 } from '../../services/marketing/shorts'
 import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
+import { QuickStart } from './QuickStart'
+import { Fold, openFold } from '../../components/ui/fold'
+import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 
 type Tab = 'write' | 'records' | 'guide'
 const TABS = [
@@ -74,6 +77,8 @@ interface Draft {
   hashtags: string
   checks: string[]
   source: ShortPost['source']
+  /** MUX-2 형식을 누가 정했나 — 'rec' 추천 · 'hand' 직접 고름(추천이 덮지 않음) */
+  formatBy?: 'rec' | 'hand'
 }
 const EMPTY: Draft = { platform: 'tiktok', aim: '', format: '', topic: '', facts: '', script: '', caption: '', hashtags: '', checks: [], source: 'hand' }
 const DRAFT_KEY = 'mirae.shorts.draft.v1'
@@ -113,8 +118,11 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
   // D-274 스레드에서 '같은 소재로' 를 누르고 왔으면 소재를 채운다(주소의 topic 은 한 번 쓰고 지운다)
   const [draft, setDraftState] = useState<Draft>(() => {
     const d = readDraft()
-    const t = params.get('topic')
-    return t ? { ...d, topic: t.slice(0, 200) } : d
+    const t = params.get('topic')?.slice(0, 200)
+    if (!t) return d
+    // MUX-2 주제를 들고 왔으면 목적 · 형식도 그 주제에 맞춰 추천
+    const r = recommendShort({ topic: t, platform: d.platform, posts: [] })
+    return { ...d, topic: t, aim: r.aim, format: r.format, formatBy: 'rec' }
   })
   useEffect(() => {
     if (!params.get('topic')) return
@@ -186,32 +194,76 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags, facts: factsText }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags, factsText])
   const mix = weekMix(store.posts, today)
 
+  const bodyNow = useRef(draft.script)
+  bodyNow.current = draft.script
+  // MUX-2 추천 형식(규칙) — 사람이 직접 고른 형식이 있으면 그것, 없으면 이번 주 올린 비율 · 주제 낱말로
+  const rec = useMemo(() => recommendShort({ topic: draft.topic, platform: draft.platform, posts: store.posts, today }), [draft.topic, draft.platform, store.posts, today])
+  const effFmt = draft.format ? formatOf(draft.format) : undefined
+  const eff = effFmt ? { aim: (draft.aim || aimsOf(effFmt, draft.platform)[0]) as ShortAim, format: effFmt.key } : { aim: rec.aim, format: rec.format }
+  const chips = useMemo(() => topicChips(readWeekTopics(today), QUICK_TOPICS), [today])
+  const pickTopic = (t: string) => {
+    const r = recommendShort({ topic: t, platform: draft.platform, posts: store.posts, today })
+    // 칩으로 새 주제를 고르면 목적 · 형식도 그 주제에 맞춰 다시 추천
+    set({ topic: t, aim: r.aim, format: r.format, formatBy: 'rec' })
+  }
+  const openFormats = () => {
+    openFold('sht.formats')
+    window.setTimeout(() => document.querySelector('[data-testid="sht-choose"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+
   const pickPlatform = (p: ShortPlatform) => {
+    // 추천으로 정해진 형식이면 새 플랫폼에 맞춰 다시 추천
+    if (draft.formatBy === 'rec' && draft.topic.trim()) {
+      const r = recommendShort({ topic: draft.topic, platform: p, posts: store.posts, today })
+      return set({ platform: p, aim: r.aim, format: r.format })
+    }
     const f = draft.format ? formatOf(draft.format) : undefined
     set({ platform: p, format: f && f.platforms.includes(p) && (!draft.aim || aimsOf(f, p).includes(draft.aim)) ? draft.format : '' })
   }
   const pickAim = (a: ShortAim) => {
     const f = draft.format ? formatOf(draft.format) : undefined
-    set({ aim: a, format: f && aimsOf(f, draft.platform).includes(a) ? draft.format : '' })
+    set({ aim: a, format: f && aimsOf(f, draft.platform).includes(a) ? draft.format : '', formatBy: 'hand' })
   }
   const start = (part: Pick<Draft, 'script' | 'caption' | 'hashtags' | 'source'> & Partial<Draft>) => {
     if (draft.script.trim() && draft.script.trim() !== part.script.trim() && !window.confirm('지금 쓰던 대본을 이 대본으로 바꿀까요? (쓰던 대본은 사라집니다)')) return
     set({ checks: [], ...part })
     document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  const runAi = async () => {
+  const startExample = () => {
+    const f = formatOf(eff.format)
+    if (!f) return
+    if (!draft.format) set({ aim: eff.aim, format: eff.format, formatBy: 'rec' })
+    start({ ...exampleOf(f, draft.platform), hashtags: f.exampleTags, source: 'example' })
+  }
+  /** auto — 대본 칸이 비어 있으면 1안을 바로 넣는다(쓰던 대본은 덮지 않는다) */
+  const runAi = async (pick?: { aim: ShortAim | ''; format: ShortFormatKey | '' }, auto = false) => {
     if (ai.busy) return
     setAi({ busy: true, error: '', drafts: [] })
+    const use = pick ?? { aim: draft.aim, format: draft.format }
     try {
-      const context = shortsContext({ platform: draft.platform, aim: draft.aim, format: draft.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today })
+      const context = shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today })
       const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context })
       const { drafts, checks } = parseShortDrafts(run.structured)
       if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 대본을 찾지 못했어요 — 다시 눌러 주세요.')
       setAi({ busy: false, error: '', drafts })
       set({ checks })
+      if (auto) {
+        // 기다리는 사이 대본 칸에 쓴 것이 있으면 덮지 않는다
+        const first = drafts[0]
+        const fill = !bodyNow.current.trim()
+        if (fill) set({ script: first.script, caption: first.caption, hashtags: first.hashtags, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
+        showToast(fill ? '1안을 대본 칸에 넣었어요 — 다른 안은 "AI로 바로 쓰기" 아래에 있어요.' : '쓰던 대본은 그대로 두었어요 — AI 대본은 "AI로 바로 쓰기" 아래에서 골라 넣어요.')
+        if (fill) window.setTimeout(() => document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+      }
     } catch (e) {
       setAi({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', drafts: [] })
     }
+  }
+  const runQuick = () => {
+    if (!draft.topic.trim()) return
+    // 형식을 아직 안 정했으면 추천대로 정해 두고 쓴다 — '형식 직접 고르기' 에도 그대로 보인다
+    if (!draft.format) set({ aim: eff.aim, format: eff.format, formatBy: 'rec' })
+    return runAi({ aim: eff.aim, format: eff.format }, true)
   }
   const save = async (posted: boolean) => {
     if (!draft.script.trim()) return showToast('대본이 비어 있어요.')
@@ -253,6 +305,39 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
 
   return (
     <div className="flex flex-col gap-4" data-testid="sht-write">
+      {/* MUX-2 주제 하나 → 바로 쓰기 — 목적 · 형식은 이번 주 올린 비율 · 주제 낱말로 추천(규칙). 직접 고르기는 아래에 접어 둠(지운 것 없음) */}
+      <QuickStart
+        testPrefix="sht"
+        topic={draft.topic}
+        onTopic={(t) => set({ topic: t })}
+        onPick={pickTopic}
+        chips={chips}
+        recLabel={`${aimLabel(draft.platform, eff.aim)} · ${formatOf(eff.format)?.name ?? ''} (${formatOf(eff.format)?.seconds ?? ''})`}
+        recWhy={rec.why}
+        picked={!!draft.format && draft.formatBy !== 'rec'}
+        onChangeFormat={openFormats}
+        top={
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="어디에 올려요" data-testid="sht-qs-platform">
+            {PLATFORMS.map((p) => (
+              <button key={p.key} type="button" role="radio" aria-checked={draft.platform === p.key} onClick={() => pickPlatform(p.key)} className={chip(draft.platform === p.key)} data-testid={`sht-qs-platform-${p.key}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        }
+        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
+        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
+        fallback={{ label: '형식 예시로 시작', onClick: startExample }}
+      >
+        {ai.drafts.length > 0 && (
+          <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 22rem), 1fr))' }} data-testid="sht-ai-drafts">
+            {ai.drafts.map((d, i) => (
+              <AiDraftCard key={i} n={i + 1} d={d} draft={draft} facts={factsText} onUse={() => start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', checks: draft.checks, ...(d.format ? { format: d.format } : {}) })} />
+            ))}
+          </ul>
+        )}
+      </QuickStart>
+
       <div className="rounded-(--radius-panel) border-2 border-slate-900 bg-white px-4 py-3" data-testid="sht-basics">
         <p className="t-body font-bold text-slate-900">이것만 지키면 돼요</p>
         <ol className="t-body mt-1 flex list-decimal flex-col gap-1 pl-5 break-keep text-slate-800">
@@ -262,91 +347,59 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         </ol>
       </div>
 
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="1">어디에 올려요?</StepTitle>
-        <BigChoices items={PLATFORMS} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
-      </Surface>
-
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="2">무엇을 원해요?</StepTitle>
-        <BigChoices items={AIMS[draft.platform]} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
-        <p className="t-sub break-keep text-slate-600" data-testid="sht-mix">
-          {draft.platform === 'tiktok' ? `권장: 많이 보이게 3번에 문의로 1번 · 이번 주 ${mix.tiktok.reach} : ${mix.tiktok.convert}` : `권장: 많이 보이게 2번 · 댓글 받기 2번(자금 · 세금 소재는 댓글 위주) · 이번 주 ${mix.reels.reach} : ${mix.reels.convert}`}
-        </p>
-      </Surface>
-
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="3">어떤 형식으로?</StepTitle>
-        <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }} data-testid="sht-formats">
-          {formats.map((f) => {
-            const on = draft.format === f.key
-            return (
-              <li key={f.key} className="min-w-0">
-                <button type="button" aria-pressed={on} onClick={() => set({ format: f.key })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white hover:border-brand-300'}`} data-testid={`sht-format-${f.key}`}>
-                  <span className="flex w-full flex-wrap items-baseline gap-x-2">
-                    <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
-                    <span className="t-sub text-slate-500">{f.seconds}</span>
-                  </span>
-                  <span className="t-sub break-keep text-slate-600">{f.how}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        {fmt && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="sht-format-detail">
-            <p className="t-sub break-keep text-slate-700">
-              <b>왜 되나</b> {fmt.why}
-            </p>
-            {fmt.caution && (
-              <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
-                <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {fmt.caution}
-              </p>
-            )}
-            <div>
-              <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: fmt.exampleTags, source: 'example' })} data-testid="sht-use-example">
-                <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
-              </Button>
-            </div>
-          </div>
-        )}
-      </Surface>
-
-      <Surface className="flex flex-col gap-3">
-        <StepTitle n="4">무엇에 대해?</StepTitle>
-        <input value={draft.topic} onChange={(e) => set({ topic: e.target.value })} placeholder="예: 창업 3년 안 벤처확인 세금" aria-label="소재" className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-topic" />
-        <div className="flex flex-wrap gap-1.5">
-          {QUICK_TOPICS.map((t) => (
-            <button key={t} type="button" onClick={() => set({ topic: t })} className={chip(draft.topic === t)} data-testid="sht-topic-pick">
-              {t}
-            </button>
-          ))}
+      <Fold id="sht.formats" title="형식 직접 고르기" summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본" panel testId="sht-choose">
+        <div className="flex flex-col gap-3">
+          <h3 className="t-card font-bold text-slate-900">어디에 올려요?</h3>
+          <BigChoices items={PLATFORMS} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
         </div>
-        <FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />
-        {aiOk && (
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" onClick={() => void runAi()} disabled={ai.busy} className="w-full sm:w-auto" data-testid="sht-ai">
-              <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : 'AI로 대본 2개 쓰기'}
-            </Button>
-            {ai.error && (
-              <p role="alert" className="t-sub break-keep text-danger-700" data-testid="sht-ai-error">
-                {ai.error}
+        <div className="flex flex-col gap-3">
+          <h3 className="t-card font-bold text-slate-900">무엇을 원해요?</h3>
+          <BigChoices items={AIMS[draft.platform]} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
+          <p className="t-sub break-keep text-slate-600" data-testid="sht-mix">
+            {draft.platform === 'tiktok' ? `권장: 많이 보이게 3번에 문의로 1번 · 이번 주 ${mix.tiktok.reach} : ${mix.tiktok.convert}` : `권장: 많이 보이게 2번 · 댓글 받기 2번(자금 · 세금 소재는 댓글 위주) · 이번 주 ${mix.reels.reach} : ${mix.reels.convert}`}
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <h3 className="t-card font-bold text-slate-900">어떤 형식으로?</h3>
+          <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }} data-testid="sht-formats">
+            {formats.map((f) => {
+              const on = draft.format === f.key
+              return (
+                <li key={f.key} className="min-w-0">
+                  <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white hover:border-brand-300'}`} data-testid={`sht-format-${f.key}`}>
+                    <span className="flex w-full flex-wrap items-baseline gap-x-2">
+                      <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
+                      <span className="t-sub text-slate-500">{f.seconds}</span>
+                    </span>
+                    <span className="t-sub break-keep text-slate-600">{f.how}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          {fmt && (
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="sht-format-detail">
+              <p className="t-sub break-keep text-slate-700">
+                <b>왜 되나</b> {fmt.why}
               </p>
-            )}
-            {ai.drafts.length > 0 && (
-              <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 22rem), 1fr))' }} data-testid="sht-ai-drafts">
-                {ai.drafts.map((d, i) => (
-                  <AiDraftCard key={i} d={d} draft={draft} facts={factsText} onUse={() => start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', checks: draft.checks, ...(d.format ? { format: d.format } : {}) })} />
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </Surface>
+              {fmt.caution && (
+                <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
+                  <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {fmt.caution}
+                </p>
+              )}
+              <div>
+                <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: fmt.exampleTags, source: 'example' })} data-testid="sht-use-example">
+                  <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Fold>
 
       <Surface className="flex flex-col gap-3">
         <div id="sht-editor" className="scroll-mt-24">
-          <StepTitle n="5">고치고 확인하기</StepTitle>
+          <StepTitle n="2">고치고 확인하기</StepTitle>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" data-testid="sht-editor">
           <div className="flex min-w-0 flex-col gap-3">
@@ -420,12 +473,13 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   )
 }
 
-function AiDraftCard({ d, draft, facts, onUse }: { d: ShortDraft; draft: Draft; facts: string; onUse: () => void }) {
+function AiDraftCard({ n, d, draft, facts, onUse }: { n: number; d: ShortDraft; draft: Draft; facts: string; onUse: () => void }) {
   const lint = lintShort({ platform: draft.platform, aim: draft.aim, script: d.script, caption: d.caption, hashtags: d.hashtags, facts })
   const f = d.format ? formatOf(d.format) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-ai-draft">
       <div className="flex flex-wrap items-center gap-1.5">
+        <span className="t-sub font-bold text-slate-900">{n}안</span>
         {f && <Badge tone="brand">{f.name}</Badge>}
         <Badge tone={lint.bad ? 'danger' : 'success'}>
           약 {lint.seconds}초 · 고칠 것 {lint.bad}

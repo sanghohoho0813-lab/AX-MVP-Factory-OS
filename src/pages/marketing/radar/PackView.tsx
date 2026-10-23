@@ -9,7 +9,7 @@
  *  - 팀장 화면을 보는 중이면 AI 를 부르지 않는다(규칙 초안만 · 저장 안 함).
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, BookmarkPlus, ChevronDown, ClipboardCopy, ExternalLink, FileText, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, AtSign, BookmarkPlus, ChevronDown, ClipboardCopy, ExternalLink, FileText, Film, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
@@ -173,6 +173,17 @@ export function PackView({
           )
         })}
       </nav>
+
+      {/* MUX-2 같은 주제를 스레드 · 릴스 · 틱톡 전용 공식으로 — 주제를 들고 가면 그 화면이 형식을 추천해 [AI로 바로 쓰기] 하나만 누르면 된다 */}
+      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="mk-pack-channels">
+        <span className="t-sub min-w-[10rem] flex-1 break-keep font-semibold text-slate-800">같은 주제로 다른 채널 — 채널마다 공식이 달라 따로 써요</span>
+        <Link to={`/marketing/threads?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-threads">
+          <AtSign aria-hidden="true" className="size-4" /> 스레드 글 쓰기
+        </Link>
+        <Link to={`/marketing/shorts?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-shorts">
+          <Film aria-hidden="true" className="size-4" /> 릴스 · 틱톡 대본 쓰기
+        </Link>
+      </div>
 
       {pack.sections.map((x) => {
         const L = SECTION_LOOK[x.id]
