@@ -3,8 +3,9 @@
  * 대표 "60대도 쓸 수 있게 쉽고 간편하게" — 단추는 크게(44px 이상), 글은 짧게, 고를 것은 한 번에 2~4개.
  */
 import { useState, type ReactNode } from 'react'
-import { CheckCircle2, OctagonAlert, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
+import { KIM_FACTS, REWRITES, VENTURE_CARDS } from '../../services/marketing/snsRules'
 
 export function StepTitle({ n, children }: { n: string; children: ReactNode }) {
   return (
@@ -126,5 +127,78 @@ export function StatInputs<K extends string>({ keys, values, disabled, onSet, te
         </label>
       ))}
     </div>
+  )
+}
+
+/** D-274 나눠 줄 자료 — 체크리스트 카드 6장(누르면 크게 · 한 장씩 / 모두 내려받기) */
+export function ShareKit({ testId }: { testId: string }) {
+  const all = () => {
+    VENTURE_CARDS.cards.forEach((c, i) =>
+      window.setTimeout(() => {
+        const a = document.createElement('a')
+        a.href = c.file
+        a.download = c.file.split('/').pop() ?? 'card.png'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }, i * 250),
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-brand-200 bg-brand-50/50 px-3 py-3" data-testid={testId}>
+      <p className="t-body flex items-center gap-1.5 font-bold break-keep text-slate-900">
+        <Gift aria-hidden="true" className="size-5 shrink-0 text-brand-700" /> 나눠 줄 자료가 이미 있어요 — {VENTURE_CARDS.title}
+      </p>
+      <p className="t-sub break-keep text-slate-600">{VENTURE_CARDS.how}</p>
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {VENTURE_CARDS.cards.map((c, i) => (
+          <li key={c.file} className="min-w-0">
+            <a href={c.file} target="_blank" rel="noreferrer noopener" download className="tap flex flex-col items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 text-center hover:border-brand-400" data-testid={`${testId}-card`}>
+              <img src={c.file} alt={`카드 ${i + 1} — ${c.label}`} loading="lazy" width={108} height={135} className="aspect-[4/5] w-full rounded-sm object-cover" />
+              <span className="t-meta w-full break-keep text-slate-600">{i + 1}. {c.label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={all} data-testid={`${testId}-all`}>
+          <Download aria-hidden="true" className="size-4" /> 6장 모두 내려받기
+        </Button>
+        <span className="t-meta break-keep text-slate-500">휴대폰은 카드를 눌러 연 뒤 길게 눌러 저장해도 돼요.</span>
+      </div>
+    </div>
+  )
+}
+
+/** D-274 이렇게 말고 → 이렇게(대표 운영 원칙 · 넣지 말 것) */
+export function RewriteTable({ testId }: { testId: string }) {
+  return (
+    <ul className="flex flex-col divide-y divide-slate-100" data-testid={testId}>
+      {REWRITES.map((r) => (
+        <li key={r.no} className="flex flex-col gap-0.5 py-2">
+          <span className="t-sub break-keep text-danger-700">✕ {r.no}</span>
+          <span className="t-sub break-keep text-success-800">○ {r.yes}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** D-274 사실 목록(이것만 씀) 보기 + 이번에 더 쓸 사실 — AI 와 숫자 대조가 같은 목록을 쓴다 */
+export function FactsBox({ value, onChange, testPrefix, what }: { value: string; onChange: (v: string) => void; testPrefix: string; what: string }) {
+  return (
+    <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid={`${testPrefix}-facts-box`}>
+      <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">사실 목록 보기 · 이번 {what}에 더 쓸 사실 (선택)</summary>
+      <p className="t-sub mt-1 break-keep text-slate-600">AI 와 규칙 검사는 아래 사실만 씁니다. 목록에 없는 숫자가 나오면 규칙 검사가 알려 드려요.</p>
+      <ul className="t-sub mt-1 list-disc pl-5 break-keep text-slate-700" data-testid={`${testPrefix}-kim-facts`}>
+        {KIM_FACTS.map((f) => (
+          <li key={f}>{f}</li>
+        ))}
+      </ul>
+      <label className="mt-2 flex flex-col gap-1">
+        <span className="t-sub font-semibold text-slate-700">이번 {what}에 더 쓸 사실 — 한 줄에 하나(고객 실명 · 매출 · 계약금액은 적지 않기)</span>
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="예: 점검표 받은 대표님 12명(이번 달)" data-testid={`${testPrefix}-facts`} />
+      </label>
+    </details>
   )
 }

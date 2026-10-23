@@ -11,7 +11,7 @@ import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
-import { AX_AS_MONEY, AX_DENIED, HYPE, LINK } from './threads'
+import { AX_AS_MONEY, AX_DENIED, HYPE, LINK, numberLint, principleLint } from './snsRules'
 
 export const SHORTS_MODULE = 'marketing'
 export const SHORTS_BUCKET = 'shorts'
@@ -219,7 +219,7 @@ const NARROW = /보유\s*법인|입찰\s*업체|연구소\s*(?:보유|있는)\s*
 const CAPTION_SELL = /DM|디엠|상담|문의\s*주세요|전화|카톡|링크/
 const EXPERT_BRAG = /\d+\s*년\s*(?:경력|차\s*전문가)|전문가|전문\s*컨설턴트|베테랑/
 
-export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; script: string; caption: string; hashtags: string }): { lines: LintLine[]; seconds: number; firstWords: string; tags: string[]; bad: number; warn: number } {
+export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; script: string; caption: string; hashtags: string; facts?: string }): { lines: LintLine[]; seconds: number; firstWords: string; tags: string[]; bad: number; warn: number } {
   const script = input.script.replace(/\r\n?/g, '\n').trim()
   const caption = input.caption.trim()
   const out: LintLine[] = []
@@ -254,6 +254,8 @@ export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; 
     if (hype) add('hype', 'bad', `"${hype[0]}" — 보장 · 과장 · 지어낸 선착순은 쓰지 않아요`)
     if (AX_AS_MONEY.test(all) && !AX_DENIED.test(all)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — 자금은 기관 심사')
     if (/벤처/.test(all) && /감면|혜택|세금/.test(all) && !/확인\s*기관|기관\s*심사/.test(all)) add('venture', 'warn', '벤처 세금 이야기 — 캡션에 "(요건 충족 시 · 결과는 확인기관이 정합니다)"')
+    // D-274 대표 운영 원칙 · 사실 목록에 없는 숫자(말 · 화면 글자 · 캡션만 — 시간 표시는 빼고)
+    out.push(...principleLint(all), ...numberLint(`${script.split('\n').map(spokenOf).join('\n')}\n${caption}`, input.facts ?? ''))
     const brackets = script.match(/\[[^\]\n]{1,40}\]/g)?.filter((b) => !/^\[\d{1,2}:\d{2}\]$/.test(b)) ?? []
     if (brackets.length) add('brackets', 'warn', `[대괄호] ${brackets.length}칸 남음 — 사실을 확인해 채우기: ${brackets.slice(0, 2).join(' ')}`)
   }

@@ -1,7 +1,8 @@
 /**
  * D-273 스레드 · 릴스 · 틱톡 · 마케팅 공식 내재화 — 틀 23가지 · 숏폼 형식 5 · 규칙 검사(규칙 계산) · 기록표 점수 · AI 에 보내는 자료 · 서버 단추 · 공식 묶음.
  */
-import { ASSISTS, PACKS, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { ASSISTS, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { CONDITION_NOTE, KIM_FACTS, REWRITES, VENTURE_CARDS, VENTURE_PROMISE, numberLint, principleLint, unknownNumbers } from '../marketing/snsRules'
 import {
   AIMS,
   PLATFORMS,
@@ -178,21 +179,21 @@ check('D5 아무것도 안 골라도 자료가 만들어짐 · 참고 글 칸 �
 /* ---------------- A 서버 단추 · 공식 묶음 ---------------- */
 const tw = ASSISTS['threads.write']
 check('A1 서버 threads.write — 스레드 화면 · 쓰기 · 화면 단추 이름 같음', tw?.page === 'threads' && tw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'threads.write' && p.page === 'threads' && p.label === tw.label && p.kind === 'write'))
-check('A2 threads.write 에 스레드 공식 + 사실 목록이 실림', knowledgeOf(tw).map((k: { key: string }) => k.key).join() === 'mk_threads,mk_facts')
+check('A2 threads.write 에 대표 운영 원칙 + 스레드 공식 + 사실 목록이 실림', knowledgeOf(tw).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_threads,mk_facts')
 const sys = assistSystem(tw)
 check('A3 스레드 규칙 5줄이 지시문에 · 마케팅(유튜브) 규칙은 안 붙음', THREADS_RULES.length === 5 && THREADS_RULES.every((r: string) => sys.includes(r)) && !sys.includes('[마케팅 규칙]') && sys.includes('[스레드 규칙]'))
 check('A4 스레드 지시 — 500자 · 본인 댓글 · 틀 글자 · 참고 글은 뼈대만', /500자/.test(sys) && /본인 댓글/.test(sys) && /틀 글자 하나\(A~X\)/.test(sys) && /뼈대.*만 빌리고/.test(sys))
 const built = buildAssistPrompt(tw, ctx, '')
 check('A5 보낼 글에 참고 글 줄 · 고른 틀 · 최근 올린 글', /참고 글/.test(built.user) && /고른틀: P 자료 나눔 조건/.test(built.user) && /최근 올린 글 4건/.test(built.user), built.user.slice(0, 600))
 const meta = MK_KNOWLEDGE_META as Record<string, { chars: number }>
-check('A6 공식 묶음 5개 — 공통 · 스레드 · 숏폼 · 롱폼 · 사실 목록 · 모두 글자 있음', ['mk_common', 'mk_threads', 'mk_short', 'mk_long', 'mk_facts'].every((k) => typeof (MK_KNOWLEDGE as Record<string, string>)[k] === 'string' && meta[k].chars > 800 && typeof PACKS[k] === 'string' && PACKS[k].length > 800))
+check('A6 공식 묶음 7개 — 공통 · 스레드 · 숏폼 · 롱폼 · 사실 목록 · 운영 원칙 · 판정 기준 · 모두 글자 있음', ['mk_common', 'mk_threads', 'mk_short', 'mk_long', 'mk_facts', 'mk_principles', 'mk_judge'].every((k) => typeof (MK_KNOWLEDGE as Record<string, string>)[k] === 'string' && meta[k].chars > 800 && typeof PACKS[k] === 'string' && PACKS[k].length > 800))
 const allMk = Object.values(MK_KNOWLEDGE as Record<string, string>).join('\n')
 check('A7 공식 묶음에 출처 이름 · 남의 계정 · 파일 경로 · 차수 표시 없음', !/자청|이상한\s*AI|쓰레드나이스|@[A-Za-z]|[A-Za-z]:\\|\.md\b|\.csv\b|〔|⟲|배포자료\\/.test(allMk), (/자청|이상한\s*AI|쓰레드나이스|@[A-Za-z]|[A-Za-z]:\\|\.md\b|\.csv\b|〔|⟲|배포자료\\/.exec(allMk) ?? [''])[0])
 const kbOf = (id: string) => knowledgeOf(ASSISTS[id]).map((k: { key: string }) => k.key).join()
-check('A8 마케팅 단추마다 맞는 공식 — 기획은 공통 · 대본은 롱폼 · 쇼츠는 숏폼 · 블로그는 사실 목록만 · 받아 적기는 없음', kbOf('radar.top5') === 'mk_common,mk_facts' && kbOf('radar.script') === 'mk_common,mk_long,mk_facts' && kbOf('radar.pack.video') === 'mk_common,mk_long,mk_facts' && kbOf('radar.adapt') === 'mk_common,mk_long,mk_facts' && kbOf('radar.pack.short') === 'mk_common,mk_short,mk_facts' && kbOf('rising.shorts') === 'mk_common,mk_short,mk_facts' && kbOf('radar.pack.blog') === 'mk_facts' && kbOf('radar.transcript') === '')
+check('A8 마케팅 단추마다 맞는 공식 — 모두 운영 원칙 먼저 · 기획은 공통 · 대본은 롱폼 · 쇼츠는 숏폼 · 남의 영상 보기는 판정 기준 · 블로그는 사실 목록 · 받아 적기는 없음', kbOf('radar.top5') === 'mk_principles,mk_common,mk_facts' && kbOf('radar.script') === 'mk_principles,mk_common,mk_long,mk_facts' && kbOf('radar.pack.video') === 'mk_principles,mk_common,mk_long,mk_facts' && kbOf('radar.adapt') === 'mk_principles,mk_judge,mk_common,mk_long,mk_facts' && kbOf('bench.why') === 'mk_principles,mk_judge,mk_common,mk_facts' && kbOf('rising.ref') === 'mk_principles,mk_judge,mk_common,mk_facts' && kbOf('radar.pack.short') === 'mk_principles,mk_common,mk_short,mk_facts' && kbOf('rising.shorts') === 'mk_principles,mk_common,mk_short,mk_facts' && kbOf('radar.pack.blog') === 'mk_principles,mk_facts' && kbOf('radar.transcript') === '' && kbOf('content.blog') === '')
 check('A9 마케팅 규칙에 실측 공통 법칙 3줄 더(넓은 주제 · 팔지 않기 · 첫 줄 숫자 · 증거)', RADAR_RULES.length === 8 && /넓은 주제/.test(RADAR_RULES[5]) && /팔고 시작하지 않는다/.test(RADAR_RULES[6]) && /증거/.test(RADAR_RULES[7]))
 const scriptI = ASSISTS['radar.script'].instruction.join(' ')
-check('A10 대본 지시 — 0~15초 증거 장면 · 번호형 챕터 · 상담 권유 한 문장 이하 · 썸네일 큰 글자 10자 · 60초 한도 그대로', /0~15초 증거 장면/.test(scriptI) && /번호형 챕터/.test(scriptI) && /한 문장 이하/.test(scriptI) && /큰 글자 10자/.test(scriptI) && /2,500~3,500자/.test(scriptI) && /60초/.test(scriptI))
+check('A10 대본 지시 — 0~15초 증거 장면 · 번호형 챕터 · 마무리 V1.8(임팩트 한 줄 · CTA 한 문장 · 김팀장이었습니다 · 숙제 없이) · 썸네일 큰 글자 10자 · 60초 한도 그대로', /0~15초 증거 장면/.test(scriptI) && /번호형 챕터/.test(scriptI) && /임팩트 한 줄/.test(scriptI) && /CTA 한 문장/.test(scriptI) && /김팀장이었습니다/.test(scriptI) && /숙제/.test(scriptI) && /큰 글자 10자/.test(scriptI) && /2,500~3,500자/.test(scriptI) && /60초/.test(scriptI))
 const shortI = ASSISTS['radar.pack.short'].instruction.join(' ')
 check('A11 릴스 지시 — 첫마디 10자 · 2초 · 캡션 200자 · 해시태그 0~3 · 저장 유도 · 프로필 링크 없이', /첫마디 10자/.test(shortI) && /2초/.test(shortI) && /200자/.test(shortI) && /0~3개/.test(shortI) && /저장 유도 · 프로필 링크 · 상담 안내 없이/.test(shortI) && !/해시태그 5개/.test(shortI))
 const all = Object.values(ASSISTS).map((a) => assistSystem(a)).join('\n')
@@ -242,10 +243,28 @@ const sctx = shortsContext({ platform: 'reels', aim: 'convert', format: 'comment
 const sctxText = JSON.stringify(sctx)
 check('SH20 보낼 자료 — 플랫폼 · 목적 · 고른 형식 · 맞는 형식 · 소재 · 최근 올린 영상 · 더 쓸 사실', /인스타 릴스/.test(sctxText) && /댓글 받기/.test(sctxText) && /고른형식":"댓글형 글자 영상/.test(sctxText) && /맞는형식":"댓글형 글자 영상"/.test(sctxText) && sctx.sections[1].rows.length === 3 && (sctx.facts ?? []).length === 1)
 const sw = ASSISTS['shorts.write']
-check('SH21 서버 shorts.write — 숏폼 화면 · 쓰기 · 화면 단추 이름 같음 · 공통 + 숏폼 공식 + 사실 목록', sw?.page === 'shorts' && sw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'shorts.write' && p.page === 'shorts' && p.label === sw.label) && knowledgeOf(sw).map((k: { key: string }) => k.key).join() === 'mk_common,mk_short,mk_facts')
+check('SH21 서버 shorts.write — 숏폼 화면 · 쓰기 · 화면 단추 이름 같음 · 공통 + 숏폼 공식 + 사실 목록', sw?.page === 'shorts' && sw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'shorts.write' && p.page === 'shorts' && p.label === sw.label) && knowledgeOf(sw).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_common,mk_short,mk_facts')
 const ssys = assistSystem(sw)
 check('SH22 숏폼 규칙 5줄이 지시문에 · 스레드 · 마케팅 규칙은 안 붙음 · 첫마디 10자 · 키워드 댓글', SHORTS_RULES.length === 5 && SHORTS_RULES.every((r: string) => ssys.includes(r)) && ssys.includes('[숏폼 규칙]') && !ssys.includes('[스레드 규칙]') && !ssys.includes('[마케팅 규칙]') && /첫마디 10자/.test(ssys) && /키워드 댓글/.test(ssys))
 check('SH23 첫마디 뽑기 — 빈 줄 · 시간 표시 건너뜀', firstWordsOf('\n[0:00] 이거 아직 손으로 해요?  (화면: 손)') === '이거 아직 손으로 해요?')
+
+/* ---------------- P 대표 운영 원칙 · 숫자 대조 · 나눠 줄 자료(D-274 보충본) ---------------- */
+const sysOf = (id: string) => assistSystem(ASSISTS[id])
+check('P1 운영 원칙 4줄이 김팀장 채널 단추(레이더 · 스레드 · 릴스 · 틱톡)에 — 채널 규칙보다 먼저', PRINCIPLE_RULES.length === 4 && ['radar.top5', 'radar.script', 'threads.write', 'shorts.write', 'bench.why'].every((id) => { const t = sysOf(id); return PRINCIPLE_RULES.every((r: string) => t.includes(r)) && t.indexOf('[대표 운영 원칙') < t.indexOf(id === 'threads.write' ? '[스레드 규칙]' : id === 'shorts.write' ? '[숏폼 규칙]' : '[마케팅 규칙]') }))
+check('P2 고객 업체 글(홍보 글 만들기) · 영상 받아 적기에는 운영 원칙 · 김팀장 이야기를 붙이지 않음', !sysOf('content.blog').includes('[대표 운영 원칙') && !sysOf('content.place').includes('김팀장') && !sysOf('radar.transcript').includes('[대표 운영 원칙'))
+check('P3 운영 원칙 묶음 — AX 위치 · 우선순위 · 괄호 문장 · 벤처 문장 · 사업 기준 · 롱폼 마무리 V1.8 · 작업 메모 · 외부 계정 · 파일 경로 없음', /비슷한 회사들 사이에서 눈에 띄게/.test(PACKS.mk_principles) && /기본 컨디션/.test(PACKS.mk_principles) && /재신청·이의신청을 추가 비용 없이/.test(PACKS.mk_principles) && /3분 AX Fit 진단/.test(PACKS.mk_principles) && /김팀장이었습니다/.test(PACKS.mk_principles) && !/isanghanai|마이페이지|Claude|\.md\b|이상한/.test(PACKS.mk_principles))
+check('P4 판정 기준 묶음 — 주제 · 형식 · 후킹 · 표본 · 목적 · 끝 · 제목 공식 · 오프닝 · 원문 옮기지 않기 · 영어 지시문 · 경로 없음', ['주제:', '후킹', '표본:', '목적:', '제목 공식', '오프닝', '원문은 옮기지 않는다'].every((w) => PACKS.mk_judge.includes(w)) && !/[A-Za-z]:\\|localStorage|You classify/.test(PACKS.mk_judge))
+const pl = (t: string) => principleLint(t).map((l) => `${l.key}:${l.level}`).join()
+check('P5 원칙 검사 — "큰 가점" 고칠 것 · "꼭 성공시켜 드립니다" 고칠 것(대신 쓸 문장) · 자금+AX 에 괄호 없으면 알림 · 괄호 있으면 통과 · 바로잡는 대화는 통과', pl('AX 는 큰 가점 요소예요') === 'gajeom:bad' && principleLint('벤처확인 꼭 성공시켜 드립니다')[0]?.text.includes(VENTURE_PROMISE) && pl('정책자금 심사 전에 AX 화면 하나') === 'condition:warn' && pl(`정책자금 심사 전에 AX 화면 하나 ${CONDITION_NOTE}`) === '' && pl('AX 하면 정책자금 나와요? 그건 따로예요') === '')
+check('P6 바꿔쓰기 표 — 10줄 넘게 · 가점 · 성공 약속 · 숙제 · 숫자 뜻 포함', REWRITES.length >= 10 && ['가점', '성공시켜', '숙제', '후기 N개'].every((w) => REWRITES.some((r) => r.no.includes(w))))
+check('P7 숫자 대조 — 사실 목록 숫자(1,650만 원 · 5년 · 50% · 2주 · 100억 · 250건)는 통과 · 지어낸 숫자(30% · 500명 · 3배)는 알림 · 구조 숫자(3가지 · 2단계)와 연도는 안 봄', unknownNumbers('창업 3년 안 · 5년간 50% · 법인 약 1,650만 원 · 2주 · 100억+ · 250건 · 3가지 · 2단계 · 2026년', '').length === 0 && unknownNumbers('합격률 30% · 고객 500명 · 3배 빨라짐', '').join() === '30%,500명,3배')
+check('P8 더 쓸 사실 · 소재에 적은 숫자는 통과(쉼표 · 띄어쓰기 달라도)', unknownNumbers('점검표 받은 대표님 12명 · 매출 3,000만 원', '점검표 받은 대표님 12명\n매출 3000만원').length === 0 && numberLint('고객 500명', '')[0]?.level === 'warn')
+const kimText = (MK_KNOWLEDGE as Record<string, string>).mk_facts.replace(/[\s,]/g, '')
+const kimNums = KIM_FACTS.join(' ').match(/\d[\d,]*(?:\.\d+)?\s*(?:%|억|만\s*원|원|건|년|주|분)/g) ?? []
+check(`P9 화면의 사실 목록 숫자 ${kimNums.length}개가 서버 사실 목록에 그대로 있음(어긋나지 않게)`, kimNums.length >= 8 && kimNums.every((n) => kimText.includes(n.replace(/[\s,]/g, ''))), kimNums.filter((n) => !kimText.includes(n.replace(/[\s,]/g, ''))))
+check('P10 규칙 검사에 원칙 · 숫자 대조가 붙음(스레드 · 릴스)', lintThreadPost({ body: 'AX 는 큰 가점 요소예요.\n합격률 30%', tag: 'AX' }).lines.some((l) => l.key === 'gajeom') && lintThreadPost({ body: 'AX 는 큰 가점 요소예요.\n합격률 30%', tag: 'AX' }).lines.some((l) => l.key === 'numbers') && lintShort({ platform: 'tiktok', aim: 'reach', script: '[0:00] 합격률 30% 비결', caption: '한 줄', hashtags: '#a #b #c' }).lines.some((l) => l.key === 'numbers') && !lintShort({ platform: 'tiktok', aim: 'reach', script: '[0:00] 합격률 30% 비결', caption: '한 줄', hashtags: '#a #b #c', facts: '합격률 30%' }).lines.some((l) => l.key === 'numbers'))
+check('P11 예시 글 · 대본은 숫자 대조 · 원칙 검사에서 고칠 것 0(사실 목록 숫자만 씀)', THREAD_TEMPLATES.filter((t) => t.example).every((t) => !lintThreadPost({ body: t.example ?? '', template: t.key, tag: t.exampleTag }).lines.some((l) => l.key === 'numbers' || l.level === 'bad')) && SHORT_FORMATS.every((f) => f.platforms.every((pf) => !lintShort({ platform: pf, aim: aimsOf(f, pf)[0], ...exampleOf(f, pf), hashtags: f.exampleTags }).lines.some((l) => l.key === 'numbers' || l.level === 'bad'))))
+check('P12 나눠 줄 자료 — 체크리스트 카드 6장(/sns/ 아래 PNG · 실제 파일은 qa:threads 가 받아 봄)', VENTURE_CARDS.cards.length === 6 && VENTURE_CARDS.cards.every((c, i) => c.file === `/sns/venture-check-0${i + 1}.png` && c.label))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

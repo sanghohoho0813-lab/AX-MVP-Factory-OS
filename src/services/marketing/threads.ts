@@ -10,6 +10,7 @@ import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
+import { AX_AS_MONEY, AX_DENIED, EMOJI, HYPE, LINK, numberLint, principleLint } from './snsRules'
 
 export const THREADS_MODULE = 'marketing'
 export const THREADS_BUCKET = 'threads'
@@ -592,22 +593,15 @@ export interface LintLine {
   text: string
 }
 
-/** D-273 릴스 · 틱톡 규칙 검사도 같은 낱말 거르기를 쓴다(shorts.ts) */
-export const LINK = /https?:\/\/|www\.|litt\.ly|\b[\w-]+\.(?:com|kr|net|io|co)\b/i
 const SELL = /상담\s*(?:신청|문의|예약)|문의\s*(?:주세요|하세요|환영)|연락\s*주세요|DM\s*주세요|할인|가격\s*[:은는]|[0-9,]+\s*원부터|지금\s*신청|프로필\s*링크/
-export const HYPE = /100\s*%|무조건|보장|누구나\s*(?:받|가능|됩)|공짜|선착순|마감\s*임박|대박|충격|꿀팁|확실히\s*(?:받|승인|통과)|반드시\s*(?:받|승인|통과)/
-/** '그건 따로예요' 처럼 바로 바로잡는 글(대화형)은 괜찮다 */
-export const AX_DENIED = /따로예요|따로야|수단이\s*아니|별개|별도\s*(?:기관|심사)/
-export const AX_AS_MONEY = /(?:AX|MVP|자동화|화면)[^\n]{0,24}(?:정책\s*자금|지원금|보증|자금)[^\n]{0,12}(?:수단|받는\s*(?:법|방법)|나와요|나온다|받을\s*수\s*있)/
 const PRIVATE = /(?:매출|계약\s*금액?|수수료)\s*[0-9]/
 const KNOCK = /(?:다른|타)\s*(?:컨설턴트|컨설팅|업체|회사)[^\n]{0,24}(?:사기|엉터리|별로|거르|조심|믿지\s*마)/
-export const EMOJI = /\p{Extended_Pictographic}/u
 
 /**
  * 스레드 공식의 지켜야 할 줄을 글자로 확인한다. recent = 이미 저장한 글(같은 틀 반복 · V 한 달 한 번).
  * bad = 고칠 것(그래도 저장은 된다), warn = 보면 좋은 것.
  */
-export function lintThreadPost(input: { body: string; template?: string; tag?: string; selfComment?: string; recent?: readonly ThreadPost[]; id?: string; today?: string }): { lines: LintLine[]; chars: number; firstLine: string; ending: EndingKind; bad: number; warn: number } {
+export function lintThreadPost(input: { body: string; template?: string; tag?: string; selfComment?: string; recent?: readonly ThreadPost[]; id?: string; today?: string; facts?: string }): { lines: LintLine[]; chars: number; firstLine: string; ending: EndingKind; bad: number; warn: number } {
   const body = input.body.replace(/\r\n?/g, '\n')
   const text = body.trim()
   const chars = text.length
@@ -633,6 +627,8 @@ export function lintThreadPost(input: { body: string; template?: string; tag?: s
   if (hype) add('hype', 'bad', `"${hype[0]}" — 보장 · 과장 · 지어낸 선착순은 쓰지 않아요`)
   if (/벤처/.test(text) && /감면|혜택|세금|받으면|받을|확인받|신청/.test(text) && !/확인\s*기관/.test(text)) add('venture', 'warn', '벤처 이야기 — "(결과는 확인기관이 정하고, 회사마다 달라)" 괄호를 붙여요')
   if (AX_AS_MONEY.test(text) && !AX_DENIED.test(text)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — AX 는 일하는 방식을 바꾸는 일, 자금은 기관 심사')
+  // D-274 대표 운영 원칙(가점 · 성공 약속 · 기본 컨디션 괄호) · 사실 목록에 없는 숫자
+  if (text) out.push(...principleLint(text), ...numberLint(text, input.facts ?? ''))
   if (PRIVATE.test(text)) add('private', 'warn', '매출 · 계약금액 · 수수료 숫자 — 고객 숫자라면 빼요')
   if (KNOCK.test(text)) add('knock', 'bad', '다른 컨설턴트 · 업체를 깎아내리는 말은 쓰지 않아요')
   const brackets = text.match(/\[[^\]\n]{1,40}\]/g) ?? []

@@ -749,7 +749,8 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
     // D-229 규칙집 3-4 — 끝은 요약(정보형)이 기본, 업체 말은 한 줄만
     {
       // 요약은 '…, 이 N가지만 기억하세요.' 로 끝낸다(질문형 항목 '…있나요' 로 문장이 끝나면 격식 말투로 바뀌지 않는다)
-      nar: n === 3 ? `그럼 뭘 확인하면 되냐고요? ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지만 기억하세요. 저장해 두고 필요할 때 다시 보세요. ${cta}` : `정리하면 ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지예요. 저장해 두고 다시 보세요. ${cta}`,
+      // D-274 규칙집 ⟲9차 — 말로 하는 저장 유도는 잘 된 릴스의 1%뿐이라 뺀다(끝은 요약 + 업체 말 한 줄)
+      nar: n === 3 ? `그럼 뭘 확인하면 되냐고요? ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지만 기억하세요. ${cta}` : `정리하면 ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지예요. ${cta}`,
       sub: points.map((pt, i) => `${i + 1}. ${pt.title.replace(/[.!]$/, '')}`).join(' / '),
       scene: `${points.length}가지 체크 목록 화면(업체 이름 · 연락처는 한 줄만)`,
     },
@@ -766,8 +767,8 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
     { label: '첫 3초 · 붙잡는 말', text: hook },
     { label: '구조', text: `도입부: ${painFor(topic)}\n중반부: ${points.map((pt) => pt.title).join(' · ')}\n후반부: ${cta}` },
     ...script,
-    // 릴스 캡션 — 해시태그 5개(지역 + 업종 + 고민) · 의료는 개인차 안내
-    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}${noticeOf(p) ? `\n${noticeOf(p)}` : ''}\n${hashtags(p, 5).join(' ')}` },
+    // 릴스 캡션 — D-274 규칙집 ⟲9차: 해시태그 5개는 안 된 쪽에 더 많았다 → 3개(지역 + 업종 + 고민) · 의료는 개인차 안내
+    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}${noticeOf(p) ? `\n${noticeOf(p)}` : ''}\n${hashtags(p, 3).join(' ')}` },
   ]
 }
 
@@ -864,7 +865,8 @@ function videoDraft(p: ContentProfile, topic: Topic, variant: number, titleOverr
   const blocks: DraftBlock[] = [
     { label: '', text: title, hint: isB2B(p) ? '제목 — 기업형: 괄호 없이 짧고 단정하게(25~35자) · 지역은 빼요' : '제목 — 본제목 (괄호 꼬리말) 40~55자 · 지역은 빼요' },
     { label: '썸네일 문구', text: thumb, hint: '20~35자 · 숫자를 꼭 넣어요' },
-    { label: '도입부 · 처음 15초', text: `말: ${intro}\n화면: ${at(visuals, 0)} · 큰 자막 "${thumb}"`, hint: '질문 → 흔한 실패 → 근거 → "오늘 N가지" 약속(3~5문장)' },
+    // D-274 규칙집 ⟲10차 — 약속보다 증거 장면을 먼저(결과 화면 · 작업 장면 · 실적 숫자 — 사실만)
+    { label: '도입부 · 처음 15초', text: `증거 장면(0~5초): [실제 결과 · 작업 장면 · 실적 숫자 중 하나 — 사실만 · 고객 정보 가림]\n말: ${intro}\n화면: ${at(visuals, 0)} · 큰 자막 "${thumb}"`, hint: '증거 장면 먼저 → 질문 → 흔한 실패 → 근거 → "오늘 N가지" 약속(3~5문장)' },
     { label: '주제', text: `${TOPIC_LABEL[topic.type]} — ${topic.angle}` },
     { label: '타겟 청중', text: p.target },
     { label: '전략', text: topic.strategy },

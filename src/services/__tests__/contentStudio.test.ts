@@ -224,7 +224,7 @@ check('C27 카톡 혜택은 기간 · 대상 · 혜택을 비워 둠(지어내�
 const kwd = makeDraft(fp, { kind: 'keywords' }, today)
 check('C28 키워드 글 — 묶음마다 설명(hint) · 검색량은 짐작하지 않는다는 안내', kwd.blocks.slice(0, -1).every((b) => !!b.hint) && kwd.notes.some((n) => n.includes('검색량')) && !/\d+회|\d+건 검색/.test(plainText('keywords', kwd.blocks)))
 const sh = makeDraft(fp, { kind: 'shorts', topic: topics[0] }, today)
-check('C29 쇼츠 · 릴스(D-207 · D-229) — 고정 문구 · 첫 3초 · 구조 · 초 구간 대본 · 끝은 요약(업체 말은 한 줄) · 캡션 해시태그 5개', ['고정 문구', '첫 3초 · 붙잡는 말', '구조', '캡션'].every((l) => sh.blocks.some((b) => b.label === l)) && sh.blocks.filter((b) => /^\d:\d{2} - \d:\d{2}$/.test(b.label)).length === 5 && /정리하면 .+, 이 2가지예요\./.test(sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).at(-1)!.text) && (sh.blocks.find((b) => b.label === '캡션')!.text.match(/#\S+/g) ?? []).length === 5 &&  sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).every((b) => b.text.includes('나레이션:') && b.text.includes('자막:') && b.text.includes('장면:')), sh.blocks.map((b) => b.label))
+check('C29 쇼츠 · 릴스(D-207 · D-229 · D-274 ⟲9차) — 고정 문구 · 첫 3초 · 구조 · 초 구간 대본 · 끝은 요약(업체 말은 한 줄) · 캡션 해시태그 3개', ['고정 문구', '첫 3초 · 붙잡는 말', '구조', '캡션'].every((l) => sh.blocks.some((b) => b.label === l)) && sh.blocks.filter((b) => /^\d:\d{2} - \d:\d{2}$/.test(b.label)).length === 5 && /정리하면 .+, 이 2가지예요\./.test(sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).at(-1)!.text) && (sh.blocks.find((b) => b.label === '캡션')!.text.match(/#\S+/g) ?? []).length === 3 &&  sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).every((b) => b.text.includes('나레이션:') && b.text.includes('자막:') && b.text.includes('장면:')), sh.blocks.map((b) => b.label))
 const cards7 = makeDraft(fp, { kind: 'cards', topic: topics[0], pages: 7 }, today)
 const cards5 = makeDraft(fp, { kind: 'cards', topic: topics[0], pages: 5 }, today)
 check('C30 카드뉴스 5장 · 7장(표지 · 내용 · 마무리) + 올릴 때 쓰는 글', cards5.blocks.filter((b) => /장/.test(b.label)).length === 5 && cards7.blocks.filter((b) => /장/.test(b.label)).length === 7 && cards7.blocks.some((b) => b.label === '올릴 때 쓰는 글'))
@@ -543,7 +543,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   check('C100 영상 — 5편 순서(깊게 → 손해 피하기 → 넓히기 → 결정 직전 → 우리 업체) · 1편에 업력(기록) · 마무리 전 다리 문장', series.length === 5 && series[0].title.includes('(12년 차 한솔정밀(주))') && series[4].title.startsWith('한솔정밀(주)만의 진행 방식') && ['깊게', '손해 피하기', '넓히기', '결정 직전', '우리 업체'].every((r, i) => series[i].role.startsWith(r)) && vid.blocks.some((b) => b.label === '이 주제로 이어 찍을 5편') && end.includes('오늘 말한') && end.includes('이렇게 지켜요') && end.includes('도면 받은 날 바로 회신해요'), series.map((x) => x.title))
   const s60 = makeDraft(mp, { kind: 'shorts', topic: choose, shortLen: '30-60' }, today)
   const s60t = plainText('shorts', s60.blocks)
-  check('C101 쇼츠 30~60초 — 첫째 · 둘째 · "셋째가 제일 중요한데요"(끝까지 보는 고리) · "그럼 … 냐고요?"(질문으로 넘기기) · 저장 · 6구간 45초 그대로', s60t.includes('첫째,') && s60t.includes('둘째,') && s60t.includes('셋째가 제일 중요한데요.') && /그럼 뭘 확인하면 되냐고요\?/.test(s60t) && s60t.includes('저장해 두고') && s60t.includes('0:38 - 0:45'), s60t.slice(0, 300))
+  check('C101 쇼츠 30~60초 — 첫째 · 둘째 · "셋째가 제일 중요한데요"(끝까지 보는 고리) · "그럼 … 냐고요?"(질문으로 넘기기) · 말로 저장 유도 없음(D-274 ⟲9차) · 6구간 45초 그대로', s60t.includes('첫째,') && s60t.includes('둘째,') && s60t.includes('셋째가 제일 중요한데요.') && /그럼 뭘 확인하면 되냐고요\?/.test(s60t) && !s60t.includes('저장해 두고') && s60t.includes('0:38 - 0:45'), s60t.slice(0, 300))
   // 사실 대조 — 우리 엔진이 만든 글은 거짓 경보 0(전 업종 · 전 형식)
   const falseAlarm: unknown[] = []
   let drafts = 0
@@ -699,7 +699,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const rq = aiRequestText(rp, { kind: 'blog', keyword: '화성 정밀 금속부품' })
   const rqv = aiRequestText(rp, { kind: 'video', keyword: '화성 정밀 금속부품' })
   const rqs = aiRequestText(rp, { kind: 'shorts', shortLen: '30-60' })
-  check('C125 요청문 채널별 — 채널 · 길이(숫자) · 지역 방침 · 걱정 · 흔한 반박 · 마지막 제안(업종표) · 업체가 막은 말 · 직함만이면 이름 금지 · 배송 조건', rq.includes('채널 · 종류: 네이버 블로그 글') && rq.includes('2,100~3,000자') && rq.includes('검색 키워드 "화성 정밀 금속부품" 를 띄어쓰기까지 그대로 제목 맨 앞에') && rq.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && rq.includes('독자의 걱정 1개: "소량도 받아 줄까"') && rq.includes('끝: 도면 검토 · 방문 상담 안내 하나만') && rq.includes('"최저가"') && rq.includes('사람 이름은 쓰지 마세요') && rq.includes('배송 · 교환 조건: 전국 택배') && rqv.includes('("정밀 금속부품")') && rqv.includes('괄호 없이 25~35자') && rqs.includes('60초 이내 · 컷 15개 이하') && !aiRequestText(rp).includes('채널 · 종류'), rq)
+  check('C125 요청문 채널별 — 채널 · 길이(숫자) · 지역 방침 · 걱정 · 흔한 반박 · 마지막 제안(업종표) · 업체가 막은 말 · 직함만이면 이름 금지 · 배송 조건', rq.includes('채널 · 종류: 네이버 블로그 글') && rq.includes('2,100~3,000자') && rq.includes('검색 키워드 "화성 정밀 금속부품" 를 띄어쓰기까지 그대로 제목 맨 앞에') && rq.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && rq.includes('독자의 걱정 1개: "소량도 받아 줄까"') && rq.includes('끝: 도면 검토 · 방문 상담 안내 하나만') && rq.includes('"최저가"') && rq.includes('사람 이름은 쓰지 마세요') && rq.includes('배송 · 교환 조건: 전국 택배') && rqv.includes('("정밀 금속부품")') && rqv.includes('40~50자(금액 · 결과 숫자 + 괄호 꼬리말)') && rqv.includes('0~15초 증거 장면') && rqs.includes('정보형 40~60초 · 컷 15개 이하') && rqs.includes('말로 저장 유도 없이') && !aiRequestText(rp).includes('채널 · 종류'), rq)
 }
 
 /* ---------------- D-230 제목 각도 · 카드 5안 · 올린 뒤 숫자 ---------------- */

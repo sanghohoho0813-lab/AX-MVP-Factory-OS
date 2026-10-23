@@ -92,6 +92,10 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('V1 유튜브 대본 — 확정 제목 + 0:00 오프닝(증거 장면 · 결론 먼저) → 왜 지금 → 번호형 챕터 ①②③ → 7:30 정리 · 다음 편', video[0].label === '확정 제목' && times.join() === '0:00,0:40,1:30,3:30,5:30,7:30' && /증거 장면/.test(video[1].label) && video.filter((b) => /^\d+:\d+ [①②③] /.test(b.label)).length === 3 && video[6].label === '7:30 정리 · 다음 편', video.map((b) => b.label))
   check('V2 오프닝은 0~15초 증거 장면 → 첫 문장(찍기 키트) · 마무리는 채널 끝맺음', video[1].text.startsWith('[0~15초 증거 장면]') && video[1].text.includes(p.source.hook) && video[6].text.includes(DEFAULT_BRIEF.ending), video[1].text.slice(0, 80))
   check('V3 구간마다 [화면] 지시', video.slice(1).every((b) => b.text.includes('[화면]')))
+  // D-274 대표 롱폼 마무리 V1.8 — 핵심 다시 짚기 → 임팩트 한 줄 → CTA 한 문장 → 다음 편 → 끝인사 · 숙제 없음 · 챕터마다 '해당 / 손해' 한 문장
+  const endT = video[6].text
+  const order = ['핵심만 다시 짚겠습니다', '먼저 알고 움직인 회사가', DEFAULT_BRIEF.ending, '다음 영상에서는', '김팀장이었습니다. 감사합니다.'].map((w) => endT.indexOf(w))
+  check('V4 마무리 V1.8 순서(다시 짚기 → 임팩트 → CTA 한 문장 → 다음 편 → "김팀장이었습니다. 감사합니다.") · 숙제(적어 보세요) 없음 · 챕터 셋 모두 해당 / 손해 문장', order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])) && !/적어\s*보세요|계산해\s*보세요/.test(endT) && video.slice(3, 6).every((b) => /해당되는지|놓치면|차이가 여기서/.test(b.text)) && /고정 댓글 링크/.test(DEFAULT_BRIEF.ending), { order, endT: endT.slice(0, 300) })
 
   const shorts = sec(p, 'shorts').blocks
   const fixed = shorts.slice(0, 2).map((b) => (b.text.split('\n')[0] ?? '').replace('상단 고정 문구: ', ''))

@@ -8,7 +8,7 @@
  * 대표 전용(마케팅 · 브랜딩 모듈 · 팀장에게 안 보임). 저장은 기존 모듈 기록(marketing / threads).
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, NotebookPen, RefreshCw, Save, Send, Sparkles, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
@@ -19,7 +19,7 @@ import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useViewingPilot } from '../../auth/osAccess'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
-import { BigChoices, DeleteTwice, InnerTabs, LintList, StatInputs, StepTitle, chip } from './snsParts'
+import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
@@ -117,7 +117,18 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
     else next.set('tab', t)
     setParams(next)
   }
-  const [draft, setDraftState] = useState<Draft>(readDraft)
+  // D-274 다른 채널에서 '같은 소재로' 를 누르고 왔으면 소재를 채운다(주소의 topic 은 한 번 쓰고 지운다)
+  const [draft, setDraftState] = useState<Draft>(() => {
+    const d = readDraft()
+    const t = params.get('topic')
+    return t ? { ...d, topic: t.slice(0, 200) } : d
+  })
+  useEffect(() => {
+    if (!params.get('topic')) return
+    const next = new URLSearchParams(params)
+    next.delete('topic')
+    setParams(next, { replace: true })
+  }, [params, setParams])
   const setDraft = (fn: (d: Draft) => Draft) =>
     setDraftState((d) => {
       const n = fn(d)
@@ -168,6 +179,7 @@ type Store = ReturnType<typeof useThreadPosts>
 
 function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibrary }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void }) {
   const { showToast } = useToast()
+  const navigate = useNavigate()
   const today = todayLocalDate()
   const plan = todayPlan(today)
   const goal = GOALS.find((g) => g.key === draft.goal)
@@ -175,7 +187,8 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
   const tpl = draft.template ? templateOf(draft.template) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
-  const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today])
+  const factsText = `${draft.facts}\n${draft.topic}`
+  const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today, factsText])
   const set = (part: Partial<Draft>) => setDraft((d) => ({ ...d, ...part }))
 
   const pickGoal = (g: ThreadGoal) => set({ goal: g, template: draft.template && templateOf(draft.template)?.goals.includes(g) ? draft.template : '' })
@@ -340,11 +353,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
             ))}
           </div>
         </div>
-        <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="thr-facts-box">
-          <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">이번 글에 더 쓸 사실 (선택)</summary>
-          <p className="t-meta mt-1 break-keep text-slate-500">AI 는 김팀장 사실 목록에 있는 것만 씁니다. 새 숫자 · 사례가 있으면 한 줄씩 적어 주세요(고객 실명 · 매출 · 계약금액은 적지 않기).</p>
-          <textarea value={draft.facts} onChange={(e) => set({ facts: e.target.value })} rows={3} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="예: 점검표 받은 대표님 12명(이번 달)" data-testid="thr-facts" />
-        </details>
+        <FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />
         <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="thr-ref-box">
           <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">잘 된 남의 글 붙여넣기 (선택 — 뼈대만 빌림 · 저장 안 함)</summary>
           <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
@@ -365,7 +374,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
             {ai.drafts.length > 0 && (
               <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">
                 {ai.drafts.map((d, i) => (
-                  <AiDraftCard key={i} d={d} tag={draft.tag} recent={store.posts} onUse={() => takeDraft(d)} />
+                  <AiDraftCard key={i} d={d} tag={draft.tag} recent={store.posts} facts={factsText} onUse={() => takeDraft(d)} />
                 ))}
               </ul>
             )}
@@ -420,6 +429,13 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
                 새 글
               </Button>
             </div>
+            {/* D-274 보충본 1-3 "한 주제를 여러 채널로" — 같은 소재 · 태그를 들고 릴스 · 틱톡으로 */}
+            {draft.topic.trim() && (
+              <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/shorts?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="thr-to-shorts">
+                같은 소재로 릴스 · 틱톡 만들기 →
+              </Button>
+            )}
+            {(draft.template === 'P' || lint.ending === 'material') && <ShareKit testId="thr-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -456,8 +472,8 @@ function TemplateButton({ t, on, onClick }: { t: ThreadTemplate; on: boolean; on
   )
 }
 
-function AiDraftCard({ d, tag, recent, onUse }: { d: ThreadDraft; tag: string; recent: readonly ThreadPost[]; onUse: () => void }) {
-  const lint = lintThreadPost({ body: d.body, template: d.template, tag, recent })
+function AiDraftCard({ d, tag, recent, facts, onUse }: { d: ThreadDraft; tag: string; recent: readonly ThreadPost[]; facts: string; onUse: () => void }) {
+  const lint = lintThreadPost({ body: d.body, template: d.template, tag, recent, facts })
   const t = d.template ? templateOf(d.template) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-ai-draft">
@@ -657,6 +673,11 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
           </li>
         )}
       </ul>
+      <Surface className="flex flex-col gap-2">
+        <h2 className="t-section break-keep text-slate-900">이렇게 말고 → 이렇게</h2>
+        <p className="t-sub break-keep text-slate-600">대표님이 정한 원칙 · 넣지 말 것 — 규칙 검사가 이 표대로 알려 드려요.</p>
+        <RewriteTable testId="thr-rewrites" />
+      </Surface>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <h2 className="t-section break-keep text-slate-900">첫 줄 10가지</h2>

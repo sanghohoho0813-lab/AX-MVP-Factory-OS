@@ -6,8 +6,8 @@
  *  기록표: 조회 · 좋아요 · 댓글 · 저장 · 공유 · 문의 → 점수(좋아요 + 댓글×3) · 저장 · 공유율 · 형식별 평균.
  * 대표 전용(마케팅 · 브랜딩 모듈). 저장은 기존 모듈 기록(marketing / shorts).
  */
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, FilePlus2, RefreshCw, Save, Send, Sparkles, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
@@ -50,7 +50,7 @@ import {
   type ShortPlatform,
   type ShortPost,
 } from '../../services/marketing/shorts'
-import { BigChoices, DeleteTwice, InnerTabs, LintList, StatInputs, StepTitle, chip } from './snsParts'
+import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
 
 type Tab = 'write' | 'records' | 'guide'
 const TABS = [
@@ -110,7 +110,18 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
     else next.set('tab', t)
     setParams(next)
   }
-  const [draft, setDraftState] = useState<Draft>(readDraft)
+  // D-274 스레드에서 '같은 소재로' 를 누르고 왔으면 소재를 채운다(주소의 topic 은 한 번 쓰고 지운다)
+  const [draft, setDraftState] = useState<Draft>(() => {
+    const d = readDraft()
+    const t = params.get('topic')
+    return t ? { ...d, topic: t.slice(0, 200) } : d
+  })
+  useEffect(() => {
+    if (!params.get('topic')) return
+    const next = new URLSearchParams(params)
+    next.delete('topic')
+    setParams(next, { replace: true })
+  }, [params, setParams])
   const setDraft = (fn: (d: Draft) => Draft) =>
     setDraftState((d) => {
       const n = fn(d)
@@ -164,13 +175,15 @@ type Store = ReturnType<typeof useShortPosts>
 
 function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
   const { showToast } = useToast()
+  const navigate = useNavigate()
   const today = todayLocalDate()
   const set = (part: Partial<Draft>) => setDraft((d) => ({ ...d, ...part }))
   const formats = formatsFor(draft.platform, draft.aim)
   const fmt = draft.format ? formatOf(draft.format) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ShortDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
-  const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags])
+  const factsText = `${draft.facts}\n${draft.topic}`
+  const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags, facts: factsText }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags, factsText])
   const mix = weekMix(store.posts, today)
 
   const pickPlatform = (p: ShortPlatform) => {
@@ -309,10 +322,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             </button>
           ))}
         </div>
-        <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2">
-          <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">이번 영상에 더 쓸 사실 (선택)</summary>
-          <textarea value={draft.facts} onChange={(e) => set({ facts: e.target.value })} rows={3} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="한 줄에 하나 — 고객 실명 · 매출 · 계약금액은 적지 않기" data-testid="sht-facts" />
-        </details>
+        <FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />
         {aiOk && (
           <div className="flex flex-col gap-2">
             <Button variant="primary" onClick={() => void runAi()} disabled={ai.busy} className="w-full sm:w-auto" data-testid="sht-ai">
@@ -326,7 +336,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             {ai.drafts.length > 0 && (
               <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 22rem), 1fr))' }} data-testid="sht-ai-drafts">
                 {ai.drafts.map((d, i) => (
-                  <AiDraftCard key={i} d={d} draft={draft} onUse={() => start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', checks: draft.checks, ...(d.format ? { format: d.format } : {}) })} />
+                  <AiDraftCard key={i} d={d} draft={draft} facts={factsText} onUse={() => start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', checks: draft.checks, ...(d.format ? { format: d.format } : {}) })} />
                 ))}
               </ul>
             )}
@@ -388,6 +398,12 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                 새로
               </Button>
             </div>
+            {draft.topic.trim() && (
+              <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/threads?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="sht-to-threads">
+                같은 소재로 스레드 글 쓰기 →
+              </Button>
+            )}
+            {draft.format === 'comment' && <ShareKit testId="sht-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -404,8 +420,8 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   )
 }
 
-function AiDraftCard({ d, draft, onUse }: { d: ShortDraft; draft: Draft; onUse: () => void }) {
-  const lint = lintShort({ platform: draft.platform, aim: draft.aim, script: d.script, caption: d.caption, hashtags: d.hashtags })
+function AiDraftCard({ d, draft, facts, onUse }: { d: ShortDraft; draft: Draft; facts: string; onUse: () => void }) {
+  const lint = lintShort({ platform: draft.platform, aim: draft.aim, script: d.script, caption: d.caption, hashtags: d.hashtags, facts })
   const f = d.format ? formatOf(d.format) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-ai-draft">
@@ -599,6 +615,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
       </ul>
       <Surface className="flex flex-col gap-2">
         <h2 className="t-section break-keep text-slate-900">릴스 "댓글 받기" 가 통하는 조건</h2>
+        <ShareKit testId="sht-guide-share" />
         <ul className="flex flex-col divide-y divide-slate-100" data-testid="sht-comment-works">
           {COMMENT_WORKS.map(([yes, no]) => (
             <li key={yes} className="flex flex-col gap-0.5 py-2">
@@ -608,6 +625,11 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
           ))}
         </ul>
         <p className="t-sub break-keep text-slate-600">자료는 실제로 만든 뒤에만 겁니다.</p>
+      </Surface>
+      <Surface className="flex flex-col gap-2">
+        <h2 className="t-section break-keep text-slate-900">이렇게 말고 → 이렇게</h2>
+        <p className="t-sub break-keep text-slate-600">대표님이 정한 원칙 · 넣지 말 것 — 규칙 검사가 이 표대로 알려 드려요.</p>
+        <RewriteTable testId="sht-rewrites" />
       </Surface>
     </div>
   )
