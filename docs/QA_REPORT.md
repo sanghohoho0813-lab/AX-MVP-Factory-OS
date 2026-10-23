@@ -3727,3 +3727,15 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main 1da5ce1 → **a479e2b**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(a479e2b · Production) · 새 묶음 index-C7x0emZJ.js · 'AI 와 기획 시작' 은 SpecWritePage · VenturePlanWorkbench 조각 · 'spec-mats-paste-text' · 'spec-trash-purge' 는 SpecWritePage 조각 · 'vplan-talk-start' 는 VenturePlanWorkbench 조각.
 - 확인하지 못한 것: 실제 AI 로 기획 대화를 돌린 결과(로그인 · 키 필요) · 클라우드(Supabase)에서 업체 서류함 파일을 실제로 내려받아 읽는 것(이 시험 기기는 로컬 저장이라 '읽지 못함' 길만 확인).
+
+## §188 D-272 AI 전략실(잠재고객) · [AX 전략 분석] 을 AX 기준 문서대로 — 게이트 · 병합 · Production (2026-10-23)
+
+- **게이트 62단계 — 62/62 녹색**(HEAD 25c7ad7 · dirty 0).
+  - 첫 게이트는 4단계 말 점검(qa:wording)에서 멈췄다: 새 반론 질문 칸 이름이 D-264 에서 쓰지 않기로 한 이름이었다 → challenges 로 바꿈.
+  - 다시 돈 게이트는 컨테이너가 두 번 다시 시작돼 끊겼다. 끊기기 전 33단계에서 qa:files 2개가 실패했는데, 혼자 다시 돌리니 38/38. 처음부터 다시 돌려 47단계 녹색에서 또 끊겼고, 나머지 15단계(pilot~vstudy)를 이어서 돌렸다.
+  - 그중 qa:cert 1개('업체 없이 열면 대화창' — 0.5초만 기다리고 보는 시험)가 컨테이너 재시작 직후 실패했고, 혼자 다시 돌려 155/155.
+  - 이번 것에 걸린 숫자: 단위 test:ownerai 99 · test:assist 136 · test:all 전체 / e2e qa:ownerai 72 · qa:pvmenu 33 · qa:content 184 · qa:specwrite 55 · qa:wording 5/5.
+- **화면 사진(시험 · 가짜 AI 답)** — AI 전략실 결과 카드: 판정 '작게 시작' · 가장 큰 문제 · 12주에 증명할 것 · 가장 추천(AI 전에 먼저 · 방법 RULE) · 차선 · 사이드바 'AI 전략실(잠재고객)'(잘림 없음).
+- **병합** — main 8d7391e → **25c7ad7**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(25c7ad7 · Production) · 새 묶음 index-Wnoi-roH.js · 'AI 전략실(잠재고객)' 은 메뉴 조각 · '반론 질문' · '돈 KPI 3' · '기준대로 판정' 은 AI 전략실 공통 조각 · 옛 이름 'AI 작업실' 0곳.
+- 확인하지 못한 것: 실제 AI 로 [AX 전략 분석] 을 돌린 답(로그인 · 키 필요). 서버 함수에 기준 문서가 붙는 것은 단위 시험(지시문 · 통째 인용 막기)과 e2e(공급자로 가는 지시)로만 확인했다.
