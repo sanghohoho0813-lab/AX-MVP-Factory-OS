@@ -146,7 +146,7 @@ const CASE = 'case_qa_test_01'
   // D-272 AX 전략 분석 = 대표 AX 기준 문서대로(예전 손으로 쓴 12단계 → 기준 문서의 16단계 · 적합성 판정 · 돈 KPI 3 · 12주 · 반론)
   const p = SKILLS.AX_PENGUIN.systemInstruction.join('\n')
   const steps = ['회사 현실', '핵심 병목', '업무 재설계', '데이터 기반', '방법 선택', '판단→행동→결과', '12주 실증', '현장 실행 넘기기', '기업가치 증거', '고객/파트너 접점', '방어력/단위 경제성/확장', '정부 관점', '투자자 관점', '자금 용도', '반론 검증', '후행 모듈']
-  check('S4 AX_PENGUIN — 기준 문서의 16단계 순서 · 판정 넷 · 돈 KPI 3 · 12주 · 반론 질문 · 방법 여섯', steps.every((x, i) => p.indexOf(x) >= 0 && (i === 0 || p.indexOf(x) > p.indexOf(steps[i - 1]))) && ['FULL_GO', 'LITE', 'NO_GO_REDESIGN', 'INSUFFICIENT_DATA'].every((v) => p.includes(v)) && /cost.*revenue.*scale/.test(p) && p.includes('prove12w') && p.includes('devil') && ['RULE', 'OPTIMIZATION', 'ML', 'RAG', 'LLM', 'HUMAN'].every((m) => p.includes(m)), steps.filter((x) => p.indexOf(x) < 0))
+  check('S4 AX_PENGUIN — 기준 문서의 16단계 순서 · 판정 넷 · 돈 KPI 3 · 12주 · 반론 질문 · 방법 여섯', steps.every((x, i) => p.indexOf(x) >= 0 && (i === 0 || p.indexOf(x) > p.indexOf(steps[i - 1]))) && ['FULL_GO', 'LITE', 'NO_GO_REDESIGN', 'INSUFFICIENT_DATA'].every((v) => p.includes(v)) && /cost.*revenue.*scale/.test(p) && p.includes('prove12w') && p.includes('challenges') && ['RULE', 'OPTIMIZATION', 'ML', 'RAG', 'LLM', 'HUMAN'].every((m) => p.includes(m)), steps.filter((x) => p.indexOf(x) < 0))
   {
     const ax = ['AX_PENGUIN', 'AX_IDEA', 'AX_MVP'] as const
     const pk = KNOWLEDGE.ax_strategy

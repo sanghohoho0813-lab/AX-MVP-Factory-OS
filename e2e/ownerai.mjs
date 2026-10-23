@@ -84,7 +84,7 @@ const AX = {
   thinking: Array.from({ length: 16 }, (_, i) => ({ step: i + 1, title: `단계 ${i + 1}`, finding: '확인함' })),
   kpis: { cost: '배차 1건 처리 시간 — 측정 필요', revenue: '견적 → 계약 전환율 — 측정 필요', scale: '배차 담당 1인당 월 처리 건수 — 측정 필요' },
   prove12w: '배차 담당이 추천 화면으로 배차한 건수와 처리 시간을 0주 기준선과 비교',
-  devil: [{ q: '실제 누가 반복적으로 사용합니까?', answer: '배차 담당 2명(매일)', risk: 'P1' }],
+  challenges: [{ q: '실제 누가 반복적으로 사용합니까?', answer: '배차 담당 2명(매일)', risk: 'P1' }],
   buildNow: ['배차 추천 화면'],
   prepareNow: ['주문 · 배차 엑셀 3개월 정리'],
   validateLater: ['기사 앱'],

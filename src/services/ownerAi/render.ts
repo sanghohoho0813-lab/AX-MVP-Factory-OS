@@ -84,7 +84,7 @@ export function renderStructured(skill: SkillId, s: unknown): string {
         ...arr(o.alternatives).flatMap((a, i) => axItem(`차선 ${i + 1}`, obj(a))),
         ...list('돈 KPI 3', [str(k.cost) && `비용 · 효율: ${str(k.cost)}`, str(k.revenue) && `매출 · 고객: ${str(k.revenue)}`, str(k.scale) && `규모 · 처리 능력: ${str(k.scale)}`].filter(Boolean)),
         ...list(arr(o.thinking).length > 12 ? '16단계로 본 것' : '단계별로 본 것', arr(o.thinking).map((t) => `${str(obj(t).step)}. ${str(obj(t).title)} — ${str(obj(t).finding)}`)),
-        ...list('반론 질문', arr(o.devil).map((d) => { const x = obj(d); return `${str(x.risk) ? `[${str(x.risk)}] ` : ''}${str(x.q)} — ${str(x.answer) || '답 없음'}` }).filter((x) => x.length > 4)),
+        ...list('반론 질문', arr(o.challenges).map((d) => { const x = obj(d); return `${str(x.risk) ? `[${str(x.risk)}] ` : ''}${str(x.q)} — ${str(x.answer) || '답 없음'}` }).filter((x) => x.length > 4)),
         ...list('지금 만들 것', strs(o.buildNow)),
         ...list('준비할 것', strs(o.prepareNow)),
         ...list('나중에 검증할 것', strs(o.validateLater)),
