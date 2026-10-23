@@ -163,6 +163,8 @@ check('A6 AI 글 규칙 검사 — 고칠 것 0 · 끝 고르기 쉬운 질문',
 await page.getByTestId('thr-save').click()
 await page.waitForTimeout(400)
 await page.getByTestId('thr-tab-records').click()
+await page.getByTestId('thr-records').waitFor()
+await page.locator('[data-testid="thr-rec-drafts"] [data-testid="thr-rec-item"]').first().waitFor({ timeout: 5000 }).catch(() => {})
 check('S1 [저장] → 기록표의 쓰다 둔 글 1', (await page.locator('[data-testid="thr-rec-drafts"] [data-testid="thr-rec-item"]').count()) === 1)
 await page.getByTestId('thr-rec-open').first().click()
 check('S2 [열어서 고치기] → 쓰기 칸에 그 글', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()))
@@ -202,9 +204,10 @@ await page.getByTestId('thr-new').click()
 await page.getByTestId('thr-tab-records').click()
 const before = await page.locator('[data-testid="thr-rec-item"]').count()
 await page.getByTestId('thr-rec-del').first().click()
+await page.getByTestId('thr-rec-del-confirm').waitFor({ timeout: 5000 }).catch(() => {})
 check('S9 지우기 → 한 번 더 묻기(아직 안 지워짐)', (await page.getByTestId('thr-rec-del-confirm').count()) === 1 && (await page.locator('[data-testid="thr-rec-item"]').count()) === before)
 await page.getByTestId('thr-rec-del-yes').click()
-await page.waitForTimeout(300)
+await page.waitForFunction((n) => document.querySelectorAll('[data-testid="thr-rec-item"]').length === n, before - 1, { timeout: 5000 }).catch(() => {})
 check('S10 [지우기] 확인 → 한 줄 줄어듦', (await page.locator('[data-testid="thr-rec-item"]').count()) === before - 1)
 
 /* ---------------- K 쓰던 글 남기기 ---------------- */
@@ -219,9 +222,12 @@ check('K1 쓰던 글은 새로고침해도 남음 · 참고 글(남의 글)은 �
 
 /* ---------------- L 틀 23가지 ---------------- */
 await page.getByTestId('thr-tab-library').click()
+await page.getByTestId('thr-library').waitFor()
+await page.waitForFunction(() => document.querySelectorAll('[data-testid="thr-lib-card"]').length === 24, null, { timeout: 5000 }).catch(() => {})
 check('L1 틀 카드 24장(A~X) + 쓰지 않는 Z · 첫 줄 10가지 · 끝 방식', (await page.getByTestId('thr-lib-card').count()) === 24 && /남의 말 얹기/.test(await page.getByTestId('thr-library').innerText()) && (await page.locator('[data-testid="thr-first-lines"] li').count()) === 10 && (await page.locator('[data-testid="thr-endings"] li').count()) === 8)
 await shot(page, 'pc-library', false)
 await page.getByTestId('thr-lib-filter-share').click()
+await page.waitForFunction(() => document.querySelectorAll('[data-testid="thr-lib-card"]').length === 7, null, { timeout: 5000 }).catch(() => {})
 const shareKeys = await page.getByTestId('thr-lib-card').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-key')).join(''))
 check('L2 공유 · 저장으로 거르기 → B · E · H · M · O · Q · U', shareKeys === 'BEHMOQU', shareKeys)
 await page.locator('[data-testid="thr-lib-card"][data-key="U"]').locator('xpath=ancestor::article').getByTestId('thr-lib-use').click()
@@ -230,6 +236,7 @@ check('L3 [이 틀로 쓰기] → 쓰기 칸 · U 밥줄 공개 골라짐', (awa
 
 /* ---------------- R 하루 10분 ---------------- */
 await page.getByTestId('thr-tab-routine').click()
+await page.getByTestId('thr-routine').waitFor()
 await page.getByTestId('thr-routine-scan').check()
 await page.waitForTimeout(100)
 await page.reload({ waitUntil: 'networkidle' })
