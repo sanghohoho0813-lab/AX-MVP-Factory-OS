@@ -1170,7 +1170,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const reqBlog = await p.getByTestId('content-ai-req-text').innerText()
   await p.locator('[data-testid="content-ai-channel-btn"][data-kind="video"]').click()
   const reqVideo = await p.getByTestId('content-ai-req-text').innerText()
-  check('D229-8 요청문 — 블로그: 2,100~3,000자 · 키워드 제목 맨 앞 · 흔한 반박 · 배송 조건 · 업체가 막은 말 · 마지막 제안 / 영상으로 바꾸면 썸네일 20~35자 · 지역 빼기', reqBlog.includes('채널 · 종류: 네이버 블로그 글') && reqBlog.includes('2,100~3,000자') && reqBlog.includes('제목 맨 앞에') && reqBlog.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && reqBlog.includes('배송 · 교환 조건: 전국 택배') && reqBlog.includes('"최저가"') && reqBlog.includes('끝: 도면 검토') && reqVideo.includes('썸네일 문구 20~35자') && reqVideo.includes('지역명은 제목 · 썸네일에 넣지 말고') && !reqVideo.includes('2,100~3,000자'), reqVideo)
+  check('D229-8 요청문 — 블로그: 2,100~3,000자 · 키워드 제목 맨 앞 · 흔한 반박 · 배송 조건 · 업체가 막은 말 · 마지막 제안 / 영상으로 바꾸면 썸네일 큰 글자 10자 · 증거 장면 먼저(D-274 ⟲10차) · 지역 빼기', reqBlog.includes('채널 · 종류: 네이버 블로그 글') && reqBlog.includes('2,100~3,000자') && reqBlog.includes('제목 맨 앞에') && reqBlog.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && reqBlog.includes('배송 · 교환 조건: 전국 택배') && reqBlog.includes('"최저가"') && reqBlog.includes('끝: 도면 검토') && reqVideo.includes('썸네일 큰 글자 10자 안팎') && reqVideo.includes('0~15초 증거 장면') && reqVideo.includes('지역명은 제목 · 썸네일에 넣지 말고') && !reqVideo.includes('2,100~3,000자'), reqVideo)
   await wait(900)
   if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d229-request.png`, fullPage: false })
   await p.getByTestId('content-ai-next').click()
