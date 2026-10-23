@@ -3706,3 +3706,14 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(cc0dd2d · Production 18:23 UTC) · 새 묶음 index-1Q5KtEDF.js · 'spec-board-thin' · '출원 전에 손볼 곳' · 'title{titleEn}' · '길이 상한에서 잘렸' 는 SpecWritePage 조각 · 'PARTS_SENTENCE' 는 specDraft 조각.
 - 확인하지 못한 것: 실제 AI(Gemini · GPT)로 가연인터내셔널 명세서를 다시 써서 점수가 얼마나 오르는지(로그인 · 키 필요 — 시험은 가짜 답) · 그 실행에 쓰인 모델 ·
   가연인터내셔널 회사 기록에 업종 · 상담 메모를 채우거나 GPT 원고를 자료로 넣었을 때의 결과.
+
+## §186 D-269 명세서 기획 먼저 · 단계마다 고른 모델 · 전문/나눠서 보기 + D-270 벤처 기획 먼저 — 게이트 · 병합 · Production (2026-10-23)
+
+- **게이트 62단계 — 62/62 녹색**(HEAD fbe3182 · dirty 0 · 실패 0 · D-269 만 돌던 게이트는 15단계에서 멈추고 D-269+D-270 한 번에 다시). 이번 것에 걸린 숫자: 단위 test:specdraft 125 · test:ventureplan 88 · test:assist 136 · test:patent 67 · test:all 전체 /
+  e2e qa:specboard 81 · qa:ventureplan 80 · qa:certai 19.
+- **화면 사진(시험 · 가짜 AI 답)** — PC 1440: 아이디어 5개(1순위 · 점수 · 순위 이유 · 회사 근거) · [제일 좋은 게 뭐야?] 뒤 다시 줄 세움 · [더 짜내기] '새로 · 자체점검' 2개 · 구성 확인(조사 결론 · 구성요소 · 연결관계 · 자체점검 ①) · 전문(【식별항목】 · 한글{영문} · 문단 번호 없음) · 나눠서 보기(칸마다 복사) ·
+  회사 정보 문(회사 이야기 없을 때) · 벤처 기획 방향 5개 · 요약에서 멈춘 뒤 [요약 확인 — 본문 5묶음 쓰기]. 휴대폰 360 · 390: 아이디어 고르기 · 회사 정보 문 · 전문 · 나눠서 보기 넘침 0.
+- **고친 것(사진을 보고)** — 진행 줄 차례에서 견주기 · 짜내기가 아이디어 줄보다 위에 오던 것 · 전문에 [0001] 문단 번호가 붙던 것(첨부 명세서에 없음) · 휴대폰에서 'P0 1개' 줄바꿈.
+- **병합** — main 4a7cb16 → **fbe3182**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(fbe3182 · Production) · 새 묶음 index-Ca98YKUe.js · 'spec-plan-idea' · 'spec-gate-company' · 'spec-new-model' 은 SpecWritePage 조각 · 'vplan-plan-option' · 'vplan-ai-next' 는 VenturePlanWorkbench 조각 · '【해결하고자 하는 과제】' 는 specDraft 조각.
+- 확인하지 못한 것: 실제 AI(GPT-6 Luna 등)로 처음부터 써 본 결과 · 특허로 작성기에 전문 · 칸별 글을 실제로 붙여 넣은 결과(로그인 · 키 · 특허로 계정 필요).
