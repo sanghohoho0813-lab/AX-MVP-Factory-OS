@@ -3739,3 +3739,17 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main 8d7391e → **25c7ad7**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(25c7ad7 · Production) · 새 묶음 index-Wnoi-roH.js · 'AI 전략실(잠재고객)' 은 메뉴 조각 · '반론 질문' · '돈 KPI 3' · '기준대로 판정' 은 AI 전략실 공통 조각 · 옛 이름 'AI 작업실' 0곳.
 - 확인하지 못한 것: 실제 AI 로 [AX 전략 분석] 을 돌린 답(로그인 · 키 필요). 서버 함수에 기준 문서가 붙는 것은 단위 시험(지시문 · 통째 인용 막기)과 e2e(공급자로 가는 지시)로만 확인했다.
+
+## §189 D-273 짜부라짐 · 마케팅 실측 공식 내재화 · 스레드 · 릴스 · 틱톡 — 게이트 · 병합 · Production (2026-10-23)
+
+- **게이트 64단계**(첫 판 HEAD c66997a · dirty 0) — 62/64 녹색. 빨간 둘은 모두 시험 쪽이었다:
+  - unit: mirae-os 메뉴 시험이 마케팅 목차 3칸(D-233)을 글자 그대로 보고 있었다 → 스레드 · 릴스 · 틱톡 주소(권한 · 머리줄 · 사이드바 · 팀장 닫힘)까지 넣어 고침(891/891). test:all 이 여기서 멈춰 뒤 단위 시험이 안 돌았으므로 다음 판에서 통째로 다시 돌렸다.
+  - qa:threads S9 · S10(지우기 한 번 더 묻기): 칸을 바꾼 직후 기록표 줄 수를 세서 0 이 나온 경우 — 앱이 아니라 시험의 시간 차. 그려진 뒤에 세도록 고치고, 릴스 · 틱톡 시험의 같은 모양도 기다리게 했다.
+- **다시 돈 것**(HEAD 2405f05 → fa8c759 · c66997a 이후 바뀐 것은 시험 파일 3개뿐 · 앱 코드 같음): tsc · oxlint · build · qa:wording 5/5 · **test:all 전부 녹색** · qa:mkpack 67 · qa:shorts 36 ·
+  qa:threads 는 게이트 방식(e2e/.gate 복사본 · 4400)으로 48/48 세 번 · qa:shorts 36/36 세 번.
+- 이번 것에 걸린 숫자: test:threads 88(스레드 · 릴스 · 틱톡 규칙 검사 · 점수 · 서버 단추 · 공식 묶음 · 출처 이름 0) · test:mkpack 71 · test:assist 136 · qa:youtube 242(목차 9칸) · qa:assist 64 · qa:squeeze --all 짜부라짐 0(메뉴 화면 30곳 × 360 · 390 · 430 · 큰 글자).
+- **화면 사진(눈으로 봄)** — 스레드: PC 쓰기(예시 글 · 규칙 검사 고칠 것 0) · AI 글 3개 · 기록표(점수 44 · 틀별 평균) · 390 쓰기 · 기록표. 릴스 · 틱톡: 390 · 360 큰 글자 만들기(큰 고르기 단추 한 줄에 하나) · 기록표 · 형식 · 공식.
+  AI 전략실 '바로 시작 — 타자 없이' 412 · 360 큰 글자(가로 한 줄).
+- **병합** — main 08d4fb6 → **fa8c759**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(fa8c759 · Production) · 새 묶음 index-D4cJrc9O.js · ThreadsPage · ShortsPage 조각 · 목차 '릴스 · 틱톡' · '(틀 23가지 · 글쓰기 · 기록표)' · 바로 시작 제목 줄 클래스(min-w-[12rem]) · 유튜브 '0~15초 증거 장면' · /marketing/threads · /marketing/shorts 200.
+- 확인하지 못한 것: 실제 AI 로 돌린 스레드 글 · 숏폼 대본 · 바뀐 마케팅 지시의 답(로그인 · 키 필요 — 시험은 가짜 답). 공식 묶음이 서버 지시에 붙는 것은 단위 시험과 e2e(공급자로 가는 지시)로만 확인했다.
