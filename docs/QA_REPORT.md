@@ -3717,3 +3717,13 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main 4a7cb16 → **fbe3182**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(fbe3182 · Production) · 새 묶음 index-Ca98YKUe.js · 'spec-plan-idea' · 'spec-gate-company' · 'spec-new-model' 은 SpecWritePage 조각 · 'vplan-plan-option' · 'vplan-ai-next' 는 VenturePlanWorkbench 조각 · '【해결하고자 하는 과제】' 는 specDraft 조각.
 - 확인하지 못한 것: 실제 AI(GPT-6 Luna 등)로 처음부터 써 본 결과 · 특허로 작성기에 전문 · 칸별 글을 실제로 붙여 넣은 결과(로그인 · 키 · 특허로 계정 필요).
+
+## §187 D-271 기획 대화 · 업체 서류함 연동 · 글 붙여넣기 · 명세서 휴지통 — 게이트 · 병합 · Production (2026-10-23)
+
+- **게이트 62단계 — 62/62 녹색**(HEAD a479e2b · dirty 0). 한 번에 돈 게이트에서 60/62 — 간단 모드(qa:simple) · 작업실 고급(qa:studio)이 실패했는데, 같은 시간에 다른 시험(qa:simple 따로) · 파일 전체 찾기를 돌려 기계가 바빴던 때였다(작업실 고급은 'Page crashed'). 아무것도 같이 돌리지 않고 같은 묶음(4400)에 다시 돌려 qa:simple 88/88 · qa:studio 63/63.
+  이번 것에 걸린 숫자: 단위 test:specdraft 140 · test:ventureplan 91 · test:assist 136 · test:all 전체 / e2e qa:specboard 102 · qa:ventureplan 82.
+- **화면 사진(시험 · 가짜 AI 답)** — PC 1440: 기획 대화 첫 질문(회사 이해 · 의견 2 · 질문 · 누를 답 4 · 직접 적기) · 아이디어 5개 위에 접힌 '기획 대화 2번' · [자료 넣기] 창(업체 서류함 · 읽지 못한 이유 · 파일 · GPT 대화 붙여넣기) · 휴지통(되살리기 · 두 번째 확인) · 벤처 기획 대화. 휴대폰 360 · 390: 기획 대화 · 휴지통 두 번째 확인 넘침 0.
+- **고친 것(사진을 보고)** — 휴대폰 360 에서 직접 적기 칸 안내 글이 잘리던 것(짧게) · 명세서 첫 화면 설명이 예전 흐름(아이디어 5개부터)을 말하던 것.
+- **병합** — main 1da5ce1 → **a479e2b**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(a479e2b · Production) · 새 묶음 index-C7x0emZJ.js · 'AI 와 기획 시작' 은 SpecWritePage · VenturePlanWorkbench 조각 · 'spec-mats-paste-text' · 'spec-trash-purge' 는 SpecWritePage 조각 · 'vplan-talk-start' 는 VenturePlanWorkbench 조각.
+- 확인하지 못한 것: 실제 AI 로 기획 대화를 돌린 결과(로그인 · 키 필요) · 클라우드(Supabase)에서 업체 서류함 파일을 실제로 내려받아 읽는 것(이 시험 기기는 로컬 저장이라 '읽지 못함' 길만 확인).
