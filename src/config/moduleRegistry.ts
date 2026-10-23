@@ -111,7 +111,7 @@ export interface ModuleDefinition {
   moduleKey?: string
   /** D-162: 대표 · 기존 구성원(full)에게만 — Pilot 에게는 메뉴에도 없고 주소로도 열리지 않는다 */
   ownerOnly?: boolean
-  /** 기능 권한(capability)이 있어야 메뉴에 보인다(예: 대표 AI 작업실). 화면 · DB · 서버 함수가 따로 또 막는다 */
+  /** 기능 권한(capability)이 있어야 메뉴에 보인다(예: 대표 AI 전략실). 화면 · DB · 서버 함수가 따로 또 막는다 */
   capability?: string
 }
 
@@ -242,8 +242,8 @@ export const MODULES: ModuleDefinition[] = [
   // D-104: '고객 운영' → '고객 관리', '고객 이벤트함' → '잠재고객 상담신청' (주소는 그대로)
   { key: 'client-ops', label: '고객 관리', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true, badge: 'clients' },
   // D-162: 공개 사이트(고객 플랫폼) 상담신청은 대표 작업공간으로만 들어온다 — Pilot 에게는 없다
-  // 대표 AI 작업실(Company Case Intelligence) — 기능 권한 can_use_owner_ai_workspace 가 있는 사람만(지금은 대표). 팀장 · 팀장 화면 보기에는 없다
-  { key: 'ai-workspace', label: 'AI 작업실', path: '/ai', icon: Sparkles, group: 'clients', accent: 'ai', enabled: true, hint: '대표 전용 — 업체별 AX 분석 · 특허 · 벤처 · 자금 · 제안서 · 동료 전달문구 · 기억', ownerOnly: true, capability: 'can_use_owner_ai_workspace' },
+  // 대표 AI 전략실(Company Case Intelligence) — 기능 권한 can_use_owner_ai_workspace 가 있는 사람만(지금은 대표). 팀장 · 팀장 화면 보기에는 없다
+  { key: 'ai-workspace', label: 'AI 전략실(잠재고객)', path: '/ai', icon: Sparkles, group: 'clients', accent: 'ai', enabled: true, hint: '대표 전용 — 업체별 AX 분석 · 특허 · 벤처 · 자금 · 제안서 · 동료 전달문구 · 기억', ownerOnly: true, capability: 'can_use_owner_ai_workspace' },
   // D-247 대표 "어디 있는지 못 찾겠다 — 기업인증 밖으로": 벤처 사업계획서 쓰기 · 특허 명세서 점검을 한 줄로(대표만). 기업인증 › 벤처 · 특허·MVP 안 입구도 그대로
   { key: 'patent-venture', label: '특허 · 벤처', path: '/patent-venture', icon: Stamp, group: 'clients', accent: 'ai', enabled: true, hint: '벤처 사업계획서 쓰기 · 특허 명세서 점검 — 바로 열기', ownerOnly: true },
   { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함', ownerOnly: true },
@@ -292,7 +292,7 @@ export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolea
   return MODULE_GROUPS.filter((group) => !(pilot && group.ownerOnly)).map((group) => ({
     group,
     // D-162: Pilot 에게는 대표 전용 줄 · 고급 운영 기능(검증 · 기관 전략 · 사례)을 빼고 보인다
-    // 기능 권한이 필요한 줄(AI 작업실)은 권한이 있을 때만
+    // 기능 권한이 필요한 줄(AI 전략실)은 권한이 있을 때만
     items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && (m.ownerOnly || m.advanced || isPilotHiddenPath(m.path))) && (!m.capability || caps.has(m.capability))),
   })).filter((g) => g.items.length > 0)
 }

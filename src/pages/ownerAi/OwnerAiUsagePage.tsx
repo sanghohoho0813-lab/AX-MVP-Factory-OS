@@ -49,7 +49,7 @@ function Usage() {
     <div className="flex flex-col gap-4">
       <Link to="/ai" className="t-sub tap inline-flex min-h-11 items-center gap-1 self-start font-semibold text-slate-600 hover:text-slate-900">
         <ChevronLeft aria-hidden="true" className="size-4" />
-        AI 작업실
+        AI 전략실
       </Link>
       <ScreenTitle
         title="AI 사용량"
@@ -64,7 +64,7 @@ function Usage() {
       />
       {dbSetup && (
         <Surface>
-          <p className="t-body font-semibold text-slate-900">AI 작업실 DB 설정이 필요합니다.</p>
+          <p className="t-body font-semibold text-slate-900">AI 전략실 DB 설정이 필요합니다.</p>
         </Surface>
       )}
       {runs === null ? (

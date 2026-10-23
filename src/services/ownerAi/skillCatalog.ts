@@ -13,9 +13,9 @@ export interface SkillMeta {
 }
 
 export const SKILL_META: Record<SkillId, SkillMeta> = {
-  AX_PENGUIN: { id: 'AX_PENGUIN', name: 'AX 전략 분석', version: 1, tier: 'deep', description: '돈 버는 방식부터 12단계로 생각해 가장 추천하는 AX 1개와 차선' },
-  AX_IDEA: { id: 'AX_IDEA', name: 'AX 아이템 발굴', version: 1, tier: 'standard', description: '해 볼 만한 AX 아이템 후보(빨리 되는 것 표시)' },
-  AX_MVP: { id: 'AX_MVP', name: 'MVP 구체화', version: 1, tier: 'standard', description: '채택한 AX 를 MVP 범위 · 기능 · 화면 · 단계로' },
+  AX_PENGUIN: { id: 'AX_PENGUIN', name: 'AX 전략 분석', version: 2, tier: 'deep', description: '기준 문서대로 — 적합성 판정 · 16단계 · 가장 큰 문제 · 추천 AX 1개와 차선 · 돈 KPI 3 · 12주 실증 · 반론 질문' },
+  AX_IDEA: { id: 'AX_IDEA', name: 'AX 아이템 발굴', version: 2, tier: 'standard', description: '기준 문서대로 — 해 볼 만한 AX 아이템 후보(방법 · 12주 증명 · 빨리 되는 것 표시)' },
+  AX_MVP: { id: 'AX_MVP', name: 'MVP 구체화', version: 2, tier: 'standard', description: '기준 문서대로 — 채택한 AX 를 MVP 범위 · 기능(자동화 수준) · 화면 · 12주 단계로' },
   AX_FRONT: { id: 'AX_FRONT', name: 'AX 화면 기획', version: 1, tier: 'standard', description: 'PC 대시보드 1개 + 모바일 핵심 화면 2개(글자는 OS 가 그림)' },
   SANGHO_PROPOSAL: { id: 'SANGHO_PROPOSAL', name: '제안서 구성', version: 1, tier: 'standard', description: '페이지 구성 · 제목 · 메시지 · 핵심 수치 → 제안서 스튜디오에서 실제 글자로' },
   PATENT_IDEA: { id: 'PATENT_IDEA', name: '특허 아이디어', version: 1, tier: 'deep', description: '채택한 AX 로 특허 아이디어 정리(변리사 검토 전 내부용)' },
@@ -44,7 +44,7 @@ export interface QuickAction {
 }
 
 export const QUICK_ACTIONS: readonly QuickAction[] = [
-  { key: 'ax', label: 'AX 전략 분석', skill: 'AX_PENGUIN', hint: '가장 추천하는 AX 1개 + 차선', ask: { label: '더 볼 점(선택)', placeholder: '예: 영업 쪽 업무를 먼저 보고 싶어요' } },
+  { key: 'ax', label: 'AX 전략 분석', skill: 'AX_PENGUIN', hint: '기준대로 판정 · 추천 AX 1개 · 12주 증명', ask: { label: '더 볼 점(선택)', placeholder: '예: 영업 쪽 업무를 먼저 보고 싶어요' } },
   { key: 'idea', label: 'AX 아이템 발굴', skill: 'AX_IDEA', hint: '해 볼 만한 아이템 후보' },
   { key: 'mvp', label: 'MVP 구체화', skill: 'AX_MVP', hint: '채택한 AX 를 만들 범위로', ask: { label: '어느 AX 로(선택 · 비우면 채택한 것)', placeholder: '예: 견적 자동 작성' } },
   { key: 'patent', label: '특허 아이디어', skill: 'PATENT_IDEA', hint: '내부 정리용 · 변리사 검토 필요' },

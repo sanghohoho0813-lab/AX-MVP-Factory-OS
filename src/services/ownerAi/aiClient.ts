@@ -48,7 +48,7 @@ export class AiCallError extends Error {
 
 const MESSAGE: Record<string, string> = {
   setup_needed: 'AI 기능 설정이 필요합니다.',
-  db_setup_needed: 'AI 작업실 DB 설정이 필요합니다.',
+  db_setup_needed: 'AI 전략실 DB 설정이 필요합니다.',
   login_required: 'AI 는 로그인한 클라우드 화면에서만 부를 수 있습니다. 다시 로그인해 주세요.',
   forbidden: '이 기능을 쓸 권한이 없습니다.',
   rate_limited: '요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.',

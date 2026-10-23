@@ -522,9 +522,9 @@ try {
     out.lvPatch = await fetch(`${base}/consulting_projects?id=eq.qa-legacy-venture`, { method: 'PATCH', headers: h, body: JSON.stringify({ payload: { venture: { submittedAt: '2099-01-01' } } }) }).then((r) => r.text())
     return out
   }, [REF, OWNER_WS, OWNER_CLIENT])
-  check('AI Pilot REST: 대표 AI 작업실 업체 · 실행 기록 읽기 = []', direct.cases === '[]' && direct.runs === '[]', `${direct.cases} ${direct.runs}`)
+  check('AI Pilot REST: 대표 AI 전략실 업체 · 실행 기록 읽기 = []', direct.cases === '[]' && direct.runs === '[]', `${direct.cases} ${direct.runs}`)
   check('AI Pilot REST: 내 기능 권한 = [] · has_capability = false', direct.caps === '[]' && direct.hasCap === 'false', `${direct.caps} ${direct.hasCap}`)
-  check('AI Pilot REST: AI 작업실 업체 넣기 · 자기 권한 넣기 막힘', direct.caseIns >= 400 && direct.capIns >= 400, `${direct.caseIns} ${direct.capIns}`)
+  check('AI Pilot REST: AI 전략실 업체 넣기 · 자기 권한 넣기 막힘', direct.caseIns >= 400 && direct.capIns >= 400, `${direct.caseIns} ${direct.capIns}`)
   check('AI DB: 기능 권한은 대표 한 사람 · 대표 AI 업체 그대로', sql(`select string_agg(user_id::text, ',') from public.user_capabilities where capability = 'can_use_owner_ai_workspace'`) === OWNER.id && sql(`select count(*) from public.company_cases where id = 'case_pilot_sneak_01'`) === '0')
   check('Pilot REST(D-180 S8): 대표의 예전 벤처 기록 고치기 = 0줄 · DB 그대로', direct.lvPatch === '[]' && sql(`select payload->'venture'->>'submittedAt' from public.consulting_projects where id = 'qa-legacy-venture'`) === '2026-07-15', direct.lvPatch)
   check('Pilot REST: 표 8개 어디에도 대표 자료 없음', Object.entries(direct).filter(([k]) => !['patch', 'del', 'insert', 'ws2', 'tier'].includes(k)).every(([, v]) => leaked(String(v)).length === 0 && !String(v).includes(OWNER_WS)), JSON.stringify(direct).slice(0, 400))
@@ -917,7 +917,7 @@ try {
   check('P7 대표 → 팀장 화면(D-195): 마케팅 · 브랜딩 메뉴 없음', !pnav.includes('마케팅'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
-  check('AI 대표 → 팀장 화면: AI 작업실 메뉴 없음', !pnav.includes('AI 작업실'), pnav.replace(/\n/g, '|').slice(0, 300))
+  check('AI 대표 → 팀장 화면: AI 전략실 메뉴 없음', !pnav.includes('AI 전략실'), pnav.replace(/\n/g, '|').slice(0, 300))
   {
     // D-257 대표가 팀장 화면으로 볼 때도 팀장과 같게 — AI 띠는 있고 회사는 Gemini 만
     await go(page, '/')
@@ -948,7 +948,7 @@ try {
   const back2 = await bodyText(page)
   check('팀장 → 대표 화면: 대표 업체 다시 · 팀장 줄 없음 · 대표 메뉴', back2.includes('대표비밀정밀') && (await page.getByTestId('viewing-pilot').count()) === 0 && ((await page.locator('aside').first().innerText()) ?? '').includes('영업자 정산'))
   check('P1 대표(D-195): 마케팅 · 브랜딩 메뉴 보임', ((await page.locator('aside').first().innerText()) ?? '').includes('마케팅 · 브랜딩'))
-  check('AI 대표: 사이드바에 AI 작업실', ((await page.locator('aside').first().innerText()) ?? '').includes('AI 작업실'))
+  check('AI 대표: 사이드바에 AI 전략실', ((await page.locator('aside').first().innerText()) ?? '').includes('AI 전략실'))
   await go(page, '/ai')
   await page.getByTestId('case-new').waitFor({ timeout: 8000 }).catch(() => {})
   check('AI 대표: /ai 열림(업체 등록 단추 · 권한 막힘 안내 없음)', (await page.getByTestId('case-new').count()) === 1 && (await page.getByTestId('owner-ai-denied').count()) === 0 && (await page.getByTestId('owner-ai-db-setup').count()) === 0, (await bodyText(page)).slice(0, 200))

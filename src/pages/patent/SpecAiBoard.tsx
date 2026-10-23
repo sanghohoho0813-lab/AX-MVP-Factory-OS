@@ -3,10 +3,10 @@
  *
  *   맨 위   [✨ 전부 써줘] 한 번 — 아이디어 → 조사 → 구성 → 본문 → 청구항 → 점검대로 고치기(약 4~5분 · 화면을 떠나도 계속)
  *   칸 여섯 아이디어 · 조사 · 구성 · 본문 · 청구항 · 점검 — 칸마다 [○○ 써줘 / 다시] · 결과 미리보기 · [직접 고치기]
- *   재료   회사 기록 · AI 작업실 자료 · 끌어다 놓은 파일(읽은 글만) — 타자 칠 칸이 없다
+ *   재료   회사 기록 · AI 전략실 자료 · 끌어다 놓은 파일(읽은 글만) — 타자 칠 칸이 없다
  * 기준 문서(내부 기준 문서 · 내부 기준 문서)는 서버가 단추마다 붙인다. 대표 계정에서만(편집기가 ai === 'yes' 일 때만 그린다).
  * D-261 대표: "버튼 한 번만 눌러도 처음부터 끝까지 · 너무 뭐가 많아". 새 명세서는 만들자마자 [전부 써줘] 가 저절로(autoStart) —
- *   회사 기록 · AI 작업실 자료를 다 읽은 뒤 시작한다. 맨 위 한 칸에 진행 → 다 쓰면 명칭 · 청구항 · 내려받기.
+ *   회사 기록 · AI 전략실 자료를 다 읽은 뒤 시작한다. 맨 위 한 칸에 진행 → 다 쓰면 명칭 · 청구항 · 내려받기.
  *   칸 여섯(고르기 · 칸별 다시 쓰기 · 직접 고치기)은 [칸별로 보기] 안으로 접었다(지운 것 없음).
  * D-263 대표: "자체점검 스킬은 명세서에도 항상 중간중간 들어가야 해. 반드시." — 구성 뒤(①) · 청구항 뒤(②)에 자체점검 단계가 저절로.
  *   자체점검이 직접 고친 칸 · 점수 · P0 · 대표 확인을 맨 위 상자에 보여 주고, [자체점검 기준] 에서 대표 정의를 붙여 넣는다.
@@ -158,7 +158,7 @@ export function SpecAiBoard({
   const fileRef = useRef<HTMLInputElement>(null)
   const clientId = record?.id ?? ''
 
-  // AI 작업실 — 이 회사와 이어진 작업실의 자료 · '특허 아이디어' 결과를 재료로(실패하면 없이)
+  // AI 전략실 — 이 회사와 이어진 작업실의 자료 · '특허 아이디어' 결과를 재료로(실패하면 없이)
   useEffect(() => {
     if (!clientId) {
       setMatsFor('')
@@ -168,7 +168,7 @@ export function SpecAiBoard({
     void (async () => {
       try {
         const cases = (await repo.listCases()).filter((c) => c.clientId === clientId)
-        const mats = cases.flatMap((c) => c.materials.filter((m) => !m.excluded && m.text.trim()).map((m) => ({ title: m.title, kind: 'AI 작업실 자료', text: m.text })))
+        const mats = cases.flatMap((c) => c.materials.filter((m) => !m.excluded && m.text.trim()).map((m) => ({ title: m.title, kind: 'AI 전략실 자료', text: m.text })))
         const ideas: string[] = []
         for (const c of cases.slice(0, 2)) {
           for (const r of await repo.listRuns(c.id)) {
@@ -366,7 +366,7 @@ export function SpecAiBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 한 번만(명세서를 열 때)
   }, [matsFor, clientId, wantClient, record, docs])
 
-  // D-261 새 명세서 — 회사 기록 · 그 회사의 AI 작업실 자료를 다 읽은 뒤 한 번만 저절로.
+  // D-261 새 명세서 — 회사 기록 · 그 회사의 AI 전략실 자료를 다 읽은 뒤 한 번만 저절로.
   // D-269 저절로는 '아이디어 5개' 까지만(고르는 것은 대표) · 회사 이야기가 없으면 시작하지 않고 '회사 정보부터'
   useEffect(() => {
     if (!autoStart || autoDone.current || busy) return
@@ -484,7 +484,7 @@ export function SpecAiBoard({
 
           <ul className="flex flex-wrap gap-1.5" data-testid="spec-board-sources">
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{record ? `${record.companyName} 기록 ${facts.length}줄` : '회사 고르지 않음'}</li>
-            <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">AI 작업실 자료 {caseMats.length}개</li>
+            <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">AI 전략실 자료 {caseMats.length}개</li>
             <li className="t-meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700" data-testid="spec-board-docs">
               업체 서류 {d.materials.filter((m) => m.kind === DOC_MATERIAL_KIND).length}/{docs.length}개 읽음
             </li>

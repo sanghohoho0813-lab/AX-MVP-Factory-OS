@@ -50,7 +50,7 @@ export function QuickActions({
           <h2 className="t-section break-keep text-slate-900">빠른 작업</h2>
           <span className="t-sub break-keep text-slate-500">모두 이 업체 기억 · 자료를 같이 씁니다</span>
         </div>
-        {/* D-255 AI 작업실도 고른 모델로 — 고르지 않으면 일마다 빠르게 · 보통 · 깊게 모델(전과 같음) */}
+        {/* D-255 AI 전략실도 고른 모델로 — 고르지 않으면 일마다 빠르게 · 보통 · 깊게 모델(전과 같음) */}
         <ModelPicker popover testId="owner-ai-model" />
       </div>
       {/* 칸 폭이 좁아도 이름이 한 줄씩 읽히게 — 최소 10.5rem 칸을 들어가는 만큼(휴대폰 2칸 · PC 3~5칸) */}

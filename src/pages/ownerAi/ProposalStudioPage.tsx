@@ -120,7 +120,7 @@ function Studio() {
   if (state.kind !== 'ready' || !doc)
     return (
       <Surface>
-        <p className="t-body text-slate-700">{state.kind === 'db_setup' ? 'AI 작업실 DB 설정이 필요합니다.' : state.kind === 'error' ? state.message : '이 제안서 결과를 찾지 못했습니다.'}</p>
+        <p className="t-body text-slate-700">{state.kind === 'db_setup' ? 'AI 전략실 DB 설정이 필요합니다.' : state.kind === 'error' ? state.message : '이 제안서 결과를 찾지 못했습니다.'}</p>
         <Link to={`/ai/cases/${caseId}`} className="t-body tap mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">업체 작업실로</Link>
       </Surface>
     )

@@ -5,7 +5,7 @@
  *        키워드 → 낱말 누르면 블로그로 · 주제 고르기 → 블로그(점검: 대괄호 · 키워드) · 전체 복사(클립보드) · 다른 안
  *        보관함 저장 · 같은 글 두 번 안 넣음 · 고쳐서 2판 · 새로고침해도 그대로 · 즐겨찾기 · 같은 주제로 짧은 영상
  *        카톡 혜택 = (광고) · 밤 9시 안내 · 격식 있게(합니다) · 홍보 정보 고치기 → 키워드 따라감 · 공격 글은 글자로만 · 광고 규정 말 알림
- *        업체 기록에 붙이기(다시 열기 주소) · AI 작업실 자료로(대표) · 지우기(한 번 더 묻기) · 업체 상세 [홍보 글 만들기] 입구
+ *        업체 기록에 붙이기(다시 열기 주소) · AI 전략실 자료로(대표) · 지우기(한 번 더 묻기) · 업체 상세 [홍보 글 만들기] 입구
  *        대표 전화 없는 가게 → 휴대폰 번호 안 들어감 · [대표 전화] 로 비움
  *  390 · 360  가로 넘침 0 · 누르는 것 44px · 먼저 만들 것 → 결과
  *  D-207  이 칸만 채우면 · 주제 전략 · 체험단 가이드(대가 표시) · 쇼츠 30~60초 · 카드뉴스 광고 유형 · 검색량 붙여 넣기 · 한 달 계획
@@ -278,7 +278,7 @@ const errors = []
   await wait(600)
   check('18 지우면 보관함에서 빠짐', (await page.getByTestId('content-archive-item').count()) === before - 1)
 
-  // 19 AI 작업실 자료로(대표)
+  // 19 AI 전략실 자료로(대표)
   await mode(page, 'direct')
   await page.getByTestId('content-make').click()
   await wait(900)
@@ -289,7 +289,7 @@ const errors = []
   await page.getByTestId('content-to-ai').click()
   await page.waitForURL(/tab=ai/, { timeout: 8000 }).catch(() => {})
   await wait(1200)
-  check('19 AI 작업실에서 다듬기 → 업체 상세 AI 작업실 탭 · 자료에 "홍보 글 · 제목"', /\/ops\/clients\/cli_site\?tab=ai/.test(page.url()) && (await page.content()).includes(`홍보 글 · ${aiTitle}`), page.url())
+  check('19 AI 전략실에서 다듬기 → 업체 상세 AI 전략실 탭 · 자료에 "홍보 글 · 제목"', /\/ops\/clients\/cli_site\?tab=ai/.test(page.url()) && (await page.content()).includes(`홍보 글 · ${aiTitle}`), page.url())
 
   // 20 업체 상세 입구
   await page.goto(BASE + '/ops/clients/cli_site', { waitUntil: 'networkidle' })

@@ -1,5 +1,5 @@
 /**
- * 대표 AI 작업실을 이 화면에서 열 수 있는가 — 기능 권한(capability) 'can_use_owner_ai_workspace'.
+ * 대표 AI 전략실을 이 화면에서 열 수 있는가 — 기능 권한(capability) 'can_use_owner_ai_workspace'.
  *
  *   yes    권한 있음(대표). 로컬 모드(이 기기 = 대표 혼자 쓰는 시험 · 개발)도 yes
  *   no     팀장(Pilot) · 대표가 팀장 화면으로 볼 때 · 권한 없는 구성원 · 접근 없음
@@ -35,7 +35,7 @@ export function useOwnerAiAccess(): OwnerAiAccess {
  *   owner  대표(모든 회사 모델) · 로컬 모드
  *   pilot  팀장 · 대표가 팀장 화면으로 볼 때 — Gemini 만(서버 ai-assist 도 Gemini 밖은 403)
  *   no / setup  useOwnerAiAccess 와 같은 뜻
- * AI 작업실(/ai · 업체 'AI 작업실' 탭)은 이것이 아니라 useOwnerAiAccess 그대로 — 팀장에게 안 연다.
+ * AI 전략실(/ai · 업체 'AI 전략실' 탭)은 이것이 아니라 useOwnerAiAccess 그대로 — 팀장에게 안 연다.
  */
 export type AssistAccess = 'owner' | 'pilot' | 'no' | 'setup'
 

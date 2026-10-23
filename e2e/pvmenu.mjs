@@ -1,6 +1,6 @@
 /**
  * qa:pvmenu — D-247 메뉴 '특허 · 벤처'(기업인증 밖). 실행: npm run qa:pvmenu -- http://localhost:4390 [사진 폴더]
- *  - 사이드바 고객 묶음(AI 작업실 다음)에 '특허 · 벤처' · 누르면 첫 화면 · 불 켜짐
+ *  - 사이드바 고객 묶음(AI 전략실 다음)에 '특허 · 벤처' · 누르면 첫 화면 · 불 켜짐
  *  - 첫 화면 = 대화창(D-250) · [자세히](/patent-venture/more): 벤처 사업계획서 쓰기(회사 고르기 → 쓰기) · 특허 명세서 점검 열기
  *  - /patent-venture/plan?client= 에서 쓴 칸 = 기업인증 › 벤처 › 사업계획서 쓰기의 같은 칸(같은 기록) · 새로고침해도 그대로
  *  - 돌아가기 → 특허 · 벤처 · 회사 없이 열면 고르기 · 명세서 점검(같은 화면, 돌아가기만 특허 · 벤처로)
@@ -52,11 +52,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.evaluate(seedScript())
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 
-  // 메뉴 자리 — 고객 묶음, AI 작업실 다음 · 상담신청 앞
+  // 메뉴 자리 — 고객 묶음, AI 전략실 다음 · 상담신청 앞
   const nav = (await page.locator('aside').first().innerText()) ?? ''
   const at = (s) => nav.indexOf(s)
   check('메뉴: 고객 묶음에 "특허 · 벤처"(고객 관리 다음 · 잠재고객 상담신청 앞)', at('특허 · 벤처') > at('고객 관리') && at('고객 관리') >= 0 && at('특허 · 벤처') < at('잠재고객 상담신청'), nav.replace(/\n/g, '|').slice(0, 300))
-  check('메뉴: AI 작업실이 있으면 그 바로 다음', at('AI 작업실') === -1 || at('특허 · 벤처') > at('AI 작업실'))
+  check('메뉴: AI 전략실이 있으면 그 바로 다음', at('AI 전략실') === -1 || at('특허 · 벤처') > at('AI 전략실'))
   await page.locator('aside').first().getByRole('link', { name: /특허 · 벤처/ }).click()
   await page.waitForURL(/\/patent-venture$/)
   await page.waitForTimeout(400)

@@ -108,7 +108,7 @@ export interface AiAssistProps {
 }
 
 export function AiAssist(props: AiAssistProps) {
-  // D-257 팀장도 띠가 보인다(Gemini 만) — AI 작업실은 따로(대표만)
+  // D-257 팀장도 띠가 보인다(Gemini 만) — AI 전략실은 따로(대표만)
   const access = useAiAssistAccess()
   if (access === 'no') return null
   return <AiAssistInner {...props} />
@@ -691,8 +691,8 @@ export function ModelRow({
             )}
           </div>
           <p className="t-meta break-keep text-slate-500">
-            {/* D-257 팀장 화면에는 없는 마케팅 · AI 작업실은 말하지 않는다 */}
-            고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 ? ' · 마케팅 · AI 작업실' : ' · 오른쪽 판 AI 대화'})가 같이 써요.
+            {/* D-257 팀장 화면에는 없는 마케팅 · AI 전략실은 말하지 않는다 */}
+            고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 ? ' · 마케팅 · AI 전략실' : ' · 오른쪽 판 AI 대화'})가 같이 써요.
             {allowedProviders().length === 1 && ' 팀장 계정은 지금 Gemini 모델만 쓸 수 있어요.'}
           </p>
         </div>
@@ -713,7 +713,7 @@ function ErrorBox({ error }: { error: { code: string; message: string; missing: 
         Vercel › Settings › Environment Variables 에 <b>{error.missing[0] ?? 'GEMINI_API_KEY'}</b> 를 넣고 Redeploy 하면 바로 됩니다(키는 서버에만 — 이름이 VITE_ 로 시작하면 안 됩니다).
       </>
     )
-  if (error.code === 'db_setup_needed') how = <>Supabase SQL Editor 에서 0021(AI 작업실 권한) 을 한 번 실행하면 됩니다 — docs/OWNER_AI_WORKSPACE_V1.md §12.</>
+  if (error.code === 'db_setup_needed') how = <>Supabase SQL Editor 에서 0021(AI 전략실 권한) 을 한 번 실행하면 됩니다 — docs/OWNER_AI_WORKSPACE_V1.md §12.</>
   return (
     <div role="alert" className="flex gap-2 rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-3" data-testid="ai-assist-error" data-code={error.code}>
       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-700" />

@@ -1,10 +1,10 @@
 /**
- * 대표 AI 작업실 저장소 — 로컬 모드(이 브라우저)와 클라우드 모드(Supabase 표 0021) 같은 모양.
+ * 대표 AI 전략실 저장소 — 로컬 모드(이 브라우저)와 클라우드 모드(Supabase 표 0021) 같은 모양.
  *
  *   company_cases · company_context_snapshots · ai_runs · ai_output_revisions
  *   - 기억 · 실행 · 수정 이력은 덧붙이기만(지우기 · 덮어쓰기 없음) — DB 정책도 그렇게 막혀 있다.
  *   - 실행 기록은 평가(채택 · 일부 채택 · 폐기)만 바뀐다.
- * 클라우드 표가 아직 없으면(0021 실행 전) OwnerAiSetupError — 화면은 'AI 작업실 DB 설정이 필요합니다' 를 보인다.
+ * 클라우드 표가 아직 없으면(0021 실행 전) OwnerAiSetupError — 화면은 'AI 전략실 DB 설정이 필요합니다' 를 보인다.
  */
 import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
@@ -15,14 +15,14 @@ import { caseClash, newId } from './caseUtil'
 
 export class OwnerAiSetupError extends Error {
   constructor() {
-    super('AI 작업실 DB 설정이 필요합니다(0021).')
+    super('AI 전략실 DB 설정이 필요합니다(0021).')
   }
 }
 
 /** D-219: 같은 사업자번호 · 같은 고객으로 이미 열린 작업실이 있다(예전에는 '저장에 실패했습니다' 로만 보여 왜 막혔는지 몰랐다) */
 export class OwnerAiDuplicateError extends Error {
   constructor() {
-    super('같은 사업자번호(또는 같은 고객)로 만든 작업실이 이미 있습니다 — AI 작업실 목록에서 열어 주세요.')
+    super('같은 사업자번호(또는 같은 고객)로 만든 작업실이 이미 있습니다 — AI 전략실 목록에서 열어 주세요.')
   }
 }
 
@@ -203,7 +203,7 @@ function missingTable(error: { code?: string; message?: string } | null): boolea
 
 function check<T>(r: { data: T | null; error: { code?: string; message?: string } | null }): T {
   if (missingTable(r.error)) throw new OwnerAiSetupError()
-  if (r.error) throw new Error('AI 작업실 저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.')
+  if (r.error) throw new Error('AI 전략실 저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.')
   return r.data as T
 }
 

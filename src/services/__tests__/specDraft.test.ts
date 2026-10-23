@@ -1,6 +1,6 @@
 /**
  * D-247 특허 명세서 쓰기 — 조사 · 명칭 · 권리축 → 구성요소 · 단계 · 도면 · 청구항 뼈대 · 본문 뼈대 · 복붙용 MD(명세서 점검 0 오류) ·
- * 점검 · 진행 · AI 작업실 아이디어 → 초안 · AI 합치기(고친 칸 보호) · AI 묶음 · 보낼 자료 · 답 읽기.
+ * 점검 · 진행 · AI 전략실 아이디어 → 초안 · AI 합치기(고친 칸 보호) · AI 묶음 · 보낼 자료 · 답 읽기.
  *
  * 시험용 발명(공구 마모 예측)은 실제 고객 발명과 상관없다.
  */
@@ -178,12 +178,12 @@ function fullDraft(): SpecDraft {
   check('K9 본문 네 칸 이상 쓰면 완료', p1.done === p1.total)
 }
 
-/* ---------------- AI 작업실 아이디어 → 초안 ---------------- */
+/* ---------------- AI 전략실 아이디어 → 초안 ---------------- */
 {
   const base = { ...emptyDraft(), idea: { ...emptyDraft().idea, problem: '사람이 쓴 문제' } }
-  const d = draftFromIdea(base, { title: '가 기반 나 시스템 및 방법', problem: 'AI 문제', priorArt: '기존', coreIdea: '핵심', distinct: ['차별1', '차별2'], dataFlow: ['수집', '판정'], procedure: ['진동을 수집한다', '마모를 판정한다'], independentClaim: '연결', dependentClaims: ['세 단계로 나누는'] }, 'AI 작업실 · 특허 아이디어 1')
+  const d = draftFromIdea(base, { title: '가 기반 나 시스템 및 방법', problem: 'AI 문제', priorArt: '기존', coreIdea: '핵심', distinct: ['차별1', '차별2'], dataFlow: ['수집', '판정'], procedure: ['진동을 수집한다', '마모를 판정한다'], independentClaim: '연결', dependentClaims: ['세 단계로 나누는'] }, 'AI 전략실 · 특허 아이디어 1')
   check('I1 이미 적은 칸은 그대로 · 빈 칸만 채움', d.idea.problem === '사람이 쓴 문제' && d.idea.prior === '기존' && d.idea.distinct === '핵심 · 차별1 · 차별2' && d.idea.flow === '수집 → 판정' && d.axis.link === '연결' && d.title === '가 기반 나 시스템 및 방법')
-  check('I2 처리 절차 → 단계 · 종속항 후보 → 씨앗', d.steps.map((s) => `${s.no}:${s.text}`).join() === 'S110:진동을 수집하는,S120:마모를 판정하는' && d.seeds[0].text === '세 단계로 나누는' && d.source === 'AI 작업실 · 특허 아이디어 1')
+  check('I2 처리 절차 → 단계 · 종속항 후보 → 씨앗', d.steps.map((s) => `${s.no}:${s.text}`).join() === 'S110:진동을 수집하는,S120:마모를 판정하는' && d.seeds[0].text === '세 단계로 나누는' && d.source === 'AI 전략실 · 특허 아이디어 1')
 }
 
 /* ---------------- AI 합치기 ---------------- */

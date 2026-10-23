@@ -1,8 +1,8 @@
 /**
- * D-255 AI 작업실 첫 화면 '바로 시작' — 대표: "기존 고객도 여기서 바로 · 업체 등록도 간단하게 · PDF 만 넣어도(크레탑 · 사업자등록증) 시작 · 타자는 거의 없게".
+ * D-255 AI 전략실 첫 화면 '바로 시작' — 대표: "기존 고객도 여기서 바로 · 업체 등록도 간단하게 · PDF 만 넣어도(크레탑 · 사업자등록증) 시작 · 타자는 거의 없게".
  *  ① 고객 관리에서 고르기 — 아직 작업실과 잇지 않은 고객 단추(최근 순 8개 · 찾기). 누르면 그 고객 정보 · 관계로 바로 만든다.
  *  ② 서류 한 장으로 — 사업자등록증 · 크레탑 보고서 · 등기를 넣으면 업체명 · 사업자번호 · 대표자를 읽어(새 업체 등록 창과 같은 읽기)
- *     같은 고객 · 작업실이 있으면 그쪽으로 잇기를 먼저, 없으면 [이 서류로 AI 작업실 만들기]. 읽은 글은 개인정보를 지운 뒤 '자료' 로 같이 들어간다.
+ *     같은 고객 · 작업실이 있으면 그쪽으로 잇기를 먼저, 없으면 [이 서류로 AI 전략실 만들기]. 읽은 글은 개인정보를 지운 뒤 '자료' 로 같이 들어간다.
  *     사업자번호가 확실하지 않으면 칸에 넣지 않고 후보 단추(D-255 사업자번호 읽기와 같음).
  * 직접 적는 빠른 등록은 그대로(머리줄 [업체 등록]).
  */
@@ -150,7 +150,7 @@ export function CaseQuickStart({
                       </>
                     ) : (
                       <Button size="sm" variant="primary" disabled={busy} onClick={() => onStartDocs({ companyName, bizNo, contactName, materials: materials() })} data-testid="case-quick-create">
-                        이 서류로 AI 작업실 만들기
+                        이 서류로 AI 전략실 만들기
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => { setRead(EMPTY_DOCS_READ); setPickedBiz(''); setDropKey((k) => k + 1) }}>

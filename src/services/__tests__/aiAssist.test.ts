@@ -160,7 +160,7 @@ const CTX = { title: '오늘 할 일', today: '2026-10-19 (월)', sections: [{ n
     const a = (access: string | null, pilot: boolean, capabilities: string[] | null = base.capabilities) => aiAssistAccessOf({ hasAuth: true, access, pilot, capabilities })
     check('PA1 화면 AI 단추 권한 — 대표 owner · 팀장 pilot · 대표가 팀장 화면 pilot · 권한 없는 구성원 no · 0021 전 setup · 로컬 owner',
       a('full', false) === 'owner' && a('pilot', true, []) === 'pilot' && a('full', true) === 'pilot' && a('full', false, []) === 'no' && a('full', false, null) === 'setup' && a('none', false, []) === 'no' && aiAssistAccessOf({ hasAuth: false, access: null, pilot: false, capabilities: null }) === 'owner')
-    check('PA2 AI 작업실 권한은 그대로 — 팀장 · 대표가 팀장 화면으로 볼 때 no', ownerAiAccessOf({ ...base, access: 'pilot', pilot: true, capabilities: [] }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: true }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: false }) === 'yes')
+    check('PA2 AI 전략실 권한은 그대로 — 팀장 · 대표가 팀장 화면으로 볼 때 no', ownerAiAccessOf({ ...base, access: 'pilot', pilot: true, capabilities: [] }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: true }) === 'no' && ownerAiAccessOf({ ...base, access: 'full', pilot: false }) === 'yes')
   }
   check('L11 화면이 보낸 선택 검사 — 모르는 회사 · 이상한 모델 이름은 버림', cleanChoice({ provider: 'evil' }) === null && cleanChoice({ provider: 'gemini', model: 'x y' })?.model === '' && cleanChoice({ provider: 'GEMINI', model: 'gemini-3.8-flash' })?.provider === 'gemini')
 }
@@ -322,23 +322,23 @@ async function serverTests() {
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX })
     check('S18 VITE_ 이름의 키는 읽지 않음(번들에 들어가는 이름) → 설정 필요', r.statusCode === 503 && r.body.code === 'setup_needed')
   }
-  // AI 작업실도 고른 회사로
+  // AI 전략실도 고른 회사로
   setEnv()
   {
     const st = mkRes()
     await runHandler({ method: 'GET', url: '/api/ai-run?status=1&provider=gemini', headers: { authorization: OWNER } }, st)
-    check('S19 AI 작업실 — OpenAI 설정 없이 Gemini 키만 있어도 설정 완료(빠르게 · 보통 · 깊게)', st.statusCode === 200 && st.body.configured === true && st.body.provider === 'gemini' && JSON.stringify(st.body.tiers) === '{"cheap":true,"standard":true,"deep":true}', st.body)
+    check('S19 AI 전략실 — OpenAI 설정 없이 Gemini 키만 있어도 설정 완료(빠르게 · 보통 · 깊게)', st.statusCode === 200 && st.body.configured === true && st.body.provider === 'gemini' && JSON.stringify(st.body.tiers) === '{"cheap":true,"standard":true,"deep":true}', st.body)
     const cfg = aiConfig({ provider: 'anthropic' })
-    check('S20 AI 작업실 Claude 고름 → 빠르게 Haiku · 보통 Sonnet · 깊게 Opus', cfg.models.cheap === 'claude-haiku-5-5' && cfg.models.standard === 'claude-sonnet-5-5' && cfg.models.deep === 'claude-opus-5-5')
+    check('S20 AI 전략실 Claude 고름 → 빠르게 Haiku · 보통 Sonnet · 깊게 Opus', cfg.models.cheap === 'claude-haiku-5-5' && cfg.models.standard === 'claude-sonnet-5-5' && cfg.models.deep === 'claude-opus-5-5')
     const legacy = (() => {
       setEnv({ GEMINI_API_KEY: undefined, ANTHROPIC_API_KEY: undefined, OPENAI_API_KEY: O_KEY, AI_MODEL_CHEAP: 'm-c', AI_MODEL_STANDARD: 'm-s', AI_MODEL_DEEP: 'm-d' })
       return aiConfig()
     })()
     check('S21 예전 OpenAI 설정(AI_MODEL_*)이 다 있으면 예전 그대로', legacy.legacy === true && legacy.models.deep === 'm-d' && legacy.missing.length === 0)
-    // D-255 대표 "AI 작업실도 내가 고른 모델로" — 모델까지 고르면 빠르게 · 보통 · 깊게 모두 그 모델, 회사만 고르면 전처럼 단계별
+    // D-255 대표 "AI 전략실도 내가 고른 모델로" — 모델까지 고르면 빠르게 · 보통 · 깊게 모두 그 모델, 회사만 고르면 전처럼 단계별
     setEnv()
     const pinned = aiConfig({ provider: 'anthropic', model: 'claude-sonnet-5-5' })
-    check('S21a AI 작업실 모델까지 고름 → 모든 일에 그 모델 · 값도 그 모델 값', pinned.pinned === 'claude-sonnet-5-5' && pinned.models.cheap === 'claude-sonnet-5-5' && pinned.models.deep === 'claude-sonnet-5-5' && pinned.prices.cheap?.in === 2, pinned.models)
+    check('S21a AI 전략실 모델까지 고름 → 모든 일에 그 모델 · 값도 그 모델 값', pinned.pinned === 'claude-sonnet-5-5' && pinned.models.cheap === 'claude-sonnet-5-5' && pinned.models.deep === 'claude-sonnet-5-5' && pinned.prices.cheap?.in === 2, pinned.models)
     const free = aiConfig({ provider: 'anthropic' })
     check('S21b 회사만 고르면 전처럼 단계별(고른 모델 없음)', !free.pinned && free.models.cheap === 'claude-haiku-5-5' && free.models.deep === 'claude-opus-5-5')
     const bad = aiConfig({ provider: 'anthropic', model: 'x; DROP' })
@@ -741,8 +741,9 @@ async function kbContractTests() {
   }
   check('KB2 기준 문서 글이 실제로 지시문 안에 들어감(장마다 앞 300자 대조)', missing.length === 0, missing)
   const packs = Object.keys(KNOWLEDGE)
-  const used = new Set([...ours.flatMap((a) => knowledgeOf(a).map((k: { key: string }) => k.key)), ...topicPacks('청구항 몇 개 벤처 사업계획서 실사')])
-  check(`KB3 만들어 둔 기준 문서 장 ${packs.length}개 + 샘플 — 쓰이지 않는 장 없음(예전엔 실사 장이 놀고 있었음)`, [...packs, 'patent_samples'].every((k) => used.has(k)), [...packs, 'patent_samples'].filter((k) => !used.has(k)))
+  // D-272 AX 기준(ax_strategy)은 AI 전략실 AX 단추(ai-run 스킬)가 쓴다
+  const used = new Set([...ours.flatMap((a) => knowledgeOf(a).map((k: { key: string }) => k.key)), ...topicPacks('청구항 몇 개 벤처 사업계획서 실사'), ...Object.values(SKILLS).flatMap((k) => ((k as { knowledge?: string[] }).knowledge ?? []))])
+  check(`KB3 만들어 둔 기준 문서 장 ${packs.length}개 + 샘플 — 쓰이지 않는 장 없음(예전엔 실사 장이 놀고 있었음 · AX 기준은 AI 전략실 AX 단추)`, [...packs, 'patent_samples'].every((k) => used.has(k)), [...packs, 'patent_samples'].filter((k) => !used.has(k)))
   const noJudge = ours.filter((a) => !['spec.idea', 'spec.research', 'venture.market', 'cert.say', 'cert.reply'].includes(a.id)).filter((a) => !assistSystem(a).includes('[자체점검 —')).map((a) => a.id)
   check('KB4 자체점검 — 명세서 · 사업계획서를 쓰거나 고치거나 판정하는 단추 모두에(아이디어 · 조사 · 시장조사 · 실사 빼고)', noJudge.length === 0, noJudge)
   const sizes = Object.fromEntries(ours.map((a) => [a.id, assistSystem(a, { skill: 'x'.repeat(8000) }).length]))
@@ -790,7 +791,7 @@ async function lockTests() {
   check(`LK1 AI 단추 ${all.length}개 모두 — 지시문 맨 앞 비공개 규칙 · 쓰지 않는 이름 · 출처 이름 0(대표 기준 글에 섞여 와도) · 장 이름표 줄 없음`, bad.length === 0, bad)
   const skills = Object.values(SKILLS) as { id: string }[]
   const runBad = skills.filter((k) => { const { system } = buildPrompt(k, {}, {}, 'cheap', COMMON_RULES); return hasBanned(system) || !system.startsWith(CONFIDENTIAL_RULES[0]) || system.includes(k.id) }).map((k) => k.id)
-  check(`LK2 AI 작업실 스킬 ${skills.length}개 — 비공개 규칙 맨 앞 · 쓰지 않는 이름 0 · 스킬 내부 번호(…_PENGUIN 등) 안 보냄`, runBad.length === 0, runBad)
+  check(`LK2 AI 전략실 스킬 ${skills.length}개 — 비공개 규칙 맨 앞 · 쓰지 않는 이름 0 · 스킬 내부 번호(…_PENGUIN 등) 안 보냄`, runBad.length === 0, runBad)
   const cases: [string, string][] = [
     [`이건 ${B1} 기준`, '이건 자체점검 기준'],
     [`/${B1.split('').join(' ')} 로 봐`, '자체점검 로 봐'],

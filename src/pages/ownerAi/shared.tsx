@@ -1,5 +1,5 @@
 /**
- * AI 작업실 화면 공용 — 문지기(권한) · 저장소 고르기 · 짧은 글 그리기 · 작은 부품.
+ * AI 전략실 화면 공용 — 문지기(권한) · 저장소 고르기 · 짧은 글 그리기 · 작은 부품.
  *
  * 문지기는 화면만 막는다. 데이터는 DB 정책(owner_ai_can), AI 호출은 서버 함수(has_capability)가 따로 막는다.
  */
@@ -34,7 +34,7 @@ export function useOwnerAiRepo(): OwnerAiRepo {
   return useMemo(() => ownerAiRepo({ workspaceId, userId }), [workspaceId, userId])
 }
 
-/** 고객 관리 업체 목록(같은 작업공간) — 실패하면 빈 목록(AI 작업실은 업체 없이도 쓴다) */
+/** 고객 관리 업체 목록(같은 작업공간) — 실패하면 빈 목록(AI 전략실은 업체 없이도 쓴다) */
 export function useClientList(): { clients: ClientOpsRecord[]; loaded: boolean; reload: () => void } {
   const { workspaceId } = useOwnerAiIdentity()
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
@@ -119,9 +119,9 @@ export function OwnerAiGate({ children }: { children: ReactNode }) {
         <div className="flex items-start gap-3" data-testid="owner-ai-db-setup">
           <Sparkles aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
           <div className="min-w-0">
-            <h1 className="t-section break-keep text-slate-900">AI 작업실 DB 설정이 필요합니다</h1>
+            <h1 className="t-section break-keep text-slate-900">AI 전략실 DB 설정이 필요합니다</h1>
             <p className="t-sub mt-1 break-keep text-slate-600">
-              Supabase SQL 편집기에서 <code className="rounded bg-slate-100 px-1">20261014000021_owner_ai_workspace.sql</code> 를 한 번 실행하면 대표 계정에만 AI 작업실이 열립니다(docs/OWNER_AI_WORKSPACE_V1.md · 수동 설정).
+              Supabase SQL 편집기에서 <code className="rounded bg-slate-100 px-1">20261014000021_owner_ai_workspace.sql</code> 를 한 번 실행하면 대표 계정에만 AI 전략실이 열립니다(docs/OWNER_AI_WORKSPACE_V1.md · 수동 설정).
             </p>
           </div>
         </div>

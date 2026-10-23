@@ -57,6 +57,15 @@ const PACKS = {
   ],
   /** 실사 답변 — 현장실사 대표자 설명 · 예상 질문 · 금지 표현 */
   inspection: [['현장실사 기준', between(master, '# PART 8. FIELD REVIEW', '# PART 9. QA', 'inspection')]],
+  /**
+   * D-272 AI 전략실 [AX 전략 분석] · [AX 아이템 발굴] · [MVP 구체화] — 대표: "전략 분석 누르면 무조건 AX 기준 MD 를 기반으로 · 하나하나씩".
+   * 목적 · 적용 경계(1장) + 원칙 · 입력 · 적합성 판정 · 16단계 · 업무 재설계 · KPI · 12주 실증 · 기관 관점 · 반론 · 출력 규격(4~13장).
+   * 14장 이후(운영 OS 데이터 모델 · 구현 로드맵 · 개발 완료 기준)는 개발 문서라 모델에 보내지 않는다.
+   */
+  ax_strategy: [
+    ['AX 전략 목적', between(penguin, '# 1. 스킬의 최종 목적과 적용 범위', '# 2. 원본과 우선순위', 'ax_strategy/purpose')],
+    ['AX 전략 기준', between(penguin, '# 4. 절대 원칙과 금지사항', '# 14. 운영 OS 데이터 모델 및 JSON 계약', 'ax_strategy/core')],
+  ],
 }
 
 const out = {}
@@ -73,6 +82,7 @@ const header = `/**
  * D-264 출처 문서 이름 · 버전 · 장 이름표 줄과 쓰지 않는 이름은 뺀 채로 둔다(guard.sanitizeKnowledge).
  */
 
+`
 const body = `export const KNOWLEDGE_META = ${JSON.stringify(meta, null, 2)}\n\nexport const KNOWLEDGE = ${JSON.stringify(out, null, 2)}\n`
 writeFileSync(new URL('../api/_ai/knowledge.js', import.meta.url), header + body)
 for (const [k, m] of Object.entries(meta)) console.log(`${k}: ${m.chars.toLocaleString()}자 · ${m.parts.join(' + ')}`)

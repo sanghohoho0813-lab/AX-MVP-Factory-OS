@@ -19,8 +19,8 @@ export const CLIENT_DETAIL_TABS: { key: ClientDetailTab; label: string; hidden?:
   { key: 'consulting', label: '컨설팅', hidden: true },
   // D-151: 공고에서 '신청 준비' 를 건 업체는 줄에 보인다(아래 showTab)
   { key: 'funding', label: '지원사업 신청', hidden: true },
-  // 대표 AI 작업실 — 기본 줄에 없고(탭 순서 그대로) 더보기에서 연다. 대표 전용
-  { key: 'ai', label: 'AI 작업실', hidden: true },
+  // 대표 AI 전략실 — 기본 줄에 없고(탭 순서 그대로) 더보기에서 연다. 대표 전용
+  { key: 'ai', label: 'AI 전략실', hidden: true },
 ]
 
 /** 탭 이름(주소 ?tab= 값 → 화면 이름). 모르는 값 · 없으면 개요 */

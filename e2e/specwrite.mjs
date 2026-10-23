@@ -7,7 +7,7 @@
  *  - 4 청구항: 뼈대(시스템 · 종속 · 방법) → 고쳐 쓰기 · 5 본문: 뼈대 넣고 고치기 · 글자 수
  *  - 6 점검: 고쳐야 할 것 0(초안 + 명세서 점검) · MD 내려받기(영문 이름 · 입력 주의 · 식별항목) · 벤처 사업계획서 재료로(같은 회사) · 이미 있으면 한 번 더 묻기
  *  - 새로고침해도 그대로 · AI 초안(서버 흉내): 다섯 묶음 차례 · 한 번 실패 → 못 쓴 묶음만 다시 · 고친 칸은 새 안 · 구체적인 내용 앞+뒤 · 청구항 새 안 바꾸기
- *  - AI 작업실 특허 아이디어 가져오기(빈 칸만) · 목록 · 지우기는 한 번 더 묻기
+ *  - AI 전략실 특허 아이디어 가져오기(빈 칸만) · 목록 · 지우기는 한 번 더 묻기
  *  - 360 · 390 · 430 · 글자 아주 크게에서 가로 넘침 0 · JS 오류 0
  */
 import { chromium } from 'playwright'
@@ -86,7 +86,7 @@ let draftUrl = ''
   await toEdit(page)
   draftUrl = page.url()
   check('새 명세서 → 주소에 draft · client · 1 아이디어부터', draftUrl.includes(`client=${CLIENT}`) && (await page.getByTestId('spec-tab-idea').getAttribute('aria-selected')) === 'true' && (await page.getByTestId('spec-editor').getAttribute('data-progress')) === '1/6')
-  check('대표(로컬): AI 작업실에서 가져오기 · AI 초안 단추', (await page.getByTestId('spec-import-open').count()) === 1 && (await page.getByTestId('spec-ai-open').count()) === 1)
+  check('대표(로컬): AI 전략실에서 가져오기 · AI 초안 단추', (await page.getByTestId('spec-import-open').count()) === 1 && (await page.getByTestId('spec-ai-open').count()) === 1)
   await shot(page, 'spec-01-new')
 
   // 1 아이디어
@@ -256,7 +256,7 @@ let draftUrl = ''
   check('청구항 새 안으로 바꾸기 → 머리(청구항 n.) 떼고 3개', claims.join('|') === 'AI 시스템 독립항.|청구항 1에 있어서, AI 종속항.|AI 방법 독립항.', claims)
   await page.unroute('**/api/ai-assist')
 
-  // AI 작업실에서 가져오기 — 회사 없는 새 명세서
+  // AI 전략실에서 가져오기 — 회사 없는 새 명세서
   await page.evaluate(() => {
     const at = new Date().toISOString()
     localStorage.setItem('axmvp.v1.owner_ai.cases', JSON.stringify([{ id: 'case_spec_e2e', companyName: '시험 정밀', relation: 'contracted', bizNo: '', clientId: null, ownerId: null, workspaceId: null, materials: [], facts: {}, activity: [], createdAt: at, updatedAt: at, archivedAt: null, contextVersion: 0 }]))
@@ -274,7 +274,7 @@ let draftUrl = ''
   await page.getByTestId('spec-import-case').selectOption('case_spec_e2e')
   await page.getByTestId('spec-import-use').first().click()
   await page.waitForTimeout(600)
-  check('AI 작업실 아이디어 → 명칭 · 문제 · 연결관계(빈 칸만) · 1 아이디어', (await page.getByTestId('spec-title').inputValue()) === '용접 비드 영상 기반 결함 판정 시스템 및 방법' && (await page.getByTestId('spec-idea-problem').inputValue()) === '용접 결함을 사람이 눈으로 본다' && (await page.getByTestId('spec-axis-link').inputValue()) === '비드 폭 변화와 라인별 기준선을 함께 써서 판정')
+  check('AI 전략실 아이디어 → 명칭 · 문제 · 연결관계(빈 칸만) · 1 아이디어', (await page.getByTestId('spec-title').inputValue()) === '용접 비드 영상 기반 결함 판정 시스템 및 방법' && (await page.getByTestId('spec-idea-problem').inputValue()) === '용접 결함을 사람이 눈으로 본다' && (await page.getByTestId('spec-axis-link').inputValue()) === '비드 폭 변화와 라인별 기준선을 함께 써서 판정')
   await page.getByTestId('spec-tab-parts').click()
   const st2 = await page.getByTestId('spec-step-text').evaluateAll((els) => els.map((e) => e.value))
   check('처리 절차 → 방법 단계(~하는) · 종속항 씨앗', st2.join() === '비드 영상을 촬영하는,결함을 판정하는' && (await page.getByTestId('spec-seed-text').first().inputValue()) === '결함을 세 단계로 나누는', st2)

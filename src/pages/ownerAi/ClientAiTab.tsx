@@ -1,7 +1,7 @@
 /**
- * 업체 상세 'AI 작업실' 탭(대표 전용) — 이 고객과 이어 둔 작업실이 있으면 그 자리에서 열고,
- * 없으면 '이 업체로 AI 작업실 열기' 한 번(고객 정보 · 관계를 채워 이어 만든다 — 업체 DB 를 따로 만들지 않는다).
- * D-219: 같은 사업자번호로 먼저 만든 작업실이 있으면(AI 작업실 목록에서 빠른 등록 등) 새로 만들지 않고 묻고 잇는다 —
+ * 업체 상세 'AI 전략실' 탭(대표 전용) — 이 고객과 이어 둔 작업실이 있으면 그 자리에서 열고,
+ * 없으면 '이 업체로 AI 전략실 열기' 한 번(고객 정보 · 관계를 채워 이어 만든다 — 업체 DB 를 따로 만들지 않는다).
+ * D-219: 같은 사업자번호로 먼저 만든 작업실이 있으면(AI 전략실 목록에서 빠른 등록 등) 새로 만들지 않고 묻고 잇는다 —
  * 예전에는 DB 고유 규칙에 걸려 '저장에 실패했습니다' 만 뜨고 이 탭을 영영 열 수 없었다.
  */
 import { useEffect, useState } from 'react'
@@ -51,11 +51,11 @@ function Inner({ record }: { record: ClientOpsRecord }) {
   if (dbSetup)
     return (
       <Surface>
-        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 작업실 DB 설정이 필요합니다.</p>
+        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
         <p className="t-sub mt-1 break-keep text-slate-600">Supabase 에 0021 마이그레이션을 실행하면 열립니다.</p>
       </Surface>
     )
-  if (linked === undefined) return <p className="t-sub text-slate-500" role="status">AI 작업실을 찾는 중…</p>
+  if (linked === undefined) return <p className="t-sub text-slate-500" role="status">AI 전략실을 찾는 중…</p>
   if (linked) return <CaseWorkspace caseId={linked.id} embedded />
 
   return (
@@ -63,7 +63,7 @@ function Inner({ record }: { record: ClientOpsRecord }) {
       <div className="flex items-start gap-3">
         <Sparkles aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
         <div className="min-w-0">
-          <h2 className="t-section break-keep text-slate-900">이 업체로 AI 작업실 열기</h2>
+          <h2 className="t-section break-keep text-slate-900">이 업체로 AI 전략실 열기</h2>
           <p className="t-sub mt-1 break-keep text-slate-600">
             고객 관리의 회사 정보 · 서류를 그대로 쓰고, AX 전략 · 제안서 · 특허 · 정책자금 결과와 업체 기억을 이 업체에 이어 쌓습니다. 대표만 보입니다.
           </p>
@@ -112,7 +112,7 @@ function Inner({ record }: { record: ClientOpsRecord }) {
           }
         }}
       >
-        AI 작업실 열기
+        AI 전략실 열기
       </Button>
     </Surface>
   )

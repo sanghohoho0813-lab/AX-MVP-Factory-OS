@@ -16,7 +16,7 @@
  */
 import { SKILLS, COMMON_RULES, skillOf } from './_ai/skills.js'
 import { CONFIDENTIAL_RULES, guardOutput, scrubBrandDeep, secretIndex } from './_ai/guard.js'
-import { ProviderError, aiConfig, buildPrompt, callProvider, costOf, extractJson, publicStatus, scrubDeep, validate } from './_ai/core.js'
+import { ProviderError, aiConfig, buildPrompt, callProvider, skillKnowledge, costOf, extractJson, publicStatus, scrubDeep, validate } from './_ai/core.js'
 import { __resetGateState, fail, limits, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { __resetProviderCache, tierOf } from './_ai/providers.js'
 
@@ -37,7 +37,8 @@ const CASE_RE = /^case_[A-Za-z0-9_-]{6,64}$/
 
 /** D-264 서버만 가진 글(공통 규칙 · 스킬 지시) — 답에 통째로 나오면 막는다 */
 let SECRETS = null
-const secrets = () => (SECRETS ??= secretIndex([...CONFIDENTIAL_RULES, ...COMMON_RULES, ...Object.values(SKILLS).flatMap((k) => k.systemInstruction)]))
+// D-272 AX 기준 문서도 통째로 옮겨 적지 못하게(서버만 가진 글)
+const secrets = () => (SECRETS ??= secretIndex([...CONFIDENTIAL_RULES, ...COMMON_RULES, ...Object.values(SKILLS).flatMap((k) => k.systemInstruction), ...Object.values(SKILLS).map(skillKnowledge).filter(Boolean)]))
 
 async function runOnce(cfg, skill, body) {
   const tier = skill.tier

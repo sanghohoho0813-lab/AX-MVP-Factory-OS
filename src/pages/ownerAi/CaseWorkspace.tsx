@@ -1,5 +1,5 @@
 /**
- * 업체 작업실(Company Case) — /ai/cases/:caseId 와 업체 상세 'AI 작업실' 탭이 같은 부품을 쓴다.
+ * 업체 작업실(Company Case) — /ai/cases/:caseId 와 업체 상세 'AI 전략실' 탭이 같은 부품을 쓴다.
  *
  * 흐름: 생성(빠른 작업) → 판단(채택 · 일부 채택 · 폐기) → 기록(기억 새 판 · 수정 이력 · 타임라인) → 재사용(다음 작업의 맥락).
  * 저장은 모두 덧붙이기 — 기억 · 실행 · 수정 이력은 지우거나 덮지 않는다.
@@ -82,18 +82,18 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const currentContext = useMemo(() => (bundle ? latestSnapshot(bundle)?.content ?? emptyContext() : emptyContext()), [bundle])
   const snapshotFields = useMemo(() => (bundle ? caseSnapshot(bundle.c, bundle.client, currentContext, bundle.runs, today) : []), [bundle, currentContext, today])
 
-  if (phase.kind === 'loading') return <p className="t-sub text-slate-500" role="status">AI 작업실을 여는 중…</p>
+  if (phase.kind === 'loading') return <p className="t-sub text-slate-500" role="status">AI 전략실을 여는 중…</p>
   if (phase.kind === 'missing')
     return (
       <Surface>
         <p className="t-body text-slate-700">이 업체 작업실을 찾지 못했습니다.</p>
-        <Link to="/ai" className="t-body tap mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">AI 작업실 목록으로</Link>
+        <Link to="/ai" className="t-body tap mt-2 inline-flex min-h-11 items-center font-semibold text-brand-700">AI 전략실 목록으로</Link>
       </Surface>
     )
   if (phase.kind === 'db_setup')
     return (
       <Surface>
-        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 작업실 DB 설정이 필요합니다.</p>
+        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
         <p className="t-sub mt-1 break-keep text-slate-600">Supabase 에 0021 마이그레이션을 실행하면 열립니다(docs/OWNER_AI_WORKSPACE_V1.md).</p>
       </Surface>
     )
@@ -230,7 +230,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
           )}
           {embedded ? (
             <Link to={`/ai/cases/${b.c.id}`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
-              AI 작업실 크게 보기
+              AI 전략실 크게 보기
               <ExternalLink aria-hidden="true" className="size-3.5" />
             </Link>
           ) : (

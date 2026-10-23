@@ -176,7 +176,7 @@ export interface SpecDraft {
   suggestion: Partial<Record<string, string>>
   /** 문단 번호 [0001] 붙이기 */
   numbered: boolean
-  /** 어디서 왔나(AI 작업실 특허 아이디어 등) */
+  /** 어디서 왔나(AI 전략실 특허 아이디어 등) */
   source: string
   /** D-252 AI 아이디어 후보 · 조사 메모 */
   ideas: IdeaPick[]
@@ -829,7 +829,7 @@ export function draftProgress(d: SpecDraft): DraftProgress {
 }
 
 /* ------------------------------------------------------------------ */
-/* AI 작업실 '특허 아이디어' → 초안                                        */
+/* AI 전략실 '특허 아이디어' → 초안                                        */
 /* ------------------------------------------------------------------ */
 
 export interface PatentIdeaLike {
@@ -844,7 +844,7 @@ export interface PatentIdeaLike {
   dependentClaims?: string[]
 }
 
-/** AI 작업실 특허 아이디어 하나로 1단계(아이디어) · 단계 뼈대를 채운다 — 이미 적은 칸은 그대로 */
+/** AI 전략실 특허 아이디어 하나로 1단계(아이디어) · 단계 뼈대를 채운다 — 이미 적은 칸은 그대로 */
 export function draftFromIdea(base: SpecDraft, idea: PatentIdeaLike, source: string): SpecDraft {
   const keep = (cur: string, next: string) => (cur.trim() ? cur : next.trim())
   const list = (xs?: string[]) => (Array.isArray(xs) ? xs.map((x) => String(x ?? '').trim()).filter(Boolean) : [])

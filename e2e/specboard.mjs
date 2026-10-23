@@ -233,7 +233,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.evaluate(() => localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' })))
   // D-263 대표가 붙여 넣은 /자체점검 정의 — 자체점검 · 쓰기 · 아이디어 단추마다 같이 가야 한다
   await page.evaluate(() => localStorage.setItem('axmvp.ai.judgeSkill.v1', '/자체점검 — 대표정의표식: 심사관처럼 공격하고 점수로 판정한다'))
-  // 이 회사와 이어진 AI 작업실 자료 — 저절로 쓰기에도 재료로 들어가야 한다(회사 기록이 늦게 와도 자료를 읽은 뒤 시작)
+  // 이 회사와 이어진 AI 전략실 자료 — 저절로 쓰기에도 재료로 들어가야 한다(회사 기록이 늦게 와도 자료를 읽은 뒤 시작)
   await page.evaluate((cid) => {
     const at = new Date().toISOString()
     localStorage.setItem('axmvp.v1.owner_ai.cases', JSON.stringify([{ id: 'case_spec_mat', workspaceId: null, ownerId: null, companyName: '(주)한솔테크', relation: 'client', clientId: cid, bizNo: '', homepageUrl: '', requester: '', industry: '', memo: '', materials: [{ id: 'm1', kind: 'memo', title: '현장 메모', text: '작업실재료표식 — 절삭 공구 교체를 작업자 감으로 함', chars: 30, hash: 'h1' }], facts: {}, activity: [], contextVersion: 0, origin: '', createdAt: at, updatedAt: at, archivedAt: null }]))
@@ -261,7 +261,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   const opts = await page.getByTestId('spec-talk-option').allInnerTexts()
   check('B1a 첫 질문 — AI 가 이해한 회사 · 의견 2(흔한 것 · 약한 점) · 질문 하나 · 누를 답 4개(마지막 "AI 가 정해 주세요") · 직접 적기 · 머리 "AI 의 질문에 답해 주세요" · 질문 1/5', /금속가공 라인의 절삭 공구/.test(await page.getByTestId('spec-talk-understanding').innerText()) && /너무 흔하고/.test(await page.getByTestId('spec-talk-opinions').innerText()) && /어느 문제를 먼저/.test(await page.getByTestId('spec-talk-question').innerText()) && opts.length === 4 && opts[0] === '공구 교체 불량' && /AI 가 정해/.test(opts[3]) && (await page.getByTestId('spec-talk-own').isVisible()) && /AI 의 질문에 답해 주세요/.test(await page.getByTestId('spec-board-head').innerText()) && /질문 1\/5/.test(await page.getByTestId('spec-talk').innerText()), opts)
   const t1Ctx = JSON.stringify(talk1[0]?.context ?? '')
-  check('B1d 기획 대화 자료 — 회사 기록 · 그 회사 AI 작업실 자료 · 대표 정의(skill) · 아직 대화 줄 없음', t1Ctx.includes('작업실재료표식') && /업종|종목|설립/.test(t1Ctx) && /대표정의표식/.test(talk1[0]?.skill ?? '') && !t1Ctx.includes('대표 답:'), t1Ctx.slice(0, 300))
+  check('B1d 기획 대화 자료 — 회사 기록 · 그 회사 AI 전략실 자료 · 대표 정의(skill) · 아직 대화 줄 없음', t1Ctx.includes('작업실재료표식') && /업종|종목|설립/.test(t1Ctx) && /대표정의표식/.test(talk1[0]?.skill ?? '') && !t1Ctx.includes('대표 답:'), t1Ctx.slice(0, 300))
   await shot(page, 'B-talk-1')
   const t1 = sent.length
   await page.getByTestId('spec-talk-option').first().click()
@@ -352,7 +352,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B10 단계 줄 모두 다 씀', phases.every((p) => p === 'done'), phases)
   const ideaCtx = JSON.stringify(ideaReq[0].context)
   check('B11 아이디어 자료 = 회사 기록(업종 등) · 이름 · 연락처 없음', /업종|종목|설립/.test(ideaCtx) && !/010-\d{4}-\d{4}/.test(ideaCtx), ideaCtx.slice(0, 300))
-  check('B11b 저절로 쓰기도 그 회사 AI 작업실 자료를 읽은 뒤 시작 — 첫 부름부터 자료가 들어감', ideaCtx.includes('작업실재료표식'), ideaCtx.slice(0, 400))
+  check('B11b 저절로 쓰기도 그 회사 AI 전략실 자료를 읽은 뒤 시작 — 첫 부름부터 자료가 들어감', ideaCtx.includes('작업실재료표식'), ideaCtx.slice(0, 400))
   check('B12 고른 아이디어(공구 진동정보)가 명칭 · 영문으로 들어감', (await page.getByTestId('spec-board-title').innerText()).includes('공구 진동정보 기반 마모 단계 판정') && (await page.getByTestId('spec-board-title').innerText()).includes('{SYSTEM AND METHOD FOR JUDGING'))
   const ideas = await page.getByTestId('spec-idea').evaluateAll((els) => els.map((e) => e.getAttribute('data-current')))
   check('B13 칸별로 보기 — 지금 쓰는 것은 위에 하나 · 다른 후보 6개만 아래(겹치지 않음)', ideas.length === 6 && ideas.every((x) => x === 'no'), ideas)
@@ -603,7 +603,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   const first = sent[before]
   const firstCtx = JSON.stringify(first?.context ?? '')
   check('C1 대화창 [새 명세서] → 명세서 화면이 새로 열려도 단추 한 번으로 바로 기획 대화 시작(주소 auto 지움)', !page.url().includes('auto=1') && first?.assistId === 'spec.talk' && sent.length > before, { url: page.url(), id: first?.assistId })
-  check('C2 회사 기록 · 그 회사 AI 작업실 자료를 다 읽은 뒤 시작 — 첫 부름부터 회사 기록 + 작업실 자료', firstCtx.includes('대화창재료표식') && /업종|종목|설립/.test(firstCtx), firstCtx.slice(0, 400))
+  check('C2 회사 기록 · 그 회사 AI 전략실 자료를 다 읽은 뒤 시작 — 첫 부름부터 회사 기록 + 작업실 자료', firstCtx.includes('대화창재료표식') && /업종|종목|설립/.test(firstCtx), firstCtx.slice(0, 400))
   await waitIdle(page)
   check('C3 JS 오류 0', errors.length === 0, errors)
   await ctx.close()

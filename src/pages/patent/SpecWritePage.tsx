@@ -726,7 +726,7 @@ function SpecEditor({
           {ai === 'yes' && !boardView && (
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={() => setImportOpen((v) => !v)} aria-expanded={importOpen} data-testid="spec-import-open">
-                <Import aria-hidden="true" className="size-4" /> AI 작업실에서 가져오기
+                <Import aria-hidden="true" className="size-4" /> AI 전략실에서 가져오기
               </Button>
               <Button
                 variant="secondary"

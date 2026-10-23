@@ -1,5 +1,5 @@
 /**
- * 대표 AI 작업실(Company Case Intelligence) — 타입.
+ * 대표 AI 전략실(Company Case Intelligence) — 타입.
  *
  * Company Case = 미래AI랩이 한 번이라도 검토한 회사(고객이 아니어도). 기존 고객(operations_clients)과 이어 둘 수 있다(clientId).
  * 생성 → 판단(채택 · 일부 채택 · 폐기) → 기록(기억 버전 · 수정 이력 · 타임라인) → 재사용(다음 AI 호출의 맥락).

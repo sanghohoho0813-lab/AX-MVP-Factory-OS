@@ -1,5 +1,5 @@
 /**
- * qa:ownerai — 대표 AI 작업실 V1 (Company Case Intelligence) 끝까지 이어 보기.
+ * qa:ownerai — 대표 AI 전략실 V1 (Company Case Intelligence) 끝까지 이어 보기.
  *
  * 브라우저 → /api/ai-run 은 진짜 서버 함수(api/ai-run.js)를 이 프로세스에서 부른다(Playwright route).
  * 밖으로 나가는 것만 가짜: Supabase 로그인 확인 · 권한 RPC · AI 공급자(chat completions).
@@ -11,7 +11,7 @@
  *   C  벤처 사업계획 → AI 에 보낸 글에 지난 AX · 특허 판단이 들어감(다시 설명 안 함)
  *   D  제안서 → 페이지 구성 → 점검(자리표시자 · 숫자) → 한 쪽만 고침 → 맞춤법 → PDF 다시(AI 다시 안 부름) · PNG
  *   E  AX 화면 → PC 1 + 모바일 2 → 글 고침 → 새로고침해도 남음 · PNG
- *   F  실패 · 형식 다름(원문 보관) · 업체 상세 'AI 작업실'(더보기 · 탭 줄 그대로) · Partner 주소 · 사용량 · 360/390 넘침 0 · 키 노출 0
+ *   F  실패 · 형식 다름(원문 보관) · 업체 상세 'AI 전략실'(더보기 · 탭 줄 그대로) · Partner 주소 · 사용량 · 360/390 넘침 0 · 키 노출 0
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -78,7 +78,16 @@ let llmOverride = null
 
 const AX = {
   oneLine: '배차 · 정산을 한 화면에 모아 하루 3시간을 줄이는 물류 AX',
-  thinking: Array.from({ length: 12 }, (_, i) => ({ step: i + 1, title: `단계 ${i + 1}`, finding: '확인함' })),
+  // D-272 기준 문서대로 — 판정 · 가장 큰 문제 · 16단계 · 돈 KPI 3 · 12주 · 반론 질문
+  verdict: 'LITE',
+  primaryConstraint: '배차를 전화 · 엑셀로 해 오후마다 2~3시간이 묶임',
+  thinking: Array.from({ length: 16 }, (_, i) => ({ step: i + 1, title: `단계 ${i + 1}`, finding: '확인함' })),
+  kpis: { cost: '배차 1건 처리 시간 — 측정 필요', revenue: '견적 → 계약 전환율 — 측정 필요', scale: '배차 담당 1인당 월 처리 건수 — 측정 필요' },
+  prove12w: '배차 담당이 추천 화면으로 배차한 건수와 처리 시간을 0주 기준선과 비교',
+  devil: [{ q: '실제 누가 반복적으로 사용합니까?', answer: '배차 담당 2명(매일)', risk: 'P1' }],
+  buildNow: ['배차 추천 화면'],
+  prepareNow: ['주문 · 배차 엑셀 3개월 정리'],
+  validateLater: ['기사 앱'],
   recommended: {
     title: '배차 자동 추천 + 운임 정산 한 화면',
     why: '하루 배차 40건을 엑셀과 전화로 맞추고 있어 가장 시간이 큼',
@@ -88,6 +97,8 @@ const AX = {
     dataNeeded: ['주문 · 배차 엑셀 3개월'],
     difficulty: '중간',
     mvpScope: '배차 추천 + 정산표(기사 앱은 다음)',
+    method: 'RULE — 거리 · 차량 조건 규칙으로 충분(학습 모델은 데이터가 쌓인 뒤)',
+    processFirst: '배차 요청 양식을 하나로 표준화',
     risks: ['기사 앱 사용률'],
     patentLink: '배차 우선순위 산정 방법',
     ventureLink: '기술 차별성 — 추천 알고리즘',
@@ -148,7 +159,7 @@ globalThis.fetch = async (input, init = {}) => {
     // D-264 지시문에는 스킬 화면 이름만 간다(내부 번호 · 판 없이) — 이름으로 찾는다
     const name = /^\[스킬\] (.+)$/m.exec(sys)?.[1]
     const skill = Object.entries(SKILLS).find(([, s]) => s.name === name)?.[0] ?? 'UNKNOWN'
-    llm.push({ skill, model: body.model, user: String(body.messages?.[1]?.content ?? ''), auth: h.Authorization })
+    llm.push({ skill, model: body.model, system: String(body.messages?.[0]?.content ?? ''), user: String(body.messages?.[1]?.content ?? ''), auth: h.Authorization })
     if (llmOverride) {
       const o = llmOverride
       llmOverride = null
@@ -233,7 +244,7 @@ setEnv({ OPENAI_API_KEY: undefined })
 await wireApi(page)
 {
   await page.goto(BASE + '/ai', { waitUntil: 'networkidle' })
-  check('메뉴: 사이드바에 AI 작업실(대표 전용)', (await page.locator('nav a[href="/ai"]').count()) > 0)
+  check('메뉴: 사이드바에 AI 전략실(대표 전용)', (await page.locator('nav a[href="/ai"]').count()) > 0)
   await page.getByTestId('ai-setup-banner').waitFor({ timeout: 8000 }).catch(() => {})
   const banner = (await page.getByTestId('ai-setup-banner').innerText().catch(() => '')) ?? ''
   check("설정 없음: 'AI 기능 설정이 필요합니다.' + 넣을 설정 이름만(값 없음)", banner.includes('AI 기능 설정이 필요합니다.') && banner.includes('OPENAI_API_KEY') && !banner.includes(KEY), banner)
@@ -311,7 +322,8 @@ await page.reload({ waitUntil: 'networkidle' })
   check('A AX 분석은 깊게(m-deep) · 서버 키로만 공급자 호출', axCall?.model === 'm-deep' && axCall?.auth === `Bearer ${KEY}`)
   check('A AI 에 보낸 글: 회사소개서 내용 O · 주민번호 · 비밀번호 · 대표자 이름 X', !!axCall && axCall.user.includes('배차') && !axCall.user.includes('1234567') && !axCall.user.includes('abc!23'), axCall?.user.slice(0, 400))
   const runText = await page.getByTestId('run-text').first().innerText()
-  check('A 결과 카드: 가장 추천 + 차선 + 12단계', runText.includes('가장 추천') && runText.includes('배차 자동 추천') && runText.includes('차선 1') && runText.includes('12단계'))
+  check('A 결과 카드(D-272 기준 문서대로): 판정 "작게 시작" · 가장 큰 문제 · 12주 · 가장 추천(방법 · AI 전에 먼저) · 차선 · 돈 KPI 3 · 16단계 · 반론 질문 · 지금 만들 것', runText.includes('작게 시작') && runText.includes('가장 큰 문제') && runText.includes('12주에 증명할 것') && runText.includes('가장 추천') && runText.includes('배차 자동 추천') && runText.includes('AI 전에 먼저') && runText.includes('차선 1') && runText.includes('돈 KPI 3') && runText.includes('16단계로 본 것') && runText.includes('반론 질문') && runText.includes('지금 만들 것'), runText.slice(0, 300))
+  check('A AX 분석 지시에 기준 문서(적합성 판정 · 반론 질문)가 같이 감 · 출처 이름 없음', !!axCall && axCall.system.includes('[기준 문서]') && axCall.system.includes('INSUFFICIENT_DATA') && axCall.system.includes('실제 누가 반복적으로 사용합니까') && !/펭귄|PENGUIN/i.test(axCall.system))
   await shot(page, 'A2-ax-result')
 
   // 일부 채택 → 기억에 넣기(바뀌는 칸만) → v1
@@ -527,10 +539,10 @@ let caseId = ''
   await rosterRow.scrollIntoViewIfNeeded()
   await shot(page, 'F0-roster-kept', false)
 
-  // 업체 상세 — 탭 줄은 그대로, 더보기에서 AI 작업실
+  // 업체 상세 — 탭 줄은 그대로, 더보기에서 AI 전략실
   await page.goto(`${BASE}/ops/clients/cli_hansol`, { waitUntil: 'networkidle' })
   const tabs = await page.locator('[role="tab"]').allInnerTexts()
-  check('F 업체 상세: 탭 줄 그대로(AI 작업실은 더보기)', !tabs.some((t) => t.includes('AI 작업실')), tabs)
+  check('F 업체 상세: 탭 줄 그대로(AI 전략실은 더보기)', !tabs.some((t) => t.includes('AI 전략실')), tabs)
   await page.getByRole('button', { name: /더보기/ }).first().click()
   await page.getByTestId('more-ai').click()
   await page.getByTestId('client-ai-open').click()
@@ -592,7 +604,7 @@ let caseId = ''
   await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([bizDoc])
   await page.getByTestId('case-quick-found').waitFor({ timeout: 25000 })
   const found = await page.getByTestId('case-quick-found').innerText()
-  check('G 서류 한 장 → 업체명 · 대표 · 사업자번호를 읽어 보여 줌 · [이 서류로 AI 작업실 만들기]', found.includes('푸른하늘') && found.includes('하늘이') && found.includes('214-88-01232') && (await page.getByTestId('case-quick-create').count()) === 1, found)
+  check('G 서류 한 장 → 업체명 · 대표 · 사업자번호를 읽어 보여 줌 · [이 서류로 AI 전략실 만들기]', found.includes('푸른하늘') && found.includes('하늘이') && found.includes('214-88-01232') && (await page.getByTestId('case-quick-create').count()) === 1, found)
   await shot(page, 'G2-quick-docs', false)
   await page.getByTestId('case-quick-create').click()
   await page.waitForURL(/\/ai\/cases\//, { timeout: 10000 })

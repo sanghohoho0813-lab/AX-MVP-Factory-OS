@@ -1,5 +1,5 @@
 /**
- * AI 작업실 흐름 — 생성 → 판단 → 채택 → 기록 → 재사용.
+ * AI 전략실 흐름 — 생성 → 판단 → 채택 → 기록 → 재사용.
  *
  *  runSkill       업체 기억 · 자료로 최소 묶음을 만들어 서버 함수 호출 → 실행 기록 저장 → 타임라인 한 줄
  *  evaluate       채택 · 일부 채택 · 폐기 → 실행 기록 평가 + 타임라인(채택하면 기억에 넣을 제안을 돌려준다)
@@ -71,7 +71,7 @@ export async function registerCase(repo: OwnerAiRepo, input: RegisterInput, at =
     materials: (input.materials ?? []).slice(0, 200),
   }
   const where = input.origin?.startsWith('partner:') ? ' — Partner OS 요청' : input.clientId ? ' — 고객 관리 업체와 이어 만듦' : ''
-  return repo.saveCase(withCaseActivity(c, `AI 작업실에 등록(${RELATION_LABEL[c.relation]})${input.requester ? ` · 요청 ${input.requester.trim()}` : ''}${where}`, at))
+  return repo.saveCase(withCaseActivity(c, `AI 전략실에 등록(${RELATION_LABEL[c.relation]})${input.requester ? ` · 요청 ${input.requester.trim()}` : ''}${where}`, at))
 }
 
 /**

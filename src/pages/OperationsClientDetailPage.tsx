@@ -126,7 +126,7 @@ import { pendingFacts } from '../services/customerFacts'
 const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 // D-190: 개요 맨 위 '이 업체에 먼저 제안할 것' — 판정 엔진(정책자금 · 창업감면 …)은 따로 받아 첫 화면을 무겁게 하지 않는다
 const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
-// 대표 AI 작업실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
+// 대표 AI 전략실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
 const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
@@ -1823,7 +1823,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {tab === 'fees' && <FeesPanel record={record} onChange={commit} today={today} />}
 
       {tab === 'ai' && (
-        <Suspense fallback={<p className="t-sub text-slate-500">AI 작업실을 여는 중…</p>}>
+        <Suspense fallback={<p className="t-sub text-slate-500">AI 전략실을 여는 중…</p>}>
           <ClientAiTab record={record} />
         </Suspense>
       )}
@@ -1952,7 +1952,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   }}
                 >
                   <Sparkles aria-hidden="true" className="size-4" />
-                  AI 작업실(대표 전용)
+                  AI 전략실(대표 전용)
                 </Button>
               )}
               <Button

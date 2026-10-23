@@ -6,7 +6,7 @@
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
 
-/** 업체 서류함에서 재료로 가져올 수 있는 칸 — 신분증 · 명부 · 인증서 · 건강보험 같은 개인 정보 서류는 뺀다(AI 작업실과 같은 기준) */
+/** 업체 서류함에서 재료로 가져올 수 있는 칸 — 신분증 · 명부 · 인증서 · 건강보험 같은 개인 정보 서류는 뺀다(AI 전략실과 같은 기준) */
 export const SAFE_DOC_KEYS: readonly string[] = ['businessRegistration', 'corporateRegistry', 'cretopReport', 'financialStatements', 'smeCertificate']
 
 /** 재료 칸의 종류 — 업체 서류에서 온 것 */

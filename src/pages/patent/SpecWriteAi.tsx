@@ -2,7 +2,7 @@
  * D-248 명세서 쓰기 — 대표만(useOwnerAiAccess 'yes' 일 때만 그리고, 서버 /api/ai-assist 가 대표 권한을 다시 본다).
  *
  *   SpecAiPanel     본문 · 청구항 AI 초안 — 다섯 번 차례로(spec.a~e). 받는 대로 저장 · 고친 칸은 덮지 않고 새 안으로 · 못 쓴 묶음만 다시.
- *   IdeaImportPanel AI 작업실 '특허 아이디어' 결과 → 1단계 빈 칸 · 단계 · 종속항 씨앗(이미 적은 칸은 그대로).
+ *   IdeaImportPanel AI 전략실 '특허 아이디어' 결과 → 1단계 빈 칸 · 단계 · 종속항 씨앗(이미 적은 칸은 그대로).
  */
 import { useEffect, useRef, useState } from 'react'
 import { Surface } from '../../components/ui/primitives'
@@ -161,7 +161,7 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
 
 type IdeaChoice = { caseName: string; idea: PatentIdeaLike & { coreIdea?: string } }
 
-/** AI 작업실 특허 아이디어 고르기 — 이 초안의 회사와 이어진 작업실을 먼저 */
+/** AI 전략실 특허 아이디어 고르기 — 이 초안의 회사와 이어진 작업실을 먼저 */
 export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: string; onPick: (d: (cur: SpecDraft) => SpecDraft, label: string) => void; onClose: () => void }) {
   const repo = useOwnerAiRepo()
   const [cases, setCases] = useState<CompanyCase[] | null>(null)
@@ -178,7 +178,7 @@ export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: strin
         setCases(sorted)
         if (sorted[0] && clientId && sorted[0].clientId === clientId) setCaseId(sorted[0].id)
       },
-      () => alive && setError('AI 작업실 목록을 읽지 못했습니다'),
+      () => alive && setError('AI 전략실 목록을 읽지 못했습니다'),
     )
     return () => {
       alive = false
@@ -215,14 +215,14 @@ export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: strin
     <Surface>
       <div className="flex flex-col gap-3" data-testid="spec-import">
         <div className="flex flex-col gap-1">
-          <h3 className="t-body font-bold text-slate-900">AI 작업실에서 가져오기</h3>
-          <p className="t-sub break-keep text-slate-700">AI 작업실의 '특허 아이디어' 결과를 1단계 빈 칸 · 방법 단계 · 종속항 씨앗으로 옮깁니다. 이미 적은 칸은 그대로 둡니다. AI 를 다시 부르지 않습니다.</p>
+          <h3 className="t-body font-bold text-slate-900">AI 전략실에서 가져오기</h3>
+          <p className="t-sub break-keep text-slate-700">AI 전략실의 '특허 아이디어' 결과를 1단계 빈 칸 · 방법 단계 · 종속항 씨앗으로 옮깁니다. 이미 적은 칸은 그대로 둡니다. AI 를 다시 부르지 않습니다.</p>
         </div>
         {error && <p className="t-sub text-danger-700">{error}</p>}
-        {cases && cases.length === 0 && <p className="t-sub text-slate-600">AI 작업실에 업체가 없습니다.</p>}
+        {cases && cases.length === 0 && <p className="t-sub text-slate-600">AI 전략실에 업체가 없습니다.</p>}
         {cases && cases.length > 0 && (
-          <select value={caseId} onChange={(e) => setCaseId(e.target.value)} className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 sm:max-w-md" aria-label="AI 작업실 업체" data-testid="spec-import-case">
-            <option value="">AI 작업실 업체 고르기</option>
+          <select value={caseId} onChange={(e) => setCaseId(e.target.value)} className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 sm:max-w-md" aria-label="AI 전략실 업체" data-testid="spec-import-case">
+            <option value="">AI 전략실 업체 고르기</option>
             {cases.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.companyName}
@@ -231,7 +231,7 @@ export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: strin
             ))}
           </select>
         )}
-        {ideas && ideas.length === 0 && <p className="t-sub break-keep text-slate-600" data-testid="spec-import-none">이 업체에는 아직 '특허 아이디어' 결과가 없습니다 — AI 작업실에서 먼저 돌려 주세요.</p>}
+        {ideas && ideas.length === 0 && <p className="t-sub break-keep text-slate-600" data-testid="spec-import-none">이 업체에는 아직 '특허 아이디어' 결과가 없습니다 — AI 전략실에서 먼저 돌려 주세요.</p>}
         {ideas && ideas.length > 0 && (
           <ul className="flex flex-col gap-2" data-testid="spec-import-ideas">
             {ideas.map((x, i) => (
@@ -240,7 +240,7 @@ export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: strin
                   <p className="t-sub font-semibold break-keep text-slate-900">{x.idea.title || `아이디어 ${i + 1}`}</p>
                   {x.idea.coreIdea && <p className="t-sub break-keep text-slate-600">{x.idea.coreIdea}</p>}
                 </div>
-                <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={() => onPick((cur) => draftFromIdea(cur, x.idea, `AI 작업실 · ${x.caseName} · ${x.idea.title ?? `아이디어 ${i + 1}`}`), x.idea.title ?? '')} data-testid="spec-import-use">
+                <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={() => onPick((cur) => draftFromIdea(cur, x.idea, `AI 전략실 · ${x.caseName} · ${x.idea.title ?? `아이디어 ${i + 1}`}`), x.idea.title ?? '')} data-testid="spec-import-use">
                   이 아이디어로 채우기
                 </Button>
               </li>

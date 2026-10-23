@@ -1,6 +1,6 @@
 /**
  * AI 도우미 서버 함수(/api/ai-assist) 부르기 — 브라우저는 AI 공급자를 직접 부르지 않는다(키 · 주소 모두 서버에만).
- * 로그인 토큰만 붙인다(AI 작업실과 같은 방식). 오류는 사람 말로 바꾼다.
+ * 로그인 토큰만 붙인다(AI 전략실과 같은 방식). 오류는 사람 말로 바꾼다.
  */
 import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'

@@ -1,16 +1,18 @@
 /**
- * 대표 AI 작업실 V1 시험 — 서버 함수(api/ai-run) · 스킬 서재 · 화면 엔진(업체 · 기억 · 맥락 · 결과 · 제안서 · 화면 기획 · 사용량 · Partner 다리).
+ * 대표 AI 전략실 V1 시험 — 서버 함수(api/ai-run) · 스킬 서재 · 화면 엔진(업체 · 기억 · 맥락 · 결과 · 제안서 · 화면 기획 · 사용량 · Partner 다리).
  *
  * 서버 함수는 진짜 코드를 부르고, 밖으로 나가는 것(Supabase 로그인 · 권한 RPC · AI 공급자)만 가짜 fetch 로 바꾼다.
  * 화면 흐름(runSkill)도 진짜 코드 → '/api/ai-run' → 서버 함수 → 가짜 공급자로 끝까지 이어 본다.
  */
 import handler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
-import { aiConfig, buildPrompt, extractJson, scrubDeep, validate } from '../../../api/_ai/core.js'
+import { aiConfig, buildPrompt, extractJson, scrubDeep, skillKnowledge, validate } from '../../../api/_ai/core.js'
+import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
+import { hasBanned, leakedChars, secretIndex } from '../../../api/_ai/guard.js'
 import { SKILL_META, QUICK_ACTIONS } from '../ownerAi/skillCatalog'
 import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient, clientsToStart } from '../ownerAi/caseUtil'
 import { buildAiContext, caseSnapshot, UNKNOWN } from '../ownerAi/context'
-import { renderStructured, revisedText, runSummary, PATENT_WARNING, fundingBasis } from '../ownerAi/render'
+import { renderStructured, revisedText, runSummary, PATENT_WARNING, fundingBasis, verdictLabel } from '../ownerAi/render'
 import { proposeFromRun, contextDiff, applyContext } from '../ownerAi/memory'
 import { ownerAiRepo, OwnerAiDuplicateError } from '../ownerAi/repo'
 import { runSkill, evaluate, saveContext, saveRevision, pasteChatGpt, latestSnapshot, patchCase, type CaseBundle } from '../ownerAi/workflow'
@@ -141,9 +143,20 @@ const CASE = 'case_qa_test_01'
   check('S1 스킬 서재 — 화면 목록과 서버 스킬이 같은 id · 판 · 단계 · 이름(13개)', same && server.length === 13, server.map((s) => `${s.id}:${s.version}:${s.tier}`))
   check('S2 스킬 메타데이터 — id · name · version · description · systemInstruction(줄 배열) · outputSchema · active · createdAt · updatedAt', server.every((s) => s.id && s.name && s.version >= 1 && s.description && Array.isArray(s.systemInstruction) && s.systemInstruction.length >= 2 && s.outputSchema && typeof s.active === 'boolean' && /^\d{4}-\d{2}-\d{2}$/.test(s.createdAt) && s.updatedAt))
   check('S3 예시 JSON 이 출력 형식 검사를 통과(모델이 따라 쓸 틀이 틀리지 않음)', server.every((s) => validate(s.outputSchema, s.example).ok), server.filter((s) => !validate(s.outputSchema, s.example).ok).map((s) => [s.id, validate(s.outputSchema, s.example).errors]))
+  // D-272 AX 전략 분석 = 대표 AX 기준 문서대로(예전 손으로 쓴 12단계 → 기준 문서의 16단계 · 적합성 판정 · 돈 KPI 3 · 12주 · 반론)
   const p = SKILLS.AX_PENGUIN.systemInstruction.join('\n')
-  const steps = ['회사가 실제로 돈을 벌고 있는 방식', '사람이 반복해서 하는 업무', '현재 데이터가 존재하는 위치', '비효율 · 병목', 'AI 가 실제로 개입할 수 있는 지점', '도입 난이도', 'MVP 가능 범위', '사업성', '실제 사용할 가능성', '정책기관에서 설명하기 좋은', '벤처 · 특허 · 정책자금으로 이어질', '과도한 AI 포장 여부']
-  check('S4 AX_PENGUIN — 12단계 순서 그대로', steps.every((s, i) => p.indexOf(s) >= 0 && (i === 0 || p.indexOf(s) > p.indexOf(steps[i - 1]))), steps.filter((s) => p.indexOf(s) < 0))
+  const steps = ['회사 현실', '핵심 병목', '업무 재설계', '데이터 기반', '방법 선택', '판단→행동→결과', '12주 실증', '현장 실행 넘기기', '기업가치 증거', '고객/파트너 접점', '방어력/단위 경제성/확장', '정부 관점', '투자자 관점', '자금 용도', '반론 검증', '후행 모듈']
+  check('S4 AX_PENGUIN — 기준 문서의 16단계 순서 · 판정 넷 · 돈 KPI 3 · 12주 · 반론 질문 · 방법 여섯', steps.every((x, i) => p.indexOf(x) >= 0 && (i === 0 || p.indexOf(x) > p.indexOf(steps[i - 1]))) && ['FULL_GO', 'LITE', 'NO_GO_REDESIGN', 'INSUFFICIENT_DATA'].every((v) => p.includes(v)) && /cost.*revenue.*scale/.test(p) && p.includes('prove12w') && p.includes('devil') && ['RULE', 'OPTIMIZATION', 'ML', 'RAG', 'LLM', 'HUMAN'].every((m) => p.includes(m)), steps.filter((x) => p.indexOf(x) < 0))
+  {
+    const ax = ['AX_PENGUIN', 'AX_IDEA', 'AX_MVP'] as const
+    const pk = KNOWLEDGE.ax_strategy
+    check('S4b AX 단추 셋(전략 분석 · 아이템 발굴 · MVP 구체화)은 기준 문서(ax_strategy)를 받음 · 다른 스킬은 안 받음 · 기준 문서는 적합성 판정 · 16단계 · 반론 · 출력 규격까지(개발 문서 14장 이후는 뺌)', ax.every((id) => (SKILLS[id] as { knowledge?: string[] }).knowledge?.includes('ax_strategy') && skillKnowledge(SKILLS[id]).length > 10000) && !skillKnowledge(SKILLS.CONSULTANT_MESSAGE) && !skillKnowledge(SKILLS.PATENT_IDEA) && pk.includes('FULL_GO') && pk.includes('Company Reality') && pk.includes('실제 누가 반복적으로 사용합니까') && pk.includes('10초 요약') && !pk.includes('JSON 계약') && !pk.includes('구현 로드맵'))
+    const sysAx = buildPrompt(SKILLS.AX_PENGUIN, { company: { name: 'X', fields: [] } }, {}, 'deep', COMMON_RULES).system
+    const sysMsg = buildPrompt(SKILLS.CONSULTANT_MESSAGE, { company: { name: 'X', fields: [] } }, {}, 'cheap', COMMON_RULES).system
+    check('S4c 프롬프트 — AX 전략 분석에 [기준 문서] 가 출력 형식 앞에 · 출처 이름(펭귄 등) 0 · 동료 문구에는 없음', sysAx.includes('[기준 문서]') && sysAx.lastIndexOf('[기준 문서]') < sysAx.lastIndexOf('[출력 형식]') && sysAx.includes('ELIMINATE') && !hasBanned(sysAx) && !/펭귄|PENGUIN/i.test(sysAx) && !sysMsg.includes('[기준 문서]'))
+    const leak = pk.slice(2000, 2300)
+    check('S4d 기준 문서를 통째로 옮겨 적으면 서버가 막음(서버만 가진 글로 셈)', leakedChars(leak, secretIndex([skillKnowledge(SKILLS.AX_PENGUIN)])) >= 200)
+  }
   check('S5 특허 — 경고 문구 그대로(예시 · 지시)', SKILLS.PATENT_IDEA.example.warning === PATENT_WARNING && SKILLS.PATENT_IDEA.systemInstruction.join('').includes(PATENT_WARNING))
   check('S6 공통 규칙 — 숫자 지어내지 않음 · 미확인 · JSON 만', COMMON_RULES.join('\n').includes('근거 없는 숫자') && COMMON_RULES.join('\n').includes('미확인') && COMMON_RULES.join('\n').includes('JSON'))
   check('S7 빠른 작업 10가지 = 대표 지시 순서', QUICK_ACTIONS.map((q) => q.label).join('|') === 'AX 전략 분석|AX 아이템 발굴|MVP 구체화|특허 아이디어|벤처 사업계획|정책자금 · 지원 전략|제안서 구성|AX 화면 기획|동료 전달문구|자유 AI 작업')
@@ -207,7 +220,7 @@ async function serverTests() {
     const r = await post({ requestId: reqId(), skillId: 'AX_PENGUIN', caseId: CASE, input: { task: '영업 업무 먼저' }, context: { company: { name: '한빛정밀(주)', fields: [{ label: '업종', value: '정밀기계' }] } } })
     const run = r.body.run as Record<string, unknown>
     const sys = String(((llmCalls[0]?.body.messages as { content: string }[]) ?? [])[0]?.content ?? '')
-    check('B4 깊게 — AX 전략은 AI_MODEL_DEEP · 출력 한도 깊게 · 12단계 지시가 붙음', llmCalls[0]?.model === 'm-deep' && llmCalls[0].body.max_completion_tokens === 12000 && sys.includes('12. 과도한 AI 포장 여부') && run.skillVersion === 1, llmCalls[0]?.body.max_completion_tokens)
+    check('B4 깊게 — AX 전략은 AI_MODEL_DEEP · 출력 한도 깊게 · 기준 문서(적합성 판정 · 반론 질문)가 붙음 · 판 2', llmCalls[0]?.model === 'm-deep' && llmCalls[0].body.max_completion_tokens === 12000 && sys.includes('[기준 문서]') && sys.includes('NO_GO_REDESIGN') && sys.includes('실제 누가 반복적으로 사용합니까') && run.skillVersion === 2, llmCalls[0]?.body.max_completion_tokens)
     check('B5 가격을 정했으면 비용 계산(USD · 1200×2.5 + 300×10 / 100만)', Math.abs(Number(run.estimatedCostUsd) - (1200 * 2.5 + 300 * 10) / 1e6) < 1e-9, run.estimatedCostUsd)
   }
 
@@ -328,7 +341,7 @@ async function engineTests() {
     check('D-219 중복 업체 — 같은 블로그(m. 주소 · 대소문자 달라도)는 홈페이지 같음', findDuplicates({ name: '그린', url: 'https://m.blog.naver.com/GreenLogis' }, [blogCase], []).some((d) => d.reason.includes('홈페이지')))
   }
   {
-    // D-255 AI 작업실 '고객 관리에서 고르기' — 아직 작업실과 잇지 않은 고객만 · 최근 순 · 찾기
+    // D-255 AI 전략실 '고객 관리에서 고르기' — 아직 작업실과 잇지 않은 고객만 · 최근 순 · 찾기
     const mk = (id: string, name: string, biz: string, upd: string, extra: Partial<ClientOpsRecord> = {}) => normalizeClientOps({ id, companyName: name, businessNumber: biz, contactName: `${name} 대표`, createdAt: at, updatedAt: upd, ...extra } as unknown as Partial<ClientOpsRecord>)
     const cl = [mk('a', '가람상사', '111-11-11111', '2026-10-10T00:00:00Z'), mk('b', '나래식품', '222-22-22222', '2026-10-12T00:00:00Z'), mk('c', '다온테크', '333-33-33333', '2026-10-11T00:00:00Z'), mk('d', '라온물산', '', '2026-10-13T00:00:00Z', { archivedAt: '2026-10-13T00:00:00Z' } as Partial<ClientOpsRecord>), mk('e', '마루건설', '555-55-55555', '2026-10-09T00:00:00Z')]
     const linkedCase = { ...emptyCase({ companyName: '가람상사', at }), clientId: 'a' }
@@ -369,8 +382,11 @@ async function engineTests() {
     check('K3 동료 문구(빠르게) — 자료는 보내지 않고 채택한 결과만(토큰 아끼기)', msg.materials.length === 0 && msg.adopted.length === 1)
   }
   {
-    const md = renderStructured('AX_PENGUIN', SKILLS.AX_PENGUIN.example)
-    check('L1 결과 글 — AX 전략: 가장 추천 · 차선 · 12단계', md.includes('가장 추천') && md.includes('차선 1') && md.includes('12단계'))
+    const md = renderStructured('AX_PENGUIN', { ...SKILLS.AX_PENGUIN.example, verdict: 'LITE', thinking: Array.from({ length: 16 }, (_, i) => ({ step: i + 1, title: `단계${i + 1}`, finding: '판단' })) })
+    check('L1 결과 글 — AX 전략: 판정(한글) · 가장 큰 문제 · 12주 · 가장 추천(방법 · AI 전에 먼저) · 차선 · 돈 KPI 3 · 16단계 · 반론 질문 · 지금 만들 것', md.includes('판정: 작게 시작') && md.includes('가장 큰 문제') && md.includes('12주에 증명할 것') && md.includes('가장 추천') && md.includes('- 방법:') && md.includes('AI 전에 먼저') && md.includes('차선 1') && md.includes('돈 KPI 3') && md.includes('16단계로 본 것') && md.includes('반론 질문') && md.includes('[P0 | P1 | P2]') && md.includes('지금 만들 것'), md)
+    const old = renderStructured('AX_PENGUIN', { oneLine: '예전 결과', thinking: [{ step: 1, title: '돈 버는 방식', finding: '판단' }], recommended: { title: '견적 자동화', why: '이유' }, alternatives: [] })
+    check('L1b 예전(판 1) 결과도 그대로 — 판정 · KPI 줄 없이 · "단계별로 본 것"', old.includes('견적 자동화') && !old.includes('판정') && !old.includes('돈 KPI') && old.includes('단계별로 본 것'), old)
+    check('L1c 판정 글 — 넷 모두 한글 · 모르는 값은 그대로', verdictLabel('FULL_GO').startsWith('바로 진행') && verdictLabel('no go redesign').startsWith('지금은 만들지') && verdictLabel('INSUFFICIENT_DATA').startsWith('정보 부족') && verdictLabel('기타') === '기타')
     // D-219: 결과 글에 영어 칸 이름이 보이지 않게 · 스튜디오에서 고친 판도 글로
     const ctxMd = renderStructured('CONTEXT_UPDATE', { proposed: { oneLine: '수도권 물류', problems: '배차가 늦다' } })
     check('D-219 기억 정리 결과 — 한글 칸 이름(oneLine 아님)', ctxMd.includes('회사 한줄 정의: 수도권 물류') && ctxMd.includes('해결할 문제') && !ctxMd.includes('oneLine'), ctxMd)
@@ -411,7 +427,7 @@ async function engineTests() {
     let bundle: CaseBundle = { c, client: null, snapshots: [s1.snap], runs: [], latestRevision: new Map() }
     const rid = reqId()
     const r = await runSkill({ repo, bundle, skill: 'AX_PENGUIN', input: {}, requestId: rid, today: TODAY, userId: 'owner-1' })
-    check('N1 흐름 — 화면 → 서버 함수 → 결과 저장(구조 · 글 · 기억 판 · 요청 번호) · 타임라인', r.run.status === 'succeeded' && r.run.rendered.includes('가장 추천') && r.run.contextVersion === 1 && r.run.contextSnapshotId === s1.snap.id && r.run.requestId === rid && r.c.activity[0].text.startsWith('AX 전략 분석 v1 생성'), r.run)
+    check('N1 흐름 — 화면 → 서버 함수 → 결과 저장(구조 · 글 · 기억 판 · 요청 번호) · 타임라인', r.run.status === 'succeeded' && r.run.rendered.includes('가장 추천') && r.run.contextVersion === 1 && r.run.contextSnapshotId === s1.snap.id && r.run.requestId === rid && r.c.activity[0].text.startsWith('AX 전략 분석 v2 생성'), r.run)
     const again = await runSkill({ repo, bundle, skill: 'AX_PENGUIN', input: {}, requestId: rid, today: TODAY, userId: 'owner-1' })
     const runs = await repo.listRuns(c.id)
     check('N2 같은 요청 번호로 또 — 공급자 1번 · 기록 1줄', llmCalls.length === 1 && runs.length === 1 && again.replayed === true, { calls: llmCalls.length, runs: runs.length })

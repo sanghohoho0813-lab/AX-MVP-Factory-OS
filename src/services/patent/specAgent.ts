@@ -2,7 +2,7 @@
  * D-252 AI 가 다 쓰는 명세서 — 대표: "하나하나 다 타자로 입력하는 거는 절대 없어야 돼. 조사해줘 · 아이디어 내줘 하면 LLM 이 MD 파일이랑 연계해서 최적의 결과".
  *
  * 단계(칸 단추 하나 = 단계 하나 · [전부 써줘] = 필요한 단계를 차례로):
- *   idea      아이디어 내줘   — 회사 기록 · 재료(AI 작업실 · 올린 자료)로 아이디어 3개 → 비어 있으면 추천 1번을 바로 채움
+ *   idea      아이디어 내줘   — 회사 기록 · 재료(AI 전략실 · 올린 자료)로 아이디어 3개 → 비어 있으면 추천 1번을 바로 채움
  *   research  조사해줘        — 선행기술 · 차별화 메모(검색 근거가 붙으면 출처) → 청구항 · 해결 수단이 이 차별화를 쓴다
  *   parts     구성 · 단계 써줘 — 권리축 7줄 · 시스템 이름 · 구성요소 · 단계 · 종속항 씨앗(부호는 OS 가 110 부터)
  *   a~e       본문 · 청구항   — D-247 의 다섯 묶음 그대로(specDraftAi)
@@ -87,9 +87,9 @@ export interface AgentCompany {
   name: string
   /** '업종: 제조업' 처럼 한 줄씩 — 사람 이름 · 연락처는 넣지 않는다 */
   facts: string[]
-  /** AI 작업실 자료 · 올린 파일에서 읽은 글 */
+  /** AI 전략실 자료 · 올린 파일에서 읽은 글 */
   materials: { title: string; kind: string; text: string }[]
-  /** AI 작업실 '특허 아이디어' 결과 제목 · 핵심(있으면) */
+  /** AI 전략실 '특허 아이디어' 결과 제목 · 핵심(있으면) */
   priorIdeas: string[]
 }
 
@@ -129,7 +129,7 @@ function materialRows(c: AgentCompany): AssistRow[] {
 const DESCRIBES = /^(?:업종|업태|종목|홈페이지|상담 메모):/
 
 /**
- * D-269 AI 가 읽을 회사 이야기가 없나 — 업종 · 업태 · 종목 · 홈페이지 · 상담 메모 · 자료 · AI 작업실 아이디어가 모두 없으면.
+ * D-269 AI 가 읽을 회사 이야기가 없나 — 업종 · 업태 · 종목 · 홈페이지 · 상담 메모 · 자료 · AI 전략실 아이디어가 모두 없으면.
  * 대표: "자료가 없으면 일단은 자료를 넣어 달라고 하고" — 이때는 아이디어를 내지 않고 회사 정보부터 받는다.
  */
 export function companyThin(c: AgentCompany): boolean {
@@ -142,13 +142,13 @@ export const THIN_BLOCK = '회사 정보부터 — 업종 · 종목 · 상담 �
 /* 아이디어 내줘                                                          */
 /* ------------------------------------------------------------------ */
 
-/** 회사 · 재료 · AI 작업실 아이디어 · 이미 있는 명세서 — 기획 대화와 아이디어가 같이 쓴다 */
+/** 회사 · 재료 · AI 전략실 아이디어 · 이미 있는 명세서 — 기획 대화와 아이디어가 같이 쓴다 */
 function companySections(c: AgentCompany, others: string[]): AssistContext['sections'] {
   const sections: AssistContext['sections'] = [
     { name: '회사', rows: [{ part: '회사 이름', memo: c.name || '(회사 미정 — 업종 일반으로)' }, ...c.facts.slice(0, 20).map((f) => ({ part: '기록', memo: safeText(f) }))] },
     { name: '재료', rows: materialRows(c) },
   ]
-  if (c.priorIdeas.length) sections.push({ name: 'AI 작업실 특허 아이디어', rows: c.priorIdeas.slice(0, 6).map((memo) => ({ part: '앞선 결과', memo: safeText(memo, [], 560) })) })
+  if (c.priorIdeas.length) sections.push({ name: 'AI 전략실 특허 아이디어', rows: c.priorIdeas.slice(0, 6).map((memo) => ({ part: '앞선 결과', memo: safeText(memo, [], 560) })) })
   if (others.length) sections.push({ name: '이미 있는 명세서', rows: others.slice(0, 10).map((t) => ({ part: '명칭', memo: t })) })
   return sections
 }

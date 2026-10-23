@@ -35,12 +35,26 @@ export function fundingBasis(v: unknown): (typeof FUNDING_BASIS)[number] {
   return (FUNDING_BASIS as readonly string[]).includes(s) ? (s as (typeof FUNDING_BASIS)[number]) : '미확인'
 }
 
+/** D-272 AX 적합성 판정(기준 문서) — 모르는 값은 그대로 */
+export const VERDICT_LABEL: Record<string, string> = {
+  FULL_GO: '바로 진행 — 운영형 AX + 단계적 실증',
+  LITE: '작게 시작 — 작은 워크플로 · 자동화 · MVP 부터',
+  NO_GO_REDESIGN: '지금은 만들지 않음 — 업무 · 가설부터 다시 설계',
+  INSUFFICIENT_DATA: '정보 부족 — 확인 질문부터(잠정 결론)',
+}
+export const verdictLabel = (v: unknown): string => {
+  const k = str(v).toUpperCase().replace(/[\s-]+/g, '_')
+  return VERDICT_LABEL[k] ?? str(v)
+}
+
 function axItem(title: string, it: O): string[] {
   return [
     `### ${title}: ${str(it.title)}`,
     str(it.why) ? `${str(it.why)}` : '',
+    ...line('AI 전에 먼저', it.processFirst),
     ...line('지금', it.before),
     ...line('바뀐 뒤', it.after),
+    ...line('방법', it.method),
     ...line('난이도', it.difficulty),
     ...line('MVP 범위', it.mvpScope),
     ...(strs(it.coreFeatures).length ? [`- 핵심 기능: ${strs(it.coreFeatures).join(' · ')}`] : []),
@@ -56,18 +70,30 @@ function axItem(title: string, it: O): string[] {
 export function renderStructured(skill: SkillId, s: unknown): string {
   const o = obj(s)
   switch (skill) {
-    case 'AX_PENGUIN':
+    case 'AX_PENGUIN': {
+      // D-272 기준 문서대로 — 판정 · 가장 큰 문제 · 12주 · TOP 아이템 · 돈 KPI 3 · 16단계 · 반론 질문 · 지금 만들 것
+      const k = obj(o.kpis)
       return [
         `## ${str(o.oneLine)}`,
         '',
+        ...line('판정', verdictLabel(o.verdict)),
+        ...line('가장 큰 문제', o.primaryConstraint),
+        ...line('12주에 증명할 것', o.prove12w),
+        '',
         ...axItem('가장 추천', obj(o.recommended)),
         ...arr(o.alternatives).flatMap((a, i) => axItem(`차선 ${i + 1}`, obj(a))),
-        ...list('12단계로 본 것', arr(o.thinking).map((t) => `${str(obj(t).step)}. ${str(obj(t).title)} — ${str(obj(t).finding)}`)),
+        ...list('돈 KPI 3', [str(k.cost) && `비용 · 효율: ${str(k.cost)}`, str(k.revenue) && `매출 · 고객: ${str(k.revenue)}`, str(k.scale) && `규모 · 처리 능력: ${str(k.scale)}`].filter(Boolean)),
+        ...list(arr(o.thinking).length > 12 ? '16단계로 본 것' : '단계별로 본 것', arr(o.thinking).map((t) => `${str(obj(t).step)}. ${str(obj(t).title)} — ${str(obj(t).finding)}`)),
+        ...list('반론 질문', arr(o.devil).map((d) => { const x = obj(d); return `${str(x.risk) ? `[${str(x.risk)}] ` : ''}${str(x.q)} — ${str(x.answer) || '답 없음'}` }).filter((x) => x.length > 4)),
+        ...list('지금 만들 것', strs(o.buildNow)),
+        ...list('준비할 것', strs(o.prepareNow)),
+        ...list('나중에 검증할 것', strs(o.validateLater)),
         ...list('주의', strs(o.cautions)),
         ...list('확인할 것', strs(o.unknowns)),
-      ].join('\n').trim()
+      ].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n').trim()
+    }
     case 'AX_IDEA':
-      return [`## ${str(o.oneLine)}`, '', ...arr(o.items).flatMap((x, i) => { const it = obj(x); return [`### ${i + 1}. ${str(it.title)}${it.quickWin === true ? ' (빨리 됨)' : ''}`, ...line('문제', it.problem), ...line('아이디어', it.idea), ...line('쓰는 사람', it.users), ...line('난이도', it.difficulty), ...line('얻는 것', it.value), ...(strs(it.dataNeeded).length ? [`- 데이터: ${strs(it.dataNeeded).join(' · ')}`] : []), ''] }), ...list('확인할 것', strs(o.unknowns))].join('\n').trim()
+      return [`## ${str(o.oneLine)}`, '', ...arr(o.items).flatMap((x, i) => { const it = obj(x); return [`### ${i + 1}. ${str(it.title)}${it.quickWin === true ? ' (빨리 됨)' : ''}`, ...line('문제', it.problem), ...line('아이디어', it.idea), ...line('방법', it.method), ...line('쓰는 사람', it.users), ...line('난이도', it.difficulty), ...line('얻는 것', it.value), ...line('12주 증명', it.prove12w), ...(strs(it.dataNeeded).length ? [`- 데이터: ${strs(it.dataNeeded).join(' · ')}`] : []), ''] }), ...list('확인할 것', strs(o.unknowns))].join('\n').trim()
     case 'AX_MVP':
       return [
         `## ${str(o.mvpName)} — ${str(o.oneLine)}`,
@@ -75,7 +101,7 @@ export function renderStructured(skill: SkillId, s: unknown): string {
         ...line('푸는 문제', o.problem),
         '',
         ...list('사용 흐름', strs(o.coreFlow)),
-        ...list('기능', arr(o.features).map((f) => `[${str(obj(f).priority) || '필수'}] ${str(obj(f).name)}${str(obj(f).detail) ? ` — ${str(obj(f).detail)}` : ''}`)),
+        ...list('기능', arr(o.features).map((f) => `[${str(obj(f).priority) || '필수'}${str(obj(f).level) ? ` · ${str(obj(f).level)}` : ''}] ${str(obj(f).name)}${str(obj(f).detail) ? ` — ${str(obj(f).detail)}` : ''}`)),
         ...list('화면', strs(o.screens)),
         ...list('데이터', strs(o.data)),
         ...list('단계', arr(o.phases).map((p) => `${str(obj(p).name)}: ${str(obj(p).scope)}${str(obj(p).duration) ? ` (${str(obj(p).duration)})` : ''}`)),

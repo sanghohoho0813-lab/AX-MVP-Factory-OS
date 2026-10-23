@@ -42,17 +42,17 @@ export function caseSnapshot(c: CompanyCase, client: ClientOpsRecord | null, ctx
     for (const [v, s] of cands) if (v && String(v).trim()) return [String(v).trim(), s]
     return ['', '']
   }
-  put('name', '회사명', c.companyName, client ? '고객 관리' : 'AI 작업실 등록')
-  put('industry', '업종', ...pick([f?.industryText, '고객 관리'], [c.industry, 'AI 작업실 등록'], [fact('industry')?.value, `자료 · ${fact('industry')?.source ?? ''}`]))
+  put('name', '회사명', c.companyName, client ? '고객 관리' : 'AI 전략실 등록')
+  put('industry', '업종', ...pick([f?.industryText, '고객 관리'], [c.industry, 'AI 전략실 등록'], [fact('industry')?.value, `자료 · ${fact('industry')?.source ?? ''}`]))
   const years = f?.years != null && f.establishedAt ? `${f.years}년(설립 ${f.establishedAt})` : null
   put('years', '업력', ...pick([years, '고객 관리'], [fact('founded')?.value, `자료 · ${fact('founded')?.source ?? ''}`]))
   put('ceo', '대표자', ...pick([f?.representativeName, '고객 관리'], [fact('ceo')?.value, `자료 · ${fact('ceo')?.source ?? ''}`]))
   put('employees', '직원수', ...pick([f?.employeeCount != null ? `${f.employeeCount}명` : null, '고객 관리'], [fact('employees')?.value, `자료 · ${fact('employees')?.source ?? ''}`]))
   const rev = f?.revenue ? `${manwonText(f.revenue.won)}${f.revenue.asOf ? `(${f.revenue.asOf})` : ''}${f.revenue.estimated ? ' · 예상' : ''}` : null
   put('revenue', '매출', ...pick([rev, '고객 관리'], [fact('revenue')?.value, `자료 · ${fact('revenue')?.source ?? ''}`]))
-  put('homepage', '홈페이지', ...pick([c.homepageUrl, 'AI 작업실 등록'], [client?.homepage, '고객 관리'], [fact('homepage')?.value, `자료 · ${fact('homepage')?.source ?? ''}`]))
-  put('requester', '요청자', c.requester, 'AI 작업실 등록')
-  put('relation', '관계상태', RELATION_LABEL[c.relation], 'AI 작업실')
+  put('homepage', '홈페이지', ...pick([c.homepageUrl, 'AI 전략실 등록'], [client?.homepage, '고객 관리'], [fact('homepage')?.value, `자료 · ${fact('homepage')?.source ?? ''}`]))
+  put('requester', '요청자', c.requester, 'AI 전략실 등록')
+  put('relation', '관계상태', RELATION_LABEL[c.relation], 'AI 전략실')
   const firstLine = (s: string | undefined) => (s ?? '').split('\n').map((x) => x.replace(/^[-·\s]+/, '').trim()).find(Boolean) ?? ''
   put('problem', '주요 문제', ...pick([firstLine(ctx?.problems), '지금까지의 기억'], [fact('mainProblem')?.value, `자료 · ${fact('mainProblem')?.source ?? ''}`]))
   put('system', '현재 시스템 · 업무방식', ...pick([fact('currentSystem')?.value, `자료 · ${fact('currentSystem')?.source ?? ''}`]))

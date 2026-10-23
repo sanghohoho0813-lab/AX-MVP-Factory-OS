@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const memberships = (await listMyWorkspaces()).filter((m) => m.userId === nextSession.user.id)
         // D-164: 대표면 바로 볼 수 있는 팀장 화면 목록(0020 전이면 빈 목록)
         const views = tier === 'full' ? await fetchPilotViews() : []
-        // 대표 AI 작업실 등 기능 권한(0021) — full 만 묻는다(Pilot 은 서버도 빈 목록)
+        // 대표 AI 전략실 등 기능 권한(0021) — full 만 묻는다(Pilot 은 서버도 빈 목록)
         const caps = tier === 'full' ? await fetchMyCapabilities() : []
         if (!mounted.current) return
         setWorkspaces(memberships)

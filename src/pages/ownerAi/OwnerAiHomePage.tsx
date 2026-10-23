@@ -1,5 +1,5 @@
 /**
- * /ai — 대표 AI 작업실 첫 화면.
+ * /ai — 대표 AI 전략실 첫 화면.
  *  - 빠른 등록: 회사명 · 홈페이지 · 요청자 · 관계 · 업종 · 메모(최소 회사명만). 같은 업체가 있으면 새로 만들기 전에 잇기를 먼저 권한다.
  *  - Partner OS 요청(ax_proposal_requested): 주소(?event=…) 또는 붙여넣은 JSON 으로 칸을 채운다.
  *  - 목록: 검색 · 관계 거르기 · 최근 작업 순.
@@ -120,7 +120,7 @@ function Home() {
         userId: ident.userId,
       })
       setPendingMaterials([])
-      showToast(`${c.companyName} — AI 작업실을 만들었습니다.`)
+      showToast(`${c.companyName} — AI 전략실을 만들었습니다.`)
       navigate(`/ai/cases/${c.id}`)
     } catch (e) {
       if (e instanceof OwnerAiSetupError) setDbSetup(true)
@@ -136,7 +136,7 @@ function Home() {
   return (
     <div className="flex flex-col gap-5">
       <ScreenTitle
-        title="AI 작업실"
+        title="AI 전략실"
         sub="대표 전용 · 업체마다 기억이 이어지는 AI 작업 · 결과는 채택한 것만 다음 작업에 씁니다"
         actions={
           <>
@@ -154,7 +154,7 @@ function Home() {
       <AiSetupBanner setup={setup} />
       {dbSetup && (
         <Surface>
-          <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 작업실 DB 설정이 필요합니다.</p>
+          <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
           <p className="t-sub mt-1 break-keep text-slate-600">Supabase 에 0021 마이그레이션을 실행하면 업체 · 기억 · 실행 기록을 저장할 수 있습니다(docs/OWNER_AI_WORKSPACE_V1.md).</p>
         </Surface>
       )}
@@ -189,7 +189,7 @@ function Home() {
                 {dups.slice(0, 5).map((d) => (
                   <li key={`${d.kind}-${d.id}`} className="flex flex-wrap items-center gap-2">
                     <span className="t-body min-w-0 font-semibold break-words text-slate-900">{d.name}</span>
-                    <Badge tone={d.strong ? 'warning' : 'neutral'}>{d.kind === 'case' ? 'AI 작업실' : '고객 관리'} · {d.reason}</Badge>
+                    <Badge tone={d.strong ? 'warning' : 'neutral'}>{d.kind === 'case' ? 'AI 전략실' : '고객 관리'} · {d.reason}</Badge>
                     {d.kind === 'case' ? (
                       <Button size="sm" variant="primary" onClick={() => navigate(`/ai/cases/${d.id}`)} data-testid="dup-open-case">이 작업실 열기</Button>
                     ) : d.caseId ? (
@@ -206,7 +206,7 @@ function Home() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => { setFormOpen(false); setDraft(EMPTY) }}>닫기</Button>
             <Button variant={dups.length ? 'secondary' : 'primary'} disabled={saving || !draft.companyName.trim() || !!strongCase} onClick={() => void create()} data-testid="case-create">
-              {strongCase ? '같은 업체가 있어 새로 만들 수 없음' : dups.length ? '그래도 새로 만들기' : 'AI 작업실 만들기'}
+              {strongCase ? '같은 업체가 있어 새로 만들 수 없음' : dups.length ? '그래도 새로 만들기' : 'AI 전략실 만들기'}
             </Button>
           </div>
 

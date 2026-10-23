@@ -73,7 +73,7 @@ export const CLIENT_FLOW: FlowDef = {
       why: '공고에서 신청 준비를 건 지원사업의 서류 · 마감 · 결과를 챙기는 곳이에요.',
     },
     ai: {
-      label: 'AI 작업실',
+      label: 'AI 전략실',
       why: '대표만 쓰는 곳 — 이 업체 자료로 AI 에게 글 · 제안서를 맡겨요.',
     },
   },

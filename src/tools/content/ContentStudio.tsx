@@ -2,7 +2,7 @@
  * 홍보 글 만들기 화면 (D-203) — 업체 하나로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 · 플레이스 소개 · 키워드.
  *
  * 순서: 업체 홍보 정보(업체 기록에서 저절로 · 고치기) → 먼저 만들 것 3개(누르면 바로 글) → 직접 고르기(형식 · 키워드 · 주제)
- *      → 결과(복사 · 다른 안 · 고치기 · 보관함 · 업체 기록에 붙이기 · 대표는 AI 작업실로) → 보관함.
+ *      → 결과(복사 · 다른 안 · 고치기 · 보관함 · 업체 기록에 붙이기 · 대표는 AI 전략실로) → 보관함.
  * 규칙 + 업종 견본으로 채우며 'AI' 가 아니다. 업체마다 다른 내용은 [대괄호] 로 비워 두고 점검이 알린다.
  * D-207: 차별점 · 판매 채널 · 손님이 망설이는 점 칸, '이 칸만 채우면' 안내, 블로그 글 종류(우리 글 / 체험단 가이드), 주제 카드에 전략,
  *        쇼츠 길이 20~30 / 30~60초, 카드뉴스 광고 유형 5가지, 키워드 검색량 붙여넣기 정리, 한 달 올릴 계획(주 2회 / 주 4회).
@@ -535,10 +535,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     setBusy(true)
     try {
       const r = await sendDraftToOwnerAi(aiRepo, aiIdent, record, shown.draft.title, text)
-      showToast(r.added ? 'AI 작업실 자료에 넣었어요 — 자유 AI 작업에 "이 글을 다듬어 줘" 라고 적어 주세요.' : '이미 AI 작업실 자료에 있는 글이에요.')
+      showToast(r.added ? 'AI 전략실 자료에 넣었어요 — 자유 AI 작업에 "이 글을 다듬어 줘" 라고 적어 주세요.' : '이미 AI 전략실 자료에 있는 글이에요.')
       navigate(`/ops/clients/${encodeURIComponent(record.id)}?tab=ai`)
     } catch (e) {
-      showToast(e instanceof Error && /0021|설정/.test(e.message) ? 'AI 작업실 DB 설정이 필요해요.' : 'AI 작업실에 넣지 못했어요. 잠시 뒤 다시 눌러 주세요.')
+      showToast(e instanceof Error && /0021|설정/.test(e.message) ? 'AI 전략실 DB 설정이 필요해요.' : 'AI 전략실에 넣지 못했어요. 잠시 뒤 다시 눌러 주세요.')
     } finally {
       setBusy(false)
     }
@@ -966,11 +966,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                     {shown.item.postedAt ? '올렸어요 · 되돌리기' : '올렸어요 표시'}
                   </Button>
                 )}
-                {/* D-220: 가상 업체 · 컨설턴트는 AI 작업실(업체마다)에 아직 없다 — 임시등록한 뒤에 */}
+                {/* D-220: 가상 업체 · 컨설턴트는 AI 전략실(업체마다)에 아직 없다 — 임시등록한 뒤에 */}
                 {ownerAi === 'yes' && !isTrialId(record.id) && (
                   <Button size="sm" variant="ghost" onClick={() => void toAi()} disabled={busy} data-testid="content-to-ai">
                     <Sparkles className="size-4 text-violet-600" aria-hidden="true" />
-                    AI 작업실에서 다듬기
+                    AI 전략실에서 다듬기
                   </Button>
                 )}
               </div>
