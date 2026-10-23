@@ -197,7 +197,8 @@ export function IdeaImportPanel({ clientId, onPick, onClose }: { clientId: strin
         if (!alive) return
         const out: IdeaChoice[] = []
         for (const r of runs) {
-          if (r.skillId !== 'PATENT_IDEA') continue
+          // PV-2 폐기한 결과는 고를 목록에 넣지 않는다
+          if (r.skillId !== 'PATENT_IDEA' || r.evaluation === 'rejected') continue
           const list = (r.structured as { ideas?: unknown } | null)?.ideas
           if (!Array.isArray(list)) continue
           for (const it of list) if (it && typeof it === 'object') out.push({ caseName: name, idea: it as IdeaChoice['idea'] })

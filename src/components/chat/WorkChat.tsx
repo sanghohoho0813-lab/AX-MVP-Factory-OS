@@ -51,6 +51,10 @@ export interface WorkChatProps {
   detailHref: string
   guide: readonly ChatGuideStep[]
   today: string
+  /** PV-1 회사 고르기 바로 아래 — 이 회사 준비 현황 · 다음 할 일(규칙). 있으면 대화창은 그 아래 보조로 */
+  brief?: ReactNode
+  /** 대화창 큰 제목(없으면 '무엇을 도와드릴까요?') */
+  heroTitle?: string
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -186,7 +190,14 @@ export function WorkChat(p: WorkChatProps) {
 
   const onCopy = async (t: string, what: string) => showToast((await copyText(t)) ? `${what} 복사했어요` : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요')
 
+  // PV-2 [AI로 더 자세히] · [다시 묻기] 를 연달아 눌러도 AI 는 한 번만(예전엔 누른 만큼 불렀다 — 매번 새 요청 번호라 서버도 못 걸렀다)
+  const askingRef = useRef(false)
   const askAi = async (q: string, shown = q) => {
+    if (askingRef.current) {
+      showToast('AI가 앞 질문에 답하는 중이에요 — 끝나면 다시 눌러 주세요')
+      return
+    }
+    askingRef.current = true
     const id = uid('t')
     const key = keyRef.current
     const ctx = p.aiContext(turnsRef.current)
@@ -202,6 +213,7 @@ export function WorkChat(p: WorkChatProps) {
       const fallback = p.ruleAnswer({ text: q })
       commit((cur) => cur.map((t) => (t.id === id ? { ...t, a: fallback, status: 'error', error: `AI 답을 받지 못해 정해진 답을 보여 드려요 — ${why}` } : t)), key)
     } finally {
+      askingRef.current = false
       setBusy(false)
     }
   }
@@ -350,11 +362,12 @@ export function WorkChat(p: WorkChatProps) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4" data-testid={`chat-${p.module}`} data-turns={turns.length}>
       {head}
+      {p.brief}
       {p.onFile && <input ref={fileRef} type="file" accept={p.fileAccept} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} data-testid="chat-file-input" />}
 
       {empty ? (
-        <section className="flex flex-col gap-4 py-4 sm:py-10" data-testid="chat-hero">
-          <h2 className="t-page text-center font-bold break-keep text-slate-900">무엇을 도와드릴까요?</h2>
+        <section className={`flex flex-col gap-4 ${p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
+          <h2 className={`${p.brief ? 't-section' : 't-page'} text-center font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
           {composer(false)}
           {starterButtons(false)}
         </section>

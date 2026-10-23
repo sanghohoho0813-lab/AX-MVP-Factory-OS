@@ -32,10 +32,11 @@ const HOME = PV_HOME
 
 /** 회사 고르기 — 고르고 [사업계획서 쓰기] */
 function PlanClientPick({ autoFocus = false }: { autoFocus?: boolean }) {
-  const { loadClients } = useToolClient()
+  const { loadClients, clientId } = useToolClient()
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
-  const [picked, setPicked] = useState('')
+  // PV-1 업체에서 열었으면(?client=) 그 회사가 골라진 채로 — 다시 고르지 않게
+  const [picked, setPicked] = useState(clientId ?? '')
   useEffect(() => {
     let alive = true
     void loadClients().then((l) => alive && setClients(l.filter((c) => c.archivedAt === null)))

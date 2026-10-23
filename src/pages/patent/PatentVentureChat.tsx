@@ -19,6 +19,10 @@ import { checkSpec } from '../../services/patent/specCheck'
 import { topicOf } from '../../services/workChat/chatTypes'
 import { PV_GUIDE, PV_STARTERS, PV_TOPICS, pvAiContext, pvAnswer, pvFileAnswer, pvHelpAnswer, type PvChatData } from '../../services/workChat/pvChat'
 import { liveRows } from '../../services/patent/specTrash'
+import { pvBoard } from '../../services/patent/pvBoard'
+import { pvBrief } from '../../services/patent/pvBrief'
+import { companyFactLines, importableDocs } from '../../services/patent/specMaterials'
+import { PvBriefCard, PvResumeCard } from './PvBriefCard'
 
 type DraftRow = { draft: SpecDraft } & Record<string, unknown>
 type CertWorkRow = { cert?: string; notes?: Record<string, string> } & Record<string, unknown>
@@ -63,6 +67,13 @@ export function PatentVentureChatPage() {
   const owner = access !== 'no'
 
   const specAi = useOwnerAiAccess()
+  // PV-1 회사를 고르면 대화를 시작하지 않아도 준비 현황 · 이미 있는 자료 · 다음 할 일 하나가 먼저(규칙 계산)
+  const record = clients?.find((c) => c.id === clientId) ?? null
+  const brief = useMemo(
+    () => (clientId && ready ? pvBrief({ clientId, drafts: data.drafts, plans: data.plans, clients: data.clients, factLines: companyFactLines(record).length, docs: importableDocs(record).map((d) => d.label), specAi: specAi === 'yes' }) : null),
+    [clientId, ready, data, record, specAi],
+  )
+  const resumeRows = useMemo(() => (!clientId && ready ? pvBoard({ drafts: data.drafts, plans: data.plans, clients: data.clients }) : []), [clientId, ready, data])
   const createDraft = async (draft: SpecDraft, msg: string, auto = false) => {
     try {
       const r = await drafts.save({ clientId, data: { draft } })
@@ -112,6 +123,14 @@ export function PatentVentureChatPage() {
         detailHref={`${PV_HOME}/more${clientId ? `?client=${encodeURIComponent(clientId)}` : ''}`}
         guide={PV_GUIDE}
         today={today}
+        brief={
+          brief ? (
+            <PvBriefCard company={clientName || '이 회사'} brief={brief} onNewSpec={() => void createDraft(emptyDraft(), '', true)} />
+          ) : resumeRows.length ? (
+            <PvResumeCard rows={resumeRows} onPick={(r) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))} />
+          ) : undefined
+        }
+        heroTitle={brief || resumeRows.length ? '다른 것을 묻거나 고르세요' : undefined}
       />
     </div>
   )

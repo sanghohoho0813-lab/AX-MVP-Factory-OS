@@ -5,6 +5,9 @@
  * 서류 글은 화면에서만 읽고(서버에 원본 파일 · 글을 따로 저장하지 않음 — 서류함 원칙 그대로) 명세서 초안의 재료 칸에만 읽은 글을 남긴다.
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { safeText, personNames, wonText } from '../aiAssist/context'
+import { clientFacts } from '../../tools/shared/clientPrefill'
+import { usableFactValue } from '../customerFacts'
 
 /** 업체 서류함에서 재료로 가져올 수 있는 칸 — 신분증 · 명부 · 인증서 · 건강보험 같은 개인 정보 서류는 뺀다(AI 전략실과 같은 기준) */
 export const SAFE_DOC_KEYS: readonly string[] = ['businessRegistration', 'corporateRegistry', 'cretopReport', 'financialStatements', 'smeCertificate']
@@ -44,4 +47,45 @@ export function excerptForAi(text: string, max = 4480): string {
   const head = Math.floor(max / 3)
   const tail = max - head - 12
   return `${t.slice(0, head)} …(가운데 줄임)… ${t.slice(t.length - tail)}`
+}
+
+/** 회사 기록 → 'AI 에 보낼 한 줄' 들(사람 이름 · 연락처는 가림) */
+export function companyFactLines(r: ClientOpsRecord | null): string[] {
+  if (!r) return []
+  const f = clientFacts(r, new Date())
+  const names = personNames(r)
+  const out: string[] = []
+  const add = (label: string, v: string | number | null | undefined) => {
+    const t = typeof v === 'number' ? String(v) : String(v ?? '').trim()
+    if (t) out.push(`${label}: ${t}`)
+  }
+  add('업종', f.industryText || f.industry || r.industry)
+  add('업태', r.businessCategory)
+  add('종목', [r.businessItem, r.businessItemsExtra].filter((x) => String(x ?? '').trim()).join(' · '))
+  add('설립', f.establishedAt)
+  add('업력(년)', f.years)
+  add('직원 수', f.employeeCount)
+  if (f.revenue) add('매출', `${wonText(f.revenue.won)}${f.revenue.estimated ? '(추정)' : ''}`)
+  add('지역', String(f.address || r.businessAddress || '').split(/\s+/).slice(0, 2).join(' '))
+  add('홈페이지', r.homepage)
+  // D-271 사실 창고(서류에서 찾아 확인한 것)도 — 거래처 · 인증 · 특허 · 연구소가 발명 · 시장을 잡는 데 쓰인다
+  for (const [key, label] of [['mainCustomers', '주요 거래처'], ['certifications', '보유 인증'], ['patents', '특허'], ['researchLab', '연구소']] as const) add(label, safeText(usableFactValue(r, key), names, 300))
+  const memo = safeText(r.notes, names, 1200)
+  if (memo) out.push(`상담 메모: ${memo}`)
+  return out
+}
+
+/**
+ * PV-2 AI 전략실 '특허 아이디어' 결과 → 명세서 AI 에 보낼 줄. 폐기한 결과는 빼고, 채택 · 일부 채택을 먼저, 검토 전은 '(검토 전)' 을 붙인다.
+ * 예전엔 폐기한 아이디어까지 재료로 갔다(감사 MUX-0).
+ */
+export function priorIdeaLines(runs: ReadonlyArray<{ skillId: string; evaluation: string; structured: unknown }>): string[] {
+  const kept = runs.filter((r) => r.skillId === 'PATENT_IDEA' && r.evaluation !== 'rejected')
+  const rank = (e: string) => (e === 'adopted' || e === 'partially_adopted' ? 0 : 1)
+  const out: string[] = []
+  for (const r of [...kept].sort((a, b) => rank(a.evaluation) - rank(b.evaluation))) {
+    const list = (r.structured as { ideas?: { title?: string; coreIdea?: string }[] } | null)?.ideas
+    if (Array.isArray(list)) for (const it of list) if (it?.title) out.push(`${r.evaluation === 'draft' ? '(검토 전) ' : ''}${it.title}${it.coreIdea ? ` — ${it.coreIdea}` : ''}`)
+  }
+  return out
 }

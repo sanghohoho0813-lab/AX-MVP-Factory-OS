@@ -11,6 +11,8 @@ import { isPlanStarted, nextOf, planStateOf, pvBoard, pvSummary, specHref, specS
 import { AXIS_EXAMPLE, IDEA_EXAMPLE, SAMPLE_SOURCE, SECTION_RANGE, axisEndingFix, ideaHint, lengthRatio, lengthState, sampleDraft, submitChecklist } from '../patent/specCoach'
 import { blockSvg, flowSvg, svgDataUrl, wrapText, xmlEsc } from '../patent/specFigureSvg'
 import { unzip, zipStore } from '../patent/zip'
+import { pvBrief } from '../patent/pvBrief'
+import { priorIdeaLines } from '../patent/specMaterials'
 
 let passed = 0
 let failed = 0
@@ -123,6 +125,30 @@ const planNotes = (fill: { narrative: number; core: number; patent?: boolean; te
   const m = await unzip(z)
   const dec = new TextDecoder()
   check('Z1 묶음 → 다시 풀면 같은 내용(글 · 그림 바이트 · 한글)', m.size === 3 && dec.decode(m.get('spec.md')!) === '**[발명의 명칭]**\n가{A}\n' && m.get('fig1-draft.png')!.join() === png.join() && dec.decode(m.get('checklist.txt')!) === '확인표')
+}
+
+/* ---------------- PV-1 첫 화면 준비 현황(규칙) · PV-2 폐기한 AI 아이디어는 재료로 안 씀 ---------------- */
+{
+  const clients = [{ id: 'c1', companyName: '한솔' }]
+  const base = { clientId: 'c1', clients, factLines: 4, docs: ['사업자등록증', '재무제표', '크레탑'], specAi: true }
+  const b0 = pvBrief({ ...base, drafts: [], plans: [] })
+  check('PB1 명세서 없음 — 세 칸 다 아직 · 다음 할 일 = AI로 명세서 초안(새 명세서) · 이미 있는 자료(회사 기록 4줄 · 서류 3개) · 선행기술 줄 없음', b0.steps.every((x) => x.state === 'todo' && x.text === '') && b0.next.act === 'new-spec' && b0.next.label === 'AI로 명세서 초안 쓰기' && !b0.next.href && b0.have.join('|') === '회사 기록 4줄|서류함 3개(사업자등록증 · 재무제표 …)' && b0.research === null, b0)
+  check('PB2 AI 없는 계정 → "명세서 쓰기 시작" · 주의 2줄(AI 초안은 사람이 정함 · 출원번호는 기록에 있는 것만)', pvBrief({ ...base, specAi: false, drafts: [], plans: [] }).next.label === '명세서 쓰기 시작' && b0.cautions.length === 2 && /대표 · 변리사/.test(b0.cautions[0]) && /출원번호 없음/.test(b0.cautions[1]) && /10-2026-1/.test(pvBrief({ ...base, drafts: [], plans: [], applicationNumber: '10-2026-1' }).cautions[1]))
+  const half = emptyDraft()
+  half.title = '공구 마모 예측'
+  const b1 = pvBrief({ ...base, drafts: [{ id: 'd1', clientId: 'c1', updatedAt: '2026-10-20T00:00:00Z', draft: half }], plans: [] })
+  check('PB3 쓰던 명세서 — 1칸 진행 중(n/6단계) · 다음 할 일은 진행판과 같은 주소(명세서 이어 쓰기) · 선행기술 조사 아직', b1.steps[0].state === 'doing' && /\/6단계/.test(b1.steps[0].text) && b1.next.label === '명세서 이어 쓰기' && (b1.next.href ?? '').includes('draft=d1') && b1.research === 'todo' && b1.have.includes('명세서 1개'), b1)
+  const done = full()
+  const b2 = pvBrief({ ...base, drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [] })
+  check('PB4 다 쓴 명세서 → 다음 할 일은 진행판 그대로(고칠 것 또는 재료로 보내기) · 다른 회사 명세서는 안 봄', b2.next.href !== undefined && b2.next.text === (pvBoard({ drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [], clients }).find((r) => r.key === 'c1')?.next.text) && pvBrief({ ...base, clientId: 'c2', drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [] }).steps[0].state === 'todo')
+  const runs = [
+    { skillId: 'PATENT_IDEA', evaluation: 'rejected', structured: { ideas: [{ title: '폐기한 아이디어' }] } },
+    { skillId: 'PATENT_IDEA', evaluation: 'draft', structured: { ideas: [{ title: '검토 전 아이디어', coreIdea: '핵심' }] } },
+    { skillId: 'PATENT_IDEA', evaluation: 'adopted', structured: { ideas: [{ title: '채택 아이디어' }] } },
+    { skillId: 'AX_STRATEGY', evaluation: 'adopted', structured: { ideas: [{ title: '다른 작업' }] } },
+  ]
+  const lines = priorIdeaLines(runs)
+  check('PB5 AI 전략실 특허 아이디어 → 폐기 빼고 · 채택 먼저 · 검토 전은 표시 · 다른 작업 결과는 안 섞음', lines.join('|') === '채택 아이디어|(검토 전) 검토 전 아이디어 — 핵심', lines)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

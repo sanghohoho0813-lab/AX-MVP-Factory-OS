@@ -20,7 +20,7 @@ import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
-import { safeText, personNames, wonText } from '../../services/aiAssist/context'
+import { safeText, personNames } from '../../services/aiAssist/context'
 import { parseSpecFile } from '../../services/patent/specParse'
 import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, claimsOf, figureSubject, titleLine, titleParts, type DraftStep, type IdeaPick, type SpecDraft } from '../../services/patent/specDraft'
 import { CARD_STAGES, PLAN_BODY, applyIdea, backToIdeas, bodyWritten, cardState, clearAfterIdea, companyThin, hasLaterWork, partsHuman, planAll, planParts, rankLabel, specPhase, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage, type SpecPhase } from '../../services/patent/specAgent'
@@ -30,42 +30,17 @@ import { PlanTalk } from '../../components/ai/PlanTalk'
 import { talkFinished, withAnswer } from '../../services/aiAssist/talk'
 import { SpecFullText, downloadPlain } from './SpecFullText'
 import { SpecMaterialsSheet } from './SpecMaterials'
-import { DOC_MATERIAL_KIND, PASTE_MATERIAL_KIND, docsWithoutFile, importableDocs } from '../../services/patent/specMaterials'
+import { DOC_MATERIAL_KIND, PASTE_MATERIAL_KIND, companyFactLines, docsWithoutFile, importableDocs, priorIdeaLines } from '../../services/patent/specMaterials'
 import { fetchClientDocFile } from '../../tools/shared/clientDocFile'
 import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePanel'
 import { judgePassed } from '../../services/aiAssist/judge'
-import { clientFacts } from '../../tools/shared/clientPrefill'
-import { usableFactValue } from '../../services/customerFacts'
 import { useOwnerAiRepo } from '../ownerAi/shared'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
 type Act = (label: string, fn: (cur: SpecDraft) => SpecDraft) => void
 
-/** 회사 기록 → 'AI 에 보낼 한 줄' 들(사람 이름 · 연락처는 가림) */
-export function companyFactLines(r: ClientOpsRecord | null): string[] {
-  if (!r) return []
-  const f = clientFacts(r, new Date())
-  const names = personNames(r)
-  const out: string[] = []
-  const add = (label: string, v: string | number | null | undefined) => {
-    const t = typeof v === 'number' ? String(v) : String(v ?? '').trim()
-    if (t) out.push(`${label}: ${t}`)
-  }
-  add('업종', f.industryText || f.industry || r.industry)
-  add('업태', r.businessCategory)
-  add('종목', [r.businessItem, r.businessItemsExtra].filter((x) => String(x ?? '').trim()).join(' · '))
-  add('설립', f.establishedAt)
-  add('업력(년)', f.years)
-  add('직원 수', f.employeeCount)
-  if (f.revenue) add('매출', `${wonText(f.revenue.won)}${f.revenue.estimated ? '(추정)' : ''}`)
-  add('지역', String(f.address || r.businessAddress || '').split(/\s+/).slice(0, 2).join(' '))
-  add('홈페이지', r.homepage)
-  // D-271 사실 창고(서류에서 찾아 확인한 것)도 — 거래처 · 인증 · 특허 · 연구소가 발명 · 시장을 잡는 데 쓰인다
-  for (const [key, label] of [['mainCustomers', '주요 거래처'], ['certifications', '보유 인증'], ['patents', '특허'], ['researchLab', '연구소']] as const) add(label, safeText(usableFactValue(r, key), names, 300))
-  const memo = safeText(r.notes, names, 1200)
-  if (memo) out.push(`상담 메모: ${memo}`)
-  return out
-}
+/** 회사 기록 → 'AI 에 보낼 한 줄' 들 — 서비스로 옮김(특허 · 벤처 첫 화면도 같이 쓴다). 예전 import 길은 그대로 */
+export { companyFactLines }
 
 const CARD_META: Record<AgentCard, { n: number; title: string; icon: ReactNode; run: string; again: string; help: string }> = {
   idea: { n: 1, title: '아이디어', icon: <Lightbulb aria-hidden="true" className="size-5" />, run: '아이디어 내줘', again: '다른 아이디어 더', help: '회사 기록 · 자료로 출원할 만한 아이디어 5개를 순위 · 이유와 함께 냅니다. 다른 것을 누르면 그걸로 바뀝니다.' },
@@ -171,11 +146,8 @@ export function SpecAiBoard({
         const mats = cases.flatMap((c) => c.materials.filter((m) => !m.excluded && m.text.trim()).map((m) => ({ title: m.title, kind: 'AI 전략실 자료', text: m.text })))
         const ideas: string[] = []
         for (const c of cases.slice(0, 2)) {
-          for (const r of await repo.listRuns(c.id)) {
-            if (r.skillId !== 'PATENT_IDEA') continue
-            const list = (r.structured as { ideas?: { title?: string; coreIdea?: string }[] } | null)?.ideas
-            if (Array.isArray(list)) for (const it of list) if (it?.title) ideas.push(`${it.title}${it.coreIdea ? ` — ${it.coreIdea}` : ''}`)
-          }
+          // PV-2 폐기한 결과는 재료로 쓰지 않는다 — 채택 · 일부 채택을 먼저, 검토 전은 그렇다고 적어서
+          ideas.push(...priorIdeaLines(await repo.listRuns(c.id)))
         }
         if (alive) {
           setCaseMats(mats.slice(0, 6))
@@ -199,6 +171,16 @@ export function SpecAiBoard({
   )
 
   const busy = run.running
+  // PV-2 AI 가 쓰는 동안 새로고침 · 창 닫기는 한 번 묻는다 — 다른 화면으로 옮기는 것은 괜찮다(계속 씀), 새로고침하면 남은 단계가 사라진다
+  useEffect(() => {
+    if (!busy) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [busy])
   const start = (stages: AgentStage[], forceParts = false): boolean => {
     const ok = startSpecRun(draftId, stages, { company, others, today, forceParts })
     if (!ok) showToast('지금 쓰는 중입니다 — 끝나면 다시 눌러 주세요')
