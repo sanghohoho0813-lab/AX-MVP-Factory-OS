@@ -392,11 +392,12 @@ export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_
 export const EXPERT_REPLY = '현장에서 보면 [사실 하나]도 같이 봐요.\n[그게 왜 중요한지 한 줄].'
 
 /** 하루 10분 */
+/** D-275 대표 "인기 글 매일 모을 필요 없다 · 주 단위로 잘 터진 글의 형식만 참고" — 매일은 쓰기 · 답글, 훑어보기는 월요일 한 번 */
 export const ROUTINE: ReadonlyArray<{ key: string; when: string; what: string; min: string }> = [
-  { key: 'scan', when: '아침', what: '주제 태그(정책자금 · 벤처기업확인 · 정부지원사업) 인기 글 5개 훑고, 각각 어느 틀인지 붙이기', min: '3분' },
-  { key: 'write', when: '아침', what: '오늘 글 1개 — 틀 고르기 → 쓰는 순서대로 → 규칙 검사', min: '4분' },
+  { key: 'write', when: '매일 아침', what: '오늘 글 1개 — 틀 고르기 → 쓰는 순서대로 → 규칙 검사', min: '4분' },
   { key: 'answer', when: '올린 뒤', what: '1시간은 답글에 바로 답하기 · "저요" 에는 링크로', min: '수시' },
   { key: 'expert', when: '점심 · 저녁', what: '업계 상위 글에 전문가 답글 3개(칭찬 한 줄 말고 사실 하나 더하기)', min: '3분' },
+  { key: 'weekref', when: '월요일', what: '주제 태그 인기 글 3~5개를 훑고, 잘 터진 글의 형식(틀 · 첫 줄 · 끝)만 "이번 주 잘 터진 형식" 에 적기 — 원문은 적지 않아요', min: '10분' },
   { key: 'record', when: '금요일', what: '기록표 채우기 → 틀별 평균 비교 → 다음 주 틀 비중 정하기', min: '10분' },
 ]
 
@@ -541,12 +542,73 @@ export function templateRecords(posts: readonly ThreadPost[]): TemplateRecord[] 
 }
 
 /** 이번 주(월~일) 올린 글 */
-export function postsThisWeek(posts: readonly ThreadPost[], today: string = todayLocalDate()): ThreadPost[] {
+/** 그 주 월요일(YYYY-MM-DD) */
+export function mondayOf(today: string = todayLocalDate()): string {
   const d = new Date(`${today}T00:00:00`)
-  const back = (d.getDay() + 6) % 7
-  const mon = new Date(d.getTime() - back * 86400000)
-  const from = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`
+  const mon = new Date(d.getTime() - ((d.getDay() + 6) % 7) * 86400000)
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`
+}
+
+export function postsThisWeek(posts: readonly ThreadPost[], today: string = todayLocalDate()): ThreadPost[] {
+  const from = mondayOf(today)
   return posts.filter((p) => p.status === 'posted' && p.postedOn >= from && p.postedOn <= today)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-275 이번 주 잘 터진 형식 — 원문 없이 틀 · 첫 줄 · 끝 방식만(기본은 우리 공식 · 이건 참고)          */
+/* ------------------------------------------------------------------ */
+
+export const WEEK_BUCKET = 'threads_week'
+export const WEEK_REF_MAX = 5
+
+export interface WeekRefItem {
+  template: ThreadTemplateKey
+  firstLine: string
+  ending: EndingKind | ''
+  /** 한 줄 메모(원문 문장은 적지 않는다) */
+  note: string
+}
+export interface WeekRef {
+  week: string
+  items: WeekRefItem[]
+  savedAt: string
+}
+
+const FIRST_LINE_LABELS = new Set(FIRST_LINES.map((f) => f.label))
+const ENDING_KEYS = new Set<string>(ENDINGS.map((e) => e.key))
+
+export function normalizeWeekRef(raw: unknown, week: string): WeekRef | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const items = (Array.isArray(r.items) ? r.items : [])
+    .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : null))
+    .filter((x): x is Record<string, unknown> => !!x && TEMPLATE_KEYS.has(str(x.template, 2)))
+    .slice(0, WEEK_REF_MAX)
+    .map((x) => ({
+      template: str(x.template, 2) as ThreadTemplateKey,
+      firstLine: FIRST_LINE_LABELS.has(str(x.firstLine, 20)) ? str(x.firstLine, 20) : '',
+      ending: (ENDING_KEYS.has(str(x.ending, 12)) ? str(x.ending, 12) : '') as EndingKind | '',
+      note: str(x.note, 80),
+    }))
+  return { week, items, savedAt: str(r.savedAt, 40) || nowIso() }
+}
+
+export const weekRefId = (week: string) => `wk_${week}`
+
+/** 이번 주 것 — 없으면 null(지난주 것은 쓰지 않는다: 주 단위로 새로 본다) */
+export async function loadWeekRef(workspaceId: string | null, today: string = todayLocalDate()): Promise<WeekRef | null> {
+  const week = mondayOf(today)
+  const rows = await listRows(workspaceId, THREADS_MODULE, WEEK_BUCKET)
+  const row = rows.find((r) => r.id === weekRefId(week))
+  return row ? normalizeWeekRef(row.data, week) : null
+}
+
+export async function saveWeekRef(workspaceId: string | null, items: readonly WeekRefItem[], today: string = todayLocalDate()): Promise<WeekRef> {
+  const week = mondayOf(today)
+  const clean = normalizeWeekRef({ items, savedAt: nowIso() }, week)
+  if (!clean) throw new Error('적은 형식이 없습니다.')
+  await saveRow(workspaceId, THREADS_MODULE, WEEK_BUCKET, { id: weekRefId(week), data: { items: clean.items, savedAt: clean.savedAt } as unknown as Record<string, unknown> })
+  return clean
 }
 
 const csvCell = (v: unknown) => {
@@ -708,7 +770,7 @@ export function parseThreadDrafts(a: AssistAnswer | null): { drafts: ThreadDraft
 }
 
 /** threads.write 에 보낼 자료 — 고른 목표 · 틀 · 소재 · 더 쓸 사실 · 참고 글(뼈대만 · 저장 안 함) · 최근 올린 글의 틀 */
-export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; topic: string; tag: string; facts: string; reference: string; recent: readonly ThreadPost[]; today?: string }): AssistContext {
+export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; topic: string; tag: string; facts: string; reference: string; recent: readonly ThreadPost[]; today?: string; weekRef?: WeekRef | null }): AssistContext {
   const today = input.today ?? todayLocalDate()
   const t = input.template ? templateOf(input.template) : undefined
   const goal = GOALS.find((g) => g.key === input.goal)
@@ -728,6 +790,9 @@ export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadT
       ],
     },
   ]
+  // D-275 이번 주 잘 터진 형식 — 참고만(기본은 기준 문서의 공식)
+  const wk = input.weekRef?.items ?? []
+  if (wk.length) sections.push({ name: '이번 주 잘 터진 형식(참고만 — 기본은 우리 공식)', rows: wk.map((x) => ({ 틀: `${x.template} ${templateOf(x.template)?.name ?? ''}`, 첫줄기법: x.firstLine, 끝방식: ENDINGS.find((e) => e.key === x.ending)?.label ?? '', 메모: x.note })) })
   const ref = input.reference.trim()
   if (ref) sections.push({ name: '참고 글(뼈대만 · 문장 쓰지 않기)', rows: ref.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 30).map((l) => ({ 줄: l.slice(0, 200) })) })
   const recent = input.recent.filter((p) => p.status === 'posted').slice(0, 7)

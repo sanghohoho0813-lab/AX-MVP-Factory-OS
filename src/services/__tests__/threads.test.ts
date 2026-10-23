@@ -32,6 +32,10 @@ import {
   NOT_THIS,
   THREAD_MAX,
   THREAD_TEMPLATES,
+  ROUTINE,
+  WEEK_REF_MAX,
+  mondayOf,
+  normalizeWeekRef,
   TOPIC_TAGS,
   WEEK_PLAN,
   endingOf,
@@ -265,6 +269,16 @@ check(`P9 화면의 사실 목록 숫자 ${kimNums.length}개가 서버 사실 �
 check('P10 규칙 검사에 원칙 · 숫자 대조가 붙음(스레드 · 릴스)', lintThreadPost({ body: 'AX 는 큰 가점 요소예요.\n합격률 30%', tag: 'AX' }).lines.some((l) => l.key === 'gajeom') && lintThreadPost({ body: 'AX 는 큰 가점 요소예요.\n합격률 30%', tag: 'AX' }).lines.some((l) => l.key === 'numbers') && lintShort({ platform: 'tiktok', aim: 'reach', script: '[0:00] 합격률 30% 비결', caption: '한 줄', hashtags: '#a #b #c' }).lines.some((l) => l.key === 'numbers') && !lintShort({ platform: 'tiktok', aim: 'reach', script: '[0:00] 합격률 30% 비결', caption: '한 줄', hashtags: '#a #b #c', facts: '합격률 30%' }).lines.some((l) => l.key === 'numbers'))
 check('P11 예시 글 · 대본은 숫자 대조 · 원칙 검사에서 고칠 것 0(사실 목록 숫자만 씀)', THREAD_TEMPLATES.filter((t) => t.example).every((t) => !lintThreadPost({ body: t.example ?? '', template: t.key, tag: t.exampleTag }).lines.some((l) => l.key === 'numbers' || l.level === 'bad')) && SHORT_FORMATS.every((f) => f.platforms.every((pf) => !lintShort({ platform: pf, aim: aimsOf(f, pf)[0], ...exampleOf(f, pf), hashtags: f.exampleTags }).lines.some((l) => l.key === 'numbers' || l.level === 'bad'))))
 check('P12 나눠 줄 자료 — 체크리스트 카드 6장(/sns/ 아래 PNG · 실제 파일은 qa:threads 가 받아 봄)', VENTURE_CARDS.cards.length === 6 && VENTURE_CARDS.cards.every((c, i) => c.file === `/sns/venture-check-0${i + 1}.png` && c.label))
+
+/* ---------------- WK 이번 주 잘 터진 형식(D-275 — 매일 모으지 않고 주 단위 형식만 참고) ---------------- */
+check('WK1 그 주 월요일 — 금 · 월 · 일 모두 같은 주', mondayOf('2026-10-23') === '2026-10-19' && mondayOf('2026-10-19') === '2026-10-19' && mondayOf('2026-10-25') === '2026-10-19' && mondayOf('2026-10-26') === '2026-10-26')
+const wr = normalizeWeekRef({ items: [{ template: 'P', firstLine: '대상 부르기', ending: 'material', note: '가'.repeat(100) }, { template: 'Z', firstLine: 'x' }, { template: 'B', firstLine: '없는 기법', ending: 'nope' }, ...Array.from({ length: 6 }, () => ({ template: 'E' }))] }, '2026-10-19')
+check('WK2 저장 모양 — 없는 틀(Z) 버림 · 모르는 첫 줄 · 끝은 빈칸 · 5줄까지 · 메모 80자', !!wr && wr.items.length === WEEK_REF_MAX && wr.items[0].template === 'P' && wr.items[0].note.length === 80 && wr.items[1].template === 'B' && wr.items[1].firstLine === '' && wr.items[1].ending === '' && wr.week === '2026-10-19')
+const wctx = threadsContext({ goal: '', template: '', topic: '', tag: '', facts: '', reference: '', recent: [], today: '2026-10-23', weekRef: wr })
+const wsec = wctx.sections.find((x) => x.name.startsWith('이번 주 잘 터진 형식'))
+check('WK3 AI 자료 — "이번 주 잘 터진 형식(참고만 — 기본은 우리 공식)" 칸 · 틀 이름 · 첫 줄 · 끝 방식 이름 · 없으면 칸 없음', !!wsec && wsec.name === '이번 주 잘 터진 형식(참고만 — 기본은 우리 공식)' && JSON.stringify(wsec.rows[0]).includes('P 자료 나눔 조건') && JSON.stringify(wsec.rows[0]).includes('자료 나눔 조건') && !threadsContext({ goal: '', template: '', topic: '', tag: '', facts: '', reference: '', recent: [], today: '2026-10-23' }).sections.some((x) => x.name.startsWith('이번 주')))
+check('WK4 할 일 — 매일 훑기(scan) 없음 · 월요일 이번 주 형식 · 금요일 기록표', !ROUTINE.some((r) => r.key === 'scan') && ROUTINE.find((r) => r.key === 'weekref')?.when === '월요일' && ROUTINE.find((r) => r.key === 'record')?.when === '금요일')
+check('WK5 서버 지시 — 기본은 이 공식 · 이번 주 형식은 글 하나에만 참고', /기본은 이 공식/.test(ASSISTS['threads.write'].instruction.join(' ')) && /이번 주 잘 터진 형식\] 이 있으면 그 틀 · 첫 줄 기법 · 끝 방식을 글 하나에만 참고/.test(ASSISTS['threads.write'].instruction.join(' ')))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

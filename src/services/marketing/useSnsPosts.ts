@@ -3,7 +3,7 @@
  * 못 읽었으면 저장을 막는다(빈 목록으로 보고 같은 글을 또 만들거나 V 한 달 한 번 검사가 틀리지 않게 — D-222 와 같은 이유).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listThreadPosts, removeThreadPost, saveThreadPost, sortThreadPosts, type ThreadInput, type ThreadPost } from './threads'
+import { listThreadPosts, loadWeekRef, removeThreadPost, saveThreadPost, saveWeekRef, sortThreadPosts, type ThreadInput, type ThreadPost, type WeekRef, type WeekRefItem } from './threads'
 import { listShortPosts, removeShortPost, saveShortPost, sortShortPosts, type ShortInput, type ShortPost } from './shorts'
 
 interface Api<T, I> {
@@ -82,3 +82,34 @@ const SHORT_API: Api<ShortPost, ShortInput> = { list: listShortPosts, save: save
 
 export const useThreadPosts = (workspaceId: string | null, readOnly: boolean) => useSnsPosts(workspaceId, readOnly, THREAD_API)
 export const useShortPosts = (workspaceId: string | null, readOnly: boolean) => useSnsPosts(workspaceId, readOnly, SHORT_API)
+
+/** D-275 이번 주 잘 터진 형식 — 못 읽었으면 저장을 막는다(이번 주 것을 빈 것으로 덮지 않게) */
+export function useWeekRef(workspaceId: string | null, readOnly: boolean) {
+  const [ref, setRef] = useState<WeekRef | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const reload = useCallback(async () => {
+    try {
+      setRef(await loadWeekRef(workspaceId))
+      setFailed(false)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoaded(true)
+    }
+  }, [workspaceId])
+  useEffect(() => {
+    void reload()
+  }, [reload])
+  const save = useCallback(
+    async (items: readonly WeekRefItem[]) => {
+      if (readOnly) throw new Error('팀장 화면을 보는 중에는 저장하지 않습니다.')
+      if (failed) throw new Error('이번 주 형식을 아직 읽지 못했습니다 — 새로고침한 뒤 저장해 주세요.')
+      const saved = await saveWeekRef(workspaceId, items)
+      setRef(saved)
+      return saved
+    },
+    [workspaceId, readOnly, failed],
+  )
+  return { ref, loaded, failed, reload, save }
+}

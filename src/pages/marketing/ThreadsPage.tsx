@@ -23,7 +23,7 @@ import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, S
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
-import { useThreadPosts } from '../../services/marketing/useSnsPosts'
+import { useThreadPosts, useWeekRef } from '../../services/marketing/useSnsPosts'
 import {
   BEFORE_POST,
   ENDINGS,
@@ -50,6 +50,11 @@ import {
   threadScore,
   threadsContext,
   todayPlan,
+  mondayOf,
+  WEEK_REF_MAX,
+  type WeekRef,
+  type WeekRefItem,
+  type EndingKind,
   type ThreadDraft,
   type ThreadGoal,
   type ThreadPost,
@@ -109,6 +114,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
   const readOnly = useViewingPilot() !== null
   const aiOk = useOwnerAiAccess() !== 'no' && !readOnly
   const store = useThreadPosts(workspaceId, readOnly)
+  const week = useWeekRef(workspaceId, readOnly)
   const [params, setParams] = useSearchParams()
   const tab = tabOf(params.get('tab'))
   const go = (t: Tab) => {
@@ -163,10 +169,10 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} />}
+      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} weekRef={week.ref} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'library' && <LibraryPanel onUse={pickTemplate} />}
-      {tab === 'routine' && <RoutinePanel onWrite={() => go('write')} onRecords={() => go('records')} />}
+      {tab === 'routine' && <RoutinePanel week={week} readOnly={readOnly} onWrite={() => go('write')} onRecords={() => go('records')} />}
     </div>
   )
 }
@@ -177,7 +183,7 @@ type Store = ReturnType<typeof useThreadPosts>
 /* ① 오늘 쓸 글                                                         */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibrary }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void }) {
+function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; weekRef: WeekRef | null; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -185,6 +191,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
   const goal = GOALS.find((g) => g.key === draft.goal)
   const picks = (goal?.picks ?? (plan ? plan.picks : ['P', 'B', 'T', 'U', 'Q', 'E'])).map((k) => templateOf(k)).filter((t): t is ThreadTemplate => !!t)
   const tpl = draft.template ? templateOf(draft.template) : undefined
+  const hotKeys = new Set((weekRef?.items ?? []).map((x) => x.template))
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
   const factsText = `${draft.facts}\n${draft.topic}`
@@ -202,7 +209,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
     if (ai.busy) return
     setAi({ busy: true, error: '', drafts: [] })
     try {
-      const context = threadsContext({ goal: draft.goal, template: draft.template, topic: draft.topic, tag: draft.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today })
+      const context = threadsContext({ goal: draft.goal, template: draft.template, topic: draft.topic, tag: draft.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef })
       const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context })
       const { drafts, tag } = parseThreadDrafts(run.structured)
       if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 글을 찾지 못했어요 — 다시 눌러 주세요.')
@@ -256,6 +263,21 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
 
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
+      {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄 */}
+      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2.5" data-testid="thr-week-hint">
+        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
+          {hotKeys.size ? (
+            <>
+              <b className="text-slate-900">이번 주 잘 터진 형식(참고)</b> · {[...hotKeys].map((k) => `${k} ${templateOf(k)?.name ?? ''}`).join(' / ')} — 기본은 우리 공식, AI 는 글 하나에만 참고해요
+            </>
+          ) : (
+            '이번 주 잘 터진 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 형식만 적으면 돼요(매일 모을 필요 없어요)'
+          )}
+        </p>
+        <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
+          {hotKeys.size ? '고치기' : '적으러 가기'}
+        </Button>
+      </div>
       {plan && (
         <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5" data-testid="thr-plan">
           <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
@@ -285,7 +307,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
           {picks.map((t) => (
             <li key={t.key} className="min-w-0">
-              <TemplateButton t={t} on={draft.template === t.key} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0] })} />
+              <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0] })} />
             </li>
           ))}
         </ul>
@@ -460,12 +482,17 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords, onLibra
   )
 }
 
-function TemplateButton({ t, on, onClick }: { t: ThreadTemplate; on: boolean; onClick: () => void }) {
+function TemplateButton({ t, on, hot = false, onClick }: { t: ThreadTemplate; on: boolean; hot?: boolean; onClick: () => void }) {
   return (
     <button type="button" aria-pressed={on} onClick={onClick} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border px-3 py-2.5 text-left ${on ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200' : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/40'}`} data-testid={`thr-tpl-${t.key}`}>
       <span className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
         <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-900 text-[0.85rem] font-bold text-white">{t.key}</span>
         <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{t.name}</span>
+        {hot && (
+          <Badge tone="warning" className="shrink-0">
+            이번 주 잘 됨
+          </Badge>
+        )}
       </span>
       <span className="t-sub break-keep text-slate-600">{t.reaction}</span>
     </button>
@@ -726,7 +753,7 @@ function readRoutine(today: string): string[] {
   return []
 }
 
-function RoutinePanel({ onWrite, onRecords }: { onWrite: () => void; onRecords: () => void }) {
+function RoutinePanel({ week, readOnly, onWrite, onRecords }: { week: ReturnType<typeof useWeekRef>; readOnly: boolean; onWrite: () => void; onRecords: () => void }) {
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [done, setDone] = useState<string[]>(() => readRoutine(today))
@@ -743,7 +770,7 @@ function RoutinePanel({ onWrite, onRecords }: { onWrite: () => void; onRecords: 
     <div className="flex flex-col gap-4" data-testid="thr-routine">
       <Surface className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">오늘 할 일</h2>
+          <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">할 일 — 매일 셋 · 월요일 · 금요일</h2>
           <Badge tone={done.length === ROUTINE.length ? 'success' : 'neutral'}>
             {done.length} / {ROUTINE.length}
           </Badge>
@@ -775,10 +802,11 @@ function RoutinePanel({ onWrite, onRecords }: { onWrite: () => void; onRecords: 
           </Button>
         </div>
       </Surface>
+      <WeekRefEditor week={week} readOnly={readOnly} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <h2 className="t-section break-keep text-slate-900">주제 태그 인기 글 보기</h2>
-          <p className="t-sub break-keep text-slate-600">스레드 검색을 새 창으로 엽니다. 인기 글 5개를 훑고 어느 틀인지만 붙여 보세요.</p>
+          <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 스레드 검색을 새 창으로 열고 잘 터진 글 3~5개의 형식만 위 "이번 주 잘 터진 형식" 에 적어요. 매일 모을 필요는 없어요.</p>
           <div className="flex flex-wrap gap-1.5">
             {TOPIC_TAGS.map((t) => (
               <a key={t} href={`https://www.threads.com/search?q=${encodeURIComponent(t)}&serp_type=default`} target="_blank" rel="noreferrer noopener" className={`${chip(false)} gap-1`} data-testid="thr-search-link">
@@ -821,5 +849,111 @@ function RoutinePanel({ onWrite, onRecords }: { onWrite: () => void; onRecords: 
         <p className="t-meta break-keep text-slate-500">대놓고 영업(V)은 한 달에 한 번. 4주 뒤 기록표의 틀별 평균을 보고 잘 된 틀 비중을 늘립니다.</p>
       </Surface>
     </div>
+  )
+}
+
+/** D-275 이번 주 잘 터진 형식 — 원문 없이 틀 · 첫 줄 · 끝 방식만(5줄까지) */
+function WeekRefEditor({ week, readOnly }: { week: ReturnType<typeof useWeekRef>; readOnly: boolean }) {
+  const { showToast } = useToast()
+  const [items, setItems] = useState<WeekRefItem[]>(() => week.ref?.items ?? [])
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (!dirty) setItems(week.ref?.items ?? [])
+  }, [week.ref, dirty])
+  const upd = (i: number, part: Partial<WeekRefItem>) => {
+    setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...part } : x)))
+    setDirty(true)
+  }
+  const add = () => {
+    setItems((xs) => (xs.length >= WEEK_REF_MAX ? xs : [...xs, { template: 'B', firstLine: '', ending: '', note: '' }]))
+    setDirty(true)
+  }
+  const drop = (i: number) => {
+    setItems((xs) => xs.filter((_, j) => j !== i))
+    setDirty(true)
+  }
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await week.save(items)
+      setDirty(false)
+      showToast('이번 주 잘 터진 형식을 저장했어요 — AI 는 글 하나에만 참고하고, 기본은 우리 공식이에요.')
+    } catch (e) {
+      showToast(e instanceof Error && e.message ? `저장하지 못했어요 — ${e.message}` : '저장하지 못했어요.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  const sel = 't-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2'
+  return (
+    <Surface className="flex flex-col gap-3" as="section">
+      <div className="flex flex-wrap items-center gap-2" data-testid="thr-weekref">
+        <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">이번 주 잘 터진 형식</h2>
+        <Badge>{mondayOf().slice(5).replace('-', '/')} 주</Badge>
+      </div>
+      <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 잘 터진 글 3~5개의 형식만 적어요(원문 문장은 적지 않아요). 기본은 우리가 정리해 둔 공식이고, AI 는 이 형식을 글 하나에만 참고해요.</p>
+      {items.length === 0 && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep text-slate-600">아직 적은 형식이 없어요.</p>}
+      <ul className="flex flex-col gap-2" data-testid="thr-weekref-list">
+        {items.map((x, i) => (
+          <li key={i} className="grid gap-2 rounded-(--radius-control) border border-slate-200 p-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 11rem), 1fr))' }} data-testid="thr-weekref-item">
+            <label className="flex min-w-0 flex-col gap-0.5">
+              <span className="t-sub text-slate-600">틀</span>
+              <select value={x.template} onChange={(e) => upd(i, { template: e.target.value as ThreadTemplateKey })} disabled={readOnly} className={sel} data-testid="thr-weekref-template">
+                {THREAD_TEMPLATES.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.key} {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-0.5">
+              <span className="t-sub text-slate-600">첫 줄</span>
+              <select value={x.firstLine} onChange={(e) => upd(i, { firstLine: e.target.value })} disabled={readOnly} className={sel} data-testid="thr-weekref-first">
+                <option value="">(잘 모름)</option>
+                {FIRST_LINES.map((f) => (
+                  <option key={f.label} value={f.label}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-0.5">
+              <span className="t-sub text-slate-600">끝</span>
+              <select value={x.ending} onChange={(e) => upd(i, { ending: e.target.value as EndingKind | '' })} disabled={readOnly} className={sel} data-testid="thr-weekref-ending">
+                <option value="">(잘 모름)</option>
+                {ENDINGS.map((e2) => (
+                  <option key={e2.key} value={e2.key}>
+                    {e2.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-0.5">
+              <span className="t-sub text-slate-600">메모(선택)</span>
+              <input value={x.note} maxLength={80} onChange={(e) => upd(i, { note: e.target.value })} disabled={readOnly} placeholder="예: 자금 태그 · 답글이 많음" className={sel} data-testid="thr-weekref-note" />
+            </label>
+            {!readOnly && (
+              <div className="flex items-end">
+                <Button size="sm" variant="ghost" onClick={() => drop(i)} data-testid="thr-weekref-drop">
+                  빼기
+                </Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!readOnly && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={add} disabled={items.length >= WEEK_REF_MAX} data-testid="thr-weekref-add">
+            + 한 줄 더
+          </Button>
+          <Button variant="primary" onClick={() => void save()} disabled={!dirty || saving || week.failed} data-testid="thr-weekref-save">
+            <Save aria-hidden="true" className="size-4" /> 저장
+          </Button>
+        </div>
+      )}
+    </Surface>
   )
 }
