@@ -48,7 +48,8 @@ export function pvBrief(input: PvBriefInput): PvBrief {
   const steps: PvBrief['steps'] = [
     // 상태는 화면이 '끝 · 진행 중 · 아직' 으로 따로 적는다 — 여기 text 는 숫자만(아직이면 빈칸)
     { key: 'spec', label: '특허 명세서', state: specDone ? 'done' : spec ? 'doing' : 'todo', text: spec ? `${spec.done}/${spec.total}단계` : '' },
-    { key: 'check', label: '점검', state: specDone && spec.errors === 0 ? 'done' : spec && spec.errors > 0 ? 'doing' : 'todo', text: spec && spec.errors > 0 ? `고칠 것 ${spec.errors}` : specDone ? '고칠 것 0' : '' },
+    // 점검은 명세서를 다 쓴 뒤의 일 — 쓰는 중에 나오는 '고칠 것' 은 아직 보이지 않는다(헷갈리지 않게)
+    { key: 'check', label: '점검', state: !specDone ? 'todo' : spec.errors > 0 ? 'doing' : 'done', text: !specDone ? '' : spec.errors > 0 ? `고칠 것 ${spec.errors}` : '고칠 것 0' },
     { key: 'plan', label: '벤처 사업계획서', state: plan?.complete ? 'done' : plan ? 'doing' : 'todo', text: plan ? `서술 ${plan.narrative}/${plan.narrativeTotal}` : '' },
   ]
   const have: string[] = []

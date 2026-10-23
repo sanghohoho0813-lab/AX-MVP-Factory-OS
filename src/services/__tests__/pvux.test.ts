@@ -137,7 +137,7 @@ const planNotes = (fill: { narrative: number; core: number; patent?: boolean; te
   const half = emptyDraft()
   half.title = '공구 마모 예측'
   const b1 = pvBrief({ ...base, drafts: [{ id: 'd1', clientId: 'c1', updatedAt: '2026-10-20T00:00:00Z', draft: half }], plans: [] })
-  check('PB3 쓰던 명세서 — 1칸 진행 중(n/6단계) · 다음 할 일은 진행판과 같은 주소(명세서 이어 쓰기) · 선행기술 조사 아직', b1.steps[0].state === 'doing' && /\/6단계/.test(b1.steps[0].text) && b1.next.label === '명세서 이어 쓰기' && (b1.next.href ?? '').includes('draft=d1') && b1.research === 'todo' && b1.have.includes('명세서 1개'), b1)
+  check('PB3 쓰던 명세서 — 1칸 진행 중(n/6단계) · 점검은 다 쓴 뒤라 아직 · 다음 할 일은 진행판과 같은 주소(명세서 이어 쓰기) · 선행기술 조사 아직', b1.steps[0].state === 'doing' && /\/6단계/.test(b1.steps[0].text) && b1.steps[1].state === 'todo' && b1.steps[1].text === '' && b1.next.label === '명세서 이어 쓰기' && (b1.next.href ?? '').includes('draft=d1') && b1.research === 'todo' && b1.have.includes('명세서 1개'), b1)
   const done = full()
   const b2 = pvBrief({ ...base, drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [] })
   check('PB4 다 쓴 명세서 → 다음 할 일은 진행판 그대로(고칠 것 또는 재료로 보내기) · 다른 회사 명세서는 안 봄', b2.next.href !== undefined && b2.next.text === (pvBoard({ drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [], clients }).find((r) => r.key === 'c1')?.next.text) && pvBrief({ ...base, clientId: 'c2', drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [] }).steps[0].state === 'todo')
