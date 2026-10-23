@@ -3753,3 +3753,13 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **병합** — main 08d4fb6 → **fa8c759**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(fa8c759 · Production) · 새 묶음 index-D4cJrc9O.js · ThreadsPage · ShortsPage 조각 · 목차 '릴스 · 틱톡' · '(틀 23가지 · 글쓰기 · 기록표)' · 바로 시작 제목 줄 클래스(min-w-[12rem]) · 유튜브 '0~15초 증거 장면' · /marketing/threads · /marketing/shorts 200.
 - 확인하지 못한 것: 실제 AI 로 돌린 스레드 글 · 숏폼 대본 · 바뀐 마케팅 지시의 답(로그인 · 키 필요 — 시험은 가짜 답). 공식 묶음이 서버 지시에 붙는 것은 단위 시험과 e2e(공급자로 가는 지시)로만 확인했다.
+
+## §190 D-274 SNS 보충본 스며들게 — 게이트 · 병합 · Production (2026-10-23)
+
+- **게이트 64단계**(HEAD 48fccbe · dirty 0) — 63/64 녹색. 빨간 하나는 qa:content D229-8: 영상 요청문 썸네일 기준을 ⟲10차(큰 글자 10자 · 증거 장면 먼저)로 바꿨는데 시험이 예전 글자('썸네일 문구 20~35자')를 보고 있었다 → 시험을 고쳐(3eb0d35 · 시험 파일 하나만 바뀜) 게이트 방식으로 다시 돌려 184/184.
+- 이번 것에 걸린 숫자: test:threads 100(운영 원칙 P1~P12 · 숫자 대조 · 카드 6장) · test:mkpack 72(V4 롱폼 마무리 V1.8) · test:content 146(C29 해시태그 3 · C101 말로 저장 유도 없음 · C125 요청문 ⟲8~10차) ·
+  qa:threads 54 · qa:shorts 40 · qa:mkpack 67 · qa:assist 64 · qa:wording 5/5 · test:all 전부.
+- **화면 사진(눈으로 봄)** — 390: 스레드 P 틀 → '나눠 줄 자료가 이미 있어요 — 체크리스트 카드 6장'(3 × 2 · 모두 내려받기) · '이렇게 말고 → 이렇게' 11줄. PC 쓰기 · 기록표.
+- **병합** — main 17c6a7a → **3eb0d35**(fast-forward) · feature 브랜치 claude/ai-first-d252 남김.
+- **Production(os.miraeailab.com)** — Vercel 배포 성공(3eb0d35) · snsParts 조각에 '나눠 줄 자료가 이미 있어요' · '사실 목록에 없는 숫자' · Threads · Shorts 조각에 '이렇게 말고 → 이렇게' · builders 에 '김팀장이었습니다. 감사합니다.' · 홍보 글 조각에 '썸네일 큰 글자 10자 안팎' · /sns/venture-check-01.png 200(image/png).
+- 확인하지 못한 것: 실제 AI 로 돌린 답(운영 원칙이 붙은 레이더 · 스레드 · 릴스 · 틱톡 · 판정 기준이 붙은 벤치마킹)은 확인하지 못했다(로그인 · 키 필요 — 시험은 가짜 답).
