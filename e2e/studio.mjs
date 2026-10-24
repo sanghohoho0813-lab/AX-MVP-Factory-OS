@@ -23,7 +23,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true })
-const page = await ctx.newPage()
+let page = await ctx.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 
@@ -310,6 +310,11 @@ await page.keyboard.press('Escape')
 }
 
 // 20) 모바일 390 — 새 화면들 가로 넘침 0 · JS 오류 0
+// 같은 창에서 30번 넘게 새로 열면 시험 브라우저가 자원 부족으로 멈춘다(창 하나가 불러온 파일마다 자원을 쥐고 놓지 않음 —
+// D-282 전 빌드도 34번째에 같음 · 앱 문제 아님). 그래서 마지막 13화면은 새 창에서(같은 저장소 · 같은 오류 감시).
+await page.close()
+page = await ctx.newPage()
+page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 let overflow = 0
 for (const tab of ['', '?adv=1', '?adv=1&tab=stages', '?adv=1&tab=factsheet', '?adv=1&tab=thread', '?adv=1&tab=patent', '?adv=1&tab=mvp', '?adv=1&tab=venture', '?adv=1&tab=evidence', '?adv=1&tab=prompts', '?adv=1&tab=artifacts', '?adv=1&tab=decisions', '?adv=1&tab=review']) {
   await page.goto(projectUrl + tab, { waitUntil: 'networkidle' })
