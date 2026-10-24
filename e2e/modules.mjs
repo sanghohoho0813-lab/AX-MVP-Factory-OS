@@ -498,9 +498,11 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   const colors = await page.evaluate(() => {
     const probe = (v) => { const d = document.createElement('span'); d.style.color = `var(${v})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c }
     const icons = [...document.querySelectorAll('nav[aria-label="주요 화면"] li svg')].map((el) => getComputedStyle(el).color)
-    return { icons, want: ['--color-nav-overview', '--color-nav-evidence', '--color-nav-ops', '--color-nav-alert', '--color-nav-revenue'].map(probe) }
+    // D-282 기능 색 갈래(config/featureVisual) — 오늘 남색 · 일정 청록 · 고객 파랑 · 상담신청 장미 · 영업 주황(서랍 메뉴 아이콘 칸과 같은 갈래, 밝은 바탕용 진한 색)
+    const cls = (c) => { const d = document.createElement('span'); d.className = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v }
+    return { icons, want: ['text-indigo-600', 'text-teal-600', 'text-blue-600', 'text-rose-600', 'text-orange-600'].map(cls), probe: probe('--color-nav-ops') }
   })
-  check('하단 목차: 아이콘 색이 서랍 메뉴와 같다 (오늘 · 일정 · 고객 · 상담신청 · 영업)', colors.want.every((c, i) => colors.icons[i] === c), JSON.stringify(colors))
+  check('하단 목차: 아이콘 색이 서랍 메뉴와 같은 기능 색 갈래(D-282 — 오늘 · 일정 · 고객 · 상담신청 · 영업)', colors.want.every((c, i) => colors.icons[i] === c), JSON.stringify(colors))
   check('하단 목차: 더보기도 회색이 아니다', colors.icons[5] !== 'rgb(148, 163, 184)' && new Set(colors.icons).size === 6, JSON.stringify(colors.icons))
   const clientBadge = bar.locator('[data-nav-badge="clients"]')
   // 서랍(햄버거) 메뉴의 고객 관리 숫자와 같아야 한다
@@ -579,7 +581,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close()
 }
 
-/* ---- D-102: 도구함 아이콘 색 사다리 · 세금 계산기 짙은 색이 테마를 따라감 · 인쇄 · 첫 화면 파일 ---- */
+/* ---- D-282(예전 D-102 색 사다리): 분야 줄 아이콘은 기능 색 고정 · 세금 계산기 짙은 색은 테마를 따라감 · 인쇄 · 첫 화면 파일 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   const page = await ctx.newPage()
@@ -606,19 +608,14 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   for (const theme of ['navy-blue', 'burgundy']) {
     await page.evaluate((t) => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: t, themeChosen: true })), theme)
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-    const ramp = await page.evaluate(() =>
-      [...document.querySelectorAll('aside svg.nav-ramp')].map((el) => {
-        const m = getComputedStyle(el).color.match(/oklch\(([\d.]+) ([\d.]+) ([\d.]+)/)
-        return m ? m.slice(1).map(Number) : null
-      }),
-    )
-    // D-136 · D-163: 잘 안 쓰는 기능이 접혀 있고 전문 모듈은 기업성장 · 절세·재무 둘 — 보이는 아이콘은 셋(분야 둘 + 모듈 전체)
-    const ok = ramp.length >= 3 && ramp.every(Boolean)
-    const sameTone = ok && ramp.every((c) => c[0] === ramp[0][0] && c[1] === ramp[0][1])
-    const steps = ok ? ramp.slice(1).map((c, i) => (c[2] - ramp[i][2] + 360) % 360) : []
-    check(`${theme}: 도구함 아이콘 ${ramp.length}개가 밝기·채도는 같고`, sameTone, JSON.stringify(ramp[0]))
-    check(`${theme}: 위에서 아래로 색상만 조금씩(한 칸 8~20°) 옮겨 간다`, steps.length > 0 && steps.every((d) => d >= 8 && d <= 20), steps.map((d) => d.toFixed(0)).join(','))
-    hues.push(ok ? ramp[0][2] : -1)
+    // D-282 분야 줄 아이콘 칸은 기능 색으로 고정(기업성장 = 정책자금 초록 · 절세·재무 청록빛) — 예전 D-102 색 사다리(테마 강조색에서 색상만 옮김)를 바꿨다
+    const icon = await page.evaluate(() => {
+      const of = (k) => { const el = document.querySelector(`aside button[data-nav-category="${k}"] span[aria-hidden="true"] svg`); return el ? getComputedStyle(el).color : null }
+      const cls = (c) => { const d = document.createElement('span'); d.className = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v }
+      return { growth: of('growth'), tax: of('tax-finance'), wantGrowth: cls('text-emerald-300'), wantTax: cls('text-cyan-300') }
+    })
+    check(`${theme}: 분야 줄 아이콘 — 기업성장 초록 · 절세·재무 청록빛(기능 색 고정)`, !!icon.growth && icon.growth === icon.wantGrowth && icon.tax === icon.wantTax, JSON.stringify(icon))
+    hues.push(icon.growth ?? -1)
 
     await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
     await page.locator('button', { hasText: '특정법인' }).first().click()
@@ -639,7 +636,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     check(`${theme}: 표 머리는 테마 짙은 색 계열(투명·옛 남색 아님)`, !!col.th && col.th !== 'rgba(0, 0, 0, 0)' && col.th !== 'rgb(30, 41, 59)', col.th)
     hues.push(col.dark)
   }
-  check('테마를 바꾸면 아이콘 색·세금 계산기 짙은 색이 함께 바뀐다', hues[0] !== hues[2] && hues[1] !== hues[3], JSON.stringify(hues))
+  check('테마를 바꾸면 세금 계산기 짙은 색은 바뀌고 · 기능 아이콘 색은 그대로(D-282 — 어디인가 색은 테마와 무관)', hues[0] === hues[2] && hues[1] !== hues[3], JSON.stringify(hues))
 
   // 인쇄 (A4 폭) — 제목이 찍히고, 짙은 바탕이 빠지지 않고, 긴 표가 오른쪽에서 잘리지 않는다
   await page.setViewportSize({ width: 794, height: 1123 })

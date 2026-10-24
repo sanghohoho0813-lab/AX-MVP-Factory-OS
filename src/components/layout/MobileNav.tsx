@@ -69,7 +69,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                 className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-0 py-1.5"
               >
                 <span
-                  className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${active ? tone.soft : ''}`}
+                  className={`relative flex h-7 w-14 items-center justify-center rounded-full transition-colors ${active ? tone.soft : ''}`}
                 >
                   <Icon aria-hidden="true" className={`size-[22px] ${tone.icon}`} strokeWidth={active ? 2.4 : 2} />
                   {/* D-104 · D-108: 처리 안 한 상담신청 수 — 빨간 바탕 흰 숫자, 흰 테두리로 아이콘과 떼어 바로 보이게 (0 이면 없음) */}
@@ -109,7 +109,8 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
             className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-0 py-1.5 whitespace-nowrap text-slate-500"
           >
             {/* 더보기 = 서랍 — 서랍 속 컨설팅 작업실 첫 아이콘과 같은 색(테마를 따라간다) */}
-            <span className="flex h-8 w-14 items-center justify-center">
+            {/* D-282 높이는 예전 그대로(h-7) — 아래 메뉴가 높아지면 '맨 위로' 단추와 겹친다 */}
+            <span className="flex h-7 w-14 items-center justify-center">
               <LayoutGrid aria-hidden="true" className="size-[22px] text-slate-600" />
             </span>
             <span className="t-meta font-medium">더보기</span>
