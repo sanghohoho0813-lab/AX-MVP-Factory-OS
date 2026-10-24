@@ -21,6 +21,7 @@ import { TOOLS } from '../toolRegistry'
 import { MODULES, enabledModulesByGroup, screenGroupForPath } from '../moduleRegistry'
 import { LAUNCHER_ALL, LAUNCHER_ENTRIES, LAUNCHER_SLOTS, moduleTone, toneClass, type FeatureTone } from '../featureVisual'
 import { clientEntryHref, featureForPath, featurePath } from '../featurePaths'
+import { ICON_SLOTS, customIcon, slotIcon } from '../iconSlots'
 import { DEFAULT_CATALOG, defaultSubscription, quote, resolveEntitlements, validateSelection, type Subscription } from '../../services/entitlements'
 import type { ModuleAccess } from '../../services/moduleAccess'
 import { loadSubscription, saveSubscription } from '../../services/subscription'
@@ -226,6 +227,26 @@ await storage()
   check('D-282 모르는 줄은 회색', moduleTone('settings') === 'slate' && moduleTone('없는줄') === 'slate')
   const tones: FeatureTone[] = ['indigo', 'teal', 'blue', 'purple', 'amber', 'orange', 'coral', 'green', 'cyan', 'rose', 'slate']
   check('D-282 색 클래스는 통째로 적힘(이어 붙이지 않음 — D-26)', tones.every((t) => Object.values(toneClass(t)).every((c) => typeof c === 'string' && c.length > 0 && !c.includes('${'))))
+}
+
+/* D-283 아이콘 자리 표 — 지금은 전부 임시 아이콘 · 대표가 만든 아이콘이 오면 표의 custom 만 바꾼다 */
+{
+  const slotKeys = ICON_SLOTS.map((s) => s.key)
+  check('D-283 자리 key 겹침 없음', new Set(slotKeys).size === slotKeys.length)
+  const catKeys = new Set(MODULE_CATALOG.map((m) => `cat-${m.key}`))
+  const known = new Set([...MODULES.map((m) => m.key), ...catKeys, 'more'])
+  check('D-283 자리마다 실제 메뉴 줄 · 분야 · 더보기를 가리킴', slotKeys.every((k) => known.has(k)), slotKeys.filter((k) => !known.has(k)).join())
+  const need = [...LAUNCHER_ENTRIES.map((e) => e.module), LAUNCHER_ALL.module, 'today', 'calendar', 'client-ops', 'inbox', 'sales', 'more', ...MODULES.filter((m) => moduleTone(m.key) !== 'slate').map((m) => m.key)]
+  check('D-283 바로가기 · 아래 메뉴 · 기능 색 줄은 모두 자리 표에 있음(대표가 만들 아이콘 목록)', need.every((k) => slotKeys.includes(k)), need.filter((k) => !slotKeys.includes(k)).join())
+  check('D-283 지금은 새 아이콘 없음 — 전부 임시 아이콘 그대로', ICON_SLOTS.every((s) => !s.custom) && MODULES.every((m) => slotIcon(m.key, m.icon) === m.icon))
+  type El = { type: string; props: Record<string, unknown> }
+  const Tint = customIcon('/icons/x.svg', true, 'client-ops') as unknown as (p: { className?: string }) => El
+  const el = Tint({ className: 'size-4 text-blue-600' })
+  const style = el.props.style as Record<string, string>
+  check('D-283 한 색 새 아이콘 → 글자색으로 칠한 모양(기능 색 그대로) · 크기는 부르는 쪽 클래스', el.type === 'span' && String(style.mask).includes('/icons/x.svg') && String(el.props.className).includes('size-4') && String(el.props.className).includes('bg-current'))
+  const Img = customIcon('/icons/y.png', false, 'sales') as unknown as (p: { className?: string }) => El
+  const img = Img({ className: 'size-6' })
+  check('D-283 여러 색 새 아이콘 → 그림 그대로(alt 비움 · 이름은 옆 글자가 말함)', img.type === 'img' && img.props.src === '/icons/y.png' && img.props.alt === '')
 }
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)

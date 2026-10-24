@@ -18,6 +18,7 @@
 
 import type { LucideIcon } from 'lucide-react'
 import { Building2, Calculator, Globe, Landmark, Lightbulb, Sparkles, TrendingUp } from 'lucide-react'
+import { withSlotIcons } from './iconSlots'
 
 /* ------------------------------------------------------------------ */
 /* 분야(카테고리) — 메뉴에 한 줄씩. 모듈이 늘어도 분야 줄은 늘지 않는다     */
@@ -82,7 +83,7 @@ export interface CatalogModule {
 
 export const BASE_MODULE_KEY = 'basic-os'
 
-export const MODULE_CATALOG: CatalogModule[] = [
+export const MODULE_CATALOG: CatalogModule[] = withSlotIcons<CatalogModule>([
   {
     key: BASE_MODULE_KEY,
     name: '기본 OS',
@@ -213,7 +214,8 @@ export const MODULE_CATALOG: CatalogModule[] = [
     rarelyUsed: true,
     order: 6,
   },
-]
+  // D-283 분야 아이콘도 지금은 임시 — 대표가 만든 아이콘이 오면 iconSlots.ts 의 'cat-…' 줄에서만 바꾼다
+], (m) => `cat-${m.key}`)
 
 /* ------------------------------------------------------------------ */
 /* FEATURE → MODULE — 코드에 있는 기능이 어느 묶음에 드는가               */

@@ -15,6 +15,10 @@ import { Link } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { CalendarDays, Inbox, KanbanSquare, LayoutGrid, ListChecks, Sun } from 'lucide-react'
 import { moduleTone, toneClass } from '../../config/featureVisual'
+import { slotIcon } from '../../config/iconSlots'
+
+/** D-283 '더보기' 칸도 아이콘 자리 표를 거친다(지금은 임시 아이콘) */
+const MoreIcon = slotIcon('more', LayoutGrid)
 
 interface NavItem {
   to: string
@@ -57,7 +61,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
       <ul className="flex items-stretch">
         {items.map((item) => {
           const active = isActive(pathname, item)
-          const Icon = item.icon
+          const Icon = slotIcon(item.module, item.icon)
           const tone = toneClass(moduleTone(item.module))
           const requests = item.to === '/ops/inbox' ? (counts.requests ?? 0) : 0
           const clients = item.to === '/ops/clients' ? counts.clients : null
@@ -111,7 +115,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
             {/* 더보기 = 서랍 — 서랍 속 컨설팅 작업실 첫 아이콘과 같은 색(테마를 따라간다) */}
             {/* D-282 높이는 예전 그대로(h-7) — 아래 메뉴가 높아지면 '맨 위로' 단추와 겹친다 */}
             <span className="flex h-7 w-14 items-center justify-center">
-              <LayoutGrid aria-hidden="true" className="size-[22px] text-slate-600" />
+              <MoreIcon aria-hidden="true" className="size-[22px] text-slate-600" />
             </span>
             <span className="t-meta font-medium">더보기</span>
           </button>

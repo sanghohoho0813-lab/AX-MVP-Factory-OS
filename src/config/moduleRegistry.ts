@@ -36,6 +36,7 @@ import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
 import { FEATURE_CATALOG, visibleModules } from './productCatalog'
 import { UPCOMING_PATH, UPCOMING_PRODUCTS } from './upcomingProducts'
+import { withSlotIcons } from './iconSlots'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -234,7 +235,8 @@ function movedToPaths(target: string): string[] {
   return movedTools().flatMap((t) => (t.path && t.movedTo?.path === target ? [t.path] : []))
 }
 
-export const MODULES: ModuleDefinition[] = [
+// D-283 아이콘은 지금 전부 임시 — 대표가 만든 아이콘이 오면 iconSlots.ts 표에서만 바꾼다(여기 icon 은 임시 아이콘)
+export const MODULES: ModuleDefinition[] = withSlotIcons<ModuleDefinition>([
   { key: 'today', label: '오늘', path: '/', icon: Sun, group: 'today', accent: 'overview', enabled: true, exact: true },
   // D-103: 오늘 기록 · 주간 돌아보기 · 전체 기록은 일정 안의 탭이다 — 그 주소에서도 '일정' 에 불이 켜진다
   // D-158: 프로그램이 준비한 것에 맞다 · 아니다만 고르는 곳
@@ -280,7 +282,7 @@ export const MODULES: ModuleDefinition[] = [
     : []),
   { key: 'tools', label: '모듈 전체', path: '/tools', icon: LayoutGrid, group: 'modules', accent: 'system', enabled: true, hint: '전문 모듈 여섯과 그 안의 기능 · 요금제', alsoPaths: ['/modules'], exact: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
-]
+])
 
 /** 켜져 있는 모듈만, 그룹 순서대로 묶어 돌려준다 */
 /**

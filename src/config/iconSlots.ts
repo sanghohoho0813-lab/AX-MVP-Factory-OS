@@ -1,0 +1,85 @@
+/**
+ * D-283 아이콘 자리 표 — 메뉴 · 바로가기 · 화면 제목 · 휴대폰 아래 메뉴 · 모듈 전체의 기능 아이콘을 **한 곳에서** 바꾼다.
+ *
+ * 대표(2026-10-24): "아이콘이 필요하면 일단 그 자리엔 임시로 아이콘 둬 줘. 나중에 새로 만든 거 줄게."
+ *  - 지금 보이는 기능 아이콘은 전부 **임시**(lucide 기본 아이콘)다.
+ *  - 새 아이콘이 오면 파일을 src/assets/icons/ 에 넣고, 아래 그 자리 줄의 custom 에 import 한 주소만 적는다.
+ *    화면 코드는 고치지 않는다 — 메뉴 표(moduleRegistry MODULES) · 아래 메뉴 · 모듈 전체가 slotIcon() 을 거친다.
+ *  - tint: 한 색(검정) 아이콘이면 true(기본) — 기능 색(featureVisual)을 그대로 입힌다(CSS mask).
+ *    여러 색 그림이면 false — 그림 그대로.
+ *  - 새 화면에 기능 아이콘이 필요하면 임시 아이콘을 두고 여기 한 줄을 더한다. 이 표가 곧 '대표가 만들 아이콘 목록'이다(docs/ICON_SLOTS.md).
+ */
+import { createElement, type CSSProperties } from 'react'
+import type { LucideIcon } from 'lucide-react'
+
+export interface IconSlot {
+  /** moduleRegistry MODULES 의 key(분야 줄은 cat-*) · 휴대폰 아래 메뉴 '더보기' 는 'more' */
+  key: string
+  /** 대표가 부르는 이름 */
+  name: string
+  /** 어디에 보이는지 */
+  where: string
+  /** 새 아이콘 파일 주소(import 한 값). 비어 있으면 임시 아이콘 */
+  custom?: string
+  /** 한 색 아이콘이면 true(기능 색을 입힘 · 기본) · 여러 색 그림이면 false */
+  tint?: boolean
+}
+
+export const ICON_SLOTS: IconSlot[] = [
+  { key: 'today', name: '오늘', where: '메뉴 · 휴대폰 아래 메뉴' },
+  { key: 'decide', name: '확인할 것', where: '메뉴' },
+  { key: 'calendar', name: '일정', where: '메뉴 · 휴대폰 아래 메뉴 · 바로가기 · 화면 제목' },
+  { key: 'client-ops', name: '고객 관리', where: '메뉴 · 휴대폰 아래 메뉴 · 바로가기 · 화면 제목' },
+  { key: 'ai-workspace', name: 'AI 전략실', where: '메뉴 · 바로가기 · 화면 제목(대표만)' },
+  { key: 'patent-venture', name: '특허 · 벤처', where: '메뉴 · 바로가기 · 화면 제목(대표만)' },
+  { key: 'inbox', name: '잠재고객 상담신청', where: '메뉴 · 휴대폰 아래 메뉴(대표만)' },
+  { key: 'sales', name: '영업 관리', where: '메뉴 · 휴대폰 아래 메뉴 · 바로가기' },
+  { key: 'agents', name: '영업자 정산', where: '메뉴(대표만)' },
+  { key: 'money', name: '매출 · 비용', where: '메뉴 · 바로가기(팀장)' },
+  { key: 'marketing', name: '마케팅 · 브랜딩', where: '메뉴 · 바로가기 · 화면 제목(대표만)' },
+  { key: 'first-meeting', name: '1차 미팅 체크리스트', where: '메뉴(대표만 · 준비 중)' },
+  { key: 'cat-growth', name: '기업성장(자금 · 지원사업)', where: '메뉴 · 바로가기 · 모듈 전체' },
+  { key: 'cat-gov-support', name: '정부지원사업', where: '모듈 전체' },
+  { key: 'cat-tax-finance', name: '절세 · 재무', where: '메뉴 · 바로가기(팀장) · 모듈 전체' },
+  { key: 'cat-tech-biz', name: '기술사업화', where: '메뉴(잘 안 쓰는 기능) · 모듈 전체' },
+  { key: 'cat-ax-studio', name: 'AX 스튜디오', where: '메뉴(잘 안 쓰는 기능) · 모듈 전체' },
+  { key: 'cat-web-studio', name: '웹 스튜디오', where: '메뉴(잘 안 쓰는 기능) · 모듈 전체' },
+  { key: 'tools', name: '전체 도구(모듈 전체)', where: '메뉴 · 바로가기 맨 끝' },
+  { key: 'more', name: '더보기', where: '휴대폰 아래 메뉴' },
+  { key: 'settings', name: '설정', where: '메뉴' },
+]
+
+const BY_KEY = new Map(ICON_SLOTS.map((s) => [s.key, s]))
+const made = new Map<string, LucideIcon>()
+
+/** 이 자리의 아이콘 — 새 아이콘(custom)이 있으면 그것, 없으면 임시 아이콘(fallback) 그대로 */
+export function slotIcon(key: string, fallback: LucideIcon): LucideIcon {
+  const slot = BY_KEY.get(key)
+  if (!slot?.custom) return fallback
+  let icon = made.get(key)
+  if (!icon) {
+    icon = customIcon(slot.custom, slot.tint ?? true, key)
+    made.set(key, icon)
+  }
+  return icon
+}
+
+/** 표(메뉴 줄 · 분야)의 icon 을 자리 표로 거른다 — keyOf 로 자리 key 를 정한다(분야는 cat-…) */
+export function withSlotIcons<T extends { key: string; icon: LucideIcon }>(rows: T[], keyOf: (row: T) => string = (row) => row.key): T[] {
+  return rows.map((row) => ({ ...row, icon: slotIcon(keyOf(row), row.icon) }))
+}
+
+/**
+ * 파일 아이콘을 lucide 아이콘과 같은 자리에 꽂히게 — 크기는 부르는 쪽 className(size-4 · size-[22px] …)을 그대로 따른다.
+ * tint 면 글자색(currentColor)으로 칠한 모양(기능 색 · 지금 화면 흰색이 그대로 먹는다), 아니면 그림 그대로.
+ */
+export function customIcon(src: string, tint: boolean, key: string): LucideIcon {
+  function SlotIcon({ className = '', style, size }: { className?: string; style?: CSSProperties; size?: number | string }) {
+    const box: CSSProperties = size == null ? {} : { width: size, height: size }
+    if (!tint) return createElement('img', { src, alt: '', 'aria-hidden': true, draggable: false, 'data-icon-slot': key, className: `inline-block shrink-0 object-contain ${className}`, style: { ...box, ...style } })
+    const mask = `url("${src}") center / contain no-repeat`
+    return createElement('span', { 'aria-hidden': true, 'data-icon-slot': key, className: `inline-block shrink-0 bg-current ${className}`, style: { ...box, WebkitMask: mask, mask, ...style } })
+  }
+  SlotIcon.displayName = `SlotIcon(${key})`
+  return SlotIcon as unknown as LucideIcon
+}
