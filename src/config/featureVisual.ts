@@ -89,24 +89,26 @@ export interface LauncherEntry {
   /** moduleRegistry MODULES 의 key */
   module: string
   label: string
+  /** 휴대폰 큰 아이콘 칸에 쓰는 짧은 이름(칸이 70~80px — 긴 이름은 '지원사/업' 처럼 낱말이 쪼개진다). 읽는 기계에는 label 그대로 */
+  short: string
   sub: string
 }
 
 export const LAUNCHER_ENTRIES: LauncherEntry[] = [
-  { module: 'client-ops', label: '고객 관리', sub: '업체 기록 · 서류 · 수금' },
-  { module: 'ai-workspace', label: 'AI 전략실', sub: '업체별 분석 · 제안' },
-  { module: 'patent-venture', label: '특허 · 벤처', sub: '명세서 · 사업계획서' },
-  { module: 'cat-growth', label: '자금 · 지원사업', sub: '정책자금 · 고용 · 공고' },
-  { module: 'sales', label: '영업 관리', sub: '잠재고객 → 계약' },
-  { module: 'marketing', label: '마케팅 · 브랜딩', sub: '이번 주 콘텐츠' },
-  { module: 'calendar', label: '일정', sub: '달력 · 오늘 기록' },
+  { module: 'client-ops', label: '고객 관리', short: '고객 관리', sub: '업체 기록 · 서류 · 수금' },
+  { module: 'ai-workspace', label: 'AI 전략실', short: 'AI 전략실', sub: '업체별 분석 · 제안' },
+  { module: 'patent-venture', label: '특허 · 벤처', short: '특허·벤처', sub: '명세서 · 사업계획서' },
+  { module: 'cat-growth', label: '자금 · 지원사업', short: '자금·지원', sub: '정책자금 · 고용 · 공고' },
+  { module: 'sales', label: '영업 관리', short: '영업', sub: '잠재고객 → 계약' },
+  { module: 'marketing', label: '마케팅 · 브랜딩', short: '마케팅', sub: '이번 주 콘텐츠' },
+  { module: 'calendar', label: '일정', short: '일정', sub: '달력 · 오늘 기록' },
   // 예비 — 위 줄이 권한으로 빠졌을 때 채운다
-  { module: 'money', label: '매출 · 비용', sub: '들어온 돈 · 결제일' },
-  { module: 'decide', label: '확인할 것', sub: '맞다 · 아니다만' },
-  { module: 'cat-tax-finance', label: '절세 · 재무', sub: '세금 · 창업감면' },
+  { module: 'money', label: '매출 · 비용', short: '매출·비용', sub: '들어온 돈 · 결제일' },
+  { module: 'decide', label: '확인할 것', short: '확인할 것', sub: '맞다 · 아니다만' },
+  { module: 'cat-tax-finance', label: '절세 · 재무', short: '절세·재무', sub: '세금 · 창업감면' },
 ]
 
 /** 맨 끝 칸 — 전문 모듈 전체(모든 사람에게 있다) */
-export const LAUNCHER_ALL: LauncherEntry = { module: 'tools', label: '전체 도구', sub: '모듈 · 기능 전부' }
+export const LAUNCHER_ALL: LauncherEntry = { module: 'tools', label: '전체 도구', short: '전체 도구', sub: '모듈 · 기능 전부' }
 
 export const LAUNCHER_SLOTS = 7

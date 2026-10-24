@@ -829,9 +829,16 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
 
   return (
     <section aria-label="AI 답" className="flex flex-col gap-3 rounded-(--radius-panel) border border-violet-300 bg-white p-3.5 shadow-sm" data-testid="ai-assist-result" data-assist={entry.assistId}>
+      {/* D-282 AI 결과 공통 머리 — 작업 아이콘 · 무슨 작업 · 쓴 모델(아래 줄의 자세한 기록은 그대로) */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="t-meta inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">
-          <Sparkles aria-hidden="true" className="size-3.5" /> {entry.label}
+        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+          <Sparkles className="size-4" />
+        </span>
+        <span className="t-body min-w-0 font-bold break-keep text-slate-900" data-testid="ai-assist-task">
+          {entry.label}
+        </span>
+        <span className="t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid="ai-assist-model">
+          {prettyModel(run.model)}
         </span>
         {stale && (
           <span className="t-meta rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900" data-testid="ai-assist-stale">

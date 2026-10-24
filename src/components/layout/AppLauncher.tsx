@@ -19,6 +19,7 @@ import { AppTile } from '../ui/visual'
 export interface LauncherItem {
   key: string
   label: string
+  short: string
   sub: string
   path: string
   icon: LucideIcon
@@ -46,6 +47,7 @@ export function useLauncherItems(): LauncherItem[] {
     return {
       key: e.module,
       label: e.label,
+      short: e.short,
       sub: e.sub,
       path: m.path,
       icon: m.icon,
@@ -73,6 +75,7 @@ export function AppLauncher({ variant, onNavigate, testId = 'app-launcher' }: { 
             icon={it.icon}
             tone={it.tone}
             label={it.label}
+            short={it.short}
             sub={it.sub}
             badge={it.badge}
             locked={it.locked}

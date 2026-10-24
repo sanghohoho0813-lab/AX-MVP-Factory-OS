@@ -39,6 +39,7 @@ export function AppTile({
   icon,
   tone,
   label,
+  short,
   sub,
   badge,
   badgeTone = 'neutral',
@@ -52,6 +53,8 @@ export function AppTile({
   icon: LucideIcon
   tone: FeatureTone
   label: string
+  /** 큰 아이콘(icon) 칸에 보일 짧은 이름 — 읽는 기계 · 손을 올렸을 때는 label */
+  short?: string
   sub?: string
   /** 오른쪽 위 숫자(계약 고객 수 · 새 상담신청) — 0 · 없음이면 그리지 않는다 */
   badge?: string | null
@@ -82,11 +85,12 @@ export function AppTile({
         onClick={onClick}
         data-testid={testId}
         data-key={dataKey}
-        aria-label={locked ? `${label} (잠김)` : undefined}
+        aria-label={locked ? `${label} (잠김)` : short && short !== label ? label : undefined}
+        title={short && short !== label ? label : undefined}
         className="tap relative flex min-w-0 flex-col items-center gap-1.5 rounded-(--radius-card) px-1 py-2 text-center hover:bg-slate-50"
       >
         <IconTile icon={icon} tone={tone} size="xl" />
-        <span className="t-sub w-full font-semibold break-keep text-slate-800">{label}</span>
+        <span className="t-sub w-full font-semibold break-keep text-slate-800">{short ?? label}</span>
         {badge && (
           <span className={`t-meta absolute top-1 right-[calc(50%-2.4rem)] flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-bold tabular-nums ring-2 ring-white ${badgeTone === 'danger' ? 'bg-danger-500 text-white' : 'bg-slate-700 text-white'}`}>
             {badge}
