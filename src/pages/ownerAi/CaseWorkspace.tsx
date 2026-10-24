@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import { Archive, ExternalLink } from 'lucide-react'
 import { AiCallError } from '../../services/ownerAi/aiClient'
 import { caseSnapshot } from '../../services/ownerAi/context'
+import { caseDocs, docsNotIn } from '../../services/ownerAi/caseDocs'
 import { factsFromExtract, newUuid, withCaseActivity } from '../../services/ownerAi/caseUtil'
 import { applyContext } from '../../services/ownerAi/memory'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
@@ -43,6 +44,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const [memoryApply, setMemoryApply] = useState<null | { run: AiRun; proposed: CurrentContext }>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [showOld, setShowOld] = useState(false)
+  // AI-2 첫 화면 [서류 넣기] → 업체 자료의 서류함 창(숫자가 바뀔 때마다 연다)
+  const [docsOpen, setDocsOpen] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +83,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   }
 
   const currentContext = useMemo(() => (bundle ? latestSnapshot(bundle)?.content ?? emptyContext() : emptyContext()), [bundle])
+  const newDocs = useMemo(() => (bundle?.client ? docsNotIn(caseDocs(bundle.client), bundle.c.materials).length : 0), [bundle])
   const snapshotFields = useMemo(() => (bundle ? caseSnapshot(bundle.c, bundle.client, currentContext, bundle.runs, today) : []), [bundle, currentContext, today])
 
   if (phase.kind === 'loading') return <p className="t-sub text-slate-500" role="status">AI 전략실을 여는 중…</p>
@@ -93,8 +97,12 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   if (phase.kind === 'db_setup')
     return (
       <Surface>
-        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
-        <p className="t-sub mt-1 break-keep text-slate-600">Supabase 에 0021 마이그레이션을 실행하면 열립니다(docs/OWNER_AI_WORKSPACE_V1.md).</p>
+        <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실을 쓰려면 관리자 설정이 한 번 필요합니다.</p>
+        {/* AI-1 개발자 말은 접어 둔다(대표 · 관리자만 펼쳐 봄) */}
+        <details className="t-sub mt-1 text-slate-600">
+          <summary className="tap cursor-pointer font-semibold">관리자용 자세히</summary>
+          <p className="mt-1 break-keep">Supabase 에 0021 마이그레이션을 실행하면 열립니다(docs/OWNER_AI_WORKSPACE_V1.md).</p>
+        </details>
       </Surface>
     )
   if (phase.kind === 'error' || !bundle)
@@ -247,7 +255,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="flex min-w-0 flex-col gap-4">
-          <QuickActions bundle={b} today={today} running={running} setup={setup} onRun={doRun} onPaste={() => setPasteOpen(true)} />
+          <QuickActions bundle={b} today={today} running={running} setup={setup} onRun={doRun} onPaste={() => setPasteOpen(true)} docsHint={newDocs} onDocs={() => setDocsOpen((n) => n + 1)} />
           <section className="flex flex-col gap-3" aria-label="AI 결과">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="t-section text-slate-900">결과</h2>
@@ -255,7 +263,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
             </div>
             {recentRuns.length === 0 ? (
               <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-4 py-6 text-center break-keep text-slate-500">
-                아직 결과가 없습니다. 위 빠른 작업에서 하나를 눌러 보세요 — 'AX 전략 분석' 부터 권합니다.
+                아직 결과가 없습니다. 위 '추천' 단추를 누르면 여기에 결과가 쌓입니다.
               </p>
             ) : (
               <div className="flex flex-col gap-3" data-testid="run-list">
@@ -290,6 +298,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
             onAiTidy={() => void runInternal('CONTEXT_UPDATE', '기억 정리')}
           />
           <MaterialsCard
+            openDocs={docsOpen}
             materials={b.c.materials}
             client={b.client}
             busy={saving || !!running}
@@ -358,7 +367,7 @@ function TimelineCard({ activity }: { activity: CaseBundle['c']['activity'] }) {
         <ol className="flex flex-col gap-2" data-testid="case-timeline">
           {list.map((a) => (
             <li key={a.id} className="flex flex-col">
-              <span className="t-meta text-slate-400">{fmtDateTime(a.at)}</span>
+              <span className="t-meta text-slate-600">{fmtDateTime(a.at)}</span>
               <span className="t-sub break-words text-slate-700">{a.text}</span>
             </li>
           ))}

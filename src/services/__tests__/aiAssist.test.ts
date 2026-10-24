@@ -658,12 +658,30 @@ async function d263Tests() {
   calls = []
   seq([{ status: 200, body: empty }, { status: 200, body: good }])
   const r1 = await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: '이름표 score · verdict 로', missMessage: '못 읽음', onRetry: (w) => whys.push(w) })
+  const rIds = calls.map((c) => c.body.requestId)
   check('DR1 답 모양이 어긋나면 이름표를 알려 주고(ask) 다시 — 두 번째에 읽음', !!r1.value && whys.join() === 'parse' && calls.length === 2 && calls[1].body.ask === '이름표 score · verdict 로' && !calls[0].body.ask, calls.map((c) => c.body.ask))
   whys.length = 0
   calls = []
   seq([{ status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 200, body: good }])
   await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
-  check('DR2 잠깐 끊김(504) → 쉬었다 다시 · 같은 요청 번호 아님', whys.join() === 'transient' && calls.length === 2 && calls[0].body.requestId !== calls[1].body.requestId)
+  // D-278 끊겨서 다시 부를 때는 같은 요청 번호 — 서버가 이미 쓴 답(못 받은 것)을 그대로 돌려줘 요금이 두 번 나가지 않는다
+  check('DR2 잠깐 끊김(504) → 쉬었다 다시 · 같은 요청 번호(서버가 앞의 답을 그대로 — 요금 한 번)', whys.join() === 'transient' && calls.length === 2 && calls[0].body.requestId === calls[1].body.requestId, calls.map((c) => c.body.requestId))
+  check('DR2a 답 모양 어긋남 → 이름표를 붙인 다른 질문이라 새 요청 번호', r1.value != null && rIds.length === 2 && rIds[0] !== rIds[1], rIds)
+  whys.length = 0
+  calls = []
+  seq([{ status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 200, body: good }])
+  let timeoutCode = ''
+  try {
+    await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
+  } catch (e) {
+    timeoutCode = e instanceof AssistError ? e.code : 'other'
+  }
+  check('DR2b 시간 초과가 두 번이면 멈춤 — 자동으로는 한 번만 다시(이미 요금이 났을 수 있음)', timeoutCode === 'provider_unreachable' && calls.length === 2 && whys.join() === 'transient', { timeoutCode, n: calls.length, whys })
+  whys.length = 0
+  calls = []
+  seq([{ status: 503, body: JSON.stringify({ ok: false, code: 'provider_busy' }) }, { status: 503, body: JSON.stringify({ ok: false, code: 'provider_busy' }) }, { status: 200, body: good }])
+  const rBusy = await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
+  check('DR2c 붐빔(공급자가 거절 — 요금 없음)은 두 번까지 다시 · 세 번 모두 같은 요청 번호', !!rBusy.value && calls.length === 3 && whys.join() === 'transient,transient' && new Set(calls.map((c) => c.body.requestId)).size === 1, { n: calls.length, whys })
   whys.length = 0
   calls = []
   seq([{ status: 429, body: JSON.stringify({ ok: false, code: 'rate_limited' }) }])

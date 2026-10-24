@@ -85,6 +85,7 @@
     "qa:threads": "node e2e/threads.mjs",
     "qa:mkquick": "node e2e/mkquick.mjs",
     "qa:pvhome": "node e2e/pvhome.mjs",
+    "qa:aihome": "node e2e/aihome.mjs",
     "qa:shorts": "node e2e/shorts.mjs",
     "qa:vstudy": "node e2e/vstudy.mjs",
     "qa:speccheck": "node e2e/speccheck.mjs",

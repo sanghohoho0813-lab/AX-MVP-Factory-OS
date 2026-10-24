@@ -5,26 +5,18 @@
  *  - 4대보험 명부 모양이면 'AI 에 보내지 않음' 으로 둔다(개인별 원문).
  *  - 같은 자료를 두 번 넣으면 알려 준다(지문 · 파일 이름+크기 · 주소).
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileUp, Link2, Loader2, StickyNote, Type } from 'lucide-react'
 import { canExtractText, extractTextFromFile } from '../../../services/docTextExtract'
 import { documentFileUrl } from '../../../services/clientOpsService'
 import { guessMaterialKind, makeMaterial, normalizeUrl, sameMaterial } from '../../../services/ownerAi/caseUtil'
-import { MATERIAL_KIND_LABEL, type CaseMaterial, type MaterialKind } from '../../../services/ownerAi/types'
+import { MATERIAL_KIND_LABEL, type CaseMaterial } from '../../../services/ownerAi/types'
+import { DOC_KIND, FROM_DOCS, caseDocs, docsNotIn } from '../../../services/ownerAi/caseDocs'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { Badge, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { fmtDateTime } from '../shared'
-
-/** 업체 서류함에서 AI 자료로 가져올 수 있는 칸(신분증 · 명부 · 인증서 · 건강보험은 뺀다) */
-const DOC_KIND: Record<string, MaterialKind> = {
-  businessRegistration: 'bizreg',
-  corporateRegistry: 'registry',
-  cretopReport: 'company_info',
-  financialStatements: 'company_info',
-  smeCertificate: 'other',
-}
 
 /** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다(실패하면 적은 글이 그대로) */
 export type AddMaterials = (list: CaseMaterial[], note: string) => Promise<boolean>
@@ -38,7 +30,10 @@ export function MaterialsCard({
   onSummarize,
   aiReady,
   toast,
+  openDocs = 0,
 }: {
+  /** AI-2 첫 화면 [서류 넣기] — 숫자가 바뀌면 서류함 창을 연다 */
+  openDocs?: number
   materials: CaseMaterial[]
   client: ClientOpsRecord | null
   busy: boolean
@@ -51,6 +46,9 @@ export function MaterialsCard({
   const fileRef = useRef<HTMLInputElement>(null)
   const [reading, setReading] = useState<string | null>(null)
   const [dialog, setDialog] = useState<null | 'url' | 'paste' | 'memo' | 'docs'>(null)
+  useEffect(() => {
+    if (openDocs && client) setDialog('docs')
+  }, [openDocs, client])
 
   /** 창을 닫아도 되면 true — 이미 넣은 자료(알리고 닫음) · 저장됨. 저장이 안 됐으면 false(창 · 적은 글 그대로) */
   const addOne = async (m: CaseMaterial, note: string): Promise<boolean> => {
@@ -266,11 +264,9 @@ function TextDialog({
 }
 
 function DocsDialog({ client, materials, busy, onClose, onAdd, toast }: { client: ClientOpsRecord; materials: CaseMaterial[]; busy: boolean; onClose: () => void; onAdd: (list: CaseMaterial[]) => Promise<void>; toast: (m: string) => void }) {
-  const custom = new Map(client.customDocuments.filter((d) => !d.sensitive).map((d) => [d.key, d.label]))
-  const docs = Object.entries(client.documents)
-    .filter(([k, d]) => d.storagePath && (k in DOC_KIND || custom.has(k)))
-    .map(([k, d]) => ({ key: k, label: custom.get(k) || d.fileName || k, state: d }))
-  const [picked, setPicked] = useState<string[]>([])
+  const docs = caseDocs(client)
+  // AI-2 아직 자료로 안 넣은 서류는 미리 골라 둔다(고를 것을 줄임 — 빼고 싶으면 체크를 풀면 된다)
+  const [picked, setPicked] = useState<string[]>(() => docsNotIn(docs, materials).map((d) => d.key))
   const [working, setWorking] = useState<string | null>(null)
   const run = async () => {
     const at = new Date().toISOString()
@@ -283,7 +279,7 @@ function DocsDialog({ client, materials, busy, onClose, onAdd, toast }: { client
         const blob = await (await fetch(url)).blob()
         const file = new File([blob], d.state.fileName || 'document', { type: blob.type })
         const text = canExtractText(file) ? (await extractTextFromFile(file)).text : ''
-        const m = makeMaterial({ kind: DOC_KIND[d.key] ?? guessMaterialKind(d.label, text), title: d.label, text, fileName: d.state.fileName, fileSize: d.state.fileSize, source: '업체 서류함' }, at)
+        const m = makeMaterial({ kind: DOC_KIND[d.key] ?? guessMaterialKind(d.label, text), title: d.label, text, fileName: d.state.fileName, fileSize: d.state.fileSize, source: FROM_DOCS }, at)
         if (!sameMaterial([...materials, ...out], m)) out.push(m)
       } catch {
         toast(`${d.label} 을(를) 읽지 못했습니다.`)

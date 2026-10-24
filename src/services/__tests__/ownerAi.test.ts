@@ -20,6 +20,8 @@ import { monthUsage } from '../ownerAi/usage'
 import { parsePartnerHandoff } from '../ownerAi/partnerBridge'
 import { proposalFrom, qaProposal, roughMeasure, layoutPage, applyFix, proofreadInput } from '../ownerAi/proposal'
 import { frontFrom } from '../ownerAi/front'
+import { caseNext, CASE_PURPOSES } from '../ownerAi/caseNext'
+import { caseDocs, docsNotIn } from '../ownerAi/caseDocs'
 import { emptyContext, type AiRun, type SkillId } from '../ownerAi/types'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -531,7 +533,34 @@ async function engineTests() {
   }
 }
 
+/* AI-1 첫 질문 '이 회사에 어떤 도움을 줄까요?' — 추천 하나(규칙) · AI-2 서류함 → 자료 */
+function caseFirstTests() {
+  const r = (skillId: SkillId, evaluation: AiRun['evaluation'] = 'adopted', status: AiRun['status'] = 'succeeded') => ({ skillId, evaluation, status })
+  const n0 = caseNext([])
+  check('CN1 기록 없음 → AX 전략 분석 추천 · 이유 한 줄', n0.action === 'ax' && n0.why.includes('분석 기록이 없어') && n0.pending === 0, n0)
+  const n1 = caseNext([r('AX_PENGUIN', 'draft')])
+  check('CN2 AX 결과가 검토 전이면 여전히 AX · 채택하면 다음 단계 · 검토 전 1개', n1.action === 'ax' && n1.why.includes('채택하면') && n1.pending === 1, n1)
+  const n2 = caseNext([r('AX_PENGUIN')])
+  check("CN3 AX 채택 → 'AX 방향이 확정되어 있어 MVP 구체화를 추천'", n2.action === 'mvp' && n2.why === 'AX 방향이 확정되어 있어 MVP 구체화를 추천합니다', n2)
+  check('CN3b MVP 결과가 검토 전이면 채택을 먼저(다음 단계 제안서)', caseNext([r('AX_PENGUIN'), r('AX_MVP', 'draft')]).why === 'MVP 구체화 결과를 채택하면 다음 단계(제안서)를 추천해 드려요')
+  check('CN4 일부 채택도 정해진 것으로', caseNext([r('AX_PENGUIN', 'partially_adopted')]).action === 'mvp')
+  check('CN5 폐기 · 실패한 결과는 안 셈', caseNext([r('AX_PENGUIN', 'rejected'), r('AX_PENGUIN', 'adopted', 'failed')]).action === 'ax')
+  check('CN6 AX · MVP → 제안서 · 그다음 특허 · 벤처 · 끝으로 정책자금', caseNext([r('AX_PENGUIN'), r('AX_MVP')]).action === 'proposal' && caseNext([r('AX_PENGUIN'), r('AX_MVP'), r('SANGHO_PROPOSAL')]).action === 'patent' && caseNext([r('AX_PENGUIN'), r('AX_MVP'), r('SANGHO_PROPOSAL'), r('VENTURE_PLAN')]).action === 'funding')
+  check('CN7 기억 정리 · 맞춤법 · 자료 요약은 결과 수에 안 셈', caseNext([r('CONTEXT_UPDATE', 'draft'), r('PROOFREAD', 'draft'), r('SNAPSHOT_EXTRACT', 'draft')]).pending === 0)
+  check('CN8 목적 단추 4개가 모두 빠른 작업에 있음(누르면 같은 창)', CASE_PURPOSES.length === 4 && CASE_PURPOSES.every((p) => QUICK_ACTIONS.some((a) => a.key === p.key)), CASE_PURPOSES)
+  const doc = (fileName: string, storagePath = 'ws/x/' + fileName) => ({ status: 'received', fileName, storagePath }) as never
+  const client = {
+    documents: { businessRegistration: doc('사업자등록증.pdf'), idCard: doc('신분증.jpg'), financialStatements: doc('재무제표.pdf', ''), custom_ir: doc('IR.pdf'), custom_secret: doc('명부.xlsx') },
+    customDocuments: [{ key: 'custom_ir', label: 'IR 자료', sensitive: false }, { key: 'custom_secret', label: '직원 명부', sensitive: true }],
+  } as never as Parameters<typeof caseDocs>[0]
+  const docs = caseDocs(client)
+  check('CD1 서류함에서 AI 자료로 가져올 것 — 사업자등록증 · IR(직접 만든 칸) · 신분증 · 개인 정보 칸 · 파일 없는 칸은 뺌', JSON.stringify(docs.map((d) => d.label)) === JSON.stringify(['사업자등록증.pdf', 'IR 자료']), docs.map((d) => d.label))
+  const left = docsNotIn(docs, [{ source: '업체 서류함', title: 'IR 자료' }, { source: '직접 올림', title: '사업자등록증.pdf' }])
+  check('CD2 이미 서류함에서 넣은 것은 빼고 센다(직접 올린 같은 이름은 따로)', left.length === 1 && left[0].key === 'businessRegistration', left.map((d) => d.key))
+}
+
 await serverTests()
 await engineTests()
+caseFirstTests()
 console.log(`\nownerAi: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

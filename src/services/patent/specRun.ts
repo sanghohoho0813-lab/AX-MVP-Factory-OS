@@ -10,6 +10,7 @@ import { answerOf, rawObjectOf } from '../aiAssist/looseJson'
 import { judgeOf, judgePassed, type JudgeReport } from '../aiAssist/judge'
 import { readJudgeSkill } from '../aiAssist/judgeSkill'
 import { newRequestId, readChoice } from '../aiAssist/store'
+import { UNREACHABLE, transientRetry } from '../aiAssist/retry'
 import { TALK_MAX, answeredCount, talkFinished, talkOf } from '../aiAssist/talk'
 import { cleanAiText, mergeSpecAi, type SectionKey, type SpecDraft } from './specDraft'
 import { buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from './specDraftAi'
@@ -169,10 +170,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * D-262 단계가 한 번 어긋나도 멈추지 않게 — 대표: "저기 단계에서 자꾸 막히네. llm 모델이 문제가 아닌 것 같아".
  * 예전엔 답 모양이 어긋나면(이름표가 다른 칸 · 머리글 빠짐 · 끝 잘림) 곧바로 '실패' 였다(다시 부르기는 '많이 불렀음' 때만).
  * 이제 같은 단계를 3번까지 — 두 번째부터는 무엇이 어긋났는지 · 이름표를 다시 알려 준다. 잠깐 끊긴 연결(시간 초과 · 붐빔)도 잠시 쉬었다 다시.
+ * D-278 끊겨서 다시 부를 때는 같은 요청 번호(서버가 이미 쓴 답을 그대로 — 요금 한 번) · 시간 초과는 한 번만 다시(retry.ts 와 같은 규칙).
  */
 const TRIES = 3
 const PARSE_MISS = 'parse_miss'
-const TRANSIENT = new Set(['provider_unreachable', 'provider_busy', 'provider_error'])
 let transientMs = 3_000
 /** 시험용 — 잠깐 끊겼을 때 쉬는 시간 */
 export function __setTransientMs(ms: number) {
@@ -253,6 +254,8 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
   let hint = ''
   let rateWaited = false
   let cutRetried = false
+  let unreachableTried = false
+  let requestId = newRequestId()
   for (let attempt = 0; attempt < TRIES; attempt += 1) {
     if (!attempt) setStage(id, stage, { phase: 'run', text: `쓰는 중…(${s.seconds}초쯤)` })
     try {
@@ -260,10 +263,11 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
       const skill = stage === 'research' ? '' : readJudgeSkill()
       // D-269 그때그때 고른 모델 — 예전엔 시작할 때 한 번 읽어, 쓰는 중에 모델을 바꿔도 끝까지 처음 모델로 썼다
       const choice = readChoice()
-      const run = await callAssist({ requestId: newRequestId(), assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+      const run = await callAssist({ requestId, assistId: s.assistId, page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
       if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
         cutRetried = true
         hint = CUT_HINT
+        requestId = newRequestId()
         setStage(id, stage, { phase: 'run', text: `답이 길이 상한에서 잘려 더 짧게 다시 씁니다(${attempt + 2}/${TRIES})` })
         continue
       }
@@ -377,10 +381,12 @@ async function runStage(id: string, stage: AgentStage, env: RunEnv): Promise<'ok
       }
       if (code === PARSE_MISS && left) {
         hint = FORMAT_HINT[stage]
+        requestId = newRequestId()
         setStage(id, stage, { phase: 'run', text: `답 모양이 어긋나 이름표를 다시 알려 주고 씁니다(${attempt + 2}/${TRIES})` })
         continue
       }
-      if (TRANSIENT.has(code) && left) {
+      if (transientRetry(code, unreachableTried) && left) {
+        if (code === UNREACHABLE) unreachableTried = true
         setStage(id, stage, { phase: 'run', text: `연결이 잠깐 끊겨 다시 씁니다(${attempt + 2}/${TRIES})` })
         await sleep(transientMs)
         continue
@@ -417,15 +423,18 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv): Pr
     let got: ReturnType<typeof judgeOf> | null = null
     let rateWaited = false
     let cutRetried = false
+    let unreachableTried = false
+    let requestId = newRequestId()
     for (let attempt = 0; attempt < TRIES && !got; attempt += 1) {
       if (!attempt) setStage(id, stage, { phase: 'run', text: round === 1 ? `${label}을 자체점검하는 중…(${stageOf(stage).seconds}초쯤)` : '고친 글로 한 번 더 자체점검하는 중…' })
       try {
         const choice = readChoice()
-        const run = await callAssist({ requestId: newRequestId(), assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
+        const run = await callAssist({ requestId, assistId: 'spec.judge', page: 'patent', choice: choice ? { provider: choice.provider, model: choice.model } : null, context, ...(hint ? { ask: hint } : {}), ...(skill ? { skill } : {}) })
         model = usedModel(run) || model
         if (cutOff(run) && !cutRetried && attempt < TRIES - 1) {
           cutRetried = true
           hint = CUT_HINT_JUDGE
+          requestId = newRequestId()
           setStage(id, stage, { phase: 'run', text: `판정 답이 길이 상한에서 잘려 더 짧게 다시 판정합니다(${attempt + 2}/${TRIES})` })
           continue
         }
@@ -448,10 +457,12 @@ async function runJudge(id: string, stage: 'judge1' | 'judge2', env: RunEnv): Pr
         }
         if (code === PARSE_MISS && left) {
           hint = FORMAT_HINT[stage]
+          requestId = newRequestId()
           setStage(id, stage, { phase: 'run', text: `답 모양이 어긋나 이름표를 다시 알려 주고 판정합니다(${attempt + 2}/${TRIES})` })
           continue
         }
-        if (TRANSIENT.has(code) && left) {
+        if (transientRetry(code, unreachableTried) && left) {
+          if (code === UNREACHABLE) unreachableTried = true
           setStage(id, stage, { phase: 'run', text: `연결이 잠깐 끊겨 다시 판정합니다(${attempt + 2}/${TRIES})` })
           await sleep(transientMs)
           continue

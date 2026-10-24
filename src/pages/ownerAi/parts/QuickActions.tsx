@@ -1,7 +1,8 @@
 /**
- * 빠른 작업 10가지 — 모두 같은 업체 기억을 쓴다.
+ * 빠른 작업 10가지 — 모두 같은 업체 기억을 쓴다. AI-1: 맨 위는 '이 회사에 어떤 도움을 줄까요?' — 추천 하나 · 목적 4개, 10가지는 '다른 작업' 안.
  * 누르면 창: 고를 것 · 적을 것 · 이번에 보낼 자료(최소 묶음) · 얼마나 보내는지 → 'AI 로 만들기'.
  *  - 요청 번호는 창을 열 때 한 번 만든다 → 두 번 눌러도 서버가 같은 결과를 돌려준다(중복 과금 없음).
+ *    D-278 실패한 뒤 같은 내용으로 다시 눌러도 같은 번호 — 끊겨서 못 받았거나 저장만 실패한 답을 서버가 그대로 돌려준다. 내용을 바꾸면 새 번호.
  *  - 하나가 도는 동안 다른 단추는 잠긴다.
  *  - '깊게' 작업을 이미 한 번 만들었으면 다시 만들기 전에 한 번 묻는다(비용).
  */
@@ -12,6 +13,8 @@ import { newUuid } from '../../../services/ownerAi/caseUtil'
 import { QUICK_ACTIONS, SKILL_META, TIER_LABEL, type QuickAction } from '../../../services/ownerAi/skillCatalog'
 import { latestSnapshot, type CaseBundle } from '../../../services/ownerAi/workflow'
 import { MATERIAL_KIND_LABEL, type AiRunInput, type SkillId } from '../../../services/ownerAi/types'
+import { CASE_PURPOSES, caseNext, type CaseActionKey } from '../../../services/ownerAi/caseNext'
+import { Fold } from '../../../components/ui/fold'
 import { BottomSheet, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { TierBadge, type AiSetup } from '../shared'
@@ -33,7 +36,12 @@ export function QuickActions({
   setup,
   onRun,
   onPaste,
+  docsHint = 0,
+  onDocs,
 }: {
+  /** AI-2 업체 서류함에 아직 자료로 안 넣은 서류 수 */
+  docsHint?: number
+  onDocs?: () => void
   bundle: CaseBundle
   today: string
   /** 지금 도는 작업 이름(없으면 null) */
@@ -43,43 +51,90 @@ export function QuickActions({
   onPaste: () => void
 }) {
   const [open, setOpen] = useState<QuickAction | null>(null)
+  // AI-1 첫 질문 "이 회사에 어떤 도움을 줄까요?" — 지금 할 작업 하나(규칙) + 목적 단추 4개. 작업 10가지 · 붙여넣기는 '다른 작업' 안(지운 것 없음)
+  const next = useMemo(() => caseNext(bundle.runs), [bundle.runs])
+  const actionOf = (key: CaseActionKey) => QUICK_ACTIONS.find((a) => a.key === key)
+  const rec = actionOf(next.action)
+  const purposes = CASE_PURPOSES.filter((p) => p.key !== next.action)
   return (
     <Surface className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-col">
-          <h2 className="t-section break-keep text-slate-900">빠른 작업</h2>
-          <span className="t-sub break-keep text-slate-500">모두 이 업체 기억 · 자료를 같이 씁니다</span>
-        </div>
+        <h2 className="t-section min-w-0 break-keep text-slate-900" data-testid="case-ask">
+          이 회사에 어떤 도움을 줄까요?
+        </h2>
         {/* D-255 AI 전략실도 고른 모델로 — 고르지 않으면 일마다 빠르게 · 보통 · 깊게 모델(전과 같음) */}
         <ModelPicker popover testId="owner-ai-model" />
       </div>
-      {/* 칸 폭이 좁아도 이름이 한 줄씩 읽히게 — 최소 10.5rem 칸을 들어가는 만큼(휴대폰 2칸 · PC 3~5칸) */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]" data-testid="quick-actions">
-        {QUICK_ACTIONS.map((a) => {
-          const tier = SKILL_META[a.skill].tier
-          const isRunning = running === a.label
+      {rec && (
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3 sm:flex-row sm:items-center" data-testid="case-next" data-action-next={next.action}>
+          <p className="t-body min-w-0 flex-1 break-keep text-slate-900">
+            <b>추천 · {rec.label}</b>
+            <span className="t-sub block text-slate-700" data-testid="case-next-why">
+              {next.why}
+            </span>
+            {next.pending > 0 && (
+              <span className="t-sub block text-warning-800" data-testid="case-next-pending">
+                검토 전 결과 {next.pending}개 — 아래 결과에서 채택 · 폐기를 먼저 해 주세요
+              </span>
+            )}
+          </p>
+          <Button variant="primary" onClick={() => setOpen(rec)} disabled={!!running} className="w-full sm:w-auto" data-testid="case-next-go" data-purpose={next.action}>
+            <Sparkles aria-hidden="true" className="size-4" /> {running === rec.label ? '만드는 중…' : rec.label}
+          </Button>
+        </div>
+      )}
+      {docsHint > 0 && onDocs && (
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="case-docs-hint">
+          <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
+            업체 서류함에 아직 AI 자료로 안 넣은 서류 <b data-testid="case-docs-count">{docsHint}개</b> — 넣으면 분석이 회사 사실에 맞춰져요
+          </p>
+          <Button size="sm" variant="secondary" onClick={onDocs} disabled={!!running} className="w-full sm:w-auto" data-testid="case-docs-add">
+            서류 넣기
+          </Button>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="case-purposes">
+        {purposes.map((p) => {
+          const a = actionOf(p.key)
+          if (!a) return null
           return (
-            <button
-              key={a.key}
-              type="button"
-              data-action={a.key}
-              disabled={!!running}
-              onClick={() => setOpen(a)}
-              className="tap flex min-h-[4.75rem] flex-col items-start gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="t-body font-semibold break-keep text-slate-900">{a.label}</span>
-              <span className="t-meta break-keep text-slate-500">{isRunning ? '만드는 중…' : a.hint}</span>
-              <span className="mt-auto pt-1">{isRunning ? <Loader2 aria-hidden="true" className="size-4 animate-spin text-brand-600" /> : <TierBadge tier={tier} />}</span>
-            </button>
+            <Button key={p.key} variant="secondary" onClick={() => setOpen(a)} disabled={!!running} className="justify-start" data-testid="case-purpose" data-purpose={p.key}>
+              {running === a.label ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
+              {p.label}
+            </Button>
           )
         })}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={onPaste} data-testid="paste-chatgpt-open">
-          ChatGPT 결과 붙여넣기
-        </Button>
-        <span className="t-meta break-keep text-slate-500">ChatGPT 대화 · 기억은 OS 가 읽지 못합니다 — 가져온 결과만 기록으로 남겨 채택할 수 있습니다.</span>
-      </div>
+      <Fold id="ownerai.more" title="다른 작업 · ChatGPT 결과 붙여넣기" summary={`작업 ${QUICK_ACTIONS.length}가지 — AX 아이템 · MVP · 화면 기획 · 동료 전달문구 · 자유 질문 …`} testId="case-more">
+        <span className="t-sub break-keep text-slate-600">모두 이 업체 기억 · 자료를 같이 씁니다</span>
+        {/* 칸 폭이 좁아도 이름이 한 줄씩 읽히게 — 최소 10.5rem 칸을 들어가는 만큼(휴대폰 2칸 · PC 3~5칸) */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]" data-testid="quick-actions">
+          {QUICK_ACTIONS.map((a) => {
+            const tier = SKILL_META[a.skill].tier
+            const isRunning = running === a.label
+            return (
+              <button
+                key={a.key}
+                type="button"
+                data-action={a.key}
+                disabled={!!running}
+                onClick={() => setOpen(a)}
+                className="tap flex min-h-[4.75rem] flex-col items-start gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="t-body font-semibold break-keep text-slate-900">{a.label}</span>
+                <span className="t-meta break-keep text-slate-600">{isRunning ? '만드는 중…' : a.hint}</span>
+                <span className="mt-auto pt-1">{isRunning ? <Loader2 aria-hidden="true" className="size-4 animate-spin text-brand-600" /> : <TierBadge tier={tier} />}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={onPaste} data-testid="paste-chatgpt-open">
+            ChatGPT 결과 붙여넣기
+          </Button>
+          <span className="t-meta break-keep text-slate-600">ChatGPT 대화 · 기억은 OS 가 읽지 못합니다 — 가져온 결과만 기록으로 남겨 채택할 수 있습니다.</span>
+        </div>
+      </Fold>
       {open && (
         <ActionSheet
           action={open}
@@ -118,7 +173,8 @@ function ActionSheet({
 }) {
   const skill = action.skill
   const meta = SKILL_META[skill]
-  const [requestId, setRequestId] = useState(() => newUuid())
+  // key = 마지막으로 보낸 내용(고른 것 · 적은 것 · 자료) — 실패 뒤 같은 내용이면 같은 번호
+  const [sent, setSent] = useState<{ id: string; key: string | null }>(() => ({ id: newUuid(), key: null }))
   const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries((action.choices ?? []).map((c) => [c.key, c.initial])))
   const [ask, setAsk] = useState('')
   const defaults = useMemo(() => materialsFor(skill, bundle.c.materials).map((m) => m.id), [skill, bundle.c.materials])
@@ -147,10 +203,12 @@ function ActionSheet({
     }
     setSubmitting(true)
     const input: AiRunInput = { task: ask.trim() || undefined, options: choices }
+    const key = JSON.stringify([input, picked])
+    const requestId = sent.key === null || sent.key === key ? sent.id : newUuid()
     const ok = await onRun({ skill, input, requestId, materialIds: picked, label: action.label })
     setSubmitting(false)
-    // 실패하면 새 요청 번호(다시 누르면 새로 시도)
-    if (!ok) setRequestId(newUuid())
+    // 실패하면 이 번호를 기억 — 서버가 실패한 요청은 지우므로 다시 누르면 새로 부르고, 이미 쓴 답이 있으면 그대로 받는다(요금 한 번)
+    if (!ok) setSent({ id: requestId, key })
   }
 
   return (
