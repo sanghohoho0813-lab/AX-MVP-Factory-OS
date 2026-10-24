@@ -4,17 +4,24 @@
  *  - 업체를 골랐으면 그 업체 숫자로 바로(?client=&preset= — 각 화면이 이미 읽는 주소, D-199).
  *  - 안 골랐으면 예시 가정만 얹어 연다(업체를 고르라는 한 줄).
  *  - 규칙 계산(AI 아님) · 계산식은 그대로.
+ *  - NX-4 예시가 많아져 처음엔 6개(휴대폰 4개)만 — 나머지는 [상황 예시 n개 더 보기].
  */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Lightbulb } from 'lucide-react'
 import { SCENARIO_MODULE_PATH, SCENARIO_PRESETS, scenarioPath, type ScenarioModule } from '../../services/scenarioPresets'
 import { Surface } from '../../components/ui/primitives'
 import { useToolClient } from './toolClientContext'
+import { useIsPhone } from '../../lib/useIsPhone'
 
 export function ModulePresets({ module }: { module: ScenarioModule }) {
   const { clientId, clientRecord } = useToolClient()
+  const phone = useIsPhone()
+  const [all, setAll] = useState(false)
   const list = SCENARIO_PRESETS.filter((p) => p.module === module && !p.calc)
   if (!list.length) return null
+  const first = phone ? 4 : 6
+  const shown = all ? list : list.slice(0, first)
   const name = clientId ? clientRecord?.companyName : ''
   return (
     <div data-testid="module-presets" data-module={module}>
@@ -25,7 +32,7 @@ export function ModulePresets({ module }: { module: ScenarioModule }) {
         </h2>
         {!clientId && <p className="t-sub break-keep text-slate-600">위에서 업체를 먼저 고르면 그 업체 숫자(직원 수 · 매출 · 주소 등)로 채워져요. 고르지 않으면 예시 가정만 넣어 엽니다.</p>}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((p) => (
+          {shown.map((p) => (
             <Link
               key={p.id}
               to={clientId ? scenarioPath(p, clientId) : `${SCENARIO_MODULE_PATH[module]}?preset=${encodeURIComponent(p.id)}`}
@@ -38,6 +45,11 @@ export function ModulePresets({ module }: { module: ScenarioModule }) {
             </Link>
           ))}
         </div>
+        {list.length > first && (
+          <button type="button" onClick={() => setAll((v) => !v)} className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="module-presets-more" aria-expanded={all}>
+            {all ? '상황 예시 접기' : `상황 예시 ${list.length - first}개 더 보기`}
+          </button>
+        )}
       </Surface>
     </div>
   )

@@ -60,7 +60,9 @@ const spaGo = (url) => page.evaluate((u) => {
   })
   check('P1 정책자금 첫 화면 주 단추 [이 업체 진단하기] · 그 업체 주소 · AI 자리 단추보다 앞', (await go.innerText()).includes('이 업체 진단하기') && (await go.getAttribute('href')).includes(`client=${A.id}`) && order === true, { order })
   const chips = await page.getByTestId('module-preset').evaluateAll((els) => els.map((e) => e.dataset.preset))
-  check('P2 상황 예시 3개(운전자금 · 시설자금 · 청년 채용)', JSON.stringify(chips) === JSON.stringify(['policy-working', 'policy-facility', 'policy-hiring']), chips)
+  check('P2 상황 예시 — 처음 6개(운전자금 · 시설자금 · 청년 채용 · 창업 초기 · 인테리어 · 대환) · [더 보기] 로 나머지', JSON.stringify(chips) === JSON.stringify(['policy-working', 'policy-facility', 'policy-hiring', 'policy-startup', 'policy-interior', 'policy-refinance']) && (await page.getByTestId('module-presets-more').innerText()).includes('1개 더 보기'), chips)
+  await page.getByTestId('module-presets-more').click()
+  check('P2b [더 보기] → 7개 모두(긴급 경영안정 포함)', (await page.getByTestId('module-preset').count()) === 7 && (await page.locator('[data-testid="module-preset"][data-preset="policy-emergency"]').count()) === 1)
   check('P3 상황 예시 제목에 업체 이름', (await page.getByTestId('module-presets').innerText()).includes(`${A.name} 숫자로`))
   await shot(page, 'P1-policy-1440')
   await page.locator('[data-testid="module-preset"][data-preset="policy-working"]').click()
@@ -79,7 +81,7 @@ const spaGo = (url) => page.evaluate((u) => {
   const chips = await page.getByTestId('module-preset').evaluateAll((els) => els.map((e) => e.dataset.preset))
   const yPresets = (await page.getByTestId('module-presets').boundingBox())?.y ?? 9e9
   const yLink = (await page.getByText('고객 관리 업체와 연결').first().boundingBox())?.y ?? 0
-  check('E1 고용지원금 상황 예시 4개 · 원래 대시보드보다 위', chips.length === 4 && chips.includes('emp-youth') && yPresets < yLink, { chips, yPresets, yLink })
+  check('E1 고용지원금 상황 예시 처음 6개(전부 9개) · 원래 대시보드보다 위', chips.length === 6 && chips.includes('emp-youth') && (await page.getByTestId('module-presets-more').innerText()).includes('3개 더 보기') && yPresets < yLink, { chips, yPresets, yLink })
   await page.goto(`${BASE}/tools/employment/diagnosis?client=${A.id}`, { waitUntil: 'networkidle' })
   const size = page.locator('input[placeholder="피보험자 수"]').first()
   await size.waitFor({ timeout: 10000 })
@@ -94,7 +96,7 @@ const spaGo = (url) => page.evaluate((u) => {
   // 연구소는 업체를 물고 오면 업체 목록(추가)으로 간다(예전 그대로) — 한눈에 보기는 업체 없이
   await page.goto(`${BASE}/tools/labcare`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
-  check('L1 연구소 한눈에 보기 맨 위 상황 예시 2개', (await page.getByTestId('module-preset').count()) === 2)
+  check('L1 연구소 한눈에 보기 맨 위 상황 예시 4개', (await page.getByTestId('module-preset').count()) === 4)
   await page.goto(`${BASE}/tools/labcare/assessment?client=${A.id}`, { waitUntil: 'networkidle' })
   const proj = page.locator('input[placeholder="예) 추천엔진 정확도 고도화 연구"]').first()
   await proj.waitFor({ timeout: 10000 })
@@ -112,7 +114,7 @@ const spaGo = (url) => page.evaluate((u) => {
 {
   await page.goto(`${BASE}/tools/startup-tax`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
-  check('S1 창업감면 상황 예시 3개', (await page.getByTestId('module-preset').count()) === 3)
+  check('S1 창업감면 상황 예시 5개(양수 · 재창업 — 감면이 안 될 수 있는 형태 포함)', (await page.getByTestId('module-preset').count()) === 5)
   await page.locator('[data-testid="module-preset"][data-preset="startup-convert"]').click()
   await page.waitForURL(/\/tools\/startup-tax/, { timeout: 10000 })
   await page.waitForTimeout(800)
@@ -121,6 +123,13 @@ const spaGo = (url) => page.evaluate((u) => {
 
 /* ---- G 지원사업 지우기 실패 ---- */
 {
+  // NX-4 주 단추 '맞는 업체 보기'(공고는 매일 저절로) — [공고 넣기] 는 옆에 그대로
+  await page.goto(`${BASE}/grants`, { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-fit-open').waitFor({ timeout: 10000 })
+  check('G0 지원사업 첫 화면 주 단추 [맞는 업체 보기] · [공고 넣기] 그대로', (await page.getByTestId('grant-add-open').count()) === 1 && ((await page.getByTestId('grant-fit-open').getAttribute('class')) ?? '').includes('bg-brand-600'))
+  await page.getByTestId('grant-fit-open').click()
+  await page.waitForTimeout(500)
+  check('G0b 누르면 업체별 보기', page.url().includes('view=clients') && (await page.getByTestId('grant-view-clients').getAttribute('aria-selected')) === 'true')
   const now = new Date().toISOString()
   await page.evaluate((at) => {
     const list = JSON.parse(localStorage.getItem('axmvp.module.grants.notices') || '[]')

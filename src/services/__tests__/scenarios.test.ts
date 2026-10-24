@@ -55,15 +55,15 @@ const empty = normalizeClientOps({ id: 'empty', companyName: '빈회사', create
 // S1 카탈로그
 const by = (m: string) => SCENARIO_PRESETS.filter((s) => s.module === m).length
 check(
-  'S1 카탈로그 28개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 4 · 연구소 2 · 창업감면 3 · 정책자금 3 · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기 상황은 그 계산기 · 그 탭으로',
-  SCENARIO_PRESETS.length === 28 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 4 && by('labcare') === 2 && by('startup-tax') === 3 && by('policy-funding') === 3 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 28 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
+  'S1 카탈로그 41개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 9 · 연구소 4 · 창업감면 5 · 정책자금 7(NX-4 13개 더함) · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기',
+  SCENARIO_PRESETS.length === 41 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 9 && by('labcare') === 4 && by('startup-tax') === 5 && by('policy-funding') === 7 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 41 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
   SCENARIO_PRESETS.map((s) => s.id),
 )
 
 // S2 숫자가 다 있는 업체
 const runs = runScenarios(full, today)
 const r = (id: string) => runs.find((x) => x.id === id)!
-check('S2 숫자가 다 있는 업체 — 28개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 28 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
+check('S2 숫자가 다 있는 업체 — 41개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 41 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
 const cash = r('tax-cash-1e')
 const p = viewProfile(scenarioTaxProfile(full, today).profile)
 const direct = cashPlan(p, full.shareholderRegister, shareValueOf(p, full.shareholderRegister), 100_000_000, today)
@@ -166,8 +166,8 @@ check(
 check('F3 가연 — 연구소(무역 · 직원 2명)는 설계하지 않는다(맞음 아님)', gyK['lab-two'] !== 'fit' && gyK['lab-material'] !== 'fit', [gyK['lab-two'], gyK['lab-material']])
 check('F4 가연 — 목돈 · 자사주는 쌓인 이익을 몰라 "자료를 받으면 판단"(설계 안 함) · 가업승계는 업력 2년이라 안 맞음 · 상속은 대표 만 45세라 안 맞음', gyK['tax-cash-1e'] === 'data' && gyK['tax-treasury'] === 'data' && gyK['tax-succession'] === 'no' && gyK['tax-inherit'] === 'no', gyK)
 check(
-  'F5 가연 — 맞는 상황은 근거가 있는 것만: 창업감면(설립 2년) · 본점 이전(서울 과밀억제권역) · 운전자금(매출 1.5억)',
-  JSON.stringify(fitIds(gyRuns)) === JSON.stringify(['policy-working', 'startup-move', 'startup-new']),
+  'F5 가연 — 맞는 상황은 근거가 있는 것만: 창업감면(설립 2년) · 본점 이전(서울 과밀억제권역) · 운전자금(매출 1.5억) · NX-4 창업 초기 창업자금(설립 2년)',
+  JSON.stringify(fitIds(gyRuns)) === JSON.stringify(['policy-startup', 'policy-working', 'startup-move', 'startup-new']) && gyRuns.find((x) => x.id === 'policy-startup')!.fit.why.includes('2024-05-01'),
   fitIds(gyRuns),
 )
 check(
@@ -175,7 +175,7 @@ check(
   gyRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('2024-05-01') && gyRuns.find((x) => x.id === 'policy-working')!.fit.why.includes('1억 5,000만원') && gyRuns.find((x) => x.id === 'startup-move')!.fit.why.includes('서울'),
   gyRuns.filter((x) => x.fit.kind === 'fit').map((x) => x.fit.why),
 )
-check('F7 가연 — 맞는 상황이 맨 앞(28개 중 3개 · 정렬)', gyRuns.slice(0, 3).every((x) => x.fit.kind === 'fit') && gyRuns.length === 28)
+check('F7 가연 — 맞는 상황이 맨 앞(41개 중 4개 · 정렬)', gyRuns.slice(0, 4).every((x) => x.fit.kind === 'fit') && gyRuns.length === 41)
 
 // 대표가 답하면 — 같은 질문을 쓰는 상황이 함께 열린다
 const gyAns = withScenarioAnswer(withScenarioAnswer(withScenarioAnswer(gy, 'hireSenior', 'yes', '2026-10-15T00:00:00.000Z'), 'contract', 'no', '2026-10-15T00:00:00.000Z'), 'hireYouth', 'yes', '2026-10-15T00:00:00.000Z')
@@ -247,7 +247,7 @@ const eRuns = runScenarios(empty, today)
 check('F18 빈 업체 — 맞는 상황 0개(짐작해서 붙이지 않음) · 물어볼 것과 받을 자료로만', eRuns.every((x) => x.fit.kind === 'ask' || x.fit.kind === 'data'), kinds(eRuns))
 const eReq = fitDataRequest(empty, eRuns)
 check('F19 받을 자료 요청 문구 — 같은 자료는 한 번(재무제표 · 사업자등록증) · 주민등록번호 요구 없음', (eReq.match(/^\d+\. 최근 재무제표/gm) ?? []).length === 1 && (eReq.match(/^\d+\. 사업자등록증 사본/gm) ?? []).length === 1 && !eReq.includes('주민등록번호를'), eReq)
-check('F20 질문 13가지(D-243 회사에 빌려준 돈 · 재산 넣어 주기 더함) — 모두 예/아니요로 답할 수 있는 한 문장(물음표로 끝남)', Object.values(SCENARIO_QUESTIONS).length === 13 && Object.values(SCENARIO_QUESTIONS).every((q) => q.endsWith('?')))
+check('F20 질문 22가지(D-243 회사에 빌려준 돈 · 재산 넣어 주기 · NX-4 상황 예시 9가지 더함) — 모두 예/아니요로 답할 수 있는 한 문장(물음표로 끝남)', Object.values(SCENARIO_QUESTIONS).length === 22 && Object.values(SCENARIO_QUESTIONS).every((q) => q.endsWith('?')))
 
 // 무작위 업체 2,000곳 — 기록이 반대를 말하는데 '맞음' 이 나오지 않는가
 let seed = 20261015

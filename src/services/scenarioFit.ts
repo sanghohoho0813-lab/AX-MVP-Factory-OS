@@ -48,6 +48,16 @@ export const SCENARIO_QUESTIONS = {
   retire: '대표 퇴임이나 퇴직금 중간정산을 생각하고 있나요?',
   lendToCorp: '대표가 회사에 빌려준 돈(가수금)이 있거나 빌려줄 계획이 있나요?',
   giftToCorp: '대표가 회사에 현금 · 부동산을 넣어 줄 계획이 있나요?',
+  // NX-4 상황 예시 더 — 기록으로 알 수 없는 것만 묻는다
+  hireWoman: '경력단절 여성을 새로 뽑을 계획이 있나요?',
+  hireDisabled: '장애인을 새로 뽑을 계획이 있나요?',
+  flexWork: '유연근무(시차출퇴근 · 재택)를 도입할 계획이 있나요?',
+  retireKeep: '정년이 됐거나 곧 될 직원이 있나요?',
+  interior: '매장 · 사무실 인테리어나 리모델링 계획이 있나요?',
+  highRateLoan: '금리가 높은 대출(제2금융권 등)이 있나요?',
+  salesDrop: '최근 매출이 갑자기 크게 줄었나요?',
+  acquired: '남의 사업(사업장 · 설비)을 넘겨받아 시작했나요?',
+  reopened: '예전에 같은 업종 사업을 접고 다시 시작했나요?',
 } as const
 
 export type QuestionKey = keyof typeof SCENARIO_QUESTIONS
@@ -334,7 +344,31 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
     case 'emp-convert':
       if (f.employeeCount === 0) return no('직원 0명')
       return byAnswer(c, 'contract', '계약직 직원 있음', '계약직 직원 없음')
+    case 'emp-woman':
+      return byAnswer(c, 'hireWoman', '경력단절 여성을 뽑을 계획 있음', '경력단절 여성 채용 계획 없음')
+    case 'emp-disabled':
+      return byAnswer(c, 'hireDisabled', '장애인을 뽑을 계획 있음', '장애인 채용 계획 없음')
+    case 'emp-flex':
+      if (f.employeeCount === 0) return no('직원 0명')
+      return byAnswer(c, 'flexWork', '유연근무 도입 계획 있음', '유연근무 도입 계획 없음')
+    case 'emp-retire-keep':
+      if (f.employeeCount === 0) return no('직원 0명')
+      return byAnswer(c, 'retireKeep', '정년이 됐거나 곧 될 직원 있음', '정년 된 직원 없음', c.roster && c.roster.senior > 0 ? `명부에 만 60세 이상 ${c.roster.senior}명` : '')
+    case 'emp-shorter':
+      if (f.employeeCount === 0) return no('직원 0명')
+      return byAnswer(c, 'childcare', '육아휴직 · 육아 중인 직원 있음', '육아 중인 직원 없음')
     /* 연구소 */
+    case 'lab-one': {
+      if (c.hasLab) return no('이미 연구소(전담부서)가 있어요 — 세액공제는 연구소 관리에서')
+      if (isExcludedIndustryText(c.industryText)) return no(`업종(${c.industryText}) — 연구소 인정 제외 업종으로 보여요`)
+      if (f.employeeCount === 0) return no('직원 0명 — 연구 · 개발 담당을 두기 어려워요')
+      return byAnswer(c, 'researchStaff', '연구 · 개발 맡을 직원 있음', '연구 · 개발 맡을 직원 없음')
+    }
+    case 'lab-three-growth': {
+      if (isExcludedIndustryText(c.industryText)) return no(`업종(${c.industryText}) — 연구소 인정 제외 업종으로 보여요`)
+      if (f.employeeCount !== null && f.employeeCount < 3) return no(`직원 ${f.employeeCount}명 — 연구원 3명을 두기 어려워요`)
+      return byAnswer(c, 'researchStaff', '연구 · 개발 맡을 직원 있음', '연구 · 개발 맡을 직원 없음', '신성장 · 원천기술 분야 해당 여부는 세무사 확인')
+    }
     case 'lab-two': {
       if (c.hasLab) return no('이미 연구소(전담부서)가 있어요 — 세액공제는 연구소 관리에서')
       if (isExcludedIndustryText(c.industryText)) return no(`업종(${c.industryText}) — 연구소 인정 제외 업종으로 보여요`)
@@ -366,7 +400,23 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (over !== 'yes') return no('본점이 이미 과밀억제권역 밖이에요')
       return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 과밀억제권역 안`)
     }
+    case 'startup-acquire':
+      if (months !== null && months >= 60) return no(`설립 ${est} — 창업 5년이 지났어요`)
+      return byAnswer(c, 'acquired', '남의 사업을 넘겨받아 시작함', '넘겨받지 않고 새로 시작')
+    case 'startup-reopen':
+      if (months !== null && months >= 60) return no(`설립 ${est} — 창업 5년이 지났어요`)
+      return byAnswer(c, 'reopened', '같은 업종을 접고 다시 시작함', '같은 업종 재창업 아님')
     /* 정책자금 */
+    case 'policy-startup':
+      if (!est || months === null) return data('설립일을 알면 판단해요(창업 초기인지)', ['설립일(창업일)'])
+      if (months < 36) return fit(`설립 ${est} — 창업 ${Math.floor(months / 12)}년 ${months % 12}개월(창업 초기)`)
+      return no(`설립 ${est} — 창업 초기가 지나 창업자금보다 운전 · 시설자금 예시가 맞아요`)
+    case 'policy-interior':
+      return byAnswer(c, 'interior', '인테리어 · 리모델링 계획 있음', '인테리어 계획 없음')
+    case 'policy-refinance':
+      return byAnswer(c, 'highRateLoan', '금리가 높은 대출 있음', '고금리 대출 없음')
+    case 'policy-emergency':
+      return byAnswer(c, 'salesDrop', '최근 매출이 크게 줄었음', '매출 급감 없음')
     case 'policy-working':
       if (c.revenue !== null && c.revenue > 0) return fit(`매출 ${krw(c.revenue)} — 운전자금 상담 대상`)
       if (f.employeeCount !== null && f.employeeCount > 0) return fit(`직원 ${f.employeeCount}명 — 인건비 운전자금 상담 대상`)

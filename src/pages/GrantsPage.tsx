@@ -12,7 +12,7 @@ import { AiAssist } from '../components/ai/AiAssist'
 import { grantsBundle } from '../services/aiAssist/builders'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BellRing, Link2, Plus, Search } from 'lucide-react'
+import { BellRing, Link2, Plus, Search, Users } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
@@ -222,7 +222,13 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
         sub={`공고 ${notices.length.toLocaleString()}개 · 접수 중 ${open.length.toLocaleString()}개 · 7일 안에 마감 ${urgent}개`}
         actions={
           <>
-            <Button variant="primary" onClick={() => setAdding(true)} data-testid="grant-add-open">
+            {/* NX-4 공고는 매일 저절로 받아진다 — 주 단추는 '맞는 업체 보기', [공고 넣기](손으로)는 옆에 그대로 */}
+            {view !== 'clients' && (
+              <Button variant="primary" onClick={() => setParam('view', 'clients')} data-testid="grant-fit-open">
+                <Users aria-hidden="true" className="size-4" /> 맞는 업체 보기
+              </Button>
+            )}
+            <Button variant={view === 'clients' ? 'primary' : 'secondary'} onClick={() => setAdding(true)} data-testid="grant-add-open">
               <Plus aria-hidden="true" className="size-4" /> 공고 넣기
             </Button>
             {actions.copyLink && (

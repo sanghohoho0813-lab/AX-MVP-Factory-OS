@@ -113,17 +113,33 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'emp-senior', module: 'employment', title: '만 60세 이상 고령자 채용', when: '경력직 고령자를 뽑을 때', hiring: { situation: 'new', cats: ['고령자'], specials: [], age: 61, gender: null, empType: '정규직' } }),
   p({ id: 'emp-childcare', module: 'employment', title: '직원 육아휴직 · 대체인력 채용', when: '직원이 육아휴직을 쓰고 빈자리를 채울 때', hiring: { situation: 'childcare', cats: ['육아'], specials: ['육아휴직', '대체인력'], age: null, gender: null, empType: '정규직' } }),
   p({ id: 'emp-convert', module: 'employment', title: '계약직 → 정규직 전환', when: '계약직 직원을 정규직으로 바꿀 때', hiring: { situation: 'retain', cats: ['재직'], specials: ['정규직전환'], age: null, gender: null, empType: '계약직' } }),
+  // NX-4 상황 예시 더 — 채용 진단 화면의 같은 단추 값만(대상 · 처우개선 · 육아). 금액 · 요건은 엔진이 계산
+  p({ id: 'emp-woman', module: 'employment', title: '경력단절 여성 채용', when: '육아 · 가사로 일을 쉬었던 여성을 뽑을 때', hiring: { situation: 'new', cats: ['여성'], specials: [], age: null, gender: null, empType: '정규직' } }),
+  p({ id: 'emp-disabled', module: 'employment', title: '장애인 채용', when: '장애인을 새로 뽑을 때', hiring: { situation: 'new', cats: ['장애인'], specials: [], age: null, gender: null, empType: '정규직' } }),
+  p({ id: 'emp-flex', module: 'employment', title: '유연근무(시차출퇴근 · 재택) 도입', when: '지금 직원들 근무 방식을 바꿀 때', hiring: { situation: 'retain', cats: ['재직'], specials: ['유연근무'], age: null, gender: null, empType: '정규직' } }),
+  p({ id: 'emp-retire-keep', module: 'employment', title: '정년 된 직원 계속 고용', when: '정년이 됐거나 곧 될 직원을 계속 쓸 때', hiring: { situation: 'retain', cats: ['재직'], specials: ['정년도달'], age: null, gender: null, empType: '정규직' } }),
+  p({ id: 'emp-shorter', module: 'employment', title: '육아기 근로시간 단축', when: '어린 자녀를 둔 직원이 근무 시간을 줄일 때', hiring: { situation: 'childcare', cats: ['육아'], specials: ['근로시간단축'], age: null, gender: null, empType: '정규직' } }),
   // 연구소 2 — 연구개발비 세액공제(같은 엔진)
   p({ id: 'lab-two', module: 'labcare', title: '연구원 2명(연봉 각 4,000만원)으로 연구소 설립', when: '연구소(전담부서)를 새로 만들 때 — 인건비 세액공제', lab: { payroll: 80_000_000, material: 0, other: 0, category: '일반 R&D', heads: 2 } }),
   p({ id: 'lab-material', module: 'labcare', title: '연구원 1명 + 시제품 재료비 3,000만원', when: '시제품 · 개발 재료비가 드는 해', lab: { payroll: 40_000_000, material: 30_000_000, other: 0, category: '일반 R&D' } }),
+  p({ id: 'lab-one', module: 'labcare', title: '연구원 1명(연봉 3,600만원)으로 연구전담부서', when: '작은 회사가 연구 · 개발 담당 1명으로 시작할 때', lab: { payroll: 36_000_000, material: 0, other: 0, category: '일반 R&D', heads: 1 } }),
+  p({ id: 'lab-three-growth', module: 'labcare', title: '연구원 3명(연봉 각 5,000만원) · 신성장 · 원천기술 분야', when: '신성장 · 원천기술 분야로 연구를 키울 때(분야 해당 여부는 세무사 확인)', lab: { payroll: 150_000_000, material: 0, other: 0, category: '신성장·원천기술', heads: 3 } }),
   // 창업감면 3 — 판정기(같은 엔진)
   p({ id: 'startup-new', module: 'startup-tax', title: '새로 창업한 경우 — 지금 감면 판정', when: '신규 창업(이어받지 않음) — 이 회사 숫자 그대로', startup: { startupForm: 'brand_new' } }),
   p({ id: 'startup-convert', module: 'startup-tax', title: '개인사업자 → 법인전환한 경우', when: '법인으로 바꿨을 때 — 감면 기간이 이어지는지', startup: { startupForm: 'conversion' } }),
   p({ id: 'startup-move', module: 'startup-tax', title: '본점을 과밀억제권역 밖으로 옮기면', when: '수도권 과밀억제권역 안 업체 — 이전하면 감면율이 바뀌는지', startup: { startupForm: 'brand_new', region: 'other_local', overconcentration: 'no' } }),
+  // NX-4 감면이 안 될 수 있는 창업 형태 — 미리 알려 주는 것이 상담
+  p({ id: 'startup-acquire', module: 'startup-tax', title: '남의 사업을 넘겨받아(양수) 시작했으면', when: '기존 사업장 · 설비를 인수해 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'acquisition' } }),
+  p({ id: 'startup-reopen', module: 'startup-tax', title: '같은 업종으로 다시 창업했으면', when: '예전에 같은 업종 사업을 접고 다시 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'reopen_same' } }),
   // 정책자금 3 — 진단(같은 엔진)
   p({ id: 'policy-working', module: 'policy-funding', title: '운전자금(인건비 · 원자재) 필요', when: '매출은 있는데 운영 자금이 빠듯할 때', policy: { purpose: '운전자금' } }),
   p({ id: 'policy-facility', module: 'policy-funding', title: '기계 · 설비 사기(시설자금)', when: '설비 투자 견적이 있을 때', policy: { purpose: '시설자금', quoteReady: '있음' } }),
   p({ id: 'policy-hiring', module: 'policy-funding', title: '청년 채용 계획과 함께 신청', when: '자금과 함께 고용을 늘릴 때 — 가점', policy: { purpose: '운전자금', hiringPlan: '있음', youthEmployment: '예정' } }),
+  // NX-4 정책자금 진단 화면의 '자금 목적 · 쓸 곳' 칸 값만 — 진행 가능성 · 기관은 엔진이 판단
+  p({ id: 'policy-startup', module: 'policy-funding', title: '창업 초기 — 창업자금', when: '창업한 지 얼마 안 돼 사업 자금이 필요할 때', policy: { purpose: '창업자금' } }),
+  p({ id: 'policy-interior', module: 'policy-funding', title: '매장 · 사무실 인테리어(시설자금)', when: '사업장을 꾸미거나 리모델링할 때', policy: { purpose: '시설자금', facilityUse: '인테리어' } }),
+  p({ id: 'policy-refinance', module: 'policy-funding', title: '고금리 대출 갈아타기(대환)', when: '금리가 높은 대출 이자가 부담될 때', policy: { purpose: '운전자금', workingCapitalUse: '고금리 대환' } }),
+  p({ id: 'policy-emergency', module: 'policy-funding', title: '매출이 갑자기 줄어 긴급 경영안정', when: '매출 급감 · 거래처 부도 등으로 급히 버텨야 할 때', policy: { purpose: '긴급자금' } }),
 ]
 
 /* ---- D-211 모듈 화면 '넣은 가정' 칩 · [가정 빼기] ---- */
@@ -143,6 +159,8 @@ const big = (won: number) => {
 }
 // 고용지원금 진단 화면의 '1. 상황' 단추와 같은 말
 const SITUATION_LABEL: Record<string, string> = { new: '신규 채용', retain: '재직자 처우개선', childcare: '출산·육아' }
+// 채용 진단 화면 '대상' 단추와 같은 말(NX-4 — '여성' 만 쓰면 누구인지 모호)
+const CAT_LABEL: Record<string, string> = { 여성: '경력단절 여성', 취약계층: '취업취약계층' }
 const STARTUP_FORM_LABEL: Record<string, string> = { brand_new: '새로 창업', conversion: '개인 → 법인전환', acquisition: '사업 양수', reopen_same: '같은 업종 재창업', succession: '사업 승계' }
 const REGION_LABEL: Record<string, string> = { seoul: '서울', gyeonggi_incheon: '경기/인천', metro_city: '지방 광역시', other_local: '기타 지방' }
 
@@ -164,6 +182,8 @@ export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
   if (s.policy) {
     if (s.policy.purpose) out.push({ field: 'purpose', text: s.policy.purpose })
     if (s.policy.quoteReady === '있음') out.push({ field: 'quoteReady', text: '설비 견적 있음' })
+    if (s.policy.facilityUse && s.policy.facilityUse !== '해당없음') out.push({ field: 'facilityUse', text: `시설 · ${s.policy.facilityUse}` })
+    if (s.policy.workingCapitalUse && s.policy.workingCapitalUse !== '해당없음') out.push({ field: 'workingCapitalUse', text: `쓸 곳 · ${s.policy.workingCapitalUse}` })
     if (s.policy.hiringPlan === '있음') out.push({ field: 'hiringPlan', text: '채용 계획 있음' })
     if (s.policy.youthEmployment === '예정') out.push({ field: 'youthEmployment', text: '청년 채용 예정' })
   }
@@ -176,7 +196,7 @@ export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
   }
   if (s.hiring) {
     const h = s.hiring
-    const words = [SITUATION_LABEL[h.situation] ?? '', ...h.cats.filter((c) => c !== '육아' && c !== '재직'), ...h.specials, h.age !== null ? `만 ${h.age}세` : '', h.empType ?? '']
+    const words = [SITUATION_LABEL[h.situation] ?? '', ...h.cats.filter((c) => c !== '육아' && c !== '재직').map((c) => CAT_LABEL[c] ?? c), ...h.specials, h.age !== null ? `만 ${h.age}세` : '', h.empType ?? '']
     for (const w of [...new Set(words)]) if (w) out.push({ field: '', text: w })
   }
   return out
