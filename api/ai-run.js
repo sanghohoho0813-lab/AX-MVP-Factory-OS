@@ -114,6 +114,7 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true, replayed: true, run })
     } catch (e) {
       const code = e instanceof ProviderError ? e.code : 'provider_error'
+      console.warn(`[ai-run] 실패 문의번호=${String(body.requestId).slice(-6)} 작업=${skill.id} 오류=${code}`)
       return fail(res, e instanceof ProviderError ? e.status : 502, code)
     }
   }
@@ -135,6 +136,8 @@ export default async function handler(req, res) {
     // 실패한 요청은 같은 번호로 다시 시도할 수 있게 지운다
     inflight.delete(idemKey)
     const code = e instanceof ProviderError ? e.code : 'provider_error'
+    // NX-2 화면의 '문의 번호'(요청 번호 끝 6자리)로 함수 기록에서 찾는다 — 번호 · 작업 · 오류 갈래만
+    console.warn(`[ai-run] 실패 문의번호=${String(body.requestId).slice(-6)} 작업=${skill.id} 오류=${code}`)
     return fail(res, e instanceof ProviderError ? e.status : 502, code)
   }
 }

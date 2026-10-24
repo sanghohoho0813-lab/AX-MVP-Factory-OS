@@ -11,6 +11,7 @@ import { TodayCare } from '../components/ops/TodayCare'
 import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
+import { TodayPicks } from '../components/ops/TodayPicks'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -437,12 +438,15 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
             <span className="hidden sm:inline-flex">
-              <Button variant="primary" onClick={() => setSummaryOpen(true)}>
+              {/* NX-1 하루를 마칠 때 누르는 단추 — 아침 첫 화면의 강조는 '오늘 먼저 제안할 것' 에 양보(단추 · 하는 일은 그대로) */}
+              <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
                 <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
               </Button>
             </span>
           </div>
         </div>
+        {/* NX-1 대표 목표 2 — 맞는 모듈이 있는 업체를 맨 위에 눈에 띄게(예전엔 접힌 '영업' 칸 안 작은 링크) */}
+        {!loading && <TodayPicks clients={clients} reco={reco} phone={phone} />}
         {/* D-239: 오늘 화면의 AI 도우미 — 오늘 제일 중요한 것만 · 놓치면 끝나는 것 · 순서 · 연락할 곳(대표 계정에서만) */}
         {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
       </section>

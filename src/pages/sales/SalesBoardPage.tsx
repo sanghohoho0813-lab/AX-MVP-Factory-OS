@@ -9,7 +9,7 @@
  * 모양은 운영 OS 규칙을 따른다 — 원본의 여러 색 단계 표시 대신 테마색 하나와 회색, 급한 것만 경고색.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AiAssist } from '../../components/ai/AiAssist'
 import { salesBundle } from '../../services/aiAssist/builders'
 import { useIsPhone } from '../../lib/useIsPhone'
@@ -31,6 +31,7 @@ import { SalesTabs } from '../../components/sales/SalesTabs'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { createClient, listClients, saveClient } from '../../services/clientOpsService'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
+import { findClientForCretop } from '../../services/salesCretop'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { listRows } from '../../services/moduleData'
@@ -163,9 +164,11 @@ const EMPTY_FORM: ProspectForm = { companyName: '', contactName: '', contactPhon
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
-function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: boolean; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
+function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: boolean; busy: boolean; records: ClientOpsRecord[]; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
   const [f, setF] = useState<ProspectForm>(EMPTY_FORM)
   const pilot = useIsPilot()
+  // NX-2 같은 업체가 이미 있으면 먼저 알린다(고객 관리 등록 · 크레탑과 같은 규칙) — 예전엔 같은 업체가 두 번 생겼다. 다른 업체면 그대로 등록
+  const dupe = f.companyName.trim().length >= 2 ? findClientForCretop(records, { name: f.companyName, bizNo: '' }) : null
   useEffect(() => {
     if (open) setF(EMPTY_FORM)
   }, [open])
@@ -229,6 +232,15 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
           <input value={f.concern} onChange={(e) => set('concern', e.target.value)} placeholder="예) 가지급금이 쌓여 정리 방법을 찾는 중" className={inputClass} />
         </label>
       </div>
+      {dupe && (
+        <p role="status" data-testid="prospect-dupe" className="t-sub mt-3 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-slate-800">
+          같은 이름의 업체가 이미 있습니다 —{' '}
+          <Link to={`/ops/clients/${dupe.id}`} className="font-semibold text-brand-700 underline">
+            {dupe.companyName} 열기
+          </Link>
+          {dupe.archivedAt ? '(보관한 업체)' : ''}. 다른 업체면 그대로 등록하세요.
+        </p>
+      )}
       <p className="t-meta mt-3 break-keep text-slate-500">관심사는 1차 미팅을 마친 뒤 미팅 기록에서 확인합니다.</p>
     </Modal>
   )
@@ -381,20 +393,32 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     [showToast, load, today, records],
   )
 
+  // NX-2 업체는 만들어졌는데 영업 칸 저장만 실패했을 때 — 창 · 적은 내용은 그대로 두고, 다시 누르면 그 업체로 다시 저장(업체를 또 만들지 않음)
+  const createdRef = useRef<ClientOpsRecord | null>(null)
+  const closeForm = () => {
+    const made = createdRef.current
+    createdRef.current = null
+    if (made) setRecords((list) => (list.some((r) => r.id === made.id) ? list : [made, ...list]))
+    setFormOpen(false)
+  }
+
   const create = async (f: ProspectForm) => {
     if (!f.companyName.trim()) return
     setBusy(true)
-    let created: ClientOpsRecord | null = null
+    let created: ClientOpsRecord | null = createdRef.current
     // D-182: 대표가 고른 쪽으로 바로 — 팀장 화면은 늘 중소기업 고객
     const asType: ClientType = pilot ? 'sme' : f.clientType
     try {
-      created = await createClient(workspaceId, {
-        companyName: f.companyName,
-        contactName: f.contactName,
-        contactPhone: f.contactPhone,
-        status: 'waiting',
-        ...(asType === 'consultant' ? { clientType: 'consultant' as const } : {}),
-      })
+      created =
+        created ??
+        (await createClient(workspaceId, {
+          companyName: f.companyName,
+          contactName: f.contactName,
+          contactPhone: f.contactPhone,
+          status: 'waiting',
+          ...(asType === 'consultant' ? { clientType: 'consultant' as const } : {}),
+        }))
+      createdRef.current = created
       const fee = parseInt(f.feeManwon, 10)
       const next = withSalesInfo(withNewProspect(created, f.source), {
         referrer: f.referrer,
@@ -403,7 +427,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         expectedFee: Number.isFinite(fee) && fee > 0 ? fee * 10_000 : null,
       })
       const saved = await saveClient(next)
-      setRecords((list) => [saved, ...list])
+      createdRef.current = null
+      setRecords((list) => [saved, ...list.filter((r) => r.id !== saved.id)])
       setFormOpen(false)
       setPicked('lead')
       if (!pilot) rememberClientTypeView(asType)
@@ -411,11 +436,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : '등록하지 못했습니다.'
       if (created) {
-        // D-120: 업체는 만들어졌는데 영업 칸 저장만 실패 — 다시 누르면 같은 업체가 두 번 생기므로 창을 닫고 목록에 넣는다
-        const made = created
-        setRecords((list) => (list.some((r) => r.id === made.id) ? list : [made, ...list]))
-        setFormOpen(false)
-        showToast(`${josa(made.companyName, '은/는')} 만들어졌지만 영업 칸을 저장하지 못했습니다 — 카드에서 다시 고쳐 주세요. (${msg})`)
+        // D-120 → NX-2: 업체는 만들어졌는데 영업 칸 저장만 실패 — 예전엔 창을 닫아 적은 유입 경로 · 고민 · 수임료가 사라졌다.
+        // 이제 창 · 적은 내용은 그대로, 다시 누르면 같은 업체로 영업 칸만 다시 저장(업체가 두 번 생기지 않음)
+        showToast(`${josa(created.companyName, '은/는')} 만들었지만 영업 칸을 저장하지 못했습니다 — 적은 내용은 그대로예요. [잠재고객 등록] 을 다시 누르면 같은 업체로 다시 저장합니다. (${msg})`)
       } else {
         showToast(msg)
       }
@@ -618,7 +641,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </>
       )}
 
-      <NewProspectModal open={formOpen} busy={busy} onClose={() => setFormOpen(false)} onSubmit={(f) => void create(f)} />
+      <NewProspectModal open={formOpen} busy={busy} records={records} onClose={closeForm} onSubmit={(f) => void create(f)} />
       {closing && (
         <ContractCloseSheet
           record={closing.record}

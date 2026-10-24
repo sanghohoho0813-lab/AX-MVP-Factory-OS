@@ -125,7 +125,9 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
       showToast(replayed ? '같은 요청이라 앞서 만든 결과를 그대로 보여 드립니다.' : run.status === 'parse_fallback' ? `${req.label} — 형식이 달라 원문을 보관했습니다.` : `${req.label} 결과가 나왔습니다. 채택 · 일부 채택 · 폐기 중 골라 주세요.`)
       return true
     } catch (e) {
-      if (e instanceof AiCallError) showToast(e.retryAfter ? `${e.message} (${e.retryAfter}초 뒤)` : e.message)
+      // NX-2 같은 오류가 되풀이되면 관리자가 서버 기록을 찾을 수 있게 문의 번호(요청 번호 끝 6자리)
+      const ref = ['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'rate_limited'].includes(e instanceof AiCallError ? e.code : '') ? '' : ` · 문의 번호 ${req.requestId.slice(-6)}`
+      if (e instanceof AiCallError) showToast(e.retryAfter ? `${e.message} (${e.retryAfter}초 뒤)` : `${e.message}${ref}`)
       else fail(e)
       return false
     } finally {

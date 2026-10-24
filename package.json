@@ -87,6 +87,7 @@
     "qa:pvhome": "node e2e/pvhome.mjs",
     "qa:aihome": "node e2e/aihome.mjs",
     "qa:modfirst": "node e2e/modfirst.mjs",
+    "qa:nextstep": "node e2e/nextstep.mjs",
     "qa:shorts": "node e2e/shorts.mjs",
     "qa:vstudy": "node e2e/vstudy.mjs",
     "qa:speccheck": "node e2e/speccheck.mjs",

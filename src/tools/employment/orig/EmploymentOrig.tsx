@@ -154,7 +154,8 @@ export function EmploymentOrig({
     ref.current = next
     setData(next)
   }, [])
-  const fail = useCallback((e: unknown) => showToast(`저장하지 못했습니다: ${e instanceof Error ? e.message : '오류'}`), [showToast])
+  // NX-2 적은 값은 화면에 그대로 두되(다시 적지 않게) 아직 저장 전이라는 것을 분명히 — 지우기 실패는 아래에서 화면도 되돌린다
+  const fail = useCallback((e: unknown) => showToast(`저장하지 못했습니다(${e instanceof Error ? e.message : '오류'}) — 화면의 값은 아직 저장 전이에요. 인터넷 연결을 확인하고 다시 해 주세요.`), [showToast])
 
   /* ---------------- 업체 ---------------- */
   const persistCompany = useCallback(
@@ -208,10 +209,22 @@ export function EmploymentOrig({
       if (!cur) return
       const gone = new Set(ids)
       commit({ ...cur, companies: cur.companies.filter((c) => !gone.has(String(c.id))), employees: cur.employees.filter((e) => !gone.has(String(e.companyId))) })
-      for (const id of ids) {
-        const row = cur.metaRows.get(id)
-        const saved = await saveRow(workspaceId, MODULE, 'companies', { id: row?.id, clientId: id, data: { ...(row?.data ?? {}), removedAt: new Date().toISOString() } })
-        ref.current?.metaRows.set(id, { id: saved.id, data: saved.data })
+      const done = new Set<string>()
+      try {
+        for (const id of ids) {
+          const row = cur.metaRows.get(id)
+          const saved = await saveRow(workspaceId, MODULE, 'companies', { id: row?.id, clientId: id, data: { ...(row?.data ?? {}), removedAt: new Date().toISOString() } })
+          ref.current?.metaRows.set(id, { id: saved.id, data: saved.data })
+          done.add(id)
+        }
+      } catch (e) {
+        // NX-2 못 뺀 업체는 화면에 되돌린다 — 예전엔 화면에서만 사라지고 새로 열면 다시 나타났다
+        const now = ref.current
+        if (now) {
+          const back = (id: string) => gone.has(id) && !done.has(id)
+          commit({ ...now, companies: [...now.companies, ...cur.companies.filter((c) => back(String(c.id)))], employees: [...now.employees, ...cur.employees.filter((x) => back(String(x.companyId)))] })
+        }
+        throw e
       }
     },
     [commit, workspaceId],
@@ -252,7 +265,18 @@ export function EmploymentOrig({
       if (!cur) return
       const gone = new Set(ids)
       commit({ ...cur, employees: cur.employees.filter((e) => !gone.has(String(e.id))) })
-      for (const id of ids) await deleteRow(workspaceId, MODULE, 'employees', id)
+      const done = new Set<string>()
+      try {
+        for (const id of ids) {
+          await deleteRow(workspaceId, MODULE, 'employees', id)
+          done.add(id)
+        }
+      } catch (e) {
+        // NX-2 못 지운 직원은 화면에 되돌린다
+        const now = ref.current
+        if (now) commit({ ...now, employees: [...now.employees, ...cur.employees.filter((x) => gone.has(String(x.id)) && !done.has(String(x.id)))] })
+        throw e
+      }
     },
     [commit, workspaceId],
   )

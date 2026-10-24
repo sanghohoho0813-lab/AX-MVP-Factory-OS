@@ -299,7 +299,7 @@ function AssistPanel({
   useEscToClose(true, onClose)
   const { showToast } = useToast()
   const [running, setRunning] = useState<string | null>(null)
-  const [error, setError] = useState<{ code: string; message: string; missing: string[] } | null>(null)
+  const [error, setError] = useState<{ code: string; message: string; missing: string[]; ref?: string } | null>(null)
   const [shown, setShown] = useState<Shown>(null)
   const [history, setHistory] = useState<HistoryEntry[]>(() => historyOf(scope))
   const [ask, setAsk] = useState('')
@@ -342,6 +342,8 @@ function AssistPanel({
       if (running) return
       setRunning(preset.id)
       setError(null)
+      // NX-2 실패하면 이 번호 끝 6자리를 '문의 번호' 로 보여 준다(서버 함수 기록과 같은 번호)
+      const requestId = newRequestId()
       try {
         const bundle = await Promise.resolve(build())
         const hash = contextHash(JSON.stringify(bundle.context))
@@ -349,15 +351,16 @@ function AssistPanel({
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : bundle.context
         // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
         const masked = askText ? safeText(askText, [], 500) : ''
-        const runResult: AssistRun = await callAssist({ requestId: newRequestId(), assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
+        const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
         const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label: opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
         setShown(entry)
         window.setTimeout(() => resultRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 40)
       } catch (e) {
-        if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing })
-        else setError({ code: 'provider_error', message: assistMessage('provider_error'), missing: [] })
+        const ref = requestId.slice(-6)
+        if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing, ref })
+        else setError({ code: 'provider_error', message: assistMessage('provider_error'), missing: [], ref })
       } finally {
         setRunning(null)
       }
@@ -706,7 +709,7 @@ export function ModelRow({
 /* 오류 · 결과                                                            */
 /* ------------------------------------------------------------------ */
 
-function ErrorBox({ error }: { error: { code: string; message: string; missing: string[] } }) {
+function ErrorBox({ error }: { error: { code: string; message: string; missing: string[]; ref?: string } }) {
   let how: ReactNode = null
   if (error.code === 'setup_needed')
     how = (
@@ -728,6 +731,12 @@ function ErrorBox({ error }: { error: { code: string; message: string; missing: 
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="t-body font-semibold break-keep text-amber-950">{error.message}</span>
         {how && <span className="t-sub break-keep text-amber-900">{how}</span>}
+        {/* NX-2 같은 오류가 되풀이되면 이 번호로 관리자가 서버 기록을 찾는다(키 · 설정 문제는 번호가 필요 없다) */}
+        {error.ref && !['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'not_deployed'].includes(error.code) && (
+          <span className="t-meta break-keep text-amber-800" data-testid="ai-assist-error-ref">
+            문의 번호 {error.ref} — 계속 안 되면 관리자에게 이 번호를 알려 주세요
+          </span>
+        )}
       </span>
     </div>
   )

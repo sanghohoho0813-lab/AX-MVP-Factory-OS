@@ -206,6 +206,7 @@ export default async function handler(req, res) {
     try {
       return send(res, 200, { ok: true, replayed: true, run: await prev.promise })
     } catch (e) {
+      logFail(body.requestId, assist.id, e)
       return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
     }
   }
@@ -224,6 +225,16 @@ export default async function handler(req, res) {
     return send(res, 200, { ok: true, replayed: false, run: await promise })
   } catch (e) {
     inflight.delete(idemKey)
+    logFail(body.requestId, assist.id, e)
     return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
   }
+}
+
+/**
+ * NX-2 실패 한 줄 — 화면의 '문의 번호'(요청 번호 끝 6자리)로 Vercel 함수 기록에서 찾는다.
+ * 보낸 글 · 답 · 사용자 · 키는 남기지 않는다(번호 · 작업 · 오류 갈래만).
+ */
+function logFail(requestId, assistId, e) {
+  const code = e instanceof ProviderError ? e.code : 'provider_error'
+  console.warn(`[ai-assist] 실패 문의번호=${String(requestId).slice(-6)} 작업=${assistId} 오류=${code}`)
 }
