@@ -97,7 +97,7 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
       {!pilot && (
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
           <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">만들기</span>
-          <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
             {TOOLS.map((it) => (
               <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
                 <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${it.tile ?? 'bg-slate-100 text-slate-600'}`}>
