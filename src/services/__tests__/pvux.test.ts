@@ -12,6 +12,7 @@ import { AXIS_EXAMPLE, IDEA_EXAMPLE, SAMPLE_SOURCE, SECTION_RANGE, axisEndingFix
 import { blockSvg, flowSvg, svgDataUrl, wrapText, xmlEsc } from '../patent/specFigureSvg'
 import { unzip, zipStore } from '../patent/zip'
 import { pvBrief } from '../patent/pvBrief'
+import { pvSteps } from '../patent/pvSteps'
 import { priorIdeaLines } from '../patent/specMaterials'
 
 let passed = 0
@@ -149,6 +150,23 @@ const planNotes = (fill: { narrative: number; core: number; patent?: boolean; te
   ]
   const lines = priorIdeaLines(runs)
   check('PB5 AI 전략실 특허 아이디어 → 폐기 빼고 · 채택 먼저 · 검토 전은 표시 · 다른 작업 결과는 안 섞음', lines.join('|') === '채택 아이디어|(검토 전) 검토 전 아이디어 — 핵심', lines)
+}
+
+// D-282 단계 표시 — 회사 → 아이디어 → 명세서 → 점검 → 사업계획서(명세서 · 점검 · 사업계획서는 준비 현황과 같은 규칙)
+{
+  const clients = [{ id: 'c1', companyName: '한빛' }]
+  const st = (rows: ReturnType<typeof pvBoard>, id: string) => pvSteps(id, rows.find((r) => r.clientId === id) ?? null, '한빛').map((s) => `${s.key}:${s.state}`).join()
+  check('PS1 회사 전 — 회사 고르기가 지금 단계 · 나머지 남음', pvSteps('', null).map((s) => `${s.key}:${s.state}`).join() === 'company:current,idea:todo,spec:todo,check:todo,plan:todo')
+  check('PS2 회사만 고름 — 회사 끝 · 아이디어가 지금', st([], 'c1') === 'company:done,idea:current,spec:todo,check:todo,plan:todo', st([], 'c1'))
+  const fresh = pvBoard({ drafts: [{ id: 'd1', clientId: 'c1', updatedAt: '2026-10-20T00:00:00Z', draft: emptyDraft() }], plans: [], clients })
+  check('PS3 빈 명세서 — 아이디어 진행 중(지금) · 명세서 진행 중', st(fresh, 'c1') === 'company:done,idea:current,spec:todo,check:todo,plan:todo' && pvSteps('c1', fresh[0], '한빛')[2].word === 'doing', st(fresh, 'c1'))
+  const brief = pvBrief({ clientId: 'c1', drafts: [{ id: 'd1', clientId: 'c1', updatedAt: '2026-10-20T00:00:00Z', draft: emptyDraft() }], plans: [], clients, factLines: 0, docs: [], specAi: false })
+  const words = pvSteps('c1', brief.row, '한빛').filter((s) => s.key === 'spec' || s.key === 'check' || s.key === 'plan').map((s) => s.word)
+  check('PS4 명세서 · 점검 · 사업계획서 낱말 상태 = 준비 현황(pvBrief) 상태', JSON.stringify(words) === JSON.stringify(brief.steps.map((s) => s.state)), { words, brief: brief.steps.map((s) => s.state) })
+  const done = sampleDraft()
+  const full = pvBoard({ drafts: [{ id: 'd2', clientId: 'c1', updatedAt: '2026-10-21T00:00:00Z', draft: done }], plans: [], clients })
+  const s2 = pvSteps('c1', full[0], '한빛')
+  check('PS5 지금 단계는 하나뿐 · 끝난 단계 뒤에 남은 단계', s2.filter((s) => s.state === 'current').length <= 1 && s2[0].state === 'done', s2.map((s) => `${s.key}:${s.state}`).join())
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

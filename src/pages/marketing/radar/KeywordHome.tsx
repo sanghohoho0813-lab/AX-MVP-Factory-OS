@@ -10,7 +10,7 @@
  *  - 우리 분야(정책자금 · 고용지원금 · 인증 · 지원사업)는 이번 주 새 공고 수로 — 칩 '이번 주 새 공고 n건'
  */
 import { useState } from 'react'
-import { ArrowRight, CircleHelp, Flame, PenLine, Sparkles } from 'lucide-react'
+import { ArrowRight, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, PenLine, Sparkles, type LucideIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { HintTip } from '../../../components/ui/fold'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
@@ -25,6 +25,14 @@ const AXIS_TONE: Record<ContentAxis, string> = {
 }
 
 const HOME_MAX = 10
+
+/** D-282 키워드 하나로 나오는 형식 — 무엇이 나오는지 아이콘으로 먼저 보이게(콘텐츠 묶음 PackView 의 칸과 같다) */
+const FORMATS: readonly { label: string; icon: LucideIcon }[] = [
+  { label: '유튜브 대본', icon: Clapperboard },
+  { label: '릴스', icon: Film },
+  { label: '블로그', icon: PenLine },
+  { label: '카드뉴스', icon: GalleryHorizontalEnd },
+]
 
 export interface HomeKeyword {
   key: string
@@ -84,6 +92,14 @@ export function KeywordHome({
             </h2>
           </HintTip>
           <p className="t-sub break-keep text-white/90">누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요</p>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
+            {FORMATS.map((f) => (
+              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">
+                <f.icon aria-hidden="true" className="size-3.5" />
+                {f.label}
+              </li>
+            ))}
+          </ul>
           {basis && (
             <p className="t-meta break-keep text-white/80" data-testid="mk-basis">
               {basis}

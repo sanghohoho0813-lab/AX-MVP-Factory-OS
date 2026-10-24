@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, ChevronDown, Copy, PencilLine, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, PencilLine, RotateCcw, X } from 'lucide-react'
 import { PATENT_WARNING, runParts, runTitle } from '../../../services/ownerAi/render'
 import { EVALUATION_LABEL, type AiRevision, type AiRun, type Evaluation } from '../../../services/ownerAi/types'
 import { Badge, Surface, type Tone } from '../../../components/ui/primitives'
@@ -12,6 +12,8 @@ import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { revisedText } from '../../../services/ownerAi/render'
 import { Md, TierBadge, copyToClipboard, fmtDateTime, fmtUsd } from '../shared'
+import { IconTile } from '../../../components/ui/visual'
+import { skillVisual } from '../skillVisual'
 
 const EVAL_TONE: Record<Evaluation, Tone> = { draft: 'neutral', adopted: 'success', partially_adopted: 'brand', rejected: 'danger' }
 
@@ -28,6 +30,7 @@ export function RunCard({
   onEvaluate,
   onRevise,
   onToMemory,
+  onRegenerate,
   toast,
 }: {
   run: AiRun
@@ -38,6 +41,8 @@ export function RunCard({
   onEvaluate: (evaluation: Evaluation, note: string, part: unknown) => Promise<boolean>
   onRevise: (text: string, note: string) => Promise<boolean>
   onToMemory: () => void
+  /** D-282 같은 작업 창을 다시 연다(고를 것 · 자료 · 비용 확인은 그 창 그대로). 없으면 단추 없음 */
+  onRegenerate?: () => void
   toast: (m: string) => void
 }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -46,11 +51,13 @@ export function RunCard({
   const adopted = run.evaluation === 'adopted' || run.evaluation === 'partially_adopted'
   const studio = run.skillId === 'SANGHO_PROPOSAL' ? 'proposal' : run.skillId === 'AX_FRONT' ? 'front' : null
   const isMessage = run.skillId === 'CONSULTANT_MESSAGE'
+  const sv = skillVisual(run.skillId)
 
   return (
     <div data-run={run.id} data-skill={run.skillId} data-evaluation={run.evaluation}>
     <Surface as="article" className="flex flex-col gap-3">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="tap -m-1 flex min-h-11 items-start gap-2 p-1 text-left">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="tap -m-1 flex min-h-11 items-start gap-3 p-1 text-left">
+        <IconTile icon={sv.icon} tone={sv.tone} size="md" />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="t-card font-bold break-keep text-slate-900">{runTitle(run)}</span>
@@ -61,6 +68,7 @@ export function RunCard({
           </span>
           <span className="t-meta mt-0.5 block text-slate-500">
             {fmtDateTime(run.createdAt)}
+            {run.tier !== 'manual' && run.model ? ` · ${run.model}` : ''}
             {run.contextVersion ? ` · 기억 v${run.contextVersion} 사용` : run.tier === 'manual' ? '' : ' · 기억 없이'}
             {run.evaluationNote && ` · 메모: ${run.evaluationNote}`}
           </span>
@@ -82,11 +90,12 @@ export function RunCard({
             {isMessage || run.status === 'pasted' || run.status === 'parse_fallback' ? <p className="t-body break-words whitespace-pre-wrap text-slate-800">{text}</p> : <Md text={text} />}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant={run.evaluation === 'adopted' ? 'primary' : 'secondary'} disabled={busy} onClick={() => onEvaluate('adopted', '', null)} data-testid="eval-adopt">
+            {/* D-282 주 단추는 하나 — 검토 전이면 [채택], 채택했으면 [기억에 넣기] */}
+            <Button size="sm" variant={run.evaluation === 'draft' ? 'primary' : 'secondary'} aria-pressed={run.evaluation === 'adopted'} disabled={busy} onClick={() => onEvaluate('adopted', '', null)} data-testid="eval-adopt">
               <Check aria-hidden="true" className="size-4" />
               채택
             </Button>
-            <Button size="sm" variant={run.evaluation === 'partially_adopted' ? 'primary' : 'secondary'} disabled={busy} onClick={() => setDialog('partial')} data-testid="eval-partial">
+            <Button size="sm" variant="secondary" aria-pressed={run.evaluation === 'partially_adopted'} disabled={busy} onClick={() => setDialog('partial')} data-testid="eval-partial">
               일부 채택
             </Button>
             <Button size="sm" variant={run.evaluation === 'rejected' ? 'danger' : 'secondary'} disabled={busy} onClick={() => setDialog('reject')} data-testid="eval-reject">
@@ -117,8 +126,14 @@ export function RunCard({
               복사
             </Button>
             {adopted && (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={onToMemory} data-testid="run-to-memory">
+              <Button size="sm" variant="primary" disabled={busy} onClick={onToMemory} data-testid="run-to-memory">
                 기억에 넣기
+              </Button>
+            )}
+            {onRegenerate && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={onRegenerate} data-testid="run-regenerate">
+                <RotateCcw aria-hidden="true" className="size-4" />
+                다시 만들기
               </Button>
             )}
           </div>

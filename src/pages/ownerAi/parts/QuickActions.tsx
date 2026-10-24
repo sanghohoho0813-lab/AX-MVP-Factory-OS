@@ -6,8 +6,8 @@
  *  - 하나가 도는 동안 다른 단추는 잠긴다.
  *  - '깊게' 작업을 이미 한 번 만들었으면 다시 만들기 전에 한 번 묻는다(비용).
  */
-import { useMemo, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileText, Landmark, Loader2, Sparkles, Stamp, Target, type LucideIcon } from 'lucide-react'
 import { buildAiContext, materialsFor, payloadChars } from '../../../services/ownerAi/context'
 import { newUuid } from '../../../services/ownerAi/caseUtil'
 import { QUICK_ACTIONS, SKILL_META, TIER_LABEL, type QuickAction } from '../../../services/ownerAi/skillCatalog'
@@ -19,6 +19,17 @@ import { BottomSheet, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { TierBadge, type AiSetup } from '../shared'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
+import { IconTile } from '../../../components/ui/visual'
+import type { FeatureTone } from '../../../config/featureVisual'
+import { skillVisual } from '../skillVisual'
+
+/** D-282 목적 카드 그림 — 기능 색 갈래(AX 보라 · 자금 초록 · 특허 · 벤처 호박 · 제안서 파랑) */
+const PURPOSE_VISUAL: Partial<Record<CaseActionKey, { icon: LucideIcon; tone: FeatureTone; sub: string }>> = {
+  ax: { icon: Target, tone: 'purple', sub: '판정 · 추천 AX · 12주 증명' },
+  funding: { icon: Landmark, tone: 'green', sub: '맞는 자금 · 근거 표시' },
+  patent: { icon: Stamp, tone: 'amber', sub: '특허 아이디어 · 벤처 논리' },
+  proposal: { icon: FileText, tone: 'blue', sub: '페이지 구성 → 실제 글자로' },
+}
 
 export interface RunRequest {
   skill: SkillId
@@ -38,7 +49,10 @@ export function QuickActions({
   onPaste,
   docsHint = 0,
   onDocs,
+  reopen = null,
 }: {
+  /** D-282 결과 카드 [다시 만들기] — 그 작업 창을 연다(n 이 바뀔 때마다) */
+  reopen?: { skill: SkillId; n: number } | null
   /** AI-2 업체 서류함에 아직 자료로 안 넣은 서류 수 */
   docsHint?: number
   onDocs?: () => void
@@ -51,6 +65,11 @@ export function QuickActions({
   onPaste: () => void
 }) {
   const [open, setOpen] = useState<QuickAction | null>(null)
+  useEffect(() => {
+    if (!reopen) return
+    const a = QUICK_ACTIONS.find((x) => x.skill === reopen.skill)
+    if (a) setOpen(a)
+  }, [reopen])
   // AI-1 첫 질문 "이 회사에 어떤 도움을 줄까요?" — 지금 할 작업 하나(규칙) + 목적 단추 4개. 작업 10가지 · 붙여넣기는 '다른 작업' 안(지운 것 없음)
   const next = useMemo(() => caseNext(bundle.runs), [bundle.runs])
   const actionOf = (key: CaseActionKey) => QUICK_ACTIONS.find((a) => a.key === key)
@@ -66,9 +85,11 @@ export function QuickActions({
         <ModelPicker popover testId="owner-ai-model" />
       </div>
       {rec && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3 sm:flex-row sm:items-center" data-testid="case-next" data-action-next={next.action}>
+        <div className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/40 px-3.5 py-3.5 sm:flex-row sm:items-center" data-testid="case-next" data-action-next={next.action}>
+          <IconTile icon={PURPOSE_VISUAL[next.action]?.icon ?? Sparkles} tone={PURPOSE_VISUAL[next.action]?.tone ?? 'purple'} size="lg" className="hidden sm:flex" />
           <p className="t-body min-w-0 flex-1 break-keep text-slate-900">
-            <b>추천 · {rec.label}</b>
+            <span className="t-meta block font-semibold text-violet-700">다음 추천 작업</span>
+            <b className="t-card">{rec.label}</b>
             <span className="t-sub block text-slate-700" data-testid="case-next-why">
               {next.why}
             </span>
@@ -97,11 +118,29 @@ export function QuickActions({
         {purposes.map((p) => {
           const a = actionOf(p.key)
           if (!a) return null
+          const v = PURPOSE_VISUAL[p.key] ?? { ...skillVisual(a.skill), sub: a.hint }
           return (
-            <Button key={p.key} variant="secondary" onClick={() => setOpen(a)} disabled={!!running} className="justify-start" data-testid="case-purpose" data-purpose={p.key}>
-              {running === a.label ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-              {p.label}
-            </Button>
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setOpen(a)}
+              disabled={!!running}
+              className="tap ax-lift flex min-h-[4.25rem] items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+              data-testid="case-purpose"
+              data-purpose={p.key}
+            >
+              {running === a.label ? (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                  <Loader2 aria-hidden="true" className="size-5 animate-spin text-slate-600" />
+                </span>
+              ) : (
+                <IconTile icon={v.icon} tone={v.tone} size="md" />
+              )}
+              <span className="flex min-w-0 flex-col">
+                <span className="t-body font-semibold break-keep text-slate-900">{p.label}</span>
+                <span className="t-meta break-keep text-slate-500">{v.sub}</span>
+              </span>
+            </button>
           )
         })}
       </div>
@@ -112,6 +151,7 @@ export function QuickActions({
           {QUICK_ACTIONS.map((a) => {
             const tier = SKILL_META[a.skill].tier
             const isRunning = running === a.label
+            const sv = skillVisual(a.skill)
             return (
               <button
                 key={a.key}
@@ -119,9 +159,12 @@ export function QuickActions({
                 data-action={a.key}
                 disabled={!!running}
                 onClick={() => setOpen(a)}
-                className="tap flex min-h-[4.75rem] flex-col items-start gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="tap flex min-h-[4.75rem] flex-col items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span className="t-body font-semibold break-keep text-slate-900">{a.label}</span>
+                <span className="flex items-center gap-2">
+                  <IconTile icon={sv.icon} tone={sv.tone} size="sm" />
+                  <span className="t-body font-semibold break-keep text-slate-900">{a.label}</span>
+                </span>
                 <span className="t-meta break-keep text-slate-600">{isRunning ? '만드는 중…' : a.hint}</span>
                 <span className="mt-auto pt-1">{isRunning ? <Loader2 aria-hidden="true" className="size-4 animate-spin text-brand-600" /> : <TierBadge tier={tier} />}</span>
               </button>

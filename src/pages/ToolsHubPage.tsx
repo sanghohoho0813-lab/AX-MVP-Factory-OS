@@ -1,3 +1,5 @@
+import { IconTile } from '../components/ui/visual'
+import { moduleTone } from '../config/featureVisual'
 import { ArrowRight } from 'lucide-react'
 import { useIsPilot } from '../auth/osAccess'
 import { Link } from 'react-router-dom'
@@ -68,7 +70,7 @@ function ModuleCard({ m }: { m: CatalogModule }) {
   return (
     <li className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4" data-module-card={m.key}>
       <div className="flex flex-wrap items-center gap-2">
-        <m.icon aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+        <IconTile icon={m.icon} tone={moduleTone(`cat-${m.key}`)} size="md" />
         <h3 className="t-card font-bold text-slate-900">{m.name}</h3>
         <Badge tone={e.usable ? (e.source === 'trial' ? 'warning' : 'success') : 'neutral'}>{e.usable ? (e.source === 'trial' ? e.label : '쓰는 중') : '잠김'}</Badge>
       </div>

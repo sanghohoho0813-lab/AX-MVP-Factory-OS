@@ -22,13 +22,15 @@ import { ModelPicker } from '../ai/ModelPicker'
 import type { AssistPage } from '../../services/aiAssist/presets'
 import type { AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
+import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
 
 export interface WorkChatProps {
   module: ChatModule
   title: string
   placeholder: string
-  starters: readonly (ChatStarter & { icon: ReactNode })[]
+  /** D-282 tone — 큰 단추 아이콘 칸의 기능 색(없으면 테마색) */
+  starters: readonly (ChatStarter & { icon: ReactNode; tone?: FeatureTone })[]
   clients: readonly { id: string; companyName: string; businessNumber?: string | null; corporateNumber?: string | null }[] | null
   clientId: string
   clientName: string
@@ -55,6 +57,8 @@ export interface WorkChatProps {
   brief?: ReactNode
   /** 대화창 큰 제목(없으면 '무엇을 도와드릴까요?') */
   heroTitle?: string
+  /** D-282 회사 고르기 바로 아래 · 준비 현황 위 — 단계 표시(규칙 계산) */
+  steps?: ReactNode
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -325,7 +329,7 @@ export function WorkChat(p: WorkChatProps) {
           data-testid="chat-starter"
           data-id={s.id}
         >
-          <span className={`grid shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ${compact ? 'size-5 bg-transparent' : 'size-8'}`} aria-hidden="true">
+          <span className={`grid shrink-0 place-items-center rounded-lg ${compact ? `size-5 bg-transparent ${s.tone ? toneClass(s.tone).icon : 'text-brand-700'}` : `size-10 ${s.tone ? toneClass(s.tone).tile : 'bg-brand-50 text-brand-700'}`}`} aria-hidden="true">
             {s.icon}
           </span>
           <span className={`${compact ? '' : 't-body'} font-semibold break-keep text-slate-900`}>{s.label}</span>
@@ -362,6 +366,7 @@ export function WorkChat(p: WorkChatProps) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4" data-testid={`chat-${p.module}`} data-turns={turns.length}>
       {head}
+      {p.steps}
       {p.brief}
       {p.onFile && <input ref={fileRef} type="file" accept={p.fileAccept} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} data-testid="chat-file-input" />}
 

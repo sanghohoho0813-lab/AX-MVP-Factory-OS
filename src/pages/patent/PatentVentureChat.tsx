@@ -23,11 +23,16 @@ import { pvBoard } from '../../services/patent/pvBoard'
 import { pvBrief } from '../../services/patent/pvBrief'
 import { companyFactLines, importableDocs } from '../../services/patent/specMaterials'
 import { PvBriefCard, PvResumeCard } from './PvBriefCard'
+import { pvSteps } from '../../services/patent/pvSteps'
+import { StepProgress } from '../../components/ui/visual'
+import type { FeatureTone } from '../../config/featureVisual'
 
 type DraftRow = { draft: SpecDraft } & Record<string, unknown>
 type CertWorkRow = { cert?: string; notes?: Record<string, string> } & Record<string, unknown>
 
 const ICONS = { status: <ListChecks className="size-5" />, write: <FilePen className="size-5" />, check: <FileSearch className="size-5" />, plan: <PenLine className="size-5" /> } as const
+/** D-282 큰 단추 아이콘 칸 색 — 특허 · 벤처 도구는 호박색, 진행 확인은 남색 */
+const TONES: Record<keyof typeof ICONS, FeatureTone> = { status: 'indigo', write: 'amber', check: 'amber', plan: 'amber' }
 
 
 export function PatentVentureChatPage() {
@@ -74,6 +79,8 @@ export function PatentVentureChatPage() {
     [clientId, ready, data, record, specAi],
   )
   const resumeRows = useMemo(() => (!clientId && ready ? pvBoard({ drafts: data.drafts, plans: data.plans, clients: data.clients }) : []), [clientId, ready, data])
+  // D-282 단계 표시 — 회사를 고르기 전에는 순서만(회사 고르기가 지금 단계). 고르면 준비 현황 카드 안에 같은 다섯 단계
+  const steps = useMemo(() => (ready && !clientId ? pvSteps('', null) : null), [clientId, ready])
   const createDraft = async (draft: SpecDraft, msg: string, auto = false) => {
     try {
       const r = await drafts.save({ clientId, data: { draft } })
@@ -96,7 +103,17 @@ export function PatentVentureChatPage() {
         module="pv"
         title="특허 · 벤처"
         placeholder="예) 이 회사 명세서 어디까지 썼어?"
-        starters={PV_STARTERS.map((s) => ({ ...s, icon: ICONS[s.id as keyof typeof ICONS] }))}
+        starters={PV_STARTERS.map((s) => ({ ...s, icon: ICONS[s.id as keyof typeof ICONS], tone: TONES[s.id as keyof typeof ICONS] }))}
+        steps={
+          steps ? (
+            <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-3 sm:px-4" aria-label="특허 · 벤처 단계" data-testid="pv-steps">
+              <StepProgress
+                label={clientName ? `${clientName} 특허 · 벤처 단계` : '특허 · 벤처 단계'}
+                steps={steps.map((st) => ({ key: st.key, label: st.label, state: st.state, note: st.note, onClick: st.href ? () => navigate(st.href as string) : undefined }))}
+              />
+            </section>
+          ) : undefined
+        }
         clients={clients}
         clientId={clientId}
         clientName={clientName}
@@ -125,7 +142,7 @@ export function PatentVentureChatPage() {
         today={today}
         brief={
           brief ? (
-            <PvBriefCard company={clientName || '이 회사'} brief={brief} onNewSpec={() => void createDraft(emptyDraft(), '', true)} />
+            <PvBriefCard company={clientName || '이 회사'} clientId={clientId} brief={brief} onNewSpec={() => void createDraft(emptyDraft(), '', true)} />
           ) : resumeRows.length ? (
             <PvResumeCard rows={resumeRows} onPick={(r) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))} />
           ) : undefined

@@ -6,7 +6,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Plus, Search, Sparkles } from 'lucide-react'
+import { BarChart3, Building2, Plus, Search, Sparkles } from 'lucide-react'
+import { IconTile } from '../../components/ui/visual'
 import { findDuplicates, normalizeCompany, relationForClient, type DuplicateHit } from '../../services/ownerAi/caseUtil'
 import { parsePartnerHandoff, PARTNER_EVENT } from '../../services/ownerAi/partnerBridge'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
@@ -137,6 +138,7 @@ function Home() {
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="AI 전략실"
+        icon={<IconTile icon={Sparkles} tone="purple" size="lg" />}
         sub="대표 전용 · 업체마다 기억이 이어지는 AI 작업 · 결과는 채택한 것만 다음 작업에 씁니다"
         actions={
           <>
@@ -285,6 +287,7 @@ function Home() {
             {list.map((c) => (
               <ListRow
                 key={c.id}
+                leading={<IconTile icon={Building2} tone={c.clientId ? 'blue' : 'slate'} size="sm" />}
                 title={c.companyName}
                 badge={<Badge tone={c.relation === 'contracted' ? 'success' : c.relation === 'proposing' ? 'brand' : 'neutral'}>{RELATION_LABEL[c.relation]}</Badge>}
                 meta={[c.requester && `요청 ${c.requester}`, c.clientId && '고객 관리와 이어짐', c.contextVersion ? `기억 v${c.contextVersion}` : '기억 없음', `${fmtDateTime(c.updatedAt).slice(0, 10)} 작업`].filter(Boolean).join(' · ')}

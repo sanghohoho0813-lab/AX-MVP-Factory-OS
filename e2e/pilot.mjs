@@ -403,6 +403,11 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   check('Pilot(D-185): Esc 로 닫힘', (await tut.count()) === 0)
+  // D-282 팀장 오늘 화면 — 바로가기는 메뉴와 같은 권한(대표 전용 AI 전략실 · 특허 · 벤처 · 마케팅 없음) · KPI 에 '최근 AI 작업' 칸 없음
+  await go(page, '/')
+  const uxTiles = await page.getByTestId('app-tile').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('Pilot(D-282): 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처 · 마케팅) 없음 · 고객 관리 · 전체 도구는 있음', uxTiles.includes('client-ops') && uxTiles.includes('tools') && !uxTiles.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)), uxTiles)
+  check('Pilot(D-282): KPI — 최근 AI 작업 칸 없음 · 상담 대신 후속 약속 · 대표 자료 0', (await page.getByTestId('kpi-ai').count()) === 0 && (await page.getByTestId('kpi-follow').innerText()).includes('후속 약속') && leaked(await page.getByTestId('today-kpis').innerText()).length === 0)
   // 팀장 머리줄([안내 영상] 단추가 늘 있다) — 5폭 × 글자 3단계에서 넘치지 않는다
   {
     const bad = []
@@ -1084,6 +1089,8 @@ try {
   const bottom = (await mp.locator('nav').last().innerText().catch(() => '')) ?? ''
   check('390 Pilot: 하단 메뉴에 상담 없음', !bottom.includes('상담'), bottom.replace(/\n/g, '|'))
   check('390 Pilot: 오늘 화면 가로 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
+  const mTiles = await mp.getByTestId('app-tile').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('390 Pilot(D-282): 휴대폰 큰 아이콘 바로가기 — 대표 전용 없음', mTiles.length >= 4 && !mTiles.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)), mTiles)
   await shot(mp, 'pilot-m01-today')
   await mp.getByRole('button', { name: /더보기|메뉴/ }).last().click().catch(() => {})
   await mp.waitForTimeout(500)

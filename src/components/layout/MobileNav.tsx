@@ -14,39 +14,27 @@ import { useNavCounts } from './useNavCounts'
 import { Link } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { CalendarDays, Inbox, KanbanSquare, LayoutGrid, ListChecks, Sun } from 'lucide-react'
-import { navAccentClass, type NavAccent } from '../../config/moduleRegistry'
+import { moduleTone, toneClass } from '../../config/featureVisual'
 
 interface NavItem {
   to: string
   label: string
   icon: typeof Sun
-  /** 서랍(햄버거) 메뉴의 같은 항목과 같은 아이콘 색 — moduleRegistry 의 accent */
-  accent: NavAccent
+  /** 서랍(햄버거) 메뉴의 같은 항목과 같은 기능 색 — moduleRegistry 줄 key(D-282 featureVisual) */
+  module: string
   /** 이 경로들로 시작하면 선택된 것으로 본다 */
   match?: string[]
 }
 
 /** 서랍 메뉴 순서와 같다: 오늘 → 일정 → 고객 → 상담신청 → 영업 (D-108 · D-125: 영업이 하루 일의 절반이라 아래에도) */
 const ITEMS: NavItem[] = [
-  { to: '/', label: '오늘', icon: Sun, accent: 'overview', match: ['/'] },
-  { to: '/ops/calendar', label: '일정', icon: CalendarDays, accent: 'evidence', match: ['/ops/calendar', '/journal'] },
-  { to: '/ops/clients', label: '고객', icon: ListChecks, accent: 'ops', match: ['/ops/clients'] },
+  { to: '/', label: '오늘', icon: Sun, module: 'today', match: ['/'] },
+  { to: '/ops/calendar', label: '일정', icon: CalendarDays, module: 'calendar', match: ['/ops/calendar', '/journal'] },
+  { to: '/ops/clients', label: '고객', icon: ListChecks, module: 'client-ops', match: ['/ops/clients'] },
   // D-125: 여섯 칸이 되어 아래에서는 '상담' 으로 줄인다(서랍에는 '잠재고객 상담신청' 그대로) — 큰 글자에서 옆 칸과 붙었다
-  { to: '/ops/inbox', label: '상담', icon: Inbox, accent: 'alert', match: ['/ops/inbox'] },
-  { to: '/sales/board', label: '영업', icon: KanbanSquare, accent: 'revenue', match: ['/sales'] },
+  { to: '/ops/inbox', label: '상담', icon: Inbox, module: 'inbox', match: ['/ops/inbox'] },
+  { to: '/sales/board', label: '영업', icon: KanbanSquare, module: 'sales', match: ['/sales'] },
 ]
-
-/* 고른 칸의 옅은 바탕 — Tailwind 는 적힌 글자만 만들므로 통째로 적는다 */
-const ACTIVE_BG: Record<NavAccent, string> = {
-  overview: 'bg-nav-overview/15',
-  ops: 'bg-nav-ops/15',
-  revenue: 'bg-nav-revenue/15',
-  customer: 'bg-nav-customer/15',
-  ai: 'bg-nav-ai/15',
-  evidence: 'bg-nav-evidence/15',
-  alert: 'bg-nav-alert/15',
-  system: 'bg-nav-system/15',
-}
 
 function isActive(pathname: string, item: NavItem): boolean {
   if (item.to === '/') return pathname === '/'
@@ -70,6 +58,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
         {items.map((item) => {
           const active = isActive(pathname, item)
           const Icon = item.icon
+          const tone = toneClass(moduleTone(item.module))
           const requests = item.to === '/ops/inbox' ? (counts.requests ?? 0) : 0
           const clients = item.to === '/ops/clients' ? counts.clients : null
           return (
@@ -80,9 +69,9 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                 className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-0 py-1.5"
               >
                 <span
-                  className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-colors ${active ? ACTIVE_BG[item.accent] : ''}`}
+                  className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${active ? tone.soft : ''}`}
                 >
-                  <Icon aria-hidden="true" className={`size-5 ${navAccentClass(item.accent)}`} />
+                  <Icon aria-hidden="true" className={`size-[22px] ${tone.icon}`} strokeWidth={active ? 2.4 : 2} />
                   {/* D-104 · D-108: 처리 안 한 상담신청 수 — 빨간 바탕 흰 숫자, 흰 테두리로 아이콘과 떼어 바로 보이게 (0 이면 없음) */}
                   {requests > 0 && (
                     <span
@@ -120,8 +109,8 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
             className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-0 py-1.5 whitespace-nowrap text-slate-500"
           >
             {/* 더보기 = 서랍 — 서랍 속 컨설팅 작업실 첫 아이콘과 같은 색(테마를 따라간다) */}
-            <span className="flex h-7 w-12 items-center justify-center">
-              <LayoutGrid aria-hidden="true" className="nav-ramp size-5" />
+            <span className="flex h-8 w-14 items-center justify-center">
+              <LayoutGrid aria-hidden="true" className="size-[22px] text-slate-600" />
             </span>
             <span className="t-meta font-medium">더보기</span>
           </button>

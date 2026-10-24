@@ -12,6 +12,9 @@ import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
 import { TodayPicks } from '../components/ops/TodayPicks'
+import { TodayKpis } from '../components/ops/TodayKpis'
+import { AppLauncher } from '../components/layout/AppLauncher'
+import { buildAllDecisions } from '../services/decisions'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -42,7 +45,7 @@ import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesS
 import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
 import { CallButton } from '../components/ops/opsControls'
 import { addDaysLocal } from '../services/clientOpsNextAction'
-import { isProspect, salesInFlow } from '../services/salesPipeline'
+import { countContractClients, isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
@@ -162,6 +165,23 @@ function AllLink({ to }: { to: string }) {
     <Link to={to} className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline">
       모두 보기
     </Link>
+  )
+}
+
+/** D-282 바로가기 — 목차 머리 + 앱 런처(PC 흰 카드 · 휴대폰 큰 아이콘) */
+function TodayLauncher({ phone }: { phone: boolean }) {
+  return (
+    <section aria-labelledby="today-launcher-title" className="flex flex-col gap-2" data-testid="today-launcher">
+      <HelpHeading
+        id="today-launcher-title"
+        label="바로가기"
+        help="자주 여는 기능으로 바로 가요. 왼쪽 메뉴와 같은 기능이고, 계정에 열린 것만 보여요. 나머지는 [전체 도구] 에 있어요."
+        className={`${phone ? 't-card' : 't-section'} flex items-center gap-2 break-keep text-slate-900`}
+      >
+        바로가기
+      </HelpHeading>
+      <AppLauncher variant={phone ? 'icon' : 'card'} />
+    </section>
   )
 }
 
@@ -340,6 +360,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [journal, today],
   )
   const todoCount = openTodos.length
+  // D-282 맨 위 KPI — 화면이 이미 센 것만(확인할 것은 아래 '확인할 것' 칸과 같은 판정)
+  const decisionCount = useMemo(() => buildAllDecisions(clients, today, grantNotices, usable).length, [clients, today, grantNotices, usable])
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   /** D-239: AI 도우미에 보낼 오늘 자료 — 화면이 이미 계산한 목록 그대로 */
   const assistBuild = useCallback(async () => {
@@ -445,6 +468,21 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </span>
           </div>
         </div>
+        {/* D-282 맨 위 KPI 다섯 칸(휴대폰은 옆으로 밀기) · 바로가기(메뉴와 같은 권한 규칙). 휴대폰은 큰 아이콘 바로가기를 먼저 */}
+        {phone && <TodayLauncher phone />}
+        {!loading && (
+          <TodayKpis
+            todo={{ open: todoCount, overdue: overdueTodos.length, hard: hardDue.length }}
+            clients={{ contract: countContractClients(clients), prospect: clients.filter(isProspect).length }}
+            decisions={decisionCount}
+            follow={{ events: openEvents.length, appointments: appointments.length, lateAppointments: appointments.filter((e) => (e.daysLeft ?? 0) < 0).length }}
+            pilot={pilot}
+            phone={phone}
+            onTodos={() => scrollTo('today-todo-card')}
+            onFollow={() => (!pilot && openEvents.length > 0 ? navigate('/ops/inbox') : appointments.length > 0 ? scrollTo('today-appointments') : navigate('/ops/calendar'))}
+          />
+        )}
+        {!phone && <TodayLauncher phone={false} />}
         {/* NX-1 대표 목표 2 — 맞는 모듈이 있는 업체를 맨 위에 눈에 띄게(예전엔 접힌 '영업' 칸 안 작은 링크) */}
         {!loading && <TodayPicks clients={clients} reco={reco} phone={phone} />}
         {/* D-239: 오늘 화면의 AI 도우미 — 오늘 제일 중요한 것만 · 놓치면 끝나는 것 · 순서 · 연락할 곳(대표 계정에서만) */}
@@ -470,7 +508,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       */}
       <section
         aria-labelledby="todos"
-        className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
+        id="today-todo-card"
+        className="scroll-mt-24 flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
       >
         {/*
           카드 안에 '오늘 할 일' 제목을 또 두지 않는다 — 바로 위 h1 이 이미 그 말이다.
@@ -544,7 +583,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
           {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
           {appointments.length > 0 && (
-            <div data-testid="today-appointments" className="flex flex-col gap-2">
+            <div data-testid="today-appointments" id="today-appointments" className="scroll-mt-24 flex flex-col gap-2">
               <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
               <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
                 {(phone && !showAllAppts ? appointments.slice(0, PHONE_ROWS) : appointments).map((e) => {

@@ -105,6 +105,14 @@
   --color-nav-alert: #d66a5e;
   --color-nav-system: #94a3b8;
 
+  /* D-282 기능 색 '산호'(마케팅) — Tailwind 기본 색표에 없어 따로 둔다. 나머지 기능 색은 기본 색표(blue · violet · amber …)를 쓴다(config/featureVisual.ts) */
+  --color-coral-50: #fff3f0;
+  --color-coral-100: #ffe4dd;
+  --color-coral-300: #ffab9b;
+  --color-coral-400: #fb8a74;
+  --color-coral-600: #e0583f;
+  --color-coral-700: #b9402b;
+
   /* Restrained radii (10–14px) */
   --radius-card: 12px;
   --radius-panel: 14px;

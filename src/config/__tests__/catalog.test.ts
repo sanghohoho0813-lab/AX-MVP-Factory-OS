@@ -19,6 +19,7 @@ import {
 } from '../productCatalog'
 import { TOOLS } from '../toolRegistry'
 import { MODULES, enabledModulesByGroup, screenGroupForPath } from '../moduleRegistry'
+import { LAUNCHER_ALL, LAUNCHER_ENTRIES, LAUNCHER_SLOTS, moduleTone, toneClass, type FeatureTone } from '../featureVisual'
 import { clientEntryHref, featureForPath, featurePath } from '../featurePaths'
 import { DEFAULT_CATALOG, defaultSubscription, quote, resolveEntitlements, validateSelection, type Subscription } from '../../services/entitlements'
 import type { ModuleAccess } from '../../services/moduleAccess'
@@ -206,6 +207,26 @@ async function storage() {
 }
 
 await storage()
+
+/* D-282 기능 색 · 바로가기 — 메뉴 표와 같은 줄을 가리키고, 대표 전용 줄은 팀장 메뉴처럼 빠진다 */
+{
+  const keys = new Set(MODULES.map((m) => m.key))
+  check('D-282 바로가기 줄은 모두 메뉴 표에 있다(새 길을 만들지 않는다)', [...LAUNCHER_ENTRIES, LAUNCHER_ALL].every((e) => keys.has(e.module)), [...LAUNCHER_ENTRIES, LAUNCHER_ALL].filter((e) => !keys.has(e.module)).map((e) => e.module).join())
+  const visibleFor = (pilot: boolean, caps: string[]) => {
+    const vis = new Set(enabledModulesByGroup({ advanced: true, pilot, caps: new Set(caps) }).flatMap((g) => g.items.map((m) => m.key)))
+    return LAUNCHER_ENTRIES.filter((e) => vis.has(e.module)).slice(0, LAUNCHER_SLOTS).map((e) => e.module)
+  }
+  const owner = visibleFor(false, ['can_use_owner_ai_workspace'])
+  const pilot = visibleFor(true, [])
+  check('D-282 대표 바로가기 7 + 전체 도구 — 고객 관리 · AI 전략실 · 특허 · 벤처 · 자금 · 지원사업 · 영업 · 마케팅 · 일정', owner.join() === 'client-ops,ai-workspace,patent-venture,cat-growth,sales,marketing,calendar', owner.join())
+  check('D-282 팀장 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처 · 마케팅) 없음 · 예비 줄이 채움', !pilot.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)) && pilot.length === LAUNCHER_SLOTS, pilot.join())
+  check('D-282 기능 권한 없는 대표(구성원)에게도 AI 전략실 바로가기 없음', !visibleFor(false, []).includes('ai-workspace'))
+  const want: Record<string, FeatureTone> = { 'client-ops': 'blue', 'ai-workspace': 'purple', 'patent-venture': 'amber', 'cat-growth': 'green', sales: 'orange', marketing: 'coral', calendar: 'teal' }
+  check('D-282 기능 색 — 고객 파랑 · AI 보라 · 특허 · 벤처 호박 · 정책자금 초록 · 영업 주황 · 마케팅 산호 · 일정 청록', Object.entries(want).every(([k, t]) => moduleTone(k) === t), Object.keys(want).map((k) => `${k}:${moduleTone(k)}`).join())
+  check('D-282 모르는 줄은 회색', moduleTone('settings') === 'slate' && moduleTone('없는줄') === 'slate')
+  const tones: FeatureTone[] = ['indigo', 'teal', 'blue', 'purple', 'amber', 'orange', 'coral', 'green', 'cyan', 'rose', 'slate']
+  check('D-282 색 클래스는 통째로 적힘(이어 붙이지 않음 — D-26)', tones.every((t) => Object.values(toneClass(t)).every((c) => typeof c === 'string' && c.length > 0 && !c.includes('${'))))
+}
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

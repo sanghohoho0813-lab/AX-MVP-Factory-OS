@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { screenTitleForPath } from '../../config/moduleRegistry'
 import { HintTip } from './fold'
+import { useTitleIcon } from './titleIcon'
 
 interface PageHeaderProps {
   title: string
@@ -28,10 +29,14 @@ export function PageHeader({ title, description, descriptionAsHint = false, acti
   const { pathname } = useLocation()
   const sameAsHeader = screenTitleForPath(pathname) === title && !showOnPhone
   const asHint = descriptionAsHint && !!description
+  // D-282 메뉴와 같은 기능 아이콘 칸(제목이 메뉴 이름으로 시작할 때만) — 휴대폰에서 제목을 숨기는 화면이면 같이 숨긴다
+  const icon = useTitleIcon(title)
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-      <div className="min-w-0">
+      <div className={`min-w-0 ${icon ? 'flex items-start gap-3' : ''}`}>
+        {icon && <span className={sameAsHeader ? 'hidden lg:flex print:hidden' : 'flex print:hidden'}>{icon}</span>}
+        <div className="min-w-0">
         {asHint ? (
           <>
             {/* 휴대폰 위쪽 띠가 이미 이름을 말하면 제목 · ⓘ 를 다시 그리지 않는다(읽어 주는 기계용 제목만) */}
@@ -48,6 +53,7 @@ export function PageHeader({ title, description, descriptionAsHint = false, acti
         {description && !asHint && (
           <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'}`}>{description}</p>
         )}
+        </div>
       </div>
       {actions && (
         <div className="-mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:justify-end sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

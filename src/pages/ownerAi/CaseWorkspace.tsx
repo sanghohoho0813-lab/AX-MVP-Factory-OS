@@ -6,14 +6,15 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Archive, ExternalLink } from 'lucide-react'
+import { Archive, Brain, ExternalLink, FolderOpen, History, Sparkles, type LucideIcon } from 'lucide-react'
+import { IconTile } from '../../components/ui/visual'
 import { AiCallError } from '../../services/ownerAi/aiClient'
 import { caseSnapshot } from '../../services/ownerAi/context'
 import { caseDocs, docsNotIn } from '../../services/ownerAi/caseDocs'
 import { factsFromExtract, newUuid, withCaseActivity } from '../../services/ownerAi/caseUtil'
 import { applyContext } from '../../services/ownerAi/memory'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
-import { skillName } from '../../services/ownerAi/skillCatalog'
+import { QUICK_ACTIONS, skillName } from '../../services/ownerAi/skillCatalog'
 import { CASE_RELATIONS, RELATION_LABEL, emptyContext, type AiRun, type CaseRelation, type CurrentContext, type Evaluation, type SkillId } from '../../services/ownerAi/types'
 import { evaluate, latestSnapshot, loadBundle, pasteChatGpt, patchCase, runSkill, saveContext, saveRevision, type CaseBundle } from '../../services/ownerAi/workflow'
 import { todayLocalDate } from '../../lib/appClock'
@@ -27,6 +28,13 @@ import { QuickActions, type RunRequest } from './parts/QuickActions'
 import { RunCard } from './parts/RunCard'
 import { MemoryCard, MemoryEditor } from './parts/MemoryCard'
 import { MaterialsCard } from './parts/MaterialsCard'
+
+type SideTab = 'memory' | 'materials' | 'timeline'
+const SIDE_TABS: { key: SideTab; label: string; icon: LucideIcon }[] = [
+  { key: 'memory', label: '기억', icon: Brain },
+  { key: 'materials', label: '자료', icon: FolderOpen },
+  { key: 'timeline', label: '기록', icon: History },
+]
 
 type Phase = { kind: 'loading' } | { kind: 'ready' } | { kind: 'missing' } | { kind: 'db_setup' } | { kind: 'error'; message: string }
 
@@ -46,6 +54,13 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const [showOld, setShowOld] = useState(false)
   // AI-2 첫 화면 [서류 넣기] → 업체 자료의 서류함 창(숫자가 바뀔 때마다 연다)
   const [docsOpen, setDocsOpen] = useState(0)
+  // D-282 오른쪽 칸 — 기억 · 자료 · 기록을 탭으로(세 칸을 길게 쌓지 않는다). 셋 다 늘 그려 두고 고른 것만 보인다
+  const [side, setSide] = useState<SideTab>('memory')
+  // D-282 결과 카드 [다시 만들기] → 같은 작업 창을 연다(QuickActions 가 받는다)
+  const [reopen, setReopen] = useState<{ skill: SkillId; n: number } | null>(null)
+  useEffect(() => {
+    if (docsOpen > 0) setSide('materials')
+  }, [docsOpen])
 
   const load = useCallback(async () => {
     try {
@@ -208,6 +223,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
       {/* 머리 — 업체 · 관계 · 이어 둔 고객 */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          {!embedded && <IconTile icon={Sparkles} tone="purple" size="lg" />}
           {!embedded && <h1 className="t-page min-w-0 break-words text-slate-900" data-testid="case-title">{b.c.companyName}</h1>}
           <label className="flex items-center gap-1.5">
             <span className="sr-only">관계 상태</span>
@@ -257,10 +273,10 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="flex min-w-0 flex-col gap-4">
-          <QuickActions bundle={b} today={today} running={running} setup={setup} onRun={doRun} onPaste={() => setPasteOpen(true)} docsHint={newDocs} onDocs={() => setDocsOpen((n) => n + 1)} />
+          <QuickActions bundle={b} today={today} running={running} setup={setup} onRun={doRun} onPaste={() => setPasteOpen(true)} docsHint={newDocs} onDocs={() => setDocsOpen((n) => n + 1)} reopen={reopen} />
           <section className="flex flex-col gap-3" aria-label="AI 결과">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="t-section text-slate-900">결과</h2>
+              <h2 className="t-section text-slate-900">AI 결과</h2>
               <span className="t-sub text-slate-500">{b.runs.length}개 · 지우지 않고 쌓입니다</span>
             </div>
             {recentRuns.length === 0 ? (
@@ -279,6 +295,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
                     onEvaluate={onEvaluate(run)}
                     onRevise={onRevise(run)}
                     onToMemory={() => toMemory(run)}
+                    onRegenerate={run.status !== 'pasted' && QUICK_ACTIONS.some((a) => a.skill === run.skillId) ? () => setReopen({ skill: run.skillId, n: Date.now() }) : undefined}
                     toast={showToast}
                   />
                 ))}
@@ -291,7 +308,31 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
             )}
           </section>
         </div>
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
+          <div role="tablist" aria-label="업체 기억 · 자료 · 기록" className="grid grid-cols-3 gap-1 rounded-(--radius-control) bg-slate-100 p-1" data-testid="case-side-tabs">
+            {SIDE_TABS.map((t) => {
+              const count = t.key === 'memory' ? (b.snapshots.length ? `v${b.snapshots[b.snapshots.length - 1].version}` : '') : t.key === 'materials' ? String(b.c.materials.length) : String(b.c.activity.length)
+              const on = side === t.key
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  id={`case-side-tab-${t.key}`}
+                  aria-selected={on}
+                  aria-controls={`case-side-${t.key}`}
+                  onClick={() => setSide(t.key)}
+                  data-side-tab={t.key}
+                  className={`tap t-sub flex min-h-11 items-center justify-center gap-1.5 rounded-[8px] px-2 font-semibold ${on ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  <t.icon aria-hidden="true" className="size-4 shrink-0" />
+                  {t.label}
+                  {count && count !== '0' && <span className="t-meta font-semibold text-slate-500 tabular-nums">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
+          <div role="tabpanel" id="case-side-memory" aria-labelledby="case-side-tab-memory" hidden={side !== 'memory'}>
           <MemoryCard
             snapshots={b.snapshots}
             busy={saving || !!running}
@@ -299,6 +340,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
             onSave={saveMemory}
             onAiTidy={() => void runInternal('CONTEXT_UPDATE', '기억 정리')}
           />
+          </div>
+          <div role="tabpanel" id="case-side-materials" aria-labelledby="case-side-tab-materials" hidden={side !== 'materials'}>
           <MaterialsCard
             openDocs={docsOpen}
             materials={b.c.materials}
@@ -323,7 +366,10 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
               if (c) setBundle((prev) => (prev ? { ...prev, c } : prev))
             }}
           />
-          <TimelineCard activity={b.c.activity} />
+          </div>
+          <div role="tabpanel" id="case-side-timeline" aria-labelledby="case-side-tab-timeline" hidden={side !== 'timeline'}>
+            <TimelineCard activity={b.c.activity} />
+          </div>
         </div>
       </div>
 

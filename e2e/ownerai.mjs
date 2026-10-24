@@ -286,6 +286,8 @@ await page.reload({ waitUntil: 'networkidle' })
   await page.getByTestId('case-workspace').waitFor()
 
   // 자료 — PDF · URL · 메모(주민번호 · 비밀번호는 저장 전에 지움)
+  // D-282 오른쪽 칸이 기억 · 자료 · 기록 탭 — 자료 탭을 연다
+  await page.locator('[data-side-tab="materials"]').click()
   await page.getByTestId('material-file-input').setInputFiles(PDF)
   await page.locator('[data-material]').first().waitFor({ timeout: 30000 })
   const mats = (await cases()).find((c) => c.companyName.includes('그린로직스'))?.materials ?? []
@@ -518,6 +520,7 @@ let caseId = ''
 
   // D-219: '자료 요약 · 업체 정보 채우기' — 올린 자료를 실제로 보낸다(예전: 빈 목록을 '이것만' 으로 읽어 자료 0개)
   const nS = (await runs()).length
+  await page.locator('[data-side-tab="materials"]').click()
   await page.getByTestId('material-summarize').click()
   await waitRuns(nS + 1)
   const sum = llm.filter((c) => c.skill === 'SNAPSHOT_EXTRACT').at(-1)

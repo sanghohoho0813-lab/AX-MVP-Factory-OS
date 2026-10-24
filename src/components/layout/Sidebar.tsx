@@ -1,23 +1,22 @@
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react'
+import type { FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useEffect, useRef, useState } from 'react'
 import { MAIN_MIN, NAV_MIN, navMaxFor, navPx, setNavSize, showNav, sizeAtDrag, stepNav, toggleNavIcons, useNavSize, type NavSize } from '../../lib/navWidth'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
-import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
+import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X, type LucideIcon } from 'lucide-react'
 import { FeedbackNavButton } from '../feedback/FeedbackNavButton'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
 import {
   enabledModulesByGroup,
-  groupAccentClass,
   moduleMatchLength,
-  navAccentClass,
   navPathForSidebar,
   type ModuleDefinition,
   type ModuleGroupKey,
 } from '../../config/moduleRegistry'
+import { groupTone, moduleTone, toneClass, type FeatureTone } from '../../config/featureVisual'
 import { readRaw, writeRaw } from '../../storage/localStore'
 import { FUTURE_ITEMS, type FutureItem } from '../../config/capabilityStatus'
 import { FutureItemDialog } from './FutureItemDialog'
@@ -86,6 +85,15 @@ function SidebarContent({
   const groups = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot, caps })
   const counts = useNavCounts()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
+  // D-282 접힌 메뉴(아이콘만)에서 손을 올리거나 키보드로 옮기면 이름표 — 브라우저 기본 title 은 늦게 · 작게 떠서 대신한다
+  const [tip, setTip] = useState<{ label: string; top: number; left: number } | null>(null)
+  const showTip = (e: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-nav-tip]')
+    if (!el) return setTip(null)
+    const r = el.getBoundingClientRect()
+    setTip({ label: el.dataset.navTip ?? '', top: r.top + r.height / 2, left: r.right + 10 })
+  }
+  const tipProps = collapsed ? { onMouseOver: showTip, onFocus: showTip, onMouseLeave: () => setTip(null), onBlur: () => setTip(null), onScroll: () => setTip(null) } : {}
 
   useEffect(() => {
     setUserCollapsed(readCollapsedGroups())
@@ -160,8 +168,8 @@ function SidebarContent({
         )}
       </div>
 
-      <nav aria-label="주 메뉴" className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="flex flex-col gap-4">
+      <nav aria-label="주 메뉴" className="flex-1 overflow-y-auto px-3 py-4" {...tipProps}>
+        <ul className="flex flex-col gap-5">
           {groups.map(({ group, items }) => {
             const containsActive = items.some((m) => moduleMatchLength(m, navPath) > 0)
             const isCollapsed = group.collapsible
@@ -179,13 +187,13 @@ function SidebarContent({
                       onClick={() => toggleGroup(group.key, isCollapsed)}
                       className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300 hover:text-white"
                     >
-                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${groupAccentClass(group.accent)}`} />
+                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
                       <span className="flex-1 text-left">{group.title}</span>
                       <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                     </button>
                   ) : (
                     <p id={`nav-${group.key}`} className="flex items-center gap-1.5 px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300">
-                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${groupAccentClass(group.accent)}`} />
+                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
                       {group.title}
                     </p>
                   )
@@ -195,9 +203,9 @@ function SidebarContent({
                     id={listId}
                     aria-labelledby={!collapsed && !group.collapsible ? `nav-${group.key}` : undefined}
                     aria-label={collapsed || group.collapsible ? group.title : undefined}
-                    className="flex flex-col gap-1"
+                    className="flex flex-col gap-0.5"
                   >
-                    {items.filter((item) => !item.parent).map((item, idx, top) => (
+                    {items.filter((item) => !item.parent).map((item) => (
                       <li key={item.key}>
                         {item.expand === 'future-items' ? (
                           <FutureExpandRow item={item} collapsed={collapsed} />
@@ -208,8 +216,6 @@ function SidebarContent({
                             navPath={navPath}
                             collapsed={collapsed}
                             onNavigate={onNavigate}
-                            rampIndex={idx}
-                            rampCount={top.length}
                             isOpen={isCategoryOpen}
                             onToggle={toggleCategory}
                           />
@@ -220,8 +226,7 @@ function SidebarContent({
                             collapsed={collapsed}
                             onNavigate={onNavigate}
                             counts={counts}
-                            iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
-                            iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
+                            tone={moduleTone(item.key)}
                           />
                         )}
                       </li>
@@ -239,7 +244,7 @@ function SidebarContent({
         예전 서랍의 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기)은 없앴다 —
         가이드는 '이 시스템' 묶음으로, 글자 크기는 설정으로 갔다.
       */}
-      <div className="shrink-0 border-t border-navy-800 px-3 py-3">
+      <div className="shrink-0 border-t border-navy-800 px-3 py-3" {...tipProps}>
         {/* D-158: 휴대폰 서랍의 글자 크기는 뺐다(대표: 설정에 있으니 굳이) */}
         {/* D-164: 휴대폰 서랍에서도 대표 ↔ 팀장 화면(PC 는 머리줄 오른쪽 위) */}
         {!collapsed && (
@@ -264,13 +269,38 @@ function SidebarContent({
             type="button"
             onClick={onToggleCollapsed}
             aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            data-nav-tip={collapsed ? '사이드바 펼치기' : undefined}
             className={`flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2 text-[0.9rem] text-navy-200 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
           >
             {collapsed ? <ChevronsRight aria-hidden="true" className="size-[18px] shrink-0" /> : (<><ChevronsLeft aria-hidden="true" className="size-[18px] shrink-0" /><span>사이드바 접기</span></>)}
           </button>
         )}
       </div>
+      {collapsed && tip && (
+        <div
+          role="tooltip"
+          data-testid="nav-tip"
+          style={{ top: tip.top, left: tip.left }}
+          className="t-sub pointer-events-none fixed z-[60] -translate-y-1/2 rounded-(--radius-control) bg-slate-900 px-3 py-1.5 font-semibold whitespace-nowrap text-white shadow-(--shadow-overlay)"
+        >
+          {tip.label}
+        </div>
+      )}
     </div>
+  )
+}
+
+/**
+ * D-282 메뉴 아이콘 칸 — 기능 색 옅은 바탕 + 아이콘(어두운 메뉴 위). 지금 화면이면 흰 칸.
+ * 색은 '어디인가' 만 말한다(화면 규칙 §8-1). 급한 정도는 숫자 배지(빨강)가 말한다.
+ */
+function NavIcon({ icon: Icon, tone, active, collapsed, small = false }: { icon: LucideIcon; tone: FeatureTone; active: boolean; collapsed: boolean; small?: boolean }) {
+  const t = toneClass(tone)
+  const box = collapsed ? 'size-10 rounded-xl' : small ? 'size-7 rounded-lg' : 'size-8 rounded-lg'
+  return (
+    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center ${box} ${active ? 'bg-white/20 text-white' : `${t.darkTile} ${t.darkIcon}`}`}>
+      <Icon className={collapsed ? 'size-5' : small ? 'size-4' : 'size-[18px]'} />
+    </span>
   )
 }
 
@@ -412,8 +442,7 @@ function NavLinkRow({
   collapsed,
   onNavigate,
   counts,
-  iconClass,
-  iconStyle,
+  tone,
   nested = false,
 }: {
   item: ModuleDefinition
@@ -421,23 +450,29 @@ function NavLinkRow({
   collapsed: boolean
   onNavigate?: () => void
   counts: NavCounts
-  iconClass: string
-  iconStyle?: CSSProperties
+  /** 기능 색 — 분야 아래 줄(nested)은 색 없이 작은 아이콘 */
+  tone?: FeatureTone
   nested?: boolean
 }) {
   return (
     <Link
       to={item.path}
       onClick={onNavigate}
-      title={collapsed ? item.label : item.hint}
+      title={collapsed ? undefined : item.hint}
+      aria-label={collapsed ? item.label : undefined}
+      data-nav-tip={collapsed ? item.label : undefined}
       // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
       aria-current={isActive ? 'page' : undefined}
-      className={`relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 font-medium transition-colors ${nested ? 'text-[0.92rem]' : 'text-[0.95rem]'} ${collapsed ? 'justify-center px-0' : ''} ${
+      className={`relative flex items-center gap-3 rounded-(--radius-control) font-medium transition-colors ${nested ? 'min-h-11 px-3 py-2 text-[0.92rem]' : 'min-h-11 px-2 py-1.5 text-[0.95rem]'} ${collapsed ? 'justify-center px-0' : ''} ${
         isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
       }`}
     >
       {isActive && !collapsed && <span aria-hidden="true" className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90" />}
-      <item.icon aria-hidden="true" className={`${nested ? 'size-4' : 'size-5'} shrink-0 ${isActive ? 'text-white' : iconClass}`} style={!isActive ? iconStyle : undefined} />
+      {nested || !tone ? (
+        <item.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? 'text-white' : 'text-navy-300'}`} />
+      ) : (
+        <NavIcon icon={item.icon} tone={tone} active={isActive} collapsed={collapsed} />
+      )}
       {!collapsed && <span className="truncate">{item.label}</span>}
       <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
       {!collapsed && item.status === 'soon' && (
@@ -465,8 +500,6 @@ function CategoryRow({
   navPath,
   collapsed,
   onNavigate,
-  rampIndex,
-  rampCount,
   isOpen,
   onToggle,
 }: {
@@ -475,8 +508,6 @@ function CategoryRow({
   navPath: string
   collapsed: boolean
   onNavigate?: () => void
-  rampIndex: number
-  rampCount: number
   isOpen: (key: string, containsActive: boolean) => boolean
   onToggle: (key: string, currentlyOpen: boolean) => void
 }) {
@@ -487,16 +518,17 @@ function CategoryRow({
   const childActive = items.some((c) => moduleMatchLength(c, navPath) > 0)
   const open = isOpen(item.key, childActive || selfActive)
   const listId = `nav-cat-${item.key}`
+  const tone = moduleTone(item.key)
   if (collapsed) {
     return (
       <Link
         to={item.path}
         onClick={onNavigate}
-        title={item.label}
+        data-nav-tip={item.label}
         aria-current={selfActive || childActive ? 'page' : undefined}
-        className={`relative flex min-h-11 items-center justify-center rounded-(--radius-control) py-2.5 transition-colors ${selfActive || childActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'}`}
+        className={`relative flex min-h-11 items-center justify-center rounded-(--radius-control) py-1.5 transition-colors ${selfActive || childActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'}`}
       >
-        <item.icon aria-hidden="true" className={`size-5 shrink-0 ${selfActive || childActive ? 'text-white' : 'nav-ramp'}`} style={rampStyle(rampIndex, rampCount)} />
+        <NavIcon icon={item.icon} tone={tone} active={selfActive || childActive} collapsed />
         <span className="sr-only">{item.label}</span>
       </Link>
     )
@@ -510,11 +542,11 @@ function CategoryRow({
         data-nav-category={item.moduleKey}
         onClick={() => onToggle(item.key, open)}
         title={item.hint}
-        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.95rem] font-medium transition-colors ${
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.95rem] font-medium transition-colors ${
           selfActive ? 'bg-navy-800 text-white' : childActive ? 'text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
         }`}
       >
-        <item.icon aria-hidden="true" className="nav-ramp size-5 shrink-0" style={rampStyle(rampIndex, rampCount)} />
+        <NavIcon icon={item.icon} tone={tone} active={false} collapsed={false} />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {locked && (
           <span data-nav-locked className="shrink-0 rounded-full border border-navy-600 px-1.5 py-0.5 text-[0.875rem] font-semibold text-navy-300">
@@ -524,10 +556,10 @@ function CategoryRow({
         <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
-        <ul id={listId} aria-label={`${item.label} 기능`} className="mt-1 ml-5 flex flex-col gap-0.5 border-l border-navy-700 pl-2">
+        <ul id={listId} aria-label={`${item.label} 기능`} className="mt-1 ml-6 flex flex-col gap-0.5 border-l border-navy-700 pl-2">
           {items.map((c) => (
             <li key={c.key}>
-              <NavLinkRow item={c} isActive={moduleMatchLength(c, navPath) > 0} collapsed={false} onNavigate={onNavigate} counts={counts} iconClass="text-navy-300" nested />
+              <NavLinkRow item={c} isActive={moduleMatchLength(c, navPath) > 0} collapsed={false} onNavigate={onNavigate} counts={counts} nested />
             </li>
           ))}
           <li>
@@ -544,17 +576,6 @@ function CategoryRow({
       )}
     </>
   )
-}
-
-/**
- * D-102: 도구함 아이콘 색 — 맨 위(세금 계산기)부터 아래로 색상(hue)만 조금씩 옮겨 간다.
- * 밝기·채도는 한 가지로 묶어(톤 일정) 튀지 않게 하고, 시작 색상은 지금 테마의 강조색에서 잡는다(테마를 바꾸면 같이 옮겨 간다).
- * 전체 폭은 84° — 한 칸에 84/(n-1)° 씩(8칸이면 12°). 더 넓히면 맨 아래가 딴 색처럼 튄다.
- */
-function rampStyle(index: number, count: number): CSSProperties {
-  // D-136: 한 칸 14° 까지만 — 잘 안 쓰는 분야를 접어 줄이 넷이 되어도 색이 크게 튀지 않게(예전 일곱 줄일 때와 같은 폭)
-  const step = count > 1 ? Math.min(14, 84 / (count - 1)) : 0
-  return { ['--ramp-shift' as string]: String(Math.round(index * step)) }
 }
 
 /** D-103: 사이드바 아래 — 이름 · 직함 + 고객 플랫폼 아이콘 */
@@ -611,10 +632,12 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((v) => !v)}
-        title={collapsed ? item.label : item.hint}
-        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.95rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+        title={collapsed ? undefined : item.hint}
+        aria-label={collapsed ? item.label : undefined}
+        data-nav-tip={collapsed ? item.label : undefined}
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.95rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
       >
-        <item.icon aria-hidden="true" className={`size-5 shrink-0 ${navAccentClass(item.accent)}`} />
+        <NavIcon icon={item.icon} tone="slate" active={false} collapsed={collapsed} />
         {!collapsed && <span className="truncate">{item.label}</span>}
         {!collapsed && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">

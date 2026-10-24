@@ -187,6 +187,20 @@ await page.getByTestId('case-workspace').waitFor()
   await page.waitForFunction(() => document.querySelector('[data-testid="case-next"]')?.getAttribute('data-action-next') === 'mvp', null, { timeout: 10000 }).catch(() => {})
   check("N1 AX 채택 → 추천 'MVP 구체화' · 'AX 방향이 확정되어 있어 MVP 구체화를 추천합니다'", (await page.getByTestId('case-next').getAttribute('data-action-next')) === 'mvp' && (await page.getByTestId('case-next-why').innerText()).includes('AX 방향이 확정되어 있어 MVP 구체화를 추천합니다'))
   check('N2 목적 단추에 AX 다시 보임(다시 분석할 수 있게)', (await page.getByTestId('case-purpose').evaluateAll((els) => els.map((e) => e.dataset.purpose))).includes('ax'))
+  // D-282 결과 카드 — 주 단추는 하나(채택했으니 [기억에 넣기]) · [다시 만들기] 는 같은 작업 창을 연다(AI 를 바로 부르지 않는다)
+  {
+    const card = page.locator('[data-skill="AX_PENGUIN"]').first()
+    const primaries = await card.locator('button.bg-brand-600, a.bg-brand-600').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
+    const model = (await runs()).find((r) => r.skillId === 'AX_PENGUIN')?.model ?? ''
+    check('UX1 채택한 결과 카드 — 주 단추 하나([기억에 넣기]) · 쓴 모델 이름이 머리줄에', JSON.stringify(primaries) === '["run-to-memory"]' && !!model && (await card.innerText()).includes(model), { primaries, model })
+    const l0 = llm.length
+    await card.getByTestId('run-regenerate').click()
+    await page.getByTestId('ai-run').waitFor({ timeout: 5000 })
+    const sheetTitle = await page.getByRole('dialog').first().innerText()
+    check('UX2 [다시 만들기] → 같은 작업 창(AX 전략 분석) · AI 호출 0(누르기 전)', sheetTitle.includes('AX 전략 분석') && llm.length === l0, sheetTitle.slice(0, 80))
+    await page.getByRole('dialog').getByRole('button', { name: '닫기' }).first().click()
+    await page.waitForTimeout(300)
+  }
 
   // 내용을 바꿔 다시 누르면 새 요청 번호(같은 번호면 앞의 답이 돌아온다)
   await page.getByTestId('case-next-go').click()

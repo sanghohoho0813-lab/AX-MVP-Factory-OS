@@ -3,40 +3,37 @@
  * 대화창은 그 아래 그대로(묻고 싶은 것 · 점검 파일 올리기).
  */
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Circle, CircleDot, Sparkles } from 'lucide-react'
+import { ArrowRight, Sparkles, Stamp } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import type { PvBrief, PvStepState } from '../../services/patent/pvBrief'
+import { IconTile, StepProgress } from '../../components/ui/visual'
+import type { PvBrief } from '../../services/patent/pvBrief'
 import type { PvBoardRow } from '../../services/patent/pvBoard'
+import { pvSteps } from '../../services/patent/pvSteps'
 
-const STATE: Record<PvStepState, { icon: typeof Circle; word: string; cls: string }> = {
-  done: { icon: CheckCircle2, word: '끝', cls: 'text-success-700' },
-  doing: { icon: CircleDot, word: '진행 중', cls: 'text-brand-700' },
-  todo: { icon: Circle, word: '아직', cls: 'text-slate-600' },
-}
-
-export function PvBriefCard({ company, brief, onNewSpec }: { company: string; brief: PvBrief; onNewSpec: () => void }) {
+export function PvBriefCard({ company, clientId, brief, onNewSpec }: { company: string; clientId: string; brief: PvBrief; onNewSpec: () => void }) {
   const navigate = useNavigate()
   const go = () => (brief.next.href ? navigate(brief.next.href) : onNewSpec())
+  // D-282 준비 현황 = 다섯 단계 표시(회사 → 아이디어 → 명세서 → 점검 → 사업계획서). 명세서 · 점검 · 사업계획서는 준비 현황과 같은 규칙
+  const steps = pvSteps(clientId, brief.row, company)
   return (
-    <section className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-slate-900 bg-white p-4" data-testid="pv-brief" aria-label={`${company} 특허 · 벤처 준비 현황`}>
-      <h2 className="t-section break-keep text-slate-900 [overflow-wrap:anywhere]">{company} — 준비 현황</h2>
-      <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="pv-brief-steps">
-        {brief.steps.map((s, i) => {
-          const L = STATE[s.state]
-          return (
-            <li key={s.key} className="flex min-w-0 items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2" data-testid="pv-brief-step" data-key={s.key} data-state={s.state}>
-              <L.icon aria-hidden="true" className={`size-5 shrink-0 ${L.cls}`} />
-              <span className="t-sub min-w-0 flex-1 break-keep text-slate-800">
-                <b className="text-slate-900">
-                  {i + 1} {s.label}
-                </b>
-                {s.text && <> · {s.text}</>}
-              </span>
-              <span className={`t-sub shrink-0 font-bold ${L.cls}`}>{L.word}</span>
-            </li>
-          )
-        })}
-      </ol>
+    <section className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-amber-200 bg-white p-4" data-testid="pv-brief" aria-label={`${company} 특허 · 벤처 준비 현황`}>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <IconTile icon={Stamp} tone="amber" size="md" />
+        <h2 className="t-section min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">{company} — 준비 현황</h2>
+      </div>
+      <StepProgress
+        label={`${company} 특허 · 벤처 단계`}
+        testId="pv-brief-steps"
+        steps={steps.map((st) => ({
+          key: st.key,
+          label: st.label,
+          state: st.state,
+          note: st.note,
+          onClick: st.href ? () => navigate(st.href as string) : undefined,
+          // 명세서 · 점검 · 사업계획서 줄은 예전 준비 현황 칸과 같은 이름 · 상태 낱말(done · doing · todo)
+          attrs: (st.key === 'spec' || st.key === 'check' || st.key === 'plan' ? { 'data-testid': 'pv-brief-step', 'data-key': st.key, 'data-state': st.word } : { 'data-key': st.key }) as Record<string, string>,
+        }))}
+      />
       <p className="t-sub break-keep text-slate-700" data-testid="pv-brief-have">
         <b className="text-slate-900">이미 있는 자료</b> · {brief.have.length ? `${brief.have.join(' · ')} — AI 가 알아서 읽어요` : '아직 없음 — 고객 관리 › 서류함에 올리면 알아서 읽어요'}
         {brief.research && <> · 선행기술 조사 {brief.research === 'done' ? '함' : '아직'}</>}
