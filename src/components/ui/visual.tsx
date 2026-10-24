@@ -205,8 +205,9 @@ export interface StepItem {
  * 화면이 실제로 가진 상태만 넣는다 — 상태를 지어내지 않는다.
  */
 export function StepProgress({ steps, label, testId }: { steps: StepItem[]; label: string; testId?: string }) {
+  // 휴대폰(640 미만)은 세로 목록 — 다섯 칸을 한 줄에 두면 칸이 60~70px 라 이름이 한 줄 두 자씩 짜부라진다(qa:squeeze)
   return (
-    <ol aria-label={label} className="grid gap-y-2" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} data-testid={testId}>
+    <ol aria-label={label} className="flex flex-col gap-0.5 sm:grid sm:gap-y-2" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} data-testid={testId}>
       {steps.map((s, i) => {
         const dot =
           s.state === 'done'
@@ -216,29 +217,32 @@ export function StepProgress({ steps, label, testId }: { steps: StepItem[]; labe
               : 'border-slate-300 bg-white text-slate-500'
         const inner = (
           <>
-            <span className="flex w-full items-center">
-              <span aria-hidden="true" className={`h-0.5 flex-1 ${i === 0 ? 'bg-transparent' : s.state === 'todo' ? 'bg-slate-200' : 'bg-brand-500'}`} />
+            <span className="flex shrink-0 items-center sm:w-full">
+              <span aria-hidden="true" className={`hidden h-0.5 flex-1 sm:block ${i === 0 ? 'bg-transparent' : s.state === 'todo' ? 'bg-slate-200' : 'bg-brand-500'}`} />
               <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-[0.875rem] font-bold ${dot}`}>
                 {s.state === 'done' ? <Check aria-hidden="true" className="size-4" strokeWidth={3} /> : i + 1}
               </span>
-              <span aria-hidden="true" className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'bg-transparent' : steps[i + 1]?.state === 'todo' ? 'bg-slate-200' : 'bg-brand-500'}`} />
+              <span aria-hidden="true" className={`hidden h-0.5 flex-1 sm:block ${i === steps.length - 1 ? 'bg-transparent' : steps[i + 1]?.state === 'todo' ? 'bg-slate-200' : 'bg-brand-500'}`} />
             </span>
-            <span className={`t-sub px-0.5 text-center leading-snug font-semibold break-keep ${s.state === 'current' ? 'text-brand-700' : s.state === 'done' ? 'text-slate-700' : 'text-slate-500'}`}>
-              {s.label}
-              {s.state === 'current' && <span className="sr-only"> (지금 단계)</span>}
-              {s.state === 'done' && <span className="sr-only"> (끝남)</span>}
+            <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 sm:flex-none sm:flex-col sm:items-center">
+              <span className={`t-sub px-0.5 leading-snug font-semibold break-keep sm:text-center ${s.state === 'current' ? 'text-brand-700' : s.state === 'done' ? 'text-slate-700' : 'text-slate-500'}`}>
+                {s.label}
+                {s.state === 'current' && <span className="sr-only"> (지금 단계)</span>}
+                {s.state === 'done' && <span className="sr-only"> (끝남)</span>}
+              </span>
+              {s.note && <span className="t-meta px-0.5 break-keep text-slate-500 sm:text-center">{s.note}</span>}
             </span>
-            {s.note && <span className="t-meta px-0.5 text-center break-keep text-slate-500">{s.note}</span>}
           </>
         )
+        const box = 'flex w-full items-center gap-3 rounded-(--radius-control) px-1 py-1 text-left sm:flex-col sm:gap-1 sm:px-0'
         return (
           <li key={s.key} className="min-w-0" data-step={s.key} data-state={s.state} {...s.attrs}>
             {s.onClick ? (
-              <button type="button" onClick={s.onClick} className="tap flex w-full cursor-pointer flex-col items-center gap-1 rounded-(--radius-control) py-1 hover:bg-slate-50" aria-current={s.state === 'current' ? 'step' : undefined}>
+              <button type="button" onClick={s.onClick} className={`tap ${box} cursor-pointer hover:bg-slate-50`} aria-current={s.state === 'current' ? 'step' : undefined}>
                 {inner}
               </button>
             ) : (
-              <span className="flex w-full flex-col items-center gap-1 py-1" aria-current={s.state === 'current' ? 'step' : undefined}>
+              <span className={box} aria-current={s.state === 'current' ? 'step' : undefined}>
                 {inner}
               </span>
             )}
