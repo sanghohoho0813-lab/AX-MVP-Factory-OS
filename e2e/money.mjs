@@ -188,7 +188,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(prep, { TODAY, later, earlier })
-  await page.evaluate(() => localStorage.setItem('axmvp.ui.text_scale', 'extra_large'))
+  await page.evaluate(() => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); p.textScale = 'extra_large'; localStorage.setItem(k, JSON.stringify(p)) })
   await page.goto(BASE + '/money', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('390 매출: 가로 넘침 0', (await overflowX(page)) <= 0, await overflowX(page))

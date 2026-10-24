@@ -3825,7 +3825,7 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   AX 단추(추천 단추) 위치(px): 390 **926 → 877** · 360 아주 큰 글자 **1,349 → 1,315**. AX 결과까지 누르는 수는 2번 그대로.
 - **시험**: test:ownerai 110(CN1~CN8 · CN3b · CD1~CD2 새로) · test:assist 139(DR2 · DR2a~DR2c 새로) · qa:aihome 18(새로) · qa:ownerai 72 · qa:assist 64 · qa:specboard 102 · qa:ventureplan 82.
   스크린샷(PC 1440 · 390 · 360 아주 큰 글자 · 서류함 창)을 눈으로 확인.
-- **게이트 67단계**(HEAD 4e48e74 · dirty 0) — **67/67 녹색**(qa:aihome 18 · qa:ownerai 72 · qa:specboard 102 · qa:ventureplan 82 · 짜부라짐 0 · DB 보안 · 1인 Pilot 교차 255 · test:all 전부).
+- **게이트 67단계**(HEAD 4e48e74 · dirty 0) — **67/67 녹색**(qa:aihome 18 · qa:ownerai 72 · qa:specboard 102 · qa:ventureplan 82 · 짜부라짐 0 · DB 보안 230 · 1인 Pilot 교차 255 · test:all 전부).
 - **병합** — main bc670c6 → **4e48e74**(fast-forward) · 작업 브랜치 claude/os-master-ux-stabilization 남김.
 - **Production(os.miraeailab.com)** — Vercel 배포 성공(4e48e74) · CaseWorkspace 조각에 '이 회사에 어떤 도움을 줄까요?' · 추천 단추 · 서류 넣기 안내 · '결과를 채택하면 다음 단계' 있음.
 - 확인하지 못한 것: 실제 AI 공급자에서 끊긴 요청을 같은 번호로 다시 보냈을 때 서버가 같은 인스턴스에서 받는지(다른 인스턴스면 다시 부름 — 그래서 시간 초과는 자동 한 번만) ·

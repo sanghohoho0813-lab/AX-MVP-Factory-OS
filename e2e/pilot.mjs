@@ -780,6 +780,31 @@ try {
   await go(page, '/journal')
   check('대표 다시: 업무 일기에 Pilot 기록 없음', !((await page.locator('main').innerText()) ?? '').includes('은혜테스트정밀') && !((await page.locator('main').innerText()) ?? '').includes('박대표와 통화'))
 
+  /* ---------- INT-1 동시 저장 보호(진짜 DB) — 화면을 연 사이 다른 곳(다른 창 · 다른 사람)이 고친 업체를 이 화면 저장이 덮어쓰지 않는다 ---------- */
+  {
+    const typeOf = () => sql(`select coalesce(payload->>'clientType','') from public.operations_clients where id = '${OWNER_CLIENT}'`) || 'sme'
+    const contactOf = () => sql(`select coalesce(payload->>'contactName','') from public.operations_clients where id = '${OWNER_CLIENT}'`)
+    const toggleType = async () => {
+      await page.getByRole('button', { name: /더보기/ }).first().click()
+      await page.getByTestId('more-client-type').click()
+      await page.waitForTimeout(1500)
+      return (await page.locator('[role="status"]').allInnerTexts().catch(() => [])).join(' | ')
+    }
+    await go(page, `/ops/clients/${OWNER_CLIENT}`)
+    await page.waitForTimeout(800)
+    const t0 = typeOf()
+    const c0 = contactOf()
+    sql(`update public.operations_clients set payload = jsonb_set(payload, '{contactName}', '"다른 곳에서 고친 담당자"') where id = '${OWNER_CLIENT}'`)
+    const toastC = await toggleType()
+    check('안정(INT-1): 화면을 연 사이 다른 곳이 고친 업체 — 이 화면 저장이 덮어쓰지 않음(진짜 DB) · 알림', toastC.includes('먼저 고쳐서') && contactOf() === '다른 곳에서 고친 담당자' && typeOf() === t0, JSON.stringify({ toastC, c: contactOf(), t: typeOf(), t0 }))
+    await page.waitForTimeout(800)
+    await toggleType()
+    check('안정(INT-1): 새로 불러온 뒤 다시 누르면 저장 · 다른 곳이 고친 담당자도 그대로', typeOf() !== t0 && contactOf() === '다른 곳에서 고친 담당자', JSON.stringify({ t: typeOf(), t0, c: contactOf() }))
+    await toggleType()
+    check('안정(INT-1): 같은 창에서 이어서 저장은 막히지 않음(되돌림)', typeOf() === t0, JSON.stringify({ t: typeOf(), t0 }))
+    sql(`update public.operations_clients set payload = jsonb_set(payload, '{contactName}', '${JSON.stringify(c0)}') where id = '${OWNER_CLIENT}'`)
+  }
+
   /* ---------- D-184: 계정 바꾸기 — 이 기기에서 로그인했던 계정(이메일 · 이름만) → 비밀번호만 넣고 대표 ↔ 팀장 ---------- */
   {
     const store = await page.evaluate(() => ({ recent: localStorage.getItem('axmvp.auth.recent') ?? '', all: JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)) }))

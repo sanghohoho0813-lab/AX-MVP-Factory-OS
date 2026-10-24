@@ -243,7 +243,11 @@ async function pool(items, n, fn) {
   return out
 }
 
-/** 로그인한 OS 사용자인가 — Supabase 로그인 토큰을 Supabase 에 물어본다(토큰을 저장하지 않는다) */
+/**
+ * 로그인한 OS 사용자인가 — Supabase 로그인 토큰을 Supabase 에 물어본다(토큰을 저장하지 않는다).
+ * INT-1 로그인만 하면 누구나(공개 사이트 가입자 포함) 유튜브 할당량을 쓸 수 있었다 — 이제 OS 접근 등급(대표 full · 팀장 pilot)이 있는 사람만.
+ * 등급 함수가 없는 DB(0019 전)면 예전처럼 로그인만 본다.
+ */
 async function signedIn(req) {
   const raw = req.headers?.authorization ?? req.headers?.Authorization ?? ''
   const m = /^Bearer\s+([\w.-]{20,4096})$/.exec(String(raw))
@@ -251,11 +255,17 @@ async function signedIn(req) {
   const base = envFirst(SUPA_URL_NAMES)
   const anon = envFirst(SUPA_ANON_NAMES)
   if (!base || !anon) return { ok: false, reason: 'no_auth_config' }
+  const root = base.replace(/\/$/, '')
+  const headers = { apikey: anon, Authorization: `Bearer ${m[1]}` }
   try {
-    const r = await fetch(`${base.replace(/\/$/, '')}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${m[1]}` } })
+    const r = await fetch(`${root}/auth/v1/user`, { headers })
     if (!r.ok) return { ok: false, reason: 'login_required' }
     const u = await r.json().catch(() => null)
-    return u && typeof u.id === 'string' && u.id ? { ok: true } : { ok: false, reason: 'login_required' }
+    if (!(u && typeof u.id === 'string' && u.id)) return { ok: false, reason: 'login_required' }
+    const ar = await fetch(`${root}/rest/v1/rpc/my_os_access`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{}' })
+    if (ar.status === 404) return { ok: true }
+    const access = ar.ok ? await ar.json().catch(() => null) : null
+    return access === 'full' || access === 'pilot' ? { ok: true } : { ok: false, reason: 'forbidden' }
   } catch {
     return { ok: false, reason: 'login_required' }
   }
@@ -386,7 +396,7 @@ export default async function handler(req, res) {
   // 값이 정해져 있지 않은 두 갈래는 로그인한 사람만 — 남이 주소를 바꿔 가며 할당량을 쓰지 못하게
   if (q.kind === 'resolve' || q.kind === 'extra') {
     const who = await signedIn(req)
-    if (!who.ok) return fail(res, who.reason === 'no_auth_config' ? 503 : 401, { error: who.reason })
+    if (!who.ok) return fail(res, who.reason === 'no_auth_config' ? 503 : who.reason === 'forbidden' ? 403 : 401, { error: who.reason })
   }
 
   const controller = new AbortController()

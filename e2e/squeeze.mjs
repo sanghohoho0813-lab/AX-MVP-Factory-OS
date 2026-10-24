@@ -165,7 +165,7 @@ async function run() {
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
     await page.evaluate(seedScript())
     if (vp.scale) {
-      await page.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), vp.scale)
+      await page.evaluate((s) => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); if (s) p.textScale = s; else delete p.textScale; localStorage.setItem(k, JSON.stringify(p)) }, vp.scale)
     }
 
     for (const [i, screen] of SCREENS.entries()) {

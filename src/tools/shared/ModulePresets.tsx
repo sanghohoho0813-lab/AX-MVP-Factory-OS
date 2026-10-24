@@ -1,0 +1,44 @@
+/**
+ * MOD-1 모듈 첫 화면 '상황 예시' — 대표 목표 3 "계산기는 상황 예시로 — 한 번 누르면 그 업체 숫자로 설계까지".
+ * 예전엔 상황 예시가 업체 상세(맞춤 추천)에만 있어 모듈 첫 화면에서는 빈 칸부터 적어야 했다.
+ *  - 업체를 골랐으면 그 업체 숫자로 바로(?client=&preset= — 각 화면이 이미 읽는 주소, D-199).
+ *  - 안 골랐으면 예시 가정만 얹어 연다(업체를 고르라는 한 줄).
+ *  - 규칙 계산(AI 아님) · 계산식은 그대로.
+ */
+import { Link } from 'react-router-dom'
+import { Lightbulb } from 'lucide-react'
+import { SCENARIO_MODULE_PATH, SCENARIO_PRESETS, scenarioPath, type ScenarioModule } from '../../services/scenarioPresets'
+import { Surface } from '../../components/ui/primitives'
+import { useToolClient } from './toolClientContext'
+
+export function ModulePresets({ module }: { module: ScenarioModule }) {
+  const { clientId, clientRecord } = useToolClient()
+  const list = SCENARIO_PRESETS.filter((p) => p.module === module && !p.calc)
+  if (!list.length) return null
+  const name = clientId ? clientRecord?.companyName : ''
+  return (
+    <div data-testid="module-presets" data-module={module}>
+      <Surface className="flex flex-col gap-3">
+        <h2 className="t-section flex items-center gap-2 break-keep text-slate-900">
+          <Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-500" />
+          상황 예시 — 누르면 {name ? `${name} 숫자로` : '바로'} 계산
+        </h2>
+        {!clientId && <p className="t-sub break-keep text-slate-600">위에서 업체를 먼저 고르면 그 업체 숫자(직원 수 · 매출 · 주소 등)로 채워져요. 고르지 않으면 예시 가정만 넣어 엽니다.</p>}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((p) => (
+            <Link
+              key={p.id}
+              to={clientId ? scenarioPath(p, clientId) : `${SCENARIO_MODULE_PATH[module]}?preset=${encodeURIComponent(p.id)}`}
+              data-testid="module-preset"
+              data-preset={p.id}
+              className="tap flex min-h-14 flex-col justify-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 hover:border-brand-400 hover:bg-brand-50"
+            >
+              <span className="t-body font-semibold break-keep text-slate-900">{p.title}</span>
+              <span className="t-meta break-keep text-slate-600">{p.when}</span>
+            </Link>
+          ))}
+        </div>
+      </Surface>
+    </div>
+  )
+}

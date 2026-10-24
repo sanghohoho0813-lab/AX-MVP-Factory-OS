@@ -748,6 +748,36 @@ export function saveClient(record: ClientOpsRecord): Promise<ClientOpsRecord> {
   return run
 }
 
+/**
+ * INT-1 다른 곳(다른 창 · 다른 사람)이 먼저 고친 업체를 통째로 덮어쓰지 않게 — 읽은 판(updated_at)이 그대로일 때만 저장한다(DB 변경 없음).
+ * 같은 창 안에서 이어서 저장하는 것은 예전처럼 된다: 이 창이 저장해 넘긴 판은 기억해 두고, 그 판을 들고 온 저장은 최신 판으로 본다.
+ */
+export class ClientSaveConflictError extends Error {
+  /** 지금 DB 에 있는 최신 업체 기록 */
+  latest: ClientOpsRecord
+  constructor(latest: ClientOpsRecord) {
+    super('다른 화면이나 다른 사람이 이 업체를 먼저 고쳐서 덮어쓰지 않았어요 — 최신 내용을 보고 다시 해 주세요')
+    this.name = 'ClientSaveConflictError'
+    this.latest = latest
+  }
+}
+
+/** 이 창이 저장하며 넘긴 판 → 그 뒤 최신 판 */
+const ownVersions = new Map<string, { seen: Set<string>; latest: string }>()
+
+function expectedVersion(record: ClientOpsRecord): string {
+  const own = ownVersions.get(record.id)
+  return record.updatedAt && own?.seen.has(record.updatedAt) ? own.latest : record.updatedAt
+}
+
+function rememberVersion(id: string, from: string, to: string): void {
+  const own = ownVersions.get(id) ?? { seen: new Set<string>(), latest: to }
+  if (from) own.seen.add(from)
+  if (own.latest && own.latest !== to) own.seen.add(own.latest)
+  own.latest = to
+  ownVersions.set(id, own)
+}
+
 async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> {
   const next = normalizeClientOps({ ...record, updatedAt: nowIso() })
   if (isLocal()) {
@@ -755,7 +785,8 @@ async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> 
     return next
   }
   if (!next.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
-  const { data, error } = await getSupabaseClient()
+  const base = expectedVersion(record)
+  let query = getSupabaseClient()
     .from('operations_clients')
     .update({
       company_name: next.companyName,
@@ -766,10 +797,19 @@ async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> 
     })
     .eq('id', next.id)
     .eq('workspace_id', next.workspaceId)
-    .select()
-    .single()
+  if (base) query = query.eq('updated_at', base)
+  const { data, error } = await query.select().maybeSingle()
   if (error) throw error
-  return fromRow(data as Record<string, unknown>)
+  if (!data) {
+    // 0줄 — 판이 바뀌었거나(다른 곳이 먼저 고침) 업체가 없다(지워짐 · 권한 없음)
+    const { data: cur, error: readError } = await getSupabaseClient().from('operations_clients').select('*').eq('id', next.id).eq('workspace_id', next.workspaceId).maybeSingle()
+    if (readError) throw readError
+    if (cur) throw new ClientSaveConflictError(fromRow(cur as Record<string, unknown>))
+    throw new Error('업체를 찾지 못했습니다 — 지워졌거나 볼 수 없는 업체입니다.')
+  }
+  const saved = fromRow(data as Record<string, unknown>)
+  rememberVersion(saved.id, base, saved.updatedAt)
+  return saved
 }
 
 /**
@@ -1299,10 +1339,11 @@ export function canUploadFiles(): boolean {
 function uploadErrorMessage(raw: string, file: File): string {
   const m = raw.toLowerCase()
   if (m.includes('exceeded') || m.includes('too large') || m.includes('payload')) {
-    return `파일이 너무 큽니다 (${formatFileSize(file.size)}). Supabase Dashboard → Storage → Settings 의 "Upload file size limit" 을 올리면 더 큰 파일도 올릴 수 있습니다.`
+    // MOD-1 사람 말 먼저 — 고칠 곳(저장소 설정 이름)은 관리자용으로 괄호 안에만
+    return `파일이 너무 큽니다 (${formatFileSize(file.size)}). 파일을 나눠 올리거나, 관리자에게 '올릴 수 있는 파일 크기' 를 늘려 달라고 알려 주세요. (관리자: 저장소 설정 Upload file size limit)`
   }
   if (m.includes('mime') || m.includes('not supported') || m.includes('content type')) {
-    return `이 형식(${file.type || '알 수 없음'})은 저장소가 아직 막고 있습니다. supabase/migrations/20260906000011_storage_open_types.sql 을 적용하면 모든 형식이 열립니다.`
+    return `이 형식(${file.type || '알 수 없음'})의 파일은 아직 올릴 수 없습니다. PDF 로 바꿔 올리거나 관리자에게 알려 주세요. (관리자: 20260906000011_storage_open_types 적용)`
   }
   if (m.includes('duplicate') || m.includes('already exists')) {
     return '같은 이름의 파일이 이미 있습니다. 잠시 뒤 다시 시도해 주세요.'

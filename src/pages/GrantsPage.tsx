@@ -453,11 +453,15 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           }}
           onTogglePublish={() => void saveOne({ ...current, published: !current.published }, current.id)}
           onDelete={() => {
-            void removeNotice(workspaceId, current).then(() => {
-              setNotices((prev) => prev.filter((x) => x.id !== current.id))
-              setOpenId('')
-              showToast('공고를 지웠습니다')
-            })
+            // MOD-1 지우기 실패가 조용히 묻히지 않게 — 공고는 그대로 두고 알린다
+            void removeNotice(workspaceId, current).then(
+              () => {
+                setNotices((prev) => prev.filter((x) => x.id !== current.id))
+                setOpenId('')
+                showToast('공고를 지웠습니다')
+              },
+              () => showToast('공고를 지우지 못했습니다 — 인터넷 연결을 확인하고 다시 눌러 주세요. 공고는 그대로 있습니다.'),
+            )
           }}
           onOpenClient={(cid) => {
             setOpenId('')

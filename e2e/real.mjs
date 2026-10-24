@@ -186,7 +186,7 @@ for (const vp of VIEWPORTS) {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(LONG_DATA)
-  if (vp.scale) await page.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), vp.scale)
+  if (vp.scale) await page.evaluate((s) => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); if (s) p.textScale = s; else delete p.textScale; localStorage.setItem(k, JSON.stringify(p)) }, vp.scale)
   for (const path of SCREENS) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     if (vp.scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), vp.scale)

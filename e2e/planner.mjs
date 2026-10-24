@@ -220,7 +220,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  await page.evaluate(() => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify('extra_large')))
+  await page.evaluate(() => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); p.textScale = 'extra_large'; localStorage.setItem(k, JSON.stringify(p)) })
   // D-210: 끝낸 할 일만 있는 날(10/20) · 남은 할 일이 있는 날(10/21)
   await page.evaluate(() => {
     const list = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]')

@@ -241,13 +241,17 @@ let mode: FetchMode = 'ok'
 const calls: string[] = []
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const GOOD_TOKEN = 'good-token-0123456789abcdef'
+const OUTSIDER_TOKEN = 'outsider-token-0123456789abcdef'
 // 유튜브에서 없어진 채널 흉내(채널 정보 응답에서 빠짐)
 const goneIds = new Set<string>()
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input))
   if (u.hostname.endsWith('supabase.test')) {
     const auth = new Headers(init?.headers).get('authorization')
-    return auth === `Bearer ${GOOD_TOKEN}` ? json(200, { id: 'user-1' }) : json(401, { msg: 'bad jwt' })
+    const known = auth === `Bearer ${GOOD_TOKEN}` || auth === `Bearer ${OUTSIDER_TOKEN}`
+    // INT-1 OS 접근 등급 — 대표는 full · 공개 사이트 가입자는 없음(null)
+    if (u.pathname.endsWith('/rpc/my_os_access')) return known ? json(200, auth === `Bearer ${GOOD_TOKEN}` ? 'full' : null) : json(401, { msg: 'bad jwt' })
+    return known ? json(200, { id: auth === `Bearer ${GOOD_TOKEN}` ? 'user-1' : 'outsider-1' }) : json(401, { msg: 'bad jwt' })
   }
   calls.push(u.pathname.split('/').pop() + '?' + [...u.searchParams.keys()].join(','))
   if (mode === 'quota') return json(403, { error: { errors: [{ reason: 'quotaExceeded' }], message: 'quota' } })
@@ -618,6 +622,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const badTok = await call('?resolve=@abc', { authorization: 'Bearer wrong-token-0123456789abcdef' })
   const ex401 = await call('?extra=UCgi5InkiecEitESPWd-n0vA')
   check('[채널 추가] 로그인 안 하면 401 — 아무나 주소를 바꿔 가며 할당량을 쓰지 못함 · 유튜브 호출 0', anon.code === 401 && badTok.code === 401 && ex401.code === 401 && calls.length === 0 && anon.headers['cache-control'] === 'no-store')
+  const outsider = await call('?resolve=@abc', { authorization: `Bearer ${OUTSIDER_TOKEN}` })
+  check('[채널 추가] INT-1 로그인했어도 OS 접근 등급이 없는 가입자는 403 — 유튜브 할당량을 못 씀 · 유튜브 호출 0', outsider.code === 403 && (outsider.body as { error: string }).error === 'forbidden' && calls.length === 0, outsider.body)
   const ok = await call('?resolve=https://www.youtube.com/@routeai', { authorization: `Bearer ${GOOD_TOKEN}` })
   const ch1 = (ok.body as { channel: { id: string; title: string; subs: number }; units: number })
   check('[채널 추가] 로그인하면 채널 확인 — 채널 정보 1단위(검색 100단위 안 씀) · 키 값 없음 · 캐시 안 함', ok.code === 200 && ch1.channel.id === 'UC_routeai' && ch1.units === 1 && !calls.some((c) => c.startsWith('search')) && !JSON.stringify(ok.body).includes(KEYVAL) && ok.headers['cache-control'] === 'no-store', ok.body)

@@ -26,6 +26,8 @@ import { daysLeftFrom } from '../../services/clientOpsAlerts'
 import type { ClientOpsRecord, ToolResult } from '../../types/clientOps'
 import { useToolClient } from './toolClientContext'
 import { useIsPhone } from '../../lib/useIsPhone'
+import type { ScenarioModule } from '../../services/scenarioPresets'
+import { ModulePresets } from './ModulePresets'
 
 /** 이 모듈이 만든 기한 한 줄 — 어느 업체의 것인지까지 */
 interface ModuleDue {
@@ -143,9 +145,14 @@ export interface ModuleDashboardProps {
   children?: ReactNode
   /** false — AI 도우미 띠를 그리지 않는다(화면 맨 위에 ModuleAssistBar 를 따로 둔 모듈) */
   assist?: boolean
+  /** MOD-1 false — '상황 예시' 를 그리지 않는다(화면 맨 위에 ModulePresets 를 따로 둔 모듈) */
+  presets?: boolean
 }
 
-export function ModuleDashboard({ toolKey, children, assist = true }: ModuleDashboardProps) {
+/** 상황 예시가 있는 모듈 */
+const PRESET_MODULE: Record<string, ScenarioModule> = { 'policy-funding': 'policy-funding', 'startup-tax': 'startup-tax', employment: 'employment', labcare: 'labcare' }
+
+export function ModuleDashboard({ toolKey, children, assist = true, presets = true }: ModuleDashboardProps) {
   const { loadClients } = useToolClient()
   // D-166: 휴대폰은 서류 빠진 업체를 4곳만(같은 사유가 수십 줄 반복됐다) — 나머지는 '몇 곳 더'
   const phone = useIsPhone()
@@ -180,6 +187,7 @@ export function ModuleDashboard({ toolKey, children, assist = true }: ModuleDash
   return (
     <div className="flex flex-col gap-5" data-testid="module-dashboard" data-module={toolKey}>
       {assist && <ModuleAssistBar toolKey={toolKey} clients={clients} />}
+      {presets && PRESET_MODULE[toolKey] && <ModulePresets module={PRESET_MODULE[toolKey]} />}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 관리에 있는 업체" />
         <MetricTile

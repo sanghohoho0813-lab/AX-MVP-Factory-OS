@@ -311,7 +311,7 @@ let finderLink = ''
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(prepClients)
-  await page.evaluate(() => localStorage.setItem('axmvp.ui.text_scale', 'extra_large'))
+  await page.evaluate(() => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); p.textScale = 'extra_large'; localStorage.setItem(k, JSON.stringify(p)) })
   await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
   await page.getByTestId('grant-add-open').click()
   await page.locator('#grant-paste').fill(PASTE)
@@ -652,7 +652,7 @@ function feedItems(n) {
     const c = list.find((x) => x.id === 'cli_hansol')
     c.fundingApplications = [{ id: 'fa1', programName: '[경기] 아주 긴 이름의 파주시 수출기업 해외인증 · 해외규격 획득 지원사업 2차 추가 공고', institution: '경기도 파주시', status: 'preparing', applyDueDate: '', submittedAt: null, resultAt: null, requestedAmount: null, approvedAmount: null, note: '', noticeId: 'x', applyDueTime: '18:00', docs: [{ label: '사업신청서', done: false }, { label: '국세 · 지방세 완납증명서 및 4대 사회보험 완납증명서(신청일 기준 발급분)', done: false }, { label: '사업자등록증 사본', done: false }], createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }]
     localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
-    localStorage.setItem('axmvp.ui.text_scale', 'extra_large')
+    { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); p.textScale = 'extra_large'; localStorage.setItem(k, JSON.stringify(p)) }
   })
   await mp.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
   await mp.getByTestId('apply-checklist').waitFor()

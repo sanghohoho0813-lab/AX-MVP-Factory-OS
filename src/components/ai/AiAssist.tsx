@@ -637,7 +637,8 @@ export function ModelRow({
           {!status && <p className="t-sub text-slate-600">모델 목록을 받지 못했어요(서버 함수가 없는 미리보기이거나 연결 문제). 기본 모델로 물어봅니다.</p>}
           {provider && !provider.configured && (
             <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900">
-              {provider.label} 키가 아직 없어요 — Vercel › Settings › Environment Variables 에 <b>{provider.keyName}</b> 를 넣고 Redeploy 하면 고를 수 있어요.
+              {provider.label} 은(는) 아직 연결되지 않았어요 — 관리자가 연결하면 고를 수 있어요.
+              <span className="t-meta block text-amber-800">관리자용: Vercel › Settings › Environment Variables 에 <b>{provider.keyName}</b> 를 넣고 Redeploy</span>
             </p>
           )}
           {provider && (
@@ -710,10 +711,17 @@ function ErrorBox({ error }: { error: { code: string; message: string; missing: 
   if (error.code === 'setup_needed')
     how = (
       <>
-        Vercel › Settings › Environment Variables 에 <b>{error.missing[0] ?? 'GEMINI_API_KEY'}</b> 를 넣고 Redeploy 하면 바로 됩니다(키는 서버에만 — 이름이 VITE_ 로 시작하면 안 됩니다).
+        관리자에게 'AI 키 연결' 을 부탁해 주세요.
+        <span className="t-meta block">관리자용: Vercel › Settings › Environment Variables 에 <b>{error.missing[0] ?? 'GEMINI_API_KEY'}</b> 를 넣고 Redeploy(키는 서버에만 — 이름이 VITE_ 로 시작하면 안 됩니다).</span>
       </>
     )
-  if (error.code === 'db_setup_needed') how = <>Supabase SQL Editor 에서 0021(AI 전략실 권한) 을 한 번 실행하면 됩니다 — docs/OWNER_AI_WORKSPACE_V1.md §12.</>
+  if (error.code === 'db_setup_needed')
+    how = (
+      <>
+        관리자에게 'AI 권한 설정' 을 부탁해 주세요.
+        <span className="t-meta block">관리자용: Supabase SQL Editor 에서 0021(AI 전략실 권한) 실행 — docs/OWNER_AI_WORKSPACE_V1.md §12.</span>
+      </>
+    )
   return (
     <div role="alert" className="flex gap-2 rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-3" data-testid="ai-assist-error" data-code={error.code}>
       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-700" />

@@ -17,6 +17,7 @@ import { startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { StartupTaxReportScreen } from './screens/ReportScreen'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -167,6 +168,8 @@ function StartupTaxScreen() {
           }}
         />
       )}
+      {/* MOD-1 상황 예시 — 판정 전 · 예시를 안 넣었을 때만(누르면 고른 업체 숫자로 바로 판정) */}
+      {!presetUsed && !submitted && <ModulePresets module="startup-tax" />}
       {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌) */}
       <div className="flex justify-end">
         <StartupZoomPicker value={zoom} onChange={setZoom} />

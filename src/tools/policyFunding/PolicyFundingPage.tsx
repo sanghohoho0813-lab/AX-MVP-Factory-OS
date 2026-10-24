@@ -414,7 +414,19 @@ export function PolicyFundingPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="정책자금 진단"
-        actions={<AiSoonButton size="sm" label="AI로 사업계획서 초안" what="진단 결과와 업체 정보로 사업계획서 초안을 써 줍니다" />}
+        actions={
+          // MOD-1 첫 화면 주 단추 = 진단(예전엔 누르면 '준비 중' 만 뜨는 AI 자리 단추 하나뿐이었다 — 그 자리는 옆에 그대로)
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={clientId ? `/tools/policy-funding/diagnosis?client=${encodeURIComponent(clientId)}` : '/tools/policy-funding/diagnosis'}
+              data-testid="pf-diagnose-go"
+              className="tap inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-semibold text-white shadow-sm hover:bg-brand-700 t-body sm:min-h-10"
+            >
+              {clientId ? '이 업체 진단하기' : '진단하기'}
+            </Link>
+            <AiSoonButton size="sm" label="AI로 사업계획서 초안" what="진단 결과와 업체 정보로 사업계획서 초안을 써 줍니다" />
+          </div>
+        }
         description={
           meta?.hint
             ? `${meta.label} — ${meta.hint}. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.`

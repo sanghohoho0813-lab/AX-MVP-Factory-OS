@@ -118,8 +118,9 @@ export function EmploymentOrig({
   // D-211 [가정 빼기] — 채용 상황(대상 · 나이 · 형태) 가정만 빼고 업체 숫자(직원 수 · 권역)는 남긴다. 진단은 다시 누를 때
   const [presetCleared, setPresetCleared] = useState('')
   const hiringPreset = presetOf?.hiring ?? null
+  // MOD-1 상황 예시 없이 열어도 고른 업체의 직원 수 · 권역은 채워 둔다(진단은 누를 때) — 예전엔 업체를 골라 놓고도 다시 적어야 했다
   const hiringWithCompany = useMemo(() => {
-    if (!hiringPreset && !presetCleared) return null
+    if (!hiringPreset && !presetCleared && !clientRecord) return null
     const f = clientRecord ? clientFacts(clientRecord, new Date()) : null
     const sido = f?.address.match(/^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/)?.[1] ?? ''
     const company = { companySize: f?.employeeCount ?? null, region: !sido || ['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권' }

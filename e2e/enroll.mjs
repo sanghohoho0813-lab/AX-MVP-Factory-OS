@@ -53,7 +53,7 @@ for (const vp of [
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  await page.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), vp.s)
+  await page.evaluate((s) => { const k = 'axmvp.ui.preferences'; const p = JSON.parse(localStorage.getItem(k) || '{}'); if (s) p.textScale = s; else delete p.textScale; localStorage.setItem(k, JSON.stringify(p)) }, vp.s)
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
 
   await page.goto(BASE + '/tools/employment/roster?client=cli_hansol', { waitUntil: 'networkidle' })

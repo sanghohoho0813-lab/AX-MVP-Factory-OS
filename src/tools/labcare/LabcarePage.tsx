@@ -20,6 +20,7 @@ import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { OrigLabcare } from './orig/OrigLabcare'
 import { Button } from '../../components/ui/Button'
@@ -204,6 +205,7 @@ const DISCLAIMER =
 export function LabcarePage() {
   const section = useModuleSection()
   const meta = toolOf('labcare')?.sections?.find((s) => s.key === section)
+  const { clientId } = useToolClient()
 
   if (section === 'tax') {
     return (
@@ -226,14 +228,17 @@ export function LabcarePage() {
         <>
           {/* D-239: 한눈에 보기 맨 위 — 고객 전체의 연구소 판정을 AI 가 한 번에 */}
           <ModuleAssistBar toolKey="labcare" />
+          {/* MOD-1 상황 예시 — 원래 대시보드가 길어 맨 위에(누르면 고른 업체 숫자로 세액공제) */}
+          <ModulePresets module="labcare" />
           <OrigLabcare section="dashboard" />
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
             <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="labcare" assist={false} />
+            <ModuleDashboard toolKey="labcare" assist={false} presets={false} />
           </section>
         </>
       ) : (
-        <OrigLabcare section={section} />
+        // MOD-1 업체를 바꾸면 화면을 새로 연다 — 예전엔 설립 가능성 체크가 앞 업체 답을 그대로 들고 있다가 뒤 업체 이름으로 저장했다
+        <OrigLabcare key={clientId ?? ''} section={section} />
       )}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>

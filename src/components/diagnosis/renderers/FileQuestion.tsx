@@ -96,8 +96,7 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
         </label>
       )}
       <p className="mt-1.5 text-[0.875rem] break-keep text-slate-400">
-        현재 테스트 모드에서는 파일 원본이 업로드되지 않고 파일 정보만 저장됩니다.
-        실제 파일 업로드는 Supabase Storage 연결 후 제공됩니다.
+        지금은 파일 이름 · 크기만 남고 파일 자체는 올라가지 않습니다 — 파일은 담당자에게 따로 보내 주세요.
       </p>
     </div>
   )
