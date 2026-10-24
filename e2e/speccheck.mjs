@@ -228,6 +228,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('특허·MVP 머리에 [명세서 점검] 입구', (await entry.count()) === 1)
   await entry.click()
   await page.waitForURL('**/studio/spec-check')
+  // 화면 조각을 받는 사이 앞 화면 제목을 읽지 않게 — 올리기 칸이 뜰 때까지 기다린다(게이트 중 한 번 앞질러 읽음)
+  await page.locator('label[for="spec-file"]').waitFor({ timeout: 10000 }).catch(() => {})
   check('입구 → /studio/spec-check · 제목 명세서 점검', ((await page.locator('h1').first().innerText()) ?? '').includes('명세서 점검'))
   check('처음엔 결과 없음 · 올리기 칸 · 오류 코드 도우미', (await page.locator('[data-summary]').count()) === 0 && (await page.locator('label[for="spec-file"]').count()) === 1 && (await page.getByText('특허로 오류 코드로 찾기').count()) === 1)
   await shot(page, 'speccheck-1440-empty')
