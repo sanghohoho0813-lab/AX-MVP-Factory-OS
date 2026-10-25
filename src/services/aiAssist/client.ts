@@ -39,7 +39,8 @@ export interface AssistStatus {
   /** SAAS-2 마케팅 AI 가 이 계정에 열렸나(대표는 늘 true · 고객은 사용량 장부가 켜졌을 때) */
   marketing?: boolean
   /** SAAS-2 고객 이번 달 사용량(장부가 켜졌을 때만) */
-  usage?: { used: number; limit: number; month: string } | null
+  /** SAAS-2 내부 팀장은 limit = null(한도 없이 기록만) */
+  usage?: { used: number; limit: number | null; month: string; kind: 'internal' | 'customer'; plan: string; active: boolean } | null
 }
 
 export interface AssistItem {
@@ -120,6 +121,8 @@ const MESSAGE: Record<string, string> = {
   // SAAS-2 고객별 AI 사용량(서버 장부)
   quota_exceeded: '이번 달 AI 사용량을 다 썼어요. 다음 달 1일에 다시 채워집니다(설정 › 계정 · 보기에서 남은 양 확인).',
   usage_setup_needed: '이 AI 기능은 사용량 관리가 준비되면 열립니다.',
+  subscription_inactive: '이용 기간이 끝났거나 요금제가 아직 없어요. 구독을 확인해 주세요.',
+  marketing_not_included: '마케팅 · 브랜딩은 이 기능이 포함된 요금제에서 열려요.',
   usage_unreachable: 'AI 사용량을 확인하지 못해 멈췄어요(세지 않았습니다). 잠시 뒤 다시 눌러 주세요.',
   request_in_progress: '같은 요청이 아직 처리 중이에요. 잠시 뒤 결과를 확인해 주세요.',
   request_done: '이미 처리된 요청이에요. 새로 눌러 주세요.',
@@ -188,7 +191,7 @@ export async function fetchAssistStatus(withModels = false): Promise<AssistStatu
     defaultChoice: b.defaultChoice,
     // SAAS-2 서버가 분명히 연다고 한 때만(옛 서버 · 빠진 칸은 닫힘)
     marketing: b.marketing === true,
-    usage: b.usage && Number.isFinite(b.usage.used) && Number.isFinite(b.usage.limit) ? { used: b.usage.used, limit: b.usage.limit, month: String(b.usage.month ?? '') } : null,
+    usage: b.usage && Number.isFinite(b.usage.used) ? { used: b.usage.used, limit: Number.isFinite(b.usage.limit) ? b.usage.limit : null, month: String(b.usage.month ?? ''), kind: b.usage.kind === 'internal' ? 'internal' : 'customer', plan: String(b.usage.plan ?? ''), active: b.usage.active === true } : null,
   }
 }
 

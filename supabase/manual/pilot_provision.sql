@@ -36,6 +36,11 @@ begin
 
   insert into public.os_access (user_id, tier, note) values (v_uid, 'pilot', '1인 Pilot')
   on conflict (user_id) do update set tier = 'pilot', note = '1인 Pilot';
+  -- SAAS-2: 0022(AI 사용량 장부)가 있으면 내부 팀장으로 — 한도 없이 기록만(구독 고객 기본값 '쓸 수 없음' 에 걸리지 않게). 마케팅은 따로 켠다
+  if to_regclass('public.ai_entitlements') is not null then
+    insert into public.ai_entitlements (user_id, kind, plan, note) values (v_uid, 'internal', 'internal', '내부 팀장(pilot_provision)')
+    on conflict (user_id) do nothing;
+  end if;
 
   select w.id into v_ws from public.workspaces w where w.owner_id = v_uid order by w.created_at limit 1;
   if v_ws is null then

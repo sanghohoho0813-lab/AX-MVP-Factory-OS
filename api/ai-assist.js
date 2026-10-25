@@ -19,7 +19,7 @@ import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { cleanBrand } from './_ai/brand.js'
 import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
-import { myUsage, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
+import { myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
@@ -195,11 +195,13 @@ export default async function handler(req, res) {
     if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
     const full = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
     const catalog = who.role === 'pilot' ? pilotCatalog(full) : full
-    // SAAS-2 고객 — 이번 달 사용량 · 마케팅 열림(장부가 켜지고 DB 설정까지 됐을 때만)
-    const usage = who.role === 'pilot' && usageReady() ? await myUsage(bearerOf(req)) : null
-    const marketing = who.role !== 'pilot' || (!!usage && usage.configured)
+    // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅은 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
+    const acc = who.role === 'pilot' ? await myAccess(bearerOf(req)) : null
+    const meterable = !!acc && acc.state === 'ok' && acc.configured && usageReady()
+    const marketing = who.role !== 'pilot' || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
     const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
-    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), marketing, usage: usage && usage.configured ? { used: usage.used, limit: usage.limit, month: usage.month } : null, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
+    const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
+    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
@@ -214,9 +216,8 @@ export default async function handler(req, res) {
   if (!assist || body.page !== assist.page || typeof body.requestId !== 'string' || !ID_RE.test(body.requestId)) return fail(res, 400, 'bad_request')
 
   if (pilot && CUSTOMER_ALWAYS_BLOCKED.has(assist.page)) return fail(res, 403, 'forbidden')
-  // SAAS-2 고객 AI 는 장부로 센다(대표는 세지 않음) — 장부가 꺼져 있으면 마케팅은 닫힌 채
-  const metered = pilot && usageReady()
-  if (pilot && MARKETING_PAGES.has(assist.page) && !metered) return fail(res, 403, 'usage_setup_needed')
+  // SAAS-2 비밀값이 없으면 마케팅은 누구에게도(대표 빼고) 열지 않는다 — 장부로 셀 수 없다
+  if (pilot && MARKETING_PAGES.has(assist.page) && !usageReady()) return fail(res, 403, 'usage_setup_needed')
   // D-260 영상 단추는 영상 번호 · 구간이 맞아야
   const video = assist.video ? cleanVideo(body.video) : null
   if (assist.video && !video) return fail(res, 400, 'bad_request')
@@ -257,21 +258,38 @@ export default async function handler(req, res) {
     return fail(res, 429, 'rate_limited', { retryAfter: rate.retryAfter })
   }
 
-  // SAAS-2 AI 를 부르기 전에 장부에 예약 — 한도 · 같은 요청 번호 · 동시 호출은 DB 가 사람마다 차례로 판단.
-  // 예약까지 한 약속(promise)으로 묶어 먼저 기억해 둔다 — 같은 서버에서 같은 요청이 동시에 오면 예약 · AI 를 한 번만.
-  const token = metered ? bearerOf(req) : ''
+  // SAAS-2 대표가 아닌 계정 — 이용 권한을 묻고 장부에 예약한 뒤 AI 를 부른다(대표는 세지 않음).
+  // 권한 조회 · 예약까지 한 약속(promise)으로 묶어 먼저 기억해 둔다 — 같은 서버에서 같은 요청이 동시에 오면 예약 · AI 를 한 번만.
+  //   고객(customer) · 마케팅: 예약이 성공해야만 AI(비밀값 없음 · DB 설정 오류 · 장부 끊김 · 권한 조회 실패 → 막음)
+  //   내부 팀장(internal)의 일반 AI: 장부가 고장 나도 예전처럼(기록이 빠진 것은 서버 기록에 남김)
+  //   0022 적용 전(권한 함수 없음 · 지금 운영): 고객 계정이 있을 수 없으므로 pilot 은 예전처럼 · 마케팅은 닫힘
+  const token = pilot ? bearerOf(req) : ''
   const tier = tierOf(choice.provider, choice.model)
+  const mk = MARKETING_PAGES.has(assist.page)
   const promise = (async () => {
     let charged = false
-    if (metered) {
-      const r = await reserveUsage(token, { requestId: body.requestId, assistId: assist.id, tier, units: usageUnits(assist, tier), workspaceId: null })
-      if (r.ok) charged = true
-      else if (r.code === 'usage_setup_needed') {
-        // 비밀값은 있는데 DB 설정이 아직(또는 틀림) — 마케팅은 닫고, 나머지는 예전처럼
-        if (MARKETING_PAGES.has(assist.page)) throw new UsageError(403, 'usage_setup_needed')
-      } else if (r.code === 'quota_exceeded') throw new UsageError(429, 'quota_exceeded', { used: r.used, limit: r.limit })
-      else if (r.code === 'usage_unreachable') throw new UsageError(503, 'usage_unreachable')
-      else throw new UsageError(409, r.code)
+    if (pilot) {
+      const acc = await myAccess(token)
+      if (acc.state === 'error') throw new UsageError(503, 'usage_unreachable')
+      const legacy = acc.state === 'missing'
+      const customer = !legacy && acc.kind === 'customer'
+      if (mk && (legacy || !acc.marketing)) throw new UsageError(403, legacy ? 'usage_setup_needed' : 'marketing_not_included')
+      if (customer && !acc.active) throw new UsageError(403, 'subscription_inactive')
+      const mustMeter = customer || mk
+      const canMeter = !legacy && acc.configured && usageReady()
+      if (mustMeter && !canMeter) throw new UsageError(503, 'usage_setup_needed')
+      if (!canMeter && !legacy) console.warn(`[ai-assist] 장부 기록 못 함(내부 팀장 · 일반) 문의번호=${String(body.requestId).slice(-6)} 이유=usage_setup_needed`)
+      if (canMeter) {
+        const r = await reserveUsage(token, { requestId: body.requestId, assistId: assist.id, tier, units: usageUnits(assist, tier), workspaceId: null, feature: mk ? 'marketing' : 'general' })
+        if (r.ok) charged = true
+        else if (r.code === 'usage_setup_needed' || r.code === 'usage_unreachable') {
+          if (mustMeter) throw new UsageError(503, r.code)
+          // 내부 팀장 일반 AI — 지금 쓰는 업무가 멈추지 않게 예전처럼(기록 빠짐은 함수 기록에)
+          console.warn(`[ai-assist] 장부 기록 못 함(내부 팀장 · 일반) 문의번호=${String(body.requestId).slice(-6)} 이유=${r.code}`)
+        } else if (r.code === 'quota_exceeded') throw new UsageError(429, 'quota_exceeded', { used: r.used, limit: r.limit })
+        else if (r.code === 'subscription_inactive' || r.code === 'marketing_not_included') throw new UsageError(403, r.code)
+        else throw new UsageError(409, r.code)
+      }
     }
     let run
     try {
@@ -283,7 +301,9 @@ export default async function handler(req, res) {
     }
     if (!charged) return run
     const s = await settleUsage(token, body.requestId, run)
-    return { ...run, quota: s ? { used: Number(s.used) || 0, limit: Number(s.limit) || 0 } : null }
+    // 정산이 끝내 실패해도 장부에서 빠지지 않는다(예약 줄 = 센 기록 · 15분 뒤 자동 정산) — 답은 그대로 준다
+    if (!s) console.warn(`[ai-assist] 정산 못 함(예약으로 센 채 · 15분 뒤 자동 정산) 문의번호=${String(body.requestId).slice(-6)}`)
+    return { ...run, quota: s ? { used: Number(s.used) || 0, limit: s.limit === null || s.limit === undefined ? null : Number(s.limit) } : null }
   })()
   inflight.set(idemKey, { at: now, promise, assistId: assist.id })
   if (inflight.size > 500) inflight.delete(inflight.keys().next().value)

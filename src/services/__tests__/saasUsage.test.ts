@@ -45,29 +45,45 @@ const PILOT = 'Bearer pilot-token-bbbbbbbbbbbbbbbbbbbb'
 const SECRET = 'qa-usage-secret-0123456789abcdef'
 const ANSWER = { headline: '김팀장의 경영노트 다음 편', items: [{ title: '미래AI랩 관점으로 — 정책자금 3가지', ref: '', tag: '롱폼', detail: '김팀장이 직접 말하기' }], next: [], caution: '' }
 
-/* ---- 가짜 장부(0022 판단 흉내) ---- */
-type Row = { units: number; status: 'reserved' | 'settled' | 'released'; assist: string }
+/* ---- 가짜 장부 · 이용 권한(0022 판단 흉내 — 진짜 판단은 scripts/db-local/test-0022) ---- */
+type Row = { units: number; status: 'reserved' | 'settled' | 'released'; assist: string; feature: string; kind: string }
+type Acct = { kind: 'internal' | 'customer'; plan: string; marketing: boolean; active: boolean }
 let ledger = new Map<string, Row>()
 let limit = 20
+/** null = 권한 줄 없음(고객 · 쓸 수 없음) */
+let acct: Acct | null = { kind: 'customer', plan: 'growth', marketing: true, active: true }
 let ledgerMode: 'ok' | 'not_configured' | 'down' = 'ok'
+/** my_ai_access — ok · missing(0022 적용 전) · error(닿지 못함) */
+let accessMode: 'ok' | 'missing' | 'error' = 'ok'
+let configured = true
+let settleFails = 0
 let ledgerCalls: { fn: string; args: Record<string, unknown> }[] = []
 const used = () => [...ledger.values()].filter((r) => r.status !== 'released').reduce((n, r) => n + r.units, 0)
+const accountOf = () => {
+  const a = acct ?? { kind: 'customer' as const, plan: 'none', marketing: false, active: false }
+  return { ...a, limit: a.kind === 'internal' ? null : limit }
+}
 function reserve(a: Record<string, unknown>) {
   const id = String(a.p_request_id)
   const units = Number(a.p_units)
+  const acc = accountOf()
+  const lim = acc.limit
   const row = ledger.get(id)
   if (row) {
     if (row.assist !== a.p_assist_id) return { state: 'conflict' }
     if (row.status === 'reserved') return { state: 'inflight' }
     if (row.status === 'settled') return { state: 'done' }
-    if (used() + units > limit) return { state: 'quota', used: used(), limit }
+  }
+  if (acc.kind === 'customer' && !acc.active) return { state: 'inactive' }
+  if (a.p_feature === 'marketing' && !acc.marketing) return { state: 'not_entitled' }
+  if (acc.kind === 'customer' && lim !== null && used() + units > lim) return { state: 'quota', used: used(), limit: lim }
+  if (row) {
     row.status = 'reserved'
     row.units = units
-    return { state: 'retry', used: used(), limit }
+    return { state: 'retry', used: used(), limit: lim }
   }
-  if (used() + units > limit) return { state: 'quota', used: used(), limit }
-  ledger.set(id, { units, status: 'reserved', assist: String(a.p_assist_id) })
-  return { state: 'new', used: used(), limit }
+  ledger.set(id, { units, status: 'reserved', assist: String(a.p_assist_id), feature: String(a.p_feature), kind: acc.kind })
+  return { state: 'new', used: used(), limit: lim }
 }
 
 type Call = { url: string; body: Record<string, unknown> }
@@ -86,24 +102,33 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   }
   if (url.includes('/rest/v1/rpc/has_capability')) return json(headers.Authorization === OWNER)
   if (url.includes('/rest/v1/rpc/my_os_access')) return json(headers.Authorization === OWNER ? 'full' : headers.Authorization === PILOT ? 'pilot' : 'none')
-  const m = /\/rest\/v1\/rpc\/(ai_usage_\w+|my_ai_usage)$/.exec(url)
+  if (url.includes('/rest/v1/rpc/my_ai_access')) {
+    ledgerCalls.push({ fn: 'my_ai_access', args: body })
+    if (accessMode === 'missing') return json({ code: 'PGRST202', message: 'Could not find the function public.my_ai_access' }, 404)
+    if (accessMode === 'error') throw new Error('network down')
+    return json({ ...accountOf(), configured, used: used(), month: '2026-10' })
+  }
+  const m = /\/rest\/v1\/rpc\/(ai_usage_\w+)$/.exec(url)
   if (m) {
     ledgerCalls.push({ fn: m[1], args: body })
     if (ledgerMode === 'down') throw new Error('network down')
-    if (m[1] === 'my_ai_usage') return json(ledgerMode === 'ok' ? { configured: true, used: used(), limit, month: '2026-10-01' } : { configured: false, used: 0, limit: 0, month: '2026-10-01' })
     if (ledgerMode === 'not_configured') return json({ code: 'P0001', message: 'ai_usage_not_configured' }, 400)
     if (body.p_secret !== SECRET) return json({ code: 'P0001', message: 'ai_usage_bad_secret' }, 400)
     if (m[1] === 'ai_usage_reserve') return json(reserve(body))
     const row = ledger.get(String(body.p_request_id))
     if (m[1] === 'ai_usage_settle') {
-      const n = row && row.status === 'reserved' ? 1 : 0
+      if (settleFails > 0) {
+        settleFails -= 1
+        return json({ message: 'db hiccup' }, 503)
+      }
+      const n = row && row.status !== 'settled' ? 1 : 0
       if (n && row) row.status = 'settled'
-      return json({ settled: n, used: used(), limit })
+      return json({ settled: n, used: used(), limit: accountOf().limit })
     }
     if (m[1] === 'ai_usage_release') {
       const n = row && row.status === 'reserved' ? 1 : 0
       if (n && row) row.status = 'released'
-      return json({ released: n, used: used(), limit })
+      return json({ released: n, used: used(), limit: accountOf().limit })
     }
   }
   calls.push({ url, body })
@@ -141,7 +166,11 @@ function setEnv(secret = true) {
   ledgerCalls = []
   ledger = new Map()
   limit = 20
+  acct = { kind: 'customer', plan: 'growth', marketing: true, active: true }
   ledgerMode = 'ok'
+  accessMode = 'ok'
+  configured = true
+  settleFails = 0
   providerFails = false
   providerDelayMs = 0
 }
@@ -189,7 +218,7 @@ async function run() {
   check('U6 같은 요청 번호가 다른 서버로 가도(메모리 없음) — 장부가 "이미 끝남" · 409 request_done · AI 안 부름 · 사용량 그대로', other.statusCode === 409 && other.body.code === 'request_done' && provider().length === 0 && used() === 2, other.body)
 
   const id2 = rid()
-  ledger.set(id2, { units: 2, status: 'reserved', assist: 'threads.write' })
+  ledger.set(id2, { units: 2, status: 'reserved', assist: 'threads.write', feature: 'marketing', kind: 'customer' })
   const busy = await post({ requestId: id2, assistId: 'threads.write', page: 'threads', context: MK_CTX, brand: BRAND }, PILOT)
   check('U7 다른 서버에서 같은 요청이 도는 중 — 409 request_in_progress · AI 안 부름(동시 호출 두 번 세지 않음)', busy.statusCode === 409 && busy.body.code === 'request_in_progress' && provider().length === 0, busy.body)
   ledger.delete(id2)
@@ -220,10 +249,13 @@ async function run() {
   const small = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-25', sections: [] } }, PILOT)
   check('U12 남은 1단위로 빠른 정리 단추(1단위)는 됨 — 한도는 단위로', small.statusCode === 200 && used() === 3, { s: small.statusCode, used: used() })
 
+  const TODAY = { title: '오늘', today: '2026-10-25', sections: [] }
+  const INTERNAL: Acct = { kind: 'internal', plan: 'internal', marketing: false, active: true }
+
   setEnv()
   ledgerMode = 'down'
-  const down = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-25', sections: [] } }, PILOT)
-  check('U13 장부에 닿지 못하면 — 503 usage_unreachable · AI 안 부름(세지 않고 쓰는 일 없음)', down.statusCode === 503 && down.body.code === 'usage_unreachable' && provider().length === 0, down.body)
+  const down = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U13 고객 — 장부에 닿지 못하면 503 usage_unreachable · AI 안 부름(세지 않고 쓰는 일 없음)', down.statusCode === 503 && down.body.code === 'usage_unreachable' && provider().length === 0, down.body)
 
   setEnv()
   const own = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX }, OWNER)
@@ -233,19 +265,104 @@ async function run() {
   setEnv(false)
   const noSecret = await status(PILOT)
   const mk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
-  const plain = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-25', sections: [] } }, PILOT)
-  check('U15 비밀값 없음(대표가 SQL 적용 전) — 고객 마케팅 닫힘(상태 · 직접 호출 403 usage_setup_needed) · 다른 AI 는 예전처럼(장부 안 부름)', noSecret.body.marketing === false && !(noSecret.body.assists as { page: string }[]).some((a) => MARKETING_PAGES.has(a.page)) && mk.statusCode === 403 && mk.body.code === 'usage_setup_needed' && plain.statusCode === 200 && ledgerCalls.length === 0, { m: noSecret.body.marketing, mk: mk.body.code, p: plain.statusCode })
+  const plain = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U15 비밀값 빠짐(환경변수 설정 오류) — 마케팅 닫힘(상태 · 직접 호출 403) · 고객의 다른 AI 도 503(기록 없이 실행 0)', noSecret.body.marketing === false && !(noSecret.body.assists as { page: string }[]).some((a) => MARKETING_PAGES.has(a.page)) && mk.statusCode === 403 && mk.body.code === 'usage_setup_needed' && plain.statusCode === 503 && plain.body.code === 'usage_setup_needed' && provider().length === 0 && fnCalls('ai_usage_reserve').length === 0, { m: noSecret.body.marketing, mk: mk.body.code, p: plain.statusCode, n: provider().length })
+  acct = INTERNAL
+  calls = []
+  const plainIn = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U15b 같은 상황 · 내부 팀장의 일반 AI 는 예전처럼 200(업무가 멈추지 않음) · 예약 안 부름', plainIn.statusCode === 200 && provider().length === 1 && fnCalls('ai_usage_reserve').length === 0, { s: plainIn.statusCode, b: plainIn.body.code })
 
   setEnv()
   ledgerMode = 'not_configured'
   const nc = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
-  const nc2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-25', sections: [] } }, PILOT)
+  const nc2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U16 비밀값이 DB 와 다름 · DB 설정 줄 없음 — 고객 마케팅 · 일반 둘 다 503 · AI 안 부름', nc.statusCode === 503 && nc.body.code === 'usage_setup_needed' && nc2.statusCode === 503 && nc2.body.code === 'usage_setup_needed' && provider().length === 0, { nc: nc.body.code, nc2: nc2.statusCode })
+  configured = false
+  ledgerMode = 'ok'
   const ncSt = await status(PILOT)
-  check('U16 비밀값은 있는데 DB 설정이 없음 · 틀림 — 마케팅 403 usage_setup_needed · 다른 AI 는 예전처럼 · 상태도 닫힘', nc.statusCode === 403 && nc.body.code === 'usage_setup_needed' && nc2.statusCode === 200 && ncSt.body.marketing === false, { nc: nc.body.code, nc2: nc2.statusCode, st: ncSt.body.marketing })
+  const nc3 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U16b 장부 설정 줄이 없다고 권한 조회가 알려 주면 — 상태 마케팅 닫힘 · 고객 일반 503 · 예약 시도도 안 함', ncSt.body.marketing === false && ncSt.body.usage === null && nc3.statusCode === 503 && nc3.body.code === 'usage_setup_needed' && fnCalls('ai_usage_reserve').length === 2 && provider().length === 0, { st: ncSt.body.marketing, s: nc3.statusCode, r: fnCalls('ai_usage_reserve').length })
+  acct = INTERNAL
+  ledgerMode = 'not_configured'
+  configured = true
+  calls = []
+  const ncIn = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('U16c 같은 상황 · 내부 팀장 일반 AI 는 예전처럼 200(예약 실패는 서버 기록에만)', ncIn.statusCode === 200 && provider().length === 1, { s: ncIn.statusCode, b: ncIn.body.code })
 
   setEnv()
   const pat = await post({ requestId: rid(), assistId: 'spec.talk', page: 'patent', context: MK_CTX }, PILOT)
   check('U17 특허 명세서(대표 회사 기준)는 장부가 있어도 고객에게 403 forbidden · 장부 안 부름', pat.statusCode === 403 && ledgerCalls.length === 0, { s: pat.statusCode, b: pat.body.code })
+
+  /* ---- 1b. 장부가 고장 나도 고객이 세지 않고 쓰는 길 0(SAAS-2.1 ①) ---- */
+  setEnv()
+  accessMode = 'error'
+  const ae = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const aeSt = await status(PILOT)
+  check('F1 권한 조회(my_ai_access)가 닿지 못하면 — 503 usage_unreachable · AI 0 · 상태 마케팅 닫힘', ae.statusCode === 503 && ae.body.code === 'usage_unreachable' && provider().length === 0 && aeSt.body.marketing === false, { s: ae.statusCode, b: ae.body.code, st: aeSt.body.marketing })
+
+  setEnv()
+  acct = INTERNAL
+  ledgerMode = 'down'
+  const inDown = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('F2 내부 팀장 · 장부 끊김 · 일반 AI — 예전처럼 200(호환)', inDown.statusCode === 200 && provider().length === 1 && fnCalls('ai_usage_reserve').length === 1, { s: inDown.statusCode, b: inDown.body.code })
+  acct = { ...INTERNAL, marketing: true }
+  calls = []
+  const inMk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  check('F3 내부 팀장이라도 마케팅은 세야만 — 장부 끊김이면 503 · AI 0', inMk.statusCode === 503 && inMk.body.code === 'usage_unreachable' && provider().length === 0, { s: inMk.statusCode, b: inMk.body.code })
+
+  setEnv()
+  accessMode = 'missing'
+  const lg = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const lgMk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const lgSt = await status(PILOT)
+  check('F4 0022 적용 전(지금 운영 · 권한 함수 없음) — 팀장 일반 AI 는 예전처럼 · 예약 안 부름 · 마케팅 403 · 상태 마케팅 닫힘', lg.statusCode === 200 && fnCalls('ai_usage_reserve').length === 0 && lgMk.statusCode === 403 && lgMk.body.code === 'usage_setup_needed' && lgSt.body.marketing === false && lgSt.body.usage === null, { s: lg.statusCode, mk: lgMk.body.code, st: lgSt.body.marketing })
+
+  setEnv()
+  acct = INTERNAL
+  const inOk = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const inRes = fnCalls('ai_usage_reserve')[0]?.args
+  const inSt = await status(PILOT)
+  check('F5 내부 팀장 · 장부 정상 — 일반 AI 도 장부에 기록(feature general · kind internal) · 한도 없음(limit null)', inOk.statusCode === 200 && inRes?.p_feature === 'general' && [...ledger.values()][0]?.kind === 'internal' && [...ledger.values()][0]?.status === 'settled' && (inOk.body.run as { quota?: { limit: number | null } }).quota?.limit === null && (inSt.body.usage as { kind: string; limit: number | null } | null)?.kind === 'internal' && (inSt.body.usage as { limit: number | null }).limit === null, { s: inOk.statusCode, inRes, u: inSt.body.usage })
+
+  /* ---- 1c. AI 는 됐는데 정산이 실패해도 장부에서 빠지지 않음(SAAS-2.1 ②) ---- */
+  setEnv()
+  settleFails = 3
+  const sid = rid()
+  const sf = await post({ requestId: sid, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  check('S1 정산이 세 번 다 실패 — 답은 그대로 200 · 정산 3번 시도 · 예약 줄이 센 채로 남음(사용량 2) · 되돌리지 않음', sf.statusCode === 200 && fnCalls('ai_usage_settle').length === 3 && fnCalls('ai_usage_release').length === 0 && ledger.get(sid)?.status === 'reserved' && used() === 2 && (sf.body.run as { quota: unknown }).quota === null, { s: sf.statusCode, settle: fnCalls('ai_usage_settle').length, row: ledger.get(sid), q: (sf.body.run as { quota?: unknown })?.quota })
+  limit = 3
+  const after = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  check('S2 정산 못 한 예약도 한도에 들어감 — 다음 요청이 한도(3)를 넘으면 429(정산 실패로 공짜 사용 0)', after.statusCode === 429 && after.body.code === 'quota_exceeded' && after.body.used === 2, after.body)
+  setEnv()
+  settleFails = 2
+  const sid2 = rid()
+  const sf2 = await post({ requestId: sid2, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  check('S3 정산이 두 번 실패 후 세 번째에 성공 — settled · 답에 사용량', sf2.statusCode === 200 && fnCalls('ai_usage_settle').length === 3 && ledger.get(sid2)?.status === 'settled' && (sf2.body.run as { quota?: { used: number } }).quota?.used === 2, { s: sf2.statusCode, row: ledger.get(sid2) })
+
+  /* ---- 1d. 이용 권한 — 유료 구독자에게만 마케팅(SAAS-2.1 ③) ---- */
+  setEnv()
+  acct = { kind: 'customer', plan: 'basic', marketing: false, active: true }
+  const ne = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const neSt = await status(PILOT)
+  const nePlain = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('E1 마케팅이 빠진 요금제 — 마케팅 403 marketing_not_included · 메뉴 닫힘 · 일반 AI 는 장부에 세고 200', ne.statusCode === 403 && ne.body.code === 'marketing_not_included' && neSt.body.marketing === false && !(neSt.body.assists as { page: string }[]).some((a) => MARKETING_PAGES.has(a.page)) && nePlain.statusCode === 200 && fnCalls('ai_usage_reserve').length === 1, { mk: ne.body.code, st: neSt.body.marketing, p: nePlain.statusCode })
+
+  setEnv()
+  acct = { kind: 'customer', plan: 'growth', marketing: true, active: false }
+  const ex = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const exMk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const exSt = await status(PILOT)
+  check('E2 이용 기한 끝난 구독자 — 일반 · 마케팅 둘 다 403 subscription_inactive · AI 0 · 상태 마케팅 닫힘 · active false', ex.statusCode === 403 && ex.body.code === 'subscription_inactive' && exMk.statusCode === 403 && exMk.body.code === 'subscription_inactive' && provider().length === 0 && exSt.body.marketing === false && (exSt.body.usage as { active: boolean } | null)?.active === false, { s: ex.body.code, mk: exMk.body.code, st: exSt.body.usage })
+
+  setEnv()
+  acct = null
+  const none = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  check('E3 권한 줄이 아예 없는 계정(가입만 함) — 403 subscription_inactive · AI 0', none.statusCode === 403 && none.body.code === 'subscription_inactive' && provider().length === 0, none.body)
+
+  setEnv()
+  acct = { kind: 'customer', plan: 'growth', marketing: true, active: true }
+  const okMk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  check('E4 마케팅 포함 구독자 — 예약에 feature marketing · 200', okMk.statusCode === 200 && fnCalls('ai_usage_reserve')[0]?.args.p_feature === 'marketing', { s: okMk.statusCode, a: fnCalls('ai_usage_reserve')[0]?.args })
 
   /* ---- 2. 마케팅 고객판 — 서버 ---- */
   setEnv()

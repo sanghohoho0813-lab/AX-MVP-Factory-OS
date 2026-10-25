@@ -1177,9 +1177,13 @@ try {
   check('Pilot(D-185): 그래도 머리줄 [안내 영상] 으로는 열린다', (await p3.getByTestId('tutorial-dialog').count()) === 1)
   await c3.close()
 
-  /* ================= 7. SAAS-2 — 사용량 장부를 켜면 고객(팀장)에게 마케팅이 열린다(진짜 DB 장부 0022 · 진짜 RLS) ================= */
+  /* ================= 7. SAAS-2 — 사용량 장부 · 이용 권한(진짜 DB 장부 0022 · 진짜 RLS) ================= */
+  // SAAS-2.1 지금 팀장은 '내부 계정'(pilot_provision 이 권한 줄을 넣음) — 장부를 켜도 마케팅은 닫힌 채, 일반 AI 는 한도 없이 기록만.
+  //   구독 고객으로 바꾸면(대표가 SQL 한 줄) 그때 마케팅 · 한도가 열린다.
   const USAGE_SECRET = 'pilot-e2e-usage-secret-0123456789abcdef'
-  check('SAAS-2 준비 전: 장부 설정 없음(위 P1~P4 — 팀장 마케팅 닫힘이 이 상태)', sql(`select count(*) from public.ai_usage_config`) === '0')
+  check('SAAS-2 준비 전: 장부 설정 없음(위 P1~P4 — 팀장 마케팅 닫힘 · 일반 AI 예전처럼이 이 상태)', sql(`select count(*) from public.ai_usage_config`) === '0')
+  check('SAAS-2.1 pilot_provision: 팀장 권한 줄 = 내부 계정(internal · 마케팅 없음)', sql(`select kind || ':' || plan || ':' || marketing from public.ai_entitlements where user_id = '${PILOT.id}'`) === 'internal:internal:false')
+  check('SAAS-2.1 위 P1~P4 팀장 일반 AI(장부 설정 전) — 장부 줄 0 · 예전처럼 답함', sql(`select count(*) from public.ai_usage_ledger`) === '0')
   sql(`insert into public.ai_usage_config (id, secret_hash, default_monthly_units) values (1, sha256(convert_to('${USAGE_SECRET}', 'UTF8')), 12) on conflict (id) do update set secret_hash = excluded.secret_hash, default_monthly_units = excluded.default_monthly_units`)
   process.env.AI_USAGE_SECRET = USAGE_SECRET
   const c4 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
@@ -1192,7 +1196,22 @@ try {
   // 본문(main)만 — 왼쪽 위 제품 이름(MIRAE AI LAB OS)은 이 서비스 이름이라 대표 개인 정보가 아니다
   const OWNER_WORDS = /김상호|김팀장|미래AI랩|MIRAE|경영노트|AX Fit|3분 진단/
   const mainText = (pg) => pg.locator('main').innerText().catch(() => '')
-  check('SAAS-2 팀장: 장부를 켜면 왼쪽 메뉴에 마케팅 · 브랜딩', (await p4.locator('aside a[href="/marketing"]').count()) >= 1, await p4.locator('aside').innerText().catch(() => ''))
+  const todayCtx = { title: '오늘', today: '2026-10-25', sections: [] }
+  check('SAAS-2.1 내부 팀장: 장부를 켜도 마케팅 메뉴 닫힘(권한에 마케팅 없음)', (await p4.locator('aside a[href="/marketing"]').count()) === 0, await p4.locator('aside').innerText().catch(() => ''))
+  const inRun = await assistDirect(PILOT, { requestId: 'req-saas21-int-000001', assistId: 'today.top3', page: 'today', context: todayCtx })
+  check('SAAS-2.1 내부 팀장 일반 AI → 200 · DB 장부에 기록(internal · general · 정산)', inRun.statusCode === 200 && sql(`select kind || ':' || feature || ':' || status from public.ai_usage_ledger where request_id = 'req-saas21-int-000001'`) === 'internal:general:settled', `${inRun.statusCode} ${inRun.raw.slice(0, 160)}`)
+  const inMk = await assistDirect(PILOT, { requestId: 'req-saas21-int-000002', assistId: 'radar.top5', page: 'radar', context: { title: '콘텐츠 레이더', today: '2026-10-25', sections: [] } })
+  check('SAAS-2.1 내부 팀장 마케팅 직접 호출 → 403 marketing_not_included · 장부 줄 안 생김', inMk.statusCode === 403 && inMk.body.code === 'marketing_not_included' && sql(`select count(*) from public.ai_usage_ledger where request_id = 'req-saas21-int-000002'`) === '0', `${inMk.statusCode} ${inMk.raw.slice(0, 160)}`)
+  await go(p4, '/settings')
+  await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})
+  check('SAAS-2.1 내부 팀장: 설정에 "내부 계정(한도 없이 기록만)"', (await p4.getByTestId('ai-usage').getAttribute('data-kind').catch(() => '')) === 'internal' && ((await p4.getByTestId('ai-usage-numbers').innerText().catch(() => '')) ?? '').includes('내부 계정(한도 없이 기록만)'), await p4.getByTestId('ai-usage').innerText().catch(() => ''))
+  await shot(p4, 'saas21-internal-settings')
+
+  // 구독 고객으로 바꾼다(대표가 SQL Editor 에서 할 한 줄) — 시험 DB 만: 내부 기록은 지우고 0 부터
+  sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`)
+  sql(`update public.ai_entitlements set kind = 'customer', plan = 'test', marketing = true, monthly_units = 12, active_until = now() + interval '30 days' where user_id = '${PILOT.id}'`)
+  await go(p4, '/')
+  check('SAAS-2 구독 고객(마케팅 포함): 왼쪽 메뉴에 마케팅 · 브랜딩', (await p4.locator('aside a[href="/marketing"]').count()) >= 1, await p4.locator('aside').innerText().catch(() => ''))
   await go(p4, '/marketing/threads')
   const mkTabs = await p4.getByTestId('mk-tabs').locator('[data-testid^="mk-tab-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
   check('SAAS-2 팀장: 스레드 화면 열림 · 만들기 칸은 스레드 · 릴스/틱톡만(홍보 글 · 홈페이지 없음)', (await p4.getByTestId('thr-page').count()) === 1 && mkTabs.includes('mk-tab-threads') && mkTabs.includes('mk-tab-shorts') && !mkTabs.includes('mk-tab-content') && !mkTabs.includes('mk-tab-homepage'), mkTabs.join())
@@ -1245,6 +1264,23 @@ try {
   await go(p4, '/settings')
   await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})
   check('SAAS-2 팀장: 다 쓴 뒤 설정에 12 / 12', ((await p4.getByTestId('ai-usage-numbers').innerText().catch(() => '')) ?? '').startsWith('12 / 12'))
+  // SAAS-2.1 이용 기한이 끝난 구독자 — 일반 · 마케팅 모두 AI 0 · 설정에 '구독 확인'
+  sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`)
+  sql(`update public.ai_entitlements set active_until = now() - interval '1 day' where user_id = '${PILOT.id}'`)
+  aiCalls.length = 0
+  const exp1 = await assistDirect(PILOT, { requestId: 'req-saas21-exp-000001', assistId: 'today.top3', page: 'today', context: todayCtx })
+  const exp2 = await assistDirect(PILOT, { requestId: 'req-saas21-exp-000002', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('SAAS-2.1 기한 끝난 구독자: 일반 · 마케팅 둘 다 403 subscription_inactive · AI 0 · 장부 줄 0', exp1.statusCode === 403 && exp1.body.code === 'subscription_inactive' && exp2.statusCode === 403 && exp2.body.code === 'subscription_inactive' && aiCalls.length === 0 && sql(`select count(*) from public.ai_usage_ledger where user_id = '${PILOT.id}'`) === '0', `${exp1.raw.slice(0, 120)} ${exp2.raw.slice(0, 120)}`)
+  await go(p4, '/settings')
+  await p4.getByTestId('ai-usage-inactive').waitFor({ timeout: 8000 }).catch(() => {})
+  check('SAAS-2.1 기한 끝난 구독자: 설정에 "구독을 확인해 주세요" · 왼쪽 메뉴에 마케팅 없음', (await p4.getByTestId('ai-usage-inactive').count()) === 1 && (await p4.locator('aside a[href="/marketing"]').count()) === 0, await p4.getByTestId('ai-usage').innerText().catch(() => ''))
+  await shot(p4, 'saas21-inactive-settings')
+  // SAAS-2.1 마케팅이 빠진 요금제 — 일반 AI 는 세고 200 · 마케팅은 403
+  sql(`update public.ai_entitlements set active_until = now() + interval '30 days', marketing = false where user_id = '${PILOT.id}'`)
+  const nm1 = await assistDirect(PILOT, { requestId: 'req-saas21-nom-000001', assistId: 'today.top3', page: 'today', context: todayCtx })
+  const nm2 = await assistDirect(PILOT, { requestId: 'req-saas21-nom-000002', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('SAAS-2.1 마케팅 빠진 요금제: 일반 AI 200 · 장부에 customer 줄 · 마케팅 403 marketing_not_included', nm1.statusCode === 200 && sql(`select kind || ':' || feature || ':' || status from public.ai_usage_ledger where request_id = 'req-saas21-nom-000001'`) === 'customer:general:settled' && nm2.statusCode === 403 && nm2.body.code === 'marketing_not_included', `${nm1.raw.slice(0, 120)} ${nm2.raw.slice(0, 120)}`)
+  sql(`update public.ai_entitlements set marketing = true where user_id = '${PILOT.id}'`)
   // 휴대폰 390 — 열린 마케팅 화면도 넘침 0
   await p4.setViewportSize({ width: 390, height: 844 })
   for (const pth of ['/marketing/threads', '/marketing/shorts', '/marketing']) {

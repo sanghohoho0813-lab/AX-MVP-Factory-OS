@@ -115,7 +115,7 @@
     "qa:money": "node e2e/money.mjs",
     "qa:pilot": "node e2e/pilot.mjs",
     "qa:isolation": "node e2e/isolation.mjs",
-    "qa:db": "bash scripts/db-local/run.sh && bash scripts/db-local/run-0019-seed.sh",
+    "qa:db": "bash scripts/db-local/run.sh && bash scripts/db-local/run-0019-seed.sh && bash scripts/db-local/run-0022-owner.sh",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",
     "qa:journey": "node e2e/journey.mjs",

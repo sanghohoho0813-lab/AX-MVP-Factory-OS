@@ -76,6 +76,8 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   }
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/has_capability')) return new Response(JSON.stringify(headers.Authorization === OWNER), { status: 200 })
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_os_access')) return new Response(JSON.stringify(headers.Authorization === OWNER ? 'full' : headers.Authorization === PILOT ? 'pilot' : 'none'), { status: 200 })
+  // SAAS-2 0022 적용 전(지금 운영) — 이용 권한 함수가 없다: 팀장은 예전처럼(내부 팀장)
+  if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_ai_access')) return new Response(JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.my_ai_access' }), { status: 404 })
   const c: Call = { url, headers, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {} }
   if (/models(\?|$)/.test(url) && (init?.method ?? 'GET') === 'GET') {
     calls.push(c)

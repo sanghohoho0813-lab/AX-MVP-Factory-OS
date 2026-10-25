@@ -303,6 +303,8 @@ export const ERROR_TEXT = {
   // SAAS-2 고객별 AI 사용량
   quota_exceeded: '이번 달 AI 사용량을 다 썼습니다. 다음 달 1일에 다시 채워집니다(설정 › 계정 · 보기에서 남은 양 확인).',
   usage_setup_needed: '이 AI 기능은 사용량 관리가 준비되면 열립니다.',
+  subscription_inactive: '이용 기간이 끝났거나 요금제가 아직 없습니다. 구독을 확인해 주세요.',
+  marketing_not_included: '마케팅 · 브랜딩은 이 기능이 포함된 요금제에서 열립니다.',
   usage_unreachable: 'AI 사용량을 확인하지 못해 멈췄습니다(세지 않았습니다). 잠시 뒤 다시 눌러 주세요.',
   request_in_progress: '같은 요청이 아직 처리 중입니다. 잠시 뒤 결과를 확인해 주세요.',
   request_done: '이미 처리된 요청입니다. 새로 눌러 주세요.',
