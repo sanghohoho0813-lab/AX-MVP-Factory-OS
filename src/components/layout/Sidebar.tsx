@@ -23,6 +23,7 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { ViewAsSwitch } from './ViewAsSwitch'
+import { DeviceSwitch } from './DeviceView'
 import { AccountSwitchItems } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
@@ -250,6 +251,13 @@ function SidebarContent({
         {!collapsed && (
           <div className="mb-2 px-1.5 lg:hidden">
             <ViewAsSwitch stacked />
+          </div>
+        )}
+        {/* D-286 휴대폰 서랍(더보기)에서도 보기 방식 — PC · Mobile · PC+Mobile(대표 "폰에서도 PC 버전 · 모바일 · 동시에") */}
+        {onCloseMobile && !collapsed && (
+          <div className="mb-2 px-1.5 lg:hidden" data-testid="drawer-device">
+            <p className="mb-1 px-0.5 text-[0.8125rem] font-semibold text-navy-200">보기 방식</p>
+            <DeviceSwitch stacked />
           </div>
         )}
         {/* D-254 [ChatGPT 옆에 띄우기] 는 D-265 에 본문 오른쪽 위로 옮겼다(AppShell — 대표 "우측 상단 여백에") */}

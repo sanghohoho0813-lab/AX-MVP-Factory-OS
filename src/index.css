@@ -717,6 +717,12 @@ html[data-text-scale="extra_large"] .hdr-mclock {
   }
 }
 
+/* D-286 휴대폰 서랍 '보기 방식' — 글자 '크게 · 매우 크게' 에서는 아이콘을 빼고 글자만(360 에서 PC+Mobile 이 잘렸다) */
+html[data-text-scale="large"] .dev-stacked-icon,
+html[data-text-scale="extra_large"] .dev-stacked-icon {
+  display: none !important;
+}
+
 /* D-256: 왼쪽 메뉴를 넓혀 머리줄 자리가 모자랄 때 — Header 가 실제로 재서 넘칠 때만 data-fit 을 올린다(같은 순서로 뺀다) */
 header:is([data-fit='1'], [data-fit='2'], [data-fit='3']) :is(.hdr-wide-search, .hdr-opt, .hdr-opt-label) {
   display: none !important;

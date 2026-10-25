@@ -38,7 +38,7 @@ function BootSplash() {
 
 function App() {
   const cfg = getDataModeConfig()
-  // D-164: PC 에서 Mobile · PC+Mobile 을 고르면 앱 대신 보기 무대(같은 앱을 iframe 으로)
+  // D-164: PC 에서 Mobile · PC+Mobile 을 고르면 앱 대신 보기 무대(같은 앱을 iframe 으로) · D-286 휴대폰에서 PC · PC+Mobile 도
   const device = useDeviceView()
   const staged = device.staged && !isStageExcluded(window.location.pathname)
   const wasStaged = useRef(staged)
@@ -52,7 +52,7 @@ function App() {
       <TextScaleProvider>
         <AppearanceProvider>
           {/* 방식이 바뀌면 무대를 새로 그린다(칸 크기 재기 · iframe 새로) */}
-          <DeviceStage key={device.mode} />
+          <DeviceStage key={`${device.mode}-${device.narrow}`} />
         </AppearanceProvider>
       </TextScaleProvider>
     )

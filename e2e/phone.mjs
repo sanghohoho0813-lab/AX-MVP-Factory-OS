@@ -14,6 +14,9 @@
  *   3. 4글자 넘는 글이 40px 보다 좁은 칸에 갇혀 세로로 늘어지지 않는다(짜부라짐)
  *   4. 가로 칩 줄의 칩이 서로 겹치지 않는다
  *   5. 화면 오류 · JS 오류 없음
+ *
+ * D-286 보기 방식(휴대폰에서도 PC · Mobile · PC+Mobile) — 서랍 세 칸 · PC 칸 하나(1200 배치) · 세로면 위 PC 아래 휴대폰 ·
+ *   가로면 나란히 · Mobile 로 돌아오면 본 화면 · 휴대폰에서 고른 값은 PC 에 번지지 않음
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -150,6 +153,87 @@ for (const vp of VIEWPORTS) {
   check(`[${vp.tag}] JS 오류 없음`, errors.length === 0, errors.slice(0, 3).join(' | '))
   await ctx.close()
 }
+/* ---- D-286 보기 방식 — 휴대폰에서도 PC · Mobile · PC+Mobile ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '메뉴 열기' }).click()
+  await page.waitForTimeout(400)
+  const sw = page.getByTestId('drawer-device').getByTestId('device-switch')
+  const opts = await sw.locator('[data-mode]').evaluateAll((els) => els.map((e) => ({ m: e.dataset.mode, on: e.getAttribute('aria-checked'), clip: [...e.querySelectorAll('span')].some((t) => t.scrollWidth > t.clientWidth + 1) })))
+  check('[보기 방식] 390 서랍(더보기)에 PC · Mobile · PC+Mobile · 지금은 Mobile · 글자 잘림 없음', opts.map((o) => o.m).join() === 'pc,mobile,dual' && opts.find((o) => o.m === 'mobile')?.on === 'true' && opts.every((o) => !o.clip), opts)
+  await sw.locator('[data-mode="pc"]').click()
+  await page.getByTestId('pc-stage').waitFor({ timeout: 10000 })
+  await page.waitForTimeout(2500)
+  const pcIn = page.frameLocator('[data-testid="pc-frame"] iframe')
+  const pcW = await pcIn.locator('body').evaluate(() => innerWidth).catch(() => 0)
+  const pcAside = await pcIn.locator('aside').first().isVisible().catch(() => false)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  check('[보기 방식] PC — PC 칸 하나 · 안 화면은 PC 배치(폭 1200 · 사이드바 보임) · 휴대폰 폭에 맞춤(넘침 0) · 주소 그대로', pcW === 1200 && pcAside && over <= 0 && page.url().endsWith('/sales/board'), { pcW, pcAside, over, url: page.url() })
+  await page.getByTestId('device-switch').locator('[data-mode="dual"]').click()
+  await page.getByTestId('dual-view').waitFor({ timeout: 10000 })
+  await page.waitForTimeout(3000)
+  const lay = await page.evaluate(() => {
+    const pc = document.querySelector('[data-testid="dual-pc"]')?.getBoundingClientRect()
+    const ph = document.querySelector('[data-testid="device-frame"]')?.getBoundingClientRect()
+    return { layout: document.querySelector('[data-testid="dual-view"]')?.getAttribute('data-layout'), pcBottom: pc ? Math.round(pc.bottom) : null, phTop: ph ? Math.round(ph.top) : null, phRight: ph ? Math.round(ph.right) : null, vw: innerWidth }
+  })
+  const moIn = page.frameLocator('[data-testid="device-frame"] iframe')
+  const moW = await moIn.locator('body').evaluate(() => innerWidth).catch(() => 0)
+  const moSw = await moIn.locator('[data-testid="device-switch"]').count().catch(() => -1)
+  check('[보기 방식] PC+Mobile 세로 — 위 PC · 아래 휴대폰(안은 진짜 390) · 휴대폰 칸 안에 보기 단추 없음(재귀 없음) · 화면 안', lay.layout === 'stack' && lay.pcBottom <= lay.phTop && lay.phRight <= lay.vw && moW === 390 && moSw === 0, { ...lay, moW, moSw })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(1500)
+  const side = await page.evaluate(() => {
+    const pc = document.querySelector('[data-testid="dual-pc"]')?.getBoundingClientRect()
+    const ph = document.querySelector('[data-testid="device-frame"]')?.getBoundingClientRect()
+    return { layout: document.querySelector('[data-testid="dual-view"]')?.getAttribute('data-layout'), pcRight: pc ? Math.round(pc.right) : null, phLeft: ph ? Math.round(ph.left) : null, phBottom: ph ? Math.round(ph.bottom) : null, vh: innerHeight }
+  })
+  check('[보기 방식] PC+Mobile 가로(844×390) — 왼쪽 PC · 오른쪽 휴대폰 · 화면 안', side.layout === 'side' && side.pcRight <= side.phLeft && side.phBottom <= side.vh, side)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(800)
+  await page.getByTestId('device-switch').locator('[data-mode="mobile"]').first().click()
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(1500)
+  const back = { stage: await page.locator('[data-testid="dual-view"], [data-testid="pc-stage"]').count(), menu: await page.getByRole('button', { name: '메뉴 열기' }).count(), keys: await page.evaluate(() => [localStorage.getItem('axmvp.ui.device_view_narrow'), localStorage.getItem('axmvp.ui.device_view')]) }
+  check("[보기 방식] Mobile — 본 화면으로(무대 없음 · 메뉴 단추) · 휴대폰 값만 'mobile' · PC 값은 손대지 않음", back.stage === 0 && back.menu === 1 && back.keys[0] === 'mobile' && back.keys[1] === null && page.url().endsWith('/sales/board'), back)
+  check('[보기 방식] JS 오류 없음', errors.length === 0, errors.slice(0, 3).join(' | '))
+  await ctx.close()
+  // 휴대폰에서 PC+Mobile 을 골라 둔 채 PC(1440)로 열어도 PC 는 늘 보던 화면
+  const pc = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const pp = await pc.newPage()
+  await pp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await pp.evaluate(() => localStorage.setItem('axmvp.ui.device_view_narrow', 'dual'))
+  await pp.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await pp.waitForTimeout(800)
+  const pcState = { stage: await pp.locator('[data-testid="dual-view"], [data-testid="pc-stage"], [data-testid="mobile-stage"]').count(), on: await pp.locator('header [data-testid="device-switch"] [aria-checked="true"]').getAttribute('data-mode').catch(() => null) }
+  check('[보기 방식] 휴대폰에서 고른 값은 PC 에 번지지 않음(1440 — 무대 없음 · PC 선택)', pcState.stage === 0 && pcState.on === 'pc', pcState)
+  await pc.close()
+  // 360 · 글자 '매우 크게' — 서랍 세 칸 글자가 잘리지 않는다(아이콘을 빼고 글자만)
+  const xl = await browser.newContext({ viewport: { width: 360, height: 780 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const xp = await xl.newPage()
+  await xp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await xp.evaluate(seedScript())
+  await xp.evaluate(() => {
+    const k = 'axmvp.ui.preferences'
+    const v = JSON.parse(localStorage.getItem(k) || '{}')
+    v.textScale = 'extra_large'
+    localStorage.setItem(k, JSON.stringify(v))
+  })
+  await xp.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await xp.getByRole('button', { name: '메뉴 열기' }).click()
+  await xp.waitForTimeout(400)
+  const xlOpts = await xp.getByTestId('drawer-device').locator('[data-mode]').evaluateAll((els) => els.map((e) => ({ m: e.dataset.mode, clip: [...e.querySelectorAll('span')].some((t) => t.scrollWidth > t.clientWidth + 1), r: Math.round(e.getBoundingClientRect().right) })))
+  const drawerRight = await xp.getByTestId('drawer-device').evaluate((e) => Math.round(e.getBoundingClientRect().right))
+  check('[보기 방식] 360 · 글자 매우 크게 — 서랍 세 칸 글자 잘림 없음 · 칸 밖으로 안 나감', xlOpts.length === 3 && xlOpts.every((o) => !o.clip && o.r <= drawerRight + 1), { xlOpts, drawerRight })
+  await xl.close()
+}
+
 await browser.close()
 console.log(`\n휴대폰 화면: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)
