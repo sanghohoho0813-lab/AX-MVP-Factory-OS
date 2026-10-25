@@ -35,6 +35,7 @@ import { Modal } from '../components/ui/Modal'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Button } from '../components/ui/Button'
 import { HeroFrame } from '../components/ui/pageFrame'
+import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
 import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoEdits } from '../components/journal/TodoBoard'
@@ -472,25 +473,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </div>
         </div>
         </HeroFrame>
-        {/* D-282 맨 위 KPI 다섯 칸(휴대폰은 옆으로 밀기) · 바로가기(메뉴와 같은 권한 규칙). 휴대폰은 큰 아이콘 바로가기를 먼저 */}
-        {phone && <TodayLauncher phone />}
-        {!loading && (
-          <TodayKpis
-            todo={{ open: todoCount, overdue: overdueTodos.length, hard: hardDue.length }}
-            clients={{ contract: countContractClients(clients), prospect: clients.filter(isProspect).length }}
-            decisions={decisionCount}
-            follow={{ events: openEvents.length, appointments: appointments.length, lateAppointments: appointments.filter((e) => (e.daysLeft ?? 0) < 0).length }}
-            pilot={pilot}
-            phone={phone}
-            onTodos={() => scrollTo('today-todo-card')}
-            onFollow={() => (!pilot && openEvents.length > 0 ? navigate('/ops/inbox') : appointments.length > 0 ? scrollTo('today-appointments') : navigate('/ops/calendar'))}
-          />
-        )}
-        {!phone && <TodayLauncher phone={false} />}
-        {/* NX-1 대표 목표 2 — 맞는 모듈이 있는 업체를 맨 위에 눈에 띄게(예전엔 접힌 '영업' 칸 안 작은 링크) */}
-        {!loading && <TodayPicks clients={clients} reco={reco} phone={phone} />}
-        {/* D-239: 오늘 화면의 AI 도우미 — 오늘 제일 중요한 것만 · 놓치면 끝나는 것 · 순서 · 연락할 곳(대표 계정에서만) */}
-        {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
       </section>
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}
@@ -506,407 +488,448 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       )}
 
       {/*
-        B. 오늘 할 일 — 내가 적은 것.
-        규칙이 찾아 주는 경고보다 위에 둔다. 하루를 실제로 굴리는 것은 내가 적어 둔
-        한 줄이지, 시스템이 센 숫자가 아니다.
+        D-287 화면 꾸미기 — 아래 칸은 사람마다 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]).
+        기본 순서는 예전 그대로(휴대폰은 바로가기가 숫자 칸 위). 머리(인사 · 오늘 할 일 수)와 '첫 업체 등록' 안내는 늘 위.
       */}
-      <section
-        aria-labelledby="todos"
-        id="today-todo-card"
-        className="scroll-mt-24 flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
-      >
-        {/*
-          카드 안에 '오늘 할 일' 제목을 또 두지 않는다 — 바로 위 h1 이 이미 그 말이다.
-          제목 줄을 없앤 자리를 적는 칸이 가져간다. 이 화면에서 제일 많이 누르는 곳이다.
-        */}
-        <h2 id="todos" className="sr-only">
-          오늘 할 일
-        </h2>
-        <TodoComposer date={today} clients={active} onAdd={addTodo} />
-
-        {/* 밀린 것 — 어제까지가 기한인데 아직 안 끝난 것 */}
-        {overdueTodos.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="t-sub font-semibold text-danger-700">밀린 것 {overdueTodos.length}건</p>
-            <ul className={todoGridClass(overdueTodos.length)} data-testid="today-todo-grid">
-              {overdueTodos.map((e, i) => (
-                <TodoRow
-                  key={e.id}
-                  number={i + 1}
-                  entry={e}
-                  today={today}
-                  clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
-                  onPick={() => setTodoPick(e)}
-                />
-              ))}
-            </ul>
-          </div>
+      <ArrangeArea page="today" title="오늘" className="flex flex-col gap-4 sm:gap-6">
+        {phone && (
+          <ArrangeItem id="launcher" label="바로가기" hint="자주 쓰는 화면 아이콘">
+            <TodayLauncher phone />
+          </ArrangeItem>
         )}
+        <ArrangeItem id="kpis" label="숫자 다섯 칸" hint="오늘 처리할 업무 · 진행 중 고객사 · 확인 필요 · AI 작업 · 상담">
+          {!loading && (
+                    <TodayKpis
+                      todo={{ open: todoCount, overdue: overdueTodos.length, hard: hardDue.length }}
+                      clients={{ contract: countContractClients(clients), prospect: clients.filter(isProspect).length }}
+                      decisions={decisionCount}
+                      follow={{ events: openEvents.length, appointments: appointments.length, lateAppointments: appointments.filter((e) => (e.daysLeft ?? 0) < 0).length }}
+                      pilot={pilot}
+                      phone={phone}
+                      onTodos={() => scrollTo('today-todo-card')}
+                      onFollow={() => (!pilot && openEvents.length > 0 ? navigate('/ops/inbox') : appointments.length > 0 ? scrollTo('today-appointments') : navigate('/ops/calendar'))}
+                    />
+                  )}
+        </ArrangeItem>
+        {!phone && (
+          <ArrangeItem id="launcher" label="바로가기" hint="자주 쓰는 화면 아이콘">
+            <TodayLauncher phone={false} />
+          </ArrangeItem>
+        )}
+        <ArrangeItem id="picks" label="오늘 먼저 제안할 것" hint="맞는 모듈이 있는 업체">
+          {!loading && <TodayPicks clients={clients} reco={reco} phone={phone} />}
+        </ArrangeItem>
+        <ArrangeItem id="assist" label="AI 도우미" hint="오늘 제일 중요한 것 · 직접 묻기">
+          {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
+        </ArrangeItem>
+        <ArrangeItem id="todos" label="오늘 할 일" hint="할 일 적기 · 밀린 것 · 오늘 · 끝낸 것">
+          {/*
+            B. 오늘 할 일 — 내가 적은 것.
+            규칙이 찾아 주는 경고보다 위에 둔다. 하루를 실제로 굴리는 것은 내가 적어 둔
+            한 줄이지, 시스템이 센 숫자가 아니다.
+          */}
+          <section
+            aria-labelledby="todos"
+            id="today-todo-card"
+            className="scroll-mt-24 flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
+          >
+            {/*
+              카드 안에 '오늘 할 일' 제목을 또 두지 않는다 — 바로 위 h1 이 이미 그 말이다.
+              제목 줄을 없앤 자리를 적는 칸이 가져간다. 이 화면에서 제일 많이 누르는 곳이다.
+            */}
+            <h2 id="todos" className="sr-only">
+              오늘 할 일
+            </h2>
+            <TodoComposer date={today} clients={active} onAdd={addTodo} />
 
-        {todayTodos.length > 0 && (
-          <ul className={todoGridClass(todayTodos.length)} data-testid="today-todo-grid">
-            {todayTodos.map((e, i) => (
-              <TodoRow
-                key={e.id}
-                number={overdueTodos.length + i + 1}
-                entry={e}
-                today={today}
-                clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
-                onPick={() => setTodoPick(e)}
+            {/* 밀린 것 — 어제까지가 기한인데 아직 안 끝난 것 */}
+            {overdueTodos.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="t-sub font-semibold text-danger-700">밀린 것 {overdueTodos.length}건</p>
+                <ul className={todoGridClass(overdueTodos.length)} data-testid="today-todo-grid">
+                  {overdueTodos.map((e, i) => (
+                    <TodoRow
+                      key={e.id}
+                      number={i + 1}
+                      entry={e}
+                      today={today}
+                      clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                      onPick={() => setTodoPick(e)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {todayTodos.length > 0 && (
+              <ul className={todoGridClass(todayTodos.length)} data-testid="today-todo-grid">
+                {todayTodos.map((e, i) => (
+                  <TodoRow
+                    key={e.id}
+                    number={overdueTodos.length + i + 1}
+                    entry={e}
+                    today={today}
+                    clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                    onPick={() => setTodoPick(e)}
+                  />
+                ))}
+              </ul>
+            )}
+
+            {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '다가오는 마감 · 약속' 이 화면 밖으로 밀렸다 */}
+            <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4" data-testid="today-side-grid">
+              {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
+              {hardDue.length > 0 && (
+                <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
+                  <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
+                  <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
+                    {hardDue.map((a) => (
+                      <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                        <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
+                        <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                          {a.clientName}
+                        </Link>
+                        <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{a.title}</span>
+                        <span className="t-sub ml-auto shrink-0 break-keep text-slate-500">지나면 신청 불가</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* D-156: '맞는 업체에 알릴 공고(7일 안 마감)' 자동 알림은 뺐다(대표: 다 뜨면 오히려 안 보게 된다).
+                  도전 체크한 공고의 마감은 업체의 신청 건으로 위 '다가오는 마감 · 약속' 에 뜬다 */}
+
+              {/* D-142: 3일 안에 결제될 정기 결제 */}
+              <TodayCharges workspaceId={workspaceId} today={today} />
+
+              {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
+              {appointments.length > 0 && (
+                <div data-testid="today-appointments" id="today-appointments" className="scroll-mt-24 flex flex-col gap-2">
+                  <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
+                  <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
+                    {(phone && !showAllAppts ? appointments.slice(0, PHONE_ROWS) : appointments).map((e) => {
+                      const late = (e.daysLeft ?? 0) < 0
+                      return (
+                        <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                          <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
+                            {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
+                          </span>
+                          <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                            {e.clientName}
+                          </Link>
+                          <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-2">
+                            {prospectIds.has(e.clientId) ? (
+                              <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
+                                미팅 준비 →
+                              </Link>
+                            ) : (
+                              <Link to={`/ops/clients/${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
+                                업체 열기 →
+                              </Link>
+                            )}
+                            {/* D-125: 약속 줄에서 바로 전화 */}
+                            <CallButton phone={phoneOf(e.clientId)} name={e.clientName} />
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  {phone && !showAllAppts && appointments.length > PHONE_ROWS && (
+                    <button type="button" onClick={() => setShowAllAppts(true)} className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="today-appointments-more">
+                      업체 약속 {appointments.length - PHONE_ROWS}건 더 보기
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}
+            {doneTodos.length > 0 && (
+              <Disclosure title="끝낸 것" hint={`${doneTodos.length}건`}>
+                <ul className={todoGridClass(doneTodos.length)}>
+                  {doneTodos.map((e) => (
+                    <TodoRow
+                      key={e.id}
+                      entry={e}
+                      today={today}
+                      clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                      onPick={() => setTodoPick(e)}
+                    />
+                  ))}
+                </ul>
+              </Disclosure>
+            )}
+          </section>
+        </ArrangeItem>
+        <ArrangeItem id="decisions" label="확인할 것" hint="자료에서 읽은 정보 — 맞다 · 아니다">
+          {/* D-158: 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만(없으면 칸 없음) */}
+          <TodayDecisions
+            clients={clients}
+            today={today}
+            workspaceId={workspaceId}
+            userId={userId}
+            notices={grantNotices}
+            usable={usable}
+            onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))}
+            onTodo={(e) => setJournal((js) => [e, ...js])}
+            linkOf={linkOf}
+            onTodosRemoved={(ids) => setJournal((js) => js.filter((j) => !ids.includes(j.id)))}
+          />
+        </ArrangeItem>
+        <ArrangeItem id="agenda" label="다가오는 마감 · 약속" span="wide">
+          {/* 2단계 — 다가오는 마감 · 약속(D-143: 날짜가 있는 실제 일만, 날짜 순) */}
+          {/* D-192: 목차마다 접기 · 마우스를 올리면 무슨 칸인지. 마감 · 약속은 펼친 채로 시작 */}
+          <Fold
+            id="today.agenda"
+            title="다가오는 마감 · 약속"
+            headingId="upcoming"
+            tour="home-upcoming"
+            testId="today-agenda"
+            defaultOpen
+            icon={<SectionChip icon={CalendarClock} accent="urgent" />}
+            count={agenda.length}
+            countTone={agenda.length > 0 ? 'danger' : 'neutral'}
+            action={<AllLink to="/ops/calendar" />}
+          >
+            {loading ? (
+              <p className="t-sub text-slate-500">불러오는 중…</p>
+            ) : agenda.length === 0 ? (
+              <p className="t-sub break-keep rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500" data-testid="today-agenda-empty">
+                2주 안에 잡힌 마감 · 약속이 없습니다.
+              </p>
+            ) : (
+              <ol className="ax-stagger flex flex-col gap-2">
+                {agenda.slice(0, phone ? 4 : 8).map((a) => (
+                  <AgendaRow key={a.id} item={a} />
+                ))}
+              </ol>
+            )}
+            {agenda.length > (phone ? 4 : 8) && (
+              <Link to="/ops/calendar" className="tap t-sub inline-flex items-center self-start font-semibold text-brand-700 hover:underline" data-testid="today-agenda-more">
+                2주 안 {agenda.length}건 모두 달력에서 보기 →
+              </Link>
+            )}
+            {agendaLate.length > 0 && (
+              <div data-testid="today-agenda-late">
+                <Disclosure title="마감 지난 업무 · 신청" hint={`${agendaLate.length}건`}>
+                  <ol className="flex flex-col gap-2">
+                    {agendaLate.slice(0, 10).map((a) => (
+                      <AgendaRow key={a.id} item={a} />
+                    ))}
+                  </ol>
+                </Disclosure>
+              </div>
+            )}
+
+            {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
+            <div className={`ax-stagger mt-1 grid grid-cols-2 gap-2.5 ${pilot ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
+              <MetricTile
+                label="이번 주 마감"
+                value={`${weekDue.length}건`}
+                tone={weekDue.length > 0 ? 'warning' : 'neutral'}
+                onClick={() => navigate('/ops/calendar')}
               />
-            ))}
-          </ul>
-        )}
+              <MetricTile
+                label="고객 회신 대기"
+                value={`${waiting}건`}
+                tone={waiting > 0 ? 'warning' : 'neutral'}
+                // D-126: 그 조건으로 거른 목록이 바로 열린다(예전엔 전체 목록)
+                onClick={() => navigate(waiting > 0 ? '/ops/clients?filter=waiting' : '/ops/clients')}
+              />
+              <MetricTile
+                label={moneyWords.unpaid}
+                value={krwTile(money.scheduled.total + money.overdue.total)}
+                tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
+                hint={
+                  [
+                    // D-125: 이번 주 들어올 돈을 먼저 — 대표가 가장 먼저 묻는 숫자
+                    weekIn.count > 0 ? `이번 주 받을 것 ${krwTile(weekIn.total)} · ${weekIn.count}건` : '',
+                    money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : '',
+                    money.scheduled.gross + money.overdue.gross !== money.scheduled.total + money.overdue.total
+                      ? `청구 기준 ${krwTile(money.scheduled.gross + money.overdue.gross)}`
+                      : '',
+                  ]
+                    .filter((v) => v !== '')
+                    .join(' · ') || undefined
+                }
+                // D-122: 연체가 있으면 가장 오래 밀린 업체의 수금 탭으로 바로
+                onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : money.scheduled.count > 0 ? '/ops/clients?filter=unpaid' : '/ops/clients')}
+              />
+              {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
+              {!pilot && (
+                <MetricTile
+                  label="새 상담신청"
+                  value={`${openEvents.length}건`}
+                  tone={openEvents.length > 0 ? 'brand' : 'neutral'}
+                  onClick={() => navigate('/ops/inbox')}
+                />
+              )}
+            </div>
 
-        {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '다가오는 마감 · 약속' 이 화면 밖으로 밀렸다 */}
-        <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4" data-testid="today-side-grid">
-          {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
-          {hardDue.length > 0 && (
-            <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
-              <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
-              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
-                {hardDue.map((a) => (
-                  <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                    <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
-                    <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
-                      {a.clientName}
+            {/* D-122: 오늘 화면에 안 보이던 돈 두 가지 — 영업자에게 줄 돈 · 받을 날을 안 정한 수금 */}
+            {((!pilot && agentPayable > 0) || noDueFees.length > 0) && (
+              <p data-testid="today-money-notes" className="t-sub flex flex-wrap gap-x-4 gap-y-1 break-keep text-slate-600">
+                {!pilot && agentPayable > 0 && (
+                  <Link to="/ops/agents" className="tap inline-flex items-center font-semibold text-warning-700 hover:underline">
+                    영업자에게 줄 돈 {krwTile(agentPayable)} (고객 입금됨) →
+                  </Link>
+                )}
+                {noDueFees.length > 0 && (
+                  <Link to={`/ops/clients/${noDueFees[0].clientId}?tab=fees`} className="tap inline-flex items-center font-semibold text-slate-700 hover:underline">
+                    받을 날을 안 정한 수금 {noDueFees.length}건 →
+                  </Link>
+                )}
+              </p>
+            )}
+          </Fold>
+        </ArrangeItem>
+        <ArrangeItem id="capture" label="무슨 일이 있었나요? (메모 · 기록)" hint="빠른 기록 · 오늘 적은 메모" span="narrow">
+          {/* 3단계 — 빠른 기록(D-192: 접어 두고 필요할 때 펼친다) */}
+          <Fold
+            id="today.capture"
+            title="무슨 일이 있었나요?"
+            headingId="capture"
+            tour="home-capture"
+            testId="today-capture"
+            defaultOpen={!phone}
+            icon={<SectionChip icon={NotebookPen} accent="journal" />}
+            count={todayJournal.length}
+            action={<AllLink to="/journal" />}
+          >
+            <QuickCapture
+              clients={active}
+              compact
+              onCreate={(input) => journalMutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
+            />
+            <JournalList
+              entries={todayJournal.slice(0, 4)}
+              clientNames={clientNames}
+              today={today}
+              showDate={false}
+              onToggleComplete={(e) => journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))}
+              onTogglePin={(e) => journalMutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
+              onEdit={(e, content) => journalMutate(() => updateJournalEntry(e, { content }))}
+              onDelete={(e) => setPendingDelete(e)}
+              emptyTitle="오늘 기록된 업무가 없습니다."
+              emptyHint=""
+            />
+            {todayJournal.length > 4 && (
+              <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
+                오늘 기록 {todayJournal.length}건 모두 보기
+              </Link>
+            )}
+          </Fold>
+        </ArrangeItem>
+        {/* 4단계 — 고객 이벤트(Pilot 은 고객 플랫폼을 쓰지 않는다) */}
+        {!pilot && (
+          <ArrangeItem id="events" label="상담신청" span="half">
+          <Fold
+            id="today.events"
+            title="상담신청"
+            headingId="events"
+            tour="home-events"
+            testId="today-events"
+            icon={<SectionChip icon={Inbox} accent="event" />}
+            count={openEvents.length}
+            countTone="brand"
+            action={<AllLink to="/ops/inbox" />}
+          >
+            {openEvents.length === 0 ? (
+              <Blank
+                title="새 상담신청이 없습니다."
+                icon={<Inbox className="size-7" />}
+                action={
+                  isLocal ? (
+                    <Link to="/ops/inbox" className="t-sub font-medium text-brand-700 hover:underline">
+                      상담신청함에서 샘플 만들기
                     </Link>
-                    <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{a.title}</span>
-                    <span className="t-sub ml-auto shrink-0 break-keep text-slate-500">지나면 신청 불가</span>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {openEvents.slice(0, 3).map((e) => (
+                  <li key={e.id}>
+                    <EventCard
+                      event={e}
+                      compact
+                      clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
+                      onLink={() => setLinking({ event: e, tab: 'existing' })}
+                      onCreateClient={() => setLinking({ event: e, tab: 'new' })}
+                      onStatus={(status) => void setEventStatus(e, status)}
+                    />
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-
-          {/* D-156: '맞는 업체에 알릴 공고(7일 안 마감)' 자동 알림은 뺐다(대표: 다 뜨면 오히려 안 보게 된다).
-              도전 체크한 공고의 마감은 업체의 신청 건으로 위 '다가오는 마감 · 약속' 에 뜬다 */}
-
-          {/* D-142: 3일 안에 결제될 정기 결제 */}
-          <TodayCharges workspaceId={workspaceId} today={today} />
-
-          {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
-          {appointments.length > 0 && (
-            <div data-testid="today-appointments" id="today-appointments" className="scroll-mt-24 flex flex-col gap-2">
-              <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
-              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
-                {(phone && !showAllAppts ? appointments.slice(0, PHONE_ROWS) : appointments).map((e) => {
-                  const late = (e.daysLeft ?? 0) < 0
-                  return (
-                    <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                      <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
-                        {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
-                      </span>
-                      <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
-                        {e.clientName}
-                      </Link>
-                      <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
-                      <span className="ml-auto flex shrink-0 items-center gap-2">
-                        {prospectIds.has(e.clientId) ? (
-                          <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
-                            미팅 준비 →
-                          </Link>
-                        ) : (
-                          <Link to={`/ops/clients/${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
-                            업체 열기 →
-                          </Link>
-                        )}
-                        {/* D-125: 약속 줄에서 바로 전화 */}
-                        <CallButton phone={phoneOf(e.clientId)} name={e.clientName} />
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-              {phone && !showAllAppts && appointments.length > PHONE_ROWS && (
-                <button type="button" onClick={() => setShowAllAppts(true)} className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="today-appointments-more">
-                  업체 약속 {appointments.length - PHONE_ROWS}건 더 보기
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}
-        {doneTodos.length > 0 && (
-          <Disclosure title="끝낸 것" hint={`${doneTodos.length}건`}>
-            <ul className={todoGridClass(doneTodos.length)}>
-              {doneTodos.map((e) => (
-                <TodoRow
-                  key={e.id}
-                  entry={e}
-                  today={today}
-                  clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
-                  onPick={() => setTodoPick(e)}
-                />
-              ))}
-            </ul>
-          </Disclosure>
-        )}
-      </section>
-
-      {/* D-158: 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만(없으면 칸 없음) */}
-      <TodayDecisions
-        clients={clients}
-        today={today}
-        workspaceId={workspaceId}
-        userId={userId}
-        notices={grantNotices}
-        usable={usable}
-        onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))}
-        onTodo={(e) => setJournal((js) => [e, ...js])}
-        linkOf={linkOf}
-        onTodosRemoved={(ids) => setJournal((js) => js.filter((j) => !ids.includes(j.id)))}
-      />
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        {/* 2단계 — 다가오는 마감 · 약속(D-143: 날짜가 있는 실제 일만, 날짜 순) */}
-        {/* D-192: 목차마다 접기 · 마우스를 올리면 무슨 칸인지. 마감 · 약속은 펼친 채로 시작 */}
-        <Fold
-          id="today.agenda"
-          title="다가오는 마감 · 약속"
-          headingId="upcoming"
-          tour="home-upcoming"
-          testId="today-agenda"
-          defaultOpen
-          icon={<SectionChip icon={CalendarClock} accent="urgent" />}
-          count={agenda.length}
-          countTone={agenda.length > 0 ? 'danger' : 'neutral'}
-          action={<AllLink to="/ops/calendar" />}
-        >
-          {loading ? (
-            <p className="t-sub text-slate-500">불러오는 중…</p>
-          ) : agenda.length === 0 ? (
-            <p className="t-sub break-keep rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500" data-testid="today-agenda-empty">
-              2주 안에 잡힌 마감 · 약속이 없습니다.
-            </p>
-          ) : (
-            <ol className="ax-stagger flex flex-col gap-2">
-              {agenda.slice(0, phone ? 4 : 8).map((a) => (
-                <AgendaRow key={a.id} item={a} />
-              ))}
-            </ol>
-          )}
-          {agenda.length > (phone ? 4 : 8) && (
-            <Link to="/ops/calendar" className="tap t-sub inline-flex items-center self-start font-semibold text-brand-700 hover:underline" data-testid="today-agenda-more">
-              2주 안 {agenda.length}건 모두 달력에서 보기 →
-            </Link>
-          )}
-          {agendaLate.length > 0 && (
-            <div data-testid="today-agenda-late">
-              <Disclosure title="마감 지난 업무 · 신청" hint={`${agendaLate.length}건`}>
-                <ol className="flex flex-col gap-2">
-                  {agendaLate.slice(0, 10).map((a) => (
-                    <AgendaRow key={a.id} item={a} />
-                  ))}
-                </ol>
-              </Disclosure>
-            </div>
-          )}
-
-          {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
-          <div className={`ax-stagger mt-1 grid grid-cols-2 gap-2.5 ${pilot ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
-            <MetricTile
-              label="이번 주 마감"
-              value={`${weekDue.length}건`}
-              tone={weekDue.length > 0 ? 'warning' : 'neutral'}
-              onClick={() => navigate('/ops/calendar')}
-            />
-            <MetricTile
-              label="고객 회신 대기"
-              value={`${waiting}건`}
-              tone={waiting > 0 ? 'warning' : 'neutral'}
-              // D-126: 그 조건으로 거른 목록이 바로 열린다(예전엔 전체 목록)
-              onClick={() => navigate(waiting > 0 ? '/ops/clients?filter=waiting' : '/ops/clients')}
-            />
-            <MetricTile
-              label={moneyWords.unpaid}
-              value={krwTile(money.scheduled.total + money.overdue.total)}
-              tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
-              hint={
-                [
-                  // D-125: 이번 주 들어올 돈을 먼저 — 대표가 가장 먼저 묻는 숫자
-                  weekIn.count > 0 ? `이번 주 받을 것 ${krwTile(weekIn.total)} · ${weekIn.count}건` : '',
-                  money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : '',
-                  money.scheduled.gross + money.overdue.gross !== money.scheduled.total + money.overdue.total
-                    ? `청구 기준 ${krwTile(money.scheduled.gross + money.overdue.gross)}`
-                    : '',
-                ]
-                  .filter((v) => v !== '')
-                  .join(' · ') || undefined
-              }
-              // D-122: 연체가 있으면 가장 오래 밀린 업체의 수금 탭으로 바로
-              onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : money.scheduled.count > 0 ? '/ops/clients?filter=unpaid' : '/ops/clients')}
-            />
-            {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
-            {!pilot && (
-              <MetricTile
-                label="새 상담신청"
-                value={`${openEvents.length}건`}
-                tone={openEvents.length > 0 ? 'brand' : 'neutral'}
-                onClick={() => navigate('/ops/inbox')}
-              />
             )}
-          </div>
-
-          {/* D-122: 오늘 화면에 안 보이던 돈 두 가지 — 영업자에게 줄 돈 · 받을 날을 안 정한 수금 */}
-          {((!pilot && agentPayable > 0) || noDueFees.length > 0) && (
-            <p data-testid="today-money-notes" className="t-sub flex flex-wrap gap-x-4 gap-y-1 break-keep text-slate-600">
-              {!pilot && agentPayable > 0 && (
-                <Link to="/ops/agents" className="tap inline-flex items-center font-semibold text-warning-700 hover:underline">
-                  영업자에게 줄 돈 {krwTile(agentPayable)} (고객 입금됨) →
-                </Link>
-              )}
-              {noDueFees.length > 0 && (
-                <Link to={`/ops/clients/${noDueFees[0].clientId}?tab=fees`} className="tap inline-flex items-center font-semibold text-slate-700 hover:underline">
-                  받을 날을 안 정한 수금 {noDueFees.length}건 →
-                </Link>
-              )}
-            </p>
-          )}
-        </Fold>
-
-        {/* 3단계 — 빠른 기록(D-192: 접어 두고 필요할 때 펼친다) */}
-        <Fold
-          id="today.capture"
-          title="무슨 일이 있었나요?"
-          headingId="capture"
-          tour="home-capture"
-          testId="today-capture"
-          defaultOpen={!phone}
-          icon={<SectionChip icon={NotebookPen} accent="journal" />}
-          count={todayJournal.length}
-          action={<AllLink to="/journal" />}
-        >
-          <QuickCapture
-            clients={active}
-            compact
-            onCreate={(input) => journalMutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
-          />
-          <JournalList
-            entries={todayJournal.slice(0, 4)}
-            clientNames={clientNames}
-            today={today}
-            showDate={false}
-            onToggleComplete={(e) => journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))}
-            onTogglePin={(e) => journalMutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
-            onEdit={(e, content) => journalMutate(() => updateJournalEntry(e, { content }))}
-            onDelete={(e) => setPendingDelete(e)}
-            emptyTitle="오늘 기록된 업무가 없습니다."
-            emptyHint=""
-          />
-          {todayJournal.length > 4 && (
-            <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
-              오늘 기록 {todayJournal.length}건 모두 보기
-            </Link>
-          )}
-        </Fold>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* 4단계 — 고객 이벤트(Pilot 은 고객 플랫폼을 쓰지 않는다) */}
-        {!pilot && (
-        <Fold
-          id="today.events"
-          title="상담신청"
-          headingId="events"
-          tour="home-events"
-          testId="today-events"
-          icon={<SectionChip icon={Inbox} accent="event" />}
-          count={openEvents.length}
-          countTone="brand"
-          action={<AllLink to="/ops/inbox" />}
-        >
-          {openEvents.length === 0 ? (
-            <Blank
-              title="새 상담신청이 없습니다."
-              icon={<Inbox className="size-7" />}
-              action={
-                isLocal ? (
-                  <Link to="/ops/inbox" className="t-sub font-medium text-brand-700 hover:underline">
-                    상담신청함에서 샘플 만들기
+          </Fold>
+        
+          </ArrangeItem>
+        )}
+        <ArrangeItem id="sales" label="영업" hint="지금 챙길 영업 · 다시 연락할 곳" span="half">
+          {/* D-118: 영업 — 영업 관리 보드의 '지금 챙길 영업' 을 오늘에서도. 없으면 다시 연락할 곳 */}
+          <Fold
+            id="today.sales"
+            title="영업"
+            headingId="today-sales"
+            testId="today-sales"
+            icon={<SectionChip icon={KanbanSquare} accent="sales" />}
+            count={salesRiskList.length}
+            countTone="warning"
+            action={<AllLink to="/sales/board" />}
+          >
+            <p className="t-sub text-slate-500">
+              진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
+              {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
+              {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
+              {pickCount > 0 && (
+                <>
+                  {' · '}
+                  <Link to="/ops/clients?sort=reco" data-testid="today-reco-count" className="tap inline-flex items-center font-semibold whitespace-nowrap text-success-700 hover:underline">
+                    먼저 제안할 업체 {pickCount}곳 →
                   </Link>
-                ) : undefined
-              }
-            />
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {openEvents.slice(0, 3).map((e) => (
-                <li key={e.id}>
-                  <EventCard
-                    event={e}
-                    compact
-                    clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
-                    onLink={() => setLinking({ event: e, tab: 'existing' })}
-                    onCreateClient={() => setLinking({ event: e, tab: 'new' })}
-                    onStatus={(status) => void setEventStatus(e, status)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Fold>
-        )}
-
-        {/* D-118: 영업 — 영업 관리 보드의 '지금 챙길 영업' 을 오늘에서도. 없으면 다시 연락할 곳 */}
-        <Fold
-          id="today.sales"
-          title="영업"
-          headingId="today-sales"
-          testId="today-sales"
-          icon={<SectionChip icon={KanbanSquare} accent="sales" />}
-          count={salesRiskList.length}
-          countTone="warning"
-          action={<AllLink to="/sales/board" />}
-        >
-          <p className="t-sub text-slate-500">
-            진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
-            {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
-            {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
-            {pickCount > 0 && (
-              <>
-                {' · '}
-                <Link to="/ops/clients?sort=reco" data-testid="today-reco-count" className="tap inline-flex items-center font-semibold whitespace-nowrap text-success-700 hover:underline">
-                  먼저 제안할 업체 {pickCount}곳 →
-                </Link>
-              </>
+                </>
+              )}
+              {' · '}
+              {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
+              <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">
+                + 크레탑으로 등록
+              </Link>
+            </p>
+            {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
+              <Blank
+                title="지금 챙길 영업이 없습니다."
+                icon={<KanbanSquare className="size-7" />}
+                action={
+                  <Link to="/sales/board" className="tap inline-flex items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 font-semibold text-brand-700 hover:bg-brand-100">
+                    영업 보드에서 잠재고객 등록 →
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
+                {(salesRiskList.length > 0
+                  ? salesRiskList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reason, tone: 'text-warning-700', go: r.action }))
+                  : salesRecontactList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reasons[0], tone: 'text-slate-500', go: '연락하기' }))
+                ).map((x) => (
+                  <li key={x.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-1.5">
+                    <Link to={`/ops/clients/${x.id}`} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
+                    {/* 12rem 아래로는 줄이지 않고 다음 줄로 — 좁은 화면 · 큰 글자에서 한 줄에 두세 자씩 짜부라지지 않게 */}
+                    <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${x.tone}`}>{x.why}</span>
+                    <Link to={salesActionPath(x.go, x.id)} className="tap t-meta ml-auto inline-flex shrink-0 items-center font-semibold text-brand-700 hover:underline">{x.go} →</Link>
+                  </li>
+                ))}
+              </ul>
             )}
-            {' · '}
-            {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
-            <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">
-              + 크레탑으로 등록
-            </Link>
-          </p>
-          {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
-            <Blank
-              title="지금 챙길 영업이 없습니다."
-              icon={<KanbanSquare className="size-7" />}
-              action={
-                <Link to="/sales/board" className="tap inline-flex items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 font-semibold text-brand-700 hover:bg-brand-100">
-                  영업 보드에서 잠재고객 등록 →
-                </Link>
-              }
-            />
-          ) : (
-            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
-              {(salesRiskList.length > 0
-                ? salesRiskList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reason, tone: 'text-warning-700', go: r.action }))
-                : salesRecontactList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reasons[0], tone: 'text-slate-500', go: '연락하기' }))
-              ).map((x) => (
-                <li key={x.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-1.5">
-                  <Link to={`/ops/clients/${x.id}`} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
-                  {/* 12rem 아래로는 줄이지 않고 다음 줄로 — 좁은 화면 · 큰 글자에서 한 줄에 두세 자씩 짜부라지지 않게 */}
-                  <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${x.tone}`}>{x.why}</span>
-                  <Link to={salesActionPath(x.go, x.id)} className="tap t-meta ml-auto inline-flex shrink-0 items-center font-semibold text-brand-700 hover:underline">{x.go} →</Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Fold>
-
-        {/* D-155: 계약 고객 돌봄 — 한 달 넘게 조용 · 계약 1주년. 없으면 칸 없음 */}
-        <TodayCare clients={clients} today={today} workspaceId={workspaceId} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
-      </div>
+          </Fold>
+        </ArrangeItem>
+        <ArrangeItem id="care" label="안부 챙길 계약 고객" hint="한 달 넘게 조용 · 계약 1주년(없으면 칸 없음)" span="half">
+          {/* D-155: 계약 고객 돌봄 — 한 달 넘게 조용 · 계약 1주년. 없으면 칸 없음 */}
+          <TodayCare clients={clients} today={today} workspaceId={workspaceId} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
+        </ArrangeItem>
+      </ArrangeArea>
 
       {/* 하루의 끝에 누르는 버튼이라 모바일에서는 화면 맨 아래에 둔다 */}
       <Button variant="secondary" className="w-full sm:hidden" onClick={() => setSummaryOpen(true)}>

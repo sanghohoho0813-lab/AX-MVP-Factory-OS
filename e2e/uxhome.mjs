@@ -11,6 +11,8 @@
  *   T  화면 제목 아이콘 — 메뉴 이름인 화면(고객 관리)에는 있고, 업체 상세(업체 이름)에는 없음
  *   U  UXS-1 화면 문법 — AI 전략실 · 업체 작업실 · 특허 · 벤처 · 영업 보드가 같은 순서(머리 → 요약 → 지금 할 일 → 본문 판) ·
  *      머리 배경 그림 · '지금 할 일' 은 한 화면에 하나 · 요약 숫자 칸은 한 판(칸마다 상자 없음) · 휴대폰은 머리 → 지금 할 일 → 요약 · 넘침 0
+ *   R  D-287 화면 꾸미기 — 오늘: 기본 순서 그대로 · 메모 칸 맨 위로 · 오늘만 숨기기(다음 날 다시 보임) · 계속 숨기기 · 새로 고쳐도 유지 ·
+ *      처음대로 · 휴대폰 · 다른 화면 8곳에 [화면 꾸미기] · 꾸밀 칸 없는 화면에는 없음 · 영업 보드 AI 도우미 숨기기
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -271,6 +273,88 @@ let caseUrl = ''
     return { art: hero?.dataset.hero ?? null, shown: !!art && art.offsetWidth > 100 }
   })
   check("U 오늘 — 웰컴 띠에 머리 그림 'home'", home.art === 'home' && home.shown, home)
+}
+
+/* ---- R D-287 화면 꾸미기 ---- */
+{
+  const order = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-arrange-item]')].map((e) => e.getAttribute('data-arrange-item')))
+  const top = (pg, id) => pg.evaluate((id) => Math.round(document.querySelector(`[data-arrange-item="${id}"]`)?.getBoundingClientRect().top ?? -1), id)
+  await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('axmvp.ui.layout.')).forEach((k) => localStorage.removeItem(k)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
+  const def = await order(page)
+  check('R1 오늘 — [화면 꾸미기] 단추 · 기본 순서 예전 그대로(숫자 → 바로가기 → 제안 → AI → 할 일 → 확인할 것 → 마감 · 메모 → 상담 · 영업 · 돌봄)', (await page.getByTestId('arrange-open').count()) === 1 && def.join() === 'kpis,launcher,picks,assist,todos,decisions,agenda,capture,events,sales,care', def)
+  await page.getByTestId('arrange-open').click()
+  await page.getByTestId('arrange-list').waitFor()
+  const rows = await page.locator('[data-arrange-row]').count()
+  await page.locator('[data-arrange-row="capture"]').getByTestId('arrange-top').click()
+  await page.locator('[data-arrange-row="sales"] [data-vis="today"]').click()
+  await page.locator('[data-arrange-row="kpis"] [data-vis="off"]').click()
+  await shot(page, 'R-sheet-1440')
+  await page.getByTestId('arrange-done').click()
+  await page.waitForTimeout(300)
+  const after = await order(page)
+  const hiddenLine = await page.getByTestId('arrange-hidden').innerText().catch(() => '')
+  check(`R2 꾸미기 창 칸 ${rows}개 — 메모(무슨 일이 있었나요?) 맨 위로 · 영업 오늘만 숨김 · 숫자 칸 계속 숨김 → 화면에 바로 · 맨 아래 '숨긴 칸 2개'`, rows === 11 && after[0] === 'capture' && !after.includes('sales') && !after.includes('kpis') && (await top(page, 'capture')) < (await top(page, 'todos')) && hiddenLine.includes('숨긴 칸 2개'), { after, hiddenLine })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const again = await order(page)
+  check('R3 새로 고쳐도 그대로(이 기기에 기억)', again[0] === 'capture' && !again.includes('sales') && !again.includes('kpis'), again)
+  // 다음 날 — '오늘만' 은 저절로 다시 보인다(숨긴 날짜를 어제로 바꿔 흉내)
+  await page.evaluate(() => {
+    const k = 'axmvp.ui.layout.today'
+    const v = JSON.parse(localStorage.getItem(k) || '{}')
+    v.today = { sales: '2000-01-01' }
+    localStorage.setItem(k, JSON.stringify(v))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const next = await order(page)
+  check("R4 '오늘만 숨기기' 는 다음 날 다시 보임 · '계속 숨기기' 는 그대로 숨김", next.includes('sales') && !next.includes('kpis'), next)
+  await page.getByTestId('arrange-hidden-open').click()
+  await page.getByTestId('arrange-reset').click()
+  await page.getByTestId('arrange-done').click()
+  await page.waitForTimeout(300)
+  check('R5 [처음대로] — 기본 순서 · 숨긴 칸 없음', (await order(page)).join() === def.join() && (await page.getByTestId('arrange-hidden').count()) === 0)
+  // 다른 화면 — [화면 꾸미기] 가 있는 곳 · 없는 곳
+  const withBtn = []
+  for (const u of ['/ai', '/sales/board', '/ops/clients', '/ops/inbox', '/ops/agents', '/money', '/grants', '/ops/calendar']) {
+    await page.goto(BASE + u, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    withBtn.push(`${u}:${await page.getByTestId('arrange-open').count()}:${await page.locator('[data-arrange-item]').count()}`)
+  }
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const none = await page.getByTestId('arrange-open').count()
+  check('R6 다른 화면 8곳에 [화면 꾸미기](칸 2개 이상) · 꾸밀 칸이 없는 화면(확인할 것)에는 없음', withBtn.every((x) => /:1:([2-9]|\d\d)$/.test(x)) && none === 0, { withBtn, none })
+  // 영업 보드 — AI 도우미 띠 숨기기
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const barBefore = await page.getByTestId('ai-assist-bar').count()
+  await page.getByTestId('arrange-open').click()
+  await page.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
+  await page.getByTestId('arrange-done').click()
+  await page.waitForTimeout(300)
+  check('R7 영업 보드 — AI 도우미 띠 계속 숨기기 → 띠 없음 · 보드 · 요약은 그대로', barBefore === 1 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('sales-board-panel').count()) === 1 && (await page.getByTestId('sales-summary').count()) === 1)
+  await page.evaluate(() => localStorage.removeItem('axmvp.ui.layout.sales-board'))
+  // 휴대폰 390
+  const m = await ctx.newPage()
+  await m.setViewportSize({ width: 390, height: 844 })
+  await m.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await m.waitForTimeout(600)
+  const mDef = await order(m)
+  await m.getByTestId('arrange-open').click()
+  await m.getByTestId('arrange-list').waitFor()
+  const wide = await m.evaluate(() => [...document.querySelectorAll('[role="dialog"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
+  await m.locator('[data-arrange-row="capture"]').getByTestId('arrange-top').click()
+  await shot(m, 'R-sheet-390')
+  await m.getByTestId('arrange-done').click()
+  await m.waitForTimeout(300)
+  const mAfter = await order(m)
+  const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check('R8 휴대폰 390 — 기본은 바로가기가 숫자 위 · [꾸미기] 창 넘침 0 · 메모 맨 위로 · 화면 넘침 0', mDef[0] === 'launcher' && mDef[1] === 'kpis' && wide === 0 && mAfter[0] === 'capture' && over <= 0, { mDef, wide, mAfter, over })
+  await m.evaluate(() => localStorage.removeItem('axmvp.ui.layout.today'))
+  await m.close()
 }
 
 check('오류 0', errors.length === 0, errors)

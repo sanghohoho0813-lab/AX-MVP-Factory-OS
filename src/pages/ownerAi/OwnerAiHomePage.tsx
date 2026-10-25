@@ -9,6 +9,8 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { BarChart3, Brain, Building2, CalendarClock, Link2, Plus, Search, Sparkles } from 'lucide-react'
 import { IconTile, KpiCard } from '../../components/ui/visual'
 import { NextActionBar, PageHero, PageStack, SummaryStrip, WorkPanel } from '../../components/ui/pageFrame'
+import { ArrangeArea, ArrangeItem } from '../../components/ui/arrange'
+import { useIsPhone } from '../../lib/useIsPhone'
 import { todayLocalDate } from '../../lib/appClock'
 import { findDuplicates, normalizeCompany, relationForClient, type DuplicateHit } from '../../services/ownerAi/caseUtil'
 import { parsePartnerHandoff, PARTNER_EVENT } from '../../services/ownerAi/partnerBridge'
@@ -144,6 +146,7 @@ function Home() {
     return d.toISOString()
   })()
   const latest = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+  const phone = useIsPhone()
 
   return (
     <PageStack>
@@ -165,37 +168,6 @@ function Home() {
         }
         notice={<AiSetupBanner setup={setup} strip />}
       />
-      {cases !== null && !dbSetup && (
-        <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
-          <KpiCard icon={Building2} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
-          <KpiCard icon={Link2} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
-          <KpiCard icon={Brain} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
-          <KpiCard icon={CalendarClock} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
-        </SummaryStrip>
-      )}
-      {cases !== null && !dbSetup && !formOpen && (
-        latest ? (
-          <NextActionBar
-            tone="purple"
-            label="이어서 하기"
-            title={latest.companyName}
-            detail={[RELATION_LABEL[latest.relation], latest.contextVersion ? `기억 v${latest.contextVersion}` : '기억 없음', `${fmtDateTime(latest.updatedAt).slice(0, 10)} 마지막 작업`].join(' · ')}
-            action={
-              <Button variant="primary" onClick={() => navigate(`/ai/cases/${latest.id}`)} data-testid="ai-next-open">
-                작업실 열기
-              </Button>
-            }
-            testId="ai-next"
-          />
-        ) : (
-          <NextActionBar
-            tone="purple"
-            title="고객 관리에 있는 업체를 골라 바로 시작하세요"
-            detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
-            testId="ai-next"
-          />
-        )
-      )}
       {dbSetup && (
         <Surface>
           <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
@@ -280,72 +252,142 @@ function Home() {
         </Surface>
       )}
 
-      {cases !== null && !dbSetup && !formOpen && (
-        <CaseQuickStart
-          cases={cases}
-          clients={clients}
-          busy={saving}
-          onPickClient={(id, materials) => void create({ clientId: id, materials })}
-          onStartDocs={(d) => void create({ from: { companyName: d.companyName, bizNo: d.bizNo, memo: d.contactName ? `대표 ${d.contactName}` : '', origin: 'docs' }, materials: d.materials })}
-          onOpenCase={(id) => navigate(`/ai/cases/${id}`)}
-          onTypeIt={(materials) => {
-            setPendingMaterials(materials)
-            setFormOpen(true)
-          }}
-        />
-      )}
-
-      {/* UXS-1 본문 작업 판 — 검색 · 거르기는 판 첫 줄, 목록은 판 안 줄로(상자 안 상자 없음) */}
-      <WorkPanel
-        title="업체 목록"
-        count={cases === null ? undefined : list.length}
-        testId="case-list-panel"
-        bodyClassName=""
-        toolbar={
-          <>
-            <label className="relative min-w-0 flex-1 basis-56">
-              <span className="sr-only">업체 찾기</span>
-              <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="회사명 · 요청자" className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white pr-3 pl-9" data-testid="case-search" />
-            </label>
-            <select value={rel} onChange={(e) => setRel(e.target.value as CaseRelation | 'all')} className="t-body min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3" aria-label="관계 거르기">
-              <option value="all">관계 전체</option>
-              {CASE_RELATIONS.map((r) => (
-                <option key={r} value={r}>{RELATION_LABEL[r]}</option>
-              ))}
-            </select>
-            <label className="tap t-sub flex min-h-11 items-center gap-2 text-slate-600">
-              <input type="checkbox" className="size-5 accent-brand-600" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-              보관한 것
-            </label>
-          </>
-        }
-      >
-        {cases === null ? (
-          <p className="t-sub px-4 pb-4 text-slate-500 sm:px-5" role="status">불러오는 중…</p>
-        ) : list.length === 0 ? (
-          <div className="border-t border-slate-100 px-4 py-8 text-center sm:px-5">
-            <Sparkles aria-hidden="true" className="mx-auto size-6 text-brand-500" />
-            <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없습니다. 검토할 회사를 하나 등록해 보세요 — 회사명만 있어도 됩니다.'}</p>
-            {!(cases ?? []).length && (
-              <Button variant="primary" className="mt-3" onClick={() => setFormOpen(true)}>업체 등록</Button>
-            )}
-          </div>
-        ) : (
-          <div data-testid="case-list" className="divide-y divide-slate-100 border-t border-slate-100">
-            {list.map((c) => (
-              <ListRow
-                key={c.id}
-                leading={<IconTile icon={Building2} tone={c.clientId ? 'blue' : 'slate'} size="sm" />}
-                title={c.companyName}
-                badge={<Badge tone={c.relation === 'contracted' ? 'success' : c.relation === 'proposing' ? 'brand' : 'neutral'}>{RELATION_LABEL[c.relation]}</Badge>}
-                meta={[c.requester && `요청 ${c.requester}`, c.clientId && '고객 관리와 이어짐', c.contextVersion ? `기억 v${c.contextVersion}` : '기억 없음', `${fmtDateTime(c.updatedAt).slice(0, 10)} 작업`].filter(Boolean).join(' · ')}
-                onClick={() => navigate(`/ai/cases/${c.id}`)}
+      {/* D-287 화면 꾸미기 — 요약 · 이어서 하기 · 바로 시작 · 업체 목록(휴대폰 기본은 이어서 하기가 요약 위 — UXS-1) */}
+      <ArrangeArea page="ai-home" title="AI 전략실" className="flex flex-col gap-4 sm:gap-5" pairGap="gap-4 sm:gap-5">
+        {phone && (
+          <ArrangeItem id="next" label="이어서 하기" hint="가장 최근 업체 · 작업실 열기">
+          {cases !== null && !dbSetup && !formOpen && (
+            latest ? (
+              <NextActionBar
+                tone="purple"
+                label="이어서 하기"
+                title={latest.companyName}
+                detail={[RELATION_LABEL[latest.relation], latest.contextVersion ? `기억 v${latest.contextVersion}` : '기억 없음', `${fmtDateTime(latest.updatedAt).slice(0, 10)} 마지막 작업`].join(' · ')}
+                action={
+                  <Button variant="primary" onClick={() => navigate(`/ai/cases/${latest.id}`)} data-testid="ai-next-open">
+                    작업실 열기
+                  </Button>
+                }
+                testId="ai-next"
               />
-            ))}
-          </div>
+            ) : (
+              <NextActionBar
+                tone="purple"
+                title="고객 관리에 있는 업체를 골라 바로 시작하세요"
+                detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
+                testId="ai-next"
+              />
+            )
+          )}
+          </ArrangeItem>
         )}
-      </WorkPanel>
+        <ArrangeItem id="summary" label="한눈에 숫자" hint="검토 중 · 고객 관리와 이어짐 · 기억 · 이번 주 작업">
+        {cases !== null && !dbSetup && (
+          <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
+            <KpiCard icon={Building2} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
+            <KpiCard icon={Link2} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
+            <KpiCard icon={Brain} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
+            <KpiCard icon={CalendarClock} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
+          </SummaryStrip>
+        )}
+        </ArrangeItem>
+        {!phone && (
+          <ArrangeItem id="next" label="이어서 하기" hint="가장 최근 업체 · 작업실 열기">
+          {cases !== null && !dbSetup && !formOpen && (
+            latest ? (
+              <NextActionBar
+                tone="purple"
+                label="이어서 하기"
+                title={latest.companyName}
+                detail={[RELATION_LABEL[latest.relation], latest.contextVersion ? `기억 v${latest.contextVersion}` : '기억 없음', `${fmtDateTime(latest.updatedAt).slice(0, 10)} 마지막 작업`].join(' · ')}
+                action={
+                  <Button variant="primary" onClick={() => navigate(`/ai/cases/${latest.id}`)} data-testid="ai-next-open">
+                    작업실 열기
+                  </Button>
+                }
+                testId="ai-next"
+              />
+            ) : (
+              <NextActionBar
+                tone="purple"
+                title="고객 관리에 있는 업체를 골라 바로 시작하세요"
+                detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
+                testId="ai-next"
+              />
+            )
+          )}
+          </ArrangeItem>
+        )}
+        <ArrangeItem id="quick" label="바로 시작 — 타자 없이" hint="고객 관리에서 고르기 · 서류 한 장으로">
+        {cases !== null && !dbSetup && !formOpen && (
+          <CaseQuickStart
+            cases={cases}
+            clients={clients}
+            busy={saving}
+            onPickClient={(id, materials) => void create({ clientId: id, materials })}
+            onStartDocs={(d) => void create({ from: { companyName: d.companyName, bizNo: d.bizNo, memo: d.contactName ? `대표 ${d.contactName}` : '', origin: 'docs' }, materials: d.materials })}
+            onOpenCase={(id) => navigate(`/ai/cases/${id}`)}
+            onTypeIt={(materials) => {
+              setPendingMaterials(materials)
+              setFormOpen(true)
+            }}
+          />
+        )}
+        </ArrangeItem>
+        <ArrangeItem id="list" label="업체 목록" hint="찾기 · 관계 · 보관">
+        {/* UXS-1 본문 작업 판 — 검색 · 거르기는 판 첫 줄, 목록은 판 안 줄로(상자 안 상자 없음) */}
+        <WorkPanel
+          title="업체 목록"
+          count={cases === null ? undefined : list.length}
+          testId="case-list-panel"
+          bodyClassName=""
+          toolbar={
+            <>
+              <label className="relative min-w-0 flex-1 basis-56">
+                <span className="sr-only">업체 찾기</span>
+                <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="회사명 · 요청자" className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white pr-3 pl-9" data-testid="case-search" />
+              </label>
+              <select value={rel} onChange={(e) => setRel(e.target.value as CaseRelation | 'all')} className="t-body min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3" aria-label="관계 거르기">
+                <option value="all">관계 전체</option>
+                {CASE_RELATIONS.map((r) => (
+                  <option key={r} value={r}>{RELATION_LABEL[r]}</option>
+                ))}
+              </select>
+              <label className="tap t-sub flex min-h-11 items-center gap-2 text-slate-600">
+                <input type="checkbox" className="size-5 accent-brand-600" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+                보관한 것
+              </label>
+            </>
+          }
+        >
+          {cases === null ? (
+            <p className="t-sub px-4 pb-4 text-slate-500 sm:px-5" role="status">불러오는 중…</p>
+          ) : list.length === 0 ? (
+            <div className="border-t border-slate-100 px-4 py-8 text-center sm:px-5">
+              <Sparkles aria-hidden="true" className="mx-auto size-6 text-brand-500" />
+              <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없습니다. 검토할 회사를 하나 등록해 보세요 — 회사명만 있어도 됩니다.'}</p>
+              {!(cases ?? []).length && (
+                <Button variant="primary" className="mt-3" onClick={() => setFormOpen(true)}>업체 등록</Button>
+              )}
+            </div>
+          ) : (
+            <div data-testid="case-list" className="divide-y divide-slate-100 border-t border-slate-100">
+              {list.map((c) => (
+                <ListRow
+                  key={c.id}
+                  leading={<IconTile icon={Building2} tone={c.clientId ? 'blue' : 'slate'} size="sm" />}
+                  title={c.companyName}
+                  badge={<Badge tone={c.relation === 'contracted' ? 'success' : c.relation === 'proposing' ? 'brand' : 'neutral'}>{RELATION_LABEL[c.relation]}</Badge>}
+                  meta={[c.requester && `요청 ${c.requester}`, c.clientId && '고객 관리와 이어짐', c.contextVersion ? `기억 v${c.contextVersion}` : '기억 없음', `${fmtDateTime(c.updatedAt).slice(0, 10)} 작업`].filter(Boolean).join(' · ')}
+                  onClick={() => navigate(`/ai/cases/${c.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </WorkPanel>
+        </ArrangeItem>
+      </ArrangeArea>
     </PageStack>
   )
 }

@@ -17,6 +17,7 @@ import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
 import { Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
+import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { AddNoticeSheet, CategoryChips, NoticeRow, type ChallengeControl } from '../components/grants/GrantParts'
 import { ClientGrantPanel, NoticeSheet } from '../components/grants/GrantSheets'
 import { useGrantActions, useGrantData } from '../components/grants/useGrants'
@@ -239,206 +240,212 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
-      {/* D-239: 지원사업 AI 도우미 — 맞는 공고 TOP5 · 업체별 도전할 공고 · 마감 임박 */}
-      {notices.length > 0 && <AiAssist page="grants" title="지원사업 알림" presets={['grants.best', 'grants.client', 'grants.soon']} build={assistBuild} />}
-
       {(error || loadError) && (
         <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
           {error || loadError}
         </p>
       )}
 
-      <GrantFeedBar feed={feed} onRefresh={() => void feed.refresh()} />
-
-      <div role="tablist" className="flex max-w-md rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
-        {(
-          [
-            ['notices', '공고별'],
-            ['clients', '업체별'],
-            ['applying', applyingCount ? `신청 진행 ${applyingCount}` : '신청 진행'],
-          ] as [View, string][]
-        ).map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`grant-view-${k}`} onClick={() => setParam('view', k === 'notices' ? '' : k)} className={`tap t-body flex-1 rounded-[8px] px-3 py-2 font-semibold ${view === k ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {view === 'applying' && <ApplyBoardView records={records} today={today} />}
-
-      {view === 'notices' && (
-        <>
-          <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-sky-50 p-3 sm:p-4" aria-label="지역 · 갈래">
-            <h2 className="t-section break-keep text-slate-900" data-testid="grant-hero">
-              <label className="inline-flex items-center">
-                <span className="sr-only">지역</span>
-                <select value={region} onChange={(e) => setParam('r', e.target.value)} data-testid="grant-region" className="tap mr-1 rounded-(--radius-control) border-0 bg-transparent p-0 pr-1 font-bold text-brand-700 focus:outline-none">
-                  <option value="">전국</option>
-                  {SIDO_LIST.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              에서 접수 중인 지원사업 <span className="text-brand-700">{open.length}개</span>
-            </h2>
-            <CategoryChips value={category} counts={counts} onChange={setCategory} />
-            <label className="relative flex max-w-md items-center">
-              <span className="sr-only">공고 찾기</span>
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4 text-slate-400" />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="공고 이름 · 기관으로 찾기"
-                data-testid="grant-search"
-                className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 focus:border-brand-500 focus:outline-none"
-              />
-            </label>
-          </section>
-          {open.length > 0 && (
-            <GrantFunnel
-              counts={{ base: funnel.base.length, stage1: onlyReach ? funnel.s1.length : null, stage2: funnel.s2.length, stage3: funnel.s3.length }}
-              settings={filter}
-              onlyReach={onlyReach}
-              onToggleReach={setOnlyReach}
-              onOpenSettings={() => setFilterOpen(true)}
-              showHidden={showHidden}
-              onToggleHidden={() => setShowHidden((v) => !v)}
-            />
-          )}
-
-          {loaded && notices.length === 0 ? (
-            <Blank
-              icon={<BellRing className="size-8" />}
-              title="아직 넣은 공고가 없어요. 기업마당 공고 글을 붙여 넣으면 우리 업체 중 맞는 곳을 바로 찾아 드립니다."
-              action={
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button variant="primary" onClick={() => setAdding(true)}>
-                    공고 넣기
-                  </Button>
-                  <Button variant="secondary" onClick={() => void addExamples()} data-testid="grant-examples">
-                    예시 공고 6개 넣어 보기
-                  </Button>
-                </div>
-              }
-            />
-          ) : listed.length === 0 ? (
-            <Blank title={open.length === 0 ? '접수 중인 공고가 없습니다.' : '이 조건에 맞는 공고가 없습니다.'} />
-          ) : (
-            <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-list">
-              {listed.slice(0, limit).map((n) => {
-                const r = reachOf(reach.get(n.id) ?? [])
-                return (
-                  <NoticeRow
-                    key={n.id}
-                    notice={n}
-                    today={today}
-                    onOpen={() => setOpenId(n.id)}
-                    facts={facts.get(n.id)}
-                    verdict={verdicts.get(n.id)}
-                    extra={
-                      <span className="t-sub flex flex-wrap gap-x-2" data-testid="grant-reach">
-                        {r.fit > 0 ? (
-                          <span className="rounded-full bg-success-50 px-2 font-semibold text-success-700">
-                            맞는 업체 {r.fit}곳{r.contract && r.prospect ? ` (계약 ${r.contract} · 잠재 ${r.prospect})` : r.prospect ? ' (잠재고객)' : ''}
-                          </span>
-                        ) : r.check === 0 && !targetsSomeone(n.rules) ? (
-                          <span className="text-brand-700">전국 공통 · 누구나</span>
-                        ) : (
-                          <span className="text-slate-400">맞는 업체 없음</span>
-                        )}
-                        {r.check > 0 && <span className="text-warning-800">확인 필요 {r.check}곳</span>}
-                      </span>
-                    }
-                  />
-                )
-              })}
-            </ul>
-          )}
-          {listed.length > limit && (
-            <Button variant="secondary" onClick={() => setPaging({ key: pageKey, n: limit + PAGE * 2 })} data-testid="grant-more" className="self-center">
-              더 보기 (남은 {(listed.length - limit).toLocaleString()}개)
-            </Button>
-          )}
-
-          {closed.length > 0 && (
-            <div>
-              <button type="button" onClick={() => setShowClosed((v) => !v)} className="tap t-sub font-semibold text-slate-500 hover:text-slate-700" aria-expanded={showClosed}>
-                마감된 공고 {closed.length}개 {showClosed ? '접기' : '보기'}
-              </button>
-              {showClosed && (
-                <ul className="mt-2 flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white opacity-80">
-                  {closed.map((n) => (
-                    <NoticeRow key={n.id} notice={n} today={today} onOpen={() => setOpenId(n.id)} />
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {notices.length > 0 && notices.every((n) => n.source === 'example') && (
-            <p className="t-sub text-slate-500">지금은 예시 공고뿐입니다. 실제 공고를 넣으면 예시는 공고를 눌러 지울 수 있어요.</p>
-          )}
-        </>
-      )}
-
-      {view === 'clients' && (
-        <section className="flex flex-col gap-3" aria-label="업체별">
-          <div className="flex flex-wrap gap-2">
+      {/* D-287 화면 꾸미기 — 칸 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]) */}
+      <ArrangeArea page="grants" title="지원사업 알림" className="flex flex-col gap-5">
+        <ArrangeItem id="assist" label="AI 도우미" hint="맞는 공고 TOP5 · 업체별 · 직접 묻기">
+          {/* D-239: 지원사업 AI 도우미 — 맞는 공고 TOP5 · 업체별 도전할 공고 · 마감 임박 */}
+          {notices.length > 0 && <AiAssist page="grants" title="지원사업 알림" presets={['grants.best', 'grants.client', 'grants.soon']} build={assistBuild} />}
+        </ArrangeItem>
+        <ArrangeItem id="feed" label="기업마당 공고 받아오기" hint="새 공고 받기 · 마지막 받은 때">
+          <GrantFeedBar feed={feed} onRefresh={() => void feed.refresh()} />
+        </ArrangeItem>
+        <ArrangeItem id="main" label="공고 · 업체 · 신청 진행" hint="탭과 목록">
+          <div role="tablist" className="flex max-w-md rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
             {(
               [
-                ['all', '전체'],
-                ['contract', '계약 고객'],
-                ['prospect', '잠재고객'],
-              ] as ['all' | 'contract' | 'prospect', string][]
+                ['notices', '공고별'],
+                ['clients', '업체별'],
+                ['applying', applyingCount ? `신청 진행 ${applyingCount}` : '신청 진행'],
+              ] as [View, string][]
             ).map(([k, l]) => (
-              <button key={k} type="button" aria-pressed={kindFilter === k} onClick={() => setKindFilter(k)} data-testid={`grant-kind-filter-${k}`} className={`tap t-sub rounded-full border px-3 py-1.5 font-semibold ${kindFilter === k ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+              <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`grant-view-${k}`} onClick={() => setParam('view', k === 'notices' ? '' : k)} className={`tap t-body flex-1 rounded-[8px] px-3 py-2 font-semibold ${view === k ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}>
                 {l}
               </button>
             ))}
           </div>
-          {byClient.length === 0 ? (
-            <Blank title="업체가 없습니다." />
-          ) : (
-            <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-client-list">
-              {byClient.map(({ c, sum }) => {
-                const fit = sum.fit
-                // D-156: '7일 안 마감' 을 자동으로 세지 않는다 — 대표가 도전 체크한 공고 수만
-                const picked = c.record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching').length
-                const last = localDateOf(sent.find((s) => s.clientId === c.record.id)?.at ?? '')
-                return (
-                  <li key={c.record.id}>
-                    <button type="button" onClick={() => setParam('client', c.record.id)} data-testid="grant-client-row" data-client={c.record.id} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:px-5">
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="t-body truncate font-semibold text-slate-900">{c.record.companyName}</span>
-                        <span className="t-sub truncate text-slate-500">
-                          <span className={c.kind === 'prospect' ? 'font-semibold text-cat-client-700' : ''}>{CLIENT_KIND_LABEL[c.kind]}</span>
-                          {profileLine(c.profile) ? ` · ${profileLine(c.profile)}` : ' · 업체 정보 비어 있음'}
-                          {last ? ` · 알림 ${Number(last.slice(5, 7))}/${Number(last.slice(8, 10))}` : ''}
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 flex-col items-end gap-0.5">
-                        <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
-                          맞음 {fit}
-                        </span>
-                        {picked > 0 ? (
-                          <span className="t-meta font-semibold text-amber-800" data-testid="grant-client-picked">★ 도전 체크 {picked}</span>
-                        ) : !c.profile.sido || !c.profile.years || !c.profile.industry.trim() ? (
-                          <span className="t-meta text-warning-800">정보를 적으면 맞춤</span>
-                        ) : sum.check > 0 ? (
-                          <span className="t-meta text-warning-800">확인 {sum.check}</span>
-                        ) : null}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-      )}
 
+          {view === 'applying' && <ApplyBoardView records={records} today={today} />}
+
+          {view === 'notices' && (
+            <>
+              <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-sky-50 p-3 sm:p-4" aria-label="지역 · 갈래">
+                <h2 className="t-section break-keep text-slate-900" data-testid="grant-hero">
+                  <label className="inline-flex items-center">
+                    <span className="sr-only">지역</span>
+                    <select value={region} onChange={(e) => setParam('r', e.target.value)} data-testid="grant-region" className="tap mr-1 rounded-(--radius-control) border-0 bg-transparent p-0 pr-1 font-bold text-brand-700 focus:outline-none">
+                      <option value="">전국</option>
+                      {SIDO_LIST.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  에서 접수 중인 지원사업 <span className="text-brand-700">{open.length}개</span>
+                </h2>
+                <CategoryChips value={category} counts={counts} onChange={setCategory} />
+                <label className="relative flex max-w-md items-center">
+                  <span className="sr-only">공고 찾기</span>
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4 text-slate-400" />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="공고 이름 · 기관으로 찾기"
+                    data-testid="grant-search"
+                    className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 focus:border-brand-500 focus:outline-none"
+                  />
+                </label>
+              </section>
+              {open.length > 0 && (
+                <GrantFunnel
+                  counts={{ base: funnel.base.length, stage1: onlyReach ? funnel.s1.length : null, stage2: funnel.s2.length, stage3: funnel.s3.length }}
+                  settings={filter}
+                  onlyReach={onlyReach}
+                  onToggleReach={setOnlyReach}
+                  onOpenSettings={() => setFilterOpen(true)}
+                  showHidden={showHidden}
+                  onToggleHidden={() => setShowHidden((v) => !v)}
+                />
+              )}
+
+              {loaded && notices.length === 0 ? (
+                <Blank
+                  icon={<BellRing className="size-8" />}
+                  title="아직 넣은 공고가 없어요. 기업마당 공고 글을 붙여 넣으면 우리 업체 중 맞는 곳을 바로 찾아 드립니다."
+                  action={
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Button variant="primary" onClick={() => setAdding(true)}>
+                        공고 넣기
+                      </Button>
+                      <Button variant="secondary" onClick={() => void addExamples()} data-testid="grant-examples">
+                        예시 공고 6개 넣어 보기
+                      </Button>
+                    </div>
+                  }
+                />
+              ) : listed.length === 0 ? (
+                <Blank title={open.length === 0 ? '접수 중인 공고가 없습니다.' : '이 조건에 맞는 공고가 없습니다.'} />
+              ) : (
+                <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-list">
+                  {listed.slice(0, limit).map((n) => {
+                    const r = reachOf(reach.get(n.id) ?? [])
+                    return (
+                      <NoticeRow
+                        key={n.id}
+                        notice={n}
+                        today={today}
+                        onOpen={() => setOpenId(n.id)}
+                        facts={facts.get(n.id)}
+                        verdict={verdicts.get(n.id)}
+                        extra={
+                          <span className="t-sub flex flex-wrap gap-x-2" data-testid="grant-reach">
+                            {r.fit > 0 ? (
+                              <span className="rounded-full bg-success-50 px-2 font-semibold text-success-700">
+                                맞는 업체 {r.fit}곳{r.contract && r.prospect ? ` (계약 ${r.contract} · 잠재 ${r.prospect})` : r.prospect ? ' (잠재고객)' : ''}
+                              </span>
+                            ) : r.check === 0 && !targetsSomeone(n.rules) ? (
+                              <span className="text-brand-700">전국 공통 · 누구나</span>
+                            ) : (
+                              <span className="text-slate-400">맞는 업체 없음</span>
+                            )}
+                            {r.check > 0 && <span className="text-warning-800">확인 필요 {r.check}곳</span>}
+                          </span>
+                        }
+                      />
+                    )
+                  })}
+                </ul>
+              )}
+              {listed.length > limit && (
+                <Button variant="secondary" onClick={() => setPaging({ key: pageKey, n: limit + PAGE * 2 })} data-testid="grant-more" className="self-center">
+                  더 보기 (남은 {(listed.length - limit).toLocaleString()}개)
+                </Button>
+              )}
+
+              {closed.length > 0 && (
+                <div>
+                  <button type="button" onClick={() => setShowClosed((v) => !v)} className="tap t-sub font-semibold text-slate-500 hover:text-slate-700" aria-expanded={showClosed}>
+                    마감된 공고 {closed.length}개 {showClosed ? '접기' : '보기'}
+                  </button>
+                  {showClosed && (
+                    <ul className="mt-2 flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white opacity-80">
+                      {closed.map((n) => (
+                        <NoticeRow key={n.id} notice={n} today={today} onOpen={() => setOpenId(n.id)} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {notices.length > 0 && notices.every((n) => n.source === 'example') && (
+                <p className="t-sub text-slate-500">지금은 예시 공고뿐입니다. 실제 공고를 넣으면 예시는 공고를 눌러 지울 수 있어요.</p>
+              )}
+            </>
+          )}
+
+          {view === 'clients' && (
+            <section className="flex flex-col gap-3" aria-label="업체별">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ['all', '전체'],
+                    ['contract', '계약 고객'],
+                    ['prospect', '잠재고객'],
+                  ] as ['all' | 'contract' | 'prospect', string][]
+                ).map(([k, l]) => (
+                  <button key={k} type="button" aria-pressed={kindFilter === k} onClick={() => setKindFilter(k)} data-testid={`grant-kind-filter-${k}`} className={`tap t-sub rounded-full border px-3 py-1.5 font-semibold ${kindFilter === k ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {byClient.length === 0 ? (
+                <Blank title="업체가 없습니다." />
+              ) : (
+                <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-client-list">
+                  {byClient.map(({ c, sum }) => {
+                    const fit = sum.fit
+                    // D-156: '7일 안 마감' 을 자동으로 세지 않는다 — 대표가 도전 체크한 공고 수만
+                    const picked = c.record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching').length
+                    const last = localDateOf(sent.find((s) => s.clientId === c.record.id)?.at ?? '')
+                    return (
+                      <li key={c.record.id}>
+                        <button type="button" onClick={() => setParam('client', c.record.id)} data-testid="grant-client-row" data-client={c.record.id} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:px-5">
+                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="t-body truncate font-semibold text-slate-900">{c.record.companyName}</span>
+                            <span className="t-sub truncate text-slate-500">
+                              <span className={c.kind === 'prospect' ? 'font-semibold text-cat-client-700' : ''}>{CLIENT_KIND_LABEL[c.kind]}</span>
+                              {profileLine(c.profile) ? ` · ${profileLine(c.profile)}` : ' · 업체 정보 비어 있음'}
+                              {last ? ` · 알림 ${Number(last.slice(5, 7))}/${Number(last.slice(8, 10))}` : ''}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 flex-col items-end gap-0.5">
+                            <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
+                              맞음 {fit}
+                            </span>
+                            {picked > 0 ? (
+                              <span className="t-meta font-semibold text-amber-800" data-testid="grant-client-picked">★ 도전 체크 {picked}</span>
+                            ) : !c.profile.sido || !c.profile.years || !c.profile.industry.trim() ? (
+                              <span className="t-meta text-warning-800">정보를 적으면 맞춤</span>
+                            ) : sum.check > 0 ? (
+                              <span className="t-meta text-warning-800">확인 {sum.check}</span>
+                            ) : null}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
+        </ArrangeItem>
+      </ArrangeArea>
       {current && (
         <NoticeSheet
           notice={current}

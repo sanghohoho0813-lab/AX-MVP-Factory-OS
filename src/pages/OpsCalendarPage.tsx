@@ -1,5 +1,6 @@
 import { AiAssist } from '../components/ai/AiAssist'
 import { calendarBundle } from '../services/aiAssist/builders'
+import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
@@ -266,349 +267,354 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         }
       />
       <ScheduleTabs />
-      {/* D-239: 일정 AI 도우미 — 이번 주 한눈에 · 빡빡한 날 · 이번 달 꼭 지킬 마감 */}
-      <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
-
-      {/* 월 이동 + 종류 필터 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* 휴대폰: 달 이동 줄과 건수를 나눈다. 한 줄에 넣으면 건수 칸이 40px 로 눌린다 */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            aria-label="이전 달"
-            onClick={() => setYm(shiftMonth(ym[0], ym[1], -1))}
-            className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-2.5 pl-1.5 font-medium text-slate-700 hover:bg-slate-50"
-          >
-            {/* D-127: 화살표만 두지 않는다 — 무엇을 하는지 글로 */}
-            <ChevronLeft aria-hidden="true" className="size-4" />
-            지난달
-          </button>
-          <span className="min-w-[6.5rem] text-center text-[1.2rem] font-bold text-slate-900">
-            {ym[0]}년 {ym[1]}월
-          </span>
-          <button
-            type="button"
-            aria-label="다음 달"
-            onClick={() => setYm(shiftMonth(ym[0], ym[1], 1))}
-            className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-1.5 pl-2.5 font-medium text-slate-700 hover:bg-slate-50"
-          >
-            다음 달
-            <ChevronRight aria-hidden="true" className="size-4" />
-          </button>
-          <span className="w-full text-[0.9rem] text-slate-500 sm:ml-1 sm:w-auto" data-testid="calendar-month-summary">
-            <span className="whitespace-nowrap">이 달 남은 일정 {monthOpen.length}건</span> · <span className="whitespace-nowrap">영업일 {workdays.workdays}일</span>
-            {workdays.weekdayOffs > 0 && <span className="whitespace-nowrap text-danger-700"> · 평일 쉬는 날 {workdays.weekdayOffs}일</span>}
-          </span>
-          {/* D-139: 법정 공휴일은 자동으로 깔지 않는다 — 대표가 보고 넣는다 */}
-          {missingHolidays.length > 0 && (
-            <button type="button" onClick={() => setHolidayImport(true)} data-testid="holiday-import-open" className="tap t-sub rounded-full border border-danger-200 bg-danger-50 px-3 py-1 font-semibold text-danger-700 hover:bg-white">
-              {ym[0]}년 공휴일 넣기 ({missingHolidays.length}일)
-            </button>
-          )}
-        </div>
-
-        {/* D-158: 휴대폰은 종류 칩을 한 줄(옆으로 밀기) — 세 줄을 차지해 달력이 아래로 밀렸다 */}
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" data-testid="calendar-kind-chips">
-          {KINDS.map((k) => {
-            const on = !hidden.has(k)
-            return (
+      {/* D-287 화면 꾸미기 — 칸 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]) */}
+      <ArrangeArea page="calendar" title="일정" className="flex flex-col gap-5">
+        <ArrangeItem id="assist" label="AI 도우미" hint="이번 주 한눈에 · 빡빡한 날 · 직접 묻기">
+          {/* D-239: 일정 AI 도우미 — 이번 주 한눈에 · 빡빡한 날 · 이번 달 꼭 지킬 마감 */}
+          <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
+        </ArrangeItem>
+        <ArrangeItem id="month" label="달력 · 선택한 날" hint="달 이동 · 종류 · 달력 · 그날 할 일 · 업체 일정">
+          {/* 월 이동 + 종류 필터 */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* 휴대폰: 달 이동 줄과 건수를 나눈다. 한 줄에 넣으면 건수 칸이 40px 로 눌린다 */}
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                key={k}
                 type="button"
-                aria-pressed={on}
-                onClick={() => toggleKind(k)}
-                className={`tap inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium whitespace-nowrap ${
-                  on ? SCHEDULE_KIND_CLASS[k].chip : 'border-slate-200 bg-white text-slate-400'
-                }`}
+                aria-label="이전 달"
+                onClick={() => setYm(shiftMonth(ym[0], ym[1], -1))}
+                className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-2.5 pl-1.5 font-medium text-slate-700 hover:bg-slate-50"
               >
-                <span aria-hidden="true" className={`size-2 rounded-full ${on ? SCHEDULE_KIND_CLASS[k].dot : 'bg-slate-300'}`} />
-                {SCHEDULE_KIND_LABEL[k]}
+                {/* D-127: 화살표만 두지 않는다 — 무엇을 하는지 글로 */}
+                <ChevronLeft aria-hidden="true" className="size-4" />
+                지난달
               </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {loadError && (
-        <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
-          일정을 불러오지 못했습니다 — {loadError}
-          <button type="button" onClick={() => void load()} className="tap font-semibold underline">
-            다시 불러오기
-          </button>
-        </p>
-      )}
-      {loading ? (
-        <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
-          불러오는 중…
-        </p>
-      ) : (
-        <>
-          {/* D-156: PC 에서는 달력을 왼쪽에 줄여 두고 고른 날의 할 일을 오른쪽에 — 한눈에. 휴대폰은 위아래 그대로 */}
-          <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start">
-          <div className="flex min-w-0 flex-col gap-5">
-          {/* 달력 */}
-          <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="month-calendar">
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80">
-              {WEEKDAYS.map((w, i) => (
-                <div
-                  key={w}
-                  className={`py-2 text-center text-[0.88rem] font-semibold ${
-                    i === 0 ? 'text-weekday-sun' : i === 6 ? 'text-weekday-sat' : 'text-slate-600'
-                  }`}
-                >
-                  {w}
-                </div>
-              ))}
+              <span className="min-w-[6.5rem] text-center text-[1.2rem] font-bold text-slate-900">
+                {ym[0]}년 {ym[1]}월
+              </span>
+              <button
+                type="button"
+                aria-label="다음 달"
+                onClick={() => setYm(shiftMonth(ym[0], ym[1], 1))}
+                className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-1.5 pl-2.5 font-medium text-slate-700 hover:bg-slate-50"
+              >
+                다음 달
+                <ChevronRight aria-hidden="true" className="size-4" />
+              </button>
+              <span className="w-full text-[0.9rem] text-slate-500 sm:ml-1 sm:w-auto" data-testid="calendar-month-summary">
+                <span className="whitespace-nowrap">이 달 남은 일정 {monthOpen.length}건</span> · <span className="whitespace-nowrap">영업일 {workdays.workdays}일</span>
+                {workdays.weekdayOffs > 0 && <span className="whitespace-nowrap text-danger-700"> · 평일 쉬는 날 {workdays.weekdayOffs}일</span>}
+              </span>
+              {/* D-139: 법정 공휴일은 자동으로 깔지 않는다 — 대표가 보고 넣는다 */}
+              {missingHolidays.length > 0 && (
+                <button type="button" onClick={() => setHolidayImport(true)} data-testid="holiday-import-open" className="tap t-sub rounded-full border border-danger-200 bg-danger-50 px-3 py-1 font-semibold text-danger-700 hover:bg-white">
+                  {ym[0]}년 공휴일 넣기 ({missingHolidays.length}일)
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-7">
-              {days.map((d) => {
-                const inMonth = d.startsWith(monthPrefix)
-                const list = byDate.get(d) ?? []
-                const isToday = d === today
-                const isPicked = d === picked
-                const dow = new Date(`${d}T00:00:00Z`).getUTCDay()
-                const off = offMap.get(d)
-                const todos = todosByDate.get(d) ?? []
-                // PC 칸: 할 일 → 업체 일정 순으로 3줄까지, 나머지는 +n건
-                // D-157: 끝낸 것은 맨 뒤로 — 끝낸 할 일 셋이 열린 업체 일정을 '+n건' 으로 밀어내지 않게
-                const lines = [
-                  ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed, entry: t })),
-                  ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done, entry: null as JournalEntry | null })),
-                ].sort((a, b) => Number(a.done) - Number(b.done))
+
+            {/* D-158: 휴대폰은 종류 칩을 한 줄(옆으로 밀기) — 세 줄을 차지해 달력이 아래로 밀렸다 */}
+            <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" data-testid="calendar-kind-chips">
+              {KINDS.map((k) => {
+                const on = !hidden.has(k)
                 return (
                   <button
-                    key={d}
+                    key={k}
                     type="button"
-                    data-date={d}
-                    data-off={off ? 'true' : undefined}
-                    title={off ? `${off.map((o) => o.name).join(' · ')} — 한 번 더 누르면 바로 적기` : '한 번 더 누르면 바로 적기'}
-                    // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
-                    onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
-                    onDragOver={(e) => {
-                      if (!e.dataTransfer.types.includes(TODO_DRAG)) return
-                      e.preventDefault()
-                      e.dataTransfer.dropEffect = 'move'
-                      if (dropDay !== d) setDropDay(d)
-                    }}
-                    onDragLeave={() => setDropDay((v) => (v === d ? null : v))}
-                    onDrop={(e) => {
-                      const id = e.dataTransfer.getData(TODO_DRAG)
-                      if (!id) return
-                      e.preventDefault()
-                      moveTodo(id, d)
-                    }}
-                    data-drop={dropDay === d ? 'true' : undefined}
-                    // D-158: 휴대폰은 칸을 낮게(점만) — 달력이 세로로 길어 그날 할 일이 너무 늦게 보였다(대표)
-                    className={`flex min-h-[3.25rem] min-w-0 flex-col items-center gap-0.5 border-r border-b lg:min-h-[6.75rem] lg:items-stretch lg:gap-1 lg:p-1 border-slate-100 p-1 text-left last:border-r-0 ${
-                      inMonth ? 'bg-white' : 'bg-slate-50/60'
-                    } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} ${dropDay === d ? 'bg-brand-100 ring-2 ring-brand-600 ring-inset' : ''} hover:bg-brand-50/40`}
+                    aria-pressed={on}
+                    onClick={() => toggleKind(k)}
+                    className={`tap inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium whitespace-nowrap ${
+                      on ? SCHEDULE_KIND_CLASS[k].chip : 'border-slate-200 bg-white text-slate-400'
+                    }`}
                   >
-                    <span
-                      className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
-                        isToday
-                          ? 'bg-brand-600 text-white'
-                          : !inMonth
-                            ? 'text-slate-400'
-                            : off || dow === 0
-                              ? 'text-weekday-sun'
-                              : dow === 6
-                                ? 'text-weekday-sat'
-                                : 'text-slate-700'
-                      }`}
-                    >
-                      {Number(d.slice(8))}
-                    </span>
-                    {/* 쉬는 날은 일요일처럼 날짜 숫자만 빨갛게(D-139 대표: 빗금은 과하다). 좁은 화면은 이름이 잘려서 달력 아래 '이 달 쉬는 날' 에 */}
-                    {off && (
-                      <span className="t-meta hidden max-w-full truncate leading-tight font-semibold text-weekday-sun lg:block" data-testid="day-off-label">
-                        {off[0].name}
-                      </span>
-                    )}
-                    {/* 좁은 화면에서는 업체명이 '한..' 처럼 잘려 쓸모가 없다.
-                        점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
-                    <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
-                      {/* 내가 적은 할 일은 브랜드색 점으로 — 마감(회사 일정)과 구분된다 */}
-                      {/* D-210: 끝낸 할 일은 회색 점(업체 일정처럼) — 다 끝낸 날이 할 일 남은 날처럼 보이지 않게 */}
-                      {todos.slice(0, 3).map((t) => (
-                        <span key={`t${t.id}`} aria-hidden="true" data-done={t.completed ? '1' : '0'} className={`size-1.5 rounded-full ${t.completed ? 'bg-slate-200' : 'bg-brand-500'}`} />
-                      ))}
-                      {list.slice(0, 4).map((e) => (
-                        <span
-                          key={e.id}
-                          aria-hidden="true"
-                          className={`size-1.5 rounded-full ${e.done ? 'bg-slate-200' : SCHEDULE_KIND_CLASS[e.kind].dot}`}
-                        />
-                      ))}
-                    </span>
-                    {/* D-156: '할 일 4' 숫자 대신 무슨 일인지 — 윗줄 할 일(진하게), 아랫줄 업체(작게). 내가 적은 할 일은 진한 브랜드색, 업체 일정은 종류색 */}
-                    <span className="hidden min-w-0 flex-col gap-0.5 lg:flex" data-testid="cell-lines">
-                      {lines.slice(0, 3).map((l) => (
-                        <span
-                          key={l.key}
-                          title={l.who ? `${l.who} · ${l.title}` : l.title}
-                          data-kind={l.kind}
-                          {...(l.entry ? dragTodo(l.entry) : {})}
-                          className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
-                            l.done
-                              ? 'border-slate-100 bg-white text-slate-400 line-through'
-                              : l.kind === 'todo'
-                                ? 'border-brand-600 bg-brand-600 text-white'
-                                : SCHEDULE_KIND_CLASS[l.kind].cell
-                          }`}
-                        >
-                          {/* 두 줄까지 — 한 줄로 자르면 '대표님…' 처럼 무슨 일인지 안 보였다 */}
-                          <span className="t-meta line-clamp-2 font-semibold [overflow-wrap:anywhere]">{l.title}</span>
-                          {l.who && <span className="t-meta truncate opacity-80">{l.who}</span>}
-                        </span>
-                      ))}
-                      {lines.length > 3 && <span className="t-meta px-1 font-semibold text-slate-600">+{lines.length - 3}건 더</span>}
-                    </span>
+                    <span aria-hidden="true" className={`size-2 rounded-full ${on ? SCHEDULE_KIND_CLASS[k].dot : 'bg-slate-300'}`} />
+                    {SCHEDULE_KIND_LABEL[k]}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* D-139: 이 달 쉬는 날 — 누르면 그날로 */}
-          {daysOff.some((d) => d.date.startsWith(monthPrefix)) && (
-            <div className="flex flex-wrap items-center gap-1.5" data-testid="month-days-off">
-              <span className="t-sub mr-1 font-semibold text-slate-700">이 달 쉬는 날</span>
-              {daysOff
-                .filter((d) => d.date.startsWith(monthPrefix))
-                .map((d) => (
-                  <button key={d.id} type="button" onClick={() => setPicked(d.date)} className="tap t-sub rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-weekday-sun hover:bg-slate-50">
-                    {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8))} {d.name}
-                  </button>
-                ))}
-            </div>
+          {loadError && (
+            <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+              일정을 불러오지 못했습니다 — {loadError}
+              <button type="button" onClick={() => void load()} className="tap font-semibold underline">
+                다시 불러오기
+              </button>
+            </p>
           )}
-
-          {/*
-            선택한 날.
-            위는 내가 적은 할 일(고칠 수 있는 것), 아래는 업체에서 자동으로 올라온
-            마감(고칠 수 없는 것). 순서가 곧 "내가 뭘 할 수 있나" 다.
-          */}
-          </div>
-          <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:rounded-(--radius-panel) xl:border xl:border-slate-200 xl:bg-slate-50/60 xl:p-4" data-testid="picked-panel">
-            <div className="flex flex-col gap-2">
-              <HintTip tip={hintFor('그날 할 일')} label="고른 날 할 일">
-              <h2 className="text-[1.15rem] font-bold text-slate-900">
-                {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
-                {picked && pickedTodos.length > 0 && (
-                  <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedTodos.length}건</span>
-                )}
-              </h2>
-              </HintTip>
-              {picked && (
-                <>
-                  {/* D-139: 쉬는 날 · 쉬는 날 마감 */}
-                  {pickedOff.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5" data-testid="picked-day-off">
-                      <span className="t-body font-bold text-weekday-sun">쉬는 날 · {pickedOff.map((o) => o.name).join(' · ')}</span>
-                      <button type="button" onClick={() => setQuick({ date: picked, tab: 'off' })} className="tap t-sub ml-auto font-semibold text-slate-700 underline">
-                        고치기 · 지우기
-                      </button>
+          {loading ? (
+            <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
+              불러오는 중…
+            </p>
+          ) : (
+            <>
+              {/* D-156: PC 에서는 달력을 왼쪽에 줄여 두고 고른 날의 할 일을 오른쪽에 — 한눈에. 휴대폰은 위아래 그대로 */}
+              <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start">
+              <div className="flex min-w-0 flex-col gap-5">
+              {/* 달력 */}
+              <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="month-calendar">
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80">
+                  {WEEKDAYS.map((w, i) => (
+                    <div
+                      key={w}
+                      className={`py-2 text-center text-[0.88rem] font-semibold ${
+                        i === 0 ? 'text-weekday-sun' : i === 6 ? 'text-weekday-sat' : 'text-slate-600'
+                      }`}
+                    >
+                      {w}
                     </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {days.map((d) => {
+                    const inMonth = d.startsWith(monthPrefix)
+                    const list = byDate.get(d) ?? []
+                    const isToday = d === today
+                    const isPicked = d === picked
+                    const dow = new Date(`${d}T00:00:00Z`).getUTCDay()
+                    const off = offMap.get(d)
+                    const todos = todosByDate.get(d) ?? []
+                    // PC 칸: 할 일 → 업체 일정 순으로 3줄까지, 나머지는 +n건
+                    // D-157: 끝낸 것은 맨 뒤로 — 끝낸 할 일 셋이 열린 업체 일정을 '+n건' 으로 밀어내지 않게
+                    const lines = [
+                      ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed, entry: t })),
+                      ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done, entry: null as JournalEntry | null })),
+                    ].sort((a, b) => Number(a.done) - Number(b.done))
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        data-date={d}
+                        data-off={off ? 'true' : undefined}
+                        title={off ? `${off.map((o) => o.name).join(' · ')} — 한 번 더 누르면 바로 적기` : '한 번 더 누르면 바로 적기'}
+                        // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
+                        onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
+                        onDragOver={(e) => {
+                          if (!e.dataTransfer.types.includes(TODO_DRAG)) return
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = 'move'
+                          if (dropDay !== d) setDropDay(d)
+                        }}
+                        onDragLeave={() => setDropDay((v) => (v === d ? null : v))}
+                        onDrop={(e) => {
+                          const id = e.dataTransfer.getData(TODO_DRAG)
+                          if (!id) return
+                          e.preventDefault()
+                          moveTodo(id, d)
+                        }}
+                        data-drop={dropDay === d ? 'true' : undefined}
+                        // D-158: 휴대폰은 칸을 낮게(점만) — 달력이 세로로 길어 그날 할 일이 너무 늦게 보였다(대표)
+                        className={`flex min-h-[3.25rem] min-w-0 flex-col items-center gap-0.5 border-r border-b lg:min-h-[6.75rem] lg:items-stretch lg:gap-1 lg:p-1 border-slate-100 p-1 text-left last:border-r-0 ${
+                          inMonth ? 'bg-white' : 'bg-slate-50/60'
+                        } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} ${dropDay === d ? 'bg-brand-100 ring-2 ring-brand-600 ring-inset' : ''} hover:bg-brand-50/40`}
+                      >
+                        <span
+                          className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
+                            isToday
+                              ? 'bg-brand-600 text-white'
+                              : !inMonth
+                                ? 'text-slate-400'
+                                : off || dow === 0
+                                  ? 'text-weekday-sun'
+                                  : dow === 6
+                                    ? 'text-weekday-sat'
+                                    : 'text-slate-700'
+                          }`}
+                        >
+                          {Number(d.slice(8))}
+                        </span>
+                        {/* 쉬는 날은 일요일처럼 날짜 숫자만 빨갛게(D-139 대표: 빗금은 과하다). 좁은 화면은 이름이 잘려서 달력 아래 '이 달 쉬는 날' 에 */}
+                        {off && (
+                          <span className="t-meta hidden max-w-full truncate leading-tight font-semibold text-weekday-sun lg:block" data-testid="day-off-label">
+                            {off[0].name}
+                          </span>
+                        )}
+                        {/* 좁은 화면에서는 업체명이 '한..' 처럼 잘려 쓸모가 없다.
+                            점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
+                        <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
+                          {/* 내가 적은 할 일은 브랜드색 점으로 — 마감(회사 일정)과 구분된다 */}
+                          {/* D-210: 끝낸 할 일은 회색 점(업체 일정처럼) — 다 끝낸 날이 할 일 남은 날처럼 보이지 않게 */}
+                          {todos.slice(0, 3).map((t) => (
+                            <span key={`t${t.id}`} aria-hidden="true" data-done={t.completed ? '1' : '0'} className={`size-1.5 rounded-full ${t.completed ? 'bg-slate-200' : 'bg-brand-500'}`} />
+                          ))}
+                          {list.slice(0, 4).map((e) => (
+                            <span
+                              key={e.id}
+                              aria-hidden="true"
+                              className={`size-1.5 rounded-full ${e.done ? 'bg-slate-200' : SCHEDULE_KIND_CLASS[e.kind].dot}`}
+                            />
+                          ))}
+                        </span>
+                        {/* D-156: '할 일 4' 숫자 대신 무슨 일인지 — 윗줄 할 일(진하게), 아랫줄 업체(작게). 내가 적은 할 일은 진한 브랜드색, 업체 일정은 종류색 */}
+                        <span className="hidden min-w-0 flex-col gap-0.5 lg:flex" data-testid="cell-lines">
+                          {lines.slice(0, 3).map((l) => (
+                            <span
+                              key={l.key}
+                              title={l.who ? `${l.who} · ${l.title}` : l.title}
+                              data-kind={l.kind}
+                              {...(l.entry ? dragTodo(l.entry) : {})}
+                              className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
+                                l.done
+                                  ? 'border-slate-100 bg-white text-slate-400 line-through'
+                                  : l.kind === 'todo'
+                                    ? 'border-brand-600 bg-brand-600 text-white'
+                                    : SCHEDULE_KIND_CLASS[l.kind].cell
+                              }`}
+                            >
+                              {/* 두 줄까지 — 한 줄로 자르면 '대표님…' 처럼 무슨 일인지 안 보였다 */}
+                              <span className="t-meta line-clamp-2 font-semibold [overflow-wrap:anywhere]">{l.title}</span>
+                              {l.who && <span className="t-meta truncate opacity-80">{l.who}</span>}
+                            </span>
+                          ))}
+                          {lines.length > 3 && <span className="t-meta px-1 font-semibold text-slate-600">+{lines.length - 3}건 더</span>}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* D-139: 이 달 쉬는 날 — 누르면 그날로 */}
+              {daysOff.some((d) => d.date.startsWith(monthPrefix)) && (
+                <div className="flex flex-wrap items-center gap-1.5" data-testid="month-days-off">
+                  <span className="t-sub mr-1 font-semibold text-slate-700">이 달 쉬는 날</span>
+                  {daysOff
+                    .filter((d) => d.date.startsWith(monthPrefix))
+                    .map((d) => (
+                      <button key={d.id} type="button" onClick={() => setPicked(d.date)} className="tap t-sub rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-weekday-sun hover:bg-slate-50">
+                        {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8))} {d.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              {/*
+                선택한 날.
+                위는 내가 적은 할 일(고칠 수 있는 것), 아래는 업체에서 자동으로 올라온
+                마감(고칠 수 없는 것). 순서가 곧 "내가 뭘 할 수 있나" 다.
+              */}
+              </div>
+              <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:rounded-(--radius-panel) xl:border xl:border-slate-200 xl:bg-slate-50/60 xl:p-4" data-testid="picked-panel">
+                <div className="flex flex-col gap-2">
+                  <HintTip tip={hintFor('그날 할 일')} label="고른 날 할 일">
+                  <h2 className="text-[1.15rem] font-bold text-slate-900">
+                    {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
+                    {picked && pickedTodos.length > 0 && (
+                      <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedTodos.length}건</span>
+                    )}
+                  </h2>
+                  </HintTip>
+                  {picked && (
+                    <>
+                      {/* D-139: 쉬는 날 · 쉬는 날 마감 */}
+                      {pickedOff.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5" data-testid="picked-day-off">
+                          <span className="t-body font-bold text-weekday-sun">쉬는 날 · {pickedOff.map((o) => o.name).join(' · ')}</span>
+                          <button type="button" onClick={() => setQuick({ date: picked, tab: 'off' })} className="tap t-sub ml-auto font-semibold text-slate-700 underline">
+                            고치기 · 지우기
+                          </button>
+                        </div>
+                      )}
+                      {(pickedOff.length > 0 || [0, 6].includes(new Date(`${picked}T00:00:00Z`).getUTCDay())) && pickedEvents.some((e) => !e.done) && (
+                        <p className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-warning-800" data-testid="picked-off-deadline">
+                          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                          <span>
+                            쉬는 날에 걸린 업체 마감이 {pickedEvents.filter((e) => !e.done).length}건 있습니다
+                            {prevWorkday(picked, offSet) ? ` — 전 영업일 ${dateLabel(prevWorkday(picked, offSet) as string)}까지 챙기세요.` : '.'}
+                          </span>
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="primary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo">
+                          <Plus aria-hidden="true" className="size-4" />이 날에 적기 · 반복
+                        </Button>
+                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off">
+                          {pickedOff.length > 0 ? '쉬는 날 고치기' : '쉬는 날로 표시'}
+                        </Button>
+                      </div>
+                      <TodoComposer
+                        date={picked}
+                        clients={activeClients}
+                        onAdd={(draft) =>
+                          mutate(
+                            () =>
+                              createJournalEntry(workspaceId, userId, {
+                                entryDate: today,
+                                entryType: 'follow_up',
+                                content: draft.content,
+                                clientId: draft.clientId,
+                                dueDate: draft.dueDate,
+                              }),
+                            '할 일을 넣었습니다.',
+                          )
+                        }
+                      />
+                      {pickedTodos.some((t) => !t.completed) && (
+                        <p className="t-sub hidden break-keep text-slate-500 lg:block" data-testid="drag-hint">할 일을 끌어 왼쪽 달력의 다른 날짜에 놓으면 그 날로 옮겨져요.</p>
+                      )}
+                      {pickedTodos.length > 0 && (
+                        <ul className="flex flex-col gap-2">
+                          {pickedTodos.map((e, i) => (
+                            <TodoRow
+                              key={e.id}
+                              number={i + 1}
+                              entry={e}
+                              today={today}
+                              dragProps={{ ...dragTodo(e), 'data-todo-id': e.id } as LiHTMLAttributes<HTMLLIElement>}
+                              clientName={
+                                e.clientId ? records.find((r) => r.id === e.clientId)?.companyName : undefined
+                              }
+                              onPick={() => setTodoPick(e)}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </>
                   )}
-                  {(pickedOff.length > 0 || [0, 6].includes(new Date(`${picked}T00:00:00Z`).getUTCDay())) && pickedEvents.some((e) => !e.done) && (
-                    <p className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-warning-800" data-testid="picked-off-deadline">
-                      <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <span>
-                        쉬는 날에 걸린 업체 마감이 {pickedEvents.filter((e) => !e.done).length}건 있습니다
-                        {prevWorkday(picked, offSet) ? ` — 전 영업일 ${dateLabel(prevWorkday(picked, offSet) as string)}까지 챙기세요.` : '.'}
-                      </span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <HintTip tip={hintFor('업체 일정')} label="업체 일정">
+                    <h2 className="text-[1.15rem] font-bold text-slate-900">
+                      업체 일정
+                      {picked && <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
+                    </h2>
+                  </HintTip>
+                  {pickedEvents.length === 0 ? (
+                    <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
+                      이 날에는 업체 쪽 마감이 없습니다.
                     </p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo">
-                      <Plus aria-hidden="true" className="size-4" />이 날에 적기 · 반복
-                    </Button>
-                    <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off">
-                      {pickedOff.length > 0 ? '쉬는 날 고치기' : '쉬는 날로 표시'}
-                    </Button>
-                  </div>
-                  <TodoComposer
-                    date={picked}
-                    clients={activeClients}
-                    onAdd={(draft) =>
-                      mutate(
-                        () =>
-                          createJournalEntry(workspaceId, userId, {
-                            entryDate: today,
-                            entryType: 'follow_up',
-                            content: draft.content,
-                            clientId: draft.clientId,
-                            dueDate: draft.dueDate,
-                          }),
-                        '할 일을 넣었습니다.',
-                      )
-                    }
-                  />
-                  {pickedTodos.some((t) => !t.completed) && (
-                    <p className="t-sub hidden break-keep text-slate-500 lg:block" data-testid="drag-hint">할 일을 끌어 왼쪽 달력의 다른 날짜에 놓으면 그 날로 옮겨져요.</p>
-                  )}
-                  {pickedTodos.length > 0 && (
+                  ) : (
                     <ul className="flex flex-col gap-2">
-                      {pickedTodos.map((e, i) => (
-                        <TodoRow
+                      {pickedEvents.map((e) => (
+                        <EventRow
                           key={e.id}
-                          number={i + 1}
-                          entry={e}
-                          today={today}
-                          dragProps={{ ...dragTodo(e), 'data-todo-id': e.id } as LiHTMLAttributes<HTMLLIElement>}
-                          clientName={
-                            e.clientId ? records.find((r) => r.id === e.clientId)?.companyName : undefined
+                          event={e}
+                          onOpen={() => navigate(`/ops/clients/${e.clientId}`)}
+                          onTodo={() =>
+                            void mutate(
+                              () =>
+                                createJournalEntry(workspaceId, userId, {
+                                  entryDate: today,
+                                  entryType: 'follow_up',
+                                  content: `${e.clientName} · ${e.title}`,
+                                  clientId: e.clientId,
+                                  dueDate: picked ?? today,
+                                }),
+                              '할 일로 옮겼습니다.',
+                            )
                           }
-                          onPick={() => setTodoPick(e)}
                         />
                       ))}
                     </ul>
                   )}
-                </>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <HintTip tip={hintFor('업체 일정')} label="업체 일정">
-                <h2 className="text-[1.15rem] font-bold text-slate-900">
-                  업체 일정
-                  {picked && <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
-                </h2>
-              </HintTip>
-              {pickedEvents.length === 0 ? (
-                <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
-                  이 날에는 업체 쪽 마감이 없습니다.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {pickedEvents.map((e) => (
-                    <EventRow
-                      key={e.id}
-                      event={e}
-                      onOpen={() => navigate(`/ops/clients/${e.clientId}`)}
-                      onTodo={() =>
-                        void mutate(
-                          () =>
-                            createJournalEntry(workspaceId, userId, {
-                              entryDate: today,
-                              entryType: 'follow_up',
-                              content: `${e.clientName} · ${e.title}`,
-                              clientId: e.clientId,
-                              dueDate: picked ?? today,
-                            }),
-                          '할 일로 옮겼습니다.',
-                        )
-                      }
-                    />
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
-          </div>
-        </>
-      )}
-
+                </div>
+              </section>
+              </div>
+            </>
+          )}
+        </ArrangeItem>
+      </ArrangeArea>
       {quick && (
         <CalendarQuickSheet
           key={`${quick.date}-${quick.tab}`}

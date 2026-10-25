@@ -24,6 +24,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure } from '../../components/ui/primitives'
 import { KpiCard } from '../../components/ui/visual'
 import { NextActionBar, PageHero, PageStack, SummaryStrip, WorkPanel } from '../../components/ui/pageFrame'
+import { ArrangeArea, ArrangeItem } from '../../components/ui/arrange'
 import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
 import { CopyButton } from '../../components/sales/salesParts'
 import { stageColor } from '../../components/sales/salesColor'
@@ -516,177 +517,227 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </p>
       )}
 
-      {/* ② 요약 — 같은 숫자 · 같은 판정(아이콘 칸만 더함) */}
-      <SummaryStrip label="영업 요약" testId="sales-summary">
-        <KpiCard icon={TrendingUp} tone="orange" label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
-        <KpiCard icon={Coins} tone="orange" label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
-        <KpiCard icon={CalendarCheck} tone="green" label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'success' : 'neutral'} hint="계약 완료로 옮긴 곳" />
-        <KpiCard icon={Hourglass} tone="slate" label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
-      </SummaryStrip>
+      {/* D-287 화면 꾸미기 — 요약 · 지금 챙길 영업 · AI 도우미 · 챙길 곳 목록 · 영업 보드(휴대폰 기본은 지금 할 일이 요약 위 — UXS-1) */}
+      <ArrangeArea page="sales-board" title="영업 관리" className="flex flex-col gap-4 sm:gap-5" pairGap="gap-4 sm:gap-5">
+        {phone && (
+          <ArrangeItem id="next" label="지금 챙길 영업" hint="가장 급한 한 곳 · 다음 단계">
+          {/* ③ 지금 할 일 — 한 줄 · 단추 하나 */}
+          {topRisk ? (
+            <NextActionBar
+              tone="orange"
+              label={`지금 챙길 영업 · ${risks.length}곳`}
+              title={topRisk.record.companyName}
+              detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
+              action={
+                <Link to={salesActionPath(topRisk.action, topRisk.record.id)} state={salesActionPath(topRisk.action, topRisk.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+                  {topRisk.action} <ChevronRight aria-hidden="true" className="size-4" />
+                </Link>
+              }
+              testId="sales-next"
+            />
+          ) : flow.here ? (
+            <NextActionBar
+              tone="orange"
+              icon={Route}
+              label={`${flow.flow.name} · ${flow.index + 1} / ${flow.flow.steps.length}단계`}
+              title={flow.here.label}
+              detail={flow.here.why}
+              action={
+                flow.next ? (
+                  <Link to={flow.next.key} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+                    다음: {flow.next.label} <ChevronRight aria-hidden="true" className="size-4" />
+                  </Link>
+                ) : undefined
+              }
+              testId="sales-next"
+            />
+          ) : null}
 
-      {/* ③ 지금 할 일 — 한 줄 · 단추 하나 */}
-      {topRisk ? (
-        <NextActionBar
-          tone="orange"
-          label={`지금 챙길 영업 · ${risks.length}곳`}
-          title={topRisk.record.companyName}
-          detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
-          action={
-            <Link to={salesActionPath(topRisk.action, topRisk.record.id)} state={salesActionPath(topRisk.action, topRisk.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className={LINK_BUTTON.primary} data-testid="sales-next-go">
-              {topRisk.action} <ChevronRight aria-hidden="true" className="size-4" />
-            </Link>
-          }
-          testId="sales-next"
-        />
-      ) : flow.here ? (
-        <NextActionBar
-          tone="orange"
-          icon={Route}
-          label={`${flow.flow.name} · ${flow.index + 1} / ${flow.flow.steps.length}단계`}
-          title={flow.here.label}
-          detail={flow.here.why}
-          action={
-            flow.next ? (
-              <Link to={flow.next.key} className={LINK_BUTTON.primary} data-testid="sales-next-go">
-                다음: {flow.next.label} <ChevronRight aria-hidden="true" className="size-4" />
-              </Link>
-            ) : undefined
-          }
-          testId="sales-next"
-        />
-      ) : null}
+          {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
+          </ArrangeItem>
+        )}
+        <ArrangeItem id="summary" label="한눈에 숫자" hint="진행 중 · 예상 수임료 · 이번 달 계약 · 멈춤">
+        {/* ② 요약 — 같은 숫자 · 같은 판정(아이콘 칸만 더함) */}
+        <SummaryStrip label="영업 요약" testId="sales-summary">
+          <KpiCard icon={TrendingUp} tone="orange" label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
+          <KpiCard icon={Coins} tone="orange" label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
+          <KpiCard icon={CalendarCheck} tone="green" label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'success' : 'neutral'} hint="계약 완료로 옮긴 곳" />
+          <KpiCard icon={Hourglass} tone="slate" label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
+        </SummaryStrip>
+        </ArrangeItem>
+        {!phone && (
+          <ArrangeItem id="next" label="지금 챙길 영업" hint="가장 급한 한 곳 · 다음 단계">
+          {/* ③ 지금 할 일 — 한 줄 · 단추 하나 */}
+          {topRisk ? (
+            <NextActionBar
+              tone="orange"
+              label={`지금 챙길 영업 · ${risks.length}곳`}
+              title={topRisk.record.companyName}
+              detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
+              action={
+                <Link to={salesActionPath(topRisk.action, topRisk.record.id)} state={salesActionPath(topRisk.action, topRisk.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+                  {topRisk.action} <ChevronRight aria-hidden="true" className="size-4" />
+                </Link>
+              }
+              testId="sales-next"
+            />
+          ) : flow.here ? (
+            <NextActionBar
+              tone="orange"
+              icon={Route}
+              label={`${flow.flow.name} · ${flow.index + 1} / ${flow.flow.steps.length}단계`}
+              title={flow.here.label}
+              detail={flow.here.why}
+              action={
+                flow.next ? (
+                  <Link to={flow.next.key} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+                    다음: {flow.next.label} <ChevronRight aria-hidden="true" className="size-4" />
+                  </Link>
+                ) : undefined
+              }
+              testId="sales-next"
+            />
+          ) : null}
 
-      {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
-      {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
-
-      {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}
-      {(risks.length > 0 || recontacts.length > 0) && (
-        <div className="grid gap-2.5 xl:grid-cols-2" data-testid="sales-signals">
-          {risks.length > 0 && (
-            <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>} defaultOpen>
-              <ul className="flex flex-col divide-y divide-slate-100">
-                {(phone && !allRisks ? risks.slice(0, 3) : risks).map((r) => (
-                  <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-                    <button type="button" onClick={() => open(r.record)} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
-                    <span className="t-sub text-warning-700">{r.reason}</span>
-                    <span className="ml-auto flex items-center gap-1.5">
-                      <Link to={salesActionPath(r.action, r.record.id)} state={salesActionPath(r.action, r.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">{r.action} →</Link>
-                      <CallButton phone={r.record.contactPhone.trim() || r.record.companyPhone.trim()} name={r.record.companyName} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {/* D-166: 휴대폰은 3곳만 — 열 곳이 펼쳐져 찾기 칸 · 단계 보드가 한참 아래로 밀렸다 */}
-              {phone && !allRisks && risks.length > 3 && (
-                <button type="button" onClick={() => setAllRisks(true)} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="sales-risks-more">
-                  {risks.length - 3}곳 더 보기
-                </button>
-              )}
-            </Disclosure>
-          )}
-          {recontacts.length > 0 && (
-            <Disclosure title="다시 연락할 곳" hint={`${recontacts.length}곳 · 오래 조용하거나 보류가 길어진 곳`} badge={<Badge>{recontacts.length}</Badge>}>
-              <ul className="flex flex-col divide-y divide-slate-100">
-                {recontacts.map((r) => (
-                  <li key={r.record.id} className="flex flex-col gap-1 py-2">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
-                      <span className="t-meta text-slate-400">{r.days >= 999 ? '기록 없음' : `${r.days}일 조용함`}</span>
-                      <span className="ml-auto"><CopyButton text={r.ment} label="연락 문구" /></span>
-                    </span>
-                    {r.reasons.map((x) => <span key={x} className="t-meta break-keep text-slate-500">· {x}</span>)}
-                  </li>
-                ))}
-              </ul>
-            </Disclosure>
-          )}
-        </div>
-      )}
-
-      {/* ④ 본문 작업 판 — 찾기는 판 첫 줄, 단계 칸은 판 안 */}
-      <WorkPanel
-        title="영업 보드"
-        count={liveCount}
-        testId="sales-board-panel"
-        toolbar={
-          liveCount > 0 ? (
-            <div className="relative w-full min-w-0 sm:max-w-md">
-              <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="업체명·담당자·유입 경로로 찾기"
-                aria-label="영업 업체 검색"
-                className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
-              />
-            </div>
-          ) : undefined
-        }
-      >
-      {loading ? (
-        <p className="t-sub text-slate-500">불러오는 중…</p>
-      ) : liveCount === 0 ? (
-        <div className="px-1 py-8 text-center">
-          <KanbanSquare aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-          <p className="mt-3 text-[1.2rem] font-bold text-slate-900">아직 영업 중인 업체가 없습니다</p>
-          <p className="mx-auto mt-2 max-w-xl text-[1rem] break-keep text-slate-600">
-            처음 연락한 업체를 <strong className="font-semibold">새 잠재고객</strong>으로 등록하면 여기서 미팅 · 제안 · 계약까지 단계를 옮기며 봅니다.
-            홈페이지 상담신청에서 만든 업체도 자동으로 '잠재 고객' 칸에 들어옵니다.
-          </p>
-          <Button variant="primary" className="mt-5" onClick={() => setFormOpen(true)}>
-            <CirclePlus aria-hidden="true" className="size-4" />첫 잠재고객 등록
-          </Button>
-        </div>
-      ) : (
-        <>
-          {/* 넓은 화면 — 여섯 칸이 한눈에 */}
-          <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6">
-            {SALES_FLOW_STAGES.map((s) => column(s, groups[s]))}
-          </div>
-          <div className="hidden gap-2.5 xl:grid xl:grid-cols-2">
-            {column('hold', groups.hold)}
-            {column('lost', groups.lost)}
-          </div>
-
-          {/* 좁은 화면 — 칸을 골라 한 칸씩 (옆으로 밀지 않는다) */}
-          <div className="flex flex-col gap-3 xl:hidden">
-            <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
-              {SALES_STAGE_ORDER.map((s) => {
-                const on = picked === s
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setPicked(s)}
-                    className={`tap flex flex-col items-start gap-0.5 rounded-(--radius-control) border px-2.5 py-2 text-left ${
-                      on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="t-meta flex w-full min-w-0 items-start gap-1.5 font-semibold">
-                      <span aria-hidden="true" className={`mt-[0.4em] size-2 shrink-0 rounded-full ${on ? 'bg-white' : stageColor(s).dot}`} style={on ? undefined : stageColor(s).style} />
-                      {/* 좁으면 두 줄로 — '1차 미팅 예정' · '1차 미팅 완료' 가 둘 다 '1차 미팅 …' 으로 잘리면 구별이 안 된다 */}
-                      <span className="min-w-0 break-keep leading-tight">{SALES_STAGE_LABEL[s]}</span>
-                    </span>
-                    <span className={`t-body font-bold tabular-nums ${on ? 'text-white' : 'text-slate-900'}`}>{groups[s].length}</span>
+          {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
+          </ArrangeItem>
+        )}
+        <ArrangeItem id="assist" label="AI 도우미" hint="건마다 특징 · 밀어붙일 건 · 직접 묻기">
+        {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
+        </ArrangeItem>
+        <ArrangeItem id="signals" label="지금 챙길 영업 · 다시 연락할 곳" hint="목록(있을 때만)">
+        {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}
+        {(risks.length > 0 || recontacts.length > 0) && (
+          <div className="grid gap-2.5 xl:grid-cols-2" data-testid="sales-signals">
+            {risks.length > 0 && (
+              <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>} defaultOpen>
+                <ul className="flex flex-col divide-y divide-slate-100">
+                  {(phone && !allRisks ? risks.slice(0, 3) : risks).map((r) => (
+                    <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+                      <button type="button" onClick={() => open(r.record)} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
+                      <span className="t-sub text-warning-700">{r.reason}</span>
+                      <span className="ml-auto flex items-center gap-1.5">
+                        <Link to={salesActionPath(r.action, r.record.id)} state={salesActionPath(r.action, r.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                        <CallButton phone={r.record.contactPhone.trim() || r.record.companyPhone.trim()} name={r.record.companyName} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {/* D-166: 휴대폰은 3곳만 — 열 곳이 펼쳐져 찾기 칸 · 단계 보드가 한참 아래로 밀렸다 */}
+                {phone && !allRisks && risks.length > 3 && (
+                  <button type="button" onClick={() => setAllRisks(true)} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="sales-risks-more">
+                    {risks.length - 3}곳 더 보기
                   </button>
-                )
-              })}
-            </div>
-            <p className="t-sub break-keep text-slate-500">{SALES_STAGE_LABEL[picked]} — {SALES_STAGE_HINT[picked]}</p>
-            {groups[picked].length === 0 ? (
-              <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-slate-400">이 단계에 있는 업체가 없습니다</p>
-            ) : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {groups[picked].map((r) => (
-                  <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
-                ))}
-              </ul>
+                )}
+              </Disclosure>
+            )}
+            {recontacts.length > 0 && (
+              <Disclosure title="다시 연락할 곳" hint={`${recontacts.length}곳 · 오래 조용하거나 보류가 길어진 곳`} badge={<Badge>{recontacts.length}</Badge>}>
+                <ul className="flex flex-col divide-y divide-slate-100">
+                  {recontacts.map((r) => (
+                    <li key={r.record.id} className="flex flex-col gap-1 py-2">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
+                        <span className="t-meta text-slate-400">{r.days >= 999 ? '기록 없음' : `${r.days}일 조용함`}</span>
+                        <span className="ml-auto"><CopyButton text={r.ment} label="연락 문구" /></span>
+                      </span>
+                      {r.reasons.map((x) => <span key={x} className="t-meta break-keep text-slate-500">· {x}</span>)}
+                    </li>
+                  ))}
+                </ul>
+              </Disclosure>
             )}
           </div>
-        </>
-      )}
-      </WorkPanel>
+        )}
+
+        {/* ④ 본문 작업 판 — 찾기는 판 첫 줄, 단계 칸은 판 안 */}
+        </ArrangeItem>
+        <ArrangeItem id="board" label="영업 보드" hint="단계별 칸반 · 찾기">
+        <WorkPanel
+          title="영업 보드"
+          count={liveCount}
+          testId="sales-board-panel"
+          toolbar={
+            liveCount > 0 ? (
+              <div className="relative w-full min-w-0 sm:max-w-md">
+                <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="업체명·담당자·유입 경로로 찾기"
+                  aria-label="영업 업체 검색"
+                  className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+                />
+              </div>
+            ) : undefined
+          }
+        >
+        {loading ? (
+          <p className="t-sub text-slate-500">불러오는 중…</p>
+        ) : liveCount === 0 ? (
+          <div className="px-1 py-8 text-center">
+            <KanbanSquare aria-hidden="true" className="mx-auto size-9 text-brand-400" />
+            <p className="mt-3 text-[1.2rem] font-bold text-slate-900">아직 영업 중인 업체가 없습니다</p>
+            <p className="mx-auto mt-2 max-w-xl text-[1rem] break-keep text-slate-600">
+              처음 연락한 업체를 <strong className="font-semibold">새 잠재고객</strong>으로 등록하면 여기서 미팅 · 제안 · 계약까지 단계를 옮기며 봅니다.
+              홈페이지 상담신청에서 만든 업체도 자동으로 '잠재 고객' 칸에 들어옵니다.
+            </p>
+            <Button variant="primary" className="mt-5" onClick={() => setFormOpen(true)}>
+              <CirclePlus aria-hidden="true" className="size-4" />첫 잠재고객 등록
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* 넓은 화면 — 여섯 칸이 한눈에 */}
+            <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6">
+              {SALES_FLOW_STAGES.map((s) => column(s, groups[s]))}
+            </div>
+            <div className="hidden gap-2.5 xl:grid xl:grid-cols-2">
+              {column('hold', groups.hold)}
+              {column('lost', groups.lost)}
+            </div>
+
+            {/* 좁은 화면 — 칸을 골라 한 칸씩 (옆으로 밀지 않는다) */}
+            <div className="flex flex-col gap-3 xl:hidden">
+              <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
+                {SALES_STAGE_ORDER.map((s) => {
+                  const on = picked === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setPicked(s)}
+                      className={`tap flex flex-col items-start gap-0.5 rounded-(--radius-control) border px-2.5 py-2 text-left ${
+                        on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="t-meta flex w-full min-w-0 items-start gap-1.5 font-semibold">
+                        <span aria-hidden="true" className={`mt-[0.4em] size-2 shrink-0 rounded-full ${on ? 'bg-white' : stageColor(s).dot}`} style={on ? undefined : stageColor(s).style} />
+                        {/* 좁으면 두 줄로 — '1차 미팅 예정' · '1차 미팅 완료' 가 둘 다 '1차 미팅 …' 으로 잘리면 구별이 안 된다 */}
+                        <span className="min-w-0 break-keep leading-tight">{SALES_STAGE_LABEL[s]}</span>
+                      </span>
+                      <span className={`t-body font-bold tabular-nums ${on ? 'text-white' : 'text-slate-900'}`}>{groups[s].length}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="t-sub break-keep text-slate-500">{SALES_STAGE_LABEL[picked]} — {SALES_STAGE_HINT[picked]}</p>
+              {groups[picked].length === 0 ? (
+                <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-slate-400">이 단계에 있는 업체가 없습니다</p>
+              ) : (
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {groups[picked].map((r) => (
+                    <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+        </WorkPanel>
+        </ArrangeItem>
+      </ArrangeArea>
 
       <NewProspectModal open={formOpen} busy={busy} records={records} onClose={closeForm} onSubmit={(f) => void create(f)} />
       {closing && (

@@ -49,6 +49,7 @@ import {
 import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
 import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
+import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { withNewProspect } from '../services/salesPipeline'
 import { findClientForCretop } from '../services/salesCretop'
@@ -615,17 +616,6 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
-      {/* D-239: 고객 관리 AI 도우미(예전 'AI 비서 · 준비 중' 자리) — 고른 구분(계약 고객 · 잠재고객)에 맞춘 질문 */}
-      {typed.length > 0 && (
-        <AiAssist
-          page="clients"
-          scope={`clients:${segment}`}
-          title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
-          presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
-          build={assistBuild}
-        />
-      )}
-
       {moreOpen && (
         <BottomSheet title="고객 관리 도구" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-2">
@@ -737,380 +727,402 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </ul>
       </Modal>
 
-      {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) */}
-      {!pilot && (records.length > 0 || ctype === 'consultant') && (
-        <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="flex gap-1 overflow-x-auto border-b border-slate-200">
-          {CLIENT_TYPES.map((t) => {
-            const on = ctype === t
-            const Icon = t === 'sme' ? Building2 : BriefcaseBusiness
-            return (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                data-testid={`client-type-${t}`}
-                onClick={() => switchType(t)}
-                className={`tap -mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[1rem] font-semibold whitespace-nowrap ${
-                  on ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Icon aria-hidden="true" className="size-4" />
-                {CLIENT_TYPE_LABEL[t]}
-                <span className={`t-meta tabular-nums ${on ? 'text-brand-600' : 'text-slate-400'}`}>{typeCount[t]}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
-      {typed.length > 0 && !showArchived && (
-        <div role="group" aria-label="고객 구분" data-testid="client-segment" className="grid grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto sm:self-start">
-          {SEGMENTS.map((sg) => {
-            const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
-            const on = segment === sg.key
-            return (
-              <button
-                key={sg.key}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setSegment(sg.key)}
-                className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <span className="text-[0.9rem]">{sg.label}</span>
-                <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* 검색 · 보관 */}
-      {typed.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {/* 휴대폰에서는 검색칸이 한 줄을 다 쓴다 — 보관함 단추와 나눠 쓰면
-              안내 문구가 '…번호로' 에서 잘렸다 */}
-          <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
-            <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="업체명·담당자·번호·직접 만든 칸으로 찾기"
-              aria-label="업체 검색"
-              className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+      {/* D-287 화면 꾸미기 — AI 도우미 · 업체 목록(고르개 · 찾기 · 요약 · 현황표) · 지금 챙길 것 */}
+      <ArrangeArea page="clients" title="고객 관리" className="flex flex-col gap-6">
+        <ArrangeItem id="assist" label="AI 도우미" hint="여러 달 연락 안 된 곳 · 계약 가능성 · 직접 묻기">
+          {/* D-239: 고객 관리 AI 도우미(예전 'AI 비서 · 준비 중' 자리) — 고른 구분(계약 고객 · 잠재고객)에 맞춘 질문 */}
+          {typed.length > 0 && (
+            <AiAssist
+              page="clients"
+              scope={`clients:${segment}`}
+              title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
+              presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
+              build={assistBuild}
             />
-          </div>
-          {/* 보관한 업체가 하나도 없으면 단추도 두지 않는다 — 빈 서랍을 여는 단추는 자리만 먹는다 */}
-          {(archivedCount > 0 || showArchived) && (
-            <button
-              type="button"
-              aria-pressed={showArchived}
-              onClick={() => setShowArchived((v) => !v)}
-              className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
-                showArchived
-                  ? 'border-brand-300 bg-brand-50 text-brand-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Archive aria-hidden="true" className="size-4" />
-              보관함 {archivedCount}
-            </button>
           )}
-          {/*
-            정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
-            좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
-          */}
-          {/* D-126: 휴대폰에서는 '거르기' 단추 하나 — 누르면 보기 · 정렬이 펼쳐진다 */}
-          <button
-            type="button"
-            aria-expanded={filtersOpen}
-            data-testid="client-filters-toggle"
-            onClick={() => setFiltersOpen((v) => !v)}
-            className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium sm:hidden ${
-              filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
-            }`}
-          >
-            <SlidersHorizontal aria-hidden="true" className="size-4" />
-            거르기{filterKey !== 'all' ? ` · ${CLIENT_FILTER_LABEL[filterKey]}` : ''}
-          </button>
-          <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
-          {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
-          <label className="flex shrink-0 items-center gap-1.5">
-            <span className="t-sub text-slate-500">보기</span>
-            <select
-              value={filterKey}
-              aria-label="업체 보기 조건"
-              onChange={(e) => setFilterKey(isClientFilterKey(e.target.value) ? e.target.value : 'all')}
-              className={`rounded-(--radius-control) border bg-white px-2 py-2 text-[0.92rem] font-medium focus:border-brand-500 focus:outline-none sm:py-1.5 ${
-                filterKey === 'all' ? 'border-slate-300 text-slate-700' : 'border-brand-300 text-brand-700'
-              }`}
-            >
-              {CLIENT_FILTER_ORDER.map((k) => (
-                <option key={k} value={k}>
-                  {k === 'unpaid' ? moneyWords.unpaidFilter : CLIENT_FILTER_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex shrink-0 items-center gap-1.5">
-            <span className="t-sub text-slate-500">정렬</span>
-            <select
-              value={sortKey}
-              aria-label="업체 정렬 기준"
-              onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'active')}
-              className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
-            >
-              {CLIENT_SORT_ORDER.map((k) => (
-                <option key={k} value={k}>
-                  {CLIENT_SORT_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
-          </div>
-          {(query !== '' || filterKey !== 'all') && (
-            <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
-          )}
-        </div>
-      )}
 
-      {/* 요약 — 0 일 때는 색을 쓰지 않는다 */}
-      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-5">
-        <MetricTile
-          label="지금 처리할 일"
-          value={`${summary.critical}건`}
-          tone={summary.critical > 0 ? 'danger' : 'neutral'}
-          hint="마감 지남 · 서류 없음"
-          onClick={() => { setTab('critical'); setAlertsOpen(true) }}
-        />
-        <MetricTile
-          label="곧 처리할 일"
-          value={`${summary.warning}건`}
-          tone={summary.warning > 0 ? 'warning' : 'neutral'}
-          hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
-          onClick={() => { setTab('warning'); setAlertsOpen(true) }}
-        />
-        <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳`} />
-        {/* D-171: 잠재고객(가망고객) — 누르면 잠재고객만 */}
-        <MetricTile label="잠재고객" value={`${prospectCount}곳`} hint="계약 전 · 영업 중" onClick={() => setSegment('prospect')} />
-        <MetricTile
-          label={moneyWords.unpaid}
-          value={krwTile(money.unpaid)}
-          tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
-          hint={
-            // 연체 건수와 청구 기준은 둘 다 사실이라 둘 다 적는다 — 하나만 고르면 다른 하나를 잃는다
-            [
-              money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '',
-              money.unpaidGross !== money.unpaid ? `청구 기준 ${krwTile(money.unpaidGross)}` : '',
-            ]
-              .filter((v) => v !== '')
-              .join(' · ') || '연체 없음'
-          }
-        />
-      </section>
+        </ArrangeItem>
+        <ArrangeItem id="list" label="업체 목록" hint="고객 종류 · 계약/잠재 · 찾기 · 요약 숫자 · 업체별 현황표">
+          <div className="flex flex-col gap-6">
+            {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) */}
+            {!pilot && (records.length > 0 || ctype === 'consultant') && (
+              <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+                {CLIENT_TYPES.map((t) => {
+                  const on = ctype === t
+                  const Icon = t === 'sme' ? Building2 : BriefcaseBusiness
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      data-testid={`client-type-${t}`}
+                      onClick={() => switchType(t)}
+                      className={`tap -mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[1rem] font-semibold whitespace-nowrap ${
+                        on ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Icon aria-hidden="true" className="size-4" />
+                      {CLIENT_TYPE_LABEL[t]}
+                      <span className={`t-meta tabular-nums ${on ? 'text-brand-600' : 'text-slate-400'}`}>{typeCount[t]}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
-      {/* B. 업체별 현황표 */}
-      <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <HintTip tip={hintFor('업체별 현황표')} label="업체별 현황표">
-            <h2 id="ops-matrix" className="t-section text-slate-900">
-              업체별 현황표
-            </h2>
-          </HintTip>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setCatalogOpen(true)}
-              className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
-            >
-              업무 항목 추가
-            </button>
-          </div>
-        </div>
+            {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
+            {typed.length > 0 && !showArchived && (
+              <div role="group" aria-label="고객 구분" data-testid="client-segment" className="grid grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto sm:self-start">
+                {SEGMENTS.map((sg) => {
+                  const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
+                  const on = segment === sg.key
+                  return (
+                    <button
+                      key={sg.key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setSegment(sg.key)}
+                      className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <span className="text-[0.9rem]">{sg.label}</span>
+                      <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
-        {typed.length === 0 && !pilot && ctype === 'consultant' ? (
-          // D-181: 컨설턴트 고객이 아직 없을 때 — 새로 넣거나, 이미 넣은 업체를 옮기는 길을 알려 준다
-          <div data-testid="clients-empty-consultant" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
-            <BriefcaseBusiness aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
-            <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-consultant-add">
-              <CirclePlus aria-hidden="true" className="size-4" />컨설턴트 고객 등록
-            </Button>
-            <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
-              이미 등록한 고객이 컨설턴트라면 그 고객 화면 › 더보기 › <strong>컨설턴트 고객으로 옮기기</strong> 를 누르세요. 중소기업 고객 목록에서 빠지고 여기로 옵니다.
-            </p>
-          </div>
-        ) : typed.length === 0 ? (
-          // D-162: 빈 화면 자체가 다음 행동을 알려 준다 — 안내 창을 따로 띄우지 않는다
-          <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
-            <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
-            <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-add">
-              <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
-            </Button>
-            <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
-              업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.
-            </p>
-          </div>
-        ) : (
-          <>
-          {/*
-            표를 버리고 카드로 간다.
-            업무가 6개일 때도 표는 가로 900px 를 넘겨 옆으로 밀어야 했고, 앞으로
-            15개까지 늘면 미는 거리만 길어진다. 카드 안에서 업무를 작은 조각으로
-            줄바꿈시키면 몇 개가 되든 가로로는 넘치지 않는다.
-            휴대폰과 데스크톱이 같은 부품을 쓴다 — 한쪽만 어긋날 일이 없다.
-          */}
-          {/* D-120: 고른 보기 · 검색에 맞는 업체가 없으면 빈 화면 대신 알려 주고 바로 풀 수 있게 */}
-          {ordered.length === 0 && (
-            <div data-testid="clients-empty-filter" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
-              <p className="text-[1.1rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
-              <p className="t-body break-keep text-slate-600">
-                {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {typed.length}곳이 보입니다.
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setQuery('')
-                  setFilterKey('all')
-                  setSegment('all')
-                }}
-              >
-                조건 모두 풀기
-              </Button>
-            </div>
-          )}
-          <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
-            {ordered.map((record, i) => {
-              const p = clientOpsProgress(record, today)
-              const critical = summary.criticalByClient[record.id] ?? 0
-              const warning = summary.warningByClient[record.id] ?? 0
-              const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
-              return (
-                <ClientBoardCard
-                  key={record.id}
-                  rank={i + 1}
-                  record={record}
-                  today={today}
-                  dueSoonDays={DUE_SOON_DAYS}
-                  tone={clientTone(dLeft, p.overduePayments, critical, warning)}
-                  criticalCount={critical}
-                  warningCount={warning}
-                  onOpen={() => navigate(`/ops/clients/${record.id}`)}
-                  onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
-                  onMoney={() => setQuick({ id: record.id, kind: 'money' })}
-                  onBulkDocs={() => setBulkDocsFor(record.id)}
-                  hit={query.trim() !== '' ? searchHit(record, query) : null}
-                  grants={grantSums.get(record.id) ?? null}
-                  reco={reco.chips.get(record.id) ?? []}
-                  onGrants={() => navigate(`/grants?view=clients&client=${record.id}`)}
-                />
-              )
-            })}
-          </ul>
-          </>
-        )}
-
-        {/*
-          색 설명을 적어 두지 않는다.
-          조각에 이미 '7일 지남' 이라고 글자로 쓰여 있으므로 빨강이 무슨 뜻인지 물어볼 일이 없다.
-          범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
-        */}
-        <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>
-      </section>
-
-      {/* A. 지금 챙길 것 */}
-      <section
-        aria-labelledby="ops-alerts"
-        className={`flex-col gap-3 ${records.length === 0 ? 'hidden' : 'flex'}`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            id="ops-alerts"
-            aria-expanded={alertsOpen}
-            onClick={() => setAlertsOpen((v) => !v)}
-            className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900"
-          >
-            <ChevronRight
-              aria-hidden="true"
-              className={`size-5 text-slate-400 transition-transform ${alertsOpen ? 'rotate-90' : ''}`}
-            />
-            지금 챙길 것
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-semibold text-slate-600">
-              {alerts.length}
-            </span>
-          </button>
-          <div className={`flex-wrap gap-1 ${alertsOpen ? 'flex' : 'hidden'}`}>
-            {SEVERITY_TABS.map((t) => {
-              const count =
-                t.key === 'all'
-                  ? alerts.length
-                  : alerts.filter((a) => a.severity === t.key).length
-              return (
+            {/* 검색 · 보관 */}
+            {typed.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 휴대폰에서는 검색칸이 한 줄을 다 쓴다 — 보관함 단추와 나눠 쓰면
+                    안내 문구가 '…번호로' 에서 잘렸다 */}
+                <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
+                  <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="업체명·담당자·번호·직접 만든 칸으로 찾기"
+                    aria-label="업체 검색"
+                    className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+                  />
+                </div>
+                {/* 보관한 업체가 하나도 없으면 단추도 두지 않는다 — 빈 서랍을 여는 단추는 자리만 먹는다 */}
+                {(archivedCount > 0 || showArchived) && (
+                  <button
+                    type="button"
+                    aria-pressed={showArchived}
+                    onClick={() => setShowArchived((v) => !v)}
+                    className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
+                      showArchived
+                        ? 'border-brand-300 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Archive aria-hidden="true" className="size-4" />
+                    보관함 {archivedCount}
+                  </button>
+                )}
+                {/*
+                  정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
+                  좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
+                */}
+                {/* D-126: 휴대폰에서는 '거르기' 단추 하나 — 누르면 보기 · 정렬이 펼쳐진다 */}
                 <button
-                  key={t.key}
                   type="button"
-                  aria-pressed={tab === t.key}
-                  onClick={() => {
-                    setTab(t.key)
-                    setShowAllAlerts(false)
-                  }}
-                  className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
-                    tab === t.key
-                      ? 'border-brand-300 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  aria-expanded={filtersOpen}
+                  data-testid="client-filters-toggle"
+                  onClick={() => setFiltersOpen((v) => !v)}
+                  className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium sm:hidden ${
+                    filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
                   }`}
                 >
-                  {t.label} {count}
+                  <SlidersHorizontal aria-hidden="true" className="size-4" />
+                  거르기{filterKey !== 'all' ? ` · ${CLIENT_FILTER_LABEL[filterKey]}` : ''}
                 </button>
-              )
-            })}
-          </div>
-        </div>
+                <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
+                {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
+                <label className="flex shrink-0 items-center gap-1.5">
+                  <span className="t-sub text-slate-500">보기</span>
+                  <select
+                    value={filterKey}
+                    aria-label="업체 보기 조건"
+                    onChange={(e) => setFilterKey(isClientFilterKey(e.target.value) ? e.target.value : 'all')}
+                    className={`rounded-(--radius-control) border bg-white px-2 py-2 text-[0.92rem] font-medium focus:border-brand-500 focus:outline-none sm:py-1.5 ${
+                      filterKey === 'all' ? 'border-slate-300 text-slate-700' : 'border-brand-300 text-brand-700'
+                    }`}
+                  >
+                    {CLIENT_FILTER_ORDER.map((k) => (
+                      <option key={k} value={k}>
+                        {k === 'unpaid' ? moneyWords.unpaidFilter : CLIENT_FILTER_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex shrink-0 items-center gap-1.5">
+                  <span className="t-sub text-slate-500">정렬</span>
+                  <select
+                    value={sortKey}
+                    aria-label="업체 정렬 기준"
+                    onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'active')}
+                    className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
+                  >
+                    {CLIENT_SORT_ORDER.map((k) => (
+                      <option key={k} value={k}>
+                        {CLIENT_SORT_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
+                </div>
+                {(query !== '' || filterKey !== 'all') && (
+                  <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
+                )}
+              </div>
+            )}
 
-        {alertsOpen && (
-          <>
-          {loading ? (
-            <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.95rem] text-slate-500">
-              불러오는 중…
-            </p>
-          ) : visibleAlerts.length === 0 ? (
-            <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
-              <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
-              <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
-                {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
-              </p>
-              <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
-                {tab === 'all'
-                  ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
-                  : '다른 분류를 눌러 확인해 보세요.'}
-              </p>
-            </div>
-          ) : (
-            <>
-              <ul className="flex flex-col gap-2">
-                {shownAlerts.map((a) => (
-                  <AlertRow key={a.id} alert={a} onOpen={openAlert} />
-                ))}
-              </ul>
-              {visibleAlerts.length > shownAlerts.length && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllAlerts(true)}
-                  className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  {visibleAlerts.length - shownAlerts.length}건 더 보기
-                </button>
+            {/* 요약 — 0 일 때는 색을 쓰지 않는다 */}
+            <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-5">
+              <MetricTile
+                label="지금 처리할 일"
+                value={`${summary.critical}건`}
+                tone={summary.critical > 0 ? 'danger' : 'neutral'}
+                hint="마감 지남 · 서류 없음"
+                onClick={() => { setTab('critical'); setAlertsOpen(true) }}
+              />
+              <MetricTile
+                label="곧 처리할 일"
+                value={`${summary.warning}건`}
+                tone={summary.warning > 0 ? 'warning' : 'neutral'}
+                hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
+                onClick={() => { setTab('warning'); setAlertsOpen(true) }}
+              />
+              <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳`} />
+              {/* D-171: 잠재고객(가망고객) — 누르면 잠재고객만 */}
+              <MetricTile label="잠재고객" value={`${prospectCount}곳`} hint="계약 전 · 영업 중" onClick={() => setSegment('prospect')} />
+              <MetricTile
+                label={moneyWords.unpaid}
+                value={krwTile(money.unpaid)}
+                tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
+                hint={
+                  // 연체 건수와 청구 기준은 둘 다 사실이라 둘 다 적는다 — 하나만 고르면 다른 하나를 잃는다
+                  [
+                    money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '',
+                    money.unpaidGross !== money.unpaid ? `청구 기준 ${krwTile(money.unpaidGross)}` : '',
+                  ]
+                    .filter((v) => v !== '')
+                    .join(' · ') || '연체 없음'
+                }
+              />
+            </section>
+
+            {/* B. 업체별 현황표 */}
+            <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <HintTip tip={hintFor('업체별 현황표')} label="업체별 현황표">
+                  <h2 id="ops-matrix" className="t-section text-slate-900">
+                    업체별 현황표
+                  </h2>
+                </HintTip>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogOpen(true)}
+                    className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
+                  >
+                    업무 항목 추가
+                  </button>
+                </div>
+              </div>
+
+              {typed.length === 0 && !pilot && ctype === 'consultant' ? (
+                // D-181: 컨설턴트 고객이 아직 없을 때 — 새로 넣거나, 이미 넣은 업체를 옮기는 길을 알려 준다
+                <div data-testid="clients-empty-consultant" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
+                  <BriefcaseBusiness aria-hidden="true" className="mx-auto size-9 text-brand-400" />
+                  <p className="mt-3 text-[1.25rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
+                  <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-consultant-add">
+                    <CirclePlus aria-hidden="true" className="size-4" />컨설턴트 고객 등록
+                  </Button>
+                  <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
+                    이미 등록한 고객이 컨설턴트라면 그 고객 화면 › 더보기 › <strong>컨설턴트 고객으로 옮기기</strong> 를 누르세요. 중소기업 고객 목록에서 빠지고 여기로 옵니다.
+                  </p>
+                </div>
+              ) : typed.length === 0 ? (
+                // D-162: 빈 화면 자체가 다음 행동을 알려 준다 — 안내 창을 따로 띄우지 않는다
+                <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
+                  <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
+                  <p className="mt-3 text-[1.25rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
+                  <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-add">
+                    <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
+                  </Button>
+                  <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
+                    업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.
+                  </p>
+                </div>
+              ) : (
+                <>
+                {/*
+                  표를 버리고 카드로 간다.
+                  업무가 6개일 때도 표는 가로 900px 를 넘겨 옆으로 밀어야 했고, 앞으로
+                  15개까지 늘면 미는 거리만 길어진다. 카드 안에서 업무를 작은 조각으로
+                  줄바꿈시키면 몇 개가 되든 가로로는 넘치지 않는다.
+                  휴대폰과 데스크톱이 같은 부품을 쓴다 — 한쪽만 어긋날 일이 없다.
+                */}
+                {/* D-120: 고른 보기 · 검색에 맞는 업체가 없으면 빈 화면 대신 알려 주고 바로 풀 수 있게 */}
+                {ordered.length === 0 && (
+                  <div data-testid="clients-empty-filter" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
+                    <p className="text-[1.1rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
+                    <p className="t-body break-keep text-slate-600">
+                      {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {typed.length}곳이 보입니다.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setQuery('')
+                        setFilterKey('all')
+                        setSegment('all')
+                      }}
+                    >
+                      조건 모두 풀기
+                    </Button>
+                  </div>
+                )}
+                <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
+                  {ordered.map((record, i) => {
+                    const p = clientOpsProgress(record, today)
+                    const critical = summary.criticalByClient[record.id] ?? 0
+                    const warning = summary.warningByClient[record.id] ?? 0
+                    const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
+                    return (
+                      <ClientBoardCard
+                        key={record.id}
+                        rank={i + 1}
+                        record={record}
+                        today={today}
+                        dueSoonDays={DUE_SOON_DAYS}
+                        tone={clientTone(dLeft, p.overduePayments, critical, warning)}
+                        criticalCount={critical}
+                        warningCount={warning}
+                        onOpen={() => navigate(`/ops/clients/${record.id}`)}
+                        onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
+                        onMoney={() => setQuick({ id: record.id, kind: 'money' })}
+                        onBulkDocs={() => setBulkDocsFor(record.id)}
+                        hit={query.trim() !== '' ? searchHit(record, query) : null}
+                        grants={grantSums.get(record.id) ?? null}
+                        reco={reco.chips.get(record.id) ?? []}
+                        onGrants={() => navigate(`/grants?view=clients&client=${record.id}`)}
+                      />
+                    )
+                  })}
+                </ul>
+                </>
               )}
-            </>
-          )}
-          </>
-        )}
-      </section>
 
+              {/*
+                색 설명을 적어 두지 않는다.
+                조각에 이미 '7일 지남' 이라고 글자로 쓰여 있으므로 빨강이 무슨 뜻인지 물어볼 일이 없다.
+                범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
+              */}
+              <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>
+            </section>
+
+          </div>
+        </ArrangeItem>
+        <ArrangeItem id="alerts" label="지금 챙길 것" hint="서류 · 기한 · 돈 경고(업체가 있을 때)">
+          {/* A. 지금 챙길 것 */}
+          <section
+            aria-labelledby="ops-alerts"
+            className={`flex-col gap-3 ${records.length === 0 ? 'hidden' : 'flex'}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                id="ops-alerts"
+                aria-expanded={alertsOpen}
+                onClick={() => setAlertsOpen((v) => !v)}
+                className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900"
+              >
+                <ChevronRight
+                  aria-hidden="true"
+                  className={`size-5 text-slate-400 transition-transform ${alertsOpen ? 'rotate-90' : ''}`}
+                />
+                지금 챙길 것
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-semibold text-slate-600">
+                  {alerts.length}
+                </span>
+              </button>
+              <div className={`flex-wrap gap-1 ${alertsOpen ? 'flex' : 'hidden'}`}>
+                {SEVERITY_TABS.map((t) => {
+                  const count =
+                    t.key === 'all'
+                      ? alerts.length
+                      : alerts.filter((a) => a.severity === t.key).length
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      aria-pressed={tab === t.key}
+                      onClick={() => {
+                        setTab(t.key)
+                        setShowAllAlerts(false)
+                      }}
+                      className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
+                        tab === t.key
+                          ? 'border-brand-300 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {t.label} {count}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {alertsOpen && (
+              <>
+              {loading ? (
+                <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.95rem] text-slate-500">
+                  불러오는 중…
+                </p>
+              ) : visibleAlerts.length === 0 ? (
+                <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
+                  <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
+                  <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
+                    {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
+                  </p>
+                  <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+                    {tab === 'all'
+                      ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
+                      : '다른 분류를 눌러 확인해 보세요.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <ul className="flex flex-col gap-2">
+                    {shownAlerts.map((a) => (
+                      <AlertRow key={a.id} alert={a} onOpen={openAlert} />
+                    ))}
+                  </ul>
+                  {visibleAlerts.length > shownAlerts.length && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllAlerts(true)}
+                      className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      {visibleAlerts.length - shownAlerts.length}건 더 보기
+                    </button>
+                  )}
+                </>
+              )}
+              </>
+            )}
+          </section>
+
+        </ArrangeItem>
+      </ArrangeArea>
       {/*
         목록에서 바로 고치기.
         저장은 상세 화면과 같은 함수를 쓰므로 여기서 바꾼 값이 업체 기록에 그대로

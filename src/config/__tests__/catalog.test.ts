@@ -7,6 +7,7 @@
  * 실행: npm run test:catalog
  */
 
+import { arrangeIds, hiddenIds, isCustomized, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
 import {
   FEATURE_CATALOG,
   MODULE_CATALOG,
@@ -261,6 +262,27 @@ await storage()
   const Img = customIcon('/icons/y.png', false, 'sales') as unknown as (p: { className?: string }) => El
   const img = Img({ className: 'size-6' })
   check('D-283 여러 색 새 아이콘 → 그림 그대로(alt 비움 · 이름은 옆 글자가 말함)', img.type === 'img' && img.props.src === '/icons/y.png' && img.props.alt === '')
+}
+
+/* D-287 화면 꾸미기 — 순서 · 숨김 규칙(lib/pageLayout) */
+{
+  const D = ['a', 'b', 'c', 'd', 'e']
+  const empty = { order: [], off: [], today: {} }
+  check('D-287 바꾼 적 없으면 기본 순서 그대로', arrangeIds(D, empty).join() === 'a,b,c,d,e')
+  check('D-287 저장한 뒤 생긴 칸은 기본 순서의 앞 칸 바로 뒤 · 없어진 칸은 버림', arrangeIds([...D, 'f'], { ...empty, order: ['c', 'a', 'b', 'x', 'e', 'd'] }).join() === 'c,a,b,e,f,d' && arrangeIds(['n', ...D], { ...empty, order: ['e', 'd', 'c', 'b', 'a'] }).join() === 'n,e,d,c,b,a')
+  resetLayout('t1')
+  moveSection('t1', D, 'd', 'top')
+  const l1 = readLayoutForTest('t1')
+  check('D-287 맨 위로 — d 가 첫째', arrangeIds(D, l1).join() === 'd,a,b,c,e')
+  setSectionVisibility('t1', 'b', 'off')
+  setSectionVisibility('t1', 'c', 'today')
+  moveSection('t1', D, 'e', 'up')
+  const l2 = readLayoutForTest('t1')
+  check("D-287 위로 — 숨긴 칸(b 계속 · c 오늘만)은 건너뛰고 보이는 이웃(a) 앞으로", arrangeIds(D, l2).join() === 'd,e,a,b,c' && visibilityOf(l2, 'b') === 'off' && visibilityOf(l2, 'c') === 'today' && hiddenIds(D, l2).join() === 'b,c')
+  check("D-287 '오늘만' 은 다른 날이면 보임 · '계속' 은 그대로", visibilityOf(l2, 'c', '2099-01-01') === 'show' && visibilityOf(l2, 'b', '2099-01-01') === 'off')
+  setSectionVisibility('t1', 'b', 'show')
+  resetLayout('t1')
+  check('D-287 처음대로 — 바꾼 것 없음', !isCustomized(readLayoutForTest('t1')) && arrangeIds(D, readLayoutForTest('t1')).join() === 'a,b,c,d,e')
 }
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)

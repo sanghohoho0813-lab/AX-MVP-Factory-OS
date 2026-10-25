@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { ScreenTitle } from '../components/ui/primitives'
+import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { ScrollHintRow } from '../components/ui/ScrollHintRow'
@@ -189,9 +190,6 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       />
-      {/* D-239: 상담신청함 AI 도우미 — 전환 가능성 높은 순 · 먼저 연락할 곳 · 오래 기다린 신청 */}
-      {events.length > 0 && <AiAssist page="inbox" title="잠재고객 상담신청" presets={['inbox.rank', 'inbox.first', 'inbox.waiting']} build={assistBuild} />}
-
       {notReady && (
         <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
           {/* D-122: 개발자 말(READY · 브릿지 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
@@ -206,126 +204,134 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
-      {/* D-122: 오른쪽에 더 있으면 '›' */}
-      <ScrollHintRow className="-mx-4 sm:mx-0" innerClassName="flex gap-1.5 px-4 sm:flex-wrap sm:px-0">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            aria-pressed={filter === f.key}
-            onClick={() => setFilter(f.key)}
-            className={`tap t-sub shrink-0 rounded-full border px-3.5 py-2 font-medium whitespace-nowrap ${
-              filter === f.key
-                ? 'border-brand-600 bg-brand-50 text-brand-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {f.label} <span className={counts[f.key] === 0 ? 'text-slate-400' : 'text-slate-500'}>{counts[f.key]}</span>
-          </button>
-        ))}
-      </ScrollHintRow>
+      {/* D-287 화면 꾸미기 — 칸 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]) */}
+      <ArrangeArea page="inbox" title="잠재고객 상담신청" className="flex flex-col gap-5">
+        <ArrangeItem id="assist" label="AI 도우미" hint="전환 가능성 높은 순 · 먼저 연락할 곳 · 직접 묻기">
+          {/* D-239: 상담신청함 AI 도우미 — 전환 가능성 높은 순 · 먼저 연락할 곳 · 오래 기다린 신청 */}
+          {events.length > 0 && <AiAssist page="inbox" title="잠재고객 상담신청" presets={['inbox.rank', 'inbox.first', 'inbox.waiting']} build={assistBuild} />}
+        </ArrangeItem>
+        <ArrangeItem id="list" label="상담신청 목록" hint="상태 · 종류 · 정렬 · 신청">
+          {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
+          {/* D-122: 오른쪽에 더 있으면 '›' */}
+          <ScrollHintRow className="-mx-4 sm:mx-0" innerClassName="flex gap-1.5 px-4 sm:flex-wrap sm:px-0">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={`tap t-sub shrink-0 rounded-full border px-3.5 py-2 font-medium whitespace-nowrap ${
+                  filter === f.key
+                    ? 'border-brand-600 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {f.label} <span className={counts[f.key] === 0 ? 'text-slate-400' : 'text-slate-500'}>{counts[f.key]}</span>
+              </button>
+            ))}
+          </ScrollHintRow>
 
-      {/* 종류가 두 가지 이상일 때만 — 한 가지뿐이면 고를 것이 없다 */}
-      {typeChips.items.length >= 2 && (
-        <div
-          role="group"
-          aria-label="종류별 보기"
-          data-testid="inbox-type-filter"
-          className="-mx-4 -mt-2 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <span className="t-meta shrink-0 pr-0.5 text-slate-400">종류</span>
-          {[{ key: 'all' as const, label: '전부', count: typeChips.total }, ...typeChips.items].map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              aria-pressed={typeFilter === t.key}
-              onClick={() => setTypeFilter(t.key)}
-              className={`tap t-meta shrink-0 rounded-full border px-3 py-1.5 font-medium whitespace-nowrap ${
-                typeFilter === t.key
-                  ? 'border-navy-800 bg-navy-800 text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+          {/* 종류가 두 가지 이상일 때만 — 한 가지뿐이면 고를 것이 없다 */}
+          {typeChips.items.length >= 2 && (
+            <div
+              role="group"
+              aria-label="종류별 보기"
+              data-testid="inbox-type-filter"
+              className="-mx-4 -mt-2 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {t.label}{' '}
-              <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-400' : 'text-slate-500'}>{t.count}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* D-111: 정렬 — 기본은 급한 것 · 새것 먼저, 켜면 오래 기다린 것 먼저 */}
-      {!loading && visible.length > 1 && (
-        <div className="-mt-2 flex items-center justify-end gap-1" role="group" aria-label="정렬">
-          {[
-            { on: false, label: '새것 먼저' },
-            { on: true, label: '오래 기다린 것 먼저' },
-          ].map((o) => (
-            <button
-              key={o.label}
-              type="button"
-              aria-pressed={waitingFirst === o.on}
-              data-testid={o.on ? 'inbox-sort-waiting' : 'inbox-sort-new'}
-              onClick={() => setWaitingFirst(o.on)}
-              className={`tap t-meta rounded-full px-2.5 py-1 font-medium ${
-                waitingFirst === o.on ? 'bg-slate-200 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading ? (
-        <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
-      ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
-          <Inbox aria-hidden="true" className="size-8 text-slate-300" />
-          <p className="text-[1rem] font-semibold text-slate-700">{typeFilter !== 'all'
-              ? `${EVENT_TYPE_LABEL[typeFilter]} 중에 해당하는 것이 없습니다.`
-              : filter === 'open'
-                ? '새 고객 요청이 없습니다.'
-                : '해당하는 상담신청이 없습니다.'}</p>
-          <p className="max-w-md text-[0.9rem] break-keep text-slate-500">
-            고객이 {brand.customerPlatformLabel}에서 진단을 마치거나, 서비스를 주문하거나, 서류를 올리거나, 요청을 보내면 여기에 나타납니다.
-          </p>
-          {typeFilter !== 'all' && (
-            <button type="button" onClick={() => setTypeFilter('all')} className="t-sub mt-1 font-medium text-brand-700 hover:underline">
-              모든 종류 보기
-            </button>
+              <span className="t-meta shrink-0 pr-0.5 text-slate-400">종류</span>
+              {[{ key: 'all' as const, label: '전부', count: typeChips.total }, ...typeChips.items].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={typeFilter === t.key}
+                  onClick={() => setTypeFilter(t.key)}
+                  className={`tap t-meta shrink-0 rounded-full border px-3 py-1.5 font-medium whitespace-nowrap ${
+                    typeFilter === t.key
+                      ? 'border-navy-800 bg-navy-800 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {t.label}{' '}
+                  <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-400' : 'text-slate-500'}>{t.count}</span>
+                </button>
+              ))}
+            </div>
           )}
-          {isLocal && filter === 'open' && typeFilter === 'all' && (
-            <button
-              type="button"
-              onClick={() => {
-                const created = seedDemoEvents()
-                showToast(created.length ? `샘플 이벤트 ${created.length}건을 만들었습니다 (DEMO).` : '샘플 이벤트가 이미 있습니다.')
-                void load()
-              }}
-              className="tap t-sub mt-2 inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 font-medium text-slate-600 hover:bg-slate-50 sm:h-10"
-            >
-              <Sparkles aria-hidden="true" className="size-4" /> 샘플 이벤트 만들기 (로컬 데모)
-            </button>
-          )}
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {visible.map((e) => (
-            <li key={e.id}>
-              <EventCard
-                event={e}
-                clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
-                clientTag={e.operationsClientId && consultantIds.has(e.operationsClientId) ? CLIENT_TYPE_LABEL.consultant : null}
-                onLink={() => setLinking({ event: e, tab: 'existing' })}
-                onCreateClient={() => setLinking({ event: e, tab: 'new' })}
-                onStatus={(status) => void setStatus(e, status)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
 
+          {/* D-111: 정렬 — 기본은 급한 것 · 새것 먼저, 켜면 오래 기다린 것 먼저 */}
+          {!loading && visible.length > 1 && (
+            <div className="-mt-2 flex items-center justify-end gap-1" role="group" aria-label="정렬">
+              {[
+                { on: false, label: '새것 먼저' },
+                { on: true, label: '오래 기다린 것 먼저' },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  aria-pressed={waitingFirst === o.on}
+                  data-testid={o.on ? 'inbox-sort-waiting' : 'inbox-sort-new'}
+                  onClick={() => setWaitingFirst(o.on)}
+                  className={`tap t-meta rounded-full px-2.5 py-1 font-medium ${
+                    waitingFirst === o.on ? 'bg-slate-200 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {loading ? (
+            <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
+          ) : visible.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
+              <Inbox aria-hidden="true" className="size-8 text-slate-300" />
+              <p className="text-[1rem] font-semibold text-slate-700">{typeFilter !== 'all'
+                  ? `${EVENT_TYPE_LABEL[typeFilter]} 중에 해당하는 것이 없습니다.`
+                  : filter === 'open'
+                    ? '새 고객 요청이 없습니다.'
+                    : '해당하는 상담신청이 없습니다.'}</p>
+              <p className="max-w-md text-[0.9rem] break-keep text-slate-500">
+                고객이 {brand.customerPlatformLabel}에서 진단을 마치거나, 서비스를 주문하거나, 서류를 올리거나, 요청을 보내면 여기에 나타납니다.
+              </p>
+              {typeFilter !== 'all' && (
+                <button type="button" onClick={() => setTypeFilter('all')} className="t-sub mt-1 font-medium text-brand-700 hover:underline">
+                  모든 종류 보기
+                </button>
+              )}
+              {isLocal && filter === 'open' && typeFilter === 'all' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const created = seedDemoEvents()
+                    showToast(created.length ? `샘플 이벤트 ${created.length}건을 만들었습니다 (DEMO).` : '샘플 이벤트가 이미 있습니다.')
+                    void load()
+                  }}
+                  className="tap t-sub mt-2 inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 font-medium text-slate-600 hover:bg-slate-50 sm:h-10"
+                >
+                  <Sparkles aria-hidden="true" className="size-4" /> 샘플 이벤트 만들기 (로컬 데모)
+                </button>
+              )}
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {visible.map((e) => (
+                <li key={e.id}>
+                  <EventCard
+                    event={e}
+                    clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
+                    clientTag={e.operationsClientId && consultantIds.has(e.operationsClientId) ? CLIENT_TYPE_LABEL.consultant : null}
+                    onLink={() => setLinking({ event: e, tab: 'existing' })}
+                    onCreateClient={() => setLinking({ event: e, tab: 'new' })}
+                    onStatus={(status) => void setStatus(e, status)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </ArrangeItem>
+      </ArrangeArea>
       {linking && (
         <LinkCustomerModal
           event={linking.event}

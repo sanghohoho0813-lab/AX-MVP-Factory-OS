@@ -26,6 +26,7 @@ import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 import { useSideAi } from '../../lib/sideAi'
 import { SideDock } from './SideDock'
 import { SideAiButton } from './SideAiButton'
+import { ArrangeButton } from '../ui/arrange'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders } from '../../services/aiAssist/store'
 
@@ -101,10 +102,12 @@ export function AppShell() {
             <ViewingPilotBanner />
             {/* D-235: 경로 줄 — 어디를 눌러 들어와도 지금 어디 안에 있는지(앞 칸을 누르면 그 단계로) */}
             {/* D-265 [ChatGPT 옆에 띄우기] — 본문 오른쪽 여백에 들어가면 그 여백(화면 고정), 아니면 이 줄 오른쪽(PC 만) */}
+            {/* D-287 [화면 꾸미기] — 칸 순서 · 숨기기를 고를 수 있는 화면에서만(경로 줄 오른쪽 · 휴대폰도) */}
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <Breadcrumbs />
               </div>
+              <ArrangeButton />
               <SideAiButton />
             </div>
             <div key={shellKeyOf(location.pathname)} className="ax-rise">
