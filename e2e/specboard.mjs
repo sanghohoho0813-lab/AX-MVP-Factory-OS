@@ -248,7 +248,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   // 기획 대화 첫 질문 한 번만 부르므로 답을 천천히 — "쓰는 중" 을 볼 틈이 있게
   delayMs = 1500
   talkMode = 'ask'
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-board').waitFor()
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
@@ -264,7 +264,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('B1d 기획 대화 자료 — 회사 기록 · 그 회사 AI 전략실 자료 · 대표 정의(skill) · 아직 대화 줄 없음', t1Ctx.includes('작업실재료표식') && /업종|종목|설립/.test(t1Ctx) && /대표정의표식/.test(talk1[0]?.skill ?? '') && !t1Ctx.includes('대표 답:'), t1Ctx.slice(0, 300))
   await shot(page, 'B-talk-1')
   const t1 = sent.length
-  await page.getByTestId('spec-talk-option').first().click()
+  { const l289 = page.getByTestId('spec-talk-option').first(); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   await page.waitForTimeout(200)
   const talk2 = sent.slice(t1)
@@ -292,7 +292,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
 
   // [이 중 제일 좋은 게 뭐야?] — 후보 2(작업지시)가 95점으로 1순위
   const s1 = sent.length
-  await page.getByTestId('spec-plan-rank').click()
+  { const l289 = page.getByTestId('spec-plan-rank'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   await page.waitForTimeout(200)
   const rankReq = sent.slice(s1)
@@ -302,7 +302,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
 
   // [자체점검으로 더 짜내기] — 새 아이디어 2개(새로 표시)
   const s2 = sent.length
-  await page.getByTestId('spec-plan-more').click()
+  { const l289 = page.getByTestId('spec-plan-more'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   await page.waitForTimeout(200)
   const moreReq = sent.slice(s2)
@@ -324,7 +324,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await tool.getByTestId('spec-plan-pick').click()
   check('B4b 다른 후보를 누르면 그것이 골라짐(하나만)', (await tool.getAttribute('data-picked')) === 'yes' && (await page.locator('[data-testid="spec-plan-idea"][data-picked="yes"]').count()) === 1)
   const s3 = sent.length
-  await page.getByTestId('spec-plan-start').click()
+  { const l289 = page.getByTestId('spec-plan-start'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   await page.waitForTimeout(300)
   const partsReq = sent.slice(s3)
@@ -337,7 +337,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await shot(page, 'B-review')
 
   const s4 = sent.length
-  await page.getByTestId('spec-plan-body').click()
+  { const l289 = page.getByTestId('spec-plan-body'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   await page.waitForTimeout(500)
   check('B8 [이 구성으로 본문 · 청구항 쓰기] → 본문 a~d → 청구항 → 자체점검 ② → 점검대로 고치기', sent.slice(s4).map((r) => r.assistId).join() === 'spec.a,spec.b,spec.c,spec.d,spec.e,spec.judge,spec.fix', sent.slice(s4).map((r) => r.assistId))
@@ -429,7 +429,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   // 쓰는 중에 나갔다 오기 — 본문만 다시(천천히)
   delayMs = 700
   const before = sent.length
-  await page.locator('[data-testid="spec-card-run"][data-card="body"]').click()
+  { const l289 = page.locator('[data-testid="spec-card-run"][data-card="body"]'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForTimeout(300)
   const url = page.url()
   await page.getByTestId('spec-back-list').click()
@@ -464,7 +464,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.waitForTimeout(800)
   check('B28 자료 넣기 → 올린 자료 1개', /올린 자료 1개/.test(await page.getByTestId('spec-board-mats').innerText()))
   const before2 = sent.length
-  await page.locator('[data-testid="spec-card-run"][data-card="idea"]').click()
+  { const l289 = page.locator('[data-testid="spec-card-run"][data-card="idea"]'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page)
   const ideaCtx2 = JSON.stringify(sent[before2].context)
   check('B29 다음 아이디어 내줘에 올린 자료가 감 · 휴대폰 번호는 가림', ideaCtx2.includes('공구 교체를 감으로') && !ideaCtx2.includes('010-1234-5678'), ideaCtx2.slice(0, 200))
@@ -488,7 +488,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   const rows0 = await page.getByTestId('spec-row').count()
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-board').waitFor()
   await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
   await waitIdle(page)
@@ -596,7 +596,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   const act = page.locator('[data-testid="chat-action"][data-id="new-spec"]').last()
   await act.waitFor()
   const before = sent.length
-  await act.click()
+  await act.click(); await page.waitForTimeout(450); await act.click() // D-289 AI 단추 두 번
   await page.getByTestId('spec-board').waitFor()
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(400)
@@ -626,11 +626,11 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
   const before = sent.length
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-board').waitFor()
   await page.getByTestId('spec-plan-start').waitFor({ timeout: 20000 })
   await waitIdle(page)
-  await page.getByTestId('spec-plan-start').click()
+  { const l289 = page.getByTestId('spec-plan-start'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   await waitIdle(page, 60000)
   await page.waitForTimeout(400)
@@ -642,7 +642,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   check('E2 2번째 답(머리글 없음 · 이름표가 tag 에 · 끝 잘림 · 코드 블록) → 구성요소 4 · 단계 2 로 읽고 다 씀', /구성요소 4개/.test(rowText) && /단계 2개/.test(rowText) && (await partsRow.getAttribute('data-phase')) === 'done', rowText)
   await partsRow.scrollIntoViewIfNeeded().catch(() => {})
   await shot(page, 'E-messy-board', false)
-  await page.getByTestId('spec-plan-body').click()
+  { const l289 = page.getByTestId('spec-plan-body'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   await waitIdle(page, 60000)
   mine = sent.slice(before)
@@ -677,7 +677,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   const before = sent.length
   // 회사를 고르지 않고 시작 — AI 가 읽을 회사 이야기가 없다
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-board').waitFor()
   await page.getByTestId('spec-gate-company').waitFor({ timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(800)
@@ -686,16 +686,16 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.getByTestId('spec-board-file-input').setInputFiles({ name: 'company.txt', mimeType: 'text/plain', buffer: Buffer.from('자료회사표식 — 화장품을 백화점 · 온라인 · 해외 판매채널로 판다. 채널마다 재고가 따로 논다.') })
   await page.getByTestId('spec-ideas-run').waitFor({ timeout: 8000 })
   check('T1b 자료를 넣으면 회사 정보 문이 닫히고 [아이디어 5개 내줘]', (await page.getByTestId('spec-gate-company').count()) === 0 && (await page.getByTestId('spec-board').getAttribute('data-phase')) === 'ideas')
-  await page.getByTestId('spec-ideas-run').click()
+  { const l289 = page.getByTestId('spec-ideas-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitIdle(page, 60000)
   const ideaReq = sent.slice(before).filter((r) => r.assistId === 'spec.idea')
   check('T1c 아이디어 내줘에 넣은 자료가 감', ideaReq.length === 1 && JSON.stringify(ideaReq[0].context).includes('자료회사표식'))
-  await page.getByTestId('spec-plan-start').click()
+  { const l289 = page.getByTestId('spec-plan-start'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   await waitIdle(page, 60000)
   const reviewText = (await page.getByTestId('spec-review').count()) ? await page.getByTestId('spec-review').innerText() : ''
   check('T3 구성요소 이름이 문장("입력 자료를 수집합니다.") → "입력 자료 수집부(110)" · 줄일 수 없는 문장은 빠짐', /입력 자료 수집부\(110\)/.test(reviewText) && !/수집합니다/.test(reviewText) && !/보여줍니다/.test(reviewText) && /교체시점 산출부\(130\)/.test(reviewText), reviewText)
-  await page.getByTestId('spec-plan-body').click()
+  { const l289 = page.getByTestId('spec-plan-body'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-board"]')?.getAttribute('data-busy') === 'yes', null, { timeout: 8000 }).catch(() => {})
   await waitIdle(page, 60000)
   await page.waitForTimeout(400)
@@ -752,7 +752,7 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.evaluate(seedScript())
   await routeAi(page)
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-gate-company').waitFor({ timeout: 8000 }).catch(() => {})
   check('M-gate 360 회사 정보 문 넘침 0 · JS 오류 0', (await page.getByTestId('spec-gate-company').isVisible()) && (await overflowX(page)) <= 0 && errors.length === 0, { o: await overflowX(page), errors })
   await shot(page, 'M-360-gate')
@@ -770,7 +770,7 @@ for (const width of [360, 390]) {
   await routeAi(page)
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-board').waitFor()
   await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
   await waitIdle(page)
@@ -779,7 +779,7 @@ for (const width of [360, 390]) {
   check(`M${width}t 기획 대화 — 질문 · 누를 답 4개 · 직접 적기 · 넘침 0 · 답 단추 글자 잘림 0`, (await page.getByTestId('spec-talk-option').count()) === 4 && (await page.getByTestId('spec-talk-own').isVisible()) && (await overflowX(page)) <= 0 && tooWide === 0, { o: await overflowX(page), tooWide })
   await page.getByTestId('spec-talk').scrollIntoViewIfNeeded()
   await shot(page, `M-${width}-talk`, false)
-  await page.getByTestId('spec-talk-next').click()
+  { const l289 = page.getByTestId('spec-talk-next'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-plan-idea"]').length === 5, null, { timeout: 20000 }).catch(() => {})
   await waitIdle(page)
   await page.waitForTimeout(400)

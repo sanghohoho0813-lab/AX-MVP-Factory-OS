@@ -20,6 +20,9 @@ import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 import { updateMyName } from '../../auth/authService'
+import { AccountViewPanel, AccountViewRow } from './AccountViewPanel'
+import { AccountSwitchItems } from '../../components/layout/AccountSwitch'
+import { FeedbackNavButton } from '../../components/feedback/FeedbackNavButton'
 
 /** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
 function NameEditor() {
@@ -116,6 +119,24 @@ function DataPanelSupabase() {
   )
 }
 
+/** D-290 계정 · 보기 — 클라우드에서만 더하는 줄: 계정 바꾸기(대표) · 피드백(팀장: 보내기 / 대표: 받은 함) */
+function CloudAccountView() {
+  const { access } = useAuth()
+  const pilot = useIsPilot()
+  return (
+    <AccountViewPanel portal={!pilot}>
+      {access === 'full' && (
+        <AccountViewRow label="계정 바꾸기" hint="이 기기에서 로그인했던 다른 계정으로 — 비밀번호만 넣으면 됩니다." testId="settings-account-switch">
+          <AccountSwitchItems tone="light" signout={false} empty={<p className="t-sub break-keep text-slate-500">이 기기에서 로그인했던 다른 계정이 없어요. 다른 계정으로 한 번 로그인하면 여기에 생깁니다.</p>} />
+        </AccountViewRow>
+      )}
+      <AccountViewRow label={pilot ? '개발자에게 피드백' : '받은 피드백함'} hint={pilot ? '불편한 점 · 바라는 점을 설문으로 보냅니다.' : '팀장이 보낸 설문 · 의견을 봅니다.'} testId="settings-feedback">
+        <FeedbackNavButton tone="light" />
+      </AccountViewRow>
+    </AccountViewPanel>
+  )
+}
+
 export function SupabaseSettingsView() {
   const [tab, setTab] = useState<TabKey>('me')
   const { session, workspaces, currentWorkspaceId } = useAuth()
@@ -127,6 +148,7 @@ export function SupabaseSettingsView() {
     return (
       <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5" data-testid="settings-pilot">
         <PageHeader title="설정" description="내 계정과 화면 표시를 바꿉니다." />
+        <CloudAccountView />
         <Panel title="내 정보">
           <NameEditor />
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
@@ -143,6 +165,7 @@ export function SupabaseSettingsView() {
       <TabNav active={tab} onChange={setTab} />
       {tab === 'me' && (
         <>
+          <CloudAccountView />
           <Panel title="내 정보">
             <NameEditor />
             <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>

@@ -158,7 +158,7 @@ await page.getByTestId('sht-platform-tiktok').click()
 await page.getByTestId('sht-aim-reach').click()
 await page.getByTestId('sht-format-list').click()
 await page.getByTestId('sht-qs-chip').first().click()
-await page.getByTestId('sht-qs-ai').click()
+{ const l289 = page.getByTestId('sht-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.getByTestId('sht-ai-drafts').waitFor({ timeout: 20000 })
 const call = llm.find((x) => x.sys.includes('(shorts.write'))
 check('A1 AI 대본 2개 · 형식 · 길이 · 고칠 것 수', (await page.getByTestId('sht-ai-draft').count()) === 2 && /리스트형/.test(await page.getByTestId('sht-ai-draft').first().innerText()) && /약 \d+초 · 고칠 것 \d/.test(await page.getByTestId('sht-ai-draft').first().innerText()))

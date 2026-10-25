@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { MAIN_MIN, NAV_MIN, navMaxFor, navPx, setNavSize, showNav, sizeAtDrag, stepNav, toggleNavIcons, useNavSize, type NavSize } from '../../lib/navWidth'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
-import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X, type LucideIcon } from 'lucide-react'
-import { FeedbackNavButton } from '../feedback/FeedbackNavButton'
+import { ChevronDown, ChevronsLeft, ChevronsRight, X, type LucideIcon } from 'lucide-react'
+import { FeedbackNavDot } from '../feedback/FeedbackNavButton'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
 import {
@@ -22,9 +22,7 @@ import { FUTURE_ITEMS, type FutureItem } from '../../config/capabilityStatus'
 import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
-import { ViewAsSwitch } from './ViewAsSwitch'
-import { DeviceSwitch } from './DeviceView'
-import { AccountSwitchItems } from './AccountSwitch'
+import { SignOutButton } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
 import { useCapabilitySet } from '../../auth/ownerAiAccess'
@@ -142,7 +140,7 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col bg-navy-900 text-navy-200">
       {/* 로고를 1.5배로 키우면서 머리 칸도 함께 키운다 — 안 키우면 제품명 줄이 눌린다 (D-87) */}
-      <div className={`flex h-20 shrink-0 items-center border-b border-navy-800 ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+      <div className={`flex h-20 shrink-0 border-b border-navy-800 ${collapsed ? 'flex-col items-center justify-center gap-1 px-2' : 'items-center justify-between gap-2 px-4'}`} {...tipProps}>
         <button
           type="button"
           onClick={() => { navigate('/'); onNavigate?.() }}
@@ -150,7 +148,7 @@ function SidebarContent({
           className="flex min-w-0 cursor-pointer items-center gap-2.5"
         >
           {collapsed ? (
-            <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.15rem] font-black text-white">
+            <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.15rem] font-black text-white ${onToggleCollapsed ? 'size-10' : 'size-12'}`}>
               M
             </span>
           ) : (
@@ -162,6 +160,20 @@ function SidebarContent({
             </span>
           )}
         </button>
+        {/* D-290 [사이드바 접기] — 예전 왼쪽 아래 맨 끝 줄에서 로고 옆으로(왼쪽 아래는 이름 · 로그아웃만) */}
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            title={collapsed ? undefined : '사이드바 접기'}
+            data-nav-tip={collapsed ? '사이드바 펼치기' : undefined}
+            data-testid="sidebar-collapse"
+            className={`tap flex shrink-0 cursor-pointer items-center justify-center rounded-(--radius-control) text-navy-300 hover:bg-navy-800 hover:text-white ${collapsed ? 'h-7 w-10' : 'size-10'}`}
+          >
+            {collapsed ? <ChevronsRight aria-hidden="true" className="size-[18px]" /> : <ChevronsLeft aria-hidden="true" className="size-5" />}
+          </button>
+        )}
         {onCloseMobile && (
           <button type="button" aria-label="메뉴 닫기" onClick={onCloseMobile} className="tap flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-navy-300 hover:bg-navy-800 hover:text-white">
             <X aria-hidden="true" className="size-5" />
@@ -241,48 +253,15 @@ function SidebarContent({
       </nav>
 
       {/*
-        D-103: 아래 한 줄 — 지금 쓰는 사람(로그인한 사람 이름, 없으면 대표 이름) · 고객 플랫폼은 작은 아이콘.
-        예전 서랍의 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기)은 없앴다 —
-        가이드는 '이 시스템' 묶음으로, 글자 크기는 설정으로 갔다.
+        D-103: 아래 한 줄 — 지금 쓰는 사람(로그인한 사람 이름, 없으면 대표 이름).
+        D-290 대표: "왼쪽 아래엔 김상호 대표, 로그아웃만 두고 나머지는 다 설정 안에." — 대표 ↔ 팀장 · 보기 방식 ·
+        계정 바꾸기 · 피드백 · 고객 플랫폼은 설정 › 계정 · 보기로 옮겼다. [사이드바 접기] 는 맨 위 로고 옆으로.
       */}
       <div className="shrink-0 border-t border-navy-800 px-3 py-3" {...tipProps}>
-        {/* D-158: 휴대폰 서랍의 글자 크기는 뺐다(대표: 설정에 있으니 굳이) */}
-        {/* D-164: 휴대폰 서랍에서도 대표 ↔ 팀장 화면(PC 는 머리줄 오른쪽 위) */}
-        {!collapsed && (
-          <div className="mb-2 px-1.5 lg:hidden">
-            <ViewAsSwitch stacked />
-          </div>
-        )}
-        {/* D-286 휴대폰 서랍(더보기)에서도 보기 방식 — PC · Mobile · PC+Mobile(대표 "폰에서도 PC 버전 · 모바일 · 동시에") */}
-        {onCloseMobile && !collapsed && (
-          <div className="mb-2 px-1.5 lg:hidden" data-testid="drawer-device">
-            <p className="mb-1 px-0.5 text-[0.8125rem] font-semibold text-navy-200">보기 방식</p>
-            <DeviceSwitch stacked />
-          </div>
-        )}
-        {/* D-254 [ChatGPT 옆에 띄우기] 는 D-265 에 본문 오른쪽 위로 옮겼다(AppShell — 대표 "우측 상단 여백에") */}
         <SidebarAccount collapsed={collapsed} />
-        {/* D-184: 휴대폰 서랍 — 다른 계정으로 바꾸기 · 로그아웃(PC 는 머리줄 오른쪽 위 사용자 메뉴) */}
-        {onCloseMobile && (
-          <div className="mt-1.5">
-            <AccountSwitchItems tone="dark" />
-          </div>
-        )}
-        {/* D-188: 예전 '컨설팅 운영 · AX 스튜디오 · v0.1.0' 글자 자리 — 팀장은 [개발자에게 피드백], 대표는 [받은 피드백함] */}
-        <div className="mt-2">
-          <FeedbackNavButton collapsed={collapsed} onNavigate={onNavigate} />
+        <div className="mt-1.5">
+          <SignOutButton collapsed={collapsed} testId={onCloseMobile ? 'account-signout' : 'sidebar-signout'} />
         </div>
-        {onToggleCollapsed && (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            data-nav-tip={collapsed ? '사이드바 펼치기' : undefined}
-            className={`flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2 text-[0.9rem] text-navy-200 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
-          >
-            {collapsed ? <ChevronsRight aria-hidden="true" className="size-[18px] shrink-0" /> : (<><ChevronsLeft aria-hidden="true" className="size-[18px] shrink-0" /><span>사이드바 접기</span></>)}
-          </button>
-        )}
       </div>
       {collapsed && tip && (
         <div
@@ -483,6 +462,8 @@ function NavLinkRow({
       )}
       {!collapsed && <span className="truncate">{item.label}</span>}
       <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
+      {/* D-290 피드백 단추가 설정 안으로 — 새 피드백(대표) · 새 설문(팀장)은 '설정' 줄에 표시 */}
+      {item.key === 'settings' && <FeedbackNavDot collapsed={collapsed} />}
       {!collapsed && item.status === 'soon' && (
         <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.875rem] font-semibold ${isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'}`}>
           {/* D-120: 배지는 작게 — 메뉴 이름(1차 미팅 체크리스트)이 잘리지 않게 */}
@@ -586,41 +567,26 @@ function CategoryRow({
   )
 }
 
-/** D-103: 사이드바 아래 — 이름 · 직함 + 고객 플랫폼 아이콘 */
+/** D-103: 사이드바 아래 — 이름 · 직함(D-290 고객 플랫폼 열기는 설정 › 계정 · 보기로) */
 function SidebarAccount({ collapsed }: { collapsed: boolean }) {
   const me = useCurrentUser()
-  const portal = (
-    <a
-      href={brand.customerPlatformUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={`${brand.customerPlatformLabel} 열기 (새 창)`}
-      title={`${brand.customerPlatformLabel} 열기`}
-      data-testid="sidebar-portal-link"
-      className="flex size-9 shrink-0 items-center justify-center rounded-(--radius-control) text-navy-300 hover:bg-navy-800 hover:text-white"
-    >
-      <ExternalLink aria-hidden="true" className="size-[18px]" />
-    </a>
-  )
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-1.5">
         <span title={`${me.name} ${me.title}`} aria-label={`${me.name} ${me.title}`} role="img" className="flex size-9 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
           {me.initial}
         </span>
-        {portal}
       </div>
     )
   }
   return (
-    <div data-testid="sidebar-account" className="flex items-center gap-2.5 px-1.5">
+    <div data-testid="sidebar-account" className="flex min-h-11 items-center gap-2.5 px-1.5">
       <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
         {me.initial}
       </span>
       <span className="min-w-0 flex-1 truncate text-[0.95rem] text-navy-100">
         <b className="font-bold text-white">{me.name}</b> {me.title}
       </span>
-      {portal}
     </div>
   )
 }

@@ -21,6 +21,7 @@ import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { AiSetupBanner, OwnerAiGate, useAiSetup, useOwnerAiIdentity } from './shared'
 import { PrintSheet, STUDIO_FONT, downloadBlob, safeFileName, svgToPng, useStudioRun } from './studioShared'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 export default function ProposalStudioPage() {
   const { runId = '' } = useParams()
@@ -306,10 +307,10 @@ function Studio() {
             </Button>
           </div>
           <hr className="border-slate-100" />
-          <Button variant="secondary" disabled={proofing || setup.state !== 'ready'} onClick={() => void proofread()} data-testid="proofread">
+          <AiConfirm><Button variant="secondary" disabled={proofing || setup.state !== 'ready'} onClick={() => void proofread()} data-testid="proofread">
             <SpellCheck aria-hidden="true" className="size-4" />
             {proofing ? '검사 중…' : '맞춤법 · 오타 검사(빠르게)'}
-          </Button>
+          </Button></AiConfirm>
           {fixes && fixes.length > 0 && (
             <div className="flex flex-col gap-2" data-testid="proofread-fixes">
               {fixes.map((f, i) => (

@@ -36,6 +36,7 @@ import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePane
 import { judgePassed } from '../../services/aiAssist/judge'
 import { useOwnerAiRepo } from '../ownerAi/shared'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type Act = (label: string, fn: (cur: SpecDraft) => SpecDraft) => void
 
@@ -556,12 +557,12 @@ export function SpecAiBoard({
                 ) : (
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                      <Button variant="primary" className="min-h-12 sm:min-w-56" onClick={talkRun} data-testid="spec-talk-start">
+                      <AiConfirm><Button variant="primary" className="min-h-12 sm:min-w-56" onClick={talkRun} data-testid="spec-talk-start">
                         <MessageCircleQuestion aria-hidden="true" className="size-5" /> AI 와 기획 시작(질문 5번 안)
-                      </Button>
-                      <Button variant="secondary" onClick={ideasRun} data-testid="spec-ideas-run">
+                      </Button></AiConfirm>
+                      <AiConfirm><Button variant="secondary" onClick={ideasRun} data-testid="spec-ideas-run">
                         <Lightbulb aria-hidden="true" className="size-4" /> 묻지 말고 아이디어 5개 내줘
-                      </Button>
+                      </Button></AiConfirm>
                       <Button variant="ghost" disabled={!!reading} onClick={() => setMatsOpen(true)} data-testid="spec-board-file">
                         <Upload aria-hidden="true" className="size-4" /> {reading || '자료 넣기(선택)'}
                       </Button>
@@ -608,18 +609,18 @@ export function SpecAiBoard({
                     })}
                   </ul>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                    <Button variant="primary" className="min-h-12" disabled={busy || !picked} onClick={chooseIdea} data-testid="spec-plan-start">
+                    <AiConfirm><Button variant="primary" className="min-h-12" disabled={busy || !picked} onClick={chooseIdea} data-testid="spec-plan-start">
                       이걸로 시작하자 <ArrowRight aria-hidden="true" className="size-5" />
-                    </Button>
-                    <Button variant="secondary" disabled={busy || d.ideas.length < 2} onClick={rankRun} data-testid="spec-plan-rank">
+                    </Button></AiConfirm>
+                    <AiConfirm><Button variant="secondary" disabled={busy || d.ideas.length < 2} onClick={rankRun} data-testid="spec-plan-rank">
                       <Gavel aria-hidden="true" className="size-4" /> 이 중 제일 좋은 게 뭐야?
-                    </Button>
-                    <Button variant="secondary" disabled={busy} onClick={moreRun} data-testid="spec-plan-more">
+                    </Button></AiConfirm>
+                    <AiConfirm><Button variant="secondary" disabled={busy} onClick={moreRun} data-testid="spec-plan-more">
                       <Sparkles aria-hidden="true" className="size-4" /> 자체점검으로 더 짜내기
-                    </Button>
-                    <Button variant="ghost" disabled={busy} onClick={ideasRun} data-testid="spec-ideas-run">
+                    </Button></AiConfirm>
+                    <AiConfirm><Button variant="ghost" disabled={busy} onClick={ideasRun} data-testid="spec-ideas-run">
                       5개 새로 내줘
-                    </Button>
+                    </Button></AiConfirm>
                   </div>
                   <p className="t-meta break-keep text-slate-500">고른 것: <b className="font-semibold text-slate-700">{picked ? clip(picked.title, 60) : '—'}</b> · [이걸로 시작하자] 를 누르면 선행기술 조사 → 구성 → 자체점검 ① 까지 쓰고 다시 멈춥니다.</p>
                 </>
@@ -629,9 +630,9 @@ export function SpecAiBoard({
 
           {phase === 'parts' && !busy && (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" data-testid="spec-plan-parts">
-              <Button variant="primary" className="min-h-12" onClick={() => partsRun()} data-testid="spec-plan-parts-run">
+              <AiConfirm><Button variant="primary" className="min-h-12" onClick={() => partsRun()} data-testid="spec-plan-parts-run">
                 <Boxes aria-hidden="true" className="size-5" /> 이 아이디어로 구성 짜기
-              </Button>
+              </Button></AiConfirm>
               <Button variant="ghost" onClick={goBackToIdeas} data-testid="spec-plan-back">
                 다른 아이디어로
               </Button>
@@ -642,12 +643,12 @@ export function SpecAiBoard({
             <div className="flex flex-col gap-2.5" data-testid="spec-plan-review">
               <PartsReview d={d} />
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <Button variant="primary" className="min-h-12" onClick={bodyRun} data-testid="spec-plan-body">
+                <AiConfirm><Button variant="primary" className="min-h-12" onClick={bodyRun} data-testid="spec-plan-body">
                   <FileText aria-hidden="true" className="size-5" /> 이 구성으로 본문 · 청구항 쓰기
-                </Button>
-                <Button variant="secondary" onClick={() => partsRun(true)} data-testid="spec-plan-parts-again">
+                </Button></AiConfirm>
+                <AiConfirm><Button variant="secondary" onClick={() => partsRun(true)} data-testid="spec-plan-parts-again">
                   <Boxes aria-hidden="true" className="size-4" /> 구성 다시 짜기
-                </Button>
+                </Button></AiConfirm>
                 <Button variant="ghost" onClick={() => onEdit('parts')} data-testid="spec-plan-edit-parts">
                   <PenLine aria-hidden="true" className="size-4" /> 구성 직접 고치기
                 </Button>
@@ -660,9 +661,9 @@ export function SpecAiBoard({
 
           {phase === 'body' && !busy && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button variant="primary" className="min-h-12 sm:min-w-56" onClick={all} data-testid="spec-board-all">
+              <AiConfirm><Button variant="primary" className="min-h-12 sm:min-w-56" onClick={all} data-testid="spec-board-all">
                 <Sparkles aria-hidden="true" className="size-5" /> 이어서 끝까지 써줘
-              </Button>
+              </Button></AiConfirm>
             </div>
           )}
 
@@ -677,9 +678,9 @@ export function SpecAiBoard({
               <Button variant="ghost" onClick={onDownload} data-testid="spec-board-done-md">
                 MD 내려받기
               </Button>
-              <Button variant="ghost" disabled={busy} onClick={all} data-testid="spec-board-all">
+              <AiConfirm><Button variant="ghost" disabled={busy} onClick={all} data-testid="spec-board-all">
                 <Sparkles aria-hidden="true" className="size-4" /> 빠진 곳 다시 써줘
-              </Button>
+              </Button></AiConfirm>
             </div>
           )}
           {matsOpen && (
@@ -781,9 +782,9 @@ export function SpecAiBoard({
                 )}
 
                 <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                  <Button variant={st.done ? 'secondary' : 'primary'} size="sm" disabled={busy || !!blocked} onClick={() => runCard(card)} data-testid="spec-card-run" data-card={card} title={blocked || undefined}>
+                  <AiConfirm><Button variant={st.done ? 'secondary' : 'primary'} size="sm" disabled={busy || !!blocked} onClick={() => runCard(card)} data-testid="spec-card-run" data-card={card} title={blocked || undefined}>
                     <Sparkles aria-hidden="true" className="size-4" /> {blocked ? `${meta.run} (${blocked})` : st.done ? meta.again : meta.run}
-                  </Button>
+                  </Button></AiConfirm>
                   {card === 'check' ? (
                     <>
                       <Button variant="secondary" size="sm" onClick={onDownload} data-testid="spec-board-download">

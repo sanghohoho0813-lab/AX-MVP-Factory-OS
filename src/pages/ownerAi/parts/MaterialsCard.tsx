@@ -17,6 +17,7 @@ import { Badge, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { fmtDateTime } from '../shared'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
 
 /** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다(실패하면 적은 글이 그대로) */
 export type AddMaterials = (list: CaseMaterial[], note: string) => Promise<boolean>
@@ -162,9 +163,9 @@ export function MaterialsCard({
         </ul>
       )}
       {materials.some((m) => !m.excluded && m.text.trim()) && (
-        <Button size="sm" variant="ghost" disabled={busy || !aiReady} onClick={onSummarize} data-testid="material-summarize">
+        <AiConfirm><Button size="sm" variant="ghost" disabled={busy || !aiReady} onClick={onSummarize} data-testid="material-summarize">
           자료 요약 · 업체 정보 채우기(빠르게)
-        </Button>
+        </Button></AiConfirm>
       )}
 
       {dialog === 'url' && (

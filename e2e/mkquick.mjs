@@ -131,7 +131,7 @@ const recLabel = await page.getByTestId('thr-qs-rec-label').innerText()
 const recKey = /· ([A-X]) /.exec(recLabel)?.[1] ?? ''
 check('Q3 칩 하나 → 추천 형식 한 줄(반응 · 틀 이름) · 이유 · 자료 없는 주제라 P(자료 나눔) 아님', !!recKey && recKey !== 'P' && /추천 형식/.test(await page.getByTestId('thr-qs-rec').innerText()) && (await page.getByTestId('thr-qs-topic').inputValue()) === '고용지원금', recLabel)
 const before = llm.length
-await page.getByTestId('thr-qs-ai').click()
+{ const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 clicks++
 await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
 await page.waitForTimeout(200)
@@ -142,7 +142,7 @@ check('Q6 1안의 확인할 것 · 규칙 검사가 바로 보임', /신청 시�
 console.log(`MEASURE threads-after pc clicks=${clicks + 1} typed=0 (마케팅 목차 [스레드] 1 + 칩 1 + AI 1)`)
 // 쓰던 글은 덮지 않는다
 await page.getByTestId('thr-body').fill('대표님이 직접 고친 글')
-await page.getByTestId('thr-qs-ai').click()
+{ const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.waitForTimeout(600)
 check('Q7 글 칸에 쓴 것이 있으면 다시 눌러도 덮지 않음(다른 안만 새로)', (await page.getByTestId('thr-body').inputValue()) === '대표님이 직접 고친 글' && (await page.getByTestId('thr-ai-draft').count()) === 3)
 // 형식 바꾸기 → 펼쳐지고, 직접 고른 틀은 칩이 덮지 않는다
@@ -165,7 +165,7 @@ await page.locator('[data-testid="sht-qs-week"] [data-testid="sht-qs-chip"]').fi
 clicks++
 check('S2 틱톡 · 고용지원금 → 추천 "많이 보이게 · 리스트형"', /많이 보이게 · 리스트형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
 const sb = llm.length
-await page.getByTestId('sht-qs-ai').click()
+{ const l289 = page.getByTestId('sht-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 clicks++
 await page.getByTestId('sht-ai-drafts').waitFor({ timeout: 20000 })
 await page.waitForTimeout(200)
@@ -241,7 +241,7 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
     await mp.locator(`[data-testid="${pre}-qs-week"] [data-testid="${pre}-qs-chip"]`).first().click()
     const aiY = await yOf(mp, `${pre}-qs-ai`)
     const pageH = await mp.evaluate(() => document.documentElement.scrollHeight)
-    await mp.getByTestId(`${pre}-qs-ai`).click()
+    { const l289 = mp.getByTestId(`${pre}-qs-ai`); await l289.click(); await mp.waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
     await mp.getByTestId(`${pre}-ai-drafts`).waitFor({ timeout: 20000 })
     await mp.waitForTimeout(250)
     const btnH = await mp.locator(`[data-testid="${pre}-qs-ai"], [data-testid="${pre}-qs-chip"]`).evaluateAll((xs) => xs.map((x) => Math.round(x.getBoundingClientRect().height)))

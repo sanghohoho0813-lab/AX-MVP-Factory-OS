@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { ArrowRight, Loader2, MessageCircleQuestion, Send, Sparkles } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { TALK_MAX, answeredCount, openRound, talkFinished, type TalkRound } from '../../services/aiAssist/talk'
+import { AiConfirm } from './AiConfirm'
 
 export function PlanTalk({
   rounds,
@@ -92,9 +93,9 @@ export function PlanTalk({
         <div className="flex flex-col gap-2" data-testid={`${testId}-options`}>
           <div className="flex flex-wrap gap-1.5">
             {open.options.map((o) => (
-              <button key={o} type="button" onClick={() => onAnswer(o)} className="tap t-sub min-h-11 rounded-full border border-violet-300 bg-white px-3.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-50" data-testid={`${testId}-option`}>
+              <AiConfirm keepLabel confirmLabel="이대로 답하기" cancel={false}><button key={o} type="button" onClick={() => onAnswer(o)} className="tap t-sub min-h-11 rounded-full border border-violet-300 bg-white px-3.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-50" data-testid={`${testId}-option`}>
                 {o}
-              </button>
+              </button></AiConfirm>
             ))}
           </div>
           <div className="flex gap-2">
@@ -121,9 +122,9 @@ export function PlanTalk({
       )}
       {!busy && (
         <div className="flex flex-wrap gap-2">
-          <Button variant={finished ? 'primary' : 'ghost'} className={finished ? 'min-h-12' : ''} onClick={onNext} data-testid={`${testId}-next`}>
+          <AiConfirm><Button variant={finished ? 'primary' : 'ghost'} className={finished ? 'min-h-12' : ''} onClick={onNext} data-testid={`${testId}-next`}>
             {finished ? <Sparkles aria-hidden="true" className="size-5" /> : <ArrowRight aria-hidden="true" className="size-4" />} {nextLabel}
-          </Button>
+          </Button></AiConfirm>
         </div>
       )}
     </section>

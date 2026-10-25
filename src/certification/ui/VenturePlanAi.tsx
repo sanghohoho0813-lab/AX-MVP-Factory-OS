@@ -32,6 +32,7 @@ import { JudgeReportView, JudgeSkillButton } from '../../components/ai/JudgePane
 import { RD_ORG_OPTIONS, VK, VPLAN_FIELD, mergeDraft, readPlan, type VPlanBatch, type VPlanFacts } from '../core/venturePlan'
 import { PATENT_NONE, PLAN_LINE_LABEL, RD_ORG_SHORT, chosenPlan, judgePatch, marketConfirmed, marketDone, marketNeedsConfirm, marketOf, marketPatch, normalizeAppNo, patentPatch, planStatePatch, readGate, researchersPatch, summaryGate, type MarketResearch, type PlanPick } from '../integration/ventureGate'
 import { VPLAN_BATCHES, VPLAN_STEPS, addMorePlans, buildBatchContext, buildMarketContext, buildPlanContext, buildPlanMoreContext, buildPlanRankContext, buildVentureJudgeContext, buildVentureTalkContext, draftItemsOf, fieldsOfBatch, judgeItemsOf, plansOf, rerankPlans, type VPlanStep } from '../integration/venturePlanAi'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 export type AiRow = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string; model?: string }
 type RowState = AiRow
@@ -81,6 +82,7 @@ export function VenturePlanAi({
   onGoField,
   onClose,
   request,
+  onRequestTaken,
   onRows,
 }: {
   notes: Record<string, string>
@@ -93,6 +95,8 @@ export function VenturePlanAi({
   onClose: () => void
   /** 칸에서 누른 [AI로 이 칸 쓰기] — n 이 바뀔 때마다 그 묶음 하나를 쓴다 */
   request?: { batch: VPlanBatch; n: number } | null
+  /** D-289 칸 요청을 받아 쓰기 시작했으면 — 부르는 쪽이 요청을 비운다(판을 다시 펼쳐도 또 부르지 않게) */
+  onRequestTaken?: () => void
   /** 묶음 진행을 칸에도 보여 주려고 */
   onRows?: (rows: Record<string, AiRow>) => void
 }) {
@@ -264,11 +268,13 @@ export function VenturePlanAi({
     // 같은 요청을 두 번 쓰지 않게(화면이 다시 그려져도) · 다른 묶음을 쓰는 중이면 끝난 뒤에 이어서
     if (!request || request.n === lastReq.current || !hasMaterial || busy) return
     lastReq.current = request.n
+    // D-289 받은 요청은 바로 비운다 — 판을 접었다 다시 펼치면(새로 그려지며 lastReq 가 0) 지난 요청을 누르지 않아도 또 부르던 문제
+    onRequestTaken?.()
     requestRun.current = true
     void runRef.current([request.batch]).finally(() => {
       requestRun.current = false
     })
-  }, [request, hasMaterial, busy])
+  }, [request, hasMaterial, busy, onRequestTaken])
 
   /* D-270 기획 방향 — [기획 방향 5개 내줘] · [이 중 제일 좋은 게 뭐야?] · [자체점검으로 더 짜내기] · [이걸로 시작하자] */
   const planSt = gate.plan
@@ -454,9 +460,9 @@ export function VenturePlanAi({
                       {!busy && (
                         <div className="flex flex-wrap gap-2">
                           {rows.talk?.phase === 'fail' && (
-                            <Button variant="secondary" size="sm" onClick={() => void runTalk()} data-testid="vplan-talk-retry">
+                            <AiConfirm><Button variant="secondary" size="sm" onClick={() => void runTalk()} data-testid="vplan-talk-retry">
                               질문 다시 받기
-                            </Button>
+                            </Button></AiConfirm>
                           )}
                           <Button variant="ghost" size="sm" onClick={() => void talkAgain()} data-testid="vplan-talk-again">
                             기획 대화 처음부터
@@ -471,12 +477,12 @@ export function VenturePlanAi({
                   ) : (
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                        <Button variant="primary" className="min-h-12" onClick={() => void runTalk()} data-testid="vplan-talk-start">
+                        <AiConfirm><Button variant="primary" className="min-h-12" onClick={() => void runTalk()} data-testid="vplan-talk-start">
                           <MessageCircleQuestion aria-hidden="true" className="size-5" /> AI 와 기획 시작(질문 5번 안)
-                        </Button>
-                        <Button variant="secondary" onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
+                        </Button></AiConfirm>
+                        <AiConfirm><Button variant="secondary" onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
                           <Sparkles aria-hidden="true" className="size-4" /> 묻지 말고 방향 5개 내줘
-                        </Button>
+                        </Button></AiConfirm>
                       </div>
                       <p className="t-meta break-keep text-slate-500">AI 가 회사를 어떻게 이해했는지 · 흔한 줄거리와 약한 점을 먼저 말하고, 무엇을 정하면 좋을지 하나씩 묻습니다. 답은 누르기만 하면 돼요.</p>
                     </div>
@@ -523,15 +529,15 @@ export function VenturePlanAi({
                       <Button variant="primary" className="min-h-12" disabled={busy || !picked} onClick={() => void choosePlan()} data-testid="vplan-plan-start">
                         이걸로 시작하자 <ArrowRight aria-hidden="true" className="size-5" />
                       </Button>
-                      <Button variant="secondary" disabled={busy || planSt.options.length < 2} onClick={() => void runPlan('rank')} data-testid="vplan-plan-rank">
+                      <AiConfirm><Button variant="secondary" disabled={busy || planSt.options.length < 2} onClick={() => void runPlan('rank')} data-testid="vplan-plan-rank">
                         <Gavel aria-hidden="true" className="size-4" /> 이 중 제일 좋은 게 뭐야?
-                      </Button>
-                      <Button variant="secondary" disabled={busy} onClick={() => void runPlan('more')} data-testid="vplan-plan-more">
+                      </Button></AiConfirm>
+                      <AiConfirm><Button variant="secondary" disabled={busy} onClick={() => void runPlan('more')} data-testid="vplan-plan-more">
                         <Sparkles aria-hidden="true" className="size-4" /> 자체점검으로 더 짜내기
-                      </Button>
-                      <Button variant="ghost" disabled={busy} onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
+                      </Button></AiConfirm>
+                      <AiConfirm><Button variant="ghost" disabled={busy} onClick={() => void runPlan('plan')} data-testid="vplan-plan-run">
                         5개 새로 내줘
-                      </Button>
+                      </Button></AiConfirm>
                     </div>
                   </>
                 )}
@@ -551,19 +557,19 @@ export function VenturePlanAi({
                 <SummaryGateCard key={gate.patentNo} gate={sg} market={gate.market} patentInput={gate.patentNo} busy={busy} onSave={save} onRunMarket={() => void runAll(['market'])} rowMarket={rows.market} notes={notes} />
                 <div className="flex flex-wrap gap-2">
                   {phase === 'sum' && (
-                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll(['sum', 'judgeSum'])} data-testid="vplan-ai-next" data-step="sum">
+                    <AiConfirm><Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll(['sum', 'judgeSum'])} data-testid="vplan-ai-next" data-step="sum">
                       {busy ? '쓰는 중…' : '요약 쓰기 — 자체점검 ① 까지'}
-                    </Button>
+                    </Button></AiConfirm>
                   )}
                   {phase === 'body' && (
-                    <Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll([...bodyLeft, 'judgeAll'])} data-testid="vplan-ai-next" data-step="body">
+                    <AiConfirm><Button variant="primary" className="min-h-12" disabled={busy} onClick={() => void runAll([...bodyLeft, 'judgeAll'])} data-testid="vplan-ai-next" data-step="body">
                       {busy ? '쓰는 중…' : `요약 확인 — 본문 ${bodyLeft.length}묶음 쓰기`}
-                    </Button>
+                    </Button></AiConfirm>
                   )}
                   {failedKeys.length > 0 && !busy && (
-                    <Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="vplan-ai-retry">
+                    <AiConfirm><Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="vplan-ai-retry">
                       못 쓴 {failedKeys.length}단계만 다시
-                    </Button>
+                    </Button></AiConfirm>
                   )}
                   <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
                     닫기
@@ -601,9 +607,9 @@ export function VenturePlanAi({
                   {r && <span className={`block ${r.phase === 'fail' ? 'text-danger-700' : r.phase === 'done' ? 'text-success-700' : 'text-slate-600'}`}>{r.phase === 'done' ? '✓ ' : r.phase === 'fail' ? '△ ' : ''}{r.text}</span>}
                 </p>
                 {hasMaterial && (
-                  <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy || blocked} onClick={() => void runAll([st.key])} data-testid="vplan-ai-one" title={blocked ? (!chosen && st.key !== 'market' ? '기획 방향부터' : `요약 전에 먼저 — ${sg.missing.join(' · ')}`) : undefined}>
+                  <AiConfirm><Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy || blocked} onClick={() => void runAll([st.key])} data-testid="vplan-ai-one" title={blocked ? (!chosen && st.key !== 'market' ? '기획 방향부터' : `요약 전에 먼저 — ${sg.missing.join(' · ')}`) : undefined}>
                     {judge ? (r?.phase === 'done' ? '다시 판정' : '판정해줘') : st.key === 'market' ? (r?.phase === 'done' || marketDone(gate.market) ? '다시 조사' : '조사해줘') : r?.phase === 'done' ? '다시 써줘' : '이것만 써줘'}
-                  </Button>
+                  </Button></AiConfirm>
                 )}
               </li>
             )
@@ -736,9 +742,9 @@ function SummaryGateCard({
               이 숫자로 확인
             </Button>
           )}
-          <Button variant={gate.market.ok || marketNeedsConfirm(market) ? 'ghost' : 'primary'} size="sm" disabled={busy} onClick={onRunMarket} data-testid="vplan-gate-market-run">
+          <AiConfirm><Button variant={gate.market.ok || marketNeedsConfirm(market) ? 'ghost' : 'primary'} size="sm" disabled={busy} onClick={onRunMarket} data-testid="vplan-gate-market-run">
             {market ? '다시 조사' : 'AI로 시장조사'}
-          </Button>
+          </Button></AiConfirm>
           <Button variant="ghost" size="sm" onClick={() => setMarketEdit(!marketEdit)} data-testid="vplan-gate-market-edit">
             {marketEdit ? '숫자 고치기 닫기' : '숫자 고치기'}
           </Button>

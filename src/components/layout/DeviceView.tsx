@@ -52,8 +52,8 @@ export function DeviceSwitch({ wide = false, stacked = false }: { wide?: boolean
             className={`inline-flex h-full min-w-9 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] px-2 text-[0.85rem] font-semibold whitespace-nowrap ${stacked ? 'min-w-0 flex-auto' : ''} ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300 ring-inset' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             <Icon aria-hidden="true" className={`size-4 shrink-0 ${stacked ? 'dev-stacked-icon' : ''}`} />
-            {/* 넓은 화면에서만 글자 — 머리줄이 옆으로 넘치지 않게(무대 위쪽 줄 · 휴대폰 서랍에서는 늘 글자) */}
-            <span aria-hidden="true" className={wide || stacked ? 'min-w-0 truncate' : 'hdr-opt-label hidden min-[1900px]:inline'}>{label}</span>
+            {/* 머리줄도 글자(D-290 대표 "PC 화면 상단에도" — 예전엔 1900px 부터) · 자리가 모자라면 고르지 않은 둘의 글자부터 뺀다(data-fit 1 → 2) · 무대 위쪽 줄 · 설정에서는 늘 글자 */}
+            <span aria-hidden="true" className={wide || stacked ? 'min-w-0 truncate' : on ? 'hdr-dev-label-on' : 'hdr-dev-label'}>{label}</span>
           </button>
         )
       })}
@@ -79,6 +79,8 @@ export function DeviceSwitchCompact() {
         className={`inline-flex h-10 items-center gap-0.5 rounded-(--radius-control) border px-2 ${mode === 'pc' ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' : 'border-brand-300 bg-brand-50 text-brand-700'}`}
       >
         <cur.Icon aria-hidden="true" className="size-4" />
+        {/* D-290 지금 보기 방식 이름도(아이콘만으로는 무엇인지 몰랐다) */}
+        <span aria-hidden="true" className="hdr-dev-label-on ml-1 text-[0.85rem] font-semibold whitespace-nowrap">{cur.label}</span>
         <ChevronDown aria-hidden="true" className="size-3.5 opacity-70" />
       </button>
       {open && (

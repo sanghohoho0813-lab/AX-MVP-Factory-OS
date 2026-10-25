@@ -107,7 +107,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // B 실사 말할 답
   const nq = await page.getByTestId('pack-question').count()
-  await page.getByTestId('pack-say-run').click()
+  { const l289 = page.getByTestId('pack-say-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="pack-question"] [data-testid="pack-say"]').length > 0, null, { timeout: 15000 })
   const sq = sent.find((r) => r.assistId === 'cert.say')
   check(`B1 [AI로 말할 답 쓰기] 한 번 → cert.say(질문 ${nq}개 q1…) · 근거(핵심답근거 · 증빙) 같이 보냄`, !!sq && sq.context.sections.find((s) => s.name === '예상 질문').rows.length === nq && '핵심답근거' in sq.context.sections.find((s) => s.name === '예상 질문').rows[0])
@@ -161,7 +161,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(1500)
   await page.getByTestId('vplan-tab-problem').click()
   await page.waitForTimeout(200)
-  await fieldAi.click()
+  await fieldAi.click(); await page.waitForTimeout(450); await fieldAi.click() // D-289 재료가 있으면 AI 단추 두 번
   await page.waitForFunction(() => (document.querySelector('[data-testid="vplan-field"][data-id="development_background"] [data-testid="vplan-text"]')?.value ?? '').includes('AI 가 쓴 개발 배경'), null, { timeout: 15000 })
   const vs = sent.filter((r) => r.assistId?.startsWith('venture.'))
   check('D4 [AI로 이 칸 쓰기] → 그 칸 묶음(venture.p1) 하나만 · 칸에 AI 글 · 같은 묶음 경쟁력 칸도', vs.length === 1 && vs[0].assistId === 'venture.p1' && (await page.locator('[data-testid="vplan-field"][data-id="competitiveness_strategy"] [data-testid="vplan-text"]').inputValue()).includes('AI 가 쓴 경쟁력'), vs.map((r) => r.assistId))
@@ -186,7 +186,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('owner-reply-open').click()
   await page.getByTestId('owner-reply-text').fill('1. 네\n2. 월별로 정리 중')
   await page.getByTestId('owner-reply-split').click()
-  await page.getByTestId('pack-say-run').click()
+  { const l289 = page.getByTestId('pack-say-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="pack-say"]').length > 0, null, { timeout: 15000 })
   await page.getByTestId('pack-question').first().locator('summary').click()
   await shot(page, 'E1-390')

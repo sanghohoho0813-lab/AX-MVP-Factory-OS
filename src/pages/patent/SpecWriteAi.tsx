@@ -16,6 +16,7 @@ import { SECTION_LABEL, cleanAiText, draftFromIdea, mergeSpecAi, type PatentIdea
 import { SPEC_BATCHES, buildSpecContext, joinDetail, specItemsOf, type SpecBatch } from '../../services/patent/specDraftAi'
 import { useOwnerAiRepo } from '../ownerAi/shared'
 import type { CompanyCase } from '../../services/ownerAi/types'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type RowState = { phase: 'wait' | 'run' | 'done' | 'fail'; text: string }
 type Merge = { draft: SpecDraft; replaced: string[]; kept: string[] }
@@ -111,13 +112,13 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => void runAll(SPEC_BATCHES.map((b) => b.key))} data-testid="spec-ai-run">
+            <AiConfirm><Button variant="primary" size="sm" disabled={busy} onClick={() => void runAll(SPEC_BATCHES.map((b) => b.key))} data-testid="spec-ai-run">
               {busy ? '쓰는 중…' : '다섯 묶음 모두 쓰기'}
-            </Button>
+            </Button></AiConfirm>
             {failedKeys.length > 0 && !busy && (
-              <Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="spec-ai-retry">
+              <AiConfirm><Button variant="secondary" size="sm" onClick={() => void runAll(failedKeys)} data-testid="spec-ai-retry">
                 못 쓴 {failedKeys.length}묶음만 다시
-              </Button>
+              </Button></AiConfirm>
             )}
             <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
               닫기
@@ -134,9 +135,9 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
                   {r && <span className={`block ${r.phase === 'fail' ? 'text-danger-700' : r.phase === 'done' ? 'text-success-700' : 'text-slate-600'}`}>{r.phase === 'done' ? '✓ ' : r.phase === 'fail' ? '△ ' : ''}{r.text}</span>}
                 </p>
                 {ready && (
-                  <Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy} onClick={() => void runAll([b.key])} data-testid="spec-ai-one">
+                  <AiConfirm><Button variant="ghost" size="sm" className="self-start sm:self-auto" disabled={busy} onClick={() => void runAll([b.key])} data-testid="spec-ai-one">
                     {r?.phase === 'done' ? '다시 쓰기' : '이것만 쓰기'}
-                  </Button>
+                  </Button></AiConfirm>
                 )}
               </li>
             )

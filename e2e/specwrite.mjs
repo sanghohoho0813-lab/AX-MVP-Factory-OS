@@ -80,7 +80,7 @@ let draftUrl = ''
   await page.getByTestId('spec-list').waitFor()
   check('명세서 쓰기 → 목록(아직 없음) · 회사 고르기 · 새 명세서', (await page.getByTestId('spec-row').count()) === 0 && (await page.getByTestId('spec-new-client').count()) === 1)
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-editor').waitFor()
   await toEdit(page)
@@ -227,14 +227,14 @@ let draftUrl = ''
   await page.getByTestId('spec-ai-open').click()
   await page.getByTestId('spec-ai').waitFor()
   check('AI 초안 → 5 본문 단계에 판 열림', (await page.getByTestId('spec-tab-body').getAttribute('aria-selected')) === 'true')
-  await page.getByTestId('spec-ai-run').click()
+  { const l289 = page.getByTestId('spec-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-ai-row"][data-phase="done"], [data-testid="spec-ai-row"][data-phase="fail"]').length === 5, null, { timeout: 20000 })
   await page.waitForTimeout(500)
   const phases = await page.getByTestId('spec-ai-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-phase')}`))
   check('AI: 다섯 묶음 차례로(a → e) · c 만 실패', sent.map((r) => r.assistId).join() === 'spec.a,spec.b,spec.c,spec.d,spec.e' && phases.join() === 'a:done,b:done,c:fail,d:done,e:done', phases)
   const a = sent[0]
   check('AI 보낸 것: page patent · 구성요소(마모판정부 140) · 권리축 · 규칙(AI 라 부르지 않음 · 부호 그대로)', a.page === 'patent' && JSON.stringify(a.context.sections).includes('마모판정부') && JSON.stringify(a.context.sections).includes('경쟁사가 피하기 어려운 연결관계') && a.context.rules.some((r) => r.includes('AI · 인공지능')) && a.context.rules.some((r) => r.includes('이름과 부호를 그대로')))
-  await page.getByTestId('spec-ai-retry').click()
+  { const l289 = page.getByTestId('spec-ai-retry'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="spec-ai-row"][data-key="c"]')?.getAttribute('data-phase') === 'done', null, { timeout: 15000 })
   check('AI: 못 쓴 묶음만 다시 → c 만(6번째 요청)', sent.length === 6 && sent[5].assistId === 'spec.c')
   check('AI: 확인해 달라는 점 따로', /종래 기술 출처 확인/.test(await page.getByTestId('spec-ai-asks').innerText()))
@@ -265,7 +265,7 @@ let draftUrl = ''
   await page.getByTestId('spec-back-list').click()
   await page.getByTestId('spec-list').waitFor()
   await page.getByTestId('spec-new-client').selectOption('')
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForURL(/draft=/)
   await page.getByTestId('spec-editor').waitFor()
   await toEdit(page)
@@ -303,7 +303,7 @@ for (const width of [360, 390, 430]) {
   await page.evaluate(seedScript())
   await page.goto(BASE + '/patent-venture/write', { waitUntil: 'networkidle' })
   await page.getByTestId('spec-new-client').selectOption(CLIENT)
-  await page.getByTestId('spec-new').click()
+  { const l289 = page.getByTestId('spec-new'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('spec-editor').waitFor()
   await toEdit(page)
   await page.getByTestId('spec-title').fill('공구 진동정보 기반 마모상태 판정 및 교체시점 산출 시스템 및 방법')

@@ -198,7 +198,7 @@ await page.waitForTimeout(200)
 check('P3b 모델 고르기 → Claude 로 바꾸면 단추에 그 모델', (await page.getByTestId('mk-pack-ai').getByTestId('model-pick').getAttribute('data-model')) === 'claude-haiku-5-5')
 await page.getByTestId('mk-pack-ai').getByTestId('model-pick').click()
 delayMs = 2500
-await page.getByTestId('mk-pack-ai-run').click()
+{ const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.waitForTimeout(300)
 check('P3 누른 뒤 AI 를 기다리는 동안에도 규칙 초안이 다 보임 · 칸마다 \'AI가 쓰는 중\'', (await page.getByTestId('mk-pack-ai').getAttribute('data-state')) === 'running' && (await page.locator('[data-sec="video"]').innerText()).includes('0:00 오프닝') && (await page.locator('[data-sec="blog"]').getByTestId('mk-pack-origin').innerText()).includes('쓰는 중'))
 await shot(page, 'P-pack-running')
@@ -276,7 +276,7 @@ check('R4 [← 이번 주 키워드] → 첫 화면', (await page.getByTestId('m
 await page.locator(`[data-testid="mk-key"][data-key="${firstKey}"]`).click()
 await page.getByTestId('mk-pack').waitFor()
 const n1 = packCalls().length
-await page.getByTestId('mk-pack-ai-run').click()
+{ const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await aiDone(page)
 check('R5 [AI로 다시 쓰기] → 세 갈래 다시 한 번씩', packCalls().length === n1 + 3, packCalls().length - n1)
 await page.getByTestId('mk-pack-back').click()
@@ -289,7 +289,7 @@ const thirdKey = await third.getAttribute('data-key')
 const nL = packCalls().length
 await third.click()
 await page.getByTestId('mk-pack').waitFor()
-await page.getByTestId('mk-pack-ai-run').click()
+{ const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.waitForTimeout(400)
 await page.getByTestId('mk-pack-back').click()
 await page.getByTestId('mk-home').waitFor()
@@ -307,7 +307,7 @@ failing = 'radar.pack.blog'
 const second = page.getByTestId('mk-key').nth(1)
 await second.click()
 await page.getByTestId('mk-pack').waitFor()
-await page.getByTestId('mk-pack-ai-run').click()
+{ const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await aiDone(page)
 await page.waitForTimeout(300)
 const errText = await page.getByTestId('mk-pack-ai-error').innerText().catch(() => '')
@@ -327,7 +327,7 @@ await page.getByTestId('mk-custom-go').click()
 await page.getByTestId('mk-pack').waitFor()
 await page.waitForTimeout(800)
 check('D2a 직접 주제도 누르기 전에는 AI 를 부르지 않음', packCalls().length === nD && (await page.getByTestId('mk-pack-ai').getAttribute('data-state')) === 'idle')
-await page.getByTestId('mk-pack-ai-run').click()
+{ const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await aiDone(page)
 check("D2 직접 주제 → 같은 묶음 · '직접 고른 주제' · [AI로 다 쓰기] 도 같이", (await page.getByTestId('mk-pack-topic').innerText()).includes('가업승계 2027') && (await page.getByTestId('mk-pack').innerText()).includes('직접 고른 주제') && (await page.locator('[data-testid="mk-pack-section"][data-ai="1"]').count()) === 6 && new URL(page.url()).searchParams.get('pack') === 'custom:가업승계 2027 달라지는 점')
 check('D3 직접 주제에는 레이더 근거 칸 · [왜 이 키워드?] 단추 없음', (await page.getByTestId('mk-pack-why').count()) === 0 && (await page.getByTestId('mk-pack-why-toggle').count()) === 0)

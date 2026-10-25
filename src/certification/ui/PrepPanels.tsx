@@ -29,6 +29,7 @@ import { ModelPicker } from '../../components/ai/ModelPicker'
 import { todayLocalDate } from '../../lib/appClock'
 import { buildSayContext, ownerAsks, sayItemsOf, sayKey } from '../integration/certAi'
 import { ReplyPaste } from './ReplyPaste'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 function useCopy() {
   const { showToast } = useToast()
@@ -318,9 +319,9 @@ export function InspectionPackPanel({
           {assistOn(ai) && pkg.questions.length > 0 && (
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5" data-testid="pack-say-ai">
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="primary" disabled={saying} onClick={() => void writeSays()} data-testid="pack-say-run">
+                <AiConfirm><Button size="sm" variant="primary" disabled={saying} onClick={() => void writeSays()} data-testid="pack-say-run">
                   <Sparkles aria-hidden="true" className="size-4" /> {saying ? 'AI 가 쓰는 중…(30초쯤)' : said ? `AI로 말할 답 다시 쓰기 (${pkg.questions.length}개)` : `AI로 말할 답 쓰기 (${pkg.questions.length}개)`}
-                </Button>
+                </Button></AiConfirm>
                 <ModelPicker popover testId="pack-say-model" />
               </div>
               <p className="t-meta break-keep text-slate-600">

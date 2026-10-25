@@ -13,6 +13,8 @@
  *      [내 콘텐츠에 담기] → 그 줄 펼쳐 보기 · [이 기획으로 대본 끝까지] → [더 잘 쓰는 모델로 다시] → [내 콘텐츠에 저장] → 대본 칸 · 기준 고치면 다음 기획에
  *   G  D-288 직접 질문 — 띠의 [직접 묻기] · 판의 질문 칸(늘 보임 · 기본 '직접 질문')에 적은 말이 단추에 묶이지 않고 그 화면의 '직접 물어본 것에 답'
  *      으로 감(화면마다) · 일정에서 "이번 달 메모가 가장 많았던 업체" → 이번 달 업체별 기록 수가 같이 감 · 단추에 덧붙이기도 그대로
+ *   H  D-289 AI 단추 두 번 — 띠 단추 · 판 단추 · 다시 만들기를 한 번 누르면 고르기만(공급자 호출 0) · [취소] 하면 그대로 · [이대로 질문하기] 를 눌러야 1번 ·
+ *      다른 화면 AI 단추(대화창 [AI로 더 자세히])도 한 번 누르면 '이대로 질문하기' 로 바뀌기만 · 두 번째에 부름
  *   E  360/390 넘침 0 · 판 열어도 넘침 0 · JS 오류 0 · 키 노출 0
  */
 import { chromium } from 'playwright'
@@ -121,6 +123,7 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
 check('0 오늘: AI 도우미 띠(대표 계정)', (await page.getByTestId('ai-assist-bar').count()) === 1)
 await page.getByTestId('ai-assist-chip').first().click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-error').waitFor({ timeout: 8000 })
 const err0 = await page.getByTestId('ai-assist-error').innerText()
 check("0 키 없음 → '키가 아직' + 넣을 이름 GEMINI_API_KEY · 공급자 안 부름", /키가 아직/.test(err0) && err0.includes('GEMINI_API_KEY') && llm.length === 0, err0)
@@ -131,6 +134,7 @@ setEnv()
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
 await page.getByTestId('ai-assist-chip').filter({ hasText: '오늘 제일 중요한 것 3개만' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 const call = llm.at(-1)
 check('A1 한 번 누르면 답 — 한 줄 결론 · 항목 2개 · 바로 할 일', (await page.getByTestId('ai-assist-headline').innerText()).includes('서류 마감') && (await page.getByTestId('ai-assist-item').count()) === 2)
@@ -159,6 +163,7 @@ await shot(page, 'B-model-settings')
 check('B1 모델 줄 — Claude Haiku 5.5 로 바뀜 · 기본으로 단추', (await page.getByTestId('ai-assist-model-label').innerText()).includes('Claude Haiku 5.5') && (await page.getByTestId('ai-assist-model-reset').count()) === 1)
 check('B2 GPT 는 키 없음 표시 · 고를 수 없음', /키 없음/.test(await page.getByTestId('ai-assist-settings').locator('[data-provider="openai"]').innerText()))
 await page.getByTestId('ai-assist-preset').filter({ hasText: '놓치면 끝나는 것만' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'today.deadline', null, { timeout: 10000 })
 check('B3 다음 질문은 Claude 로(claude-haiku-5-5)', llm.at(-1)?.provider === 'anthropic' && llm.at(-1)?.model === 'claude-haiku-5-5' && llm.at(-1)?.key === A_KEY)
 await page.keyboard.press('Escape')
@@ -200,6 +205,7 @@ await page.goto(BASE + '/money', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
 check("C 매출 · 비용: 예전 '준비 중' 단추 대신 실제 단추", (await page.getByTestId('ai-soon').filter({ hasText: '이 달 비용 정리해 보기' }).count()) === 0)
 await page.getByTestId('ai-assist-chip').filter({ hasText: '가장 큰 비용 TOP5' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 check('C 매출 · 비용 [가장 큰 비용 TOP5] → 정기 결제 · 비용 자료가 감', llm.at(-1)?.user.includes('[자료 · 정기 결제') && llm.at(-1)?.sys.includes('money.top'))
 await page.keyboard.press('Escape')
@@ -211,6 +217,7 @@ await page.getByTestId('ai-assist-open').first().click()
 await page.waitForTimeout(400)
 check('C 업체 상세 AI 판 — 한 장 요약 · 다음 할 일 · 미팅 질문 10개 · 제안 순서', (await page.getByTestId('ai-assist-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-assist')))).join() === 'client.brief,client.next,client.meeting,client.pitch')
 await page.getByTestId('ai-assist-preset').first().click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 await shot(page, 'C-client-answer')
 check('C 업체 상세 [한 장 요약] → 이 업체 자료 · OS 모듈 판정이 감 · 대표 이름 · 전화 없음', llm.at(-1)?.user.includes('[자료 · OS 모듈 판정') && llm.at(-1)?.user.includes('한솔') && !/김대표|010-2345-6789/.test(llm.at(-1)?.user ?? ''), (llm.at(-1)?.user ?? '').slice(0, 400))
@@ -281,6 +288,51 @@ await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 }
 
+/* ---------------- H D-289 AI 단추 두 번 ---------------- */
+{
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const n0 = llm.length
+  await page.getByTestId('ai-assist-chip').first().click()
+  await page.getByTestId('ai-assist-panel').waitFor()
+  await page.waitForTimeout(1200)
+  const confirm = page.getByTestId('ai-assist-confirm')
+  check('H1 띠 단추 한 번 → 판이 열리고 고른 단추 확인 줄만(AI 호출 0) · [이대로 질문하기]', llm.length === n0 && (await confirm.isVisible()) && (await page.getByTestId('ai-assist-result').count()) === 0 && (await page.getByTestId('ai-assist-confirm-go').innerText()).includes('이대로 질문하기'), { calls: llm.length - n0 })
+  await page.getByTestId('ai-assist-confirm-cancel').click()
+  await page.getByTestId('ai-assist-preset').nth(1).click()
+  await page.waitForTimeout(800)
+  check('H2 [취소] → 확인 줄 사라짐 · 판 단추 한 번 → 다시 확인 줄만(AI 호출 0) · 고른 단추 표시', llm.length === n0 && (await confirm.count()) === 1 && (await page.getByTestId('ai-assist-preset').nth(1).getAttribute('aria-pressed')) === 'true', { calls: llm.length - n0 })
+  await page.getByTestId('ai-assist-confirm-go').click()
+  await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
+  check('H3 [이대로 질문하기] → 그때 1번 부름 · 확인 줄 닫힘', llm.length === n0 + 1 && (await confirm.count()) === 0, { calls: llm.length - n0 })
+  await page.getByTestId('ai-assist-rerun').click()
+  await page.waitForTimeout(800)
+  const reLabel = await confirm.innerText().catch(() => '')
+  check("H4 [다시 만들기] 한 번 → '— 다시 만들기' 확인 줄만(AI 호출 그대로)", llm.length === n0 + 1 && reLabel.includes('다시 만들기'), reLabel)
+  await page.getByTestId('ai-assist-confirm-go').click()
+  await page.waitForFunction((n) => document.querySelectorAll('[data-testid="ai-assist-running"]').length === 0, null, { timeout: 10000 }).catch(() => {})
+  await page.waitForTimeout(600)
+  check('H5 [이대로 질문하기] → 다시 만들기 1번', llm.length === n0 + 2, { calls: llm.length - n0 })
+  await page.keyboard.press('Escape')
+  // 다른 화면 — 특허 · 벤처 대화창 [AI로 더 자세히](공통 두 번 누르기 부품)
+  await page.goto(BASE + '/patent-venture?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByTestId('chat-starter').first().click().catch(() => {})
+  await page.waitForTimeout(800)
+  const more = page.getByTestId('chat-ai-more').first()
+  if (await more.count()) {
+    const n1 = llm.length
+    await more.click()
+    await page.waitForTimeout(900)
+    const armedText = await more.innerText()
+    check("H6 대화창 [AI로 더 자세히] 한 번 → '이대로 질문하기' 로 바뀌기만(AI 호출 0)", llm.length === n1 && armedText.includes('이대로 질문하기') && (await more.getAttribute('data-armed')) === 'true', { calls: llm.length - n1, armedText })
+    await more.click()
+    await page.waitForFunction(() => !document.querySelector('[data-testid="chat-ai-more"][data-armed="true"]'), null, { timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(2500)
+    check('H7 한 번 더 누르면 그때 부름', llm.length === n1 + 1, { calls: llm.length - n1 })
+  } else check('H6 대화창 [AI로 더 자세히] 단추', false, '없음')
+}
+
 /* ---------------- D 블로그 · 플레이스 홍보 글 ---------------- */
 await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
@@ -291,6 +343,7 @@ await page.waitForURL(/trial=trial_miraeailab/, { timeout: 8000 })
 await page.waitForTimeout(800)
 check("D2 '미래AI랩으로 만들기' → 늘 같은 자리(trial_miraeailab)", page.url().includes('trial=trial_miraeailab'))
 await page.getByTestId('ai-assist-chip').filter({ hasText: '블로그 글 한 번에' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-body').first().waitFor({ timeout: 10000 })
 await shot(page, 'D-blog-answer')
 const blogCall = llm.at(-1)
@@ -314,6 +367,7 @@ check("D6 다시 '미래AI랩으로 만들기' → 새로 만들지 않고 같�
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
 await page.getByTestId('ai-assist-chip').filter({ hasText: '오늘 제일 중요한 것 3개만' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 const refText = await page.getByTestId('ai-assist-ref').first().innerText()
 check("F1 번호 단추는 무엇이 열리는지 — c1 → '업체 열기'(예전 '열어 보기')", refText.includes('업체 열기') && !refText.includes('열어 보기'), refText)
@@ -332,6 +386,7 @@ check('F5 판을 닫으면 오늘 목록에 그 할 일이 바로 있음(새로�
 // F6~ 마케팅: TOP5 기획 → 담기 · 대본
 await openRadar(page)
 await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
 const plan5 = llm.at(-1)
 check('F6 TOP5 기획 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 미래AI랩 일 · 상투어 금지)', plan5.sys.includes('[마케팅 규칙]') && plan5.sys.includes('채널 설계 기준') && plan5.sys.includes('N분 컷'), plan5.sys.slice(0, 300))
@@ -353,8 +408,10 @@ await shot(page, 'F-make-focus')
 // 대본 끝까지 → 더 잘 쓰는 모델로 다시 → 저장
 await openRadar(page)
 await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
 await page.getByTestId('ai-assist-item').nth(1).locator('[data-action="script"]').click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 이어 쓰기 · 다시도 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.script', null, { timeout: 10000 })
 const scr = llm.at(-1)
 check('F11 [이 기획으로 대본 끝까지] → 같은 판에서 대본 단추 · 고른 기획이 자료 맨 앞(제목 · 구성 · 후보 찍기 키트)', scr.sys.includes('(radar.script') && scr.user.indexOf('[자료 · 고른 기획') >= 0 && scr.user.indexOf('[자료 · 고른 기획') < scr.user.indexOf('[자료 · 채널 설계 기준') && scr.user.includes('고용지원금 놓치는 회사 — 이 날짜 하나') && scr.user.includes('구성_규칙'), scr.user.slice(0, 500))
@@ -364,6 +421,7 @@ const better = page.getByTestId('ai-assist-better')
 check('F13 [더 잘 쓰는 모델로 다시] — 지금(Flash-Lite) 한 단계 위 Gemini 3.8 Flash', (await better.count()) === 1 && (await better.getAttribute('data-model')) === 'gemini-3.8-flash', await better.count())
 const nBefore = llm.length
 await better.click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 이어 쓰기 · 다시도 [이대로 질문하기]
 await page.waitForFunction((n) => document.querySelectorAll('[data-testid="ai-assist-history"] li').length >= n, 4, { timeout: 10000 })
 await page.waitForTimeout(400)
 const re = llm.at(-1)
@@ -387,6 +445,7 @@ await page.waitForTimeout(800)
 await brief.scrollIntoViewIfNeeded()
 await shot(page, 'F-brief')
 await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 check('F16 채널 설계 기준을 고치면 다음 기획 자료에 그대로(새로고침 없이)', llm.at(-1).user.includes('코인 · 주식 종목 추천 · 연예 이야기는 다루지 않는다'))
 await page.keyboard.press('Escape')
@@ -411,6 +470,7 @@ for (const w of [360, 390]) {
   await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
   await mp.waitForTimeout(400)
   await mp.getByTestId('ai-assist-chip').first().click()
+  await mp.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await mp.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
   await mp.waitForTimeout(800)
   const wide = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="ai-assist-panel"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
@@ -420,6 +480,7 @@ for (const w of [360, 390]) {
   await mp.keyboard.press('Escape')
   await openRadar(mp)
   await mp.getByTestId('ai-assist-chip').first().click()
+  await mp.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await mp.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
   await mp.waitForTimeout(800)
   const wideR = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="ai-assist-panel"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)

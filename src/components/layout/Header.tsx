@@ -161,7 +161,7 @@ function UserMenu() {
 
 /**
  * D-256 왼쪽 메뉴를 끌어 넓히면 머리줄 자리가 화면 폭 기준(1360 · 1440 · 1600 …)보다 좁아진다 — 실제로 넘칠 때만
- * 덜 중요한 것부터 뺀다(data-fit 1: 넓은 찾기 칸 → 찾기 단추 · 폭 · 저장 글 / 2: 시계 / 3: 고객 플랫폼 · 설정 아이콘). index.css
+ * 덜 중요한 것부터 뺀다(data-fit 1 · 2: 보기 방식 글자 — 고르지 않은 둘 → 고른 것(D-290) / 3: 넓은 찾기 칸 → 찾기 단추 · 폭 · 저장 글 / 4: 시계 / 5: 고객 플랫폼 · 설정 아이콘). index.css
  * 머리줄 크기나 안 내용이 바뀔 때마다 0 부터 다시 재므로 메뉴를 좁히면 도로 보인다. 한 번에 재고 그려서 깜박이지 않는다.
  */
 function useHeaderFit(ref: RefObject<HTMLElement | null>) {
@@ -171,7 +171,7 @@ function useHeaderFit(ref: RefObject<HTMLElement | null>) {
     let frame = 0
     const fit = () => {
       frame = 0
-      for (let level = 0; level <= 3; level++) {
+      for (let level = 0; level <= 5; level++) {
         el.dataset.fit = String(level)
         if (el.scrollWidth <= el.clientWidth + 1) return
       }

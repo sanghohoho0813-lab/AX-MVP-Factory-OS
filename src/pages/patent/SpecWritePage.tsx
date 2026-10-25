@@ -47,6 +47,7 @@ import { zipStore } from '../../services/patent/zip'
 import { BodyStep, CheckStep, ClaimsStep, FiguresStep, IdeaStep, PartsStep, type Act } from './SpecWriteSteps'
 import { IdeaImportPanel, SpecAiPanel } from './SpecWriteAi'
 import { downloadBytes, svgToPngBytes } from './specFigureFile'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type Row = { draft: SpecDraft } & Record<string, unknown>
 const HOME = PV_HOME
@@ -123,9 +124,9 @@ function DraftList({ rows, trash, onNew, onSample, onRemove, onRestore, onPurge 
               <p className="t-meta font-semibold text-slate-700">어느 AI 로 쓸까요? (모든 단계가 이 모델로 · 쓰는 중에 바꾸면 다음 단계부터)</p>
               <ModelPicker testId="spec-new-model" />
             </div>
-            <Button variant="primary" className="min-h-12 self-start" disabled={busy} onClick={() => void go(() => onNew(pick))} data-testid="spec-new">
+            <AiConfirm><Button variant="primary" className="min-h-12 self-start" disabled={busy} onClick={() => void go(() => onNew(pick))} data-testid="spec-new">
               <Sparkles aria-hidden="true" className="size-5" /> {pick ? `${nameOf(pick) || '이 회사'} 명세서 — 기획부터 시작` : '명세서 기획부터 시작'}
-            </Button>
+            </Button></AiConfirm>
             {!pick && <p className="t-meta break-keep text-slate-500">회사를 고르면 그 회사 기록 · 업체 서류함 · 상담 메모를 읽고 기획합니다(안 고르면 회사 정보부터 받아요).</p>}
             <button type="button" disabled={busy} onClick={() => void go(onSample)} className="tap t-meta self-start font-semibold text-slate-600 underline underline-offset-2" data-testid="spec-sample">
               견본(연습용 발명)으로 둘러보기
@@ -141,7 +142,7 @@ function DraftList({ rows, trash, onNew, onSample, onRemove, onRestore, onPurge 
           </div>
           <ClientSelect value={pick} onChange={setPick} clients={clients} label="어느 회사 특허인가요?" testId="spec-new-client" />
           <div className="flex flex-wrap gap-2">
-            <Button
+            <AiConfirm><Button
               variant="primary"
               disabled={busy}
               onClick={async () => {
@@ -155,7 +156,7 @@ function DraftList({ rows, trash, onNew, onSample, onRemove, onRestore, onPurge 
               data-testid="spec-new"
             >
               <FilePlus2 aria-hidden="true" className="size-4" /> 새 명세서 쓰기
-            </Button>
+            </Button></AiConfirm>
             <Button
               variant="secondary"
               disabled={busy}

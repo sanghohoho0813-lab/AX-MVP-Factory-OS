@@ -19,6 +19,7 @@ import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, type P
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { PACK_AI_PARTS, PACK_LABEL, makePack, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
 
 const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = {
   titles: { icon: Type, chip: 'bg-violet-100 text-violet-700' },
@@ -277,10 +278,10 @@ function AiBar({
         </p>
         <div className="flex flex-wrap items-start gap-2">
           <ModelPicker />
-          <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={onRun} disabled={running} data-testid="mk-pack-ai-run">
+          <AiConfirm><Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={onRun} disabled={running} data-testid="mk-pack-ai-run">
             {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
             {running ? '쓰는 중…' : saved ? 'AI로 다시 쓰기' : 'AI로 다 쓰기'}
-          </Button>
+          </Button></AiConfirm>
         </div>
       </div>
       {(running || Object.values(parts).some((s) => s !== 'idle')) && (

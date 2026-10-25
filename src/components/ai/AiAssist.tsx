@@ -322,6 +322,8 @@ function AssistPanel({
   const DIRECT = '__direct'
   const [askPreset, setAskPreset] = useState(askDirect ? DIRECT : (presets[0]?.id ?? ''))
   const askRef = useRef<HTMLTextAreaElement | null>(null)
+  // D-289 단추를 한 번 누르면 고르기만 — 아래 [이대로 질문하기] 를 눌러야 AI 를 부른다(잘못 눌러 바로 도는 일 없게)
+  const [pending, setPending] = useState<{ preset: AssistPreset; ask: string; opts: { choice?: AiChoice; follow?: FollowMeta }; label: string } | null>(null)
   const [settings, setSettings] = useState(false)
   const [nowHash, setNowHash] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
@@ -389,12 +391,23 @@ function AssistPanel({
   /** 판의 단추에 없는 질문(이어 쓰기 전용 — 예: 대본 끝까지)도 찾는다 */
   const presetOf = useCallback((id: string) => presets.find((x) => x.id === id) ?? presetsFor([id])[0], [presets])
 
+  /** D-289 바로 부르지 않고 '이대로 질문하기' 를 기다린다 */
+  const request = useCallback((preset: AssistPreset, label: string, ask = '', opts: { choice?: AiChoice; follow?: FollowMeta } = {}) => {
+    setPending({ preset, ask, opts, label })
+  }, [])
+  const confirmPending = () => {
+    const p = pending
+    if (!p || running) return
+    setPending(null)
+    void run(p.preset, p.ask, p.opts)
+  }
+
   const rerun = useCallback(
-    (entry: NonNullable<Shown>, choiceOverride?: AiChoice) => {
+    (entry: NonNullable<Shown>, choiceOverride?: AiChoice, betterLabel?: string) => {
       const p = presetOf(entry.assistId)
-      if (p) void run(p, entry.ask, { choice: choiceOverride, follow: entry.follow })
+      if (p) request(p, betterLabel ? `${entry.label} — ${betterLabel} 로 다시` : `${entry.label} — 다시 만들기`, entry.ask, { choice: choiceOverride, follow: entry.follow })
     },
-    [presetOf, run],
+    [presetOf, request],
   )
 
   const ctxFor = useCallback(
@@ -407,11 +420,11 @@ function AssistPanel({
       },
       follow: (presetId, meta) => {
         const p = presetOf(presetId)
-        if (p) void run(p, '', { follow: meta })
+        if (p) request(p, `${p.label} · ${meta.title}`, '', { follow: meta })
       },
       close: onClose,
     }),
-    [presetOf, run, onClose],
+    [presetOf, request, onClose],
   )
 
   const better = useMemo(() => (shown ? betterModel(status, shown.run) : null), [status, shown])
@@ -425,7 +438,7 @@ function AssistPanel({
     [scope],
   )
 
-  // 띠의 질문 단추로 열었으면 바로 묻는다(한 번만) · D-288 [직접 묻기] 로 열었으면 질문 칸에 바로 쓰게
+  // 띠의 질문 단추로 열었으면 그 단추를 골라 둔다(한 번만) · D-288 [직접 묻기] 로 열었으면 질문 칸에 바로 쓰게
   useEffect(() => {
     if (!autoRun || started.current) return
     started.current = true
@@ -433,9 +446,10 @@ function AssistPanel({
       window.setTimeout(() => askRef.current?.focus(), 60)
       return
     }
+    // D-289 띠의 단추로 열어도 고르기만 — [이대로 질문하기] 를 눌러야 부른다
     const p = presets.find((x) => x.id === autoRun)
-    if (p) void run(p)
-  }, [autoRun, presets, run])
+    if (p) request(p, p.label)
+  }, [autoRun, presets, request])
 
   const sendAsk = () => {
     const text = ask.trim()
@@ -461,7 +475,7 @@ function AssistPanel({
             {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게(전에는 질문 단추 아래) */}
             <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
             <section aria-label="무엇을 도와드릴까요" className="flex flex-col gap-2">
-              <p className="t-sub font-semibold text-slate-700">무엇을 도와드릴까요? — 누르면 바로 답해요</p>
+              <p className="t-sub font-semibold text-slate-700">무엇을 도와드릴까요? — 고른 뒤 [이대로 질문하기] 를 누르면 답해요</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {presets.map((p) => (
                   <button
@@ -470,8 +484,9 @@ function AssistPanel({
                     data-testid="ai-assist-preset"
                     data-assist={p.id}
                     disabled={!!running}
-                    onClick={() => void run(p, '')}
-                    className={`tap flex min-h-14 min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:cursor-wait ${shown?.assistId === p.id ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white hover:bg-violet-50'}`}
+                    aria-pressed={pending?.preset.id === p.id && !pending.opts.follow}
+                    onClick={() => request(p, p.label)}
+                    className={`tap flex min-h-14 min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:cursor-wait ${pending?.preset.id === p.id && !pending.opts.follow ? 'border-violet-600 bg-violet-100 ring-2 ring-violet-300' : shown?.assistId === p.id ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white hover:bg-violet-50'}`}
                   >
                     {running === p.id ? <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin text-violet-700" /> : <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />}
                     <span className="flex min-w-0 flex-col">
@@ -560,7 +575,7 @@ function AssistPanel({
                   onSaved={(ok) => showToast(ok ? '보관함에 저장했어요 — 화면 아래 보관함에 쌓여요' : '저장하지 못했어요. 다시 눌러 주세요.')}
                   onRerun={() => rerun(shown)}
                   better={better}
-                  onBetter={() => better && rerun(shown, { provider: better.provider, model: better.model })}
+                  onBetter={() => better && rerun(shown, { provider: better.provider, model: better.model }, better.label)}
                   onCopied={() => showToast('복사했어요')}
                   ctx={ctxFor(shown)}
                   itemActions={itemActions?.(shown.assistId) ?? []}
@@ -602,6 +617,21 @@ function AssistPanel({
             </p>
           </div>
         </div>
+        {/* D-289 고른 단추 확인 — 판 맨 아래에 늘 붙어 있다(어느 단추를 눌렀든 보이게). 이걸 눌러야 AI 를 부른다 */}
+        {pending && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 px-5 py-3 sm:rounded-b-(--radius-panel)" data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
+            <p className="t-sub min-w-0 flex-1 break-keep text-violet-950 [overflow-wrap:anywhere]">
+              <b>‘{pending.label}’</b> — 이대로 물어볼까요?
+              <span className="t-meta block text-violet-800">{labelOf(status, pending.opts.choice ?? effective)} 로 · 화면 자료를 같이 보내요</span>
+            </p>
+            <button type="button" onClick={() => setPending(null)} className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-confirm-cancel">
+              취소
+            </button>
+            <button type="button" disabled={!!running} onClick={confirmPending} className="tap t-body inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 disabled:opacity-60" data-testid="ai-assist-confirm-go">
+              <Sparkles aria-hidden="true" className="size-4" /> 이대로 질문하기
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

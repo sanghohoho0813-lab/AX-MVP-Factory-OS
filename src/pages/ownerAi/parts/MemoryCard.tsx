@@ -10,6 +10,7 @@ import { Badge, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { fmtDateTime } from '../shared'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
 
 const SOURCE_LABEL = (s: string) =>
   s === 'manual' ? '직접 고침' : s.startsWith('run:') ? '채택한 결과' : s === 'chatgpt' ? 'ChatGPT 붙여넣기' : s === 'ai:context_update' ? 'AI 로 정리' : s || '직접 고침'
@@ -57,10 +58,10 @@ export function MemoryCard({
           <PencilLine aria-hidden="true" className="size-4" />
           직접 고치기
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy || !aiReady} onClick={onAiTidy} title={aiReady ? '' : 'AI 기능 설정이 필요합니다.'} data-testid="memory-ai-tidy">
+        <AiConfirm><Button size="sm" variant="ghost" disabled={busy || !aiReady} onClick={onAiTidy} title={aiReady ? '' : 'AI 기능 설정이 필요합니다.'} data-testid="memory-ai-tidy">
           <Sparkles aria-hidden="true" className="size-4" />
           AI 로 정리
-        </Button>
+        </Button></AiConfirm>
         {snapshots.length > 0 && (
           <Button size="sm" variant="ghost" onClick={() => setHistory(true)} data-testid="memory-history">
             <History aria-hidden="true" className="size-4" />

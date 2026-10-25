@@ -431,7 +431,7 @@ let caseId = ''
   await page.waitForTimeout(400)
   check('D 한 쪽씩 고침 → 점검 통과 · 수정 이력 2번(원래 결과 그대로)', (await page.getByTestId('proposal-qa-ok').count()) === 1 && (await revs()).length === 2 && JSON.stringify((await runs()).find((r) => r.skillId === 'SANGHO_PROPOSAL').structured).includes('[회사명]'))
   // 맞춤법 → 고른 것만 고치기
-  await page.getByTestId('proofread').click()
+  { const l289 = page.getByTestId('proofread'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('proofread-fixes').waitFor({ timeout: 10000 })
   await page.getByRole('button', { name: '고른 것 고치기' }).click()
   await page.waitForTimeout(500)
@@ -521,7 +521,7 @@ let caseId = ''
   // D-219: '자료 요약 · 업체 정보 채우기' — 올린 자료를 실제로 보낸다(예전: 빈 목록을 '이것만' 으로 읽어 자료 0개)
   const nS = (await runs()).length
   await page.locator('[data-side-tab="materials"]').click()
-  await page.getByTestId('material-summarize').click()
+  { const l289 = page.getByTestId('material-summarize'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitRuns(nS + 1)
   const sum = llm.filter((c) => c.skill === 'SNAPSHOT_EXTRACT').at(-1)
   check('D-219 자료 요약: 올린 자료(회사소개서 · 메모)를 AI 에 함께 보낸다', !!sum && sum.user.includes('배차') && sum.user.includes('화주'), sum?.user.slice(0, 300))

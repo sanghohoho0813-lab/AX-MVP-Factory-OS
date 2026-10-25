@@ -195,7 +195,7 @@ const errors = []
 
   // AI로 더 자세히
   const firstRule = page.getByTestId('chat-answer').first()
-  await firstRule.getByTestId('chat-ai-more').click()
+  { const l289 = firstRule.getByTestId('chat-ai-more'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await waitTurns(page, 4)
   await page.waitForFunction(() => !document.querySelector('[data-testid="chat-turn"][data-status="pending"]'), null, { timeout: 10000 })
   check('A20 [AI로 더 자세히] → 같은 질문을 AI 로 다시(질문 끝에 표시)', /AI로 더 자세히/.test(await page.getByTestId('chat-q').last().innerText()) && (await lastAnswer(page).getAttribute('data-source')) === 'ai')

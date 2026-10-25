@@ -257,14 +257,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('V0 재료가 있으면 차례 "기획 방향" · [AI 와 기획 시작] · [묻지 말고 방향 5개 내줘] · 요약 전 3가지 · 쓰기 단추 · [전부 써줘] 는 아직 없음', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'plan' && (await page.getByTestId('vplan-talk-start').isVisible()) && (await page.getByTestId('vplan-plan-run').isVisible()) && (await page.getByTestId('vplan-gate').count()) === 0 && (await page.getByTestId('vplan-ai-next').count()) === 0 && (await page.getByTestId('vplan-ai-run').count()) === 0 && /기획부터/.test(await page.getByTestId('vplan-ai-head').innerText()))
   check('V0b 방향을 고르기 전에는 [이것만 써줘] 도 막힘(시장조사만 됨)', (await row('p1').getByTestId('vplan-ai-one').isDisabled()) && /기획 방향부터/.test(await row('p1').innerText()) && !(await row('market').getByTestId('vplan-ai-one').isDisabled()))
   // D-271 기획 대화 — 의견 · 질문(누를 답) → 답 → '충분' → 그 대화대로 방향 5개
-  await page.getByTestId('vplan-talk-start').click()
+  { const l289 = page.getByTestId('vplan-talk-start'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('vplan-talk-option').first().waitFor({ timeout: 20000 })
   await vIdle()
   const vt1 = sent.filter((r) => r.assistId === 'venture.talk')
   const vOpts = await page.getByTestId('vplan-talk-option').allInnerTexts()
   check('V0c [AI 와 기획 시작] → 재료(명세서 · AX)를 읽고 회사 이해 · 의견 2(흔한 것 · 약한 점) · 질문 하나 · 누를 답 4개(마지막 "AI 가 정해 주세요") · 대표 /자체점검 정의 같이', vt1.length === 1 && !JSON.stringify(vt1[0].context).includes('대표 답:') && JSON.stringify(vt1[0].context).includes('휴대폰') && /휴대폰 진동/.test(await page.getByTestId('vplan-talk-understanding').innerText()) && /너무 흔하고/.test(await page.getByTestId('vplan-talk-opinions').innerText()) && /누구에게 먼저/.test(await page.getByTestId('vplan-talk-question').innerText()) && vOpts.length === 4 && /AI 가 정해/.test(vOpts[3]) && vt1[0].skill === SKILL && (await planAiRow('talk').getAttribute('data-model')) === 'test-model', vOpts)
   await shot(page, 'vplan-04t-talk')
-  await page.getByTestId('vplan-talk-option').first().click()
+  { const l289 = page.getByTestId('vplan-talk-option').first(); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('vplan-plan-option').first().waitFor({ timeout: 20000 })
   await vIdle()
   const vt2 = sent.filter((r) => r.assistId === 'venture.talk')
@@ -273,11 +273,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const opts = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ picked: e.getAttribute('data-picked'), text: e.textContent })))
   check('V1 기획 방향 5개 — 1순위(86점) · 순위 이유 · 고객 · 회사 근거 · 1순위가 골라져 있음 · 모델 표시', opts.length === 5 && /1순위/.test(opts[0].text) && /86점/.test(opts[0].text) && /1순위인 이유 · 특허와 MVP 가 같은 이야기/.test(opts[0].text) && /고객 · 절삭 공구를 쓰는/.test(opts[0].text) && /회사 근거/.test(opts[0].text) && opts[0].picked === 'yes' && (await planAiRow('plan').getAttribute('data-model')) === 'test-model', opts.map((o) => o.text?.slice(0, 30)))
   await shot(page, 'vplan-05p-plans')
-  await page.getByTestId('vplan-plan-rank').click()
+  { const l289 = page.getByTestId('vplan-plan-rank'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-plan-row"][data-key="planRank"]')?.getAttribute('data-phase') === 'done', null, { timeout: 20000 })
   const afterRank = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ picked: e.getAttribute('data-picked'), text: e.textContent })))
   check('V2 [이 중 제일 좋은 게 뭐야?] → 후보를 보내 견줌 → 일정 SaaS 93점이 1순위 · 골라짐', /공구 교체 일정 SaaS/.test(afterRank[0].text) && /93점/.test(afterRank[0].text) && afterRank[0].picked === 'yes' && /후보 5/.test(JSON.stringify(sent.find((r) => r.assistId === 'venture.planRank')?.context ?? '')), afterRank.map((o) => o.text?.slice(0, 20)))
-  await page.getByTestId('vplan-plan-more').click()
+  { const l289 = page.getByTestId('vplan-plan-more'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-plan-row"][data-key="planMore"]')?.getAttribute('data-phase') === 'done', null, { timeout: 20000 })
   const afterMore = await page.getByTestId('vplan-plan-option').evaluateAll((els) => els.map((e) => ({ fresh: e.getAttribute('data-fresh'), text: e.textContent })))
   check('V3 [자체점검으로 더 짜내기] → 새 방향 2개 "새로 · 자체점검" · 점수 순(90점 2순위) · 7개', afterMore.length === 7 && afterMore.filter((o) => o.fresh === 'yes').length === 2 && /교체 배치 대행/.test(afterMore[1].text) && /새로 · 자체점검/.test(afterMore[1].text), afterMore.map((o) => o.text?.slice(0, 20)))
@@ -305,14 +305,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await shot(page, 'vplan-05a-gate')
   // 출원번호 모르고 [AI로 시장조사] → 시장조사만 · 요약 쓰기 단추는 아직 없음
   check('요약 전 3가지가 다 안 되면 [요약 쓰기] 단추가 없음', (await page.getByTestId('vplan-ai-next').count()) === 0)
-  await page.getByTestId('vplan-gate-market-run').click()
+  { const l289 = page.getByTestId('vplan-gate-market-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="market"]')?.getAttribute('data-phase') === 'fail', null, { timeout: 20000 })
   await page.waitForTimeout(400)
   check('시장조사 숫자 · 출원번호를 모르면 시장조사만 하고 요약 앞에서 멈춤 — "요약 전에 먼저 — 시장조사 · 출원번호" · 다른 단계 안 부름', mine().map((r) => r.assistId).join() === 'venture.market' && /요약 전에 먼저 — 시장조사\(TAM · SAM · SOM\) · 출원번호/.test(await row('sum').innerText()) && (await row('p1').getAttribute('data-phase')) === '', { sent: mine().map((r) => r.assistId), sum: await row('sum').innerText() })
   check('숫자 없이 산식만 온 시장조사 — 다시 부르지 않고(1번) "TAM · SAM · SOM 숫자를 찾지 못했습니다" · 숫자 칸이 저절로 열리고 AI 산식이 보임', marketCalls === 1 && /TAM · SAM · SOM 숫자를 찾지 못했습니다/.test(await row('market').innerText()) && (await page.getByTestId('vplan-gate-market-form').isVisible()) && /AI 산식 · .*사업체 수 × 연 단가/.test(await page.getByTestId('vplan-gate-tam-basis').innerText()), { calls: marketCalls, row: await row('market').innerText() })
   await shot(page, 'vplan-05b-market-empty', false)
   // 두 번째 조사는 검색 근거 없이 AI 추정 숫자 → 대표가 한 번 확인해야 요약으로
-  await page.getByTestId('vplan-gate-market-run').click()
+  { const l289 = page.getByTestId('vplan-gate-market-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="market"]')?.getAttribute('data-phase') === 'done', null, { timeout: 15000 })
   await page.waitForTimeout(300)
   check('검색 근거 없는 AI 추정 숫자 — 시장조사 ✓ 아님 · "AI 추정 · 맞으면 [이 숫자로 확인]" · 숫자 칸 열림(새 숫자)', (await page.getByTestId('vplan-gate-market').getAttribute('data-ok')) === 'no' && /AI 추정\(검색 근거 없음\)/.test(await page.getByTestId('vplan-gate-market').innerText()) && (await page.getByTestId('vplan-gate-market-confirm').isVisible()) && (await page.getByTestId('vplan-gate-tam').inputValue()) === '1조 2,000억 원', await page.getByTestId('vplan-gate-market').innerText())
@@ -327,11 +327,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 이제 [요약 쓰기 — 자체점검 ① 까지] → 멈춤 → [요약 확인 — 본문 쓰기]
   const before = sent.length
   check('3가지가 다 되면 차례 "요약" · [요약 쓰기 — 자체점검 ① 까지]', (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'sum' && /요약 쓰기 — 자체점검 ① 까지/.test(await page.getByTestId('vplan-ai-next').innerText()))
-  await page.getByTestId('vplan-ai-next').click()
+  { const l289 = page.getByTestId('vplan-ai-next'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-next"]')?.getAttribute('data-step') === 'body' && !document.querySelector('[data-testid="vplan-ai-next"]')?.hasAttribute('disabled'), null, { timeout: 40000 })
   check('[요약 쓰기] → 요약 · 자체점검 ①(두 번) 까지만 쓰고 멈춤 · 다음 단추 "요약 확인 — 본문 5묶음 쓰기"', sent.slice(before).map((r) => r.assistId).join() === 'venture.sum,venture.judge,venture.judge' && /본문 5묶음 쓰기/.test(await page.getByTestId('vplan-ai-next').innerText()) && (await page.getByTestId('vplan-ai').getAttribute('data-phase')) === 'body', sent.slice(before).map((r) => r.assistId))
   await shot(page, 'vplan-05r-sum-done', false)
-  await page.getByTestId('vplan-ai-next').click()
+  { const l289 = page.getByTestId('vplan-ai-next'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => {
     const rows = [...document.querySelectorAll('[data-testid="vplan-ai-row"]')]
     return rows.length === 9 && rows.every((e) => ['done', 'fail'].includes(e.getAttribute('data-phase') ?? '')) && !document.querySelector('[data-testid="vplan-ai-next"][disabled]')
@@ -355,7 +355,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('자체점검 ① 줄 — 93점 · 직접 고친 칸 · 고친 뒤 다시 판정 / ② 줄 — 94점', /93점/.test(await row('judgeSum').innerText()) && /차별점/.test(await row('judgeSum').innerText()) && /고친 뒤 다시 판정/.test(await row('judgeSum').innerText()) && /94점/.test(await row('judgeAll').innerText()), [await row('judgeSum').innerText(), await row('judgeAll').innerText()])
   check('판정 상자 — ② 94점 · 통과 · 자체점검이 고친 칸(목표시장) · 대표 기준 표시', (await page.getByTestId('vplan-judge').getAttribute('data-score')) === '94' && (await page.getByTestId('vplan-judge').getAttribute('data-pass')) === 'yes' && /목표시장/.test(await page.getByTestId('vplan-judge').innerText()) && /대표 기준/.test(await page.getByTestId('vplan-judge').innerText()))
   check('AI: 못 쓴 단계만 다시 단추', (await page.getByTestId('vplan-ai-retry').count()) === 1)
-  await page.getByTestId('vplan-ai-retry').click()
+  { const l289 = page.getByTestId('vplan-ai-retry'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelector('[data-testid="vplan-ai-row"][data-key="g2"]')?.getAttribute('data-phase') === 'done', null, { timeout: 15000 })
   check('AI: 다시 → g2 씀 · 마지막 요청은 g2 하나', sent[sent.length - 1].assistId === 'venture.g2' && sent.length === before + run2.length + 1)
   check('AI: 확인해 달라는 점(본문 아님 · 자체점검의 대표 확인 질문) 보임', /불량률 숫자 출처 확인/.test(await page.getByTestId('vplan-ai-asks').innerText()) && /지금 거래처 49곳이 맞나요/.test(await page.getByTestId('vplan-ai-asks').innerText()))

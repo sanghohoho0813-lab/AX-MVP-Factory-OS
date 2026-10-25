@@ -4,6 +4,7 @@ import { Panel } from '../components/ui/Panel'
 import { CloudSaveStatus } from '../components/cloud/CloudSaveStatus'
 import { getDataModeConfig } from '../data/dataMode'
 import { CURRENT_USER } from '../data/demo'
+import { AccountViewPanel } from './settings/AccountViewPanel'
 import {
   TabNav,
   SettingRow,
@@ -29,6 +30,8 @@ function LocalSettings() {
       <TabNav active={tab} onChange={setTab} />
       {tab === 'me' && (
         <>
+          {/* D-290 예전 왼쪽 아래(보기 방식 · 고객 플랫폼)는 여기로 */}
+          <AccountViewPanel />
           <Panel title="내 정보">
             <SettingRow label="이름">{CURRENT_USER.name}</SettingRow>
             <SettingRow label="역할">{CURRENT_USER.role}</SettingRow>

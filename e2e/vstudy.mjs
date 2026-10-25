@@ -144,7 +144,7 @@ const openTop = async (page) => {
   check('V1 영상 창 아래 "영상 대본" · "AI로 우리 회사 버전 만들기" 두 칸 · 받기 전 안내(10분씩 3번)', (await study.isVisible()) && (await page.getByTestId('vs-get').isVisible()) && (await page.getByTestId('vs-adapt-run').isVisible()) && ((await page.getByTestId('vs-transcript').innerText()) ?? '').includes('10분씩 3번'))
   await shot(page, 'V1-detail-before')
 
-  await page.getByTestId('vs-get').click()
+  { const l289 = page.getByTestId('vs-get'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('vs-progress').waitFor({ timeout: 3000 }).catch(() => {})
   const progressSeen = (await page.getByTestId('vs-progress').count()) === 1
   await page.waitForFunction(() => !document.querySelector('[data-testid="vs-progress"]'), null, { timeout: 15000 })
@@ -157,7 +157,7 @@ const openTop = async (page) => {
   const failedNote = await page.getByTestId('vs-failed').innerText().catch(() => '')
   const lines1 = await page.getByTestId('vs-lines').locator('li').count()
   check('V3 한 구간(10:00~20:00)이 멈추면 받은 구간(6줄)은 보이고 그 구간만 안내', lines1 === 6 && failedNote.includes('10:00~20:00') && (await page.getByTestId('vs-retry').isVisible()), { lines1, failedNote })
-  await page.getByTestId('vs-retry').click()
+  { const l289 = page.getByTestId('vs-retry'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="vs-lines"] li').length === 9, null, { timeout: 10000 })
   const t2 = posts.filter((p) => p.assistId === 'radar.transcript')
   check('V3b [못 받은 구간 다시] → 그 구간(600)만 다시 · 9줄 · 안내 사라짐', t2.length === 4 && t2[3].video.start === 600 && (await page.getByTestId('vs-failed').count()) === 0, t2.map((p) => p.video.start))
@@ -170,7 +170,7 @@ const openTop = async (page) => {
   const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
   check('V5 [대본 전체 복사] → "[대본] 제목" + "0:00  말" 줄', clip.startsWith('[대본] 세무 기장 수수료') && clip.includes('0:30  (화면 글) 월 기장료 표') && clip.split('\n').length === 10, clip.slice(0, 200))
 
-  await page.getByTestId('vs-adapt-run').click()
+  { const l289 = page.getByTestId('vs-adapt-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('vs-adapt-result').waitFor({ timeout: 10000 })
   const ap = posts.find((p) => p.assistId === 'radar.adapt')
   const secNames = (ap?.context?.sections ?? []).map((s) => s.name)
@@ -235,9 +235,9 @@ for (const width of [390, 360]) {
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   await openTop(page)
-  await page.getByTestId('vs-get').click()
+  { const l289 = page.getByTestId('vs-get'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="vs-lines"] li').length === 9, null, { timeout: 15000 })
-  await page.getByTestId('vs-adapt-run').click()
+  { const l289 = page.getByTestId('vs-adapt-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await page.getByTestId('vs-adapt-result').waitFor({ timeout: 10000 })
   const r = await page.evaluate(() => {
     const d = document.querySelector('[data-testid="radar-video-detail"]')

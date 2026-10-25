@@ -161,7 +161,7 @@ check('W7 [빈 틀로 시작] → 뼈대 [대괄호] 칸 · 대괄호 알림', /
 await page.getByTestId('thr-qs-topic').fill('창업 3년 안 벤처기업확인 세금')
 await page.getByTestId('thr-ref-box').locator('summary').click()
 await page.getByTestId('thr-ref').fill('남의 글 첫 줄입니다\n남의 글 둘째 줄')
-await page.getByTestId('thr-qs-ai').click()
+{ const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
 const call = llm.find((x) => x.sys.includes('(threads.write'))
 check('A1 AI 글 3개 · 틀 표시 · 글자 수 · 고칠 것 수', (await page.getByTestId('thr-ai-draft').count()) === 3 && /B 손해 \+ 숫자/.test(await page.getByTestId('thr-ai-draft').first().innerText()))
@@ -290,7 +290,7 @@ await page.getByTestId('thr-write').waitFor()
 await page.getByTestId('thr-goal-reply').click()
 check('R1d 쓰기 칸 — 이번 주 잘 터진 형식(참고) 한 줄 · P 틀에 "이번 주 잘 됨"', /P 자료 나눔 조건/.test(await page.getByTestId('thr-week-hint').innerText()) && /이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-P').innerText()) && !/이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-A').innerText()))
 const before2 = llm.length
-await page.getByTestId('thr-qs-ai').click()
+{ const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
 const wcall = llm.slice(before2).find((x) => x.sys.includes('(threads.write'))
 check('R1e AI 에 이번 주 형식은 참고로만 — 자료 칸 이름 · 지시에 "기본은 이 공식"', !!wcall && /이번 주 잘 터진 형식\(참고만 — 기본은 우리 공식\)/.test(wcall.user) && /P 자료 나눔 조건/.test(wcall.user) && /기본은 이 공식/.test(wcall.sys), wcall?.user.slice(0, 400))

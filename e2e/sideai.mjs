@@ -402,7 +402,7 @@ await ctx.close()
   const starters = await p.getByTestId('dock-starter').count()
   check('D3 처음 — "무엇이든 물어보세요" · 예시 질문 4개 · 모델 고르기 단추', (await p.getByTestId('dock-chat-empty').isVisible()) && starters === 4 && (await p.getByTestId('dock-model').isVisible()), starters)
   await shot(p, 'D3-chat-empty')
-  await p.getByTestId('dock-starter').nth(1).click()
+  { const l289 = p.getByTestId('dock-starter').nth(1); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await p.getByTestId('dock-answer').first().waitFor()
   const a1 = await p.getByTestId('dock-answer').first().innerText()
   check('D4 예시 질문 한 번 → side.chat(page side)로 묻고 판 안에 답 · 핵심 · 단계 · 복사할 글 · 모델 이름 · 이어 묻기 칩', posts.length === 1 && posts[0].assistId === 'side.chat' && posts[0].page === 'side' && posts[0].ask.includes('정책자금') && a1.includes('답 1') && a1.includes('1단계 진단') && a1.includes('대표님 안녕하세요 1') && a1.includes('gemini-3.1-flash-lite') && (await p.getByTestId('dock-next').count()) === 2, { posts: posts.length, a1 })
@@ -411,7 +411,7 @@ await ctx.close()
   await p.getByTestId('dock-answer').nth(1).waitFor()
   const ctx2 = posts[1]?.context ?? {}
   check('D5 질문 칸 + Enter → 두 번째 답 · 앞선 대화 1줄 · 지금 보는 화면 이름만 보냄(회사 기록 없음)', posts.length === 2 && posts[1].ask === '고용지원금은?' && ctx2.sections?.[0]?.name === '앞선 대화' && ctx2.sections[0].rows.length === 1 && ctx2.sections.length === 1 && (ctx2.facts ?? []).length === 1 && ctx2.facts[0].startsWith('지금 보고 있는 화면'), ctx2)
-  await p.getByTestId('dock-next').last().click()
+  { const l289 = p.getByTestId('dock-next').last(); await l289.click(); await p.waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await p.getByTestId('dock-answer').nth(2).waitFor()
   check('D6 이어 묻기 칩 → 세 번째 질문으로 바로', posts.length === 3 && posts[2].ask === '기한은 언제야', posts.map((x) => x.ask))
   failNext = 1
@@ -419,7 +419,7 @@ await ctx.close()
   await p.getByTestId('dock-chat-send').click()
   await p.getByTestId('dock-error').waitFor()
   const errText = await p.getByTestId('dock-error').innerText()
-  await p.getByTestId('dock-retry').click()
+  { const l289 = p.getByTestId('dock-retry'); await l289.click(); await p.waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
   await p.waitForFunction(() => document.querySelectorAll('[data-testid="dock-answer"]').length === 4)
   check('D7 AI 가 붐비면 사람 말로 · [다시] → 같은 질문으로 답', errText.includes('붐비') && posts.length === 5 && posts[4].ask === '실패해 볼 질문', { errText, n: posts.length })
   // 알림이 판에 가리지 않게 — 복사 알림은 판 왼쪽에
@@ -598,7 +598,8 @@ for (const width of [1024, 1440, 1600, 1920, 2300]) {
   if (width === 1920) await shot(p, 'S10-1920-margin')
   await c.close()
 }
-check('S10 머리줄 넘침 0 · 화면 넘침 0 · 단추는 어느 폭에서나 보임 · 메뉴 기본 폭이면 머리줄에서 빼는 것 없음(1024 · 1440 · 1600 · 1920 · 2300)', hdr.every((h) => h.hdr <= 0 && h.page <= 0 && h.vis && h.fit === '0'), hdr)
+// D-290 머리줄 자리 맞추기 1 · 2 단계는 보기 방식 글자(PC · Mobile · PC+Mobile)만 뺀다 — 찾기 칸 · 시계 · 단추는 그대로
+check('S10 머리줄 넘침 0 · 화면 넘침 0 · 단추는 어느 폭에서나 보임 · 메뉴 기본 폭이면 머리줄에서 빼는 것 없음(보기 방식 글자만 자리 따라 — 1024 · 1440 · 1600 · 1920 · 2300)', hdr.every((h) => h.hdr <= 0 && h.page <= 0 && h.vis && Number(h.fit) <= 2), hdr)
 check('S10b 1024 · 1440 · 1600 은 맨 위 줄 오른쪽 · 1920 · 2300 은 오른쪽 여백(본문 글과 12px 넘게 떨어짐 · 화면 안 · 굴려도 그 자리)', hdr.map((h) => h.spot).join() === 'inline,inline,inline,margin,margin' && hdr.filter((h) => h.spot === 'margin').every((h) => h.gap >= 12 && h.right <= h.cw && h.topAfter === h.top), hdr.map((h) => ({ w: h.width, spot: h.spot, gap: h.gap, top: h.top, topAfter: h.topAfter })))
 
 // 노트북(1024) — 메뉴를 끝까지 넓혀도 본문 768px 남김(예전 폭 256 까지) · 큰 화면에서 넓혀 둔 440 도 줄여 보임

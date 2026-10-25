@@ -669,6 +669,7 @@ try {
   const pBar = page.getByTestId('ai-assist-bar').first()
   check('팀장(D-257): 오늘 화면에 AI 도우미 띠', (await pBar.count()) === 1)
   await page.getByTestId('ai-assist-chip').first().click()
+  await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await page.getByTestId('ai-assist-result').first().waitFor({ timeout: 15000 }).catch(() => {})
   const pRes = await page.getByTestId('ai-assist-result').first().innerText().catch(() => '')
   const gem = aiCalls.filter((c) => c.provider === 'gemini')
@@ -698,10 +699,14 @@ try {
   await shot(page, 'pilot-08-dock-chat')
   await page.getByTestId('dock-close').click()
 
-  // D-188: 사이드바 아래 — 버전 글자 대신 [개발자에게 피드백](이번 회차 아직이면 '새 설문')
+  // D-188 → D-290: [개발자에게 피드백] 은 설정 › 계정 · 보기 안으로(왼쪽 아래는 이름 · 로그아웃만) — 메뉴 '설정' 줄에 '새 설문'
   const side = (await page.locator('aside').first().innerText()) ?? ''
-  const fbBtn = page.locator('aside [data-testid="feedback-open"]').first()
-  check('팀장(D-188): 사이드바 아래 버전 글자(컨설팅 운영 · AX 스튜디오 · v0.1.0) 없음 · [개발자에게 피드백] · 새 설문 표시', !side.includes('v0.1.0') && !side.includes('컨설팅 운영 · AX 스튜디오') && (await fbBtn.count()) === 1 && (await fbBtn.getAttribute('data-fresh')) === '1' && (await fbBtn.innerText()).includes('개발자에게 피드백'), side.replace(/\n/g, '|').slice(-160))
+  const freshDot = page.locator('aside [data-testid="settings-feedback-fresh"]').first()
+  check('팀장(D-188 · D-290): 사이드바 버전 글자 없음 · 아래에 피드백 단추 없음 · 메뉴 설정 줄에 "새 설문"', !side.includes('v0.1.0') && !side.includes('컨설팅 운영 · AX 스튜디오') && (await page.locator('aside [data-testid="feedback-open"]').count()) === 0 && (await freshDot.count()) === 1, side.replace(/\n/g, '|').slice(-160))
+  await go(page, '/settings')
+  const fbBtn = page.locator('[data-testid="settings-feedback"] [data-testid="feedback-open"]').first()
+  await shot(page, 'pilot-d290-settings')
+  check('팀장(D-290): 설정 › 계정 · 보기 — [개발자에게 피드백] · 새 설문 표시 · 고객 플랫폼 · 대표/팀장 전환 · 계정 바꾸기 없음', (await fbBtn.count()) === 1 && (await fbBtn.getAttribute('data-fresh')) === '1' && (await fbBtn.innerText()).includes('개발자에게 피드백') && (await page.getByTestId('settings-portal-link').count()) === 0 && (await page.getByTestId('settings-view-as').count()) === 0 && (await page.getByTestId('settings-account-switch').count()) === 0)
   await fbBtn.click()
   await page.waitForURL(/\/feedback$/, { timeout: 10000 })
   await page.waitForTimeout(600)
@@ -733,7 +738,7 @@ try {
   await go(page, '/feedback/inbox')
   check('팀장(D-188): 받은 피드백함 주소는 막힘(대표만)', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
   await go(page, '/')
-  check('팀장(D-188): 보낸 뒤 사이드바 "새 설문" 표시 사라짐', (await page.locator('aside [data-testid="feedback-open"]').first().getAttribute('data-fresh')) === '0')
+  check('팀장(D-188 · D-290): 보낸 뒤 메뉴 설정 줄 "새 설문" 표시 사라짐', (await page.locator('aside a[href="/settings"]').count()) >= 1 && (await page.locator('aside [data-testid="settings-feedback-fresh"]').count()) === 0)
   await go(page, '/ops/clients')
   const pHub = await bodyText(page)
   check('팀장(D-171): 고객 관리 — "잠재고객" 칸 · 돈 칸은 "미수금"', pHub.includes('잠재고객') && pHub.includes('미수금') && !pHub.includes('못 받은 내 돈'), pHub.slice(0, 300))
@@ -885,8 +890,12 @@ try {
   {
     await go(page, '/ops/clients')
     const oside = (await page.locator('aside').first().innerText()) ?? ''
-    const inboxBtn = page.locator('aside [data-testid="feedback-inbox-open"]').first()
-    check('대표(D-188): 사이드바 아래 버전 글자 없음 · [받은 피드백함] + 새 피드백 1', !oside.includes('v0.1.0') && (await inboxBtn.count()) === 1 && (await inboxBtn.getAttribute('data-unread')) === '1', oside.replace(/\n/g, '|').slice(-160))
+    const unreadDot = page.locator('aside [data-testid="settings-feedback-unread"]').first()
+    check('대표(D-188 · D-290): 사이드바 버전 글자 없음 · 메뉴 설정 줄에 새 피드백 1', !oside.includes('v0.1.0') && (await unreadDot.count()) === 1 && ((await unreadDot.innerText()) ?? '').trim() === '1', oside.replace(/\n/g, '|').slice(-160))
+    await go(page, '/settings')
+    const inboxBtn = page.locator('[data-testid="settings-feedback"] [data-testid="feedback-inbox-open"]').first()
+    await shot(page, 'owner-d290-settings')
+    check('대표(D-290): 설정 › 계정 · 보기 — [받은 피드백함] + 새 피드백 1 · 보는 화면(대표 ↔ 팀장) · 왼쪽 아래 로그아웃 하나', (await inboxBtn.count()) === 1 && (await inboxBtn.getAttribute('data-unread')) === '1' && (await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"]').count()) === 1 && (await page.locator('aside [data-testid="sidebar-signout"]').count()) === 1)
     await page.locator('header button[aria-label^="챙길 것"]').first().click()
     await page.waitForTimeout(300)
     const bellFb = page.getByTestId('bell-feedback')
@@ -902,7 +911,7 @@ try {
     // D-222 '몇 명' 이 아니라 응답 건수였다 — 한 사람이 두 번 보내면 '2명' 으로 보이던 것
     check('대표(D-222): 모아 보기 기준 — "(응답 1건 · 1명)"', /응답 1건 · 1명/.test((await page.getByTestId('feedback-basis').innerText().catch(() => '')) ?? ''), await page.getByTestId('feedback-basis').innerText().catch(() => 'none'))
     const readAt = sql(`select coalesce(payload->>'readAt', '') from public.module_data where workspace_id = '${PILOT_WS}' and module_key = 'feedback' order by created_at desc limit 1`)
-    check('대표(D-188): 열면 읽음으로 적힘(DB readAt) · 사이드바 숫자 사라짐', readAt.length > 10 && (await page.locator('aside [data-testid="feedback-inbox-open"]').first().getAttribute('data-unread')) === '0', readAt)
+    check('대표(D-188): 열면 읽음으로 적힘(DB readAt) · 사이드바 숫자 사라짐', readAt.length > 10 && (await page.locator('aside [data-testid="settings-feedback-unread"]').count()) === 0, readAt)
     await shot(page, 'owner-feedback-inbox')
   }
 
@@ -953,6 +962,7 @@ try {
     await go(page, '/')
     const hasBar = (await page.getByTestId('ai-assist-bar').count()) >= 1
     await page.getByTestId('ai-assist-chip').first().click()
+    await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
     await page.getByTestId('ai-assist-model-toggle').first().waitFor({ timeout: 8000 }).catch(() => {})
     await page.getByTestId('ai-assist-model-toggle').first().click().catch(() => {})
     await page.waitForTimeout(500)

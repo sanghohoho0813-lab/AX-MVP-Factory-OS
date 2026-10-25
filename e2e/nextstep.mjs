@@ -118,6 +118,7 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
 {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.getByTestId('ai-assist-chip').first().click()
+  await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await page.getByTestId('ai-assist-error').waitFor({ timeout: 10000 })
   const ref = (await page.getByTestId('ai-assist-error-ref').innerText().catch(() => '')) ?? ''
   const id = posts.at(-1)?.requestId ?? ''

@@ -682,7 +682,9 @@ html[data-text-scale="extra_large"] .hdr-wide-search,
 html[data-text-scale="large"] .hdr-opt,
 html[data-text-scale="extra_large"] .hdr-opt,
 html[data-text-scale="large"] .hdr-opt-label,
-html[data-text-scale="extra_large"] .hdr-opt-label {
+html[data-text-scale="extra_large"] .hdr-opt-label,
+html[data-text-scale="large"] .hdr-dev-label,
+html[data-text-scale="extra_large"] .hdr-dev-label {
   display: none !important;
 }
 html[data-text-scale="large"] .hdr-compact-search,
@@ -724,16 +726,23 @@ html[data-text-scale="extra_large"] .dev-stacked-icon {
 }
 
 /* D-256: 왼쪽 메뉴를 넓혀 머리줄 자리가 모자랄 때 — Header 가 실제로 재서 넘칠 때만 data-fit 을 올린다(같은 순서로 뺀다) */
-header:is([data-fit='1'], [data-fit='2'], [data-fit='3']) :is(.hdr-wide-search, .hdr-opt, .hdr-opt-label) {
+/* D-290 보기 방식 글자(PC · Mobile · PC+Mobile)는 넓은 찾기 칸보다 먼저 뺀다 — 고르지 않은 둘 → 지금 고른 것 순서로 */
+header:is([data-fit='1'], [data-fit='2'], [data-fit='3'], [data-fit='4'], [data-fit='5']) .hdr-dev-label {
   display: none !important;
 }
-header:is([data-fit='1'], [data-fit='2'], [data-fit='3']) .hdr-compact-search {
+header:is([data-fit='2'], [data-fit='3'], [data-fit='4'], [data-fit='5']) .hdr-dev-label-on {
+  display: none !important;
+}
+header:is([data-fit='3'], [data-fit='4'], [data-fit='5']) :is(.hdr-wide-search, .hdr-opt, .hdr-opt-label) {
+  display: none !important;
+}
+header:is([data-fit='3'], [data-fit='4'], [data-fit='5']) .hdr-compact-search {
   display: inline-flex !important;
 }
-header:is([data-fit='2'], [data-fit='3']) .hdr-clock {
+header:is([data-fit='4'], [data-fit='5']) .hdr-clock {
   display: none !important;
 }
-header[data-fit='3'] .hdr-tight {
+header[data-fit='5'] .hdr-tight {
   display: none !important;
 }
 

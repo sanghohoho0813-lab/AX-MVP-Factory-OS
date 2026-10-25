@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button'
 import { Surface } from '../../components/ui/primitives'
 import type { TopicChip } from '../../services/marketing/quickStart'
 import { StepTitle, chip } from './snsParts'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 export function QuickStart({
   testPrefix,
@@ -96,9 +97,9 @@ export function QuickStart({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {ai.ok && (
-              <Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`}>
+              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`}>
                 <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
-              </Button>
+              </Button></AiConfirm>
             )}
             {fallback && (
               <Button variant={ai.ok ? 'ghost' : 'primary'} onClick={fallback.onClick} disabled={!has} className={ai.ok ? '' : 'w-full sm:w-auto'} data-testid={`${testPrefix}-qs-rule`}>

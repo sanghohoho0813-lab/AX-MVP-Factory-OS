@@ -161,12 +161,18 @@ for (const vp of VIEWPORTS) {
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // D-290 왼쪽 아래(서랍)는 이름 · 로그아웃만 — 보기 방식은 설정 › 계정 · 보기로
   await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(400)
-  const sw = page.getByTestId('drawer-device').getByTestId('device-switch')
+  const drawerBottom = await page.locator('[data-testid="sidebar-account"]:visible').first().evaluate((el) => el.parentElement?.innerText ?? '').catch(() => '')
+  check('[D-290] 390 서랍 아래 — 이름 한 줄뿐(로컬 모드라 로그아웃 없음 · 보기 방식 · 대표/팀장 · 피드백 · 고객 플랫폼 없음)', (await page.getByTestId('drawer-device').count()) === 0 && (await page.locator('[data-testid="device-switch"]:visible').count()) === 0 && (await page.getByTestId('sidebar-portal-link').count()) === 0 && /김상호/.test(drawerBottom) && drawerBottom.trim().split('\n').filter(Boolean).length <= 2, drawerBottom)
+  await page.keyboard.press('Escape')
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  await page.getByTestId('settings-account-view').waitFor({ timeout: 10000 })
+  const sw = page.getByTestId('settings-device').getByTestId('device-switch')
   const opts = await sw.locator('[data-mode]').evaluateAll((els) => els.map((e) => ({ m: e.dataset.mode, on: e.getAttribute('aria-checked'), clip: [...e.querySelectorAll('span')].some((t) => t.scrollWidth > t.clientWidth + 1) })))
-  check('[보기 방식] 390 서랍(더보기)에 PC · Mobile · PC+Mobile · 지금은 Mobile · 글자 잘림 없음', opts.map((o) => o.m).join() === 'pc,mobile,dual' && opts.find((o) => o.m === 'mobile')?.on === 'true' && opts.every((o) => !o.clip), opts)
+  check('[보기 방식] 390 설정 › 계정 · 보기에 PC · Mobile · PC+Mobile · 지금은 Mobile · 글자 잘림 없음', opts.map((o) => o.m).join() === 'pc,mobile,dual' && opts.find((o) => o.m === 'mobile')?.on === 'true' && opts.every((o) => !o.clip), opts)
   await sw.locator('[data-mode="pc"]').click()
   await page.getByTestId('pc-stage').waitFor({ timeout: 10000 })
   await page.waitForTimeout(2500)
@@ -174,7 +180,7 @@ for (const vp of VIEWPORTS) {
   const pcW = await pcIn.locator('body').evaluate(() => innerWidth).catch(() => 0)
   const pcAside = await pcIn.locator('aside').first().isVisible().catch(() => false)
   const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
-  check('[보기 방식] PC — PC 칸 하나 · 안 화면은 PC 배치(폭 1200 · 사이드바 보임) · 휴대폰 폭에 맞춤(넘침 0) · 주소 그대로', pcW === 1200 && pcAside && over <= 0 && page.url().endsWith('/sales/board'), { pcW, pcAside, over, url: page.url() })
+  check('[보기 방식] PC — PC 칸 하나 · 안 화면은 PC 배치(폭 1200 · 사이드바 보임) · 휴대폰 폭에 맞춤(넘침 0) · 주소 그대로', pcW === 1200 && pcAside && over <= 0 && page.url().endsWith('/settings'), { pcW, pcAside, over, url: page.url() })
   await page.getByTestId('device-switch').locator('[data-mode="dual"]').click()
   await page.getByTestId('dual-view').waitFor({ timeout: 10000 })
   await page.waitForTimeout(3000)
@@ -201,7 +207,7 @@ for (const vp of VIEWPORTS) {
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1500)
   const back = { stage: await page.locator('[data-testid="dual-view"], [data-testid="pc-stage"]').count(), menu: await page.getByRole('button', { name: '메뉴 열기' }).count(), keys: await page.evaluate(() => [localStorage.getItem('axmvp.ui.device_view_narrow'), localStorage.getItem('axmvp.ui.device_view')]) }
-  check("[보기 방식] Mobile — 본 화면으로(무대 없음 · 메뉴 단추) · 휴대폰 값만 'mobile' · PC 값은 손대지 않음", back.stage === 0 && back.menu === 1 && back.keys[0] === 'mobile' && back.keys[1] === null && page.url().endsWith('/sales/board'), back)
+  check("[보기 방식] Mobile — 본 화면으로(무대 없음 · 메뉴 단추) · 휴대폰 값만 'mobile' · PC 값은 손대지 않음", back.stage === 0 && back.menu === 1 && back.keys[0] === 'mobile' && back.keys[1] === null && page.url().endsWith('/settings'), back)
   check('[보기 방식] JS 오류 없음', errors.length === 0, errors.slice(0, 3).join(' | '))
   await ctx.close()
   // 휴대폰에서 PC+Mobile 을 골라 둔 채 PC(1440)로 열어도 PC 는 늘 보던 화면
@@ -213,8 +219,22 @@ for (const vp of VIEWPORTS) {
   await pp.waitForTimeout(800)
   const pcState = { stage: await pp.locator('[data-testid="dual-view"], [data-testid="pc-stage"], [data-testid="mobile-stage"]').count(), on: await pp.locator('header [data-testid="device-switch"] [aria-checked="true"]').getAttribute('data-mode').catch(() => null) }
   check('[보기 방식] 휴대폰에서 고른 값은 PC 에 번지지 않음(1440 — 무대 없음 · PC 선택)', pcState.stage === 0 && pcState.on === 'pc', pcState)
+  // D-290 PC 머리줄 — 자리가 있으면 'PC · Mobile · PC+Mobile' 글자 · 모자라면 글자부터 빼고 넓은 찾기 칸은 지킨다 · 넘침 0
+  const hdrAt = async (w) => {
+    await pp.setViewportSize({ width: w, height: 900 })
+    await pp.waitForTimeout(500)
+    return pp.evaluate(() => {
+      const h = document.querySelector('header')
+      const vis = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null)
+      const sw = vis('header [data-testid="device-switch"]')[0]
+      const cp = vis('header [data-testid="device-switch-compact"]')[0]
+      return { w: innerWidth, fit: h?.dataset.fit, over: h ? h.scrollWidth - h.clientWidth : 99, sw: sw ? sw.innerText.replace(/\s+/g, ' ').trim() : null, compact: cp ? cp.innerText.trim() : null, wideSearch: vis('header .hdr-wide-search').length }
+    })
+  }
+  const hdrs = [await hdrAt(1280), await hdrAt(1440), await hdrAt(1600), await hdrAt(1920)]
+  check('[D-290] PC 머리줄 보기 방식 — 1280 단추 하나에 지금 이름(PC) · 1440~1920 세 단추 · 1920 글자 PC · Mobile · PC+Mobile · 넓은 찾기 칸 유지(1440+) · 넘침 0', hdrs[0].compact === 'PC' && hdrs.slice(1).every((h) => h.sw !== null && h.wideSearch === 1) && hdrs[3].sw === 'PC Mobile PC+Mobile' && hdrs.every((h) => h.over <= 0), hdrs)
   await pc.close()
-  // 360 · 글자 '매우 크게' — 서랍 세 칸 글자가 잘리지 않는다(아이콘을 빼고 글자만)
+  // 360 · 글자 '매우 크게' — 설정 세 칸 글자가 잘리지 않는다(아이콘을 빼고 글자만)
   const xl = await browser.newContext({ viewport: { width: 360, height: 780 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
   const xp = await xl.newPage()
   await xp.goto(BASE + '/', { waitUntil: 'networkidle' })
@@ -225,12 +245,11 @@ for (const vp of VIEWPORTS) {
     v.textScale = 'extra_large'
     localStorage.setItem(k, JSON.stringify(v))
   })
-  await xp.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
-  await xp.getByRole('button', { name: '메뉴 열기' }).click()
-  await xp.waitForTimeout(400)
-  const xlOpts = await xp.getByTestId('drawer-device').locator('[data-mode]').evaluateAll((els) => els.map((e) => ({ m: e.dataset.mode, clip: [...e.querySelectorAll('span')].some((t) => t.scrollWidth > t.clientWidth + 1), r: Math.round(e.getBoundingClientRect().right) })))
-  const drawerRight = await xp.getByTestId('drawer-device').evaluate((e) => Math.round(e.getBoundingClientRect().right))
-  check('[보기 방식] 360 · 글자 매우 크게 — 서랍 세 칸 글자 잘림 없음 · 칸 밖으로 안 나감', xlOpts.length === 3 && xlOpts.every((o) => !o.clip && o.r <= drawerRight + 1), { xlOpts, drawerRight })
+  await xp.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  await xp.getByTestId('settings-device').waitFor({ timeout: 10000 })
+  const xlOpts = await xp.getByTestId('settings-device').locator('[data-mode]').evaluateAll((els) => els.map((e) => ({ m: e.dataset.mode, clip: [...e.querySelectorAll('span')].some((t) => t.scrollWidth > t.clientWidth + 1), r: Math.round(e.getBoundingClientRect().right) })))
+  const drawerRight = await xp.getByTestId('settings-device').evaluate((e) => Math.round(e.getBoundingClientRect().right))
+  check('[보기 방식] 360 · 글자 매우 크게 — 설정 세 칸 글자 잘림 없음 · 칸 밖으로 안 나감 · 가로 넘침 0', xlOpts.length === 3 && xlOpts.every((o) => !o.clip && o.r <= drawerRight + 1) && (await xp.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, { xlOpts, drawerRight })
   await xl.close()
 }
 

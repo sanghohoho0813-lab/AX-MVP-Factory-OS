@@ -15,6 +15,7 @@ import type { ChannelBrief, IdeaInput } from '../../../services/marketing/radarS
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, transcriptContext, transcriptDone, transcriptLines, transcriptSegments, transcriptText } from '../../../services/marketing/videoStudy'
 import { adaptOf, resetTranscript, startAdapt, startTranscript, studyRun, studyVersion, subscribeStudy, transcriptOf } from '../../../services/marketing/videoStudyRun'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
 
 export interface StudyProps {
   brief: ChannelBrief | null
@@ -135,14 +136,14 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
             )}
             <div className="flex flex-wrap items-center gap-2">
               {!done && run.running === 0 && (failed.length === 0 || gotParts + failed.length < segs.length) && (
-                <button type="button" onClick={() => getTranscript()} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-slate-900 px-3 font-semibold text-white hover:bg-slate-800" data-testid="vs-get">
+                <AiConfirm><button type="button" onClick={() => getTranscript()} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-slate-900 px-3 font-semibold text-white hover:bg-slate-800" data-testid="vs-get">
                   <FileText aria-hidden="true" className="size-4" /> {lines.length ? '나머지 받아 적기' : '대본 받아 적기'}
-                </button>
+                </button></AiConfirm>
               )}
               {failed.length > 0 && run.running === 0 && (
-                <button type="button" onClick={() => getTranscript(true)} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-amber-300 bg-white px-3 font-semibold text-amber-900 hover:bg-amber-50" data-testid="vs-retry">
+                <AiConfirm><button type="button" onClick={() => getTranscript(true)} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-amber-300 bg-white px-3 font-semibold text-amber-900 hover:bg-amber-50" data-testid="vs-retry">
                   <RotateCcw aria-hidden="true" className="size-4" /> 못 받은 구간 다시
-                </button>
+                </button></AiConfirm>
               )}
               {lines.length > 0 && (
                 <button type="button" onClick={() => void copy(transcriptText(doc), '대본')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="vs-copy">
@@ -180,10 +181,10 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
         </p>
         {can && !lines.length && !a && <p className="t-meta break-keep text-violet-900">대본을 먼저 받으면 구성까지 더 정확해요(없어도 만들 수 있어요).</p>}
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => void makeAdapt()} disabled={run.adapting} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-60" data-testid="vs-adapt-run">
+          <AiConfirm><button type="button" onClick={() => void makeAdapt()} disabled={run.adapting} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-60" data-testid="vs-adapt-run">
             {run.adapting ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}
             {run.adapting ? '만드는 중…' : a ? '다시 만들기' : 'AI로 우리 회사 버전 만들기'}
-          </button>
+          </button></AiConfirm>
           <ModelPicker popover testId="vs-model" />
           {a && adapt && <span className="t-meta text-violet-900/70">{adapt.withTranscript ? '대본을 보고 만듦' : '제목 · 숫자로 만듦'} · {adapt.model}</span>}
         </div>

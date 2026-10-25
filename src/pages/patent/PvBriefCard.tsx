@@ -15,6 +15,7 @@ import { NextActionBar } from '../../components/ui/pageFrame'
 import type { PvBrief } from '../../services/patent/pvBrief'
 import type { PvBoardRow } from '../../services/patent/pvBoard'
 import { pvSteps } from '../../services/patent/pvSteps'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 /** ② 요약 — 이 회사 준비 현황(다섯 단계 · 이미 있는 자료) */
 export function PvBriefSummary({ company, clientId, brief }: { company: string; clientId: string; brief: PvBrief }) {
@@ -59,9 +60,18 @@ export function PvBriefNext({ brief, onNewSpec }: { brief: PvBrief; onNewSpec: (
       icon={brief.next.act ? Sparkles : ArrowRight}
       title={<span data-testid="pv-brief-next-text">{brief.next.text}</span>}
       action={
-        <Button variant="primary" onClick={go} data-testid="pv-brief-next">
-          {brief.next.act ? <Sparkles aria-hidden="true" className="size-4" /> : <ArrowRight aria-hidden="true" className="size-4" />} {brief.next.label}
-        </Button>
+        // D-289 AI 를 바로 부르는 다음 할 일(AI로 명세서 초안 쓰기 등)만 두 번 — 화면 이동은 한 번
+        brief.next.act ? (
+          <AiConfirm>
+            <Button variant="primary" onClick={go} data-testid="pv-brief-next">
+              <Sparkles aria-hidden="true" className="size-4" /> {brief.next.label}
+            </Button>
+          </AiConfirm>
+        ) : (
+          <Button variant="primary" onClick={go} data-testid="pv-brief-next">
+            <ArrowRight aria-hidden="true" className="size-4" /> {brief.next.label}
+          </Button>
+        )
       }
       testId="pv-next"
     />

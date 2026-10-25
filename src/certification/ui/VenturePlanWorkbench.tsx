@@ -43,6 +43,7 @@ import { localDateOf } from '../../lib/appClock'
 import { VenturePlanAi, type AiRow } from './VenturePlanAi'
 import type { VPlanBatch } from '../core/venturePlan'
 import { liveRows } from '../../services/patent/specTrash'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type Tab = 'mat' | VPlanPart | 'check'
 const TABS: readonly { key: Tab; label: string }[] = [
@@ -156,7 +157,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
         </div>
       </Surface>
 
-      {assistOn(ai) && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} request={aiReq} onRows={setAiRows} />}
+      {assistOn(ai) && aiOpen && <VenturePlanAi notes={notes} facts={facts} today={ctx.today} hasMaterial={hasMaterial} onSave={onSave} onGoMaterials={() => setTab('mat')} onGoField={goField} onClose={() => setAiOpen(false)} request={aiReq} onRequestTaken={() => setAiReq(null)} onRows={setAiRows} />}
 
       <div role="tablist" className="grid grid-cols-3 gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-1 sm:grid-cols-6" data-testid="vplan-tabs">
         {TABS.map((t, i) => {
@@ -189,6 +190,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
                 assistOn(ai) && f.batch
                   ? {
                       phase: aiRows[f.batch]?.phase,
+                      ready: hasMaterial,
                       run: () => {
                         if (!hasMaterial) {
                           showToast('먼저 재료 — 특허 명세서나 AX 내용이 있어야 AI 가 지어내지 않고 씁니다')
@@ -284,7 +286,7 @@ const SAVE_LABEL: Record<SaveState, string> = { idle: '', saving: '저장 중…
 /* 칸 하나                                                               */
 /* ------------------------------------------------------------------ */
 
-function FieldCard({ f, s, issues, save, ai }: { f: VPlanField; s: VPlanState; issues: VPlanIssue[]; save: (patch: Record<string, string>) => Promise<boolean>; ai?: { phase?: AiRow['phase']; run: () => void } }) {
+function FieldCard({ f, s, issues, save, ai }: { f: VPlanField; s: VPlanState; issues: VPlanIssue[]; save: (patch: Record<string, string>) => Promise<boolean>; ai?: { phase?: AiRow['phase']; ready?: boolean; run: () => void } }) {
   const { showToast } = useToast()
   const value = s.text[f.id] ?? ''
   const d = useDraft(value, (v) => save({ [VK.text(f.id)]: v }))
@@ -381,11 +383,16 @@ function FieldCard({ f, s, issues, save, ai }: { f: VPlanField; s: VPlanState; i
           {d.state !== 'idle' && <span className={`t-meta ${d.state === 'error' ? 'font-semibold text-danger-700' : 'text-slate-500'}`} data-testid="vplan-save-state">{SAVE_LABEL[d.state]}</span>}
           <span className="flex-1" />
           {/* D-252 칸마다 AI — 이 칸이 든 묶음을 쓴다(고친 칸은 덮지 않고 새 안으로) */}
-          {ai && (
+          {/* D-289 재료가 없으면 AI 를 부르지 않고 재료 탭으로 옮기기만 — 그때는 한 번에 */}
+          {ai && (ai.ready === false ? (
             <Button variant="secondary" size="sm" disabled={ai.phase === 'run' || ai.phase === 'wait'} onClick={ai.run} data-testid="vplan-field-ai">
               <Sparkles aria-hidden="true" className="size-4" /> {ai.phase === 'run' ? 'AI 가 쓰는 중…' : ai.phase === 'wait' ? '차례 기다림' : d.draft.trim() ? 'AI로 다시 쓰기' : 'AI로 이 칸 쓰기'}
             </Button>
-          )}
+          ) : (
+            <AiConfirm><Button variant="secondary" size="sm" disabled={ai.phase === 'run' || ai.phase === 'wait'} onClick={ai.run} data-testid="vplan-field-ai">
+              <Sparkles aria-hidden="true" className="size-4" /> {ai.phase === 'run' ? 'AI 가 쓰는 중…' : ai.phase === 'wait' ? '차례 기다림' : d.draft.trim() ? 'AI로 다시 쓰기' : 'AI로 이 칸 쓰기'}
+            </Button></AiConfirm>
+          ))}
           {f.template && !d.draft.trim() && (
             <Button variant="ghost" size="sm" onClick={() => d.setDraft(f.template!)} data-testid="vplan-template">
               문장 틀 넣기

@@ -26,6 +26,7 @@ import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { HeroArt } from '../../config/heroArt'
 import { PageColumns, PageHero } from '../ui/pageFrame'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
+import { AiConfirm } from '../ai/AiConfirm'
 
 export interface WorkChatProps {
   module: ChatModule
@@ -133,6 +134,13 @@ function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: 
             <button key={x.id} type="button" onClick={() => onAsk(x.ask!)} className="tap t-sub inline-flex items-center gap-1.5 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 font-semibold text-brand-800 hover:bg-brand-100" data-testid="chat-action" data-id={x.id}>
               <MessageCircle aria-hidden="true" className="size-4" /> {x.label}
             </button>
+          ) : x.act === 'new-spec' ? (
+            // D-289 새 명세서는 열자마자 AI 가 쓰기 시작(D-261) — 그래서 두 번 눌러야
+            <AiConfirm key={x.id}>
+              <Button size="sm" variant={x.primary ? 'primary' : 'secondary'} onClick={() => onAct(x.act!)} data-testid="chat-action" data-id={x.id}>
+                {x.label}
+              </Button>
+            </AiConfirm>
           ) : x.act ? (
             <Button key={x.id} size="sm" variant={x.primary ? 'primary' : 'secondary'} onClick={() => onAct(x.act!)} data-testid="chat-action" data-id={x.id}>
               {x.act === 'file' && <Paperclip aria-hidden="true" className="size-4" />}
@@ -141,9 +149,9 @@ function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: 
           ) : null,
         )}
         {owner && aiReady && a.source === 'rule' && a.topic !== 'help' && (
-          <Button size="sm" variant="ghost" className="text-violet-700" onClick={onAiMore} data-testid="chat-ai-more">
+          <AiConfirm><Button size="sm" variant="ghost" className="text-violet-700" onClick={onAiMore} data-testid="chat-ai-more">
             <Sparkles aria-hidden="true" className="size-4" /> AI로 더 자세히
-          </Button>
+          </Button></AiConfirm>
         )}
         <Button size="sm" variant="ghost" className="ml-auto" aria-label="답 복사" onClick={() => onCopy(answerText(a), '답')} data-testid="chat-copy">
           <Copy aria-hidden="true" className="size-4" />
@@ -401,9 +409,11 @@ export function WorkChat(p: WorkChatProps) {
             {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
             {t.status === 'error' && !t.a && (
               <div>
-                <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)}>
-                  <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
-                </Button>
+                <AiConfirm>
+                  <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)} data-testid="chat-retry">
+                    <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
+                  </Button>
+                </AiConfirm>
               </div>
             )}
           </li>

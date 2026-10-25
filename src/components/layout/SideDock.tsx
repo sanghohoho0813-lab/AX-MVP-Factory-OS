@@ -19,6 +19,7 @@ import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../
 import { copyText } from '../../services/grants/grantView'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
+import { AiConfirm } from '../ai/AiConfirm'
 
 const DOCK_DEFAULT_W = 420
 const STEP = 24
@@ -121,7 +122,7 @@ function ChatTab() {
             <p className="t-sub break-keep text-slate-600">OS 화면을 보면서 옆에서 바로 묻는 AI 예요. 회사 기록은 보내지 않고, 적은 질문과 앞선 대화 몇 줄만 보냅니다.</p>
             <div className="flex flex-col gap-1.5 pt-1">
               {STARTERS.map((s) => (
-                <button
+                <AiConfirm><button
                   key={s}
                   type="button"
                   onClick={() => {
@@ -134,7 +135,7 @@ function ChatTab() {
                   data-testid="dock-starter"
                 >
                   <MessageCircle aria-hidden="true" className="size-4 shrink-0" /> <span className="min-w-0 break-keep">{s.replace(/: $/, ' …')}</span>
-                </button>
+                </button></AiConfirm>
               ))}
             </div>
           </li>
@@ -150,9 +151,9 @@ function ChatTab() {
             {t.status === 'error' && (
               <div className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" role="alert" data-testid="dock-error">
                 <span className="min-w-0 flex-1 break-keep">{t.error}</span>
-                <button type="button" onClick={() => ask(t.q)} disabled={busy} className="tap inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-amber-300 bg-white px-2.5 font-semibold disabled:opacity-50" data-testid="dock-retry">
+                <AiConfirm><button type="button" onClick={() => ask(t.q)} disabled={busy} className="tap inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-amber-300 bg-white px-2.5 font-semibold disabled:opacity-50" data-testid="dock-retry">
                   <RotateCcw aria-hidden="true" className="size-4" /> 다시
-                </button>
+                </button></AiConfirm>
               </div>
             )}
             {t.status === 'done' && (
@@ -180,9 +181,9 @@ function ChatTab() {
                 {t.caution && <p className="t-sub break-keep text-warning-800">△ {t.caution}</p>}
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                   {(t.next ?? []).slice(0, 3).map((n) => (
-                    <button key={n} type="button" onClick={() => ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
+                    <AiConfirm keepLabel cancel={false}><button key={n} type="button" onClick={() => ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
                       {n}
-                    </button>
+                    </button></AiConfirm>
                   ))}
                   <button type="button" onClick={() => void copy(turnText(t))} className="tap ml-auto flex size-9 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="답 복사" data-testid="dock-copy">
                     <Copy aria-hidden="true" className="size-4" />

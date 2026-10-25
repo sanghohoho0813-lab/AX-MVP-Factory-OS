@@ -127,11 +127,17 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     check('숫자: 1차 미팅은 아직 프로그램이 없어 숫자 없음(0 이면 안 단다)', (await badge('first-meetings').count()) === 0)
   }
 
-  /* ---- D-103: 사이드바 아래 이름 · 고객 플랫폼 아이콘 · 글자 크기는 설정에만 ---- */
+  /* ---- D-103 · D-290: 사이드바 아래는 이름(+ 로그인 모드면 로그아웃)만 · 고객 플랫폼 · 보기 방식은 설정 › 계정 · 보기 · 글자 크기는 설정에만 ---- */
   const account = page.getByTestId('sidebar-account')
   check('사이드바 아래: 김상호 대표', ((await account.innerText()) ?? '').replace(/\s+/g, ' ').includes('김상호 대표'), await account.innerText())
-  const portalIcon = page.getByTestId('sidebar-portal-link')
-  check('사이드바 아래: 고객 플랫폼은 작은 아이콘(새 창)', (await portalIcon.getAttribute('target')) === '_blank' && ((await portalIcon.innerText()) ?? '').trim() === '' && ((await portalIcon.boundingBox())?.width ?? 99) <= 40)
+  check('사이드바 아래(D-290): 고객 플랫폼 아이콘 · 피드백 · 접기 줄 없음 — [사이드바 접기] 는 로고 옆', (await page.getByTestId('sidebar-portal-link').count()) === 0 && (await page.locator('aside [data-testid="sidebar-account"] + *').getByText('사이드바 접기').count()) === 0 && (await page.getByTestId('sidebar-collapse').count()) === 1)
+  {
+    const s0 = page.url()
+    await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+    const portalLink = page.getByTestId('settings-portal-link')
+    check('설정 › 계정 · 보기(D-290): 고객 플랫폼 열기(새 창) · 보기 방식 세 칸', (await portalLink.getAttribute('target')) === '_blank' && (await page.locator('[data-testid="settings-device"] [data-mode]').count()) === 3)
+    await page.goto(s0, { waitUntil: 'networkidle' })
+  }
   check('사이드바: 글자 크기 조절이 없다', (await page.locator('aside').getByText('글자 크기').count()) === 0)
   await page.getByRole('button', { name: '사용자 메뉴' }).click()
   await page.waitForTimeout(200)
