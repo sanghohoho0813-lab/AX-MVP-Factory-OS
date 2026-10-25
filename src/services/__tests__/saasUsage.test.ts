@@ -240,6 +240,28 @@ async function run() {
   const retry = await post({ requestId: id4, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
   check('U10 실패한 요청을 같은 번호로 다시 시도 — 장부가 "다시" 로 받아 한 번만 셈(2단위)', retry.statusCode === 200 && provider().length === 1 && used() === 2 && ledger.get(id4)?.status === 'settled', { s: retry.statusCode, used: used() })
 
+  // SAAS-2.2 되돌린 요청을 같은 번호로 다시 할 때도 그 자리에서 기한 · 마케팅 · 한도를 다시 본다
+  setEnv()
+  providerFails = true
+  const idR = rid()
+  await post({ requestId: idR, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  providerFails = false
+  const again2 = async () => {
+    __resetAiAssistState()
+    calls = []
+    return post({ requestId: idR, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  }
+  acct = { kind: 'customer', plan: 'growth', marketing: true, active: false }
+  const rExp = await again2()
+  acct = { kind: 'customer', plan: 'basic', marketing: false, active: true }
+  const rNoMk = await again2()
+  acct = { kind: 'customer', plan: 'growth', marketing: true, active: true }
+  limit = 1
+  const rQuota = await again2()
+  limit = 20
+  const rOk = await again2()
+  check('U10b 되돌린 요청 다시 — 그 사이 기한 끝남 403 · 마케팅 빠짐 403 · 한도 줄어 429(AI 0 · 줄은 released) → 다 맞으면 200 · 한 번만 셈', rExp.statusCode === 403 && rExp.body.code === 'subscription_inactive' && rNoMk.statusCode === 403 && rNoMk.body.code === 'marketing_not_included' && rQuota.statusCode === 429 && rOk.statusCode === 200 && provider().length === 1 && ledger.get(idR)?.status === 'settled' && used() === 2, { e: rExp.body.code, m: rNoMk.body.code, q: rQuota.statusCode, ok: rOk.statusCode, row: ledger.get(idR) })
+
   setEnv()
   limit = 3
   await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)

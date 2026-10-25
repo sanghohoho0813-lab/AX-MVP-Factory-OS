@@ -15,7 +15,9 @@
 --   - 같은 요청 번호는 한 번만 센다(사람 + 요청 번호 하나) · 실패해서 되돌린 요청은 같은 번호로 다시 해도 한 번만
 --   - 동시에 여러 번 눌러도 한도를 넘지 않는다(사람마다 잠금 — 한 줄씩 차례로 센다)
 --   - '예약' 줄은 그 자체로 센다 — AI 는 답했는데 정산이 실패해도 장부에서 빠지지 않는다(예전: 10분 뒤 빠짐 → 고침).
---     서버가 중간에 멈춰 남은 예약은 3분 뒤 같은 요청 번호로 이어받고(다시 세지 않음), 15분 뒤에는 '자동 정산' 으로 닫는다.
+--     예약 줄이 남아 있는 동안 같은 요청 번호로는 AI 를 다시 부르지 않는다(inflight) — AI 회사 요금이 이미 났을 수 있다.
+--     서버가 중간에 멈춰 남은 예약은 15분 뒤 '자동 정산' 으로 닫고(그 뒤 같은 번호 = done), 다시 하려면 새 요청 번호로(권한 · 한도를 처음부터 확인).
+--   - AI 를 새로 부르는 길(new · 되돌린 요청 retry)은 언제나 이용 기한 · 마케팅 권한 · 한도를 그 자리에서 다시 확인하고, 이번 단추 · 모델 단위로 센다.
 --   - 장부를 쓰는 함수(예약 · 정산 · 되돌림)는 서버 비밀값을 아는 쪽(우리 서버 함수)만 부를 수 있다 —
 --     고객이 자기 로그인으로 직접 불러 '공짜로 정산 · 되돌리기' 를 하지 못하게. 비밀값 원문은 DB 에 두지 않는다(sha256 해시만).
 --   - 대표 계정은 세지 않는다(서버 함수가 대표에게는 이 함수를 부르지 않는다 — 대표 AI 는 예전 그대로).
@@ -192,7 +194,7 @@ revoke all on function public.ai_usage_account(uuid) from public, anon, authenti
 
 -- ---------------------------------------------------------------------
 -- 5) 예약 — AI 를 부르기 전에. 같은 요청 번호는 한 번만 · 권한 · 한도 · 사람마다 차례로(잠금)
---    돌려주는 state: new(새로 셈) · retry(되돌린 요청을 다시 · 멈춘 예약을 이어받음) · inflight(같은 번호가 지금 도는 중) ·
+--    돌려주는 state: new(새로 셈) · retry(되돌린 요청을 다시 — 새로 셈) · inflight(같은 번호의 예약이 남아 있음 — AI 다시 안 부름) ·
 --                   done(이미 끝난 번호) · conflict(같은 번호 · 다른 단추) · quota(한도 넘음) ·
 --                   inactive(고객인데 이용 기한 없음) · not_entitled(마케팅이 포함되지 않음)
 -- ---------------------------------------------------------------------
@@ -243,13 +245,11 @@ begin
     if r.status = 'settled' then
       return jsonb_build_object('state', 'done', 'used', public.ai_usage_used(uid), 'limit', v_limit);
     end if;
+    -- 예약이 남아 있다 = 지금 도는 중이거나 서버가 멈춘 요청. 어느 쪽이든 AI 회사 요금이 이미 났을 수 있으므로
+    -- 같은 번호로는 AI 를 다시 부르지 않는다(예전: 3분 뒤 이어받아 다시 부름 · 다시 세지 않음 · 권한 확인도 건너뜀 → 없앰).
+    -- 15분 뒤 위에서 자동 정산으로 닫히면 같은 번호는 done — 다시 하려면 새 번호(아래 권한 · 한도 확인을 거친다)
     if r.status = 'reserved' then
-      if r.updated_at > now() - interval '3 minutes' then
-        return jsonb_build_object('state', 'inflight', 'used', public.ai_usage_used(uid), 'limit', v_limit);
-      end if;
-      -- 3분 넘게 멈춘 예약(서버 함수 최대 60초) — 같은 번호로 이어받는다(이미 센 것이라 다시 세지 않음)
-      update public.ai_usage_ledger set updated_at = now() where id = r.id;
-      return jsonb_build_object('state', 'retry', 'used', public.ai_usage_used(uid), 'limit', v_limit);
+      return jsonb_build_object('state', 'inflight', 'used', public.ai_usage_used(uid), 'limit', v_limit);
     end if;
   end if;
   -- 새 요청 · 되돌린 요청을 다시 — 권한 · 한도

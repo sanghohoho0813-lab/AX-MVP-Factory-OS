@@ -88,7 +88,16 @@ select qa.eq('P: 2분 된 예약(아직 도는 중일 수 있음) → inflight',
 reset role;
 update public.ai_usage_ledger set updated_at = now() - interval '4 minutes' where request_id = 'req-p22-000002';
 set role authenticated;
-select qa.eq('P: 4분 넘게 멈춘 예약(서버 함수 최대 60초) → 같은 번호로 이어받음 retry · 다시 세지 않음(5)', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000002', 'today.top3', 'standard', 3, null, 'general') r) x), 'retry 5');
+select qa.eq('P: 4분 넘게 멈춘 예약(AI 요금이 났을 수 있음) → 같은 번호로 다시 와도 inflight · AI 다시 안 부름 · 센 양 그대로(5)', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000002', 'today.top3', 'standard', 3, null, 'general') r) x), 'inflight 5');
+select qa.eq('P: 멈춘 예약에 더 비싼 모델(깊게 10)로 다시 와도 inflight', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000002', 'today.top3', 'deep', 10, null, 'general') ->> 'state'), 'inflight');
+select qa.eq('P: 그 줄은 그대로(standard 3 · reserved · 시각 안 바뀜 → 15분 자동 정산 시계 그대로)', (select tier || ' ' || units || ' ' || status || ' ' || (updated_at < now() - interval '3 minutes')::text from public.ai_usage_ledger where request_id = 'req-p22-000002'), 'standard 3 reserved true');
+reset role;
+update public.ai_entitlements set active_until = now() - interval '1 day' where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('P: 기한이 끝난 뒤 멈춘 예약 번호로 다시 → inflight(이어받아 AI 실행 0)', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000002', 'today.top3', 'standard', 3, null, 'general') ->> 'state'), 'inflight');
+reset role;
+update public.ai_entitlements set active_until = now() + interval '30 days' where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
 select qa.eq('P: 새 요청 예약 → new 7', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000004', 'today.top3', 'cheap', 2, null, 'general') r) x), 'new 7');
 select qa.eq('P: AI 는 답했는데 정산 실패(예약으로 남음) — 그래도 센 양에 들어감(7)', (public.my_ai_access() ->> 'used') || ' ' || (select status from public.ai_usage_ledger where request_id = 'req-p22-000004'), '7 reserved');
 reset role;
@@ -98,6 +107,7 @@ values ('19000000-0000-0000-0000-0000000000b1', 'req-p22-lastmon', 'today.top3',
 set role authenticated;
 select qa.eq('P: 다음 요청 → new · 지난달 50 은 안 셈(8)', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000005', 'today.top3', 'cheap', 1, null, 'general') ->> 'used'), '8');
 select qa.eq('P: 그때 15분 넘은 예약은 자동 정산으로 닫힘(센 양 그대로 8)', (select status || ':' || closed_by from public.ai_usage_ledger where request_id = 'req-p22-000004') || ' ' || (public.my_ai_access() ->> 'used'), 'settled:auto 8');
+select qa.eq('P: 자동 정산된 번호로 다시 → done(15분 뒤에도 같은 번호로 AI 다시 안 부름) · 센 양 8', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000004', 'today.top3', 'cheap', 2, null, 'general') r) x), 'done 8');
 select qa.eq('P: 늦게 온 정산 → 1줄 · 다시 세지 않음(8)', (select r->>'settled' || ' ' || (r->>'used') from (select public.ai_usage_settle('qa-secret-0123456789abcdefghij', 'req-p22-000004', 900, 100, 0.0002) r) x), '1 8');
 select qa.eq('P: 늦게 온 정산은 토큰 · 비용만 채움', (select closed_by || ':' || tokens_in from public.ai_usage_ledger where request_id = 'req-p22-000004'), 'server:900');
 reset role;
@@ -118,6 +128,31 @@ update public.ai_entitlements set active_until = now() - interval '1 day' where 
 set role authenticated;
 select qa.eq('P: 기한 지난 고객 — 새 예약 inactive · 줄 안 생김', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-000006', 'today.top3', 'cheap', 1, null, 'general') ->> 'state') || ' ' || (select count(*)::text from public.ai_usage_ledger where request_id = 'req-p22-000006'), 'inactive 0');
 select qa.eq('P: 기한 지난 고객 — 내 권한 active=false', (public.my_ai_access() ->> 'active'), 'false');
+reset role;
+
+-- ---------- 되돌린 요청을 같은 번호로 다시(AI 를 새로 부르는 길) — 그 자리에서 기한 · 마케팅 · 한도를 다시 확인 ----------
+update public.ai_entitlements set active_until = now() + interval '30 days', marketing = true, monthly_units = 20 where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('재시도 준비: 마케팅 예약 new · 센 양 9', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'cheap', 2, null, 'marketing') r) x), 'new 9');
+select qa.eq('재시도 준비: AI 실패 → 되돌림 1 · 센 양 7', (select r->>'released' || ' ' || (r->>'used') from (select public.ai_usage_release('qa-secret-0123456789abcdefghij', 'req-p22-rt0001') r) x), '1 7');
+reset role;
+update public.ai_entitlements set marketing = false where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('재시도: 그 사이 마케팅이 빠지면 → not_entitled · 줄은 released 그대로', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'cheap', 2, null, 'marketing') ->> 'state') || ' ' || (select status from public.ai_usage_ledger where request_id = 'req-p22-rt0001'), 'not_entitled released');
+reset role;
+update public.ai_entitlements set marketing = true, active_until = now() - interval '1 day' where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('재시도: 그 사이 기한이 끝나면 → inactive · 줄은 released 그대로', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'cheap', 2, null, 'marketing') ->> 'state') || ' ' || (select status from public.ai_usage_ledger where request_id = 'req-p22-rt0001'), 'inactive released');
+reset role;
+update public.ai_entitlements set active_until = now() + interval '30 days', monthly_units = 8 where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('재시도: 그 사이 한도가 줄면(7 + 2 > 8) → quota · 줄은 released 그대로', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'cheap', 2, null, 'marketing') ->> 'state') || ' ' || (select status from public.ai_usage_ledger where request_id = 'req-p22-rt0001'), 'quota released');
+reset role;
+update public.ai_entitlements set monthly_units = 20 where user_id = '19000000-0000-0000-0000-0000000000b1';
+set role authenticated;
+select qa.eq('재시도: 모두 맞으면 → retry · 이번 모델 단위(깊게 10)로 셈 → 17', (select r->>'state' || ' ' || (r->>'used') from (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'deep', 10, null, 'marketing') r) x), 'retry 17');
+select qa.eq('재시도: 줄은 reserved · deep 10 · marketing', (select status || ' ' || tier || ' ' || units || ' ' || feature from public.ai_usage_ledger where request_id = 'req-p22-rt0001'), 'reserved deep 10 marketing');
+select qa.eq('재시도 뒤 같은 번호 또 → inflight(두 번 부르지 않음)', (select public.ai_usage_reserve('qa-secret-0123456789abcdefghij', 'req-p22-rt0001', 'radar.top5', 'deep', 10, null, 'marketing') ->> 'state'), 'inflight');
 reset role;
 
 -- ---------- 내부 팀장 — 한도 없이 기록만 · 마케팅은 따로 켠다 ----------
