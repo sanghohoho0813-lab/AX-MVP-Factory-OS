@@ -227,7 +227,8 @@ async function logout(page) {
   const menu = page.getByRole('button', { name: '사용자 메뉴' })
   if (await menu.isVisible().catch(() => false)) {
     await menu.click()
-    await page.getByRole('button', { name: '로그아웃' }).click()
+    // D-290 왼쪽 아래에도 [로그아웃](sidebar-signout) — 여기서는 사용자 메뉴 안의 것
+    await page.getByTestId('account-signout').click()
   } else {
     await page.getByRole('button', { name: '로그아웃' }).first().click()
   }

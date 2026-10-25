@@ -684,7 +684,9 @@ html[data-text-scale="extra_large"] .hdr-opt,
 html[data-text-scale="large"] .hdr-opt-label,
 html[data-text-scale="extra_large"] .hdr-opt-label,
 html[data-text-scale="large"] .hdr-dev-label,
-html[data-text-scale="extra_large"] .hdr-dev-label {
+html[data-text-scale="extra_large"] .hdr-dev-label,
+html[data-text-scale="large"] .hdr-dev-label-on,
+html[data-text-scale="extra_large"] .hdr-dev-label-on {
   display: none !important;
 }
 html[data-text-scale="large"] .hdr-compact-search,

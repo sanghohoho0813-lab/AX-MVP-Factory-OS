@@ -171,6 +171,8 @@ function useHeaderFit(ref: RefObject<HTMLElement | null>) {
     let frame = 0
     const fit = () => {
       frame = 0
+      // 숨어 있을 때(인쇄 · 무대 뒤)는 재지 않는다 — 폭 0 으로 재면 0 단계로 돌아가 다시 보일 때 잠깐 넘친다(D-290)
+      if (el.clientWidth === 0) return
       for (let level = 0; level <= 5; level++) {
         el.dataset.fit = String(level)
         if (el.scrollWidth <= el.clientWidth + 1) return
