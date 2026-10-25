@@ -21,7 +21,7 @@ import { TOOLS } from '../toolRegistry'
 import { MODULES, enabledModulesByGroup, screenGroupForPath } from '../moduleRegistry'
 import { LAUNCHER_ALL, LAUNCHER_ENTRIES, LAUNCHER_SLOTS, moduleTone, toneClass, type FeatureTone } from '../featureVisual'
 import { clientEntryHref, featureForPath, featurePath } from '../featurePaths'
-import { ICON_SLOTS, customIcon, slotIcon } from '../iconSlots'
+import { ICON_SLOTS, ICON_SPRITE, customIcon, slotIcon, spriteIcon } from '../iconSlots'
 import { DEFAULT_CATALOG, defaultSubscription, quote, resolveEntitlements, validateSelection, type Subscription } from '../../services/entitlements'
 import type { ModuleAccess } from '../../services/moduleAccess'
 import { loadSubscription, saveSubscription } from '../../services/subscription'
@@ -229,7 +229,7 @@ await storage()
   check('D-282 색 클래스는 통째로 적힘(이어 붙이지 않음 — D-26)', tones.every((t) => Object.values(toneClass(t)).every((c) => typeof c === 'string' && c.length > 0 && !c.includes('${'))))
 }
 
-/* D-283 아이콘 자리 표 — 지금은 전부 임시 아이콘 · 대표가 만든 아이콘이 오면 표의 custom 만 바꾼다 */
+/* D-283 아이콘 자리 표 · D-284 대표 아이콘 21개(한 장 그림) — 화면 코드는 그대로, 표에서만 바꾼다 */
 {
   const slotKeys = ICON_SLOTS.map((s) => s.key)
   check('D-283 자리 key 겹침 없음', new Set(slotKeys).size === slotKeys.length)
@@ -238,8 +238,22 @@ await storage()
   check('D-283 자리마다 실제 메뉴 줄 · 분야 · 더보기를 가리킴', slotKeys.every((k) => known.has(k)), slotKeys.filter((k) => !known.has(k)).join())
   const need = [...LAUNCHER_ENTRIES.map((e) => e.module), LAUNCHER_ALL.module, 'today', 'calendar', 'client-ops', 'inbox', 'sales', 'more', ...MODULES.filter((m) => moduleTone(m.key) !== 'slate').map((m) => m.key)]
   check('D-283 바로가기 · 아래 메뉴 · 기능 색 줄은 모두 자리 표에 있음(대표가 만들 아이콘 목록)', need.every((k) => slotKeys.includes(k)), need.filter((k) => !slotKeys.includes(k)).join())
-  check('D-283 지금은 새 아이콘 없음 — 전부 임시 아이콘 그대로', ICON_SLOTS.every((s) => !s.custom) && MODULES.every((m) => slotIcon(m.key, m.icon) === m.icon))
   type El = { type: string; props: Record<string, unknown> }
+  // D-284 대표 아이콘 21개 — 한 장 그림의 칸 번호 = 받은 파일 번호 - 1
+  const idx = ICON_SLOTS.map((s) => s.sprite)
+  check('D-284 21곳 모두 대표 아이콘 · 칸 번호 0~20 차례대로(받은 파일 01~21)', ICON_SPRITE.count === 21 && ICON_SLOTS.length === 21 && idx.every((n, i) => n === i), idx.join())
+  const name = (ic: unknown) => String((ic as { displayName?: string }).displayName ?? '')
+  const slotSet = new Set(slotKeys)
+  const slotRows = MODULES.filter((m) => slotSet.has(m.key))
+  check('D-284 메뉴 표의 자리 줄은 대표 아이콘 · 자리 없는 줄(전문 모듈 안 기능)은 예전 아이콘 그대로', slotRows.length >= 15 && slotRows.every((m) => name(m.icon) === `SlotIcon(${m.key})`) && MODULES.filter((m) => !slotSet.has(m.key)).every((m) => !name(m.icon).startsWith('SlotIcon(')), slotRows.filter((m) => name(m.icon) !== `SlotIcon(${m.key})`).map((m) => m.key).join())
+  check('D-284 제품 카탈로그 분야도 같은 대표 아이콘(모듈 전체 · 업체 화면 모듈 줄)', name(MODULE_CATALOG.find((m) => m.key === 'growth')?.icon) === 'SlotIcon(cat-growth)' && name(MODULE_CATALOG.find((m) => m.key === 'tax-finance')?.icon) === 'SlotIcon(cat-tax-finance)')
+  const art = (i: number, key: string, cls: string) => (spriteIcon(i, key) as unknown as (p: { className?: string }) => El)({ className: cls })
+  const first = art(0, 'today', 'size-4')
+  const mid = art(10, 'marketing', 'size-6')
+  const last = art(20, 'settings', 'size-[22px]')
+  const st = (e: El) => e.props.style as Record<string, string>
+  check('D-284 한 장에서 제 칸만 — 크기는 부르는 쪽 클래스 · 위치 0% / 50% / 100%', [first, mid, last].every((e) => e.type === 'span' && String(st(e).backgroundImage).includes(String(ICON_SPRITE.src)) && st(e).backgroundSize === '2100% 100%') && st(first).backgroundPosition === '0% 0' && st(mid).backgroundPosition === '50% 0' && st(last).backgroundPosition === '100% 0' && String(first.props.className).includes('size-4') && String(last.props.className).includes('size-[22px]') && first.props['data-icon-slot'] === 'today')
+  check('D-284 slotIcon 은 같은 자리에 같은 그림(한 번 만들어 다시 씀)', slotIcon('sales', MODULES[0].icon) === slotIcon('sales', MODULES[1].icon) && name(slotIcon('없는자리', MODULES[0].icon)) === name(MODULES[0].icon))
   const Tint = customIcon('/icons/x.svg', true, 'client-ops') as unknown as (p: { className?: string }) => El
   const el = Tint({ className: 'size-4 text-blue-600' })
   const style = el.props.style as Record<string, string>
