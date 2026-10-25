@@ -22,6 +22,7 @@ import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 import { updateMyName } from '../../auth/authService'
 import { AccountViewPanel, AccountViewRow } from './AccountViewPanel'
 import { BrandSettingsPanel } from './BrandSettingsPanel'
+import { AiUsagePanel } from './AiUsagePanel'
 import { AccountSwitchItems } from '../../components/layout/AccountSwitch'
 import { FeedbackNavButton } from '../../components/feedback/FeedbackNavButton'
 
@@ -152,6 +153,8 @@ export function SupabaseSettingsView() {
         <CloudAccountView />
         {/* SAAS-1 내 브랜드 · AI 설정 — AI 가 이 사람의 업종 · 말투 · 사실로 */}
         <BrandSettingsPanel />
+        {/* SAAS-2 이번 달 AI 사용량(서버 장부가 센 값) */}
+        <AiUsagePanel />
         <Panel title="내 정보">
           <NameEditor />
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>

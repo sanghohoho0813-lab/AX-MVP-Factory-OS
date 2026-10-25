@@ -5,6 +5,7 @@
  *  - '이렇게 말고 → 이렇게' 바꿔쓰기 표(1-3 "금지 표현은 금지 → 바꿔쓰기 표로").
  *  - 김팀장 사실 목록(이것만 씀) · 사실 목록에 없는 숫자 찾기 — 2~3부에서 가장 흔한 실수가 '숫자를 지어내거나 뜻을 바꾸는 것' 이었다.
  */
+import { customerFacts, isMarketingCustomer } from './persona'
 
 export const LINK = /https?:\/\/|www\.|litt\.ly|\b[\w-]+\.(?:com|kr|net|io|co)\b/i
 export const HYPE = /100\s*%|무조건|보장|누구나\s*(?:받|가능|됩)|공짜|선착순|마감\s*임박|대박|충격|꿀팁|확실히\s*(?:받|승인|통과)|반드시\s*(?:받|승인|통과)/
@@ -48,6 +49,11 @@ export const KIM_FACTS: readonly string[] = [
   '배포 자료: 벤처기업확인 셀프 체크리스트(4칸: 업종 · 기본 조건 / 유형 / 기술 근거 / 조직 · 준비 · DM용 카드 6장)',
 ]
 
+/** SAAS-2 사실 목록 — 대표 계정은 김팀장 사실 목록 · 고객은 설정 › 내 브랜드 '확인된 사실' 칸(비었으면 빈 목록) */
+export function ourFactsList(): readonly string[] {
+  return isMarketingCustomer() ? customerFacts() : KIM_FACTS
+}
+
 /** D-274 나눠 줄 자료 — 대표가 만들어 둔 벤처기업확인 셀프 체크리스트 카드 6장(1080×1350 · 보충본 부록 A) */
 export const VENTURE_CARDS = {
   title: '벤처기업확인 셀프 체크리스트 카드 6장',
@@ -90,7 +96,7 @@ const norm = (s: string) => s.replace(/[\s,]/g, '')
 
 /** 글 속 사실 숫자 가운데 사실 목록 · 더 쓸 사실에 없는 것(겹치면 하나) */
 export function unknownNumbers(text: string, facts: string): string[] {
-  const known = norm([...KIM_FACTS, facts].join('\n'))
+  const known = norm([...ourFactsList(), facts].join('\n'))
   const out: string[] = []
   for (const m of text.matchAll(FACT_NUM)) {
     const n = m[1]

@@ -18,13 +18,26 @@ import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_a
 import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { cleanBrand } from './_ai/brand.js'
+import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
+import { myUsage, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
 /** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
 export const PILOT_PROVIDERS = new Set(['gemini'])
-// SAAS-1 특허 명세서(대표 전용 화면 · 대표 회사 기준)도 막는다 — 벤처 사업계획서(기업인증 안)는 팀장도 쓴다(D-257)
-export const PILOT_BLOCKED_PAGES = new Set(['radar', 'content', 'threads', 'shorts', 'patent'])
+// SAAS-1 특허 명세서(대표 전용 화면 · 대표 회사 기준)는 늘 막는다 — 벤처 사업계획서(기업인증 안)는 팀장도 쓴다(D-257)
+export const CUSTOMER_ALWAYS_BLOCKED = new Set(['patent'])
+// SAAS-2 마케팅(레이더 · 홍보 글 · 스레드 · 숏폼)은 사용량 장부(0022 + AI_USAGE_SECRET)가 켜졌을 때만 고객에게 연다
+export const MARKETING_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
+/** 장부가 꺼진 지금 고객에게 닫힌 화면(예전 이름 — 시험이 쓴다) */
+export const PILOT_BLOCKED_PAGES = new Set([...MARKETING_PAGES, ...CUSTOMER_ALWAYS_BLOCKED])
+export function pilotBlocked(page, marketingOpen) {
+  return CUSTOMER_ALWAYS_BLOCKED.has(page) || (!marketingOpen && MARKETING_PAGES.has(page))
+}
+const bearerOf = (req) => {
+  const m = /^Bearer\s+([\w.-]{20,4096})$/.exec(String((req.headers && (req.headers.authorization || req.headers.Authorization)) || ''))
+  return m ? m[1] : ''
+}
 
 /** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서 */
 function pilotCatalog(catalog) {
@@ -86,11 +99,25 @@ const secrets = () =>
     ...Object.values(ASSISTS).flatMap((a) => a.instruction),
   ]))
 
+/** SAAS-2 장부가 막은 요청(한도 · 같은 요청 · 장부 끊김) — AI 를 부르지 않고 이 상태 · 갈래로 답한다 */
+class UsageError extends Error {
+  constructor(status, code, extra = {}) {
+    super(code)
+    this.status = status
+    this.code = code
+    this.extra = extra
+  }
+}
+
 async function runOnce(assist, choice, body, role, video = null) {
   const key = providerKey(choice.provider)
   const base = providerBase(choice.provider)
   // D-264 화면 자료 · 물음 · 대표 기준에서도 쓰지 않는 이름 · 출처 이름을 지우고 보낸다
-  const context = scrubBrandDeep(scrubDeep(body.context || {}))
+  const scrubbed = scrubBrandDeep(scrubDeep(body.context || {}))
+  // SAAS-2 고객 마케팅 — 화면 자료에 대표 이름 · 대표 사실이 섞여 오면(옛 화면 · 기본값) 그 줄을 빼고 보낸다(바꿔 쓰지 않는다)
+  const brand = role === 'pilot' ? cleanBrand(body.brand) : null
+  const customerMk = role === 'pilot' && MARKETING_PAGES.has(assist.page)
+  const context = customerMk ? stripOwnerContext(scrubbed, brand).context : scrubbed
   const ask = typeof body.ask === 'string' ? scrubBrand(scrubText(body.ask)).slice(0, 500) : ''
   // D-263 대표가 붙여 넣은 점검 기준 — 자체점검 · 명세서/사업계획서 쓰기 단추에만(다른 단추는 버림)
   const skill = (assist.judge || assist.final || assist.ideaJudge) && typeof body.skill === 'string' ? scrubBrand(scrubText(body.skill)).slice(0, SKILL_MAX) : ''
@@ -98,8 +125,9 @@ async function runOnce(assist, choice, body, role, video = null) {
   const prev = Array.isArray(context.sections) ? context.sections.find((x) => /앞선\s*대화/.test(String(x?.name ?? ''))) : null
   const topicText = !assist.topicKb ? '' : topicPacks(ask).length ? ask : JSON.stringify(prev?.rows ?? '').slice(-2000)
   // SAAS-1 대표가 아닌 계정은 그 사람 브랜드 · AI 설정으로(대표 개인 정보 없이) — 예전 '팀장이 보냈다' 한 줄도 이 안에
-  const system = assistSystem(assist, { skill, topicText, customer: role === 'pilot' ? { brand: cleanBrand(body.brand) } : null })
-  const built = buildAssistPrompt(assist, context, ask)
+  const system = assistSystem(assist, { skill, topicText, customer: role === 'pilot' ? { brand } : null })
+  // SAAS-2 고객 마케팅 — [요청] 줄의 단추 이름도 고객판('미래AI랩 맞춤' → '내 채널 맞춤')
+  const built = buildAssistPrompt(customerMk ? { ...assist, label: customerLabel(assist.label) } : assist, context, ask)
   const { sent } = built
   // D-260 영상 단추 — 맨 앞에 붙인 영상의 어느 구간인지(시각은 영상 처음부터)
   const user = video ? `${built.user}\n[영상] 맨 앞에 붙인 YouTube 영상\n[구간] ${clock(video.start)} ~ ${clock(video.end)} — 이 구간만(시각은 영상 처음부터 센 것)` : built.user
@@ -130,8 +158,11 @@ async function runOnce(assist, choice, body, role, video = null) {
   // D-264 답 지키기 — 쓰지 않는 이름 · 출처 이름 바꾸기 + 지시 · 기준 문서 · 대표 기준을 통째로 옮긴 칸 막기(화면이 보낸 글은 세지 않음)
   const known = `${JSON.stringify(context)}\n${ask}`
   const own = skill ? secretIndex([skill]) : null
-  const safe = checked.ok ? guardOutput(checked.value, secrets(), known, own) : { value: null, blocked: 0 }
-  const safeRaw = checked.ok ? { value: '', blocked: 0 } : guardOutput(String(out.content || '').slice(0, 20000), secrets(), known, own)
+  const guarded = checked.ok ? guardOutput(checked.value, secrets(), known, own) : { value: null, blocked: 0 }
+  const guardedRaw = checked.ok ? { value: '', blocked: 0 } : guardOutput(String(out.content || '').slice(0, 20000), secrets(), known, own)
+  // SAAS-2 고객 마케팅 답에 대표 이름이 나오면 그 사람 이름 · 회사로(마지막 그물)
+  const safe = customerMk && guarded.value ? { ...guarded, value: customerOutput(guarded.value, brand) } : guarded
+  const safeRaw = customerMk && guardedRaw.value ? { ...guardedRaw, value: customerOutput(guardedRaw.value, brand) } : guardedRaw
   return {
     requestId: body.requestId,
     assistId: assist.id,
@@ -164,8 +195,11 @@ export default async function handler(req, res) {
     if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
     const full = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
     const catalog = who.role === 'pilot' ? pilotCatalog(full) : full
-    const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !PILOT_BLOCKED_PAGES.has(a.page))
-    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
+    // SAAS-2 고객 — 이번 달 사용량 · 마케팅 열림(장부가 켜지고 DB 설정까지 됐을 때만)
+    const usage = who.role === 'pilot' && usageReady() ? await myUsage(bearerOf(req)) : null
+    const marketing = who.role !== 'pilot' || (!!usage && usage.configured)
+    const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
+    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), marketing, usage: usage && usage.configured ? { used: usage.used, limit: usage.limit, month: usage.month } : null, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
@@ -179,7 +213,10 @@ export default async function handler(req, res) {
   const assist = assistOf(body.assistId)
   if (!assist || body.page !== assist.page || typeof body.requestId !== 'string' || !ID_RE.test(body.requestId)) return fail(res, 400, 'bad_request')
 
-  if (pilot && PILOT_BLOCKED_PAGES.has(assist.page)) return fail(res, 403, 'forbidden')
+  if (pilot && CUSTOMER_ALWAYS_BLOCKED.has(assist.page)) return fail(res, 403, 'forbidden')
+  // SAAS-2 고객 AI 는 장부로 센다(대표는 세지 않음) — 장부가 꺼져 있으면 마케팅은 닫힌 채
+  const metered = pilot && usageReady()
+  if (pilot && MARKETING_PAGES.has(assist.page) && !metered) return fail(res, 403, 'usage_setup_needed')
   // D-260 영상 단추는 영상 번호 · 구간이 맞아야
   const video = assist.video ? cleanVideo(body.video) : null
   if (assist.video && !video) return fail(res, 400, 'bad_request')
@@ -207,6 +244,7 @@ export default async function handler(req, res) {
     try {
       return send(res, 200, { ok: true, replayed: true, run: await prev.promise })
     } catch (e) {
+      if (e instanceof UsageError) return fail(res, e.status, e.code, e.extra)
       logFail(body.requestId, assist.id, e)
       return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
     }
@@ -219,13 +257,41 @@ export default async function handler(req, res) {
     return fail(res, 429, 'rate_limited', { retryAfter: rate.retryAfter })
   }
 
-  const promise = runOnce(assist, choice, body, who.role, video)
+  // SAAS-2 AI 를 부르기 전에 장부에 예약 — 한도 · 같은 요청 번호 · 동시 호출은 DB 가 사람마다 차례로 판단.
+  // 예약까지 한 약속(promise)으로 묶어 먼저 기억해 둔다 — 같은 서버에서 같은 요청이 동시에 오면 예약 · AI 를 한 번만.
+  const token = metered ? bearerOf(req) : ''
+  const tier = tierOf(choice.provider, choice.model)
+  const promise = (async () => {
+    let charged = false
+    if (metered) {
+      const r = await reserveUsage(token, { requestId: body.requestId, assistId: assist.id, tier, units: usageUnits(assist, tier), workspaceId: null })
+      if (r.ok) charged = true
+      else if (r.code === 'usage_setup_needed') {
+        // 비밀값은 있는데 DB 설정이 아직(또는 틀림) — 마케팅은 닫고, 나머지는 예전처럼
+        if (MARKETING_PAGES.has(assist.page)) throw new UsageError(403, 'usage_setup_needed')
+      } else if (r.code === 'quota_exceeded') throw new UsageError(429, 'quota_exceeded', { used: r.used, limit: r.limit })
+      else if (r.code === 'usage_unreachable') throw new UsageError(503, 'usage_unreachable')
+      else throw new UsageError(409, r.code)
+    }
+    let run
+    try {
+      run = await runOnce(assist, choice, body, who.role, video)
+    } catch (e) {
+      // AI 가 실패하면 센 것을 돌려준다 — 같은 요청 번호로 다시 해도 한 번만 센다
+      if (charged) await releaseUsage(token, body.requestId)
+      throw e
+    }
+    if (!charged) return run
+    const s = await settleUsage(token, body.requestId, run)
+    return { ...run, quota: s ? { used: Number(s.used) || 0, limit: Number(s.limit) || 0 } : null }
+  })()
   inflight.set(idemKey, { at: now, promise, assistId: assist.id })
   if (inflight.size > 500) inflight.delete(inflight.keys().next().value)
   try {
     return send(res, 200, { ok: true, replayed: false, run: await promise })
   } catch (e) {
     inflight.delete(idemKey)
+    if (e instanceof UsageError) return fail(res, e.status, e.code, e.extra)
     logFail(body.requestId, assist.id, e)
     return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
   }

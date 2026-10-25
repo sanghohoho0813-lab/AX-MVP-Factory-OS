@@ -108,13 +108,13 @@ export function customerize(text, brand) {
   const b = brand || {}
   const company = b.company || '이 컨설팅사'
   const person = b.name || '담당 컨설턴트'
-  return customerFrame(text)
-    .replace(/김팀장의\s*경영\s*노트/g, b.company || '이 채널')
-    .replace(/MIRAE\s*AI\s*LAB/gi, company)
-    .replace(/미래\s*AI\s*랩|미래에이아이랩|MIRAE/g, company)
-    .replace(/김상호\s*대표/g, person)
-    .replace(/김상호|김팀장/g, person)
-    .replace(/최은혜(\s*팀장)?/g, '팀장')
+  // SAAS-2 한 번에 바꾼다 — 바꿔 넣은 고객 이름(예: 팀장 본인 이름 · 'MIRAE…' 가 든 회사 이름)이 다음 바꾸기에 다시 걸리지 않게
+  return customerFrame(text).replace(/김팀장의\s*경영\s*노트|[Mm][Ii][Rr][Aa][Ee]\s*[Aa][Ii]\s*[Ll][Aa][Bb]|미래\s*AI\s*랩|미래에이아이랩|MIRAE|김상호(?:\s*대표)?|김팀장|최은혜(?:\s*팀장)?/g, (m) => {
+    if (/경영\s*노트$/.test(m)) return b.company || '이 채널'
+    if (/^(?:김상호|김팀장)/.test(m)) return person
+    if (/^최은혜/.test(m)) return '팀장'
+    return company
+  })
 }
 
 /**

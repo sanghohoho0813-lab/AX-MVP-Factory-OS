@@ -19,7 +19,9 @@ import { batchimOf, particle } from '../../lib/josa'
 import type { ContentAxis } from './radarPlaybook'
 import type { Opportunity } from './ytRadar'
 import { shootKit } from './shootKit'
-import { DEFAULT_BRIEF, type ChannelBrief } from './radarStore'
+import { defaultBrief, type ChannelBrief } from './radarStore'
+import { isMarketingCustomer, mkText, ourName } from './persona'
+import { brandForRequest } from '../brandProfile'
 
 type Pair = '은/는' | '이/가' | '을/를' | '과/와' | '으로/로'
 const j = (w: string, p: Pair) => `${w}${particle(w, p)}`
@@ -143,8 +145,10 @@ function split(topic: string): { market: string; device: string } {
   return { market: (a ?? topic).trim(), device: (b ?? '').trim() }
 }
 
-const hostName = (b: ChannelBrief) => (b.host.split(/[(—,]/)[0] ?? '').trim() || '미래AI랩'
-const channelName = (b: ChannelBrief) => (b.channel.split(' — ')[0] ?? '').trim() || '미래AI랩'
+const hostName = (b: ChannelBrief) => (b.host.split(/[(—,]/)[0] ?? '').trim() || ourName()
+const channelName = (b: ChannelBrief) => (b.channel.split(' — ')[0] ?? '').trim() || ourName()
+/** SAAS-2 회사 해시태그 — 대표: 미래AI랩 · 고객: 적은 회사 이름(없으면 넣지 않음) */
+const ourTag = (): string => (isMarketingCustomer() ? (brandForRequest()?.company ?? '').replace(/[^0-9A-Za-z가-힣]/g, '') : '미래AI랩')
 
 /** 체크포인트 셋 — 축마다 다르게(제목 · 요지 · 말) */
 interface Point {
@@ -350,7 +354,7 @@ function hashtags(s: PackSource, n: number): string[] {
   const words = [s.topic, ...split(s.topic).device.split(/\s+/)].map((w) => w.replace(/[^0-9A-Za-z가-힣]/g, '')).filter((w) => w.length >= 2)
   const base = s.axis === 'axai' ? ['업무자동화', 'AI활용', '중소기업', '대표님'] : ['중소기업', '대표님', '경영', '지원사업', '절세']
   const out: string[] = []
-  for (const w of [...words, ...base, '미래AI랩']) if (!out.includes(`#${w}`) && out.length < n) out.push(`#${w}`)
+  for (const w of [...words, ...base, ourTag()].filter(Boolean)) if (!out.includes(`#${w}`) && out.length < n) out.push(`#${w}`)
   return out
 }
 
@@ -378,7 +382,7 @@ function blogBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
   ].join('\n')
   const bridge = `${j(s.topic, '은/는')} 혼자 판단하면 '안 되겠지' 하고 넘기기 쉽습니다. 조건을 하나씩 맞춰 보는 것만으로도 놓치는 돈이 줄어듭니다.`
   const outro = [
-    `${hostName(b)}(미래AI랩)은 정책자금 · 고용지원금 · 기업부설연구소 · 절세 · 지원사업까지 중소기업 대표님 상담을 해 왔습니다.`,
+    customerIntro(b) ?? `${hostName(b)}(미래AI랩)은 정책자금 · 고용지원금 · 기업부설연구소 · 절세 · 지원사업까지 중소기업 대표님 상담을 해 왔습니다.`,
     b.ending,
     '',
     '[사진: 상담 신청 안내 이미지]',
@@ -402,7 +406,7 @@ function cardsBlocks(s: PackSource, b: ChannelBrief): PackBlock[] {
     [`② ${ps[1].head}`, fit(ps[1].say.split('. ')[0], 60), ps[1].screen],
     [`③ ${ps[2].head}`, fit(ps[2].say.split('. ')[0], 60), ps[2].screen],
     ['지금 할 일 체크', ax.check.join('\n'), '체크리스트 그림'],
-    ['우리 회사는 해당될까?', fit(b.ending, 60), '미래AI랩 상담 안내(실제로 하는 일만 · 혜택 약속 없이)'],
+    ['우리 회사는 해당될까?', fit(b.ending, 60), `${ourName()} 상담 안내(실제로 하는 일만 · 혜택 약속 없이)`],
   ]
   return cards.map(([big, small, img], i) => ({ label: `${i + 1}장`, text: `큰 글자: ${big}\n작은 글자: ${small}\n그림: ${img}` }))
 }
@@ -435,7 +439,7 @@ function uploadBlocks(s: PackSource, b: ChannelBrief, headline: string, titles: 
     '',
     hashtags(s, 3).join(' '),
   ].join('\n')
-  const tags = Array.from(new Set([s.topic.replace(/\s+/g, ''), ...hashtags(s, 10).map((h) => h.slice(1)), '중소기업대표', '정책자금', '지원사업', '미래AI랩'])).slice(0, 10)
+  const tags = Array.from(new Set([s.topic.replace(/\s+/g, ''), ...hashtags(s, 10).map((h) => h.slice(1)), '중소기업대표', '정책자금', '지원사업', ourTag()].filter(Boolean))).slice(0, 10)
   return [
     { label: '유튜브 설명란', text: desc },
     { label: '고정 댓글', text: pinned },
@@ -450,7 +454,7 @@ function uploadBlocks(s: PackSource, b: ChannelBrief, headline: string, titles: 
 /* ------------------------------------------------------------------ */
 
 export function makePack(s: PackSource, brief: ChannelBrief | null = null): ContentPack {
-  const b = brief ?? DEFAULT_BRIEF
+  const b = brief ?? defaultBrief()
   const { titles, thumbs } = titlesOf(s)
   const headline = titles[0] ?? s.topic
   const sections: PackSection[] = [
@@ -470,6 +474,8 @@ export function makePack(s: PackSource, brief: ChannelBrief | null = null): Cont
     { id: 'cards', label: PACK_LABEL.cards, hint: PACK_SECTIONS[4].hint, blocks: cardsBlocks(s, b) },
     { id: 'upload', label: PACK_LABEL.upload, hint: PACK_SECTIONS[5].hint, blocks: uploadBlocks(s, b, headline, titles) },
   ]
+  // SAAS-2 카드뉴스는 1차 상품에서 고객에게 보이지 않는다(대표 화면 · 코드는 그대로)
+  if (isMarketingCustomer()) sections.splice(sections.findIndex((x) => x.id === 'cards'), 1)
   const holes = countHoles(sections)
   sections.push({ id: 'checks', label: PACK_LABEL.checks, hint: PACK_SECTIONS[6].hint, blocks: checkBlocks(s, holes) })
   return { key: s.key, topic: s.topic, headline, why: s.why, view: s.view, sections, holes, source: s }
@@ -541,6 +547,40 @@ export const PACK_RULES: readonly string[] = [
   '— 카드뉴스 —',
   '7장 · 장마다 큰 글자 1줄(20~35자) + 작은 글자 1줄 + 그림 지시 1줄 · 순서: 표지 → 고민 공감 → 핵심 셋 → 체크리스트 → 마지막 장(실제로 하는 일만 · 기간 한정 문구 없이).',
 ]
+
+/**
+ * SAAS-2 규칙집 고객판 — 끝인사 "김팀장이었습니다" · "미래AI랩 소개" 대신 채널 주인이 적은 것, 카드뉴스 줄은 뺀다.
+ * 대표 계정은 PACK_RULES 그대로.
+ */
+export function packRules(): readonly string[] {
+  if (!isMarketingCustomer()) return PACK_RULES
+  const out: string[] = []
+  let cards = false
+  for (const r of PACK_RULES) {
+    if (r === '— 카드뉴스 —') {
+      cards = true
+      continue
+    }
+    if (cards && r.startsWith('— ')) cards = false
+    if (cards) continue
+    out.push(
+      r
+        .replace(/"김팀장이었습니다\.\s*감사합니다\."/g, '끝인사 한 줄(채널 설계 기준의 끝맺음 · 없으면 "감사합니다.")')
+        .replace(/미래AI랩 소개 · 문의/g, '하는 일 소개(채널 주인이 적은 것만) · 문의'),
+    )
+  }
+  return out
+}
+
+/** SAAS-2 고객 블로그 끝 소개 — 설정 › 내 브랜드 '하는 일 · 강점' 이 있으면 그 말, 없으면 빈칸(대표 경력 문장을 쓰지 않는다). 대표 계정은 null */
+function customerIntro(b: ChannelBrief): string | null {
+  if (!isMarketingCustomer()) return null
+  const intro = brandForRequest()?.intro
+  return intro ? `${hostName(b)} — ${intro}` : `${hostName(b)} 소개: [하는 일 한 줄 — 설정 › 내 브랜드 '하는 일 · 강점' 에 적으면 채워집니다]`
+}
+
+/** 갈래 이름 — 고객에게는 카드뉴스 없이 */
+export const packPartLabel = (p: { label: string }): string => (isMarketingCustomer() ? mkText(p.label.replace('카드뉴스 · ', '')) : p.label)
 
 /** AI 갈래 — 한 번에 쓰면 60초를 넘겨 셋으로 나눠 동시에 부른다 */
 export type PackAiPart = 'video' | 'short' | 'blog'

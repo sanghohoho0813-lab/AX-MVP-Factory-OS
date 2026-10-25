@@ -41,7 +41,7 @@ import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -62,6 +62,7 @@ import {
   shortNum,
   uploadCadence,
   videosCsv,
+  withoutOwnerChannel,
   type GroupStat,
   type Prepared,
   type Topic,
@@ -70,6 +71,7 @@ import {
   type YtType,
   type YtVideo,
 } from '../../services/marketing/ytBench'
+import { isMarketingCustomer, mkText } from '../../services/marketing/persona'
 import {
   SIDE_MAX,
   aiKeywordBoard,
@@ -186,7 +188,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const packKey = view === 'plan' ? (params.get('pack') ?? '') : ''
   const location = useLocation()
   const navigate = useNavigate()
-  const access = useOwnerAiAccess()
+  // SAAS-2 고객도 서버가 마케팅을 열었으면 묶음 AI 를 쓴다(사용량 장부로 셈) — 대표 판정은 그대로
+  const mkAi = useMarketingAiOn()
   // 묶음 화면이 다시 그려질 때마다 규칙 초안을 새로 만들지 않게(채널 설계 기준이 바뀔 때만)
   const brief = useMemo(() => briefOf(prefs), [prefs])
   // 첫 화면 'AI로 써 둠' — 첫 화면에 있는 동안 도착한 AI 답도 바로
@@ -203,7 +206,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }
 
   const groupsOfAdded = useMemo(() => Object.fromEntries(prefs.added.map((a) => [a.id, a.group])), [prefs.added])
-  const fullFeed = useMemo(() => (yt.feed ? mergeFeeds(yt.feed, extra.feed, groupsOfAdded) : null), [yt.feed, extra.feed, groupsOfAdded])
+  // SAAS-2 고객 계정은 대표 채널을 '내 채널' 로 보지 않는다(채널 · 영상에서 뺌)
+  const customer = isMarketingCustomer()
+  const fullFeed = useMemo(() => {
+    const merged = yt.feed ? mergeFeeds(yt.feed, extra.feed, groupsOfAdded) : null
+    return merged && customer ? withoutOwnerChannel(merged) : merged
+  }, [yt.feed, extra.feed, groupsOfAdded, customer])
   const feed = useMemo(() => (fullFeed ? withoutDisabled(fullFeed, prefs.overrides) : null), [fullFeed, prefs.overrides])
   const prepared = useMemo(() => (feed ? prepareFeed(feed) : null), [feed])
   const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted }), [prefs.overrides, prefs.mix, prefs.muted])
@@ -560,7 +568,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           title="마케팅 · 브랜딩"
           showOnPhone
           descriptionAsHint
-          description="이번 주 키워드 하나를 누르면 제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글이 한 번에 나옵니다. 키워드는 벤치마킹 채널의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 주제를 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다."
+          description={mkText('이번 주 키워드 하나를 누르면 제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글이 한 번에 나옵니다. 키워드는 벤치마킹 채널의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 주제를 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           actions={view === 'plan' && (prepared || packKey) ? undefined : feedButtons}
         />
@@ -609,7 +617,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             brief={brief}
             rank={homeRank(packKey)}
             readOnly={readOnly}
-            ownerAi={access !== 'no'}
+            ownerAi={mkAi}
             savedIdeaHref={packIdea?.script ? ideaHref(packIdea.id) : null}
             onBack={closePack}
             onCopy={(t, what) => copy(t, what)}

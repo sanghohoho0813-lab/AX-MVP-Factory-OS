@@ -28,11 +28,12 @@ import { RefBook, clientRow, daysBetween, personNames, safeText, wonText } from 
 import type { AssistBundle, AssistRow, AssistSection } from './context'
 import { STRENGTH_LABEL, myChannelStats, ratioLine } from '../marketing/ytRadar'
 import type { RadarPlan, RadarVideo, RisingTopic } from '../marketing/ytRadar'
-import { BRIEF_FIELDS, DEFAULT_BRIEF, IDEA_STATUS_LABEL, MAKE_CHECKS } from '../marketing/radarStore'
+import { BRIEF_FIELDS, defaultBrief, IDEA_STATUS_LABEL, MAKE_CHECKS } from '../marketing/radarStore'
 import type { ChannelBrief, ContentIdea } from '../marketing/radarStore'
 import { shootKit } from '../marketing/shootKit'
 import { linkedVideo, perfOf } from '../marketing/myPerformance'
-import { PACK_RULES, PACK_SECTIONS, type ContentPack } from '../marketing/contentPack'
+import { PACK_SECTIONS, packRules, type ContentPack } from '../marketing/contentPack'
+import { customerProfileLines, isMarketingCustomer } from '../marketing/persona'
 import { ANGLES, RISKY_WORDS, aiRequestFacts, aiRequestText, briefSlots } from '../contentStudio'
 import type { ContentProfile, ProfileSource } from '../contentStudio'
 
@@ -620,6 +621,9 @@ export const MIRAE_PROFILE = [
   '우리만 말할 수 있는 것: 수백 개 업체 상담에서 본 실제 실수 · 받을 수 있는데 몰라서 못 받는 돈 · AI 를 현장 업무에 붙여 본 경험.',
 ]
 
+/** SAAS-2 '우리는 누구인가' 줄 — 대표 계정은 미래AI랩 소개 · 고객은 그 사람 브랜드 설정에 적은 것만 */
+const profileLines = (): string[] => (isMarketingCustomer() ? customerProfileLines() : MIRAE_PROFILE)
+
 export interface RadarInput {
   today: string
   view: string
@@ -641,7 +645,7 @@ export interface RadarInput {
  */
 export function radarBundle(i: RadarInput): AssistBundle {
   const book = new RefBook()
-  const brief = i.brief ?? DEFAULT_BRIEF
+  const brief = i.brief ?? defaultBrief()
   const vRow = (v: RadarVideo) => ({
     ref: book.ref('v', v.id, v.url),
     제목: safeText(v.title, [], 120),
@@ -682,7 +686,7 @@ export function radarBundle(i: RadarInput): AssistBundle {
           왜지금: safeText(o.summary, [], 240),
           근거: o.facts.slice(0, 3),
           잘된영상: o.benchmarks.slice(0, 3).map((b) => `${safeText(b.title, [], 80)} (${safeText(b.channelName, [], 30)} · ${ratioLine(b)})`),
-          미래AI랩관점_규칙: safeText(o.view, [], 300),
+          [isMarketingCustomer() ? '관점_규칙' : '미래AI랩관점_규칙']: safeText(o.view, [], 300),
           잘된틀_우리제목: kit.frames.slice(0, 3).map((f) => `${f.label} → ${f.mine}`),
           첫문장_규칙: safeText(kit.hook, [], 160),
           구성_규칙: kit.outline.map((st) => `${st.at} ${st.what}`),
@@ -725,7 +729,7 @@ export function radarBundle(i: RadarInput): AssistBundle {
     const top = [...i.videos].filter((v) => !v.mine).sort((a, b) => b.views - a.views).slice(0, 20)
     sections.push({ name: '이번 달 조회 많은 영상', rows: top.map(vRow) })
   }
-  const facts = [...MIRAE_PROFILE]
+  const facts = [...profileLines()]
   if (stats) {
     const longMin = stats.longMedian ? ` · 롱폼 조회 중간값 ${stats.longMedian.toLocaleString('ko-KR')}` : ''
     facts.push(`내 채널 최근 ${stats.count}편: 롱폼 ${stats.longCount} · 쇼츠 ${stats.shortCount}${longMin}${stats.cadenceDays ? ` · 평균 ${stats.cadenceDays}일마다 한 편` : ''}${stats.bestTopic ? ` · 가장 잘 된 주제 '${stats.bestTopic.label}'` : ''}${stats.bestPattern ? ` · 가장 잘 된 제목 틀 '${stats.bestPattern.label}'` : ''}`)
@@ -742,7 +746,7 @@ export function radarBundle(i: RadarInput): AssistBundle {
 export function packBundle(i: { today: string; pack: ContentPack; brief?: ChannelBrief | null }): AssistBundle {
   const p = i.pack
   const s = p.source
-  const brief = i.brief ?? DEFAULT_BRIEF
+  const brief = i.brief ?? defaultBrief()
   const outline = p.sections
     .filter((x) => x.id !== 'checks')
     .map((x) => ({ 칸: x.label, 구성: x.blocks.map((b) => safeText(b.label, [], 80)), 예시: safeText(x.blocks[1]?.text ?? x.blocks[0]?.text ?? '', [], 400) }))
@@ -751,7 +755,7 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
     context: {
       title: `마케팅 · 콘텐츠 묶음 · ${p.topic}`,
       today: todayLabel(i.today),
-      purpose: '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글을 검증된 방법대로 한 번에',
+      purpose: isMarketingCustomer() ? '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 올릴 때 글을 검증된 방법대로 한 번에' : '이번 주 키워드 하나로 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글을 검증된 방법대로 한 번에',
       sections: [
         {
           name: '고른 키워드(이 주제 하나로)',
@@ -759,7 +763,7 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
             {
               주제: safeText(s.topic, [], 80),
               왜지금: safeText(s.why, [], 240),
-              미래AI랩관점: safeText(s.view, [], 300),
+              [isMarketingCustomer() ? '관점' : '미래AI랩관점']: safeText(s.view, [], 300),
               제목후보_규칙: s.titles.slice(0, 5).map((t) => safeText(t, [], 80)),
               썸네일_규칙: s.thumbs.slice(0, 3).map((t) => safeText(t, [], 60)),
               첫문장_규칙: safeText(s.hook, [], 160),
@@ -772,8 +776,8 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
         { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
         { name: `규칙 초안 뼈대(${PACK_SECTIONS.length - 1}칸 — 이 순서 · 칸 이름을 살려 다듬기)`, rows: outline },
       ],
-      facts: [...MIRAE_PROFILE],
-      rules: [...PACK_RULES],
+      facts: [...profileLines()],
+      rules: [...packRules()],
     },
   }
 }
@@ -807,7 +811,7 @@ export function contentBundle(i: { today: string; profile: ContentProfile; sourc
         { name: '사실 목록(이것만 사실로)', rows: aiRequestFacts(p).map((f) => ({ 사실: safeText(f, [], 300) })) },
         { name: '보관함에 이미 있는 글(같은 제목 피하기)', rows: i.items.slice(0, 15).map((x) => ({ 제목: safeText(x.title, [], 80), 종류: x.kind, 만든날: x.createdAt.slice(0, 10) })) },
       ],
-      facts: [`주 키워드: ${i.keyword || '(없음)'}`, ...(i.mirae ? MIRAE_PROFILE : [])],
+      facts: [`주 키워드: ${i.keyword || '(없음)'}`, ...(i.mirae ? profileLines() : [])],
       rules,
     },
   }

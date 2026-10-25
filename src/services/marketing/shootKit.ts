@@ -10,6 +10,7 @@
  * 숫자는 우리가 가진 근거(레이더가 센 영상 · 채널 수)만 쓰고, 영상 안 숫자는 '공식 자료로 확인' 빈칸으로 남긴다.
  */
 import { TITLE_PATTERNS, type Opportunity, type RadarVideo } from './ytRadar'
+import { mkText } from './persona'
 
 export interface KitFrame {
   pattern: string
@@ -151,7 +152,7 @@ export function shootKit(o: Opportunity): ShootKit {
     '썸네일 — 짧은 질문 · 숫자 한 줄',
   ]
   const change = [
-    '사례 — 미래AI랩이 실제로 본 회사 이야기(회사 이름은 빼고)',
+    mkText('사례 — 미래AI랩이 실제로 본 회사 이야기(회사 이름은 빼고)'),
     `관점 — ${view}`,
     '말투 — 대표님께 설명하듯, 숫자는 공식 자료로 확인',
     '제목 · 대사 — 참고 영상과 다르게(그대로 쓰지 않기)',

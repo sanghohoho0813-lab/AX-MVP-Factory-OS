@@ -12,6 +12,7 @@ import { deleteRow, listRows, saveRow } from '../moduleData'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, HYPE, LINK, numberLint, principleLint } from './snsRules'
+import { isMarketingCustomer, mkText } from './persona'
 
 export const SHORTS_MODULE = 'marketing'
 export const SHORTS_BUCKET = 'shorts'
@@ -140,7 +141,14 @@ export const formatOf = (k: string): ShortFormat | undefined => SHORT_FORMATS.fi
 export const aimsOf = (f: ShortFormat, p: ShortPlatform): ShortAim[] => (p === 'reels' && f.reelsAims ? f.reelsAims : f.aims)
 export const formatsFor = (p: ShortPlatform, a: ShortAim | ''): ShortFormat[] => SHORT_FORMATS.filter((f) => f.platforms.includes(p) && (!a || aimsOf(f, p).includes(a)))
 /** 이 플랫폼의 예시 대본 · 캡션 */
-export const exampleOf = (f: ShortFormat, p: ShortPlatform) => ({ script: p === 'reels' && f.reelsExample ? f.reelsExample : f.example, caption: p === 'reels' && f.reelsCaption ? f.reelsCaption : f.exampleCaption })
+/** SAAS-2 고객 예시 — 대표 상품 문장(2주 첫 화면 · 3분 진단)은 [대괄호] 빈칸으로, '김팀장:' 은 그 사람 이름으로. 대표 계정은 그대로 */
+const CUSTOMER_SWAPS: ReadonlyArray<[RegExp, string]> = [
+  [/이런 첫 화면은 2주면 만들어요\./g, '[우리가 실제로 해 주는 것 한 줄 — 사실만]'],
+  [/프로필에서 3분 진단부터 해 보세요\./g, '프로필에서 [상담 · 자료 안내 — 실제로 있는 것만].'],
+  [/3분 진단/g, '상담 신청'],
+]
+export const exampleText = (s: string): string => (isMarketingCustomer() ? mkText(CUSTOMER_SWAPS.reduce((t, [re, rep]) => t.replace(re, rep), s)) : s)
+export const exampleOf = (f: ShortFormat, p: ShortPlatform) => ({ script: exampleText(p === 'reels' && f.reelsExample ? f.reelsExample : f.example), caption: exampleText(p === 'reels' && f.reelsCaption ? f.reelsCaption : f.exampleCaption) })
 export const aimLabel = (p: ShortPlatform, a: ShortAim) => AIMS[p].find((x) => x.key === a)?.label ?? ''
 
 /** 한 줄 공식 — 화면 맨 위 "이것만 지키면 돼요" */
@@ -245,7 +253,7 @@ export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; 
       if (!KEYWORD_COMMENT.test(all)) add('keyword', 'warn', "댓글 받기는 \"댓글에 '○○' 남기면 정리본\" 한 가지를 화면 · 캡션에")
       if (OTHER_CTA.test(all)) add('cta', 'bad', '댓글 받기도 상담 · 링크 · DM 안내는 빼기 — 여러 단계면 안 됐어요')
     }
-    if (input.aim === 'convert' && tiktok) add('cta', cta ? 'ok' : 'warn', cta ? '문의로 잇기 — 끝에 한 줄' : '문의로 잇기 — 끝에 한 줄(예: 프로필에서 3분 진단)')
+    if (input.aim === 'convert' && tiktok) add('cta', cta ? 'ok' : 'warn', cta ? '문의로 잇기 — 끝에 한 줄' : `문의로 잇기 — 끝에 한 줄(예: 프로필에서 ${isMarketingCustomer() ? '상담 신청' : '3분 진단'})`)
     if (SPOKEN_SAVE.test(script)) add('save', 'warn', '말로 하는 "저장해 두세요" 는 거의 안 됐어요(1%) — 빼도 돼요')
     const jargon = JARGON.exec(all)
     if (jargon) add('jargon', 'warn', `업계 용어 "${jargon[0]}" — 결과 언어로(예: 세금 5년 50%)`)
@@ -471,7 +479,7 @@ export function shortsContext(input: { platform: ShortPlatform; aim: ShortAim | 
   return {
     title: '릴스 · 틱톡 대본 쓰기',
     today,
-    purpose: '김팀장(미래AI랩) 숏폼 — 실측 공식대로 첫마디 10자 · 2~3가지 + 숫자 · 영상 · 캡션에서 팔지 않기',
+    purpose: isMarketingCustomer() ? '내 숏폼 — 실측 공식대로 첫마디 10자 · 2~3가지 + 숫자 · 영상 · 캡션에서 팔지 않기' : '김팀장(미래AI랩) 숏폼 — 실측 공식대로 첫마디 10자 · 2~3가지 + 숫자 · 영상 · 캡션에서 팔지 않기',
     sections: [
       {
         name: '만들 영상',

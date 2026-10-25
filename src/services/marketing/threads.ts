@@ -11,6 +11,7 @@ import { deleteRow, listRows, saveRow } from '../moduleData'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, EMOJI, HYPE, LINK, numberLint, principleLint } from './snsRules'
+import { isMarketingCustomer } from './persona'
 
 export const THREADS_MODULE = 'marketing'
 export const THREADS_BUCKET = 'threads'
@@ -802,7 +803,7 @@ export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadT
   return {
     title: '스레드 글 쓰기',
     today,
-    purpose: '김팀장(미래AI랩) 스레드 계정에 올릴 글 — 실측 공식대로 500자 안 · 본문에서 팔지 않기',
+    purpose: isMarketingCustomer() ? '내 스레드 계정에 올릴 글 — 실측 공식대로 500자 안 · 본문에서 팔지 않기' : '김팀장(미래AI랩) 스레드 계정에 올릴 글 — 실측 공식대로 500자 안 · 본문에서 팔지 않기',
     sections,
     ...(facts.length ? { facts: facts.map((f) => `이번 글에 더 쓸 사실: ${f}`) } : {}),
   }

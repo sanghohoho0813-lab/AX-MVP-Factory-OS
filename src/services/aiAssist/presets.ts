@@ -2,6 +2,7 @@
  * AI 도우미 — 화면마다 미리 만든 질문 단추의 이름표(D-239).
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
+import { isMarketingCustomer, mkText } from '../marketing/persona'
 
 export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'threads' | 'shorts' | 'venture' | 'patent' | 'cert' | 'side'
 
@@ -123,8 +124,25 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'cert.say', page: 'cert', label: '기업인증 — 실사 예상 질문 말할 답 쓰기', kind: 'write', hint: '확인된 사실 · 대표 답만으로' },
 ]
 
+const MARKETING_PAGES: readonly AssistPage[] = ['radar', 'content', 'threads', 'shorts']
+
+/** SAAS-2 고객 계정의 마케팅 단추 이름 — 서버 customerLabel 과 같은 말('미래AI랩 맞춤' → '내 채널 맞춤' · 카드뉴스 없이). 대표 계정은 그대로 */
+export function customerPreset(p: AssistPreset): AssistPreset {
+  if (!isMarketingCustomer() || !MARKETING_PAGES.includes(p.page)) return p
+  const fix = (s: string) =>
+    mkText(
+      s
+        .replace(/카드뉴스 · /g, '')
+        .replace(/미래AI랩 맞춤/g, '내 채널 맞춤')
+        .replace(/미래AI랩이 따라 할/g, '내가 따라 할')
+        .replace(/미래AI랩이 참고할/g, '내가 참고할'),
+    )
+  return { ...p, label: fix(p.label), hint: fix(p.hint) }
+}
+
 export function presetOf(id: string): AssistPreset | undefined {
-  return ASSIST_PRESETS.find((p) => p.id === id)
+  const p = ASSIST_PRESETS.find((x) => x.id === id)
+  return p ? customerPreset(p) : undefined
 }
 
 /** D-288 이 화면의 '직접 물어본 것에 답' 단추(없는 화면이면 undefined) */

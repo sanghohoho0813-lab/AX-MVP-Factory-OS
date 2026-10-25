@@ -9,6 +9,7 @@
 import { Link } from 'react-router-dom'
 import { AtSign, BarChart3, Clapperboard, Film, Flame, Globe, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
+import { usePilotMarketing } from '../../config/pilotMarketing'
 
 export type RadarView = 'plan' | 'top' | 'channels' | 'analysis' | 'make'
 export type MarketingTab = RadarView | 'threads' | 'shorts' | 'content' | 'homepage'
@@ -70,8 +71,11 @@ function Label({ it }: { it: Item }) {
 /** onRadar 가 있으면(레이더 화면) 레이더 칸은 그 자리에서 바꾼다 — 예전 시험 이름(yt-view-*) 그대로 */
 export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRadar?: (v: RadarView) => void }) {
   const pilot = useIsPilot()
-  // 도구 화면에서 팀장(Pilot)에게는 그리지 않는다(마케팅 · 브랜딩은 대표 전용)
-  if (pilot && !onRadar) return null
+  // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
+  const open = usePilotMarketing() === 'open'
+  // 도구 화면에서 마케팅이 닫힌 팀장(Pilot)에게는 그리지 않는다
+  if (pilot && !open && !onRadar) return null
+  const tools = pilot ? TOOLS.filter((t) => t.key === 'threads' || t.key === 'shorts') : TOOLS
   /*
    * D-282 두 줄 — 위: 콘텐츠 레이더 보기(그 자리에서 바뀜) · 아래: 만들기(형식마다 색 아이콘 칸). 예전 한 줄은 넓은 화면에서도 두 줄로 어색하게 접혔다.
    * 칸 순서 · 시험 이름 · 주소는 그대로(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 → 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지).
@@ -94,11 +98,11 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
           )}
         </div>
       </div>
-      {!pilot && (
+      {(!pilot || open) && (
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
           <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">만들기</span>
-          <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-            {TOOLS.map((it) => (
+          <div className={`grid min-w-0 flex-1 gap-1.5 ${tools.length < TOOLS.length ? 'grid-cols-2' : 'grid-cols-4 sm:grid-cols-2 xl:grid-cols-4'}`}>
+            {tools.map((it) => (
               <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
                 <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${it.tile ?? 'bg-slate-100 text-slate-600'}`}>
                   <it.icon className="size-4" />

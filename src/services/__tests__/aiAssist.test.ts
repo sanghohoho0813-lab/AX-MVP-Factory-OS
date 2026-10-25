@@ -234,7 +234,8 @@ async function serverTests() {
     const c2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX }, PILOT)
     check('P4 팀장이 Claude · GPT 를 보내면 403 provider_not_allowed · 공급자 안 부름', c1.statusCode === 403 && c1.body.code === 'provider_not_allowed' && c2.statusCode === 403 && c2.body.code === 'provider_not_allowed' && calls.length === 0, { c1: c1.body, n: calls.length })
     const m1 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: CTX }, PILOT)
-    check('P5 팀장이 대표 전용 마케팅 단추를 직접 불러도 403 · 공급자 안 부름', m1.statusCode === 403 && m1.body.code === 'forbidden' && calls.length === 0, m1.body)
+    // SAAS-2 사용량 장부(AI_USAGE_SECRET)가 없으면 고객 마케팅은 닫힌 채 — 이유는 '사용량 관리 준비 중'
+    check('P5 팀장이 마케팅 단추를 직접 불러도(사용량 장부 없음) 403 usage_setup_needed · 공급자 안 부름', m1.statusCode === 403 && m1.body.code === 'usage_setup_needed' && calls.length === 0, m1.body)
     const own = await get('/api/ai-assist?status=1')
     check('P6 대표는 그대로 — 세 회사 · role owner', (own.body.providers as { id: string }[]).length === 3 && own.body.role === 'owner')
   }

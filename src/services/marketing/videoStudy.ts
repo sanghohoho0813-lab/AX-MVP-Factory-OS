@@ -10,8 +10,9 @@
  */
 import { safeText, type AssistContext } from '../aiAssist/context'
 import { MIRAE_PROFILE } from '../aiAssist/builders'
-import { PACK_RULES } from './contentPack'
-import { BRIEF_FIELDS, DEFAULT_BRIEF, type ChannelBrief, type IdeaInput } from './radarStore'
+import { customerProfileLines, isMarketingCustomer, mkText } from './persona'
+import { packRules } from './contentPack'
+import { BRIEF_FIELDS, defaultBrief, type ChannelBrief, type IdeaInput } from './radarStore'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { RadarVideo } from './ytRadar'
 
@@ -232,12 +233,12 @@ export function transcriptContext(v: Pick<RadarVideo, 'title' | 'channelName' | 
 
 export function adaptContext(i: { v: RadarVideo; lessons: readonly string[]; brief?: ChannelBrief | null; transcript: TranscriptDoc | null; today: string }): AssistContext {
   const { v } = i
-  const brief = i.brief ?? DEFAULT_BRIEF
+  const brief = i.brief ?? defaultBrief()
   const rows = transcriptRows(i.transcript)
   return {
     title: `마케팅 · 벤치마킹 영상 → 우리 회사 버전 · ${safeText(v.title, [], 60)}`,
     today: i.today,
-    purpose: '남의 채널에서 잘 된 영상 하나의 틀을 빌려, 미래AI랩 채널(채널 설계 기준)에 맞는 우리 영상 한 편으로 다시 기획한다',
+    purpose: mkText('남의 채널에서 잘 된 영상 하나의 틀을 빌려, 미래AI랩 채널(채널 설계 기준)에 맞는 우리 영상 한 편으로 다시 기획한다'),
     sections: [
       {
         name: '참고 영상(틀만 참고 · 제목 · 대사는 베끼지 않기)',
@@ -258,8 +259,8 @@ export function adaptContext(i: { v: RadarVideo; lessons: readonly string[]; bri
       ...(rows.length ? [{ name: `참고 영상 대본(받아 적은 것 · ${rows.length}줄)`, rows }] : []),
       { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
     ],
-    facts: [...MIRAE_PROFILE, rows.length ? '참고 영상 대본이 있다 — 구성 · 흐름은 대본에서 읽는다.' : '참고 영상 대본이 없다 — 제목 · 숫자 · 참고할 것만으로 짐작한다.'],
-    rules: [...PACK_RULES],
+    facts: [...(isMarketingCustomer() ? customerProfileLines() : MIRAE_PROFILE), rows.length ? '참고 영상 대본이 있다 — 구성 · 흐름은 대본에서 읽는다.' : '참고 영상 대본이 없다 — 제목 · 숫자 · 참고할 것만으로 짐작한다.'],
+    rules: [...packRules()],
   }
 }
 

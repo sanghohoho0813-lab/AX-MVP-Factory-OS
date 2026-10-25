@@ -17,7 +17,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useViewingPilot } from '../../auth/osAccess'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
 import { QuickStart } from './QuickStart'
@@ -27,6 +27,7 @@ import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { useThreadPosts, useWeekRef } from '../../services/marketing/useSnsPosts'
+import { isMarketingCustomer, mkText } from '../../services/marketing/persona'
 import {
   BEFORE_POST,
   ENDINGS,
@@ -117,7 +118,8 @@ export default function ThreadsPage() {
 
 function Threads({ workspaceId }: { workspaceId: string | null }) {
   const readOnly = useViewingPilot() !== null
-  const aiOk = useOwnerAiAccess() !== 'no' && !readOnly
+  // SAAS-2 고객도 서버가 마케팅을 열었으면(사용량 장부로 셈) AI 를 쓴다 — 대표 판정은 그대로
+  const aiOk = useMarketingAiOn() && !readOnly
   const store = useThreadPosts(workspaceId, readOnly)
   const week = useWeekRef(workspaceId, readOnly)
   const [params, setParams] = useSearchParams()
@@ -395,16 +397,18 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
               <p className="t-sub break-keep text-slate-700">
                 <b>왜 되나</b> {tpl.why}
               </p>
-              <p className="t-sub break-keep text-slate-700">
-                <b>우리가 쓰면</b> {tpl.ours}
-              </p>
+              {!isMarketingCustomer() && (
+                <p className="t-sub break-keep text-slate-700">
+                  <b>우리가 쓰면</b> {tpl.ours}
+                </p>
+              )}
               {tpl.caution && (
                 <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
                   <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {tpl.caution}
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                {tpl.example && (
+                {tpl.example && !isMarketingCustomer() && (
                   <Button size="sm" variant="secondary" onClick={() => startBody(tpl.example ?? '', 'example', tpl.exampleTag)} data-testid="thr-use-example">
                     <FilePlus2 aria-hidden="true" className="size-4" /> 예시 글로 시작
                   </Button>
@@ -449,7 +453,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
             </label>
             <label className="flex flex-col gap-1">
               <span className="t-sub font-semibold text-slate-700">본인 댓글 (조회 1,000 넘으면 · 진단 · 자료 안내는 여기만)</span>
-              <input value={draft.selfComment} onChange={(e) => set({ selfComment: e.target.value })} placeholder="예: 3분 진단은 프로필 링크에서" className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-comment" />
+              <input value={draft.selfComment} onChange={(e) => set({ selfComment: e.target.value })} placeholder={isMarketingCustomer() ? '예: 자세한 정리는 프로필 링크에서' : '예: 3분 진단은 프로필 링크에서'} className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-comment" />
             </label>
             {draft.checks.length > 0 && (
               <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="thr-checks">
@@ -699,11 +703,13 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
               <p className="t-sub break-keep text-slate-700">
                 <b>왜</b> {t.why}
               </p>
-              <p className="t-sub break-keep text-slate-700">
-                <b>우리가 쓰면</b> {t.ours}
-              </p>
+              {!isMarketingCustomer() && (
+                <p className="t-sub break-keep text-slate-700">
+                  <b>우리가 쓰면</b> {t.ours}
+                </p>
+              )}
               {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
-              {t.example && (
+              {t.example && !isMarketingCustomer() && (
                 <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
                   <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">우리 버전 예시</summary>
                   <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{t.example}</p>
@@ -743,7 +749,7 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
                 <span className="t-sub font-bold break-keep text-slate-900">
                   {f.label} <span className="t-meta font-normal text-slate-500">· {f.note}</span>
                 </span>
-                <span className="t-sub break-keep text-slate-700">{f.example}</span>
+                <span className="t-sub break-keep text-slate-700">{mkText(f.example)}</span>
               </li>
             ))}
           </ul>

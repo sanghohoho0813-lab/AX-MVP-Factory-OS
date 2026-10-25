@@ -14,6 +14,7 @@ import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
 import { isGroup, normalizeMix, type BenchmarkChannelGroup, type ContentAxis, type MixGuide, type Opportunity } from './ytRadar'
 import { shootKit } from './shootKit'
+import { customerBrief, isMarketingCustomer } from './persona'
 
 const MODULE = 'marketing'
 const IDEAS = 'ideas'
@@ -325,6 +326,11 @@ export const DEFAULT_BRIEF: ChannelBrief = {
 
 const BRIEF_MAX = 300
 
+/** SAAS-2 기본 채널 기준 — 대표 계정은 DEFAULT_BRIEF(김팀장의 경영노트) · 고객은 그 사람 브랜드 설정으로(persona) */
+export function defaultBrief(): ChannelBrief {
+  return isMarketingCustomer() ? customerBrief() : DEFAULT_BRIEF
+}
+
 export function normalizeBrief(raw: unknown): ChannelBrief | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
@@ -332,13 +338,13 @@ export function normalizeBrief(raw: unknown): ChannelBrief | null {
   let any = false
   for (const f of BRIEF_FIELDS) {
     const v = str(r[f.key], BRIEF_MAX).trim()
-    out[f.key] = v || DEFAULT_BRIEF[f.key]
+    out[f.key] = v || defaultBrief()[f.key]
     if (v) any = true
   }
   return any ? out : null
 }
 
-export const briefOf = (prefs: Pick<RadarPrefs, 'brief'>): ChannelBrief => prefs.brief ?? DEFAULT_BRIEF
+export const briefOf = (prefs: Pick<RadarPrefs, 'brief'>): ChannelBrief => prefs.brief ?? defaultBrief()
 
 export interface RadarPrefs {
   /** 정해 둔 채널의 묶음 바꿈 · 사용 여부(끄면 계산에서 뺀다) */

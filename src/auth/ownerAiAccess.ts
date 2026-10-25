@@ -10,6 +10,7 @@
 import { useContext } from 'react'
 import { AuthContext } from './authContext'
 import { useIsPilot } from './osAccess'
+import { usePilotMarketing } from '../config/pilotMarketing'
 
 export const OWNER_AI_CAP = 'can_use_owner_ai_workspace'
 
@@ -50,6 +51,17 @@ export function useAiAssistAccess(): AssistAccess {
   const auth = useContext(AuthContext)
   const pilot = useIsPilot()
   return aiAssistAccessOf({ hasAuth: !!auth, access: auth?.access ?? null, pilot, capabilities: auth?.capabilities ?? null })
+}
+
+/**
+ * SAAS-2 마케팅 화면(레이더 묶음 · 스레드 · 릴스/틱톡)의 AI — 대표는 예전 판정 그대로,
+ * 고객(팀장 등급)은 서버가 마케팅을 열었을 때만(그 계정의 사용량을 장부로 셀 수 있을 때). 대표가 팀장 화면으로 볼 때는 꺼짐.
+ */
+export function useMarketingAiOn(): boolean {
+  const owner = useOwnerAiAccess()
+  const auth = useContext(AuthContext)
+  const open = usePilotMarketing() === 'open'
+  return owner !== 'no' || (auth?.access === 'pilot' && open)
 }
 
 /** AI 단추를 눌러 부를 수 있는가(대표 · 팀장) */

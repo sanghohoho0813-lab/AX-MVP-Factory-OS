@@ -58,6 +58,7 @@ import {
 import { Peek } from './EvidencePeek'
 import { AiKeywordBoard, DomainBoard, SideBreakouts } from './FocusSignals'
 import { AxisBadge, DomainBadge, IconChip, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
+import { mkText } from '../../../services/marketing/persona'
 
 /** 시장 신호 첫 화면 개수(나머지는 [더 보기]) */
 const SIGNAL_FIRST = 4
@@ -619,7 +620,7 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
         </div>
       </section>
       <p className="t-sub break-keep text-slate-700" data-testid="radar-approach">
-        <span className="font-bold text-slate-900">추천 접근 · {APPROACH_LABEL[o.approach]}</span> — {o.approachWhy}
+        <span className="font-bold text-slate-900">추천 접근 · {mkText(APPROACH_LABEL[o.approach])}</span> — {mkText(o.approachWhy)}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {inNotebook ? (
@@ -689,7 +690,7 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
                 onChange={(e) => setDraft((d) => ({ ...d, [k]: Number(e.target.value) }))}
                 className="tap t-sub w-20 rounded-(--radius-control) border border-slate-300 px-2 py-1.5"
                 aria-label={`${AXIS_LABEL[k]} 비중`}
-                title={AXIS_HINT[k]}
+                title={mkText(AXIS_HINT[k])}
               />
               <span className="t-meta text-slate-400">%</span>
             </label>
@@ -844,7 +845,7 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
                         <Badge tone="danger">터진 영상 {r.breakouts}</Badge>
                       </Peek>
                     )}
-                    {!r.fit && <Badge>MIRAE 분야 밖 · 참고</Badge>}
+                    {!r.fit && <Badge>{mkText('MIRAE 분야 밖 · 참고')}</Badge>}
                   </li>
                 ))}
               </ul>

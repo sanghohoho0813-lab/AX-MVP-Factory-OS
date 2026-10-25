@@ -5,7 +5,8 @@
 import { useState, type ReactNode } from 'react'
 import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { KIM_FACTS, REWRITES, VENTURE_CARDS } from '../../services/marketing/snsRules'
+import { REWRITES, VENTURE_CARDS, ourFactsList } from '../../services/marketing/snsRules'
+import { isMarketingCustomer } from '../../services/marketing/persona'
 
 export function StepTitle({ n, children }: { n: string; children: ReactNode }) {
   return (
@@ -132,6 +133,8 @@ export function StatInputs<K extends string>({ keys, values, disabled, onSet, te
 
 /** D-274 나눠 줄 자료 — 체크리스트 카드 6장(누르면 크게 · 한 장씩 / 모두 내려받기) */
 export function ShareKit({ testId }: { testId: string }) {
+  // SAAS-2 대표가 만들어 둔 카드라 고객 화면에는 없다(고객이 '자료가 이미 있다' 고 믿고 약속하지 않게)
+  if (isMarketingCustomer()) return null
   const all = () => {
     VENTURE_CARDS.cards.forEach((c, i) =>
       window.setTimeout(() => {
@@ -191,9 +194,10 @@ export function FactsBox({ value, onChange, testPrefix, what }: { value: string;
       <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">사실 목록 보기 · 이번 {what}에 더 쓸 사실 (선택)</summary>
       <p className="t-sub mt-1 break-keep text-slate-600">AI 와 규칙 검사는 아래 사실만 씁니다. 목록에 없는 숫자가 나오면 규칙 검사가 알려 드려요.</p>
       <ul className="t-sub mt-1 list-disc pl-5 break-keep text-slate-700" data-testid={`${testPrefix}-kim-facts`}>
-        {KIM_FACTS.map((f) => (
+        {ourFactsList().map((f) => (
           <li key={f}>{f}</li>
         ))}
+        {ourFactsList().length === 0 && <li>아직 없음 — 설정 › 내 브랜드 '확인된 사실' 에 경력 · 숫자를 적으면 여기에 나옵니다.</li>}
       </ul>
       <label className="mt-2 flex flex-col gap-1">
         <span className="t-sub font-semibold text-slate-700">이번 {what}에 더 쓸 사실 — 한 줄에 하나(고객 실명 · 매출 · 계약금액은 적지 않기)</span>

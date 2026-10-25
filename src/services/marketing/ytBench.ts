@@ -65,6 +65,17 @@ export interface YtFeed {
 
 /** 예전 앱의 '내 채널' — 서버가 mine 을 못 붙여 보냈을 때 이름으로 찾는다 */
 export const MY_CHANNEL_HANDLE = '김팀장의경영노트'
+/**
+ * SAAS-2 고객 계정 — 대표 채널(김팀장의 경영노트)은 고객의 '내 채널' 이 아니다. 채널 · 영상에서 통째로 뺀다
+ * (고객 화면에 대표 채널 성적이 '내 채널' 로 보이거나 AI 자료로 가지 않게). 대표 계정은 부르지 않는다.
+ */
+export function withoutOwnerChannel(feed: YtFeed): YtFeed {
+  const h = MY_CHANNEL_HANDLE.toLowerCase()
+  const owner = new Set(feed.channels.filter((c) => c.mine || [c.customUrl, c.handle].some((x) => (x ?? '').replace(/^@/, '').toLowerCase() === h) || (c.title ?? '').replace(/\s+/g, '').includes(h)).map((c) => c.id))
+  if (owner.size === 0) return feed
+  return { ...feed, channels: feed.channels.filter((c) => !owner.has(c.id)), videos: feed.videos.filter((v) => !owner.has(v.ch)) }
+}
+
 /** 쇼츠 = 3분 이하(유튜브 쇼츠 최대 길이) */
 export const SHORT_MAX_SEC = 180
 

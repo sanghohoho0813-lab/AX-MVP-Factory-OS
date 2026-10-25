@@ -20,6 +20,7 @@ import { IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stage
 import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl, type PerfTone } from '../../../services/marketing/myPerformance'
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { AxisBadge, IconChip } from './RadarParts'
+import { isMarketingCustomer } from '../../../services/marketing/persona'
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 const shortDay = (d: string) => {
@@ -449,9 +450,12 @@ function MakeRow({
         <Button size="sm" variant="ghost" onClick={() => onCopy(briefText(i), '브리프')} data-testid="radar-idea-brief">
           <ClipboardCopy aria-hidden="true" className="size-4" /> 브리프 복사
         </Button>
-        <Link to={`/tools/content?kw=${encodeURIComponent(i.topic.split(/\s*×\s*/)[0].slice(0, 40))}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold text-violet-700 hover:bg-violet-50" data-testid="make-to-content" title="누구 글인지 고르면 이 주제를 키워드로 넣은 채 블로그 · 쇼츠 · 카드뉴스를 만들어요">
-          <PenLine aria-hidden="true" className="size-4" /> 홍보 글로
-        </Link>
+        {/* SAAS-2 홍보 글 만들기는 고객 계정에 아직 닫혀 있어 그 입구도 보이지 않는다 */}
+        {!isMarketingCustomer() && (
+          <Link to={`/tools/content?kw=${encodeURIComponent(i.topic.split(/\s*×\s*/)[0].slice(0, 40))}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold text-violet-700 hover:bg-violet-50" data-testid="make-to-content" title="누구 글인지 고르면 이 주제를 키워드로 넣은 채 블로그 · 쇼츠 · 카드뉴스를 만들어요">
+            <PenLine aria-hidden="true" className="size-4" /> 홍보 글로
+          </Link>
+        )}
         {i.link && (
           <a href={i.link} target="_blank" rel="noreferrer noopener" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold text-emerald-700 hover:bg-emerald-50" data-testid="make-open-link">
             <ExternalLink aria-hidden="true" className="size-4" /> 올린 글 보기

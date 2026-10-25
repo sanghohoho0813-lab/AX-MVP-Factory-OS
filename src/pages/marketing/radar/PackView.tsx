@@ -18,8 +18,9 @@ import { todayLocalDate } from '../../../lib/appClock'
 import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
-import { PACK_AI_PARTS, PACK_LABEL, makePack, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
+import { PACK_AI_PARTS, PACK_LABEL, makePack, packPartLabel, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
+import { mkText } from '../../../services/marketing/persona'
 
 const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = {
   titles: { icon: Type, chip: 'bg-violet-100 text-violet-700' },
@@ -274,7 +275,7 @@ function AiBar({
             ? 'AI 가 검증된 방법대로 쓰는 중이에요(20~60초) — 그동안 아래 초안을 먼저 보세요.'
             : saved
               ? `AI 가 쓴 글이에요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-              : '모델을 고르고 [AI로 다 쓰기] 를 누르면 제목 · 대본 · 블로그 · 카드뉴스를 검증된 방법대로 다시 써요. 누르기 전에는 부르지 않아요.'}
+              : mkText('모델을 고르고 [AI로 다 쓰기] 를 누르면 제목 · 대본 · 블로그 · 카드뉴스를 검증된 방법대로 다시 써요. 누르기 전에는 부르지 않아요.')}
         </p>
         <div className="flex flex-wrap items-start gap-2">
           <ModelPicker />
@@ -288,7 +289,7 @@ function AiBar({
         <ul className="flex flex-wrap gap-1.5" data-testid="mk-pack-ai-parts">
           {PACK_AI_PARTS.map((p) => (
             <li key={p.part} className={`t-meta inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${parts[p.part] === 'error' ? 'bg-amber-100 text-amber-900' : parts[p.part] === 'done' ? 'bg-violet-100 text-violet-800' : 'bg-white text-slate-600'}`} data-part={p.part} data-state={parts[p.part]}>
-              {icon(parts[p.part])} {p.label}
+              {icon(parts[p.part])} {packPartLabel(p)}
             </li>
           ))}
         </ul>

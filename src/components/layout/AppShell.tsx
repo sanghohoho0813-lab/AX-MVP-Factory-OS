@@ -1,6 +1,9 @@
 import { Suspense, useContext, useEffect, useState } from 'react'
 import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
+import { setMarketingCustomer } from '../../services/marketing/persona'
+import { isCustomerMarketingPath, setPilotMarketing, usePilotMarketing } from '../../config/pilotMarketing'
+import { fetchAssistStatus } from '../../services/aiAssist/client'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -38,6 +41,9 @@ function PilotRouteGuard({ pathname, children }: { pathname: string; children: R
   setBuiltinServicesHidden(pilot)
   // 대표 AI 전략실처럼 기능 권한이 필요한 화면 — 권한이 없으면(팀장 · 권한 없는 구성원) 직접 주소로도 없는 화면
   const caps = useCapabilitySet()
+  // SAAS-2 마케팅을 열지 서버에 묻는 동안은 '없는 화면' 대신 불러오는 중(답이 오면 열리거나 닫힌다)
+  const marketing = usePilotMarketing()
+  if (pilot && marketing === 'unknown' && isCustomerMarketingPath(pathname)) return <ShellFallback />
   if ((pilot && isPilotHiddenPath(pathname)) || isCapabilityHiddenPath(pathname, caps)) {
     return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
   }
@@ -73,7 +79,27 @@ export function AppShell() {
   useScrollMemory(() => setMobileOpen(false))
 
   // SAAS-1 이 작업공간의 브랜드 · AI 설정을 미리 읽어 둔다 — AI 요청마다 같이 간다(설정 화면을 열지 않아도)
-  const brandWorkspace = useContext(AuthContext)?.currentWorkspaceId ?? null
+  const auth = useContext(AuthContext)
+  const brandWorkspace = auth?.currentWorkspaceId ?? null
+  // SAAS-2 마케팅 화면이 누구 이름으로 쓰는지(팀장 · 구독 고객 = 그 사람 브랜드) — 화면을 그리기 전에 정한다
+  const access = auth?.access ?? null
+  setMarketingCustomer(access === 'pilot')
+  // SAAS-2 마케팅을 고객에게 열지는 서버가 정한다(사용량 장부가 준비된 계정만) — 메뉴가 이 값을 따라 다시 그려진다
+  usePilotMarketing()
+  useEffect(() => {
+    if (access !== 'pilot') {
+      setPilotMarketing('closed')
+      return
+    }
+    let alive = true
+    setPilotMarketing('unknown')
+    fetchAssistStatus()
+      .then((s) => alive && setPilotMarketing(s.marketing === true ? 'open' : 'closed'))
+      .catch(() => alive && setPilotMarketing('closed'))
+    return () => {
+      alive = false
+    }
+  }, [access])
   useEffect(() => {
     void loadBrand(brandWorkspace).catch(() => {})
   }, [brandWorkspace])

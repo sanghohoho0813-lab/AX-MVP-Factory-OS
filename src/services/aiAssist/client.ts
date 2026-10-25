@@ -36,6 +36,10 @@ export interface ProviderInfo {
 export interface AssistStatus {
   providers: ProviderInfo[]
   defaultChoice: { provider: ProviderId; model: string }
+  /** SAAS-2 마케팅 AI 가 이 계정에 열렸나(대표는 늘 true · 고객은 사용량 장부가 켜졌을 때) */
+  marketing?: boolean
+  /** SAAS-2 고객 이번 달 사용량(장부가 켜졌을 때만) */
+  usage?: { used: number; limit: number; month: string } | null
 }
 
 export interface AssistItem {
@@ -67,6 +71,8 @@ export interface AssistRun {
   raw: string
   usage: { input: number; output: number; total: number }
   estimatedCostUsd: number | null
+  /** SAAS-2 고객 — 이 요청을 센 뒤 이번 달 사용량 */
+  quota?: { used: number; limit: number } | null
   ms: number
   sent: { userChars: number; rows: number; rowsCut: number }
   createdAt: string
@@ -111,6 +117,12 @@ const MESSAGE: Record<string, string> = {
   network: '서버에 닿지 못했습니다. 인터넷 연결을 확인해 주세요.',
   auth_unreachable: '로그인 확인이 늦어 멈췄습니다. 잠시 뒤 다시 눌러 주세요.',
   not_deployed: 'AI 서버 함수가 없는 곳입니다(로컬 미리보기 등). 배포된 주소에서 눌러 주세요.',
+  // SAAS-2 고객별 AI 사용량(서버 장부)
+  quota_exceeded: '이번 달 AI 사용량을 다 썼어요. 다음 달 1일에 다시 채워집니다(설정 › 계정 · 보기에서 남은 양 확인).',
+  usage_setup_needed: '이 AI 기능은 사용량 관리가 준비되면 열립니다.',
+  usage_unreachable: 'AI 사용량을 확인하지 못해 멈췄어요(세지 않았습니다). 잠시 뒤 다시 눌러 주세요.',
+  request_in_progress: '같은 요청이 아직 처리 중이에요. 잠시 뒤 결과를 확인해 주세요.',
+  request_done: '이미 처리된 요청이에요. 새로 눌러 주세요.',
 }
 
 export function assistMessage(code: string): string {
@@ -148,7 +160,7 @@ function notJson(res: Response): boolean {
 }
 
 async function readError(res: Response): Promise<AssistError> {
-  let body: { code?: string; missing?: string[] } = {}
+  let body: { code?: string; missing?: string[]; used?: number; limit?: number } = {}
   try {
     body = await res.json()
   } catch {
@@ -156,7 +168,9 @@ async function readError(res: Response): Promise<AssistError> {
     return new AssistError(code, assistMessage(code))
   }
   const code = typeof body.code === 'string' ? body.code : 'provider_error'
-  return new AssistError(code, assistMessage(code), Array.isArray(body.missing) ? body.missing.map(String) : [])
+  // SAAS-2 한도를 다 쓰면 몇 단위 중 몇을 썼는지도
+  const quota = code === 'quota_exceeded' && Number.isFinite(body.used) && Number.isFinite(body.limit) ? ` (이번 달 ${body.used} / ${body.limit})` : ''
+  return new AssistError(code, assistMessage(code) + quota, Array.isArray(body.missing) ? body.missing.map(String) : [])
 }
 
 export async function fetchAssistStatus(withModels = false): Promise<AssistStatus> {
@@ -169,7 +183,13 @@ export async function fetchAssistStatus(withModels = false): Promise<AssistStatu
   if (!res.ok) throw await readError(res)
   if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as AssistStatus & { ok: boolean }
-  return { providers: Array.isArray(b.providers) ? b.providers : [], defaultChoice: b.defaultChoice }
+  return {
+    providers: Array.isArray(b.providers) ? b.providers : [],
+    defaultChoice: b.defaultChoice,
+    // SAAS-2 서버가 분명히 연다고 한 때만(옛 서버 · 빠진 칸은 닫힘)
+    marketing: b.marketing === true,
+    usage: b.usage && Number.isFinite(b.usage.used) && Number.isFinite(b.usage.limit) ? { used: b.usage.used, limit: b.usage.limit, month: String(b.usage.month ?? '') } : null,
+  }
 }
 
 /** D-260 영상 단추(radar.transcript) — 영상 번호 · 구간(초). 주소는 서버가 만든다 */

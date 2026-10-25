@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/Button'
 import { HintTip } from '../../../components/ui/fold'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
 import { cleanTopic } from '../../../services/marketing/contentPack'
+import { isMarketingCustomer, mkText } from '../../../services/marketing/persona'
 
 /** 처음 쓰는 사람도 알아보게 — 레이더 축 이름(시장수요 · BRIDGE)을 쉬운 말로 */
 const AXIS_EASY: Record<ContentAxis, string> = { market: '경제 · 경영', axai: 'AI · 업무', bridge: '경영 × AI' }
@@ -91,9 +92,9 @@ export function KeywordHome({
               이번 주 키워드
             </h2>
           </HintTip>
-          <p className="t-sub break-keep text-white/90">누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요</p>
+          <p className="t-sub break-keep text-white/90">{mkText('누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요')}</p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
-            {FORMATS.map((f) => (
+            {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
               <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">
                 <f.icon aria-hidden="true" className="size-3.5" />
                 {f.label}
@@ -125,7 +126,7 @@ export function KeywordHome({
                 {i + 1}
               </span>
               <p className="t-sub min-w-0 break-keep text-slate-800">
-                <b className="text-slate-900">{h.title}</b> — {h.body}
+                <b className="text-slate-900">{h.title}</b> — {isMarketingCustomer() ? mkText(h.body).replace('대표 계정이면 ', '') : h.body}
               </p>
             </li>
           ))}

@@ -7,6 +7,8 @@
  * 쓰는 법: 쉬운 해요체 한두 문장(110자 안, 되도록 90자 안) — ① 무엇인지 ② 무엇을 위해 · 언제 펼치는지.
  * 앞부분으로 찾으므로 짧은 이름(예: '영업' · '계약')은 더 긴 다른 목차까지 잡는다 — 뜻이 다른 긴 목차는 따로 적는다(긴 이름이 이긴다).
  */
+import { mkText } from '../services/marketing/persona'
+
 const HINTS: Record<string, string> = {
   // 오늘
   '오늘 할 일': '오늘 · 밀린 할 일. 적고, 누르면 완료 · 미루기 · 업체 열기.',
@@ -357,9 +359,10 @@ const KEYS = Object.keys(HINTS).sort((a, b) => b.length - a.length)
 export function hintFor(title: string | undefined | null): string | undefined {
   const t = (title ?? '').replace(/\s+/g, ' ').trim()
   if (!t) return undefined
-  if (HINTS[t]) return HINTS[t]
+  // SAAS-2 고객 계정에는 'MIRAE 관점' 같은 대표 이름 대신 '우리'(대표 계정은 그대로)
+  if (HINTS[t]) return mkText(HINTS[t])
   const k = KEYS.find((key) => t.startsWith(key))
-  return k ? HINTS[k] : undefined
+  return k ? mkText(HINTS[k]) : undefined
 }
 
 export const SECTION_HINT_COUNT = KEYS.length

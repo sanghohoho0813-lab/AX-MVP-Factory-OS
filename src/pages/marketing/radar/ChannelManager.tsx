@@ -16,6 +16,7 @@ import { MAX_ADDED, type RadarPrefs } from '../../../services/marketing/radarSto
 import { resolveChannel, type ResolvedChannel } from '../../../services/marketing/ytExtra'
 import { quoted as q } from '../../../lib/josa'
 import { localDateOf } from '../../../lib/appClock'
+import { mkText } from '../../../services/marketing/persona'
 
 export function ChannelManager({
   channels,
@@ -81,14 +82,14 @@ export function ChannelManager({
             <HelpHeading as="h3" tight id="radar-default-h" label="기본 벤치마킹 채널" className="t-card font-bold text-slate-900">
               기본 벤치마킹 채널 <span className="t-sub font-semibold text-slate-500">{defaultCount}곳</span>
             </HelpHeading>
-            <p className="t-meta break-keep text-slate-500">MIRAE 가 미리 골라 둔 채널입니다 — 채널마다 '왜 보는 채널인지' 를 적어 두었습니다.</p>
+            <p className="t-meta break-keep text-slate-500">{mkText("MIRAE 가 미리 골라 둔 채널입니다 — 채널마다 '왜 보는 채널인지' 를 적어 두었습니다.")}</p>
           </div>
           {GROUPS.map((g) => {
             const list = byGroup.get(g) ?? []
             const on = list.filter((c) => prefs.overrides[c.id]?.enabled !== false).length
             return (
               <Fold key={g} panel id={`radar.ch.${g}`} title={GROUP_LABEL[g]} count={list.length} defaultOpen={list.length > 0} summary={list.length ? `사용 중 ${on}곳` : '아직 채널이 없습니다'} testId={`radar-group-${g}`}>
-                <p className="t-meta mb-1 break-keep text-slate-500">{GROUP_PURPOSE[g]}</p>
+                <p className="t-meta mb-1 break-keep text-slate-500">{mkText(GROUP_PURPOSE[g])}</p>
                 {list.length === 0 ? (
                   <p className="t-sub break-keep text-slate-500">이 묶음에 기본 채널이 없습니다{g === 'ai' || g === 'ax' ? ' — 위 [채널 추가] 로 더할 수 있습니다' : ''}.</p>
                 ) : (

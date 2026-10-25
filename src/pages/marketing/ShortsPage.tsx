@@ -16,7 +16,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useViewingPilot } from '../../auth/osAccess'
-import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
+import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist } from '../../services/aiAssist/client'
@@ -54,6 +54,8 @@ import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, S
 import { QuickStart } from './QuickStart'
 import { Fold, openFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
+import { mkText } from '../../services/marketing/persona'
+import { exampleText } from '../../services/marketing/shorts'
 
 type Tab = 'write' | 'records' | 'guide'
 const TABS = [
@@ -110,7 +112,8 @@ export default function ShortsPage() {
 
 function Shorts({ workspaceId }: { workspaceId: string | null }) {
   const readOnly = useViewingPilot() !== null
-  const aiOk = useOwnerAiAccess() !== 'no' && !readOnly
+  // SAAS-2 고객도 서버가 마케팅을 열었으면(사용량 장부로 셈) AI 를 쓴다 — 대표 판정은 그대로
+  const aiOk = useMarketingAiOn() && !readOnly
   const store = useShortPosts(workspaceId, readOnly)
   const [params, setParams] = useSearchParams()
   const tab = tabOf(params.get('tab'))
@@ -377,7 +380,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                       <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
                       <span className="t-sub text-slate-500">{f.seconds}</span>
                     </span>
-                    <span className="t-sub break-keep text-slate-600">{f.how}</span>
+                    <span className="t-sub break-keep text-slate-600">{mkText(f.how)}</span>
                   </button>
                 </li>
               )
@@ -655,13 +658,13 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
                 <span className="t-sub text-slate-500">{f.seconds}</span>
               </div>
               <p className="t-sub break-keep text-slate-600">{f.platforms.map((p) => (p === 'reels' ? '릴스' : '틱톡 · 쇼츠')).join(' · ')}</p>
-              <p className="t-sub break-keep text-slate-800">{f.how}</p>
+              <p className="t-sub break-keep text-slate-800">{mkText(f.how)}</p>
               <p className="t-sub break-keep text-slate-700">
                 <b>왜</b> {f.why}
               </p>
               <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
                 <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">예시 대본 보기</summary>
-                <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{f.example}</p>
+                <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{exampleText(f.example)}</p>
                 <p className="t-sub mt-2 break-keep whitespace-pre-line text-slate-500">캡션: {f.exampleCaption}</p>
               </details>
               <div className="mt-auto">

@@ -32,7 +32,7 @@ let fail = 0
 function check(name, ok, detail) {
   if (ok) pass += 1
   else fail += 1
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : ' — ' + String(detail).slice(0, 400)}`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : ' — ' + (typeof detail === 'object' ? JSON.stringify(detail) : String(detail)).slice(0, 400)}`)
 }
 
 const OWNER = { id: '0e000000-0000-4000-8000-0000000000a1', email: 'owner@e2e.kr', password: 'owner-pass' }
@@ -115,6 +115,8 @@ const { default: assistHandler } = await import(pathToFileURL(path.resolve('api/
 Object.assign(process.env, { SUPABASE_URL: `https://${REF}.supabase.co`, SUPABASE_ANON_KEY: 'qa-anon', GEMINI_API_KEY: 'gem-pilot-e2e-KEY', ANTHROPIC_API_KEY: 'ant-pilot-e2e-KEY', AI_ASSIST_RATE_PER_MIN: '100', AI_ASSIST_RATE_PER_HOUR: '500' })
 const aiCalls = [] // { provider, sys, user }
 const rpcCalls = [] // { who, fn, body }
+// SAAS-2 서버는 로그인 등급을 60초 기억한다(gate.js) — 화면이 여는 순간 마케팅 열림을 물어(?status=1) 기억이 먼저 채워질 수 있어, '물은 적 있나' 는 지우지 않는 목록으로 본다
+const rpcSeen = new Set()
 const AI_ANSWER = { headline: '오늘은 서류 마감부터', items: [{ title: '서류 받기', tag: '마감', detail: '내일까지 받아야 신청할 수 있어요' }], next: ['오전에 전화'], caution: '' }
 const realFetch = globalThis.fetch
 globalThis.fetch = async (input, init = {}) => {
@@ -127,6 +129,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.startsWith(`https://${REF}.supabase.co/rest/v1/rpc/`)) {
     const fn = url.split('/rpc/')[1]
     rpcCalls.push({ who: whoOf(h.Authorization)?.email ?? 'anon', fn, body: init.body })
+    rpcSeen.add(`${whoOf(h.Authorization)?.email ?? 'anon'}:${fn}`)
     return realFetch(`http://127.0.0.1:${PGRST_PORT}/rpc/${fn}`, { method: 'POST', headers: { Authorization: h.Authorization, 'Content-Type': 'application/json' }, body: init.body ?? '{}' })
   }
   if (url.includes('generativelanguage.googleapis.com') && url.includes(':generateContent')) {
@@ -695,7 +698,7 @@ try {
   await page.getByTestId('ai-assist-result').first().waitFor({ timeout: 15000 }).catch(() => {})
   const pRes = await page.getByTestId('ai-assist-result').first().innerText().catch(() => '')
   const gem = aiCalls.filter((c) => c.provider === 'gemini')
-  check('팀장(D-257): 질문 단추 한 번 → 답 · Gemini 로만 감 · 서버가 DB 에 등급을 물어 팀장으로 판단(my_os_access)', pRes.includes('서류 마감부터') && gem.length === 1 && aiCalls.length === 1 && rpcCalls.some((c) => c.who === PILOT.email && c.fn === 'my_os_access'), { n: aiCalls.length, rpc: rpcCalls.map((c) => `${c.who}:${c.fn}`).join(), pRes: pRes.slice(0, 80) })
+  check('팀장(D-257): 질문 단추 한 번 → 답 · Gemini 로만 감 · 서버가 DB 에 등급을 물어 팀장으로 판단(my_os_access)', pRes.includes('서류 마감부터') && gem.length === 1 && aiCalls.length === 1 && rpcSeen.has(`${PILOT.email}:my_os_access`), { n: aiCalls.length, rpc: rpcCalls.map((c) => `${c.who}:${c.fn}`).join(), pRes: pRes.slice(0, 80) })
   check('팀장(D-257 · SAAS-1): 지시문 첫 줄이 팀장 설정(은혜컨설턴트(은혜경영)) · 확인된 사실 · "사용자 본인이 보냈다" · 대표 이름 · 회사 0 · 보낸 자료에 대표 자료 0', (gem[0]?.sys ?? '').includes('은혜컨설턴트(은혜경영)의 업무 비서') && (gem[0]?.sys ?? '').includes('경력 5년 · 상담 80곳') && (gem[0]?.sys ?? '').includes('컨설턴트(사용자) 본인이 보냈다') && !/김상호|김팀장|미래AI랩/.test(gem[0]?.sys ?? '') && leaked(gem[0]?.user ?? '').length === 0, leaked(gem[0]?.user ?? '').join())
   await page.getByTestId('ai-assist-model-toggle').first().click()
   await page.waitForTimeout(500)
@@ -1173,6 +1176,84 @@ try {
   await p3.waitForTimeout(400)
   check('Pilot(D-185): 그래도 머리줄 [안내 영상] 으로는 열린다', (await p3.getByTestId('tutorial-dialog').count()) === 1)
   await c3.close()
+
+  /* ================= 7. SAAS-2 — 사용량 장부를 켜면 고객(팀장)에게 마케팅이 열린다(진짜 DB 장부 0022 · 진짜 RLS) ================= */
+  const USAGE_SECRET = 'pilot-e2e-usage-secret-0123456789abcdef'
+  check('SAAS-2 준비 전: 장부 설정 없음(위 P1~P4 — 팀장 마케팅 닫힘이 이 상태)', sql(`select count(*) from public.ai_usage_config`) === '0')
+  sql(`insert into public.ai_usage_config (id, secret_hash, default_monthly_units) values (1, sha256(convert_to('${USAGE_SECRET}', 'UTF8')), 12) on conflict (id) do update set secret_hash = excluded.secret_hash, default_monthly_units = excluded.default_monthly_units`)
+  process.env.AI_USAGE_SECRET = USAGE_SECRET
+  const c4 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  await c4.route(`https://${REF}.supabase.co/**`, route)
+  await c4.route('**/api/ai-assist**', assistRoute)
+  const p4 = await c4.newPage()
+  p4.on('pageerror', (e) => errors.push(String(e)))
+  await login(p4, PILOT)
+  await p4.waitForTimeout(800)
+  // 본문(main)만 — 왼쪽 위 제품 이름(MIRAE AI LAB OS)은 이 서비스 이름이라 대표 개인 정보가 아니다
+  const OWNER_WORDS = /김상호|김팀장|미래AI랩|MIRAE|경영노트|AX Fit|3분 진단/
+  const mainText = (pg) => pg.locator('main').innerText().catch(() => '')
+  check('SAAS-2 팀장: 장부를 켜면 왼쪽 메뉴에 마케팅 · 브랜딩', (await p4.locator('aside a[href="/marketing"]').count()) >= 1, await p4.locator('aside').innerText().catch(() => ''))
+  await go(p4, '/marketing/threads')
+  const mkTabs = await p4.getByTestId('mk-tabs').locator('[data-testid^="mk-tab-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
+  check('SAAS-2 팀장: 스레드 화면 열림 · 만들기 칸은 스레드 · 릴스/틱톡만(홍보 글 · 홈페이지 없음)', (await p4.getByTestId('thr-page').count()) === 1 && mkTabs.includes('mk-tab-threads') && mkTabs.includes('mk-tab-shorts') && !mkTabs.includes('mk-tab-content') && !mkTabs.includes('mk-tab-homepage'), mkTabs.join())
+  const thrText = await mainText(p4)
+  check('SAAS-2 팀장: 스레드 화면에 대표 이름 · 회사 · 대표 사실 0 · 대표 예시 글 단추 없음', !OWNER_WORDS.test(thrText) && !thrText.includes('100억') && (await p4.getByTestId('thr-use-example').count()) === 0, (thrText.match(OWNER_WORDS) ?? []).join())
+  await shot(p4, 'saas2-pilot-threads')
+  // 화면에서 AI 로 바로 쓰기(D-289 두 번 누르기) — 고객 AI 도 켜져 있고, 부르면 DB 장부에 한 줄
+  aiCalls.length = 0
+  await p4.locator('[data-testid="thr-qs-chip"]').first().click()
+  const qsAi = p4.getByTestId('thr-qs-ai')
+  const qsEnabled = (await qsAi.count()) === 1 && !(await qsAi.isDisabled())
+  if (qsEnabled) {
+    await qsAi.click()
+    await p4.waitForTimeout(450)
+    await qsAi.click()
+  }
+  for (let i = 0; i < 30 && aiCalls.length === 0; i += 1) await p4.waitForTimeout(500)
+  await p4.waitForTimeout(1500) // 정산까지
+  const uiRows = sql(`select count(*) || ':' || coalesce(sum(units), 0) from public.ai_usage_ledger where user_id = '${PILOT.id}' and assist_id = 'threads.write' and status = 'settled'`)
+  check('SAAS-2 팀장 화면: 스레드 [AI로 바로 쓰기] 켜짐 → AI 한 번 · 지시문에 대표 이름 0 · DB 장부에 정산 1줄(글 쓰기 2단위)', qsEnabled && aiCalls.length === 1 && !OWNER_WORDS.test(aiCalls[0]?.sys ?? '') && uiRows === '1:2', `${qsEnabled} n=${aiCalls.length} ${uiRows}`)
+  sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`) // 아래 한도 시험을 0 부터(시험 DB 만)
+  await go(p4, '/marketing/shorts')
+  check('SAAS-2 팀장: 릴스 · 틱톡 화면 열림 · 대표 이름 0', (await p4.getByTestId('sht-page').count()) === 1 && !OWNER_WORDS.test(await mainText(p4)), ((await mainText(p4)).match(OWNER_WORDS) ?? []).join())
+  await go(p4, '/marketing')
+  await p4.waitForTimeout(800)
+  const ytText = await mainText(p4)
+  check('SAAS-2 팀장: 콘텐츠 레이더 열림 · 대표 이름 · 대표 채널 0 · 대표 레이더 기록 0', (await p4.getByTestId('yt-page').count()) === 1 && !OWNER_WORDS.test(ytText) && leaked(ytText).length === 0 && (await p4.locator('[data-testid="yt-card"][data-mine="1"]').count()) === 0, (ytText.match(OWNER_WORDS) ?? []).join())
+  await shot(p4, 'saas2-pilot-radar')
+  for (const pth of ['/tools/content', '/tools/homepage', '/marketing/more', '/patent-venture']) {
+    await go(p4, pth)
+    check(`SAAS-2 팀장: ${pth} 는 열려도 그대로 닫힘`, (await bodyText(p4)).includes('화면을 찾지 못했습니다'))
+  }
+  await go(p4, '/settings')
+  await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})
+  check('SAAS-2 팀장: 설정 › 이번 달 AI 사용량 0 / 12(DB 장부 값)', ((await p4.getByTestId('ai-usage-numbers').innerText().catch(() => '')) ?? '').startsWith('0 / 12'), await p4.getByTestId('ai-usage').innerText().catch(() => ''))
+  await shot(p4, 'saas2-pilot-settings')
+
+  const mkCtx = { title: '콘텐츠 레이더', today: '2026-10-25', sections: [{ name: '후보', rows: [{ ref: 'o1', 주제: '정책자금 금리' }] }] }
+  aiCalls.length = 0
+  const s1 = await assistDirect(PILOT, { requestId: 'req-saas2-e2e-000001', assistId: 'radar.top5', page: 'radar', context: mkCtx, brand: { name: '은혜컨설턴트', company: '은혜경영', facts: '경력 5년 · 상담 80곳' } })
+  const ledgerRow = sql(`select user_id || ':' || status || ':' || units from public.ai_usage_ledger where request_id = 'req-saas2-e2e-000001'`)
+  check('SAAS-2 팀장 AI: 마케팅 단추 → 200 · DB 장부에 팀장 줄 하나(정산 · 2단위) · AI 지시문에 대표 이름 0 · 팀장 설정', s1.statusCode === 200 && ledgerRow === `${PILOT.id}:settled:2` && aiCalls.length === 1 && !OWNER_WORDS.test(aiCalls[0].sys) && aiCalls[0].sys.includes('은혜컨설턴트(은혜경영)'), `${s1.statusCode} ${ledgerRow} ${s1.raw.slice(0, 200)}`)
+  const again2 = await assistDirect(PILOT, { requestId: 'req-saas2-e2e-000001', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('SAAS-2 팀장 AI: 같은 요청 번호 다시 → AI 다시 안 부름 · 장부 줄 그대로 하나', again2.statusCode === 200 && aiCalls.length === 1 && sql(`select count(*) from public.ai_usage_ledger where request_id = 'req-saas2-e2e-000001'`) === '1')
+  for (let i = 2; i <= 6; i += 1) await assistDirect(PILOT, { requestId: `req-saas2-e2e-00000${i}`, assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  const over = await assistDirect(PILOT, { requestId: 'req-saas2-e2e-000007', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('SAAS-2 팀장 AI: 한도 12단위를 다 쓰면 429 quota_exceeded · AI 안 부름 · 장부 합계 12', over.statusCode === 429 && over.body.code === 'quota_exceeded' && aiCalls.length === 6 && sql(`select sum(units) from public.ai_usage_ledger where user_id = '${PILOT.id}' and status <> 'released'`) === '12', `${over.statusCode} ${over.raw.slice(0, 160)} n=${aiCalls.length}`)
+  const ownRun = await assistDirect(OWNER, { requestId: 'req-saas2-e2e-owner01', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('SAAS-2 대표 AI: 장부에 대표 줄 0(대표는 세지 않음) · 대표 마케팅 그대로', ownRun.statusCode === 200 && sql(`select count(*) from public.ai_usage_ledger where user_id = '${OWNER.id}'`) === '0')
+  await go(p4, '/settings')
+  await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})
+  check('SAAS-2 팀장: 다 쓴 뒤 설정에 12 / 12', ((await p4.getByTestId('ai-usage-numbers').innerText().catch(() => '')) ?? '').startsWith('12 / 12'))
+  // 휴대폰 390 — 열린 마케팅 화면도 넘침 0
+  await p4.setViewportSize({ width: 390, height: 844 })
+  for (const pth of ['/marketing/threads', '/marketing/shorts', '/marketing']) {
+    await go(p4, pth)
+    check(`SAAS-2 팀장 390: ${pth} 가로 넘침 0`, (await overflowX(p4)) <= 0, String(await overflowX(p4)))
+    await shot(p4, `saas2-pilot-m${pth.replace(/\//g, '-')}`)
+  }
+  await c4.close()
+  delete process.env.AI_USAGE_SECRET
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))
 } finally {

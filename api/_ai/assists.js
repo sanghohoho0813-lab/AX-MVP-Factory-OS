@@ -14,6 +14,10 @@ import { finalRules, ideaJudgeBlock, judgeBlock } from './judge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from './specSamples.js'
 import { CONFIDENTIAL_RULES, sanitizeKnowledge, scrubBrand } from './guard.js'
 import { brandBlock, brandIdentity, CUSTOMER_NOTE, customerize } from './brand.js'
+import { CUSTOMER_KB_EXCLUDE, customerChannelRules, customerInstruction, customerLabel, customerPack, customerRadarRules } from './customerMarketing.js'
+
+/** SAAS-2 마케팅 · 브랜딩 화면(고객판 단추 지시 · 이름을 쓰는 곳) — ai-assist.js MARKETING_PAGES 와 같다 */
+export const MARKETING_ASSIST_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
 
 const D = '2026-10-19'
 
@@ -569,10 +573,20 @@ export function assistSystem(assist, opts = {}) {
   const tail = ['', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)]
   if (customer) {
     // SAAS-1 첫 줄은 이 사람의 업무 비서 · 대표 회사 · 사람 이름은 이 사람 것으로 · 끝에 [내 브랜드] 와 '대표 = 이 사용자' 안내
-    const rules = [brandIdentity(customer.brand), ASSIST_RULES[1].replace('대표가 바로', '사용자가 바로'), ...ASSIST_RULES.slice(2)]
-    const body = [...CONFIDENTIAL_RULES, '', ...rules, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines]
+    // SAAS-2 마케팅 채널 규칙 · 단추 지시 · 실측 공식도 고객판(대표 화자 · 끝인사 · 대표 사실 · 대표 예시 · 카드뉴스 없이 — customerMarketing.js)
+    const channel = assist.video ? own : assist.page === 'radar' ? ['', '[마케팅 규칙]', ...customerRadarRules(RADAR_RULES)] : assist.page === 'threads' ? ['', '[스레드 규칙]', ...customerChannelRules(THREADS_RULES, 'threads')] : assist.page === 'shorts' ? ['', '[숏폼 규칙]', ...customerChannelRules(SHORTS_RULES, 'shorts')] : []
+    const marketing = MARKETING_ASSIST_PAGES.has(assist.page)
+    const ckb = kb.filter((k) => !CUSTOMER_KB_EXCLUDE.has(k.key)).map((k) => (k.key.startsWith('mk_') ? customerPack(k.text) : k.text))
+    const ckbLines = ckb.length ? [kbLines[0], kbLines[1], ...ckb, '[기준 문서 끝]'] : []
+    const label = marketing ? customerLabel(assist.label) : assist.label
+    const instruction = marketing ? customerInstruction(assist.instruction) : assist.instruction
+    // 그 사람이 적은 첫 줄 · [내 브랜드] 는 이름 바꾸기를 거치지 않는다(고객 본인 이름이 대표 측 이름과 같아도 그대로)
+    const ID = '\u0000BRAND_ID\u0000'
+    const rules = [ID, ASSIST_RULES[1].replace('대표가 바로', '사용자가 바로'), ...ASSIST_RULES.slice(2)]
+    const body = [...CONFIDENTIAL_RULES, '', ...rules, ...channel, '', `[단추] ${label} (${assist.id} v${assist.version})`, ...instruction, ...judge, ...ckbLines]
+    const server = customerize(body.join('\n'), customer.brand).replace(ID, () => brandIdentity(customer.brand))
     const brand = brandBlock(customer.brand)
-    return scrubBrand(customerize([...body, ...(brand.length ? ['', ...brand] : []), '', CUSTOMER_NOTE, ...tail].join('\n'), customer.brand))
+    return scrubBrand([server, ...(brand.length ? ['', ...brand] : []), '', CUSTOMER_NOTE, ...tail].join('\n'))
   }
   // D-264 비공개 규칙이 맨 앞 · 마지막으로 쓰지 않는 이름 · 출처 이름을 한 번 더 지운다(대표 기준 글 포함)
   return scrubBrand([...CONFIDENTIAL_RULES, '', ...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines, ...tail].join('\n'))
