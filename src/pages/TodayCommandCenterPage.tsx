@@ -374,8 +374,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     } catch {
       charges = []
     }
-    return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges })
-  }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable])
+    return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges, journal })
+  }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable, journal])
 
   const clientNameOf = (id: string) => clientNames.get(id)
 

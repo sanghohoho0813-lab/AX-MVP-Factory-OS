@@ -11,6 +11,8 @@
  *   D  블로그 · 플레이스 홍보 글: 이름 · '미래AI랩으로 만들기' → 같은 자리 · 블로그 글 한 번에(규칙집이 같이 감) → 보관함에 저장 → 보관함에 쌓임
  *   F  D-241 답 → 다음 단계: 번호 단추 이름(업체 열기) · [할 일로 넣기] → 오늘 목록 · 마케팅 TOP5 기획에 채널 설계 기준 · 내 채널이 감 ·
  *      [내 콘텐츠에 담기] → 그 줄 펼쳐 보기 · [이 기획으로 대본 끝까지] → [더 잘 쓰는 모델로 다시] → [내 콘텐츠에 저장] → 대본 칸 · 기준 고치면 다음 기획에
+ *   G  D-288 직접 질문 — 띠의 [직접 묻기] · 판의 질문 칸(늘 보임 · 기본 '직접 질문')에 적은 말이 단추에 묶이지 않고 그 화면의 '직접 물어본 것에 답'
+ *      으로 감(화면마다) · 일정에서 "이번 달 메모가 가장 많았던 업체" → 이번 달 업체별 기록 수가 같이 감 · 단추에 덧붙이기도 그대로
  *   E  360/390 넘침 0 · 판 열어도 넘침 0 · JS 오류 0 · 키 노출 0
  */
 import { chromium } from 'playwright'
@@ -213,6 +215,71 @@ await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 await shot(page, 'C-client-answer')
 check('C 업체 상세 [한 장 요약] → 이 업체 자료 · OS 모듈 판정이 감 · 대표 이름 · 전화 없음', llm.at(-1)?.user.includes('[자료 · OS 모듈 판정') && llm.at(-1)?.user.includes('한솔') && !/김대표|010-2345-6789/.test(llm.at(-1)?.user ?? ''), (llm.at(-1)?.user ?? '').slice(0, 400))
 await page.keyboard.press('Escape')
+
+/* ---------------- G D-288 직접 질문 — 단추에 묶이지 않고 이 화면 자료로 ---------------- */
+{
+  // 대표: "이번 달 메모가 가장 많았던 업체는? 이라고 물었는데 '이번 주 일정 한눈에' 를 뗄 방법이 없어 그 답만 나왔다"
+  const ASK_SCREENS = [
+    ['/', 'today', '오늘'],
+    ['/sales/board', 'sales', '영업 관리'],
+    ['/ops/clients', 'clients', '고객 관리'],
+    ['/ops/inbox', 'inbox', '상담신청'],
+    ['/ops/agents', 'agents', '영업자 정산'],
+    ['/money', 'money', '매출 · 비용'],
+    ['/ops/calendar', 'calendar', '일정'],
+    ['/tools/employment', 'module', '모듈'],
+    ['/marketing?view=make', 'radar', '마케팅'],
+  ]
+  for (const [p, pg, title] of ASK_SCREENS) {
+    await page.goto(BASE + p, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(700)
+    const bar = page.getByTestId('ai-assist-bar').first()
+    if (!(await bar.count())) {
+      check(`G ${title}: AI 도우미 띠`, false, '띠 없음')
+      continue
+    }
+    await bar.getByTestId('ai-assist-ask-chip').click()
+    await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+    await page.waitForTimeout(250)
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))
+    const mode = await page.getByTestId('ai-assist-ask-preset').inputValue()
+    const q = pg === 'calendar' ? '이번 달에 메모가 가장 많았던 업체는?' : `${title} 화면에서 단추에 없는 것 하나 — 지금 제일 오래 손 안 댄 건 뭐야?`
+    await page.getByTestId('ai-assist-ask').fill(q)
+    const before = llm.length
+    await page.keyboard.press('Enter')
+    await page.waitForFunction((id) => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === id, `${pg}.ask`, { timeout: 10000 }).catch(() => {})
+    const sent = llm.length > before ? llm.at(-1) : null
+    const asked = await page.getByTestId('ai-assist-asked').innerText().catch(() => '')
+    check(
+      `G ${title}: [직접 묻기] → 질문 칸에 바로(기본 '직접 질문') · Enter 로 보냄 → '${pg}.ask' 로 감 · 적은 말 그대로 · 단추 주제 없음 · 답 위에 물어본 것`,
+      focused === 'ai-assist-ask' && mode === '__direct' && !!sent && sent.user.includes(`[대표가 더 묻는 것] ${q}`) && sent.user.includes(`[요청] ${title} — 직접 물어본 것에 답`) && sent.sys.includes('물어본 것에만 답') && asked.includes(q),
+      { focused, mode, req: sent?.user.slice(-160), asked },
+    )
+    if (pg === 'calendar') {
+      check('G 일정: "이번 달 메모가 가장 많았던 업체" — 이번 달 업체별 기록 수(OS 가 센 값) · 최근 30일 기록이 같이 감', !!sent && /\[자료 · 이번 달\(\d{4}-\d{2}\) 업체별 기록 수/.test(sent.user) && sent.user.includes('[자료 · 최근 30일 기록'), sent?.user.slice(0, 300))
+      await shot(page, 'G-calendar-direct')
+      // 단추에 덧붙이기도 그대로(고르면 '같이 보내기')
+      await page.getByTestId('ai-assist-ask').fill('금요일 것만')
+      await page.getByTestId('ai-assist-ask-preset').selectOption('calendar.busy')
+      const sendLabel = await page.getByTestId('ai-assist-ask-send').innerText()
+      await page.getByTestId('ai-assist-ask-send').click()
+      await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'calendar.busy', null, { timeout: 10000 }).catch(() => {})
+      const att = llm.at(-1)
+      check("G 일정: 단추를 고르면 '같이 보내기' → 그 단추 + 적은 말(덧붙이기)", sendLabel.includes('같이 보내기') && !!att && att.user.includes('[요청] 빡빡한 날 · 겹치는 날') && att.user.includes('[대표가 더 묻는 것] 금요일 것만'), { sendLabel, req: att?.user.slice(-120) })
+    }
+    check(`G ${title}: 예전 '단추에 없는 것 물어보기(선택)' 접힌 줄 없음 · 질문 칸이 처음부터 보임`, (await page.getByText('단추에 없는 것 물어보기(선택)').count()) === 0 && (await page.getByTestId('ai-assist-ask-box').isVisible()), '')
+    await page.keyboard.press('Escape')
+  }
+  // 업체 상세 — 머리줄 [AI 도우미](띠 없음) 판에서도
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByTestId('ai-assist-open').first().click()
+  await page.getByTestId('ai-assist-ask').fill('이 업체 지난달에 뭐 했어?')
+  await page.getByTestId('ai-assist-ask-send').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'client.ask', null, { timeout: 10000 }).catch(() => {})
+  check("G 업체 상세: 판의 질문 칸 → 'client.ask'(이 업체 자료로)", (llm.at(-1)?.user ?? '').includes('[대표가 더 묻는 것] 이 업체 지난달에 뭐 했어?') && (llm.at(-1)?.user ?? '').includes('[요청] 업체 — 직접 물어본 것에 답'), (llm.at(-1)?.user ?? '').slice(-160))
+  await page.keyboard.press('Escape')
+}
 
 /* ---------------- D 블로그 · 플레이스 홍보 글 ---------------- */
 await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })

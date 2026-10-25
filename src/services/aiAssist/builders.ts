@@ -22,6 +22,7 @@ import type { GrantClient, GrantIndex } from '../grants/grantView'
 import { INSIGHT_TONE_LABEL, buildInsights } from '../clientInsights'
 import type { Insight } from '../clientInsights'
 import { clientFacts } from '../../tools/shared/clientPrefill'
+import { JOURNAL_TYPE_LABEL } from '../journalService'
 import { latestEmploymentRoster } from '../toolResultGroups'
 import { RefBook, clientRow, daysBetween, personNames, safeText, wonText } from './context'
 import type { AssistBundle, AssistRow, AssistSection } from './context'
@@ -40,6 +41,46 @@ const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 export function todayLabel(today: string): string {
   const d = new Date(`${today}T00:00:00`)
   return Number.isNaN(d.getTime()) ? today : `${today} (${WEEKDAY[d.getDay()]})`
+}
+
+/**
+ * D-288 기록(메모 · 통화 · 결정 …) 두 묶음 — 직접 물어본 질문(예: "이번 달 메모가 가장 많았던 업체는?")에 답할 재료.
+ *   ① 이번 달 업체별 기록 수(OS 가 센 값 — 모델이 수백 줄을 세다 틀리지 않게) ② 최근 30일 기록 내용(짧게)
+ * 사람 이름 · 연락처는 다른 줄과 같이 가린다.
+ */
+export function memoSections(journal: readonly JournalEntry[], byId: ReadonlyMap<string, ClientOpsRecord>, today: string, book: RefBook): AssistSection[] {
+  const month = today.slice(0, 7)
+  const from = new Date(`${today}T00:00:00`)
+  from.setDate(from.getDate() - 30)
+  const since = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+  const inMonth = journal.filter((j) => j.entryDate.slice(0, 7) === month)
+  const counts = new Map<string, { n: number; last: string }>()
+  for (const j of inMonth) {
+    const k = j.clientId && byId.has(j.clientId) ? j.clientId : ''
+    const cur = counts.get(k) ?? { n: 0, last: '' }
+    counts.set(k, { n: cur.n + 1, last: j.entryDate > cur.last ? j.entryDate : cur.last })
+  }
+  const countRows = [...counts.entries()]
+    .sort((a, b) => b[1].n - a[1].n || b[1].last.localeCompare(a[1].last))
+    .slice(0, 30)
+    .map(([id, v]) => {
+      const c = id ? byId.get(id) : undefined
+      return { ref: c ? book.client(c) : undefined, 업체: c?.companyName ?? '(업체 없이 적은 것)', 기록수: v.n, 마지막: v.last }
+    })
+  const recent = journal
+    .filter((j) => j.entryDate >= since && j.entryDate <= today)
+    .sort((a, b) => b.entryDate.localeCompare(a.entryDate) || b.createdAt.localeCompare(a.createdAt))
+  return [
+    { name: `이번 달(${month}) 업체별 기록 수 — OS 가 센 값`, rows: countRows, total: counts.size },
+    {
+      name: '최근 30일 기록(메모 · 통화 · 결정 · 할 일)',
+      rows: recent.slice(0, 120).map((j) => {
+        const c = j.clientId ? byId.get(j.clientId) : undefined
+        return { ref: c ? book.client(c) : book.ref('t', j.id, '/journal'), 날짜: j.entryDate, 종류: JOURNAL_TYPE_LABEL[j.entryType] ?? j.entryType, 업체: c?.companyName ?? '', 내용: safeText(j.content, c ? personNames(c) : [], 120) }
+      }),
+      total: recent.length,
+    },
+  ]
 }
 
 /** 도구 기한 제목의 직원 이름('청년도약 참여신청 — 홍길동')을 가린다 */
@@ -79,6 +120,8 @@ export interface TodayInput {
   agentPayable: number
   /** 3일 안 정기 결제(있으면) */
   charges?: { name: string; date: string; amount: string }[]
+  /** D-288 기록 전체(직접 질문 재료 — 이번 달 업체별 기록 수 · 최근 30일) */
+  journal?: readonly JournalEntry[]
 }
 
 export function todayBundle(i: TodayInput): AssistBundle {
@@ -130,6 +173,8 @@ export function todayBundle(i: TodayInput): AssistBundle {
         { name: '영업 — 다시 연락할 곳', rows: i.recontacts.slice(0, 12).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: safeText(s.reasons.join(' · '), personNames(s.record), 160), 조용한날: s.days })) },
         { name: '안부 챙길 계약 고객', rows: i.care.slice(0, 12).map((c) => ({ ref: clientRef(c.clientId), 업체: c.companyName, 이유: c.reason === 'anniversary' ? '계약 1주년' : `${c.quietDays}일 조용`, 급함: c.urgent ? '급함' : '' })) },
         ...(i.charges && i.charges.length ? [{ name: '3일 안 정기 결제', rows: i.charges.map((c) => ({ 결제: safeText(c.name, [], 60), 날짜: c.date, 금액: c.amount })) }] : []),
+        // D-288 직접 질문 재료 — 맨 뒤(자료가 넘치면 여기부터 줄어든다)
+        ...(i.journal ? memoSections(i.journal, byId, i.today, book) : []),
       ],
       facts: [
         `이번 주 받을 돈(내 몫) ${wonText(i.weekIn.total) || '0원'} · ${i.weekIn.count}건`,
@@ -332,7 +377,7 @@ export function calendarBundle(i: { today: string; events: ScheduleEvent[]; jour
     context: {
       title: '일정',
       today: todayLabel(i.today),
-      purpose: '이번 주 · 이번 달 일정과 마감을 한눈에',
+      purpose: '이번 주 · 이번 달 일정과 마감을 한눈에 · 이번 달 기록(메모)',
       sections: [
         {
           name: '업체 일정 · 마감(오늘부터 45일)',
@@ -351,6 +396,8 @@ export function calendarBundle(i: { today: string; events: ScheduleEvent[]; jour
           total: todos.length,
         },
         { name: '쉬는 날', rows: i.daysOff.filter((d) => inRange(d.date)).slice(0, 30).map((d) => ({ 날짜: todayLabel(d.date), 이름: safeText(d.name, [], 30) })) },
+        // D-288 직접 질문 재료(이번 달 업체별 기록 수 · 최근 30일 기록) — 일정 화면에서 "이번 달 메모가 가장 많았던 업체는?" 에 답하지 못했다
+        ...memoSections(i.journal, byId, i.today, book),
       ],
     },
   }

@@ -92,6 +92,19 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'spec.c', page: 'patent', label: '명세서 — 구체적인 내용 ① 구성', kind: 'write', hint: '도 1 · 구성요소마다' },
   { id: 'spec.d', page: 'patent', label: '명세서 — 구체적인 내용 ② 흐름 · 도면', kind: 'write', hint: '도 2 이후 · 단계 · 변형예' },
   { id: 'spec.e', page: 'patent', label: '명세서 — 청구항', kind: 'write', hint: '시스템 · 종속 · 방법' },
+  // D-288 직접 질문 — AI 도우미 판의 '직접 물어보기'(단추에 묶지 않고 이 화면 자료로 그 질문에만 답 · 띠 · 판 단추 목록에는 없음)
+  { id: 'today.ask', page: 'today', label: '오늘 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'sales.ask', page: 'sales', label: '영업 관리 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'clients.ask', page: 'clients', label: '고객 관리 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'inbox.ask', page: 'inbox', label: '상담신청 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'agents.ask', page: 'agents', label: '영업자 정산 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'money.ask', page: 'money', label: '매출 · 비용 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'calendar.ask', page: 'calendar', label: '일정 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'grants.ask', page: 'grants', label: '지원사업 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'client.ask', page: 'client', label: '업체 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'module.ask', page: 'module', label: '모듈 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'radar.ask', page: 'radar', label: '마케팅 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'content.ask', page: 'content', label: '홍보 글 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   // D-250 대화창 — 질문창에 직접 쓴 말에 답(띠 · 판 단추에는 없음)
   // D-251 마케팅 첫 화면 키워드 묶음 — 묶음 화면이 세 갈래를 동시에 부른다(띠에는 없음)
   { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
@@ -112,6 +125,11 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
 
 export function presetOf(id: string): AssistPreset | undefined {
   return ASSIST_PRESETS.find((p) => p.id === id)
+}
+
+/** D-288 이 화면의 '직접 물어본 것에 답' 단추(없는 화면이면 undefined) */
+export function askPresetOf(page: AssistPage): AssistPreset | undefined {
+  return presetOf(`${page}.ask`)
 }
 
 export function presetsFor(ids: readonly string[]): AssistPreset[] {

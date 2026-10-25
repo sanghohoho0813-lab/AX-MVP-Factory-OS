@@ -17,7 +17,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Check, ChevronDown, ChevronUp, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
@@ -30,7 +30,7 @@ import { AssistError, assistMessage, callAssist, fetchAssistStatus } from '../..
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
 import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
-import { presetsFor } from '../../services/aiAssist/presets'
+import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders } from '../../services/aiAssist/store'
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
@@ -114,6 +114,9 @@ export function AiAssist(props: AiAssistProps) {
   return <AiAssistInner {...props} />
 }
 
+/** D-288 [직접 묻기] 로 열 때 — 단추를 누르지 않고 질문 칸에 바로 */
+const ASK_FIRST = '__ask'
+
 function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
@@ -175,6 +178,17 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
               {p.label}
             </button>
           ))}
+          {/* D-288 단추에 없는 것 — 판을 열고 질문 칸에 바로 */}
+          {askPresetOf(page) && (
+            <button
+              type="button"
+              data-testid="ai-assist-ask-chip"
+              onClick={() => openWith(ASK_FIRST)}
+              className="tap t-sub inline-flex min-h-10 max-w-full min-w-0 items-center gap-1 rounded-full border border-dashed border-violet-400 bg-white px-3 py-1.5 font-semibold break-keep text-violet-800 hover:bg-violet-100"
+            >
+              직접 묻기
+            </button>
+          )}
           {/* D-255 대표 "곳곳에 제미나이 3.1 플래시 라이트만 — 어디서든 내가 원하는 모델로": 이름만 보이던 칩 → 누르면 고르는 단추 */}
           <ModelPicker popover className="ml-auto" testId="ai-assist-model-chip" />
         </section>
@@ -303,8 +317,11 @@ function AssistPanel({
   const [shown, setShown] = useState<Shown>(null)
   const [history, setHistory] = useState<HistoryEntry[]>(() => historyOf(scope))
   const [ask, setAsk] = useState('')
-  const [askOpen, setAskOpen] = useState(false)
-  const [askPreset, setAskPreset] = useState(presets[0]?.id ?? '')
+  // D-288 적은 질문은 기본으로 '직접 질문'(이 화면 자료로 그 질문에만 답) — 예전에는 첫 단추(예: 이번 주 일정 한눈에)에 묶여 그 단추 답만 나왔다
+  const askDirect = useMemo(() => askPresetOf(page), [page])
+  const DIRECT = '__direct'
+  const [askPreset, setAskPreset] = useState(askDirect ? DIRECT : (presets[0]?.id ?? ''))
+  const askRef = useRef<HTMLTextAreaElement | null>(null)
   const [settings, setSettings] = useState(false)
   const [nowHash, setNowHash] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
@@ -352,7 +369,8 @@ function AssistPanel({
         // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
         const masked = askText ? safeText(askText, [], 500) : ''
         const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
-        const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label: opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
+        const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
+        const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
         setShown(entry)
@@ -407,13 +425,24 @@ function AssistPanel({
     [scope],
   )
 
-  // 띠의 질문 단추로 열었으면 바로 묻는다(한 번만)
+  // 띠의 질문 단추로 열었으면 바로 묻는다(한 번만) · D-288 [직접 묻기] 로 열었으면 질문 칸에 바로 쓰게
   useEffect(() => {
     if (!autoRun || started.current) return
     started.current = true
+    if (autoRun === ASK_FIRST) {
+      window.setTimeout(() => askRef.current?.focus(), 60)
+      return
+    }
     const p = presets.find((x) => x.id === autoRun)
     if (p) void run(p)
   }, [autoRun, presets, run])
+
+  const sendAsk = () => {
+    const text = ask.trim()
+    if (!text || running) return
+    const p = askPreset === DIRECT ? askDirect : (presets.find((x) => x.id === askPreset) ?? presets[0])
+    if (p) void run(p, text)
+  }
 
   const stale = !!shown && !!nowHash && shown.hash !== nowHash
 
@@ -452,51 +481,55 @@ function AssistPanel({
                   </button>
                 ))}
               </div>
-              <button type="button" onClick={() => setAskOpen((v) => !v)} aria-expanded={askOpen} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-violet-800 hover:underline">
-                {askOpen ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
-                단추에 없는 것 물어보기(선택)
-              </button>
-              {askOpen && (
-                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 p-3">
-                  <textarea
-                    value={ask}
-                    maxLength={500}
-                    onChange={(e) => setAsk(e.target.value)}
-                    rows={2}
-                    placeholder="예: 이 중에서 이번 주 금요일까지 끝낼 수 있는 것만"
-                    className="t-body w-full rounded-(--radius-control) border border-slate-300 px-3 py-2"
-                    data-testid="ai-assist-ask"
-                  />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="t-meta text-slate-500">아래 단추 하나를 고르면 이 말을 같이 보내요</span>
-                    <select
-                      aria-label="어느 질문에 붙일까요"
-                      className="t-sub ml-auto min-h-10 rounded-(--radius-control) border border-slate-300 bg-white px-2"
-                      data-testid="ai-assist-ask-preset"
-                      value={askPreset}
-                      onChange={(e) => setAskPreset(e.target.value)}
-                    >
-                      {presets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!ask.trim() || !!running}
-                      onClick={() => {
-                        const p = presets.find((x) => x.id === askPreset) ?? presets[0]
-                        if (p) void run(p, ask.trim())
-                      }}
-                      className="tap t-sub min-h-10 rounded-(--radius-control) bg-violet-700 px-3 font-semibold text-white disabled:opacity-50"
-                      data-testid="ai-assist-ask-send"
-                    >
-                      같이 보내기
-                    </button>
-                  </div>
+              {/* D-288 직접 물어보기 — 늘 보인다(접지 않음). 기본은 단추와 상관없이 이 화면 자료로 그 질문에만 답 */}
+              <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/40 p-3" data-testid="ai-assist-ask-box">
+                <label htmlFor={`ai-ask-${scope}`} className="t-sub font-semibold text-violet-900">
+                  직접 물어보기 — 단추에 없는 것도 이 화면 자료로 답해요
+                </label>
+                <textarea
+                  id={`ai-ask-${scope}`}
+                  ref={askRef}
+                  value={ask}
+                  maxLength={500}
+                  onChange={(e) => setAsk(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter = 보내기 · Shift+Enter = 줄바꿈(한글 조합 중에는 보내지 않음)
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      sendAsk()
+                    }
+                  }}
+                  rows={2}
+                  placeholder="예: 이번 달에 메모가 가장 많았던 업체는?"
+                  className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
+                  data-testid="ai-assist-ask"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label="어떻게 물을까요"
+                    className="t-sub min-h-10 max-w-full min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 sm:flex-none"
+                    data-testid="ai-assist-ask-preset"
+                    value={askPreset}
+                    onChange={(e) => setAskPreset(e.target.value)}
+                  >
+                    {askDirect && <option value={DIRECT}>직접 질문 — 단추와 상관없이</option>}
+                    {presets.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        ‘{p.label}’ 에 덧붙여 묻기
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!ask.trim() || !!running}
+                    onClick={sendAsk}
+                    className="tap t-sub ml-auto min-h-10 rounded-(--radius-control) bg-violet-700 px-4 font-semibold text-white disabled:opacity-50"
+                    data-testid="ai-assist-ask-send"
+                  >
+                    {askPreset === DIRECT ? '물어보기' : '같이 보내기'}
+                  </button>
                 </div>
-              )}
+              </div>
             </section>
 
             {error && <ErrorBox error={error} />}
@@ -840,6 +873,11 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
         <span className="t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid="ai-assist-model">
           {prettyModel(run.model)}
         </span>
+        {entry.ask && (
+          <p className="t-sub w-full break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="ai-assist-asked">
+            물어본 것 · “{entry.ask}”
+          </p>
+        )}
         {stale && (
           <span className="t-meta rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900" data-testid="ai-assist-stale">
             그 뒤로 화면 자료가 바뀌었어요 — 다시 만들면 새 자료로

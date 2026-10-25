@@ -12,7 +12,7 @@ import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, t
 import { aiConfig, buildPrompt, scrubText, validate } from '../../../api/_ai/core.js'
 import { CONFIDENTIAL_RULES, REFUSAL, guardOutput, hasBanned, scrubBrand, secretIndex } from '../../../api/_ai/guard.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
-import { ASSIST_PRESETS } from '../aiAssist/presets'
+import { ASSIST_PRESETS, askPresetOf } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
 import { AssistError, callAssist } from '../aiAssist/client'
@@ -23,12 +23,12 @@ import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeB
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan, radarVideos } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
-import { agentsBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, radarBundle, salesBundle } from '../aiAssist/builders'
+import { agentsBundle, calendarBundle, clientsBundle, inboxBundle, maskStaff, moduleBundle, radarBundle, salesBundle } from '../aiAssist/builders'
 import { allowedProviders, contextHash, historyOf, markDone, pushHistory, readChoice, setAllowedProviders } from '../aiAssist/store'
 import { aiAssistAccessOf, ownerAiAccessOf } from '../../auth/ownerAiAccess'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import type { CustomerEvent } from '../../types/bridge'
+import type { CustomerEvent, JournalEntry } from '../../types/bridge'
 
 let passed = 0
 let failed = 0
@@ -855,7 +855,48 @@ async function lockTests() {
   setEnv()
 }
 
+/** D-288 직접 질문 — 단추에 묶이지 않고 이 화면 자료로 그 질문에만 · 일정 화면 자료에 이번 달 기록 수 */
+function askTests() {
+  // 화면에 AI 도우미 판이 있는 모든 화면(<AiAssist page=...>) — 화면마다 '직접 물어본 것에 답' 이 있어야 한다
+  const PANEL_PAGES = ['today', 'sales', 'clients', 'inbox', 'agents', 'money', 'calendar', 'grants', 'client', 'module', 'radar', 'content'] as const
+  const miss = PANEL_PAGES.filter((pg) => {
+    const p = askPresetOf(pg)
+    const a = (ASSISTS as Record<string, { page: string; label: string; kind: string }>)[`${pg}.ask`]
+    return !p || !a || a.page !== pg || a.label !== p.label || a.kind !== 'list'
+  })
+  check(`Q1 직접 질문 단추 — AI 도우미 판이 있는 화면 ${PANEL_PAGES.length}곳 모두 · 화면 이름표 = 서버 지시(같은 id · 화면 · 이름)`, miss.length === 0, miss)
+  const a = (ASSISTS as Record<string, Parameters<typeof buildAssistPrompt>[0]>)['calendar.ask']
+  const ins = (a as unknown as { instruction: string[] }).instruction.join(' ')
+  check('Q2 지시 — 물어본 것에만 답(미리 만든 단추 주제로 바꾸지 않음) · 세는 질문은 직접 세고 · 자료에 없으면 지어내지 않음', ins.includes('물어본 것에만 답') && ins.includes('바꿔 답하지 않는다') && ins.includes('직접 세거나') && ins.includes('이 화면 자료에는 없어요'))
+  const q = '이번 달에 메모가 가장 많았던 업체는?'
+  const built = buildAssistPrompt(a, { title: '일정', today: '2026-10-25', sections: [] }, q)
+  check('Q3 보내는 글 — [요청] 은 직접 질문 · [대표가 더 묻는 것] 에 적은 말 그대로 · "이번 주 일정 한눈에" 없음', built.user.includes('[요청] 일정 — 직접 물어본 것에 답') && built.user.includes(`[대표가 더 묻는 것] ${q}`) && !built.user.includes('이번 주 일정 한눈에'), built.user.slice(-200))
+  // 일정 화면 자료 — 이번 달 업체별 기록 수(OS 가 센 값) · 최근 30일 기록
+  const recs = [
+    { id: 'c_a', companyName: '가나정밀', contactName: '홍길동', contactPhone: '010-1111-2222' },
+    { id: 'c_b', companyName: '다라식품' },
+  ].map((r) => normalizeClientOps({ workspaceId: null, status: 'active', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', ...r } as Partial<ClientOpsRecord>))
+  const j = (id: string, date: string, clientId: string | null, content: string, type: JournalEntry['entryType'] = 'note'): JournalEntry => ({ id, workspaceId: null, ownerId: null, entryDate: date, entryType: type, content, clientId, projectId: null, serviceKey: null, dueDate: '', pinned: false, completed: false, completedAt: null, createdAt: `${date}T09:00:00Z`, updatedAt: `${date}T09:00:00Z` })
+  const journal = [
+    j('j1', '2026-10-03', 'c_a', '홍길동 대표 010-1111-2222 통화 — 자금 서류'),
+    j('j2', '2026-10-10', 'c_a', '서류 받음'),
+    j('j3', '2026-10-20', 'c_a', '연구소 문의', 'call'),
+    j('j4', '2026-10-21', 'c_b', '견적 보냄'),
+    j('j5', '2026-09-28', 'c_b', '지난달 기록'),
+    j('j6', '2026-10-22', null, '혼자 메모'),
+  ]
+  const b = calendarBundle({ today: '2026-10-25', events: [], journal, clients: recs, daysOff: [] })
+  const counts = b.context.sections.find((x) => x.name.startsWith('이번 달(2026-10) 업체별 기록 수'))
+  const top = counts?.rows[0] as Record<string, unknown> | undefined
+  const bRow = counts?.rows.find((r) => (r as Record<string, unknown>).업체 === '다라식품') as Record<string, unknown> | undefined
+  check('Q4 일정 자료 — 이번 달 업체별 기록 수(OS 가 셈): 가나정밀 3건이 1위 · 다라식품은 이번 달 1건(지난달 것은 안 셈) · 업체 없는 메모도 따로', top?.업체 === '가나정밀' && top?.기록수 === 3 && bRow?.기록수 === 1 && counts?.rows.some((r) => (r as Record<string, unknown>).업체 === '(업체 없이 적은 것)'), counts?.rows)
+  const recent = b.context.sections.find((x) => x.name.startsWith('최근 30일 기록'))
+  const txt = JSON.stringify(recent)
+  check('Q5 최근 30일 기록 — 새것부터 · 종류 이름 · 사람 이름 · 전화번호는 가림', (recent?.rows.length ?? 0) === 6 && (recent?.rows[0] as Record<string, unknown>).날짜 === '2026-10-22' && txt.includes('통화') && !txt.includes('010-1111-2222') && !txt.includes('홍길동'), txt.slice(0, 300))
+}
+
 await serverTests()
+askTests()
 bundleTests()
 d241Tests()
 await d263Tests()
