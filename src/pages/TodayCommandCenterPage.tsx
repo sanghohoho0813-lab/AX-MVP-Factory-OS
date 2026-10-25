@@ -34,6 +34,7 @@ import { Blank, Disclosure, MetricTile } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Modal'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Button } from '../components/ui/Button'
+import { HeroFrame } from '../components/ui/pageFrame'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
 import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoEdits } from '../components/journal/TodoBoard'
@@ -443,8 +444,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       {/* A. 오늘 */}
       {/* 1단계 — 오늘이 어떤 날인지 한 문장 */}
       <section aria-label="오늘" data-tour="home-today" className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-          <div className="min-w-0 flex-1">
+        {/* UXS-1 웰컴 띠 — 화면 공통 머리 바탕(HeroFrame) + 대표 그림 1번. 글 · 단추 · 셈은 그대로 */}
+        <HeroFrame art="home" testId="today-hero">
+        <div className="flex flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 lg:min-h-[9.5rem] lg:justify-center">
+          <div className="min-w-0 flex-1 lg:max-w-[62%]">
             <p className="t-sub font-medium text-slate-500">
               <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
@@ -459,7 +462,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               </Link>
             </h1>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+          <div className="flex shrink-0 flex-wrap gap-2 self-start">
             <span className="hidden sm:inline-flex">
               {/* NX-1 하루를 마칠 때 누르는 단추 — 아침 첫 화면의 강조는 '오늘 먼저 제안할 것' 에 양보(단추 · 하는 일은 그대로) */}
               <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
@@ -468,6 +471,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </span>
           </div>
         </div>
+        </HeroFrame>
         {/* D-282 맨 위 KPI 다섯 칸(휴대폰은 옆으로 밀기) · 바로가기(메뉴와 같은 권한 규칙). 휴대폰은 큰 아이콘 바로가기를 먼저 */}
         {phone && <TodayLauncher phone />}
         {!loading && (

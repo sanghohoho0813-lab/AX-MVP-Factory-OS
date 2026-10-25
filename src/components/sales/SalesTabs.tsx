@@ -14,7 +14,11 @@ import { StepGuide } from '../ui/StepGuide'
 /** 업체를 골라 보는 탭 — 옮겨 가도 보던 업체를 그대로 (D-124) */
 const CLIENT_TABS = new Set(['/sales/meeting', '/sales/proposal'])
 
-export function SalesTabs() {
+/**
+ * part — UXS-1 영업 보드는 탭을 화면 머리(PageHero) 안 '보는 대상' 줄에 넣고(tabs), 순서 안내는 '지금 할 일' 줄이 맡는다.
+ * 다른 영업 탭(미팅 준비 · 상품·제안 · 전략)은 예전처럼 둘 다(all).
+ */
+export function SalesTabs({ part = 'all' }: { part?: 'all' | 'tabs' } = {}) {
   const [params] = useSearchParams()
   const client = params.get('client')
   const { pathname } = useLocation()
@@ -25,7 +29,7 @@ export function SalesTabs() {
   const hrefOf = (to: string) => (client && CLIENT_TABS.has(to) ? `${to}?client=${encodeURIComponent(client)}` : to)
   return (
     <>
-    <nav aria-label="영업 관리 보기" data-testid="sales-tabs" className="no-print">
+    <nav aria-label="영업 관리 보기" data-testid="sales-tabs" className="no-print w-full sm:w-auto">
       <ul
         className="grid gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto"
         style={{ gridTemplateColumns: `repeat(${SALES_TABS.length}, minmax(0, 1fr))` }}
@@ -53,7 +57,7 @@ export function SalesTabs() {
         ))}
       </ul>
     </nav>
-    <StepGuide pos={pos} hrefOf={hrefOf} />
+    {part === 'all' && <StepGuide pos={pos} hrefOf={hrefOf} />}
     </>
   )
 }

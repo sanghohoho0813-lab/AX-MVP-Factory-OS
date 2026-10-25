@@ -6,8 +6,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Archive, Brain, ExternalLink, FolderOpen, History, Sparkles, type LucideIcon } from 'lucide-react'
+import { Archive, Brain, ChevronLeft, ExternalLink, FolderOpen, History, Sparkles, type LucideIcon } from 'lucide-react'
 import { IconTile } from '../../components/ui/visual'
+import { NextActionBar, PageHero } from '../../components/ui/pageFrame'
+import { slotIcon } from '../../config/iconSlots'
+import { caseNext } from '../../services/ownerAi/caseNext'
 import { AiCallError } from '../../services/ownerAi/aiClient'
 import { caseSnapshot } from '../../services/ownerAi/context'
 import { caseDocs, docsNotIn } from '../../services/ownerAi/caseDocs'
@@ -56,8 +59,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const [docsOpen, setDocsOpen] = useState(0)
   // D-282 오른쪽 칸 — 기억 · 자료 · 기록을 탭으로(세 칸을 길게 쌓지 않는다). 셋 다 늘 그려 두고 고른 것만 보인다
   const [side, setSide] = useState<SideTab>('memory')
-  // D-282 결과 카드 [다시 만들기] → 같은 작업 창을 연다(QuickActions 가 받는다)
-  const [reopen, setReopen] = useState<{ skill: SkillId; n: number } | null>(null)
+  // D-282 결과 카드 [다시 만들기] · UXS-1 '다음 추천 작업' 줄 → 같은 작업 창을 연다(QuickActions 가 받는다)
+  const [reopen, setReopen] = useState<{ skill: SkillId; n: number; key?: string } | null>(null)
   useEffect(() => {
     if (docsOpen > 0) setSide('materials')
   }, [docsOpen])
@@ -98,6 +101,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   }
 
   const currentContext = useMemo(() => (bundle ? latestSnapshot(bundle)?.content ?? emptyContext() : emptyContext()), [bundle])
+  const next = useMemo(() => caseNext(bundle?.runs ?? []), [bundle])
   const newDocs = useMemo(() => (bundle?.client ? docsNotIn(caseDocs(bundle.client), bundle.c.materials).length : 0), [bundle])
   const snapshotFields = useMemo(() => (bundle ? caseSnapshot(bundle.c, bundle.client, currentContext, bundle.runs, today) : []), [bundle, currentContext, today])
 
@@ -218,58 +222,108 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const recentRuns = b.runs.filter((r) => r.skillId !== 'PROOFREAD' && (r.skillId !== 'CONTEXT_UPDATE' || r.evaluation === 'draft'))
   const shownRuns = showOld ? recentRuns : recentRuns.slice(0, 8)
 
+  const relationSelect = (
+    <label className="flex items-center gap-1.5">
+      <span className="sr-only">관계 상태</span>
+      <select
+        value={b.c.relation}
+        onChange={(e) => void setRelation(e.target.value as CaseRelation)}
+        disabled={saving}
+        className="t-sub min-h-11 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-700"
+        data-testid="case-relation"
+      >
+        {CASE_RELATIONS.map((r) => (
+          <option key={r} value={r}>{RELATION_LABEL[r]}</option>
+        ))}
+      </select>
+    </label>
+  )
+  const caseBadges = (
+    <>
+      {b.c.archivedAt && <Badge tone="warning">보관됨</Badge>}
+      {b.c.origin.startsWith('partner:') && <Badge tone="brand">Partner OS 요청</Badge>}
+    </>
+  )
+  const rec = QUICK_ACTIONS.find((a) => a.key === next.action)
+
   return (
-    <div className="flex flex-col gap-4" data-testid="case-workspace" data-case={b.c.id}>
-      {/* 머리 — 업체 · 관계 · 이어 둔 고객 */}
+    <div className="flex flex-col gap-4 sm:gap-5" data-testid="case-workspace" data-case={b.c.id}>
+      {/* UXS-1 머리 — 큰 화면(/ai/cases/…)은 공통 머리(PageHero): 제목 · 한 줄 상태 → 관계 → 주 단추. 업체 상세 탭 안(embedded)은 예전 머리 그대로 */}
+      {!embedded ? (
+        <PageHero
+          art="ai"
+          title={b.c.companyName}
+          titleTestId="case-title"
+          icon={<IconTile icon={slotIcon('ai-workspace', Sparkles)} tone="purple" size="lg" />}
+          badges={caseBadges}
+          back={
+            <Link to="/ai" className="t-sub tap inline-flex min-h-11 items-center gap-1 self-start font-semibold text-slate-600 hover:text-slate-900 sm:min-h-0">
+              <ChevronLeft aria-hidden="true" className="size-4" />
+              AI 전략실
+            </Link>
+          }
+          sub={[b.c.requester && `요청 ${b.c.requester}`, b.client ? '고객 관리와 이어짐 — 회사 정보 · 서류를 같이 씁니다' : '고객 관리와 아직 잇지 않음'].filter(Boolean).join(' · ')}
+          context={relationSelect}
+          actions={
+            <>
+              {b.client && (
+                <Link to={`/ops/clients/${b.client.id}`} className="tap t-body inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10" data-testid="case-client-link">
+                  고객 관리에서 보기
+                  <ExternalLink aria-hidden="true" className="size-3.5" />
+                </Link>
+              )}
+              <button type="button" onClick={() => void archive()} disabled={saving} className="tap t-sub inline-flex min-h-11 items-center gap-1 px-2 text-slate-500 hover:text-slate-800">
+                <Archive aria-hidden="true" className="size-4" />
+                {b.c.archivedAt ? '보관 풀기' : '보관'}
+              </button>
+            </>
+          }
+          notice={<AiSetupBanner setup={setup} strip />}
+        />
+      ) : (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {!embedded && <IconTile icon={Sparkles} tone="purple" size="lg" />}
-          {!embedded && <h1 className="t-page min-w-0 break-words text-slate-900" data-testid="case-title">{b.c.companyName}</h1>}
-          <label className="flex items-center gap-1.5">
-            <span className="sr-only">관계 상태</span>
-            <select
-              value={b.c.relation}
-              onChange={(e) => void setRelation(e.target.value as CaseRelation)}
-              disabled={saving}
-              className="t-sub min-h-11 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-700"
-              data-testid="case-relation"
-            >
-              {CASE_RELATIONS.map((r) => (
-                <option key={r} value={r}>{RELATION_LABEL[r]}</option>
-              ))}
-            </select>
-          </label>
-          {b.c.archivedAt && <Badge tone="warning">보관됨</Badge>}
-          {b.c.origin.startsWith('partner:') && <Badge tone="brand">Partner OS 요청</Badge>}
+          {relationSelect}
+          {caseBadges}
         </div>
         <div className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
           {b.c.requester && <span>요청 {b.c.requester}</span>}
-          {b.client ? (
-            !embedded && (
-              <Link to={`/ops/clients/${b.client.id}`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="case-client-link">
-                고객 관리에서 보기
-                <ExternalLink aria-hidden="true" className="size-3.5" />
-              </Link>
-            )
-          ) : (
-            <span>고객 관리와 아직 잇지 않음</span>
-          )}
-          {embedded ? (
-            <Link to={`/ai/cases/${b.c.id}`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
-              AI 전략실 크게 보기
-              <ExternalLink aria-hidden="true" className="size-3.5" />
-            </Link>
-          ) : (
-            <button type="button" onClick={() => void archive()} disabled={saving} className="tap inline-flex min-h-11 items-center gap-1 text-slate-500 hover:text-slate-800">
-              <Archive aria-hidden="true" className="size-4" />
-              {b.c.archivedAt ? '보관 풀기' : '보관'}
-            </button>
-          )}
+          {!b.client && <span>고객 관리와 아직 잇지 않음</span>}
+          <Link to={`/ai/cases/${b.c.id}`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
+            AI 전략실 크게 보기
+            <ExternalLink aria-hidden="true" className="size-3.5" />
+          </Link>
         </div>
       </div>
+      )}
 
-      <AiSetupBanner setup={setup} />
+      {embedded && <AiSetupBanner setup={setup} />}
+      {/* ② 요약 — 회사 한눈에 */}
       <SnapshotCard fields={snapshotFields} />
+      {/* ③ 지금 할 일 — 다음 추천 작업 하나(규칙 caseNext · 예전 '이 회사에 어떤 도움' 칸 맨 위에 있던 것과 같은 판정 · 같은 창) */}
+      {rec && (
+        <NextActionBar
+            tone="purple"
+          label="다음 추천 작업"
+          title={rec.label}
+          icon={Sparkles}
+          detail={<span data-testid="case-next-why">{next.why}</span>}
+          extra={
+            next.pending > 0 && (
+              <span className="t-sub block text-warning-800" data-testid="case-next-pending">
+                검토 전 결과 {next.pending}개 — 아래 결과에서 채택 · 폐기를 먼저 해 주세요
+              </span>
+            )
+          }
+          action={
+            <Button variant="primary" onClick={() => setReopen({ skill: rec.skill, key: rec.key, n: Date.now() })} disabled={!!running} data-testid="case-next-go" data-purpose={next.action}>
+              <Sparkles aria-hidden="true" className="size-4" /> {running === rec.label ? '만드는 중…' : rec.label}
+            </Button>
+          }
+          testId="case-next"
+          attrs={{ 'data-action-next': next.action }}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="flex min-w-0 flex-col gap-4">

@@ -6,15 +6,17 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Building2, Plus, Search, Sparkles } from 'lucide-react'
-import { IconTile } from '../../components/ui/visual'
+import { BarChart3, Brain, Building2, CalendarClock, Link2, Plus, Search, Sparkles } from 'lucide-react'
+import { IconTile, KpiCard } from '../../components/ui/visual'
+import { NextActionBar, PageHero, PageStack, SummaryStrip, WorkPanel } from '../../components/ui/pageFrame'
+import { todayLocalDate } from '../../lib/appClock'
 import { findDuplicates, normalizeCompany, relationForClient, type DuplicateHit } from '../../services/ownerAi/caseUtil'
 import { parsePartnerHandoff, PARTNER_EVENT } from '../../services/ownerAi/partnerBridge'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
 import { CASE_RELATIONS, RELATION_LABEL, type CaseMaterial, type CaseRelation, type CompanyCase } from '../../services/ownerAi/types'
 import { registerCase } from '../../services/ownerAi/workflow'
 import { useToast } from '../../components/ui/toastContext'
-import { Badge, ListRow, ListSurface, ScreenTitle, Surface } from '../../components/ui/primitives'
+import { Badge, ListRow, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { AiSetupBanner, OwnerAiGate, fmtDateTime, useAiSetup, useClientList, useOwnerAiIdentity, useOwnerAiRepo } from './shared'
 import { CaseQuickStart } from './parts/CaseQuickStart'
@@ -134,26 +136,66 @@ function Home() {
   // 사업자번호 · 홈페이지가 같은 작업실이 있으면 새로 만들지 않는다(이름만 같으면 확인 뒤 만들 수 있다)
   const strongCase = dups.find((d) => d.kind === 'case' && /사업자번호|홈페이지/.test(d.reason))
 
+  // UXS-1 요약 줄 · 지금 할 일 — 목록이 이미 가진 값만 센다(새 데이터 없음)
+  const active = (cases ?? []).filter((c) => !c.archivedAt)
+  const weekAgo = (() => {
+    const d = new Date(`${todayLocalDate()}T00:00:00`)
+    d.setDate(d.getDate() - 7)
+    return d.toISOString()
+  })()
+  const latest = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+
   return (
-    <div className="flex flex-col gap-5">
-      <ScreenTitle
+    <PageStack>
+      <PageHero
+        art="ai"
         title="AI 전략실"
-        icon={<IconTile icon={Sparkles} tone="purple" size="lg" />}
         sub="대표 전용 · 업체마다 기억이 이어지는 AI 작업 · 결과는 채택한 것만 다음 작업에 씁니다"
         actions={
           <>
-            <Link to="/ai/usage" className="tap t-body inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
-              <BarChart3 aria-hidden="true" className="size-4" />
-              사용량
-            </Link>
             <Button variant="primary" onClick={() => setFormOpen((v) => !v)} data-testid="case-new">
               <Plus aria-hidden="true" className="size-4" />
               업체 등록
             </Button>
+            <Link to="/ai/usage" className="tap t-body inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
+              <BarChart3 aria-hidden="true" className="size-4" />
+              사용량
+            </Link>
           </>
         }
+        notice={<AiSetupBanner setup={setup} strip />}
       />
-      <AiSetupBanner setup={setup} />
+      {cases !== null && !dbSetup && (
+        <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
+          <KpiCard icon={Building2} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
+          <KpiCard icon={Link2} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
+          <KpiCard icon={Brain} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
+          <KpiCard icon={CalendarClock} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
+        </SummaryStrip>
+      )}
+      {cases !== null && !dbSetup && !formOpen && (
+        latest ? (
+          <NextActionBar
+            tone="purple"
+            label="이어서 하기"
+            title={latest.companyName}
+            detail={[RELATION_LABEL[latest.relation], latest.contextVersion ? `기억 v${latest.contextVersion}` : '기억 없음', `${fmtDateTime(latest.updatedAt).slice(0, 10)} 마지막 작업`].join(' · ')}
+            action={
+              <Button variant="primary" onClick={() => navigate(`/ai/cases/${latest.id}`)} data-testid="ai-next-open">
+                작업실 열기
+              </Button>
+            }
+            testId="ai-next"
+          />
+        ) : (
+          <NextActionBar
+            tone="purple"
+            title="고객 관리에 있는 업체를 골라 바로 시작하세요"
+            detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
+            testId="ai-next"
+          />
+        )
+      )}
       {dbSetup && (
         <Surface>
           <p className="t-body font-semibold text-slate-900" data-testid="owner-ai-db-setup">AI 전략실 DB 설정이 필요합니다.</p>
@@ -253,37 +295,44 @@ function Home() {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="relative min-w-0 flex-1 basis-56">
-          <span className="sr-only">업체 찾기</span>
-          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="회사명 · 요청자" className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white pr-3 pl-9" data-testid="case-search" />
-        </label>
-        <select value={rel} onChange={(e) => setRel(e.target.value as CaseRelation | 'all')} className="t-body min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3" aria-label="관계 거르기">
-          <option value="all">관계 전체</option>
-          {CASE_RELATIONS.map((r) => (
-            <option key={r} value={r}>{RELATION_LABEL[r]}</option>
-          ))}
-        </select>
-        <label className="tap t-sub flex min-h-11 items-center gap-2 text-slate-600">
-          <input type="checkbox" className="size-5 accent-brand-600" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          보관한 것
-        </label>
-      </div>
-
-      {cases === null ? (
-        <p className="t-sub text-slate-500" role="status">불러오는 중…</p>
-      ) : list.length === 0 ? (
-        <Surface className="text-center">
-          <Sparkles aria-hidden="true" className="mx-auto size-6 text-brand-500" />
-          <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없습니다. 검토할 회사를 하나 등록해 보세요 — 회사명만 있어도 됩니다.'}</p>
-          {!(cases ?? []).length && (
-            <Button variant="primary" className="mt-3" onClick={() => setFormOpen(true)}>업체 등록</Button>
-          )}
-        </Surface>
-      ) : (
-        <ListSurface>
-          <div data-testid="case-list" className="divide-y divide-slate-100">
+      {/* UXS-1 본문 작업 판 — 검색 · 거르기는 판 첫 줄, 목록은 판 안 줄로(상자 안 상자 없음) */}
+      <WorkPanel
+        title="업체 목록"
+        count={cases === null ? undefined : list.length}
+        testId="case-list-panel"
+        bodyClassName=""
+        toolbar={
+          <>
+            <label className="relative min-w-0 flex-1 basis-56">
+              <span className="sr-only">업체 찾기</span>
+              <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="회사명 · 요청자" className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white pr-3 pl-9" data-testid="case-search" />
+            </label>
+            <select value={rel} onChange={(e) => setRel(e.target.value as CaseRelation | 'all')} className="t-body min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3" aria-label="관계 거르기">
+              <option value="all">관계 전체</option>
+              {CASE_RELATIONS.map((r) => (
+                <option key={r} value={r}>{RELATION_LABEL[r]}</option>
+              ))}
+            </select>
+            <label className="tap t-sub flex min-h-11 items-center gap-2 text-slate-600">
+              <input type="checkbox" className="size-5 accent-brand-600" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+              보관한 것
+            </label>
+          </>
+        }
+      >
+        {cases === null ? (
+          <p className="t-sub px-4 pb-4 text-slate-500 sm:px-5" role="status">불러오는 중…</p>
+        ) : list.length === 0 ? (
+          <div className="border-t border-slate-100 px-4 py-8 text-center sm:px-5">
+            <Sparkles aria-hidden="true" className="mx-auto size-6 text-brand-500" />
+            <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없습니다. 검토할 회사를 하나 등록해 보세요 — 회사명만 있어도 됩니다.'}</p>
+            {!(cases ?? []).length && (
+              <Button variant="primary" className="mt-3" onClick={() => setFormOpen(true)}>업체 등록</Button>
+            )}
+          </div>
+        ) : (
+          <div data-testid="case-list" className="divide-y divide-slate-100 border-t border-slate-100">
             {list.map((c) => (
               <ListRow
                 key={c.id}
@@ -295,9 +344,9 @@ function Home() {
               />
             ))}
           </div>
-        </ListSurface>
-      )}
-    </div>
+        )}
+      </WorkPanel>
+    </PageStack>
   )
 }
 

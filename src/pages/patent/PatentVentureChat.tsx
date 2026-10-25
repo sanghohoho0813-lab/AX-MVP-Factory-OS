@@ -22,9 +22,10 @@ import { liveRows } from '../../services/patent/specTrash'
 import { pvBoard } from '../../services/patent/pvBoard'
 import { pvBrief } from '../../services/patent/pvBrief'
 import { companyFactLines, importableDocs } from '../../services/patent/specMaterials'
-import { PvBriefCard, PvResumeCard } from './PvBriefCard'
+import { PvBriefCautions, PvBriefNext, PvBriefSummary, PvResumeCard } from './PvBriefCard'
 import { pvSteps } from '../../services/patent/pvSteps'
 import { StepProgress } from '../../components/ui/visual'
+import { NextActionBar } from '../../components/ui/pageFrame'
 import type { FeatureTone } from '../../config/featureVisual'
 
 type DraftRow = { draft: SpecDraft } & Record<string, unknown>
@@ -92,6 +93,39 @@ export function PatentVentureChatPage() {
     }
   }
 
+  // UXS-1 화면 문법 — ① 머리(회사 고르기) ② 단계 ③ 다음 할 일 ④ 대화 판 ⑤ 보조(주의 · 이어서 할 회사)
+  const doneSteps = brief ? pvSteps(clientId, brief.row, clientName).filter((st) => st.state === 'done').length : 0
+  const resumeFirst = resumeRows.find((r) => r.stage !== 'done')
+  const pickResume = (r: (typeof resumeRows)[number]) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))
+  const summary = brief ? (
+    <PvBriefSummary company={clientName || '이 회사'} clientId={clientId} brief={brief} />
+  ) : steps ? (
+    <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-3 sm:px-4" aria-label="특허 · 벤처 단계" data-testid="pv-steps">
+      <StepProgress
+        label={clientName ? `${clientName} 특허 · 벤처 단계` : '특허 · 벤처 단계'}
+        steps={steps.map((st) => ({ key: st.key, label: st.label, state: st.state, note: st.note, onClick: st.href ? () => navigate(st.href as string) : undefined }))}
+      />
+    </section>
+  ) : undefined
+  // 회사를 안 골랐으면 '지금 할 일' 은 이어서 할 회사가 있을 때만(없으면 머리의 회사 칸이 그 말을 한다 — 첫 화면 글을 늘리지 않게)
+  const next = brief ? (
+    <PvBriefNext brief={brief} onNewSpec={() => void createDraft(emptyDraft(), '', true)} />
+  ) : ready && resumeFirst ? (
+    <NextActionBar
+      label="이어서 하기"
+      tone="amber"
+      title={resumeFirst.companyName}
+      detail={resumeFirst.next.text}
+      action={
+        <button type="button" onClick={() => pickResume(resumeFirst)} className="tap t-body inline-flex h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50" data-testid="pv-next-resume">
+          {resumeFirst.clientId ? '이 회사 보기' : resumeFirst.next.label}
+        </button>
+      }
+      testId="pv-next"
+    />
+  ) : undefined
+  const aside = brief ? <PvBriefCautions brief={brief} /> : resumeRows.length ? <PvResumeCard rows={resumeRows} onPick={pickResume} /> : undefined
+
   return (
     <div className="flex flex-col gap-4" data-testid="pv-chat-page">
       {(drafts.error || works.error) && (
@@ -104,16 +138,14 @@ export function PatentVentureChatPage() {
         title="특허 · 벤처"
         placeholder="예) 이 회사 명세서 어디까지 썼어?"
         starters={PV_STARTERS.map((s) => ({ ...s, icon: ICONS[s.id as keyof typeof ICONS], tone: TONES[s.id as keyof typeof ICONS] }))}
-        steps={
-          steps ? (
-            <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-3 sm:px-4" aria-label="특허 · 벤처 단계" data-testid="pv-steps">
-              <StepProgress
-                label={clientName ? `${clientName} 특허 · 벤처 단계` : '특허 · 벤처 단계'}
-                steps={steps.map((st) => ({ key: st.key, label: st.label, state: st.state, note: st.note, onClick: st.href ? () => navigate(st.href as string) : undefined }))}
-              />
-            </section>
-          ) : undefined
-        }
+        frame={{
+          art: 'patent-venture',
+          // 회사를 안 골랐으면 한 줄 상태는 없음 — 단계 1 '위에서 회사 고르기' 가 같은 말(첫 화면 글 220자 이하 · qa:chat A4)
+          sub: clientId && clientName ? `${clientName} — 다섯 단계 중 ${doneSteps}단계 끝 · 명세서 · 점검 · 벤처 사업계획서를 한곳에서` : undefined,
+          summary,
+          next,
+          aside,
+        }}
         clients={clients}
         clientId={clientId}
         clientName={clientName}
@@ -140,13 +172,6 @@ export function PatentVentureChatPage() {
         detailHref={`${PV_HOME}/more${clientId ? `?client=${encodeURIComponent(clientId)}` : ''}`}
         guide={PV_GUIDE}
         today={today}
-        brief={
-          brief ? (
-            <PvBriefCard company={clientName || '이 회사'} clientId={clientId} brief={brief} onNewSpec={() => void createDraft(emptyDraft(), '', true)} />
-          ) : resumeRows.length ? (
-            <PvResumeCard rows={resumeRows} onPick={(r) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))} />
-          ) : undefined
-        }
         heroTitle={brief || resumeRows.length ? '다른 것을 묻거나 고르세요' : undefined}
       />
     </div>

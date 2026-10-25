@@ -9,6 +9,8 @@
  *   P  특허 · 벤처 — 회사 전 다섯 단계(회사 고르기가 지금) · 회사 고르면 준비 현황 안 다섯 단계(명세서 · 점검 · 사업계획서 칸 이름 · 상태 그대로)
  *   G  마케팅 — 목차 두 줄(콘텐츠 레이더 · 만들기) · 한 번에 나오는 형식 4 · 390 넘침 0
  *   T  화면 제목 아이콘 — 메뉴 이름인 화면(고객 관리)에는 있고, 업체 상세(업체 이름)에는 없음
+ *   U  UXS-1 화면 문법 — AI 전략실 · 업체 작업실 · 특허 · 벤처 · 영업 보드가 같은 순서(머리 → 요약 → 지금 할 일 → 본문 판) ·
+ *      머리 배경 그림 · '지금 할 일' 은 한 화면에 하나 · 요약 숫자 칸은 한 판(칸마다 상자 없음) · 휴대폰은 머리 → 지금 할 일 → 요약 · 넘침 0
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -134,12 +136,14 @@ for (const [w, scale] of [[390, ''], [360, 'extra_large']]) {
 }
 
 /* ---- A AI 전략실 ---- */
+let caseUrl = ''
 {
   await page.goto(BASE + '/ai', { waitUntil: 'networkidle' })
   await page.getByTestId('case-quick').waitFor()
   await page.getByTestId('case-quick-client').first().click()
   await page.waitForURL(/\/ai\/cases\//, { timeout: 10000 })
   await page.getByTestId('case-workspace').waitFor()
+  caseUrl = new URL(page.url()).pathname
   await page.waitForTimeout(500)
   const missing = page.getByTestId('snapshot-missing')
   const hiddenBefore = await page.locator('[data-snapshot][data-missing]').evaluateAll((els) => els.filter((e) => e.offsetParent === null).length)
@@ -206,6 +210,67 @@ for (const [w, scale] of [[390, ''], [360, 'extra_large']]) {
   await page.waitForTimeout(800)
   const b = await tileNextToH1()
   check('T1 고객 관리 제목 앞 기능 아이콘 · 업체 상세(업체 이름 제목)에는 없음', a && !b, { a, b })
+}
+
+/* ---- U UXS-1 화면 문법 ---- */
+{
+  // [이름, 주소, 머리 그림, 요약, 지금 할 일, 본문 판, 요약이 숫자 칸(KpiCard) 줄인가]
+  const screens = [
+    ['AI 전략실', '/ai', 'ai', 'ai-summary', 'ai-next', 'case-list-panel', true],
+    ['업체 작업실', caseUrl, 'ai', 'snapshot-fields', 'case-next', 'case-purposes', false],
+    ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'chat-panel', false],
+    ['영업 보드', '/sales/board', 'sales', 'sales-summary', 'sales-next', 'sales-board-panel', true],
+  ]
+  const layout = (pg, ids) =>
+    pg.evaluate((ids) => {
+      const top = (id) => {
+        const el = document.querySelector(`[data-testid="${id}"]`)
+        return el ? Math.round(el.getBoundingClientRect().top + scrollY) : null
+      }
+      const hero = document.querySelector('main [data-hero]')
+      const art = hero?.querySelector('[data-hero-art]')
+      const kpi = document.querySelector(`[data-testid="${ids[1]}"] > *`)
+      return {
+        hero: hero ? Math.round(hero.getBoundingClientRect().top + scrollY) : null,
+        heroArt: hero?.dataset.hero ?? null,
+        artShown: !!art && art.offsetWidth > 100 && /url\(/.test(getComputedStyle(art).backgroundImage),
+        summary: top(ids[1]),
+        next: top(ids[2]),
+        panel: top(ids[3]),
+        nextBars: document.querySelectorAll('main [data-frame="next"]').length,
+        kpiBorder: kpi ? getComputedStyle(kpi).borderTopWidth : null,
+        over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    }, ids)
+  for (const [name, url, art, summary, next, panel, kpis] of screens) {
+    await page.goto(BASE + url, { waitUntil: 'networkidle' })
+    await page.getByTestId(next).waitFor({ timeout: 10000 })
+    await page.waitForTimeout(400)
+    const L = await layout(page, [art, summary, next, panel])
+    check(
+      `U ${name} 1440 — 머리(그림 '${art}') → 요약 → 지금 할 일 → 본문 판 순서 · 지금 할 일 하나${kpis ? ' · 숫자 칸은 한 판(칸 테두리 0)' : ''}`,
+      L.heroArt === art && L.artShown && L.hero < L.summary && L.summary < L.next && L.next < L.panel && L.nextBars === 1 && (!kpis || L.kpiBorder === '0px') && L.over <= 0,
+      L,
+    )
+  }
+  const m = await ctx.newPage()
+  await m.setViewportSize({ width: 390, height: 844 })
+  for (const [name, url, art, summary, next, panel] of screens) {
+    await m.goto(BASE + url, { waitUntil: 'networkidle' })
+    await m.getByTestId(next).waitFor({ timeout: 10000 })
+    await m.waitForTimeout(400)
+    const L = await layout(m, [art, summary, next, panel])
+    check(`U ${name} 390 — 머리 → 지금 할 일 → 요약 → 본문 판 · 그림 대신 옅은 빛 · 넘침 0`, L.hero < L.next && L.next < L.summary && L.summary < L.panel && !L.artShown && L.over <= 0, L)
+  }
+  await m.close()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
+  const home = await page.evaluate(() => {
+    const hero = document.querySelector('[data-testid="today-hero"]')
+    const art = hero?.querySelector('[data-hero-art]')
+    return { art: hero?.dataset.hero ?? null, shown: !!art && art.offsetWidth > 100 }
+  })
+  check("U 오늘 — 웰컴 띠에 머리 그림 'home'", home.art === 'home' && home.shown, home)
 }
 
 check('오류 0', errors.length === 0, errors)

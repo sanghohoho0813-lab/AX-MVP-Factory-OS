@@ -90,12 +90,17 @@ export function useAiSetup(): { setup: AiSetup; recheck: () => void } {
 }
 
 /** 'AI 기능 설정이 필요합니다.' — 무엇을 넣어야 하는지(이름만) */
-export function AiSetupBanner({ setup }: { setup: AiSetup }) {
+export function AiSetupBanner({ setup, strip = false }: { setup: AiSetup; strip?: boolean }) {
   if (setup.state !== 'missing' && setup.state !== 'error') return null
+  // UXS-1 strip: 화면 머리(PageHero) 아래 얇은 한 줄 — 본문 앞 큰 상자로 첫 화면을 차지하지 않게(글은 그대로)
   return (
-    <div role="status" data-testid="ai-setup-banner" className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 px-4 py-3">
-      <p className="t-body font-semibold break-keep text-warning-700">AI 기능 설정이 필요합니다.</p>
-      <p className="t-sub mt-1 break-keep text-warning-700">
+    <div
+      role="status"
+      data-testid="ai-setup-banner"
+      className={strip ? 'border-t border-warning-200 bg-warning-50 px-4 py-2.5 sm:px-6' : 'rounded-(--radius-panel) border border-warning-200 bg-warning-50 px-4 py-3'}
+    >
+      <p className={`${strip ? 't-sub' : 't-body'} font-semibold break-keep text-warning-700`}>AI 기능 설정이 필요합니다.</p>
+      <p className={`t-sub break-keep text-warning-700 ${strip ? '' : 'mt-1'}`}>
         {setup.state === 'missing'
           ? `서버 환경변수에 ${setup.missing.length ? setup.missing.join(' · ') : 'AI 키 · 모델'} 을(를) 넣으면 AI 버튼이 켜집니다. 그 전에도 업체 등록 · 자료 · 기억 · ChatGPT 결과 붙여넣기는 그대로 쓸 수 있습니다.`
           : setup.message}

@@ -23,6 +23,8 @@ import type { AssistPage } from '../../services/aiAssist/presets'
 import type { AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
 import { toneClass, type FeatureTone } from '../../config/featureVisual'
+import type { HeroArt } from '../../config/heroArt'
+import { PageColumns, PageHero } from '../ui/pageFrame'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
 
 export interface WorkChatProps {
@@ -59,6 +61,11 @@ export interface WorkChatProps {
   heroTitle?: string
   /** D-282 회사 고르기 바로 아래 · 준비 현황 위 — 단계 표시(규칙 계산) */
   steps?: ReactNode
+  /**
+   * UXS-1 화면 문법(공통 다섯 칸) — 주면 ① 머리(PageHero · 회사 고르기 · 사용 방법 · 자세히) ② summary ③ next ④ 대화 판 ⑤ aside 로 그린다.
+   * 없으면 예전 모양(가운데 좁은 칸 — 기업인증 대화창). 대화 · 답 · 저장은 두 모양이 같다.
+   */
+  frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode }
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -338,99 +345,137 @@ export function WorkChat(p: WorkChatProps) {
     </div>
   )
 
+  const headButtons = (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setGuide(true)} data-testid="chat-guide-open">
+        <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
+      </Button>
+      <Link to={p.detailHref} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100" data-testid="chat-detail">
+        <LayoutList aria-hidden="true" className="size-4" /> 자세히
+      </Link>
+    </>
+  )
+  const pickClient = (
+    <label className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+      <span className={`t-sub shrink-0 font-semibold text-slate-600 ${p.frame ? 'sr-only sm:not-sr-only' : ''}`}>회사</span>
+      <select ref={pickRef} value={p.clientId} onChange={(e) => p.onClient(e.target.value)} className="tap t-body min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 sm:w-80 sm:max-w-sm sm:flex-none" data-testid="chat-client">
+        <option value="">{p.needClient ? '회사 고르기' : '회사 고르지 않음(전체)'}</option>
+        {p.clients && <ClientPickerOptions clients={p.clients.map((c) => ({ id: c.id, companyName: c.companyName, businessNumber: c.businessNumber ?? '', corporateNumber: c.corporateNumber ?? '' }))} />}
+      </select>
+    </label>
+  )
   const head = (
     <div className="flex flex-col gap-3" data-testid="chat-head">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h1 className="t-page min-w-0 break-keep text-slate-900">{p.title}</h1>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setGuide(true)} data-testid="chat-guide-open">
-            <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
-          </Button>
-          <Link to={p.detailHref} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100" data-testid="chat-detail">
-            <LayoutList aria-hidden="true" className="size-4" /> 자세히
-          </Link>
-        </div>
+        <div className="flex shrink-0 items-center gap-1">{headButtons}</div>
       </div>
-      <label className="flex min-w-0 items-center gap-2">
-        <span className="t-sub shrink-0 font-semibold text-slate-600">회사</span>
-        <select ref={pickRef} value={p.clientId} onChange={(e) => p.onClient(e.target.value)} className="tap t-body min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 sm:max-w-sm" data-testid="chat-client">
-          <option value="">{p.needClient ? '회사 고르기' : '회사 고르지 않음(전체)'}</option>
-          {p.clients && <ClientPickerOptions clients={p.clients.map((c) => ({ id: c.id, companyName: c.companyName, businessNumber: c.businessNumber ?? '', corporateNumber: c.corporateNumber ?? '' }))} />}
-        </select>
-      </label>
+      {pickClient}
     </div>
   )
 
   const lastId = useMemo(() => turns[turns.length - 1]?.id, [turns])
+  const fileInput = p.onFile && <input ref={fileRef} type="file" accept={p.fileAccept} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} data-testid="chat-file-input" />
+  const small = !!(p.frame || p.brief)
+
+  const body = empty ? (
+    <section className={`flex flex-col gap-4 ${p.frame ? '' : p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
+      <h2 className={`${small ? 't-section' : 't-page'} ${p.frame ? 'text-left' : 'text-center'} font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
+      {composer(false)}
+      {starterButtons(false)}
+    </section>
+  ) : null
+  const turnsList = !empty && (
+      <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
+        {turns.map((t) => (
+          <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-20 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
+            <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="chat-q">
+              {t.q}
+            </p>
+            {t.status === 'pending' && (
+              <p className="t-sub flex items-center gap-2 text-slate-500" role="status" data-testid="chat-pending">
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" /> AI가 답을 만드는 중…
+              </p>
+            )}
+            {t.error && <p className="t-sub break-keep text-warning-800" data-testid="chat-error">△ {t.error}</p>}
+            {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
+            {t.status === 'error' && !t.a && (
+              <div>
+                <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)}>
+                  <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
+                </Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+  )
+  // 휴대폰: 아래 메뉴 바로 위에 붙고 화면 끝까지 덮는다(뒤 글이 비치지 않게)
+  // UXS-1 공통 틀에서는 대화 판 밖(화면 맨 바깥)에 둔다 — 판 안에 두면 판 위 머리 · 요약 때문에 화면 맨 위에서 붙지 못했다(sticky 는 부모 안에서만)
+  const dock = !empty && (
+      <div className={`sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-3 backdrop-blur sm:-mx-1 sm:rounded-2xl sm:border-0 sm:px-1 lg:bottom-3 lg:pb-1 ${p.frame?.aside ? 'xl:mr-[25rem]' : ''}`} data-testid="chat-dock">
+        {starterButtons(true)}
+        {composer(true)}
+      </div>
+  )
+  const clearRow = !empty && (
+      <div className="flex justify-center">
+        <Button variant="ghost" size="sm" onClick={clear} data-testid="chat-clear">
+          <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기
+        </Button>
+      </div>
+  )
+
+  const guideSheet = guide && (
+    <BottomSheet title="사용 방법" onClose={() => setGuide(false)}>
+      <ol className="flex flex-col gap-3" data-testid="chat-guide">
+        {p.guide.map((g, i) => (
+          <li key={g.head} className="flex gap-3">
+            <span className="t-sub grid size-7 shrink-0 place-items-center rounded-full bg-brand-600 font-bold text-white" aria-hidden="true">
+              {i + 1}
+            </span>
+            <div className="min-w-0">
+              <p className="t-body font-bold break-keep text-slate-900">{g.head}</p>
+              <p className="t-sub break-keep whitespace-pre-line text-slate-700">{g.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </BottomSheet>
+  )
+
+  // UXS-1 공통 다섯 칸 — 머리 → 요약 → 지금 할 일 → 대화 판(본문) · 보조 칸
+  if (p.frame)
+    return (
+      <div className="flex flex-col gap-4 sm:gap-5" data-testid={`chat-${p.module}`} data-turns={turns.length}>
+        <PageHero art={p.frame.art} title={p.title} sub={p.frame.sub} context={pickClient} actions={headButtons} testId="chat-head" />
+        {p.frame.summary}
+        {p.frame.next}
+        {fileInput}
+        <PageColumns aside={p.frame.aside} asideLabel="도움 · 이어서 할 것">
+          <section className="flex min-w-0 flex-col gap-4 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" aria-label="대화창" data-testid="chat-panel">
+            {body}
+            {turnsList}
+            {clearRow}
+          </section>
+        </PageColumns>
+        {dock}
+        {guideSheet}
+      </div>
+    )
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4" data-testid={`chat-${p.module}`} data-turns={turns.length}>
       {head}
       {p.steps}
       {p.brief}
-      {p.onFile && <input ref={fileRef} type="file" accept={p.fileAccept} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} data-testid="chat-file-input" />}
-
-      {empty ? (
-        <section className={`flex flex-col gap-4 ${p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
-          <h2 className={`${p.brief ? 't-section' : 't-page'} text-center font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
-          {composer(false)}
-          {starterButtons(false)}
-        </section>
-      ) : (
-        <>
-          <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
-            {turns.map((t) => (
-              <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-20 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
-                <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="chat-q">
-                  {t.q}
-                </p>
-                {t.status === 'pending' && (
-                  <p className="t-sub flex items-center gap-2 text-slate-500" role="status" data-testid="chat-pending">
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" /> AI가 답을 만드는 중…
-                  </p>
-                )}
-                {t.error && <p className="t-sub break-keep text-warning-800" data-testid="chat-error">△ {t.error}</p>}
-                {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
-                {t.status === 'error' && !t.a && (
-                  <div>
-                    <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)}>
-                      <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
-                    </Button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-          {/* 휴대폰: 아래 메뉴 바로 위에 붙고 화면 끝까지 덮는다(뒤 글이 비치지 않게) */}
-          <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-3 backdrop-blur sm:-mx-1 sm:rounded-2xl sm:border-0 sm:px-1 lg:bottom-3 lg:pb-1" data-testid="chat-dock">
-            {starterButtons(true)}
-            {composer(true)}
-          </div>
-          <div className="flex justify-center">
-            <Button variant="ghost" size="sm" onClick={clear} data-testid="chat-clear">
-              <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기
-            </Button>
-          </div>
-        </>
-      )}
-
-      {guide && (
-        <BottomSheet title="사용 방법" onClose={() => setGuide(false)}>
-          <ol className="flex flex-col gap-3" data-testid="chat-guide">
-            {p.guide.map((g, i) => (
-              <li key={g.head} className="flex gap-3">
-                <span className="t-sub grid size-7 shrink-0 place-items-center rounded-full bg-brand-600 font-bold text-white" aria-hidden="true">
-                  {i + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="t-body font-bold break-keep text-slate-900">{g.head}</p>
-                  <p className="t-sub break-keep whitespace-pre-line text-slate-700">{g.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </BottomSheet>
-      )}
+      {fileInput}
+      {body}
+      {turnsList}
+      {dock}
+      {clearRow}
+      {guideSheet}
     </div>
   )
 }
+

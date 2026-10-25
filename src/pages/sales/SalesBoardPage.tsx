@@ -17,11 +17,14 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { fromState } from '../../lib/navFrom'
 import { useQueryInUrl } from '../../lib/useQueryInUrl'
 import { CallButton } from '../../components/ops/opsControls'
-import { BellRing, ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
+import { BellRing, CalendarCheck, ChevronRight, CirclePlus, Coins, Hourglass, KanbanSquare, Presentation, Route, ScanSearch, Search, TrendingUp } from 'lucide-react'
 import { useClientGrantSummaries, type ClientGrantSummary } from '../../components/grants/useGrants'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
-import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
+import { Badge, Disclosure } from '../../components/ui/primitives'
+import { KpiCard } from '../../components/ui/visual'
+import { NextActionBar, PageHero, PageStack, SummaryStrip, WorkPanel } from '../../components/ui/pageFrame'
+import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
 import { CopyButton } from '../../components/sales/salesParts'
 import { stageColor } from '../../components/sales/salesColor'
 import { salesActionPath, salesRecontacts, salesRisks } from '../../services/salesSignals'
@@ -453,8 +456,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const column = (stage: SalesStage, list: ClientOpsRecord[]) => {
     const c = stageColor(stage)
     return (
-    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-2 pt-3">
+    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-(--radius-panel) bg-slate-50 p-2 pt-3">
       {/* D-118: 칸 머리 위 3px 띠 + 옅은 머리 바탕 — 단계 구분색(테마를 따라간다). 칸 전체는 칠하지 않는다 */}
+      {/* UXS-1 영업 보드 판 안이라 칸에는 테두리를 두르지 않는다(옅은 바탕으로만 — 상자 안 상자 안 상자를 만들지 않게) */}
       <span aria-hidden="true" data-stage-bar className={`absolute inset-x-0 top-0 h-[3px] ${c.bar}`} style={c.style} />
       <div data-stage-head className={`-mx-2 -mt-3 flex flex-col gap-0.5 px-3 pt-3.5 pb-2 ${c.soft}`} style={c.style}>
         <div className="flex items-baseline justify-between gap-2">
@@ -479,13 +483,20 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     )
   }
 
+  // UXS-1 지금 할 일 — 챙길 영업이 있으면 맨 위 하나, 없으면 영업 순서의 다음 단계(예전 순서 안내 상자가 하던 말)
+  const topRisk = risks[0]
+  const flow = flowPosition(SALES_FLOW, '/sales/board')
+
   return (
-    <div className="flex flex-col gap-5">
-      <ScreenTitle
+    <PageStack>
+      {/* UXS-1 ① 머리 — 제목 · 한 줄 상태 → 영업 관리 탭(보는 대상) → 주 단추 */}
+      <PageHero
+        art="sales"
         title="영업 관리"
         sub={`${today} · 진행 중 ${stats.inFlow}곳 · 계약 완료 ${all.contracted.length}곳`}
+        context={<SalesTabs part="tabs" />}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <>
             {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 */}
             <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
               <ScanSearch aria-hidden="true" className="size-4" />
@@ -495,12 +506,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
               <CirclePlus aria-hidden="true" className="size-4" />
               새 잠재고객
             </Button>
-          </div>
+          </>
         }
       />
-      <SalesTabs />
-      {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
-      {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
 
       {error && (
         <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
@@ -508,17 +516,48 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </p>
       )}
 
-      <section aria-label="영업 요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-        <MetricTile label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
-        <MetricTile label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
-        <MetricTile label="이번 달 계약" value={`${stats.wonThisMonth}곳`} tone={stats.wonThisMonth > 0 ? 'success' : 'neutral'} hint="계약 완료로 옮긴 곳" />
-        <MetricTile
-          label={`${SALES_STALE_DAYS}일 넘게 멈춤`}
-          value={`${stats.stale}곳`}
-          tone={stats.stale > 0 ? 'warning' : 'neutral'}
-          hint={`보류·이탈 ${stats.parked}곳은 따로`}
+      {/* ② 요약 — 같은 숫자 · 같은 판정(아이콘 칸만 더함) */}
+      <SummaryStrip label="영업 요약" testId="sales-summary">
+        <KpiCard icon={TrendingUp} tone="orange" label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
+        <KpiCard icon={Coins} tone="orange" label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
+        <KpiCard icon={CalendarCheck} tone="green" label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'success' : 'neutral'} hint="계약 완료로 옮긴 곳" />
+        <KpiCard icon={Hourglass} tone="slate" label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
+      </SummaryStrip>
+
+      {/* ③ 지금 할 일 — 한 줄 · 단추 하나 */}
+      {topRisk ? (
+        <NextActionBar
+          tone="orange"
+          label={`지금 챙길 영업 · ${risks.length}곳`}
+          title={topRisk.record.companyName}
+          detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
+          action={
+            <Link to={salesActionPath(topRisk.action, topRisk.record.id)} state={salesActionPath(topRisk.action, topRisk.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+              {topRisk.action} <ChevronRight aria-hidden="true" className="size-4" />
+            </Link>
+          }
+          testId="sales-next"
         />
-      </section>
+      ) : flow.here ? (
+        <NextActionBar
+          tone="orange"
+          icon={Route}
+          label={`${flow.flow.name} · ${flow.index + 1} / ${flow.flow.steps.length}단계`}
+          title={flow.here.label}
+          detail={flow.here.why}
+          action={
+            flow.next ? (
+              <Link to={flow.next.key} className={LINK_BUTTON.primary} data-testid="sales-next-go">
+                다음: {flow.next.label} <ChevronRight aria-hidden="true" className="size-4" />
+              </Link>
+            ) : undefined
+          }
+          testId="sales-next"
+        />
+      ) : null}
+
+      {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
+      {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
 
       {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}
       {(risks.length > 0 || recontacts.length > 0) && (
@@ -564,23 +603,30 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      {liveCount > 0 && (
-        <div className="relative w-full min-w-0 sm:max-w-md">
-          <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="업체명·담당자·유입 경로로 찾기"
-            aria-label="영업 업체 검색"
-            className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
-          />
-        </div>
-      )}
-
+      {/* ④ 본문 작업 판 — 찾기는 판 첫 줄, 단계 칸은 판 안 */}
+      <WorkPanel
+        title="영업 보드"
+        count={liveCount}
+        testId="sales-board-panel"
+        toolbar={
+          liveCount > 0 ? (
+            <div className="relative w-full min-w-0 sm:max-w-md">
+              <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="업체명·담당자·유입 경로로 찾기"
+                aria-label="영업 업체 검색"
+                className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+              />
+            </div>
+          ) : undefined
+        }
+      >
       {loading ? (
         <p className="t-sub text-slate-500">불러오는 중…</p>
       ) : liveCount === 0 ? (
-        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
+        <div className="px-1 py-8 text-center">
           <KanbanSquare aria-hidden="true" className="mx-auto size-9 text-brand-400" />
           <p className="mt-3 text-[1.2rem] font-bold text-slate-900">아직 영업 중인 업체가 없습니다</p>
           <p className="mx-auto mt-2 max-w-xl text-[1rem] break-keep text-slate-600">
@@ -640,6 +686,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           </div>
         </>
       )}
+      </WorkPanel>
 
       <NewProspectModal open={formOpen} busy={busy} records={records} onClose={closeForm} onSubmit={(f) => void create(f)} />
       {closing && (
@@ -654,7 +701,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           }}
         />
       )}
-    </div>
+    </PageStack>
   )
 }
 

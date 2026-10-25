@@ -1,8 +1,8 @@
 /**
  * /ai/cases/:caseId — 업체 작업실 한 장(대표 전용).
+ * UXS-1 '← AI 전략실' 은 화면 공통 머리(PageHero) 안 맨 위로 옮겼다(CaseWorkspace).
  */
-import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { useParams } from 'react-router-dom'
 import { CaseWorkspace } from './CaseWorkspace'
 import { OwnerAiGate } from './shared'
 
@@ -10,13 +10,7 @@ export default function OwnerAiCasePage() {
   const { caseId = '' } = useParams()
   return (
     <OwnerAiGate>
-      <div className="flex flex-col gap-3">
-        <Link to="/ai" className="t-sub tap inline-flex min-h-11 items-center gap-1 self-start font-semibold text-slate-600 hover:text-slate-900">
-          <ChevronLeft aria-hidden="true" className="size-4" />
-          AI 전략실
-        </Link>
-        <CaseWorkspace key={caseId} caseId={caseId} />
-      </div>
+      <CaseWorkspace key={caseId} caseId={caseId} />
     </OwnerAiGate>
   )
 }

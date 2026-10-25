@@ -51,8 +51,8 @@ export function QuickActions({
   onDocs,
   reopen = null,
 }: {
-  /** D-282 결과 카드 [다시 만들기] — 그 작업 창을 연다(n 이 바뀔 때마다) */
-  reopen?: { skill: SkillId; n: number } | null
+  /** D-282 결과 카드 [다시 만들기] · UXS-1 '다음 추천 작업' 줄 — 그 작업 창을 연다(n 이 바뀔 때마다 · key 가 있으면 그 작업) */
+  reopen?: { skill: SkillId; n: number; key?: string } | null
   /** AI-2 업체 서류함에 아직 자료로 안 넣은 서류 수 */
   docsHint?: number
   onDocs?: () => void
@@ -67,13 +67,13 @@ export function QuickActions({
   const [open, setOpen] = useState<QuickAction | null>(null)
   useEffect(() => {
     if (!reopen) return
-    const a = QUICK_ACTIONS.find((x) => x.skill === reopen.skill)
+    const a = QUICK_ACTIONS.find((x) => (reopen.key ? x.key === reopen.key : x.skill === reopen.skill))
     if (a) setOpen(a)
   }, [reopen])
   // AI-1 첫 질문 "이 회사에 어떤 도움을 줄까요?" — 지금 할 작업 하나(규칙) + 목적 단추 4개. 작업 10가지 · 붙여넣기는 '다른 작업' 안(지운 것 없음)
+  // UXS-1 '다음 추천 작업' 줄은 화면 공통 자리(회사 한눈에 바로 아래 — CaseWorkspace 의 NextActionBar)로 옮겼다. 여기는 목적 단추 · 다른 작업
   const next = useMemo(() => caseNext(bundle.runs), [bundle.runs])
   const actionOf = (key: CaseActionKey) => QUICK_ACTIONS.find((a) => a.key === key)
-  const rec = actionOf(next.action)
   const purposes = CASE_PURPOSES.filter((p) => p.key !== next.action)
   return (
     <Surface className="flex flex-col gap-3">
@@ -84,26 +84,6 @@ export function QuickActions({
         {/* D-255 AI 전략실도 고른 모델로 — 고르지 않으면 일마다 빠르게 · 보통 · 깊게 모델(전과 같음) */}
         <ModelPicker popover testId="owner-ai-model" />
       </div>
-      {rec && (
-        <div className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/40 px-3.5 py-3.5 sm:flex-row sm:items-center" data-testid="case-next" data-action-next={next.action}>
-          <IconTile icon={PURPOSE_VISUAL[next.action]?.icon ?? Sparkles} tone={PURPOSE_VISUAL[next.action]?.tone ?? 'purple'} size="lg" className="hidden sm:flex" />
-          <p className="t-body min-w-0 flex-1 break-keep text-slate-900">
-            <span className="t-meta block font-semibold text-violet-700">다음 추천 작업</span>
-            <b className="t-card">{rec.label}</b>
-            <span className="t-sub block text-slate-700" data-testid="case-next-why">
-              {next.why}
-            </span>
-            {next.pending > 0 && (
-              <span className="t-sub block text-warning-800" data-testid="case-next-pending">
-                검토 전 결과 {next.pending}개 — 아래 결과에서 채택 · 폐기를 먼저 해 주세요
-              </span>
-            )}
-          </p>
-          <Button variant="primary" onClick={() => setOpen(rec)} disabled={!!running} className="w-full sm:w-auto" data-testid="case-next-go" data-purpose={next.action}>
-            <Sparkles aria-hidden="true" className="size-4" /> {running === rec.label ? '만드는 중…' : rec.label}
-          </Button>
-        </div>
-      )}
       {docsHint > 0 && onDocs && (
         <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="case-docs-hint">
           <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">

@@ -5,11 +5,12 @@
  *  - 기능 색(featureVisual)은 **아이콘 칸에만**. 카드 바탕은 흰색.
  *  - 급한 정도(빨강 · 주황)는 KPI 칸 위쪽 3px 선 + 숫자 색으로만(MetricTile 과 같다). 값이 0 이면 색 없음.
  */
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Lock, type LucideIcon } from 'lucide-react'
 import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { Tone } from './primitives'
+import { KpiGroupContext } from './kpiGroup'
 
 const TILE_SIZE = {
   sm: { box: 'size-8 rounded-lg', icon: 'size-4' },
@@ -172,16 +173,21 @@ export function KpiCard({
       {hint && <span className="t-meta min-w-0 break-keep text-slate-500">{hint}</span>}
     </>
   )
-  const cls = 'ax-lift relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white px-3.5 py-3 text-left'
+  // UXS-1 요약 줄 안이면 한 판 안의 칸(테두리 · 들썩임 없이 칸 사이 1px 선) — 박스 수를 늘리지 않는다
+  const inGroup = useContext(KpiGroupContext)
+  const cls = inGroup
+    ? 'relative flex min-w-0 flex-col gap-1.5 overflow-hidden bg-white px-4 py-3.5 text-left'
+    : 'ax-lift relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white px-3.5 py-3 text-left'
+  const hover = inGroup ? 'hover:bg-slate-50' : 'hover:border-slate-300'
   if (to)
     return (
-      <Link to={to} onClick={onClick} className={`tap ${cls} hover:border-slate-300`} data-testid={testId}>
+      <Link to={to} onClick={onClick} className={`tap ${cls} ${hover}`} data-testid={testId}>
         {body}
       </Link>
     )
   if (onClick)
     return (
-      <button type="button" onClick={onClick} className={`tap ${cls} cursor-pointer hover:border-slate-300`} data-testid={testId}>
+      <button type="button" onClick={onClick} className={`tap ${cls} cursor-pointer ${hover}`} data-testid={testId}>
         {body}
       </button>
     )
