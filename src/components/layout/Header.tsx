@@ -183,9 +183,15 @@ function useHeaderFit(ref: RefObject<HTMLElement | null>) {
     })
     ro.observe(el)
     for (const child of Array.from(el.children)) ro.observe(child)
+    // 글자 크기만 바뀌면 머리줄 칸 크기가 그대로라 위 관찰이 울리지 않을 때가 있다 — 큰 글자 → 기본으로 돌아오면 숨겼던 글자가 다시 나와 넘쳤다(D-290 · SAAS-1 때 시험이 잡음)
+    const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+      if (!frame) frame = requestAnimationFrame(fit)
+    })
+    mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-text-scale'] })
     fit()
     return () => {
       ro.disconnect()
+      mo?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
   }, [ref])

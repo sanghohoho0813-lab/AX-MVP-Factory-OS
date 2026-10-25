@@ -58,7 +58,7 @@
     "qa:sideai": "node e2e/sideai.mjs",
     "qa:certai": "node e2e/certai.mjs",
     "qa:specboard": "node e2e/specboard.mjs",
-    "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:office-docs && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os && npm run test:consulting && npm run test:operator && npm run test:startup-tax && npm run test:cretop && npm run test:tools && npm run test:employment && npm run test:labcare && npm run test:xlsx && npm run test:catalog && npm run test:facts && npm run test:taxplan && npm run test:scenarios && npm run test:site && npm run test:content && npm run test:ownerai && npm run test:assist && npm run test:grants && npm run test:youtube && npm run test:cert && npm run test:finance && npm run test:pilot && npm run test:patent && npm run test:ventureplan && npm run test:specdraft && npm run test:pvux && npm run test:chat && npm run test:mkpack && npm run test:threads && npm run test:sideai && npm run test:vstudy",
+    "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:office-docs && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os && npm run test:consulting && npm run test:operator && npm run test:startup-tax && npm run test:cretop && npm run test:tools && npm run test:employment && npm run test:labcare && npm run test:xlsx && npm run test:catalog && npm run test:facts && npm run test:taxplan && npm run test:scenarios && npm run test:site && npm run test:content && npm run test:ownerai && npm run test:assist && npm run test:grants && npm run test:youtube && npm run test:cert && npm run test:finance && npm run test:pilot && npm run test:patent && npm run test:ventureplan && npm run test:specdraft && npm run test:pvux && npm run test:chat && npm run test:mkpack && npm run test:threads && npm run test:sideai && npm run test:vstudy && npm run test:saasbrand",
     "e2e:mobile": "node e2e/mobile-journey.mjs",
     "qa:board": "node e2e/board.mjs",
     "qa:tax": "node e2e/tax-parity.mjs",
@@ -122,7 +122,8 @@
     "qa:easy": "node e2e/easy.mjs",
     "qa:themes": "node e2e/themes.mjs",
     "qa:phone": "node e2e/phone.mjs",
-    "qa:wayfinding": "node e2e/wayfinding.mjs"
+    "qa:wayfinding": "node e2e/wayfinding.mjs",
+    "test:saasbrand": "vite build --config vite.saasbrand.config.mjs && node .saasbrand-out/saasbrand.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

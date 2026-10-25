@@ -21,6 +21,7 @@ import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityP
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 import { updateMyName } from '../../auth/authService'
 import { AccountViewPanel, AccountViewRow } from './AccountViewPanel'
+import { BrandSettingsPanel } from './BrandSettingsPanel'
 import { AccountSwitchItems } from '../../components/layout/AccountSwitch'
 import { FeedbackNavButton } from '../../components/feedback/FeedbackNavButton'
 
@@ -149,6 +150,8 @@ export function SupabaseSettingsView() {
       <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5" data-testid="settings-pilot">
         <PageHeader title="설정" description="내 계정과 화면 표시를 바꿉니다." />
         <CloudAccountView />
+        {/* SAAS-1 내 브랜드 · AI 설정 — AI 가 이 사람의 업종 · 말투 · 사실로 */}
+        <BrandSettingsPanel />
         <Panel title="내 정보">
           <NameEditor />
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
@@ -172,6 +175,7 @@ export function SupabaseSettingsView() {
             <SettingRow label="현재 작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
           </Panel>
+          <BrandSettingsPanel />
           <TextScalePanel />
           <AppearancePanel />
           <FeatureVisibilityPanel />

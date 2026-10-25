@@ -663,6 +663,27 @@ try {
   await page.waitForTimeout(900)
   check('팀장(D-257): 벤처 사업계획서 쓰기 화면 열림 · AI 판 단추 있음(대표 지시 — Gemini 만) · 대표 자료 0', (await page.getByTestId('vplan').count()) === 1 && (await page.getByTestId('vplan-ai-open').count()) === 1 && leaked(await bodyText(page)).length === 0, (await bodyText(page)).slice(0, 200))
 
+  // SAAS-1: 팀장 — 설정 › 내 브랜드 · AI 설정 → 저장(진짜 DB · 팀장 작업공간) → 이후 AI 지시문이 이 설정으로(대표 개인 정보 0)
+  await go(page, '/settings')
+  await page.getByTestId('brand-settings').waitFor({ timeout: 10000 }).catch(() => {})
+  await page.waitForFunction(() => document.querySelector('[data-testid="brand-settings"]')?.getAttribute('data-ready') === '1', null, { timeout: 10000 }).catch(() => {})
+  await page.getByTestId('brand-name').fill('은혜컨설턴트')
+  await page.getByTestId('brand-company').fill('은혜경영')
+  await page.getByTestId('brand-industry').fill('정책자금 컨설팅')
+  await page.getByTestId('brand-tone').fill('쉬운 말 · 과장 없이')
+  await page.getByTestId('brand-more').click()
+  await page.getByTestId('brand-facts').fill('경력 5년 · 상담 80곳')
+  const brandPreview = (await page.getByTestId('brand-preview').innerText()) ?? ''
+  await page.getByTestId('brand-save').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="brand-save"]')?.textContent?.includes('저장됨'), null, { timeout: 10000 }).catch(() => {})
+  const brandRow = JSON.parse(sql(`select coalesce((select payload::text from public.module_data where workspace_id = '${PILOT_WS}' and module_key = 'brand' and bucket = 'profile' limit 1), '{}')`) || '{}')
+  const brandElsewhere = sql(`select count(*) from public.module_data where module_key = 'brand' and workspace_id <> '${PILOT_WS}'`)
+  check('팀장(SAAS-1): 설정 › 내 브랜드 · AI 설정 — 미리보기 "은혜컨설턴트(은혜경영)" · 저장 → 팀장 작업공간에만(DB) · 다른 작업공간 0', brandPreview.includes('은혜컨설턴트(은혜경영)') && brandRow.name === '은혜컨설턴트' && brandRow.facts === '경력 5년 · 상담 80곳' && brandElsewhere === '0', { brandRow, brandElsewhere })
+  await shot(page, 'pilot-saas1-brand')
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForFunction(() => document.querySelector('[data-testid="brand-settings"]')?.getAttribute('data-ready') === '1', null, { timeout: 10000 }).catch(() => {})
+  check('팀장(SAAS-1): 새로 고쳐도 적은 그대로(클라우드에서 다시 읽음)', (await page.getByTestId('brand-name').inputValue()) === '은혜컨설턴트' && (await page.getByTestId('brand-save').innerText()).includes('저장됨'))
+
   // D-257: 팀장 — 오늘 AI 도우미 띠 → 질문 단추 → 진짜 서버 함수 · 진짜 DB(my_os_access = pilot) → Gemini 로만
   aiCalls.length = 0
   rpcCalls.length = 0
@@ -675,7 +696,7 @@ try {
   const pRes = await page.getByTestId('ai-assist-result').first().innerText().catch(() => '')
   const gem = aiCalls.filter((c) => c.provider === 'gemini')
   check('팀장(D-257): 질문 단추 한 번 → 답 · Gemini 로만 감 · 서버가 DB 에 등급을 물어 팀장으로 판단(my_os_access)', pRes.includes('서류 마감부터') && gem.length === 1 && aiCalls.length === 1 && rpcCalls.some((c) => c.who === PILOT.email && c.fn === 'my_os_access'), { n: aiCalls.length, rpc: rpcCalls.map((c) => `${c.who}:${c.fn}`).join(), pRes: pRes.slice(0, 80) })
-  check('팀장(D-257): 지시문에 "팀장이 보냈다" 한 줄 · 보낸 자료에 대표 자료 0', (gem[0]?.sys ?? '').includes('팀장(이 OS 를 함께 쓰는 컨설턴트)') && leaked(gem[0]?.user ?? '').length === 0, leaked(gem[0]?.user ?? '').join())
+  check('팀장(D-257 · SAAS-1): 지시문 첫 줄이 팀장 설정(은혜컨설턴트(은혜경영)) · 확인된 사실 · "사용자 본인이 보냈다" · 대표 이름 · 회사 0 · 보낸 자료에 대표 자료 0', (gem[0]?.sys ?? '').includes('은혜컨설턴트(은혜경영)의 업무 비서') && (gem[0]?.sys ?? '').includes('경력 5년 · 상담 80곳') && (gem[0]?.sys ?? '').includes('컨설턴트(사용자) 본인이 보냈다') && !/김상호|김팀장|미래AI랩/.test(gem[0]?.sys ?? '') && leaked(gem[0]?.user ?? '').length === 0, leaked(gem[0]?.user ?? '').join())
   await page.getByTestId('ai-assist-model-toggle').first().click()
   await page.waitForTimeout(500)
   const tabs = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
@@ -696,7 +717,7 @@ try {
   await page.getByTestId('dock-answer').first().waitFor({ timeout: 15000 }).catch(() => {})
   const dockAns = await page.getByTestId('dock-answer').first().innerText().catch(() => '')
   const gem2 = aiCalls.filter((c) => c.provider === 'gemini')
-  check('팀장(D-258): 오른쪽 판 AI 대화 → 판 안에 답 · Gemini 로만 · 팀장 한 줄 · 보낸 것에 대표 자료 0', dockAns.includes('서류 마감부터') && gem2.length === 2 && aiCalls.length === 2 && gem2[1].sys.includes('팀장(이 OS 를 함께 쓰는 컨설턴트)') && gem2[1].user.includes('정책자금 신청 순서') && leaked(gem2[1].user).length === 0, { n: aiCalls.length, dockAns: dockAns.slice(0, 80) })
+  check('팀장(D-258 · SAAS-1): 오른쪽 판 AI 대화 → 판 안에 답 · Gemini 로만 · 팀장 설정 첫 줄 · 대표 이름 0 · 보낸 것에 대표 자료 0', dockAns.includes('서류 마감부터') && gem2.length === 2 && aiCalls.length === 2 && gem2[1].sys.includes('은혜컨설턴트(은혜경영)의 업무 비서') && !/김상호|김팀장|미래AI랩/.test(gem2[1].sys) && gem2[1].user.includes('정책자금 신청 순서') && leaked(gem2[1].user).length === 0, { n: aiCalls.length, dockAns: dockAns.slice(0, 80) })
   await shot(page, 'pilot-08-dock-chat')
   await page.getByTestId('dock-close').click()
 
@@ -896,7 +917,7 @@ try {
     await go(page, '/settings')
     const inboxBtn = page.locator('[data-testid="settings-feedback"] [data-testid="feedback-inbox-open"]').first()
     await shot(page, 'owner-d290-settings')
-    check('대표(D-290): 설정 › 계정 · 보기 — [받은 피드백함] + 새 피드백 1 · 보는 화면(대표 ↔ 팀장) · 왼쪽 아래 로그아웃 하나', (await inboxBtn.count()) === 1 && (await inboxBtn.getAttribute('data-unread')) === '1' && (await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"]').count()) === 1 && (await page.locator('aside [data-testid="sidebar-signout"]').count()) === 1)
+    check('대표(D-290 · SAAS-1): 설정 › 계정 · 보기 — [받은 피드백함] + 새 피드백 1 · 보는 화면(대표 ↔ 팀장) · 왼쪽 아래 로그아웃 하나 · 브랜드 칸 대신 "대표 AI 는 지금 기준 그대로" 안내', (await inboxBtn.count()) === 1 && (await inboxBtn.getAttribute('data-unread')) === '1' && (await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"]').count()) === 1 && (await page.locator('aside [data-testid="sidebar-signout"]').count()) === 1 && (await page.getByTestId('brand-owner-note').count()) === 1 && (await page.getByTestId('brand-settings').count()) === 0)
     await page.locator('header button[aria-label^="챙길 것"]').first().click()
     await page.waitForTimeout(300)
     const bellFb = page.getByTestId('bell-feedback')

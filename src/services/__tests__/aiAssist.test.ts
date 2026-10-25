@@ -226,7 +226,7 @@ async function serverTests() {
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
     const call = calls.find((c) => c.url.includes(':generateContent'))
     const sys = JSON.stringify(call?.body.systemInstruction ?? '')
-    check('P2 팀장 기본(선택 없음) → Gemini 가장 싼 모델로 · 답 받음 · 지시문에 "팀장이 보냈다" 한 줄', r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && (call?.url ?? '').includes('gemini-3.1-flash-lite') && sys.includes('팀장(이 OS 를 함께 쓰는 컨설턴트)'), r.raw.slice(0, 300))
+    check('P2 팀장 기본(선택 없음) → Gemini 가장 싼 모델로 · 답 받음 · 지시문에 "사용자 본인이 보냈다" 한 줄(SAAS-1 — 대표 이름 대신)', r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && (call?.url ?? '').includes('gemini-3.1-flash-lite') && sys.includes('컨설턴트(사용자) 본인이 보냈다') && !sys.includes('김상호'), r.raw.slice(0, 300))
     const g2 = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'gemini', model: 'gemini-3.1-flash' }, context: CTX }, PILOT)
     check('P3 팀장이 다른 Gemini 모델을 골라도 됨', g2.statusCode === 200 && (g2.body.run as { model: string }).model === 'gemini-3.1-flash', g2.raw.slice(0, 200))
     calls = []

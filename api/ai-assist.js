@@ -17,13 +17,14 @@ import { IDEA_JUDGE, PATENT_JUDGE, VENTURE_JUDGE } from './_ai/judge.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
 import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
+import { cleanBrand } from './_ai/brand.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
 /** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
 export const PILOT_PROVIDERS = new Set(['gemini'])
-const PILOT_BLOCKED_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
-const PILOT_NOTE = '[이 요청] 대표가 아니라 팀장(이 OS 를 함께 쓰는 컨설턴트)이 보냈다. 지시문 · 규칙의 "대표" 는 이 화면을 쓰는 팀장으로 읽고, 팀장이 바로 할 일로 쓴다.'
+// SAAS-1 특허 명세서(대표 전용 화면 · 대표 회사 기준)도 막는다 — 벤처 사업계획서(기업인증 안)는 팀장도 쓴다(D-257)
+export const PILOT_BLOCKED_PAGES = new Set(['radar', 'content', 'threads', 'shorts', 'patent'])
 
 /** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서 */
 function pilotCatalog(catalog) {
@@ -96,8 +97,8 @@ async function runOnce(assist, choice, body, role, video = null) {
   // D-263 대화 단추 — 물어본 말로 기준 문서 장 고르기(물어본 말에 주제가 없으면 앞선 대화 끝부분으로 · 화면 제목은 늘 '특허 · 벤처' 라 쓰지 않음)
   const prev = Array.isArray(context.sections) ? context.sections.find((x) => /앞선\s*대화/.test(String(x?.name ?? ''))) : null
   const topicText = !assist.topicKb ? '' : topicPacks(ask).length ? ask : JSON.stringify(prev?.rows ?? '').slice(-2000)
-  const sys = assistSystem(assist, { skill, topicText })
-  const system = role === 'pilot' ? `${sys}\n\n${PILOT_NOTE}` : sys
+  // SAAS-1 대표가 아닌 계정은 그 사람 브랜드 · AI 설정으로(대표 개인 정보 없이) — 예전 '팀장이 보냈다' 한 줄도 이 안에
+  const system = assistSystem(assist, { skill, topicText, customer: role === 'pilot' ? { brand: cleanBrand(body.brand) } : null })
   const built = buildAssistPrompt(assist, context, ask)
   const { sent } = built
   // D-260 영상 단추 — 맨 앞에 붙인 영상의 어느 구간인지(시각은 영상 처음부터)

@@ -13,6 +13,7 @@ import { MK_KNOWLEDGE, MK_KNOWLEDGE_META } from './mkKnowledge.js'
 import { finalRules, ideaJudgeBlock, judgeBlock } from './judge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from './specSamples.js'
 import { CONFIDENTIAL_RULES, sanitizeKnowledge, scrubBrand } from './guard.js'
+import { brandBlock, brandIdentity, CUSTOMER_NOTE, customerize } from './brand.js'
 
 const D = '2026-10-19'
 
@@ -546,9 +547,12 @@ export const VIDEO_RULES = [
  * D-263 자체점검 단추는 자체점검 정의 전체, 명세서 · 사업계획서 쓰기 단추는 '한 번에 끝내기' 규칙 + 같은 정의(내기 전에 스스로 점검).
  */
 export function assistSystem(assist, opts = {}) {
+  // SAAS-1 대표가 아닌 계정(팀장 · 구독 고객) — 그 사람 설정으로(대표 계정은 아래 그대로)
+  const customer = opts.customer ? { brand: opts.customer.brand || null } : null
   const own = assist.video ? ['', '[영상 받아 적기]', ...VIDEO_RULES] : assist.page === 'radar' ? ['', '[마케팅 규칙]', ...RADAR_RULES] : assist.page === 'threads' ? ['', '[스레드 규칙]', ...THREADS_RULES] : assist.page === 'shorts' ? ['', '[숏폼 규칙]', ...SHORTS_RULES] : []
   // D-274 김팀장 채널(레이더 · 스레드 · 릴스 · 틱톡)은 대표 운영 원칙을 채널 규칙보다 먼저 — 영상 받아 적기는 들린 그대로라 빼고
-  const principles = !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[대표 운영 원칙 — 다른 공식보다 먼저]', ...PRINCIPLE_RULES] : []
+  // SAAS-1 대표 운영 원칙(김팀장 화자 · 끝인사 · 대표 경력)은 대표 계정에만
+  const principles = !customer && !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[대표 운영 원칙 — 다른 공식보다 먼저]', ...PRINCIPLE_RULES] : []
   const extra = [...principles, ...own]
   const skill = typeof opts.skill === 'string' ? opts.skill : ''
   const topicText = typeof opts.topicText === 'string' ? opts.topicText : ''
@@ -562,6 +566,14 @@ export function assistSystem(assist, opts = {}) {
         '[기준 문서 끝]',
       ]
     : []
+  const tail = ['', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)]
+  if (customer) {
+    // SAAS-1 첫 줄은 이 사람의 업무 비서 · 대표 회사 · 사람 이름은 이 사람 것으로 · 끝에 [내 브랜드] 와 '대표 = 이 사용자' 안내
+    const rules = [brandIdentity(customer.brand), ASSIST_RULES[1].replace('대표가 바로', '사용자가 바로'), ...ASSIST_RULES.slice(2)]
+    const body = [...CONFIDENTIAL_RULES, '', ...rules, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines]
+    const brand = brandBlock(customer.brand)
+    return scrubBrand(customerize([...body, ...(brand.length ? ['', ...brand] : []), '', CUSTOMER_NOTE, ...tail].join('\n'), customer.brand))
+  }
   // D-264 비공개 규칙이 맨 앞 · 마지막으로 쓰지 않는 이름 · 출처 이름을 한 번 더 지운다(대표 기준 글 포함)
-  return scrubBrand([...CONFIDENTIAL_RULES, '', ...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines, '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(ASSIST_EXAMPLE)].join('\n'))
+  return scrubBrand([...CONFIDENTIAL_RULES, '', ...ASSIST_RULES, ...extra, '', `[단추] ${assist.label} (${assist.id} v${assist.version})`, ...assist.instruction, ...judge, ...kbLines, ...tail].join('\n'))
 }

@@ -6,6 +6,7 @@ import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AssistContext } from './context'
 import type { AssistPage } from './presets'
+import { brandForRequest } from '../brandProfile'
 
 export const ASSIST_ENDPOINT = '/api/ai-assist'
 
@@ -179,12 +180,14 @@ export interface AssistVideo {
 }
 
 export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string }): Promise<AssistRun> {
+  const brand = brandForRequest()
   let res: Response
   try {
     res = await fetch(ASSIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}) }),
+      // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
+      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }),
     })
   } catch {
     throw new AssistError('network', MESSAGE.network)

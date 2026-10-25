@@ -1,4 +1,6 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useContext, useEffect, useState } from 'react'
+import { AuthContext } from '../../auth/authContext'
+import { loadBrand } from '../../services/brandProfile'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -69,6 +71,12 @@ export function AppShell() {
 
   // 화면이 바뀌면 모바일 메뉴를 닫고 맨 위로 — 뒤로 · 앞으로 온 것이면 보던 자리로 (D-124)
   useScrollMemory(() => setMobileOpen(false))
+
+  // SAAS-1 이 작업공간의 브랜드 · AI 설정을 미리 읽어 둔다 — AI 요청마다 같이 간다(설정 화면을 열지 않아도)
+  const brandWorkspace = useContext(AuthContext)?.currentWorkspaceId ?? null
+  useEffect(() => {
+    void loadBrand(brandWorkspace).catch(() => {})
+  }, [brandWorkspace])
 
   return (
     <EntitlementsProvider>
