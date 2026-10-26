@@ -109,6 +109,98 @@ export function noticePackSource(k: NoticeKeyword, today: string): PackSource | 
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* D-295 고정 키워드 — 우리 본업 다섯 개는 늘 따로                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 대표(2026-10-26): "고용지원금 · 기업인증 · 정책자금은 새 공고가 떴다고 이번 주 키워드에 올리는 건 별로 —
+ * 고정 키워드로 따로 분류하고 정부지원금 · 정부지원사업까지 5개 정도 펼쳤을 때 볼 수 있게. 이번 주 키워드 10개는 유튜브에서 실제로 뜨는 것만."
+ *  - 이번 주 새 공고 수(기업마당)는 고정 키워드 칸에 칩으로만 — 키는 예전 공고 키워드와 같다(notice:주제 · 담아 둔 묶음 · AI 결과가 그대로 이어짐).
+ *  - 정부지원금 = 공고 분류의 '지원금'(소상공인 지원금 포함) 무리 — 이름 · 관점 · 제목은 회사 대표 기준으로 넓혔다.
+ */
+export interface FixedTopic {
+  /** 공고 무리(noticeTopicOf) = 레이더 주제 번호 */
+  topicId: NoticeTopicId
+  label: string
+  /** 화면 둘째 줄(짧게) */
+  sub: string
+  /** 레이더 분류표 대신 쓰는 관점 · 제목(분류표 이름이 다를 때만) */
+  main?: { view: string; titles: string[]; thumbs: string[] }
+}
+
+export const FIXED_TOPICS: readonly FixedTopic[] = [
+  { topicId: 'policy_fund', label: '정책자금', sub: '융자 · 보증' },
+  { topicId: 'employ_subsidy', label: '고용지원금', sub: '채용 · 인건비' },
+  { topicId: 'certification', label: '기업인증', sub: '벤처 · 연구소' },
+  {
+    topicId: 'sme_subsidy',
+    label: '정부지원금',
+    sub: '갚지 않는 돈',
+    main: {
+      view: '지원금 목록을 읽어 주는 대신, 우리 회사가 받을 수 있는 갚지 않는 지원금만 조건(업종 · 지역 · 규모)으로 추려 줍니다.',
+      titles: ['정부지원금, 우리 회사가 받을 수 있는 것만 골라봤습니다', '갚지 않아도 되는 정부지원금, 신청 순서대로 정리했습니다', '정부지원금 신청 전에 대표님이 꼭 확인할 3가지'],
+      thumbs: ['갚지 않는 돈', '우리 회사 해당?'],
+    },
+  },
+  { topicId: 'grant_program', label: '정부지원사업', sub: '공고 · 사업계획서' },
+]
+
+/** 고정 키워드 주제 번호 — 레이더 '경제 · 경영' 후보에서 뺀다(radarPlan fixedTopics) */
+export const FIXED_TOPIC_IDS: readonly string[] = FIXED_TOPICS.map((f) => f.topicId)
+
+export interface FixedKeyword extends NoticeKeyword {
+  sub: string
+  fixed: FixedTopic
+}
+
+/** 고정 키워드 다섯 — 공고가 없어도 늘 다섯(칩은 이번 주 새 공고가 있을 때만) */
+export function fixedKeywords(notices: readonly GrantNotice[], today: string): FixedKeyword[] {
+  const { from } = weekWindow(today)
+  const soon = ymd(at(today) + 6 * DAY)
+  const groups = new Map<NoticeTopicId, { fresh: GrantNotice[]; closing: GrantNotice[] }>()
+  for (const n of notices) {
+    if (n.applyEnd && n.applyEnd < today) continue
+    const id = noticeTopicOf(n)
+    const g = groups.get(id) ?? { fresh: [], closing: [] }
+    const seen = n.postedAt || n.applyStart
+    if (seen && seen >= from && seen <= today) g.fresh.push(n)
+    if (n.applyEnd && n.applyEnd >= today && n.applyEnd <= soon) g.closing.push(n)
+    groups.set(id, g)
+  }
+  return FIXED_TOPICS.map((f) => {
+    const g = groups.get(f.topicId) ?? { fresh: [], closing: [] }
+    const fresh = [...g.fresh].sort((a, b) => (b.postedAt || b.applyStart).localeCompare(a.postedAt || a.applyStart) || a.title.localeCompare(b.title))
+    const closing = [...g.closing].sort((a, b) => a.applyEnd.localeCompare(b.applyEnd))
+    return { key: `notice:${f.topicId}`, topicId: f.topicId, label: f.label, sub: f.sub, fixed: f, fresh, closing, note: fresh.length ? `새 공고 ${fresh.length}건` : '' }
+  })
+}
+
+/** 고정 키워드 → 콘텐츠 묶음 재료(이번 주 새 공고가 있으면 그 이름 · 마감을 근거로, 없으면 늘 찾는 본업 주제로) */
+export function fixedPackSource(k: FixedKeyword, today: string): PackSource | null {
+  const def = TOPIC_BY_ID.get(k.topicId)
+  const main = k.fixed.main ?? def?.main
+  if (!main) return null
+  if (k.fresh.length > 0) {
+    const base = noticePackSource(k, today)
+    if (!base) return null
+    return { ...base, topic: k.label, view: `${main.view} 이번 주 새로 올라온 공고를 예로 들되, 금액 · 자격은 공고 원문으로 확인해 말합니다.`, titles: [...main.titles], thumbs: [...main.thumbs] }
+  }
+  return {
+    key: k.key,
+    topic: k.label,
+    axis: 'market',
+    why: `${k.label} — 대표님들이 늘 찾는 우리 본업 주제(고정 키워드)예요.${k.closing.length ? ` 7일 안에 마감되는 공고가 ${k.closing.length}건 있어요.` : ' 이번 주 기업마당 새 공고는 아직 없어요.'}`,
+    facts: [...(k.closing.length ? [`7일 안 마감 ${k.closing.length}건(기업마당)`] : []), ...k.closing.slice(0, 2).map((n) => `곧 마감: ${noticeLine(n)}`)],
+    view: `${main.view} 금액 · 자격 · 날짜는 공고 원문 · 공식 자료로 확인해 말합니다.`,
+    titles: [...main.titles],
+    thumbs: [...main.thumbs],
+    hook: `${k.label}, 대표님들이 가장 많이 묻는 것부터 딱 짚어 드리겠습니다.`,
+    refs: [],
+    custom: false,
+  }
+}
+
 /** 이미 있는 레이더 묶음에 같은 주제 공고 근거를 덧붙인다(같은 주제가 레이더에도 올라왔을 때) */
 export function withNoticeFacts(s: PackSource, k: NoticeKeyword | undefined): PackSource {
   if (!k) return s

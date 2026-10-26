@@ -52,7 +52,7 @@ export function PackView({
 }: {
   source: PackSource
   brief: ChannelBrief
-  /** 이번 주 키워드 몇 번째(직접 쓴 주제면 0) */
+  /** 이번 주 키워드 몇 번째(직접 쓴 주제면 0 · D-295 고정 키워드면 -1) */
   rank: number
   readOnly: boolean
   /** 대표 AI 를 쓸 수 있음 */
@@ -111,7 +111,7 @@ export function PackView({
       <header className="relative overflow-hidden rounded-(--radius-panel) bg-gradient-to-br from-red-600 via-red-600 to-rose-700 p-4 text-white sm:p-5">
         <span aria-hidden="true" className="pointer-events-none absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
         <div className="relative flex flex-col gap-1">
-          <p className="t-meta font-semibold text-white/90">{rank > 0 ? `이번 주 키워드 ${rank}번` : '직접 고른 주제'}</p>
+          <p className="t-meta font-semibold text-white/90">{rank > 0 ? `이번 주 키워드 ${rank}번` : rank < 0 ? '고정 키워드' : '직접 고른 주제'}</p>
           <HintTip tip="이 키워드 하나로 만든 묶음이에요 — 아래 칸마다 [이 칸 복사] 로 가져가 쓰고, 찍을 거면 [내 콘텐츠에 담기]." label={source.topic} onDark>
             <h2 className="t-page break-keep text-white [overflow-wrap:anywhere]" data-testid="mk-pack-topic">
               {source.topic}
@@ -229,7 +229,7 @@ export function PackView({
       })}
 
       {briefSlot && (
-        <Fold id="mk-pack-brief" title="채널 설계 기준 — 인사 · 말투 · 끝맺음" hint="대본의 인사 · 끝맺음과 AI 가 쓰는 말투가 이 기준을 따릅니다. 바꾸면 다음 묶음부터 바뀌어요." panel testId="mk-pack-brief">
+        <Fold id="mk-pack-brief" title="채널 설계 기준 — 인사 · 말투 · 끝맺음" hint="대본의 인사 · 끝맺음과 AI 가 쓰는 말투가 이 기준을 따릅니다. 바꾸면 다음 묶음부터 바뀌어요." panel testId="mk-pack-brief" keepClosed>
           {briefSlot}
         </Fold>
       )}

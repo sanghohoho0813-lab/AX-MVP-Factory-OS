@@ -22,6 +22,7 @@ import { Badge, ListRow, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { AiSetupBanner, OwnerAiGate, fmtDateTime, useAiSetup, useClientList, useOwnerAiIdentity, useOwnerAiRepo } from './shared'
 import { CaseQuickStart } from './parts/CaseQuickStart'
+import { slotIcon } from '../../config/iconSlots'
 
 export default function OwnerAiHomePage() {
   return (
@@ -284,10 +285,10 @@ function Home() {
         <ArrangeItem id="summary" label="한눈에 숫자" hint="검토 중 · 고객 관리와 이어짐 · 기억 · 이번 주 작업">
         {cases !== null && !dbSetup && (
           <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
-            <KpiCard icon={Building2} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
-            <KpiCard icon={Link2} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
-            <KpiCard icon={Brain} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
-            <KpiCard icon={CalendarClock} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
+            <KpiCard icon={slotIcon('ai-reviewing', Building2)} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
+            <KpiCard icon={slotIcon('ai-linked', Link2)} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
+            <KpiCard icon={slotIcon('ai-memory', Brain)} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
+            <KpiCard icon={slotIcon('ai-week', CalendarClock)} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
           </SummaryStrip>
         )}
         </ArrangeItem>

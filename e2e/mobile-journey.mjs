@@ -117,14 +117,49 @@ await step('오늘로 돌아온다', async () => {
   return true
 })
 
-await step('더보기 서랍이 열리고 닫힌다', async () => {
+await step('더보기 = 아래에서 올라오는 전체 메뉴(D-295) — 분야 순서 · 가로 칸 · 맨 아래 설정 · 보기 방식 · 누구 · 제품 이름 · 닫힘', async () => {
   await page.getByRole('button', { name: '더보기' }).click()
   await page.waitForTimeout(500)
-  // D-103: 서랍 아래 '이 기기 · 계정' 칸은 없어지고 이름 한 줄(김상호 대표 + 고객 플랫폼 아이콘)이 섰다
-  const opened = await page.getByTestId('sidebar-account').last().isVisible()
+  const sheet = page.getByTestId('more-sheet')
+  if (!(await sheet.isVisible())) return '판이 안 열림'
+  const box = await sheet.boundingBox()
+  const vp = page.viewportSize()
+  // 아래에 붙어 올라온다(왼쪽 서랍이 아니다)
+  if (!box || Math.abs(box.y + box.height - vp.height) > 2 || box.x > 1 || box.width < vp.width - 2) return `판 위치 ${JSON.stringify(box)}`
+  const groups = await page.getByTestId('more-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
+  if (groups.slice(0, 3).join() !== 'today,clients,sales') return `분야 순서 ${groups.join()}`
+  // '오늘' 아래 세 칸이 한 줄(가로)
+  const tops = await page.locator('[data-testid="more-group"][data-group="today"] [data-testid="more-tile"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+  if (tops.length < 3 || new Set(tops.slice(0, 3)).size !== 1) return `오늘 칸 세로로 ${tops.join()}`
+  const bottom = (await page.getByTestId('more-settings').innerText()) ?? ''
+  if (!/설정/.test(bottom) || !/지금 로그인/.test(bottom) || !/MIRAE AI LAB OS/.test(bottom)) return `맨 아래 ${bottom.slice(0, 80)}`
+  if ((await page.getByTestId('more-settings').getByTestId('device-switch').count()) !== 1) return '보기 방식 단추 없음'
   await page.getByRole('button', { name: '메뉴 닫기' }).click()
   await page.waitForTimeout(400)
-  return opened
+  return (await sheet.count()) === 0 ? true : '닫히지 않음'
+})
+
+await step('아래 메뉴 바꾸기(D-295) — 상담 빼고 마케팅 넣기 → 아래 칸 · 기본으로 되돌리기', async () => {
+  const keys = () => page.getByTestId('mobile-nav').getAttribute('data-keys')
+  if ((await keys()) !== 'today,calendar,client-ops,inbox,sales') return `처음 ${await keys()}`
+  await page.getByRole('button', { name: '더보기' }).click()
+  await page.getByTestId('more-edit-nav').click()
+  await page.locator('[data-testid="more-nav-current"] li[data-key="inbox"] [data-testid="more-nav-remove"]').click()
+  await page.locator('[data-testid="more-nav-add"][data-key="marketing"]').click()
+  await page.getByTestId('more-nav-done').click()
+  await page.getByRole('button', { name: '메뉴 닫기' }).click()
+  await page.waitForTimeout(300)
+  const changed = await keys()
+  const label = await page.locator('nav[aria-label="주요 화면"]').innerText()
+  await page.reload({ waitUntil: 'networkidle' })
+  const kept = await keys()
+  await page.getByRole('button', { name: '더보기' }).click()
+  await page.getByTestId('more-edit-nav').click()
+  await page.getByTestId('more-nav-reset').click()
+  await page.getByRole('button', { name: '메뉴 닫기' }).click()
+  await page.waitForTimeout(300)
+  const back = await keys()
+  return changed === 'today,calendar,client-ops,sales,marketing' && label.includes('마케팅') && !label.includes('상담') && kept === changed && back === 'today,calendar,client-ops,inbox,sales' ? true : JSON.stringify({ changed, kept, back })
 })
 
 await step('누르는 자리가 44px 아래로 내려가지 않는다', async () => {

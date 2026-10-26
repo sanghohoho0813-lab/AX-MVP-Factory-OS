@@ -13,9 +13,18 @@
 import { createElement, type CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import featureSprite from '../assets/icons/feature-icons.webp'
+import marketingSprite from '../assets/icons/marketing-icons.webp'
 
 /** 대표 아이콘 한 장 — 칸 21개를 가로로 */
 export const ICON_SPRITE = { src: featureSprite, count: 21 }
+/**
+ * D-295 마케팅 · 브랜딩 목차 · AI 전략실 요약 칸 한 장 — 칸 13개를 가로로(62KB).
+ *  0 이번 주 찍을 것(YouTube 실제 로고) · 1 인기 · 급상승 · 2 채널 · 3 분석 · 4 내 콘텐츠 ·
+ *  5 스레드(Threads 실제 로고) · 6 릴스 · 틱톡(실제 로고 둘) · 7 블로그 · 플레이스(블로그 실제 로고) · 8 홈페이지 만들기 ·
+ *  9 검토 중인 업체 · 10 고객 관리와 이어짐 · 11 기억이 쌓인 곳 · 12 이번 주 작업
+ * 대표: "이번 주 찍을 것 · 스레드 · 릴스틱톡 · 블로그 플레이스 홍보 글은 GPT 아이콘 말고 실제 브랜드 로고로 · 나머지는 GPT 가 만든 것 그대로".
+ */
+export const MK_SPRITE = { src: marketingSprite, count: 13 }
 
 export interface IconSlot {
   /** moduleRegistry MODULES 의 key(분야 줄은 cat-*) · 휴대폰 아래 메뉴 '더보기' 는 'more' */
@@ -26,6 +35,8 @@ export interface IconSlot {
   where: string
   /** 대표 아이콘 한 장에서 몇 번째 칸인지(0부터 — 받은 파일 번호 - 1) */
   sprite?: number
+  /** D-295 어느 한 장인지 — 없으면 기능 아이콘(feature) · 'mk' 는 마케팅 · AI 전략실 한 장 */
+  sheet?: 'mk'
   /** 따로 받은 아이콘 파일 주소(import 한 값) */
   custom?: string
   /** custom 이 한 색 아이콘이면 true(기능 색을 입힘 · 기본) · 여러 색 그림이면 false */
@@ -54,6 +65,21 @@ export const ICON_SLOTS: IconSlot[] = [
   { key: 'tools', name: '전체 도구(모듈 전체)', where: '메뉴 · 바로가기 맨 끝', sprite: 18 },
   { key: 'more', name: '더보기', where: '휴대폰 아래 메뉴', sprite: 19 },
   { key: 'settings', name: '설정', where: '메뉴', sprite: 20 },
+  // D-295 마케팅 · 브랜딩 목차(위: 콘텐츠 레이더 · 아래: 만들기)
+  { key: 'mk-plan', name: '이번 주 찍을 것', where: '마케팅 목차 — YouTube 로고', sheet: 'mk', sprite: 0 },
+  { key: 'mk-top', name: '인기 · 급상승', where: '마케팅 목차', sheet: 'mk', sprite: 1 },
+  { key: 'mk-channels', name: '채널', where: '마케팅 목차', sheet: 'mk', sprite: 2 },
+  { key: 'mk-analysis', name: '분석', where: '마케팅 목차', sheet: 'mk', sprite: 3 },
+  { key: 'mk-make', name: '내 콘텐츠', where: '마케팅 목차', sheet: 'mk', sprite: 4 },
+  { key: 'mk-threads', name: '스레드', where: '마케팅 만들기 — Threads 로고', sheet: 'mk', sprite: 5 },
+  { key: 'mk-shorts', name: '릴스 · 틱톡', where: '마케팅 만들기 — Reels · TikTok 로고', sheet: 'mk', sprite: 6 },
+  { key: 'mk-content', name: '블로그 · 플레이스 홍보 글', where: '마케팅 만들기 — 블로그 로고', sheet: 'mk', sprite: 7 },
+  { key: 'mk-homepage', name: '홈페이지 만들기', where: '마케팅 만들기', sheet: 'mk', sprite: 8 },
+  // D-295 AI 전략실 첫 화면 요약 칸
+  { key: 'ai-reviewing', name: '검토 중인 업체', where: 'AI 전략실 요약 칸', sheet: 'mk', sprite: 9 },
+  { key: 'ai-linked', name: '고객 관리와 이어짐', where: 'AI 전략실 요약 칸', sheet: 'mk', sprite: 10 },
+  { key: 'ai-memory', name: '기억이 쌓인 곳', where: 'AI 전략실 요약 칸', sheet: 'mk', sprite: 11 },
+  { key: 'ai-week', name: '이번 주 작업', where: 'AI 전략실 요약 칸', sheet: 'mk', sprite: 12 },
 ]
 
 const BY_KEY = new Map(ICON_SLOTS.map((s) => [s.key, s]))
@@ -65,7 +91,7 @@ export function slotIcon(key: string, fallback: LucideIcon): LucideIcon {
   if (!slot || (slot.sprite == null && !slot.custom)) return fallback
   let icon = made.get(key)
   if (!icon) {
-    icon = slot.sprite != null ? spriteIcon(slot.sprite, key) : customIcon(slot.custom!, slot.tint ?? true, key)
+    icon = slot.sprite != null ? spriteIcon(slot.sprite, key, slot.sheet === 'mk' ? MK_SPRITE : ICON_SPRITE) : customIcon(slot.custom!, slot.tint ?? true, key)
     made.set(key, icon)
   }
   return icon
@@ -82,8 +108,8 @@ type IconProps = { className?: string; style?: CSSProperties; size?: number | st
  * 대표 아이콘 한 칸 — 크기는 부르는 쪽 className(size-4 · size-[22px] …)을 그대로 따르고, 입체 그림은 선 아이콘보다 작게 읽혀
  * 같은 자리에서 1.5배로 그린다(--icon-art-scale — 칸 안에 들어오는 크기 · 자리를 차지하는 크기는 그대로라 옆 글자가 밀리지 않는다). 1 · 1.3 · 1.5 를 찍어 보고 1.5(아이콘 칸을 거의 채움)로 정함.
  */
-export function spriteIcon(index: number, key: string): LucideIcon {
-  const pos = ICON_SPRITE.count > 1 ? (index / (ICON_SPRITE.count - 1)) * 100 : 0
+export function spriteIcon(index: number, key: string, sheet: { src: string; count: number } = ICON_SPRITE): LucideIcon {
+  const pos = sheet.count > 1 ? (index / (sheet.count - 1)) * 100 : 0
   function SlotIcon({ className = '', style, size }: IconProps) {
     const box: CSSProperties = size == null ? {} : { width: size, height: size }
     return createElement('span', {
@@ -93,8 +119,8 @@ export function spriteIcon(index: number, key: string): LucideIcon {
       className: `inline-block shrink-0 bg-no-repeat ${className}`,
       style: {
         ...box,
-        backgroundImage: `url("${ICON_SPRITE.src}")`,
-        backgroundSize: `${ICON_SPRITE.count * 100}% 100%`,
+        backgroundImage: `url("${sheet.src}")`,
+        backgroundSize: `${sheet.count * 100}% 100%`,
         backgroundPosition: `${pos}% 0`,
         transform: 'scale(var(--icon-art-scale, 1.5))',
         ...style,

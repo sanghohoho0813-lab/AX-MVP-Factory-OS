@@ -221,6 +221,8 @@ export interface RadarOptions {
   mix?: Partial<MixGuide>
   /** 대표가 [관심 없음] 으로 숨긴 후보(Opportunity.key — '축:주제' 그대로 · D-195) */
   muted?: readonly string[]
+  /** D-295 고정 키워드 주제(정책자금 · 고용지원금 · 인증 · 지원금 · 지원사업) — 늘 따로 보이므로 '경제 · 경영' · '경영 × AI' 후보에서 뺀다(그 자리는 유튜브에서 뜨는 다른 주제로) */
+  fixedTopics?: readonly string[]
 }
 
 /** 영상마다 평소 · 배수 · 등급 · 주제 · 제목 구조 */
@@ -837,6 +839,9 @@ export function radarPlan(p: Prepared, opts: RadarOptions = {}, precomputed?: re
   }
   // [관심 없음] 으로 숨긴 후보는 뺀다 — 정확히 그 후보(축:주제)만(같은 주제의 다른 축 · 비슷한 낱말은 그대로)
   for (const a of ['market', 'axai', 'bridge'] as const) pools[a] = pools[a].filter((o) => !muted.has(o.key))
+  const fixed = new Set(opts.fixedTopics ?? [])
+  // '경영 × AI' 다리 주제도 같은 주제면 뺀다(정책자금 × 공고 자동 수집 …) — 이번 주 10개에 고정 키워드 이름이 다시 보이지 않게
+  if (fixed.size) for (const a of ['market', 'bridge'] as const) pools[a] = pools[a].filter((o) => !fixed.has(o.topicId))
   return { picks: withHoldsLast(pools, mix), aiDataShort, aiChannels, clusters: cs, hot, mix, muted: [...muted] }
 }
 

@@ -2,6 +2,8 @@
  * D-241 채널 설계 기준 — AI 도우미가 이번 주 기획 · 대본을 쓸 때 늘 따르는 것.
  * 대표: "기획을 할 거면 정확히 내가 내 컨텐츠에 맞게 설계를 해줘야". 처음에는 김팀장의 경영노트 기본값 — 고치면 그것이 기준.
  * 저장은 레이더 설정(RadarPrefs.brief) 한 곳. 기본값으로 되돌리면 null 로 저장해 다음 기본값 개선을 그대로 받는다.
+ * D-295 대표: "내 아이디에서는 그대로 두되 접어 두기로 · 다른 사람에게는 안 보이게(각자 알아서)" — 대표 계정만 · 열 때마다 접힌 채로.
+ *   팀장 · 구독 고객은 이 카드를 보지 않는다(AI 는 그 사람의 설정 › 내 브랜드로 쓴다).
  */
 import { useEffect, useRef, useState } from 'react'
 import { Compass, RotateCcw, Save } from 'lucide-react'
@@ -40,6 +42,7 @@ export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelB
       hint="AI 도우미가 이번 주 기획 · 대본을 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 다루지 않는 것 · 말투 · 형식 · 끝맺음"
       summary={custom ? '직접 고친 기준' : isMarketingCustomer() ? '기본값 · 설정 › 내 브랜드에서' : '기본값 · 김팀장의 경영노트'}
       testId="radar-brief"
+      keepClosed
     >
       <div className="flex flex-col gap-3">
         <p className="t-sub break-keep text-slate-600">여기 적은 대로 AI 가 기획 · 대본을 맞춥니다. 내 채널 최근 영상 · 잘 된 영상도 함께 보냅니다.</p>

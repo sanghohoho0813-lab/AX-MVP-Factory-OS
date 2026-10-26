@@ -388,11 +388,25 @@ export interface CalcOpen {
   label: string
 }
 
+/**
+ * D-295 같은 계산기 · 같은 값이면 다시 계산하지 않는다 — 거꾸로 찾기(solveUp)가 같은 값을 여러 번 묻는다
+ * (한 업체 상황 예시에서 11,335번 중 서로 다른 값 1,316가지). 계산기는 받은 값만 보고 계산한다(바깥 상태 없음).
+ * 결과는 읽기만 한다(lineWon · lineText) — 고치지 않는다.
+ */
+const RUN_MEMO = new Map<string, Output>()
+const RUN_MEMO_MAX = 5000
+
 function run(calcKey: string, subKey: string, values: Record<string, string>): Output {
+  const key = `${calcKey}\u0001${subKey}\u0001${JSON.stringify(values)}`
+  const hit = RUN_MEMO.get(key)
+  if (hit) return hit
   const calc = calculatorOf(calcKey)
   const sub = calc?.subs.find((s) => s.key === subKey)
   if (!calc || !sub) throw new Error(`계산기 ${calcKey}/${subKey} 가 없습니다`)
-  return sub.compute({ ...defaultValues(calc), ...values })
+  const out = sub.compute({ ...defaultValues(calc), ...values })
+  if (RUN_MEMO.size >= RUN_MEMO_MAX) RUN_MEMO.clear()
+  RUN_MEMO.set(key, out)
+  return out
 }
 
 /** 결과 줄 '1,234원' → 1234. 없으면 NaN */

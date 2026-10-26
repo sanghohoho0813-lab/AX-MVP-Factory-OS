@@ -734,6 +734,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <FileUp aria-hidden="true" className="size-4" />
             서류 올리기
           </Button>
+          {/* D-295 대표: 업체를 등록하고 바로 AI 전략실로(반대로 AI 전략실 → 고객 관리처럼) — 머리 단추라 어느 탭에서든 · 휴대폰에서도. 이어 둔 작업실이 없으면 그 탭에서 한 번에 이어 만든다 · 팀장에게는 없다 */}
+          {!pilot && ownerAi !== 'no' && tab !== 'ai' && (
+            <Button variant="secondary" onClick={() => setTab('ai')} data-testid="client-open-ai">
+              <Sparkles aria-hidden="true" className="size-4 text-violet-600" />
+              AI 전략실
+            </Button>
+          )}
           {/* D-166: 휴대폰은 머리 단추를 줄인다 — 서류 요청 문구는 '더보기' 안에(PC 는 그대로) */}
           <Button
             variant="secondary"

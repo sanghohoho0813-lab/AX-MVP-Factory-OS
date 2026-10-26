@@ -8,6 +8,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
+import { MoreSheet } from './MoreSheet'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
 import { TutorialProvider } from '../tutorial/TutorialProvider'
 import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
@@ -64,6 +65,8 @@ export function AppShell() {
   // D-257 팀장(대표가 팀장 화면으로 볼 때도)은 AI 회사 Gemini 만 — 모델 고르기 · 고른 것 읽기가 같이 따른다
   setAllowedProviders(useAiAssistAccess() === 'pilot' ? ['gemini'] : null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // D-295 휴대폰 아래 메뉴 '더보기' = 아래에서 올라오는 판(왼쪽 위 ☰ 는 예전 서랍 그대로)
+  const [moreOpen, setMoreOpen] = useState(false)
   const location = useLocation()
   const contentWidth = useContentWidth()
   // D-254 오른쪽에 AI 옆 창을 붙였으면 덮이는 만큼 화면을 왼쪽으로 비킨다(창이 닫히면 0)
@@ -161,7 +164,8 @@ export function AppShell() {
           </main>
           </div>
         </div>
-        <MobileNav onOpenMore={() => setMobileOpen(true)} />
+        <MobileNav onOpenMore={() => setMoreOpen(true)} />
+        <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
         <ScrollTopButton />
         <SideDock />
       </div>

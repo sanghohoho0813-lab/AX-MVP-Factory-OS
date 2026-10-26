@@ -22,7 +22,7 @@ import { TOOLS } from '../toolRegistry'
 import { MODULES, enabledModulesByGroup, screenGroupForPath } from '../moduleRegistry'
 import { LAUNCHER_ALL, LAUNCHER_ENTRIES, LAUNCHER_SLOTS, moduleTone, toneClass, type FeatureTone } from '../featureVisual'
 import { clientEntryHref, featureForPath, featurePath } from '../featurePaths'
-import { ICON_SLOTS, ICON_SPRITE, customIcon, slotIcon, spriteIcon } from '../iconSlots'
+import { ICON_SLOTS, ICON_SPRITE, MK_SPRITE, customIcon, slotIcon, spriteIcon } from '../iconSlots'
 import { DEFAULT_CATALOG, defaultSubscription, quote, resolveEntitlements, validateSelection, type Subscription } from '../../services/entitlements'
 import type { ModuleAccess } from '../../services/moduleAccess'
 import { loadSubscription, saveSubscription } from '../../services/subscription'
@@ -232,8 +232,10 @@ await storage()
 
 /* D-283 아이콘 자리 표 · D-284 대표 아이콘 21개(한 장 그림) — 화면 코드는 그대로, 표에서만 바꾼다 */
 {
-  const slotKeys = ICON_SLOTS.map((s) => s.key)
-  check('D-283 자리 key 겹침 없음', new Set(slotKeys).size === slotKeys.length)
+  check('D-283 자리 key 겹침 없음', new Set(ICON_SLOTS.map((s) => s.key)).size === ICON_SLOTS.length)
+  // D-295 마케팅 · AI 전략실 한 장(sheet 'mk')은 메뉴 줄이 아니라 목차 · 요약 칸 — 아래 메뉴 시험은 기능 아이콘 21곳만
+  const FEATURE = ICON_SLOTS.filter((s) => s.sheet !== 'mk')
+  const slotKeys = FEATURE.map((s) => s.key)
   const catKeys = new Set(MODULE_CATALOG.map((m) => `cat-${m.key}`))
   const known = new Set([...MODULES.map((m) => m.key), ...catKeys, 'more'])
   check('D-283 자리마다 실제 메뉴 줄 · 분야 · 더보기를 가리킴', slotKeys.every((k) => known.has(k)), slotKeys.filter((k) => !known.has(k)).join())
@@ -241,8 +243,12 @@ await storage()
   check('D-283 바로가기 · 아래 메뉴 · 기능 색 줄은 모두 자리 표에 있음(대표가 만들 아이콘 목록)', need.every((k) => slotKeys.includes(k)), need.filter((k) => !slotKeys.includes(k)).join())
   type El = { type: string; props: Record<string, unknown> }
   // D-284 대표 아이콘 21개 — 한 장 그림의 칸 번호 = 받은 파일 번호 - 1
-  const idx = ICON_SLOTS.map((s) => s.sprite)
-  check('D-284 21곳 모두 대표 아이콘 · 칸 번호 0~20 차례대로(받은 파일 01~21)', ICON_SPRITE.count === 21 && ICON_SLOTS.length === 21 && idx.every((n, i) => n === i), idx.join())
+  const idx = FEATURE.map((s) => s.sprite)
+  check('D-284 21곳 모두 대표 아이콘 · 칸 번호 0~20 차례대로(받은 파일 01~21)', ICON_SPRITE.count === 21 && FEATURE.length === 21 && idx.every((n, i) => n === i), idx.join())
+  const MK = ICON_SLOTS.filter((s) => s.sheet === 'mk')
+  check('D-295 마케팅 · AI 전략실 한 장 13칸 — 칸 번호 0~12 차례대로 · 실제 로고 자리(찍을 것 · 스레드 · 릴스/틱톡 · 블로그)', MK_SPRITE.count === 13 && MK.length === 13 && MK.every((s, i) => s.sprite === i) && ['mk-plan', 'mk-threads', 'mk-shorts', 'mk-content'].every((k) => MK.find((s) => s.key === k)?.where.includes('로고')), MK.map((s) => `${s.key}:${s.sprite}`).join())
+  const mkArt = (slotIcon('mk-shorts', MODULES[0].icon) as unknown as (p: { className?: string }) => El)({ className: 'size-5' })
+  check('D-295 마케팅 칸은 마케팅 한 장에서(1300% · 50%)', String((mkArt.props.style as Record<string, string>).backgroundImage).includes(String(MK_SPRITE.src)) && (mkArt.props.style as Record<string, string>).backgroundSize === '1300% 100%' && (mkArt.props.style as Record<string, string>).backgroundPosition === '50% 0', JSON.stringify(mkArt.props.style))
   const name = (ic: unknown) => String((ic as { displayName?: string }).displayName ?? '')
   const slotSet = new Set(slotKeys)
   const slotRows = MODULES.filter((m) => slotSet.has(m.key))

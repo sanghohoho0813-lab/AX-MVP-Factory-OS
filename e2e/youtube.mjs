@@ -259,6 +259,9 @@ const RADAR = {
     v('r9', 'UCa2', 'Claude 업무 활용 실제 후기', 5 * D, 8_000), v('r10', 'UCa2', 'n8n 자동화 처음이면', 12 * D, 4_100),
     v('r11', 'UCx1', '업무자동화 실제로 얼마나 줄까', 8 * D, 6_000), v('r12', 'UCx1', 'Claude 사내 시스템 만들기', 10 * D, 2_100),
     v('r13', 'UCf1', '정책자금 인터뷰 대표 이야기', 7 * D, 60_000), v('r14', 'UCme', '정책자금 설명만 잘하면 받던 시대', 6 * D, 700),
+    // D-295 정책자금 · 지원사업은 고정 키워드라 이번 주 후보에서 빠진다 — 시장수요 후보가 셋은 되게 다른 경영 주제(가업승계 · 대표 급여)
+    v('r17', 'UCd1', '가업승계 미리 준비 안 하면 생기는 일', 5 * D, 7_000), v('r18', 'UCd2', '증여로 가업승계 세금 줄이는 법', 6 * D, 30_000), v('r19', 'UCd3', '상속 전에 꼭 할 것', 8 * D, 2_500),
+    v('r20', 'UCd1', '가지급금 정리 안 하면 터지는 일', 4 * D, 6_500), v('r21', 'UCd2', '대표 급여 배당 어떻게 받을까', 7 * D, 25_000), v('r22', 'UCd3', '법인 돈 꺼내는 방법 3가지', 9 * D, 2_000),
   ],
   failed: [],
 }
@@ -970,8 +973,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const all = await n()
   const order = await page.evaluate(() => ['radar-domain-economy', 'radar-ai-keywords', 'radar-rising', 'radar-side'].map((id) => Math.round(document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1)))
   check(`D227-6 ${T} [전부 보기] — 예전처럼 네 판이 한 화면에(흐름 → AI → 급상승 → 사이드 순) · 지운 기능 0`, all.flow === 1 && all.ai === 1 && all.hot === 1 && all.side === 1 && order.every((y, i) => i === 0 || y > order[i - 1]), { all, order })
-  const tabs = await page.locator('[data-testid^="yt-view-"]').evaluateAll((els) => els.map((e) => ({ k: e.dataset.testid, svg: e.querySelectorAll('svg').length, on: e.getAttribute('aria-selected') === 'true', img: getComputedStyle(e).backgroundImage })))
-  check(`D227-7 ${T} 화면 탭 5개(D-231 내 콘텐츠 더함) 모두 아이콘 · 고른 탭은 빨강 그라데이션`, tabs.length === 5 && tabs.every((t) => t.svg >= 1) && tabs.filter((t) => t.on).length === 1 && /gradient/.test(tabs.find((t) => t.on)?.img ?? ''), tabs)
+  const tabs = await page.locator('[data-testid^="yt-view-"]').evaluateAll((els) => els.map((e) => ({ k: e.dataset.testid, svg: e.querySelectorAll('svg, [data-icon-slot]').length, on: e.getAttribute('aria-selected') === 'true', img: getComputedStyle(e).backgroundImage })))
+  check(`D227-7 ${T} 화면 탭 5개(D-231 내 콘텐츠 더함) 모두 아이콘(D-295 대표 아이콘 · YouTube 로고 포함) · 고른 탭은 빨강 그라데이션`, tabs.length === 5 && tabs.every((t) => t.svg >= 1) && tabs.filter((t) => t.on).length === 1 && /gradient/.test(tabs.find((t) => t.on)?.img ?? ''), tabs)
   const pickH = await boards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
   const labelW = await page.locator('[data-testid="radar-board-pick"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check(`D227-8 ${T} 판 칸 44px 이상 · 이름 칸 짜부라짐 0(폭 ≥ 90) · 가로 넘침 0 · 오류 0`, pickH.every((h) => h >= 44) && labelW.every((w) => w >= 90) && (await over()) <= 0 && errs.length === 0, { pickH, labelW, over: await over(), errs })

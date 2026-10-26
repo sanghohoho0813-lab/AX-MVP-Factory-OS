@@ -52,8 +52,8 @@ export function openFold(id: string) {
 }
 
 /** 접힘 상태 — 기억 · [모두 펼치기/접기] 를 따른다. force 면 기억과 상관없이 펼친 채로 시작 */
-export function useFold(id: string, defaultOpen: boolean, force = false): [boolean, (next: boolean) => void] {
-  const [open, setOpenState] = useState(() => force || readFold(id, defaultOpen))
+export function useFold(id: string, defaultOpen: boolean, force = false, keepClosed = false): [boolean, (next: boolean) => void] {
+  const [open, setOpenState] = useState(() => force || (keepClosed ? false : readFold(id, defaultOpen)))
   useEffect(() => {
     const on = (e: Event) => setOpenState((e as CustomEvent<boolean>).detail)
     const one = (e: Event) => {
@@ -68,7 +68,7 @@ export function useFold(id: string, defaultOpen: boolean, force = false): [boole
   }, [id])
   const setOpen = (next: boolean) => {
     setOpenState(next)
-    writeFold(id, next)
+    if (!keepClosed) writeFold(id, next)
   }
   return [open, setOpen]
 }
@@ -242,6 +242,7 @@ export function Fold({
   panel = false,
   summary,
   forceOpen = false,
+  keepClosed = false,
   children,
   className = '',
   testId,
@@ -263,11 +264,13 @@ export function Fold({
   summary?: ReactNode
   /** 이 목차로 데려온 경우(#주소 등) — 기억과 상관없이 펼친 채로 */
   forceOpen?: boolean
+  /** D-295 열 때마다 접힌 채로(펼친 것을 기억하지 않고 [모두 펼치기] 도 따르지 않는다) — 가끔 고치는 설정 칸 */
+  keepClosed?: boolean
   children: ReactNode
   className?: string
   testId?: string
 }) {
-  const [open, setOpen] = useFold(id, defaultOpen, forceOpen)
+  const [open, setOpen] = useFold(id, defaultOpen, forceOpen, keepClosed)
   const bodyId = useId()
   const tip = hint ?? hintFor(title)
   const tone =

@@ -76,7 +76,7 @@ export function AccountSwitchItems({ tone, onPick, signout = true, empty = null 
  * 대표: "왼쪽 아래엔 김상호 대표, 로그아웃만 두고 나머지는 다 설정 안에."
  * 접힌 사이드바에서는 아이콘만(손을 올리면 이름표).
  */
-export function SignOutButton({ collapsed = false, testId = 'account-signout' }: { collapsed?: boolean; testId?: string }) {
+export function SignOutButton({ collapsed = false, testId = 'account-signout', tone = 'dark' }: { collapsed?: boolean; testId?: string; tone?: 'dark' | 'light' }) {
   const auth = useContext(AuthContext)
   if (!auth || !auth.session) return null
   const signOut = auth.signOut
@@ -90,9 +90,9 @@ export function SignOutButton({ collapsed = false, testId = 'account-signout' }:
         clearSwitchTarget()
         void signOut()
       }}
-      className={`tap flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-3 py-2 text-left text-[0.95rem] text-navy-100 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+      className={`tap flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-3 py-2 text-left text-[0.95rem] ${tone === 'light' ? 'border border-slate-200 bg-white font-semibold text-slate-700 hover:bg-slate-50' : 'text-navy-100 hover:bg-navy-800 hover:text-white'} ${collapsed ? 'justify-center px-0' : ''}`}
     >
-      <LogOut aria-hidden="true" className="size-[18px] shrink-0 text-navy-300" />
+      <LogOut aria-hidden="true" className={`size-[18px] shrink-0 ${tone === 'light' ? 'text-slate-500' : 'text-navy-300'}`} />
       {!collapsed && <span>로그아웃</span>}
     </button>
   )

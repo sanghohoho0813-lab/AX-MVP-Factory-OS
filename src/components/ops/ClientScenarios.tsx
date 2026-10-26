@@ -20,11 +20,12 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, type Tone } from '../ui/primitives'
 import { SCENARIO_MODULE_LABEL, type ScenarioModule } from '../../services/scenarioPresets'
-import { SCENARIO_STATE_LABEL, fitDataRequest, runScenarios, scenariosRequest, type ScenarioRun, type ScenarioState } from '../../services/scenarios'
+import { SCENARIO_STATE_LABEL, fitDataRequest, peekScenarios, runScenarios, runScenariosCached, scenariosRequest, type ScenarioRun, type ScenarioState } from '../../services/scenarios'
 import { SCENARIO_QUESTIONS, scenarioAnswer, withScenarioAnswer, type QuestionKey } from '../../services/scenarioFit'
 import { nowIso } from '../../lib/appClock'
 
 const STATE_TONE: Record<ScenarioState, Tone> = { ready: 'success', partial: 'brand', need: 'warning' }
+const NO_RUNS: ScenarioRun[] = []
 const FIRST = 6
 /** 질문은 처음에 세 개만 — 한꺼번에 아홉 개를 묻지 않는다(나머지는 '질문 더 보기') */
 const FIRST_Q = 3
@@ -62,7 +63,25 @@ export function ClientScenarios({
   /** 대표 답 저장(null 이면 지움 — 답 바꾸기). 없으면 질문만 보여 준다. 약속을 돌려주면 저장이 끝날 때까지 다른 답을 막는다 */
   onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void | Promise<unknown>
 }) {
-  const runs = useMemo(() => runScenarios(record, today, usable, true), [record, today, usable])
+  // D-295 탭은 먼저 보이고 상황 예시는 바로 뒤에 채운다(무거운 절세 설계 계산 — 결과는 기록마다 기억)
+  const [computed, setComputed] = useState<ScenarioRun[] | null>(() => peekScenarios(record, today, usable, true))
+  useEffect(() => {
+    const hit = peekScenarios(record, today, usable, true)
+    if (hit) {
+      setComputed(hit)
+      return
+    }
+    // 한 번 그린 뒤(rAF → 다음 일) 계산 — 탭이 먼저 화면에 나온다
+    let t = 0
+    const f = window.requestAnimationFrame(() => {
+      t = window.setTimeout(() => setComputed(runScenariosCached(record, today, usable, true)), 0)
+    })
+    return () => {
+      window.cancelAnimationFrame(f)
+      window.clearTimeout(t)
+    }
+  }, [record, today, usable])
+  const runs = computed ?? NO_RUNS
   const fits = useMemo(() => runs.filter((r) => r.fit.kind === 'fit'), [runs])
   const asks = useMemo(() => runs.filter((r) => r.fit.kind === 'ask'), [runs])
   const datas = useMemo(() => runs.filter((r) => r.fit.kind === 'data'), [runs])
@@ -156,6 +175,14 @@ export function ClientScenarios({
     }
     return [...m]
   }, [asks])
+  if (computed === null)
+    return (
+      <Section title="상황 예시로 바로 설계" fold={{ id: 'smart.scenarios', open: true }}>
+        <p className="t-sub text-slate-500" data-testid="smart-scenarios-loading">
+          이 업체 숫자로 상황 예시를 맞춰 보는 중…
+        </p>
+      </Section>
+    )
   if (runs.length === 0) return null
   return (
     <Section title="상황 예시로 바로 설계" count={fits.length} fold={{ id: 'smart.scenarios', open: true }}>

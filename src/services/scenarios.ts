@@ -434,6 +434,37 @@ export function runScenarios(record: ClientOpsRecord, today: string, usable: (mo
     .map((v) => v.x)
 }
 
+/*
+ * D-295 같은 업체 기록 · 같은 날 · 같은 요금제면 상황 예시를 다시 계산하지 않는다.
+ * 절세 설계(거꾸로 찾기)가 무거워 업체 상세 '맞춤 추천' 을 열 때 화면이 멈췄다 — 게다가 탭 바꾸기는 React 전환(transition)이라
+ * 머리줄 시계가 1초마다 바뀌면 그리던 것을 버리고 처음부터 다시 그렸다(느린 휴대폰에서 같은 계산 18번). 결과를 기록에 붙여 기억한다.
+ */
+const RUN_CACHE = new WeakMap<ClientOpsRecord, Map<string, ScenarioRun[]>>()
+const SCENARIO_MODULES = Object.keys(SCENARIO_MODULE_LABEL) as ScenarioModule[]
+function runKey(record: ClientOpsRecord, today: string, usable: (module: ScenarioModule) => boolean, sortReady: boolean): string {
+  return `${today}|${String((record as { updatedAt?: unknown }).updatedAt ?? '')}|${SCENARIO_MODULES.map((m) => (usable(m) ? 1 : 0)).join('')}|${sortReady ? 1 : 0}`
+}
+
+/** 기억해 둔 상황 예시(없으면 null — 계산하지 않는다) */
+export function peekScenarios(record: ClientOpsRecord, today: string, usable: (module: ScenarioModule) => boolean = () => true, sortReady = false): ScenarioRun[] | null {
+  return RUN_CACHE.get(record)?.get(runKey(record, today, usable, sortReady)) ?? null
+}
+
+/** runScenarios 와 같은 결과 — 같은 기록이면 기억해 둔 것 */
+export function runScenariosCached(record: ClientOpsRecord, today: string, usable: (module: ScenarioModule) => boolean = () => true, sortReady = false): ScenarioRun[] {
+  const key = runKey(record, today, usable, sortReady)
+  let byKey = RUN_CACHE.get(record)
+  const hit = byKey?.get(key)
+  if (hit) return hit
+  const runs = runScenarios(record, today, usable, sortReady)
+  if (!byKey) {
+    byKey = new Map()
+    RUN_CACHE.set(record, byKey)
+  }
+  byKey.set(key, runs)
+  return runs
+}
+
 /** D-201: '판단할 자료' 요청 문구 — 자료를 받으면 맞는지 판단할 상황들(같은 자료는 하나로) */
 export function fitDataRequest(record: ClientOpsRecord, runs: readonly ScenarioRun[]): string {
   const items = runs

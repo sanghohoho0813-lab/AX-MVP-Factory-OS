@@ -96,7 +96,7 @@ import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, type HomeKeyword } from './radar/KeywordHome'
 import { useGrantFeed } from '../../services/grants/grantFeed'
-import { noticeKeywords, noticePackSource, readWeekLog, rememberWeek, weekChange, weekWindow, withNoticeFacts, withNoticeKeywords, writeWeekLog } from '../../services/marketing/noticeKeywords'
+import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
@@ -214,7 +214,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }, [yt.feed, extra.feed, groupsOfAdded, customer])
   const feed = useMemo(() => (fullFeed ? withoutDisabled(fullFeed, prefs.overrides) : null), [fullFeed, prefs.overrides])
   const prepared = useMemo(() => (feed ? prepareFeed(feed) : null), [feed])
-  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted }), [prefs.overrides, prefs.mix, prefs.muted])
+  // D-295 고정 키워드 주제(정책자금 · 고용지원금 · 인증 · 지원금 · 지원사업)는 이번 주 키워드 후보에서 뺀다 — 늘 따로 보인다
+  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted, fixedTopics: FIXED_TOPIC_IDS }), [prefs.overrides, prefs.mix, prefs.muted])
   const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
   // D-232 내 콘텐츠 성과 — 레이더가 이미 받은 내 채널 영상만(유튜브를 더 부르지 않음)
@@ -242,17 +243,16 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-241 답의 후보 번호(o#) → 레이더 후보(같은 주제 줄에 합치고 · 찍기 키트를 대본 자료로)
   const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
   const packOpp = packKey && !packKey.startsWith('custom:') ? (oppByKey.get(packKey) ?? null) : null
-  // D-267 우리 분야(정책자금 · 지원금 · 인증) — 기업마당 공고(매일 아침 9시)에서 이번 주 새로 올라온 공고로 키워드
+  // D-295 고정 키워드 다섯(정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업) — 늘 따로. 이번 주 새 공고 수(기업마당 · 매일 아침 9시)는 칩으로
   const grants = useGrantFeed()
   const today = todayLocalDate()
-  const noticeKeys = useMemo(() => noticeKeywords(grants.notices, today), [grants.notices, today])
-  const packNotice = packKey.startsWith('notice:') ? (noticeKeys.find((k) => k.key === packKey) ?? null) : null
+  const fixedKeys = useMemo(() => fixedKeywords(grants.notices, today), [grants.notices, today])
+  const packFixed = packKey.startsWith('notice:') ? (fixedKeys.find((k) => k.key === packKey) ?? null) : null
   const packSource = useMemo<PackSource | null>(() => {
     if (packKey.startsWith('custom:')) return customSource(packKey.slice(7))
-    if (packNotice) return noticePackSource(packNotice, today)
-    // 같은 주제가 레이더에도 올라왔으면 이번 주 공고 근거를 덧붙인다
-    return packOpp ? withNoticeFacts(packSourceOf(packOpp), noticeKeys.find((k) => k.topicId === packOpp.topicId && packOpp.axis === 'market')) : null
-  }, [packKey, packOpp, packNotice, noticeKeys, today])
+    if (packFixed) return fixedPackSource(packFixed, today)
+    return packOpp ? packSourceOf(packOpp) : null
+  }, [packKey, packOpp, packFixed, today])
   /** 이 묶음이 담긴 내 콘텐츠 줄 — 직접 쓴 주제는 '내 콘텐츠' 탭에서 같은 이름으로 담은 줄도(키가 달라도) */
   const ideaOfPack = (key: string, topic: string, custom: boolean) => notebook.ideas.find((i) => i.key === key) ?? (custom ? notebook.ideas.find((i) => i.topic.trim() === topic.trim()) : undefined)
   const packIdea = packSource ? (ideaOfPack(packSource.key, packSource.topic, packSource.custom) ?? null) : null
@@ -269,12 +269,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     else setParam({ pack: '' })
   }
 
-  // D-267 첫 화면 목록 — 레이더(유튜브) 후보 + 이번 주 공고 키워드(3번째 · 6번째 자리 · 같은 주제면 그 줄에 칩)
-  const homeData = useMemo<{ list: HomeKeyword[]; noteOf: Map<string, string> } | null>(() => {
-    if (!plan && noticeKeys.length === 0) return null
-    const base: HomeKeyword[] = (plan?.picks ?? []).map((o) => ({ key: o.key, topic: o.topic, axis: o.axis, topicId: o.topicId }))
-    return withNoticeKeywords(base, noticeKeys, (k) => ({ key: k.key, topic: k.label, axis: 'market', topicId: k.topicId, notice: true }))
-  }, [plan, noticeKeys])
+  // D-295 이번 주 키워드 = 벤치마킹 유튜브에서 실제로 뜨는 주제만(레이더 후보 10개 · 고정 키워드 주제는 빠짐)
+  const homeData = useMemo<{ list: HomeKeyword[] } | null>(() => (plan ? { list: plan.picks.map((o) => ({ key: o.key, topic: o.topic, axis: o.axis, topicId: o.topicId })) } : null), [plan])
+  const fixedHome = useMemo<HomeKeyword[]>(() => fixedKeys.map((k) => ({ key: k.key, topic: k.label, sub: k.sub, axis: 'market', topicId: k.topicId, notice: true, note: k.note })), [fixedKeys])
   // D-267 지난주와 비교 — 주마다 첫 목록을 이 브라우저에 적어 두고 새로 들어온 키워드에 '새로'
   const homeKeyIds = useMemo(() => (homeData?.list ?? []).map((k) => k.key).join('|'), [homeData])
   const [lastWeek, setLastWeek] = useState<string[] | null>(null)
@@ -284,17 +281,17 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     writeWeekLog(log)
     setLastWeek(last)
   }, [prepared, homeKeyIds, today])
-  // MUX-2 이번 주 키워드를 스레드 · 릴스 · 틱톡 쓰기의 주제 칩으로 — 예시 데이터(유튜브 연결 전)는 두지 않는다
-  const homeTopics = useMemo(() => (homeData?.list ?? []).map((k) => k.topic).join('|'), [homeData])
+  // MUX-2 이번 주 키워드를 스레드 · 릴스 · 틱톡 쓰기의 주제 칩으로 — 예시 데이터(유튜브 연결 전)는 두지 않는다(고정 키워드는 뒤에)
+  const homeTopics = useMemo(() => [...(homeData?.list ?? []).map((k) => k.topic), ...fixedHome.map((k) => k.topic)].join('|'), [homeData, fixedHome])
   useEffect(() => {
     if (!prepared || yt.sample || !homeTopics) return
     rememberWeekTopics(homeTopics.split('|'), today)
   }, [prepared, yt.sample, homeTopics, today])
-  const homeKeys = homeData ? homeData.list.map((k) => ({ ...k, note: homeData.noteOf.get(k.key) })) : null
+  const homeKeys = homeData ? homeData.list : null
   // 이름표가 없는 키(예전 주제 · 지운 주제)는 앞머리('market:')를 떼고
   const change = useMemo(() => weekChange((homeData?.list ?? []).map((k) => k.key), lastWeek, (key) => opportunityLabel(key).label.replace(/^[a-z]+:/, '')), [homeData, lastWeek])
-  /** D-267 묶음 머리 '이번 주 키워드 n번' — 첫 화면에 보인 번호 그대로(공고 키워드가 끼면 레이더 순위와 다르다) · 목록 밖은 0 */
-  const homeRank = (key: string) => (homeData?.list.findIndex((k) => k.key === key) ?? -1) + 1
+  /** D-267 묶음 머리 '이번 주 키워드 n번' — 첫 화면에 보인 번호 그대로 · 고정 키워드는 -1 · 목록 밖은 0 */
+  const homeRank = (key: string) => (fixedKeys.some((k) => k.key === key) ? -1 : (homeData?.list.findIndex((k) => k.key === key) ?? -1) + 1)
   const span = weekWindow(today)
   const spanText = `${Number(span.from.slice(5, 7))}/${Number(span.from.slice(8, 10))}~${Number(span.to.slice(5, 7))}/${Number(span.to.slice(8, 10))}`
 
@@ -556,7 +553,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       </Button>
     </>
   )
-  const briefCard = !readOnly ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
+  // D-295 채널 설계 기준은 대표 계정만(접힌 채로) — 팀장 · 구독 고객은 설정 › 내 브랜드로 각자
+  const briefCard = !readOnly && !isMarketingCustomer() ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
 
@@ -659,14 +657,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                     )}
                   </div>
                 </PeekProvider>
-              ) : packNotice ? (
+              ) : packFixed ? (
                 <div className="flex flex-col gap-2.5" data-testid="mk-pack-notices">
                   <p className="t-sub break-keep text-slate-800">
                     <b>왜 지금</b> — {packSource?.why}
                   </p>
-                  <p className="t-sub font-semibold text-slate-800">이번 주 새로 올라온 공고 {packNotice.fresh.length}건 — 금액 · 자격은 공고 원문으로 확인해서 말해요</p>
+                  <p className="t-sub font-semibold text-slate-800">이번 주 새로 올라온 공고 {packFixed.fresh.length}건 — 금액 · 자격은 공고 원문으로 확인해서 말해요</p>
                   <ul className="flex flex-col gap-1.5">
-                    {[...packNotice.fresh.slice(0, 8), ...packNotice.closing.filter((n) => !packNotice.fresh.includes(n)).slice(0, 3)].map((n) => (
+                    {[...packFixed.fresh.slice(0, 8), ...packFixed.closing.filter((n) => !packFixed.fresh.includes(n)).slice(0, 3)].map((n) => (
                       <li key={n.id} className="t-sub flex min-w-0 flex-wrap items-baseline gap-x-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                         <span className="min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{n.title}</span>
                         <span className="t-meta shrink-0 text-slate-600">
@@ -712,11 +710,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <>
           {prepared && <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />}
           <KeywordHome
+            fixed={fixedHome}
             keywords={homeKeys}
             status={homeStatus}
             aiDone={aiDone}
             fresh={change.fresh}
-            basis={`기준: 벤치마킹 채널 최근 2주 영상(6시간마다 새로) · 기업마당 이번 주(${spanText}) 새 공고(매일 아침 9시)`}
+            basis={`이번 주 키워드: 벤치마킹 채널 최근 2주 영상(6시간마다 새로) · 고정 키워드 칩: 기업마당 이번 주(${spanText}) 새 공고(매일 아침 9시)`}
             change={change.line}
             onPick={openPack}
             onCustom={(t) => openPack(`custom:${t}`)}

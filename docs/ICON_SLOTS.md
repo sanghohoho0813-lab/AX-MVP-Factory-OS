@@ -59,3 +59,29 @@
 - `npm run test:catalog`(D-284 칸 번호 · 그림 위치) · `qa:modules`(아래 메뉴 그림) 를 돌리고 화면을 찍어 본다(메뉴 · 접은 메뉴 · 휴대폰 아래 메뉴 · 바로가기 · 화면 제목).
 
 새 화면에 기능 아이콘이 필요하면: 임시 아이콘을 두고 이 표와 `iconSlots.ts` 에 한 줄을 더한다.
+
+## D-295 마케팅 · 브랜딩 목차 · AI 전략실 요약 칸 13곳 (2026-10-26)
+
+원본: 대표 구글 드라이브 「futureailab-marketing-brand-icons-13-v1.zip」(GPT 입체 아이콘 13장) + 실제 로고 한 장(YouTube · Threads · Reels/TikTok · 블로그).
+대표: "이번 주 찍을 것 · 스레드 · 릴스틱톡 · 블로그 플레이스 홍보 글은 GPT 아이콘 무시하고 **실제 브랜드 로고**로 — 나머지는 GPT 가 만든 것 그대로."
+
+- 한 장 그림 **`src/assets/icons/marketing-icons.webp`(128px 칸 13개 · 62KB)** — 자리 표의 `sheet: 'mk'` 줄. 기능 아이콘 한 장(21칸)과 따로.
+- 로고 한 장은 투명 배경에서 넷으로 잘라(작은 점 잡티 제외) 칸에 맞췄다. Threads 로고가 검정이라 목차에서는 흰 칸 위에 그린다(빨간 '지금 화면' 칸에서도 보이게).
+- 목차 · 만들기 칸은 그림을 1배로(`--icon-art-scale: 1`) — 로고가 칸을 넘지 않게.
+- 다시 만들기: 칸 순서대로 파일 이름을 01- … 13- 로 맞춘 폴더 → `python3 scripts/icon-sprite.py <폴더> src/assets/icons/marketing-icons.webp 128 13`.
+
+| 칸 | 자리 key | 이름 | 그림 |
+|---:|---|---|---|
+| 0 | `mk-plan` | 이번 주 찍을 것 | YouTube 실제 로고 |
+| 1 | `mk-top` | 인기 · 급상승 | GPT 02 |
+| 2 | `mk-channels` | 채널 | GPT 03 |
+| 3 | `mk-analysis` | 분석 | GPT 04 |
+| 4 | `mk-make` | 내 콘텐츠 | GPT 05 |
+| 5 | `mk-threads` | 스레드 | Threads 실제 로고 |
+| 6 | `mk-shorts` | 릴스 · 틱톡 | Reels · TikTok 실제 로고 |
+| 7 | `mk-content` | 블로그 · 플레이스 홍보 글 | 블로그 실제 로고 |
+| 8 | `mk-homepage` | 홈페이지 만들기 | GPT 09 |
+| 9 | `ai-reviewing` | 검토 중인 업체(AI 전략실 요약) | GPT 10 |
+| 10 | `ai-linked` | 고객 관리와 이어짐 | GPT 11 |
+| 11 | `ai-memory` | 기억이 쌓인 곳 | GPT 12 |
+| 12 | `ai-week` | 이번 주 작업 | GPT 13 |

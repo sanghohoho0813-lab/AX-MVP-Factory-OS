@@ -398,7 +398,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await m.close()
 }
 
-/* ---------------- D-267 이번 주 공고 키워드(정책자금 · 지원금) · 기준 한 줄 · 지난주와 비교 ---------------- */
+/* ---------------- D-267 · D-295 고정 키워드 5개(공고 칩) · 이번 주 키워드 10개(유튜브만) · 기준 한 줄 · 지난주와 비교 · 휴대폰 2열 ---------------- */
 {
   const kst = (off = 0) => new Date(Date.now() + 9 * 3_600_000 + off * 86_400_000).toISOString().slice(0, 10)
   const d8 = (off) => kst(off).replace(/-/g, '')
@@ -433,41 +433,54 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await openHome(p)
   await p.waitForTimeout(800)
   const keyIds = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
-  const noteOf = async (key) => (await p.locator(`[data-testid="mk-key"][data-key="${key}"] [data-testid="mk-key-note"]`).innerText().catch(() => '')) ?? ''
-  check('K1 이미 레이더에 있는 정책자금 · 고용지원금 줄에 "이번 주 새 공고 n건" 칩(같은 주제 두 줄 안 만듦 · 지난달 공고는 안 셈)', (await noteOf('market:policy_fund')) === '이번 주 새 공고 3건' && (await noteOf('market:employ_subsidy')) === '이번 주 새 공고 2건' && !keyIds.includes('notice:policy_fund') && !keyIds.includes('notice:employ_subsidy'), { keyIds, pf: await noteOf('market:policy_fund') })
-  check('K2 레이더에 없던 소상공인 지원금 → 공고 키워드로 3번째 자리 · 1건뿐인 인증은 안 넣음 · 10개 넘지 않음', keyIds[2] === 'notice:sme_subsidy' && !keyIds.includes('notice:certification') && keyIds.length <= 10, keyIds)
-  const k3 = p.locator('[data-testid="mk-key"][data-key="notice:sme_subsidy"]')
-  check('K3 공고 키워드 칩 — "지원사업 · 공고" · "이번 주 새 공고 2건"', (await k3.innerText()).includes('지원사업 · 공고') && (await noteOf('notice:sme_subsidy')) === '이번 주 새 공고 2건', await k3.innerText())
+  const fixedIds = await p.getByTestId('mk-fixed-key').evaluateAll((els) => els.map((e) => e.dataset.key))
+  const fixedNames = (await p.getByTestId('mk-fixed-key').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  const noteOf = async (key) => (await p.locator(`[data-testid="mk-fixed-key"][data-key="${key}"] [data-testid="mk-key-note"]`).innerText().catch(() => '')) ?? ''
+  // D-295 대표: 정책자금 · 고용지원금 · 기업인증은 새 공고가 떴다고 이번 주 키워드에 올리지 말고 고정 키워드로(정부지원금 · 정부지원사업까지 5개)
+  check('K1 고정 키워드 5개 — 정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업(늘 그 자리)', JSON.stringify(fixedNames) === JSON.stringify(['정책자금', '고용지원금', '기업인증', '정부지원금', '정부지원사업']) && JSON.stringify(fixedIds) === JSON.stringify(['notice:policy_fund', 'notice:employ_subsidy', 'notice:certification', 'notice:sme_subsidy', 'notice:grant_program']), { fixedNames, fixedIds })
+  check('K2 고정 키워드 칩 = 이번 주 새 공고 수(지난달 공고는 안 셈 · 1건도 · 없으면 칩 대신 짧은 설명)', (await noteOf('notice:policy_fund')) === '새 공고 3건' && (await noteOf('notice:employ_subsidy')) === '새 공고 2건' && (await noteOf('notice:sme_subsidy')) === '새 공고 2건' && (await noteOf('notice:certification')) === '새 공고 1건' && (await noteOf('notice:grant_program')) === '', { pf: await noteOf('notice:policy_fund'), cert: await noteOf('notice:certification') })
+  const FIXED_TOPICS = ['policy_fund', 'employ_subsidy', 'certification', 'sme_subsidy', 'grant_program']
+  check('K3 이번 주 키워드 10개는 유튜브에서 뜨는 주제만 — 고정 키워드 주제 · 공고 키워드 0(경영 × AI 다리 주제도)', keyIds.length === 10 && !keyIds.some((k) => k.startsWith('notice:') || FIXED_TOPICS.includes(k.split(':')[1])), keyIds)
   const basis = (await p.getByTestId('mk-basis').innerText()) ?? ''
-  check('K4 기준 한 줄 — 벤치마킹 채널 최근 2주 · 기업마당 이번 주(날짜) 새 공고 · 받는 때', basis.includes('최근 2주') && basis.includes('기업마당 이번 주') && /\d+\/\d+~\d+\/\d+/.test(basis) && basis.includes('6시간마다') && basis.includes('아침 9시'), basis)
+  check('K4 기준 한 줄 — 이번 주 키워드: 벤치마킹 채널 최근 2주 · 고정 키워드 칩: 기업마당 이번 주(날짜) 새 공고 · 받는 때', basis.includes('최근 2주') && basis.includes('기업마당 이번 주') && /\d+\/\d+~\d+\/\d+/.test(basis) && basis.includes('6시간마다') && basis.includes('아침 9시'), basis)
   const change = (await p.getByTestId('mk-change').innerText().catch(() => '')) ?? ''
   const isNew = async (key) => (await p.locator(`[data-testid="mk-key"][data-key="${key}"] [data-testid="mk-key-new"]`).count()) === 1
-  check('K5 지난주와 비교 한 줄 · 지난주에 없던 키워드에만 "새로"(정책자금 · Claude 는 지난주에도 있어 없음)', change.startsWith('지난주와 비교: 새로') && change.includes('빠진 것') && (await isNew('notice:sme_subsidy')) && !(await isNew('market:policy_fund')) && !(await isNew('axai:claude')), change)
+  const newCount = await p.locator('[data-testid="mk-key"] [data-testid="mk-key-new"]').count()
+  check('K5 지난주와 비교 한 줄 · 지난주에 없던 키워드에만 "새로"(Claude 는 지난주에도 있어 없음 · 정책자금은 빠진 것)', change.startsWith('지난주와 비교: 새로') && change.includes('빠진 것') && newCount > 0 && !(await isNew('axai:claude')), change)
   await shot(p, 'K-home')
+  const k3 = p.locator('[data-testid="mk-fixed-key"][data-key="notice:sme_subsidy"]')
   await k3.click()
   await p.getByTestId('mk-pack').waitFor()
   await aiDone(p)
   await p.getByTestId('mk-pack-why-toggle').click()
   await p.waitForTimeout(200)
   const why = (await p.getByTestId('mk-pack-notices').innerText().catch(() => '')) ?? ''
-  check('K6 누르면 묶음 — 왜 지금(이번 주 새 공고 2건 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 2건') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
+  check('K6 고정 키워드(정부지원금) 누르면 묶음 — 왜 지금(이번 주 새 공고 2건 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 2건') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
   const packAll = (await p.getByTestId('mk-pack').innerText()) ?? ''
-  check('K7 묶음 첫 문장 — 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('이번 주에만 소상공인 지원금 공고가 2건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
+  check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('고정 키워드') && packAll.includes('이번 주에만 정부지원금 공고가 2건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
   await shot(p, 'K-pack')
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
-  await p.locator('[data-testid="mk-key"][data-key="market:policy_fund"]').click()
+  await p.locator('[data-testid="mk-fixed-key"][data-key="notice:policy_fund"]').click()
   await p.getByTestId('mk-pack').waitFor()
   await aiDone(p)
   const pfText = (await p.getByTestId('mk-pack').innerText()) ?? ''
   const copied = await p.evaluate(() => document.querySelector('[data-testid="mk-pack"]')?.textContent ?? '')
-  check('K8 레이더 정책자금 묶음에도 이번 주 공고 근거가 덧붙음(근거 칸)', (pfText + copied).includes('이번 주 새 공고 3건(기업마당)') || (pfText + copied).includes('2026 중소기업 정책자금 융자 4차 공고'), pfText.slice(0, 120))
-  // 휴대폰 — 칩이 늘어도 넘침 0
+  check('K8 고정 키워드 정책자금 묶음 — 이번 주 공고 근거(기업마당)', (pfText + copied).includes('이번 주 새 공고 3건(기업마당)') || (pfText + copied).includes('2026 중소기업 정책자금 융자 4차 공고'), pfText.slice(0, 120))
+  await p.goBack()
+  await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
+  await p.locator('[data-testid="mk-fixed-key"][data-key="notice:grant_program"]').click()
+  await p.getByTestId('mk-pack').waitFor()
+  await aiDone(p)
+  const gpText = (await p.getByTestId('mk-pack').innerText()) ?? ''
+  check('K8b 이번 주 새 공고가 없는 고정 키워드(정부지원사업)도 묶음이 열림 — 늘 찾는 본업 주제', gpText.includes('고정 키워드') && gpText.includes('정부지원사업'), gpText.slice(0, 160))
+  // 휴대폰 — 고정 키워드 · 이번 주 키워드 모두 2열 · 넘침 0
   await p.setViewportSize({ width: 390, height: 844 })
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
   await p.waitForTimeout(400)
-  check('K9 휴대폰 390 — 칩(공고 · 새로) 있어도 넘침 0', (await overflowX(p)) <= 0, await overflowX(p))
+  const cols = (sel) => p.locator(sel).evaluateAll((els) => new Set(els.slice(0, 4).map((e) => Math.round(e.getBoundingClientRect().left))).size)
+  check('K9 휴대폰 390 — 고정 키워드 · 이번 주 키워드 2열(1 2 / 3 4) · 넘침 0', (await overflowX(p)) <= 0 && (await cols('[data-testid="mk-fixed-key"]')) === 2 && (await cols('[data-testid="mk-key"]')) === 2, { ov: await overflowX(p), f: await cols('[data-testid="mk-fixed-key"]'), k: await cols('[data-testid="mk-key"]') })
   await shot(p, 'K-390')
   check('K JS 오류 0', errs.length === 0, errs.join(' | '))
   await c.close()

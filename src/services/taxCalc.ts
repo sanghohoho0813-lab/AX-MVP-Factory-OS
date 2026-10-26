@@ -16,11 +16,17 @@
 /* 형식 — 원본의 won()/pct() 그대로                                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 천 단위 쉼표 — toLocaleString('ko-KR') 과 같은 글자. 부를 때마다 형식기를 새로 만들면 느려서(절세 설계가 거꾸로 찾느라 수만 번 부른다 —
+ * 업체 상세 '맞춤 추천' 이 5초 멈추던 까닭) 하나를 만들어 두고 쓴다.
+ */
+const KO_NUM = new Intl.NumberFormat('ko-KR')
+
 export function won(n: number | null | undefined): string {
   if (n === null || n === undefined || isNaN(n)) return '-'
   const sign = n < 0 ? '-' : ''
   const r = Math.round(Math.abs(n))
-  return sign + r.toLocaleString('ko-KR') + '원'
+  return sign + KO_NUM.format(r) + '원'
 }
 
 export function pct(n: number | null | undefined, d?: number): string {
