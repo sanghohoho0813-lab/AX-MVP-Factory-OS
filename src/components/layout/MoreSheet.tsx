@@ -11,7 +11,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Plus, RotateCcw, Settings2, X, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, PlayCircle, Plus, RotateCcw, Settings2, X, type LucideIcon } from 'lucide-react'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
 import { enabledModulesByGroup, moduleMatchLength, navPathForSidebar, type ModuleDefinition } from '../../config/moduleRegistry'
@@ -31,6 +31,7 @@ import { SignOutButton } from './AccountSwitch'
 import { DeviceSwitch } from './DeviceView'
 import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
+import { useTutorial } from '../tutorial/tutorialContext'
 
 function badgeOf(m: ModuleDefinition, counts: NavCounts): { n: number; red: boolean } | null {
   if (!m.badge) return null
@@ -74,6 +75,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const navPath = navPathForSidebar(useNavPath())
   const me = useCurrentUser()
   const saved = useMobileNavKeys()
+  const tutorial = useTutorial()
   const [editing, setEditing] = useState(false)
   const [future, setFuture] = useState(false)
   const [picked, setPicked] = useState<FutureItem | null>(null)
@@ -264,6 +266,11 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                     아래 메뉴 바꾸기
                   </button>
                 </div>
+                {tutorial && (
+                  <button type="button" onClick={() => { onClose(); tutorial.open() }} data-testid="more-tutorial" className="tap t-sub flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50">
+                    <PlayCircle aria-hidden="true" className="size-4 text-brand-600" /> 안내 영상 보기
+                  </button>
+                )}
                 <div className="flex flex-col gap-1">
                   <span className="t-meta font-semibold text-slate-500">보기 방식</span>
                   <DeviceSwitch stacked />

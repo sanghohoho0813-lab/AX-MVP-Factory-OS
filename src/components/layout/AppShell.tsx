@@ -115,7 +115,7 @@ export function AppShell() {
       {/* D-164: 보기 무대(iframe) 안에서 주소 · 저장을 바깥과 맞춘다 */}
       <FrameBridge />
       <DemoTourProvider>
-      {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
+      {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 다시 보기는 설정 › 계정 · 보기(D-296) */}
       <TutorialProvider>
       <div className="flex min-h-screen">
         {/* D-256 메뉴 폭(넓게 · 아이콘 · 숨김)은 메뉴가 스스로 기억한다 — 경계선 끌기 · [사이드바 접기] */}

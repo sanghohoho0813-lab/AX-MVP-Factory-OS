@@ -217,8 +217,8 @@ for (const vp of VIEWPORTS) {
   await pp.evaluate(() => localStorage.setItem('axmvp.ui.device_view_narrow', 'dual'))
   await pp.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
   await pp.waitForTimeout(800)
-  const pcState = { stage: await pp.locator('[data-testid="dual-view"], [data-testid="pc-stage"], [data-testid="mobile-stage"]').count(), on: await pp.locator('header [data-testid="device-switch"] [aria-checked="true"]').getAttribute('data-mode').catch(() => null) }
-  check('[보기 방식] 휴대폰에서 고른 값은 PC 에 번지지 않음(1440 — 무대 없음 · PC 선택)', pcState.stage === 0 && pcState.on === 'pc', pcState)
+  const pcState = { stage: await pp.locator('[data-testid="dual-view"], [data-testid="pc-stage"], [data-testid="mobile-stage"]').count(), on: await pp.locator('header [data-testid="device-switch-compact"] button[aria-haspopup]').getAttribute('aria-label').catch(() => null) }
+  check('[보기 방식] 휴대폰에서 고른 값은 PC 에 번지지 않음(1440 — 무대 없음 · PC 선택)', pcState.stage === 0 && pcState.on === '보기 방식: PC', pcState)
   // D-290 PC 머리줄 — 자리가 있으면 'PC · Mobile · PC+Mobile' 글자 · 모자라면 글자부터 빼고 넓은 찾기 칸은 지킨다 · 넘침 0
   const hdrAt = async (w) => {
     await pp.setViewportSize({ width: w, height: 900 })
@@ -232,7 +232,8 @@ for (const vp of VIEWPORTS) {
     })
   }
   const hdrs = [await hdrAt(1280), await hdrAt(1440), await hdrAt(1600), await hdrAt(1920)]
-  check('[D-290] PC 머리줄 보기 방식 — 1280 단추 하나에 지금 이름(PC) · 1440~1920 세 단추 · 1920 글자 PC · Mobile · PC+Mobile · 넓은 찾기 칸 유지(1440+) · 넘침 0', hdrs[0].compact === 'PC' && hdrs.slice(1).every((h) => h.sw !== null && h.wideSearch === 1) && hdrs[3].sw === 'PC Mobile PC+Mobile' && hdrs.every((h) => h.over <= 0), hdrs)
+  // D-296 대표 "PC 랑 모바일 선택하는 건 접어 두고 클릭해서" — 모든 PC 폭에서 단추 하나(지금 이름 ▾)
+  check('[D-290 · D-296] PC 머리줄 보기 방식 — 1280~1920 모두 접힌 단추 하나에 지금 이름(PC) · 세 단추 줄 없음 · 넓은 찾기 칸 유지(1440+) · 넘침 0', hdrs.every((h) => h.compact === 'PC' && h.sw === null && h.over <= 0) && hdrs.slice(1).every((h) => h.wideSearch === 1), hdrs)
   await pc.close()
   // 360 · 글자 '매우 크게' — 설정 세 칸 글자가 잘리지 않는다(아이콘을 빼고 글자만)
   const xl = await browser.newContext({ viewport: { width: 360, height: 780 }, locale: 'ko-KR', isMobile: true, hasTouch: true })

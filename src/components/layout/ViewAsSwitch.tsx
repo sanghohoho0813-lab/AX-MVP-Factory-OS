@@ -129,7 +129,7 @@ export function ViewingPilotBanner() {
         <b>{who}</b> 화면 보는 중
         <span className="hidden sm:inline"> — 팀장님 작업공간의 자료입니다(업무 일기는 사람마다 따로라 보이지 않습니다).</span>
       </p>
-      <button type="button" onClick={() => t.go(t.own?.workspaceId)} className="tap t-sub shrink-0 rounded-(--radius-control) bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-navy-900 hover:bg-slate-100">
+      <button type="button" onClick={() => t.go(t.own?.workspaceId)} data-testid="viewing-pilot-back" className="tap t-sub shrink-0 rounded-(--radius-control) bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-navy-900 hover:bg-slate-100">
         {brand.ownerTitle}로
         <span className="hidden sm:inline"> 돌아가기</span>
       </button>

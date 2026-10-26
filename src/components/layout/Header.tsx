@@ -1,14 +1,10 @@
 import { Link } from 'react-router-dom'
-import { useIsPilot } from '../../auth/osAccess'
 import { useNavPath } from '../../lib/navFrom'
-import { DeviceSwitch, DeviceSwitchCompact } from './DeviceView'
-import { ContentWidthButton } from './ContentWidthButton'
-import { ViewAsSwitch, ViewAsSwitchCompact } from './ViewAsSwitch'
+import { DeviceSwitchCompact } from './DeviceView'
 import {
   Building,
   Check,
   ChevronDown,
-  ExternalLink,
   Menu,
   Settings,
   UserRound,
@@ -18,9 +14,8 @@ import { CURRENT_USER, WORKSPACES } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
 import { getDataModeConfig } from '../../data/dataMode'
-import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
-import { TutorialButton, TutorialMenuItem } from '../tutorial/TutorialButton'
+import { TutorialMenuItem } from '../tutorial/TutorialButton'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
 import { screenGroupForPath, screenTitleForPath, type NavAccent } from '../../config/moduleRegistry'
@@ -201,7 +196,6 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null)
   useHeaderFit(headerRef)
   const isSupabase = getDataModeConfig().mode === 'supabase'
-  const pilot = useIsPilot()
   // D-124: 영업에서 온 업체 화면은 머리줄도 '영업 관리' 그대로
   const pathname = useNavPath()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
@@ -275,53 +269,19 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="hdr-clock hidden lg:inline-flex">
           <HeaderClock />
         </span>
-        {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). D-162: Pilot 에게는 없다(대표 고객 플랫폼) */}
-        {!pilot && <a
-          href={brand.customerPlatformUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={brand.customerPlatformLabel}
-          title={brand.customerPlatformLabel}
-          className="hdr-tight hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex min-[1900px]:px-3"
-        >
-          <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
-          {/* D-120 · D-201: 1900px 아래에서는 아이콘만 — 머리줄이 옆으로 넘치지 않게(1700~1800 에서 넘쳤다) */}
-          <span className="hidden min-[1900px]:inline">{brand.customerPlatformLabel}</span>
-        </a>}
-        {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
-        {/* D-120: 저장 상태 글은 아주 넓은 화면에서만(글자 크기 단추 자리를 냈다) — 서랍 · 설정에도 있다 */}
-        <span className="hdr-opt hidden min-[2300px]:inline-flex">
-          <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
-        </span>
-        {/* D-164: 머리줄 글자 크기 단추는 뺐다(설정 › 화면에 있다 · 휴대폰은 서랍 메뉴). 그 자리에 보기 방식 — PC · Mobile · PC+Mobile */}
-        {/* 1440px 아래에서는 단추 하나 + 고르기 창(머리줄이 옆으로 넘치지 않게) */}
-        <span className="hidden min-[1440px]:inline-flex">
-          <DeviceSwitch />
-        </span>
-        {/* D-201: 본문 폭 — 누를 때마다 좁게 → 보통 → 넓게. 본문이 1,100px 보다 넓어지는 1600px 이상 PC 에서만(설정 › 화면에도 있다) */}
-        <span className="hdr-opt hidden min-[1600px]:inline-flex">
-          <ContentWidthButton />
-        </span>
-        <span className="hidden lg:max-[1440px]:inline-flex">
+        {/*
+          D-296 대표 "머리줄이 지저분 — 안내 영상 · 고객 플랫폼 · 대표/팀장 단추는 숨기고 설정 안에서만, PC · Mobile 고르기는 접어 두고 눌러서".
+          머리줄에서 뺀 것(기능은 그대로): 고객 플랫폼 열기 · 안내 영상 · 대표 ↔ 팀장 화면 → 설정 › 계정 · 보기 / 본문 폭 · 저장 상태 → 설정 › 화면.
+          보기 방식은 모든 PC 폭에서 단추 하나(지금 방식 이름 ▾) → 눌러서 PC · Mobile · PC+Mobile.
+        */}
+        <span className="hidden lg:inline-flex">
           <DeviceSwitchCompact />
         </span>
         {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
         <span className="hdr-compact-search inline-flex min-[1360px]:hidden">
           <GlobalSearch compact />
         </span>
-        {/* D-164: 대표 ↔ 최은혜 팀장 화면 — 대표 계정에서만(다시 로그인 없이) */}
-        {isSupabase && (
-          <>
-            <span className="hidden min-[1440px]:inline-flex">
-              <ViewAsSwitch />
-            </span>
-            <span className="hidden lg:max-[1440px]:inline-flex">
-              <ViewAsSwitchCompact />
-            </span>
-          </>
-        )}
-        {/* D-185: 안내 영상 — 언제든 다시 보기 */}
-        <TutorialButton roomy={pilot} />
+        {/* D-164 대표 ↔ 최은혜 팀장 화면 전환 — D-296 설정 › 계정 · 보기 › 보는 화면에서만. 팀장 화면을 보는 동안에는 본문 위 띠의 [대표로 돌아가기] */}
         <SignalBell />
         <Link
           to="/settings"

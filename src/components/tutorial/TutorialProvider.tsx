@@ -1,5 +1,5 @@
 /**
- * 안내 영상 (D-185) — 팀장님이 로그인하면 먼저 영상부터. 머리줄 [안내 영상] 으로 언제든 다시.
+ * 안내 영상 (D-185) — 팀장님이 로그인하면 먼저 영상부터. 설정 › 계정 · 보기 › [안내 영상 보기] 로 언제든 다시(D-296 머리줄 단추는 뺐다).
  *
  * 저절로 띄우는 조건은 services/tutorialPrefs(계산만) 가 정한다. 여기서는 창을 그리고 답을 저장한다.
  * PC(가로가 긴 화면)는 16:9 영상, 휴대폰 세로 화면은 9:16 영상을 튼다 — 같은 내용, 자막이 영상 안에 있다.
@@ -103,14 +103,14 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
 
   const hideToday = () => {
     hideTutorialToday(todayLocalDate())
-    showToast('오늘은 안내 영상을 띄우지 않습니다 — 머리줄 [안내 영상] 으로 언제든 볼 수 있어요')
+    showToast('오늘은 안내 영상을 띄우지 않습니다 — 설정 › 계정 · 보기에서 언제든 볼 수 있어요')
     onClose()
   }
   const hideForever = () => {
     hideTutorialForever()
     // 다른 기기에서도 뜨지 않게 로그인 계정 정보에도 남긴다(로컬 모드에서는 이 기기만)
     void import('../../auth/authService').then((m) => m.setTutorialHidden(true)).catch(() => {})
-    showToast('앞으로 안내 영상을 저절로 띄우지 않습니다 — 머리줄 [안내 영상] 으로 언제든 볼 수 있어요')
+    showToast('앞으로 안내 영상을 저절로 띄우지 않습니다 — 설정 › 계정 · 보기에서 언제든 볼 수 있어요')
     onClose()
   }
 
@@ -201,7 +201,7 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
               </button>
             </>
           ) : (
-            <p className="text-[0.9rem] text-white/60">머리줄 [안내 영상] 으로 언제든 다시 볼 수 있어요.</p>
+            <p className="text-[0.9rem] text-white/60">설정 › 계정 · 보기에서 언제든 다시 볼 수 있어요.</p>
           )}
           <button
             type="button"

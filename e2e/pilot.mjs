@@ -268,15 +268,15 @@ try {
 
   /* ================= 1. 대표 — 몇 달 쓴 자료가 보인다 ================= */
   await login(page, OWNER)
-  check('대표(D-185): 안내 영상은 저절로 안 뜸(팀장님 계정만) · 머리줄 [안내 영상] 단추는 있음', (await page.getByTestId('tutorial-dialog').count()) === 0 && (await page.getByTestId('tutorial-open').count()) === 1)
-  // 좁은 PC(1100) — 대표 머리줄은 자리가 없어 단추를 숨기고, 사용자 메뉴의 [안내 영상 보기] 로 연다
+  // D-296 대표 "머리줄이 지저분 — 안내 영상 · 고객 플랫폼 · 대표/팀장 단추는 설정 안에서만, PC · Mobile 은 접어서"
+  const hdr0 = (await page.locator('header').innerText()) ?? ''
+  check('대표(D-185 · D-296): 안내 영상은 저절로 안 뜸 · 머리줄에 안내 영상 · 고객 플랫폼 · 대표/팀장 · 폭 단추 없음 · 보기 방식은 접힌 단추 하나', (await page.getByTestId('tutorial-dialog').count()) === 0 && (await page.getByTestId('tutorial-open').count()) === 0 && !hdr0.includes('고객 플랫폼') && (await page.locator('header [data-testid="view-as-switch"], header [data-testid="view-as-compact"], header [data-testid="content-width"], header [data-testid="device-switch"]').count()) === 0 && (await page.locator('header [data-testid="device-switch-compact"]').count()) === 1, hdr0.replace(/\n/g, '|'))
   await page.setViewportSize({ width: 1100, height: 900 })
   await page.waitForTimeout(300)
-  const tutHidden = !(await page.getByTestId('tutorial-open').isVisible())
   await page.getByRole('button', { name: '사용자 메뉴' }).click()
   await page.getByTestId('tutorial-menu-open').click()
   await page.waitForTimeout(400)
-  check('대표(D-185): 1100px — 머리줄 단추 대신 사용자 메뉴 [안내 영상 보기] 로 열림', tutHidden && (await page.getByTestId('tutorial-dialog').getAttribute('data-auto')) === '0')
+  check('대표(D-185): 사용자 메뉴 [안내 영상 보기] 로 열림', (await page.getByTestId('tutorial-dialog').getAttribute('data-auto')) === '0')
   await page.keyboard.press('Escape')
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForTimeout(300)
@@ -398,9 +398,10 @@ try {
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   check('Pilot(D-185): 새로 열어도 오늘은 안 뜸', (await page.getByTestId('tutorial-dialog').count()) === 0)
-  await page.getByTestId('tutorial-open').click()
+  await go(page, '/settings')
+  await page.getByTestId('settings-tutorial-open').click()
   await page.waitForTimeout(500)
-  check('Pilot(D-185): 머리줄 [안내 영상] → 언제든 다시(숨기기 단추 없이)', (await tut.count()) === 1 && (await tut.getAttribute('data-auto')) === '0' && (await page.getByTestId('tutorial-hide-today').count()) === 0)
+  check('Pilot(D-185 · D-296): 설정 › 계정 · 보기 [안내 영상 보기] → 언제든 다시(숨기기 단추 없이)', (await tut.count()) === 1 && (await tut.getAttribute('data-auto')) === '0' && (await page.getByTestId('tutorial-hide-today').count()) === 0)
   await page.getByTestId('tutorial-tab-part2').click()
   await page.waitForTimeout(300)
   check('Pilot(D-185): 2편 고르면 2편 영상', /part2-wide\.mp4$/.test(await vsrc(page)), await vsrc(page))
@@ -412,7 +413,7 @@ try {
   const uxTiles = await page.getByTestId('app-tile').evaluateAll((els) => els.map((e) => e.dataset.key))
   check('Pilot(D-282): 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처 · 마케팅) 없음 · 고객 관리 · 전체 도구는 있음', uxTiles.includes('client-ops') && uxTiles.includes('tools') && !uxTiles.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)), uxTiles)
   check('Pilot(D-282): KPI — 최근 AI 작업 칸 없음 · 상담 대신 후속 약속 · 대표 자료 0', (await page.getByTestId('kpi-ai').count()) === 0 && (await page.getByTestId('kpi-follow').innerText()).includes('후속 약속') && leaked(await page.getByTestId('today-kpis').innerText()).length === 0)
-  // 팀장 머리줄([안내 영상] 단추가 늘 있다) — 5폭 × 글자 3단계에서 넘치지 않는다
+  // 팀장 머리줄 — 5폭 × 글자 3단계에서 넘치지 않는다(D-296 안내 영상 단추는 머리줄에 없다)
   {
     const bad = []
     for (const w of [1024, 1280, 1366, 1440, 1920]) {
@@ -425,17 +426,16 @@ try {
           const hdr = document.querySelector('header')
           const hb = hdr.getBoundingClientRect()
           const cut = [...hdr.querySelectorAll('a,button')].filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > hb.right + 1).length
-          const tb = document.querySelector('[data-testid="tutorial-open"]')
+          const tb = document.querySelector('header [data-testid="tutorial-open"]')
           return { over: hdr.scrollWidth - hdr.clientWidth, cut, btn: !!tb && tb.offsetParent !== null }
         })
-        // 아주 큰 글자 · 좁은 PC 에서는 머리줄이 덜 급한 단추(hdr-tight)를 접는다 — 그때는 사용자 메뉴의 [안내 영상 보기]
-        if (r.over > 0 || r.cut > 0 || (!r.btn && scale === 'default')) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
+        if (r.over > 0 || r.cut > 0 || r.btn) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
       }
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.waitForTimeout(300)
-    check('Pilot 머리줄(D-185): 5폭 × 글자 3단계 넘침 0 · 기본 글자에서는 [안내 영상] 단추 보임', bad.length === 0, bad.join(' | '))
+    check('Pilot 머리줄(D-185 · D-296): 5폭 × 글자 3단계 넘침 0 · 안내 영상 단추 없음(설정에서)', bad.length === 0, bad.join(' | '))
   }
   const today = await bodyText(page)
   check('Pilot: 로그인하면 오늘 화면', !page.url().includes('/login') && (await page.getByTestId('no-access').count()) === 0, page.url())
@@ -456,7 +456,7 @@ try {
   check('Pilot(D-164): 대표 ↔ 팀장 전환 단추 없음', (await page.getByTestId('view-as-switch').count()) === 0)
   check('P3 Pilot 메뉴(D-195): 마케팅 · 브랜딩 없음(대표 전용)', !nav.includes('마케팅'), nav.replace(/\n/g, '|').slice(0, 400))
   check('P3 Pilot 메뉴(D-206): 홍보 글 만들기 · 홈페이지 만들기 · 콘텐츠 레이더 없음(대표 전용)', !nav.includes('홍보 글') && !nav.includes('홈페이지 만들기') && !nav.includes('콘텐츠 레이더'))
-  check('Pilot(D-164): 머리줄 글자 크기 단추 없음 · 보기 방식(PC · Mobile · PC+Mobile) 단추 있음', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch"]').count()) === 1)
+  check('Pilot(D-164 · D-296): 머리줄 글자 크기 단추 없음 · 보기 방식은 접힌 단추 하나(눌러서 PC · Mobile · PC+Mobile)', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch-compact"]').count()) === 1 && (await page.locator('header [data-testid="device-switch"]').count()) === 0)
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
   // 교차 — 대표 업체 · 숨긴 화면 주소
@@ -941,13 +941,15 @@ try {
   }
 
   /* ---------- D-164: 대표 → 최은혜 팀장 화면 바로 보기(다시 로그인 없이) ---------- */
-  await go(page, '/ops/clients')
-  const vs = page.locator('header [data-testid="view-as-switch"]')
-  check('대표(D-164): 머리줄에 [대표 | 최은혜 팀장] 단추', (await vs.count()) === 1 && /최은혜\s*팀장/.test(await vs.innerText()), await vs.innerText().catch(() => ''))
+  // D-296 머리줄 단추는 없앴다 — 설정 › 계정 · 보기 › 보는 화면에서만
+  await go(page, '/settings')
+  const vs = page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"]')
+  check('대표(D-164 · D-296): 머리줄에는 전환 단추 없음 · 설정 › 보는 화면에 [대표 | 최은혜 팀장]', (await page.locator('header [data-testid="view-as-switch"], header [data-testid="view-as-compact"]').count()) === 0 && (await vs.count()) === 1 && /최은혜\s*팀장/.test(await vs.innerText()), await vs.innerText().catch(() => ''))
   restLog = []
   await vs.locator('[data-view="pilot"]').click()
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1500)
+  await go(page, '/ops/clients')
   const pv = await bodyText(page)
   check('대표 → 팀장 화면: 팀장 업체(은혜테스트정밀)가 보인다', pv.includes('은혜테스트정밀'), pv.slice(0, 300))
   check('대표 → 팀장 화면: 대표 업체는 안 보인다(팀장 작업공간 자료만)', leaked(pv).length === 0, leaked(pv).join())
@@ -1006,7 +1008,8 @@ try {
   await go(page, '/settings')
   check('대표 → 팀장 화면: 설정 이름 칸 대신 안내(여기서 저장하면 대표 이름이 바뀌므로)', (await page.getByTestId('name-editor-viewing').count()) === 1 && (await page.getByTestId('name-input').count()) === 0)
   await go(page, '/')
-  await page.locator('header [data-testid="view-as-switch"] [data-view="owner"]').click()
+  // 팀장 화면을 보는 동안 본문 위 띠의 [대표로 돌아가기] 한 번(D-296 머리줄 단추 대신)
+  await page.getByTestId('viewing-pilot-back').click()
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1500)
   await go(page, '/ops/clients')
@@ -1038,26 +1041,26 @@ try {
           const hb = hdr.getBoundingClientRect()
           const cut = [...hdr.querySelectorAll('a,button')].filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > hb.right + 1).length
           const sw = [...hdr.querySelectorAll('[data-testid="view-as-switch"],[data-testid="view-as-compact"]')].filter((e) => e.offsetParent !== null).length
-          return { over: hdr.scrollWidth - hdr.clientWidth, cut, sw }
+          const dev = [...hdr.querySelectorAll('[data-testid="device-switch-compact"]')].filter((e) => e.offsetParent !== null).length
+          return { over: hdr.scrollWidth - hdr.clientWidth, cut, sw, dev }
         })
-        if (r.over > 0 || r.cut > 0 || r.sw !== 1) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
+        if (r.over > 0 || r.cut > 0 || r.sw !== 0 || r.dev !== 1) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
       }
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
-    check('대표 머리줄(D-164): 5폭 × 글자 3단계 넘침 0 · 전환 단추 늘 하나', bad.length === 0, bad.join(' | '))
-    // 좁은 PC(1280) — 단추 하나 → 고르기 창 → 팀장 화면 → 다시 대표
+    check('대표 머리줄(D-164 · D-296): 5폭 × 글자 3단계 넘침 0 · 전환 단추 0 · 보기 방식 접힌 단추 늘 하나', bad.length === 0, bad.join(' | '))
+    // 좁은 PC(1280) — 설정 › 보는 화면 → 팀장 화면 → 띠의 [대표로 돌아가기]
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.waitForTimeout(300)
-    const vc = page.locator('header [data-testid="view-as-compact"]')
-    await vc.locator('button[aria-haspopup]').click()
-    await shot(page, 'owner-1280-viewas-menu')
-    await vc.locator('[data-view="pilot"]').click()
+    await go(page, '/settings')
+    await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"] [data-view="pilot"]').click()
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1500)
+    await go(page, '/ops/clients')
     const pv2 = await bodyText(page)
-    check('대표 1280(D-164): 단추 하나로 팀장 화면 · 대표 업체 안 보임', (await page.getByTestId('viewing-pilot').count()) === 1 && pv2.includes('은혜테스트정밀') && leaked(pv2).length === 0)
-    await vc.locator('button[aria-haspopup]').click()
-    await vc.locator('[data-view="owner"]').click()
+    check('대표 1280(D-164 · D-296): 설정에서 팀장 화면 · 대표 업체 안 보임', (await page.getByTestId('viewing-pilot').count()) === 1 && pv2.includes('은혜테스트정밀') && leaked(pv2).length === 0)
+    await shot(page, 'owner-1280-viewing-pilot')
+    await page.getByTestId('viewing-pilot-back').click()
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1500)
     await go(page, '/ops/clients')
@@ -1067,7 +1070,9 @@ try {
   }
 
   /* ---------- D-164: 보기 방식 — PC+Mobile(같은 로그인 · 같은 자료) ---------- */
-  await page.locator('header [data-testid="device-switch"] [data-mode="dual"]').click()
+  // D-296 보기 방식은 접힌 단추 하나 — 눌러서 고른다
+  await page.locator('header [data-testid="device-switch-compact"] button[aria-haspopup]').click()
+  await page.locator('header [data-testid="device-switch-compact"] [data-mode="dual"]').click()
   await page.waitForTimeout(3500)
   const dualPc = page.frameLocator('[data-testid="dual-pc"] iframe')
   const dualMo = page.frameLocator('[data-testid="device-frame"] iframe')
@@ -1120,7 +1125,7 @@ try {
   await mp.getByTestId('tutorial-hide-forever').click()
   await mp.waitForTimeout(1200)
   check('390 Pilot(D-185): 앞으로 보지 않기 → 닫힘 · 로그인 계정 정보에 남음', (await mtut.count()) === 0 && sql(`select raw_user_meta_data->>'tutorial_hidden' from auth.users where id = '${PILOT.id}'`) === 'true')
-  check('390 Pilot(D-185): 머리줄 [안내 영상] 단추(휴대폰은 아이콘) 44 이상 · 머리줄 넘침 0', ((await mp.getByTestId('tutorial-open').boundingBox())?.height ?? 0) >= 44 && (await overflowX(mp)) <= 0)
+  check('390 Pilot(D-185 · D-296): 머리줄에 안내 영상 단추 없음(더보기 판 · 설정에서) · 머리줄 넘침 0', (await mp.locator('header [data-testid="tutorial-open"]').count()) === 0 && (await overflowX(mp)) <= 0)
   const bottom = (await mp.locator('nav').last().innerText().catch(() => '')) ?? ''
   check('390 Pilot: 하단 메뉴에 상담 없음', !bottom.includes('상담'), bottom.replace(/\n/g, '|'))
   check('390 Pilot: 오늘 화면 가로 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
@@ -1172,9 +1177,10 @@ try {
   await login(p3, PILOT)
   await p3.waitForTimeout(800)
   check('Pilot(D-185): 다른 기기에서도 앞으로 보지 않기 그대로 — 저절로 안 뜸', (await p3.getByTestId('tutorial-dialog').count()) === 0)
-  await p3.getByTestId('tutorial-open').click()
+  await go(p3, '/settings')
+  await p3.getByTestId('settings-tutorial-open').click()
   await p3.waitForTimeout(400)
-  check('Pilot(D-185): 그래도 머리줄 [안내 영상] 으로는 열린다', (await p3.getByTestId('tutorial-dialog').count()) === 1)
+  check('Pilot(D-185 · D-296): 그래도 설정 › [안내 영상 보기] 로는 열린다', (await p3.getByTestId('tutorial-dialog').count()) === 1)
   await c3.close()
 
   /* ================= 7. SAAS-2 — 사용량 장부 · 이용 권한(진짜 DB 장부 0022 · 진짜 RLS) ================= */

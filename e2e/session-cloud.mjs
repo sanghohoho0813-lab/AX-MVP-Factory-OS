@@ -183,7 +183,8 @@ try {
   /* ---------- 2 [최은혜 팀장] → '나가시겠습니까?' 에서 취소 ---------- */
   {
     const { ctx, page, errors, seen } = await open({ ws: WS })
-    await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+    // D-296 대표 ↔ 팀장 전환은 설정 › 계정 · 보기에서만(머리줄 단추는 없앴다)
+    await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
     await ready(page)
     await page.waitForTimeout(800)
     // 저장하지 않은 글이 있는 화면처럼
@@ -194,7 +195,7 @@ try {
       asked += 1
       void d.dismiss()
     })
-    await page.locator('header [data-testid="view-as-switch"] [data-view="pilot"]').first().click()
+    await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"] [data-view="pilot"]').first().click()
     await page.waitForTimeout(1500)
     seen.ws.length = 0
     await go(page, '/money')
