@@ -7,11 +7,13 @@
  *  ③ 주 단추 하나 [AI로 바로 쓰기] — 1안은 글 칸에 바로, 다른 안은 이 아래(AI 는 누를 때만 · 한 번에 한 번)
  */
 import type { ReactNode } from 'react'
-import { Sparkles, Wand2 } from 'lucide-react'
+import { Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Surface } from '../../components/ui/primitives'
+import { HintTip } from '../../components/ui/fold'
 import type { TopicChip } from '../../services/marketing/quickStart'
-import { StepTitle, chip } from './snsParts'
+import { StepTitle } from './snsParts'
+import { toneChip } from './snsTone'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 
 export function QuickStart({
@@ -22,6 +24,7 @@ export function QuickStart({
   chips,
   recLabel,
   recWhy,
+  recTip,
   picked,
   onChangeFormat,
   top,
@@ -40,6 +43,8 @@ export function QuickStart({
   /** 추천(또는 직접 고른) 형식 이름 */
   recLabel: string
   recWhy: string
+  /** D-298 추천 형식이 무슨 뜻인지(쉽게 말하면 · 예시) — 마우스를 올리거나 ? 를 누르면 */
+  recTip?: string
   /** 사람이 직접 고른 형식이면 true — '고른 형식' 으로 보인다 */
   picked: boolean
   onChangeFormat: () => void
@@ -56,19 +61,35 @@ export function QuickStart({
   const week = chips.filter((c) => c.from === 'week')
   const ours = chips.filter((c) => c.from === 'ours')
   const has = !!topic.trim()
-  const chipRow = (list: readonly TopicChip[], label: string, id: string) =>
-    list.length > 0 && (
+  // D-298 대표 "우리 분야 주제도 늘 고정인지 바뀌는 건지 모르겠다" — 이름 옆에 '매주 바뀌어요' / '늘 그대로예요' + 색(이번 주 = 빨강 계열 · 우리 분야 = 남색)
+  const chipRow = (list: readonly TopicChip[], id: 'week' | 'ours') => {
+    if (!list.length) return null
+    const week = id === 'week'
+    const Icon = week ? Flame : Pin
+    const tone = week ? 'rose' : 'indigo'
+    return (
       <div className="flex flex-col gap-1.5" data-testid={`${testPrefix}-qs-${id}`}>
-        <span className="t-sub font-semibold text-slate-700">{label}</span>
+        <HintTip
+          tip={week ? '콘텐츠 레이더가 유튜브에서 이번 주에 뜨는 주제를 골라 둔 거예요. 월요일마다 새로 바뀌어요.' : '우리 회사가 꾸준히 이야기할 주제예요. 매주 바뀌지 않고 늘 같은 자리에 있어요.'}
+          label={week ? '이번 주 키워드' : '우리 분야 주제'}
+          tight
+        >
+          <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-${id}-label`}>
+            <Icon aria-hidden="true" className={`size-4 shrink-0 ${week ? 'text-rose-600' : 'text-indigo-600'}`} />
+            {week ? '이번 주 키워드' : '우리 분야 주제'}
+            <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${week ? 'bg-rose-100 text-rose-800' : 'bg-indigo-100 text-indigo-800'}`}>{week ? '매주 바뀌어요' : '늘 그대로예요'}</span>
+          </span>
+        </HintTip>
         <div className="flex flex-wrap gap-1.5">
           {list.map((c) => (
-            <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={chip(topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
+            <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={toneChip(tone, topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
               {c.label ?? c.topic}
             </button>
           ))}
         </div>
       </div>
     )
+  }
   return (
     <div data-testid={`${testPrefix}-qs`}>
       <Surface className="flex flex-col gap-3 border-2 border-slate-900">
@@ -82,16 +103,24 @@ export function QuickStart({
           className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3"
           data-testid={`${testPrefix}-qs-topic`}
         />
-        {chipRow(week, '이번 주 키워드(콘텐츠 레이더)', 'week')}
-        {chipRow(ours, '우리 분야 주제', 'ours')}
-        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-2.5" data-testid={`${testPrefix}-qs-rec`}>
-          <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-800">
-            <b className="text-slate-900">{picked ? '고른 형식' : '추천 형식'}</b> · <span data-testid={`${testPrefix}-qs-rec-label`}>{recLabel}</span>
-            {!picked && recWhy && <span className="block text-slate-600">{recWhy}</span>}
-          </p>
-          <Button size="sm" variant="ghost" onClick={onChangeFormat} data-testid={`${testPrefix}-qs-change`}>
-            형식 바꾸기
-          </Button>
+        {chipRow(week, 'week')}
+        {chipRow(ours, 'ours')}
+        {/* D-298 추천 형식 줄 — 보라 테두리 · '추천 형식' 딱지 · 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시 */}
+        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2.5" data-testid={`${testPrefix}-qs-rec`}>
+          <div className="t-sub min-w-[12rem] flex-1 break-keep text-slate-800">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <b className="t-meta shrink-0 rounded-full bg-violet-600 px-2.5 py-0.5 font-bold text-white">{picked ? '고른 형식' : '추천 형식'}</b>
+              <HintTip tip={recTip} label="추천 형식" tight className="min-w-0">
+                <span className="min-w-0 font-bold text-violet-900" data-testid={`${testPrefix}-qs-rec-label`}>
+                  {recLabel}
+                </span>
+              </HintTip>
+            </div>
+            {!picked && recWhy && <span className="mt-0.5 block text-slate-600">{recWhy}</span>}
+          </div>
+          <button type="button" onClick={onChangeFormat} className="tap t-sub inline-flex h-10 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-white px-3 font-semibold whitespace-nowrap text-violet-800 hover:bg-violet-100" data-testid={`${testPrefix}-qs-change`}>
+            <SlidersHorizontal aria-hidden="true" className="size-4" /> 형식 바꾸기
+          </button>
         </div>
         {facts}
         <div className="flex flex-col gap-2">

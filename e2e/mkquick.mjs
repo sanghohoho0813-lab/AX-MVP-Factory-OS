@@ -146,9 +146,13 @@ await page.getByTestId('thr-body').fill('대표님이 직접 고친 글')
 await page.waitForTimeout(600)
 check('Q7 글 칸에 쓴 것이 있으면 다시 눌러도 덮지 않음(다른 안만 새로)', (await page.getByTestId('thr-body').inputValue()) === '대표님이 직접 고친 글' && (await page.getByTestId('thr-ai-draft').count()) === 3)
 // 형식 바꾸기 → 펼쳐지고, 직접 고른 틀은 칩이 덮지 않는다
+// D-298 AI 1안이 다른 틀(A)로 썼으면 지금 형식은 그 틀 — 원하는 반응도 그 틀에 맞춰서, 펼치면 그 틀이 골라져 있다(예전: 반응 목록에 없어 아무것도 안 골라져 보임)
+const nowKey = /· ([A-X]) /.exec(await page.getByTestId('thr-qs-rec-label').innerText())?.[1] ?? ''
 await page.getByTestId('thr-qs-change').click()
 await page.waitForTimeout(300)
-check('Q8 [형식 바꾸기] → "형식 직접 고르기" 펼침 · 추천한 틀이 골라져 있음', (await page.getByTestId('thr-choose').getAttribute('data-open')) === '1' && (await page.getByTestId(`thr-tpl-${recKey}`).getAttribute('aria-pressed')) === 'true')
+check('Q8 [형식 바꾸기] → "형식 직접 고르기" 펼침 · 지금 형식(추천 또는 AI 1안의 틀)이 골라져 있음', !!nowKey && (await page.getByTestId('thr-choose').getAttribute('data-open')) === '1' && (await page.getByTestId(`thr-tpl-${nowKey}`).getAttribute('aria-pressed')) === 'true', nowKey)
+// D-298 [형식 바꾸기] → 펼친 칸이 잠깐 빛남(보라 테두리) · 색 구역 셋 · 화면 안으로 내려옴
+check('Q8b [형식 바꾸기] → 펼친 칸이 보라 테두리로 빛남 · 색 구역(반응 · 틀 · 태그) · 화면 안으로 내려옴', (await page.getByTestId('thr-choose').evaluate((e) => e.classList.contains('mk-flash'))) && (await page.locator('[data-testid="thr-choose"] section[data-tone]').count()) === 3 && (await page.getByTestId('thr-choose').evaluate((e) => { const r = e.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0 })))
 await page.getByTestId('thr-goal-share').click()
 await page.getByTestId('thr-tpl-B').click()
 await page.locator('[data-testid="thr-qs-ours"] [data-testid="thr-qs-chip"]').first().click()

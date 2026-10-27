@@ -2,9 +2,11 @@
  * D-273 스레드 · 릴스 · 틱톡 화면이 같이 쓰는 조각 — 단계 제목 · 큰 고르기 단추 · 안쪽 칸 · 규칙 검사 목록 · 지우기 한 번 더 묻기.
  * 대표 "60대도 쓸 수 있게 쉽고 간편하게" — 단추는 크게(44px 이상), 글은 짧게, 고를 것은 한 번에 2~4개.
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
+import { HelpHeading } from '../../components/ui/fold'
+import { TONES, type Tone } from './snsTone'
 import { REWRITES, VENTURE_CARDS, ourFactsList } from '../../services/marketing/snsRules'
 import { isMarketingCustomer } from '../../services/marketing/persona'
 
@@ -21,17 +23,129 @@ export function StepTitle({ n, children }: { n: string; children: ReactNode }) {
 
 export const chip = (on: boolean) => `tap t-sub inline-flex min-h-11 max-w-full items-center rounded-full border px-3.5 text-left font-semibold break-keep ${on ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`
 
+/** 마우스를 올리면 뜨는 설명 안 — 이름 · 쉬운 설명 · 예시 */
+export function TipBody({ title, body, example }: { title: string; body: string; example?: string }) {
+  return (
+    <>
+      <span className="block font-bold text-white">{title}</span>
+      <span className="mt-0.5 block text-slate-100">{body}</span>
+      {example && (
+        <span className="mt-1.5 block rounded-lg bg-white/10 px-2.5 py-1.5 text-[0.86rem] leading-snug text-amber-100">
+          <b className="text-amber-200">예시</b>
+          {'\n'}
+          {example}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
+ * D-298 대표 "마우스를 올리자마자 무엇을 하는 곳인지 메시지가 뜨게" — 감싼 것(단추 · 이름)에 마우스를 올리면 바로 뜬다.
+ * 휴대폰은 마우스가 없어 뜨지 않는다 — 같은 설명을 화면 안(지금 칸 설명 · 고른 틀 상자)에도 둔다.
+ * 카드(overflow-hidden) 안에서도 잘리지 않게 화면 기준(fixed)으로 띄운다 — 아래가 모자라면 위로, 오른쪽이 모자라면 왼쪽으로.
+ * 화면을 굴리면 닫는다(자리가 어긋나지 않게).
+ */
+export function HoverTip({ tip, children, className = '', block = false, testId = 'hover-tip' }: { tip: ReactNode; children: ReactNode; className?: string; block?: boolean; testId?: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const [place, setPlace] = useState<{ top: number; left: number } | null>(null)
+  const show = () => {
+    const wrap = wrapRef.current
+    if (wrap) setRect(wrap.getBoundingClientRect())
+  }
+  const hide = () => {
+    setRect(null)
+    setPlace(null)
+  }
+  useLayoutEffect(() => {
+    const el = tipRef.current
+    if (!rect || !el) return
+    const { width, height } = el.getBoundingClientRect()
+    const vw = document.documentElement.clientWidth
+    const vh = window.innerHeight
+    const left = Math.max(12, Math.min(rect.left, vw - 12 - width))
+    const below = rect.bottom + 6
+    const top = below + height > vh - 12 && rect.top - 6 - height > 12 ? rect.top - 6 - height : below
+    setPlace({ top, left })
+  }, [rect])
+  useEffect(() => {
+    if (!rect) return
+    window.addEventListener('scroll', hide, true)
+    window.addEventListener('resize', hide)
+    return () => {
+      window.removeEventListener('scroll', hide, true)
+      window.removeEventListener('resize', hide)
+    }
+  }, [rect])
+  if (!tip) return <>{children}</>
+  return (
+    <span
+      ref={wrapRef}
+      className={`relative min-w-0 ${block ? 'block' : 'inline-block'} ${className}`}
+      onMouseEnter={() => {
+        // 마우스가 있는 기기만 — 휴대폰에서 누를 때 생기는 가짜 mouseenter 로 뜨지 않게
+        if (window.matchMedia?.('(hover: hover)').matches) show()
+      }}
+      onMouseLeave={hide}
+      onFocus={(e) => {
+        if (e.target instanceof HTMLElement && e.target.matches(':focus-visible')) show()
+      }}
+      onBlur={hide}
+    >
+      {children}
+      {rect && (
+        <span
+          ref={tipRef}
+          role="tooltip"
+          style={{ position: 'fixed', top: place?.top ?? rect.bottom + 6, left: place?.left ?? rect.left, visibility: place ? 'visible' : 'hidden' }}
+          data-testid={testId}
+          className="pointer-events-none z-[70] block w-max max-w-[min(22rem,calc(100vw-1rem))] rounded-xl bg-slate-900 px-3 py-2.5 text-left text-[0.92rem] leading-snug font-normal break-keep whitespace-pre-line text-white shadow-lg"
+        >
+          {tip}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** 색 구역 — 번호 동그라미 · 제목(? 를 누르면 설명) · 안의 고르기 */
+export function ToneSection({ n, tone, title, help, children, testId }: { n: string; tone: Tone; title: string; help: string; children: ReactNode; testId?: string }) {
+  const t = TONES[tone]
+  return (
+    <section className={`flex min-w-0 flex-col gap-3 rounded-xl border ${t.line} ${t.wash} p-3 sm:p-4`} data-testid={testId} data-tone={tone}>
+      <HelpHeading as="h3" help={help} label={title} tight className="t-card flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
+        <span aria-hidden="true" className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-[0.8rem] font-bold ${t.solid}`}>
+          {n}
+        </span>
+        <span className="min-w-0">{title}</span>
+      </HelpHeading>
+      {children}
+    </section>
+  )
+}
+
 /** 큰 고르기 단추 묶음 — 좁으면(큰 글자 포함) 한 줄에 하나 */
-export function BigChoices<K extends string>({ items, value, onPick, label, testPrefix, min = '11rem' }: { items: ReadonlyArray<{ key: K; label: string; hint: string }>; value: K | ''; onPick: (k: K) => void; label: string; testPrefix: string; min?: string }) {
+export function BigChoices<K extends string>({ items, value, onPick, label, testPrefix, min = '11rem' }: { items: ReadonlyArray<{ key: K; label: string; hint: string; tone?: Tone; tip?: string; icon?: LucideIcon }>; value: K | ''; onPick: (k: K) => void; label: string; testPrefix: string; min?: string }) {
   return (
     <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${min}), 1fr))` }} role="radiogroup" aria-label={label}>
       {items.map((g) => {
         const on = value === g.key
+        // D-298 색이 있는 고르기(뜻마다 색) — 색을 안 주면 예전처럼 흰 바탕 · 고르면 검정
+        const t = g.tone ? TONES[g.tone] : null
+        const Icon = g.icon
+        const look = on ? (t ? t.solid : 'border-slate-900 bg-slate-900 text-white') : t ? `${t.line} ${t.soft} text-slate-800 ${t.hover}` : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
         return (
-          <button key={g.key} type="button" role="radio" aria-checked={on} onClick={() => onPick(g.key)} className={`tap flex min-h-16 min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'}`} data-testid={`${testPrefix}-${g.key}`}>
-            <span className="t-body font-bold break-keep">{g.label}</span>
-            <span className={`t-sub break-keep ${on ? 'text-slate-200' : 'text-slate-500'}`}>{g.hint}</span>
-          </button>
+          <HoverTip key={g.key} block tip={g.tip ? <TipBody title={g.label} body={g.tip} /> : null} className="h-full">
+            <button type="button" role="radio" aria-checked={on} onClick={() => onPick(g.key)} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${look}`} data-testid={`${testPrefix}-${g.key}`}>
+              <span className="t-body flex items-center gap-1.5 font-bold break-keep">
+                {Icon && <Icon aria-hidden="true" className={`size-[1.1rem] shrink-0 ${on ? 'text-white' : (t?.icon ?? 'text-slate-500')}`} />}
+                {g.label}
+              </span>
+              <span className={`t-sub break-keep ${on ? 'text-white/85' : 'text-slate-600'}`}>{g.hint}</span>
+            </button>
+          </HoverTip>
         )
       })}
     </div>
@@ -39,20 +153,41 @@ export function BigChoices<K extends string>({ items, value, onPick, label, test
 }
 
 /** 화면 안쪽 칸(쓰기 · 기록표 · …) */
-export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPrefix }: { tabs: ReadonlyArray<{ key: K; label: string; short: string; icon: LucideIcon }>; value: K; onPick: (k: K) => void; label: string; testPrefix: string }) {
+/**
+ * 화면 안쪽 칸(쓰기 · 기록표 · …).
+ * D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 한 번에 모르겠다" — 칸마다 색 · 마우스를 올리면 무엇을 하는 곳인지 바로,
+ * 휴대폰(마우스 없음)도 알 수 있게 칸 줄 아래에 '지금 칸' 한 줄.
+ */
+export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPrefix }: { tabs: ReadonlyArray<{ key: K; label: string; short: string; icon: LucideIcon; tone?: Tone; tip?: string }>; value: K; onPick: (k: K) => void; label: string; testPrefix: string }) {
+  const cur = tabs.find((t) => t.key === value)
+  const curTone = TONES[cur?.tone ?? 'slate']
+  const CurIcon = cur?.icon
   return (
-    <div role="tablist" aria-label={label} className="grid gap-1 rounded-(--radius-control) bg-slate-100 p-1" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} data-testid={`${testPrefix}-tabs`}>
-      {tabs.map((t) => {
-        const Icon = t.icon
-        const on = value === t.key
-        return (
-          <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => onPick(t.key)} className={`tap t-sub inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 text-center leading-tight font-semibold break-keep sm:flex-row sm:gap-1.5 ${on ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600 hover:bg-white/70'}`} data-testid={`${testPrefix}-tab-${t.key}`}>
-            <Icon aria-hidden="true" className="size-4 shrink-0" />
-            <span className="sm:hidden">{t.short}</span>
-            <span className="hidden sm:inline">{t.label}</span>
-          </button>
-        )
-      })}
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div role="tablist" aria-label={label} className="grid gap-1 rounded-(--radius-control) bg-slate-100 p-1" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} data-testid={`${testPrefix}-tabs`}>
+        {tabs.map((t) => {
+          const Icon = t.icon
+          const on = value === t.key
+          const tone = TONES[t.tone ?? 'slate']
+          return (
+            <HoverTip key={t.key} block tip={t.tip ? <TipBody title={t.label} body={t.tip} /> : null} className="h-full" testId={`${testPrefix}-tabtip`}>
+              <button type="button" role="tab" aria-selected={on} onClick={() => onPick(t.key)} className={`tap t-sub inline-flex h-full min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 text-center leading-tight font-semibold break-keep sm:flex-row sm:gap-1.5 ${on ? `bg-white ${tone.ink} shadow-(--shadow-card) ring-2 ${tone.ring}` : 'text-slate-600 hover:bg-white/70'}`} data-testid={`${testPrefix}-tab-${t.key}`}>
+                <Icon aria-hidden="true" className={`size-4 shrink-0 ${tone.icon}`} />
+                <span className="sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            </HoverTip>
+          )
+        })}
+      </div>
+      {cur?.tip && (
+        <p className={`t-sub flex min-w-0 items-start gap-1.5 rounded-(--radius-control) border px-3 py-1.5 break-keep ${curTone.line} ${curTone.soft} text-slate-700`} data-testid={`${testPrefix}-about`}>
+          {CurIcon && <CurIcon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${curTone.icon}`} />}
+          <span className="min-w-0">
+            <b className={curTone.ink}>{cur.label}</b> — {cur.tip}
+          </span>
+        </p>
+      )}
     </div>
   )
 }

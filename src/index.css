@@ -457,6 +457,19 @@ html[data-motion="reduced"] *::after {
   animation: ax-pop 380ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
+/* D-298 [형식 바꾸기] 로 펼친 칸 — 눈이 가게 보라 테두리가 두 번 번진다(움직임 줄이기 설정이면 테두리만) */
+@keyframes mk-flash {
+  0%   { box-shadow: 0 0 0 0 rgb(139 92 246 / 0.55); }
+  45%  { box-shadow: 0 0 0 10px rgb(139 92 246 / 0.18); }
+  100% { box-shadow: 0 0 0 0 rgb(139 92 246 / 0); }
+}
+.mk-flash {
+  animation: mk-flash 1.2s ease-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-flash { animation: none; outline: 3px solid rgb(139 92 246); }
+}
+
 /* D-295 휴대폰 '더보기' — 아래에서 올라오는 판(움직임 줄이기 설정이면 위 규칙이 끈다) */
 @keyframes more-sheet-up {
   from { transform: translate3d(0, 100%, 0); }

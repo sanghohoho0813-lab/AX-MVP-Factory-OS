@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, FilePlus2, RefreshCw, Save, Send, TriangleAlert } from 'lucide-react'
+import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile, Surface } from '../../components/ui/primitives'
@@ -25,8 +25,9 @@ import { useShortPosts } from '../../services/marketing/useSnsPosts'
 import {
   AIMS,
   EMPTY_SHORT_STATS,
+  FORMAT_EASY,
   PLATFORMS,
-  SHORT_BASICS,
+  SHORT_BASICS_EASY,
   SHORT_FORMATS,
   SHORT_STAT_KEYS,
   aimLabel,
@@ -50,19 +51,35 @@ import {
   type ShortPlatform,
   type ShortPost,
 } from '../../services/marketing/shorts'
-import { BigChoices, DeleteTwice, FactsBox, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, chip } from './snsParts'
+import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection } from './snsParts'
+import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
-import { Fold, openFold } from '../../components/ui/fold'
+import { Fold, HelpHeading, HintTip, openFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
 import { exampleText } from '../../services/marketing/shorts'
 
 type Tab = 'write' | 'records' | 'guide'
-const TABS = [
-  { key: 'write' as const, label: '오늘 만들 영상', short: '만들기', icon: Clapperboard },
-  { key: 'records' as const, label: '기록표', short: '기록표', icon: CalendarCheck },
-  { key: 'guide' as const, label: '형식 · 공식', short: '공식', icon: BookOpen },
+// D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
+const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof Clapperboard; tone: Tone; tip: string }> = [
+  { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.' },
+  { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 영상의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 형식이 잘 되는지 숫자로 알려 줘요.' },
+  { key: 'guide', label: '형식 · 공식', short: '공식', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.' },
 ]
+
+/** D-298 어디에 · 무엇을 · 형식마다 색(같은 뜻은 어느 화면에서나 같은 색) */
+const PLATFORM_TONE: Readonly<Record<ShortPlatform, Tone>> = { tiktok: 'teal', reels: 'fuchsia' }
+const AIM_TONE: Readonly<Record<ShortAim, Tone>> = { reach: 'sky', convert: 'emerald' }
+const AIM_ICON = { reach: Eye, convert: MessageCircle } as const
+const FORMAT_TONE: Readonly<Record<ShortFormatKey, Tone>> = { list: 'sky', talk: 'violet', demo: 'emerald', comment: 'rose', ban: 'orange' }
+const PLATFORM_CHOICES = PLATFORMS.map((p) => ({ ...p, tone: PLATFORM_TONE[p.key], tip: p.key === 'tiktok' ? '말로 설명하는 40~60초 영상이에요. 틱톡과 유튜브 쇼츠에 같이 올려요.' : '20초 안팎 짧은 영상이에요. 글자 화면만 넘겨도 돼요.' }))
+const aimChoices = (p: ShortPlatform) => AIMS[p].map((a) => ({ ...a, tone: AIM_TONE[a.key], icon: AIM_ICON[a.key], tip: a.key === 'reach' ? '더 많은 사람에게 보이게 하고 싶을 때 골라요. 끝에 "연락 주세요" 같은 말을 넣지 않아요.' : p === 'reels' ? '댓글을 받고 싶을 때 골라요. 나눠 줄 자료가 실제로 있을 때만 써요.' : '문의로 이어지게 하고 싶을 때 골라요. 끝에 한 줄만 넣어요.' }))
+
+/** 형식 설명(마우스를 올리면 · ? 를 누르면) — 쉽게 말하면 · 예시 */
+function formatTip(f: ShortFormat): string {
+  const e = FORMAT_EASY[f.key]
+  return `${f.name} (${f.seconds})\n${e.plain}\n\n예시\n${e.sample}`
+}
 const tabOf = (raw: string | null): Tab => (TABS.some((t) => t.key === raw) ? (raw as Tab) : 'write')
 
 // short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다
@@ -217,7 +234,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   }
   const openFormats = () => {
     openFold('sht.formats')
-    window.setTimeout(() => document.querySelector('[data-testid="sht-choose"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    scrollAndFlash('sht-choose')
   }
 
   const pickPlatform = (p: ShortPlatform) => {
@@ -323,14 +340,17 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         chips={chips}
         recLabel={`${aimLabel(draft.platform, eff.aim)} · ${formatOf(eff.format)?.name ?? ''} (${formatOf(eff.format)?.seconds ?? ''})`}
         recWhy={rec.why}
+        recTip={formatOf(eff.format) ? formatTip(formatOf(eff.format) as ShortFormat) : undefined}
         picked={!!draft.format && draft.formatBy !== 'rec'}
         onChangeFormat={openFormats}
         top={
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="어디에 올려요" data-testid="sht-qs-platform">
-            {PLATFORMS.map((p) => (
-              <button key={p.key} type="button" role="radio" aria-checked={draft.platform === p.key} onClick={() => pickPlatform(p.key)} className={chip(draft.platform === p.key)} data-testid={`sht-qs-platform-${p.key}`}>
-                {p.label}
-              </button>
+            {PLATFORM_CHOICES.map((p) => (
+              <HoverTip key={p.key} tip={<TipBody title={p.label} body={p.tip} />}>
+                <button type="button" role="radio" aria-checked={draft.platform === p.key} onClick={() => pickPlatform(p.key)} className={toneChip(p.tone, draft.platform === p.key)} data-testid={`sht-qs-platform-${p.key}`}>
+                  {p.label}
+                </button>
+              </HoverTip>
             ))}
           </div>
         }
@@ -347,47 +367,80 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         )}
       </QuickStart>
 
-      <div className="rounded-(--radius-panel) border-2 border-slate-900 bg-white px-4 py-3" data-testid="sht-basics">
-        <p className="t-body font-bold text-slate-900">이것만 지키면 돼요</p>
-        <ol className="t-body mt-1 flex list-decimal flex-col gap-1 pl-5 break-keep text-slate-800">
-          {SHORT_BASICS.map((b) => (
-            <li key={b}>{b}</li>
+      {/* D-298 '이것만 지키면 돼요' — 글자 덩어리 대신 색 번호 · 굵은 한마디 · 짧은 설명, 예시는 마우스를 올리거나 ? 를 누르면 */}
+      <div className="rounded-(--radius-panel) border-2 border-amber-300 bg-amber-50/60 px-4 py-3" data-testid="sht-basics">
+        <p className="t-body flex items-center gap-1.5 font-bold text-slate-900">
+          <Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" /> 이것만 지키면 돼요
+        </p>
+        <ol className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }}>
+          {SHORT_BASICS_EASY.map((b, i) => (
+            <li key={b.title} className="min-w-0 rounded-lg border border-amber-200 bg-white px-2.5 py-2" data-testid="sht-basic">
+              <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
+                <span className="t-body flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
+                  <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[0.78rem] font-bold text-white">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0">{b.title}</span>
+                </span>
+              </HintTip>
+              <span className="t-sub block pl-8 break-keep text-slate-600">{b.detail}</span>
+            </li>
           ))}
         </ol>
       </div>
 
-      <Fold id="sht.formats" title="형식 직접 고르기" summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본" panel testId="sht-choose">
-        <div className="flex flex-col gap-3">
-          <h3 className="t-card font-bold text-slate-900">어디에 올려요?</h3>
-          <BigChoices items={PLATFORMS} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
-        </div>
-        <div className="flex flex-col gap-3">
-          <h3 className="t-card font-bold text-slate-900">무엇을 원해요?</h3>
-          <BigChoices items={AIMS[draft.platform]} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
+      {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
+      <Fold
+        id="sht.formats"
+        title="형식 직접 고르기"
+        hint="추천 형식 말고 내가 직접 고르는 곳이에요. 어디에 올릴지 → 무엇을 원하는지 → 영상 형식 순서로 골라요."
+        icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
+        summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
+        className="scroll-mt-24 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/40 px-3 py-1 data-[open=1]:pb-4 sm:px-4"
+        testId="sht-choose"
+      >
+        <ToneSection n="1" tone="teal" title="어디에 올려요?" help="영상을 올릴 곳이에요. 틱톡 · 쇼츠는 말로 설명하는 조금 긴 영상, 릴스는 20초 안팎 짧은 영상이 잘 돼요." testId="sht-sec-platform">
+          <BigChoices items={PLATFORM_CHOICES} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
+        </ToneSection>
+        <ToneSection n="2" tone="sky" title="무엇을 원해요?" help="이 영상으로 얻고 싶은 것이에요. 많이 보이게 하는 영상과 문의 · 댓글을 받는 영상은 끝맺음이 달라요." testId="sht-sec-aim">
+          <BigChoices items={aimChoices(draft.platform)} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
           <p className="t-sub break-keep text-slate-600" data-testid="sht-mix">
             {draft.platform === 'tiktok' ? `권장: 많이 보이게 3번에 문의로 1번 · 이번 주 ${mix.tiktok.reach} : ${mix.tiktok.convert}` : `권장: 많이 보이게 2번 · 댓글 받기 2번(자금 · 세금 소재는 댓글 위주) · 이번 주 ${mix.reels.reach} : ${mix.reels.convert}`}
           </p>
-        </div>
-        <div className="flex flex-col gap-3">
-          <h3 className="t-card font-bold text-slate-900">어떤 형식으로?</h3>
+        </ToneSection>
+        <ToneSection n="3" tone="violet" title="어떤 형식으로?" help="영상의 모양이에요. 형식 이름에 마우스를 올리면 어떤 영상인지 · 예시가 나와요." testId="sht-sec-format">
           <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }} data-testid="sht-formats">
             {formats.map((f) => {
               const on = draft.format === f.key
+              const tone = TONES[FORMAT_TONE[f.key]]
               return (
                 <li key={f.key} className="min-w-0">
-                  <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white hover:border-brand-300'}`} data-testid={`sht-format-${f.key}`}>
-                    <span className="flex w-full flex-wrap items-baseline gap-x-2">
-                      <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
-                      <span className="t-sub text-slate-500">{f.seconds}</span>
-                    </span>
-                    <span className="t-sub break-keep text-slate-600">{mkText(f.how)}</span>
-                  </button>
+                  <HoverTip block className="h-full" tip={<TipBody title={`${f.name} (${f.seconds})`} body={FORMAT_EASY[f.key].plain} example={FORMAT_EASY[f.key].sample} />} testId="sht-formattip">
+                    <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`sht-format-${f.key}`}>
+                      <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span aria-hidden="true" className={`inline-block size-2.5 shrink-0 rounded-full ${tone.bar}`} />
+                        <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
+                        <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${tone.soft} ${tone.ink}`}>{f.seconds}</span>
+                      </span>
+                      <span className="t-sub break-keep text-slate-600">{mkText(f.how)}</span>
+                    </button>
+                  </HoverTip>
                 </li>
               )
             })}
           </ul>
           {fmt && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="sht-format-detail">
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-white px-3 py-3" data-testid="sht-format-detail">
+              {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
+              <p className="t-sub flex items-start gap-1.5 rounded-lg bg-violet-50 px-2.5 py-2 break-keep text-violet-950" data-testid="sht-format-plain">
+                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
+                <span className="min-w-0">
+                  <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
+                </span>
+              </p>
+              <p className="t-sub rounded-lg border border-dashed border-amber-300 bg-amber-50/70 px-2.5 py-2 break-keep text-slate-800">
+                <b className="text-amber-800">예시</b> {FORMAT_EASY[fmt.key].sample}
+              </p>
               <p className="t-sub break-keep text-slate-700">
                 <b>왜 되나</b> {fmt.why}
               </p>
@@ -403,7 +456,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               </div>
             </div>
           )}
-        </div>
+        </ToneSection>
       </Fold>
 
       <Surface className="flex flex-col gap-3">
@@ -414,7 +467,9 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           <div className="flex min-w-0 flex-col gap-3">
             <label className="flex flex-col gap-1">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="t-sub font-semibold text-slate-700">대본{fmt ? ` — ${fmt.name}` : ''}</span>
+                <HintTip tip="영상에서 말할 말과 화면에 띄울 큰 글자를 시간 순서대로 적은 것이에요. [0:00] 은 몇 초에 나오는지예요." label="대본" tight>
+                  <span className="t-sub font-semibold text-slate-700">대본{fmt ? ` — ${fmt.name}` : ''}</span>
+                </HintTip>
                 <span className="t-sub font-bold tabular-nums text-slate-700" data-testid="sht-seconds">
                   {draft.script.trim() ? `약 ${lint.seconds}초 · 첫마디 ${lint.firstWords.replace(/\s/g, '').length}자` : ''}
                 </span>
@@ -422,11 +477,15 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               <textarea value={draft.script} onChange={(e) => set({ script: e.target.value })} rows={11} placeholder={'[0:00] 첫마디 10자 안팎  (화면 큰 글자: …)\n[0:03] 딱 세 가지만 보세요.\n[0:06] 첫째, …'} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 leading-relaxed" data-testid="sht-script" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="t-sub font-semibold text-slate-700">캡션 {draft.platform === 'tiktok' ? '(한 줄)' : draft.aim === 'convert' ? '(200자 안팎 · 요약 3줄 + 키워드)' : '(100자 안팎)'}</span>
+              <HintTip tip="영상 아래에 붙는 설명 글이에요. 영상을 다 안 본 사람도 무슨 내용인지 알게 짧게 적어요." label="캡션" tight>
+                <span className="t-sub font-semibold text-slate-700">캡션 {draft.platform === 'tiktok' ? '(한 줄)' : draft.aim === 'convert' ? '(200자 안팎 · 요약 3줄 + 키워드)' : '(100자 안팎)'}</span>
+              </HintTip>
               <textarea value={draft.caption} onChange={(e) => set({ caption: e.target.value })} rows={3} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" data-testid="sht-caption" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="t-sub font-semibold text-slate-700">해시태그 {draft.platform === 'tiktok' ? '(3~5개)' : '(0~3개)'}</span>
+              <HintTip tip="#으로 시작하는 검색 낱말이에요. 이 낱말을 찾는 사람에게 영상이 보여요. 예: #창업 #세금" label="해시태그" tight>
+                <span className="t-sub font-semibold text-slate-700">해시태그 {draft.platform === 'tiktok' ? '(3~5개)' : '(0~3개)'}</span>
+              </HintTip>
               <input value={draft.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#벤처기업확인 #창업" className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-tags" />
             </label>
             {draft.checks.length > 0 && (
@@ -469,7 +528,9 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           </div>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="t-sub font-semibold text-slate-700">규칙 검사</span>
+              <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 캡션 · 해시태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
+                <span className="t-sub font-semibold text-slate-700">규칙 검사</span>
+              </HintTip>
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
               {lint.warn > 0 && <Badge tone="warning">볼 것 {lint.warn}</Badge>}
             </div>
@@ -528,7 +589,9 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
       </div>
       <Surface className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">우리 계정에서 되는 형식</h2>
+          <HelpHeading help="올린 영상의 숫자를 모아 형식마다 평균을 낸 표예요. 점수가 높은 형식을 더 자주 만들면 돼요." wrapClassName="min-w-[12rem] flex-1" className="t-section break-keep text-slate-900">
+            우리 계정에서 되는 형식
+          </HelpHeading>
           <Button size="sm" variant="ghost" onClick={() => downloadText(`릴스-틱톡-기록표-${today}.csv`, `﻿${shortsCsv(store.posts)}`, 'text/csv')} disabled={!posted.length} data-testid="sht-rec-csv">
             <Download aria-hidden="true" className="size-4" /> CSV
           </Button>
@@ -628,7 +691,8 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
     <div className="flex flex-col gap-4" data-testid="sht-guide">
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 20rem), 1fr))' }}>
         <Surface className="flex flex-col gap-1.5">
-          <h2 className="t-section break-keep text-slate-900">틱톡 · 유튜브 쇼츠</h2>
+          <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES.teal.bar}`} />
+          <h2 className="t-section break-keep text-teal-900">틱톡 · 유튜브 쇼츠</h2>
           <ul className="t-body flex list-disc flex-col gap-1 pl-5 break-keep text-slate-800">
             <li>정보형 40~70초 (답을 끝으로) · 이미지형 25~30초</li>
             <li>말로 설명 — 1초에 6~7자</li>
@@ -638,7 +702,8 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
           </ul>
         </Surface>
         <Surface className="flex flex-col gap-1.5">
-          <h2 className="t-section break-keep text-slate-900">인스타 릴스</h2>
+          <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES.fuchsia.bar}`} />
+          <h2 className="t-section break-keep text-fuchsia-900">인스타 릴스</h2>
           <ul className="t-body flex list-disc flex-col gap-1 pl-5 break-keep text-slate-800">
             <li>20~25초 · 한 화면 목록은 6~15초</li>
             <li>말 없이 글자만도 됨 (말을 넣으면 첫 문장에 숫자)</li>
@@ -653,11 +718,23 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
         {SHORT_FORMATS.map((f) => (
           <li key={f.key} className="min-w-0">
             <Surface className="flex h-full flex-col gap-2" as="article">
+              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[FORMAT_TONE[f.key]].bar}`} />
               <div className="flex flex-wrap items-baseline gap-x-2" data-testid="sht-guide-card" data-key={f.key}>
                 <h3 className="t-body font-bold break-keep text-slate-900">{f.name}</h3>
-                <span className="t-sub text-slate-500">{f.seconds}</span>
+                <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${TONES[FORMAT_TONE[f.key]].soft} ${TONES[FORMAT_TONE[f.key]].ink}`}>{f.seconds}</span>
               </div>
-              <p className="t-sub break-keep text-slate-600">{f.platforms.map((p) => (p === 'reels' ? '릴스' : '틱톡 · 쇼츠')).join(' · ')}</p>
+              {/* D-298 쉽게 말하면 — 카드 맨 위 한 줄 */}
+              <p className={`t-sub flex items-start gap-1.5 rounded-lg px-2.5 py-2 break-keep text-slate-800 ${TONES[FORMAT_TONE[f.key]].soft}`} data-testid="sht-guide-plain">
+                <Lightbulb aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${TONES[FORMAT_TONE[f.key]].icon}`} />
+                <span className="min-w-0">{FORMAT_EASY[f.key].plain}</span>
+              </p>
+              <p className="flex flex-wrap gap-1">
+                {f.platforms.map((p) => (
+                  <span key={p} className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${TONES[PLATFORM_TONE[p]].line} ${TONES[PLATFORM_TONE[p]].soft} ${TONES[PLATFORM_TONE[p]].ink}`}>
+                    {p === 'reels' ? '릴스' : '틱톡 · 쇼츠'}
+                  </span>
+                ))}
+              </p>
               <p className="t-sub break-keep text-slate-800">{mkText(f.how)}</p>
               <p className="t-sub break-keep text-slate-700">
                 <b>왜</b> {f.why}
