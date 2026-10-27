@@ -94,7 +94,7 @@ export function SpecMaterialsSheet({
           <h3 id="spec-mats-file-h" className="t-sub flex items-center gap-1.5 font-bold text-slate-900">
             <FileUp aria-hidden="true" className="size-4" /> 파일 올리기
           </h3>
-          <p className="t-meta break-keep text-slate-600">회사 소개서 · 제품 설명 · 기존 명세서 · GPT 대화 저장본(.hwpx · .hwp · .docx · .pdf · .txt · .md)</p>
+          <p className="t-meta break-keep text-slate-600">회사 소개서 · 제품 설명 · 기존 명세서 · GPT 대화 저장본(.hwpx · .hwp · .docx · .doc · .pptx · .pdf · .txt · .md)</p>
           <Button variant="secondary" size="sm" className="self-start" disabled={busy || room <= 0} onClick={onPickFiles} data-testid="spec-mats-file">
             <FileUp aria-hidden="true" className="size-4" /> 파일 고르기
           </Button>

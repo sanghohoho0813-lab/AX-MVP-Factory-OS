@@ -214,14 +214,14 @@ export function isCfb(bytes: Uint8Array): boolean {
   return bytes.length >= 512 && CFB_SIG.every((b, i) => bytes[i] === b)
 }
 
-/** 복합 문서 읽기 — 이름 경로('BodyText/Section0')로 흐름(stream)을 꺼낸다 */
-export function readCfb(bytes: Uint8Array): { list: () => string[]; get: (path: string) => Uint8Array | null } {
-  if (!isCfb(bytes)) throw new OfficeReadError('한글(.hwp) 파일이 아닙니다.')
+/** 복합 문서 읽기 — 이름 경로('BodyText/Section0')로 흐름(stream)을 꺼낸다. what = 알릴 때 쓸 형식 이름(D-301 옛 엑셀 · 워드도 같은 그릇) */
+export function readCfb(bytes: Uint8Array, what = '한글(.hwp)'): { list: () => string[]; get: (path: string) => Uint8Array | null } {
+  if (!isCfb(bytes)) throw new OfficeReadError(`${what} 파일이 아닙니다.`)
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const u32 = (o: number) => (o + 4 <= bytes.length ? dv.getUint32(o, true) : END_OF_CHAIN)
   const sectorShift = dv.getUint16(0x1e, true)
   const miniShift = dv.getUint16(0x20, true)
-  if (sectorShift !== 9 && sectorShift !== 12) throw new OfficeReadError('한글(.hwp) 파일이 깨졌습니다.')
+  if (sectorShift !== 9 && sectorShift !== 12) throw new OfficeReadError(`${what} 파일이 깨졌습니다.`)
   const ss = 1 << sectorShift
   const ms = 1 << miniShift
   const sectorOff = (n: number) => (n + 1) * ss
@@ -282,7 +282,7 @@ export function readCfb(bytes: Uint8Array): { list: () => string[]; get: (path: 
     dirs.push({ name, type: dirBytes[o + 0x42], left: ddv.getUint32(o + 0x44, true), right: ddv.getUint32(o + 0x48, true), child: ddv.getUint32(o + 0x4c, true), start: ddv.getUint32(o + 0x74, true), size: ddv.getUint32(o + 0x78, true) })
   }
   const root = dirs[0]
-  if (!root || root.type !== 5) throw new OfficeReadError('한글(.hwp) 파일이 깨졌습니다.')
+  if (!root || root.type !== 5) throw new OfficeReadError(`${what} 파일이 깨졌습니다.`)
   // 작은 흐름(4KB 아래)은 미니 흐름 안에
   const miniStream = readChain(root.start, root.size)
   const miniFat: number[] = []

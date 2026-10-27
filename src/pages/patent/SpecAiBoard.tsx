@@ -698,7 +698,7 @@ export function SpecAiBoard({
               onRemove={removeMaterial}
             />
           )}
-          <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.hwp,.hwpx,.docx,.txt,.md,.xlsx,.png,.jpg,.jpeg" onChange={(e) => {
+          <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.hwp,.hwpx,.docx,.doc,.pptx,.txt,.md,.xlsx,.xls,.png,.jpg,.jpeg" onChange={(e) => {
             void addFiles(e.target.files)
             e.target.value = ''
           }} data-testid="spec-board-file-input" />

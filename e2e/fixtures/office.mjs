@@ -232,3 +232,88 @@ export function makeZip(entries) {
 export const CP949 = {
   '서류모음/스캔0003.hwp': [188, 173, 183, 249, 184, 240, 192, 189, 47, 189, 186, 196, 181, 48, 48, 48, 51, 46, 104, 119, 112],
 }
+
+/* ------------------------------------------------------------------ */
+/* D-301 옛 워드(.doc) · 옛 엑셀(.xls) — 단위 시험(officeFixtures.ts)과 같은 모양                     */
+/* ------------------------------------------------------------------ */
+
+const u16b = (n) => {
+  const b = new Uint8Array(2)
+  new DataView(b.buffer).setUint16(0, n, true)
+  return b
+}
+const u32b = (n) => {
+  const b = new Uint8Array(4)
+  new DataView(b.buffer).setUint32(0, n >>> 0, true)
+  return b
+}
+
+/** 옛 워드 — 문단(lines) + 표(rows · 한 행 끝은 문단 속성 fTtp 로 표시) */
+export function makeDoc({ lines = [], rows = [], after = [] } = {}) {
+  let text = lines.map((l) => `${l}\r`).join('')
+  const rowEndCps = []
+  for (const r of rows) {
+    text += r.map((c) => `${c}\u0007`).join('')
+    rowEndCps.push(text.length)
+    text += '\u0007'
+  }
+  text += after.map((l) => `${l}\r`).join('')
+  const head = new Uint8Array(0x400)
+  const hv = new DataView(head.buffer)
+  hv.setUint16(0, 0xa5ec, true)
+  hv.setUint16(2, 0x00c1, true)
+  hv.setUint16(0x0a, 0x0200, true)
+  const body = utf16(text)
+  const fc = head.length
+  const plc = concat([u32b(0), u32b(text.length), u16b(0), u32b(fc), u16b(0)])
+  const clx = concat([new Uint8Array([0x02]), u32b(plc.length), plc])
+  hv.setUint32(0x01a2, 0, true)
+  hv.setUint32(0x01a6, clx.length, true)
+  let table = clx
+  const extra = []
+  if (rowEndCps.length) {
+    const ends = rowEndCps.map((cp) => fc + (cp + 1) * 2)
+    const at = fc + body.length
+    const pad = (512 - (at % 512)) % 512
+    const pn = (at + pad) / 512
+    const page = new Uint8Array(512)
+    const pv = new DataView(page.buffer)
+    ;[fc, ...ends].forEach((x, k) => pv.setUint32(k * 4, x, true))
+    for (let k = 0; k < ends.length; k++) page[(ends.length + 1) * 4 + k * 13] = 200
+    page.set([3, 0, 0, 0x17, 0x24, 0x01], 400)
+    page[511] = ends.length
+    extra.push(new Uint8Array(pad), page)
+    const bte = concat([u32b(fc), u32b(ends[ends.length - 1]), u32b(pn)])
+    hv.setUint32(0x0102, clx.length, true)
+    hv.setUint32(0x0106, bte.length, true)
+    table = concat([clx, bte])
+  }
+  return makeCfb([
+    { path: 'WordDocument', data: concat([head, body, ...extra]) },
+    { path: '1Table', data: table },
+  ])
+}
+
+/** 옛 엑셀 — 시트 하나 · 글은 글 표(SST) · 숫자는 RK */
+export function makeXls({ name = 'Sheet1', rows = [] } = {}) {
+  const rec = (type, data) => concat([u16b(type), u16b(data.length), data])
+  const wide = (s) => [...s].some((c) => c.charCodeAt(0) > 0xff)
+  const chars = (s) => (wide(s) ? utf16(s) : new Uint8Array([...s].map((c) => c.charCodeAt(0))))
+  const strings = []
+  for (const r of rows) for (const v of r) if (typeof v === 'string' && v && !strings.includes(v)) strings.push(v)
+  const bof = (dt) => rec(0x0809, concat([u16b(0x0600), u16b(dt), new Uint8Array(12)]))
+  const eof = rec(0x000a, new Uint8Array(0))
+  const cells = []
+  rows.forEach((r, ri) =>
+    r.forEach((v, ci) => {
+      if (v === '' || v === null || v === undefined) return
+      if (typeof v === 'number') cells.push(rec(0x027e, concat([u16b(ri), u16b(ci), u16b(0), u32b(((v << 2) | 2) >>> 0)])))
+      else cells.push(rec(0x00fd, concat([u16b(ri), u16b(ci), u16b(0), u32b(strings.indexOf(v))])))
+    }),
+  )
+  const sheet = concat([bof(0x0010), ...cells, eof])
+  const sst = rec(0x00fc, concat([u32b(strings.length), u32b(strings.length), ...strings.flatMap((s) => [u16b(s.length), new Uint8Array([wide(s) ? 1 : 0]), chars(s)])]))
+  const globals = (pos) => concat([bof(0x0005), rec(0x00e0, concat([u16b(0), u16b(0), new Uint8Array(16)])), rec(0x0085, concat([u32b(pos), new Uint8Array([0, 0, name.length, wide(name) ? 1 : 0]), chars(name)])), sst, eof])
+  const g = globals(0)
+  return makeCfb([{ path: 'Workbook', data: concat([globals(g.length), sheet]) }])
+}

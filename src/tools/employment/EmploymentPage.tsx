@@ -644,7 +644,7 @@ function RosterTab() {
         setMeta(null)
         setNotice(
           r.error === 'unsupported'
-            ? '엑셀(.xlsx) · PDF · CSV/TSV 글자 파일을 읽습니다. 오래된 엑셀(.xls)은 "다른 이름으로 저장 → xlsx 또는 CSV" 로 바꿔 주세요.'
+            ? '엑셀(.xlsx · .xls) · PDF · CSV/TSV 글자 파일을 읽습니다.'
             : r.error === 'no_text'
               ? 'PDF 에서 글자를 찾지 못했습니다. 스캔본이면 글자를 복사해 아래 칸에 붙여 넣어 주세요.'
               : r.error === 'no_rows' || r.error === 'empty'
@@ -699,11 +699,11 @@ function RosterTab() {
         <Field label="① 업체명 (요약 문구용 · 선택)">
           <input type="text" aria-label="업체명" value={form.company} onChange={(e) => set('company', e.target.value)} className={inputCls} placeholder="예: 미래상사" />
         </Field>
-        <Field label="② 4대보험 가입자 명부 파일 (엑셀 · PDF · CSV/TSV)" hint="엑셀(.xlsx)은 그대로 올리면 됩니다. 스캔 PDF 는 글자 인식으로 넘어가며 처음 한 번은 다소 걸립니다.">
+        <Field label="② 4대보험 가입자 명부 파일 (엑셀 · PDF · CSV/TSV)" hint="엑셀(.xlsx · 옛 .xls · EDI 에서 받은 엑셀)은 그대로 올리면 됩니다. 스캔 PDF 는 글자 인식으로 넘어가며 처음 한 번은 다소 걸립니다.">
           <input
             ref={fileRef}
             type="file"
-            accept=".xlsx,.pdf,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,text/csv,text/plain"
+            accept=".xlsx,.xls,.pdf,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf,text/csv,text/plain"
             aria-label="명부 파일"
             disabled={busy}
             onChange={(e) => {

@@ -4,7 +4,7 @@
  */
 import { isMarketingCustomer, mkText } from '../marketing/persona'
 
-export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'threads' | 'shorts' | 'venture' | 'patent' | 'cert' | 'side'
+export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'threads' | 'shorts' | 'site' | 'venture' | 'patent' | 'cert' | 'side'
 
 export interface AssistPreset {
   id: string
@@ -65,6 +65,10 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'content.place', page: 'content', label: '플레이스 소개글 한 번에', kind: 'write', hint: '한 줄 소개 · 소개글 · 소식 아이디어' },
   { id: 'content.titles', page: 'content', label: '제목 후보 5개 (각도 다르게)', kind: 'list', hint: '검색 의도가 다르게' },
   { id: 'content.keywords', page: 'content', label: '키워드 · 해시태그 정리', kind: 'list', hint: '키워드 10 · 해시태그 15' },
+  // D-300 홈페이지 만들기 — 답마다 [이 블록에 넣기]
+  { id: 'site.copy', page: 'site', label: '홈페이지 문구 다시 쓰기', kind: 'write', hint: '첫 화면 · 회사 소개 · 하는 일 · 연락 권유' },
+  { id: 'site.faq', page: 'site', label: '자주 묻는 질문 5개', kind: 'write', hint: '손님이 연락 전에 궁금한 것 · 답' },
+  { id: 'site.seo', page: 'site', label: '검색 제목 · 설명 3가지', kind: 'list', hint: '검색 결과에 보일 글 · 각도 다르게' },
   // D-246 벤처 사업계획서 — 기업인증 › 벤처 › 사업계획서 쓰기의 [AI 초안] 이 차례로 부른다(띠 · 판 단추에는 없음)
   { id: 'venture.p1', page: 'venture', label: '벤처 사업계획서 — 개발 배경 · 경쟁력', kind: 'write', hint: '[1] 1 · 2' },
   { id: 'venture.p2', page: 'venture', label: '벤처 사업계획서 — 기술개발 경과 · 3년 계획', kind: 'write', hint: '[1] 3-1 · 3-2' },
@@ -109,6 +113,7 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   // D-299 스레드 · 릴스/틱톡 화면에도 AI 도우미 판 — 직접 묻기(그 플랫폼 공식으로 답)
   { id: 'threads.ask', page: 'threads', label: '스레드 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   { id: 'shorts.ask', page: 'shorts', label: '릴스 · 틱톡 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'site.ask', page: 'site', label: '홈페이지 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   // D-250 대화창 — 질문창에 직접 쓴 말에 답(띠 · 판 단추에는 없음)
   // D-251 마케팅 첫 화면 키워드 묶음 — 묶음 화면이 세 갈래를 동시에 부른다(띠에는 없음)
   { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },

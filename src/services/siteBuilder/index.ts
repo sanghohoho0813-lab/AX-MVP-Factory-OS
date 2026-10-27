@@ -6,6 +6,7 @@ export { siteFacts, industryForRecord, draftSite, newBlock, formatBizNo, regionO
 export { renderSiteHtml, siteFileName, esc, safeHref, safeImage, telHref, httpsHref, mapHref, hasContent, menuItems, blockAnchors, MAX_IMAGE_CHARS } from './render'
 export { siteChecks, type SiteCheck, type CheckLevel } from './checks'
 export * from './ops'
+export { siteAssistBundle, applyCopy, applyFaq, applySeo, copyTargetOf, type SiteCopyTarget } from './assist'
 export { normalizeSiteDoc, normalizeBlock, imageChars, MAX_TOTAL_IMAGE_CHARS } from './normalize'
 export { heroArt, serviceIcon, ALL_ART } from './art'
 export { STYLE_PRESETS, INDUSTRY_STYLE, stylePreset, currentStyle, applyStylePreset, siteScore, blockSuggestions, type StyleKey, type StylePreset, type ScoreItem, type SiteScore, type BlockSuggestion } from './design'

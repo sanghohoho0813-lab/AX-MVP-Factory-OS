@@ -82,6 +82,7 @@ const ASK_EXAMPLE: Partial<Record<AssistPage, string>> = {
   shorts: '예: 이 대본을 릴스 20초로 줄이면?',
   radar: '예: 이번 주 1순위로 쇼츠 제목 3개만',
   content: '예: 블로그 제목에 지역 이름을 넣어 다시',
+  site: '예: 첫 화면 큰 문구를 더 짧게 세 가지',
 }
 
 /** 답 항목에 [할 일로 넣기] 를 붙일 화면 — 일하는 화면만(마케팅 · 홍보 글은 그 화면 단추가 대신) */

@@ -12,6 +12,8 @@ import { normalizeClientOps } from '../clientOpsService'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { placeDocument } from '../docClassify'
 import { factCandidatesFromDocText } from '../docFacts'
+import { concat, makeCfb, makeDoc, makeXls, utf16 } from './officeFixtures'
+import { legacyKindOf, legacyText, rtfText, webDocText, webTableSheets, wordChars, isXlsFile } from '../legacyOffice'
 
 let pass = 0
 let fail = 0
@@ -33,125 +35,6 @@ async function deflateRaw(data: Uint8Array): Promise<Uint8Array> {
   const s = new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream('deflate-raw'))
   return new Uint8Array(await new Response(s).arrayBuffer())
 }
-const utf16 = (s: string) => {
-  const out = new Uint8Array(s.length * 2)
-  const dv = new DataView(out.buffer)
-  for (let i = 0; i < s.length; i++) dv.setUint16(i * 2, s.charCodeAt(i), true)
-  return out
-}
-const concat = (parts: Uint8Array[]) => {
-  const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0))
-  let at = 0
-  for (const p of parts) {
-    out.set(p, at)
-    at += p.length
-  }
-  return out
-}
-
-/** 시험용 복합 문서(CFB 3판 · 512 섹터) — 4KB 아래 흐름은 미니 흐름(64바이트 조각)에 넣는다(실제 한글 파일과 같게) */
-function makeCfb(streams: { path: string; data: Uint8Array }[]): Uint8Array {
-  const SS = 512
-  const END = 0xfffffffe
-  const FREE = 0xffffffff
-  type Node = { name: string; type: number; kids: Node[]; data?: Uint8Array; start: number; size: number; idx: number }
-  const root: Node = { name: 'Root Entry', type: 5, kids: [], start: END, size: 0, idx: 0 }
-  for (const s of streams) {
-    const parts = s.path.split('/')
-    let cur = root
-    for (const p of parts.slice(0, -1)) {
-      let k = cur.kids.find((x) => x.name === p)
-      if (!k) {
-        k = { name: p, type: 1, kids: [], start: 0, size: 0, idx: 0 }
-        cur.kids.push(k)
-      }
-      cur = k
-    }
-    cur.kids.push({ name: parts[parts.length - 1], type: 2, kids: [], data: s.data, start: END, size: s.data.length, idx: 0 })
-  }
-  const all: Node[] = []
-  const number = (n: Node) => {
-    n.idx = all.length
-    all.push(n)
-    n.kids.forEach(number)
-  }
-  number(root)
-  // 미니 흐름
-  const minis = all.filter((n) => n.type === 2 && n.size < 4096)
-  const bigs = all.filter((n) => n.type === 2 && n.size >= 4096)
-  const miniFat: number[] = []
-  const miniParts: Uint8Array[] = []
-  for (const n of minis) {
-    const count = Math.max(1, Math.ceil(n.size / 64))
-    n.start = miniFat.length
-    for (let i = 0; i < count; i++) miniFat.push(i === count - 1 ? END : miniFat.length + 1)
-    const padded = new Uint8Array(count * 64)
-    padded.set(n.data as Uint8Array)
-    miniParts.push(padded)
-  }
-  const miniContainer = concat(miniParts)
-  const secs = (bytes: number) => Math.max(bytes ? 1 : 0, Math.ceil(bytes / SS))
-  const dirSecs = secs(all.length * 128)
-  const miniFatSecs = secs(miniFat.length * 4)
-  const miniSecs = secs(miniContainer.length)
-  const bigSecs = bigs.map((n) => secs(n.size))
-  const used = dirSecs + miniFatSecs + miniSecs + bigSecs.reduce((a, b) => a + b, 0)
-  let fatSecs = 1
-  while (used + fatSecs > fatSecs * (SS / 4)) fatSecs++
-  const total = used + fatSecs
-  const fat = new Array<number>(fatSecs * (SS / 4)).fill(FREE)
-  let next = 0
-  const alloc = (count: number) => {
-    const start = next
-    for (let i = 0; i < count; i++) fat[start + i] = i === count - 1 ? END : start + i + 1
-    next += count
-    return count ? start : END
-  }
-  const dirStart = alloc(dirSecs)
-  const miniFatStart = alloc(miniFatSecs)
-  root.start = alloc(miniSecs)
-  root.size = miniContainer.length
-  for (let i = 0; i < bigs.length; i++) bigs[i].start = alloc(bigSecs[i])
-  const fatStart = next
-  for (let i = 0; i < fatSecs; i++) fat[fatStart + i] = 0xfffffffd
-  const out = new Uint8Array((total + 1) * SS)
-  const dv = new DataView(out.buffer)
-  ;[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1].forEach((b, i) => (out[i] = b))
-  dv.setUint16(0x18, 0x3e, true)
-  dv.setUint16(0x1a, 3, true)
-  dv.setUint16(0x1c, 0xfffe, true)
-  dv.setUint16(0x1e, 9, true)
-  dv.setUint16(0x20, 6, true)
-  dv.setUint32(0x2c, fatSecs, true)
-  dv.setUint32(0x30, dirStart, true)
-  dv.setUint32(0x38, 4096, true)
-  dv.setUint32(0x3c, miniFatSecs ? miniFatStart : END, true)
-  dv.setUint32(0x40, miniFatSecs, true)
-  dv.setUint32(0x44, END, true)
-  for (let i = 0; i < 109; i++) dv.setUint32(0x4c + i * 4, i < fatSecs ? fatStart + i : FREE, true)
-  const sec = (n: number) => (n + 1) * SS
-  // 목록 — 형제는 오른쪽으로 이은 나무(읽는 쪽은 왼쪽 · 자기 · 오른쪽 차례로 본다)
-  for (const n of all) {
-    const o = sec(dirStart) + n.idx * 128
-    for (let i = 0; i < n.name.length; i++) dv.setUint16(o + i * 2, n.name.charCodeAt(i), true)
-    dv.setUint16(o + 0x40, (n.name.length + 1) * 2, true)
-    out[o + 0x42] = n.type
-    out[o + 0x43] = 1
-    dv.setUint32(o + 0x44, FREE, true)
-    dv.setUint32(o + 0x48, FREE, true)
-    dv.setUint32(o + 0x4c, n.kids.length ? n.kids[0].idx : FREE, true)
-    dv.setUint32(o + 0x74, n.start, true)
-    dv.setUint32(o + 0x78, n.size, true)
-  }
-  for (const n of all) for (let i = 0; i + 1 < n.kids.length; i++) dv.setUint32(sec(dirStart) + n.kids[i].idx * 128 + 0x48, n.kids[i + 1].idx, true)
-  // 미니 FAT · 미니 흐름 · 큰 흐름 · FAT
-  miniFat.forEach((v, i) => dv.setUint32(sec(miniFatStart) + i * 4, v, true))
-  for (let i = 0; i < miniSecs; i++) out.set(miniContainer.subarray(i * SS, (i + 1) * SS), sec(root.start + i))
-  for (const n of bigs) for (let i = 0; i * SS < n.size; i++) out.set((n.data as Uint8Array).subarray(i * SS, (i + 1) * SS), sec(n.start + i))
-  fat.forEach((v, i) => dv.setUint32(sec(fatStart + Math.floor(i / (SS / 4))) + (i % (SS / 4)) * 4, v, true))
-  return out
-}
-
 /** 본문 기록 하나 — 머리(태그 · 깊이 · 크기) + 몸 */
 function rec(tag: number, level: number, body: Uint8Array): Uint8Array {
   const big = body.length >= 0xfff
@@ -427,6 +310,110 @@ async function main() {
     check('Z11 압축 · 다른 형식 · 종류 판별', isZipFile({ name: 'A.ZIP', type: '' }) && isZipFile({ name: 'x', type: 'application/x-zip-compressed' }) && !isZipFile({ name: 'a.hwpx', type: '' }) && isOtherArchive({ name: 'a.egg' }) && !isOtherArchive({ name: 'a.zip' }) && mimeOf('A.JPG') === 'image/jpeg' && mimeOf('noext') === 'application/octet-stream')
     const empty = await expandArchives([fileOf('빈.zip', await makeZip([{ name: '폴더/', data: '' }]))])
     check('Z12 빈 압축 → 그대로 · "안에 서류가 없어요"', empty.files.length === 1 && (empty.notes[0].reason ?? '').includes('없어요'))
+  }
+
+  /* ---------------- D-301 옛 엑셀(.xls) · 옛 워드(.doc) · 파워포인트(.pptx) ---------------- */
+  {
+    const enc = new TextEncoder()
+    const xls = makeXls(
+      [
+        {
+          name: '가입자명부',
+          rows: [
+            ['사업장명', '한솔테크(주)'],
+            [],
+            ['연번', '성명', '주민등록번호', '자격취득일', '월급여', '비율', '합계식', '비고식', '메모', '재직'],
+            [1, '김철수', '900101-1234567', { date: 45200 }, 2500000, 0.1 + 0.2, { fnum: 1234.5 }, { fstr: '정규직' }, { label: '바로 적힌 글' }, { bool: true }],
+            [2, '박영희', '880202-2345678', { date: 45108, xf: 2 }, { mulrk: [3000000, 7, 8] }],
+          ],
+        },
+        { name: 'Sheet2', rows: [['두 번째 시트']] },
+      ],
+      { splitSst: true },
+    )
+    const t = await legacyText('xls', xls)
+    const lines = t.split('\n')
+    check('XL1 옛 엑셀(.xls) — 시트 이름 · 글 표(SST · CONTINUE 에서 잘린 한글 글도 그대로) · 줄마다 탭', t.startsWith('[가입자명부]') && lines.includes('사업장명\t한솔테크(주)') && lines.includes('연번\t성명\t주민등록번호\t자격취득일\t월급여\t비율\t합계식\t비고식\t메모\t재직') && t.includes('[Sheet2]\n두 번째 시트'), t.slice(0, 300))
+    check('XL2 칸 값 — 정수(RK) · 소수(0.30000000000000004 → 0.3) · 날짜(기본 서식 · "yyyy년" 서식) · 식 결과(숫자 · 글) · 바로 적힌 글 · 참거짓 · 숫자 여럿(MULRK)', lines.includes('1\t김철수\t900101-1234567\t2023-10-01\t2500000\t0.3\t1234.5\t정규직\t바로 적힌 글\tTRUE') && lines.includes('2\t박영희\t880202-2345678\t2023-07-01\t3000000\t7\t8'), lines)
+    const x1904 = await legacyText('xls', makeXls([{ name: 'a', rows: [[{ date: 43738 }]] }], { date1904: true }))
+    check('XL3 1904 날짜 체계(맥 엑셀) — 1462일 더해서', x1904 === '2023-10-01', x1904)
+    const errOf = async (f: () => Promise<unknown>) => {
+      try {
+        await f()
+        return ''
+      } catch (e) {
+        return e instanceof OfficeReadError ? e.message : `다른 오류: ${String(e)}`
+      }
+    }
+    check('XL4 암호 엑셀 · 아주 옛 엑셀(95) · 엉뚱한 파일 — 사람 말', (await errOf(() => legacyText('xls', makeXls([{ name: 'a', rows: [['x']] }], { encrypt: true })))).includes('암호') && (await errOf(() => legacyText('xls', makeXls([{ name: 'a', rows: [['x']] }], { biff5: true })))).includes('아주 옛 엑셀') && (await errOf(() => legacyText('xls', enc.encode('그냥 글')))).includes('엑셀(.xls) 파일이 아닙니다'))
+    // 관공서 · EDI '엑셀로 저장' — 이름만 .xls 인 웹 표(euc-kr)
+    const cp = (arr: number[]) => new Uint8Array(arr)
+    const html = concat([enc.encode('<html><head><meta http-equiv="Content-Type" content="text/html; charset=euc-kr"></head><body><table border=1><thead><tr><th>'), cp([188, 186, 184, 237]), enc.encode('</th><th colspan="2">'), cp([193, 214, 185, 206, 181, 238, 183, 207, 185, 248, 200, 163]), enc.encode('</th><th>X</th></tr></thead><tr><td>'), cp([199, 209, 188, 214, 193, 164, 185, 208]), enc.encode('&nbsp;</td><td>900101</td><td>1234567</td><td>a&amp;b</td></tr></table></body></html>')])
+    const ht = await legacyText('xls', html)
+    check('XL5 이름만 .xls 인 웹 표(euc-kr · th · colspan · &nbsp; · &amp;) → 표 그대로', ht === '성명\t주민등록번호\t\tX\n한솔정밀\t900101\t1234567\ta&b', ht)
+    const ssml = '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="명부"><Table><Row><Cell><Data ss:Type="String">성명</Data></Cell><Cell ss:Index="3"><Data ss:Type="String">입사일</Data></Cell></Row><Row><Cell><Data ss:Type="String">김철수</Data></Cell><Cell ss:Index="3"><Data ss:Type="DateTime">2026-01-15T00:00:00.000</Data></Cell></Row></Table></Worksheet></Workbook>'
+    const st = await legacyText('xls', enc.encode(ssml))
+    check('XL6 이름만 .xls 인 엑셀 2003 XML — 칸 건너뛰기(ss:Index) · 날짜', st === '성명\t\t입사일\n김철수\t\t2026-01-15', st)
+    const realXlsx = zipStore([
+      { name: 'xl/workbook.xml', data: '<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>' },
+      { name: 'xl/worksheets/sheet1.xml', data: '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>속은 xlsx</t></is></c></row></sheetData></worksheet>' },
+    ])
+    check('XL7 이름만 .xls 인 .xlsx(ZIP) → .xlsx 로 읽음', (await legacyText('xls', realXlsx)) === '속은 xlsx')
+    check('XL8 웹 표 읽개 — 표 없는 웹 문서는 빈 목록', webTableSheets('<html><body><p>표 없음</p></body></html>').length === 0)
+
+    // 옛 워드
+    // 표 두 행: [등록번호 | 124-81-00998] [법인명 | 한빛정밀] — 행 끝 0x07 은 문단 속성(fTtp)으로 알아본다(빈 칸 0x07 과 글자로는 같다)
+    const t1 = '사 업 자 등 록 증\r(법인사업자)\r등록번호\u0007124-81-00998\u0007\u0007법인명(단체명)\u0007\u0007한빛정밀 주식회사\u0007\u0007'
+    const rowEnd1 = t1.indexOf('00998\u0007\u0007') + 6
+    const doc = makeDoc(
+      [
+        { text: t1 },
+        { text: '\u0013 PAGE \\* MERGEFORMAT \u00143\u0015\rISO 9001\u000bline2\r', compressed: true },
+      ],
+      { rowEnds: [rowEnd1, t1.length - 1] },
+    )
+    const wt = await legacyText('doc', doc)
+    const wl = wt.split('\n')
+    check('W1 옛 워드(.doc) — 조각표(UTF-16 조각 + 1바이트 조각) · 문단 · 표 한 행 = 한 줄(빈 칸은 자리만) · 필드는 결과만 · 줄바꿈', wl[0] === '사 업 자 등 록 증' && wl.includes('등록번호\t124-81-00998') && wl.includes('법인명(단체명)\t\t한빛정밀 주식회사') && wl.includes('3') && !wt.includes('PAGE') && wl.includes('ISO 9001') && wl.includes('line2'), wl)
+    const noTtp = (await legacyText('doc', makeDoc([{ text: 'A\u0007B\u0007\u0007C\r' }]))).split('\n')
+    check('W1b 문단 속성이 없으면(행 끝을 모름) 한 줄로 이어질 뿐 · 글은 다 있음', noTtp[0] === 'A\tB\t\tC', noTtp)
+    check('W2 0Table 쓰는 문서도', (await legacyText('doc', makeDoc([{ text: '영번 표\r' }], { table: '0Table' }))) === '영번 표')
+    check('W3 암호 워드 · 아주 옛 워드(95) · 이름만 .doc 인 .docx — 사람 말', (await errOf(() => legacyText('doc', makeDoc([{ text: 'x' }], { encrypted: true })))).includes('암호') && (await errOf(() => legacyText('doc', makeDoc([{ text: 'x' }], { nFib: 0x0065 - 1 })))).includes('아주 옛 워드') && (await errOf(() => legacyText('doc', zipStore([{ name: 'word/document.xml', data: 'x' }])))).includes('.docx 로 바꿔'))
+    const rtf = "{\\rtf1\\ansi\\ansicpg949\\deff0{\\fonttbl{\\f0 Batang;}}{\\*\\generator Riched20;}\\f0\\'bb\\'e7\\'be\\'f7\\'c0\\'da\\'b5\\'ee\\'b7\\'cf\\'c1\\'f5\\par \\'b5\\'ee\\'b7\\'cf\\'b9\\'f8\\'c8\\'a3\\tab 124-81-00998\\par \\u54620?\\u44544? done}"
+    check('W4 이름만 .doc 인 RTF(cp949 \\\'hh · \\u · 글꼴표 · 생성기 빼기)', rtfText(rtf) === '사업자등록증\n등록번호\t124-81-00998\n한글 done', rtfText(rtf))
+    check('W5 이름만 .doc 인 웹 문서 → 문단 · 표 줄', webDocText('<html><head><title>x</title><style>p{}</style></head><body><p>상호&nbsp;한빛</p><table><tr><td>대표</td><td>김가나</td></tr></table></body></html>') === '상호 한빛\n대표\t김가나', webDocText('<p>상호&nbsp;한빛</p><table><tr><td>대표</td><td>김가나</td></tr></table>'))
+    check('W6 wordChars — 겹친 필드 · 쪽 나눔 · 줄 끝 탭 · 3줄 넘는 빈 줄', wordChars('A\u0013 X \u0013 Y \u0014y\u0015 \u0014r\u0015B\u000cC\u0007\u0007\r\r\r\rD') === 'ArB\nC\n\nD', wordChars('A\u0013 X \u0013 Y \u0014y\u0015 \u0014r\u0015B\u000cC\u0007\u0007\r\r\r\rD'))
+
+    // 파워포인트
+    const slide = (body: string) => `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree>${body}</p:spTree></p:cSld></p:sld>`
+    const ap = (t: string) => `<p:sp><p:txBody><a:p><a:r><a:t>${t}</a:t></a:r></a:p></p:txBody></p:sp>`
+    const pptx = await makeZip([
+      { name: 'ppt/slides/slide10.xml', data: slide(ap('열째 장')), deflate: true },
+      { name: 'ppt/slides/slide2.xml', data: slide(`${ap('둘째 장')}<p:graphicFrame><a:graphic><a:graphicData><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>매출</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>12억</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>`), deflate: true },
+      { name: 'ppt/slides/slide1.xml', data: slide(ap('회사 소개서')), deflate: true },
+      { name: 'ppt/slides/_rels/slide1.xml.rels', data: '<x/>' },
+    ])
+    const pt = await legacyText('pptx', pptx)
+    check('P1 파워포인트(.pptx) — 슬라이드 차례(1 · 2 · 10) · 표 한 행 한 줄', pt === '회사 소개서\n\n둘째 장\n매출\t12억\n\n열째 장', pt)
+
+    // 읽기 길 · 분류 · 사실
+    check('E8 종류 — .xls · .doc · .pptx(대소문자 · 브라우저 종류) · 명부용 isXlsFile', legacyKindOf('A.XLS') === 'xls' && legacyKindOf('b.Doc') === 'doc' && legacyKindOf('c.pptx') === 'pptx' && legacyKindOf('x', 'application/msword') === 'doc' && legacyKindOf('a.docx') === null && legacyKindOf('a.xlsx') === null && isXlsFile({ name: '명부.XLS' }))
+    check('E9 읽을 수 있는 파일 — .xls · .doc · .pptx 도(예전엔 이름으로만)', canExtractText(fileOf('a.xls', new Uint8Array(1))) && canExtractText(fileOf('a.doc', new Uint8Array(1))) && canExtractText(fileOf('a.pptx', new Uint8Array(1))))
+    const docFile = fileOf('스캔_0007.doc', doc)
+    const res = await extractTextFromFile(docFile)
+    const base = normalizeClientOps({ id: 'od2', companyName: '한빛정밀', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+    const placed = placeDocument({ text: res.text, fileName: docFile.name }, allDocumentMetas(base))
+    check('E10 이름이 "스캔_0007.doc" 여도 글로 사업자등록증 칸 · 확실(예전: 기타 · 확인 필요)', res.method === 'doc' && placed.kind === 'existing' && placed.key === 'businessRegistration' && placed.sure, { m: res.method, placed })
+    const facts = factCandidatesFromDocText('businessRegistration', res.text, 'doc:doc')
+    check('E11 옛 워드 표 줄에서 사업자등록번호 찾음', facts.some((f) => f.key === 'businessNumber' && f.value === '124-81-00998'), facts)
+    const xr = await extractTextFromFile(fileOf('명부.xls', xls))
+    check('E12 읽기 길 — 옛 엑셀은 방법 "xls" · 같은 글', xr.method === 'xls' && xr.text.includes('김철수'), xr.method)
+    // 압축 안 옛 서류도
+    const { files } = await expandArchives([fileOf('옛서류.zip', await makeZip([{ name: '정관.doc', data: makeDoc([{ text: '정 관\r제1조 상호\r' }]), utf8: true }, { name: '명부.xls', data: xls, utf8: true }]))])
+    const docIn = files.find((f) => f.name === '정관.doc') as File
+    const xlsIn = files.find((f) => f.name === '명부.xls') as File
+    check('E13 압축 안 .doc · .xls 도 꺼내서 바로 읽힘(종류 application/msword · vnd.ms-excel)', docIn?.type === 'application/msword' && xlsIn?.type === 'application/vnd.ms-excel' && (await extractTextFromFile(docIn)).text.startsWith('정 관') && (await extractTextFromFile(xlsIn)).text.includes('박영희'))
+    check('E14 mimeOf — doc · xls · pptx', mimeOf('a.doc') === 'application/msword' && mimeOf('a.xls') === 'application/vnd.ms-excel' && mimeOf('a.pptx').includes('presentationml'))
   }
 
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)

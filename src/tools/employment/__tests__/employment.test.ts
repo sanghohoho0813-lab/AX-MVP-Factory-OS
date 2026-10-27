@@ -64,6 +64,7 @@ import {
   normDate,
   type RosterEmployee,
 } from '../lib/payrollDiagnosis'
+import { makeXls } from '../../../services/__tests__/officeFixtures'
 
 let passed = 0
 let failed = 0
@@ -457,6 +458,27 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('엑셀 명부: 주민번호 원본은 보관하지 않는다', JSON.stringify(r.employees).indexOf('900101-1234567') < 0 && r.employees?.[0].rrnMasked === '900101-1******' && r.employees?.[0].birthDate === '1990-01-01')
   const bad = await parseRosterFile(new File([new TextEncoder().encode('hwp 인 척')], '명부.hwp', { type: '' }))
   check('엑셀 아닌 파일: 안 읽는 것은 그대로 안 읽는다', bad.ok === false && bad.error === 'unsupported')
+}
+
+// ── D-301 옛 엑셀(.xls) 명부 — 예전엔 "xlsx 나 CSV 로 다시 저장하세요" ─────────
+{
+  const xls = makeXls([
+    {
+      name: '가입자명부',
+      rows: [
+        ['사업장명', '한솔테크(주)'],
+        [],
+        ['연번', '성명', '주민등록번호', '자격취득일'],
+        [1, '김철수', '900101-1234567', { date: 46037 }],
+        [2, '박영희', '880202-2345678', '2025-07-01'],
+      ],
+    },
+  ])
+  const r = await parseRosterFile(new File([xls as BlobPart], '4대보험 가입자명부.xls', { type: 'application/vnd.ms-excel' }))
+  check('옛 엑셀(.xls) 명부: 그대로 읽어 두 명 · 이름 · 입사일(날짜 칸) · 주민번호 원본 보관 0', r.ok === true && (r.employees?.length ?? 0) === 2 && r.employees?.[0].name === '김철수' && r.employees?.[0].hireDate === '2026-01-15' && JSON.stringify(r.employees).indexOf('900101-1234567') < 0, JSON.stringify({ ok: r.ok, error: r.error, e: r.employees?.map((e) => [e.name, e.hireDate]) }))
+  const html = '<html><meta charset="utf-8"><table><tr><td>연번</td><td>성명</td><td>주민등록번호</td><td>자격취득일</td></tr><tr><td>1</td><td>김철수</td><td>900101-1234567</td><td>2026-01-15</td></tr><tr><td>2</td><td>박영희</td><td>880202-2345678</td><td>2025-07-01</td></tr></table></html>'
+  const r2 = await parseRosterFile(new File([new TextEncoder().encode(html)], 'EDI_명부.xls', { type: 'application/vnd.ms-excel' }))
+  check('이름만 .xls 인 웹 표(EDI · 홈택스 엑셀 저장) 명부: 두 명', r2.ok === true && (r2.employees?.length ?? 0) === 2, JSON.stringify({ ok: r2.ok, error: r2.error }))
 }
 
 /* ---- D-91 모듈 기록: 대상자 · 진행 보드 · 시뮬레이터 ---- */

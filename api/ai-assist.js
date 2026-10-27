@@ -26,7 +26,8 @@ const IDEM_TTL = 15 * 60_000
 /** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
 export const PILOT_PROVIDERS = new Set(['gemini'])
 // SAAS-1 특허 명세서(대표 전용 화면 · 대표 회사 기준)는 늘 막는다 — 벤처 사업계획서(기업인증 안)는 팀장도 쓴다(D-257)
-export const CUSTOMER_ALWAYS_BLOCKED = new Set(['patent'])
+// D-300 홈페이지 만들기(site)도 대표 전용 화면이라 팀장 · 고객은 늘 막는다
+export const CUSTOMER_ALWAYS_BLOCKED = new Set(['patent', 'site'])
 // SAAS-2 마케팅(레이더 · 홍보 글 · 스레드 · 숏폼)은 사용량 장부(0022 + AI_USAGE_SECRET)가 켜졌을 때만 고객에게 연다
 export const MARKETING_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
 /** 장부가 꺼진 지금 고객에게 닫힌 화면(예전 이름 — 시험이 쓴다) */

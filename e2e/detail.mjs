@@ -376,6 +376,39 @@ for (const width of [360, 390, 430]) {
   await ctx.close()
 }
 
+/* ---------------- D-301 옛 워드(.doc) · 옛 엑셀(.xls) — 대충 올려도 알아서(예전엔 이름으로만) ---------------- */
+{
+  const { makeDoc, makeXls } = await import(new URL('./fixtures/office.mjs', import.meta.url).href)
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae'))
+  const BIZ = makeDoc({ lines: ['사 업 자 등 록 증', '(법인사업자)'], rows: [['등록번호', '124-81-00998'], ['법인명(단체명)', '미래바이오랩'], ['대표자', '이대표'], ['개업연월일', '2023 년 01 월 10 일'], ['사업장 소재지', '경기도 파주시 탄현면 평화로 3']], after: ['2023년 01월 12일'] })
+  const ROSTER = makeXls({ name: '가입자명부', rows: [['사업장 가입자 명부'], ['사업장명', '미래바이오랩'], [], ['연번', '성명', '주민등록번호', '자격취득일'], [1, '김청년', '000301-3123456', '2026-03-02'], [2, '이선배', '850501-1234567', '2024-05-01']] })
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([
+    { name: '스캔_0042.doc', mimeType: 'application/msword', buffer: Buffer.from(BIZ) },
+    { name: '파일3.xls', mimeType: 'application/vnd.ms-excel', buffer: Buffer.from(ROSTER) },
+  ])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = (await page.getByTestId('smart-placed').innerText()) ?? ''
+  const r = await rec()
+  const filed = Object.entries(r.documents).filter(([, d]) => d.fileName).map(([k, d]) => `${k}=${d.fileName}`)
+  check('L1 이름이 "스캔_0042.doc" 여도 옛 워드 글을 읽어 사업자등록증 칸 · "파일3.xls" → 4대보험 가입자 명부 칸', filed.includes('businessRegistration=스캔_0042.doc') && filed.includes('payrollRoster=파일3.xls'), filed.join(' | '))
+  check('L2 확인 필요 0(전부 글로 확실)', /서류함에 넣은 곳 2개/.test(placed) && !/확인 필요 [1-9]/.test(placed), placed.slice(0, 300))
+  check('L3 옛 워드 표에서 바로 입력 — 사업자번호 · 설립일 · 주소', r.businessNumber.replace(/\D/g, '') === '1248100998' && r.establishedAt === '2023-01-10' && r.businessAddress.includes('파주시'), JSON.stringify({ b: r.businessNumber, e: r.establishedAt, a: r.businessAddress }))
+  check('L4 옛 엑셀 명부로 고용지원금 명부 진단이 저절로 붙음 · 주민번호 원본은 기록에 0', (r.toolResults ?? []).some((t) => t.toolKey === 'employment' && t.title === '4대보험 명부 진단') && !JSON.stringify(r).includes('000301-3123456') && !JSON.stringify(r).includes('850501-1234567'))
+  if (process.env.D301_SHOTS) await page.screenshot({ path: `${process.env.D301_SHOTS}/old-doc-upload.png` })
+  check('D-301 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- D-146 서류 분류 — 제목으로 칸 · 겹치면 번호 칸 · 지우기 · 다시 분류 ---------------- */
 for (const width of [1440, 390]) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })

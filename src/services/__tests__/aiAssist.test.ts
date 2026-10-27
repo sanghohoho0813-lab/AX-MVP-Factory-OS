@@ -861,7 +861,7 @@ async function lockTests() {
 /** D-288 직접 질문 — 단추에 묶이지 않고 이 화면 자료로 그 질문에만 · 일정 화면 자료에 이번 달 기록 수 */
 function askTests() {
   // 화면에 AI 도우미 판이 있는 모든 화면(<AiAssist page=...>) — 화면마다 '직접 물어본 것에 답' 이 있어야 한다
-  const PANEL_PAGES = ['today', 'sales', 'clients', 'inbox', 'agents', 'money', 'calendar', 'grants', 'client', 'module', 'radar', 'content', 'threads', 'shorts'] as const
+  const PANEL_PAGES = ['today', 'sales', 'clients', 'inbox', 'agents', 'money', 'calendar', 'grants', 'client', 'module', 'radar', 'content', 'threads', 'shorts', 'site'] as const
   const miss = PANEL_PAGES.filter((pg) => {
     const p = askPresetOf(pg)
     const a = (ASSISTS as Record<string, { page: string; label: string; kind: string }>)[`${pg}.ask`]

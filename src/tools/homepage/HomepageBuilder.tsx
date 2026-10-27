@@ -7,6 +7,8 @@
  * 휴대폰에서는 [고치기 | 미리보기] 를 번갈아 본다.
  * D-208: 디자인 한 번에(스타일 6가지 — 꾸밈 + 블록 모양 + 바탕 흐름) · 홈페이지 점수 100점 + '이것만 하면 +n점'(누르면 그 블록) ·
  *        업종 맞춤 블록 [넣기] · 같은 업체 홍보 글 만들기로 바로 가기.
+ * D-300: 대표 "홈페이지 만들기에도 AI 단추" — 머리 띠 아래 AI 도우미 판(모델 고르기 · 직접 묻기 · 문구 다시 쓰기 · 자주 묻는 질문 · 검색 정보).
+ *        답마다 [이 블록에 넣기] — 규칙 함수(siteBuilder/assist)가 블록 칸에 넣고, [되돌리기] 로 돌아간다. 초안 만들기는 그대로 규칙.
  * D-227: 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 토스처럼 다음 단계로" —
  *        블록 · 꾸밈 · 점검 탭을 ① 내용 고치기 → ② 꾸미기 → ③ 점검 · 내려받기 단계로(아무 단계나 눌러 가도 된다),
  *        단계 끝마다 [다음 단계] 단추, ③ 에 [HTML 내려받기] 를 크게. 점수 카드는 '이것만 하면' 첫 칸만 보이고 나머지는 접는다.
@@ -59,6 +61,11 @@ import {
   siteFacts,
   siteFileName,
   withContactPhone,
+  siteAssistBundle,
+  applyCopy,
+  applyFaq,
+  applySeo,
+  copyTargetOf,
   type BlockType,
   type IndustryKey,
   type ScoreItem,
@@ -76,6 +83,7 @@ import { BlockFields, IconBtn, inputClass } from './BlockFields'
 import { SitePreview, type Device } from './SitePreview'
 import type { SiteStore } from './useSiteDoc'
 import { MkHero, MkIcon } from '../marketing/mkKit'
+import { AiAssist, type AssistItemAction } from '../../components/ai/AiAssist'
 import { BLOCK_STYLE, MK_PRIMARY, TONE } from '../marketing/mkTheme'
 
 type Tab = 'blocks' | 'style' | 'checks'
@@ -343,6 +351,78 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   const nowStyle = currentStyle(doc)
   const recommendStyle = INDUSTRY_STYLE[doc.industry]
+
+  /** D-300 AI 도우미 답 → 블록에 넣기(늘 그때의 최신 홈페이지에 · [되돌리기] 로 돌아감) */
+  const COPY_LABEL = { hero: '첫 화면', about: '회사 소개', services: '하는 일', cta: '연락 권유' } as const
+  const assistActions = (assistId: string): AssistItemAction[] | null => {
+    if (assistId === 'site.copy')
+      return [
+        {
+          id: 'site-put',
+          label: '이 블록에 넣기',
+          primary: true,
+          run: (item) => {
+            const target = copyTargetOf(item)
+            const r = applyCopy(docRef.current ?? doc, item, nowIso())
+            if (!r) {
+              showToast(target ? `${COPY_LABEL[target]} 블록이 없어요 — [블록 더하기] 로 넣은 뒤 다시 눌러 주세요.` : '어느 블록 문구인지 알 수 없어요.')
+              return false
+            }
+            change(r.doc)
+            setSelected(r.blockId)
+            setTab('blocks')
+            showToast(`${COPY_LABEL[r.target]} 블록에 넣었어요 — 마음에 안 들면 [되돌리기].`)
+            return true
+          },
+        },
+      ]
+    if (assistId === 'site.faq')
+      return [
+        {
+          id: 'site-faq-put',
+          label: '자주 묻는 질문에 넣기',
+          primary: true,
+          once: true,
+          run: (item) => {
+            let d = docRef.current ?? doc
+            let faq = d.blocks.find((b) => b.type === 'faq')
+            // 자주 묻는 질문 블록이 없으면 연락처 바로 위에 하나 만들고 넣는다
+            if (!faq) {
+              const b = newBlock('faq', record, d.industry, today, generateId(), promo)
+              const contact = d.blocks.find((x) => x.type === 'contact')
+              const before = contact ? d.blocks[d.blocks.indexOf(contact) - 1] : undefined
+              d = insertBlock(d, b, before?.id ?? null, nowIso())
+              faq = b
+            }
+            const next = applyFaq(d, faq.id, item, nowIso())
+            if (!next) {
+              showToast('넣지 못했어요 — 같은 질문이 이미 있거나 10개가 다 찼어요.')
+              return false
+            }
+            change(next)
+            setSelected(faq.id)
+            setTab('blocks')
+            return true
+          },
+        },
+      ]
+    if (assistId === 'site.seo')
+      return [
+        {
+          id: 'site-seo-put',
+          label: '검색 정보에 넣기',
+          primary: true,
+          run: (item) => {
+            const next = applySeo(docRef.current ?? doc, item, nowIso())
+            if (!next) return false
+            change(next)
+            showToast('검색 제목 · 설명에 넣었어요 — ② 꾸미기 › 검색 정보에서 고칠 수 있어요.')
+            return true
+          },
+        },
+      ]
+    return null
+  }
 
   /* ---- 머리 도구줄 ---- */
   const toolbar = (
@@ -764,6 +844,14 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         />
         <div className="p-3 sm:p-4">{toolbar}</div>
       </section>
+      <AiAssist
+        page="site"
+        scope={`site:${record.id}`}
+        title={`홈페이지 · ${record.companyName}`}
+        presets={['site.copy', 'site.faq', 'site.seo']}
+        build={() => siteAssistBundle({ record, doc: docRef.current ?? doc, today, promo })}
+        itemActions={assistActions}
+      />
       {mismatch && (
         <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-amber-200 bg-amber-50 p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
           <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />

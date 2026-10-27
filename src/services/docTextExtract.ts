@@ -8,6 +8,7 @@
  * 두 라이브러리 모두 실제로 쓸 때만 내려받도록 동적 import 한다.
  *  - 엑셀(.xlsx): 칸 안의 글자를 그대로 뽑는다 (D-89). 라이브러리를 쓰지 않는다.
  *  - 한글(.hwp · .hwpx) · 워드(.docx): 본문 글과 표를 뽑는다 (D-266 — officeText). 라이브러리를 쓰지 않는다.
+ *  - 옛 엑셀(.xls) · 옛 워드(.doc) · 파워포인트(.pptx): D-301 — legacyOffice. 이름만 옛 형식인 웹 표 · RTF 도 글만.
  */
 
 import { isXlsxFile, readXlsxText } from './xlsxText'
@@ -15,8 +16,9 @@ import { pdfItemsToText } from './pdfTextLines'
 import { REREAD_MARK } from './bizNoRead'
 import { ensureMapUpsert } from '../lib/mapUpsert'
 import { officeKindOf, officeText } from './officeText'
+import { legacyKindOf, legacyText } from './legacyOffice'
 
-export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx'
+export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx'
 
 export interface ExtractResult {
   text: string
@@ -221,6 +223,15 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     onProgress?.(1, office === 'docx' ? '워드 문서 읽음' : '한글 문서 읽음')
     return { text, method: office === 'docx' ? 'docx' : 'hwp' }
   }
+  // D-301 옛 엑셀 · 옛 워드 · 파워포인트 — 엑셀은 .xlsx 와 같은 모양(탭 · 줄), 워드 · 파워포인트는 본문 글
+  const legacy = legacyKindOf(file.name, file.type)
+  if (legacy) {
+    const what = legacy === 'xls' ? '엑셀' : legacy === 'doc' ? '워드 문서' : '파워포인트'
+    onProgress?.(0.2, `${what} 여는 중`)
+    const text = await legacyText(legacy, new Uint8Array(await file.arrayBuffer()))
+    onProgress?.(1, `${what} 읽음`)
+    return { text, method: legacy }
+  }
   // 글자 파일은 그대로 읽는다 — 홈택스 텍스트 저장본, 복사해 둔 메모
   if (file.type.startsWith('text/') || /\.(txt|md|csv)$/i.test(file.name)) {
     onProgress?.(1, '글자 파일 읽는 중')
@@ -249,6 +260,9 @@ export const EXTRACT_METHOD_LABEL: Record<ExtractMethod, string> = {
   xlsx: '엑셀 표',
   hwp: '한글 문서',
   docx: '워드 문서',
+  xls: '엑셀 표(옛 형식)',
+  doc: '워드 문서(옛 형식)',
+  pptx: '파워포인트',
 }
 
 /** 판독기가 읽을 수 있는 파일인지 — 아니면 파일 이름만으로 판별한다 */
@@ -256,6 +270,7 @@ export function canExtractText(file: File): boolean {
   return (
     isXlsxFile(file) ||
     officeKindOf(file.name, file.type) !== null ||
+    legacyKindOf(file.name, file.type) !== null ||
     file.type === 'application/pdf' ||
     /\.pdf$/i.test(file.name) ||
     file.type.startsWith('image/') ||

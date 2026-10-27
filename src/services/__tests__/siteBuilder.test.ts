@@ -6,7 +6,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { adoptRow, isTrialId, normalizeTrial, registerInput, rowSubjectId, sameNameClient, subjectQuery, subjectRow, trialRecord, TRIAL_SAMPLES, withoutProvisional, withTrialDetails, type TrialProfile } from '../marketingTrial'
-import { industryForRecord, siteFacts } from '../siteBuilder'
+import { industryForRecord, siteFacts, siteAssistBundle, applyCopy, applyFaq, applySeo, copyTargetOf } from '../siteBuilder'
 import { promoForSite } from '../contentStudio'
 import {
   ALL_ART,
@@ -544,6 +544,39 @@ check('H83 믿음 기록이 없으면 업종에 맞는 블록 더하기(병의�
   check('D237-7 나중에 더하는 후기 · 연락처 블록도 홍보 정보로(없으면 빈 칸 그대로)', (nb.props.items as { text: string }[])[0].text === '아이가 매일 가고 싶어 해요' && (nbEmpty.props.items as { text: string }[])[0].text === '' && nc.props.phone === '031-555-0000' && nc.props.hours === '평일 9시~6시 · 토 10시~2시')
   const html = renderSiteHtml(pd)
   check('D237-8 HTML 에 후기 · 영업시간이 나오고 공격 글은 막힘', html.includes('아이가 매일 가고 싶어 해요') && html.includes('평일 9시~6시') && !/<script/i.test(renderSiteHtml(draftSite(noPhone, { today, now, makeId, promo: { voice: '<script>alert(1)</script>' } }))))
+}
+
+/* ---------------- D-300 AI 도우미 — 보낼 자료 · 답을 블록에 넣기 ---------------- */
+{
+  n = 0
+  const d0 = draftSite(full, { today, now, makeId })
+  const sent = JSON.stringify(siteAssistBundle({ record: full, doc: d0, today }).context)
+  check('AI1 보낼 자료 — 회사 · 업종 · 하는 일 · 지역 · 설립 연수 · 직원 · 인증 · 지금 블록(견본 표시)', sent.includes('한솔정밀') && sent.includes('정밀 금속부품') && sent.includes('화성시') && sent.includes('12년째') && sent.includes('42명') && sent.includes('이노비즈') && sent.includes('견본 그대로') && sent.includes('"종류":"hero"'), sent.slice(0, 300))
+  check('AI2 보내지 않는 것 — 대표 이름 · 사업자번호 · 전화 · 휴대폰 · 메일 · 상세 주소(번지)', !sent.includes('김한솔') && !sent.includes('1234567890') && !sent.includes('123-45-67890') && !sent.includes('031-123-4567') && !sent.includes('010-9999-8888') && !sent.includes('hello@hansol') && !sent.includes('6길 15'))
+  const t = (tag: string) => copyTargetOf({ tag, title: '' })
+  check('AI3 답 tag → 블록(영어 · 우리말)', t('hero') === 'hero' && t('첫 화면') === 'hero' && t('About') === 'about' && t('하는 일') === 'services' && t('cta') === 'cta' && t('기타') === null)
+  const hero = d0.blocks.find((b) => b.type === 'hero')!
+  const r1 = applyCopy(d0, { title: '정밀 부품,\n한 번에 맞게', body: '시제품부터 양산까지 금형 · 가공을 한곳에서', tag: 'hero' }, now)
+  const h1 = r1?.doc.blocks.find((b) => b.id === hero.id)
+  check('AI4 [이 블록에 넣기] 첫 화면 — 큰 문구 · 설명이 들어가고 견본 표시가 그 칸만 빠짐', !!r1 && r1.blockId === hero.id && h1?.props.title === '정밀 부품,\n한 번에 맞게' && h1?.props.subtitle === '시제품부터 양산까지 금형 · 가공을 한곳에서' && !(h1?.sample ?? []).includes('title') && !(h1?.sample ?? []).includes('subtitle'), h1)
+  const r2 = applyCopy(d0, { title: '하는 일', tag: 'services', outline: ['정밀 가공 — 0.01mm 공차 부품', '- 금형: 사출 금형 설계 · 제작', '시제품'] }, now)
+  const sv = r2?.doc.blocks.find((b) => b.type === 'services')
+  check('AI5 하는 일 — "이름 — 설명" 줄을 목록으로(— · : · 설명 없는 줄 모두)', JSON.stringify(sv?.props.items) === JSON.stringify([{ name: '정밀 가공', desc: '0.01mm 공차 부품' }, { name: '금형', desc: '사출 금형 설계 · 제작' }, { name: '시제품', desc: '' }]), sv?.props.items)
+  const long = 'ㄱ'.repeat(500)
+  const r3 = applyCopy(d0, { title: long, body: long, tag: 'hero' }, now)
+  const h3 = r3?.doc.blocks.find((b) => b.id === hero.id)
+  check('AI6 글자 수 한도(큰 문구 80 · 설명 200)', String(h3?.props.title).length === 80 && String(h3?.props.subtitle).length === 200)
+  const noAbout = { ...d0, blocks: d0.blocks.filter((b) => b.type !== 'about') }
+  check('AI7 그 블록이 없거나 어느 블록인지 모르면 넣지 않음(null)', applyCopy(noAbout, { title: '소개', body: '글', tag: 'about' }, now) === null && applyCopy(d0, { title: 'x', body: 'y', tag: '?' }, now) === null)
+  n = 0
+  const fb = newBlock('faq', full, d0.industry, today, 'faq1')
+  const dF = insertBlock(d0, fb, null, now)
+  const f1 = applyFaq(dF, 'faq1', { title: '견적은 얼마나 걸리나요?', body: '도면을 받으면 상담 때 정확히 알려 드려요.' }, now)
+  const f2 = f1 && applyFaq(f1, 'faq1', { title: '소량도 되나요?', body: '시제품 1개부터 됩니다.' }, now)
+  const items = (f2?.blocks.find((b) => b.id === 'faq1')?.props.items ?? []) as { q: string }[]
+  check('AI8 자주 묻는 질문 — 견본 질문은 비우고 AI 질문부터 · 다음은 뒤에 더함 · 같은 질문은 두 번 안 들어감', items.map((x) => x.q).join('|') === '견적은 얼마나 걸리나요?|소량도 되나요?' && applyFaq(f2!, 'faq1', { title: '소량도 되나요?', body: '또' }, now) === null, items)
+  const s1 = applySeo(d0, { title: '한솔정밀 | 화성 정밀 부품 가공', detail: '화성 동탄산단에서 금형 · 정밀 가공을 한곳에서 합니다.' }, now)
+  check('AI9 검색 제목 · 설명에 넣기', s1?.seo.title === '한솔정밀 | 화성 정밀 부품 가공' && s1?.seo.description === '화성 동탄산단에서 금형 · 정밀 가공을 한곳에서 합니다.')
 }
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)

@@ -121,7 +121,7 @@ export function MaterialsCard({
           업체 서류함에서 가져오기
         </Button>
       )}
-      <input ref={fileRef} type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx,.hwp,.hwpx,.docx" onChange={(e) => void onFiles(e.target.files)} data-testid="material-file-input" />
+      <input ref={fileRef} type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx,.xls,.hwp,.hwpx,.docx,.doc,.pptx" onChange={(e) => void onFiles(e.target.files)} data-testid="material-file-input" />
       {reading && (
         <p className="t-sub flex items-center gap-2 text-slate-600" role="status">
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />

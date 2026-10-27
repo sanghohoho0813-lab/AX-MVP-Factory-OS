@@ -9,6 +9,7 @@
 
 import { extractTextFromFile } from '../../../services/docTextExtract'
 import { isXlsxFile, readXlsxText } from '../../../services/xlsxText'
+import { isXlsFile, xlsText } from '../../../services/legacyOffice'
 import { detectRoster, extractEmployees, parseRosterText, textToGrid, type RosterEmployee, type RosterMeta } from './rosterCore'
 
 export * from './rosterCore'
@@ -29,15 +30,17 @@ export interface RosterFileResult {
 
 // ── 파일 파싱 (엑셀 · CSV/TSV 글자 · PDF) — 브라우저 메모리에서만 ──────────
 // 엑셀(.xlsx)은 D-89 부터 그대로 읽는다 (services/xlsxText.ts, 라이브러리 없이).
+// D-301 옛 엑셀(.xls · EDI · 홈택스에서 받은 '엑셀' 이 웹 표인 것 포함)도 같은 모양 글로 읽어 같은 길로 간다(services/legacyOffice.ts).
 export async function parseRosterFile(file: File): Promise<RosterFileResult> {
   const ext = (file.name.split('.').pop() || '').toLowerCase()
   const isText = file.type.startsWith('text/') || ['csv', 'tsv', 'txt'].indexOf(ext) >= 0
   const isPdf = file.type === 'application/pdf' || ext === 'pdf'
-  const isXlsx = isXlsxFile(file)
+  const isXls = isXlsFile(file)
+  const isXlsx = isXlsxFile(file) || isXls
   if (!isText && !isPdf && !isXlsx) return { ok: false, error: 'unsupported' }
   try {
     if (isXlsx) {
-      const text = await readXlsxText(await file.arrayBuffer())
+      const text = isXls ? await xlsText(new Uint8Array(await file.arrayBuffer())) : await readXlsxText(await file.arrayBuffer())
       const grid = textToGrid(text)
       if (!grid || grid.length < 2) return { ok: false, error: 'empty' }
       const det = detectRoster(grid)

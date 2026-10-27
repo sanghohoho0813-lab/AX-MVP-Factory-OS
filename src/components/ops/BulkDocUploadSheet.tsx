@@ -508,7 +508,7 @@ export function BulkDocUploadSheet({
             </Button>
           </div>
           <p className="text-[0.88rem] break-keep text-slate-500">
-            PDF · 사진 · 엑셀 · 한글(hwp · hwpx) · 워드(docx)는 내용을 읽어 어느 칸인지 가리고, 압축(zip)은 풀어서 하나씩 넣습니다.
+            PDF · 사진 · 엑셀(xlsx · 옛 xls) · 한글(hwp · hwpx) · 워드(docx · 옛 doc) · 파워포인트(pptx)는 내용을 읽어 어느 칸인지 가리고, 압축(zip)은 풀어서 하나씩 넣습니다.
             그 밖의 파일은 파일 이름으로 가립니다. 사진과 스캔본은 처음 한 번 한글 인식 준비가 걸립니다.
           </p>
         </div>
