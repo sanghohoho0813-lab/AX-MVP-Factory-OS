@@ -280,6 +280,8 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
     check(`${path}: 내려가면 '맨 위로' 가 뜨고 하단 메뉴·탭을 가리지 않는다`, shown && box !== null && box.y + box.height <= below - 4, `${box && Math.round(box.y + box.height)} / ${Math.round(below)}`)
     if (shown) await btn.click()
     await page.waitForTimeout(900)
+    // 부드럽게 올라가는 데 1~1.5초 걸린다(긴 화면 · 바쁜 시험 기계) — 다 올라갈 때까지 3초 안에서 기다린다
+    await page.waitForFunction(() => window.scrollY === 0, null, { timeout: 3000 }).catch(() => {})
     if (path.includes('cretop')) check(`${path}: 크레탑 하단 탭이 화면 아래에 붙어 있다(시험이 제 구실을 하는지)`, below < 844 - 60, String(Math.round(below)))
     check(`${path}: 누르면 맨 위로 간다`, (await page.evaluate(() => window.scrollY)) === 0)
   }

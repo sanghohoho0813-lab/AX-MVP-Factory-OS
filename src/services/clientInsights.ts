@@ -214,7 +214,7 @@ const startupInsight: Provider = ({ record, today, facts }) => {
  * D-302 명부 날짜로 센 인원(서류 올리기 · 명부 화면이 붙임) → 통합고용세액공제. 단가는 볼 때마다 지금 업체 주소 · 중소기업 확인으로.
  * 작년보다 줄었으면 공제 없음 · 같으면 '1명 늘면' 힌트. 직원 300명 이상인데 중소기업 확인이 없으면 단가를 정하지 않는다.
  */
-export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: RosterHeadcount): { won: number; line: string; assumptions: string[] } | null {
+export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: RosterHeadcount): { won: number; line: string; basis: string; assumptions: string[] } | null {
   const sme = smeConfirmed(record)
   if (!sme && facts.employeeCount !== null && facts.employeeCount >= 300) return null
   const sido = placeOf(facts.address).sido
@@ -223,14 +223,16 @@ export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: Ro
   const p = `${hc.prev.year}년 평균 ${headText(hc.prev.total)}명`
   const c = `${hc.cur.year}년 ${hc.cur.actualMonths < 12 ? '예상 ' : ''}${headText(hc.cur.total)}명`
   const assumptions = [
-    ...(hc.basis === 'current' ? ['지금 직원만 있는 명부 — 작년에 그만둔 사람이 있으면 작년 인원이 늘어 공제가 줄어요'] : []),
+    ...(hc.basis === 'current' ? ['지금 직원만 있는 명부 — 작년에 그만둔 사람이 있으면 공제가 줄어요'] : []),
     ...(sme ? [] : ['중소기업으로 보고 계산(★ 중소기업 확인서)']),
     ...(region ? [] : ['주소를 몰라 수도권 단가(더 낮은 쪽)로 계산']),
   ]
   const won = estimate.creditTotal ?? 0
-  if (won > 0) return { won, line: `통합고용세액공제 예상 약 ${manwonText(won)}(${p} → ${c} · 명부 날짜로 셈 · 세무사 확인)`, assumptions }
-  if (hc.cur.total < hc.prev.total) return { won: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, assumptions }
-  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 1년에 약 ${manwonText(units.youth * 10_000)} 덜 내요`, assumptions }
+  // basis: 금액을 제목 · 금액 줄이 이미 말할 때 설명 칸에 쓸 '어떻게 셌나' 만
+  const basis = `${p} → ${c} · 명부 날짜로 셈 · 세무사 확인`
+  if (won > 0) return { won, line: `통합고용세액공제 예상 약 ${manwonText(won)}(${basis})`, basis, assumptions }
+  if (hc.cur.total < hc.prev.total) return { won: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, basis, assumptions }
+  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 1년에 약 ${manwonText(units.youth * 10_000)} 덜 내요`, basis, assumptions }
 }
 
 const employmentInsight: Provider = ({ record, facts }) => {
@@ -249,15 +251,19 @@ const employmentInsight: Provider = ({ record, facts }) => {
   const fromRoster = hc ? rosterCredit(record, facts, hc) : null
   const credit = typed > 0 ? typed : (fromRoster?.won ?? 0)
   const newHires = typeof data?.counts?.newHireCount === 'number' ? data.counts.newHireCount : 0
+  const candidates = roster.verdict === 'candidates'
+  // 지원금 후보가 없고 세액공제만 있으면 제목 · 금액 줄이 금액을 말한다 — 설명 칸은 어떻게 셌는지만(같은 금액을 세 번 쓰지 않게)
+  const creditHeadline = !candidates && credit > 0
   const creditLine =
     typed > 0
-      ? `통합고용세액공제 예상 약 ${manwonText(typed)}(1차 추정 · 세무사 확인)`
+      ? creditHeadline
+        ? '명부 진단 화면에서 계산한 값 · 1차 추정 · 세무사 확인'
+        : `통합고용세액공제 예상 약 ${manwonText(typed)}(1차 추정 · 세무사 확인)`
       : fromRoster
-        ? [fromRoster.line, ...fromRoster.assumptions.slice(0, 1)].join(' · ')
+        ? [creditHeadline ? fromRoster.basis : fromRoster.line, ...fromRoster.assumptions.slice(0, 1)].join(' · ')
         : newHires > 0
           ? `최근 1년 새로 들어온 직원 ${newHires}명 — 전년 직원 수를 넣으면 통합고용세액공제도 계산해요`
           : ''
-  const candidates = roster.verdict === 'candidates'
   const amount =
     candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + 세액공제 약 ${manwonText(credit)}` : ''}` : credit > 0 ? `세액공제 약 ${manwonText(credit)}(1차 추정)` : undefined
   const first = hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, '')
@@ -267,7 +273,7 @@ const employmentInsight: Provider = ({ record, facts }) => {
     label: '고용지원금',
     // 지원금 후보가 없어도 세액공제가 나오는 업체는 제안할 거리가 있다(검토해 볼 만함)
     tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
-    headline: candidates || credit === 0 ? roster.verdictLabel || roster.title : `통합고용세액공제 예상 약 ${manwonText(credit)}`,
+    headline: creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
     detail: [first.startsWith('[') ? '' : first, creditLine].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
