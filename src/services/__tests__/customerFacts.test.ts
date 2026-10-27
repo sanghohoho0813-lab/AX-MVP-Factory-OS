@@ -949,6 +949,27 @@ await (async () => {
   check('D-232 고용: 세액공제를 아직 안 했으면 금액 없이 "새로 들어온 직원 3명 — 전년 직원 수를 넣으면" 안내(지원금 금액은 그대로)', hires?.tone === 'good' && hires?.amount === '최대 1,440만원 검토(1차 추정)' && !!hires?.detail.includes('새로 들어온 직원 3명'), JSON.stringify(hires))
   const noneRec = normalizeClientOps({ ...base, toolResults: [roster({}, 'none')] } as never)
   check('D-232 고용: 후보도 세액공제도 새 직원도 없으면 예전처럼 "지금은 어려움"', buildInsights(noneRec, T, []).find((i) => i.key === 'employment')?.tone === 'no')
+
+  // D-302 서류 올리기가 붙인 '명부 날짜로 센 인원' → 볼 때마다 지금 주소 · 규모로 세액공제
+  const hc = (prev: number, prevY: number, cur: number, curY: number, basis = 'history') => ({ asOf: '2026-09-20', prev: { year: 2025, total: prev, youth: prevY, actualMonths: 12 }, cur: { year: 2026, total: cur, youth: curY, actualMonths: 8 }, basis, counted: 3, excluded: { rel: 0, noEi: 0, noHire: 0, lostNoDate: 0 } })
+  const local = normalizeClientOps({ ...base, businessAddress: '충청북도 청주시 흥덕구 1' } as never)
+  const up = (r: unknown, data: Record<string, unknown>, verdict = 'none') => normalizeClientOps({ ...(r as object), toolResults: [roster(data, verdict)] } as never)
+  const e1 = buildInsights(up(local, { headcount: hc(2, 0, 3, 1) }), T, []).find((i) => i.key === 'employment')
+  check('D-302 고용: 명부 날짜 인원만으로 세액공제 — 지방 중소 청년 1 × 1,550만 = 1,550만 · 검토해 볼 만함', e1?.tone === 'maybe' && e1?.amount === '세액공제 약 1,550만원(1차 추정)' && !!e1?.detail.includes('2025년 평균 2명 → 2026년 예상 3명') && !!e1?.detail.includes('명부 날짜로 셈'), JSON.stringify(e1))
+  check('D-302 고용: 중소기업 확인이 없으면 가정을 같이(★)', !!e1?.detail.includes('중소기업으로 보고'), e1?.detail)
+  const e2 = buildInsights(up(local, { headcount: hc(2, 0, 3, 1, 'current'), subsidyTotal: 14_400_000 }, 'candidates'), T, []).find((i) => i.key === 'employment')
+  check('D-302 고용: 지원금 후보 + 세액공제 금액 같이 · 지금 직원만 있는 명부면 "작년에 그만둔 사람" 주의', e2?.tone === 'good' && e2?.amount === '최대 1,440만원 검토(1차 추정) + 세액공제 약 1,550만원' && !!e2?.detail.includes('작년에 그만둔 사람'), JSON.stringify(e2))
+  const e3 = buildInsights(up(local, { headcount: hc(3, 1, 2, 1) }), T, []).find((i) => i.key === 'employment')
+  check('D-302 고용: 작년보다 줄면 공제 없음 · 추징 확인 안내 · 지금은 어려움', e3?.tone === 'no' && e3?.amount === undefined && !!e3?.detail.includes('추징'), JSON.stringify(e3))
+  const e4 = buildInsights(up(local, { headcount: hc(2, 0, 2, 0) }), T, []).find((i) => i.key === 'employment')
+  check('D-302 고용: 같으면 "청년 등 1명 늘면 1년에 약 1,550만원"', e4?.tone === 'no' && !!e4?.detail.includes('1명 늘면 1년에 약 1,550만원'), JSON.stringify(e4))
+  const metro = normalizeClientOps({ ...base, businessAddress: '서울특별시 강남구 1' } as never)
+  check('D-302 고용: 서울이면 수도권 단가(1,450만)', buildInsights(up(metro, { headcount: hc(2, 0, 3, 1) }), T, []).find((i) => i.key === 'employment')?.amount === '세액공제 약 1,450만원(1차 추정)')
+  const typedFirst = buildInsights(up(local, { headcount: hc(2, 0, 3, 1), estimate: { computable: true, creditTotal: 23_000_000, incTotal: 2 } }), T, []).find((i) => i.key === 'employment')
+  check('D-302 고용: 명부 화면에서 사람이 넣어 계산한 값이 먼저', typedFirst?.amount === '세액공제 약 2,300만원(1차 추정)', JSON.stringify(typedFirst))
+  const big = withFactValue(local, 'employeeCount', '320', { source: 'meeting', status: 'entered', now: NOW232 })
+  check('D-302 고용: 직원 300명 이상인데 중소기업 확인이 없으면 단가를 정하지 않음(금액 없음)', buildInsights(up(big, { headcount: hc(2, 0, 3, 1) }), T, []).find((i) => i.key === 'employment')?.amount === undefined)
+  check('D-302 고용: 모양이 깨진 인원 기록은 무시', buildInsights(up(local, { headcount: { prev: 1 } }), T, []).find((i) => i.key === 'employment')?.amount === undefined)
 }
 
 // D-233: 판정 넓히기 마무리 — 절세 급여 vs 배당(세후 1억 · 상황 예시 '대표가 1억 가져오기' 와 같은 경로 식)

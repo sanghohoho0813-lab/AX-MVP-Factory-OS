@@ -65,6 +65,24 @@ for (const vp of [
   check(`${vp.tag} 명부: 3년 전 입사자는 기한 칸에 없음`, !panel.includes('오래된청년'))
   check(`${vp.tag} 명부: 가로 넘침 없음`, (await overflow()) <= 0)
 
+  // D-302 명부 날짜로 작년 · 올해 매월 말 인원 → 네 칸이 저절로 · 세액공제 예상이 바로
+  const hcNote = await page.getByTestId('roster-headcount').innerText().catch(() => '')
+  const val = (l) => page.getByLabel(l, { exact: true }).inputValue()
+  const four = [await val('전년도 상시근로자'), await val('전년도 청년 등'), await val('올해 상시근로자'), await val('올해 청년 등')]
+  check(`${vp.tag} D-302 명부 날짜로 셌어요 — 작년 → 올해 평균 · 지금 직원만 있는 명부 주의`, /명부 날짜로 셌어요 — \d{4}년 매월 말 평균 [\d.]+명 → \d{4}년/.test(hcNote) && (await page.getByTestId('roster-headcount-current').count()) === 1, hcNote.slice(0, 240))
+  check(`${vp.tag} D-302 네 칸이 저절로 채워짐(전년 칸도)`, four.every((v) => v !== '' && !Number.isNaN(Number(v))) && Number(four[2]) > Number(four[0]), four.join(' / '))
+  const body1 = await page.locator('body').innerText()
+  check(`${vp.tag} D-302 결과 카드에 통합고용세액공제 예상(전년 인원을 넣지 않아도)`, /통합고용세액공제 예상 약 [\d,.]+(만원|억원)/.test(body1), (body1.match(/통합고용세액공제 예상[^\n]{0,60}/) ?? [''])[0])
+  await page.getByLabel('전년도 상시근로자', { exact: true }).fill('9')
+  await page.waitForTimeout(300)
+  check(`${vp.tag} D-302 직접 고치면 그 값 그대로 · [명부 값으로 네 칸 채우기] 단추`, (await val('전년도 상시근로자')) === '9' && (await page.getByTestId('roster-headcount-apply').count()) === 1)
+  await page.getByTestId('roster-headcount-apply').click()
+  await page.waitForTimeout(300)
+  check(`${vp.tag} D-302 단추 → 다시 명부 값 · 단추 사라짐`, (await val('전년도 상시근로자')) === four[0] && (await page.getByTestId('roster-headcount-apply').count()) === 0, await val('전년도 상시근로자'))
+  check(`${vp.tag} D-302 가로 넘침 없음(안내 칸 포함)`, (await overflow()) <= 0)
+  if (vp.tag === '1440') await page.getByTestId('roster-headcount').screenshot({ path: '/tmp/claude-0/shot302-roster-note.png' }).catch(() => {})
+  if (vp.tag !== '1440') await page.screenshot({ path: '/tmp/claude-0/shot302-roster-360.png', fullPage: false }).catch(() => {})
+
   await page.getByTestId('youth-enroll-register').click()
   await page.waitForTimeout(1200)
   const done1 = await page.getByTestId('youth-enroll-done').innerText().catch(() => '')

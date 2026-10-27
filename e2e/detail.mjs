@@ -282,6 +282,12 @@ for (const width of [360, 390, 430]) {
   check('모듈별 판정: 정책자금 · 고용지원금 · 창업감면 · 지원사업 …', ['policy-funding', 'employment', 'startup-tax', 'grants'].every((k) => ins.some((x) => x.startsWith(k + ':'))), ins.join())
   check('모듈별 판정: 정책자금은 서류만으로 판정(정보 부족 아님)', ins.some((x) => x.startsWith('policy-funding:') && !x.endsWith(':need')), ins.join())
   check('모듈별 판정: 고용지원금은 명부로 판정', ins.some((x) => x.startsWith('employment:') && !x.endsWith(':need')), ins.join())
+  // D-302 서류만으로 통합고용세액공제 — 명부 날짜로 작년 · 올해 매월 말 인원(고용보험 없는 김영희는 뺌) → 금액이 맞춤 추천에
+  const empTr = (r.toolResults ?? []).find((t) => t.toolKey === 'employment' && t.title === '4대보험 명부 진단')
+  const hcd = empTr?.data?.headcount
+  check('D-302 명부: 작년 · 올해 매월 말 인원이 결과에 붙음(고용보험 없는 1명 뺌 · 지금 직원만 있는 명부)', !!hcd && hcd.counted === 1 && hcd.excluded.noEi === 1 && hcd.basis === 'current' && hcd.cur.total > hcd.prev.total, JSON.stringify(hcd))
+  const empCard = (await page.locator('[data-testid="smart-insight"][data-key="employment"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check('D-302 맞춤 추천 고용지원금: 세액공제 금액 · 명부 날짜로 셈 · 작년 퇴사자 주의', /세액공제 약 [\d,.]+(만원|억원)/.test(empCard) && empCard.includes('명부 날짜로 셈') && empCard.includes('작년에 그만둔 사람'), empCard.slice(0, 400))
   check('다음 행동 추천이 있다', (await page.getByTestId('smart-step').count()) >= 1)
   await page.getByTestId('smart-step-next').first().click()
   await page.waitForTimeout(600)

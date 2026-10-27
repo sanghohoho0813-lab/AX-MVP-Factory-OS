@@ -23,6 +23,7 @@ import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
+import { headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 
@@ -159,6 +160,14 @@ function metroOver(sido: string, city: string): StartupForm['overconcentration']
   return IC_OUT.includes(city) ? 'no' : IC_PART.includes(city) ? 'unknown' : 'yes'
 }
 
+/** 중소기업 확인 — 회사 정보 '중소기업 확인' 칸 · 인증 칸 · 받은 확인서. 모르면 false(가정은 부르는 쪽에서 ★ 로) */
+export function smeConfirmed(record: ClientOpsRecord): boolean {
+  const re = /중소기업\s*(확인|기준)/
+  if ((record.customFields ?? []).some((f) => re.test(`${f.label} ${f.value}`))) return true
+  if (re.test(usableFactValue(record, 'certifications'))) return true
+  return !!record.documents?.smeCertificate?.received
+}
+
 export function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration'] } {
   const { sido, city } = placeOf(address)
   if (sido === '서울') return { region: 'seoul', over: 'yes' }
@@ -201,36 +210,80 @@ const startupInsight: Provider = ({ record, today, facts }) => {
   }
 }
 
-const employmentInsight: Provider = ({ record }) => {
+/**
+ * D-302 명부 날짜로 센 인원(서류 올리기 · 명부 화면이 붙임) → 통합고용세액공제. 단가는 볼 때마다 지금 업체 주소 · 중소기업 확인으로.
+ * 작년보다 줄었으면 공제 없음 · 같으면 '1명 늘면' 힌트. 직원 300명 이상인데 중소기업 확인이 없으면 단가를 정하지 않는다.
+ */
+export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: RosterHeadcount): { won: number; line: string; assumptions: string[] } | null {
+  const sme = smeConfirmed(record)
+  if (!sme && facts.employeeCount !== null && facts.employeeCount >= 300) return null
+  const sido = placeOf(facts.address).sido
+  const region = regionTypeOf(sido || null)
+  const { units, estimate } = headcountTaxCredit(hc, region, 'sme')
+  const p = `${hc.prev.year}년 평균 ${headText(hc.prev.total)}명`
+  const c = `${hc.cur.year}년 ${hc.cur.actualMonths < 12 ? '예상 ' : ''}${headText(hc.cur.total)}명`
+  const assumptions = [
+    ...(hc.basis === 'current' ? ['지금 직원만 있는 명부 — 작년에 그만둔 사람이 있으면 작년 인원이 늘어 공제가 줄어요'] : []),
+    ...(sme ? [] : ['중소기업으로 보고 계산(★ 중소기업 확인서)']),
+    ...(region ? [] : ['주소를 몰라 수도권 단가(더 낮은 쪽)로 계산']),
+  ]
+  const won = estimate.creditTotal ?? 0
+  if (won > 0) return { won, line: `통합고용세액공제 예상 약 ${manwonText(won)}(${p} → ${c} · 명부 날짜로 셈 · 세무사 확인)`, assumptions }
+  if (hc.cur.total < hc.prev.total) return { won: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, assumptions }
+  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 1년에 약 ${manwonText(units.youth * 10_000)} 덜 내요`, assumptions }
+}
+
+const employmentInsight: Provider = ({ record, facts }) => {
   const open = `/tools/employment/roster${q(record)}`
   const roster = latestEmploymentRoster(record)
-  if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한까지.', missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+  if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'
   const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
   const fromText = /최대\s*([\d,]+)\s*만원/.exec(roster.summary)?.[1]
   const total = typeof saved === 'number' && saved > 0 ? saved : fromText ? Number(fromText.replace(/,/g, '')) * 10_000 : 0
-  // D-232 통합고용세액공제 — 명부 진단 화면이 전년 인원까지 넣고 계산해 붙인 값만(짐작하지 않음). 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
-  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown } } | null
-  const credit = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
+  // 통합고용세액공제 — 명부 화면에서 사람이 넣어 계산한 값이 먼저(D-232), 없으면 명부 날짜로 센 인원으로(D-302). 둘 다 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
+  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown }; headcount?: unknown } | null
+  const typed = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
+  const hc = typed > 0 ? null : headcountOf(data?.headcount)
+  const fromRoster = hc ? rosterCredit(record, facts, hc) : null
+  const credit = typed > 0 ? typed : (fromRoster?.won ?? 0)
   const newHires = typeof data?.counts?.newHireCount === 'number' ? data.counts.newHireCount : 0
-  const creditLine = credit > 0 ? `통합고용세액공제 예상 약 ${manwonText(credit)}(1차 추정 · 세무사 확인)` : newHires > 0 ? `최근 1년 새로 들어온 직원 ${newHires}명 — 전년 직원 수를 넣으면 통합고용세액공제도 계산해요` : ''
+  const creditLine =
+    typed > 0
+      ? `통합고용세액공제 예상 약 ${manwonText(typed)}(1차 추정 · 세무사 확인)`
+      : fromRoster
+        ? [fromRoster.line, ...fromRoster.assumptions.slice(0, 1)].join(' · ')
+        : newHires > 0
+          ? `최근 1년 새로 들어온 직원 ${newHires}명 — 전년 직원 수를 넣으면 통합고용세액공제도 계산해요`
+          : ''
   const candidates = roster.verdict === 'candidates'
-  const amount = candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)` : credit > 0 ? `세액공제 약 ${manwonText(credit)}(1차 추정)` : undefined
+  const amount =
+    candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + 세액공제 약 ${manwonText(credit)}` : ''}` : credit > 0 ? `세액공제 약 ${manwonText(credit)}(1차 추정)` : undefined
   const first = hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, '')
   return {
     amount,
     key: 'employment',
     label: '고용지원금',
-    // 지원금 후보가 없어도 세액공제를 계산해 둔 업체는 제안할 거리가 있다(검토해 볼 만함)
+    // 지원금 후보가 없어도 세액공제가 나오는 업체는 제안할 거리가 있다(검토해 볼 만함)
     tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
     headline: candidates || credit === 0 ? roster.verdictLabel || roster.title : `통합고용세액공제 예상 약 ${manwonText(credit)}`,
-    detail: [first, creditLine].filter(Boolean).join(' · '),
+    detail: [first.startsWith('[') ? '' : first, creditLine].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',
     action: candidates ? `고용지원금 — ${roster.verdictLabel}` : credit > 0 ? '통합고용세액공제 — 세무사와 신고 확인' : null,
   }
+}
+
+/** 붙여 둔 결과의 인원 기록 — 모양이 맞을 때만 */
+function headcountOf(v: unknown): RosterHeadcount | null {
+  const h = v as RosterHeadcount | null | undefined
+  const ok = (y: unknown) => {
+    const x = y as { year?: unknown; total?: unknown; youth?: unknown; actualMonths?: unknown } | null | undefined
+    return !!x && typeof x.year === 'number' && typeof x.total === 'number' && typeof x.youth === 'number' && typeof x.actualMonths === 'number'
+  }
+  return h && ok(h.prev) && ok(h.cur) && (h.basis === 'history' || h.basis === 'current') ? h : null
 }
 
 /** D-191 연구소 도구가 붙인 가장 최근 세액공제 계산(연간 · 원) — 없으면 0 */

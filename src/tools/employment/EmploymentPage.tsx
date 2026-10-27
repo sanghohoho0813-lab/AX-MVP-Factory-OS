@@ -36,6 +36,7 @@ import { notYetRegistered, youthEmployeeRecord, youthEnrollDeadlines, youthEnrol
 import { listRows, saveRow } from '../../services/moduleData'
 import { employeeRowData, toOrigEmployee } from './orig/store'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { placeOf } from '../../services/grants/grantMatch'
 import {
   analyzeRoster,
   buildCopyText,
@@ -48,6 +49,8 @@ import {
   LEVELS,
   parseRosterFile,
   parseRosterText,
+  headText,
+  rosterHeadcount,
   rosterStaleness,
   SUBSIDY_ESTIMATE_NOTE,
   TAX_CHECKLIST,
@@ -55,6 +58,7 @@ import {
   type RegionType,
   type RosterAnalysis,
   type RosterEmployee,
+  type RosterHeadcount,
   type RosterMeta,
   type SizeType,
 } from './lib/payrollDiagnosis'
@@ -149,11 +153,11 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-function NumberField({ label, value, onChange, hint, unit, placeholder }: { label: string; value: string; onChange: (v: string) => void; hint?: string; unit?: string; placeholder?: string }) {
+function NumberField({ label, value, onChange, hint, unit, placeholder, decimal }: { label: string; value: string; onChange: (v: string) => void; hint?: string; unit?: string; placeholder?: string; decimal?: boolean }) {
   return (
     <Field label={label} hint={hint}>
       <span className="flex items-center gap-1.5">
-        <input type="number" inputMode="numeric" min={0} aria-label={label} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={`${inputCls} text-right tabular-nums`} />
+        <input type="number" inputMode={decimal ? 'decimal' : 'numeric'} step={decimal ? 0.01 : undefined} min={0} aria-label={label} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={`${inputCls} text-right tabular-nums`} />
         {unit && <span className="t-sub shrink-0 text-slate-500">{unit}</span>}
       </span>
     </Field>
@@ -443,9 +447,26 @@ interface RosterForm {
   unitYouth: string
   unitNormal: string
   unitsTouched: boolean
+  /** D-302 명부 날짜로 채운 칸(직접 고치면 빠진다) — 다음 명부가 다시 채운다 */
+  auto?: HeadKey[]
 }
 
+type HeadKey = 'prevTotal' | 'prevYouth' | 'curTotal' | 'curYouth'
+const HEAD_KEYS: readonly HeadKey[] = ['prevTotal', 'prevYouth', 'curTotal', 'curYouth']
+
 const EMPTY_ROSTER: RosterForm = { company: '', sido: '', sizeType: 'sme', prevTotal: '', prevYouth: '', curTotal: '', curYouth: '', unitYouth: '', unitNormal: '', unitsTouched: false }
+
+/** 명부 날짜로 센 인원 → 네 칸 값 */
+function headValues(hc: RosterHeadcount): Record<HeadKey, string> {
+  return { prevTotal: headText(hc.prev.total), prevYouth: headText(hc.prev.youth), curTotal: headText(hc.cur.total), curYouth: headText(hc.cur.youth) }
+}
+
+/** 업체 주소 → 소재지 칸(서울 · 경기 · 인천 · 그 외) */
+function sidoChoice(address: string): string {
+  const sido = placeOf(address).sido
+  if (!sido) return ''
+  return ['서울', '경기', '인천'].includes(sido) ? sido : '기타'
+}
 
 const SIDO_OPTIONS: readonly Option<string>[] = [
   { value: '서울', label: '서울' },
@@ -562,15 +583,55 @@ function YouthEnrollPanel({ items }: { items: YouthEnrollItem[] }) {
   )
 }
 
+/** D-302 명부 날짜로 센 인원 — 어떻게 셌는지 · 뺀 사람 · 지금 직원만 있는 명부면 주의 */
+function HeadcountNote({ hc, differs, onApply }: { hc: RosterHeadcount; differs: boolean; onApply: () => void }) {
+  const ex = hc.excluded
+  const out = [
+    ex.noEi ? `고용보험이 없는 ${ex.noEi}명(대표 · 임원으로 보임)` : '',
+    ex.rel ? `대표 · 임원 표시 ${ex.rel}명` : '',
+    ex.noHire ? `입사일 모름 ${ex.noHire}명` : '',
+    ex.lostNoDate ? `그만둔 날을 모르는 ${ex.lostNoDate}명` : '',
+  ].filter(Boolean)
+  const rest = 12 - hc.cur.actualMonths
+  return (
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 p-3" data-testid="roster-headcount">
+      <p className="t-sub font-bold break-keep text-slate-800">
+        명부 날짜로 셌어요 — {hc.prev.year}년 매월 말 평균 {headText(hc.prev.total)}명 → {hc.cur.year}년 {rest > 0 ? '예상 ' : ''}
+        {headText(hc.cur.total)}명
+      </p>
+      <p className="t-meta break-keep text-slate-600">
+        입사 · 퇴사(자격 취득 · 상실) 날짜로 달마다 센 평균이에요(법이 세는 방식).
+        {rest > 0 && ` ${hc.cur.year}년은 ${hc.cur.actualMonths}월까지 실제, 남은 ${rest}달은 ${hc.asOf} 인원이 그대로라고 봤어요.`}
+        {out.length > 0 && ` 뺀 사람: ${out.join(' · ')}.`} 청년 등 = 입사 때 만 15~34세 · 만 60세 이상(★ 장애인 · 경력단절 여성 · 병역 · 계약직은 세무사 확인).
+      </p>
+      {hc.basis === 'current' && (
+        <p className="t-meta font-semibold break-keep text-amber-700" data-testid="roster-headcount-current">
+          ★ 지금 직원만 있는 명부예요 — 작년에 그만둔 사람이 있으면 작년 인원이 늘어 공제가 줄어요(상실자까지 나온 명부면 정확해요).
+        </p>
+      )}
+      {differs && (
+        <Button variant="secondary" size="sm" className="self-start" onClick={onApply} data-testid="roster-headcount-apply">
+          명부 값으로 네 칸 채우기
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function RosterTab() {
   const [form, setForm] = useStored<RosterForm>('roster', EMPTY_ROSTER)
   const set = <K extends keyof RosterForm>(k: K, v: RosterForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const { clientRecord, clientName } = useToolClient()
   // 업체에서 열었으면 업체명은 이미 안다 (D-90)
   const { note: prefillNote } = usePrefillFromClient((facts) => {
-    if (form.company || !facts.companyName) return []
-    setForm((f) => ({ ...f, company: facts.companyName }))
-    return ['업체명']
+    const filled: string[] = []
+    const sido = form.sido ? '' : sidoChoice(facts.address)
+    const company = form.company || !facts.companyName ? '' : facts.companyName
+    if (company) filled.push('업체명')
+    // D-302 세액공제 단가(수도권 · 지방)가 업체 주소로 정해지게
+    if (sido) filled.push('사업장 소재지')
+    if (filled.length) setForm((f) => ({ ...f, ...(company ? { company } : {}), ...(sido ? { sido } : {}) }))
+    return filled
   })
   // 붙여 넣은 명부 글자와 직원 목록은 저장하지 않는다 — 주민등록번호가 섞여 있을 수 있다
   const [text, setText] = useState('')
@@ -588,13 +649,26 @@ function RosterTab() {
 
   const analysis: RosterAnalysis | null = useMemo(() => (employees && employees.length > 0 ? analyzeRoster(employees, { baseDate }) : null), [employees, baseDate])
   // D-211: '올해 상시근로자' 는 재직 중인 사람만(상실한 사람 빼고) — 예전에는 명부 줄 수 전부라 늘어난 인원 · 공제가 부풀었다.
-  // 명부가 채운 값이면 다음 명부가 다시 채운다(직접 적은 값은 그대로)
-  const curAuto = useRef(false)
-  const fillCurTotal = (list: RosterEmployee[]) => {
-    if (form.curTotal && !curAuto.current) return
-    curAuto.current = true
-    set('curTotal', String(analyzeRoster(list, { baseDate }).counts.activeCount))
+  // D-302: 네 칸(작년 · 올해 × 전체 · 청년 등)을 명부 날짜로 센 매월 말 평균으로 채운다 — 법이 세는 방식 · 전년 인원을 몰라도 계산된다.
+  // 명부가 채운 칸이면 다음 명부가 다시 채운다(직접 적은 칸은 그대로 — 대신 [명부 값으로] 단추)
+  const headcount = useMemo(() => (employees && employees.length ? rosterHeadcount(employees, { baseDate, issueDate: meta?.issueDate ?? null }) : null), [employees, meta, baseDate])
+  const fillFromRoster = (list: RosterEmployee[], m: RosterMeta | null, force = false) => {
+    const hc = rosterHeadcount(list, { baseDate, issueDate: m?.issueDate ?? null })
+    if (!hc) return
+    const v = headValues(hc)
+    setForm((f) => {
+      const auto = new Set(f.auto ?? [])
+      const next: RosterForm = { ...f }
+      for (const k of HEAD_KEYS) {
+        if (!force && f[k] !== '' && !auto.has(k)) continue
+        next[k] = v[k]
+        auto.add(k)
+      }
+      return { ...next, auto: [...auto] }
+    })
   }
+  const setHead = (k: HeadKey, v: string) => setForm((f) => ({ ...f, [k]: v, auto: (f.auto ?? []).filter((x) => x !== k) }))
+  const headDiffers = !!headcount && HEAD_KEYS.some((k) => form[k] !== headValues(headcount)[k])
   // D-138: 지금 참여신청할 수 있는 청년도약 후보 — 기한이 달력 · 오늘에 붙고, 직원으로 바로 등록할 수 있다
   const youthItems = useMemo(() => (analysis ? youthEnrollItems(analysis.rows, baseDate) : []), [analysis, baseDate])
   const estimate = useMemo(
@@ -615,7 +689,7 @@ function RosterTab() {
     }
     setEmployees(r.employees)
     setMeta(r.meta)
-    fillCurTotal(r.employees)
+    fillFromRoster(r.employees, r.meta)
     setNotice(r.missingCount > 0 ? `${r.employees.length}명 후보 · 이름·생년월일·입사일이 빈 ${r.missingCount}명은 확인이 필요합니다.` : `${r.employees.length}명 후보를 찾았습니다.`)
   }
 
@@ -655,7 +729,7 @@ function RosterTab() {
       }
       setEmployees(r.employees)
       setMeta(r.meta ?? null)
-      fillCurTotal(r.employees)
+      fillFromRoster(r.employees, r.meta ?? null)
       setNotice(`${file.name} 에서 ${r.employees.length}명 후보를 찾았습니다.`)
     } finally {
       setBusy(false)
@@ -745,13 +819,14 @@ function RosterTab() {
             <ChoiceGroup label="사업장 소재지" value={form.sido} options={SIDO_OPTIONS} onChange={(v) => set('sido', v)} />
             <ChoiceGroup label="기업 규모" value={form.sizeType} options={SIZE_OPTIONS} onChange={(v) => set('sizeType', v)} />
             <div className="grid grid-cols-2 gap-3">
-              <NumberField label="전년도 상시근로자" value={form.prevTotal} onChange={(v) => set('prevTotal', v)} unit="명" />
-              <NumberField label="전년도 청년 등" value={form.prevYouth} onChange={(v) => set('prevYouth', v)} unit="명" />
-              <NumberField label="올해 상시근로자" value={form.curTotal} onChange={(v) => { curAuto.current = false; set('curTotal', v) }} unit="명" />
-              <NumberField label="올해 청년 등" value={form.curYouth} onChange={(v) => set('curYouth', v)} unit="명" />
+              <NumberField label="전년도 상시근로자" value={form.prevTotal} onChange={(v) => setHead('prevTotal', v)} unit="명" decimal />
+              <NumberField label="전년도 청년 등" value={form.prevYouth} onChange={(v) => setHead('prevYouth', v)} unit="명" decimal />
+              <NumberField label="올해 상시근로자" value={form.curTotal} onChange={(v) => setHead('curTotal', v)} unit="명" decimal />
+              <NumberField label="올해 청년 등" value={form.curYouth} onChange={(v) => setHead('curYouth', v)} unit="명" decimal />
               <NumberField label="청년 등 단가" value={unitYouth} onChange={(v) => setForm((f) => ({ ...f, unitYouth: v, unitsTouched: true }))} unit="만원" hint="귀속연도 법령표 확인 필요" />
               <NumberField label="일반 단가" value={unitNormal} onChange={(v) => setForm((f) => ({ ...f, unitNormal: v, unitsTouched: true }))} unit="만원" />
             </div>
+            {headcount && <HeadcountNote hc={headcount} differs={headDiffers} onApply={() => employees && fillFromRoster(employees, meta, true)} />}
             {form.unitsTouched && (
               <Button variant="ghost" size="sm" onClick={() => setForm((f) => ({ ...f, unitYouth: '', unitNormal: '', unitsTouched: false }))}>
                 기본 단가로 되돌리기
@@ -803,6 +878,8 @@ function RosterTab() {
                     // D-191: 최대 예상 지원금(원) — 업체 상세 '먼저 제안할 것' 에 금액으로
                     subsidyTotal: estimateSubsidyTotal(analysis.subsidySummary),
                     estimate,
+                    // D-302 명부 날짜로 센 인원 — 맞춤 추천이 칸을 비워 둔 때에도 세액공제를 다시 계산한다
+                    ...(headcount ? { headcount } : {}),
                     issueDate: meta?.issueDate ?? null,
                     employees: analysis.rows.map((r) => ({ name: r.emp.name, age: r.diag.age, candidates: r.diag.candidates.map((c) => `${c.key}:${c.level}`) })),
                   }}

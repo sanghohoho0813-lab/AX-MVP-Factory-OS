@@ -21,6 +21,10 @@ import { calcAgeDetailed, daysInMonth, parseYMD, youthAgeAt } from './dates'
 import { DEFAULT_PROGRAMS } from './programs'
 import { hireWindowBlocks, hireWindowOf } from './hireWindow'
 import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from './birthCell'
+import type { RosterHeadcount, TaxCreditResult, YearHeadcount } from './taxCredit'
+
+// D-302 세액공제 식은 taxCredit.ts 로 — 예전처럼 rosterCore 에서도 쓸 수 있게 다시 내보낸다
+export * from './taxCredit'
 
 // ── 결과 단계(레벨) 정의 ──────────────────────────────────
 export type LevelKey = 'likely' | 'check' | 'more' | 'unknown'
@@ -88,14 +92,6 @@ export const EMP_DOC_CHECKLIST: readonly string[] = [
   '퇴사 여부 확인',
   '세무대리인 검토',
 ]
-
-// 시/도 → 수도권 여부 (통합고용세액공제 지역 구분)
-export const METRO_SIDO: readonly string[] = ['서울', '경기', '인천']
-export type RegionType = 'metro' | 'local'
-export function regionTypeOf(sido: string | null | undefined): RegionType | null {
-  if (!sido) return null
-  return METRO_SIDO.indexOf(sido) >= 0 ? 'metro' : 'local'
-}
 
 // ── 명부 컬럼 자동 인식 사전 ──────────────────────────────
 export type RosterFieldKey = 'name' | 'rrn' | 'gender' | 'hireDate' | 'loseDate' | 'status' | 'insurance' | 'workplace' | 'bizNo'
@@ -740,6 +736,35 @@ export function parseTextRoster(text: string): RosterTextResult {
   return parseRosterText(text)
 }
 
+/**
+ * D-302 표(엑셀 칸이 탭으로 나뉜 글)로 온 명부 — 상실일 · 상태 칸이 있으면 머리줄로 칸을 찾아 읽는다(그만둔 사람 · 그만둔 날까지).
+ * 서류 올리기(맞춤 추천)가 쓴다 — 예전에는 주민번호 읽기만 써서 엑셀 명부의 상실일 칸을 못 읽었다(그만둔 사람도 재직으로 셈).
+ * 상실 칸이 없거나 주민번호로 찾은 사람보다 적게 나오면 예전 그대로 주민번호 읽기. 보험 가입 칸 · 발급일은 주민번호 읽기에서 가져온다.
+ */
+export function parseRosterTable(text: string): RosterTextResult {
+  const byText = parseRosterText(text)
+  if (text.indexOf('\t') < 0) return byText
+  const grid = textToGrid(text)
+  if (grid.length < 2) return byText
+  const det = detectRoster(grid)
+  const has = (k: RosterFieldKey) => det.map[k] != null && det.map[k] >= 0
+  if (!has('name') || !has('hireDate') || !(has('loseDate') || has('status'))) return byText
+  const emps = extractEmployees(grid, det).filter((e) => e.birthDate || e.hireDate)
+  if (!emps.length || emps.filter((e) => e.birthDate).length < byText.employees.length) return byText
+  const merged = emps.map((e) => {
+    if (e.insKnown && Object.values(e.insKnown).some(Boolean)) return e
+    const t = byText.employees.find((x) => x.name === e.name && x.birthDate === e.birthDate)
+    return t?.insKnown ? { ...e, ins: t.ins, insKnown: t.insKnown, insCount: t.insCount, insuranceRaw: e.insuranceRaw || t.insuranceRaw } : e
+  })
+  const missing = merged.filter((e) => !e.birthDate || !e.hireDate).length
+  return {
+    employees: merged,
+    meta: { workplace: det.meta.workplace || byText.meta.workplace, bizNo: det.meta.bizNo || byText.meta.bizNo, issueDate: byText.meta.issueDate ?? null },
+    missingCount: missing,
+    stats: { ...byText.stats, candCount: merged.length },
+  }
+}
+
 export function isYouthAge(age: number | null): boolean {
   return age != null && age >= 15 && age <= 34
 }
@@ -981,15 +1006,6 @@ export function analyzeRoster(employees: RosterEmployee[], opts?: { baseDate?: D
   }
 }
 
-// ── 통합고용세액공제 기본 단가 (만원/인, 편집 가능) ───────
-// 귀속연도별로 바뀌므로 반드시 "법령표 확인 필요" 전제. 기본값은 참고용.
-export type SizeType = 'sme' | 'mid' | 'other'
-export function defaultTaxUnits(region: RegionType | null | string, sizeType: SizeType | string): { youth: number; normal: number } {
-  if (sizeType === 'sme') return region === 'local' ? { youth: 1550, normal: 950 } : { youth: 1450, normal: 850 }
-  if (sizeType === 'mid') return { youth: 800, normal: 450 }
-  return { youth: 0, normal: 0 } // 기타/확인 필요 → 직접 입력
-}
-
 // ── 지원금 1인당 최대 예상 금액 (만원, "최대 가능 추정" · 법령·요건에 따라 상이) ──
 // 영업용 "조건 충족 시 최대 예상" 표시에만 사용. 확정 금액 아님.
 // D-136: 예전엔 여기만 따로 적은 숫자(청년도약 1,200만 · 시니어 인턴 240만 · 새일 380만)가 규칙표(720만 · 550만 · 400만)와
@@ -1014,64 +1030,81 @@ export function estimateSubsidyTotal(summary: readonly SubsidySummaryRow[] | nul
   return won
 }
 
-export interface TaxCreditParams {
-  region?: RegionType | null
-  sizeType?: SizeType | string
-  prevTotal?: number | null
-  prevYouth?: number | null
-  curTotal?: number | null
-  curYouth?: number | null
-  unitYouth?: number | string | null
-  unitNormal?: number | string | null
-}
+// ── D-302 명부 날짜로 상시근로자 수(해마다 매월 말 평균) ─────
+// 통합고용세액공제는 '그 해 매월 말 상시근로자 수의 합 ÷ 개월 수(100분의 1 미만 버림)' 를 작년과 견준다.
+// 명부의 입사(자격 취득)일 · 퇴사(자격 상실)일로 작년 12달과 올해를 센다 — 서류만 올려도 전년 인원을 넣지 않고 계산되게.
+//  - 올해는 명부 날짜(발급일, 없으면 오늘)까지 실제로 세고, 그 뒤 달은 '그날 인원이 12월까지 그대로' 로 본다.
+//  - 빼는 사람: 대표 · 임원 표시 · 고용보험이 없다고 나온 사람(대표 · 임원으로 보임) · 입사일 모름 · 그만둔 날을 모르는 상실자.
+//  - 청년 등: 입사 때 만 15~34세(명부 진단과 같은 기준) 또는 그 달 말 만 60세 이상. 장애인 · 경력단절 여성 · 병역 · 계약직은 모른다(★ 세무사).
+//  - 상실 날짜가 하나도 없는 명부(지금 직원만)면 basis 'current' — 작년에 그만둔 사람이 빠져 작년 인원이 적게 잡힐 수 있다.
 
-export interface TaxCreditResult {
-  computable: boolean
-  youthKnown: boolean
-  incTotal: number | null
-  incYouth: number | null
-  incNormal: number | null
-  creditYouth: number | null
-  creditNormal: number | null
-  creditTotal: number | null
-  overYouth: boolean
-  needsRecheck: boolean
-}
+const floor2 = (n: number) => Math.floor(n * 100 + 1e-9) / 100
 
-// ── 통합고용세액공제 예상 검토 계산 ───────────────────────
-// params: { region, sizeType, prevTotal, prevYouth, curTotal, curYouth, unitYouth, unitNormal }
-// "모름"은 null 로 전달. 단가는 만원 단위. 반환 금액은 원 단위.
-export function estimateTaxCredit(params?: TaxCreditParams | null): TaxCreditResult {
-  const p = params || {}
-  const computable = typeof p.prevTotal === 'number' && typeof p.curTotal === 'number'
-  const incTotal = computable ? Math.max(0, (p.curTotal as number) - (p.prevTotal as number)) : null
-
-  const youthKnown = typeof p.prevYouth === 'number' && typeof p.curYouth === 'number'
-  const rawIncYouth = youthKnown ? Math.max(0, (p.curYouth as number) - (p.prevYouth as number)) : null
-  // D-136: 청년 등 증가는 전체 증가를 넘을 수 없다 → 전체 증가로 자른다 (넘으면 overYouth 로 입력 재확인 안내)
-  const incYouth = rawIncYouth != null && incTotal != null ? Math.min(rawIncYouth, incTotal) : rawIncYouth
-  const incNormal = incTotal != null && incYouth != null ? Math.max(0, incTotal - incYouth) : null
-
-  const unitY = Number(p.unitYouth) || 0
-  const unitN = Number(p.unitNormal) || 0
-  const creditYouth = incYouth != null ? incYouth * unitY * 10000 : null
-  const creditNormal = incNormal != null ? incNormal * unitN * 10000 : null
-  const creditTotal = (creditYouth || 0) + (creditNormal || 0)
-
-  // 검증: 청년 등 증가 인원이 전체 증가 인원을 초과하면 입력값 재확인 필요(과대계산 위험)
-  const overYouth = incTotal != null && rawIncYouth != null && rawIncYouth > incTotal
-
+export function rosterHeadcount(employees: readonly RosterEmployee[], opts?: { baseDate?: Date | string; issueDate?: string | null }): RosterHeadcount | null {
+  const o = opts || {}
+  const base = parseYMD(o.baseDate || new Date())
+  if (!base) return null
+  const iss = parseYMD(o.issueDate)
+  const baseStr = base.y + '-' + pad2(base.m) + '-' + pad2(base.d)
+  const issStr = iss ? iss.y + '-' + pad2(iss.m) + '-' + pad2(iss.d) : ''
+  const asOf = issStr && issStr < baseStr ? issStr : baseStr
+  const excluded = { rel: 0, noEi: 0, noHire: 0, lostNoDate: 0 }
+  const people: { hire: string; lose: string | null; birth: string | null; youthAtHire: boolean }[] = []
+  for (const e of employees) {
+    if (e.rel === 'ceo' || e.rel === 'exec' || e.rel === 'special') {
+      excluded.rel++
+      continue
+    }
+    if (e.insKnown?.ei && !e.ins?.ei) {
+      excluded.noEi++
+      continue
+    }
+    const hire = parseYMD(e.hireDate) ? normDate(e.hireDate) : null
+    if (!hire) {
+      excluded.noHire++
+      continue
+    }
+    const lose = e.loseDate ? normDate(e.loseDate) : null
+    if (!lose && isLostStatus(e.statusRaw)) {
+      excluded.lostNoDate++
+      continue
+    }
+    const hireAge = calcAge(e.birthDate, hire)
+    people.push({ hire, lose, birth: e.birthDate, youthAtHire: isYouthAge(hireAge) && youthAgeAt(e.birthDate, hire, 0).ok })
+  }
+  if (!people.length) return null
+  const at = (date: string) => {
+    let total = 0
+    let youth = 0
+    for (const p of people) {
+      if (p.hire > date || (p.lose != null && p.lose <= date)) continue
+      total++
+      if (p.youthAtHire || isSeniorAge(calcAge(p.birth, date))) youth++
+    }
+    return { total, youth }
+  }
+  const yearOf = (y: number): YearHeadcount => {
+    let total = 0
+    let youth = 0
+    let actualMonths = 0
+    for (let m = 1; m <= 12; m++) {
+      const end = y + '-' + pad2(m) + '-' + pad2(daysInMonth(y, m))
+      const actual = end <= asOf
+      if (actual) actualMonths++
+      const c = at(actual ? end : asOf)
+      total += c.total
+      youth += c.youth
+    }
+    return { year: y, total: floor2(total / 12), youth: floor2(youth / 12), actualMonths }
+  }
+  const y = Number(asOf.slice(0, 4))
   return {
-    computable: computable,
-    youthKnown: youthKnown,
-    incTotal: incTotal,
-    incYouth: incYouth,
-    incNormal: incNormal,
-    creditYouth: creditYouth,
-    creditNormal: creditNormal,
-    creditTotal: creditYouth != null || creditNormal != null ? creditTotal : null,
-    overYouth: overYouth,
-    needsRecheck: overYouth,
+    asOf,
+    prev: yearOf(y - 1),
+    cur: yearOf(y),
+    basis: people.some((p) => p.lose != null) ? 'history' : 'current',
+    counted: people.length,
+    excluded,
   }
 }
 

@@ -60,8 +60,12 @@ import {
   textToGrid,
   detectRoster,
   extractEmployees,
+  headcountTaxCredit,
+  headText,
   idCellKind,
   normDate,
+  parseRosterTable,
+  rosterHeadcount,
   type RosterEmployee,
 } from '../lib/payrollDiagnosis'
 import { makeXls } from '../../../services/__tests__/officeFixtures'
@@ -1069,6 +1073,45 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   const r = youthEmployeeRecord(it, 'c1', DEFAULT_PROGRAMS.youth_jump as never, 'emp-g')
   check('D-224 명부 → 직원: 성별을 모르면 빈 칸(예전: 남)', r.gender === '', String(r.gender))
   check('D-224 명부 → 직원: 성별을 알면 그대로', youthEmployeeRecord({ ...it, gender: 'female' }, 'c1', DEFAULT_PROGRAMS.youth_jump as never, 'emp-f').gender === 'female')
+}
+
+// D-302 명부 날짜로 상시근로자 수(매월 말 평균) → 통합고용세액공제 — 전년 인원을 넣지 않아도
+{
+  const emp = (name: string, birthDate: string, hireDate: string | null, extra: Partial<RosterEmployee> = {}): RosterEmployee => ({ name, birthDate, gender: 'M', rrnMasked: null, hireDate, loseDate: null, statusRaw: '취득', insuranceRaw: '', workplace: '', bizNo: '', ...extra })
+  const list: RosterEmployee[] = [
+    emp('가오래', '1980-05-01', '2024-01-10'),
+    emp('나청년', '1998-03-10', '2026-03-15'),
+    emp('다퇴사', '1970-02-02', '2025-01-01', { loseDate: '2025-07-01', statusRaw: '상실' }),
+    emp('라대표', '1975-01-01', '2019-01-01', { rel: 'ceo' }),
+    emp('마임원', '1972-01-01', '2019-01-01', { ins: { np: true, hi: true, wc: false, ei: false }, insKnown: { np: true, hi: true, wc: true, ei: true } }),
+    emp('바모름', '1990-01-01', null),
+    emp('사상실', '1985-01-01', '2023-01-01', { statusRaw: '상실' }),
+    emp('아고령', '1964-11-15', '2020-01-01'),
+  ]
+  const hc = rosterHeadcount(list, { baseDate: '2026-10-27', issueDate: '2026-09-20' })
+  check('D-302 인원: 기준일은 명부 발급일(오늘보다 이르면)', hc?.asOf === '2026-09-20', hc?.asOf)
+  check('D-302 인원: 작년 12달 매월 말 평균(퇴사자는 상실일 전 달까지) — (12+6+12)/12 = 2.5 · 청년 등(만 60세 이상) 1', hc?.prev.year === 2025 && hc.prev.total === 2.5 && hc.prev.youth === 1 && hc.prev.actualMonths === 12, JSON.stringify(hc?.prev))
+  check('D-302 인원: 올해는 8월까지 실제 + 남은 달은 발급일 인원 그대로 — (12+10+12)/12 = 2.83(100분의 1 미만 버림) · 청년 등 1.83', hc?.cur.year === 2026 && hc.cur.total === 2.83 && hc.cur.youth === 1.83 && hc.cur.actualMonths === 8, JSON.stringify(hc?.cur))
+  check('D-302 인원: 뺀 사람 — 대표 표시 1 · 고용보험 없음 1 · 입사일 모름 1 · 그만둔 날 모르는 상실 1', !!hc && hc.counted === 4 && hc.excluded.rel === 1 && hc.excluded.noEi === 1 && hc.excluded.noHire === 1 && hc.excluded.lostNoDate === 1, JSON.stringify(hc?.excluded))
+  check('D-302 인원: 상실 날짜가 있는 명부는 history', hc?.basis === 'history')
+  const cr = hc ? headcountTaxCredit(hc, 'local', 'sme') : null
+  check('D-302 세액공제: 늘어난 0.33명(청년 등 증가는 전체 증가로 자름) × 지방 중소 청년 1,550만 = 약 511.5만원', !!cr && cr.units.youth === 1550 && Math.round(cr.estimate.creditTotal ?? 0) === 5_115_000, JSON.stringify(cr?.estimate))
+  const cur = rosterHeadcount(list.filter((e) => !e.loseDate), { baseDate: '2026-10-27' })
+  check('D-302 인원: 상실 날짜가 하나도 없으면 current(작년 퇴사자가 빠졌을 수 있음) · 발급일이 없으면 오늘까지 실제(9달)', cur?.basis === 'current' && cur.asOf === '2026-10-27' && cur.cur.actualMonths === 9, JSON.stringify(cur && { b: cur.basis, a: cur.asOf, m: cur.cur.actualMonths }))
+  check('D-302 인원: 발급일이 오늘보다 늦게 적혀 있으면 오늘', rosterHeadcount(list, { baseDate: '2026-10-27', issueDate: '2026-12-01' })?.asOf === '2026-10-27')
+  check('D-302 인원: 셀 사람이 없으면 null', rosterHeadcount([emp('대표만', '1970-01-01', '2020-01-01', { rel: 'ceo' })], { baseDate: '2026-10-27' }) === null)
+  const down = rosterHeadcount([emp('가', '1980-01-01', '2020-01-01', { loseDate: '2026-02-01' }), emp('나', '1980-01-01', '2020-01-01')], { baseDate: '2026-10-27' })
+  check('D-302 인원: 올해 그만두면 올해 평균이 작년보다 적다 → 공제 0', !!down && down.cur.total < down.prev.total && headcountTaxCredit(down, 'metro', 'sme').estimate.creditTotal === 0, JSON.stringify(down))
+  check('D-302 인원 글: 2.5 · 2 · 0.41(뒤 0 없이)', headText(2.5) === '2.5' && headText(2) === '2' && headText(0.41) === '0.41')
+
+  // 엑셀(탭) 명부 — 상실일 칸이 있으면 머리줄로 읽어 그만둔 날까지
+  const tsv = ['4대보험 사업장 가입자 명부', '발급일 2026.09.20', ['성명', '주민등록번호', '자격취득일', '자격상실일'].join('\t'), ['홍길동', '980310-1234567', '2026-03-15', ''].join('\t'), ['김퇴사', '700202-1234567', '2025-01-01', '2025-07-01'].join('\t')].join('\n')
+  const t = parseRosterTable(tsv)
+  check('D-302 표 명부: 상실일 칸을 읽는다 · 발급일은 머리 위 글에서', t.employees.length === 2 && t.employees.find((e) => e.name === '김퇴사')?.loseDate === '2025-07-01' && t.meta.issueDate === '2026-09-20', JSON.stringify(t.employees.map((e) => [e.name, e.hireDate, e.loseDate])) + ' ' + t.meta.issueDate)
+  check('D-302 표 명부: 주민번호 원본은 남지 않음', !JSON.stringify(t).includes('1234567'))
+  const noLose = ['성명\t주민등록번호\t자격취득일', '홍길동\t980310-1234567\t2026-03-15'].join('\n')
+  check('D-302 표 명부: 상실 · 상태 칸이 없으면 예전 읽기 그대로', JSON.stringify(parseRosterTable(noLose).employees) === JSON.stringify(parseRosterText(noLose).employees))
+  check('D-302 표 명부: 탭이 없는 글(PDF 등)도 예전 읽기 그대로', JSON.stringify(parseRosterTable('980310-1234567 홍길동 2026-08-05').employees) === JSON.stringify(parseRosterText('980310-1234567 홍길동 2026-08-05').employees))
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

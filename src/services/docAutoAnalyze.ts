@@ -9,7 +9,7 @@
  *  2. 크레탑 기업종합보고서 — 크레탑 분석기와 같은 엔진으로 읽어 업체에 반영 · 분석 결과를 붙인다.
  *     다른 회사 보고서면(사업자번호 · 이름이 다르면) 붙이지 않고 알려만 준다.
  *  3. 4대보험 가입자 명부 — 고용지원금 명부 진단과 같은 엔진으로 직원별 후보 · 청년도약 참여신청 기한을 붙이고,
- *     재직 인원이 비어 있으면 넣는다. 주민등록번호는 남기지 않는다(명부 읽기가 생년월일 · 성별만 남김).
+ *     작년 · 올해 매월 말 인원(통합고용세액공제용 · D-302)을 함께 남기고, 재직 인원이 비어 있으면 넣는다. 주민등록번호는 남기지 않는다(명부 읽기가 생년월일 · 성별만 남김).
  *  4. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
  *     — 업체 정보가 바뀌면 판정도 바로 바뀐다(clientInsights).
  *
@@ -161,7 +161,8 @@ export async function analyzeUploadedDocs(
   if (rDoc) {
     try {
       const [core, enroll] = await Promise.all([import('../tools/employment/lib/rosterCore'), import('../tools/employment/lib/rosterEnroll')])
-      const parsed = core.parseRosterText(rDoc.text)
+      // D-302 엑셀 명부는 상실일 · 상태 칸까지(그만둔 사람 · 그만둔 날) — 없으면 예전처럼 주민번호로
+      const parsed = core.parseRosterTable(rDoc.text)
       if (parsed.employees.length === 0) {
         warnings.push(`${rDoc.fileName}: 명부에서 직원을 찾지 못했습니다 — 고용지원금 '4대보험 명부 진단' 에서 직접 올려 주세요.`)
       } else {
@@ -169,6 +170,8 @@ export async function analyzeUploadedDocs(
         const youth = enroll.youthEnrollItems(analysis.rows, today)
         const total = core.estimateSubsidyTotal(analysis.subsidySummary)
         const lines = analysis.subsidySummary.filter((s) => s.candidateCount > 0).map((s) => `· ${s.name} 후보 ${s.candidateCount}명`)
+        // D-302 통합고용세액공제용 — 작년 · 올해 매월 말 인원 평균(금액은 맞춤 추천이 볼 때마다 지금 주소 · 규모로)
+        const hc = core.rosterHeadcount(parsed.employees, { baseDate: today, issueDate: parsed.meta?.issueDate ?? null })
         rec = withToolResult(rec, {
           toolKey: 'employment',
           title: '4대보험 명부 진단',
@@ -179,6 +182,7 @@ export async function analyzeUploadedDocs(
             ...lines,
             total > 0 ? `조건 충족 시 최대 ${Math.round(total / 10_000).toLocaleString()}만원 검토 가능성(1차 추정)` : '',
             youth.length ? `청년도약 참여신청 기한 ${youth.length}명 — 지나면 신청 불가` : '',
+            hc ? `[통합고용세액공제 인원] ${hc.prev.year}년 매월 말 평균 ${core.headText(hc.prev.total)}명 → ${hc.cur.year}년 ${hc.cur.actualMonths < 12 ? '예상 ' : ''}${core.headText(hc.cur.total)}명(명부 날짜로 셈)` : '',
           ]
             .filter(Boolean)
             .join('\n'),
@@ -189,6 +193,7 @@ export async function analyzeUploadedDocs(
             issueDate: parsed.meta?.issueDate ?? null,
             // D-191: 최대 예상 지원금(원) — 맞춤 추천이 엔진 없이 금액을 보여 준다
             subsidyTotal: total,
+            ...(hc ? { headcount: hc } : {}),
             from: 'upload',
           },
           deadlines: enroll.youthEnrollDeadlines(youth),

@@ -18,8 +18,7 @@
  */
 import type { ClientOpsRecord, ToolDeadline } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { usableFactValue } from './customerFacts'
-import { manwonText, startupRegion } from './clientInsights'
+import { manwonText, smeConfirmed, startupRegion } from './clientInsights'
 import { requestItemFor, requestMessage, type RequestItem } from './recoRequest'
 import { scenarioPath, scenarioPreset } from './scenarioPresets'
 import { fitContext, scenarioFit, type FitContext, type ScenarioFit } from './scenarioFit'
@@ -28,7 +27,7 @@ import { addDaysLocal } from './clientOpsNextAction'
 import { placeOf } from './grants/grantMatch'
 import { diagnoseHiring, type DiagnosisRow, type HiringAnswers } from '../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../tools/employment/lib/programs'
-import { defaultTaxUnits, estimateTaxCredit, regionTypeOf, type RegionType } from '../tools/employment/lib/rosterCore'
+import { defaultTaxUnits, estimateTaxCredit, regionTypeOf, type RegionType } from '../tools/employment/lib/taxCredit'
 import { getTaxCreditEstimate } from '../tools/labcare/lib/taxCredit'
 import type { Client as LabClient } from '../tools/labcare/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
@@ -138,13 +137,8 @@ function sidoOf(facts: ClientFacts): string {
   return placeOf(facts.address).sido
 }
 
-/** 중소기업 확인 — 회사 정보 '중소기업 확인' 칸 · 인증 칸 · 받은 확인서. 모르면 false(가정은 부르는 쪽에서 ★ 로) */
-export function smeConfirmed(record: ClientOpsRecord): boolean {
-  const re = /중소기업\s*(확인|기준)/
-  if ((record.customFields ?? []).some((f) => re.test(`${f.label} ${f.value}`))) return true
-  if (re.test(usableFactValue(record, 'certifications'))) return true
-  return !!record.documents?.smeCertificate?.received
-}
+/** 중소기업 확인 — clientInsights 로 옮김(D-302 · 맞춤 추천 고용 세액공제도 같은 기준) */
+export { smeConfirmed }
 
 /** 할 일 날짜가 토 · 일이면 다음 월요일로 — 달력 · 오늘 화면에 주말 할 일이 뜨지 않게 */
 function workday(date: string): string {
