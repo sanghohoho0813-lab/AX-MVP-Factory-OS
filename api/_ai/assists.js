@@ -84,6 +84,9 @@ export const ASK_PAGES = [
   ['module', '모듈'],
   ['radar', '마케팅'],
   ['content', '홍보 글'],
+  // D-299 대표 "마케팅 · 브랜딩 어디서든 모델을 골라 요청할 수 있어야" — 스레드 · 릴스/틱톡 화면에도 AI 도우미 판(직접 묻기)
+  ['threads', '스레드'],
+  ['shorts', '릴스 · 틱톡'],
 ]
 const ASK_INSTRUCTION = [
   '[대표가 더 묻는 것] 의 질문 하나에 이 화면 [자료] 로 직접 답한다. 미리 만든 단추 주제(예: 이번 주 일정 한눈에 · 오늘 제일 중요한 것)로 바꿔 답하지 않는다 — 물어본 것에만 답한다.',
@@ -103,6 +106,8 @@ const MK_LONG = { knowledge: ['mk_principles', 'mk_common', 'mk_long', 'mk_facts
 const MK_SHORT = { knowledge: ['mk_principles', 'mk_common', 'mk_short', 'mk_facts'] }
 const MK_FACTS = { knowledge: ['mk_principles', 'mk_facts'] }
 const THREADS_KB = { knowledge: ['mk_principles', 'mk_threads', 'mk_facts'] }
+/** D-299 직접 질문에 붙일 기준 문서(그 화면 공식) */
+const ASK_KB = { threads: THREADS_KB, shorts: MK_SHORT }
 /** D-274 남의 영상을 볼 때 — 대표가 잘 된 것 · 안 된 것 비교에 쓴 분류와 같은 말로 */
 const MK_JUDGE = { knowledge: ['mk_principles', 'mk_judge', 'mk_common', 'mk_facts'] }
 const MK_ADAPT = { knowledge: ['mk_principles', 'mk_judge', 'mk_common', 'mk_long', 'mk_facts'] }
@@ -280,7 +285,8 @@ const LIST = [
   ['content.keywords', 'content', '키워드 · 해시태그 정리', L, 2200, ['브리프와 지역 · 업종으로 블로그 · 플레이스 키워드 10개와 해시태그 15개. 검색량은 자료에 있을 때만 쓴다.']],
 
   /* D-288 직접 질문 — AI 도우미 판의 '직접 물어보기'. 미리 만든 단추(예: 이번 주 일정 한눈에)에 묶지 않고, 이 화면 [자료] 로 그 질문에만 답한다 */
-  ...ASK_PAGES.map(([page, title]) => [`${page}.ask`, page, `${title} — 직접 물어본 것에 답`, L, 3000, ASK_INSTRUCTION]),
+  // D-299 스레드 · 릴스/틱톡 직접 질문은 그 플랫폼 공식(틀 · 형식)을 기준 문서로 붙여 답한다 — "이 틀로 어떻게 써?" 에 공식대로
+  ...ASK_PAGES.map(([page, title]) => [`${page}.ask`, page, `${title} — 직접 물어본 것에 답`, L, 3000, ASK_INSTRUCTION, ...(ASK_KB[page] ? [ASK_KB[page]] : [])]),
 
   /* D-250 대화창 — 대표가 질문창에 직접 쓴 말([대표가 더 묻는 것])에 이 회사 기록으로 답한다. 띠 · 판 단추에는 없고 대화창에서만 부른다 */
   ['pv.chat', 'patent', '특허 · 벤처 — 물어본 것에 답', L, 2600, [

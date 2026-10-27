@@ -451,6 +451,8 @@ check('F16 채널 설계 기준을 고치면 다음 기획 자료에 그대로(�
 await page.keyboard.press('Escape')
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
+// D-295 채널 설계 기준은 열 때마다 접힌 채(가끔 고치는 칸) — 펼쳐서 본다
+if ((await page.getByTestId('radar-brief').getAttribute('data-open')) !== '1') await page.getByTestId('radar-brief').getByTestId('fold-toggle').click()
 check("F17 새로고침해도 고친 기준 그대로 · '직접 고친 기준'", (await page.getByTestId('radar-brief').locator('textarea[data-brief="avoid"]').inputValue()).includes('코인') || (await page.getByTestId('radar-brief').innerText()).includes('직접 고친 기준'))
 
 /* ---------------- E 휴대폰 ---------------- */

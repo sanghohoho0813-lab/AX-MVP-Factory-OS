@@ -76,6 +76,14 @@ export interface AssistResultAction {
   run: (answer: { structured: AssistAnswer | null; raw: string }, ctx: AssistCtx) => Promise<AssistActionResult> | AssistActionResult
 }
 
+/** D-299 직접 묻기 칸의 예 — 마케팅 화면은 그 화면에 맞는 질문으로(업체 질문 예가 엉뚱해 보이지 않게) */
+const ASK_EXAMPLE: Partial<Record<AssistPage, string>> = {
+  threads: '예: 이 소재로 팔로워 모으기 좋은 첫 줄 3개만',
+  shorts: '예: 이 대본을 릴스 20초로 줄이면?',
+  radar: '예: 이번 주 1순위로 쇼츠 제목 3개만',
+  content: '예: 블로그 제목에 지역 이름을 넣어 다시',
+}
+
 /** 답 항목에 [할 일로 넣기] 를 붙일 화면 — 일하는 화면만(마케팅 · 홍보 글은 그 화면 단추가 대신) */
 const RECORD_PAGES: ReadonlySet<AssistPage> = new Set<AssistPage>(['today', 'sales', 'clients', 'inbox', 'agents', 'money', 'calendar', 'grants', 'client', 'module'])
 
@@ -515,7 +523,7 @@ function AssistPanel({
                     }
                   }}
                   rows={2}
-                  placeholder="예: 이번 달에 메모가 가장 많았던 업체는?"
+                  placeholder={ASK_EXAMPLE[page] ?? '예: 이번 달에 메모가 가장 많았던 업체는?'}
                   className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
                   data-testid="ai-assist-ask"
                 />

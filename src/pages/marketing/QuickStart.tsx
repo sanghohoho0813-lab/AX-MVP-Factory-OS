@@ -9,12 +9,12 @@
 import type { ReactNode } from 'react'
 import { Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { Surface } from '../../components/ui/primitives'
 import { HintTip } from '../../components/ui/fold'
 import type { TopicChip } from '../../services/marketing/quickStart'
 import { StepTitle } from './snsParts'
 import { toneChip } from './snsTone'
 import { AiConfirm } from '../../components/ai/AiConfirm'
+import { ModelPicker } from '../../components/ai/ModelPicker'
 
 export function QuickStart({
   testPrefix,
@@ -92,7 +92,8 @@ export function QuickStart({
   }
   return (
     <div data-testid={`${testPrefix}-qs`}>
-      <Surface className="flex flex-col gap-3 border-2 border-slate-900">
+      {/* D-299 카드(Surface)는 넘치는 것을 자른다 — [모델 · ○○] 고르는 판 · ? 설명이 잘려서 자르지 않는 상자로 */}
+      <div className="relative flex flex-col gap-3 rounded-(--radius-panel) border-2 border-slate-900 bg-white p-4 sm:p-5" data-testid={`${testPrefix}-qs-box`}>
         <StepTitle n="1">무엇에 대해 쓸까요?</StepTitle>
         {top}
         <input
@@ -135,6 +136,8 @@ export function QuickStart({
                 <Wand2 aria-hidden="true" className="size-4" /> {fallback.label}
               </Button>
             )}
+            {/* D-299 대표 "마케팅 · 브랜딩 어디서든 모델을 골라 요청" — AI 단추 바로 옆에서 모델 고르기(고른 모델은 모든 화면 AI 단추가 같이 씀) */}
+            {ai.ok && <ModelPicker popover className="sm:ml-auto" testId={`${testPrefix}-qs-model`} />}
           </div>
           <p className="t-sub break-keep text-slate-600" data-testid={`${testPrefix}-qs-note`}>
             {has ? (ai.ok ? '1안은 아래 글 칸에 바로 넣어요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 꼭 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : '주제를 고르면 바로 쓸 수 있어요.'}
@@ -146,7 +149,7 @@ export function QuickStart({
           )}
           {children}
         </div>
-      </Surface>
+      </div>
     </div>
   )
 }

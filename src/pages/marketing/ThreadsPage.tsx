@@ -25,7 +25,8 @@ import { QuickStart } from './QuickStart'
 import { Fold, HelpHeading, HintTip, openFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
-import { AssistError, callAssist } from '../../services/aiAssist/client'
+import { AssistError, callAssist, type AssistAnswer } from '../../services/aiAssist/client'
+import { AiAssist } from '../../components/ai/AiAssist'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { useThreadPosts, useWeekRef } from '../../services/marketing/useSnsPosts'
 import { isMarketingCustomer, mkText } from '../../services/marketing/persona'
@@ -82,7 +83,34 @@ const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof
 const GOAL_TONE: Readonly<Record<ThreadGoal, Tone>> = { reply: 'sky', share: 'emerald', follow: 'violet', like: 'rose' }
 const GOAL_ICON = { reply: MessageCircle, share: Share2, follow: UserPlus, like: Heart } as const
 const GOAL_CHOICES = GOALS.map((g) => ({ ...g, tone: GOAL_TONE[g.key], tip: GOAL_EASY[g.key], icon: GOAL_ICON[g.key] }))
-const toneOfTemplate = (t: ThreadTemplate): Tone => GOAL_TONE[t.goals[0]] ?? 'slate'
+/**
+ * 틀 색 = 그 틀이 잘 되는 반응 색. D-299 대표 "반응을 고르면 틀이 색별로 나뉘는데 가끔 하나씩 다른 색이 섞여 있다" —
+ * 두 반응에 다 좋은 틀(I 판 깔기 = 답글 · 팔로워)은 예전엔 첫 반응 색만 보였다. 지금 고른 반응이 그 틀에 맞으면 그 반응 색으로 칠한다.
+ */
+const toneOfTemplate = (t: ThreadTemplate, ctx: ThreadGoal | '' = ''): Tone => (ctx && t.goals.includes(ctx) ? GOAL_TONE[ctx] : (GOAL_TONE[t.goals[0]] ?? 'slate'))
+const GOAL_SHORT: Readonly<Record<ThreadGoal, string>> = { reply: '답글', share: '공유', follow: '팔로워', like: '공감' }
+
+/** 이 틀이 잘 되는 반응 — 색 딱지(두 반응에 다 좋으면 두 개) */
+function GoalTags({ t, dots = false }: { t: ThreadTemplate; dots?: boolean }) {
+  if (dots)
+    return (
+      <span className="inline-flex shrink-0 items-center gap-0.5" aria-label={`잘 되는 반응: ${t.goals.map((g) => GOAL_SHORT[g]).join(' · ')}`} data-testid="thr-goaldots">
+        {t.goals.map((g) => (
+          <span key={g} aria-hidden="true" className={`inline-block size-2 rounded-full ${TONES[GOAL_TONE[g]].bar}`} />
+        ))}
+      </span>
+    )
+  return (
+    <span className="flex flex-wrap items-center gap-1" data-testid="thr-goaltags">
+      {t.goals.map((g) => (
+        <span key={g} className={`t-meta inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-semibold ${TONES[GOAL_TONE[g]].line} ${TONES[GOAL_TONE[g]].soft} ${TONES[GOAL_TONE[g]].ink}`}>
+          <span aria-hidden="true" className={`inline-block size-1.5 rounded-full ${TONES[GOAL_TONE[g]].bar}`} />
+          {GOAL_SHORT[g]}
+        </span>
+      ))}
+    </span>
+  )
+}
 
 /** AI 가 다른 틀로 썼을 때 원하는 반응도 그 틀에 맞춘다 — [형식 바꾸기] 를 열면 그 틀이 골라져 보이게(반응 목록에 없는 틀이면 아무것도 안 골라져 보였다) */
 function goalFor(k: ThreadTemplateKey, g: ThreadGoal | ''): ThreadGoal | '' {
@@ -388,6 +416,35 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         )}
       </QuickStart>
 
+      {/* D-299 대표 "마케팅 · 브랜딩 어디서든 LLM 모델을 골라 요청" — 이 화면에도 AI 도우미 판: 모델 고르기 · 직접 묻기(스레드 공식으로 답) ·
+          [스레드 글 3개 쓰기] 를 고른 모델로 → 답의 [글 칸에 넣기]. 띠에는 단추를 늘어놓지 않는다(위 [AI로 바로 쓰기] 와 겹치지 않게) */}
+      {aiOk && (
+        <AiAssist
+          page="threads"
+          title="스레드"
+          presets={['threads.write']}
+          quick={0}
+          build={() => ({ context: threadsContext({ goal: draft.goal, template: draft.template, topic: draft.topic, tag: draft.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef }), links: {} })}
+          itemActions={(id) =>
+            id === 'threads.write'
+              ? [
+                  {
+                    id: 'thr-use',
+                    label: '글 칸에 넣기',
+                    primary: true,
+                    run: (item) => {
+                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
+                      if (!d) return false
+                      takeDraft(d)
+                      return true
+                    },
+                  },
+                ]
+              : null
+          }
+        />
+      )}
+
       {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
       <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2.5" data-testid="thr-week-hint">
         <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
@@ -429,19 +486,58 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           <BigChoices items={GOAL_CHOICES} value={draft.goal} onPick={pickGoal} label="원하는 반응" testPrefix="thr-goal" />
         </ToneSection>
         <ToneSection n="2" tone="violet" title="틀 고르기" help="틀 = 글을 쓰는 순서예요. 잘 된 글 수백 개를 보고 모양이 같은 것끼리 묶었어요. 틀 이름에 마우스를 올리면 뜻 · 예시가 나와요." testId="thr-sec-tpl">
+          {/* D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천해 주고, 23개가 조그맣게라도 다 나열돼서 마우스를 올리면 정의 · 예시" —
+              ① 추천 틀(반응 · 오늘 계획) 큰 단추 ② 그 아래 틀 전부 작은 색 단추(반응 색 · ★ 추천 · 이번 주 잘 됨) — 어느 것이든 바로 고른다 */}
           <div className="flex flex-wrap items-center gap-2">
-            <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">{goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : '반응을 고르면 그 반응에 맞는 틀만 남아요. 지금은 오늘 계획 · 자주 쓰는 틀.'}</p>
+            <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700" data-testid="thr-picks-why">
+              <b className="text-violet-800">★ 추천</b> ·{' '}
+              {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 딱지 = 그 틀이 잘 되는 반응. 아래에서 다른 틀도 바로 골라요.
+            </p>
             <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
-              <BookOpen aria-hidden="true" className="size-4" /> 틀 23가지 전부
+              <BookOpen aria-hidden="true" className="size-4" /> 틀 설명서
             </Button>
           </div>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
             {picks.map((t) => (
               <li key={t.key} className="min-w-0">
-                <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0], formatBy: 'hand' })} />
+                <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} ctx={draft.goal || plan?.goal || ''} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0], formatBy: 'hand' })} />
               </li>
             ))}
           </ul>
+          <div className="flex flex-col gap-2 rounded-lg border border-violet-200 bg-white/80 p-2.5 sm:p-3" data-testid="thr-all-tpls">
+            <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-700">
+              <b className="text-slate-900">틀 전부 — 눌러서 바로 골라요</b>
+              <span className="text-slate-500">마우스를 올리면 뜻 · 예시{' · '}휴대폰은 누르면 아래 상자에</span>
+            </p>
+            {/* D-299 색 읽는 법 — 색 = 그 틀이 잘 되는 반응 · 점 두 개 = 두 반응에 다 좋음 · 고른 반응에 맞는 틀은 진하게 */}
+            <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600" data-testid="thr-color-legend">
+              <span>
+                <b className="text-slate-800">색 = 잘 되는 반응</b> · 점이 두 개면 두 반응에 다 좋아요
+                {goal ? (
+                  <>
+                    {' · '}
+                    <b className={TONES[GOAL_TONE[goal.key]].ink}>'{goal.label}'</b> 에 맞는 틀은 진하게
+                  </>
+                ) : null}
+              </span>
+              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="색 뜻">
+                {GOAL_CHOICES.map((g) => (
+                  <span key={g.key} className="t-meta inline-flex items-center gap-1 text-slate-600">
+                    <span aria-hidden="true" className={`inline-block size-2.5 rounded-full ${TONES[g.tone].bar}`} />
+                    {g.label}
+                  </span>
+                ))}
+              </span>
+            </p>
+            {/* 휴대폰도 두 줄(8.5rem) — 큰 글자면 저절로 한 줄 */}
+            <ul className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr))' }}>
+              {THREAD_TEMPLATES.map((t) => (
+                <li key={t.key} className="min-w-0">
+                  <MiniTemplate t={t} on={draft.template === t.key} rec={picks.some((x) => x.key === t.key)} hot={hotKeys.has(t.key)} ctx={draft.goal} onClick={() => set({ template: t.key, goal: goalFor(t.key, draft.goal), formatBy: 'hand' })} />
+                </li>
+              ))}
+            </ul>
+          </div>
           {tpl && (
             <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-white px-3 py-3" data-testid="thr-tpl-detail">
               <p className="t-body font-bold break-keep text-slate-900">
@@ -596,9 +692,9 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   )
 }
 
-function TemplateButton({ t, on, hot = false, onClick }: { t: ThreadTemplate; on: boolean; hot?: boolean; onClick: () => void }) {
-  // D-298 번호 딱지는 그 틀의 반응 색 · 마우스를 올리면 쉽게 말하면 · 예시
-  const tone = TONES[toneOfTemplate(t)]
+function TemplateButton({ t, on, hot = false, ctx = '', onClick }: { t: ThreadTemplate; on: boolean; hot?: boolean; ctx?: ThreadGoal | ''; onClick: () => void }) {
+  // D-298 번호 딱지는 그 틀의 반응 색 · 마우스를 올리면 쉽게 말하면 · 예시. D-299 추천 칸에서는 고른 반응 색으로 맞추고 잘 되는 반응 딱지를 붙인다
+  const tone = TONES[toneOfTemplate(t, ctx)]
   return (
     <HoverTip block className="h-full" tip={<TipBody title={`${t.key} ${t.name}`} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
       <button type="button" aria-pressed={on} onClick={onClick} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border-2 px-3 py-2.5 text-left ${on ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`thr-tpl-${t.key}`}>
@@ -612,6 +708,46 @@ function TemplateButton({ t, on, hot = false, onClick }: { t: ThreadTemplate; on
           )}
         </span>
         <span className="t-sub break-keep text-slate-600">{t.reaction}</span>
+        <GoalTags t={t} />
+      </button>
+    </HoverTip>
+  )
+}
+
+/** D-299 틀 전부 — 작은 색 단추(번호 딱지는 반응 색 · ★ 추천 · 🔥 이번 주 잘 됨) · 마우스를 올리면 쉽게 말하면 · 예시 */
+function MiniTemplate({ t, on, rec, hot, ctx, onClick }: { t: ThreadTemplate; on: boolean; rec: boolean; hot: boolean; ctx: ThreadGoal | ''; onClick: () => void }) {
+  const tone = TONES[toneOfTemplate(t, ctx)]
+  // 고른 반응에 안 맞는 틀은 흐리게(그래도 누르면 고를 수 있다)
+  const fits = !ctx || t.goals.includes(ctx)
+  return (
+    <HoverTip block className="h-full" tip={<TipBody title={`${t.key} ${t.name}`} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
+      <button
+        type="button"
+        aria-pressed={on}
+        onClick={onClick}
+        className={`tap t-sub flex h-full min-h-11 w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-left font-semibold break-keep ${on ? 'border-violet-500 bg-violet-100 text-violet-950 ring-2 ring-violet-300' : `${tone.line} bg-white text-slate-800 ${tone.hover}`} ${fits || on ? '' : 'opacity-50 hover:opacity-100'}`}
+        data-testid={`thr-mini-${t.key}`}
+        data-rec={rec ? '1' : '0'}
+        data-fits={fits ? '1' : '0'}
+      >
+        <span aria-hidden="true" className={`inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-[0.78rem] font-bold ${tone.solid}`}>
+          {t.key}
+        </span>
+        {/* 반응 점은 이름 아래 줄 — 휴대폰 두 줄 칸에서 이름이 낱말 가운데서 끊기지 않게 */}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="leading-tight">{t.name}</span>
+          <GoalTags t={t} dots />
+        </span>
+        {rec && (
+          <span className="shrink-0 text-amber-500" title="추천">
+            ★
+          </span>
+        )}
+        {hot && (
+          <span className="shrink-0" title="이번 주 잘 됨">
+            🔥
+          </span>
+        )}
       </button>
     </HoverTip>
   )
@@ -780,15 +916,16 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
         {list.map((t) => (
           <li key={t.key} className="min-w-0">
             <Surface className="flex h-full flex-col gap-2" as="article">
-              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[toneOfTemplate(t)].bar}`} />
+              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[toneOfTemplate(t, goal)].bar}`} />
               <div className="flex flex-wrap items-center gap-1.5" data-testid="thr-lib-card" data-key={t.key}>
-                <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border font-bold ${TONES[toneOfTemplate(t)].solid}`}>{t.key}</span>
+                <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border font-bold ${TONES[toneOfTemplate(t, goal)].solid}`}>{t.key}</span>
                 <h3 className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{t.name}</h3>
                 {t.few && <Badge>표본 적음</Badge>}
+                <GoalTags t={t} />
               </div>
               {/* D-298 쉽게 말하면 — 카드 맨 위 한 줄(초등학생도) · 예시는 펼쳐서 */}
-              <p className={`t-sub flex items-start gap-1.5 rounded-lg px-2.5 py-2 break-keep text-slate-800 ${TONES[toneOfTemplate(t)].soft}`} data-testid="thr-lib-plain">
-                <Lightbulb aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${TONES[toneOfTemplate(t)].icon}`} />
+              <p className={`t-sub flex items-start gap-1.5 rounded-lg px-2.5 py-2 break-keep text-slate-800 ${TONES[toneOfTemplate(t, goal)].soft}`} data-testid="thr-lib-plain">
+                <Lightbulb aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${TONES[toneOfTemplate(t, goal)].icon}`} />
                 <span className="min-w-0">{TEMPLATE_EASY[t.key].plain}</span>
               </p>
               <p className="t-meta break-keep text-slate-600">

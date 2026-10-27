@@ -66,13 +66,13 @@ globalThis.fetch = async (input, init = {}) => {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
     const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
-    llm.push({ sys, user })
+    llm.push({ sys, user, provider: 'gemini', model: /models\/([^:]+):/.exec(url)?.[1] ?? '' })
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com/v1/messages')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.system ?? '')
-    llm.push({ sys, user: String(body.messages?.[0]?.content ?? '') })
+    llm.push({ sys, user: String(body.messages?.[0]?.content ?? ''), provider: 'anthropic', model: body.model })
     return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ANSWER) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
   }
   if (/\/models(\?|$)/.test(url)) return new Response(JSON.stringify({ models: [], data: [] }), { status: 200 })
@@ -152,6 +152,27 @@ check('H6 틀 [T 닿아라] 에 마우스 → 무슨 뜻인지 + 예시(데려�
 await page.mouse.move(5, 700)
 const goalBg = await page.locator('[data-testid^="thr-goal-"]').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).borderColor))
 check('H7 원하는 반응 4개 — 색이 모두 다름', new Set(goalBg).size === 4, goalBg)
+// D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천 · 23개가 조그맣게라도 다 나열 · 마우스를 올리면 정의 · 예시"
+const minis = page.getByTestId('thr-all-tpls').locator('[data-testid^="thr-mini-"]')
+const recMinis = await page.getByTestId('thr-all-tpls').locator('[data-rec="1"]').evaluateAll((xs) => xs.map((x) => x.dataset.testid))
+check('T1 추천 틀(큰 단추) 아래 틀 전부 작은 단추 24개(A~X) · 추천 표시(★) = 위 추천 6개', (await minis.count()) === 24 && recMinis.length === 6 && /★ 추천/.test(await page.getByTestId('thr-picks-why').innerText()), recMinis)
+await page.getByTestId('thr-mini-M').hover()
+await page.waitForTimeout(150)
+check('T2 작은 단추 [M] 에 마우스 → 쉽게 말하면 + 예시 · 화면 안', /이름을 붙여 주는 글/.test(await page.getByTestId('thr-tpltip').innerText().catch(() => '')) && /예시/.test(await page.getByTestId('thr-tpltip').innerText()) && (await inView(page.getByTestId('thr-tpltip'))))
+await page.getByTestId('thr-mini-M').click()
+await page.mouse.move(5, 700)
+await page.waitForTimeout(150)
+check('T3 추천에 없던 틀(M 개념 · 이름 붙이기)도 바로 고름 → 작은 단추 · 위 추천 단추 모두 골라짐 · 반응도 그 틀에 맞게(공유) · 아래 상자에 쉽게 말하면', (await page.getByTestId('thr-mini-M').getAttribute('aria-pressed')) === 'true' && (await page.getByTestId('thr-tpl-M').getAttribute('aria-pressed')) === 'true' && (await page.getByTestId('thr-goal-share').getAttribute('aria-checked')) === 'true' && /개념 · 이름 붙이기/.test(await page.getByTestId('thr-tpl-detail').innerText()))
+await page.getByTestId('thr-goal-reply').click()
+// D-299 대표 "반응을 고르면 틀이 색별로 나뉘는데 가끔 하나씩 다른 색이 섞여 있다" — 추천 칸은 고른 반응 색 하나 · 두 반응 틀은 딱지 둘
+await page.getByTestId('thr-goal-follow').click()
+await page.waitForTimeout(150)
+const badgeBg = await page.locator('[data-testid="thr-picks"] button > span:first-child > span:first-child').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).backgroundColor))
+check('T4 [팔로워 모으기] 추천 4개 번호 딱지가 모두 같은 색 — 두 반응에 다 좋은 I 판 깔기도 · I 에 딱지 답글 · 팔로워 둘', badgeBg.length === 4 && new Set(badgeBg).size === 1 && /답글[\s\S]*팔로워/.test(await page.getByTestId('thr-tpl-I').getByTestId('thr-goaltags').innerText()), badgeBg)
+const fitsNow = await page.getByTestId('thr-all-tpls').locator('[data-fits="1"]').evaluateAll((xs) => xs.map((x) => x.dataset.testid.replace('thr-mini-', '')))
+const dimOp = await page.getByTestId('thr-mini-A').evaluate((e) => getComputedStyle(e).opacity)
+check('T5 틀 전부 — 팔로워에 맞는 틀(F · I · R · T · X)만 진하게 · 나머지는 흐리게(그래도 누를 수 있음) · 색 읽는 법 한 줄', fitsNow.join() === 'F,I,R,T,X' && Number(dimOp) < 1 && /색 = 잘 되는 반응/.test(await page.getByTestId('thr-color-legend').innerText()), { fitsNow, dimOp })
+await page.getByTestId('thr-goal-reply').click()
 const picks = await page.locator('[data-testid="thr-picks"] [data-testid^="thr-tpl-"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-testid')))
 check('W1 답글 · 문의 → 맞는 틀 6개 · P(자료 나눔 조건) 먼저', picks.length === 6 && picks[0] === 'thr-tpl-P', picks)
 await page.getByTestId('thr-tpl-P').click()
@@ -327,6 +348,56 @@ check('R1e AI 에 이번 주 형식은 참고로만 — 자료 칸 이름 · 지
 await page.getByTestId('thr-tab-routine').click()
 await page.getByTestId('thr-routine').waitFor()
 await shot(page, 'pc-routine', false)
+/* ---------------- L D-299 마케팅 어디서든 모델 고르기 · AI 도우미 판 ---------------- */
+// 대표 "마케팅 · 브랜딩 쪽에서 어디서든 LLM 모델을 선택해서 적용해 요청할 수 있어야 하는데 없다"
+await page.evaluate(() => localStorage.removeItem('mirae.threads.draft.v1'))
+await open(page)
+await page.getByTestId('thr-qs-topic').fill('정책자금 신청 전에 볼 것')
+const bar = page.getByTestId('ai-assist-bar')
+check('L1 [AI로 바로 쓰기] 바로 옆 [모델 · ○○] · 이 화면에도 AI 도우미 판(직접 묻기 · 모델) — 띠에 단추를 늘어놓지 않음', (await page.getByTestId('thr-qs-model').count()) === 1 && (await bar.count()) === 1 && (await bar.getByTestId('ai-assist-ask-chip').count()) === 1 && (await bar.getByTestId('ai-assist-model-chip').count()) === 1 && (await bar.getByTestId('ai-assist-chip').count()) === 0)
+await page.getByTestId('thr-qs-model').click()
+await page.getByTestId('model-pick-panel').locator('[data-provider="anthropic"]').click()
+await page.getByTestId('model-pick-panel').getByTestId('ai-assist-model-option').filter({ hasText: 'Claude Haiku 5.5' }).click()
+await page.waitForTimeout(200)
+check('L2 모델을 Claude Haiku 5.5 로 → AI 도우미 판 모델 칩도 같이 바뀜', /Claude Haiku 5\.5/.test(await page.getByTestId('thr-qs-model').innerText()) && /Claude Haiku 5\.5/.test(await bar.getByTestId('ai-assist-model-chip').innerText()))
+await page.keyboard.press('Escape')
+{
+  const before = llm.length
+  const l289 = page.getByTestId('thr-qs-ai')
+  await l289.click()
+  await page.waitForTimeout(450)
+  await l289.click()
+  await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
+  check('L3 [AI로 바로 쓰기] 는 고른 모델로(claude-haiku-5-5) · 한 번', llm.length - before === 1 && llm.at(-1)?.provider === 'anthropic' && llm.at(-1)?.model === 'claude-haiku-5-5', llm.at(-1)?.model)
+}
+await bar.getByTestId('ai-assist-ask-chip').click()
+await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+{
+  const before = llm.length
+  const q = '이번 주에 팔로워 모으기로 쓸 만한 소재 하나만'
+  await page.getByTestId('ai-assist-ask').fill(q)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'threads.ask', null, { timeout: 10000 }).catch(() => {})
+  const sent = llm.length > before ? llm.at(-1) : null
+  check('L4 [직접 묻기] → threads.ask · 고른 모델 · 적은 말 그대로 · 스레드 공식(기준 문서)과 이 화면 소재를 같이 보냄', !!sent && sent.provider === 'anthropic' && sent.user.includes(`[대표가 더 묻는 것] ${q}`) && sent.user.includes('스레드 — 직접 물어본 것에 답') && sent.user.includes('정책자금 신청 전에 볼 것'), sent?.user.slice(0, 200))
+}
+await page.keyboard.press('Escape')
+await page.waitForTimeout(200)
+// 판에서 [스레드 글 3개 쓰기] → 답 항목의 [글 칸에 넣기]
+await page.getByTestId('thr-new').click()
+await bar.getByTestId('ai-assist-open').click()
+await page.getByTestId('ai-assist-preset').filter({ hasText: '스레드 글 3개 쓰기' }).click()
+await page.getByTestId('ai-assist-confirm-go').click()
+await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'threads.write', null, { timeout: 10000 }).catch(() => {})
+const useBtn = page.locator('[data-testid="ai-assist-action"][data-action="thr-use"]').first()
+check('L5 판에서 [스레드 글 3개 쓰기] → 답마다 [글 칸에 넣기]', (await page.locator('[data-testid="ai-assist-action"][data-action="thr-use"]').count()) >= 1)
+await useBtn.click()
+await page.waitForTimeout(300)
+check('L6 [글 칸에 넣기] → 그 글이 글 칸에', /창업 3년 안 된 대표님/.test(await page.getByTestId('thr-body').inputValue()), (await page.getByTestId('thr-body').inputValue()).slice(0, 40))
+await page.keyboard.press('Escape')
+// 다음 시험에 남지 않게 기본 모델로
+await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/ai.*choice|choice.*ai/i.test(k)) localStorage.removeItem(k) })
+
 check('R2 PC — JS 오류 0', errors.length === 0, errors)
 
 /* ---------------- M 휴대폰 ---------------- */

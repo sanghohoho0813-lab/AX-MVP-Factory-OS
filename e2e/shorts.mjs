@@ -63,13 +63,13 @@ globalThis.fetch = async (input, init = {}) => {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
     const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
-    llm.push({ sys, user })
+    llm.push({ sys, user, provider: 'gemini', model: /models\/([^:]+):/.exec(url)?.[1] ?? '' })
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com/v1/messages')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.system ?? '')
-    llm.push({ sys, user: String(body.messages?.[0]?.content ?? '') })
+    llm.push({ sys, user: String(body.messages?.[0]?.content ?? ''), provider: 'anthropic', model: body.model })
     return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ANSWER) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
   }
   if (/\/models(\?|$)/.test(url)) return new Response(JSON.stringify({ models: [], data: [] }), { status: 200 })
@@ -234,6 +234,28 @@ check('G2 [이 형식으로 만들기] → 릴스 · 댓글 받기 · 댓글형 
 await page.getByTestId('sht-tab-guide').click()
 await page.getByTestId('sht-guide').waitFor()
 check('G4 형식 · 공식 — 이렇게 말고 → 이렇게 표 · 나눠 줄 자료', (await page.locator('[data-testid="sht-rewrites"] li').count()) >= 10 && (await page.getByTestId('sht-guide-share-card').count()) === 6)
+/* ---------------- L D-299 모델 고르기 · AI 도우미 판 ---------------- */
+await page.getByTestId('sht-tab-write').click()
+await page.getByTestId('sht-qs-topic').fill('정책자금 전에 볼 기본 컨디션')
+{
+  const bar = page.getByTestId('ai-assist-bar')
+  check('L1 [AI로 바로 쓰기] 바로 옆 [모델 · ○○] · AI 도우미 판(직접 묻기 · 모델)', (await page.getByTestId('sht-qs-model').count()) === 1 && (await bar.count()) === 1 && (await bar.getByTestId('ai-assist-ask-chip').count()) === 1 && (await bar.getByTestId('ai-assist-chip').count()) === 0)
+  await page.getByTestId('sht-qs-model').click()
+  await page.getByTestId('model-pick-panel').locator('[data-provider="anthropic"]').click()
+  await page.getByTestId('model-pick-panel').getByTestId('ai-assist-model-option').filter({ hasText: 'Claude Haiku 5.5' }).click()
+  await page.keyboard.press('Escape')
+  await bar.getByTestId('ai-assist-ask-chip').click()
+  await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+  const before = llm.length
+  const q = '릴스로 20초 안에 끝낼 수 있게 줄여 줘'
+  await page.getByTestId('ai-assist-ask').fill(q)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'shorts.ask', null, { timeout: 10000 }).catch(() => {})
+  const sent = llm.length > before ? llm.at(-1) : null
+  check('L2 [직접 묻기] → shorts.ask · 고른 모델(claude-haiku-5-5) · 적은 말 그대로 · 이 화면 소재', !!sent && sent.model === 'claude-haiku-5-5' && sent.user.includes(`[대표가 더 묻는 것] ${q}`) && sent.user.includes('릴스 · 틱톡 — 직접 물어본 것에 답') && sent.user.includes('정책자금 전에 볼 기본 컨디션'), sent?.model)
+  await page.keyboard.press('Escape')
+  await page.evaluate(() => localStorage.removeItem('axmvp.ai.choice.v1'))
+}
 await page.getByTestId('sht-tab-write').click()
 await page.getByTestId('sht-qs-topic').fill('매일 반복되는 일 하나 화면으로 바꾸기')
 await page.getByTestId('sht-to-threads').click()

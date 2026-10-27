@@ -106,6 +106,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'module.ask', page: 'module', label: '모듈 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   { id: 'radar.ask', page: 'radar', label: '마케팅 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   { id: 'content.ask', page: 'content', label: '홍보 글 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  // D-299 스레드 · 릴스/틱톡 화면에도 AI 도우미 판 — 직접 묻기(그 플랫폼 공식으로 답)
+  { id: 'threads.ask', page: 'threads', label: '스레드 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
+  { id: 'shorts.ask', page: 'shorts', label: '릴스 · 틱톡 — 직접 물어본 것에 답', kind: 'list', hint: '이 화면 자료로 — 단추에 없는 질문' },
   // D-250 대화창 — 질문창에 직접 쓴 말에 답(띠 · 판 단추에는 없음)
   // D-251 마케팅 첫 화면 키워드 묶음 — 묶음 화면이 세 갈래를 동시에 부른다(띠에는 없음)
   { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },

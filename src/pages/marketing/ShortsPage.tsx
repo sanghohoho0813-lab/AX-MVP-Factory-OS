@@ -19,7 +19,8 @@ import { useViewingPilot } from '../../auth/osAccess'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { todayLocalDate } from '../../lib/appClock'
-import { AssistError, callAssist } from '../../services/aiAssist/client'
+import { AssistError, callAssist, type AssistAnswer } from '../../services/aiAssist/client'
+import { AiAssist } from '../../components/ai/AiAssist'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { useShortPosts } from '../../services/marketing/useSnsPosts'
 import {
@@ -366,6 +367,34 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           </ul>
         )}
       </QuickStart>
+
+      {/* D-299 AI 도우미 판 — 모델 고르기 · 직접 묻기(숏폼 공식으로 답) · [대본 2개 쓰기] 를 고른 모델로 → 답의 [대본 칸에 넣기] */}
+      {aiOk && (
+        <AiAssist
+          page="shorts"
+          title="릴스 · 틱톡"
+          presets={['shorts.write']}
+          quick={0}
+          build={() => ({ context: shortsContext({ platform: draft.platform, aim: draft.aim, format: draft.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), links: {} })}
+          itemActions={(id) =>
+            id === 'shorts.write'
+              ? [
+                  {
+                    id: 'sht-use',
+                    label: '대본 칸에 넣기',
+                    primary: true,
+                    run: (item) => {
+                      const d = parseShortDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
+                      if (!d) return false
+                      start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
+                      return true
+                    },
+                  },
+                ]
+              : null
+          }
+        />
+      )}
 
       {/* D-298 '이것만 지키면 돼요' — 글자 덩어리 대신 색 번호 · 굵은 한마디 · 짧은 설명, 예시는 마우스를 올리거나 ? 를 누르면 */}
       <div className="rounded-(--radius-panel) border-2 border-amber-300 bg-amber-50/60 px-4 py-3" data-testid="sht-basics">
