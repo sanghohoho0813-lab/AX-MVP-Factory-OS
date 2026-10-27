@@ -69,7 +69,7 @@ for (const vp of [
   const hcNote = await page.getByTestId('roster-headcount').innerText().catch(() => '')
   const val = (l) => page.getByLabel(l, { exact: true }).inputValue()
   const four = [await val('전년도 상시근로자'), await val('전년도 청년 등'), await val('올해 상시근로자'), await val('올해 청년 등')]
-  check(`${vp.tag} D-302 명부 날짜로 셌어요 — 작년 → 올해 평균 · 지금 직원만 있는 명부 주의`, /명부 날짜로 셌어요 — \d{4}년 매월 말 평균 [\d.]+명 → \d{4}년/.test(hcNote) && (await page.getByTestId('roster-headcount-current').count()) === 1, hcNote.slice(0, 240))
+  check(`${vp.tag} D-302 명부 날짜로 셌어요 — 작년 → 올해 평균 · 지금 직원만 있는 명부 주의`, /명부 날짜로 셌어요[\s\S]*\d{4}년 매월 말 평균 [\d.]+명 → \d{4}년 [\d.]+명/.test(hcNote) && (await page.getByTestId('roster-headcount-current').count()) === 1, hcNote.slice(0, 240))
   check(`${vp.tag} D-302 네 칸이 저절로 채워짐(전년 칸도)`, four.every((v) => v !== '' && !Number.isNaN(Number(v))) && Number(four[2]) > Number(four[0]), four.join(' / '))
   const body1 = await page.locator('body').innerText()
   check(`${vp.tag} D-302 결과 카드에 통합고용세액공제 예상(전년 인원을 넣지 않아도)`, /통합고용세액공제 예상 약 [\d,.]+(만원|억원)/.test(body1), (body1.match(/통합고용세액공제 예상[^\n]{0,60}/) ?? [''])[0])

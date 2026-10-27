@@ -63,7 +63,7 @@ import {
   type SizeType,
 } from './lib/payrollDiagnosis'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
-import { HelpHeading } from '../../components/ui/fold'
+import { HelpHeading, HintTip } from '../../components/ui/fold'
 
 const STORAGE_PREFIX = 'axmvp.tools.employment.'
 
@@ -595,18 +595,20 @@ function HeadcountNote({ hc, differs, onApply }: { hc: RosterHeadcount; differs:
   const rest = 12 - hc.cur.actualMonths
   return (
     <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 p-3" data-testid="roster-headcount">
-      <p className="t-sub font-bold break-keep text-slate-800">
-        명부 날짜로 셌어요 — {hc.prev.year}년 매월 말 평균 {headText(hc.prev.total)}명 → {hc.cur.year}년 {rest > 0 ? '예상 ' : ''}
-        {headText(hc.cur.total)}명
+      {/* 어떻게 셌는지는 ? 안에 — 칸에는 숫자와 꼭 볼 주의만 */}
+      <HintTip
+        label="명부 날짜로 셌어요"
+        tip={`입사 · 퇴사(자격 취득 · 상실) 날짜로 달마다 말일 인원을 세어 평균을 냈어요(법이 세는 방식).${rest > 0 ? ` ${hc.cur.year}년 남은 ${rest}달은 ${hc.asOf} 인원이 그대로라고 봤어요.` : ''} 청년 등 = 입사 때 만 15~34세 · 만 60세 이상(장애인 · 경력단절 여성 · 병역 · 계약직은 세무사 확인).`}
+      >
+        <p className="t-sub font-bold break-keep text-slate-700">명부 날짜로 셌어요</p>
+      </HintTip>
+      <p className="t-body font-bold break-keep text-slate-900 tabular-nums">
+        {hc.prev.year}년 매월 말 평균 {headText(hc.prev.total)}명 → {hc.cur.year}년 {headText(hc.cur.total)}명{rest > 0 && <span className="t-sub font-semibold text-slate-500">(예상)</span>}
       </p>
-      <p className="t-meta break-keep text-slate-600">
-        입사 · 퇴사(자격 취득 · 상실) 날짜로 달마다 센 평균이에요(법이 세는 방식).
-        {rest > 0 && ` ${hc.cur.year}년은 ${hc.cur.actualMonths}월까지 실제, 남은 ${rest}달은 ${hc.asOf} 인원이 그대로라고 봤어요.`}
-        {out.length > 0 && ` 뺀 사람: ${out.join(' · ')}.`} 청년 등 = 입사 때 만 15~34세 · 만 60세 이상(★ 장애인 · 경력단절 여성 · 병역 · 계약직은 세무사 확인).
-      </p>
+      {out.length > 0 && <p className="t-meta break-keep text-slate-600">뺀 사람: {out.join(' · ')}</p>}
       {hc.basis === 'current' && (
         <p className="t-meta font-semibold break-keep text-amber-700" data-testid="roster-headcount-current">
-          ★ 지금 직원만 있는 명부예요 — 작년에 그만둔 사람이 있으면 작년 인원이 늘어 공제가 줄어요(상실자까지 나온 명부면 정확해요).
+          ★ 지금 직원만 있는 명부 — 작년에 그만둔 사람이 있으면 공제가 줄어요
         </p>
       )}
       {differs && (
