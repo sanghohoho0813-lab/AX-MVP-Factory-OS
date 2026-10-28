@@ -1209,7 +1209,7 @@ await (async () => {
   const out = await analyzeUploadedDocs(base, docs, ctx)
   const tp = out.record.taxProfile
   check('D-304 등기부 → 대표 취임일 2015-07-21 · 1주 액면가 5,000 · 발행주식 총수 20,000 / 규정 → 지급배수 3', tp.ceoStartDate === '2015-07-21' && tp.par === '5000' && tp.totalShares === '20000' && tp.retireMult === '3', JSON.stringify(tp))
-  check('D-304 바로 넣은 정보에 넷 다(취임일엔 등기부 근거)', ['대표 취임일(퇴직금 기산일)', '1주 액면가', '발행주식 총수', '정관 퇴직금 지급배수'].every((l) => out.summary.entered.some((e) => e.label === l)) && !!out.summary.entered.find((e) => e.label.startsWith('대표 취임일'))?.display.includes('등기부'), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
+  check('D-304 바로 넣은 정보에 넷 다(취임일엔 등기부 근거)', ['대표 취임일', '1주 액면가', '발행주식 총수', '퇴직금 배수'].every((l) => out.summary.entered.some((e) => e.label === l)) && !!out.summary.entered.find((e) => e.label === '대표 취임일')?.display.includes('퇴직금 기산일(등기부'), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
   check('D-304 주민번호는 기록에 없음', !JSON.stringify(out.record).includes('801231-1'))
   const had = normalizeClientOps({ ...base, taxProfile: { totalShares: '10000' } } as never)
   const kept = await analyzeUploadedDocs(had, docs, ctx)
@@ -1233,12 +1233,12 @@ await (async () => {
   const out = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
   const tp = out.record.taxProfile
   check('D-305 재무제표 → 가지급금 3천만 · 배당 가능한 이익 8억 · 직전 연도(2024) 순이익 1.2억 · 매출 등 회사 정보도 그대로', tp.loanBalance === '30000000' && tp.retainedEarnings === '800000000' && tp.vInc1 === '120000000' && out.summary.entered.some((e) => e.key === 'netIncome'), JSON.stringify(tp))
-  check('D-305 바로 넣은 정보 글: 연도와 함께', out.summary.entered.some((e) => e.label === '가지급금 잔액' && e.display.startsWith('2025년')) && out.summary.entered.some((e) => e.label === '순이익 — 직전 연도' && e.display.startsWith('2024년')), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
+  check('D-305 바로 넣은 정보 글: 연도와 함께', out.summary.entered.some((e) => e.label === '가지급금' && e.display === '2025년 말 3,000만원') && out.summary.entered.some((e) => e.label === '직전 연도 순이익' && e.display === '2024년 1억 2,000만원') && out.summary.entered.some((e) => e.label === '배당 가능 이익' && e.display.startsWith('2025년 말 8억원')), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
   const had = normalizeClientOps({ ...base, taxProfile: { loanBalance: '50000000' } } as never)
   const kept = await analyzeUploadedDocs(had, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
-  check('D-305 이미 적힌 가지급금(5천만)과 다르면 덮지 않고 확인 필요', kept.record.taxProfile.loanBalance === '50000000' && kept.summary.flagged.some((f) => f.label === '가지급금 잔액'), JSON.stringify(kept.summary.flagged))
+  check('D-305 이미 적힌 가지급금(5천만)과 다르면 덮지 않고 확인 필요', kept.record.taxProfile.loanBalance === '50000000' && kept.summary.flagged.some((f) => f.label === '가지급금'), JSON.stringify(kept.summary.flagged))
   const loss = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FIN.replace('미처분이익잉여금 800,000 690,000', '미처분이익잉여금(미처리결손금) (40,000) (10,000)'), method: 'pdf_text' as const, docSure: true }], ctx)
-  check('D-305 미처리결손금 → 배당 가능한 이익은 넣지 않고 까닭(결손)', !loss.record.taxProfile.retainedEarnings && loss.summary.flagged.some((f) => f.label.startsWith('배당 가능한 이익') && f.note.includes('결손')), JSON.stringify(loss.summary.flagged))
+  check('D-305 미처리결손금 → 배당 가능한 이익은 넣지 않고 까닭(결손)', !loss.record.taxProfile.retainedEarnings && loss.summary.flagged.some((f) => f.label === '배당 가능 이익' && f.note.includes('결손')), JSON.stringify(loss.summary.flagged))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

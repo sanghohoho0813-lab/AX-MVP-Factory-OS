@@ -21,7 +21,7 @@
  */
 import type { ClientOpsRecord, DocUploadLog } from '../types/clientOps'
 import { withToolResult } from './clientOpsService'
-import { pendingFacts, readFact, withFactDecisions, withFactValue } from './customerFacts'
+import { formatWon, pendingFacts, readFact, withFactDecisions, withFactValue } from './customerFacts'
 import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
@@ -284,7 +284,7 @@ export async function analyzeUploadedDocs(
     const isRegistry = d.key === 'corporateRegistry' || detectDocSource(d.text) === 'corporate_registry'
     const reg = isRegistry ? readRegistryTax(d.text, rec.representativeName) : null
     if (reg) {
-      if (reg.ceoStart) putProfile('ceoStartDate', reg.ceoStart, '대표 취임일(퇴직금 기산일)', reg.ceoStartSure ? `${reg.ceoStart} (등기부 · ${reg.ceoStartNote})` : reg.ceoStart, d.fileName, reg.ceoStartSure, reg.ceoStartNote)
+      if (reg.ceoStart) putProfile('ceoStartDate', reg.ceoStart, '대표 취임일', reg.ceoStartSure ? `${reg.ceoStart} — 퇴직금 기산일(등기부 · ${reg.ceoStartNote})` : reg.ceoStart, d.fileName, reg.ceoStartSure, reg.ceoStartNote)
       if (reg.par) putProfile('par', String(reg.par), '1주 액면가', `${reg.par.toLocaleString('ko-KR')}원`, d.fileName, reg.parSure, '1주의 금액이 여러 가지로 나와요 — 절세 설계에서 확인')
       if (reg.totalShares)
         putProfile('totalShares', String(reg.totalShares), '발행주식 총수', `${reg.totalShares.toLocaleString('ko-KR')}주`, d.fileName, reg.sharesSure, reg.capital ? `1주의 금액 × 총수가 자본금(${reg.capital.toLocaleString('ko-KR')}원)과 달라요 — 절세 설계에서 확인` : '자본금과 맞춰 보지 못했어요 — 절세 설계에서 확인')
@@ -293,20 +293,21 @@ export async function analyzeUploadedDocs(
     // D-305 재무제표 → 가지급금 잔액 · 배당 가능한 이익(미처분이익잉여금) · 직전 연도 순이익
     if (d.key === 'financialStatements' || /재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|표준\s*재무제표/.test(d.text.slice(0, 3000))) {
       const f = parseFinancialStatement(d.text)
-      const yr = f.year ? `${f.year}년 ` : ''
-      if (f.loanBalance !== undefined && f.loanBalance > 0) putProfile('loanBalance', String(f.loanBalance), '가지급금 잔액', `${yr}${f.loanBalance.toLocaleString('ko-KR')}원`, d.fileName, true, '')
+            // 이름은 짧게(맞춤 추천 표의 이름 칸이 한 줄로) · 금액은 회사 정보와 같은 '억 · 만원' 글로
+      const yrEnd = f.year ? `${f.year}년 말 ` : ''
+      if (f.loanBalance !== undefined && f.loanBalance > 0) putProfile('loanBalance', String(f.loanBalance), '가지급금', `${yrEnd}${formatWon(f.loanBalance)}`, d.fileName, true, '')
       if (f.retainedEarnings !== undefined) {
-        if (f.retainedEarnings > 0) putProfile('retainedEarnings', String(f.retainedEarnings), '배당 가능한 이익(미처분이익잉여금)', `${yr}${f.retainedEarnings.toLocaleString('ko-KR')}원`, d.fileName, true, '')
+        if (f.retainedEarnings > 0) putProfile('retainedEarnings', String(f.retainedEarnings), '배당 가능 이익', `${yrEnd}${formatWon(f.retainedEarnings)}(미처분이익잉여금)`, d.fileName, true, '')
         else if (f.retainedEarnings < 0 && !String(rec.taxProfile?.retainedEarnings ?? '').trim())
-          flagged.push({ key: 'taxProfile.retainedEarnings', label: '배당 가능한 이익(미처분이익잉여금)', display: `${yr}결손 ${Math.abs(f.retainedEarnings).toLocaleString('ko-KR')}원`, fileName: d.fileName, note: '미처리결손금이라 배당할 이익이 없어요 — 배당 계획은 결손을 메운 뒤' })
+          flagged.push({ key: 'taxProfile.retainedEarnings', label: '배당 가능 이익', display: `${yrEnd}결손 ${formatWon(Math.abs(f.retainedEarnings))}`, fileName: d.fileName, note: '미처리결손금이라 배당할 이익이 없어요 — 배당 계획은 결손을 메운 뒤' })
       }
-      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '순이익 — 직전 연도', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${f.netIncomePrev.toLocaleString('ko-KR')}원`, d.fileName, true, '')
+      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '직전 연도 순이익', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
       continue
     }
     const mult = /정\s*관|퇴\s*직\s*금\s*(?:지\s*급\s*)?규\s*정|임원\s*퇴직/.test(`${d.fileName} ${d.text.slice(0, 600)}`) ? readRetireMultiple(d.text) : null
     // 정관 배수가 세법 한도보다 크면 계산은 한도로(절세 설계와 같은 규칙) — 보이는 글에 함께
     const cap = Number(ASSUMPTIONS.retireMultPost)
-    if (mult !== null) putProfile('retireMult', String(mult), '정관 퇴직금 지급배수', `대표이사 ${mult}배${mult > cap ? ` (계산은 세법 한도 ${cap}배)` : ''}`, d.fileName, true, '')
+    if (mult !== null) putProfile('retireMult', String(mult), '퇴직금 배수', `정관 · 대표이사 ${mult}배${mult > cap ? ` (계산은 세법 한도 ${cap}배)` : ''}`, d.fileName, true, '')
   }
 
   return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now } }

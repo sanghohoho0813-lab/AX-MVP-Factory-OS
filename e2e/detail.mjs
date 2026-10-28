@@ -1243,7 +1243,7 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   const r = await rec()
   check(`D-304 ${vp.tag} 등기부 → 대표 취임일 2016-04-01 · 액면가 5,000 · 총수 20,000 / 규정 → 지급배수 3`, r.taxProfile?.ceoStartDate === '2016-04-01' && r.taxProfile?.par === '5000' && r.taxProfile?.totalShares === '20000' && r.taxProfile?.retireMult === '3', JSON.stringify(r.taxProfile))
   const entered = (await page.getByTestId('smart-entered').innerText().catch(() => '')) ?? ''
-  check(`D-304 ${vp.tag} 바로 넣은 정보: 대표 취임일(등기부 근거) · 액면가 · 총수 · 지급배수(세법 한도 2배로 계산)`, entered.includes('대표 취임일') && entered.includes('등기부') && entered.includes('1주 액면가') && entered.includes('발행주식 총수') && entered.includes('대표이사 3배') && entered.includes('세법 한도'), entered.slice(0, 400))
+  check(`D-304 ${vp.tag} 바로 넣은 정보: 대표 취임일(등기부 근거) · 액면가 · 총수 · 지급배수(세법 한도 2배로 계산)`, entered.includes('대표 취임일') && entered.includes('퇴직금 기산일(등기부') && entered.includes('1주 액면가') && entered.includes('발행주식 총수') && entered.includes('대표이사 3배') && entered.includes('세법 한도'), entered.slice(0, 400))
   check(`D-304 ${vp.tag} 주민번호는 기록에 0 · 업체 상세 넘침 0`, !JSON.stringify(r).includes('801231-1') && (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0)
   if (vp.tag === '1440') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot304-batch.png' }).catch(() => {})
   await page.goto(BASE + '/tools/tax?client=cli_hansol', { waitUntil: 'networkidle' })
@@ -1251,6 +1251,43 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   const vals = await page.locator('input').evaluateAll((els) => els.map((e) => e.value))
   // 지급배수 칸은 '퇴직금 · 현금' 목표를 고를 때만 보인다 — 값은 위 업체 기록에서 확인했다
   check(`D-304 ${vp.tag} 절세 설계에 취임일 · 액면가 · 총수 그대로 · 오류 0`, vals.includes('2016-04-01') && vals.includes('5000') && vals.some((v) => v.replace(/,/g, '') === '20000') && errors.length === 0, JSON.stringify(vals.filter(Boolean).slice(0, 30)) + errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- D-305 재무제표 올리기 → 가지급금 잔액 · 배당 가능한 이익 · 직전 연도 순이익 → 맞춤 추천 '가지급금 해마다 손해' ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const FS = {
+    name: '표준재무제표증명_2025.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(['표준재무제표증명', '(단위 : 천원)', '제 9(당)기 2025년 12월 31일 현재', '재무상태표', '가지급금 80,000 60,000', '자산총계 3,200,000 2,900,000', '부채총계 1,100,000 1,000,000', '미처분이익잉여금 900,000 760,000', '손익계산서', 'Ⅰ. 매출액 5,400,000 4,800,000', 'Ⅹ. 당기순이익 150,000 120,000'].join('\n'), 'utf8'),
+  }
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'))
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([FS])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const r = await rec()
+  check(`D-305 ${vp.tag} 재무제표 → 가지급금 8천만 · 배당 가능한 이익 9억 · 직전 연도 순이익 1.2억`, r.taxProfile?.loanBalance === '80000000' && r.taxProfile?.retainedEarnings === '900000000' && r.taxProfile?.vInc1 === '120000000', JSON.stringify(r.taxProfile))
+  const entered = (await page.getByTestId('smart-entered').innerText().catch(() => '')) ?? ''
+  check(`D-305 ${vp.tag} 바로 넣은 정보: 가지급금 잔액 · 배당 가능한 이익 · 직전 연도 순이익(연도와 함께)`, entered.includes('가지급금') && entered.includes('2025년 말 8,000만원') && entered.includes('배당 가능 이익') && entered.includes('9억원') && entered.includes('2024년 1억 2,000만원'), entered.slice(0, 500))
+  const tax = (await page.locator('[data-testid="smart-insight"][data-key="tax"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check(`D-305 ${vp.tag} 맞춤 추천 절세: 서류만으로 '가지급금 8,000만원 — 해마다 약 n만원 손해'`, tax.includes('가지급금 8,000만원') && /해마다 약 [\d,.]+(만원|억원) 손해/.test(tax), tax.slice(0, 300))
+  check(`D-305 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  if (vp.tag === '1440') {
+    await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot305-batch.png' }).catch(() => {})
+    const picks = page.getByTestId('top-picks')
+    if (await picks.count()) await picks.screenshot({ path: '/tmp/claude-0/shot305-picks.png' }).catch(() => {})
+  }
   await ctx.close()
 }
 
