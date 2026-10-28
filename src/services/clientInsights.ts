@@ -24,7 +24,7 @@ import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
-import { headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
+import { headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 
@@ -291,16 +291,6 @@ const employmentInsight: Provider = ({ record, facts }) => {
     openLabel: '명부 진단 보기',
     action: candidates ? `고용지원금 — ${roster.verdictLabel}` : credit > 0 ? '통합고용세액공제 — 세무사와 신고 확인' : null,
   }
-}
-
-/** 붙여 둔 결과의 인원 기록 — 모양이 맞을 때만 */
-function headcountOf(v: unknown): RosterHeadcount | null {
-  const h = v as RosterHeadcount | null | undefined
-  const ok = (y: unknown) => {
-    const x = y as { year?: unknown; total?: unknown; youth?: unknown; actualMonths?: unknown } | null | undefined
-    return !!x && typeof x.year === 'number' && typeof x.total === 'number' && typeof x.youth === 'number' && typeof x.actualMonths === 'number'
-  }
-  return h && ok(h.prev) && ok(h.cur) && (h.basis === 'history' || h.basis === 'current') ? h : null
 }
 
 /** D-191 연구소 도구가 붙인 가장 최근 세액공제 계산(연간 · 원) — 없으면 0 */

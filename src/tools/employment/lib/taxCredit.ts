@@ -113,3 +113,13 @@ export function headcountTaxCredit(hc: Pick<RosterHeadcount, 'prev' | 'cur'>, re
 export function headText(n: number): string {
   return String(Math.round(n * 100) / 100)
 }
+
+/** 붙여 둔 결과의 인원 기록 — 모양이 맞을 때만(맞춤 추천 세액공제 · 정책자금 고용 증가가 같이 쓴다) */
+export function headcountOf(v: unknown): RosterHeadcount | null {
+  const h = v as RosterHeadcount | null | undefined
+  const ok = (y: unknown) => {
+    const x = y as { year?: unknown; total?: unknown; youth?: unknown; actualMonths?: unknown } | null | undefined
+    return !!x && typeof x.year === 'number' && typeof x.total === 'number' && typeof x.youth === 'number' && typeof x.actualMonths === 'number'
+  }
+  return h && ok(h.prev) && ok(h.cur) && (h.basis === 'history' || h.basis === 'current') ? h : null
+}

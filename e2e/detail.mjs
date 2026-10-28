@@ -1358,6 +1358,66 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-310 4대보험 명부 → 정책자금 고용 증가 · 청년 고용(고용창출 자금) — 서류 올리기 한 번 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  // 작년엔 2명(2019 · 2024 입사) → 올해 2월 · 5월에 청년 2명 입사
+  const ROSTER = {
+    name: '사업장가입자명부_한솔.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      [
+        '4대보험 사업장 가입자 명부',
+        '사업장명: 한솔테크(주)',
+        '발급일시 2026.10.20',
+        '성명 주민등록번호 국민연금 건강보험 산재보험 고용보험',
+        '800101-1234567 박민수',
+        '2019-01-02 2019-01-02 2019-01-02 2019-01-02',
+        '950505-2345678 이수진',
+        '2024-03-01 2024-03-01 2024-03-01 2024-03-01',
+        '980310-1234567 홍길동',
+        '2026-02-02 2026-02-02 2026-02-02 2026-02-02',
+        '010101-3234567 최하늘',
+        '2026-05-04 2026-05-04 2026-05-04 2026-05-04',
+      ].join('\n'),
+      'utf8',
+    ),
+  }
+  const pol = () => page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const before = (await pol()) ?? ''
+  check(`D-310 ${vp.tag} 명부 전: 정책자금에 고용 증가 근거 없음`, before !== '' && !before.includes('고용 증가('), before.slice(0, 300))
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([ROSTER])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const after = (await pol()) ?? ''
+  check(`D-310 ${vp.tag} 명부 뒤: 정책자금 '고용 증가(2025년 평균 2명 → 2026년 …) — 고용창출 자금 대상'`, /고용 증가\(2025년 평균 2명 → 2026년 (예상 )?[\d.]+명/.test(after) && after.includes('고용창출 자금 대상'), after.slice(0, 500))
+  // 보고용 — 명부 전 · 뒤 판정 제목(추천 기관이 바뀌는지)
+  console.log(`  D-310 ${vp.tag} 전: ${before.split('검토해 볼 만함').pop()?.split('체납')[0]?.trim().slice(0, 60)} / 뒤: ${after.split('검토해 볼 만함').pop()?.split('체납')[0]?.trim().slice(0, 60)}`)
+  if (vp.tag === '1440') await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').screenshot({ path: '/tmp/claude-0/shot310-card.png' }).catch(() => {})
+  if (vp.tag === '390') await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').screenshot({ path: '/tmp/claude-0/shot310-card-390.png' }).catch(() => {})
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const note = (await page.getByTestId('tool-prefill-note').innerText().catch(() => '')) ?? ''
+  if (vp.tag === '390') await page.getByTestId('tool-prefill-note').screenshot({ path: '/tmp/claude-0/shot310-note-390.png' }).catch(() => {})
+  check(`D-310 ${vp.tag} 정책자금 화면도 채움(강점 고용 증가 · 청년 고용 있음)`, note.includes('강점 고용 증가(4대보험 명부)') && note.includes('청년 고용 있음(4대보험 명부)'), note.slice(0, 400))
+  check(`D-310 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

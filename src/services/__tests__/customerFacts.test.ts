@@ -39,7 +39,7 @@ import {
   withProfileFieldEdit,
 } from '../customerFacts'
 import { clientFacts } from '../../tools/shared/clientPrefill'
-import { policyBonus, policyEvidence } from '../policyEvidence'
+import { policyBonus, policyEvidence, policyHiring } from '../policyEvidence'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
@@ -1326,6 +1326,39 @@ await (async () => {
   check('D-307 엔진: 가점을 넘기면 추천 기관이 달라진다(기술 · 특허 쪽)', names(plain) !== names(withBonus) && withBonus.agencies.slice(0, 3).some((a) => /기술보증|기보/.test(a.name)), JSON.stringify({ plain: names(plain), bonus: names(withBonus) }))
   const ins = buildInsights(rich, T, []).find((i) => i.key === 'policy-funding')
   check('D-307 맞춤 추천 정책자금: "가점 특허, 연구소, 벤처기업, 이노비즈" 근거가 맨 앞', !!ins?.detail.includes('가점 특허, 연구소, 벤처기업, 이노비즈'), ins?.detail)
+}
+
+// D-310 정책자금 고용 — 4대보험 명부 진단(작년 평균 → 올해 · 청년) → 강점 '고용증가' · 청년 고용 '있음' → 고용창출 자금 · 중진공
+{
+  const T = '2026-10-28'
+  const facts = (r: ReturnType<typeof normalizeClientOps>) => clientFacts(r, new Date(`${T}T00:00:00`))
+  let base = normalizeClientOps({ id: 'ph310', companyName: '고용테크(주)', businessCategory: '서비스업', businessItem: '소프트웨어 개발', businessAddress: '대전광역시 유성구 1', establishedAt: '2021-03-02', employeeCount: '6', createdAt: NOW, updatedAt: NOW } as never)
+  base = withFactValue(base, 'revenue', '400000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  const roster = (headcount: unknown, youthCount: number, createdAt = '2026-10-01T09:00:00.000Z') =>
+    normalizeClientOps({ ...base, toolResults: [{ id: 'tr-r', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '', summary: '', data: { tab: 'roster', headcount, counts: { youthCount, newHireCount: 1 } }, deadlines: [], createdAt, publishedUpdateId: null }] } as never)
+  const hc = (prev: number, cur: number, basis = 'history', asOf = '2026-10-01') => ({ asOf, prev: { year: 2025, total: prev, youth: 1, actualMonths: 12 }, cur: { year: 2026, total: cur, youth: 2, actualMonths: 10 }, basis, counted: 7, excluded: { rel: 0, noEi: 0, noHire: 0, lostNoDate: 0 } })
+  check('D-310 명부 없음 → 고용 신호 없음', policyHiring(base, T) === null && policyEvidence(base, facts(base), T).input.strengths === undefined)
+  const grew = roster(hc(5, 6.5), 2)
+  const h = policyHiring(grew, T)
+  check('D-310 작년 평균 5명 → 올해 6.5명 · 청년 2명 → 고용 증가', !!h?.grew && h.youth === 2 && h.line === '고용 증가(2025년 평균 5명 → 2026년 예상 6.5명, 청년 2명) — 고용창출 자금 대상', JSON.stringify(h))
+  const ev = policyEvidence(grew, facts(grew), T)
+  check('D-310 진단 입력: 강점 고용증가 · 청년 고용 있음', JSON.stringify(ev.input.strengths) === '["고용증가"]' && ev.input.youthEmployment === '있음', JSON.stringify(ev.input))
+  check('D-310 근거 줄: 고용 증가가 체납 안내보다 앞(카드에 보이게)', ev.notes[0]?.startsWith('고용 증가('), JSON.stringify(ev.notes))
+  const fell = policyHiring(roster(hc(8, 6), 0), T)
+  check('D-310 줄었으면 고용 증가 아님 · 고용 유지 조건 확인 안내', !!fell && !fell.grew && fell.line.startsWith('직원이 줄었어요(2025년 평균 8명 → 2026년 예상 6명)'), JSON.stringify(fell))
+  check('D-310 줄었으면 강점을 넣지 않음', policyEvidence(roster(hc(8, 6), 0), facts(base), T).input.strengths === undefined)
+  const stale = policyHiring(roster(hc(5, 7, 'history', '2025-06-30'), 2, '2025-06-30T09:00:00.000Z'), T)
+  check('D-310 명부가 400일 넘으면 쓰지 않고 새로 받으라고', !!stale && !stale.grew && stale.youth === 0 && stale.line.includes('1년 넘었어요'), JSON.stringify(stale))
+  check('D-310 지금 직원만 있는 명부면 그렇다고 붙임', policyHiring(roster(hc(5, 6.5, 'current'), 0), T)?.line.includes('지금 직원만 있는 명부') === true)
+  check('D-310 인원 기록이 없는 옛 결과 · 청년만 있으면 청년 고용 있음', policyHiring(roster(undefined, 3), T)?.line === '청년 직원 3명(4대보험 명부)' && policyEvidence(roster(undefined, 3), facts(base), T).input.youthEmployment === '있음')
+  const inp = policyInputFromFacts(facts(grew)).input
+  const plain = runDiagnosis(inp)
+  const withHire = runDiagnosis({ ...inp, ...ev.input })
+  const rankOf = (r: ReturnType<typeof runDiagnosis>) => r.agencies.findIndex((a) => /중소벤처기업진흥공단/.test(a.name))
+  const tracks = (r: ReturnType<typeof runDiagnosis>) => (r.specialTracks ?? []).map((t) => t.name)
+  check('D-310 엔진: 고용 증가를 넘기면 고용창출 자금이 나오고 중진공이 앞으로', tracks(withHire).includes('고용창출') && !tracks(plain).includes('고용창출') && (rankOf(plain) === -1 || rankOf(withHire) < rankOf(plain)), JSON.stringify({ plain: plain.agencies.map((a) => a.name), hire: withHire.agencies.map((a) => a.name) }))
+  const ins = buildInsights(grew, T, []).find((i) => i.key === 'policy-funding')
+  check('D-310 맞춤 추천 정책자금: 고용 증가 근거가 보인다', !!ins?.detail.includes('고용 증가(2025년 평균 5명 → 2026년 예상 6.5명'), ins?.detail)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

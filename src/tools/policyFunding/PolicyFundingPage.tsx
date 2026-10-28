@@ -215,7 +215,7 @@ function DiagnosisScreen() {
     // D-306 서류함 납세증명서 · 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음(맞춤 추천과 같은 근거) — 아직 '미확인' 인 칸만
     if (clientRecord && clientRecord.id === clientId) {
       const ev = policyEvidence(clientRecord, facts, todayLocalDate())
-      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus'>(k: K, label: string) => {
+      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'youthEmployment'>(k: K, label: string) => {
         const v = ev.input[k]
         if (v && isUntouched(k) && (next[k] ?? '미확인') === '미확인') {
           next[k] = v as DiagnosisInput[K]
@@ -225,6 +225,12 @@ function DiagnosisScreen() {
       put('taxArrears', '세금 체납 없음(납세증명서)')
       put('insuranceArrears', '4대보험 체납 없음(완납증명서)')
       put('debtRatioStatus', '부채비율 높음(자본잠식)')
+      // D-310 4대보험 명부 — 직원이 늘었으면 강점 '고용 증가'(고른 강점은 그대로 두고 더한다) · 청년 직원이 있으면 청년 고용 '있음'
+      if (ev.input.strengths?.length && isUntouched('strengths') && ev.input.strengths.some((x) => !next.strengths.includes(x))) {
+        next.strengths = [...next.strengths.filter((x) => x !== '없음' && !ev.input.strengths?.includes(x)), ...ev.input.strengths]
+        filled.push('강점 고용 증가(4대보험 명부)')
+      }
+      put('youthEmployment', '청년 고용 있음(4대보험 명부)')
       // D-307 가점(특허 · 연구소 · 벤처 · 이노비즈 …) — 아직 아무것도 고르지 않았을 때만
       if (ev.input.bonusItems?.length && isUntouched('bonusItems') && (next.bonusItems ?? []).filter((b) => b !== '없음').length === 0) {
         next.bonusItems = ev.input.bonusItems

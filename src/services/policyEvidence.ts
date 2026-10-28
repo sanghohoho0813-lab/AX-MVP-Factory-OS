@@ -8,16 +8,22 @@
  *  - 4대보험 완납증명서가 90일 안 → 4대보험 체납 '없음'.
  *  - 재무제표 자산 ≤ 부채(자본잠식) → 부채비율 '높음'(부결의 흔한 원인 — 정책자금 사전 점검표). 자본이 있으면 짐작하지 않는다(미확인 그대로).
  * 서류 내용(체납액)은 다시 읽지 않는다 — 칸 이름 · 발급일 · 올린 날만. 칸을 손으로 옮기면 그대로 따른다.
+ *
+ * D-310 고용 — 4대보험 명부 진단이 센 인원(작년 매월 말 평균 → 올해)이 늘었으면 강점 '고용증가', 청년 직원이 있으면 청년 고용 '있음'.
+ *  엔진은 이것으로 '고용창출' 자금을 꺼내고 중진공 쪽 점수를 올린다(서비스 6명 · 매출 4억 업체: 1순위 지역신용보증재단 → 중진공).
+ *  명부가 400일보다 오래됐으면 쓰지 않고 새로 받으라고만 알린다.
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { ClientFacts } from '../tools/shared/clientPrefill'
 import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { CUSTOM_FACT_PREFIX, usableFactValue } from './customerFacts'
+import { latestEmploymentRoster } from './toolResultGroups'
+import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
-  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems'>>
+  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment'>>
   /** 무엇으로 채웠는지 한 줄씩 */
   notes: string[]
   /** 받으면 확인되는 서류(있으면 더 정확) */
@@ -87,16 +93,46 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
     input.debtRatioStatus = '높음'
     notes.push(`자본잠식(자산 ${Math.round(a / 1e6).toLocaleString('ko-KR')}백만 ≤ 부채 ${Math.round(l / 1e6).toLocaleString('ko-KR')}백만) — 부결의 흔한 원인`)
   }
+  // 추천 기관이 바뀌는 근거(가점 · 고용)는 맨 앞에 — 맞춤 추천 카드는 앞의 몇 줄만 보인다
+  const front: string[] = []
   // D-307 가점 — 특허 · 연구소 · 벤처 · 이노비즈 · 메인비즈 · 여성기업 · 사회적기업(기술보증 · 혁신성장 쪽 추천이 달라진다)
   const bonus = policyBonus(record, today)
   if (bonus.items.length) {
     input.bonusItems = bonus.items
-    // 추천 기관이 바뀌는 근거라 맨 앞에
-    notes.unshift(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
+    front.push(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
   }
+  // D-310 고용 증가 · 청년 직원 — 4대보험 명부
+  const hire = policyHiring(record, today)
+  if (hire?.grew) input.strengths = ['고용증가']
+  if (hire && hire.youth > 0) input.youthEmployment = '있음'
+  if (hire?.line) (hire.grew || hire.youth > 0 ? front : notes).push(hire.line)
+  notes.unshift(...front)
   // 근거 줄은 ' · ' 로 이어 보이므로 목록은 쉼표로 — 만료는 따로 한 줄(가점 목록에 섞여 보이지 않게)
   if (bonus.expired.length) notes.push(`만료라 가점에서 뺀 인증: ${bonus.expired.join(', ')}`)
   return { input, notes, want }
+}
+
+/**
+ * D-310 4대보험 명부 진단(업체에 붙인 결과) → 고용 증가 · 청년 직원.
+ * 명부 날짜로 센 작년 평균 → 올해(D-302)가 늘었으면 grew. 지금 직원만 있는 명부(작년 퇴사자 없음)는 작년이 적게 셀 수 있어 그렇다고 붙인다.
+ */
+export function policyHiring(record: ClientOpsRecord, today: string): { grew: boolean; youth: number; line: string } | null {
+  const roster = latestEmploymentRoster(record)
+  if (!roster) return null
+  const data = roster.data as { headcount?: unknown; counts?: { youthCount?: unknown } } | null
+  const hc = headcountOf(data?.headcount)
+  const asOf = hc?.asOf || dayOf(roster.createdAt)
+  if (asOf && daysBetween(asOf, today) > 400) return { grew: false, youth: 0, line: '4대보험 명부가 1년 넘었어요 — 새로 받으면 고용 증가 확인' }
+  const youth = typeof data?.counts?.youthCount === 'number' ? data.counts.youthCount : 0
+  if (!hc) return youth > 0 ? { grew: false, youth, line: `청년 직원 ${youth}명(4대보험 명부)` } : null
+  const p = `${hc.prev.year}년 평균 ${headText(hc.prev.total)}명`
+  const c = `${hc.cur.year}년 ${hc.cur.actualMonths < 12 ? '예상 ' : ''}${headText(hc.cur.total)}명`
+  // 카드의 근거 줄은 ' · ' 로 이어 보이므로 괄호 안은 쉼표로(D-307 가점 목록과 같은 까닭)
+  const y = youth > 0 ? `, 청년 ${youth}명` : ''
+  const partial = hc.basis === 'current' ? ', 지금 직원만 있는 명부' : ''
+  if (hc.cur.total > hc.prev.total) return { grew: true, youth, line: `고용 증가(${p} → ${c}${y}${partial}) — 고용창출 자금 대상` }
+  if (hc.cur.total < hc.prev.total) return { grew: false, youth, line: `직원이 줄었어요(${p} → ${c}) — 고용 유지 조건이 있는 자금은 확인` }
+  return youth > 0 ? { grew: false, youth, line: `청년 직원 ${youth}명(4대보험 명부)` } : null
 }
 
 const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소' }
