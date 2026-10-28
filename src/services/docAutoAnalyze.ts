@@ -13,6 +13,7 @@
  *  4. 주주명부(D-303) — 주주 · 주식 수 · 관계 · 발행주식 총수 · 1주 금액을 읽어, 검산이 맞고 주주표가 비어 있으면 바로 넣는다
  *     (절세 설계 · 05 · 06 계산기 · 상황 예시가 같은 주주표를 쓴다). 주민등록번호 · 주소는 남기지 않는다.
  *  5. 등기부등본 · 정관(D-304) — 대표 취임일(퇴직금 기산일) · 1주의 금액 · 발행주식 총수 · 대표이사 퇴직금 지급배수를 절세 현황 빈 칸에.
+ *     재무제표(D-305) — 가지급금 잔액 · 배당 가능한 이익(미처분이익잉여금) · 직전 연도 순이익도 같은 규칙으로.
  *  6. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
  *     — 업체 정보가 바뀌면 판정도 바로 바뀐다(clientInsights).
  *
@@ -27,6 +28,7 @@ import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type Reg
 import { readRegistryTax, readRetireMultiple } from './registryTax'
 import { ASSUMPTIONS } from './taxPlan'
 import { detectDocSource } from './koreanDocParser'
+import { parseFinancialStatement } from './finStatementParser'
 
 export interface DocBatchSummary {
   files: number
@@ -286,6 +288,19 @@ export async function analyzeUploadedDocs(
       if (reg.par) putProfile('par', String(reg.par), '1주 액면가', `${reg.par.toLocaleString('ko-KR')}원`, d.fileName, reg.parSure, '1주의 금액이 여러 가지로 나와요 — 절세 설계에서 확인')
       if (reg.totalShares)
         putProfile('totalShares', String(reg.totalShares), '발행주식 총수', `${reg.totalShares.toLocaleString('ko-KR')}주`, d.fileName, reg.sharesSure, reg.capital ? `1주의 금액 × 총수가 자본금(${reg.capital.toLocaleString('ko-KR')}원)과 달라요 — 절세 설계에서 확인` : '자본금과 맞춰 보지 못했어요 — 절세 설계에서 확인')
+      continue
+    }
+    // D-305 재무제표 → 가지급금 잔액 · 배당 가능한 이익(미처분이익잉여금) · 직전 연도 순이익
+    if (d.key === 'financialStatements' || /재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|표준\s*재무제표/.test(d.text.slice(0, 3000))) {
+      const f = parseFinancialStatement(d.text)
+      const yr = f.year ? `${f.year}년 ` : ''
+      if (f.loanBalance !== undefined && f.loanBalance > 0) putProfile('loanBalance', String(f.loanBalance), '가지급금 잔액', `${yr}${f.loanBalance.toLocaleString('ko-KR')}원`, d.fileName, true, '')
+      if (f.retainedEarnings !== undefined) {
+        if (f.retainedEarnings > 0) putProfile('retainedEarnings', String(f.retainedEarnings), '배당 가능한 이익(미처분이익잉여금)', `${yr}${f.retainedEarnings.toLocaleString('ko-KR')}원`, d.fileName, true, '')
+        else if (f.retainedEarnings < 0 && !String(rec.taxProfile?.retainedEarnings ?? '').trim())
+          flagged.push({ key: 'taxProfile.retainedEarnings', label: '배당 가능한 이익(미처분이익잉여금)', display: `${yr}결손 ${Math.abs(f.retainedEarnings).toLocaleString('ko-KR')}원`, fileName: d.fileName, note: '미처리결손금이라 배당할 이익이 없어요 — 배당 계획은 결손을 메운 뒤' })
+      }
+      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '순이익 — 직전 연도', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${f.netIncomePrev.toLocaleString('ko-KR')}원`, d.fileName, true, '')
       continue
     }
     const mult = /정\s*관|퇴\s*직\s*금\s*(?:지\s*급\s*)?규\s*정|임원\s*퇴직/.test(`${d.fileName} ${d.text.slice(0, 600)}`) ? readRetireMultiple(d.text) : null

@@ -601,6 +601,13 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('재무제표: 당기순손실 (35,000) → 음수 · 결산 연도 2025', fv.netIncome === -35_000_000 && fv.year === '2025', JSON.stringify(fv))
   check('재무제표: 영업손실 부호 없어도 음수', parseFinancialStatement('손익계산서\n영업손실 12,000,000').operatingProfit === -12_000_000)
   check('재무제표: 글자가 없으면 아무것도 안 냄', Object.keys(parseFinancialStatement('메모')).length === 0)
+  // D-305 가지급금(주임종 채권) · 미처분이익잉여금 · 전기 순이익
+  const FIN2 = ['재무상태표', '(단위 : 원)', '제 7(당)기 2025년 12월 31일 현재', '가지급금 30,000,000 25,000,000', '주.임.종 단기채권 5,000,000 0', '단기대여금 9,000,000 0', '자산총계 3,200,000,000 2,900,000,000', 'Ⅲ. 이익잉여금 820,000,000 700,000,000', '1. 미처분이익잉여금 800,000,000 690,000,000', '손익계산서', 'Ⅹ. 당기순이익 150,000,000 120,000,000', '재무상태표(비교)', '가지급금 30,000,000 25,000,000'].join('\n')
+  const f2 = parseFinancialStatement(FIN2)
+  check('D-305 재무제표: 가지급금 + 주임종 채권(일반 단기대여금은 빼고 · 같은 과목 두 번은 한 번)', f2.loanBalance === 35_000_000, JSON.stringify(f2))
+  check('D-305 재무제표: 미처분이익잉여금(이익잉여금 합계 아님) · 전기 순이익', f2.retainedEarnings === 800_000_000 && f2.netIncomePrev === 120_000_000 && f2.netIncome === 150_000_000, JSON.stringify(f2))
+  check('D-305 재무제표: 당기순손실 줄은 전기 부호를 몰라 전기 순이익을 내지 않음', fv.netIncomePrev === undefined, JSON.stringify(fv))
+  check('D-305 재무제표: 미처리결손금은 음수', parseFinancialStatement('재무상태표\n미처분이익잉여금(미처리결손금) (40,000,000) (10,000,000)').retainedEarnings === -40_000_000)
   const fin = autoFillFromDocs(blank, [{ key: 'financialStatements', fileName: '재무제표.pdf', text: FIN, method: 'pdf_text', docSure: true }], '2026-10-07T00:00:00.000Z', mk2)
   check('재무제표 올리기 → 매출 · 영업이익 · 순이익 · 자산 · 부채 바로 채움', ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'].every((k) => fin.entered.some((e) => e.key === k)), JSON.stringify(fin.entered.map((e) => e.key)))
 }
@@ -1215,6 +1222,23 @@ await (async () => {
   const sh = ['주주명부', '발행주식의 총수: 20,000주 / 1주의 금액: 5,000원', ['주주명', '주식수', '비고'].join(T), ['박지훈', '20,000', '대표이사'].join(T), ['합계', '20,000', ''].join(T)].join('\n')
   const both = await analyzeUploadedDocs(base, [...docs, { key: 'customdoc_sh', fileName: '주주명부.xlsx', text: sh, method: 'xlsx' as const, docSure: true }], ctx)
   check('D-304 주주명부와 등기부가 같은 총수 · 액면가 → 한 번만 넣고 확인 필요 없음', both.record.taxProfile.totalShares === '20000' && !both.summary.flagged.some((f) => f.label === '발행주식 총수' || f.label === '1주 액면가') && both.record.shareholderRegister.length === 1, JSON.stringify(both.summary.flagged))
+})()
+
+// D-305 재무제표 올리기 → 절세 현황(가지급금 잔액 · 배당 가능한 이익 · 직전 연도 순이익) — 빈 칸만 · 결손이면 까닭
+await (async () => {
+  const FIN = ['표준재무제표증명', '(단위 : 천원)', '제 7(당)기 2025년 12월 31일 현재', '가지급금 30,000 25,000', '자산총계 3,200,000 2,900,000', '미처분이익잉여금 800,000 690,000', 'Ⅹ. 당기순이익 150,000 120,000'].join('\n')
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-28', makeId: () => `f${++n}` }
+  const base = normalizeClientOps({ id: 'fs305', companyName: '재무테스트(주)', createdAt: NOW, updatedAt: NOW })
+  const out = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
+  const tp = out.record.taxProfile
+  check('D-305 재무제표 → 가지급금 3천만 · 배당 가능한 이익 8억 · 직전 연도(2024) 순이익 1.2억 · 매출 등 회사 정보도 그대로', tp.loanBalance === '30000000' && tp.retainedEarnings === '800000000' && tp.vInc1 === '120000000' && out.summary.entered.some((e) => e.key === 'netIncome'), JSON.stringify(tp))
+  check('D-305 바로 넣은 정보 글: 연도와 함께', out.summary.entered.some((e) => e.label === '가지급금 잔액' && e.display.startsWith('2025년')) && out.summary.entered.some((e) => e.label === '순이익 — 직전 연도' && e.display.startsWith('2024년')), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
+  const had = normalizeClientOps({ ...base, taxProfile: { loanBalance: '50000000' } } as never)
+  const kept = await analyzeUploadedDocs(had, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
+  check('D-305 이미 적힌 가지급금(5천만)과 다르면 덮지 않고 확인 필요', kept.record.taxProfile.loanBalance === '50000000' && kept.summary.flagged.some((f) => f.label === '가지급금 잔액'), JSON.stringify(kept.summary.flagged))
+  const loss = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FIN.replace('미처분이익잉여금 800,000 690,000', '미처분이익잉여금(미처리결손금) (40,000) (10,000)'), method: 'pdf_text' as const, docSure: true }], ctx)
+  check('D-305 미처리결손금 → 배당 가능한 이익은 넣지 않고 까닭(결손)', !loss.record.taxProfile.retainedEarnings && loss.summary.flagged.some((f) => f.label.startsWith('배당 가능한 이익') && f.note.includes('결손')), JSON.stringify(loss.summary.flagged))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
