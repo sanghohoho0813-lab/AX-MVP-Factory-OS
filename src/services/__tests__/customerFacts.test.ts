@@ -1233,7 +1233,7 @@ await (async () => {
   const out = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
   const tp = out.record.taxProfile
   check('D-305 재무제표 → 가지급금 3천만 · 배당 가능한 이익 8억 · 직전 연도(2024) 순이익 1.2억 · 매출 등 회사 정보도 그대로', tp.loanBalance === '30000000' && tp.retainedEarnings === '800000000' && tp.vInc1 === '120000000' && out.summary.entered.some((e) => e.key === 'netIncome'), JSON.stringify(tp))
-  check('D-305 바로 넣은 정보 글: 연도와 함께', out.summary.entered.some((e) => e.label === '가지급금' && e.display === '2025년 말 3,000만원') && out.summary.entered.some((e) => e.label === '직전 연도 순이익' && e.display === '2024년 1억 2,000만원') && out.summary.entered.some((e) => e.label === '배당 가능 이익' && e.display.startsWith('2025년 말 8억원')), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
+  check('D-305 바로 넣은 정보 글: 연도와 함께', out.summary.entered.some((e) => e.label === '가지급금' && e.display === '2025년 말 3,000만원') && out.summary.entered.some((e) => e.label === '전년 순이익' && e.display === '2024년 1억 2,000만원') && out.summary.entered.some((e) => e.label === '배당 가능 이익' && e.display.startsWith('2025년 말 8억원')), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
   const had = normalizeClientOps({ ...base, taxProfile: { loanBalance: '50000000' } } as never)
   const kept = await analyzeUploadedDocs(had, [{ key: 'financialStatements', fileName: '표준재무제표증명.pdf', text: FIN, method: 'pdf_text' as const, docSure: true }], ctx)
   check('D-305 이미 적힌 가지급금(5천만)과 다르면 덮지 않고 확인 필요', kept.record.taxProfile.loanBalance === '50000000' && kept.summary.flagged.some((f) => f.label === '가지급금'), JSON.stringify(kept.summary.flagged))

@@ -301,7 +301,7 @@ export async function analyzeUploadedDocs(
         else if (f.retainedEarnings < 0 && !String(rec.taxProfile?.retainedEarnings ?? '').trim())
           flagged.push({ key: 'taxProfile.retainedEarnings', label: '배당 가능 이익', display: `${yrEnd}결손 ${formatWon(Math.abs(f.retainedEarnings))}`, fileName: d.fileName, note: '미처리결손금이라 배당할 이익이 없어요 — 배당 계획은 결손을 메운 뒤' })
       }
-      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '직전 연도 순이익', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
+      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '전년 순이익', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
       continue
     }
     const mult = /정\s*관|퇴\s*직\s*금\s*(?:지\s*급\s*)?규\s*정|임원\s*퇴직/.test(`${d.fileName} ${d.text.slice(0, 600)}`) ? readRetireMultiple(d.text) : null
