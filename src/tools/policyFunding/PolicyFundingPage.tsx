@@ -225,6 +225,11 @@ function DiagnosisScreen() {
       put('taxArrears', '세금 체납 없음(납세증명서)')
       put('insuranceArrears', '4대보험 체납 없음(완납증명서)')
       put('debtRatioStatus', '부채비율 높음(자본잠식)')
+      // D-307 가점(특허 · 연구소 · 벤처 · 이노비즈 …) — 아직 아무것도 고르지 않았을 때만
+      if (ev.input.bonusItems?.length && isUntouched('bonusItems') && (next.bonusItems ?? []).filter((b) => b !== '없음').length === 0) {
+        next.bonusItems = ev.input.bonusItems
+        filled.push(`가점(${ev.input.bonusItems.join(' · ')})`)
+      }
     }
     return { next, filled }
   }

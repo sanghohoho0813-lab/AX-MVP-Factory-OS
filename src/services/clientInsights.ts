@@ -139,7 +139,7 @@ const policyInsight: Provider = ({ record, facts, today }) => {
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
     detail: [
       more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
-      ...ev.notes.slice(0, 2),
+      ...ev.notes.slice(0, 3),
     ].join(' · '),
     missing: [
       ...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []),

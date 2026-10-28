@@ -39,7 +39,7 @@ import {
   withProfileFieldEdit,
 } from '../customerFacts'
 import { clientFacts } from '../../tools/shared/clientPrefill'
-import { policyEvidence } from '../policyEvidence'
+import { policyBonus, policyEvidence } from '../policyEvidence'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
@@ -1295,6 +1295,35 @@ await (async () => {
   check('D-306 자본이 있으면 부채비율은 짐작하지 않음(미확인 그대로)', policyEvidence(pos, facts(pos), T).input.debtRatioStatus === undefined)
   const req = requestItemsFrom([{ key: 'policy-funding', label: '정책자금', tone: 'need', headline: '', detail: '', missing: ['체납 확인 — 국세 납세증명서 · 4대보험 완납증명서'], openPath: '', openLabel: '', action: null }])
   check('D-306 요청 문구: "체납 확인 — …" 은 4대보험 명부가 아니라 납세증명서 · 완납증명서로', req.items.length === 1 && req.items[0].label.includes('납세증명서') && req.items[0].where.includes('위택스'), JSON.stringify(req))
+}
+
+// D-307 정책자금 가점 — 업체 기록의 인증 · 특허 · 연구소(올린 인증서 포함, 만료는 빼고) → 추천 기관이 달라진다
+{
+  const T = '2026-10-28'
+  let base = normalizeClientOps({ id: 'pb307', companyName: '가점테크(주)', businessCategory: '제조업', businessItem: '정밀 금속 가공', businessAddress: '충청북도 청주시 흥덕구 1', establishedAt: '2019-03-02', employeeCount: '12', createdAt: NOW, updatedAt: NOW } as never)
+  base = withFactValue(base, 'revenue', '2400000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  check('D-307 가점 없음 → 빈 목록', policyBonus(base, T).items.length === 0)
+  let rich = withFactValue(base, 'certifications', '벤처기업, 이노비즈', { source: 'meeting', status: 'entered', now: NOW })
+  rich = withFactValue(rich, 'patents', '특허 2건(제10-1234567호 외)', { source: 'meeting', status: 'entered', now: NOW })
+  rich = withFactValue(rich, 'researchLab', '기업부설연구소(2024 인정)', { source: 'meeting', status: 'entered', now: NOW })
+  const b = policyBonus(rich, T)
+  check('D-307 회사 정보 글 → 특허 · 연구소 · 벤처 · 이노비즈', ['특허 보유', '기업부설연구소 보유', '벤처기업', '이노비즈'].every((x) => b.items.includes(x as never)) && b.items.length === 4, JSON.stringify(b))
+  const certRec = normalizeClientOps({ ...base, factValues: { ...base.factValues, 'cf:메인비즈': '확인번호 M-1 · 확인일 2024-01-02 · 2027-01-01까지', 'cf:여성기업': '확인일 2022-01-01 · 2025-01-01까지' } } as never)
+  const c = policyBonus(certRec, T)
+  check('D-307 올린 인증서: 메인비즈(유효) 넣고 · 여성기업(만료) 빼고 알림', c.items.includes('메인비즈') && !c.items.includes('여성기업') && c.expired.some((x) => x.startsWith('여성기업(2025-01-01')), JSON.stringify(c))
+  const stale = normalizeClientOps({ ...rich, factValues: { ...rich.factValues, 'cf:벤처기업': '확인일 2021-01-01 · 2024-01-01까지' } } as never)
+  check('D-307 인증서가 만료면 회사 정보 글에 "벤처" 가 있어도 뺌', !policyBonus(stale, T).items.includes('벤처기업'))
+  const noLab = withFactValue(base, 'researchLab', '없음', { source: 'meeting', status: 'entered', now: NOW })
+  const deptOnly = withFactValue(base, 'researchLab', '연구개발전담부서', { source: 'meeting', status: 'entered', now: NOW })
+  check('D-307 연구소 "없음" · 전담부서만이면 연구소 가점 아님', !policyBonus(noLab, T).items.includes('기업부설연구소 보유') && !policyBonus(deptOnly, T).items.includes('기업부설연구소 보유'))
+  const facts2 = (r: ReturnType<typeof normalizeClientOps>) => clientFacts(r, new Date(`${T}T00:00:00`))
+  const inp = policyInputFromFacts(facts2(rich)).input
+  const plain = runDiagnosis(inp)
+  const withBonus = runDiagnosis({ ...inp, ...policyEvidence(rich, facts2(rich), T).input })
+  const names = (r: ReturnType<typeof runDiagnosis>) => r.agencies.map((a) => a.name).join(',')
+  check('D-307 엔진: 가점을 넘기면 추천 기관이 달라진다(기술 · 특허 쪽)', names(plain) !== names(withBonus) && withBonus.agencies.slice(0, 3).some((a) => /기술보증|기보/.test(a.name)), JSON.stringify({ plain: names(plain), bonus: names(withBonus) }))
+  const ins = buildInsights(rich, T, []).find((i) => i.key === 'policy-funding')
+  check('D-307 맞춤 추천 정책자금: "가점: 특허 · 연구소 · 벤처기업 · 이노비즈" 근거가 맨 앞', !!ins?.detail.includes('가점: 특허 · 연구소 · 벤처기업 · 이노비즈'), ins?.detail)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

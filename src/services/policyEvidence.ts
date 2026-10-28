@@ -11,12 +11,13 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { ClientFacts } from '../tools/shared/clientPrefill'
-import type { DiagnosisInput } from '../tools/policyFunding/types'
+import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
+import { CUSTOM_FACT_PREFIX, usableFactValue } from './customerFacts'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
-  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus'>>
+  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems'>>
   /** 무엇으로 채웠는지 한 줄씩 */
   notes: string[]
   /** 받으면 확인되는 서류(있으면 더 정확) */
@@ -86,5 +87,57 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
     input.debtRatioStatus = '높음'
     notes.push(`자본잠식(자산 ${Math.round(a / 1e6).toLocaleString('ko-KR')}백만 ≤ 부채 ${Math.round(l / 1e6).toLocaleString('ko-KR')}백만) — 부결의 흔한 원인`)
   }
+  // D-307 가점 — 특허 · 연구소 · 벤처 · 이노비즈 · 메인비즈 · 여성기업 · 사회적기업(기술보증 · 혁신성장 쪽 추천이 달라진다)
+  const bonus = policyBonus(record, today)
+  if (bonus.items.length) {
+    input.bonusItems = bonus.items
+    // 추천 기관이 바뀌는 근거라 맨 앞에
+    notes.unshift(`가점: ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(' · ')}`)
+  }
+  notes.push(...bonus.expired.map((x) => `${x} — 만료라 가점에서 뺌`))
   return { input, notes, want }
+}
+
+const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소' }
+
+/** 이름 · 칸에서 찾을 가점 — 회사 정보 글(보유 인증 · 특허 · 연구소)과 올린 인증서(cf:이름) */
+const BONUS_RULES: { item: BonusItem; text: RegExp; cert: RegExp }[] = [
+  { item: '특허 보유', text: /특허/, cert: /^특허$/ },
+  { item: '기업부설연구소 보유', text: /부설\s*연구소|연구소/, cert: /^기업부설연구소$/ },
+  { item: '벤처기업', text: /벤처/, cert: /^벤처기업/ },
+  { item: '이노비즈', text: /이노\s*비즈|기술\s*혁신형/, cert: /^이노비즈/ },
+  { item: '메인비즈', text: /메인\s*비즈|경영\s*혁신형/, cert: /^메인비즈/ },
+  { item: '여성기업', text: /여성\s*기업/, cert: /^여성기업/ },
+  { item: '사회적기업', text: /사회적\s*기업/, cert: /^사회적기업/ },
+]
+const NONE = /^(없음|아니오|아니요|미보유|해당\s*없음|-)$/
+
+/**
+ * 업체 기록의 인증 · 특허 · 연구소 → 정책자금 가점. 올린 인증서에 유효기간이 지났으면(…까지) 빼고 알린다.
+ * 회사 정보 글은 대표가 적은 값 그대로(유효기간을 모름 — 그대로 쓴다).
+ */
+export function policyBonus(record: ClientOpsRecord, today: string): { items: BonusItem[]; expired: string[] } {
+  const text = {
+    certs: usableFactValue(record, 'certifications'),
+    patents: usableFactValue(record, 'patents'),
+    lab: usableFactValue(record, 'researchLab'),
+  }
+  const certs = Object.entries(record.factValues ?? {})
+    .filter(([k, v]) => k.startsWith(CUSTOM_FACT_PREFIX) && String(v).trim() !== '')
+    .map(([k, v]) => ({ name: k.slice(CUSTOM_FACT_PREFIX.length).trim(), value: String(v) }))
+  const items: BonusItem[] = []
+  const expired: string[] = []
+  for (const r of BONUS_RULES) {
+    const fromText =
+      r.item === '특허 보유' ? !!text.patents && !NONE.test(text.patents.trim()) : r.item === '기업부설연구소 보유' ? !!text.lab && !NONE.test(text.lab.trim()) && r.text.test(text.lab) : r.text.test(text.certs)
+    const cert = certs.find((c) => r.cert.test(c.name))
+    const until = cert ? /(\d{4}-\d{2}-\d{2})\s*까지/.exec(cert.value)?.[1] : undefined
+    // 올린 인증서가 만료면 회사 정보 글에 적혀 있어도 빼고 알린다(글은 예전에 적은 것일 수 있다)
+    if (cert && until && until < today) {
+      expired.push(`${cert.name}(${until}까지)`)
+      continue
+    }
+    if (fromText || cert) items.push(r.item)
+  }
+  return { items, expired }
 }

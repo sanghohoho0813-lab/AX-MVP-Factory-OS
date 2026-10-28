@@ -1329,6 +1329,35 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-307 정책자금 가점(특허 · 연구소 · 벤처 · 이노비즈) — 업체 기록 → 맞춤 추천 · 정책자금 화면 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.factValues = { ...(r.factValues ?? {}), certifications: '벤처기업, 이노비즈', patents: '특허 2건', researchLab: '기업부설연구소(2024 인정)', 'cf:여성기업': '확인일 2022-01-01 · 2025-01-01까지' }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const pol = (await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check(`D-307 ${vp.tag} 맞춤 추천 정책자금: "가점: 특허 · 연구소 · 벤처기업 · 이노비즈" · 만료된 여성기업은 빼고 알림`, pol.includes('가점: 특허 · 연구소 · 벤처기업 · 이노비즈') && pol.includes('여성기업(2025-01-01까지) — 만료라 가점에서 뺌'), pol.slice(0, 500))
+  if (vp.tag === '1440') await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').screenshot({ path: '/tmp/claude-0/shot307-card.png' }).catch(() => {})
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const note = (await page.getByTestId('tool-prefill-note').innerText().catch(() => '')) ?? ''
+  check(`D-307 ${vp.tag} 정책자금 화면도 가점을 채움(특허 보유 · 기업부설연구소 보유 · 벤처기업 · 이노비즈)`, note.includes('가점(특허 보유 · 기업부설연구소 보유 · 벤처기업 · 이노비즈)'), note.slice(0, 300))
+  check(`D-307 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
