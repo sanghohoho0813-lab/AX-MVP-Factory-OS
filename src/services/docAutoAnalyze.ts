@@ -12,7 +12,8 @@
  *     작년 · 올해 매월 말 인원(통합고용세액공제용 · D-302)을 함께 남기고, 재직 인원이 비어 있으면 넣는다. 주민등록번호는 남기지 않는다(명부 읽기가 생년월일 · 성별만 남김).
  *  4. 주주명부(D-303) — 주주 · 주식 수 · 관계 · 발행주식 총수 · 1주 금액을 읽어, 검산이 맞고 주주표가 비어 있으면 바로 넣는다
  *     (절세 설계 · 05 · 06 계산기 · 상황 예시가 같은 주주표를 쓴다). 주민등록번호 · 주소는 남기지 않는다.
- *  5. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
+ *  5. 등기부등본 · 정관(D-304) — 대표 취임일(퇴직금 기산일) · 1주의 금액 · 발행주식 총수 · 대표이사 퇴직금 지급배수를 절세 현황 빈 칸에.
+ *  6. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
  *     — 업체 정보가 바뀌면 판정도 바로 바뀐다(clientInsights).
  *
  * 무거운 엔진(크레탑 · 명부)은 필요할 때만 불러온다. 규칙 계산 — 외부 호출 없음. 저장은 부르는 쪽.
@@ -23,6 +24,9 @@ import { pendingFacts, readFact, withFactDecisions, withFactValue } from './cust
 import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
+import { readRegistryTax, readRetireMultiple } from './registryTax'
+import { ASSUMPTIONS } from './taxPlan'
+import { detectDocSource } from './koreanDocParser'
 
 export interface DocBatchSummary {
   files: number
@@ -256,6 +260,38 @@ export async function analyzeUploadedDocs(
       }
       entered.push({ key: 'shareholderRegister', label: '주주명부', display, fileName: hDoc.fileName }, ...extra)
     }
+  }
+
+  // 5. D-304 등기부등본 → 대표 취임일 · 1주의 금액 · 발행주식 총수 / 정관 · 퇴직금 지급규정 → 지급배수 (절세 현황 — 빈 칸만, 다르면 확인)
+  const putProfile = (key: string, value: string, label: string, display: string, fileName: string, sure: boolean, why: string) => {
+    const cur = String(rec.taxProfile?.[key] ?? '').trim()
+    const same = cur !== '' && cur.replace(/[,\s원주배]/g, '') === value.replace(/[,\s원주배]/g, '')
+    if (same) return
+    if (!sure) {
+      flagged.push({ key: `taxProfile.${key}`, label, display, fileName, note: why })
+      return
+    }
+    if (cur !== '') {
+      flagged.push({ key: `taxProfile.${key}`, label, display, fileName, note: `지금 적힌 값(${cur})과 달라 바꾸지 않았어요 — 절세 설계에서 확인` })
+      return
+    }
+    rec = { ...rec, taxProfile: { ...(rec.taxProfile ?? {}), [key]: value } }
+    entered.push({ key: `taxProfile.${key}`, label, display, fileName })
+  }
+  for (const d of factDocs) {
+    const isRegistry = d.key === 'corporateRegistry' || detectDocSource(d.text) === 'corporate_registry'
+    const reg = isRegistry ? readRegistryTax(d.text, rec.representativeName) : null
+    if (reg) {
+      if (reg.ceoStart) putProfile('ceoStartDate', reg.ceoStart, '대표 취임일(퇴직금 기산일)', reg.ceoStartSure ? `${reg.ceoStart} (등기부 · ${reg.ceoStartNote})` : reg.ceoStart, d.fileName, reg.ceoStartSure, reg.ceoStartNote)
+      if (reg.par) putProfile('par', String(reg.par), '1주 액면가', `${reg.par.toLocaleString('ko-KR')}원`, d.fileName, reg.parSure, '1주의 금액이 여러 가지로 나와요 — 절세 설계에서 확인')
+      if (reg.totalShares)
+        putProfile('totalShares', String(reg.totalShares), '발행주식 총수', `${reg.totalShares.toLocaleString('ko-KR')}주`, d.fileName, reg.sharesSure, reg.capital ? `1주의 금액 × 총수가 자본금(${reg.capital.toLocaleString('ko-KR')}원)과 달라요 — 절세 설계에서 확인` : '자본금과 맞춰 보지 못했어요 — 절세 설계에서 확인')
+      continue
+    }
+    const mult = /정\s*관|퇴\s*직\s*금\s*(?:지\s*급\s*)?규\s*정|임원\s*퇴직/.test(`${d.fileName} ${d.text.slice(0, 600)}`) ? readRetireMultiple(d.text) : null
+    // 정관 배수가 세법 한도보다 크면 계산은 한도로(절세 설계와 같은 규칙) — 보이는 글에 함께
+    const cap = Number(ASSUMPTIONS.retireMultPost)
+    if (mult !== null) putProfile('retireMult', String(mult), '정관 퇴직금 지급배수', `대표이사 ${mult}배${mult > cap ? ` (계산은 세법 한도 ${cap}배)` : ''}`, d.fileName, true, '')
   }
 
   return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now } }

@@ -414,6 +414,9 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('제목: 중소기업 확인서 → 그 칸', p3.kind === 'existing' && p3.key === 'smeCertificate')
   const p4 = placeDocument({ text: '이 파일은 무엇인지 알 수 없는 메모입니다 그냥 글자만 있어요', fileName: '메모.txt' }, metas)
   check('제목 없음 · 근거 없음 → 기타 · 확인 필요', p4.kind === 'new' && p4.label === OTHER_DOC_LABEL && !p4.sure, JSON.stringify(p4))
+  const RULE = `임원퇴직금지급규정\n제3조(지급배수) 대표이사 3배, 이사 2배`
+  const p4b = placeDocument({ text: RULE, fileName: 'scan_007.pdf' }, metas)
+  check('D-304 제목: 임원퇴직금지급규정 → 기타가 아니라 그 이름의 새 칸', p4b.kind === 'new' && p4b.label === '임원퇴직금지급규정', JSON.stringify(p4b))
   const p5 = placeDocument({ text: '', fileName: '법인인감증명서_샤인.jpg' }, metas)
   check('글자 못 읽음 · 파일 이름에 서류 이름 → 그 이름(확실 아님)', p5.kind === 'new' && /인감증명서/.test(p5.label) && !p5.sure, JSON.stringify(p5))
   check('제목 찾기: 본문 문장은 제목이 아니다', documentTitle('위 사람은 본교를 졸업하였음을 증명합니다') === null)
@@ -1171,6 +1174,47 @@ await (async () => {
   const off = text.replace('1,500', '500')
   const unsure = await analyzeUploadedDocs(base, [{ ...doc, text: off }], ctx)
   check('D-303 합(9,000) ≠ 총수(10,000) → 바로 넣지 않고 까닭과 함께 확인 필요', unsure.record.shareholderRegister.length === 0 && unsure.summary.flagged.some((f) => f.label === '주주명부' && f.note.includes('발행주식 총수')), JSON.stringify(unsure.summary.flagged))
+})()
+
+// D-304 등기부등본 · 정관 올리기 → 절세 현황(대표 취임일 · 1주 액면가 · 발행주식 총수 · 지급배수) — 빈 칸만, 다르거나 확실하지 않으면 확인 필요
+await (async () => {
+  const reg = [
+    '등기사항전부증명서(말소사항 포함)',
+    '상호 주식회사 가나테크',
+    '1주의 금액 금 5,000 원',
+    '발행할 주식의 총수 100,000 주',
+    '발행주식의 총수 20,000 주',
+    '보통주식 20,000 주 금 100,000,000 원',
+    '임원에 관한 사항',
+    '대표이사 박지훈 801231-1******',
+    '2015 년 07 월 21 일 취임 2015 년 07 월 23 일 등기',
+    '2018 년 07 월 21 일 중임 2018 년 07 월 25 일 등기',
+    '회사성립연월일 2015 년 07 월 21 일',
+  ].join('\n')
+  const rule = ['임원퇴직금지급규정', '제3조 임원의 퇴직금 지급배수는 다음과 같다. 대표이사 3배, 이사 2배'].join('\n')
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-28', makeId: () => `r${++n}` }
+  const base = normalizeClientOps({ id: 'rg304', companyName: '주식회사 가나테크', representativeName: '박지훈', createdAt: NOW, updatedAt: NOW })
+  const docs = [
+    { key: 'corporateRegistry', fileName: '등기부등본.pdf', text: reg, method: 'pdf_text' as const, docSure: true },
+    { key: 'customdoc_rule', fileName: '임원퇴직금지급규정.hwp', text: rule, method: 'hwp' as const, docSure: true },
+  ]
+  const out = await analyzeUploadedDocs(base, docs, ctx)
+  const tp = out.record.taxProfile
+  check('D-304 등기부 → 대표 취임일 2015-07-21 · 1주 액면가 5,000 · 발행주식 총수 20,000 / 규정 → 지급배수 3', tp.ceoStartDate === '2015-07-21' && tp.par === '5000' && tp.totalShares === '20000' && tp.retireMult === '3', JSON.stringify(tp))
+  check('D-304 바로 넣은 정보에 넷 다(취임일엔 등기부 근거)', ['대표 취임일(퇴직금 기산일)', '1주 액면가', '발행주식 총수', '정관 퇴직금 지급배수'].every((l) => out.summary.entered.some((e) => e.label === l)) && !!out.summary.entered.find((e) => e.label.startsWith('대표 취임일'))?.display.includes('등기부'), JSON.stringify(out.summary.entered.map((e) => `${e.label}=${e.display}`)))
+  check('D-304 주민번호는 기록에 없음', !JSON.stringify(out.record).includes('801231-1'))
+  const had = normalizeClientOps({ ...base, taxProfile: { totalShares: '10000' } } as never)
+  const kept = await analyzeUploadedDocs(had, docs, ctx)
+  check('D-304 이미 다른 총수(10,000)가 있으면 덮지 않고 확인 필요', kept.record.taxProfile.totalShares === '10000' && kept.summary.flagged.some((f) => f.label === '발행주식 총수' && f.note.includes('지금 적힌 값(10000)')), JSON.stringify(kept.summary.flagged))
+  const nowOnly = reg.replace('2015 년 07 월 21 일 취임 2015 년 07 월 23 일 등기\n', '').replace('보통주식 20,000 주 금 100,000,000 원', '')
+  const cur = await analyzeUploadedDocs(base, [{ ...docs[0], text: nowOnly }], ctx)
+  check('D-304 중임 날짜만(현재 유효사항) → 취임일 넣지 않고 까닭(말소사항 포함 등기부) · 자본금 없으면 총수도 확인 필요', !cur.record.taxProfile.ceoStartDate && cur.summary.flagged.some((f) => f.label.startsWith('대표 취임일') && f.note.includes('말소사항')) && !cur.record.taxProfile.totalShares && cur.summary.flagged.some((f) => f.label === '발행주식 총수'), JSON.stringify(cur.summary.flagged))
+  // 주주명부와 함께 — 같은 값이면 조용히(겹쳐 묻지 않음)
+  const T = '\t'
+  const sh = ['주주명부', '발행주식의 총수: 20,000주 / 1주의 금액: 5,000원', ['주주명', '주식수', '비고'].join(T), ['박지훈', '20,000', '대표이사'].join(T), ['합계', '20,000', ''].join(T)].join('\n')
+  const both = await analyzeUploadedDocs(base, [...docs, { key: 'customdoc_sh', fileName: '주주명부.xlsx', text: sh, method: 'xlsx' as const, docSure: true }], ctx)
+  check('D-304 주주명부와 등기부가 같은 총수 · 액면가 → 한 번만 넣고 확인 필요 없음', both.record.taxProfile.totalShares === '20000' && !both.summary.flagged.some((f) => f.label === '발행주식 총수' || f.label === '1주 액면가') && both.record.shareholderRegister.length === 1, JSON.stringify(both.summary.flagged))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

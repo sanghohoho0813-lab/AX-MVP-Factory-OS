@@ -171,6 +171,15 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /^정관|_정관|정관\./,
   },
   {
+    // D-304: 임원 퇴직금 지급규정 — 절세 설계 '정관 퇴직금 지급배수' 를 읽는 서류(예전에는 '기타 · 확인 필요' 로 갔다)
+    label: '임원퇴직금지급규정',
+    signals: [
+      { re: /임원\s*퇴직\s*금\s*(?:지급\s*)?규정/, weight: 3, say: "제목 '임원퇴직금지급규정'" },
+      { re: /지급\s*배수/, weight: 1, say: "'지급배수'" },
+    ],
+    nameHint: /퇴직금\s*(?:지급\s*)?규정/,
+  },
+  {
     label: '벤처기업확인서',
     validMonths: 36,
     signals: [{ re: /벤처기업\s*확인서/, weight: 3, say: "제목 '벤처기업확인서'" }],

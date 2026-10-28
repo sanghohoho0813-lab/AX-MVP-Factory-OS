@@ -8,6 +8,7 @@
 
 import { normalizeClientOps } from '../clientOpsService'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc } from '../shareholderDoc'
+import { readRegistryTax, readRetireMultiple } from '../registryTax'
 import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, koreanWon, pct, unlistedShareValuation, type RowValues, type Values } from '../taxCalc'
 import {
   ASSUMPTIONS,
@@ -507,6 +508,52 @@ if (process.env.SHOW) {
   check('D-303 서명 줄 · 회사 이름 줄은 주주가 아님', !readShareholderDoc(pdf + '\n위와 같이 확인함 2026.03.31 주식회사 미래바이오랩 대표이사 이대표 (인)', '').holders.some((h) => h.name.includes('미래바이오랩')))
   const merge = readShareholderDoc(['주주명부', ['주주명', '주식의 종류', '주식수'].join(T), ['이대표', '보통주', '5,000'].join(T), ['이대표', '우선주', '1,000'].join(T), ['합계', '', '6,000'].join(T)].join('\n'), '이대표')
   check('D-303 같은 사람 두 줄(보통주 · 우선주)은 합침 · 1명 회사', merge.sure && merge.holders.length === 1 && merge.holders[0].shares === 6000, JSON.stringify(merge))
+}
+
+// D-304 등기부등본 → 대표 취임일 · 1주의 금액 · 발행주식 총수(자본금 검산) / 정관 · 규정 → 대표이사 지급배수
+{
+  const full = [
+    '등기사항전부증명서(말소사항 포함)',
+    '등기번호 131114',
+    '상호 주식회사 가나테크',
+    '본점 경기도 성남시 분당구 판교로 255번길 9-22',
+    '1주의 금액 금 5,000 원',
+    '발행할 주식의 총수 100,000 주',
+    '발행주식의 총수와 그 종류 및 각각의 수 자본금의 액 변경연월일 등기연월일',
+    '발행주식의 총수 10,000 주',
+    '보통주식 10,000 주 금 50,000,000 원',
+    '발행주식의 총수 20,000 주',
+    '보통주식 20,000 주 금 100,000,000 원 2022.05.10 변경 2022.05.12 등기',
+    '임원에 관한 사항',
+    '사내이사 박지훈 801231-1******',
+    '2015 년 07 월 21 일 취임 2015 년 07 월 23 일 등기',
+    '대표이사 박지훈 801231-1****** 경기도 성남시 분당구 판교로 1',
+    '2015 년 07 월 21 일 취임 2015 년 07 월 23 일 등기',
+    '2018 년 07 월 21 일 중임 2018 년 07 월 25 일 등기',
+    '2021 년 07 월 21 일 중임 2021 년 07 월 26 일 등기',
+    '사내이사 이수민 850505-2******',
+    '2019 년 03 월 02 일 취임 2019 년 03 월 05 일 등기',
+    '2022 년 03 월 02 일 사임 2022 년 03 월 04 일 등기',
+    '회사성립연월일 2015 년 07 월 21 일',
+  ].join('\n')
+  const r = readRegistryTax(full, '박지훈')
+  check('D-304 등기부: 1주의 금액 5,000 · 발행주식 총수는 마지막(증자 뒤) 20,000 — "발행할 주식의 총수 100,000" 아님', r?.par === 5000 && r?.totalShares === 20000, JSON.stringify(r))
+  check('D-304 등기부: 자본금 1억 = 5,000 × 20,000 검산(확실)', r?.capital === 100_000_000 && r?.sharesSure === true && r?.parSure === true, JSON.stringify(r))
+  check('D-304 등기부: 대표 처음 취임 2015-07-21(중임으로 이어짐) · 확실 · 근거', r?.ceoStart === '2015-07-21' && r?.ceoStartSure === true && !!r?.ceoStartNote.includes('2018-07-21 중임'), JSON.stringify(r))
+  check('D-304 등기부: 대표 이름을 몰라도 대표이사 줄의 사람', readRegistryTax(full, '')?.ceoStart === '2015-07-21')
+  check('D-304 등기부: 주민번호는 결과에 없음', !JSON.stringify(r).includes('801231'))
+  const now = ['등기사항일부증명서(현재 유효사항)', '1주의 금액 금 5,000 원', '발행주식의 총수 20,000 주', '임원에 관한 사항', '대표이사 박지훈 801231-1******', '2024 년 07 월 21 일 중임 2024 년 07 월 25 일 등기'].join('\n')
+  const r2 = readRegistryTax(now, '박지훈')
+  check('D-304 현재 유효사항(중임만): 처음 취임일을 모른다 — 확실하지 않음 · 까닭', r2?.ceoStart === '2024-07-21' && r2?.ceoStartSure === false && !!r2?.ceoStartNote.includes('말소사항 포함'), JSON.stringify(r2))
+  check('D-304 자본금이 없으면 총수는 확실하지 않음(액면가는 한 가지라 확실)', r2?.sharesSure === false && r2?.parSure === true)
+  const gap = [...full.split('\n').slice(0, 12), '대표이사 박지훈', '2015 년 07 월 21 일 취임', '2018 년 07 월 21 일 퇴임', '2020 년 01 월 10 일 취임'].join('\n')
+  check('D-304 퇴임 뒤 한 달 넘게 비었다가 다시 취임 → 다시 취임한 날부터', readRegistryTax(gap, '박지훈')?.ceoStart === '2020-01-10', JSON.stringify(readRegistryTax(gap, '박지훈')))
+  check('D-304 등기부가 아닌 글은 null', readRegistryTax('사업자등록증 등록번호 124-81-00998', '') === null)
+
+  check('D-304 퇴직금 규정 표: 직위 · 지급배수 칸 → 대표이사 3', readRetireMultiple(['임원퇴직금지급규정', '제3조(지급배수) 임원의 퇴직금은 아래 배수로 한다', ['직위', '지급배수'].join('\t'), ['대표이사', '3'].join('\t'), ['이사', '2'].join('\t')].join('\n')) === 3)
+  check('D-304 정관 글: "대표이사 3배, 이사 2배"', readRetireMultiple('정관 제40조(임원의 퇴직금) 임원의 퇴직금은 퇴직 전 3년 평균 연봉의 10분의 1에 근속연수와 다음 배수를 곱한다. 대표이사 3배, 이사 2배') === 3)
+  check('D-304 배수가 없는 정관은 null(대표이사 3인 이내 같은 말을 배수로 읽지 않음)', readRetireMultiple('정관 제30조 대표이사는 이사회 결의로 3인 이내로 둔다. 제40조 임원의 퇴직금은 주주총회 결의로 정한다.') === null)
+  check('D-304 대표이사 배수가 둘로 갈리면 고르지 않음', readRetireMultiple('퇴직금 지급규정 대표이사 3배 … 개정 전 대표이사 2배') === null)
 }
 
 console.log(`\ntax-plan: ${pass} passed, ${fail} failed`)
