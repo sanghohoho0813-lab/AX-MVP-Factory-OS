@@ -1323,7 +1323,7 @@ await (async () => {
   const names = (r: ReturnType<typeof runDiagnosis>) => r.agencies.map((a) => a.name).join(',')
   check('D-307 엔진: 가점을 넘기면 추천 기관이 달라진다(기술 · 특허 쪽)', names(plain) !== names(withBonus) && withBonus.agencies.slice(0, 3).some((a) => /기술보증|기보/.test(a.name)), JSON.stringify({ plain: names(plain), bonus: names(withBonus) }))
   const ins = buildInsights(rich, T, []).find((i) => i.key === 'policy-funding')
-  check('D-307 맞춤 추천 정책자금: "가점: 특허 · 연구소 · 벤처기업 · 이노비즈" 근거가 맨 앞', !!ins?.detail.includes('가점: 특허 · 연구소 · 벤처기업 · 이노비즈'), ins?.detail)
+  check('D-307 맞춤 추천 정책자금: "가점 특허, 연구소, 벤처기업, 이노비즈" 근거가 맨 앞', !!ins?.detail.includes('가점 특허, 연구소, 벤처기업, 이노비즈'), ins?.detail)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

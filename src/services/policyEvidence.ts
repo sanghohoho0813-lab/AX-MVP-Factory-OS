@@ -92,9 +92,10 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   if (bonus.items.length) {
     input.bonusItems = bonus.items
     // 추천 기관이 바뀌는 근거라 맨 앞에
-    notes.unshift(`가점: ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(' · ')}`)
+    notes.unshift(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
   }
-  notes.push(...bonus.expired.map((x) => `${x} — 만료라 가점에서 뺌`))
+  // 근거 줄은 ' · ' 로 이어 보이므로 목록은 쉼표로 — 만료는 따로 한 줄(가점 목록에 섞여 보이지 않게)
+  if (bonus.expired.length) notes.push(`만료라 가점에서 뺀 인증: ${bonus.expired.join(', ')}`)
   return { input, notes, want }
 }
 

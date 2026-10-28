@@ -1348,7 +1348,7 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
   await page.waitForTimeout(400)
   const pol = (await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
-  check(`D-307 ${vp.tag} 맞춤 추천 정책자금: "가점: 특허 · 연구소 · 벤처기업 · 이노비즈" · 만료된 여성기업은 빼고 알림`, pol.includes('가점: 특허 · 연구소 · 벤처기업 · 이노비즈') && pol.includes('여성기업(2025-01-01까지) — 만료라 가점에서 뺌'), pol.slice(0, 500))
+  check(`D-307 ${vp.tag} 맞춤 추천 정책자금: "가점 특허, 연구소, 벤처기업, 이노비즈" · 만료된 여성기업은 따로 한 줄`, pol.includes('가점 특허, 연구소, 벤처기업, 이노비즈') && pol.includes('만료라 가점에서 뺀 인증: 여성기업(2025-01-01까지)') && !pol.includes('이노비즈 · 여성기업'), pol.slice(0, 500))
   if (vp.tag === '1440') await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').screenshot({ path: '/tmp/claude-0/shot307-card.png' }).catch(() => {})
   await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
