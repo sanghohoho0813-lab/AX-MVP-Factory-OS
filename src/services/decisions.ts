@@ -17,7 +17,7 @@
  * 규칙 계산이다 — 외부 호출 · LLM 0. 저장은 업체 기록 payload 하나(DB 변경 없음).
  */
 
-import type { ClientOpsRecord } from '../types/clientOps'
+import type { ClientOpsRecord, ShareholderRelation } from '../types/clientOps'
 import { localDateOf } from '../lib/appClock'
 import { contractStageOf } from '../types/clientOps'
 import { factDef, pendingFacts, readFact, sameFactValue, withFactDecisions, withFactValue, withRecheckFacts } from './customerFacts'
@@ -27,6 +27,7 @@ import { docShelfSummary, moveDocTo, moveTargets, newestOf, otherCellSuggestion,
 import { allDocumentMetas } from './clientOpsDocuments'
 import { OTHER_DOC_LABEL } from './docClassify'
 import { buildInsights } from './clientInsights'
+import { RELATION_LABEL } from './taxPlan'
 import { documentsWithExpiry } from './clientOpsAlerts'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
@@ -76,6 +77,8 @@ export type DecisionEffect =
   | { type: 'recheck'; logId: string; items: { key: string; value: string }[] }
   /** D-210: 개인사업자의 '법인등록번호' 칸(주민등록번호일 수 있음)을 비운다 — 확인할 정보에 남은 같은 칸 후보도 함께 */
   | { type: 'clear-corp-number' }
+  /** D-303: 주주명부에서 관계를 몰라 '기타' 로 둔 주주 — 고른 관계로(relation 은 답할 때 채운다) */
+  | { type: 'holder-relation'; rowId: string; relation: string }
 
 export interface Decision {
   /** 업체 안에서 변하지 않는 이름 — 답을 이 이름으로 남긴다 */
@@ -102,6 +105,9 @@ export interface Decision {
   rows?: { label: string; value: string; note?: string }[]
   /** D-183: 고르는 결정 — 고른 값으로 [맞아요] (기타 칸 '무슨 서류인가요?') */
   choices?: { value: string; label: string }[]
+  /** D-303: 고르는 칸 앞 글 · 비어 있을 때 글(없으면 서류 고르기 글) */
+  choiceLabel?: string
+  choicePrompt?: string
   /** D-183: [아니에요] 뒤 알림 글(없으면 '다시 묻지 않습니다') */
   noText?: string
 }
@@ -467,8 +473,39 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
     })
   }
 
+  // 11) D-303: 주주명부에서 관계를 몰라 '기타' 로 둔 주주 — 배우자 · 자녀면 증여 · 상속 · 가업승계 계산이 달라져 하나씩 골라 받는다
+  if (usable('tax')) {
+    const reg = record.shareholderRegister ?? []
+    const total = reg.reduce((a, h) => a + (h.shares > 0 ? h.shares : 0), 0)
+    for (const h of reg.filter((x) => x.relation === 'other' && x.name.trim() && x.shares > 0).slice(0, 4)) {
+      push({
+        id: `holder:${h.id}`,
+        // 업체 상세 맞춤 추천에도 보이게 '바로 넣은 값' 종류로(사실 확인 칸은 따로 있어 'fact' 는 거기서 빠진다)
+        kind: 'autofill',
+        title: `주주 ${h.name} 님은 대표와 어떤 관계인가요?`,
+        why: `${h.shares.toLocaleString('ko-KR')}주${total > 0 ? `(${Math.round((h.shares / total) * 1000) / 10}%)` : ''} — 배우자 · 자녀면 증여 · 상속 · 가업승계 계산이 달라져요`,
+        yesLabel: '이 관계로',
+        noLabel: '관계 없음(그대로)',
+        effect: { type: 'holder-relation', rowId: h.id, relation: '' },
+        choices: HOLDER_CHOICES,
+        choiceLabel: '관계',
+        choicePrompt: '관계 고르기',
+        openPath: `/tools/tax?client=${encodeURIComponent(record.id)}`,
+        rank: 36,
+        doneText: '주주 관계를 넣었습니다 — 절세 설계가 이 관계로 계산합니다',
+        noText: '관계 없음으로 둡니다 — 다시 묻지 않습니다',
+      })
+    }
+  }
+
   return out.sort((a, b) => a.rank - b.rank)
 }
+
+/** D-303: 주주 관계 고르기(대표 본인 · 가족 · 임원 · 법인) — '관계 없음' 은 [아니에요] */
+const HOLDER_CHOICES: { value: ShareholderRelation; label: string }[] = (['ceo', 'spouse', 'child', 'minor_child', 'parent', 'relative', 'executive', 'corp'] as const).map((value) => ({
+  value,
+  label: value === 'ceo' ? '대표 본인' : RELATION_LABEL[value],
+}))
 
 /** 여러 업체 — 업체마다 위에서 몇 개씩, 급한 것(작은 rank) 먼저 */
 export function buildAllDecisions(records: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): Decision[] {
@@ -497,6 +534,11 @@ export function withDecisionAnswer(record: ClientOpsRecord, d: Pick<Decision, 'i
   } else if (d.effect.type === 'clear-corp-number' && answer === 'yes') {
     next = withFactValue(next, 'corporateNumber', '', { now })
     next = { ...next, factInbox: (next.factInbox ?? []).filter((c) => c.key !== 'corporateNumber') }
+  } else if (d.effect.type === 'holder-relation') {
+    // 고르지 않고 [맞아요](한꺼번에 등) — 아무것도 바꾸지 않고 답도 남기지 않는다(다시 묻는다)
+    const { rowId, relation } = d.effect
+    if (answer === 'yes' && !relation) return record
+    if (answer === 'yes') next = { ...next, shareholderRegister: next.shareholderRegister.map((h) => (h.id === rowId ? { ...h, relation: relation as ShareholderRelation } : h)) }
   } else if (d.effect.type === 'recheck' && answer === 'no') {
     next = withRecheckFacts(next, d.effect.items, d.effect.logId, now)
   } else if (d.effect.type === 'copy' && answer === 'yes' && d.effect.log) {

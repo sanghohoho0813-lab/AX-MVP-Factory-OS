@@ -113,6 +113,8 @@ export function wonOf(value: string): number | null {
 export function formatWon(won: number): string {
   const sign = won < 0 ? '-' : ''
   const a = Math.abs(Math.round(won))
+  // D-303: 1만원 아래는 그대로(1주 액면가 5,000원이 '1만원' 으로 반올림돼 보이던 것)
+  if (a < 1e4) return `${sign}${a.toLocaleString('ko-KR')}원`
   const eok = Math.floor(a / 1e8)
   const man = Math.round((a % 1e8) / 1e4)
   if (eok > 0 && man > 0) return `${sign}${eok.toLocaleString('ko-KR')}억 ${man.toLocaleString('ko-KR')}만원`

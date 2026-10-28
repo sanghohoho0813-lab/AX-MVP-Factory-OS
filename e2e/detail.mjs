@@ -1153,6 +1153,70 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await ctx.close()
 }
 
+/* ---------------- D-303 주주명부 올리기 → 주주표 · 총수 · 액면가 → 관계 모르는 주주는 골라 받기 → 절세 설계 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const T = '\t'
+  const SH = {
+    name: '주주명부_2026.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      [
+        '주 주 명 부',
+        '회사명: 한솔테크 주식회사 · 기준일: 2026년 3월 31일',
+        '발행주식의 총수: 10,000주 / 1주의 금액: 5,000원',
+        ['번호', '주주명', '주민등록번호', '주소', '주식수', '지분율', '비고'].join(T),
+        ['1', '김대표', '750101-1234567', '부산광역시 해운대구 센텀로 77', '6,000', '60%', '대표이사'].join(T),
+        ['2', '이배우', '780202-2345678', '부산광역시 해운대구 센텀로 77', '2,500', '25%', '배우자'].join(T),
+        ['3', '박친구', '800303-1456789', '경기도 성남시 분당구 45', '1,500', '15%', ''].join(T),
+        ['합계', '', '', '', '10,000', '100%', ''].join(T),
+      ].join('\n'),
+      'utf8',
+    ),
+  }
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'))
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([SH])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const r = await rec()
+  check(`D-303 ${vp.tag} 주주명부 → 주주표 3명(대표 · 배우자 · 기타) · 총수 10,000 · 액면가 5,000`, (r.shareholderRegister ?? []).map((h) => `${h.name}:${h.shares}:${h.relation}`).join(',') === '김대표:6000:ceo,이배우:2500:spouse,박친구:1500:other' && r.taxProfile?.totalShares === '10000' && r.taxProfile?.par === '5000', JSON.stringify({ reg: r.shareholderRegister, tp: r.taxProfile }))
+  check(`D-303 ${vp.tag} 주민번호 · 주주 주소는 기록에 0 · 4대보험 명부로 읽지 않음(직원 진단 안 붙음)`, !JSON.stringify(r).includes('1234567') && !JSON.stringify(r).includes('센텀로') && !(r.toolResults ?? []).some((t) => t.toolKey === 'employment' && t.createdAt > new Date(Date.now() - 600000).toISOString()))
+  const entered = (await page.getByTestId('smart-entered').innerText().catch(() => '')) ?? ''
+  check(`D-303 ${vp.tag} 맞춤 추천 '바로 넣은 정보' 에 주주명부 · 발행주식 총수 · 1주 액면가`, entered.includes('주주명부') && entered.includes('주주 3명') && entered.includes('발행주식 총수') && entered.includes('1주 액면가'), entered.slice(0, 300))
+  // 확인할 것(맞춤 추천 안 '프로그램이 준비했어요') — 관계를 모르는 박친구
+  const box = page.getByTestId('smart-decisions')
+  if (!(await box.isVisible().catch(() => false))) await page.getByText('프로그램이 준비했어요', { exact: false }).first().click()
+  await page.waitForTimeout(300)
+  const q = page.locator('[data-testid="decision"]').filter({ hasText: '박친구' }).first()
+  check(`D-303 ${vp.tag} 확인할 것: "주주 박친구 님은 대표와 어떤 관계인가요?" · 고르기 전에는 단추 꺼짐`, (await q.count()) === 1 && (await q.innerText()).includes('어떤 관계') && (await q.getByTestId('decision-yes').isDisabled()), (await q.innerText().catch(() => '')).slice(0, 200))
+  await q.getByTestId('decision-choice').selectOption({ label: '자녀(성년)' })
+  await q.getByTestId('decision-yes').click()
+  await page.waitForTimeout(800)
+  const r2 = await rec()
+  check(`D-303 ${vp.tag} [이 관계로] → 박친구 = 자녀 · 질문 사라짐`, r2.shareholderRegister.find((h) => h.name === '박친구')?.relation === 'child' && (await page.locator('[data-testid="decision"]').filter({ hasText: '박친구' }).count()) === 0, JSON.stringify(r2.shareholderRegister))
+  check(`D-303 ${vp.tag} 업체 상세 가로 넘침 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0)
+  if (vp.tag === '1440') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot303-batch.png' }).catch(() => {})
+  // 절세 설계 — 주주표가 그대로
+  await page.goto(BASE + '/tools/tax?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const body = await page.locator('body').innerText()
+  const vals = await page.locator('input').evaluateAll((els) => els.map((e) => e.value))
+  check(`D-303 ${vp.tag} 절세 설계 주주명부에 세 사람 · 발행주식 총수`, ['김대표', '이배우', '박친구'].every((n) => vals.includes(n) || body.includes(n)) && (vals.some((v) => v.replace(/,/g, '') === '10000') || body.includes('10,000')), JSON.stringify(vals.filter(Boolean).slice(0, 20)))
+  check(`D-303 ${vp.tag} 절세 설계 가로 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  if (vp.tag === '390') await page.screenshot({ path: '/tmp/claude-0/shot303-tax-390.png' }).catch(() => {})
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

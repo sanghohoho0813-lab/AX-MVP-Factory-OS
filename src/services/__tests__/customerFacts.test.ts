@@ -10,7 +10,7 @@
 
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
-import { docUploadLogOf, batchOfLog } from '../docAutoAnalyze'
+import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
 import { NOTE_RECHECK, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
 import { allDocumentMetas } from '../clientOpsDocuments'
@@ -1125,6 +1125,53 @@ await (async () => {
   const validCorpNo = { ...rrnRec, corporateNumber: '110111-0085450', factInbox: [] } as ClientOpsRecord
   check('D210-13 법인번호 검증 숫자가 맞는 번호는 묻지 않는다', !buildDecisions(validCorpNo, '2026-10-16', []).some((d) => d.effect.type === 'clear-corp-number'))
 }
+
+// D-303 주주명부 올리기 → 주주표 · 발행주식 총수 · 1주 액면가 · 주주·임원 구성 / 관계를 모르는 주주는 확인할 것에서 골라 받는다
+await (async () => {
+  const T = '\t'
+  const text = [
+    '주 주 명 부',
+    '발행주식의 총수: 10,000주 / 1주의 금액: 5,000원',
+    ['번호', '주주명', '주민등록번호', '주소', '주식수', '지분율', '비고'].join(T),
+    ['1', '이대표', '750101-1234567', '부산광역시 해운대구 센텀로 77', '6,000', '60%', '대표이사'].join(T),
+    ['2', '김배우', '780202-2345678', '부산광역시 해운대구 센텀로 77', '2,500', '25%', '배우자'].join(T),
+    ['3', '박친구', '800303-1456789', '경기도 성남시 분당구 45', '1,500', '15%', ''].join(T),
+    ['합계', '', '', '', '10,000', '100%', ''].join(T),
+  ].join('\n')
+  const doc = { key: 'customdoc_sh', fileName: '주주명부_2026.xlsx', text, method: 'xlsx' as const, docSure: true }
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-28', makeId: () => `h${++n}` }
+  const base = normalizeClientOps({ id: 'sh303', companyName: '주주테스트(주)', representativeName: '이대표', businessAddress: '서울특별시 중구 세종대로 1', createdAt: NOW, updatedAt: NOW })
+  const out = await analyzeUploadedDocs(base, [doc], ctx)
+  const r = out.record
+  check('D-303 주주명부 → 주주표 3명 · 관계(대표 · 배우자 · 기타)', r.shareholderRegister.map((h) => `${h.name}:${h.shares}:${h.relation}`).join(',') === '이대표:6000:ceo,김배우:2500:spouse,박친구:1500:other', JSON.stringify(r.shareholderRegister))
+  check('D-303 발행주식 총수 · 1주 액면가 · 주주·임원 구성 한 줄', r.taxProfile.totalShares === '10000' && r.taxProfile.par === '5000' && r.shareholders === '이대표 60% · 김배우 25% · 박친구 15%', JSON.stringify({ tp: r.taxProfile, s: r.shareholders }))
+  check('D-303 바로 넣은 정보에 주주명부 · 총수 · 액면가', ['주주명부', '발행주식 총수', '1주 액면가'].every((l) => out.summary.entered.some((e) => e.label === l)), JSON.stringify(out.summary.entered))
+  check('D-303 주민번호 · 주주 주소는 기록에 없음 · 회사 주소는 그대로(주주 주소를 회사 주소로 읽지 않음)', !JSON.stringify(r).includes('1234567') && !JSON.stringify(r).includes('센텀로') && r.businessAddress === '서울특별시 중구 세종대로 1' && !(r.factInbox ?? []).some((c) => c.key === 'businessAddress'))
+
+  const ds = buildDecisions(r, '2026-10-28', [])
+  const q = ds.filter((d) => d.effect.type === 'holder-relation')
+  check('D-303 확인할 것: 관계를 모르는 박친구만 묻는다 · 고르기(배우자 · 자녀 …)', q.length === 1 && q[0].title.includes('박친구') && !!q[0].choices?.some((c) => c.label === '배우자') && q[0].choiceLabel === '관계', JSON.stringify(q.map((d) => d.title)))
+  check('D-303 절세 설계를 못 쓰는 사람에게는 묻지 않음', !buildDecisions(r, '2026-10-28', [], (k) => k !== 'tax').some((d) => d.effect.type === 'holder-relation'))
+  const d0 = q[0]
+  const picked = withDecisionAnswer(r, { ...d0, effect: { type: 'holder-relation', rowId: (d0.effect as { rowId: string }).rowId, relation: 'child' } }, 'yes', [], NOW)
+  check('D-303 [이 관계로] 자녀 → 주주표에 · 다시 묻지 않음', picked.shareholderRegister.find((h) => h.name === '박친구')?.relation === 'child' && !buildDecisions(picked, '2026-10-28', []).some((d) => d.effect.type === 'holder-relation'))
+  check('D-303 고르지 않은 [맞아요] 는 아무것도 바꾸지 않고 다시 묻는다', withDecisionAnswer(r, d0, 'yes', [], NOW) === r)
+  const said = withDecisionAnswer(r, d0, 'no', [], NOW)
+  check('D-303 [관계 없음] — 기타 그대로 · 다시 묻지 않음', said.shareholderRegister.find((h) => h.name === '박친구')?.relation === 'other' && !buildDecisions(said, '2026-10-28', []).some((d) => d.effect.type === 'holder-relation'))
+  const back = undoDecision(picked, r, picked, d0.id)
+  check('D-303 되돌리기 — 관계도 기타로', back.shareholderRegister.find((h) => h.name === '박친구')?.relation === 'other' && !(back.decided ?? {})[d0.id])
+
+  // 이미 적힌 주주표가 다르면 덮지 않는다 · 검산이 안 맞으면 바로 넣지 않는다
+  const filled = normalizeClientOps({ ...base, shareholderRegister: [{ id: 'x1', name: '이대표', relation: 'ceo', shares: 10000, acquirePrice: 0 }] } as never)
+  const kept = await analyzeUploadedDocs(filled, [doc], ctx)
+  check('D-303 이미 다른 주주표 → 덮지 않고 확인 필요로', kept.record.shareholderRegister.length === 1 && kept.summary.flagged.some((f) => f.label === '주주명부' && f.note.includes('지금 적힌 주주표와 달라')), JSON.stringify(kept.summary.flagged))
+  const same = await analyzeUploadedDocs(r, [doc], ctx)
+  check('D-303 같은 주주명부를 다시 올리면 조용히(넣은 것도 확인할 것도 없음)', !same.summary.flagged.some((f) => f.label === '주주명부') && !same.summary.entered.some((e) => e.label === '주주명부'))
+  const off = text.replace('1,500', '500')
+  const unsure = await analyzeUploadedDocs(base, [{ ...doc, text: off }], ctx)
+  check('D-303 합(9,000) ≠ 총수(10,000) → 바로 넣지 않고 까닭과 함께 확인 필요', unsure.record.shareholderRegister.length === 0 && unsure.summary.flagged.some((f) => f.label === '주주명부' && f.note.includes('발행주식 총수')), JSON.stringify(unsure.summary.flagged))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

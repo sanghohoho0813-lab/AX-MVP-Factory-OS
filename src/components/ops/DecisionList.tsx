@@ -191,7 +191,8 @@ export function useDecisionAnswer({
     try {
       for (const d of ds) {
         // 지우는 결정(주민등록번호일 수 있는 법인번호)은 한 번에 처리하지 않는다 — 하나씩 보고 누른다
-        if (d.effect.type === 'copy' || d.effect.type === 'clear-corp-number') continue
+        // D-303: 고르는 주주 관계는 하나씩(고르지 않은 [맞아요] 로 묻지 않게 되지 않도록)
+        if (d.effect.type === 'copy' || d.effect.type === 'clear-corp-number' || d.effect.type === 'holder-relation') continue
         const rec = fresh.get(d.clientId) ?? latest(d.clientId)
         if (!rec) continue
         // 할 일 먼저 — 기록 저장이 실패하면 지운다
@@ -335,15 +336,15 @@ export function DecisionList({
           <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{d.why}</p>
           {d.choices && (
             <label className="t-sub flex min-w-0 flex-col gap-1 text-slate-600 sm:flex-row sm:items-center sm:gap-2">
-              <span className="shrink-0 font-semibold text-slate-700">이 파일은</span>
+              <span className="shrink-0 font-semibold text-slate-700">{d.choiceLabel ?? '이 파일은'}</span>
               <select
                 value={picked[`${d.clientId}:${d.id}`] ?? ''}
                 onChange={(e) => setPicked((p) => ({ ...p, [`${d.clientId}:${d.id}`]: e.target.value }))}
                 data-testid="decision-choice"
-                aria-label="무슨 서류인지 고르기"
+                aria-label={d.choicePrompt ?? '무슨 서류인지 고르기'}
                 className="tap t-sub min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800 focus:border-brand-500 focus:outline-none sm:max-w-xs"
               >
-                <option value="">서류 종류 고르기</option>
+                <option value="">{d.choicePrompt ?? '서류 종류 고르기'}</option>
                 {d.choices.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -360,7 +361,14 @@ export function DecisionList({
               onClick={() => {
                 const choice = picked[`${d.clientId}:${d.id}`]
                 // D-183: 고르는 결정은 고른 칸으로 — 결정마다 effect 의 to 를 채워 넘긴다
-                onAnswer(d.choices && choice && d.effect.type === 'shelf-move' ? { ...d, effect: { ...d.effect, to: choice } } : d, 'yes')
+                onAnswer(
+                  d.choices && choice && d.effect.type === 'shelf-move'
+                    ? { ...d, effect: { ...d.effect, to: choice } }
+                    : d.choices && choice && d.effect.type === 'holder-relation'
+                      ? { ...d, effect: { ...d.effect, relation: choice } }
+                      : d,
+                  'yes',
+                )
               }}
               data-testid="decision-yes"
             >

@@ -7,6 +7,7 @@
  */
 
 import { normalizeClientOps } from '../clientOpsService'
+import { holdersLine, looksLikeShareholderRegister, readShareholderDoc } from '../shareholderDoc'
 import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, koreanWon, pct, unlistedShareValuation, type RowValues, type Values } from '../taxCalc'
 import {
   ASSUMPTIONS,
@@ -468,6 +469,44 @@ if (process.env.SHOW) {
   check('D-225 절세 설계 퇴직금: 2024-06 취임 · 월 1천만 → 한도 58,000,000원', rYoung.ok && Math.round(rYoung.limit) === 58000000, rYoung.limit)
   const over = cashPlan(young, reg, shareValueOf(young, reg), 1e8, '2026-10-17').routes.find((r) => r.key === 'retire')
   check('D-225 퇴직금으로 1억 가져오기: 한도를 넘는다고 알림 · 조사 \'을\'', !!over && !over.ok && over.reason.includes('58,000,000원을 넘습니다'), over?.reason)
+}
+
+// D-303 주주명부 서류 → 주주표 (표 · PDF 줄 · 지분율만) — 검산이 맞을 때만 sure · 주민번호 · 주소는 남기지 않음
+{
+  const T = '\t'
+  const tab = [
+    '주 주 명 부',
+    '회사명: 주식회사 미래바이오랩',
+    '기준일: 2026년 3월 31일',
+    '발행주식의 총수: 10,000주 / 1주의 금액: 5,000원',
+    ['번호', '주주명', '주민등록번호', '주소', '주식의 종류', '주식수', '금액', '지분율', '비고'].join(T),
+    ['1', '이대표', '750101-1234567', '서울특별시 강남구 테헤란로 123', '보통주', '6,000', '30,000,000', '60%', '대표이사'].join(T),
+    ['2', '김배우', '780202-2345678', '서울특별시 강남구 테헤란로 123', '보통주', '2,500', '12,500,000', '25%', '배우자'].join(T),
+    ['3', '박친구', '800303-1456789', '경기도 성남시 분당구 45', '보통주', '1,500', '7,500,000', '15%', ''].join(T),
+    ['합계', '', '', '', '', '10,000', '50,000,000', '100%', ''].join(T),
+  ].join('\n')
+  check('D-303 주주명부 알아보기: 제목 + 주식수', looksLikeShareholderRegister({ fileName: 'scan.pdf', text: tab }) && !looksLikeShareholderRegister({ fileName: '사업자등록증.pdf', text: '사업자등록증 등록번호 124-81-00998' }))
+  const r = readShareholderDoc(tab, '이대표')
+  check('D-303 표: 주주 3명 · 주식 수 · 지분율', r.holders.length === 3 && r.holders.map((h) => `${h.name}:${h.shares}:${h.pct}`).join(',') === '이대표:6000:60,김배우:2500:25,박친구:1500:15', JSON.stringify(r.holders))
+  check('D-303 표: 발행주식 총수 10,000 · 1주의 금액 5,000원 · 기준일 · 합계로 검산(sure)', r.totalShares === 10000 && r.par === 5000 && r.baseDate === '2026-03-31' && r.check === 'sum' && r.sure, JSON.stringify({ t: r.totalShares, p: r.par, d: r.baseDate, c: r.check }))
+  check('D-303 표: 관계 — 대표(이름 · 대표이사) · 배우자(비고) · 모르면 기타(확인할 것)', r.holders.map((h) => `${h.relation}:${h.relationSure}`).join(',') === 'ceo:true,spouse:true,other:false', JSON.stringify(r.holders.map((h) => h.relation)))
+  check('D-303 표: 주민번호 · 주소는 결과에 없음', !JSON.stringify(r).includes('1234567') && !JSON.stringify(r).includes('테헤란로'))
+  check('D-303 지분 한 줄', holdersLine(r) === '이대표 60% · 김배우 25% · 박친구 15%', holdersLine(r))
+
+  // PDF 처럼 한 줄에 띄어 쓴 글 — 주소 번지(123)가 주식 수로 읽히지 않게(1주의 금액 × 주식 수 = 금액으로 찾음)
+  const pdf = ['주주명부', '발행주식총수 10,000주 1주의 금액 5,000원', '번호 주주명 주민등록번호 주소 주식의종류 주식수 금액 지분율 비고', '1 이대표 750101-1****** 서울특별시 강남구 테헤란로 123 보통주 6,000 30,000,000 60.00 대표이사', '2 (주)미래홀딩스 110111-1234567 서울특별시 중구 세종대로 9 보통주 4,000 20,000,000 40.00', '합계 10,000 50,000,000 100.00'].join('\n')
+  const p2 = readShareholderDoc(pdf, '')
+  check('D-303 PDF 줄: 주소 번지가 아니라 주식 수 · 법인 주주 · 소수 지분율 · 검산', p2.sure && p2.holders.map((h) => `${h.name}:${h.shares}:${h.pct}:${h.relation}`).join(',') === '이대표:6000:60:ceo,(주)미래홀딩스:4000:40:corp', JSON.stringify(p2.holders))
+  // 1주의 금액 없이 — 쉼표 숫자를 주식 수로, 틀리면 검산에서 걸린다
+  const noPar = ['주주명부', '번호 주주명 주소 주식수 지분율', '1 이대표 서울 강남구 77 6,000주 60%', '2 김배우 서울 강남구 77 4,000주 40%'].join('\n')
+  const p3 = readShareholderDoc(noPar, '이대표')
+  check('D-303 PDF 줄: "6,000주" · 지분율 합 100%로 검산(pct)', p3.sure && p3.check === 'pct' && p3.holders.map((h) => h.shares).join(',') === '6000,4000', JSON.stringify(p3))
+  const bad = ['주주명부', '발행주식총수 10,000주', '번호 주주명 주소 주식수', '1 이대표 서울 강남구 77 6,000', '2 김배우 서울 강남구 77 3,000'].join('\n')
+  const p4 = readShareholderDoc(bad, '이대표')
+  check('D-303 검산이 안 맞으면(합 9,000 ≠ 총수 10,000) sure 아님 — 바로 넣지 않는다', !p4.sure && p4.check === 'none' && p4.holders.length === 2, JSON.stringify(p4))
+  check('D-303 서명 줄 · 회사 이름 줄은 주주가 아님', !readShareholderDoc(pdf + '\n위와 같이 확인함 2026.03.31 주식회사 미래바이오랩 대표이사 이대표 (인)', '').holders.some((h) => h.name.includes('미래바이오랩')))
+  const merge = readShareholderDoc(['주주명부', ['주주명', '주식의 종류', '주식수'].join(T), ['이대표', '보통주', '5,000'].join(T), ['이대표', '우선주', '1,000'].join(T), ['합계', '', '6,000'].join(T)].join('\n'), '이대표')
+  check('D-303 같은 사람 두 줄(보통주 · 우선주)은 합침 · 1명 회사', merge.sure && merge.holders.length === 1 && merge.holders[0].shares === 6000, JSON.stringify(merge))
 }
 
 console.log(`\ntax-plan: ${pass} passed, ${fail} failed`)

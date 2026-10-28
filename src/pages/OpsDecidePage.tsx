@@ -57,7 +57,8 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
   })
   const clients = new Set(all.map((d) => d.clientId)).size
   // D-210: 지우는 결정(주민등록번호일 수 있는 법인번호)은 '모두 맞아요' 에 넣지 않는다
-  const bulkable = shown.filter((d) => d.effect.type !== 'clear-corp-number')
+  // D-303: 주주 관계는 골라야 해서 한꺼번에 처리하지 않는다
+  const bulkable = shown.filter((d) => d.effect.type !== 'clear-corp-number' && d.effect.type !== 'holder-relation')
 
   return (
     <div className="flex flex-col gap-5">

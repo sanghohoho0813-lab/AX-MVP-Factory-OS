@@ -10,7 +10,9 @@
  *     다른 회사 보고서면(사업자번호 · 이름이 다르면) 붙이지 않고 알려만 준다.
  *  3. 4대보험 가입자 명부 — 고용지원금 명부 진단과 같은 엔진으로 직원별 후보 · 청년도약 참여신청 기한을 붙이고,
  *     작년 · 올해 매월 말 인원(통합고용세액공제용 · D-302)을 함께 남기고, 재직 인원이 비어 있으면 넣는다. 주민등록번호는 남기지 않는다(명부 읽기가 생년월일 · 성별만 남김).
- *  4. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
+ *  4. 주주명부(D-303) — 주주 · 주식 수 · 관계 · 발행주식 총수 · 1주 금액을 읽어, 검산이 맞고 주주표가 비어 있으면 바로 넣는다
+ *     (절세 설계 · 05 · 06 계산기 · 상황 예시가 같은 주주표를 쓴다). 주민등록번호 · 주소는 남기지 않는다.
+ *  5. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
  *     — 업체 정보가 바뀌면 판정도 바로 바뀐다(clientInsights).
  *
  * 무거운 엔진(크레탑 · 명부)은 필요할 때만 불러온다. 규칙 계산 — 외부 호출 없음. 저장은 부르는 쪽.
@@ -20,6 +22,7 @@ import { withToolResult } from './clientOpsService'
 import { pendingFacts, readFact, withFactDecisions, withFactValue } from './customerFacts'
 import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
+import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
 
 export interface DocBatchSummary {
   files: number
@@ -121,8 +124,11 @@ export async function analyzeUploadedDocs(
   const readable = docs.filter((d) => d.text.replace(/\s/g, '').length >= 10)
   // 1. 회사 정보(크레탑 · 명부 글은 회사 정보 읽기에 넣지 않는다 — 그 안의 숫자는 각 엔진이 읽는다)
   const cretopDocs = readable.filter(looksLikeCretop)
-  const rosterDocs = readable.filter((d) => !cretopDocs.includes(d) && looksLikeRoster(d))
-  const factDocs = readable.filter((d) => !cretopDocs.includes(d) && !rosterDocs.includes(d))
+  // D-303 주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게 회사 정보 읽기에서 뺀다(주주표로 따로).
+  //   명부보다 먼저 가린다: 주민번호가 여럿이고 '명부' 라는 말이 있어 예전에는 4대보험 명부로 읽혀 주주가 직원으로 셌다
+  const holderDocs = readable.filter((d) => !cretopDocs.includes(d) && looksLikeShareholderRegister(d))
+  const rosterDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && looksLikeRoster(d))
+  const factDocs = readable.filter((d) => !cretopDocs.includes(d) && !rosterDocs.includes(d) && !holderDocs.includes(d))
   const filled = autoFillFromDocs(record, factDocs, now, makeId)
   let rec = filled.record
   const entered = [...filled.entered]
@@ -211,5 +217,54 @@ export async function analyzeUploadedDocs(
     }
   }
 
+  // 4. D-303 주주명부 — 가장 마지막에 올린 것 하나. 검산이 맞고 주주표가 비어 있을 때만 바로 넣는다(아니면 확인으로)
+  const hDoc = holderDocs[holderDocs.length - 1]
+  if (hDoc) {
+    const read = readShareholderDoc(hDoc.text, rec.representativeName)
+    const sum = read.holders.reduce((a, h) => a + h.shares, 0)
+    const display = `주주 ${read.holders.length}명 · ${sum.toLocaleString('ko-KR')}주(${holdersLine(read)})`
+    const empty = rec.shareholderRegister.every((r) => !r.name.trim() && !(r.shares > 0))
+    const same = !empty && sameHolders(rec.shareholderRegister, read)
+    if (read.holders.length === 0) {
+      warnings.push(`${hDoc.fileName}: 주주명부에서 주주를 찾지 못했습니다 — 절세 설계 › 주주명부에 직접 적어 주세요.`)
+    } else if (!read.sure) {
+      const why =
+        read.totalShares !== null && read.totalShares !== sum
+          ? `주식 수 합(${sum.toLocaleString('ko-KR')}주)이 발행주식 총수(${read.totalShares.toLocaleString('ko-KR')}주)와 달라 바로 넣지 않았어요 — 절세 설계에서 확인`
+          : '합계 · 지분율이 없어 맞는지 확인하지 못했어요 — 절세 설계에서 확인'
+      flagged.push({ key: 'shareholderRegister', label: '주주명부', display, fileName: hDoc.fileName, note: why })
+    } else if (!empty && !same) {
+      flagged.push({ key: 'shareholderRegister', label: '주주명부', display, fileName: hDoc.fileName, note: '지금 적힌 주주표와 달라 바꾸지 않았어요 — 절세 설계에서 확인' })
+    } else if (empty) {
+      const profile = { ...(rec.taxProfile ?? {}) }
+      const blank = (k: string) => !String(profile[k] ?? '').trim()
+      const extra: FilledFact[] = []
+      if (read.totalShares && blank('totalShares')) {
+        profile.totalShares = String(read.totalShares)
+        extra.push({ key: 'taxProfile.totalShares', label: '발행주식 총수', display: `${read.totalShares.toLocaleString('ko-KR')}주`, fileName: hDoc.fileName })
+      }
+      if (read.par && blank('par')) {
+        profile.par = String(read.par)
+        extra.push({ key: 'taxProfile.par', label: '1주 액면가', display: `${read.par.toLocaleString('ko-KR')}원`, fileName: hDoc.fileName })
+      }
+      rec = {
+        ...rec,
+        shareholderRegister: read.holders.map((h) => ({ id: makeId(), name: h.name, relation: h.relation, shares: h.shares, acquirePrice: 0 })),
+        taxProfile: profile,
+        // 회사 정보 '주주·임원 구성' 칸이 비어 있으면 지분 한 줄로
+        shareholders: rec.shareholders.trim() ? rec.shareholders : holdersLine(read),
+      }
+      entered.push({ key: 'shareholderRegister', label: '주주명부', display, fileName: hDoc.fileName }, ...extra)
+    }
+  }
+
   return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now } }
+}
+
+/** 지금 주주표와 올린 주주명부가 같은가(이름 · 주식 수) */
+function sameHolders(rows: ClientOpsRecord['shareholderRegister'], read: RegisterRead): boolean {
+  const key = (n: string, s: number) => `${n.replace(/\s/g, '')}:${s}`
+  const a = rows.filter((r) => r.name.trim() || r.shares > 0).map((r) => key(r.name, r.shares)).sort()
+  const b = read.holders.map((h) => key(h.name, h.shares)).sort()
+  return a.length === b.length && a.every((x, i) => x === b[i])
 }
