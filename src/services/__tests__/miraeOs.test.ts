@@ -58,7 +58,7 @@ import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { ensureCustomServiceCatalog, mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
 import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
-import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
+import { builtinForLabel, numberKindForCustom, profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_CHOICES,
   CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import { UPCOMING_PRODUCTS } from '../../config/upcomingProducts'
@@ -2470,6 +2470,21 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('D-235 일 순서: 모듈 순서 키 = 목차 화면 · 설명 있음(90자 안 · 규칙 계산을 AI 라 부르지 않음)', flowBad.length === 0, flowBad)
   const emp = flowPosition(TOOL_FLOWS.employment, 'roster')
   check('D-235 일 순서: 고용지원금 — 명부 진단은 2/5 · 이전 채용 진단 · 다음 회차 일정 · 한눈에 보기는 순서 밖 설명', emp.index === 1 && emp.prev?.key === 'diagnosis' && emp.next?.key === 'schedule' && flowPosition(TOOL_FLOWS.employment, 'dashboard').index === -1 && !!flowPosition(TOOL_FLOWS.employment, 'dashboard').here, emp)
+}
+
+// D-309 '+' 로 만든 사업자등록번호 칸 — 기본 칸 이름 알아보기 · 번호 칸처럼 조각 복사 · 숫자만 · 기본 칸으로 옮기기
+{
+  check('D-309 칸 이름 → 기본 칸: 사업자등록번호 · 사업자 번호 · 사업자등록증 · 법인번호 · 대표번호 · 이메일 · 주소', builtinForLabel('사업자등록번호') === 'businessNumber' && builtinForLabel('사업자 번호') === 'businessNumber' && builtinForLabel('사업자등록증') === 'businessNumber' && builtinForLabel('법인번호') === 'corporateNumber' && builtinForLabel('대표번호') === 'companyPhone' && builtinForLabel('이메일') === 'contactEmail' && builtinForLabel('사업장 주소') === 'businessAddress')
+  check('D-309 기본 칸이 아닌 이름은 그대로 새 칸(공장 등록번호 · 세무사 연락처)', builtinForLabel('공장 등록번호') === null && builtinForLabel('세무사 연락처') === null)
+  check('D-309 번호 종류: 이름(사업자 · 법인 · 전화) → 값 모양(3-2-5 · 휴대폰) · 주민번호 모양은 번호로 안 봄', numberKindForCustom('사업자등록번호', '1248100998') === 'business' && numberKindForCustom('법인번호', '1101111234567') === 'corporate' && numberKindForCustom('세무사 연락처', '010-1234-5678') === 'phone' && numberKindForCustom('메모', '124-81-00998') === 'business' && numberKindForCustom('메모', '900101-1234567') === undefined)
+  let rec = normalizeClientOps({ id: 'bz309', companyName: '번호테스트', businessNumber: '' } as never)
+  rec = withCustomField(rec, { group: 'identity', label: '사업자등록번호', value: '1248100998' })
+  const f = profileFields(rec, TODAY).find((x) => x.custom)!
+  check('D-309 직접 만든 사업자등록번호 칸: 하이픈 모양 · 번호 종류(조각 복사 · 숫자만) · 기본 칸이 비어 기본 칸으로 옮기기', f.value === '124-81-00998' && f.numberKind === 'business' && f.moveTo === 'businessNumber', JSON.stringify(f))
+  const filled = normalizeClientOps({ ...rec, businessNumber: '313-81-12508' } as never)
+  check('D-309 기본 칸에 이미 번호가 있으면 옮기기 단추 없음(두 번째 번호일 수 있다)', !profileFields(filled, TODAY).find((x) => x.custom)!.moveTo)
+  const plain = withCustomField(normalizeClientOps({ id: 'bz309b', companyName: 'x' } as never), { group: 'identity', label: '공장 등록번호', value: '4512-2026' })
+  check('D-309 번호가 아닌 직접 만든 칸은 예전 그대로(번호 종류 없음 · 옮기기 없음)', !profileFields(plain, TODAY).find((x) => x.custom)!.numberKind && !profileFields(plain, TODAY).find((x) => x.custom)!.moveTo)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

@@ -52,7 +52,7 @@ npm run test:all                                   # 단위·계약 전부(카�
 npx vite preview --port 4390 &                     # 아래 E2E 용
 npm run qa:simple -- http://localhost:4390         # 간단 모드
 npm run qa:studio -- http://localhost:4390         # 컨설팅 작업실(고급)
-npm run qa:board  -- http://localhost:4390
+npm run qa:board  -- http://localhost:4390         # 고객 보드 · 회사 기본 정보(번호 조각 · 전체 · 숫자만 복사 — '+' 로 만든 사업자등록번호 · 팩스 칸도 · 기본 칸이 비면 기본 칸으로 넣기/옮기기)
 npm run qa:todos  -- http://localhost:4390         # 할 일(창에서 바로 내용 · 기한 · 업체 고치기 + 진행 중 · 완료 · 내일로 · 지우기 함께 저장)
 npm run e2e:mobile -- http://localhost:4390
 npm run qa:sales  -- http://localhost:4390         # 영업 관리(보드 · 잠재고객 · 계약 고객 숫자 · 계약한 업체는 계약 전 단계로 안 옮김)

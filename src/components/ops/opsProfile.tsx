@@ -3,6 +3,7 @@ import { localDateOf } from '../../lib/appClock'
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
+  builtinForLabel,
   profileAsText,
   profileFields,
   profileFieldsByGroup,
@@ -43,6 +44,7 @@ export function CompanyProfileCard({
   onEdit,
   onCustomField,
   onRemoveCustomField,
+  onMoveCustomField,
   factNote,
   /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
   bare = false,
@@ -57,6 +59,8 @@ export function CompanyProfileCard({
   onCustomField?: (field: { id?: string; group: ProfileGroup; label: string; value: string }) => void
   /** 직접 만든 칸을 지웠을 때 */
   onRemoveCustomField?: (id: string) => void
+  /** D-309 직접 만든 칸(사업자등록번호 …)을 비어 있는 기본 칸으로 옮길 때 — 한 번에 저장 */
+  onMoveCustomField?: (id: string, key: ProfileEditKey) => void
   /** D-128: 칸의 출처 · 확인 상태 한 줄 (자료로 확인한 값 · 예상값만 — 평범하게 적은 값은 조용히) */
   factNote?: (key: string) => { text: string; confirmed: boolean } | null
   bare?: boolean
@@ -72,6 +76,8 @@ export function CompanyProfileCard({
   const [addingGroup, setAddingGroup] = useState<ProfileGroup | null>(null)
   const [newLabel, setNewLabel] = useState('')
   const [newValue, setNewValue] = useState('')
+  /** D-309 '+' 로 적은 값을 기본 칸에 넣었을 때 한 줄 안내(어느 묶음 · 무슨 칸) */
+  const [routed, setRouted] = useState<{ group: ProfileGroup; text: string } | null>(null)
   /** 지우기를 한 번 더 확인받는 칸 */
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const fields = profileFields(record, today)
@@ -142,7 +148,15 @@ export function CompanyProfileCard({
   const canEdit = (f: ProfileField) => (f.custom ? Boolean(onCustomField) : Boolean(onEdit && f.edit))
 
   const addField = (group: ProfileGroup) => {
-    if (onCustomField && newLabel.trim() !== '') onCustomField({ group, label: newLabel, value: newValue })
+    // D-309 칸 이름이 기본 칸(사업자등록번호 · 법인등록번호 · 대표번호 …)이고 그 칸이 비어 있으면 기본 칸에 넣는다 —
+    //   새 칸을 만들면 다른 화면(지원사업 · 정책자금 · 서류)이 못 읽고, 조각 복사 · 숫자만 복사도 없었다
+    const target = builtinForLabel(newLabel)
+    const targetEmpty = target ? String((record as unknown as Record<string, unknown>)[target] ?? '').trim() === '' : false
+    if (target && targetEmpty && onEdit && newValue.trim() !== '') {
+      onEdit(target, newValue.trim())
+      const label = fields.find((x) => x.edit === target)?.label ?? newLabel.trim()
+      setRouted({ group, text: `'${label}' 은 기본 칸이라 그 칸에 넣었어요 — 지원사업 · 정책자금 · 서류도 이 값을 읽어요` })
+    } else if (onCustomField && newLabel.trim() !== '') onCustomField({ group, label: newLabel, value: newValue })
     setAddingGroup(null)
     setNewLabel('')
     setNewValue('')
@@ -427,6 +441,22 @@ export function CompanyProfileCard({
                       )}
                     </span>
                   )}
+                  {/* D-309 직접 만든 칸인데 같은 이름의 기본 칸이 비어 있으면 — 한 번 눌러 기본 칸으로(다른 화면도 읽게). 번호 줄을 밀지 않게 따로 한 줄 */}
+                  {editingKey !== f.key && f.custom && f.moveTo && onMoveCustomField && (
+                    <span className="t-meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500 sm:justify-end">
+                      <span className="break-keep">직접 만든 칸이라 다른 화면은 아직 못 읽어요</span>
+                      <button
+                        type="button"
+                        onClick={() => onMoveCustomField(f.custom ?? '', f.moveTo!)}
+                        data-testid="profile-move-builtin"
+                        title="기본 칸으로 옮기면 지원사업 · 정책자금 · 서류 화면도 이 값을 읽어요"
+                        aria-label={`${f.label} 기본 칸으로 옮기기`}
+                        className="tap shrink-0 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-700 hover:border-brand-400"
+                      >
+                        기본 칸으로 옮기기
+                      </button>
+                    </span>
+                  )}
                   {editingKey !== f.key && !f.empty && f.edit && (() => {
                     const note = factNote?.(f.edit)
                     return note ? (
@@ -451,6 +481,12 @@ export function CompanyProfileCard({
             업종마다 챙길 값이 다르다 — 어떤 업체는 공장 등록번호가, 어떤 업체는 세무사
             연락처가 매번 필요하다. 개발을 기다리는 대신 그 자리에서 칸을 만든다.
           */}
+          {routed?.group === g.group && (
+            <p role="status" data-testid="profile-routed" className="t-sub mt-2 flex items-start gap-1 break-keep text-success-700">
+              <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              {routed.text}
+            </p>
+          )}
           {onCustomField && (
             addingGroup === g.group ? (
               <div className="mt-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3">
@@ -494,6 +530,7 @@ export function CompanyProfileCard({
                   setAddingGroup(g.group)
                   setNewLabel('')
                   setNewValue('')
+                  setRouted(null)
                 }}
                 className="tap t-sub mt-2 inline-flex items-center gap-1 font-medium text-slate-500 hover:text-brand-700"
               >

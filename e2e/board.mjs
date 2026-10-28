@@ -756,6 +756,106 @@ check('실제로 지워졌다', left === false)
   check('수금: 이익률은 저장하지 않는다 — 매번 계산한다', !JSON.stringify(fees[0] ?? {}).includes('margin'))
 }
 
+/*
+ * D-309 '+' 로 직접 만든 번호 칸도 조각 · 전체 · 숫자만 복사.
+ * 대표님 실제 상황: 잘못 들어간 사업자등록번호를 지우고 '+' 로 '사업자등록번호' 칸을 새로 만들어 숫자를 쳤더니
+ * 들어가긴 하는데 조각 복사 · 숫자만 복사가 없었다(기본 칸은 비어 있어 다른 화면도 못 읽었다).
+ */
+const readClient = (id) =>
+  page.evaluate((cid) => {
+    const r = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === cid)
+    return r?.payload ? { ...r, ...r.payload } : r
+  }, id)
+const clip = async () => {
+  await page.waitForTimeout(350)
+  return page.evaluate(() => navigator.clipboard.readText())
+}
+{
+  // 이미 '+' 로 만들어 둔 칸(고치기 전 기록) — 그대로 넣어 둔다
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_seon')
+    const t = r.payload ?? r
+    t.businessNumber = ''
+    t.customFields = [
+      { id: 'cf_bn', group: 'identity', label: '사업자등록번호', value: '1248100998' },
+      { id: 'cf_hq', group: 'identity', label: '본사 사업자번호', value: '220-81-62517' },
+      { id: 'cf_fax', group: 'identity', label: '팩스', value: '0415551234' },
+    ]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await page.goto(BASE + '/ops/clients/cli_seon', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const shown = (await page.locator('main').innerText()) ?? ''
+  check('직접 만든 칸: 사업자등록번호가 하이픈 모양으로 보인다', /124\s*-\s*81\s*-\s*00998/.test(shown), shown.slice(0, 200))
+  for (const [seg, label] of [['124', '앞'], ['81', '가운데'], ['00998', '뒤']]) {
+    const btn = page.getByRole('button', { name: `사업자등록번호 ${seg} 만 복사` }).first()
+    check(`직접 만든 칸: ${label} 조각 단추`, (await btn.count()) > 0)
+    if (await btn.count()) {
+      await btn.click()
+      const got = await clip()
+      check(`직접 만든 칸: ${label} 조각만 복사`, got === seg, got)
+    }
+  }
+  const whole = page.getByRole('button', { name: '사업자등록번호 전체 복사' }).first()
+  check('직접 만든 칸: [전체] 단추', (await whole.count()) > 0)
+  if (await whole.count()) {
+    await whole.click()
+    const got = await clip()
+    check('직접 만든 칸: 전체는 하이픈 포함', got === '124-81-00998', got)
+  }
+  const digits = page.getByRole('button', { name: '사업자등록번호 숫자만 복사' }).first()
+  check('직접 만든 칸: [숫자만] 단추', (await digits.count()) > 0)
+  if (await digits.count()) {
+    await digits.click()
+    const got = await clip()
+    check('직접 만든 칸: 숫자만은 하이픈 없이', got === '1248100998', got)
+  }
+  // 기본 칸 이름이 아니어도 '사업자 번호' 이면 같은 복사 · 팩스는 전화 모양
+  check('직접 만든 칸: 다른 이름(본사 사업자번호)도 조각 복사', (await page.getByRole('button', { name: '본사 사업자번호 62517 만 복사' }).count()) > 0)
+  check('직접 만든 칸: 팩스도 하이픈 모양 · 조각 복사', /041\s*-\s*555\s*-\s*1234/.test(shown) && (await page.getByRole('button', { name: '팩스 숫자만 복사' }).count()) > 0, shown.slice(0, 300))
+  // 회사 전체 복사에도 들어간다
+  await page.getByRole('button', { name: '전체 복사', exact: true }).first().click()
+  const all = await clip()
+  check('회사 전체 복사: 직접 만든 사업자등록번호도 하이픈 모양', all.includes('124-81-00998'), all.slice(0, 200))
+  await page.getByRole('button', { name: '숫자만', exact: true }).first().click()
+  const allPlain = await clip()
+  check('회사 전체 숫자만: 직접 만든 번호 칸도 하이픈 없이', allPlain.includes('사업자등록번호: 1248100998') && allPlain.includes('팩스: 0415551234'), allPlain.slice(0, 200))
+
+  // 기본 칸이 비어 있으면 한 번에 옮긴다 — 다른 화면(지원사업 · 정책자금 · 서류)도 읽게
+  const move = page.getByRole('button', { name: '사업자등록번호 기본 칸으로 옮기기' })
+  check('기본 칸으로 옮기기: 단추가 보인다', (await move.count()) === 1)
+  check('기본 칸으로 옮기기: 기본 칸이 아닌 이름에는 없다', (await page.getByRole('button', { name: '본사 사업자번호 기본 칸으로 옮기기' }).count()) === 0)
+  await move.click()
+  await page.waitForTimeout(900)
+  const moved = await readClient('cli_seon')
+  check('기본 칸으로 옮기기: 기본 칸에 들어간다', String(moved?.businessNumber ?? '').replace(/\D/g, '') === '1248100998', JSON.stringify(moved?.businessNumber))
+  check('기본 칸으로 옮기기: 직접 만든 칸은 빠지고 나머지는 그대로', (moved?.customFields ?? []).map((c) => c.label).join(',') === '본사 사업자번호,팩스', JSON.stringify(moved?.customFields))
+  check('기본 칸으로 옮기기: 같은 번호가 두 번 보이지 않는다', [...((await page.locator('main').innerText()) ?? '').matchAll(/124\s*-\s*81\s*-\s*00998/g)].length === 1)
+  check('기본 칸으로 옮기기: 기본 칸도 조각 복사', (await page.getByRole('button', { name: '사업자등록번호 00998 만 복사' }).count()) > 0)
+}
+{
+  // 앞으로: 기본 칸이 비어 있을 때 '+' 로 '사업자 등록번호' 를 만들면 기본 칸으로 들어간다
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: '회사에 칸 추가' }).first().click()
+  await page.waitForTimeout(300)
+  await page.getByLabel('새 칸 이름').fill('사업자 등록번호')
+  await page.getByLabel('새 칸 내용').fill('2208162517')
+  await page.getByRole('button', { name: '넣기', exact: true }).first().click()
+  await page.waitForTimeout(900)
+  const r = await readClient('cli_mirae')
+  check('+ 사업자 등록번호: 기본 칸으로 들어간다', String(r?.businessNumber ?? '').replace(/\D/g, '') === '2208162517' && (r?.customFields ?? []).length === 0, JSON.stringify({ bn: r?.businessNumber, cf: r?.customFields }))
+  check('+ 사업자 등록번호: 기본 칸에 넣었다고 알린다', (await page.getByTestId('profile-routed').count()) === 1)
+  for (const name of ['사업자등록번호 220 만 복사', '사업자등록번호 전체 복사', '사업자등록번호 숫자만 복사']) {
+    check(`+ 사업자 등록번호: '${name}' 단추`, (await page.getByRole('button', { name }).count()) > 0)
+  }
+  await page.getByRole('button', { name: '사업자등록번호 숫자만 복사' }).first().click()
+  check('+ 사업자 등록번호: 숫자만 복사', (await clip()) === '2208162517')
+  const of2 = await page.evaluate(() => ({ d: document.documentElement.scrollWidth, w: window.innerWidth }))
+  check('직접 만든 번호 칸: 가로 넘침 없음(390)', of2.d <= of2.w + 1, `${of2.d} > ${of2.w}`)
+}
+
 await browser.close()
 console.log(`\n목록 바로 고치기 · 계약 단계 · 삭제: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

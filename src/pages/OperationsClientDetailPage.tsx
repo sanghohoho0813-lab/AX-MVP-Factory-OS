@@ -908,6 +908,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
             onCustomField={(field) => void commit(withCustomField(record, field))}
             onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
+            // D-309 직접 만든 '사업자등록번호' 칸 → 비어 있는 기본 칸으로 한 번에(지우기 + 넣기를 한 번 저장)
+            onMoveCustomField={(id, key) => {
+              const c = record.customFields.find((x) => x.id === id)
+              if (c) void commit(withProfileFieldEdit(withoutCustomField(record, id), key, c.value.trim(), nowIso()))
+            }}
             bare
             hideTitle
           />

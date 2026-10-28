@@ -919,7 +919,8 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
               <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[toneOfTemplate(t, goal)].bar}`} />
               <div className="flex flex-wrap items-center gap-1.5" data-testid="thr-lib-card" data-key={t.key}>
                 <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border font-bold ${TONES[toneOfTemplate(t, goal)].solid}`}>{t.key}</span>
-                <h3 className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{t.name}</h3>
+                {/* 태그가 많으면 제목을 짜부라뜨리지 말고 태그가 다음 줄로 — 큰 글자 360 에서 한 줄 2자였다 */}
+                <h3 className="t-body min-w-[8em] flex-1 font-bold break-keep text-slate-900">{t.name}</h3>
                 {t.few && <Badge>표본 적음</Badge>}
                 <GoalTags t={t} />
               </div>

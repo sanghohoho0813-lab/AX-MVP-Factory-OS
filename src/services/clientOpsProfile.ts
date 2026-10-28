@@ -162,6 +162,50 @@ export interface ProfileField {
    * 표준 칸과 달리 **칸 자체를 지울 수 있다** — 표준 칸은 값만 비운다.
    */
   custom?: string
+  /**
+   * D-309: 직접 만든 칸인데 이름이 기본 칸(사업자등록번호 …)이고 그 기본 칸이 비어 있으면 그 칸 이름 —
+   * 화면이 [기본 칸으로 옮기기] 를 보인다(다른 모듈은 기본 칸만 읽는다).
+   */
+  moveTo?: ProfileEditKey
+}
+
+/**
+ * D-309 칸 이름 → 기본 칸. '+' 로 '사업자등록번호' 칸을 새로 만들면 화면에서는 보이지만 지원사업 · 정책자금 · 서류는
+ * 기본 칸만 읽고, 번호 칸의 조각 복사 · 숫자만 복사도 붙지 않았다. 빈칸 · 가운데점은 무시하고 본다.
+ */
+const BUILTIN_ALIASES: [ProfileEditKey, RegExp][] = [
+  ['businessNumber', /^(?:사업자(?:등록)?(?:번호|증|증번호)?|사업자번호)$/],
+  ['corporateNumber', /^법인(?:등록)?번호$/],
+  ['companyPhone', /^(?:회사)?(?:대표번호|대표전화|전화번호|전화)$|^사무실(?:전화|번호)$/],
+  ['contactPhone', /^(?:담당자)?(?:휴대폰|핸드폰|휴대전화)(?:번호)?$/],
+  ['contactEmail', /^(?:이메일|메일|e-?mail)(?:주소)?$/i],
+  ['homepage', /^(?:홈페이지|웹사이트|사이트)(?:주소)?$/],
+  ['businessAddress', /^(?:사업장)?(?:주소|소재지)$|^본점(?:주소|소재지)?$/],
+  ['establishedAt', /^(?:설립일|개업일|개업연월일|설립연월일|회사성립연월일)$/],
+  ['businessCategory', /^업태$/],
+  ['businessItem', /^종목$/],
+  ['representativeName', /^(?:대표자?|대표자명|대표자이름|대표이사)$/],
+]
+
+export function builtinForLabel(label: string): ProfileEditKey | null {
+  const l = label.replace(/[\s·ㆍ.:]/g, '')
+  if (!l) return null
+  return BUILTIN_ALIASES.find(([, re]) => re.test(l))?.[0] ?? null
+}
+
+/**
+ * D-309 직접 만든 칸의 번호 종류 — 이름(사업자 · 법인번호 · 전화 · 휴대폰 · 팩스)이 먼저, 이름으로 모르면 값 모양(313-81-12508 · 010-1234-5678).
+ * 그래야 기본 칸처럼 조각 복사 · 숫자만 복사 · 하이픈 모양 보이기가 붙는다. 주민등록번호 모양은 번호로 다루지 않는다.
+ */
+export function numberKindForCustom(label: string, value: string): NumberKind | undefined {
+  const l = label.replace(/\s/g, '')
+  const v = value.trim()
+  if (/법인(?:등록)?번호/.test(l)) return 'corporate'
+  if (/사업자/.test(l)) return 'business'
+  if (/전화|휴대폰|핸드폰|연락처|팩스|fax/i.test(l)) return 'phone'
+  if (/^\d{3}-\d{2}-\d{5}$/.test(v)) return 'business'
+  if (/^0\d{1,2}-\d{3,4}-\d{4}$/.test(v)) return 'phone'
+  return undefined
 }
 
 /**
@@ -317,15 +361,21 @@ export function profileFields(
   // 대표가 직접 만든 칸은 각 묶음 끝에 붙는다 (표준 칸 사이에 끼우지 않는다)
   for (const c of record.customFields) {
     const raw = c.value.trim()
+    // D-309 번호 칸이면 기본 칸처럼 하이픈 모양 · 조각 복사 · 숫자만 복사
+    const numberKind = numberKindForCustom(c.label, raw)
+    const target = builtinForLabel(c.label)
+    const targetEmpty = target ? String((record as unknown as Record<string, unknown>)[target] ?? '').trim() === '' : false
     out.push({
       key: `custom:${c.id}`,
       label: c.label,
-      value: raw,
+      value: numberKind ? formatNumberOf(numberKind, raw) : raw,
       empty: raw === '',
       copyable: true,
       group: c.group,
       wide: raw.length > 24,
       custom: c.id,
+      ...(numberKind ? { numberKind } : {}),
+      ...(target && targetEmpty && raw !== '' ? { moveTo: target } : {}),
     })
   }
 
