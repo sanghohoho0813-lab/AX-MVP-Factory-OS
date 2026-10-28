@@ -1418,6 +1418,73 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-311 부가세 과세표준증명 → 서류 칸 · 매출 · 정책자금 준비 서류(서류함으로 확보) ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const VAT = {
+    name: 'scan_201.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      [
+        '부가가치세 과세표준증명',
+        '상호(법인명) 한솔테크(주) 사업자등록번호 123-45-67890',
+        '과세기간 2024년 01월 01일 ~ 2026년 06월 30일',
+        '과세기간 신고구분 신고일 과세표준 납부할세액',
+        '2024.01.01~2024.06.30 확정 2024.07.25 100,000,000 5,000,000',
+        '2024.07.01~2024.12.31 확정 2025.01.24 140,000,000 7,000,000',
+        '2025.01.01~2025.06.30 확정 2025.07.25 130,000,000 6,500,000',
+        '2025.07.01~2025.12.31 확정 2026.01.25 154,000,000 7,700,000',
+        '2026.01.01~2026.06.30 확정 2026.07.25 156,000,000 7,800,000',
+        '위와 같이 증명합니다.',
+        '2026년 10월 20일',
+        '대전세무서장',
+      ].join('\n'),
+      'utf8',
+    ),
+  }
+  const pol = () => page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const before = (await pol()) ?? ''
+  check(`D-311 ${vp.tag} 올리기 전: 정책자금이 매출(재무제표 · 크레탑)을 달라고 함`, before.includes('매출(재무제표 · 크레탑)'), before.slice(0, 400))
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([VAT])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-311 ${vp.tag} 스캔 이름이어도 '부가세 과세표준증명' 칸으로`, placed.includes('→ 부가세 과세표준증명'), placed.slice(0, 300))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  const batch = ((await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-311 ${vp.tag} 바로 넣은 정보: 매출 2025년 2억 8,400만원(부가세 과세표준 · 2024년보다 +18%) · 2026년 6개월`, batch.includes('2025년 2억 8,400만원(부가세 과세표준 · 2024년보다 +18%)') && batch.includes('2026년 6개월 1억 5,600만원(작년 같은 기간보다 +20%)'), batch.slice(0, 600))
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const after = (await pol()) ?? ''
+  check(`D-311 ${vp.tag} 정책자금: 매출을 더 달라고 하지 않음 · 준비 서류 줄`, !after.includes('매출(재무제표 · 크레탑)') && /준비 서류 \d+\/\d+ — 아직 /.test(after), after.slice(0, 500))
+  if (vp.tag === '390') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot311-batch-390.png' }).catch(() => {})
+  if (vp.tag === '1440') await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').screenshot({ path: '/tmp/claude-0/shot311-card.png' }).catch(() => {})
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
+  const note = (await page.getByTestId('tool-prefill-note').innerText().catch(() => '')) ?? ''
+  check(`D-311 ${vp.tag} 정책자금 화면: '준비 서류 n가지(서류함)' 채움`, /준비 서류 \d+가지\(서류함\)/.test(note), note.slice(0, 400))
+  // 진단 결과(자료 체크)는 [진단 결과 보기] 를 눌러야 나온다
+  await page.getByRole('button', { name: '진단 결과 보기' }).first().click()
+  await page.waitForTimeout(1200)
+  const main = ((await page.locator('main').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  const vatRow = /부가세과세표준증명원 확보/.test(main) && /사업자등록증 (요청 필요|확보)/.test(main)
+  if (vp.tag === '390') await page.getByText('자료 체크 (부족 자료 자동 탐지)').first().locator('xpath=ancestor::*[.//ul][1]').screenshot({ path: '/tmp/claude-0/shot311-checks-390.png' }).catch(() => {})
+  check(`D-311 ${vp.tag} 정책자금 화면 자료 체크: 부가세과세표준증명원 확보`, vatRow, (main.match(/자료 체크[\s\S]{0,400}/)?.[0] ?? main.slice(0, 200)))
+  check(`D-311 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

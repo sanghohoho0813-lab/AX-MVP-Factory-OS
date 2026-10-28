@@ -39,7 +39,8 @@ import {
   withProfileFieldEdit,
 } from '../customerFacts'
 import { clientFacts } from '../../tools/shared/clientPrefill'
-import { policyBonus, policyEvidence, policyHiring } from '../policyEvidence'
+import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
+import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary } from '../vatDoc'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
@@ -56,7 +57,7 @@ import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
-import { manwonText } from '../clientInsights'
+import { manwonText, policyDocsLine } from '../clientInsights'
 import { loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
@@ -1359,6 +1360,108 @@ await (async () => {
   check('D-310 엔진: 고용 증가를 넘기면 고용창출 자금이 나오고 중진공이 앞으로', tracks(withHire).includes('고용창출') && !tracks(plain).includes('고용창출') && (rankOf(plain) === -1 || rankOf(withHire) < rankOf(plain)), JSON.stringify({ plain: plain.agencies.map((a) => a.name), hire: withHire.agencies.map((a) => a.name) }))
   const ins = buildInsights(grew, T, []).find((i) => i.key === 'policy-funding')
   check('D-310 맞춤 추천 정책자금: 고용 증가 근거가 보인다', !!ins?.detail.includes('고용 증가(2025년 평균 5명 → 2026년 예상 6.5명'), ins?.detail)
+}
+
+// D-311 부가세 과세표준증명 → 해마다 매출 · 정책자금 준비 서류 ↔ 서류함
+{
+  const T = '2026-10-28'
+  const facts = (r: ReturnType<typeof normalizeClientOps>) => clientFacts(r, new Date(`${T}T00:00:00`))
+  // 개인(반기 확정) — 머리의 조회 기간 · 사업자번호 · 주민번호는 행이 아니다 · 2025년 2기는 수정신고가 이긴다
+  const IND = [
+    '발급번호 : 1234-567-8901-234',
+    '부가가치세 과세표준증명',
+    '상호(법인명) 미래상사 사업자등록번호 123-45-67890',
+    '성명(대표자) 홍길동 주민(법인)등록번호 800101-1******',
+    '과세기간 2024년 01월 01일 ~ 2026년 06월 30일',
+    '과세기간 신고구분 신고일 과세표준 납부할세액',
+    '2024.01.01~2024.06.30 확정 2024.07.25 100,000,000 5,000,000',
+    '2024.07.01~2024.12.31 확정 2025.01.24 140,000,000 7,000,000',
+    '2025.01.01~2025.06.30 확정 2025.07.25 130,000,000 6,500,000',
+    '2025.07.01~2025.12.31 확정 2026.01.25 150,000,000 7,500,000',
+    '2025.07.01~2025.12.31 수정신고 2026.03.10 154,000,000 7,700,000',
+    '2026.01.01~2026.06.30 확정 2026.07.25 156,000,000 7,800,000',
+  ].join('\n')
+  const v = readVatCert(IND)
+  check('D-311 부가세: 반기 행 5개(머리 조회 기간 · 번호는 행 아님) · 같은 기간은 수정신고', !!v && v.periods.length === 5 && v.periods.find((p) => p.from === '2025-07')?.base === 154_000_000, JSON.stringify(v?.periods))
+  check('D-311 부가세: 해마다 — 2024 2.4억(다 참) · 2025 2.84억(다 참) · 2026 6개월', JSON.stringify(v?.years.map((y) => [y.year, y.total, y.months, y.full])) === '[[2024,240000000,12,true],[2025,284000000,12,true],[2026,156000000,6,false]]', JSON.stringify(v?.years))
+  check('D-311 부가세: 가장 최근 다 찬 해 2025 · 작년 같은 기간 1.3억', latestFullYear(v!)?.year === 2025 && JSON.stringify(sameMonthsLastYear(v!, 2026)) === '{"cur":156000000,"prev":130000000,"months":6}')
+  const line = vatSummary(v!, formatWon)
+  check('D-311 부가세 요약 한 줄: 2025년 · 2024년보다 +18% · 2026년 6개월 · 작년 같은 기간보다 +20%', line === '2025년 2억 8,400만원(부가세 과세표준 · 2024년보다 +18%) · 2026년 6개월 1억 5,600만원(작년 같은 기간보다 +20%)', line)
+  // 법인(분기 — 예정 · 확정 석 달씩) · 기수만 적힌 줄
+  const CORP = ['부가가치세 과세표준증명', '(단위 : 원)', '2025년 1기 예정 2025-04-25 50,000,000', '2025년 1기 확정 2025-07-25 60,000,000', '2025년 2기 예정 2025-10-27 55,000,000', '2025년 2기 확정 2026-01-26 65,000,000'].join('\n')
+  const c = readVatCert(CORP)
+  check('D-311 부가세(법인 · 기수만): 예정이 있으면 확정은 뒤 석 달 → 2025 2.3억 다 참', JSON.stringify(c?.periods.map((p) => `${p.from}~${p.to}`)) === '["2025-01~2025-03","2025-04~2025-06","2025-07~2025-09","2025-10~2025-12"]' && c?.years[0]?.total === 230_000_000 && c.years[0].full, JSON.stringify(c?.periods))
+  const OVER = ['부가가치세 과세표준증명', '2025.01.01~2025.03.31 예정 2025.04.25 50,000,000', '2025.01.01~2025.06.30 확정 2025.07.25 110,000,000', '2025.07.01~2025.12.31 확정 2026.01.25 120,000,000'].join('\n')
+  const o = readVatCert(OVER)
+  check('D-311 부가세: 예정(1~3월) + 확정(1~6월)이 겹치면 다 찬 해 아님(사람 확인)', !!o && o.years[0].overlap && !o.years[0].full && latestFullYear(o) === null, JSON.stringify(o?.years))
+  check('D-311 부가세: 재무제표 · 서류 목록 글은 부가세 서류 아님', !looksLikeVatCert('재무상태표\n자산총계 1,000,000') && readVatCert('준비 서류: 사업자등록증, 부가세 과세표준증명원, 재무제표') === null)
+  const EX = ['면세사업자 수입금액증명', '2024.01.01~2024.12.31 2025.02.10 88,000,000', '2025.01.01~2025.12.31 2026.02.10 99,000,000'].join('\n')
+  const ex = readVatCert(EX)
+  check('D-311 면세 수입금액증명: 해마다 그대로 · 이름 "면세 수입금액"', ex?.kind === 'exempt' && latestFullYear(ex)?.total === 99_000_000 && vatSummary(ex, formatWon).includes('면세 수입금액 · 2024년보다 +13%'), vatSummary(ex!, formatWon))
+
+  // 분류 — 스캔 이름이어도 제목으로 '부가세 과세표준증명' 칸
+  const base0 = normalizeClientOps({ id: 'vat311', companyName: '미래상사', businessCategory: '도소매', businessItem: '화장품', businessAddress: '대전광역시 서구 1', establishedAt: '2019-05-02', employeeCount: '3', createdAt: NOW, updatedAt: NOW } as never)
+  const pl = placeDocument({ text: IND, fileName: 'scan_201.pdf' }, allDocumentMetas(base0))
+  check('D-311 분류: 스캔 이름 → 새 칸 "부가세 과세표준증명"(확실)', pl.kind === 'new' && pl.label === '부가세 과세표준증명' && pl.sure, JSON.stringify(pl))
+  check('D-311 분류: 새 칸 유효기간 1개월', knownDocValidMonths('부가세 과세표준증명') === 1)
+  check('D-311 발급일: 과세기간(~ 의 앞 · 끝)은 발급일이 아님 · 아래 발급 날짜는 발급일', findIssuedDate(IND) === null && findIssuedDate(`${IND}\n위와 같이 증명합니다.\n2026년 10월 20일\n대전세무서장`) === '2026-10-20')
+
+  // 올리기 → 매출이 비어 있으면 가장 최근 다 찬 해(2025) · 출처 부가세 과세표준증명 · 요약 줄
+  let n = 0
+  const ctx = { now: NOW, today: T, makeId: () => `v${++n}` }
+  const doc = { key: 'customdoc_vat', fileName: 'scan_201.pdf', text: IND, method: 'pdf' as const, docSure: true }
+  const out = await analyzeUploadedDocs(base0, [doc], ctx)
+  const rev = readFact(out.record, 'revenue')
+  check('D-311 올리기: 매출 2.84억 · 2025 · 부가세 과세표준증명', rev?.value === '284000000' && rev.asOf === '2025' && rev.source === 'vatCertificate' && rev.sourceLabel.startsWith('부가세 과세표준증명 2025'), JSON.stringify(rev))
+  const ent = out.summary.entered.find((e) => e.key === 'revenue')
+  check('D-311 올리기: 바로 넣은 정보에 해마다 · 전년 대비 한 줄', ent?.display === line, JSON.stringify(out.summary.entered))
+  // 재무제표 2025 매출이 이미 있으면 묻지도 바꾸지도 않는다 · 2024 값이면 더 최근 해라 묻는다
+  const fs25 = withFactValue(base0, 'revenue', '300000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  const keep = await analyzeUploadedDocs(fs25, [doc], ctx)
+  check('D-311 재무제표 2025 매출이 있으면 그대로 · 확인할 것 없음', readFact(keep.record, 'revenue')?.value === '300000000' && !keep.summary.flagged.some((f) => f.key === 'revenue') && !pendingFacts(keep.record).some((p) => p.key === 'revenue'), JSON.stringify(keep.summary.flagged))
+  const fs24 = withFactValue(base0, 'revenue', '250000000', { source: 'financialStatements', status: 'confirmed', asOf: '2024', now: NOW })
+  const ask = await analyzeUploadedDocs(fs24, [doc], ctx)
+  check('D-311 재무제표 2024 값이면 덮지 않고 2025 값을 물음', readFact(ask.record, 'revenue')?.value === '250000000' && pendingFacts(ask.record).some((p) => p.key === 'revenue' && p.value === '284000000'), JSON.stringify(pendingFacts(ask.record).map((p) => [p.key, p.value])))
+  const overOut = await analyzeUploadedDocs(base0, [{ ...doc, text: OVER }], ctx)
+  check('D-311 기간이 겹치면 매출은 넣지 않고 확인할 정보로', !readFact(overOut.record, 'revenue')?.value && overOut.summary.flagged.some((f) => f.key === 'revenue' && f.note.includes('겹쳐')), JSON.stringify(overOut.summary.flagged))
+
+  // 준비 서류 ↔ 서류함 — 받은 것만 · 기한 지난 것은 빼고 알림 · 컨설팅 계약서는 거래처 계약서가 아님
+  let r = withDocument(base0, 'businessRegistration', { received: true, issuedAt: '2026-01-02', fileName: '사업자등록증.pdf' })
+  r = withCustomDocument(r, { label: '부가세 과세표준증명', validMonths: 1 })
+  const vk = r.customDocuments[r.customDocuments.length - 1].key
+  r = withDocument(r, vk, { received: true, issuedAt: '2026-10-20', fileName: 'scan_201.pdf' })
+  r = withCustomDocument(r, { label: '납세증명서', validMonths: 1 })
+  const nk = r.customDocuments[r.customDocuments.length - 1].key
+  r = withDocument(r, nk, { received: true, issuedAt: '2026-07-01', fileName: '납세.pdf' })
+  r = withCustomDocument(r, { label: '컨설팅 계약서' })
+  r = withDocument(r, r.customDocuments[r.customDocuments.length - 1].key, { received: true, issuedAt: '2026-10-01', fileName: '계약.pdf' })
+  r = withCustomDocument(r, { label: '사업장 임대차계약서' })
+  r = withDocument(r, r.customDocuments[r.customDocuments.length - 1].key, { received: true, issuedAt: '2025-03-01', fileName: '임대차.pdf' })
+  r = withCustomDocument(r, { label: '사업계획서' })
+  const pd = policyDocs(r, T)
+  check('D-311 준비 서류: 사업자등록증 · 부가세 · 임대차 · (빈 사업계획서 칸은 아님) · 컨설팅 계약서는 거래처 계약 아님', JSON.stringify([...pd.have].sort()) === '["bizReg","lease","vat"]', JSON.stringify(pd))
+  // 기한(1개월)이 지난 부가세 증명 — 준비 서류에서 빼고 알림 · 다시 받은 '(2)' 가 있으면 그대로
+  let old = withCustomDocument(base0, { label: '부가세 과세표준증명', validMonths: 1 })
+  old = withDocument(old, old.customDocuments[0].key, { received: true, issuedAt: '2026-08-01', fileName: 'vat_old.pdf' })
+  const po = policyDocs(old, T)
+  check('D-311 준비 서류: 기한 지난 부가세 증명은 빼고 알림', !po.have.includes('vat') && po.expired.join() === '부가세 과세표준증명', JSON.stringify(po))
+  check('D-311 진단 근거: "기한 지난 서류: 부가세 과세표준증명 — 새로 받기"', policyEvidence(old, facts(old), T).notes.includes('기한 지난 서류: 부가세 과세표준증명 — 새로 받기'))
+  let renewed = withCustomDocument(old, { label: '부가세 과세표준증명 (2)', validMonths: 1 })
+  renewed = withDocument(renewed, renewed.customDocuments[1].key, { received: true, issuedAt: '2026-10-21', fileName: 'vat_new.pdf' })
+  const pr = policyDocs(renewed, T)
+  check('D-311 준비 서류: 다시 받은 (2) 가 기한 안이면 확보 · 알림 없음', pr.have.includes('vat') && pr.expired.length === 0, JSON.stringify(pr))
+  const ev = policyEvidence(r, facts(r), T)
+  check('D-311 진단 입력 haveDocs', JSON.stringify([...(ev.input.haveDocs ?? [])].sort()) === '["bizReg","lease","vat"]', JSON.stringify(ev))
+  const inp = { ...policyInputFromFacts(facts(r)).input, ...ev.input }
+  const checks = runDiagnosis(inp).documentChecks ?? []
+  const st = (l: string) => checks.find((x) => x.label.startsWith(l))?.status
+  check('D-311 엔진 자료 체크: 서류함에 있는 사업자등록증 · 부가세 과세표준증명원 = 확보 · 사업계획서 = 요청 필요', st('사업자등록증') === '확보' && st('부가세과세표준증명원') === '확보' && st('사업계획서') === '요청 필요', JSON.stringify(checks))
+  const plain = runDiagnosis(policyInputFromFacts(facts(r)).input).documentChecks ?? []
+  check('D-311 엔진: 서류함을 넘기기 전에는 사업자등록증도 요청 필요였다', plain.find((x) => x.label.startsWith('사업자등록증'))?.status === '요청 필요')
+  check('D-311 준비 서류 줄: "준비 서류 3/12 — 아직 …" 꼴 · 괄호 설명은 뺌', /^준비 서류 \d+\/\d+ — 아직 [^()]+$/.test(policyDocsLine(checks, true)) && policyDocsLine(checks, false) === '' && policyDocsLine([{ label: '사업자등록증', status: '확보' }], true) === '준비 서류 1/1 — 다 있어요', policyDocsLine(checks, true))
+  const ins = buildInsights(r, T, []).find((i) => i.key === 'policy-funding')
+  check('D-311 맞춤 추천 정책자금: 준비 서류 줄이 보인다', !!ins?.detail.includes('준비 서류 '), ins?.detail)
+  check('D-311 서류함이 비면 준비 서류 줄 없음', !(buildInsights(base0, T, []).find((i) => i.key === 'policy-funding')?.detail ?? '').includes('준비 서류'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

@@ -642,7 +642,7 @@ export default function ResultCard({
                 }`}
               >
                 <span
-                  className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] font-bold ${
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
                     d.status === "확보"
                       ? "border-green-400 bg-green-500 text-white"
                       : "border-amber-400 text-amber-500"
@@ -650,9 +650,10 @@ export default function ResultCard({
                 >
                   {d.status === "확보" ? "✓" : "!"}
                 </span>
-                {d.label}
+                {/* 이름이 길면 이름이 줄을 바꾸고 '요청 필요' 는 한 줄로(휴대폰에서 '요청 / 필요' 로 쪼개졌다) */}
+                <span className="min-w-0 break-keep">{d.label}</span>
                 <span
-                  className={`ml-auto text-xs font-semibold ${
+                  className={`ml-auto shrink-0 whitespace-nowrap text-xs font-semibold ${
                     d.status === "확보" ? "text-green-600" : "text-amber-600"
                   }`}
                 >

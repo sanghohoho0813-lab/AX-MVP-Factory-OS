@@ -118,6 +118,16 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
   return { key: 'grants', label: '지원사업', tone: 'no', headline: '지역 · 업력 · 업종까지 맞는 공고가 지금은 없어요', detail: '새 공고가 들어오면(매일 아침 9시) 여기에 바로 보여요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
 }
 
+/** D-311 '준비 서류 9/14 — 아직 사업계획서, 매출 증빙, 임대차계약서 외 2' (괄호 설명은 빼고 짧게) */
+export function policyDocsLine(checks: readonly { label: string; status: string }[], show: boolean): string {
+  if (!show || !checks.length) return ''
+  const short = (l: string) => l.replace(/\s*\(.*\)\s*$/, '')
+  const need = checks.filter((c) => c.status === '요청 필요').map((c) => short(c.label))
+  const head = `준비 서류 ${checks.length - need.length}/${checks.length}`
+  if (!need.length) return `${head} — 다 있어요`
+  return `${head} — 아직 ${need.slice(0, 3).join(', ')}${need.length > 3 ? ` 외 ${need.length - 3}` : ''}`
+}
+
 const policyInsight: Provider = ({ record, facts, today }) => {
   const { input, missing, assumed } = policyInputFromFacts(facts)
   // D-306 서류함의 납세증명서 · 완납증명서 → 체납 '없음'(미확인이면 엔진이 '높음' 을 막는다) · 자본잠식 → 부채비율 '높음'
@@ -132,6 +142,8 @@ const policyInsight: Provider = ({ record, facts, today }) => {
   const tone: InsightTone = level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no'
   const why = r.headline?.reasons[0] ?? r.nextAction
   const more = [missing.includes('매출') ? '매출' : '', noHeadcount ? '직원 수' : ''].filter(Boolean)
+  // D-311 준비 서류 — 서류함에 있는 것은 '확보'. 서류함에 하나라도 있을 때만(새 업체에 '1/14' 를 보이지 않게)
+  const docsLine = policyDocsLine(r.documentChecks ?? [], (ev.input.haveDocs ?? []).length > 0)
   return {
     key: 'policy-funding',
     label: '정책자금',
@@ -140,7 +152,10 @@ const policyInsight: Provider = ({ record, facts, today }) => {
     detail: [
       more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
       ...ev.notes.slice(0, 3),
-    ].join(' · '),
+      docsLine,
+    ]
+      .filter(Boolean)
+      .join(' · '),
     missing: [
       ...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []),
       ...(noHeadcount ? ['직원 수(4대보험 가입자 명부)'] : []),

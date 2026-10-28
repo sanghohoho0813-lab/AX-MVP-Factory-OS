@@ -14,6 +14,7 @@ import { readBusinessNumber } from './bizNoRead'
 import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
+import { latestFullYear, looksLikeVatCert, readVatCert } from './vatDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -55,6 +56,16 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'financialStatements', asOf: f.year ?? '', ref })
     }
     return out
+  }
+  // D-311 부가세 과세표준증명 · 면세 수입금액증명 → 가장 최근 '다 찬 해'(1~12월 · 겹침 없음) 매출
+  if (looksLikeVatCert(text)) {
+    const vat = readVatCert(text)
+    const full = vat ? latestFullYear(vat) : null
+    if (full) {
+      out.push({ key: 'revenue', value: String(full.total), source: 'vatCertificate', asOf: String(full.year), ref })
+      return out
+    }
+    if (vat) return out
   }
   const cert = parseCertificateDocument(text)
   if (cert) {

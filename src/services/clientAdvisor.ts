@@ -20,7 +20,7 @@ import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { usableFactValue } from './customerFacts'
-import { buildInsights, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
+import { buildInsights, policyDocsLine, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
 import { pendingFacts } from './customerFacts'
 
 export interface AdvisorQuestion {
@@ -198,9 +198,13 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     a.verdict = { tone: level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no', text: `진행 가능성 ${level}${noHeadcount ? ' (직원 수 모름 — 소상공인으로 가정)' : ''}` }
     a.facts = [...profileLines(ctx.record, f).slice(0, 4), ...ev.notes.map((x) => `서류: ${x}`), ...(noHeadcount ? ['가정: 직원 수를 몰라 1~4명(소상공인)으로 계산 — 4대보험 명부로 확인하면 소진공 해당 여부까지 정확해요'] : []), ...(r.headline?.reasons ?? []).slice(0, 2).map((x) => `판단 이유: ${x}`), ...(r.headline?.checks ?? []).slice(0, 2).map((x) => `확인 필요: ${x}`)]
     a.steps = [...r.agencies.slice(0, 3).map((ag) => `${ag.rank}순위 ${ag.name}${ag.reasons[0] ? ` — ${ag.reasons[0]}` : ''}`), r.nextAction ? `다음: ${r.nextAction}` : ''].filter(Boolean)
-    a.docs = r.documents.slice(0, 8)
+    // D-311 서류함에 있는 준비 서류는 빼고 — 아직 받을 것만
+    const checks = r.documentChecks ?? []
+    const haveAny = (ev.input.haveDocs ?? []).length > 0
+    a.docs = haveAny ? checks.filter((c) => c.status === '요청 필요').map((c) => c.label.replace(/\s*\(.*\)\s*$/, '')).slice(0, 8) : r.documents.slice(0, 8)
+    if (haveAny) a.facts.push(`서류: ${policyDocsLine(checks, true)}`)
     a.missing = [...(missing.includes('매출') ? ['매출(재무제표 · 크레탑) — 알면 기관 · 한도가 더 정확해요'] : []), ...(ev.want.length ? [`체납 확인 — ${ev.want.join(' · ')}(없으면 가능성 '높음' 이 나오지 않아요)`] : [])]
-    a.copyText = [`[정책자금 1차 검토] ${name(ctx.record)}`, `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`, ...a.steps.map((s) => `· ${s}`), a.docs.length ? `준비 서류: ${a.docs.join(', ')}` : ''].filter(Boolean).join('\n')
+    a.copyText = [`[정책자금 1차 검토] ${name(ctx.record)}`, `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`, ...a.steps.map((s) => `· ${s}`), a.docs.length ? `${haveAny ? '아직 받을 서류' : '준비 서류'}: ${a.docs.join(', ')}` : ''].filter(Boolean).join('\n')
     return a
   },
   grants: (ctx) => {

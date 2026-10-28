@@ -153,6 +153,22 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /4대\s*보험|완납/,
   },
   {
+    // D-311: 정책자금 · 지원사업에 거의 늘 내는 매출 증명 — 해마다 매출을 읽는다(services/vatDoc.ts). 기관들은 보통 발급 1개월 안을 받는다
+    label: '부가세 과세표준증명',
+    validMonths: 1,
+    signals: [
+      { re: /부가가치세\s*과세표준\s*증명|부가세\s*과세표준\s*증명/, weight: 3, say: "제목 '부가가치세 과세표준증명'" },
+      { re: /과세\s*표준\s*증명/, weight: 2, say: "'과세표준증명'" },
+    ],
+    nameHint: /과세\s*표준|부가세|부가가치세/,
+  },
+  {
+    label: '면세사업자 수입금액증명',
+    validMonths: 1,
+    signals: [{ re: /면세\s*사업자\s*수입\s*금액\s*증명|수입\s*금액\s*증명/, weight: 3, say: "제목 '수입금액증명'" }],
+    nameHint: /수입\s*금액/,
+  },
+  {
     label: '재무제표',
     signals: [{ re: /재무제표|재무상태표|손익계산서/, weight: 3, say: "'재무제표'" }],
     nameHint: /재무제표|재무상태표|손익/,
@@ -257,7 +273,13 @@ export function findIssuedDate(text: string): string | null {
   const w = validityWindow(text)
   const body = w ? `${text.slice(0, w.start)} ${text.slice(w.end)}` : text
   const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
+  // D-311 '2024년 01월 01일 ~ 2026년 06월 30일' 같은 기간의 앞 · 끝 날짜는 발급일이 아니다(부가세 과세표준증명의 과세기간이 발급일로 읽혀 바로 '기한 지남' 이 됐다)
+  const inRange = (m: RegExpMatchArray) => {
+    const at = m.index ?? 0
+    return /^\s*[~∼〜～]/.test(body.slice(at + m[0].length, at + m[0].length + 4)) || /[~∼〜～]\s*$/.test(body.slice(Math.max(0, at - 4), at))
+  }
   for (let i = all.length - 1; i >= 0; i -= 1) {
+    if (inRange(all[i])) continue
     const d = parseKoreanDate(all[i][0])
     if (d && plausible(d)) return d
   }

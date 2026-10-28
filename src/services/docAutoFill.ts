@@ -15,7 +15,7 @@
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
-import { pendingFacts, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
+import { pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
@@ -98,6 +98,18 @@ function agreedFacts(docs: readonly ReadDoc[]): Set<string> {
   return new Set([...seen].filter(([, s]) => s.size >= 2).map(([k]) => k))
 }
 
+/**
+ * D-311 부가세 과세표준증명 매출은 재무제표 · 크레탑 · 직접 적은 매출에 밀린다 — 같은 해이거나 더 최근 해 값이 이미 있으면(연도를 모르는 값도) 묻지 않는다.
+ * 부가세 서류끼리면(다시 받은 증명) 다르면 묻는다.
+ */
+function vatYields(record: ClientOpsRecord, year: string): boolean {
+  const f = readFact(record, 'revenue')
+  if (!f || f.status === 'missing') return false
+  if (f.source === 'vatCertificate') return false
+  const y = /^(\d{4})/.exec(f.asOf)?.[1]
+  return !y || Number(y) >= Number(year)
+}
+
 /** 올린 서류들 → 바로 넣기 · 확인 필요 */
 export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string): AutoFillOutcome {
   let rec = record
@@ -117,7 +129,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
-    })
+    }).filter((c) => !(c.key === 'revenue' && c.source === 'vatCertificate' && vatYields(rec, c.asOf)))
     if (found.length === 0) return
     rec = withFactCandidates(rec, found, now, makeId)
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')

@@ -12,18 +12,22 @@
  * D-310 고용 — 4대보험 명부 진단이 센 인원(작년 매월 말 평균 → 올해)이 늘었으면 강점 '고용증가', 청년 직원이 있으면 청년 고용 '있음'.
  *  엔진은 이것으로 '고용창출' 자금을 꺼내고 중진공 쪽 점수를 올린다(서비스 6명 · 매출 4억 업체: 1순위 지역신용보증재단 → 중진공).
  *  명부가 400일보다 오래됐으면 쓰지 않고 새로 받으라고만 알린다.
+ *
+ * D-311 준비 서류 — 정책자금 엔진의 '자료 체크'(사업자등록증 · 재무제표 · 부가세 과세표준증명원 · 사업계획서 …)는 입력만 보고
+ *  거의 다 '요청 필요' 라고 했다. 서류함에 있는 서류(칸 이름 · 만료 안 됨)를 엔진에 넘겨 '확보' 로 본다.
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { ClientFacts } from '../tools/shared/clientPrefill'
 import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
+import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, usableFactValue } from './customerFacts'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
-  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment'>>
+  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment' | 'haveDocs'>>
   /** 무엇으로 채웠는지 한 줄씩 */
   notes: string[]
   /** 받으면 확인되는 서류(있으면 더 정확) */
@@ -107,6 +111,10 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   if (hire && hire.youth > 0) input.youthEmployment = '있음'
   if (hire?.line) (hire.grew || hire.youth > 0 ? front : notes).push(hire.line)
   notes.unshift(...front)
+  // D-311 서류함에 있는 준비 서류 → 엔진 자료 체크 '확보'
+  const docs = policyDocs(record, today)
+  if (docs.have.length) input.haveDocs = docs.have
+  if (docs.expired.length) notes.push(`기한 지난 서류: ${docs.expired.join(', ')} — 새로 받기`)
   // 근거 줄은 ' · ' 로 이어 보이므로 목록은 쉼표로 — 만료는 따로 한 줄(가점 목록에 섞여 보이지 않게)
   if (bonus.expired.length) notes.push(`만료라 가점에서 뺀 인증: ${bonus.expired.join(', ')}`)
   return { input, notes, want }
@@ -133,6 +141,56 @@ export function policyHiring(record: ClientOpsRecord, today: string): { grew: bo
   if (hc.cur.total > hc.prev.total) return { grew: true, youth, line: `고용 증가(${p} → ${c}${y}${partial}) — 고용창출 자금 대상` }
   if (hc.cur.total < hc.prev.total) return { grew: false, youth, line: `직원이 줄었어요(${p} → ${c}) — 고용 유지 조건이 있는 자금은 확인` }
   return youth > 0 ? { grew: false, youth, line: `청년 직원 ${youth}명(4대보험 명부)` } : null
+}
+
+/**
+ * D-311 정책자금 준비 서류(document-library.json key) ↔ 서류함 칸. 칸 이름은 띄어쓰기를 빼고 본다.
+ * 거래처 계약서는 '거래 · 공급 · 납품 · 발주 · 구매' 가 붙은 것만(컨설팅 계약서 · 임대차계약서가 섞이지 않게).
+ */
+const POLICY_DOC_RULES: [string, (key: string, label: string) => boolean][] = [
+  ['bizReg', (k, l) => k === 'businessRegistration' || /^사업자등록증/.test(l)],
+  ['financial', (k, l) => k === 'financialStatements' || /재무제표|재무상태표|손익계산서/.test(l)],
+  ['vat', (_k, l) => /과세표준증명|부가(?:가치)?세.*증명|면세.*수입금액증명/.test(l)],
+  ['insuranceList', (k, l) => k === 'payrollRoster' || /가입자명부|피보험자명부/.test(l)],
+  ['bizPlan', (_k, l) => /사업계획서/.test(l)],
+  ['quote', (_k, l) => /견적서/.test(l)],
+  ['machinePhoto', (_k, l) => /(?:기계|설비|장비).*사진/.test(l)],
+  ['factoryPhoto', (_k, l) => /(?:공장|사업장|매장|작업장).*사진/.test(l)],
+  ['clientContract', (_k, l) => /(?:거래|공급|납품|구매).*계약서|발주서/.test(l) && !/임대차|컨설팅|용역/.test(l)],
+  ['patentCert', (_k, l) => /특허/.test(l)],
+  ['labCert', (_k, l) => /연구소|연구개발전담부서/.test(l)],
+  ['bizCert', (_k, l) => /벤처기업|이노비즈|메인비즈|여성기업|사회적기업|기술혁신형|경영혁신형/.test(l)],
+  ['corpRegistry', (k, l) => k === 'corporateRegistry' || /법인등기/.test(l)],
+  ['shareholders', (_k, l) => /주주명부/.test(l)],
+  ['lease', (_k, l) => /임대차/.test(l)],
+  ['ownDeed', (_k, l) => /(?:건물|부동산|사업장|토지).*등기/.test(l)],
+  ['exportProof', (_k, l) => /수출실적/.test(l)],
+  ['idCard', (k, l) => k === 'representativeId' || /신분증/.test(l)],
+  ['salesEvidence', (_k, l) => /세금계산서|카드매출|POS|매출(?:내역|명세|정산)|정산내역/i.test(l)],
+]
+
+/** 서류함에 있는(받음 · 기한 안) 정책자금 준비 서류 key · 기한이 지난 서류 이름 */
+export function policyDocs(record: ClientOpsRecord, today: string): { have: string[]; expired: string[] } {
+  const have = new Set<string>()
+  const expired: string[] = []
+  for (const m of allDocumentMetas(record)) {
+    const st = record.documents?.[m.key]
+    if (!st || !(st.received || st.fileName)) continue
+    const label = m.label.replace(/\s+/g, '')
+    const hits = POLICY_DOC_RULES.filter(([, ok]) => ok(m.key, label)).map(([k]) => k)
+    if (!hits.length) continue
+    if (documentStatus(m.key, { ...st, received: true }, today, m).expired) {
+      expired.push(m.label)
+      continue
+    }
+    for (const h of hits) have.add(h)
+  }
+  // 같은 서류가 다시 받은 칸('(2)')에 유효하면 기한 지남 목록에서 뺀다
+  const fresh = (name: string) => {
+    const base = name.replace(/\s*\(\d+\)$/, '').replace(/\s+/g, '')
+    return POLICY_DOC_RULES.filter(([, ok]) => ok('', base)).every(([k]) => have.has(k))
+  }
+  return { have: [...have], expired: [...new Set(expired.filter((e) => !fresh(e)).map((e) => e.replace(/\s*\(\d+\)$/, '')))] }
 }
 
 const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소' }

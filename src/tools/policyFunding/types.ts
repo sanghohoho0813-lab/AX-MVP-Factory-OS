@@ -163,6 +163,8 @@ export interface DiagnosisInput {
   interestCoverage?: CoverageStatus; // 이자보상배수 상태
   leaseReady?: YesNoUnknown; // 임대차계약서 보유
   salesEvidenceReady?: YesNoUnknown; // 매출 증빙 가능
+  // D-311 업체 서류함에 이미 있는 자료(knowledge/document-library.json 의 key) — 업체로 열면 채운다. 자료 체크가 '확보' 로 본다
+  haveDocs?: string[];
 }
 
 export interface AgencyRecommendation {

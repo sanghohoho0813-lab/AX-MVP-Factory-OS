@@ -87,9 +87,11 @@ function isSecured(hint: string | null, p: Profile): boolean {
 
 export function checkDocuments(profile: Profile): DocumentCheck[] {
   const out: DocumentCheck[] = [];
+  // D-311 업체 서류함에 있는 자료는 입력과 상관없이 '확보'
+  const have = new Set(profile.input.haveDocs ?? []);
   for (const d of LIB) {
     if (!isNeeded(d.condition, profile)) continue;
-    const secured = isSecured(d.haveHint, profile);
+    const secured = have.has(d.key) || isSecured(d.haveHint, profile);
     out.push({
       label: d.label,
       status: secured ? "확보" : "요청 필요",

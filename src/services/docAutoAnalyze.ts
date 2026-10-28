@@ -29,6 +29,7 @@ import { readRegistryTax, readRetireMultiple } from './registryTax'
 import { ASSUMPTIONS } from './taxPlan'
 import { detectDocSource } from './koreanDocParser'
 import { parseFinancialStatement } from './finStatementParser'
+import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
 
 export interface DocBatchSummary {
   files: number
@@ -281,6 +282,15 @@ export async function analyzeUploadedDocs(
     entered.push({ key: `taxProfile.${key}`, label, display, fileName })
   }
   for (const d of factDocs) {
+    // D-311 부가세 과세표준증명 · 면세 수입금액증명 — 매출은 1번(회사 정보)에서 넣었다. 여기서는 넣은 줄에 해마다 · 전년 대비를 붙인다
+    const vat = looksLikeVatCert(d.text, d.fileName) ? readVatCert(d.text) : null
+    if (vat) {
+      const line = vatSummary(vat, formatWon)
+      const at = entered.findIndex((e) => e.key === 'revenue' && e.fileName === d.fileName)
+      if (at >= 0) entered[at] = { ...entered[at], display: line }
+      else if (!latestFullYear(vat)) flagged.push({ key: 'revenue', label: '매출', display: line, fileName: d.fileName, note: vat.years.some((y) => y.overlap) ? '신고 기간이 겹쳐 해마다 더하지 못했어요 — 서류를 보고 매출을 적어 주세요' : '1~12월이 다 있는 해가 없어 매출로 넣지 않았어요' })
+      continue
+    }
     const isRegistry = d.key === 'corporateRegistry' || detectDocSource(d.text) === 'corporate_registry'
     const reg = isRegistry ? readRegistryTax(d.text, rec.representativeName) : null
     if (reg) {

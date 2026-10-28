@@ -231,6 +231,12 @@ function DiagnosisScreen() {
         filled.push('강점 고용 증가(4대보험 명부)')
       }
       put('youthEmployment', '청년 고용 있음(4대보험 명부)')
+      // D-311 서류함에 있는 준비 서류 → 자료 체크 '확보' — 사람이 고르는 칸이 아니라 늘 지금 서류함대로
+      const docs = ev.input.haveDocs ?? []
+      if (docs.join() !== (next.haveDocs ?? []).join()) {
+        next.haveDocs = docs
+        if (docs.length) filled.push(`준비 서류 ${docs.length}가지(서류함)`)
+      }
       // D-307 가점(특허 · 연구소 · 벤처 · 이노비즈 …) — 아직 아무것도 고르지 않았을 때만
       if (ev.input.bonusItems?.length && isUntouched('bonusItems') && (next.bonusItems ?? []).filter((b) => b !== '없음').length === 0) {
         next.bonusItems = ev.input.bonusItems
