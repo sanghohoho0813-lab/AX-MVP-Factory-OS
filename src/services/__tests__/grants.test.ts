@@ -24,7 +24,7 @@ import {
   type GrantRules,
   type Range,
 } from '../grants/grantMatch'
-import { missingForMatch, profileOfRecord } from '../grants/grantProfile'
+import { credentialsOf, missingForMatch, profileOfRecord } from '../grants/grantProfile'
 import { DEFAULT_GRANT_FILTER, amountOf, eventWord, factsOf, judgeGrant, manText, normalizeFilter, slotsOf, type GrantFilterSettings } from '../grants/grantFilter'
 import {
   EMPLOYEE_CHIPS,
@@ -1012,6 +1012,23 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('D211 알림 보낸 날은 로컬 날짜(한국 오전 8시 30분 보낸 것 = 그날)', sentAt([{ clientId: 'a', noticeIds: ['n'], at: '2026-10-15T23:30:00.000Z', via: 'kakao' } as never], 'a', 'n') === '2026-10-16')
   if (prevTz === undefined) delete process.env.TZ
   else process.env.TZ = prevTz
+}
+
+// D-308 인증 — 회사 정보 글 + 올린 인증서(cf:…) · 만료는 빼고(정책자금 가점 D-307 과 같은 규칙)
+{
+  const T = '2026-10-28'
+  const rec = (fv: Record<string, string>) => normalizeClientOps({ id: 'cr308', companyName: '인증테스트', factValues: fv } as never)
+  const up = credentialsOf(rec({ 'cf:벤처기업': '확인번호 V-1 · 확인일 2025-01-02 · 2028-01-01까지' }), T)
+  check('D-308 올린 벤처기업확인서(유효) → 벤처 · 인증을 앎(예전: 글만 읽어 모름)', up.certs.includes('venture') && up.known, JSON.stringify(up))
+  const old = credentialsOf(rec({ certifications: '벤처기업, 이노비즈', 'cf:벤처기업': '확인일 2021-01-01 · 2024-01-01까지' }), T)
+  check('D-308 올린 인증서가 만료면 글에 "벤처" 가 있어도 뺌 · 이노비즈는 그대로', !old.certs.includes('venture') && old.certs.includes('innobiz') && old.expired.includes('venture'), JSON.stringify(old))
+  const renewed = credentialsOf(rec({ 'cf:벤처기업': '2024-01-01까지', 'cf:벤처기업 (2)': '2028-01-01까지' }), T)
+  check('D-308 옛 인증서는 만료여도 새 인증서가 유효하면 벤처 그대로', renewed.certs.includes('venture') && !renewed.expired.includes('venture'), JSON.stringify(renewed))
+  check('D-308 연구소 "없음" 은 연구소가 아님(예전: 글만 있으면 연구소로 셈)', !credentialsOf(rec({ researchLab: '없음' }), T).certs.includes('lab'))
+  check('D-308 연구개발전담부서도 연구소 조건(lab)', credentialsOf(rec({ researchLab: '연구개발전담부서(2025 인정)' }), T).certs.includes('lab'))
+  const p = profileOfRecord(rec({ 'cf:여성기업': '확인일 2025-03-01 · 2028-02-28까지' }), T)
+  check('D-308 업체 → 매칭 조건: 올린 여성기업확인서 → women', p.certs.includes('women') && p.certsKnown, JSON.stringify(p.certs))
+  check('D-308 벤처 대상 공고: 올린 확인서로 맞음 · 만료면 안 맞음', verdictOf({ certs: ['venture'] }, { certs: up.certs, certsKnown: up.known }) === 'fit' && verdictOf({ certs: ['venture'] }, { certs: old.certs, certsKnown: old.known }) === 'no')
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

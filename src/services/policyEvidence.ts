@@ -131,14 +131,15 @@ export function policyBonus(record: ClientOpsRecord, today: string): { items: Bo
   for (const r of BONUS_RULES) {
     const fromText =
       r.item === '특허 보유' ? !!text.patents && !NONE.test(text.patents.trim()) : r.item === '기업부설연구소 보유' ? !!text.lab && !NONE.test(text.lab.trim()) && r.text.test(text.lab) : r.text.test(text.certs)
-    const cert = certs.find((c) => r.cert.test(c.name))
-    const until = cert ? /(\d{4}-\d{2}-\d{2})\s*까지/.exec(cert.value)?.[1] : undefined
-    // 올린 인증서가 만료면 회사 정보 글에 적혀 있어도 빼고 알린다(글은 예전에 적은 것일 수 있다)
-    if (cert && until && until < today) {
-      expired.push(`${cert.name}(${until}까지)`)
+    // 같은 인증서가 여럿이면(다시 받은 것 '(2)') 하나라도 유효하면 그대로 — 모두 만료면 글에 적혀 있어도 빼고 알린다
+    const untilOf = (v: string) => /(\d{4}-\d{2}-\d{2})\s*까지/.exec(v)?.[1]
+    const matching = certs.filter((c) => r.cert.test(c.name.replace(/\s*\(\d+\)$/, '')))
+    const valid = matching.filter((c) => !((untilOf(c.value) ?? '9999') < today))
+    if (matching.length && !valid.length) {
+      expired.push(`${matching[0].name.replace(/\s*\(\d+\)$/, '')}(${matching.map((c) => untilOf(c.value)).sort().pop()}까지)`)
       continue
     }
-    if (fromText || cert) items.push(r.item)
+    if (fromText || valid.length) items.push(r.item)
   }
   return { items, expired }
 }

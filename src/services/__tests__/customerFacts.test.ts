@@ -1313,6 +1313,8 @@ await (async () => {
   check('D-307 올린 인증서: 메인비즈(유효) 넣고 · 여성기업(만료) 빼고 알림', c.items.includes('메인비즈') && !c.items.includes('여성기업') && c.expired.some((x) => x.startsWith('여성기업(2025-01-01')), JSON.stringify(c))
   const stale = normalizeClientOps({ ...rich, factValues: { ...rich.factValues, 'cf:벤처기업': '확인일 2021-01-01 · 2024-01-01까지' } } as never)
   check('D-307 인증서가 만료면 회사 정보 글에 "벤처" 가 있어도 뺌', !policyBonus(stale, T).items.includes('벤처기업'))
+  const renewed = normalizeClientOps({ ...stale, factValues: { ...stale.factValues, 'cf:벤처기업 (2)': '확인일 2025-01-01 · 2028-01-01까지' } } as never)
+  check('D-307 옛 확인서가 만료여도 다시 받은 확인서(2)가 유효하면 벤처 가점 그대로', policyBonus(renewed, T).items.includes('벤처기업') && !policyBonus(renewed, T).expired.length, JSON.stringify(policyBonus(renewed, T)))
   const noLab = withFactValue(base, 'researchLab', '없음', { source: 'meeting', status: 'entered', now: NOW })
   const deptOnly = withFactValue(base, 'researchLab', '연구개발전담부서', { source: 'meeting', status: 'entered', now: NOW })
   check('D-307 연구소 "없음" · 전담부서만이면 연구소 가점 아님', !policyBonus(noLab, T).items.includes('기업부설연구소 보유') && !policyBonus(deptOnly, T).items.includes('기업부설연구소 보유'))
