@@ -32,6 +32,7 @@ import { getTaxCreditEstimate } from '../tools/labcare/lib/taxCredit'
 import type { Client as LabClient } from '../tools/labcare/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { policyAssumption, policyEvidence } from './policyEvidence'
 import { judge, VERDICT_LABEL } from '../tools/startupTax/lib/judgement'
 
 export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire'
@@ -367,7 +368,7 @@ function startupBlock(record: ClientOpsRecord, facts: ClientFacts, today: string
 /* 정책자금 — 가점 힌트(대출이라 합계에 넣지 않음)                           */
 /* ------------------------------------------------------------------ */
 
-function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId): PlanBlock {
+function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId, today: string): PlanBlock {
   const { input, missing } = policyInputFromFacts(facts)
   const needs = [need('업종', facts.industryText), need('설립일(업력)', facts.establishedAt), need('매출', facts.revenue && !facts.revenue.estimated ? man(facts.revenue.won) : '')]
   const hiring = id !== 'lab-start'
@@ -376,10 +377,14 @@ function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId): P
   const base = { key: 'policy' as const, label: '정책자금', won: 0, laterWon: 0, amount: '', needs, openPath, openLabel: '정책자금 진단에서 이어서' }
   const core = missing.filter((m) => m !== '매출')
   if (core.length) return { ...base, state: 'need', headline: `${core.join(' · ')}을(를) 받으면 정책자금도 같이 봐요`, lines: [], assumptions: [] }
+  // D-312 맞춤 추천 카드와 같은 근거(서류함) 위에 이 상황의 가정 — 연구소 상황은 가점에 연구소를 더한다
+  const ev = policyEvidence(record, facts, today)
+  const bonus = [...new Set([...(ev.input.bonusItems ?? []), ...(input.bonusItems ?? []), '기업부설연구소 보유' as const])]
   const r = runDiagnosis({
     ...input,
+    ...ev.input,
     purpose: '운전자금',
-    ...(hiring ? { hiringPlan: '있음' as const, ...(youth ? { youthEmployment: '예정' as const } : {}) } : { bonusItems: [...(input.bonusItems ?? []), '기업부설연구소 보유' as const] }),
+    ...(hiring ? { hiringPlan: '있음' as const, ...(youth ? { youthEmployment: '예정' as const } : {}) } : { bonusItems: bonus }),
   })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
   return {
@@ -391,7 +396,7 @@ function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId): P
       ...(r.headline?.reasons ?? []).slice(0, 1),
       r.nextAction,
     ].filter(Boolean),
-    assumptions: ['정책자금은 갚는 돈(대출 · 보증)이라 위 합계에 넣지 않았어요', '신용 · 부채 · 체납은 모르면 문제없다고 보고 진단(★ 상담에서 확인)'],
+    assumptions: ['정책자금은 갚는 돈(대출 · 보증)이라 위 합계에 넣지 않았어요', policyAssumption(ev)],
   }
 }
 
@@ -459,7 +464,7 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
   let actions: PlanAction[]
   if (id === 'lab-start') {
     blocks.push(rndBlock(record, f, n))
-    const pol = policyBlock(record, f, id)
+    const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
     actions = labActions(today, pol.state === 'ok')
   } else {
@@ -467,7 +472,7 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
     if (startup) blocks.push(startupBlock(record, f, today))
     const { block, main } = subsidyBlock(record, f, def.hiring ?? def.preset, n)
     blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', startup ? STARTUP_CREDIT_NOTES : []))
-    const pol = policyBlock(record, f, id)
+    const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
     actions = hiringActions(today, main, n, pol.state === 'ok', startup)
   }

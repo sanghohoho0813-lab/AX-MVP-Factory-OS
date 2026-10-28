@@ -404,7 +404,11 @@ function ScenarioRow({
               </Badge>
             )}
             <Badge tone="neutral">{r.moduleLabel}</Badge>
-            <span className="t-body min-w-0 font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{r.title}</span>
+            {/* D-312 상태 배지는 제목 줄에 — 오른쪽 칸에 두면 휴대폰에서 제목 · 판정 줄이 150px 로 짜부라져 '추천 기관…' 이 잘렸다 */}
+            <Badge tone={STATE_TONE[r.state]}>
+              <span data-testid="scenario-state">{SCENARIO_STATE_LABEL[r.state]}</span>
+            </Badge>
+            <span className="t-body min-w-0 basis-full font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{r.title}</span>
           </span>
           {/* D-201: 왜 이 업체에 — 이 업체 기록의 근거 한 줄 */}
           <span className="t-meta flex min-w-0 gap-1 break-keep text-success-800 [overflow-wrap:anywhere]" data-testid="scenario-why">
@@ -420,12 +424,7 @@ function ScenarioRow({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          <Badge tone={STATE_TONE[r.state]}>
-            <span data-testid="scenario-state">{SCENARIO_STATE_LABEL[r.state]}</span>
-          </Badge>
-          <ChevronDown aria-hidden="true" className={`size-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </span>
+        <ChevronDown aria-hidden="true" className={`mt-1 size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3" data-testid="scenario-detail">

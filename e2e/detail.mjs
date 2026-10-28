@@ -1485,6 +1485,58 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-312 정책자금 판정 한 길로 — 상황 예시 = 맞춤 추천 카드(같은 근거) · 청년 채용 질문에 명부 힌트 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const ROSTER = {
+    name: '사업장가입자명부_한솔.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      ['4대보험 사업장 가입자 명부', '사업장명: 한솔테크(주)', '발급일시 2026.10.20', '성명 주민등록번호 국민연금 건강보험 산재보험 고용보험',
+        '800101-1234567 박민수', '2019-01-02 2019-01-02 2019-01-02 2019-01-02', '950505-2345678 이수진', '2024-03-01 2024-03-01 2024-03-01 2024-03-01',
+        '980310-1234567 홍길동', '2026-02-02 2026-02-02 2026-02-02 2026-02-02', '010101-3234567 최하늘', '2026-05-04 2026-05-04 2026-05-04 2026-05-04'].join('\n'),
+      'utf8',
+    ),
+  }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([ROSTER])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const card = (await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  // 카드 글은 제목 · 설명이 붙어 나온다 — 상황 예시 쪽 기관 이름이 카드 제목에 그대로 있는지로 본다
+  await page.getByTestId('smart-scenarios').waitFor({ timeout: 15000 })
+  const row = page.locator('[data-testid="scenario-row"][data-id="policy-working"]')
+  if ((await row.count()) === 0 && (await page.getByTestId('scenario-more').count())) await page.getByTestId('scenario-more').click()
+  await page.waitForTimeout(300)
+  const head = (await row.getByTestId('scenario-headline').innerText().catch(() => '')) ?? ''
+  const rowAgency = /추천 기관\s*([가-힣]+)/.exec(head)?.[1] ?? ''
+  check(`D-312 ${vp.tag} 운전자금 상황 예시 = 맞춤 추천 정책자금 카드 추천 기관(${rowAgency})`, rowAgency !== '' && card.includes(`추천 기관 ${rowAgency}`), JSON.stringify({ card: card.slice(0, 80), scenario: head }))
+  if ((await row.getByTestId('scenario-detail').count()) === 0) await row.getByTestId('scenario-toggle').click()
+  await row.getByTestId('scenario-detail').waitFor({ timeout: 5000 }).catch(() => {})
+  const detail = ((await row.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-312 ${vp.tag} 상황 예시에도 '서류: 고용 증가(…)' · 체납 가정은 엔진대로`, detail.includes('서류: 고용 증가(') && detail.includes("'높음' 으로 보지 않았어요") && !detail.includes('문제없다고'), detail.slice(0, 600))
+  await row.scrollIntoViewIfNeeded().catch(() => {})
+  await page.locator('[role="status"] button[aria-label*="닫기"]').first().click({ timeout: 1000 }).catch(() => {})
+  await row.screenshot({ path: `/tmp/claude-0/shot312-row-${vp.tag}.png` }).catch(() => {})
+  if ((await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').count()) === 0 && (await page.getByTestId('scenario-questions-more').count())) await page.getByTestId('scenario-questions-more').click()
+  const q = ((await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-312 ${vp.tag} 청년 채용 질문 옆에 '명부: 고용 증가(2025년 평균 2명 → …, 청년 3명)'`, /명부: 고용 증가\(2025년 평균 2명 → 2026년 (예상 )?[\d.]+명, 청년 3명/.test(q), q.slice(0, 400))
+  if (vp.tag === '390') await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').screenshot({ path: '/tmp/claude-0/shot312-q-390.png' }).catch(() => {})
+  check(`D-312 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

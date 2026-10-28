@@ -41,6 +41,7 @@ import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm } from '../tools/startupTax/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { policyAssumption, policyEvidence } from './policyEvidence'
 import { fitContext, scenarioFit, type FitContext, type FitKind, type ScenarioFit } from './scenarioFit'
 import { placeOf } from './grants/grantMatch'
 import { runCalcScenario } from './calcScenario'
@@ -361,7 +362,7 @@ function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): Retur
 /* 정책자금                                                              */
 /* ------------------------------------------------------------------ */
 
-function runPolicy(s: ScenarioPreset, facts: ClientFacts): ReturnType<typeof runTax> {
+function runPolicy(s: ScenarioPreset, facts: ClientFacts, record: ClientOpsRecord, today: string): ReturnType<typeof runTax> {
   const { input, missing } = policyInputFromFacts(facts)
   const needs = [
     need('업종', facts.industryText),
@@ -371,16 +372,19 @@ function runPolicy(s: ScenarioPreset, facts: ClientFacts): ReturnType<typeof run
   ]
   const core = missing.filter((m) => m !== '매출')
   if (core.length) return { state: 'need', headline: `${core.join(' · ')}을(를) 받으면 바로 진단해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
-  const r = runDiagnosis({ ...input, ...(s.policy ?? {}) })
+  // D-312 맞춤 추천 카드와 같은 근거(서류함 체납 증명 · 가점 · 명부 고용 · 준비 서류) 위에 상황 가정 — 같은 업체에 다른 추천 기관이 나오지 않게
+  const ev = policyEvidence(record, facts, today)
+  const r = runDiagnosis({ ...input, ...ev.input, ...(s.policy ?? {}) })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
+  const docs = ev.notes.slice(0, 2)
   return {
     state: needs.every((n) => n.ok) ? 'ready' : 'partial',
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
-    lines: [...(r.headline?.reasons ?? []).slice(0, 2), r.nextAction].filter(Boolean),
+    lines: [...(docs.length ? [`서류: ${docs.join(' · ')}`] : []), ...(r.headline?.reasons ?? []).slice(0, 2), r.nextAction].filter(Boolean),
     amount: '',
     needs,
     filledFrom: [],
-    assumptions: ['신용 · 부채 · 체납은 모르면 문제없다고 보고 진단(★ 상담에서 확인)'],
+    assumptions: [policyAssumption(ev)],
   }
 }
 
@@ -391,7 +395,7 @@ export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: s
   const facts = clientFacts(record, new Date(`${today}T00:00:00`))
   const f = facts.industryText ? facts : { ...facts, industryText: [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' ') }
   const body =
-    s.calc ? runCalcScenario(s, record, today) : s.module === 'tax' ? runTax(s, record, today) : s.module === 'employment' ? runHiring(s, f) : s.module === 'labcare' ? runLab(s, f) : s.module === 'startup-tax' ? runStartup(s, f, today) : runPolicy(s, f)
+    s.calc ? runCalcScenario(s, record, today) : s.module === 'tax' ? runTax(s, record, today) : s.module === 'employment' ? runHiring(s, f) : s.module === 'labcare' ? runLab(s, f) : s.module === 'startup-tax' ? runStartup(s, f, today) : runPolicy(s, f, record, today)
   const moduleLabel = SCENARIO_MODULE_LABEL[s.module]
   const items = body.needs.filter((n) => !n.ok).map((n) => requestItemFor(n.label, `${moduleLabel} · ${s.title}`)).filter((x): x is RequestItem => x !== null)
   return {

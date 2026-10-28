@@ -121,6 +121,15 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
 }
 
 /**
+ * D-312 상황 예시 · 한 장 설계서가 판정에 넣은 가정 한 줄 — 엔진은 체납이 '미확인' 이면 '높음' 으로 올리지 않는다.
+ * 예전 문구('체납은 모르면 문제없다고 보고')는 엔진과 반대였다.
+ */
+export function policyAssumption(ev: PolicyEvidence): string {
+  const clear = ev.input.taxArrears === '없음' && ev.input.insuranceArrears === '없음'
+  return clear ? '신용 · 부채는 모르면 보통으로 보고 진단(★ 상담에서 확인)' : "신용 · 부채는 모르면 보통으로 보고 진단 · 체납은 납세증명서 · 완납증명서가 없어 '높음' 으로 보지 않았어요(★ 상담에서 확인)"
+}
+
+/**
  * D-310 4대보험 명부 진단(업체에 붙인 결과) → 고용 증가 · 청년 직원.
  * 명부 날짜로 센 작년 평균 → 올해(D-302)가 늘었으면 grew. 지금 직원만 있는 명부(작년 퇴사자 없음)는 작년이 적게 셀 수 있어 그렇다고 붙인다.
  */

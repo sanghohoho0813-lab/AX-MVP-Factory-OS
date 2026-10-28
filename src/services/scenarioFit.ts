@@ -20,6 +20,7 @@ import { formatWon, usableFactValue } from './customerFacts'
 import { startupRegion } from './clientInsights'
 import { entityKindOf } from './clientOrder'
 import { latestEmploymentRoster } from './toolResultGroups'
+import { policyHiring } from './policyEvidence'
 import { isExcludedIndustryText } from '../tools/labcare/lib/assessmentOptions'
 import type { ScenarioPreset } from './scenarioPresets'
 import { parseGoalText, profileSuggestions, salaryPlan, viewProfile, type ProfileView, type TaxProfile } from './taxPlan'
@@ -111,6 +112,8 @@ export interface FitContext {
   retained: number | null
   loan: number | null
   roster: { youth: number; senior: number; active: number } | null
+  /** D-312 명부로 센 고용 증가 · 청년 — 청년 채용 질문 옆에 '명부: …' 로 보인다(없으면 '') */
+  hireHint: string
   hasLab: boolean
   industryText: string
 }
@@ -159,9 +162,17 @@ export function fitContext(record: ClientOpsRecord, today: string): FitContext {
     retained: given('retainedEarnings') ? p.retainedEarnings : null,
     loan: given('loanBalance') ? p.loanBalance : null,
     roster: rd ? { youth: rd.youthCount ?? 0, senior: rd.seniorCount ?? 0, active: rd.activeCount ?? 0 } : null,
+    hireHint: hireHintOf(record, today),
     hasLab: usableFactValue(record, 'researchLab').trim() !== '',
     industryText,
   }
+}
+
+/** D-312 '명부: 고용 증가(2025년 평균 5명 → 2026년 예상 6.5명, 청년 2명)' · 줄었거나 1년 넘은 명부는 '' (묻는 말 옆에 쓸 만한 것만) */
+function hireHintOf(record: ClientOpsRecord, today: string): string {
+  const h = policyHiring(record, today)
+  if (!h || (!h.grew && h.youth === 0)) return ''
+  return `명부: ${h.line.replace(/ — .*$/, '')}`
 }
 
 /* ------------------------------------------------------------------ */
@@ -335,7 +346,7 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
     }
     /* 고용지원금 — 채용 계획은 기록에 없다 → 묻는다 */
     case 'emp-youth':
-      return byAnswer(c, 'hireYouth', '청년을 뽑을 계획 있음', '청년 채용 계획 없음')
+      return byAnswer(c, 'hireYouth', '청년을 뽑을 계획 있음', '청년 채용 계획 없음', c.hireHint)
     case 'emp-senior':
       return byAnswer(c, 'hireSenior', '만 60세 이상을 뽑을 계획 있음', '고령자 채용 계획 없음', c.roster && c.roster.senior > 0 ? `명부에 이미 만 60세 이상 ${c.roster.senior}명(계속고용은 명부 진단에서)` : '')
     case 'emp-childcare':
@@ -424,7 +435,7 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
     case 'policy-facility':
       return byAnswer(c, 'facility', '설비 살 계획(견적) 있음', '설비 투자 계획 없음')
     case 'policy-hiring':
-      return byAnswer(c, 'hireYouth', '청년을 뽑을 계획 있음', '청년 채용 계획 없음')
+      return byAnswer(c, 'hireYouth', '청년을 뽑을 계획 있음', '청년 채용 계획 없음', c.hireHint ? `${c.hireHint} — 더 뽑으면 고용창출 자금 가점` : '')
     default:
       return ask('facility')
   }

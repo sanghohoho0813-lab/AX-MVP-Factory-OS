@@ -14,7 +14,8 @@ import { businessTypeOf, clientFacts } from '../../tools/shared/clientPrefill'
 import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSummary, planTitle, situationChoices, smeConfirmed } from '../situationPlan'
 import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
-import { formatWon } from '../customerFacts'
+import { formatWon, withFactValue } from '../customerFacts'
+import { buildInsights } from '../clientInsights'
 import { calcPresetValues, runCalcScenario } from '../calcScenario'
 import { calculatorOf, defaultValues, type RowValues } from '../taxCalc'
 
@@ -819,6 +820,34 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('R6 연구원 5명 설계서 — 이어서 주소에 n=5 · 연구소 화면 인건비 2억(1명 4,000만원 × 5) · 제목 5명 · 1~50 밖이면 그대로', lab5.openPath.endsWith('&n=5') && lp.lab!.payroll === 200_000_000 && lp.title.startsWith('연구원 5명') && labPresetFor(P('lab-two'), 0) === P('lab-two') && labPresetFor(P('lab-material'), 5) === P('lab-material'), { open: lab5.openPath, lp: lp.lab })
   // R7 05 무이자 대여 — 이율은 계산기 기본값(예전에 바꾼 이율이 남아도 카드와 같은 숫자)
   check('R7 무이자 대여 상황은 이율을 계산기 기본값으로 둠(카드와 계산기 같은 숫자)', calcPresetValues(P('calc-t7-loan'), manyRec, today).values.w1_rate === defaultValues(t7).w1_rate && calcPresetValues(P('calc-t7-forgive'), manyRec, today).values.w1_rate === undefined)
+}
+
+// D-312 정책자금 상황 예시 · 한 장 설계서도 맞춤 추천 카드와 같은 근거(서류함 · 명부) — 같은 업체에 다른 추천 기관이 나오지 않게
+{
+  const T = '2026-10-28'
+  const NOW12 = '2026-10-28T09:00:00.000Z'
+  let base = normalizeClientOps({ id: 'sc312', companyName: '고용테크(주)', businessCategory: '서비스업', businessItem: '소프트웨어 개발', businessAddress: '대전광역시 유성구 1', establishedAt: '2021-03-02', employeeCount: '6', createdAt: NOW12, updatedAt: NOW12 } as never)
+  base = withFactValue(base, 'revenue', '400000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW12 })
+  const grew = normalizeClientOps({
+    ...base,
+    toolResults: [{ id: 'tr-r', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '', summary: '', data: { tab: 'roster', headcount: { asOf: '2026-10-01', prev: { year: 2025, total: 5, youth: 1, actualMonths: 12 }, cur: { year: 2026, total: 6.5, youth: 2, actualMonths: 10 }, basis: 'history', counted: 7, excluded: { rel: 0, noEi: 0, noHire: 0, lostNoDate: 0 } }, counts: { youthCount: 2, newHireCount: 1 } }, deadlines: [], createdAt: '2026-10-01T09:00:00.000Z', publishedUpdateId: null }],
+  } as never)
+  const agencyOf = (h: string) => /추천 기관 (.+)$/.exec(h)?.[1] ?? ''
+  const card = buildInsights(grew, T, []).find((i) => i.key === 'policy-funding')!
+  const work = runScenario(scenarioPreset('policy-working')!, grew, T)
+  check('D-312 운전자금 상황 예시 = 맞춤 추천 카드와 같은 추천 기관(명부 고용 증가 → 중진공)', agencyOf(work.headline) === agencyOf(card.headline) && agencyOf(card.headline) === '중소벤처기업진흥공단', JSON.stringify({ card: card.headline, scenario: work.headline }))
+  check('D-312 상황 예시 첫 줄: 서류에서 본 근거(고용 증가)', work.lines[0]?.startsWith('서류: 고용 증가('), JSON.stringify(work.lines))
+  check("D-312 체납 서류가 없으면 '높음' 으로 보지 않았다고(예전 '문제없다고 보고' 아님)", work.assumptions.some((a) => a.includes("체납은 납세증명서 · 완납증명서가 없어 '높음' 으로 보지 않았어요")) && !work.assumptions.some((a) => a.includes('문제없다고')), JSON.stringify(work.assumptions))
+  const plan = buildSituationPlan('hire-youth', grew, T)
+  const pol = plan.blocks.find((b) => b.key === 'policy')
+  check('D-312 한 장 설계서 정책자금도 같은 근거 · 같은 가정 문구', !!pol && pol.assumptions.some((a) => a.includes("'높음' 으로 보지 않았어요")) && !pol.assumptions.some((a) => a.includes('문제없다고')), JSON.stringify(pol?.assumptions))
+  const hireFit = runScenario(scenarioPreset('policy-hiring')!, grew, T).fit
+  check('D-312 청년 채용 계획 질문 옆에 명부 힌트(고용 증가 · 청년) — 정책자금', hireFit.kind === 'ask' && hireFit.why.includes('명부: 고용 증가(2025년 평균 5명 → 2026년 예상 6.5명, 청년 2명) — 더 뽑으면 고용창출 자금 가점'), JSON.stringify(hireFit))
+  const empFit = runScenario(scenarioPreset('emp-youth')!, grew, T).fit
+  check('D-312 고용지원금 청년 채용 질문에도 같은 힌트', empFit.kind === 'ask' && empFit.why.includes('명부: 고용 증가('), JSON.stringify(empFit))
+  check('D-312 명부가 없으면 힌트 없음', !runScenario(scenarioPreset('policy-hiring')!, base, T).fit.why.includes('명부:'))
+  const plain = runScenario(scenarioPreset('policy-working')!, base, T)
+  check('D-312 서류가 없으면 근거 줄 없음(예전 그대로)', !plain.lines.some((l) => l.startsWith('서류:')), JSON.stringify(plain.lines))
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
