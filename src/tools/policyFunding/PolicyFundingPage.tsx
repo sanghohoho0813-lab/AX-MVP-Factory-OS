@@ -19,6 +19,8 @@ import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
+import { policyEvidence } from '../../services/policyEvidence'
+import { todayLocalDate } from '../../lib/appClock'
 import { sharedToolKey } from '../shared/toolStorage'
 import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
@@ -209,6 +211,20 @@ function DiagnosisScreen() {
     if ((next.ceoAge ?? '미확인') === '미확인' && age) {
       next.ceoAge = age
       filled.push('대표 나이')
+    }
+    // D-306 서류함 납세증명서 · 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음(맞춤 추천과 같은 근거) — 아직 '미확인' 인 칸만
+    if (clientRecord && clientRecord.id === clientId) {
+      const ev = policyEvidence(clientRecord, facts, todayLocalDate())
+      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus'>(k: K, label: string) => {
+        const v = ev.input[k]
+        if (v && isUntouched(k) && (next[k] ?? '미확인') === '미확인') {
+          next[k] = v as DiagnosisInput[K]
+          filled.push(label)
+        }
+      }
+      put('taxArrears', '세금 체납 없음(납세증명서)')
+      put('insuranceArrears', '4대보험 체납 없음(완납증명서)')
+      put('debtRatioStatus', '부채비율 높음(자본잠식)')
     }
     return { next, filled }
   }

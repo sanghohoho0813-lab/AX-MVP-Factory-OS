@@ -39,6 +39,9 @@ import {
   withProfileFieldEdit,
 } from '../customerFacts'
 import { clientFacts } from '../../tools/shared/clientPrefill'
+import { policyEvidence } from '../policyEvidence'
+import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
+import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { previewKindOf } from '../../lib/filePreview'
@@ -416,6 +419,12 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('제목 없음 · 근거 없음 → 기타 · 확인 필요', p4.kind === 'new' && p4.label === OTHER_DOC_LABEL && !p4.sure, JSON.stringify(p4))
   const RULE = `임원퇴직금지급규정\n제3조(지급배수) 대표이사 3배, 이사 2배`
   const p4b = placeDocument({ text: RULE, fileName: 'scan_007.pdf' }, metas)
+  const LOCAL = `지방세 납세증명서\n납세자 : 샤인디자인\n위 납세자는 지방세 체납액이 없음을 증명합니다.\n발급일 2026년 10월 20일`
+  const NATIONAL = `납세증명서\n(국세)\n위의 납세자는 국세 체납액이 없음을 증명합니다.`
+  const p4c = placeDocument({ text: LOCAL, fileName: 'scan_010.pdf' }, metas)
+  const p4d = placeDocument({ text: NATIONAL, fileName: 'scan_011.pdf' }, metas)
+  const p4e = placeDocument({ text: LOCAL, fileName: '지방세 납세증명서.pdf' }, metas)
+  check('D-306 제목: 지방세 납세증명서는 국세 납세증명서 칸이 아니라 자기 칸(파일 이름이 스캔이어도)', p4c.label === '지방세 납세증명서' && p4e.label === '지방세 납세증명서' && p4d.label === '납세증명서', JSON.stringify([p4c.label, p4d.label, p4e.label]))
   check('D-304 제목: 임원퇴직금지급규정 → 기타가 아니라 그 이름의 새 칸', p4b.kind === 'new' && p4b.label === '임원퇴직금지급규정', JSON.stringify(p4b))
   const p5 = placeDocument({ text: '', fileName: '법인인감증명서_샤인.jpg' }, metas)
   check('글자 못 읽음 · 파일 이름에 서류 이름 → 그 이름(확실 아님)', p5.kind === 'new' && /인감증명서/.test(p5.label) && !p5.sure, JSON.stringify(p5))
@@ -1240,6 +1249,53 @@ await (async () => {
   const loss = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FIN.replace('미처분이익잉여금 800,000 690,000', '미처분이익잉여금(미처리결손금) (40,000) (10,000)'), method: 'pdf_text' as const, docSure: true }], ctx)
   check('D-305 미처리결손금 → 배당 가능한 이익은 넣지 않고 까닭(결손)', !loss.record.taxProfile.retainedEarnings && loss.summary.flagged.some((f) => f.label === '배당 가능 이익' && f.note.includes('결손')), JSON.stringify(loss.summary.flagged))
 })()
+
+// D-306 정책자금 판정의 '미확인' 을 서류함으로 — 납세증명서(국세 · 지방세) · 4대보험 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음
+{
+  const T = '2026-10-28'
+  let base = normalizeClientOps({ id: 'pe306', companyName: '증명테크(주)', businessCategory: '제조업', businessItem: '금속 가공', businessAddress: '충청북도 청주시 흥덕구 1', establishedAt: '2019-03-02', employeeCount: '12', createdAt: NOW, updatedAt: NOW } as never)
+  base = withFactValue(base, 'revenue', '2400000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  const addDoc = (r: ReturnType<typeof normalizeClientOps>, label: string, issuedAt: string) => {
+    const next = withCustomDocument(r, { label })
+    const key = next.customDocuments[next.customDocuments.length - 1].key
+    return withDocument(next, key, { received: true, fileName: `${label}.pdf`, issuedAt })
+  }
+  const facts = (r: ReturnType<typeof normalizeClientOps>) => clientFacts(r, new Date(`${T}T00:00:00`))
+  const none = policyEvidence(base, facts(base), T)
+  check('D-306 서류 없음 → 체납 미확인 그대로 · 받을 서류 셋', !none.input.taxArrears && !none.input.insuranceArrears && none.want.join(',') === '국세 납세증명서,지방세 납세증명서,4대보험 완납증명서', JSON.stringify(none))
+  let all = addDoc(base, '납세증명서', '2026-10-10')
+  all = addDoc(all, '지방세 납세증명서', '2026-10-12')
+  all = addDoc(all, '4대보험 완납증명서', '2026-10-15')
+  const ev = policyEvidence(all, facts(all), T)
+  check('D-306 국세 · 지방세 납세증명서 + 4대보험 완납증명서(90일 안) → 체납 없음 둘 다 · 근거 한 줄', ev.input.taxArrears === '없음' && ev.input.insuranceArrears === '없음' && ev.want.length === 0 && ev.notes.some((n) => n.includes('국세 10/10 · 지방세 10/12')), JSON.stringify(ev))
+  const only = addDoc(base, '납세증명서', '2026-10-10')
+  const ev1 = policyEvidence(only, facts(only), T)
+  check('D-306 국세만 있으면 세금 체납은 미확인 그대로 · 지방세 받기', !ev1.input.taxArrears && ev1.want.includes('지방세 납세증명서') && !ev1.want.includes('국세 납세증명서'), JSON.stringify(ev1))
+  const old = addDoc(addDoc(base, '납세증명서', '2026-05-01'), '지방세 납세증명서', '2026-05-01')
+  const ev2 = policyEvidence(old, facts(old), T)
+  check('D-306 90일 넘은 납세증명서는 쓰지 않음 · 새로 받으라고', !ev2.input.taxArrears && ev2.notes.some((n) => n.includes('오래됐어요')), JSON.stringify(ev2))
+  // 엔진: 미확인이면 '체납 여부 확인' 이 확인할 것에 남는다 → 서류가 있으면 빠진다
+  const inp = policyInputFromFacts(facts(all)).input
+  const before = runDiagnosis(inp)
+  const after = runDiagnosis({ ...inp, ...ev.input })
+  const arrearsCheck = (r: ReturnType<typeof runDiagnosis>) => (r.headline?.checks ?? []).some((c) => /체납/.test(c))
+  check('D-306 엔진: 서류 전엔 "체납 여부 확인" → 서류 뒤엔 없음', arrearsCheck(before) && !arrearsCheck(after), JSON.stringify({ b: before.headline?.checks, a: after.headline?.checks }))
+  const insBefore = buildInsights(base, T, []).find((i) => i.key === 'policy-funding')
+  const insAfter = buildInsights(all, T, []).find((i) => i.key === 'policy-funding')
+  check('D-306 맞춤 추천 정책자금: 서류 전엔 "체납 확인 — …" 칩 · 서류 뒤엔 근거 한 줄 · 칩 없음', !!insBefore?.missing.some((m) => m.startsWith('체납 확인')) && !insAfter?.missing.some((m) => m.startsWith('체납 확인')) && !!insAfter?.detail.includes('세금 체납 없음'), JSON.stringify({ b: insBefore?.missing, a: insAfter?.detail }))
+  check('D-306 상담 · 물어볼 것: 납세증명서 · 완납증명서를 받아 두면 체납 질문 빠짐', answerFor('ask', { record: base, today: T, notices: [] }).steps.some((x) => x.includes('체납')) && !answerFor('ask', { record: all, today: T, notices: [] }).steps.some((x) => x.includes('체납')))
+  check('D-306 상담 · 정책자금: 서류 근거가 사실 줄에', answerFor('policy', { record: all, today: T, notices: [] }).facts.some((x) => x.startsWith('서류: 세금 체납 없음')))
+  // 자본잠식 — 자산 ≤ 부채
+  let neg = withFactValue(base, 'totalAssets', '500000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  neg = withFactValue(neg, 'totalLiabilities', '620000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  const ev3 = policyEvidence(neg, facts(neg), T)
+  check('D-306 자산 5억 ≤ 부채 6.2억 → 부채비율 높음(자본잠식) · 근거', ev3.input.debtRatioStatus === '높음' && ev3.notes.some((n) => n.startsWith('자본잠식')), JSON.stringify(ev3))
+  let pos = withFactValue(base, 'totalAssets', '900000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  pos = withFactValue(pos, 'totalLiabilities', '600000000', { source: 'financialStatements', status: 'confirmed', asOf: '2025', now: NOW })
+  check('D-306 자본이 있으면 부채비율은 짐작하지 않음(미확인 그대로)', policyEvidence(pos, facts(pos), T).input.debtRatioStatus === undefined)
+  const req = requestItemsFrom([{ key: 'policy-funding', label: '정책자금', tone: 'need', headline: '', detail: '', missing: ['체납 확인 — 국세 납세증명서 · 4대보험 완납증명서'], openPath: '', openLabel: '', action: null }])
+  check('D-306 요청 문구: "체납 확인 — …" 은 4대보험 명부가 아니라 납세증명서 · 완납증명서로', req.items.length === 1 && req.items[0].label.includes('납세증명서') && req.items[0].where.includes('위택스'), JSON.stringify(req))
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

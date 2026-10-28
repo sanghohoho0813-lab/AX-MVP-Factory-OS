@@ -15,6 +15,7 @@ import { matchesFor } from './grants/grantMatch'
 import { profileOfRecord } from './grants/grantProfile'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { policyEvidence } from './policyEvidence'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
@@ -188,15 +189,17 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
       a.steps = ['사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요', '그다음 이 질문을 다시 눌러 주세요']
       return a
     }
-    const r = runDiagnosis(input)
+    // D-306 서류함 납세증명서 · 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음(맞춤 추천과 같은 근거)
+    const ev = policyEvidence(ctx.record, f, ctx.today)
+    const r = runDiagnosis({ ...input, ...ev.input })
     const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
     // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — 가정이라고 적고 '높음' 은 '보통 이상' 으로만
     const noHeadcount = assumed.includes('직원 수')
     a.verdict = { tone: level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no', text: `진행 가능성 ${level}${noHeadcount ? ' (직원 수 모름 — 소상공인으로 가정)' : ''}` }
-    a.facts = [...profileLines(ctx.record, f).slice(0, 4), ...(noHeadcount ? ['가정: 직원 수를 몰라 1~4명(소상공인)으로 계산 — 4대보험 명부로 확인하면 소진공 해당 여부까지 정확해요'] : []), ...(r.headline?.reasons ?? []).slice(0, 2).map((x) => `판단 이유: ${x}`), ...(r.headline?.checks ?? []).slice(0, 2).map((x) => `확인 필요: ${x}`)]
+    a.facts = [...profileLines(ctx.record, f).slice(0, 4), ...ev.notes.map((x) => `서류: ${x}`), ...(noHeadcount ? ['가정: 직원 수를 몰라 1~4명(소상공인)으로 계산 — 4대보험 명부로 확인하면 소진공 해당 여부까지 정확해요'] : []), ...(r.headline?.reasons ?? []).slice(0, 2).map((x) => `판단 이유: ${x}`), ...(r.headline?.checks ?? []).slice(0, 2).map((x) => `확인 필요: ${x}`)]
     a.steps = [...r.agencies.slice(0, 3).map((ag) => `${ag.rank}순위 ${ag.name}${ag.reasons[0] ? ` — ${ag.reasons[0]}` : ''}`), r.nextAction ? `다음: ${r.nextAction}` : ''].filter(Boolean)
     a.docs = r.documents.slice(0, 8)
-    a.missing = missing.includes('매출') ? ['매출(재무제표 · 크레탑) — 알면 기관 · 한도가 더 정확해요'] : []
+    a.missing = [...(missing.includes('매출') ? ['매출(재무제표 · 크레탑) — 알면 기관 · 한도가 더 정확해요'] : []), ...(ev.want.length ? [`체납 확인 — ${ev.want.join(' · ')}(없으면 가능성 '높음' 이 나오지 않아요)`] : [])]
     a.copyText = [`[정책자금 1차 검토] ${name(ctx.record)}`, `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`, ...a.steps.map((s) => `· ${s}`), a.docs.length ? `준비 서류: ${a.docs.join(', ')}` : ''].filter(Boolean).join('\n')
     return a
   },
@@ -315,7 +318,8 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
       !f.revenue ? '작년 매출이 대략 얼마인가요?' : '',
       !f.representativeBirth ? '대표님 나이(생년)는요? (청년 창업 · 감면 판단)' : '',
       ctx.record.shareholderRegister.length === 0 ? '주주가 대표님 혼자인가요? 가족 지분이 있나요?' : '',
-      '세금 · 4대보험 체납이 있나요? (있으면 자금 · 지원사업이 막혀요)',
+      // D-306 납세증명서 · 완납증명서를 받아 두었으면 묻지 않는다
+      policyEvidence(ctx.record, f, ctx.today).want.length ? '세금 · 4대보험 체납이 있나요? (있으면 자금 · 지원사업이 막혀요)' : '',
       '앞으로 1년 안에 사람을 뽑을 계획이 있나요?',
     ].filter(Boolean)
     a.steps = qs

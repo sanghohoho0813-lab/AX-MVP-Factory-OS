@@ -19,6 +19,7 @@ import { matchesFor, type GrantNotice } from './grants/grantMatch'
 import { profileOfRecord, missingForMatch } from './grants/grantProfile'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { policyEvidence } from './policyEvidence'
 import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
@@ -117,12 +118,14 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
   return { key: 'grants', label: '지원사업', tone: 'no', headline: '지역 · 업력 · 업종까지 맞는 공고가 지금은 없어요', detail: '새 공고가 들어오면(매일 아침 9시) 여기에 바로 보여요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
 }
 
-const policyInsight: Provider = ({ record, facts }) => {
+const policyInsight: Provider = ({ record, facts, today }) => {
   const { input, missing, assumed } = policyInputFromFacts(facts)
+  // D-306 서류함의 납세증명서 · 완납증명서 → 체납 '없음'(미확인이면 엔진이 '높음' 을 막는다) · 자본잠식 → 부채비율 '높음'
+  const ev = policyEvidence(record, facts, today)
   const open = `/tools/policy-funding/diagnosis${q(record)}`
   const core = missing.filter((m) => m !== '매출')
   if (core.length) return { key: 'policy-funding', label: '정책자금', tone: 'need', headline: `${core.join(' · ')}을(를) 알면 바로 판정해요`, detail: '사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요.', missing: core, openPath: open, openLabel: '정책자금 진단', action: null }
-  const r = runDiagnosis(input)
+  const r = runDiagnosis({ ...input, ...ev.input })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
   // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — '높음' 으로 단정하지 않고 가정이라고 알린다
   const noHeadcount = assumed.includes('직원 수')
@@ -134,8 +137,16 @@ const policyInsight: Provider = ({ record, facts }) => {
     label: '정책자금',
     tone,
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
-    detail: more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
-    missing: [...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []), ...(noHeadcount ? ['직원 수(4대보험 가입자 명부)'] : [])],
+    detail: [
+      more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
+      ...ev.notes.slice(0, 2),
+    ].join(' · '),
+    missing: [
+      ...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []),
+      ...(noHeadcount ? ['직원 수(4대보험 가입자 명부)'] : []),
+      // 체납을 확인할 서류 — 없으면 엔진이 가능성을 '높음' 으로 올리지 않는다
+      ...(ev.want.length ? [`체납 확인 — ${ev.want.join(' · ')}`] : []),
+    ],
     openPath: open,
     openLabel: '정책자금 진단 열기',
     action: tone === 'good' || tone === 'maybe' ? `정책자금 상담 — ${r.topAgency} 쪽으로 준비` : null,

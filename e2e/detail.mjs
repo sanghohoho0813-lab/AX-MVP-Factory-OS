@@ -1291,6 +1291,44 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-306 납세증명서 · 지방세 납세증명서 · 4대보험 완납증명서 → 정책자금 판정 체납 '없음' ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const doc = (name, lines) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(lines.join('\n'), 'utf8') })
+  const NAT = doc('scan_101.txt', ['납세증명서', '(국세)', '납세자 : 한솔테크(주)', '위의 납세자는 국세 체납액이 없음을 증명합니다.'])
+  const LOC = doc('scan_102.txt', ['지방세 납세증명서', '납세자 : 한솔테크(주)', '위 납세자는 지방세 체납액이 없음을 증명합니다.'])
+  const INS = doc('scan_103.txt', ['4대보험 완납증명서', '사업장명 : 한솔테크(주)', '사회보험료 완납을 증명합니다.'])
+  const pol = () => page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  // '모듈별 판정' 은 접혀 있다(D-192) — 펼쳐서 본다
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const before = (await pol()) ?? ''
+  check(`D-306 ${vp.tag} 서류 전: 정책자금 '있으면 더 정확: 체납 확인 — 국세 · 지방세 납세증명서 · 4대보험 완납증명서'`, before.includes('체납 확인 —') && before.includes('지방세 납세증명서'), before.slice(0, 300))
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([NAT, LOC, INS])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = (await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? ''
+  check(`D-306 ${vp.tag} 스캔 이름이어도 세 칸으로(납세증명서 · 지방세 납세증명서 · 4대보험 완납증명서)`, ['→ 납세증명서', '→ 지방세 납세증명서', '→ 4대보험 완납증명서'].every((x) => placed.replace(/\s+/g, ' ').includes(x)), placed.slice(0, 300))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  const after = (await pol()) ?? ''
+  check(`D-306 ${vp.tag} 서류 뒤: 정책자금에 '세금 체납 없음 · 4대보험 체납 없음' 근거 · 체납 확인 칩 사라짐`, after.includes('세금 체납 없음') && after.includes('4대보험 체납 없음') && !after.includes('체납 확인 —'), after.slice(0, 400))
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const note = (await page.getByTestId('tool-prefill-note').innerText().catch(() => '')) ?? ''
+  check(`D-306 ${vp.tag} 정책자금 화면도 같은 근거로 채움(세금 · 4대보험 체납 없음)`, note.includes('세금 체납 없음(납세증명서)') && note.includes('4대보험 체납 없음(완납증명서)'), note.slice(0, 300))
+  check(`D-306 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
