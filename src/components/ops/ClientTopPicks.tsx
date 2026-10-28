@@ -44,6 +44,7 @@ export function TopPicksCard({
   const picks = topPicks(insights)
   const more = insights.filter(isPick).length - picks.length
   const need = missingForPicks(insights)
+  const asks = onPickRequest ? picks.filter((p) => p.request) : []
   return (
     <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-white px-4 py-4 shadow-sm sm:px-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -62,7 +63,6 @@ export function TopPicksCard({
       </div>
 
       {picks.length > 0 ? (
-        <>
         <ol className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3" data-testid="top-pick-list">
           {picks.map((p, i) => (
             <li key={p.key} className="min-w-0" data-testid="top-pick" data-key={p.key} data-tone={p.tone}>
@@ -100,27 +100,20 @@ export function TopPicksCard({
             </li>
           ))}
         </ol>
-        {/* D-313 제안할 모듈이 판정 났으면 — 아직 받을 신청 서류를 카톡 문구로(카드는 통째로 링크라 단추는 아래 줄에) */}
-        {onPickRequest && picks.some((p) => p.request) && (
-          <div className="mt-2 flex flex-wrap gap-2" data-testid="top-pick-requests">
-            {picks
-              .filter((p) => p.request)
-              .map((p) => (
-                <Button key={p.key} size="sm" variant="secondary" onClick={() => onPickRequest(p)} data-testid="top-pick-request" data-key={p.key}>
-                  <Send aria-hidden="true" className="size-4 shrink-0" /> {p.label} 신청 서류 {p.request!.count}가지 요청
-                </Button>
-              ))}
-          </div>
-        )}
-        </>
       ) : (
         <p className="t-body mt-2 break-keep text-slate-700" data-testid="top-picks-none">
           지금 바로 제안할 모듈은 아직 없어요.{need.length > 0 ? ' 아래 서류 · 정보를 받으면 판정이 바로 나와요.' : ''}
         </p>
       )}
 
-      {(more > 0 || need.length > 0) && (
+      {(more > 0 || need.length > 0 || asks.length > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* D-313 제안할 모듈이 판정 났으면 — 아직 받을 신청 서류를 카톡 문구로. 카드는 통째로 링크라 단추는 이 줄에(새 줄을 만들면 아래 회사 정보가 첫 화면 밖으로 밀린다) */}
+          {asks.map((p) => (
+            <Button key={p.key} size="sm" variant="secondary" onClick={() => onPickRequest?.(p)} data-testid="top-pick-request" data-key={p.key}>
+              <Send aria-hidden="true" className="size-4 shrink-0" /> {p.label} 신청 서류 {p.request!.count}가지 요청
+            </Button>
+          ))}
           {more > 0 && onShowAll && (
             <button type="button" onClick={onShowAll} className="tap t-sub font-semibold text-slate-600 hover:text-brand-700 hover:underline">
               검토할 모듈 {more}개 더
