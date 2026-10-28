@@ -30,6 +30,7 @@ export function TopPicksCard({
   onShowAll,
   showUpload = true,
   onRequest,
+  onPickRequest,
 }: {
   insights: readonly Insight[]
   onUpload: () => void
@@ -37,6 +38,8 @@ export function TopPicksCard({
   showUpload?: boolean
   /** D-191: '받으면 더 추천' → 고객에게 보낼 자료 요청 문구(없으면 단추를 그리지 않는다) */
   onRequest?: () => void
+  /** D-313: 제안할 모듈의 '아직 받을 서류' 문구(정책자금 신청 서류) — 없으면 단추를 그리지 않는다 */
+  onPickRequest?: (pick: Insight) => void
 }) {
   const picks = topPicks(insights)
   const more = insights.filter(isPick).length - picks.length
@@ -59,6 +62,7 @@ export function TopPicksCard({
       </div>
 
       {picks.length > 0 ? (
+        <>
         <ol className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3" data-testid="top-pick-list">
           {picks.map((p, i) => (
             <li key={p.key} className="min-w-0" data-testid="top-pick" data-key={p.key} data-tone={p.tone}>
@@ -96,6 +100,19 @@ export function TopPicksCard({
             </li>
           ))}
         </ol>
+        {/* D-313 제안할 모듈이 판정 났으면 — 아직 받을 신청 서류를 카톡 문구로(카드는 통째로 링크라 단추는 아래 줄에) */}
+        {onPickRequest && picks.some((p) => p.request) && (
+          <div className="mt-2 flex flex-wrap gap-2" data-testid="top-pick-requests">
+            {picks
+              .filter((p) => p.request)
+              .map((p) => (
+                <Button key={p.key} size="sm" variant="secondary" onClick={() => onPickRequest(p)} data-testid="top-pick-request" data-key={p.key}>
+                  <Send aria-hidden="true" className="size-4 shrink-0" /> {p.label} 신청 서류 {p.request!.count}가지 요청
+                </Button>
+              ))}
+          </div>
+        )}
+        </>
       ) : (
         <p className="t-body mt-2 break-keep text-slate-700" data-testid="top-picks-none">
           지금 바로 제안할 모듈은 아직 없어요.{need.length > 0 ? ' 아래 서류 · 정보를 받으면 판정이 바로 나와요.' : ''}
@@ -151,11 +168,19 @@ export default function ClientTopPicks({
   workspaceId: string | null
   onUpload: () => void
   onShowAll: () => void
-  onRequestText?: (text: string) => void
+  onRequestText?: (text: string, meta?: { title: string; description: string }) => void
 }) {
   const { ent } = useEntitlements()
   const notices = useGrantNotices(workspaceId)
   const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
   const text = useMemo(() => recoRequestMessage(record, insights), [record, insights])
-  return <TopPicksCard insights={insights} onUpload={onUpload} onShowAll={onShowAll} onRequest={onRequestText && text ? () => onRequestText(text) : undefined} />
+  return (
+    <TopPicksCard
+      insights={insights}
+      onUpload={onUpload}
+      onShowAll={onShowAll}
+      onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
+      onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
+    />
+  )
 }

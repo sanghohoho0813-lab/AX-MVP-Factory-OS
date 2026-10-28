@@ -20,6 +20,7 @@ import { profileOfRecord, missingForMatch } from './grants/grantProfile'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyEvidence } from './policyEvidence'
+import { policyApplyAsk, policyApplyMessage } from './policyApply'
 import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
@@ -55,6 +56,8 @@ export interface Insight {
   amount?: string
   /** D-238: 이 업체 기록에 붙인 이 모듈의 가장 최근 결과 — 이미 해 본 것이면 '지난번 무엇 · 언제' 를 같이 보여 준다(판정 글과 같으면 없음) */
   last?: { label: string; at: string }
+  /** D-313: 판정이 난 모듈의 '아직 받을 서류' 카톡 문구(정책자금 신청 서류) — 받을 것이 없으면 없음 */
+  request?: { label: string; title: string; description: string; text: string; count: number }
 }
 
 /** 원 → '1,440만원' · 1억 이상은 '1.2억원' */
@@ -144,6 +147,9 @@ const policyInsight: Provider = ({ record, facts, today }) => {
   const more = [missing.includes('매출') ? '매출' : '', noHeadcount ? '직원 수' : ''].filter(Boolean)
   // D-311 준비 서류 — 서류함에 있는 것은 '확보'. 서류함에 하나라도 있을 때만(새 업체에 '1/14' 를 보이지 않게)
   const docsLine = policyDocsLine(r.documentChecks ?? [], (ev.input.haveDocs ?? []).length > 0)
+  // D-313 판정이 났으면(볼 만함 · 바로 제안) 아직 받을 신청 서류를 카톡 문구로
+  const ask = tone === 'good' || tone === 'maybe' ? policyApplyAsk(r.documentChecks ?? [], ev.want) : null
+  const askText = ask ? policyApplyMessage(record, ask, r.topAgency) : ''
   return {
     key: 'policy-funding',
     label: '정책자금',
@@ -165,6 +171,17 @@ const policyInsight: Provider = ({ record, facts, today }) => {
     openPath: open,
     openLabel: '정책자금 진단 열기',
     action: tone === 'good' || tone === 'maybe' ? `정책자금 상담 — ${r.topAgency} 쪽으로 준비` : null,
+    ...(ask && askText
+      ? {
+          request: {
+            label: `아직 받을 서류 ${ask.items.length}가지 요청 문구`,
+            title: '정책자금 신청 서류 요청 문구',
+            description: `서류함에 이미 있는 서류는 뺐습니다. ${ask.ours.length ? `${ask.ours.join(' · ')}는 저희가 함께 쓰는 것이라 넣지 않았어요. ` : ''}어디서 떼는지 함께 적었습니다.`,
+            text: askText,
+            count: ask.items.length,
+          },
+        }
+      : {}),
   }
 }
 

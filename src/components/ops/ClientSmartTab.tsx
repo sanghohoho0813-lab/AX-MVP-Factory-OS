@@ -17,7 +17,7 @@ import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageSquareText } from 'lucide-react'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { latestToolResult } from '../../services/toolResultGroups'
 import { useIsPilot } from '../../auth/osAccess'
@@ -65,8 +65,8 @@ export default function ClientSmartTab({
   onCommitQuiet,
   onRequestText,
 }: {
-  /** D-191: '받으면 더 추천' 자료 요청 문구를 띄운다(업체 상세의 문구 창) */
-  onRequestText?: (text: string) => void
+  /** D-191: '받으면 더 추천' 자료 요청 문구를 띄운다(업체 상세의 문구 창) · D-313 제목 · 설명이 다른 문구(정책자금 신청 서류)는 meta 로 */
+  onRequestText?: (text: string, meta?: { title: string; description: string }) => void
   /** D-158: 확인할 것 — 할 일 만들 사람 · 알림 없이 저장(답마다 알림은 확인함이 띄운다) */
   userId?: string | null
   onCommitQuiet?: (next: ClientOpsRecord) => Promise<boolean>
@@ -143,7 +143,7 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onShowAll={() => {
+      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')
           window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
         }} />
@@ -288,6 +288,18 @@ export default function ClientSmartTab({
                       </span>
                     ))}
                   </p>
+                )}
+                {/* D-313 판정이 났으면 아직 받을 신청 서류를 카톡 문구로 — 서류함에 있는 것은 뺀다 */}
+                {ins.request && onRequestText && (
+                  <button
+                    type="button"
+                    onClick={() => onRequestText(ins.request!.text, { title: ins.request!.title, description: ins.request!.description })}
+                    className="tap t-sub inline-flex items-center gap-1 self-start rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold break-keep text-brand-800 hover:border-brand-400"
+                    data-testid="smart-insight-request"
+                  >
+                    <MessageSquareText aria-hidden="true" className="size-4 shrink-0" />
+                    {ins.request.label}
+                  </button>
                 )}
                 <Link to={ins.openPath} className="tap t-sub mt-auto inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
                   {ins.openLabel} <ArrowRight aria-hidden="true" className="size-4" />

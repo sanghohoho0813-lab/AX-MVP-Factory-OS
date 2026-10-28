@@ -41,6 +41,7 @@ import {
 import { clientFacts } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary } from '../vatDoc'
+import { policyApplyAsk, policyApplyMessage } from '../policyApply'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
@@ -1462,6 +1463,37 @@ await (async () => {
   const ins = buildInsights(r, T, []).find((i) => i.key === 'policy-funding')
   check('D-311 맞춤 추천 정책자금: 준비 서류 줄이 보인다', !!ins?.detail.includes('준비 서류 '), ins?.detail)
   check('D-311 서류함이 비면 준비 서류 줄 없음', !(buildInsights(base0, T, []).find((i) => i.key === 'policy-funding')?.detail ?? '').includes('준비 서류'))
+}
+
+// D-313 정책자금 신청 서류 요청 문구 — 서류함에 없는 것만 · 사업계획서는 저희가 · 체납 증명은 없는 것만
+{
+  const T = '2026-10-28'
+  const checks = [
+    { label: '표준재무제표 (3개년)', status: '요청 필요' },
+    { label: '국세/지방세 납세증명서', status: '요청 필요' },
+    { label: '사업계획서', status: '요청 필요' },
+    { label: '대표자 신분증', status: '요청 필요' },
+    { label: '새로 생긴 서류 (예시)', status: '요청 필요' },
+    { label: '사업자등록증', status: '확보' },
+  ]
+  const ask = policyApplyAsk(checks, ['국세 납세증명서', '4대보험 완납증명서'])
+  check('D-313 받을 것: 재무제표 · 없는 체납 증명만 · 신분증(뒷자리 가림) · 모르는 이름은 괄호 빼고 · 확보는 뺌', JSON.stringify(ask.items.map((i) => i.label)) === '["표준재무제표증명(최근 3년)","국세 납세증명서 · 4대보험 완납증명서","대표자 신분증 사본","새로 생긴 서류"]' && ask.items[2].where.includes('뒷자리는 가리고'), JSON.stringify(ask))
+  check('D-313 사업계획서는 고객에게 달라고 하지 않음(저희가)', JSON.stringify(ask.ours) === '["사업계획서"]')
+  const rec = { representativeName: '홍길동', contactName: '', companyName: '미래상사' }
+  const msg = policyApplyMessage(rec, ask, '중소벤처기업진흥공단')
+  check('D-313 문구: 대표님 · 회사 · 추천 기관 · 번호 · 어디서 · 사업계획서는 저희가', msg.startsWith('안녕하세요, 홍길동 대표님.') && msg.includes('미래상사 정책자금(중소벤처기업진흥공단) 신청을 준비하려고 합니다.') && msg.includes('1. 표준재무제표증명(최근 3년)\n   - 홈택스') && msg.includes('※ 사업계획서는 저희가 대표님과 통화로 함께 씁니다.') && !/AI/.test(msg), msg)
+  check('D-313 받을 것이 없으면 빈 문구', policyApplyMessage(rec, { items: [], ours: ['사업계획서'] }, 'x') === '')
+  // 맞춤 추천 카드 — 판정이 났으면 request · 서류함에 있는 사업자등록증 · 부가세는 문구에 없음
+  let r = normalizeClientOps({ id: 'pa313', companyName: '미래상사', representativeName: '홍길동', businessCategory: '도소매', businessItem: '화장품', businessAddress: '대전광역시 서구 1', establishedAt: '2019-05-02', employeeCount: '3', createdAt: NOW, updatedAt: NOW } as never)
+  r = withFactValue(r, 'revenue', '284000000', { source: 'vatCertificate', status: 'entered', asOf: '2025', now: NOW })
+  r = withDocument(r, 'businessRegistration', { received: true, issuedAt: '2026-01-02', fileName: '사업자등록증.pdf' })
+  r = withCustomDocument(r, { label: '부가세 과세표준증명', validMonths: 1 })
+  r = withDocument(r, r.customDocuments[r.customDocuments.length - 1].key, { received: true, issuedAt: '2026-10-20', fileName: 'vat.pdf' })
+  const ins = buildInsights(r, T, []).find((i) => i.key === 'policy-funding')!
+  check('D-313 카드: 판정이 나면 아직 받을 서류 요청(정책자금 신청 서류 요청 문구)', !!ins.request && ins.request.title === '정책자금 신청 서류 요청 문구' && ins.request.label === `아직 받을 서류 ${ins.request.count}가지 요청 문구` && ins.request.count > 3, JSON.stringify(ins.request))
+  check('D-313 카드 문구: 서류함에 있는 사업자등록증 · 부가세 과세표준증명은 빼고 · 재무제표 · 납세증명은 넣음', !!ins.request && !ins.request.text.includes('사업자등록증 사본') && !ins.request.text.includes('부가가치세 과세표준증명') && ins.request.text.includes('표준재무제표증명') && ins.request.text.includes('국세 납세증명서'), ins.request?.text)
+  const fresh = normalizeClientOps({ id: 'pa313b', companyName: '빈회사', createdAt: NOW, updatedAt: NOW } as never)
+  check('D-313 판정 전(정보 부족)이면 요청 문구 없음', !buildInsights(fresh, T, []).find((i) => i.key === 'policy-funding')?.request)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

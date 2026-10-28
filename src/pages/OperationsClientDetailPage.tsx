@@ -844,10 +844,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }}
             userId={userId}
             onCommitQuiet={commit}
-            onRequestText={(text) =>
+            onRequestText={(text, meta) =>
             setMessage({
-              title: '받을 자료 요청 문구',
-              description: '아직 판정하지 못한 모듈에 필요한 자료만 골라, 어디서 떼는지와 함께 정리했습니다. 크레탑 보고서처럼 저희가 조회하는 것은 뺐습니다.',
+              title: meta?.title ?? '받을 자료 요청 문구',
+              description: meta?.description ?? '아직 판정하지 못한 모듈에 필요한 자료만 골라, 어디서 떼는지와 함께 정리했습니다. 크레탑 보고서처럼 저희가 조회하는 것은 뺐습니다.',
               text,
             })}
             onAlertOpen={(a) => setTab('work', a.serviceKey ?? undefined)}
@@ -879,10 +879,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           today={today}
           workspaceId={workspaceId}
           onUpload={openUpload}
-          onRequestText={(text) =>
+          onRequestText={(text, meta) =>
           setMessage({
-            title: '받을 자료 요청 문구',
-            description: '아직 판정하지 못한 모듈에 필요한 자료만 골라, 어디서 떼는지와 함께 정리했습니다. 크레탑 보고서처럼 저희가 조회하는 것은 뺐습니다.',
+            title: meta?.title ?? '받을 자료 요청 문구',
+            description: meta?.description ?? '아직 판정하지 못한 모듈에 필요한 자료만 골라, 어디서 떼는지와 함께 정리했습니다. 크레탑 보고서처럼 저희가 조회하는 것은 뺐습니다.',
             text,
           })}
           onShowAll={() => {
