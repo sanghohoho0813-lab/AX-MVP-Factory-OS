@@ -41,6 +41,7 @@ import {
   analyzeRoster,
   buildCopyText,
   CONFIDENCE_META,
+  creditYears,
   defaultTaxUnits,
   EMP_DOC_CHECKLIST,
   estimateSubsidyTotal,
@@ -645,7 +646,8 @@ function RosterTab() {
   const [baseDate] = useState(() => new Date())
 
   const region: RegionType | null = form.sido ? (['서울', '경기', '인천'].indexOf(form.sido) >= 0 ? 'metro' : 'local') : null
-  const units = defaultTaxUnits(region, form.sizeType)
+  // D-319 '올해' 늘어난 인원 — 2026년부터는 개편표(1 · 2 · 3년 차)
+  const units = defaultTaxUnits(region, form.sizeType, baseDate.getFullYear())
   const unitYouth = form.unitsTouched && form.unitYouth !== '' ? form.unitYouth : String(units.youth)
   const unitNormal = form.unitsTouched && form.unitNormal !== '' ? form.unitNormal : String(units.normal)
 
@@ -825,7 +827,7 @@ function RosterTab() {
               <NumberField label="전년도 청년 등" value={form.prevYouth} onChange={(v) => setHead('prevYouth', v)} unit="명" decimal />
               <NumberField label="올해 상시근로자" value={form.curTotal} onChange={(v) => setHead('curTotal', v)} unit="명" decimal />
               <NumberField label="올해 청년 등" value={form.curYouth} onChange={(v) => setHead('curYouth', v)} unit="명" decimal />
-              <NumberField label="청년 등 단가" value={unitYouth} onChange={(v) => setForm((f) => ({ ...f, unitYouth: v, unitsTouched: true }))} unit="만원" hint="귀속연도 법령표 확인 필요" />
+              <NumberField label="청년 등 단가" value={unitYouth} onChange={(v) => setForm((f) => ({ ...f, unitYouth: v, unitsTouched: true }))} unit="만원" hint={units.table === 2026 ? `2026년 개편 1년 차 — 유지하면 ${units.schedule.youth[1].toLocaleString()} · ${units.schedule.youth[2].toLocaleString()}만원` : '귀속연도 법령표 확인 필요'} />
               <NumberField label="일반 단가" value={unitNormal} onChange={(v) => setForm((f) => ({ ...f, unitNormal: v, unitsTouched: true }))} unit="만원" />
             </div>
             {headcount && <HeadcountNote hc={headcount} differs={headDiffers} onApply={() => employees && fillFromRoster(employees, meta, true)} />}
@@ -862,6 +864,15 @@ function RosterTab() {
                 <p className="t-sub text-slate-600">
                   통합고용세액공제 예상 <b className="text-slate-900">약 {formatWon(estimate.creditTotal)}</b> (증가 {estimate.incTotal}명 · 1차 추정 · 확정 아님)
                   {estimate.needsRecheck && <span className="text-danger-700"> · 청년 등 증가분이 전체 증가분보다 큽니다 — 입력값 재확인</span>}
+                  {/* D-319 2026년 개편 — 인원을 유지하면 2 · 3년 차가 커진다(직접 고친 단가에는 쓰지 않음) */}
+                  {units.table === 2026 && !form.unitsTouched && estimate.creditTotal > 0 && (
+                    <span className="block" data-testid="credit-years">
+                      {(() => {
+                        const [y1, y2, y3] = creditYears(units, estimate.incYouth ?? 0, estimate.incNormal ?? 0)
+                        return `2026년 개편 — 1년 차 ${formatWon(y1)} · 인원을 유지하면 2년 차 ${formatWon(y2)} · 3년 차 ${formatWon(y3)}(3년 합계 ${formatWon(y1 + y2 + y3)})`
+                      })()}
+                    </span>
+                  )}
                 </p>
               )}
               <div className="mt-1 flex flex-wrap gap-2">

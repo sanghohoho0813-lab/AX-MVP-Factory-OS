@@ -13,11 +13,45 @@ export function regionTypeOf(sido: string | null | undefined): RegionType | null
 
 // ── 통합고용세액공제 기본 단가 (만원/인, 편집 가능) ───────
 // 귀속연도별로 바뀌므로 반드시 "법령표 확인 필요" 전제. 기본값은 참고용.
+// D-319 인원이 늘어난 해로 표를 고른다(조특법 §29의8 — 2026-01-01 이후 시작하는 과세연도부터 개편).
+//   2025 과세연도까지 늘어난 인원: 3년 같은 금액 — 중소 청년 등 수도권 1,450 · 지방 1,550 / 일반 850 · 950, 중견 800 · 450
+//   2026 과세연도부터 늘어난 인원: 고용을 유지하면 2 · 3년 차가 커진다 — 중소 청년 등 수도권 700 → 1,600 → 1,700 · 지방 1,000 → 1,900 → 2,000,
+//     일반 수도권 400 → 900 → 1,000 · 지방 700 → 1,200 → 1,300. 중견 · 그 밖은 개편 단가를 직접 넣는다(★ 확인).
+//   예전에는 해를 보지 않아 2026년에 뽑은 청년도 '1년 차 1,450만원' 으로 나와 첫해 공제가 두 배 가까이 부풀었다.
+export const CREDIT_REFORM_YEAR = 2026
 export type SizeType = 'sme' | 'mid' | 'other'
-export function defaultTaxUnits(region: RegionType | null | string, sizeType: SizeType | string): { youth: number; normal: number } {
-  if (sizeType === 'sme') return region === 'local' ? { youth: 1550, normal: 950 } : { youth: 1450, normal: 850 }
-  if (sizeType === 'mid') return { youth: 800, normal: 450 }
-  return { youth: 0, normal: 0 } // 기타/확인 필요 → 직접 입력
+type Three = [number, number, number]
+export interface TaxUnits {
+  /** 1년 차 단가(만원) — 화면 칸 · estimateTaxCredit 에 넣는 값 */
+  youth: number
+  normal: number
+  /** 1 · 2 · 3년 차 단가(만원) — 인원을 유지할 때 */
+  schedule: { youth: Three; normal: Three }
+  /** 고른 표 — 2023(3년 같은 금액) · 2026(개편) */
+  table: 2023 | 2026
+}
+const SME_2026: Record<RegionType, { youth: Three; normal: Three }> = {
+  metro: { youth: [700, 1600, 1700], normal: [400, 900, 1000] },
+  local: { youth: [1000, 1900, 2000], normal: [700, 1200, 1300] },
+}
+const flat = (youth: number, normal: number, table: 2023 | 2026): TaxUnits => ({ youth, normal, schedule: { youth: [youth, youth, youth], normal: [normal, normal, normal] }, table })
+/** year = 인원이 늘어난 과세연도(부르는 쪽이 넘긴다 — 명부의 올해 · 오늘). 넘기지 않으면 2025 표 */
+export function defaultTaxUnits(region: RegionType | null | string, sizeType: SizeType | string, year = CREDIT_REFORM_YEAR - 1): TaxUnits {
+  const reform = year >= CREDIT_REFORM_YEAR
+  if (sizeType === 'sme') {
+    if (reform) {
+      const t = SME_2026[region === 'local' ? 'local' : 'metro']
+      return { youth: t.youth[0], normal: t.normal[0], schedule: t, table: 2026 }
+    }
+    return region === 'local' ? flat(1550, 950, 2023) : flat(1450, 850, 2023)
+  }
+  if (sizeType === 'mid' && !reform) return flat(800, 450, 2023)
+  return flat(0, 0, reform ? 2026 : 2023) // 기타 · 2026 중견 → 직접 입력
+}
+
+/** D-319 늘어난 인원의 1 · 2 · 3년 차 공제(원) — 인원을 유지할 때. 단가는 표 그대로(직접 고친 단가에는 쓰지 않는다) */
+export function creditYears(units: TaxUnits, incYouth: number, incNormal: number): Three {
+  return [0, 1, 2].map((i) => (units.schedule.youth[i] * incYouth + units.schedule.normal[i] * incNormal) * 10000) as Three
 }
 
 export interface TaxCreditParams {
@@ -103,8 +137,9 @@ export interface RosterHeadcount {
 }
 
 /** 명부 날짜로 센 인원 → 통합고용세액공제(명부 화면과 같은 식 · 단가 기본값) */
-export function headcountTaxCredit(hc: Pick<RosterHeadcount, 'prev' | 'cur'>, region: RegionType | null, sizeType: SizeType): { units: { youth: number; normal: number }; estimate: TaxCreditResult } {
-  const units = defaultTaxUnits(region ?? 'metro', sizeType)
+export function headcountTaxCredit(hc: Pick<RosterHeadcount, 'prev' | 'cur'>, region: RegionType | null, sizeType: SizeType): { units: TaxUnits; estimate: TaxCreditResult } {
+  // D-319 늘어난 해(명부의 올해)로 단가 표를 고른다
+  const units = defaultTaxUnits(region ?? 'metro', sizeType, hc.cur.year)
   const estimate = estimateTaxCredit({ region, sizeType, prevTotal: hc.prev.total, prevYouth: hc.prev.youth, curTotal: hc.cur.total, curYouth: hc.cur.youth, unitYouth: units.youth, unitNormal: units.normal })
   return { units, estimate }
 }

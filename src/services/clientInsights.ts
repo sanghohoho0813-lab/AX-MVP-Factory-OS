@@ -278,7 +278,9 @@ export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: Ro
   const basis = `${p} → ${c} · 명부 날짜로 셈 · 세무사 확인`
   if (won > 0) return { won, line: `통합고용세액공제 예상 약 ${manwonText(won)}(${basis})`, basis, assumptions }
   if (hc.cur.total < hc.prev.total) return { won: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, basis, assumptions }
-  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 1년에 약 ${manwonText(units.youth * 10_000)} 덜 내요`, basis, assumptions }
+  // D-319 2026년부터 늘어난 인원은 1 · 2 · 3년 차 단가가 다르다
+  const per = units.table === 2026 ? `1년 차 약 ${manwonText(units.youth * 10_000)}(유지하면 2년 차 ${manwonText(units.schedule.youth[1] * 10_000)} · 3년 차 ${manwonText(units.schedule.youth[2] * 10_000)})` : `1년에 약 ${manwonText(units.youth * 10_000)}`
+  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 ${per} 덜 내요`, basis, assumptions }
 }
 
 const employmentInsight: Provider = ({ record, facts }) => {

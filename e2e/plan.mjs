@@ -3,7 +3,7 @@
  *
  *  1440  숫자가 다 있는 업체 › 맞춤 추천 › 상황별 한 장 설계서
  *        · 맞는 상황이 먼저(연구소 — 업종 · 직원 근거) · 청년 채용은 '확인' — 예/아니요 하나 · '예' 라면 받을 설계를 미리 보여 줌
- *        · 청년 2명 → 1년 안 받을 돈 = 고용지원금 1,440만 + 세액공제 2,900만 = 4,340만 · 3년 합계 · 정책자금(대출)은 따로
+ *        · 청년 2명 → 1년 안 받을 돈 = 고용지원금 1,440만 + 세액공제 1,400만(2026 개편 1년 차 700만 × 2 · D-319) = 2,840만 · 3년 합계 · 정책자금(대출)은 따로
  *        · 5명으로 바꾸면 그 숫자로 다시 · '예' → 맞음(업체 기록 · 상황 예시도 같이 열림)
  *        · 진행 순서 체크 하나 빼고 [업체에 붙이기] → 도구 결과 한 줄 · 할 일 4개(달력) · 다음 할 일이 비면 첫 행동 · 두 번 붙지 않음
  *        · 한 장 인쇄(인쇄하는 동안만 종이) · 요약 복사 · 모듈 화면 링크(같은 업체 · 같은 가정)
@@ -100,8 +100,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('한 장에 세 모듈 — 고용지원금 · 통합고용세액공제 · 정책자금(모두 계산됨)', blocks.join(',') === 'subsidy:ok,credit:ok,policy:ok', blocks.join(','))
   const total = await page.getByTestId('plan-total').innerText()
   check(
-    '청년 2명 — 1년 안 약 4,340만원(고용지원금 1,440만 + 세액공제 2,900만) · 3년 합계 · 정책자금(대출)은 따로',
-    (await attr(page, 'data-first')) === '43400000' && total.includes('약 4,340만원') && total.includes('최대 1,440만원') && total.includes('2,900만원') && total.includes('3년 합계') && total.includes('정책자금(대출)은 따로'),
+    '청년 2명 — 1년 안 약 2,840만원(고용지원금 1,440만 + 세액공제 1,400만 · 2026 개편 1년 차 700만 × 2) · 3년 합계 · 정책자금(대출)은 따로',
+    (await attr(page, 'data-first')) === '28400000' && total.includes('약 2,840만원') && total.includes('최대 1,440만원') && total.includes('1,400만원') && total.includes('3년 합계') && total.includes('정책자금(대출)은 따로'),
     total,
   )
   const sub = page.locator('[data-testid="plan-block"][data-key="subsidy"]')
@@ -115,7 +115,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 3. 사람 수 → 그 숫자로 다시
   await page.locator('[data-testid="plan-count"][data-n="5"]').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="plan-body"]')?.getAttribute('data-count') === '5')
-  check('5명 → 1년 안 1억 850만원(720만 × 5 + 1,450만 × 5) · 제목 청년 5명 채용', (await attr(page, 'data-first')) === '108500000' && (await page.getByTestId('plan-total').innerText()).includes('청년 5명 채용'))
+  check('5명 → 1년 안 7,100만원(720만 × 5 + 700만 × 5 · 2026 개편) · 제목 청년 5명 채용', (await attr(page, 'data-first')) === '71000000' && (await page.getByTestId('plan-total').innerText()).includes('청년 5명 채용'))
   check('사람 수 칩 눌림 표시(aria-pressed)', (await page.locator('[data-testid="plan-count"][data-n="5"]').getAttribute('aria-pressed')) === 'true')
 
   // 4. '예' → 맞음 · 업체 기록 · 상황 예시도 같이
@@ -133,7 +133,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('창업 5년 안 채용 — 청년 \'예\' 답으로 맞음 · 근거에 설립 · 5년 안', (await attr(page, 'data-fit')) === 'fit' && (await page.getByTestId('plan-fit').innerText()).includes('5년 안'))
   check('한 장 — 창업감면 → 고용지원금 → 세액공제 → 정책자금(모두 계산 · 판정됨)', sBlocks.join(',') === 'startup:ok,subsidy:ok,credit:ok,policy:ok', sBlocks.join(','))
   check('창업감면 — 판정됨 배지 · 판정기 결론 · 감면 기간 2023~2027년 · 금액 없음(판정만)', sText.includes('판정됨') && sText.includes('감면 기간: 2023~2027년') && (await sBox.getByTestId('plan-block-amount').count()) === 0, sText.slice(0, 200))
-  check('1년 안 = 청년 1명 채용과 같은 돈(720만 + 1,450만) · 창업감면은 판정만 표시', (await attr(page, 'data-first')) === '21700000' && (await page.getByTestId('plan-total').innerText()).includes('창업감면은 판정만'))
+  check('1년 안 = 청년 1명 채용과 같은 돈(720만 + 700만 · 2026 개편) · 창업감면은 판정만 표시', (await attr(page, 'data-first')) === '14200000' && (await page.getByTestId('plan-total').innerText()).includes('창업감면은 판정만'))
   check('세액공제 — 창업감면과 같은 해 · 이월 ★ 두 줄', (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('중복 배제') && (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('이월'))
   const sHref = (await sBox.getByTestId('plan-block-open').getAttribute('href')) ?? ''
   check('창업감면 → 창업감면 판정이 같은 업체 · 신규 창업 가정으로(preset=startup-new)', sHref.includes('/tools/startup-tax') && sHref.includes('client=cli_plan') && sHref.includes('preset=startup-new'), sHref)
@@ -184,7 +184,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const keptWhilePrinting = (await page.getByTestId('plan-print-sheet').count()) === 1
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
   await page.waitForTimeout(100)
-  check('한 장 인쇄 — 업체 · 상황 · 1년 안 금액 · 진행 순서 · 가정이 찍힘 · 찍는 동안 종이 남음 · 다 찍으면(afterprint) 치움', printed.includes('한솔정밀(주) — 청년 5명 채용') && printed.includes('1억') && printed.includes('이렇게 진행해요') && printed.includes('※') && keptWhilePrinting && (await page.getByTestId('plan-print-sheet').count()) === 0, { p: printed.slice(0, 120), keptWhilePrinting })
+  check('한 장 인쇄 — 업체 · 상황 · 1년 안 금액 · 진행 순서 · 가정이 찍힘 · 찍는 동안 종이 남음 · 다 찍으면(afterprint) 치움', printed.includes('한솔정밀(주) — 청년 5명 채용') && printed.includes('7,100만') && printed.includes('이렇게 진행해요') && printed.includes('※') && keptWhilePrinting && (await page.getByTestId('plan-print-sheet').count()) === 0, { p: printed.slice(0, 120), keptWhilePrinting })
   // 7. 요약 복사
   await page.getByTestId('plan-copy').click()
   await page.waitForTimeout(300)

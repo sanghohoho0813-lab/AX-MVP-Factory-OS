@@ -27,7 +27,7 @@ import { addDaysLocal } from './clientOpsNextAction'
 import { placeOf } from './grants/grantMatch'
 import { diagnoseHiring, type DiagnosisRow, type HiringAnswers } from '../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../tools/employment/lib/programs'
-import { defaultTaxUnits, estimateTaxCredit, regionTypeOf, type RegionType } from '../tools/employment/lib/taxCredit'
+import { creditYears, defaultTaxUnits, estimateTaxCredit, regionTypeOf, type RegionType } from '../tools/employment/lib/taxCredit'
 import { getTaxCreditEstimate } from '../tools/labcare/lib/taxCredit'
 import type { Client as LabClient } from '../tools/labcare/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
@@ -233,7 +233,7 @@ function subsidyBlock(record: ClientOpsRecord, facts: ClientFacts, presetId: str
 }
 
 /** 통합고용세액공제 — 청년 등(만 15~34세 · 만 60세 이상 포함) 상시근로자가 늘어난 만큼(명부 화면과 같은 식) */
-function creditBlock(record: ClientOpsRecord, facts: ClientFacts, count: number, who: string, extra: readonly string[] = []): PlanBlock {
+function creditBlock(record: ClientOpsRecord, facts: ClientFacts, count: number, who: string, today: string, extra: readonly string[] = []): PlanBlock {
   const sido = sidoOf(facts)
   const region: RegionType | null = regionTypeOf(sido || null)
   const sme = smeConfirmed(record)
@@ -244,26 +244,30 @@ function creditBlock(record: ClientOpsRecord, facts: ClientFacts, count: number,
   if (tooBig) {
     return { ...base, state: 'need', headline: '직원 300명 이상 — 기업 규모(중소 · 중견)를 알아야 단가를 정해요', won: 0, laterWon: 0, amount: '', lines: [], assumptions: ['중소기업 확인서가 있으면 바로 계산'] }
   }
-  const units = defaultTaxUnits(region ?? 'metro', 'sme')
+  // D-319 올해 뽑으면 올해 늘어난 인원 — 2026년부터는 1 · 2 · 3년 차 단가가 다르다
+  const units = defaultTaxUnits(region ?? 'metro', 'sme', Number(today.slice(0, 4)))
   const prev = facts.employeeCount ?? 0
   const est = estimateTaxCredit({ region: region ?? 'metro', sizeType: 'sme', prevTotal: prev, curTotal: prev + count, prevYouth: 0, curYouth: count, unitYouth: units.youth, unitNormal: units.normal })
   const year1 = est.creditTotal ?? 0
-  const years = 3
+  const [, y2, y3] = creditYears(units, est.incYouth ?? 0, est.incNormal ?? 0)
+  const reform = units.table === 2026
   return {
     ...base,
     state: 'ok',
     headline: `${who} ${count}명 늘면 1년 차 약 ${man(year1)} 덜 냄`,
     won: year1,
-    laterWon: year1 * (years - 1),
+    laterWon: y2 + y3,
     amount: `1년 차 약 ${man(year1)}`,
     lines: [
-      `1명 ${man(units.youth * 10_000)}(${region === 'local' ? '지방' : '수도권'} 중소기업 · 청년 등) × ${count}명 = 1년 차 약 ${man(year1)}`,
-      `인원을 그대로 두면 2년 더 — 3년 합계 약 ${man(year1 * years)}`,
-      '★ 회사 전체 상시근로자 수가 늘어야 해요 — 그사이 다른 직원이 나가면 줄어요',
+      `1명 ${man(units.youth * 10_000)}(${region === 'local' ? '지방' : '수도권'} 중소기업 · 청년 등${reform ? ' · 2026년 개편 1년 차' : ''}) × ${count}명 = 1년 차 약 ${man(year1)}`,
+      reform
+        ? `인원을 그대로 두면 2년 차 약 ${man(y2)} · 3년 차 약 ${man(y3)} — 3년 합계 약 ${man(year1 + y2 + y3)}`
+        : `인원을 그대로 두면 2년 더 — 3년 합계 약 ${man(year1 + y2 + y3)}`,
+      reform ? '★ 회사 전체 상시근로자 수가 늘어야 해요 — 줄면 준 만큼만 그해 공제에서 빠져요(2026년 개편 · 예전처럼 되돌려 내지 않음)' : '★ 회사 전체 상시근로자 수가 늘어야 해요 — 그사이 다른 직원이 나가면 줄어요',
       ...extra,
     ],
     assumptions: [
-      '단가는 명부 진단 화면과 같은 참고값 — 귀속연도 법령표 · 담당 세무사 확인',
+      reform ? '단가는 2026년 개편표(1 · 2 · 3년 차 · 명부 진단 화면과 같음) — 담당 세무사 확인' : '단가는 명부 진단 화면과 같은 참고값 — 귀속연도 법령표 · 담당 세무사 확인',
       ...(sme ? [] : ['중소기업 확인서가 없어 중소기업으로 보고 계산(★)']),
       ...(region ? [] : ['주소를 몰라 수도권 단가(더 낮은 쪽)로 계산']),
       '소비성 서비스업 등 제외 업종 · 최저한세 · 중복공제는 세무사 확인',
@@ -472,7 +476,7 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
     const startup = id === 'startup-hire'
     if (startup) blocks.push(startupBlock(record, f, today))
     const { block, main } = subsidyBlock(record, f, def.hiring ?? def.preset, n)
-    blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', startup ? STARTUP_CREDIT_NOTES : []))
+    blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', today, startup ? STARTUP_CREDIT_NOTES : []))
     const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
     actions = hiringActions(today, main, n, pol.state === 'ok', startup)

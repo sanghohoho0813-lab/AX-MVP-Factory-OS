@@ -400,11 +400,12 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
     sub.state === 'ok' && sub.headline.includes(top.program.name) && sub.won === top.program.totalAmount * 2 && sub.lines.some((l) => l.startsWith('받는 때:')) && sub.openPath.includes('preset=emp-youth'),
     { headline: sub.headline, won: sub.won, lines: sub.lines },
   )
-  const unit = defaultTaxUnits('metro', 'sme').youth * 10_000
+  // D-319 2026년에 뽑으면 2026 개편표 — 수도권 중소 청년 등 1년 차 700 · 2년 차 1,600 · 3년 차 1,700만
+  const unit = defaultTaxUnits('metro', 'sme', 2026).youth * 10_000
   check(
-    'P3 통합고용세액공제 — 명부 화면과 같은 식(경기 = 수도권 중소 청년 단가 × 2명) · 3년 유지 · 중소기업 가정 ★',
-    cred.state === 'ok' && cred.won === unit * 2 && cred.laterWon === unit * 2 * 2 && cred.assumptions.some((a) => a.includes('중소기업으로 보고')) && cred.openPath.startsWith('/tools/employment/roster'),
-    { won: cred.won, unit, later: cred.laterWon, a: cred.assumptions },
+    'P3 · D-319 통합고용세액공제 — 명부 화면과 같은 식(경기 = 수도권 중소 청년 1년 차 700만 × 2명) · 유지하면 2 · 3년 차(1,600 · 1,700만 × 2) · 중소기업 가정 ★',
+    cred.state === 'ok' && unit === 7_000_000 && cred.won === unit * 2 && cred.laterWon === (16_000_000 + 17_000_000) * 2 && cred.lines.some((l) => l.includes('2년 차 약 3,200만원') && l.includes('3년 차 약 3,400만원')) && cred.assumptions.some((a) => a.includes('중소기업으로 보고')) && cred.openPath.startsWith('/tools/employment/roster'),
+    { won: cred.won, unit, later: cred.laterWon, lines: cred.lines, a: cred.assumptions },
   )
   check(
     'P4 합계 — 1년 안 = 지원금 + 세액공제 1년 차 · 유지하면 + 2·3년 차 · 정책자금(대출)은 합계에 안 넣음',
@@ -432,7 +433,7 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   const credOf = (rec: ClientOpsRecord) => buildSituationPlan('hire-youth', rec, today, 1).blocks.find((b) => b.key === 'credit')!
   check(
     'P8 세액공제 단가 — 지방은 지방 단가 · 주소 없으면 수도권(낮은 쪽) + 가정 표시 · 중소기업 확인서 있으면 ★ 없음 · 300명 넘고 확인서 없으면 계산 안 함',
-    credOf(local).won === defaultTaxUnits('local', 'sme').youth * 10_000 &&
+    credOf(local).won === defaultTaxUnits('local', 'sme', 2026).youth * 10_000 &&
       credOf(noAddr).won === unit && credOf(noAddr).assumptions.some((a) => a.includes('주소를 몰라')) &&
       smeConfirmed(smeRec) && !credOf(smeRec).assumptions.some((a) => a.includes('중소기업으로 보고')) &&
       credOf(big).state === 'need' && credOf(big).won === 0,

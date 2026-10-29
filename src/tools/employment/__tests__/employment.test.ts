@@ -42,6 +42,7 @@ import {
   buildCopyText,
   classifyEmployee,
   CONFIDENCE_META,
+  creditYears,
   defaultTaxUnits,
   deriveFromRRN,
   EMP_DOC_CHECKLIST,
@@ -1095,7 +1096,12 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('D-302 인원: 뺀 사람 — 대표 표시 1 · 고용보험 없음 1 · 입사일 모름 1 · 그만둔 날 모르는 상실 1', !!hc && hc.counted === 4 && hc.excluded.rel === 1 && hc.excluded.noEi === 1 && hc.excluded.noHire === 1 && hc.excluded.lostNoDate === 1, JSON.stringify(hc?.excluded))
   check('D-302 인원: 상실 날짜가 있는 명부는 history', hc?.basis === 'history')
   const cr = hc ? headcountTaxCredit(hc, 'local', 'sme') : null
-  check('D-302 세액공제: 늘어난 0.33명(청년 등 증가는 전체 증가로 자름) × 지방 중소 청년 1,550만 = 약 511.5만원', !!cr && cr.units.youth === 1550 && Math.round(cr.estimate.creditTotal ?? 0) === 5_115_000, JSON.stringify(cr?.estimate))
+  // D-319 2026년에 늘어난 인원 → 2026 개편표(지방 중소 청년 등 1년 차 1,000만 · 2년 차 1,900만 · 3년 차 2,000만)
+  check('D-302 · D-319 세액공제: 늘어난 0.33명(청년 등 증가는 전체 증가로 자름) × 지방 중소 청년 1년 차 1,000만(2026 개편) = 약 330만원', !!cr && cr.units.youth === 1000 && cr.units.table === 2026 && Math.round(cr.estimate.creditTotal ?? 0) === 3_300_000, JSON.stringify(cr?.estimate))
+  check('D-319 세액공제 표: 2025년까지 늘어난 인원은 3년 같은 금액(지방 1,550 · 수도권 1,450 · 중견 800)', defaultTaxUnits('local', 'sme', 2025).youth === 1550 && defaultTaxUnits('metro', 'sme', 2025).schedule.youth.join() === '1450,1450,1450' && defaultTaxUnits('metro', 'mid', 2025).youth === 800)
+  check('D-319 세액공제 표: 2026년부터 중소 — 청년 등 수도권 700 · 1,600 · 1,700 / 지방 1,000 · 1,900 · 2,000 · 일반 수도권 400 · 900 · 1,000 / 지방 700 · 1,200 · 1,300', defaultTaxUnits('metro', 'sme', 2026).schedule.youth.join() === '700,1600,1700' && defaultTaxUnits('local', 'sme', 2026).schedule.youth.join() === '1000,1900,2000' && defaultTaxUnits('metro', 'sme', 2026).schedule.normal.join() === '400,900,1000' && defaultTaxUnits('local', 'sme', 2027).schedule.normal.join() === '700,1200,1300')
+  check('D-319 세액공제 표: 2026 중견은 직접 입력(0) — 옛 단가를 쓰지 않음', defaultTaxUnits('metro', 'mid', 2026).youth === 0 && defaultTaxUnits('metro', 'mid', 2026).table === 2026)
+  check('D-319 1 · 2 · 3년 차(원) — 수도권 중소 청년 2명 · 일반 1명 = 1,800만 · 4,100만 · 4,400만', creditYears(defaultTaxUnits('metro', 'sme', 2026), 2, 1).join() === '18000000,41000000,44000000', creditYears(defaultTaxUnits('metro', 'sme', 2026), 2, 1).join())
   const cur = rosterHeadcount(list.filter((e) => !e.loseDate), { baseDate: '2026-10-27' })
   check('D-302 인원: 상실 날짜가 하나도 없으면 current(작년 퇴사자가 빠졌을 수 있음) · 발급일이 없으면 오늘까지 실제(9달)', cur?.basis === 'current' && cur.asOf === '2026-10-27' && cur.cur.actualMonths === 9, JSON.stringify(cur && { b: cur.basis, a: cur.asOf, m: cur.cur.actualMonths }))
   check('D-302 인원: 발급일이 오늘보다 늦게 적혀 있으면 오늘', rosterHeadcount(list, { baseDate: '2026-10-27', issueDate: '2026-12-01' })?.asOf === '2026-10-27')
