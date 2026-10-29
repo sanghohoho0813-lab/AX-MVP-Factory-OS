@@ -1272,6 +1272,8 @@ function vlookupBracket(x: number, table: Bracket[]): Bracket {
   }
   return r
 }
+/** D-327 배당가산율 — 2024년 이후 지급분 10% */
+export const GROSSUP_RATE = 0.1
 export const INC9_BRACKETS: Bracket[] = [[0, 0, 0.06], [14000000, 1260000, 0.15], [50000000, 5760000, 0.24], [88000000, 15440000, 0.35], [150000000, 19940000, 0.38], [300000000, 25940000, 0.4], [500000000, 35940000, 0.42], [1000000000, 65940000, 0.45]]
 export function incomeTax9(base: number): number {
   const r = vlookupBracket(base, INC9_BRACKETS)
@@ -1365,7 +1367,9 @@ function scenario(v: Values, p: string): Scenario {
 
   const interestAmt = interest
   const finTotal = interest + dividend
-  const grossup = Math.max(0, Math.min(finTotal - 20000000, dividend)) * 0.11
+  // D-327 배당가산율(Gross-up) — 2024-01-01 이후 받는 배당은 10%(소득세법 §17③). 원본은 11%(2023년까지)라 종합과세 배당이 조금 크게 잡혔다.
+  //       2027년 지급분부터 11% 로 되돌리는 안은 국회 전 — 통과되면 지급 연도로 고른다.
+  const grossup = Math.max(0, Math.min(finTotal - 20000000, dividend)) * GROSSUP_RATE
   const dividendAmt = dividend + grossup
   const businessAmt = business
   const earnedDed = earnedDeduction9(salary)

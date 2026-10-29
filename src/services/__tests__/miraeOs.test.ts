@@ -1402,6 +1402,13 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
     const t3 = calculatorOf('t3')!
     const titles = t3.subs[0].groups.map((g) => g.title).join(' | ')
     check('D-320 증여공제: 혼인 · 출산 공제 포함 1억 5천만(부모 → 성년 자녀) · 기존 선택지는 그대로', giftDeduction('직계존속(성년 · 혼인출산)') === 150000000 && giftDeduction('직계존속(성년)') === 50000000 && giftDeduction('직계존속(미성년)') === 20000000)
+    // D-327 배당가산율 10%(2024년 이후 지급분) — 배당 1억 · 이자 0 → 2,000만 넘는 8,000만 × 10% = 800만
+    {
+      const t9 = calculatorOf('t9')!
+      const a = t9.subs.find((x) => x.key === 'inc_a')!.compute(defaultValues(t9))
+      const g = a.blocks.flatMap((b) => b.lines).find((l) => l.k === '배당가산액(Gross-up)')?.v
+      check('D-327 배당가산액 = (금융소득 1억 − 2,000만) × 10% = 8,000,000원', g === '8,000,000원', g)
+    }
     // D-321 계산 기준표 — 계산에 쓰는 상수에서 읽은 숫자
     const basis = lawBasis()
     const sec = (id: string) => basis.find((b) => b.id === id)

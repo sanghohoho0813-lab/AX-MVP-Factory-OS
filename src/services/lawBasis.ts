@@ -4,7 +4,7 @@
  * 숫자를 여기 따로 적지 않는다 — 계산기 · 모듈이 실제로 쓰는 상수와 함수에서 읽는다(바꾸면 기준표도 같이 바뀐다).
  * 기준 연도 · 조문 이름은 사람이 읽는 꼬리표다. 규칙 계산이며 AI 가 아니다.
  */
-import { CONV_DED9, CORP_RATES, INC9_BRACKETS, S_RATE, SERVICE_DED9, defaultValues, calculatorOf, giftDeduction, inheritGiftTax } from './taxCalc'
+import { CONV_DED9, CORP_RATES, GROSSUP_RATE, INC9_BRACKETS, S_RATE, SERVICE_DED9, defaultValues, calculatorOf, giftDeduction, inheritGiftTax } from './taxCalc'
 import { SME_2026, defaultTaxUnits } from '../tools/employment/lib/taxCredit'
 import { VENTURE_STARTUP_RATE, startupRates } from '../tools/startupTax/lib/rules'
 import { CATEGORY_RATES } from '../tools/labcare/lib/taxCredit'
@@ -81,7 +81,12 @@ export function lawBasis(): BasisSection[] {
       id: 'income',
       title: '소득세 기본세율',
       basis: '2023년 귀속부터 · 소득세법 §55 (근로 · 종합 · 퇴직 같은 표)',
-      rows: [...bracketRows(INC9_BRACKETS), { label: '지방소득세', value: '소득세의 10% 더' }],
+      rows: [
+        ...bracketRows(INC9_BRACKETS),
+        { label: '지방소득세', value: '소득세의 10% 더' },
+        { label: '금융소득 종합과세', value: '이자 · 배당 합계 2,000만 넘는 부분 — 2,000만까지는 14%' },
+        { label: '배당가산율(Gross-up)', value: `${pctOf(GROSSUP_RATE)} (2024년 이후 받는 배당 · 2027년 11% 안은 국회 전)` },
+      ],
       usedIn: '세금 계산기 01 · 02 · 03(소득세) · 절세 설계',
     },
     {
