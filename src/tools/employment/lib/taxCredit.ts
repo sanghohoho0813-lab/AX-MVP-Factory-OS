@@ -81,21 +81,26 @@ export interface TaxCreditResult {
 // ── 통합고용세액공제 예상 검토 계산 ───────────────────────
 // params: { region, sizeType, prevTotal, prevYouth, curTotal, curYouth, unitYouth, unitNormal }
 // "모름"은 null 로 전달. 단가는 만원 단위. 반환 금액은 원 단위.
+// D-324 상시근로자 수는 100분의 1 미만을 버린다(조특법 시행령 §23⑩) — 평균 인원을 소수 둘째 자리로 자르고 차이도 둘째 자리로.
+//   예전에는 2.91 − 2 = 0.9100000000000001 이 그대로 보이고, 청년 등 증가(0.91)가 전체 증가보다 크다는 거짓 경고가 떴다.
+const floor2 = (n: number) => Math.floor(n * 100 + 1e-6) / 100
+const diff2 = (a: number, b: number) => Math.max(0, Math.round((floor2(a) - floor2(b)) * 100) / 100)
+
 export function estimateTaxCredit(params?: TaxCreditParams | null): TaxCreditResult {
   const p = params || {}
   const computable = typeof p.prevTotal === 'number' && typeof p.curTotal === 'number'
-  const incTotal = computable ? Math.max(0, (p.curTotal as number) - (p.prevTotal as number)) : null
+  const incTotal = computable ? diff2(p.curTotal as number, p.prevTotal as number) : null
 
   const youthKnown = typeof p.prevYouth === 'number' && typeof p.curYouth === 'number'
-  const rawIncYouth = youthKnown ? Math.max(0, (p.curYouth as number) - (p.prevYouth as number)) : null
+  const rawIncYouth = youthKnown ? diff2(p.curYouth as number, p.prevYouth as number) : null
   // D-136: 청년 등 증가는 전체 증가를 넘을 수 없다 → 전체 증가로 자른다 (넘으면 overYouth 로 입력 재확인 안내)
   const incYouth = rawIncYouth != null && incTotal != null ? Math.min(rawIncYouth, incTotal) : rawIncYouth
-  const incNormal = incTotal != null && incYouth != null ? Math.max(0, incTotal - incYouth) : null
+  const incNormal = incTotal != null && incYouth != null ? Math.max(0, Math.round((incTotal - incYouth) * 100) / 100) : null
 
   const unitY = Number(p.unitYouth) || 0
   const unitN = Number(p.unitNormal) || 0
-  const creditYouth = incYouth != null ? incYouth * unitY * 10000 : null
-  const creditNormal = incNormal != null ? incNormal * unitN * 10000 : null
+  const creditYouth = incYouth != null ? Math.round(incYouth * unitY * 10000) : null
+  const creditNormal = incNormal != null ? Math.round(incNormal * unitN * 10000) : null
   const creditTotal = (creditYouth || 0) + (creditNormal || 0)
 
   // 검증: 청년 등 증가 인원이 전체 증가 인원을 초과하면 입력값 재확인 필요(과대계산 위험)

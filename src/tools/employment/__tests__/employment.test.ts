@@ -1100,6 +1100,11 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('D-302 · D-319 세액공제: 늘어난 0.33명(청년 등 증가는 전체 증가로 자름) × 지방 중소 청년 1년 차 1,000만(2026 개편) = 약 330만원', !!cr && cr.units.youth === 1000 && cr.units.table === 2026 && Math.round(cr.estimate.creditTotal ?? 0) === 3_300_000, JSON.stringify(cr?.estimate))
   check('D-319 세액공제 표: 2025년까지 늘어난 인원은 3년 같은 금액(지방 1,550 · 수도권 1,450 · 중견 800)', defaultTaxUnits('local', 'sme', 2025).youth === 1550 && defaultTaxUnits('metro', 'sme', 2025).schedule.youth.join() === '1450,1450,1450' && defaultTaxUnits('metro', 'mid', 2025).youth === 800)
   check('D-319 세액공제 표: 2026년부터 중소 — 청년 등 수도권 700 · 1,600 · 1,700 / 지방 1,000 · 1,900 · 2,000 · 일반 수도권 400 · 900 · 1,000 / 지방 700 · 1,200 · 1,300', defaultTaxUnits('metro', 'sme', 2026).schedule.youth.join() === '700,1600,1700' && defaultTaxUnits('local', 'sme', 2026).schedule.youth.join() === '1000,1900,2000' && defaultTaxUnits('metro', 'sme', 2026).schedule.normal.join() === '400,900,1000' && defaultTaxUnits('local', 'sme', 2027).schedule.normal.join() === '700,1200,1300')
+  {
+    // D-324 상시근로자 수는 100분의 1 미만 버림 — 2 → 2.919(→ 2.91) · 청년 0 → 0.91 : 증가 0.91명 · 거짓 경고 없음 · 원 단위 반올림
+    const e = estimateTaxCredit({ prevTotal: 2, curTotal: 2.919, prevYouth: 0, curYouth: 0.91, unitYouth: 700, unitNormal: 400 })
+    check('D-324 세액공제: 인원은 소수 둘째 자리까지(버림) · 0.91명 · 청년 초과 거짓 경고 없음 · 637만원', e.incTotal === 0.91 && e.incYouth === 0.91 && e.incNormal === 0 && !e.overYouth && e.creditTotal === 6_370_000, JSON.stringify(e))
+  }
   check('D-319 세액공제 표: 2026 중견은 직접 입력(0) — 옛 단가를 쓰지 않음', defaultTaxUnits('metro', 'mid', 2026).youth === 0 && defaultTaxUnits('metro', 'mid', 2026).table === 2026)
   check('D-319 1 · 2 · 3년 차(원) — 수도권 중소 청년 2명 · 일반 1명 = 1,800만 · 4,100만 · 4,400만', creditYears(defaultTaxUnits('metro', 'sme', 2026), 2, 1).join() === '18000000,41000000,44000000', creditYears(defaultTaxUnits('metro', 'sme', 2026), 2, 1).join())
   const cur = rosterHeadcount(list.filter((e) => !e.loseDate), { baseDate: '2026-10-27' })

@@ -863,7 +863,8 @@ function RosterTab() {
               {estimate.computable && estimate.creditTotal != null && (
                 <p className="t-sub text-slate-600">
                   통합고용세액공제 예상 <b className="text-slate-900">약 {formatWon(estimate.creditTotal)}</b> (증가 {estimate.incTotal}명 · 1차 추정 · 확정 아님)
-                  {estimate.needsRecheck && <span className="text-danger-700"> · 청년 등 증가분이 전체 증가분보다 큽니다 — 입력값 재확인</span>}
+                  {/* D-324 명부로 센 인원에서는 흔한 일(나이 든 직원이 나가고 청년이 들어옴) — 잘못이 아니라 전체 증가만큼만 청년 등으로 센다 */}
+                  {estimate.needsRecheck && <span className="text-amber-700" data-testid="credit-youth-capped"> · 청년 등 증가가 전체 증가보다 커서 전체 증가({estimate.incTotal}명)만큼만 청년 등 단가로 셌어요 — 직접 적은 값이면 확인</span>}
                   {/* D-319 2026년 개편 — 인원을 유지하면 2 · 3년 차가 커진다(직접 고친 단가에는 쓰지 않음) */}
                   {units.table === 2026 && !form.unitsTouched && estimate.creditTotal > 0 && (
                     <span className="block" data-testid="credit-years">
