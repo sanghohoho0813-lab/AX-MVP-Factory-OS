@@ -915,7 +915,7 @@ function calc6p3(v: Values): Output {
         title: '퇴직소득세 계산 결과',
         tone: 'dark',
         lines: [
-          L('적용 법', Number.isNaN(end.getTime()) ? '-' : before2023 ? '2022년까지 퇴직 — 옛 근속연수공제 · 옛 세율' : '2023년 이후 퇴직 — 지금 근속연수공제 · 기본세율'),
+          L('기준', Number.isNaN(end.getTime()) ? '-' : before2023 ? '2022년까지 퇴직(그때 법)' : '2023년 이후 퇴직(현행 법)'),
           L('근속연수', years > 0 ? years + '년' : '-'),
           L('근속공제', won(serviceDed)),
           L('근속공제 후 산출액', won(afterService)),
