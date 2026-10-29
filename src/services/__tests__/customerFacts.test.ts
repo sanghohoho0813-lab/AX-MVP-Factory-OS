@@ -1271,6 +1271,10 @@ await (async () => {
   const local = await run('충청북도 청주시 흥덕구 오송읍 1')
   const metro = await run('서울특별시 중구 세종대로 1')
   const none = await run('')
+  // 예전에 붙인 명부 결과(저장 합계 1,440만 = 청년도약 720 + 계속고용 720 옛 금액)도 저장된 후보 수로 지금 금액을 다시 센다
+  const oldTr = (addr: string) => normalizeClientOps({ id: 'sc334b', companyName: '옛결과(주)', businessAddress: addr, createdAt: NOW, updatedAt: NOW, toolResults: [{ id: 'tr-old', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '후보 지원금 2건 · 확인 항목 0', summary: '[4대보험 명부 진단] 2명', data: { tab: 'roster', subsidyTotal: 14_400_000, subsidySummary: [{ key: 'youth_jump', name: '청년도약', candidateCount: 1, level: 'check' }, { key: 'senior_continue', name: '계속고용', candidateCount: 1, level: 'check' }, { key: 'parental', name: '육아', candidateCount: 0, level: 'more' }] }, deadlines: [], createdAt: NOW, publishedUpdateId: null }] } as never)
+  const amt = (addr: string) => buildInsights(oldTr(addr), '2026-10-28', []).find((i) => i.key === 'employment')?.amount ?? ''
+  check('D-334 옛 명부 결과 → 지금 금액으로(비수도권 720 + 1,440 = 2,160만 · 수도권 1,800만 · 주소 모르면 저장 값과 수도권 중 큰 쪽 1,800만)', amt('충청북도 청주시 1').startsWith('최대 2,160만원') && amt('서울특별시 중구 1').startsWith('최대 1,800만원') && amt('').startsWith('최대 1,800만원'), [amt('충청북도 청주시 1'), amt('서울특별시 중구 1'), amt('')].join(' | '))
   check('D-334 명부 → 비수도권 업체는 계속고용 1,440만 · 수도권 1,080만 · 주소 모르면 수도권 금액', local.total === 14_400_000 && metro.total === 10_800_000 && none.total === 10_800_000 && local.summary.includes('최대 1,440만원'), `${local.total} ${metro.total} ${none.total}`)
 })()
 

@@ -373,6 +373,22 @@ export function programForRegion<P extends Pick<Program, 'id' | 'totalAmount' | 
   return { ...p, totalAmount: alt.totalAmount, rounds: alt.rounds.map((r) => ({ ...r })) }
 }
 
+/**
+ * D-334 명부 진단 후보 수 → 최대 예상 지원금(원) — 지금 규칙표 · 회사 지역 금액으로.
+ * 저장된 옛 합계(예: 계속고용 720만 시절)를 다시 셀 때도 쓴다. 금액을 셀 수 있는 지원금만(육아 등은 0).
+ */
+export const ROSTER_SUBSIDY_KEYS: readonly string[] = ['youth_jump', 'emp_promo', 'senior_continue', 'senior_intern', 'saeil_women']
+export function rosterSubsidyTotal(summary: readonly { key: string; candidateCount?: number }[] | null | undefined, region?: '수도권' | '비수도권' | null): number {
+  let won = 0
+  for (const s of summary || []) {
+    const p = DEFAULT_PROGRAMS[s.key]
+    if (!p || !ROSTER_SUBSIDY_KEYS.includes(s.key)) continue
+    // 만원 단위로 맞춘다(명부 화면 · 원본 앱과 같은 숫자)
+    won += (Number(s.candidateCount) || 0) * Math.round(programForRegion(p, region).totalAmount / 10000) * 10000
+  }
+  return won
+}
+
 /** 회차 금액 합 */
 export function roundsSum(p: Pick<Program, 'rounds'> | null | undefined): number {
   return ((p && p.rounds) || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)

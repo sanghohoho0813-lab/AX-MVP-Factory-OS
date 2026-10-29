@@ -26,6 +26,7 @@ import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import { METRO_POP_DECLINE } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
+import { rosterSubsidyTotal } from '../tools/employment/lib/programs'
 import { creditYears, headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
@@ -295,7 +296,13 @@ const employmentInsight: Provider = ({ record, facts }) => {
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'
   const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
   const fromText = /최대\s*([\d,]+)\s*만원/.exec(roster.summary)?.[1]
-  const total = typeof saved === 'number' && saved > 0 ? saved : fromText ? Number(fromText.replace(/,/g, '')) * 10_000 : 0
+  const old = typeof saved === 'number' && saved > 0 ? saved : fromText ? Number(fromText.replace(/,/g, '')) * 10_000 : 0
+  // D-334 저장된 후보 수가 있으면 지금 규칙표 · 회사 지역 금액으로 다시 센다(예전 결과의 계속고용 720만이 남지 않게).
+  //        주소를 모르면(수도권 금액으로 셈) 명부 화면에서 고른 소재지 금액이 더 클 수 있어 둘 중 큰 쪽
+  const rows = (roster.data as { subsidySummary?: unknown } | null)?.subsidySummary
+  const empSido = placeOf(facts.address).sido
+  const fresh = Array.isArray(rows) ? rosterSubsidyTotal(rows as { key: string; candidateCount?: number }[], empSido ? (['서울', '경기', '인천'].includes(empSido) ? '수도권' : '비수도권') : null) : 0
+  const total = fresh > 0 ? (empSido ? fresh : Math.max(fresh, old)) : old
   // 통합고용세액공제 — 명부 화면에서 사람이 넣어 계산한 값이 먼저(D-232), 없으면 명부 날짜로 센 인원으로(D-302). 둘 다 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
   const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown }; headcount?: unknown } | null
   const typed = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
