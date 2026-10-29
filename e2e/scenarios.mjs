@@ -311,7 +311,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await openSmart(page, 'cli_scen_small')
   const sb = page.getByTestId('smart-scenarios')
   const smallIds = (await page.getByTestId('scenario-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))).sort()
-  check('가연 같은 작은 업체 — 맞는 상황은 근거 있는 4개뿐(창업감면 · 본점 이전 · 운전자금 · NX-4 창업 초기 창업자금)', Number(await sb.getAttribute('data-count')) === 4 && smallIds.join(',') === 'policy-startup,policy-working,startup-move,startup-new', smallIds.join(','))
+  check('가연 같은 작은 업체 — 맞는 상황은 근거 있는 5개뿐(창업감면 · 본점 이전 · 운전자금 · NX-4 창업 초기 창업자금 · D-328 벤처 확인)', Number(await sb.getAttribute('data-count')) === 5 && smallIds.join(',') === 'policy-startup,policy-working,startup-move,startup-new,startup-venture', smallIds.join(','))
   const bodyText = await sb.innerText()
   check('가연 — "세후 월 800만원" 은 설계되지 않음(맞음 목록에 없음)', (await row(page, 'tax-salary-net').count()) === 0 && (await row(page, 'tax-salary-rate').count()) === 0)
   if (await page.getByTestId('scenario-questions-more').count()) await page.getByTestId('scenario-questions-more').click()

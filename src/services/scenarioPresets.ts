@@ -81,7 +81,8 @@ export interface ScenarioPreset {
   taxCompare?: Array<'shareSale' | 'shareBurn' | 'spouseBurn' | 'salary' | 'dividend' | 'retire' | 'mix'>
   hiring?: HiringPreset
   lab?: LabPreset
-  startup?: Partial<Pick<StartupForm, 'startupForm' | 'region' | 'overconcentration'>>
+  /** ventureDate: 'today' — D-328 '벤처 확인을 받으면' 은 오늘 받았다고 보고 판정(presetStartup 이 오늘 날짜로 바꾼다) */
+  startup?: Partial<Pick<StartupForm, 'startupForm' | 'region' | 'overconcentration' | 'ventureDate'>>
   policy?: Partial<DiagnosisInput>
   /** D-243 세금 계산기 05 · 06 */
   calc?: CalcPreset
@@ -129,6 +130,8 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'startup-convert', module: 'startup-tax', title: '개인사업자 → 법인전환한 경우', when: '법인으로 바꿨을 때 — 감면 기간이 이어지는지', startup: { startupForm: 'conversion' } }),
   p({ id: 'startup-move', module: 'startup-tax', title: '본점을 과밀억제권역 밖으로 옮기면', when: '수도권 과밀억제권역 안 업체 — 옮기면 감면율이 바뀌는지(감면율은 창업한 곳 기준)', startup: { startupForm: 'brand_new', region: 'other_local', overconcentration: 'no' } }),
   // NX-4 감면이 안 될 수 있는 창업 형태 — 미리 알려 주는 것이 상담
+  // D-328 창업 3년 안 벤처 확인 — 과밀억제권역 · 수도권 일반 창업은 0 · 25% → 창업벤처 50%(조특법 §6②)
+  p({ id: 'startup-venture', module: 'startup-tax', title: '창업 3년 안에 벤처기업 확인을 받으면', when: '과밀억제권역 · 수도권 일반 창업 — 벤처 확인으로 감면율이 오르는지(창업벤처 50%)', startup: { startupForm: 'brand_new', ventureDate: 'today' } }),
   p({ id: 'startup-acquire', module: 'startup-tax', title: '남의 사업을 넘겨받아(양수) 시작했으면', when: '기존 사업장 · 설비를 인수해 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'acquisition' } }),
   p({ id: 'startup-reopen', module: 'startup-tax', title: '같은 업종으로 다시 창업했으면', when: '예전에 같은 업종 사업을 접고 다시 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'reopen_same' } }),
   // 정책자금 3 — 진단(같은 엔진)
@@ -178,6 +181,7 @@ export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
     if (s.startup.region) out.push({ field: 'region', text: `본점 ${REGION_LABEL[s.startup.region] ?? s.startup.region}` })
     if (s.startup.overconcentration === 'no') out.push({ field: 'overconcentration', text: '과밀억제권역 밖' })
     else if (s.startup.overconcentration === 'yes') out.push({ field: 'overconcentration', text: '과밀억제권역 안' })
+    if (s.startup.ventureDate) out.push({ field: 'ventureDate', text: '벤처 확인(오늘 받았다고 보고)' })
   }
   if (s.policy) {
     if (s.policy.purpose) out.push({ field: 'purpose', text: s.policy.purpose })
@@ -223,4 +227,10 @@ export function scenarioPreset(id: string | null | undefined): ScenarioPreset | 
 export function scenarioPath(s: Pick<ScenarioPreset, 'id' | 'module' | 'calc'>, clientId: string): string {
   const calc = s.calc ? `&m=calc&c=${s.calc.key}&s=${s.calc.sub}` : ''
   return `${SCENARIO_MODULE_PATH[s.module]}?client=${encodeURIComponent(clientId)}${calc}&preset=${encodeURIComponent(s.id)}`
+}
+
+/** D-328 상황 예시의 창업감면 값 — ventureDate 'today' 는 오늘 날짜로(판정기 · 상황 예시 · 설계서가 같은 값) */
+export function presetStartup(s: ScenarioPreset['startup'], today: string): ScenarioPreset['startup'] {
+  if (!s) return s
+  return s.ventureDate === 'today' ? { ...s, ventureDate: today } : s
 }

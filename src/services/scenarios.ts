@@ -13,7 +13,7 @@ import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { formatWon } from './customerFacts'
 import { manwonText, startupRegion } from './clientInsights'
 import { requestItemFor, requestMessage, type RequestItem } from './recoRequest'
-import { SCENARIO_MODULE_LABEL, SCENARIO_PRESETS, scenarioPath, type ScenarioModule, type ScenarioPreset } from './scenarioPresets'
+import { SCENARIO_MODULE_LABEL, SCENARIO_PRESETS, presetStartup, scenarioPath, type ScenarioModule, type ScenarioPreset } from './scenarioPresets'
 import {
   GOAL_LABEL,
   cashPlan,
@@ -341,7 +341,7 @@ function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): Retur
   const core = needs.slice(0, 2).filter((n) => !n.ok)
   if (core.length) return { state: 'need', headline: `${core.map((n) => n.label).join(' · ')}을(를) 받으면 바로 판정해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
   const date = new Date(`${today}T00:00:00`)
-  const r = judge(startupFormOf(facts, s.startup), date)
+  const r = judge(startupFormOf(facts, presetStartup(s.startup, today)), date)
   if (r.notice) return { state: 'partial', headline: r.notice, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
   // D-318 감면율 한 줄(창업 연도 · 권역 · 청년) — 판정기 화면 · 한 장 설계서와 같은 값
   const lines = [r.taxRate.line, ...r.keyReasons.slice(0, 2), ...r.alerts.slice(0, 1).map((a) => `★ ${a}`)]
@@ -349,6 +349,18 @@ function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): Retur
   // 옮기면 — 지금 권역 결론과 나란히.
   // D-322 감면율은 창업일의 사업장 소재지로 정해진다 — 창업 뒤 과밀억제권역 밖으로 옮겨도 올라가지 않을 가능성이 크다.
   //       예전에는 옮긴 곳에서 처음 창업한 것처럼 '감면 가능성 높음 · 100%' 로 보여 옮기면 감면이 커지는 듯했다.
+  // D-328 벤처 확인을 받으면 — 지금(벤처 없음)과 나란히
+  if (s.id === 'startup-venture') {
+    const now = judge(startupFormOf(facts, { startupForm: s.startup?.startupForm }), date)
+    if (!now.notice) {
+      headline = r.taxRate.venture ? `벤처 확인을 받으면 ${now.taxRate.applied ?? 0}% → ${r.taxRate.applied}%(창업벤처 · 권역 무관)` : r.oneLineConclusion
+      lines.splice(0, lines.length,
+        `지금(벤처 확인 없음): ${now.taxRate.line}`,
+        `벤처 확인을 받으면: ${r.taxRate.line}`,
+        '★ 창업일부터 3년 안에 확인받아야 해요 — 확인받은 뒤 처음 소득이 난 해부터 5년 · 감면 기간 중 확인이 끊기면 그 뒤로 안 돼요',
+      )
+    }
+  }
   if (s.id === 'startup-move') {
     const now = judge(startupFormOf(facts, { startupForm: s.startup?.startupForm }), date)
     if (!now.notice) {

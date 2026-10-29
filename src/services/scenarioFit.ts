@@ -411,6 +411,21 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (over !== 'yes') return no('본점이 이미 과밀억제권역 밖이에요')
       return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 과밀억제권역 안`)
     }
+    // D-328 창업 3년 안 벤처 확인 — 과밀억제권역 · 수도권(2026~ 25%) 일반 창업만 오른다
+    case 'startup-venture': {
+      if (!est || months === null) return data('설립일을 알면 판단해요(창업 3년 안이 대상)', ['설립일(창업일)'])
+      if (months >= 36) return no(`설립 ${est} — 창업 3년이 지나 벤처 확인을 받아도 창업벤처 감면(창업 3년 안 확인)은 안 돼요`)
+      if (f.ventureConfirmedAt) return no(`이미 벤처기업 확인(확인일 ${f.ventureConfirmedAt}) — 창업감면 판정에 반영돼 있어요`)
+      const birth = f.representativeBirth
+      const ageAtStart = /^\d{4}-\d{2}-\d{2}$/.test(birth) ? Number(est.slice(0, 4)) - Number(birth.slice(0, 4)) - (est.slice(5) < birth.slice(5) ? 1 : 0) : null
+      if (ageAtStart !== null && ageAtStart <= 34) return no(`대표가 창업 당시 만 ${ageAtStart}세(청년) — 청년 감면이 같거나 더 커요`)
+      const { region, over, popDecline } = startupRegion(f.address)
+      if (!region) return data('본점 주소를 알면 판단해요(과밀억제권역 · 수도권 일반 창업이 대상)', ['회사 주소'])
+      if (over === 'yes') return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 과밀억제권역 일반 창업은 지금 0%, 벤처 확인이면 50%`)
+      if (region === 'gyeonggi_incheon' && est >= '2026-01-01' && popDecline !== 'yes') return fit(`2026년 창업 · 본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 일반 창업 25%, 벤처 확인이면 50%`)
+      if (over === 'unknown') return data(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 과밀억제권역인지 동까지 봐야 해요. 창업감면 판정에서 확인해요`, ['본점이 과밀억제권역 안인지'])
+      return no('수도권 밖 일반 창업은 이미 50% — 벤처 확인으로 더 오르지 않아요')
+    }
     case 'startup-acquire':
       if (months !== null && months >= 60) return no(`설립 ${est} — 창업 5년이 지났어요`)
       return byAnswer(c, 'acquired', '남의 사업을 넘겨받아 시작함', '넘겨받지 않고 새로 시작')

@@ -56,15 +56,15 @@ const empty = normalizeClientOps({ id: 'empty', companyName: '빈회사', create
 // S1 카탈로그
 const by = (m: string) => SCENARIO_PRESETS.filter((s) => s.module === m).length
 check(
-  'S1 카탈로그 41개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 9 · 연구소 4 · 창업감면 5 · 정책자금 7(NX-4 13개 더함) · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기',
-  SCENARIO_PRESETS.length === 41 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 9 && by('labcare') === 4 && by('startup-tax') === 5 && by('policy-funding') === 7 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 41 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
+  'S1 카탈로그 42개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 9 · 연구소 4 · 창업감면 6(D-328 벤처 확인) · 정책자금 7(NX-4 13개 더함) · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기',
+  SCENARIO_PRESETS.length === 42 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 9 && by('labcare') === 4 && by('startup-tax') === 6 && by('policy-funding') === 7 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 42 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
   SCENARIO_PRESETS.map((s) => s.id),
 )
 
 // S2 숫자가 다 있는 업체
 const runs = runScenarios(full, today)
 const r = (id: string) => runs.find((x) => x.id === id)!
-check('S2 숫자가 다 있는 업체 — 41개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 41 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
+check('S2 숫자가 다 있는 업체 — 42개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 42 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
 const cash = r('tax-cash-1e')
 const p = viewProfile(scenarioTaxProfile(full, today).profile)
 const direct = cashPlan(p, full.shareholderRegister, shareValueOf(p, full.shareholderRegister), 100_000_000, today)
@@ -169,8 +169,8 @@ check(
 check('F3 가연 — 연구소(무역 · 직원 2명)는 설계하지 않는다(맞음 아님)', gyK['lab-two'] !== 'fit' && gyK['lab-material'] !== 'fit', [gyK['lab-two'], gyK['lab-material']])
 check('F4 가연 — 목돈 · 자사주는 쌓인 이익을 몰라 "자료를 받으면 판단"(설계 안 함) · 가업승계는 업력 2년이라 안 맞음 · 상속은 대표 만 45세라 안 맞음', gyK['tax-cash-1e'] === 'data' && gyK['tax-treasury'] === 'data' && gyK['tax-succession'] === 'no' && gyK['tax-inherit'] === 'no', gyK)
 check(
-  'F5 가연 — 맞는 상황은 근거가 있는 것만: 창업감면(설립 2년) · 본점 이전(서울 과밀억제권역) · 운전자금(매출 1.5억) · NX-4 창업 초기 창업자금(설립 2년)',
-  JSON.stringify(fitIds(gyRuns)) === JSON.stringify(['policy-startup', 'policy-working', 'startup-move', 'startup-new']) && gyRuns.find((x) => x.id === 'policy-startup')!.fit.why.includes('2024-05-01'),
+  'F5 가연 — 맞는 상황은 근거가 있는 것만: 창업감면(설립 2년) · 본점 이전(서울 과밀억제권역) · 운전자금(매출 1.5억) · NX-4 창업 초기 창업자금(설립 2년) · D-328 벤처 확인(서울 · 창업 3년 안 · 일반 대표)',
+  JSON.stringify(fitIds(gyRuns)) === JSON.stringify(['policy-startup', 'policy-working', 'startup-move', 'startup-new', 'startup-venture']) && gyRuns.find((x) => x.id === 'policy-startup')!.fit.why.includes('2024-05-01'),
   fitIds(gyRuns),
 )
 check(
@@ -178,7 +178,7 @@ check(
   gyRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('2024-05-01') && gyRuns.find((x) => x.id === 'policy-working')!.fit.why.includes('1억 5,000만원') && gyRuns.find((x) => x.id === 'startup-move')!.fit.why.includes('서울'),
   gyRuns.filter((x) => x.fit.kind === 'fit').map((x) => x.fit.why),
 )
-check('F7 가연 — 맞는 상황이 맨 앞(41개 중 4개 · 정렬)', gyRuns.slice(0, 4).every((x) => x.fit.kind === 'fit') && gyRuns.length === 41)
+check('F7 가연 — 맞는 상황이 맨 앞(42개 중 5개 · 정렬)', gyRuns.slice(0, 5).every((x) => x.fit.kind === 'fit') && gyRuns.length === 42)
 
 // 대표가 답하면 — 같은 질문을 쓰는 상황이 함께 열린다
 const gyAns = withScenarioAnswer(withScenarioAnswer(withScenarioAnswer(gy, 'hireSenior', 'yes', '2026-10-15T00:00:00.000Z'), 'contract', 'no', '2026-10-15T00:00:00.000Z'), 'hireYouth', 'yes', '2026-10-15T00:00:00.000Z')
@@ -873,6 +873,13 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   // D-325 서류함의 벤처기업확인서(확인일) → 창업벤처중소기업 50% — 서울 · 일반 대표
   const vSeoul = normalizeClientOps({ ...full, id: 'vseoul', businessAddress: '서울특별시 강남구 1', establishedAt: '2024-03-02', representativeBirth: '1970-05-05', factValues: { ...(full.factValues ?? {}), 'cf:벤처기업': '확인번호 V-1 · 확인일 2025-01-02 · 2028-01-01까지' } } as unknown as Partial<ClientOpsRecord>)
   check('D-325 벤처확인서 확인일(창업 3년 안) → 상황 예시 · 맞춤 추천 감면율 50% 창업벤처', runLine(vSeoul).startsWith('감면율 50% — 창업벤처중소기업') && insightDetail(vSeoul).startsWith('감면율 50% — 창업벤처'), [runLine(vSeoul), insightDetail(vSeoul)])
+  // D-328 '창업 3년 안 벤처 확인을 받으면' — 서울 · 일반 · 2025 창업(벤처 없음) → 맞음 · 0% → 50%
+  const vNone = normalizeClientOps({ ...full, id: 'vnone', businessAddress: '서울특별시 강남구 1', establishedAt: '2025-03-02', representativeBirth: '1970-05-05' } as unknown as Partial<ClientOpsRecord>)
+  const vRun = runScenario(scenarioPreset('startup-venture')!, vNone, today)
+  const vFit = scenarioFit(scenarioPreset('startup-venture')!, fitContext(vNone, today))
+  check('D-328 벤처 확인 예시 — 서울 일반 창업 2년 안 → 맞음 · "벤처 확인을 받으면 0% → 50%" · 지금 · 받으면 두 줄', vFit.kind === 'fit' && vRun.headline.startsWith('벤처 확인을 받으면 0% → 50%') && vRun.lines[0].startsWith('지금(벤처 확인 없음): 감면율 0%') && vRun.lines[1].startsWith('벤처 확인을 받으면: 감면율 50%'), { fit: vFit, h: vRun.headline, l: vRun.lines })
+  const fitOf = (r: ClientOpsRecord) => scenarioFit(scenarioPreset('startup-venture')!, fitContext(r, today))
+  check('D-328 벤처 확인 예시 — 이미 벤처 · 청년 대표 · 지방 · 창업 3년 지남은 안 맞음(까닭)', fitOf(vSeoul).kind === 'no' && fitOf(gy26).kind === 'no' && fitOf(normalizeClientOps({ ...full, id: 'vbusan', businessAddress: '부산광역시 해운대구 1', establishedAt: '2025-03-02', representativeBirth: '1970-05-05' } as unknown as Partial<ClientOpsRecord>)).kind === 'no' && fitOf(normalizeClientOps({ ...full, id: 'vold', businessAddress: '서울특별시 강남구 1', establishedAt: '2022-03-02', representativeBirth: '1970-05-05' } as unknown as Partial<ClientOpsRecord>)).kind === 'no', [fitOf(vSeoul).why, fitOf(gy26).why])
   check('D-318 한 장 설계서(창업 5년 안 채용)의 창업감면 줄 = 상황 예시 줄', planLine(gy26) === runLine(gy26) && planLine(gh26) === runLine(gh26), [planLine(gy26), runLine(gy26)])
 }
 

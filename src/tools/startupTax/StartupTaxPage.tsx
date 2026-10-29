@@ -11,7 +11,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { presetAssumptions, presetFieldsKept, presetStartup, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { todayLocalDate } from '../../lib/appClock'
 import { PresetNote } from '../shared/PresetNote'
 import { startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -134,7 +135,7 @@ function StartupTaxScreen() {
     const preset = scenarioPreset(presetId)
     if (!preset || preset.module !== 'startup-tax') return
     const place = startupRegion(clientRecord?.businessAddress ?? '')
-    const applied: Partial<StartupTaxForm> = { ...(preset.startup ?? {}) }
+    const applied: Partial<StartupTaxForm> = { ...(presetStartup(preset.startup, todayLocalDate()) ?? {}) }
     const filledRegion = form.region ? {} : { region: place.region, overconcentration: place.over, popDecline: place.popDecline }
     const base = { ...form, ...filledRegion }
     const before: Partial<StartupTaxForm> = Object.fromEntries(Object.keys(applied).map((k) => [k, base[k as keyof StartupTaxForm]]))
