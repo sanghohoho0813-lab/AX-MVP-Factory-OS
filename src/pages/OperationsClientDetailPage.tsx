@@ -131,6 +131,8 @@ const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
+import { requestFollowUpText } from '../services/recoRequest'
+import { addDaysLocal } from '../services/clientOpsNextAction'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
@@ -2339,6 +2341,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           description={message.description}
           text={message.text}
           onClose={() => setMessage(null)}
+          followUp={(() => {
+            // D-314 요청 문구(받을 자료 · 서류 요청 · 정책자금 신청 서류)를 보냈으면 — 3일 뒤 '받았는지 확인' 할 일(오늘 · 일정). 다음 약속은 덮지 않는다
+            const follow = /요청/.test(message.title) ? requestFollowUpText(message.text) : ''
+            if (!follow) return undefined
+            return {
+              label: '보냈어요 · 3일 뒤 받았는지 확인',
+              run: async () => {
+                const due = addDaysLocal(today, 3)
+                await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
+                return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요`
+              },
+            }
+          })()}
         />
       )}
     </div>

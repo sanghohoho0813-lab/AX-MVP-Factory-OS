@@ -17,18 +17,26 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp } from 'lucide-react'
 import { hintFor } from '../../content/sectionHints'
+import { foldOldIds } from '../../lib/uiNameAliases'
 
 const KEY = (id: string) => `axmvp.fold.${id}`
-/** 'open' 이면 따로 접어 둔 것 말고는 모두 펼친 채로 시작한다([모두 펼치기]) */
+/**
+ * 'open' 이면 따로 접어 둔 것 말고는 모두 펼친 채로 시작한다([모두 펼치기]).
+ * D-315 'closed' 면 따로 펼쳐 둔 것 말고는 모두 접은 채로([모두 접기]) — 예전에는 [모두 접기] 가 기억을 지우기만 해서
+ * 다음에 열면 기본으로 펼쳐지는 칸이 다시 펼쳐졌다(새로 생긴 칸도 대표가 고른 대로 접힌 채로 시작한다).
+ */
 export const FOLD_ALL_KEY = 'axmvp.fold.all'
 const EVT = 'axmvp:fold-all'
 
 function readFold(id: string, fallback: boolean): boolean {
   try {
-    const v = localStorage.getItem(KEY(id))
+    // D-315 이름표가 바뀐 칸은 옛 이름으로 기억한 것도 읽는다
+    const v = [id, ...foldOldIds(id)].map((k) => localStorage.getItem(KEY(k))).find((x) => x === '1' || x === '0') ?? null
     if (v === '1') return true
     if (v === '0') return false
-    if (localStorage.getItem(FOLD_ALL_KEY) === 'open') return true
+    const all = localStorage.getItem(FOLD_ALL_KEY)
+    if (all === 'open') return true
+    if (all === 'closed') return false
   } catch {
     // 저장소를 못 읽어도 기본값으로
   }
@@ -76,8 +84,7 @@ export function useFold(id: string, defaultOpen: boolean, force = false, keepClo
 /** 화면에 있는 목차를 한꺼번에 펼치거나 접는다 — 펼치기는 다음에 여는 화면에도 이어진다 */
 export function foldAll(open: boolean) {
   try {
-    if (open) localStorage.setItem(FOLD_ALL_KEY, 'open')
-    else localStorage.removeItem(FOLD_ALL_KEY)
+    localStorage.setItem(FOLD_ALL_KEY, open ? 'open' : 'closed')
     for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const k = localStorage.key(i)
       if (k && k.startsWith('axmvp.fold.') && k !== FOLD_ALL_KEY) localStorage.removeItem(k)
@@ -85,7 +92,7 @@ export function foldAll(open: boolean) {
   } catch {
     // 지금 화면만 바뀐다
   }
-  window.dispatchEvent(new CustomEvent(EVT, { detail: open }))
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVT, { detail: open }))
 }
 
 /**

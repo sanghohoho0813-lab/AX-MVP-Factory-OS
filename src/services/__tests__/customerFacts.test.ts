@@ -42,6 +42,7 @@ import { clientFacts } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
+import { requestFollowUpText } from '../recoRequest'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
@@ -1494,6 +1495,17 @@ await (async () => {
   check('D-313 카드 문구: 서류함에 있는 사업자등록증 · 부가세 과세표준증명은 빼고 · 재무제표 · 납세증명은 넣음', !!ins.request && !ins.request.text.includes('사업자등록증 사본') && !ins.request.text.includes('부가가치세 과세표준증명') && ins.request.text.includes('표준재무제표증명') && ins.request.text.includes('국세 납세증명서'), ins.request?.text)
   const fresh = normalizeClientOps({ id: 'pa313b', companyName: '빈회사', createdAt: NOW, updatedAt: NOW } as never)
   check('D-313 판정 전(정보 부족)이면 요청 문구 없음', !buildInsights(fresh, T, []).find((i) => i.key === 'policy-funding')?.request)
+}
+
+// D-314 보낸 요청 문구 → 할 일 한 줄(세 가지 요청 문구 모양 모두)
+{
+  const pol = '안녕하세요, 홍길동 대표님.\n\n1. 표준재무제표증명(최근 3년)\n   - 홈택스\n2. 국세 납세증명서 · 4대보험 완납증명서\n   - 홈택스\n3. 대표자 신분증 사본\n   - 가림\n\n※ 사업계획서는 저희가'
+  check('D-314 정책자금 신청 서류 문구 → "자료 받았는지 확인 — 표준재무제표증명(최근 3년) · 국세 납세증명서 · 4대보험 완납증명서 외 1가지"', requestFollowUpText(pol) === '자료 받았는지 확인 — 표준재무제표증명(최근 3년) · 국세 납세증명서 · 4대보험 완납증명서 외 1가지', requestFollowUpText(pol))
+  const reco = '1. 4대보험 사업장 가입자 명부 — 고용지원금 확인용\n   - 4insure'
+  check('D-314 받을 자료 문구(— 무엇 확인용) → 이름만', requestFollowUpText(reco) === '자료 받았는지 확인 — 4대보험 사업장 가입자 명부')
+  const svc = '1. 사업자등록증 (기존 서류는 유효기간이 지나 새 발급본이 필요합니다)\n   - 홈택스\n2. 법인등기부등본\n   - 인터넷등기소'
+  check('D-314 서류 요청 문구(유효기간 꼬리) → 이름만', requestFollowUpText(svc) === '자료 받았는지 확인 — 사업자등록증 · 법인등기부등본')
+  check('D-314 받을 것이 없는 문구 → 빈 글(단추 없음)', requestFollowUpText('안녕하세요, 대표님. 현재 추가로 받을 서류는 없습니다.') === '')
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

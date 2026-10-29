@@ -7,6 +7,7 @@
 import { useSyncExternalStore } from 'react'
 import type { ModuleDefinition } from '../config/moduleRegistry'
 import { readRaw, removeKey, writeRaw } from '../storage/localStore'
+import { navAlias } from './uiNameAliases'
 
 const KEY = 'axmvp.ui.mobile_nav.v1'
 const EVT = 'axmvp:mobile-nav'
@@ -49,7 +50,8 @@ function readKeys(): string[] | null {
     const raw = readRaw(KEY)
     if (!raw) return null
     const v = JSON.parse(raw) as unknown
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, MOBILE_NAV_MAX) : null
+    // D-315 메뉴 key 가 바뀌면 옛 key 로 고른 칸도 이어진다
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map(navAlias).slice(0, MOBILE_NAV_MAX) : null
   } catch {
     return null
   }

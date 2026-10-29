@@ -95,6 +95,7 @@ npm run qa:specboard -- http://localhost:4390    # 명세서 AI 작업판(타자
 npm run qa:sideai -- http://localhost:4390        # AI 옆 창(왼쪽 메뉴 아래 단추 · ChatGPT · Claude · Gemini · Google 오른쪽 창 · 주소 칸 · OS 비키기 · 팝업 막힘 · 왼쪽 OS 창 · 휴대폰 없음) · 메뉴 경계선 끌기(넓게 · 아이콘 · 숨김 · 기억) · 머리줄 넘침 0 · OS 안 오른쪽 판(AI 대화 · Google igu · 막는 곳은 옆 창 · 폭 끌기 · 좁은 PC 덮기)
 npm run qa:vstudy -- http://localhost:4390        # 벤치마킹 영상 창(대본 받아 적기 10분씩 · 실패 구간 다시 · 시각 링크 · 복사 · AI로 우리 회사 버전 8칸 · 내 콘텐츠에 담기 · 다시 열어도 그대로 · 360/390)
 npm run qa:certai -- http://localhost:4390        # 기업인증 · 벤처 타자 없이(대표님 답장 한 번에 나눠 넣기 · 실사 말할 답 AI · 사업계획서 AI 판 처음부터 · 칸마다 AI)
+npm run qa:keepui -- http://localhost:4390       # 꾸미기 지키기(화면 꾸미기 순서 · 숨김 · 없는 칸 자리 · [모두 접기] · 글자 크기 · 테마 · 모르는 값 · 휴대폰 아래 메뉴 — 새로 고쳐도 그대로) — 이름표 지킴은 test:all 의 test:keep-ui
 npm run qa:wording                                # 화면 번들 · AI 지시문에 내부 별칭 0 · '검증된 방법' (npm run build 다음에)
 npm run qa:wayfinding -- http://localhost:4390    # 길잡이(경로 줄 · 단계 안내 이전/다음 · 순서 밖 화면 · 설명 접기 · 모듈 '이렇게 쓰세요' · ? 설명 화면 안 · 360/390)
 npm run qa:ventureplan -- http://localhost:4390   # 벤처 사업계획서 쓰기(기업인증 › 벤처 · 사이트 순서 · 명세서 재료 · 회사 기록으로 채우기 · 글자 수 · 점검 · MD · AI 초안 고친 칸 보호 · 360~430)
@@ -117,6 +118,9 @@ npm run qa:assist -- http://localhost:4390        # AI 도우미(진짜 서버 �
 - force push · history rewrite · 기존 브랜치 삭제 금지.
 - 고객 플랫폼은 내부 표를 읽지 않는다 — `portal_*` 과 고객 안전 RPC 만. 업무 일기는 고객에게 절대 안 보인다.
 - 규칙 계산을 "AI" 라고 부르지 않는다. LLM API 호출 0을 유지한다 — **예외는 서버 함수 둘뿐**: AI 작업실 `/api/ai-run`(D-200, 2026-10-14 대표 지시 · **대표만**) · 화면마다 AI 도우미 `/api/ai-assist`(D-239, 2026-10-19 대표 지시 · D-257 2026-10-21 대표 지시로 **최은혜 팀장(Pilot)도 — Gemini 만**). 키는 서버 환경변수에만(`VITE_` 금지) · 브라우저는 AI 공급자를 직접 부르지 않는다 · 대표 권한(`can_use_owner_ai_workspace`)도 팀장 등급(`my_os_access = pilot`)도 없으면 띠도 없다 · 팀장은 서버가 Gemini 밖 회사 · 대표 전용 마케팅 단추를 403 으로 막는다 · 고객 플랫폼은 그대로 0. 팀장에게 다른 회사(GPT · Claude)를 열거나 AI 작업실을 여는 것은 대표에게 먼저 묻는다. 규칙 계산 결과 글에는 여전히 'AI' 라고 쓰지 않는다(AI 단추가 낸 답만 AI).
+- **대표가 저장한 꾸미기를 풀지 않는다(D-315, 2026-10-29 대표 지시)** — 화면 꾸미기 칸 id · 접기 id · 메뉴 key · 테마 key 는 저장된 꾸미기의 열쇠다.
+  바꾸거나 없애야 하면 `src/config/keepUiNames.json` aliases 에 '옛 이름 → 새 이름' 을 적는다(test:all 의 test:keep-ui 가 막는다). 새 칸은 더하기만(--update).
+  저장된 설정을 쓸 때는 바꾼 칸만 고쳐 쓴다 — 이 버전이 모르는 값을 기본값으로 덮지 않는다.
 - 저장소 이름 · Vercel 프로젝트 이름 · 도메인을 바꾸지 않는다.
 - 커밋·PR·코드 주석에 모델 이름을 넣지 않는다.
 - **내부 자료 잠금(D-264)** — 화면 · AI 지시문 · 저장소 글(주석 · 문서 포함)에 예전 점검 이름 · 예전 마케팅 별칭 · 참고한 외부 사이트 · 기준 MD 문서 이름 · 버전을 쓰지 않는다.

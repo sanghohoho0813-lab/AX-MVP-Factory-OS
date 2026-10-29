@@ -7,7 +7,8 @@
  * 실행: npm run test:catalog
  */
 
-import { arrangeIds, hiddenIds, isCustomized, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
+import { arrangeIds, hiddenIds, isCustomized, keepAbsent, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
+import { FOLD_ALL_KEY, foldAll } from '../../components/ui/fold'
 import {
   FEATURE_CATALOG,
   MODULE_CATALOG,
@@ -289,6 +290,18 @@ await storage()
   setSectionVisibility('t1', 'b', 'show')
   resetLayout('t1')
   check('D-287 처음대로 — 바꾼 것 없음', !isCustomized(readLayoutForTest('t1')) && arrangeIds(D, readLayoutForTest('t1')).join() === 'a,b,c,d,e')
+
+  // D-315 꾸미기 지키기 — 화면에 잠깐 없는 칸(휴대폰 · 권한 · 자료)의 저장 자리는 다른 칸을 옮겨도 지워지지 않는다
+  moveSection('t2', D, 'e', 'top') // e,a,b,c,d
+  moveSection('t2', ['a', 'b', 'c', 'd'], 'd', 'top') // e 가 지금 화면에 없음(예: PC 전용 칸을 휴대폰에서)
+  const l3 = readLayoutForTest('t2')
+  check('D-315 없는 칸(e)의 저장 자리가 남는다 — 다시 나타나면 대표가 둔 자리', l3.order.includes('e') && arrangeIds(D, l3).join() === 'e,d,a,b,c', JSON.stringify(l3.order))
+  check('D-315 keepAbsent — 저장 순서에서 바로 앞 칸 뒤에 다시 넣는다', keepAbsent(['b', 'a', 'c'], ['a', 'x', 'b', 'c']).join() === 'b,a,x,c' && keepAbsent(['b', 'c'], ['x', 'b', 'c']).join() === 'x,b,c')
+  // D-315 [모두 접기] 를 기억한다 — 예전에는 기억을 지우기만 해 다음에 열면 기본으로 펼쳐지는 칸이 다시 펼쳐졌다
+  foldAll(false)
+  check("D-315 [모두 접기] → 'closed' 로 기억", localStorage.getItem(FOLD_ALL_KEY) === 'closed')
+  foldAll(true)
+  check("D-315 [모두 펼치기] → 'open'", localStorage.getItem(FOLD_ALL_KEY) === 'open')
 }
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)

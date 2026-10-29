@@ -187,6 +187,11 @@ check('theme: 9종', UI_THEMES.length === 9 && new Set(UI_THEMES.map((t) => t.ke
   check('theme: 설정에서 딥 틸을 고르면 딥 틸 · 고른 표시가 남는다', uiPreferencesRepository.get().theme === 'deep-teal' && JSON.parse(readRaw(K) ?? '{}').themeChosen === true)
   uiPreferencesRepository.update('extra_large')
   check('theme: 고른 딥 틸은 글자 크기를 바꿔도 남는다', uiPreferencesRepository.get().theme === 'deep-teal' && uiPreferencesRepository.get().textScale === 'extra_large')
+  // D-315 이 버전이 모르는 값(다음 버전 새 칸 · 이름 바뀐 테마)은 다른 것을 바꿔도 저장된 그대로
+  put({ textScale: 'large', theme: 'future-theme', themeChosen: true, contrast: 'high', updatedAt: 'x' })
+  uiPreferencesRepository.setMotion('reduced')
+  const kept = JSON.parse(readRaw(K) ?? '{}')
+  check('D-315 모르는 테마 · 모르는 칸은 다른 설정을 바꿔도 지워지지 않음(화면은 기본 테마로)', kept.theme === 'future-theme' && kept.contrast === 'high' && kept.motion === 'reduced' && kept.textScale === 'large' && uiPreferencesRepository.get().theme === 'onyx-gold', JSON.stringify(kept))
   uiPreferencesRepository.reset()
   check('theme: 처음으로 되돌리면 오닉스 골드', uiPreferencesRepository.get().theme === 'onyx-gold' && JSON.parse(readRaw(K) ?? '{}').themeChosen === undefined)
   if (before === null) put({}); else writeRaw(K, before)

@@ -8,10 +8,16 @@
  *  - 오늘만 숨기기 = 고른 날짜를 적어 두고 그날만 숨김(다음 날 저절로 다시 보임).
  *  - 화면에 새 칸이 생기면 기본 순서 자리(앞 칸 바로 뒤)에 들어간다 — 예전에 저장한 순서가 새 칸을 잃지 않게.
  * 기억은 이 기기 브라우저에(접기 D-192 와 같은 이유 — 기기마다 편한 순서가 다르다). 저장이 막혀도 기본 순서로 그린다.
+ *
+ * D-315 꾸미기 지키기 — 대표: "새로 개발되면 화면 꾸미기 해 놨던 게 일부 풀린다."
+ *  - 지금 화면에 없는 칸(휴대폰 · PC 에 따라 · 팀장 · 자료가 있을 때만 보이는 칸)의 저장 자리를 순서를 바꿀 때 지우지 않는다
+ *    (예전에는 그 칸이 없는 화면에서 다른 칸을 옮기면 그 칸의 자리가 지워져, 다시 나타날 때 기본 자리로 돌아갔다).
+ *  - 칸 이름표가 바뀌면 옛 이름으로 저장한 것도 새 칸에 이어진다(lib/uiNameAliases).
  */
 import { useSyncExternalStore } from 'react'
 import { readRaw, writeRaw } from '../storage/localStore'
 import { todayLocalDate } from './appClock'
+import { layoutAlias } from './uiNameAliases'
 
 export type SectionVisibility = 'show' | 'today' | 'off'
 
@@ -43,8 +49,9 @@ function read(page: string): PageLayout {
     if (raw) {
       const p = JSON.parse(raw) as Partial<PageLayout>
       const today: Record<string, string> = {}
-      if (p.today && typeof p.today === 'object') for (const [k, v] of Object.entries(p.today)) if (typeof v === 'string') today[k] = v
-      next = { order: strings(p.order), off: strings(p.off), today }
+      const al = (id: string) => layoutAlias(page, id)
+      if (p.today && typeof p.today === 'object') for (const [k, v] of Object.entries(p.today)) if (typeof v === 'string') today[al(k)] = v
+      next = { order: [...new Set(strings(p.order).map(al))], off: [...new Set(strings(p.off).map(al))], today }
     }
   } catch {
     // 손상된 기억은 버리고 기본 순서로
@@ -115,6 +122,27 @@ export function arrangeIds(defaults: readonly string[], layout: PageLayout): str
   return out
 }
 
+/**
+ * D-315 저장할 순서 — 지금 화면에 없는 칸의 저장 자리도 그대로 둔다(저장 순서에서 바로 앞에 있던 칸 뒤에).
+ * 이 칸이 다시 나타나면 대표가 정해 둔 자리로 돌아온다.
+ */
+export function keepAbsent(arranged: readonly string[], saved: readonly string[]): string[] {
+  const out = [...arranged]
+  saved.forEach((id, i) => {
+    if (out.includes(id)) return
+    let at = 0
+    for (let j = i - 1; j >= 0; j--) {
+      const k = out.indexOf(saved[j])
+      if (k >= 0) {
+        at = k + 1
+        break
+      }
+    }
+    out.splice(at, 0, id)
+  })
+  return out
+}
+
 /** 칸 하나를 위 · 아래 · 맨 위로 — 숨긴 칸은 건너뛰고 보이는 칸끼리 자리를 바꾼다 */
 export function moveSection(page: string, defaults: readonly string[], id: string, to: 'up' | 'down' | 'top') {
   const layout = read(page)
@@ -132,7 +160,7 @@ export function moveSection(page: string, defaults: readonly string[], id: strin
     if (to === 'up') order.splice(Math.max(0, j), 0, id)
     else order.splice(Math.min(order.length, j + 1), 0, id)
   }
-  write(page, { ...layout, order })
+  write(page, { ...layout, order: keepAbsent(order, layout.order) })
 }
 
 export function setSectionVisibility(page: string, id: string, v: SectionVisibility) {

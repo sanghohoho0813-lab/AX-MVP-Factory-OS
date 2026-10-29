@@ -1582,6 +1582,51 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-314 요청 문구를 보냈으면 — [보냈어요 · 3일 뒤 받았는지 확인] → 업무 일기 할 일(다음 약속은 그대로) ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const before = await record(page)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').getByTestId('smart-insight-request').click()
+  const dlg = page.locator('[role="dialog"]').first()
+  await dlg.getByTestId('message-followup').waitFor({ timeout: 4000 })
+  check(`D-314 ${vp.tag} 요청 문구 창에 [보냈어요 · 3일 뒤 받았는지 확인]`, ((await dlg.getByTestId('message-followup').innerText()) ?? '').includes('보냈어요 · 3일 뒤 받았는지 확인'))
+  await dlg.getByTestId('message-followup').click()
+  await dlg.getByTestId('message-followup-done').waitFor({ timeout: 4000 }).catch(() => {})
+  const done = (await dlg.getByTestId('message-followup-done').innerText().catch(() => '')) ?? ''
+  check(`D-314 ${vp.tag} 누르면 '할 일에 넣었어요 · 기한 MM/DD — 오늘 · 일정에 떠요' · 단추는 '할 일에 넣음'(다시 못 누름)`, /할 일에 넣었어요 · 기한 \d{2}\/\d{2}/.test(done) && (await dlg.getByTestId('message-followup').isDisabled()) && ((await dlg.getByTestId('message-followup').innerText()) ?? '').includes('할 일에 넣음'), done)
+  if (vp.tag === '390') await dlg.screenshot({ path: '/tmp/claude-0/shot314-dialog-390.png' }).catch(() => {})
+  const journal = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]'))
+  const mine = journal.filter((j) => j.clientId === 'cli_hansol' && j.entryType === 'follow_up' && String(j.content).startsWith('자료 받았는지 확인 — 표준재무제표증명'))
+  const gap = mine[0] ? Math.round((Date.parse(mine[0].dueDate) - Date.parse(mine[0].entryDate)) / 86400000) : -1
+  check(`D-314 ${vp.tag} 업무 일기 할 일 1건(이 업체 · 기한 3일 뒤 · '자료 받았는지 확인 — 표준재무제표증명 …')`, mine.length === 1 && gap === 3, JSON.stringify(mine[0] ?? journal.slice(0, 2)))
+  const after = await record(page)
+  check(`D-314 ${vp.tag} 다음 약속은 그대로(덮지 않음)`, after.nextAction === before.nextAction && after.nextActionDueDate === before.nextActionDueDate)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  // 진행 상황 보고 문구에는 단추가 없다(요청이 아니다)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  if (vp.tag === '1440') {
+    await page.getByRole('button', { name: '진행 상황 보고' }).first().click()
+  } else {
+    await page.getByRole('button', { name: /더보기/ }).first().click()
+    await page.getByRole('button', { name: '진행 상황 보고 문구' }).first().click()
+  }
+  await page.locator('[role="dialog"] textarea').first().waitFor({ timeout: 4000 })
+  check(`D-314 ${vp.tag} 진행 상황 보고 문구에는 [보냈어요] 없음`, (await page.getByTestId('message-followup').count()) === 0)
+  check(`D-314 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
