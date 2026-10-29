@@ -868,6 +868,8 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-318 2026 창업 · 강화(인구감소지역) · 청년 → 100%', runLine(gh26).startsWith('감면율 100%') && runLine(gh26).includes('인구감소지역'), runLine(gh26))
   check('D-318 2025년 창업 · 화성 · 청년 → 옛 표 100%', runLine(gy25).startsWith('감면율 100%') && runLine(gy25).includes('2025년까지'), runLine(gy25))
   check('D-318 2026 창업 · 화성 · 일반 → 25%', runLine(gy26old).startsWith('감면율 25%'), runLine(gy26old))
+  const insightDetail = (r: ClientOpsRecord) => buildInsights(r, today, []).find((i) => i.key === 'startup-tax')?.detail ?? ''
+  check('D-318 맞춤 추천 창업감면 카드도 같은 감면율 줄로 시작(화성 청년 75%)', insightDetail(gy26).startsWith(runLine(gy26)), insightDetail(gy26))
   check('D-318 한 장 설계서(창업 5년 안 채용)의 창업감면 줄 = 상황 예시 줄', planLine(gy26) === runLine(gy26) && planLine(gh26) === runLine(gh26), [planLine(gy26), runLine(gy26)])
 }
 

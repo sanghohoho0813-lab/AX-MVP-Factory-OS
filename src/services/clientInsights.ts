@@ -247,7 +247,8 @@ const startupInsight: Provider = ({ record, today, facts }) => {
     label: '창업감면',
     tone,
     headline: r.oneLineConclusion,
-    detail: r.keyChecks[0] ?? r.reasons[0] ?? '',
+    // D-318 감면율 한 줄을 먼저 — 상황 예시 · 한 장 설계서 · 판정 화면과 같은 값
+    detail: [r.taxRate.line, r.keyChecks[0] ?? r.reasons[0] ?? ''].filter(Boolean).join(' · '),
     // 창업 형태(신규 · 승계)는 기록에 없다 — 판정기에서 물어본다
     missing: ['창업 형태(새로 창업 · 이어받기)'],
     openPath: open,
