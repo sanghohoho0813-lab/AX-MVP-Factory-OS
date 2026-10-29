@@ -270,7 +270,10 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
   const one = { ...info, researchers: [{ name: '박연구', role: '연구전담요원', joinDate: '2026-01-02', dedicated: true }] }
   check('연구소: 전담 1명이면 모자란다고 말한다', researcherWarning(one).includes('2명 이상') && dedicatedCount(one) === 1)
   const two = { ...one, researchers: one.researchers.concat([{ name: '최연구', role: '연구전담요원', joinDate: '2026-02-02', dedicated: true }]) }
-  check('연구소: 전담 2명이면 아무 말 안 한다', researcherWarning(two) === '')
+  // D-329 2명은 벤처 · 창업 3년 안 소기업 기준 — 소기업 3 · 중기업 5 일 수 있어 규모 확인을 말한다 · 5명이면 아무 말 안 한다
+  check('D-329 연구소: 전담 2명이면 "벤처 · 창업 3년 안 소기업 기준은 넘어요 · 규모로 확인"', researcherWarning(two).includes('벤처 · 창업 3년 안 소기업 기준') && researcherWarning(two).includes('규모'), researcherWarning(two))
+  const five = { ...info, researchers: Array.from({ length: 5 }, (_, i) => ({ id: `r${i}`, name: `연${i}`, role: '전담', dedicated: true, joinedAt: '', degree: '', major: '' })) }
+  check('D-329 연구소: 전담 5명이면 아무 말 안 한다', researcherWarning(five as typeof info) === '', researcherWarning(five as typeof info))
   const mixed = { ...one, researchers: one.researchers.concat([{ name: '겸직', role: '연구전담요원', joinDate: '2026-02-02', dedicated: false }]) }
   check('연구소: 겸직은 전담 수에 안 센다', dedicatedCount(mixed) === 1)
 

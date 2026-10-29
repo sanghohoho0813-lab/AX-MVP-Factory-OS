@@ -141,6 +141,26 @@ export interface ClientFacts {
   totalLiabilities: WonFact | null
   /** D-325 벤처기업 확인일(올린 벤처기업확인서 중 가장 이른 '확인일') — 창업 3년 안이면 창업벤처중소기업 감면. 모르면 '' */
   ventureConfirmedAt?: string
+  /** D-329 지금 유효한 벤처기업확인서가 있는지(…까지 가 오늘 이후) — 연구소 전담요원 2명 기준 */
+  ventureValidNow?: boolean
+  /** D-329 중소기업 확인서의 기업 규모(유효한 것) — 연구소 전담요원 기준(소기업 3 · 중기업 5). 모르면 '' */
+  smeSize?: '소기업' | '중기업' | ''
+}
+
+const UNTIL = /(\d{4}-\d{2}-\d{2})\s*까지/
+/** D-329 중소기업 확인서(cf:중소기업 확인 · 회사 정보 '중소기업 확인' 칸)의 규모 — 기한 지난 것은 빼고, 소상공인 · 소기업은 '소기업' */
+export function smeSizeOf(record: ClientOpsRecord, today: string): '소기업' | '중기업' | '' {
+  const values = [
+    ...Object.entries(record.factValues ?? {}).filter(([k]) => /^cf:중소기업\s*확인/.test(k)).map(([, v]) => String(v)),
+    ...(record.customFields ?? []).filter((f) => /중소기업\s*확인/.test(f.label)).map((f) => f.value),
+  ].filter((v) => !((UNTIL.exec(v)?.[1] ?? '9999') < today))
+  if (values.some((v) => /중기업/.test(v))) return '중기업'
+  if (values.some((v) => /소기업|소상공인/.test(v))) return '소기업'
+  return ''
+}
+/** D-329 지금 유효한 벤처기업확인서(cf:벤처기업 …)가 있는지 */
+export function ventureValidOn(record: ClientOpsRecord, today: string): boolean {
+  return Object.entries(record.factValues ?? {}).some(([k, v]) => /^cf:벤처기업/.test(k) && !((UNTIL.exec(String(v))?.[1] ?? '9999') < today))
 }
 
 /** D-325 올린 벤처기업확인서(cf:벤처기업 …)의 '확인일' 중 가장 이른 날 — 처음 확인받은 날이 창업 3년 안인지 본다 */
@@ -159,6 +179,8 @@ function wonFact(record: ClientOpsRecord, key: string): WonFact | null {
   const won = wonOf(f.value)
   return won === null ? null : { won, asOf: f.asOf, estimated: f.status === 'estimated' }
 }
+
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
   const established = usableFactValue(record, 'establishedAt')
@@ -186,6 +208,8 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
     totalAssets: wonFact(record, 'totalAssets'),
     totalLiabilities: wonFact(record, 'totalLiabilities'),
     ventureConfirmedAt: ventureConfirmedAt(record),
+    ventureValidNow: ventureValidOn(record, isoDay(today)),
+    smeSize: smeSizeOf(record, isoDay(today)),
   }
 }
 

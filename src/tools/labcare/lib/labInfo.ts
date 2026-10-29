@@ -60,5 +60,8 @@ export function researcherWarning(info: LabInfoData): string {
   const need = minResearchers(info.labType)
   const have = dedicatedCount(info)
   if (info.researchers.length === 0) return '연구전담요원을 아직 적지 않았습니다'
-  return have < need ? `연구전담요원이 ${have}명입니다 — ${info.labType}는 보통 ${need}명 이상이 필요합니다` : ''
+  if (have < need) return `연구전담요원이 ${have}명입니다 — ${info.labType}는 보통 ${need}명 이상이 필요합니다`
+  // D-329 2명은 벤처 · 창업 3년 안 소기업 기준 — 소기업 3명 · 중기업 5명이 필요할 수 있다(예전에는 2명이면 아무 말 안 했다)
+  if (info.labType === '기업부설연구소' && have < 5) return `연구전담요원 ${have}명 — 벤처 · 창업 3년 안 소기업 기준(2명)은 넘어요. 소기업 3명 · 중기업 5명 기준이면 모자랄 수 있어 '설립 가능성 체크' 에서 규모로 확인`
+  return ''
 }

@@ -227,6 +227,9 @@ export default function AssessmentPage() {
     if (facts.establishedAt && !establishedAt) { setEstablishedAt(facts.establishedAt); filled.push("설립일"); }
     // 직원 수는 판정에 안 쓰니 채웠다고 알리지 않는다(참고 칸만 채움)
     if (facts.employeeCount !== null && employeeCount === "") setEmployeeCount(String(facts.employeeCount));
+    // D-329 서류함의 중소기업 확인서 → 기업 규모 · 벤처기업확인서(유효) → 벤처(전담요원 2명 기준). 이미 고른 규모 · 벤처는 덮지 않는다
+    if (facts.smeSize && !sizeConfirmed) { setCompanySize(facts.smeSize); setSizeConfirmed(true); filled.push(`중소기업 확인서의 기업 규모(${facts.smeSize})`); }
+    if (facts.ventureValidNow && !isVenture) { setIsVenture(true); filled.push("벤처기업 확인"); }
     return filled;
   });
   const todayDate = new Date();
