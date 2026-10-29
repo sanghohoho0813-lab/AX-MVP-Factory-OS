@@ -37,6 +37,8 @@ import { listRows, saveRow } from '../../services/moduleData'
 import { employeeRowData, toOrigEmployee } from './orig/store'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { placeOf } from '../../services/grants/grantMatch'
+import { customFactValue } from '../../services/customerFacts'
+import { continuingOf } from '../../services/workRules'
 import {
   analyzeRoster,
   buildCopyText,
@@ -943,6 +945,7 @@ function RosterTab() {
                       )}
                     </span>
                     <span className="t-meta break-keep text-slate-500">{s.note}</span>
+                    {s.key === 'senior_continue' && clientRecord && <SeniorRuleNote record={clientRecord} />}
                     <span className="t-meta text-slate-400">
                       {CONFIDENCE_META[s.confidence].label} · {s.confReason}
                     </span>
@@ -1056,4 +1059,22 @@ const SUBSIDY_SHORT: Record<string, string> = {
   senior_intern: '시니어',
   saeil_women: '새일여성',
   parental: '육아',
+}
+
+/** D-343 고령자 계속고용 카드 — 업체 취업규칙에서 읽은 정년 · 재고용 조항(D-339). 없으면 올리라고 */
+function SeniorRuleNote({ record }: { record: ClientOpsRecord }) {
+  const line = customFactValue(record, '정년 · 계속고용')
+  const has = continuingOf(line)
+  if (!line)
+    return (
+      <span className="t-meta break-keep text-slate-600" data-testid="senior-rule" data-state="none">
+        취업규칙(정년 · 재고용 조항)을 업체 서류함에 올리면 이 지원금 요건을 바로 봐요.
+      </span>
+    )
+  return (
+    <span className={`t-meta break-keep font-semibold ${has === 'no' ? 'text-amber-700' : has === 'yes' ? 'text-success-700' : 'text-slate-700'}`} data-testid="senior-rule" data-state={has ?? 'unknown'}>
+      취업규칙: {line.replace(/\s*\(취업규칙\)$/, '')}
+      {has === 'no' ? ' — 재고용 · 정년 연장 제도를 넣고 1년 넘게 운영해야 받아요' : has === 'yes' ? ' — 제도를 1년 넘게 운영했는지만 확인' : ''}
+    </span>
+  )
 }

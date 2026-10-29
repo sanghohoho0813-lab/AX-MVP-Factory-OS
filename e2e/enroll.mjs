@@ -63,6 +63,24 @@ for (const vp of [
   const panel = await page.getByTestId('youth-enroll').innerText().catch(() => '')
   check(`${vp.tag} 명부: 참여신청 기한 칸에 기한 안 2명`, panel.includes('참여신청 기한 2명') && panel.includes('최근청년') && panel.includes('급한청년'), panel.slice(0, 200))
   check(`${vp.tag} 명부: 3년 전 입사자는 기한 칸에 없음`, !panel.includes('오래된청년'))
+  // D-343 고령자 계속고용 카드 — 업체 취업규칙(정년 · 재고용 조항) 한 줄. 없으면 올리라고 · 있으면 그 줄(조항 없음은 주황)
+  const rule0 = page.getByTestId('senior-rule')
+  check(`${vp.tag} D-343 고령자 계속고용 카드: 취업규칙 없음 → '업체 서류함에 올리면 요건을 바로 봐요'`, (await rule0.getAttribute('data-state').catch(() => '')) === 'none' && ((await rule0.innerText().catch(() => '')) ?? '').includes('취업규칙(정년 · 재고용 조항)을 업체 서류함에 올리면'), await rule0.innerText().catch(() => ''))
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const all = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.customFields = [...(r.customFields ?? []), { id: 'wr1', group: 'people', label: '정년 · 계속고용', value: '정년 60세 · 정년 뒤 재고용 · 연장 조항 없음(취업규칙)' }]
+    localStorage.setItem(k, JSON.stringify(all))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  await page.getByLabel('명부 파일').setInputFiles(CSV)
+  await page.waitForTimeout(1500)
+  const rule1 = page.getByTestId('senior-rule')
+  check(`${vp.tag} D-343 취업규칙 '재고용 · 연장 조항 없음' → 카드에 그 줄 + '제도를 넣고 1년 넘게 운영해야 받아요' · 넘침 0`, (await rule1.getAttribute('data-state').catch(() => '')) === 'no' && ((await rule1.innerText().catch(() => '')) ?? '').includes('1년 넘게 운영해야') && (await overflow()) <= 0, await rule1.innerText().catch(() => ''))
+  if (vp.tag === '1440') await rule1.locator('xpath=..').screenshot({ path: '/tmp/claude-0/shot343-senior.png' }).catch(() => {})
+  else await rule1.locator('xpath=..').screenshot({ path: '/tmp/claude-0/shot343-senior-360.png' }).catch(() => {})
   // D-334 지원금 합계가 사업장 소재지 금액으로(고령자 계속고용 수도권 1,080만 → 비수도권 1,440만) · 지원금 기준표 바로 가기
   const subsidyMan = async () => Number((/최대 ([\d,]+)만원/.exec(await page.getByTestId('roster-subsidy-line').innerText().catch(() => '')) ?? [])[1]?.replace(/,/g, '') ?? NaN)
   const before = await subsidyMan()
