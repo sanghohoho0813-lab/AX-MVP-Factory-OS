@@ -746,8 +746,10 @@ function calc5k(v: Values): Output {
     const grossTax = inheritGiftTax(base)
     const priorBase = Math.max(prior - ded, 0)
     const priorTax = inheritGiftTax(priorBase)
-    const finalTax = grossTax - priorTax
-    return { total, ded, base, grossTax, priorTax, finalTax }
+    // D-323 신고세액공제 3%(상증법 §69 — 기한 안에 신고하면). 원본은 빠져 상속세(04)와 달리 3% 많게 나왔다
+    const reportCredit = Math.max(grossTax - priorTax, 0) * 0.03
+    const finalTax = grossTax - priorTax - reportCredit
+    return { total, ded, base, grossTax, priorTax, reportCredit, finalTax }
   }
   const k1 = one('1')
   const k2 = one('2')
@@ -758,6 +760,7 @@ function calc5k(v: Values): Output {
     L('과세표준', won(k.base)),
     L('산출증여세', won(k.grossTax)),
     L('기납부증여세공제', won(k.priorTax)),
+    L('신고세액공제(3%)', won(k.reportCredit)),
     L('납부할 증여세', won(k.finalTax), 'big'),
   ]
   return { blocks: [{ id: 'k_out', title: '증여세 계산 결과', tone: 'dark', lines: [...part('예시1', k1), ...part('예시2', k2)] }] }

@@ -120,8 +120,9 @@ check('현금: 취임일이 없으면 퇴직금은 까닭을 댄다', cashPlan(v
 
 /* ---- 증여 ---- */
 const g10 = giftPlan(p, reg, sv, { recipientId: 'c', mode: 'pct', amount: 10 })
-const expectTax = inheritGiftTax(Math.max(10000 * sv.perShare - 5e7, 0))
-check('증여 10%: 1만주 · 성년 자녀 공제 5천만 · 세금은 세율표 그대로', g10.ok && g10.qty === 10000 && g10.deduction === 5e7 && Math.abs(g10.tax - expectTax) < 1, { tax: g10.tax, expectTax })
+// D-323 기한 안 신고 — 신고세액공제 3% 뺀 금액(68,000,000 × 0.97 = 65,960,000)
+const expectTax = inheritGiftTax(Math.max(10000 * sv.perShare - 5e7, 0)) * 0.97
+check('증여 10%: 1만주 · 성년 자녀 공제 5천만 · 세금은 세율표 그대로 − 신고세액공제 3%(D-323)', g10.ok && g10.qty === 10000 && g10.deduction === 5e7 && Math.abs(g10.tax - expectTax) < 1, { tax: g10.tax, expectTax })
 check('증여 10%: 대표 60% → 50% · 자녀 0% → 10%', Math.abs(g10.ceoAfterPct - 50) < 1e-9 && Math.abs(g10.recipientAfterPct - 10) < 1e-9)
 const free = giftPlan(p, reg, sv, { recipientId: 'c', mode: 'free', amount: 0 })
 check('증여 · 세금 없이: 공제 5천만 안의 주식 수 · 세금 0', free.tax === 0 && free.qty === Math.floor(5e7 / sv.perShare))

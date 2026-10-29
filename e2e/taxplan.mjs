@@ -180,7 +180,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByLabel('자녀 수', { exact: true }).fill('2')
   await page.waitForTimeout(400)
   const gift = (await page.getByTestId('result-gift').innerText()) ?? ''
-  check('증여 10%: 증여세 68,000,000원 · 대표 50% · 자녀 10%', gift.includes('증여세 68,000,000원') && gift.includes('50.0%') && gift.includes('10.0%'), gift.slice(0, 300))
+  // D-323 신고세액공제 3% — 68,000,000 × 0.97
+  check('증여 10%: 증여세 65,960,000원(신고세액공제 3% 뺌) · 대표 50% · 자녀 10%', gift.includes('증여세 65,960,000원') && gift.includes('50.0%') && gift.includes('10.0%'), gift.slice(0, 300))
   const succ = (await page.getByTestId('succession').innerText()) ?? ''
   check('특례: 나이 · 경영 햇수를 모르면 ? 로 · 적으라고 빨갛게', succ.includes('?') && (await page.getByTestId('result-gift').locator('[data-need-key="ceoAge"]').count()) === 1)
   await page.getByTestId('result-gift').locator('[data-need-key="ceoAge"]').click()
@@ -190,7 +191,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByLabel('대표가 회사를 경영한 햇수', { exact: true }).fill('16')
   await page.waitForTimeout(400)
   const succ2 = (await page.getByTestId('succession').innerText()) ?? ''
-  check('특례 10%(4.4억): (4.4억 − 10억 공제) → 증여세 0원 · 일반보다 6,800만원 적음', succ2.includes('특례 적용 시 증여세 0원') && succ2.includes('6,800만원 적음'), succ2.slice(0, 400))
+  check('특례 10%(4.4억): (4.4억 − 10억 공제) → 증여세 0원 · 일반보다 6,596만원 적음', succ2.includes('특례 적용 시 증여세 0원') && succ2.includes('6,596만원 적음'), succ2.slice(0, 400))
   check('특례: 요건 ✓ 3 · 업종 ? · ★ 검증 필요(2023년 개정 기준 · 가업자산 비율 · 사후관리)', (await page.getByTestId('succession').locator('[data-check="ok"]').count()) === 3 && succ2.includes('2023년 개정') && succ2.includes('사후관리'))
   const inh = (await page.getByTestId('result-inherit').innerText()) ?? ''
   check('상속: 지금 · 증여 후 10년 안 · 10년 뒤 비교', inh.includes('지금 상속되면') && inh.includes('10년 안에') && inh.includes('10년 뒤'), inh.slice(0, 300))

@@ -66,8 +66,9 @@ const ORIGINAL_SUB_ID = { main: null }
  *  t6/p3  퇴직소득세 — 퇴사일로 그해 법(2023년부터 근속연수공제 · 세율 구간) · 근속연수는 날짜까지
  *  t1     가지급금 — 법인세 적용세율 기본값 20 → 22(2026 사업연도 · 지방소득세 포함). 바꾼 값 벌은 양쪽 20 으로 맞춰 식을 대조한다
  *  t8     감자 · 증자 판정표의 법인세상당액 — 2026 사업연도 법인세율(10 · 20 · 22 · 25%). 위 요약 줄은 그대로 대조한다
+ *  t5/j2  증여세 — 신고세액공제 3%(상증법 §69) 줄을 더함(D-323)
  */
-const LAW_FIX = new Set(['기본값|t6/p1', '바꾼 값|t6/p1', '기본값|t6/p3', '바꾼 값|t6/p3', '기본값|t1/main'])
+const LAW_FIX = new Set(['기본값|t6/p1', '바꾼 값|t6/p1', '기본값|t6/p3', '바꾼 값|t6/p3', '기본값|t1/main', '기본값|t5/j2', '바꾼 값|t5/j2'])
 const LAW_FIX_TABLES = new Set(['t8/x1/x1_judge', 't8/x2/x2_judge'])
 
 async function readOriginal(page, blocks, tables) {
@@ -177,7 +178,7 @@ for (const round of ['기본값', '바꾼 값']) {
     }
     for (const s of p.subs) {
       if (LAW_FIX.has(`${round}|${p.calc}/${s.sub}`)) {
-        console.log(`SKIP  ${round} · ${p.calc}/${s.sub} — 법 기준으로 고친 곳(D-317 · 단위 시험이 지킴)`)
+        console.log(`SKIP  ${round} · ${p.calc}/${s.sub} — 법 기준으로 고친 곳(D-317 · D-323 · 단위 시험이 지킴)`)
         continue
       }
       await openOurs(p.calc, s.sub)
@@ -189,7 +190,7 @@ for (const round of ['기본값', '바꾼 값']) {
       }
       for (const id of s.tables ?? []) {
         if (LAW_FIX_TABLES.has(`${p.calc}/${s.sub}/${id}`)) {
-          console.log(`SKIP  ${round} · ${p.calc}/${s.sub} · 표 ${id} — 법 기준으로 고친 곳(D-317 · 단위 시험이 지킴)`)
+          console.log(`SKIP  ${round} · ${p.calc}/${s.sub} · 표 ${id} — 법 기준으로 고친 곳(D-317 · D-323 · 단위 시험이 지킴)`)
           continue
         }
         const d = diff(a.tables[id], b.tables[id])
