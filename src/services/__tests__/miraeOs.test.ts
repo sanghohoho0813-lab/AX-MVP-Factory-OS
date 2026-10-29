@@ -144,6 +144,7 @@ import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
 import { lawBasis, lawBasisStatus } from '../lawBasis'
+import taxCalcSrc from '../taxCalc.ts?raw'
 import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, corpTaxNational, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
@@ -1358,69 +1359,35 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('세금: 증여공제 — 배우자 6억', giftDeduction('배우자') === 600000000 && giftDeduction('타인') === 0)
   check('세금: 예전 누진세율표(퇴직) — 4,600만 경계', Math.round(oldBracketTax(46000000)) === 5820000)
   check('세금: 법인세(원본 이름 corpTaxLocal = 2026 국세 10%) — 2억 경계', corpTaxLocal(200000000) === 20000000)
-  // D-317 법 기준 손계산 — 2026 사업연도부터 법인세 10 · 20 · 22 · 25%(2025 사업연도까지 9 · 19 · 21 · 24%)
-  check('D-317 법인세: 2026 사업연도 — 2억 2천만 · 10억 1.8억 · 300억 62억 · 결손 0', corpTaxNational(200000000) === 20000000 && corpTaxNational(1000000000) === 180000000 && corpTaxNational(30000000000) === 6180000000 && corpTaxNational(-5) === 0)
-  check('D-317 법인세: 2025 사업연도는 옛 세율 — 2억 1,800만 · 10억 1.7억', corpTaxNational(200000000, 2025) === 18000000 && corpTaxNational(1000000000, 2025) === 170000000)
+  // D-341 세금 계산기(01~09)는 세무사 검토본 그대로 — 계산식 · 로직을 바꾸지 않는다(2026-10-29 대표 지시).
+  //        파일 지문(export 낱말만 빼고)이 검토본과 같아야 한다. 바꿔야 하면 먼저 대표 확인 → 지문을 새로 적는다.
   {
-    const t6 = calculatorOf('t6')!
-    const p3 = t6.subs.find((x) => x.key === 'p3')!
-    const line = (out: ReturnType<typeof p3.compute>, k: string) => out.blocks.flatMap((b) => b.lines).find((l) => l.k === k)?.v
-    // 2026년 퇴직 · 2019-01-15 입사 · 9천만 — 근속 8년(7년 2개월 → 올림) · 근속공제 500만+3×200만 · 환산 1억1,850만 · 환산공제 7,002.5만
-    //   과표 4,847.5만 × 15% − 126만 = 601.125만 → × 8/12 = 4,007,500원(옛 구간으로는 4,127,500원)
-    const v26 = { ...defaultValues(t6), t_start: '2019-01-15', t_end: '2026-03-31', t_amount: '90000000' }
-    const o26 = p3.compute(v26)
-    check('D-317 퇴직소득세: 2026년 퇴직 — 근속 8년 · 근속공제 1,100만 · 세액 4,007,500 · 지방 400,750', line(o26, '근속연수') === '8년' && line(o26, '근속공제') === '11,000,000원' && line(o26, '퇴직소득세액') === '4,007,500원' && line(o26, '지방소득세') === '400,750원', JSON.stringify(o26.blocks[0].lines.slice(0, 12)))
-    // 같은 퇴직금을 09 소득세 계산기(2026) 퇴직 칸에 넣으면 같은 산출세액
-    const t9 = calculatorOf('t9')!
-    const a9 = t9.subs.find((x) => x.key === 'inc_a')!.compute({ ...defaultValues(t9), inc_a_retireAmt: '90000000', inc_a_startDate: '2019-01-15', inc_a_endDate: '2026-03-31' })
-    check('D-317 퇴직소득세: 02 계산기와 09 계산기(2026)가 같은 퇴직금에 같은 세액', line(a9, '⑧ 퇴직소득 산출세액(연분연승)') === line(o26, '퇴직소득세액'), `${line(a9, '⑧ 퇴직소득 산출세액(연분연승)')} vs ${line(o26, '퇴직소득세액')}`)
-    // 2022년 퇴직(기본값 1998-05-25 ~ 2022-12-31 · 12억) — 옛 근속공제 1,200만+5×120만 · 옛 구간 → 215,486,660원
-    const o22 = p3.compute(defaultValues(t6))
-    check('D-317 퇴직소득세: 2022년 퇴직은 그해 법(옛 근속공제 1,800만 · 옛 세율) — 215,486,660원', line(o22, '근속공제') === '18,000,000원' && line(o22, '퇴직소득세액') === '215,486,660원' && /2022년까지/.test(line(o22, '기준') ?? ''), JSON.stringify(o22.blocks[0].lines.slice(0, 12)))
-    // 근속연수는 날짜까지 — 2019-01-15 ~ 2026-01-20 은 7년 5일 → 8년(원본은 달만 세어 7년)
-    check('D-317 퇴직소득세: 근속연수는 날짜까지 보고 1년 미만 올림', line(p3.compute({ ...v26, t_end: '2026-01-20' }), '근속연수') === '8년')
-    // 01 개인 vs 법인: 근로소득 과표는 2023년 이후 구간(1,400만 6% · 5,000만 15%)
-    const p1 = t6.subs.find((x) => x.key === 'p1')!
-    const o1 = p1.compute({ ...defaultValues(t6), q_pay: '30000000', q_basic: '1500000', q_credit: '0', q_health: '0' })
-    // 3천만 − 근로소득공제(750만+1,500만×15% = 975만) − 150만 = 1,875만 → × 15% − 126만 = 1,552,500
-    check('D-317 개인 vs 법인: 근로소득 산출세액은 지금 세율 구간 — 1,875만 → 1,552,500원', line(o1, '산출세액') === '1,552,500원', line(o1, '산출세액'))
-    check('D-317 가지급금: 법인세 적용세율 기본값 22%(2026 · 지방소득세 포함)', defaultValues(calculatorOf('t1')!).g_corp === '22')
-  }
-  // D-320 비상장주식 — 상증령 §54 · §55 · §56 손계산
-  {
-    const base = { shares: 10000, ratePct: 10, asset: 3_000_000_000, debt: 1_000_000_000, reBook: 0, reFair: 0, severance: 0, goodwill: 0, corpType: '일반법인', months: [0, 0, 0] as [number, number, number], caps: [0, 0, 0] as [number, number, number] }
-    // 순자산 20억 → 1주 20만 · 순손익 1억 · 2억 · 3억(최근) → (1+4+9)/6 억 = 2.333억 → 1주 23,333 / 10% = 233,333
-    //   일반법인 0.4 × 200,000 + 0.6 × 233,333 = 220,000 · 하한 160,000 → 220,000
-    const r = unlistedShareValuation({ ...base, income: [100_000_000, 200_000_000, 300_000_000] })
-    check('D-320 비상장주식: 순손익 가중(최근 3 · 2년 전 2 · 3년 전 1) · 일반법인 2:3 · 1주 220,000원', Math.round(r.perShareIncomeValue) === 233333 && Math.round(r.finalPerShare) === 220000, JSON.stringify({ i: r.perShareIncomeValue, f: r.finalPerShare }))
-    // 3년 적자 → 순손익가치 0(음수 아님) · 1주 가치는 순자산 80% 하한 160,000
-    const loss = unlistedShareValuation({ ...base, income: [-300_000_000, -200_000_000, -100_000_000] })
-    check('D-320 비상장주식: 3년 가중평균이 음수면 순손익가치 0 · 하한 순자산 × 80%', loss.perShareIncomeValue === 0 && Math.round(loss.finalPerShare) === 160000, JSON.stringify({ i: loss.perShareIncomeValue, f: loss.finalPerShare }))
-    // 자본잠식(순자산 음수) → 1주 순자산가치 0
-    const neg = unlistedShareValuation({ ...base, debt: 4_000_000_000, income: [0, 0, 0] })
-    check('D-320 비상장주식: 순자산가액이 0 이하면 1주 순자산가치 0', neg.perShareNetAsset === 0 && neg.finalPerShare === 0, JSON.stringify({ n: neg.perShareNetAsset, f: neg.finalPerShare }))
-    const t3 = calculatorOf('t3')!
-    const titles = t3.subs[0].groups.map((g) => g.title).join(' | ')
-    check('D-320 증여공제: 혼인 · 출산 공제 포함 1억 5천만(부모 → 성년 자녀) · 기존 선택지는 그대로', giftDeduction('직계존속(성년 · 혼인출산)') === 150000000 && giftDeduction('직계존속(성년)') === 50000000 && giftDeduction('직계존속(미성년)') === 20000000)
-    // D-327 배당가산율 10%(2024년 이후 지급분) — 배당 1억 · 이자 0 → 2,000만 넘는 8,000만 × 10% = 800만
-    {
-      const t9 = calculatorOf('t9')!
-      const a = t9.subs.find((x) => x.key === 'inc_a')!.compute(defaultValues(t9))
-      const g = a.blocks.flatMap((b) => b.lines).find((l) => l.k === '배당가산액(Gross-up)')?.v
-      check('D-327 배당가산액 = (금융소득 1억 − 2,000만) × 10% = 8,000,000원', g === '8,000,000원', g)
+    const norm = (src: string) => src.replace(/\r\n?/g, '\n').replace(/\bexport /g, '')
+    const fnv = (src: string) => {
+      let x = 0x811c9dc5
+      for (let i = 0; i < src.length; i++) x = Math.imul(x ^ src.charCodeAt(i), 0x01000193) >>> 0
+      return x.toString(16)
     }
-    // D-332 기준 연도 · 다음 점검 — 해가 바뀌면 알림
+    check('D-341 세금 계산기 계산식 = 세무사 검토본(지문 906a4fa3) — 바꾸려면 대표 확인', fnv(norm(taxCalcSrc)) === '906a4fa3', fnv(norm(taxCalcSrc)))
+    check('D-341 검토본 그대로: 법인세 05 특정법인 10% · 06 감자 · 증자 9%(2억 경계) · 가지급금 기본 20%', corpTaxLocal(200000000) === 20000000 && corpTaxNational(200000000) === 18000000 && defaultValues(calculatorOf('t1')!).g_corp === '20')
+    const t9 = calculatorOf('t9')!
+    const g = t9.subs.find((x) => x.key === 'inc_a')!.compute(defaultValues(t9)).blocks.flatMap((b) => b.lines).find((l) => l.k === '배당가산액(Gross-up)')?.v
+    check('D-341 검토본 그대로: 배당가산액 11%(배당 1억 → 8,800,000원)', g === '8,800,000원', g)
+    // 비상장주식 — 순손익 가중(결산연도 3 · 직전 2 · 1년전 1) · 일반법인 2:3
+    const base = { shares: 10000, ratePct: 10, asset: 3_000_000_000, debt: 1_000_000_000, reBook: 0, reFair: 0, severance: 0, goodwill: 0, corpType: '일반법인', months: [0, 0, 0] as [number, number, number], caps: [0, 0, 0] as [number, number, number] }
+    const r = unlistedShareValuation({ ...base, income: [100_000_000, 200_000_000, 300_000_000] })
+    check('세금: 비상장주식 순손익 가중 · 일반법인 2:3 · 1주 220,000원', Math.round(r.perShareIncomeValue) === 233333 && Math.round(r.finalPerShare) === 220000, JSON.stringify({ i: r.perShareIncomeValue, f: r.finalPerShare }))
+    // D-332 기준 연도 · 다음 점검 — 해가 바뀌면 알림(고용 · 창업 · 연구소 기준)
     check('D-332 기준표 2026년 · 다음 점검 2027-01-01 · 2026-12-31 은 그대로 · 2027-01-01 부터 알림', lawBasisStatus('2026-12-31').stale === false && lawBasisStatus('2027-01-01').stale === true && lawBasisStatus('2026-10-29').nextReview === '2027-01-01')
-    // D-321 계산 기준표 — 계산에 쓰는 상수에서 읽은 숫자
+    // D-321 · D-341 계산 기준표 — 세금 칸은 검토본 계산기 함수에서 읽은 값
     const basis = lawBasis()
     const sec = (id: string) => basis.find((b) => b.id === id)
-    const rowsText = (id: string) => (sec(id)?.rows ?? []).map((r) => `${r.label}=${r.value}`).join(' | ')
-    check('D-321 기준표 10칸(D-334 고용지원금 더함) · 칸마다 기준(법 · 해) · 쓰는 곳', basis.length === 10 && basis.every((b) => b.basis.length > 4 && b.usedIn.length > 4 && b.rows.length > 0), basis.map((b) => b.id).join())
+    const rowsText = (id: string) => (sec(id)?.rows ?? []).map((x) => `${x.label}=${x.value}`).join(' | ')
+    check('D-321 기준표 10칸(D-334 고용지원금 더함) · 칸마다 기준 · 쓰는 곳', basis.length === 10 && basis.every((b) => b.basis.length > 4 && b.usedIn.length > 4 && b.rows.length > 0), basis.map((b) => b.id).join())
     check('D-334 기준표 고용지원금 = 규칙표(청년도약 720만 · 계속고용 1,080만 · 1,440만 · 정년에 이른 기존 직원)', rowsText('subsidy').includes('청년일자리도약장려금=720만') && rowsText('subsidy').includes('최대 3년(1,080만 · 1,440만)') && rowsText('subsidy').includes('정년에 이른 기존 직원'), rowsText('subsidy'))
-    check('D-321 기준표 법인세 = 계산 상수(10% · 2025 사업연도까지 9%)', rowsText('corp').includes('과표 2억 이하=10% (2025 사업연도까지 9%)') && rowsText('corp').includes('3,000억 초과=25%'), rowsText('corp'))
-    check('D-321 기준표 소득세 1,400만 이하 6% · 10억 초과 45% · 4대보험 4.75% · 3.595% · 13.14%', rowsText('income').includes('1,400만 이하=6%') && rowsText('income').includes('10억 초과=45%') && rowsText('insurance').includes('4.75%') && rowsText('insurance').includes('3.595%') && rowsText('insurance').includes('13.14%'), rowsText('insurance'))
-    check('D-321 기준표 상속 · 증여 세율 10~50% · 혼인출산 1억 5,000만 · 고용 2026 표 · 창업 75%', rowsText('inherit').includes('과세표준 30억 초과=50%') && rowsText('inherit').includes('혼인출산) =1억 5,000만원'.replace(') =', ')=')) && rowsText('employ').includes('700 → 1,600 → 1,700만') && rowsText('startup').includes('청년 75%'), rowsText('inherit'))
-    check('D-320 비상장주식 입력 목차가 가중치와 맞음(3년 전 1 · 2년 전 2 · 최근 3)', titles.includes('3년 전 사업연도(가중치 1)') && titles.includes('2년 전 사업연도(가중치 2)') && titles.includes('최근 사업연도') && !titles.includes('1년전'), titles)
+    check('D-341 기준표 법인세 = 계산기 함수(05 특정법인 10 · 20 · 22 · 25% · 06 감자 · 증자 9 · 19 · 21 · 24% · 07 기본 20%)', rowsText('corp').includes('05 특정법인 증여의제=10% · 20% · 22% · 25%') && rowsText('corp').includes('06 불균등 증자 · 감자 — 법인세 상당액=9% · 19% · 21% · 24%') && rowsText('corp').includes('07 가지급금 — 법인세 적용세율=기본 20%') && sec('corp')!.basis.includes('세무사 검토본'), rowsText('corp'))
+    check('D-321 기준표 소득세 1,400만 이하 6% · 10억 초과 45% · 02 퇴직급여 옛 구간표 · 배당가산 11% · 4대보험 4.75% · 3.595% · 13.14%', rowsText('income').includes('1,400만 이하=6%') && rowsText('income').includes('10억 초과=45%') && rowsText('income').includes('1,200만 · 4,600만 · 8,800만 구간표(6% · 15% · 24%') && rowsText('income').includes('배당가산율(Gross-up)=11%') && rowsText('insurance').includes('4.75%') && rowsText('insurance').includes('3.595%') && rowsText('insurance').includes('13.14%'), rowsText('income'))
+    check('D-341 기준표 상속 · 증여 — 세율 10~50% · 혼인출산 공제 줄 없음 · 신고세액공제는 08 상속세만 · 고용 2026 표 · 창업 75%', rowsText('inherit').includes('과세표준 30억 초과=50%') && !rowsText('inherit').includes('혼인출산') && rowsText('inherit').includes('신고세액공제=08 상속세 계산기 3%') && rowsText('employ').includes('700 → 1,600 → 1,700만') && rowsText('startup').includes('청년 75%'), rowsText('inherit'))
   }
   check('세금: 2026 종합소득세 — 5천만 원', Math.round(incomeTax9(50000000)) === 6240000)
   check('세금: 근속연수 1년 미만 절상', yearsRoundUp9('2016-01-01', '2026-03-02') === 11 && yearsRoundUp9('2020-01-01', '2020-06-01') === 1)

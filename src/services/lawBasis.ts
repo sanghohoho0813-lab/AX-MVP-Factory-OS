@@ -2,9 +2,10 @@
  * D-321 계산 기준표 — OS 가 계산에 쓰는 세율 · 공제 · 단가를 한 화면에.
  *
  * 숫자를 여기 따로 적지 않는다 — 계산기 · 모듈이 실제로 쓰는 상수와 함수에서 읽는다(바꾸면 기준표도 같이 바뀐다).
+ * D-341 세금 계산기(01~09)는 세무사 검토본 그대로다(대표 지시 — 계산식을 바꾸지 않는다). 세금 칸은 그 계산기가 쓰는 값을 보여 줄 뿐이다.
  * 기준 연도 · 조문 이름은 사람이 읽는 꼬리표다. 규칙 계산이며 AI 가 아니다.
  */
-import { CONV_DED9, CORP_RATES, GROSSUP_RATE, INC9_BRACKETS, S_RATE, SERVICE_DED9, defaultValues, calculatorOf, giftDeduction, inheritGiftTax } from './taxCalc'
+import { CONV_DED9, INC9_BRACKETS, S_RATE, SERVICE_DED9, corpTaxLocal, corpTaxNational, defaultValues, calculatorOf, giftDeduction, inheritGiftTax, oldBracketTax } from './taxCalc'
 import { SME_2026, defaultTaxUnits } from '../tools/employment/lib/taxCredit'
 import { RATES_2026 } from '../tools/employment/lib/payroll'
 import { MIN_WAGE_2026 } from '../tools/employment/lib/constants'
@@ -58,12 +59,14 @@ export function lawBasisStatus(today: string): { year: number; nextReview: strin
 }
 
 export function lawBasis(): BasisSection[] {
-  const corp26 = CORP_RATES.y2026
-  const corp25 = CORP_RATES.y2025
-  const corpCuts = ['과표 2억 이하', '2억 초과 ~ 200억', '200억 초과 ~ 3,000억', '3,000억 초과']
+  // 계산기 함수에서 구간마다 세율을 읽는다 — 식을 여기 다시 적지 않는다
+  const slope = (f: (x: number) => number, cuts: readonly number[]) => cuts.map((b, i) => (f(b) - f(i ? cuts[i - 1] : 0)) / (b - (i ? cuts[i - 1] : 0)))
+  const fourRates = (f: (x: number) => number) => slope(f, [200_000_000, 20_000_000_000, 300_000_000_000, 400_000_000_000]).map(pctOf).join(' · ')
+  const oldRates = slope(oldBracketTax, [12_000_000, 46_000_000, 88_000_000]).map(pctOf).join(' · ')
   const t1 = calculatorOf('t1')
-  const loanRate = t1 ? defaultValues(t1).g_rate : ''
-  const giftRels = ['배우자', '직계존속(성년)', '직계존속(성년 · 혼인출산)', '직계존속(미성년)', '직계비속', '기타친족'] as const
+  const t1v = t1 ? defaultValues(t1) : {}
+  const loanRate = t1v.g_rate ?? ''
+  const giftRels = ['배우자', '직계존속(성년)', '직계존속(미성년)', '직계비속', '기타친족'] as const
   const inheritCuts: [number, string][] = [
     [100_000_000, '1억 이하'],
     [500_000_000, '1억 초과 ~ 5억'],
@@ -79,33 +82,38 @@ export function lawBasis(): BasisSection[] {
   const s26m = startupRates('metro', true)
   const s26o = startupRates('overcrowded', true)
   const three = (t: readonly number[]) => t.map((n) => n.toLocaleString('ko-KR')).join(' → ') + '만'
+  const REVIEWED = '세무사 검토본 계산기 그대로'
   return [
     {
       id: 'corp',
-      title: '법인세',
-      basis: '2026-01-01 이후 시작하는 사업연도 · 법인세법 §55 (2025년 12월 국회 통과)',
+      title: '법인세 — 계산기마다 쓰는 세율',
+      basis: `${REVIEWED} — 과세표준 2억 · 200억 · 3,000억 구간`,
       rows: [
-        ...corpCuts.map((label, i) => ({ label, value: `${pctOf(corp26[i])} (2025 사업연도까지 ${pctOf(corp25[i])})` })),
-        { label: '지방소득세', value: '법인세의 10% 더 — 2억 이하 합계 11% · 2억 초과 22%' },
+        { label: '05 특정법인 증여의제', value: fourRates(corpTaxLocal) },
+        { label: '06 불균등 증자 · 감자 — 법인세 상당액', value: fourRates(corpTaxNational) },
+        { label: '01 대표이사 급여 — 회사 절세 효과', value: `${pctOf(S_RATE.corpLow)} · ${pctOf(S_RATE.corpHigh)}(지방소득세 포함)` },
+        { label: '07 가지급금 — 법인세 적용세율', value: `기본 ${t1v.g_corp ?? ''}%(화면에서 고칠 수 있음)` },
       ],
-      usedIn: '세금 계산기 01 · 05 · 06 · 08 · 절세 설계 · 가지급금',
+      usedIn: '세금 계산기 01 · 05 · 06 · 07 · 절세 설계',
     },
     {
       id: 'income',
       title: '소득세 기본세율',
-      basis: '2023년 귀속부터 · 소득세법 §55 (근로 · 종합 · 퇴직 같은 표)',
+      basis: `${REVIEWED} — 소득세법 §55`,
       rows: [
         ...bracketRows(INC9_BRACKETS),
+        { label: '02 퇴직급여(개인 vs 법인 · 퇴직소득세)', value: `1,200만 · 4,600만 · 8,800만 구간표(${oldRates} …)` },
         { label: '지방소득세', value: '소득세의 10% 더' },
         { label: '금융소득 종합과세', value: '이자 · 배당 합계 2,000만 넘는 부분 — 2,000만까지는 14%' },
-        { label: '배당가산율(Gross-up)', value: `${pctOf(GROSSUP_RATE)} (2024년 이후 받는 배당 · 2027년 11% 안은 국회 전)` },
+        { label: '배당가산율(Gross-up)', value: '11%(03 소득세 계산기)' },
       ],
-      usedIn: '세금 계산기 01 · 02 · 03(소득세) · 절세 설계',
+      usedIn: '세금 계산기 01 · 02 · 03 · 절세 설계',
+      note: '위 1,400만 · 5,000만 구간표는 03 소득세 · 01 급여 계산기가 쓴다.',
     },
     {
       id: 'retire',
       title: '퇴직소득 — 근속연수공제 · 환산급여공제',
-      basis: '2023-01-01 이후 퇴직 · 소득세법 §48 (2022년까지 퇴직은 그때 공제 · 세율로 따로 계산)',
+      basis: `${REVIEWED} — 소득세법 §48`,
       rows: [
         ...SERVICE_DED9.map(([from, base, per], i) => {
           const to = SERVICE_DED9[i + 1]?.[0]
@@ -115,7 +123,6 @@ export function lawBasis(): BasisSection[] {
           const to = CONV_DED9[i + 1]?.[0]
           return { label: `환산급여 ${i === 0 ? `${man(to!)} 이하` : to ? `${man(from)} 초과 ~ ${man(to)}` : `${man(from)} 초과`}`, value: i === 0 ? '전액 공제' : `${man(base)} + 넘는 금액의 ${pctOf(rate)}` }
         }),
-        { label: '근속연수', value: '날짜까지 보고 1년 미만은 1년' },
       ],
       usedIn: '세금 계산기 02 › 퇴직소득세 · 03 › 퇴직 · 절세 설계(퇴직금)',
     },
@@ -137,7 +144,7 @@ export function lawBasis(): BasisSection[] {
     {
       id: 'inherit',
       title: '상속세 · 증여세',
-      basis: '상속세 및 증여세법 §26 · §53 · §53의2 — 2026년에도 그대로(2026년 세제개편안은 국회 전)',
+      basis: `${REVIEWED} — 상속세 및 증여세법 §26 · §53`,
       rows: [
         ...inheritCuts.map(([to, label], i) => {
           const prev = inheritCuts[i - 1]?.[0] ?? 0
@@ -146,17 +153,17 @@ export function lawBasis(): BasisSection[] {
         }),
         ...giftRels.map((r) => ({ label: `증여공제 · ${r}`, value: `${man(giftDeduction(r))}원(10년 합산)` })),
         { label: '상속 일괄공제', value: '5억(기초 2억 + 인적공제가 더 크면 그 금액)' },
-        { label: '신고세액공제', value: '3%' },
+        { label: '신고세액공제', value: '08 상속세 계산기 3%' },
       ],
-      usedIn: '세금 계산기 04(상속세) · 05(증여세) · 절세 설계(증여 · 상속)',
+      usedIn: '세금 계산기 04(증여세) · 08(상속세) · 절세 설계(증여 · 상속)',
     },
     {
       id: 'loan',
       title: '가지급금 · 비상장주식',
-      basis: '법인세법 시행규칙(당좌대출이자율) · 상증법 시행령 §54~§56',
+      basis: `${REVIEWED} — 법인세법 시행규칙(당좌대출이자율) · 상증법 시행령 §54~§56`,
       rows: [
         { label: '가지급금 인정이자율', value: `${loanRate}% (당좌대출이자율)` },
-        { label: '순손익 가중치', value: '최근 사업연도 3 · 2년 전 2 · 3년 전 1 (평균이 음수면 0)' },
+        { label: '순손익 가중치', value: '결산연도 3 · 직전연도 2 · 1년전 1' },
         { label: '순손익가치 환원율', value: '10%' },
         { label: '일반법인 비중', value: '순손익 3 : 순자산 2' },
         { label: '부동산 50% 이상', value: '순손익 2 : 순자산 3 (80% 이상이면 순자산만)' },

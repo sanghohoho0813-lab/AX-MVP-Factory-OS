@@ -180,8 +180,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByLabel('자녀 수', { exact: true }).fill('2')
   await page.waitForTimeout(400)
   const gift = (await page.getByTestId('result-gift').innerText()) ?? ''
-  // D-323 신고세액공제 3% — 68,000,000 × 0.97
-  check('증여 10%: 증여세 65,960,000원(신고세액공제 3% 뺌) · 대표 50% · 자녀 10%', gift.includes('증여세 65,960,000원') && gift.includes('50.0%') && gift.includes('10.0%'), gift.slice(0, 300))
+  // D-341 세금 계산기 검토본 그대로(증여세에 신고세액공제 없음)
+  check('증여 10%: 증여세 68,000,000원 · 대표 50% · 자녀 10%', gift.includes('증여세 68,000,000원') && gift.includes('50.0%') && gift.includes('10.0%'), gift.slice(0, 300))
   const succ = (await page.getByTestId('succession').innerText()) ?? ''
   check('특례: 나이 · 경영 햇수를 모르면 ? 로 · 적으라고 빨갛게', succ.includes('?') && (await page.getByTestId('result-gift').locator('[data-need-key="ceoAge"]').count()) === 1)
   await page.getByTestId('result-gift').locator('[data-need-key="ceoAge"]').click()
@@ -191,7 +191,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByLabel('대표가 회사를 경영한 햇수', { exact: true }).fill('16')
   await page.waitForTimeout(400)
   const succ2 = (await page.getByTestId('succession').innerText()) ?? ''
-  check('특례 10%(4.4억): (4.4억 − 10억 공제) → 증여세 0원 · 일반보다 6,596만원 적음', succ2.includes('특례 적용 시 증여세 0원') && succ2.includes('6,596만원 적음'), succ2.slice(0, 400))
+  check('특례 10%(4.4억): (4.4억 − 10억 공제) → 증여세 0원 · 일반보다 6,800만원 적음', succ2.includes('특례 적용 시 증여세 0원') && succ2.includes('6,800만원 적음'), succ2.slice(0, 400))
   check('특례: 요건 ✓ 3 · 업종 ? · ★ 검증 필요(2023년 개정 기준 · 가업자산 비율 · 사후관리)', (await page.getByTestId('succession').locator('[data-check="ok"]').count()) === 3 && succ2.includes('2023년 개정') && succ2.includes('사후관리'))
   const inh = (await page.getByTestId('result-inherit').innerText()) ?? ''
   check('상속: 지금 · 증여 후 10년 안 · 10년 뒤 비교', inh.includes('지금 상속되면') && inh.includes('10년 안에') && inh.includes('10년 뒤'), inh.slice(0, 300))
@@ -296,9 +296,9 @@ for (const width of [1440, 390, 360]) {
   await page.getByTestId('tax-basis').waitFor()
   const ids = await page.getByTestId('tax-basis-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
   const corp = await page.locator('[data-testid="tax-basis-section"][data-id="corp"]').innerText()
-  check(`D-321 ${width} 기준표 10칸(법인세 · 소득세 · 퇴직 · 4대보험 · 상속증여 · 가지급금 · 고용 · 고용지원금 · 창업 · 연구소) · 주소 m=basis · 법인세 10%(2025까지 9%)`, ids.join() === 'corp,income,retire,insurance,inherit,loan,employ,subsidy,startup,rnd' && page.url().includes('m=basis') && corp.includes('10% (2025 사업연도까지 9%)'), ids.join())
+  check(`D-321 ${width} 기준표 10칸(법인세 · 소득세 · 퇴직 · 4대보험 · 상속증여 · 가지급금 · 고용 · 고용지원금 · 창업 · 연구소) · 주소 m=basis · 법인세 칸은 검토본 계산기 세율(05 특정법인 10% · 06 감자 · 증자 9%)`, ids.join() === 'corp,income,retire,insurance,inherit,loan,employ,subsidy,startup,rnd' && page.url().includes('m=basis') && corp.includes('세무사 검토본') && corp.includes('10% · 20% · 22% · 25%') && corp.includes('9% · 19% · 21% · 24%'), ids.join())
   // D-332 기준 연도 · 다음 점검(올해는 알림 없이 '다음 점검 2027-01-01')
-  check(`D-332 ${width} 기준표 머리 — 다음 점검 2027-01-01 · 새해 알림 없음`, (await page.getByTestId('tax-basis-review').innerText()).includes('2027-01-01') && (await page.getByTestId('tax-basis-stale').count()) === 0)
+  check(`D-332 ${width} 기준표 머리 — 세금 계산기는 검토본 그대로 · 다음 점검 2027-01-01 · 새해 알림 없음`, (await page.getByTestId('tax-basis-review').innerText()).includes('2027-01-01') && (await page.getByTestId('tax-basis-review').innerText()).includes('세무사 검토본') && (await page.getByTestId('tax-basis-stale').count()) === 0)
   const before = await page.locator('[data-testid="tax-basis-section"][data-id="income"] dl > div').count()
   await page.locator('[data-testid="tax-basis-section"][data-id="income"]').getByTestId('tax-basis-more').click()
   check(`D-321 ${width} [n줄 더 보기] → 다 보임(소득세 10억 초과 45%)`, (await page.locator('[data-testid="tax-basis-section"][data-id="income"] dl > div').count()) > before && (await page.locator('[data-testid="tax-basis-section"][data-id="income"]').innerText()).includes('45%'))

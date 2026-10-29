@@ -489,7 +489,7 @@ export function TaxCalculatorsPage() {
       {/* D-321 계산 기준표 — 몇 년 · 어떤 법으로 계산하는지 */}
       {mode !== 'basis' && (
         <button type="button" onClick={() => setMode('basis')} className="no-print tap t-sub -mt-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-2 font-semibold text-brand-800 hover:bg-brand-50" data-testid="tax-basis-open">
-          <BookOpen aria-hidden="true" className="size-4" /> 계산 기준표 보기 — 2026년 세율 · 공제
+          <BookOpen aria-hidden="true" className="size-4" /> 계산 기준표 보기 — 계산기가 쓰는 세율 · 공제
         </button>
       )}
 

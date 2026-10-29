@@ -49,28 +49,16 @@ const VARIANT = {
   // D-225: 임원 퇴직 한도(r_)는 원본과 다르게 고친 곳 하나 — 2020년 뒤 취임이면 원본은 2020년 1월부터 세어 한도가 부푼다.
   //        원본과 같아야 하는 2019년 전 취임으로 대조하고, 2020년 뒤 취임은 단위 시험(test:taxplan D-225)이 바른 값을 지킨다
   t6: { q_pay: '250000000', q_corptax_base: '150000000', r_start: '2016-06-01', r_end: '2026-09-01', t_start: '2019-01-15', t_end: '2026-03-31', t_amount: '90000000' },
-  t9: { inc_a_transferPrice: '60000', inc_a_isMajor: '소액주주', inc_a_basicDed: '여', inc_a_salary: '150000000', inc_a_dividend: '15000000', inc_b_dividend: '15000000', inc_b_under1yr: '1년미만', inc_b_isSme: '비중소기업' },
+  t9: { inc_a_transferPrice: '60000', inc_a_isMajor: '소액주주', inc_a_basicDed: '여', inc_a_salary: '150000000', inc_b_dividend: '15000000', inc_b_under1yr: '1년미만', inc_b_isSme: '비중소기업' },
   t5: { j_price: '1200000000', j_rel: '특수관계없는자(타인)', j_major: '대주주 외(소액주주)', k_rel1: '배우자', k_prior2: '0' },
   t7: { w1_principal: '800000000', w2_amount: '50000000', w3_amount: '900000000', w4_ratio: '15' },
   t8: { x1_fair: '90000', x1_issue: '20000', x2_fair: '30000', x2_redeem: '10000' },
-  t1: { g_principal: '350000000', g_years: '8', g_debt: '없음', g_corp: '20' },
+  t1: { g_principal: '350000000', g_years: '8', g_debt: '없음' },
   t4: { h_re: '4000000000', h_spouse: '아니오', h_skip: '할증30%', h_house_ok: '예', h_house_val: '500000000' },
   t3: { v_type: '부동산과다보유법인', v_re_fair: '2400000000', v_cap0: '100000000' },
 }
 
 const ORIGINAL_SUB_ID = { main: null }
-
-/**
- * D-317 법 기준으로 고친 곳 — 원본(배포본)이 옛 세법이라 일부러 다르다. 바른 값은 단위 시험(test:mirae-os 'D-317')이 손계산으로 지킨다.
- *  t6/p1  개인 vs 법인 — 근로소득 기본세율을 2023년 이후 구간(1,400만 · 5,000만)으로
- *  t6/p3  퇴직소득세 — 퇴사일로 그해 법(2023년부터 근속연수공제 · 세율 구간) · 근속연수는 날짜까지
- *  t1     가지급금 — 법인세 적용세율 기본값 20 → 22(2026 사업연도 · 지방소득세 포함). 바꾼 값 벌은 양쪽 20 으로 맞춰 식을 대조한다
- *  t8     감자 · 증자 판정표의 법인세상당액 — 2026 사업연도 법인세율(10 · 20 · 22 · 25%). 위 요약 줄은 그대로 대조한다
- *  t5/j2  증여세 — 신고세액공제 3%(상증법 §69) 줄을 더함(D-323)
- *  t9     2026 소득세 — 배당가산율 11% → 10%(2024년 이후 지급분 · D-327). 기본값 벌(배당 1억)만 SKIP — 바꾼 값 벌은 배당을 2,000만 아래로 두어 식을 대조한다
- */
-const LAW_FIX = new Set(['기본값|t6/p1', '바꾼 값|t6/p1', '기본값|t6/p3', '바꾼 값|t6/p3', '기본값|t1/main', '기본값|t5/j2', '바꾼 값|t5/j2', '기본값|t9/inc_a', '기본값|t9/inc_b', '기본값|t9/inc_cmp'])
-const LAW_FIX_TABLES = new Set(['t8/x1/x1_judge', 't8/x2/x2_judge'])
 
 async function readOriginal(page, blocks, tables) {
   return page.evaluate(
@@ -178,10 +166,6 @@ for (const round of ['기본값', '바꾼 값']) {
       }
     }
     for (const s of p.subs) {
-      if (LAW_FIX.has(`${round}|${p.calc}/${s.sub}`)) {
-        console.log(`SKIP  ${round} · ${p.calc}/${s.sub} — 법 기준으로 고친 곳(D-317 · D-323 · D-327 · 단위 시험이 지킴)`)
-        continue
-      }
       await openOurs(p.calc, s.sub)
       const a = await readOriginal(orig, s.blocks, s.tables)
       const b = await readOurs(ours, s.blocks, s.tables)
@@ -190,10 +174,6 @@ for (const round of ['기본값', '바꾼 값']) {
         check(`${round} · ${p.calc}/${s.sub} · ${id} (${a.blocks[id]?.length ?? 0}줄)`, a.blocks[id] !== null && b.blocks[id] !== null && d === '', d)
       }
       for (const id of s.tables ?? []) {
-        if (LAW_FIX_TABLES.has(`${p.calc}/${s.sub}/${id}`)) {
-          console.log(`SKIP  ${round} · ${p.calc}/${s.sub} · 표 ${id} — 법 기준으로 고친 곳(D-317 · D-323 · D-327 · 단위 시험이 지킴)`)
-          continue
-        }
         const d = diff(a.tables[id], b.tables[id])
         check(`${round} · ${p.calc}/${s.sub} · 표 ${id} (${a.tables[id]?.length ?? 0}행)`, a.tables[id] !== null && b.tables[id] !== null && d === '', d)
       }

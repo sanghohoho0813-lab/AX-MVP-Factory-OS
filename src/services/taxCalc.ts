@@ -431,7 +431,7 @@ function calc2(v: Values): Output {
 
 export type CorpValuationType = '일반법인' | '부동산과다보유법인' | '특수법인'
 
-/** 비상장주식 보충적 평가 입력 — 금액은 원, 연도 배열은 [3년 전(가중 1), 2년 전(가중 2), 최근 사업연도(가중 3)] */
+/** 비상장주식 보충적 평가 입력 — 금액은 원, 연도 배열은 [1년전(가중 1), 2년전·직전(가중 2), 결산연도(가중 3)] */
 export interface UnlistedShareInput {
   shares: number
   /** 순손익가치 환원율(%) — 기획재정부 고시 이자율 */
@@ -483,8 +483,7 @@ export function unlistedShareValuation(i: UnlistedShareInput): UnlistedShareResu
   const netAssetBook = asset - debt
   const reDiff = reFair - reBook
   const netAssetValue = netAssetBook + reDiff - i.severance + i.goodwill
-  // D-320 순자산가액이 0 이하면 0(상증령 §55①) — 예전에는 음수 1주 가치가 그대로 가중평균에 들어갔다
-  const perShareNetAsset = shares > 0 ? Math.max(netAssetValue / shares, 0) : 0
+  const perShareNetAsset = shares > 0 ? netAssetValue / shares : 0
   const reRatio = asset + reFair - reBook > 0 ? reFair / (asset + reFair - reBook) : 0
 
   const inc = i.income
@@ -500,8 +499,7 @@ export function unlistedShareValuation(i: UnlistedShareInput): UnlistedShareResu
   const perShareIncome = netIncome.map((x) => (shares > 0 ? x / shares : 0))
   const weights = [1, 2, 3]
   const weightedAvg = (perShareIncome[0] * weights[0] + perShareIncome[1] * weights[1] + perShareIncome[2] * weights[2]) / 6
-  // D-320 3년 가중평균이 음수면 순손익가치 0(상증령 §56①) — 적자 회사의 1주 순손익가치가 음수로 보였다
-  const perShareIncomeValue = rate > 0 ? Math.max(weightedAvg / rate, 0) : 0
+  const perShareIncomeValue = rate > 0 ? weightedAvg / rate : 0
 
   const specialCorp = reRatio >= 0.8
   const realEstateHeavy = !specialCorp && reRatio >= 0.5 && reRatio < 0.8
@@ -728,7 +726,6 @@ function calc5j(v: Values): Output {
 export function giftDeduction(rel: string): number {
   if (rel === '배우자') return 600000000
   if (rel === '직계존속(성년)') return 50000000
-  if (rel === '직계존속(성년 · 혼인출산)') return 150000000
   if (rel === '직계존속(미성년)') return 20000000
   if (rel === '직계비속') return 50000000
   if (rel === '기타친족') return 10000000
@@ -746,10 +743,8 @@ function calc5k(v: Values): Output {
     const grossTax = inheritGiftTax(base)
     const priorBase = Math.max(prior - ded, 0)
     const priorTax = inheritGiftTax(priorBase)
-    // D-323 신고세액공제 3%(상증법 §69 — 기한 안에 신고하면). 원본은 빠져 상속세(04)와 달리 3% 많게 나왔다
-    const reportCredit = Math.max(grossTax - priorTax, 0) * 0.03
-    const finalTax = grossTax - priorTax - reportCredit
-    return { total, ded, base, grossTax, priorTax, reportCredit, finalTax }
+    const finalTax = grossTax - priorTax
+    return { total, ded, base, grossTax, priorTax, finalTax }
   }
   const k1 = one('1')
   const k2 = one('2')
@@ -760,7 +755,6 @@ function calc5k(v: Values): Output {
     L('과세표준', won(k.base)),
     L('산출증여세', won(k.grossTax)),
     L('기납부증여세공제', won(k.priorTax)),
-    L('신고세액공제(3%)', won(k.reportCredit)),
     L('납부할 증여세', won(k.finalTax), 'big'),
   ]
   return { blocks: [{ id: 'k_out', title: '증여세 계산 결과', tone: 'dark', lines: [...part('예시1', k1), ...part('예시2', k2)] }] }
@@ -786,8 +780,7 @@ function calc6p1(v: Values): Output {
   const pay = num('q_pay'), basic = num('q_basic'), credit = num('q_credit'), health = num('q_health')
   const earnedDed = earnedIncomeDeduction(pay)
   const base = pay - earnedDed - basic
-  // D-317 2023년부터 기본세율 구간이 1,400만 · 5,000만으로 바뀌었다 — 원본은 2022년 구간(1,200만 · 4,600만)이라 대표 부담이 부풀었다
-  const grossTax = Math.max(salaryBracketTax(base), 0)
+  const grossTax = Math.max(oldBracketTax(base), 0)
   const finalTax = grossTax - credit
   const localTax = finalTax * 0.1
   const payTax = finalTax + localTax
@@ -878,20 +871,12 @@ function calc6p2(v: Values): Output {
 
 function calc6p3(v: Values): Output {
   const { num, str } = mk(v)
+  const start = new Date(str('t_start'))
   const end = new Date(str('t_end'))
   const amount = num('t_amount')
-  // D-317 근속연수는 날짜까지 보고 1년 미만은 1년(소득세법 시행령 §105) — 원본은 달만 세어 하루 차이로 한 해가 빠졌다
-  const years = yearsRoundUp9(str('t_start'), str('t_end'))
-  // D-317 2023-01-01 이후 퇴직은 근속연수공제가 커지고(100만 · 200만 · 250만 · 300만) 기본세율 구간도 바뀌었다.
-  //       원본은 새 근속공제에 옛 세율 구간을 섞어 어느 해 퇴직에도 맞지 않았다 — 퇴사일로 그해 법을 고른다
-  const before2023 = end.getFullYear() < 2023
+  const years = Math.ceil(((end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())) / 12)
   let serviceDed: number
-  if (before2023) {
-    if (years <= 5) serviceDed = years * 300000
-    else if (years <= 10) serviceDed = (years - 5) * 500000 + 1500000
-    else if (years <= 20) serviceDed = (years - 10) * 800000 + 4000000
-    else serviceDed = (years - 20) * 1200000 + 12000000
-  } else if (years <= 5) serviceDed = years * 1000000
+  if (years <= 5) serviceDed = years * 1000000
   else if (years <= 10) serviceDed = (years - 5) * 2000000 + 5000000
   else if (years <= 20) serviceDed = (years - 10) * 2500000 + 15000000
   else serviceDed = (years - 20) * 3000000 + 40000000
@@ -906,7 +891,7 @@ function calc6p3(v: Values): Output {
   else convDed = (converted - 300000000) * 0.35 + 151700000
 
   const base = converted - convDed
-  const convTax = Math.max(before2023 ? oldBracketTax(base) : salaryBracketTax(base), 0)
+  const convTax = Math.max(oldBracketTax(base), 0)
   const retireTax = Math.floor((convTax * years) / 12 / 10) * 10
   const localTax = Math.floor((retireTax * 0.1) / 10) * 10
   const totalTax = retireTax + localTax
@@ -918,8 +903,7 @@ function calc6p3(v: Values): Output {
         title: '퇴직소득세 계산 결과',
         tone: 'dark',
         lines: [
-          L('기준', Number.isNaN(end.getTime()) ? '-' : before2023 ? '2022년까지 퇴직(그때 법)' : '2023년 이후 퇴직(현행 법)'),
-          L('근속연수', years > 0 ? years + '년' : '-'),
+          L('근속연수', Number.isFinite(years) ? years + '년' : '-'),
           L('근속공제', won(serviceDed)),
           L('근속공제 후 산출액', won(afterService)),
           L('환산급여액', won(converted)),
@@ -941,24 +925,20 @@ function calc6p3(v: Values): Output {
 /* ------------------------------------------------------------------ */
 
 // D-244: 소득이 0 이하(결손)면 법인세도 0 — 예전엔 음수 세금이 나와 결손 법인 채무면제 · 증여 이익이 부풀었다
-// D-317: 2026-01-01 이후 시작하는 사업연도부터 법인세율이 구간마다 1%p 올랐다(10 · 20 · 22 · 25%, 법인세법 §55).
-//        원본은 2023~2025 세율(9 · 19 · 21 · 24%)이라 감자 · 증자 증여의제의 법인세 상당액이 적게 나왔다. 누진공제액은 두 해가 같다.
-export const CORP_RATES: Record<'y2025' | 'y2026', [number, number, number, number]> = { y2025: [0.09, 0.19, 0.21, 0.24], y2026: [0.1, 0.2, 0.22, 0.25] }
-export function corpTaxNational(x: number, fiscalYear = 2026): number {
+export function corpTaxNational(x: number): number {
   if (!(x > 0)) return 0
-  const [r1, r2, r3, r4] = CORP_RATES[fiscalYear >= 2026 ? 'y2026' : 'y2025']
-  if (x <= 200000000) return x * r1
-  if (x <= 20000000000) return x * r2 - 20000000
-  if (x <= 300000000000) return x * r3 - 420000000
-  return x * r4 - 9420000000
+  if (x <= 200000000) return x * 0.09
+  if (x <= 20000000000) return x * 0.19 - 20000000
+  if (x <= 300000000000) return x * 0.21 - 420000000
+  return x * 0.24 - 9420000000
 }
 
-/**
- * 원본 이름은 '지방세 포함' 이지만 식은 법인세(국세) 10 · 20 · 22 · 25% 그대로다 — 2026 사업연도 세율과 같다(D-317).
- * 특정법인 증여의제(상증법 §45의5)의 법인세 상당액은 국세만 보므로 이 값이 맞다. 이름만 원본을 따른다.
- */
 export function corpTaxLocal(x: number): number {
-  return corpTaxNational(x, 2026)
+  if (!(x > 0)) return 0
+  if (x <= 200000000) return x * 0.1
+  if (x <= 20000000000) return x * 0.2 - 20000000
+  if (x <= 300000000000) return x * 0.22 - 420000000
+  return x * 0.25 - 9420000000
 }
 
 function solveLimit(fn: (x: number) => number, target: number, lo: number, hi: number): number {
@@ -1272,8 +1252,6 @@ function vlookupBracket(x: number, table: Bracket[]): Bracket {
   }
   return r
 }
-/** D-327 배당가산율 — 2024년 이후 지급분 10% */
-export const GROSSUP_RATE = 0.1
 export const INC9_BRACKETS: Bracket[] = [[0, 0, 0.06], [14000000, 1260000, 0.15], [50000000, 5760000, 0.24], [88000000, 15440000, 0.35], [150000000, 19940000, 0.38], [300000000, 25940000, 0.4], [500000000, 35940000, 0.42], [1000000000, 65940000, 0.45]]
 export function incomeTax9(base: number): number {
   const r = vlookupBracket(base, INC9_BRACKETS)
@@ -1367,9 +1345,7 @@ function scenario(v: Values, p: string): Scenario {
 
   const interestAmt = interest
   const finTotal = interest + dividend
-  // D-327 배당가산율(Gross-up) — 2024-01-01 이후 받는 배당은 10%(소득세법 §17③). 원본은 11%(2023년까지)라 종합과세 배당이 조금 크게 잡혔다.
-  //       2027년 지급분부터 11% 로 되돌리는 안은 국회 전 — 통과되면 지급 연도로 고른다.
-  const grossup = Math.max(0, Math.min(finTotal - 20000000, dividend)) * GROSSUP_RATE
+  const grossup = Math.max(0, Math.min(finTotal - 20000000, dividend)) * 0.11
   const dividendAmt = dividend + grossup
   const businessAmt = business
   const earnedDed = earnedDeduction9(salary)
@@ -1512,8 +1488,7 @@ const INC9_B = { ...INC9_A, transferPrice: '5000', transferDate: '2025-05-03', s
 /* 목록 — 원본 사이드바 순서 그대로                                        */
 /* ------------------------------------------------------------------ */
 
-// D-320 혼인 · 출산 증여공제(상증법 §53의2, 2024~) — 부모 → 성년 자녀가 혼인신고 전후 2년 · 출생 2년 안이면 5천만에 1억을 더한다(평생 1억)
-const REL_OPTIONS = ['타인', '배우자', '직계존속(성년)', '직계존속(성년 · 혼인출산)', '직계존속(미성년)', '직계비속', '기타친족']
+const REL_OPTIONS = ['타인', '배우자', '직계존속(성년)', '직계존속(미성년)', '직계비속', '기타친족']
 
 export const TAX_CALCULATORS: Calculator[] = [
   {
@@ -1648,7 +1623,7 @@ export const TAX_CALCULATORS: Calculator[] = [
     desc: '대표이사(특수관계인) 가지급금을 방치할 경우 연도별 세무·자금 손실을 시뮬레이션합니다.',
     subs: [{
       key: 'main', label: '',
-      groups: [{ title: '① 기본 가정 입력', fields: [A('g_principal', '가지급금 원금 (원)', '1000000000'), N('g_rate', '인정이자율 (당좌대출이자율)', '4.6', { step: '0.01', hint: '% 단위' }), N('g_years', '분석 기간 (년, 1~10)', '5', { min: 1, max: 10 }), N('g_corp', '법인세 적용세율', '22', { step: '0.1', hint: '% — 2026 사업연도부터 과표 2억 이하 11% · 2억~200억 22%(지방소득세 포함)' }), N('g_inc', '대표이사 소득세 한계세율(지방소득세 포함)', '41.8', { step: '0.1', hint: '%' }), N('g_ins', '4대보험 추가부담률(회사분)', '9', { step: '0.1', hint: '%' }), S('g_debt', '회사 차입금 존재 여부', ['있음', '없음'], '있음'), N('g_borrow', '가중평균차입이자율(지급이자 손금불산입 계산용)', '4.6', { step: '0.01', hint: '%' })] }],
+      groups: [{ title: '① 기본 가정 입력', fields: [A('g_principal', '가지급금 원금 (원)', '1000000000'), N('g_rate', '인정이자율 (당좌대출이자율)', '4.6', { step: '0.01', hint: '% 단위' }), N('g_years', '분석 기간 (년, 1~10)', '5', { min: 1, max: 10 }), N('g_corp', '법인세 적용세율', '20', { step: '0.1', hint: '%' }), N('g_inc', '대표이사 소득세 한계세율(지방소득세 포함)', '41.8', { step: '0.1', hint: '%' }), N('g_ins', '4대보험 추가부담률(회사분)', '9', { step: '0.1', hint: '%' }), S('g_debt', '회사 차입금 존재 여부', ['있음', '없음'], '있음'), N('g_borrow', '가중평균차입이자율(지급이자 손금불산입 계산용)', '4.6', { step: '0.01', hint: '%' })] }],
       compute: calc1,
     }],
   },
@@ -1691,12 +1666,12 @@ export const TAX_CALCULATORS: Calculator[] = [
         { title: '① 법인 기본 정보', fields: [T('v_name', '법인명', 'ㅇㅇㅇ'), A('v_shares', '평가일 현재 발행주식수(주)', '138000'), A('v_par', '액면가(원)', '5000'), N('v_rate', '적용이자율(순손익가치환원율)', '10', { step: '0.1', hint: '% · 기획재정부 고시 이자율' })] },
         { title: '② 재무상태 (순자산가치용)', fields: [A('v_asset', '자산총액(원)', '3000000000'), A('v_debt', '부채총계(원)', '1000000000'), A('v_re_book', '부동산 장부가(원)', '600000000'), A('v_re_fair', '부동산 시가(원)', '800000000'), A('v_severance', '미반영 퇴직급여추계액(원)', '0'), A('v_goodwill', '영업권 상당액(원)', '0')] },
         { title: '③ 법인 구분', fields: [S('v_type', '법인 구분 직접 선택', ['일반법인', '부동산과다보유법인', '특수법인'], '일반법인')] },
-        { title: '④ 최근 3년 순손익액 & 자본거래 — 3년 전 사업연도(가중치 1)', fields: [A('v_inc0', '각 사업연도 순손익액(원)', '250000000'), N('v_month0', '유상증(감)자 실시월(1~12)', '8'), A('v_cap0', '유상증(감)자 금액(감자는 -)', '0')] },
-        { title: '2년 전 사업연도(가중치 2)', fields: [A('v_inc1', '각 사업연도 순손익액(원)', '500000000'), N('v_month1', '유상증(감)자 실시월(1~12)', '3'), A('v_cap1', '유상증(감)자 금액(감자는 -)', '-200000000')] },
-        { title: '최근 사업연도 — 평가일 직전 결산(가중치 3)', fields: [A('v_inc2', '각 사업연도 순손익액(원)', '420000000'), N('v_month2', '유상증(감)자 실시월(1~12)', '10'), A('v_cap2', '유상증(감)자 금액(감자는 -)', '0')] },
+        { title: '④ 최근 3년 순손익액 & 자본거래 — 1년전', fields: [A('v_inc0', '각 사업연도 순손익액(원)', '250000000'), N('v_month0', '유상증(감)자 실시월(1~12)', '8'), A('v_cap0', '유상증(감)자 금액(감자는 -)', '0')] },
+        { title: '2년전(직전)', fields: [A('v_inc1', '각 사업연도 순손익액(원)', '500000000'), N('v_month1', '유상증(감)자 실시월(1~12)', '3'), A('v_cap1', '유상증(감)자 금액(감자는 -)', '-200000000')] },
+        { title: '결산연도', fields: [A('v_inc2', '각 사업연도 순손익액(원)', '420000000'), N('v_month2', '유상증(감)자 실시월(1~12)', '10'), A('v_cap2', '유상증(감)자 금액(감자는 -)', '0')] },
       ],
       compute: calc3,
-      note: '가중치는 최근 사업연도 3, 2년 전 2, 3년 전 1을 적용합니다(상증령 §56). 3년 가중평균이 음수면 순손익가치는 0, 순자산가액이 0 이하면 0으로 봅니다. 자본거래가 없으면 0으로 두세요.',
+      note: '가중치는 결산연도 3, 직전연도 2, 1년전 1을 적용합니다. 자본거래가 없으면 0으로 두세요.',
     }],
     note: '※ 부동산 비율 = 부동산 시가 ÷ (자산총액 + 부동산평가차액) · 특수법인/부동산과다보유법인 자동판정은 참고용이며, 실제 반영값은 위 "법인 구분 직접 선택"입니다.',
   },

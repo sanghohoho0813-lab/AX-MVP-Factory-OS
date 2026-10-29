@@ -28,11 +28,11 @@ export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string
           {/* D-332 해가 바뀌었는데 숫자를 다시 보지 않았으면 — 조용히 옛 숫자로 계산하지 않게 알린다 */}
           {status.stale ? (
             <p className="t-sub mt-1 break-keep rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-900" data-testid="tax-basis-stale">
-              ★ {status.year + 1}년 세법 개정을 아직 반영하지 않았어요 — 아래 숫자는 {status.year}년 기준입니다. 신고 · 상담 전에 바뀐 세율 · 공제를 확인하세요.
+              ★ 고용지원금 · 통합고용 · 창업감면 · 연구소 기준이 {status.year}년 것이에요 — 새해 바뀐 금액 · 단가를 확인하세요. 세금 계산기(01~09)는 세무사 검토본 그대로예요.
             </p>
           ) : (
             <p className="t-meta mt-0.5 text-slate-500" data-testid="tax-basis-review">
-              다음 점검 {status.nextReview} — 새해 세법 · 7월 4대보험 상한이 바뀌면 이 표부터 고칩니다
+              세금 계산기(01~09)는 세무사 검토본 그대로 · 고용 · 창업 · 연구소 기준 다음 점검 {status.nextReview}
             </p>
           )}
           <p className="t-sub mt-1 break-keep text-slate-600">
