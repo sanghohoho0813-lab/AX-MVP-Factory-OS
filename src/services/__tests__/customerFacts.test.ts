@@ -41,6 +41,7 @@ import {
 import { clientFacts, ventureConfirmedAt, ventureValidOn } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
 import { continuingOf, looksLikeWorkRules, readRetireRule, retireRuleLine } from '../workRules'
+import { credentialsOf } from '../grants/grantProfile'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
 import { requestFollowUpText } from '../recoRequest'
@@ -1581,6 +1582,7 @@ await (async () => {
   const ev = policyEvidence(r, clientFacts(r, new Date(`${T}T00:00:00`)), T)
   check('D-338 정책자금 매출 성장세(칸의 매출 추이) → 3년 추세 증가', ev.input.revenueTrend3y === '증가' && ev.notes.some((x) => x.startsWith('매출 증가(')), JSON.stringify({ i: ev.input.revenueTrend3y, n: ev.notes.slice(0, 3) }))
   check('D-338 창업벤처 · 연구소 — 벤처 확인일 · 유효(칸에서 읽음)', ventureConfirmedAt(r) !== '' && ventureValidOn(r, T), `${ventureConfirmedAt(r)} ${ventureValidOn(r, T)}`)
+  check('D-338 지원사업 맞춤 인증에도 벤처(칸에서 읽음)', credentialsOf(r, T).certs.includes('venture'), JSON.stringify(credentialsOf(r, T)))
 })()
 
 // D-339 취업규칙 → 정년 · 계속고용 → 맞춤 추천 고용 카드에 계속고용장려금 기회(만 60세 이상 직원이 있을 때)

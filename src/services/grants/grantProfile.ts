@@ -7,7 +7,7 @@
  *  - 없는 값은 비워 둔다 → 매칭에서 '확인 필요' 가 된다. 지어내지 않는다.
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { CUSTOM_FACT_PREFIX, usableFactValue, wonOf } from '../customerFacts'
+import { CUSTOM_FACT_PREFIX, customFactEntries, usableFactValue, wonOf } from '../customerFacts'
 import { ageFrom, yearsInBusiness } from '../clientOpsProfile'
 import { certsFromText, exact, placeOf, type CertKey, type CompanyProfile } from './grantMatch'
 import { profileFromQuery } from './grantText'
@@ -23,7 +23,8 @@ export function credentialsOf(record: ClientOpsRecord, today: string): { certs: 
   const text = [usableFactValue(record, 'certifications'), labText].join(' ')
   const active: string[] = []
   const expired = new Set<CertKey>()
-  for (const [k, v] of Object.entries(record.factValues ?? {})) {
+  // D-338 올린 인증서는 회사 정보 칸(customFields)에 — 칸 · 예전 기록(factValues 'cf:') 둘 다
+  for (const [k, v] of customFactEntries(record)) {
     if (!k.startsWith(CUSTOM_FACT_PREFIX) || !String(v).trim()) continue
     const name = k.slice(CUSTOM_FACT_PREFIX.length)
     const keys = certsFromText(name)
