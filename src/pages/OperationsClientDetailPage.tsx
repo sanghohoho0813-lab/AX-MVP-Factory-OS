@@ -626,7 +626,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
           const sm = out.summary
           if ((sm.entered.length || sm.flagged.length || sm.cretop || sm.roster) && (await commit(out.record))) {
-            setLastBatch(sm)
+            // D-345 판정 비교는 칸에 파일을 넣기 전 기록과
+            setLastBatch({ ...sm, before: base })
             showToast(
               [sm.entered.length ? `바로 넣은 정보 ${sm.entered.length}건` : '', sm.flagged.length ? `확인할 정보 ${sm.flagged.length}건` : '', sm.cretop ? '크레탑 분석 붙임' : '', sm.roster ? '명부 진단 붙임' : '']
                 .filter(Boolean)

@@ -562,6 +562,15 @@ export function buildInsights(record: ClientOpsRecord, today: string, notices: r
 /** 제안할 만한 판정인가 — 가능성 높음 · 검토해 볼 만함만(분석 있음 · 정보 더 필요 · 어려움은 제안이 아니다) */
 export const isPick = (i: Pick<Insight, 'tone'>): boolean => i.tone === 'good' || i.tone === 'maybe'
 
+/**
+ * D-345 서류를 올린 직후 — 올리기 전에는 '정보가 더 필요해요'(또는 없던) 모듈이 이번에 판정이 난 것.
+ * 맞춤 추천 맨 위 '먼저 제안할 것' 과 별개로, 방금 올린 서류가 무엇을 열었는지 바로 보이게. 판정이 좋은 것 먼저(after 순서 그대로)
+ */
+export function insightChanges(before: readonly Insight[], after: readonly Insight[]): Insight[] {
+  const was = new Map(before.map((i) => [i.key, i]))
+  return after.filter((a) => a.tone !== 'need' && (was.get(a.key)?.tone ?? 'need') === 'need')
+}
+
 /** 업체 상세 맨 위 — 먼저 제안할 것 많아야 n개(판정은 이미 좋은 것 먼저 · 같으면 모듈 순서) */
 export function topPicks(insights: readonly Insight[], n = 3): Insight[] {
   return insights.filter(isPick).slice(0, n)

@@ -51,6 +51,7 @@ import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
+import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
@@ -60,7 +61,7 @@ import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
-import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
+import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
@@ -1688,6 +1689,11 @@ await (async () => {
   const withStart = normalizeClientOps({ ...out.record, taxProfile: { ...out.record.taxProfile, ceoStartDate: '2015-07-21' } } as never)
   const tax = buildInsights(withStart, '2026-10-29', []).find((i) => i.key === 'tax')
   const taxBefore = buildInsights(normalizeClientOps({ ...base, taxProfile: { ceoStartDate: '2015-07-21' } } as never), '2026-10-29', []).find((i) => i.key === 'tax')
+  const beforeAll = buildInsights(normalizeClientOps({ ...base, taxProfile: { ceoStartDate: '2015-07-21' } } as never), '2026-10-29', [])
+  const afterAll = buildInsights(withStart, '2026-10-29', [])
+  const opened = insightChanges(beforeAll, afterAll)
+  check('D-345 이번 서류로 새로 판정: 절세 설계(정보 필요 → 판정) · 원래 판정 나던 모듈 · 아직 정보 필요한 모듈은 빠짐', opened.some((i) => i.key === 'tax') && opened.every((i) => i.tone !== 'need' && (beforeAll.find((b) => b.key === i.key)?.tone ?? 'need') === 'need') && insightChanges(afterAll, afterAll).length === 0, JSON.stringify(opened.map((i) => `${i.key}:${i.tone}`)))
+  check('D-345 올리기 전 기록(before)은 업체 기록의 올리기 기록에 남지 않음', !!out.summary.before && !('before' in docUploadLogOf(out.record, out.summary, 'u1')))
   check('D-342 맞춤 추천 절세: 영수증 전 "대표 급여" 필요 → 뒤 퇴직금 한도 계산 · 더 묻지 않음', !!taxBefore?.missing.includes('대표 급여') && !!tax && !tax.missing.includes('대표 급여') && tax.headline.includes('퇴직금'), JSON.stringify([taxBefore?.missing, tax?.headline, tax?.missing]))
   // 서류함 칸 — 제목('[ √ ]' 표시가 붙어도) · 취업규칙
   const metas = allDocumentMetas(base)
@@ -1714,6 +1720,43 @@ await (async () => {
   check('D-342 중소기업 확인: 예전 "cf:" 값으로 남은 확인서 칸도 확인으로', smeConfirmed(legacySme) && !smeConfirmed(base))
   const req = requestItemsFrom([{ key: 'tax', label: '절세 설계', tone: 'need', headline: '', detail: '', missing: ['대표 급여'], openPath: '', openLabel: '', action: null } as Insight]).items
   check('D-342 자료 요청: 대표 급여 → 원천징수영수증(올리면 바로 채워짐)', req[0]?.label === '대표님 근로소득 원천징수영수증(작년 것)' && req[0].where.includes('바로 채워집니다'), JSON.stringify(req))
+})()
+
+// D-344 홈택스 사업자등록증명 — 표 모양(쌍점 없이 '이름표 값 이름표 값') · '개업일' · 어느 칸에 올렸든 사업자등록증처럼 읽는다
+await (async () => {
+  const cert = (bizNo: string, rrn: string) =>
+    [
+      '발급번호 : 1234-567-8901-234',
+      '사 업 자 등 록 증 명',
+      '처리기간 즉시',
+      `상호(법인명) 주식회사 가나테크 사업자등록번호 ${bizNo}`,
+      `성명(대표자) 박지훈 주민(법인)등록번호 ${rrn}`,
+      '사업장소재지 서울특별시 강남구 테헤란로 123, 4층',
+      '개업일 2015년 07월 21일 사업자등록일 2015년 07월 23일',
+      '업태 정보통신업 종목 응용 소프트웨어 개발 및 공급업',
+      '공동사업자',
+      '사용목적 금융기관 제출용',
+      '위와 같이 사업자등록을 하였음을 증명합니다.',
+      '2026년 10월 20일',
+      '강남세무서장',
+    ].join('\n')
+  const corp = cert('123-81-67899', '110111-0123456')
+  const val = (list: { key: string; value: string }[], k: string) => list.find((c) => c.key === k)?.value
+  const f = factCandidatesFromDocText('customdoc_bizcert', corp, 'r')
+  check('D-344 사업자등록증명(새 칸에 올림) → 회사명(번호 안 붙음) · 번호 · 대표 · 개업일 · 주소 · 업태 · 종목', isBizRegCertificate(corp) && val(f, 'companyName') === '주식회사 가나테크' && val(f, 'businessNumber') === '123-81-67899' && !f.find((c) => c.key === 'businessNumber')?.note && val(f, 'representativeName') === '박지훈' && val(f, 'establishedAt') === '2015-07-21' && val(f, 'businessAddress') === '서울특별시 강남구 테헤란로 123, 4층' && val(f, 'businessCategory') === '정보통신업' && val(f, 'businessItem') === '응용 소프트웨어 개발 및 공급업', JSON.stringify(f))
+  const indiv = factCandidatesFromDocText('customdoc_bizcert', cert('214-05-01239', '800101-1234567'), 'r')
+  check('D-344 개인사업자 증명의 주민(법인)등록번호는 어디에도 남지 않음(법인번호 · 생년월일로도)', !JSON.stringify(indiv).includes('800101') && !indiv.some((c) => c.key === 'corporateNumber') && val(indiv, 'businessNumber') === '214-05-01239', JSON.stringify(indiv))
+  const form = ['정책자금 융자 신청서', '제출 서류', '사업자등록증명 1부', '상호 : 다른회사', '업태 : 도매업'].join('\n')
+  check('D-344 신청서 본문의 "사업자등록증명 1부" 는 사업자등록증명이 아님(회사 정보로 안 읽음)', !isBizRegCertificate(form) && factCandidatesFromDocText('customdoc_form', form, 'r').length === 0)
+  const nc = guessNewClientFromDocs([{ fileName: 'scan_01.pdf', text: corp, method: 'pdf_text' }])
+  check('D-344 새 업체 등록 창: 사업자등록증명 하나로 업체명 · 대표자 · 사업자번호(파일마다 "사업자등록증명")', nc.guess.companyName?.value === '주식회사 가나테크' && nc.guess.contactName?.value === '박지훈' && nc.guess.businessNumber?.value === '123-81-67899' && nc.files[0]?.docLabel === '사업자등록증명', JSON.stringify([nc.guess, nc.files]))
+  const base = normalizeClientOps({ id: 'bc344', companyName: '', createdAt: NOW, updatedAt: NOW })
+  const metas = allDocumentMetas(base)
+  const pc = placeDocument({ text: corp, fileName: 'scan_01.pdf' }, metas)
+  check('D-344 서류함: "사업자등록증명" 칸(사업자등록증 칸을 덮지 않음) · 유효 1개월 · 발급일 2026-10-20', pc.kind === 'new' && pc.label === '사업자등록증명' && pc.sure && pc.issuedAt === '2026-10-20' && knownDocValidMonths('사업자등록증명') === 1, JSON.stringify(pc))
+  let n = 0
+  const out = await analyzeUploadedDocs(base, [{ key: 'customdoc_bizcert', fileName: 'scan_01.pdf', text: corp, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-29', makeId: () => `bc${++n}` })
+  check('D-344 서류 올리기: 빈 업체에 회사명 · 번호 · 개업일 · 주소가 들어감', readFact(out.record, 'companyName')?.value === '주식회사 가나테크' && readFact(out.record, 'businessNumber')?.value.replace(/\D/g, '') === '1238167899' && readFact(out.record, 'establishedAt')?.value === '2015-07-21' && (readFact(out.record, 'businessAddress')?.value ?? '').includes('테헤란로 123'), JSON.stringify([out.summary.entered, out.summary.flagged]))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

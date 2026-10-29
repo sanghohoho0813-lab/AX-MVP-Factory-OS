@@ -19,6 +19,7 @@ import type { DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { placeDocument } from './docClassify'
 import { factCandidatesFromDocText } from './docFacts'
+import { isBizRegCertificate } from './koreanDocParser'
 import { type ReadMethod } from './docAutoFill'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 import { looksLikeCretop } from './docAutoAnalyze'
@@ -171,7 +172,8 @@ export function guessNewClientFromDocs(
     }
     if (doc.text.replace(/\s/g, '').length < 10) continue
     const placed = placeDocument({ text: doc.text, fileName: doc.fileName }, metas)
-    const biz = placed.kind === 'existing' ? BIZ_DOCS.find((b) => b.key === placed.key) : undefined
+    // D-344 사업자등록증명(새 칸으로 가는 서류)도 사업자등록증처럼 칸을 채운다
+    const biz = placed.kind === 'existing' ? BIZ_DOCS.find((b) => b.key === placed.key) : isBizRegCertificate(doc.text) ? { key: 'businessRegistration', label: '사업자등록증명' } : undefined
     if (!biz) {
       if (placed.kind === 'existing') note.docLabel = placed.label
       else if (placed.sure) note.docLabel = placed.label

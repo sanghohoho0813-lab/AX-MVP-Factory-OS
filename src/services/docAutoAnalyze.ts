@@ -48,6 +48,8 @@ export interface DocBatchSummary {
   placed?: { fileName: string; label: string; other: boolean; numbered: boolean; same?: boolean }[]
   /** D-212: 못 올린 파일 — 올리는 쪽이 채운다 */
   failed?: { fileName: string; reason: string }[]
+  /** D-345 올리기 전 업체 기록 — 방금 올린 서류로 새로 판정된 모듈을 보여 주려고(화면에서만 · 업체 기록에는 남기지 않는다) */
+  before?: ClientOpsRecord
 }
 
 /**
@@ -353,7 +355,7 @@ export async function analyzeUploadedDocs(
     putProfile('monthlySalary', String(monthly), '대표 월 급여', `월 ${formatWon(monthly)} — ${basis}`, d.fileName, true, '')
   }
 
-  return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now } }
+  return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now, before: record } }
 }
 
 /** 지금 주주표와 올린 주주명부가 같은가(이름 · 주식 수) */

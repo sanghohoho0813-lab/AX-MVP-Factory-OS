@@ -39,7 +39,7 @@ interface Item {
 }
 
 /** title · hint — 부르는 곳마다 다른 안내(D-255 AI 전략실은 서류함이 아니라 '자료' 로 들어간다) */
-export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증 · 크레탑 보고서 · 등기부등본 — PDF · 사진 · 한글 · 워드 · 압축(zip) 그대로 · 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
+export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증(증명) · 크레탑 보고서 · 등기부등본 — PDF · 사진 · 한글 · 워드 · 압축(zip) 그대로 · 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
   const { showToast } = useToast()
   const [items, setItems] = useState<Item[]>([])
   const [cretop, setCretop] = useState<CretopCompanyLite[]>([])

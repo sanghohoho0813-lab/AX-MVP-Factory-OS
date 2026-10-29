@@ -17,7 +17,7 @@ import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageSquareText } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageSquareText, Sparkles } from 'lucide-react'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { latestToolResult } from '../../services/toolResultGroups'
 import { useIsPilot } from '../../auth/osAccess'
@@ -42,7 +42,7 @@ import { useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
 import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts } from '../../services/customerFacts'
-import { INSIGHT_TONE_LABEL, buildInsights, recommendNextSteps, type InsightTone } from '../../services/clientInsights'
+import { INSIGHT_TONE_LABEL, buildInsights, insightChanges, recommendNextSteps, type Insight, type InsightTone } from '../../services/clientInsights'
 import { batchOfLog, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
@@ -87,6 +87,8 @@ export default function ClientSmartTab({
   const { notices, linkOf } = useGrantData(workspaceId)
   const usable = (key: string) => key === 'grants' || ent.feature(key).usable
   const insights = useMemo(() => buildInsights(record, today, notices, usable), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
+  // D-345 방금 올린 서류 — 올리기 전 기록의 판정과 견줘 새로 판정이 난 모듈(한 번만 계산)
+  const opened = useMemo(() => (lastBatch?.before ? insightChanges(buildInsights(lastBatch.before, today, notices, usable), insights) : []), [lastBatch, today, notices, insights]) // eslint-disable-line react-hooks/exhaustive-deps
   const pending = pendingFacts(record).length
   // D-149: 서류함 손볼 것도 다음 행동에(만료 · 기타 칸 · 겹친 서류)
   const shelf = useMemo(() => {
@@ -168,7 +170,11 @@ export default function ClientSmartTab({
       </Surface>
 
       {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
-      {lastBatch ? <BatchSummary batch={lastBatch} fresh onRetry={onUpload} /> : record.docUploads?.[0] ? <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} /> : null}
+      {lastBatch ? (
+        <BatchSummary batch={lastBatch} fresh onRetry={onUpload} opened={opened} />
+      ) : record.docUploads?.[0] ? (
+        <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} />
+      ) : null}
 
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} />
@@ -378,7 +384,13 @@ function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
   )
 }
 
-function BatchSummary({ batch, fresh, onRetry }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void }) {
+/** D-345 모듈별 판정(접혀 있으면 펼쳐서) 그 모듈 카드로 */
+function goToInsight(key: string) {
+  openFold('smart.verdicts')
+  window.setTimeout(() => document.querySelector(`[data-testid="smart-insight"][data-key="${key}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+}
+
+function BatchSummary({ batch, fresh, onRetry, opened = [] }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void; opened?: Insight[] }) {
   const when = batch.at ? new Date(batch.at) : null
   const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
   const failed = batch.failed ?? []
@@ -414,6 +426,27 @@ function BatchSummary({ batch, fresh, onRetry }: { batch: DocBatchSummary; fresh
       action={time ? <span className="t-meta text-slate-500">{time}</span> : undefined}
     >
     <Surface edge="success" showEdge className="flex flex-col gap-3">
+      {/* D-345 방금 올린 서류로 새로 판정이 난 모듈 — 누르면 아래 그 모듈 카드로 */}
+      {opened.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="smart-batch-opened">
+          <p className="t-sub flex items-center gap-1.5 font-semibold break-keep text-brand-800">
+            <Sparkles aria-hidden="true" className="size-4 shrink-0" /> 이번 서류로 새로 판정됐어요 {opened.length}개
+          </p>
+          <ul className="flex flex-col gap-1">
+            {opened.slice(0, 6).map((i) => (
+              <li key={i.key}>
+                <button type="button" onClick={() => goToInsight(i.key)} className="tap t-sub flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-control) px-1 text-left break-keep hover:bg-white" data-testid="smart-batch-opened-item" data-key={i.key}>
+                  <span className="shrink-0 font-semibold text-slate-900">{i.label}</span>
+                  <Badge tone={TONE[i.tone]}>{INSIGHT_TONE_LABEL[i.tone]}</Badge>
+                  {/* 휴대폰은 판정 글을 아랫줄 전체 폭으로(좁은 칸에 한두 글자씩 끊기지 않게) */}
+                  <span className="order-last min-w-0 basis-full text-slate-700 [overflow-wrap:anywhere] sm:order-none sm:basis-0 sm:flex-1">{i.headline}</span>
+                  <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-brand-600 sm:ml-0" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {batch.entered.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="t-sub font-semibold text-success-700">바로 넣은 정보 {batch.entered.length}건</p>

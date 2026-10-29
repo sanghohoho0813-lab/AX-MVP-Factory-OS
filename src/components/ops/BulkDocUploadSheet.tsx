@@ -342,7 +342,8 @@ export function BulkDocUploadSheet({
         analyzed = await analyzeUploadedDocs(rec, readDocs, ctx)
       }
       // D-183: 올리기 기록을 업체에 남긴다 — 새로고침해도 '올린 서류' 가 보이고, '확인할 것' 이 바로 넣은 값을 한 번 더 묻는다
-      const summary = { ...analyzed.summary, files: okCount, placed, ...(failedFiles.length ? { failed: failedFiles } : {}) }
+      // D-345 판정 비교는 서류함에 넣기 전 기록과(넣은 서류 칸도 '이번 서류' 몫)
+      const summary = { ...analyzed.summary, files: okCount, placed, before: base, ...(failedFiles.length ? { failed: failedFiles } : {}) }
       const saved = await saveClient(withUploadSummary(analyzed.record, summary, `up_${generateId()}`))
       onSaved(saved, summary)
       const sm = analyzed.summary

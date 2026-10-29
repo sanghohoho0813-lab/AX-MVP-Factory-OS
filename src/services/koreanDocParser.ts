@@ -344,7 +344,7 @@ function findEstablishedAt(t: string, source: DocSource): string | undefined {
   const keys =
     source === 'corporate_registry'
       ? ['회\\s*사\\s*성\\s*립\\s*연\\s*월\\s*일', '설\\s*립\\s*등\\s*기', '개업연월일']
-      : ['개\\s*업\\s*연\\s*월\\s*일', '설\\s*립\\s*일', '회\\s*사\\s*성\\s*립\\s*연\\s*월\\s*일']
+      : ['개\\s*업\\s*연\\s*월\\s*일', '개\\s*업\\s*일(?!\\s*자)', '설\\s*립\\s*일', '회\\s*사\\s*성\\s*립\\s*연\\s*월\\s*일']
   for (const k of keys) {
     const v = valueAfter(t, k)
     if (!v) continue
@@ -405,9 +405,36 @@ function splitIndustryItems(value: string): string[] {
   return out
 }
 
+/**
+ * D-344 홈택스 '사업자등록증명' — 사업자등록증과 같은 정보지만 표 모양이라 '이름표 값 이름표 값' 이 쌍점 없이 한 줄에 붙는다
+ * ('상호(법인명) 가나테크 사업자등록번호 123-45-67890'). 예전에는 회사명에 번호까지 딸려 왔고 '개업일' 을 못 읽었다.
+ * 맨 위 제목이 사업자등록증명일 때만 — 신청서 본문의 '사업자등록증명 1부' 같은 글은 아니다.
+ */
+export function isBizRegCertificate(text: string): boolean {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((l) => l.replace(/[\s()（）\[\]·ㆍ.:：]/g, ''))
+    .filter(Boolean)
+    .slice(0, 10)
+    .some((l) => /^사업자등록증명(?:원)?$/.test(l))
+}
+
+const CERT_LABELS = ['사업자등록번호', '주민(법인)등록번호', '법인등록번호', '성명(대표자)', '사업장소재지', '개업일', '사업자등록일', '업태', '종목', '공동사업자']
+
+/** 사업자등록증명 — 줄 가운데 이름표 앞에서 줄을 나눠 '이름표 값' 한 줄씩으로 */
+function certLines(t: string): string {
+  let out = t
+  for (const l of CERT_LABELS) {
+    const pat = l.split('').map((ch) => ch.replace(/[()]/g, '\\$&')).join('\\s*')
+    out = out.replace(new RegExp(`[ \\t]+(?=${pat}(?![가-힣]))`, 'g'), '\n')
+  }
+  return out
+}
+
 /** 파싱 본체 */
 export function parseKoreanBusinessDocument(raw: string): ParsedCompanyInfo {
-  const t = normalize(raw)
+  const t0 = normalize(raw)
+  const t = isBizRegCertificate(t0) ? certLines(t0) : t0
   const source = detectDocSource(t)
 
   const out: ParsedCompanyInfo = { source }

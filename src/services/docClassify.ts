@@ -120,6 +120,13 @@ const BUILTIN_NAME_HINTS: Record<string, RegExp> = {
  */
 export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: RegExp; validMonths?: number }[] = [
   {
+    // D-344 홈택스 사업자등록증명 — 사업자등록증과 같은 회사 정보를 읽는다(koreanDocParser). 기관들은 보통 발급 1개월 안을 받는다
+    label: '사업자등록증명',
+    validMonths: 1,
+    signals: [{ re: /사업자\s*등록\s*증명/, weight: 4, say: "제목 '사업자등록증명'" }],
+    nameHint: /사업자\s*등록\s*증명/,
+  },
+  {
     label: '법인인감증명서',
     validMonths: 3,
     signals: [

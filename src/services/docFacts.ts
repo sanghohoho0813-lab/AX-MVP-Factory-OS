@@ -4,13 +4,13 @@
  * 자료 업로드 → 글자 읽기(PDF 글자 · 사진 OCR) → 구조화 → 지금 값과 비교 → '확인 필요' 로 제안 → 확인하면 반영.
  * 저절로 확정하지 않는다. 같은 값이면 묻지 않고, 같은 인증서를 또 올려도 칸이 늘지 않는다(customerFacts.pendingFacts).
  *
- *  - 사업자등록증 · 법인등기부등본 → 회사명 · 번호 · 대표자 · 설립일 · 주소 · 업태 · 종목(공통 사실)
+ *  - 사업자등록증(· 사업자등록증명 D-344) · 법인등기부등본 → 회사명 · 번호 · 대표자 · 설립일 · 주소 · 업태 · 종목(공통 사실)
  *  - 인정서 · 확인서 · 인증서 · 특허증(어느 칸에 올렸든, 직접 만든 칸이어도) → 회사 기본 정보 '인증서' 묶음의 칸
  *  - 취업규칙 → '정년 · 계속고용' 칸(D-339)
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
-import { parseKoreanBusinessDocument } from './koreanDocParser'
+import { isBizRegCertificate, parseKoreanBusinessDocument } from './koreanDocParser'
 import { readBusinessNumber } from './bizNoRead'
 import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, formatWon, withFactCandidates } from './customerFacts'
@@ -24,7 +24,8 @@ const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'busine
 export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: string): Omit<FactCandidate, 'id' | 'foundAt'>[] {
   if (!text || text.replace(/\s/g, '').length < 10) return []
   const out: Omit<FactCandidate, 'id' | 'foundAt'>[] = []
-  const bizSource = BUSINESS_DOC[key]
+  // D-344 홈택스 사업자등록증명 — 어느 칸에 올렸든(보통 '사업자등록증명' 새 칸) 사업자등록증과 같은 정보로 읽는다
+  const bizSource = BUSINESS_DOC[key] ?? (isBizRegCertificate(text) ? 'businessRegistration' : undefined)
   if (bizSource) {
     const p = parseKoreanBusinessDocument(text)
     const pairs: [string, string | undefined][] = [

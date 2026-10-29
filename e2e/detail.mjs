@@ -1668,9 +1668,18 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   const entered = (await page.getByTestId('smart-entered').innerText().catch(() => '')) ?? ''
   check(`D-342 ${vp.tag} 파일 이름이 scan 이어도 서류함 '근로소득 원천징수영수증' 칸`, placed.includes('근로소득 원천징수영수증'), placed.slice(0, 300))
   check(`D-342 ${vp.tag} 바로 넣은 정보: 대표 월 급여 700만원 — 2025년 총급여 8,400만원 ÷ 12개월`, entered.includes('대표 월 급여') && entered.includes('월 700만원') && entered.includes('2025년 총급여 8,400만원 ÷ 12개월'), entered.slice(0, 400))
+  // D-345 방금 올린 서류로 새로 판정이 난 모듈 — 절세 설계 · 누르면 그 카드로
+  const opened = (await page.getByTestId('smart-batch-opened').innerText().catch(() => '')) ?? ''
+  check(`D-345 ${vp.tag} '이번 서류로 새로 판정됐어요' 에 절세 설계(퇴직금)`, opened.includes('이번 서류로 새로 판정됐어요') && opened.includes('절세 설계') && opened.includes('퇴직금'), opened.slice(0, 300))
   if (vp.tag === '1440') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot342-batch.png' }).catch(() => {})
+  else await page.getByTestId('smart-batch-opened').screenshot({ path: '/tmp/claude-0/shot345-opened-390.png' }).catch(() => {})
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
+  await page.locator('[data-testid="smart-batch-opened-item"][data-key="tax"]').click().catch(() => {})
+  // 휴대폰은 카드까지 길어(수천 px) 부드러운 스크롤이 1초 넘게 걸린다 — 화면에 들어올 때까지
+  await page.waitForFunction(() => { const el = document.querySelector('[data-testid="smart-insight"][data-key="tax"]'); if (!el) return false; const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }, null, { timeout: 5000 }).catch(() => {})
+  const inView = await page.locator('[data-testid="smart-insight"][data-key="tax"]').evaluate((el) => { const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }).catch(() => false)
+  check(`D-345 ${vp.tag} 누르면 모듈별 판정의 절세 설계 카드가 화면에`, inView)
   const r = await rec()
   check(`D-342 ${vp.tag} 업체 기록 절세 현황 대표 월 급여 7,000,000 · 주민번호 · 대표 집 주소 없음`, r.taxProfile?.monthlySalary === '7000000' && !JSON.stringify(r).includes('750101') && !JSON.stringify(r).includes('노원구'), JSON.stringify(r.taxProfile))
   const tax = (await page.locator('[data-testid="smart-insight"][data-key="tax"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
@@ -1681,6 +1690,45 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await page.waitForTimeout(900)
   const vals = await page.locator('input').evaluateAll((els) => els.map((e) => e.value))
   check(`D-342 ${vp.tag} 절세 설계 '대표 월 급여' 칸에 7,000,000 · 넘침 0 · 오류 0`, vals.some((v) => v.replace(/,/g, '') === '7000000') && (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, JSON.stringify(vals.filter(Boolean).slice(0, 20)) + errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- D-344 홈택스 사업자등록증명 — 새 업체 등록 창이 칸을 채우고, 등록하면 개업일 · 주소까지 · 서류함 '사업자등록증명' 칸 ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const CERT = {
+    name: 'scan_0101.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      ['발급번호 : 1234-567-8901-234', '사 업 자 등 록 증 명', '처리기간 즉시', '상호(법인명) 가나테크(주) 사업자등록번호 123-81-67899', '성명(대표자) 박지훈 주민(법인)등록번호 110111-0123456', '사업장소재지 서울특별시 강남구 테헤란로 123, 4층', '개업일 2015년 07월 21일 사업자등록일 2015년 07월 23일', '업태 정보통신업 종목 응용 소프트웨어 개발 및 공급업', '위와 같이 사업자등록을 하였음을 증명합니다.', '2026년 10월 20일', '강남세무서장'].join('\n'),
+      'utf8',
+    ),
+  }
+  const val = (label) => page.locator('form').getByLabel(label, { exact: false }).first().inputValue()
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.getByTestId('clients-add').click()
+  await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([CERT])
+  await page.getByTestId('new-client-from-doc-companyName').waitFor({ timeout: 20000 }).catch(() => {})
+  await page.waitForFunction(() => !document.querySelector('[data-testid="new-client-docs-reading"]'), null, { timeout: 20000 }).catch(() => {})
+  const name = await page.locator('form input[required]').first().inputValue()
+  const ceo = await val('대표자·담당자')
+  const biz = await val('사업자등록번호')
+  const note = (await page.getByTestId('new-client-doc-note').allInnerTexts()).join(' | ')
+  check(`D-344 ${tag} 새 업체 등록 창: 사업자등록증명 하나로 업체명 · 대표자 · 사업자번호(회사명에 번호 안 붙음)`, name === '가나테크(주)' && ceo === '박지훈' && biz === '123-81-67899' && /사업자등록증명 — 업체명 · 대표자 · 사업자등록번호 찾음/.test(note), JSON.stringify({ name, ceo, biz, note }))
+  if (tag === '390') await page.screenshot({ path: '/tmp/claude-0/shot344-new-390.png' })
+  await page.getByRole('button', { name: '등록하고 열기' }).click()
+  await page.waitForURL(/\/ops\/clients\/[^/?]+/, { timeout: 15000 })
+  await page.getByTestId('smart-placed').waitFor({ timeout: 25000 }).catch(() => {})
+  await page.waitForTimeout(800)
+  const made = (await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]'))).find((r) => r.companyName === '가나테크(주)')
+  const certCell = made ? (made.customDocuments ?? []).find((d) => d.label === '사업자등록증명') : null
+  check(`D-344 ${tag} 등록 뒤 개업일 2015-07-21 · 주소 테헤란로 · 서류함 '사업자등록증명' 칸에 파일 · 오류 0`, !!made && made.establishedAt === '2015-07-21' && made.businessAddress.includes('테헤란로 123') && !!certCell && made.documents[certCell.key]?.fileName === 'scan_0101.txt' && errors.length === 0, JSON.stringify(made && { e: made.establishedAt, a: made.businessAddress, cells: (made.customDocuments ?? []).map((d) => d.label) }) + errors.join(' | '))
+  if (tag === 'PC') await page.getByTestId('smart-placed').screenshot({ path: '/tmp/claude-0/shot344-placed.png' }).catch(() => {})
   await ctx.close()
 }
 
