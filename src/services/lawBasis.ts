@@ -186,6 +186,8 @@ export function lawBasis(): BasisSection[] {
       rows: [
         { label: '청년일자리도약장려금', value: `${man(DEFAULT_PROGRAMS.youth_jump.totalAmount)}(6 · 9 · 12개월) — 수도권은 취업애로 청년만 · 비수도권은 청년 본인에게도 2년간 480만 ~ 720만(따로)` },
         { label: '고령자 계속고용장려금', value: `수도권 월 30만 · 비수도권 월 40만, 최대 3년(${man(DEFAULT_PROGRAMS.senior_continue.totalAmount)} · ${man(programForRegion(DEFAULT_PROGRAMS.senior_continue, '비수도권').totalAmount)}) — 정년에 이른 기존 직원` },
+        // D-339 요건 — 취업규칙을 올리면 회사 정보 '정년 · 계속고용' 칸으로 읽는다
+        { label: '계속고용장려금 요건', value: '정년 연장 · 폐지 · 정년 뒤 재고용을 취업규칙 등에 두고 1년 넘게 운영 · 60세 이상 피보험자 30% 이하 · 피보험자 30%(최대 30명)까지' },
         { label: '시니어 인턴십(만 60세 이상 채용)', value: `최대 ${man(DEFAULT_PROGRAMS.senior_intern.totalAmount)}` },
         { label: '정규직 전환 지원', value: `최대 ${man(DEFAULT_PROGRAMS.regular_convert.totalAmount)}(30인 미만 · 사전 승인)` },
       ],
