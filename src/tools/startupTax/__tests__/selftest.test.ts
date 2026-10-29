@@ -593,6 +593,14 @@ const CASES: Expect[] = [
     expect: (r) => [rate(r) === 100 && !r.alerts.includes(REVISED_RULE_ALERT) && r.taxRate.line.includes('2025년까지'), `rate=${rate(r)} line=${r.taxRate.line}`],
   },
   {
+    name: '[D-336] 2025년 이후 창업 → 같은 해 통합고용세액공제와 함께 못 받을 수 있음 ★ · 2024년 창업은 그 안내 없음',
+    form: mkForm({ startupDate: '2025-03-01', birthDate: '1995-06-01', region: 'other_local', overconcentration: 'no' }),
+    expect: (r) => {
+      const r24 = judge(mkForm({ startupDate: '2024-12-31', birthDate: '1995-06-01', region: 'other_local', overconcentration: 'no' }), BASE)
+      return [hasAlert(r, '2025년 이후 창업 — 같은 과세연도에 통합고용세액공제와 함께') && !hasAlert(r24, '통합고용세액공제와 함께'), r.alerts.join('|')]
+    },
+  },
+  {
     name: '[D-318] 2026 창업 · 서울 · 청년 50% / 일반 0%',
     form: mkForm({ startupDate: '2026-02-01', birthDate: '1995-06-01', region: 'seoul', overconcentration: 'yes' }),
     expect: (r) => [rate(r) === 50 && r.taxRate.general === 0, `rate=${rate(r)} general=${r.taxRate.general}`],

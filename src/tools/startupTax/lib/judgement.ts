@@ -17,6 +17,7 @@ import {
   industryClassOf,
   REVISED_RULE_ALERT,
   REVISED_RULE_FROM,
+  startupCreditOverlap,
   startupRates,
   startupZone,
   VENTURE_STARTUP_RATE,
@@ -526,6 +527,11 @@ function buildAlerts(form: FormData, facts: Facts, age: number | null, regionAle
   }
 
   if (facts.zone === 'metro_unsure') out.push(REVISED_RULE_ALERT)
+
+  // D-336 2025년 이후 창업 — 같은 해 통합고용세액공제와 함께 못 받을 수 있다(직원을 늘리는 해에 큰 쪽 비교)
+  if (industry !== 'excluded' && startupCreditOverlap(form.startupDate) === 'excluded') {
+    out.push('2025년 이후 창업 — 같은 과세연도에 통합고용세액공제와 함께 받지 못할 수 있습니다(개정 조특법). 직원을 늘린 해에는 두 혜택 중 큰 쪽을 비교 — ★확인')
+  }
 
   if (form.overconcentration === 'yes' && industry !== 'excluded') {
     out.push('과밀억제권역 창업은 취득세·재산세 창업감면(지특법 §58의3) 대상이 아닌 것이 원칙입니다 — 예외 ★확인')

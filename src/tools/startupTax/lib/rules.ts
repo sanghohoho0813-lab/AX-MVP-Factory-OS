@@ -157,3 +157,21 @@ export function ventureWithin3y(startupDate: string, ventureDate: string | undef
   const y = Number(startupDate.slice(0, 4)) + 3
   return ventureDate < `${y}${startupDate.slice(4)}`
 }
+
+/**
+ * D-336 2025-01-01 이후 창업 — 같은 과세연도에 창업감면(§6)과 통합고용세액공제(§29의8)를 함께 받지 못할 수 있다(개정 조특법).
+ * 배제 범위(감면 전부 · 고용증가 추가감면만)는 자료마다 설명이 달라 ★ 세무사 확인으로 남긴다.
+ * 'excluded' = 2025년 이후 창업 · 'allowed' = 2024년까지 창업 · null = 창업일 모름
+ */
+export const CREDIT_OVERLAP_FROM = '2025-01-01'
+export function startupCreditOverlap(startupDate: string): 'excluded' | 'allowed' | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startupDate)) return null
+  return startupDate >= CREDIT_OVERLAP_FROM ? 'excluded' : 'allowed'
+}
+/** 화면 · 설계서에 쓰는 한 줄 */
+export function startupCreditOverlapLine(startupDate: string): string {
+  const k = startupCreditOverlap(startupDate)
+  if (k === 'excluded') return '2025년 이후 창업 — 같은 해에 창업감면과 통합고용세액공제를 함께 받지 못할 수 있어요(개정 조특법). 직원을 늘린 해엔 큰 쪽을 골라요 · 못 쓴 공제는 이월(최대 10년) 검토 — ★ 세무사 확인'
+  if (k === 'allowed') return '2024년까지 창업 — 창업감면과 통합고용세액공제를 같은 해에 함께 받을 수 있는 쪽이에요(★ 최저한세 · 세무사 확인)'
+  return '★ 창업감면과 통합고용세액공제를 같은 해에 함께 받는지는 창업일에 따라 달라요(2025년 이후 창업은 함께 못 받을 수 있음) — 세무사 확인'
+}

@@ -34,6 +34,7 @@ import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyAssumption, policyEvidence } from './policyEvidence'
 import { judge, VERDICT_LABEL } from '../tools/startupTax/lib/judgement'
+import { startupCreditOverlap, startupCreditOverlapLine } from '../tools/startupTax/lib/rules'
 import { josa } from '../lib/josa'
 
 export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire'
@@ -148,6 +149,9 @@ function workday(date: string): string {
   return d === 6 ? addDaysLocal(date, 2) : d === 0 ? addDaysLocal(date, 1) : date
 }
 
+/** D-337 청년일자리도약장려금 — 비수도권 청년 본인 근속 인센티브(2026 · 일반 480만 · 우대 600만 · 특별 720만) */
+const YOUTH_STAY_BONUS = '480만 ~ 720만'
+
 /** 오늘부터 n일 뒤(주말이면 월요일) */
 const after = (today: string, n: number) => workday(addDaysLocal(today, n))
 
@@ -209,6 +213,8 @@ function subsidyBlock(record: ClientOpsRecord, facts: ClientFacts, presetId: str
     ...main.cautions.slice(0, 1).map((c) => `★ ${c}`),
     // 규칙표 note 의 수도권 조건(청년도약 — 수도권은 취업애로 요건 필수)
     ...(main.program.id === 'youth_jump' && capital ? ['★ 수도권은 취업애로 요건이 있는 청년만 대상 — 공고 확인'] : []),
+    // D-337 비수도권은 청년 본인에게도 근속 인센티브(회사 몫과 따로) — 채용할 때 청년에게 말해 줄 거리
+    ...(main.program.id === 'youth_jump' && !capital ? [`청년 본인도 6개월 넘게 다니면 2년간 ${YOUTH_STAY_BONUS}(지역에 따라 · 회사 몫과 따로) — 채용 때 청년에게 알려 주세요`] : []),
   ]
   // '또는' 은 같은 근로 형태로 받을 수 있는 것만(정규직 채용에 인턴 사업을 나란히 두지 않는다)
   const empType = scenarioPreset(presetId)?.hiring?.empType
@@ -357,7 +363,7 @@ function startupBlock(record: ClientOpsRecord, facts: ClientFacts, today: string
       r.taxRate.line,
       ...(item?.reasons ?? r.keyReasons).slice(0, 2),
       left > 0
-        ? `감면 기간: ${from}~${to}년(창업한 해부터 5년으로 보수적으로) — 올해 포함 ${left}년 남음. 뽑은 해부터 남은 해까지 함께 챙겨요`
+        ? `감면 기간: ${from}~${to}년(창업한 해부터 5년으로 보수적으로) — 올해 포함 ${left}년 남음. ${startupCreditOverlap(facts.establishedAt) === 'excluded' ? '뽑은 해엔 통합고용세액공제와 큰 쪽을 골라요(2025년 이후 창업)' : '뽑은 해부터 남은 해까지 함께 챙겨요'}`
         : `감면 기간: 창업한 해부터 5년이면 ${to}년에 끝 — 최초 소득이 늦게 생겼으면 올해도 남았을 수 있어요(★ 확인)`,
       ...r.alerts.slice(0, 1).map((a) => `★ ${a}`),
       '★ 감면 기간 중 직원이 늘어난 해에는 늘어난 만큼 더 감면받는 규정도 있어요(업종별 직원 수 기준) — 세무사 확인',
@@ -453,9 +459,9 @@ export function planFit(def: PlanDef, ctx: FitContext): ScenarioFit {
   return hire.kind === 'fit' ? { ...hire, why: `${base.why} · ${hire.why}` } : hire
 }
 
-/** '창업 5년 안 채용' 에만 붙는 세액공제 확인 — 두 제도를 같은 해에 · 낼 세금보다 공제가 클 때 */
-const STARTUP_CREDIT_NOTES = [
-  '★ 창업감면과 같은 해에 함께 받을 수 있는지(중복 배제) 세무사 확인',
+/** '창업 5년 안 채용' 에만 붙는 세액공제 확인 — 두 제도를 같은 해에(D-336 창업일로) · 낼 세금보다 공제가 클 때 */
+const startupCreditNotes = (establishedAt: string) => [
+  startupCreditOverlapLine(establishedAt),
   '★ 창업 초기엔 낼 세금이 적어 공제를 다 못 쓸 수 있어요 — 남은 공제를 다음 해로 넘기는지(이월) 세무사 확인',
 ]
 
@@ -477,7 +483,7 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
     const startup = id === 'startup-hire'
     if (startup) blocks.push(startupBlock(record, f, today))
     const { block, main } = subsidyBlock(record, f, def.hiring ?? def.preset, n)
-    blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', today, startup ? STARTUP_CREDIT_NOTES : []))
+    blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', today, startup ? startupCreditNotes(f.establishedAt) : []))
     const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
     actions = hiringActions(today, main, n, pol.state === 'ok', startup)

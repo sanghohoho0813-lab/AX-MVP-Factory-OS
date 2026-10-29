@@ -134,7 +134,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('한 장 — 창업감면 → 고용지원금 → 세액공제 → 정책자금(모두 계산 · 판정됨)', sBlocks.join(',') === 'startup:ok,subsidy:ok,credit:ok,policy:ok', sBlocks.join(','))
   check('창업감면 — 판정됨 배지 · 판정기 결론 · 감면 기간 2023~2027년 · 금액 없음(판정만)', sText.includes('판정됨') && sText.includes('감면 기간: 2023~2027년') && (await sBox.getByTestId('plan-block-amount').count()) === 0, sText.slice(0, 200))
   check('1년 안 = 청년 1명 채용과 같은 돈(720만 + 700만 · 2026 개편) · 창업감면은 판정만 표시', (await attr(page, 'data-first')) === '14200000' && (await page.getByTestId('plan-total').innerText()).includes('창업감면은 판정만'))
-  check('세액공제 — 창업감면과 같은 해 · 이월 ★ 두 줄', (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('중복 배제') && (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('이월'))
+  check('세액공제 — 창업감면과 같은 해(2023년 창업 → 함께 받는 쪽 · D-336) · 이월 ★ 두 줄', (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('같은 해에 함께') && (await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()).includes('이월'))
   const sHref = (await sBox.getByTestId('plan-block-open').getAttribute('href')) ?? ''
   check('창업감면 → 창업감면 판정이 같은 업체 · 신규 창업 가정으로(preset=startup-new)', sHref.includes('/tools/startup-tax') && sHref.includes('client=cli_plan') && sHref.includes('preset=startup-new'), sHref)
   check('결산 전 할 일 — 세무사에게 창업감면 · 늘어난 인원 함께', (await page.locator('[data-testid="plan-action"][data-id="tax"]').innerText()).includes('창업감면'))

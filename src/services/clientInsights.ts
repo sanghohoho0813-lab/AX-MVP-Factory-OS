@@ -23,7 +23,7 @@ import { policyEvidence } from './policyEvidence'
 import { policyApplyAsk, policyApplyMessage } from './policyApply'
 import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
-import { METRO_POP_DECLINE } from '../tools/startupTax/lib/rules'
+import { METRO_POP_DECLINE, startupCreditOverlap } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
 import { rosterSubsidyTotal } from '../tools/employment/lib/programs'
@@ -336,7 +336,8 @@ const employmentInsight: Provider = ({ record, facts }) => {
     // 지원금 후보가 없어도 세액공제가 나오는 업체는 제안할 거리가 있다(검토해 볼 만함)
     tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
     headline: creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
-    detail: [first.startsWith('[') ? '' : first, creditLine].filter(Boolean).join(' · '),
+    // D-336 2025년 이후 창업이면 세액공제와 창업감면을 같은 해 함께 못 받을 수 있다 — 금액을 볼 때 같이 알린다
+    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : ''].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',

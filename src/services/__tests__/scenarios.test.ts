@@ -481,6 +481,11 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
     longName.needs.find((x) => x.label.startsWith('회사 주소'))?.value === '비수도권' && !longName.assumptions.some((a) => a.includes('주소를 몰라')),
     longName.needs,
   )
+  // D-337 비수도권 청년 채용 — 청년 본인 근속 인센티브(480만 ~ 720만 · 회사 몫과 따로) 한 줄 · 수도권엔 없음
+  const yL = buildSituationPlan('hire-youth', normalizeClientOps({ ...full, id: 'yl337', businessAddress: '충청북도 청주시 흥덕구 1' } as unknown as Partial<ClientOpsRecord>), today, 1)
+  const yM = buildSituationPlan('hire-youth', normalizeClientOps({ ...full, id: 'ym337', businessAddress: '서울특별시 중구 세종대로 1' } as unknown as Partial<ClientOpsRecord>), today, 1)
+  const subLines = (p: typeof yL) => p.blocks.find((b) => b.key === 'subsidy')?.lines ?? []
+  check('D-337 비수도권 청년 채용 — 청년 본인 근속 인센티브 한 줄 · 수도권은 취업애로 줄만', subLines(yL).some((l) => l.includes('청년 본인도 6개월 넘게 다니면 2년간 480만 ~ 720만')) && !subLines(yM).some((l) => l.includes('청년 본인도')) && subLines(yM).some((l) => l.includes('취업애로')), [subLines(yL), subLines(yM)])
   // D-334 정년 된 직원 계속 고용 — 계속고용장려금이 회사 지역 금액(비수도권 1,440만 · 수도권 1,080만)
   const keepL = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk1', businessAddress: '충청북도 청주시 흥덕구 1' } as unknown as Partial<ClientOpsRecord>), today)
   const keepM = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk2', businessAddress: '서울특별시 중구 세종대로 1' } as unknown as Partial<ClientOpsRecord>), today)
@@ -524,9 +529,18 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   )
   check(
     'Q5 세액공제에 창업 초기 확인 두 줄(같은 해 함께 · 이월) · 청년 채용 설계서엔 없음 · 결산 전 할 일에 창업감면',
-    at(sh, 'credit').lines.some((l) => l.includes('중복 배제')) && at(sh, 'credit').lines.some((l) => l.includes('이월')) && !at(yh, 'credit').lines.some((l) => l.includes('중복 배제')) &&
+    at(sh, 'credit').lines.some((l) => l.includes('같은 해에 함께')) && at(sh, 'credit').lines.some((l) => l.includes('이월')) && !at(yh, 'credit').lines.some((l) => l.includes('같은 해에 함께')) &&
       sh.actions.map((a) => a.id).join(',') === yh.actions.map((a) => a.id).join(',') && sh.actions.find((a) => a.id === 'tax')!.text.includes('창업감면') && at(sh, 'policy').lines[0].includes('(청년)'),
     sh.actions,
+  )
+  // D-336 창업일로 같은 해 함께 받는지 — 2023년 창업은 함께 받는 쪽 · 2025년 창업은 함께 못 받을 수 있어 큰 쪽 선택(감면 기간 줄도)
+  const sh25 = buildSituationPlan('startup-hire', normalizeClientOps({ ...yes, id: 'sh25', establishedAt: '2025-03-04' } as unknown as Partial<ClientOpsRecord>), today, 1)
+  check(
+    'D-336 창업 5년 안 채용 — 2023년 창업: 함께 받는 쪽 · 2025년 창업: 함께 못 받을 수 있음 · 큰 쪽 선택',
+    at(sh, 'credit').lines.some((l) => l.startsWith('2024년까지 창업 — 창업감면과 통합고용세액공제를 같은 해에 함께 받을 수 있는 쪽')) &&
+      at(sh25, 'credit').lines.some((l) => l.startsWith('2025년 이후 창업 — 같은 해에 창업감면과 통합고용세액공제를 함께 받지 못할 수 있어요')) &&
+      (at(sh25, 'startup').state !== 'ok' || at(sh25, 'startup').lines.some((l) => l.includes('큰 쪽을 골라요'))),
+    [at(sh25, 'credit').lines, at(sh25, 'startup').lines],
   )
   const noBirth = buildSituationPlan('startup-hire', normalizeClientOps({ ...yes, id: 'nb', representativeBirth: '' } as unknown as Partial<ClientOpsRecord>), today, 1)
   check(

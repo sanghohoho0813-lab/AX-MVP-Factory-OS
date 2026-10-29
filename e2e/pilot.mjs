@@ -1155,7 +1155,9 @@ try {
   await mp.waitForTimeout(500)
   await mp.getByTestId('account-signout').click()
   await mp.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
-  await mp.waitForTimeout(700)
+  // 로그인 화면의 '이 기기 계정' 줄은 조금 늦게 그려진다(여럿 돌 때 700ms 로는 모자랐다) — 나올 때까지 기다린다
+  await mp.getByTestId('recent-account').first().waitFor({ timeout: 10000 }).catch(() => {})
+  await mp.waitForTimeout(300)
   check('390(D-184): 서랍 로그아웃 → 로그인 화면 · 이 기기 계정 1개(팀장)', mp.url().includes('/login') && (await mp.getByTestId('recent-account').count()) === 1 && (await mp.getByTestId('recent-account').getAttribute('data-email')) === PILOT.email)
   check('390(D-184): 로그인 화면 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
   await mp.getByTestId('recent-account').click()
