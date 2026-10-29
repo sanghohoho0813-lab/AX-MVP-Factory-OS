@@ -184,7 +184,7 @@ export function lawBasis(): BasisSection[] {
       title: '고용지원금(사업주 몫 · 1명당)',
       basis: '고용노동부 2026년 사업 안내 — 예산 · 지역 구분이 해마다 바뀌어 공고로 다시 확인',
       rows: [
-        { label: '청년일자리도약장려금', value: `${man(DEFAULT_PROGRAMS.youth_jump.totalAmount)}(6 · 9 · 12개월) — 수도권은 취업애로 청년만 · 비수도권 청년 본인 근속 인센티브는 따로` },
+        { label: '청년일자리도약장려금', value: `${man(DEFAULT_PROGRAMS.youth_jump.totalAmount)}(6 · 9 · 12개월) — 수도권은 취업애로 청년만 · 비수도권은 청년 본인에게도 2년간 480만 ~ 720만(따로)` },
         { label: '고령자 계속고용장려금', value: `수도권 월 30만 · 비수도권 월 40만, 최대 3년(${man(DEFAULT_PROGRAMS.senior_continue.totalAmount)} · ${man(programForRegion(DEFAULT_PROGRAMS.senior_continue, '비수도권').totalAmount)}) — 정년에 이른 기존 직원` },
         { label: '시니어 인턴십(만 60세 이상 채용)', value: `최대 ${man(DEFAULT_PROGRAMS.senior_intern.totalAmount)}` },
         { label: '정규직 전환 지원', value: `최대 ${man(DEFAULT_PROGRAMS.regular_convert.totalAmount)}(30인 미만 · 사전 승인)` },
