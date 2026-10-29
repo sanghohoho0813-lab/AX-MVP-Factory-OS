@@ -1385,6 +1385,24 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
     check('D-317 개인 vs 법인: 근로소득 산출세액은 지금 세율 구간 — 1,875만 → 1,552,500원', line(o1, '산출세액') === '1,552,500원', line(o1, '산출세액'))
     check('D-317 가지급금: 법인세 적용세율 기본값 22%(2026 · 지방소득세 포함)', defaultValues(calculatorOf('t1')!).g_corp === '22')
   }
+  // D-320 비상장주식 — 상증령 §54 · §55 · §56 손계산
+  {
+    const base = { shares: 10000, ratePct: 10, asset: 3_000_000_000, debt: 1_000_000_000, reBook: 0, reFair: 0, severance: 0, goodwill: 0, corpType: '일반법인', months: [0, 0, 0] as [number, number, number], caps: [0, 0, 0] as [number, number, number] }
+    // 순자산 20억 → 1주 20만 · 순손익 1억 · 2억 · 3억(최근) → (1+4+9)/6 억 = 2.333억 → 1주 23,333 / 10% = 233,333
+    //   일반법인 0.4 × 200,000 + 0.6 × 233,333 = 220,000 · 하한 160,000 → 220,000
+    const r = unlistedShareValuation({ ...base, income: [100_000_000, 200_000_000, 300_000_000] })
+    check('D-320 비상장주식: 순손익 가중(최근 3 · 2년 전 2 · 3년 전 1) · 일반법인 2:3 · 1주 220,000원', Math.round(r.perShareIncomeValue) === 233333 && Math.round(r.finalPerShare) === 220000, JSON.stringify({ i: r.perShareIncomeValue, f: r.finalPerShare }))
+    // 3년 적자 → 순손익가치 0(음수 아님) · 1주 가치는 순자산 80% 하한 160,000
+    const loss = unlistedShareValuation({ ...base, income: [-300_000_000, -200_000_000, -100_000_000] })
+    check('D-320 비상장주식: 3년 가중평균이 음수면 순손익가치 0 · 하한 순자산 × 80%', loss.perShareIncomeValue === 0 && Math.round(loss.finalPerShare) === 160000, JSON.stringify({ i: loss.perShareIncomeValue, f: loss.finalPerShare }))
+    // 자본잠식(순자산 음수) → 1주 순자산가치 0
+    const neg = unlistedShareValuation({ ...base, debt: 4_000_000_000, income: [0, 0, 0] })
+    check('D-320 비상장주식: 순자산가액이 0 이하면 1주 순자산가치 0', neg.perShareNetAsset === 0 && neg.finalPerShare === 0, JSON.stringify({ n: neg.perShareNetAsset, f: neg.finalPerShare }))
+    const t3 = calculatorOf('t3')!
+    const titles = t3.subs[0].groups.map((g) => g.title).join(' | ')
+    check('D-320 증여공제: 혼인 · 출산 공제 포함 1억 5천만(부모 → 성년 자녀) · 기존 선택지는 그대로', giftDeduction('직계존속(성년 · 혼인출산)') === 150000000 && giftDeduction('직계존속(성년)') === 50000000 && giftDeduction('직계존속(미성년)') === 20000000)
+    check('D-320 비상장주식 입력 목차가 가중치와 맞음(3년 전 1 · 2년 전 2 · 최근 3)', titles.includes('3년 전 사업연도(가중치 1)') && titles.includes('2년 전 사업연도(가중치 2)') && titles.includes('최근 사업연도') && !titles.includes('1년전'), titles)
+  }
   check('세금: 2026 종합소득세 — 5천만 원', Math.round(incomeTax9(50000000)) === 6240000)
   check('세금: 근속연수 1년 미만 절상', yearsRoundUp9('2016-01-01', '2026-03-02') === 11 && yearsRoundUp9('2020-01-01', '2020-06-01') === 1)
   const s = computeSalary(10000000)

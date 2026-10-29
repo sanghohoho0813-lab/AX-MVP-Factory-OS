@@ -431,7 +431,7 @@ function calc2(v: Values): Output {
 
 export type CorpValuationType = '일반법인' | '부동산과다보유법인' | '특수법인'
 
-/** 비상장주식 보충적 평가 입력 — 금액은 원, 연도 배열은 [1년전(가중 1), 2년전·직전(가중 2), 결산연도(가중 3)] */
+/** 비상장주식 보충적 평가 입력 — 금액은 원, 연도 배열은 [3년 전(가중 1), 2년 전(가중 2), 최근 사업연도(가중 3)] */
 export interface UnlistedShareInput {
   shares: number
   /** 순손익가치 환원율(%) — 기획재정부 고시 이자율 */
@@ -483,7 +483,8 @@ export function unlistedShareValuation(i: UnlistedShareInput): UnlistedShareResu
   const netAssetBook = asset - debt
   const reDiff = reFair - reBook
   const netAssetValue = netAssetBook + reDiff - i.severance + i.goodwill
-  const perShareNetAsset = shares > 0 ? netAssetValue / shares : 0
+  // D-320 순자산가액이 0 이하면 0(상증령 §55①) — 예전에는 음수 1주 가치가 그대로 가중평균에 들어갔다
+  const perShareNetAsset = shares > 0 ? Math.max(netAssetValue / shares, 0) : 0
   const reRatio = asset + reFair - reBook > 0 ? reFair / (asset + reFair - reBook) : 0
 
   const inc = i.income
@@ -499,7 +500,8 @@ export function unlistedShareValuation(i: UnlistedShareInput): UnlistedShareResu
   const perShareIncome = netIncome.map((x) => (shares > 0 ? x / shares : 0))
   const weights = [1, 2, 3]
   const weightedAvg = (perShareIncome[0] * weights[0] + perShareIncome[1] * weights[1] + perShareIncome[2] * weights[2]) / 6
-  const perShareIncomeValue = rate > 0 ? weightedAvg / rate : 0
+  // D-320 3년 가중평균이 음수면 순손익가치 0(상증령 §56①) — 적자 회사의 1주 순손익가치가 음수로 보였다
+  const perShareIncomeValue = rate > 0 ? Math.max(weightedAvg / rate, 0) : 0
 
   const specialCorp = reRatio >= 0.8
   const realEstateHeavy = !specialCorp && reRatio >= 0.5 && reRatio < 0.8
@@ -726,6 +728,7 @@ function calc5j(v: Values): Output {
 export function giftDeduction(rel: string): number {
   if (rel === '배우자') return 600000000
   if (rel === '직계존속(성년)') return 50000000
+  if (rel === '직계존속(성년 · 혼인출산)') return 150000000
   if (rel === '직계존속(미성년)') return 20000000
   if (rel === '직계비속') return 50000000
   if (rel === '기타친족') return 10000000
@@ -1502,7 +1505,8 @@ const INC9_B = { ...INC9_A, transferPrice: '5000', transferDate: '2025-05-03', s
 /* 목록 — 원본 사이드바 순서 그대로                                        */
 /* ------------------------------------------------------------------ */
 
-const REL_OPTIONS = ['타인', '배우자', '직계존속(성년)', '직계존속(미성년)', '직계비속', '기타친족']
+// D-320 혼인 · 출산 증여공제(상증법 §53의2, 2024~) — 부모 → 성년 자녀가 혼인신고 전후 2년 · 출생 2년 안이면 5천만에 1억을 더한다(평생 1억)
+const REL_OPTIONS = ['타인', '배우자', '직계존속(성년)', '직계존속(성년 · 혼인출산)', '직계존속(미성년)', '직계비속', '기타친족']
 
 export const TAX_CALCULATORS: Calculator[] = [
   {
@@ -1680,12 +1684,12 @@ export const TAX_CALCULATORS: Calculator[] = [
         { title: '① 법인 기본 정보', fields: [T('v_name', '법인명', 'ㅇㅇㅇ'), A('v_shares', '평가일 현재 발행주식수(주)', '138000'), A('v_par', '액면가(원)', '5000'), N('v_rate', '적용이자율(순손익가치환원율)', '10', { step: '0.1', hint: '% · 기획재정부 고시 이자율' })] },
         { title: '② 재무상태 (순자산가치용)', fields: [A('v_asset', '자산총액(원)', '3000000000'), A('v_debt', '부채총계(원)', '1000000000'), A('v_re_book', '부동산 장부가(원)', '600000000'), A('v_re_fair', '부동산 시가(원)', '800000000'), A('v_severance', '미반영 퇴직급여추계액(원)', '0'), A('v_goodwill', '영업권 상당액(원)', '0')] },
         { title: '③ 법인 구분', fields: [S('v_type', '법인 구분 직접 선택', ['일반법인', '부동산과다보유법인', '특수법인'], '일반법인')] },
-        { title: '④ 최근 3년 순손익액 & 자본거래 — 1년전', fields: [A('v_inc0', '각 사업연도 순손익액(원)', '250000000'), N('v_month0', '유상증(감)자 실시월(1~12)', '8'), A('v_cap0', '유상증(감)자 금액(감자는 -)', '0')] },
-        { title: '2년전(직전)', fields: [A('v_inc1', '각 사업연도 순손익액(원)', '500000000'), N('v_month1', '유상증(감)자 실시월(1~12)', '3'), A('v_cap1', '유상증(감)자 금액(감자는 -)', '-200000000')] },
-        { title: '결산연도', fields: [A('v_inc2', '각 사업연도 순손익액(원)', '420000000'), N('v_month2', '유상증(감)자 실시월(1~12)', '10'), A('v_cap2', '유상증(감)자 금액(감자는 -)', '0')] },
+        { title: '④ 최근 3년 순손익액 & 자본거래 — 3년 전 사업연도(가중치 1)', fields: [A('v_inc0', '각 사업연도 순손익액(원)', '250000000'), N('v_month0', '유상증(감)자 실시월(1~12)', '8'), A('v_cap0', '유상증(감)자 금액(감자는 -)', '0')] },
+        { title: '2년 전 사업연도(가중치 2)', fields: [A('v_inc1', '각 사업연도 순손익액(원)', '500000000'), N('v_month1', '유상증(감)자 실시월(1~12)', '3'), A('v_cap1', '유상증(감)자 금액(감자는 -)', '-200000000')] },
+        { title: '최근 사업연도 — 평가일 직전 결산(가중치 3)', fields: [A('v_inc2', '각 사업연도 순손익액(원)', '420000000'), N('v_month2', '유상증(감)자 실시월(1~12)', '10'), A('v_cap2', '유상증(감)자 금액(감자는 -)', '0')] },
       ],
       compute: calc3,
-      note: '가중치는 결산연도 3, 직전연도 2, 1년전 1을 적용합니다. 자본거래가 없으면 0으로 두세요.',
+      note: '가중치는 최근 사업연도 3, 2년 전 2, 3년 전 1을 적용합니다(상증령 §56). 3년 가중평균이 음수면 순손익가치는 0, 순자산가액이 0 이하면 0으로 봅니다. 자본거래가 없으면 0으로 두세요.',
     }],
     note: '※ 부동산 비율 = 부동산 시가 ÷ (자산총액 + 부동산평가차액) · 특수법인/부동산과다보유법인 자동판정은 참고용이며, 실제 반영값은 위 "법인 구분 직접 선택"입니다.',
   },
