@@ -6,6 +6,7 @@
  *  - 규칙 계산이다(LLM 호출 없음). 화면에서 'AI' 라고 부르지 않는다.
  * 원본 앱(영업 도구 모음)은 아직 자기 복사본을 쓴다 — 영업 도구 모음을 내릴 때(4단계) 한 벌로 합친다.
  */
+import { josa } from "../lib/josa";
 
 // [D-120] 로컬(한국) 날짜 — 원본은 UTC 날짜라 오전 9시 전에는 어제로 찍혔다
 function todayISO() {
@@ -490,7 +491,7 @@ function buildMeetingPlan(item, stage) {
   if (stage === "m2") {
     return {
       title: "2차 미팅 준비",
-      goal: `${pb.label}을(를) 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
+      goal: `${josa(pb.label, "을/를")} 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
       topIssues: strategies.map((s, idx) => `${idx + 1}. ${s.name} — ${s.pitch}`),
       approach: `이번 미팅은 ${main.name}을 첫 번째 이슈로 잡고, 이후 ${strategies.slice(1).map((s) => s.name).join(" → ") || "추가 점검"} 순서로 확장하는 것이 좋습니다. (각 항목은 자료 확인 후 판단)`,
       objections: DEFAULT_M2_OBJ,
@@ -606,7 +607,7 @@ export function analyzeTranscript(text) {
   const newInfo = (t.match(/지분\s*[0-9]+\s*%|주주\s*[0-9]+|자녀\s*[0-9]*\s*명?|배우자|매출\s*[0-9,]+|직원\s*[0-9]+\s*명/g) || []).slice(0, 6);
   const summary = `미팅에서 ${issues.slice(0, 4).join(", ") || "주요 주제"} 등이 언급되었고, 대표 반응은 ${reaction}으로 보입니다. (텍스트 기반 추정이며 실제 맥락은 추가 확인 필요)`;
   const secondPoints = Array.from(new Set([...interested, ...issues])).slice(0, 5).map((x) => `${x} 관련 자료 기반 점검 결과 공유`);
-  const strategy = `${interested[0] || issues[0] || "핵심 이슈"}을(를) 중심으로, '문제 제기 → 방치 시 부담 → 해결 방향 → 로드맵 → 플랜' 순으로 2차 미팅을 구성하는 흐름을 권합니다. (협의 후 정리)`;
+  const strategy = `${josa(interested[0] || issues[0] || "핵심 이슈", "을/를")} 중심으로, '문제 제기 → 방치 시 부담 → 해결 방향 → 로드맵 → 플랜' 순으로 2차 미팅을 구성하는 흐름을 권합니다. (협의 후 정리)`;
   const nextDocs = Array.from(new Set(["재무제표(최근 3개년)", "주주명부", "정관", "계정별원장", ...(issues.includes("가지급금") ? ["가지급금 명세"] : []), ...(issues.includes("고용지원금") ? ["근로계약·4대보험 현황"] : [])])).slice(0, 8);
   const kakao = `대표님, 오늘 시간 내주셔서 감사합니다. 말씀 주신 ${issues.slice(0, 2).join(", ") || "부분"} 중심으로 자료를 확인한 뒤, 실제 적용 가능성이 있는 부분만 추려 2차 미팅에서 정리해 드리겠습니다. (적용 여부는 세부 요건 확인이 필요하며, 세무사 검토가 필요한 부분은 함께 안내드리겠습니다.)`;
   return { summary, reaction, interested, hesitant, newInfo, issues, secondPoints, strategy, nextDocs, kakao, analyzedAt: todayISO() };

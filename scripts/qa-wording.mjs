@@ -3,6 +3,7 @@
  * 대표: "OS 안에서는 그런 단어 자체를 일절 없애 줘" — 마케팅은 '검증된 방법', 점검은 '자체점검' 으로.
  *  - 화면: 빌드한 번들(dist/assets/*.js) 전부 — 코드 주석은 빌드 때 빠지므로 남은 것은 화면 · 복사 글 · 보내는 지시문뿐
  *  - 서버: api/ 의 .js — 주석을 걷어 낸 뒤 문자열(AI 지시문 · 화면 이름표)만
+ * D-335 조사 둘 다 적기(을(를) …)도 src 에서 찾는다.
  * 쓰는 법: npm run build && npm run qa:wording
  */
 import fs from 'node:fs'
@@ -65,6 +66,18 @@ check(`W3 public 파일에 0곳`, pub.length === 0, pub.slice(0, 5))
 // 대신 쓰는 말이 실제로 남아 있는지 — 낱말만 지우고 뜻을 잃지 않게
 const joined = bundle.map((f) => fs.readFileSync(f, 'utf8')).join('\n')
 check(`W4 대신 '검증된 방법' 말이 화면에 있음`, joined.includes('검증된 방법'))
+
+// D-335 '을(를) · 이(가) · 은(는) · (으)로' 처럼 조사를 둘 다 적은 화면 글 0 — 받침을 보고 하나만(src/lib/josa.ts)
+//  조사를 고르는 도우미 자신과 그 표 · 받침을 모를 때만 둘 다 쓰는 곳은 뺀다
+const JOSA_BOTH = /을\(를\)|이\(가\)|은\(는\)|과\(와\)|\(으\)로/g
+const JOSA_ALLOW = ['lib/josa.ts', 'domain/consulting/koreanText.ts', 'policyFunding/engine/reviewEngine.ts', 'certification/core/josa.ts', 'services/patent/specCheck.ts']
+const josaHits = walk('src', ['.ts', '.tsx', '.js', '.jsx'])
+  .filter((f) => !f.includes('__tests__') && !JOSA_ALLOW.some((a) => f.split(path.sep).join('/').endsWith(a)))
+  .flatMap((f) => {
+    const text = stripComments(fs.readFileSync(f, 'utf8'))
+    return [...text.matchAll(JOSA_BOTH)].map((m) => `${path.relative('.', f)}: …${text.slice(Math.max(0, m.index - 30), m.index + 10).replace(/\s+/g, ' ')}…`)
+  })
+check(`W5 화면 글에 조사 둘 다 적기(을(를) · 이(가) …) 0곳`, josaHits.length === 0, josaHits.slice(0, 5))
 
 console.log(`\nqa:wording: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

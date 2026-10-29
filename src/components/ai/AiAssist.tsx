@@ -36,6 +36,7 @@ import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHisto
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
+import { josa } from '../../lib/josa'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
 /** 서버 상태를 못 받았을 때 보일 기본 이름(서버 목록이 오면 그것으로) */
@@ -712,7 +713,7 @@ export function ModelRow({
           {!status && <p className="t-sub text-slate-600">모델 목록을 받지 못했어요(서버 함수가 없는 미리보기이거나 연결 문제). 기본 모델로 물어봅니다.</p>}
           {provider && !provider.configured && (
             <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900">
-              {provider.label} 은(는) 아직 연결되지 않았어요 — 관리자가 연결하면 고를 수 있어요.
+              {josa(provider.label, '은/는')} 아직 연결되지 않았어요 — 관리자가 연결하면 고를 수 있어요.
               <span className="t-meta block text-amber-800">관리자용: Vercel › Settings › Environment Variables 에 <b>{provider.keyName}</b> 를 넣고 Redeploy</span>
             </p>
           )}

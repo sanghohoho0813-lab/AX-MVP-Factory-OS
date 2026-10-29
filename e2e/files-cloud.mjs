@@ -288,6 +288,8 @@ await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle
 await page.waitForTimeout(800)
 await page.getByTestId('portal-file-pd1').click()
 await page.waitForFunction(() => !!document.querySelector('[data-testid="portal-filed-pd1"]'), null, { timeout: 30000 })
+// 화면은 먼저 바뀌고 저장(PATCH)은 조금 뒤 — 저장이 닿을 때까지 기다린다(최대 10초 · 뒤에서 여럿 돌 때 늦던 것)
+for (let i = 0; i < 100 && !row.payload?.documents?.financialStatements?.storagePath; i++) await page.waitForTimeout(100)
 const fin = row.payload?.documents?.financialStatements ?? {}
 check('서류함에 넣기: 고객 파일이 재무제표 칸에(같은 보관함 경로)', fin.storagePath === `${WS}/portal/lnk1/123-fin.png` && fin.fileName === '2025 재무제표.png', JSON.stringify(fin))
 check("서류함에 넣기: '서류함 … 칸에 있음' 으로 바뀜", ((await page.getByTestId('portal-filed-pd1').innerText()) ?? '').includes('재무제표'))

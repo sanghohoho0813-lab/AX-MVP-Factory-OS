@@ -69,6 +69,7 @@ import {
   type ThreadTemplate,
   type ThreadTemplateKey,
 } from '../../services/marketing/threads'
+import { josa } from '../../lib/josa'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -810,7 +811,7 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
             <Download aria-hidden="true" className="size-4" /> CSV
           </Button>
         </div>
-        <p className="t-sub break-keep text-slate-600">점수 = 좋아요 + 답글×3 + 리포스트×2 + 공유×3 (남의 계정 실측과 같은 계산). 틀마다 글이 3개 넘게 쌓이면 그 숫자를 공식보다 먼저 믿어요.{best ? ` 지금은 ${best.key} ${best.name} 이(가) 가장 좋아요.` : ''}</p>
+        <p className="t-sub break-keep text-slate-600">점수 = 좋아요 + 답글×3 + 리포스트×2 + 공유×3 (남의 계정 실측과 같은 계산). 틀마다 글이 3개 넘게 쌓이면 그 숫자를 공식보다 먼저 믿어요.{best ? ` 지금은 ${best.key} ${josa(best.name, '이/가')} 가장 좋아요.` : ''}</p>
         {recs.length ? (
           <ul className="flex flex-col divide-y divide-slate-100" data-testid="thr-rec-templates">
             {recs.map((r) => (

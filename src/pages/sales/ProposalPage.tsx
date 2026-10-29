@@ -54,6 +54,7 @@ import {
 } from '../../services/salesProposal'
 import { todayLocalDate } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord } from '../../types/clientOps'
+import { josa } from '../../lib/josa'
 
 const CATALOG_MODULE = 'sales-os'
 const CATALOG_BUCKET = 'catalog'
@@ -677,7 +678,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
     try {
       const row = await saveRow(workspaceId, CATALOG_MODULE, CATALOG_BUCKET, { id: kindRowId, clientId: '', data: { key: 'kinds', value: clean } })
       setKindRowId(row.id)
-      showToast(`${FEE_KIND_LABEL[kind]}(으)로 바꿨습니다.`)
+      showToast(`${josa(FEE_KIND_LABEL[kind], '으로/로')} 바꿨습니다.`)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
     }

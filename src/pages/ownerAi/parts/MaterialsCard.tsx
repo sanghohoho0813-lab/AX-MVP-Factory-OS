@@ -18,6 +18,7 @@ import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { fmtDateTime } from '../shared'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
+import { josa } from '../../../lib/josa'
 
 /** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다(실패하면 적은 글이 그대로) */
 export type AddMaterials = (list: CaseMaterial[], note: string) => Promise<boolean>
@@ -283,7 +284,7 @@ function DocsDialog({ client, materials, busy, onClose, onAdd, toast }: { client
         const m = makeMaterial({ kind: DOC_KIND[d.key] ?? guessMaterialKind(d.label, text), title: d.label, text, fileName: d.state.fileName, fileSize: d.state.fileSize, source: FROM_DOCS }, at)
         if (!sameMaterial([...materials, ...out], m)) out.push(m)
       } catch {
-        toast(`${d.label} 을(를) 읽지 못했습니다.`)
+        toast(`${josa(d.label, '을/를')} 읽지 못했습니다.`)
       }
     }
     setWorking(null)

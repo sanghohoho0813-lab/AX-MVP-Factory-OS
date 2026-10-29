@@ -10,6 +10,7 @@
  */
 import { charPropFlags, ROLE_LABEL, type Role, type SpecDoc, type SpecItem, type SpecPara } from './specParse'
 import { COMPRESSION_NAME, dpiOf } from './tiffInfo'
+import { josa } from '../../lib/josa'
 
 export type Level = 'error' | 'warn' | 'info'
 
@@ -458,7 +459,7 @@ export function checkSpec(doc: SpecDoc): SpecReport {
     }
     const ghost = bodyNums.filter((n) => !figNums.includes(n))
     if (ghost.length > 0) {
-      add({ id: 'FIG_BODY_REF', level: 'error', title: `본문이 없는 도면 도 ${ghost.join(', 도 ')} 을(를) 가리킵니다`, detail: `실제 도면: 도 ${figNums.join(', 도 ')}`, fix: '본문의 도 번호를 실제 도면 번호로 고치세요.' })
+      add({ id: 'FIG_BODY_REF', level: 'error', title: `본문이 없는 도면 도 ${josa(ghost.join(', 도 '), '을/를')} 가리킵니다`, detail: `실제 도면: 도 ${figNums.join(', 도 ')}`, fix: '본문의 도 번호를 실제 도면 번호로 고치세요.' })
     }
   } else if (descNums.length > 0 && !isHwpx) {
     add({ id: 'FIG_NOT_CHECKED', level: 'info', title: '도면 칸이 없어 도면 수와 대조하지 못했습니다', detail: `도면의 간단한 설명: 도 ${descNums.join(', 도 ')}`, fix: '.hwpx 로 올리면 실제 도면 · 그림 규격까지 대조합니다.' })

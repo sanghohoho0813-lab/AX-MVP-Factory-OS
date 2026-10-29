@@ -11,6 +11,7 @@ import { missingForMatch, profileLine } from '../../services/grants/grantProfile
 import { CLIENT_KIND_LABEL, type ClientMatch, type GrantClient } from '../../services/grants/grantView'
 import { ChallengeButton, DeadlineText, MatchList, NoticeLink, ReasonList, VerdictBadge, type ChallengeControl } from './GrantParts'
 import { applicationFor, applyReadiness } from '../../services/grants/grantApply'
+import { josa } from '../../lib/josa'
 
 const mdOf = (iso: string) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
@@ -239,7 +240,7 @@ export function ClientGrantPanel({
       </p>
       {missing.length > 0 && (
         <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="client-grants-missing">
-          {missing.join(' · ')}을(를) 적으면 더 정확해져요.
+          {josa(missing.join(' · '), '을/를')} 적으면 더 정확해져요.
           {onFill && (
             <button type="button" onClick={onFill} className="tap ml-1 font-semibold text-brand-700 underline">
               회사 정보 적기

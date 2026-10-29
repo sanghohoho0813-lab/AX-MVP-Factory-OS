@@ -13,6 +13,7 @@ import { calcPrefill, holdersWithShares } from './taxCalcPrefill'
 import { CALC_AMOUNT_FIELD, type ScenarioPreset } from './scenarioPresets'
 import { filledTaxProfile, shareValueOf, viewProfile } from './taxPlan'
 import { formatWon } from './customerFacts'
+import { josa } from '../lib/josa'
 
 export interface CalcPresetValues {
   /** 업체 숫자 + 상황 값 — 계산기 칸에 그대로 */
@@ -147,7 +148,7 @@ export function runCalcScenario(s: ScenarioPreset, record: ClientOpsRecord, toda
   }
   const assumptions = [`세금 계산기 ${calc.no}(${calc.title.replace(/ 계산기$/, '')})와 같은 식 · 참고용 — 실행 전 담당 세무사 검토`, ...pv.notes]
   if (pv.missing.length > 0) {
-    return { state: 'need', headline: `${pv.missing.join(' · ')}을(를) 받으면 바로 계산해요`, lines: [], amount: '', needs, filledFrom: pv.filled, assumptions }
+    return { state: 'need', headline: `${josa(pv.missing.join(' · '), '을/를')} 받으면 바로 계산해요`, lines: [], amount: '', needs, filledFrom: pv.filled, assumptions }
   }
   const o = sub.compute({ ...defaultValues(calc), ...pv.values })
   const lines: string[] = []

@@ -34,6 +34,7 @@ import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyAssumption, policyEvidence } from './policyEvidence'
 import { judge, VERDICT_LABEL } from '../tools/startupTax/lib/judgement'
+import { josa } from '../lib/josa'
 
 export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire'
 
@@ -340,7 +341,7 @@ function startupBlock(record: ClientOpsRecord, facts: ClientFacts, today: string
   ]
   const base = { key: 'startup' as const, label: '창업감면', won: 0, laterWon: 0, amount: '', needs, openPath: scenarioPath({ id: 'startup-new', module: 'startup-tax' }, record.id), openLabel: '창업감면 판정에서 이어서' }
   const core = needs.slice(0, 2).filter((n) => !n.ok)
-  if (core.length) return { ...base, state: 'need', headline: `${core.map((n) => n.label).join(' · ')}을(를) 받으면 창업감면도 같이 판정해요`, lines: [], assumptions: [] }
+  if (core.length) return { ...base, state: 'need', headline: `${josa(core.map((n) => n.label).join(' · '), '을/를')} 받으면 창업감면도 같이 판정해요`, lines: [], assumptions: [] }
   const r = judge(startupFormOf(facts, { startupForm: 'brand_new' }), new Date(`${today}T00:00:00`))
   if (r.notice) return { ...base, state: 'need', headline: r.notice, lines: [], assumptions: [] }
   const item = r.coreItems.find((i) => i.key === 'incomeTax')
@@ -381,7 +382,7 @@ function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId, to
   const openPath = hiring ? scenarioPath({ id: 'policy-hiring', module: 'policy-funding' }, record.id) : `/tools/policy-funding/diagnosis${q(record.id)}`
   const base = { key: 'policy' as const, label: '정책자금', won: 0, laterWon: 0, amount: '', needs, openPath, openLabel: '정책자금 진단에서 이어서' }
   const core = missing.filter((m) => m !== '매출')
-  if (core.length) return { ...base, state: 'need', headline: `${core.join(' · ')}을(를) 받으면 정책자금도 같이 봐요`, lines: [], assumptions: [] }
+  if (core.length) return { ...base, state: 'need', headline: `${josa(core.join(' · '), '을/를')} 받으면 정책자금도 같이 봐요`, lines: [], assumptions: [] }
   // D-312 맞춤 추천 카드와 같은 근거(서류함) 위에 이 상황의 가정 — 연구소 상황은 가점에 연구소를 더한다
   const ev = policyEvidence(record, facts, today)
   const bonus = [...new Set([...(ev.input.bonusItems ?? []), ...(input.bonusItems ?? []), '기업부설연구소 보유' as const])]

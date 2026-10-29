@@ -45,6 +45,7 @@ import { policyAssumption, policyEvidence } from './policyEvidence'
 import { fitContext, scenarioFit, type FitContext, type FitKind, type ScenarioFit } from './scenarioFit'
 import { placeOf } from './grants/grantMatch'
 import { runCalcScenario } from './calcScenario'
+import { josa } from '../lib/josa'
 
 export interface ScenarioNeed {
   /** 화면에 쓰는 이름 */
@@ -226,7 +227,7 @@ function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit
   // 핵심 값이 없으면 결과를 내지 않는다 — 주주명부 · 배당 가능한 이익 없이 '급여 40% + 배당 60%' 같은 답은 믿을 수 없다
   const coreMissing = goals.some((goal) => (TAX_CORE[goal] ?? []).some((k) => missing.has(k)))
   const state: ScenarioState = coreMissing || !allOk ? (okGoals.length > 0 && !coreMissing ? 'partial' : 'need') : missing.size > 0 ? 'partial' : 'ready'
-  const headline = state === 'need' ? `${[...missing.values()].slice(0, 3).join(' · ')}을(를) 받으면 바로 설계해요` : point || (lines[0] ?? GOAL_LABEL[goals[0]])
+  const headline = state === 'need' ? `${josa([...missing.values()].slice(0, 3).join(' · '), '을/를')} 받으면 바로 설계해요` : point || (lines[0] ?? GOAL_LABEL[goals[0]])
   return {
     state,
     headline,
@@ -339,7 +340,7 @@ export function startupFormOf(facts: ClientFacts, over: ScenarioPreset['startup'
 function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): ReturnType<typeof runTax> {
   const needs = [need('설립일(창업일)', facts.establishedAt), need('대표 생년월일', facts.representativeBirth), need('회사 주소(권역)', startupRegion(facts.address).region ? facts.address : ''), need('업종', facts.industry ? facts.industryText || facts.industry : '')]
   const core = needs.slice(0, 2).filter((n) => !n.ok)
-  if (core.length) return { state: 'need', headline: `${core.map((n) => n.label).join(' · ')}을(를) 받으면 바로 판정해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
+  if (core.length) return { state: 'need', headline: `${josa(core.map((n) => n.label).join(' · '), '을/를')} 받으면 바로 판정해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
   const date = new Date(`${today}T00:00:00`)
   const r = judge(startupFormOf(facts, presetStartup(s.startup, today)), date)
   if (r.notice) return { state: 'partial', headline: r.notice, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
@@ -397,7 +398,7 @@ function runPolicy(s: ScenarioPreset, facts: ClientFacts, record: ClientOpsRecor
     need('매출', facts.revenue && !facts.revenue.estimated ? krw(facts.revenue.won) : ''),
   ]
   const core = missing.filter((m) => m !== '매출')
-  if (core.length) return { state: 'need', headline: `${core.join(' · ')}을(를) 받으면 바로 진단해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
+  if (core.length) return { state: 'need', headline: `${josa(core.join(' · '), '을/를')} 받으면 바로 진단해요`, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
   // D-312 맞춤 추천 카드와 같은 근거(서류함 체납 증명 · 가점 · 명부 고용 · 준비 서류) 위에 상황 가정 — 같은 업체에 다른 추천 기관이 나오지 않게
   const ev = policyEvidence(record, facts, today)
   const r = runDiagnosis({ ...input, ...ev.input, ...(s.policy ?? {}) })

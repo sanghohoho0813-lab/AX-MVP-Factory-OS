@@ -118,7 +118,7 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
       action: null,
     }
   }
-  if (core.length) return { key: 'grants', label: '지원사업', tone: 'need', headline: `${core.join(' · ')}을(를) 알면 맞는 공고를 골라요`, detail: `지금 확인 필요 ${check.length}건`, missing: core, openPath: open, openLabel: '지원사업 알림', action: null }
+  if (core.length) return { key: 'grants', label: '지원사업', tone: 'need', headline: `${josa(core.join(' · '), '을/를')} 알면 맞는 공고를 골라요`, detail: `지금 확인 필요 ${check.length}건`, missing: core, openPath: open, openLabel: '지원사업 알림', action: null }
   if (check.length) return { key: 'grants', label: '지원사업', tone: 'maybe', headline: `확인하면 맞을 수 있는 공고 ${check.length}건`, detail: check[0].reasons.filter((r) => r.state === 'unknown').map((r) => r.label).join(' · ') + ' 확인', missing: [], openPath: open, openLabel: '확인할 공고 보기', action: null }
   return { key: 'grants', label: '지원사업', tone: 'no', headline: '지역 · 업력 · 업종까지 맞는 공고가 지금은 없어요', detail: '새 공고가 들어오면(매일 아침 9시) 여기에 바로 보여요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
 }
@@ -139,7 +139,7 @@ const policyInsight: Provider = ({ record, facts, today }) => {
   const ev = policyEvidence(record, facts, today)
   const open = `/tools/policy-funding/diagnosis${q(record)}`
   const core = missing.filter((m) => m !== '매출')
-  if (core.length) return { key: 'policy-funding', label: '정책자금', tone: 'need', headline: `${core.join(' · ')}을(를) 알면 바로 판정해요`, detail: '사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요.', missing: core, openPath: open, openLabel: '정책자금 진단', action: null }
+  if (core.length) return { key: 'policy-funding', label: '정책자금', tone: 'need', headline: `${josa(core.join(' · '), '을/를')} 알면 바로 판정해요`, detail: '사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요.', missing: core, openPath: open, openLabel: '정책자금 진단', action: null }
   const r = runDiagnosis({ ...input, ...ev.input })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
   // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — '높음' 으로 단정하지 않고 가정이라고 알린다
@@ -158,7 +158,7 @@ const policyInsight: Provider = ({ record, facts, today }) => {
     tone,
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
     detail: [
-      more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
+      more.length ? `${why} · ${josa(more.join(' · '), '을/를')} 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
       ...ev.notes.slice(0, 3),
       docsLine,
     ]
@@ -228,7 +228,7 @@ const startupInsight: Provider = ({ record, today, facts }) => {
   // 창업 5년이 지났으면 대표 나이와 상관없이 감면 기간 밖 — 묻지 않고 바로 말한다
   if (facts.establishedAt && facts.months !== null && facts.months >= 60) return { key: 'startup-tax', label: '창업감면', tone: 'no', headline: '창업 5년이 지나 감면 기간이 끝났을 가능성이 커요', detail: `설립 ${facts.establishedAt}`, missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
   const missing = [!facts.establishedAt ? '설립일(창업일)' : '', !facts.representativeBirth ? '대표 생년월일' : ''].filter(Boolean)
-  if (missing.length) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: `${missing.join(' · ')}을(를) 알면 판정해요`, detail: '사업자등록증 · 대표 신분 정보로 채워져요.', missing, openPath: open, openLabel: '창업감면 판정', action: null }
+  if (missing.length) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: `${josa(missing.join(' · '), '을/를')} 알면 판정해요`, detail: '사업자등록증 · 대표 신분 정보로 채워져요.', missing, openPath: open, openLabel: '창업감면 판정', action: null }
   const { region, over, popDecline } = startupRegion(facts.address)
   const form: StartupForm = {
     ...EMPTY_FORM,

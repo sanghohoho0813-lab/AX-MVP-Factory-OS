@@ -12,12 +12,13 @@ import { withSalesInfo } from '../../services/salesPipeline'
 import { PillList } from './salesParts'
 import { HintTip } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
+import { quoted } from '../../lib/josa'
 
 export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; onSave: (next: ClientOpsRecord, msg: string) => unknown }) {
   const picks = record.sales?.picks ?? []
   const toggle = (name: string) => {
     const next = picks.includes(name) ? picks.filter((x) => x !== name) : [...picks, name]
-    void onSave(withSalesInfo(record, { picks: next }), picks.includes(name) ? `'${name}' 을(를) 뺐습니다.` : `'${name}' 을(를) 이번 미팅 항목에 넣었습니다.`)
+    void onSave(withSalesInfo(record, { picks: next }), picks.includes(name) ? `${quoted(name, '을/를')} 뺐습니다.` : `${quoted(name, '을/를')} 이번 미팅 항목에 넣었습니다.`)
   }
   const chosen = picks.map((n) => CONSULTING_STRATEGIES.find((s) => s.name === n)).filter((s): s is (typeof CONSULTING_STRATEGIES)[number] => !!s)
   return (

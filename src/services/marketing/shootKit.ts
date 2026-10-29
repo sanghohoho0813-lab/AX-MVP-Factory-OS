@@ -11,6 +11,7 @@
  */
 import { TITLE_PATTERNS, type Opportunity, type RadarVideo } from './ytRadar'
 import { mkText } from './persona'
+import { josa } from '../../lib/josa'
 
 export interface KitFrame {
   pattern: string
@@ -118,7 +119,7 @@ export function shootKit(o: Opportunity): ShootKit {
     hook = `${market} 챙기느라 바쁘시죠 — 손으로 찾지 말고 이렇게 자동으로 받아 보세요.`
     outline = [
       { at: '0:00', what: `문제 장면 — 첫 문장 "${hook}"` },
-      { at: '0:30', what: `지금 어떻게들 하나 — ${market}을(를) 손으로 챙길 때 놓치는 것` },
+      { at: '0:30', what: `지금 어떻게들 하나 — ${josa(market, '을/를')} 손으로 챙길 때 놓치는 것` },
       { at: '1:30', what: `장치 보여 주기 — ${device || '자동화 장치'} 완성 화면` },
       { at: '3:00', what: '만드는 순서 3단계(화면 녹화)' },
       { at: '5:00', what: '달라진 점 — 시간 · 놓침이 어떻게 줄었나(우리 실제 기록만)' },

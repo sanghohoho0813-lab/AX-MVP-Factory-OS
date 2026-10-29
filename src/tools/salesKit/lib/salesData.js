@@ -1,6 +1,7 @@
 // 기업컨설팅 세일즈 OS(corp-consult-sales-os · src/App.jsx)에서 표와 규칙만 그대로 옮긴 것 (D-88).
 // 원본 줄: STRATEGY_LIBRARY 278-462 · 상품 716-762 · CRETOP_WEAPONS 2280-2326 · 테마 3465-3487 · MEETING_THEMES·buildMeetingPlan 3488-3660 · CUST_FLAGS 2108-2171 · scoreLead 3374-3463 · 보류 사유 1123-1124·1414-1425 · 재무 신호등 1132-1166
 // 문자열·숫자·순서를 바꾸지 않는다. 원본이 부르던 작은 도우미(safe·getCompanyName·todayISO)만 아래에 같이 둔다.
+import { josa } from "../../../lib/josa";
 export function safe(v, fallback) { return v === undefined || v === null || v === "" ? fallback : v; }
 export function getCompanyName(item) { return (item && (item.companyName || item.company || item.name)) || ""; }
 export function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -472,7 +473,7 @@ export function buildMeetingPlan(item, stage) {
   if (stage === "m2") {
     return {
       title: "2차 미팅 준비",
-      goal: `${pb.label}을(를) 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
+      goal: `${josa(pb.label, "을/를")} 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
       topIssues: strategies.map((s, idx) => `${idx + 1}. ${s.name} — ${s.pitch}`),
       approach: `이번 미팅은 ${main.name}을 첫 번째 이슈로 잡고, 이후 ${strategies.slice(1).map((s) => s.name).join(" → ") || "추가 점검"} 순서로 확장하는 것이 좋습니다. (각 항목은 자료 확인 후 판단)`,
       objections: DEFAULT_M2_OBJ,

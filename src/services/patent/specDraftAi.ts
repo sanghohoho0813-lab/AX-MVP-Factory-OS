@@ -13,6 +13,7 @@
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext, AssistRow } from '../aiAssist/context'
 import { AXIS_LABEL, SECTION_LABEL, claimSkeleton, figureSubject, titleLine, titleParts, type SectionKey, type SpecAxis, type SpecDraft, type SpecIdea } from './specDraft'
+import { josa } from '../../lib/josa'
 
 export type SpecBatch = 'a' | 'b' | 'c' | 'd' | 'e'
 export type SpecAiKey = SectionKey | 'claims' | 'detail2'
@@ -85,7 +86,7 @@ function batchRules(b: SpecBatch, d: SpecDraft): string[] {
       ]
     case 'b':
       return [
-        `칸 solution = 과제의 해결 수단 — 청구항 뼈대를 풀어 쓴다. 첫 문단은 "상기 목적을 달성하기 위한 본 발명의 일 실시예에 따른 ${system}은(는) …", 다음 문단은 종속항 내용, 마지막 문단은 ${method}.`,
+        `칸 solution = 과제의 해결 수단 — 청구항 뼈대를 풀어 쓴다. 첫 문단은 "상기 목적을 달성하기 위한 본 발명의 일 실시예에 따른 ${josa(system, '은/는')} …", 다음 문단은 종속항 내용, 마지막 문단은 ${method}.`,
         '칸 abstract = 요약 — 400자 이내 한 문단. "본 발명은 … 에 관한 것으로," 로 시작해 핵심 구성 · 처리 · 효과를 한 번에.',
       ]
     case 'c':

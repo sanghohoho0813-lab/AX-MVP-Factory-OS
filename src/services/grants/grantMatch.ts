@@ -11,6 +11,7 @@
  */
 
 import { nowDate, todayLocalDate } from '../../lib/appClock'
+import { josa } from '../../lib/josa'
 
 export type GrantCategory = 'money' | 'hr' | 'marketing' | 'rnd' | 'export' | 'startup' | 'etc'
 
@@ -544,7 +545,7 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
   const hasNo = reasons.some((x) => x.state === 'no')
   // 겨냥한 조건이 맞아도 업체의 지역 · 업력 · 업종 중 모르는 것이 있으면 '확인 필요'(아무 조건 없는 공고는 누구나라 상관없다)
   if (!hasNo && targeted && missing.length && !reasons.some((x) => x.state === 'unknown')) {
-    add('profile', '업체 정보', 'unknown', `${missing.join(' · ')}을(를) 적어야 맞춤 여부를 판단할 수 있어요`)
+    add('profile', '업체 정보', 'unknown', `${josa(missing.join(' · '), '을/를')} 적어야 맞춤 여부를 판단할 수 있어요`)
   }
   const unknownCount = reasons.filter((x) => x.state === 'unknown').length
   const verdict: Verdict = hasNo ? 'no' : unknownCount > 0 ? 'check' : targeted ? 'fit' : 'general'

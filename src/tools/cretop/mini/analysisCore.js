@@ -8,6 +8,7 @@
  */
 import { buildCretopParsedForUi, cretopRowTrend } from "../engine/index.js";
 import { extractAll, detectBizForm } from "./extract.js";
+import { josa } from "../../../lib/josa";
 
 export const ratioKeys = new Set(["netIncomeMargin", "debtRatio", "currentRatio", "interestCoverageRatio"]);
 
@@ -86,7 +87,7 @@ export function buildDiagnosisSummary(ui) {
   const order = { bad: 0, warn: 1, good: 2, info: 3 };
   lines.sort((a, b) => order[a.tone] - order[b.tone]);
   const out = lines.slice(0, 5);
-  out.push({ text: `미팅에서는 ${focus.slice(0, 3).join(", ")}을(를) 우선 확인해볼 수 있습니다.`, tone: "info" });
+  out.push({ text: `미팅에서는 ${josa(focus.slice(0, 3).join(", "), "을/를")} 우선 확인해볼 수 있습니다.`, tone: "info" });
   if (out.length < 2) out.unshift({ text: "자동 산출 지표가 부족합니다. 원문 재무비율·재무제표 표를 직접 확인해보세요.", tone: "info" });
   return out;
 }

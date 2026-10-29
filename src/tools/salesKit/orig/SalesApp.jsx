@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 // PDF: 정적 import(동적 import 청크 fetch 실패 방지) — pdf.js 본체는 메인 번들에, 워커는 ?url 정적 에셋으로.
 import * as pdfjsLib from "pdfjs-dist-v4/build/pdf.min.mjs"; // [D-94] 원본과 같은 pdf.js 4 계열
 import pdfWorkerUrl from "pdfjs-dist-v4/build/pdf.worker.min.mjs?url";
+import { josa, quoted } from "../../../lib/josa"; // 을(를) 대신 받침에 맞는 조사
 const FIN_MODULE_VERSION = "pdf-static-import-v2-current-file-only";
 // 정식 출시 전 릴리즈 정보(오류 제보·버전 표시용). 출시 단계가 바뀌면 여기만 수정.
 const APP_RELEASE = { name: "법인컨설팅 세일즈 OS", version: "Release Candidate v0.9", build: "2026-06-16", storage: "localStorage(브라우저 임시 저장)", finModule: "table-paste-first / PDF·숫자추출기 BETA" };
@@ -994,7 +995,7 @@ function currentIssueSummary(item) {
   if (Number(item.empCount) >= 20) facts.push(`직원 ${item.empCount}명`);
   const f = facts.length ? facts.join("·") + " 기준, " : "";
   const concern = item.concern ? ` 대표 고민(${item.concern})과 연결됩니다.` : "";
-  return `${f}${main.name}이(가) 우선 점검 포인트로 보입니다.${concern} 단정하기보다 자료 확인 후 검토 가능성을 판단하는 흐름을 권합니다.`;
+  return `${f}${josa(main.name, "이/가")} 우선 점검 포인트로 보입니다.${concern} 단정하기보다 자료 확인 후 검토 가능성을 판단하는 흐름을 권합니다.`;
 }
 // ── 방문용 1페이지 리포트 ─────────────────────────────────────────
 const REPORT_PROFILE_DEFAULT = { consultant: "김팀장", org: "미래에이아이랩", /* [D-94] 고객에게 나가는 리포트 머리 — 원본 앱 이름 대신 회사 이름 */ title: "컨설턴트", phone: "", email: "", footer: "본 리포트는 상담 전 사전 점검용 자료이며, 실제 적용 여부는 회사의 세부 자료 확인과 세무사·노무사·전문가 검토가 필요합니다." };
@@ -1209,7 +1210,7 @@ function analyzeTranscript(text) {
   const newInfo = (t.match(/지분\s*[0-9]+\s*%|주주\s*[0-9]+|자녀\s*[0-9]*\s*명?|배우자|매출\s*[0-9,]+|직원\s*[0-9]+\s*명/g) || []).slice(0, 6);
   const summary = `미팅에서 ${issues.slice(0, 4).join(", ") || "주요 주제"} 등이 언급되었고, 대표 반응은 ${reaction}으로 보입니다. (텍스트 기반 추정이며 실제 맥락은 추가 확인 필요)`;
   const secondPoints = Array.from(new Set([...interested, ...issues])).slice(0, 5).map((x) => `${x} 관련 자료 기반 점검 결과 공유`);
-  const strategy = `${interested[0] || issues[0] || "핵심 이슈"}을(를) 중심으로, '문제 제기 → 방치 시 부담 → 해결 방향 → 로드맵 → 플랜' 순으로 2차 미팅을 구성하는 흐름을 권합니다. (협의 후 정리)`;
+  const strategy = `${josa(interested[0] || issues[0] || "핵심 이슈", "을/를")} 중심으로, '문제 제기 → 방치 시 부담 → 해결 방향 → 로드맵 → 플랜' 순으로 2차 미팅을 구성하는 흐름을 권합니다. (협의 후 정리)`;
   const nextDocs = Array.from(new Set(["재무제표(최근 3개년)", "주주명부", "정관", "계정별원장", ...(issues.includes("가지급금") ? ["가지급금 명세"] : []), ...(issues.includes("고용지원금") ? ["근로계약·4대보험 현황"] : [])])).slice(0, 8);
   const kakao = `대표님, 오늘 시간 내주셔서 감사합니다. 말씀 주신 ${issues.slice(0, 2).join(", ") || "부분"} 중심으로 자료를 확인한 뒤, 실제 적용 가능성이 있는 부분만 추려 2차 미팅에서 정리해 드리겠습니다. (적용 여부는 세부 요건 확인이 필요하며, 세무사 검토가 필요한 부분은 함께 안내드리겠습니다.)`;
   return { summary, reaction, interested, hesitant, newInfo, issues, secondPoints, strategy, nextDocs, kakao, analyzedAt: todayISO() };
@@ -3657,7 +3658,7 @@ function buildMeetingPlan(item, stage) {
   if (stage === "m2") {
     return {
       title: "2차 미팅 준비",
-      goal: `${pb.label}을(를) 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
+      goal: `${josa(pb.label, "을/를")} 첫 번째 축으로, 전문성을 보여주되 겁주기보다 '우선순위'를 정리해주는 단계입니다.`,
       topIssues: strategies.map((s, idx) => `${idx + 1}. ${s.name} — ${s.pitch}`),
       approach: `이번 미팅은 ${main.name}을 첫 번째 이슈로 잡고, 이후 ${strategies.slice(1).map((s) => s.name).join(" → ") || "추가 점검"} 순서로 확장하는 것이 좋습니다. (각 항목은 자료 확인 후 판단)`,
       objections: DEFAULT_M2_OBJ,
@@ -3977,13 +3978,13 @@ function Prospecting({ data, setData, setTab, goMeeting, openAdd, selectId, rece
     const markLead = (lds) => lds.map((x) => (x.id === l.id ? { ...x, convertedToDB: true, convertedAt: todayISO() } : x));
     if (companies.some((c) => c.name === l.name)) {
       setData({ ...data, leads: markLead(leads) });
-      window.alert(`이미 고객사 관리에 '${l.name}'이(가) 등록되어 있습니다. 리드를 '고객사 관리 전환 완료'로 표시하고 고객사 관리 탭으로 이동합니다.`);
+      window.alert(`이미 고객사 관리에 ${quoted(l.name, "이/가")} 등록되어 있습니다. 리드를 '고객사 관리 전환 완료'로 표시하고 고객사 관리 탭으로 이동합니다.`);
       setTab && setTab("companies");
       return;
     }
     const company = { id: uid(), name: l.name, corpType: "주식회사", juPosition: "앞", ceoName: "", industry: l.industry, region: l.region, revenue: l.revenue, empCount: l.empCount, estYears: l.estYears, ceoAge: l.ceoAge, stage: l.stage, interests: l.interests || [], concern: l.concern, memo: l.memo, nextDate: l.nextDate, notes: [], docs: [], feePotential: "", fromLead: true, ...(isSample(l) ? { sample: true, source: "sample" } : { manual: true }) };
     setData({ ...data, companies: [company, ...companies], leads: markLead(leads) });
-    window.alert(`'${l.name}'을(를) 고객사 관리에 등록하고 리드를 '고객사 관리 전환 완료'로 표시했습니다. 고객사 관리 탭으로 이동합니다.`);
+    window.alert(`${quoted(l.name, "을/를")} 고객사 관리에 등록하고 리드를 '고객사 관리 전환 완료'로 표시했습니다. 고객사 관리 탭으로 이동합니다.`);
     setTab && setTab("companies");
   };
   const lead = leads.find((l) => l.id === selected) || prospects[0];

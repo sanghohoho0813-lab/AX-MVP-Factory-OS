@@ -40,6 +40,7 @@ import {
   type TableOut,
   type Values,
 } from '../services/taxCalc'
+import { josa } from '../lib/josa'
 
 const STORAGE_PREFIX = 'axmvp.tax.'
 
@@ -585,7 +586,7 @@ export function TaxCalculatorsPage() {
           <PresetNote
             testId="calc-preset-note"
             title={presetShown.title}
-            done={presetShown.missing.length > 0 ? `${presetShown.missing.join(' · ')}이(가) 없어 상황 값만 넣었어요 — 받으면 이 업체 숫자로 계산해요` : '이 업체 숫자로 바로 계산했어요(아래 칸을 바꾸면 다시 계산)'}
+            done={presetShown.missing.length > 0 ? `${josa(presetShown.missing.join(' · '), '이/가')} 없어 상황 값만 넣었어요 — 받으면 이 업체 숫자로 계산해요` : '이 업체 숫자로 바로 계산했어요(아래 칸을 바꾸면 다시 계산)'}
             chips={presetShown.chips.filter((c) => !c.field || presetKept.includes(c.field)).map((c) => c.text)}
             cleared={presetShown.cleared}
             clearedText="상황 값을 넣기 전 값으로 돌렸어요(직접 고친 칸은 그대로)."

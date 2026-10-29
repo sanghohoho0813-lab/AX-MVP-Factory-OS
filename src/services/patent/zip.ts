@@ -6,6 +6,8 @@
  * 쓰기는 '압축 안 함(store)' 만 — 시험 자료 · 내려받기 묶음용.
  */
 
+import { quoted } from '../../lib/josa'
+
 const SIG_EOCD = 0x06054b50
 const SIG_CEN = 0x02014b50
 const SIG_LOC = 0x04034b50
@@ -84,8 +86,8 @@ export function zipEntries(bytes: Uint8Array): Array<ZipEntry & { localOffset: n
 
 /** D-266 항목 하나 꺼내기 — 크기 한도는 부르는 쪽이 목차(size)로 먼저 본다 */
 export async function readZipEntry(bytes: Uint8Array, e: ZipEntry & { localOffset: number; compSize: number }): Promise<Uint8Array> {
-  if (e.encrypted) throw new ZipError(`'${e.name}' 은(는) 암호가 걸려 있어 꺼낼 수 없습니다.`)
-  if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
+  if (e.encrypted) throw new ZipError(`${quoted(e.name, '은/는')} 암호가 걸려 있어 꺼낼 수 없습니다.`)
+  if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 ${quoted(e.name, '이/가')} 너무 큽니다.`)
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const lo = e.localOffset
   if (lo + 30 > bytes.length || dv.getUint32(lo, true) !== SIG_LOC) throw new ZipError('ZIP 안의 파일 머리가 깨졌습니다.')
@@ -94,7 +96,7 @@ export async function readZipEntry(bytes: Uint8Array, e: ZipEntry & { localOffse
   if (e.method === 0) return raw
   if (e.method === 8) {
     const data = await inflateRaw(raw)
-    if (data.length > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
+    if (data.length > MAX_ENTRY) throw new ZipError(`파일 안의 ${quoted(e.name, '이/가')} 너무 큽니다.`)
     return data
   }
   throw new ZipError(`지원하지 않는 압축 방식입니다(${e.method}).`)
@@ -106,7 +108,7 @@ export async function unzip(bytes: Uint8Array, filter?: (name: string) => boolea
   let total = 0
   for (const e of zipEntries(bytes)) {
     if (e.name.endsWith('/') || (filter && !filter(e.name))) continue
-    if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 '${e.name}' 이(가) 너무 큽니다.`)
+    if (e.size > MAX_ENTRY) throw new ZipError(`파일 안의 ${quoted(e.name, '이/가')} 너무 큽니다.`)
     total += e.size
     if (total > MAX_TOTAL) throw new ZipError('압축을 푼 크기가 너무 큽니다.')
     files.set(e.name, await readZipEntry(bytes, e))

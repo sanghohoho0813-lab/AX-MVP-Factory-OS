@@ -22,6 +22,7 @@ import { latestEmploymentRoster } from './toolResultGroups'
 import { usableFactValue } from './customerFacts'
 import { buildInsights, policyDocsLine, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
 import { pendingFacts } from './customerFacts'
+import { josa } from '../lib/josa'
 
 export interface AdvisorQuestion {
   id: string
@@ -184,7 +185,7 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     a.links = [{ label: '정책자금 진단 열기', href: `/tools/policy-funding/diagnosis${q(ctx.record)}` }]
     const core = missing.filter((m) => m !== '매출')
     if (core.length) {
-      a.verdict = { tone: 'need', text: `${core.join(' · ')}을(를) 알아야 판정해요` }
+      a.verdict = { tone: 'need', text: `${josa(core.join(' · '), '을/를')} 알아야 판정해요` }
       a.missing = core
       a.steps = ['사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요', '그다음 이 질문을 다시 눌러 주세요']
       return a

@@ -5,6 +5,7 @@
  * 글자 너비 재기(measure)는 밖에서 받는다 — 화면은 canvas measureText, 시험은 어림셈.
  */
 import { newId, normalizeCompany } from './caseUtil'
+import { josa } from '../../lib/josa'
 
 export interface ProposalNumber {
   label: string
@@ -202,7 +203,7 @@ export function qaProposal(doc: ProposalDoc, measure: Measure): QaIssue[] {
     const no = i + 1
     if (!p.title.trim() || (!p.message.trim() && p.bullets.length === 0 && p.keyNumbers.length === 0)) out.push({ page: no, kind: 'empty', text: !p.title.trim() ? '제목이 비었습니다' : '본문이 비었습니다' })
     const lay = layoutPage(p, measure)
-    for (const o of lay.overflow) out.push({ page: no, kind: 'overflow', text: `${o}이(가) 칸을 넘칩니다 — 줄이거나 나누세요` })
+    for (const o of lay.overflow) out.push({ page: no, kind: 'overflow', text: `${josa(o, '이/가')} 칸을 넘칩니다 — 줄이거나 나누세요` })
     const all = pageTexts(p)
     for (const t of all) {
       const ph = PLACEHOLDER.exec(t)

@@ -15,6 +15,7 @@ import { TIER_LABEL } from '../../services/ownerAi/skillCatalog'
 import type { Tier } from '../../services/ownerAi/types'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, Surface } from '../../components/ui/primitives'
+import { josa } from '../../lib/josa'
 
 /* ---------------- 누가 · 어디에 ---------------- */
 
@@ -102,7 +103,7 @@ export function AiSetupBanner({ setup, strip = false }: { setup: AiSetup; strip?
       <p className={`${strip ? 't-sub' : 't-body'} font-semibold break-keep text-warning-700`}>AI 기능 설정이 필요합니다.</p>
       <p className={`t-sub break-keep text-warning-700 ${strip ? '' : 'mt-1'}`}>
         {setup.state === 'missing'
-          ? `서버 환경변수에 ${setup.missing.length ? setup.missing.join(' · ') : 'AI 키 · 모델'} 을(를) 넣으면 AI 버튼이 켜집니다. 그 전에도 업체 등록 · 자료 · 기억 · ChatGPT 결과 붙여넣기는 그대로 쓸 수 있습니다.`
+          ? `서버 환경변수에 ${josa(setup.missing.length ? setup.missing.join(' · ') : 'AI 키 · 모델', '을/를')} 넣으면 AI 버튼이 켜집니다. 그 전에도 업체 등록 · 자료 · 기억 · ChatGPT 결과 붙여넣기는 그대로 쓸 수 있습니다.`
           : setup.message}
       </p>
     </div>
