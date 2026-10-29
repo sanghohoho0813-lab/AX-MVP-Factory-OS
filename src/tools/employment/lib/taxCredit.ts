@@ -30,7 +30,7 @@ export interface TaxUnits {
   /** 고른 표 — 2023(3년 같은 금액) · 2026(개편) */
   table: 2023 | 2026
 }
-const SME_2026: Record<RegionType, { youth: Three; normal: Three }> = {
+export const SME_2026: Record<RegionType, { youth: Three; normal: Three }> = {
   metro: { youth: [700, 1600, 1700], normal: [400, 900, 1000] },
   local: { youth: [1000, 1900, 2000], normal: [700, 1200, 1300] },
 }

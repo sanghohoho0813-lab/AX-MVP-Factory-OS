@@ -294,7 +294,7 @@ function calc1(v: Values): Output {
 /* 2. 대표이사 급여 최적화                                               */
 /* ------------------------------------------------------------------ */
 
-const S_RATE = {
+export const S_RATE = {
   natPension: 0.0475,
   natPensionCap: 6590000,
   health: 0.03595,
@@ -940,7 +940,7 @@ function calc6p3(v: Values): Output {
 // D-244: 소득이 0 이하(결손)면 법인세도 0 — 예전엔 음수 세금이 나와 결손 법인 채무면제 · 증여 이익이 부풀었다
 // D-317: 2026-01-01 이후 시작하는 사업연도부터 법인세율이 구간마다 1%p 올랐다(10 · 20 · 22 · 25%, 법인세법 §55).
 //        원본은 2023~2025 세율(9 · 19 · 21 · 24%)이라 감자 · 증자 증여의제의 법인세 상당액이 적게 나왔다. 누진공제액은 두 해가 같다.
-const CORP_RATES: Record<'y2025' | 'y2026', [number, number, number, number]> = { y2025: [0.09, 0.19, 0.21, 0.24], y2026: [0.1, 0.2, 0.22, 0.25] }
+export const CORP_RATES: Record<'y2025' | 'y2026', [number, number, number, number]> = { y2025: [0.09, 0.19, 0.21, 0.24], y2026: [0.1, 0.2, 0.22, 0.25] }
 export function corpTaxNational(x: number, fiscalYear = 2026): number {
   if (!(x > 0)) return 0
   const [r1, r2, r3, r4] = CORP_RATES[fiscalYear >= 2026 ? 'y2026' : 'y2025']
@@ -1260,7 +1260,7 @@ function calc8x2(v: Values): Output {
 /* 9. 2026 소득세 (양도·퇴직·종합)                                        */
 /* ------------------------------------------------------------------ */
 
-type Bracket = [number, number, number]
+export type Bracket = [number, number, number]
 function vlookupBracket(x: number, table: Bracket[]): Bracket {
   let r = table[0]
   for (const row of table) {
@@ -1269,7 +1269,7 @@ function vlookupBracket(x: number, table: Bracket[]): Bracket {
   }
   return r
 }
-const INC9_BRACKETS: Bracket[] = [[0, 0, 0.06], [14000000, 1260000, 0.15], [50000000, 5760000, 0.24], [88000000, 15440000, 0.35], [150000000, 19940000, 0.38], [300000000, 25940000, 0.4], [500000000, 35940000, 0.42], [1000000000, 65940000, 0.45]]
+export const INC9_BRACKETS: Bracket[] = [[0, 0, 0.06], [14000000, 1260000, 0.15], [50000000, 5760000, 0.24], [88000000, 15440000, 0.35], [150000000, 19940000, 0.38], [300000000, 25940000, 0.4], [500000000, 35940000, 0.42], [1000000000, 65940000, 0.45]]
 export function incomeTax9(base: number): number {
   const r = vlookupBracket(base, INC9_BRACKETS)
   return base * r[2] - r[1]
@@ -1286,13 +1286,13 @@ function pensionDeduction9(p: number): number {
   const r = vlookupBracket(p, PENSION_DED9)
   return Math.min(9000000, r[1] + r[2] * (p - r[0]))
 }
-const SERVICE_DED9: Bracket[] = [[0, 0, 1000000], [5, 5000000, 2000000], [10, 15000000, 2500000], [20, 40000000, 3000000]]
+export const SERVICE_DED9: Bracket[] = [[0, 0, 1000000], [5, 5000000, 2000000], [10, 15000000, 2500000], [20, 40000000, 3000000]]
 function serviceDeduction9(years: number): number {
   if (years <= 5) return 1000000 * years
   const r = vlookupBracket(years, SERVICE_DED9)
   return r[1] + r[2] * (years - r[0])
 }
-const CONV_DED9: Bracket[] = [[0, 0, 1], [8000000, 8000000, 0.6], [70000000, 45200000, 0.55], [100000000, 61700000, 0.45], [300000000, 151700000, 0.35]]
+export const CONV_DED9: Bracket[] = [[0, 0, 1], [8000000, 8000000, 0.6], [70000000, 45200000, 0.55], [100000000, 61700000, 0.45], [300000000, 151700000, 0.35]]
 function convertedDeduction9(x: number): number {
   if (x <= 8000000) return x
   const r = vlookupBracket(x, CONV_DED9)

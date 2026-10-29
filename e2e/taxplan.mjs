@@ -282,6 +282,36 @@ for (const width of [360, 390, 430]) {
   await ctx.close()
 }
 
+// ---- D-321 계산 기준표 — 계산기 · 판정이 쓰는 세율 · 공제(몇 년 · 어떤 법) ----
+for (const width of [1440, 390, 360]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(width < 500 ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+  await page.getByTestId('tax-basis-open').click()
+  await page.getByTestId('tax-basis').waitFor()
+  const ids = await page.getByTestId('tax-basis-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
+  const corp = await page.locator('[data-testid="tax-basis-section"][data-id="corp"]').innerText()
+  check(`D-321 ${width} 기준표 9칸(법인세 · 소득세 · 퇴직 · 4대보험 · 상속증여 · 가지급금 · 고용 · 창업 · 연구소) · 주소 m=basis · 법인세 10%(2025까지 9%)`, ids.join() === 'corp,income,retire,insurance,inherit,loan,employ,startup,rnd' && page.url().includes('m=basis') && corp.includes('10% (2025 사업연도까지 9%)'), ids.join())
+  const before = await page.locator('[data-testid="tax-basis-section"][data-id="income"] dl > div').count()
+  await page.locator('[data-testid="tax-basis-section"][data-id="income"]').getByTestId('tax-basis-more').click()
+  check(`D-321 ${width} [n줄 더 보기] → 다 보임(소득세 10억 초과 45%)`, (await page.locator('[data-testid="tax-basis-section"][data-id="income"] dl > div').count()) > before && (await page.locator('[data-testid="tax-basis-section"][data-id="income"]').innerText()).includes('45%'))
+  for (const scale of ['default', 'extra_large']) {
+    await page.evaluate((sc) => document.documentElement.setAttribute('data-text-scale', sc), scale)
+    await page.waitForTimeout(300)
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    check(`D-321 ${width} ${scale}: 기준표 가로 넘침 0`, over <= 1, String(over))
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
+  await page.getByTestId('tax-basis-back').click()
+  await page.waitForTimeout(300)
+  check(`D-321 ${width} [계산기로] → 계산기 화면 · 오류 0`, (await page.getByTestId('tax-basis').count()) === 0 && page.url().includes('m=calc') && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n절세 설계: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

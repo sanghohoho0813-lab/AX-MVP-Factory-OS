@@ -10,12 +10,13 @@ import { useToolClient } from '../tools/shared/toolClientContext'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sharedToolKey } from '../tools/shared/toolStorage'
 import { useOutsideTap } from '../lib/useDismissable'
-import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
 import { HelpHeading } from '../components/ui/fold'
 import { TaxPlanner } from '../components/tax/TaxPlanner'
+import { TaxBasis } from '../components/tax/TaxBasis'
 import type { CalcOpen } from '../services/taxPlan'
 import { calcPrefill } from '../services/taxCalcPrefill'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -194,7 +195,8 @@ export function TaxCalculatorsPage() {
   // 계산기 · 업체가 바뀌면 그 칸의 값을 읽는다 — 읽기 전에는 저장하지 않는다(앞 업체 숫자가 뒤 업체 칸에 들어가지 않게)
   // D-165: 절세 설계(plan) 화면에서는 계산기 칸을 읽지도 저장하지도 않는다 — 전에는 업체 기록이 비어 있을 때
   // 계산기 01 예시 숫자가 업체 칸에 저장돼, 절세 설계에서 급여를 적은 뒤 계산기를 열어도 예시가 남았다
-  const mode: 'plan' | 'calc' = params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
+  // D-321 m=basis — 계산 기준표(계산기 · 판정이 쓰는 세율 · 공제)
+  const mode: 'plan' | 'calc' | 'basis' = params.get('m') === 'basis' ? 'basis' : params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
   const loadKey = `${mode}|${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
   const loadedFor = useRef(loadKey)
   /** D-244: 지금 values 가 어느 읽기(loadKey)의 값인지 — 읽은 바로 그 커밋에는 아직 앞 값이라 저장하지 않는다
@@ -278,7 +280,7 @@ export function TaxCalculatorsPage() {
    * D-130: 업체로 열면(?client=) 먼저 '원하는 결과로 찾기'. 계산기를 고르면(?c=) 예전 그대로.
    * 업체 없이 열면 예전처럼 계산기부터(원본 대조 qa:tax 가 이 화면을 연다) — 위 두 칸으로 오갈 수 있다.
    */
-  const setMode = (m: 'plan' | 'calc') => {
+  const setMode = (m: 'plan' | 'calc' | 'basis') => {
     const next = new URLSearchParams()
     const client = params.get('client')
     if (client) next.set('client', client)
@@ -483,7 +485,16 @@ export function TaxCalculatorsPage() {
         ))}
       </div>
 
-      {mode === 'plan' ? (
+      {/* D-321 계산 기준표 — 몇 년 · 어떤 법으로 계산하는지 */}
+      {mode !== 'basis' && (
+        <button type="button" onClick={() => setMode('basis')} className="no-print tap t-sub -mt-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-2 font-semibold text-brand-800 hover:bg-brand-50" data-testid="tax-basis-open">
+          <BookOpen aria-hidden="true" className="size-4" /> 계산 기준표 보기 — 2026년 세율 · 공제
+        </button>
+      )}
+
+      {mode === 'basis' ? (
+        <TaxBasis onBack={() => setMode('calc')} />
+      ) : mode === 'plan' ? (
         <TaxPlanner onOpenCalc={openCalc} />
       ) : (
       <>

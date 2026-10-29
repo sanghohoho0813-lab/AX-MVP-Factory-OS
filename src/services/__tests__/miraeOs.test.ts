@@ -143,6 +143,7 @@ import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
+import { lawBasis } from '../lawBasis'
 import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, corpTaxNational, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
@@ -1401,6 +1402,14 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
     const t3 = calculatorOf('t3')!
     const titles = t3.subs[0].groups.map((g) => g.title).join(' | ')
     check('D-320 증여공제: 혼인 · 출산 공제 포함 1억 5천만(부모 → 성년 자녀) · 기존 선택지는 그대로', giftDeduction('직계존속(성년 · 혼인출산)') === 150000000 && giftDeduction('직계존속(성년)') === 50000000 && giftDeduction('직계존속(미성년)') === 20000000)
+    // D-321 계산 기준표 — 계산에 쓰는 상수에서 읽은 숫자
+    const basis = lawBasis()
+    const sec = (id: string) => basis.find((b) => b.id === id)
+    const rowsText = (id: string) => (sec(id)?.rows ?? []).map((r) => `${r.label}=${r.value}`).join(' | ')
+    check('D-321 기준표 9칸 · 칸마다 기준(법 · 해) · 쓰는 곳', basis.length === 9 && basis.every((b) => b.basis.length > 4 && b.usedIn.length > 4 && b.rows.length > 0), basis.map((b) => b.id).join())
+    check('D-321 기준표 법인세 = 계산 상수(10% · 2025 사업연도까지 9%)', rowsText('corp').includes('과표 2억 이하=10% (2025 사업연도까지 9%)') && rowsText('corp').includes('3,000억 초과=25%'), rowsText('corp'))
+    check('D-321 기준표 소득세 1,400만 이하 6% · 10억 초과 45% · 4대보험 4.75% · 3.595% · 13.14%', rowsText('income').includes('1,400만 이하=6%') && rowsText('income').includes('10억 초과=45%') && rowsText('insurance').includes('4.75%') && rowsText('insurance').includes('3.595%') && rowsText('insurance').includes('13.14%'), rowsText('insurance'))
+    check('D-321 기준표 상속 · 증여 세율 10~50% · 혼인출산 1억 5,000만 · 고용 2026 표 · 창업 75%', rowsText('inherit').includes('과세표준 30억 초과=50%') && rowsText('inherit').includes('혼인출산) =1억 5,000만원'.replace(') =', ')=')) && rowsText('employ').includes('700 → 1,600 → 1,700만') && rowsText('startup').includes('청년 75%'), rowsText('inherit'))
     check('D-320 비상장주식 입력 목차가 가중치와 맞음(3년 전 1 · 2년 전 2 · 최근 3)', titles.includes('3년 전 사업연도(가중치 1)') && titles.includes('2년 전 사업연도(가중치 2)') && titles.includes('최근 사업연도') && !titles.includes('1년전'), titles)
   }
   check('세금: 2026 종합소득세 — 5천만 원', Math.round(incomeTax9(50000000)) === 6240000)
