@@ -5,7 +5,7 @@
  * 같은 출처라 바깥(이 화면)에서 블록 누르기만 듣는다 → 누른 블록이 왼쪽에서 열린다.
  * PC 는 1280 폭, 휴대폰은 390 폭으로 그리고 칸에 맞게 줄인다. 고칠 때마다 다시 그려도 보던 자리를 지킨다.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderSiteHtml, type SiteDoc } from '../../services/siteBuilder'
 
 export type Device = 'pc' | 'mobile'
@@ -37,26 +37,50 @@ export function SitePreview({ doc, device, selectedId, onSelect, height }: { doc
   const scale = boxWidth > 0 ? Math.min(1, boxWidth / w) : 1
   const innerHeight = Math.round(height / scale)
 
+  // 누르기는 늘 지금의 onSelect 로(처음 그릴 때 받은 옛 함수가 남지 않게)
+  const onSelectRef = useRef(onSelect)
+  onSelectRef.current = onSelect
+  const wired = useRef(new WeakSet<Document>())
+  // 블록 누르기 듣기 — 글이 다 그려지면(interactive) 바로. 예전에는 사진 · 글꼴까지 다 받은 뒤(load)에야 들어서,
+  // 사진이 늦게 오는 동안 블록을 눌러도 아무 일이 없었다(D-316)
+  const wire = useCallback(() => {
+    const d = frame.current?.contentDocument
+    if (!d || d.URL !== 'about:srcdoc' || d.readyState === 'loading') return false
+    if (wired.current.has(d)) return true
+    wired.current.add(d)
+    d.addEventListener('click', (e) => {
+      const el = (e.target as Element | null)?.closest?.('[data-block]')
+      const a = (e.target as Element | null)?.closest?.('a')
+      // 앵커(#) 는 미리보기 안에서 그대로 움직이게, 나머지 링크는 막는다
+      if (a && !(a.getAttribute('href') ?? '').startsWith('#')) e.preventDefault()
+      if (el) onSelectRef.current(el.getAttribute('data-block') ?? '')
+    })
+    return true
+  }, [])
+  useEffect(() => {
+    // 새 글로 다시 그리면 새 문서가 생긴다 — 그 문서가 그려질 때까지 잠깐씩 본다(최대 10초)
+    const before = frame.current?.contentDocument
+    let n = 0
+    const t = window.setInterval(() => {
+      if (++n > 200 || (frame.current?.contentDocument !== before && wire())) window.clearInterval(t)
+    }, 50)
+    return () => window.clearInterval(t)
+  }, [html, wire])
+
   const onLoad = useMemo(
     () => () => {
       const d = frame.current?.contentDocument
       const win = frame.current?.contentWindow
       if (!d || !win) return
+      wire()
       // 고른 블록이 바뀌었으면 그 블록으로, 아니면 보던 자리로
       const target = selectedId && selectedId !== lastSelected.current ? d.querySelector(`[data-block="${CSS.escape(selectedId)}"]`) : null
       if (target) (target as HTMLElement).scrollIntoView({ block: 'start' })
       else win.scrollTo(0, scrollY.current)
       lastSelected.current = selectedId
       win.addEventListener('scroll', () => (scrollY.current = win.scrollY), { passive: true })
-      d.addEventListener('click', (e) => {
-        const el = (e.target as Element | null)?.closest?.('[data-block]')
-        const a = (e.target as Element | null)?.closest?.('a')
-        // 앵커(#) 는 미리보기 안에서 그대로 움직이게, 나머지 링크는 막는다
-        if (a && !(a.getAttribute('href') ?? '').startsWith('#')) e.preventDefault()
-        if (el) onSelect(el.getAttribute('data-block') ?? '')
-      })
     },
-    [selectedId, onSelect],
+    [selectedId, wire],
   )
 
   return (
