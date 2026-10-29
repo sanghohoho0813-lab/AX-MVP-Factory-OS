@@ -193,7 +193,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await openCalc(page, '/tools/tax?client=cli_noreg&m=calc&c=t7&s=w1&preset=calc-t7-loan')
   await page.getByTestId('calc-preset-note').waitFor()
   const nr = await page.getByTestId('calc-preset-note').innerText()
-  check('주주명부 없는 업체 — "주주명부(주식 수)이(가) 없어 상황 값만" 안내 · 대여원금 10억은 들어감 · 주주 표는 계산기 예시(A)', nr.includes('주주명부(주식 수)이(가) 없어 상황 값만') && (await page.locator('#w1_principal').inputValue()) === '1,000,000,000' && (await rowsOf(page, 'w_share_rows'))[0][0] === 'A', nr)
+  check('주주명부 없는 업체 — "주주명부(주식 수)가 없어 상황 값만" 안내(D-335 조사 하나) · 대여원금 10억은 들어감 · 주주 표는 계산기 예시(A)', nr.includes('주주명부(주식 수)가 없어 상황 값만') && (await page.locator('#w1_principal').inputValue()) === '1,000,000,000' && (await rowsOf(page, 'w_share_rows'))[0][0] === 'A', nr)
 
   // 업체 없이 연 계산기 — 상황 단추 없음
   await openCalc(page, '/tools/tax?m=calc&c=t7')

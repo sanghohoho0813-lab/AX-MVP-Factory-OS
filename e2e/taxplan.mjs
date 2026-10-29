@@ -319,6 +319,8 @@ for (const width of [1440, 390, 360]) {
     await page.getByTestId('tax-basis').waitFor()
     await page.waitForTimeout(600)
     const focused = page.locator('[data-testid="tax-basis-section"][data-focus="1"]')
+    // 여럿이 함께 돌면 스크롤이 늦다 — 칸이 화면에 들어올 때까지(최대 5초)
+    await page.waitForFunction(() => { const el = document.querySelector('[data-testid="tax-basis-section"][data-focus="1"]'); if (!el) return false; const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }, null, { timeout: 5000 }).catch(() => {})
     const inView = await focused.evaluate((el) => { const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }).catch(() => false)
     check(`D-326 ${width} [감면율 기준표] → 기준표 창업감면 칸(강조 · 화면 안)`, page.url().includes('m=basis') && page.url().includes('s=startup') && (await focused.getAttribute('data-id')) === 'startup' && inView, page.url())
   }
