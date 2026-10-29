@@ -4280,3 +4280,22 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   → 단추를 기존 아래 줄('받으면 더 추천 · 요청 문구')에 넣어 회사 정보 위치 859px · 다시 돌려 녹색.
   (다시 돌리는 중 시험 기계가 한 번 재시작돼 남은 시험을 이어서 돌렸다 — 결과는 위 숫자.)
 - 스크린샷(눈으로 봄): 정책자금 카드 390 · 문구 창 390 · 맨 위 제안할 것 390 · 1440.
+
+## §226 안정화 게이트(main 전체 점검) · D-314 ~ D-325 — 1차 병합 (2026-10-29 · '다음 단계 고도화 및 안정화' · 6시간 이상 이어 하기)
+
+- **안정화 게이트**(main cd73662 를 따로 작업 폴더 · 빌드에서): tsc · oxlint · test:all 녹색 + e2e **55묶음 녹색 · 2묶음 빨강 · 5,769 통과**
+  (simple 88 · studio 63 · board 198 · todos 50 · sales 201 · journey 57 · easy 81 · steady 76 · flow 171 · real 188 · modules 894 · facts 24 · detail 426 · taxplan 72 ·
+  scenarios 69 · plan 63 · calcpreset 32 · siteai 13 · content 184 · calendar 21 · connect 45 · enroll 36 · planner 42 · contract 72 · grants 152 · money 41 · youtube 245 ·
+  matrix · modsafe · ownerai · phone · specboard · sideai 72 · vstudy 16 · certai 19 · wayfinding · ventureplan · specwrite · pvux · chat 64 · mkpack 68 · assist 92 ·
+  mobile 16 · squeeze(짜부라진 글자 0) · wording 5 · files 38 · folder 19 · radar 14 · session 14 · db · pilot 294 · isolation 24).
+  - 빨강 1 — qa:site 139/140: 휴대폰 미리보기에서 블록을 눌러도 고치기 화면으로 안 감. 원인: 미리보기가 사진 · 글꼴까지 다 받은 뒤에야 누르기를 들음 → **D-316** 고침 · 140/140.
+  - 빨강 2 — qa:pvmenu: 시험이 더보기 서랍 뒤에 가린 '특허 · 벤처' 링크(오늘 화면 본문)를 누르려다 멈춤 — 앱이 아니라 시험의 찾기 → 서랍 안에서 찾게 · 33/33.
+- **이번 병합에 들어간 것**: D-314 요청 문구 → 3일 뒤 할 일 · D-315 꾸미기 지키기 · D-316 미리보기 누르기 · D-317 법인세 2026 · 퇴직소득 그해 법 ·
+  D-318 창업감면 2026 표 · D-319 통합고용세액공제 2026 개편 · D-320 비상장주식 · 증여 조문대로 · D-321 계산 기준표 · D-322 '본점 옮기면' 창업한 곳 기준 ·
+  D-323 증여세 신고세액공제 3% · D-324 명부 인원 소수 둘째 자리 · D-325 창업벤처 50%.
+- **빠른 점검(HEAD)**: tsc · oxlint(오류 0) · build · test:all 녹색(mirae-os 915 · startup-tax 1,914,128 · employment 359 · scenarios 129 · taxplan 165 · facts 433 · cretop 골든 76) · qa:wording 5/5.
+- **고친 화면 e2e**: detail 438 · modules 894 · matrix 584 · flow 171 · phone 184 · connect 45 · scenarios 69 · enroll 38(D-319 2026 개편 줄) · plan 63(세액공제 개편 금액) ·
+  taxplan 87(D-321 기준표 1440 · 390 · 360 · 큰 글자 넘침 0 · D-323 증여 65,960,000원) · calcpreset 32 · site 140 · siteai 13 · pvmenu 33 · keepui 10 · tax-parity 62(고친 곳만 SKIP · 이름 · 까닭 적음).
+- 스크린샷(눈으로 봄): 창업감면 감면율 줄 390 · 1440(화성 청년 75% · 강화 일반 50%) · 인구감소지역 질문 390 · 퇴직소득세 '기준' 줄 390 · 비상장주식 목차 390 ·
+  계산 기준표 1440 · 390 · 360 · 명부 진단 2026 개편 줄 390(→ 소수 오차 · 거짓 경고 찾아 D-324) · 벤처 확인 입력 · 결과 390(→ 모순 경고 찾아 D-325 에서 고침).
+- 확인하지 못한 것: 대표 실제 계정 · 실제 업체 서류로 본 화면 · 2026년 통합고용세액공제 개편 단가의 법령 원문(세무 자료 여러 곳이 같은 표 — 화면에 ★ 세무사 확인).
