@@ -26,7 +26,7 @@ import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import { METRO_POP_DECLINE } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
-import { headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
+import { creditYears, headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 
@@ -262,7 +262,7 @@ const startupInsight: Provider = ({ record, today, facts }) => {
  * D-302 명부 날짜로 센 인원(서류 올리기 · 명부 화면이 붙임) → 통합고용세액공제. 단가는 볼 때마다 지금 업체 주소 · 중소기업 확인으로.
  * 작년보다 줄었으면 공제 없음 · 같으면 '1명 늘면' 힌트. 직원 300명 이상인데 중소기업 확인이 없으면 단가를 정하지 않는다.
  */
-export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: RosterHeadcount): { won: number; line: string; basis: string; assumptions: string[] } | null {
+export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: RosterHeadcount): { won: number; threeYear: number; line: string; basis: string; assumptions: string[] } | null {
   const sme = smeConfirmed(record)
   if (!sme && facts.employeeCount !== null && facts.employeeCount >= 300) return null
   const sido = placeOf(facts.address).sido
@@ -276,13 +276,15 @@ export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: Ro
     ...(region ? [] : ['주소를 몰라 수도권 단가(더 낮은 쪽)로 계산']),
   ]
   const won = estimate.creditTotal ?? 0
+  // D-330 2026년 개편 — 1년 차는 작고 2 · 3년 차가 크다. 인원을 유지할 때 3년 합계(개편표일 때만 · 예전 표는 3년 같은 금액이라 따로 안 적음)
+  const threeYear = units.table === 2026 && won > 0 ? creditYears(units, estimate.incYouth ?? 0, estimate.incNormal ?? 0).reduce((a, b) => a + b, 0) : 0
   // basis: 금액을 제목 · 금액 줄이 이미 말할 때 설명 칸에 쓸 '어떻게 셌나' 만
   const basis = `${p} → ${c} · 명부 날짜로 셈 · 세무사 확인`
-  if (won > 0) return { won, line: `통합고용세액공제 예상 약 ${manwonText(won)}(${basis})`, basis, assumptions }
-  if (hc.cur.total < hc.prev.total) return { won: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, basis, assumptions }
+  if (won > 0) return { won, threeYear, line: `통합고용세액공제 예상 ${threeYear ? `1년 차 약 ${manwonText(won)} · 3년 약 ${manwonText(threeYear)}` : `약 ${manwonText(won)}`}(${basis})`, basis, assumptions }
+  if (hc.cur.total < hc.prev.total) return { won: 0, threeYear: 0, line: `${c} — ${p}보다 적어 통합고용세액공제는 없어요 · 지난해 공제를 받았다면 추징 확인`, basis, assumptions }
   // D-319 2026년부터 늘어난 인원은 1 · 2 · 3년 차 단가가 다르다
   const per = units.table === 2026 ? `1년 차 약 ${manwonText(units.youth * 10_000)}(유지하면 2년 차 ${manwonText(units.schedule.youth[1] * 10_000)} · 3년 차 ${manwonText(units.schedule.youth[2] * 10_000)})` : `1년에 약 ${manwonText(units.youth * 10_000)}`
-  return { won: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 ${per} 덜 내요`, basis, assumptions }
+  return { won: 0, threeYear: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 ${per} 덜 내요`, basis, assumptions }
 }
 
 const employmentInsight: Provider = ({ record, facts }) => {
@@ -314,8 +316,11 @@ const employmentInsight: Provider = ({ record, facts }) => {
         : newHires > 0
           ? `최근 1년 새로 들어온 직원 ${newHires}명 — 전년 직원 수를 넣으면 통합고용세액공제도 계산해요`
           : ''
+  // D-330 개편표면 '1년 차 · 3년' 을 같이 — 1년 차만 보면 혜택이 작아 보였다
+  const three = typed > 0 ? 0 : (fromRoster?.threeYear ?? 0)
+  const creditText = three > 0 ? `세액공제 1년 차 약 ${manwonText(credit)} · 3년 약 ${manwonText(three)}` : `세액공제 약 ${manwonText(credit)}`
   const amount =
-    candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + 세액공제 약 ${manwonText(credit)}` : ''}` : credit > 0 ? `세액공제 약 ${manwonText(credit)}(1차 추정)` : undefined
+    candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + ${creditText}` : ''}` : credit > 0 ? `${creditText}(1차 추정)` : undefined
   const first = hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, '')
   return {
     amount,
