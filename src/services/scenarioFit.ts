@@ -16,7 +16,8 @@
  */
 import type { ClientOpsRecord, ShareholderRow } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { formatWon, usableFactValue } from './customerFacts'
+import { customFactValue, formatWon, usableFactValue } from './customerFacts'
+import { continuingOf } from './workRules'
 import { startupRegion } from './clientInsights'
 import { entityKindOf } from './clientOrder'
 import { latestEmploymentRoster } from './toolResultGroups'
@@ -362,9 +363,14 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
     case 'emp-flex':
       if (f.employeeCount === 0) return no('직원 0명')
       return byAnswer(c, 'flexWork', '유연근무 도입 계획 있음', '유연근무 도입 계획 없음')
-    case 'emp-retire-keep':
+    case 'emp-retire-keep': {
       if (f.employeeCount === 0) return no('직원 0명')
-      return byAnswer(c, 'retireKeep', '정년이 됐거나 곧 될 직원 있음', '정년 된 직원 없음', c.roster && c.roster.senior > 0 ? `명부에 만 60세 이상 ${c.roster.senior}명` : '')
+      // D-339 취업규칙의 정년 · 계속고용 제도(회사 정보 칸) — 질문 옆 · 맞음 근거에 같이
+      const rule = continuingOf(customFactValue(c.record, '정년 · 계속고용'))
+      const ruleWhy = rule === 'yes' ? '취업규칙에 계속고용 제도 있음' : rule === 'no' ? '취업규칙에 정년 뒤 재고용 조항 없음 — 넣고 1년 운영해야 받아요' : ''
+      const r = byAnswer(c, 'retireKeep', '정년이 됐거나 곧 될 직원 있음', '정년 된 직원 없음', [c.roster && c.roster.senior > 0 ? `명부에 만 60세 이상 ${c.roster.senior}명` : '', ruleWhy].filter(Boolean).join(' · '))
+      return r.kind === 'fit' && ruleWhy ? { ...r, why: `${r.why} · ${ruleWhy}` } : r
+    }
     case 'emp-shorter':
       if (f.employeeCount === 0) return no('직원 0명')
       return byAnswer(c, 'childcare', '육아휴직 · 육아 중인 직원 있음', '육아 중인 직원 없음')

@@ -486,6 +486,11 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   const yM = buildSituationPlan('hire-youth', normalizeClientOps({ ...full, id: 'ym337', businessAddress: '서울특별시 중구 세종대로 1' } as unknown as Partial<ClientOpsRecord>), today, 1)
   const subLines = (p: typeof yL) => p.blocks.find((b) => b.key === 'subsidy')?.lines ?? []
   check('D-337 비수도권 청년 채용 — 청년 본인 근속 인센티브 한 줄 · 수도권은 취업애로 줄만', subLines(yL).some((l) => l.includes('청년 본인도 6개월 넘게 다니면 2년간 480만 ~ 720만')) && !subLines(yM).some((l) => l.includes('청년 본인도')) && subLines(yM).some((l) => l.includes('취업애로')), [subLines(yL), subLines(yM)])
+  // D-339 정년 된 직원 계속 고용 — 취업규칙 칸(정년 · 계속고용)이 질문 옆 · 맞음 근거에
+  const ruleRec = normalizeClientOps({ ...full, id: 'rk339', customFields: [{ id: 'c1', group: 'people', label: '정년 · 계속고용', value: '정년 60세 · 정년 뒤 재고용 · 연장 조항 없음(취업규칙)' }] } as unknown as Partial<ClientOpsRecord>)
+  const askRun = runScenarios(ruleRec, today).find((x) => x.id === 'emp-retire-keep')!
+  const yesRun = runScenarios(withScenarioAnswer(ruleRec, 'retireKeep', 'yes', '2026-10-01T00:00:00.000Z'), today).find((x) => x.id === 'emp-retire-keep')!
+  check('D-339 정년 된 직원 계속 고용 — 취업규칙 재고용 조항 없음이 질문 옆 · 예 답이면 맞음 근거에', askRun.fit.kind === 'ask' && askRun.fit.why.includes('재고용 조항 없음') && yesRun.fit.kind === 'fit' && yesRun.fit.why.includes('넣고 1년 운영해야'), [askRun.fit, yesRun.fit])
   // D-334 정년 된 직원 계속 고용 — 계속고용장려금이 회사 지역 금액(비수도권 1,440만 · 수도권 1,080만)
   const keepL = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk1', businessAddress: '충청북도 청주시 흥덕구 1' } as unknown as Partial<ClientOpsRecord>), today)
   const keepM = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk2', businessAddress: '서울특별시 중구 세종대로 1' } as unknown as Partial<ClientOpsRecord>), today)
