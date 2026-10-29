@@ -6,6 +6,8 @@
  */
 import { CONV_DED9, CORP_RATES, GROSSUP_RATE, INC9_BRACKETS, S_RATE, SERVICE_DED9, defaultValues, calculatorOf, giftDeduction, inheritGiftTax } from './taxCalc'
 import { SME_2026, defaultTaxUnits } from '../tools/employment/lib/taxCredit'
+import { RATES_2026 } from '../tools/employment/lib/payroll'
+import { MIN_WAGE_2026 } from '../tools/employment/lib/constants'
 import { VENTURE_STARTUP_RATE, startupRates } from '../tools/startupTax/lib/rules'
 import { CATEGORY_RATES } from '../tools/labcare/lib/taxCredit'
 
@@ -111,13 +113,15 @@ export function lawBasis(): BasisSection[] {
       title: '4대보험(근로자 몫) · 근로소득 공제',
       basis: '2026년 요율',
       rows: [
-        { label: '국민연금', value: `${pctOf(S_RATE.natPension)} · 기준소득 월 ${man(S_RATE.natPensionCap)}원 상한` },
+        { label: '국민연금', value: `${pctOf(S_RATE.natPension)} · 기준소득 월 ${man(S_RATE.natPensionCap)}원 상한(2026년 7월부터 · 그 전 637만)` },
         { label: '건강보험', value: pctOf(S_RATE.health) },
         { label: '장기요양', value: `건강보험료의 ${pctOf(S_RATE.ltc)}` },
+        { label: '고용보험(근로자)', value: `${pctOf(RATES_2026.employEach)} · 사업주는 고용안정 ${pctOf(RATES_2026.employStabilityEr)} 더(150인 미만)` },
+        { label: '최저임금', value: `시간당 ${MIN_WAGE_2026.toLocaleString('ko-KR')}원(2026년)` },
         { label: '근로소득공제 한도', value: `${man(S_RATE.earnedCap)}원` },
         { label: '표준세액공제', value: `${man(S_RATE.stdCredit)}원` },
       ],
-      usedIn: '세금 계산기 01(대표이사 급여) · 절세 설계(월급 바꾸기)',
+      usedIn: '세금 계산기 01(대표이사 급여) · 절세 설계(월급 바꾸기) · 고용지원금 › 급여 계산기',
     },
     {
       id: 'inherit',

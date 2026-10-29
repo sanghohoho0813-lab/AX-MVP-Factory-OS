@@ -10,7 +10,7 @@ import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENA
 import { addMo, calcAgeDetailed, calcMilitaryLimit, fD, formatDday, getDdayFrom, parseJumin, toYMD, youthAgeAt, youthByYears } from '../lib/dates'
 import { fMan, fProgramAmt, fmtBizNo, fmtPhone, clampMoney, clampRate } from '../lib/format'
 import { buildAnswers, checkWage, diagnoseHiring, youthGate, type HiringAnswers } from '../lib/eligibility'
-import { basicIncomeTax, computePayroll, RATE_LABELS, RATES_2026 } from '../lib/payroll'
+import { basicIncomeTax, computePayroll, pensionBaseLimits, RATE_LABELS, RATES_2026 } from '../lib/payroll'
 import { buildRounds, roundDate, roundSchedule, sumReceived, sumRemaining } from '../lib/schedule'
 import {
   EMP_STAGES,
@@ -181,7 +181,9 @@ check('checkWage 0', checkWage(0, 40) === null)
 
 // ── computePayroll ──────────────────────────────────────
 // D-136: 2026 요율 (국민연금 4.75% · 상한 637만 · 하한 40만 · 건강 3.595% · 장기요양 13.14% · 고용안정 0.25%)
-check('computePayroll 2026 요율 한 묶음', RATES_2026.pensionEach === 0.0475 && RATES_2026.pensionBaseCap === 6370000 && RATES_2026.pensionBaseFloor === 400000 && RATES_2026.healthEach === 0.03595 && RATES_2026.careOfHealth === 0.1314 && RATES_2026.employEach === 0.009 && RATES_2026.employStabilityEr === 0.0025 && RATES_2026.injuryEr === 0.0143)
+// D-331 국민연금 기준소득월액 상한은 7월에 바뀐다 — 월 800만 대표: 2026-06 은 637만 × 4.75% = 302,575 · 2026-10 은 659만 × 4.75% = 313,025
+check('D-331 국민연금 상한 날짜로 — 6월 637만 · 7월부터 659만', computePayroll(8000000, 40, 1, '2026-06-30')!.pension_ee === 302575 && computePayroll(8000000, 40, 1, '2026-10-29')!.pension_ee === 313025 && pensionBaseLimits('2026-07-01').floor === 410000, JSON.stringify([computePayroll(8000000, 40, 1, '2026-06-30')?.pension_ee, computePayroll(8000000, 40, 1, '2026-10-29')?.pension_ee]))
+check('computePayroll 2026 요율 한 묶음', RATES_2026.pensionEach === 0.0475 && RATES_2026.pensionBaseCap === 6590000 && RATES_2026.pensionBaseFloor === 410000 && RATES_2026.healthEach === 0.03595 && RATES_2026.careOfHealth === 0.1314 && RATES_2026.employEach === 0.009 && RATES_2026.employStabilityEr === 0.0025 && RATES_2026.injuryEr === 0.0143)
 check('computePayroll 표시 글자도 같은 숫자', RATE_LABELS.pension === '4.75%' && RATE_LABELS.health === '3.595%' && RATE_LABELS.care === '건보×13.14%' && RATE_LABELS.injury.includes('★확인') && RATE_LABELS.note.includes('★') && RATE_LABELS.incomeTax.includes('근사치'), JSON.stringify(RATE_LABELS))
 check('computePayroll 300만/40h/부양1', (() => {
   const r = computePayroll(3000000, 40, 1)
@@ -226,13 +228,14 @@ check('computePayroll 소득세: 예전 식(연금·특별공제 빠짐)보다 �
   const r = computePayroll(3000000, 40, 1)
   return !!r && r.incomeTax > 0 && r.incomeTax < 131458
 })(), String(computePayroll(3000000, 40, 1)?.incomeTax))
-check('computePayroll 연금 상한 637만', (() => {
-  const r = computePayroll(8000000, 40, 1)
+check('computePayroll 연금 상한 637만(2026년 6월까지)', (() => {
+  const r = computePayroll(8000000, 40, 1, '2026-06-30')
   return !!r && r.pension_ee === Math.round(6370000 * 0.0475)
 })())
-check('computePayroll 연금 하한 40만', (() => {
-  const r = computePayroll(300000, 15, 1)
-  return !!r && r.pension_ee === Math.round(400000 * 0.0475)
+check('computePayroll 연금 하한 40만(2026년 6월까지) · 41만(7월부터)', (() => {
+  const r = computePayroll(300000, 15, 1, '2026-06-30')
+  const r2 = computePayroll(300000, 15, 1, '2026-10-29')
+  return !!r && r.pension_ee === Math.round(400000 * 0.0475) && !!r2 && r2.pension_ee === Math.round(410000 * 0.0475)
 })())
 check('computePayroll 저소득 → 소득세 0', (() => {
   const r = computePayroll(400000, 40, 1)

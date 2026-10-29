@@ -8,9 +8,10 @@
 
 import { BOSU_FLOOR_2026, MIN_WAGE_2026 } from './constants'
 import { monthlyHoursOf } from './eligibility'
+import { todayLocalDate } from '../../../lib/appClock'
 
 /* ── 2026 기준 — 고시 확인 필요 ────────────────────────────────────────
- * 국민연금: 보험료율 9.5%(근로자·사업주 각 4.75%, 2026년부터 — 연금개혁), 기준소득월액 상한 637만 · 하한 40만(2025.7~2026.6 적용분)
+ * 국민연금: 보험료율 9.5%(근로자·사업주 각 4.75%, 2026년부터 — 연금개혁), 기준소득월액 상한 · 하한은 해마다 7월 — 2026.7~ 659만 · 41만(그 전 637만 · 40만 · D-331 pensionBaseLimits)
  * 건강보험: 7.19%(근로자·사업주 각 3.595%)
  * 장기요양: 건강보험료 × 13.14%
  * 고용보험: 실업급여 근로자·사업주 각 0.9% + 사업주만 고용안정·직업능력개발 0.25%(150인 미만 기준)
@@ -19,8 +20,9 @@ import { monthlyHoursOf } from './eligibility'
 export const RATES_2026 = {
   label: '2026 기준 — 고시 확인 필요',
   pensionEach: 0.0475,
-  pensionBaseCap: 6370000,
-  pensionBaseFloor: 400000,
+  /** D-331 2026-07 부터(2027-06 까지) 659만 · 41만 — 그 전(2025-07 ~ 2026-06)은 637만 · 40만. 날짜로 고르는 것은 pensionBaseLimits */
+  pensionBaseCap: 6590000,
+  pensionBaseFloor: 410000,
   healthEach: 0.03595,
   careOfHealth: 0.1314,
   employEach: 0.009,
@@ -125,7 +127,15 @@ export function standardSpecialDeduction(annual: number): number {
   return 0
 }
 
-export function computePayroll(monthlyPay: number, weeklyHours: number, dependents: number): PayrollResult | null {
+/**
+ * D-331 국민연금 기준소득월액 상 · 하한 — 해마다 7월에 바뀐다(A값 변동률 반영).
+ *  2025-07 ~ 2026-06: 637만 · 40만 / 2026-07 ~ 2027-06: 659만 · 41만. 예전에는 637만 · 40만 하나라 7월 뒤 고소득 대표의 연금이 적게 나왔다.
+ */
+export function pensionBaseLimits(asOf: string): { cap: number; floor: number } {
+  return asOf >= '2026-07-01' ? { cap: RATES_2026.pensionBaseCap, floor: RATES_2026.pensionBaseFloor } : { cap: 6370000, floor: 400000 }
+}
+
+export function computePayroll(monthlyPay: number, weeklyHours: number, dependents: number, asOf: string = todayLocalDate()): PayrollResult | null {
   const raw = Number(monthlyPay)
   // 음수·글자는 0 으로 본다
   const monthly = Number.isFinite(raw) && raw > 0 ? raw : 0
@@ -135,7 +145,8 @@ export function computePayroll(monthlyPay: number, weeklyHours: number, dependen
   const hourlyWage = Math.floor(monthly / mh)
   const minMonthly = MIN_WAGE_2026 * mh
   // 4대보험 근로자 (원 단위 반올림 근사 ★ 실제 고지는 절사 규칙이 있다)
-  const pensionBase = Math.min(Math.max(monthly, R.pensionBaseFloor), R.pensionBaseCap)
+  const lim = pensionBaseLimits(asOf)
+  const pensionBase = Math.min(Math.max(monthly, lim.floor), lim.cap)
   const pension_ee = Math.round(pensionBase * R.pensionEach)
   const health_ee = Math.round(monthly * R.healthEach)
   const care_ee = Math.round(health_ee * R.careOfHealth)
