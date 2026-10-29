@@ -344,14 +344,25 @@ function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): Retur
   if (r.notice) return { state: 'partial', headline: r.notice, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
   // D-318 감면율 한 줄(창업 연도 · 권역 · 청년) — 판정기 화면 · 한 장 설계서와 같은 값
   const lines = [r.taxRate.line, ...r.keyReasons.slice(0, 2), ...r.alerts.slice(0, 1).map((a) => `★ ${a}`)]
-  // 옮기면 — 지금 권역 결론과 나란히
+  let headline = r.oneLineConclusion
+  // 옮기면 — 지금 권역 결론과 나란히.
+  // D-322 감면율은 창업일의 사업장 소재지로 정해진다 — 창업 뒤 과밀억제권역 밖으로 옮겨도 올라가지 않을 가능성이 크다.
+  //       예전에는 옮긴 곳에서 처음 창업한 것처럼 '감면 가능성 높음 · 100%' 로 보여 옮기면 감면이 커지는 듯했다.
   if (s.id === 'startup-move') {
     const now = judge(startupFormOf(facts, { startupForm: s.startup?.startupForm }), date)
-    if (!now.notice) lines.unshift(`지금 권역: ${now.oneLineConclusion}`)
+    if (!now.notice) {
+      headline = `옮겨도 감면율은 그대로일 가능성이 커요 — ${now.taxRate.line.replace(/ — .*$/, '')}(창업한 곳 기준)`
+      lines.splice(0, lines.length,
+        `지금 권역: ${now.oneLineConclusion}`,
+        `지금(창업한 곳): ${now.taxRate.line}`,
+        `처음부터 수도권 밖에서 창업했다면: ${r.taxRate.line}`,
+        '★ 감면율은 창업일의 사업장 소재지로 정해져요 — 옮긴 뒤 올라가는지는 세무사 확인(과밀억제권역 안으로 옮기면 줄거나 끊길 수 있음)',
+      )
+    }
   }
   return {
     state: needs.every((n) => n.ok) ? 'ready' : 'partial',
-    headline: r.oneLineConclusion,
+    headline,
     lines,
     amount: '',
     needs,

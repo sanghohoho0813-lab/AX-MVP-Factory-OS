@@ -127,7 +127,7 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   // 창업감면 3 — 판정기(같은 엔진)
   p({ id: 'startup-new', module: 'startup-tax', title: '새로 창업한 경우 — 지금 감면 판정', when: '신규 창업(이어받지 않음) — 이 회사 숫자 그대로', startup: { startupForm: 'brand_new' } }),
   p({ id: 'startup-convert', module: 'startup-tax', title: '개인사업자 → 법인전환한 경우', when: '법인으로 바꿨을 때 — 감면 기간이 이어지는지', startup: { startupForm: 'conversion' } }),
-  p({ id: 'startup-move', module: 'startup-tax', title: '본점을 과밀억제권역 밖으로 옮기면', when: '수도권 과밀억제권역 안 업체 — 이전하면 감면율이 바뀌는지', startup: { startupForm: 'brand_new', region: 'other_local', overconcentration: 'no' } }),
+  p({ id: 'startup-move', module: 'startup-tax', title: '본점을 과밀억제권역 밖으로 옮기면', when: '수도권 과밀억제권역 안 업체 — 옮기면 감면율이 바뀌는지(감면율은 창업한 곳 기준)', startup: { startupForm: 'brand_new', region: 'other_local', overconcentration: 'no' } }),
   // NX-4 감면이 안 될 수 있는 창업 형태 — 미리 알려 주는 것이 상담
   p({ id: 'startup-acquire', module: 'startup-tax', title: '남의 사업을 넘겨받아(양수) 시작했으면', when: '기존 사업장 · 설비를 인수해 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'acquisition' } }),
   p({ id: 'startup-reopen', module: 'startup-tax', title: '같은 업종으로 다시 창업했으면', when: '예전에 같은 업종 사업을 접고 다시 시작했을 때 — 창업으로 보는지', startup: { startupForm: 'reopen_same' } }),

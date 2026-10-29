@@ -93,6 +93,8 @@ const mv = r('startup-move')
 // D-244: 업태 '제조업' 은 종목 글('정밀기계 부품')이 있어도 업종으로 읽는다 — 아는 말이 하나도 없을 때만 ✗
 const mvUnknown = runScenario(scenarioPreset('startup-move')!, normalizeClientOps({ ...full, id: 'mvu', businessCategory: '기타', businessItem: '정밀기계 부품' } as unknown as Partial<ClientOpsRecord>), today)
 check('S9 본점 옮기면 — 지금 권역 결론과 나란히 · 업태로 업종 ✓ · 아는 업종 말이 없으면 ✗ 로 남김(짐작 안 함)', mv.lines[0]?.startsWith('지금 권역') && mv.needs.some((n) => n.label === '업종' && n.ok) && mvUnknown.needs.some((n) => n.label === '업종' && !n.ok), { mv: mv.needs, mvUnknown: mvUnknown.needs })
+// D-322 감면율은 창업한 곳 기준 — 옮겨도 올라간다고 말하지 않는다(처음부터 밖이었다면은 따로 한 줄)
+check('D-322 본점 옮기면 — "옮겨도 감면율은 그대로일 가능성" · 지금(창업한 곳) 감면율 · 처음부터 밖이었다면 · 세무사 확인', mv.headline.startsWith('옮겨도 감면율은 그대로일 가능성이 커요') && mv.lines.some((l) => l.startsWith('지금(창업한 곳): 감면율')) && mv.lines.some((l) => l.startsWith('처음부터 수도권 밖에서 창업했다면: 감면율')) && mv.lines.some((l) => l.includes('창업일의 사업장 소재지')), { h: mv.headline, l: mv.lines })
 check('S10 업체 기록에서 채운 값은 따로 알림(자산 · 순이익) · 업체 기록 자체는 바꾸지 않음', cash.filledFrom.some((f) => f.includes('자산')) && !('vAsset' in (full.taxProfile ?? {})), cash.filledFrom)
 
 // S11 빈 업체 — 짐작하지 않는다

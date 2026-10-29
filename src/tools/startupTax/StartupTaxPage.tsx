@@ -122,7 +122,7 @@ function StartupTaxScreen() {
   const presetId = params.get('preset')
   const presetDone = useRef(false)
   // D-211: 넣은 가정(창업 형태 · 옮길 권역)만 칩으로 · [가정 빼기]는 그 칸만 넣기 전 값으로(업체 주소로 채운 권역은 가정이 아니다)
-  const [presetUsed, setPresetUsed] = useState<{ title: string; applied: Partial<StartupTaxForm>; before: Partial<StartupTaxForm>; chips: { field: string; text: string }[]; cleared: boolean } | null>(null)
+  const [presetUsed, setPresetUsed] = useState<{ id: string; title: string; applied: Partial<StartupTaxForm>; before: Partial<StartupTaxForm>; chips: { field: string; text: string }[]; cleared: boolean } | null>(null)
   useEffect(() => {
     if (presetDone.current || !presetId || (clientId && !clientRecord)) return
     presetDone.current = true
@@ -136,7 +136,7 @@ function StartupTaxScreen() {
     setForm((f) => ({ ...f, ...(f.region ? {} : filledRegion), ...applied }))
     setSubmitted(true)
     markStartupTaxJudged(clientId, true)
-    setPresetUsed({ title: preset.title, applied, before, chips: presetAssumptions(preset), cleared: false })
+    setPresetUsed({ id: preset.id, title: preset.title, applied, before, chips: presetAssumptions(preset), cleared: false })
     const next = new URLSearchParams(params)
     next.delete('preset')
     setParams(next, { replace: true })
@@ -176,7 +176,14 @@ function StartupTaxScreen() {
             setForm((f) => withoutPresetFields(f, presetUsed.applied, presetUsed.before))
             setPresetUsed({ ...presetUsed, cleared: true })
           }}
-        />
+        >
+          {/* D-322 감면율은 창업일의 사업장 소재지로 정해진다 — 이 판정은 '처음부터 옮긴 곳에서 창업했다면' */}
+          {presetUsed.id === 'startup-move' && (
+            <p className="t-meta break-keep text-amber-800" data-testid="startup-move-note">
+              ★ 감면율은 창업일의 사업장 소재지로 정해져요 — 아래 결과는 '처음부터 옮긴 곳에서 창업했다면' 이에요. 창업 뒤 옮겨서 감면율이 올라가는지는 세무사 확인.
+            </p>
+          )}
+        </PresetNote>
       )}
       {/* MOD-1 상황 예시 — 판정 전 · 예시를 안 넣었을 때만(누르면 고른 업체 숫자로 바로 판정) */}
       {!presetUsed && !submitted && <ModulePresets module="startup-tax" />}
