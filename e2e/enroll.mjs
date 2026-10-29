@@ -63,6 +63,30 @@ for (const vp of [
   const panel = await page.getByTestId('youth-enroll').innerText().catch(() => '')
   check(`${vp.tag} 명부: 참여신청 기한 칸에 기한 안 2명`, panel.includes('참여신청 기한 2명') && panel.includes('최근청년') && panel.includes('급한청년'), panel.slice(0, 200))
   check(`${vp.tag} 명부: 3년 전 입사자는 기한 칸에 없음`, !panel.includes('오래된청년'))
+  // D-334 지원금 합계가 사업장 소재지 금액으로(고령자 계속고용 수도권 1,080만 → 비수도권 1,440만) · 지원금 기준표 바로 가기
+  const subsidyMan = async () => Number((/최대 ([\d,]+)만원/.exec(await page.getByTestId('roster-subsidy-line').innerText().catch(() => '')) ?? [])[1]?.replace(/,/g, '') ?? NaN)
+  const before = await subsidyMan()
+  const noteBefore = await page.getByTestId('subsidy-basis').locator('xpath=..').innerText().catch(() => '')
+  await page.getByRole('button', { name: '그 외(비수도권)' }).click()
+  await page.waitForTimeout(400)
+  const after = await subsidyMan()
+  const noteAfter = await page.getByTestId('subsidy-basis').locator('xpath=..').innerText().catch(() => '')
+  check(`${vp.tag} D-334 소재지 모름 → 수도권 금액 · '그 외(비수도권)' 고르면 고령 1명 +360만(1,080 → 1,440)`, before > 0 && after - before === 360 && noteBefore.includes('소재지를 고르면 지역 금액') && noteAfter.includes('비수도권 금액'), `${before} → ${after} · ${noteAfter.slice(0, 80)}`)
+  await page.getByTestId('subsidy-basis').click()
+  await page.waitForURL(/m=basis&s=subsidy/, { timeout: 5000 }).catch(() => {})
+  await page.waitForTimeout(500)
+  const focused = await page.locator('[data-testid="tax-basis-section"][data-focus="1"]').getAttribute('data-id').catch(() => '')
+  const subTxt = await page.locator('[data-testid="tax-basis-section"][data-id="subsidy"]').innerText().catch(() => '')
+  check(`${vp.tag} D-334 [지원금 기준표] → 계산 기준표 고용지원금 칸(수도권 월 30만 · 비수도권 월 40만 · 최대 3년)`, focused === 'subsidy' && subTxt.includes('비수도권 월 40만') && subTxt.includes('최대 3년'), `${focused} ${subTxt.slice(0, 120)}`)
+  check(`${vp.tag} D-334 기준표 가로 넘침 없음`, (await overflow()) <= 0)
+  if (vp.tag === '1440') await page.locator('[data-testid="tax-basis-section"][data-id="subsidy"]').screenshot({ path: '/tmp/claude-0/shot334-basis.png' }).catch(() => {})
+  else await page.screenshot({ path: '/tmp/claude-0/shot334-basis-360.png' }).catch(() => {})
+  await page.goBack({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  if (!(await page.getByTestId('youth-enroll').count())) {
+    await page.getByLabel('명부 파일').setInputFiles(CSV)
+    await page.waitForTimeout(1500)
+  }
   check(`${vp.tag} 명부: 가로 넘침 없음`, (await overflow()) <= 0)
 
   // D-302 명부 날짜로 작년 · 올해 매월 말 인원 → 네 칸이 저절로 · 세액공제 예상이 바로

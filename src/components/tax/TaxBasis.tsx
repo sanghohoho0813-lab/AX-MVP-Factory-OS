@@ -20,7 +20,8 @@ export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string
   return (
     <section className="flex flex-col gap-4" data-testid="tax-basis" aria-labelledby="tax-basis-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* 좁은 화면 · 큰 글자에서는 [계산기로] 를 아래 줄로 — 제목 · 다음 점검 글이 짜부라지지 않게 */}
+        <div className="min-w-0 flex-1 basis-64">
           <h2 id="tax-basis-title" className="t-card flex items-center gap-2 font-bold text-slate-900">
             <BookOpen aria-hidden="true" className="size-5 shrink-0 text-brand-700" /> 계산 기준표 — {status.year}년
           </h2>
@@ -61,7 +62,7 @@ export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string
               <dl className="mt-3 divide-y divide-slate-100">
                 {rows.map((r) => (
                   <div key={r.label} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                    <dt className="t-sub min-w-0 break-keep text-slate-600">{r.label}</dt>
+                    <dt className="t-sub min-w-0 break-keep text-slate-600 sm:max-w-[45%] sm:shrink-0">{r.label}</dt>
                     <dd className="t-sub min-w-0 break-keep font-semibold text-slate-900 sm:text-right">{r.value}</dd>
                   </div>
                 ))}

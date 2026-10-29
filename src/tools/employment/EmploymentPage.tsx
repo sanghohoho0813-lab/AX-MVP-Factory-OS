@@ -858,7 +858,7 @@ function RosterTab() {
                 {meta?.workplace && <Badge>{meta.workplace}</Badge>}
                 {staleText && <Badge tone={stale?.level === 'high' ? 'danger' : 'warning'}>발급 {staleText}</Badge>}
               </div>
-              <p className="t-card font-bold break-keep text-slate-900">
+              <p className="t-card font-bold break-keep text-slate-900" data-testid="roster-subsidy-line">
                 {analysis.counts.totalEmp}명 중 청년 추정 {analysis.counts.youthCount}명 · 고령 {analysis.counts.seniorCount}명 · 조건 충족 시 최대 {formatWon(estimateSubsidyTotal(analysis.subsidySummary, subsidyRegion))} 검토 가능성
               </p>
               <p className="t-meta break-keep text-amber-700">
