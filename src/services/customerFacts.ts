@@ -251,6 +251,23 @@ export const CUSTOM_FACT_PREFIX = 'cf:'
 export function isCustomFactKey(key: string): boolean {
   return key.startsWith(CUSTOM_FACT_PREFIX)
 }
+/**
+ * D-338 직접 만든 칸 값 전부 — ['cf:<이름>', 값].
+ * 서류에서 받아 넣은 칸(인증서 · 매출 추이 …)은 회사 정보 칸(customFields)에 저장된다. 예전 기록 · 시험은 factValues 의 'cf:' 에 있을 수 있어 둘 다 본다.
+ * (예전에는 factValues 만 읽어 — 올린 인증서 · 매출 추이가 정책자금 가점 · 성장세 · 창업벤처 판정에서 빠졌다)
+ */
+export function customFactEntries(record: ClientOpsRecord): [string, string][] {
+  const out = new Map<string, string>()
+  for (const f of record.customFields ?? []) if (f.label.trim() && f.value.trim()) out.set(`${CUSTOM_FACT_PREFIX}${f.label.trim()}`, f.value.trim())
+  for (const [k, v] of Object.entries(record.factValues ?? {})) if (k.startsWith(CUSTOM_FACT_PREFIX) && String(v).trim() && !out.has(k)) out.set(k, String(v).trim())
+  return [...out]
+}
+/** 이름(앞부분이 같으면 — '매출 추이' · '벤처기업 확인서')으로 직접 만든 칸 값 하나 */
+export function customFactValue(record: ClientOpsRecord, name: string): string {
+  const want = name.replace(/\s/g, '')
+  return customFactEntries(record).find(([k]) => k.slice(CUSTOM_FACT_PREFIX.length).replace(/\s/g, '').startsWith(want))?.[1] ?? ''
+}
+
 function customFieldOf(record: ClientOpsRecord, label: string) {
   // '이노비즈' 와 '이노비즈 확인서' 는 같은 칸 — 서류 읽기 · 기업인증 진행 기록이 같은 인증으로 칸을 두 개 만들지 않게
   const norm = (v: string) => v.replace(/\s/g, '').replace(/(확인서|인증서|인정서)$/, '')

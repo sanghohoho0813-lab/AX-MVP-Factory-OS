@@ -38,7 +38,7 @@ import {
   factNoteFor,
   withProfileFieldEdit,
 } from '../customerFacts'
-import { clientFacts } from '../../tools/shared/clientPrefill'
+import { clientFacts, ventureConfirmedAt, ventureValidOn } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
@@ -1554,6 +1554,33 @@ await (async () => {
   const ev = policyEvidence(rec, clientFacts(rec, new Date(`${T}T00:00:00`)), T)
   check('D-333 정책자금 근거 — 매출 추이 증가 → 3년 추세 증가 · 앞줄 "매출 증가(…)"', ev.input.revenueTrend3y === '증가' && ev.notes[0]?.startsWith('매출 증가('), JSON.stringify({ i: ev.input.revenueTrend3y, n: ev.notes.slice(0, 2) }))
 }
+
+// D-338 진짜 저장 경로 — 서류를 올리면 인증서 · 매출 추이는 회사 정보 칸(customFields)에. 정책자금 가점 · 성장세 · 창업벤처가 그 칸을 읽는다
+//        (예전 시험은 factValues 에 직접 넣어 통과했고, 실제로 올린 서류는 가점 · 성장세에서 빠졌다)
+await (async () => {
+  const T = '2026-10-28'
+  const vat = [
+    '부가가치세 과세표준증명', '상호(법인명) 저장테크(주) 사업자등록번호 123-45-67890', '과세기간 신고구분 신고일 과세표준 납부할세액',
+    '2024.01.01~2024.06.30 확정 2024.07.25 100,000,000 5,000,000', '2024.07.01~2024.12.31 확정 2025.01.24 140,000,000 7,000,000',
+    '2025.01.01~2025.06.30 확정 2025.07.25 130,000,000 6,500,000', '2025.07.01~2025.12.31 확정 2026.01.25 154,000,000 7,700,000',
+    '2026.01.01~2026.06.30 확정 2026.07.25 156,000,000 7,800,000',
+  ].join('\n')
+  const ven = ['벤처기업확인서', '확인번호 : 20240501-01', '기업명 : 저장테크(주)', '유효기간 : 2024.05.01 ~ 2027.04.30', '벤처기업확인기관장'].join('\n')
+  let n = 0
+  const ctx = { now: NOW, today: T, makeId: () => `v${++n}` }
+  const base = normalizeClientOps({ id: 'st338', companyName: '저장테크(주)', businessCategory: '제조업', businessItem: '금속 가공', businessAddress: '충청북도 청주시 흥덕구 1', establishedAt: '2022-03-02', employeeCount: '12', createdAt: NOW, updatedAt: NOW })
+  const out = await analyzeUploadedDocs(base, [
+    { key: 'customdoc_vat', fileName: '부가세과세표준증명.pdf', text: vat, method: 'pdf_text' as const, docSure: true },
+    { key: 'customdoc_ven', fileName: '벤처기업확인서.pdf', text: ven, method: 'pdf_text' as const, docSure: true },
+  ], ctx)
+  const r = out.record
+  const labels = r.customFields.map((f) => f.label)
+  check('D-338 올린 서류 → 회사 정보 칸(매출 추이 · 벤처기업) · factValues 의 cf: 에는 없음', labels.some((l) => l.includes('매출 추이')) && labels.some((l) => l.includes('벤처기업')) && !Object.keys(r.factValues ?? {}).some((k) => k.startsWith('cf:')), JSON.stringify({ labels, fv: Object.keys(r.factValues ?? {}) }))
+  check('D-338 정책자금 가점에 벤처기업(칸에서 읽음)', policyBonus(r, T).items.includes('벤처기업'), JSON.stringify(policyBonus(r, T)))
+  const ev = policyEvidence(r, clientFacts(r, new Date(`${T}T00:00:00`)), T)
+  check('D-338 정책자금 매출 성장세(칸의 매출 추이) → 3년 추세 증가', ev.input.revenueTrend3y === '증가' && ev.notes.some((x) => x.startsWith('매출 증가(')), JSON.stringify({ i: ev.input.revenueTrend3y, n: ev.notes.slice(0, 3) }))
+  check('D-338 창업벤처 · 연구소 — 벤처 확인일 · 유효(칸에서 읽음)', ventureConfirmedAt(r) !== '' && ventureValidOn(r, T), `${ventureConfirmedAt(r)} ${ventureValidOn(r, T)}`)
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

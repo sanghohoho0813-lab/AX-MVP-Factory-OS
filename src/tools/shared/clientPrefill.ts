@@ -15,7 +15,7 @@
 
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
-import { readFact, usableFactValue, wonOf } from '../../services/customerFacts'
+import { customFactEntries, readFact, usableFactValue, wonOf } from '../../services/customerFacts'
 import { entityKindOf } from '../../services/clientOrder'
 
 /**
@@ -150,24 +150,25 @@ export interface ClientFacts {
 const UNTIL = /(\d{4}-\d{2}-\d{2})\s*까지/
 /** D-329 중소기업 확인서(cf:중소기업 확인 · 회사 정보 '중소기업 확인' 칸)의 규모 — 기한 지난 것은 빼고, 소상공인 · 소기업은 '소기업' */
 export function smeSizeOf(record: ClientOpsRecord, today: string): '소기업' | '중기업' | '' {
-  const values = [
-    ...Object.entries(record.factValues ?? {}).filter(([k]) => /^cf:중소기업\s*확인/.test(k)).map(([, v]) => String(v)),
-    ...(record.customFields ?? []).filter((f) => /중소기업\s*확인/.test(f.label)).map((f) => f.value),
-  ].filter((v) => !((UNTIL.exec(v)?.[1] ?? '9999') < today))
+  const values = customFactEntries(record)
+    .filter(([k]) => /^cf:중소기업\s*확인/.test(k))
+    .map(([, v]) => v)
+    .filter((v) => !((UNTIL.exec(v)?.[1] ?? '9999') < today))
   if (values.some((v) => /중기업/.test(v))) return '중기업'
   if (values.some((v) => /소기업|소상공인/.test(v))) return '소기업'
   return ''
 }
 /** D-329 지금 유효한 벤처기업확인서(cf:벤처기업 …)가 있는지 */
 export function ventureValidOn(record: ClientOpsRecord, today: string): boolean {
-  return Object.entries(record.factValues ?? {}).some(([k, v]) => /^cf:벤처기업/.test(k) && !((UNTIL.exec(String(v))?.[1] ?? '9999') < today))
+  return customFactEntries(record).some(([k, v]) => /^cf:벤처기업/.test(k) && !((UNTIL.exec(v)?.[1] ?? '9999') < today))
 }
 
 /** D-325 올린 벤처기업확인서(cf:벤처기업 …)의 '확인일' 중 가장 이른 날 — 처음 확인받은 날이 창업 3년 안인지 본다 */
 export function ventureConfirmedAt(record: ClientOpsRecord): string {
-  const dates = Object.entries(record.factValues ?? {})
+  // D-338 올린 확인서는 회사 정보 칸에 — 칸 · 예전 기록 둘 다
+  const dates = customFactEntries(record)
     .filter(([k]) => /^cf:벤처기업/.test(k))
-    .map(([, v]) => /확인일\s*(\d{4}-\d{2}-\d{2})/.exec(String(v))?.[1] ?? '')
+    .map(([, v]) => /확인일\s*(\d{4}-\d{2}-\d{2})/.exec(v)?.[1] ?? '')
     .filter(Boolean)
     .sort()
   return dates[0] ?? ''

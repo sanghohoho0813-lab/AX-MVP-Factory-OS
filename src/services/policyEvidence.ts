@@ -21,7 +21,7 @@ import type { ClientFacts } from '../tools/shared/clientPrefill'
 import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
-import { CUSTOM_FACT_PREFIX, usableFactValue } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
 import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
@@ -107,7 +107,7 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
     front.push(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
   }
   // D-333 매출 추이(부가세 과세표준증명 → 회사 정보 '매출 추이') → 3년 추세 · 올해 추세 — 엔진의 '매출 성장세'
-  const trendLine = String(record.factValues?.[`${CUSTOM_FACT_PREFIX}매출 추이`] ?? '').trim()
+  const trendLine = customFactValue(record, '매출 추이')
   if (trendLine) {
     const t = vatTrendOf(trendLine)
     if (t.trend3y && !input.revenueTrend3y) input.revenueTrend3y = t.trend3y
@@ -236,9 +236,8 @@ export function policyBonus(record: ClientOpsRecord, today: string): { items: Bo
     patents: usableFactValue(record, 'patents'),
     lab: usableFactValue(record, 'researchLab'),
   }
-  const certs = Object.entries(record.factValues ?? {})
-    .filter(([k, v]) => k.startsWith(CUSTOM_FACT_PREFIX) && String(v).trim() !== '')
-    .map(([k, v]) => ({ name: k.slice(CUSTOM_FACT_PREFIX.length).trim(), value: String(v) }))
+  // D-338 올린 인증서는 회사 정보 칸에 — 칸 · 예전 기록 둘 다
+  const certs = customFactEntries(record).map(([k, v]) => ({ name: k.slice(CUSTOM_FACT_PREFIX.length).trim(), value: v }))
   const items: BonusItem[] = []
   const expired: string[] = []
   for (const r of BONUS_RULES) {
