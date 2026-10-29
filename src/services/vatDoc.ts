@@ -182,3 +182,15 @@ export function vatSummary(read: VatRead, fmt: (won: number) => string): string 
   if (!late) return head
   return `${head} · ${late.year}년 ${late.months}개월 ${fmt(late.total)}${same && same.prev > 0 ? `(작년 같은 기간보다 ${pct(same.cur, same.prev)})` : ''}`
 }
+
+/**
+ * D-333 매출 추이(부가세 과세표준증명 요약 줄) → 정책자금 엔진의 3년 추세 · 올해 추세.
+ * '…(부가세 과세표준 · 2024년보다 +20%) · 2026년 6개월 …(작년 같은 기간보다 +17%)' 에서 숫자만 읽는다. ±3% 안은 유지 · 비슷.
+ */
+export function vatTrendOf(summary: string): { trend3y: '증가' | '유지' | '감소' | null; thisYear: '전년보다 증가' | '비슷' | '감소' | null } {
+  const y = /\d{4}년보다 ([+-]?\d+)%/.exec(summary)?.[1]
+  const t = /작년 같은 기간보다 ([+-]?\d+)%/.exec(summary)?.[1]
+  const band3 = (v: string | undefined) => (v === undefined ? null : Number(v) >= 3 ? ('증가' as const) : Number(v) <= -3 ? ('감소' as const) : ('유지' as const))
+  const bandT = (v: string | undefined) => (v === undefined ? null : Number(v) >= 3 ? ('전년보다 증가' as const) : Number(v) <= -3 ? ('감소' as const) : ('비슷' as const))
+  return { trend3y: band3(y), thisYear: bandT(t) }
+}

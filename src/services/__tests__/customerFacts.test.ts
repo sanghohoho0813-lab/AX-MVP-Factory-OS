@@ -40,7 +40,7 @@ import {
 } from '../customerFacts'
 import { clientFacts } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
-import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary } from '../vatDoc'
+import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
 import { requestFollowUpText } from '../recoRequest'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
@@ -1510,6 +1510,28 @@ await (async () => {
   const svc = '1. 사업자등록증 (기존 서류는 유효기간이 지나 새 발급본이 필요합니다)\n   - 홈택스\n2. 법인등기부등본\n   - 인터넷등기소'
   check('D-314 서류 요청 문구(유효기간 꼬리) → 이름만', requestFollowUpText(svc) === '자료 받았는지 확인 — 사업자등록증 · 법인등기부등본')
   check('D-314 받을 것이 없는 문구 → 빈 글(단추 없음)', requestFollowUpText('안녕하세요, 대표님. 현재 추가로 받을 서류는 없습니다.') === '')
+}
+
+/* ---- D-333 부가세 과세표준증명 → 회사 정보 '매출 추이' → 정책자금 매출 성장세 ---- */
+{
+  const T = '2026-10-28'
+  const vatText = [
+    '부가가치세 과세표준증명',
+    '상호(법인명) 미래상사 사업자등록번호 123-45-67890',
+    '과세기간 신고구분 신고일 과세표준 납부할세액',
+    '2024.01.01~2024.06.30 확정 2024.07.25 100,000,000 5,000,000',
+    '2024.07.01~2024.12.31 확정 2025.01.24 140,000,000 7,000,000',
+    '2025.01.01~2025.06.30 확정 2025.07.25 130,000,000 6,500,000',
+    '2025.07.01~2025.12.31 확정 2026.01.25 154,000,000 7,700,000',
+    '2026.01.01~2026.06.30 확정 2026.07.25 156,000,000 7,800,000',
+  ].join('\n')
+  const found = factCandidatesFromDocText('vatCertificate' as never, vatText, 'doc:t')
+  const trend = found.find((c) => c.key === 'cf:매출 추이')
+  check('D-333 부가세 증명(2년 다 참) → 매출 + 회사 정보 매출 추이 한 줄(2024년보다 +18% · 작년 같은 기간 +20%)', !!trend && trend.value.includes('2025년') && trend.value.includes('2024년보다 +18%') && trend.value.includes('작년 같은 기간보다 +20%') && found.some((c) => c.key === 'revenue' && c.value === '284000000'), JSON.stringify(found.map((c) => `${c.key}=${c.value}`)))
+  check('D-333 매출 추이 줄 → 3년 추세 증가 · 작년 같은 기간 비슷/감소 읽기', vatTrendOf('2025년 12억(부가세 과세표준 · 2024년보다 +20%)').trend3y === '증가' && vatTrendOf('… · 2026년 6개월 5억(작년 같은 기간보다 -2%)').thisYear === '비슷' && vatTrendOf('2025년 10억(부가세 과세표준 · 2024년보다 -8%)').trend3y === '감소')
+  const rec = normalizeClientOps({ id: 'pe333', companyName: '증명테크(주)', businessCategory: '제조업', businessItem: '금속 가공', businessAddress: '충청북도 청주시 흥덕구 1', establishedAt: '2018-03-02', employeeCount: '12', factValues: { 'cf:매출 추이': trend?.value ?? '' }, createdAt: NOW, updatedAt: NOW } as never)
+  const ev = policyEvidence(rec, clientFacts(rec, new Date(`${T}T00:00:00`)), T)
+  check('D-333 정책자금 근거 — 매출 추이 증가 → 3년 추세 증가 · 앞줄 "매출 증가(…)"', ev.input.revenueTrend3y === '증가' && ev.notes[0]?.startsWith('매출 증가('), JSON.stringify({ i: ev.input.revenueTrend3y, n: ev.notes.slice(0, 2) }))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

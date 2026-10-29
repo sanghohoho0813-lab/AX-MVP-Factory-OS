@@ -287,7 +287,7 @@ for (const width of [360, 390, 430]) {
   const hcd = empTr?.data?.headcount
   check('D-302 명부: 작년 · 올해 매월 말 인원이 결과에 붙음(고용보험 없는 1명 뺌 · 지금 직원만 있는 명부)', !!hcd && hcd.counted === 1 && hcd.excluded.noEi === 1 && hcd.basis === 'current' && hcd.cur.total > hcd.prev.total, JSON.stringify(hcd))
   const empCard = (await page.locator('[data-testid="smart-insight"][data-key="employment"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
-  check('D-302 맞춤 추천 고용지원금: 세액공제 금액 · 명부 날짜로 셈 · 작년 퇴사자 주의', /세액공제 약 [\d,.]+(만원|억원)/.test(empCard) && empCard.includes('명부 날짜로 셈') && empCard.includes('작년에 그만둔 사람'), empCard.slice(0, 400))
+  check('D-302 · D-330 맞춤 추천 고용지원금: 세액공제 금액(2026 개편이면 1년 차 · 3년) · 명부 날짜로 셈 · 작년 퇴사자 주의', /세액공제 (1년 차 )?약 [\d,.]+(만원|억원)/.test(empCard) && empCard.includes('명부 날짜로 셈') && empCard.includes('작년에 그만둔 사람'), empCard.slice(0, 400))
   check('다음 행동 추천이 있다', (await page.getByTestId('smart-step').count()) >= 1)
   await page.getByTestId('smart-step-next').first().click()
   await page.waitForTimeout(600)

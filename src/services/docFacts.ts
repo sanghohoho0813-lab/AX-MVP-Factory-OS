@@ -12,9 +12,9 @@ import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '..
 import { parseKoreanBusinessDocument } from './koreanDocParser'
 import { readBusinessNumber } from './bizNoRead'
 import { certificateValue, parseCertificateDocument } from './certDocParser'
-import { CUSTOM_FACT_PREFIX, withFactCandidates } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, formatWon, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
-import { latestFullYear, looksLikeVatCert, readVatCert } from './vatDoc'
+import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -63,6 +63,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     const full = vat ? latestFullYear(vat) : null
     if (full) {
       out.push({ key: 'revenue', value: String(full.total), source: 'vatCertificate', asOf: String(full.year), ref })
+      // D-333 해마다 · 작년 같은 기간 대비 한 줄을 회사 정보에도 — 정책자금 '매출 성장세' 가 이 줄을 읽는다
+      const trend = vat ? vatSummary(vat, formatWon) : ''
+      if (/보다 [+-]?\d+%/.test(trend)) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'vatCertificate', asOf: String(full.year), ref })
       return out
     }
     if (vat) return out

@@ -22,12 +22,13 @@ import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, usableFactValue } from './customerFacts'
+import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
-  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment' | 'haveDocs'>>
+  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment' | 'haveDocs' | 'revenueTrend3y' | 'thisYearTrend'>>
   /** 무엇으로 채웠는지 한 줄씩 */
   notes: string[]
   /** 받으면 확인되는 서류(있으면 더 정확) */
@@ -104,6 +105,15 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   if (bonus.items.length) {
     input.bonusItems = bonus.items
     front.push(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
+  }
+  // D-333 매출 추이(부가세 과세표준증명 → 회사 정보 '매출 추이') → 3년 추세 · 올해 추세 — 엔진의 '매출 성장세'
+  const trendLine = String(record.factValues?.[`${CUSTOM_FACT_PREFIX}매출 추이`] ?? '').trim()
+  if (trendLine) {
+    const t = vatTrendOf(trendLine)
+    if (t.trend3y && !input.revenueTrend3y) input.revenueTrend3y = t.trend3y
+    if (t.thisYear && !input.thisYearTrend) input.thisYearTrend = t.thisYear
+    if (t.trend3y === '증가' || t.thisYear === '전년보다 증가') front.push(`매출 증가(${trendLine.replace(/\(부가세 과세표준 · /, '(').slice(0, 60)})`)
+    else if (t.trend3y === '감소' || t.thisYear === '감소') notes.push(`매출 감소(${trendLine.slice(0, 60)}) — 부결 사유가 되기 쉬워요`)
   }
   // D-310 고용 증가 · 청년 직원 — 4대보험 명부
   const hire = policyHiring(record, today)
