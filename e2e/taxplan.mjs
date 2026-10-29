@@ -296,7 +296,7 @@ for (const width of [1440, 390, 360]) {
   await page.getByTestId('tax-basis').waitFor()
   const ids = await page.getByTestId('tax-basis-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
   const corp = await page.locator('[data-testid="tax-basis-section"][data-id="corp"]').innerText()
-  check(`D-321 ${width} 기준표 9칸(법인세 · 소득세 · 퇴직 · 4대보험 · 상속증여 · 가지급금 · 고용 · 창업 · 연구소) · 주소 m=basis · 법인세 10%(2025까지 9%)`, ids.join() === 'corp,income,retire,insurance,inherit,loan,employ,startup,rnd' && page.url().includes('m=basis') && corp.includes('10% (2025 사업연도까지 9%)'), ids.join())
+  check(`D-321 ${width} 기준표 10칸(법인세 · 소득세 · 퇴직 · 4대보험 · 상속증여 · 가지급금 · 고용 · 고용지원금 · 창업 · 연구소) · 주소 m=basis · 법인세 10%(2025까지 9%)`, ids.join() === 'corp,income,retire,insurance,inherit,loan,employ,subsidy,startup,rnd' && page.url().includes('m=basis') && corp.includes('10% (2025 사업연도까지 9%)'), ids.join())
   // D-332 기준 연도 · 다음 점검(올해는 알림 없이 '다음 점검 2027-01-01')
   check(`D-332 ${width} 기준표 머리 — 다음 점검 2027-01-01 · 새해 알림 없음`, (await page.getByTestId('tax-basis-review').innerText()).includes('2027-01-01') && (await page.getByTestId('tax-basis-stale').count()) === 0)
   const before = await page.locator('[data-testid="tax-basis-section"][data-id="income"] dl > div').count()

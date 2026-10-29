@@ -5,8 +5,9 @@
  * 실행: npm run test:employment
  */
 import { makeSimpleXlsx } from '../../../services/__tests__/xlsxFixture'
+import origSubsidySrc from '../orig/SubsidyApp.jsx?raw'
 import { BOSU_FLOOR_2026, DIAG_CATS, ELIG, EXCL, MIN_WAGE_2026, MIN_WAGE_MONTH_2026, STS } from '../lib/constants'
-import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENABLED_DEFAULTS, PROGRAM_LIST, roundsMismatch, roundsSum, type Program } from '../lib/programs'
+import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENABLED_DEFAULTS, PROGRAM_LIST, programForRegion, roundsMismatch, roundsSum, type Program } from '../lib/programs'
 import { addMo, calcAgeDetailed, calcMilitaryLimit, fD, formatDday, getDdayFrom, parseJumin, toYMD, youthAgeAt, youthByYears } from '../lib/dates'
 import { fMan, fProgramAmt, fmtBizNo, fmtPhone, clampMoney, clampRate } from '../lib/format'
 import { buildAnswers, checkWage, diagnoseHiring, youthGate, type HiringAnswers } from '../lib/eligibility'
@@ -98,7 +99,7 @@ const EXPECTED_PROGRAMS: [string, number][] = [
   ['senior_intern', 5500000],
   ['disabled_emp', 5400000],
   ['regular_convert', 7200000],
-  ['senior_continue', 7200000],
+  ['senior_continue', 10800000], // D-334 2026 — 수도권 월 30만 · 최대 3년
   ['worklife45', 7200000],
   ['parental_leave', 3600000],
   ['parental_reduce', 3600000],
@@ -121,7 +122,7 @@ check('youth_jump match', (() => {
 })())
 check('regular_convert companyMax 30', DEFAULT_PROGRAMS.regular_convert.match.companyMax === 30 && DEFAULT_PROGRAMS.regular_convert.match.empTypes.join() === '계약직')
 check('worklife45 companyMin 20', DEFAULT_PROGRAMS.worklife45.match.companyMin === 20)
-check('senior_continue ageMin 55 · companyMax 100', DEFAULT_PROGRAMS.senior_continue.match.ageMin === 55 && DEFAULT_PROGRAMS.senior_continue.match.companyMax === 100)
+check('senior_continue ageMin 55 · 인원 상한 없음(우선지원대상 · 중견 — D-334)', DEFAULT_PROGRAMS.senior_continue.match.ageMin === 55 && DEFAULT_PROGRAMS.senior_continue.match.companyMax === null)
 check('saeil_women gender female · special 경력단절', DEFAULT_PROGRAMS.saeil_women.match.gender === 'female' && DEFAULT_PROGRAMS.saeil_women.match.special?.[0] === '경력단절')
 check('senior_intern 5회차 · 마지막 36개월', DEFAULT_PROGRAMS.senior_intern.rounds.length === 5 && DEFAULT_PROGRAMS.senior_intern.rounds[4].month === 36)
 check('youth_jump note 원문', DEFAULT_PROGRAMS.youth_jump.note.startsWith('수도권: 기업 720만(취업애로요건 필수). 비수도권: 기업 720만+청년 근속인센티브 480~720만.'))
@@ -282,7 +283,9 @@ function rowOf(rows: ReturnType<typeof diagnoseHiring>, id: string) {
 {
   const rows = diagnoseHiring({ ...BASE_ANSWERS, cats: ['고령자'], age: 62 }, PROGRAM_LIST)
   check('60세 → senior_intern recommend', rowOf(rows, 'senior_intern')?.status === 'recommend' && rowOf(rows, 'senior_intern')?.score === 63)
-  check('60세 → senior_continue recommend', rowOf(rows, 'senior_continue')?.status === 'recommend')
+  // D-334 새로 뽑는 사람은 계속고용 대상이 아님(정년에 이른 기존 직원만) — 계속 고용(retain)이면 recommend
+  check('62세 새 채용 → senior_continue 는 대상 아님(D-334)', rowOf(rows, 'senior_continue')?.status === 'exclude' && /새로 뽑는 사람은 대상 아님/.test(rowOf(rows, 'senior_continue')?.blockers[0] ?? ''))
+  check('62세 계속 고용 → senior_continue recommend', rowOf(diagnoseHiring({ ...BASE_ANSWERS, situation: 'retain', cats: ['고령자'], age: 62 }, PROGRAM_LIST), 'senior_continue')?.status === 'recommend')
   check('60세 → youth_jump 나이 미충족 exclude', rowOf(rows, 'youth_jump')?.status === 'exclude' && rowOf(rows, 'youth_jump')?.blockers.indexOf('나이 요건 미충족') >= 0)
 }
 {
@@ -382,7 +385,9 @@ const ROSTER: RosterEmployee[] = [
   check('summary youth_jump check 1 · level check', !!yj && yj.check === 1 && yj.candidateCount === 1 && yj.level === 'check' && yj.confidence === 'more')
   check('summary parental 는 항상 more', !!pa && pa.level === 'more' && pa.candidateCount === 0)
   // D-136: 규칙표 총액 하나만 쓴다 (청년도약 720 · 계속고용 720 · 시니어 인턴 550 · 새일 400)
-  check('estimateSubsidyTotal — 새로 신청할 수 있는 후보만(청년도약 720 · 계속고용 720)', estimateSubsidyTotal(a.subsidySummary) === (720 + 720) * 10000, String(estimateSubsidyTotal(a.subsidySummary)))
+  check('estimateSubsidyTotal — 새로 신청할 수 있는 후보만(청년도약 720 · 계속고용 1,080)', estimateSubsidyTotal(a.subsidySummary) === (720 + 1080) * 10000, String(estimateSubsidyTotal(a.subsidySummary)))
+  // D-334 비수도권이면 계속고용 1,440만(월 40만 × 36) · 청년도약 기업 몫은 720만 그대로 · 모르면 수도권
+  check('D-334 estimateSubsidyTotal 비수도권 — 720 + 1,440', estimateSubsidyTotal(a.subsidySummary, '비수도권') === (720 + 1440) * 10000 && estimateSubsidyTotal(a.subsidySummary, null) === (720 + 1080) * 10000, String(estimateSubsidyTotal(a.subsidySummary, '비수도권')))
   const txt = buildCopyText({ company: '미래상사', totalEmp: 3, youthCount: 1, seniorCount: 1, eiCheckCount: 1, wcCheckCount: 1, partialInsCount: 1, relCheckCount: 1, candidateSubsidyCount: 4 })
   check('buildCopyText 첫줄·주의문구', txt.startsWith('미래상사 4대보험 명부 1차 검토 결과') && txt.indexOf('· 통합고용세액공제 예상: 전년도 인원·소재지 입력 후 검토 가능') >= 0 && txt.indexOf('홍길동') < 0)
 }
@@ -839,7 +844,8 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   {
     const mismatched = PROGRAM_LIST.filter((p) => roundsMismatch(p)).map((p) => `${p.id}(회차 합 ${roundsSum(p)} / 총액 ${p.totalAmount})`)
     console.log(`  ★ 회차별 금액 확인 필요: ${mismatched.join(' · ')}`)
-    check('회차 합 ≠ 총액 목록이 정확히 이 넷', PROGRAM_LIST.filter((p) => roundsMismatch(p)).map((p) => p.id).join() === 'work_exp,disabled_emp,senior_continue,replace_worker', mismatched.join(' · '))
+    // D-334 계속고용은 3년 12분기 회차로 총액과 맞췄다
+    check('회차 합 ≠ 총액 목록이 정확히 이 셋', PROGRAM_LIST.filter((p) => roundsMismatch(p)).map((p) => p.id).join() === 'work_exp,disabled_emp,replace_worker', mismatched.join(' · '))
     const sim = simulate(DEFAULT_PROGRAMS.work_exp, 2, '2026-01-01')
     check('시뮬레이터: 1인당 = 회차 합 (총수령액과 같은 숫자) + ★', sim.perPerson === 800000 && sim.total === 1600000 && sim.mismatch && sim.tableTotal === 1400000 && simulationText('미래내일 일경험', 2, sim).includes('★ 회차별 금액 확인 필요'))
     const yj = simulate(DEFAULT_PROGRAMS.youth_jump, 1, '2026-01-01')
@@ -1126,6 +1132,26 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   const noLose = ['성명\t주민등록번호\t자격취득일', '홍길동\t980310-1234567\t2026-03-15'].join('\n')
   check('D-302 표 명부: 상실 · 상태 칸이 없으면 예전 읽기 그대로', JSON.stringify(parseRosterTable(noLose).employees) === JSON.stringify(parseRosterText(noLose).employees))
   check('D-302 표 명부: 탭이 없는 글(PDF 등)도 예전 읽기 그대로', JSON.stringify(parseRosterTable('980310-1234567 홍길동 2026-08-05').employees) === JSON.stringify(parseRosterText('980310-1234567 홍길동 2026-08-05').employees))
+}
+
+// ── D-334 고령자 계속고용장려금 2026 — 수도권 월 30만 · 비수도권 월 40만 · 최대 3년 ──
+{
+  const sc = DEFAULT_PROGRAMS.senior_continue
+  check('D-334 계속고용 규칙표: 수도권 1,080만 · 12분기 × 90만 · 마지막 36개월', sc.totalAmount === 10_800_000 && sc.rounds.length === 12 && sc.rounds.every((r) => r.amount === 900_000) && sc.rounds[11].month === 36 && sc.rounds[0].label === '1년 차 1분기' && sc.rounds[11].label === '3년 차 4분기')
+  const local = programForRegion(sc, '비수도권')
+  check('D-334 비수도권: 1,440만 · 12분기 × 120만 · 원본 표는 그대로', local.totalAmount === 14_400_000 && local.rounds.every((r) => r.amount === 1_200_000) && roundsSum(local) === 14_400_000 && sc.totalAmount === 10_800_000)
+  check('D-334 수도권 · 모름이면 그대로', programForRegion(sc, '수도권') === sc && programForRegion(sc, null) === sc)
+  check('D-334 직접 고친 금액(예전 720만 표)은 지역 금액으로 덮지 않음', programForRegion({ ...sc, totalAmount: 7_200_000 }, '비수도권').totalAmount === 7_200_000)
+  check('D-334 지역 금액이 없는 지원금은 그대로', programForRegion(DEFAULT_PROGRAMS.youth_jump, '비수도권') === DEFAULT_PROGRAMS.youth_jump)
+  const base: HiringAnswers = { situation: 'retain', cats: ['고령자'], specials: ['정년도달'], age: 61, gender: null, milMonths: 0, region: '비수도권', companySize: 150, empType: '정규직', preApply: true, noLayoff: true, aboveFloor: true, youthEligible: true }
+  const rowL = diagnoseHiring(base, PROGRAM_LIST).find((r) => r.program.id === 'senior_continue')
+  const rowM = diagnoseHiring({ ...base, region: '수도권' }, PROGRAM_LIST).find((r) => r.program.id === 'senior_continue')
+  check('D-334 채용 진단: 비수도권 1,440만 · 수도권 1,080만', rowL?.program.totalAmount === 14_400_000 && rowM?.program.totalAmount === 10_800_000, `${rowL?.program.totalAmount} ${rowM?.program.totalAmount}`)
+  check('D-334 채용 진단: 150명 회사도 막지 않음(예전 100인 미만) · 60세 이상 비율 확인 ★', !!rowL && rowL.status === 'recommend' && !rowL.blockers.length && rowL.cautions.some((c) => c.includes('60세 이상 피보험자 30% 이하')), JSON.stringify(rowL && { s: rowL.status, b: rowL.blockers, c: rowL.cautions }))
+  check('D-334 원본 앱 규칙표도 같은 금액 · 회차', (() => {
+    const line = origSubsidySrc.split('\n').find((l) => l.includes('senior_continue:{id:"senior_continue"')) ?? ''
+    return line.includes('totalAmount:10800000') && (line.match(/amount:900000/g) ?? []).length === 12 && line.includes('companyMax:null') && !line.includes('2년 최대720')
+  })())
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

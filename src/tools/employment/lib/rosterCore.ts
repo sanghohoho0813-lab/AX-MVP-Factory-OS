@@ -18,7 +18,7 @@
 
 
 import { calcAgeDetailed, daysInMonth, parseYMD, youthAgeAt } from './dates'
-import { DEFAULT_PROGRAMS } from './programs'
+import { DEFAULT_PROGRAMS, programForRegion } from './programs'
 import { hireWindowBlocks, hireWindowOf } from './hireWindow'
 import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from './birthCell'
 import type { RosterHeadcount, TaxCreditResult, YearHeadcount } from './taxCredit'
@@ -1020,11 +1020,18 @@ export const SUBSIDY_MAX_PER_PERSON: Record<string, number> = {
   parental: 0,
 }
 export const SUBSIDY_ESTIMATE_NOTE = '★ 규칙표 총액 기준 추정 · 공고로 확인'
+/** D-334: 1인 최대(만원) — 비수도권이면 그 지역 금액(고령자 계속고용 1,440만) */
+export function subsidyMaxPerPerson(key: string, region?: '수도권' | '비수도권' | null): number {
+  const p = DEFAULT_PROGRAMS[key]
+  if (!p || !(key in SUBSIDY_MAX_PER_PERSON)) return SUBSIDY_MAX_PER_PERSON[key] || 0
+  return Math.round(programForRegion(p, region).totalAmount / 10000)
+}
 // 지원금별 후보(candidateCount) 기준 최대 예상 지원금 총액(원). "최대 가능 추정".
-export function estimateSubsidyTotal(summary: readonly SubsidySummaryRow[] | null | undefined): number {
+// region 을 모르면 수도권 금액(작게)으로 센다.
+export function estimateSubsidyTotal(summary: readonly SubsidySummaryRow[] | null | undefined, region?: '수도권' | '비수도권' | null): number {
   let won = 0
   ;(summary || []).forEach((s) => {
-    const per = SUBSIDY_MAX_PER_PERSON[s.key] || 0
+    const per = subsidyMaxPerPerson(s.key, region)
     won += (s.candidateCount || 0) * per * 10000
   })
   return won

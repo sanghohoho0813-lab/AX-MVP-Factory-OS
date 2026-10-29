@@ -1257,6 +1257,23 @@ await (async () => {
   check('D-305 미처리결손금 → 배당 가능한 이익은 넣지 않고 까닭(결손)', !loss.record.taxProfile.retainedEarnings && loss.summary.flagged.some((f) => f.label === '배당 가능 이익' && f.note.includes('결손')), JSON.stringify(loss.summary.flagged))
 })()
 
+// D-334 명부 올리기 → 고령자 계속고용 최대 금액이 업체 주소 지역으로(비수도권 월 40만 × 36 = 1,440만 · 수도권 1,080만)
+await (async () => {
+  const ROSTER = ['4대보험 사업장 가입자 명부', ['성명', '주민등록번호', '자격취득일'].join('\t'), ['장계속', '650101-1234567', '2015-03-01'].join('\t')].join('\n')
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-28', makeId: () => `s${++n}` }
+  const run = async (addr: string) => {
+    const base = normalizeClientOps({ id: 'sc334', companyName: '계속테스트(주)', businessAddress: addr, createdAt: NOW, updatedAt: NOW })
+    const out = await analyzeUploadedDocs(base, [{ key: 'payrollRoster', fileName: '가입자명부.xlsx', text: ROSTER, method: 'xlsx' as const, docSure: true }], ctx)
+    const tr = out.record.toolResults.find((t) => t.toolKey === 'employment')
+    return { total: (tr?.data as { subsidyTotal?: number } | null)?.subsidyTotal ?? 0, summary: tr?.summary ?? '' }
+  }
+  const local = await run('충청북도 청주시 흥덕구 오송읍 1')
+  const metro = await run('서울특별시 중구 세종대로 1')
+  const none = await run('')
+  check('D-334 명부 → 비수도권 업체는 계속고용 1,440만 · 수도권 1,080만 · 주소 모르면 수도권 금액', local.total === 14_400_000 && metro.total === 10_800_000 && none.total === 10_800_000 && local.summary.includes('최대 1,440만원'), `${local.total} ${metro.total} ${none.total}`)
+})()
+
 // D-306 정책자금 판정의 '미확인' 을 서류함으로 — 납세증명서(국세 · 지방세) · 4대보험 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음
 {
   const T = '2026-10-28'

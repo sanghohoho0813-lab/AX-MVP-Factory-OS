@@ -8,6 +8,7 @@ import { CONV_DED9, CORP_RATES, GROSSUP_RATE, INC9_BRACKETS, S_RATE, SERVICE_DED
 import { SME_2026, defaultTaxUnits } from '../tools/employment/lib/taxCredit'
 import { RATES_2026 } from '../tools/employment/lib/payroll'
 import { MIN_WAGE_2026 } from '../tools/employment/lib/constants'
+import { DEFAULT_PROGRAMS, programForRegion } from '../tools/employment/lib/programs'
 import { VENTURE_STARTUP_RATE, startupRates } from '../tools/startupTax/lib/rules'
 import { CATEGORY_RATES } from '../tools/labcare/lib/taxCredit'
 
@@ -176,6 +177,20 @@ export function lawBasis(): BasisSection[] {
       ],
       usedIn: '고용지원금 › 명부 진단 · 한 장 설계서(청년 · 만 60세 이상 채용) · 맞춤 추천 고용 카드',
       note: '청년 등 = 청년 · 장애인 · 만 60세 이상 · 경력단절. 2·3년 차는 인원을 유지할 때. 중견기업 개편 단가는 화면에서 직접 넣는다.',
+    },
+    {
+      // D-334 고용지원금 금액도 규칙표(programs.ts)에서 읽는다
+      id: 'subsidy',
+      title: '고용지원금(사업주 몫 · 1명당)',
+      basis: '고용노동부 2026년 사업 안내 — 예산 · 지역 구분이 해마다 바뀌어 공고로 다시 확인',
+      rows: [
+        { label: '청년일자리도약장려금', value: `${man(DEFAULT_PROGRAMS.youth_jump.totalAmount)}(6 · 9 · 12개월) — 수도권은 취업애로 청년만 · 비수도권 청년 본인 근속 인센티브는 따로` },
+        { label: '고령자 계속고용장려금', value: `수도권 월 30만 · 비수도권 월 40만, 최대 3년(${man(DEFAULT_PROGRAMS.senior_continue.totalAmount)} · ${man(programForRegion(DEFAULT_PROGRAMS.senior_continue, '비수도권').totalAmount)}) — 정년에 이른 기존 직원` },
+        { label: '시니어 인턴십(만 60세 이상 채용)', value: `최대 ${man(DEFAULT_PROGRAMS.senior_intern.totalAmount)}` },
+        { label: '정규직 전환 지원', value: `최대 ${man(DEFAULT_PROGRAMS.regular_convert.totalAmount)}(30인 미만 · 사전 승인)` },
+      ],
+      usedIn: '고용지원금 › 채용 진단 · 명부 진단 · 상황 예시 · 한 장 설계서 · 맞춤 추천 고용 카드',
+      note: '회사 주소로 수도권(서울 · 경기 · 인천) · 비수도권을 정한다. 지원금 관리에서 금액을 직접 고친 표는 그 금액을 쓴다.',
     },
     {
       id: 'startup',

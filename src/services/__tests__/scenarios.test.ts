@@ -482,6 +482,8 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
     longName.needs,
   )
   const senior = buildSituationPlan('hire-senior', full, today, 1)
+  // D-334 새로 뽑는 만 60세 이상에게 계속고용장려금(정년 도달 기존 직원용)을 '또는' 으로 보여 주지 않는다
+  check('P15b 만 60세 이상 새 채용 — 지원금 줄에 계속고용장려금 없음 · 시니어 인턴십', !senior.blocks.find((b) => b.key === 'subsidy')!.lines.some((l) => l.includes('계속고용')) && senior.blocks.find((b) => b.key === 'subsidy')!.headline.includes('시니어 인턴십'), JSON.stringify(senior.blocks.find((b) => b.key === 'subsidy')?.lines))
   check('P15 만 60세 이상 1명 — 세액공제는 청년 등 단가(만 60세 이상 포함) · 제목', senior.title === '만 60세 이상 1명 채용' && senior.blocks.find((b) => b.key === 'credit')!.won === unit && senior.blocks.find((b) => b.key === 'credit')!.headline.includes('만 60세 이상'), senior.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`))
 }
 

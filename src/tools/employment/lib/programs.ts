@@ -50,6 +50,11 @@ export interface Program {
   match: ProgramMatch
 }
 
+/** 분기마다 같은 금액 · 3년(12번) — 고령자 계속고용장려금 */
+function quarterRounds(amount: number): ProgramRound[] {
+  return Array.from({ length: 12 }, (_, i) => ({ month: (i + 1) * 3, amount, label: `${Math.floor(i / 4) + 1}년 차 ${(i % 4) + 1}분기` }))
+}
+
 export const DEFAULT_PROGRAMS: Record<string, Program> = {
   youth_jump: {
     id: 'youth_jump',
@@ -199,20 +204,16 @@ export const DEFAULT_PROGRAMS: Record<string, Program> = {
     year: 2026,
     group: '재직자유지',
     color: '#475569',
-    totalAmount: 7200000,
-    rounds: [
-      { month: 3, amount: 900000, label: '1분기' },
-      { month: 6, amount: 900000, label: '2분기' },
-      { month: 9, amount: 900000, label: '3분기' },
-      { month: 12, amount: 900000, label: '4분기' },
-    ],
+    // D-334: 2026 고용노동부 안내 — 수도권 월 30만 · 비수도권 월 40만, 최대 3년(예전 표는 2년 720만 · 100인 미만이었다)
+    totalAmount: 10800000,
+    rounds: quarterRounds(900000),
     companyDocs: ['지급신청서', '취업규칙(정년 명문화)', '재고용 근로계약서'],
     employeeDocs: ['근로계약서', '월별임금대장'],
     isCustom: false,
     isBuiltIn: true,
-    note: '수도권 분기90만 2년 최대720. 비수도권 분기120만 3년 최대1440(2026). 정년연장/폐지/재고용 취업규칙 필수. 100인미만.',
+    note: '수도권 월30만(분기90만) 최대3년 1,080만. 비수도권 월40만(분기120만) 최대3년 1,440만(2026). 정년연장·폐지·재고용(1년 이상) 취업규칙 필수. 우선지원대상·중견기업 · 60세 이상 피보험자 30% 이하 · 피보험자 30%(최대 30명)까지.',
     applyUrl: '고용24(work24.go.kr)',
-    match: { cats: ['고령자', '재직'], ageMin: 55, ageMax: null, gender: 'any', empTypes: ['정규직'], preApply: false, companyMax: 100, regionSensitive: true, bosuFloor: false, special: ['정년도달'] },
+    match: { cats: ['고령자', '재직'], ageMin: 55, ageMax: null, gender: 'any', empTypes: ['정규직'], preApply: false, companyMax: null, regionSensitive: true, bosuFloor: false, special: ['정년도달'] },
   },
   worklife45: {
     id: 'worklife45',
@@ -351,6 +352,25 @@ export const DEFAULT_PROGRAMS: Record<string, Program> = {
     applyUrl: '고용24(work24.go.kr)',
     match: { cats: ['재직'], ageMin: null, ageMax: null, gender: 'any', empTypes: ['정규직'], preApply: true, companyMin: null, companyMax: null, regionSensitive: false, bosuFloor: false, special: ['일자리나누기'] },
   },
+}
+
+/**
+ * D-334: 지역에 따라 1인 금액이 다른 지원금 — 비수도권 단가(2026).
+ * 규칙표(DEFAULT_PROGRAMS)는 수도권 금액을 적고, 비수도권이면 여기 금액으로 바꿔 보여 준다.
+ */
+const NON_METRO: Record<string, { totalAmount: number; rounds: ProgramRound[] }> = {
+  senior_continue: { totalAmount: 14400000, rounds: quarterRounds(1200000) },
+}
+
+/**
+ * 업체 지역에 맞는 금액으로 — 비수도권이면 NON_METRO 금액.
+ * 사용자가 규칙표 금액을 직접 고친 지원금(기본 수도권 금액과 다름)은 그대로 둔다.
+ */
+export function programForRegion<P extends Pick<Program, 'id' | 'totalAmount' | 'rounds'>>(p: P, region: '수도권' | '비수도권' | null | undefined): P {
+  const alt = NON_METRO[p.id]
+  const base = DEFAULT_PROGRAMS[p.id]
+  if (!alt || !base || region !== '비수도권' || p.totalAmount !== base.totalAmount) return p
+  return { ...p, totalAmount: alt.totalAmount, rounds: alt.rounds.map((r) => ({ ...r })) }
 }
 
 /** 회차 금액 합 */

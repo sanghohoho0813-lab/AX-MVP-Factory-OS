@@ -7,7 +7,7 @@
 import { BOSU_FLOOR_2026, ELIG, EXCL, MIN_WAGE_2026 } from './constants'
 import { hireWindowBlocks, hireWindowOf } from './hireWindow'
 import { YOUTH_MAX_AGE, youthAgeAt, youthByYears, youthLimitLabel } from './dates'
-import type { EmpType, Gender, Program } from './programs'
+import { programForRegion, type EmpType, type Gender, type Program } from './programs'
 
 export type Situation = 'new' | 'retain' | 'childcare'
 export type Region = '수도권' | '비수도권'
@@ -47,7 +47,9 @@ export const YOUTH_JUMP_MIN_INSURED = 5
 
 export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): DiagnosisRow[] {
   const results: DiagnosisRow[] = []
-  programs.forEach((p) => {
+  programs.forEach((p0) => {
+    // D-334: 비수도권이면 그 지역 금액으로(고령자 계속고용 월 40만)
+    const p = programForRegion(p0, a.region)
     const m = p.match || ({} as Program['match'])
     let score = 0
     const reasons: string[] = []
@@ -56,6 +58,12 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
     let capped = false
     if (m.deprecated) {
       results.push({ program: p, status: 'exclude', score: 0, reasons: ['2026년 신규 종료'], blockers: [], cautions: [] })
+      return
+    }
+    // D-334 계속고용장려금은 정년에 이른 기존 직원을 계속 쓸 때 — 새로 뽑는 사람에게는 대상이 아니다
+    //        (예전엔 만 60세 이상 '새 채용' 에도 '가능성 높음' · 설계서 '또는' 에 금액이 나왔다)
+    if (p.id === 'senior_continue' && a.situation === 'new' && (a.specials || []).indexOf('정년도달') < 0) {
+      results.push({ program: p, status: 'exclude', score: 0, reasons: [], blockers: ['정년에 이른 기존 직원을 계속 고용할 때만 — 새로 뽑는 사람은 대상 아님', ...(a.noLayoff === false ? ['최근 감원 이력—신청 제한'] : [])], cautions: [] })
       return
     }
     const catHit = (m.cats || []).some((c) => (a.cats || []).indexOf(c) >= 0)
@@ -143,6 +151,10 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
       } else {
         cautions.push('★ 회사 규모 미입력 — 5인 이상 우선지원대상기업인지 확인')
       }
+    }
+    // D-334: 계속고용장려금 — 60세 이상 비율 · 계속고용제도 운영 기간은 이 화면에서 모른다
+    if (p.id === 'senior_continue' && catHit) {
+      cautions.push('★ 60세 이상 피보험자 30% 이하 · 정년연장/폐지/재고용 제도 1년 이상(취업규칙) 확인')
     }
     let status: DiagnosisStatus
     if (blockers.length > 0 && !catHit && score < 30) status = 'exclude'

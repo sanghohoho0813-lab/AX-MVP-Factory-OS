@@ -646,6 +646,8 @@ function RosterTab() {
   const [baseDate] = useState(() => new Date())
 
   const region: RegionType | null = form.sido ? (['서울', '경기', '인천'].indexOf(form.sido) >= 0 ? 'metro' : 'local') : null
+  // D-334 지원금도 지역 금액으로(고령자 계속고용 — 비수도권 월 40만) · 소재지를 모르면 수도권 금액
+  const subsidyRegion = region === 'local' ? '비수도권' : region === 'metro' ? '수도권' : null
   // D-319 '올해' 늘어난 인원 — 2026년부터는 개편표(1 · 2 · 3년 차)
   const units = defaultTaxUnits(region, form.sizeType, baseDate.getFullYear())
   const unitYouth = form.unitsTouched && form.unitYouth !== '' ? form.unitYouth : String(units.youth)
@@ -857,9 +859,15 @@ function RosterTab() {
                 {staleText && <Badge tone={stale?.level === 'high' ? 'danger' : 'warning'}>발급 {staleText}</Badge>}
               </div>
               <p className="t-card font-bold break-keep text-slate-900">
-                {analysis.counts.totalEmp}명 중 청년 추정 {analysis.counts.youthCount}명 · 고령 {analysis.counts.seniorCount}명 · 조건 충족 시 최대 {formatWon(estimateSubsidyTotal(analysis.subsidySummary))} 검토 가능성
+                {analysis.counts.totalEmp}명 중 청년 추정 {analysis.counts.youthCount}명 · 고령 {analysis.counts.seniorCount}명 · 조건 충족 시 최대 {formatWon(estimateSubsidyTotal(analysis.subsidySummary, subsidyRegion))} 검토 가능성
               </p>
-              <p className="t-meta break-keep text-amber-700">{SUBSIDY_ESTIMATE_NOTE} · 청년은 입사일 기준 나이</p>
+              <p className="t-meta break-keep text-amber-700">
+                {SUBSIDY_ESTIMATE_NOTE} · 청년은 입사일 기준 나이{subsidyRegion ? ` · ${subsidyRegion} 금액` : ' · 소재지를 고르면 지역 금액'}{' '}
+                {/* D-334 지원금 금액이 어디서 왔는지 — 계산 기준표 고용지원금 칸 */}
+                <Link to="/tools/tax?m=basis&s=subsidy" className="font-semibold text-brand-800 underline underline-offset-2" data-testid="subsidy-basis">
+                  지원금 기준표
+                </Link>
+              </p>
               {estimate.computable && estimate.creditTotal != null && (
                 <p className="t-sub text-slate-600">
                   통합고용세액공제 예상 <b className="text-slate-900">약 {formatWon(estimate.creditTotal)}</b> (증가 {estimate.incTotal}명 · 1차 추정 · 확정 아님)
@@ -894,7 +902,7 @@ function RosterTab() {
                     counts: analysis.counts,
                     subsidySummary: analysis.subsidySummary.map((s) => ({ key: s.key, name: s.name, candidateCount: s.candidateCount, level: s.level })),
                     // D-191: 최대 예상 지원금(원) — 업체 상세 '먼저 제안할 것' 에 금액으로
-                    subsidyTotal: estimateSubsidyTotal(analysis.subsidySummary),
+                    subsidyTotal: estimateSubsidyTotal(analysis.subsidySummary, subsidyRegion),
                     estimate,
                     // D-302 명부 날짜로 센 인원 — 맞춤 추천이 칸을 비워 둔 때에도 세액공제를 다시 계산한다
                     ...(headcount ? { headcount } : {}),

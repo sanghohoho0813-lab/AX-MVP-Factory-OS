@@ -14,7 +14,7 @@ import { fD, addMo, getDday, calcAgeDetailed, parseJumin, youthAgeAt, youthLimit
 import { checkWage, diagnoseHiring, parseCount } from "../lib/eligibility";
 import { computePayroll, RATE_LABELS } from "../lib/payroll";
 import { simulate } from "../lib/simulator";
-import { roundsMismatch, roundsSum, ROUNDS_CHECK_NOTE } from "../lib/programs";
+import { roundsMismatch, roundsSum, ROUNDS_CHECK_NOTE, programForRegion } from "../lib/programs";
 import { stripRrn, bizNoLooksLikeRrn, birthFromCell, isRrnHeader, RRN_REMOVED } from "../lib/privacy";
 import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from "../lib/birthCell"; // [D-215] 숫자로 들어온 생년월일(앞 0 빠짐 · 6자리)
 import { parseBulkPaste as parseExcelData, makeCompanyFinder } from "../lib/excelImport";
@@ -81,7 +81,7 @@ export var DEFAULT_PROGRAMS = { // [D-93] export — 옛 기록(D-91 켜고 끄�
   senior_intern:{id:"senior_intern",name:"시니어 인턴십",year:2026,group:"신규채용",color:"var(--color-brand-600)",totalAmount:5500000,rounds:[{month:3,amount:1200000,label:"1단계(3개월)"},{month:9,amount:1500000,label:"2단계(6개월)"},{month:18,amount:900000,label:"3단계(18개월)"},{month:24,amount:900000,label:"3단계(24개월)"},{month:36,amount:1000000,label:"3단계(36개월)"}],companyDocs:["사업자등록증","사업참여신청서","협약서","4대보험가입자명부"],employeeDocs:["근로계약서","사전교육 이수증","월별급여대장"],isCustom:false,isBuiltIn:true,note:"일반형 최대 550만. 만60세↑. 한국노인인력개발원 사전승인 필수. 요양보호사·경비·청소 등 단순노무 제외.",applyUrl:"한국노인인력개발원 / seniorro.or.kr",match:{cats:["고령자"],ageMin:60,ageMax:null,gender:"any",empTypes:["정규직","인턴"],preApply:true,companyMax:null,regionSensitive:false,bosuFloor:false}},
   disabled_emp:{id:"disabled_emp",name:"장애인 고용장려금",year:2026,group:"신규채용",color:"#1E3A5F",totalAmount:5400000,rounds:[{month:1,amount:450000,label:"월(예시·중증여)"}],companyDocs:["고용장려금 지급신청서","장애인 근로자 명부","근로계약서"],employeeDocs:["장애인증명서","근로계약서","월별임금대장"],isCustom:false,isBuiltIn:true,note:"경증 남35/여50, 중증 남70/여90만 매월. 고용보험 가입+최저임금↑ 필수.",applyUrl:"한국장애인고용공단 e-신고(esingo.or.kr)",match:{cats:["장애인"],ageMin:null,ageMax:null,gender:"any",empTypes:["정규직","계약직"],preApply:false,companyMax:null,regionSensitive:false,bosuFloor:false,special:["장애"]}},
   regular_convert:{id:"regular_convert",name:"정규직 전환 지원금",year:2026,group:"재직자유지",color:"#475569",totalAmount:7200000,rounds:[{month:3,amount:1800000,label:"1차(3개월)"},{month:6,amount:1800000,label:"2차(6개월)"},{month:9,amount:1800000,label:"3차(9개월)"},{month:12,amount:1800000,label:"4차(12개월)"}],companyDocs:["사업참여신청서","정규직전환 근로계약서","사업자등록증","취업규칙"],employeeDocs:["전환 전 근로계약서","전환 후 근로계약서","월별임금대장"],isCustom:false,isBuiltIn:true,note:"기본 월40만+임금인상보전 월20만=연720. 5~30인미만. 2026 예산 한정·상반기 사전승인 필수. 6개월↑ 기간제→정규직. 먼저 전환하면 0원.",applyUrl:"고용24(work24.go.kr)",match:{cats:["재직"],ageMin:null,ageMax:null,gender:"any",empTypes:["계약직"],preApply:true,companyMax:30,regionSensitive:false,bosuFloor:true,special:["정규직전환"]}},
-  senior_continue:{id:"senior_continue",name:"고령자 계속고용 장려금",year:2026,group:"재직자유지",color:"#475569",totalAmount:7200000,rounds:[{month:3,amount:900000,label:"1분기"},{month:6,amount:900000,label:"2분기"},{month:9,amount:900000,label:"3분기"},{month:12,amount:900000,label:"4분기"}],companyDocs:["지급신청서","취업규칙(정년 명문화)","재고용 근로계약서"],employeeDocs:["근로계약서","월별임금대장"],isCustom:false,isBuiltIn:true,note:"수도권 분기90만 2년 최대720. 비수도권 분기120만 3년 최대1440(2026). 정년연장/폐지/재고용 취업규칙 필수. 100인미만.",applyUrl:"고용24(work24.go.kr)",match:{cats:["고령자","재직"],ageMin:55,ageMax:null,gender:"any",empTypes:["정규직"],preApply:false,companyMax:100,regionSensitive:true,bosuFloor:false,special:["정년도달"]}},
+  senior_continue:{id:"senior_continue",name:"고령자 계속고용 장려금",year:2026,group:"재직자유지",color:"#475569",totalAmount:10800000,rounds:[{month:3,amount:900000,label:"1년 차 1분기"},{month:6,amount:900000,label:"1년 차 2분기"},{month:9,amount:900000,label:"1년 차 3분기"},{month:12,amount:900000,label:"1년 차 4분기"},{month:15,amount:900000,label:"2년 차 1분기"},{month:18,amount:900000,label:"2년 차 2분기"},{month:21,amount:900000,label:"2년 차 3분기"},{month:24,amount:900000,label:"2년 차 4분기"},{month:27,amount:900000,label:"3년 차 1분기"},{month:30,amount:900000,label:"3년 차 2분기"},{month:33,amount:900000,label:"3년 차 3분기"},{month:36,amount:900000,label:"3년 차 4분기"}],companyDocs:["지급신청서","취업규칙(정년 명문화)","재고용 근로계약서"],employeeDocs:["근로계약서","월별임금대장"],isCustom:false,isBuiltIn:true,note:"수도권 월30만(분기90만) 최대3년 1,080만. 비수도권 월40만(분기120만) 최대3년 1,440만(2026). 정년연장·폐지·재고용(1년 이상) 취업규칙 필수. 우선지원대상·중견기업 · 60세 이상 피보험자 30% 이하 · 피보험자 30%(최대 30명)까지.",applyUrl:"고용24(work24.go.kr)",match:{cats:["고령자","재직"],ageMin:55,ageMax:null,gender:"any",empTypes:["정규직"],preApply:false,companyMax:null,regionSensitive:true,bosuFloor:false,special:["정년도달"]}},
   worklife45:{id:"worklife45",name:"워라밸+4.5 프로젝트",year:2026,group:"재직자유지",color:"#475569",totalAmount:7200000,rounds:[{month:3,amount:1800000,label:"1분기"},{month:6,amount:1800000,label:"2분기"},{month:9,amount:1800000,label:"3분기"},{month:12,amount:1800000,label:"4분기"}],companyDocs:["노사합의서","사업참여신청서(재단)","근태관리 증빙","취업규칙"],employeeDocs:["변경 근로계약서"],isCustom:false,isBuiltIn:true,note:"기존직원 부분단축 연240/전면단축 연720. 신규채용 보너스 별도. 20인↑. 노사발전재단(nosa.or.kr) 사전신청.",applyUrl:"노사발전재단(nosa.or.kr)",match:{cats:["재직"],ageMin:null,ageMax:null,gender:"any",empTypes:["정규직"],preApply:true,companyMin:20,companyMax:null,regionSensitive:false,bosuFloor:false,special:["주4.5일제"]}},
   parental_leave:{id:"parental_leave",name:"육아휴직 지원금(사업주)",year:2026,group:"육아",color:"#059669",totalAmount:3600000,rounds:[{month:3,amount:900000,label:"1차(3개월)"},{month:6,amount:900000,label:"2차(6개월)"},{month:9,amount:900000,label:"3차(9개월)"},{month:12,amount:900000,label:"4차(12개월)"}],companyDocs:["육아휴직 확인서","사업자등록증","근로계약서"],employeeDocs:["육아휴직 신청서","가족관계증명서","휴직 발령 증빙"],isCustom:false,isBuiltIn:true,note:"사업주 월30만(남성 +10만). 생후12개월내 특례 첫3개월 월100만. 우선지원대상+30일↑ 허용.",applyUrl:"고용24(work24.go.kr)",match:{cats:["육아"],ageMin:null,ageMax:null,gender:"any",empTypes:["정규직"],preApply:false,companyMax:null,regionSensitive:false,bosuFloor:true,special:["육아휴직"]}},
   parental_reduce:{id:"parental_reduce",name:"육아기 근로시간 단축(사업주)",year:2026,group:"육아",color:"#059669",totalAmount:3600000,rounds:[{month:3,amount:900000,label:"1차(3개월)"},{month:6,amount:900000,label:"2차(6개월)"},{month:9,amount:900000,label:"3차(9개월)"},{month:12,amount:900000,label:"4차(12개월)"}],companyDocs:["근로시간 단축 확인서","사업자등록증","변경 근로계약서"],employeeDocs:["단축 신청서","가족관계증명서","변경 근로계약서"],isCustom:false,isBuiltIn:true,note:"사업주 월30만(남성 +10만). 근로자 단축급여 월최대250만. 만12세↓ 자녀, 최대3년.",applyUrl:"고용24(work24.go.kr)",match:{cats:["육아"],ageMin:null,ageMax:null,gender:"any",empTypes:["정규직"],preApply:false,companyMax:null,regionSensitive:false,bosuFloor:true,special:["근로시간단축"]}},
@@ -1929,6 +1929,9 @@ function ExcelImport(props){
         var pid=matchProgramId(pe.programName);
         if(!pid)noProg++;
         var p=pid?(props.programs||{})[pid]:null;
+        /* [D-334] 비수도권 업체면 그 지역 금액(고령자 계속고용 월 40만) */
+        var compOfEmp=newComps.find(function(c){return c.id===cid;})||(props.companies||[]).find(function(c){return c.id===cid;});
+        if(p)p=programForRegion(p,compOfEmp&&compOfEmp.region);
         var memo=pe.memo||"";
         var extra=[];
         if(pe.programName&&!pid)extra.push("지원금(원본): "+pe.programName);
@@ -2574,7 +2577,7 @@ function PayrollDiagnosis(props){
     return stIssueDate[0]?PD.rosterStaleness(stIssueDate[0],stBase[0]):null;
   },[stIssueDate[0],stBase[0]]);
   // 영업용 최대 예상 혜택 (지원금 + 세액공제)
-  var subsidyMax=analysis?PD.estimateSubsidyTotal(analysis.subsidySummary):0;
+  var subsidyMax=analysis?PD.estimateSubsidyTotal(analysis.subsidySummary,stRegion[0]==="local"?"비수도권":"수도권"):0; /* [D-334] 지역 금액 */
   var creditMax=(estimate.computable&&!estimate.overYouth&&estimate.creditTotal!=null)?estimate.creditTotal:0;
   var totalBenefit=subsidyMax+creditMax;
   function staleText(){ return stale?("발급 후 "+stale.days+"일 경과"):""; }
@@ -3860,6 +3863,7 @@ function EmpModal(props){
     if(!st.programId[0]){toast("지원금을 선택하세요","warn");return;}
     if(!isValidEmail(st.email[0])){toast("이메일 형식을 확인하세요","warn");return;}
     var p=programs[st.programId[0]];
+    if(p)p=programForRegion(p,company&&company.region); /* [D-334] 지역 금액 */
     var selYear=Number(st.programYear[0])||defYear(st.programId[0]);
     var info=getProgramInfo(company,st.programId[0],selYear);
     var quota=info?Number(info.quota||0):0;
@@ -4240,6 +4244,7 @@ function CompDet(props){
     rows.forEach(function(row){
       var p=programs[row.programId]||Object.values(programs)[0];
       if(!p)return;
+      p=programForRegion(p,company&&company.region); /* [D-334] 지역 금액 */
       var k=empKey(row);
       if(have.has(k)){skipped.push(row.name);return;}
       have.add(k);
@@ -5089,6 +5094,15 @@ function ProgramsList(props){
     delete updated[pid];
     onUpdate(updated);
   }
+  // [D-334] 예전에 저장된 기본 지원금 표 — 금액이 최신 기준과 다른 것만 골라 새 기준으로(켜고 끈 것은 그대로)
+  var outdated=Object.keys(DEFAULT_PROGRAMS).filter(function(id){var p=programs[id];return !!p&&!p.isCustom&&Number(p.totalAmount)!==DEFAULT_PROGRAMS[id].totalAmount;});
+  function refreshOutdated(){
+    var names=outdated.map(function(id){return DEFAULT_PROGRAMS[id].name;}).join(", ");
+    if(!window.confirm(names+" — 금액 · 회차 · 설명을 최신 기준으로 바꿉니다. 직접 고친 금액이었다면 취소하세요. 진행할까요?"))return;
+    var updated=Object.assign({},programs);
+    outdated.forEach(function(id){updated[id]=Object.assign({},DEFAULT_PROGRAMS[id],{enabled:programs[id].enabled});});
+    onUpdate(updated);
+  }
   function resetBuiltins(){
     if(!window.confirm("기본 지원금을 처음 상태로 되돌립니다. (직접 추가한 커스텀은 유지) 진행할까요?"))return;
     var updated=Object.assign({},programs);
@@ -5126,6 +5140,12 @@ function ProgramsList(props){
       <div style={{padding:"10px 14px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:8,marginBottom:14,fontSize:12,color:"#92400E"}}>
         ⭐ <strong>청년일자리도약장려금</strong>이 기본 추천 지원금입니다. 2026년에도 예산이 유지되며 청년 채용 기업의 신청 실적이 가장 높습니다.
       </div>
+      {outdated.length>0&&(
+        <div data-testid="prog-outdated" style={{padding:"10px 14px",background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,marginBottom:14,fontSize:FS_BODY,color:"#1E3A8A",display:"flex",flexWrap:"wrap",alignItems:"center",gap:8}}>
+          <span style={{minWidth:0,flex:"1 1 240px",wordBreak:"keep-all"}}>📌 기본 지원금 {outdated.length}개의 금액이 최신 기준과 달라요 — <b>{outdated.map(function(id){var p=programs[id];return DEFAULT_PROGRAMS[id].name+"("+Math.round((Number(p.totalAmount)||0)/10000).toLocaleString()+"만 → "+Math.round(DEFAULT_PROGRAMS[id].totalAmount/10000).toLocaleString()+"만)";}).join(" · ")}</b></span>
+          <button style={btnS} className="prog-tap" data-testid="prog-outdated-fix" onClick={refreshOutdated}>이것만 최신 기준으로</button>
+        </div>
+      )}
       <Notice>금액·회차·신청처는 매년 공고에 따라 바뀝니다. 카드의 <b>편집</b>으로 직접 수정하면 내 계정에 저장됩니다. 기본 지원금도 모두 수정 가능합니다.</Notice>
       <OfficialSites/>
       <BeginnerSubsidyGuide/>

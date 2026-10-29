@@ -21,7 +21,8 @@
  */
 import type { ClientOpsRecord, DocUploadLog } from '../types/clientOps'
 import { withToolResult } from './clientOpsService'
-import { formatWon, pendingFacts, readFact, withFactDecisions, withFactValue } from './customerFacts'
+import { formatWon, pendingFacts, readFact, usableFactValue, withFactDecisions, withFactValue } from './customerFacts'
+import { placeOf } from './grants/grantMatch'
 import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
@@ -181,7 +182,9 @@ export async function analyzeUploadedDocs(
       } else {
         const analysis = core.analyzeRoster(parsed.employees, { baseDate: today })
         const youth = enroll.youthEnrollItems(analysis.rows, today)
-        const total = core.estimateSubsidyTotal(analysis.subsidySummary)
+        // D-334 비수도권 업체면 지원금도 그 지역 금액(고령자 계속고용 월 40만) · 주소를 모르면 수도권 금액
+        const sido = placeOf(usableFactValue(rec, 'businessAddress')).sido
+        const total = core.estimateSubsidyTotal(analysis.subsidySummary, sido ? (['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권') : null)
         const lines = analysis.subsidySummary.filter((s) => s.candidateCount > 0).map((s) => `· ${s.name} 후보 ${s.candidateCount}명`)
         // D-302 통합고용세액공제용 — 작년 · 올해 매월 말 인원 평균(금액은 맞춤 추천이 볼 때마다 지금 주소 · 규모로)
         const hc = core.rosterHeadcount(parsed.employees, { baseDate: today, issueDate: parsed.meta?.issueDate ?? null })
