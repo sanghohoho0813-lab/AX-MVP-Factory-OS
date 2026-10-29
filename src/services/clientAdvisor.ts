@@ -19,7 +19,7 @@ import { policyEvidence } from './policyEvidence'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
-import { usableFactValue } from './customerFacts'
+import { researchLabOf, usableFactValue } from './customerFacts'
 import { buildInsights, policyDocsLine, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
 import { pendingFacts } from './customerFacts'
 import { josa } from '../lib/josa'
@@ -281,7 +281,7 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     const a = empty('lab', '연구소 · 전담부서')
     const f = factsOf(ctx)
     a.links = [{ label: '연구소 설립 가능성 보기', href: `/tools/labcare${q(ctx.record)}` }]
-    if (usableFactValue(ctx.record, 'researchLab')) {
+    if (researchLabOf(ctx.record)) {
       a.verdict = { tone: 'done', text: '이미 연구소(전담부서)가 있어요' }
       a.steps = ['연구원 변동 · 연구 공간 변경은 30일 안에 변경 신고', '연구 인력 인건비 세액공제 · 연구개발 과제 신청에 활용', '연구노트 · 연구 활동 기록을 남겨 두기(사후관리)']
       return a

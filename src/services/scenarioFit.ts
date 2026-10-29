@@ -16,7 +16,7 @@
  */
 import type { ClientOpsRecord, ShareholderRow } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { customFactValue, formatWon, usableFactValue } from './customerFacts'
+import { customFactValue, formatWon, researchLabOf } from './customerFacts'
 import { continuingOf } from './workRules'
 import { startupRegion } from './clientInsights'
 import { entityKindOf } from './clientOrder'
@@ -164,7 +164,8 @@ export function fitContext(record: ClientOpsRecord, today: string): FitContext {
     loan: given('loanBalance') ? p.loanBalance : null,
     roster: rd ? { youth: rd.youthCount ?? 0, senior: rd.seniorCount ?? 0, active: rd.activeCount ?? 0 } : null,
     hireHint: hireHintOf(record, today),
-    hasLab: usableFactValue(record, 'researchLab').trim() !== '',
+    // D-340 회사 정보 글 · 올린 인정서 둘 다('없음' 글은 아님)
+    hasLab: researchLabOf(record) !== '',
     industryText,
   }
 }

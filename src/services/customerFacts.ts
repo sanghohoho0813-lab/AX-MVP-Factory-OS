@@ -269,6 +269,17 @@ export function customFactValue(record: ClientOpsRecord, name: string): string {
   return customFactEntries(record).find(([k]) => k.slice(CUSTOM_FACT_PREFIX.length).replace(/\s/g, '').startsWith(want))?.[1] ?? ''
 }
 
+/**
+ * D-340 연구소(전담부서) — 회사 정보 '연구소' 글. 비었으면 올린 인정서(기업부설연구소 · 연구개발전담부서 칸).
+ * '없음 · 아니오 · 미보유' 같은 글은 연구소가 아니다(예전엔 글만 있으면 '있음' 으로 봤고, 올린 인정서는 못 봤다).
+ */
+export function researchLabOf(record: ClientOpsRecord): string {
+  const text = usableFactValue(record, 'researchLab').trim()
+  if (text && !/^(없음|아니오|아니요|미보유|해당\s*없음|-)$/.test(text)) return text
+  const cert = customFactEntries(record).find(([k]) => /^cf:(기업부설연구소|연구개발전담부서)/.test(k))
+  return cert ? `${cert[0].slice(CUSTOM_FACT_PREFIX.length).replace(/\s*\(\d+\)$/, '')}(${cert[1]})` : ''
+}
+
 function customFieldOf(record: ClientOpsRecord, label: string) {
   // '이노비즈' 와 '이노비즈 확인서' 는 같은 칸 — 서류 읽기 · 기업인증 진행 기록이 같은 인증으로 칸을 두 개 만들지 않게
   const norm = (v: string) => v.replace(/\s/g, '').replace(/(확인서|인증서|인정서)$/, '')

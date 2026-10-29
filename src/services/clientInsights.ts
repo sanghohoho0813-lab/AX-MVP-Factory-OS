@@ -12,7 +12,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { customFactValue, usableFactValue } from './customerFacts'
+import { customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
@@ -373,7 +373,8 @@ function labCreditOf(record: ClientOpsRecord): number {
 
 const labInsight: Provider = ({ record, facts }) => {
   const open = `/tools/labcare${q(record)}`
-  const lab = usableFactValue(record, 'researchLab')
+  // D-340 회사 정보 글 · 올린 인정서 둘 다('없음' 글은 아님)
+  const lab = researchLabOf(record)
   if (lab) {
     // D-232: 연구소가 있으면 '연구개발비 세액공제를 챙겼나' 가 다음 제안이다(못 받은 해는 경정청구 5년) — 계산이 붙어 있으면 그 금액
     const credit = labCreditOf(record)

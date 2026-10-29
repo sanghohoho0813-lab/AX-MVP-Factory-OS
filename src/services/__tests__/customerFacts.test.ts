@@ -12,7 +12,8 @@ import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog,
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
-import { NOTE_RECHECK, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
+import { NOTE_RECHECK, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
+import { fitContext } from '../scenarioFit'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
@@ -1615,6 +1616,17 @@ await (async () => {
   check('D-339 취업규칙 올리면 회사 정보 "정년 · 계속고용" 칸(출처 취업규칙)', a.rec.customFields.some((f) => f.label === '정년 · 계속고용' && f.value.startsWith('정년 60세 · 정년 뒤 재고용 · 연장 조항 없음')), JSON.stringify(a.rec.customFields))
   check('D-339 고용 카드: 조항 없음 → "넣고 1년 운영하면 계속고용장려금(1명 최대 1,440만원)" · 있음 → 후보 · 안 올림 → 취업규칙 올리라고', a.emp.includes('정년 뒤 재고용 조항이 없어요') && a.emp.includes('1,440만원') && b.emp.includes('계속고용 제도 있음') && c.emp.includes('취업규칙(정년 · 재고용 조항)을 올리면'), [a.emp, b.emp, c.emp].join(' || ').slice(0, 900))
 })()
+
+// D-340 연구소 — 회사 정보 글 · 올린 인정서(기업부설연구소 · 연구개발전담부서 칸) 둘 다 · '없음' 글은 연구소가 아님
+{
+  const base = normalizeClientOps({ id: 'lab340', companyName: '연구테크(주)', employeeCount: '12', createdAt: NOW, updatedAt: NOW })
+  const withCert = normalizeClientOps({ ...base, customFields: [{ id: 'l1', group: 'credential', label: '기업부설연구소', value: '인정번호 2024-1 · 인정일 2024-01-02' }] } as never)
+  const saysNone = withFactValue(base, 'researchLab', '없음', { source: 'meeting', status: 'entered', now: NOW })
+  const saysLab = withFactValue(base, 'researchLab', '기업부설연구소(2024 인정)', { source: 'meeting', status: 'entered', now: NOW })
+  check('D-340 연구소: 올린 인정서 → 있음 · 글 → 그 글 · "없음" 글 → 없음', researchLabOf(withCert).startsWith('기업부설연구소(') && researchLabOf(saysLab) === '기업부설연구소(2024 인정)' && researchLabOf(saysNone) === '' && researchLabOf(base) === '', [researchLabOf(withCert), researchLabOf(saysNone)].join(' | '))
+  const T = '2026-10-28'
+  check('D-340 상황 예시 · 맞춤 추천이 올린 인정서를 연구소로 본다(설립 권유 안 함)', fitContext(withCert, T).hasLab && !fitContext(saysNone, T).hasLab && (buildInsights(withCert, T, []).find((i) => i.key === 'labcare')?.headline ?? '').includes('연구소(전담부서)가 있어요'), buildInsights(withCert, T, []).find((i) => i.key === 'labcare')?.headline)
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
