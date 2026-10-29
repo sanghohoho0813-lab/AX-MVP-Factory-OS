@@ -12,7 +12,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { usableFactValue } from './customerFacts'
+import { customFactValue, usableFactValue } from './customerFacts'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
@@ -26,7 +26,8 @@ import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import { METRO_POP_DECLINE, startupCreditOverlap } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
-import { rosterSubsidyTotal } from '../tools/employment/lib/programs'
+import { DEFAULT_PROGRAMS, programForRegion, rosterSubsidyTotal } from '../tools/employment/lib/programs'
+import { continuingOf } from './workRules'
 import { creditYears, headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
@@ -288,6 +289,21 @@ export function rosterCredit(record: ClientOpsRecord, facts: ClientFacts, hc: Ro
   return { won: 0, threeYear: 0, line: `${c} — ${p}와 같아요 · 청년 등 1명 늘면 ${per} 덜 내요`, basis, assumptions }
 }
 
+/**
+ * D-339 만 60세 이상 직원이 있으면 — 취업규칙의 정년 · 계속고용 제도(회사 정보 '정년 · 계속고용' 칸)로 계속고용장려금 기회를 한 줄.
+ * 제도가 없으면 '넣고 1년 운영하면' 이 제안 거리, 칸이 비면 취업규칙을 올리라고.
+ */
+function seniorRuleLine(record: ClientOpsRecord, seniorCount: unknown, sido: string): string {
+  const n = typeof seniorCount === 'number' ? seniorCount : 0
+  if (n <= 0) return ''
+  const region = sido ? (['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권') : null
+  const per = manwonText(programForRegion(DEFAULT_PROGRAMS.senior_continue, region).totalAmount)
+  const state = continuingOf(customFactValue(record, '정년 · 계속고용'))
+  if (state === 'yes') return `만 60세 이상 ${n}명 — 취업규칙에 계속고용 제도 있음: 정년 지난 직원은 계속고용장려금 후보(1명 최대 ${per} · ★ 1년 넘게 운영 · 60세 이상 30% 이하)`
+  if (state === 'no') return `만 60세 이상 ${n}명 — 취업규칙에 정년 뒤 재고용 조항이 없어요: 넣고 1년 운영하면 계속고용장려금(1명 최대 ${per}) 제안 거리`
+  return `만 60세 이상 ${n}명 — 취업규칙(정년 · 재고용 조항)을 올리면 계속고용장려금 요건을 바로 봐요`
+}
+
 const employmentInsight: Provider = ({ record, facts }) => {
   const open = `/tools/employment/roster${q(record)}`
   const roster = latestEmploymentRoster(record)
@@ -304,7 +320,7 @@ const employmentInsight: Provider = ({ record, facts }) => {
   const fresh = Array.isArray(rows) ? rosterSubsidyTotal(rows as { key: string; candidateCount?: number }[], empSido ? (['서울', '경기', '인천'].includes(empSido) ? '수도권' : '비수도권') : null) : 0
   const total = fresh > 0 ? (empSido ? fresh : Math.max(fresh, old)) : old
   // 통합고용세액공제 — 명부 화면에서 사람이 넣어 계산한 값이 먼저(D-232), 없으면 명부 날짜로 센 인원으로(D-302). 둘 다 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
-  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown }; headcount?: unknown } | null
+  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown; seniorCount?: unknown }; headcount?: unknown } | null
   const typed = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
   const hc = typed > 0 ? null : headcountOf(data?.headcount)
   const fromRoster = hc ? rosterCredit(record, facts, hc) : null
@@ -337,7 +353,7 @@ const employmentInsight: Provider = ({ record, facts }) => {
     tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
     headline: creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
     // D-336 2025년 이후 창업이면 세액공제와 창업감면을 같은 해 함께 못 받을 수 있다 — 금액을 볼 때 같이 알린다
-    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : ''].filter(Boolean).join(' · '),
+    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : '', seniorRuleLine(record, data?.counts?.seniorCount, empSido)].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',

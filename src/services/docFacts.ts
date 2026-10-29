@@ -6,6 +6,7 @@
  *
  *  - 사업자등록증 · 법인등기부등본 → 회사명 · 번호 · 대표자 · 설립일 · 주소 · 업태 · 종목(공통 사실)
  *  - 인정서 · 확인서 · 인증서 · 특허증(어느 칸에 올렸든, 직접 만든 칸이어도) → 회사 기본 정보 '인증서' 묶음의 칸
+ *  - 취업규칙 → '정년 · 계속고용' 칸(D-339)
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -15,6 +16,7 @@ import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, formatWon, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
+import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -69,6 +71,12 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       return out
     }
     if (vat) return out
+  }
+  // D-339 취업규칙 → 정년 · 계속고용 제도(고령자 계속고용장려금 요건) — 회사 정보 '정년 · 계속고용' 칸
+  if (looksLikeWorkRules(text)) {
+    const rule = readRetireRule(text)
+    if (rule) out.push({ key: `${CUSTOM_FACT_PREFIX}정년 · 계속고용`, label: '정년 · 계속고용', group: 'people', value: retireRuleLine(rule), source: 'workRules', asOf: '', ref })
+    return out
   }
   const cert = parseCertificateDocument(text)
   if (cert) {

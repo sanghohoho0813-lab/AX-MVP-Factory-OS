@@ -711,6 +711,7 @@ export type FactSource =
   | 'meeting' // 상담 · 미팅 메모
   | 'certificate' // 인증서 · 확인서 · 인정서 (D-129)
   | 'vatCertificate' // 부가세 과세표준증명 · 면세 수입금액증명 (D-311)
+  | 'workRules' // 취업규칙 — 정년 · 계속고용 (D-339)
 
 export interface FactMeta {
   source: FactSource

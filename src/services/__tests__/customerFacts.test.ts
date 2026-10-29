@@ -40,6 +40,7 @@ import {
 } from '../customerFacts'
 import { clientFacts, ventureConfirmedAt, ventureValidOn } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
+import { continuingOf, looksLikeWorkRules, readRetireRule, retireRuleLine } from '../workRules'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
 import { requestFollowUpText } from '../recoRequest'
@@ -1580,6 +1581,35 @@ await (async () => {
   const ev = policyEvidence(r, clientFacts(r, new Date(`${T}T00:00:00`)), T)
   check('D-338 정책자금 매출 성장세(칸의 매출 추이) → 3년 추세 증가', ev.input.revenueTrend3y === '증가' && ev.notes.some((x) => x.startsWith('매출 증가(')), JSON.stringify({ i: ev.input.revenueTrend3y, n: ev.notes.slice(0, 3) }))
   check('D-338 창업벤처 · 연구소 — 벤처 확인일 · 유효(칸에서 읽음)', ventureConfirmedAt(r) !== '' && ventureValidOn(r, T), `${ventureConfirmedAt(r)} ${ventureValidOn(r, T)}`)
+})()
+
+// D-339 취업규칙 → 정년 · 계속고용 → 맞춤 추천 고용 카드에 계속고용장려금 기회(만 60세 이상 직원이 있을 때)
+await (async () => {
+  const head = '취업규칙\n제1장 총칙\n제20조(근로시간) 1일 8시간 · 1주 40시간\n'
+  const rehire = head + '제50조(정년) ① 직원의 정년은 만 60세로 한다. ② 정년에 도달한 직원 중 회사가 필요하다고 인정하는 자는 촉탁직으로 재고용할 수 있다.'
+  const none = head + '제50조(정년) 직원의 정년은 만 60세로 하며, 정년에 도달한 날이 속하는 달의 말일에 퇴직한다.'
+  const r1 = readRetireRule(rehire)
+  const r2 = readRetireRule(none)
+  const r3 = readRetireRule(head + '제50조(정년) 직원의 정년은 만 63세로 한다.')
+  const r4 = readRetireRule(head + '제50조(정년) 회사는 정년을 두지 아니한다.')
+  check('D-339 취업규칙 읽기: 60세 · 재고용 / 60세 · 조항 없음 / 63세 연장 / 정년 폐지', r1?.age === 60 && r1.continuing === 'rehire' && r2?.age === 60 && r2.continuing === null && r3?.continuing === 'extend' && r4?.continuing === 'abolish', JSON.stringify([r1, r2, r3, r4]))
+  check('D-339 칸 글 → 제도 있음 · 없음', continuingOf(retireRuleLine(r1!)) === 'yes' && continuingOf(retireRuleLine(r2!)) === 'no' && continuingOf(retireRuleLine(r3!)) === 'yes' && continuingOf(retireRuleLine(r4!)) === 'yes' && continuingOf('') === null)
+  check('D-339 취업규칙이 아닌 글은 읽지 않음(근로계약서 · 정관)', !looksLikeWorkRules('근로계약서\n정년 60세') && !looksLikeWorkRules('정관\n제1조 상호') && looksLikeWorkRules(rehire))
+  const ROSTER = ['4대보험 사업장 가입자 명부', ['성명', '주민등록번호', '자격취득일'].join('\t'), ['장정년', '650101-1234567', '2015-03-01'].join('\t')].join('\n')
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-28', makeId: () => `w${++n}` }
+  const base = normalizeClientOps({ id: 'wr339', companyName: '규칙테크(주)', businessAddress: '충청북도 청주시 흥덕구 1', createdAt: NOW, updatedAt: NOW })
+  const run = async (rules: string | null) => {
+    const docs = [{ key: 'payrollRoster', fileName: '가입자명부.xlsx', text: ROSTER, method: 'xlsx' as const, docSure: true }]
+    if (rules) docs.push({ key: 'customdoc_wr', fileName: '취업규칙.pdf', text: rules, method: 'pdf_text' as never, docSure: true })
+    const out = await analyzeUploadedDocs(base, docs, ctx)
+    return { rec: out.record, emp: buildInsights(out.record, '2026-10-28', []).find((i) => i.key === 'employment')?.detail ?? '' }
+  }
+  const a = await run(none)
+  const b = await run(rehire)
+  const c = await run(null)
+  check('D-339 취업규칙 올리면 회사 정보 "정년 · 계속고용" 칸(출처 취업규칙)', a.rec.customFields.some((f) => f.label === '정년 · 계속고용' && f.value.startsWith('정년 60세 · 정년 뒤 재고용 · 연장 조항 없음')), JSON.stringify(a.rec.customFields))
+  check('D-339 고용 카드: 조항 없음 → "넣고 1년 운영하면 계속고용장려금(1명 최대 1,440만원)" · 있음 → 후보 · 안 올림 → 취업규칙 올리라고', a.emp.includes('정년 뒤 재고용 조항이 없어요') && a.emp.includes('1,440만원') && b.emp.includes('계속고용 제도 있음') && c.emp.includes('취업규칙(정년 · 재고용 조항)을 올리면'), [a.emp, b.emp, c.emp].join(' || ').slice(0, 900))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
