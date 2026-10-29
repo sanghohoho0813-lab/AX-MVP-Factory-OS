@@ -46,6 +46,16 @@ function bracketRows(table: readonly (readonly [number, number, number])[], unit
   })
 }
 
+/**
+ * D-332 기준 연도 · 다음 점검 — 세법은 해마다 1월 · 7월(4대보험 상한)에 바뀐다. 해가 바뀌었는데 숫자를 다시 보지 않았으면 기준표 머리에 알린다.
+ * 숫자를 고친 해에 LAW_BASIS_YEAR 를 올린다(그 해의 개정을 반영했다는 뜻).
+ */
+export const LAW_BASIS_YEAR = 2026
+export function lawBasisStatus(today: string): { year: number; nextReview: string; stale: boolean } {
+  const nextReview = `${LAW_BASIS_YEAR + 1}-01-01`
+  return { year: LAW_BASIS_YEAR, nextReview, stale: today >= nextReview }
+}
+
 export function lawBasis(): BasisSection[] {
   const corp26 = CORP_RATES.y2026
   const corp25 = CORP_RATES.y2025

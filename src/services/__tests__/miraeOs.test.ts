@@ -143,7 +143,7 @@ import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
-import { lawBasis } from '../lawBasis'
+import { lawBasis, lawBasisStatus } from '../lawBasis'
 import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, corpTaxNational, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
@@ -1409,6 +1409,8 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
       const g = a.blocks.flatMap((b) => b.lines).find((l) => l.k === '배당가산액(Gross-up)')?.v
       check('D-327 배당가산액 = (금융소득 1억 − 2,000만) × 10% = 8,000,000원', g === '8,000,000원', g)
     }
+    // D-332 기준 연도 · 다음 점검 — 해가 바뀌면 알림
+    check('D-332 기준표 2026년 · 다음 점검 2027-01-01 · 2026-12-31 은 그대로 · 2027-01-01 부터 알림', lawBasisStatus('2026-12-31').stale === false && lawBasisStatus('2027-01-01').stale === true && lawBasisStatus('2026-10-29').nextReview === '2027-01-01')
     // D-321 계산 기준표 — 계산에 쓰는 상수에서 읽은 숫자
     const basis = lawBasis()
     const sec = (id: string) => basis.find((b) => b.id === id)

@@ -4,11 +4,13 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BookOpen, ChevronDown } from 'lucide-react'
-import { lawBasis } from '../../services/lawBasis'
+import { lawBasis, lawBasisStatus } from '../../services/lawBasis'
+import { todayLocalDate } from '../../lib/appClock'
 
 /** focus — 판정 · 계산 화면에서 '기준표' 를 누르고 왔으면 그 칸(?s=)으로 내려가 펼치고 테두리를 칠한다(D-326) */
 export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string | null }) {
   const sections = useMemo(() => lawBasis(), [])
+  const status = lawBasisStatus(todayLocalDate())
   const [open, setOpen] = useState<string | null>(focus ?? null)
   useEffect(() => {
     if (!focus) return
@@ -20,8 +22,18 @@ export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 id="tax-basis-title" className="t-card flex items-center gap-2 font-bold text-slate-900">
-            <BookOpen aria-hidden="true" className="size-5 shrink-0 text-brand-700" /> 계산 기준표 — 2026년
+            <BookOpen aria-hidden="true" className="size-5 shrink-0 text-brand-700" /> 계산 기준표 — {status.year}년
           </h2>
+          {/* D-332 해가 바뀌었는데 숫자를 다시 보지 않았으면 — 조용히 옛 숫자로 계산하지 않게 알린다 */}
+          {status.stale ? (
+            <p className="t-sub mt-1 break-keep rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-900" data-testid="tax-basis-stale">
+              ★ {status.year + 1}년 세법 개정을 아직 반영하지 않았어요 — 아래 숫자는 {status.year}년 기준입니다. 신고 · 상담 전에 바뀐 세율 · 공제를 확인하세요.
+            </p>
+          ) : (
+            <p className="t-meta mt-0.5 text-slate-500" data-testid="tax-basis-review">
+              다음 점검 {status.nextReview} — 새해 세법 · 7월 4대보험 상한이 바뀌면 이 표부터 고칩니다
+            </p>
+          )}
           <p className="t-sub mt-1 break-keep text-slate-600">
             계산기 · 판정 · 설계서가 쓰는 세율과 공제를 그대로 보여 줘요. 이 표의 숫자는 계산에 쓰는 값에서 바로 읽어서, 계산과 어긋나지 않아요. 신고 전에는 담당 세무사와 확인하세요.
           </p>
