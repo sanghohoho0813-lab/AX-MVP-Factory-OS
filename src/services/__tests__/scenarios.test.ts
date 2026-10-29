@@ -481,6 +481,10 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
     longName.needs.find((x) => x.label.startsWith('회사 주소'))?.value === '비수도권' && !longName.assumptions.some((a) => a.includes('주소를 몰라')),
     longName.needs,
   )
+  // D-334 정년 된 직원 계속 고용 — 계속고용장려금이 회사 지역 금액(비수도권 1,440만 · 수도권 1,080만)
+  const keepL = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk1', businessAddress: '충청북도 청주시 흥덕구 1' } as unknown as Partial<ClientOpsRecord>), today)
+  const keepM = runScenario(scenarioPreset('emp-retire-keep')!, normalizeClientOps({ ...full, id: 'rk2', businessAddress: '서울특별시 중구 세종대로 1' } as unknown as Partial<ClientOpsRecord>), today)
+  check('D-334 상황 예시 정년 된 직원 계속 고용 — 비수도권 1,440만 · 수도권 1,080만', keepL.lines.some((l) => l.includes('고령자 계속고용 장려금 — 1명 최대 1,440만원')) && keepM.lines.some((l) => l.includes('고령자 계속고용 장려금 — 1명 최대 1,080만원')), JSON.stringify([keepL.lines, keepM.lines]))
   const senior = buildSituationPlan('hire-senior', full, today, 1)
   // D-334 새로 뽑는 만 60세 이상에게 계속고용장려금(정년 도달 기존 직원용)을 '또는' 으로 보여 주지 않는다
   check('P15b 만 60세 이상 새 채용 — 지원금 줄에 계속고용장려금 없음 · 시니어 인턴십', !senior.blocks.find((b) => b.key === 'subsidy')!.lines.some((l) => l.includes('계속고용')) && senior.blocks.find((b) => b.key === 'subsidy')!.headline.includes('시니어 인턴십'), JSON.stringify(senior.blocks.find((b) => b.key === 'subsidy')?.lines))
