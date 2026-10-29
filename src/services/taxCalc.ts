@@ -780,7 +780,8 @@ function calc6p1(v: Values): Output {
   const pay = num('q_pay'), basic = num('q_basic'), credit = num('q_credit'), health = num('q_health')
   const earnedDed = earnedIncomeDeduction(pay)
   const base = pay - earnedDed - basic
-  const grossTax = Math.max(oldBracketTax(base), 0)
+  // D-317 2023년부터 기본세율 구간이 1,400만 · 5,000만으로 바뀌었다 — 원본은 2022년 구간(1,200만 · 4,600만)이라 대표 부담이 부풀었다
+  const grossTax = Math.max(salaryBracketTax(base), 0)
   const finalTax = grossTax - credit
   const localTax = finalTax * 0.1
   const payTax = finalTax + localTax
@@ -871,12 +872,20 @@ function calc6p2(v: Values): Output {
 
 function calc6p3(v: Values): Output {
   const { num, str } = mk(v)
-  const start = new Date(str('t_start'))
   const end = new Date(str('t_end'))
   const amount = num('t_amount')
-  const years = Math.ceil(((end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())) / 12)
+  // D-317 근속연수는 날짜까지 보고 1년 미만은 1년(소득세법 시행령 §105) — 원본은 달만 세어 하루 차이로 한 해가 빠졌다
+  const years = yearsRoundUp9(str('t_start'), str('t_end'))
+  // D-317 2023-01-01 이후 퇴직은 근속연수공제가 커지고(100만 · 200만 · 250만 · 300만) 기본세율 구간도 바뀌었다.
+  //       원본은 새 근속공제에 옛 세율 구간을 섞어 어느 해 퇴직에도 맞지 않았다 — 퇴사일로 그해 법을 고른다
+  const before2023 = end.getFullYear() < 2023
   let serviceDed: number
-  if (years <= 5) serviceDed = years * 1000000
+  if (before2023) {
+    if (years <= 5) serviceDed = years * 300000
+    else if (years <= 10) serviceDed = (years - 5) * 500000 + 1500000
+    else if (years <= 20) serviceDed = (years - 10) * 800000 + 4000000
+    else serviceDed = (years - 20) * 1200000 + 12000000
+  } else if (years <= 5) serviceDed = years * 1000000
   else if (years <= 10) serviceDed = (years - 5) * 2000000 + 5000000
   else if (years <= 20) serviceDed = (years - 10) * 2500000 + 15000000
   else serviceDed = (years - 20) * 3000000 + 40000000
@@ -891,7 +900,7 @@ function calc6p3(v: Values): Output {
   else convDed = (converted - 300000000) * 0.35 + 151700000
 
   const base = converted - convDed
-  const convTax = Math.max(oldBracketTax(base), 0)
+  const convTax = Math.max(before2023 ? oldBracketTax(base) : salaryBracketTax(base), 0)
   const retireTax = Math.floor((convTax * years) / 12 / 10) * 10
   const localTax = Math.floor((retireTax * 0.1) / 10) * 10
   const totalTax = retireTax + localTax
@@ -903,7 +912,8 @@ function calc6p3(v: Values): Output {
         title: '퇴직소득세 계산 결과',
         tone: 'dark',
         lines: [
-          L('근속연수', Number.isFinite(years) ? years + '년' : '-'),
+          L('적용 법', Number.isNaN(end.getTime()) ? '-' : before2023 ? '2022년까지 퇴직 — 옛 근속연수공제 · 옛 세율' : '2023년 이후 퇴직 — 지금 근속연수공제 · 기본세율'),
+          L('근속연수', years > 0 ? years + '년' : '-'),
           L('근속공제', won(serviceDed)),
           L('근속공제 후 산출액', won(afterService)),
           L('환산급여액', won(converted)),
@@ -925,20 +935,24 @@ function calc6p3(v: Values): Output {
 /* ------------------------------------------------------------------ */
 
 // D-244: 소득이 0 이하(결손)면 법인세도 0 — 예전엔 음수 세금이 나와 결손 법인 채무면제 · 증여 이익이 부풀었다
-export function corpTaxNational(x: number): number {
+// D-317: 2026-01-01 이후 시작하는 사업연도부터 법인세율이 구간마다 1%p 올랐다(10 · 20 · 22 · 25%, 법인세법 §55).
+//        원본은 2023~2025 세율(9 · 19 · 21 · 24%)이라 감자 · 증자 증여의제의 법인세 상당액이 적게 나왔다. 누진공제액은 두 해가 같다.
+const CORP_RATES: Record<'y2025' | 'y2026', [number, number, number, number]> = { y2025: [0.09, 0.19, 0.21, 0.24], y2026: [0.1, 0.2, 0.22, 0.25] }
+export function corpTaxNational(x: number, fiscalYear = 2026): number {
   if (!(x > 0)) return 0
-  if (x <= 200000000) return x * 0.09
-  if (x <= 20000000000) return x * 0.19 - 20000000
-  if (x <= 300000000000) return x * 0.21 - 420000000
-  return x * 0.24 - 9420000000
+  const [r1, r2, r3, r4] = CORP_RATES[fiscalYear >= 2026 ? 'y2026' : 'y2025']
+  if (x <= 200000000) return x * r1
+  if (x <= 20000000000) return x * r2 - 20000000
+  if (x <= 300000000000) return x * r3 - 420000000
+  return x * r4 - 9420000000
 }
 
+/**
+ * 원본 이름은 '지방세 포함' 이지만 식은 법인세(국세) 10 · 20 · 22 · 25% 그대로다 — 2026 사업연도 세율과 같다(D-317).
+ * 특정법인 증여의제(상증법 §45의5)의 법인세 상당액은 국세만 보므로 이 값이 맞다. 이름만 원본을 따른다.
+ */
 export function corpTaxLocal(x: number): number {
-  if (!(x > 0)) return 0
-  if (x <= 200000000) return x * 0.1
-  if (x <= 20000000000) return x * 0.2 - 20000000
-  if (x <= 300000000000) return x * 0.22 - 420000000
-  return x * 0.25 - 9420000000
+  return corpTaxNational(x, 2026)
 }
 
 function solveLimit(fn: (x: number) => number, target: number, lo: number, hi: number): number {
@@ -1623,7 +1637,7 @@ export const TAX_CALCULATORS: Calculator[] = [
     desc: '대표이사(특수관계인) 가지급금을 방치할 경우 연도별 세무·자금 손실을 시뮬레이션합니다.',
     subs: [{
       key: 'main', label: '',
-      groups: [{ title: '① 기본 가정 입력', fields: [A('g_principal', '가지급금 원금 (원)', '1000000000'), N('g_rate', '인정이자율 (당좌대출이자율)', '4.6', { step: '0.01', hint: '% 단위' }), N('g_years', '분석 기간 (년, 1~10)', '5', { min: 1, max: 10 }), N('g_corp', '법인세 적용세율', '20', { step: '0.1', hint: '%' }), N('g_inc', '대표이사 소득세 한계세율(지방소득세 포함)', '41.8', { step: '0.1', hint: '%' }), N('g_ins', '4대보험 추가부담률(회사분)', '9', { step: '0.1', hint: '%' }), S('g_debt', '회사 차입금 존재 여부', ['있음', '없음'], '있음'), N('g_borrow', '가중평균차입이자율(지급이자 손금불산입 계산용)', '4.6', { step: '0.01', hint: '%' })] }],
+      groups: [{ title: '① 기본 가정 입력', fields: [A('g_principal', '가지급금 원금 (원)', '1000000000'), N('g_rate', '인정이자율 (당좌대출이자율)', '4.6', { step: '0.01', hint: '% 단위' }), N('g_years', '분석 기간 (년, 1~10)', '5', { min: 1, max: 10 }), N('g_corp', '법인세 적용세율', '22', { step: '0.1', hint: '% — 2026 사업연도부터 과표 2억 이하 11% · 2억~200억 22%(지방소득세 포함)' }), N('g_inc', '대표이사 소득세 한계세율(지방소득세 포함)', '41.8', { step: '0.1', hint: '%' }), N('g_ins', '4대보험 추가부담률(회사분)', '9', { step: '0.1', hint: '%' }), S('g_debt', '회사 차입금 존재 여부', ['있음', '없음'], '있음'), N('g_borrow', '가중평균차입이자율(지급이자 손금불산입 계산용)', '4.6', { step: '0.01', hint: '%' })] }],
       compute: calc1,
     }],
   },

@@ -143,7 +143,7 @@ import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
-import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
+import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, corpTaxNational, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, builtinServicesHidden, clearBuiltinServiceUse, isServiceTouched, noteBuiltinServiceUse, registerCustomServices, setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
@@ -1356,7 +1356,35 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('세금: 상속·증여 세율 — 10억 경계', inheritGiftTax(1000000000) === 240000000)
   check('세금: 증여공제 — 배우자 6억', giftDeduction('배우자') === 600000000 && giftDeduction('타인') === 0)
   check('세금: 예전 누진세율표(퇴직) — 4,600만 경계', Math.round(oldBracketTax(46000000)) === 5820000)
-  check('세금: 법인세(지방세 포함) — 2억 경계', corpTaxLocal(200000000) === 20000000)
+  check('세금: 법인세(원본 이름 corpTaxLocal = 2026 국세 10%) — 2억 경계', corpTaxLocal(200000000) === 20000000)
+  // D-317 법 기준 손계산 — 2026 사업연도부터 법인세 10 · 20 · 22 · 25%(2025 사업연도까지 9 · 19 · 21 · 24%)
+  check('D-317 법인세: 2026 사업연도 — 2억 2천만 · 10억 1.8억 · 300억 62억 · 결손 0', corpTaxNational(200000000) === 20000000 && corpTaxNational(1000000000) === 180000000 && corpTaxNational(30000000000) === 6180000000 && corpTaxNational(-5) === 0)
+  check('D-317 법인세: 2025 사업연도는 옛 세율 — 2억 1,800만 · 10억 1.7억', corpTaxNational(200000000, 2025) === 18000000 && corpTaxNational(1000000000, 2025) === 170000000)
+  {
+    const t6 = calculatorOf('t6')!
+    const p3 = t6.subs.find((x) => x.key === 'p3')!
+    const line = (out: ReturnType<typeof p3.compute>, k: string) => out.blocks.flatMap((b) => b.lines).find((l) => l.k === k)?.v
+    // 2026년 퇴직 · 2019-01-15 입사 · 9천만 — 근속 8년(7년 2개월 → 올림) · 근속공제 500만+3×200만 · 환산 1억1,850만 · 환산공제 7,002.5만
+    //   과표 4,847.5만 × 15% − 126만 = 601.125만 → × 8/12 = 4,007,500원(옛 구간으로는 4,127,500원)
+    const v26 = { ...defaultValues(t6), t_start: '2019-01-15', t_end: '2026-03-31', t_amount: '90000000' }
+    const o26 = p3.compute(v26)
+    check('D-317 퇴직소득세: 2026년 퇴직 — 근속 8년 · 근속공제 1,100만 · 세액 4,007,500 · 지방 400,750', line(o26, '근속연수') === '8년' && line(o26, '근속공제') === '11,000,000원' && line(o26, '퇴직소득세액') === '4,007,500원' && line(o26, '지방소득세') === '400,750원', JSON.stringify(o26.blocks[0].lines.slice(0, 12)))
+    // 같은 퇴직금을 09 소득세 계산기(2026) 퇴직 칸에 넣으면 같은 산출세액
+    const t9 = calculatorOf('t9')!
+    const a9 = t9.subs.find((x) => x.key === 'inc_a')!.compute({ ...defaultValues(t9), inc_a_retireAmt: '90000000', inc_a_startDate: '2019-01-15', inc_a_endDate: '2026-03-31' })
+    check('D-317 퇴직소득세: 02 계산기와 09 계산기(2026)가 같은 퇴직금에 같은 세액', line(a9, '⑧ 퇴직소득 산출세액(연분연승)') === line(o26, '퇴직소득세액'), `${line(a9, '⑧ 퇴직소득 산출세액(연분연승)')} vs ${line(o26, '퇴직소득세액')}`)
+    // 2022년 퇴직(기본값 1998-05-25 ~ 2022-12-31 · 12억) — 옛 근속공제 1,200만+5×120만 · 옛 구간 → 215,486,660원
+    const o22 = p3.compute(defaultValues(t6))
+    check('D-317 퇴직소득세: 2022년 퇴직은 그해 법(옛 근속공제 1,800만 · 옛 세율) — 215,486,660원', line(o22, '근속공제') === '18,000,000원' && line(o22, '퇴직소득세액') === '215,486,660원' && /2022년까지/.test(line(o22, '적용 법') ?? ''), JSON.stringify(o22.blocks[0].lines.slice(0, 12)))
+    // 근속연수는 날짜까지 — 2019-01-15 ~ 2026-01-20 은 7년 5일 → 8년(원본은 달만 세어 7년)
+    check('D-317 퇴직소득세: 근속연수는 날짜까지 보고 1년 미만 올림', line(p3.compute({ ...v26, t_end: '2026-01-20' }), '근속연수') === '8년')
+    // 01 개인 vs 법인: 근로소득 과표는 2023년 이후 구간(1,400만 6% · 5,000만 15%)
+    const p1 = t6.subs.find((x) => x.key === 'p1')!
+    const o1 = p1.compute({ ...defaultValues(t6), q_pay: '30000000', q_basic: '1500000', q_credit: '0', q_health: '0' })
+    // 3천만 − 근로소득공제(750만+1,500만×15% = 975만) − 150만 = 1,875만 → × 15% − 126만 = 1,552,500
+    check('D-317 개인 vs 법인: 근로소득 산출세액은 지금 세율 구간 — 1,875만 → 1,552,500원', line(o1, '산출세액') === '1,552,500원', line(o1, '산출세액'))
+    check('D-317 가지급금: 법인세 적용세율 기본값 22%(2026 · 지방소득세 포함)', defaultValues(calculatorOf('t1')!).g_corp === '22')
+  }
   check('세금: 2026 종합소득세 — 5천만 원', Math.round(incomeTax9(50000000)) === 6240000)
   check('세금: 근속연수 1년 미만 절상', yearsRoundUp9('2016-01-01', '2026-03-02') === 11 && yearsRoundUp9('2020-01-01', '2020-06-01') === 1)
   const s = computeSalary(10000000)
