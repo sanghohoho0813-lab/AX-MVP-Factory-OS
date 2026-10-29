@@ -98,6 +98,9 @@ import { KeywordHome, type HomeKeyword } from './radar/KeywordHome'
 import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
+import { WeekView } from './radar/WeekView'
+import { weekRequests, weekStart, weekTopics } from '../../services/marketing/weekPlan'
+import { startWeekAi, subscribeWeek, weekSaved, weekVersion } from '../../services/marketing/weekRun'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
@@ -186,6 +189,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const [detail, setDetail] = useState<RadarVideo | null>(null)
   // D-251 이번 주 키워드 하나 → 콘텐츠 묶음(?pack=키 · 직접 쓴 주제는 custom:주제)
   const packKey = view === 'plan' ? (params.get('pack') ?? '') : ''
+  // D-346 1주일치 한 번에(?week=1) — 이번 주 키워드 1~3위로 롱폼 1 · 릴스/쇼츠 3 · 스레드 7
+  const weekOn = view === 'plan' && !packKey && params.get('week') === '1'
   const location = useLocation()
   const navigate = useNavigate()
   // SAAS-2 고객도 서버가 마케팅을 열었으면 묶음 AI 를 쓴다(사용량 장부로 셈) — 대표 판정은 그대로
@@ -253,6 +258,24 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if (packFixed) return fixedPackSource(packFixed, today)
     return packOpp ? packSourceOf(packOpp) : null
   }, [packKey, packOpp, packFixed, today])
+  // D-346 1주일치 주제 — 이번 주 키워드 1~3위(모자라면 고정 키워드)
+  const weekSources = useMemo(() => weekTopics((plan?.picks ?? []).map(packSourceOf), fixedKeys.map((k) => fixedPackSource(k, today)).filter((x): x is PackSource => !!x)), [plan, fixedKeys, today])
+  const weekVer = useSyncExternalStore(subscribeWeek, weekVersion)
+  const weekDone = useMemo(() => !!weekSaved(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** 첫 화면 단추 → 1주일치(AI 를 부를 수 있으면 두 번 눌러 확인한 뒤 여섯 갈래를 바로) */
+  const openWeek = (startAi: boolean) => {
+    if (startAi && mkAi && !readOnly && weekSources.length) startWeekAi(weekStart(today), weekSources.map((t) => t.topic), weekRequests(weekSources, brief, today))
+    const next = new URLSearchParams(params)
+    next.delete('view')
+    next.delete('pack')
+    next.set('week', '1')
+    setParams(next, { state: { mkHome: true } })
+    window.scrollTo({ top: 0 })
+  }
+  const closeWeek = () => {
+    if ((location.state as { mkHome?: boolean } | null)?.mkHome) navigate(-1)
+    else setParam({ week: '' })
+  }
   /** 이 묶음이 담긴 내 콘텐츠 줄 — 직접 쓴 주제는 '내 콘텐츠' 탭에서 같은 이름으로 담은 줄도(키가 달라도) */
   const ideaOfPack = (key: string, topic: string, custom: boolean) => notebook.ideas.find((i) => i.key === key) ?? (custom ? notebook.ideas.find((i) => i.topic.trim() === topic.trim()) : undefined)
   const packIdea = packSource ? (ideaOfPack(packSource.key, packSource.topic, packSource.custom) ?? null) : null
@@ -555,7 +578,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   // D-295 채널 설계 기준은 대표 계정만(접힌 채로) — 팀장 · 구독 고객은 설정 › 내 브랜드로 각자
   const briefCard = !readOnly && !isMarketingCustomer() ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
-  const home = view === 'plan' && !packKey
+  const home = view === 'plan' && !packKey && !weekOn
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
 
   return (
@@ -568,10 +591,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           descriptionAsHint
           description={mkText('이번 주 키워드 하나를 누르면 제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글이 한 번에 나옵니다. 키워드는 벤치마킹 채널의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 주제를 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
-          actions={view === 'plan' && (prepared || packKey) ? undefined : feedButtons}
+          actions={view === 'plan' && (prepared || packKey || weekOn) ? undefined : feedButtons}
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
-        {!packKey && (
+        {!packKey && !weekOn && (
           <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
             <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
               콘텐츠 레이더 · YouTube 벤치마킹
@@ -590,7 +613,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* D-231 목차는 데이터를 받기 전에도 — 내 콘텐츠 · 홍보 글 · 홈페이지는 유튜브 데이터 없이도 쓴다. 묶음 화면에서는 [← 이번 주 키워드] 하나로 */}
-      {!packKey && (
+      {!packKey && !weekOn && (
         <div role="tablist" data-testid="yt-views">
           <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
         </div>
@@ -691,6 +714,21 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             </Button>
           </div>
         )
+      ) : weekOn ? (
+        <WeekView
+          topics={weekSources}
+          brief={brief}
+          readOnly={readOnly}
+          ownerAi={mkAi}
+          savedLongHref={(() => {
+            const t0 = weekSources[0]
+            const idea = t0 ? ideaOfPack(t0.key, t0.topic, t0.custom) : undefined
+            return idea?.script ? ideaHref(idea.id) : null
+          })()}
+          onBack={closeWeek}
+          onCopy={(t, what) => copy(t, what)}
+          onSaveLong={savePack}
+        />
       ) : view === 'make' ? (
         <MakeView
           focusId={params.get('idea') ?? ''}
@@ -719,6 +757,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             change={change.line}
             onPick={openPack}
             onCustom={(t) => openPack(`custom:${t}`)}
+            week={{ ai: mkAi && !readOnly && weekSources.length > 0, done: weekDone, onOpen: openWeek }}
           />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}

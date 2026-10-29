@@ -13,8 +13,9 @@
  *  - 맨 위 '고정 키워드' 다섯 칸(새 공고 칩) → 아래 '이번 주 키워드' 10칸(폰 2열 · 작은 칸). 폰에서는 형식 칩 · 기준 줄을 접어 둔다(물음표에 그대로).
  */
 import { useState } from 'react'
-import { ArrowRight, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
+import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
 import { HintTip } from '../../../components/ui/fold'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
 import { cleanTopic } from '../../../services/marketing/contentPack'
@@ -69,7 +70,10 @@ export function KeywordHome({
   change,
   onPick,
   onCustom,
+  week,
 }: {
+  /** D-346 1주일치 한 번에 — ai: 누르면 AI 를 부를 수 있음(두 번 눌러 확인) · done: 이번에 만들 주를 이미 써 둠 */
+  week?: { ai: boolean; done: boolean; onOpen: (startAi: boolean) => void }
   /** D-295 고정 키워드(늘 다섯 — 유튜브 데이터가 없어도 보인다) */
   fixed?: HomeKeyword[]
   /** null = 아직 키워드를 받지 못함(받는 중 · 키 없음) */
@@ -144,6 +148,7 @@ export function KeywordHome({
       )}
 
       <div className="flex flex-col gap-3 p-3 sm:p-4">
+        {week && <WeekButton {...week} />}
         {fixed.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
             <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
@@ -263,4 +268,45 @@ export function KeywordHome({
       </div>
     </section>
   )
+}
+
+/**
+ * D-346 대표 "버튼 하나만 누르면 1주일치 유튜브 롱폼 1 · 릴스쇼츠 3 · 스레드 7 한 번에 쫙".
+ * AI 를 부를 수 있으면 두 번 눌러 확인(D-289)한 뒤 여섯 갈래를 바로 — 이미 써 둔 주면 그냥 열기(다시 쓰기는 안에서).
+ */
+function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: (startAi: boolean) => void }) {
+  const body = (
+    <button
+      type="button"
+      onClick={() => onOpen(ai && !done)}
+      className="tap group flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-gradient-to-r from-violet-700 to-fuchsia-700 px-3 py-3 text-left text-white shadow-(--shadow-card) hover:from-violet-800 hover:to-fuchsia-800 sm:px-4"
+      data-testid="mk-week-open"
+      data-done={done ? '1' : '0'}
+    >
+      <CalendarDays aria-hidden="true" className="size-6 shrink-0" />
+      <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
+        <span className="t-body font-bold break-keep">{done ? '1주일치 콘텐츠 보기' : '1주일치 콘텐츠 한 번에 만들기'}</span>
+        <span className="t-meta break-keep text-white/90">이번 주 키워드 1~3위로 · 검증된 방법 그대로</span>
+      </span>
+      <span className="flex flex-wrap gap-1">
+        {[
+          { icon: MonitorPlay, t: '롱폼 1' },
+          { icon: Film, t: '릴스 · 쇼츠 3' },
+          { icon: AtSign, t: '스레드 7' },
+        ].map((c) => (
+          <span key={c.t} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold ring-1 ring-white/25">
+            <c.icon aria-hidden="true" className="size-3.5" /> {c.t}
+          </span>
+        ))}
+      </span>
+      {done ? (
+        <span className="t-meta inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-semibold text-violet-800">
+          <Sparkles aria-hidden="true" className="size-3.5" /> AI로 써 둠
+        </span>
+      ) : (
+        <ArrowRight aria-hidden="true" className="hidden size-5 shrink-0 transition-transform group-hover:translate-x-0.5 sm:block" />
+      )}
+    </button>
+  )
+  return ai && !done ? <AiConfirm confirmLabel="이대로 1주일치 만들기">{body}</AiConfirm> : body
 }

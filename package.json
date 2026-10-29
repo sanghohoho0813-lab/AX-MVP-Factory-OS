@@ -82,6 +82,7 @@
     "qa:pvux": "node e2e/pvux.mjs",
     "qa:chat": "node e2e/chat.mjs",
     "qa:mkpack": "node e2e/mkpack.mjs",
+    "qa:mkweek": "node e2e/mkweek.mjs",
     "qa:threads": "node e2e/threads.mjs",
     "qa:mkquick": "node e2e/mkquick.mjs",
     "qa:pvhome": "node e2e/pvhome.mjs",

@@ -11,6 +11,8 @@ import { radarPlan } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
 import { noticeKeywords, noticePackSource, noticeTopicOf, rememberWeek, weekChange, weekOf, weekWindow, withNoticeFacts, withNoticeKeywords } from '../marketing/noticeKeywords'
 import { parseBizinfoJson, postedOf } from '../grants/grantText'
+import { LONG_DAY, SHORT_SLOTS, THREAD_SLOTS, buildWeek, partResult, parseWeekStore, placeThreads, putWeekStore, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, weekTopics, type WeekSaved } from '../marketing/weekPlan'
+import type { ThreadDraft } from '../marketing/threads'
 import type { GrantNotice } from '../grants/grantMatch'
 import {
   HOLE,
@@ -296,6 +298,52 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('N14 기업마당 등록일시 읽기 — "2026-10-20 10:31:22" · "20261020" · 깨진 값은 빈칸', postedOf('2026-10-20 10:31:22') === '2026-10-20' && postedOf('20261020') === '2026-10-20' && postedOf('2026-13-01') === '' && postedOf('') === '')
   const parsed = parseBizinfoJson(JSON.stringify({ jsonArray: [{ pblancId: 'X1', pblancNm: '정책자금 공고', creatPnttm: '2026-10-21 09:00:00', reqstBeginEndDe: '20261021 ~ 20261110', pldirSportRealmLclasCodeNm: '금융' }] }))
   check('N15 받아 온 공고에 올라온 날(postedAt)이 남음', parsed.drafts[0]?.postedAt === '2026-10-21', parsed.drafts[0])
+}
+
+/* ---------------- D-346 1주일치 한 번에 — 롱폼 1 · 릴스/쇼츠 3 · 스레드 7(+예비 2) ---------------- */
+{
+  check('K1 만들 주 — 월 · 화는 이번 주, 수요일부터는 다음 주 월요일', weekStart('2026-11-02') === '2026-11-02' && weekStart('2026-11-03') === '2026-11-02' && weekStart('2026-10-29') === '2026-11-02' && weekStart('2026-11-08') === '2026-11-09', [weekStart('2026-11-02'), weekStart('2026-10-29'), weekStart('2026-11-08')])
+  const fixed = customs
+  const tp = weekTopics(sources.slice(0, picks.length), fixed)
+  const tp1 = weekTopics(sources.slice(0, 1), fixed)
+  const dup = weekTopics([sources[0], { ...sources[0], key: 'x' }], fixed)
+  check('K2 주제 — 이번 주 키워드 1~3위 · 모자라면 고정 키워드로 · 같은 주제는 한 번', tp.length === 3 && tp.map((t) => t.topic).join() === picks.slice(0, 3).map((o) => o.topic).join() && tp1.length === 3 && tp1[1].topic === fixed[0].topic && dup.length === 3 && dup[1].topic === fixed[0].topic, tp.map((t) => t.topic))
+  const days = THREAD_SLOTS.filter((x) => x.day > 0).map((x) => x.day)
+  check('K3 스레드 자리 — 월~일 하루 하나 + 예비 둘 · 아홉 글 모두 다른 틀 · 실화 · 실적 숫자 · 밥줄 틀(C · F · U) 없음', days.join() === '1,2,3,4,5,6,7' && THREAD_SLOTS.length === 9 && new Set(THREAD_SLOTS.map((x) => x.template)).size === 9 && !THREAD_SLOTS.some((x) => ['C', 'F', 'U'].includes(x.template)), THREAD_SLOTS.map((x) => x.template).join(''))
+  check('K4 쇼츠 자리 — ①② 1위 틱톡 · 쇼츠(롱폼 전날 · 다음 날) · ③ 2위 릴스 · 다른 버전 하나 · 롱폼은 수요일', SHORT_SLOTS.filter((x) => x.n > 0).map((x) => `${x.n}${x.platform}${x.topic}${x.day}`).join() === '1tiktok02,2tiktok04,3reels16' && LONG_DAY === 3 && SHORT_SLOTS.some((x) => x.n === 0))
+  const reqs = weekRequests(tp, DEFAULT_BRIEF, '2026-10-29')
+  check('K5 여섯 갈래 — 롱폼 1(radar.pack.video) · 숏폼 2(shorts.write) · 스레드 3(threads.write) — 서버에 있는 공식 단추 그대로', reqs.map((r) => r.assistId).join() === 'radar.pack.video,shorts.write,shorts.write,threads.write,threads.write,threads.write' && reqs.every((r) => !!ASSISTS[r.assistId] && ASSISTS[r.assistId].page === r.page), reqs.map((r) => `${r.assistId}/${r.page}`))
+  const sentOf = (i: number) => buildAssistPrompt(ASSISTS[reqs[i].assistId], reqs[i].context, '')
+  const longU = sentOf(0).user
+  check('K6 롱폼 자료 — 1위 주제 · 채널 설계 기준 · 규칙집 · 이번 주 계획(수요일 · 쇼츠로 자를 곳) · 줄임 0', longU.includes(tp[0].topic) && longU.includes('[규칙집]') && longU.includes('11/4(수)') && longU.includes('쇼츠로 자를 곳') && sentOf(0).sent.rowsCut === 0, longU.slice(0, 300))
+  const sA = sentOf(1).user
+  const sB = sentOf(2).user
+  check('K7 쇼츠 자료 — ① ② 1위 · 틱톡 · 같은 주 롱폼 제목 · 링크는 고정 댓글 / ③ 2위 · 릴스 · 관점', sA.includes(tp[0].topic) && sA.includes('틱톡 · 유튜브 쇼츠') && sA.includes('같은주롱폼') && sA.includes('고정 댓글에만') && sB.includes(tp[1].topic) && sB.includes('인스타 릴스') && sB.includes('관점'), [sA.slice(0, 200), sB.slice(0, 200)])
+  const tU = [3, 4, 5].map((i) => sentOf(i).user)
+  const tpls = tU.map((u) => [...u.matchAll(/(\d)번 ([A-X]) /g)].map((m) => m[2]).join(''))
+  check('K8 스레드 자료 — 세 주제 · 글마다 요일 · 목적 · 틀 뼈대(ETX / DGQ / ISP) · 요일 이름', tpls.join() === 'ETX,DGQ,ISP' && tU[0].includes(tp[0].topic) && tU[1].includes(tp[1].topic) && tU[2].includes(tp[2].topic) && tU[0].includes('11/2(월) 저장 · 공유') && tU[1].includes('뼈대:'), tpls)
+  const leak = reqs.slice(1).filter((r) => tp.some((t) => t.facts.some((f) => JSON.stringify(r.context).includes(f))))
+  check('K9 쇼츠 · 스레드 자료에 레이더 숫자(근거) 없음 · 개인정보 없음', leak.length === 0 && reqs.every((r) => !/@|010-|\d{6}-\d{7}/.test(JSON.stringify(r.context))), leak.map((r) => r.part))
+  const d = (t: string, body = `${t} 본문`): ThreadDraft => ({ firstLine: t, template: t as ThreadDraft['template'], body, ending: '', selfComment: '', checks: [] })
+  const placed = placeThreads(THREAD_SLOTS.filter((x) => x.part === 'th1'), [d('G'), d('D'), d('Q')])
+  const loose = placeThreads(THREAD_SLOTS.filter((x) => x.part === 'th1'), [d('A'), d('D')])
+  check('K10 스레드 답 → 자리 — 같은 틀은 그 요일로(답 순서가 섞여도) · 틀이 다르면 차례로 · 모자라면 빈 자리', placed.map((x) => x?.template).join() === 'D,G,Q' && loose.map((x) => x?.template ?? '-').join() === 'D,A,-', [placed.map((x) => x?.template), loose.map((x) => x?.template)])
+  const longA = partResult('long', { headline: '확정 제목 X', items: [{ title: '0:00 오프닝', tag: '유튜브 대본', body: '말' }, { title: '제목 후보', tag: '제목', outline: ['a'] }] }, '규칙 제목')
+  const empty = partResult('th0', { headline: '', items: [{ title: '', body: '' }] }, '')
+  check('K11 답 나누기 — 롱폼은 대본 · 제목 칸(확정 제목) · 빈 답은 실패(null)', !!longA?.long?.video?.length && longA.long.video[0].text === '확정 제목 X' && !!longA.long.titles?.length && empty === null, longA)
+  const rule = buildWeek(tp, DEFAULT_BRIEF, '2026-10-29', null)
+  check('K12 규칙 초안(AI 전) — 롱폼 대본 · 쇼츠 4(①②③ + 다른 버전) · 스레드 9 · 모두 글이 있음 · AI 아님', rule.long.script.length > 0 && !rule.long.ai && rule.shorts.length === 4 && rule.shorts.every((x) => x.draft.script.trim().length > 20 && !x.ai) && rule.threads.length === 9 && rule.threads.every((x) => x.draft.body.includes('[') && !x.ai), rule.shorts.map((x) => x.draft.script.slice(0, 30)))
+  const saved: WeekSaved = { at: '2026-10-29T01:00:00Z', model: 'gemini', start: '2026-11-02', topics: tp.map((t) => t.topic), long: longA!.long, th1: [d('G', '첫 줄\n\n둘째\n\n이 셋 중 몇 번? 1 / 2 / 3'), d('D'), d('Q', '자세한 건 https://example.com')] }
+  const w = buildWeek(tp, DEFAULT_BRIEF, '2026-10-29', saved)
+  const sum = weekLintSummary(w)
+  check('K13 AI 결과 섞기 — 온 갈래만 AI(롱폼 · 목~토) · 나머지는 초안 · 점검: 이번 주 11개 · 링크 글은 고칠 곳', w.long.ai && w.long.headline === '확정 제목 X' && w.threads.filter((x) => x.ai).map((x) => x.slot.day).join() === '4,5,6' && w.shorts.every((x) => !x.ai) && sum.total === 11 && (w.threads.find((x) => x.slot.day === 6)?.lint.bad ?? 0) > 0 && sum.pass < sum.total, sum)
+  const cal = weekCalendar(w)
+  check('K14 달력 — 7일 · 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 날마다 스레드', cal.length === 7 && cal[2].items.some((i) => i.kind === 'long') && cal[1].items.some((i) => i.text === '쇼츠 ①') && cal[3].items.some((i) => i.text === '쇼츠 ②') && cal[5].items.some((i) => i.text === '릴스 ③') && cal.every((c) => c.items.some((i) => i.kind === 'thread')), cal.map((c) => c.items.map((i) => i.text).join('+')))
+  const txt = weekText(w)
+  check('K15 전체 글 — 기간 · 주제 셋 · 롱폼(확정 제목) · 쇼츠 4 · 스레드 9 · 줄바꿈 셋 이상 없음', txt.startsWith('1주일치 콘텐츠 — 11/2(월) ~ 11/8(일)') && tp.every((t) => txt.includes(t.topic)) && txt.includes('확정 제목 X') && (txt.match(/■ 스레드 /g) ?? []).length === 9 && (txt.match(/■ (쇼츠|릴스)/g) ?? []).length === 4 && !/\n{3,}/.test(txt), txt.slice(0, 200))
+  const store = putWeekStore(putWeekStore(putWeekStore(putWeekStore(putWeekStore({}, { ...saved, start: '2026-10-05' }), { ...saved, start: '2026-10-12' }), { ...saved, start: '2026-10-19' }), { ...saved, start: '2026-10-26' }), saved)
+  const back = parseWeekStore(JSON.stringify({ ...store, bad: { at: 1 }, '2026-12-01': { at: 'x', start: '2026-12-01' } }))
+  check('K16 이 브라우저 저장 — 최근 4주만 · 깨진 값 · 모르는 칸은 버림 · 다시 읽으면 같은 결과', Object.keys(store).join() === '2026-11-02,2026-10-26,2026-10-19,2026-10-12' && Object.keys(back).length === 4 && JSON.stringify(buildWeek(tp, DEFAULT_BRIEF, '2026-10-29', back['2026-11-02'])) === JSON.stringify(w) && parseWeekStore('{x').constructor === Object, Object.keys(back))
 }
 
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
