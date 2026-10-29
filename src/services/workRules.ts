@@ -26,8 +26,14 @@ export function readRetireRule(text: string): RetireRule | null {
   if (/정\s*년\s*(?:을|를|은|는)?\s*(?:두지\s*아니|두지\s*않|폐지|없)/.test(t)) return { age: null, continuing: 'abolish' }
   const ageM = /정\s*년\s*(?:은|는|을|를)?\s*(?:만\s*)?(\d{2})\s*세/.exec(t)
   const age = ageM && Number(ageM[1]) >= 55 && Number(ageM[1]) <= 75 ? Number(ageM[1]) : null
-  // 정년 뒤 다시 쓰는 조항 — 재고용 · 촉탁 · 계속 고용 · 정년 뒤 근로계약
-  const rehire = /재\s*고\s*용|촉\s*탁|계\s*속\s*고\s*용|정\s*년\s*(?:에\s*)?(?:도달|이\s*된|퇴직)[^.。]{0,40}(?:다시|새로)\s*(?:고용|채용|근로계약)/.test(t)
+  // 정년 뒤 다시 쓰는 조항 — 재고용 · 촉탁 · 계속 고용 · 정년 뒤 근로계약. 정년이 나오는 조(제n조)에서만 —
+  // 다른 조항의 '퇴직자 재고용' 을 정년 조항으로 읽지 않게. 조 번호가 없는 글이면 정년 낱말 뒤 100자
+  const articles = t.split(/(?=제\s*\d+\s*조)/)
+  const near =
+    articles.length > 1
+      ? articles.filter((a) => /정\s*년/.test(a)).join(' | ')
+      : [...t.matchAll(/정\s*년/g)].map((m) => t.slice(Math.max(0, (m.index ?? 0) - 20), (m.index ?? 0) + 100)).join(' | ')
+  const rehire = /재\s*고\s*용|촉\s*탁|계\s*속\s*고\s*용|(?:다시|새로)\s*(?:고용|채용|근로\s*계약)/.test(near)
   if (age === null && !rehire) return null
   // 법정 정년(만 60세)보다 늦으면 정년 연장으로 본다 — 언제 늘렸는지(1년 넘게 운영)는 ★ 확인
   return { age, continuing: rehire ? 'rehire' : age !== null && age > 60 ? 'extend' : null }

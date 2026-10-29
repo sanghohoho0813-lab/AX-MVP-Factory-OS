@@ -1596,6 +1596,8 @@ await (async () => {
   const r4 = readRetireRule(head + '제50조(정년) 회사는 정년을 두지 아니한다.')
   check('D-339 취업규칙 읽기: 60세 · 재고용 / 60세 · 조항 없음 / 63세 연장 / 정년 폐지', r1?.age === 60 && r1.continuing === 'rehire' && r2?.age === 60 && r2.continuing === null && r3?.continuing === 'extend' && r4?.continuing === 'abolish', JSON.stringify([r1, r2, r3, r4]))
   check('D-339 칸 글 → 제도 있음 · 없음', continuingOf(retireRuleLine(r1!)) === 'yes' && continuingOf(retireRuleLine(r2!)) === 'no' && continuingOf(retireRuleLine(r3!)) === 'yes' && continuingOf(retireRuleLine(r4!)) === 'yes' && continuingOf('') === null)
+  const far = head + '제50조(정년) 직원의 정년은 만 60세로 한다.' + ' 제51조(휴직) 업무 외 질병으로 휴직할 수 있다. 제52조(포상) 회사는 우수 직원을 포상한다. 제53조(징계) 징계의 종류는 견책 · 감봉 · 정직 · 해고로 한다. 제54조(교육) 회사는 직무 교육을 한다. 제60조(경력 인정) 퇴직한 직원을 재고용하는 경우 이전 근속기간은 합산하지 않는다.'
+  check('D-339 정년 조항과 먼 다른 조항의 "재고용" 은 정년 재고용으로 읽지 않음', readRetireRule(far)?.continuing === null, JSON.stringify(readRetireRule(far)))
   check('D-339 취업규칙이 아닌 글은 읽지 않음(근로계약서 · 정관)', !looksLikeWorkRules('근로계약서\n정년 60세') && !looksLikeWorkRules('정관\n제1조 상호') && looksLikeWorkRules(rehire))
   const ROSTER = ['4대보험 사업장 가입자 명부', ['성명', '주민등록번호', '자격취득일'].join('\t'), ['장정년', '650101-1234567', '2015-03-01'].join('\t')].join('\n')
   let n = 0
