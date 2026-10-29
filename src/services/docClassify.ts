@@ -196,6 +196,28 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /퇴직금\s*(?:지급\s*)?규정/,
   },
   {
+    // D-342 대표 원천징수영수증 — 대표 월 급여를 읽는다(services/wageReceipt.ts). 예전에는 제목을 못 찾아 '기타 · 확인 필요' 로 갔다
+    label: '근로소득 원천징수영수증',
+    signals: [
+      { re: /근로\s*소득\s*원천\s*징수\s*영수증/, weight: 3, say: "제목 '근로소득 원천징수영수증'" },
+      { re: /근로\s*소득\s*지급\s*명세서/, weight: 3, say: "제목 '근로소득 지급명세서'" },
+      { re: /징\s*수\s*의\s*무\s*자/, weight: 1, say: "'징수의무자'" },
+    ],
+    nameHint: /원천\s*징수\s*영수증|근로\s*소득/,
+  },
+  {
+    // D-342 급여대장 — 대표 줄의 월 급여를 읽는다(services/wageReceipt.ts)
+    label: '급여대장',
+    signals: [{ re: /급\s*여\s*대\s*장/, weight: 3, say: "제목 '급여대장'" }],
+    nameHint: /급여\s*대장/,
+  },
+  {
+    // D-339 취업규칙 — 정년 · 계속고용 조항을 읽는다(services/workRules.ts)
+    label: '취업규칙',
+    signals: [{ re: /취\s*업\s*규\s*칙/, weight: 3, say: "제목 '취업규칙'" }],
+    nameHint: /취업\s*규칙/,
+  },
+  {
     label: '벤처기업확인서',
     validMonths: 36,
     signals: [{ re: /벤처기업\s*확인서/, weight: 3, say: "제목 '벤처기업확인서'" }],
@@ -433,12 +455,13 @@ const TITLE_TO_KEY: [RegExp, DocumentKey][] = [
 ]
 
 /** 제목이 끝나는 모양 — '…증명서' '…확인서' '…등본' '…명부' … */
-const TITLE_END = /(증명서|증명원|증명|확인서|확인원|인정서|인증서|등록증|등본|초본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|사본|정관|원부|대장|면허증|허가증|자격증|증서|재무제표|계산서|상태표|등록증명)$/
+const TITLE_END = /(증명서|증명원|증명|확인서|확인원|인정서|인증서|등록증|등본|초본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|사본|정관|원부|대장|면허증|허가증|자격증|증서|재무제표|계산서|상태표|등록증명|영수증|규칙|규정)$/
 /** 제목이 아닌 줄(머리 · 안내 문구) */
 const NOT_TITLE = /^(발급번호|문서확인번호|접수번호|확인번호|페이지|쪽|page|발행|민원|정부24|홈택스|국세청|대법원|인터넷등기소|본증명서|이증명서|위와같이|아래와같이)/i
 
 function compactTitle(s: string): string {
-  return s.replace(/[\s·ㆍ.,:：\-_()（）\[\]「」『』<>《》"'“”]/g, '')
+  // D-342 '[ √ ]근로소득 원천징수영수증' 처럼 고른 표시(√ · ■ · □)가 붙은 제목도
+  return s.replace(/[\s·ㆍ.,:：\-_()（）\[\]「」『』<>《》"'“”√✓✔☑■□]/g, '')
 }
 
 /** 서류 글 맨 위에서 제목을 찾는다(없으면 null) */
@@ -452,6 +475,8 @@ export function documentTitle(text: string): string | null {
     // D-148: '정 관' 은 두 글자지만 제목이다
     if ((c.length < 3 && c !== '정관') || c.length > 22) continue
     if (NOT_TITLE.test(c)) continue
+    // '본 규칙' · '관련 규정' 같은 본문 조각은 제목이 아니다
+    if (/^(?:본|이|위|동|관련|해당|내부)?(?:규칙|규정|영수증)$/.test(c)) continue
     if (!/^[가-힣A-Za-z0-9]+$/.test(c)) continue
     if (!/[가-힣]{2}/.test(c)) continue
     if (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c))) return c
@@ -460,7 +485,7 @@ export function documentTitle(text: string): string | null {
 }
 
 /** D-148: 끝말만 남은 이름 — 이것만으로는 무슨 서류인지 모른다('사업자 등록증' 을 띄어 쓰면 '등록증' 만 남았다) */
-const GENERIC_TITLE = /^(등록증|확인서|확인원|증명서|증명원|증명|사본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|등본|초본|원부|대장|증서|계산서|인증서|인정서)$/
+const GENERIC_TITLE = /^(등록증|확인서|확인원|증명서|증명원|증명|사본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|등본|초본|원부|대장|증서|계산서|인증서|인정서|영수증|규칙|규정)$/
 
 /** 파일 이름에서 서류 이름 — '사업자등록증_샤인디자인_2026.pdf' → 사업자등록증 · '사업자 등록증.pdf' → 사업자등록증 */
 export function titleFromFileName(fileName: string): string | null {

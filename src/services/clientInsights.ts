@@ -12,7 +12,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { customFactValue, researchLabOf, usableFactValue } from './customerFacts'
+import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
@@ -209,7 +209,8 @@ function metroOver(sido: string, city: string): StartupForm['overconcentration']
 /** 중소기업 확인 — 회사 정보 '중소기업 확인' 칸 · 인증 칸 · 받은 확인서. 모르면 false(가정은 부르는 쪽에서 ★ 로) */
 export function smeConfirmed(record: ClientOpsRecord): boolean {
   const re = /중소기업\s*(확인|기준)/
-  if ((record.customFields ?? []).some((f) => re.test(`${f.label} ${f.value}`))) return true
+  // D-342 직접 만든 칸 · 예전 'cf:' 값 둘 다(customFactEntries — D-338 과 같은 길)
+  if (customFactEntries(record).some(([k, v]) => re.test(`${k} ${v}`))) return true
   if (re.test(usableFactValue(record, 'certifications'))) return true
   return !!record.documents?.smeCertificate?.received
 }

@@ -1627,6 +1627,63 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-342 대표 원천징수영수증 올리기 → 대표 월 급여 → 절세 설계 · 맞춤 추천 퇴직금 · 서류함 칸 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const RCPT = {
+    name: 'scan_0042.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      [
+        '■ 소득세법 시행규칙 [별지 제24호서식(1)]',
+        '[ √ ]근로소득 원천징수영수증',
+        '[ ]근로소득 지급명세서',
+        '징수의무자 ① 법인명(상 호) 한솔테크(주) ② 대 표 자(성 명) 김대표',
+        '③ 사업자등록번호 123-45-67890 ⑤ 소 재 지(주소) 경기도 남양주시 진접읍 해밀예당1로 1',
+        '소득자 ⑥ 성 명 김대표 ⑦ 주 민 등 록 번 호(외국인등록번호) 750101-1******',
+        '⑧ 주 소 서울특별시 노원구 1',
+        '⑪ 근무기간 2025.01.01~2025.12.31',
+        '⑬ 급 여 86,400,000 86,400,000',
+        '⑯ 계 86,400,000 86,400,000',
+        '⑳ 비과세소득 계 2,400,000',
+        '㉑ 총 급 여 (⑯, 다만 외국인단일세율 적용시 연간 근로소득) 84,000,000',
+      ].join('\n'),
+      'utf8',
+    ),
+  }
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'))
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const before = await rec()
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([RCPT])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = (await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? ''
+  const entered = (await page.getByTestId('smart-entered').innerText().catch(() => '')) ?? ''
+  check(`D-342 ${vp.tag} 파일 이름이 scan 이어도 서류함 '근로소득 원천징수영수증' 칸`, placed.includes('근로소득 원천징수영수증'), placed.slice(0, 300))
+  check(`D-342 ${vp.tag} 바로 넣은 정보: 대표 월 급여 700만원 — 2025년 총급여 8,400만원 ÷ 12개월`, entered.includes('대표 월 급여') && entered.includes('월 700만원') && entered.includes('2025년 총급여 8,400만원 ÷ 12개월'), entered.slice(0, 400))
+  if (vp.tag === '1440') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot342-batch.png' }).catch(() => {})
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const r = await rec()
+  check(`D-342 ${vp.tag} 업체 기록 절세 현황 대표 월 급여 7,000,000 · 주민번호 · 대표 집 주소 없음`, r.taxProfile?.monthlySalary === '7000000' && !JSON.stringify(r).includes('750101') && !JSON.stringify(r).includes('노원구'), JSON.stringify(r.taxProfile))
+  const tax = (await page.locator('[data-testid="smart-insight"][data-key="tax"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check(`D-342 ${vp.tag} 맞춤 추천 절세: 대표 급여 없던 업체 → 영수증 하나로 퇴직금 한도 계산(설립일을 취임일로)`, !before.taxProfile?.monthlySalary && tax.includes('퇴직금 한도') && !tax.includes('대표 급여를 알면'), tax.slice(0, 200))
+  if (vp.tag === '1440') await page.locator('[data-testid="smart-insight"][data-key="tax"]').screenshot({ path: '/tmp/claude-0/shot342-tax.png' }).catch(() => {})
+  // 절세 설계 화면에 그 금액이 그대로
+  await page.goto(BASE + '/tools/tax?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const vals = await page.locator('input').evaluateAll((els) => els.map((e) => e.value))
+  check(`D-342 ${vp.tag} 절세 설계 '대표 월 급여' 칸에 7,000,000 · 넘침 0 · 오류 0`, vals.some((v) => v.replace(/,/g, '') === '7000000') && (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, JSON.stringify(vals.filter(Boolean).slice(0, 20)) + errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

@@ -42,6 +42,7 @@ import {
 import { clientFacts, ventureConfirmedAt, ventureValidOn } from '../../tools/shared/clientPrefill'
 import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
 import { continuingOf, looksLikeWorkRules, readRetireRule, retireRuleLine } from '../workRules'
+import { ceoWageReceipt, looksLikePayrollLedger, looksLikeWageReceipt, monthlyPayOf, readLedgerCeoPay, readWageReceipts } from '../wageReceipt'
 import { credentialsOf } from '../grants/grantProfile'
 import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
@@ -62,7 +63,7 @@ import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
-import { manwonText, policyDocsLine } from '../clientInsights'
+import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
 import { loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
@@ -1627,6 +1628,93 @@ await (async () => {
   const T = '2026-10-28'
   check('D-340 상황 예시 · 맞춤 추천이 올린 인정서를 연구소로 본다(설립 권유 안 함)', fitContext(withCert, T).hasLab && !fitContext(saysNone, T).hasLab && (buildInsights(withCert, T, []).find((i) => i.key === 'labcare')?.headline ?? '').includes('연구소(전담부서)가 있어요'), buildInsights(withCert, T, []).find((i) => i.key === 'labcare')?.headline)
 }
+
+// D-342 근로소득 원천징수영수증 → 대표 월 급여(총급여 ÷ 근무한 달 수) — 대표 본인 것만 · 빈 칸만 · 다르면 확인 · 명부 · 회사 정보로 읽지 않음
+await (async () => {
+  const page = (who: string, rrn: string, period: string, pay: string, exempt: string, total: string | null) =>
+    [
+      '■ 소득세법 시행규칙 [별지 제24호서식(1)] <개정 2024. 3. 22.>',
+      '거주구분 거주자1 /비거주자2',
+      '세대주 여부 세대주1, 세대원2',
+      '[ √ ]근로소득 원천징수영수증',
+      '[ ]근로소득 지급명세서',
+      '([√]소득자 보관용 [ ]발행자 보관용 [ ]발행자 보고용)',
+      '징수의무자 ① 법인명(상 호) 주식회사 가나테크 ② 대 표 자(성 명) 박지훈',
+      '③ 사업자등록번호 123-45-67890 ⑤ 소 재 지(주소) 서울특별시 강남구 테헤란로 1',
+      `소득자 ⑥ 성 명 ${who} ⑦ 주 민 등 록 번 호(외국인등록번호) ${rrn}`,
+      '⑧ 주 소 경기도 성남시 분당구 2',
+      '구 분 주(현) 종(전) 종(전) ⑯-1 납세조합 합 계',
+      '⑨ 근 무 처 명 주식회사 가나테크',
+      `⑪ 근무기간 ${period} ~ ~`,
+      `⑬ 급 여 ${pay} ${pay}`,
+      '⑭ 상 여',
+      `⑯ 계 ${pay} ${pay}`,
+      `⑳ 비과세소득 계 ${exempt}`,
+      '국민연금보험료 건강보험료(노인장기요양보험료 포함) 고용보험료',
+      total ? `㉑ 총 급 여 (⑯, 다만 외국인단일세율 적용시 연간 근로소득) ${total}` : '',
+      '㉒ 근 로 소 득 공 제 12,930,000',
+      '인적공제 관계코드 성 명 내ㆍ외국인 주민등록번호',
+      '0 박지훈 1 801231-1****** 3 김영희 1 820505-2******',
+      '작성방법: 총급여액이 7,000만원 이하인 경우 ...',
+    ]
+      .filter(Boolean)
+      .join('\n')
+  const ceo = page('박지훈', '801231-1******', '2025.01.01~2025.12.31', '96,000,000', '2,400,000', '93,600,000')
+  const r1 = readWageReceipts(ceo)
+  check('D-342 영수증 판별 · 소득자(대표자 성명 칸 아님) · 총급여 ㉑ · 12개월 → 월 780만', looksLikeWageReceipt(ceo) && r1.length === 1 && r1[0].name === '박지훈' && r1[0].payerCeo === '박지훈' && r1[0].totalPay === 93_600_000 && r1[0].months === 12 && r1[0].year === 2025 && monthlyPayOf(r1[0]) === 7_800_000, JSON.stringify(r1))
+  const p1only = readWageReceipts(page('박지훈', '801231-1******', '2025.01.01~2025.12.31', '96,000,000', '2,400,000', null))
+  check('D-342 1쪽만(㉑ 없음) → ⑯ 계 − 비과세 계 = 9,360만 · 안내 글의 "7,000만원" 은 금액 아님', p1only[0]?.totalPay === 93_600_000, JSON.stringify(p1only))
+  const mid = readWageReceipts(page('박지훈', '801231-1******', '2025.04.01~2025.12.31', '54,000,000', '0', '54,000,000'))
+  check('D-342 4월 취임(근무기간 9개월) → 5,400만 ÷ 9 = 월 600만', mid[0]?.months === 9 && monthlyPayOf(mid[0]) === 6_000_000, JSON.stringify(mid))
+  const bundle = [page('김민수', '950101-1******', '2025.01.01~2025.12.31', '42,000,000', '2,400,000', '39,600,000'), ceo].join('\n')
+  const rb = readWageReceipts(bundle)
+  check('D-342 여러 사람 묶음 → 사람마다 · 대표 이름으로 대표 것만 · 이름을 몰라도 같은 장의 대표자와 같은 사람', rb.length === 2 && ceoWageReceipt(rb, '박 지훈')?.totalPay === 93_600_000 && ceoWageReceipt(rb, '')?.name === '박지훈' && ceoWageReceipt(rb.slice(0, 1), '') === null, JSON.stringify(rb))
+
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-29', makeId: () => `wg${++n}` }
+  const base = normalizeClientOps({ id: 'wg342', companyName: '주식회사 가나테크', representativeName: '박지훈', createdAt: NOW, updatedAt: NOW })
+  const doc = { key: 'customdoc_wage', fileName: 'scan_002.pdf', text: bundle, method: 'pdf_text' as const, docSure: true }
+  const out = await analyzeUploadedDocs(base, [doc], ctx)
+  const e = out.summary.entered.find((x) => x.label === '대표 월 급여')
+  check('D-342 올리면 절세 현황 대표 월 급여 7,800,000 · 바로 넣은 정보에 근거(2025년 총급여 ÷ 12개월)', out.record.taxProfile.monthlySalary === '7800000' && !!e && e.display.includes('월 780만원') && e.display.includes('2025년 총급여 9,360만원 ÷ 12개월'), JSON.stringify(out.summary.entered))
+  const js = JSON.stringify(out.record)
+  check('D-342 주민번호 · 주소 · 직원 급여는 기록에 없음 · 명부(고용 진단)로 읽지 않음 · 회사 정보 후보 없음', !js.includes('801231') && !js.includes('950101') && !js.includes('분당구') && !js.includes('39,600,000') && out.summary.roster === null && !out.record.toolResults?.some((t) => t.toolKey === 'employment') && !(out.record.factCandidates ?? []).length, js.slice(0, 300))
+  const same = await analyzeUploadedDocs(normalizeClientOps({ ...base, taxProfile: { monthlySalary: '780만' } } as never), [doc], ctx)
+  const other = await analyzeUploadedDocs(normalizeClientOps({ ...base, taxProfile: { monthlySalary: '500만' } } as never), [doc], ctx)
+  check('D-342 이미 같은 금액("780만") → 조용히 · 다른 금액 → 덮지 않고 확인 필요', !same.summary.flagged.length && !same.summary.entered.length && other.record.taxProfile.monthlySalary === '500만' && other.summary.flagged.some((f) => f.label === '대표 월 급여' && f.note.includes('지금 적힌 값(500만)')), JSON.stringify([same.summary, other.summary.flagged]))
+  const staff = await analyzeUploadedDocs(base, [{ ...doc, text: page('김민수', '950101-1******', '2025.01.01~2025.12.31', '42,000,000', '2,400,000', '39,600,000').replace('② 대 표 자(성 명) 박지훈', '② 대 표 자(성 명) 박지훈') }], ctx)
+  check('D-342 직원 영수증만 → 대표 급여로 쓰지 않음(조용히)', !staff.record.taxProfile.monthlySalary && !staff.summary.flagged.length, JSON.stringify(staff.summary))
+  // 맞춤 추천 — 등기부(취임일)와 함께면 퇴직금 한도가 계산되고 '대표 급여' 를 더 묻지 않는다
+  const withStart = normalizeClientOps({ ...out.record, taxProfile: { ...out.record.taxProfile, ceoStartDate: '2015-07-21' } } as never)
+  const tax = buildInsights(withStart, '2026-10-29', []).find((i) => i.key === 'tax')
+  const taxBefore = buildInsights(normalizeClientOps({ ...base, taxProfile: { ceoStartDate: '2015-07-21' } } as never), '2026-10-29', []).find((i) => i.key === 'tax')
+  check('D-342 맞춤 추천 절세: 영수증 전 "대표 급여" 필요 → 뒤 퇴직금 한도 계산 · 더 묻지 않음', !!taxBefore?.missing.includes('대표 급여') && !!tax && !tax.missing.includes('대표 급여') && tax.headline.includes('퇴직금'), JSON.stringify([taxBefore?.missing, tax?.headline, tax?.missing]))
+  // 서류함 칸 — 제목('[ √ ]' 표시가 붙어도) · 취업규칙
+  const metas = allDocumentMetas(base)
+  const pw = placeDocument({ text: ceo, fileName: 'scan_002.pdf' }, metas)
+  const pr = placeDocument({ text: '주식회사 가나테크 취업규칙\n제1장 총칙\n제1조(목적) 이 규칙은 근로조건을 정한다.', fileName: 'scan_003.pdf' }, metas)
+  const pn = placeDocument({ text: '', fileName: '2025_근로소득원천징수영수증_박지훈.pdf' }, metas)
+  check('D-342 서류함: 원천징수영수증 · 취업규칙 → 기타가 아니라 그 이름의 칸(파일 이름만이어도)', pw.label === '근로소득 원천징수영수증' && pw.sure && pr.label === '취업규칙' && pn.label === '근로소득 원천징수영수증', JSON.stringify([pw, pr, pn]))
+  check('D-342 제목 찾기: "본 규칙" 은 제목 아님', documentTitle('본 규칙\n취업규칙') === '취업규칙')
+  // 급여대장(엑셀) — 대표 줄 과세 급여 · 영수증과 함께면 이번 달 급여대장이 먼저
+  const T = '\t'
+  const ledger = [
+    '2026년 9월분 급여대장',
+    ['사번', '성명', '직위', '기본급', '식대', '지급합계', '비과세', '과세급여', '국민연금', '실지급액'].join(T),
+    ['1', '박지훈', '대표이사', '8,000,000', '200,000', '8,200,000', '200,000', '8,000,000', '277,650', '7,100,000'].join(T),
+    ['2', '김민수', '과장', '3,300,000', '200,000', '3,500,000', '200,000', '3,300,000', '148,500', '3,050,000'].join(T),
+    ['', '합계', '', '11,300,000', '400,000', '11,700,000', '400,000', '11,300,000', '426,150', '10,150,000'].join(T),
+  ].join('\n')
+  const noTax = ledger.replace(`${T}비과세${T}과세급여`, `${T}공제1${T}공제2`)
+  check('D-342 급여대장 판별 · 대표 줄 과세 급여 800만 · 달 2026-09 · 이름 몰라도 직위 "대표" · 과세 칸 없으면 지급합계', looksLikePayrollLedger(ledger) && readLedgerCeoPay(ledger, '박지훈')?.monthly === 8_000_000 && readLedgerCeoPay(ledger, '')?.month === '2026-09' && readLedgerCeoPay(ledger, '')?.name === '박지훈' && readLedgerCeoPay(noTax, '박지훈')?.monthly === 8_200_000 && readLedgerCeoPay(noTax, '박지훈')?.taxable === false && readLedgerCeoPay(ledger, '최없음') === null, JSON.stringify([readLedgerCeoPay(ledger, ''), readLedgerCeoPay(noTax, '박지훈')]))
+  const both = await analyzeUploadedDocs(base, [doc, { key: 'customdoc_pay', fileName: '급여대장_9월.xlsx', text: ledger, method: 'xlsx' as const, docSure: true }], ctx)
+  check('D-342 영수증 + 급여대장 → 이번 달 급여대장 800만(작년 영수증은 다시 묻지 않음) · 직원 급여는 기록에 없음', both.record.taxProfile.monthlySalary === '8000000' && !both.summary.flagged.length && !!both.summary.entered.find((x) => x.label === '대표 월 급여')?.display.includes('2026년 9월 급여대장 과세 급여') && !JSON.stringify(both.record).includes('3,300,000'), JSON.stringify([both.summary.entered, both.summary.flagged]))
+  check('D-342 서류함: 급여대장 → 그 이름의 칸', placeDocument({ text: ledger, fileName: 'book1.xlsx' }, metas).label === '급여대장', JSON.stringify(placeDocument({ text: ledger, fileName: 'book1.xlsx' }, metas)))
+  const legacySme = normalizeClientOps({ ...base, factValues: { 'cf:중소기업 확인서': '소기업 · 유효기간 2026-04-01 ~ 2027-03-31' } } as never)
+  check('D-342 중소기업 확인: 예전 "cf:" 값으로 남은 확인서 칸도 확인으로', smeConfirmed(legacySme) && !smeConfirmed(base))
+  const req = requestItemsFrom([{ key: 'tax', label: '절세 설계', tone: 'need', headline: '', detail: '', missing: ['대표 급여'], openPath: '', openLabel: '', action: null } as Insight]).items
+  check('D-342 자료 요청: 대표 급여 → 원천징수영수증(올리면 바로 채워짐)', req[0]?.label === '대표님 근로소득 원천징수영수증(작년 것)' && req[0].where.includes('바로 채워집니다'), JSON.stringify(req))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

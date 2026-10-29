@@ -452,6 +452,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 
   return (
     <NeedCtx.Provider value={needSet}>
+    <DocHintCtx.Provider value={!!clientRecord}>
     <div className="flex flex-col gap-5" data-testid="tax-plan">
       {recordChanged && clientRecord && (
         <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-amber-300 bg-amber-50 px-4 py-3 lg:flex-row lg:items-center lg:gap-3" data-testid="tax-plan-record-changed">
@@ -971,6 +972,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       </div>
       {st.goals.length > 0 && <PrintSheet clientName={clientName} today={today} glance={glance} parts={summaryParts()} proofs={proofCount()} />}
     </div>
+    </DocHintCtx.Provider>
     </NeedCtx.Provider>
   )
 }
@@ -1002,6 +1004,18 @@ type SetProfile = (k: ProfileKey, v: string) => void
 
 /** D-131: 결과를 정확히 하려면 필요한데 비어 있는 칸 — 빨갛게 */
 const NeedCtx = createContext<Set<string>>(new Set())
+/** D-342 업체를 골랐을 때만 — 빈 칸 아래 '이 서류를 올리면 채워져요'(서류 올리기가 읽는 칸) */
+const DocHintCtx = createContext(false)
+const DOC_FILL: Partial<Record<ProfileKey, string>> = {
+  monthlySalary: '대표 원천징수영수증 · 급여대장',
+  ceoStartDate: '법인 등기부등본(말소사항 포함)',
+  loanBalance: '재무제표',
+  retainedEarnings: '재무제표',
+  vInc1: '재무제표',
+  totalShares: '주주명부 · 등기부등본',
+  par: '주주명부 · 등기부등본',
+  retireMult: '정관 · 임원퇴직금지급규정',
+}
 
 const STEPS: [number, string][] = [
   [1e6, '+100만'],
@@ -1059,8 +1073,18 @@ function QuickPick({ values, suffix, current, onPick }: { values: string[]; suff
   )
 }
 
-function NeedNote({ need }: { need: boolean }) {
-  return need ? <span className="t-meta mt-1 block font-semibold text-danger-700">적으면 결과가 더 정확해집니다</span> : null
+function NeedNote({ need, k, empty }: { need: boolean; k?: ProfileKey; empty?: boolean }) {
+  const doc = useContext(DocHintCtx) && empty && k ? DOC_FILL[k] : ''
+  return (
+    <>
+      {need && <span className="t-meta mt-1 block font-semibold text-danger-700">적으면 결과가 더 정확해집니다</span>}
+      {doc && (
+        <span className="t-meta mt-1 block break-keep text-slate-500" data-testid={`doc-fill-${k}`}>
+          업체 서류함에 {josa(doc, '을/를')} 올리면 저절로 채워져요
+        </span>
+      )}
+    </>
+  )
 }
 
 function MoneyField({ k, st, set }: { k: ProfileKey; st: PlanState; set: SetProfile }) {
@@ -1069,7 +1093,7 @@ function MoneyField({ k, st, set }: { k: ProfileKey; st: PlanState; set: SetProf
     <div className="block">
       <span className={`t-sub font-medium ${need ? 'text-danger-700' : 'text-slate-700'}`}>{PROFILE_FIELDS[k]}</span>
       <MoneyInput value={st.profile[k] ?? ''} onChange={(v) => set(k, v)} label={PROFILE_FIELDS[k]} field={k} need={need} />
-      <NeedNote need={need} />
+      <NeedNote need={need} k={k} empty={!st.profile[k]?.trim()} />
     </div>
   )
 }
@@ -1100,7 +1124,7 @@ function NumberField({ k, st, set, hint, quick }: { k: ProfileKey; st: PlanState
           ))}
         </div>
       )}
-      <NeedNote need={need} />
+      <NeedNote need={need} k={k} empty={!st.profile[k]?.trim()} />
     </div>
   )
 }
@@ -1111,7 +1135,7 @@ function DateField({ k, st, set }: { k: ProfileKey; st: PlanState; set: SetProfi
     <label className="block">
       <span className={`t-sub font-medium ${need ? 'text-danger-700' : 'text-slate-700'}`}>{PROFILE_FIELDS[k]}</span>
       <input type="date" value={st.profile[k] ?? ''} onChange={(e) => set(k, e.target.value)} className={`${inputCls} ${need ? '!border-danger-500 bg-danger-50' : ''}`} aria-label={PROFILE_FIELDS[k]} data-field={k} />
-      <NeedNote need={need} />
+      <NeedNote need={need} k={k} empty={!st.profile[k]?.trim()} />
     </label>
   )
 }

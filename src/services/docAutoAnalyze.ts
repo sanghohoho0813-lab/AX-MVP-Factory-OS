@@ -14,6 +14,8 @@
  *     (절세 설계 · 05 · 06 계산기 · 상황 예시가 같은 주주표를 쓴다). 주민등록번호 · 주소는 남기지 않는다.
  *  5. 등기부등본 · 정관(D-304) — 대표 취임일(퇴직금 기산일) · 1주의 금액 · 발행주식 총수 · 대표이사 퇴직금 지급배수를 절세 현황 빈 칸에.
  *     재무제표(D-305) — 가지급금 잔액 · 배당 가능한 이익(미처분이익잉여금) · 직전 연도 순이익도 같은 규칙으로.
+ *     급여대장 · 근로소득 원천징수영수증(D-342) — 대표 본인 줄 · 영수증이면 월 급여(급여대장 과세 급여 / 총급여 ÷ 근무한 달 수)를
+ *     '대표 월 급여' 빈 칸에(퇴직금 · 급여 vs 배당이 이 숫자로).
  *  6. 그 밖의 판정(정책자금 · 창업감면 · 연구소 · 지원사업 …)은 저장하지 않고 '맞춤 추천' 이 볼 때마다 계산한다
  *     — 업체 정보가 바뀌면 판정도 바로 바뀐다(clientInsights).
  *
@@ -27,10 +29,11 @@ import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
 import { readRegistryTax, readRetireMultiple } from './registryTax'
-import { ASSUMPTIONS } from './taxPlan'
+import { ASSUMPTIONS, wonOf } from './taxPlan'
 import { detectDocSource } from './koreanDocParser'
 import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
+import { ceoWageReceipt, looksLikePayrollLedger, looksLikeWageReceipt, monthlyPayOf, readLedgerCeoPay, readWageReceipts } from './wageReceipt'
 
 export interface DocBatchSummary {
   files: number
@@ -135,8 +138,10 @@ export async function analyzeUploadedDocs(
   // D-303 주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게 회사 정보 읽기에서 뺀다(주주표로 따로).
   //   명부보다 먼저 가린다: 주민번호가 여럿이고 '명부' 라는 말이 있어 예전에는 4대보험 명부로 읽혀 주주가 직원으로 셌다
   const holderDocs = readable.filter((d) => !cretopDocs.includes(d) && looksLikeShareholderRegister(d))
-  const rosterDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && looksLikeRoster(d))
-  const factDocs = readable.filter((d) => !cretopDocs.includes(d) && !rosterDocs.includes(d) && !holderDocs.includes(d))
+  // D-342 근로소득 원천징수영수증 — 부양가족 주민번호 · 징수의무자 주소가 있어 명부 · 회사 정보로 읽지 않는다(대표 월 급여만 따로)
+  const wageDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && looksLikeWageReceipt(d.text, d.fileName))
+  const rosterDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && !wageDocs.includes(d) && looksLikeRoster(d))
+  const factDocs = readable.filter((d) => !cretopDocs.includes(d) && !rosterDocs.includes(d) && !holderDocs.includes(d) && !wageDocs.includes(d))
   const filled = autoFillFromDocs(record, factDocs, now, makeId)
   let rec = filled.record
   const entered = [...filled.entered]
@@ -321,6 +326,31 @@ export async function analyzeUploadedDocs(
     // 정관 배수가 세법 한도보다 크면 계산은 한도로(절세 설계와 같은 규칙) — 보이는 글에 함께
     const cap = Number(ASSUMPTIONS.retireMultPost)
     if (mult !== null) putProfile('retireMult', String(mult), '퇴직금 배수', `정관 · 대표이사 ${mult}배${mult > cap ? ` (계산은 세법 한도 ${cap}배)` : ''}`, d.fileName, true, '')
+  }
+
+  // 6. D-342 대표 월 급여 — 급여대장(이번 달 대표 줄 과세 급여)이 먼저, 없으면 근로소득 원천징수영수증(총급여 ÷ 근무한 달 수).
+  //    대표 본인 것만 · 빈 칸만, 다르면 확인
+  let ledgerPut = false
+  for (const d of readable.filter((x) => !cretopDocs.includes(x) && !holderDocs.includes(x) && !wageDocs.includes(x) && looksLikePayrollLedger(x.text, x.fileName))) {
+    const l = readLedgerCeoPay(d.text, rec.representativeName)
+    if (!l || wonOf(rec.taxProfile?.monthlySalary) === l.monthly) continue
+    ledgerPut = true
+    putProfile('monthlySalary', String(l.monthly), '대표 월 급여', `월 ${formatWon(l.monthly)} — ${l.month ? `${l.month.slice(0, 4)}년 ${Number(l.month.slice(5))}월 ` : ''}급여대장 ${l.taxable ? '과세 급여' : '지급 합계(비과세 포함일 수 있음)'}`, d.fileName, true, '')
+  }
+  for (const d of ledgerPut ? [] : wageDocs) {
+    const list = readWageReceipts(d.text)
+    const r = ceoWageReceipt(list, rec.representativeName)
+    if (!r) {
+      // 대표 이름을 모르고 같은 장의 대표자와도 맞춰 보지 못했으면 — 한 사람 것일 때만 확인으로(직원 영수증은 조용히 둔다)
+      if (list.length === 1 && !rec.representativeName.trim() && !list[0].payerCeo)
+        flagged.push({ key: 'taxProfile.monthlySalary', label: '대표 월 급여', display: `월 ${formatWon(monthlyPayOf(list[0]))}(${list[0].name})`, fileName: d.fileName, note: '대표 이름을 몰라 대표 본인 영수증인지 확인하지 못했어요 — 맞으면 절세 설계에 적어 주세요' })
+      continue
+    }
+    const monthly = monthlyPayOf(r)
+    // 이미 같은 금액('780만' 처럼 적었어도)이면 조용히
+    if (wonOf(rec.taxProfile?.monthlySalary) === monthly) continue
+    const basis = `${r.year ? `${r.year}년 ` : ''}총급여 ${formatWon(r.totalPay)} ÷ ${r.months}개월${r.monthsSure ? '' : '(근무기간 못 읽음)'}`
+    putProfile('monthlySalary', String(monthly), '대표 월 급여', `월 ${formatWon(monthly)} — ${basis}`, d.fileName, true, '')
   }
 
   return { record: rec, summary: { files: docs.length, entered, flagged, cretop, roster, warnings, at: now } }

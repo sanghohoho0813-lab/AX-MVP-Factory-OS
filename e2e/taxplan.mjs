@@ -80,8 +80,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   check('업체로 열면 원하는 결과로 찾기부터', (await page.getByTestId('tax-plan').count()) === 1 && (await page.locator('[data-mode="plan"][aria-selected="true"]').count()) === 1)
 
+  // D-342 빈 칸 아래 '업체 서류함에 … 올리면 저절로 채워져요' — 채우면 사라진다
+  const fillHint = (await page.getByTestId('doc-fill-monthlySalary').innerText().catch(() => '')) ?? ''
+  check("D-342 빈 '대표 월 급여' 칸 아래: 업체 서류함에 대표 원천징수영수증 · 급여대장을 올리면 저절로 채워져요", fillHint.includes('대표 원천징수영수증 · 급여대장을 올리면 저절로 채워져요'), fillHint)
   await fillNow(page)
   await page.waitForTimeout(400)
+  check('D-342 채우면 그 안내는 사라짐', (await page.getByTestId('doc-fill-monthlySalary').count()) === 0)
   const now = (await page.getByTestId('plan-now-summary').innerText()) ?? ''
   check('현황: 1주 가치 44,000원 · 기업가치 44억 (09 식)', now.includes('1주당 가치 44,000원') && now.includes('44억원') && now.includes('09 비상장주식'), now)
   check('현황: 대표 김대표 지분 60% · 평가액 26억 4,000만원', now.includes('대표 김대표 지분 60.0%') && now.includes('26억 4,000만원'), now)
