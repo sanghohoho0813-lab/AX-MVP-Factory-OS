@@ -268,6 +268,33 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(900)
   await page.getByRole('button', { name: 'OFF', exact: true }).first().click()
   await page.waitForTimeout(700)
+  // D-334 예전에 저장된 지원금 표(계속고용 720만 시절) → '이것만 최신 기준으로' — 켜고 끈 것은 그대로
+  const editStoredProgram = (amt) =>
+    page.evaluate((a) => {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i) ?? ''
+        if (!k.includes('employment') || !k.includes('orig')) continue
+        const rows = JSON.parse(localStorage.getItem(k) ?? '[]')
+        const row = rows.find((r) => (r.data ?? r).key === 'programs')
+        if (!row) continue
+        const progs = (row.data ?? row).value
+        if (a !== null) progs.senior_continue.totalAmount = a
+        localStorage.setItem(k, JSON.stringify(rows))
+        return { total: progs.senior_continue.totalAmount, on: Object.keys(progs).filter((id) => progs[id].enabled).sort().join() }
+      }
+      return null
+    }, amt)
+  const stored = await editStoredProgram(7_200_000)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const banner = await page.getByTestId('prog-outdated').innerText().catch(() => '')
+  check('D-334 예전 지원금 표(계속고용 720만) → 최신 기준과 다르다는 띠 · 이름 · 옛 금액 → 새 금액', !!stored && banner.includes('고령자 계속고용 장려금(720만 → 1,080만)'), banner || JSON.stringify(stored))
+  if (SHOTS) await page.getByTestId('prog-outdated').screenshot({ path: `${SHOTS}/07-prog-outdated.png` }).catch(() => {})
+  page.once('dialog', (d) => d.accept())
+  await page.getByTestId('prog-outdated-fix').click()
+  await page.waitForTimeout(900)
+  const after = await editStoredProgram(null)
+  check('D-334 [이것만 최신 기준으로] → 1,080만 · 띠 사라짐 · 켜고 끈 것 그대로', after?.total === 10_800_000 && after.on === stored?.on && (await page.getByTestId('prog-outdated').count()) === 0, JSON.stringify({ stored, after }))
   await page.goto(BASE + '/tools/employment/companies?cid=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(1000)
   await empApp.getByRole('button', { name: /직원 \(/ }).first().click()
