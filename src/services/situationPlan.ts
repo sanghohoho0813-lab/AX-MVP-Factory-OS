@@ -349,6 +349,7 @@ function startupBlock(record: ClientOpsRecord, facts: ClientFacts, today: string
     state: 'ok',
     headline: `${VERDICT_LABEL[item?.verdict ?? r.overall]} — ${r.oneLineConclusion}`,
     lines: [
+      r.taxRate.line,
       ...(item?.reasons ?? r.keyReasons).slice(0, 2),
       left > 0
         ? `감면 기간: ${from}~${to}년(창업한 해부터 5년으로 보수적으로) — 올해 포함 ${left}년 남음. 뽑은 해부터 남은 해까지 함께 챙겨요`

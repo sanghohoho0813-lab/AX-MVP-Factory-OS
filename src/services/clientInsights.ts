@@ -23,6 +23,7 @@ import { policyEvidence } from './policyEvidence'
 import { policyApplyAsk, policyApplyMessage } from './policyApply'
 import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
+import { METRO_POP_DECLINE } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
 import { headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
@@ -211,13 +212,14 @@ export function smeConfirmed(record: ClientOpsRecord): boolean {
   return !!record.documents?.smeCertificate?.received
 }
 
-export function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration'] } {
+/** D-318 popDecline — 수도권 인구감소지역(가평 · 연천 · 강화 · 옹진)인지. 2026년 이후 창업 감면율을 가른다(시 · 군을 모르면 '') */
+export function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration']; popDecline: NonNullable<StartupForm['popDecline']> } {
   const { sido, city } = placeOf(address)
-  if (sido === '서울') return { region: 'seoul', over: 'yes' }
-  if (sido === '경기' || sido === '인천') return { region: 'gyeonggi_incheon', over: metroOver(sido, city) }
-  if (['부산', '대구', '광주', '대전', '울산'].includes(sido)) return { region: 'metro_city', over: 'no' }
-  if (sido) return { region: 'other_local', over: 'no' }
-  return { region: '', over: '' }
+  if (sido === '서울') return { region: 'seoul', over: 'yes', popDecline: 'no' }
+  if (sido === '경기' || sido === '인천') return { region: 'gyeonggi_incheon', over: metroOver(sido, city), popDecline: !city ? '' : METRO_POP_DECLINE.includes(city) ? 'yes' : 'no' }
+  if (['부산', '대구', '광주', '대전', '울산'].includes(sido)) return { region: 'metro_city', over: 'no', popDecline: '' }
+  if (sido) return { region: 'other_local', over: 'no', popDecline: '' }
+  return { region: '', over: '', popDecline: '' }
 }
 
 const startupInsight: Provider = ({ record, today, facts }) => {
@@ -226,9 +228,10 @@ const startupInsight: Provider = ({ record, today, facts }) => {
   if (facts.establishedAt && facts.months !== null && facts.months >= 60) return { key: 'startup-tax', label: '창업감면', tone: 'no', headline: '창업 5년이 지나 감면 기간이 끝났을 가능성이 커요', detail: `설립 ${facts.establishedAt}`, missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
   const missing = [!facts.establishedAt ? '설립일(창업일)' : '', !facts.representativeBirth ? '대표 생년월일' : ''].filter(Boolean)
   if (missing.length) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: `${missing.join(' · ')}을(를) 알면 판정해요`, detail: '사업자등록증 · 대표 신분 정보로 채워져요.', missing, openPath: open, openLabel: '창업감면 판정', action: null }
-  const { region, over } = startupRegion(facts.address)
+  const { region, over, popDecline } = startupRegion(facts.address)
   const form: StartupForm = {
     ...EMPTY_FORM,
+    popDecline,
     businessType: facts.businessType,
     birthDate: facts.representativeBirth,
     startupDate: facts.establishedAt,

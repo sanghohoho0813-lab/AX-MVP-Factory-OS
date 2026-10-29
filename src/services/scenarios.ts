@@ -321,9 +321,10 @@ function runLab(s: ScenarioPreset, facts: ClientFacts): ReturnType<typeof runTax
 
 /** 창업감면 판정기 입력 — 업체 사실 + 상황 값(상황별 설계서 '창업 5년 안 채용' 도 같이 쓴다) */
 export function startupFormOf(facts: ClientFacts, over: ScenarioPreset['startup']): StartupForm {
-  const { region, over: oc } = startupRegion(facts.address)
+  const { region, over: oc, popDecline } = startupRegion(facts.address)
   return {
     ...EMPTY_FORM,
+    popDecline,
     businessType: facts.businessType,
     birthDate: facts.representativeBirth,
     startupDate: facts.establishedAt,
@@ -341,7 +342,8 @@ function runStartup(s: ScenarioPreset, facts: ClientFacts, today: string): Retur
   const date = new Date(`${today}T00:00:00`)
   const r = judge(startupFormOf(facts, s.startup), date)
   if (r.notice) return { state: 'partial', headline: r.notice, lines: [], amount: '', needs, filledFrom: [], assumptions: [] }
-  const lines = [...r.keyReasons.slice(0, 2), ...r.alerts.slice(0, 1).map((a) => `★ ${a}`)]
+  // D-318 감면율 한 줄(창업 연도 · 권역 · 청년) — 판정기 화면 · 한 장 설계서와 같은 값
+  const lines = [r.taxRate.line, ...r.keyReasons.slice(0, 2), ...r.alerts.slice(0, 1).map((a) => `★ ${a}`)]
   // 옮기면 — 지금 권역 결론과 나란히
   if (s.id === 'startup-move') {
     const now = judge(startupFormOf(facts, { startupForm: s.startup?.startupForm }), date)

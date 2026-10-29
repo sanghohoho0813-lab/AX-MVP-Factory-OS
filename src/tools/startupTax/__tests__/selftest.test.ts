@@ -341,11 +341,14 @@ function checkDomain(f: FormData, r: JudgementResult) {
     check(r.alerts.some((x) => x.includes('경기·인천')), '경기·인천 주소 확인 안내', r.alerts.join('|'), f)
   }
 
-  // D-136: 2026 이후 창업 → 종합 good 금지 · 개정 규정 안내
-  if (f.startupDate >= '2026-01-01') {
-    check(r.overall !== 'good', '2026 창업 종합 good아님', r.overall, f)
-    check(r.alerts.includes(REVISED_RULE_ALERT), '2026 창업 개정 안내', r.alerts.join('|'), f)
+  // D-318: 2026 이후 창업은 개정 감면율표 — 경기 · 인천 과밀억제권역 밖인데 인구감소지역인지 모르면 good 금지 · 주소 안내
+  if (f.startupDate >= '2026-01-01' && f.region === 'gyeonggi_incheon' && f.overconcentration === 'no' && !(f.popDecline === 'yes' || f.popDecline === 'no')) {
+    check(r.overall !== 'good', '2026 경기·인천 인구감소지역 모름 종합 good아님', r.overall, f)
+    check(r.alerts.includes(REVISED_RULE_ALERT), '2026 경기·인천 인구감소지역 안내', r.alerts.join('|'), f)
   }
+  // D-318: 감면율은 표 안의 값만 — 청년 100 · 75 · 50 / 일반 50 · 25 · 0
+  check([100, 75, 50, null].includes(r.taxRate.youth) && [50, 25, 0, null].includes(r.taxRate.general), '감면율 표 안의 값', JSON.stringify(r.taxRate), f)
+  if (f.startupDate < '2026-01-01') check(r.taxRate.youth !== 75 && r.taxRate.general !== 25, '2025년까지 창업은 75 · 25 구간 없음', JSON.stringify(r.taxRate), f)
   // D-136: 예비창업(창업일이 아직 안 옴) → 안내 · good 금지
   if (validDate(f.startupDate) && f.startupDate > formatDate(BASE) && validDate(f.birthDate)) {
     check(r.notice === NOTICE_PRE_STARTUP, '예비창업 안내', `${r.notice}`, f)
@@ -519,7 +522,44 @@ const tax = (r: JudgementResult) => r.frameworks[0].verdict
 const item = (r: JudgementResult, k: string) => r.coreItems.find((i) => i.key === k)?.verdict
 const hasAlert = (r: JudgementResult, s: string) => r.alerts.some((a) => a.includes(s))
 
+const rate = (r: JudgementResult) => r.taxRate.applied
 const CASES: Expect[] = [
+  // ---- D-318 2026년 이후 창업 감면율(조특법 §6① 2호 · 시행령 §5②) ----
+  {
+    name: '[D-318] 2026 창업 · 지방 · 청년 → 100% · good',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1995-06-01' }),
+    expect: (r) => [rate(r) === 100 && tax(r) === 'good' && r.taxRate.line.includes('2026년 이후') && !hasAlert(r, '인구감소지역'), `rate=${rate(r)} tax=${tax(r)} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-318] 2026 창업 · 경기 과밀 밖 · 인구감소지역 아님 · 청년 → 75%',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1995-06-01', region: 'gyeonggi_incheon', overconcentration: 'no', popDecline: 'no' }),
+    expect: (r) => [rate(r) === 75 && item(r, 'incomeTax') === 'good' && r.coreItems[0].reasons.some((x) => x.includes('75%')), `rate=${rate(r)} item=${item(r, 'incomeTax')}`],
+  },
+  {
+    name: '[D-318] 2026 창업 · 경기 과밀 밖 · 인구감소지역 아님 · 일반 → 25%',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1971-06-01', region: 'gyeonggi_incheon', overconcentration: 'no', popDecline: 'no' }),
+    expect: (r) => [rate(r) === 25 && r.coreItems[0].reasons.some((x) => x.includes('25%')), `rate=${rate(r)}`],
+  },
+  {
+    name: '[D-318] 2026 창업 · 인천 강화(인구감소지역) · 일반 → 50%',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1971-06-01', region: 'gyeonggi_incheon', overconcentration: 'no', popDecline: 'yes' }),
+    expect: (r) => [rate(r) === 50 && r.taxRate.line.includes('인구감소지역'), `rate=${rate(r)} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-318] 2026 창업 · 경기 과밀 밖 · 인구감소지역 모름 · 청년 → 75~100% · 주의 · 주소 안내',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1995-06-01', region: 'gyeonggi_incheon', overconcentration: 'no' }),
+    expect: (r) => [rate(r) === null && item(r, 'incomeTax') === 'caution' && r.taxRate.line.includes('75~100%') && r.alerts.includes(REVISED_RULE_ALERT), `rate=${rate(r)} item=${item(r, 'incomeTax')} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-318] 2025년 창업 · 경기 과밀 밖 · 청년 → 옛 표 100%(인구감소지역 안 물음)',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1995-06-01', region: 'gyeonggi_incheon', overconcentration: 'no' }),
+    expect: (r) => [rate(r) === 100 && !r.alerts.includes(REVISED_RULE_ALERT) && r.taxRate.line.includes('2025년까지'), `rate=${rate(r)} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-318] 2026 창업 · 서울 · 청년 50% / 일반 0%',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1995-06-01', region: 'seoul', overconcentration: 'yes' }),
+    expect: (r) => [rate(r) === 50 && r.taxRate.general === 0, `rate=${rate(r)} general=${r.taxRate.general}`],
+  },
   {
     name: '청년+제조+비과밀+신규 → 종합 good, 조특법 good',
     form: mkForm({ birthDate: '1995-06-01', industry: 'manufacturing', overconcentration: 'no', startupForm: 'brand_new' }),
@@ -873,9 +913,10 @@ const CASES: Expect[] = [
 
   // ---- 13. 2026년 이후 창업 ----
   {
-    name: '[13] 2026-01-01 창업 → 개정 규정 ★확인 · 종합 주의 상한',
+    // D-318 예전에는 2026 이후 창업을 '개정 규정 확인 필요' 로 막아 종합 '주의' 였다 — 이제 개정 표(지방 · 청년 100%)로 본다
+    name: '[13] 2026-01-01 창업 · 지방 · 청년 → 개정 표 100% · good(막지 않음)',
     form: mkForm({ startupDate: '2026-01-01', birthDate: '1995-06-01' }),
-    expect: (r) => [r.overall === 'caution' && tax(r) === 'caution' && r.alerts.includes(REVISED_RULE_ALERT) && r.frameworks[0].risks.includes(REVISED_RULE_ALERT), `overall=${r.overall}`],
+    expect: (r) => [r.overall === 'good' && tax(r) === 'good' && rate(r) === 100 && !r.alerts.includes(REVISED_RULE_ALERT) && !r.frameworks[0].risks.includes(REVISED_RULE_ALERT), `overall=${r.overall} rate=${rate(r)}`],
   },
   {
     name: '[13] 2025-12-31 창업 → 개정 안내 없음 · good',
@@ -890,8 +931,9 @@ const CASES: Expect[] = [
     expect: (r) => [r.savingsLevel.level === 'A' && r.overall === 'good', `level=${r.savingsLevel.level}`],
   },
   {
-    name: '절세 A 금지: 2026 창업(종합 주의)',
-    form: mkForm({ birthDate: '1995-06-01', startupDate: '2026-02-01' }),
+    // D-318 2026 창업 · 경기 과밀 밖 · 인구감소지역 모름 → 주의라 절세 A 아님
+    name: '절세 A 금지: 2026 창업 · 경기 과밀 밖 · 인구감소지역 모름(종합 주의)',
+    form: mkForm({ birthDate: '1995-06-01', startupDate: '2026-02-01', region: 'gyeonggi_incheon', overconcentration: 'no' }),
     expect: (r) => [r.savingsLevel.level !== 'A', `level=${r.savingsLevel.level}`],
   },
   // ---- D-225 지방세 창업감면은 창업 후 4년 안 취득만 — 업력을 보지 않아 오래된 업체도 '가능성 높음' 이었다 ----

@@ -850,5 +850,23 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-312 서류가 없으면 근거 줄 없음(예전 그대로)', !plain.lines.some((l) => l.startsWith('서류:')), JSON.stringify(plain.lines))
 }
 
+/* ---- D-318 창업감면 2026 개정 감면율 — 주소로 인구감소지역 · 상황 예시 · 한 장 설계서가 같은 값 ---- */
+{
+  check('D-318 주소 → 수도권 인구감소지역(가평 · 연천 · 강화 · 옹진)', startupRegion('인천광역시 강화군 강화읍 1').popDecline === 'yes' && startupRegion('경기도 가평군 가평읍 1').popDecline === 'yes' && startupRegion('경기도 화성시 동탄대로 1').popDecline === 'no' && startupRegion('부산광역시 해운대구 1').popDecline === '', [startupRegion('인천광역시 강화군 강화읍 1'), startupRegion('경기도 화성시 동탄대로 1')])
+  const mk = (id: string, address: string, est: string, birth: string) =>
+    normalizeClientOps({ ...full, id, businessAddress: address, establishedAt: est, representativeBirth: birth } as unknown as Partial<ClientOpsRecord>)
+  const runLine = (r: ClientOpsRecord) => runScenario(scenarioPreset('startup-new')!, r, today).lines[0] ?? ''
+  const planLine = (r: ClientOpsRecord) => (buildSituationPlan('startup-hire', r, today, 1).blocks.find((b) => b.key === 'startup')?.lines[0] ?? '')
+  const gy26 = mk('gy26', '경기도 화성시 동탄대로 1', '2026-03-02', '1995-05-05')
+  const gh26 = mk('gh26', '인천광역시 강화군 강화읍 1', '2026-03-02', '1995-05-05')
+  const gy25 = mk('gy25', '경기도 화성시 동탄대로 1', '2025-03-02', '1995-05-05')
+  const gy26old = mk('gy26o', '경기도 화성시 동탄대로 1', '2026-03-02', '1970-05-05')
+  check('D-318 2026 창업 · 화성(수도권 · 과밀 밖) · 청년 → 상황 예시 감면율 75%', runLine(gy26).startsWith('감면율 75%') && runLine(gy26).includes('2026년 이후'), runLine(gy26))
+  check('D-318 2026 창업 · 강화(인구감소지역) · 청년 → 100%', runLine(gh26).startsWith('감면율 100%') && runLine(gh26).includes('인구감소지역'), runLine(gh26))
+  check('D-318 2025년 창업 · 화성 · 청년 → 옛 표 100%', runLine(gy25).startsWith('감면율 100%') && runLine(gy25).includes('2025년까지'), runLine(gy25))
+  check('D-318 2026 창업 · 화성 · 일반 → 25%', runLine(gy26old).startsWith('감면율 25%'), runLine(gy26old))
+  check('D-318 한 장 설계서(창업 5년 안 채용)의 창업감면 줄 = 상황 예시 줄', planLine(gy26) === runLine(gy26) && planLine(gh26) === runLine(gh26), [planLine(gy26), runLine(gy26)])
+}
+
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -17,6 +17,10 @@ import {
   industryClassOf,
   REVISED_RULE_ALERT,
   REVISED_RULE_FROM,
+  startupRates,
+  startupZone,
+  type StartupRates,
+  type StartupZone,
   worstOf,
 } from './rules'
 import {
@@ -132,8 +136,10 @@ interface Facts {
   baseYear: number
   datesMissing: boolean // 생년월일·창업일 없음 / 잘못됨 / 예시 날짜 / 순서 뒤바뀜
   future: boolean // 창업일이 아직 오지 않음 (예비창업)
-  after2026: boolean // 2026-01-01 이후 창업 (개정 규정 확인 필요)
+  after2026: boolean // 2026-01-01 이후 창업 (개정 감면율표 — D-318)
   regionInconsistent: boolean // 지역 ↔ 과밀억제권역 답이 맞지 않음
+  zone: StartupZone // D-318 감면율을 고르는 권역
+  rates: StartupRates
 }
 
 // 모든 항목에 똑같이 씌우는 상한 — 입력이 불완전하면 '가능성 높음' 이 나오지 않게
@@ -205,15 +211,30 @@ function judgeIncomeTax(form: FormData, recognition: Verdict, facts: Facts): Ite
     reasons.push('신규 창업으로 확인되면 감면 가능성이 높아집니다.')
     consultScript = '창업 형태(신규/전환/양수)를 먼저 확인하면 감면 가능 여부가 분명해집니다.'
   } else if (over === 'no') {
-    // 과밀억제권역 밖: 청년 100% · 청년 아님 50% — 둘 다 감면 대상
-    verdict = 'good'
+    // 과밀억제권역 밖 — D-318 2026년 이후 창업은 수도권(인구감소지역 밖)이면 한 단계 낮다(청년 75 · 일반 25)
+    const zone = facts.zone
+    verdict = zone === 'metro_unsure' ? 'caution' : 'good'
     if (isYouth === true) {
-      reasons.push('청년 창업 + 수도권 과밀억제권역 외 지역으로 유리한 조건입니다.')
-      reasons.push('청년창업중소기업 세액감면(높은 감면율) 적용 가능성을 검토할 수 있습니다.')
-      consultScript =
-        '대표님은 청년 + 비과밀억제권역 창업으로, 창업감면에서 가장 유리한 구간에 해당할 가능성이 있습니다.'
+      if (zone === 'metro') {
+        reasons.push('청년 창업 + 수도권(과밀억제권역 · 인구감소지역 밖) — 2026년 이후 창업이라 감면율 75%입니다.')
+        consultScript = '대표님은 청년 창업이지만 2026년부터 수도권(과밀억제권역 밖)은 감면율이 75%로 한 단계 낮아졌습니다. 그래도 5년간 법인세 · 소득세의 4분의 3을 덜 냅니다.'
+      } else if (zone === 'metro_unsure') {
+        reasons.push('청년 창업 + 경기 · 인천의 과밀억제권역 밖 — 2026년 이후 창업은 인구감소지역(가평 · 연천 · 강화 · 옹진)이면 100%, 아니면 75%입니다.')
+        consultScript = '청년 창업이라 감면이 큽니다. 사업장 주소가 인구감소지역인지에 따라 100%인지 75%인지 정해지니 주소부터 확인하겠습니다.'
+      } else {
+        reasons.push('청년 창업 + 수도권 과밀억제권역 외 지역으로 유리한 조건입니다(감면율 100%).')
+        reasons.push('청년창업중소기업 세액감면(높은 감면율) 적용 가능성을 검토할 수 있습니다.')
+        consultScript =
+          '대표님은 청년 + 비과밀억제권역 창업으로, 창업감면에서 가장 유리한 구간에 해당할 가능성이 있습니다.'
+      }
     } else {
-      reasons.push('비과밀억제권역 창업으로 일반 창업중소기업 세액감면(감면율 50%) 검토가 가능합니다.')
+      reasons.push(
+        zone === 'metro'
+          ? '수도권(과밀억제권역 · 인구감소지역 밖) 창업 — 2026년 이후 창업은 일반 창업중소기업 감면율 25%입니다(연 수입금액 8천만원 이하인 해는 75%).'
+          : zone === 'metro_unsure'
+            ? '경기 · 인천의 과밀억제권역 밖 — 2026년 이후 창업은 인구감소지역이면 일반 50%, 아니면 25%입니다(주소 ★확인).'
+            : '비과밀억제권역 창업으로 일반 창업중소기업 세액감면(감면율 50%) 검토가 가능합니다.',
+      )
       if (isYouth === null) reasons.push('병역 기간을 빼면 청년(감면율 우대)일 수 있어 확인이 필요합니다.')
       consultScript =
         '대표님 케이스는 창업감면 가능성이 있어 보이지만, 업종 코드와 최초 소득 발생연도 확인이 먼저 필요합니다.'
@@ -272,10 +293,8 @@ function judgeIncomeTax(form: FormData, recognition: Verdict, facts: Facts): Ite
     }
   }
 
-  if (facts.after2026) {
-    verdict = worstOf(verdict, 'caution')
-    reasons.push('2026년 이후 창업은 개정 규정(지역 구분 · 감면율) 확인이 필요합니다.')
-  }
+  // D-318 2026년 이후 창업은 개정 감면율표로 봤다 — 예전처럼 '개정 규정 확인 필요' 로 막지 않는다
+  if (facts.after2026) reasons.push(`2026년 이후 창업 — 개정 감면율표(조특법 §6①)로 봤습니다: ${facts.rates.text}.`)
   verdict = applyInputCaps(verdict, reasons, facts)
 
   reasons.push('정확한 감면율은 창업지역, 업종, 과밀억제권역, 최초 소득 발생연도에 따라 달라집니다.')
@@ -483,13 +502,30 @@ function buildAlerts(form: FormData, facts: Facts, age: number | null, regionAle
     out.push('과세연도는 1~12월로 계산했습니다. 법인 사업연도가 다르면 감면 기간이 달라집니다 — ★확인')
   }
 
-  if (facts.after2026) out.push(REVISED_RULE_ALERT)
+  if (facts.zone === 'metro_unsure') out.push(REVISED_RULE_ALERT)
 
   if (form.overconcentration === 'yes' && industry !== 'excluded') {
     out.push('과밀억제권역 창업은 취득세·재산세 창업감면(지특법 §58의3) 대상이 아닌 것이 원칙입니다 — 예외 ★확인')
   }
 
   return [...new Set(out)]
+}
+
+/** D-318 감면율 한 줄 — '감면율 75%(2026년 이후 창업 · 수도권 과밀억제권역 밖)' */
+const ZONE_LABEL: Record<StartupZone, string> = {
+  outside: '과밀억제권역 밖',
+  metro: '수도권(과밀억제권역 · 인구감소지역 밖)',
+  metro_unsure: '경기 · 인천 과밀억제권역 밖',
+  overcrowded: '수도권 과밀억제권역',
+  unknown: '권역 확인 전',
+}
+function taxRateOf(facts: Facts, isYouth: boolean | null, form: FormData): JudgementResult['taxRate'] {
+  const { zone, rates, after2026 } = facts
+  const applied = isYouth === true ? rates.youth : isYouth === false ? rates.general : null
+  const where = zone === 'outside' && after2026 ? (form.region === 'gyeonggi_incheon' ? '수도권 인구감소지역' : '수도권 밖') : ZONE_LABEL[zone]
+  const when = after2026 ? '2026년 이후 창업' : '2025년까지 창업'
+  const line = applied !== null ? `감면율 ${applied}% — ${when} · ${where}${isYouth ? ' · 청년' : ''}` : `감면율 ${rates.text} — ${when} · ${where}`
+  return { zone, youth: rates.youth, general: rates.general, applied, line }
 }
 
 // ---------------------------------------------------------------------------
@@ -521,14 +557,18 @@ export function judge(inputForm: FormData, baseDate: Date = new Date()): Judgeme
   const isYouth = youth.taxLaw
   const recognition = judgeStartupRecognition(form)
 
+  const after2026 = start !== null && formatDate(start) >= REVISED_RULE_FROM
+  const zone = startupZone(form, after2026)
   const facts: Facts = {
     youthTax: isYouth,
     lineage,
     baseYear: today.getFullYear(),
     datesMissing: !birth || !start || dateOrderWrong,
     future,
-    after2026: start !== null && formatDate(start) >= REVISED_RULE_FROM,
+    after2026,
     regionInconsistent: region.inconsistent,
+    zone,
+    rates: startupRates(zone, after2026),
   }
 
   const checked = form.checkItems
@@ -555,7 +595,7 @@ export function judge(inputForm: FormData, baseDate: Date = new Date()): Judgeme
     youth,
     registration ? registration.note : buildRegistrationReference(form).note,
     lineage,
-    facts.after2026 ? [REVISED_RULE_ALERT] : [],
+    facts.zone === 'metro_unsure' ? [REVISED_RULE_ALERT] : [],
   )
 
   // 종합판정: 핵심 항목(등록면허세 제외) 중 가장 보수적인 상태
@@ -598,6 +638,7 @@ export function judge(inputForm: FormData, baseDate: Date = new Date()): Judgeme
     age,
     youth,
     frameworks,
+    taxRate: taxRateOf(facts, isYouth, form),
     lineage,
     startupRecognition: recognition.verdict,
     startupRecognitionNote: recognition.note,

@@ -66,6 +66,8 @@ export interface FormData {
   placeholdersCleared?: true
   region: Region | ''
   overconcentration: Overconcentration | ''
+  /** D-318 사업장이 수도권 인구감소지역(가평 · 연천 · 강화 · 옹진)인지 — 2026년 이후 창업은 수도권 밖과 같은 감면율. 예전 저장분은 없음 */
+  popDecline?: YesNoUnknown | ''
   industry: Industry | ''
   startupForm: StartupForm | ''
   checkItems: Record<ExemptionKey, boolean>
@@ -196,6 +198,9 @@ export interface JudgementResult {
 
   // 창업일 승계 분석 (법인전환 등)
   lineage: Lineage
+
+  /** D-318 법인세 · 소득세 감면율 — 창업 연도 · 권역 · 청년으로 고른 값(applied: 청년 여부를 모르면 null) */
+  taxRate: { zone: 'outside' | 'metro' | 'metro_unsure' | 'overcrowded' | 'unknown'; youth: number | null; general: number | null; applied: number | null; line: string }
 
   // 창업 인정 분석
   startupRecognition: Verdict

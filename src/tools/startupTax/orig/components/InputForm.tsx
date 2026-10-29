@@ -6,7 +6,9 @@ import {
   OVERCONCENTRATIONS,
   REGIONS,
   STARTUP_FORMS,
+  YES_NO_UNKNOWN,
 } from '../../lib/options'
+import { REVISED_RULE_FROM } from '../../lib/rules'
 import { Accordion, ChoiceGroup, FieldLabel, HintText, Section } from './ui'
 import DateSelect from './DateSelect'
 import AdvancedSection from './AdvancedSection'
@@ -91,6 +93,14 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           columns={3}
         />
         <HintText>과밀억제권역 여부에 따라 감면율과 적용 여부가 크게 달라집니다.</HintText>
+        {/* D-318 2026년 이후 창업 · 경기 · 인천 과밀억제권역 밖이면 — 인구감소지역인지로 감면율이 한 단계 갈린다 */}
+        {form.region === 'gyeonggi_incheon' && form.overconcentration !== 'yes' && form.startupDate >= REVISED_RULE_FROM && (
+          <div className="mt-4 border-t border-gray-100 pt-4" data-testid="startup-pop-decline">
+            <p className="mb-3 break-keep text-base font-bold text-gray-800">가평 · 연천 · 강화 · 옹진(수도권 인구감소지역)인가요?</p>
+            <ChoiceGroup options={YES_NO_UNKNOWN} value={form.popDecline ?? ''} onSelect={(v) => update('popDecline', v)} columns={3} />
+            <HintText>2026년 이후 창업은 이 네 곳이면 수도권 밖과 같은 감면율(청년 100% · 일반 50%), 아니면 청년 75% · 일반 25%입니다.</HintText>
+          </div>
+        )}
       </Section>
 
       {/* 6. 업종 */}

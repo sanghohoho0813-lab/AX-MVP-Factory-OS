@@ -107,6 +107,40 @@ export function checkRegion(form: Pick<FormData, 'region' | 'overconcentration'>
   }
 }
 
-/** 2026-01-01 이후 창업은 2025 세법 개정 규정 확인 전까지 판정 상한 '주의' */
+/** 2026-01-01 이후 창업은 개정 감면율표(조특법 §6① 2호 · 시행령 §5②)로 본다 — D-318 */
 export const REVISED_RULE_FROM = '2026-01-01'
-export const REVISED_RULE_ALERT = '2026년 이후 창업은 개정 규정(지역 구분 · 감면율) 확인 필요 — ★확인'
+export const REVISED_RULE_ALERT = '사업장이 가평 · 연천 · 강화 · 옹진(수도권 인구감소지역)이면 수도권 밖과 같은 감면율, 아니면 한 단계 낮은 감면율(청년 75% · 일반 25%) — 주소 ★확인'
+
+/**
+ * D-318 창업감면(법인세 · 소득세) 감면율 — 조특법 §6① · ⑥ · 시행령 §5②.
+ *  2025년까지 창업: 과밀억제권역 밖 청년 100 · 일반 50 / 과밀억제권역 청년 50 · 일반 0
+ *  2026년부터 창업: 수도권 밖 · 수도권 인구감소지역 청년 100 · 일반 50 / 수도권(과밀 · 인구감소지역 밖) 청년 75 · 일반 25 / 과밀억제권역 청년 50 · 일반 0
+ *  일반 창업도 연 수입금액 8천만원 이하인 해(§6⑥)는 청년과 같은 감면율.
+ * 예전에는 2026년 이후 창업을 '개정 규정 확인 필요' 로만 두고 '주의' 로 막았다.
+ */
+export const METRO_POP_DECLINE = ['가평군', '연천군', '강화군', '옹진군']
+export type StartupZone = 'outside' | 'metro' | 'metro_unsure' | 'overcrowded' | 'unknown'
+
+export function startupZone(form: Pick<FormData, 'region' | 'overconcentration' | 'popDecline'>, after2026: boolean): StartupZone {
+  if (form.overconcentration === 'yes') return 'overcrowded'
+  if (form.region === 'metro_city' || form.region === 'other_local') return 'outside'
+  if (form.overconcentration !== 'no') return 'unknown'
+  // 과밀억제권역 밖 — 2025년까지는 지역을 더 나누지 않는다
+  if (!after2026 || form.region !== 'gyeonggi_incheon') return 'outside'
+  return form.popDecline === 'yes' ? 'outside' : form.popDecline === 'no' ? 'metro' : 'metro_unsure'
+}
+
+export interface StartupRates {
+  youth: number | null
+  general: number | null
+  /** 사람이 읽는 한 줄 — '청년 100% · 일반 50%' · '청년 75~100% · 일반 25~50%' */
+  text: string
+}
+
+export function startupRates(zone: StartupZone, after2026: boolean): StartupRates {
+  if (zone === 'outside') return { youth: 100, general: 50, text: '청년 100% · 일반 50%' }
+  if (zone === 'overcrowded') return { youth: 50, general: 0, text: '청년 50% · 일반 0%(연 수입금액 8천만원 이하인 해는 50%)' }
+  if (zone === 'metro') return { youth: 75, general: 25, text: '청년 75% · 일반 25%(연 수입금액 8천만원 이하인 해는 75%)' }
+  if (zone === 'metro_unsure') return { youth: null, general: null, text: '청년 75~100% · 일반 25~50%(인구감소지역이면 높은 쪽)' }
+  return { youth: null, general: null, text: after2026 ? '청년 50~100% · 일반 0~50%(권역에 따라)' : '청년 50~100% · 일반 0~50%(과밀억제권역 여부에 따라)' }
+}

@@ -147,7 +147,8 @@ for (const width of [360, 390, 430]) {
   if (width === 390) {
     await page.locator('nav[aria-label="주요 화면"]').getByRole('button', { name: /더보기/ }).click()
     await page.waitForTimeout(400)
-    const link = page.getByRole('link', { name: /특허 · 벤처/ }).filter({ visible: true }).first()
+    // 더보기 서랍 안에서 찾는다 — 오늘 화면 본문에도 '특허 · 벤처' 링크가 생겨, 서랍 뒤에 가린 그 링크를 누르려다 멈췄다
+    const link = page.getByTestId('more-sheet-wrap').getByRole('link', { name: /특허 · 벤처/ }).filter({ visible: true }).first()
     check('390: 더보기 서랍에 "특허 · 벤처"', (await link.count()) === 1)
     await link.click()
     await page.waitForURL(/\/patent-venture$/)

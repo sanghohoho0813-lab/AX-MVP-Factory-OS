@@ -20,6 +20,12 @@ export default function OverallCard({ result }: { result: JudgementResult }) {
       <p className={`mt-4 text-[1.75rem] font-extrabold leading-tight ${s.text}`} data-testid="startup-tax-oneline">
         {result.oneLineConclusion}
       </p>
+      {/* D-318 감면율 — 창업 연도(2026 개정) · 권역 · 청년으로 고른 값 */}
+      {!result.notice && (
+        <p className="mt-3 inline-flex max-w-full break-keep rounded-2xl bg-white/80 px-3 py-1.5 text-base font-bold text-gray-800" data-testid="startup-tax-rate">
+          {result.taxRate.line}
+        </p>
+      )}
 
       {/* D-136: 판정기가 단정하지 못한 것 — 숨기지 않고 판정 바로 아래에 */}
       {result.alerts.length > 0 && (

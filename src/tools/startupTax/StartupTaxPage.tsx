@@ -102,6 +102,16 @@ function StartupTaxScreen() {
       next.industry = facts.industry as StartupTaxForm['industry']
       filled.push('업종')
     }
+    // D-318 회사 주소로 권역까지 — 예전에는 상황 예시로 열 때만 채워, 그냥 열면 지역 · 과밀억제권역을 다시 골라야 했다
+    if (!next.region && facts.address) {
+      const place = startupRegion(facts.address)
+      if (place.region) {
+        next.region = place.region
+        if (!next.overconcentration && place.over) next.overconcentration = place.over
+        if (!next.popDecline && place.popDecline) next.popDecline = place.popDecline
+        filled.push('사업장 지역(주소)')
+      }
+    }
     if (filled.length > 0) setForm(next)
     return filled
   })
@@ -120,7 +130,7 @@ function StartupTaxScreen() {
     if (!preset || preset.module !== 'startup-tax') return
     const place = startupRegion(clientRecord?.businessAddress ?? '')
     const applied: Partial<StartupTaxForm> = { ...(preset.startup ?? {}) }
-    const filledRegion = form.region ? {} : { region: place.region, overconcentration: place.over }
+    const filledRegion = form.region ? {} : { region: place.region, overconcentration: place.over, popDecline: place.popDecline }
     const base = { ...form, ...filledRegion }
     const before: Partial<StartupTaxForm> = Object.fromEntries(Object.keys(applied).map((k) => [k, base[k as keyof StartupTaxForm]]))
     setForm((f) => ({ ...f, ...(f.region ? {} : filledRegion), ...applied }))
