@@ -2,13 +2,19 @@
  * D-321 계산 기준표 — OS 가 계산에 쓰는 세율 · 공제 · 단가(몇 년 · 어떤 법)를 한 화면에.
  * 숫자는 lawBasis 가 계산기 · 모듈 상수에서 읽는다. 규칙 계산이다.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BookOpen, ChevronDown } from 'lucide-react'
 import { lawBasis } from '../../services/lawBasis'
 
-export function TaxBasis({ onBack }: { onBack: () => void }) {
+/** focus — 판정 · 계산 화면에서 '기준표' 를 누르고 왔으면 그 칸(?s=)으로 내려가 펼치고 테두리를 칠한다(D-326) */
+export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string | null }) {
   const sections = useMemo(() => lawBasis(), [])
-  const [open, setOpen] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(focus ?? null)
+  useEffect(() => {
+    if (!focus) return
+    const t = window.setTimeout(() => document.querySelector(`[data-testid="tax-basis-section"][data-id="${CSS.escape(focus)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80)
+    return () => window.clearTimeout(t)
+  }, [focus])
   return (
     <section className="flex flex-col gap-4" data-testid="tax-basis" aria-labelledby="tax-basis-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -29,7 +35,13 @@ export function TaxBasis({ onBack }: { onBack: () => void }) {
           const expanded = open === s.id || s.rows.length <= 6
           const rows = expanded ? s.rows : s.rows.slice(0, 5)
           return (
-            <li key={s.id} className="flex min-w-0 flex-col rounded-(--radius-card) border border-slate-200 bg-white p-4 shadow-(--shadow-card)" data-testid="tax-basis-section" data-id={s.id}>
+            <li
+              key={s.id}
+              className={`flex min-w-0 scroll-mt-24 flex-col rounded-(--radius-card) border bg-white p-4 shadow-(--shadow-card) ${focus === s.id ? 'border-brand-400 ring-2 ring-brand-200' : 'border-slate-200'}`}
+              data-testid="tax-basis-section"
+              data-id={s.id}
+              data-focus={focus === s.id ? '1' : undefined}
+            >
               <h3 className="t-card font-bold break-keep text-slate-900">{s.title}</h3>
               <p className="t-meta mt-1 break-keep text-brand-800" data-testid="tax-basis-law">
                 {s.basis}

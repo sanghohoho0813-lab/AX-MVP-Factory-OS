@@ -555,7 +555,11 @@ function taxRateOf(facts: Facts, isYouth: boolean | null, form: FormData): Judge
       : applied !== null
         ? `감면율 ${applied}% — ${when} · ${where}${isYouth ? ' · 청년' : ''}`
         : `감면율 ${rates.text} — ${when} · ${where}${ventureWins ? ' · 벤처 확인으로 최소 50%' : ''}`
-  return { zone, youth: rates.youth, general: rates.general, applied, line, venture: ventureWins }
+  // D-326 감면 기간 끝 해 — 창업한 해 + 4년(창업벤처는 확인한 해 + 4년까지). 승계형은 lineage 가 정한 해
+  const ventureLast = ventureWins && form.ventureDate ? Number(form.ventureDate.slice(0, 4)) + 4 : null
+  const L = facts.lineage.taxLastYear
+  const lastYear = L !== null && ventureLast !== null ? Math.max(L, ventureLast) : L
+  return { zone, youth: rates.youth, general: rates.general, applied, line, venture: ventureWins, lastYear, baseYear: facts.baseYear }
 }
 
 // ---------------------------------------------------------------------------

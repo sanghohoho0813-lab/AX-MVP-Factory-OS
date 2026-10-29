@@ -524,6 +524,17 @@ const hasAlert = (r: JudgementResult, s: string) => r.alerts.some((a) => a.inclu
 
 const rate = (r: JudgementResult) => r.taxRate.applied
 const CASES: Expect[] = [
+  // ---- D-326 감면 기간 끝 해 — 창업한 해 + 4년 · 창업벤처는 확인한 해 + 4년 ----
+  {
+    name: '[D-326] 2024 창업 → 감면 기간 ~2028년 · 기준 해 2026',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1995-06-01' }),
+    expect: (r) => [r.taxRate.lastYear === 2028 && r.taxRate.baseYear === 2026, `last=${r.taxRate.lastYear} base=${r.taxRate.baseYear}`],
+  },
+  {
+    name: '[D-326] 2024 창업 · 서울 · 일반 · 벤처 확인 2025 → 감면 기간 ~2029년',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1971-06-01', region: 'seoul', overconcentration: 'yes', ventureDate: '2025-06-01' }),
+    expect: (r) => [r.taxRate.lastYear === 2029, `last=${r.taxRate.lastYear}`],
+  },
   // ---- D-325 창업벤처중소기업(§6②) — 창업 3년 안 벤처 확인이면 권역 무관 50% ----
   {
     name: '[D-325] 2024 창업 · 서울 · 일반 · 벤처 확인 2025 → 50% · good(예전 조건부 0%)',

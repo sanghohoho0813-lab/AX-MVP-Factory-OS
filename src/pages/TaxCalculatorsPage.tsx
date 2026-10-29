@@ -493,7 +493,7 @@ export function TaxCalculatorsPage() {
       )}
 
       {mode === 'basis' ? (
-        <TaxBasis onBack={() => setMode('calc')} />
+        <TaxBasis onBack={() => setMode('calc')} focus={params.get('s')} />
       ) : mode === 'plan' ? (
         <TaxPlanner onOpenCalc={openCalc} />
       ) : (

@@ -10,7 +10,7 @@
  */
 
 import { useToolClient } from '../shared/toolClientContext'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { labPresetFor, presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
 import { PresetNote } from '../shared/PresetNote'
 import { clientFacts } from '../shared/clientPrefill'
@@ -401,7 +401,11 @@ function TaxTab() {
                 {est.sizeAssumed && <Badge tone="warning">★ 중소기업 기준</Badge>}
               </div>
               <p className="t-card font-bold break-keep text-slate-900">연간 약 {formatManwon(est.annual)} 절세 검토 가능성</p>
-              <p className="t-sub break-keep text-slate-600">당해연도 연구개발비 {formatKRW(est.totalRnd)} × {est.rate}% — 실제 적용은 연구개발비 범위·구분경리·세무조정에 따라 달라집니다. 그해 낼 세금보다 많이 공제받을 수는 없습니다.</p>
+              <p className="t-sub break-keep text-slate-600">당해연도 연구개발비 {formatKRW(est.totalRnd)} × {est.rate}% — 실제 적용은 연구개발비 범위·구분경리·세무조정에 따라 달라집니다. 그해 낼 세금보다 많이 공제받을 수는 없습니다.{' '}
+                <Link to="/tools/tax?m=basis&s=rnd" className="font-semibold text-brand-800 underline underline-offset-2" data-testid="lab-tax-basis">
+                  공제율 기준표
+                </Link>
+              </p>
               {est.warnings.map((w) => (
                 <p key={w} className="t-sub break-keep font-semibold text-amber-700" data-testid="lab-tax-warning">⚠ {w}</p>
               ))}

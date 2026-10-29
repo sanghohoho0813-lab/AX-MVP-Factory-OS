@@ -870,8 +870,12 @@ function RosterTab() {
                     <span className="block" data-testid="credit-years">
                       {(() => {
                         const [y1, y2, y3] = creditYears(units, estimate.incYouth ?? 0, estimate.incNormal ?? 0)
-                        return `2026년 개편 — 1년 차 ${formatWon(y1)} · 인원을 유지하면 2년 차 ${formatWon(y2)} · 3년 차 ${formatWon(y3)}(3년 합계 ${formatWon(y1 + y2 + y3)})`
+                        return `2026년 개편 — 1년 차 ${formatWon(y1)} · 인원을 유지하면 2년 차 ${formatWon(y2)} · 3년 차 ${formatWon(y3)}(3년 합계 ${formatWon(y1 + y2 + y3)}) `
                       })()}
+                      {/* D-326 단가 표가 어디서 왔는지 — 계산 기준표 통합고용세액공제 칸 */}
+                      <Link to="/tools/tax?m=basis&s=employ" className="font-semibold text-brand-800 underline underline-offset-2" data-testid="credit-basis">
+                        단가 기준표
+                      </Link>
                     </span>
                   )}
                 </p>

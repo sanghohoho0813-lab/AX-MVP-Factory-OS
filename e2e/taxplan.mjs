@@ -307,6 +307,21 @@ for (const width of [1440, 390, 360]) {
     check(`D-321 ${width} ${scale}: 기준표 가로 넘침 0`, over <= 1, String(over))
   }
   await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
+  // D-326 판정 화면 → 기준표 그 칸으로(창업감면 결과의 '감면율 기준표')
+  if (width === 1440 || width === 390) {
+    await page.goto(BASE + '/tools/startup-tax?client=cli_hansol&preset=startup-new', { waitUntil: 'networkidle' })
+    await page.getByTestId('startup-tax-rate').waitFor({ timeout: 15000 })
+    const period = await page.getByTestId('startup-tax-period').innerText().catch(() => '')
+    check(`D-326 ${width} 창업감면 결과에 감면 기간(~N년 과세연도)`, /감면 기간 ~\d{4}년 과세연도/.test(period), period)
+    await page.getByTestId('startup-tax-basis').click()
+    await page.getByTestId('tax-basis').waitFor()
+    await page.waitForTimeout(600)
+    const focused = page.locator('[data-testid="tax-basis-section"][data-focus="1"]')
+    const inView = await focused.evaluate((el) => { const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }).catch(() => false)
+    check(`D-326 ${width} [감면율 기준표] → 기준표 창업감면 칸(강조 · 화면 안)`, page.url().includes('m=basis') && page.url().includes('s=startup') && (await focused.getAttribute('data-id')) === 'startup' && inView, page.url())
+  }
+  await page.goto(BASE + '/tools/tax?m=basis', { waitUntil: 'networkidle' })
+  await page.getByTestId('tax-basis').waitFor()
   await page.getByTestId('tax-basis-back').click()
   await page.waitForTimeout(300)
   check(`D-321 ${width} [계산기로] → 계산기 화면 · 오류 0`, (await page.getByTestId('tax-basis').count()) === 0 && page.url().includes('m=calc') && errors.length === 0, errors.join(' | '))

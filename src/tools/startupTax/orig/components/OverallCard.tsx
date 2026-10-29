@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { JudgementResult } from '../../types'
 import { VERDICT_LABEL } from '../../lib/judgement'
 import { VERDICT_STYLE } from '../../lib/verdictStyle'
@@ -22,9 +23,24 @@ export default function OverallCard({ result }: { result: JudgementResult }) {
       </p>
       {/* D-318 감면율 — 창업 연도(2026 개정) · 권역 · 청년으로 고른 값 */}
       {!result.notice && (
-        <p className="mt-3 inline-flex max-w-full break-keep rounded-2xl bg-white/80 px-3 py-1.5 text-base font-bold text-gray-800" data-testid="startup-tax-rate">
-          {result.taxRate.line}
-        </p>
+        <div className="mt-3 flex flex-col items-start gap-1.5">
+          <p className="inline-flex max-w-full break-keep rounded-2xl bg-white/80 px-3 py-1.5 text-base font-bold text-gray-800" data-testid="startup-tax-rate">
+            {result.taxRate.line}
+          </p>
+          {/* D-326 감면 기간 · 이 감면율의 기준(계산 기준표 창업감면 칸) */}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 break-keep text-sm text-gray-600">
+            {result.taxRate.lastYear !== null && (
+              <span data-testid="startup-tax-period">
+                {result.taxRate.lastYear >= result.taxRate.baseYear
+                  ? `감면 기간 ~${result.taxRate.lastYear}년 과세연도 · 올해 포함 ${result.taxRate.lastYear - result.taxRate.baseYear + 1}년 남음`
+                  : `감면 기간 ~${result.taxRate.lastYear}년 과세연도 — 지났을 가능성`}
+              </span>
+            )}
+            <Link to="/tools/tax?m=basis&s=startup" className="tap inline-flex min-h-11 items-center font-semibold text-brand-800 underline underline-offset-2" data-testid="startup-tax-basis">
+              감면율 기준표
+            </Link>
+          </p>
+        </div>
       )}
 
       {/* D-136: 판정기가 단정하지 못한 것 — 숨기지 않고 판정 바로 아래에 */}

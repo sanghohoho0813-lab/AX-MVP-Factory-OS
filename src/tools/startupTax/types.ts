@@ -202,7 +202,7 @@ export interface JudgementResult {
   lineage: Lineage
 
   /** D-318 법인세 · 소득세 감면율 — 창업 연도 · 권역 · 청년으로 고른 값(applied: 청년 여부를 모르면 null) */
-  taxRate: { zone: 'outside' | 'metro' | 'metro_unsure' | 'overcrowded' | 'unknown'; youth: number | null; general: number | null; applied: number | null; line: string; venture: boolean }
+  taxRate: { zone: 'outside' | 'metro' | 'metro_unsure' | 'overcrowded' | 'unknown'; youth: number | null; general: number | null; applied: number | null; line: string; venture: boolean; lastYear: number | null; baseYear: number }
 
   // 창업 인정 분석
   startupRecognition: Verdict
