@@ -870,6 +870,9 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-318 2026 창업 · 화성 · 일반 → 25%', runLine(gy26old).startsWith('감면율 25%'), runLine(gy26old))
   const insightDetail = (r: ClientOpsRecord) => buildInsights(r, today, []).find((i) => i.key === 'startup-tax')?.detail ?? ''
   check('D-318 맞춤 추천 창업감면 카드도 같은 감면율 줄로 시작(화성 청년 75%)', insightDetail(gy26).startsWith(runLine(gy26)), insightDetail(gy26))
+  // D-325 서류함의 벤처기업확인서(확인일) → 창업벤처중소기업 50% — 서울 · 일반 대표
+  const vSeoul = normalizeClientOps({ ...full, id: 'vseoul', businessAddress: '서울특별시 강남구 1', establishedAt: '2024-03-02', representativeBirth: '1970-05-05', factValues: { ...(full.factValues ?? {}), 'cf:벤처기업': '확인번호 V-1 · 확인일 2025-01-02 · 2028-01-01까지' } } as unknown as Partial<ClientOpsRecord>)
+  check('D-325 벤처확인서 확인일(창업 3년 안) → 상황 예시 · 맞춤 추천 감면율 50% 창업벤처', runLine(vSeoul).startsWith('감면율 50% — 창업벤처중소기업') && insightDetail(vSeoul).startsWith('감면율 50% — 창업벤처'), [runLine(vSeoul), insightDetail(vSeoul)])
   check('D-318 한 장 설계서(창업 5년 안 채용)의 창업감면 줄 = 상황 예시 줄', planLine(gy26) === runLine(gy26) && planLine(gh26) === runLine(gh26), [planLine(gy26), runLine(gy26)])
 }
 

@@ -325,6 +325,7 @@ export function startupFormOf(facts: ClientFacts, over: ScenarioPreset['startup'
   return {
     ...EMPTY_FORM,
     popDecline,
+    ventureDate: facts.ventureConfirmedAt ?? '',
     businessType: facts.businessType,
     birthDate: facts.representativeBirth,
     startupDate: facts.establishedAt,

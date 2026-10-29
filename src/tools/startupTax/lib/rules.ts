@@ -144,3 +144,16 @@ export function startupRates(zone: StartupZone, after2026: boolean): StartupRate
   if (zone === 'metro_unsure') return { youth: null, general: null, text: '청년 75~100% · 일반 25~50%(인구감소지역이면 높은 쪽)' }
   return { youth: null, general: null, text: after2026 ? '청년 50~100% · 일반 0~50%(권역에 따라)' : '청년 50~100% · 일반 0~50%(과밀억제권역 여부에 따라)' }
 }
+
+/**
+ * D-325 창업벤처중소기업(조특법 §6②) — 창업 후 3년 안에 벤처기업으로 확인받으면, 확인받은 뒤 처음 소득이 난 해부터 5년 50%.
+ * 권역(과밀억제권역 포함) · 나이와 상관없다. §6① 감면과 겹치면 유리한 쪽 하나.
+ * true = 창업일부터 3년 안 확인 · false = 3년 뒤 확인 · null = 확인일 · 창업일을 모름
+ */
+export const VENTURE_STARTUP_RATE = 50
+export function ventureWithin3y(startupDate: string, ventureDate: string | undefined): boolean | null {
+  if (!ventureDate || !/^\d{4}-\d{2}-\d{2}$/.test(ventureDate) || !/^\d{4}-\d{2}-\d{2}$/.test(startupDate)) return null
+  if (ventureDate < startupDate) return true // 창업 전에 받은 예비벤처 등 — 3년 안으로 본다(★ 확인)
+  const y = Number(startupDate.slice(0, 4)) + 3
+  return ventureDate < `${y}${startupDate.slice(4)}`
+}

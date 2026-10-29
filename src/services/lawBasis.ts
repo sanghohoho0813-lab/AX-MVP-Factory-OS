@@ -6,7 +6,7 @@
  */
 import { CONV_DED9, CORP_RATES, INC9_BRACKETS, S_RATE, SERVICE_DED9, defaultValues, calculatorOf, giftDeduction, inheritGiftTax } from './taxCalc'
 import { SME_2026, defaultTaxUnits } from '../tools/employment/lib/taxCredit'
-import { startupRates } from '../tools/startupTax/lib/rules'
+import { VENTURE_STARTUP_RATE, startupRates } from '../tools/startupTax/lib/rules'
 import { CATEGORY_RATES } from '../tools/labcare/lib/taxCredit'
 
 export interface BasisRow {
@@ -168,6 +168,7 @@ export function lawBasis(): BasisSection[] {
         { label: '2026~ 수도권 밖 · 인구감소지역', value: s26.text },
         { label: '2026~ 수도권(과밀 · 인구감소지역 밖)', value: s26m.text },
         { label: '2026~ 과밀억제권역', value: s26o.text },
+        { label: '창업 3년 안 벤처 확인(창업벤처)', value: `권역 · 나이 상관없이 ${VENTURE_STARTUP_RATE}%(확인받은 뒤 처음 소득이 난 해부터 5년 · §6②)` },
       ],
       usedIn: '창업감면 판정 · 상황 예시 · 한 장 설계서(창업 5년 안 채용) · 맞춤 추천',
       note: '수도권 인구감소지역 = 경기 가평 · 연천, 인천 강화 · 옹진(회사 주소로 저절로).',

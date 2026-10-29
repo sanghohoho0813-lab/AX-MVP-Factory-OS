@@ -524,6 +524,32 @@ const hasAlert = (r: JudgementResult, s: string) => r.alerts.some((a) => a.inclu
 
 const rate = (r: JudgementResult) => r.taxRate.applied
 const CASES: Expect[] = [
+  // ---- D-325 창업벤처중소기업(§6②) — 창업 3년 안 벤처 확인이면 권역 무관 50% ----
+  {
+    name: '[D-325] 2024 창업 · 서울 · 일반 · 벤처 확인 2025 → 50% · good(예전 조건부 0%)',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1971-06-01', region: 'seoul', overconcentration: 'yes', ventureDate: '2025-06-01' }),
+    expect: (r) => [rate(r) === 50 && r.taxRate.venture && item(r, 'incomeTax') === 'good' && r.taxRate.line.includes('창업벤처중소기업') && r.coreItems[0].reasons.some((x) => x.includes('§6②')), `rate=${rate(r)} item=${item(r, 'incomeTax')} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-325] 벤처 확인이 창업 3년 뒤면 해당 없음(까닭 한 줄) · 0%',
+    form: mkForm({ startupDate: '2022-03-01', birthDate: '1971-06-01', region: 'seoul', overconcentration: 'yes', ventureDate: '2025-04-01' }),
+    expect: (r) => [rate(r) === 0 && !r.taxRate.venture && r.coreItems[0].reasons.some((x) => x.includes('창업 3년 뒤')), `rate=${rate(r)}`],
+  },
+  {
+    name: '[D-325] 청년은 청년 감면 그대로(과밀 50%) — 창업벤처로 바꾸지 않음',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1995-06-01', region: 'seoul', overconcentration: 'yes', ventureDate: '2025-06-01' }),
+    expect: (r) => [rate(r) === 50 && !r.taxRate.venture && !r.taxRate.line.includes('창업벤처'), `rate=${rate(r)} line=${r.taxRate.line}`],
+  },
+  {
+    name: '[D-325] 2026 창업 · 경기 수도권(25%) · 일반 · 벤처 → 50%',
+    form: mkForm({ startupDate: '2026-02-01', birthDate: '1971-06-01', region: 'gyeonggi_incheon', overconcentration: 'no', popDecline: 'no', ventureDate: '2026-05-01' }),
+    expect: (r) => [rate(r) === 50 && r.taxRate.venture, `rate=${rate(r)}`],
+  },
+  {
+    name: '[D-325] 2021 창업 · 2023 벤처 확인 → 감면 기간은 확인한 해 + 4년(2027)까지 — 2026년에 끝났다고 하지 않음',
+    form: mkForm({ startupDate: '2021-03-01', birthDate: '1971-06-01', region: 'seoul', overconcentration: 'yes', ventureDate: '2023-05-01' }),
+    expect: (r) => [item(r, 'incomeTax') !== 'bad' && !r.coreItems[0].reasons.some((x) => x.includes('끝났을 가능성')), `item=${item(r, 'incomeTax')} ${r.coreItems[0].reasons.join('|')}`],
+  },
   // ---- D-318 2026년 이후 창업 감면율(조특법 §6① 2호 · 시행령 §5②) ----
   {
     name: '[D-318] 2026 창업 · 지방 · 청년 → 100% · good',

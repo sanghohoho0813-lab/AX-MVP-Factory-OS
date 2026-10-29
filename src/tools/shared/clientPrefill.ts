@@ -139,6 +139,18 @@ export interface ClientFacts {
   netIncome: WonFact | null
   totalAssets: WonFact | null
   totalLiabilities: WonFact | null
+  /** D-325 벤처기업 확인일(올린 벤처기업확인서 중 가장 이른 '확인일') — 창업 3년 안이면 창업벤처중소기업 감면. 모르면 '' */
+  ventureConfirmedAt?: string
+}
+
+/** D-325 올린 벤처기업확인서(cf:벤처기업 …)의 '확인일' 중 가장 이른 날 — 처음 확인받은 날이 창업 3년 안인지 본다 */
+export function ventureConfirmedAt(record: ClientOpsRecord): string {
+  const dates = Object.entries(record.factValues ?? {})
+    .filter(([k]) => /^cf:벤처기업/.test(k))
+    .map(([, v]) => /확인일\s*(\d{4}-\d{2}-\d{2})/.exec(String(v))?.[1] ?? '')
+    .filter(Boolean)
+    .sort()
+  return dates[0] ?? ''
 }
 
 function wonFact(record: ClientOpsRecord, key: string): WonFact | null {
@@ -173,6 +185,7 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
     netIncome: wonFact(record, 'netIncome'),
     totalAssets: wonFact(record, 'totalAssets'),
     totalLiabilities: wonFact(record, 'totalLiabilities'),
+    ventureConfirmedAt: ventureConfirmedAt(record),
   }
 }
 

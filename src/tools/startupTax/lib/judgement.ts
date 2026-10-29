@@ -19,6 +19,8 @@ import {
   REVISED_RULE_FROM,
   startupRates,
   startupZone,
+  VENTURE_STARTUP_RATE,
+  ventureWithin3y,
   type StartupRates,
   type StartupZone,
   worstOf,
@@ -140,6 +142,7 @@ interface Facts {
   regionInconsistent: boolean // 지역 ↔ 과밀억제권역 답이 맞지 않음
   zone: StartupZone // D-318 감면율을 고르는 권역
   rates: StartupRates
+  venture: boolean | null // D-325 창업 3년 안 벤처 확인(창업벤처중소기업 50%)
 }
 
 // 모든 항목에 똑같이 씌우는 상한 — 입력이 불완전하면 '가능성 높음' 이 나오지 않게
@@ -266,6 +269,17 @@ function judgeIncomeTax(form: FormData, recognition: Verdict, facts: Facts): Ite
       '과밀억제권역에서 청년이 아니시면 원칙적으로 감면이 없습니다. 연 매출 8천만원 이하이거나 벤처기업이면 달라지니 그것부터 확인하겠습니다.'
   }
 
+  // D-325 창업 3년 안 벤처 확인 → 창업벤처중소기업 50%(§6② · 권역 무관). 청년 감면(50% 이상)이 아니고 §6① 감면율이 50% 보다 낮으면 이쪽이 유리하다.
+  //       예전에는 '벤처기업이면 감면받을 수 있어 확인이 필요' 로만 두어, 벤처확인서가 서류함에 있어도 과밀억제권역 일반 창업은 '조건부'(0%) 였다.
+  const hardNo = industry === 'excluded' || form.startupForm === 'reopen_same' || isRecognitionWeak(recognition) || recognition === 'conditional'
+  if (facts.venture === true && !hardNo && isYouth !== true && (facts.rates.general ?? 0) < VENTURE_STARTUP_RATE) {
+    verdict = 'good'
+    reasons.push(`창업 후 3년 안에 벤처기업 확인(확인일 ${form.ventureDate}) — 창업벤처중소기업 감면 ${VENTURE_STARTUP_RATE}%(조특법 §6② · 과밀억제권역도 받음 · 확인받은 뒤 처음 소득이 난 해부터 5년).`)
+    consultScript = '창업 후 3년 안에 벤처기업 확인을 받으셔서, 사업장 권역과 상관없이 5년간 법인세 · 소득세 절반을 감면받을 수 있습니다. 벤처 확인이 유지되는지만 같이 보겠습니다.'
+  } else if (facts.venture === false && isYouth !== true && (facts.rates.general ?? 0) < VENTURE_STARTUP_RATE) {
+    reasons.push(`벤처기업 확인(확인일 ${form.ventureDate})이 창업 3년 뒤라 창업벤처중소기업 감면(§6②)은 해당하지 않습니다.`)
+  }
+
   // 업종 — 대상 업종 목록(§6③)에 확실히 있지 않으면 '가능성 높음' 금지
   if (industry === 'partial') {
     verdict = worstOf(verdict, 'caution')
@@ -281,15 +295,20 @@ function judgeIncomeTax(form: FormData, recognition: Verdict, facts: Facts): Ite
 
   // 감면 기간 — 신규 창업도 5개 과세연도가 지나면 끝 (승계형은 조특법 기준 블록에서 본다)
   const L = facts.lineage
-  if (!L.inherited && L.taxLastYear !== null) {
-    if (facts.baseYear > L.taxLastYear) {
+  // D-325 창업벤처는 벤처 확인받은 뒤 처음 소득이 난 해부터 5년 — 확인한 해 + 4년까지는 끝났다고 보지 않는다
+  const ventureLast = facts.venture === true && form.ventureDate && !hardNo && isYouth !== true ? Number(form.ventureDate.slice(0, 4)) + 4 : null
+  const lastYear = L.taxLastYear !== null && ventureLast !== null ? Math.max(L.taxLastYear, ventureLast) : L.taxLastYear
+  if (!L.inherited && lastYear !== null) {
+    if (facts.baseYear > lastYear) {
       verdict = 'bad'
       reasons.push(
-        `창업한 해부터 5개 과세연도(~${L.taxLastYear}년)가 지나 감면 기간이 끝났을 가능성이 높습니다.`,
+        ventureLast !== null && lastYear === ventureLast
+          ? `벤처 확인한 해부터 5개 과세연도(~${lastYear}년)가 지나 감면 기간이 끝났을 가능성이 높습니다.`
+          : `창업한 해부터 5개 과세연도(~${lastYear}년)가 지나 감면 기간이 끝났을 가능성이 높습니다.`,
       )
-    } else if (facts.baseYear === L.taxLastYear) {
+    } else if (facts.baseYear === lastYear) {
       verdict = worstOf(verdict, 'caution')
-      reasons.push(`올해(${L.taxLastYear}년)가 감면 마지막 과세연도일 수 있습니다.`)
+      reasons.push(`올해(${lastYear}년)가 감면 마지막 과세연도일 수 있습니다.`)
     }
   }
 
@@ -476,9 +495,13 @@ function buildAlerts(form: FormData, facts: Facts, age: number | null, regionAle
     out.push('폐업 후 같은 업종 재개업은 조특법상 창업이 아닙니다(§6⑩). 폐업 전과 업종이 정말 같은지 ★확인')
   }
 
-  // 과밀(또는 모름) + 청년 아님 → 원칙 0%
+  // 과밀(또는 모름) + 청년 아님 → 원칙 0%. D-325 창업 3년 안 벤처 확인이면 0% 대신 창업벤처 50% — 확인 유지만 본다
   if (industry !== 'excluded' && form.overconcentration !== 'no' && facts.youthTax !== true) {
-    out.push('과밀억제권역에서 청년이 아니면 감면 0%가 원칙입니다. 생계형(연 매출 8천만원 이하)·벤처기업이면 감면 가능 — ★확인')
+    out.push(
+      facts.venture === true
+        ? `창업 3년 안 벤처 확인(${form.ventureDate}) — 과밀억제권역이어도 창업벤처중소기업 감면 50%(§6②). 감면 기간 중 벤처 확인이 끊기지 않았는지 ★확인`
+        : '과밀억제권역에서 청년이 아니면 감면 0%가 원칙입니다. 생계형(연 매출 8천만원 이하)·벤처기업이면 감면 가능 — ★확인',
+    )
   }
 
   if (facts.youthTax === null && age !== null) {
@@ -521,11 +544,18 @@ const ZONE_LABEL: Record<StartupZone, string> = {
 }
 function taxRateOf(facts: Facts, isYouth: boolean | null, form: FormData): JudgementResult['taxRate'] {
   const { zone, rates, after2026 } = facts
-  const applied = isYouth === true ? rates.youth : isYouth === false ? rates.general : null
+  // D-325 창업 3년 안 벤처 확인 — 청년이 아니면 §6① 과 §6②(50%) 중 큰 쪽
+  const ventureWins = facts.venture === true && isYouth !== true && (rates.general ?? 0) < VENTURE_STARTUP_RATE
+  const applied = isYouth === true ? rates.youth : isYouth === false ? (ventureWins ? VENTURE_STARTUP_RATE : rates.general) : null
   const where = zone === 'outside' && after2026 ? (form.region === 'gyeonggi_incheon' ? '수도권 인구감소지역' : '수도권 밖') : ZONE_LABEL[zone]
   const when = after2026 ? '2026년 이후 창업' : '2025년까지 창업'
-  const line = applied !== null ? `감면율 ${applied}% — ${when} · ${where}${isYouth ? ' · 청년' : ''}` : `감면율 ${rates.text} — ${when} · ${where}`
-  return { zone, youth: rates.youth, general: rates.general, applied, line }
+  const line =
+    ventureWins && applied !== null
+      ? `감면율 ${applied}% — 창업벤처중소기업(창업 3년 안 벤처 확인 · 권역 무관)`
+      : applied !== null
+        ? `감면율 ${applied}% — ${when} · ${where}${isYouth ? ' · 청년' : ''}`
+        : `감면율 ${rates.text} — ${when} · ${where}${ventureWins ? ' · 벤처 확인으로 최소 50%' : ''}`
+  return { zone, youth: rates.youth, general: rates.general, applied, line, venture: ventureWins }
 }
 
 // ---------------------------------------------------------------------------
@@ -569,6 +599,7 @@ export function judge(inputForm: FormData, baseDate: Date = new Date()): Judgeme
     regionInconsistent: region.inconsistent,
     zone,
     rates: startupRates(zone, after2026),
+    venture: start !== null ? ventureWithin3y(formatDate(start), form.ventureDate) : null,
   }
 
   const checked = form.checkItems

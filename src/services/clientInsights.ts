@@ -232,6 +232,7 @@ const startupInsight: Provider = ({ record, today, facts }) => {
   const form: StartupForm = {
     ...EMPTY_FORM,
     popDecline,
+    ventureDate: facts.ventureConfirmedAt ?? '',
     businessType: facts.businessType,
     birthDate: facts.representativeBirth,
     startupDate: facts.establishedAt,

@@ -103,6 +103,28 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
         )}
       </Section>
 
+      {/* D-325 벤처기업 확인 — 창업 3년 안이면 권역과 상관없이 50%(창업벤처중소기업 · 조특법 §6②) */}
+      <Section>
+        <div data-testid="startup-venture">
+          <p className="mb-3 break-keep text-base font-bold text-gray-800">벤처기업 확인을 받았나요?</p>
+          <ChoiceGroup
+            options={[
+              { value: 'yes', label: '예' },
+              { value: 'no', label: '아니오' },
+            ]}
+            value={form.ventureDate ? 'yes' : form.ventureDate === '' ? 'no' : ''}
+            onSelect={(v) => update('ventureDate', v === 'yes' ? form.ventureDate || form.startupDate || `${currentYear}-01-01` : '')}
+          />
+          {form.ventureDate && (
+            <div className="mt-3">
+              <p className="mb-2 text-sm font-semibold text-gray-600">처음 확인받은 날(벤처기업확인서 '확인일')</p>
+              <DateSelect groupLabel="벤처기업 확인일" value={form.ventureDate} onChange={(v) => update('ventureDate', v)} startAt={form.startupDate || '2024-01-01'} minYear={1990} maxYear={currentYear} yearStep={5} />
+            </div>
+          )}
+          <HintText>창업 후 3년 안에 확인받았으면 사업장 권역과 상관없이 5년간 50% 감면(창업벤처중소기업). 업체 서류함에 벤처기업확인서가 있으면 저절로 채워져요.</HintText>
+        </div>
+      </Section>
+
       {/* 6. 업종 */}
       <Section>
         <FieldLabel step={6}>업종</FieldLabel>

@@ -102,6 +102,11 @@ function StartupTaxScreen() {
       next.industry = facts.industry as StartupTaxForm['industry']
       filled.push('업종')
     }
+    // D-325 서류함의 벤처기업확인서 '확인일' → 창업벤처중소기업 감면(§6②)
+    if (next.ventureDate === undefined && facts.ventureConfirmedAt) {
+      next.ventureDate = facts.ventureConfirmedAt
+      filled.push('벤처 확인일')
+    }
     // D-318 회사 주소로 권역까지 — 예전에는 상황 예시로 열 때만 채워, 그냥 열면 지역 · 과밀억제권역을 다시 골라야 했다
     if (!next.region && facts.address) {
       const place = startupRegion(facts.address)
