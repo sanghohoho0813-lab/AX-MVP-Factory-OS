@@ -1,3 +1,4 @@
+import { useRef, useState, type ReactNode } from 'react'
 import type { ExemptionKey, FormData } from '../../types'
 import {
   BUSINESS_TYPES,
@@ -21,10 +22,59 @@ interface Props {
   currentYear: number
 }
 
+/** 2019-03-02 → 2019.03.02 */
+const dot = (d: string) => d.replaceAll('-', '.')
+const labelOf = (opts: readonly { value: string; label: string }[], v: string) => opts.find((o) => o.value === v)?.label ?? v
+
+/**
+ * D-358 화면 원칙(첫 화면은 단순하게) — 열 때 이미 답이 있는 질문(업체 기록 · 상황 예시 · 지난번 답)은 '✓ 답 · 바꾸기' 한 줄.
+ * 누르면 그 질문만 펼친다. 이 화면에서 고친 질문은 펼친 채(고르는 중에 갑자기 접히지 않게). 판정 · 계산은 그대로(화면만).
+ */
+function Answered({ n, label, value, k, raw, onOpen }: { n?: number; label: string; value: ReactNode; k: string; raw: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      data-testid="startup-answered"
+      data-key={k}
+      data-value={raw}
+      className="flex w-full min-w-0 items-center gap-3 rounded-2xl bg-white px-5 py-3.5 text-left shadow-card transition-colors hover:bg-gray-50"
+    >
+      <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+        ✓
+      </span>
+      <span className="min-w-0 flex-1 break-keep text-base text-gray-600">
+        {n ? `${n}. ` : ''}
+        {label}
+        <b className="ml-2 font-bold text-gray-900">{value}</b>
+      </span>
+      <span className="shrink-0 text-sm font-semibold text-brand">바꾸기</span>
+    </button>
+  )
+}
+
 export default function InputForm({ form, onChange, onSubmit, onReset, currentYear }: Props) {
+  // D-358 이 화면에서 고른 질문 · [바꾸기] 로 연 질문은 펼친 채
+  const touched = useRef(new Set<string>())
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    touched.current.add(key as string)
     onChange({ ...form, [key]: value })
   }
+  const folded = (key: string, answered: boolean) => answered && !opened.has(key) && !touched.current.has(key)
+  const openQ = (key: string) => setOpened((x) => new Set(x).add(key))
+  const needPop = form.region === 'gyeonggi_incheon' && form.overconcentration !== 'yes' && form.startupDate >= REVISED_RULE_FROM
+  const fold = {
+    businessType: folded('businessType', !!form.businessType),
+    birthDate: folded('birthDate', !!form.birthDate),
+    startupDate: folded('startupDate', !!form.startupDate),
+    region: folded('region', !!form.region),
+    overconcentration: folded('overconcentration', !!form.overconcentration && !(needPop && !form.popDecline)),
+    ventureDate: folded('ventureDate', form.ventureDate !== undefined),
+    industry: folded('industry', !!form.industry),
+    startupForm: folded('startupForm', !!form.startupForm),
+  }
+  const foldedCount = Object.values(fold).filter(Boolean).length
 
   const toggleCheck = (key: ExemptionKey) => {
     onChange({ ...form, checkItems: { ...form.checkItems, [key]: !form.checkItems[key] } })
@@ -38,7 +88,16 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
         onSubmit()
       }}
     >
+      {foldedCount > 0 && (
+        <p className="break-keep px-1 text-sm text-gray-500" data-testid="startup-folded-note">
+          이미 답이 있는 질문 {foldedCount}개는 한 줄로 접었어요 — 바꾸려면 그 줄을 누르세요. 남은 질문만 고르고 [1분 판정하기].
+        </p>
+      )}
+
       {/* 1. 사업자 유형 */}
+      {fold.businessType ? (
+        <Answered n={1} label="사업자 유형" value={labelOf(BUSINESS_TYPES, form.businessType)} k="businessType" raw={form.businessType} onOpen={() => openQ('businessType')} />
+      ) : (
       <Section>
         <FieldLabel step={1}>사업자 유형</FieldLabel>
         <ChoiceGroup
@@ -47,8 +106,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           onSelect={(v) => update('businessType', v)}
         />
       </Section>
+      )}
 
       {/* 2. 생년월일 */}
+      {fold.birthDate ? (
+        <Answered n={2} label="대표자 생년월일" value={dot(form.birthDate)} k="birthDate" raw={form.birthDate} onOpen={() => openQ('birthDate')} />
+      ) : (
       <Section>
         <FieldLabel step={2}>대표자 생년월일</FieldLabel>
         <DateSelect
@@ -61,8 +124,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
         />
         <HintText>창업 당시 만 15~34세면 청년 창업에 해당할 수 있습니다. (병역 기간 최대 6년 빼기)</HintText>
       </Section>
+      )}
 
       {/* 3. 창업일 */}
+      {fold.startupDate ? (
+        <Answered n={3} label="창업일" value={dot(form.startupDate)} k="startupDate" raw={form.startupDate} onOpen={() => openQ('startupDate')} />
+      ) : (
       <Section>
         <FieldLabel step={3}>창업일</FieldLabel>
         <DateSelect
@@ -76,14 +143,29 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
         />
         <HintText>사업자등록증의 개업일(법인은 설립등기일)을 고르세요.</HintText>
       </Section>
+      )}
 
       {/* 4. 지역 */}
+      {fold.region ? (
+        <Answered n={4} label="사업장 지역" value={labelOf(REGIONS, form.region)} k="region" raw={form.region} onOpen={() => openQ('region')} />
+      ) : (
       <Section>
         <FieldLabel step={4}>사업장 지역</FieldLabel>
         <ChoiceGroup options={REGIONS} value={form.region} onSelect={(v) => update('region', v)} />
       </Section>
+      )}
 
       {/* 5. 과밀억제권역 */}
+      {fold.overconcentration ? (
+        <Answered
+          n={5}
+          label="수도권 과밀억제권역"
+          value={`${labelOf(OVERCONCENTRATIONS, form.overconcentration)}${needPop && form.popDecline ? ` · 인구감소지역 ${labelOf(YES_NO_UNKNOWN, form.popDecline)}` : ''}`}
+          k="overconcentration"
+          raw={form.overconcentration}
+          onOpen={() => openQ('overconcentration')}
+        />
+      ) : (
       <Section>
         <FieldLabel step={5}>수도권 과밀억제권역 여부</FieldLabel>
         <ChoiceGroup
@@ -102,8 +184,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           </div>
         )}
       </Section>
+      )}
 
       {/* D-325 벤처기업 확인 — 창업 3년 안이면 권역과 상관없이 50%(창업벤처중소기업 · 조특법 §6②) */}
+      {fold.ventureDate ? (
+        <Answered label="벤처기업 확인" value={form.ventureDate ? `예 · ${dot(form.ventureDate)}` : '아니오'} k="ventureDate" raw={form.ventureDate ?? ''} onOpen={() => openQ('ventureDate')} />
+      ) : (
       <Section>
         <div data-testid="startup-venture">
           <p className="mb-3 break-keep text-base font-bold text-gray-800">벤처기업 확인을 받았나요?</p>
@@ -124,8 +210,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           <HintText>창업 후 3년 안에 확인받았으면 사업장 권역과 상관없이 5년간 50% 감면(창업벤처중소기업). 업체 서류함에 벤처기업확인서가 있으면 저절로 채워져요.</HintText>
         </div>
       </Section>
+      )}
 
       {/* 6. 업종 */}
+      {fold.industry ? (
+        <Answered n={6} label="업종" value={labelOf(INDUSTRIES, form.industry)} k="industry" raw={form.industry} onOpen={() => openQ('industry')} />
+      ) : (
       <Section>
         <FieldLabel step={6}>업종</FieldLabel>
         <ChoiceGroup
@@ -134,8 +224,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           onSelect={(v) => update('industry', v)}
         />
       </Section>
+      )}
 
       {/* 7. 창업 형태 */}
+      {fold.startupForm ? (
+        <Answered n={7} label="창업 형태" value={labelOf(STARTUP_FORMS, form.startupForm)} k="startupForm" raw={form.startupForm} onOpen={() => openQ('startupForm')} />
+      ) : (
       <Section>
         <FieldLabel step={7}>창업 형태</FieldLabel>
         <ChoiceGroup
@@ -145,6 +239,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           columns={1}
         />
       </Section>
+      )}
 
       {/* 8. 감면 확인 항목 */}
       <Section>

@@ -130,7 +130,7 @@ export function ClientSituationPlan({
 
   return (
     <div ref={boxRef} className="scroll-mt-36">
-    <Section title="상황별 한 장 설계서" fold={{ id: 'smart.plan', open: true }} testId="situation-plan">
+    <Section title="상황별 한 장 설계서" fold={{ id: 'smart.plan', summary: '상황 하나 · 사람 수만 고르면 지원금 · 세액공제 · 정책자금을 한 장에' }} testId="situation-plan">
       <div className="flex flex-col gap-3" data-testid="plan-body" data-plan={plan.id} data-count={plan.count} data-fit={fit.kind} data-first={plan.firstWon}>
         <p className="t-sub break-keep text-slate-600">상황 하나와 사람 수만 고르면 고용지원금 · 세액공제 · 정책자금을 이 업체 숫자로 한 장에 모아요.</p>
 

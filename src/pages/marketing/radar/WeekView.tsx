@@ -369,7 +369,7 @@ export function WeekView({
                   ))}
                 </div>
               )}
-              <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} defaultOpen summary="그대로 읽는 말 + 화면에 띄울 것">
+              <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} summary="그대로 읽는 말 + 화면에 띄울 것 — 누르면 펼쳐져요">
                 <div className="flex flex-col gap-3">
                   {week.long.script.map((b, i) => (
                     <Block key={`s-${i}`} label={b.label} text={b.text} />

@@ -28,7 +28,7 @@ import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, M
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile } from '../../components/ui/primitives'
-import { Fold, HintTip } from '../../components/ui/fold'
+import { Fold, HintTip, openFold } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
@@ -447,6 +447,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if (!ok) showToast('되살리지 못했습니다.')
   }
   const goNotebook = () => {
+    // D-357 방금 확정한 주제를 보러 가는 길 — 접힌 '유튜브 롱폼 진행판' 을 펼쳐 둔다
+    openFold('mk.make.long')
     setParam({ view: 'make' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }

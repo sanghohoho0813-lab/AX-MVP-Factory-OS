@@ -67,7 +67,7 @@ import {
   type SizeType,
 } from './lib/payrollDiagnosis'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
-import { HelpHeading, HintTip } from '../../components/ui/fold'
+import { HintTip } from '../../components/ui/fold'
 
 const STORAGE_PREFIX = 'axmvp.tools.employment.'
 
@@ -263,10 +263,8 @@ export function EmploymentPage() {
         {section === 'dashboard' && <ModulePresets module="employment" />}
         <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} focusClient={clientId} />
         {section === 'dashboard' && (
-          <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
-            <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="employment" assist={false} presets={false} focus={false} />
-          </section>
+          // D-357 '고객 관리 업체와 연결' 은 접힌 채 한 줄(숫자 요약) — 펼치면 예전과 같은 칸
+          <ModuleDashboard toolKey="employment" assist={false} presets={false} focus={false} allTitle="고객 관리 업체와 연결" />
         )}
         <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
       </div>

@@ -177,7 +177,7 @@ export function ClientScenarios({
   }, [asks])
   if (computed === null)
     return (
-      <Section title="상황 예시로 바로 설계" fold={{ id: 'smart.scenarios', open: true }}>
+      <Section title="상황 예시로 바로 설계" fold={{ id: 'smart.scenarios' }}>
         <p className="t-sub text-slate-500" data-testid="smart-scenarios-loading">
           이 업체 숫자로 상황 예시를 맞춰 보는 중…
         </p>
@@ -185,7 +185,7 @@ export function ClientScenarios({
     )
   if (runs.length === 0) return null
   return (
-    <Section title="상황 예시로 바로 설계" count={fits.length} fold={{ id: 'smart.scenarios', open: true }}>
+    <Section title="상황 예시로 바로 설계" count={fits.length} fold={{ id: 'smart.scenarios', summary: fits.length ? `이 업체에 맞는 상황 ${fits.length}가지 — 누르면 업체 숫자로 바로 설계` : '누르면 물어보며 맞는 상황을 찾아요' }}>
       <div
         className="flex flex-col gap-3"
         data-testid="smart-scenarios"

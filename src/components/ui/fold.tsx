@@ -312,7 +312,8 @@ export function Fold({
           </h2>
         </HintTip>
         {summary && !open && (
-          <span data-testid="fold-summary" className="t-sub min-w-0 basis-full pb-2 pl-7 break-keep text-slate-500 [overflow-wrap:anywhere] sm:flex-[1_1_10rem] sm:basis-auto sm:pb-0 sm:pl-0">
+          // D-357 휴대폰은 요약을 제목 줄 아래로(order-last) — '모두 보기' 같은 단추는 제목 줄에 그대로
+          <span data-testid="fold-summary" className="t-sub order-last min-w-0 basis-full pb-2 pl-7 break-keep text-slate-500 [overflow-wrap:anywhere] sm:order-none sm:flex-[1_1_10rem] sm:basis-auto sm:pb-0 sm:pl-0">
             {summary}
           </span>
         )}

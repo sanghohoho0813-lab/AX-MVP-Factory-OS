@@ -161,10 +161,10 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const order = await page.evaluate(() => {
     const a = document.querySelector('[data-testid="mk-projects"]')
     const b = document.querySelector('[data-testid="mk-allmade"]')
-    const c = document.querySelector('[data-testid="make-stages"]')
+    const c = document.querySelector('[data-testid="mk-make-long"]')
     return !!(a && b && c && a.getBoundingClientRect().top < b.getBoundingClientRect().top && b.getBoundingClientRect().top < c.getBoundingClientRect().top)
   })
-  check('H3 자리 — 1주일치 묶음 아래 · 롱폼 단계판 위', order)
+  check('H3 자리 — 1주일치 프로젝트 아래 · 유튜브 롱폼 진행판(접힘) 위', order)
   await hub.locator('[data-testid="mk-allmade-kind"][data-kind="thread"]').click()
   const only = await hub.getByTestId('mk-allmade-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind')))
   const titles = await hub.getByTestId('mk-allmade-item').allInnerTexts()

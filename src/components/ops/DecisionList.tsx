@@ -453,7 +453,8 @@ export function TodayDecisions({
       title="확인할 것"
       headingId="today-decide-title"
       testId="today-decide"
-      defaultOpen
+      // D-357 화면 원칙 — 첫 화면은 단순하게: 접힌 채로 숫자만(누르면 하나씩 맞다 · 아니다)
+      summary="누르면 하나씩 — 맞다 · 아니다만 고르면 끝"
       icon={
         <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
           <CheckCheck className="size-4" />

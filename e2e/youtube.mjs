@@ -349,6 +349,11 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(400)
   const savedChip = await first.getByTestId('radar-saved').count()
   await toMake()
+  // D-357 롱폼 줄은 '유튜브 롱폼 진행판'(접힘) 안 — 접힌 줄에 숫자 · 단계 요약, 펼치면 줄
+  const longFold = page.getByTestId('mk-make-long')
+  check('D-357 내 콘텐츠: 롱폼 진행판은 접힌 채 한 줄 요약(아이디어 1)', (await longFold.getAttribute('data-open')) === '0' && /아이디어 1/.test((await longFold.getByTestId('fold-summary').innerText().catch(() => '')) ?? ''))
+  await longFold.getByTestId('fold-toggle').first().click()
+  await page.waitForTimeout(200)
   check('아이디어 저장: 카드에 "내 콘텐츠에 있음" · 내 콘텐츠 1개', savedChip === 1 && (await page.getByTestId('radar-idea').count()) === 1)
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800)

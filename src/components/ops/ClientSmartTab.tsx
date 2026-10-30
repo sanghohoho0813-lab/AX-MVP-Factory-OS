@@ -193,7 +193,8 @@ export default function ClientSmartTab({
       )}
 
       {/* 4. 다음 행동 */}
-      <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', open: true }}>
+      {/* D-357 화면 원칙 — 맞춤 추천 첫 화면은 '먼저 제안할 것' 하나만 펼치고 나머지는 접힌 채 한 줄(펼친 것은 기억) */}
+      <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', summary: steps.length ? '누르면 이 업체에 지금 할 일 순서' : '지금 추천할 행동 없음' }}>
         {steps.length === 0 ? (
           <p className="t-sub break-keep text-slate-500">지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.</p>
         ) : (

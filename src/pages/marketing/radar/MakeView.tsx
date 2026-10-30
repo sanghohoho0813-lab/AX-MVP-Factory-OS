@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, FileText, NotebookPen, PenLine, Plus, Trash2, TrendingUp, Tv } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
-import { HelpHeading } from '../../../components/ui/fold'
+import { Fold, HelpHeading, openFold } from '../../../components/ui/fold'
 import { todayLocalDate } from '../../../lib/appClock'
 import { IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
 import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl, type PerfTone } from '../../../services/marketing/myPerformance'
@@ -79,6 +79,10 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
     const key = (i: ContentIdea) => [i.shootDate, i.publishDate].filter(Boolean).sort()[0] ?? '9999'
     return [...list].sort((a, b) => Number(a.status === 'published') - Number(b.status === 'published') || key(a).localeCompare(key(b)) || b.savedAt.localeCompare(a.savedAt))
   }, [ideas, stage])
+  // D-357 줄로 데려오면(?idea= — 만든 것 한눈에 · 1주일치 · AI 도우미) 접힌 진행판을 펼친다(이 화면에 이미 있어도)
+  useEffect(() => {
+    if (focusId) openFold('mk.make.long')
+  }, [focusId])
   const add = async () => {
     const t = topic.trim()
     if (!t) return
@@ -97,136 +101,147 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
       {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
       {projects}
 
-      {/* 단계판 */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
-        {(['all', ...IDEA_STATUSES] as const).map((s) => {
-          const n = s === 'all' ? ideas.length : counts[s]
-          const on = stage === s
-          return (
-            <button key={s} type="button" role="tab" aria-selected={on} onClick={() => setStage(on ? 'all' : s)} className={`tap flex min-h-14 flex-col items-center justify-center rounded-(--radius-control) border-2 px-1 py-1.5 ${on ? 'border-transparent bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-sm' : `bg-white ${s === 'all' ? 'border-slate-300 text-slate-800' : STAGE_TONE[s]}`}`} data-testid="make-stage" data-status={s}>
-              <span className="text-xl leading-none font-extrabold tabular-nums">{n}</span>
-              <span className="t-meta mt-0.5 font-semibold break-keep">{s === 'all' ? '전체' : IDEA_STATUS_LABEL[s]}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* D-357 화면 원칙 — 내 콘텐츠 첫 화면은 1주일치 프로젝트 · 만든 것 한눈에만. 롱폼 단계 · 일정 · 체크리스트 줄은 접힌 채 한 줄(펼친 것은 기억 · 줄로 오면 펼침) */}
+      <Fold
+        panel
+        id="mk.make.long"
+        title="유튜브 롱폼 진행판"
+        forceOpen={!!focusId}
+        count={ideas.length}
+        summary={ideas.length ? [...IDEA_STATUSES.filter((x) => counts[x] > 0).map((x) => `${IDEA_STATUS_LABEL[x]} ${counts[x]}`), late.length ? `늦은 일 ${late.length}` : ''].filter(Boolean).join(' · ') : '아직 담은 롱폼이 없어요 — 누르면 주제를 직접 담는 칸'}
+        testId="mk-make-long"
+      >
+        {/* 단계판 */}
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
+          {(['all', ...IDEA_STATUSES] as const).map((s) => {
+            const n = s === 'all' ? ideas.length : counts[s]
+            const on = stage === s
+            return (
+              <button key={s} type="button" role="tab" aria-selected={on} onClick={() => setStage(on ? 'all' : s)} className={`tap flex min-h-14 flex-col items-center justify-center rounded-(--radius-control) border-2 px-1 py-1.5 ${on ? 'border-transparent bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-sm' : `bg-white ${s === 'all' ? 'border-slate-300 text-slate-800' : STAGE_TONE[s]}`}`} data-testid="make-stage" data-status={s}>
+                <span className="text-xl leading-none font-extrabold tabular-nums">{n}</span>
+                <span className="t-meta mt-0.5 font-semibold break-keep">{s === 'all' ? '전체' : IDEA_STATUS_LABEL[s]}</span>
+              </button>
+            )
+          })}
+        </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        {/* 이번 주 일정 */}
-        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-rose-200 bg-white p-3 sm:p-4" data-testid="make-week">
-          <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
-            <CalendarDays aria-hidden="true" className="size-4 text-rose-600" /> 이번 주 일정
-            <span className="t-meta font-normal text-slate-500">
-              {shortDay(range.from)} ~ {shortDay(range.to)}
-            </span>
-          </p>
-          {week.length === 0 ? (
-            <p className="t-sub break-keep text-slate-500" data-testid="make-week-empty">
-              아래 줄에서 촬영일 · 게시일을 적으면 여기 이번 주 일정으로 모여요.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-slate-100">
-              {week.map((w) => (
-                <li key={`${w.idea.id}-${w.what}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5" data-testid="make-week-item" data-what={w.what}>
-                  <span className={`t-sub w-[4.75rem] shrink-0 font-bold tabular-nums ${w.date === today ? 'text-rose-700' : 'text-slate-700'}`}>{w.date === today ? '오늘' : shortDay(w.date)}</span>
-                  <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${w.what === 'shoot' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>{w.what === 'shoot' ? '촬영' : '게시'}</span>
-                  <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{w.idea.topic}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {late.length > 0 && (
-            <p className="t-sub flex items-start gap-1.5 rounded-(--radius-control) bg-danger-50 px-3 py-2 break-keep text-danger-700" data-testid="make-late">
-              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span className="min-w-0">
-                날짜가 지난 일 {late.length}개 — {late.slice(0, 2).map((i) => i.topic).join(' · ')}
-                {late.length > 2 ? ' …' : ''}. 단계를 바꾸거나 날짜를 다시 잡아 주세요.
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          {/* 이번 주 일정 */}
+          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-rose-200 bg-white p-3 sm:p-4" data-testid="make-week">
+            <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
+              <CalendarDays aria-hidden="true" className="size-4 text-rose-600" /> 이번 주 일정
+              <span className="t-meta font-normal text-slate-500">
+                {shortDay(range.from)} ~ {shortDay(range.to)}
               </span>
             </p>
-          )}
-        </section>
+            {week.length === 0 ? (
+              <p className="t-sub break-keep text-slate-500" data-testid="make-week-empty">
+                아래 줄에서 촬영일 · 게시일을 적으면 여기 이번 주 일정으로 모여요.
+              </p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-slate-100">
+                {week.map((w) => (
+                  <li key={`${w.idea.id}-${w.what}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5" data-testid="make-week-item" data-what={w.what}>
+                    <span className={`t-sub w-[4.75rem] shrink-0 font-bold tabular-nums ${w.date === today ? 'text-rose-700' : 'text-slate-700'}`}>{w.date === today ? '오늘' : shortDay(w.date)}</span>
+                    <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${w.what === 'shoot' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>{w.what === 'shoot' ? '촬영' : '게시'}</span>
+                    <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{w.idea.topic}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {late.length > 0 && (
+              <p className="t-sub flex items-start gap-1.5 rounded-(--radius-control) bg-danger-50 px-3 py-2 break-keep text-danger-700" data-testid="make-late">
+                <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <span className="min-w-0">
+                  날짜가 지난 일 {late.length}개 — {late.slice(0, 2).map((i) => i.topic).join(' · ')}
+                  {late.length > 2 ? ' …' : ''}. 단계를 바꾸거나 날짜를 다시 잡아 주세요.
+                </span>
+              </p>
+            )}
+          </section>
 
-        {/* 직접 담기 */}
-        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4">
-          <p className="t-sub font-bold text-slate-900">레이더에 없는 주제 직접 담기</p>
-          <div className="flex min-w-0 gap-2">
-            <input
-              value={topic}
-              maxLength={120}
-              disabled={readOnly}
-              onChange={(e) => setTopic(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void add()}
-              placeholder="예: 정책자금 상담 전 꼭 준비할 서류 5가지"
-              className="tap t-sub min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
-              aria-label="담을 주제"
-              data-testid="make-add-input"
-            />
-            <Button variant="primary" onClick={() => void add()} disabled={readOnly || !topic.trim()} data-testid="make-add">
-              <Plus aria-hidden="true" className="size-4" /> 담기
-            </Button>
-          </div>
-          <p className="t-meta break-keep text-slate-500">담으면 '제작 예정' 으로 들어가요. 레이더 카드의 [이번 주로 확정] 도 여기로 모여요.</p>
-        </section>
-      </div>
+          {/* 직접 담기 */}
+          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4">
+            <p className="t-sub font-bold text-slate-900">레이더에 없는 주제 직접 담기</p>
+            <div className="flex min-w-0 gap-2">
+              <input
+                value={topic}
+                maxLength={120}
+                disabled={readOnly}
+                onChange={(e) => setTopic(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void add()}
+                placeholder="예: 정책자금 상담 전 꼭 준비할 서류 5가지"
+                className="tap t-sub min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
+                aria-label="담을 주제"
+                data-testid="make-add-input"
+              />
+              <Button variant="primary" onClick={() => void add()} disabled={readOnly || !topic.trim()} data-testid="make-add">
+                <Plus aria-hidden="true" className="size-4" /> 담기
+              </Button>
+            </div>
+            <p className="t-meta break-keep text-slate-500">담으면 '제작 예정' 으로 들어가요. 레이더 카드의 [이번 주로 확정] 도 여기로 모여요.</p>
+          </section>
+        </div>
 
-      {/* D-232 우리 채널 성과 — 올린 영상이 평소보다 어땠나 · 어떤 축 · 제목 틀이 잘 됐나 */}
-      {feedReady && ideas.length > 0 && (
-        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-3 sm:p-4" data-testid="make-learn" data-linked={learning.linked} data-measured={learning.measured}>
-          <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
-            <TrendingUp aria-hidden="true" className="size-4 text-emerald-600" /> 우리 채널 성과
-            <span className="t-meta font-normal text-slate-500">내 채널 최근 영상 {mine.length}편 기준{sample ? ' · 예시 데이터' : ''} · 평소 대비(레이더와 같은 식)</span>
-          </p>
-          {learning.lines.length > 0 ? (
-            <ul className="flex flex-col gap-1">
-              {learning.lines.map((l) => (
-                <li key={l} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="make-learn-line">
-                  {l}
-                </li>
+        {/* D-232 우리 채널 성과 — 올린 영상이 평소보다 어땠나 · 어떤 축 · 제목 틀이 잘 됐나 */}
+        {feedReady && ideas.length > 0 && (
+          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-3 sm:p-4" data-testid="make-learn" data-linked={learning.linked} data-measured={learning.measured}>
+            <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
+              <TrendingUp aria-hidden="true" className="size-4 text-emerald-600" /> 우리 채널 성과
+              <span className="t-meta font-normal text-slate-500">내 채널 최근 영상 {mine.length}편 기준{sample ? ' · 예시 데이터' : ''} · 평소 대비(레이더와 같은 식)</span>
+            </p>
+            {learning.lines.length > 0 ? (
+              <ul className="flex flex-col gap-1">
+                {learning.lines.map((l) => (
+                  <li key={l} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="make-learn-line">
+                    {l}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="t-sub break-keep text-slate-600" data-testid="make-learn-empty">
+                올린 유튜브 주소를 적거나 아래 '이 영상인가요?' 에서 [맞아요] 를 누르면, 평소보다 잘 됐는지가 여기 모여요.
+              </p>
+            )}
+            {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length > 0 && (
+              <p className="t-meta font-semibold text-rose-700" data-testid="make-learn-suggest">
+                이 영상인가요? 확인할 것 {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length}건 — 아래 줄에서 [맞아요] 한 번이면 이어져요
+              </p>
+            )}
+            {/* D-236: 내 채널을 고르는 단추는 없다 — 미리 정해 둔 한 채널(예전 글은 '채널 탭에서 정하라' 고 했다) */}
+            {mine.length === 0 && <p className="t-meta break-keep text-slate-500">아직 받아 온 내 채널 영상이 없어요. 내 채널은 따로 고르지 않아도 미리 정해져 있어요(채널 탭의 '내 채널' 표시) — 그 영상이 들어오면 올린 영상의 숫자를 저절로 찾아요.</p>}
+            <p className="t-meta break-keep text-slate-500">노출 · 클릭률 · 시청 지속시간은 공개 숫자에 없어 어림하지 않아요(YouTube Analytics 연결 뒤).</p>
+          </section>
+        )}
+
+        {/* 콘텐츠 줄 */}
+        <section className="flex flex-col" data-testid="radar-notebook">
+          {ideas.length === 0 ? (
+            <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-500" data-testid="make-empty">
+              아직 담은 콘텐츠가 없어요. [이번 주 찍을 것] 에서 카드의 [이번 주로 확정] 을 누르거나, 위에 주제를 직접 적어 담아 주세요.
+            </p>
+          ) : shown.length === 0 ? (
+            <p className="t-sub break-keep text-slate-500">이 단계의 콘텐츠가 없어요.</p>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {shown.map((i) => (
+                <MakeRow
+                  key={i.id}
+                  i={i}
+                  readOnly={readOnly}
+                  today={today}
+                  video={linkedVideo(i, mineById)}
+                  missingVideo={feedReady && mine.length > 0 && !!youtubeIdOf(i.link) && !linkedVideo(i, mineById)}
+                  suggestion={dismissed.has(i.id) ? null : (suggestions.get(i.id) ?? null)}
+                  onDismiss={() => setDismissed((s) => new Set([...s, i.id]))}
+                  focus={i.id === focusId}
+                  {...act}
+                />
               ))}
             </ul>
-          ) : (
-            <p className="t-sub break-keep text-slate-600" data-testid="make-learn-empty">
-              올린 유튜브 주소를 적거나 아래 '이 영상인가요?' 에서 [맞아요] 를 누르면, 평소보다 잘 됐는지가 여기 모여요.
-            </p>
           )}
-          {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length > 0 && (
-            <p className="t-meta font-semibold text-rose-700" data-testid="make-learn-suggest">
-              이 영상인가요? 확인할 것 {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length}건 — 아래 줄에서 [맞아요] 한 번이면 이어져요
-            </p>
-          )}
-          {/* D-236: 내 채널을 고르는 단추는 없다 — 미리 정해 둔 한 채널(예전 글은 '채널 탭에서 정하라' 고 했다) */}
-          {mine.length === 0 && <p className="t-meta break-keep text-slate-500">아직 받아 온 내 채널 영상이 없어요. 내 채널은 따로 고르지 않아도 미리 정해져 있어요(채널 탭의 '내 채널' 표시) — 그 영상이 들어오면 올린 영상의 숫자를 저절로 찾아요.</p>}
-          <p className="t-meta break-keep text-slate-500">노출 · 클릭률 · 시청 지속시간은 공개 숫자에 없어 어림하지 않아요(YouTube Analytics 연결 뒤).</p>
         </section>
-      )}
-
-      {/* 콘텐츠 줄 */}
-      <section className="flex flex-col" data-testid="radar-notebook">
-        {ideas.length === 0 ? (
-          <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-500" data-testid="make-empty">
-            아직 담은 콘텐츠가 없어요. [이번 주 찍을 것] 에서 카드의 [이번 주로 확정] 을 누르거나, 위에 주제를 직접 적어 담아 주세요.
-          </p>
-        ) : shown.length === 0 ? (
-          <p className="t-sub break-keep text-slate-500">이 단계의 콘텐츠가 없어요.</p>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {shown.map((i) => (
-              <MakeRow
-                key={i.id}
-                i={i}
-                readOnly={readOnly}
-                today={today}
-                video={linkedVideo(i, mineById)}
-                missingVideo={feedReady && mine.length > 0 && !!youtubeIdOf(i.link) && !linkedVideo(i, mineById)}
-                suggestion={dismissed.has(i.id) ? null : (suggestions.get(i.id) ?? null)}
-                onDismiss={() => setDismissed((s) => new Set([...s, i.id]))}
-                focus={i.id === focusId}
-                {...act}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+      </Fold>
     </div>
   )
 }

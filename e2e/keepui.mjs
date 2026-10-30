@@ -75,6 +75,11 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   const openCount = () => page.locator('[data-testid="fold-toggle"][aria-expanded="true"]').count()
+  // D-357 업체 상세 목차는 처음엔 모두 접힘 — 하나를 펼쳐 둔 뒤 [모두 접기]
+  if ((await openCount()) === 0) {
+    await page.locator('[data-testid="fold-toggle"]').first().click()
+    await page.waitForTimeout(200)
+  }
   const before = await openCount()
   await page.getByTestId('fold-all-close').first().click()
   await page.waitForTimeout(300)
@@ -91,7 +96,7 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
   await page.getByTestId('fold-all-open').first().click()
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
-  check('K3 [모두 펼치기] → 새로 고쳐도 모두 펼침', (await openCount()) >= before && (await store('axmvp.fold.all')) === 'open', await openCount())
+  check('K3 [모두 펼치기] → 새로 고쳐도 모두 펼침', (await openCount()) >= Math.max(before, 2) && (await store('axmvp.fold.all')) === 'open', await openCount())
 }
 
 /* ---- K4 글자 크기 · 테마 ---- */

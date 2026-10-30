@@ -687,7 +687,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             headingId="upcoming"
             tour="home-upcoming"
             testId="today-agenda"
-            defaultOpen
+            // D-357 첫 화면은 단순하게 — 접힌 채로 숫자만(밀린 것 · 오늘 약속은 위 할 일 칸에 이미 있다)
+            summary={agenda.length ? `2주 안 ${agenda.length}건 — 누르면 날짜 순으로` : '2주 안에 잡힌 마감 · 약속 없음'}
             icon={<SectionChip icon={CalendarClock} accent="urgent" />}
             count={agenda.length}
             countTone={agenda.length > 0 ? 'danger' : 'neutral'}
@@ -793,7 +794,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             headingId="capture"
             tour="home-capture"
             testId="today-capture"
-            defaultOpen={!phone}
+            summary="누르면 바로 적는 칸"
             icon={<SectionChip icon={NotebookPen} accent="journal" />}
             count={todayJournal.length}
             action={<AllLink to="/journal" />}

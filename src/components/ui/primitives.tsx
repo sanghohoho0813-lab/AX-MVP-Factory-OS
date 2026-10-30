@@ -224,12 +224,12 @@ export function Section({
   className?: string
   hint?: string
   /** 접는 목차 — id 는 기억 열쇠, open 은 처음 펼침 여부 */
-  fold?: { id: string; open?: boolean; force?: boolean; panel?: boolean }
+  fold?: { id: string; open?: boolean; force?: boolean; panel?: boolean; /** 접혀 있을 때 제목 옆 한 줄 */ summary?: ReactNode }
   testId?: string
 }) {
   if (fold && title)
     return (
-      <Fold id={fold.id} title={title} hint={hint} count={count} defaultOpen={fold.open ?? false} forceOpen={fold.force} panel={fold.panel} action={action} className={className} testId={testId}>
+      <Fold id={fold.id} title={title} hint={hint} count={count} defaultOpen={fold.open ?? false} forceOpen={fold.force} panel={fold.panel} summary={fold.summary} action={action} className={className} testId={testId}>
         <div className="flex flex-col gap-3">{children}</div>
       </Fold>
     )

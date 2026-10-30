@@ -275,7 +275,7 @@ const headsWithoutHint = (page) =>
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
 
-  // 오늘 — 마감 · 약속 · 확인할 것 · 빠른 기록(PC)은 펼침, 상담신청 · 영업 · 안부는 접힘
+  // D-357 화면 원칙(대표 2026-10-30 '첫 화면에 많은 것 금지') — 오늘의 목차는 모두 접힌 채 숫자 · 한 줄 요약(예전 D-192 는 마감 · 확인할 것 · 빠른 기록을 펼쳐 두었다)
   const today = {
     agenda: await foldState(page, 'today.agenda'),
     decide: await foldState(page, 'today.decide'),
@@ -284,7 +284,8 @@ const headsWithoutHint = (page) =>
     sales: await foldState(page, 'today.sales'),
     care: await foldState(page, 'today.care'),
   }
-  check('D-192 오늘: 마감 · 약속 · 확인할 것 · 빠른 기록은 펼침, 상담신청 · 영업 · 안부는 접힘', today.agenda === '1' && today.decide === '1' && today.capture === '1' && today.events === '0' && today.sales === '0' && ['0', 'none'].includes(today.care), JSON.stringify(today))
+  check('D-357 오늘: 목차는 모두 접힌 채(마감 · 약속 · 확인할 것 · 빠른 기록 · 상담신청 · 영업 · 안부)', today.agenda === '0' && today.decide === '0' && today.capture === '0' && today.events === '0' && today.sales === '0' && ['0', 'none'].includes(today.care), JSON.stringify(today))
+  check('D-357 오늘: 접힌 확인할 것 · 마감 옆에 한 줄 요약', /하나씩/.test((await page.getByTestId('today-decide').getByTestId('fold-summary').innerText().catch(() => '')) ?? '') && /2주/.test((await page.getByTestId('today-agenda').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''))
   check('D-192 오늘: 접힌 목차도 숫자는 보인다(상담신청 3)', ((await page.getByTestId('today-events').getByTestId('fold-toggle').innerText()) ?? '').replace(/\s+/g, ' ').includes('상담신청 3'))
   check("D-192 오늘: 늘 깔리던 설명 글이 없다('프로그램이 먼저 준비했어요' 는 목차 설명으로)", !((await page.locator('main').innerText()) ?? '').includes('프로그램이 먼저 준비했어요'))
 
@@ -318,7 +319,9 @@ const headsWithoutHint = (page) =>
     history: await foldState(page, 'overview.history'),
     tools: await foldState(page, 'overview.tools'),
   }
-  check('D-192 개요: 회사 기본 정보만 펼침 · 숫자 · 계약 · 해 드린 일 · 전문 모듈은 접힘', ov.company === '1' && ov.numbers === '0' && ov.contract === '0' && ov.history === '0' && ov.tools === '0', JSON.stringify(ov))
+  check('D-357 개요: 목차는 모두 접힌 채(회사 기본 정보 · 숫자 · 계약 · 해 드린 일 · 전문 모듈)', ov.company === '0' && ov.numbers === '0' && ov.contract === '0' && ov.history === '0' && ov.tools === '0', JSON.stringify(ov))
+  const coSum = (await page.getByTestId('fold-company').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
+  check('D-357 개요: 접힌 회사 기본 정보 옆에 사업자번호 · 대표 · 설립 한 줄(업체를 여는 이유 — D-144)', coSum.includes('123-45-67890') && coSum.includes('김대표') && coSum.includes('2019'), coSum)
   const cSum = (await page.getByTestId('fold-contract').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
   check('D-192 개요: 접힌 계약 목차 옆에 한 줄 요약(펼치지 않고도 금액 · 몇 달째)', /원/.test(cSum) && /개월|년/.test(cSum), cSum)
   check("D-192 개요: '번호는 조각마다 따로 복사' 설명은 목차 설명으로", !((await page.locator('main').innerText()) ?? '').includes('조각마다'))

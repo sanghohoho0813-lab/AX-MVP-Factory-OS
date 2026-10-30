@@ -412,11 +412,16 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
       )}
 
       {/* D-298 '이것만 지키면 돼요' — 글자 덩어리 대신 색 번호 · 굵은 한마디 · 짧은 설명, 예시는 마우스를 올리거나 ? 를 누르면 */}
-      <div className="rounded-(--radius-panel) border-2 border-amber-300 bg-amber-50/60 px-4 py-3" data-testid="sht-basics">
-        <p className="t-body flex items-center gap-1.5 font-bold text-slate-900">
-          <Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" /> 이것만 지키면 돼요
-        </p>
-        <ol className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }}>
+      {/* D-357 화면 원칙 — 접힌 채로도 네 가지 한마디는 한 줄에(누르면 설명 · 예시) */}
+      <Fold
+        id="sht.basics"
+        title="이것만 지키면 돼요"
+        icon={<Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
+        summary={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
+        className="rounded-(--radius-panel) border-2 border-amber-300 bg-amber-50/60 px-3 py-1 data-[open=1]:pb-3 sm:px-4"
+        testId="sht-basics"
+      >
+        <ol className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }}>
           {SHORT_BASICS_EASY.map((b, i) => (
             <li key={b.title} className="min-w-0 rounded-lg border border-amber-200 bg-white px-2.5 py-2" data-testid="sht-basic">
               <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
@@ -431,7 +436,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             </li>
           ))}
         </ol>
-      </div>
+      </Fold>
 
       {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
       <Fold

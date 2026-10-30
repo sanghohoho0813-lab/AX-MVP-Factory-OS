@@ -902,7 +902,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <FoldAllButton className="-my-2 self-end" />
       {/* D-192: 카드마다 접는 목차 — 제목 줄(▸ · 숫자 · 한 줄 요약)만 보이고, 마우스를 올리면 무슨 칸인지. 회사 정보만 펼친 채로 */}
       <div data-testid="overview-company" className="flex flex-col gap-3">
-        <Fold panel id="overview.company" title="회사 기본 정보" defaultOpen testId="fold-company">
+        {/* D-357 화면 원칙 — 첫 화면은 단순하게: 접힌 채로도 사업자번호 · 대표 · 설립은 한 줄로(펼친 것은 기억) */}
+        <Fold
+          panel
+          id="overview.company"
+          title="회사 기본 정보"
+          testId="fold-company"
+          summary={[record.businessNumber && `사업자 ${record.businessNumber}`, record.representativeName && `대표 ${record.representativeName}`, record.establishedAt && `설립 ${record.establishedAt}`].filter(Boolean).join(' · ') || '아직 적은 정보가 없어요 — 누르면 채우는 칸'}
+        >
           <CompanyProfileCard
             record={record}
             today={today}

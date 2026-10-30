@@ -100,7 +100,8 @@ export function ModuleAccessPanel() {
   }
 
   return (
-    <Section title="요금제와 모듈">
+    // D-357 화면 원칙 — 모듈 화면 첫 화면은 모듈 카드만. 요금제 고르기는 가끔 쓰는 설정이라 접힌 채 한 줄(#plan 으로 오면 펼침)
+    <Section title="요금제와 모듈" fold={{ id: 'tools.plan', force: typeof window !== 'undefined' && window.location.hash === '#plan', summary: `지금 ${ent.plan.key} 요금제 — 누르면 요금제 · 모듈 잠그기 · 체험` }}>
       <Surface>
         <div className="flex flex-col gap-4" id="plan" data-testid="plan-panel">
           <p className="t-body break-keep text-slate-700">

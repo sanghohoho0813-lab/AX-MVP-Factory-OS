@@ -158,219 +158,239 @@ export default function DashboardPage() {
         </section>
       ) : null}
 
-      {/* ── KPI 6종 ── */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 @2xl:grid-cols-3 @4xl:grid-cols-6">
-        <MetricCard label="관리 고객사" value={stats?.managedClients ?? 0} unit="개사" tone="navy" icon="🏢" />
-        <MetricCard label="설립 진행중" value={docsInProgress} unit="건" tone="navy" icon="🚀" hint="가능성 체크~신고 준비" />
-        <MetricCard label="서류 준비중" value={docsInProgress} unit="건" tone="warning" icon="📁" hint="설립서류 미완료" />
-        <MetricCard label="연구노트 작성 필요" value={stats?.notesNeeded ?? 0} unit="건" tone="warning" icon="📓" hint="이번 달 미완료" />
-        <MetricCard label="변경사항 확인 필요" value={pendingChanges.length} unit="건" tone="danger" icon="🔄" hint="30일 기한 관리" />
-        <MetricCard label="리포트 발송 대기" value={stats?.reportPending ?? 0} unit="개사" tone="navy" icon="📤" />
-      </section>
-
-      <div className="mt-6 grid grid-cols-1 gap-5 @4xl:grid-cols-3">
-        {/* ── 오늘 할 일 ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-card @4xl:col-span-1">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="text-lg font-bold text-slate-900">오늘 할 일</h2>
-            <Link href="/tasks" className="text-sm font-bold text-navy-600 hover:text-navy-800">
-              전체 보기 →
+      {/* D-358 화면 원칙 — 아직 관리하는 고객사가 없으면 0 이 가득한 칸 · 빈 칸 다섯 대신 무엇을 하면 무엇이 생기는지 한 장 */}
+      {(stats?.managedClients ?? 0) === 0 ? (
+        <section className="rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-6 text-center" data-testid="lab-dash-empty">
+          <p className="text-lg font-bold text-slate-900">아직 연구소로 관리하는 고객사가 없어요</p>
+          <p className="mx-auto mt-2 max-w-2xl break-keep text-base leading-relaxed text-slate-600">
+            ① 업체 목록에서 고객사를 넣고 → ② 설립 가능성을 체크하면 → ③ 여기에 오늘 할 일 · 설립 진행 · 연구노트 · 변경신고 기한 · 고객 리포트가 저절로 모여요.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Link href="/clients" className="rounded-xl bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800">
+              업체 목록에서 고객사 넣기
             </Link>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {tasks.slice(0, 6).map((t) => (
-              <Link
-                key={t.id}
-                href={t.href}
-                onClick={() => saveReturnPoint("/dashboard", "대시보드")}
-                className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50/60"
-              >
-                <span className="mt-0.5 text-base">{t.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-medium leading-tight text-slate-800">
-                    {t.urgent ? <span className="mr-1 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">긴급</span> : null}
-                    {t.title}
-                  </p>
-                  <p className="mt-0.5 truncate text-sm text-slate-500">
-                    {t.clientName}
-                    {t.meta ? ` · ${t.meta}` : ""}
-                  </p>
-                </div>
-              </Link>
-            ))}
-            {tasks.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-slate-400">
-                오늘 처리할 일이 없습니다. 👍
-              </p>
-            ) : null}
+            <Link href="/assessment" className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-base font-bold text-slate-700 hover:bg-slate-50">
+              설립 가능성부터 체크
+            </Link>
           </div>
         </section>
+      ) : (
+        <>
+          {/* ── KPI 6종 ── */}
+          <section className="grid grid-cols-2 gap-3 sm:gap-4 @2xl:grid-cols-3 @4xl:grid-cols-6">
+            <MetricCard label="관리 고객사" value={stats?.managedClients ?? 0} unit="개사" tone="navy" icon="🏢" />
+            <MetricCard label="설립 진행중" value={docsInProgress} unit="건" tone="navy" icon="🚀" hint="가능성 체크~신고 준비" />
+            <MetricCard label="서류 준비중" value={docsInProgress} unit="건" tone="warning" icon="📁" hint="설립서류 미완료" />
+            <MetricCard label="연구노트 작성 필요" value={stats?.notesNeeded ?? 0} unit="건" tone="warning" icon="📓" hint="이번 달 미완료" />
+            <MetricCard label="변경사항 확인 필요" value={pendingChanges.length} unit="건" tone="danger" icon="🔄" hint="30일 기한 관리" />
+            <MetricCard label="리포트 발송 대기" value={stats?.reportPending ?? 0} unit="개사" tone="navy" icon="📤" />
+          </section>
 
-        {/* ── 설립 진행 현황 + 서류 준비율 ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-card @4xl:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="text-lg font-bold text-slate-900">설립 진행 현황</h2>
-            <Link href="/setup-documents" className="text-sm font-bold text-navy-600 hover:text-navy-800">
-              설립서류 관리 →
-            </Link>
-          </div>
-          <div className="space-y-5 px-5 py-5">
-            {setupInProgress.map((pkg) => {
-              const progress = docProgress(pkg);
-              const missing = missingDocs(pkg);
-              const stageIdx = SETUP_STAGES.indexOf(pkg.stage);
-              return (
-                <div key={pkg.id} className="rounded-xl border border-slate-100 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-slate-900">{pkg.clientName}</p>
-                      <p className="text-sm text-slate-500">{pkg.labType}</p>
-                    </div>
-                    <span className="rounded-full bg-navy-50 px-3.5 py-1.5 text-sm font-semibold text-navy-700 ring-1 ring-inset ring-navy-100">
-                      {pkg.stage}
-                    </span>
-                  </div>
-                  {/* 단계 표시 */}
-                  <div className="mt-3 flex items-center gap-1">
-                    {SETUP_STAGES.map((s, i) => (
-                      <div
-                        key={s}
-                        className={`h-1.5 flex-1 rounded-full ${
-                          i <= stageIdx ? "bg-navy-600" : "bg-slate-100"
-                        }`}
-                        title={s}
-                      />
-                    ))}
-                  </div>
-                  {/* 준비율 */}
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className={`h-full ${progress >= 80 ? "bg-status-normal" : progress >= 50 ? "bg-blue-500" : "bg-status-warning"}`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <span className="text-lg font-bold text-slate-700">{progress}%</span>
-                  </div>
-                  {missing.length ? (
-                    <p className="mt-2 text-base text-slate-600">
-                      누락: <span className="font-medium text-amber-700">{missing.slice(0, 3).map((d) => d.label).join(", ")}{missing.length > 3 ? ` 외 ${missing.length - 3}건` : ""}</span>
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-status-normal">서류 준비 완료 — 최종 점검 단계</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-5 @4xl:grid-cols-2">
-        {/* ── 연구노트 작성 대상 ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-card">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="text-lg font-bold text-slate-900">이번 달 연구노트 작성 대상</h2>
-            <Link href="/notes" className="text-sm font-bold text-navy-600 hover:text-navy-800">
-              연구노트 →
-            </Link>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {noteTargets.map((t) => (
-              <div key={t.project.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-slate-900">{t.client?.name ?? "—"}</p>
-                  <p className="truncate text-sm text-slate-500">
-                    {t.project.name} · 마지막 작성 {t.lastMonth ? t.lastMonth.replace("-", ".") : "—"}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-inset ${NOTE_STATUS_STYLE[t.status]}`}>
-                    {t.status}
-                  </span>
-                  <Link
-                    href={`/notes?client=${t.project.clientId}&project=${t.project.id}&month=${month}`}
-                    className={`rounded-lg px-4 py-2 text-sm font-bold ${
-                      t.status === "저장 완료"
-                        ? "border border-slate-300 text-slate-600 hover:bg-slate-50"
-                        : "bg-navy-700 text-white hover:bg-navy-800"
-                    }`}
-                  >
-                    {t.status === "저장 완료" ? "보기" : "생성"}
-                  </Link>
-                </div>
+          <div className="mt-6 grid grid-cols-1 gap-5 @4xl:grid-cols-3">
+            {/* ── 오늘 할 일 ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-card @4xl:col-span-1">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">오늘 할 일</h2>
+                <Link href="/tasks" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+                  전체 보기 →
+                </Link>
               </div>
-            ))}
-            {noteTargets.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-slate-400">진행 중인 연구과제가 없습니다.</p>
-            ) : null}
-          </div>
-        </section>
+              <div className="divide-y divide-slate-50">
+                {tasks.slice(0, 6).map((t) => (
+                  <Link
+                    key={t.id}
+                    href={t.href}
+                    onClick={() => saveReturnPoint("/dashboard", "대시보드")}
+                    className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50/60"
+                  >
+                    <span className="mt-0.5 text-base">{t.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-medium leading-tight text-slate-800">
+                        {t.urgent ? <span className="mr-1 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">긴급</span> : null}
+                        {t.title}
+                      </p>
+                      <p className="mt-0.5 truncate text-sm text-slate-500">
+                        {t.clientName}
+                        {t.meta ? ` · ${t.meta}` : ""}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+                {tasks.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-sm text-slate-400">
+                    오늘 처리할 일이 없습니다. 👍
+                  </p>
+                ) : null}
+              </div>
+            </section>
 
-        {/* ── 변경사항 관리 (D-day) ── */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-card">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-            <h2 className="text-lg font-bold text-slate-900">변경사항 관리</h2>
-            <Link href="/changes" className="text-sm font-bold text-navy-600 hover:text-navy-800">
-              전체 보기 →
-            </Link>
+            {/* ── 설립 진행 현황 + 서류 준비율 ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-card @4xl:col-span-2">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">설립 진행 현황</h2>
+                <Link href="/setup-documents" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+                  설립서류 관리 →
+                </Link>
+              </div>
+              <div className="space-y-5 px-5 py-5">
+                {setupInProgress.map((pkg) => {
+                  const progress = docProgress(pkg);
+                  const missing = missingDocs(pkg);
+                  const stageIdx = SETUP_STAGES.indexOf(pkg.stage);
+                  return (
+                    <div key={pkg.id} className="rounded-xl border border-slate-100 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-900">{pkg.clientName}</p>
+                          <p className="text-sm text-slate-500">{pkg.labType}</p>
+                        </div>
+                        <span className="rounded-full bg-navy-50 px-3.5 py-1.5 text-sm font-semibold text-navy-700 ring-1 ring-inset ring-navy-100">
+                          {pkg.stage}
+                        </span>
+                      </div>
+                      {/* 단계 표시 */}
+                      <div className="mt-3 flex items-center gap-1">
+                        {SETUP_STAGES.map((s, i) => (
+                          <div
+                            key={s}
+                            className={`h-1.5 flex-1 rounded-full ${
+                              i <= stageIdx ? "bg-navy-600" : "bg-slate-100"
+                            }`}
+                            title={s}
+                          />
+                        ))}
+                      </div>
+                      {/* 준비율 */}
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-full ${progress >= 80 ? "bg-status-normal" : progress >= 50 ? "bg-blue-500" : "bg-status-warning"}`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className="text-lg font-bold text-slate-700">{progress}%</span>
+                      </div>
+                      {missing.length ? (
+                        <p className="mt-2 text-base text-slate-600">
+                          누락: <span className="font-medium text-amber-700">{missing.slice(0, 3).map((d) => d.label).join(", ")}{missing.length > 3 ? ` 외 ${missing.length - 3}건` : ""}</span>
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-xs text-status-normal">서류 준비 완료 — 최종 점검 단계</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-          <div className="divide-y divide-slate-50">
-            {changes.map((c) => {
-              const d = ddayOf(c.deadline);
-              const done = c.status === "신고 완료";
-              return (
-                <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-slate-900">{c.item}</p>
-                    <p className="truncate text-sm text-slate-500">
-                      {c.clientName} · 기한 {c.deadline.replace(/-/g, ".")}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {!done ? (
-                      <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-bold ring-1 ring-inset ${DDAY_STYLE[d.tone]}`}>
-                        {d.label}
+
+          <div className="mt-5 grid grid-cols-1 gap-5 @4xl:grid-cols-2">
+            {/* ── 연구노트 작성 대상 ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-card">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">이번 달 연구노트 작성 대상</h2>
+                <Link href="/notes" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+                  연구노트 →
+                </Link>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {noteTargets.map((t) => (
+                  <div key={t.project.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-slate-900">{t.client?.name ?? "—"}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {t.project.name} · 마지막 작성 {t.lastMonth ? t.lastMonth.replace("-", ".") : "—"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-inset ${NOTE_STATUS_STYLE[t.status]}`}>
+                        {t.status}
                       </span>
-                    ) : null}
-                    <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-inset ${
-                      done
-                        ? "bg-status-normalBg text-status-normal ring-green-200"
-                        : "bg-slate-100 text-slate-600 ring-slate-200"
-                    }`}>
-                      {c.status}
-                    </span>
+                      <Link
+                        href={`/notes?client=${t.project.clientId}&project=${t.project.id}&month=${month}`}
+                        className={`rounded-lg px-4 py-2 text-sm font-bold ${
+                          t.status === "저장 완료"
+                            ? "border border-slate-300 text-slate-600 hover:bg-slate-50"
+                            : "bg-navy-700 text-white hover:bg-navy-800"
+                        }`}
+                      >
+                        {t.status === "저장 완료" ? "보기" : "생성"}
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+                ))}
+                {noteTargets.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-sm text-slate-400">진행 중인 연구과제가 없습니다.</p>
+                ) : null}
+              </div>
+            </section>
 
-      {/* ── 고객 리포트 현황 ── */}
-      <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-card">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-bold text-slate-900">고객 리포트</h2>
-          <Link href="/reports" className="text-sm font-bold text-navy-600 hover:text-navy-800">
-            리포트 센터 →
-          </Link>
-        </div>
-        <div className="grid grid-cols-3 divide-x divide-slate-100 px-2 py-5 text-center">
-          <div>
-            <p className="text-3xl font-bold text-status-warning">{stats?.reportPending ?? 0}</p>
-            <p className="mt-1 text-sm text-slate-500">발송 대기</p>
+            {/* ── 변경사항 관리 (D-day) ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-card">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">변경사항 관리</h2>
+                <Link href="/changes" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+                  전체 보기 →
+                </Link>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {changes.map((c) => {
+                  const d = ddayOf(c.deadline);
+                  const done = c.status === "신고 완료";
+                  return (
+                    <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-slate-900">{c.item}</p>
+                        <p className="truncate text-sm text-slate-500">
+                          {c.clientName} · 기한 {c.deadline.replace(/-/g, ".")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!done ? (
+                          <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-bold ring-1 ring-inset ${DDAY_STYLE[d.tone]}`}>
+                            {d.label}
+                          </span>
+                        ) : null}
+                        <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-inset ${
+                          done
+                            ? "bg-status-normalBg text-status-normal ring-green-200"
+                            : "bg-slate-100 text-slate-600 ring-slate-200"
+                        }`}>
+                          {c.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-          <div>
-            <p className="text-3xl font-bold text-status-normal">{Math.max(0, sentReports)}</p>
-            <p className="mt-1 text-sm text-slate-500">발송 완료/관리중</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-navy-700">{reportReadyRate}%</p>
-            <p className="mt-1 text-sm text-slate-500">이번 달 리포트 준비율</p>
-          </div>
-        </div>
-      </section>
+
+          {/* ── 고객 리포트 현황 ── */}
+          <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-card">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <h2 className="text-lg font-bold text-slate-900">고객 리포트</h2>
+              <Link href="/reports" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+                리포트 센터 →
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-slate-100 px-2 py-5 text-center">
+              <div>
+                <p className="text-3xl font-bold text-status-warning">{stats?.reportPending ?? 0}</p>
+                <p className="mt-1 text-sm text-slate-500">발송 대기</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-status-normal">{Math.max(0, sentReports)}</p>
+                <p className="mt-1 text-sm text-slate-500">발송 완료/관리중</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-navy-700">{reportReadyRate}%</p>
+                <p className="mt-1 text-sm text-slate-500">이번 달 리포트 준비율</p>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
     </Layout>
   );
 }

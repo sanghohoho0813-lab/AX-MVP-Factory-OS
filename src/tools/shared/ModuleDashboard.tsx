@@ -29,6 +29,7 @@ import { useIsPhone } from '../../lib/useIsPhone'
 import type { ScenarioModule } from '../../services/scenarioPresets'
 import { ModulePresets } from './ModulePresets'
 import { ModuleClientFocus } from './ModuleClientFocus'
+import { Fold } from '../../components/ui/fold'
 
 /** 이 모듈이 만든 기한 한 줄 — 어느 업체의 것인지까지 */
 interface ModuleDue {
@@ -150,12 +151,14 @@ export interface ModuleDashboardProps {
   presets?: boolean
   /** D-354 false — 업체로 열었을 때 맨 위 '이 업체' 한 장을 그리지 않는다(화면 맨 위에 따로 둔 모듈) */
   focus?: boolean
+  /** D-357 접힌 '고객 전체' 목차 이름 */
+  allTitle?: string
 }
 
 /** 상황 예시가 있는 모듈 */
 const PRESET_MODULE: Record<string, ScenarioModule> = { 'policy-funding': 'policy-funding', 'startup-tax': 'startup-tax', employment: 'employment', labcare: 'labcare' }
 
-export function ModuleDashboard({ toolKey, children, assist = true, presets = true, focus = true }: ModuleDashboardProps) {
+export function ModuleDashboard({ toolKey, children, assist = true, presets = true, focus = true, allTitle = '고객 전체 현황' }: ModuleDashboardProps) {
   const { loadClients } = useToolClient()
   // D-166: 휴대폰은 서류 빠진 업체를 4곳만(같은 사유가 수십 줄 반복됐다) — 나머지는 '몇 곳 더'
   const phone = useIsPhone()
@@ -192,28 +195,6 @@ export function ModuleDashboard({ toolKey, children, assist = true, presets = tr
       {focus && <ModuleClientFocus toolKey={toolKey} />}
       {assist && <ModuleAssistBar toolKey={toolKey} clients={clients} />}
       {presets && PRESET_MODULE[toolKey] && <ModulePresets module={PRESET_MODULE[toolKey]} />}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 관리에 있는 업체" />
-        <MetricTile
-          label="지금 돌릴 수 있는 업체"
-          value={`${sum.ready.length}곳`}
-          hint="필요한 서류가 다 있는 곳"
-          tone={sum.ready.length > 0 ? 'success' : 'neutral'}
-        />
-        <MetricTile
-          label="서류가 빠진 업체"
-          value={`${sum.gaps.length}곳`}
-          hint="받아야 할 서류가 있다"
-          tone={sum.gaps.length > 0 ? 'warning' : 'neutral'}
-        />
-        <MetricTile
-          label="이 모듈이 만든 기한"
-          value={`${upcoming.length}건`}
-          hint={overdue.length > 0 ? `지난 것 ${overdue.length}건` : '30일 안'}
-          tone={overdue.length > 0 ? 'danger' : upcoming.length > 0 ? 'warning' : 'neutral'}
-        />
-      </div>
-
       {sum.clients.length === 0 && (
         <Surface edge="brand" showEdge>
           <p className="t-sub break-keep text-slate-600">
@@ -225,103 +206,136 @@ export function ModuleDashboard({ toolKey, children, assist = true, presets = tr
 
       {children}
 
-      {sum.dues.length > 0 && (
-        <Section title="이 모듈이 잡아 둔 기한" count={sum.dues.length}>
-          <ul className="flex flex-col gap-2" data-testid="module-dues">
-            {sum.dues.slice(0, 8).map((d, i) => {
-              const tone = dueTone(d.daysLeft)
-              return (
-                <li key={`${d.clientId}-${d.date}-${i}`}>
-                  <Surface as="div" edge={tone.tone} showEdge padded={false}>
-                    <Link
-                      to={`/ops/clients/${d.clientId}`}
-                      className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5"
-                    >
-                      <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-                      <span className="t-sub font-bold text-slate-900">{d.clientName}</span>
-                      <span className="t-sub min-w-[10rem] flex-1 break-keep text-slate-600">{d.title}</span>
-                      <span className="t-meta text-slate-400">{d.date}</span>
-                      <Badge tone={tone.tone}>{tone.text}</Badge>
-                    </Link>
-                  </Surface>
-                </li>
-              )
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {sum.gaps.length > 0 && (
-        <Section title="서류부터 받아야 하는 업체" count={sum.gaps.length}>
-          <ul className="flex flex-col gap-2" data-testid="module-gaps">
-            {sum.gaps.slice(0, phone ? 4 : 8).map((g) => (
-              <li key={g.clientId}>
-                <Surface as="div" edge="warning" showEdge padded={false}>
-                  <Link
-                    to={`/ops/clients/${g.clientId}?tab=docs`}
-                    className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5"
-                  >
-                    <FileWarning aria-hidden="true" className="size-4 shrink-0 text-amber-500" />
-                    <span className="t-sub font-bold text-slate-900">{g.clientName}</span>
-                    <span className="t-sub min-w-[10rem] flex-1 break-keep text-amber-700">{g.missing.join(' · ')} 없음</span>
-                    <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
-                  </Link>
-                </Surface>
-              </li>
-            ))}
-          </ul>
-          {sum.gaps.length > (phone ? 4 : 8) && (
-            <Link to="/ops/clients" className="tap t-sub mt-1 inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="module-gaps-more">
-              그 밖에 {sum.gaps.length - (phone ? 4 : 8)}곳 — 고객 관리에서 보기 →
-            </Link>
-          )}
-        </Section>
-      )}
-
-      {sum.ready.length > 0 && (
-        <Section title="이 업체로 바로 열기" count={sum.ready.length}>
-          <div className="flex flex-wrap gap-2" data-testid="module-ready">
-            {sum.ready.slice(0, 12).map((c) => (
-              <Link
-                key={c.id}
-                to={`${basePath}?client=${c.id}`}
-                data-client={c.id}
-                className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 t-sub font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <Building2 aria-hidden="true" className="size-4 text-slate-400" />
-                {c.companyName}
-              </Link>
-            ))}
+      {/* D-357 화면 원칙 — 첫 화면은 단순하게: 고객 전체 숫자 · 서류 빠진 업체 · 기한 · 최근 결과는 접힌 채 한 줄(펼친 것은 기억) */}
+      {sum.clients.length > 0 && (
+        <Fold
+          panel
+          id={`modules.${toolKey}.all`}
+          title={allTitle}
+          summary={[`업체 ${sum.clients.length}곳`, `지금 돌릴 수 있는 ${sum.ready.length}곳`, sum.gaps.length ? `서류 빠진 ${sum.gaps.length}곳` : '', overdue.length ? `지난 기한 ${overdue.length}건` : upcoming.length ? `30일 안 기한 ${upcoming.length}건` : '', sum.results.length ? `결과 ${sum.results.length}건` : ''].filter(Boolean).join(' · ')}
+          testId="module-all"
+        >
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 관리에 있는 업체" />
+            <MetricTile
+              label="지금 돌릴 수 있는 업체"
+              value={`${sum.ready.length}곳`}
+              hint="필요한 서류가 다 있는 곳"
+              tone={sum.ready.length > 0 ? 'success' : 'neutral'}
+            />
+            <MetricTile
+              label="서류가 빠진 업체"
+              value={`${sum.gaps.length}곳`}
+              hint="받아야 할 서류가 있다"
+              tone={sum.gaps.length > 0 ? 'warning' : 'neutral'}
+            />
+            <MetricTile
+              label="이 모듈이 만든 기한"
+              value={`${upcoming.length}건`}
+              hint={overdue.length > 0 ? `지난 것 ${overdue.length}건` : '30일 안'}
+              tone={overdue.length > 0 ? 'danger' : upcoming.length > 0 ? 'warning' : 'neutral'}
+            />
           </div>
-        </Section>
-      )}
 
-      {sum.results.length > 0 && (
-        <Section title="최근 결과" count={sum.results.length}>
-          <ul className="flex flex-col gap-2" data-testid="module-results">
-            {sum.results.slice(0, 6).map(({ clientId, clientName, result }) => (
-              <li key={result.id}>
-                <Surface as="div" padded={false}>
-                  <Link to={`/ops/clients/${clientId}`} className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
-                    <span className="t-sub font-bold text-slate-900">{clientName}</span>
-                    <span className="t-sub min-w-0 flex-1 break-keep text-slate-600">{result.title}</span>
-                    {result.verdictLabel && <Badge tone="neutral">{result.verdictLabel}</Badge>}
-                    <span className="t-meta text-slate-400">{result.createdAt.slice(0, 10)}</span>
+          {sum.dues.length > 0 && (
+            <Section title="이 모듈이 잡아 둔 기한" count={sum.dues.length}>
+              <ul className="flex flex-col gap-2" data-testid="module-dues">
+                {sum.dues.slice(0, 8).map((d, i) => {
+                  const tone = dueTone(d.daysLeft)
+                  return (
+                    <li key={`${d.clientId}-${d.date}-${i}`}>
+                      <Surface as="div" edge={tone.tone} showEdge padded={false}>
+                        <Link
+                          to={`/ops/clients/${d.clientId}`}
+                          className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5"
+                        >
+                          <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                          <span className="t-sub font-bold text-slate-900">{d.clientName}</span>
+                          <span className="t-sub min-w-[10rem] flex-1 break-keep text-slate-600">{d.title}</span>
+                          <span className="t-meta text-slate-400">{d.date}</span>
+                          <Badge tone={tone.tone}>{tone.text}</Badge>
+                        </Link>
+                      </Surface>
+                    </li>
+                  )
+                })}
+              </ul>
+            </Section>
+          )}
+
+          {sum.gaps.length > 0 && (
+            <Section title="서류부터 받아야 하는 업체" count={sum.gaps.length}>
+              <ul className="flex flex-col gap-2" data-testid="module-gaps">
+                {sum.gaps.slice(0, phone ? 4 : 8).map((g) => (
+                  <li key={g.clientId}>
+                    <Surface as="div" edge="warning" showEdge padded={false}>
+                      <Link
+                        to={`/ops/clients/${g.clientId}?tab=docs`}
+                        className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5"
+                      >
+                        <FileWarning aria-hidden="true" className="size-4 shrink-0 text-amber-500" />
+                        <span className="t-sub font-bold text-slate-900">{g.clientName}</span>
+                        <span className="t-sub min-w-[10rem] flex-1 break-keep text-amber-700">{g.missing.join(' · ')} 없음</span>
+                        <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+                      </Link>
+                    </Surface>
+                  </li>
+                ))}
+              </ul>
+              {sum.gaps.length > (phone ? 4 : 8) && (
+                <Link to="/ops/clients" className="tap t-sub mt-1 inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="module-gaps-more">
+                  그 밖에 {sum.gaps.length - (phone ? 4 : 8)}곳 — 고객 관리에서 보기 →
+                </Link>
+              )}
+            </Section>
+          )}
+
+          {sum.ready.length > 0 && (
+            <Section title="이 업체로 바로 열기" count={sum.ready.length}>
+              <div className="flex flex-wrap gap-2" data-testid="module-ready">
+                {sum.ready.slice(0, 12).map((c) => (
+                  <Link
+                    key={c.id}
+                    to={`${basePath}?client=${c.id}`}
+                    data-client={c.id}
+                    className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 t-sub font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <Building2 aria-hidden="true" className="size-4 text-slate-400" />
+                    {c.companyName}
                   </Link>
-                </Surface>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+                ))}
+              </div>
+            </Section>
+          )}
 
-      {sum.clients.length > 0 && sum.results.length === 0 && (
-        <Surface edge="neutral">
-          <p className="t-sub flex flex-wrap items-center gap-2 break-keep text-slate-600">
-            <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-            아직 이 모듈로 만든 결과가 없습니다. 목차에서 화면을 골라 돌리면, 결과와 기한이 업체 기록과 달력으로 갑니다.
-          </p>
-        </Surface>
+          {sum.results.length > 0 && (
+            <Section title="최근 결과" count={sum.results.length}>
+              <ul className="flex flex-col gap-2" data-testid="module-results">
+                {sum.results.slice(0, 6).map(({ clientId, clientName, result }) => (
+                  <li key={result.id}>
+                    <Surface as="div" padded={false}>
+                      <Link to={`/ops/clients/${clientId}`} className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                        <span className="t-sub font-bold text-slate-900">{clientName}</span>
+                        <span className="t-sub min-w-0 flex-1 break-keep text-slate-600">{result.title}</span>
+                        {result.verdictLabel && <Badge tone="neutral">{result.verdictLabel}</Badge>}
+                        <span className="t-meta text-slate-400">{result.createdAt.slice(0, 10)}</span>
+                      </Link>
+                    </Surface>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+
+          {sum.clients.length > 0 && sum.results.length === 0 && (
+            <Surface edge="neutral">
+              <p className="t-sub flex flex-wrap items-center gap-2 break-keep text-slate-600">
+                <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                아직 이 모듈로 만든 결과가 없습니다. 목차에서 화면을 골라 돌리면, 결과와 기한이 업체 기록과 달력으로 갑니다.
+              </p>
+            </Surface>
+          )}
+        </Fold>
       )}
     </div>
   )
