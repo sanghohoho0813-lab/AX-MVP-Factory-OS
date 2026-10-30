@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
+import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile, Surface } from '../../components/ui/primitives'
@@ -55,7 +55,7 @@ import {
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
-import { Fold, HelpHeading, HintTip, openFold } from '../../components/ui/fold'
+import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
 import { exampleText } from '../../services/marketing/shorts'
@@ -231,6 +231,14 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   const fmt = draft.format ? formatOf(draft.format) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ShortDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
+  /** D-364 📐 한 단계씩 — 대본이 아직 없으면 2단계는 한 줄 + [직접 쓰기](스레드 화면과 같다) */
+  const [editorAll] = useFold('sht.editor', false)
+  const [handOpen, setHandOpen] = useState(false)
+  const hasScript = !!draft.script.trim()
+  useEffect(() => {
+    if (hasScript) setHandOpen(true)
+  }, [hasScript])
+  const editorOpen = editorAll || handOpen || hasScript
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags, facts: factsText }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags, factsText])
   const mix = weekMix(store.posts, today)
@@ -331,6 +339,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
       if (posted) {
         setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim }))
         setAi({ busy: false, error: '', drafts: [] })
+        setHandOpen(false)
         showToast('기록표에 올렸어요 — 하루 이틀 뒤 숫자를 적어 주세요.')
         onRecords()
       } else {
@@ -508,6 +517,17 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         </ToneSection>
       </Fold>
 
+      {!editorOpen ? (
+        <Surface className="flex flex-col gap-2">
+          <div id="sht-editor" className="scroll-mt-24" data-testid="sht-editor-closed">
+            <StepTitle n="2">고치고 확인하기</StepTitle>
+          </div>
+          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · 해시태그를 바로 검사해요.</p>
+          <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
+            <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
+          </Button>
+        </Surface>
+      ) : (
       <Surface className="flex flex-col gap-3">
         <div id="sht-editor" className="scroll-mt-24">
           <StepTitle n="2">고치고 확인하기</StepTitle>
@@ -564,7 +584,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                   </Button>
                 </>
               )}
-              <Button variant="ghost" onClick={() => (draft.script.trim() && !window.confirm('지금 대본을 비우고 새로 만들까요?') ? undefined : (setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim })), setAi({ busy: false, error: '', drafts: [] })))} data-testid="sht-new">
+              <Button variant="ghost" onClick={() => (draft.script.trim() && !window.confirm('지금 대본을 비우고 새로 만들까요?') ? undefined : (setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim })), setAi({ busy: false, error: '', drafts: [] }), setHandOpen(false)))} data-testid="sht-new">
                 새로
               </Button>
             </div>
@@ -588,6 +608,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           </div>
         </div>
       </Surface>
+      )}
     </div>
   )
 }

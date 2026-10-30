@@ -882,6 +882,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           today={today}
           workspaceId={workspaceId}
           onUpload={openUpload}
+          onCommitQuiet={commit}
           onRequestText={(text, meta) =>
           setMessage({
             title: meta?.title ?? '받을 자료 요청 문구',

@@ -8,7 +8,8 @@ import { createPortal } from 'react-dom'
 import { Copy, Printer } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { Insight, InsightTone } from '../../services/clientInsights'
-import { buildDiagnosis, diagnosisKakao, type DiagnosisLine, type DiagnosisSheet } from '../../services/clientDiagnosis'
+import { buildDiagnosis, diagnosisKakao, givenOf, sinceLines, withDiagnosisGiven, type DiagnosisLine, type DiagnosisSheet } from '../../services/clientDiagnosis'
+import { localDateOf, nowIso } from '../../lib/appClock'
 import { useSenderLine } from '../layout/useCurrentUser'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -49,6 +50,30 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
             </div>
           ))}
         </dl>
+      )}
+
+      {d.since && sinceLines(d.since).length > 0 && (
+        <>
+          <H>{`지난 진단(${ymd(d.since.date)}) 뒤 달라진 것`}</H>
+          <ul className="flex flex-col gap-1" data-testid="diagnosis-since">
+            {d.since.changed.map((c) => (
+              <li key={c.key} className="avoid-break text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]" data-better={c.better ? '1' : '0'}>
+                <span aria-hidden="true" className={c.better ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
+                  {c.better ? '▲ ' : '▼ '}
+                </span>
+                <b>{c.label}</b> — {c.from} → <b>{c.to}</b>
+              </li>
+            ))}
+            {d.since.received.length > 0 && (
+              <li className="avoid-break text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]">
+                <span aria-hidden="true" className="font-bold text-emerald-700">
+                  ✓{' '}
+                </span>
+                받은 자료: {d.since.received.join(' · ')}
+              </li>
+            )}
+          </ul>
+        </>
       )}
 
       <H>먼저 제안드리는 것</H>
@@ -135,10 +160,28 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
   )
 }
 
-export function ClientDiagnosisSheet({ record, insights, today, onClose }: { record: ClientOpsRecord; insights: readonly Insight[]; today: string; onClose: () => void }) {
+export function ClientDiagnosisSheet({
+  record,
+  insights,
+  today,
+  onClose,
+  onGiven,
+}: {
+  record: ClientOpsRecord
+  insights: readonly Insight[]
+  today: string
+  onClose: () => void
+  /** D-363 인쇄 · 카톡 요약을 누르면 '드린 기록' 을 업체 기록에 남긴다(알림 없이 저장 — 실패하면 false) */
+  onGiven?: (next: ClientOpsRecord) => Promise<boolean>
+}) {
   const sender = useSenderLine()
   const { showToast } = useToast()
   const d = useMemo(() => buildDiagnosis(record, insights, today), [record, insights, today])
+  const last = record.diagnosisGiven?.[0]
+  const lastDate = last ? localDateOf(last.at) : ''
+  const howName = (h: 'print' | 'kakao') => (h === 'print' ? '인쇄 · PDF' : '카톡 요약')
+  /** 드린 기록 — 저장이 안 돼도 진단서는 그대로(인쇄 · 복사는 막지 않는다) */
+  const recordGiven = async (how: 'print' | 'kakao') => (onGiven ? onGiven(withDiagnosisGiven(record, givenOf(d, how, nowIso()))).catch(() => false) : true)
   return (
     <>
       <Modal
@@ -148,10 +191,26 @@ export function ClientDiagnosisSheet({ record, insights, today, onClose }: { rec
         onClose={onClose}
         footer={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="secondary" data-testid="diagnosis-kakao" onClick={async () => showToast((await copyText(diagnosisKakao(d, sender))) ? '진단 요약을 복사했어요 — 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')}>
+            <Button
+              variant="secondary"
+              data-testid="diagnosis-kakao"
+              onClick={async () => {
+                if (!(await copyText(diagnosisKakao(d, sender)))) return showToast('복사하지 못했어요 — 다시 눌러 주세요')
+                const kept = await recordGiven('kakao')
+                showToast(kept ? '진단 요약을 복사했어요 — 카톡에 붙여 넣으세요 · 드린 기록도 남겼어요' : '진단 요약을 복사했어요 — 드린 기록은 남기지 못했어요(다시 누르면 다시 남겨요)')
+              }}
+            >
               <Copy aria-hidden="true" className="size-4" /> 카톡 요약
             </Button>
-            <Button variant="primary" data-testid="diagnosis-print-button" onClick={() => window.print()}>
+            <Button
+              variant="primary"
+              data-testid="diagnosis-print-button"
+              onClick={async () => {
+                const kept = await recordGiven('print')
+                if (!kept) showToast('드린 기록은 남기지 못했어요 — 인쇄는 그대로 할 수 있어요')
+                window.print()
+              }}
+            >
               <Printer aria-hidden="true" className="size-4" /> 인쇄 · PDF로 저장
             </Button>
           </div>
@@ -159,6 +218,14 @@ export function ClientDiagnosisSheet({ record, insights, today, onClose }: { rec
       >
         <div className="flex flex-col gap-3">
           <p className="t-sub break-keep text-slate-600">대표님께 드리는 종이예요 — 맞춤 추천 판정 그대로 · 수수료 · 영업자 · 메모 · 업무 일기는 들어가지 않아요.</p>
+          {/* D-363 언제 무엇을 드렸나 — 화면에만(종이에는 '달라진 것' 만) */}
+          <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 break-keep text-slate-700" data-testid="diagnosis-given-note" data-state={!last ? 'first' : lastDate === today ? 'today' : 'before'}>
+            {!last
+              ? '처음 드리는 진단서예요 — [인쇄] 나 [카톡 요약] 을 누르면 드린 날 · 판정이 업체 기록에 남고, 다음에 열면 그 뒤 달라진 것이 종이에 들어가요.'
+              : lastDate === today
+                ? `오늘 이미 드렸어요(${howName(last.how)}) — ${d.since ? `종이의 '달라진 것' 은 ${ymd(d.since.date)} 진단과 견준 거예요.` : '다음에 다시 열면 오늘 판정과 견줘요.'}`
+                : `지난번 ${ymd(lastDate)} 에 드렸어요(${howName(last.how)}) — ${sinceLines(d.since).length ? '그 뒤 달라진 것을 종이에 넣었어요.' : '그 뒤 판정 · 요청 자료는 그대로예요.'}`}
+          </p>
           <div className="rounded-(--radius-control) border border-slate-200 bg-white p-4">
             <DiagnosisDocument d={d} sender={sender} />
           </div>

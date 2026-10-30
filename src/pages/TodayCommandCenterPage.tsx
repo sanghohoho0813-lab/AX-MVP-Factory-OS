@@ -695,7 +695,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             tour="home-upcoming"
             testId="today-agenda"
             // D-357 첫 화면은 단순하게 — 접힌 채로 숫자만(밀린 것 · 오늘 약속은 위 할 일 칸에 이미 있다)
-            summary={agenda.length ? `2주 안 ${agenda.length}건 — 누르면 날짜 순으로` : '2주 안에 잡힌 마감 · 약속 없음'}
+            // D-365 접혀 있어도 돈 숫자는 한 줄에(안의 '못 받은 내 돈 · 미수금' 칸과 같은 숫자)
+            summary={`${agenda.length ? `2주 안 ${agenda.length}건 — 누르면 날짜 순으로` : '2주 안에 잡힌 마감 · 약속 없음'}${money.scheduled.total + money.overdue.total > 0 ? ` · ${moneyWords.unpaid} ${krwTile(money.scheduled.total + money.overdue.total)}${money.overdue.count > 0 ? `(연체 ${money.overdue.count}건)` : ''}` : ''}`}
             icon={<SectionChip icon={CalendarClock} accent="urgent" />}
             count={agenda.length}
             countTone={agenda.length > 0 ? 'danger' : 'neutral'}

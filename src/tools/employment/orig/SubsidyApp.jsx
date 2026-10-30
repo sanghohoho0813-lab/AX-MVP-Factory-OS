@@ -5916,7 +5916,8 @@ function BeginnerSubsidyGuide(){
 // 첫 사용자가 "무엇부터, 왜 쓰는지"를 바로 이해하도록 돕는다.
 function StarterGuide(props){
   var stHidden=useState(function(){return guideHidden("dashboard");});
-  var stOpen=useState(true); // 기본 펼침 — 첫 화면에서 가장 먼저 보이게
+  // [D-362] 📐 첫 화면은 단순하게 — 처음엔 1 → 2 → 3 → 4 한 줄 도식(누르면 그 단계로) · [자세히] 로 예전 큰 안내
+  var stOpen=useState(false);
   if(stHidden[0])return null;
   function hideForDay(){guideHideForDay("dashboard");stHidden[1](true);}
   var steps=[
@@ -5926,16 +5927,25 @@ function StarterGuide(props){
     {n:4,emoji:"📄",title:"고객 보고서로 상담",desc:"대표님에게 보여줄 상담 자료와 보고서를 만듭니다.",cta:"고객 보고서 보기",on:props.onReport,tint:"#E5F7ED",bd:"#B6E9CA",c:"#059669"},
   ];
 
-  // ── 접힘: 크고 클릭하고 싶은 CTA 카드 ──
+  // ── 접힘: 한 줄 도식 — 단계마다 누르면 그 화면 ──
   if(!stOpen[0]){
     return(
-      <div className="fade-in" style={{display:"flex",alignItems:"center",gap:16,background:"linear-gradient(135deg,var(--color-brand-50),#FFFFFF)",border:"1px solid var(--color-brand-100)",borderRadius:"var(--radius-panel)",padding:"20px 24px",marginBottom:22,boxShadow:"0 2px 10px color-mix(in srgb, var(--color-brand-600) 6%, transparent)"}}>
-        <span style={{fontSize:34,flexShrink:0,lineHeight:1}}>👋</span>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:19,fontWeight:800,color:"#0F172A",letterSpacing:"-0.4px",lineHeight:1.3,wordBreak:"keep-all"}}>처음 오셨나요? 고용지원금 관리는 이렇게 시작하세요</div>
-          <div style={{fontSize:14.5,color:"#64748B",marginTop:5,lineHeight:1.5,wordBreak:"keep-all"}}>기존 엑셀 불러오기부터 고객 보고서 활용까지 한 번에 안내해드립니다.</div>
+      <div className="fade-in" data-testid="emp-guide-mini" style={{background:"linear-gradient(135deg,var(--color-brand-50),#FFFFFF)",border:"1px solid var(--color-brand-100)",borderRadius:"var(--radius-panel)",padding:"14px 16px",marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:10}}>
+          <div style={{fontSize:15.5,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px",wordBreak:"keep-all"}}>👋 이렇게 써요 — 단계를 누르면 그 화면으로</div>
+          <button className="prog-tap" style={btnSm} onClick={function(){stOpen[1](true);}} data-testid="emp-guide-more">자세히 ▼</button>
         </div>
-        <button className="prog-tap" onClick={function(){stOpen[1](true);}} style={{flexShrink:0,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:11,padding:"13px 24px",fontSize:15.5,fontWeight:800,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 28%, transparent)",whiteSpace:"nowrap"}}>가이드 보기 →</button>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8}}>
+          {steps.map(function(s){
+            return(
+              <button key={s.n} type="button" className="prog-tap" onClick={s.on} data-testid="emp-guide-step" data-step={s.n} style={{display:"flex",alignItems:"center",gap:8,minWidth:0,minHeight:44,background:"#fff",border:"1px solid "+s.bd,borderRadius:12,padding:"9px 12px",textAlign:"left",cursor:"pointer",fontFamily:FF}}>
+                <span style={{width:24,height:24,borderRadius:8,background:s.tint,color:s.c,fontWeight:800,fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.n}</span>
+                <span aria-hidden="true" style={{fontSize:18,lineHeight:1,flexShrink:0}}>{s.emoji}</span>
+                <span style={{fontSize:14.5,fontWeight:700,color:"#0F172A",lineHeight:1.3,wordBreak:"keep-all",minWidth:0}}>{s.title}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -7230,11 +7240,13 @@ export default function SubsidyApp(props){
           )}
 
           {companies.length===0&&(
-            <div data-testid="emp-empty" style={{background:"#F8FAFC",border:"2px dashed var(--color-brand-200)",borderRadius:"var(--radius-panel)",padding:"36px 28px",marginBottom:32,textAlign:"center"}}>
-              <div style={{fontSize:44,marginBottom:12}}>🏢</div>
-              <h3 style={{margin:"0 0 10px",fontSize:22,fontWeight:800,color:"#0F172A"}}>고용지원금으로 관리할 업체를 고르세요</h3>
-              <p style={{margin:"0 0 22px",fontSize:15,color:"#475569",lineHeight:1.8}}>업체는 고객 관리에만 있습니다. 여기서는 그 가운데 고용지원금을 진행할 업체를 고릅니다.<br/>고른 업체에 직원을 넣으면 회차·서류·수수료·보고서가 원본 그대로 이어집니다.</p>
-              <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
+            <div data-testid="emp-empty" style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",background:"#F8FAFC",border:"2px dashed var(--color-brand-200)",borderRadius:"var(--radius-panel)",padding:"16px 18px",marginBottom:20}}>{/* [D-362] 한 줄 크기로 — 예전 큰 빈 화면(아이콘 · 두 줄 설명)은 첫 화면을 한 뼘 넘게 차지했다 */}
+              <div aria-hidden="true" style={{fontSize:30,lineHeight:1,flexShrink:0}}>🏢</div>
+              <div style={{flex:"1 1 240px",minWidth:0}}>
+                <h3 style={{margin:0,fontSize:18,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>고용지원금으로 관리할 업체를 고르세요</h3>
+                <p style={{margin:"4px 0 0",fontSize:14,color:"#475569",lineHeight:1.6,wordBreak:"keep-all"}}>고객 관리에 있는 업체 가운데 고릅니다 — 직원을 넣으면 회차 · 서류 · 수수료 · 보고서가 이어져요.</p>
+              </div>
+              <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{flexShrink:0,minHeight:44,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"11px 22px",fontSize:15.5,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
             </div>
           )}
 

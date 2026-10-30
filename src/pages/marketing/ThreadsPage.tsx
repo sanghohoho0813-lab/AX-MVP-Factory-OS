@@ -22,7 +22,7 @@ import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection, chip } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
-import { Fold, HelpHeading, HintTip, openFold } from '../../components/ui/fold'
+import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist, type AssistAnswer } from '../../services/aiAssist/client'
@@ -299,6 +299,17 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   const hotKeys = new Set((weekRef?.items ?? []).map((x) => x.template))
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
+  /**
+   * D-364 📐 한 단계씩 — 글이 아직 없으면 2단계(글 칸 · 규칙 검사)는 한 줄 + [직접 쓰기].
+   * AI · 예시 · 빈 틀 · 기록표에서 연 글이 들어오면 펼치고, 쓰는 동안(글을 다 지워도) 접지 않는다. [모두 펼치기] 면 처음부터 펼침.
+   */
+  const [editorAll] = useFold('thr.editor', false)
+  const [handOpen, setHandOpen] = useState(false)
+  const hasBody = !!draft.body.trim()
+  useEffect(() => {
+    if (hasBody) setHandOpen(true)
+  }, [hasBody])
+  const editorOpen = editorAll || handOpen || hasBody
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today, factsText])
   const set = (part: Partial<Draft>) => setDraft((d) => ({ ...d, ...part }))
@@ -392,6 +403,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
       if (posted) {
         setDraft(() => ({ ...EMPTY_DRAFT }))
         setAi({ busy: false, error: '', drafts: [] })
+        setHandOpen(false)
         showToast('기록표에 올렸어요 — 하루 이틀 뒤 숫자를 적어 주세요.')
         onRecords()
       } else {
@@ -623,6 +635,17 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         </details>
       </Fold>
 
+      {!editorOpen ? (
+        <Surface className="flex flex-col gap-2">
+          <div id="thr-editor" className="scroll-mt-24" data-testid="thr-editor-closed">
+            <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
+          </div>
+          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요.</p>
+          <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus(), 0))} data-testid="thr-hand">
+            <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
+          </Button>
+        </Surface>
+      ) : (
       <Surface className="flex flex-col gap-3">
         <div id="thr-editor" className="scroll-mt-24">
           <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
@@ -671,7 +694,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                   </Button>
                 </>
               )}
-              <Button variant="ghost" onClick={() => (draft.body.trim() && !window.confirm('지금 글을 비우고 새로 쓸까요?') ? undefined : (setDraft(() => ({ ...EMPTY_DRAFT })), setAi({ busy: false, error: '', drafts: [] })))} data-testid="thr-new">
+              <Button variant="ghost" onClick={() => (draft.body.trim() && !window.confirm('지금 글을 비우고 새로 쓸까요?') ? undefined : (setDraft(() => ({ ...EMPTY_DRAFT })), setAi({ busy: false, error: '', drafts: [] }), setHandOpen(false)))} data-testid="thr-new">
                 새 글
               </Button>
             </div>
@@ -704,6 +727,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           </div>
         </div>
       </Surface>
+      )}
     </div>
   )
 }

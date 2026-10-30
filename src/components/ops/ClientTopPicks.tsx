@@ -164,6 +164,7 @@ export default function ClientTopPicks({
   onUpload,
   onShowAll,
   onRequestText,
+  onCommitQuiet,
 }: {
   record: ClientOpsRecord
   today: string
@@ -171,6 +172,8 @@ export default function ClientTopPicks({
   onUpload: () => void
   onShowAll: () => void
   onRequestText?: (text: string, meta?: { title: string; description: string }) => void
+  /** D-363 진단서를 드리면 드린 기록을 알림 없이 저장 */
+  onCommitQuiet?: (next: ClientOpsRecord) => Promise<boolean>
 }) {
   const { ent } = useEntitlements()
   const notices = useGrantNotices(workspaceId)
@@ -180,7 +183,7 @@ export default function ClientTopPicks({
   const [diag, setDiag] = useState(false)
   return (
     <>
-      {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} />}
+      {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}
       <TopPicksCard
         insights={insights}
         onUpload={onUpload}

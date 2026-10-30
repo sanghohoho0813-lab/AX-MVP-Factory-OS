@@ -8,7 +8,9 @@
  *  - 고객에게 드리는 종이 — 수수료 · 영업자 · 메모 · 업무 일기 · 내부 표시(★ 같은) · 화면 안내 말('올리면 · 판정해요')은 넣지 않는다.
  *  - 금액은 엔진이 이미 계산한 것만(짐작하지 않음). 규칙 계산이다 — 외부 호출 · LLM 0. 선정 · 승인을 보장하지 않는다.
  */
-import type { ClientOpsRecord } from '../types/clientOps'
+import type { ClientOpsRecord, DiagnosisGiven } from '../types/clientOps'
+import { localDateOf } from '../lib/appClock'
+import { withActivity } from './clientOpsActivity'
 import { clientFacts } from '../tools/shared/clientPrefill'
 import { regionOf } from './clientOpsProfile'
 import { isPick, manwonText, topPicks, type Insight, type InsightTone } from './clientInsights'
@@ -26,9 +28,22 @@ export interface DiagnosisLine {
   amount: string
 }
 
+/** D-363 지난번 드린 진단서 뒤 달라진 것(고객 종이 · 화면 같은 내용) */
+export interface DiagnosisSince {
+  /** 지난번 드린 날 YYYY-MM-DD */
+  date: string
+  how: DiagnosisGiven['how']
+  /** 판정이 바뀐 모듈 */
+  changed: { key: string; label: string; from: string; to: string; better: boolean }[]
+  /** 그때 요청했고 지금은 더 필요 없는 자료(받은 자료) */
+  received: string[]
+}
+
 export interface DiagnosisSheet {
   companyName: string
   today: string
+  /** D-363 지난번(오늘 전) 드린 진단서와 견준 것 — 처음이면 null */
+  since: DiagnosisSince | null
   /** 회사 한눈에 — 확인된 것만(모르면 칸을 빼서 비어 보이지 않게) */
   snapshot: { label: string; value: string }[]
   picks: DiagnosisLine[]
@@ -71,6 +86,56 @@ function lineOf(i: Insight): DiagnosisLine {
 
 const won = (n: number) => manwonText(n)
 
+/** 판정이 나아졌는지 — 가능성 높음 > 검토해 볼 만함 · 분석 있음 > 자료 필요 > 지금은 어려움 */
+const RANK: Record<string, number> = { good: 3, maybe: 2, done: 2, need: 1, no: 0 }
+const toneName = (t: string) => SHEET_TONE[t as InsightTone] ?? t
+
+/** D-363 오늘 전에 드린 가장 최근 진단서와 견준다 — 바뀐 판정 · 받은 자료. 처음이면 null */
+export function diagnosisSince(given: readonly DiagnosisGiven[] | undefined, lines: readonly DiagnosisLine[], requests: readonly { label: string }[], today: string): DiagnosisSince | null {
+  const prev = (given ?? []).find((g) => localDateOf(g.at) && localDateOf(g.at) < today)
+  if (!prev) return null
+  const before = new Map(prev.lines.map((l) => [l.key, l]))
+  const changed: DiagnosisSince['changed'] = []
+  for (const l of lines) {
+    const b = before.get(l.key)
+    if (!b || b.tone === l.tone) continue
+    changed.push({ key: l.key, label: l.label, from: toneName(b.tone), to: l.toneLabel, better: (RANK[l.tone] ?? 0) > (RANK[b.tone] ?? 0) })
+  }
+  changed.sort((a, b) => Number(b.better) - Number(a.better))
+  const still = new Set(requests.map((r) => r.label))
+  const received = prev.requests.filter((r) => !still.has(r))
+  return { date: localDateOf(prev.at), how: prev.how, changed, received }
+}
+
+/** D-363 진단서를 드린 기록 한 건(그때 판정 · 요청 자료) */
+export function givenOf(d: DiagnosisSheet, how: DiagnosisGiven['how'], at: string): DiagnosisGiven {
+  return {
+    id: `dg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    at,
+    how,
+    lines: [...d.picks.map((l) => ({ key: l.key, label: l.label, tone: l.tone, pick: true })), ...d.others.map((l) => ({ key: l.key, label: l.label, tone: l.tone, pick: false }))],
+    requests: d.requests.map((r) => r.label),
+  }
+}
+
+/**
+ * D-363 드린 기록을 맨 앞에(최근 5번) + 활동 기록 한 줄. 같은 날 같은 방법으로 또 누르면 그 줄만 바꾼다(두 번 눌러도 한 줄).
+ */
+export function withDiagnosisGiven(record: ClientOpsRecord, given: DiagnosisGiven): ClientOpsRecord {
+  const prev = record.diagnosisGiven ?? []
+  const same = !!prev[0] && localDateOf(prev[0].at) === localDateOf(given.at) && prev[0].how === given.how
+  const next = { ...record, diagnosisGiven: [given, ...(same ? prev.slice(1) : prev)].slice(0, 5) }
+  if (same) return next
+  const picks = given.lines.filter((l) => l.pick).map((l) => l.label)
+  return withActivity(
+    next,
+    'tool',
+    `맞춤 진단서 드림(${given.how === 'print' ? '인쇄 · PDF' : '카톡 요약'})${picks.length ? ` — 먼저 제안: ${picks.join(' · ')}` : ''}${given.requests.length ? ` · 요청한 자료 ${given.requests.length}가지` : ''}`,
+    null,
+    given.at,
+  )
+}
+
 export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insight[], today: string): DiagnosisSheet {
   const facts = clientFacts(record, new Date(`${today}T00:00:00`))
   const snapshot: { label: string; value: string }[] = []
@@ -104,6 +169,7 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   return {
     companyName: record.companyName || facts.companyName || '대표님 회사',
     today,
+    since: diagnosisSince(record.diagnosisGiven, [...picks, ...others], requests, today),
     snapshot,
     picks,
     others,
@@ -117,9 +183,21 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   }
 }
 
+/** D-363 '달라진 것' 한 줄씩 — 종이 · 카톡 같은 말 */
+export function sinceLines(since: DiagnosisSince | null): string[] {
+  if (!since) return []
+  const out = since.changed.map((c) => `${c.label}: ${c.from} → ${c.to}`)
+  if (since.received.length) out.push(`받은 자료: ${since.received.join(' · ')}`)
+  return out
+}
+
 /** 카톡 요약 — 먼저 제안할 것 · 받을 자료 · 다음 순서(짧게) */
 export function diagnosisKakao(d: DiagnosisSheet, sender = ''): string {
   const out: string[] = [`[${d.companyName}] 맞춤 진단 요약 (${d.today})`, '']
+  const since = sinceLines(d.since)
+  if (since.length) {
+    out.push(`■ 지난 진단(${d.since?.date}) 뒤 달라진 것`, ...since.map((x) => `- ${x}`), '')
+  }
   if (d.picks.length) {
     out.push('■ 먼저 제안드릴 것')
     d.picks.forEach((p, i) => out.push(`${i + 1}. ${p.label} — ${p.text}${p.amount ? ` (${p.amount})` : ''}`))

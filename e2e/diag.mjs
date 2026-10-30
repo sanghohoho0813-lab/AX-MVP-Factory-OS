@@ -96,7 +96,37 @@ await page.getByTestId('diagnosis-kakao').click()
 await page.waitForTimeout(300)
 const kt = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
 check('D6 [카톡 요약] — 회사 이름 · 먼저 제안드릴 것 · PDF 안내', kt.includes('맞춤 진단 요약') && kt.includes('■ 먼저 제안드릴 것') && kt.includes('PDF'), kt.slice(0, 300))
+// D-363 드린 기록 — [카톡 요약] 을 누르면 업체 기록에 남고, 창은 '오늘 이미 드렸어요'
+const hansol = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'))
+await page.waitForFunction(() => (JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol')?.diagnosisGiven ?? []).length > 0, null, { timeout: 5000 }).catch(() => {})
+const r1 = await hansol()
+const g1 = r1?.diagnosisGiven ?? []
+check('D8 [카톡 요약] → 드린 기록(카톡 · 그때 판정 · 먼저 제안) · 활동 기록 "맞춤 진단서 드림(카톡 요약) — 먼저 제안: …" · 창에 "오늘 이미 드렸어요"', g1.length === 1 && g1[0].how === 'kakao' && g1[0].lines.filter((l) => l.pick).map((l) => l.key).join() === pickKeys.join() && String(r1?.activity?.[0]?.text ?? '').startsWith('맞춤 진단서 드림(카톡 요약) — 먼저 제안:') && (await page.getByTestId('diagnosis-given-note').getAttribute('data-state')) === 'today', { g1, act: r1?.activity?.[0]?.text })
+await page.getByTestId('diagnosis-kakao').click()
+await page.waitForTimeout(600)
+check('D9 같은 날 또 눌러도 기록 한 줄', ((await hansol())?.diagnosisGiven ?? []).length === 1 && ((await hansol())?.activity ?? []).filter((a) => String(a.text).startsWith('맞춤 진단서 드림')).length === 1)
 await shot(page, 'D-diagnosis')
+await page.keyboard.press('Escape')
+// 열흘 전에 드렸고, 그때는 첫 제안 모듈이 '자료 필요' · '가짜 자료 X' 를 요청했다고 바꿔 두고 다시 연다
+await page.evaluate((first) => {
+  const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+  const r = all.find((x) => x.id === 'cli_hansol')
+  const g = r.diagnosisGiven[0]
+  g.at = new Date(Date.now() - 10 * 86400000).toISOString()
+  g.lines = g.lines.map((l) => (l.key === first ? { ...l, tone: 'need' } : l))
+  g.requests = [...g.requests, '가짜 자료 X']
+  localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+}, pickKeys[0])
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('top-picks-diagnosis').click()
+await doc.waitFor({ timeout: 5000 })
+const since = (await doc.getByTestId('diagnosis-since').innerText().catch(() => '')) ?? ''
+await page.getByTestId('diagnosis-kakao').click()
+await page.waitForTimeout(400)
+const kt2 = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
+check('D10 다음에 열면 — 종이에 "지난 진단(날짜) 뒤 달라진 것": ▲ 첫 제안 모듈 자료 필요 → 지금 판정 · 받은 자료: 가짜 자료 X · 창 "지난번 … 드렸어요" · 카톡 요약에도', /자료 필요 → /.test(since) && since.includes('받은 자료: 가짜 자료 X') && (await doc.getByTestId('diagnosis-since').locator('li[data-better="1"]').count()) >= 1 && (await doc.innerText()).includes('뒤 달라진 것') && kt2.includes('뒤 달라진 것') && kt2.includes('받은 자료: 가짜 자료 X'), { since, kt2: kt2.slice(0, 300) })
+check('D11 오류 0', errors.length === 0, errors)
+await shot(page, 'D-since')
 await page.keyboard.press('Escape')
 await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
 await page.getByTestId('smart-tab').waitFor({ timeout: 8000 })

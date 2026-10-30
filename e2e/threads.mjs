@@ -400,6 +400,35 @@ await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/ai.*
 
 check('R2 PC — JS 오류 0', errors.length === 0, errors)
 
+/* ---------------- D-364 한 단계씩 — 글이 없으면 2단계는 한 줄([모두 펼치기] 를 지운 처음 그대로) ---------------- */
+await page.evaluate(() => {
+  localStorage.removeItem('axmvp.fold.all')
+  localStorage.removeItem('axmvp.fold.thr.editor')
+  localStorage.removeItem('axmvp.fold.sht.editor')
+})
+await page.goto(`${BASE}/marketing/threads`, { waitUntil: 'networkidle' })
+await page.getByTestId('thr-page').waitFor({ timeout: 15000 })
+if ((await page.getByTestId('thr-body').count()) && (await page.getByTestId('thr-body').inputValue()).trim()) await page.getByTestId('thr-new').click()
+await page.waitForTimeout(300)
+check('E1 스레드 — 글이 없으면 2단계 "고치기 · 규칙 검사" 는 한 줄 + [직접 쓰기](글 칸 · 규칙 검사 안 보임)', (await page.getByTestId('thr-editor-closed').count()) === 1 && (await page.getByTestId('thr-body').count()) === 0 && (await page.getByTestId('thr-hand').count()) === 1)
+await page.getByTestId('thr-hand').click()
+await page.waitForTimeout(200)
+check('E2 [직접 쓰기] → 글 칸이 열리고 바로 적을 수 있음(커서)', (await page.getByTestId('thr-body').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'thr-body')
+await page.getByTestId('thr-body').fill('잠깐 적었다가')
+await page.getByTestId('thr-body').fill('')
+await page.waitForTimeout(200)
+check('E3 쓰다가 다 지워도 글 칸은 그대로(갑자기 접히지 않음)', (await page.getByTestId('thr-body').count()) === 1)
+await page.goto(`${BASE}/marketing/shorts`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+if ((await page.getByTestId('sht-script').count()) && (await page.getByTestId('sht-script').inputValue()).trim()) await page.getByTestId('sht-new').click()
+await page.waitForTimeout(300)
+check('E4 릴스 · 틱톡도 — 대본이 없으면 2단계 한 줄 + [직접 쓰기] → 대본 칸', (await page.getByTestId('sht-editor-closed').count()) === 1 && (await page.getByTestId('sht-script').count()) === 0)
+await page.getByTestId('sht-hand').click()
+await page.waitForTimeout(200)
+check('E5 [직접 쓰기] → 대본 칸 · 커서', (await page.getByTestId('sht-script').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'sht-script')
+await page.evaluate(() => localStorage.setItem('axmvp.fold.all', 'open'))
+check('E6 JS 오류 0', errors.length === 0, errors)
+
 /* ---------------- M 휴대폰 ---------------- */
 for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]) {
   const tag = `${w}${scale ? '-large' : ''}`

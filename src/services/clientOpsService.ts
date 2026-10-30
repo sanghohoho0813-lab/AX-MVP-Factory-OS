@@ -40,6 +40,7 @@ import type {
   ContractInfo,
   CustomDocument,
   CustomProfileField,
+  DiagnosisGiven,
   DocUploadLog,
   FactCandidate,
   ShareholderRelation,
@@ -415,6 +416,28 @@ function normalizeDocUploads(value: unknown): { docUploads?: DocUploadLog[] } {
   return out.length ? { docUploads: out } : {}
 }
 
+/** D-363 진단서 드린 기록 — 모양이 맞는 것만, 최근 5번 */
+export const DIAGNOSIS_GIVEN_LIMIT = 5
+function normalizeDiagnosisGiven(value: unknown): { diagnosisGiven?: DiagnosisGiven[] } {
+  if (!Array.isArray(value)) return {}
+  const str = (v: unknown, max = 80) => (typeof v === 'string' ? v.slice(0, max) : '')
+  const out: DiagnosisGiven[] = []
+  for (const raw of value.slice(0, DIAGNOSIS_GIVEN_LIMIT)) {
+    if (!raw || typeof raw !== 'object') continue
+    const v = raw as Record<string, unknown>
+    if (typeof v.id !== 'string' || typeof v.at !== 'string') continue
+    const lines = Array.isArray(v.lines)
+      ? v.lines
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && typeof (x as Record<string, unknown>).key === 'string')
+          .slice(0, 30)
+          .map((x) => ({ key: str(x.key), label: str(x.label), tone: str(x.tone, 10), pick: x.pick === true }))
+      : []
+    const requests = Array.isArray(v.requests) ? v.requests.filter((x): x is string => typeof x === 'string').slice(0, 30).map((x) => x.slice(0, 80)) : []
+    out.push({ id: v.id, at: v.at, how: v.how === 'kakao' ? 'kakao' : 'print', lines, requests })
+  }
+  return out.length ? { diagnosisGiven: out } : {}
+}
+
 /** D-183: 서류 올리기 기록을 맨 앞에 — 최근 5번만 */
 export function withDocUploadLog(record: ClientOpsRecord, log: DocUploadLog): ClientOpsRecord {
   return { ...record, docUploads: [log, ...(record.docUploads ?? []).filter((x) => x.id !== log.id)].slice(0, DOC_UPLOAD_LIMIT) }
@@ -568,6 +591,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     ...normalizeCare(value.care),
     ...normalizeDecided(value.decided),
     ...normalizeDocUploads(value.docUploads),
+    ...normalizeDiagnosisGiven(value.diagnosisGiven),
     // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
     ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     ...normalizeProvisional(value.provisional),

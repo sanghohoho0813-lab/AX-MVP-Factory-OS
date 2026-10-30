@@ -147,7 +147,7 @@ export default function ClientSmartTab({
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
-      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} />}
+      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} onGiven={onCommitQuiet} />}
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
       <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')

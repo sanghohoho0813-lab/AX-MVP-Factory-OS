@@ -219,6 +219,19 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   check('모듈 목차: 모르는 주소는 첫 화면으로', (await page.getByTestId('module-dashboard').count()) === 1)
 
+  // D-362 고용지원금 첫 화면 — 사용 흐름은 1 → 2 → 3 → 4 한 줄(누르면 그 화면) · [자세히] 로 예전 큰 안내
+  await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('D-362 고용지원금: 사용 흐름은 한 줄 도식 4단계(큰 안내는 접힘) · 빈 화면도 한 줄', (await page.getByTestId('emp-guide-step').count()) === 4 && (await page.getByTestId('emp-empty').count()) === 1 && !(await page.getByTestId('emp-orig').innerText()).includes('고용지원금 사용 흐름'))
+  await page.getByTestId('emp-guide-more').click()
+  await page.waitForTimeout(300)
+  check('D-362 [자세히] → 예전 큰 안내(사용 흐름 · 단계 설명 · 하루 동안 다시 보지 않기)', (await page.getByTestId('emp-orig').innerText()).includes('고용지원금 사용 흐름') && (await page.getByTestId('emp-orig').innerText()).includes('하루 동안 다시 보지 않기'))
+  await page.getByRole('button', { name: '가이드 접기 ▲' }).click()
+  await page.waitForTimeout(300)
+  await page.locator('[data-testid="emp-guide-step"][data-step="2"]').click()
+  await page.waitForTimeout(500)
+  check('D-362 단계(2 지원금 후보 확인)를 누르면 그 화면으로(주소도)', (await page.getByTestId('emp-guide-step').count()) === 0 && page.url().includes('/tools/employment/programs'), page.url())
+
   /* ---- D-93: 고용지원금 — 원본 고용지원금 Pro 화면 그대로 · 업체는 고객 운영 업체에서 고른다 ---- */
   await page.goto(BASE + '/tools/employment/companies', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
@@ -283,7 +296,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('대시보드: 고객 운영 업체와 연결 칸', (await page.getByTestId('module-dashboard').count()) === 1)
 
   // 원본 화면 안에서 화면을 옮기면 주소가 따라 바뀐다
-  await page.getByTestId('emp-orig').getByRole('button', { name: /진행 보드 보기/ }).first().click()
+  // D-362 사용 흐름은 한 줄 도식 — '3 일정·서류 관리' 가 예전 [진행 보드 보기] 단추와 같은 곳으로
+  await page.locator('[data-testid="emp-guide-step"][data-step="3"]').click()
   await page.waitForTimeout(700)
   check('원본 안 이동: 주소가 진행 보드로', page.url().includes('/tools/employment/board'), page.url())
 
@@ -552,6 +566,34 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-358 창업감면: 접힌 질문 수를 알려 주고, 남은 질문(창업 형태)은 펼친 채', /한 줄로 접었어요/.test(await page.getByTestId('startup-folded-note').innerText().catch(() => '')) && (await page.getByRole('button', { name: '완전 신규 창업', exact: true }).count()) === 1)
   await page.locator('[data-testid="startup-answered"][data-key="businessType"]').click()
   check('D-358 창업감면: [바꾸기] → 그 질문만 펼침(고른 답 그대로)', (await page.getByRole('button', { name: '법인사업자', exact: true }).getAttribute('aria-pressed')) === 'true' && (await page.locator('[data-testid="startup-answered"][data-key="startupDate"]').count()) === 1)
+  // D-361 한 질문씩 — [모두 펼치기] 를 지운 처음 그대로 · 업체 없이 새로
+  await page.evaluate(() => {
+    localStorage.removeItem('axmvp.fold.all')
+    localStorage.removeItem('axmvp.fold.startup.steps')
+    localStorage.removeItem('axmvp.tools.startupTax')
+  })
+  await page.goto(BASE + '/tools/startup-tax', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const rest = page.getByTestId('startup-rest')
+  const restText = (await rest.innerText().catch(() => '')) ?? ''
+  check('D-361 창업감면 처음: 첫 질문(사업자 유형)만 · "질문 0/8 — 다음: 대표자 생년월일 외 6개" · 감면 항목 · 상세 입력은 아직', (await page.getByRole('button', { name: '개인사업자', exact: true }).count()) === 1 && (await page.getByRole('button', { name: '완전 신규 창업', exact: true }).count()) === 0 && (await rest.getAttribute('data-count')) === '7' && restText.includes('질문 0/8') && restText.includes('다음: 대표자 생년월일 외 6개') && !(await page.getByTestId('startup-orig').innerText()).includes('감면 확인 항목'), restText)
+  await page.getByRole('button', { name: '개인사업자', exact: true }).click()
+  await page.waitForTimeout(300)
+  check('D-361 답하면 다음 질문(대표자 생년월일)이 나오고, 고른 질문은 펼친 채 · 1/8', (await page.getByRole('button', { name: '개인사업자', exact: true }).getAttribute('aria-pressed')) === 'true' && (await page.getByRole('group', { name: '② 대표자 생년월일' }).count()) === 1 && (await rest.getAttribute('data-count')) === '6' && (await rest.innerText()).includes('질문 1/8'), await rest.innerText().catch(() => ''))
+  await page.getByTestId('startup-show-all').click()
+  await page.waitForTimeout(300)
+  check('D-361 [한꺼번에 보기] → 질문 전부 · 감면 확인 항목까지', (await rest.count()) === 0 && (await page.getByRole('button', { name: '완전 신규 창업', exact: true }).count()) === 1 && (await page.getByTestId('startup-orig').innerText()).includes('감면 확인 항목'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('D-361 [한꺼번에 보기] 는 기억 — 다시 열어도 전부', (await rest.count()) === 0 && (await page.getByRole('button', { name: '완전 신규 창업', exact: true }).count()) === 1)
+  await page.getByTestId('startup-steps-on').click()
+  await page.waitForTimeout(300)
+  check('D-361 [한 질문씩 보기] 로 돌아가기', (await rest.count()) === 1 && (await page.getByRole('button', { name: '완전 신규 창업', exact: true }).count()) === 0)
+  await page.evaluate(() => {
+    localStorage.setItem('axmvp.fold.all', 'open')
+    localStorage.removeItem('axmvp.fold.startup.steps')
+    localStorage.removeItem('axmvp.tools.startupTax')
+  })
   // 서류함에 파일이 없으면 크레탑이 그렇게 말한다
   await page.goto(BASE + '/tools/cretop?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)

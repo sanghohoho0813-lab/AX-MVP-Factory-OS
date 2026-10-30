@@ -13,6 +13,7 @@ import { REVISED_RULE_FROM } from '../../lib/rules'
 import { Accordion, ChoiceGroup, FieldLabel, HintText, Section } from './ui'
 import DateSelect from './DateSelect'
 import AdvancedSection from './AdvancedSection'
+import { useFold } from '../../../../components/ui/fold'
 
 interface Props {
   form: FormData
@@ -24,6 +25,18 @@ interface Props {
 
 /** 2019-03-02 → 2019.03.02 */
 const dot = (d: string) => d.replaceAll('-', '.')
+type Q = 'businessType' | 'birthDate' | 'startupDate' | 'region' | 'overconcentration' | 'ventureDate' | 'industry' | 'startupForm'
+const Q_ORDER: readonly Q[] = ['businessType', 'birthDate', 'startupDate', 'region', 'overconcentration', 'ventureDate', 'industry', 'startupForm']
+const Q_LABEL: Record<Q, string> = {
+  businessType: '사업자 유형',
+  birthDate: '대표자 생년월일',
+  startupDate: '창업일',
+  region: '사업장 지역',
+  overconcentration: '과밀억제권역',
+  ventureDate: '벤처기업 확인',
+  industry: '업종',
+  startupForm: '창업 형태',
+}
 const labelOf = (opts: readonly { value: string; label: string }[], v: string) => opts.find((o) => o.value === v)?.label ?? v
 
 /**
@@ -75,6 +88,27 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
     startupForm: folded('startupForm', !!form.startupForm),
   }
   const foldedCount = Object.values(fold).filter(Boolean).length
+  /**
+   * D-361 한 질문씩(📐 화면 원칙 — 토스처럼 하나 답하면 다음) — 처음엔 아직 답 없는 첫 질문 하나만 펼친다.
+   * 답이 있는 질문(한 줄) · 이 화면에서 고른 질문은 그대로 보이고, 남은 질문은 이름만 한 줄. [한꺼번에 보기] 는 기억(모두 펼치기도 따름).
+   * 판정은 그대로 — [1분 판정하기] 는 언제든 누를 수 있다.
+   */
+  const [all, setAll] = useFold('startup.steps', false)
+  const answered: Record<Q, boolean> = {
+    businessType: !!form.businessType,
+    birthDate: !!form.birthDate,
+    startupDate: !!form.startupDate,
+    region: !!form.region,
+    overconcentration: !!form.overconcentration && !(needPop && !form.popDecline),
+    ventureDate: form.ventureDate !== undefined,
+    industry: !!form.industry,
+    startupForm: !!form.startupForm,
+  }
+  const waiting = (k: Q) => !answered[k] && !touched.current.has(k) && !opened.has(k)
+  const current = Q_ORDER.find(waiting)
+  const hide = (k: Q) => !all && waiting(k) && k !== current
+  const rest = Q_ORDER.filter(hide)
+  const done = Q_ORDER.filter((k) => answered[k]).length
 
   const toggleCheck = (key: ExemptionKey) => {
     onChange({ ...form, checkItems: { ...form.checkItems, [key]: !form.checkItems[key] } })
@@ -95,7 +129,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 1. 사업자 유형 */}
-      {fold.businessType ? (
+      {hide('businessType') ? null : fold.businessType ? (
         <Answered n={1} label="사업자 유형" value={labelOf(BUSINESS_TYPES, form.businessType)} k="businessType" raw={form.businessType} onOpen={() => openQ('businessType')} />
       ) : (
       <Section>
@@ -109,7 +143,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 2. 생년월일 */}
-      {fold.birthDate ? (
+      {hide('birthDate') ? null : fold.birthDate ? (
         <Answered n={2} label="대표자 생년월일" value={dot(form.birthDate)} k="birthDate" raw={form.birthDate} onOpen={() => openQ('birthDate')} />
       ) : (
       <Section>
@@ -127,7 +161,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 3. 창업일 */}
-      {fold.startupDate ? (
+      {hide('startupDate') ? null : fold.startupDate ? (
         <Answered n={3} label="창업일" value={dot(form.startupDate)} k="startupDate" raw={form.startupDate} onOpen={() => openQ('startupDate')} />
       ) : (
       <Section>
@@ -146,7 +180,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 4. 지역 */}
-      {fold.region ? (
+      {hide('region') ? null : fold.region ? (
         <Answered n={4} label="사업장 지역" value={labelOf(REGIONS, form.region)} k="region" raw={form.region} onOpen={() => openQ('region')} />
       ) : (
       <Section>
@@ -156,7 +190,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 5. 과밀억제권역 */}
-      {fold.overconcentration ? (
+      {hide('overconcentration') ? null : fold.overconcentration ? (
         <Answered
           n={5}
           label="수도권 과밀억제권역"
@@ -187,7 +221,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* D-325 벤처기업 확인 — 창업 3년 안이면 권역과 상관없이 50%(창업벤처중소기업 · 조특법 §6②) */}
-      {fold.ventureDate ? (
+      {hide('ventureDate') ? null : fold.ventureDate ? (
         <Answered label="벤처기업 확인" value={form.ventureDate ? `예 · ${dot(form.ventureDate)}` : '아니오'} k="ventureDate" raw={form.ventureDate ?? ''} onOpen={() => openQ('ventureDate')} />
       ) : (
       <Section>
@@ -213,7 +247,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 6. 업종 */}
-      {fold.industry ? (
+      {hide('industry') ? null : fold.industry ? (
         <Answered n={6} label="업종" value={labelOf(INDUSTRIES, form.industry)} k="industry" raw={form.industry} onOpen={() => openQ('industry')} />
       ) : (
       <Section>
@@ -227,7 +261,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       )}
 
       {/* 7. 창업 형태 */}
-      {fold.startupForm ? (
+      {hide('startupForm') ? null : fold.startupForm ? (
         <Answered n={7} label="창업 형태" value={labelOf(STARTUP_FORMS, form.startupForm)} k="startupForm" raw={form.startupForm} onOpen={() => openQ('startupForm')} />
       ) : (
       <Section>
@@ -241,7 +275,29 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
       </Section>
       )}
 
-      {/* 8. 감면 확인 항목 */}
+      {rest.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-dashed border-gray-300 bg-white/70 px-5 py-3.5" data-testid="startup-rest" data-count={rest.length}>
+          <p className="min-w-0 flex-1 break-keep text-base text-gray-600">
+            <b className="text-gray-900">
+              질문 {done}/{Q_ORDER.length}
+            </b>{' '}
+            — 답하면 다음 질문이 하나씩 나와요(다음: {Q_LABEL[rest[0]]}
+            {rest.length > 1 ? ` 외 ${rest.length - 1}개` : ''}).
+          </p>
+          <button type="button" onClick={() => setAll(true)} className="shrink-0 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50" data-testid="startup-show-all">
+            한꺼번에 보기
+          </button>
+        </div>
+      )}
+
+      {all && Q_ORDER.some((k) => !answered[k]) && (
+        <button type="button" onClick={() => setAll(false)} className="self-start px-1 text-sm font-semibold text-brand hover:underline" data-testid="startup-steps-on">
+          한 질문씩 보기
+        </button>
+      )}
+
+      {/* 8. 감면 확인 항목 — 한 질문씩일 때는 남은 질문이 없을 때 */}
+      {rest.length === 0 && (
       <Section>
         <FieldLabel step={8}>감면 확인 항목</FieldLabel>
         <HintText>
@@ -277,14 +333,17 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           })}
         </div>
       </Section>
+      )}
 
       {/* 9. 상세 입력 (선택, 접힘) */}
+      {rest.length === 0 && (
       <Accordion title="상세 입력 (선택) · 법 기준 정밀 판정">
         <AdvancedSection
           value={form.advanced}
           onChange={(advanced) => onChange({ ...form, advanced })}
         />
       </Accordion>
+      )}
 
       {/* 액션 */}
       <div className="sticky bottom-4 z-10 mt-2 flex gap-3 max-lg:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]">

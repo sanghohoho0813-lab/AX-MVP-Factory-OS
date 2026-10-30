@@ -862,6 +862,11 @@ export interface ClientOpsRecord {
    * payload 에 함께 저장된다(DB 변경 없음). 파일 글자 · 주민등록번호는 남기지 않는다.
    */
   docUploads?: DocUploadLog[]
+  /**
+   * D-363 맞춤 진단서를 드린 기록(최근 5번) — 언제 · 어떻게(인쇄/카톡) · 그때 모듈 판정 · 요청한 자료.
+   * 다음에 진단서를 열면 '지난번 드린 뒤 달라진 것' 을 이 기록과 견준다. payload 에 함께 저장된다(DB 변경 없음).
+   */
+  diagnosisGiven?: DiagnosisGiven[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
@@ -873,6 +878,18 @@ export interface ProvisionalMark {
   at: string
   from: 'marketing'
   requestedBy?: string
+}
+
+/** D-363 맞춤 진단서를 드린 한 번 */
+export interface DiagnosisGiven {
+  id: string
+  /** 드린 시각(ISO) */
+  at: string
+  how: 'print' | 'kakao'
+  /** 그때 모듈 판정(먼저 제안한 것은 pick) — tone 은 맞춤 추천 판정(good · maybe · need · done · no) */
+  lines: { key: string; label: string; tone: string; pick: boolean }[]
+  /** 그때 요청한 자료 이름 */
+  requests: string[]
 }
 
 /** D-183: 서류 올리기 한 번의 기록 */

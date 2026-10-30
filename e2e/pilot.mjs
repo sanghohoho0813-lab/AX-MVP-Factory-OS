@@ -240,6 +240,16 @@ async function logout(page) {
 }
 const bodyText = (page) => page.locator('body').innerText().catch(() => '')
 const leaked = (t) => SECRETS.filter((s) => t.includes(s))
+/** D-357 처음엔 접힌 목차(오늘 '바로 적기' · 맞춤 추천 '다음 행동' …) — 제목 줄을 눌러 펼친다(펼친 상태는 그 기기에 기억) */
+async function openFoldIn(page, id) {
+  const f = page.locator(`[data-fold="${id}"]`).first()
+  await f.waitFor({ timeout: 8000 }).catch(() => {})
+  if ((await f.getAttribute('data-open').catch(() => '1')) === '0') {
+    await f.getByTestId('fold-toggle').first().click()
+    await new Promise((r) => setTimeout(r, 300)) // 동시 보기 안쪽(frameLocator)은 waitForTimeout 이 없다
+  }
+}
+
 async function go(page, p) {
   await page.goto(BASE + p, { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
@@ -581,7 +591,8 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   await shot(page, 'pilot-03-after-upload')
-  // 다음 약속(일정)
+  // 다음 약속(일정) — D-357 '다음 행동 추천' 은 접혀 있다(제목 줄을 눌러 펼친다)
+  await openFoldIn(page, 'smart.steps')
   const step = page.getByTestId('smart-step-next').first()
   if (await step.isVisible().catch(() => false)) {
     await step.click()
@@ -609,12 +620,14 @@ try {
   await page.getByLabel('할 일 내용').fill('은혜테스트정밀 서류 받기')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(900)
+  await openFoldIn(page, 'today.capture')
   await page.getByLabel('기록 내용').first().fill('은혜테스트정밀 박대표와 통화 — 다음 주 방문')
   await page.getByRole('button', { name: /^기록$/ }).first().click()
   await page.waitForTimeout(900)
   const jr = sql(`select string_agg(content, ' | ' order by content) from public.ops_journal_entries where workspace_id = '${PILOT_WS}'`)
   check('흐름: 할 일 · 업무 일기가 Pilot 작업공간에 저장(DB)', jr.includes('서류 받기') && jr.includes('박대표와 통화'), jr)
   check('흐름: 대표 업무 일기에 섞이지 않음(DB)', !sql(`select coalesce(string_agg(content, '|'), '') from public.ops_journal_entries where workspace_id = '${OWNER_WS}'`).includes('은혜'))
+  await openFoldIn(page, 'today.agenda') // 돈 칸(미수금)은 '다가오는 마감 · 약속' 안
   const todayAfter = await bodyText(page)
   check('흐름: 오늘 화면에 내 할 일 · 기록', todayAfter.includes('서류 받기') && todayAfter.includes('박대표와 통화') && leaked(todayAfter).length === 0)
   await shot(page, 'pilot-05-today-after')
@@ -854,7 +867,9 @@ try {
       if (who === PILOT) await shot(page, 'acct-01-owner-menu')
       await sw.first().click()
       await page.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
-      await page.waitForTimeout(700)
+      // 로그인 화면이 다 그려질 때까지(바꿀 계정 이메일이 들어갈 때까지) — 시험 기계가 바쁠 때 0.7초로는 모자랐다
+      await page.waitForFunction(() => !!document.getElementById('email')?.value, null, { timeout: 8000 }).catch(() => {})
+      await page.waitForTimeout(300)
       const pre = await page.evaluate(() => ({ email: document.getElementById('email')?.value ?? '', focus: document.activeElement?.id ?? '', text: document.body.innerText }))
       return { info, pre }
     }
@@ -1092,6 +1107,7 @@ try {
     await page.waitForTimeout(300)
   }
   const memo = '동시보기 확인 메모 ' + Date.now().toString().slice(-5)
+  await openFoldIn(dualPc, 'today.capture')
   await dualPc.getByLabel('기록 내용').first().fill(memo)
   await dualPc.getByRole('button', { name: /^기록$/ }).first().click()
   let moSaw = false

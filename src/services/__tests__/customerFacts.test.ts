@@ -62,7 +62,7 @@ import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
-import { buildDiagnosis, customerText, diagnosisKakao } from '../clientDiagnosis'
+import { buildDiagnosis, customerText, diagnosisKakao, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
@@ -374,6 +374,18 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const kt = diagnosisKakao(dg, '미래AI랩 김팀장')
   check('D-352 카톡 요약 — 회사 이름 · 먼저 제안드릴 것 · 서명 · 빈 줄 셋 없음', kt.startsWith(`[${dg.companyName}] 맞춤 진단 요약`) && (dg.picks.length === 0 || kt.includes('■ 먼저 제안드릴 것')) && kt.endsWith('미래AI랩 김팀장') && !/\n{3,}/.test(kt), kt)
   check('D-352 고객 말로 — ★ 세무사 표시 · 신고 누락 안내는 빼고', customerText('연구소가 있어요 · 신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)') === '연구소가 있어요')
+  // D-363 진단서 드린 기록 — 같은 날 두 번 눌러도 한 줄 · 다음에 열면 '지난번 뒤 달라진 것'(판정 · 받은 자료)
+  const g1 = withDiagnosisGiven(empty, givenOf(dn, 'print', '2026-09-20T01:00:00.000Z'))
+  const g2 = withDiagnosisGiven(g1, givenOf(dn, 'print', '2026-09-20T05:00:00.000Z'))
+  check('D-363 드린 기록 — 같은 날 같은 방법은 한 줄(활동 기록도 한 줄) · 먼저 제안 · 요청 자료 수', g2.diagnosisGiven?.length === 1 && g2.activity.filter((a) => a.text.startsWith('맞춤 진단서 드림')).length === 1 && g2.activity[0].text.includes(`요청한 자료 ${dn.requests.length}가지`), JSON.stringify([g2.diagnosisGiven?.length, g2.activity.map((a) => a.text)]))
+  const g3 = withDiagnosisGiven(g2, givenOf(dn, 'kakao', '2026-09-20T06:00:00.000Z'))
+  check('D-363 같은 날이라도 카톡 요약은 따로 한 줄', g3.diagnosisGiven?.length === 2 && g3.diagnosisGiven[0].how === 'kakao')
+  const later = buildDiagnosis({ ...full, diagnosisGiven: g3.diagnosisGiven } as typeof full, ins, '2026-10-02')
+  const pfChange = later.since?.changed.find((c) => c.key === 'policy-funding')
+  check('D-363 지난번(9/20, 자료가 없던 때) 뒤 — 정책자금 자료 필요 → 나아짐 · 받은 자료(그때 요청 · 지금은 필요 없음)', later.since?.date === '2026-09-20' && !!pfChange && pfChange.from === '자료 필요' && pfChange.better && later.since.received.length > 0 && later.since.received.every((r) => !later.requests.some((q) => q.label === r)), JSON.stringify(later.since))
+  check('D-363 나아진 것이 먼저 · 카톡 요약에도 "지난 진단 뒤 달라진 것"', later.since!.changed.every((c, i, a) => i === 0 || !(c.better && !a[i - 1].better)) && diagnosisKakao(later).includes('■ 지난 진단(2026-09-20) 뒤 달라진 것') && sinceLines(later.since).some((x) => x.startsWith('받은 자료: ')), diagnosisKakao(later))
+  check('D-363 오늘 드린 것만 있으면 견줄 것 없음(처음과 같음)', buildDiagnosis({ ...full, diagnosisGiven: [{ ...g3.diagnosisGiven![0], at: '2026-10-02T03:00:00.000Z' }] } as typeof full, ins, '2026-10-02').since === null && dg.since === null)
+  check('D-363 기록 모양 지킴 — 저장했다 다시 읽어도 그대로 · 모양이 틀린 줄은 버림', JSON.stringify(normalizeClientOps({ ...g3, diagnosisGiven: [...g3.diagnosisGiven!, { id: 1 }, 'x'] } as never).diagnosisGiven) === JSON.stringify(g3.diagnosisGiven))
   check('맞춤 추천: 요금제에 없는 모듈은 빠짐', !buildInsights(full, '2026-10-02', [], (k) => k !== 'labcare').some((i) => i.key === 'labcare'))
   // D-215: 직원 수를 모르면 정책자금은 1~4명(소상공인)으로 계산된다 — 가정이라고 알리고 '좋음' 으로 단정하지 않는다
   const noEmp = { ...full, employeeCount: '' } as typeof full
