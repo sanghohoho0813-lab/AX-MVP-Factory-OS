@@ -83,6 +83,7 @@
     "qa:chat": "node e2e/chat.mjs",
     "qa:mkpack": "node e2e/mkpack.mjs",
     "qa:diag": "node e2e/diag.mjs",
+    "qa:uxpick": "node e2e/uxpick.mjs",
     "qa:mkkit": "node e2e/mkkit.mjs",
     "qa:mkweek": "node e2e/mkweek.mjs",
     "qa:threads": "node e2e/threads.mjs",

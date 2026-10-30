@@ -3,14 +3,14 @@
  * 대표: "버튼 하나만 누르면 1주일치 … 한 번에 쫙 — 트렌드 잇는 주제 벤치마킹해서, 기존 마케팅 공식들 잘 적용해서 100점짜리".
  *
  *  - 규칙 초안(AI 아님)을 바로 보여 주고, [AI로 1주일치 다 쓰기](두 번 눌러 확인)를 누르면 여섯 갈래가 동시에 — 답이 온 것부터 바뀐다.
- *  - 위에 요일별 달력(무엇을 언제 올리나) · 점검 요약, 아래에 롱폼 · 쇼츠 · 스레드. 글마다 공식 점검(점검 통과 / 고칠 곳).
+ *  - D-356 프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 탭 넷(유튜브 롱폼 · 릴스 · 쇼츠 · 스레드 · 올릴 날) — 한 번에 하나만. 글마다 공식 점검(점검 통과 / 고칠 곳).
  *  - 결과는 이 브라우저(사람별 금고)에 주마다 — 다시 열어도 다시 부르지 않는다. 팀장 화면을 보는 중이면 AI 를 부르지 않는다.
  *  - D-349 AI 가 쓴 글은 클라우드에도 남고 내 콘텐츠 · 릴스 · 틱톡 · 스레드 목록에 저절로 모인다(고친 글 · 올린 글은 그대로) — 어디에 모였는지 한 줄로.
- *  - D-350 쓰는 중 [멈추기] — 누르지 않으면 다른 화면으로 가도 계속 쓴다(어느 화면에서나 아래에 진행 표시). 내 콘텐츠의 '1주일치 묶음' 에서 지난 주도 이 화면으로 연다.
+ *  - D-350 쓰는 중 [멈추기] — 누르지 않으면 다른 화면으로 가도 계속 쓴다(어느 화면에서나 아래에 진행 표시). 내 콘텐츠의 '1주일치 프로젝트' 에서 지난 주도 이 화면으로 연다.
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, FolderCheck, Loader2, MonitorPlay, RotateCcw, Sparkles, Square } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, FolderCheck, FolderOpen, Loader2, MonitorPlay, RotateCcw, Sparkles, Square } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
@@ -29,6 +29,8 @@ const when = (iso: string) => {
   return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 const NUM = ['①', '②', '③']
+type WeekTab = 'long' | 'shorts' | 'threads' | 'plan'
+const WEEK_TABS: readonly WeekTab[] = ['long', 'shorts', 'threads', 'plan']
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
 function download(name: string, text: string) {
@@ -119,6 +121,20 @@ export function WeekView({
   const collect = !readOnly && ws !== undefined
   const got = { long: week.long.ai ? 1 : 0, shorts: shortsMain.filter((s) => s.ai).length, threads: threadsMain.filter((x) => x.ai).length }
   const gotAny = got.long + got.shorts + got.threads > 0
+  // D-356 탭은 주소에(?wt=) — 뒤로 가기 · 새로 고침에도 보던 탭 그대로
+  const [params, setParams] = useSearchParams()
+  const tab: WeekTab = WEEK_TABS.includes(params.get('wt') as WeekTab) ? (params.get('wt') as WeekTab) : 'long'
+  const pickTab = (t: WeekTab) => {
+    const next = new URLSearchParams(params)
+    if (t === 'long') next.delete('wt')
+    else next.set('wt', t)
+    setParams(next, { replace: true })
+  }
+  /** 올릴 날 달력에서 누르면 그 탭으로 가서 그 글로 */
+  const goTo = (kind: 'long' | 'short' | 'thread', anchor: string) => {
+    pickTab(kind === 'long' ? 'long' : kind === 'short' ? 'shorts' : 'threads')
+    window.setTimeout(() => scrollTo(anchor), 60)
+  }
 
   if (past && !saved)
     return (
@@ -134,160 +150,302 @@ export function WeekView({
       </div>
     )
 
+  /** 탭마다 AI 진행 — 그 탭의 갈래가 쓰는 중이면 돌고, 다 쓰면 ✓ */
+  const tabState = (parts: readonly string[]): WeekPartState => {
+    const xs = parts.map((p) => run.parts[p as keyof typeof run.parts])
+    if (xs.includes('running')) return 'running'
+    if (xs.includes('error')) return 'error'
+    if (xs.length && xs.every((x) => x === 'done')) return 'done'
+    if (xs.includes('stopped')) return 'stopped'
+    return 'idle'
+  }
+  const TABS: { key: WeekTab; label: string; count: string; icon: typeof MonitorPlay; tone: string; state: WeekPartState | null; ai: boolean }[] = [
+    { key: 'long', label: '유튜브 롱폼', count: '1', icon: MonitorPlay, tone: 'text-red-600', state: tabState(['long']), ai: week.long.ai },
+    { key: 'shorts', label: '릴스 · 쇼츠', count: `${shortsMain.length}`, icon: Film, tone: 'text-fuchsia-700', state: tabState(['shortA', 'shortB']), ai: shortsMain.some((x) => x.ai) },
+    { key: 'threads', label: '스레드', count: `${threadsMain.length}${threadsSpare.length ? `+${threadsSpare.length}` : ''}`, icon: AtSign, tone: 'text-slate-800', state: tabState(['th0', 'th1', 'th2']), ai: threadsMain.some((x) => x.ai) },
+    { key: 'plan', label: '올릴 날', count: '7일', icon: CalendarDays, tone: 'text-violet-700', state: null, ai: false },
+  ]
+  const madeLine = saved ? `${when(saved.at) ? `${when(saved.at)} 만듦 · ` : ''}AI 로 씀${saved.model ? `(${saved.model})` : ''}` : running ? 'AI 가 쓰는 중' : '규칙 초안 — 아직 AI 로 안 씀'
+
   return (
-    <div className="flex flex-col gap-4" data-testid="mk-week" data-start={start}>
+    <div className="flex flex-col gap-4" data-testid="mk-week" data-start={start} data-tab={tab}>
       <div>
         <button type="button" onClick={onBack} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-slate-700 hover:bg-slate-100" data-testid="mk-week-back">
           <ArrowLeft aria-hidden="true" className="size-4" /> {backLabel}
         </button>
       </div>
 
-      {/* 장식 원만 머리 안에서 자른다 — 머리 전체를 자르면 'AI 는 미끼' 설명 상자가 휴대폰에서 잘린다 */}
-      <header className="relative z-10 rounded-(--radius-panel) bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 p-4 text-white sm:p-5">
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-(--radius-panel)">
-          <span className="absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
-        </span>
-        <div className="relative flex flex-col gap-2">
-          <p className="t-meta font-semibold text-white/90">
-            1주일치 콘텐츠 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
-          </p>
-          <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업" onDark>
-            <h2 className="t-page break-keep text-white">AI 는 미끼, 끝은 본업</h2>
-          </HintTip>
-          <ul className="flex flex-wrap gap-1.5" aria-label="만드는 것">
-            {[
-              { icon: MonitorPlay, t: '유튜브 롱폼 1' },
-              { icon: Film, t: '릴스 · 쇼츠 3' },
-              { icon: AtSign, t: '스레드 7 + 예비 2' },
-            ].map((c) => (
-              <li key={c.t} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">
-                <c.icon aria-hidden="true" className="size-3.5" /> {c.t}
-              </li>
-            ))}
-          </ul>
-          <ol className="flex flex-col gap-1" data-testid="mk-week-topics">
-            {week.topics.map((t, i) => (
-              <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-white">
-                <span className="t-meta shrink-0 rounded-full bg-white px-1.5 font-bold text-violet-800">짝 {i + 1}</span>
-                <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
-                <span className="t-meta shrink-0 text-white/85">{['롱폼 · 쇼츠 2 · 스레드 3', '릴스 1 · 스레드 3', '스레드 1 · 예비 2'][i]}</span>
-              </li>
-            ))}
-          </ol>
-          {setup.trend.length > 0 && (
-            <p className="t-meta break-keep text-white/85" data-testid="mk-week-trend">
-              이번 주 AI 흐름(미끼 후보): {setup.trend.slice(0, 6).join(' · ')}
-            </p>
-          )}
-        </div>
-      </header>
-
-      {/* AI — 여섯 갈래 */}
-      {canAi ? (
-        <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${run.errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
-            <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
-              {running
-                ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 다른 화면으로 가도 계속 써요(멈추려면 [멈추기]).'
-                : stopped
-                  ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
-                  : saved
-                  ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-                    : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 롱폼 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
-            </p>
-            <div className="flex flex-wrap items-start gap-2">
-              {running ? (
-                <Button size="sm" variant="secondary" onClick={() => stopWeekAi(start)} data-testid="mk-week-stop">
-                  <Square aria-hidden="true" className="size-4" /> 멈추기
-                </Button>
-              ) : (
-                <>
-                  <ModelPicker />
-                  <AiConfirm>
-                    <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run">
-                      {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
-                      {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
-                    </Button>
-                  </AiConfirm>
-                </>
-              )}
+      {/* D-356 대표 "1주일치 쓰면 밑으로 쫙 풀려 눈에 안 들어온다 — 프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 딱딱 나눠서".
+          프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
+      <section className="relative z-10 flex flex-col overflow-visible rounded-(--radius-panel) border-2 border-violet-200 bg-white" data-testid="mk-week-project">
+        <header className="relative rounded-t-[calc(var(--radius-panel)-2px)] bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 px-4 py-3 text-white sm:px-5">
+          <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-[calc(var(--radius-panel)-2px)]">
+            <span className="absolute -top-14 -right-10 size-40 rounded-full bg-white/10" />
+          </span>
+          <div className="relative flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <FolderOpen aria-hidden="true" className="size-5 shrink-0" />
+              <h2 className="t-card font-extrabold break-keep text-white">
+                1주일치 프로젝트 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
+              </h2>
+              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업" onDark>
+                <span className="t-meta rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">AI 는 미끼, 끝은 본업</span>
+              </HintTip>
             </div>
-          </div>
-          {Object.values(run.parts).some((s) => s !== 'idle') && (
-            <ul className="flex flex-wrap gap-1.5" data-testid="mk-week-parts">
-              {WEEK_PARTS.map((p) => (
-                <li key={p.part} className={`t-meta inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${partTone(run.parts[p.part])}`} data-testid="mk-week-part" data-part={p.part} data-state={run.parts[p.part]}>
-                  {partIcon(run.parts[p.part])} {p.label}
+            <p className="t-meta font-semibold text-white/90" data-testid="mk-week-made">
+              {madeLine}
+            </p>
+            <ol className="flex flex-col gap-0.5" data-testid="mk-week-topics">
+              {week.topics.map((t, i) => (
+                <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-white">
+                  <span className="t-meta shrink-0 rounded-full bg-white px-1.5 font-bold text-violet-800">짝 {i + 1}</span>
+                  <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
                 </li>
               ))}
-            </ul>
-          )}
-          {changed && !running && (
-            <p className="t-meta break-keep text-violet-900" data-testid="mk-week-changed">
-              지금 짝(본업 × 이번 주 AI 흐름)이 이 1주일치를 만들 때와 달라요 — [AI로 다시 쓰기] 를 누르면 지금 짝으로 다시 써요.
-            </p>
-          )}
-          {run.errors.length > 0 && (
-            <p role="alert" className="t-sub break-keep text-amber-900" data-testid="mk-week-error">
-              일부를 AI 로 쓰지 못했어요 — {run.errors.join(' · ')} 그 글은 규칙 초안 그대로예요. [AI로 다시 쓰기] 로 한 번 더.
-            </p>
-          )}
-          {run.storeFull && <p className="t-meta break-keep text-amber-900">이 브라우저 저장 공간이 가득 차 결과를 남기지 못했어요 — [전체 복사] · [텍스트 파일로] 로 가져가세요.</p>}
-        </div>
-      ) : (
-        <p className="t-sub break-keep rounded-xl bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-week-ai-off">
-          {readOnly
-            ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않아요).'
-            : past
-              ? `${dayLabel(start, 1)} 주에 만든 1주일치예요${saved?.model ? ` · ${saved.model}` : ''}${saved && when(saved.at) ? ` · ${when(saved.at)}` : ''} — 다시 쓰기는 이번에 만들 주만 돼요.`
-              : 'AI 로 다 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
-        </p>
-      )}
-
-      {/* D-349 어디에 모였나 */}
-      {collect && gotAny && (
-        <div
-          className={`flex flex-col gap-1 rounded-xl border px-3 py-2 ${sync.state === 'error' ? 'border-amber-300 bg-amber-50' : 'border-success-200 bg-success-50'}`}
-          data-testid="mk-week-collect"
-          data-state={sync.state}
-          data-kept={sync.kept}
-        >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {sync.state === 'saving' ? <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-success-700" /> : <FolderCheck aria-hidden="true" className={`size-4 shrink-0 ${sync.state === 'error' ? 'text-amber-700' : 'text-success-700'}`} />}
-            <p className={`t-sub min-w-0 break-keep font-semibold ${sync.state === 'error' ? 'text-amber-900' : 'text-success-800'}`}>
-              {sync.state === 'saving'
-                ? '목록으로 모으는 중이에요…'
-                : sync.state === 'error'
-                  ? '목록으로 모으지 못했어요(인터넷 · 로그인 확인) — 이 화면을 다시 열면 한 번 더 모아요.'
-                  : 'AI 가 쓴 글을 모아 뒀어요 — 내 콘텐츠 › 1주일치 묶음에서 언제든 다시 열고, 다른 기기에서도 보여요'}
-            </p>
+            </ol>
+            {setup.trend.length > 0 && (
+              <p className="t-meta break-keep text-white/80" data-testid="mk-week-trend">
+                이번 주 AI 흐름(미끼 후보): {setup.trend.slice(0, 6).join(' · ')}
+              </p>
+            )}
           </div>
-          {sync.state !== 'error' && (
-            <p className="t-sub flex flex-wrap gap-x-3 gap-y-1">
-              {got.long > 0 && (
-                <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-long">
-                  내 콘텐츠 · 롱폼 1
-                </Link>
+        </header>
+
+        <div className="flex flex-col gap-2 p-3 sm:p-4">
+          {/* AI — 여섯 갈래 */}
+          {canAi ? (
+            <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${run.errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
+                <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
+                  {running
+                    ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 다른 화면으로 가도 계속 써요(멈추려면 [멈추기]).'
+                    : stopped
+                      ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
+                      : saved
+                        ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
+                        : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 롱폼 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
+                </p>
+                <div className="flex flex-wrap items-start gap-2">
+                  {running ? (
+                    <Button size="sm" variant="secondary" onClick={() => stopWeekAi(start)} data-testid="mk-week-stop">
+                      <Square aria-hidden="true" className="size-4" /> 멈추기
+                    </Button>
+                  ) : (
+                    <>
+                      <ModelPicker />
+                      <AiConfirm>
+                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run">
+                          {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
+                          {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
+                        </Button>
+                      </AiConfirm>
+                    </>
+                  )}
+                </div>
+              </div>
+              {Object.values(run.parts).some((st) => st !== 'idle') && (
+                <ul className="flex flex-wrap gap-1.5" data-testid="mk-week-parts">
+                  {WEEK_PARTS.map((p) => (
+                    <li key={p.part} className={`t-meta inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${partTone(run.parts[p.part])}`} data-testid="mk-week-part" data-part={p.part} data-state={run.parts[p.part]}>
+                      {partIcon(run.parts[p.part])} {p.label}
+                    </li>
+                  ))}
+                </ul>
               )}
-              {got.shorts > 0 && (
-                <Link to="/marketing/shorts?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-shorts">
-                  릴스 · 틱톡 {got.shorts}
-                </Link>
+              {changed && !running && (
+                <p className="t-meta break-keep text-violet-900" data-testid="mk-week-changed">
+                  지금 짝(본업 × 이번 주 AI 흐름)이 이 1주일치를 만들 때와 달라요 — [AI로 다시 쓰기] 를 누르면 지금 짝으로 다시 써요.
+                </p>
               )}
-              {got.threads > 0 && (
-                <Link to="/marketing/threads?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-threads">
-                  스레드 {got.threads}
-                </Link>
+              {run.errors.length > 0 && (
+                <p role="alert" className="t-sub break-keep text-amber-900" data-testid="mk-week-error">
+                  일부를 AI 로 쓰지 못했어요 — {run.errors.join(' · ')} 그 글은 규칙 초안 그대로예요. [AI로 다시 쓰기] 로 한 번 더.
+                </p>
               )}
+              {run.storeFull && <p className="t-meta break-keep text-amber-900">이 브라우저 저장 공간이 가득 차 결과를 남기지 못했어요 — [전체 복사] · [텍스트 파일로] 로 가져가세요.</p>}
+            </div>
+          ) : (
+            <p className="t-sub break-keep rounded-xl bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-week-ai-off">
+              {readOnly
+                ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않아요).'
+                : past
+                  ? `${dayLabel(start, 1)} 주에 만든 1주일치예요${saved?.model ? ` · ${saved.model}` : ''}${saved && when(saved.at) ? ` · ${when(saved.at)}` : ''} — 다시 쓰기는 이번에 만들 주만 돼요.`
+                  : 'AI 로 다 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
             </p>
           )}
-          {sync.kept > 0 && <p className="t-meta break-keep text-slate-700">직접 고친 글 {sync.kept}개는 덮지 않고 그대로 뒀어요(올린 글도 그대로).</p>}
-        </div>
-      )}
 
-      {/* 도구 · 점검 요약 */}
-      <div className="flex flex-wrap items-center gap-2">
+          {/* D-349 어디에 모였나 */}
+          {collect && gotAny && (
+            <div
+              className={`flex flex-col gap-1 rounded-xl border px-3 py-2 ${sync.state === 'error' ? 'border-amber-300 bg-amber-50' : 'border-success-200 bg-success-50'}`}
+              data-testid="mk-week-collect"
+              data-state={sync.state}
+              data-kept={sync.kept}
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {sync.state === 'saving' ? <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-success-700" /> : <FolderCheck aria-hidden="true" className={`size-4 shrink-0 ${sync.state === 'error' ? 'text-amber-700' : 'text-success-700'}`} />}
+                <p className={`t-sub min-w-0 break-keep font-semibold ${sync.state === 'error' ? 'text-amber-900' : 'text-success-800'}`}>
+                  {sync.state === 'saving'
+                    ? '목록으로 모으는 중이에요…'
+                    : sync.state === 'error'
+                      ? '목록으로 모으지 못했어요(인터넷 · 로그인 확인) — 이 화면을 다시 열면 한 번 더 모아요.'
+                      : 'AI 가 쓴 글을 모아 뒀어요 — 내 콘텐츠 › 1주일치 프로젝트에서 언제든 다시 열고, 다른 기기에서도 보여요'}
+                </p>
+              </div>
+              {sync.state !== 'error' && (
+                <p className="t-sub flex flex-wrap gap-x-3 gap-y-1">
+                  {got.long > 0 && (
+                    <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-long">
+                      내 콘텐츠 · 롱폼 1
+                    </Link>
+                  )}
+                  {got.shorts > 0 && (
+                    <Link to="/marketing/shorts?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-shorts">
+                      릴스 · 틱톡 {got.shorts}
+                    </Link>
+                  )}
+                  {got.threads > 0 && (
+                    <Link to="/marketing/threads?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-threads">
+                      스레드 {got.threads}
+                    </Link>
+                  )}
+                </p>
+              )}
+              {sync.kept > 0 && <p className="t-meta break-keep text-slate-700">직접 고친 글 {sync.kept}개는 덮지 않고 그대로 뒀어요(올린 글도 그대로).</p>}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 형식별 탭 — 한 번에 하나만(예전엔 달력 · 롱폼 · 쇼츠 3 · 스레드 9 가 한 화면에 줄줄이) */}
+      <div role="tablist" aria-label="1주일치 — 무엇을 볼까요" className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" data-testid="mk-week-tabs">
+        {TABS.map((t) => {
+          const on = tab === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => pickTab(t.key)}
+              className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border-2 px-3 py-2 text-left ${on ? 'border-violet-600 bg-violet-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-violet-300'}`}
+              data-testid="mk-week-tab"
+              data-tab={t.key}
+              data-state={t.state ?? ''}
+            >
+              <t.icon aria-hidden="true" className={`size-5 shrink-0 ${on ? 'text-white' : t.tone}`} />
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="t-sub truncate font-bold">{t.label}</span>
+                <span className={`t-meta truncate ${on ? 'text-white/85' : 'text-slate-500'}`}>
+                  {t.count}
+                  {t.state === 'running' ? ' · 쓰는 중' : t.state === 'error' ? ' · 일부 초안' : t.ai ? ' · AI' : t.key === 'plan' ? '' : ' · 초안'}
+                </span>
+              </span>
+              {t.state === 'running' && <Loader2 aria-hidden="true" className={`ml-auto size-4 shrink-0 animate-spin ${on ? 'text-white' : 'text-violet-600'}`} />}
+            </button>
+          )
+        })}
+      </div>
+
+      <div role="tabpanel" className="flex min-w-0 flex-col gap-3" data-testid="mk-week-panel" data-tab={tab}>
+        {tab === 'long' && (
+          <section id="mk-week-long" className="scroll-mt-32" data-testid="mk-week-long" data-ai={week.long.ai ? '1' : '0'}>
+            <Card
+              icon={<MonitorPlay aria-hidden="true" className="size-5 text-red-600" />}
+              title={`유튜브 롱폼 · ${dayLabel(start, LONG_DAY)}`}
+              sub={`짝 1 · ${week.long.topic}`}
+              ai={week.long.ai}
+              lint={week.long.lint}
+              onCopy={() => onCopy([`제목: ${week.long.headline}`, ...[...week.long.titles, ...week.long.script].map((b) => `[${b.label}]\n${b.text}`)].join('\n\n'), '롱폼')}
+            >
+              <p className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-week-long-title">
+                {week.long.headline}
+              </p>
+              {week.long.titles.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-lg bg-violet-50/60 px-3 py-2">
+                  {week.long.titles.map((b, i) => (
+                    <Block key={`t-${i}`} label={b.label} text={b.text} />
+                  ))}
+                </div>
+              )}
+              <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} defaultOpen summary="그대로 읽는 말 + 화면에 띄울 것">
+                <div className="flex flex-col gap-3">
+                  {week.long.script.map((b, i) => (
+                    <Block key={`s-${i}`} label={b.label} text={b.text} />
+                  ))}
+                </div>
+              </Fold>
+            </Card>
+          </section>
+        )}
+
+        {tab === 'shorts' && (
+          <section className="flex flex-col gap-2" aria-label="릴스 · 쇼츠 3편">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              {shortsMain.map((x) => (
+                <ShortCard key={x.slot.n} s={x} start={start} onCopy={onCopy} />
+              ))}
+            </div>
+            {shortsSpare.length > 0 && (
+              <Fold id="mk-week-short-spare" title="다른 버전 1편" summary="③이 마음에 안 들면 이걸로">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  {shortsSpare.map((x) => (
+                    <ShortCard key="spare" s={x} start={start} onCopy={onCopy} />
+                  ))}
+                </div>
+              </Fold>
+            )}
+          </section>
+        )}
+
+        {tab === 'threads' && (
+          <section className="flex flex-col gap-2" aria-label="스레드 7개">
+            <p className="t-sub break-keep text-slate-600">요일마다 목적 · 틀이 달라요 — 하루 하나씩 올려요.</p>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {threadsMain.map((x) => (
+                <ThreadCard key={x.slot.day} x={x} start={start} onCopy={onCopy} />
+              ))}
+            </div>
+            {threadsSpare.length > 0 && (
+              <Fold id="mk-week-thread-spare" title="예비 글 2개" summary="반응이 약한 날 바꿔 올리기">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {threadsSpare.map((x, i) => (
+                    <ThreadCard key={`spare-${i}`} x={x} start={start} onCopy={onCopy} />
+                  ))}
+                </div>
+              </Fold>
+            )}
+          </section>
+        )}
+
+        {tab === 'plan' && (
+          <section aria-labelledby="mk-week-cal-title" className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4">
+            <h3 id="mk-week-cal-title" className="t-card flex items-center gap-2 font-bold text-slate-900">
+              <CalendarDays aria-hidden="true" className="size-5 text-violet-700" /> 언제 무엇을 올리나
+              <span className="t-meta font-normal text-slate-500">추천 일정 — 누르면 그 글로</span>
+            </h3>
+            <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-7" data-testid="mk-week-calendar">
+              {cal.map((d) => (
+                // 휴대폰은 하루 한 줄(날짜 옆에 올릴 것) — PC 는 일곱 칸
+                <li key={d.day} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1.5 lg:flex-col lg:flex-nowrap lg:items-start lg:py-2" data-testid="mk-week-day" data-day={d.day}>
+                  <span className="t-sub w-16 shrink-0 font-bold text-slate-900 lg:w-auto">{d.label}</span>
+                  <span className="flex flex-wrap gap-1">
+                    {d.items.map((it) => (
+                      <button key={it.anchor} type="button" onClick={() => goTo(it.kind, it.anchor)} className={`tap t-meta inline-flex min-h-8 items-center rounded-full px-2 font-semibold break-keep ${it.kind === 'long' ? 'bg-red-100 text-red-700' : it.kind === 'short' ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-slate-200 text-slate-800'}`}>
+                        {it.text}
+                      </button>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+      </div>
+
+      {/* 도구 · 점검 요약 — 탭 아래 한 줄 */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
         <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all">
           <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
         </Button>
@@ -311,101 +469,6 @@ export function WeekView({
           {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
         </p>
       </div>
-
-      {/* 요일별 달력 */}
-      <section aria-labelledby="mk-week-cal-title" className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4">
-        <h3 id="mk-week-cal-title" className="t-card flex items-center gap-2 font-bold text-slate-900">
-          <CalendarDays aria-hidden="true" className="size-5 text-violet-700" /> 언제 무엇을 올리나
-          <span className="t-meta font-normal text-slate-500">추천 일정 — 바꿔도 돼요</span>
-        </h3>
-        <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-7" data-testid="mk-week-calendar">
-          {cal.map((d) => (
-            // 휴대폰은 하루 한 줄(날짜 옆에 올릴 것) — PC 는 일곱 칸
-            <li key={d.day} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1.5 lg:flex-col lg:flex-nowrap lg:items-start lg:py-2" data-testid="mk-week-day" data-day={d.day}>
-              <span className="t-sub w-16 shrink-0 font-bold text-slate-900 lg:w-auto">{d.label}</span>
-              <span className="flex flex-wrap gap-1">
-                {d.items.map((it) => (
-                  <button key={it.anchor} type="button" onClick={() => scrollTo(it.anchor)} className={`tap t-meta inline-flex min-h-8 items-center rounded-full px-2 font-semibold break-keep ${it.kind === 'long' ? 'bg-red-100 text-red-700' : it.kind === 'short' ? 'bg-fuchsia-100 text-fuchsia-800' : 'bg-slate-200 text-slate-800'}`}>
-                    {it.text}
-                  </button>
-                ))}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* 롱폼 */}
-      <section id="mk-week-long" className="scroll-mt-32" data-testid="mk-week-long" data-ai={week.long.ai ? '1' : '0'}>
-        <Card
-          icon={<MonitorPlay aria-hidden="true" className="size-5 text-red-600" />}
-          title={`유튜브 롱폼 · ${dayLabel(start, LONG_DAY)}`}
-          sub={`짝 1 · ${week.long.topic}`}
-          ai={week.long.ai}
-          lint={week.long.lint}
-          onCopy={() => onCopy([`제목: ${week.long.headline}`, ...[...week.long.titles, ...week.long.script].map((b) => `[${b.label}]\n${b.text}`)].join('\n\n'), '롱폼')}
-        >
-          <p className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-week-long-title">
-            {week.long.headline}
-          </p>
-          {week.long.titles.length > 0 && (
-            <div className="flex flex-col gap-2 rounded-lg bg-violet-50/60 px-3 py-2">
-              {week.long.titles.map((b, i) => (
-                <Block key={`t-${i}`} label={b.label} text={b.text} />
-              ))}
-            </div>
-          )}
-          <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} defaultOpen summary="그대로 읽는 말 + 화면에 띄울 것">
-            <div className="flex flex-col gap-3">
-              {week.long.script.map((b, i) => (
-                <Block key={`s-${i}`} label={b.label} text={b.text} />
-              ))}
-            </div>
-          </Fold>
-        </Card>
-      </section>
-
-      {/* 쇼츠 */}
-      <section className="flex flex-col gap-2" aria-label="릴스 · 쇼츠 3편">
-        <h3 className="t-section flex items-center gap-2 text-slate-900">
-          <Film aria-hidden="true" className="size-5 text-fuchsia-700" /> 릴스 · 쇼츠 3편
-        </h3>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          {shortsMain.map((s) => (
-            <ShortCard key={s.slot.n} s={s} start={start} onCopy={onCopy} />
-          ))}
-        </div>
-        {shortsSpare.length > 0 && (
-          <Fold id="mk-week-short-spare" title="다른 버전 1편" summary="③이 마음에 안 들면 이걸로">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              {shortsSpare.map((s) => (
-                <ShortCard key="spare" s={s} start={start} onCopy={onCopy} />
-              ))}
-            </div>
-          </Fold>
-        )}
-      </section>
-
-      {/* 스레드 */}
-      <section className="flex flex-col gap-2" aria-label="스레드 7개">
-        <h3 className="t-section flex items-center gap-2 text-slate-900">
-          <AtSign aria-hidden="true" className="size-5 text-slate-800" /> 스레드 7개 — 요일마다 목적 · 틀이 달라요
-        </h3>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {threadsMain.map((x) => (
-            <ThreadCard key={x.slot.day} x={x} start={start} onCopy={onCopy} />
-          ))}
-        </div>
-        {threadsSpare.length > 0 && (
-          <Fold id="mk-week-thread-spare" title="예비 글 2개" summary="반응이 약한 날 바꿔 올리기">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {threadsSpare.map((x, i) => (
-                <ThreadCard key={`spare-${i}`} x={x} start={start} onCopy={onCopy} />
-              ))}
-            </div>
-          </Fold>
-        )}
-      </section>
 
       <p className="t-meta break-keep text-slate-500">
         [대괄호] · [공식 자료 확인] 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요 — 금액 · 날짜는 지어내지 않아요. 올리기 전 스레드 · 릴스 화면에서 한 번 더 점검할 수 있어요.

@@ -28,6 +28,7 @@ import { useToolClient } from './toolClientContext'
 import { useIsPhone } from '../../lib/useIsPhone'
 import type { ScenarioModule } from '../../services/scenarioPresets'
 import { ModulePresets } from './ModulePresets'
+import { ModuleClientFocus } from './ModuleClientFocus'
 
 /** 이 모듈이 만든 기한 한 줄 — 어느 업체의 것인지까지 */
 interface ModuleDue {
@@ -147,12 +148,14 @@ export interface ModuleDashboardProps {
   assist?: boolean
   /** MOD-1 false — '상황 예시' 를 그리지 않는다(화면 맨 위에 ModulePresets 를 따로 둔 모듈) */
   presets?: boolean
+  /** D-354 false — 업체로 열었을 때 맨 위 '이 업체' 한 장을 그리지 않는다(화면 맨 위에 따로 둔 모듈) */
+  focus?: boolean
 }
 
 /** 상황 예시가 있는 모듈 */
 const PRESET_MODULE: Record<string, ScenarioModule> = { 'policy-funding': 'policy-funding', 'startup-tax': 'startup-tax', employment: 'employment', labcare: 'labcare' }
 
-export function ModuleDashboard({ toolKey, children, assist = true, presets = true }: ModuleDashboardProps) {
+export function ModuleDashboard({ toolKey, children, assist = true, presets = true, focus = true }: ModuleDashboardProps) {
   const { loadClients } = useToolClient()
   // D-166: 휴대폰은 서류 빠진 업체를 4곳만(같은 사유가 수십 줄 반복됐다) — 나머지는 '몇 곳 더'
   const phone = useIsPhone()
@@ -186,6 +189,7 @@ export function ModuleDashboard({ toolKey, children, assist = true, presets = tr
 
   return (
     <div className="flex flex-col gap-5" data-testid="module-dashboard" data-module={toolKey}>
+      {focus && <ModuleClientFocus toolKey={toolKey} />}
       {assist && <ModuleAssistBar toolKey={toolKey} clients={clients} />}
       {presets && PRESET_MODULE[toolKey] && <ModulePresets module={PRESET_MODULE[toolKey]} />}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">

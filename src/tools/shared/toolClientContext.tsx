@@ -11,13 +11,15 @@
 
 import { lastClientTab, rememberClientNames } from '../../lib/crumbStore'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthProvider'
 import { getDataModeConfig } from '../../data/dataMode'
 import { listClients } from '../../services/clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { setToolWorkspace } from './toolStorage'
+import { ToolClientPicker } from './ToolClientPicker'
+import { pickerOn } from './toolClientPick'
 
 export interface ToolClientValue {
   /** 주소에 실린 업체 id (없으면 null) */
@@ -78,6 +80,8 @@ function CloudFrame({ children }: { children: ReactNode }) {
 function FrameInner({ workspaceId, children }: { workspaceId: string | null; children: ReactNode }) {
   const [params] = useSearchParams()
   const clientId = params.get('client')
+  // D-354 업체 고르기 — 업체 숫자로 채우는 모듈(세금 계산기 · 창업감면 · 고용지원금 · 연구소 · 정책자금 · 크레탑)만
+  const picker = pickerOn(useLocation().pathname)
   const [client, setClient] = useState<ClientOpsRecord | null>(null)
   const cache = useRef<Promise<ClientOpsRecord[]> | null>(null)
 
@@ -129,7 +133,7 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
     [clientId, clientName, client, workspaceId, loadClients, replaceClient],
   )
 
-  // 업체를 물고 온 때만 띠를 얹는다 — 그냥 연 도구 화면은 예전과 한 픽셀도 다르지 않다.
+  // 업체를 물고 온 때만 띠를 얹는다. D-354 업체 숫자로 채우는 모듈은 업체 없이 열면 '어느 업체 일인가요? [업체 고르기]' 한 줄.
   return (
     <ToolClientCtx.Provider value={value}>
       {clientId ? (
@@ -146,13 +150,23 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
               {/* D-235: 예전 '결과는 이 업체 기록으로 갑니다' 는 사실과 달랐다 — [기록에 붙이기] 를 눌러야 남는다 */}
               <span className="max-sm:hidden"> 결과는 [기록에 붙이기] 를 누르면 이 업체에 남습니다.</span>
             </span>
+            {picker && (
+              <span className="ml-auto shrink-0">
+                <ToolClientPicker clientId={clientId} loadClients={loadClients} mode="switch" />
+              </span>
+            )}
             <Link
               to={`/ops/clients/${clientId}${backTab}`}
-              className="tap t-sub ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-brand-700 hover:underline"
+              className={`tap t-sub inline-flex shrink-0 items-center gap-1 font-medium text-brand-700 hover:underline ${picker ? '' : 'ml-auto'}`}
             >
               <ArrowLeft aria-hidden="true" className="size-4" /> 업체로<span className="max-sm:sr-only"> 돌아가기</span>
             </Link>
           </div>
+          {children}
+        </div>
+      ) : picker ? (
+        <div className="flex flex-col gap-4">
+          <ToolClientPicker clientId={null} loadClients={loadClients} mode="bar" />
           {children}
         </div>
       ) : (

@@ -20,6 +20,7 @@ import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModuleClientFocus } from '../shared/ModuleClientFocus'
 import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { OrigLabcare } from './orig/OrigLabcare'
@@ -226,6 +227,8 @@ export function LabcarePage() {
       <p className="sr-only" data-testid="lab-module-eyebrow">기업부설연구소 관리</p>
       {section === 'dashboard' ? (
         <>
+          {/* D-354 업체로 열었으면 맨 위에 이 업체의 연구소 판정 · 더 필요한 것 · 다음 단추 */}
+          <ModuleClientFocus toolKey="labcare" />
           {/* D-239: 한눈에 보기 맨 위 — 고객 전체의 연구소 판정을 AI 가 한 번에 */}
           <ModuleAssistBar toolKey="labcare" />
           {/* MOD-1 상황 예시 — 원래 대시보드가 길어 맨 위에(누르면 고른 업체 숫자로 세액공제) */}
@@ -233,7 +236,7 @@ export function LabcarePage() {
           <OrigLabcare section="dashboard" />
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
             <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="labcare" assist={false} presets={false} />
+            <ModuleDashboard toolKey="labcare" assist={false} presets={false} focus={false} />
           </section>
         </>
       ) : (

@@ -163,10 +163,24 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       writeDraft(n)
       return n
     })
+  const draftOf = (p: ShortPost): Draft => ({ ...EMPTY, id: p.id, platform: p.platform, aim: p.aim, format: p.format, topic: p.topic, script: p.script, caption: p.caption, hashtags: p.hashtags, checks: p.checks, source: p.source })
   const openPost = (p: ShortPost) => {
-    setDraft(() => ({ ...EMPTY, id: p.id, platform: p.platform, aim: p.aim, format: p.format, topic: p.topic, script: p.script, caption: p.caption, hashtags: p.hashtags, checks: p.checks, source: p.source }))
+    setDraft(() => draftOf(p))
     go('write')
   }
+  // D-355 내 콘텐츠 '만든 것 한눈에' 에서 누르고 왔으면(?open=) 그 대본을 대본 칸에 — 쓰던 다른 대본이 있으면 묻고 · 못 찾으면 기록표로 · open 은 한 번 쓰고 지운다
+  const openId = params.get('open')
+  useEffect(() => {
+    if (!openId || !store.loaded) return
+    const p = store.posts.find((x) => x.id === openId)
+    const next = new URLSearchParams(params)
+    next.delete('open')
+    if (p) {
+      next.delete('tab')
+      if (draft.id === p.id || !draft.script.trim() || window.confirm('지금 쓰던 대본을 이 대본으로 바꿀까요? (쓰던 대본은 사라집니다)')) setDraft(() => draftOf(p))
+    } else next.set('tab', 'records')
+    setParams(next, { replace: true })
+  }, [openId, store.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
   const pickFormat = (f: ShortFormat) => {
     setDraft((d) => {
       const platform = f.platforms.includes(d.platform) ? d.platform : f.platforms[0]

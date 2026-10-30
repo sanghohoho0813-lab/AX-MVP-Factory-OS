@@ -289,7 +289,7 @@ function MakeRow({
         {/* D-350 1주일치에서 모은 롱폼 — 그 주 묶음(쇼츠 · 스레드까지)으로 바로 */}
         {i.key.startsWith('week:') && (
           <Link to={`/marketing?week=1&start=${encodeURIComponent(i.key.slice(5))}&from=make`} className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-bold text-violet-900 hover:bg-violet-200" data-testid="make-week-badge">
-            <CalendarDays aria-hidden="true" className="size-3.5" /> 1주일치 묶음 보기
+            <CalendarDays aria-hidden="true" className="size-3.5" /> 1주일치 프로젝트 보기
           </Link>
         )}
         {i.script && (

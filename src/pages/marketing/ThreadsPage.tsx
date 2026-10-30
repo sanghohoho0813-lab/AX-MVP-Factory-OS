@@ -232,10 +232,24 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       writeDraft(n)
       return n
     })
+  const draftOf = (p: ThreadPost): Draft => ({ ...EMPTY_DRAFT, id: p.id, goal: p.goal, template: p.template, topic: p.topic, tag: p.tag, body: p.body, selfComment: p.selfComment, checks: p.checks, source: p.source })
   const openPost = (p: ThreadPost) => {
-    setDraft(() => ({ ...EMPTY_DRAFT, id: p.id, goal: p.goal, template: p.template, topic: p.topic, tag: p.tag, body: p.body, selfComment: p.selfComment, checks: p.checks, source: p.source }))
+    setDraft(() => draftOf(p))
     go('write')
   }
+  // D-355 내 콘텐츠 '만든 것 한눈에' 에서 누르고 왔으면(?open=) 그 글을 글 칸에 — 쓰던 다른 글이 있으면 묻고 · 못 찾으면 기록표로 · 주소의 open 은 한 번 쓰고 지운다
+  const openId = params.get('open')
+  useEffect(() => {
+    if (!openId || !store.loaded) return
+    const p = store.posts.find((x) => x.id === openId)
+    const next = new URLSearchParams(params)
+    next.delete('open')
+    if (p) {
+      next.delete('tab')
+      if (draft.id === p.id || !draft.body.trim() || window.confirm('지금 쓰던 글을 이 글로 바꿀까요? (쓰던 글은 사라집니다)')) setDraft(() => draftOf(p))
+    } else next.set('tab', 'records')
+    setParams(next, { replace: true })
+  }, [openId, store.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
   const pickTemplate = (t: ThreadTemplate) => {
     setDraft((d) => ({ ...d, template: t.key, goal: d.goal && t.goals.includes(d.goal) ? d.goal : t.goals[0] }))
     go('write')

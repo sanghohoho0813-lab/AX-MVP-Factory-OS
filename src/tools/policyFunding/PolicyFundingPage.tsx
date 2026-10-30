@@ -14,7 +14,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AiSoonButton } from '../../components/ui/AiSoonButton'
 import { useToast } from '../../components/ui/toastContext'
-import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -429,7 +428,6 @@ function ClientReport({ id }: { id: string }) {
 /** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
 export function PolicyFundingPage() {
   const section = useModuleSection()
-  const meta = toolOf('policy-funding')?.sections?.find((s) => s.key === section)
   const [params] = useSearchParams()
   const { clientId } = useToolClient()
   const cid = params.get('cid')
@@ -460,11 +458,8 @@ export function PolicyFundingPage() {
             <AiSoonButton size="sm" label="AI로 사업계획서 초안" what="진단 결과와 업체 정보로 사업계획서 초안을 써 줍니다" />
           </div>
         }
-        description={
-          meta?.hint
-            ? `${meta.label} — ${meta.hint}. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.`
-            : '추천 기관 TOP3·서류·로드맵·상담 대본. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.'
-        }
+        // D-354 화면 이름 · 설명은 바로 위 순서 띠(StepGuide)가 이미 보여 준다 — 같은 말을 두 번 쓰지 않고 이 모듈이 주는 것만
+        description="추천 기관 TOP3·서류·로드맵·상담 대본. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다."
       />
       <ModuleDashboard toolKey="policy-funding">
         <PolicyDashboardExtra />

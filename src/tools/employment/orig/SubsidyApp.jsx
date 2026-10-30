@@ -3527,9 +3527,8 @@ function Dashboard(props){
     )}
 
     {/* 업체 목록 (list 모드) */}
-    {props.mode!=="stats"&&(props.companies.length===0?(
-      <EmptyState icon="🏢" title="아직 등록된 업체가 없습니다" desc="첫 번째 거래처를 등록하고 직원·지원금·서류를 한 곳에서 관리해보세요. 등록 즉시 D-Day 알림과 수령 현황이 자동 집계됩니다." actionLabel="+ 첫 업체 등록하기" action={props.onAddCompany}/>
-    ):(<Card style={{padding:0,marginBottom:16,border:"1px solid #E2E8F0",overflow:"hidden"}}>
+    {/* D-354 업체가 없으면 위 '고용지원금으로 관리할 업체를 고르세요'(emp-empty) 하나만 — 예전엔 같은 말 · 같은 단추가 아래에 또 있었다 */}
+    {props.mode!=="stats"&&(props.companies.length===0?null:(<Card style={{padding:0,marginBottom:16,border:"1px solid #E2E8F0",overflow:"hidden"}}>
       {/* 패널 헤더: 검색 · 정렬 · 필터 · 엑셀 (큰 리스트 박스 상단에 정돈) */}
       <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"15px 20px",borderBottom:"1px solid #EDF2F7",background:"#FAFBFC"}}>
         <input value={stCoQ[0]} onChange={function(e){stCoQ[1](e.target.value);}} placeholder="🔍 업체명·사업자번호·대표자 검색"
@@ -3598,9 +3597,7 @@ function Dashboard(props){
 
     {props.mode!=="stats"&&selectedCompanyId!=="all"&&(<div><PendingPaymentsList employees={props.employees} programs={props.programs} goCompany={props.goCompany} selectedCompanyId={selectedCompanyId}/></div>)}
 
-    {props.mode!=="list"&&props.companies.length===0&&(
-      <EmptyState icon="📊" title="대시보드가 곧 채워집니다" desc="업체와 직원을 등록하면 이곳에 이번 달 신청 가능 지원금, 월별 수령 추이, 신청 일정 캘린더가 자동으로 표시됩니다." actionLabel="+ 첫 업체 등록하기" action={props.onAddCompany}/>
-    )}
+    {/* D-354 업체가 없을 때의 빈 화면은 위 '고용지원금으로 관리할 업체를 고르세요'(emp-empty) 하나로 — 같은 말 · 같은 단추가 두 번 나왔다 */}
 
     {/* [+] 월별 수령 캘린더 — 기본 접힘 */}
     {props.mode!=="list"&&props.companies.length>0&&(

@@ -15,6 +15,7 @@ import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucid
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModuleClientFocus } from '../shared/ModuleClientFocus'
 import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { EmploymentOrig } from './orig/EmploymentOrig'
@@ -255,6 +256,8 @@ export function EmploymentPage() {
           고용지원금 관리
         </h1>
         {/* D-239: 한눈에 보기 맨 위 — 명부가 있는 업체 전체의 지원금을 AI 가 한 번에(원래 대시보드가 길어 아래에 두면 안 보인다) */}
+        {/* D-354 업체로 열었으면 맨 위에 이 업체의 고용지원금 판정 · 더 필요한 것 · 다음 단추 */}
+        {section === 'dashboard' && <ModuleClientFocus toolKey="employment" />}
         {section === 'dashboard' && <ModuleAssistBar toolKey="employment" />}
         {/* MOD-1 상황 예시 — 원래 대시보드가 길어 맨 위에(누르면 고른 업체 숫자로 채용 진단) */}
         {section === 'dashboard' && <ModulePresets module="employment" />}
@@ -262,7 +265,7 @@ export function EmploymentPage() {
         {section === 'dashboard' && (
           <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
             <HelpHeading className="t-section text-slate-900">고객 관리 업체와 연결</HelpHeading>
-            <ModuleDashboard toolKey="employment" assist={false} presets={false} />
+            <ModuleDashboard toolKey="employment" assist={false} presets={false} focus={false} />
           </section>
         )}
         <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>

@@ -1,5 +1,5 @@
 /**
- * D-350 내 콘텐츠 맨 위 '1주일치 묶음' — 대표: "일주일치 콘텐츠 쓰면 내 콘텐츠에 프로젝트식으로, 누르면 써 준 내용이 싹 다 보이게.
+ * D-350 내 콘텐츠 맨 위 '1주일치 묶음'(D-356 이름 '1주일치 프로젝트' — 대표 "프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 나눠서") — 대표: "일주일치 콘텐츠 쓰면 내 콘텐츠에 프로젝트식으로, 누르면 써 준 내용이 싹 다 보이게.
  *        롱폼은 어디 저장돼 있는지 모르겠고, 스레드는 기록표에 … 여기저기 분산돼 있어서 더 헷갈려".
  * 주마다 카드 하나(만든 주 · 짝 셋 · 롱폼 · 쇼츠 · 스레드 몇 개 · 쓰는 중이면 진행) — [열기] 를 누르면 그 주 1주일치 화면에 전부.
  * 이 브라우저 · 클라우드(다른 기기에서 만든 주)를 합쳐 최근 주부터.
@@ -32,9 +32,9 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
     <section className="flex flex-col gap-2.5 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/60 p-3 sm:p-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-violet-950">
-          <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 묶음
+          <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
-        <p className="t-meta break-keep text-violet-900">누르면 그 주에 만든 롱폼 · 쇼츠 · 스레드가 한 화면에 다 보여요 · 다른 기기에서 만든 것도</p>
+        <p className="t-meta break-keep text-violet-900">누르면 그 주 프로젝트 안에서 롱폼 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
       </div>
       {weeks.length === 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-dashed border-violet-300 bg-white px-3 py-3" data-testid="mk-projects-empty">

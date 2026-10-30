@@ -105,7 +105,9 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
       {(!pilot || open) && (
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
           <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">만들기</span>
-          <div className={`grid min-w-0 flex-1 gap-1.5 ${tools.length < TOOLS.length ? 'grid-cols-2' : 'grid-cols-4 sm:grid-cols-2 xl:grid-cols-4'}`}>
+          {/* D-354 넓은 화면 4칸은 칸이 좁아 이름 · 설명이 서너 줄로 접혔다 — 칸 폭(@container)이 넉넉할 때만 4칸, 아니면 2칸에 한 줄씩 */}
+          <div className="@container min-w-0 flex-1">
+          <div className={`grid min-w-0 gap-1.5 ${tools.length < TOOLS.length ? 'grid-cols-2' : 'grid-cols-4 sm:grid-cols-2 sm:@[70rem]:grid-cols-4'}`}>
             {tools.map((it) => (
               <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
                 <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1]">
@@ -113,13 +115,14 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
                 </span>
                 <span className="min-w-0 text-center sm:text-left">
                   <span className="lg:hidden">{it.short}</span>
-                  <span className="hidden flex-col leading-tight lg:flex">
-                    <span>{it.label}</span>
-                    {it.sub && <span className="t-meta font-normal text-slate-500">{it.sub}</span>}
+                  <span className="hidden min-w-0 flex-col leading-tight lg:flex">
+                    <span className="truncate">{it.label}</span>
+                    {it.sub && <span className="t-meta truncate font-normal text-slate-500">{it.sub}</span>}
                   </span>
                 </span>
               </Link>
             ))}
+          </div>
           </div>
         </div>
       )}

@@ -124,6 +124,7 @@ import { openWeekSync, startWeekAi, subscribeWeek, weekSaved, weekSync, weekVers
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
+import { AllMade } from './radar/AllMade'
 import { BriefCard } from './radar/BriefCard'
 import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
 import { usePageCrumbs } from '../../lib/crumbStore'
@@ -340,7 +341,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const closeWeek = () => {
     if ((location.state as { mkHome?: boolean } | null)?.mkHome) navigate(-1)
     else if (weekFromMake) navigate('/marketing?view=make')
-    else setParam({ week: '', start: '', from: '' })
+    else setParam({ week: '', start: '', from: '', wt: '' })
   }
   /** D-350 내 콘텐츠 '1주일치 묶음' 카드 → 그 주 1주일치 화면(뒤로 가면 내 콘텐츠) */
   const openProject = (start: string) => {
@@ -817,7 +818,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           onRemove={(i) => void removeIdea(i)}
           onCopy={(t, what) => copy(t, what)}
           onAdd={addCustom}
-          projects={<WeekProjects onOpen={openProject} onMake={() => setParam({ view: '' })} />}
+          projects={
+            <>
+              <WeekProjects onOpen={openProject} onMake={() => setParam({ view: '' })} />
+              {/* D-355 1주일치 밖에서 하나씩 쓴 스레드 · 릴스 글까지 — 만든 것 전부 한 목록 */}
+              <AllMade ideas={notebook.ideas} workspaceId={workspaceId} />
+            </>
+          }
         />
       ) : home ? (
         <>

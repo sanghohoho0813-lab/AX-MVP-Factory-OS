@@ -155,6 +155,17 @@ const weekCalls = () => llm.filter((x) => /\((radar\.pack\.video|shorts\.write|t
 const idOf = (c) => (c.sys.match(/\((radar\.pack\.video|shorts\.write|threads\.write)/) ?? [])[1]
 const weekDone = (p) => p.waitForSelector('[data-testid="mk-week-ai"]:not([data-state="running"])', { timeout: 25000 })
 const overflowX = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+/** D-356 1주일치는 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) — 한 번에 하나만 그려진다 */
+const tabTo = async (p, key) => {
+  await p.locator(`[data-testid="mk-week-tab"][data-tab="${key}"]`).click()
+  await p.waitForSelector(`[data-testid="mk-week-panel"][data-tab="${key}"]`, { timeout: 5000 }).catch(() => {})
+}
+/** 그 탭으로 가서 센다 */
+const countIn = async (p, key, sel) => {
+  await tabTo(p, key)
+  return p.locator(sel).count()
+}
+const AI9 = '[data-testid="mk-week-thread"][data-ai="1"]'
 const twice = async (loc) => {
   await loc.click()
   await loc.page().waitForTimeout(450)
@@ -194,7 +205,15 @@ await page.waitForTimeout(200)
 await open.click()
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(300)
-check('G1 ?week=1 · 1주일치 화면 · 쓰는 중에도 초안이 다 보임(롱폼 · 쇼츠 3 · 스레드 7)', new URL(page.url()).searchParams.get('week') === '1' && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'running' && (await page.getByTestId('mk-week-long').count()) === 1 && (await page.locator('[data-testid="mk-week-short"]:not([data-n="0"])').count()) === 3 && (await page.locator('[data-testid="mk-week-thread"]:not([data-day="0"])').count()) === 7)
+{
+  // D-356 프로젝트 머리 + 탭 넷 · 처음엔 롱폼만(달력 · 쇼츠 · 스레드는 탭 뒤)
+  const tabs = await page.getByTestId('mk-week-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
+  const first = { long: await page.getByTestId('mk-week-long').count(), short: await page.getByTestId('mk-week-short').count(), thread: await page.getByTestId('mk-week-thread').count(), cal: await page.getByTestId('mk-week-calendar').count() }
+  const runTab = await page.locator('[data-testid="mk-week-tab"][data-tab="threads"]').getAttribute('data-state')
+  check('G0 1주일치 = 프로젝트 박스(기간 · 만든 날 · 짝 셋) + 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) · 처음엔 롱폼 하나만 · 쓰는 중이면 탭에 표시', (await page.getByTestId('mk-week-project').count()) === 1 && tabs.join() === 'long,shorts,threads,plan' && first.long === 1 && first.short === 0 && first.thread === 0 && first.cal === 0 && runTab === 'running', { tabs, first, runTab })
+}
+check('G1 ?week=1 · 1주일치 화면 · 쓰는 중에도 탭마다 초안이 다 보임(롱폼 · 쇼츠 3 · 스레드 7)', new URL(page.url()).searchParams.get('week') === '1' && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'running' && (await page.getByTestId('mk-week-long').count()) === 1 && (await countIn(page, 'shorts', '[data-testid="mk-week-short"]:not([data-n="0"])')) === 3 && (await countIn(page, 'threads', '[data-testid="mk-week-thread"]:not([data-day="0"])')) === 7 && new URL(page.url()).searchParams.get('wt') === 'threads')
+await tabTo(page, 'long')
 await shot(page, 'G-running')
 const pairs = await page.locator('[data-testid="mk-week-topics"] li > span:nth-child(2)').evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim()))
 const coreOf = (l) => l.split(' × ')[0]
@@ -216,19 +235,26 @@ const tplOf = (u) => [...u.matchAll(/(\d)번 ([A-X]) /g)].map((m) => m[2]).join(
 check('G5 스레드 자료 — 짝 셋 · 글마다 요일 목적 · 틀(ETX / DGQ / ISP) · 채널 설계 기준 · 접목 · 레이더 숫자 없음', th.map(tplOf).sort().join() === ['DGQ', 'ETX', 'ISP'].sort().join() && pairs.every((t) => th.some((u) => u.includes(t))) && th.every((u) => u.includes('저장 · 공유') || u.includes('관계 · 팔로워')) && th.every((u) => u.includes('[자료 · 채널 설계 기준') && u.includes('[자료 · 접목') && !u.includes('근거_우리만')), th.map(tplOf))
 
 /* ---------------- V 결과 ---------------- */
+await tabTo(page, 'threads')
 await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-week-thread"][data-ai="1"]').length === 9, null, { timeout: 8000 }).catch(() => {})
+await tabTo(page, 'long')
 check('V1 롱폼 = AI 확정 제목 · 대본 · 제목 후보', (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.getByTestId('mk-week-long-title').innerText()).includes('AI 확정 제목') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 챕터 1') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 제목 1'))
+await tabTo(page, 'shorts')
 const shortTxt = await page.locator('[data-testid="mk-week-short"]:not([data-n="0"])').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-n')}:${e.getAttribute('data-ai')}:${(e.textContent ?? '').includes('AI 쇼츠 대본 1') ? 's1' : (e.textContent ?? '').includes('AI 쇼츠 대본 2') ? 's2' : (e.textContent ?? '').includes('AI 릴스 대본 1') ? 'r1' : '?'}`))
 check('V2 쇼츠 ① ② = 짝 1 틱톡 · 쇼츠 대본 1 · 2 / ③ = 짝 2 릴스 대본 1 · 다른 버전 = 릴스 대본 2', shortTxt.join() === '1:1:s1,2:1:s2,3:1:r1' && ((await page.locator('[data-testid="mk-week-short"][data-n="0"]').textContent()) ?? '').includes('AI 릴스 대본 2'), shortTxt)
+await tabTo(page, 'threads')
 const thr = await page.locator('[data-testid="mk-week-thread"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-day')}${(/AI 스레드 첫 줄 ([A-X])/.exec(e.textContent ?? '') ?? [])[1] ?? '?'}`))
 check('V3 스레드 월~일 7 + 예비 2 — 요일 자리마다 그 틀의 글(답 순서가 섞여도) · 모두 AI', thr.join() === '1E,2T,3X,4D,5G,6Q,7I,0S,0P' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9, thr)
+const badFri = await page.locator('[data-testid="mk-week-thread"][data-day="5"]').getAttribute('data-bad')
+const badMon = await page.locator('[data-testid="mk-week-thread"][data-day="1"]').getAttribute('data-bad')
+await tabTo(page, 'plan')
 const cal = await page.getByTestId('mk-week-day').evaluateAll((els) => els.map((e) => e.textContent ?? ''))
 check('V4 달력 7일 — 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 매일 스레드', cal.length === 7 && cal[2].includes('유튜브 롱폼') && cal[1].includes('쇼츠 ①') && cal[3].includes('쇼츠 ②') && cal[5].includes('릴스 ③') && cal.every((d) => d.includes('스레드')), cal)
 const lintLine = await page.getByTestId('mk-week-lint').innerText()
-check("V5 점검 — 이번 주 글 11개 중 통과 · 링크가 든 금요일 스레드는 '고칠 곳'", lintLine.includes('이번 주 글 11개') && (await page.locator('[data-testid="mk-week-thread"][data-day="5"]').getAttribute('data-bad')) !== '0' && (await page.locator('[data-testid="mk-week-thread"][data-day="1"]').getAttribute('data-bad')) === '0' && /고칠 곳 [1-9]/.test(lintLine), lintLine)
+check("V5 점검 — 이번 주 글 11개 중 통과 · 링크가 든 금요일 스레드는 '고칠 곳'", lintLine.includes('이번 주 글 11개') && badFri !== '0' && badMon === '0' && /고칠 곳 [1-9]/.test(lintLine), lintLine)
 await page.locator('[data-testid="mk-week-day"][data-day="3"] button').first().click()
 await page.waitForFunction(() => { const el = document.getElementById('mk-week-long'); if (!el) return false; const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }, null, { timeout: 5000 }).catch(() => {})
-check('V6 달력의 [유튜브 롱폼] 누르면 롱폼 칸으로', await page.evaluate(() => { const b = document.getElementById('mk-week-long')?.getBoundingClientRect(); return !!b && b.top < window.innerHeight && b.bottom > 0 }))
+check('V6 올릴 날 탭의 [유튜브 롱폼] 누르면 롱폼 탭 · 롱폼 칸으로', await page.evaluate(() => { const b = document.getElementById('mk-week-long')?.getBoundingClientRect(); return !!b && b.top < window.innerHeight && b.bottom > 0 }))
 await page.evaluate(() => window.scrollTo({ top: 0 }))
 await shot(page, 'V-week', true)
 
@@ -275,11 +301,11 @@ const n1 = weekCalls().length
 await open.click()
 await page.getByTestId('mk-week').waitFor({ timeout: 5000 })
 await page.waitForTimeout(1200)
-check('R2 써 둔 주는 한 번에 열림(확인 없이) · AI 다시 안 부름 · 남긴 글 그대로', weekCalls().length === n1 && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'done')
+check('R2 써 둔 주는 한 번에 열림(확인 없이) · AI 다시 안 부름 · 남긴 글 그대로', weekCalls().length === n1 && (await countIn(page, 'threads', AI9)) === 9 && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'done')
 await page.reload({ waitUntil: 'networkidle' })
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(800)
-check('R3 새로 고쳐도(이 브라우저에 남김) AI 글 그대로 · 다시 안 부름', weekCalls().length === n1 && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1')
+check('R3 새로 고쳐도(이 브라우저에 남김) AI 글 그대로 · 다시 안 부름 · 보던 탭 그대로', weekCalls().length === n1 && (await page.locator('[data-testid="mk-week-panel"][data-tab="threads"]').count()) === 1 && (await page.locator(AI9).count()) === 9 && (await countIn(page, 'long', '[data-testid="mk-week-long"][data-ai="1"]')) === 1)
 await twice(page.getByTestId('mk-week-run'))
 await weekDone(page)
 check('R4 [AI로 다시 쓰기] → 여섯 갈래 다시 한 번씩', weekCalls().length === n1 + 6, weekCalls().length - n1)
@@ -293,8 +319,9 @@ await page.evaluate(() => localStorage.removeItem('axmvp.mkweek.v1'))
 const n2 = weekCalls().length
 await page.goto(BASE + '/marketing?week=1', { waitUntil: 'networkidle' })
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+await tabTo(page, 'threads')
 await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-week-thread"][data-ai="1"]').length === 9, null, { timeout: 8000 }).catch(() => {})
-check('R6 이 브라우저 저장을 지워도 클라우드 사본으로 AI 글 그대로 · AI 다시 안 부름', weekCalls().length === n2 && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1')
+check('R6 이 브라우저 저장을 지워도 클라우드 사본으로 AI 글 그대로 · AI 다시 안 부름', weekCalls().length === n2 && (await page.locator(AI9).count()) === 9 && (await countIn(page, 'long', '[data-testid="mk-week-long"][data-ai="1"]')) === 1)
 
 /* ---------------- D-350 W 내 콘텐츠 › 1주일치 묶음 ---------------- */
 await page.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
@@ -302,14 +329,14 @@ await page.getByTestId('mk-projects').waitFor({ timeout: 8000 })
 await page.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('스레드 7/7'), null, { timeout: 8000 }).catch(() => {})
 const proj = page.locator('[data-testid="mk-project"]').first()
 const projTxt = (await proj.textContent().catch(() => '')) ?? ''
-check('W1 내 콘텐츠 맨 위 1주일치 묶음 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('롱폼 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
-check('W2 내 콘텐츠의 롱폼 줄에 [1주일치 묶음 보기]', (await page.getByTestId('make-week-badge').count()) === 1)
+check('W1 내 콘텐츠 맨 위 1주일치 프로젝트 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('롱폼 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
+check('W2 내 콘텐츠의 롱폼 줄에 [1주일치 프로젝트 보기]', (await page.getByTestId('make-week-badge').count()) === 1)
 await shot(page, 'W-projects')
 await proj.click()
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(500)
 const wurl = new URL(page.url())
-check('W3 묶음을 누르면 그 주 1주일치 전부(롱폼 · 쇼츠 3 · 스레드 7 + 예비 · AI 글) · 뒤로 단추 = 내 콘텐츠', wurl.searchParams.get('from') === 'make' && /^\d{4}-\d{2}-\d{2}$/.test(wurl.searchParams.get('start') ?? '') && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.getByTestId('mk-week-back').innerText()).includes('내 콘텐츠'))
+check('W3 프로젝트를 누르면 그 주 1주일치(롱폼 · 쇼츠 3 · 스레드 7 + 예비 · AI 글 — 탭마다) · 뒤로 단추 = 내 콘텐츠', wurl.searchParams.get('from') === 'make' && /^\d{4}-\d{2}-\d{2}$/.test(wurl.searchParams.get('start') ?? '') && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await countIn(page, 'threads', AI9)) === 9 && (await page.getByTestId('mk-week-back').innerText()).includes('내 콘텐츠'))
 await page.getByTestId('mk-week-back').click()
 await page.waitForURL(/view=make/, { timeout: 5000 }).catch(() => {})
 await page.getByTestId('mk-projects').waitFor({ timeout: 5000 }).catch(() => {})
@@ -328,7 +355,7 @@ await page.waitForTimeout(300)
 const stoppedParts = await page.locator('[data-testid="mk-week-part"][data-state="stopped"]').count()
 check('X1 쓰는 중 [멈추기] → 멈춤 · 여섯 갈래 모두 멈춤 표시 · [AI로 다시 쓰기] 가 돌아옴', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'stopped' && stoppedParts === 6 && (await page.getByTestId('mk-week-run').count()) === 1, stoppedParts)
 await page.waitForTimeout(4800)
-check('X2 멈춘 뒤 늦게 온 답은 버림 — 멈춤 그대로 · 예전 AI 글 그대로 · 오류 0', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'stopped' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && errors.length === 0, { calls: weekCalls().length - nx, errors })
+check('X2 멈춘 뒤 늦게 온 답은 버림 — 멈춤 그대로 · 예전 AI 글 그대로 · 오류 0', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'stopped' && (await countIn(page, 'threads', AI9)) === 9 && errors.length === 0, { calls: weekCalls().length - nx, errors })
 delayMs = 0
 
 /* ---------------- D-350 Y 다른 화면으로 가도 계속 ---------------- */
@@ -348,7 +375,7 @@ check('Y2 다른 화면에 있는 동안 다 씀 → "1주일치 다 썼어요 �
 await page.getByTestId('week-dock-open').click()
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(400)
-check('Y3 [보기] → 1주일치 화면(AI 글 그대로) · 아래 알림은 사라짐', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'done' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('week-dock').count()) === 0)
+check('Y3 [보기] → 1주일치 화면(AI 글 그대로) · 아래 알림은 사라짐', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'done' && (await countIn(page, 'threads', AI9)) === 9 && (await page.getByTestId('week-dock').count()) === 0)
 delayMs = 0
 
 /* ---------------- E 한 갈래 실패 ---------------- */
@@ -360,12 +387,14 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' })
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(600)
-check('E0 이 브라우저 · 클라우드 사본을 다 지우고 다시 열면 초안(AI 아님)', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'idle' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 0)
+check('E0 이 브라우저 · 클라우드 사본을 다 지우고 다시 열면 초안(AI 아님)', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'idle' && (await countIn(page, 'threads', AI9)) === 0)
 await twice(page.getByTestId('mk-week-run'))
 await weekDone(page)
 await page.waitForTimeout(300)
 const err = await page.getByTestId('mk-week-error').innerText().catch(() => '')
-check('E1 숏폼 갈래만 실패 → 이유(쇼츠 ① ② · 릴스 ③) · 쇼츠는 초안 그대로(빈 칸 아님) · 롱폼 · 스레드는 AI', err.includes('쇼츠 ① ②') && err.includes('릴스 ③') && (await page.locator('[data-testid="mk-week-short"][data-ai="1"]').count()) === 0 && (await page.locator('[data-testid="mk-week-short"][data-n="1"]').innerText()).length > 40 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9, err)
+const e1short = (await countIn(page, 'shorts', '[data-testid="mk-week-short"][data-ai="1"]')) === 0 && (await page.locator('[data-testid="mk-week-short"][data-n="1"]').innerText()).length > 40
+const e1tab = await page.locator('[data-testid="mk-week-tab"][data-tab="shorts"]').innerText()
+check('E1 숏폼 갈래만 실패 → 이유(쇼츠 ① ② · 릴스 ③) · 쇼츠는 초안 그대로(빈 칸 아님 · 탭에 "일부 초안") · 롱폼 · 스레드는 AI', err.includes('쇼츠 ① ②') && err.includes('릴스 ③') && e1short && e1tab.includes('일부 초안') && (await countIn(page, 'long', '[data-testid="mk-week-long"][data-ai="1"]')) === 1 && (await countIn(page, 'threads', AI9)) === 9, { err, e1tab })
 failing = ''
 check('E2 오류 0', errors.length === 0, errors)
 await ctx.close()
@@ -410,13 +439,13 @@ for (const [w, scale] of [[360, 'extra_large'], [390, ''], [430, 'large']]) {
   await weekDone(p)
   await p.waitForTimeout(500)
   await p.waitForSelector('[data-testid="mk-week-collect"][data-state="done"]', { timeout: 10000 }).catch(() => {})
-  check(`M${w}${scale ? ` ${scale}` : ''} 1주일치 화면 가로 넘침 0 · 오류 0 · 글 7 + 3 · 모은 줄 보임`, (await p.getByTestId('mk-week-collect').count()) === 1 && (await overflowX(p)) <= 0 && errs.length === 0 && (await p.locator('[data-testid="mk-week-thread"]:not([data-day="0"])').count()) === 7 && (await p.locator('[data-testid="mk-week-short"]:not([data-n="0"])').count()) === 3, { ox: await overflowX(p), errs })
+  check(`M${w}${scale ? ` ${scale}` : ''} 1주일치 화면 가로 넘침 0 · 오류 0 · 글 7 + 3 · 모은 줄 보임`, (await p.getByTestId('mk-week-collect').count()) === 1 && (await overflowX(p)) <= 0 && errs.length === 0 && (await countIn(p, 'threads', '[data-testid="mk-week-thread"]:not([data-day="0"])')) === 7 && (await overflowX(p)) <= 0 && (await countIn(p, 'shorts', '[data-testid="mk-week-short"]:not([data-n="0"])')) === 3 && (await overflowX(p)) <= 0 && (await countIn(p, 'plan', '[data-testid="mk-week-day"]')) === 7 && (await overflowX(p)) <= 0, { ox: await overflowX(p), errs })
   await shot(p, `M-${w}`, w === 390)
   if (w === 390) {
     // D-350 휴대폰 — 내 콘텐츠 묶음 · 다른 화면에서 '쓰는 중' 표시(아래 메뉴 위 · 넘침 0)
     await p.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
     await p.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('7/7'), null, { timeout: 8000 }).catch(() => {})
-    check('M390 내 콘텐츠 1주일치 묶음 카드 · 넘침 0', (await p.getByTestId('mk-project').count()) >= 1 && (await overflowX(p)) <= 0)
+    check('M390 내 콘텐츠 1주일치 프로젝트 카드 · 넘침 0', (await p.getByTestId('mk-project').count()) >= 1 && (await overflowX(p)) <= 0)
     await p.getByTestId('mk-projects').scrollIntoViewIfNeeded()
     await shot(p, 'M-390-projects')
     await p.getByTestId('mk-project').first().click()
