@@ -7,9 +7,10 @@
  *  - 제안할 것이 없으면 무엇을 받으면 판정이 나오는지 + [서류 올리기].
  * 규칙 계산이다 — 'AI' 라고 부르지 않는다. 선정 · 승인을 보장하지 않는다.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileUp, History, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, FileText, FileUp, History, Send, Sparkles } from 'lucide-react'
+import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, type Tone } from '../ui/primitives'
@@ -31,7 +32,10 @@ export function TopPicksCard({
   showUpload = true,
   onRequest,
   onPickRequest,
+  onDiagnosis,
 }: {
+  /** D-352 대표님께 드릴 맞춤 진단서 한 장(없으면 단추를 그리지 않는다) */
+  onDiagnosis?: () => void
   insights: readonly Insight[]
   onUpload: () => void
   onShowAll?: () => void
@@ -55,8 +59,13 @@ export function TopPicksCard({
             이 업체에 먼저 제안할 것
           </h2>
         </HintTip>
+        {onDiagnosis && insights.length > 0 && (
+          <Button size="sm" variant="secondary" onClick={onDiagnosis} className="ml-auto" data-testid="top-picks-diagnosis" title="이 판정 그대로 대표님께 드릴 한 장 — 인쇄 · PDF · 카톡 요약">
+            <FileText aria-hidden="true" className="size-4" /> 맞춤 진단서
+          </Button>
+        )}
         {onShowAll && insights.length > 0 && (
-          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className="tap t-sub ml-auto inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
+          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className={`tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline ${onDiagnosis ? '' : 'ml-auto'}`}>
             모듈별 판정 {insights.length}개 <ArrowRight aria-hidden="true" className="size-4" />
           </button>
         )}
@@ -167,13 +176,19 @@ export default function ClientTopPicks({
   const notices = useGrantNotices(workspaceId)
   const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
   const text = useMemo(() => recoRequestMessage(record, insights), [record, insights])
+  // D-352 대표님께 드릴 맞춤 진단서 — 개요 맨 위에서도 바로
+  const [diag, setDiag] = useState(false)
   return (
-    <TopPicksCard
-      insights={insights}
-      onUpload={onUpload}
-      onShowAll={onShowAll}
-      onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
-      onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
-    />
+    <>
+      {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} />}
+      <TopPicksCard
+        insights={insights}
+        onUpload={onUpload}
+        onShowAll={onShowAll}
+        onDiagnosis={() => setDiag(true)}
+        onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
+        onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
+      />
+    </>
   )
 }

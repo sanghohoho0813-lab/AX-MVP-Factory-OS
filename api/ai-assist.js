@@ -20,7 +20,7 @@ import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan
 import { cleanBrand } from './_ai/brand.js'
 import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
 import { myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
-import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
+import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, probeProvider, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
 /** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
@@ -46,6 +46,8 @@ function pilotCatalog(catalog) {
   const def = PILOT_PROVIDERS.has(catalog.defaultChoice.provider) ? catalog.defaultChoice : { provider: 'gemini', model: tierModel('gemini', 'cheap') }
   return { providers, defaultChoice: def }
 }
+/** D-353 [연결 점검] 누른 때(사람마다 20초에 한 번) */
+const probeAt = new Map()
 const inflight = new Map()
 const ID_RE = /^[A-Za-z0-9_-]{8,80}$/
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/
@@ -77,6 +79,7 @@ export function __resetAiAssistState() {
   __resetGateState()
   __resetProviderCache()
   inflight.clear()
+  probeAt.clear()
 }
 
 function timeoutMs() {
@@ -196,13 +199,22 @@ export default async function handler(req, res) {
     if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
     const full = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
     const catalog = who.role === 'pilot' ? pilotCatalog(full) : full
+    // D-353 [연결 점검] — 공급자마다 아주 짧게 한 번 불러 본다(팀장은 Gemini 만 · 20초에 한 번)
+    let probe
+    if (url.searchParams.get('probe') === '1') {
+      const last = probeAt.get(who.userId) ?? 0
+      if (Date.now() - last < 20_000) return fail(res, 429, 'rate_limited', { retryAfter: 20 })
+      probeAt.set(who.userId, Date.now())
+      const ids = catalog.providers.map((p) => p.id).filter((id) => who.role !== 'pilot' || id === 'gemini')
+      probe = await Promise.all(ids.map((id) => probeProvider(id)))
+    }
     // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅은 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
     const acc = who.role === 'pilot' ? await myAccess(bearerOf(req)) : null
     const meterable = !!acc && acc.state === 'ok' && acc.configured && usageReady()
     const marketing = who.role !== 'pilot' || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
     const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
     const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
-    return send(res, 200, { ok: true, role: who.role, ...catalog, limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
+    return send(res, 200, { ok: true, role: who.role, ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
@@ -248,7 +260,7 @@ export default async function handler(req, res) {
     } catch (e) {
       if (e instanceof UsageError) return fail(res, e.status, e.code, e.extra)
       logFail(body.requestId, assist.id, e)
-      return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
+      return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error', providerExtra(e))
     }
   }
 
@@ -314,8 +326,16 @@ export default async function handler(req, res) {
     inflight.delete(idemKey)
     if (e instanceof UsageError) return fail(res, e.status, e.code, e.extra)
     logFail(body.requestId, assist.id, e)
-    return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error')
+    return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error', providerExtra(e))
   }
+}
+
+/**
+ * D-353 어느 회사의 문제인지만 — 화면이 '키 틀림 · 잔액 부족 · 모델 이름' 을 회사 이름과 함께 보여 준다.
+ * 공급자가 준 오류 원문은 보내지 않는다(회사에 따라 키 일부를 섞어 돌려준다 — S15).
+ */
+function providerExtra(e) {
+  return e instanceof ProviderError && e.provider ? { provider: e.provider } : {}
 }
 
 /**

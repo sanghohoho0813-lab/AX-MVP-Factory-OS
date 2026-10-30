@@ -33,7 +33,21 @@ export interface ProviderInfo {
   checked: boolean
 }
 
+/** D-353 [연결 점검] 공급자 하나 — ok · no_key · bad_base · provider_auth · provider_billing · provider_model · provider_busy · provider_unreachable … */
+export interface ProviderProbe {
+  id: ProviderId
+  code: string
+  /** 키 이름(키가 없을 때 · 값은 보내지 않는다) */
+  keyName?: string
+  /** 점검에 쓴 가장 싼 모델 */
+  model?: string
+  /** 공급자가 준 까닭 한 줄(키 값은 가림) */
+  detail: string
+}
+
 export interface AssistStatus {
+  /** D-353 [연결 점검] 결과(눌렀을 때만) */
+  probe?: ProviderProbe[]
   providers: ProviderInfo[]
   defaultChoice: { provider: ProviderId; model: string }
   /** SAAS-2 마케팅 AI 가 이 계정에 열렸나(대표는 늘 true · 고객은 사용량 장부가 켜졌을 때) */
@@ -92,9 +106,32 @@ export const usedModel = (run: Pick<AssistRun, 'model' | 'servedModel'>): string
 /** D-268 답이 길이 상한에서 잘렸나 — Gemini MAX_TOKENS · OpenAI length · Claude max_tokens */
 export const cutOff = (run: Pick<AssistRun, 'finish'> | null | undefined): boolean => /^(?:max_tokens|length)$/i.test(String(run?.finish ?? '').trim())
 
+export const PROVIDER_NAME: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
+/** D-353 공급자 관리 화면(키 · 잔액을 고치는 곳) */
+export const PROVIDER_CONSOLE: Record<ProviderId, string> = {
+  gemini: 'Google AI Studio(aistudio.google.com) › API 키 · 결제',
+  openai: 'OpenAI 플랫폼(platform.openai.com) › API keys · Billing',
+  anthropic: 'Anthropic 콘솔(console.anthropic.com) › API Keys · Plans & Billing',
+}
+const isProvider = (v: unknown): v is ProviderId => v === 'gemini' || v === 'openai' || v === 'anthropic'
+
+/** D-353 어느 회사의 무슨 문제인지 — 키 틀림 · 잔액 부족 · 모델 이름은 회사 이름과 고치는 곳까지 */
+export function providerMessage(code: string, provider: ProviderId | '', detail = ''): string {
+  if (!provider) return assistMessage(code)
+  const name = PROVIDER_NAME[provider]
+  const why = detail ? ` (회사가 준 까닭: ${detail})` : ''
+  if (code === 'provider_billing') return `${name} 계정의 잔액(크레딧) · 사용 한도가 다 됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 충전하면 바로 됩니다(키는 그대로).${why}`
+  if (code === 'provider_auth') return `${name} 키가 틀렸거나 폐기됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 새 키를 만들어 Vercel 환경변수에 넣고 Redeploy 해 주세요.${why}`
+  if (code === 'provider_model') return `${name} 가 이 모델 이름을 모릅니다(이름이 바뀌었거나 끝난 모델) — 다른 모델을 골라 주세요.${why}`
+  return `${name} — ${assistMessage(code)}`
+}
+
 export class AssistError extends Error {
   code: string
   missing: string[]
+  /** D-353 문제가 난 AI 회사 · 그 회사가 준 까닭(있으면) */
+  provider: ProviderId | '' = ''
+  detail = ''
   constructor(code: string, message: string, missing: string[] = []) {
     super(message)
     this.code = code
@@ -113,6 +150,8 @@ const MESSAGE: Record<string, string> = {
   provider_auth: 'AI 키가 맞지 않습니다. 키를 다시 확인해 주세요.',
   provider_busy: 'AI 쪽이 붐비거나 사용 한도에 닿았습니다. 잠시 뒤 다시 눌러 주세요.',
   provider_rejected: '이 모델을 쓸 수 없습니다. 다른 모델을 골라 주세요.',
+  provider_billing: 'AI 회사 계정의 잔액 · 사용 한도가 다 됐습니다. 충전한 뒤 다시 눌러 주세요.',
+  provider_model: 'AI 회사가 이 모델 이름을 모릅니다. 다른 모델을 골라 주세요.',
   provider_unreachable: 'AI 답을 받지 못했습니다(시간 초과). 다시 눌러 주세요.',
   provider_error: 'AI 쪽 오류로 답을 받지 못했습니다. 다시 눌러 주세요.',
   network: '서버에 닿지 못했습니다. 인터넷 연결을 확인해 주세요.',
@@ -163,7 +202,7 @@ function notJson(res: Response): boolean {
 }
 
 async function readError(res: Response): Promise<AssistError> {
-  let body: { code?: string; missing?: string[]; used?: number; limit?: number } = {}
+  let body: { code?: string; missing?: string[]; used?: number; limit?: number; provider?: string; detail?: string } = {}
   try {
     body = await res.json()
   } catch {
@@ -173,13 +212,18 @@ async function readError(res: Response): Promise<AssistError> {
   const code = typeof body.code === 'string' ? body.code : 'provider_error'
   // SAAS-2 한도를 다 쓰면 몇 단위 중 몇을 썼는지도
   const quota = code === 'quota_exceeded' && Number.isFinite(body.used) && Number.isFinite(body.limit) ? ` (이번 달 ${body.used} / ${body.limit})` : ''
-  return new AssistError(code, assistMessage(code) + quota, Array.isArray(body.missing) ? body.missing.map(String) : [])
+  const provider = isProvider(body.provider) ? body.provider : ''
+  const detail = typeof body.detail === 'string' ? body.detail.slice(0, 160) : ''
+  const err = new AssistError(code, (provider ? providerMessage(code, provider, detail) : assistMessage(code)) + quota, Array.isArray(body.missing) ? body.missing.map(String) : [])
+  err.provider = provider
+  err.detail = detail
+  return err
 }
 
-export async function fetchAssistStatus(withModels = false): Promise<AssistStatus> {
+export async function fetchAssistStatus(withModels = false, probe = false): Promise<AssistStatus> {
   let res: Response
   try {
-    res = await fetch(`${ASSIST_ENDPOINT}?status=1${withModels ? '&models=1' : ''}`, { headers: { ...(await authHeader()) } })
+    res = await fetch(`${ASSIST_ENDPOINT}?status=1${withModels ? '&models=1' : ''}${probe ? '&probe=1' : ''}`, { headers: { ...(await authHeader()) } })
   } catch {
     throw new AssistError('network', MESSAGE.network)
   }
@@ -187,6 +231,7 @@ export async function fetchAssistStatus(withModels = false): Promise<AssistStatu
   if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as AssistStatus & { ok: boolean }
   return {
+    ...(Array.isArray(b.probe) ? { probe: b.probe.filter((x) => x && isProvider(x.id)).map((x) => ({ id: x.id, code: String(x.code ?? ''), keyName: x.keyName ? String(x.keyName) : undefined, model: x.model ? String(x.model) : undefined, detail: String(x.detail ?? '').slice(0, 160) })) } : {}),
     providers: Array.isArray(b.providers) ? b.providers : [],
     defaultChoice: b.defaultChoice,
     // SAAS-2 서버가 분명히 연다고 한 때만(옛 서버 · 빠진 칸은 닫힘)

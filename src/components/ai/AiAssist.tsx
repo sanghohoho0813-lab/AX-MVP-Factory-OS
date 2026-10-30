@@ -26,7 +26,7 @@ import { useEscToClose } from '../../lib/escStack'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { createJournalEntry } from '../../services/journalService'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refKind, refLabel, todoText, unalias, unaliasAnswer } from '../../services/aiAssist/actions'
-import { AssistError, assistMessage, callAssist, fetchAssistStatus } from '../../services/aiAssist/client'
+import { AssistError, PROVIDER_NAME, assistMessage, callAssist, fetchAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
 import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
@@ -149,9 +149,9 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
   // 할 일을 넣었으면 판을 닫을 때 화면 목록을 다시 읽는다 — 열린 채 다시 읽으면 방금 답에 '자료가 바뀌었어요' 가 떠서
   const recorded = useRef(false)
 
-  const loadStatus = useCallback(async (withModels = false) => {
+  const loadStatus = useCallback(async (withModels = false, probe = false) => {
     try {
-      const s = await fetchAssistStatus(withModels)
+      const s = await fetchAssistStatus(withModels, probe)
       setStatus(s)
       return s
     } catch {
@@ -670,10 +670,22 @@ export function ModelRow({
   open: boolean
   setOpen: (v: boolean) => void
   setChoice: (c: AiChoice | null) => void
-  loadStatus: (withModels?: boolean) => Promise<AssistStatus | null>
+  loadStatus: (withModels?: boolean, probe?: boolean) => Promise<AssistStatus | null>
 }) {
   const [tab, setTab] = useState<ProviderId>(effective.provider)
   const [checking, setChecking] = useState(false)
+  // D-353 [연결 점검] — 공급자마다 아주 짧게 한 번 불러 본 결과(키 없음 · 키 틀림 · 잔액 부족 · 모델 이름 …)
+  const [probing, setProbing] = useState(false)
+  const [probe, setProbe] = useState<ProviderProbe[] | null>(null)
+  const [probeFail, setProbeFail] = useState(false)
+  const runProbe = async () => {
+    setProbing(true)
+    setProbeFail(false)
+    const s = await loadStatus(true, true)
+    setProbe(s?.probe ?? null)
+    setProbeFail(!s?.probe)
+    setProbing(false)
+  }
   const provider = status?.providers.find((p) => p.id === tab)
   const current = labelOf(status, effective)
   const isDefault = !choice
@@ -705,7 +717,9 @@ export function ModelRow({
                   className={`tap t-sub inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 font-semibold ${tab === id ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
                 >
                   {PROVIDER_LABEL[id]}
-                  <span className={`t-meta rounded-full px-1.5 ${tab === id ? 'bg-white/25' : p?.configured ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'}`}>{p ? (p.configured ? '키 있음' : '키 없음') : '…'}</span>
+                  <span className={`t-meta rounded-full px-1.5 ${tab === id ? 'bg-white/25' : probeOf(probe, id) ? (probeOf(probe, id)!.code === 'ok' ? 'bg-success-50 text-success-700' : 'bg-amber-100 text-amber-900') : p?.configured ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'}`} data-testid="ai-assist-provider-state" data-for={id}>
+                    {probeOf(probe, id) ? PROBE_CHIP[probeOf(probe, id)!.code] ?? '문제 있음' : p ? (p.configured ? '키 있음' : '키 없음') : '…'}
+                  </span>
                 </button>
               )
             })}
@@ -761,12 +775,33 @@ export function ModelRow({
             >
               <RefreshCw aria-hidden="true" className={`size-4 ${checking ? 'animate-spin' : ''}`} /> 키로 쓸 수 있는 모델 확인
             </button>
+            <button
+              type="button"
+              disabled={probing}
+              onClick={() => void runProbe()}
+              className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-violet-300 bg-violet-50 px-2.5 font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
+              data-testid="ai-assist-probe"
+              title="AI 회사마다 가장 싼 모델로 아주 짧게 한 번 불러 봐요 — 키 없음 · 키 틀림 · 잔액 부족을 바로 알려 줘요"
+            >
+              <RefreshCw aria-hidden="true" className={`size-4 ${probing ? 'animate-spin' : ''}`} /> {probing ? '점검 중…' : '연결 점검'}
+            </button>
             {!isDefault && (
               <button type="button" onClick={() => setChoice(null)} className="tap t-sub min-h-10 rounded-(--radius-control) px-2.5 font-semibold text-violet-800 hover:underline" data-testid="ai-assist-model-reset">
                 기본(가장 싼 Gemini)으로
               </button>
             )}
           </div>
+          {(probe || probeFail) && (
+            <ul className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2" data-testid="ai-assist-probe-result">
+              {probeFail && <li className="t-sub break-keep text-amber-900">점검하지 못했어요 — 20초 뒤 다시 눌러 주세요(연달아 누르면 잠시 막혀요).</li>}
+              {(probe ?? []).map((x) => (
+                <li key={x.id} className={`t-sub flex min-w-0 items-start gap-1.5 break-keep [overflow-wrap:anywhere] ${x.code === 'ok' ? 'text-success-800' : 'text-amber-900'}`} data-testid="ai-assist-probe-row" data-provider={x.id} data-code={x.code}>
+                  <span aria-hidden="true" className="shrink-0 font-bold">{x.code === 'ok' ? '✓' : '!'}</span>
+                  <span className="min-w-0">{probeText(x)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="t-meta break-keep text-slate-500">
             {/* D-257 팀장 화면에는 없는 마케팅 · AI 전략실은 말하지 않는다 */}
             고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 ? ' · 마케팅 · AI 전략실' : ' · 오른쪽 판 AI 대화'})가 같이 써요.
@@ -776,6 +811,33 @@ export function ModelRow({
       )}
     </section>
   )
+}
+
+/* ------------------------------------------------------------------ */
+/* D-353 연결 점검                                                         */
+/* ------------------------------------------------------------------ */
+
+const PROBE_CHIP: Record<string, string> = {
+  ok: '연결됨',
+  no_key: '키 없음',
+  bad_base: '주소 설정',
+  provider_auth: '키 틀림',
+  provider_billing: '잔액 부족',
+  provider_model: '모델 이름',
+  provider_busy: '붐빔',
+  provider_unreachable: '응답 없음',
+}
+const probeOf = (probe: readonly ProviderProbe[] | null, id: ProviderId) => probe?.find((x) => x.id === id) ?? null
+
+/** 점검 한 줄 — 무엇이 문제고 어디서 고치는지 */
+function probeText(x: ProviderProbe): string {
+  const name = PROVIDER_NAME[x.id]
+  if (x.code === 'ok') return `${name} — 연결됨${x.model ? `(${x.model} 로 한 번 불러 봤어요)` : ''}`
+  if (x.code === 'no_key') return `${name} — 서버에 키가 없어요. 관리자: Vercel › Settings › Environment Variables 에 ${x.keyName ?? '키'} 를 넣고(Production 에 체크) Redeploy 해 주세요.`
+  if (x.code === 'bad_base') return `${name} — 주소 설정(${x.keyName ?? ''})이 https 주소가 아니에요. 지우면 기본 주소로 붙어요.`
+  if (x.code === 'provider_busy') return `${name} — 지금 붐비거나 1분 한도에 닿았어요. 잠시 뒤 다시 점검해 주세요.`
+  if (x.code === 'provider_unreachable') return `${name} — 20초 안에 답이 없었어요. 잠시 뒤 다시 점검해 주세요.`
+  return providerMessage(x.code, x.id, x.detail)
 }
 
 /* ------------------------------------------------------------------ */

@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     } catch (e) {
       const code = e instanceof ProviderError ? e.code : 'provider_error'
       console.warn(`[ai-run] 실패 문의번호=${String(body.requestId).slice(-6)} 작업=${skill.id} 오류=${code}`)
-      return fail(res, e instanceof ProviderError ? e.status : 502, code)
+      return fail(res, e instanceof ProviderError ? e.status : 502, code, e instanceof ProviderError && e.provider ? { provider: e.provider } : {})
     }
   }
 
@@ -138,6 +138,6 @@ export default async function handler(req, res) {
     const code = e instanceof ProviderError ? e.code : 'provider_error'
     // NX-2 화면의 '문의 번호'(요청 번호 끝 6자리)로 함수 기록에서 찾는다 — 번호 · 작업 · 오류 갈래만
     console.warn(`[ai-run] 실패 문의번호=${String(body.requestId).slice(-6)} 작업=${skill.id} 오류=${code}`)
-    return fail(res, e instanceof ProviderError ? e.status : 502, code)
+    return fail(res, e instanceof ProviderError ? e.status : 502, code, e instanceof ProviderError && e.provider ? { provider: e.provider } : {})
   }
 }

@@ -209,6 +209,28 @@ export async function liveModels(provider) {
   return ids
 }
 
+/**
+ * D-353 [연결 점검] — 공급자마다 ① 키가 있나 ② 키로 모델 목록이 열리나(무료) ③ 가장 싼 모델로 아주 짧게 한 번 불러지나(잔액 · 결제까지).
+ * 결과는 갈래(code)만 — 키 · 주소 값 · 공급자 오류 원문은 보내지 않는다.
+ */
+export async function probeProvider(provider) {
+  const p = PROVIDERS[provider]
+  const key = providerKey(provider)
+  const base = providerBase(provider)
+  if (!p) return { id: provider, code: 'unknown', detail: '' }
+  if (!key) return { id: provider, code: 'no_key', keyName: p.keyNames[0], detail: '' }
+  if (!base) return { id: provider, code: 'bad_base', keyName: p.baseNames[0], detail: '' }
+  const model = tierModel(provider, 'cheap')
+  try {
+    await callModel({ provider, key, base, model, system: 'Reply with the single word OK.', user: 'OK', maxOut: 64, timeoutMs: 20000, json: false })
+    return { id: provider, code: 'ok', model, detail: '' }
+  } catch (e) {
+    // 공급자 오류 원문은 보내지 않는다 — 갈래(code)만
+    if (e instanceof ProviderError) return { id: provider, code: e.code, model, detail: '' }
+    return { id: provider, code: 'provider_error', model, detail: '' }
+  }
+}
+
 /** 화면에 보낼 공급자 · 모델 목록(키 · 주소 값은 빼고) */
 export async function publicCatalog({ withLive = false } = {}) {
   const ready = new Set(configuredProviders())
@@ -230,18 +252,56 @@ export async function publicCatalog({ withLive = false } = {}) {
 /* ------------------------------------------------------------------ */
 
 export class ProviderError extends Error {
-  constructor(code, status) {
+  /** detail = 공급자가 준 까닭 한 줄(키처럼 보이는 글은 가림 · 160자) — 서버 안에서만(화면 · 기록에는 보내지 않는다) */
+  constructor(code, status, detail = '', provider = '') {
     super(code)
     this.code = code
     this.status = status
+    this.detail = detail
+    this.provider = provider
   }
 }
 
-function statusError(status) {
-  if (status === 401 || status === 403) return new ProviderError('provider_auth', 503)
-  if (status === 429 || status === 529) return new ProviderError('provider_busy', 503)
-  if (status === 400 || status === 404) return new ProviderError('provider_rejected', 502)
-  return new ProviderError('provider_error', 502)
+/** 키처럼 보이는 글 가리기(공급자 오류 글에 키가 들어오는 일은 없지만 한 번 더) */
+export function scrubSecret(s) {
+  return String(s ?? '')
+    .replace(/(sk-ant-[A-Za-z0-9_-]{4,}|sk-[A-Za-z0-9_-]{8,}|AIza[0-9A-Za-z_-]{10,}|Bearer\s+\S+)/g, '[가림]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160)
+}
+
+/**
+ * D-353 공급자 오류 몸통까지 읽어 까닭을 나눈다 — 예전엔 Anthropic '잔액 부족'(400)도 '이 모델을 쓸 수 없습니다' 로 보여
+ * 대표가 '연동이 안 됐다' 로만 알았다. billing = 잔액 · 결제 · 사용 한도 · auth = 키가 틀림 · 폐기 · model = 모델 이름을 모름.
+ */
+export function classifyProviderError(status, text, provider = '') {
+  const t = String(text ?? '')
+  let msg = ''
+  try {
+    const j = JSON.parse(t)
+    msg = (j && j.error && (j.error.message || j.error.type || j.error.status)) || j.message || ''
+  } catch {
+    msg = t
+  }
+  const detail = scrubSecret(msg || t)
+  const billing = /credit balance|billing|insufficient_quota|exceeded your current quota|payment|spend(ing)? limit|purchase credits|plan and billing/i
+  if (billing.test(t)) return new ProviderError('provider_billing', 503, detail, provider)
+  if (status === 401 || status === 403 || /authentication_error|invalid x-api-key|invalid_api_key|incorrect api key|api key not valid|API_KEY_INVALID|permission_error|PERMISSION_DENIED/i.test(t)) return new ProviderError('provider_auth', 503, detail, provider)
+  if (status === 404 || /not_found_error|model[^.]{0,40}(not found|does not exist|is not supported|not available)|model_not_found|NOT_FOUND/i.test(t)) return new ProviderError('provider_model', 502, detail, provider)
+  if (status === 429 || status === 529 || /overloaded|rate.?limit|RESOURCE_EXHAUSTED/i.test(t)) return new ProviderError('provider_busy', 503, detail, provider)
+  if (status === 400) return new ProviderError('provider_rejected', 502, detail, provider)
+  return new ProviderError('provider_error', 502, detail, provider)
+}
+
+async function errorFrom(res, provider) {
+  let text = ''
+  try {
+    text = (await res.text()).slice(0, 4000)
+  } catch {
+    text = ''
+  }
+  return classifyProviderError(res.status, text, provider)
 }
 
 /**
@@ -311,11 +371,11 @@ export async function callModel({ provider, key, base, model, system, user, maxO
       })
     }
   } catch {
-    throw new ProviderError('provider_unreachable', 502)
+    throw new ProviderError('provider_unreachable', 502, '', provider)
   } finally {
     clearTimeout(timer)
   }
-  if (!res.ok) throw statusError(res.status)
+  if (!res.ok) throw await errorFrom(res, provider)
   let data
   try {
     data = await res.json()

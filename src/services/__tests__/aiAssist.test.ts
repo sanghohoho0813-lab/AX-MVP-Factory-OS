@@ -8,14 +8,14 @@ import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, PACKS, RADAR_RULES, assistSystem, buildAssistPrompt, knowledgeOf, topicPacks } from '../../../api/_ai/assists.js'
 import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from '../../../api/_ai/specSamples.js'
-import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, tierOf } from '../../../api/_ai/providers.js'
+import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, classifyProviderError, tierOf } from '../../../api/_ai/providers.js'
 import { aiConfig, buildPrompt, scrubText, validate } from '../../../api/_ai/core.js'
 import { CONFIDENTIAL_RULES, REFUSAL, guardOutput, hasBanned, scrubBrand, secretIndex } from '../../../api/_ai/guard.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { ASSIST_PRESETS, askPresetOf } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
-import { AssistError, callAssist } from '../aiAssist/client'
+import { AssistError, callAssist, providerMessage } from '../aiAssist/client'
 import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
 import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
 import type { AssistRun, AssistStatus } from '../aiAssist/client'
@@ -198,6 +198,28 @@ async function serverTests() {
     check('S8 Claude 고름(모델 안 정함) → Claude 가장 싼 모델 · 코드블록 안 JSON 도 읽음', r.statusCode === 200 && call?.body.model === 'claude-haiku-5-5' && call?.headers['x-api-key'] === A_KEY && (r.body.run as { structured: { headline: string } }).structured.headline === ANSWER.headline, r.raw.slice(0, 300))
   }
   {
+    // D-353 '클로드가 며칠 전부터 연동이 안 된다' — 잔액 부족 · 키 틀림을 회사 이름과 까닭까지 화면에
+    const BILLING = { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.' } }
+    reply = (c) => (c.url.includes('/messages') ? { status: 400, body: BILLING } : { status: 200, body: okFor(c.url) })
+    const r = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'anthropic' }, context: CTX })
+    check('S8b Claude 잔액 부족(400) → provider_billing · 회사 anthropic · 오류 원문 · 키 값 0', r.statusCode === 503 && r.body.code === 'provider_billing' && r.body.provider === 'anthropic' && !r.raw.includes('credit balance') && !r.raw.includes(A_KEY), r.raw)
+    reply = (c) => (c.url.includes('/messages') ? { status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } } : { status: 200, body: okFor(c.url) })
+    const r2 = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'anthropic' }, context: CTX })
+    check('S8c 키 틀림(401) → provider_auth · anthropic', r2.body.code === 'provider_auth' && r2.body.provider === 'anthropic', r2.raw)
+    check('S8d 화면 글 — 회사 이름 · 고치는 곳(콘솔 · 충전 / 새 키 · Redeploy)', providerMessage('provider_billing', 'anthropic', 'x').startsWith('Claude 계정의 잔액') && providerMessage('provider_billing', 'anthropic').includes('console.anthropic.com') && providerMessage('provider_auth', 'anthropic').includes('Redeploy') && providerMessage('provider_model', 'openai').startsWith('GPT'))
+    reply = (c) => (c.url.includes('/messages') ? { status: 400, body: BILLING } : { status: 200, body: okFor(c.url) })
+    const pr = await get('/api/ai-assist?status=1&probe=1')
+    const probe = (pr.body.probe ?? []) as { id: string; code: string; keyName?: string; detail: string }[]
+    const of = (id: string) => probe.find((x) => x.id === id)
+    check('S8e [연결 점검] — Gemini 연결됨 · GPT 키 없음(키 이름만) · Claude 잔액 부족 · 오류 원문 · 키 값 0', pr.statusCode === 200 && of('gemini')?.code === 'ok' && of('openai')?.code === 'no_key' && of('openai')?.keyName === 'OPENAI_API_KEY' && of('anthropic')?.code === 'provider_billing' && !pr.raw.includes('credit balance') && !pr.raw.includes(A_KEY) && !pr.raw.includes(G_KEY), pr.raw.slice(0, 500))
+    const again = await get('/api/ai-assist?status=1&probe=1')
+    check('S8f 연달아 점검은 20초 막힘(429)', again.statusCode === 429, again.statusCode)
+    const pp = await get('/api/ai-assist?status=1&probe=1', PILOT)
+    check('S8g 팀장 점검은 Gemini 만', pp.statusCode === 200 && ((pp.body.probe ?? []) as { id: string }[]).map((x) => x.id).join() === 'gemini', pp.raw.slice(0, 300))
+    check('S8h 오류 나누기 — 잔액 · 키 · 모델 · 붐빔 · 그 밖 400 · 키처럼 보이는 글 가림', classifyProviderError(429, '{"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}').code === 'provider_billing' && classifyProviderError(404, '{"error":{"type":"not_found_error","message":"model: claude-x"}}').code === 'provider_model' && classifyProviderError(529, '{"error":{"type":"overloaded_error"}}').code === 'provider_busy' && classifyProviderError(400, '{"error":{"message":"max_tokens too large"}}').code === 'provider_rejected' && !classifyProviderError(401, '{"error":{"message":"bad key sk-ant-abcdef123456"}}').detail.includes('sk-ant'))
+    setEnv()
+  }
+  {
     calls = []
     const r = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX })
     check('S9 GPT 고름 · 키 없음 → 503 설정 필요 + 넣을 이름 OPENAI_API_KEY · 공급자 안 부름', r.statusCode === 503 && r.body.code === 'setup_needed' && JSON.stringify(r.body.missing) === '["OPENAI_API_KEY"]' && calls.length === 0, r.body)
@@ -318,7 +340,8 @@ async function serverTests() {
     check('S16 JSON 이 아니면 parse_fallback · 받은 글 그대로', r2.statusCode === 200 && (r2.body.run as { status: string; raw: string }).status === 'parse_fallback' && (r2.body.run as { raw: string }).raw.includes('정리 못한 글'))
     reply = () => ({ status: 404, body: {} })
     const r3 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'gemini', model: 'gemini-old-gone' }, context: CTX })
-    check('S17 없어진 모델(404) → 502 provider_rejected — 화면은 "다른 모델을 골라 주세요"', r3.statusCode === 502 && r3.body.code === 'provider_rejected')
+    // D-353 404 는 '모델 이름을 모름'(provider_model) 으로 따로 — 화면은 같은 말(다른 모델을 골라 주세요) + 회사 이름
+    check('S17 없어진 모델(404) → 502 provider_model — 화면은 "다른 모델을 골라 주세요"', r3.statusCode === 502 && r3.body.code === 'provider_model' && r3.body.provider === 'gemini')
   }
   setEnv({ VITE_GEMINI_API_KEY: 'should-not-read', GEMINI_API_KEY: undefined, ANTHROPIC_API_KEY: undefined })
   {

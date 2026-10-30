@@ -62,6 +62,7 @@ import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
+import { buildDiagnosis, customerText, diagnosisKakao } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
@@ -362,6 +363,17 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('맞춤 추천: 창업 7년 → 창업감면 기간 끝남', st?.tone === 'no', st?.headline)
   const none = buildInsights(empty, '2026-10-02', [])
   check('맞춤 추천: 정보가 없으면 짐작하지 않고 무엇이 필요한지', none.find((i) => i.key === 'policy-funding')?.tone === 'need' && (none.find((i) => i.key === 'policy-funding')?.missing.length ?? 0) > 0)
+
+  // D-352 맞춤 진단서 한 장 — 같은 판정 · 같은 순서 · 고객 말로
+  const dg = buildDiagnosis(full, ins, '2026-10-02')
+  check('D-352 진단서 — 먼저 제안할 것 = 맨 위 제안과 같은 모듈 · 같은 순서 · 나머지 모듈도 전부 한 줄 · 회사 한눈에(업종 · 설립)', dg.picks.map((p) => p.key).join() === topPicks(ins).map((p) => p.key).join() && dg.picks.length + dg.others.length === ins.length && dg.snapshot.some((x) => x.label === '설립') && dg.snapshot.some((x) => x.label === '업종'), JSON.stringify([dg.picks.map((p) => p.key), dg.snapshot]))
+  const dgText = JSON.stringify(dg)
+  check('D-352 고객에게 드리는 종이 — 화면 안내 말(올리면 · 판정해요) · 내부 표시(★) 없음 · 지금은 어려운 것은 맨 뒤', !/올리면|판정해요|★/.test(dgText) && dg.others.every((o, i, a) => i === 0 || !(a[i - 1].tone === 'no' && o.tone !== 'no')), [dgText.match(/.{0,50}(올리면|판정해요|★).{0,30}/g), dg.others.map((o) => o.tone)])
+  const dn = buildDiagnosis(empty, none, '2026-10-02')
+  check('D-352 정보가 없으면 — 제안 0 · 보내 주실 자료(어디서 떼는지 · 어느 진단에) · 다음 순서 첫 줄이 자료 요청', dn.picks.length === 0 && dn.requests.length > 0 && dn.requests.every((r) => r.for.length > 0) && dn.steps[0].includes('자료'), JSON.stringify([dn.requests, dn.steps]))
+  const kt = diagnosisKakao(dg, '미래AI랩 김팀장')
+  check('D-352 카톡 요약 — 회사 이름 · 먼저 제안드릴 것 · 서명 · 빈 줄 셋 없음', kt.startsWith(`[${dg.companyName}] 맞춤 진단 요약`) && (dg.picks.length === 0 || kt.includes('■ 먼저 제안드릴 것')) && kt.endsWith('미래AI랩 김팀장') && !/\n{3,}/.test(kt), kt)
+  check('D-352 고객 말로 — ★ 세무사 표시 · 신고 누락 안내는 빼고', customerText('연구소가 있어요 · 신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)') === '연구소가 있어요')
   check('맞춤 추천: 요금제에 없는 모듈은 빠짐', !buildInsights(full, '2026-10-02', [], (k) => k !== 'labcare').some((i) => i.key === 'labcare'))
   // D-215: 직원 수를 모르면 정책자금은 1~4명(소상공인)으로 계산된다 — 가정이라고 알리고 '좋음' 으로 단정하지 않는다
   const noEmp = { ...full, employeeCount: '' } as typeof full

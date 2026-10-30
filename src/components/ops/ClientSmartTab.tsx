@@ -31,6 +31,7 @@ import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
 import { ClientScenarios } from './ClientScenarios'
 import { ClientSituationPlan } from './ClientSituationPlan'
+import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
 import { SITUATION_PLANS, planResultInput, type PlanId, type SituationPlan } from '../../services/situationPlan'
 import { withToolResult } from '../../services/clientOpsService'
 import { withScenarioAnswer } from '../../services/scenarioFit'
@@ -123,6 +124,8 @@ export default function ClientSmartTab({
   // D-199: 상황 예시도 요금제에 있는 모듈만(모듈 키 = 기능 권한 키)
   const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
   const assistBuild = useCallback(() => clientBundle(record, today, insights, buildClientSchedule(record, today)), [record, today, insights])
+  // D-352 맞춤 진단서 한 장(대표님께 드릴 종이)
+  const [diagOpen, setDiagOpen] = useState(false)
   // D-242: 아래 상황 예시 줄의 '한 장 설계서로' → 위 설계서가 그 상황으로 펼쳐진다
   const [planFocus, setPlanFocus] = useState<{ id: PlanId; n: number } | null>(null)
   const openPlan = (presetId: string) => {
@@ -144,8 +147,9 @@ export default function ClientSmartTab({
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
+      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} />}
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
+      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')
           window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
         }} />
