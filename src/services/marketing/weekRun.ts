@@ -10,12 +10,17 @@ import { newRequestId, readChoice } from '../aiAssist/store'
 import { collectWeek, loadWeeksCloud, saveWeekCloud } from './weekCollect'
 import { WEEK_PARTS, WEEK_STORE_KEY, parseWeekStore, partResult, putWeekStore, type WeekPart, type WeekRequest, type WeekSaved } from './weekPlan'
 
-export type WeekPartState = 'idle' | 'running' | 'done' | 'error'
+/** D-350 stopped = [멈추기] 로 멈춘 갈래(다 쓴 갈래는 그대로 남는다) */
+export type WeekPartState = 'idle' | 'running' | 'done' | 'error' | 'stopped'
 
 export interface WeekRun {
   parts: Record<WeekPart, WeekPartState>
   errors: string[]
   storeFull: boolean
+  /** D-350 쓰기를 마친 때(멈춘 것 빼고) — 다른 화면에 있었으면 '다 썼어요' 알림 */
+  finishedAt?: number
+  /** D-350 그 알림을 봤나(1주일치 화면을 열었거나 닫기) */
+  seen?: boolean
 }
 
 const allParts = (s: WeekPartState) => Object.fromEntries(WEEK_PARTS.map((p) => [p.part, s])) as Record<WeekPart, WeekPartState>
@@ -43,6 +48,16 @@ export function subscribeWeek(f: () => void): () => void {
 export const weekVersion = () => version
 export const weekRun = (start: string): WeekRun => runs.get(start) ?? IDLE_WEEK
 export const weekRunning = (start: string) => Object.values(weekRun(start).parts).includes('running')
+
+/** D-350 어느 화면에서든 띄울 1주일치 — 쓰는 중이거나, 다 썼는데 아직 안 본 주(가장 최근) */
+export function activeWeekRun(): { start: string; run: WeekRun } | null {
+  const xs = [...runs.entries()].filter(([s, r]) => weekRunning(s) || (r.finishedAt && !r.seen)).sort((a, b) => b[0].localeCompare(a[0]))
+  return xs.length ? { start: xs[0][0], run: xs[0][1] } : null
+}
+export function markWeekSeen(start: string): void {
+  const r = runs.get(start)
+  if (r && r.finishedAt && !r.seen) setRun(start, (x) => ({ ...x, seen: true }))
+}
 
 export function readWeekStore(): Record<string, WeekSaved> {
   try {
@@ -80,6 +95,18 @@ export interface WeekSync {
 }
 export const IDLE_SYNC: WeekSync = { state: 'idle', idea: 0, shorts: 0, threads: 0, kept: 0 }
 const syncs = new Map<string, WeekSync>()
+/** D-350 클라우드에서 마지막으로 읽은 주들(내 콘텐츠 '1주일치 묶음' — 이 브라우저에 4주만 남겨도 지난 주들이 보이게) */
+const cloudWeeks = new Map<string, WeekSaved>()
+
+/** D-350 만든 주 전부 — 이번 접속 · 이 브라우저 · 클라우드 가운데 같은 주는 가장 새것, 최근 주 먼저 */
+export function allWeeks(): WeekSaved[] {
+  const out = new Map<string, WeekSaved>()
+  for (const w of [...cloudWeeks.values(), ...Object.values(readWeekStore()), ...memory.values()]) {
+    const had = out.get(w.start)
+    if (!had || w.at >= had.at) out.set(w.start, w)
+  }
+  return [...out.values()].sort((a, b) => b.start.localeCompare(a.start))
+}
 const syncIds = new Map<string, { idea: Set<string>; shorts: Set<string>; threads: Set<string>; kept: Set<string> }>()
 let chain: Promise<void> = Promise.resolve()
 export const weekSync = (start: string): WeekSync => syncs.get(start) ?? IDLE_SYNC
@@ -122,6 +149,8 @@ export async function openWeekSync(ws: string | null, current: string): Promise<
   } catch {
     return
   }
+  cloudWeeks.clear()
+  for (const w of cloud) cloudWeeks.set(w.start, w)
   const local = readWeekStore()
   const byStart = new Map(cloud.map((w) => [w.start, w]))
   let adopted = false
@@ -158,15 +187,37 @@ export interface WeekAiOptions {
   ws?: string | null
 }
 
-/** 여섯 갈래를 동시에 — 이미 쓰는 중이면 그대로 둔다. 다시 쓰면 그 주 결과를 새로 채운다(답이 온 갈래부터 바뀐다) */
+/** D-350 주마다 지금 쓰는 차례 — [멈추기] 를 누르면 끊고(늦게 온 답은 버린다) · 1분 뒤 다시 부르기도 취소 */
+const ctls = new Map<string, { ac: AbortController; timers: Set<ReturnType<typeof setTimeout>>; gen: number }>()
+let gens = 0
+
+/** 쓰는 중인 갈래를 멈춘다 — 이미 다 쓴 갈래는 그대로 남고 목록에도 모인다 */
+export function stopWeekAi(start: string): void {
+  const c = ctls.get(start)
+  if (!c || !weekRunning(start)) return
+  c.ac.abort()
+  for (const t of c.timers) clearTimeout(t)
+  ctls.delete(start)
+  setRun(start, (x) => ({ ...x, parts: Object.fromEntries(Object.entries(x.parts).map(([k, v]) => [k, v === 'running' ? 'stopped' : v])) as Record<WeekPart, WeekPartState>, finishedAt: undefined, seen: true }))
+}
+
+/** 마지막 갈래가 끝났으면 '다 썼어요' 알림 자리(다른 화면에서 보게) */
+const finishIfDone = (start: string) => setRun(start, (x) => (Object.values(x.parts).includes('running') ? x : { ...x, finishedAt: Date.now(), seen: false }))
+
+/** 여섯 갈래를 동시에 — 이미 쓰는 중이면 그대로 둔다. 다시 쓰면 그 주 결과를 새로 채운다(답이 온 갈래부터 바뀐다).
+ * 화면을 나가도(뒤로 가기 · 고객 관리 · 특허 등 다른 메뉴) 이 모듈에서 계속 돈다 — 멈추는 것은 [멈추기] 뿐. */
 export function startWeekAi(start: string, topics: readonly string[], requests: readonly WeekRequest[], opts: WeekAiOptions = {}): void {
   const retryMs = opts.retryMs ?? WEEK_RATE_RETRY_MS
   if (weekRunning(start) || requests.length === 0) return
   const choice = readChoice()
+  const ctl = { ac: new AbortController(), timers: new Set<ReturnType<typeof setTimeout>>(), gen: ++gens }
+  ctls.set(start, ctl)
+  const live = () => ctls.get(start)?.gen === ctl.gen && !ctl.ac.signal.aborted
   setRun(start, () => ({ parts: { ...allParts('idle'), ...Object.fromEntries(requests.map((r) => [r.part, 'running'])) }, errors: [], storeFull: false }))
   const call = (r: WeekRequest, attempt: number) =>
-    void callAssist({ requestId: newRequestId(), assistId: r.assistId, page: r.page, choice, context: r.context })
+    void callAssist({ requestId: newRequestId(), assistId: r.assistId, page: r.page, choice, context: r.context, signal: ctl.ac.signal })
       .then((run) => {
+        if (!live()) return
         const got = run.structured ? partResult(r.part, run.structured, r.headline) : null
         if (!got) throw new AssistError('provider_error', 'AI 답을 칸으로 나누지 못했습니다.')
         // 다시 쓰기 — 같은 주라도 주제가 바뀌었으면 예전 갈래 결과를 섞지 않는다
@@ -176,17 +227,24 @@ export function startWeekAi(start: string, topics: readonly string[], requests: 
         memory.set(start, next)
         const kept = writeWeekStore(next)
         setRun(start, (x) => ({ ...x, parts: { ...x.parts, [r.part]: 'done' }, storeFull: x.storeFull || !kept }))
+        finishIfDone(start)
         // 같은 주제로 다시 쓴 것이면 예전 AI 글과 비교해 고친 글을 지킨다(주제가 바뀌었으면 예전 글은 비교 대상이 아님)
         if (opts.ws !== undefined) void queue(start, () => saveAndCollect(opts.ws ?? null, next, same ? prev : null, [r.part]))
       })
       .catch((e: unknown) => {
+        if (!live()) return
         if (e instanceof AssistError && e.code === 'rate_limited' && attempt === 0) {
-          setTimeout(() => call(r, 1), retryMs)
+          const t = setTimeout(() => {
+            ctl.timers.delete(t)
+            if (live()) call(r, 1)
+          }, retryMs)
+          ctl.timers.add(t)
           return
         }
         const label = WEEK_PARTS.find((p) => p.part === r.part)?.label ?? r.part
         const msg = `${label}: ${e instanceof Error ? e.message : '다시 눌러 주세요.'}`
         setRun(start, (x) => ({ ...x, parts: { ...x.parts, [r.part]: 'error' }, errors: x.errors.includes(msg) ? x.errors : [...x.errors, msg] }))
+        finishIfDone(start)
       })
   for (const r of requests) call(r, 0)
 }

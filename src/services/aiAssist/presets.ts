@@ -119,6 +119,8 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'radar.pack.video', page: 'radar', label: '키워드 묶음 — 유튜브 대본 · 제목', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'radar.pack.short', page: 'radar', label: '키워드 묶음 — 릴스 · 카드뉴스 · 올릴 때 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
   { id: 'radar.pack.blog', page: 'radar', label: '키워드 묶음 — 블로그 글', kind: 'write', hint: '이번 주 키워드 하나로 · 규칙집대로' },
+  // D-351 이번 주 찍을 것 카드의 [AI로 내 채널에 맞게 추천](띠에는 없음)
+  { id: 'radar.kit', page: 'radar', label: '이번 주 이렇게 찍으세요 — 내 채널에 맞게', kind: 'write', hint: '후보 하나를 채널 설계 기준의 본업으로 잇기' },
   { id: 'radar.transcript', page: 'radar', label: '영상 대본 받아 적기', kind: 'write', hint: '벤치마킹 영상 창에서만 — Gemini 가 영상을 보고 10분씩' },
   { id: 'radar.adapt', page: 'radar', label: '이 영상 → 우리 회사 버전 만들기', kind: 'write', hint: '벤치마킹 영상 창에서만 — 틀만 가져오고 제목 · 대사는 새로' },
   // D-273 스레드 화면의 [AI로 글 3개 쓰기] · 릴스 · 틱톡 화면의 [AI로 대본 2개 쓰기] 가 부른다(띠 · 판 단추에는 없음)

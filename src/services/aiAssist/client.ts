@@ -202,7 +202,7 @@ export interface AssistVideo {
   end: number
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string }): Promise<AssistRun> {
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
   const brand = brandForRequest()
   let res: Response
   try {
@@ -211,8 +211,11 @@ export async function callAssist(req: { requestId: string; assistId: string; pag
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
       // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
       body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }),
+      // D-350 [멈추기] — 기다리던 답을 버린다(서버가 이미 받은 요청은 끝까지 갈 수 있다)
+      ...(req.signal ? { signal: req.signal } : {}),
     })
   } catch {
+    if (req.signal?.aborted) throw new AssistError('aborted', '멈췄습니다.')
     throw new AssistError('network', MESSAGE.network)
   }
   if (!res.ok) throw await readError(res)

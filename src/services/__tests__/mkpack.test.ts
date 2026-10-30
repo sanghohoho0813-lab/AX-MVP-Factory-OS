@@ -13,6 +13,9 @@ import { noticeKeywords, noticePackSource, noticeTopicOf, rememberWeek, weekChan
 import { parseBizinfoJson, postedOf } from '../grants/grantText'
 import { LONG_DAY, SHORT_SLOTS, THREAD_SLOTS, buildWeek, normalizeWeekSaved, partResult, parseWeekStore, placeThreads, putWeekStore, weekCalendar, weekLintSummary, weekRequests, weekSetup, weekStart, weekText, type WeekSaved } from '../marketing/weekPlan'
 import { collectWeek, decideRow, weekBadge, weekItemId, weekRows } from '../marketing/weekCollect'
+import { brandPicks, briefCores, coreChoices, coreOf } from '../marketing/brandAngle'
+import { kitContext, parseKitAnswer, parseKitStore, putKitStore } from '../marketing/kitAi'
+import { shootKit } from '../marketing/shootKit'
 import { listThreadPosts, saveThreadPost, sortThreadPosts, type ThreadDraft } from '../marketing/threads'
 import { listShortPosts, type ShortDraft } from '../marketing/shorts'
 import type { GrantNotice } from '../grants/grantMatch'
@@ -411,6 +414,38 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('L7 다시 쓰기 — 수요일 글 · 쇼츠 ①은 새 글로 · 고친 화요일 · 올린 월요일 · 촬영 완료 롱폼은 그대로 · 줄 수 그대로', body('11/4') === '새 수요일' && body('11/3') === '대표가 고친 화요일 글' && body('11/2') === '월요일 글' && shorts2.find((s) => s.topic.startsWith('11/3'))?.script === '새 쇼츠 하나' && ideas2[0].script.includes('대본 1') && ideas2[0].memo === '메모' && re.kept === 1 && re.posted === 2 && re.keptIds.length === 1 && threads2.length === 7 && shorts2.length === 3 && ideas2.length === 1, [re, body('11/2'), body('11/3'), body('11/4')])
   const other = await collectWeek('ws-other', v1, null)
   check('L8 다른 작업공간은 따로 — 대표 목록에 섞이지 않음', other.written === 11 && (await listThreadPosts(WS)).length === 7 && (await listThreadPosts('ws-other')).length === 7)
+}
+
+/* ---------------- D-351 이번 주 이렇게 찍으세요 = 채널 설계 기준의 본업으로 ---------------- */
+{
+  const own = briefCores(DEFAULT_BRIEF).map((c) => c.id)
+  const cust = briefCores({ services: '절세 · 자본거래(가지급금 · 차등배당) · 정부지원금 · 정책자금 · 기업인증(이노비즈)', covers: '', bridge: '' }).map((c) => c.id)
+  const none = briefCores({ services: '', covers: '', bridge: '' }).map((c) => c.id)
+  check('S1 본업 목록 — 대표 기준은 AX · 시제품 · 벤처 · 정책자금 순 · 구독 컨설턴트는 적은 순서(절세 · 자본거래 · 지원금 · 정책자금 · 인증) · 없으면 돈 문제 셋', own.slice(0, 4).join() === 'ax,mvp,venture,policy' && cust.join() === 'tax,capital,grant,policy,cert' && none.join() === 'policy,grant,tax', { own, cust, none })
+  const branded = brandPicks(picks, DEFAULT_BRIEF)
+  const ai = branded.filter((o) => o.axis === 'axai')
+  const market = branded.filter((o, i) => o.axis === 'market' && picks[i])
+  const bad = /\d+\s*(분|배)|꿀팁|충격/
+  check('S2 AI 주제는 모두 본업으로 이음(첫 문장 · 이렇게 말해요 · 제목) · 시장 주제는 그대로', ai.length > 0 && ai.every((o) => !!o.brand && o.view.includes('기능 소개로 끝내지 않습니다') && shootKit(o).hook === o.brand.hook) && market.every((o) => !o.brand && o.view === picks.find((p) => p.key === o.key)?.view), ai.map((o) => `${o.topic}→${o.brand?.label}`))
+  const pats = ai.map((o) => new Set(o.titles.flatMap((t) => t.patterns)).size)
+  check('S3 제목 — 틀이 다섯 가지 넘게(숫자 · 질문 · 방법 · 경고 · 비교 · 결과) · 본업 이름이 들어감 · 쓰지 않는 말 0', ai.every((o) => o.titles.length === 6 && o.titles.some((t) => t.text.includes(o.brand!.label.replace(/\(.*\)/, '')) || o.brand!.core === 'ax')) && pats.every((n) => n >= 5) && !ai.some((o) => o.titles.some((t) => bad.test(t.text))), { pats, t: ai[0]?.titles.map((t) => t.text) })
+  check('S4 AI 후보가 여럿이면 본업이 돌아가며(같은 본업만 나오지 않게)', ai.length < 2 || new Set(ai.map((o) => o.brand?.core)).size >= 2, ai.map((o) => o.brand?.core))
+  const custBrief = { ...DEFAULT_BRIEF, services: '절세 · 자본거래 · 정부지원금 · 정책자금 · 기업인증', covers: '', bridge: '' }
+  const cb = brandPicks(picks, custBrief).filter((o) => o.axis === 'axai')
+  check('S5 구독 컨설턴트(절세 · 자본거래 …) — AI 주제가 그 사람 본업으로(대표 AX 로 가지 않음)', cb.length > 0 && cb.every((o) => ['tax', 'capital', 'grant', 'policy', 'cert'].includes(o.brand?.core ?? '')) && cb.some((o) => o.titles.some((t) => /절세|자본거래|정부지원사업/.test(t.text))), cb.map((o) => o.brand?.core))
+  const k0 = ai[0]
+  const chosen = brandPicks(picks, DEFAULT_BRIEF, new Map([[k0.key, 'policy']])).find((o) => o.key === k0.key)!
+  const kept = brandPicks(picks, DEFAULT_BRIEF, new Map(market[0] ? [[market[0].key, 'policy']] : [])).find((o) => o.key === market[0]?.key)
+  check('S6 칩으로 고른 본업 — 그 본업으로 다시(정책자금) · 시장 주제도 고르면 본업으로 이음', chosen.brand?.core === 'policy' && chosen.titles.some((t) => t.text.includes('정책자금')) && (!market[0] || (kept?.brand?.core === 'policy' && kept.titles.some((t) => t.text.includes(market[0].topic)))), [chosen.titles.map((t) => t.text), kept?.titles.map((t) => t.text)])
+  check('S7 칩 목록 — AI 주제는 본업 전부 · 본업인 시장 주제(정책자금 등)는 칩 없음', coreChoices(k0, briefCores(DEFAULT_BRIEF)).length === briefCores(DEFAULT_BRIEF).length && coreChoices({ topic: '정책자금 2027', axis: 'market' }, briefCores(DEFAULT_BRIEF)).length === 0)
+  const ans = { headline: '도구가 아니라 정책자금 준비에 붙입니다.', items: [{ title: '정책자금 준비, Claude로 먼저 해 둘 3가지', tag: '제목', when: '숫자형' }, { title: 'Claude로 사업계획서 써도 될까?', tag: '제목', when: '질문형' }, { title: '첫 문장', tag: '첫 문장', body: '오늘은 기능 말고 정책자금입니다.' }, { title: '썸네일', tag: '썸네일', outline: ['정책자금 × Claude'] }, { title: '구성', tag: '구성', outline: ['0:00 결과 먼저'] }] }
+  const kp = parseKitAnswer(ans, '정책자금', '2026-10-30T00:00:00Z', 'gemini')
+  const back = parseKitStore(JSON.stringify(putKitStore({}, 'w:k', kp!)))
+  check('S8 AI 추천 답 → 칸(제목 · 틀 · 첫 문장 · 썸네일 · 구성) · 첫 문장이 없으면 실패 · 저장했다 읽어도 같음', !!kp && kp.titles.length === 2 && kp.titles[0].type === '숫자형' && kp.hook.includes('정책자금') && kp.thumbs[0] === '정책자금 × Claude' && kp.outline.length === 1 && parseKitAnswer({ headline: '', items: [{ title: 'x', tag: '제목' }] }, '', '', '') === null && JSON.stringify(back['w:k']) === JSON.stringify(kp), kp)
+  const kc = kitContext(k0, DEFAULT_BRIEF, coreOf('policy') ?? null, briefCores(DEFAULT_BRIEF), '2026-10-30')
+  const sent = buildAssistPrompt(ASSISTS['radar.kit'], kc, '').user
+  check('S9 AI 추천 단추(radar.kit) — 서버에 있음 · 보내는 자료에 채널 설계 기준 전부 · 후보 · 고른 본업 · 레이더 숫자 근거 없음', !!ASSISTS['radar.kit'] && ASSIST_PRESETS.some((p) => p.id === 'radar.kit') && sent.includes('채널 설계 기준') && sent.includes(k0.topic) && sent.includes('이 본업으로') && sent.includes('우리가 실제로 하는 일') && !k0.facts.some((f) => sent.includes(f)), sent.slice(0, 300))
+  if (process.env.MK_SHOW) for (const o of branded.slice(0, 10)) console.log(`  ${o.axis} ${o.topic} → ${o.brand?.label ?? '(그대로)'}\n    ${o.titles.map((t) => t.text).join('\n    ')}\n    첫 문장: ${shootKit(o).hook}\n    말해요: ${o.view}`)
 }
 
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)

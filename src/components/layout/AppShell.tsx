@@ -16,6 +16,7 @@ import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
 import { ScrollTopButton } from './ScrollTopButton'
+import { WeekRunDock } from './WeekRunDock'
 import { BackToCloseGuard } from '../../lib/backToClose'
 import { useScrollMemory } from '../../lib/scrollMemory'
 import { EntitlementsProvider } from '../../lib/entitlementsContext'
@@ -167,6 +168,7 @@ export function AppShell() {
         <MobileNav onOpenMore={() => setMoreOpen(true)} />
         <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
         <ScrollTopButton />
+        <WeekRunDock />
         <SideDock />
       </div>
       </TutorialProvider>

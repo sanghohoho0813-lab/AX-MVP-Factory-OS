@@ -20,8 +20,11 @@
  *    긴 영상 구성 · 쇼츠 3컷 · 그대로/바꿀 것 · 준비물 · 키트 복사. 1순위는 펼친 채로. 4위 아래 한 줄에도 제목 예.
  * D-296 대표 "처음부터 읽을 게 너무 많아 눈이 아프다 — 이번 주 이렇게 찍으세요도 펼치기를 눌러야 나오게":
  *  - 찍기 키트는 1순위까지 모두 접힌 채(제목 줄 · 준비 시간만). 누르면 이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일 · 전체 복사.
+ * D-351 대표 "이번 주 이렇게 찍으세요를 내 브랜딩에 유리하게 — AI 주제는 AX 로, 정책자금 신청할 때 … 채널 설계 기준에 맞춰서":
+ *  - 키트 맨 위 '내 본업으로 잇기' 칩(채널 설계 기준에서 읽은 본업) — AI 주제는 늘 본업으로 이어진 제목(틀별) · 첫 문장 · 이렇게 말해요(규칙).
+ *  - [AI로 내 채널에 맞게 추천](두 번 눌러 확인) — 기준 전부 · 이 후보 · 고른 본업으로 AI 가 다시 쓴다. 규칙 추천 / AI 추천을 바꿔 본다.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Fold } from '../../../components/ui/fold'
 import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
 import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
@@ -32,6 +35,13 @@ import { hintFor } from '../../../content/sectionHints'
 import { shortNum } from '../../../services/marketing/ytBench'
 import { IDEA_STATUS_LABEL, type ContentIdea, type IdeaStatus } from '../../../services/marketing/radarStore'
 import { kitText, shootKit } from '../../../services/marketing/shootKit'
+import { coreChoices, type BrandCore } from '../../../services/marketing/brandAngle'
+import { kitContext, kitError, kitKey, kitRunning, kitSaved, kitVersion, startKitAi, subscribeKit, type KitAi } from '../../../services/marketing/kitAi'
+import type { ChannelBrief } from '../../../services/marketing/radarStore'
+import { weekStart } from '../../../services/marketing/weekPlan'
+import { todayLocalDate } from '../../../lib/appClock'
+import { AiConfirm } from '../../../components/ai/AiConfirm'
+import { ModelPicker } from '../../../components/ai/ModelPicker'
 import {
   APPROACH_LABEL,
   AXIS_HINT,
@@ -83,7 +93,10 @@ export function PlanView({
   onMix,
   onGoChannels,
   onGoNotebook,
+  brand,
 }: {
+  /** D-351 채널 설계 기준의 본업 · 칩으로 고르기 · AI 추천(대표 · AI 가 되는 계정만) */
+  brand?: BrandCtx
   plan: RadarPlan
   rising: RisingTopic[]
   breakouts: RadarVideo[]
@@ -110,7 +123,7 @@ export function PlanView({
   const inWork = useMemo(() => ideas.filter((i) => i.status === 'selected' || i.status === 'script' || i.status === 'filmed').length, [ideas])
   const [hero, ...subs] = plan.picks.slice(0, 3)
   const rest = plan.picks.slice(3)
-  const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo }
+  const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo, brand }
   return (
     <div className="flex flex-col gap-6" data-testid="radar-plan">
       <section className="flex flex-col gap-3" aria-labelledby="radar-plan-h">
@@ -240,8 +253,18 @@ export interface FocusData {
 /* 후보 카드                                                              */
 /* ------------------------------------------------------------------ */
 
+export interface BrandCtx {
+  brief: ChannelBrief
+  cores: readonly BrandCore[]
+  /** AI 추천 단추를 보이나(대표 계정 · 팀장 화면 보기가 아닐 때) */
+  ai: boolean
+  /** 칩 — '' = 그대로 두기 */
+  onCore: (key: string, core: string) => void
+}
+
 interface CardProps {
   o: Opportunity
+  brand?: BrandCtx
   status: ReadonlyMap<string, IdeaStatus>
   readOnly: boolean
   noThumb: boolean
@@ -322,7 +345,7 @@ function HeroCard(props: CardProps) {
         <ConfirmButton {...props} />
         <DetailsToggle open={open} onToggle={() => setOpen((x) => !x)} />
       </div>
-      <ShootBox o={o} onCopy={props.onCopy} size="lg" />
+      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size="lg" />
     </article>
   )
 }
@@ -344,7 +367,7 @@ function SubCard(props: CardProps & { rank: number }) {
       </h3>
       <Facts o={o} size="sm" />
       <WhyRecommended o={o} />
-      <ShootBox o={o} onCopy={props.onCopy} />
+      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} />
       {open && <Details {...props} />}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <ConfirmButton {...props} quiet />
@@ -360,11 +383,27 @@ function SubCard(props: CardProps & { rank: number }) {
  *        그대로/바꿀 것 · 찍기 전 준비는 지우고 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일 · 제목 예 · 첫 문장만".
  * 늘 보이는 것: 이렇게 말해요(우리 각도) · 제목 예 · 첫 문장. 펼치면: 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일.
  */
-function ShootBox({ o, onCopy, size = 'sm' }: { o: Opportunity; onCopy: (text: string, what?: string) => void; size?: 'lg' | 'sm' }) {
+function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (text: string, what?: string) => void; brand?: BrandCtx; size?: 'lg' | 'sm' }) {
   const kit = useMemo(() => shootKit(o), [o])
   // D-296 처음엔 접힌 채(제목 줄 · 준비 시간만) — 누르면 안의 글이 펼쳐진다
   const [open, setOpen] = useState(false)
   const lg = size === 'lg'
+  // D-351 AI 추천 — 이 후보 · 이번 주 · 화면 밖(모듈)에 남는다
+  const kver = useSyncExternalStore(subscribeKit, kitVersion)
+  const today = todayLocalDate()
+  const key = kitKey(o, weekStart(today))
+  const aiKit = useMemo(() => kitSaved(key), [key, kver]) // eslint-disable-line react-hooks/exhaustive-deps
+  const aiBusy = kitRunning(key)
+  const aiErr = kitError(key)
+  const [tab, setTab] = useState<'rule' | 'ai' | null>(null)
+  const showAi = !!aiKit && (tab ?? 'ai') === 'ai'
+  const choices = useMemo(() => (brand ? coreChoices(o, brand.cores) : []), [o, brand])
+  const askAi = () => {
+    if (!brand) return
+    const core = brand.cores.find((c) => c.id === o.brand?.core) ?? null
+    startKitAi(key, kitContext(o, brand.brief, core, brand.cores, today), o.brand?.label ?? '')
+    setTab('ai')
+  }
   return (
     <section className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border-2 border-rose-300 bg-gradient-to-br from-rose-50 via-white to-white ${lg ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left" data-testid="radar-kit-toggle">
@@ -380,6 +419,54 @@ function ShootBox({ o, onCopy, size = 'sm' }: { o: Opportunity; onCopy: (text: s
       </button>
       {open && (
         <div className="flex min-w-0 flex-col gap-2.5" data-testid="radar-kit-open">
+          {brand && choices.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-1" data-testid="radar-kit-cores">
+              <p className="t-meta font-bold text-slate-700">
+                내 본업으로 잇기 <span className="font-normal text-slate-500">· 채널 설계 기준에서 — 누르면 제목 · 첫 문장이 그 본업으로</span>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {o.axis !== 'axai' && (
+                  <CoreChip on={!o.brand} label="주제 그대로" onClick={() => brand.onCore(o.key, '')} id="" />
+                )}
+                {choices.map((c) => (
+                  <CoreChip key={c.id} id={c.id} on={o.brand?.core === c.id} label={c.label} onClick={() => brand.onCore(o.key, c.id)} />
+                ))}
+              </div>
+            </div>
+          )}
+          {brand?.ai && (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-(--radius-control) bg-violet-50 px-2.5 py-2" data-testid="radar-kit-ai">
+              <Sparkles aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
+              <span className="t-meta min-w-0 flex-1 basis-40 break-keep text-violet-950">
+                {aiBusy ? 'AI 가 내 채널 기준으로 쓰는 중이에요(10~30초) — 다른 화면으로 가도 답은 남아요.' : aiKit ? `AI 추천이 있어요${aiKit.core ? ` · ${aiKit.core}` : ''}` : '규칙 추천이 아쉬우면 — 채널 설계 기준 전부로 AI 가 다시 써요(누를 때만).'}
+              </span>
+              {!aiBusy && <ModelPicker />}
+              <AiConfirm>
+                <Button size="sm" variant={aiKit ? 'secondary' : 'primary'} onClick={askAi} disabled={aiBusy} data-testid="radar-kit-ai-run">
+                  {aiBusy ? <Clock aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
+                  {aiBusy ? '쓰는 중…' : aiKit ? 'AI로 다시 추천' : 'AI로 내 채널에 맞게 추천'}
+                </Button>
+              </AiConfirm>
+              {aiErr && (
+                <p role="alert" className="t-meta basis-full break-keep text-amber-900" data-testid="radar-kit-ai-error">
+                  AI 추천을 받지 못했어요 — {aiErr}
+                </p>
+              )}
+            </div>
+          )}
+          {aiKit && (
+            <div className="flex gap-1" role="tablist" aria-label="추천 보기">
+              {(['ai', 'rule'] as const).map((t) => (
+                <button key={t} type="button" role="tab" aria-selected={(tab ?? 'ai') === t} onClick={() => setTab(t)} className={`tap t-meta rounded-full px-3 font-bold ${(tab ?? 'ai') === t ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-300'}`} data-testid="radar-kit-tab" data-tab={t}>
+                  {t === 'ai' ? 'AI 추천' : '규칙 추천'}
+                </button>
+              ))}
+            </div>
+          )}
+          {showAi && aiKit ? (
+            <AiKitBlock k={aiKit} lg={lg} onCopy={onCopy} topic={o.topic} />
+          ) : (
+          <>
           <p className={`min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere] ${lg ? 'text-[1.0625rem] leading-relaxed' : 't-sub'}`} data-testid="radar-angle">
             <span className="t-meta mr-1 inline-flex items-center gap-1 rounded-full bg-rose-600 px-2 py-0.5 align-middle font-bold text-white">
               <Lightbulb aria-hidden="true" className="size-3.5" /> 이렇게 말해요
@@ -443,9 +530,85 @@ function ShootBox({ o, onCopy, size = 'sm' }: { o: Opportunity; onCopy: (text: s
               <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
             </Button>
           </div>
+          </>
+          )}
         </div>
       )}
     </section>
+  )
+}
+
+function CoreChip({ id, label, on, onClick }: { id: string; label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on} className={`tap t-meta rounded-full px-2.5 font-bold ${on ? 'bg-rose-600 text-white' : 'bg-white text-rose-900 ring-1 ring-rose-200 hover:bg-rose-50'}`} data-testid="radar-kit-core" data-core={id} data-on={on ? '1' : '0'}>
+      {label}
+    </button>
+  )
+}
+
+/** D-351 AI 추천 — 이렇게 말해요 · 제목(틀별) · 첫 문장 · 썸네일 · 구성 · 전체 복사 */
+function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: string; onCopy: (text: string, what?: string) => void }) {
+  const text = [
+    `[이번 주 이렇게 찍으세요 · AI 추천] ${topic}${k.core ? ` → ${k.core}` : ''}`,
+    k.view ? `이렇게 말해요: ${k.view}` : '',
+    `첫 문장: ${k.hook}`,
+    '',
+    '제목 후보',
+    ...k.titles.map((t, i) => `${i + 1}. ${t.type ? `[${t.type}] ` : ''}${t.text}`),
+    k.thumbs.length ? `썸네일 문구: ${k.thumbs.join(' / ')}` : '',
+    ...(k.outline.length ? ['', '구성', ...k.outline.map((x) => `- ${x}`)] : []),
+  ]
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-control) bg-white px-3 py-2.5 ring-1 ring-violet-200" data-testid="radar-kit-ai-result">
+      {k.view && (
+        <p className={`min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere] ${lg ? 'text-[1.0625rem] leading-relaxed' : 't-sub'}`}>
+          <span className="t-meta mr-1 inline-flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 align-middle font-bold text-white">
+            <Lightbulb aria-hidden="true" className="size-3.5" /> 이렇게 말해요
+          </span>
+          <span className="font-semibold">{k.view}</span>
+        </p>
+      )}
+      <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-ai-hook">
+        <span className="t-meta font-bold text-violet-700">첫 문장 </span>"{k.hook}"
+      </p>
+      <ul className="flex flex-col gap-1" data-testid="radar-kit-ai-titles">
+        {k.titles.map((t) => (
+          <li key={t.text} className="flex min-w-0 items-start gap-1.5">
+            {t.type && <span className="t-meta mt-0.5 shrink-0 rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{t.type}</span>}
+            <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.text}</span>
+            <Button size="sm" variant="ghost" onClick={() => onCopy(t.text)} aria-label={`제목 복사 — ${t.text}`}>
+              <ClipboardCopy aria-hidden="true" className="size-4" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {k.thumbs.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {k.thumbs.map((t) => (
+            <span key={t} className="t-meta rounded-[6px] bg-slate-900 px-2 py-0.5 font-bold text-white">{t}</span>
+          ))}
+        </div>
+      )}
+      {k.outline.length > 0 && (
+        <details className="t-sub rounded-lg bg-slate-50 px-2.5 py-1.5">
+          <summary className="cursor-pointer font-semibold text-slate-800">구성 {k.outline.length}줄</summary>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {k.outline.map((x) => (
+              <li key={x} className="break-keep text-slate-700 [overflow-wrap:anywhere]">· {x}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="ghost" onClick={() => onCopy(text, '이번 주 찍을 것(AI 추천)')} data-testid="radar-kit-ai-copy">
+          <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
+        </Button>
+        {k.model && <span className="t-meta text-slate-500">{k.model}</span>}
+      </div>
+    </div>
   )
 }
 

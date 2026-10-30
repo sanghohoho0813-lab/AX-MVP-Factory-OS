@@ -99,6 +99,26 @@ import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
 import { WeekView } from './radar/WeekView'
+import { WeekProjects } from './radar/WeekProjects'
+import { brandPicks, briefCores } from '../../services/marketing/brandAngle'
+
+/** D-351 '내 본업으로 잇기' 칩에서 고른 것(후보 키 → 본업 id · '' = 그대로) — 이 브라우저에 */
+const BRAND_CHOICE_KEY = 'axmvp.mkbrand.v1'
+function readBrandChoice(): Map<string, string> {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(BRAND_CHOICE_KEY) ?? '{}') as Record<string, unknown>
+    return new Map(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string').slice(0, 60))
+  } catch {
+    return new Map()
+  }
+}
+function writeBrandChoice(m: ReadonlyMap<string, string>): void {
+  try {
+    window.localStorage.setItem(BRAND_CHOICE_KEY, JSON.stringify(Object.fromEntries([...m.entries()].slice(-60))))
+  } catch {
+    /* 저장이 막혀도 이번 접속 동안은 그대로 */
+  }
+}
 import { weekRequests, weekSetup, weekStart } from '../../services/marketing/weekPlan'
 import { openWeekSync, startWeekAi, subscribeWeek, weekSaved, weekSync, weekVersion } from '../../services/marketing/weekRun'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
@@ -191,6 +211,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const packKey = view === 'plan' ? (params.get('pack') ?? '') : ''
   // D-346 1주일치 한 번에(?week=1) — 이번 주 키워드 1~3위로 롱폼 1 · 릴스/쇼츠 3 · 스레드 7
   const weekOn = view === 'plan' && !packKey && params.get('week') === '1'
+  // D-350 내 콘텐츠의 '1주일치 묶음' 에서 연 주(지난 주도) — 뒤로 가면 내 콘텐츠로
+  const weekStartParam = /^\d{4}-\d{2}-\d{2}$/.test(params.get('start') ?? '') ? (params.get('start') ?? '') : ''
+  const weekFromMake = params.get('from') === 'make'
   const location = useLocation()
   const navigate = useNavigate()
   // SAAS-2 고객도 서버가 마케팅을 열었으면 묶음 AI 를 쓴다(사용량 장부로 셈) — 대표 판정은 그대로
@@ -225,7 +248,18 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
   // D-232 내 콘텐츠 성과 — 레이더가 이미 받은 내 채널 영상만(유튜브를 더 부르지 않음)
   const mineVideos = useMemo(() => rvideos.filter((v) => v.mine), [rvideos])
-  const plan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
+  const rawPlan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
+  // D-351 이번 주 후보를 채널 설계 기준의 본업으로 — AI 주제는 늘 본업으로 이은 제목 · 첫 문장 · 관점(규칙). 칩으로 고른 본업은 이 브라우저에 기억
+  const [brandChoice, setBrandChoice] = useState<ReadonlyMap<string, string>>(() => readBrandChoice())
+  const cores = useMemo(() => briefCores(brief), [brief])
+  const plan = useMemo(() => (rawPlan ? { ...rawPlan, picks: brandPicks(rawPlan.picks, brief, brandChoice) } : null), [rawPlan, brief, brandChoice])
+  const chooseCore = (key: string, core: string) =>
+    setBrandChoice((m) => {
+      const next = new Map(m)
+      next.set(key, core)
+      writeBrandChoice(next)
+      return next
+    })
   const rising = useMemo(() => (prepared && plan ? risingTopics(prepared, rvideos, plan.clusters) : []), [prepared, rvideos, plan])
   const breakouts = useMemo(() => breakoutVideos(rvideos), [rvideos])
   // D-197 — 경제 · 경영 · AI 신호판 · AI 핵심 키워드 · 새 AI 키워드 후보 · 사이드 급상승(새 AI 키워드 영상은 사이드에서 뺀다)
@@ -276,6 +310,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   useEffect(() => {
     if (readOnly) return
     void openWeekSync(workspaceId, weekStart(todayLocalDate()))
+    // D-350 다른 기기에서 만든 것 — 이 창으로 돌아올 때마다 다시 맞춘다(새로 고치지 않아도 휴대폰에서 만든 주가 PC 에 뜬다)
+    let last = Date.now()
+    const again = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 15_000) return
+      last = Date.now()
+      void openWeekSync(workspaceId, weekStart(todayLocalDate()))
+    }
+    document.addEventListener('visibilitychange', again)
+    window.addEventListener('focus', again)
+    return () => {
+      document.removeEventListener('visibilitychange', again)
+      window.removeEventListener('focus', again)
+    }
   }, [workspaceId, readOnly])
   useEffect(() => {
     if (weekSyncNow.state === 'done' && weekSyncNow.idea > 0) void notebook.reload()
@@ -292,7 +339,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }
   const closeWeek = () => {
     if ((location.state as { mkHome?: boolean } | null)?.mkHome) navigate(-1)
-    else setParam({ week: '' })
+    else if (weekFromMake) navigate('/marketing?view=make')
+    else setParam({ week: '', start: '', from: '' })
+  }
+  /** D-350 내 콘텐츠 '1주일치 묶음' 카드 → 그 주 1주일치 화면(뒤로 가면 내 콘텐츠) */
+  const openProject = (start: string) => {
+    navigate(`/marketing?week=1&start=${start}&from=make`)
+    window.scrollTo({ top: 0 })
   }
   /** 이 묶음이 담긴 내 콘텐츠 줄 — 직접 쓴 주제는 '내 콘텐츠' 탭에서 같은 이름으로 담은 줄도(키가 달라도) */
   const ideaOfPack = (key: string, topic: string, custom: boolean) => notebook.ideas.find((i) => i.key === key) ?? (custom ? notebook.ideas.find((i) => i.topic.trim() === topic.trim()) : undefined)
@@ -737,6 +790,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           setup={weekPlanSetup}
           brief={brief}
           ws={readOnly ? undefined : workspaceId}
+          start={weekStartParam || undefined}
+          backLabel={weekFromMake ? '내 콘텐츠' : '이번 주 키워드'}
           readOnly={readOnly}
           ownerAi={mkAi}
           savedLongHref={(() => {
@@ -762,6 +817,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           onRemove={(i) => void removeIdea(i)}
           onCopy={(t, what) => copy(t, what)}
           onAdd={addCustom}
+          projects={<WeekProjects onOpen={openProject} onMake={() => setParam({ view: '' })} />}
         />
       ) : home ? (
         <>
@@ -823,6 +879,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   onMix={(mix) => void savePrefs({ ...prefs, mix })}
                   onGoChannels={() => setParam({ view: 'channels' })}
                   onGoNotebook={goNotebook}
+                  brand={{ brief, cores, ai: mkAi && !readOnly, onCore: chooseCore }}
                 />
               </PeekProvider>
               {briefCard}

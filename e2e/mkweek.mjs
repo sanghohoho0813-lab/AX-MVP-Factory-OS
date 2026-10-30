@@ -17,6 +17,8 @@
  * D-348 주제 = 짝 셋(본업 = 고정 키워드 × 미끼 = 이번 주 AI 흐름) — 여섯 갈래 모두 채널 설계 기준 · 접목 · 규칙집(AI 는 미끼, 끝은 본업)
  * D-349 모으기 — AI 결과가 내 콘텐츠(롱폼) · 릴스 · 틱톡 기록표(3) · 스레드 기록표(7)에 저절로 · 다시 써도 줄이 늘지 않음 ·
  *       이 브라우저 저장을 지워도 클라우드 사본으로 돌아옴 · 예전 휴대폰(이 브라우저에만 남은 주)을 열면 올리고 모음(AI 다시 안 부름)
+ * D-350 W 내 콘텐츠 맨 위 '1주일치 묶음' 카드 → 누르면 그 주 전부 · 뒤로 = 내 콘텐츠 · 롱폼 줄 [1주일치 묶음 보기]
+ *       X 쓰는 중 [멈추기] → 멈춤(늦게 온 답은 버림) · Y 다른 화면(고객 관리)으로 가도 계속 — 아래 진행 표시 · 다 쓰면 '다 썼어요 [보기]'
  */
 import { chromium } from 'playwright'
 import path from 'node:path'
@@ -134,7 +136,8 @@ async function wire(page) {
     const u = new URL(req.url())
     const res = { statusCode: 200, headers: {}, raw: '', setHeader(k, v) { this.headers[k] = v }, end(b) { this.raw = b ?? '' } }
     await handler({ method: req.method(), url: u.pathname + u.search, headers: { authorization: OWNER }, body: req.postData() ?? undefined }, res)
-    await route.fulfill({ status: res.statusCode, headers: { 'content-type': 'application/json' }, body: res.raw })
+    // [멈추기] 로 화면이 끊은 요청은 이미 닫혀 있다 — 늦게 온 답을 버린다
+    await route.fulfill({ status: res.statusCode, headers: { 'content-type': 'application/json' }, body: res.raw }).catch(() => {})
   })
 }
 
@@ -293,6 +296,61 @@ await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-week-thread"][data-ai="1"]').length === 9, null, { timeout: 8000 }).catch(() => {})
 check('R6 이 브라우저 저장을 지워도 클라우드 사본으로 AI 글 그대로 · AI 다시 안 부름', weekCalls().length === n2 && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1')
 
+/* ---------------- D-350 W 내 콘텐츠 › 1주일치 묶음 ---------------- */
+await page.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
+await page.getByTestId('mk-projects').waitFor({ timeout: 8000 })
+await page.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('스레드 7/7'), null, { timeout: 8000 }).catch(() => {})
+const proj = page.locator('[data-testid="mk-project"]').first()
+const projTxt = (await proj.textContent().catch(() => '')) ?? ''
+check('W1 내 콘텐츠 맨 위 1주일치 묶음 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('롱폼 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
+check('W2 내 콘텐츠의 롱폼 줄에 [1주일치 묶음 보기]', (await page.getByTestId('make-week-badge').count()) === 1)
+await shot(page, 'W-projects')
+await proj.click()
+await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+await page.waitForTimeout(500)
+const wurl = new URL(page.url())
+check('W3 묶음을 누르면 그 주 1주일치 전부(롱폼 · 쇼츠 3 · 스레드 7 + 예비 · AI 글) · 뒤로 단추 = 내 콘텐츠', wurl.searchParams.get('from') === 'make' && /^\d{4}-\d{2}-\d{2}$/.test(wurl.searchParams.get('start') ?? '') && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.getByTestId('mk-week-back').innerText()).includes('내 콘텐츠'))
+await page.getByTestId('mk-week-back').click()
+await page.waitForURL(/view=make/, { timeout: 5000 }).catch(() => {})
+await page.getByTestId('mk-projects').waitFor({ timeout: 5000 }).catch(() => {})
+check('W4 [← 내 콘텐츠] → 내 콘텐츠로', new URL(page.url()).searchParams.get('view') === 'make' && (await page.getByTestId('mk-projects').count()) === 1)
+
+/* ---------------- D-350 X 멈추기 ---------------- */
+await page.goto(BASE + '/marketing?week=1', { waitUntil: 'networkidle' })
+await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+delayMs = 4000
+const nx = weekCalls().length
+await twice(page.getByTestId('mk-week-run'))
+await page.getByTestId('mk-week-stop').waitFor({ timeout: 5000 }).catch(() => {})
+await page.waitForTimeout(400)
+await page.getByTestId('mk-week-stop').click()
+await page.waitForTimeout(300)
+const stoppedParts = await page.locator('[data-testid="mk-week-part"][data-state="stopped"]').count()
+check('X1 쓰는 중 [멈추기] → 멈춤 · 여섯 갈래 모두 멈춤 표시 · [AI로 다시 쓰기] 가 돌아옴', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'stopped' && stoppedParts === 6 && (await page.getByTestId('mk-week-run').count()) === 1, stoppedParts)
+await page.waitForTimeout(4800)
+check('X2 멈춘 뒤 늦게 온 답은 버림 — 멈춤 그대로 · 예전 AI 글 그대로 · 오류 0', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'stopped' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && errors.length === 0, { calls: weekCalls().length - nx, errors })
+delayMs = 0
+
+/* ---------------- D-350 Y 다른 화면으로 가도 계속 ---------------- */
+delayMs = 2500
+const ny = weekCalls().length
+await twice(page.getByTestId('mk-week-run'))
+await page.waitForTimeout(300)
+// 앱 안에서 이동(새로 고침 아님) — 왼쪽 메뉴 [고객 관리]
+await page.locator('a[href="/ops/clients"]').first().click()
+await page.waitForURL(/\/ops\/clients/, { timeout: 5000 }).catch(() => {})
+await page.waitForTimeout(400)
+const dock = page.getByTestId('week-dock')
+check('Y1 다른 화면(고객 관리)으로 가도 아래에 "1주일치 쓰는 중 n/6 · 보기 · 멈추기"', (await dock.count()) === 1 && (await dock.getAttribute('data-state')) === 'running' && (await page.getByTestId('week-dock-stop').count()) === 1, await dock.innerText().catch(() => ''))
+await shot(page, 'Y-dock-running')
+await page.waitForSelector('[data-testid="week-dock"][data-state="done"]', { timeout: 25000 }).catch(() => {})
+check('Y2 다른 화면에 있는 동안 다 씀 → "1주일치 다 썼어요 · 보기" · 여섯 갈래 한 번씩', (await dock.getAttribute('data-state').catch(() => '')) === 'done' && (await dock.innerText()).includes('다 썼어요') && weekCalls().length === ny + 6, { calls: weekCalls().length - ny })
+await page.getByTestId('week-dock-open').click()
+await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+await page.waitForTimeout(400)
+check('Y3 [보기] → 1주일치 화면(AI 글 그대로) · 아래 알림은 사라짐', (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'done' && (await page.locator('[data-testid="mk-week-thread"][data-ai="1"]').count()) === 9 && (await page.getByTestId('week-dock').count()) === 0)
+delayMs = 0
+
 /* ---------------- E 한 갈래 실패 ---------------- */
 failing = 'shorts.write'
 await page.evaluate(() => {
@@ -354,6 +412,28 @@ for (const [w, scale] of [[360, 'extra_large'], [390, ''], [430, 'large']]) {
   await p.waitForSelector('[data-testid="mk-week-collect"][data-state="done"]', { timeout: 10000 }).catch(() => {})
   check(`M${w}${scale ? ` ${scale}` : ''} 1주일치 화면 가로 넘침 0 · 오류 0 · 글 7 + 3 · 모은 줄 보임`, (await p.getByTestId('mk-week-collect').count()) === 1 && (await overflowX(p)) <= 0 && errs.length === 0 && (await p.locator('[data-testid="mk-week-thread"]:not([data-day="0"])').count()) === 7 && (await p.locator('[data-testid="mk-week-short"]:not([data-n="0"])').count()) === 3, { ox: await overflowX(p), errs })
   await shot(p, `M-${w}`, w === 390)
+  if (w === 390) {
+    // D-350 휴대폰 — 내 콘텐츠 묶음 · 다른 화면에서 '쓰는 중' 표시(아래 메뉴 위 · 넘침 0)
+    await p.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
+    await p.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('7/7'), null, { timeout: 8000 }).catch(() => {})
+    check('M390 내 콘텐츠 1주일치 묶음 카드 · 넘침 0', (await p.getByTestId('mk-project').count()) >= 1 && (await overflowX(p)) <= 0)
+    await p.getByTestId('mk-projects').scrollIntoViewIfNeeded()
+    await shot(p, 'M-390-projects')
+    await p.getByTestId('mk-project').first().click()
+    await p.getByTestId('mk-week').waitFor({ timeout: 8000 })
+    delayMs = 2500
+    await p.goto(BASE + '/marketing?week=1', { waitUntil: 'networkidle' })
+    await p.getByTestId('mk-week').waitFor({ timeout: 8000 })
+    await twice(p.getByTestId('mk-week-run'))
+    await p.waitForTimeout(300)
+    await p.locator('a[href="/ops/clients"]:visible').first().click()
+    await p.waitForTimeout(500)
+    const box = await p.getByTestId('week-dock').boundingBox()
+    check('M390 다른 화면에서 쓰는 중 표시 — 화면 안 · 넘침 0', !!box && box.x >= 0 && box.x + box.width <= 390 && box.y + box.height <= 844 && (await overflowX(p)) <= 0, box)
+    await shot(p, 'M-390-dock')
+    await p.waitForSelector('[data-testid="week-dock"][data-state="done"]', { timeout: 25000 }).catch(() => {})
+    delayMs = 0
+  }
   await c.close()
 }
 

@@ -6,9 +6,10 @@
  *  - 위에 요일별 달력(무엇을 언제 올리나) · 점검 요약, 아래에 롱폼 · 쇼츠 · 스레드. 글마다 공식 점검(점검 통과 / 고칠 곳).
  *  - 결과는 이 브라우저(사람별 금고)에 주마다 — 다시 열어도 다시 부르지 않는다. 팀장 화면을 보는 중이면 AI 를 부르지 않는다.
  *  - D-349 AI 가 쓴 글은 클라우드에도 남고 내 콘텐츠 · 릴스 · 틱톡 · 스레드 목록에 저절로 모인다(고친 글 · 올린 글은 그대로) — 어디에 모였는지 한 줄로.
+ *  - D-350 쓰는 중 [멈추기] — 누르지 않으면 다른 화면으로 가도 계속 쓴다(어느 화면에서나 아래에 진행 표시). 내 콘텐츠의 '1주일치 묶음' 에서 지난 주도 이 화면으로 연다.
  */
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, FolderCheck, Loader2, MonitorPlay, RotateCcw, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, FolderCheck, Loader2, MonitorPlay, RotateCcw, Sparkles, Square } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
@@ -20,7 +21,7 @@ import { makePack, withAi, type ContentPack } from '../../../services/marketing/
 import { templateOf } from '../../../services/marketing/threads'
 import { PLATFORMS } from '../../../services/marketing/shorts'
 import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
-import { startWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
+import { markWeekSeen, startWeekAi, stopWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
 import { weekItemId } from '../../../services/marketing/weekCollect'
 
 const when = (iso: string) => {
@@ -46,6 +47,8 @@ export function WeekView({
   setup,
   brief,
   ws,
+  start: startProp,
+  backLabel = '이번 주 키워드',
   readOnly,
   ownerAi,
   savedLongHref,
@@ -58,6 +61,10 @@ export function WeekView({
   brief: ChannelBrief
   /** D-349 작업공간 — 주면 AI 결과를 클라우드 · 목록으로 모은다(팀장 화면 보기면 주지 않는다) */
   ws?: string | null
+  /** D-350 보여 줄 주(월요일) — 없으면 이번에 만들 주. 내 콘텐츠의 지난 주 묶음은 그 주 */
+  start?: string
+  /** D-350 뒤로 단추 글 — 내 콘텐츠에서 열었으면 '내 콘텐츠' */
+  backLabel?: string
   readOnly: boolean
   ownerAi: boolean
   /** 롱폼 주제가 이미 내 콘텐츠에 있으면 그 줄 주소 */
@@ -67,7 +74,10 @@ export function WeekView({
   onSaveLong: (pack: ContentPack) => Promise<string | null>
 }) {
   const today = todayLocalDate()
-  const start = weekStart(today)
+  const current = weekStart(today)
+  const start = startProp || current
+  /** 지난 주(또는 다른 주) 묶음 — 보기 · 복사만, 다시 쓰기는 이번에 만들 주만 */
+  const past = start !== current
   const version = useSyncExternalStore(subscribeWeek, weekVersion)
   const run = useMemo(() => weekRun(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
   const saved = useMemo(() => weekSaved(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -77,8 +87,13 @@ export function WeekView({
   const lint = useMemo(() => weekLintSummary(week), [week])
   const cal = useMemo(() => weekCalendar(week), [week])
   const running = Object.values(run.parts).includes('running')
-  const canAi = ownerAi && !readOnly && setup.pairs.length > 0
-  const changed = !!saved && saved.topics.join('|') !== labels.join('|')
+  const stopped = Object.values(run.parts).includes('stopped')
+  const canAi = ownerAi && !readOnly && setup.pairs.length > 0 && !past
+  const changed = !past && !!saved && saved.topics.join('|') !== labels.join('|')
+  // 이 화면을 보고 있으면 '다 썼어요' 알림은 본 것으로
+  useEffect(() => {
+    if (run.finishedAt && !run.seen) markWeekSeen(start)
+  }, [run.finishedAt, run.seen, start])
   const [savedHref, setSavedHref] = useState<string | null>(savedLongHref)
   const [saving, setSaving] = useState(false)
 
@@ -105,11 +120,25 @@ export function WeekView({
   const got = { long: week.long.ai ? 1 : 0, shorts: shortsMain.filter((s) => s.ai).length, threads: threadsMain.filter((x) => x.ai).length }
   const gotAny = got.long + got.shorts + got.threads > 0
 
+  if (past && !saved)
+    return (
+      <div className="flex flex-col gap-3" data-testid="mk-week" data-start={start}>
+        <div>
+          <button type="button" onClick={onBack} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-slate-700 hover:bg-slate-100" data-testid="mk-week-back">
+            <ArrowLeft aria-hidden="true" className="size-4" /> {backLabel}
+          </button>
+        </div>
+        <p className="t-body rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-600" data-testid="mk-week-missing">
+          {dayLabel(start, 1)} 주에 만든 1주일치를 찾지 못했어요 — 다른 기기에서 만들었다면 그 기기에서 마케팅 화면을 한 번 열면 여기로 올라와요.
+        </p>
+      </div>
+    )
+
   return (
     <div className="flex flex-col gap-4" data-testid="mk-week" data-start={start}>
       <div>
         <button type="button" onClick={onBack} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-slate-700 hover:bg-slate-100" data-testid="mk-week-back">
-          <ArrowLeft aria-hidden="true" className="size-4" /> 이번 주 키워드
+          <ArrowLeft aria-hidden="true" className="size-4" /> {backLabel}
         </button>
       </div>
 
@@ -155,24 +184,34 @@ export function WeekView({
 
       {/* AI — 여섯 갈래 */}
       {canAi ? (
-        <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${run.errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : saved ? 'done' : 'idle'}>
+        <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${run.errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
             <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
               {running
-                ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 그동안 아래 초안을 보세요.'
-                : saved
+                ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 다른 화면으로 가도 계속 써요(멈추려면 [멈추기]).'
+                : stopped
+                  ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
+                  : saved
                   ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-                  : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 롱폼 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
+                    : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 롱폼 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
             </p>
             <div className="flex flex-wrap items-start gap-2">
-              <ModelPicker />
-              <AiConfirm>
-                <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} disabled={running} data-testid="mk-week-run">
-                  {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
-                  {running ? '쓰는 중…' : saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
+              {running ? (
+                <Button size="sm" variant="secondary" onClick={() => stopWeekAi(start)} data-testid="mk-week-stop">
+                  <Square aria-hidden="true" className="size-4" /> 멈추기
                 </Button>
-              </AiConfirm>
+              ) : (
+                <>
+                  <ModelPicker />
+                  <AiConfirm>
+                    <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run">
+                      {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
+                      {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
+                    </Button>
+                  </AiConfirm>
+                </>
+              )}
             </div>
           </div>
           {Object.values(run.parts).some((s) => s !== 'idle') && (
@@ -198,7 +237,11 @@ export function WeekView({
         </div>
       ) : (
         <p className="t-sub break-keep rounded-xl bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-week-ai-off">
-          {readOnly ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않아요).' : 'AI 로 다 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
+          {readOnly
+            ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않아요).'
+            : past
+              ? `${dayLabel(start, 1)} 주에 만든 1주일치예요${saved?.model ? ` · ${saved.model}` : ''}${saved && when(saved.at) ? ` · ${when(saved.at)}` : ''} — 다시 쓰기는 이번에 만들 주만 돼요.`
+              : 'AI 로 다 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
         </p>
       )}
 
@@ -217,7 +260,7 @@ export function WeekView({
                 ? '목록으로 모으는 중이에요…'
                 : sync.state === 'error'
                   ? '목록으로 모으지 못했어요(인터넷 · 로그인 확인) — 이 화면을 다시 열면 한 번 더 모아요.'
-                  : 'AI 가 쓴 글을 목록에 모아 뒀어요 — 다른 기기에서도 보여요'}
+                  : 'AI 가 쓴 글을 모아 뒀어요 — 내 콘텐츠 › 1주일치 묶음에서 언제든 다시 열고, 다른 기기에서도 보여요'}
             </p>
           </div>
           {sync.state !== 'error' && (
@@ -371,8 +414,8 @@ export function WeekView({
   )
 }
 
-const partTone = (s: WeekPartState) => (s === 'error' ? 'bg-amber-100 text-amber-900' : s === 'done' ? 'bg-violet-100 text-violet-800' : 'bg-white text-slate-600')
-const partIcon = (s: WeekPartState) => (s === 'running' ? <Loader2 aria-hidden="true" className="size-3.5 animate-spin" /> : s === 'done' ? '✓' : s === 'error' ? '!' : '·')
+const partTone = (s: WeekPartState) => (s === 'error' ? 'bg-amber-100 text-amber-900' : s === 'done' ? 'bg-violet-100 text-violet-800' : s === 'stopped' ? 'bg-slate-200 text-slate-700' : 'bg-white text-slate-600')
+const partIcon = (s: WeekPartState) => (s === 'running' ? <Loader2 aria-hidden="true" className="size-3.5 animate-spin" /> : s === 'done' ? '✓' : s === 'error' ? '!' : s === 'stopped' ? '■' : '·')
 
 function Card({ icon, title, sub, ai, lint, onCopy, children }: { icon: ReactNode; title: string; sub: string; ai: boolean; lint: LintSum; onCopy: () => void; children: ReactNode }) {
   return (

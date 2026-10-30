@@ -547,6 +547,8 @@ export interface Opportunity {
   thumbs: string[]
   approach: Approach
   approachWhy: string
+  /** D-351 채널 설계 기준의 본업으로 이은 것(brandAngle) — 있으면 찍기 키트의 첫 문장 · 구성이 이것 */
+  brand?: { core: string; label: string; hook: string; outline: { at: string; what: string }[] }
 }
 
 /** 이번 달 잘된 제목 구조 — 평소보다 잘된 영상(2배+) 중 많이 쓴 구조 */

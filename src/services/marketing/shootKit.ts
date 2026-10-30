@@ -141,6 +141,11 @@ export function shootKit(o: Opportunity): ShootKit {
     prep = ['공식 자료 한 장(보도자료 · 공고문) — 영상 속 숫자는 여기서만', '예시 회사 숫자 하나(매출 · 직원 수 — 실제 고객이면 이름은 빼기)', `썸네일 문구 고르기 — "${thumb}"`]
     effort = { label: '자료 + 말로 설명', minutes: 30 }
   }
+  // D-351 본업으로 이은 후보 — 첫 문장 · 구성은 그 각도로(기능 소개로 끝내지 않게)
+  if (o.brand) {
+    hook = o.brand.hook
+    outline = o.brand.outline.map((x) => ({ ...x }))
+  }
   const shorts: KitStep[] = [
     { at: '0~3초', what: `화면 자막 "${thumb || main}" + 첫 문장 짧게` },
     { at: '3~40초', what: `핵심 하나만 — "${main}" 의 답 한 가지` },

@@ -10,7 +10,7 @@
  * 예전 '콘텐츠 수첩'(D-194)의 줄 · 단계 · 메모 · 브리프 · 빼기는 그대로 여기로 옮겼다(지운 것 없음). 저장은 같은 수첩 줄.
  * D-241 AI 도우미에서 담은 기획 · 대본이 여기로 온다 — 주소 ?idea=번호 로 오면 그 줄을 펼쳐 보여 주고, 대본은 줄 안에서 읽고 복사.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, FileText, NotebookPen, PenLine, Plus, Trash2, TrendingUp, Tv } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
@@ -61,7 +61,7 @@ const dayOf = (ms: number) => {
   return d.toISOString().slice(0, 10)
 }
 
-export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mine = [], feedReady = false, sample = false, focusId = '', ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string; focusId?: string } & MineProps & MakeActions) {
+export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mine = [], feedReady = false, sample = false, focusId = '', projects, ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string; focusId?: string; /** D-350 1주일치 묶음(맨 위) */ projects?: ReactNode } & MineProps & MakeActions) {
   const [stage, setStage] = useState<IdeaStatus | 'all'>('all')
   const [topic, setTopic] = useState('')
   // '아니에요' 를 누른 제안 — 이 화면에서만 숨긴다(다음에 열면 다시 물어도 된다)
@@ -95,6 +95,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
       </div>
       {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
       {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
+      {projects}
 
       {/* 단계판 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
@@ -285,6 +286,12 @@ function MakeRow({
         <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-body min-w-0 flex-[1_1_12rem] text-left font-bold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-rose-700" data-testid="make-row-toggle">
           {i.topic}
         </button>
+        {/* D-350 1주일치에서 모은 롱폼 — 그 주 묶음(쇼츠 · 스레드까지)으로 바로 */}
+        {i.key.startsWith('week:') && (
+          <Link to={`/marketing?week=1&start=${encodeURIComponent(i.key.slice(5))}&from=make`} className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-bold text-violet-900 hover:bg-violet-200" data-testid="make-week-badge">
+            <CalendarDays aria-hidden="true" className="size-3.5" /> 1주일치 묶음 보기
+          </Link>
+        )}
         {i.script && (
           <button type="button" onClick={() => setOpen(true)} className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900" data-testid="make-script-badge">
             <FileText aria-hidden="true" className="size-3.5" /> 대본 있음

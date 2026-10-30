@@ -131,6 +131,12 @@ export function weekRows(ws: string | null, saved: WeekSaved, parts?: readonly W
   return { idea, shorts, threads }
 }
 
+/** D-350 내 콘텐츠 '1주일치 묶음' 카드 — AI 가 쓴 롱폼 · 쇼츠 · 스레드 수(예비 빼고) */
+export function weekCounts(saved: WeekSaved): { long: number; shorts: number; threads: number } {
+  const r = weekRows(null, saved)
+  return { long: r.idea ? 1 : 0, shorts: r.shorts.length, threads: r.threads.length }
+}
+
 /* ------------------------------------------------------------------ */
 /* 목록에 넣기 — 없으면 새로 · 예전 AI 글 그대로면 바꾸기 · 고쳤거나 올렸으면 그대로   */
 /* ------------------------------------------------------------------ */
