@@ -4442,3 +4442,8 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   uxpick 37(롱폼 진행판 접힘 · 줄로 오면 펼침 — 이미 화면에 있을 때 안 펼쳐지던 것 고침) · youtube 246([다음: 내 콘텐츠] 로 오면 진행판 펼침) · tools 230(창업감면 채운 질문은 한 줄 · [바꾸기]) ·
   mkweek 48 · shorts · modules 894 · matrix 584 · phone 184 · real 188 · detail 456 · taxplan 96 · scenarios 69 · connect 45 · calcpreset 32 · wayfinding 28 · enroll 48 — 모두 0 실패.
 - 스크린샷(눈으로 봄): 맞춤 추천 1440 · 오늘 390 · 1주일치 1440 · 창업감면(한솔테크) 1440 · 연구소 빈 대시보드 1440.
+
+## §240 D-359 1주일치 프로젝트 '올렸나' · qa:firstscreen — 병합 (2026-10-30 · 빠른 모드)
+
+- mkweek 52(Q0~Q3 새 — 카드 '아직 안 올림' · 그 글로 · [올렸어요] 뒤 '올림 m/d' · 머리 '올린 글 1/10') · firstscreen 54(새) — 0 실패. tsc · oxlint · build 녹색.
+- 스크린샷: 1주일치 스레드 탭(머리 '올린 글 1/10').

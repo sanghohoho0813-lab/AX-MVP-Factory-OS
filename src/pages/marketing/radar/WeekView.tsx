@@ -23,6 +23,8 @@ import { PLATFORMS } from '../../../services/marketing/shorts'
 import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
 import { markWeekSeen, startWeekAi, stopWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
 import { weekItemId } from '../../../services/marketing/weekCollect'
+import { listThreadPosts } from '../../../services/marketing/threads'
+import { listShortPosts } from '../../../services/marketing/shorts'
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -97,6 +99,19 @@ export function WeekView({
     if (run.finishedAt && !run.seen) markWeekSeen(start)
   }, [run.finishedAt, run.seen, start])
   const [savedHref, setSavedHref] = useState<string | null>(savedLongHref)
+  // D-359 프로젝트 안에서 '올렸나' 까지 — 모은 글(스레드 · 릴스 기록표)의 상태를 읽는다(쓰기는 그 화면에서)
+  const [posts, setPosts] = useState<ReadonlyMap<string, { status: 'draft' | 'posted'; postedOn: string }>>(() => new Map())
+  useEffect(() => {
+    if (ws === undefined) return
+    let alive = true
+    void Promise.all([listThreadPosts(ws).catch(() => []), listShortPosts(ws).catch(() => [])]).then(([t, sh]) => {
+      if (!alive) return
+      setPosts(new Map([...t, ...sh].filter((p) => p.id.startsWith(weekItemId(ws, start, ''))).map((p) => [p.id, { status: p.status, postedOn: p.postedOn }])))
+    })
+    return () => {
+      alive = false
+    }
+  }, [ws, start, sync.state])
   const [saving, setSaving] = useState(false)
 
   const runAi = () => {
@@ -121,6 +136,15 @@ export function WeekView({
   const collect = !readOnly && ws !== undefined
   const got = { long: week.long.ai ? 1 : 0, shorts: shortsMain.filter((s) => s.ai).length, threads: threadsMain.filter((x) => x.ai).length }
   const gotAny = got.long + got.shorts + got.threads > 0
+  /** 모은 글이면 그 글 주소 · 상태(스레드 · 릴스 화면에서 고치고 [올렸어요]) */
+  const linkOf = (kind: 't' | 's', n: number) => {
+    if (!collect) return undefined
+    const id = weekItemId(ws ?? null, start, `${kind}${n}`)
+    const p = posts.get(id)
+    if (!p) return undefined
+    return { href: `/marketing/${kind === 't' ? 'threads' : 'shorts'}?open=${encodeURIComponent(id)}`, posted: p.status === 'posted', postedOn: p.postedOn }
+  }
+  const postedN = [...posts.values()].filter((p) => p.status === 'posted').length
   // D-356 탭은 주소에(?wt=) — 뒤로 가기 · 새로 고침에도 보던 탭 그대로
   const [params, setParams] = useSearchParams()
   const tab: WeekTab = WEEK_TABS.includes(params.get('wt') as WeekTab) ? (params.get('wt') as WeekTab) : 'long'
@@ -165,7 +189,7 @@ export function WeekView({
     { key: 'threads', label: '스레드', count: `${threadsMain.length}${threadsSpare.length ? `+${threadsSpare.length}` : ''}`, icon: AtSign, tone: 'text-slate-800', state: tabState(['th0', 'th1', 'th2']), ai: threadsMain.some((x) => x.ai) },
     { key: 'plan', label: '올릴 날', count: '7일', icon: CalendarDays, tone: 'text-violet-700', state: null, ai: false },
   ]
-  const madeLine = saved ? `${when(saved.at) ? `${when(saved.at)} 만듦 · ` : ''}AI 로 씀${saved.model ? `(${saved.model})` : ''}` : running ? 'AI 가 쓰는 중' : '규칙 초안 — 아직 AI 로 안 씀'
+  const madeLine = `${saved ? `${when(saved.at) ? `${when(saved.at)} 만듦 · ` : ''}AI 로 씀${saved.model ? `(${saved.model})` : ''}` : running ? 'AI 가 쓰는 중' : '규칙 초안 — 아직 AI 로 안 씀'}${posts.size ? ` · 올린 글 ${postedN}/${posts.size}` : ''}`
 
   return (
     <div className="flex flex-col gap-4" data-testid="mk-week" data-start={start} data-tab={tab}>
@@ -384,7 +408,7 @@ export function WeekView({
           <section className="flex flex-col gap-2" aria-label="릴스 · 쇼츠 3편">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               {shortsMain.map((x) => (
-                <ShortCard key={x.slot.n} s={x} start={start} onCopy={onCopy} />
+                <ShortCard key={x.slot.n} s={x} start={start} onCopy={onCopy} link={linkOf('s', x.slot.n)} />
               ))}
             </div>
             {shortsSpare.length > 0 && (
@@ -404,7 +428,7 @@ export function WeekView({
             <p className="t-sub break-keep text-slate-600">요일마다 목적 · 틀이 달라요 — 하루 하나씩 올려요.</p>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {threadsMain.map((x) => (
-                <ThreadCard key={x.slot.day} x={x} start={start} onCopy={onCopy} />
+                <ThreadCard key={x.slot.day} x={x} start={start} onCopy={onCopy} link={linkOf('t', x.slot.day)} />
               ))}
             </div>
             {threadsSpare.length > 0 && (
@@ -480,6 +504,23 @@ export function WeekView({
 const partTone = (s: WeekPartState) => (s === 'error' ? 'bg-amber-100 text-amber-900' : s === 'done' ? 'bg-violet-100 text-violet-800' : s === 'stopped' ? 'bg-slate-200 text-slate-700' : 'bg-white text-slate-600')
 const partIcon = (s: WeekPartState) => (s === 'running' ? <Loader2 aria-hidden="true" className="size-3.5 animate-spin" /> : s === 'done' ? '✓' : s === 'error' ? '!' : s === 'stopped' ? '■' : '·')
 
+type PostLink = { href: string; posted: boolean; postedOn: string } | undefined
+
+/** D-359 모은 글이면 카드 아래 — 올렸는지 · 그 화면에서 고치고 [올렸어요] */
+function PostRow({ link, what }: { link: PostLink; what: string }) {
+  if (!link) return null
+  return (
+    <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2" data-testid="mk-week-post" data-posted={link.posted ? '1' : '0'}>
+      <span className={`t-meta rounded-full px-2 py-0.5 font-bold ${link.posted ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-800'}`}>
+        {link.posted ? `올림${link.postedOn ? ` ${Number(link.postedOn.slice(5, 7))}/${Number(link.postedOn.slice(8, 10))}` : ''}` : '아직 안 올림'}
+      </span>
+      <Link to={link.href} className="tap t-sub ml-auto inline-flex items-center font-semibold text-violet-800 hover:underline" data-testid="mk-week-post-open">
+        {link.posted ? `${what} 화면에서 숫자 적기 →` : `${what} 화면에서 고치기 · 올렸어요 →`}
+      </Link>
+    </div>
+  )
+}
+
 function Card({ icon, title, sub, ai, lint, onCopy, children }: { icon: ReactNode; title: string; sub: string; ai: boolean; lint: LintSum; onCopy: () => void; children: ReactNode }) {
   return (
     <div className="flex h-full min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-3 shadow-(--shadow-card) sm:p-4">
@@ -531,7 +572,7 @@ function Block({ label, text }: { label: string; text: string }) {
   )
 }
 
-function ShortCard({ s, start, onCopy }: { s: WeekShort; start: string; onCopy: (t: string, what: string) => void }) {
+function ShortCard({ s, start, onCopy, link }: { s: WeekShort; start: string; onCopy: (t: string, what: string) => void; link?: PostLink }) {
   const kind = s.slot.platform === 'reels' ? '릴스' : '쇼츠'
   const title = s.slot.n ? `${kind} ${NUM[s.slot.n - 1]} · ${dayLabel(start, s.slot.day)}` : `${kind} 다른 버전`
   const plat = PLATFORMS.find((p) => p.key === s.slot.platform)
@@ -543,12 +584,13 @@ function ShortCard({ s, start, onCopy }: { s: WeekShort; start: string; onCopy: 
         <p className="t-sub whitespace-pre-wrap break-keep text-slate-800 [overflow-wrap:anywhere]">{s.draft.script}</p>
         {s.draft.caption && <Block label="캡션" text={s.draft.caption} />}
         {s.draft.hashtags && <p className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]">{s.draft.hashtags}</p>}
+        <PostRow link={link} what="릴스 · 틱톡" />
       </Card>
     </div>
   )
 }
 
-function ThreadCard({ x, start, onCopy }: { x: WeekThread; start: string; onCopy: (t: string, what: string) => void }) {
+function ThreadCard({ x, start, onCopy, link }: { x: WeekThread; start: string; onCopy: (t: string, what: string) => void; link?: PostLink }) {
   const tp = templateOf(x.draft.template || x.slot.template)
   const title = x.slot.day ? `스레드 · ${dayLabel(start, x.slot.day)}` : '스레드 · 예비'
   return (
@@ -563,6 +605,7 @@ function ThreadCard({ x, start, onCopy }: { x: WeekThread; start: string; onCopy
             ))}
           </ul>
         )}
+        <PostRow link={link} what="스레드" />
       </Card>
     </div>
   )

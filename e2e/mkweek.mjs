@@ -397,6 +397,29 @@ const e1tab = await page.locator('[data-testid="mk-week-tab"][data-tab="shorts"]
 check('E1 숏폼 갈래만 실패 → 이유(쇼츠 ① ② · 릴스 ③) · 쇼츠는 초안 그대로(빈 칸 아님 · 탭에 "일부 초안") · 롱폼 · 스레드는 AI', err.includes('쇼츠 ① ②') && err.includes('릴스 ③') && e1short && e1tab.includes('일부 초안') && (await countIn(page, 'long', '[data-testid="mk-week-long"][data-ai="1"]')) === 1 && (await countIn(page, 'threads', AI9)) === 9, { err, e1tab })
 failing = ''
 check('E2 오류 0', errors.length === 0, errors)
+
+/* ---------------- D-359 프로젝트 안에서 올렸는지 · 그 글 화면으로 ---------------- */
+await page.waitForSelector('[data-testid="mk-week-collect"][data-state="done"]', { timeout: 10000 }).catch(() => {})
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+await tabTo(page, 'threads')
+await page.waitForSelector('[data-testid="mk-week-post"]', { timeout: 8000 }).catch(() => {})
+const postRows = await page.getByTestId('mk-week-post').evaluateAll((els) => els.map((e) => e.getAttribute('data-posted')))
+const firstHref = (await page.getByTestId('mk-week-post-open').first().getAttribute('href').catch(() => '')) ?? ''
+check('Q0 스레드 탭 카드마다 "아직 안 올림" · [스레드 화면에서 고치기 · 올렸어요] (그 글 ?open=)', postRows.length === 7 && postRows.every((x) => x === '0') && /\/marketing\/threads\?open=/.test(firstHref), { postRows, firstHref })
+await page.getByTestId('mk-week-post-open').first().click()
+await page.waitForURL(/\/marketing\/threads/, { timeout: 5000 }).catch(() => {})
+await page.waitForTimeout(800)
+check('Q1 누르면 스레드 화면 글 칸에 그 글', (await page.getByTestId('thr-body').inputValue()).includes('AI 스레드 첫 줄'))
+await page.getByTestId('thr-posted').click()
+await page.waitForTimeout(800)
+await page.goto(BASE + '/marketing?week=1&wt=threads', { waitUntil: 'networkidle' })
+await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+await page.waitForFunction(() => document.querySelector('[data-testid="mk-week-post"][data-posted="1"]') !== null, null, { timeout: 8000 }).catch(() => {})
+const made = (await page.getByTestId('mk-week-made').innerText().catch(() => '')) ?? ''
+check('Q2 [올렸어요] 뒤 프로젝트로 돌아오면 그 카드 "올림 m/d" · 머리에 "올린 글 1/10"', (await page.locator('[data-testid="mk-week-post"][data-posted="1"]').count()) === 1 && /올림 \d+\/\d+/.test(await page.locator('[data-testid="mk-week-post"][data-posted="1"]').innerText()) && made.includes('올린 글 1/10'), made)
+await shot(page, 'Q-posted')
+check('Q3 오류 0', errors.length === 0, errors)
 await ctx.close()
 
 /* ---------------- P 예전 휴대폰 — 이 브라우저에만 남은 주를 열면 올리고 모음 ---------------- */
