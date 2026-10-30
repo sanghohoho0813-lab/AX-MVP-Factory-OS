@@ -420,6 +420,33 @@ const made = (await page.getByTestId('mk-week-made').innerText().catch(() => '')
 check('Q2 [올렸어요] 뒤 프로젝트로 돌아오면 그 카드 "올림 m/d" · 머리에 "올린 글 1/10"', (await page.locator('[data-testid="mk-week-post"][data-posted="1"]').count()) === 1 && /올림 \d+\/\d+/.test(await page.locator('[data-testid="mk-week-post"][data-posted="1"]').innerText()) && made.includes('올린 글 1/10'), made)
 await shot(page, 'Q-posted')
 check('Q3 오류 0', errors.length === 0, errors)
+
+/* ---------------- D-360 그 주가 되면 오늘 화면 맨 위 '오늘 올릴 것' ---------------- */
+{
+  const wk = (await page.getByTestId('mk-week').getAttribute('data-start')) ?? ''
+  const before = await page.goto(BASE + '/', { waitUntil: 'networkidle' }).then(() => page.getByTestId('today-posts').count())
+  const wed = new Date(`${wk}T10:00:00+09:00`)
+  wed.setDate(wed.getDate() + 2)
+  await page.clock.setFixedTime(wed)
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.getByTestId('today-posts').waitFor({ timeout: 8000 }).catch(() => {})
+  const line = (await page.getByTestId('today-posts').innerText().catch(() => '')) ?? ''
+  const href = (await page.getByTestId('today-posts').getAttribute('href').catch(() => '')) ?? ''
+  check('T1 그 주 수요일이 되면 오늘 화면 맨 위 "오늘 올릴 것 · 날짜(수) 유튜브 롱폼 · 스레드(신뢰)" (만든 주가 오기 전엔 없음)', before === 0 && /오늘 올릴 것/.test(line) && line.includes('(수)') && line.includes('유튜브 롱폼') && line.includes('스레드(신뢰)'), { before, line })
+  await page.getByTestId('today-posts').click()
+  await page.waitForURL(/\/marketing\?/, { timeout: 5000 }).catch(() => {})
+  await page.getByTestId('mk-week').waitFor({ timeout: 8000 }).catch(() => {})
+  check('T2 누르면 그 주 프로젝트 · 롱폼 탭으로', href === `/marketing?week=1&start=${wk}&wt=long` && (await page.getByTestId('mk-week').getAttribute('data-tab')) === 'long' && (await page.getByTestId('mk-week').getAttribute('data-start')) === wk, { href, wk })
+  const fri = new Date(wed)
+  fri.setDate(fri.getDate() + 2)
+  await page.clock.setFixedTime(fri)
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.getByTestId('today-posts').waitFor({ timeout: 8000 }).catch(() => {})
+  const fline = (await page.getByTestId('today-posts').innerText().catch(() => '')) ?? ''
+  check('T3 금요일은 스레드(답글 · 리드)만 → 스레드 탭', fline.includes('(금)') && fline.includes('스레드(답글 · 리드)') && !fline.includes('롱폼') && /wt=threads/.test((await page.getByTestId('today-posts').getAttribute('href')) ?? ''), fline)
+  await shot(page, 'T-today')
+  check('T4 오류 0', errors.length === 0, errors)
+}
 await ctx.close()
 
 /* ---------------- P 예전 휴대폰 — 이 브라우저에만 남은 주를 열면 올리고 모음 ---------------- */

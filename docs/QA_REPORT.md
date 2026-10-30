@@ -4447,3 +4447,11 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 
 - mkweek 52(Q0~Q3 새 — 카드 '아직 안 올림' · 그 글로 · [올렸어요] 뒤 '올림 m/d' · 머리 '올린 글 1/10') · firstscreen 54(새) — 0 실패. tsc · oxlint · build 녹색.
 - 스크린샷: 1주일치 스레드 탭(머리 '올린 글 1/10').
+
+## §241 D-360 오늘 화면 '오늘 올릴 것' — 병합 (2026-10-30 · 빠른 모드)
+
+- mkweek 56(T1~T4 새 — 만든 주가 오기 전엔 없음 · 그 주 수요일 '유튜브 롱폼 · 스레드(신뢰)' · 누르면 롱폼 탭 · 금요일은 스레드만 → 스레드 탭) · firstscreen 54 · easy · keepui — 0 실패.
+- 안정성 묶음(D-359 빌드): steady · board · grants · planner · todos · calendar · diag · plan · content · site · flow · sales · contract · simple · journey · studio 녹색.
+  money 는 월말 날짜 때문에 시험 기대가 틀렸던 것(D-360 참고) → 고친 뒤 41 · 0 실패.
+- 첫 화면 길이(PC/휴대폰): 오늘 2.2/3.0 — 한 줄 더해도 그대로.
+- 스크린샷: 오늘(PC) 'h1 아래 오늘 올릴 것 · 11/6(금) 스레드(답글 · 리드)'.

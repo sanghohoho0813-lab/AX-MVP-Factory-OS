@@ -122,10 +122,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check(`비용 적기 저장 ${Date.now() - t0}ms`, true)
   const costText = await page.getByTestId('cost-list').innerText()
   check('비용 탭: 택시 28,000원 · 한솔테크', /미팅 택시/.test(costText) && /28,000원/.test(costText) && /한솔테크/.test(costText), costText)
-  check('비용 탭: 정기 결제(Claude) · 영업자 수수료 줄', (await page.locator('[data-testid="cost-line"][data-source="subscription"]').count()) === (inMonth(IN2) ? 1 : 0) && (await page.locator('[data-testid="cost-line"][data-source="agent"]').count()) === 1)
+  // 쓰기 시작한 날을 비워 뒀으니 결제일이 다음 달 초(월말에 돌린 날)여도 이번 달 같은 날짜에 한 번 — 화면 안내 "비워 두면 지난달 비용에도 들어갑니다"
+  check('비용 탭: 정기 결제(Claude) · 영업자 수수료 줄', (await page.locator('[data-testid="cost-line"][data-source="subscription"]').count()) === 1 && (await page.locator('[data-testid="cost-line"][data-source="agent"]').count()) === 1)
   check('분류별: 수수료 · 교통', /수수료/.test(await page.getByTestId('cost-categories').innerText()) && /교통/.test(await page.getByTestId('cost-categories').innerText()))
   const t2 = await tile(page, 2)
-  const costSum = 28_000 + 500_000 + (inMonth(IN2) ? 30_000 : 0)
+  const costSum = 28_000 + 500_000 + 30_000
   check('나간 돈 = 택시 + 수수료 (+ Claude)', t2.includes(`${costSum.toLocaleString('ko-KR')}원`), t2)
 
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('cost-csv').click()])
