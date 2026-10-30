@@ -112,8 +112,9 @@ export default function DashboardPage() {
         result="오늘 할 일, 변경 확인 대상, 연구노트·활동조사·리포트 진행 상황을 확인합니다."
         steps={["오늘 할 일 확인", "지연 항목 처리", "고객 리포트·변경사항으로 이동"]}
       />
-      {/* ── 히어로 ── */}
-      <section className="mb-5 overflow-hidden rounded-2xl bg-navy-900 px-6 py-6 text-white shadow-card sm:px-7">
+      {/* ── 히어로 ── D-367 관리하는 고객사가 없으면 빼고 아래 한 장(① → ② → ③)만 — 0 개 · 0 건 소개와 같은 단추가 두 번 나왔다 */}
+      {(stats?.managedClients ?? 0) > 0 && (
+      <section className="mb-5 overflow-hidden rounded-2xl bg-navy-900 px-6 py-6 text-white shadow-card sm:px-7" data-testid="lab-hero">
         <p className="text-xl font-bold sm:text-2xl">
           기업부설연구소, <span className="text-amber-300">설립부터 사후관리까지</span> 한 번에
           관리합니다.
@@ -131,6 +132,7 @@ export default function DashboardPage() {
           <HeroBtn href="/reports" label="고객 리포트" />
         </div>
       </section>
+      )}
 
       {/* ── 샘플 데이터 관리 (대시보드 상단) ── */}
       <div className="mb-5">

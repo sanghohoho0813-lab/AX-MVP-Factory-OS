@@ -9,6 +9,7 @@ import { Lightbulb } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { ClientReco } from './useClientReco'
 import { HelpHeading } from '../ui/fold'
+import { improvedSinceGiven } from '../../services/diagnosisGiven'
 
 export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientOpsRecord[]; reco: ClientReco; phone: boolean }) {
   if (!reco.ready) return null
@@ -67,6 +68,15 @@ export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientO
               ))}
               {chips.length > 4 && <span className="t-meta text-slate-600">+{chips.length - 4}</span>}
             </span>
+            {/* D-368 진단서를 드린 뒤 새로 추천할 수 있게 된 모듈 — 다시 드릴 때 */}
+            {(() => {
+              const fresh = improvedSinceGiven(c.diagnosisGiven, chips)
+              return fresh.length > 0 ? (
+                <span className="t-meta rounded-full bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900 ring-1 ring-amber-200" data-testid="today-pick-new">
+                  진단서 드린 뒤 새 추천: {fresh.join(' · ')}
+                </span>
+              ) : null
+            })()}
             <Link to={`/ops/clients/${c.id}?tab=smart`} className="tap t-sub ml-auto inline-flex shrink-0 items-center font-semibold text-brand-700 hover:underline" data-testid="today-pick-go">
               맞춤 추천 보기 →
             </Link>

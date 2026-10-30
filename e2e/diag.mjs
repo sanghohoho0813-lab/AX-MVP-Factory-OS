@@ -149,6 +149,13 @@ await note2.click()
 await doc.waitFor({ timeout: 5000 }).catch(() => {})
 check('D14 한 줄을 누르면 진단서 창(달라진 것 칸)', (await doc.getByTestId('diagnosis-since').count()) === 1)
 await page.keyboard.press('Escape')
+// D-368 오늘 화면 '오늘 먼저 제안할 것' — 진단서를 드린 뒤 새로 추천할 수 있게 된 모듈
+await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+await page.getByTestId('today-picks').waitFor({ timeout: 8000 }).catch(() => {})
+const newTag = page.locator('[data-testid="today-pick"][data-client="cli_hansol"] [data-testid="today-pick-new"]')
+const newText = (await newTag.innerText().catch(() => '')) ?? ''
+check('D15 오늘 먼저 제안할 것 — 한솔테크 줄에 "진단서 드린 뒤 새 추천: (그때 자료 필요였던 모듈)" · 다른 업체(드린 적 없음)엔 없음', newText.startsWith('진단서 드린 뒤 새 추천:') && newText.length > '진단서 드린 뒤 새 추천:'.length && (await page.locator('[data-testid="today-pick"]:not([data-client="cli_hansol"]) [data-testid="today-pick-new"]').count()) === 0, newText)
+await shot(page, 'D-today-new')
 await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
 await page.getByTestId('smart-tab').waitFor({ timeout: 8000 })
 check('D7 맞춤 추천 탭에도 같은 [맞춤 진단서]', (await page.getByTestId('smart-tab').getByTestId('top-picks-diagnosis').count()) === 1)

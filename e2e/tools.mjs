@@ -174,6 +174,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check('연구소: 화면이 열린다 (원본 대시보드 + 고객 운영 연결)', (await page.getByTestId('lab-module-eyebrow').innerText()).includes('연구소') && (await page.getByTestId('lab-orig').count()) === 1 && (await page.getByTestId('module-dashboard').count()) === 1)
+  check('D-367 연구소: 관리하는 고객사가 없으면 짙은 소개 상자(0개 · 0건) 없이 ① → ② → ③ 한 장만', (await page.getByTestId('lab-hero').count()) === 0 && (await page.getByTestId('lab-dash-empty').count()) === 1)
 
   /* ---- D-91: 모듈 2단 목차 · 모듈 대시보드가 OS 업체를 본다 ---- */
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })

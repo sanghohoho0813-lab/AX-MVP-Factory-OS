@@ -15,7 +15,7 @@ const BASE = process.argv[2] ?? 'http://localhost:4390'
 const si = process.argv.indexOf('--shots')
 const SHOTS = si > 0 ? process.argv[si + 1] : ''
 
-/** [이름, 주소, PC 한도, 휴대폰 한도] — 2026-10-30 D-357 · D-358 뒤 길이 + 여유(창업감면 D-361 · 고용지원금 D-362 에서 줄임) */
+/** [이름, 주소, PC 한도, 휴대폰 한도] — 2026-10-30 D-357 · D-358 뒤 길이 + 여유(창업감면 D-361 · 고용지원금 D-362 · 연구소 D-367 에서 줄임) */
 const SCREENS = [
   ['오늘', '/', 2.6, 3.6],
   ['고객 관리', '/ops/clients', 2.4, 3.1],
@@ -31,7 +31,7 @@ const SCREENS = [
   ['전문 모듈', '/tools', 2.0, 3.6],
   ['정책자금', '/tools/policy-funding', 1.7, 2.5],
   ['고용지원금', '/tools/employment', 2.0, 3.0],
-  ['연구소', '/tools/labcare', 2.2, 3.7],
+  ['연구소', '/tools/labcare', 2.2, 3.0],
   ['창업감면', '/tools/startup-tax', 2.0, 2.8],
   ['세금 계산기', '/tools/tax', 3.2, 4.0],
   ['기업인증', '/tools/cert-os', 1.4, 1.4],

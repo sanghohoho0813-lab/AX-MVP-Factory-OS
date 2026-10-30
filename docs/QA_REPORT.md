@@ -4473,3 +4473,13 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - tsc · oxlint(경고 수 그대로) · build · test:all EXIT 0(customer-facts 488 — D-366 2 새).
 - diag 20(D12~D14 새 — 오늘 드림 · 그대로 / 지난번 뒤 판정 바뀜 · 받은 자료 → '다시 드릴 때예요' / 누르면 진단서 '달라진 것') · detail 0 실패.
 - 스크린샷: 업체 개요 '먼저 제안할 것' 아래 노란 한 줄(PC).
+
+## §244 D-367 연구소 첫 화면 · D-368 오늘 '진단서 드린 뒤 새 추천' — 병합 + 안정화 묶음 (2026-10-30 · 빠른 모드)
+
+- tsc · oxlint(경고 수 그대로) · build · test:all EXIT 0.
+- e2e(0 실패): tools(D-367 새) · modules · matrix · firstscreen(연구소 휴대폰 한도 3.7 → 3.0) · diag 21(D15 새) · flow · easy.
+- 안정화 묶음(D-357 접기 뒤 아직 안 돌린 것 25개 — 0 실패): squeeze · e2e:mobile · taxplan · connect · tax(계산기 원본 대조) · wording · files · folder · radar ·
+  session · isolation · siteai · ownerai · specboard · sideai · vstudy · certai · ventureplan · pvmenu · specwrite · pvux · chat · mkpack · mkkit · assist.
+- 첫 화면 길이: 연구소 휴대폰 3.2 → 2.6.
+- 스크린샷: 연구소(390 — ① → ② → ③ 한 장) · 오늘(PC — '진단서 드린 뒤 새 추천: 정책자금').
+- 서류 탭(휴대폰 4.5)은 그대로 — '받음 체크했지만 파일이 없는' 칸이 파일을 붙이라고 펼쳐지는 것이 길이의 대부분이고, 클라우드(실제 사용)에서는 의도된 동작.
