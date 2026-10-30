@@ -170,7 +170,7 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
         사용자가 기억할 필요가 없다 — 시스템이 들고 있다가 필요한 단계에서 다시 묻는다.
       */}
       {p.deferred.length > 0 && (
-        <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50/60 px-4 py-3">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
           <p className="t-sub font-semibold text-warning-800">나중에 확인하기로 한 것 {p.deferred.length}가지</p>
           <p className="t-sub mt-0.5 break-keep text-slate-700">{p.deferred.map((d) => d.label).join(' · ')}</p>
           <p className="t-sub mt-1 break-keep text-slate-600">지금은 몰라도 됩니다. 이 값이 꼭 필요해지는 단계에서 다시 여쭤봅니다.</p>

@@ -452,12 +452,12 @@ export function BulkDocUploadSheet({
     >
       <div className="flex flex-col gap-3">
         {archiveNote && (
-          <p role="status" data-testid="bulk-archive-note" className="rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 t-sub break-keep text-brand-900 [overflow-wrap:anywhere]">
+          <p role="status" data-testid="bulk-archive-note" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 t-sub break-keep text-brand-900 [overflow-wrap:anywhere]">
             {archiveNote}
           </p>
         )}
         {autoNote && (
-          <p role="status" data-testid="bulk-auto-note" className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 t-sub break-keep text-warning-800">
+          <p role="status" data-testid="bulk-auto-note" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 t-sub break-keep text-warning-800">
             {autoNote}
           </p>
         )}

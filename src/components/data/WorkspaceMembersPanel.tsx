@@ -115,7 +115,7 @@ export function WorkspaceMembersPanel() {
   return (
     <div className="flex flex-col gap-5">
       {error && (
-        <p className="rounded-(--radius-control) border border-danger-200 bg-danger-50/70 px-3 py-2 text-[0.875rem] text-danger-700">{error}</p>
+        <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] text-danger-700">{error}</p>
       )}
 
       <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-card) border border-slate-200">

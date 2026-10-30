@@ -203,17 +203,17 @@ function CustomerEditor({
 
       {/* 저장 안내 */}
       {notice && (notice.startsWith("저장하지 못했습니다") ? (
-        <div role="alert" data-testid="pf-detail-save-failed" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+        <div role="alert" data-testid="pf-detail-save-failed" className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-red-800">
           ⚠️ {notice}
         </div>
       ) : (
-        <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-green-800">
           ✅ {notice}
         </div>
       ))}
 
       {/* 오늘 해야 할 일 (최상단) */}
-      <div className="mt-5 rounded-3xl border-2 border-blue-100 bg-white p-6 shadow-sm">
+      <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
           <span className="text-xl">📌</span> 오늘 해야 할 일
         </h2>
@@ -448,7 +448,7 @@ function CustomerEditor({
           })}
         </div>
         {reaction && (
-          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold text-blue-700">
               추천 대응 멘트 · {reaction}
             </p>

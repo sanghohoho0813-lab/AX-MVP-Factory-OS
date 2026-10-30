@@ -34,7 +34,7 @@ export function FileMetadataDisplay({ file }: { file: SurveyFileMetadata }) {
           {sizeLabel} · {file.type || '형식 미상'}
         </p>
       </div>
-      <span className="ml-auto shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+      <span className="ml-auto shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
         실제 파일 미보관
       </span>
     </div>

@@ -264,7 +264,7 @@ export function ClientScenarios({
         )}
 
         {questions.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/40 px-3 py-3" data-testid="scenario-questions">
+          <div className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-3" data-testid="scenario-questions">
             <p className="t-body font-bold break-keep text-slate-900">
               물어보면 열리는 상황 <span className="text-slate-500">{asks.length}</span>
             </p>

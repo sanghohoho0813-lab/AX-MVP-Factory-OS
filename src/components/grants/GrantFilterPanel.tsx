@@ -47,7 +47,7 @@ export function GrantFunnel({
   const before3 = counts.stage1 ?? counts.base
   const hidden = before3 - counts.stage3
   return (
-    <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-3 sm:p-4" aria-label="공고 거르기" data-testid="grant-funnel">
+    <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-violet-200 bg-white p-3 sm:p-4" aria-label="공고 거르기" data-testid="grant-funnel">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <HelpHeading as="h3" tight label="볼 만한 공고만 거르기" className="t-body inline-flex items-center gap-1.5 font-bold text-violet-900">
           <Filter aria-hidden="true" className="size-4" /> 볼 만한 공고만 거르기

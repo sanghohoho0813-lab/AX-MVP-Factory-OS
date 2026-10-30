@@ -488,7 +488,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
           <Panel title="실제 결과">
             <div className="flex flex-col gap-4">
               {!hasAnyOutcome && (
-                <div className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3.5 py-2.5">
+                <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-2.5">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
                   <p className="text-[0.92rem] break-keep text-warning-800">
                     아직 검증된 결과가 없습니다. 결과가 없거나 부결·보류된 경우라도 실패가 아니라 <b>내부 학습 사례</b>로 정리할 수 있습니다.
@@ -532,7 +532,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
               {anonymization.ok ? (
                 <p className="text-[0.95rem] break-keep text-success-700">재식별 가능한 정보가 발견되지 않았습니다.</p>
               ) : (
-                <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3 py-2.5">
+                <div className="rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5">
                   <p className="flex items-center gap-2 text-[0.95rem] font-medium text-warning-800">
                     <AlertTriangle aria-hidden="true" className="size-4" />
                     익명화 검토가 필요합니다 ({anonymization.issues.length}건)
@@ -595,7 +595,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
         <section id="case-finalize" className="scroll-mt-24">
           <Panel title="사례 확정·보관">
             {!canApprove.ok && !readOnly && (
-              <div className="mb-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3 py-2.5">
+              <div className="mb-3 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5">
                 <p className="text-[0.95rem] font-medium text-warning-800">확정 전 해결할 항목 {canApprove.reasons.length}건</p>
                 <ul className="mt-1.5 flex flex-col gap-0.5">
                   {canApprove.reasons.map((r, idx) => (

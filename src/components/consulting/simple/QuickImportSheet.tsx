@@ -69,7 +69,7 @@ export function QuickImportSheet({
         {fileName && <p className="t-meta text-slate-500">파일: {fileName}</p>}
 
         {parsed?.found && (
-          <div className="rounded-(--radius-card) border border-success-200 bg-success-50/50 px-4 py-3">
+          <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
             <p className="t-sub font-semibold text-success-700">내용을 알아봤습니다</p>
             {parsed.summary && <p className="t-body mt-1 break-keep text-slate-700">{parsed.summary.slice(0, 300)}</p>}
             {parsed.decisionOptions.length > 0 && (

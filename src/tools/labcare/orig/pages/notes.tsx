@@ -311,7 +311,7 @@ function NotesWorkspace() {
               </div>
             </div>
             {clientId && projects.length === 0 ? (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="lab-note-new-project">
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3" data-testid="lab-note-new-project">
                 <p className="text-sm font-semibold text-amber-900">이 고객사에는 연구과제가 아직 없어요. 과제를 하나 만들면 바로 연구노트를 쓸 수 있습니다.</p>
                 <div className="mt-2 grid grid-cols-1 gap-2">
                   <input className={inputCls} placeholder="연구과제 이름 (예: 저염 소스 배합 개선)" value={newProjName} onChange={(e) => setNewProjName(e.target.value)} aria-label="연구과제 이름" />
@@ -589,7 +589,7 @@ function NotesWorkspace() {
                   });
                   try { await navigator.clipboard.writeText(p); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 1500); } catch { /* 무시 */ }
                 }}
-                className="break-keep rounded-lg border border-violet-300 bg-violet-50/50 px-2 py-2.5 text-sm font-bold text-violet-700 hover:bg-violet-100"
+                className="break-keep rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-sm font-bold text-violet-700 hover:bg-violet-100"
               >
                 {promptCopied ? "복사됨 ✓" : "GPT 프롬프트 복사"}
               </button>
@@ -744,7 +744,7 @@ function EnhanceBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-lg border border-violet-300 bg-violet-50/50 px-3 py-2.5 text-sm font-bold leading-tight text-violet-700 hover:bg-violet-100 disabled:opacity-40"
+      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold leading-tight text-violet-700 hover:bg-violet-100 disabled:opacity-40"
     >
       {label}
     </button>

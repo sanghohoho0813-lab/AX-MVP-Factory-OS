@@ -60,7 +60,7 @@ export function ValidationProjectNotFound() {
 /** 확정 설계가 없어 검증을 시작할 수 없을 때 안내 */
 export function TrackGateNotice({ track }: { track: TrackContext }) {
   return (
-    <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50/50 p-6">
+    <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-6">
       <p className="text-[1.05rem] font-semibold break-keep text-slate-800">{TRACK_META[track.trackType].label}를 시작할 수 없습니다</p>
       <p className="mt-1 text-[0.95rem] break-keep text-slate-600">{track.eligibility.reason}</p>
     </div>

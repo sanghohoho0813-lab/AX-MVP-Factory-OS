@@ -210,7 +210,7 @@ export function DocImportModal({
           {error && (
             <p
               role="alert"
-              className="mt-3 flex items-start gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2.5 text-[0.92rem] break-keep text-danger-700"
+              className="mt-3 flex items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.92rem] break-keep text-danger-700"
             >
               <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               {error}
@@ -233,7 +233,7 @@ export function DocImportModal({
               </div>
 
               {found.length === 0 ? (
-                <p className="mt-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2.5 text-[0.92rem] break-keep text-warning-800">
+                <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.92rem] break-keep text-warning-800">
                   읽을 수 있는 항목을 찾지 못했습니다. 사진이 흐리거나 기울어졌을 수 있습니다. "글자 붙여넣기"로 다시 시도해 보세요.
                 </p>
               ) : (

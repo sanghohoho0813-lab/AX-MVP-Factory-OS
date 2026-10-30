@@ -63,19 +63,20 @@ interface ToneClass {
 }
 
 // Tailwind 는 글자 그대로의 class 만 만든다 — 조합하지 않고 다 적어 둔다
+// D-370 대표 '박스 색은 하나로' — 칸 · 테두리 · 고른 칸 · 글자는 뜻과 상관없이 같은 차분한 모양, 작은 아이콘 칸(icon)만 글 종류 색을 둔다
 export const TONE: Record<MkTone, ToneClass> = {
-  violet: { icon: 'bg-violet-100 text-violet-700', solid: 'bg-violet-600 text-white', soft: 'bg-violet-50', line: 'border-violet-200', on: 'border-violet-500 bg-violet-50 ring-2 ring-violet-200', hover: 'hover:border-violet-400', text: 'text-violet-700', deep: 'text-violet-900' },
-  fuchsia: { icon: 'bg-fuchsia-100 text-fuchsia-700', solid: 'bg-fuchsia-700 text-white', soft: 'bg-fuchsia-50', line: 'border-fuchsia-200', on: 'border-fuchsia-500 bg-fuchsia-50 ring-2 ring-fuchsia-200', hover: 'hover:border-fuchsia-400', text: 'text-fuchsia-700', deep: 'text-fuchsia-900' },
-  emerald: { icon: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-700 text-white', soft: 'bg-emerald-50', line: 'border-emerald-200', on: 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200', hover: 'hover:border-emerald-400', text: 'text-emerald-700', deep: 'text-emerald-900' },
-  teal: { icon: 'bg-teal-100 text-teal-700', solid: 'bg-teal-700 text-white', soft: 'bg-teal-50', line: 'border-teal-200', on: 'border-teal-500 bg-teal-50 ring-2 ring-teal-200', hover: 'hover:border-teal-400', text: 'text-teal-700', deep: 'text-teal-900' },
-  green: { icon: 'bg-green-100 text-green-700', solid: 'bg-green-700 text-white', soft: 'bg-green-50', line: 'border-green-200', on: 'border-green-500 bg-green-50 ring-2 ring-green-200', hover: 'hover:border-green-400', text: 'text-green-700', deep: 'text-green-900' },
-  red: { icon: 'bg-red-100 text-red-600', solid: 'bg-red-600 text-white', soft: 'bg-red-50', line: 'border-red-200', on: 'border-red-500 bg-red-50 ring-2 ring-red-200', hover: 'hover:border-red-400', text: 'text-red-700', deep: 'text-red-900' },
-  rose: { icon: 'bg-rose-100 text-rose-600', solid: 'bg-rose-600 text-white', soft: 'bg-rose-50', line: 'border-rose-200', on: 'border-rose-500 bg-rose-50 ring-2 ring-rose-200', hover: 'hover:border-rose-400', text: 'text-rose-700', deep: 'text-rose-900' },
-  sky: { icon: 'bg-sky-100 text-sky-700', solid: 'bg-sky-700 text-white', soft: 'bg-sky-50', line: 'border-sky-200', on: 'border-sky-500 bg-sky-50 ring-2 ring-sky-200', hover: 'hover:border-sky-400', text: 'text-sky-700', deep: 'text-sky-900' },
-  indigo: { icon: 'bg-indigo-100 text-indigo-600', solid: 'bg-indigo-600 text-white', soft: 'bg-indigo-50', line: 'border-indigo-200', on: 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200', hover: 'hover:border-indigo-400', text: 'text-indigo-700', deep: 'text-indigo-900' },
-  amber: { icon: 'bg-amber-100 text-amber-700', solid: 'bg-amber-400 text-amber-950', soft: 'bg-amber-50', line: 'border-amber-200', on: 'border-amber-500 bg-amber-50 ring-2 ring-amber-200', hover: 'hover:border-amber-400', text: 'text-amber-700', deep: 'text-amber-900' },
-  orange: { icon: 'bg-orange-100 text-orange-700', solid: 'bg-orange-700 text-white', soft: 'bg-orange-50', line: 'border-orange-200', on: 'border-orange-500 bg-orange-50 ring-2 ring-orange-200', hover: 'hover:border-orange-400', text: 'text-orange-700', deep: 'text-orange-900' },
-  slate: { icon: 'bg-slate-100 text-slate-600', solid: 'bg-slate-700 text-white', soft: 'bg-slate-50', line: 'border-slate-200', on: 'border-slate-500 bg-slate-50 ring-2 ring-slate-200', hover: 'hover:border-slate-400', text: 'text-slate-700', deep: 'text-slate-900' },
+  violet: { icon: 'bg-violet-100 text-violet-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  fuchsia: { icon: 'bg-fuchsia-100 text-fuchsia-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  emerald: { icon: 'bg-emerald-100 text-emerald-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  teal: { icon: 'bg-teal-100 text-teal-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  green: { icon: 'bg-green-100 text-green-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  red: { icon: 'bg-red-100 text-red-600', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  rose: { icon: 'bg-rose-100 text-rose-600', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  sky: { icon: 'bg-sky-100 text-sky-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  indigo: { icon: 'bg-indigo-100 text-indigo-600', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  amber: { icon: 'bg-amber-100 text-amber-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  orange: { icon: 'bg-orange-100 text-orange-700', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
+  slate: { icon: 'bg-slate-100 text-slate-600', solid: 'bg-brand-600 text-white', soft: 'bg-white', line: 'border-slate-200', on: 'border-brand-500 bg-white ring-2 ring-brand-200', hover: 'hover:border-brand-500', text: 'text-slate-700', deep: 'text-slate-900' },
 }
 
 /** 도구 머리 띠 — 흰 글자가 읽히는 진한 단계만 */
@@ -87,14 +88,15 @@ export const HERO: Record<'violet' | 'emerald' | 'red' | 'hub', string> = {
 }
 
 /** 머리 띠 안 흰 단추 */
-export const HERO_BTN = 'tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-white px-3 font-semibold text-slate-900 shadow-sm hover:bg-white/90'
+export const HERO_BTN = 'tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50'
 
 /** 도구마다 큰 단추 — 테마 색 대신 도구 색 */
 export const MK_PRIMARY: Record<'violet' | 'emerald' | 'sky', string> = {
-  violet: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-violet-600 to-fuchsia-700 px-4 font-semibold text-white shadow-sm hover:from-violet-700 hover:to-fuchsia-800 disabled:cursor-not-allowed disabled:opacity-50',
-  emerald: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-emerald-700 to-teal-700 px-4 font-semibold text-white shadow-sm hover:from-emerald-800 hover:to-teal-800 disabled:cursor-not-allowed disabled:opacity-50',
-  // D-228 다른 AI 도구에 맡기기(요청문 · 받은 글 점검)
-  sky: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-gradient-to-r from-sky-700 to-blue-700 px-4 font-semibold text-white shadow-sm hover:from-sky-800 hover:to-blue-800 disabled:cursor-not-allowed disabled:opacity-50',
+  // D-370 큰 단추도 OS 기본 단추(테마 강조색)로 — 보라는 AI(LLM) 단추만. 이름(violet · emerald · sky)은 그대로 둔다
+  violet: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) border border-brand-600 bg-brand-600 px-4 font-semibold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50',
+  emerald: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) border border-brand-600 bg-brand-600 px-4 font-semibold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50',
+  // D-228 다른 AI 도구에 맡기기(요청문 · 받은 글 점검) — 우리 AI 를 부르지 않으니 흰 단추
+  sky: 'tap t-body inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50',
 }
 
 /** 고르는 칩(켜짐/꺼짐) */

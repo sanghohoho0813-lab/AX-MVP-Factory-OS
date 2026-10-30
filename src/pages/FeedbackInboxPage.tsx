@@ -119,7 +119,7 @@ export function FeedbackInboxPage() {
       <ScreenTitle title="받은 피드백함" sub={entries === null ? '불러오는 중…' : `팀장님이 보낸 의견 ${total}건${fresh.size > 0 ? ` · 새 의견 ${fresh.size}건` : unread > 0 ? ` · 새 의견 ${unread}건` : ''}`} />
 
       {error && (
-        <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
+        <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-danger-700">
           {error}
         </p>
       )}

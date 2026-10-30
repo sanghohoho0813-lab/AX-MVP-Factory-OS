@@ -185,7 +185,7 @@ export function ClientSituationPlan({
           </p>
         )}
         {fit.kind === 'ask' && fit.question && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="plan-ask">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="plan-ask">
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="t-body font-semibold break-keep text-slate-900">{SCENARIO_QUESTIONS[fit.question]}</span>
               <span className="t-meta break-keep text-slate-600">기록에 없는 계획이에요 — 아래는 '예' 라면 받을 수 있는 설계예요.</span>
@@ -221,7 +221,7 @@ export function ClientSituationPlan({
         {showPlan && (
           <>
             {/* 4. 한눈에 — 1년 안에 받을 수 있는 돈 */}
-            <div className="flex flex-col gap-1 rounded-(--radius-panel) border border-success-200 bg-success-50 px-4 py-3" data-testid="plan-total">
+            <div className="flex flex-col gap-1 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="plan-total">
               <span className="t-sub font-semibold break-keep text-success-800">{plan.title} — 1년 안에 받을 수 있는 돈(1차 추정)</span>
               <span className="t-page font-extrabold break-keep text-success-800 tabular-nums" data-testid="plan-total-amount">
                 {plan.totalText || '받을 숫자가 있으면 계산해요'}

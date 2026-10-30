@@ -156,7 +156,7 @@ export function PlanView({
         {criteria && <Criteria plan={plan} basis={basis} readOnly={readOnly} onMix={onMix} onUnmute={onUnmute} onClose={() => setCriteria(false)} />}
 
         {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에) */}
-        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white p-3 sm:p-4" data-testid="radar-guide">
+        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-rose-200 bg-white p-3 sm:p-4" data-testid="radar-guide">
           <div className="mx-auto w-full max-w-xl">
             <MkSteps
               steps={[
@@ -171,7 +171,7 @@ export function PlanView({
             />
           </div>
           {selected.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-(--radius-control) border border-success-200 bg-success-50/70 px-3 py-2" data-testid="radar-selected">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="radar-selected">
               <span className="t-sub inline-flex items-center gap-1 font-bold text-success-800">
                 <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
               </span>
@@ -405,7 +405,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
     setTab('ai')
   }
   return (
-    <section className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border-2 border-rose-300 bg-gradient-to-br from-rose-50 via-white to-white ${lg ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
+    <section className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white ${lg ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left" data-testid="radar-kit-toggle">
         <IconChip icon={Clapperboard} tone="rose" />
         <span className={`font-extrabold text-rose-900 ${lg ? 't-card' : 't-sub'}`}>이번 주 이렇게 찍으세요</span>
@@ -540,7 +540,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
 
 function CoreChip({ id, label, on, onClick }: { id: string; label: string; on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={on} className={`tap t-meta rounded-full px-2.5 font-bold ${on ? 'bg-rose-600 text-white' : 'bg-white text-rose-900 ring-1 ring-rose-200 hover:bg-rose-50'}`} data-testid="radar-kit-core" data-core={id} data-on={on ? '1' : '0'}>
+    <button type="button" onClick={onClick} aria-pressed={on} className={`tap t-meta rounded-full px-2.5 font-bold ${on ? 'bg-brand-600 text-white' : 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50'}`} data-testid="radar-kit-core" data-core={id} data-on={on ? '1' : '0'}>
       {label}
     </button>
   )
@@ -940,7 +940,7 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
       {on('ai') && <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />}
       {on('hot') && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4" data-testid="radar-rising">
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-rising">
           <HintTip tip={hintFor('급상승 주제')} label="급상승 주제">
             <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
               <IconChip icon={TrendingUp} tone="emerald" /> 급상승 주제
@@ -977,7 +977,7 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
             </>
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-red-100 bg-red-50/30 p-3 sm:p-4" data-testid="radar-breakouts">
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-breakouts">
           <HintTip tip={hintFor('평소보다 터진 영상')} label="평소보다 터진 영상">
             <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
               <IconChip icon={Flame} tone="red" /> 평소보다 터진 영상

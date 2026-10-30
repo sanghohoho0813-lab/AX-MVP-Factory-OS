@@ -18,7 +18,7 @@ export default function SampleDataBox({ onChange }: { onChange?: () => void; com
 
   if (!count) return null;
   return (
-    <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 shadow-card" data-testid="lab-sample-leftover">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" data-testid="lab-sample-leftover">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold text-slate-900">🧪 예전에 넣은 샘플 고객사 {count}개</h2>

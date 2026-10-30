@@ -124,7 +124,7 @@ export function SectionEditorCard({
       actions={
         <div className="flex items-center gap-1.5">
           {section.manuallyEdited && (
-            <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+            <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
               수동 수정됨
             </span>
           )}
@@ -140,7 +140,7 @@ export function SectionEditorCard({
       <ContentBlocks blocks={section.structuredContent} showInternal={true} />
 
       {section.manuallyEdited && section.editNotes && (
-        <p className="mt-4 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
+        <p className="mt-4 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] break-keep text-warning-700">
           <span className="font-semibold">수정 사유</span> · {section.editNotes}
         </p>
       )}
@@ -242,7 +242,7 @@ export function SectionEditorCard({
           </div>
           <div>
             <p className="mb-1.5 text-[0.9rem] font-semibold text-brand-700">새 원본</p>
-            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3 text-[0.9rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700">
+            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-slate-200 bg-white p-3 text-[0.9rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700">
               {regenBody}
             </pre>
           </div>

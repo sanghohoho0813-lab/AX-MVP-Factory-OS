@@ -207,7 +207,7 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
               <p className="text-sm font-semibold break-keep text-slate-800">{s.title}</p>
               <ScenarioTypeBadge type={s.type} />
               {s.required ? (
-                <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">필수</span>
+                <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">필수</span>
               ) : (
                 <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">선택</span>
               )}

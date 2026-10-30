@@ -146,7 +146,7 @@ export function ExpectedEffectList({ effects }: { effects: ExpectedEffect[] }) {
           <div className="flex items-center justify-between gap-2">
             <span className="text-[0.875rem] font-medium text-slate-800">{effectText(e)}</span>
             {e.notEstimable ? (
-              <span className="shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+              <span className="shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                 산정 필요
               </span>
             ) : (
@@ -190,7 +190,7 @@ export function CandidateDependencyList({ dependencies }: { dependencies: Candid
               <p className="text-[0.875rem] font-medium text-slate-700">
                 {d.title}
                 {d.requiredBeforeMvp && (
-                  <span className="ml-1.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                  <span className="ml-1.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                     MVP 전 필수
                   </span>
                 )}

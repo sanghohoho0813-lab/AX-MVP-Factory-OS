@@ -243,7 +243,7 @@ export function CertOverview({
         </Surface>
       )}
       {ctx.conflicts && ctx.conflicts.length > 0 && (
-        <details className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3" data-testid="cert-conflicts">
+        <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3" data-testid="cert-conflicts">
           <summary className="tap t-sub flex cursor-pointer items-center gap-1.5 font-semibold break-keep text-warning-800">
             <AlertTriangle aria-hidden="true" className="size-4 shrink-0" /> {CONFLICT_LINE}
           </summary>

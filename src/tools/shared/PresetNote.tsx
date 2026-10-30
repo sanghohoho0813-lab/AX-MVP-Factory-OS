@@ -36,7 +36,7 @@ export function PresetNote({
       </p>
     )
   return (
-    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2" data-testid={testId}>
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid={testId}>
       <p className="t-sub font-semibold break-keep text-success-800">
         상황 예시 · {title} — {done}
       </p>

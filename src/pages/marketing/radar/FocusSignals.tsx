@@ -103,7 +103,7 @@ export function AiKeywordBoard({
   if (keywords.length === 0 && workflow.length === 0 && fresh.length === 0) return null
   const vendors = VENDORS.map((v) => ({ v, list: keywords.filter((k) => k.vendor === v) })).filter((x) => x.list.length > 0)
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-violet-100 bg-violet-50/30 p-3 sm:p-4" data-testid="radar-ai-keywords">
+    <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-ai-keywords">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <HintTip tip={hintFor('AI 핵심 키워드')} label="AI 핵심 키워드">
           <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
@@ -153,7 +153,7 @@ export function AiKeywordBoard({
         </div>
       )}
       {fresh.length > 0 && (
-        <div className="flex min-w-0 flex-col gap-1 rounded-(--radius-control) border border-dashed border-brand-300 bg-brand-50/40 px-3 py-2" data-testid="radar-ai-new">
+        <div className="flex min-w-0 flex-col gap-1 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="radar-ai-new">
           <p className="t-meta flex flex-wrap items-center gap-x-2 font-bold text-brand-800">
             새 AI 키워드 후보 <span className="font-normal text-slate-500">분류표에 아직 없는 이름 — 저절로 넣지 않습니다(보고 판단)</span>
           </p>
@@ -176,7 +176,7 @@ export function AiKeywordBoard({
 /** 사이드 급상승 — TOP 보다 작게. 없으면 한 줄만 */
 export function SideBreakouts({ items, noThumb, onOpenVideo }: { items: readonly SideBreakout[]; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
   return (
-    <section className="flex flex-col gap-2 rounded-(--radius-card) border border-amber-100 bg-amber-50/40 p-3 sm:p-4" aria-labelledby="radar-side-h" data-testid="radar-side" data-count={items.length}>
+    <section className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="radar-side-h" data-testid="radar-side" data-count={items.length}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <HintTip tip={hintFor('사이드 급상승')} label="사이드 급상승">
           <h2 id="radar-side-h" className="t-card flex items-center gap-2 font-bold text-slate-900">

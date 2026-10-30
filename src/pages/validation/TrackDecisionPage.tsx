@@ -99,7 +99,7 @@ function DecisionForm({ w }: { w: ValidationWorkspace }) {
 
   return (
     <Panel title="최종 결정">
-      <p className="mb-3 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
+      <p className="mb-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600">
         범위 확대·운영 전환은 결과 검토 통과·테스트를 막는 중대한 문제 0건·필수 통과율 80% 이상·성과 측정 증거가 있어야 선택할 수 있습니다.
       </p>
       <div className="flex flex-col gap-3">
@@ -202,7 +202,7 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
           )}
         </div>
         {summary.hasOpenCritical && (
-          <p className="mt-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[0.95rem] font-medium break-keep text-danger-700">
+          <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] font-medium break-keep text-danger-700">
             테스트를 막는 중대한 문제가 남아 있어 검증을 확정할 수 없습니다.
           </p>
         )}

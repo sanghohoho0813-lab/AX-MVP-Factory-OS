@@ -6,7 +6,7 @@ export default function ExclusionCard({ reasons }: { reasons: ExclusionReason[] 
   if (reasons.length === 0) return null
 
   return (
-    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-card sm:p-7">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-card sm:p-7">
       <div className="flex items-center gap-2.5">
         <span className="text-2xl">⚠️</span>
         <h3 className="text-xl font-bold text-amber-800">창업 제외사유 진단</h3>

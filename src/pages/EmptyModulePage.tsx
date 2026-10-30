@@ -21,7 +21,7 @@ export function EmptyModulePage({ config }: EmptyModulePageProps) {
         <div className="mx-auto flex max-w-lg flex-col items-center text-center">
           <span
             aria-hidden="true"
-            className="flex size-14 items-center justify-center rounded-(--radius-panel) border border-brand-200 bg-brand-50 text-brand-600"
+            className="flex size-14 items-center justify-center rounded-(--radius-panel) border border-slate-200 bg-white text-brand-600"
           >
             <config.icon className="size-6" />
           </span>

@@ -32,7 +32,7 @@ export function NextActionHero({
   secondary?: ReactNode
 }) {
   return (
-    <section className="rounded-(--radius-panel) border border-brand-100 bg-gradient-to-br from-brand-50/80 to-white p-6 sm:p-8">
+    <section className="rounded-(--radius-panel) border border-brand-100 bg-white p-6 sm:p-8">
       {eyebrow && (
         <p className="mb-2 text-[0.95rem] font-semibold text-brand-700">{eyebrow}</p>
       )}

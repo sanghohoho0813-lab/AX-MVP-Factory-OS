@@ -123,7 +123,7 @@ export function StepGuide({ pos, onGo, hrefOf, className = '' }: GoProps & { pos
       data-index={index + 1}
       data-total={n}
       data-min={min ? '1' : '0'}
-      className={`no-print rounded-(--radius-card) border border-brand-100 bg-brand-50/70 px-3 py-2.5 sm:px-4 ${className}`}
+      className={`no-print rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5 sm:px-4 ${className}`}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">

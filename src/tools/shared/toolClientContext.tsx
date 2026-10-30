@@ -140,7 +140,7 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
         <div className="flex flex-col gap-4">
           <div
             data-testid="tool-client-banner"
-            className="no-print flex items-center gap-x-3 gap-y-1 rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-3 py-2 sm:flex-wrap"
+            className="no-print flex items-center gap-x-3 gap-y-1 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2 sm:flex-wrap"
           >
             {/* D-98: 휴대폰에서는 한 줄로 — 전에는 아이콘 한 줄 · 글 두 줄 · 돌아가기 한 줄로 모든 모듈 화면 위를 약 110px 차지했다 */}
             <Building2 aria-hidden="true" className="size-4 shrink-0 text-brand-600" />

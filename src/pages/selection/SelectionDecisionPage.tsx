@@ -185,7 +185,7 @@ export function SelectionDecisionPage() {
 
       {/* §7 핵심 업무 확정 결과 히어로 */}
       {finalized && primary && (
-        <section className="rounded-(--radius-panel) border border-success-200 bg-success-50/50 p-6 sm:p-7">
+        <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 sm:p-7">
           <p className="flex items-center gap-1.5 text-[0.95rem] font-semibold text-success-700">
             <Trophy aria-hidden="true" className="size-4.5" />핵심 업무 확정
           </p>
@@ -205,7 +205,7 @@ export function SelectionDecisionPage() {
       <div className="flex flex-wrap items-center gap-2">
         <SelectionStatusBadge status={decision.status} />
         {context.needsReselectionFlag && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+          <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
             <RefreshCw aria-hidden="true" className="size-3" />
             재선별 필요
           </span>
@@ -391,7 +391,7 @@ export function SelectionDecisionPage() {
           {editable && (
             <Panel title="결과 상태">
               {!check.ok && (
-                <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2">
+                <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
                   {check.reasons.map((r) => <li key={r} className="text-[0.875rem] break-keep text-warning-800">• {r}</li>)}
                 </ul>
               )}

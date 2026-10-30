@@ -4489,3 +4489,14 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - tsc · oxlint · build · test:all EXIT 0. tools · phone 0 실패 · firstscreen 55(휴대폰 전문 모듈 3개 → 더 보기 새) — 전문 모듈 휴대폰 3.2 → 3.0.
 - 스크린샷: 전문 모듈(390 — 카드마다 3줄 + '기능 n개 더 보기').
 - 확인한 것: qa:shell(게이트 목록 밖)은 D-296 머리줄 정리 뒤로 '고객 플랫폼' 머리줄 링크를 찾다 멈춘다 — 이번 변경과 무관한 예전 시험(고치지 않음 · 따로 정리할 일로 남김).
+
+## §246 D-370 박스 색 통일(흰 바탕 · 얇은 회색 테두리 · 보라는 AI 단추만) — 병합 (2026-10-30)
+
+- 약 210 파일 색 이름만 바꿈(글 · 순서 · 기능 그대로). tsc · oxlint(경고 수 그대로 89) · build · test:all EXIT 0(keep-ui 138 · 0).
+- 바뀐 화면이 넓어 빠른 모드지만 게이트 거의 전부를 돌렸다(0 실패): content 184 · site 140 · threads 86 · shorts 48 · mkpack 68 · mkweek · youtube 246 · mkkit 12 ·
+  detail · modules · real · phone · easy · todos · money · flow · grants · sales · journey · diag · plan · scenarios · taxplan · tools · uxpick · firstscreen · keepui · squeeze ·
+  board · steady · contract · planner · calendar · enroll · modsafe · connect · calcpreset · simple · studio · files · folder · ownerai · assist · siteai · certai ·
+  specwrite · pvux · chat · ventureplan · pvmenu · vstudy · sideai · specboard · wayfinding · e2e:mobile · wording · matrix 584.
+- 처음 빨간 것은 모두 예전 색 규칙을 지키던 시험(칸마다 다른 색 · 보라/초록 머리 띠 · 빨강 그라데이션 탭 · 굵은 테두리) — 새 규칙으로 고침(DECISIONS D-370 목록).
+- 스크린샷(PC · 390): 스레드 쓰기 · 마케팅 첫 화면 · 내 콘텐츠 · 릴스 · 틱톡 · 홍보 글 만들기 · 오늘 · 업체 개요 · 매출 · 비용 · AI 전략실.
+- 확인하지 못한 것: 테마마다(지금 시험 테마 onyx-gold 외) 강조색이 어떻게 보이는지 — 강조색은 테마를 따른다.

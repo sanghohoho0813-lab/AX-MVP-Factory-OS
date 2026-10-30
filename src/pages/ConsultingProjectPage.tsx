@@ -404,7 +404,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         )}
 
         {saveFailed && (
-          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="cs-save-failed">
+          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="cs-save-failed">
             <p className="t-sub min-w-[12rem] flex-1 break-keep text-warning-800">저장하지 못했어요 — 적은 내용은 이 화면에 그대로 있어요. 인터넷이 돌아오면 다시 저장해 주세요.</p>
             <Button size="sm" variant="secondary" onClick={() => void flush()} data-testid="cs-save-retry">
               다시 저장

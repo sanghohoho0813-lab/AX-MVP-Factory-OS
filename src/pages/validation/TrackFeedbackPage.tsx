@@ -134,7 +134,7 @@ function AddFeedbackModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           피드백은 참여자·관찰자의 <span className="font-semibold">의견·관찰</span>입니다. 재현 가능한 문제·증거는 이슈로 등록하세요.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -252,7 +252,7 @@ function AddIssueModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           이슈는 <span className="font-semibold">재현 가능한 문제·증거</span>입니다. 재현 절차와 기대·실제 동작을 함께 기록하세요.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -523,7 +523,7 @@ function IssueCard({
         )}
       </dl>
       {issue.status === 'accepted_risk' && issue.acceptedRiskReason && (
-        <p className="mt-2 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
+        <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] break-keep text-warning-700">
           위험 감수 사유: {issue.acceptedRiskReason} · 승인: {issue.acceptedRiskApprovedBy || '미지정'}
         </p>
       )}
@@ -615,7 +615,7 @@ function FeedbackBody({ w }: { w: ValidationWorkspace }) {
       ) : (
         <>
           {openCriticals.length > 0 && (
-            <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-3" role="alert">
+            <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3" role="alert">
               <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
               <p className="text-[0.95rem] font-medium break-keep text-danger-700">
                 미해결 critical 이슈 {openCriticals.length}건 — 미해결 critical 이슈는 Gate 6 통과·검증 확정을 막습니다.

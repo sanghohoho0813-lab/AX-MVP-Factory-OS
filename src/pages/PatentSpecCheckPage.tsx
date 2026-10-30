@@ -249,7 +249,7 @@ export function PatentSpecCheckPage({ back = { to: '/studio', label: '특허·MV
       </Disclosure>
 
       {error && (
-        <p role="alert" className="t-body break-keep rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
+        <p role="alert" className="t-body break-keep rounded-lg border border-slate-200 bg-white px-4 py-3 text-danger-700">
           {error}
         </p>
       )}

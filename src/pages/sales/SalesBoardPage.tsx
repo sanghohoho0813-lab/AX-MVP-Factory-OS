@@ -237,7 +237,7 @@ function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: bo
         </label>
       </div>
       {dupe && (
-        <p role="status" data-testid="prospect-dupe" className="t-sub mt-3 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-slate-800">
+        <p role="status" data-testid="prospect-dupe" className="t-sub mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-slate-800">
           같은 이름의 업체가 이미 있습니다 —{' '}
           <Link to={`/ops/clients/${dupe.id}`} className="font-semibold text-brand-700 underline">
             {dupe.companyName} 열기
@@ -512,7 +512,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       />
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
           {error}
         </p>
       )}

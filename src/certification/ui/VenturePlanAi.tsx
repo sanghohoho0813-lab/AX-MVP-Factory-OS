@@ -443,7 +443,7 @@ export function VenturePlanAi({
           })}
         </ol>
         {!hasMaterial ? (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-ai-need">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-ai-need">
             <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">재료(특허 명세서 또는 AX · MVP)가 없으면 AI 가 지어낼 수 있어 막아 두었습니다.</p>
             <Button variant="primary" size="sm" onClick={onGoMaterials}>
               재료 넣기
@@ -545,7 +545,7 @@ export function VenturePlanAi({
             ) : (
               <>
                 {chosen && (
-                  <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-plan-chosen">
+                  <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center" data-testid="vplan-plan-chosen">
                     <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
                       <b className="font-semibold">기획 방향</b> · <span className="[overflow-wrap:anywhere]">{chosen.title}</span>
                     </p>

@@ -56,7 +56,7 @@ export function GrantApplyChecklist({
     showToast(ok ? (r.needFromClient.length ? `서류 요청 문구를 복사했습니다 — ${r.needFromClient.length}가지` : '다 받았다는 문구를 복사했습니다') : '복사하지 못했습니다')
   }
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-100 bg-brand-50/40 p-3" data-testid="apply-checklist" data-app={app.id}>
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="apply-checklist" data-app={app.id}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="t-body font-semibold text-slate-900" data-testid="apply-count">
           낼 서류 {r.ready === r.total ? <span className="text-success-700">다 모음 ({r.total}가지)</span> : `${r.ready}/${r.total}`}

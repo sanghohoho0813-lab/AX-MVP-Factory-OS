@@ -308,7 +308,7 @@ export default function ClientSmartTab({
                   <button
                     type="button"
                     onClick={() => onRequestText(ins.request!.text, { title: ins.request!.title, description: ins.request!.description })}
-                    className="tap t-sub inline-flex items-center gap-1 self-start rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold break-keep text-brand-800 hover:border-brand-400"
+                    className="tap t-sub inline-flex items-center gap-1 self-start rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1 font-semibold break-keep text-brand-800 hover:border-brand-400"
                     data-testid="smart-insight-request"
                   >
                     <MessageSquareText aria-hidden="true" className="size-4 shrink-0" />
@@ -436,7 +436,7 @@ function BatchSummary({ batch, fresh, onRetry, opened = [] }: { batch: DocBatchS
     <Surface edge="success" showEdge className="flex flex-col gap-3">
       {/* D-345 방금 올린 서류로 새로 판정이 난 모듈 — 누르면 아래 그 모듈 카드로 */}
       {opened.length > 0 && (
-        <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="smart-batch-opened">
+        <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="smart-batch-opened">
           <p className="t-sub flex items-center gap-1.5 font-semibold break-keep text-brand-800">
             <Sparkles aria-hidden="true" className="size-4 shrink-0" /> 이번 서류로 새로 판정됐어요 {opened.length}개
           </p>

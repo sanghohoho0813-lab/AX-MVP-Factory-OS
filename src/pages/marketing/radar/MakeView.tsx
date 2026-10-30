@@ -185,7 +185,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
 
         {/* D-232 우리 채널 성과 — 올린 영상이 평소보다 어땠나 · 어떤 축 · 제목 틀이 잘 됐나 */}
         {feedReady && ideas.length > 0 && (
-          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-3 sm:p-4" data-testid="make-learn" data-linked={learning.linked} data-measured={learning.measured}>
+          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-200 bg-white p-3 sm:p-4" data-testid="make-learn" data-linked={learning.linked} data-measured={learning.measured}>
             <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
               <TrendingUp aria-hidden="true" className="size-4 text-emerald-600" /> 우리 채널 성과
               <span className="t-meta font-normal text-slate-500">내 채널 최근 영상 {mine.length}편 기준{sample ? ' · 예시 데이터' : ''} · 평소 대비(레이더와 같은 식)</span>
@@ -355,7 +355,7 @@ function MakeRow({
         </p>
       )}
       {suggestion && !i.link && (
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-rose-200 bg-rose-50/70 px-3 py-2.5" data-testid="make-suggest">
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="make-suggest">
           <p className="t-sub min-w-0 break-keep text-slate-800 [overflow-wrap:anywhere]">
             <span className="font-bold text-rose-700">이 영상인가요? </span>'{suggestion.title}' <span className="t-meta text-slate-500">· {shortDay(dayOf(suggestion.publishedAt))} 올림</span>
           </p>

@@ -92,7 +92,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
       )}
       {/* D-160: 종류를 고르면 그 종류를 한 번에 — 카톡 문구(복사)는 하나씩 보내야 하므로 없다 */}
       {kind !== 'all' && DECISION_BULK_KINDS.includes(kind) && bulkable.length >= 2 && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-4 py-3 sm:flex-row sm:items-center" data-testid="decide-bulk">
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="decide-bulk">
           <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
             {DECISION_KIND_LABEL[kind]} {bulkable.length}건을 다 읽어 보셨으면 한 번에 처리할 수 있어요.
           </p>

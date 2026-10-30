@@ -152,7 +152,7 @@ export function DocResortSheet({
         {!reading && items.length === 0 && <p className="t-body text-slate-600">올려 둔 파일이 없습니다.</p>}
 
         {!reading && items.length > 0 && moves.length === 0 && (
-          <p className="t-body rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 break-keep text-success-800" data-testid="resort-none">
+          <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-success-800" data-testid="resort-none">
             {items.length}개 모두 맞는 칸에 있습니다.
           </p>
         )}

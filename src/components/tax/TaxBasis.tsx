@@ -27,7 +27,7 @@ export function TaxBasis({ onBack, focus }: { onBack: () => void; focus?: string
           </h2>
           {/* D-332 해가 바뀌었는데 숫자를 다시 보지 않았으면 — 조용히 옛 숫자로 계산하지 않게 알린다 */}
           {status.stale ? (
-            <p className="t-sub mt-1 break-keep rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-900" data-testid="tax-basis-stale">
+            <p className="t-sub mt-1 break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-semibold text-amber-900" data-testid="tax-basis-stale">
               ★ 고용지원금 · 통합고용 · 창업감면 · 연구소 기준이 {status.year}년 것이에요 — 새해 바뀐 금액 · 단가를 확인하세요. 세금 계산기(01~09)는 세무사 검토본 그대로예요.
             </p>
           ) : (

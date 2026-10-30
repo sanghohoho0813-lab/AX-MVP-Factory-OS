@@ -335,7 +335,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </div>
 
           {loadError && (
-            <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+            <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
               일정을 불러오지 못했습니다 — {loadError}
               <button type="button" onClick={() => void load()} className="tap font-semibold underline">
                 다시 불러오기
@@ -516,7 +516,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         </div>
                       )}
                       {(pickedOff.length > 0 || [0, 6].includes(new Date(`${picked}T00:00:00Z`).getUTCDay())) && pickedEvents.some((e) => !e.done) && (
-                        <p className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-warning-800" data-testid="picked-off-deadline">
+                        <p className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5 text-warning-800" data-testid="picked-off-deadline">
                           <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                           <span>
                             쉬는 날에 걸린 업체 마감이 {pickedEvents.filter((e) => !e.done).length}건 있습니다

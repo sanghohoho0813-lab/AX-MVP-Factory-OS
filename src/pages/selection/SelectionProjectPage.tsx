@@ -173,7 +173,7 @@ export function SelectionProjectPage() {
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-slate-800">{c.name}</p>
                           {isPrimary && (
-                            <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">
+                            <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">
                               추천 핵심
                             </span>
                           )}

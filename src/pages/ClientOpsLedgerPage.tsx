@@ -352,7 +352,7 @@ export function ClientOpsLedgerPage() {
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-brand-200 bg-brand-50 text-brand-700">
+            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-slate-200 bg-white text-brand-700">
               <CalendarClock aria-hidden="true" className="size-4.5" />
             </span>
             <div>
@@ -361,7 +361,7 @@ export function ClientOpsLedgerPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-warning-200 bg-warning-50 text-warning-700">
+            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-slate-200 bg-white text-warning-700">
               <ClipboardList aria-hidden="true" className="size-4.5" />
             </span>
             <div>
@@ -370,7 +370,7 @@ export function ClientOpsLedgerPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-success-200 bg-success-50 text-success-700">
+            <span className="flex size-10 items-center justify-center rounded-(--radius-control) border border-slate-200 bg-white text-success-700">
               <ListChecks aria-hidden="true" className="size-4.5" />
             </span>
             <div>

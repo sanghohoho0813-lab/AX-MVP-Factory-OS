@@ -171,7 +171,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
       </div>
 
       {/* 우리 회사 버전 */}
-      <div className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-violet-200 bg-violet-50 p-3 sm:p-4" data-testid="vs-adapt">
+      <div className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="vs-adapt">
         <div className="flex flex-wrap items-center gap-2">
           <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
           <p className="t-body min-w-0 flex-1 font-bold text-violet-950">AI로 우리 회사 버전 만들기</p>

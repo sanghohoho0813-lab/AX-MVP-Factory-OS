@@ -72,7 +72,7 @@ export function DocKindPicker({
     if (out) onMove(out.record, out.to)
   }
   return (
-    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 p-3" data-testid={`doc-kind-${docKey}`}>
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid={`doc-kind-${docKey}`}>
       <label className="t-sub font-semibold break-keep text-warning-800" htmlFor={`kind-${docKey}`}>
         무슨 서류인가요? 고르면 맞는 칸으로 옮깁니다
       </label>

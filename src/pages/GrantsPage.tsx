@@ -241,7 +241,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
       {(error || loadError) && (
-        <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
+        <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-danger-700">
           {error || loadError}
         </p>
       )}
@@ -274,7 +274,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
 
           {view === 'notices' && (
             <>
-              <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-sky-50 p-3 sm:p-4" aria-label="지역 · 갈래">
+              <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-100 bg-white p-3 sm:p-4" aria-label="지역 · 갈래">
                 <h2 className="t-section break-keep text-slate-900" data-testid="grant-hero">
                   <label className="inline-flex items-center">
                     <span className="sr-only">지역</span>

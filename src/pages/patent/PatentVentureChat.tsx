@@ -129,7 +129,7 @@ export function PatentVentureChatPage() {
   return (
     <div className="flex flex-col gap-4" data-testid="pv-chat-page">
       {(drafts.error || works.error) && (
-        <p role="alert" className="t-sub break-keep rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 font-semibold text-amber-900">
+        <p role="alert" className="t-sub break-keep rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-amber-900">
           기록 일부를 읽지 못했어요 — 저장한 것은 그대로 있어요. 잠시 뒤 새로 고쳐 주세요.
         </p>
       )}

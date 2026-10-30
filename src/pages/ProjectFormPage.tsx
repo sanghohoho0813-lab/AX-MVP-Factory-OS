@@ -346,7 +346,7 @@ export function ProjectFormPage() {
         summary={summary}
       >
         {existing?.archivedAt && (
-          <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-warning-700">
             보관 처리된 프로젝트입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지 않습니다.
           </p>
         )}
@@ -423,7 +423,7 @@ export function ProjectFormPage() {
                 </div>
               ))}
             </dl>
-            <p className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3 text-[0.95rem] break-keep text-brand-800">
+            <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-brand-800">
               시작하면 프로젝트 코드가 자동 생성되고, 프로젝트 컨트롤 센터에서 첫 번째 해야 할 일을 안내합니다.
             </p>
           </div>
@@ -442,7 +442,7 @@ export function ProjectFormPage() {
                 <p className="mt-0.5 text-[1.1rem] font-bold text-slate-900">{saved?.name}</p>
               </div>
               {j && (
-                <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3">
+                <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                   <p className="text-[0.875rem] font-semibold text-brand-700">첫 번째 해야 할 일</p>
                   <p className="mt-0.5 text-[0.95rem] break-keep text-slate-700">{j.actionText}</p>
                 </div>

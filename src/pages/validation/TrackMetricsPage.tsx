@@ -113,7 +113,7 @@ function MetricModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           기준값·목표값은 근거가 있을 때만 입력하세요. 측정값은 별도로 '측정값 기록'에서 실측을 남깁니다.
         </p>
         <div>

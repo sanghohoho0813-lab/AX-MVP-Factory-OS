@@ -229,7 +229,7 @@ function BoardRow({ r, today }: { r: PvBoardRow; today: string }) {
         <PartLink testId="pv-row-spec" label="특허 명세서" text={specText} value={spec ? spec.done / spec.total : null} tone={spec?.errors ? 'warning' : spec && spec.done === spec.total ? 'success' : 'brand'} href={spec ? specHref(spec.id, r.clientId) : null} />
         <PartLink testId="pv-row-plan" label="벤처 사업계획서" text={planText} value={plan ? (plan.narrative + plan.core) / Math.max(1, plan.narrativeTotal + plan.coreTotal) : null} tone={plan?.complete ? 'success' : 'brand'} href={r.clientId ? planHref(r.clientId) : null} />
       </div>
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center">
         <p className="t-sub min-w-0 flex-1 break-keep text-slate-800" data-testid="pv-row-next-text">
           <b className="font-semibold">다음</b> · {r.next.text}
         </p>
@@ -358,7 +358,7 @@ export function PatentVentureHomePage() {
         </Link>
       </div>
       {loadError ? (
-        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center" data-testid="pv-board-error">
+        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="pv-board-error">
           <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">진행 상황을 읽지 못했습니다. 저장해 둔 기록은 그대로 있어요. 아래 도구는 그대로 쓸 수 있습니다.</p>
           <Button
             variant="secondary"
@@ -452,7 +452,7 @@ export function VenturePlanPage() {
       <div className="flex flex-col gap-5">
         {head}
         {d.loadError ? (
-          <div role="alert" data-testid="pv-plan-load-error" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
+          <div role="alert" data-testid="pv-plan-load-error" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
             <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">사업계획서 기록을 읽지 못했습니다. 저장해 둔 기록은 그대로 있고, 다시 읽기 전에는 바꾸지 않습니다.</p>
             <Button variant="secondary" size="sm" onClick={() => void d.reloadAll()}>
               다시 읽기

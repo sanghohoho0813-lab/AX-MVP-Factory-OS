@@ -214,7 +214,7 @@ function MatchCard({
           </div>
 
           {match.officialConfirmationRequired.length > 0 && (
-            <div aria-live="polite" className="rounded-(--radius-card) border border-warning-300 bg-warning-50 px-3.5 py-3">
+            <div aria-live="polite" className="rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-3">
               <p className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-warning-800">
                 <AlertTriangle aria-hidden="true" className="size-4" />
                 공식 확인 필요

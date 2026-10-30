@@ -439,7 +439,7 @@ export default function SetupDocumentsPage() {
             <button
               type="button"
               onClick={generateRequestMsg}
-              className="block w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-center text-base font-bold text-amber-700 hover:bg-amber-100"
+              className="block w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-center text-base font-bold text-amber-700 hover:bg-amber-100"
             >
               누락서류 요청문 생성
             </button>
@@ -453,7 +453,7 @@ export default function SetupDocumentsPage() {
           </section>
 
           {requestMsg ? (
-            <section className="rounded-2xl border-2 border-amber-200 bg-white p-5 shadow-card">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
               <h3 className="text-base font-bold text-slate-800">📩 고객 요청문 (카톡용)</h3>
               <div className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-base leading-relaxed text-slate-700">
                 {requestMsg}
@@ -509,7 +509,7 @@ export default function SetupDocumentsPage() {
             </section>
           ) : null}
 
-          <section className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4">
             <p className="text-base font-bold text-amber-800">📷 사진·도면은 별도 메뉴에서</p>
             <p className="mt-1 text-sm leading-relaxed text-amber-800/90">
               현판 근접 1장 · 출입문 전체 1장 · 내부 전·후·좌·우 4장. 촬영 구도 가이드와 조직도·도면
@@ -689,7 +689,7 @@ function PrepRow({
         <div className="flex items-center gap-1.5">
           <button type="button" onClick={onToggle} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50">{open ? "메모 접기" : "메모"}</button>
           {doc.promptKey ? (
-            <button type="button" onClick={() => onPrompt(doc.promptKey!)} className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100">프롬프트</button>
+            <button type="button" onClick={() => onPrompt(doc.promptKey!)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100">프롬프트</button>
           ) : null}
           <select value={doc.status} onChange={(e) => onChange(e.target.value as DocStatus)} className={`rounded-full border-0 px-3.5 py-1.5 text-sm font-bold ring-1 ring-inset focus:outline-none ${DOC_STATUS_STYLE[doc.status]}`}>
             {PREP_STATUS.map((s) => <option key={s}>{s}</option>)}

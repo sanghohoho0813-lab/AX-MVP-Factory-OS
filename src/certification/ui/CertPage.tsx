@@ -73,7 +73,7 @@ export default function CertPage() {
       <div className="flex flex-col gap-5">
         {head}
         {d.loadError ? (
-          <div role="alert" data-testid="cert-load-error" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
+          <div role="alert" data-testid="cert-load-error" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
             <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">기업인증 기록을 읽지 못했습니다. 저장해 둔 기록은 그대로 있고, 다시 읽기 전에는 바꾸지 않습니다.</p>
             <Button variant="secondary" size="sm" onClick={() => void d.reloadAll()}>
               다시 읽기

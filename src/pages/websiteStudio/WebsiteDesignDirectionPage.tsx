@@ -74,7 +74,7 @@ function DesignBody({ design }: { design: WebsiteDesign }) {
       <Panel title="금지할 디자인">
         <ul className="flex flex-wrap gap-2">
           {d.prohibitedStyles.map((s) => (
-            <li key={s} className="inline-flex items-center gap-1.5 rounded-md border border-danger-200 bg-danger-50 px-2 py-1 text-[0.875rem] text-danger-700">
+            <li key={s} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[0.875rem] text-danger-700">
               <Ban aria-hidden="true" className="size-3" />
               {s}
               <button type="button" aria-label={`${s} 삭제`} onClick={() => removeProhibited(s)} className="text-danger-400 hover:text-danger-700"><X className="size-3" /></button>

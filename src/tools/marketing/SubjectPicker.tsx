@@ -239,7 +239,7 @@ export function SubjectPicker({
                 </span>
                 <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                   {made.has(r.id) && <span className={`t-meta hidden rounded-full px-2 py-0.5 font-semibold sm:inline ${t.icon}`}>{madeLabel(r.id)}</span>}
-                  {r.provisional && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">임시등록</span>}
+                  {r.provisional && <span className="t-meta rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-amber-800">임시등록</span>}
                   <span className={`t-meta rounded-full border px-2 py-0.5 ${r.group === 'trial' ? `${t.line} ${t.soft} ${t.text}` : 'border-slate-200 text-slate-600'}`}>{r.kindLabel ?? GROUP_LABEL[r.group]}</span>
                 </span>
               </Link>

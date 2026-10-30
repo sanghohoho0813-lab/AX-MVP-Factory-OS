@@ -29,7 +29,7 @@ export function DesignRulesPage() {
                       <p className="text-sm font-semibold text-slate-800">{rule.name}</p>
                       <BusinessRuleTypeBadge type={rule.type} />
                       {rule.needsConfirmation && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <AlertTriangle aria-hidden="true" className="size-3" />담당자 확인 필요
                         </span>
                       )}

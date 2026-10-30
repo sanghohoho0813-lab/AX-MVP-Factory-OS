@@ -598,7 +598,7 @@ function HeadcountNote({ hc, differs, onApply }: { hc: RosterHeadcount; differs:
   ].filter(Boolean)
   const rest = 12 - hc.cur.actualMonths
   return (
-    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 p-3" data-testid="roster-headcount">
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="roster-headcount">
       {/* 어떻게 셌는지는 ? 안에 — 칸에는 숫자와 꼭 볼 주의만 */}
       <HintTip
         label="명부 날짜로 셌어요"

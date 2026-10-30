@@ -476,7 +476,7 @@ export function ProjectSurveySetupPage() {
             {expertOpen && (
               <div className="flex flex-col gap-5 border-t border-slate-100 px-4 py-5">
                 {quality.verdict === 'error' && (
-                  <p className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[0.9rem] text-danger-700">
+                  <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] text-danger-700">
                     확인이 필요한 항목이 있어 전문가 설정을 펼쳤습니다. 아래에서 템플릿·모듈 구성을 조정해 주세요.
                   </p>
                 )}
@@ -498,7 +498,7 @@ export function ProjectSurveySetupPage() {
                             <p className="text-[0.875rem] text-slate-400">문항 {t.sections.reduce((n, s) => n + s.placements.length, 0)}개 · 약 {t.estimatedMinutes}분</p>
                           </div>
                           <RespondentRoleBadge role={t.respondentRole} />
-                          {recommended && <span className="rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.875rem] font-medium text-success-700">추천</span>}
+                          {recommended && <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-success-700">추천</span>}
                         </label>
                       )
                     })}
@@ -567,7 +567,7 @@ export function ProjectSurveySetupPage() {
                   {additionalQuestions.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {additionalQuestions.map((q) => (
-                        <span key={q.id} className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] text-warning-700">
+                        <span key={q.id} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] text-warning-700">
                           {q.code}
                           <button type="button" aria-label={`${q.code} 맞춤 질문 제거`} onClick={() => removeCustom(q.id)} className="cursor-pointer hover:text-warning-900">
                             <X aria-hidden="true" className="size-3" />
@@ -583,7 +583,7 @@ export function ProjectSurveySetupPage() {
         </section>
 
         {/* §5 발송 전 확인 */}
-        <section className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/50 p-5 sm:p-6">
+        <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
           <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">설문을 만들기 전에 마지막으로 확인하세요</h2>
           <p className="mt-1.5 text-[1rem] break-keep text-slate-600">
             {quality.verdict === 'error'

@@ -192,7 +192,7 @@ export function SideAiButton() {
             ))}
           </div>
           {/* D-258 새 창 없이 OS 안 오른쪽 판으로 — 머리줄 아래 본문 칸 안에 뜬다(우리 서버 · 팀장은 Gemini) */}
-          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 py-2.5" data-testid="side-ai-inside">
+          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="side-ai-inside">
             <span className="t-meta font-semibold text-violet-900">OS 안에서 열기 (새 창 없이 · 화면 오른쪽 칸)</span>
             <div className="flex gap-1.5">
               {s.service === 'google' ? (
@@ -326,7 +326,7 @@ export function SideAiButton() {
           <button
             type="button"
             onClick={() => setOsOpened(openOsLeft(window.location.href))}
-            className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-violet-50 px-3 font-semibold text-violet-900 hover:bg-violet-100"
+            className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-violet-900 hover:bg-violet-100"
             data-testid="side-ai-os-left"
           >
             <PanelsLeftRight aria-hidden="true" className="size-4" /> OS 도 왼쪽 창으로(반반 딱 맞게)

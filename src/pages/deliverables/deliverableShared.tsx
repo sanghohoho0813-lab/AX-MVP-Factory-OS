@@ -62,7 +62,7 @@ export function DeliverableNotFound() {
 export function StaleBanner({ show }: { show: boolean }) {
   if (!show) return null
   return (
-    <div className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+    <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
       <p className="text-[0.9rem] break-keep text-warning-800">
         자료 원본이 변경되었습니다. 확정된 자료는 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.

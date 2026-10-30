@@ -214,7 +214,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         })
       }
       return (
-        <span data-testid={`new-client-choices-${field}`} className="t-meta mt-1 flex flex-col gap-1.5 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-2.5 py-2 font-normal break-keep text-warning-900">
+        <span data-testid={`new-client-choices-${field}`} className="t-meta mt-1 flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 font-normal break-keep text-warning-900">
           <span className="font-semibold">⚠ {g.note}</span>
           {g.choices?.length ? (
             <span className="flex flex-wrap items-center gap-1.5">
@@ -657,7 +657,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       {error && (
         <div
           role="alert"
-          className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700"
+          className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700"
         >
           {error}
         </div>
@@ -670,7 +670,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         그래서 360px 화면에서 한 줄에 한 글자씩 세로로 흘렀다.
       */}
       {leftover.length > 0 && (
-        <div className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/70 px-4 py-3.5">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5">
           <div className="flex items-start gap-2.5">
             <CloudUpload aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
             <p className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-800">
@@ -1088,7 +1088,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   불러오는 중…
                 </p>
               ) : visibleAlerts.length === 0 ? (
-                <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
+                <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-center">
                   <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
                   <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
                     {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
@@ -1259,7 +1259,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                 </div>
               </fieldset>
               {dupe && (
-                <p role="status" data-testid="new-client-dupe" className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-slate-800">
+                <p role="status" data-testid="new-client-dupe" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-slate-800">
                   같은 업체가 이미 있습니다 —{' '}
                   {/* D-187: 넣은 서류가 있으면 그 업체 서류함으로 함께 넘긴다 */}
                   <Link to={`/ops/clients/${dupe.id}`} onClick={() => handDocsTo(dupe.id, docsRead.docs)} className="font-semibold text-brand-700 underline">

@@ -92,13 +92,13 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
       <ReadOnlyNotice pkg={pkg} />
 
       {!summary.includesValidation && (
-        <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-warning-700">
           이 자료에는 실제 사용 테스트(검증) 결과가 포함되어 있지 않습니다. &lsquo;검증 완료&rsquo;가 아닌 <span className="font-semibold">검증 전 설계안</span>으로 다뤄야 합니다.
         </div>
       )}
 
       {/* 지금 해야 할 일 */}
-      <section aria-label="지금 해야 할 일" className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5">
+      <section aria-label="지금 해야 할 일" className="rounded-(--radius-panel) border border-slate-200 bg-white p-5">
         <p className="text-[0.9rem] font-semibold tracking-wide text-brand-700 uppercase">지금 해야 할 일</p>
         <p className="mt-1.5 text-base font-semibold break-keep text-slate-900">{nextStep.title}</p>
         <p className="mt-1 text-[0.9rem] break-keep text-slate-600">{nextStep.description}</p>

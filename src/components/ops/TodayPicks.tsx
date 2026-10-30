@@ -25,7 +25,7 @@ export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientO
   const shown = picks.slice(0, phone ? 2 : 3)
   const goodCount = picks.filter((p) => p.good > 0).length
   return (
-    <section aria-labelledby="today-picks-title" className="flex flex-col gap-2.5 rounded-(--radius-panel) border-2 border-success-200 bg-success-50/50 p-4" data-testid="today-picks">
+    <section aria-labelledby="today-picks-title" className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="today-picks">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <HelpHeading
           id="today-picks-title"

@@ -96,7 +96,7 @@ export function WebsiteResultsPage() {
                   <span>개발 지시문 {r.design.generatedPrompts.length}종</span>
                 </div>
                 {r.stale && (
-                  <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                  <span className="w-fit rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                     진단 변경됨 · 재설계 권장
                   </span>
                 )}

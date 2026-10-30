@@ -332,7 +332,7 @@ export function OrganizationFormPage() {
         summary={summary}
       >
         {existing?.archivedAt && (
-          <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-warning-700">
             보관 처리된 고객사입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지 않습니다.
           </p>
         )}
@@ -386,11 +386,11 @@ export function OrganizationFormPage() {
               ))}
             </dl>
             {missingRequired.length > 0 ? (
-              <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[0.95rem] break-keep text-warning-700">
+              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-warning-700">
                 아직 필요한 정보가 있습니다: {missingRequired.join(', ')}. 이전 단계에서 입력해 주세요.
               </p>
             ) : (
-              <p className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3 text-[0.95rem] break-keep text-brand-800">
+              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-brand-800">
                 등록 후 이 고객사로 <b>새 프로젝트</b>를 만들어 진단을 시작할 수 있습니다.
               </p>
             )}

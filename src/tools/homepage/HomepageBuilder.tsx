@@ -214,7 +214,7 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
             블로그 · 플레이스 홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
           </p>
         )}
-        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-white p-3 sm:flex-row sm:items-end">
           <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
             <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
             <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
@@ -453,7 +453,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         {must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
         {must ? `꼭 고칠 것 ${must}` : should ? `확인할 것 ${should}` : '점검 통과'}
       </button>
-      <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 font-semibold text-violet-800 hover:border-violet-400" data-testid="site-to-content">
+      <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-violet-800 hover:border-violet-400" data-testid="site-to-content">
         <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
       </Link>
       <Button size="sm" onClick={onOpen} data-testid="site-open">
@@ -482,7 +482,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const blocksTab = (
     <div className="flex flex-col gap-2" data-testid="site-blocks">
       {suggestions.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3" data-testid="site-suggest">
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-white p-3" data-testid="site-suggest">
           <button type="button" onClick={() => setSuggestOpen(!suggestOpen)} aria-expanded={suggestOpen} className="tap -m-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) p-1 text-left" data-testid="site-suggest-toggle">
             <ChevronRight className={`size-4 shrink-0 text-emerald-700 transition-transform duration-150 ${suggestOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
             <Sparkles className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
@@ -579,7 +579,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border-2 border-dashed border-emerald-300 bg-emerald-50 font-semibold text-emerald-800 hover:bg-emerald-100"
+        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border border-dashed border-slate-300 bg-white font-semibold text-emerald-800 hover:bg-emerald-100"
         data-testid="block-add"
       >
         <Plus className="size-5" aria-hidden="true" /> 블록 더하기
@@ -754,7 +754,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <ArrowRight className="size-4" aria-hidden="true" />
       </button>
     ) : (
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3" data-testid="site-finish">
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-emerald-200 bg-white p-3" data-testid="site-finish">
         <p className="t-sub break-keep text-emerald-900">
           <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 HTML 파일 하나가 홈페이지 전체예요.
         </p>
@@ -853,7 +853,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         itemActions={assistActions}
       />
       {mismatch && (
-        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-amber-200 bg-amber-50 p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
+        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
           <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
           <p className="t-body min-w-0 flex-1 break-keep text-amber-900">
             업체 기록으로 보면 <b>{industryDef(detected).label}</b> 업종이에요. 지금은 {industryDef(doc.industry).label} 견본이라 첫 화면 문구가 안 맞을 수 있어요.

@@ -185,7 +185,7 @@ export function AssessmentsListPage() {
         <div className="flex items-center gap-1.5">
           <AssessmentStatusBadge status={r.assessment.status} />
           {r.needsReanalysis && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재분석
             </span>
@@ -348,7 +348,7 @@ export function AssessmentsListPage() {
                         />
                       )}
                       {r.needsReanalysis && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재분석
                         </span>

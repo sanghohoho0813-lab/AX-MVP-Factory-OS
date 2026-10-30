@@ -34,7 +34,7 @@ export function OverviewTab() {
   return (
     <div className="flex flex-col gap-5">
       {/* 1단계 — 지금 할 것 */}
-      <section className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5">
+      <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
         <h2 className="t-section text-slate-900">다음 행동</h2>
         {actions.length === 0 ? (
           <p className="t-body text-slate-500">지금 할 것이 없습니다. 프로젝트가 끝났거나 보류 상태입니다.</p>

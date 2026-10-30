@@ -112,7 +112,7 @@ export function PublishUpdateModal({
             <h3 className="mt-2 text-[1.05rem] font-bold text-slate-900">{title || '(제목)'}</h3>
             <p className="mt-1 text-[0.95rem] break-keep whitespace-pre-wrap text-slate-700">{body || '(내용 없음)'}</p>
             {actionRequired && (
-              <div className="mt-3 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-[0.92rem] text-warning-700">
+              <div className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] text-warning-700">
                 <strong>해주실 일:</strong> {actionLabel || '(해야 할 일)'}{dueDate ? ` · ${dueDate}까지` : ''}
               </div>
             )}

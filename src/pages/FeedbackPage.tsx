@@ -105,7 +105,7 @@ export function FeedbackPage() {
   if (sent) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-        <div data-testid="feedback-sent" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-success-200 bg-success-50 px-6 py-8 text-center">
+        <div data-testid="feedback-sent" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-6 py-8 text-center">
           <CheckCircle2 aria-hidden="true" className="size-10 text-success-600" />
           <p className="text-[1.25rem] font-bold text-slate-900">보냈어요 — 고맙습니다!</p>
           <p className="t-sub break-keep text-slate-700">대표님 [받은 피드백함]에 바로 전달됐어요. 읽으시면 아래에 '대표님 읽음' 이 표시됩니다.</p>
@@ -128,7 +128,7 @@ export function FeedbackPage() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       <ScreenTitle title="개발자에게 피드백" sub={`${round.label} · 2주마다 한 번 · 누르기만 하면 1분`} />
 
-      <div className="flex items-start gap-3 rounded-(--radius-panel) border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-4">
+      <div className="flex items-start gap-3 rounded-(--radius-panel) border border-amber-300 bg-white px-4 py-4">
         <MessageSquareHeart aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-orange-600" />
         <div className="min-w-0">
           <p className="text-[1rem] font-bold break-keep text-slate-900">쓰시면서 느낀 그대로 눌러 주세요</p>

@@ -36,7 +36,7 @@ function extractSuggestedUrl(detail?: string): string | null {
 function CopyableValue({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="mt-3 rounded-(--radius-card) border border-brand-200 bg-brand-50 p-3 text-left">
+    <div className="mt-3 rounded-(--radius-card) border border-slate-200 bg-white p-3 text-left">
       <p className="text-[12px] font-semibold text-brand-700">이 값을 그대로 넣으세요</p>
       <div className="mt-1.5 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-slate-800">{value}</code>

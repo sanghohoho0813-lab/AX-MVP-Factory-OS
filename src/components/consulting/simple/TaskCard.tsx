@@ -133,7 +133,7 @@ export function TaskCard({
         <button
           type="button"
           onClick={onImportDoc}
-          className="tap mt-4 flex w-full items-start gap-3 rounded-(--radius-card) border border-dashed border-brand-300 bg-brand-50/40 px-4 py-3.5 text-left hover:border-brand-500 hover:bg-brand-50"
+          className="tap mt-4 flex w-full items-start gap-3 rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-3.5 text-left hover:border-brand-500 hover:bg-brand-50"
         >
           <FileUp aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
           <span className="min-w-0 flex-1">
@@ -145,7 +145,7 @@ export function TaskCard({
 
       {/* ── 시스템 의견 먼저 (§5) ── */}
       {rec && (
-        <div className="mt-4 rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3.5">
+        <div className="mt-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3.5">
           <p className="t-sub inline-flex items-center gap-1.5 font-medium text-slate-600">
             <Sparkles aria-hidden="true" className="size-4 text-brand-600" /> 지금 자료로 보면
           </p>
@@ -244,7 +244,7 @@ export function TaskCard({
 
           {/* 고른 즉시 무엇이 저장될지 보여 준다 — 저장하고 나서 놀라지 않게 (§9) */}
           {composed !== '' && (
-            <div className="rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3">
+            <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-brand-800">
                 <Sparkles aria-hidden="true" className="size-4" /> 이렇게 저장됩니다
               </p>
@@ -259,7 +259,7 @@ export function TaskCard({
         <div className="mt-4 flex flex-col gap-3">
           {/* 초안이 있으면 그것을 먼저 크게 보여 준다. 칸은 접어 둔다 (§9) */}
           {hasDraft && !editOpen && (
-            <div className="rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3.5">
+            <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3.5">
               <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-brand-800">
                 <Sparkles aria-hidden="true" className="size-4" /> 이렇게 정리해 봤습니다
               </p>

@@ -203,14 +203,14 @@ function PreviewBody({
         </header>
 
         {isInstitution && (
-          <div className="avoid-break rounded-(--radius-card) border border-success-200 bg-success-50/70 px-4 py-3">
+          <div className="avoid-break rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
             <p className="text-[0.9rem] font-semibold break-keep text-success-800">기관 제출 준비 안내</p>
             <p className="mt-1 text-[0.9rem] leading-relaxed break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
           </div>
         )}
 
         {!includesValidation && (
-          <div className="avoid-break rounded-(--radius-card) border border-warning-200 bg-warning-50/70 px-4 py-3">
+          <div className="avoid-break rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
             <p className="text-[0.9rem] leading-relaxed break-keep text-warning-800">
               검증 전 설계안입니다. 실제 사용 테스트로 검증되지 않은 설계 기준의 자료이며, 검증 완료 자료가 아닙니다.
             </p>

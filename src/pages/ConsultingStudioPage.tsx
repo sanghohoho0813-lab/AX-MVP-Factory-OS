@@ -143,7 +143,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
         목록 위에 한 번 뜨고, 닫으면 다시 뜨지 않는다.
       */}
       {!missing && showIntro && (
-        <div className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/60 px-5 py-4">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <p className="t-card break-keep text-slate-900">처음이신가요? 세 가지만 알면 됩니다.</p>
             <button type="button" aria-label="안내 닫기" onClick={dismissIntro} className="tap shrink-0 text-slate-500 hover:text-slate-800">

@@ -107,7 +107,7 @@ export function SpecAiPanel({ d, today, apply, onClose }: { d: SpecDraft; today:
           <ModelPicker className="mt-1" />
         </div>
         {!ready ? (
-          <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-900" data-testid="spec-ai-need">
+          <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-warning-900" data-testid="spec-ai-need">
             명칭(1단계)과 구성요소 2개 이상(2단계)이 있어야 AI 가 지어내지 않습니다 — 먼저 채워 주세요.
           </p>
         ) : (

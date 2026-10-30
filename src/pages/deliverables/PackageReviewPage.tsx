@@ -200,7 +200,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
       <div id="review-sources" className="scroll-mt-4">
         <Panel title="B. 출처 최신성" flush>
           {stale && (
-            <div className="mx-5 mt-5 flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+            <div className="mx-5 mt-5 flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
               <p className="text-[0.9rem] break-keep text-warning-800">
                 출처 원본이 변경되었습니다. 확정된 자료는 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.
@@ -436,7 +436,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
       <div id="review-finalize" className="scroll-mt-4">
         <Panel title="G. 상태·확정">
           {pkg.status === 'finalized' ? (
-            <div className="flex flex-col gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-4 py-3">
+            <div className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <p className="inline-flex items-center gap-1.5 text-[0.9rem] font-semibold text-success-800">
                 <CheckCircle2 aria-hidden="true" className="size-4" />
                 자료가 확정되었습니다.
@@ -464,7 +464,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
                 </Button>
               </div>
               {finalizeDisabled && !readOnly && finalizeCheck.reasons.length > 0 && (
-                <div className="mt-3 rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-4 py-3">
+                <div className="mt-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                   <p className="text-[0.9rem] font-semibold text-danger-700">확정 전 해결이 필요합니다.</p>
                   <ul className="mt-1.5 flex flex-col gap-1">
                     {finalizeCheck.reasons.map((reason, i) => (

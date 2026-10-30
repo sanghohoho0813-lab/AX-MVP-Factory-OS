@@ -110,7 +110,7 @@ export function TemplateBuilderPage() {
           backLabel="설문 템플릿"
           title={existing.name}
         />
-        <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 px-6 py-8 text-center">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-6 py-8 text-center">
           <p className="text-sm font-semibold break-keep text-warning-800">
             게시된 템플릿은 기존 프로젝트의 일관성을 위해 직접 수정하지 않습니다.
           </p>

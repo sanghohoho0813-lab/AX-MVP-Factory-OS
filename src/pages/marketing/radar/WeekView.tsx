@@ -201,7 +201,7 @@ export function WeekView({
 
       {/* D-356 대표 "1주일치 쓰면 밑으로 쫙 풀려 눈에 안 들어온다 — 프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 딱딱 나눠서".
           프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
-      <section className="relative z-10 flex flex-col overflow-visible rounded-(--radius-panel) border-2 border-violet-200 bg-white" data-testid="mk-week-project">
+      <section className="relative z-10 flex flex-col overflow-visible rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-week-project">
         <header className="relative rounded-t-[calc(var(--radius-panel)-2px)] bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 px-4 py-3 text-white sm:px-5">
           <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-[calc(var(--radius-panel)-2px)]">
             <span className="absolute -top-14 -right-10 size-40 rounded-full bg-white/10" />
@@ -353,7 +353,7 @@ export function WeekView({
               role="tab"
               aria-selected={on}
               onClick={() => pickTab(t.key)}
-              className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border-2 px-3 py-2 text-left ${on ? 'border-violet-600 bg-violet-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-violet-300'}`}
+              className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border px-3 py-2 text-left ${on ? 'border-brand-600 bg-brand-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-200'}`}
               data-testid="mk-week-tab"
               data-tab={t.key}
               data-state={t.state ?? ''}

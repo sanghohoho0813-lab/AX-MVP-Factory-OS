@@ -151,7 +151,7 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
       </div>
 
       {!check.ok && editable && (
-        <ul className="flex flex-col gap-1 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3" aria-live="polite">
+        <ul className="flex flex-col gap-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3" aria-live="polite">
           {check.reasons.map((r) => <li key={r} className="text-[0.9rem] break-keep text-warning-800">• {r}</li>)}
         </ul>
       )}

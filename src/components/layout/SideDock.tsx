@@ -131,7 +131,7 @@ function ChatTab() {
                       inputRef.current?.focus()
                     } else ask(s)
                   }}
-                  className="tap t-sub flex min-h-11 items-center gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 text-left font-semibold text-violet-900 hover:bg-violet-100"
+                  className="tap t-sub flex min-h-11 items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-left font-semibold text-violet-900 hover:bg-violet-100"
                   data-testid="dock-starter"
                 >
                   <MessageCircle aria-hidden="true" className="size-4 shrink-0" /> <span className="min-w-0 break-keep">{s.replace(/: $/, ' …')}</span>

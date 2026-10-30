@@ -515,7 +515,7 @@ function PlanCard({
               <ActivityItem key={a.id} activity={a} internal={false} />
             ))}
             {internal.length > 0 && (
-              <div className="flex flex-col gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/50 p-3">
+              <div className="flex flex-col gap-3 rounded-(--radius-card) border border-slate-200 bg-white p-3">
                 <p className="text-[0.875rem] font-semibold text-warning-700">내부 메모 (외부 공유 대상 아님)</p>
                 {internal.map((a) => (
                   <ActivityItem key={a.id} activity={a} internal={true} />
@@ -543,7 +543,7 @@ function ActivityItem({
         <OutreachChannelBadge channel={activity.channel} />
         {activity.contactRole && <span className="text-[0.875rem] text-slate-500">{activity.contactRole}</span>}
         {internal && (
-          <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+          <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
             내부 메모
           </span>
         )}

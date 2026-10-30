@@ -52,7 +52,7 @@ export function DesignWorkflowPage() {
         const desired = design.workflows.find((w) => w.kind === 'desired')
         return (
           <>
-            <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
+            <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <p className="text-[0.92rem] break-keep text-slate-600">
                 기능명이 아니라 실제 업무 흐름을 정의합니다. 목표 흐름의 각 단계가 어떤 기능으로 처리되는지 <ArrowRight aria-hidden="true" className="inline size-3" /> 기능·범위 탭에서 이어집니다.
               </p>

@@ -77,27 +77,25 @@ export function MkHero({
   testId?: string
 }) {
   return (
-    <div className={`relative overflow-hidden bg-gradient-to-br ${HERO[tone]} p-4 text-white sm:p-5`} data-testid={testId}>
-      {/* 장식 동그라미 — 눌리지 않고 읽히지 않는다 */}
-      <span aria-hidden="true" className="pointer-events-none absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
-      <span aria-hidden="true" className="pointer-events-none absolute -bottom-16 right-28 size-32 rounded-full bg-white/10" />
+    // D-370 머리 띠도 흰 칸 — 색 그라데이션 · 장식 동그라미 대신 아래 얇은 줄 하나(tone 은 이름만 남는다)
+    <div className="relative overflow-hidden border-b border-slate-100 bg-white p-4 text-slate-900 sm:p-5" data-testid={testId} data-tone={tone}>
       <div className="relative flex flex-wrap items-start gap-3">
-        <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/30">
+        <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
           <Icon className="size-6" />
         </span>
         <div className="min-w-0 flex-1 basis-56">
-          {eyebrow && <p className="t-meta font-semibold tracking-wide text-white/90">{eyebrow}</p>}
-          <h2 className="t-section break-keep text-white [overflow-wrap:anywhere]">{title}</h2>
-          {sub && <p className="t-sub mt-0.5 break-keep text-white/90">{sub}</p>}
+          {eyebrow && <p className="t-meta font-semibold tracking-wide text-slate-500">{eyebrow}</p>}
+          <h2 className="t-section break-keep text-slate-900 [overflow-wrap:anywhere]">{title}</h2>
+          {sub && <p className="t-sub mt-0.5 break-keep text-slate-600">{sub}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
       {stats && stats.length > 0 && (
         <dl className="relative mt-3 flex flex-wrap gap-2">
           {stats.map((s) => (
-            <div key={s.label} className="flex items-baseline gap-1.5 rounded-full bg-white/15 px-3 py-1 ring-1 ring-white/25" data-testid={s.testId}>
-              <dt className="t-meta text-white/90">{s.label}</dt>
-              <dd className="t-sub font-bold tabular-nums text-white">{s.value}</dd>
+            <div key={s.label} className="flex items-baseline gap-1.5 rounded-full bg-slate-100 px-3 py-1" data-testid={s.testId}>
+              <dt className="t-meta text-slate-600">{s.label}</dt>
+              <dd className="t-sub font-bold tabular-nums text-slate-900">{s.value}</dd>
             </div>
           ))}
         </dl>

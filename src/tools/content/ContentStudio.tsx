@@ -601,10 +601,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
       {/* 먼저 만들 것 — 눈에 잘 띄게(D-226 글 종류마다 색 아이콘) */}
       {mode === 'pick' && (
-      <section className="rounded-(--radius-panel) border-2 border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-4 shadow-sm sm:p-5" data-testid="content-picks">
+      <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" data-testid="content-picks">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="t-section flex min-w-0 items-center gap-2.5 text-violet-900">
-            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-700 text-white shadow-sm">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
               <Sparkles className="size-5" />
             </span>
             {/* D-224 띄어쓰기 없는 아주 긴 업체 이름도 줄을 바꿔 휴대폰에서 옆으로 넘치지 않게 */}
@@ -617,7 +617,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
             const ks = KIND_STYLE[p.kind]
             return (
               <li key={p.key}>
-                <button type="button" onClick={() => guard(() => onPick(p))} className={`tap group flex h-full w-full flex-col items-start gap-2 rounded-(--radius-control) border-2 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md ${TONE[ks.tone].line} ${TONE[ks.tone].hover}`} data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
+                <button type="button" onClick={() => guard(() => onPick(p))} className={`tap group flex h-full w-full flex-col items-start gap-2 rounded-(--radius-control) border bg-white p-3 text-left transition-shadow hover:shadow-md ${TONE[ks.tone].line} ${TONE[ks.tone].hover}`} data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
                   <span className="flex w-full items-center gap-2.5">
                     <MkIcon icon={ks.icon} tone={ks.tone} />
                     <span className="min-w-0 flex-1">
@@ -766,7 +766,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
             <fieldset className="flex flex-col gap-1.5" data-testid="content-adtype">
               <legend className="t-sub mb-1 font-semibold text-slate-700">어떤 마음을 움직일까요?</legend>
               {riskyCards.length > 0 && (
-                <p className="t-meta mb-1 rounded-(--radius-control) bg-amber-50 px-3 py-2 break-keep text-amber-900 ring-1 ring-amber-200" data-testid="content-adtype-regulated">
+                <p className="t-meta mb-1 rounded-(--radius-control) bg-white px-3 py-2 break-keep text-danger-700 ring-1 ring-slate-200" data-testid="content-adtype-regulated">
                   {regulated?.label} 업종 — {riskyCards.map((a) => AD_TYPE_LABEL[a]).join(' · ')}은 금지한 표현(사례 · 금액 · 손실 압박 · 실적)을 다시 만들기 쉬워요. {cardFiveTypes(profile).map((a) => AD_TYPE_LABEL[a]).join(' · ')}을 권해요.
                 </p>
               )}
@@ -816,7 +816,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
             {kind === 'blog' && blogType === 'review' ? '체험단 가이드 만들기' : `${KIND_LABEL[kind]} 만들기`}
           </button>
           {kind === 'cards' && (
-            <button type="button" onClick={openCardFive} className="tap flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border-2 border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-center hover:border-fuchsia-500" data-testid="content-cards5">
+            <button type="button" onClick={openCardFive} className="tap flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-center hover:border-fuchsia-500" data-testid="content-cards5">
               <span className="t-body inline-flex items-center gap-1.5 font-semibold text-fuchsia-900">
                 <Layers className="size-4" aria-hidden="true" />
                 {cardFiveTypes(profile).length}안 한 번에 만들기
@@ -833,7 +833,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           {shown ? (
             <section className={`${card} flex flex-col gap-3 overflow-hidden p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
               {pack && (
-                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3" data-testid="content-pack" data-key={pack.key}>
+                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-white p-3" data-testid="content-pack" data-key={pack.key}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-violet-900">
                       <MkIcon icon={packStyle(pack.key).icon} tone={packStyle(pack.key).tone} size="sm" />
@@ -1091,7 +1091,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               )}
             </section>
           ) : (
-            <section className="flex flex-col items-center gap-3 rounded-(--radius-panel) border-2 border-dashed border-violet-200 bg-gradient-to-br from-violet-50/70 via-white to-fuchsia-50/70 p-6 text-center" data-testid="content-empty">
+            <section className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white p-6 text-center" data-testid="content-empty">
               <span aria-hidden="true" className="flex -space-x-2">
                 {(['blog', 'shorts', 'cards', 'kakao'] as ContentKind[]).map((k) => (
                   <span key={k} className="rounded-xl ring-4 ring-white">
@@ -1247,7 +1247,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
         }
       />
       <div className="flex flex-col gap-3 p-4 sm:p-5">
-      <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
+      <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
         <span className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-keep">
           <b className="font-bold text-violet-900">브리프 {slots.length}칸 · {filled}/{slots.length}</b>
           <span className="t-meta font-semibold text-violet-700">{slots.find((x) => x.key === 'facts')?.note}</span>
@@ -1270,7 +1270,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       {open && (
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((r) => (
-          <div key={r.label} className={`flex min-w-0 items-start gap-2.5 rounded-(--radius-control) border p-2.5 ${r.missing ? 'border-dashed border-amber-300 bg-amber-50/70' : 'border-slate-200 bg-white'}`} data-testid="content-profile-row" data-missing={r.missing ? '1' : '0'}>
+          <div key={r.label} className={`flex min-w-0 items-start gap-2.5 rounded-(--radius-control) border p-2.5 ${r.missing ? 'border-dashed border-slate-300 bg-white' : 'border-slate-200 bg-white'}`} data-testid="content-profile-row" data-missing={r.missing ? '1' : '0'}>
             <MkIcon icon={r.icon} tone={r.missing ? 'amber' : r.tone} size="sm" />
             <div className="min-w-0 flex-1">
               <dt className="t-meta flex flex-wrap items-center gap-1.5 text-slate-500">
@@ -1284,7 +1284,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       </dl>
       )}
       {open && material.length > 0 && (
-        <dl className="flex flex-col gap-1 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-2.5" data-testid="content-profile-material">
+        <dl className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-2.5" data-testid="content-profile-material">
           <span className="t-meta font-bold text-violet-900">글 재료 · 적어 둔 것만 글에 들어가요</span>
           {material.map((m) => (
             <div key={m.label} className="t-sub flex min-w-0 flex-wrap gap-x-2 break-keep">
@@ -1295,7 +1295,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
         </dl>
       )}
       {gaps.length > 0 && (
-        <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-profile-gaps">
+        <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-500" data-testid="content-profile-gaps">
           <MkIcon icon={Sparkles} tone="amber" size="sm" />
           <span className="min-w-0 flex-1">
             <span className="t-sub block font-bold break-keep text-amber-900">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
@@ -1392,7 +1392,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, start
       {!open && running && (nextAt >= 0 || late > 0) && (
         <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-next">
           {nextAt >= 0 && (
-            <button type="button" onClick={() => (states[nextAt].item ? onOpen(states[nextAt].item as ContentItem) : onPick(slots[nextAt]))} className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-control) border border-sky-200 bg-sky-50 px-3 py-2 text-left hover:border-sky-400" data-testid="content-plan-next-open">
+            <button type="button" onClick={() => (states[nextAt].item ? onOpen(states[nextAt].item as ContentItem) : onPick(slots[nextAt]))} className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-sky-400" data-testid="content-plan-next-open">
               <MkIcon icon={KIND_STYLE[slots[nextAt].kind].icon} tone={KIND_STYLE[slots[nextAt].kind].tone} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="t-meta block font-semibold text-sky-800">
@@ -1530,12 +1530,12 @@ function SituationCard({ profile, today, holidays, openKey, onPick }: { profile:
                 type="button"
                 onClick={() => onPick(sit.key)}
                 aria-pressed={on}
-                className={`tap flex h-full w-full min-w-0 flex-col items-start gap-1.5 rounded-(--radius-control) border p-3 text-left transition-shadow hover:shadow-sm ${on ? TONE[ss.tone].on : sit.now ? 'border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-fuchsia-50 hover:border-violet-500' : `border-slate-200 bg-white ${TONE[ss.tone].hover}`}`}
+                className={`tap flex h-full w-full min-w-0 flex-col items-start gap-1.5 rounded-(--radius-control) border p-3 text-left transition-shadow hover:shadow-sm ${on ? TONE[ss.tone].on : sit.now ? 'border-brand-500 bg-white hover:border-brand-600' : `border-slate-200 bg-white ${TONE[ss.tone].hover}`}`}
                 data-testid="content-situation"
                 data-key={sit.key}
               >
                 {sit.now && (
-                  <span className="t-meta flex w-full items-start gap-1 rounded-md bg-violet-600 px-2 py-1 font-semibold break-keep text-white" data-testid="content-situation-now">
+                  <span className="t-meta flex w-full items-start gap-1 rounded-md bg-slate-100 px-2 py-1 font-semibold break-keep text-brand-700" data-testid="content-situation-now">
                     <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                     <span className="min-w-0">지금 때 · {sit.now}</span>
                   </span>
@@ -1588,7 +1588,7 @@ function FillBox({ names, scope, onApply }: { names: string[]; scope: string; on
     onApply(out, dropNames)
   }
   return (
-    <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/60" data-testid="content-fill">
+    <div className="rounded-(--radius-control) border border-slate-200 bg-white" data-testid="content-fill">
       <button type="button" className="tap flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-fill-toggle">
         <PencilLine className="size-4 shrink-0 text-warning-700" aria-hidden="true" />
         <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">
@@ -1969,7 +1969,7 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
               ))}
             </div>
             <p className="t-sub break-keep text-slate-700">다른 AI 글쓰기 도구의 '추가 요청' 칸에 이 글을 그대로 붙여 넣으세요. 업체 · 독자 · 쓸 수 있는 사실 · 넣지 말 것을 적어 두면 엉뚱한 업종 이야기와 지어낸 숫자가 줄어요. 여기서는 AI 를 부르지 않아요 — 복사만 해요.</p>
-            <pre className="t-sub max-h-72 overflow-auto rounded-(--radius-control) border border-sky-200 bg-sky-50/60 p-3 font-sans break-words whitespace-pre-wrap text-slate-800" data-testid="content-ai-req-text">
+            <pre className="t-sub max-h-72 overflow-auto rounded-(--radius-control) border border-slate-200 bg-white p-3 font-sans break-words whitespace-pre-wrap text-slate-800" data-testid="content-ai-req-text">
               {req}
             </pre>
             <button type="button" className={MK_PRIMARY.sky} onClick={async () => showToast((await copyToClipboard(req)) ? '요청문을 복사했어요 — 다른 AI 도구의 추가 요청 칸에 붙여 넣으세요.' : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요.')} data-testid="content-ai-req-copy">
@@ -1977,7 +1977,7 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
               요청문 복사
             </button>
             {thin.length > 0 && (
-              <button type="button" onClick={onEditProfile} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-amber-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-ai-thin">
+              <button type="button" onClick={onEditProfile} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-ai-thin">
                 <MkIcon icon={Sparkles} tone="amber" size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="t-sub block font-bold break-keep text-amber-900">사실 목록이 얇아요 — {thin.map((g) => g.label).join(' · ')}</span>
@@ -2047,7 +2047,7 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
 function AnglePicker({ open, onToggle, cands, sel, onSel, onMore, used, best, video }: { open: boolean; onToggle: () => void; cands: TitleCandidate[]; sel: AngleId | null; onSel: (a: AngleId | null) => void; onMore: () => void; used: AngleId[]; best: string; video: boolean }) {
   const picked = cands.find((c) => c.id === sel)
   return (
-    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-sky-200 bg-sky-50/50 p-2.5" data-testid="content-angle" data-open={open ? '1' : '0'}>
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-2.5" data-testid="content-angle" data-open={open ? '1' : '0'}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="tap flex min-h-11 w-full items-center gap-2 text-left" data-testid="content-angle-toggle">
         <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-sky-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
         <span className="min-w-0 flex-1">
@@ -2122,7 +2122,7 @@ function StatsBox({ item, onSave }: { item: ContentItem; onSave: (it: ContentIte
     setBusy(false)
   }
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-emerald-50/60 p-3" data-testid="content-stats">
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="content-stats">
       <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-emerald-900">
         <BarChart3 className="size-4 shrink-0" aria-hidden="true" />
         올린 뒤 숫자
@@ -2156,7 +2156,7 @@ function PerfBox({ items, rows, onOpen }: { items: readonly ContentItem[]; rows:
   const top = perf[0]
   const lead = !!top && top.inquiries + top.saves + top.views > 0
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-emerald-50/50 p-3" data-testid="content-perf">
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="content-perf">
       <p className="t-sub flex items-center gap-2 font-semibold text-emerald-900">
         <BarChart3 className="size-4 shrink-0" aria-hidden="true" />
         무엇이 잘 됐나

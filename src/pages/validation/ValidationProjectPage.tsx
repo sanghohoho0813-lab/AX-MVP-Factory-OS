@@ -49,7 +49,7 @@ export function ValidationProjectPage() {
 
       <section
         aria-label="테스트 진행 방식 안내"
-        className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 p-5"
+        className="rounded-(--radius-panel) border border-slate-200 bg-white p-5"
       >
         <p className="text-[0.875rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
         <p className="mt-1.5 text-[1.05rem] font-semibold break-keep text-slate-900">
@@ -100,7 +100,7 @@ function TrackCard({
       </div>
 
       {!track.eligibility.available ? (
-        <div className="flex flex-col gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/50 p-4">
+        <div className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-4">
           <p className="flex items-center gap-1.5 text-[1.05rem] font-semibold break-keep text-slate-800">
             <Lock aria-hidden="true" className="size-4 text-warning-600" />
             {meta.label}를 시작할 수 없습니다
@@ -127,7 +127,7 @@ function TrackCard({
       ) : (
         <div className="flex flex-col gap-3">
           {track.needsRevalidationFlag && (
-            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
+            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] break-keep text-warning-700">
               <RefreshCw aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
               출처 설계가 새 버전으로 확정됨 — 새 버전 검증 필요
             </p>

@@ -191,7 +191,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
       {notReady && (
-        <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
           {/* D-122: 개발자 말(READY · 브릿지 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
           <p className="text-[0.98rem] font-semibold text-warning-700">홈페이지 상담신청 연결을 아직 켜지 않았습니다</p>
           <p className="mt-1 text-[0.92rem] break-keep text-slate-700">

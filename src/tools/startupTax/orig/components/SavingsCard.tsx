@@ -17,7 +17,7 @@ export default function SavingsCard({ points, advice }: Props) {
   if (points.length === 0) return null
 
   return (
-    <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5 shadow-card sm:p-6">
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
       <div className="flex items-center gap-2.5">
         <span className="text-2xl">💰</span>
         <h3 className="text-xl font-bold text-gray-900">예상 절세 포인트</h3>

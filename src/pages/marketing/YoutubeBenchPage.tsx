@@ -678,7 +678,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         )}
       </div>
       {prefsFailed && !readOnly && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="radar-prefs-failed">
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="radar-prefs-failed">
           <p className="t-sub min-w-0 flex-1 break-keep text-warning-700">채널 · 추천 설정을 읽지 못했습니다. 저장해 둔 설정은 그대로 있고, 다시 읽기 전에는 바꾸지 않습니다.</p>
           <Button size="sm" variant="secondary" onClick={reloadPrefs} data-testid="radar-prefs-retry">
             <RefreshCw aria-hidden="true" className="size-4" /> 다시 읽기
@@ -990,12 +990,12 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
   return (
     <div className="flex flex-col gap-2">
       {sample && (
-        <p className="t-body rounded-(--radius-control) border border-amber-300 bg-amber-50 px-4 py-3 font-semibold break-keep text-amber-900" data-testid="yt-sample-banner">
+        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-amber-900" data-testid="yt-sample-banner">
           예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 벤치마킹 채널로 바뀝니다.
         </p>
       )}
       {message && (
-        <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-800" data-testid="yt-message">
+        <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-800" data-testid="yt-message">
           {message}
         </p>
       )}
@@ -1019,7 +1019,7 @@ function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword:
       <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {topics.map((t, i) => (
           <li key={t.keyword} className="min-w-0">
-            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-card) border border-red-200 bg-red-50/60 px-3 py-2.5 text-left hover:border-red-400">
+            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-red-400">
               <span className="t-meta flex size-7 shrink-0 items-center justify-center rounded-full bg-red-500 font-bold text-white">{i + 1}</span>
               <span className="flex min-w-0 flex-col">
                 <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.keyword}</span>

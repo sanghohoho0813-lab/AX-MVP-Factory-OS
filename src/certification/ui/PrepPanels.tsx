@@ -51,7 +51,7 @@ function Block({ title, children, testid }: { title: string; children: ReactNode
 export function UnconfirmedHint({ count, clientId }: { count: number; clientId: string }) {
   if (count === 0) return null
   return (
-    <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="pack-unconfirmed">
+    <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-warning-800" data-testid="pack-unconfirmed">
       입력만 되고 확인 전인 회사 정보 {count}개는 답에 쓰지 않았습니다.{' '}
       <Link to={`/ops/clients/${clientId}`} className="tap inline-flex min-h-10 items-center font-semibold underline">
         회사 정보에서 확인하기
@@ -175,7 +175,7 @@ function QuestionCard({ x, n, say, onSay }: { x: PackageQuestion; n: number; say
       <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2.5">
         {/* D-252 말할 답(AI 초안 · 고칠 수 있음) — [대표 확인: …] 자리는 대표님께 물어 채운다 */}
         {(say || edit !== null) && (
-          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2" data-testid="pack-say">
+          <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="pack-say">
             <p className="t-meta font-semibold text-violet-900">말할 답 · AI 초안</p>
             {edit === null ? (
               <>
@@ -317,7 +317,7 @@ export function InspectionPackPanel({
 
         <Block title={`예상 핵심질문 ${pkg.questions.length}개 — 눌러서 말하기 가이드`} testid="pack-questions">
           {assistOn(ai) && pkg.questions.length > 0 && (
-            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5" data-testid="pack-say-ai">
+            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="pack-say-ai">
               <div className="flex flex-wrap items-center gap-2">
                 <AiConfirm><Button size="sm" variant="primary" disabled={saying} onClick={() => void writeSays()} data-testid="pack-say-run">
                   <Sparkles aria-hidden="true" className="size-4" /> {saying ? 'AI 가 쓰는 중…(30초쯤)' : said ? `AI로 말할 답 다시 쓰기 (${pkg.questions.length}개)` : `AI로 말할 답 쓰기 (${pkg.questions.length}개)`}

@@ -77,7 +77,7 @@ export function QuickStart({
           <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-${id}-label`}>
             <Icon aria-hidden="true" className={`size-4 shrink-0 ${week ? 'text-rose-600' : 'text-indigo-600'}`} />
             {week ? '이번 주 키워드' : '우리 분야 주제'}
-            <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${week ? 'bg-rose-100 text-rose-800' : 'bg-indigo-100 text-indigo-800'}`}>{week ? '매주 바뀌어요' : '늘 그대로예요'}</span>
+            <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${week ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{week ? '매주 바뀌어요' : '늘 그대로예요'}</span>
           </span>
         </HintTip>
         <div className="flex flex-wrap gap-1.5">
@@ -93,7 +93,7 @@ export function QuickStart({
   return (
     <div data-testid={`${testPrefix}-qs`}>
       {/* D-299 카드(Surface)는 넘치는 것을 자른다 — [모델 · ○○] 고르는 판 · ? 설명이 잘려서 자르지 않는 상자로 */}
-      <div className="relative flex flex-col gap-3 rounded-(--radius-panel) border-2 border-slate-900 bg-white p-4 sm:p-5" data-testid={`${testPrefix}-qs-box`}>
+      <div className="relative flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" data-testid={`${testPrefix}-qs-box`}>
         <StepTitle n="1">무엇에 대해 쓸까요?</StepTitle>
         {top}
         <input
@@ -107,10 +107,10 @@ export function QuickStart({
         {chipRow(week, 'week')}
         {chipRow(ours, 'ours')}
         {/* D-298 추천 형식 줄 — 보라 테두리 · '추천 형식' 딱지 · 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시 */}
-        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2.5" data-testid={`${testPrefix}-qs-rec`}>
+        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-qs-rec`}>
           <div className="t-sub min-w-[12rem] flex-1 break-keep text-slate-800">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <b className="t-meta shrink-0 rounded-full bg-violet-600 px-2.5 py-0.5 font-bold text-white">{picked ? '고른 형식' : '추천 형식'}</b>
+              <b className="t-meta shrink-0 font-bold text-brand-700">{picked ? '고른 형식' : '추천 형식'}</b>
               <HintTip tip={recTip} label="추천 형식" tight className="min-w-0">
                 <span className="min-w-0 font-bold text-violet-900" data-testid={`${testPrefix}-qs-rec-label`}>
                   {recLabel}
@@ -119,7 +119,7 @@ export function QuickStart({
             </div>
             {!picked && recWhy && <span className="mt-0.5 block text-slate-600">{recWhy}</span>}
           </div>
-          <button type="button" onClick={onChangeFormat} className="tap t-sub inline-flex h-10 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-violet-300 bg-white px-3 font-semibold whitespace-nowrap text-violet-800 hover:bg-violet-100" data-testid={`${testPrefix}-qs-change`}>
+          <button type="button" onClick={onChangeFormat} className="tap t-sub inline-flex h-10 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50" data-testid={`${testPrefix}-qs-change`}>
             <SlidersHorizontal aria-hidden="true" className="size-4" /> 형식 바꾸기
           </button>
         </div>

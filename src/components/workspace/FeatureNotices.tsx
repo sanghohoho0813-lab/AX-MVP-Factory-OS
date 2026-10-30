@@ -160,7 +160,7 @@ export function AdvancedFeatureNotice({
 /** 로컬 모드 제약 안내 — 외부 공유·협업이 필요한 기능 */
 export function LocalModeNotice({ context }: { context?: string }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+    <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Cloud aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-warning-600" />
       <p className="min-w-0 text-[0.9rem] leading-relaxed break-keep text-warning-800">
         <span className="font-semibold">현재 로컬 모드</span> — 이 브라우저에만 저장됩니다.

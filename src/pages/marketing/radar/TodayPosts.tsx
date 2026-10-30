@@ -27,7 +27,7 @@ export default function TodayPosts() {
   return (
     <Link
       to={`/marketing?week=1&start=${monday}&wt=${items[0].tab}`}
-      className="tap t-sub inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border border-violet-200 bg-violet-50 px-3 py-1 font-semibold text-violet-900 hover:bg-violet-100"
+      className="tap t-sub inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-violet-900 hover:bg-violet-100"
       data-testid="today-posts"
     >
       <Megaphone aria-hidden="true" className="size-4 shrink-0 text-violet-700" />

@@ -91,7 +91,7 @@ export function CreatePackagePage() {
       </div>
 
       {!canCreate && (
-        <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
           <p className="text-[0.9rem] font-semibold text-warning-800">지금은 자료를 만들 수 없습니다</p>
           <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[0.9rem] break-keep text-warning-700">
             {eligibility.reasons.length > 0
@@ -190,7 +190,7 @@ export function CreatePackagePage() {
               </div>
             </fieldset>
 
-            <div className="flex items-start gap-2 rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3">
+            <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-500" />
               <p className="text-[0.9rem] break-keep text-slate-600">
                 검증(실제 사용 테스트) 결과가 포함되지 않은 자료는 <span className="font-semibold">검증 전 설계안</span>으로 표시됩니다. 근거가 없는 수치는 자동으로 "산정 필요"로 남습니다.
@@ -198,7 +198,7 @@ export function CreatePackagePage() {
             </div>
 
             {type === 'institution_preparation' && (
-              <div className="flex items-start gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-4 py-3">
+              <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                 <Landmark aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-600" />
                 <p className="text-[0.9rem] font-medium break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
               </div>
@@ -252,7 +252,7 @@ export function CreatePackagePage() {
                 )}
 
                 {preview.warnings.length > 0 && (
-                  <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3.5 py-3">
+                  <div className="rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-3">
                     <p className="text-[0.9rem] font-semibold text-warning-800">확인이 필요한 항목</p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.9rem] break-keep text-warning-700">
                       {preview.warnings.map((warning, i) => (

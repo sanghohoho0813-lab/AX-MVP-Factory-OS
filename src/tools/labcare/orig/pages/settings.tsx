@@ -55,7 +55,7 @@ export default function SettingsPage() {
   return (
     <Layout title="설정 · 데이터 관리" subtitle="저장 안내 · 백업/복원 · 초기화">
       {/* 로컬 MVP 안내 */}
-      <section className="mb-5 rounded-2xl border border-sky-200 bg-sky-50 p-5">
+      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
         <p className="text-base font-bold text-sky-900">ℹ️ 이 모듈의 기록은 미래에이아이랩 OS 의 모듈 기록으로 저장됩니다.</p>
         <p className="mt-1 text-sm leading-relaxed text-sky-900/80">
           클라우드 모드에서는 작업실 안의 다른 기기에서도 같은 기록이 보이고, 로컬 모드에서는 이 브라우저에만 남습니다. 고객사(회사명·대표자·주소)는 <b>고객 관리</b> 업체를 그대로 씁니다.
@@ -94,7 +94,7 @@ export default function SettingsPage() {
         </section>
 
         {/* 초기화 */}
-        <section className="rounded-2xl border-2 border-red-200 bg-white p-5 shadow-card @2xl:col-span-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card @2xl:col-span-2">
           <h2 className="text-lg font-bold text-status-danger">로컬 데이터 초기화</h2>
           <p className="mt-1 text-sm text-slate-500">
             이 브라우저의 모든 앱 데이터(고객사·연구노트·변경·활동조사 등)를 삭제합니다. 되돌릴 수 없으니 먼저 백업하세요.

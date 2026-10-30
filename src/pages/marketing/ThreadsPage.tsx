@@ -266,7 +266,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       <MarketingTabs active="threads" />
       <InnerTabs tabs={TABS} value={tab} onPick={go} label="스레드" testPrefix="thr" />
       {store.failed && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="thr-failed">
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="thr-failed">
           <p className="t-sub min-w-[12rem] flex-1 break-keep text-warning-700">스레드 기록을 읽지 못했습니다. 적어 둔 글은 이 화면에 그대로 있고, 다시 읽기 전에는 저장하지 않습니다.</p>
           <Button size="sm" variant="secondary" onClick={() => void store.reload()} data-testid="thr-retry">
             <RefreshCw aria-hidden="true" className="size-4" /> 다시 읽기
@@ -474,7 +474,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
       )}
 
       {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
-      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2.5" data-testid="thr-week-hint">
+      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-week-hint">
         <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
           {hotKeys.size ? (
             <>
@@ -496,11 +496,11 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         hint="추천 형식 말고 내가 글 모양(틀)을 직접 고르는 곳이에요. 원하는 반응 → 틀 → 주제 태그 순서로 골라요."
         icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
         summary={`원하는 반응 · 틀 23가지 · 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 남의 글 뼈대`}
-        className="scroll-mt-24 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/40 px-3 py-1 data-[open=1]:pb-4 sm:px-4"
+        className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
         testId="thr-choose"
       >
         {plan && (
-          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-amber-200 bg-amber-50 px-3 py-2.5" data-testid="thr-plan">
+          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-plan">
             <p className="t-sub min-w-[12rem] flex-1 break-keep leading-relaxed text-slate-700">
               <CalendarCheck aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-amber-600" />
               <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · <TplNames keys={plan.picks} />
@@ -532,7 +532,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
               </li>
             ))}
           </ul>
-          <div className="flex flex-col gap-2 rounded-lg border border-violet-200 bg-white/80 p-2.5 sm:p-3" data-testid="thr-all-tpls">
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2.5 sm:p-3" data-testid="thr-all-tpls">
             <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-700">
               <b className="text-slate-900">틀 전부 — 눌러서 바로 골라요</b>
               <span className="text-slate-500">마우스를 올리면 뜻 · 예시{' · '}휴대폰은 누르면 아래 상자에</span>
@@ -567,18 +567,18 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
             </ul>
           </div>
           {tpl && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-white px-3 py-3" data-testid="thr-tpl-detail">
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-tpl-detail">
               <p className="t-body font-bold break-keep text-slate-900">
                 {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
               </p>
               {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 rounded-lg bg-violet-50 px-2.5 py-2 break-keep text-violet-950" data-testid="thr-tpl-plain">
+              <p className="t-sub flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 break-keep text-slate-800" data-testid="thr-tpl-plain">
                 <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
                 <span className="min-w-0">
                   <b>쉽게 말하면</b> {TEMPLATE_EASY[tpl.key].plain}
                 </span>
               </p>
-              <p className="t-sub rounded-lg border border-dashed border-amber-300 bg-amber-50/70 px-2.5 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
+              <p className="t-sub rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
                 <b className="text-amber-800">예시</b>
                 {'\n'}
                 {TEMPLATE_EASY[tpl.key].sample}
@@ -587,7 +587,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                 {tpl.skeleton.map((s, i) => (
                   <li key={s} className="inline-flex items-center gap-1.5">
                     {i > 0 && <span aria-hidden="true" className="text-violet-400">→</span>}
-                    <span className="rounded-md bg-violet-100/70 px-1.5 py-0.5 text-violet-950">{s}</span>
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-900">{s}</span>
                   </li>
                 ))}
               </ol>
@@ -671,7 +671,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
               <input value={draft.selfComment} onChange={(e) => set({ selfComment: e.target.value })} placeholder={isMarketingCustomer() ? '예: 자세한 정리는 프로필 링크에서' : '예: 3분 진단은 프로필 링크에서'} className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-comment" />
             </label>
             {draft.checks.length > 0 && (
-              <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="thr-checks">
+              <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="thr-checks">
                 <p className="t-sub font-semibold text-warning-900">올리기 전 확인할 것(AI 가 적음)</p>
                 <ul className="t-sub list-disc pl-5 break-keep text-warning-900">
                   {draft.checks.map((c) => (
@@ -737,7 +737,7 @@ function TemplateButton({ t, on, hot = false, ctx = '', onClick }: { t: ThreadTe
   const tone = TONES[toneOfTemplate(t, ctx)]
   return (
     <HoverTip block className="h-full" tip={<TipBody title={`${t.key} ${t.name}`} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
-      <button type="button" aria-pressed={on} onClick={onClick} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border-2 px-3 py-2.5 text-left ${on ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`thr-tpl-${t.key}`}>
+      <button type="button" aria-pressed={on} onClick={onClick} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border px-3 py-2.5 text-left ${on ? 'border-brand-500 bg-white ring-2 ring-brand-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`thr-tpl-${t.key}`}>
         <span className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
           <span className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-[0.85rem] font-bold ${tone.solid}`}>{t.key}</span>
           <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{t.name}</span>
@@ -765,7 +765,7 @@ function MiniTemplate({ t, on, rec, hot, ctx, onClick }: { t: ThreadTemplate; on
         type="button"
         aria-pressed={on}
         onClick={onClick}
-        className={`tap t-sub flex h-full min-h-11 w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-left font-semibold break-keep ${on ? 'border-violet-500 bg-violet-100 text-violet-950 ring-2 ring-violet-300' : `${tone.line} bg-white text-slate-800 ${tone.hover}`} ${fits || on ? '' : 'opacity-50 hover:opacity-100'}`}
+        className={`tap t-sub flex h-full min-h-11 w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-left font-semibold break-keep ${on ? 'border-brand-500 bg-white text-brand-700 ring-2 ring-brand-200' : `${tone.line} bg-white text-slate-800 ${tone.hover}`} ${fits || on ? '' : 'opacity-50 hover:opacity-100'}`}
         data-testid={`thr-mini-${t.key}`}
         data-rec={rec ? '1' : '0'}
         data-fits={fits ? '1' : '0'}
@@ -988,7 +988,7 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
                 </p>
               )}
               {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
-              <details className="rounded-(--radius-control) border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2" data-testid="thr-lib-sample">
+              <details className="rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="thr-lib-sample">
                 <summary className="tap t-sub cursor-pointer font-semibold text-amber-900">짧은 예시 보기</summary>
                 <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{TEMPLATE_EASY[t.key].sample}</p>
               </details>

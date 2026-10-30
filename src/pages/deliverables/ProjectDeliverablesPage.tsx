@@ -380,7 +380,7 @@ export function ProjectDeliverablesPage() {
                       </div>
                       <p className="text-[0.9rem] break-keep text-slate-600">{s.headline}</p>
                       {stale && (
-                        <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                        <span className="w-fit rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           출처 원본 변경됨 · 새 버전 검토 필요
                         </span>
                       )}

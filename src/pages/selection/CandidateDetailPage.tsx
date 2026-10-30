@@ -151,7 +151,7 @@ export function CandidateDetailPage() {
       />
 
       {candidate.quadrantExceptionReason && (
-        <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-2.5 text-[0.875rem] break-keep text-warning-800">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-2.5 text-[0.875rem] break-keep text-warning-800">
           분류 예외: {candidate.quadrantExceptionReason}
         </p>
       )}

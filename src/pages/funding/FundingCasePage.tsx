@@ -149,7 +149,7 @@ function CaseContent({ context, projectId }: { context: ProjectFundingContext; p
         {!creatable.ok ? (
           <Panel title="사례 만들기" flush>
             <div className="flex flex-col items-start gap-3 px-5 py-6">
-              <div className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+              <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
                 <p className="text-[0.95rem] break-keep text-warning-800">{creatable.reason}</p>
               </div>

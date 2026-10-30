@@ -134,7 +134,7 @@ export function AnalysisMainPage() {
         <ReanalysisBanner show={context.needsReanalysisFlag} onRun={runAnalysis} />
 
         {/* 의사결정 히어로 */}
-        <section className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/50 p-6 sm:p-7">
+        <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 sm:p-7">
           <h1 className="text-[1.5rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.65rem]">
             {isWebsite ? '홈페이지 제작 준비 상태를 확인했습니다.' : '이 기업에서 먼저 개선할 업무를 비교할 준비가 되었습니다.'}
           </h1>

@@ -446,7 +446,7 @@ export default function AssessmentPage() {
       title="연구소 설립 가능성 체크"
       subtitle="기업 정보와 연구인력 조건을 바탕으로 연구소/전담부서 설립 가능성을 빠르게 검토합니다"
     >
-      {prefillNote && <p className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800" data-testid="lab-prefill-note">{prefillNote}</p>}
+      {prefillNote && <p className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-brand-800" data-testid="lab-prefill-note">{prefillNote}</p>}
       <PageGuide
         id="assessment"
         purpose="기업부설연구소·연구개발전담부서 설립 가능성을 1차 검토합니다."
@@ -710,7 +710,7 @@ export default function AssessmentPage() {
               </div>
 
               {/* 연구과제 추천 프롬프트 */}
-              <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <p className="text-base font-bold text-violet-800">
                   어떤 연구과제로 잡을지 막막하신가요?
                 </p>
@@ -776,7 +776,7 @@ export default function AssessmentPage() {
                     {facilityMet.length ? facilityMet.map((c) => <li key={c.key}>✓ {c.label}</li>) : <li className="text-slate-400">—</li>}
                   </ul>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-sm font-bold text-amber-700">보완 필요 ({facilityGap.length})</p>
                   <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
                     {facilityGap.length ? facilityGap.map((c) => <li key={c.key}>⚠ {c.label}</li>) : <li className="text-status-normal">현재 보완 필요 항목 없음</li>}

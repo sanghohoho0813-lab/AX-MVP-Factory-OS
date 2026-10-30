@@ -106,7 +106,7 @@ export function DesignFeaturesPage() {
         }))
         return (
           <>
-            <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
+            <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
               <p className="flex items-start gap-2 text-[0.92rem] break-keep text-slate-600">
                 <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-500" />
                 1차 MVP는 Must 기능에 집중합니다. 검증되지 않은 기능은 Should/Later로 미루고, 각 기능은 입력·처리·출력으로 정의합니다.

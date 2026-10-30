@@ -95,26 +95,27 @@ export function KeywordHome({
   const topic = cleanTopic(custom)
   const list = (keywords ?? []).slice(0, HOME_MAX)
   return (
-    <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-red-200 bg-white shadow-(--shadow-card)" aria-labelledby="mk-home-title" data-testid="mk-home">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-gradient-to-r from-red-600 to-rose-700 px-4 py-3 text-white">
-        <Flame aria-hidden="true" className="size-6 shrink-0" />
+    <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" aria-labelledby="mk-home-title" data-testid="mk-home">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-3">
+        {/* D-370 빨간 띠 대신 흰 칸 · 제목 글자만 빨강(강조는 글자색 하나) */}
+        <Flame aria-hidden="true" className="size-6 shrink-0 text-red-600" />
         <div className="min-w-0 flex-1 basis-40">
-          <HintTip tip="고정 키워드 다섯은 우리 본업 주제라 늘 그 자리예요(칩 = 기업마당 이번 주 새 공고 수 · 매일 아침 9시). 이번 주 키워드는 경제 · 경영 · AI 벤치마킹 채널에서 최근 2주 동안 여러 곳이 함께 다루고 평소보다 잘된 주제예요(규칙 계산 · 6시간마다 새로). 근거는 화면 아래 [자세히 보기] 에 있어요." label="이번 주 키워드" onDark>
-            <h2 id="mk-home-title" className="t-section text-white">
+          <HintTip tip="고정 키워드 다섯은 우리 본업 주제라 늘 그 자리예요(칩 = 기업마당 이번 주 새 공고 수 · 매일 아침 9시). 이번 주 키워드는 경제 · 경영 · AI 벤치마킹 채널에서 최근 2주 동안 여러 곳이 함께 다루고 평소보다 잘된 주제예요(규칙 계산 · 6시간마다 새로). 근거는 화면 아래 [자세히 보기] 에 있어요." label="이번 주 키워드">
+            <h2 id="mk-home-title" className="t-section text-red-700">
               이번 주 키워드
             </h2>
           </HintTip>
-          <p className="t-sub break-keep text-white/90">{mkText('누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요')}</p>
+          <p className="t-sub break-keep text-slate-600">{mkText('누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요')}</p>
           <ul className="mt-1.5 hidden flex-wrap gap-1.5 sm:flex" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
             {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
-              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">
+              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
                 <f.icon aria-hidden="true" className="size-3.5" />
                 {f.label}
               </li>
             ))}
           </ul>
           {basis && (
-            <p className="t-meta hidden break-keep text-white/80 sm:block" data-testid="mk-basis">
+            <p className="t-meta hidden break-keep text-slate-500 sm:block" data-testid="mk-basis">
               {basis}
             </p>
           )}
@@ -124,7 +125,7 @@ export function KeywordHome({
           onClick={() => setHelp((v) => !v)}
           aria-expanded={help}
           aria-label="사용 방법"
-          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 self-start rounded-(--radius-control) bg-white/15 px-3 font-semibold text-white ring-1 ring-white/30 hover:bg-white/25 sm:self-center"
+          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 self-start rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50 sm:self-center"
           data-testid="mk-howto-toggle"
         >
           <CircleHelp aria-hidden="true" className="size-4" /> <span className="hidden sm:inline">사용 방법</span>
@@ -132,7 +133,7 @@ export function KeywordHome({
       </div>
 
       {help && (
-        <ol className="flex flex-col gap-2 border-b border-red-100 bg-red-50/60 px-4 py-3" data-testid="mk-howto">
+        <ol className="flex flex-col gap-2 border-b border-slate-100 bg-white px-4 py-3" data-testid="mk-howto">
           {HOW_TO.map((h, i) => (
             <li key={h.title} className="flex gap-2.5">
               <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-red-600 font-bold text-white">
@@ -160,7 +161,7 @@ export function KeywordHome({
                   <button
                     type="button"
                     onClick={() => onPick(k.key)}
-                    className="tap flex min-h-14 w-full min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl border-2 border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5 text-left hover:border-emerald-400 hover:bg-emerald-50"
+                    className="tap flex min-h-14 w-full min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-left hover:border-emerald-400 hover:bg-emerald-50"
                     data-testid="mk-fixed-key"
                     data-key={k.key}
                   >

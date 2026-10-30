@@ -138,7 +138,7 @@ export function BigChoices<K extends string>({ items, value, onPick, label, test
         const look = on ? (t ? t.solid : 'border-slate-900 bg-slate-900 text-white') : t ? `${t.line} ${t.soft} text-slate-800 ${t.hover}` : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
         return (
           <HoverTip key={g.key} block tip={g.tip ? <TipBody title={g.label} body={g.tip} /> : null} className="h-full">
-            <button type="button" role="radio" aria-checked={on} onClick={() => onPick(g.key)} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${look}`} data-testid={`${testPrefix}-${g.key}`}>
+            <button type="button" role="radio" aria-checked={on} onClick={() => onPick(g.key)} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3.5 py-2.5 text-left ${look}`} data-testid={`${testPrefix}-${g.key}`}>
               <span className="t-body flex items-center gap-1.5 font-bold break-keep">
                 {Icon && <Icon aria-hidden="true" className={`size-[1.1rem] shrink-0 ${on ? 'text-white' : (t?.icon ?? 'text-slate-500')}`} />}
                 {g.label}
@@ -209,7 +209,7 @@ export function LintList({ lines, testId }: { lines: readonly LintItem[]; testId
         .map((l) => {
           const Icon = l.level === 'bad' ? OctagonAlert : l.level === 'warn' ? TriangleAlert : CheckCircle2
           return (
-            <li key={l.key} data-level={l.level} data-key={l.key} className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) px-2.5 py-1.5 break-keep ${l.level === 'bad' ? 'bg-danger-50 text-danger-800' : l.level === 'warn' ? 'bg-warning-50 text-warning-900' : 'bg-success-50 text-success-800'}`}>
+            <li key={l.key} data-level={l.level} data-key={l.key} className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) px-2.5 py-1.5 break-keep ${l.level === 'bad' ? 'text-danger-700' : l.level === 'warn' ? 'text-warning-800' : 'text-success-700'}`}>
               <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               <span className="min-w-0">{l.text}</span>
             </li>
@@ -283,7 +283,7 @@ export function ShareKit({ testId }: { testId: string }) {
     )
   }
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-brand-200 bg-brand-50/50 px-3 py-3" data-testid={testId}>
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid={testId}>
       <p className="t-body flex items-center gap-1.5 font-bold break-keep text-slate-900">
         <Gift aria-hidden="true" className="size-5 shrink-0 text-brand-700" /> 나눠 줄 자료가 이미 있어요 — {VENTURE_CARDS.title}
       </p>

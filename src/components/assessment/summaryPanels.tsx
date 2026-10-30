@@ -219,7 +219,7 @@ export function WebsiteReadinessSummary({
       {(website.missingContent.length > 0 || website.missingAssets.length > 0) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {website.missingContent.length > 0 && (
-            <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
+            <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
               <p className="text-[0.875rem] font-semibold text-warning-700">부족한 콘텐츠</p>
               <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">
                 {website.missingContent.join(', ')}
@@ -227,7 +227,7 @@ export function WebsiteReadinessSummary({
             </div>
           )}
           {website.missingAssets.length > 0 && (
-            <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
+            <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
               <p className="text-[0.875rem] font-semibold text-warning-700">부족한 이미지·영상 자산</p>
               <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">
                 {website.missingAssets.join(', ')}

@@ -105,7 +105,7 @@ export function InstitutionDetailPage() {
       {staleWarning && (
         <div
           aria-live="polite"
-          className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
+          className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3"
         >
           <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
           <p className="text-[0.875rem] break-keep text-warning-800">확인일·유효기간을 확인해 최신성을 갱신하세요. 실제 조건은 공식 공고에서 확인해야 합니다.</p>

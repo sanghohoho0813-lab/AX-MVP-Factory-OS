@@ -45,7 +45,7 @@ export function ModuleClientFocus({ toolKey }: { toolKey: string }) {
   // 판정에 더 필요한 것과 모듈 서류가 겹치면 한 번만
   const need = [...new Set([...(insight?.missing ?? []), ...missingDocs])]
   return (
-    <section className="no-print flex flex-col gap-2.5 rounded-(--radius-panel) border-2 border-brand-200 bg-white p-3 sm:p-4" data-testid="module-client-focus" data-tone={insight?.tone ?? ''} aria-label={`${name} — ${tool?.label ?? ''}`}>
+    <section className="no-print flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="module-client-focus" data-tone={insight?.tone ?? ''} aria-label={`${name} — ${tool?.label ?? ''}`}>
       <div className="flex flex-wrap items-center gap-2">
         <Building2 aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
         <h2 className="t-section min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">
@@ -68,7 +68,7 @@ export function ModuleClientFocus({ toolKey }: { toolKey: string }) {
         </div>
       )}
       {need.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-amber-200 bg-amber-50/70 px-3 py-2" data-testid="module-client-focus-need">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="module-client-focus-need">
           <FileWarning aria-hidden="true" className="size-4 shrink-0 text-amber-600" />
           <span className="t-sub min-w-[10rem] flex-1 break-keep text-amber-900">
             <b>더 필요한 것</b> · {need.join(' · ')}

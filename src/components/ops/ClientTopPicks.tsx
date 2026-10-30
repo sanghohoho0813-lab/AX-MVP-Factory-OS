@@ -54,7 +54,7 @@ export function TopPicksCard({
   const need = missingForPicks(insights)
   const asks = onPickRequest ? picks.filter((p) => p.request) : []
   return (
-    <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-white px-4 py-4 shadow-sm sm:px-5">
+    <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-4 shadow-sm sm:px-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
         {/* D-192: 설명은 화면에 깔지 않고 ⓘ · 마우스를 올리면 */}

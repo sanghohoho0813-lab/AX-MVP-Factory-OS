@@ -111,7 +111,7 @@ export function CompanyDocSheet({
         </button>
 
         {error && (
-          <p role="alert" className="t-sub flex items-start gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2.5 break-keep text-danger-700">
+          <p role="alert" className="t-sub flex items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 break-keep text-danger-700">
             <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             {error}
           </p>

@@ -29,7 +29,7 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
   }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section className="flex flex-col gap-2.5 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/60 p-3 sm:p-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
+    <section className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-violet-950">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트

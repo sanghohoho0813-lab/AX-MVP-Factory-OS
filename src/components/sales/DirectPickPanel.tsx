@@ -56,7 +56,7 @@ export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; o
       {chosen.length > 0 && (
         <ol className="grid gap-2 lg:grid-cols-2" data-testid="direct-pick-points">
           {chosen.map((s, i) => (
-            <li key={s.name} className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50/40 p-3">
+            <li key={s.name} className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3">
               <span className="t-sub font-bold text-slate-900">{i + 1}. {s.name}</span>
               <span className="t-sub break-keep text-slate-700">{s.why}</span>
               {s.questions.length > 0 && (

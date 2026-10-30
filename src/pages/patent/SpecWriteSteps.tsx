@@ -91,7 +91,7 @@ function ExampleToggle({ open, onToggle, testId }: { open: boolean; onToggle: ()
 
 function ExampleLine({ text, testId }: { text: string; testId: string }) {
   return (
-    <p className="t-sub break-keep rounded-(--radius-control) border border-dashed border-brand-200 bg-brand-50/60 px-2.5 py-1.5 text-slate-700" data-testid={testId}>
+    <p className="t-sub break-keep rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-slate-700" data-testid={testId}>
       <b className="font-semibold text-brand-800">예시</b> {text}
     </p>
   )
@@ -182,7 +182,7 @@ export function IdeaStep({ d, update, flush, act }: { d: SpecDraft; update: Upda
 
       <Card title="권리축 일곱 줄" hint="줄마다 '~하는' 으로 끝나게 쓰면 다음 단계에서 구성요소 · 단계 · 청구항 뼈대가 바로 나옵니다. 마지막 줄(연결관계)이 청구항 1의 중심입니다." testId="spec-axis-card" aside={<ExampleToggle open={axisEx} onToggle={() => setAxisEx((v) => !v)} testId="spec-axis-examples" />}>
         {fixes.length > 1 && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 sm:flex-row sm:items-center" data-testid="spec-axis-fix-banner">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center" data-testid="spec-axis-fix-banner">
             <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">'~하는' 으로 끝나지 않는 줄이 {fixes.length}개 있어요. 이대로면 청구항 문장이 어색해집니다.</p>
             <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={fixAll} data-testid="spec-axis-fix-all">
               <Wand2 aria-hidden="true" className="size-4" /> 한 번에 고치기
@@ -413,7 +413,7 @@ export function FiguresStep({ d, update, flush, issues, onError, act }: { d: Spe
 
 function Suggestion({ text, onUse, onDrop, testId }: { text: string; onUse: () => void; onDrop: () => void; testId: string }) {
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2" data-testid={testId}>
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid={testId}>
       <p className="t-sub font-semibold text-brand-900">AI 새 안 — 고치신 글은 그대로 두었습니다</p>
       <Disclosure title="새 안 보기">
         <p className="t-sub whitespace-pre-wrap break-keep text-slate-800">{text}</p>

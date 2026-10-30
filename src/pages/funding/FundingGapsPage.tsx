@@ -158,7 +158,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
                     </td>
                     <td className="px-3 py-2.5">
                       {e.sensitive && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.875rem] font-medium text-danger-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-danger-700">
                           <Lock aria-hidden="true" className="size-3" />
                           민감정보
                         </span>

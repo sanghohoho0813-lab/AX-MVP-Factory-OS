@@ -249,7 +249,7 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
   if (embedded && bucket.rows === null)
     return bucket.error ? (
       // D-225 못 읽으면 '불러오는 중…' 에서 멈추지 않고 알린다
-      <div role="alert" data-testid="cretop-load-error" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
+      <div role="alert" data-testid="cretop-load-error" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
         <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">크레탑 분석 기록을 읽지 못했습니다. 저장해 둔 분석은 그대로 있습니다.</p>
         <Button variant="secondary" size="sm" onClick={() => void bucket.reload()}>
           다시 읽기

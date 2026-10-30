@@ -121,7 +121,7 @@ export function ContractCard({
           {s.moneyText !== '' && <p className="t-body mt-2 font-semibold text-slate-800">{s.moneyText}</p>}
           {c.note.trim() !== '' && <p className="t-sub mt-1 break-keep text-slate-600">{c.note}</p>}
           {gap && (
-            <div data-testid="contract-gap" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2">
+            <div data-testid="contract-gap" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
               <span className="t-sub break-keep text-slate-800">
                 {gap.gap > 0 ? (
                   <>

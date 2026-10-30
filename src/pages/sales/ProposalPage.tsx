@@ -93,7 +93,7 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
   return (
     <div className="flex flex-col gap-3" data-testid="catalog">
       {/* D-167: 처음 들어 있는 가격은 임의로 넣어 둔 기본값 — 우리 가격으로 고쳐 쓰도록 맨 위에 알린다 */}
-      <p data-testid="catalog-default-note" className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3.5 py-2.5 text-warning-800">
+      <p data-testid="catalog-default-note" className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-warning-800">
         <b>가격은 처음 넣어 둔 기본값(임의 예시)입니다.</b> 우리 회사 가격으로 고쳐 쓰세요 — 가격을 누르면 고칠 수 있습니다. 금액은 기본이 <b>보험(월납)</b>이고, 수수료인 상품은 <b>수수료</b>를 누르세요.
       </p>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="상품 분류">
@@ -702,7 +702,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
           {error}
         </p>
       )}
@@ -730,7 +730,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
             </select>
           </label>
           {!record && clientId !== '' && (
-            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 break-keep text-slate-800">
+            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 break-keep text-slate-800">
               이 업체를 찾을 수 없습니다 — 보관했거나 지운 업체일 수 있습니다. 위 칸에서 다른 업체를 골라 주세요.
             </p>
           )}

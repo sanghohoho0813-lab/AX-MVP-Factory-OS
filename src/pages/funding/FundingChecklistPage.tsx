@@ -520,7 +520,7 @@ function ChecklistView({
 
       <div
         role="note"
-        className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
+        className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3"
       >
         <span aria-hidden="true" className="mt-0.5 text-warning-600">
           ⚠

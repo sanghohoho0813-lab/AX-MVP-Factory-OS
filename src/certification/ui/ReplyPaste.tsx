@@ -91,7 +91,7 @@ export function ReplyPaste({
     )
 
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-3 py-3" data-testid={testId}>
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid={testId}>
       <p className="t-sub break-keep text-slate-800">
         <b className="font-semibold">대표님 카톡 답장을 통째로 붙여 넣으세요.</b> 번호(1. 2.)대로 답하셨으면 질문마다 나눠 담고, 저장 전에 어디로 가는지 보여 드려요.
       </p>

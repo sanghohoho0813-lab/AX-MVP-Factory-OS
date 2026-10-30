@@ -130,7 +130,7 @@ export function ClientAdvisor({
                           onClick={() => ask(qq.id, qq.label)}
                           data-testid="advisor-q"
                           data-q={qq.id}
-                          className="tap t-sub w-full rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-left font-semibold break-keep text-brand-800 hover:border-brand-300 hover:bg-brand-50"
+                          className="tap t-sub w-full rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left font-semibold break-keep text-brand-800 hover:border-brand-300 hover:bg-brand-50"
                         >
                           {qq.label}
                         </button>

@@ -490,7 +490,7 @@ export function SpecAiBoard({
             )}
           </p>
           {thin && phase !== 'company' && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-board-thin">
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-board-thin">
               <p className="t-sub min-w-0 flex-1 break-keep text-warning-900">
                 <TriangleAlert aria-hidden="true" className="mr-1 inline size-4 align-[-2px]" />
                 <b className="font-semibold">AI 가 읽을 회사 이야기가 거의 없어요</b> — 업종 · 종목 · 상담 메모 · 자료가 비어 있어, 이대로 쓰면 업종 일반으로 지어낸 발명이 됩니다. 회사 소개서 · 제품 설명 · GPT 와 나눈 대화를 먼저 넣어 주세요(.hwpx · .hwp · .docx · .pdf).
@@ -503,7 +503,7 @@ export function SpecAiBoard({
           {(d.judge.full ?? d.judge.parts) && phase !== 'ideas' && <JudgeReportView report={d.judge.full ?? d.judge.parts} title={d.judge.full ? '자체점검 ② 명세서 전체' : '자체점검 ① 구성 · 권리축'} testId="spec-judge" />}
 
           {phase === 'company' && (
-            <div className="flex flex-col gap-2.5 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-3 py-3" data-testid="spec-gate-company">
+            <div className="flex flex-col gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="spec-gate-company">
               <p className="t-sub break-keep text-warning-900">
                 <b className="font-semibold">AI 가 읽을 회사 이야기가 없어요.</b> 이대로 아이디어를 내면 어느 회사에나 맞는 지어낸 발명이 됩니다. 아래 둘 중 하나만 있으면 바로 시작해요.
               </p>
@@ -705,7 +705,7 @@ export function SpecAiBoard({
           <p className="t-meta break-keep text-slate-500">절차마다 단추로 넘어갑니다 · 직접 고치신 글은 덮지 않고 새 안으로 둡니다 · 이 내용이 고른 AI 회사로 갑니다(출원 전 발명).</p>
 
           {stagesShown.length > 0 && (
-            <ol className="flex flex-col gap-1 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2" data-testid="spec-board-rows" aria-live="polite">
+            <ol className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="spec-board-rows" aria-live="polite">
               {stagesShown.map((k) => {
                 const r = run.stages[k]!
                 return (
@@ -721,7 +721,7 @@ export function SpecAiBoard({
             </ol>
           )}
           {run.asks.length > 0 && (
-            <div className="flex flex-col gap-1 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="spec-board-asks">
+            <div className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="spec-board-asks">
               <p className="t-sub font-semibold text-warning-900">AI 가 확인해 달라는 점</p>
               <ul className="flex flex-col gap-0.5">
                 {run.asks.map((a) => (
@@ -855,7 +855,7 @@ function CardBody({ card, d, onPick, errs }: { card: AgentCard; d: SpecDraft; on
       return (
         <div className="flex flex-col gap-2">
           {d.title.trim() ? (
-            <div className="rounded-(--radius-control) border border-violet-300 bg-violet-50 px-3 py-2" data-testid="spec-board-title">
+            <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="spec-board-title">
               <p className="t-meta font-semibold text-violet-800">
                 {d.ideas[0]?.title === d.title && <span className="mr-1 rounded-full bg-violet-600 px-1.5 py-0.5 font-bold text-white">추천</span>}
                 지금 쓰는 아이디어

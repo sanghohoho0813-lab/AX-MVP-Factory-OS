@@ -68,7 +68,7 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
                 setKind(k)
                 setMore(false)
               }}
-              className={`tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-rose-600 bg-rose-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300'}`}
+              className={`tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`}
               data-testid="mk-allmade-kind"
               data-kind={k}
             >

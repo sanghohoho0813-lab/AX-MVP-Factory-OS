@@ -136,7 +136,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
             </span>
             {warnCount > 0 && <span className="font-semibold text-danger-700">고칠 것 {warnCount}</span>}
           </p>
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="vplan-next">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="vplan-next">
             <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
               <b className="font-semibold">지금 할 것</b> · {next.text}
             </p>
@@ -417,7 +417,7 @@ function FieldCard({ f, s, issues, save, ai }: { f: VPlanField; s: VPlanState; i
         )}
 
         {sug && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 py-2" data-testid="vplan-suggestion">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="vplan-suggestion">
             <div className="flex flex-wrap items-center gap-2">
               <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">AI 새 안이 있습니다 — 고치신 글은 그대로 두었어요.</p>
               <Button variant="ghost" size="sm" onClick={() => setSugOpen((v) => !v)} aria-expanded={sugOpen} data-testid="vplan-suggestion-open">
@@ -581,7 +581,7 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
               )}
             </div>
             {mine.length > 0 && (
-              <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-2" data-testid="vplan-spec-drafts">
+              <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="vplan-spec-drafts">
                 <p className="t-sub break-keep font-semibold text-slate-800">이 회사 명세서 {mine.length}건 — 파일 없이 바로 가져오기</p>
                 <ul className="flex flex-col gap-1.5">
                   {mine.slice(0, 3).map((m) => (

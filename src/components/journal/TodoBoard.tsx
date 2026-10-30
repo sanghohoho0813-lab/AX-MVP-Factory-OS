@@ -175,8 +175,8 @@ export function TodoRow({
         entry.completed
           ? 'border-slate-200 bg-white'
           : overdue
-            ? 'border-danger-200 bg-danger-50/50'
-            : 'border-brand-200 bg-white'
+            ? 'border-slate-200 bg-white' // D-370 밀린 것도 흰 칸 — '55일 지남' 빨간 글자로 알린다
+            : 'border-slate-200 bg-white'
       }`}
     >
       <button
@@ -418,7 +418,7 @@ export function TodoActionSheet({
           </div>
           {/* 지울지 묻는 칸은 [지우기] 바로 아래 — 기한 칸 밑으로 밀려나지 않게 */}
           {confirmDelete && (
-            <div role="alertdialog" aria-label="할 일 삭제 확인" data-testid="todo-delete-confirm" className="mt-1 flex flex-col gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-3">
+            <div role="alertdialog" aria-label="할 일 삭제 확인" data-testid="todo-delete-confirm" className="mt-1 flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3">
               <p className="t-body font-semibold break-keep text-danger-800">이 할 일을 지울까요? 되돌릴 수 없습니다.</p>
               <div className="flex gap-2">
                 <Button variant="danger" onClick={() => onPick('delete')}>

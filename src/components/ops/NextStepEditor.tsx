@@ -91,7 +91,7 @@ export function NextStepEditor({
 
   const firstMeeting = suggestsFirstMeeting(record, text, date)
   return (
-    <div data-testid="next-step" data-open="1" className="flex flex-col gap-3 rounded-(--radius-control) border border-brand-200 bg-brand-50/40 p-3.5">
+    <div data-testid="next-step" data-open="1" className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3.5">
       <p className="t-sub inline-flex items-center gap-2 font-semibold text-slate-800">
         <CalendarClock aria-hidden="true" className="size-5 text-brand-600" />
         {label} 정하기

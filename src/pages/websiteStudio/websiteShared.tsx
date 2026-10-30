@@ -93,7 +93,7 @@ export function WebsiteGateNotice({ context }: { context: ProjectWebsiteContext 
 export function ReadinessNotice({ show }: { show: boolean }) {
   if (!show) return null
   return (
-    <div className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+    <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
       <p className="text-[0.95rem] break-keep text-warning-800">
         홈페이지 준비도 분석을 먼저 확정하면 더 정확한 설계를 만들 수 있습니다. 지금은 기본 가정으로 초안을 생성합니다.
@@ -105,7 +105,7 @@ export function ReadinessNotice({ show }: { show: boolean }) {
 export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => void }) {
   if (!show) return null
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
       <p className="min-w-0 flex-1 text-[0.95rem] break-keep text-warning-800">
         홈페이지 진단 결과가 변경되어 재설계가 필요합니다. 확정된 설계는 그대로 보존됩니다.

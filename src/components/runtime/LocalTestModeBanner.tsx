@@ -13,7 +13,7 @@ export function LocalTestModeBanner({ compact = false }: LocalTestModeBannerProp
   return (
     <div
       role="note"
-      className={`flex items-start gap-2.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 ${
+      className={`flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-4 ${
         compact ? 'py-2' : 'py-3'
       } text-warning-800`}
     >

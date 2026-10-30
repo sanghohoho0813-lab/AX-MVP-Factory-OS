@@ -89,7 +89,7 @@ export function SelfCheckFlow({ rule, items, ctx, answers, onAnswer, onDone }: {
         <h3 className="t-section font-bold break-keep text-slate-900">{r.item.question}</h3>
         <p className="t-body break-keep text-slate-700">{r.item.plain}</p>
         {r.suggested && r.because && (
-          <p className="t-sub rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 break-keep text-brand-900" data-testid="selfcheck-suggest">
+          <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-brand-900" data-testid="selfcheck-suggest">
             기록으로 미리 골랐어요: <b className="font-semibold">{ANSWER_LABEL[r.answer]}</b> — {r.because}
           </p>
         )}
@@ -185,7 +185,7 @@ export function InspectionFlow({ qs, ctx, labelOf, prep, onPrep }: { qs: Inspect
             </p>
           </div>
         ) : (
-          <p className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-800" data-testid="inspection-owner">
+          <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-800" data-testid="inspection-owner">
             기록에 근거가 없어 초안을 만들지 않았습니다 — 대표 확인 필요
           </p>
         )}

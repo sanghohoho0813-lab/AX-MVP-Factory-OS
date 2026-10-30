@@ -145,7 +145,7 @@ function FeeLine({
           </button>
         </div>
       ) : (
-        <div role="alertdialog" aria-label={confirm === 'in' ? '입금 확인' : '입금 되돌리기'} className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="fee-confirm">
+        <div role="alertdialog" aria-label={confirm === 'in' ? '입금 확인' : '입금 되돌리기'} className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="fee-confirm">
           <span className="t-body min-w-0 break-keep font-semibold text-slate-900">
             {confirm === 'in' ? `오늘(${md(today)}) ${fee.amount === null ? '' : `${formatKrw(fee.amount)} `}입금으로 처리할까요?` : '입금 표시를 지울까요? (아직 안 들어온 돈이 됩니다)'}
           </span>
@@ -351,7 +351,7 @@ export function FeesPanel({
       </div>
 
       {empty ? (
-        <div className="flex flex-col items-start gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5" data-testid="plan-empty">
+        <div className="flex flex-col items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5" data-testid="plan-empty">
           <p className="t-body break-keep text-slate-800">
             <b>얼마짜리 계약 → 지금 얼마 받음 → 나머지는 언제</b> 세 가지만 고르면 수금 계획이 만들어집니다.
           </p>
@@ -362,7 +362,7 @@ export function FeesPanel({
       ) : (
         <>
           {m.unplanned > 0 && (
-            <div data-testid="plan-gap" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3">
+            <div data-testid="plan-gap" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3">
               <span className="t-body break-keep text-slate-800">
                 계약금액 {formatKrw(m.contract)} 중 <b className="text-warning-800">{formatKrw(m.unplanned)}</b>은 아직 언제 받을지 정하지 않았습니다.
               </span>

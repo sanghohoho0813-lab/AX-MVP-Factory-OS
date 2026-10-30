@@ -181,7 +181,7 @@ export function PromptsTab({ focus }: { focus?: string }) {
           </Button>
         </div>
         {saved && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
             <span className="t-sub text-success-700">꾸러미를 기록했습니다 ({formatDateTime(saved.createdAt)}). 결과가 오면:</span>
             <Button size="sm" variant="primary" onClick={() => setImportFor(saved)}>
               <Inbox aria-hidden="true" className="size-4" /> 결과 들여오기

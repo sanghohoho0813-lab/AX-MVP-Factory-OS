@@ -56,11 +56,11 @@ function EvidenceTable({ pkg }: { pkg: DeliverablePackage }) {
               </td>
               <td className="px-2.5 py-2 whitespace-nowrap">
                 {item.verified ? (
-                  <span className="inline-flex items-center rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.875rem] font-medium text-success-700">
+                  <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-success-700">
                     확인
                   </span>
                 ) : (
-                  <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                  <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                     확인 필요
                   </span>
                 )}

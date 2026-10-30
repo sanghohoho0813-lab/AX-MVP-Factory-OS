@@ -451,7 +451,7 @@ export function CompanyProfileCard({
                         data-testid="profile-move-builtin"
                         title="기본 칸으로 옮기면 지원사업 · 정책자금 · 서류 화면도 이 값을 읽어요"
                         aria-label={`${f.label} 기본 칸으로 옮기기`}
-                        className="tap shrink-0 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-700 hover:border-brand-400"
+                        className="tap shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-1.5 py-0.5 font-semibold text-brand-700 hover:border-brand-400"
                       >
                         기본 칸으로 옮기기
                       </button>
@@ -489,7 +489,7 @@ export function CompanyProfileCard({
           )}
           {onCustomField && (
             addingGroup === g.group ? (
-              <div className="mt-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3">
+              <div className="mt-2 rounded-(--radius-card) border border-slate-200 bg-white p-3">
                 <p className="t-sub font-semibold text-slate-700">{g.label}에 칸 만들기</p>
                 <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
                   <input
@@ -692,7 +692,7 @@ export function NotesSection({
               {/* D-122: 아이콘만 두지 않는다 — 글자 · 누르기 쉬운 크기 · 삭제는 한 번 더 묻기 */}
               {editingId !== n.id && (
                 deletingId === n.id ? (
-                  <div role="alertdialog" aria-label="메모 삭제 확인" className="mt-2 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2">
+                  <div role="alertdialog" aria-label="메모 삭제 확인" className="mt-2 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
                     <span className="t-sub font-semibold text-danger-800">이 메모를 지울까요?</span>
                     <Button variant="danger" size="sm" onClick={() => { setDeletingId(null); void onDelete(n.id) }}>
                       네, 지웁니다

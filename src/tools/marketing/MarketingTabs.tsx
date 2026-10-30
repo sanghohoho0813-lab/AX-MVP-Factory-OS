@@ -43,13 +43,13 @@ const TOOLS: Array<Item & { to: string; on: string }> = [
   { key: 'homepage', label: '홈페이지 만들기', short: '홈페이지', icon: slotIcon('mk-homepage', Globe), to: '/tools/homepage', on: 'from-emerald-700 to-teal-700' },
 ]
 
-const cls = (on: boolean, grad = 'from-red-600 to-rose-700') =>
+const cls = (on: boolean) =>
   // 휴대폰: 아이콘 위 · 글자 아래(3칸 × 3줄 — D-273 스레드 · 릴스 · 틱톡이 늘어 9칸. 칸이 좁아도 글자가 잘리지 않게, 넘치면 줄바꿈) / sm 이상: 한 줄
-  `tap t-sub inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 py-1.5 text-center leading-tight font-semibold break-keep sm:min-w-max sm:flex-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 sm:whitespace-nowrap ${on ? `bg-gradient-to-r ${grad} text-white shadow-(--shadow-card)` : 'text-slate-600 hover:bg-white/70'}`
+  `tap t-sub inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 py-1.5 text-center leading-tight font-semibold break-keep sm:min-w-max sm:flex-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 sm:whitespace-nowrap ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-slate-600 hover:bg-slate-50'}`
 
 /** D-282 만들기 칸 — 흰 칸 + 형식 색 아이콘. 지금 화면이면 테두리 강조 */
 const makeCls = (on: boolean) =>
-  `tap t-sub flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-(--radius-control) border px-1.5 py-1.5 leading-tight font-semibold break-keep sm:flex-row sm:justify-start sm:gap-2 sm:px-2.5 ${on ? 'border-rose-400 bg-white text-slate-900 ring-2 ring-rose-100' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300'}`
+  `tap t-sub flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-(--radius-control) border px-1.5 py-1.5 leading-tight font-semibold break-keep sm:flex-row sm:justify-start sm:gap-2 sm:px-2.5 ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`
 
 function Label({ it }: { it: Item }) {
   const Icon = it.icon
@@ -88,7 +88,7 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
     <nav aria-label="마케팅 · 브랜딩 목차" className="flex flex-col gap-2" data-testid="mk-tabs">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
         <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">콘텐츠 레이더</span>
-        <div className="grid min-w-0 flex-1 grid-cols-5 gap-1 rounded-(--radius-control) border border-rose-100 bg-rose-50/60 p-1 sm:flex sm:flex-wrap">
+        <div className="grid min-w-0 flex-1 grid-cols-5 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:flex sm:flex-wrap">
           {RADAR_VIEWS.map((it) =>
             onRadar ? (
               <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={cls(active === it.key)}>

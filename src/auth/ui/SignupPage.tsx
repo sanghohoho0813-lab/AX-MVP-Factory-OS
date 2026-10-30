@@ -66,7 +66,7 @@ export function SignupPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               to="/login"
-              className="inline-flex h-9 items-center rounded-(--radius-control) border border-brand-300 bg-brand-50 px-3 text-[0.92rem] font-semibold text-brand-700 hover:bg-brand-100"
+              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-semibold text-brand-700 hover:bg-brand-100"
             >
               로그인하러 가기
             </Link>

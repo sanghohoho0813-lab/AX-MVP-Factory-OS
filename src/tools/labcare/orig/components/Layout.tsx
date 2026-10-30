@@ -11,7 +11,7 @@ function UnsavedNote() {
   const [busy, setBusy] = useState(false)
   if (n === 0) return null
   return (
-    <div role="alert" data-testid="lab-unsaved" className="print-hide flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+    <div role="alert" data-testid="lab-unsaved" className="print-hide flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-amber-900">
       <span className="min-w-0 flex-1 break-keep">저장하지 못한 기록이 있어요. 적은 내용은 이 화면에 그대로 있고, 조금 뒤 다시 저장합니다. 이 창을 닫지 마세요.</span>
       <button
         type="button"

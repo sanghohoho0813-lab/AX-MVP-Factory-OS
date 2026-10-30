@@ -138,7 +138,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
       {error && (
-        <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-danger-700">
+        <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-danger-700">
           {error}
         </p>
       )}

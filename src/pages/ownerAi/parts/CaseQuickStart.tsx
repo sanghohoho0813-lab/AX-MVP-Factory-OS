@@ -118,7 +118,7 @@ export function CaseQuickStart({
           <p className="t-sub break-keep text-slate-600">사업자등록증 · 크레탑 보고서 · 등기부등본(PDF · 사진)을 넣으면 업체명 · 사업자번호 · 대표자를 읽어 바로 만들어요. 읽은 글은 자료로 같이 들어갑니다(주민번호 · 계좌 · 휴대폰은 지움).</p>
           <NewClientDocDrop key={dropKey} onChange={setRead} title="서류만 넣으면 업체가 만들어집니다" hint="사업자등록증 · 크레탑 보고서 · 등기부등본 — 읽은 글은 이 작업실 '자료' 로 들어갑니다" />
           {readDone && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-3" data-testid="case-quick-found">
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="case-quick-found">
               {companyName ? (
                 <>
                   <p className="t-body font-semibold break-keep text-slate-900">
@@ -127,7 +127,7 @@ export function CaseQuickStart({
                     {bizNo && <span className="t-sub font-normal text-slate-600 tabular-nums"> · {bizNo}</span>}
                   </p>
                   {bizChoices.length > 0 && !pickedBiz && (
-                    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-warning-300 bg-warning-50 px-2.5 py-2" data-testid="case-quick-biz-choices">
+                    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2" data-testid="case-quick-biz-choices">
                       <span className="t-meta break-keep text-warning-900">{g.businessNumber?.note || '사업자번호를 확실히 못 읽었어요 — 서류를 보고 맞는 것을 눌러 주세요'}</span>
                       <span className="flex flex-wrap gap-1.5">
                         {bizChoices.map((v) => (

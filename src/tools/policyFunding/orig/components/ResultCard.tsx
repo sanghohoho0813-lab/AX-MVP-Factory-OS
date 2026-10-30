@@ -207,7 +207,7 @@ export default function ResultCard({
 
       {/* 김팀장 AI 한마디 (10차) */}
       {result.coachMessage && (
-        <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg">
             🧭
           </span>
@@ -252,7 +252,7 @@ export default function ResultCard({
                 </p>
               )}
               <div className="mt-3 grid gap-3 @min-[640px]:grid-cols-2">
-                <div className="rounded-lg border border-green-100 bg-green-50/50 p-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-bold text-green-700">👍 좋은 이유</p>
                   <ul className="mt-1.5 space-y-1 text-sm text-slate-700">
                     {a.reasons.map((r) => (
@@ -263,7 +263,7 @@ export default function ResultCard({
                     ))}
                   </ul>
                 </div>
-                <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-bold text-amber-700">⚠ 주의</p>
                   <ul className="mt-1.5 space-y-1 text-sm text-slate-700">
                     {a.cautions.map((c) => (
@@ -354,7 +354,7 @@ export default function ResultCard({
             {result.summary.coreStrategy}
           </p>
         </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-xs font-semibold text-amber-700">가장 큰 리스크</p>
           <p className="mt-1.5 text-sm font-medium leading-6 text-amber-900">
             {result.summary.biggestRisk}
@@ -387,7 +387,7 @@ export default function ResultCard({
       {/* 김팀장 실전 코치 인사이트 */}
       <Card title="김팀장 실전 코치 인사이트" emoji="🧭">
         <div className="grid gap-4 @min-[640px]:grid-cols-2">
-          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-sm font-bold text-blue-900">✅ 가장 먼저 확인할 것</p>
             <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
               {result.coachInsight.firstChecks.map((t) => (
@@ -398,7 +398,7 @@ export default function ResultCard({
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-sm font-bold text-amber-900">⚠️ 리스크</p>
             <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
               {result.coachInsight.risks.map((t) => (
@@ -409,7 +409,7 @@ export default function ResultCard({
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-green-100 bg-green-50/50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-sm font-bold text-green-900">🎯 상담 전략</p>
             <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
               {result.coachInsight.strategies.map((t) => (
@@ -420,7 +420,7 @@ export default function ResultCard({
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-red-100 bg-red-50/50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-sm font-bold text-red-900">🚫 절대 약속하면 안 되는 것</p>
             <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
               {result.coachInsight.neverPromise.map((t) => (
@@ -514,7 +514,7 @@ export default function ResultCard({
       <Card title="업셀링 추천" emoji="📈">
         <div className="grid gap-3 @min-[640px]:grid-cols-2">
           {result.upsells.map((u) => (
-            <div key={u.title} className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div key={u.title} className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-sm font-bold text-blue-900">{u.title}</p>
               <p className="mt-1 text-sm leading-6 text-slate-600">{u.desc}</p>
             </div>
@@ -569,7 +569,7 @@ export default function ResultCard({
             ))}
           </div>
           {result.planScore.weakPoints.length > 0 && (
-            <div className="mt-4 rounded-xl border border-red-100 bg-red-50/50 p-4">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs font-bold text-red-700">
                 ⚠ 보완이 필요한 부분
               </p>

@@ -225,7 +225,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
       </div>
 
       {target && targetMismatch && c && (
-        <p role="alert" data-testid="intake-target-mismatch" className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-2.5 text-danger-700">
+        <p role="alert" data-testid="intake-target-mismatch" className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5 text-danger-700">
           <Building2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           <span className="min-w-0">
             이 보고서는 <strong className="font-semibold">{c.name || '회사 이름 없음'}{c.bizNo ? ` (${c.bizNo})` : ''}</strong> 것입니다 — <strong className="font-semibold">{target.companyName}</strong> 에는 채우지 않습니다. 아래에서 보고서 회사로 등록합니다.
@@ -233,7 +233,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
         </p>
       )}
       {target && !targetMismatch && (
-        <p data-testid="intake-target" className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-2.5 text-brand-800">
+        <p data-testid="intake-target" className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5 text-brand-800">
           <Building2 aria-hidden="true" className="size-4" />
           <strong className="font-semibold">{target.companyName}</strong> 에 붙입니다 — 빈 칸만 채우고, 적어 둔 값은 그대로 둡니다.
         </p>
@@ -263,7 +263,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                 e.preventDefault()
                 void onPick(e.dataTransfer.files?.[0])
               }}
-              className="flex cursor-pointer flex-col items-center gap-2 rounded-(--radius-control) border-2 border-dashed border-brand-200 bg-brand-50/40 px-4 py-8 text-center hover:bg-brand-50"
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 py-8 text-center hover:bg-brand-50"
             >
               <FileUp aria-hidden="true" className="size-7 text-brand-500" />
               <span className="t-body font-semibold text-brand-700">{busy ? status || '읽는 중…' : '크레탑 PDF 고르기'}</span>
@@ -286,7 +286,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
             </>
           )}
           {err && (
-            <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-danger-700">
+            <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
               {err}
             </p>
           )}
@@ -297,12 +297,12 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
           <>
             {/* 같은 업체 */}
             {sameNameOther && (
-              <p data-testid="intake-same-name" className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-slate-800">
+              <p data-testid="intake-same-name" className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5 text-slate-800">
                 이름이 같은 업체 <strong className="font-semibold">{sameNameOther.companyName}</strong> 가 있지만 사업자번호가 달라 붙이지 않습니다 — 새 잠재고객으로 등록합니다.
               </p>
             )}
             {match && (!target || targetMismatch) && (
-              <section data-testid="intake-match" className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3">
+              <section data-testid="intake-match" className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3">
                 <p className="t-sub flex flex-wrap items-center gap-2 text-slate-800">
                   이미 고객 관리에 있는 업체입니다 — <strong className="font-semibold">{match.companyName}</strong>
                   <StageBadge stage={salesStageOf(match)} />

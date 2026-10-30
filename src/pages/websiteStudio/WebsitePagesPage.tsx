@@ -26,7 +26,7 @@ function PagesBody({ design }: { design: WebsiteDesign }) {
   const pages = design.pages.filter((p) => p.status !== 'excluded').sort((a, b) => a.orderIndex - b.orderIndex)
   return (
     <>
-      <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
+      <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
         <p className="text-[0.9rem] break-keep text-slate-600">각 페이지의 섹션 구조·순서·목적·준비상태를 정리합니다. 복잡한 빌더가 아니라 블록 구조를 정리하는 도구입니다.</p>
       </div>
       {pages.map((p) => <PageCard key={p.id} design={design} page={p} onToast={showToast} />)}

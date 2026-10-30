@@ -25,7 +25,7 @@ export function StorageFullNotice() {
 
   if (!full) return null
   return (
-    <div role="alert" data-testid="storage-full" className="no-print mb-4 flex items-start gap-3 rounded-(--radius-panel) border border-rose-200 bg-rose-50 px-4 py-3">
+    <div role="alert" data-testid="storage-full" className="no-print mb-4 flex items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
       <HardDrive aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-rose-600" />
       <div className="min-w-0 flex-1">
         <p className="t-sub font-bold text-rose-800">브라우저 저장 공간이 가득 차 방금 적은 것을 저장하지 못했습니다</p>

@@ -28,7 +28,7 @@ export function PromptResultPanel({ pkg, onCopied }: { pkg: ConsultingPromptPack
   }
 
   return (
-    <section className="rounded-(--radius-panel) border border-success-200 bg-success-50/40 p-5">
+    <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5">
       <p className="t-card break-keep text-slate-900">프롬프트가 만들어졌습니다</p>
       <p className="t-sub mt-1 break-keep text-slate-700">
         {pkg.title} · {pkg.prompt.length.toLocaleString()}자

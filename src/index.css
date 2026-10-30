@@ -19,6 +19,9 @@
   --color-brand-50: #eff6ff;
   --color-brand-100: #dbeafe;
   --color-brand-200: #bfdbfe;
+  /* D-370 300 · 400 은 없어서 'border-brand-400' 같은 칸 테두리가 검게 나왔다 — 이웃 칸을 따라간다(테마를 바꿔도 같이) */
+  --color-brand-300: var(--color-brand-200);
+  --color-brand-400: var(--color-brand-500);
   --color-brand-500: #3b82f6;
   --color-brand-600: #2563eb;
   --color-brand-700: #1d4ed8;

@@ -386,12 +386,12 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
                         {OUTCOME_METRIC_TYPE_META[metric.type].label}
                       </span>
                       {metric.verified ? (
-                        <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">검증됨</span>
+                        <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">검증됨</span>
                       ) : (
                         <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">미검증</span>
                       )}
                       {metric.sensitive && (
-                        <span className="rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">민감정보</span>
+                        <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">민감정보</span>
                       )}
                     </div>
                     {metric.outcomeId && (
@@ -635,7 +635,7 @@ function InternalPerformanceSection({ strategy, readOnly }: { strategy: FundingS
         <ChevronDown aria-hidden="true" className="size-4 text-slate-400 transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-slate-100 px-5 py-5">
-        <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.875rem] break-keep text-warning-700">
+        <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] break-keep text-warning-700">
           금액(외부 투입비·수임료 등)은 민감정보이며 고객용 자료에서 자동으로 가려집니다. 메인 화면에서는 강조하지 않습니다.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

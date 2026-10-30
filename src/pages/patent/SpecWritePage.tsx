@@ -268,7 +268,7 @@ function VentureSend({ title, md }: { title: string; md: string }) {
         <b className="font-semibold">{cert.clientName || '이 회사'}</b> 벤처 사업계획서의 '재료 · 특허 명세서' 칸에 이 명세서 요약(명칭 · 과제 · 해결 수단 · 효과 · 독립 청구항 · 구성요소)을 넣습니다.
       </p>
       {ask ? (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" role="alertdialog" data-testid="spec-venture-ask">
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" role="alertdialog" data-testid="spec-venture-ask">
           <p className="t-sub break-keep font-semibold text-warning-900">사업계획서 재료에 이미 다른 특허 글이 있습니다. 이 명세서로 바꿀까요?</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" size="sm" onClick={() => void send()} data-testid="spec-venture-yes">
@@ -715,7 +715,7 @@ function SpecEditor({
             </div>
           )}
           {!boardView && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-next">
+          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="spec-next">
             <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
               <b className="font-semibold">지금 할 것</b> · {next.text}
             </p>
@@ -951,7 +951,7 @@ export function SpecWritePage() {
   let body
   if (bucket.error) {
     body = (
-      <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center" data-testid="spec-load-error">
+      <div role="alert" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="spec-load-error">
         <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">명세서 기록을 읽지 못했습니다. 저장해 둔 기록은 그대로 있습니다.</p>
         <Button variant="secondary" size="sm" onClick={() => void bucket.reload()}>
           다시 읽기

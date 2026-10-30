@@ -18,7 +18,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
         <ComparisonStatusBadge status={item.status} />
         <ComparisonImportanceBadge importance={item.importance} />
         {item.requiresInterview && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+          <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
             <MessageCircleQuestion aria-hidden="true" className="size-3" />
             인터뷰 필요
           </span>

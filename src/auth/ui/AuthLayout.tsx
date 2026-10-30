@@ -80,7 +80,7 @@ export function AuthError({ message }: { message: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-(--radius-control) border border-danger-200 bg-danger-50/70 px-3 py-2 text-[13px] break-keep text-danger-700"
+      className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[13px] break-keep text-danger-700"
     >
       {message}
     </p>
@@ -90,7 +90,7 @@ export function AuthError({ message }: { message: string | null }) {
 export function AuthNotice({ message }: { message: string | null }) {
   if (!message) return null
   return (
-    <p className="rounded-(--radius-control) border border-success-200 bg-success-50/70 px-3 py-2 text-[13px] break-keep text-success-700">
+    <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[13px] break-keep text-success-700">
       {message}
     </p>
   )

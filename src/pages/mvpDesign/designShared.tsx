@@ -92,7 +92,7 @@ export function DesignGateNotice({ context }: { context: ProjectDesignContext })
 export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => void }) {
   if (!show) return null
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <RefreshCw aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
       <p className="min-w-0 flex-1 text-[0.92rem] break-keep text-warning-800">
         확정된 핵심 과제가 변경되어 재설계가 필요합니다. 확정된 설계는 그대로 보존됩니다.

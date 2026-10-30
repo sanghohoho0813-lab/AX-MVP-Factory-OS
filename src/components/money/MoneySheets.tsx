@@ -210,7 +210,7 @@ export function ExpenseSheet({
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
         </Row>
         {error && (
-          <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-danger-700">
+          <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
             {error}
           </p>
         )}
@@ -377,7 +377,7 @@ export function SubscriptionSheet({
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
         </Row>
         {error && (
-          <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-danger-700">
+          <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
             {error}
           </p>
         )}

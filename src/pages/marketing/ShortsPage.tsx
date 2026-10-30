@@ -201,7 +201,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       <MarketingTabs active="shorts" />
       <InnerTabs tabs={TABS} value={tab} onPick={go} label="릴스 · 틱톡" testPrefix="sht" />
       {store.failed && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="sht-failed">
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="sht-failed">
           <p className="t-sub min-w-[12rem] flex-1 break-keep text-warning-700">기록을 읽지 못했습니다. 적어 둔 대본은 이 화면에 그대로 있고, 다시 읽기 전에는 저장하지 않습니다.</p>
           <Button size="sm" variant="secondary" onClick={() => void store.reload()}>
             <RefreshCw aria-hidden="true" className="size-4" /> 다시 읽기
@@ -427,7 +427,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         title="이것만 지키면 돼요"
         icon={<Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
         summary={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
-        className="rounded-(--radius-panel) border-2 border-amber-300 bg-amber-50/60 px-3 py-1 data-[open=1]:pb-3 sm:px-4"
+        className="rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-3 sm:px-4"
         testId="sht-basics"
       >
         <ol className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }}>
@@ -435,7 +435,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             <li key={b.title} className="min-w-0 rounded-lg border border-amber-200 bg-white px-2.5 py-2" data-testid="sht-basic">
               <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
                 <span className="t-body flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
-                  <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[0.78rem] font-bold text-white">
+                  <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[0.78rem] font-bold text-white">
                     {i + 1}
                   </span>
                   <span className="min-w-0">{b.title}</span>
@@ -454,7 +454,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         hint="추천 형식 말고 내가 직접 고르는 곳이에요. 어디에 올릴지 → 무엇을 원하는지 → 영상 형식 순서로 골라요."
         icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
         summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
-        className="scroll-mt-24 rounded-(--radius-panel) border-2 border-violet-200 bg-violet-50/40 px-3 py-1 data-[open=1]:pb-4 sm:px-4"
+        className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
         testId="sht-choose"
       >
         <ToneSection n="1" tone="teal" title="어디에 올려요?" help="영상을 올릴 곳이에요. 틱톡 · 쇼츠는 말로 설명하는 조금 긴 영상, 릴스는 20초 안팎 짧은 영상이 잘 돼요." testId="sht-sec-platform">
@@ -474,7 +474,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               return (
                 <li key={f.key} className="min-w-0">
                   <HoverTip block className="h-full" tip={<TipBody title={`${f.name} (${f.seconds})`} body={FORMAT_EASY[f.key].plain} example={FORMAT_EASY[f.key].sample} />} testId="sht-formattip">
-                    <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border-2 px-3.5 py-2.5 text-left ${on ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`sht-format-${f.key}`}>
+                    <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-white ring-2 ring-brand-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`sht-format-${f.key}`}>
                       <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
                         <span aria-hidden="true" className={`inline-block size-2.5 shrink-0 rounded-full ${tone.bar}`} />
                         <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
@@ -488,15 +488,15 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             })}
           </ul>
           {fmt && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-violet-200 bg-white px-3 py-3" data-testid="sht-format-detail">
+            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-format-detail">
               {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 rounded-lg bg-violet-50 px-2.5 py-2 break-keep text-violet-950" data-testid="sht-format-plain">
+              <p className="t-sub flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 break-keep text-slate-800" data-testid="sht-format-plain">
                 <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
                 <span className="min-w-0">
                   <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
                 </span>
               </p>
-              <p className="t-sub rounded-lg border border-dashed border-amber-300 bg-amber-50/70 px-2.5 py-2 break-keep text-slate-800">
+              <p className="t-sub rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 break-keep text-slate-800">
                 <b className="text-amber-800">예시</b> {FORMAT_EASY[fmt.key].sample}
               </p>
               <p className="t-sub break-keep text-slate-700">
@@ -558,7 +558,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               <input value={draft.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#벤처기업확인 #창업" className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-tags" />
             </label>
             {draft.checks.length > 0 && (
-              <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="sht-checks">
+              <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="sht-checks">
                 <p className="t-sub font-semibold text-warning-900">찍기 전 확인할 것(AI 가 적음)</p>
                 <ul className="t-sub list-disc pl-5 break-keep text-warning-900">
                   {draft.checks.map((c) => (

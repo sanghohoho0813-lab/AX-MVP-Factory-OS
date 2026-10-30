@@ -597,7 +597,7 @@ export function TaxCalculatorsPage() {
           />
         )}
         {calcPresets.length > 0 && (
-          <div className="no-print flex flex-col gap-1.5 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2.5" data-testid="calc-presets">
+          <div className="no-print flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="calc-presets">
             <p className="t-sub font-semibold break-keep text-brand-900">상황 예시로 바로 — 누르면 이 업체 숫자(주주명부 · 순이익 · 1주 가치)로 계산</p>
             <div className="flex flex-wrap gap-1.5">
               {calcPresets.map((p) => (

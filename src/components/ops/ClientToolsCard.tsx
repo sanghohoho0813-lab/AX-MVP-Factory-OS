@@ -209,7 +209,7 @@ function FeatureRow({
             </span>
           )}
         </span>
-        <span className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold text-brand-800">
+        <span className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1 font-semibold text-brand-800">
           {last ? `다시 ${entry.verb}` : entry.verb}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>

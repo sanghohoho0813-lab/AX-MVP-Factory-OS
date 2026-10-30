@@ -137,7 +137,8 @@ await page.mouse.move(5, 700)
 await page.waitForTimeout(120)
 check('H2 마우스를 떼면 설명 닫힘 · 지금 칸 한 줄(휴대폰도 보임) "오늘 쓸 글 — 주제만 고르면"', (await page.getByTestId('thr-tabtip').count()) === 0 && /오늘 쓸 글 — 주제만 고르면/.test(await page.getByTestId('thr-about').innerText()))
 const tabColors = await page.locator('[role="tab"][data-testid^="thr-tab-"] svg').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).color))
-check('H3 안쪽 칸 그림마다 다른 색(4색)', new Set(tabColors).size === 4, tabColors)
+// D-370 대표 '박스 · 단추 색은 하나로' — 예전(D-298) 칸마다 다른 색 대신 같은 색, 고른 칸만 강조
+check('H3 안쪽 칸 그림 색은 하나(고른 칸만 다를 수 있음) — D-370', new Set(tabColors).size <= 2, tabColors)
 check('H4 "우리 분야 주제 · 늘 그대로예요" — 매주 바뀌는지 바로 앎', /늘 그대로예요/.test(await page.getByTestId('thr-qs-ours-label').innerText()))
 
 /* ---------------- W 쓰기 ---------------- */
@@ -151,7 +152,7 @@ const tplTip = page.getByTestId('thr-tpltip')
 check('H6 틀 [T 닿아라] 에 마우스 → 무슨 뜻인지 + 예시(데려다줘) · 화면 안', /T 닿아라/.test(await tplTip.innerText().catch(() => '')) && /내 손님을 부르는 글/.test(await tplTip.innerText()) && /예시\n?[\s\S]*데려다줘/.test(await tplTip.innerText()) && (await inView(tplTip)))
 await page.mouse.move(5, 700)
 const goalBg = await page.locator('[data-testid^="thr-goal-"]').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).borderColor))
-check('H7 원하는 반응 4개 — 색이 모두 다름', new Set(goalBg).size === 4, goalBg)
+check('H7 원하는 반응 4개 — 같은 테두리(고른 것만 강조) · 뜻 색은 작은 점에만 — D-370', new Set(goalBg).size <= 2, goalBg)
 // D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천 · 23개가 조그맣게라도 다 나열 · 마우스를 올리면 정의 · 예시"
 const minis = page.getByTestId('thr-all-tpls').locator('[data-testid^="thr-mini-"]')
 const recMinis = await page.getByTestId('thr-all-tpls').locator('[data-rec="1"]').evaluateAll((xs) => xs.map((x) => x.dataset.testid))

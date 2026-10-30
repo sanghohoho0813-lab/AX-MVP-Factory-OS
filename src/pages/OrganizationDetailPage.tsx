@@ -229,7 +229,7 @@ export function OrganizationDetailPage() {
       />
 
       {organization.clientOpsId && (
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-brand-200 bg-brand-50 px-4 py-2.5 text-[0.95rem] break-keep text-slate-700" data-testid="org-client-link">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-2.5 text-[0.95rem] break-keep text-slate-700" data-testid="org-client-link">
           고객 관리 업체와 이어진 고객사입니다 — 연락 · 수금 · 서류는 업체 기록에서.
           <Link to={`/ops/clients/${encodeURIComponent(organization.clientOpsId)}`} className="tap ml-auto inline-flex items-center font-semibold text-brand-700 hover:underline">
             업체 기록 열기
@@ -262,7 +262,7 @@ export function OrganizationDetailPage() {
             (() => {
               const j = computeProjectJourney(primaryProject)
               return (
-                <section className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/50 p-5 sm:p-6">
+                <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
                   <p className="text-[0.9rem] font-semibold text-brand-700">현재 가장 중요한 일</p>
                   <p className="mt-1.5 text-[1.3rem] leading-snug font-bold break-keep text-slate-900">{primaryProject.name} · {j.actionText}</p>
                   <p className="mt-2 text-[1rem] break-keep text-slate-600">{j.reason}</p>

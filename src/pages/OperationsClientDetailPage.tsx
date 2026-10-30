@@ -947,7 +947,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           type="button"
           onClick={() => setTab('smart')}
           data-testid="overview-smart-link"
-          className="tap t-sub flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 text-left font-medium text-brand-800 hover:bg-brand-100/60"
+          className="tap t-sub flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-left font-medium text-brand-800 hover:bg-brand-100/60"
         >
           <span className="font-bold">맞춤 추천</span>
           {pendingFacts(record).length > 0 && <span>확인할 정보 {pendingFacts(record).length}건</span>}
@@ -2131,7 +2131,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <p className="t-body break-keep text-slate-800">
                 마지막으로 확인합니다. 지우면 <strong className="font-semibold text-danger-700">되돌릴 수 없습니다.</strong>
               </p>
-              <label className="tap mt-3 flex cursor-pointer items-start gap-3 rounded-(--radius-control) border border-danger-200 bg-danger-50/50 px-3.5 py-3">
+              <label className="tap mt-3 flex cursor-pointer items-start gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3">
                 <input
                   type="checkbox"
                   className="mt-0.5 size-5 shrink-0 accent-danger-600"

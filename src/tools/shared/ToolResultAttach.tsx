@@ -266,7 +266,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
         </Link>
       )}
       {done && done.resultId && followState === 'ask' && (
-        <div className="flex w-full basis-full flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 p-3" data-testid="tool-followup">
+        <div className="flex w-full basis-full flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="tool-followup">
           <p className="t-sub font-semibold text-slate-800">다음 할 일도 걸까요? — 달력에 올라가고, 날이 가까우면 오늘 화면에 뜹니다</p>
           <label className="block">
             <span className="sr-only">다음 할 일</span>

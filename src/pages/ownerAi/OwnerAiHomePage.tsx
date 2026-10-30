@@ -200,7 +200,7 @@ function Home() {
           </div>
 
           {dups.length > 0 && (
-            <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-3" data-testid="case-dups">
+            <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="case-dups">
               <p className="t-sub font-semibold break-keep text-warning-700">같은 업체일 수 있습니다 — 새로 만들기 전에 확인해 주세요</p>
               <ul className="mt-2 flex flex-col gap-2">
                 {dups.slice(0, 5).map((d) => (

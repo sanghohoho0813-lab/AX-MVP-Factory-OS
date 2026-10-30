@@ -267,7 +267,7 @@ export function NoticeForm({ value, onChange }: { value: NoticeInput; onChange: 
       </div>
 
       {value.source !== 'example' && (
-        <label className="tap flex items-start gap-2.5 rounded-(--radius-control) border border-brand-200 bg-brand-50 p-3">
+        <label className="tap flex items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white p-3">
           <input type="checkbox" checked={value.published} onChange={(e) => set({ published: e.target.checked })} className="mt-1 size-5 accent-brand-600" data-testid="grant-publish" />
           <span className="t-sub break-keep text-slate-700">
             <span className="font-semibold text-slate-900">가망고객 찾기 화면에도 보이기</span> — 로그인 없이 자기 회사 조건으로 찾아보는 화면입니다.
@@ -390,7 +390,7 @@ export function AddNoticeSheet({
         )}
 
         {mode === 'paste' && draft && (
-          <p className="t-sub rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 text-success-800" data-testid="grant-read-done">
+          <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-success-800" data-testid="grant-read-done">
             읽었습니다. 틀린 칸만 고치고 저장하세요.
           </p>
         )}
@@ -420,7 +420,7 @@ export function AddNoticeSheet({
         )}
 
         {error && (
-          <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-danger-700">
+          <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
             {error}
           </p>
         )}

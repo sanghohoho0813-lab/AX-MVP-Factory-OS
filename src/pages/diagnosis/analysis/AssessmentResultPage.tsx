@@ -254,7 +254,7 @@ export function AssessmentResultPage() {
       {editable && (
         <Panel title="결과 상태">
           {!finalizeCheck.ok && (
-            <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2">
+            <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
               {finalizeCheck.reasons.map((r) => (
                 <li key={r} className="text-[0.875rem] break-keep text-warning-800">• {r}</li>
               ))}

@@ -13,7 +13,7 @@ export function LegacyVentureNotice({ clientId, variant = 'banner' }: { clientId
   const href = `/tools/cert-os/venture${clientId ? `?client=${clientId}` : ''}`
   if (variant === 'record') {
     return (
-      <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-4 py-3.5" data-testid="legacy-venture-record-notice">
+      <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5" data-testid="legacy-venture-record-notice">
         <p className="t-card inline-flex items-center gap-1.5 font-bold text-slate-900">
           <Info aria-hidden="true" className="size-4 shrink-0 text-brand-600" /> 이전 벤처 기록입니다
         </p>
@@ -27,7 +27,7 @@ export function LegacyVentureNotice({ clientId, variant = 'banner' }: { clientId
     )
   }
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3" data-testid="legacy-venture-notice">
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3" data-testid="legacy-venture-notice">
       <p className="t-sub flex min-w-0 flex-1 items-start gap-1.5 break-keep text-slate-800">
         <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-600" />
         <span>벤처기업 확인 업무는 새 기업인증에서 진행합니다. 여기 적어 둔 벤처 기록은 그대로 남고 기업인증이 읽어 씁니다.</span>

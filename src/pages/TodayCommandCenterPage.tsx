@@ -538,7 +538,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           <section
             aria-labelledby="todos"
             id="today-todo-card"
-            className="scroll-mt-24 flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
+            className="scroll-mt-24 flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5"
           >
             {/*
               카드 안에 '오늘 할 일' 제목을 또 두지 않는다 — 바로 위 h1 이 이미 그 말이다.
@@ -912,7 +912,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                 title="지금 챙길 영업이 없습니다."
                 icon={<KanbanSquare className="size-7" />}
                 action={
-                  <Link to="/sales/board" className="tap inline-flex items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 font-semibold text-brand-700 hover:bg-brand-100">
+                  <Link to="/sales/board" className="tap inline-flex items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-semibold text-brand-700 hover:bg-brand-100">
                     영업 보드에서 잠재고객 등록 →
                   </Link>
                 }

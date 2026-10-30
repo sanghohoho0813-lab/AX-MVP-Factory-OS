@@ -501,7 +501,7 @@ function SubsidyModal({ client, onClose }: { client: Row; onClose: () => void })
             <button type="button" onClick={onClose} className="flex-1 rounded-xl bg-navy-700 px-5 py-3 text-base font-bold text-white hover:bg-navy-800">
               확인
             </button>
-            <button type="button" disabled className="flex-1 whitespace-nowrap rounded-xl border border-sky-200 bg-sky-50 px-5 py-3 text-base font-bold text-sky-400">
+            <button type="button" disabled className="flex-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-5 py-3 text-base font-bold text-sky-400">
               고용지원금 SaaS 연결 예정
             </button>
           </div>

@@ -192,7 +192,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <ul className="flex flex-col gap-2">
               {primaryMatches.map((m) => (
                 <li key={m.id} className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[0.875rem] break-keep text-slate-700">
-                  <span className="mr-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">우선</span>
+                  <span className="mr-1.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">우선</span>
                   {m.reasonSummary || '사유 미입력'}
                 </li>
               ))}
@@ -212,7 +212,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
           ) : (
             <ul className="flex flex-col gap-2">
               {criticalGaps.map((g) => (
-                <li key={g.id} className="flex items-start gap-2 rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-3 py-2">
+                <li key={g.id} className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
                   <div>
                     <p className="text-[0.875rem] font-medium break-keep text-danger-800">{g.title}</p>
@@ -364,12 +364,12 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
         <Panel title="품질검사">
           <div aria-live="polite" className="mb-4">
             {finalizeCheck.ok ? (
-              <div className="flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[0.875rem] font-medium text-success-700">
+              <div className="flex items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] font-medium text-success-700">
                 <CheckCircle2 aria-hidden="true" className="size-4" />
                 확정 가능한 상태입니다.
               </div>
             ) : (
-              <div className="rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-3 py-2">
+              <div className="rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2">
                 <p className="flex items-center gap-2 text-[0.875rem] font-medium text-danger-700">
                   <XCircle aria-hidden="true" className="size-4" />
                   확정 전 해결할 항목 {finalizeCheck.reasons.length}건
@@ -399,7 +399,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
       {/* 상태 액션 */}
       <Panel title="상태·확정">
         {strategy.status === 'finalized' && (
-          <div className="mb-4 flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[0.875rem] text-success-700">
+          <div className="mb-4 flex items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] text-success-700">
             <ShieldCheck aria-hidden="true" className="size-4" />
             확정일 {formatDate(strategy.finalizedAt)} · 스냅샷 생성됨 (읽기 전용)
           </div>

@@ -175,7 +175,7 @@ function LocalTestPageInner() {
           {session.participantName && <p className="mt-1 text-sm text-slate-400">참여자: {session.participantName}</p>}
           <p
             role="note"
-            className="mt-4 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-sm font-medium break-keep text-warning-700"
+            className="mt-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-sm font-medium break-keep text-warning-700"
           >
             로컬 테스트 모드 · 동일 브라우저에서만 사용할 수 있습니다.
           </p>
@@ -258,7 +258,7 @@ function LocalTestPageInner() {
 
         <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
           {error && (
-            <p role="alert" className="mb-3 rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-2.5 text-sm font-medium break-keep text-danger-700">
+            <p role="alert" className="mb-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium break-keep text-danger-700">
               {error}
             </p>
           )}

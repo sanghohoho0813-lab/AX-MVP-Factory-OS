@@ -187,7 +187,7 @@ export function FundingResultsPage() {
       cell: (r) => (
         <div className="flex flex-wrap items-center gap-1.5">
           {r.latestOutcome ? <OutcomeTypeBadge type={r.latestOutcome.type} /> : <span className="text-[0.875rem] text-slate-400">결과 없음</span>}
-          {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
+          {r.summary.caseCandidate && <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
           <StrategyStatusBadge status={r.strategy.status} />
         </div>
       ),
@@ -256,7 +256,7 @@ export function FundingResultsPage() {
                 <div className="flex flex-wrap items-center gap-1.5">
                   {r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[0.875rem] text-slate-400">신청 전</span>}
                   {r.latestOutcome && <OutcomeTypeBadge type={r.latestOutcome.type} />}
-                  {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
+                  {r.summary.caseCandidate && <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
                 </div>
                 {r.strategy.preferredSupportTypes.length > 0 && (
                   <div className="flex flex-wrap gap-1">

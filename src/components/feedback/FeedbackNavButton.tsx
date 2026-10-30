@@ -23,7 +23,7 @@ const LOOK =
 
 // D-290 설정 화면(밝은 바탕)용
 const LOOK_LIGHT =
-  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-2 text-[0.95rem] font-semibold text-amber-950 hover:bg-amber-100'
+  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] font-semibold text-amber-950 hover:bg-amber-100'
 
 type Tone = 'dark' | 'light'
 

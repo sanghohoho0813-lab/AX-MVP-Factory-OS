@@ -43,7 +43,7 @@ export function CertChat({ d }: { d: ReturnType<typeof useCertData> }) {
   return (
     <>
       {d.loadError && (
-        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center" data-testid="cert-load-error">
+        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="cert-load-error">
           <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">기업인증 기록을 읽지 못했어요. 저장해 둔 기록은 그대로 있어요.</p>
           <button type="button" className="tap t-sub rounded-(--radius-control) border border-amber-400 bg-white px-3 py-2 font-semibold" onClick={() => void d.reloadAll()}>
             다시 읽기

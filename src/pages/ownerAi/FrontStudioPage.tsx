@@ -245,7 +245,7 @@ function Studio() {
           </Button>
         }
       />
-      {frontIsEmpty(spec) && <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700">그릴 내용이 거의 없습니다 — 오른쪽에서 채우거나 화면 기획을 다시 만들어 주세요.</p>}
+      {frontIsEmpty(spec) && <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-warning-700">그릴 내용이 거의 없습니다 — 오른쪽에서 채우거나 화면 기획을 다시 만들어 주세요.</p>}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-4">

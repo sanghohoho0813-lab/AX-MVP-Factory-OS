@@ -643,7 +643,7 @@ export function FloorPlanner({ company }: { company: string }) {
             <p className="text-base font-bold text-navy-700">① 공간 형태·라벨</p>
             <p className="mt-1 text-sm text-slate-500">크기(m)는 <b>도면 바로 아래 입력칸</b>에서 조정합니다. 모서리·변 핸들 드래그로도 크기를 바꿀 수 있고, 사각형이 아니면 “직접 그리기”로 외곽선을 만들 수 있습니다.</p>
             {/* 전용공간 라벨 전환 (연구소 / 전담부서 / 직접입력) — 출력물에도 반영 */}
-            <div className="mt-4 rounded-xl border-2 border-red-200 bg-red-50/40 p-3.5">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3.5">
               <p className="text-base font-bold text-red-800">전용공간 라벨 <span className="ml-1 text-sm font-semibold text-red-700/70">— 도면·출력물에 표시되는 명칭</span></p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => setLabLabel("연구소 전용공간")}
@@ -657,7 +657,7 @@ export function FloorPlanner({ company }: { company: string }) {
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => startDraw("office")} className="whitespace-nowrap rounded-lg border border-navy-300 bg-navy-50 px-4 py-2 text-base font-bold text-navy-700 hover:bg-navy-100">✏️ 사무실 직접 그리기</button>
-              <button type="button" onClick={() => startDraw("lab")} className="whitespace-nowrap rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-base font-bold text-red-700 hover:bg-red-100">✏️ 연구소 직접 그리기</button>
+              <button type="button" onClick={() => startDraw("lab")} className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 py-2 text-base font-bold text-red-700 hover:bg-red-100">✏️ 연구소 직접 그리기</button>
               <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">전체 {doc.hideOffice ? "—" : `${approxO}${officeArea.toFixed(1)}㎡`} · 연구소 {doc.hideLab ? "—" : `${approxL}${labArea.toFixed(1)}㎡`}{!doc.hideOffice && !doc.hideLab ? ` (${ratio}%)` : ""}</p>
             </div>
             {drawing ? (
@@ -906,7 +906,7 @@ export function FloorPlanner({ company }: { company: string }) {
               </>
             )}
             {doc.hideLab ? (
-              <div className="col-span-2"><button type="button" onClick={showLab} className="w-full rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-base font-bold text-red-700 hover:bg-red-100">＋ 연구소 공간 표시</button></div>
+              <div className="col-span-2"><button type="button" onClick={showLab} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-bold text-red-700 hover:bg-red-100">＋ 연구소 공간 표시</button></div>
             ) : doc.labPoly ? (
               <div className="col-span-2 flex items-end gap-2"><p className="flex-1 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-700">연구소: 직접 그린 형태</p><button type="button" onClick={revertLab} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600">사각형으로</button></div>
             ) : (

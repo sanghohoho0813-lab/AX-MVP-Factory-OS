@@ -241,7 +241,7 @@ function ActionSheet({
       footer={
         <div className="flex flex-col gap-2">
           {confirmDeep && (
-            <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-700" data-testid="deep-confirm">
+            <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-700" data-testid="deep-confirm">
               이 작업은 '깊게'(비용이 큰 모델)로 이미 한 번 만들었습니다. 다시 만들까요? 지난 결과는 그대로 남습니다.
             </p>
           )}
@@ -260,7 +260,7 @@ function ActionSheet({
       <div className="flex flex-col gap-4">
         <p className="t-body break-keep text-slate-700">{meta.description}</p>
         {!ready && (
-          <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-700">
+          <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-700">
             AI 기능 설정이 필요합니다. 지금은 ChatGPT 결과 붙여넣기로 기록을 남길 수 있습니다.
           </p>
         )}

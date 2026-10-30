@@ -90,7 +90,7 @@ export function TrialBanner({
   }
 
   return (
-    <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="trial-banner" data-kind={trial.kind}>
+    <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2.5" data-testid="trial-banner" data-kind={trial.kind}>
       <p className="t-sub flex items-start gap-2 break-keep text-slate-700">
         <FlaskConical aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-600" />
         <span className="min-w-0">

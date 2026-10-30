@@ -141,7 +141,7 @@ export default function DashboardPage() {
 
       {/* ── 활동조사 시즌 배너 ── */}
       {isSurveySeason() ? (
-        <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+        <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📋</span>
             <div>

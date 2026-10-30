@@ -136,7 +136,7 @@ export function SurveyStartScreen({
       </section>
 
       {hasDraft && (
-        <section className="rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-5 py-4">
+        <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-4">
           <p className="text-sm font-medium text-brand-800">작성 중인 응답이 있습니다</p>
           <p className="mt-0.5 text-[0.875rem] text-brand-700">
             현재 진행률 {draftProgress}%

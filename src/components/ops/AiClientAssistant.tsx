@@ -53,7 +53,7 @@ export function AiClientAssistantButton() {
             </p>
             <ul className="grid gap-2.5 sm:grid-cols-2">
               {EXAMPLES.map((e) => (
-                <li key={e.title} className="flex gap-3 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-3" data-testid="ai-example">
+                <li key={e.title} className="flex gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="ai-example">
                   <e.icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-violet-700" />
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="t-body font-semibold break-keep text-violet-950">{e.title}</span>

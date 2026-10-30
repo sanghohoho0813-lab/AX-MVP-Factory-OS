@@ -148,7 +148,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
             오늘 할 일 열기
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
-          <div className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[0.875rem] font-semibold text-brand-700">
+          <div className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[0.875rem] font-semibold text-brand-700">
             <TrendingUp aria-hidden="true" className="size-3.5" />
             오늘 초점: {brief.focusLabel}
           </div>

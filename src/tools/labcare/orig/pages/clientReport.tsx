@@ -737,7 +737,7 @@ function VisitReport({
 
       {/* 추가 혜택 후보 선택 (컨설턴트 편집용 — 고객 공유/출력 시 숨김) */}
       {!customerView ? (
-        <section className="no-print rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/40 p-4">
+        <section className="no-print rounded-xl border border-dashed border-slate-300 bg-white p-4">
           <h3 className="text-base font-bold text-violet-800">
             추가 혜택 후보 선택
             <span className="ml-1 text-sm font-medium text-violet-600/70">(컨설턴트 편집용 — 출력물·고객 화면에는 선택된 항목만 표시)</span>

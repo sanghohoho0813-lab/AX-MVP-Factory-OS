@@ -11,7 +11,7 @@ export function ErrorPanel({ error, onRetry, withHomeLink = true }: { error: unk
   const stale = isStaleChunkError(error)
   const detail = error instanceof Error ? error.message : String(error ?? '')
   return (
-    <div role="alert" data-testid="screen-error" className="mx-auto flex max-w-xl flex-col gap-3 rounded-(--radius-card) border border-amber-200 bg-amber-50/60 p-5 sm:p-6">
+    <div role="alert" data-testid="screen-error" className="mx-auto flex max-w-xl flex-col gap-3 rounded-(--radius-card) border border-slate-200 bg-white p-5 sm:p-6">
       <p className="t-card flex items-center gap-2 font-bold text-slate-900">
         <AlertTriangle aria-hidden="true" className="size-5 shrink-0 text-amber-600" />
         {stale ? '새 버전이 올라왔습니다' : '이 화면을 여는 중 문제가 생겼습니다'}

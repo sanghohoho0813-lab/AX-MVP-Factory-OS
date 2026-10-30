@@ -70,12 +70,12 @@ function PromptCard({
             </span>
             <h3 className="text-[0.9375rem] font-semibold break-keep text-slate-900">{prompt.title}</h3>
             {prompt.manuallyEdited && (
-              <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+              <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                 수동 수정됨
               </span>
             )}
             {done && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.875rem] font-medium text-success-700">
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-success-700">
                 <Check aria-hidden="true" className="size-3" />
                 완료 표시
               </span>

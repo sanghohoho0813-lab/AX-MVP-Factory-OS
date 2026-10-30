@@ -105,7 +105,7 @@ export function ImportWizard() {
 
       {/* 2. 진행률 */}
       {running && progress && (
-        <div className="flex items-center gap-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3 text-[0.875rem] text-brand-700">
+        <div className="flex items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem] text-brand-700">
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
           {DOMAIN_LABEL[progress.domain as ImportDomain] ?? progress.domain} 가져오는 중… {progress.done}/{progress.total}
         </div>
@@ -113,7 +113,7 @@ export function ImportWizard() {
 
       {/* 3. 오류 */}
       {error && (
-        <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50/70 px-4 py-3 text-[0.875rem] break-keep text-danger-700">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem] break-keep text-danger-700">
           {error}
         </p>
       )}

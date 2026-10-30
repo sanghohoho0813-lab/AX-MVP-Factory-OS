@@ -455,7 +455,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     <DocHintCtx.Provider value={!!clientRecord}>
     <div className="flex flex-col gap-5" data-testid="tax-plan">
       {recordChanged && clientRecord && (
-        <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-amber-300 bg-amber-50 px-4 py-3 lg:flex-row lg:items-center lg:gap-3" data-testid="tax-plan-record-changed">
+        <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:gap-3" data-testid="tax-plan-record-changed">
           <p className="t-sub min-w-0 break-keep text-amber-900 lg:flex-1">
             이 업체 기록의 주주명부 · 절세 현황이 다른 화면에서 바뀌었습니다. 여기에 적던 것을 그대로 저장하면 그 내용을 덮습니다.
           </p>
@@ -479,7 +479,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       )}
       {/* D-199 상황 예시로 열었을 때 — 무엇을 가정했고 무엇을 업체 기록에서 채웠는지 */}
       {presetNote && (
-        <div className="no-print flex flex-col gap-0.5 rounded-(--radius-panel) border border-success-200 bg-success-50 px-4 py-3" data-testid="tax-preset-note">
+        <div className="no-print flex flex-col gap-0.5 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="tax-preset-note">
           <p className="t-sub font-semibold break-keep text-success-800">상황 예시 · {presetNote.title} — 이 업체 숫자로 바로 계산했어요</p>
           {presetNote.filled.list.length > 0 && (
             <p className="t-meta break-keep text-success-800">
@@ -489,7 +489,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
         </div>
       )}
       {/* ① 원하는 것 */}
-      <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
+      <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" aria-labelledby="plan-want">
         <HelpHeading id="plan-want" label="원하는 결과를 적으세요" className="t-card font-bold text-slate-900">
           원하는 결과를 적으세요{clientName ? ` — ${clientName}` : ''}
         </HelpHeading>
@@ -950,7 +950,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
         )}
       </section>
 
-      <div className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-amber-300 bg-amber-50 px-4 py-3">
+      <div className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
         <p className="t-sub break-keep text-slate-700">
           <b className="font-semibold">참고용 계산입니다.</b> 세금 계산기 9종(기업지원단 배포본)의 식을 그대로 써서 거꾸로 찾았습니다. 실행 전에 담당 세무사가 요건 · 사실관계를 확인해야 합니다.
         </p>
@@ -1159,7 +1159,7 @@ function SelectField({ k, options, st, set }: { k: ProfileKey; options: string[]
 function VerifyBox({ items }: { items: string[] }) {
   if (items.length === 0) return null
   return (
-    <div className="rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-2.5" data-verify>
+    <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-verify>
       <p className="t-sub font-bold text-amber-900">★ 검증 필요 — 세무사와 확인하세요</p>
       <ul className="t-sub mt-1 flex flex-col gap-1 break-keep text-slate-800">
         {items.map((v) => (
@@ -1179,7 +1179,7 @@ export interface NeedItem {
 function NeedBox({ items, onJump }: { items: NeedItem[]; onJump: (key: string) => void }) {
   if (items.length === 0) return null
   return (
-    <div className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2.5" data-need>
+    <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-need>
       <p className="t-sub font-bold text-danger-800">이 값을 적으면 더 정확하게 알 수 있습니다</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {items.map((it) => (
@@ -1196,7 +1196,7 @@ const CHECK_MARK: Record<CheckState, string> = { ok: '✓', no: '✗', unknown: 
 
 function SuccessionBlock({ r }: { r: SuccessionResult }) {
   return (
-    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 p-3" data-testid="succession">
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="succession">
       <p className="t-card font-bold text-slate-900">가업승계 증여세 과세특례와 비교</p>
       <ul className="flex flex-col gap-1">
         {r.checks.map((c) => (
@@ -1454,7 +1454,7 @@ function CashRoutes({ plan, onOpen }: { plan: NonNullable<ReturnType<typeof cash
   return (
     <div className="flex flex-col gap-3">
       {best && (
-        <p className="t-body rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2.5 break-keep text-slate-800" data-testid="route-best">
+        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 break-keep text-slate-800" data-testid="route-best">
           <b className="font-bold text-brand-800">추천: {best.label}</b> — 순부담 {krw(best.netBurden)}
           {saving > 0 ? `, 다음으로 싼 방법보다 ${krw(saving)} 적게 냅니다.` : '.'}
           {best.verify.length > 0 && <span className="text-amber-800"> ★ 표시는 세무사 확인.</span>}
@@ -1506,7 +1506,7 @@ function ProofBadge({ proof, outside }: { proof?: Proof | null; outside?: string
       {res && !res.ok && (
         <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기 {josa(calcNo(proof!.calc), '과/와')} 다름 — 세무사 확인</span>
       )}
-      {outside && <span className="t-meta rounded-(--radius-control) border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
+      {outside && <span className="t-meta rounded-(--radius-control) border border-slate-200 bg-white px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
     </span>
   )
 }
@@ -1681,7 +1681,7 @@ function SplitBox({ open, onToggle, split }: { open: boolean; onToggle: (v: bool
               </span>
             )}
             {bad > 0 && <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기와 다른 해 {bad}개 — 세무사 확인</span>}
-            <span className="t-meta rounded-(--radius-control) border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {split.outside}</span>
+            <span className="t-meta rounded-(--radius-control) border border-slate-200 bg-white px-2 py-0.5 font-semibold break-keep text-amber-900">★ {split.outside}</span>
           </span>
           {split.notes.length > 0 && (
             <ul className="t-sub list-disc pl-5 break-keep text-slate-600">

@@ -239,7 +239,7 @@ export default function CheckPage() {
 
             {/* '즉시 확인'일 때 왜 시급한지 설명 */}
             {preview.level === "즉시 확인" ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="mb-1 text-xs font-bold text-status-danger">왜 즉시 확인이 필요한가요?</p>
                 <p className="text-xs leading-relaxed text-slate-600">{urgentReason(answers)}</p>
               </div>

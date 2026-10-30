@@ -104,7 +104,7 @@ export function ClientSharedFiles({
                     data-testid={`portal-file-${d.id}`}
                     disabled={filing !== null}
                     onClick={() => void fileToShelf(d)}
-                    className="tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) border border-brand-300 bg-brand-50 px-3 font-semibold text-brand-800 disabled:opacity-60"
+                    className="tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-brand-800 disabled:opacity-60"
                   >
                     {filing === d.id ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <FolderInput aria-hidden="true" className="size-4" />}
                     서류함에 넣기

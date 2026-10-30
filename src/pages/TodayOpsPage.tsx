@@ -118,11 +118,11 @@ function TodayContent({ workspaceId }: { workspaceId: string | null }) {
           불러오는 중…
         </p>
       ) : failed ? (
-        <p role="alert" className="rounded-(--radius-panel) border border-danger-200 bg-danger-50 px-5 py-6 text-[0.95rem] break-keep text-danger-800">
+        <p role="alert" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] break-keep text-danger-800">
           {failed} — 잠시 뒤 새로고침해 주세요.
         </p>
       ) : nothing ? (
-        <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-12 text-center">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
           <CheckCircle2 aria-hidden="true" className="mx-auto size-9 text-success-600" />
           <p className="mt-3 text-[1.2rem] font-bold text-slate-900">이번 주에 급한 일이 없습니다</p>
           <p className="mt-1 text-[1rem] break-keep text-slate-600">

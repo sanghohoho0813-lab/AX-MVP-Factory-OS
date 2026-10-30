@@ -239,7 +239,7 @@ export function ClientGrantPanel({
         {general.length ? ` · 전국 공통 ${general.length}건` : ''}
       </p>
       {missing.length > 0 && (
-        <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="client-grants-missing">
+        <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-warning-800" data-testid="client-grants-missing">
           {josa(missing.join(' · '), '을/를')} 적으면 더 정확해져요.
           {onFill && (
             <button type="button" onClick={onFill} className="tap ml-1 font-semibold text-brand-700 underline">

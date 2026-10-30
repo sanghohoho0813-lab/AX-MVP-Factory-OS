@@ -298,7 +298,7 @@ export function ProjectDetailPage() {
         <section
           aria-label="지금 해야 할 일"
           data-tour="control-next"
-          className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5"
+          className="rounded-(--radius-panel) border border-slate-200 bg-white p-5"
         >
           <p className="text-[0.875rem] font-semibold tracking-wide text-brand-700 uppercase">
             지금 해야 할 일
@@ -581,7 +581,7 @@ export function ProjectDetailPage() {
         {project.riskSummary || project.nextAction ? (
           <div className="flex flex-col gap-3">
             {project.riskSummary && (
-              <p className="flex items-start gap-2.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-sm break-keep text-warning-700">
+              <p className="flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-sm break-keep text-warning-700">
                 <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 {project.riskSummary}
               </p>

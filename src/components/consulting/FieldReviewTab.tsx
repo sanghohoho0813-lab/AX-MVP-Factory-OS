@@ -21,7 +21,7 @@ export function FieldReviewTab({ focus }: { focus?: string }) {
     <div className="flex flex-col gap-4" data-testid="legacy-field-review">
       <LegacyVentureNotice clientId={p.clientId} variant="record" />
       {forbidden.length > 0 && (
-        <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="legacy-forbidden">
+        <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-warning-800" data-testid="legacy-forbidden">
           예전 기록에 금지 표현이 들어 있습니다: {forbidden.join(' · ')} — 다시 쓸 때는 증빙이 있는 말로 바꿔 주세요.
         </p>
       )}

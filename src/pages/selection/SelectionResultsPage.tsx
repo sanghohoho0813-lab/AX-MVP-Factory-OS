@@ -137,7 +137,7 @@ export function SelectionResultsPage() {
         <div className="flex items-center gap-1.5">
           <SelectionStatusBadge status={r.decision.status} />
           {r.reselection && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재선별
             </span>
@@ -242,7 +242,7 @@ export function SelectionResultsPage() {
                       <SelectionStatusBadge status={r.decision.status} />
                       {r.primary && <CandidateConfidenceBadge confidence={r.primary.confidence} />}
                       {r.reselection && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재선별
                         </span>

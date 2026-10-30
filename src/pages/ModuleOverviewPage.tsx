@@ -91,11 +91,11 @@ export function ModuleOverviewPage() {
               return (
                 <li key={g.title} data-step={i + 1}>
                   {g.to ? (
-                    <Link to={withClient(g.to, clientId)} className="ax-lift tap flex h-full flex-col rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 px-4 py-3.5 hover:border-brand-300">
+                    <Link to={withClient(g.to, clientId)} className="ax-lift tap flex h-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 hover:border-brand-300">
                       {inner}
                     </Link>
                   ) : (
-                    <div className="flex h-full flex-col rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 px-4 py-3.5">{inner}</div>
+                    <div className="flex h-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5">{inner}</div>
                   )}
                 </li>
               )

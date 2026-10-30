@@ -160,7 +160,7 @@ export function SupabasePublicTest() {
           </label>
         </section>
 
-        {error && <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">{error}</p>}
+        {error && <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">{error}</p>}
 
         <Button variant="primary" disabled={submitting || !consented} onClick={() => void handleSubmit()} className="h-11">
           {submitting ? '제출 중…' : '피드백 제출'}

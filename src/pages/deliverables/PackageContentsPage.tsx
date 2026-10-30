@@ -75,7 +75,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
       <ReadOnlyNotice pkg={pkg} />
 
       {showLeakWarning && (
-        <div className="rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-4 py-3 text-[0.9rem] break-keep text-danger-700">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-danger-700">
           대상이 {pkg.audience === 'client' ? '고객용' : '기관 준비용'}인데 <span className="font-semibold">내부 전용</span> Section {leakingSections.length}개가 포함되어 있습니다. 공개 범위를 조정하거나 제외하세요.
         </div>
       )}
@@ -110,7 +110,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
                         <SectionStatusBadge status={section.status} />
                         {!excluded && <VisibilityBadge visibility={section.visibility} />}
                         {section.manuallyEdited && (
-                          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
+                          <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                             수동 수정됨
                           </span>
                         )}

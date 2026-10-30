@@ -185,7 +185,7 @@ export function FundingCatalogPage() {
 
       <div
         role="note"
-        className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
+        className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3"
       >
         <Landmark aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
         <p className="text-[0.875rem] break-keep text-warning-800">

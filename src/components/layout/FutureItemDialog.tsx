@@ -61,7 +61,7 @@ export function FutureItemDialog({ item, onClose, onPick }: { item: FutureItem |
           </ol>
         </section>
 
-        <section aria-label="예시" className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3.5 py-3">
+        <section aria-label="예시" className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3">
           <p className="t-meta font-bold tracking-wide text-brand-700">예시</p>
           <p className="t-sub mt-1 break-keep text-slate-700">{item.example}</p>
         </section>

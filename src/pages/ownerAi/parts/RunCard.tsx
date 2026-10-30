@@ -79,12 +79,12 @@ export function RunCard({
       {open && (
         <>
           {run.status === 'parse_fallback' && (
-            <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-700">
+            <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-700">
               AI 가 약속한 모양으로 답하지 않아 원문을 그대로 보관했습니다. 읽고 쓸 만하면 채택하거나 고쳐서 쓰세요.
             </p>
           )}
           {run.skillId === 'PATENT_IDEA' && run.status !== 'succeeded' && (
-            <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-warning-700">⚠ {PATENT_WARNING}</p>
+            <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-700">⚠ {PATENT_WARNING}</p>
           )}
           <div className="max-h-[32rem] overflow-y-auto rounded-(--radius-control) bg-slate-50 px-3 py-3 sm:px-4" data-testid="run-text">
             {isMessage || run.status === 'pasted' || run.status === 'parse_fallback' ? <p className="t-body break-words whitespace-pre-wrap text-slate-800">{text}</p> : <Md text={text} />}

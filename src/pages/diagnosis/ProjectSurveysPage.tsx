@@ -135,7 +135,7 @@ export function ProjectSurveysPage() {
       ) : (
         <>
           {/* 지금 무엇이 더 필요한가 */}
-          <section className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/50 p-5 sm:p-6">
+          <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
             <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">진단 결과를 만들려면 어떤 응답이 더 필요할까요?</h2>
             <p className="mt-2 text-[1rem] break-keep text-slate-600">
               {pendingRoles.length === 0

@@ -212,7 +212,7 @@ export default function GrantFinderPage() {
 
         {shownState === 'loading' && <p className="t-body text-slate-500">공고를 불러오는 중…</p>}
         {shownState === 'error' && (
-          <p className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 text-warning-800" role="alert">
+          <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-warning-800" role="alert">
             지금은 공고를 불러오지 못했습니다. 아래 '알림 받기' 를 남겨 주시면 맞는 공고를 직접 보내 드릴게요.
           </p>
         )}
@@ -343,7 +343,7 @@ function AlertSheet({ profile, from, titles, fitCount, onClose, onDone }: { prof
           </span>
         </label>
         {error && (
-          <p role="alert" className="t-sub rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-danger-700">
+          <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
             {error}
           </p>
         )}

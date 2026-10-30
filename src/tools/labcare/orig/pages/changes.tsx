@@ -303,7 +303,7 @@ export default function ChangesPage() {
         </div>
 
         {/* 변경 확인 요청문 */}
-        <div className="rounded-2xl border-2 border-red-200 bg-red-50/40 p-5 shadow-card">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <h3 className="text-base font-bold text-red-800">📨 변경 확인 요청문</h3>
           <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
             연구노트와 변경사항 확인을 함께 안내하는 카톡용 요청문입니다. 내용을 수정한 뒤 복사해 사용하세요.
@@ -316,7 +316,7 @@ export default function ChangesPage() {
 
       {/* 요청문 편집 (열렸을 때 전체 폭) */}
       {reqOpen ? (
-        <section className="mb-5 rounded-2xl border-2 border-red-200 bg-white p-5 shadow-card">
+        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-bold text-slate-800">📨 변경 확인 요청문 (카톡용 · 수정 가능)</h3>
             <button type="button" onClick={() => setReqOpen(false)} className="text-xl text-slate-400 hover:text-slate-700">✕</button>
@@ -336,7 +336,7 @@ export default function ChangesPage() {
       ) : null}
 
       {/* 이번에 확인할 고객사 */}
-      <section className="mb-5 rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-base font-bold text-amber-900">이번에 확인할 고객사 ({dueClients.length})</p>
           <p className="text-sm text-amber-800/80">클릭하면 해당 고객사가 바로 선택됩니다</p>

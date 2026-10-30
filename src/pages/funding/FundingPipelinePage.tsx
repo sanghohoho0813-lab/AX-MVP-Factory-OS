@@ -359,7 +359,7 @@ function ApplicationCard({
       </dl>
 
       {supplementActive && app.supplementRequests.length > 0 && (
-        <div className="mt-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 p-3">
+        <div className="mt-3 rounded-(--radius-card) border border-slate-200 bg-white p-3">
           <p className="text-[0.875rem] font-semibold text-warning-800">보완 요청 사항</p>
           <ul className="mt-1 flex flex-col gap-1">
             {app.supplementRequests.map((r, i) => (
@@ -373,7 +373,7 @@ function ApplicationCard({
       )}
 
       {isResult && (
-        <p className="mt-3 rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.875rem] break-keep text-brand-700">
+        <p className="mt-3 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] break-keep text-brand-700">
           결과가 확정된 단계입니다. 결과·성과 화면에서 상세 결과와 성과를 기록하세요.
         </p>
       )}

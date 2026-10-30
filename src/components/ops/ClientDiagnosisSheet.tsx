@@ -84,7 +84,7 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
       ) : (
         <ol className="flex flex-col gap-2" data-testid="diagnosis-picks">
           {d.picks.map((p, i) => (
-            <li key={p.key} className="avoid-break flex min-w-0 gap-3 rounded-[10px] border border-brand-200 bg-brand-50/40 px-3 py-2.5" data-testid="diagnosis-pick" data-key={p.key}>
+            <li key={p.key} className="avoid-break flex min-w-0 gap-3 rounded-[10px] border border-slate-200 bg-white px-3 py-2.5" data-testid="diagnosis-pick" data-key={p.key}>
               <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[0.95rem] font-bold text-white">
                 {i + 1}
               </span>

@@ -49,7 +49,7 @@ function InterviewItem({
       )}
 
       {q.status === 'answered' && !answering && (
-        <div className="mt-2 rounded-(--radius-control) border border-success-200 bg-success-50/50 px-3 py-2">
+        <div className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
           <p className="text-[0.875rem] break-keep whitespace-pre-wrap text-slate-700">{q.answer}</p>
           {q.answeredAt && (
             <p className="mt-1 text-[0.875rem] text-slate-400">기록 {formatDateTime(q.answeredAt)}</p>

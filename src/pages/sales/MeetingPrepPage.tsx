@@ -388,7 +388,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound, onPinRound
 
   if (wrap) {
     return (
-      <section aria-label="미팅 마무리" data-testid="meeting-wrapup" className="flex flex-col gap-3 rounded-(--radius-panel) border border-success-200 bg-success-50/40 p-4 sm:p-5">
+      <section aria-label="미팅 마무리" data-testid="meeting-wrapup" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
         <h2 className="t-section flex items-center gap-2 text-slate-900">
           <Check aria-hidden="true" className="size-5 text-success-600" />
           {roundNo}차 미팅을 기록했습니다
@@ -702,7 +702,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
       <SalesTabs />
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
           {error}
         </p>
       )}
@@ -733,7 +733,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
             </select>
           </label>
           {!record && clientId !== '' && (
-            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 break-keep text-slate-800">
+            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 break-keep text-slate-800">
               이 업체를 찾을 수 없습니다 — 보관했거나 지운 업체일 수 있습니다. 위 칸에서 다른 업체를 골라 주세요.
             </p>
           )}
@@ -818,7 +818,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   type="button"
                   data-testid="meeting-jump-record"
                   onClick={() => document.querySelector('[data-testid="meeting-recorder"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  className="tap flex w-full items-center justify-between gap-3 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 text-left hover:bg-brand-100/60"
+                  className="tap flex w-full items-center justify-between gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-left hover:bg-brand-100/60"
                 >
                   <span className="t-body font-semibold text-slate-900">
                     {record.nextActionDueDate === today ? '오늘 1차 미팅' : '1차 미팅 날짜가 지났습니다'} — 미팅이 끝났으면 기록부터
@@ -1122,7 +1122,7 @@ function PrevMeetingPoints({ record, round }: { record: ClientOpsRecord; round: 
     .filter((m): m is NonNullable<typeof m> => !!m)
   if (prev.length === 0) return null
   return (
-    <section aria-label="앞 미팅에서 적은 것" data-testid="meeting-prev-points" className="flex flex-col gap-2 rounded-(--radius-panel) border border-brand-200 bg-brand-50/40 p-4">
+    <section aria-label="앞 미팅에서 적은 것" data-testid="meeting-prev-points" className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-4">
       <HintTip tip={hintFor('앞 미팅에서 적은 것')} label="앞 미팅에서 적은 것">
         <h2 className="t-section text-slate-900">앞 미팅에서 적은 것 <span className="t-sub font-medium text-slate-500">· 이걸 짚고 시작</span></h2>
       </HintTip>

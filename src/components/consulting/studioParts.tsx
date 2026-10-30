@@ -271,7 +271,7 @@ export function Block({ title, hint, children, action }: { title: string; hint?:
 /** 마이그레이션 미적용 안내 — 아무것도 깨지지 않고 이것만 보인다 */
 export function TablesMissingNotice() {
   return (
-    <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-5">
+    <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-5">
       <p className="t-card break-keep text-warning-700">특허·MVP 작업은 READY 상태입니다</p>
       <p className="t-body mt-1 break-keep text-slate-700">
         클라우드에 아직 컨설팅 표가 없습니다. 아래 SQL 을 Supabase SQL Editor 에서 한 번 실행하면 바로 쓸 수 있습니다.

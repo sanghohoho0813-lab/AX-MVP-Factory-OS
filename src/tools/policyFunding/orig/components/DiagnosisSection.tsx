@@ -52,7 +52,7 @@ function SaveCustomerBar({
   };
 
   return (
-    <div className="mt-6 rounded-3xl border border-blue-100 bg-blue-50/50 p-6 text-center" data-testid="pf-save-bar">
+    <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 text-center" data-testid="pf-save-bar">
       {saved ? (
         <div className="flex flex-col items-center gap-3">
           <p className="font-semibold text-blue-900">
@@ -210,7 +210,7 @@ export default function DiagnosisSection({
             </div>
           )}
           {stale && (
-            <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900" data-testid="pf-stale">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-amber-900" data-testid="pf-stale">
               칸을 바꿨어요. 아래 결과는 바꾸기 전 값 기준입니다 — {deepOpen ? "[심층 진단 반영해 결과 업데이트]" : "[진단 결과 보기]"} 를 누르면 새 값으로 바뀝니다.
             </div>
           )}
@@ -223,7 +223,7 @@ export default function DiagnosisSection({
               <button
                 type="button"
                 onClick={openDeep}
-                className="w-full rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 px-6 py-5 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
+                className="w-full rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-5 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
               >
                 <span className="text-base font-bold text-blue-700">
                   🔍 심층 진단으로 정확도 높이기
