@@ -615,6 +615,30 @@ export function moduleBundle(i: { today: string; records: ClientOpsRecord[]; fea
 /* ------------------------------------------------------------------ */
 
 /** 미래AI랩이 누구인지 — 레이더 · 홍보 글 AI 가 같은 관점으로 쓰게 */
+/**
+ * D-347 채널 설계 기준 줄 — 칸 글이 길면(최대 800자) 문장 끝에서 290자 안쪽으로 나눠 '(이어서)' 줄로.
+ * 서버가 칸 하나를 300자에서 자르므로 한 칸에 다 담으면 뒤가 잘린다. 롱폼 · 쇼츠 · 스레드 · 영상 창이 같은 줄을 쓴다.
+ */
+export function briefRows(brief: ChannelBrief): { 항목: string; 기준: string }[] {
+  const out: { 항목: string; 기준: string }[] = []
+  for (const f of BRIEF_FIELDS) {
+    const text = safeText(brief[f.key], [], 800)
+    if (!text) continue
+    const parts: string[] = []
+    let rest = text
+    while (rest.length > 290) {
+      const cut = Math.max(rest.lastIndexOf('. ', 290), rest.lastIndexOf(' / ', 290), rest.lastIndexOf(' · ', 290))
+      const at = cut > 120 ? cut + 1 : 290
+      parts.push(rest.slice(0, at).trim())
+      rest = rest.slice(at).trim()
+    }
+    if (rest) parts.push(rest)
+    parts.forEach((p, i) => out.push({ 항목: i ? `${f.label}(이어서)` : f.label, 기준: p }))
+  }
+  return out
+}
+export const briefSection = (brief: ChannelBrief) => ({ name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: briefRows(brief) })
+
 export const MIRAE_PROFILE = [
   '미래AI랩: 중소기업 대표를 돕는 컨설팅 회사 — 정책자금 · 고용지원금 · 기업부설연구소 · 창업감면 · 절세 · 지원사업 · AX(업무에 AI 넣기) · 기업인증.',
   '유튜브 · 블로그 시청자 = 중소기업 대표와 실무자. 말투는 쉬운 말, 과장 없이, 실제 사례와 숫자로.',
@@ -670,7 +694,7 @@ export function radarBundle(i: RadarInput): AssistBundle {
   const mineBest = [...i.mine].filter((v) => (v.adjusted ?? v.ratio ?? 0) > 1).sort((a, b) => (b.adjusted ?? b.ratio ?? 0) - (a.adjusted ?? a.ratio ?? 0)).slice(0, 6)
   const stats = myChannelStats(i.mine as RadarVideo[])
   const sections: AssistSection[] = [
-    { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
+    briefSection(brief),
     { name: '내 채널 최근 영상(새것부터)', rows: mineRecent.map(mineRow), total: i.mine.length },
     { name: '내 채널에서 평소보다 잘 된 영상', rows: mineBest.map(mineRow) },
     {
@@ -773,7 +797,7 @@ export function packBundle(i: { today: string; pack: ContentPack; brief?: Channe
             },
           ],
         },
-        { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
+        briefSection(brief),
         { name: `규칙 초안 뼈대(${PACK_SECTIONS.length - 1}칸 — 이 순서 · 칸 이름을 살려 다듬기)`, rows: outline },
       ],
       facts: [...profileLines()],

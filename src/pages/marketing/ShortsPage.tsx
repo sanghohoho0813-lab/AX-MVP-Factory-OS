@@ -59,6 +59,7 @@ import { Fold, HelpHeading, HintTip, openFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
 import { exampleText } from '../../services/marketing/shorts'
+import { weekBadge } from '../../services/marketing/weekCollect'
 
 type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -677,6 +678,7 @@ function RecordItem({ p, store, readOnly, onOpen, showToast }: { p: ShortPost; s
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:px-4" data-testid="sht-rec-item" data-id={p.id}>
       <div className="flex flex-wrap items-center gap-1.5">
         {p.status === 'posted' ? <Badge tone="success">{p.postedOn.slice(5).replace('-', '/')} 올림</Badge> : <Badge>만들다 둠</Badge>}
+        {weekBadge(p) && <Badge tone="brand">{weekBadge(p)}</Badge>}
         <Badge tone="brand">{p.platform === 'reels' ? '릴스' : '틱톡 · 쇼츠'}</Badge>
         {f && <Badge>{f.name}</Badge>}
         {p.aim && <Badge>{aimLabel(p.platform, p.aim)}</Badge>}

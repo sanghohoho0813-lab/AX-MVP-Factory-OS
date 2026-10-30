@@ -548,7 +548,9 @@ function d241Tests() {
   const idea = normalizeIdea({ ...ideaFromOpportunity(plan.picks[0]), savedAt: '2026-10-18T00:00:00Z', status: 'selected', memo: '화요일 촬영', script: '0:00 오프닝 …' }, 'idea_1') as ContentIdea
   const rb = radarBundle({ today: T, view: 'plan', plan, rising: [], breakouts: [], videos: vids, ideas: [idea], mine, brief })
   const sec = (n: string) => rb.context.sections.find((x) => x.name.startsWith(n))
-  check('R1 레이더 자료 맨 앞 — 채널 설계 기준(대표가 고친 값 그대로 · 8칸)', rb.context.sections[0].name.startsWith('채널 설계 기준') && rb.context.sections[0].rows.length === 8 && JSON.stringify(rb.context.sections[0]).includes('코인'), rb.context.sections[0].rows.length)
+  // D-347 칸 13개(긴 칸은 '(이어서)' 줄로 나눠 서버의 칸 자르기에 안 걸리게)
+  const briefRowsSent = rb.context.sections[0].rows as { 항목: string; 기준: string }[]
+  check('R1 레이더 자료 맨 앞 — 채널 설계 기준(대표가 고친 값 그대로 · 13칸 모두 · 한 줄 300자 안)', rb.context.sections[0].name.startsWith('채널 설계 기준') && new Set(briefRowsSent.map((r) => r.항목.replace('(이어서)', ''))).size === 13 && briefRowsSent.every((r) => r.기준.length <= 300) && JSON.stringify(rb.context.sections[0]).includes('코인'), briefRowsSent.length)
   check('R2 내 채널 최근 영상 · 내 채널 숫자 한 줄(facts)', !!sec('내 채널 최근 영상') && (sec('내 채널 최근 영상')?.rows.length ?? 0) === Math.min(20, mine.length) && (rb.context.facts ?? []).some((f) => f.startsWith('내 채널')), { mine: mine.length })
   const cand = sec('이번 주 찍을 후보')
   check('R3 후보 — o1… 번호 · 주소 없음(같은 화면) · ids 로 후보 키 · 찍기 키트(첫 문장 · 구성 · 쇼츠 3컷)',
@@ -576,8 +578,8 @@ function d241Tests() {
   check('P5 후보 없는 기획 — 직접 담음 줄 · 제작 예정', !custom.existed && custom.input.source === 'custom' && custom.input.topic === '직접 기획' && custom.input.status === 'selected')
 
   // 채널 설계 기준 · 대본 칸 저장 모양
-  const nb = normalizeBrief({ tone: '  짧게  ', avoid: 'x'.repeat(500) })
-  check('B1 채널 설계 기준 — 빈 것은 null(기본값 씀) · 일부만 고치면 나머지는 기본값 · 300자 안', normalizeBrief({}) === null && normalizeBrief(null) === null && nb?.tone === '짧게' && nb?.channel === DEFAULT_BRIEF.channel && nb?.avoid.length === 300, nb)
+  const nb = normalizeBrief({ tone: '  짧게  ', avoid: 'x'.repeat(900) })
+  check('B1 채널 설계 기준 — 빈 것은 null(기본값 씀) · 일부만 고치면 나머지는 기본값(D-347 새 칸도) · 800자 안', normalizeBrief({}) === null && normalizeBrief(null) === null && nb?.tone === '짧게' && nb?.channel === DEFAULT_BRIEF.channel && nb?.services === DEFAULT_BRIEF.services && nb?.avoid.length === 800, nb)
   const big = normalizeIdea({ ...ideaFromOpportunity(opp), savedAt: '2026-10-18T00:00:00Z', script: '가'.repeat(SCRIPT_MAX + 50) }, 'idea_3') as ContentIdea
   check('B2 내 콘텐츠 대본 칸 — 저장 · 2만 자에서 자름 · 예전 줄은 빈 대본', big.script.length === SCRIPT_MAX && (normalizeIdea({ ...ideaFromOpportunity(opp), savedAt: '2026-10-18T00:00:00Z' }, 'idea_4') as ContentIdea).script === '')
 }

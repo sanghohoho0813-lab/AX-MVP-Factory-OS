@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Compass, RotateCcw, Save } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Fold } from '../../../components/ui/fold'
-import { BRIEF_FIELDS, defaultBrief, normalizeBrief, type ChannelBrief } from '../../../services/marketing/radarStore'
+import { BRIEF_FIELDS, BRIEF_MAX, defaultBrief, normalizeBrief, type ChannelBrief } from '../../../services/marketing/radarStore'
 import { isMarketingCustomer } from '../../../services/marketing/persona'
 
 export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelBrief; custom: boolean; readOnly: boolean; onSave: (next: ChannelBrief | null) => Promise<boolean> }) {
@@ -39,7 +39,7 @@ export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelB
       id="radar.brief"
       icon={<Compass aria-hidden="true" className="size-4 text-violet-700" />}
       title="채널 설계 기준"
-      hint="AI 도우미가 이번 주 기획 · 대본을 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 다루지 않는 것 · 말투 · 형식 · 끝맺음"
+      hint="AI 가 기획 · 대본 · 쇼츠 · 스레드를 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 말투 · 형식 · 끝맺음 · 본업 · 시청자 고민 · 접목 원칙 · 실제 사례 · 말할 때 지킬 것"
       summary={custom ? '직접 고친 기준' : isMarketingCustomer() ? '기본값 · 설정 › 내 브랜드에서' : '기본값 · 김팀장의 경영노트'}
       testId="radar-brief"
       keepClosed
@@ -53,8 +53,8 @@ export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelB
                 {f.label} <span className="t-meta font-normal text-slate-500">· {f.hint}</span>
               </span>
               <textarea
-                rows={3}
-                maxLength={300}
+                rows={draft[f.key].length > 200 ? 6 : 3}
+                maxLength={BRIEF_MAX}
                 value={draft[f.key]}
                 readOnly={readOnly}
                 onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}

@@ -9,10 +9,10 @@
  * 이 파일은 계산 · 저장 · 모양만(화면 없음 · 단위 시험).
  */
 import { safeText, type AssistContext } from '../aiAssist/context'
-import { MIRAE_PROFILE } from '../aiAssist/builders'
+import { MIRAE_PROFILE, briefSection } from '../aiAssist/builders'
 import { customerProfileLines, isMarketingCustomer, mkText } from './persona'
 import { packRules } from './contentPack'
-import { BRIEF_FIELDS, defaultBrief, type ChannelBrief, type IdeaInput } from './radarStore'
+import { defaultBrief, type ChannelBrief, type IdeaInput } from './radarStore'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { RadarVideo } from './ytRadar'
 
@@ -257,7 +257,7 @@ export function adaptContext(i: { v: RadarVideo; lessons: readonly string[]; bri
         ],
       },
       ...(rows.length ? [{ name: `참고 영상 대본(받아 적은 것 · ${rows.length}줄)`, rows }] : []),
-      { name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: BRIEF_FIELDS.map((f) => ({ 항목: f.label, 기준: safeText(brief[f.key], [], 300) })) },
+      briefSection(brief),
     ],
     facts: [...(isMarketingCustomer() ? customerProfileLines() : MIRAE_PROFILE), rows.length ? '참고 영상 대본이 있다 — 구성 · 흐름은 대본에서 읽는다.' : '참고 영상 대본이 없다 — 제목 · 숫자 · 참고할 것만으로 짐작한다.'],
     rules: [...packRules()],

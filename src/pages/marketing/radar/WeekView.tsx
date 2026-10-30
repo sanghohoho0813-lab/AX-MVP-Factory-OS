@@ -5,9 +5,10 @@
  *  - 규칙 초안(AI 아님)을 바로 보여 주고, [AI로 1주일치 다 쓰기](두 번 눌러 확인)를 누르면 여섯 갈래가 동시에 — 답이 온 것부터 바뀐다.
  *  - 위에 요일별 달력(무엇을 언제 올리나) · 점검 요약, 아래에 롱폼 · 쇼츠 · 스레드. 글마다 공식 점검(점검 통과 / 고칠 곳).
  *  - 결과는 이 브라우저(사람별 금고)에 주마다 — 다시 열어도 다시 부르지 않는다. 팀장 화면을 보는 중이면 AI 를 부르지 않는다.
+ *  - D-349 AI 가 쓴 글은 클라우드에도 남고 내 콘텐츠 · 릴스 · 틱톡 · 스레드 목록에 저절로 모인다(고친 글 · 올린 글은 그대로) — 어디에 모였는지 한 줄로.
  */
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, Loader2, MonitorPlay, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowLeft, AtSign, BookmarkPlus, CalendarDays, ClipboardCopy, Download, Film, FolderCheck, Loader2, MonitorPlay, RotateCcw, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
@@ -15,11 +16,12 @@ import { ModelPicker } from '../../../components/ai/ModelPicker'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import { todayLocalDate } from '../../../lib/appClock'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
-import { makePack, withAi, type ContentPack, type PackSource } from '../../../services/marketing/contentPack'
+import { makePack, withAi, type ContentPack } from '../../../services/marketing/contentPack'
 import { templateOf } from '../../../services/marketing/threads'
 import { PLATFORMS } from '../../../services/marketing/shorts'
-import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
-import { startWeekAi, subscribeWeek, weekRun, weekSaved, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
+import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
+import { startWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
+import { weekItemId } from '../../../services/marketing/weekCollect'
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -41,8 +43,9 @@ function download(name: string, text: string) {
 }
 
 export function WeekView({
-  topics,
+  setup,
   brief,
+  ws,
   readOnly,
   ownerAi,
   savedLongHref,
@@ -50,9 +53,11 @@ export function WeekView({
   onCopy,
   onSaveLong,
 }: {
-  /** 이번 주 키워드 1~3위(모자라면 고정 키워드) */
-  topics: PackSource[]
+  /** D-348 짝 셋 — 본업(고정 키워드) × 미끼(이번 주 AI 흐름) */
+  setup: WeekSetup
   brief: ChannelBrief
+  /** D-349 작업공간 — 주면 AI 결과를 클라우드 · 목록으로 모은다(팀장 화면 보기면 주지 않는다) */
+  ws?: string | null
   readOnly: boolean
   ownerAi: boolean
   /** 롱폼 주제가 이미 내 콘텐츠에 있으면 그 줄 주소 */
@@ -66,23 +71,26 @@ export function WeekView({
   const version = useSyncExternalStore(subscribeWeek, weekVersion)
   const run = useMemo(() => weekRun(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
   const saved = useMemo(() => weekSaved(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
-  const week = useMemo(() => buildWeek(topics, brief, today, saved), [topics, brief, today, saved])
+  const sync = useMemo(() => weekSync(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const week = useMemo(() => buildWeek(setup, brief, today, saved), [setup, brief, today, saved])
+  const labels = setup.pairs.map((p) => p.label)
   const lint = useMemo(() => weekLintSummary(week), [week])
   const cal = useMemo(() => weekCalendar(week), [week])
   const running = Object.values(run.parts).includes('running')
-  const canAi = ownerAi && !readOnly && topics.length > 0
-  const changed = !!saved && saved.topics.join('|') !== topics.map((t) => t.topic).join('|')
+  const canAi = ownerAi && !readOnly && setup.pairs.length > 0
+  const changed = !!saved && saved.topics.join('|') !== labels.join('|')
   const [savedHref, setSavedHref] = useState<string | null>(savedLongHref)
   const [saving, setSaving] = useState(false)
 
   const runAi = () => {
-    if (canAi) startWeekAi(start, topics.map((t) => t.topic), weekRequests(topics, brief, today))
+    if (canAi) startWeekAi(start, labels, weekRequests(setup, brief, today), { ws })
   }
   const saveLong = async () => {
-    if (!topics[0]) return
+    const first = setup.pairs[0]?.source
+    if (!first) return
     setSaving(true)
     try {
-      const href = await onSaveLong(withAi(makePack(topics[0], brief), saved?.long ?? {}))
+      const href = await onSaveLong(withAi(makePack(first, brief), saved?.long ?? {}))
       if (href) setSavedHref(href)
     } finally {
       setSaving(false)
@@ -93,6 +101,9 @@ export function WeekView({
   const shortsSpare = week.shorts.filter((s) => s.slot.n === 0)
   const threadsMain = week.threads.filter((x) => x.slot.day > 0)
   const threadsSpare = week.threads.filter((x) => x.slot.day === 0)
+  const collect = !readOnly && ws !== undefined
+  const got = { long: week.long.ai ? 1 : 0, shorts: shortsMain.filter((s) => s.ai).length, threads: threadsMain.filter((x) => x.ai).length }
+  const gotAny = got.long + got.shorts + got.threads > 0
 
   return (
     <div className="flex flex-col gap-4" data-testid="mk-week" data-start={start}>
@@ -102,14 +113,17 @@ export function WeekView({
         </button>
       </div>
 
-      <header className="relative overflow-hidden rounded-(--radius-panel) bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 p-4 text-white sm:p-5">
-        <span aria-hidden="true" className="pointer-events-none absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
+      {/* 장식 원만 머리 안에서 자른다 — 머리 전체를 자르면 'AI 는 미끼' 설명 상자가 휴대폰에서 잘린다 */}
+      <header className="relative z-10 rounded-(--radius-panel) bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 p-4 text-white sm:p-5">
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-(--radius-panel)">
+          <span className="absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
+        </span>
         <div className="relative flex flex-col gap-2">
           <p className="t-meta font-semibold text-white/90">
             1주일치 콘텐츠 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
           </p>
-          <HintTip tip="이번 주 키워드(경제 · 경영 · AI 벤치마킹 채널에서 최근 2주 함께 오른 주제) 1~3위로 만들었어요. 롱폼 · 쇼츠 · 스레드 모두 지금까지 쓰던 검증된 방법(공식) 그대로예요." label="이번 주 키워드로 한 번에" onDark>
-            <h2 className="t-page break-keep text-white">이번 주 키워드로 한 번에</h2>
+          <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업" onDark>
+            <h2 className="t-page break-keep text-white">AI 는 미끼, 끝은 본업</h2>
           </HintTip>
           <ul className="flex flex-wrap gap-1.5" aria-label="만드는 것">
             {[
@@ -125,12 +139,17 @@ export function WeekView({
           <ol className="flex flex-col gap-1" data-testid="mk-week-topics">
             {week.topics.map((t, i) => (
               <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-white">
-                <span className="t-meta shrink-0 rounded-full bg-white px-1.5 font-bold text-violet-800">{i + 1}위</span>
+                <span className="t-meta shrink-0 rounded-full bg-white px-1.5 font-bold text-violet-800">짝 {i + 1}</span>
                 <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
                 <span className="t-meta shrink-0 text-white/85">{['롱폼 · 쇼츠 2 · 스레드 3', '릴스 1 · 스레드 3', '스레드 1 · 예비 2'][i]}</span>
               </li>
             ))}
           </ol>
+          {setup.trend.length > 0 && (
+            <p className="t-meta break-keep text-white/85" data-testid="mk-week-trend">
+              이번 주 AI 흐름(미끼 후보): {setup.trend.slice(0, 6).join(' · ')}
+            </p>
+          )}
         </div>
       </header>
 
@@ -167,7 +186,7 @@ export function WeekView({
           )}
           {changed && !running && (
             <p className="t-meta break-keep text-violet-900" data-testid="mk-week-changed">
-              지금 키워드 1~3위가 이 1주일치를 만들 때와 달라요 — [AI로 다시 쓰기] 를 누르면 지금 순위로 다시 써요.
+              지금 짝(본업 × 이번 주 AI 흐름)이 이 1주일치를 만들 때와 달라요 — [AI로 다시 쓰기] 를 누르면 지금 짝으로 다시 써요.
             </p>
           )}
           {run.errors.length > 0 && (
@@ -183,6 +202,47 @@ export function WeekView({
         </p>
       )}
 
+      {/* D-349 어디에 모였나 */}
+      {collect && gotAny && (
+        <div
+          className={`flex flex-col gap-1 rounded-xl border px-3 py-2 ${sync.state === 'error' ? 'border-amber-300 bg-amber-50' : 'border-success-200 bg-success-50'}`}
+          data-testid="mk-week-collect"
+          data-state={sync.state}
+          data-kept={sync.kept}
+        >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {sync.state === 'saving' ? <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-success-700" /> : <FolderCheck aria-hidden="true" className={`size-4 shrink-0 ${sync.state === 'error' ? 'text-amber-700' : 'text-success-700'}`} />}
+            <p className={`t-sub min-w-0 break-keep font-semibold ${sync.state === 'error' ? 'text-amber-900' : 'text-success-800'}`}>
+              {sync.state === 'saving'
+                ? '목록으로 모으는 중이에요…'
+                : sync.state === 'error'
+                  ? '목록으로 모으지 못했어요(인터넷 · 로그인 확인) — 이 화면을 다시 열면 한 번 더 모아요.'
+                  : 'AI 가 쓴 글을 목록에 모아 뒀어요 — 다른 기기에서도 보여요'}
+            </p>
+          </div>
+          {sync.state !== 'error' && (
+            <p className="t-sub flex flex-wrap gap-x-3 gap-y-1">
+              {got.long > 0 && (
+                <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-long">
+                  내 콘텐츠 · 롱폼 1
+                </Link>
+              )}
+              {got.shorts > 0 && (
+                <Link to="/marketing/shorts?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-shorts">
+                  릴스 · 틱톡 {got.shorts}
+                </Link>
+              )}
+              {got.threads > 0 && (
+                <Link to="/marketing/threads?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-threads">
+                  스레드 {got.threads}
+                </Link>
+              )}
+            </p>
+          )}
+          {sync.kept > 0 && <p className="t-meta break-keep text-slate-700">직접 고친 글 {sync.kept}개는 덮지 않고 그대로 뒀어요(올린 글도 그대로).</p>}
+        </div>
+      )}
+
       {/* 도구 · 점검 요약 */}
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all">
@@ -192,6 +252,7 @@ export function WeekView({
           <Download aria-hidden="true" className="size-4" /> 텍스트 파일로
         </Button>
         {!readOnly &&
+          !(collect && week.long.ai) &&
           (savedHref ? (
             <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-long-saved">
               롱폼 — 내 콘텐츠에서 보기
@@ -236,7 +297,7 @@ export function WeekView({
         <Card
           icon={<MonitorPlay aria-hidden="true" className="size-5 text-red-600" />}
           title={`유튜브 롱폼 · ${dayLabel(start, LONG_DAY)}`}
-          sub={`1위 ${week.long.topic}`}
+          sub={`짝 1 · ${week.long.topic}`}
           ai={week.long.ai}
           lint={week.long.lint}
           onCopy={() => onCopy([`제목: ${week.long.headline}`, ...[...week.long.titles, ...week.long.script].map((b) => `[${b.label}]\n${b.text}`)].join('\n\n'), '롱폼')}

@@ -286,7 +286,7 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
       <CalendarDays aria-hidden="true" className="size-6 shrink-0" />
       <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
         <span className="t-body font-bold break-keep">{done ? '1주일치 콘텐츠 보기' : '1주일치 콘텐츠 한 번에 만들기'}</span>
-        <span className="t-meta break-keep text-white/90">이번 주 키워드 1~3위로 · 검증된 방법 그대로</span>
+        <span className="t-meta break-keep text-white/90">AI 는 미끼, 끝은 본업 — 이번 주 흐름 × 고정 키워드 · 검증된 방법 그대로</span>
       </span>
       <span className="flex flex-wrap gap-1">
         {[

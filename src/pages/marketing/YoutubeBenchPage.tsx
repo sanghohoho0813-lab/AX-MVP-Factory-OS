@@ -99,8 +99,8 @@ import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
 import { WeekView } from './radar/WeekView'
-import { weekRequests, weekStart, weekTopics } from '../../services/marketing/weekPlan'
-import { startWeekAi, subscribeWeek, weekSaved, weekVersion } from '../../services/marketing/weekRun'
+import { weekRequests, weekSetup, weekStart } from '../../services/marketing/weekPlan'
+import { openWeekSync, startWeekAi, subscribeWeek, weekSaved, weekSync, weekVersion } from '../../services/marketing/weekRun'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
@@ -259,12 +259,30 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     return packOpp ? packSourceOf(packOpp) : null
   }, [packKey, packOpp, packFixed, today])
   // D-346 1주일치 주제 — 이번 주 키워드 1~3위(모자라면 고정 키워드)
-  const weekSources = useMemo(() => weekTopics((plan?.picks ?? []).map(packSourceOf), fixedKeys.map((k) => fixedPackSource(k, today)).filter((x): x is PackSource => !!x)), [plan, fixedKeys, today])
+  // D-348 짝 셋 — 본업(고정 키워드 · 이번 주 새 공고 많은 순) × 미끼(이번 주 AI 흐름)
+  const weekPlanSetup = useMemo(
+    () =>
+      weekSetup(
+        (plan?.picks ?? []).map(packSourceOf),
+        fixedKeys.map((k) => ({ source: fixedPackSource(k, today), fresh: k.fresh.length })).filter((x): x is { source: PackSource; fresh: number } => !!x.source),
+        weekStart(today),
+      ),
+    [plan, fixedKeys, today],
+  )
   const weekVer = useSyncExternalStore(subscribeWeek, weekVersion)
   const weekDone = useMemo(() => !!weekSaved(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
+  // D-349 1주일치 — 열 때 클라우드와 맞추고(휴대폰에서 만든 주도 여기서) · 목록으로 모은 뒤 내 콘텐츠를 다시 읽는다
+  const weekSyncNow = useMemo(() => weekSync(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (readOnly) return
+    void openWeekSync(workspaceId, weekStart(todayLocalDate()))
+  }, [workspaceId, readOnly])
+  useEffect(() => {
+    if (weekSyncNow.state === 'done' && weekSyncNow.idea > 0) void notebook.reload()
+  }, [weekSyncNow.state, weekSyncNow.idea]) // eslint-disable-line react-hooks/exhaustive-deps
   /** 첫 화면 단추 → 1주일치(AI 를 부를 수 있으면 두 번 눌러 확인한 뒤 여섯 갈래를 바로) */
   const openWeek = (startAi: boolean) => {
-    if (startAi && mkAi && !readOnly && weekSources.length) startWeekAi(weekStart(today), weekSources.map((t) => t.topic), weekRequests(weekSources, brief, today))
+    if (startAi && mkAi && !readOnly && weekPlanSetup.pairs.length) startWeekAi(weekStart(today), weekPlanSetup.pairs.map((p) => p.label), weekRequests(weekPlanSetup, brief, today), { ws: workspaceId })
     const next = new URLSearchParams(params)
     next.delete('view')
     next.delete('pack')
@@ -716,12 +734,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         )
       ) : weekOn ? (
         <WeekView
-          topics={weekSources}
+          setup={weekPlanSetup}
           brief={brief}
+          ws={readOnly ? undefined : workspaceId}
           readOnly={readOnly}
           ownerAi={mkAi}
           savedLongHref={(() => {
-            const t0 = weekSources[0]
+            const t0 = weekPlanSetup.pairs[0]?.source
             const idea = t0 ? ideaOfPack(t0.key, t0.topic, t0.custom) : undefined
             return idea?.script ? ideaHref(idea.id) : null
           })()}
@@ -757,7 +776,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             change={change.line}
             onPick={openPack}
             onCustom={(t) => openPack(`custom:${t}`)}
-            week={{ ai: mkAi && !readOnly && weekSources.length > 0, done: weekDone, onOpen: openWeek }}
+            week={{ ai: mkAi && !readOnly && weekPlanSetup.pairs.length > 0, done: weekDone, onOpen: openWeek }}
           />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}

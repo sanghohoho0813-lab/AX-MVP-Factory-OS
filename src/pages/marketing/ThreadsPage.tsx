@@ -70,6 +70,7 @@ import {
   type ThreadTemplateKey,
 } from '../../services/marketing/threads'
 import { josa } from '../../lib/josa'
+import { weekBadge } from '../../services/marketing/weekCollect'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -863,6 +864,7 @@ function RecordItem({ p, store, readOnly, onOpen, showToast }: { p: ThreadPost; 
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:px-4" data-testid="thr-rec-item" data-id={p.id}>
       <div className="flex flex-wrap items-center gap-1.5">
         {p.status === 'posted' ? <Badge tone="success">{p.postedOn.slice(5).replace('-', '/')} 올림</Badge> : <Badge>쓰다 둠</Badge>}
+        {weekBadge(p) && <Badge tone="brand">{weekBadge(p)}</Badge>}
         {t && <Badge tone="brand">{t.key} {t.name}</Badge>}
         {p.tag && <Badge>#{p.tag}</Badge>}
         {score != null && (
