@@ -128,6 +128,27 @@ check('D10 다음에 열면 — 종이에 "지난 진단(날짜) 뒤 달라진 �
 check('D11 오류 0', errors.length === 0, errors)
 await shot(page, 'D-since')
 await page.keyboard.press('Escape')
+// D-366 '먼저 제안할 것' 한 줄 — 방금(오늘) 드린 뒤 그대로면 회색 '오늘 진단서 드림 — 그대로' · 지난번만 있고 판정이 바뀌었으면 '다시 드릴 때예요'
+await page.waitForTimeout(400)
+const noteToday = page.getByTestId('top-picks-diag-note')
+const nt = (await noteToday.innerText().catch(() => '')) ?? ''
+check('D12 먼저 제안할 것 아래 한 줄 — 오늘 드림(카톡 요약) · 그 뒤 판정 그대로', (await noteToday.getAttribute('data-state').catch(() => '')) === 'today' && nt.includes('오늘 진단서 드림(카톡 요약)'), nt)
+await page.evaluate(() => {
+  const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+  const r = all.find((x) => x.id === 'cli_hansol')
+  r.diagnosisGiven = r.diagnosisGiven.slice(1) // 오늘 것을 빼면 열흘 전(첫 제안이 '자료 필요' 였던) 기록이 맨 앞
+  localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.getByTestId('top-picks').waitFor({ timeout: 8000 })
+const note2 = page.getByTestId('top-picks-diag-note')
+const nt2 = (await note2.innerText().catch(() => '')) ?? ''
+check('D13 지난번 드린 뒤 판정이 바뀌었으면 — "m/d 진단서 드린 뒤 달라짐 — 판정 바뀐 것 1 · 받은 자료 1 · 다시 드릴 때예요" · 누르면 진단서', (await note2.getAttribute('data-state').catch(() => '')) === 'changed' && /진단서 드린 뒤 달라짐 — 판정 바뀐 것 1 · 받은 자료 1 · 다시 드릴 때예요/.test(nt2), nt2)
+await shot(page, 'D-note')
+await note2.click()
+await doc.waitFor({ timeout: 5000 }).catch(() => {})
+check('D14 한 줄을 누르면 진단서 창(달라진 것 칸)', (await doc.getByTestId('diagnosis-since').count()) === 1)
+await page.keyboard.press('Escape')
 await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
 await page.getByTestId('smart-tab').waitFor({ timeout: 8000 })
 check('D7 맞춤 추천 탭에도 같은 [맞춤 진단서]', (await page.getByTestId('smart-tab').getByTestId('top-picks-diagnosis').count()) === 1)

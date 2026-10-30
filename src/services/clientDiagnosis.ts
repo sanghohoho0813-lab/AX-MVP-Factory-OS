@@ -107,6 +107,23 @@ export function diagnosisSince(given: readonly DiagnosisGiven[] | undefined, lin
   return { date: localDateOf(prev.at), how: prev.how, changed, received }
 }
 
+/**
+ * D-366 '먼저 제안할 것' 카드의 한 줄 — 마지막으로 드린 진단서(오늘 것 포함)와 지금 판정을 견준다.
+ * 달라졌으면 '다시 드릴 때', 그대로면 언제 드렸는지만. 드린 적이 없으면 null(줄 없음).
+ */
+export function diagnosisNote(record: ClientOpsRecord, insights: readonly Insight[], today: string): { state: 'changed' | 'same' | 'today'; text: string } | null {
+  const last = record.diagnosisGiven?.[0]
+  if (!last) return null
+  const d = buildDiagnosis(record, insights, today)
+  // 오늘 드린 것까지 견준다 — '오늘 전' 대신 아주 먼 날을 기준으로 맨 앞 기록을 고른다
+  const s = diagnosisSince(record.diagnosisGiven, [...d.picks, ...d.others], d.requests, '9999-12-31')
+  const date = localDateOf(last.at)
+  const when = date === today ? '오늘' : `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+  const parts = [s?.changed.length ? `판정 바뀐 것 ${s.changed.length}` : '', s?.received.length ? `받은 자료 ${s.received.length}` : ''].filter(Boolean)
+  if (parts.length) return { state: 'changed', text: `${when} 진단서 드린 뒤 달라짐 — ${parts.join(' · ')} · 다시 드릴 때예요` }
+  return { state: date === today ? 'today' : 'same', text: `${when} 진단서 드림(${last.how === 'print' ? '인쇄 · PDF' : '카톡 요약'}) — 그 뒤 판정 그대로` }
+}
+
 /** D-363 진단서를 드린 기록 한 건(그때 판정 · 요청 자료) */
 export function givenOf(d: DiagnosisSheet, how: DiagnosisGiven['how'], at: string): DiagnosisGiven {
   return {

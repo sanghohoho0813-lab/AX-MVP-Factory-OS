@@ -19,6 +19,7 @@ import { useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
 import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, type Insight, type InsightTone } from '../../services/clientInsights'
 import { recoRequestMessage } from '../../services/recoRequest'
+import { diagnosisNote } from '../../services/clientDiagnosis'
 import { HintTip } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
 
@@ -33,9 +34,12 @@ export function TopPicksCard({
   onRequest,
   onPickRequest,
   onDiagnosis,
+  diagNote,
 }: {
   /** D-352 대표님께 드릴 맞춤 진단서 한 장(없으면 단추를 그리지 않는다) */
   onDiagnosis?: () => void
+  /** D-366 지난번 드린 진단서와 견준 한 줄(드린 적 없으면 없음) */
+  diagNote?: { state: 'changed' | 'same' | 'today'; text: string } | null
   insights: readonly Insight[]
   onUpload: () => void
   onShowAll?: () => void
@@ -70,6 +74,17 @@ export function TopPicksCard({
           </button>
         )}
       </div>
+      {onDiagnosis && diagNote && (
+        <button
+          type="button"
+          onClick={onDiagnosis}
+          data-testid="top-picks-diag-note"
+          data-state={diagNote.state}
+          className={`tap t-sub mt-1.5 inline-flex max-w-full items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-left font-semibold break-keep hover:underline ${diagNote.state === 'changed' ? 'bg-amber-50 text-amber-900 ring-1 ring-amber-200' : 'text-slate-500'}`}
+        >
+          <History aria-hidden="true" className="size-4 shrink-0" /> {diagNote.text}
+        </button>
+      )}
 
       {picks.length > 0 ? (
         <ol className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3" data-testid="top-pick-list">
@@ -181,6 +196,7 @@ export default function ClientTopPicks({
   const text = useMemo(() => recoRequestMessage(record, insights), [record, insights])
   // D-352 대표님께 드릴 맞춤 진단서 — 개요 맨 위에서도 바로
   const [diag, setDiag] = useState(false)
+  const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
   return (
     <>
       {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}
@@ -189,6 +205,7 @@ export default function ClientTopPicks({
         onUpload={onUpload}
         onShowAll={onShowAll}
         onDiagnosis={() => setDiag(true)}
+        diagNote={diagNote}
         onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
         onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
       />

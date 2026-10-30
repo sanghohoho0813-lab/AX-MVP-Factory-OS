@@ -62,7 +62,7 @@ import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
-import { buildDiagnosis, customerText, diagnosisKakao, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
+import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
@@ -385,6 +385,12 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('D-363 지난번(9/20, 자료가 없던 때) 뒤 — 정책자금 자료 필요 → 나아짐 · 받은 자료(그때 요청 · 지금은 필요 없음)', later.since?.date === '2026-09-20' && !!pfChange && pfChange.from === '자료 필요' && pfChange.better && later.since.received.length > 0 && later.since.received.every((r) => !later.requests.some((q) => q.label === r)), JSON.stringify(later.since))
   check('D-363 나아진 것이 먼저 · 카톡 요약에도 "지난 진단 뒤 달라진 것"', later.since!.changed.every((c, i, a) => i === 0 || !(c.better && !a[i - 1].better)) && diagnosisKakao(later).includes('■ 지난 진단(2026-09-20) 뒤 달라진 것') && sinceLines(later.since).some((x) => x.startsWith('받은 자료: ')), diagnosisKakao(later))
   check('D-363 오늘 드린 것만 있으면 견줄 것 없음(처음과 같음)', buildDiagnosis({ ...full, diagnosisGiven: [{ ...g3.diagnosisGiven![0], at: '2026-10-02T03:00:00.000Z' }] } as typeof full, ins, '2026-10-02').since === null && dg.since === null)
+  // D-366 '먼저 제안할 것' 한 줄 — 마지막으로 드린 것(오늘 것 포함)과 견줌
+  const note1 = diagnosisNote({ ...full, diagnosisGiven: g3.diagnosisGiven } as typeof full, ins, '2026-10-02')
+  check('D-366 드린 뒤 판정이 바뀌면 "9/20 진단서 드린 뒤 달라짐 — 판정 바뀐 것 n · 받은 자료 n · 다시 드릴 때예요"', note1?.state === 'changed' && /^9\/20 진단서 드린 뒤 달라짐 — 판정 바뀐 것 \d+ · 받은 자료 \d+ · 다시 드릴 때예요$/.test(note1.text), JSON.stringify(note1))
+  const fresh = withDiagnosisGiven(full, givenOf(dg, 'print', '2026-10-02T03:00:00.000Z'))
+  const note2 = diagnosisNote(fresh, ins, '2026-10-02')
+  check('D-366 오늘 드리고 그대로면 "오늘 진단서 드림(인쇄 · PDF) — 그 뒤 판정 그대로" · 드린 적 없으면 줄 없음', note2?.state === 'today' && note2.text === '오늘 진단서 드림(인쇄 · PDF) — 그 뒤 판정 그대로' && diagnosisNote(full, ins, '2026-10-02') === null, JSON.stringify(note2))
   check('D-363 기록 모양 지킴 — 저장했다 다시 읽어도 그대로 · 모양이 틀린 줄은 버림', JSON.stringify(normalizeClientOps({ ...g3, diagnosisGiven: [...g3.diagnosisGiven!, { id: 1 }, 'x'] } as never).diagnosisGiven) === JSON.stringify(g3.diagnosisGiven))
   check('맞춤 추천: 요금제에 없는 모듈은 빠짐', !buildInsights(full, '2026-10-02', [], (k) => k !== 'labcare').some((i) => i.key === 'labcare'))
   // D-215: 직원 수를 모르면 정책자금은 1~4명(소상공인)으로 계산된다 — 가정이라고 알리고 '좋음' 으로 단정하지 않는다
