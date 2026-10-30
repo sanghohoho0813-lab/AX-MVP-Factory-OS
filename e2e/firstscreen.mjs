@@ -81,6 +81,18 @@ for (const vp of [
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${vp.tag}-${name.replace(/[^가-힣a-z0-9]+/gi, '_')}.png`, fullPage: true })
   }
   console.log(`${vp.tag}: ${rows.join(' · ')}`)
+  if (vp.tag === '휴대폰') {
+    // D-369 휴대폰 전문 모듈 — 모듈마다 기능 3개 먼저 · [n개 더 보기] 로 전부(PC 는 처음부터 전부)
+    await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    const growth = page.locator('[data-module-card="growth"]')
+    const visibleFeat = () => growth.locator('[data-feature]:visible').count()
+    const before = await visibleFeat()
+    await growth.getByTestId('module-card-more').click()
+    await page.waitForTimeout(200)
+    const after = await visibleFeat()
+    check('휴대폰 전문 모듈: 기능 3개 먼저 → [n개 더 보기] 누르면 전부(단추는 사라짐)', before === 3 && after > 3 && (await growth.getByTestId('module-card-more').count()) === 0, { before, after })
+  }
   check(`${vp.tag} JS 오류 0`, errs.length === 0, errs)
   await ctx.close()
 }

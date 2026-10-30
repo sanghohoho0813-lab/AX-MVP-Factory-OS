@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { IconTile } from '../components/ui/visual'
 import { moduleTone } from '../config/featureVisual'
 import { ArrowRight } from 'lucide-react'
@@ -67,6 +68,9 @@ function ModuleCard({ m }: { m: CatalogModule }) {
   // D-162: Pilot 에게 막힌 화면(AX 프로젝트 자금 연계 등)은 줄째 뺀다
   const pilot = useIsPilot()
   const features = featuresOfModule(m.key).filter((f) => !(pilot && featurePath(f) && isPilotHiddenPath(featurePath(f) as string)))
+  // D-369 📐 휴대폰은 모듈마다 기능 3개만 먼저(카드 다섯이 세로로 쌓여 한 화면 반이 넘었다) — [n개 더 보기]. PC 는 그대로 전부
+  const [more, setMore] = useState(false)
+  const SHOWN = 3
   return (
     <li className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4" data-module-card={m.key}>
       <div className="flex flex-wrap items-center gap-2">
@@ -76,11 +80,11 @@ function ModuleCard({ m }: { m: CatalogModule }) {
       </div>
       <p className="t-sub break-keep text-slate-600">{m.description}</p>
       <ul className="flex flex-col divide-y divide-slate-100 border-y border-slate-100">
-        {features.map((f) => {
+        {features.map((f, i) => {
           const path = featurePath(f)
           const Icon = featureIcon(f)
           return (
-            <li key={f.key}>
+            <li key={f.key} className={!more && i >= SHOWN ? 'max-sm:hidden' : undefined}>
               {path ? (
                 <Link to={path} data-tool={f.source === 'tool' ? f.key : undefined} data-feature={f.key} className="tap t-body flex items-center gap-2.5 py-2.5 font-medium text-slate-800 hover:text-brand-700">
                   {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
@@ -98,6 +102,11 @@ function ModuleCard({ m }: { m: CatalogModule }) {
           )
         })}
       </ul>
+      {!more && features.length > SHOWN && (
+        <button type="button" onClick={() => setMore(true)} className="tap t-sub -mt-1 w-fit font-semibold text-slate-600 hover:text-brand-700 hover:underline sm:hidden" data-testid="module-card-more">
+          기능 {features.length - SHOWN}개 더 보기
+        </button>
+      )}
       <Link to={m.route} className="tap t-body inline-flex w-fit items-center gap-1 font-semibold text-brand-700 hover:underline" data-act="explore">
         {m.name} 살펴보기 <ArrowRight aria-hidden="true" className="size-4" />
       </Link>
