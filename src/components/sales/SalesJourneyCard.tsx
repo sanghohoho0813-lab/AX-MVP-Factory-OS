@@ -159,7 +159,7 @@ export function SalesJourneyCard({
           const total = s.tasks.filter((t) => !t.soon).length
           const c = STEP_COLORS[i % STEP_COLORS.length]
           const now = s.state === 'now'
-          const tone = now ? `${c.border} ${c.soft} border-2` : s.state === 'optional' ? 'border-dashed border-slate-300 bg-white' : 'border-slate-200 bg-white'
+          const tone = now ? `${c.border} bg-white border-2` : s.state === 'optional' ? 'border-dashed border-slate-300 bg-white' : 'border-slate-200 bg-white'
           return (
             <li key={s.key}>
               <button

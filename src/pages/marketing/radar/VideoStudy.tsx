@@ -118,7 +118,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
               <ol className="flex max-h-[45vh] flex-col gap-1.5 overflow-y-auto rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="vs-lines">
                 {lines.map((l, k) => (
                   <li key={`${l.t}-${k}`} className="t-sub flex gap-2.5 break-keep text-slate-800 [overflow-wrap:anywhere]">
-                    <a href={tAt(v.url, l.t)} target="_blank" rel="noopener noreferrer" className="shrink-0 font-semibold text-violet-700 tabular-nums hover:underline" title="유튜브에서 이 자리부터 보기">
+                    <a href={tAt(v.url, l.t)} target="_blank" rel="noopener noreferrer" className="shrink-0 font-semibold text-brand-700 tabular-nums hover:underline" title="유튜브에서 이 자리부터 보기">
                       {clockOf(l.t)}
                     </a>
                     <span className="min-w-0">
@@ -130,7 +130,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
               </ol>
             )}
             {failed.length > 0 && run.running === 0 && (
-              <p role="alert" className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" data-testid="vs-failed">
+              <p role="alert" className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700" data-testid="vs-failed">
                 {failed.length}개 구간({failed.map((p) => `${clockOf(p.start)}~${clockOf(p.end)}`).join(' · ')})을 받지 못했어요 — {failed[0].error}
               </p>
             )}
@@ -189,7 +189,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
           {a && adapt && <span className="t-meta text-violet-900/70">{adapt.withTranscript ? '대본을 보고 만듦' : '제목 · 숫자로 만듦'} · {adapt.model}</span>}
         </div>
         {run.adaptError && (
-          <p role="alert" className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" data-testid="vs-adapt-error">
+          <p role="alert" className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700" data-testid="vs-adapt-error">
             {run.adaptError}
           </p>
         )}
@@ -235,7 +235,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
                 </button>
               )}
               {savedHref && (
-                <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-violet-800 underline underline-offset-2" data-testid="vs-adapt-open">
+                <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-brand-700 underline underline-offset-2" data-testid="vs-adapt-open">
                   <ExternalLink aria-hidden="true" className="size-4" /> 내 콘텐츠에서 보기
                 </Link>
               )}
@@ -244,7 +244,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
         )}
       </div>
       {run.storeFull && (
-        <p role="status" className="t-meta break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" data-testid="vs-store-full">
+        <p role="status" className="t-meta break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700" data-testid="vs-store-full">
           이 브라우저 저장 공간이 가득 차 대본 · 우리 버전을 남기지 못했어요 — 지금 화면의 글은 [복사] 로 가져가세요(창을 새로 열면 사라져요).
         </p>
       )}

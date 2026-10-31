@@ -179,8 +179,21 @@ function valueAfter(text: string, labelPattern: string): string | undefined {
 /* 문서 종류 판별                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * D-371 부동산(건물 · 토지 · 집합건물) 등기부 — 법인 등기부와 제목이 같다('등기사항전부증명서').
+ * 예전에는 법인 등기부 칸에 '확실' 로 들어가 정책자금 준비 서류가 '법인 등기부 확보' 로 잘못 셌다.
+ * 표제부 · 소유권 같은 부동산 표시가 있고 법인 등기부 표시(회사성립연월일 · 임원 · 1주의 금액 · 본점)가 없을 때만.
+ */
+export function looksLikeRealEstateRegistry(text: string): boolean {
+  const t = normalize(text ?? '')
+  if (/회사\s?성립\s?연월일|임원에\s?관한\s?사항|1\s?주의\s?금액|발행할\s?주식의\s?총수|본\s?점\s*[:：]?\s*\S/.test(t)) return false
+  if (/등기사항\s?(?:전부|일부)?\s?증명서[^\n]{0,24}(?:건물|토지|집합\s?건물)/.test(t)) return true
+  return [/표\s?제\s?부/, /(?:건물|토지)의\s?표시/, /소유권에\s?관한\s?사항/, /소재\s?지번/, /고유\s?번호/].filter((re) => re.test(t)).length >= 2
+}
+
 export function detectDocSource(text: string): DocSource {
   const t = normalize(text)
+  if (looksLikeRealEstateRegistry(t)) return 'unknown'
   const count = (patterns: RegExp[]) => patterns.reduce((n, re) => n + (re.test(t) ? 1 : 0), 0)
 
   const registry = count([

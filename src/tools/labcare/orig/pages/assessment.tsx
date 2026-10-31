@@ -387,7 +387,7 @@ export default function AssessmentPage() {
     firstReco.tone = "amber";
     firstReco.lines.push(`단, 종합 판정은 '${result.verdict}' 입니다 — 아래 확인 항목을 먼저 보세요.`);
   }
-  const recoToneCls = firstReco.tone === "green" ? "border-green-200 bg-status-normalBg" : firstReco.tone === "indigo" ? "border-indigo-200 bg-indigo-50" : "border-amber-200 bg-amber-50";
+  const recoToneCls = "border-slate-200 bg-white";
 
   /* 후보 수(pick) 기반 UI 추천 — 법령 판정(feasibility)은 그대로, 표시용 계산만 분리 */
   const reqLab = requiredForLab({
@@ -1300,7 +1300,7 @@ function EduGuide({ education, cert, researchYears }: { education: EducationLeve
   else if (highschool) box = { tone: "amber", text: "고졸 이하 후보자는 연구개발 경력 및 자격요건 확인이 중요합니다. (마이스터고·특성화고 졸업·기능사: 경력 4년 이상)" };
   else box = { tone: "blue", text: "해당 전공 학위 기준으로 경력 없이도 검토 가능합니다. (전공이 자연계 계열인지 확인하세요)" };
 
-  const cls = box.tone === "blue" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800";
+  const cls = box.tone === "blue" ? "border-slate-200 bg-white text-slate-800" : "border-slate-200 bg-white text-danger-700";
   return (
     <div className={`mt-3 rounded-lg border px-3 py-2 text-sm leading-relaxed ${cls}`}>
       {box.text}

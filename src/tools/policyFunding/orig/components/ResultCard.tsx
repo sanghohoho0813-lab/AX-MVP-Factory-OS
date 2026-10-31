@@ -247,7 +247,7 @@ export default function ResultCard({
                 <LikelihoodBadge score={a.score} cap={headlineLevel} />
               </div>
               {a.exceptionalReview && a.exceptionalNote && (
-                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                <p className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-danger-700">
                   {a.exceptionalNote}
                 </p>
               )}
@@ -637,8 +637,8 @@ export default function ResultCard({
                 key={d.label}
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                   d.status === "확보"
-                    ? "border-green-100 bg-green-50/50 text-slate-500"
-                    : "border-amber-100 bg-amber-50/50 text-slate-700"
+                    ? "border-slate-200 bg-white text-slate-500"
+                    : "border-slate-200 bg-white text-slate-700"
                 }`}
               >
                 <span
@@ -754,8 +754,8 @@ export default function ResultCard({
                 key={step.key}
                 className={`rounded-xl border p-4 ${
                   step.emphasized
-                    ? "border-amber-200 bg-amber-50/60"
-                    : "border-slate-100 bg-slate-50"
+                    ? "border-slate-300 bg-white"
+                    : "border-slate-200 bg-white"
                 }`}
               >
                 <p className="flex items-center gap-2 text-sm font-bold text-slate-800">

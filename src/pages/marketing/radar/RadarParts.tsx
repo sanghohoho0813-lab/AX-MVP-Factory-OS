@@ -30,7 +30,7 @@ import {
 export function AxisBadge({ axis }: { axis: ContentAxis }) {
   const cls =
     axis === 'bridge'
-      ? 'border-amber-300 bg-amber-50 text-amber-900'
+      ? 'border-slate-300 bg-white text-slate-800'
       : axis === 'axai'
         ? 'border-brand-200 bg-brand-50 text-brand-800'
         : 'border-slate-300 bg-slate-50 text-slate-700'

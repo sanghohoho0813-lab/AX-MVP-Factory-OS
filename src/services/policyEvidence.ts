@@ -184,6 +184,8 @@ const POLICY_DOC_RULES: [string, (key: string, label: string) => boolean][] = [
   ['lease', (_k, l) => /임대차/.test(l)],
   ['ownDeed', (_k, l) => /(?:건물|부동산|사업장|토지).*등기/.test(l)],
   ['exportProof', (_k, l) => /수출실적/.test(l)],
+  // D-371 은행 금융거래확인서 · 부채증명 — '지금 있는 대출 내역'
+  ['loanStatus', (_k, l) => /금융거래확인서|부채증명|대출(?:내역|잔액|현황)/.test(l)],
   ['idCard', (k, l) => k === 'representativeId' || /신분증/.test(l)],
   ['salesEvidence', (_k, l) => /세금계산서|카드매출|POS|매출(?:내역|명세|정산)|정산내역/i.test(l)],
 ]

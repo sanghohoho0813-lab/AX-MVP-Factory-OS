@@ -448,7 +448,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
                 </Button>
               </AiConfirm>
               {aiErr && (
-                <p role="alert" className="t-meta basis-full break-keep text-amber-900" data-testid="radar-kit-ai-error">
+                <p role="alert" className="t-meta basis-full break-keep text-danger-700" data-testid="radar-kit-ai-error">
                   AI 추천을 받지 못했어요 — {aiErr}
                 </p>
               )}
@@ -477,7 +477,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
           </p>
           <div className="flex min-w-0 items-start gap-2">
             <p className="t-sub min-w-0 flex-1 break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-kit-title">
-              <span className="t-meta font-bold text-rose-700">제목 예 </span>
+              <span className="t-meta font-bold text-brand-700">제목 예 </span>
               <span className="font-bold">{kit.titles[0]}</span>
             </p>
             <Button size="sm" variant="ghost" onClick={() => onCopy(kit.titles[0] ?? '')} aria-label={`제목 복사 — ${kit.titles[0]}`}>
@@ -485,7 +485,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
             </Button>
           </div>
           <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-hook">
-            <span className="t-meta font-bold text-rose-700">첫 문장 </span>"{kit.hook}"
+            <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{kit.hook}"
           </p>
           <div className="flex min-w-0 flex-col gap-3 border-t border-rose-100 pt-3" data-testid="radar-kit-body">
             {kit.frames.length > 0 && (
@@ -572,7 +572,7 @@ function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: st
         </p>
       )}
       <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-ai-hook">
-        <span className="t-meta font-bold text-violet-700">첫 문장 </span>"{k.hook}"
+        <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{k.hook}"
       </p>
       <ul className="flex flex-col gap-1" data-testid="radar-kit-ai-titles">
         {k.titles.map((t) => (

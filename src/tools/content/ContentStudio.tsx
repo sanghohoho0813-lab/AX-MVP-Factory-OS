@@ -603,14 +603,14 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       {mode === 'pick' && (
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" data-testid="content-picks">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="t-section flex min-w-0 items-center gap-2.5 text-violet-900">
+          <h2 className="t-section flex min-w-0 items-center gap-2.5 text-slate-900">
             <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
               <Sparkles className="size-5" />
             </span>
             {/* D-224 띄어쓰기 없는 아주 긴 업체 이름도 줄을 바꿔 휴대폰에서 옆으로 넘치지 않게 */}
             <span className="min-w-0 [overflow-wrap:anywhere]">{record.companyName}에 먼저 만들 것</span>
           </h2>
-          <span className="t-sub break-keep text-violet-800">누르면 이 업체 글이 바로 나와요</span>
+          <span className="t-sub break-keep text-slate-500">누르면 이 업체 글이 바로 나와요</span>
         </div>
         <ul className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-3">
           {picks.map((p, i) => {
@@ -700,7 +700,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <div className="grid grid-cols-2 gap-2">
                 {(['brand', 'review'] as BlogType[]).map((b) => (
                   <button key={b} type="button" aria-pressed={blogType === b} onClick={() => setBlogType(b)} data-testid="content-blogtype-btn" data-value={b} className={`tap flex min-h-[3.75rem] flex-col items-start justify-center rounded-(--radius-control) border px-3 py-2 text-left ${pickBox(blogType === b)}`}>
-                    <span className={`t-body font-semibold break-keep ${blogType === b ? 'text-violet-900' : 'text-slate-800'}`}>{BLOG_TYPE_LABEL[b]}</span>
+                    <span className={`t-body font-semibold break-keep ${blogType === b ? 'text-brand-700' : 'text-slate-800'}`}>{BLOG_TYPE_LABEL[b]}</span>
                     <span className="t-meta break-keep text-slate-500">{BLOG_TYPE_HINT[b]}</span>
                   </button>
                 ))}
@@ -726,7 +726,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   <label key={t.type} className={`tap flex cursor-pointer items-start gap-2 rounded-(--radius-control) border px-3 py-2 ${pickBox(topicType === t.type)}`} data-testid="content-topic" data-type={t.type}>
                     <input type="radio" name="topic" className="mt-1.5 size-4 accent-violet-600" checked={topicType === t.type} onChange={() => setTopicType(t.type)} />
                     <span className="min-w-0">
-                      <span className="t-meta font-semibold text-violet-700">{TOPIC_LABEL[t.type]}</span>
+                      <span className="t-meta font-semibold text-brand-700">{TOPIC_LABEL[t.type]}</span>
                       <span className="t-body block break-keep text-slate-800">{t.title}</span>
                       {topicType === t.type && (
                         <span className="t-meta mt-0.5 block break-keep text-slate-500" data-testid="content-topic-strategy">
@@ -773,7 +773,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {AD_TYPES.map((a) => (
                   <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} data-risky={riskyCards.includes(a) ? '1' : undefined} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? TONE.fuchsia.on : `border-slate-200 bg-white ${TONE.fuchsia.hover}`}`}>
-                    <span className={`t-sub inline-flex flex-wrap items-center gap-1.5 font-semibold break-keep ${adType === a ? 'text-fuchsia-900' : 'text-slate-800'}`}>
+                    <span className={`t-sub inline-flex flex-wrap items-center gap-1.5 font-semibold break-keep ${adType === a ? 'text-brand-700' : 'text-slate-800'}`}>
                       {AD_TYPE_LABEL[a]}
                       {riskyCards.includes(a) && <span className="t-meta rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">권하지 않음</span>}
                     </span>
@@ -817,11 +817,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           </button>
           {kind === 'cards' && (
             <button type="button" onClick={openCardFive} className="tap flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-center hover:border-fuchsia-500" data-testid="content-cards5">
-              <span className="t-body inline-flex items-center gap-1.5 font-semibold text-fuchsia-900">
+              <span className="t-body inline-flex items-center gap-1.5 font-semibold text-slate-900">
                 <Layers className="size-4" aria-hidden="true" />
                 {cardFiveTypes(profile).length}안 한 번에 만들기
               </span>
-              <span className="t-meta break-keep text-fuchsia-800">{cardFiveTypes(profile).map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')}</span>
+              <span className="t-meta break-keep text-slate-500">{cardFiveTypes(profile).map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')}</span>
             </button>
           )}
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
@@ -835,7 +835,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               {pack && (
                 <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-white p-3" data-testid="content-pack" data-key={pack.key}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-violet-900">
+                    <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-slate-900">
                       <MkIcon icon={packStyle(pack.key).icon} tone={packStyle(pack.key).tone} size="sm" />
                       <span className="min-w-0">
                         {pack.label} · 글 {pack.items.length}편 묶음
@@ -1236,7 +1236,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
               이 업체 홈페이지
             </Link>
             <button type="button" onClick={onEdit} className={HERO_BTN} data-testid="content-profile-edit">
-              <PencilLine className="size-4 text-violet-700" aria-hidden="true" />
+              <PencilLine className="size-4 text-slate-500" aria-hidden="true" />
               고치기
             </button>
             <button type="button" onClick={onAiReq} className={HERO_BTN} data-testid="content-ai-req">
@@ -1249,8 +1249,8 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       <div className="flex flex-col gap-3 p-4 sm:p-5">
       <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
         <span className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-keep">
-          <b className="font-bold text-violet-900">브리프 {slots.length}칸 · {filled}/{slots.length}</b>
-          <span className="t-meta font-semibold text-violet-700">{slots.find((x) => x.key === 'facts')?.note}</span>
+          <b className="font-bold text-slate-900">브리프 {slots.length}칸 · {filled}/{slots.length}</b>
+          <span className="t-meta font-semibold text-slate-500">{slots.find((x) => x.key === 'facts')?.note}</span>
           <span className="t-meta text-slate-500">모든 글이 이 한 장에서 시작해요</span>
         </span>
         <span className="flex flex-wrap gap-1.5">
@@ -1263,7 +1263,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
         </span>
       </button>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap -my-1 flex min-h-11 w-full min-w-0 items-center gap-2 rounded-(--radius-control) text-left hover:bg-slate-50" data-testid="content-profile-toggle">
-        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-violet-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
         <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">{open ? '홍보 정보 접기' : `홍보 정보 ${rows.length}칸 보기`}</span>
         <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${missing ? 'bg-amber-100 text-amber-900' : 'bg-violet-50 text-violet-800'}`}>{missing ? `빈 칸 ${missing}` : '다 채움'}</span>
       </button>
@@ -1277,7 +1277,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
                 <span className="font-semibold text-slate-600">{r.label}</span>
                 {r.from && <span className="text-slate-500">· {r.from}</span>}
               </dt>
-              <dd className={`t-body break-words ${r.missing ? 'font-semibold text-amber-800' : 'text-slate-900'}`}>{r.value || (r.missing ? '비어 있어요' : '—')}</dd>
+              <dd className={`t-body break-words ${r.missing ? 'font-semibold text-danger-700' : 'text-slate-900'}`}>{r.value || (r.missing ? '비어 있어요' : '—')}</dd>
             </div>
           </div>
         ))}
@@ -1285,7 +1285,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       )}
       {open && material.length > 0 && (
         <dl className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-2.5" data-testid="content-profile-material">
-          <span className="t-meta font-bold text-violet-900">글 재료 · 적어 둔 것만 글에 들어가요</span>
+          <span className="t-meta font-bold text-brand-700">글 재료 · 적어 둔 것만 글에 들어가요</span>
           {material.map((m) => (
             <div key={m.label} className="t-sub flex min-w-0 flex-wrap gap-x-2 break-keep">
               <dt className="shrink-0 font-semibold text-slate-600">{m.label}</dt>
@@ -1298,7 +1298,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
         <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-500" data-testid="content-profile-gaps">
           <MkIcon icon={Sparkles} tone="amber" size="sm" />
           <span className="min-w-0 flex-1">
-            <span className="t-sub block font-bold break-keep text-amber-900">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
+            <span className="t-sub block font-bold break-keep text-danger-700">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
             <span className="mt-1 flex flex-col gap-0.5">
               {gaps.slice(0, 3).map((g) => (
                 <span key={g.key} className="t-meta block break-keep text-slate-700" data-testid="content-profile-gap" data-key={g.key}>
@@ -1307,7 +1307,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
               ))}
             </span>
           </span>
-          <ChevronRight className="mt-1 size-5 shrink-0 text-amber-700" aria-hidden="true" />
+          <ChevronRight className="mt-1 size-5 shrink-0 text-slate-400" aria-hidden="true" />
         </button>
       )}
       </div>
@@ -1417,7 +1417,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, start
             {running ? (
               <>
                 <span className="t-sub font-semibold text-slate-700">주 {running.perWeek}회 계획</span>
-                <button type="button" className="tap t-sub min-h-11 px-2 font-semibold text-violet-700 underline-offset-2 hover:underline" onClick={() => setFresh(true)} data-testid="content-plan-new">
+                <button type="button" className="tap t-sub min-h-11 px-2 font-semibold text-brand-700 underline-offset-2 hover:underline" onClick={() => setFresh(true)} data-testid="content-plan-new">
                   새 계획 짜기
                 </button>
               </>
@@ -1458,7 +1458,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, start
                           올림
                         </span>
                       ) : st.item ? (
-                        <span className="ml-auto font-semibold text-violet-700">만듦</span>
+                        <span className="ml-auto font-semibold text-brand-700">만듦</span>
                       ) : null}
                     </span>
                     <span className="t-sub block w-full break-keep text-slate-800">{sl.title}</span>
@@ -1781,8 +1781,8 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         {field('흔한 반박(손님이 흔히 하는 생각 한 가지)', 'rebuttal', '예: 리모델링은 어디서 하나 다 똑같다')}
         {/* D-228 글 재료 — 적어 둔 것만 글에 넣는다(비우면 숫자 · 후기 · 혜택을 지어내지 않고 뺀다) */}
         <div className="flex flex-col gap-1 border-t border-slate-200 pt-4" data-testid="content-ov-material">
-          <h3 className="t-sub flex items-center gap-1.5 font-bold text-violet-900">
-            <Star className="size-4 text-violet-600" aria-hidden="true" />
+          <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-900">
+            <Star className="size-4 text-slate-500" aria-hidden="true" />
             글 재료 — 있는 것만 · 사실만
           </h3>
           <p className="t-meta break-keep text-slate-600">적어 둔 것만 블로그 · 카드뉴스 · 카톡에 들어가요. 비워 두면 숫자 · 후기 · 혜택을 지어내지 않고 뺍니다.</p>
@@ -1806,8 +1806,8 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         <p className="t-meta -mt-2 break-keep text-slate-500">직함만 적으면 다른 도구가 엉뚱한 실명을 붙일 수 있어요 — 이름까지 적어 주세요.</p>
         {/* D-229 브리프 '넣지 말 것' — 기본 금지는 늘 붙고, 업체가 따로 막은 말을 더한다 */}
         <div className="flex flex-col gap-1 border-t border-slate-200 pt-4" data-testid="content-ov-avoid-section">
-          <h3 className="t-sub flex items-center gap-1.5 font-bold text-violet-900">
-            <AlertTriangle className="size-4 text-violet-600" aria-hidden="true" />
+          <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-900">
+            <AlertTriangle className="size-4 text-danger-600" aria-hidden="true" />
             넣지 말 것
           </h3>
           <p className="t-meta break-keep text-slate-600">다른 업체 · 지어낸 출처 · 깎아내리기 · 관계없는 사업 이야기는 늘 막아요. 업체가 따로 막은 말이 있으면 더해 주세요 — 글 점검이 찾아 알려요.</p>
@@ -1833,8 +1833,8 @@ function ReviewChecklist({ items, testId = 'content-review' }: { items: ReviewIt
   return (
     <section className="rounded-(--radius-control) border border-slate-200 bg-white" data-testid={testId} data-open={open ? '1' : '0'} data-warn={warn}>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-left hover:bg-slate-50" data-testid={`${testId}-toggle`}>
-        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-violet-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
-        <ListChecks aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
+        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <ListChecks aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
         <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">발행 전 검수표</span>
         <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${warn ? 'bg-amber-100 text-amber-900' : 'bg-emerald-50 text-emerald-800'}`} data-testid={`${testId}-sum`}>
           {warn ? `확인 ${warn}` : '자동 통과'} · 사람 {checked}/{manual}
@@ -1980,10 +1980,10 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
               <button type="button" onClick={onEditProfile} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-ai-thin">
                 <MkIcon icon={Sparkles} tone="amber" size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="t-sub block font-bold break-keep text-amber-900">사실 목록이 얇아요 — {thin.map((g) => g.label).join(' · ')}</span>
+                  <span className="t-sub block font-bold break-keep text-danger-700">사실 목록이 얇아요 — {thin.map((g) => g.label).join(' · ')}</span>
                   <span className="t-meta block break-keep text-slate-700">채워 두면 요청문의 사실 목록에 들어가요. 없으면 바깥 도구가 숫자 · 후기를 지어내기 쉬워요.</span>
                 </span>
-                <ChevronRight className="mt-1 size-5 shrink-0 text-amber-700" aria-hidden="true" />
+                <ChevronRight className="mt-1 size-5 shrink-0 text-slate-400" aria-hidden="true" />
               </button>
             )}
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) bg-slate-50 p-3" data-testid="content-ai-tips">
@@ -2227,7 +2227,7 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="t-section min-w-0 text-slate-900">
           <button type="button" onClick={toggle} aria-expanded={isOpen} className="tap flex min-h-11 min-w-0 items-center gap-2 text-left" data-testid="content-archive-toggle">
-            <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-indigo-400 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
+            <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
             <MkIcon icon={Archive} tone="indigo" />
             보관함
           </button>

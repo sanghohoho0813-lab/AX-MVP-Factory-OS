@@ -990,7 +990,7 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
   return (
     <div className="flex flex-col gap-2">
       {sample && (
-        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-amber-900" data-testid="yt-sample-banner">
+        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" data-testid="yt-sample-banner">
           예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 벤치마킹 채널로 바뀝니다.
         </p>
       )}

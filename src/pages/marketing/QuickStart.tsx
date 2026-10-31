@@ -112,7 +112,7 @@ export function QuickStart({
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <b className="t-meta shrink-0 font-bold text-brand-700">{picked ? '고른 형식' : '추천 형식'}</b>
               <HintTip tip={recTip} label="추천 형식" tight className="min-w-0">
-                <span className="min-w-0 font-bold text-violet-900" data-testid={`${testPrefix}-qs-rec-label`}>
+                <span className="min-w-0 font-bold text-slate-900" data-testid={`${testPrefix}-qs-rec-label`}>
                   {recLabel}
                 </span>
               </HintTip>

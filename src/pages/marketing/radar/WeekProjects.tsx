@@ -31,13 +31,13 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
   return (
     <section className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-violet-950">
+        <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
-        <p className="t-meta break-keep text-violet-900">누르면 그 주 프로젝트 안에서 롱폼 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
+        <p className="t-meta break-keep text-slate-500">누르면 그 주 프로젝트 안에서 롱폼 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
       </div>
       {weeks.length === 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-dashed border-violet-300 bg-white px-3 py-3" data-testid="mk-projects-empty">
+        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-3 py-3" data-testid="mk-projects-empty">
           <p className="t-sub min-w-0 flex-1 basis-60 break-keep text-slate-700">아직 만든 1주일치가 없어요 — 이번 주 키워드에서 [1주일치 콘텐츠 한 번에 만들기] 를 누르면 여기에 주마다 쌓여요.</p>
           <Button size="sm" variant="secondary" onClick={onMake} data-testid="mk-projects-make">
             1주일치 만들러 가기
@@ -71,13 +71,13 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
                     ) : (
                       saved && <span className="t-meta text-slate-500">{[saved.model, when(saved.at)].filter(Boolean).join(' · ')}</span>
                     )}
-                    <ChevronRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-violet-600" />
+                    <ChevronRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-400" />
                   </span>
                   {saved && saved.topics.length > 0 && (
                     <span className="flex min-w-0 flex-col gap-0.5">
                       {saved.topics.map((t, i) => (
                         <span key={`${t}-${i}`} className="t-meta min-w-0 break-keep text-slate-700 [overflow-wrap:anywhere]">
-                          <b className="text-violet-800">짝 {i + 1}</b> {t}
+                          <b className="text-brand-700">짝 {i + 1}</b> {t}
                         </span>
                       ))}
                     </span>

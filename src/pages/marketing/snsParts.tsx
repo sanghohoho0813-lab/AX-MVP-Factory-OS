@@ -114,7 +114,8 @@ export function HoverTip({ tip, children, className = '', block = false, testId 
 export function ToneSection({ n, tone, title, help, children, testId }: { n: string; tone: Tone; title: string; help: string; children: ReactNode; testId?: string }) {
   const t = TONES[tone]
   return (
-    <section className={`flex min-w-0 flex-col gap-3 rounded-xl border ${t.line} ${t.wash} p-3 sm:p-4`} data-testid={testId} data-tone={tone}>
+    // D-372 대표 "박스가 몇 개인지 모르겠다" — 접기 판 안의 구역은 상자 대신 위 가는 줄로만 나눈다(상자 안 상자 안 상자를 없앰)
+    <section className="flex min-w-0 flex-col gap-3 border-t border-slate-200 pt-4" data-testid={testId} data-tone={tone}>
       <HelpHeading as="h3" help={help} label={title} tight className="t-card flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
         <span aria-hidden="true" className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-[0.8rem] font-bold ${t.solid}`}>
           {n}

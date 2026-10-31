@@ -392,16 +392,16 @@ function MakeRow({
       </div>
 
       {open && (
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) bg-slate-50 px-3 py-2.5" data-testid="make-row-body">
+        <div className="flex min-w-0 flex-col gap-2 border-t border-slate-100 pt-2.5" data-testid="make-row-body">
           {i.angle && (
             <p className="t-sub break-keep text-slate-800">
-              <span className="t-meta font-bold text-indigo-800">이렇게 말해요 </span>
+              <span className="t-meta font-bold text-brand-700">이렇게 말해요 </span>
               {i.angle}
             </p>
           )}
           {i.hook && (
             <p className="t-sub break-keep text-slate-800">
-              <span className="t-meta font-bold text-rose-700">첫 문장 </span>"{i.hook}"
+              <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{i.hook}"
             </p>
           )}
           {i.titleCandidates.length > 0 && (
@@ -413,10 +413,10 @@ function MakeRow({
           )}
           {i.benchmarkTitles.length > 0 && <p className="t-meta break-keep text-slate-500">참고 영상 {i.benchmarkTitles.length}편 — {i.benchmarkTitles[0]}</p>}
           {i.script && (
-            <div className="flex min-w-0 flex-col gap-1.5 rounded-(--radius-control) border border-amber-200 bg-white p-2.5" data-testid="make-script">
+            <div className="flex min-w-0 flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-2.5" data-testid="make-script">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="t-sub inline-flex items-center gap-1 font-bold text-amber-900">
-                  <FileText aria-hidden="true" className="size-4" /> 대본
+                <span className="t-sub inline-flex items-center gap-1 font-bold text-slate-900">
+                  <FileText aria-hidden="true" className="size-4 text-slate-500" /> 대본
                 </span>
                 <span className="t-meta text-slate-500">{i.script.length.toLocaleString('ko-KR')}자 · AI 도우미에서 저장</span>
                 <Button size="sm" variant="secondary" className="ml-auto" onClick={() => onCopy(i.script, '대본')} data-testid="make-script-copy">

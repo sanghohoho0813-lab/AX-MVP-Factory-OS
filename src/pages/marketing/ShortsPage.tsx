@@ -490,14 +490,14 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           {fmt && (
             <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-format-detail">
               {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 break-keep text-slate-800" data-testid="sht-format-plain">
-                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
+              <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="sht-format-plain">
+                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
                 <span className="min-w-0">
                   <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
                 </span>
               </p>
-              <p className="t-sub rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 break-keep text-slate-800">
-                <b className="text-amber-800">예시</b> {FORMAT_EASY[fmt.key].sample}
+              <p className="t-sub border-l-2 border-slate-300 pl-3 break-keep text-slate-800">
+                <b className="text-slate-900">예시</b> {FORMAT_EASY[fmt.key].sample}
               </p>
               <p className="t-sub break-keep text-slate-700">
                 <b>왜 되나</b> {fmt.why}
@@ -774,7 +774,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
         </Surface>
         <Surface className="flex flex-col gap-1.5">
           <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES.fuchsia.bar}`} />
-          <h2 className="t-section break-keep text-fuchsia-900">인스타 릴스</h2>
+          <h2 className="t-section break-keep text-slate-900">인스타 릴스</h2>
           <ul className="t-body flex list-disc flex-col gap-1 pl-5 break-keep text-slate-800">
             <li>20~25초 · 한 화면 목록은 6~15초</li>
             <li>말 없이 글자만도 됨 (말을 넣으면 첫 문장에 숫자)</li>

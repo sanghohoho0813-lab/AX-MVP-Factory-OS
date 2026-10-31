@@ -108,12 +108,12 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {shown.length > limit && (
-          <button type="button" onClick={() => setMore(true)} className="tap t-sub font-semibold text-rose-700 hover:underline" data-testid="mk-allmade-more">
+          <button type="button" onClick={() => setMore(true)} className="tap t-sub font-semibold text-brand-700 hover:underline" data-testid="mk-allmade-more">
             {shown.length - limit}개 더 보기
           </button>
         )}
         {kind !== 'all' && kind !== 'long' && (
-          <Link to={KIND[kind].list} className="tap t-sub inline-flex items-center font-semibold text-slate-600 hover:text-rose-700 hover:underline" data-testid="mk-allmade-list-link">
+          <Link to={KIND[kind].list} className="tap t-sub inline-flex items-center font-semibold text-slate-600 hover:text-brand-700 hover:underline" data-testid="mk-allmade-list-link">
             {KIND[kind].listLabel}에서 숫자까지 보기 →
           </Link>
         )}

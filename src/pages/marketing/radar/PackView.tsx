@@ -295,11 +295,11 @@ function AiBar({
         </ul>
       )}
       {errors.length > 0 && (
-        <p role="alert" className="t-sub break-keep text-amber-900" data-testid="mk-pack-ai-error">
+        <p role="alert" className="t-sub break-keep text-danger-700" data-testid="mk-pack-ai-error">
           일부를 AI 로 쓰지 못했어요 — {errors.join(' · ')} 그 칸은 규칙 초안 그대로예요.
         </p>
       )}
-      {storeFull && <p className="t-meta break-keep text-amber-900">이 브라우저 저장 공간이 가득 차 AI 결과를 남기지 못했어요 — 지금 화면의 글은 [전체 복사] 로 가져가세요.</p>}
+      {storeFull && <p className="t-meta break-keep text-danger-700">이 브라우저 저장 공간이 가득 차 AI 결과를 남기지 못했어요 — 지금 화면의 글은 [전체 복사] 로 가져가세요.</p>}
     </div>
   )
 }

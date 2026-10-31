@@ -238,7 +238,7 @@ export function WeekView({
         <div className="flex flex-col gap-2 p-3 sm:p-4">
           {/* AI — 여섯 갈래 */}
           {canAi ? (
-            <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${run.errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
+            <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 border-violet-200 bg-violet-50`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
                 <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
@@ -283,11 +283,11 @@ export function WeekView({
                 </p>
               )}
               {run.errors.length > 0 && (
-                <p role="alert" className="t-sub break-keep text-amber-900" data-testid="mk-week-error">
+                <p role="alert" className="t-sub break-keep text-danger-700" data-testid="mk-week-error">
                   일부를 AI 로 쓰지 못했어요 — {run.errors.join(' · ')} 그 글은 규칙 초안 그대로예요. [AI로 다시 쓰기] 로 한 번 더.
                 </p>
               )}
-              {run.storeFull && <p className="t-meta break-keep text-amber-900">이 브라우저 저장 공간이 가득 차 결과를 남기지 못했어요 — [전체 복사] · [텍스트 파일로] 로 가져가세요.</p>}
+              {run.storeFull && <p className="t-meta break-keep text-danger-700">이 브라우저 저장 공간이 가득 차 결과를 남기지 못했어요 — [전체 복사] · [텍스트 파일로] 로 가져가세요.</p>}
             </div>
           ) : (
             <p className="t-sub break-keep rounded-xl bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-week-ai-off">
@@ -309,7 +309,7 @@ export function WeekView({
             >
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {sync.state === 'saving' ? <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-success-700" /> : <FolderCheck aria-hidden="true" className={`size-4 shrink-0 ${sync.state === 'error' ? 'text-amber-700' : 'text-success-700'}`} />}
-                <p className={`t-sub min-w-0 break-keep font-semibold ${sync.state === 'error' ? 'text-amber-900' : 'text-success-800'}`}>
+                <p className={`t-sub min-w-0 break-keep font-semibold ${sync.state === 'error' ? 'text-danger-700' : 'text-success-800'}`}>
                   {sync.state === 'saving'
                     ? '목록으로 모으는 중이에요…'
                     : sync.state === 'error'
@@ -320,17 +320,17 @@ export function WeekView({
               {sync.state !== 'error' && (
                 <p className="t-sub flex flex-wrap gap-x-3 gap-y-1">
                   {got.long > 0 && (
-                    <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-long">
+                    <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-collect-long">
                       내 콘텐츠 · 롱폼 1
                     </Link>
                   )}
                   {got.shorts > 0 && (
-                    <Link to="/marketing/shorts?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-shorts">
+                    <Link to="/marketing/shorts?tab=records" className="font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-collect-shorts">
                       릴스 · 틱톡 {got.shorts}
                     </Link>
                   )}
                   {got.threads > 0 && (
-                    <Link to="/marketing/threads?tab=records" className="font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-collect-threads">
+                    <Link to="/marketing/threads?tab=records" className="font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-collect-threads">
                       스레드 {got.threads}
                     </Link>
                   )}
@@ -452,7 +452,7 @@ export function WeekView({
             <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-7" data-testid="mk-week-calendar">
               {cal.map((d) => (
                 // 휴대폰은 하루 한 줄(날짜 옆에 올릴 것) — PC 는 일곱 칸
-                <li key={d.day} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1.5 lg:flex-col lg:flex-nowrap lg:items-start lg:py-2" data-testid="mk-week-day" data-day={d.day}>
+                <li key={d.day} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 lg:flex-col lg:flex-nowrap lg:items-start lg:py-2" data-testid="mk-week-day" data-day={d.day}>
                   <span className="t-sub w-16 shrink-0 font-bold text-slate-900 lg:w-auto">{d.label}</span>
                   <span className="flex flex-wrap gap-1">
                     {d.items.map((it) => (
@@ -479,7 +479,7 @@ export function WeekView({
         {!readOnly &&
           !(collect && week.long.ai) &&
           (savedHref ? (
-            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-violet-800 underline underline-offset-2" data-testid="mk-week-long-saved">
+            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-long-saved">
               롱폼 — 내 콘텐츠에서 보기
             </Link>
           ) : (
@@ -514,7 +514,7 @@ function PostRow({ link, what }: { link: PostLink; what: string }) {
       <span className={`t-meta rounded-full px-2 py-0.5 font-bold ${link.posted ? 'bg-success-50 text-success-700' : 'bg-amber-50 text-amber-800'}`}>
         {link.posted ? `올림${link.postedOn ? ` ${Number(link.postedOn.slice(5, 7))}/${Number(link.postedOn.slice(8, 10))}` : ''}` : '아직 안 올림'}
       </span>
-      <Link to={link.href} className="tap t-sub ml-auto inline-flex items-center font-semibold text-violet-800 hover:underline" data-testid="mk-week-post-open">
+      <Link to={link.href} className="tap t-sub ml-auto inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="mk-week-post-open">
         {link.posted ? `${what} 화면에서 숫자 적기 →` : `${what} 화면에서 고치기 · 올렸어요 →`}
       </Link>
     </div>
@@ -580,7 +580,7 @@ function ShortCard({ s, start, onCopy, link }: { s: WeekShort; start: string; on
   return (
     <div id={s.slot.n ? `mk-week-short-${s.slot.n}` : undefined} className="scroll-mt-32" data-testid="mk-week-short" data-n={s.slot.n} data-ai={s.ai ? '1' : '0'} data-bad={s.lint.bad}>
       <Card icon={<Film aria-hidden="true" className="size-5 text-fuchsia-700" />} title={title} sub={`${s.topic} · ${plat?.label ?? ''}${s.draft.seconds ? ` · ${s.draft.seconds}` : ''}`} ai={s.ai} lint={s.lint} onCopy={() => onCopy(all, title)}>
-        <p className="t-meta break-keep text-fuchsia-800">{s.slot.role}</p>
+        <p className="t-meta break-keep text-slate-600">{s.slot.role}</p>
         <p className="t-sub whitespace-pre-wrap break-keep text-slate-800 [overflow-wrap:anywhere]">{s.draft.script}</p>
         {s.draft.caption && <Block label="캡션" text={s.draft.caption} />}
         {s.draft.hashtags && <p className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]">{s.draft.hashtags}</p>}

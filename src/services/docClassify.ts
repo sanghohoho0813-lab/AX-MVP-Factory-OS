@@ -13,7 +13,7 @@
 
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import type { DocumentKey } from '../types/clientOps'
-import { parseKoreanDate } from './koreanDocParser'
+import { looksLikeRealEstateRegistry, parseKoreanDate } from './koreanDocParser'
 import { bizNoChecksumOk } from './docAutoFill'
 
 export type ClassifyConfidence = 'sure' | 'maybe' | 'unknown'
@@ -72,7 +72,8 @@ const BUILTIN_SIGNALS: Record<string, Signal[]> = {
     { re: /발급\s*기관|시장\s*·?\s*군수|경찰청장/, weight: 1, say: "'발급기관'" },
   ],
   smeCertificate: [
-    { re: /중소기업\s*확인서/, weight: 3, say: "제목 '중소기업확인서'" },
+    // D-371 '기술혁신형 중소기업 확인서'(이노비즈) · '경영혁신형 …'(메인비즈)는 중소기업확인서가 아니다
+    { re: /(?<!혁신형\s*)중소기업\s*확인서/, weight: 3, say: "제목 '중소기업확인서'" },
     { re: /중소벤처기업부/, weight: 2, say: "'중소벤처기업부'" },
     { re: /소기업|중기업|소상공인/, weight: 1, say: "'소기업·중기업'" },
     { re: /확인서\s*번호|확인\s*번호/, weight: 1, say: "'확인서 번호'" },
@@ -231,6 +232,59 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /벤처기업\s*확인/,
   },
   {
+    // D-371 이노비즈 · 메인비즈 확인서 — 예전에는 '… 중소기업 확인서' 라는 제목 때문에 중소기업확인서 칸으로 갔다(정책자금 가점 · 지원사업 인증). 보통 3년
+    label: '이노비즈 확인서',
+    validMonths: 36,
+    signals: [
+      { re: /(?:이노\s*비즈|INNO-?BIZ)\s*\)?\s*(?:확인서|인증서)|기술\s*혁신형\s*중소기업\s*(?:\([^)]{0,20}\)\s*)?확인서/i, weight: 5, say: "제목 '이노비즈 확인서'" },
+      { re: /기술\s*혁신형\s*중소기업/, weight: 3, say: "'기술혁신형 중소기업'" },
+      { re: /이노\s*비즈|INNO-?BIZ/i, weight: 1, say: "'이노비즈'" },
+    ],
+    nameHint: /이노\s*비즈|innobiz/i,
+  },
+  {
+    label: '메인비즈 확인서',
+    validMonths: 36,
+    signals: [
+      { re: /(?:메인\s*비즈|MAIN-?BIZ)\s*\)?\s*(?:확인서|인증서)|경영\s*혁신형\s*중소기업\s*(?:\([^)]{0,20}\)\s*)?확인서/i, weight: 5, say: "제목 '메인비즈 확인서'" },
+      { re: /경영\s*혁신형\s*중소기업/, weight: 3, say: "'경영혁신형 중소기업'" },
+      { re: /메인\s*비즈|MAIN-?BIZ/i, weight: 1, say: "'메인비즈'" },
+    ],
+    nameHint: /메인\s*비즈|mainbiz/i,
+  },
+  {
+    label: '여성기업확인서',
+    validMonths: 36,
+    signals: [
+      { re: /여성\s*기업\s*확인서/, weight: 5, say: "제목 '여성기업확인서'" },
+      { re: /한국여성경제인협회/, weight: 1, say: "'한국여성경제인협회'" },
+    ],
+    nameHint: /여성\s*기업/,
+  },
+  {
+    // D-371 건물 · 토지 등기부 — 제목이 법인 등기부와 같아 법인 등기부 칸으로 갔다(정책자금 '사업장 건물 등기' 준비 서류)
+    label: '부동산 등기사항증명서',
+    signals: [
+      { re: /등기\s*사항\s*(?:전부|일부)?\s*증명서.{0,24}(?:건물|토지|집합\s*건물)|부동산\s*등기/, weight: 4, say: "제목 '등기사항증명서(건물 · 토지)'" },
+      { re: /(?:건물|토지)의?\s*표시/, weight: 3, say: "'건물의 표시'" },
+      { re: /표\s*제\s*부/, weight: 2, say: "'표제부'" },
+      { re: /소유권에\s*관한\s*사항/, weight: 2, say: "'소유권에 관한 사항'" },
+      { re: /소재\s*지번/, weight: 1, say: "'소재지번'" },
+    ],
+    nameHint: /(?:건물|토지|부동산|집합\s*건물)\s*등기/,
+  },
+  {
+    // D-371 사업장 임대차계약서 — 정책자금 준비 서류(사업장 임대차계약서)
+    label: '임대차계약서',
+    signals: [
+      { re: /(?:임대차|전세|월세)\s*계약서/, weight: 4, say: "제목 '임대차계약서'" },
+      { re: /임\s*대\s*인/, weight: 1, say: "'임대인'" },
+      { re: /임\s*차\s*인/, weight: 1, say: "'임차인'" },
+      { re: /보\s*증\s*금/, weight: 1, say: "'보증금'" },
+    ],
+    nameHint: /임대차|임대\s*계약|전세\s*계약|월세\s*계약/,
+  },
+  {
     label: '특허증',
     signals: [{ re: /특허증|특허\s*제\s*\d+\s*호/, weight: 3, say: "'특허증'" }],
     nameHint: /특허증/,
@@ -305,7 +359,10 @@ export function findIssuedDate(text: string): string | null {
   // D-311 '2024년 01월 01일 ~ 2026년 06월 30일' 같은 기간의 앞 · 끝 날짜는 발급일이 아니다(부가세 과세표준증명의 과세기간이 발급일로 읽혀 바로 '기한 지남' 이 됐다)
   const inRange = (m: RegExpMatchArray) => {
     const at = m.index ?? 0
-    return /^\s*[~∼〜～]/.test(body.slice(at + m[0].length, at + m[0].length + 4)) || /[~∼〜～]\s*$/.test(body.slice(Math.max(0, at - 4), at))
+    const after = body.slice(at + m[0].length, at + m[0].length + 32)
+    if (/^\s*[~∼〜～]/.test(after) || /[~∼〜～]\s*$/.test(body.slice(Math.max(0, at - 4), at))) return true
+    // D-371 '2025년 1월 1일부터 2027년 12월 31일까지'(임대차 기간) — 끝날이 발급일로 읽혀 앞날짜가 됐다
+    return /^\s*부터\s*\d{4}\s*년[^\n]{0,16}?까지/.test(after) || (/^\s*까지/.test(after) && /부터\s*$/.test(body.slice(Math.max(0, at - 6), at)))
   }
   for (let i = all.length - 1; i >= 0; i -= 1) {
     if (inRange(all[i])) continue
@@ -382,6 +439,10 @@ export function classifyDocument(input: { text: string; fileName: string }, meta
     if (sc > (suggested?.score ?? 0)) suggested = { label: k.label, score: sc, say }
   }
 
+  // D-371 건물 · 토지 등기부는 법인 등기부 칸이 아니다(제목이 같다)
+  if (hasText && looksLikeRealEstateRegistry(text)) delete scores.corporateRegistry
+  // 이노비즈 · 메인비즈 확인서도 '중소벤처기업부 · 중소기업 · 유효기간' 이 있다 — 중소기업확인서 제목이 없으면 그 칸으로 보지 않는다
+  if (hasText && /혁신형\s*중소기업|이노\s*비즈|메인\s*비즈|INNO-?BIZ|MAIN-?BIZ/i.test(text) && !/(?<!혁신형\s*)중소기업\s*(?:\(소상공인\)\s*)?확인서/.test(text)) delete scores.smeCertificate
   // 사업자등록증과 등기부등본은 서로를 밀어낸다 — 둘 다 보이면 제목이 있는 쪽
   const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1])
   const top = ranked[0]
@@ -546,7 +607,9 @@ function placeDocumentBase(input: { text: string; fileName: string }, metas: Doc
   const title = fromText ?? titleFromFileName(input.fileName)
   const how = fromText ? '서류 제목' : '파일 이름'
   if (title) {
-    const builtin = TITLE_TO_KEY.find(([re]) => re.test(title))
+    // D-371 '등기사항전부증명서 - 건물' 은 법인 등기부 칸이 아니다 — 아래 '부동산 등기사항증명서' 로
+    const estate = looksLikeRealEstateRegistry(hasText ? text : title)
+    const builtin = TITLE_TO_KEY.find(([re, k]) => re.test(title) && !(k === 'corporateRegistry' && estate))
     const meta = builtin ? fileMetas.find((m) => m.key === builtin[1]) : null
     if (meta) {
       // D-168: 파일 이름으로 정했어도 내용 낱말 판별이 같은 칸을 가리키면 '확실'
@@ -557,7 +620,7 @@ function placeDocumentBase(input: { text: string; fileName: string }, metas: Doc
     // 이름이 같은 칸(직접 만든 칸 · 기본 칸 이름)
     const same = fileMetas.find((m) => compactTitle(m.label) === title || (title.length >= 4 && compactTitle(m.label).replace(/\(\d+\)$/, '') === title))
     if (same) return { kind: 'existing', key: same.key, label: same.label, sure: Boolean(fromText), reason: `${how} '${title}' — 같은 이름의 칸`, issuedAt }
-    const known = knownDocForTitle(title)
+    const known = estate && /등기/.test(title) ? KNOWN_EXTRA_DOCS.find((k) => k.label === '부동산 등기사항증명서') : knownDocForTitle(title)
     return { kind: 'new', label: known?.label ?? title, sure: Boolean(fromText), reason: `${how} '${title}' — 그 이름으로 새 칸`, issuedAt }
   }
   // 제목이 없으면 — 낱말 판별이 '확실' 할 때만 기본 칸, 아니면 기타

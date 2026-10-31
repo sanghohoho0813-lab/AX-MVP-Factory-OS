@@ -500,7 +500,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         testId="thr-choose"
       >
         {plan && (
-          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-plan">
+          <div className="flex flex-wrap items-center gap-2" data-testid="thr-plan">
             <p className="t-sub min-w-[12rem] flex-1 break-keep leading-relaxed text-slate-700">
               <CalendarCheck aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-amber-600" />
               <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · <TplNames keys={plan.picks} />
@@ -518,7 +518,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
               ① 추천 틀(반응 · 오늘 계획) 큰 단추 ② 그 아래 틀 전부 작은 색 단추(반응 색 · ★ 추천 · 이번 주 잘 됨) — 어느 것이든 바로 고른다 */}
           <div className="flex flex-wrap items-center gap-2">
             <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700" data-testid="thr-picks-why">
-              <b className="text-violet-800">★ 추천</b> ·{' '}
+              <b className="text-brand-700">★ 추천</b> ·{' '}
               {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 딱지 = 그 틀이 잘 되는 반응. 아래에서 다른 틀도 바로 골라요.
             </p>
             <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
@@ -532,7 +532,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
               </li>
             ))}
           </ul>
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2.5 sm:p-3" data-testid="thr-all-tpls">
+          <div className="flex flex-col gap-2 pt-1" data-testid="thr-all-tpls">
             <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-700">
               <b className="text-slate-900">틀 전부 — 눌러서 바로 골라요</b>
               <span className="text-slate-500">마우스를 올리면 뜻 · 예시{' · '}휴대폰은 누르면 아래 상자에</span>
@@ -572,21 +572,21 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                 {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
               </p>
               {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 break-keep text-slate-800" data-testid="thr-tpl-plain">
-                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
+              <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="thr-tpl-plain">
+                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
                 <span className="min-w-0">
                   <b>쉽게 말하면</b> {TEMPLATE_EASY[tpl.key].plain}
                 </span>
               </p>
-              <p className="t-sub rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
-                <b className="text-amber-800">예시</b>
+              <p className="t-sub border-l-2 border-slate-300 pl-3 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
+                <b className="text-slate-900">예시</b>
                 {'\n'}
                 {TEMPLATE_EASY[tpl.key].sample}
               </p>
               <ol className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-1 break-keep text-slate-700" aria-label="뼈대">
                 {tpl.skeleton.map((s, i) => (
                   <li key={s} className="inline-flex items-center gap-1.5">
-                    {i > 0 && <span aria-hidden="true" className="text-violet-400">→</span>}
+                    {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
                     <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-900">{s}</span>
                   </li>
                 ))}
@@ -626,7 +626,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
             ))}
           </div>
         </ToneSection>
-        <details className="rounded-xl border border-slate-200 bg-white px-3 py-2" data-testid="thr-ref-box">
+        <details className="border-t border-slate-200 pt-3" data-testid="thr-ref-box">
           <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">
             <span aria-hidden="true" className="mr-1.5 inline-flex size-6 items-center justify-center rounded-full bg-slate-700 text-[0.75rem] font-bold text-white">4</span>
             잘 된 남의 글 붙여넣기 (선택 — 뼈대만 빌림 · 저장 안 함)
@@ -989,7 +989,7 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
               )}
               {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
               <details className="rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="thr-lib-sample">
-                <summary className="tap t-sub cursor-pointer font-semibold text-amber-900">짧은 예시 보기</summary>
+                <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">짧은 예시 보기</summary>
                 <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{TEMPLATE_EASY[t.key].sample}</p>
               </details>
               {t.example && !isMarketingCustomer() && (
