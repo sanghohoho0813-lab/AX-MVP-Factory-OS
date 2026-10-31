@@ -2486,5 +2486,22 @@ await (async () => {
   check('D-409 전기 숫자가 지금 값과 안 이어지면(수정된 재무제표 · 사람이 고친 값) 예전처럼 절세 설계에서 확인', ['taxProfile.loanBalance', 'taxProfile.retainedEarnings', 'taxProfile.vInc1'].every((k) => e.summary.flagged.some((f) => f.key === k)) && tp(e.record) === '30000000/800000000/180000000/', JSON.stringify([e.summary.flagged.map((f) => f.key), tp(e.record)]))
 })()
 
+// D-410 등기부 두 가지(현재 유효사항 + 말소사항 포함)를 같이 · 따로 올려도 처음 취임일을 다시 묻지 않음
+await (async () => {
+  const HEAD = ['상 호 주식회사 가나테크', '등록번호 110111-1234567', '본 점 서울 강남구 테헤란로 123', '1주의 금액 금 5,000 원', '발행주식의 총수 20,000 주', '보통주식 20,000 주 자본금의 액 금 100,000,000 원', '회사성립연월일 2020 년 03 월 02 일', '임원에 관한 사항', '대표이사 박지훈 801231-1******']
+  const CUR = ['등기사항전부증명서(현재 유효사항)', ...HEAD, '2026 년 03 월 02 일 중임'].join('\n')
+  const ALL = ['등기사항전부증명서(말소사항 포함)', ...HEAD, '2020 년 03 월 02 일 취임', '2023 년 03 월 02 일 중임', '2026 년 03 월 02 일 중임'].join('\n')
+  const base = normalizeClientOps({ id: 'reg410', companyName: '', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const up = (rec: typeof base, texts: string[], now: string) => analyzeUploadedDocs(rec, texts.map((text, i) => ({ key: i === 0 ? 'corporateRegistry' : `customdoc_reg${i}`, fileName: `reg${i}.pdf`, text, method: 'pdf_text' as const, docSure: true })), { now, today: '2026-10-31', makeId: () => `r0${++n}` })
+  const a = await up(base, [CUR, ALL], NOW)
+  const b = await up(base, [ALL, CUR], NOW)
+  check('D-410 두 가지를 한 번에(어느 순서든) → 취임일 2020-03-02 · 묻지 않음(예전: 현재 유효사항의 "중임 날짜만 있어요")', a.record.taxProfile?.ceoStartDate === '2020-03-02' && b.record.taxProfile?.ceoStartDate === '2020-03-02' && a.summary.flagged.length === 0 && b.summary.flagged.length === 0, JSON.stringify([a.summary.flagged, b.summary.flagged]))
+  const c = await up(base, [CUR], NOW)
+  check('D-410 현재 유효사항만이면 예전처럼 확인(처음 취임일을 정말 모름)', c.summary.flagged.some((f) => f.key === 'taxProfile.ceoStartDate'), JSON.stringify(c.summary.flagged))
+  const d = await up(b.record, [CUR], '2026-10-31T03:00:00.000Z')
+  check('D-410 취임일을 안 뒤에 현재 유효사항을 다시 올려도 묻지 않고 그대로', d.record.taxProfile?.ceoStartDate === '2020-03-02' && d.summary.flagged.length === 0, JSON.stringify(d.summary.flagged))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

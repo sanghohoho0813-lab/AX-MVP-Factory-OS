@@ -301,6 +301,10 @@ export async function analyzeUploadedDocs(
   //        바로 앞 해 재무제표의 전기 순이익은 '2년 전 순이익'(비상장주식 3년 가중평균의 셋째 해). 더 앞선 해는 서류함에만
   const isFs = (d: ReadDoc) => d.key === 'financialStatements' || /재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|표준\s*재무제표/.test(d.text.slice(0, 3000))
   const fsYearNow = Math.max(latestFsYear(rec), ...factDocs.filter(isFs).map((d) => Number(parseFinancialStatement(d.text).year) || 0))
+  // D-410 등기부 두 가지(현재 유효사항 + 말소사항 포함)를 같이 올리면 — 말소사항 포함에서 처음 취임일을 확실히 읽었으니
+  //        현재 유효사항의 '중임 날짜만 있어요' 는 묻지 않는다. 이미 적힌 취임일이 그 중임 날짜보다 앞서도(처음 취임) 묻지 않는다
+  const regOf = (d: ReadDoc) => (d.key === 'corporateRegistry' || detectDocSource(d.text) === 'corporate_registry' ? readRegistryTax(d.text, rec.representativeName) : null)
+  const sureCeoInBatch = factDocs.some((d) => { const r = regOf(d); return !!r?.ceoStart && r.ceoStartSure })
   for (const d of factDocs) {
     // D-311 부가세 과세표준증명 · 면세 수입금액증명 — 매출은 1번(회사 정보)에서 넣었다. 여기서는 넣은 줄에 해마다 · 전년 대비를 붙인다
     const vat = looksLikeVatCert(d.text, d.fileName) ? readVatCert(d.text) : null
@@ -314,7 +318,9 @@ export async function analyzeUploadedDocs(
     const isRegistry = d.key === 'corporateRegistry' || detectDocSource(d.text) === 'corporate_registry'
     const reg = isRegistry ? readRegistryTax(d.text, rec.representativeName) : null
     if (reg) {
-      if (reg.ceoStart) putProfile('ceoStartDate', reg.ceoStart, '대표 취임일', reg.ceoStartSure ? `${reg.ceoStart} — 퇴직금 기산일(등기부 · ${reg.ceoStartNote})` : reg.ceoStart, d.fileName, reg.ceoStartSure, reg.ceoStartNote)
+      const curCeo = String(rec.taxProfile?.ceoStartDate ?? '').trim()
+      const skipUnsure = !reg.ceoStartSure && (sureCeoInBatch || (/^\d{4}-\d{2}-\d{2}$/.test(curCeo) && !!reg.ceoStart && curCeo <= reg.ceoStart))
+      if (reg.ceoStart && !skipUnsure) putProfile('ceoStartDate', reg.ceoStart, '대표 취임일', reg.ceoStartSure ? `${reg.ceoStart} — 퇴직금 기산일(등기부 · ${reg.ceoStartNote})` : reg.ceoStart, d.fileName, reg.ceoStartSure, reg.ceoStartNote)
       if (reg.par) putProfile('par', String(reg.par), '1주 액면가', `${reg.par.toLocaleString('ko-KR')}원`, d.fileName, reg.parSure, '1주의 금액이 여러 가지로 나와요 — 절세 설계에서 확인')
       if (reg.totalShares)
         putProfile('totalShares', String(reg.totalShares), '발행주식 총수', `${reg.totalShares.toLocaleString('ko-KR')}주`, d.fileName, reg.sharesSure, reg.capital ? `1주의 금액 × 총수가 자본금(${reg.capital.toLocaleString('ko-KR')}원)과 달라요 — 절세 설계에서 확인` : '자본금과 맞춰 보지 못했어요 — 절세 설계에서 확인')
