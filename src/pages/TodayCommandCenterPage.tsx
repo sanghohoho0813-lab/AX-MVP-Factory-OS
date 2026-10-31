@@ -589,7 +589,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               {hardDue.length > 0 && (
                 <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
                   <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
-                  <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
+                  {/* D-377 박스 색은 하나로 — 급한 것은 제목 · 날짜의 빨간 글자가 말한다 */}
+                  <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
                     {hardDue.map((a) => (
                       <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                         <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>

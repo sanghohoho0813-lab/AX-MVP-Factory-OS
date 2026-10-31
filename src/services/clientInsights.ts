@@ -445,6 +445,8 @@ function convertInsight(record: ClientOpsRecord, facts: ClientFacts, today: stri
   const base = { key: 'tax', label: '법인전환 검토', openPath: open, openLabel: '법인전환 계산' }
   const income = businessIncomeOf(record, today)
   const r = income > 0 ? convertCompare(income) : null
+  // 사업소득을 아는데 0 이하(결손)면 '올리면' 이 아니라 '줄일 세금이 없어요'
+  if (!r && facts.netIncome && !facts.netIncome.estimated && facts.netIncome.won <= 0) return { ...base, tone: 'no', headline: '사업소득이 0 이하예요 — 법인전환으로 줄일 세금이 없어요', detail: `사업소득 ${facts.netIncome.won < 0 ? `△${manwonText(-facts.netIncome.won)}` : '0원'}${facts.netIncome.asOf ? `(${facts.netIncome.asOf.slice(0, 4)})` : ''}`, missing: [], action: null }
   if (!r) return { ...base, tone: 'need', headline: '개인사업자 — 사업소득(소득금액증명)을 올리면 법인으로 바꿀 때 세금 차이를 바로 계산해요', detail: '지금 종합소득세 vs 법인세 + 대표 급여 세금 — 세금 계산기 식 그대로', missing: ['소득금액증명'], action: null }
   const how = `사업소득 ${manwonText(income)} · 지금 종합소득세 약 ${manwonText(r.personal)} → 법인(대표 급여 월 ${manwonText(r.all.monthly)}) 약 ${manwonText(r.all.total) || '0원'}`
   const keep = r.keep.monthly !== r.all.monthly ? `회사에 ${manwonText(r.keep.kept)} 남겨 두면 올해 세금 약 ${manwonText(r.keep.total)}(나중에 가져가면 배당세)` : ''

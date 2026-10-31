@@ -1469,7 +1469,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               /* 직접 만든 칸이면 이름을 고치고 없앨 수 있다 (D-82) */
               const custom = record.customDocuments.find((d) => d.key === meta.key)
               // D-122: 받았고(파일이 필요하면 파일까지) 만료 · 곧 만료 · 지금 필요가 아니면 한 줄로 — 서류 탭이 휴대폰에서 3,700px 이었다
-              const compact = state.received && !view.expired && !view.expiringSoon && !urgent && (!meta.needsFile || state.fileName !== '') && !openDocs.has(meta.key)
+              // D-377 받았는데 파일만 없는 칸도 한 줄로(메모 · 설명까지 다 펼쳐 서류 탭이 휴대폰 4.5화면이었다) — 한 줄에 '파일 없음' · [파일 첨부]는 그대로
+              const compact = state.received && !view.expired && !view.expiringSoon && !urgent && !openDocs.has(meta.key)
               // 아직 안 받았지만 지금 필요하지 않은 서류 — 설명 줄은 빼고 이름 · 쓰는 도구만
               const later = !state.received && !urgent && !view.expired && !openDocs.has(meta.key)
               return (
@@ -1559,6 +1560,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {compact ? (
                     <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
                       <span className="t-sub font-medium text-success-700">받음</span>
+                      {meta.needsFile && !state.fileName && <span className="t-sub text-slate-500" data-testid={`doc-compact-nofile-${meta.key}`}>파일 없음</span>}
                       {view.expiresOn && (
                         <span data-testid={`doc-compact-expiry-${meta.key}`} className="t-sub text-slate-600">
                           {view.expiresOn}까지 유효{state.validUntil ? ' · 서류에 적힌 날짜' : ''}

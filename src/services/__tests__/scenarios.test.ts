@@ -934,6 +934,8 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-374 카드 [법인전환 계산] → 세금 계산기 03 · 사업소득 상황으로', !!ins && ins.openPath.includes('m=calc&c=t9&s=inc_a') && ins.openPath.includes('preset=calc-t9-convert'), ins?.openPath)
   const none = buildInsights(normalizeClientOps({ id: 'cv374n', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC }), T, []).find((i) => i.key === 'tax')
   check('D-374 사업소득을 모르면 "소득금액증명을 올리면" · 정보가 더 필요해요', none?.tone === 'need' && none.missing.includes('소득금액증명'), none)
+  const loss = buildInsights(withFactValue(normalizeClientOps({ id: 'cv374l', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC }), 'netIncome', '-5000000', { source: 'manual', status: 'entered', asOf: '2025', now: NOWC }), T, []).find((i) => i.key === 'tax')
+  check('D-374 결손(사업소득 −500만)이면 "올리면" 이 아니라 "줄일 세금이 없어요" · 받을 서류 없음', loss?.tone === 'no' && loss.headline.includes('줄일 세금이 없어요') && loss.missing.length === 0, loss)
   const corp = buildInsights(normalizeClientOps({ id: 'cv374c', companyName: '(주)미래', businessNumber: '124-81-00998', createdAt: NOWC, updatedAt: NOWC }), T, []).find((i) => i.key === 'tax')
   check('D-374 법인은 그대로 절세 설계', corp?.label === '절세 설계', corp)
   const sp = scenarioPreset('calc-t9-convert')!
