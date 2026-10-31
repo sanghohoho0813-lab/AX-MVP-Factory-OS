@@ -168,7 +168,8 @@ export function policyHiring(record: ClientOpsRecord, today: string): { grew: bo
  */
 const POLICY_DOC_RULES: [string, (key: string, label: string) => boolean][] = [
   ['bizReg', (k, l) => k === 'businessRegistration' || /^사업자등록증/.test(l)],
-  ['financial', (k, l) => k === 'financialStatements' || /재무제표|재무상태표|손익계산서/.test(l)],
+  // D-378 세무조정계산서(법인세 신고서)에는 표준재무제표가 들어 있다 — 기관도 재무 서류로 받는다
+  ['financial', (k, l) => k === 'financialStatements' || /재무제표|재무상태표|손익계산서|세무조정계산서|법인세(?:과세표준)?.*신고서/.test(l)],
   ['vat', (_k, l) => /과세표준증명|부가(?:가치)?세.*증명|면세.*수입금액증명/.test(l)],
   ['insuranceList', (k, l) => k === 'payrollRoster' || /가입자명부|피보험자명부/.test(l)],
   ['bizPlan', (_k, l) => /사업계획서/.test(l)],

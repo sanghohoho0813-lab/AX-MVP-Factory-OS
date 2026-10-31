@@ -94,6 +94,7 @@ export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   vatCertificate: '부가세 과세표준증명',
   workRules: '취업규칙',
   incomeCertificate: '소득금액증명',
+  taxReturn: '세무조정계산서',
 }
 
 export const FACT_STATUS_LABEL: Record<FactStatus, string> = {

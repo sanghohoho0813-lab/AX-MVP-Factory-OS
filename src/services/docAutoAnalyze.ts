@@ -195,6 +195,8 @@ export async function analyzeUploadedDocs(
         const lines = analysis.subsidySummary.filter((s) => s.candidateCount > 0).map((s) => `· ${s.name} 후보 ${s.candidateCount}명`)
         // D-302 통합고용세액공제용 — 작년 · 올해 매월 말 인원 평균(금액은 맞춤 추천이 볼 때마다 지금 주소 · 규모로)
         const hc = core.rosterHeadcount(parsed.employees, { baseDate: today, issueDate: parsed.meta?.issueDate ?? null })
+        // D-378 신고가 끝난 해(작년)의 늘어난 인원 — 그해 신고서에 통합고용세액공제가 없으면 경정청구 신호. 그만둔 사람까지 있는 명부일 때만
+        const past = hc && hc.basis === 'history' ? core.rosterHeadcount(parsed.employees, { baseDate: `${hc.cur.year - 1}-12-31`, issueDate: parsed.meta?.issueDate ?? null }) : null
         rec = withToolResult(rec, {
           toolKey: 'employment',
           title: '4대보험 명부 진단',
@@ -217,6 +219,7 @@ export async function analyzeUploadedDocs(
             // D-191: 최대 예상 지원금(원) — 맞춤 추천이 엔진 없이 금액을 보여 준다
             subsidyTotal: total,
             ...(hc ? { headcount: hc } : {}),
+            ...(past && past.cur.year === hc!.cur.year - 1 ? { headcountPast: past } : {}),
             from: 'upload',
           },
           deadlines: enroll.youthEnrollDeadlines(youth),

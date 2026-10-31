@@ -7,6 +7,7 @@
  *  - 사업자등록증(· 사업자등록증명 D-344) · 법인등기부등본 → 회사명 · 번호 · 대표자 · 설립일 · 주소 · 업태 · 종목(공통 사실)
  *  - 인정서 · 확인서 · 인증서 · 특허증(어느 칸에 올렸든, 직접 만든 칸이어도) → 회사 기본 정보 '인증서' 묶음의 칸
  *  - 취업규칙 → '정년 · 계속고용' 칸(D-339)
+ *  - 세무조정계산서 · 법인세 · 종합소득세 신고서 → '받은 공제 · 감면 YYYY년' 칸(D-378) — 경정청구 신호
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -18,6 +19,7 @@ import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
 import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
+import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -52,6 +54,21 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     }
     return out
   }
+  // D-378 세무조정계산서 · 신고서 → 그해 받은 공제 · 감면(이름 · 금액). 공제 · 감면 칸을 못 찾았고 받은 것도 없으면 남기지 않는다
+  //  (첫 장만 올린 신고서에 '없음' 이라고 적지 않게). 해를 모르면 확인으로. 세무조정계산서 묶음에는 표준재무제표도 있어 아래로 이어 간다
+  const ret = readTaxReturn(text)
+  if (ret && (ret.items.length || ret.sectionSeen)) {
+    out.push({
+      key: `${CUSTOM_FACT_PREFIX}${reliefFactLabel(ret.year)}`,
+      label: reliefFactLabel(ret.year),
+      group: 'identity',
+      value: reliefFactValue(ret, formatWon),
+      source: 'taxReturn',
+      asOf: ret.year ? String(ret.year) : '',
+      ref,
+      ...(ret.year ? {} : { note: '사업연도를 못 읽었어요 — 몇 년 신고서인지 칸 이름에 적어 주세요' }),
+    })
+  }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
   if (key === 'financialStatements') {
     const f = parseFinancialStatement(text)
@@ -61,6 +78,7 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     }
     return out
   }
+  if (ret) return out
   // D-373 소득금액증명(개인사업자 · 종합소득세) → 가장 최근 해 수입금액(매출) · 사업소득금액(순이익) · 매출 추이. 검산이 안 맞으면 확인으로
   if (looksLikeIncomeCert(text)) {
     const inc = readIncomeCert(text)

@@ -33,6 +33,7 @@ import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 import { CONVERT_MIN, businessIncomeOf, convertCompare, diligentLine } from './corpConvert'
 import { scenarioPath, scenarioPreset } from './scenarioPresets'
+import { refundOpen, reliefYearsOf, type ReliefYear } from './taxReturnDoc'
 
 export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
 
@@ -248,13 +249,15 @@ const startupInsight: Provider = ({ record, today, facts }) => {
   const r = judge(form, new Date(`${today}T00:00:00`))
   if (r.notice) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: r.notice, detail: '', missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
   const tone: InsightTone = r.overall === 'good' ? 'good' : r.overall === 'bad' ? 'no' : 'maybe'
+  // D-378 감면 대상인데 감면 기간 안 해의 신고서에 창업감면이 없으면 — 맨 앞 줄(받고 있으면 '받고 있어요')
+  const refund = tone === 'no' ? { line: '', claimed: false } : startupRefund(facts.establishedAt, facts, reliefYears(record, facts, today))
   return {
     key: 'startup-tax',
     label: '창업감면',
     tone,
     headline: r.oneLineConclusion,
     // D-318 감면율 한 줄을 먼저 — 상황 예시 · 한 장 설계서 · 판정 화면과 같은 값
-    detail: [r.taxRate.line, r.keyChecks[0] ?? r.reasons[0] ?? ''].filter(Boolean).join(' · '),
+    detail: [refund.claimed ? '' : refund.line, r.taxRate.line, refund.claimed ? refund.line : '', r.keyChecks[0] ?? r.reasons[0] ?? ''].filter(Boolean).join(' · '),
     // 창업 형태(신규 · 승계)는 기록에 없다 — 판정기에서 물어본다
     missing: ['창업 형태(새로 창업 · 이어받기)'],
     openPath: open,
@@ -318,10 +321,72 @@ export function durunuriLine(employees: number | null, newHires: number): string
   return `직원 ${employees}명(10명 미만) — ${who}월 보수 ${manwonText(DURUNURI.wageUnder)} 미만은 국민연금 · 고용보험 ${DURUNURI.rate}% · 최대 ${DURUNURI.months}개월(두루누리 · ★ 공고 확인)`
 }
 
-const employmentInsight: Provider = ({ record, facts }) => {
+/**
+ * D-378 올린 신고서(회사 정보 '받은 공제 · 감면 YYYY년') — 경정청구가 아직 되는 해만, 최근 해 먼저.
+ * 신고서에 없는 공제는 '받을 수 있었는데 빠진 것' 일 수 있다 — 경정청구(법정신고기한부터 5년) 신호.
+ */
+export function reliefYears(record: ClientOpsRecord, facts: Pick<ClientFacts, 'businessType'>, today: string): ReliefYear[] {
+  const kind = facts.businessType === 'individual' ? 'personal' : 'corp'
+  return reliefYearsOf(customFactEntries(record), 'cf:').filter((y) => refundOpen(y.year, today, kind))
+}
+
+const returnName = (facts: Pick<ClientFacts, 'businessType'>) => (facts.businessType === 'individual' ? '종합소득세 신고서' : '법인세 신고서')
+
+/**
+ * D-378 고용 — 가장 최근 신고서에 통합고용세액공제(· 고용증대 · 사회보험료)가 없을 때.
+ * 명부로 그해(작년) 인원이 늘었는지 셀 수 있으면 금액까지(그해 단가표), 못 세면 '늘었다면' 으로만. 늘지 않았으면 말하지 않는다(맞게 안 받은 것).
+ */
+export function employmentRefund(record: ClientOpsRecord, facts: ClientFacts, years: readonly ReliefYear[], past: RosterHeadcount | null): { line: string; won: number; year: number } {
+  const y = years[0]
+  if (!y) return { line: '', won: 0, year: 0 }
+  const doc = `${y.year}년 ${returnName(facts)}`
+  if (y.groups.has('employment')) return { line: `${doc}에 통합고용세액공제 있음 — 받고 있어요(인원을 유지하면 다음 해도)`, won: 0, year: y.year }
+  if (past && past.cur.year === y.year) {
+    const c = rosterCredit(record, facts, past)
+    if (c && c.won > 0) return { line: `${y.year}년 평균 ${headText(past.prev.total)} → ${headText(past.cur.total)}명으로 늘었는데 ${doc}에 통합고용세액공제가 없어요 — 경정청구 검토 약 ${manwonText(c.won)}(5년 안 · ★ 세무사)`, won: c.won, year: y.year }
+    return { line: '', won: 0, year: y.year }
+  }
+  return { line: `${doc}에 통합고용세액공제가 없어요 — 그해 직원이 늘었다면 경정청구 검토(5년 안)`, won: 0, year: y.year }
+}
+
+/** 연구소 글 · 인정서 값에서 인정(설립)한 해 — '…까지' 날짜(유효기간)는 빼고 첫 날짜 */
+export function labYearOf(lab: string): number | null {
+  for (const m of String(lab).matchAll(/(20\d{2})[-.년]\s*\d{1,2}[-.월]\s*\d{1,2}\s*일?(\s*까지)?/g)) if (!m[2]) return Number(m[1])
+  return null
+}
+
+/** D-378 연구소 — 가장 최근 신고서에 연구 · 인력개발비 세액공제가 없을 때. 연구소가 그해 전부터 있었는지 알면 '분명' */
+export function labRefund(lab: string, facts: Pick<ClientFacts, 'businessType'>, years: readonly ReliefYear[]): { line: string; sure: boolean; claimed: boolean } {
+  const y = years[0]
+  if (!lab || !y) return { line: '', sure: false, claimed: false }
+  const doc = `${y.year}년 ${returnName(facts)}`
+  if (y.groups.has('rnd')) return { line: `${doc}에 연구 · 인력개발비 세액공제 있음 — 챙기고 있어요`, sure: false, claimed: true }
+  const since = labYearOf(lab)
+  if (since !== null && since <= y.year) return { line: `${since}년부터 연구소가 있는데 ${doc}에 연구 · 인력개발비 세액공제가 없어요 — 연구원 인건비로 경정청구 검토(5년 안 · ★ 세무사)`, sure: true, claimed: false }
+  if (since !== null && since > y.year) return { line: '', sure: false, claimed: false }
+  return { line: `${doc}에 연구 · 인력개발비 세액공제가 없어요 — 그해에도 연구소가 있었다면 경정청구 검토(5년 안)`, sure: false, claimed: false }
+}
+
+/** D-378 창업감면 — 감면 기간(설립한 해부터 5년) 안 해의 신고서에 창업중소기업 세액감면이 없을 때(감면 대상으로 판정된 업체만) */
+export function startupRefund(establishedAt: string, facts: Pick<ClientFacts, 'businessType'>, years: readonly ReliefYear[]): { line: string; claimed: boolean } {
+  const est = Number(String(establishedAt).slice(0, 4))
+  const y = est ? years.find((x) => x.year >= est && x.year <= est + 4) : undefined
+  if (!y) return { line: '', claimed: false }
+  const doc = `${y.year}년 ${returnName(facts)}`
+  if (y.groups.has('startup')) return { line: `${doc}에 창업중소기업 세액감면 있음 — 받고 있어요`, claimed: true }
+  const sme = y.groups.has('smeSpecial') ? '(중소기업 특별세액감면은 받음 — 둘 중 큰 쪽 확인)' : ''
+  return { line: `${doc}에 창업중소기업 세액감면이 없어요${sme} — 그해 세금을 냈다면 경정청구 검토(5년 안 · ★ 세무사)`, claimed: false }
+}
+
+const employmentInsight: Provider = ({ record, facts, today }) => {
   const open = `/tools/employment/roster${q(record)}`
   const roster = latestEmploymentRoster(record)
-  if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: ['청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+  // D-378 올린 신고서에 통합고용세액공제가 없으면 — 명부로 그해 인원을 세면 경정청구 금액까지
+  const years = reliefYears(record, facts, today)
+  if (!roster) {
+    const refund = employmentRefund(record, facts, years, null)
+    return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: [refund.line, '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+  }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'
   const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
@@ -334,7 +399,7 @@ const employmentInsight: Provider = ({ record, facts }) => {
   const fresh = Array.isArray(rows) ? rosterSubsidyTotal(rows as { key: string; candidateCount?: number }[], empSido ? (['서울', '경기', '인천'].includes(empSido) ? '수도권' : '비수도권') : null) : 0
   const total = fresh > 0 ? (empSido ? fresh : Math.max(fresh, old)) : old
   // 통합고용세액공제 — 명부 화면에서 사람이 넣어 계산한 값이 먼저(D-232), 없으면 명부 날짜로 센 인원으로(D-302). 둘 다 없으면 새로 들어온 직원 수로 '점검해 볼 만함'
-  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown; seniorCount?: unknown }; headcount?: unknown } | null
+  const data = roster.data as { estimate?: { computable?: unknown; creditTotal?: unknown; incTotal?: unknown }; counts?: { newHireCount?: unknown; seniorCount?: unknown }; headcount?: unknown; headcountPast?: unknown } | null
   const typed = data?.estimate?.computable === true && typeof data.estimate.creditTotal === 'number' && data.estimate.creditTotal > 0 ? data.estimate.creditTotal : 0
   const hc = typed > 0 ? null : headcountOf(data?.headcount)
   const fromRoster = hc ? rosterCredit(record, facts, hc) : null
@@ -356,22 +421,31 @@ const employmentInsight: Provider = ({ record, facts }) => {
   // D-330 개편표면 '1년 차 · 3년' 을 같이 — 1년 차만 보면 혜택이 작아 보였다
   const three = typed > 0 ? 0 : (fromRoster?.threeYear ?? 0)
   const creditText = three > 0 ? `세액공제 1년 차 약 ${manwonText(credit)} · 3년 약 ${manwonText(three)}` : `세액공제 약 ${manwonText(credit)}`
+  // D-378 신고서에 빠진 통합고용세액공제(그해 늘어난 인원 · 그해 단가) — 금액이 나오면 맨 앞 · 제안할 거리
+  const refund = employmentRefund(record, facts, years, headcountOf(data?.headcountPast))
+  const refundText = refund.won > 0 ? `경정청구 약 ${manwonText(refund.won)}(${refund.year}년분)` : ''
   const amount =
-    candidates && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + ${creditText}` : ''}` : credit > 0 ? `${creditText}(1차 추정)` : undefined
+    candidates && total > 0
+      ? `최대 ${manwonText(total)} 검토(1차 추정)${credit > 0 ? ` + ${creditText}` : ''}${refundText ? ` + ${refundText}` : ''}`
+      : credit > 0
+        ? `${creditText}(1차 추정)${refundText ? ` + ${refundText}` : ''}`
+        : refundText
+          ? `${refundText} · 1차 추정`
+          : undefined
   const first = hard ? `청년도약 참여신청 기한 ${hard}명 — 지나면 신청 불가` : (roster.summary.split('\n')[1] ?? '').replace(/^·\s*/, '')
   return {
     amount,
     key: 'employment',
     label: '고용지원금',
-    // 지원금 후보가 없어도 세액공제가 나오는 업체는 제안할 거리가 있다(검토해 볼 만함)
-    tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
-    headline: creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
+    // 지원금 후보가 없어도 세액공제가 나오는 업체는 제안할 거리가 있다(검토해 볼 만함) · 신고서에 빠진 공제 금액이 나오면 바로 제안
+    tone: candidates || refund.won > 0 ? 'good' : credit > 0 ? 'maybe' : 'no',
+    headline: !candidates && refund.won > 0 ? `${refund.year}년 신고서에 통합고용세액공제가 빠졌어요 — 경정청구로 돌려받을 수 있어 보여요` : creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
     // D-336 2025년 이후 창업이면 세액공제와 창업감면을 같은 해 함께 못 받을 수 있다 — 금액을 볼 때 같이 알린다
-    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : '', seniorRuleLine(record, data?.counts?.seniorCount, empSido), durunuriLine(facts.employeeCount, newHires)].filter(Boolean).join(' · '),
+    detail: [refund.won > 0 ? refund.line : '', first.startsWith('[') ? '' : first, creditLine, refund.won > 0 ? '' : refund.line, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : '', seniorRuleLine(record, data?.counts?.seniorCount, empSido), durunuriLine(facts.employeeCount, newHires)].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',
-    action: candidates ? `고용지원금 — ${roster.verdictLabel}` : credit > 0 ? '통합고용세액공제 — 세무사와 신고 확인' : null,
+    action: candidates ? `고용지원금 — ${roster.verdictLabel}` : refund.won > 0 ? `통합고용세액공제 — ${refund.year}년분 경정청구 세무사와 검토` : credit > 0 ? '통합고용세액공제 — 세무사와 신고 확인' : null,
   }
 }
 
@@ -385,7 +459,7 @@ function labCreditOf(record: ClientOpsRecord): number {
   return 0
 }
 
-const labInsight: Provider = ({ record, facts }) => {
+const labInsight: Provider = ({ record, facts, today }) => {
   const open = `/tools/labcare${q(record)}`
   // D-340 회사 정보 글 · 올린 인정서 둘 다('없음' 글은 아님)
   const lab = researchLabOf(record)
@@ -393,8 +467,24 @@ const labInsight: Provider = ({ record, facts }) => {
     // D-232: 연구소가 있으면 '연구개발비 세액공제를 챙겼나' 가 다음 제안이다(못 받은 해는 경정청구 5년) — 계산이 붙어 있으면 그 금액
     const credit = labCreditOf(record)
     const taxOpen = `/tools/labcare/tax${q(record)}`
-    if (credit > 0) return { key: 'labcare', label: '연구소', tone: 'good', headline: `연구소가 있어요 — 연구개발비 세액공제 연간 약 ${manwonText(credit)}`, detail: `${String(lab)} · 신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)`, missing: [], openPath: taxOpen, openLabel: '세액공제 계산 보기', action: '연구소 — 연구개발비 세액공제 챙기기', amount: `세액공제 연간 약 ${manwonText(credit)}` }
-    return { key: 'labcare', label: '연구소', tone: 'maybe', headline: '연구소(전담부서)가 있어요 — 연구개발비 세액공제를 챙겼는지 볼 때', detail: `${String(lab)} · 연구원 인건비를 넣으면 연간 공제액을 바로 계산해요`, missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 확인' }
+    // D-378 올린 신고서에 연구 · 인력개발비 세액공제가 없으면(연구소가 그해 전부터 있었으면 분명) — 맨 앞 줄 · 바로 제안
+    const refund = labRefund(lab, facts, reliefYears(record, facts, today))
+    if (credit > 0)
+      return {
+        key: 'labcare',
+        label: '연구소',
+        tone: 'good',
+        headline: refund.sure ? `연구소가 있는데 신고서에 연구개발비 세액공제가 없어요 — 연간 약 ${manwonText(credit)}` : `연구소가 있어요 — 연구개발비 세액공제 연간 약 ${manwonText(credit)}`,
+        detail: [refund.line, String(lab), refund.claimed || refund.line ? '' : '신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)'].filter(Boolean).join(' · '),
+        missing: [],
+        openPath: taxOpen,
+        openLabel: '세액공제 계산 보기',
+        action: refund.sure ? '연구소 — 연구개발비 세액공제 경정청구 세무사와 검토' : '연구소 — 연구개발비 세액공제 챙기기',
+        amount: `세액공제 연간 약 ${manwonText(credit)}`,
+      }
+    if (refund.sure)
+      return { key: 'labcare', label: '연구소', tone: 'good', headline: '연구소가 있는데 신고서에 연구개발비 세액공제가 없어요 — 경정청구 검토', detail: [refund.line, String(lab), '연구원 인건비를 넣으면 돌려받을 금액을 바로 계산해요'].join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 경정청구 세무사와 검토' }
+    return { key: 'labcare', label: '연구소', tone: 'maybe', headline: '연구소(전담부서)가 있어요 — 연구개발비 세액공제를 챙겼는지 볼 때', detail: [refund.line, String(lab), '연구원 인건비를 넣으면 연간 공제액을 바로 계산해요'].filter(Boolean).join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 확인' }
   }
   const last = latestToolResult(record, 'labcare')
   if (last) {

@@ -184,6 +184,26 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /수입\s*금액/,
   },
   {
+    // D-378 세무조정계산서 · 법인세 신고서 — 그해 받은 세액공제 · 감면을 읽는다(services/taxReturnDoc.ts). 표준재무제표가 같이 있어
+    // '재무제표' 로 가던 것을 제목 · 공제감면 서식으로 먼저 잡는다
+    label: '세무조정계산서',
+    signals: [
+      { re: /세\s*무\s*조\s*정\s*계\s*산\s*서/, weight: 5, say: "제목 '세무조정계산서'" },
+      { re: /법\s*인\s*세\s*과\s*세\s*표\s*준\s*및\s*세\s*액\s*(?:신\s*고\s*서|조\s*정\s*계\s*산\s*서)/, weight: 5, say: "제목 '법인세 과세표준 및 세액신고서'" },
+      { re: /공\s*제\s*감\s*면\s*세\s*액|세\s*액\s*공\s*제\s*조\s*정\s*명\s*세\s*서/, weight: 1, say: "'공제감면세액'" },
+    ],
+    nameHint: /세무\s*조정|조정\s*계산서|법인세\s*신고/,
+  },
+  {
+    // D-378 개인사업자 종합소득세 신고서 — 받은 세액공제 · 감면 · 정책자금 재무 서류(D-373 과 같은 규칙)
+    label: '종합소득세 신고서',
+    signals: [
+      { re: /종\s*합\s*소\s*득\s*세[\s\S]{0,40}?과\s*세\s*표\s*준\s*확\s*정\s*신\s*고/, weight: 5, say: "제목 '종합소득세 과세표준확정신고'" },
+      { re: /종\s*합\s*소\s*득\s*세\s*신\s*고\s*서/, weight: 4, say: "제목 '종합소득세 신고서'" },
+    ],
+    nameHint: /종합\s*소득세\s*신고/,
+  },
+  {
     label: '재무제표',
     signals: [{ re: /재무제표|재무상태표|손익계산서/, weight: 3, say: "'재무제표'" }],
     nameHint: /재무제표|재무상태표|손익/,
@@ -605,11 +625,30 @@ export function placeDocument(input: { text: string; fileName: string }, metas: 
   return validUntil ? { ...p, validUntil } : p
 }
 
+/**
+ * D-378 제목이 22자보다 길어 documentTitle 이 건너뛰는 서식 — 맨 위 몇 줄에 있으면 그 서류(아래 줄의 '세액감면 신청서' 같은 부표 제목으로 가지 않게).
+ */
+const LONG_TITLES: [RegExp, string][] = [
+  [/종\s*합\s*소\s*득\s*세[\s\S]{0,40}?과\s*세\s*표\s*준\s*확\s*정\s*신\s*고/, '종합소득세 신고서'],
+  [/법\s*인\s*세\s*과\s*세\s*표\s*준\s*및\s*세\s*액\s*(?:신\s*고\s*서|조\s*정\s*계\s*산\s*서)/, '세무조정계산서'],
+]
+
+function longTitleOf(text: string): string | null {
+  const head = (text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 6).join('\n')
+  return LONG_TITLES.find(([re]) => re.test(head))?.[1] ?? null
+}
+
 function placeDocumentBase(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
   const text = input.text ?? ''
   const hasText = compact(text).length >= 10
   const issuedAt = hasText ? findIssuedDate(text) : null
   const fileMetas = metas.filter((m) => m.needsFile)
+  const long = hasText ? longTitleOf(text) : null
+  if (long) {
+    const same = fileMetas.find((m) => compactTitle(m.label).replace(/\(\d+\)$/, '') === compactTitle(long))
+    if (same) return { kind: 'existing', key: same.key, label: same.label, sure: true, reason: `서류 제목 '${long}' — 같은 이름의 칸`, issuedAt }
+    return { kind: 'new', label: long, sure: true, reason: `서류 제목 '${long}' — 그 이름으로 새 칸`, issuedAt }
+  }
   const fromText = hasText ? documentTitle(text) : null
   const title = fromText ?? titleFromFileName(input.fileName)
   const how = fromText ? '서류 제목' : '파일 이름'

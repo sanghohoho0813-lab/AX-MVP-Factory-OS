@@ -1732,6 +1732,45 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await ctx.close()
 }
 
+/* ---------------- D-378 세무조정계산서 → 받은 공제 · 감면 → 연구소 있는데 연구개발비 세액공제 없음 = 경정청구 ---------------- */
+for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const TR = {
+    name: 'scan_378.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      ['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '법인명 한솔테크(주)', '공제감면세액 및 추가납부세액합계표(갑)', '구분 근거법조항 코드 대상세액 감면(공제)세액', '연구·인력개발비에 대한 세액공제 조특법 제10조 13L', '중소기업에 대한 특별세액감면 조특법 제7조 112 8,500,000', '통합고용세액공제 조특법 제29조의8 1C1', '표준재무상태표', '자산총계 3,000,000,000'].join('\n'),
+      'utf8',
+    ),
+  }
+  const LABSCAN = { ...LAB, name: 'scan_377.txt' }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([LABSCAN, TR])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-378 ${vp.tag} 스캔 이름이어도 '세무조정계산서' 칸(재무제표 아님)`, placed.includes('→ 세무조정계산서'), placed.slice(0, 300))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  const batch = ((await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check(`D-378 ${vp.tag} 바로 넣은 정보: 받은 공제 · 감면 2025년 — 중소기업 특별세액감면 850만원`, batch.includes('받은 공제 · 감면 2025년') && batch.includes('중소기업 특별세액감면 850만원'), batch.slice(0, 600))
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const lab = (await page.locator('[data-testid="smart-insight"][data-key="labcare"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check(`D-378 ${vp.tag} 연구소 카드: 2024년부터 연구소가 있는데 2025년 신고서에 연구개발비 세액공제가 없어요 — 경정청구`, /2024년부터 연구소가 있는데 2025년 .{0,12}신고서에 연구 · 인력개발비 세액공제가 없어요/.test(lab) && lab.includes('경정청구'), lab.slice(0, 400))
+  if (vp.tag === '390') await page.locator('[data-testid="smart-insight"][data-key="labcare"]').screenshot({ path: '/tmp/claude-0/shot378-lab-390.png' }).catch(() => {})
+  if (vp.tag === '1440') await page.getByTestId('smart-batch').screenshot({ path: '/tmp/claude-0/shot378-batch.png' }).catch(() => {})
+  check(`D-378 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

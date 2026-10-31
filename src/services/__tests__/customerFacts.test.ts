@@ -51,6 +51,8 @@ import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { readIncomeCert } from '../incomeDoc'
+import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
+import { employmentRefund, labRefund, labYearOf, reliefYears, startupRefund } from '../clientInsights'
 import { readRegistryTax } from '../registryTax'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
@@ -1867,6 +1869,69 @@ await (async () => {
   check('D-373 중소기업 확인서 확인번호 칸에 사업자등록번호가 들어가지 않음', sme?.number === '' && sme.size === '소기업', JSON.stringify(sme))
   const reg = readRegistryTax(['등기사항전부증명서(말소사항 포함)', '1주의 금액 금 5,000 원', '임원에 관한 사항', '사내이사 이대표 750101-******* 2021 년 03 월 02 일 취임', '대표이사 이대표 750101-******* 경기도 파주시 2021 년 03 월 02 일 취임', '회사성립연월일 2021 년 03 월 02 일'].join('\n'), '이대표')
   check('D-373 대표 취임일 설명 — 같은 날 취임을 두 번 쓰지 않음', reg?.ceoStart === '2021-03-02' && reg.ceoStartNote === '2021-03-02 취임', JSON.stringify(reg))
+})()
+
+// D-378 세무조정계산서 · 법인세 · 종합소득세 신고서 → 받은 공제 · 감면 → 신고서에 빠진 공제(경정청구 5년)
+await (async () => {
+  const TR1 = ['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '법인명 주식회사 미래테크 사업자등록번호 124-81-00998', '공제감면세액 및 추가납부세액합계표(갑)', '구분 근거법조항 코드 대상세액 감면(공제)세액', '연구·인력개발비에 대한 세액공제 조특법 제10조 13L', '창업중소기업 등에 대한 세액감면 조특법 제6조 11A', '중소기업에 대한 특별세액감면 조특법 제7조 112 8,500,000', '통합고용세액공제 조특법 제29조의8 1C1', '통합투자세액공제 조특법 제24조 13W 0', '최저한세 적용대상 공제감면세액 8,500,000', '표준재무상태표', '자산총계 3,000,000,000 부채총계 1,200,000,000'].join('\n')
+  const r1 = readTaxReturn(TR1)
+  check('D-378 법인세 신고서: 사업연도 2025 · 금액 있는 줄만 받음(특별세액감면 850만) · 빈 줄 · 0 · 조문 · 코드는 아님', r1?.kind === 'corp' && r1.year === 2025 && r1.items.length === 1 && r1.items[0].group === 'smeSpecial' && r1.items[0].amount === 8_500_000 && r1.sectionSeen, JSON.stringify(r1))
+  const TR2 = ['세무조정계산서', '사업연도 2025년 1월 1일 ~ 2025년 12월 31일', '세액공제조정명세서(3)', '연구·인력개발비에 대한', '세액공제 10조 12,000,000 12,000,000', '통합고용세액공제 29조의8 15,400,000', '근로소득을 증대시킨 기업에 대한 세액공제 3,000,000'].join('\n')
+  const r2 = readTaxReturn(TR2)
+  check('D-378 이름이 두 줄로 나뉘어도 · 같은 금액 두 칸은 하나로 · 모르는 공제는 목록 밖', r2?.year === 2025 && r2.items.map((i) => `${i.group}:${i.amount}`).sort().join() === 'employment:15400000,rnd:12000000', JSON.stringify(r2))
+  const TR3 = ['종합소득세ㆍ농어촌특별세ㆍ지방소득세 과세표준확정신고 및 납부계산서', '2025년 귀속', '세액감면 신청서', '창업중소기업 세액감면 3,200,000'].join('\n')
+  const r3 = readTaxReturn(TR3)
+  check('D-378 개인사업자 종합소득세 신고서 → 2025 귀속 · 창업감면 320만', r3?.kind === 'personal' && r3.year === 2025 && r3.items[0]?.group === 'startup' && r3.items[0].amount === 3_200_000, JSON.stringify(r3))
+  const front = readTaxReturn(['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '법인명 주식회사 미래테크'].join('\n'))
+  check('D-378 첫 장만(공제 · 감면 칸 없음) → 칸을 만들지 않음("없음" 이라고 적지 않음)', !!front && !front.sectionSeen && factCandidatesFromDocText('customdoc_tr', ['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '법인명 주식회사 미래테크'].join('\n'), 'r').length === 0)
+  const total = readTaxReturn(['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '공제감면세액 8,500,000'].join('\n'))
+  const totalVal = total ? reliefFactValue(total, (n) => `${n}`) : ''
+  check('D-378 이름 없이 합계만 있으면 "없음" 이 아님 — 어떤 공제인지 서식에서 · 판정에 안 씀', /어떤 공제인지/.test(totalVal) && reliefYearsOf([['cf:받은 공제 · 감면 2025년', totalVal]], 'cf:').length === 0, totalVal)
+  check('D-378 소득금액증명 · 과세표준증명은 신고서가 아님', !looksLikeTaxReturn(['소득금액 증명', '(종합소득세 신고자용)', '종합소득세 과세표준확정신고 기준'].join('\n')) && !looksLikeTaxReturn('부가가치세 과세표준증명'))
+  const base = normalizeClientOps({ id: 'tr378', companyName: '미래테크', businessNumber: '124-81-00998', createdAt: NOW, updatedAt: NOW })
+  const pl = placeDocument({ text: TR1, fileName: 'scan_11.pdf' }, allDocumentMetas(base))
+  check('D-378 서류함: 표준재무제표가 같이 있어도 "세무조정계산서" 칸(재무제표 아님)', pl.kind === 'new' && pl.label === '세무조정계산서', JSON.stringify(pl))
+  const pl3 = placeDocument({ text: TR3, fileName: 'scan_12.pdf' }, allDocumentMetas(base))
+  check('D-378 서류함: 종합소득세 신고서 칸', pl3.kind === 'new' && pl3.label === '종합소득세 신고서', JSON.stringify(pl3))
+  const doc = (key: string, text: string) => ({ key, fileName: `${key}.pdf`, text, method: 'pdf_text' as const, docSure: true })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [doc('customdoc_tr', TR1)], { now: NOW, today: '2026-10-31', makeId: () => `tr${++n}` })
+  check('D-378 올리기 한 번 → 회사 정보 "받은 공제 · 감면 2025년" 바로(묻지 않음)', customFactValue(a.record, '받은 공제 · 감면 2025년') === '중소기업 특별세액감면 850만원(법인세 신고서)' && a.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '받은 공제 · 감면 2025년'), a.summary.flagged]))
+  check('D-378 경정청구 기한: 법인 2020년분은 2026-03-31 끝 · 2021년분은 아직 · 개인 2020년분은 2026-05-31', !refundOpen(2020, '2026-10-31') && refundOpen(2021, '2026-10-31') && refundOpen(2020, '2026-05-31', 'personal') && !refundOpen(2020, '2026-06-01', 'personal'))
+  const rec = (relief: string) => normalizeClientOps({ ...base, businessAddress: '서울특별시 강남구 테헤란로 1', customFields: [{ id: 'rl', group: 'identity', label: '받은 공제 · 감면 2025년', value: relief }] } as never)
+  const none = rec('법인세 신고서에 공제 · 감면 없음')
+  const facts = clientFacts(none, new Date('2026-10-31T00:00:00'))
+  const ry = reliefYears(none, facts, '2026-10-31')
+  check('D-378 회사 정보 칸 → 2025년 · 받은 것 없음', ry.length === 1 && ry[0].year === 2025 && ry[0].none, JSON.stringify(ry))
+  const past = { asOf: '2025-12-31', prev: { year: 2024, total: 3, youth: 0, actualMonths: 12 }, cur: { year: 2025, total: 5, youth: 1, actualMonths: 12 }, basis: 'history' as const, counted: 6, excluded: { rel: 0, noEi: 0, noHire: 0, lostNoDate: 0 } }
+  const e1 = employmentRefund(none, facts, ry, past)
+  check('D-378 고용: 2025년 3 → 5명 늘었는데 신고서에 통합고용 없음 → 경정청구 금액(그해 단가)', e1.won > 0 && e1.year === 2025 && e1.line.startsWith('2025년 평균 3 → 5명으로 늘었는데 2025년 법인세 신고서에 통합고용세액공제가 없어요 — 경정청구 검토 약'), JSON.stringify(e1))
+  const flat = { ...past, cur: { ...past.cur, total: 3, youth: 0 } }
+  check('D-378 고용: 인원이 그대로면 말하지 않음(맞게 안 받은 것) · 명부가 없으면 "늘었다면"', employmentRefund(none, facts, ry, flat).line === '' && /그해 직원이 늘었다면 경정청구 검토/.test(employmentRefund(none, facts, ry, null).line))
+  const got = rec('통합고용세액공제 1,540만원 · 연구 · 인력개발비 세액공제 1,200만원(법인세 신고서)')
+  const ryGot = reliefYears(got, facts, '2026-10-31')
+  check('D-378 받은 해는 "받고 있어요"(금액 · 경정청구 아님)', /받고 있어요/.test(employmentRefund(got, facts, ryGot, past).line) && employmentRefund(got, facts, ryGot, past).won === 0)
+  check('D-378 연구소 인정일 해 · 유효기간 날짜는 빼고', labYearOf('기업부설연구소(인정번호 2021-1 · 인정일 2021-03-02)') === 2021 && labYearOf('2027-12-31까지 · 인정일 2022-05-01') === 2022 && labYearOf('있음') === null)
+  const lr = labRefund('기업부설연구소(인정일 2021-03-02)', facts, ry)
+  check('D-378 연구소: 2021년부터 있는데 2025년 신고서에 연구 · 인력개발비 없음 → 분명 · 경정청구', lr.sure && lr.line.startsWith('2021년부터 연구소가 있는데 2025년 법인세 신고서에 연구 · 인력개발비 세액공제가 없어요'), JSON.stringify(lr))
+  check('D-378 연구소: 2026년에 생긴 연구소는 2025년 신고서와 상관없음 · 받았으면 챙기고 있어요', labRefund('인정일 2026-02-01', facts, ry).line === '' && labRefund('인정일 2021-03-02', facts, ryGot).claimed)
+  const sr = startupRefund('2023-04-01', facts, ry)
+  const ryS = reliefYearsOf([['cf:받은 공제 · 감면 2025년', '중소기업 특별세액감면 850만원(법인세 신고서)']], 'cf:')
+  check('D-378 창업감면: 감면 기간 안 해 신고서에 없음 → 경정청구 검토 · 특별세액감면을 받았으면 큰 쪽 확인 · 기간 밖 해는 말하지 않음', /2025년 법인세 신고서에 창업중소기업 세액감면이 없어요 — 그해 세금을 냈다면 경정청구/.test(sr.line) && /특별세액감면은 받음/.test(startupRefund('2023-04-01', facts, ryS).line) && startupRefund('2015-04-01', facts, ry).line === '')
+  // 맞춤 추천 카드까지 — 연구소 인정서 + 신고서(연구개발비 없음) → 연구소 '가능성 높음' 맨 앞 줄
+  const labRec = normalizeClientOps({ ...none, customFields: [...none.customFields, { id: 'lb', group: 'credential', label: '기업부설연구소', value: '인정번호 2021-1 · 인정일 2021-03-02' }] } as never)
+  const labCard = buildInsights(labRec, '2026-10-31', []).find((i) => i.key === 'labcare')
+  check('D-378 맞춤 추천 연구소: 신고서에 연구개발비 없음 → 가능성 높음 · 첫 줄이 경정청구 · 다음 행동', labCard?.tone === 'good' && labCard.detail.startsWith('2021년부터 연구소가 있는데') && /경정청구/.test(labCard.action ?? ''), JSON.stringify(labCard))
+  // 명부(그해 늘어난 인원 기록) + 신고서(통합고용 없음) → 고용지원금 카드 금액 · 가능성 높음
+  const roster = { id: 'tr-emp378', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'none', verdictLabel: '후보 지원금 0건', summary: '[4대보험 명부 진단] 6명', data: { tab: 'roster', headcount: { ...past, asOf: '2026-10-31', prev: past.cur, cur: { year: 2026, total: 5, youth: 1, actualMonths: 9 } }, headcountPast: past }, deadlines: [], createdAt: NOW, publishedUpdateId: null }
+  const empRec = normalizeClientOps({ ...none, toolResults: [roster] } as never)
+  const empCard = buildInsights(empRec, '2026-10-31', []).find((i) => i.key === 'employment')
+  check('D-378 맞춤 추천 고용: 그해 늘었는데 신고서에 없음 → 가능성 높음 · 제목 · 금액 "경정청구 약 … (2025년분)"', empCard?.tone === 'good' && /2025년 신고서에 통합고용세액공제가 빠졌어요/.test(empCard.headline) && /경정청구 약 .+\(2025년분\)/.test(empCard.amount ?? ''), JSON.stringify(empCard))
+  check('D-378 정책자금 준비 서류: 세무조정계산서 칸 → 재무 서류 확보', (() => {
+    let x = withCustomDocument(base, { label: '세무조정계산서' })
+    x = withDocument(x, x.customDocuments[x.customDocuments.length - 1].key, { received: true, issuedAt: '2026-03-31', fileName: '세무조정.pdf' })
+    return policyDocs(x, '2026-10-31').have.includes('financial')
+  })())
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
