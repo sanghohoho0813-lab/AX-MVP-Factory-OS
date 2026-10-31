@@ -2294,5 +2294,14 @@ await (async () => {
   check('D-400 법인: 매출 → 재무제표 · 세무조정계산서', b.steps.some((x) => x.includes('작년 매출') && x.includes('재무제표 · 세무조정계산서')), JSON.stringify(b.steps))
 }
 
+// D-401 맞춤 진단서 '회사 한눈에' — 한 해 매출보다 최근 해의 부가세 신고서면 한 줄
+{
+  const meta = { source: 'financialStatements', status: 'entered', asOf: '2025', updatedAt: NOW }
+  const mk = (vr: string, rev?: string) => normalizeClientOps({ id: 'dg401', companyName: '미래상사', createdAt: NOW, updatedAt: NOW, customFields: vr ? [{ id: 'v', group: 'identity', label: '부가세 신고 매출', value: vr }] : [], ...(rev ? { factValues: { revenue: rev }, factMeta: { revenue: meta } } : {}) } as never)
+  const row = (r: ReturnType<typeof mk>) => buildDiagnosis(r, buildInsights(r, '2026-10-31', []), '2026-10-31').snapshot.find((x) => x.label === '부가세 신고')?.value
+  check('D-401 2025 매출 + 2026년 1기 신고서 → "부가세 신고 · 2026년 1기 확정(1~6월) · 6억 2,000만원"', row(mk('2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', '1100000000')) === '2026년 1기 확정(1~6월) · 6억 2,000만원', String(row(mk('2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', '1100000000'))))
+  check('D-401 같은 해(2025) 신고서면 한 해 매출로 충분 — 줄 없음 · 신고서가 없으면 줄 없음', row(mk('2025년 2기 확정(7~12월) 과세표준 6억원', '1100000000')) === undefined && row(mk('', '1100000000')) === undefined)
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
