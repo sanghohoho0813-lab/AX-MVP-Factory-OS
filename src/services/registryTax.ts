@@ -11,6 +11,8 @@
  * 주민등록번호 · 주소는 남기지 않는다. 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
+
 export interface RegistryTaxRead {
   /** 1주의 금액(원) */
   par: number | null
@@ -109,7 +111,9 @@ function tenureStart(events: OfficerEvent[]): { start: string | null; sure: bool
 
 /** 등기부등본 글 → 절세 현황 값. 등기부가 아니면 null */
 export function readRegistryTax(text: string, ceoName = ''): RegistryTaxRead | null {
-  const t = flat(String(text || ''))
+  // D-416 스캔 글자 잡음(한 글자씩 띄운 말 · 마침표 금액)을 먼저 고친다
+  text = fixAmountNoise(joinSpacedHangul(String(text || '')))
+  const t = flat(text)
   if (!/등기사항|등기부|임원에\s*관한\s*사항|1\s*주\s*의\s*금\s*액/.test(t)) return null
   const parM = lastMatch(/1\s*주\s*의\s*금\s*액\s*[:：]?\s*(?:금\s*)?([\d,]+)\s*원/, t)
   // '발행할 주식의 총수'(정관상 한도)는 '발행\s*주식' 이 붙어 있지 않아 걸리지 않는다. 증자로 바뀌었으면 마지막 줄이 지금 값.
@@ -152,7 +156,7 @@ export interface OfficerTerm {
 const ROLE_RANK = ['공동대표이사', '대표이사', '대표', '사내이사', '사외이사', '기타비상무이사', '이사', '감사']
 
 export function officerTerms(text: string, termYears = 3): OfficerTerm[] {
-  const events = officerEvents(text)
+  const events = officerEvents(fixAmountNoise(joinSpacedHangul(String(text || ''))))
   const byName = new Map<string, OfficerEvent[]>()
   for (const e of events) byName.set(e.name, [...(byName.get(e.name) ?? []), e])
   const out: OfficerTerm[] = []

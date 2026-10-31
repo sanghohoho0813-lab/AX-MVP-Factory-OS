@@ -71,7 +71,8 @@ import { pdfItemsToText } from '../pdfTextLines'
 import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
-import { fixAmountNoise } from '../ocrNumbers'
+import { readShareholderDoc } from '../shareholderDoc'
+import { fixAmountNoise, joinSpacedHangul } from '../ocrNumbers'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
@@ -2575,6 +2576,18 @@ await (async () => {
   const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'scan.jpg', text: FSN, method: 'ocr' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => 'o4' })
   const pr = pendingFacts(a.record).find((p) => p.key === 'revenue')
   check('D-414 스캔 재무제표 올리기 → 확인 후보 매출 24억(예전 2,400원) · 사진 글자라 한 번 확인(바로 넣지 않는 규칙 그대로)', pr?.value === '2400000000' && !!pr?.note, JSON.stringify(pr))
+})()
+
+// D-416 스캔 글자 — 등기부 · 주주명부의 한 글자씩 띄운 말 · '5.000 원' · 머리줄만 표인 주주명부
+await (async () => {
+  check('D-416 한 글자씩 띄운 말만 붙임(탭 칸 · 낱말 띄어쓰기는 그대로)', joinSpacedHangul('발 행 주 식 의 총 수 20,000 주\n박 지 훈\t15,000\n주식회사 미래테크') === '발행주식의총수 20,000 주\n박지훈\t15,000\n주식회사 미래테크', joinSpacedHangul('발 행 주 식 의 총 수 20,000 주\n박 지 훈\t15,000\n주식회사 미래테크'))
+  check('D-416 한 묶음 + 원 · 주 → 쉼표("5.000 원" · "15.000주") · 소수 "10.5%" 그대로', fixAmountNoise('금 5.000 원 15.000주 10.5% 2025.07.25') === '금 5,000 원 15,000주 10.5% 2025.07.25', fixAmountNoise('금 5.000 원 15.000주 10.5% 2025.07.25'))
+  const REG = ['등기사항전부증명서(말소사항 포함)', '상 호 주식회사 가나테크', '1 주 의 금 액 금 5.000 원', '발 행 주 식 의 총 수 20.000 주', '보통주식 20,000 주 자본금의 액 금 100.000.000 원', '임원에 관한 사항', '대표이사 박 지 훈 801231-1******', '2020 년 03 월 02 일 취 임'].join('\n')
+  const rg = readRegistryTax(REG, '박지훈')
+  check('D-416 스캔 등기부(띄운 말 · 마침표 금액) → 액면 5,000 · 총수 20,000 · 자본금 검산 · 취임일 2020-03-02(예전: 총수 · 취임일 못 읽음)', !!rg && rg.par === 5000 && rg.totalShares === 20000 && rg.sharesSure && rg.ceoStart === '2020-03-02' && rg.ceoStartSure, JSON.stringify(rg))
+  const SH = ['주주명부', '발행주식의 총수: 20,000주 / 1주의 금액: 5,000원', ['주주명', '주식수', '비고'].join('\t'), '박 지 훈 15.000주 대표이사', '박 배 우 5.000주 배우자', '합계 20.000주'].join('\n')
+  const sh = readShareholderDoc(SH, '박지훈')
+  check('D-416 주주명부(머리줄만 표 · 띄운 이름 · "15.000주") → 박지훈 15,000 · 박배우 5,000 · 검산 맞음(예전: 주주 0명, 마침표면 15주로 잘못 읽고도 검산이 맞아 바로 넣을 뻔)', sh.sure && sh.holders.map((h) => `${h.name}:${h.shares}`).join() === '박지훈:15000,박배우:5000', JSON.stringify(sh))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

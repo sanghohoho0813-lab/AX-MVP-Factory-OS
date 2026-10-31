@@ -12,6 +12,16 @@ export function fixAmountNoise(text: string): string {
   return String(text || '')
     .replace(/(^|[^\d.,])(\d{1,3}(?:[.,]\d{3}){2,})(?!\d)/g, (_m, pre: string, num: string) => `${pre}${num.replace(/\./g, ',')}`)
     .replace(/(\d{1,3}(?:,\d{3})*),[ \t]+(\d{3}(?:,\d{3})*)(?![\d])/g, '$1,$2')
+    // D-416 한 묶음이라도 '원' · '주' 가 바로 붙으면 금액 · 주식 수('5.000 원' · '15.000주' → 5,000 · 15,000)
+    .replace(/(^|[^\d.,])(\d{1,3})\.(\d{3})(?=\s*(?:원|주)(?![가-힣]))/g, '$1$2,$3')
+}
+
+/**
+ * D-416 스캔 글자가 한 글자씩 띄워 읽은 말('발 행 주 식 의 총 수' · '박 지 훈' · '취 임') → 붙임.
+ * 한 글자 한글이 빈칸 하나씩 두고 둘 이상 이어질 때만(탭으로 나뉜 표 칸 · 낱말 사이 띄어쓰기는 그대로).
+ */
+export function joinSpacedHangul(text: string): string {
+  return String(text || '').replace(/(^|[\s])([가-힣](?: [가-힣])+)(?=\s|$)/gm, (_m, pre: string, run: string) => `${pre}${run.replace(/ /g, '')}`)
 }
 
 /**

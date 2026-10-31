@@ -10,6 +10,7 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 import type { ShareholderRelation } from '../types/clientOps'
+import { fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
 
 export interface ReadHolder {
   name: string
@@ -105,7 +106,8 @@ function colsOf(cells: string[]): Cols | null {
 
 /** 주주명부 글 → 주주 · 총수 · 1주의 금액 · 검산 */
 export function readShareholderDoc(text: string, ceoName = ''): RegisterRead {
-  const raw = String(text || '').replace(/\r\n?/g, '\n')
+  // D-416 스캔 글자 잡음(한 글자씩 띄운 이름 · '15.000주')을 먼저 고친다
+  const raw = fixAmountNoise(joinSpacedHangul(String(text || '').replace(/\r\n?/g, '\n')))
   const flat = raw.replace(/\s+/g, ' ')
   const statedTotal = (() => {
     const m = /발행\s*(?:한\s*)?주식\s*(?:의\s*)?총\s*수\s*[:：]?\s*(?:보통주\s*)?([\d,]+)\s*주?/.exec(flat) ?? /총\s*발행\s*주식\s*수?\s*[:：]?\s*([\d,]+)\s*주?/.exec(flat)
@@ -135,6 +137,8 @@ export function readShareholderDoc(text: string, ceoName = ''): RegisterRead {
       break
     }
   }
+  // D-416 머리줄만 표(탭)이고 주주 줄은 띄어 쓴 글이면 — 표 줄에서 아무도 못 찾았을 때 띄어 쓴 줄로 다시 읽는다
+  if (cols && !tabbed.slice(headAt + 1).some((l) => /\d/.test(scrub(l)))) cols = null
   if (cols) {
     for (const line of tabbed.slice(headAt + 1)) {
       const cells = line.split('\t').map((c) => c.trim())
