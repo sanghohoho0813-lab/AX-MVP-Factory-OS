@@ -2304,5 +2304,12 @@ await (async () => {
   check('D-401 같은 해(2025) 신고서면 한 해 매출로 충분 — 줄 없음 · 신고서가 없으면 줄 없음', row(mk('2025년 2기 확정(7~12월) 과세표준 6억원', '1100000000')) === undefined && row(mk('', '1100000000')) === undefined)
 }
 
+// D-402 원천세 신고서가 반년 넘게 지난 달 것이면 고용지원금 카드에 '최근 달 신고서로 다시'
+{
+  const mk = (asOf: string) => normalizeClientOps({ id: 'wh402', companyName: '미래테크', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'w', group: 'people', label: '원천세 신고 인원', value: `${Number(asOf.slice(0, 4))}년 ${Number(asOf.slice(5))}월분 근로자 12명` }], factMeta: { 'cf:원천세 신고 인원': { source: 'withholding', status: 'confirmed', asOf, updatedAt: NOW } } } as never)
+  const line = (asOf: string) => buildInsights(mk(asOf), '2026-10-31', []).find((i) => i.key === 'employment')?.detail ?? ''
+  check('D-402 2026년 3월분(7달 전) → "반년 넘었어요, 최근 달 신고서로 다시" · 9월분은 없음', line('2026-03').includes('반년 넘었어요') && !line('2026-09').includes('반년 넘었어요') && line('2026-09').includes('원천세 신고서 2026년 9월분'), `${line('2026-03')} | ${line('2026-09')}`)
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
