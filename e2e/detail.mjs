@@ -1867,6 +1867,37 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-389 대표 신분증 사본 → 대표 생년월일(주민등록번호는 어디에도 남지 않음) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    r.representativeBirth = ''
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  const ID = { name: 'scan_389.txt', mimeType: 'text/plain', buffer: Buffer.from(['주민등록증', '김대표(金代表)', '780510-1234567', '경기도 화성시 동탄대로 1', '2016. 5. 2.', '화성시장'].join('\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([ID])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-389 390 스캔 이름이어도 "대표자 신분증 사본" 칸', /scan_389\.txt → 대표자 신분증/.test(placed), placed.slice(0, 300))
+  const r = await record(page)
+  const all = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]))))
+  check('D-389 390 대표 생년월일 1978-05-10 바로 · 저장소 어디에도 주민등록번호(1234567)가 없음', r.representativeBirth === '1978-05-10' && !all.includes('780510-1234567') && !all.includes('7805101234567') && !/780510\s*-?\s*1\d{6}/.test(all), JSON.stringify({ b: r.representativeBirth }))
+  check('D-389 390 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

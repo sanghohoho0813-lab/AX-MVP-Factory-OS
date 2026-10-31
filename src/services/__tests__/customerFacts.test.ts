@@ -57,6 +57,7 @@ import { officerTerms, officerTermsOf, officerTermsValue, readDirectorTermYears,
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
 import { pagesLabel, splitBundle } from '../docBundle'
+import { looksLikeIdCard, readIdCard } from '../idCardDoc'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
@@ -2095,6 +2096,23 @@ await (async () => {
   const fresh = mk('NICE 812점 · 2026-10-20 조회')
   check('D-388 최근 조회면 날짜 줄 없이 "대표 신용 NICE 812점"', policyEvidence(fresh, clientFacts(fresh, new Date('2026-10-31T00:00:00')), '2026-10-31').notes.includes('대표 신용 NICE 812점'))
 }
+
+// D-389 대표 신분증 사본 → 대표 생년월일 · 이름(주민등록번호는 남기지 않음)
+await (async () => {
+  const ID = ['주민등록증', '홍길동(洪吉童)', '900315-1234567', '서울특별시 강남구 테헤란로 1', '2015. 3. 2.', '서울특별시 강남구청장'].join('\n')
+  check('D-389 주민등록증 → 1990-03-15 · 홍길동(한자 · 주소 · 구청장은 이름 아님)', JSON.stringify(readIdCard(ID)) === '{"birth":"1990-03-15","name":"홍길동"}', JSON.stringify(readIdCard(ID)))
+  const DL = ['자동차운전면허증', '1종보통', '11-15-123456-70', '김영희 020707-4123456', '경기도 성남시 분당구'].join('\n')
+  check('D-389 운전면허증 · 2000년대생(성별 4) → 2002-07-07 · 김영희', JSON.stringify(readIdCard(DL)) === '{"birth":"2002-07-07","name":"김영희"}', JSON.stringify(readIdCard(DL)))
+  check('D-389 본문에 "신분증 사본 제출" 이 있는 신청서는 신분증이 아님', !looksLikeIdCard(['지원사업 신청서', '대표자 성명 홍길동', '제출 서류: 사업자등록증, 신분증 사본'].join('\n')))
+  const base = normalizeClientOps({ id: 'id389', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  const cands = factCandidatesFromDocText('representativeId', ID, 'r')
+  check('D-389 후보는 생년월일 · 이름 둘뿐 — 주민등록번호 · 주소는 후보 어디에도 없음', cands.map((c) => c.key).join() === 'representativeBirth,representativeName' && !JSON.stringify(cands).includes('1234567') && !JSON.stringify(cands).includes('테헤란로'), JSON.stringify(cands))
+  let n = 0
+  const ocr = await analyzeUploadedDocs(base, [{ key: 'representativeId', fileName: 'id.jpg', text: ID, method: 'ocr' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `id${++n}` })
+  check('D-389 사진(OCR)이면 바로 넣지 않고 확인할 것(생년월일 · 이름 — 사진 글자라 한 번 확인)', !ocr.record.representativeBirth && ocr.summary.flagged.some((f) => f.key === 'representativeBirth' && f.note === NOTE_OCR) && !JSON.stringify(ocr.record).includes('900315-1234567'), JSON.stringify(ocr.summary.flagged))
+  const pdf = await analyzeUploadedDocs(base, [{ key: 'representativeId', fileName: 'id.pdf', text: ID, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `id${++n}` })
+  check('D-389 글자 PDF 면 생년월일 바로 · 기록 어디에도 주민등록번호 없음', pdf.record.representativeBirth === '1990-03-15' && !JSON.stringify(pdf.record).includes('1234567'), JSON.stringify([pdf.record.representativeBirth, pdf.summary.flagged]))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

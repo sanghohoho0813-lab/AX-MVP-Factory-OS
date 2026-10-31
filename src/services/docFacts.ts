@@ -10,6 +10,7 @@
  *  - 세무조정계산서 · 법인세 · 종합소득세 신고서 → '받은 공제 · 감면 YYYY년' 칸(D-378) — 경정청구 신호
  *  - 법인 등기부 → '임원 임기' 칸(D-380) — 3년이면 끝나는 날 · 달력에 중임 등기
  *  - 대표 신용점수 조회서 → '대표 신용점수' 칸(D-381) — 정책자금 대표 신용
+ *  - 대표 신분증 사본 → 대표 생년월일 · 이름(D-389) — 주민등록번호는 남기지 않는다
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -24,6 +25,7 @@ import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
 import { officerTerms, officerTermsValue, readDirectorTermYears } from './registryTax'
 import { creditScoreValue, readCreditScore } from './creditScoreDoc'
+import { readIdCard } from './idCardDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -61,6 +63,13 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       const terms = officerTerms(text)
       if (terms.length) out.push({ key: `${CUSTOM_FACT_PREFIX}임원 임기`, label: '임원 임기', group: 'people', value: officerTermsValue(terms), source: 'corporateRegistry', asOf: '', ref })
     }
+    return out
+  }
+  // D-389 대표 신분증 사본 → 대표 생년월일 · 이름(주민등록번호 · 주소는 남기지 않는다). 기본 칸 '대표자 신분증 사본' 이 아니어도 제목이 신분증이면
+  const id = readIdCard(text, key === 'representativeId' ? '신분증' : '')
+  if (id) {
+    out.push({ key: 'representativeBirth', value: id.birth, source: 'idCard', asOf: '', ref })
+    if (id.name) out.push({ key: 'representativeName', value: id.name, source: 'idCard', asOf: '', ref })
     return out
   }
   // D-378 세무조정계산서 · 신고서 → 그해 받은 공제 · 감면(이름 · 금액). 공제 · 감면 칸을 못 찾았고 받은 것도 없으면 남기지 않는다
