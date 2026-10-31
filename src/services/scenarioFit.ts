@@ -79,6 +79,12 @@ export interface ScenarioFit {
 
 const answerKey = (q: QuestionKey) => `scn.${q}`
 
+/** D-430 재무제표 연구개발비(회사 정보 '연구개발비') — 연구소 상황 예시의 '맞음' 근거 */
+function rndWhy(record: ClientOpsRecord): string {
+  const v = customFactValue(record, '연구개발비')
+  return v ? `재무제표에 연구개발비 ${v.replace(/\s*\([^)]*\)\s*$/, '')} — 이미 연구 · 개발을 하고 있어요(연구소가 있으면 세액공제 대상)` : ''
+}
+
 export function scenarioAnswer(record: Pick<ClientOpsRecord, 'decided'>, q: QuestionKey): 'yes' | 'no' | null {
   return record.decided?.[answerKey(q)]?.a ?? null
 }
@@ -392,6 +398,8 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (c.hasLab) return no('이미 연구소(전담부서)가 있어요 — 세액공제는 연구소 관리에서')
       if (isExcludedIndustryText(c.industryText)) return no(`업종(${c.industryText}) — 연구소 인정 제외 업종으로 보여요`)
       if (f.employeeCount === 0) return no('직원 0명 — 연구 · 개발 담당을 두기 어려워요')
+      // D-430 재무제표에 연구개발비가 있으면(D-419) 이미 연구 · 개발을 하는 회사 — 대표가 아니라고 답하지 않았으면 맞음
+      if (scenarioAnswer(c.record, 'researchStaff') === null && rndWhy(c.record)) return fit(rndWhy(c.record))
       return byAnswer(c, 'researchStaff', '연구 · 개발 맡을 직원 있음', '연구 · 개발 맡을 직원 없음')
     }
     case 'lab-three-growth': {
@@ -406,6 +414,7 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       const a = scenarioAnswer(c.record, 'researchStaff')
       if (a === 'yes') return fit('대표 답: 연구 · 개발 맡을 직원 있음', 'researchStaff')
       if (a === 'no') return no('대표 답: 연구 · 개발 맡을 직원 없음', 'researchStaff')
+      if (rndWhy(c.record)) return fit(rndWhy(c.record))
       if (RND_INDUSTRY.test(c.industryText) && f.employeeCount !== null && f.employeeCount >= 5) return fit(`업종 ${c.industryText} · 직원 ${f.employeeCount}명 · 연구소 없음 — 설립을 검토할 만해요`)
       return ask('researchStaff', c.industryText ? `${SCENARIO_QUESTIONS.researchStaff} — 업종 ${c.industryText}` : '')
     }

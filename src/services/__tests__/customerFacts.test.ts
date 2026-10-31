@@ -16,7 +16,8 @@ import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } 
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
 import { NOTE_RECHECK, sameAddress, customFactValue, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
-import { fitContext } from '../scenarioFit'
+import { fitContext, scenarioFit, withScenarioAnswer } from '../scenarioFit'
+import { scenarioPreset } from '../scenarioPresets'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
@@ -2739,6 +2740,17 @@ await (async () => {
   const got = names.map(([t]) => pl(t).label)
   check('D-429 임금대장 → 급여대장 · 의사록 · 퇴직연금 규약 · 국세/지방세 완납증명서 → 알려진 칸(예전: 기타 · 붙은 이름)', got.join() === names.map(([, l]) => l).join(), JSON.stringify(got))
   check('D-429 모르는 긴 서류 이름은 적힌 띄어쓰기대로 새 칸("고용·산재보험료 완납증명서")', pl('고용·산재보험료 완납증명서\n발급일 2026.10.20').label === '고용·산재보험료 완납증명서', pl('고용·산재보험료 완납증명서\n발급일 2026.10.20').label)
+})()
+
+// D-430 연구소 상황 예시 — 재무제표 연구개발비가 있으면 '맞음'(대표가 아니라고 답하면 그 답)
+await (async () => {
+  const base = normalizeClientOps({ id: 'sc430', companyName: '미래테크', employeeCount: '8', businessCategory: '제조업', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'r', group: 'identity', label: '연구개발비', value: '2025년 1억 3,200만원(재무제표 · 매출의 5.5%)' }] } as never)
+  const T = '2026-10-31'
+  const one = scenarioFit(scenarioPreset('lab-one')!, fitContext(base, T))
+  const two = scenarioFit(scenarioPreset('lab-two')!, fitContext(base, T))
+  check('D-430 연구소 상황(1명 · 2명) — 재무제표 연구개발비 → 맞음 · 왜 한 줄에 금액(예전: 직원 있나요? 질문)', one.kind === 'fit' && two.kind === 'fit' && one.why.includes('연구개발비 2025년 1억 3,200만원'), JSON.stringify([one, two]))
+  const said = withScenarioAnswer(base, 'researchStaff', 'no', NOW)
+  check('D-430 대표가 "연구 · 개발 맡을 직원 없음" 이라고 답했으면 그 답(안 맞음)', scenarioFit(scenarioPreset('lab-one')!, fitContext(said, T)).kind === 'no', JSON.stringify(scenarioFit(scenarioPreset('lab-one')!, fitContext(said, T))))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
