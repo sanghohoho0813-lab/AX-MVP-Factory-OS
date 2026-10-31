@@ -127,6 +127,11 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     const f = readFact(record, 'establishedAt')
     return !!f && f.status !== 'missing' && f.source === 'corporateRegistry'
   }
+  // D-391 다른 달 원천세 신고서를 또 올리면 — 같은 달이거나 더 앞선 달은 묻지 않고 그대로(더 최근 달은 아래에서 바로 바꾼다)
+  if (c.source === 'withholding') {
+    const m = record.factMeta?.[c.key]
+    if (m?.source === 'withholding' && c.asOf && m.asOf && c.asOf <= m.asOf) return true
+  }
   // D-391 원천세 신고서의 근로자 수는 이미 적힌 직원 수(명부 · 직접 적음)에 밀린다 — 퇴사 · 대표 급여로 한두 명 달라도 묻지 않는다
   if (c.source === 'withholding' && c.key === 'employeeCount') {
     const f = readFact(record, 'employeeCount')
@@ -175,7 +180,9 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')
     // 비어 있는 칸 · 까닭 없음 → 바로 넣는다. D-392 사업자등록증 개업일이 먼저 들어간 설립일은 등기부 회사성립일로 바꾼다(묻지 않음)
     const regWins = (p: PendingFact) => p.key === 'establishedAt' && p.source === 'corporateRegistry' && readFact(rec, 'establishedAt')?.source === 'businessRegistration'
-    const auto = mine.filter((p) => !p.note && (p.current === '' || regWins(p)))
+    // D-391 더 최근 달 원천세 신고서 — 앞 달 값을 바로 바꾼다(묻지 않음)
+    const newerMonth = (p: PendingFact) => p.source === 'withholding' && rec.factMeta?.[p.key]?.source === 'withholding' && !!p.asOf && p.asOf > (rec.factMeta?.[p.key]?.asOf ?? '')
+    const auto = mine.filter((p) => !p.note && (p.current === '' || regWins(p) || newerMonth(p)))
     // 다른 값이 이미 적혀 있으면 덮지 않고 묻는다
     const conflicts = mine.filter((p) => !p.note && p.current !== '' && !auto.includes(p))
     if (conflicts.length) {

@@ -2153,6 +2153,12 @@ await (async () => {
   check('D-391 고용지원금 카드(명부 없음) — "원천세 신고서 2026년 9월분 근로자 12명" · 두루누리는 10명 이상이라 없음', !!emp && emp.detail.includes('원천세 신고서 2026년 9월분 근로자 12명') && !emp.detail.includes('두루누리'), emp?.detail)
   const roster = normalizeClientOps({ ...empty, employeeCount: '10', factMeta: { employeeCount: { source: 'payrollRoster', status: 'entered', asOf: '2026-10-01', updatedAt: NOW } } } as never)
   const c = await analyzeUploadedDocs(roster, [{ key: 'customdoc_wh', fileName: 'wh.pdf', text: WH, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `wh${++n}` })
+  const WH10 = WH.replace('귀속연월 2026년 9월', '귀속연월 2026년 10월').replace('A01 12 45,000,000', 'A01 13 47,000,000')
+  const WH08 = WH.replace('귀속연월 2026년 9월', '귀속연월 2026년 8월').replace('A01 12 45,000,000', 'A01 11 41,000,000')
+  const d = await analyzeUploadedDocs(b.record, [{ key: 'customdoc_wh2', fileName: 'wh10.pdf', text: WH10, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-11-12', makeId: () => `wh${++n}` })
+  check('D-391 다음 달(10월) 신고서 → 직원 수 13 · 칸 "10월분" 으로 바로 바꿈 · 묻지 않음', d.record.employeeCount === '13' && customFactValue(d.record, '원천세 신고 인원').startsWith('2026년 10월분 근로자 13명') && d.summary.flagged.length === 0, JSON.stringify([d.record.employeeCount, customFactValue(d.record, '원천세 신고 인원'), d.summary.flagged]))
+  const e = await analyzeUploadedDocs(d.record, [{ key: 'customdoc_wh3', fileName: 'wh08.pdf', text: WH08, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-11-12', makeId: () => `wh${++n}` })
+  check('D-391 앞선 달(8월) 신고서를 나중에 올려도 최근 달 값 그대로 · 묻지 않음', e.record.employeeCount === '13' && customFactValue(e.record, '원천세 신고 인원').startsWith('2026년 10월분') && e.summary.flagged.length === 0, JSON.stringify([e.record.employeeCount, e.summary.flagged]))
   check('D-391 명부로 적힌 직원 수(10)가 있으면 그대로 · 다르다고 묻지 않음 · 원천세 신고 인원 칸은 들어감', c.record.employeeCount === '10' && c.summary.flagged.length === 0 && customFactValue(c.record, '원천세 신고 인원').includes('12명'), JSON.stringify([c.record.employeeCount, c.summary.flagged]))
 })()
 
