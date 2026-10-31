@@ -2409,5 +2409,51 @@ await (async () => {
   check('D-407 소득금액증명으로 만든 추이 줄이 있으면 바꾸지 않음', customFactValue(e.record, '매출 추이').includes('소득금액증명'), customFactValue(e.record, '매출 추이'))
 })()
 
+// D-408 실제 업체처럼 서류를 한 묶음 올렸을 때 — 서류끼리 같은 해 '매출 추이' · 사업장현황신고서 두 해 · 업태/종목 더 자세한 글은 묻지 않는다
+await (async () => {
+  const T = {
+    BR: ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래테크', '대 표 자 : 김대표', '개업연월일 : 2019년 03월 04일', '법인등록번호 : 110111-1234567', '사업장소재지 : 서울특별시 강남구 테헤란로 123, 4층 (역삼동)', '업태 정보통신업 종목 응용소프트웨어 개발'].join('\n'),
+    REG: ['등기사항전부증명서(현재 유효사항)', '상 호 주식회사 미래테크', '등록번호 110111-1234567', '본 점 서울 강남구 테헤란로 123 4층(역삼동)', '1주의 금액 금 5,000 원', '발행주식의 총수 20,000 주', '보통주식 20,000 주 자본금의 액 금 100,000,000 원', '회사성립연월일 2019년 02월 27일', '임원에 관한 사항', '대표이사 김대표 800101-1******', '2025 년 02 월 27 일 중임'].join('\n'),
+    FS: ['표준재무제표증명', '재무상태표', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '가지급금 30,000,000 25,000,000', '자산총계 3,200,000,000 2,900,000,000', '부채총계 1,400,000,000 1,300,000,000', '미처분이익잉여금 800,000,000 690,000,000', '손익계산서', '매출액 2,400,000,000 2,000,000,000', '영업이익 300,000,000 250,000,000', '당기순이익 220,000,000 180,000,000'].join('\n'),
+    VC: ['부가가치세 과세표준증명', '과세기간 신고구분 신고일 과세표준', '2024.01.01~2024.06.30 확정 2024.07.25 950,000,000', '2024.07.01~2024.12.31 확정 2025.01.24 1,000,000,000', '2025.01.01~2025.06.30 확정 2025.07.25 1,150,000,000', '2025.07.01~2025.12.31 확정 2026.01.25 1,200,000,000'].join('\n'),
+    WH: ['원천징수이행상황신고서', '① 신고구분 [√]매월 [ ]반기 [ ]수정 [ ]연말', '② 귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '원천징수의무자 법인명(상호) 주식회사 미래테크 대표자(성명) 김대표', '1. 원천징수 명세 및 납부세액', '소득자 소득구분 코드 인원 총지급액 소득세등', '근로소득 간이세액 A01 12 45,000,000 1,234,560'].join('\n'),
+    VR: ['일반과세자 부가가치세 [ ]예정 [√]확정 [ ]기한후과세표준 신고서', '신고기간 2026년 제1기 ( 1월 1일 ~ 6월 30일 )', '상호(법인명) 주식회사 미래테크 성명(대표자명) 김대표 사업자등록번호 124-81-00998', '합계 (9) 1,400,000,000 ㉮ 140,000,000'].join('\n'),
+    ROSTER: ['4대보험 사업장 가입자 명부', ['성명', '주민등록번호', '자격취득일'].join('\t'), ...['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타'].map((x, i) => [`김${x}${x}`, `9${i % 10}0${(i % 9) + 1}01-1234567`, '2024-03-01'].join('\t'))].join('\n'),
+    NICE: ['NICE지키미 신용정보 조회서', '조회일 2026.10.20', '성명 김대표 생년월일 1980.01.01', '나의 신용점수 812 점', '(1,000점 만점)'].join('\n'),
+  }
+  let n = 0
+  const up = async (rec: ClientOpsRecord, docs: [string, string][], now: string) => {
+    const metas = allDocumentMetas(rec)
+    const read = docs.map(([fileName, text], i) => {
+      const p = placeDocument({ text, fileName }, metas)
+      return { key: p.kind === 'existing' ? p.key : `customdoc_${i}_${now.slice(11, 13)}`, fileName, text, method: 'pdf_text' as const, docSure: p.sure }
+    })
+    return analyzeUploadedDocs(rec, read, { now, today: '2026-10-31', makeId: () => `d8${++n}` })
+  }
+  const base = normalizeClientOps({ id: 'set408', companyName: '', createdAt: NOW, updatedAt: NOW })
+  const set: [string, string][] = [['사업자등록증.pdf', T.BR], ['등기부.pdf', T.REG], ['재무제표.pdf', T.FS], ['과세표준증명.pdf', T.VC], ['원천세.pdf', T.WH], ['부가세신고서.pdf', T.VR], ['명부.xlsx', T.ROSTER], ['신용.pdf', T.NICE]]
+  const a = await up(base, set, NOW)
+  check('D-408 법인 서류 8장 한 번에 → 묻는 것은 진짜 확인할 대표 취임일 하나(중임 날짜만 있음) · 매출 추이는 묻지 않음', a.summary.flagged.map((f) => f.key).join() === 'taxProfile.ceoStartDate' && pendingFacts(a.record).length === 0 && customFactValue(a.record, '매출 추이').includes('(재무제표 · 2024년보다 +20%)'), JSON.stringify([a.summary.flagged.map((f) => f.key), pendingFacts(a.record).map((p) => p.key)]))
+  const rev = await up(base, [...set].reverse(), NOW)
+  check('D-408 순서를 거꾸로 올려도(과세표준증명이 먼저) 매출 추이를 묻지 않음', !rev.summary.flagged.some((f) => f.key === 'cf:매출 추이') && pendingFacts(rev.record).length === 0 && customFactValue(rev.record, '매출 추이') !== '', JSON.stringify(rev.summary.flagged.map((f) => f.key)))
+  const fsOnly = await up(base, [['재무제표.pdf', T.FS]], NOW)
+  const vcLater = await up(fsOnly.record, [['과세표준증명.pdf', T.VC]], '2026-10-31T03:00:00.000Z')
+  check('D-408 재무제표를 먼저, 과세표준증명을 나중에 올려도 같은 해 추이는 묻지 않고 그대로', customFactValue(vcLater.record, '매출 추이').includes('재무제표') && vcLater.summary.flagged.length === 0, JSON.stringify([customFactValue(vcLater.record, '매출 추이'), vcLater.summary.flagged]))
+  const VC26 = [...T.VC.split('\n'), '2026.01.01~2026.06.30 확정 2026.07.25 1,400,000,000', '2026.07.01~2026.12.31 확정 2027.01.25 1,500,000,000'].join('\n')
+  const vc26 = await up(fsOnly.record, [['과세표준증명.pdf', VC26]], '2026-10-31T04:00:00.000Z')
+  check('D-408 더 최근 해(2026) 과세표준증명 추이는 2025 재무제표 줄을 묻지 않고 바꿈', customFactValue(vc26.record, '매출 추이').startsWith('2026년') && !vc26.summary.flagged.some((f) => f.key === 'cf:매출 추이'), JSON.stringify([customFactValue(vc26.record, '매출 추이'), vc26.summary.flagged]))
+  const CERT = ['사업자등록증명', '상호(법인명) 주식회사 미래테크 사업자등록번호 124-81-00998', '성명(대표자) 김대표', '개업일 2019-03-04', '사업장소재지 서울특별시 강남구 테헤란로 123, 4층(역삼동)', '업태 정보통신업 종목 응용소프트웨어 개발 및 공급업', '발급일 2026년 10월 30일'].join('\n')
+  const b = await up(a.record, [['사업자등록증명.pdf', CERT]], '2026-10-31T05:00:00.000Z')
+  check('D-408 사업자등록증명의 종목이 더 자세하면(지금 글을 다 담음) 묻지 않고 새 글로', b.record.businessItem === '응용소프트웨어 개발 및 공급업' && b.summary.flagged.length === 0, JSON.stringify([b.record.businessItem, b.summary.flagged]))
+  const c = await up(b.record, [['사업자등록증.pdf', T.BR]], '2026-10-31T06:00:00.000Z')
+  check('D-408 짧은 종목 글(사업자등록증)을 다시 올려도 긴 글 그대로 · 묻지 않음', c.record.businessItem === '응용소프트웨어 개발 및 공급업' && c.summary.flagged.length === 0, JSON.stringify([c.record.businessItem, c.summary.flagged]))
+  const typed = normalizeClientOps({ ...base, businessItem: '소프트웨어' })
+  const d = await up(typed, [['사업자등록증.pdf', T.BR]], NOW)
+  check('D-408 사람이 적은 종목은 더 긴 글이 와도 예전처럼 묻는다', d.record.businessItem === '소프트웨어' && d.summary.flagged.some((f) => f.key === 'businessItem'), JSON.stringify([d.record.businessItem, d.summary.flagged]))
+  const SR = (y: number, amt: string, emp: number) => ['사업장현황신고서', `( ${y} 년 귀속 )`, '① 상호 미래의원', `기본사항 ⑤ 종업원수 ${emp}`, '❶ 수입금액(매출액) 명세', `합계 ${amt} ${amt} 0`].join('\n')
+  const e = await up(base, [['현황2024.pdf', SR(2024, '700,000,000', 10)], ['현황2025.pdf', SR(2025, '850,000,000', 12)]], NOW)
+  check('D-408 사업장현황신고서 두 해를 한 번에(앞선 해가 먼저) → 직원 12 · 매출 2025년 값 · 묻지 않음', e.record.employeeCount === '12' && readFact(e.record, 'revenue')?.value === '850000000' && e.summary.flagged.length === 0, JSON.stringify([e.record.employeeCount, readFact(e.record, 'revenue'), e.summary.flagged]))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

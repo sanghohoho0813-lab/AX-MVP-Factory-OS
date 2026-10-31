@@ -118,7 +118,7 @@ function vatYields(record: ClientOpsRecord, year: string, source = 'vatCertifica
  * D-373 소득금액증명 매출 · 순이익도 같은 규칙 — 다른 출처(재무제표 · 크레탑 · 부가세 · 직접)의 같은 해 이상 값이 있으면 묻지 않는다.
  * 매출 추이: 소득금액증명 줄은 이미 있는 줄에 밀리고, 부가세 줄은 소득금액증명 줄에 밀린다(둘 다 올려도 질문이 생기지 않게).
  */
-function docYields(record: ClientOpsRecord, c: { key: string; source: string; asOf: string }): boolean {
+function docYields(record: ClientOpsRecord, c: { key: string; source: string; asOf: string; value?: string }): boolean {
   // D-390 세무조정계산서 안 표준재무제표 숫자는 다른 출처(재무제표 · 크레탑 · 직접)의 같은 해 이상 값에 밀린다 — 작년 신고서를 올려도 올해 값과 다르다고 묻지 않게
   if (c.source === 'taxReturn' && FIN_KEYS.has(c.key)) {
     const f = readFact(record, c.key)
@@ -133,17 +133,28 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
   }
   // D-406 재무제표 · 세무조정계산서의 매출 추이(두 해) — 과세표준증명 · 소득금액증명의 여러 해 줄이 이미 있으면 그것이 먼저.
   //        같은 출처끼리면 더 최근 해가 바꾸고(아래), 같거나 앞선 해는 묻지 않는다
-  if (c.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (c.source === 'financialStatements' || c.source === 'taxReturn')) {
+  // D-408 서류끼리(재무제표 · 세무조정계산서 · 과세표준증명 · 소득금액증명 · 사업장현황신고서)는 묻지 않는다 —
+  //        더 최근 해(같은 해면 재무제표가 사업장현황신고서를)가 아래에서 바로 바꾸고, 같거나 앞선 해는 먼저 있던 줄 그대로.
+  //        한 번에 같이 올려도(재무제표 + 과세표준증명) 먼저 읽힌 줄이 남고 묻지 않는다. 과세표준증명은 소득금액증명 줄에 늘 밀린다(D-373 — 면세 매출 빠짐)
+  if (c.key === TREND_KEY && TREND_DOCS.has(c.source)) {
     if (!customFactValue(record, '매출 추이')) return false
     const m = record.factMeta?.[c.key]
-    // D-407 사업장현황신고서로 만든 추이는 같은 해 이후 재무제표 · 세무조정계산서가 바꾼다(더 자세한 장부)
-    if (m?.source === 'siteReport') return !!c.asOf && !!m.asOf && c.asOf.slice(0, 4) < m.asOf.slice(0, 4)
-    if (m?.source !== 'financialStatements' && m?.source !== 'taxReturn') return true
-    return !c.asOf || (!!m.asOf && c.asOf <= m.asOf)
+    if (m && TREND_DOCS.has(m.source)) {
+      if (c.source === 'vatCertificate' && m.source === 'incomeCertificate') return true
+      return !trendBeats(c, m)
+    }
+    // 사람이 적은 줄 — 재무제표 · 세무조정계산서 · 소득금액증명은 그대로 두고 묻지 않는다(D-406 · D-373). 과세표준증명은 예전처럼 묻는다
+    if (c.source !== 'vatCertificate') return true
+  }
+  // D-408 업태 · 종목 — 이미 적힌 글이 새 글을 다 담으면 묻지 않는다(더 긴 쪽이 이미 있음)
+  if (c.key === 'businessCategory' || c.key === 'businessItem') {
+    const f = readFact(record, c.key)
+    if (f && f.status !== 'missing' && bizTextContains(f.value, c.value ?? '')) return true
   }
   // D-391 다른 달 원천세 신고서를 또 올리면 — 같은 달이거나 더 앞선 달은 묻지 않고 그대로(더 최근 달은 아래에서 바로 바꾼다)
   // D-395 부가세 신고서도 같은 규칙 — 더 최근 신고 기간이 바꾸고, 같거나 앞선 기간은 묻지 않는다
-  if (c.source === 'withholding' || c.source === 'vatReturn') {
+  // D-408 사업장현황신고서도 — 두 해를 한 번에 올려도 종업원수 · 매출은 더 최근 해로, 앞선 해는 묻지 않는다
+  if (c.source === 'withholding' || c.source === 'vatReturn' || c.source === 'siteReport') {
     const m = record.factMeta?.[c.key]
     if (m?.source === c.source && c.asOf && m.asOf && c.asOf <= m.asOf) return true
   }
@@ -170,6 +181,27 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
 
 const FIN_KEYS = new Set(['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'])
 /** D-406 매출 · 이익을 말하는 서류의 종류 — 같은 종류끼리만 더 최근 해가 바꾼다(재무제표 = 세무조정계산서의 표준재무제표) */
+/** D-408 '매출 추이' 줄을 만드는 서류 — 서류끼리는 묻지 않는다(더 최근 해가 바꾸고 같거나 앞선 해는 먼저 있던 줄 그대로) */
+const TREND_KEY = `${CUSTOM_FACT_PREFIX}매출 추이`
+const TREND_DOCS = new Set(['financialStatements', 'taxReturn', 'vatCertificate', 'incomeCertificate', 'siteReport'])
+const yearOf = (s: string | undefined) => /^(\d{4})/.exec(s ?? '')?.[1] ?? ''
+/** 같은 해면 재무제표 · 세무조정계산서가 사업장현황신고서 줄을 바꾼다(D-407 — 더 자세한 장부) */
+function trendBeats(cand: { source: string; asOf: string }, cur: { source: string; asOf?: string }): boolean {
+  const cy = yearOf(cand.asOf)
+  const my = yearOf(cur.asOf)
+  if (!cy || !my) return false
+  if (cy > my) return true
+  return cy === my && (cand.source === 'financialStatements' || cand.source === 'taxReturn') && cur.source === 'siteReport'
+}
+
+/** D-408 업태 · 종목 — 한쪽 글이 다른 쪽을 다 담으면(‘응용소프트웨어 개발’ ⊂ ‘응용소프트웨어 개발 및 공급업’) 같은 뜻 */
+const bizNorm = (v: string) => v.replace(/[\s·,./()]/g, '')
+export function bizTextContains(longer: string, shorter: string): boolean {
+  const a = bizNorm(longer)
+  const b = bizNorm(shorter)
+  return b.length >= 2 && a.length > b.length && a.includes(b)
+}
+
 function finFamily(source: string | undefined): string {
   if (source === 'financialStatements' || source === 'taxReturn') return 'fs'
   if (source === 'vatCertificate' || source === 'incomeCertificate' || source === 'siteReport' || source === 'vatReturn') return source
@@ -200,16 +232,23 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     rec = withFactCandidates(rec, found, now, makeId)
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')
     // 비어 있는 칸 · 까닭 없음 → 바로 넣는다. D-392 사업자등록증 개업일이 먼저 들어간 설립일은 등기부 회사성립일로 바꾼다(묻지 않음)
-    const regWins = (p: PendingFact) => p.key === 'establishedAt' && p.source === 'corporateRegistry' && readFact(rec, 'establishedAt')?.source === 'businessRegistration'
+    const regWins = (p: PendingFact) =>
+      (p.key === 'establishedAt' && p.source === 'corporateRegistry' && readFact(rec, 'establishedAt')?.source === 'businessRegistration') ||
+      // D-408 업태 · 종목 — 새 글이 지금 글을 다 담으면(더 자세함) 묻지 않고 새 글로. 사람이 적은 값은 그대로 묻는다
+      ((p.key === 'businessCategory' || p.key === 'businessItem') && p.source !== 'manual' && readFact(rec, p.key)?.source !== 'manual' && bizTextContains(p.value, p.current)) ||
+      // D-408 같은 해 이후 재무제표 매출은 과세표준(면세 매출 빠짐) · 부가세 신고서 · 사업장현황신고서 매출을 묻지 않고 바꾼다 —
+      //        같이 올렸을 때 순서에 따라 묻던 것. 재무제표가 더 앞선 해면 예전처럼 묻는다(D-311)
+      (p.key === 'revenue' && p.source === 'financialStatements' && (() => {
+        const f = readFact(rec, 'revenue')
+        return !!f && (f.source === 'vatCertificate' || f.source === 'vatReturn' || f.source === 'siteReport') && !!yearOf(p.asOf) && !!yearOf(f.asOf) && yearOf(p.asOf) >= yearOf(f.asOf)
+      })())
     // D-391 더 최근 달 원천세 신고서 — 앞 달 값을 바로 바꾼다(묻지 않음)
     const newerMonth = (p: PendingFact) => {
       const m = rec.factMeta?.[p.key]
-      // D-407 사업장현황신고서 추이 → 같은 해 이후 재무제표 · 세무조정계산서 추이가 바꾼다
-      if (p.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (p.source === 'financialStatements' || p.source === 'taxReturn') && m?.source === 'siteReport') return !!p.asOf && !!m.asOf && p.asOf.slice(0, 4) >= m.asOf.slice(0, 4)
+      // D-408 매출 추이 — 서류끼리면 더 최근 해(같은 해면 재무제표가 사업장현황신고서를)가 바로 바꾼다
+      if (p.key === TREND_KEY && TREND_DOCS.has(p.source) && m && TREND_DOCS.has(m.source)) return trendBeats(p, m)
       if (!p.asOf || p.asOf <= (m?.asOf ?? '')) return false
-      if ((p.source === 'withholding' || p.source === 'vatReturn') && m?.source === p.source) return true
-      // D-406 재무제표 · 세무조정계산서 매출 추이 — 둘 사이에서 더 최근 해가 바꾼다
-      if (p.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (p.source === 'financialStatements' || p.source === 'taxReturn') && (m?.source === 'financialStatements' || m?.source === 'taxReturn')) return true
+      if ((p.source === 'withholding' || p.source === 'vatReturn' || p.source === 'siteReport') && m?.source === p.source) return true
       // D-406 매출 · 이익 · 자산 · 부채 — 같은 종류 서류끼리면 더 최근 해가 바꾼다(2025 재무제표 뒤 2026 재무제표 · 세무조정계산서).
       //        종류가 다르면(부가세 과세표준은 면세 매출이 빠짐 — D-311) · 사람이 적은 값이면 그대로 묻는다
       return FIN_KEYS.has(p.key) && !!m && finFamily(p.source) !== '' && finFamily(p.source) === finFamily(m.source) && /^\d{4}/.test(p.asOf) && /^\d{4}/.test(m.asOf ?? '') && p.asOf.slice(0, 4) > (m.asOf ?? '').slice(0, 4)
@@ -266,7 +305,9 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const cur = pts.get(latest)
     const prev = pts.get(latest - 1)
     const trendFrom = rec.factMeta?.[`${CUSTOM_FACT_PREFIX}매출 추이`]?.source
-    if (cur && prev && prev > 0 && (!customFactValue(rec, '매출 추이') || trendFrom === 'siteReport')) {
+    const trendMeta = rec.factMeta?.[TREND_KEY]
+    const replaceable = !customFactValue(rec, '매출 추이') || trendFrom === 'siteReport' || (!!trendMeta && TREND_DOCS.has(trendMeta.source) && trendBeats({ source: 'siteReport', asOf: String(latest) }, trendMeta))
+    if (cur && prev && prev > 0 && replaceable) {
       const pct = Math.round(((cur - prev) / prev) * 100)
       const line = `${latest}년 ${formatWon(cur)}(사업장현황신고서 · ${latest - 1}년보다 ${pct > 0 ? '+' : ''}${pct}%)`
       const curF = rec.customFields.find((f) => f.label === '매출 추이')
