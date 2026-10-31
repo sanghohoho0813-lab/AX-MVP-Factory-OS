@@ -22,6 +22,7 @@ import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
+import { yearOverYear } from './withholdingReport'
 import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
@@ -156,12 +157,27 @@ export function policyAssumption(ev: PolicyEvidence): string {
 }
 
 /**
+ * D-404 명부가 없으면 원천세 인원 추이(D-403)로 — 가장 최근 달이 작년 같은 달보다 늘었으면 고용 증가.
+ * 최근 달이 1년 넘게 지났으면 쓰지 않는다. 원천세는 그달 급여 받은 사람 수라 '명부로 확인' 을 붙인다.
+ */
+function withholdingHiring(record: ClientOpsRecord, today: string): { grew: boolean; youth: number; line: string } | null {
+  const yoy = yearOverYear(customFactValue(record, '원천세 인원 추이'))
+  if (!yoy) return null
+  const age = (Number(today.slice(0, 4)) - Number(yoy.now.ym.slice(0, 4))) * 12 + Number(today.slice(5, 7)) - Number(yoy.now.ym.slice(5, 7))
+  if (age > 12) return null
+  const span = `원천세 신고 ${yoy.before.ym} ${yoy.before.n}명 → ${yoy.now.ym} ${yoy.now.n}명`
+  if (yoy.now.n > yoy.before.n) return { grew: true, youth: 0, line: `고용 증가(${span}) — 고용창출 자금 대상 · 명부로 확인` }
+  if (yoy.now.n < yoy.before.n) return { grew: false, youth: 0, line: `직원이 줄었어요(${span}) — 고용 유지 조건이 있는 자금은 확인` }
+  return null
+}
+
+/**
  * D-310 4대보험 명부 진단(업체에 붙인 결과) → 고용 증가 · 청년 직원.
  * 명부 날짜로 센 작년 평균 → 올해(D-302)가 늘었으면 grew. 지금 직원만 있는 명부(작년 퇴사자 없음)는 작년이 적게 셀 수 있어 그렇다고 붙인다.
  */
 export function policyHiring(record: ClientOpsRecord, today: string): { grew: boolean; youth: number; line: string } | null {
   const roster = latestEmploymentRoster(record)
-  if (!roster) return null
+  if (!roster) return withholdingHiring(record, today)
   const data = roster.data as { headcount?: unknown; counts?: { youthCount?: unknown } } | null
   const hc = headcountOf(data?.headcount)
   const asOf = hc?.asOf || dayOf(roster.createdAt)

@@ -2327,5 +2327,16 @@ await (async () => {
   check('D-403 두 달을 한 번에 올려도 추이 · 직원 수는 최근 달(12)', customFactValue(c.record, '원천세 인원 추이') === '2026-08 11명 · 2026-09 12명' && c.record.employeeCount === '12', JSON.stringify([customFactValue(c.record, '원천세 인원 추이'), c.record.employeeCount, c.summary.flagged]))
 })()
 
+// D-404 명부가 없으면 원천세 인원 추이(작년 같은 달 대비)로 정책자금 고용 증가
+{
+  const mk = (trend: string) => normalizeClientOps({ id: 'ph404', companyName: '미래테크', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 't', group: 'people', label: '원천세 인원 추이', value: trend }] } as never)
+  const up = policyHiring(mk('2025-09 9명 · 2026-09 12명'), '2026-10-31')
+  const down = policyHiring(mk('2025-09 12명 · 2026-09 9명'), '2026-10-31')
+  const old = policyHiring(mk('2024-09 9명 · 2025-09 12명'), '2026-10-31')
+  check('D-404 늘었으면 고용 증가(원천세 신고 2025-09 9명 → 2026-09 12명) · 줄었으면 주의 · 1년 넘은 달이면 쓰지 않음 · 같은 달이 없으면 없음', !!up?.grew && up.line.startsWith('고용 증가(원천세 신고 2025-09 9명 → 2026-09 12명)') && !!down && !down.grew && down.line.startsWith('직원이 줄었어요') && old === null && policyHiring(mk('2026-08 11명 · 2026-09 12명'), '2026-10-31') === null, JSON.stringify([up, down, old]))
+  const ev = policyEvidence(mk('2025-09 9명 · 2026-09 12명'), clientFacts(mk('2025-09 9명 · 2026-09 12명'), new Date('2026-10-31T00:00:00')), '2026-10-31')
+  check('D-404 정책자금 판정 입력에 고용증가 · 근거 줄 맨 앞', (ev.input.strengths ?? []).includes('고용증가') && ev.notes.some((n) => n.startsWith('고용 증가(원천세 신고')), JSON.stringify([ev.input.strengths, ev.notes]))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

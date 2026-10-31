@@ -175,7 +175,8 @@ export function fitContext(record: ClientOpsRecord, today: string): FitContext {
 function hireHintOf(record: ClientOpsRecord, today: string): string {
   const h = policyHiring(record, today)
   if (!h || (!h.grew && h.youth === 0)) return ''
-  return `명부: ${h.line.replace(/ — .*$/, '')}`
+  // D-404 원천세 신고서로 본 고용 증가면 그 이름으로
+  return `${h.line.includes('원천세') ? '원천세 신고서' : '명부'}: ${h.line.replace(/ — .*$/, '')}`
 }
 
 /* ------------------------------------------------------------------ */
