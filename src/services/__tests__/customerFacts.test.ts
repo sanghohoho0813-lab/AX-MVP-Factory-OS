@@ -2713,5 +2713,16 @@ await (async () => {
   check('D-427 스캔 재무제표 "2,4OO,OOO,OOO" → 매출 24억 · 2025년', f.revenue === 2_400_000_000 && f.year === '2025', JSON.stringify(f))
 })()
 
+// D-428 고용보험 피보험자격 이력 내역서 · 제목 없는 엑셀 명부 → 4대보험 가입자 명부 칸
+await (async () => {
+  const empty = normalizeClientOps({ id: 'ros428', companyName: '미래테크', status: 'active' })
+  const R = (t: string) => [t, '성명 주민등록번호 자격취득일', '김가가 900101-1****** 2024-03-01', '이나나 950505-2****** 2025-01-02'].join('\n')
+  const p1 = placeDocument({ text: R('고용보험 피보험자격 이력 내역서'), fileName: 'scan_0001.jpg' }, allDocumentMetas(empty))
+  const p2 = placeDocument({ text: ['성명\t주민등록번호\t자격취득일\t자격상실일', '김가가\t900101-1******\t2024-03-01\t', '이나나\t950505-2******\t2025-01-02\t'].join('\n'), fileName: 'Book1.xlsx' }, allDocumentMetas(empty))
+  check('D-428 "고용보험 피보험자격 이력 내역서" · 제목 없는 엑셀 명부(머리줄 주민번호 · 취득일) → 4대보험 가입자 명부 칸(예전: 이상한 붙은 이름 새 칸 · 기타)', p1.kind === 'existing' && p1.key === 'payrollRoster' && p2.kind === 'existing' && p2.key === 'payrollRoster', JSON.stringify([p1, p2]))
+  const p3 = placeDocument({ text: ['견적서', '품명 수량 금액', '노트북 2 3,000,000'].join('\n'), fileName: 'Book1.xlsx' }, allDocumentMetas(empty))
+  check('D-428 주민번호 없는 표는 명부 아님', !(p3.kind === 'existing' && p3.key === 'payrollRoster'), JSON.stringify(p3))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
