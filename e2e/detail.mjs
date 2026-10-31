@@ -1925,7 +1925,8 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
   check('D-391 390 스캔 이름이어도 "원천징수이행상황신고서" 칸', /scan_391\.txt → 원천징수이행상황신고서/.test(placed), placed.slice(0, 300))
   const r = await record(page)
-  check('D-391 390 직원 수 7 바로(일용 2명 · 가감계 9명은 아님) · 원천세 신고 인원 칸', String(r.employeeCount) === '7' && /2026년 9월분 근로자 7명/.test(r.factValues?.['cf:원천세 신고 인원'] ?? ''), JSON.stringify({ e: r.employeeCount, w: r.factValues?.['cf:원천세 신고 인원'] }))
+  const whField = (r.customFields ?? []).find((x) => x.label === '원천세 신고 인원')
+  check('D-391 390 직원 수 7 바로(일용 2명 · 가감계 9명은 아님) · 원천세 신고 인원 칸', String(r.employeeCount) === '7' && /2026년 9월분 근로자 7명/.test(whField?.value ?? ''), JSON.stringify({ e: r.employeeCount, w: whField }))
   check('D-391 390 오류 0', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
