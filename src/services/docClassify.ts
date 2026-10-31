@@ -242,6 +242,12 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /퇴직금\s*(?:지급\s*)?규정/,
   },
   {
+    // D-397 면세사업자 사업장현황신고서 — 그해 수입금액(매출)을 읽는다(services/siteReportDoc.ts)
+    label: '사업장현황신고서',
+    signals: [{ re: /사\s*업\s*장\s*현\s*황\s*신\s*고\s*서/, weight: 5, say: "제목 '사업장현황신고서'" }],
+    nameHint: /사업장\s*현황/,
+  },
+  {
     // D-395 부가가치세 신고서(일반 · 간이과세자 · 예정 · 확정) — 그 기간 과세표준을 읽는다(services/vatReturnDoc.ts). 과세표준증명과는 다른 칸
     label: '부가가치세 신고서',
     signals: [

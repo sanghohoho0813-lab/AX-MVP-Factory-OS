@@ -139,7 +139,7 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     const f = readFact(record, 'employeeCount')
     return !!f && f.status !== 'missing' && f.source !== c.source
   }
-  if (c.key === 'revenue' && (c.source === 'vatCertificate' || c.source === 'vatReturn')) return vatYields(record, c.asOf, c.source)
+  if (c.key === 'revenue' && (c.source === 'vatCertificate' || c.source === 'vatReturn' || c.source === 'siteReport')) return vatYields(record, c.asOf, c.source)
   if (c.source !== 'incomeCertificate' && !(c.source === 'vatCertificate' && c.key === `${CUSTOM_FACT_PREFIX}매출 추이`)) return false
   if (c.key === 'revenue' || c.key === 'netIncome') {
     const f = readFact(record, c.key)

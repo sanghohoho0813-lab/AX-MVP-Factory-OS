@@ -13,6 +13,7 @@
  *  - 대표 신분증 사본 → 대표 생년월일 · 이름(D-389) — 주민등록번호는 남기지 않는다
  *  - 원천징수이행상황신고서 → 직원 수 · '원천세 신고 인원' 칸(D-391) — 근로소득 간이세액 줄만
  *  - 부가가치세 신고서 → '부가세 신고 매출' 칸(D-395) — 그 신고 기간의 과세표준(한 해 매출 칸에는 넣지 않음)
+ *  - 면세사업자 사업장현황신고서 → 그해 매출(D-397) — 수입금액 합계
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -30,6 +31,7 @@ import { creditScoreValue, readCreditScore } from './creditScoreDoc'
 import { readIdCard } from './idCardDoc'
 import { readWithholdingReport, withholdingValue } from './withholdingReport'
 import { readVatReturn, vatReturnValue } from './vatReturnDoc'
+import { readSiteReport } from './siteReportDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -82,6 +84,12 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     const asOf = wh.until || wh.yearMonth
     out.push({ key: 'employeeCount', value: String(wh.employees), source: 'withholding', asOf, ref })
     out.push({ key: `${CUSTOM_FACT_PREFIX}원천세 신고 인원`, label: '원천세 신고 인원', group: 'people', value: withholdingValue(wh, formatWon), source: 'withholding', asOf, ref })
+    return out
+  }
+  // D-397 면세사업자 사업장현황신고서 → 그해 수입금액(매출) — 재무제표 · 크레탑 · 직접 적은 같은 해 이상 값에는 밀린다(docAutoFill)
+  const site = readSiteReport(text)
+  if (site) {
+    out.push({ key: 'revenue', value: String(site.revenue), source: 'siteReport', asOf: String(site.year), ref })
     return out
   }
   // D-395 부가가치세 신고서 → 그 기간 과세표준 — 한 기간 금액이라 '매출(한 해)' 칸이 아니라 '부가세 신고 매출' 칸에 기간과 함께

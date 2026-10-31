@@ -719,6 +719,7 @@ export type FactSource =
   | 'idCard' // 대표 신분증 사본 — 대표 생년월일 · 이름(주민등록번호는 남기지 않음) (D-389)
   | 'withholding' // 원천징수이행상황신고서 — 그달 근로자 수 · 총지급액 (D-391)
   | 'vatReturn' // 부가가치세 신고서 — 그 신고 기간의 과세표준(매출) (D-395)
+  | 'siteReport' // 면세사업자 사업장현황신고서 — 그해 수입금액(매출) (D-397)
 
 export interface FactMeta {
   source: FactSource

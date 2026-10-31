@@ -10,6 +10,7 @@
 
 import { readWithholdingReport, withholdingValue } from '../withholdingReport'
 import { fullYearFromReturns, readVatReturn, vatReturnValue } from '../vatReturnDoc'
+import { readSiteReport } from '../siteReportDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
@@ -2242,6 +2243,26 @@ await (async () => {
   const fin = normalizeClientOps({ ...empty, factValues: { revenue: '1150000000' }, factMeta: { revenue: { source: 'financialStatements', status: 'entered', asOf: '2025', updatedAt: NOW } } } as never)
   const b = await analyzeUploadedDocs(fin, docs, { now: NOW, today: '2026-10-31', makeId: () => `v6${++n}` })
   check('D-396 같은 해 재무제표 매출이 있으면 신고서 합계는 묻지 않고 재무제표 값 그대로', readFact(b.record, 'revenue')?.value === '1150000000' && !b.summary.flagged.some((f) => f.key === 'revenue'), JSON.stringify(b.summary.flagged))
+})()
+
+// D-397 면세사업자 사업장현황신고서 → 그해 수입금액(매출)
+await (async () => {
+  const SR = ['사업장현황신고서', '( 2025 년 귀속 )', '① 상호 미래의원 ② 성명 홍길동 ③ 사업자등록번호 124-81-00998', '④ 전화번호 02-1234-5678', '기본사항 ⑤ 종업원수 12 ⑥ 차량 2',
+    '❶ 수입금액(매출액) 명세', '업태 종목 업종코드 합계 수입금액 수입금액제외', '보건업 일반의원 851201 850,000,000 850,000,000 0', '합계 850,000,000 850,000,000 0',
+    '❷ 수입금액 구성명세', '합계 850,000,000 계산서발행 120,000,000 신용카드 600,000,000'].join('\n')
+  check('D-397 사업장현황신고서 → 2025년 수입금액 8억 5,000만원(앞 기본사항 · 업종코드 숫자는 아님)', JSON.stringify(readSiteReport(SR)) === '{"year":2025,"revenue":850000000}', JSON.stringify(readSiteReport(SR)))
+  check('D-397 귀속 연도가 없으면 · 본문에만 낱말이 있는 안내문은 읽지 않음', readSiteReport(SR.replace('( 2025 년 귀속 )', '')) === null && readSiteReport(['세무 일정', '2월 10일까지 사업장현황신고서를 내세요', '수입금액 합계 1,000,000'].join('\n')) === null)
+  const empty = normalizeClientOps({ id: 'sr397', companyName: '미래의원', createdAt: NOW, updatedAt: NOW })
+  const place = placeDocument({ text: SR, fileName: 'scan.pdf' }, allDocumentMetas(empty))
+  check('D-397 서류함: "사업장현황신고서" 칸', place.kind === 'new' && place.label === '사업장현황신고서', JSON.stringify(place))
+  const cands = factCandidatesFromDocText('customdoc_sr', SR, 'r')
+  check('D-397 후보는 매출 하나(2025 · 출처 사업장현황신고서) — 상호 · 번호 · 전화는 이 서류로 읽지 않음', cands.length === 1 && cands[0].key === 'revenue' && cands[0].value === '850000000' && cands[0].asOf === '2025' && cands[0].source === 'siteReport', JSON.stringify(cands))
+  let n = 0
+  const a = await analyzeUploadedDocs(empty, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text: SR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `sr${++n}` })
+  check('D-397 올리기 한 번 → 매출 8.5억 바로 · 묻지 않음', readFact(a.record, 'revenue')?.value === '850000000' && a.summary.flagged.length === 0, JSON.stringify(a.summary.flagged))
+  const inc = normalizeClientOps({ ...empty, factValues: { revenue: '870000000' }, factMeta: { revenue: { source: 'incomeCertificate', status: 'entered', asOf: '2025', updatedAt: NOW } } } as never)
+  const b = await analyzeUploadedDocs(inc, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text: SR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `sr${++n}` })
+  check('D-397 같은 해 소득금액증명 매출이 있으면 묻지 않고 그 값 그대로', readFact(b.record, 'revenue')?.value === '870000000' && b.summary.flagged.length === 0, JSON.stringify(b.summary.flagged))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

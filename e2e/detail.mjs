@@ -1955,6 +1955,38 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-397 면세사업자 사업장현황신고서 → 그해 매출 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    if (r.factValues) delete r.factValues.revenue
+    if (r.factMeta) delete r.factMeta.revenue
+    r.toolResults = (r.toolResults ?? []).filter((t) => t.toolKey !== 'cretop')
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  const SR = { name: 'scan_397.txt', mimeType: 'text/plain', buffer: Buffer.from(['사업장현황신고서', '( 2025 년 귀속 )', '① 상호 한솔의원', '❶ 수입금액(매출액) 명세', '보건업 일반의원 851201 850,000,000 850,000,000 0', '합계 850,000,000 850,000,000 0'].join('\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([SR])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-397 390 스캔 이름이어도 "사업장현황신고서" 칸', /scan_397\.txt → 사업장현황신고서/.test(placed), placed.slice(0, 300))
+  const r = await record(page)
+  check('D-397 390 매출 8억 5,000만원(2025) 바로 · 출처 사업장현황신고서', r.factValues?.revenue === '850000000' && r.factMeta?.revenue?.source === 'siteReport' && r.factMeta?.revenue?.asOf === '2025', JSON.stringify({ v: r.factValues?.revenue, m: r.factMeta?.revenue }))
+  check('D-397 390 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

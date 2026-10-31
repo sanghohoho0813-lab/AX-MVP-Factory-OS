@@ -100,6 +100,7 @@ export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   idCard: '대표 신분증',
   withholding: '원천세 신고서',
   vatReturn: '부가세 신고서',
+  siteReport: '사업장현황신고서',
 }
 
 export const FACT_STATUS_LABEL: Record<FactStatus, string> = {
