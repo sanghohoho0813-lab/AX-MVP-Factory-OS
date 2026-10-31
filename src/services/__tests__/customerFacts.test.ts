@@ -2265,5 +2265,18 @@ await (async () => {
   check('D-397 같은 해 소득금액증명 매출이 있으면 묻지 않고 그 값 그대로', readFact(b.record, 'revenue')?.value === '870000000' && b.summary.flagged.length === 0, JSON.stringify(b.summary.flagged))
 })()
 
+// D-398 개인사업자에게 매출 자료를 달라고 할 때 — 표준재무제표증명이 아니라 소득금액증명(면세는 사업장현황신고서 · 과세는 부가세 과세표준증명도)
+{
+  const mk = (key: string, label: string, missing: string[]): Insight => ({ key, label, tone: 'need', headline: '', detail: '', missing, openPath: '', openLabel: '', action: null })
+  const ins = [mk('cert-os', '기업인증', ['매출 · 재무']), mk('policy-funding', '정책자금', ['매출'])]
+  const ind = requestItemsFrom(ins, { individual: true }).items
+  const corp = requestItemsFrom(ins).items
+  check('D-398 개인사업자: 매출 · 재무 → "소득금액증명(종합소득세 · 최근 해)" 하나 · 면세 · 과세 대안 안내 · 두 모듈 묶음', ind.length === 1 && ind[0].label === '소득금액증명(종합소득세 · 최근 해)' && ind[0].where.includes('사업장현황신고서') && ind[0].where.includes('부가세 과세표준증명') && ind[0].for.join() === '기업인증,정책자금', JSON.stringify(ind))
+  check('D-398 법인은 그대로 "최근 재무제표(표준재무제표증명)"', corp.length === 1 && corp[0].label === '최근 재무제표(표준재무제표증명)', JSON.stringify(corp))
+  const indRec = normalizeClientOps({ id: 'rq398', companyName: '미래상회', businessNumber: '124-01-00998', representativeName: '홍길동', createdAt: NOW, updatedAt: NOW })
+  const msg = recoRequestMessage(indRec, ins)
+  check('D-398 카톡 요청 문구도 개인사업자면 소득금액증명(사업자번호 가운데 01 = 개인)', msg.includes('소득금액증명(종합소득세 · 최근 해)') && !msg.includes('표준재무제표증명'), msg)
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

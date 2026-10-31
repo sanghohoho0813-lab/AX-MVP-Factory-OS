@@ -10,6 +10,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { Insight } from './clientInsights'
+import { businessTypeOf } from '../tools/shared/clientPrefill'
 
 interface RequestDef {
   match: RegExp
@@ -50,6 +51,21 @@ const DEFS: RequestDef[] = [
   { match: /창업 형태/, label: '창업 형태(새로 창업했는지 · 이어받았는지)', where: '한 줄로 알려 주시면 됩니다' },
 ]
 
+/**
+ * D-398 개인사업자의 매출 · 이익 — 간편장부 사업자는 재무제표가 없어 '표준재무제표증명' 을 달라고 하면 되묻게 된다.
+ * 종합소득세 소득금액증명(수입금액 · 사업소득)을 먼저, 면세사업자는 사업장현황신고서 · 과세사업자는 부가세 과세표준증명도 된다고 함께.
+ */
+const INDIVIDUAL_REVENUE: RequestDef = {
+  match: /매출|재무|영업이익|자산 · 순이익/,
+  label: '소득금액증명(종합소득세 · 최근 해)',
+  where: '홈택스 › 증명발급 › 소득금액증명(PDF) — 면세사업자(병원 · 학원 등)는 사업장현황신고서, 과세사업자는 부가세 과세표준증명도 됩니다',
+}
+
+function defFor(raw: string, individual: boolean): RequestDef | undefined {
+  if (individual && INDIVIDUAL_REVENUE.match.test(raw)) return INDIVIDUAL_REVENUE
+  return DEFS.find((d) => d.match.test(raw))
+}
+
 export interface RequestItem {
   label: string
   where: string
@@ -58,13 +74,13 @@ export interface RequestItem {
 }
 
 /** 정보가 더 필요한 모듈의 빠진 항목 → 고객에게 받을 자료(겹치지 않게) · 우리가 조회할 것 */
-export function requestItemsFrom(insights: readonly Insight[]): { items: RequestItem[]; ours: string[] } {
+export function requestItemsFrom(insights: readonly Insight[], opts: { individual?: boolean } = {}): { items: RequestItem[]; ours: string[] } {
   const items: RequestItem[] = []
   const ours: string[] = []
   for (const ins of insights) {
     if (ins.tone !== 'need') continue
     for (const raw of ins.missing) {
-      const def = DEFS.find((d) => d.match.test(raw))
+      const def = defFor(raw, !!opts.individual)
       const label = def?.label ?? raw.trim()
       if (!label) continue
       if (def?.ours) {
@@ -81,8 +97,8 @@ export function requestItemsFrom(insights: readonly Insight[]): { items: Request
 }
 
 /** 카톡으로 보낼 자료 요청 문구 — 받을 것이 없으면 '' */
-export function recoRequestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName'>, insights: readonly Insight[]): string {
-  return requestMessage(record, requestItemsFrom(insights).items)
+export function recoRequestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'corporateNumber'> & Partial<Pick<ClientOpsRecord, 'businessNumber' | 'shareholderRegister'>>, insights: readonly Insight[]): string {
+  return requestMessage(record, requestItemsFrom(insights, { individual: businessTypeOf(record) === 'individual' }).items)
 }
 
 /** 빠진 항목(사람 말) 하나 → 고객에게 받을 자료(우리가 조회하는 것이면 null) — D-199 상황 예시도 같은 표를 쓴다 */

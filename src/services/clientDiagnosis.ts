@@ -174,7 +174,7 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
     .filter((i) => !pickKeys.has(i.key))
     .map(lineOf)
     .sort((a, b) => ORDER[a.tone] - ORDER[b.tone])
-  const raw = requestItemsFrom(insights)
+  const raw = requestItemsFrom(insights, { individual: facts.businessType === 'individual' })
   const requests = raw.items.map((r) => ({ ...r, where: customerText(r.where) }))
   const ours = raw.ours
 
