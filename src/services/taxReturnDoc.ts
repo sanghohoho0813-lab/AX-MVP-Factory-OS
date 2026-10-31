@@ -14,6 +14,8 @@
  * 규칙 계산 — 외부 호출 없음. 신고서의 다른 숫자(과세표준 · 산출세액)는 남기지 않는다.
  */
 
+import { fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
+
 export type ReliefGroup = 'employment' | 'rnd' | 'startup' | 'smeSpecial' | 'invest'
 
 export interface ReliefItem {
@@ -90,7 +92,8 @@ function yearOf(text: string): number | null {
 }
 
 export function readTaxReturn(text: string, fileName = ''): TaxReturnRead | null {
-  const raw = String(text || '')
+  // D-417 스캔 신고서 — 마침표 금액 · 한 글자씩 띄운 공제 이름을 먼저 고친다
+  const raw = fixAmountNoise(joinSpacedHangul(String(text || '')))
   if (!looksLikeTaxReturn(raw, fileName)) return null
   const head = raw.slice(0, 4000)
   const kind: TaxReturnRead['kind'] = TITLE_PERSONAL.test(head) && !/법\s*인\s*세/.test(head) ? 'personal' : 'corp'

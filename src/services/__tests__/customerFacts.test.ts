@@ -2593,5 +2593,13 @@ await (async () => {
   check('D-416 주주명부(머리줄만 표 · 띄운 이름 · "15.000주") → 박지훈 15,000 · 박배우 5,000 · 검산 맞음(예전: 주주 0명, 마침표면 15주로 잘못 읽고도 검산이 맞아 바로 넣을 뻔)', sh.sure && sh.holders.map((h) => `${h.name}:${h.shares}`).join() === '박지훈:15000,박배우:5000', JSON.stringify(sh))
 })()
 
+// D-417 스캔 세무조정계산서 — 띄운 공제 이름 · 마침표 금액
+await (async () => {
+  const TR = ['세무조정계산서', '사업연도 2025년 1월 1일 ~ 2025년 12월 31일', '세액공제조정명세서(3)', '통 합 고 용 세 액 공 제 29조의8 15.400.000', '연구·인력개발비에 대한', '세액공제 10조 12.000.000 12.000.000'].join('\n')
+  const r = readTaxReturn(TR)
+  const amt = (n: string) => r?.items.find((x) => x.name.includes(n))?.amount
+  check('D-417 스캔 세무조정계산서 → 통합고용 1,540만 · 연구 · 인력개발비 1,200만(띄운 이름 · 마침표 금액)', amt('통합고용') === 15_400_000 && amt('연구') === 12_000_000, JSON.stringify(r?.items))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
