@@ -2380,5 +2380,34 @@ await (async () => {
   check('D-406 사람이 직접 적은 매출과 다르면 예전처럼 묻는다(덮지 않음)', readFact(d.record, 'revenue')?.value === '2100000000' && d.summary.flagged.some((x) => x.key === 'revenue'), JSON.stringify(d.summary.flagged))
 })()
 
+// D-407 면세사업자 사업장현황신고서를 해마다 올리면 '매출 추이'(재무제표 없는 병원 · 학원도 정책자금 매출 성장세)
+await (async () => {
+  const SR25 = ['사업장현황신고서', '( 2025 년 귀속 )', '① 상호 미래의원', '기본사항 ⑤ 종업원수 12', '❶ 수입금액(매출액) 명세', '합계 850,000,000 850,000,000 0'].join('\n')
+  const SR24 = SR25.replace('2025 년 귀속', '2024 년 귀속').replace('합계 850,000,000 850,000,000', '합계 700,000,000 700,000,000')
+  const base = normalizeClientOps({ id: 'sr407', companyName: '미래의원', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const up = (rec: typeof base, text: string, now: string) => analyzeUploadedDocs(rec, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text, method: 'pdf_text' as const, docSure: true }], { now, today: '2026-10-31', makeId: () => `s7${++n}` })
+  const a = await up(base, SR24, NOW)
+  check('D-407 한 해만 있으면 추이 줄 없음(짐작하지 않음)', readFact(a.record, 'revenue')?.value === '700000000' && customFactValue(a.record, '매출 추이') === '', customFactValue(a.record, '매출 추이'))
+  const b = await up(a.record, SR25, '2026-10-30T09:00:00.000Z')
+  const tr = customFactValue(b.record, '매출 추이')
+  const ev = policyEvidence(b.record, clientFacts(b.record, new Date('2026-10-31T00:00:00')), '2026-10-31')
+  check('D-407 다음 해 신고서 → 매출 2025년 값으로 · "2025년 …(사업장현황신고서 · 2024년보다 +21%)" · 정책자금 3년 추세 증가 · 묻지 않음', readFact(b.record, 'revenue')?.value === '850000000' && tr.startsWith('2025년 ') && tr.includes('(사업장현황신고서 · 2024년보다 +21%)') && vatTrendOf(tr).trend3y === '증가' && ev.input.revenueTrend3y === '증가' && b.summary.flagged.length === 0, JSON.stringify([tr, ev.input.revenueTrend3y, b.summary.flagged]))
+  const both = await analyzeUploadedDocs(base, [
+    { key: 'customdoc_sr', fileName: 'sr25.pdf', text: SR25, method: 'pdf_text' as const, docSure: true },
+    { key: 'customdoc_sr2', fileName: 'sr24.pdf', text: SR24, method: 'pdf_text' as const, docSure: true },
+  ], { now: NOW, today: '2026-10-31', makeId: () => `s7${++n}` })
+  check('D-407 두 해를 한 번에 올려도 같은 추이 줄', customFactValue(both.record, '매출 추이') === tr, JSON.stringify([customFactValue(both.record, '매출 추이'), both.summary.flagged]))
+  const SR23 = SR25.replace('2025 년 귀속', '2023 년 귀속').replace('합계 850,000,000 850,000,000', '합계 600,000,000 600,000,000')
+  const c = await up(b.record, SR23, '2026-10-30T10:00:00.000Z')
+  check('D-407 더 옛날 해를 나중에 올려도 최근 두 해 줄 그대로 · 매출도 2025년 값 그대로', customFactValue(c.record, '매출 추이') === tr && readFact(c.record, 'revenue')?.value === '850000000', JSON.stringify([customFactValue(c.record, '매출 추이'), readFact(c.record, 'revenue')]))
+  const FS = ['표준재무제표증명', '손익계산서', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 860,000,000 710,000,000', '당기순이익 90,000,000 70,000,000'].join('\n')
+  const d = await analyzeUploadedDocs(b.record, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FS, method: 'pdf_text' as const, docSure: true }], { now: '2026-10-30T11:00:00.000Z', today: '2026-10-31', makeId: () => `s7${++n}` })
+  check('D-407 같은 해 재무제표가 오면 매출 추이는 재무제표 줄로(더 자세한 장부) · 추이는 묻지 않음', customFactValue(d.record, '매출 추이').includes('(재무제표 · 2024년보다 +21%)') && !d.summary.flagged.some((x) => x.key === 'cf:매출 추이'), JSON.stringify([customFactValue(d.record, '매출 추이'), d.summary.flagged]))
+  const inc = normalizeClientOps({ ...a.record, customFields: [...a.record.customFields, { id: 'mt', group: 'identity', label: '매출 추이', value: '2025년 8억 6,000만원(소득금액증명 · 2024년보다 +22%)' }], factMeta: { ...(a.record.factMeta ?? {}), 'cf:매출 추이': { source: 'incomeCertificate', status: 'confirmed', asOf: '2025', updatedAt: NOW } } } as never)
+  const e = await up(inc, SR25, '2026-10-30T12:00:00.000Z')
+  check('D-407 소득금액증명으로 만든 추이 줄이 있으면 바꾸지 않음', customFactValue(e.record, '매출 추이').includes('소득금액증명'), customFactValue(e.record, '매출 추이'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

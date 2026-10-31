@@ -20,6 +20,7 @@ import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
+import { readSiteReport } from './siteReportDoc'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -135,6 +136,8 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
   if (c.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (c.source === 'financialStatements' || c.source === 'taxReturn')) {
     if (!customFactValue(record, '매출 추이')) return false
     const m = record.factMeta?.[c.key]
+    // D-407 사업장현황신고서로 만든 추이는 같은 해 이후 재무제표 · 세무조정계산서가 바꾼다(더 자세한 장부)
+    if (m?.source === 'siteReport') return !!c.asOf && !!m.asOf && c.asOf.slice(0, 4) < m.asOf.slice(0, 4)
     if (m?.source !== 'financialStatements' && m?.source !== 'taxReturn') return true
     return !c.asOf || (!!m.asOf && c.asOf <= m.asOf)
   }
@@ -201,6 +204,8 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     // D-391 더 최근 달 원천세 신고서 — 앞 달 값을 바로 바꾼다(묻지 않음)
     const newerMonth = (p: PendingFact) => {
       const m = rec.factMeta?.[p.key]
+      // D-407 사업장현황신고서 추이 → 같은 해 이후 재무제표 · 세무조정계산서 추이가 바꾼다
+      if (p.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (p.source === 'financialStatements' || p.source === 'taxReturn') && m?.source === 'siteReport') return !!p.asOf && !!m.asOf && p.asOf.slice(0, 4) >= m.asOf.slice(0, 4)
       if (!p.asOf || p.asOf <= (m?.asOf ?? '')) return false
       if ((p.source === 'withholding' || p.source === 'vatReturn') && m?.source === p.source) return true
       // D-406 재무제표 · 세무조정계산서 매출 추이 — 둘 사이에서 더 최근 해가 바꾼다
@@ -245,6 +250,31 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const seed = seedP && seedWon !== null ? [{ from: seedP.from, to: seedP.to, base: seedWon }] : []
     const merged = mergeVatTrend(curT?.value ?? '', [...seed, ...vrReads.map((r) => ({ from: r.from, to: r.to, base: r.base }))])
     if (merged && merged !== curT?.value) rec = withCustomField(rec, { id: curT?.id, group: curT?.group ?? 'identity', label: '부가세 신고 추이', value: merged })
+  }
+  // D-407 면세사업자 사업장현황신고서 — 올리기 전 매출이 같은 서류의 바로 앞 해면 '매출 추이'(작년보다 +N%). 재무제표가 없는 병원 · 학원도 매출 성장세를 본다
+  //        과세표준증명 · 소득금액증명 · 재무제표 줄이 이미 있으면 그것이 먼저
+  const sr = docs.map((d) => readSiteReport(d.text)).filter((r): r is NonNullable<typeof r> => !!r).sort((a, b) => a.year - b.year)
+  if (sr.length) {
+    const before = readFact(record, 'revenue')
+    const pts = new Map<number, number>()
+    if (before && before.status !== 'missing' && before.source === 'siteReport' && /^\d{4}/.test(before.asOf)) {
+      const w = parseWonInput(before.value)
+      if (w !== null && w > 0) pts.set(Number(before.asOf.slice(0, 4)), w)
+    }
+    for (const r of sr) pts.set(r.year, r.revenue)
+    const latest = Math.max(...pts.keys())
+    const cur = pts.get(latest)
+    const prev = pts.get(latest - 1)
+    const trendFrom = rec.factMeta?.[`${CUSTOM_FACT_PREFIX}매출 추이`]?.source
+    if (cur && prev && prev > 0 && (!customFactValue(rec, '매출 추이') || trendFrom === 'siteReport')) {
+      const pct = Math.round(((cur - prev) / prev) * 100)
+      const line = `${latest}년 ${formatWon(cur)}(사업장현황신고서 · ${latest - 1}년보다 ${pct > 0 ? '+' : ''}${pct}%)`
+      const curF = rec.customFields.find((f) => f.label === '매출 추이')
+      if (curF?.value !== line) {
+        rec = withCustomField(rec, { id: curF?.id, group: curF?.group ?? 'identity', label: '매출 추이', value: line })
+        rec = { ...rec, factMeta: { ...(rec.factMeta ?? {}), [`${CUSTOM_FACT_PREFIX}매출 추이`]: { source: 'siteReport', status: 'entered', asOf: String(latest), confirmedAt: '', updatedAt: now } } }
+      }
+    }
   }
   // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다
   const returns = docs.map((d) => ({ d, r: readVatReturn(d.text) })).filter((x): x is { d: ReadDoc; r: VatReturnRead } => !!x.r)
