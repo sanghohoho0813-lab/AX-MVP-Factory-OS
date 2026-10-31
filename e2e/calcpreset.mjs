@@ -263,8 +263,12 @@ for (const width of [360, 390]) {
   check(`${width} 페이지 오류 0`, errors.length === 0, errors.join(' | '))
   if (SHOTS) {
     await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t1')
-    await page.getByTestId('calc-presets').scrollIntoViewIfNeeded()
+    await page.getByTestId('calc-presets').evaluate((el) => el.scrollIntoView({ block: 'center' }))
     await page.screenshot({ path: `${SHOTS}/calc-plan-${width}.png`, fullPage: false })
+    await page.locator('[data-testid="calc-plan-preset"][data-id="tax-loan"]').click()
+    await page.getByTestId('tax-preset-note').waitFor({ timeout: 15000 })
+    await page.getByTestId('tax-preset-note').evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    await page.screenshot({ path: `${SHOTS}/calc-plan-${width}-open.png`, fullPage: false })
     for (const scale of ['default', 'extra_large']) {
       await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t8&s=x1&preset=calc-t8-issue')
       await page.getByTestId('calc-preset-note').waitFor()
