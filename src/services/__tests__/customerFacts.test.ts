@@ -2524,5 +2524,21 @@ await (async () => {
   check('D-411 같은 해 재무제표 두 장 · 같은 파일 이름 원천세 두 장은 예전처럼 겹침(2묶음)', g.length === 2 && g.every((x) => x.length === 2) && dupShelfBases(same).has(shelfBaseOf('최근 3개년 재무제표')), JSON.stringify(g))
 })()
 
+// D-412 소득금액증명을 한 해씩 따로 떼어 올려도 매출 추이
+await (async () => {
+  const INC25 = ['소득금액 증명', '(종합소득세 신고자용)', '성명 홍길동', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 240,000,000 180,000,000 60,000,000', '2026년 10월 20일', '송파세무서장'].join('\n')
+  const INC24 = INC25.replace('2025 214', '2024 214').replace('240,000,000 180,000,000 60,000,000', '200,000,000 160,000,000 40,000,000')
+  const base = normalizeClientOps({ id: 'inc412', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const up = (rec: typeof base, texts: string[], now: string) => analyzeUploadedDocs(rec, texts.map((text, i) => ({ key: `customdoc_inc${i}`, fileName: `inc${i}.pdf`, text, method: 'pdf_text' as const, docSure: true })), { now, today: '2026-10-31', makeId: () => `i2${++n}` })
+  const want = '2025년 2억 4,000만원(소득금액증명 수입금액 · 2024년보다 +20%)'
+  const a = await up(base, [INC25, INC24], NOW)
+  const b = await up(base, [INC24, INC25], NOW)
+  check('D-412 한 해씩 두 장을 한 번에(어느 순서든) → 매출 추이 · 매출 2025년 · 묻지 않음', customFactValue(a.record, '매출 추이') === want && customFactValue(b.record, '매출 추이') === want && readFact(a.record, 'revenue')?.value === '240000000' && a.summary.flagged.length === 0 && b.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '매출 추이'), customFactValue(b.record, '매출 추이'), a.summary.flagged, b.summary.flagged]))
+  const c1 = await up(base, [INC24], NOW)
+  const c2 = await up(c1.record, [INC25], '2026-10-31T03:00:00.000Z')
+  check('D-412 2024 한 장만이면 추이 없음 → 다음에 2025 한 장을 올리면 이어서 추이', customFactValue(c1.record, '매출 추이') === '' && customFactValue(c2.record, '매출 추이') === want && c2.summary.flagged.length === 0, JSON.stringify([customFactValue(c1.record, '매출 추이'), customFactValue(c2.record, '매출 추이'), c2.summary.flagged]))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -21,6 +21,7 @@ import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn,
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
 import { readSiteReport } from './siteReportDoc'
+import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -330,6 +331,30 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
         rec = withCustomField(rec, { id: curF?.id, group: curF?.group ?? 'identity', label: '매출 추이', value: line })
         rec = { ...rec, factMeta: { ...(rec.factMeta ?? {}), [`${CUSTOM_FACT_PREFIX}매출 추이`]: { source: 'siteReport', status: 'entered', asOf: String(latest), confirmedAt: '', updatedAt: now } } }
       }
+    }
+  }
+  // D-412 소득금액증명을 한 해씩 따로 떼어 올려도(2025 한 장 · 2024 한 장) — 올리기 전 매출(소득금액증명 · 바로 앞 해)이나 같은 묶음의 다른 해와 이어 '매출 추이'.
+  //        검산이 맞는(sure) 증명만. 이미 다른 서류로 만든 더 최근 해 줄 · 사람이 적은 줄이 있으면 그대로
+  const incs = docs.filter((d) => looksLikeIncomeCert(d.text, d.fileName)).map((d) => readIncomeCert(d.text)).filter((r): r is NonNullable<typeof r> => !!r && r.sure)
+  if (incs.length) {
+    const ys = new Map<number, IncomeYear>()
+    const before = readFact(record, 'revenue')
+    const beforeInc = readFact(record, 'netIncome')
+    if (before && before.status !== 'missing' && before.source === 'incomeCertificate' && /^\d{4}/.test(before.asOf)) {
+      const w = parseWonInput(before.value)
+      const yi = Number(before.asOf.slice(0, 4))
+      if (w !== null && w > 0) ys.set(yi, { year: yi, revenue: w, income: parseWonInput(beforeInc?.value ?? '') ?? 0, rows: 1 })
+    }
+    for (const r of incs) for (const y of r.years) ys.set(y.year, y)
+    const years = [...ys.values()].sort((a, b) => a.year - b.year)
+    const line = incomeTrendLine({ years, sure: true }, formatWon)
+    const latest = years[years.length - 1]?.year ?? 0
+    const tm = rec.factMeta?.[TREND_KEY]
+    const replaceable = !customFactValue(rec, '매출 추이') || (!!tm && TREND_DOCS.has(tm.source) && (tm.source === 'incomeCertificate' ? (yearOf(tm.asOf) || '0') <= String(latest) : trendBeats({ source: 'incomeCertificate', asOf: String(latest) }, tm)))
+    const curF = rec.customFields.find((f) => f.label === '매출 추이')
+    if (line && replaceable && curF?.value !== line) {
+      rec = withCustomField(rec, { id: curF?.id, group: curF?.group ?? 'identity', label: '매출 추이', value: line })
+      rec = { ...rec, factMeta: { ...(rec.factMeta ?? {}), [TREND_KEY]: { source: 'incomeCertificate', status: 'entered', asOf: String(latest), confirmedAt: '', updatedAt: now } } }
     }
   }
   // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다
