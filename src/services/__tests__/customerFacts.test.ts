@@ -13,7 +13,7 @@ import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog,
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
-import { NOTE_RECHECK, customFactValue, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
+import { NOTE_RECHECK, sameAddress, customFactValue, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
 import { fitContext } from '../scenarioFit'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
@@ -2154,6 +2154,25 @@ await (async () => {
   const roster = normalizeClientOps({ ...empty, employeeCount: '10', factMeta: { employeeCount: { source: 'payrollRoster', status: 'entered', asOf: '2026-10-01', updatedAt: NOW } } } as never)
   const c = await analyzeUploadedDocs(roster, [{ key: 'customdoc_wh', fileName: 'wh.pdf', text: WH, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `wh${++n}` })
   check('D-391 명부로 적힌 직원 수(10)가 있으면 그대로 · 다르다고 묻지 않음 · 원천세 신고 인원 칸은 들어감', c.record.employeeCount === '10' && c.summary.flagged.length === 0 && customFactValue(c.record, '원천세 신고 인원').includes('12명'), JSON.stringify([c.record.employeeCount, c.summary.flagged]))
+})()
+
+// D-392 사업자등록증 + 등기부를 함께 올려도 묻지 않음 — 주소 표기(서울특별시 = 서울) · 법인 설립일은 등기부 회사성립일
+await (async () => {
+  check('D-392 주소: 시 · 도 이름 · 괄호 동 · 쉼표가 달라도 같음 · 층만 더 붙어도 같음', sameAddress('서울특별시 강남구 테헤란로 123, 4층 (역삼동)', '서울 강남구 테헤란로 123 4층(역삼동)') && sameAddress('경기도 성남시 분당구 판교역로 1', '경기 성남시 분당구 판교역로 1, 2층 201호') && sameAddress('전라북도 전주시 완산구 효자로 10', '전북특별자치도 전주시 완산구 효자로 10'))
+  check('D-392 주소: 건물 번호 · 구 · 도로명이 다르면 다름(12 ≠ 123)', !sameAddress('서울 강남구 테헤란로 12', '서울 강남구 테헤란로 123') && !sameAddress('서울 강남구 테헤란로 123', '서울 서초구 테헤란로 123') && !sameAddress('서울 강남구 테헤란로 123', '서울 강남구 봉은사로 123') && !sameAddress('서울 강남구 테헤란로 123', '서울 강남구 테헤란로 123 별관'))
+  const BR = ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래테크', '대 표 자 : 김대표', '개업연월일 : 2019년 03월 04일', '법인등록번호 : 110111-1234567', '사업장소재지 : 서울특별시 강남구 테헤란로 123, 4층 (역삼동)', '업태 정보통신업 종목 응용소프트웨어 개발'].join('\n')
+  const REG = ['등기사항전부증명서(현재 유효사항)', '상 호 주식회사 미래테크', '등록번호 110111-1234567', '본 점 서울 강남구 테헤란로 123 4층(역삼동)', '회사성립연월일 2019년 02월 27일', '대표이사 김대표 800101-1******'].join('\n')
+  const empty = normalizeClientOps({ id: 'd392', companyName: '', createdAt: NOW, updatedAt: NOW })
+  const br = { key: 'businessRegistration' as const, fileName: 'br.pdf', text: BR, method: 'pdf_text' as const, docSure: true }
+  const reg = { key: 'corporateRegistry' as const, fileName: 'reg.pdf', text: REG, method: 'pdf_text' as const, docSure: true }
+  let n = 0
+  const a = await analyzeUploadedDocs(empty, [br, reg], { now: NOW, today: '2026-10-31', makeId: () => `d392a${++n}` })
+  check('D-392 사업자등록증 → 등기부 순서: 묻는 것 0 · 설립일 = 등기부 2019-02-27 · 바로 넣은 것에 설립일 한 줄', a.summary.flagged.length === 0 && a.record.establishedAt === '2019-02-27' && a.summary.entered.filter((e) => e.key === 'establishedAt').length === 1, JSON.stringify([a.record.establishedAt, a.summary.flagged, a.summary.entered.filter((e) => e.key === 'establishedAt')]))
+  const b = await analyzeUploadedDocs(empty, [reg, br], { now: NOW, today: '2026-10-31', makeId: () => `d392b${++n}` })
+  check('D-392 등기부 → 사업자등록증 순서도 묻는 것 0 · 설립일 2019-02-27 · 주소는 처음 넣은 값 그대로', b.summary.flagged.length === 0 && b.record.establishedAt === '2019-02-27' && b.record.businessAddress === '서울 강남구 테헤란로 123 4층(역삼동)', JSON.stringify([b.record.establishedAt, b.record.businessAddress, b.summary.flagged]))
+  const typed = normalizeClientOps({ ...empty, establishedAt: '2019-01-15', factMeta: { establishedAt: { source: 'manual', status: 'confirmed', asOf: '', updatedAt: NOW } } } as never)
+  const c = await analyzeUploadedDocs(typed, [reg], { now: NOW, today: '2026-10-31', makeId: () => `d392c${++n}` })
+  check('D-392 사람이 적은 설립일과 등기부가 다르면 그대로 묻는다(덮지 않음)', c.record.establishedAt === '2019-01-15' && c.summary.flagged.some((f) => f.key === 'establishedAt'), JSON.stringify([c.record.establishedAt, c.summary.flagged]))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

@@ -122,6 +122,11 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     const y = /^(\d{4})/.exec(f.asOf)?.[1]
     return !y || Number(y) >= Number(c.asOf.slice(0, 4))
   }
+  // D-392 법인 설립일은 등기부 '회사성립연월일' 이 맞다 — 사업자등록증 개업일은 등기부 날짜가 이미 있으면 묻지 않는다
+  if (c.key === 'establishedAt' && c.source === 'businessRegistration') {
+    const f = readFact(record, 'establishedAt')
+    return !!f && f.status !== 'missing' && f.source === 'corporateRegistry'
+  }
   // D-391 원천세 신고서의 근로자 수는 이미 적힌 직원 수(명부 · 직접 적음)에 밀린다 — 퇴사 · 대표 급여로 한두 명 달라도 묻지 않는다
   if (c.source === 'withholding' && c.key === 'employeeCount') {
     const f = readFact(record, 'employeeCount')
@@ -168,17 +173,23 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     if (found.length === 0) return
     rec = withFactCandidates(rec, found, now, makeId)
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')
-    // 비어 있는 칸 · 까닭 없음 → 바로 넣는다
-    const auto = mine.filter((p) => !p.note && p.current === '')
+    // 비어 있는 칸 · 까닭 없음 → 바로 넣는다. D-392 사업자등록증 개업일이 먼저 들어간 설립일은 등기부 회사성립일로 바꾼다(묻지 않음)
+    const regWins = (p: PendingFact) => p.key === 'establishedAt' && p.source === 'corporateRegistry' && readFact(rec, 'establishedAt')?.source === 'businessRegistration'
+    const auto = mine.filter((p) => !p.note && (p.current === '' || regWins(p)))
     // 다른 값이 이미 적혀 있으면 덮지 않고 묻는다
-    const conflicts = mine.filter((p) => !p.note && p.current !== '')
+    const conflicts = mine.filter((p) => !p.note && p.current !== '' && !auto.includes(p))
     if (conflicts.length) {
       const ids = new Set(conflicts.map((p) => p.id))
       rec = { ...rec, factInbox: (rec.factInbox ?? []).map((c) => (ids.has(c.id) ? { ...c, note: NOTE_CONFLICT } : c)) }
     }
     if (auto.length) rec = withFactDecisions(rec, auto.map((p) => ({ id: p.id, action: 'accept' as const })), now)
     const label = (p: PendingFact) => ({ key: p.key, label: p.label, display: p.display, fileName: doc.fileName })
-    for (const p of auto) entered.push(label(p))
+    for (const p of auto) {
+      // 같은 칸을 앞 서류가 넣었으면(개업일 → 회사성립일) 앞 줄은 지운다 — '바로 넣은 것' 에 한 줄만
+      const before = entered.findIndex((e) => e.key === p.key)
+      if (before >= 0) entered.splice(before, 1)
+      entered.push(label(p))
+    }
     for (const p of mine) if (!auto.includes(p)) flagged.push({ ...label(p), note: p.note ?? NOTE_CONFLICT })
   })
   return { record: rec, entered, flagged }

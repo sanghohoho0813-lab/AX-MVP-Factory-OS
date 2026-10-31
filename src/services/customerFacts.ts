@@ -143,8 +143,37 @@ export function displayFact(def: FactDef | undefined, value: string): string {
 }
 
 /** 같은 값인가 — 띄어쓰기 · 하이픈 · 단위를 빼고 본다 */
+/** D-392 시 · 도 이름 — '서울특별시' · '서울시' · '서울' 은 같다(사업자등록증 · 등기부 · 크레탑이 서로 다르게 적는다) */
+const SIDO_SHORT: [RegExp, string][] = [
+  [/^서울(?:특별)?시?$/, '서울'], [/^부산(?:광역)?시?$/, '부산'], [/^대구(?:광역)?시?$/, '대구'], [/^인천(?:광역)?시?$/, '인천'], [/^광주(?:광역)?시?$/, '광주'],
+  [/^대전(?:광역)?시?$/, '대전'], [/^울산(?:광역)?시?$/, '울산'], [/^세종(?:특별자치)?시?$/, '세종'], [/^경기도?$/, '경기'], [/^강원(?:특별자치)?도?$/, '강원'],
+  [/^충청북도$|^충북$/, '충북'], [/^충청남도$|^충남$/, '충남'], [/^전라북도$|^전북(?:특별자치도)?$/, '전북'], [/^전라남도$|^전남$/, '전남'],
+  [/^경상북도$|^경북$/, '경북'], [/^경상남도$|^경남$/, '경남'], [/^제주(?:특별자치)?도?$/, '제주'],
+]
+
+function addressTokens(v: string): string[] {
+  const t = v.replace(/\([^)]*\)/g, ' ').replace(/번지/g, ' ').split(/[\s,]+/).filter(Boolean)
+  if (t[0]) t[0] = SIDO_SHORT.find(([re]) => re.test(t[0]))?.[1] ?? t[0]
+  return t
+}
+
+/**
+ * D-392 주소가 같은가 — 시 · 도 이름(서울특별시 = 서울) · 괄호 속 동 이름 · 쉼표 · '번지' 는 보지 않는다.
+ * 한쪽에 층 · 호만 더 붙었으면(테헤란로 123 / 테헤란로 123, 4층) 같은 곳. 도로명 · 건물 번호가 다르면 다르다.
+ */
+export function sameAddress(a: string, b: string): boolean {
+  const x = addressTokens(a)
+  const y = addressTokens(b)
+  if (!x.length || !y.length) return false
+  if (x.join('') === y.join('')) return true
+  const [s, l] = x.length <= y.length ? [x, y] : [y, x]
+  if (!s.every((tok, i) => tok === l[i])) return false
+  return l.slice(s.length).every((tok) => /^(?:지하\s*)?제?\d+(?:층|호)$/.test(tok))
+}
+
 export function sameFactValue(def: FactDef | undefined, a: string, b: string): boolean {
   if (def?.kind === 'won') return wonOf(a) !== null && wonOf(a) === wonOf(b)
+  if (def?.key === 'businessAddress' && sameAddress(a, b)) return true
   // 직원 수는 첫 숫자로 — '12명(대표 포함)' 과 '12' 는 같다
   if (def?.kind === 'count') {
     const n = (v: string) => /(\d[\d,]*)/.exec(v)?.[1]?.replace(/,/g, '') ?? ''
