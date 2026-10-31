@@ -77,8 +77,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
   // D-391 원천징수이행상황신고서 → 그달 급여 받은 근로자 수(직원 수 칸 · 비어 있을 때 · 명부가 있으면 명부가 먼저) · '원천세 신고 인원' 칸
   const wh = readWithholdingReport(text)
   if (wh) {
-    out.push({ key: 'employeeCount', value: String(wh.employees), source: 'withholding', asOf: wh.yearMonth, ref })
-    out.push({ key: `${CUSTOM_FACT_PREFIX}원천세 신고 인원`, label: '원천세 신고 인원', group: 'people', value: withholdingValue(wh, formatWon), source: 'withholding', asOf: wh.yearMonth, ref })
+    const asOf = wh.until || wh.yearMonth
+    out.push({ key: 'employeeCount', value: String(wh.employees), source: 'withholding', asOf, ref })
+    out.push({ key: `${CUSTOM_FACT_PREFIX}원천세 신고 인원`, label: '원천세 신고 인원', group: 'people', value: withholdingValue(wh, formatWon), source: 'withholding', asOf, ref })
     return out
   }
   // D-378 세무조정계산서 · 신고서 → 그해 받은 공제 · 감면(이름 · 금액). 공제 · 감면 칸을 못 찾았고 받은 것도 없으면 남기지 않는다

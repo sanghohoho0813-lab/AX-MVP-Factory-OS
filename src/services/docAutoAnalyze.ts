@@ -225,8 +225,9 @@ export async function analyzeUploadedDocs(
           deadlines: enroll.youthEnrollDeadlines(youth),
           createdAt: now,
         })
-        // 재직 인원 — 비어 있으면 넣는다(명부에서 센 숫자)
-        if ((readFact(rec, 'employeeCount')?.value ?? '') === '') {
+        // 재직 인원 — 비어 있으면 넣는다(명부에서 센 숫자). D-391 원천세 신고서로 먼저 들어간 인원(그달 급여 받은 사람)은 명부 재직 인원으로 바꾼다
+        const empNow = readFact(rec, 'employeeCount')
+        if ((empNow?.value ?? '') === '' || (empNow?.source === 'withholding' && empNow.value !== String(analysis.counts.activeCount))) {
           rec = withFactValue(rec, 'employeeCount', String(analysis.counts.activeCount), { source: 'payrollRoster', status: 'entered', asOf: parsed.meta?.issueDate ?? '', now })
           entered.push({ key: 'employeeCount', label: '직원 수', display: `${analysis.counts.activeCount}명`, fileName: rDoc.fileName })
         }

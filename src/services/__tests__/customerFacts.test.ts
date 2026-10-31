@@ -8,7 +8,7 @@
  * 실행: npm run test:facts
  */
 
-import { readWithholdingReport } from '../withholdingReport'
+import { readWithholdingReport, withholdingValue } from '../withholdingReport'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
@@ -2140,7 +2140,7 @@ await (async () => {
 
   const WH = ['원천징수이행상황신고서', '① 신고구분 [√]매월 [ ]반기 [ ]수정 [ ]연말', '② 귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '원천징수의무자 법인명(상호) 주식회사 미래테크 대표자(성명) 홍길동', '사업자(주민)등록번호 123-45-67890',
     '1. 원천징수 명세 및 납부세액', '소득자 소득구분 코드 인원 총지급액 소득세등', '근로소득 간이세액 A01 12 45,000,000 1,234,560', '중도퇴사 A02 1 3,000,000 0', '일용근로 A03 3 1,500,000 0', '가감계 A10 16 49,500,000 1,234,560', '사업소득 매월징수 A25 2 2,000,000 60,000'].join('\n')
-  check('D-391 간이세액(A01) 줄만 — 12명 · 4,500만원 · 2026-09(중도퇴사 · 일용 · 가감계 · 사업소득은 아님)', JSON.stringify(readWithholdingReport(WH)) === '{"yearMonth":"2026-09","employees":12,"pay":45000000}', JSON.stringify(readWithholdingReport(WH)))
+  check('D-391 간이세액(A01) 줄만 — 12명 · 4,500만원 · 2026-09(중도퇴사 · 일용 · 가감계 · 사업소득은 아님)', JSON.stringify(readWithholdingReport(WH)) === '{"yearMonth":"2026-09","until":"","employees":12,"pay":45000000}', JSON.stringify(readWithholdingReport(WH)))
   check('D-391 본문에만 원천징수이행상황신고서가 있는 안내문은 아님 · 근로자 없는 달(A01 없음)은 읽지 않음', readWithholdingReport(['세무 일정 안내', '매월 10일까지 원천징수이행상황신고서를 제출하세요'].join('\n')) === null && readWithholdingReport(WH.replace(/근로소득 간이세액 A01 12 45,000,000 1,234,560\n/, '')) === null)
   const empty = normalizeClientOps({ id: 'wh391', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
   const place = placeDocument({ text: WH, fileName: 'scan.pdf' }, allDocumentMetas(empty))
@@ -2159,6 +2159,12 @@ await (async () => {
   check('D-391 다음 달(10월) 신고서 → 직원 수 13 · 칸 "10월분" 으로 바로 바꿈 · 묻지 않음', d.record.employeeCount === '13' && customFactValue(d.record, '원천세 신고 인원').startsWith('2026년 10월분 근로자 13명') && d.summary.flagged.length === 0, JSON.stringify([d.record.employeeCount, customFactValue(d.record, '원천세 신고 인원'), d.summary.flagged]))
   const e = await analyzeUploadedDocs(d.record, [{ key: 'customdoc_wh3', fileName: 'wh08.pdf', text: WH08, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-11-12', makeId: () => `wh${++n}` })
   check('D-391 앞선 달(8월) 신고서를 나중에 올려도 최근 달 값 그대로 · 묻지 않음', e.record.employeeCount === '13' && customFactValue(e.record, '원천세 신고 인원').startsWith('2026년 10월분') && e.summary.flagged.length === 0, JSON.stringify([e.record.employeeCount, e.summary.flagged]))
+  const HALF = WH.replace('[√]매월 [ ]반기', '[ ]매월 [√]반기').replace('귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '귀속연월 2026년 1월 ③ 지급연월 2026년 6월')
+  const hr = readWithholdingReport(HALF)
+  check('D-391 반기 신고(귀속 1월 · 지급 6월) → "2026년 1~6월분(반기)"', hr?.until === '2026-06' && withholdingValue(hr!, formatWon).startsWith('2026년 1~6월분(반기) 근로자 12명'), JSON.stringify(hr))
+  const ROSTER = ['4대보험 사업장 가입자 명부', ['성명', '주민등록번호', '자격취득일'].join('\t'), ...['가', '나', '다', '라', '마'].map((x, i) => [`김${x}${x}`, `90010${i + 1}-1234567`, '2024-03-01'].join('\t'))].join('\n')
+  const r2 = await analyzeUploadedDocs(b.record, [{ key: 'payrollRoster', fileName: '가입자명부.xlsx', text: ROSTER, method: 'xlsx' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `wh${++n}` })
+  check('D-391 원천세 인원(12)이 먼저 들어간 뒤 명부를 올리면 명부 재직 인원(5)으로 바꿈 · 출처 4대보험 명부', r2.record.employeeCount === '5' && readFact(r2.record, 'employeeCount')?.source === 'payrollRoster', JSON.stringify([r2.record.employeeCount, readFact(r2.record, 'employeeCount')?.source]))
   check('D-391 명부로 적힌 직원 수(10)가 있으면 그대로 · 다르다고 묻지 않음 · 원천세 신고 인원 칸은 들어감', c.record.employeeCount === '10' && c.summary.flagged.length === 0 && customFactValue(c.record, '원천세 신고 인원').includes('12명'), JSON.stringify([c.record.employeeCount, c.summary.flagged]))
 })()
 
