@@ -760,7 +760,9 @@ export interface RecoChip {
  */
 export function cardRecoChips(record: ClientOpsRecord, today: string, grantFit: number, usable: (key: string) => boolean = () => true): RecoChip[] {
   const ins = buildInsights(record, today, [], (k) => k !== 'grants' && usable(k), true).filter(isPick)
-  const chips: RecoChip[] = ins.map((i) => ({ key: i.key, label: i.label, tone: i.tone as RecoChip['tone'] }))
+  // D-384 신고서에 빠진 공제가 드러난 카드(경정청구 세무사와 검토)는 띠에도 '· 경정청구' — 고객 관리에서 돌려받을 세금이 있는 업체가 바로 보이게
+  const refund = (i: Insight) => /경정청구 세무사와 검토/.test(i.action ?? '')
+  const chips: RecoChip[] = ins.map((i) => ({ key: i.key, label: refund(i) ? `${i.label} · 경정청구` : i.label, tone: i.tone as RecoChip['tone'] }))
   if (grantFit > 0 && usable('grants')) chips.unshift({ key: 'grants', label: `지원사업 ${grantFit}건`, tone: 'good' })
   return chips.map((c, i) => ({ c, i })).sort((a, b) => TONE_RANK[a.c.tone] - TONE_RANK[b.c.tone] || a.i - b.i).map((v) => v.c)
 }

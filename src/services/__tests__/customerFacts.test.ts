@@ -1924,6 +1924,7 @@ await (async () => {
   const labRec = normalizeClientOps({ ...none, customFields: [...none.customFields, { id: 'lb', group: 'credential', label: '기업부설연구소', value: '인정번호 2021-1 · 인정일 2021-03-02' }] } as never)
   const labCard = buildInsights(labRec, '2026-10-31', []).find((i) => i.key === 'labcare')
   check('D-378 맞춤 추천 연구소: 신고서에 연구개발비 없음 → 가능성 높음 · 첫 줄이 경정청구 · 다음 행동', labCard?.tone === 'good' && labCard.detail.startsWith('2021년부터 연구소가 있는데') && /경정청구/.test(labCard.action ?? ''), JSON.stringify(labCard))
+  check('D-384 고객 관리 카드 추천 띠: "연구소 · 경정청구"(일반 창업감면 카드의 "경정청구 확인" 은 아님)', cardRecoChips(labRec, '2026-10-31', 0).some((c) => c.label === '연구소 · 경정청구' && c.tone === 'good') && !cardRecoChips(labRec, '2026-10-31', 0).some((c) => c.key === 'startup-tax' && /경정청구/.test(c.label)), JSON.stringify(cardRecoChips(labRec, '2026-10-31', 0)))
   // 명부(그해 늘어난 인원 기록) + 신고서(통합고용 없음) → 고용지원금 카드 금액 · 가능성 높음
   const roster = { id: 'tr-emp378', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'none', verdictLabel: '후보 지원금 0건', summary: '[4대보험 명부 진단] 6명', data: { tab: 'roster', headcount: { ...past, asOf: '2026-10-31', prev: past.cur, cur: { year: 2026, total: 5, youth: 1, actualMonths: 9 } }, headcountPast: past }, deadlines: [], createdAt: NOW, publishedUpdateId: null }
   const empRec = normalizeClientOps({ ...none, toolResults: [roster] } as never)
