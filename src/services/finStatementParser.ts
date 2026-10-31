@@ -18,6 +18,8 @@ export interface FinStatementValues {
   retainedEarnings?: number
   /** D-305: 당기순이익 줄의 둘째 숫자(전기) — 절세 설계 '순이익 — 직전 연도' */
   netIncomePrev?: number
+  /** D-406: 매출액 줄의 둘째 숫자(전기) — 매출 추이(작년보다 +N%) */
+  revenuePrev?: number
   /** 당기 결산 연도(찾았으면) */
   year?: string
 }
@@ -71,6 +73,8 @@ export function parseFinancialStatement(text: string): FinStatementValues {
       out[key] = v
       // D-305: 당기순이익 줄의 둘째 숫자는 전기(직전 연도). '당기순손실' 처럼 손실만 적힌 줄은 전기 부호를 알 수 없어 내지 않는다
       if (key === 'netIncome' && nums.length >= 2 && /이\s*익/.test(m[0])) out.netIncomePrev = nums[1] * unit
+      // D-406: 매출액 줄의 둘째 숫자도 전기(직전 연도) — 0 이하이면 비교하지 않는다
+      if (key === 'revenue' && nums.length >= 2 && nums[1] > 0) out.revenuePrev = nums[1] * unit
     }
     // D-305: 가지급금 · 주임종 채권은 서로 다른 과목이면 더한다(둘 다 적힌 재무상태표도 있다) — 같은 과목이 또 나오면(다른 쪽 · 비교표) 처음 것만
     //   미처분이익잉여금은 처음 것

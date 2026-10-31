@@ -130,6 +130,14 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     const f = readFact(record, 'establishedAt')
     return !!f && f.status !== 'missing' && f.source === 'corporateRegistry'
   }
+  // D-406 재무제표 · 세무조정계산서의 매출 추이(두 해) — 과세표준증명 · 소득금액증명의 여러 해 줄이 이미 있으면 그것이 먼저.
+  //        같은 출처끼리면 더 최근 해가 바꾸고(아래), 같거나 앞선 해는 묻지 않는다
+  if (c.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (c.source === 'financialStatements' || c.source === 'taxReturn')) {
+    if (!customFactValue(record, '매출 추이')) return false
+    const m = record.factMeta?.[c.key]
+    if (m?.source !== 'financialStatements' && m?.source !== 'taxReturn') return true
+    return !c.asOf || (!!m.asOf && c.asOf <= m.asOf)
+  }
   // D-391 다른 달 원천세 신고서를 또 올리면 — 같은 달이거나 더 앞선 달은 묻지 않고 그대로(더 최근 달은 아래에서 바로 바꾼다)
   // D-395 부가세 신고서도 같은 규칙 — 더 최근 신고 기간이 바꾸고, 같거나 앞선 기간은 묻지 않는다
   if (c.source === 'withholding' || c.source === 'vatReturn') {
@@ -158,6 +166,12 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
 }
 
 const FIN_KEYS = new Set(['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'])
+/** D-406 매출 · 이익을 말하는 서류의 종류 — 같은 종류끼리만 더 최근 해가 바꾼다(재무제표 = 세무조정계산서의 표준재무제표) */
+function finFamily(source: string | undefined): string {
+  if (source === 'financialStatements' || source === 'taxReturn') return 'fs'
+  if (source === 'vatCertificate' || source === 'incomeCertificate' || source === 'siteReport' || source === 'vatReturn') return source
+  return ''
+}
 
 /** 올린 서류들 → 바로 넣기 · 확인 필요 */
 export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string): AutoFillOutcome {
@@ -185,7 +199,16 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     // 비어 있는 칸 · 까닭 없음 → 바로 넣는다. D-392 사업자등록증 개업일이 먼저 들어간 설립일은 등기부 회사성립일로 바꾼다(묻지 않음)
     const regWins = (p: PendingFact) => p.key === 'establishedAt' && p.source === 'corporateRegistry' && readFact(rec, 'establishedAt')?.source === 'businessRegistration'
     // D-391 더 최근 달 원천세 신고서 — 앞 달 값을 바로 바꾼다(묻지 않음)
-    const newerMonth = (p: PendingFact) => (p.source === 'withholding' || p.source === 'vatReturn') && rec.factMeta?.[p.key]?.source === p.source && !!p.asOf && p.asOf > (rec.factMeta?.[p.key]?.asOf ?? '')
+    const newerMonth = (p: PendingFact) => {
+      const m = rec.factMeta?.[p.key]
+      if (!p.asOf || p.asOf <= (m?.asOf ?? '')) return false
+      if ((p.source === 'withholding' || p.source === 'vatReturn') && m?.source === p.source) return true
+      // D-406 재무제표 · 세무조정계산서 매출 추이 — 둘 사이에서 더 최근 해가 바꾼다
+      if (p.key === `${CUSTOM_FACT_PREFIX}매출 추이` && (p.source === 'financialStatements' || p.source === 'taxReturn') && (m?.source === 'financialStatements' || m?.source === 'taxReturn')) return true
+      // D-406 매출 · 이익 · 자산 · 부채 — 같은 종류 서류끼리면 더 최근 해가 바꾼다(2025 재무제표 뒤 2026 재무제표 · 세무조정계산서).
+      //        종류가 다르면(부가세 과세표준은 면세 매출이 빠짐 — D-311) · 사람이 적은 값이면 그대로 묻는다
+      return FIN_KEYS.has(p.key) && !!m && finFamily(p.source) !== '' && finFamily(p.source) === finFamily(m.source) && /^\d{4}/.test(p.asOf) && /^\d{4}/.test(m.asOf ?? '') && p.asOf.slice(0, 4) > (m.asOf ?? '').slice(0, 4)
+    }
     const auto = mine.filter((p) => !p.note && (p.current === '' || regWins(p) || newerMonth(p)))
     // 다른 값이 이미 적혀 있으면 덮지 않고 묻는다
     const conflicts = mine.filter((p) => !p.note && p.current !== '' && !auto.includes(p))

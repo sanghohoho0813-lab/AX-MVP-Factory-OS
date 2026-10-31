@@ -35,6 +35,16 @@ import { readSiteReport } from './siteReportDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
+/**
+ * D-406 '2025년 24억원(재무제표 · 2024년보다 +20%)' — 정책자금 매출 추이 읽기(vatTrendOf)와 같은 말. 해를 모르거나 전기가 없으면 ''.
+ */
+function revenueTrendLine(cur: number | undefined, prev: number | undefined, year: string, what: string): string {
+  const y = Number(/^(20\d{2})/.exec(year)?.[1] ?? 0)
+  if (!y || !(typeof cur === 'number' && cur > 0) || !(typeof prev === 'number' && prev > 0)) return ''
+  const pct = Math.round(((cur - prev) / prev) * 100)
+  return `${y}년 ${formatWon(cur)}(${what} · ${y - 1}년보다 ${pct > 0 ? '+' : ''}${pct}%)`
+}
+
 /** 서류 글자에서 찾은 후보들 (아직 확정 아님) */
 export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: string): Omit<FactCandidate, 'id' | 'foundAt'>[] {
   if (!text || text.replace(/\s/g, '').length < 10) return []
@@ -123,6 +133,8 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
         const v = f[k]
         if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'taxReturn', asOf, ref })
       }
+      const trend = revenueTrendLine(f.revenue, f.revenuePrev, asOf, '세무조정계산서')
+      if (trend) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'taxReturn', asOf, ref })
     }
   }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
@@ -132,6 +144,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       const v = f[k]
       if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'financialStatements', asOf: f.year ?? '', ref })
     }
+    // D-406 매출액 줄의 전기 숫자 → '매출 추이'(정책자금 매출 성장세 · 가점 '매출 10% 이상 증가')
+    const trend = revenueTrendLine(f.revenue, f.revenuePrev, f.year ?? '', '재무제표')
+    if (trend) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'financialStatements', asOf: f.year ?? '', ref })
     return out
   }
   if (ret) return out
