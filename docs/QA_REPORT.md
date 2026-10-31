@@ -4598,3 +4598,5 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - 최종 후보 빌드(82e3739) 넓은 회귀 14묶음: plan 73 · scenarios 69 · matrix 586 · firstscreen 55 · calcpreset 41 · taxplan 96 · real 188 · phone 184 · steady 76 ·
   board 198 · files 38 · folder 19 · easy 83 · modules 894 — 14묶음 모두 0 실패.
 - D-403(9bfc54f): test:all EXIT 0(customer-facts 641) · detail 488 · facts 24 — 0 실패 → main.
+- D-404(583f6c0): test:all EXIT 0(customer-facts 643) · scenarios 69 · plan 73 · detail 488 — 0 실패 → main.
+- Production 화면 번들(D-402 · 403 뒤): '원천세 인원 추이' · '반년 넘었어요' · '받으면 바로 채워져요' 글이 들어 있음(확인).
