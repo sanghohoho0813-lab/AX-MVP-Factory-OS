@@ -4553,3 +4553,12 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - 스크린샷(390): 개인사업자 법인전환 설계서 — 머리 금액 '1년에 덜 내는 세금 약 469만원 · 사업소득이 같으면 3년 1,406만원' · 법인전환 세금 · 정책자금(법인전환 기업 가점) · 진행 순서 5가지 · 넘침 0.
 - 맞춤 추천 탭 길이(390 · 처음 상태): 개인사업자 3.4화면 · 법인 3.2화면 — 그대로(시험용 시드는 '모두 펼치기' 라 13화면으로 보였다).
 - 확인하지 못한 것: 스캔(글자 없는) 합본 PDF — 글자 인식은 첫 장만이라 나누지 못한다.
+
+## §253 D-387~389 병합 확인 · D-390 병합 · main 넓은 회귀 점검 (2026-10-31)
+
+- D-387~389(ccbc94f) Production 확인: 화면 번들에 '대표 신분증' · '석 달 넘었어요' · '임원 임기' 글이 들어 있음(3단계 조각까지 찾음).
+- D-390 세무조정계산서 안 표준재무제표(5536edb): test:all EXIT 0(customer-facts 587) · qa:detail 479 · qa:facts 24 — 0 실패 → main fast-forward.
+- main 넓은 회귀(ccbc94f 빌드 · 27묶음): easy 83 · steady 76 · real 188 · squeeze(짜부라진 글자 0) · firstscreen 55 · modules 894 · keepui 10 · money 41 · sales 201 ·
+  journey 57 · contract 72 · grants 152 · todos 50 · calendar 21 · connect 45 · enroll 48 · modsafe 42 · taxplan 96 · simple 88 · studio 63 · phone 184 · uxpick 37 ·
+  wayfinding 28 · e2e:mobile 16 · flow 171 · board 198 — 0 실패.
+  calcpreset 만 1 실패 — 새로 쓴 D-393 시험(계산기 7종 상황 단추)을 D-393 이 없는 main 빌드에 돌려서(단추 0개). 회귀 아님 · D-393 빌드에서는 41/0.

@@ -9,6 +9,7 @@
  */
 
 import { readWithholdingReport, withholdingValue } from '../withholdingReport'
+import { readVatReturn, vatReturnValue } from '../vatReturnDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
@@ -2201,6 +2202,28 @@ await (async () => {
   const typed = normalizeClientOps({ ...cr, employeeCount: '20', factMeta: { employeeCount: meta('manual', '') } } as never)
   check('D-394 사람이 직접 적은 직원 수(20)와 크레탑(12)이 다르면 예전처럼 묻는다', pendingFacts(typed).some((p) => p.from === 'cretop' && p.key === 'employeeCount'))
 }
+
+// D-395 부가가치세 신고서 → 그 신고 기간 과세표준('부가세 신고 매출' 칸 · 한 해 매출 칸은 아님)
+await (async () => {
+  const VR = ['일반과세자 부가가치세 [ ]예정 [√]확정 [ ]기한후과세표준 신고서', '관리번호', '신고기간 2026년 제1기 ( 1월 1일 ~ 6월 30일 )', '상호(법인명) 미래상사 성명(대표자명) 홍길동 사업자등록번호 124-81-00998',
+    '① 신고내용', '구분 금액 세율 세액', '과세 세금계산서 발급분 (1) 500,000,000 10/100 50,000,000', '과세 신용카드·현금영수증 발행분 (3) 100,000,000 10/100 10,000,000', '과세 기타(정규영수증 외 매출분) (4) 20,000,000 10/100 2,000,000', '영세율 세금계산서 발급분 (5) 0 0/100', '합계 (9) 620,000,000 ㉮ 62,000,000', '매입세액 세금계산서 수취분 일반매입 (10) 300,000,000 30,000,000'].join('\n')
+  const r = readVatReturn(VR)
+  check('D-395 신고서 → 2026년 1기 확정 · 1~6월 · 과세표준 합계(9) 6억 2,000만원(세액 · 매입은 아님)', !!r && r.year === 2026 && r.half === 1 && r.kind === '확정' && r.from === '2026-01' && r.to === '2026-06' && r.base === 620_000_000 && vatReturnValue(r, formatWon) === '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', JSON.stringify(r))
+  check('D-395 과세표준증명 · 본문에만 "부가가치세 신고서" 가 있는 안내문은 신고서 아님', readVatReturn(['부가가치세 과세표준증명', '과세기간 2025.01.01 ~ 2025.12.31'].join('\n')) === null && readVatReturn(['세무 일정 안내', '7월 25일까지 부가가치세 확정 신고서를 내세요'].join('\n')) === null)
+  const pre = readVatReturn(VR.replace('[ ]예정 [√]확정', '[√]예정 [ ]확정').replace('( 1월 1일 ~ 6월 30일 )', '( 1월 1일 ~ 3월 31일 )').replace('합계 (9) 620,000,000', '합계 (9) 280,000,000'))
+  check('D-395 예정 신고(1~3월) → 예정 · 2026-03 · 2억 8,000만원', !!pre && pre.kind === '예정' && pre.to === '2026-03' && pre.base === 280_000_000, JSON.stringify(pre))
+  const empty = normalizeClientOps({ id: 'vr395', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  const place = placeDocument({ text: VR, fileName: 'scan.pdf' }, allDocumentMetas(empty))
+  check('D-395 서류함: "부가가치세 신고서" 칸(부가세 과세표준증명 · 사업자등록증 칸 아님)', place.kind === 'new' && place.label === '부가가치세 신고서', JSON.stringify(place))
+  const cands = factCandidatesFromDocText('customdoc_vr', VR, 'r')
+  check('D-395 후보는 "부가세 신고 매출" 하나 — 한 해 매출 · 회사 이름 · 번호는 이 서류로 읽지 않음', cands.map((c) => c.key).join() === 'cf:부가세 신고 매출' && cands[0].source === 'vatReturn', JSON.stringify(cands))
+  let n = 0
+  const a = await analyzeUploadedDocs(empty, [{ key: 'customdoc_vr', fileName: 'vr.pdf', text: VR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `vr${++n}` })
+  const b = await analyzeUploadedDocs(a.record, [{ key: 'customdoc_vr2', fileName: 'vr-pre.pdf', text: VR.replace('[ ]예정 [√]확정', '[√]예정 [ ]확정').replace('( 1월 1일 ~ 6월 30일 )', '( 1월 1일 ~ 3월 31일 )'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `vr${++n}` })
+  const sum = answerFor('summary', { record: a.record, today: '2026-10-31', notices: [] })
+  check('D-395 상담 요약 "이 회사 한눈에" 에 부가세 신고 줄', sum.facts.some((x) => x.startsWith('부가세 신고 2026년 1기 확정(1~6월) 과세표준 6억 2,000만원')), JSON.stringify(sum.facts))
+  check('D-395 올리기 → 칸 바로 · 묻지 않음 · 앞선 기간(예정) 신고서를 나중에 올려도 확정 값 그대로 · 상담 요약 한 줄', customFactValue(a.record, '부가세 신고 매출').startsWith('2026년 1기 확정') && a.summary.flagged.length === 0 && customFactValue(b.record, '부가세 신고 매출').startsWith('2026년 1기 확정') && b.summary.flagged.length === 0 && !a.record.factValues?.revenue, JSON.stringify([customFactValue(b.record, '부가세 신고 매출'), b.summary.flagged]))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

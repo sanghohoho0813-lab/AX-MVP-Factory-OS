@@ -242,6 +242,15 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /퇴직금\s*(?:지급\s*)?규정/,
   },
   {
+    // D-395 부가가치세 신고서(일반 · 간이과세자 · 예정 · 확정) — 그 기간 과세표준을 읽는다(services/vatReturnDoc.ts). 과세표준증명과는 다른 칸
+    label: '부가가치세 신고서',
+    signals: [
+      { re: /(?:일\s*반|간\s*이)\s*과\s*세\s*자\s*부\s*가\s*가\s*치\s*세/, weight: 5, say: "제목 '일반과세자 부가가치세 신고서'" },
+      { re: /부\s*가\s*가\s*치\s*세[^\n]{0,60}?신\s*고\s*서/, weight: 3, say: "'부가가치세 … 신고서'" },
+    ],
+    nameHint: /부가\s*(?:가치)?세\s*신고/,
+  },
+  {
     // D-391 원천징수이행상황신고서(매월 원천세 신고) — 그달 근로자 수 · 총지급액을 읽는다(services/withholdingReport.ts)
     label: '원천징수이행상황신고서',
     signals: [
@@ -651,6 +660,8 @@ export function placeDocument(input: { text: string; fileName: string }, metas: 
 const LONG_TITLES: [RegExp, string][] = [
   [/종\s*합\s*소\s*득\s*세[\s\S]{0,40}?과\s*세\s*표\s*준\s*확\s*정\s*신\s*고/, '종합소득세 신고서'],
   [/법\s*인\s*세\s*과\s*세\s*표\s*준\s*및\s*세\s*액\s*(?:신\s*고\s*서|조\s*정\s*계\s*산\s*서)/, '세무조정계산서'],
+  // D-395 '일반과세자 부가가치세 [ ]예정 [√]확정 … 신고서' — 제목이 길어 22자 안에서 못 찾았다
+  [/(?:일\s*반|간\s*이)\s*과\s*세\s*자\s*부\s*가\s*가\s*치\s*세[^\n]{0,60}?신\s*고\s*서/, '부가가치세 신고서'],
 ]
 
 function longTitleOf(text: string): string | null {

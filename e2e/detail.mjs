@@ -1931,6 +1931,30 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-395 부가가치세 신고서 → '부가세 신고 매출' 칸(그 기간 과세표준) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const VR = { name: 'scan_395.txt', mimeType: 'text/plain', buffer: Buffer.from(['일반과세자 부가가치세 [ ]예정 [√]확정 신고서', '신고기간 2026년 제1기 ( 1월 1일 ~ 6월 30일 )', '상호(법인명) 한솔테크', '① 신고내용', '과세 세금계산서 발급분 (1) 500,000,000 10/100 50,000,000', '합계 (9) 620,000,000 ㉮ 62,000,000'].join('\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([VR])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-395 390 스캔 이름이어도 "부가가치세 신고서" 칸', /scan_395\.txt → 부가가치세 신고서/.test(placed), placed.slice(0, 300))
+  const r = await record(page)
+  const vf = (r.customFields ?? []).find((x) => x.label === '부가세 신고 매출')
+  check('D-395 390 회사 정보 "부가세 신고 매출" = 2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', vf?.value === '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', JSON.stringify(vf))
+  check('D-395 390 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

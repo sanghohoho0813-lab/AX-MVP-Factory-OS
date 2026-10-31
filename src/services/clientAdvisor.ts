@@ -155,6 +155,8 @@ function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
     customFactValue(r, '대표 신용점수') ? `대표 신용 ${customFactValue(r, '대표 신용점수')}` : '',
     customFactValue(r, '임원 임기') ? `임원 임기 ${customFactValue(r, '임원 임기').split(' / ')[0]}` : '',
     latestRelief(r),
+    // D-395 올해 매출을 가장 먼저 보여 주는 부가세 신고서(한 기간)
+    customFactValue(r, '부가세 신고 매출') ? `부가세 신고 ${customFactValue(r, '부가세 신고 매출')}` : '',
   ].filter(Boolean)
 }
 

@@ -189,7 +189,7 @@ function normalizeContract(raw: unknown): ContractInfo {
  * 이 기능이 없던 시절의 기록에는 아예 없으므로 빈 배열이 된다(기존 데이터 영향 0).
  * 묶음 이름이 이상하면 '회사' 로 보낸다 — 칸을 잃어버리느니 자리를 옮긴다.
  */
-const FACT_SOURCES: FactSource[] = ['manual', 'businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'meeting', 'certificate', 'vatCertificate', 'workRules', 'incomeCertificate', 'taxReturn', 'creditReport', 'articles', 'idCard', 'withholding']
+const FACT_SOURCES: FactSource[] = ['manual', 'businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'meeting', 'certificate', 'vatCertificate', 'workRules', 'incomeCertificate', 'taxReturn', 'creditReport', 'articles', 'idCard', 'withholding', 'vatReturn']
 const isFactSource = (v: unknown): v is FactSource => typeof v === 'string' && (FACT_SOURCES as string[]).includes(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
