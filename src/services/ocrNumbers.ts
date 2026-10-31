@@ -9,7 +9,7 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 export function fixAmountNoise(text: string): string {
-  return String(text || '')
+  return fixDateNoise(String(text || ''))
     // D-427 숫자 덩어리 안의 영문 O(OCR 이 0 을 O 로 읽음) — '2,4OO,OOO,OOO' · '2O25' → 0. 숫자로 시작하는 덩어리 안에서만('A01' 같은 코드 · 영어 낱말은 그대로)
     .replace(/(^|[^0-9A-Za-z])(\d[\dOo,.]*[Oo][\dOo,.]*[\dOo]|\d[\dOo,.]*[Oo])(?![0-9A-Za-z])/g, (_m, pre: string, num: string) => `${pre}${num.replace(/[Oo]/g, '0')}`)
     .replace(/(^|[^\d.,])(\d{1,3}(?:[.,]\d{3}){2,})(?!\d)/g, (_m, pre: string, num: string) => `${pre}${num.replace(/\./g, ',')}`)
@@ -38,4 +38,27 @@ export function joinNumberOnlyLines(lines: readonly string[]): string[] {
     else out.push(l)
   }
   return out
+}
+
+/**
+ * D-434 날짜 안의 OCR 잡음 — '2O19 년 O3 월 l5 일' · '2O26. 1O. 2O' · '2O26년 O9월' → 숫자(O → 0 · l/I → 1).
+ * 예전에는 스캔 사업자등록증 개업일 'O3 월' 때문에 설립일이 비었다(D-427 은 숫자로 시작하는 덩어리만 고쳤다).
+ * 연도가 1 · 2 로 시작하는 네 자리 · 월 1~12 · 일 1~31 일 때만 바꾼다(코드 · 낱말은 그대로).
+ */
+export function fixDateNoise(text: string): string {
+  const fix = (s: string) => s.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1')
+  const ok = (y: string, m: string, d?: string) => {
+    const Y = Number(fix(y))
+    const M = Number(fix(m))
+    const D = d === undefined ? 1 : Number(fix(d))
+    return Y >= 1900 && Y <= 2100 && M >= 1 && M <= 12 && D >= 1 && D <= 31
+  }
+  const Ch = '[\\dOoIl]'
+  return String(text || '')
+    // '년 … 월 (… 일)'
+    .replace(new RegExp(`(^|[^0-9A-Za-z])([12]${Ch}{3})(\\s*년\\s*)(${Ch}{1,2})(\\s*월)(?:(\\s*)(${Ch}{1,2})(?=\\s*일))?`, 'g'), (m, pre: string, y: string, a: string, mo: string, b: string, c?: string, d?: string) =>
+      ok(y, mo, d) ? `${pre}${fix(y)}${a}${fix(mo)}${b}${d !== undefined ? `${c ?? ''}${fix(d)}` : ''}` : m)
+    // '2O26.1O.2O' · '2O26-O3-15' · '2O26. 1O. 2O'
+    .replace(new RegExp(`(^|[^0-9A-Za-z])([12]${Ch}{3})(\\s*[.\\-/]\\s*)(${Ch}{1,2})(\\s*[.\\-/]\\s*)(${Ch}{1,2})(?![0-9A-Za-z])`, 'g'), (m, pre: string, y: string, a: string, mo: string, b: string, d: string) =>
+      ok(y, mo, d) ? `${pre}${fix(y)}${a}${fix(mo)}${b}${fix(d)}` : m)
 }

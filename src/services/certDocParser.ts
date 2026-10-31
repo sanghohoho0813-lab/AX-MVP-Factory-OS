@@ -9,6 +9,7 @@
  */
 
 import { parseKoreanDate } from './koreanDocParser'
+import { fixDateNoise } from './ocrNumbers'
 
 export interface ParsedCertificate {
   /** 인증 이름 — 회사 기본 정보 칸 이름으로 쓴다('연구개발전담부서') */
@@ -66,7 +67,7 @@ function firstDate(s: string): string {
 
 /** 한 서류에서 인증 하나 — 모르는 서류면 null */
 export function parseCertificateDocument(raw: string): ParsedCertificate | null {
-  const text = (raw ?? '').replace(/\r/g, '')
+  const text = fixDateNoise((raw ?? '').replace(/\r/g, '')) // D-434 스캔 날짜 O · l
   if (text.replace(/\s/g, '').length < 10) return null
   const kind = KINDS.find((k) => k.re.test(text))
   if (!kind) return null

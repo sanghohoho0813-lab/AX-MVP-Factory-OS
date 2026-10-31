@@ -107,7 +107,8 @@ function colsOf(cells: string[]): Cols | null {
 /** 주주명부 글 → 주주 · 총수 · 1주의 금액 · 검산 */
 export function readShareholderDoc(text: string, ceoName = ''): RegisterRead {
   // D-416 스캔 글자 잡음(한 글자씩 띄운 이름 · '15.000주')을 먼저 고친다
-  const raw = fixAmountNoise(joinSpacedHangul(String(text || '').replace(/\r\n?/g, '\n')))
+  // D-434 주식 수는 정수 — 표 칸의 '14.000' · '6.000'(마침표 하나 · 뒤 세 자리)도 쉼표로(지분율 '33.333%' 는 그대로)
+  const raw = fixAmountNoise(joinSpacedHangul(String(text || '').replace(/\r\n?/g, '\n'))).replace(/(^|[^\d.,])(\d{1,3})\.(\d{3})(?![\d.,]|\s*%)/g, '$1$2,$3')
   const flat = raw.replace(/\s+/g, ' ')
   const statedTotal = (() => {
     const m = /발행\s*(?:한\s*)?주식\s*(?:의\s*)?총\s*수\s*[:：]?\s*(?:보통주\s*)?([\d,]+)\s*주?/.exec(flat) ?? /총\s*발행\s*주식\s*수?\s*[:：]?\s*([\d,]+)\s*주?/.exec(flat)

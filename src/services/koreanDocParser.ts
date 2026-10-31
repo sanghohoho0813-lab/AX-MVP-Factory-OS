@@ -9,6 +9,7 @@
  */
 
 import { readBusinessNumber } from './bizNoRead'
+import { fixDateNoise } from './ocrNumbers'
 
 export { readBusinessNumber }
 
@@ -39,9 +40,10 @@ export interface ParsedCompanyInfo {
 
 /** OCR 흔한 오인식 보정 + 공백 정리 */
 function normalize(raw: string): string {
-  return raw
+  // D-434 스캔 날짜의 O · l('2O19 년 O3 월') → 숫자
+  return fixDateNoise(raw
     .replace(/\r\n?/g, '\n')
-    .replace(/[〇○]/g, '0')
+    .replace(/[〇○]/g, '0'))
     .replace(/[ \t ]+/g, ' ')
     .replace(/ *\n */g, '\n')
     .trim()

@@ -73,7 +73,8 @@ import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { readShareholderDoc } from '../shareholderDoc'
-import { fixAmountNoise, joinSpacedHangul } from '../ocrNumbers'
+import { fixAmountNoise, fixDateNoise, joinSpacedHangul } from '../ocrNumbers'
+import { parseKoreanBusinessDocument } from '../koreanDocParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
@@ -2765,6 +2766,19 @@ await (async () => {
   const old = buildInsights(mk('25000000', '2025', '2024년 2,000만원(소득금액증명 소득금액 · 2023년보다 +40%)'), T, []).find((i) => i.key === 'tax')
   check('D-431 다른 해 추이(2024) 면 붙이지 않음 — 지금 계산한 해와 같을 때만', !!old && !old.detail.includes('2023년보다') && !old.detail.includes('늘고 있어요'), old?.detail)
 })()
+
+// D-434 스캔 날짜의 O · l → 숫자 · 주주명부 표 칸 '14.000' → 14,000
+{
+  check('D-434 "2O19 년 O3 월 l5 일" · "2O26. 1O. 2O" · "2O26년 O9월" → 숫자', fixDateNoise('개업연월일 : 2O19 년 O3 월 l5 일') === '개업연월일 : 2019 년 03 월 15 일' && fixDateNoise('발급일 2O26. 1O. 2O') === '발급일 2026. 10. 20' && fixDateNoise('귀속연월 2O26년 O9월') === '귀속연월 2026년 09월', [fixDateNoise('개업연월일 : 2O19 년 O3 월 l5 일'), fixDateNoise('발급일 2O26. 1O. 2O'), fixDateNoise('귀속연월 2O26년 O9월')])
+  check('D-434 날짜 아닌 것은 그대로(달 13 · 코드 · 낱말 · 금액)', fixDateNoise('2O26.13.O1 ROOM 2O1 Hello 2,4OO.OOO 1IOl-OO-Il') === '2O26.13.O1 ROOM 2O1 Hello 2,4OO.OOO 1IOl-OO-Il', fixDateNoise('2O26.13.O1 ROOM 2O1 Hello 2,4OO.OOO 1IOl-OO-Il'))
+  const BIZ = ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대 표 자 : 이 대 표', '개업연월일 : 2O19 년 O3 월 15 일', '사업장 소재지 : 경기도 성남시 분당구 판교로 100'].join('\n')
+  check('D-434 스캔 사업자등록증 개업일 "2O19 년 O3 월 15 일" → 설립일 2019-03-15(예전: 비어 있음)', parseKoreanBusinessDocument(BIZ).establishedAt === '2019-03-15', parseKoreanBusinessDocument(BIZ).establishedAt)
+  check('D-434 발급일 · 유효기간도 "2O26. 1O. 2O" · "2O28.O5.31" 그대로 읽음', findIssuedDate('납세증명서\n발급일자 2O26. 1O. 2O') === '2026-10-20' && findValidUntil('벤처기업확인서\n유효기간 2O25.O6.O1 ~ 2O28.O5.31') === '2028-05-31', [findIssuedDate('납세증명서\n발급일자 2O26. 1O. 2O'), findValidUntil('벤처기업확인서\n유효기간 2O25.O6.O1 ~ 2O28.O5.31')])
+  const SH = readShareholderDoc(['주 주 명 부', '회사명 : 주식회사 미래바이오랩', '기준일 2026. 10. 01', '성명 주식수 지분율 비고', '이대표 14.OOO 70% 대표이사', '김배우 6.000 30% 배우자', '합계 20.000 100%'].join('\n'))
+  check('D-434 스캔 주주명부 "14.OOO · 6.000 · 합계 20.000" → 주주 2명 · 14,000 · 6,000 · 총 20,000(예전: 주주 0 · 총 20주)', SH.holders.length === 2 && SH.holders[0].shares === 14000 && SH.holders[1].shares === 6000 && SH.totalShares === 20000 && SH.sure, JSON.stringify(SH))
+  const SH2 = readShareholderDoc(['주주명부', '성명 주식수 지분율', '김갑동 10,000 33.333%', '이을순 10,000 33.333%', '박병철 10,000 33.334%'].join('\n'))
+  check('D-434 지분율 "33.333%" 는 주식 수로 바꾸지 않음', SH2.holders.length === 3 && SH2.holders.every((h) => h.shares === 10000), JSON.stringify(SH2.holders))
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

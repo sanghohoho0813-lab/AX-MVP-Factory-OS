@@ -15,6 +15,7 @@ import { readCreditScore } from './creditScoreDoc'
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import type { DocumentKey } from '../types/clientOps'
 import { looksLikeRealEstateRegistry, parseKoreanDate } from './koreanDocParser'
+import { fixDateNoise } from './ocrNumbers'
 import { bizNoChecksumOk } from './docAutoFill'
 
 export type ClassifyConfidence = 'sure' | 'maybe' | 'unknown'
@@ -419,7 +420,7 @@ function validityWindow(text: string): { start: number; end: number; body: strin
  * 범위면 '~' 뒤 날짜, 하나뿐이면 그 날짜. 없으면 null(짐작하지 않는다).
  */
 export function findValidUntil(text: string): string | null {
-  const w = validityWindow(text ?? '')
+  const w = validityWindow(fixDateNoise(text ?? ''))
   if (!w) return null
   const tilde = w.body.search(/[~∼〜]/)
   for (const m of dateMatches(tilde >= 0 ? w.body.slice(tilde) : w.body)) {
@@ -434,7 +435,8 @@ export function findValidUntil(text: string): string | null {
  * D-181: 유효기간 부분의 날짜는 발급일로 쓰지 않는다(예전에는 '~ 2027년 4월 30일' 이 발급일이 되어 만료가 3년 늦게 잡혔다).
  * 라벨도 다른 날짜도 없으면 유효기간 범위의 시작일.
  */
-export function findIssuedDate(text: string): string | null {
+export function findIssuedDate(raw: string): string | null {
+  const text = fixDateNoise(raw) // D-434 '발급일 2O26. 1O. 2O'
   // D-425 인터넷등기소 '열람일시 : 2026년10월30일 11시12분' · '발행일시' 도 발급일
   const labeled = /(?:발급\s*일자?|발행\s*일(?:자|시)?|교부\s*일자?|출력\s*일(?:자|시)?|열람\s*일(?:자|시)?)\s*[:：]?\s*([0-9년월일.\-/\s]{6,24})/.exec(text)
   const fromLabel = labeled ? parseKoreanDate(labeled[1]) : undefined
