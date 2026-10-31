@@ -2668,5 +2668,18 @@ await (async () => {
   check('D-421 소득 +5% 면 가점 아님(매출만 늘어도)', !policyRecordBonus(b.record, clientFacts(b.record, new Date('2026-10-31T00:00:00'))).includes('매출 또는 영업이익 10% 이상 증가') && customFactValue(b.record, '사업소득 추이').includes('+5%'), customFactValue(b.record, '사업소득 추이'))
 })()
 
+// D-422 상담 요약 '이 회사 한눈에' — 매출 줄에 같은 해 성장률 · 연구개발비 줄
+await (async () => {
+  const FS = ['표준재무제표증명', '손익계산서', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,400,000,000 2,000,000,000', '경상연구개발비 132,000,000 90,000,000', '당기순이익 220,000,000 180,000,000'].join('\n')
+  const base = normalizeClientOps({ id: 'adv422', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FS, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `a2${++n}` })
+  const sum = answerFor('summary', { record: a.record, today: '2026-10-31', notices: [] })
+  check('D-422 상담 요약: "매출 2,400백만원(2024년보다 +20%)" · "연구개발비 2025년 1억 3,200만원(재무제표 · 매출의 5.5%)"', sum.facts.some((x) => x.includes('매출 2,400백만원(2024년보다 +20%)')) && sum.facts.some((x) => x.includes('연구개발비 2025년 1억 3,200만원')), JSON.stringify(sum.facts))
+  const other = normalizeClientOps({ ...a.record, factMeta: { ...a.record.factMeta, revenue: { ...(a.record.factMeta?.revenue as object), asOf: '2024' } } } as never)
+  const sum2 = answerFor('summary', { record: other, today: '2026-10-31', notices: [] })
+  check('D-422 매출 추이 해(2025)가 회사 정보 매출 해(2024)와 다르면 붙이지 않음', sum2.facts.some((x) => /^매출 2,400백만원$/.test(x)), JSON.stringify(sum2.facts))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

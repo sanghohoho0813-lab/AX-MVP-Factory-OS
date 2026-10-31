@@ -19,7 +19,7 @@ import { policyEvidence } from './policyEvidence'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
-import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
+import { customFactEntries, customFactValue, readFact, researchLabOf, usableFactValue } from './customerFacts'
 import { buildInsights, employmentRefund, labRefund, pastStartupRefund, policyDocsLine, recommendNextSteps, reliefYears, startupRefund, type Insight, type InsightTone } from './clientInsights'
 import { headcountOf } from '../tools/employment/lib/taxCredit'
 import { pendingFacts } from './customerFacts'
@@ -167,7 +167,7 @@ function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
     f.establishedAt ? `설립 ${f.establishedAt}${f.years !== null ? ` · 업력 ${f.years}년` : ''}` : '',
     f.industryText ? `업종 ${f.industryText}` : '',
     f.employeeCount !== null ? `직원 ${f.employeeCount}명${employeeSource(r)}` : '',
-    f.revenue ? `매출 ${Math.round(f.revenue.won / 1e6).toLocaleString()}백만원${f.revenue.estimated ? '(예상)' : ''}` : '',
+    f.revenue ? `매출 ${Math.round(f.revenue.won / 1e6).toLocaleString()}백만원${f.revenue.estimated ? '(예상)' : revenueGrowth(r)}` : '',
     f.businessType === 'corporation' ? '법인' : '',
     usableFactValue(r, 'certifications') ? `인증 ${usableFactValue(r, 'certifications')}` : '',
     // D-387 서류로 읽은 것 — 대표 신용점수 · 임원 임기(가장 이른 만료) · 가장 최근 신고서의 공제 · 감면
@@ -176,7 +176,17 @@ function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
     latestRelief(r),
     // D-395 올해 매출을 가장 먼저 보여 주는 부가세 신고서(한 기간)
     customFactValue(r, '부가세 신고 매출') ? `부가세 신고 ${customFactValue(r, '부가세 신고 매출')}${vatYoySuffix(r)}` : '',
+    // D-422 재무제표 연구개발비(D-419)
+    customFactValue(r, '연구개발비') ? `연구개발비 ${customFactValue(r, '연구개발비')}` : '',
   ].filter(Boolean)
+}
+
+/** D-422 매출 줄 끝 '(2024년보다 +20%)' — 매출 추이 줄이 회사 정보 매출과 같은 해일 때만(다른 해 줄을 섞지 않는다) */
+function revenueGrowth(r: ClientOpsRecord): string {
+  const t = customFactValue(r, '매출 추이')
+  const m = /^(20\d{2})년[^(]*\([^)]*?(\d{4}년보다\s*[+-]?\d+%)\)/.exec(t)
+  const asOf = readFact(r, 'revenue')?.asOf ?? ''
+  return m && asOf.startsWith(m[1]) ? `(${m[2]})` : ''
 }
 
 /** 가장 최근 '받은 공제 · 감면 YYYY년' 칸 한 줄 */
