@@ -378,8 +378,9 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
       !f.address ? '사업장 주소가 어디인가요? (지원사업 · 정책자금이 지역으로 갈려요)' : '',
       !f.establishedAt ? '개업일(설립일)이 언제인가요?' : '',
       !f.industryText ? '주로 무엇을 만들거나 파시나요? (업종)' : '',
-      f.employeeCount === null ? '4대보험에 가입된 직원이 몇 명인가요?' : '',
-      !f.revenue ? '작년 매출이 대략 얼마인가요?' : '',
+      // D-400 묻는 대신 받으면 되는 서류도 같이 — 올리면 그 칸이 저절로 채워진다(D-391 · D-373 · D-390 · D-395~397)
+      f.employeeCount === null ? '4대보험에 가입된 직원이 몇 명인가요? (원천세 신고서 · 4대보험 명부를 받으면 바로 채워져요)' : '',
+      !f.revenue ? `작년 매출이 대략 얼마인가요? (${f.businessType === 'individual' ? '소득금액증명 · 부가세 신고서 · 면세는 사업장현황신고서' : '재무제표 · 세무조정계산서'}를 받으면 바로 채워져요)` : '',
       !f.representativeBirth ? '대표님 나이(생년)는요? (청년 창업 · 감면 판단)' : '',
       ctx.record.shareholderRegister.length === 0 ? '주주가 대표님 혼자인가요? 가족 지분이 있나요?' : '',
       // D-306 납세증명서 · 완납증명서를 받아 두었으면 묻지 않는다

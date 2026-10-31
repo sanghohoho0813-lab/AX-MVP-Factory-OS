@@ -2284,5 +2284,15 @@ await (async () => {
   check('D-398 카톡 요청 문구도 개인사업자면 소득금액증명(사업자번호 가운데 01 = 개인)', msg.includes('소득금액증명(종합소득세 · 최근 해)') && !msg.includes('표준재무제표증명'), msg)
 }
 
+// D-400 상담 '대표님께 물어볼 것' — 직원 수 · 매출 질문에 받으면 바로 채워지는 서류
+{
+  const ind = normalizeClientOps({ id: 'ask400', companyName: '미래상회', businessNumber: '124-01-00998', createdAt: NOW, updatedAt: NOW })
+  const corp = normalizeClientOps({ id: 'ask400c', companyName: '(주)미래테크', corporateNumber: '110111-1234567', createdAt: NOW, updatedAt: NOW })
+  const a = answerFor('ask', { record: ind, today: '2026-10-31', notices: [] })
+  const b = answerFor('ask', { record: corp, today: '2026-10-31', notices: [] })
+  check('D-400 개인사업자: 직원 수 → 원천세 신고서 · 4대보험 명부 / 매출 → 소득금액증명 · 부가세 신고서 · 사업장현황신고서', a.steps.some((x) => x.includes('직원이 몇 명') && x.includes('원천세 신고서')) && a.steps.some((x) => x.includes('작년 매출') && x.includes('소득금액증명') && x.includes('사업장현황신고서')), JSON.stringify(a.steps))
+  check('D-400 법인: 매출 → 재무제표 · 세무조정계산서', b.steps.some((x) => x.includes('작년 매출') && x.includes('재무제표 · 세무조정계산서')), JSON.stringify(b.steps))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
