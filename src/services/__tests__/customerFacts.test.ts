@@ -2211,6 +2211,7 @@ await (async () => {
   const r = readVatReturn(VR)
   check('D-395 신고서 → 2026년 1기 확정 · 1~6월 · 과세표준 합계(9) 6억 2,000만원(세액 · 매입은 아님)', !!r && r.year === 2026 && r.half === 1 && r.kind === '확정' && r.from === '2026-01' && r.to === '2026-06' && r.base === 620_000_000 && vatReturnValue(r, formatWon) === '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원', JSON.stringify(r))
   check('D-395 과세표준증명 · 본문에만 "부가가치세 신고서" 가 있는 안내문은 신고서 아님', readVatReturn(['부가가치세 과세표준증명', '과세기간 2025.01.01 ~ 2025.12.31'].join('\n')) === null && readVatReturn(['세무 일정 안내', '7월 25일까지 부가가치세 확정 신고서를 내세요'].join('\n')) === null)
+  check('D-395 동그라미 숫자 "합계 ⑨" 로 적힌 신고서도 6억 2,000만원', readVatReturn(VR.replace('합계 (9) 620,000,000', '합계 ⑨ 620,000,000'))?.base === 620_000_000)
   const pre = readVatReturn(VR.replace('[ ]예정 [√]확정', '[√]예정 [ ]확정').replace('( 1월 1일 ~ 6월 30일 )', '( 1월 1일 ~ 3월 31일 )').replace('합계 (9) 620,000,000', '합계 (9) 280,000,000'))
   check('D-395 예정 신고(1~3월) → 예정 · 2026-03 · 2억 8,000만원', !!pre && pre.kind === '예정' && pre.to === '2026-03' && pre.base === 280_000_000, JSON.stringify(pre))
   const empty = normalizeClientOps({ id: 'vr395', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
