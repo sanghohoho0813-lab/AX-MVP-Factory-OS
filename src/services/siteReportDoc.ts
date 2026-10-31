@@ -8,6 +8,8 @@
  *  - 상호 · 번호 · 경비 · 임차료 같은 다른 칸은 이 서류로 읽지 않는다. 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise } from './ocrNumbers'
+
 export interface SiteReportRead {
   year: number
   revenue: number
@@ -21,7 +23,7 @@ export function looksLikeSiteReport(text: string): boolean {
 }
 
 export function readSiteReport(text: string): SiteReportRead | null {
-  const raw = String(text || '')
+  const raw = fixAmountNoise(String(text || ''))
   if (!looksLikeSiteReport(raw)) return null
   const y =
     /(20\d{2})\s*년\s*(?:도\s*)?귀\s*속/.exec(raw) ??

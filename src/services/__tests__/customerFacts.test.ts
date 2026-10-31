@@ -71,6 +71,7 @@ import { pdfItemsToText } from '../pdfTextLines'
 import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
+import { fixAmountNoise } from '../ocrNumbers'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
@@ -2557,6 +2558,23 @@ await (async () => {
   let n = 0
   const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs_all.pdf', text: [F23, F24, F25].join('\n'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `f3${++n}` })
   check('D-413 합친 PDF 올리기 → 회사 정보 매출 2025년 24억 · 매출 추이 2025년 줄 · 직전 연도 순이익 1.8억', readFact(a.record, 'revenue')?.value === '2400000000' && readFact(a.record, 'revenue')?.asOf === '2025' && customFactValue(a.record, '매출 추이').startsWith('2025년') && a.record.taxProfile?.vInc1 === '180000000', JSON.stringify([readFact(a.record, 'revenue'), customFactValue(a.record, '매출 추이'), a.record.taxProfile]))
+})()
+
+// D-414 스캔본(OCR) 금액 잡음 — 쉼표가 마침표로 · 쉼표 뒤 빈칸 · 표 칸이 줄마다
+await (async () => {
+  check('D-414 고치는 것: 마침표 묶음 · 섞임 · 쉼표 뒤 빈칸', fixAmountNoise('매출액 2.400.000.000 2,000.000,000') === '매출액 2,400,000,000 2,000,000,000' && fixAmountNoise('2,400, 000,000원') === '2,400,000,000원', fixAmountNoise('매출액 2.400.000.000 2,000.000,000'))
+  check('D-414 그대로 두는 것: 날짜 2025.07.25 · 소수 10.5 · 한 묶음 150.000 · 띄어 쓴 두 금액', fixAmountNoise('2025.07.25 10.5% 150.000 45,000,000 1,234,560') === '2025.07.25 10.5% 150.000 45,000,000 1,234,560', fixAmountNoise('2025.07.25 10.5% 150.000 45,000,000 1,234,560'))
+  const FSN = ['표준재무제표증명', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,400, 000,000 2,000,000,000', '당기순이익 220.000.000 180.000.000', '자산총계', '3,200,000,000', '2,900,000,000'].join('\n')
+  const f = parseFinancialStatement(FSN)
+  check('D-414 재무제표 잡음(빈칸 · 마침표 · 표 칸 줄마다) → 매출 24억(예전 2,400원) · 순이익 2.2억 · 자산 32억', f.revenue === 2_400_000_000 && f.netIncome === 220_000_000 && f.totalAssets === 3_200_000_000, JSON.stringify(f))
+  const vc = readVatCert(['부가가치세 과세표준증명', '2025.01.01~2025.06.30 확정 2025.07.25 1.150.000.000', '2025.07.01~2025.12.31 확정 2026.01.25 1.200.000.000'].join('\n'))
+  const inc = readIncomeCert(['소득금액 증명', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 240.000.000 180.000.000 60.000.000'].join('\n'))
+  const wh = readWithholdingReport(['원천징수이행상황신고서', '귀속연월 202609 지급연월 202609', '간이세액 A01 12 45.000.000 1.234.560'].join('\n'))
+  check('D-414 과세표준증명 · 소득금액증명 · 원천세 신고서(귀속연월 202609)도 같은 잡음을 고쳐 읽음', vc?.years[0]?.total === 2_350_000_000 && inc?.years[0]?.revenue === 240_000_000 && wh?.yearMonth === '2026-09' && wh?.pay === 45_000_000, JSON.stringify([vc?.years, inc?.years, wh]))
+  const base = normalizeClientOps({ id: 'ocr414', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'scan.jpg', text: FSN, method: 'ocr' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => 'o4' })
+  const pr = pendingFacts(a.record).find((p) => p.key === 'revenue')
+  check('D-414 스캔 재무제표 올리기 → 확인 후보 매출 24억(예전 2,400원) · 사진 글자라 한 번 확인(바로 넣지 않는 규칙 그대로)', pr?.value === '2400000000' && !!pr?.note, JSON.stringify(pr))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

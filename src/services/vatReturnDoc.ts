@@ -9,6 +9,8 @@
  *  - 상호 · 번호 · 매입 금액은 이 서류로 읽지 않는다. 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise } from './ocrNumbers'
+
 export interface VatReturnRead {
   year: number
   /** 1기 · 2기 — 모르면 0 */
@@ -31,7 +33,7 @@ export function looksLikeVatReturn(text: string): boolean {
 }
 
 export function readVatReturn(text: string): VatReturnRead | null {
-  const raw = String(text || '')
+  const raw = fixAmountNoise(String(text || ''))
   if (!looksLikeVatReturn(raw)) return null
   const t = /(20\d{2})\s*년\s*(?:제\s*)?([12])\s*기/.exec(raw)
   const full = /(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*\d{1,2}\s*일?\s*[~∼～]\s*(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*\d{1,2}/.exec(raw)

@@ -12,6 +12,8 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise } from './ocrNumbers'
+
 export interface IncomeYear {
   year: number
   /** 수입금액(원) */
@@ -45,7 +47,7 @@ function unitOf(text: string): number {
 const MONEY = /(△|-)?\s*(?<![\d,.])(\d{1,3}(?:,\d{3})+|\d{5,})(?![\d,.])/g
 
 export function readIncomeCert(text: string): IncomeRead | null {
-  const raw = String(text || '')
+  const raw = fixAmountNoise(String(text || ''))
   if (!looksLikeIncomeCert(raw)) return null
   const unit = unitOf(raw)
   const byYear = new Map<number, IncomeYear>()

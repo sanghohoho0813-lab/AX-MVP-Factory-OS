@@ -6,6 +6,8 @@
  * 단위: '(단위 : 천원)' '(단위: 백만원)' 이 있으면 곱한다. 손실 과목(영업손실 · 당기순손실) · (123) · △123 · -123 은 음수.
  * 규칙 계산이다. 못 읽으면 그 값은 내지 않는다(지어내지 않는다).
  */
+
+import { fixAmountNoise, joinNumberOnlyLines } from './ocrNumbers'
 export interface FinStatementValues {
   revenue?: number
   operatingProfit?: number
@@ -75,7 +77,8 @@ function curYearOfLine(line: string): number | null {
  * 한 해 재무제표(재무상태표 · 손익계산서 머리줄이 같은 해)는 예전과 같다.
  */
 export function parseFinancialStatement(text: string): FinStatementValues {
-  const all = String(text || '').split(/\r?\n/)
+  text = fixAmountNoise(String(text || ''))
+  const all = text.split(/\r?\n/)
   const heads = all.map((l, i) => ({ i, y: curYearOfLine(l) })).filter((h): h is { i: number; y: number } => h.y !== null)
   const years = new Set(heads.map((h) => h.y))
   if (years.size >= 2) {
@@ -96,7 +99,8 @@ function parseOneStatement(text: string): FinStatementValues {
   const out: FinStatementValues = {}
   if (!text || !/(재무|손익|대차|자산|매출)/.test(text)) return out
   const unit = unitOf(text)
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  // D-414 표 칸이 줄마다 따로 나온 글은 숫자 줄을 앞 줄에 붙여 읽는다
+  const lines = joinNumberOnlyLines(text.split(/\r?\n/).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean))
   const loanSeen = new Set<string>()
   let loanPrevOk = true
   for (const line of lines) {

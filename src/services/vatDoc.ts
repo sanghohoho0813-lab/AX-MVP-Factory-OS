@@ -11,6 +11,8 @@
  * 규칙 계산 — 외부 호출 없음. 주민등록번호는 읽지도 남기지도 않는다.
  */
 
+import { fixAmountNoise } from './ocrNumbers'
+
 export interface VatPeriod {
   /** YYYY-MM */
   from: string
@@ -61,7 +63,7 @@ function unitOf(text: string): number {
 
 /** 기간 · 금액 줄들 → 기간마다 하나(수정 · 경정 우선, 아니면 늦게 신고한 것) */
 export function readVatCert(text: string): VatRead | null {
-  const raw = String(text || '')
+  const raw = fixAmountNoise(String(text || ''))
   if (!looksLikeVatCert(raw)) return null
   const kind: VatRead['kind'] = /면세\s*사업자\s*수입\s*금액\s*증명|수입\s*금액\s*증명/.test(raw) && !/과세\s*표준\s*증명/.test(raw) ? 'exempt' : 'vat'
   const unit = unitOf(raw)

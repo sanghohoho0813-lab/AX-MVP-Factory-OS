@@ -8,6 +8,8 @@
  *  - 소득자 이름 · 세액은 남기지 않는다. 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise } from './ocrNumbers'
+
 export interface WithholdingRead {
   /** 귀속연월 YYYY-MM — 못 읽으면 '' */
   yearMonth: string
@@ -26,9 +28,10 @@ export function looksLikeWithholdingReport(text: string, fileName = ''): boolean
 }
 
 export function readWithholdingReport(text: string, fileName = ''): WithholdingRead | null {
-  const raw = String(text || '')
+  const raw = fixAmountNoise(String(text || ''))
   if (!looksLikeWithholdingReport(raw, fileName)) return null
-  const ym = /귀\s*속\s*연\s*월\s*[:：]?\s*(20\d{2})\s*[년.\-/]\s*(\d{1,2})/.exec(raw)
+  // D-414 '귀속연월 202609'(붙여 쓴 홈택스 표 · OCR)도
+  const ym = /귀\s*속\s*연\s*월\s*[:：]?\s*(20\d{2})\s*[년.\-/]\s*(\d{1,2})/.exec(raw) ?? /귀\s*속\s*연\s*월\s*[:：]?\s*(20\d{2})(0[1-9]|1[0-2])(?!\d)/.exec(raw)
   const yearMonth = ym && Number(ym[2]) >= 1 && Number(ym[2]) <= 12 ? `${ym[1]}-${ym[2].padStart(2, '0')}` : ''
   // 반기 신고 — 귀속연월(첫 달) · 지급연월(끝 달)이 5~6달 떨어진다. 그때는 '1~6월분(반기)' 로 적는다
   const pm = /지\s*급\s*연\s*월\s*[:：]?\s*(20\d{2})\s*[년.\-/]\s*(\d{1,2})/.exec(raw)
