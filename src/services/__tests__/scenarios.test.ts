@@ -15,7 +15,7 @@ import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSumm
 import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
 import { formatWon, withFactValue } from '../customerFacts'
-import { buildInsights, manwonText } from '../clientInsights'
+import { DURUNURI, buildInsights, durunuriLine, manwonText } from '../clientInsights'
 import { buildDiagnosis } from '../clientDiagnosis'
 import { calcPresetValues, runCalcScenario } from '../calcScenario'
 import { calculatorOf, computeSalary, defaultValues, type RowValues } from '../taxCalc'
@@ -949,6 +949,16 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-374 매출 8억 · 제조업 → 카드 설명 맨 앞 "성실신고확인 대상(7억 5천 이상)" · 상황 예시 첫 줄도', !!bigIns && bigIns.detail.startsWith('매출 8억원 — 성실신고확인 대상') && runScenario(sp, big, T).lines[0].startsWith('매출 8억원 — 성실신고확인 대상'), [bigIns?.detail, runScenario(sp, big, T).lines[0]])
   const pv = calcPresetValues(sp, indiv, T)
   check('D-374 계산기 03 칸: 사업소득 6천만 · 급여 · 배당 0 · 주주명부를 달라고 하지 않음', pv.values.inc_a_business === '60000000' && pv.values.inc_a_salary === '0' && pv.values.inc_a_dividend === '0' && pv.missing.length === 0, pv)
+}
+
+// D-376 두루누리 사회보험료 지원 — 10명 미만이면 고용지원금 카드에 한 줄(대상 여부만 · 금액 계산 안 함)
+{
+  check('D-376 두루누리 줄 — 직원 4명 · 최근 1년 입사 2명 → 270만원 미만 · 80% · 36개월 · 공고 확인', durunuriLine(4, 2) === `직원 4명(10명 미만) — 최근 1년 입사 2명 중 월 보수 270만원 미만은 국민연금 · 고용보험 80% · 최대 36개월(두루누리 · ★ 공고 확인)` && DURUNURI.wageUnder === 2_700_000)
+  check('D-376 10명 이상 · 0명 · 모름이면 말하지 않음', durunuriLine(10, 3) === '' && durunuriLine(0, 0) === '' && durunuriLine(null, 1) === '')
+  const NOWD = '2026-10-31T00:00:00.000Z'
+  const small = normalizeClientOps({ id: 'dr376', companyName: '미래상사', businessNumber: '214-05-01239', employeeCount: '4', createdAt: NOWD, updatedAt: NOWD } as unknown as Partial<ClientOpsRecord>)
+  const em = buildInsights(small, '2026-10-31', []).find((i) => i.key === 'employment')
+  check('D-376 명부 없이 직원 4명 — 고용지원금 카드(명부 올리면) 설명에 두루누리 · 판정 색은 그대로(정보가 더 필요해요)', em?.tone === 'need' && em.detail.includes('두루누리'), em)
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)

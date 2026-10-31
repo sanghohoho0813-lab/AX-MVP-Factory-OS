@@ -307,10 +307,21 @@ function seniorRuleLine(record: ClientOpsRecord, seniorCount: unknown, sido: str
   return `만 60세 이상 ${n}명 — 취업규칙(정년 · 재고용 조항)을 올리면 계속고용장려금 요건을 바로 봐요`
 }
 
+/**
+ * D-376 두루누리 사회보험료 지원 — 상시 근로자 10명 미만 · 월평균보수 270만원 미만 신규 가입자의 국민연금 · 고용보험 80% · 최대 36개월(2026 공고 기준).
+ * 금액은 보험별 요율 · 계산 상한이 있어 계산하지 않는다(대상 여부만) — 공고 확인(★).
+ */
+export const DURUNURI = { maxEmployees: 10, wageUnder: 2_700_000, rate: 80, months: 36 }
+export function durunuriLine(employees: number | null, newHires: number): string {
+  if (employees === null || employees < 1 || employees >= DURUNURI.maxEmployees) return ''
+  const who = newHires > 0 ? `최근 1년 입사 ${newHires}명 중 ` : '새로 들어오는 직원 중 '
+  return `직원 ${employees}명(10명 미만) — ${who}월 보수 ${manwonText(DURUNURI.wageUnder)} 미만은 국민연금 · 고용보험 ${DURUNURI.rate}% · 최대 ${DURUNURI.months}개월(두루누리 · ★ 공고 확인)`
+}
+
 const employmentInsight: Provider = ({ record, facts }) => {
   const open = `/tools/employment/roster${q(record)}`
   const roster = latestEmploymentRoster(record)
-  if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+  if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: ['청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'
   const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
@@ -356,7 +367,7 @@ const employmentInsight: Provider = ({ record, facts }) => {
     tone: candidates ? 'good' : credit > 0 ? 'maybe' : 'no',
     headline: creditHeadline ? '직원이 늘어 통합고용세액공제를 받을 수 있어 보여요' : roster.verdictLabel || roster.title,
     // D-336 2025년 이후 창업이면 세액공제와 창업감면을 같은 해 함께 못 받을 수 있다 — 금액을 볼 때 같이 알린다
-    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : '', seniorRuleLine(record, data?.counts?.seniorCount, empSido)].filter(Boolean).join(' · '),
+    detail: [first.startsWith('[') ? '' : first, creditLine, credit > 0 && startupCreditOverlap(facts.establishedAt) === 'excluded' ? '2025년 이후 창업 — 창업감면과 같은 해 함께 못 받을 수 있어 큰 쪽 선택(★ 세무사)' : '', seniorRuleLine(record, data?.counts?.seniorCount, empSido), durunuriLine(facts.employeeCount, newHires)].filter(Boolean).join(' · '),
     missing: [],
     openPath: open,
     openLabel: '명부 진단 보기',
