@@ -15,9 +15,12 @@ import { isXlsxFile, readXlsxText } from './xlsxText'
 import { pdfItemsToText } from './pdfTextLines'
 import { REREAD_MARK } from './bizNoRead'
 import { ensureMapUpsert } from '../lib/mapUpsert'
-import { officeKindOf, officeText } from './officeText'
+import { OfficeReadError, officeKindOf, officeText } from './officeText'
 import { legacyKindOf, legacyText } from './legacyOffice'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+
+/** D-432 부르는 쪽이 '못 읽은 까닭' 을 보여 줄 수 있게(암호 한글 문서 · 못 여는 사진) */
+export { OfficeReadError }
 
 export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx'
 
@@ -272,7 +275,16 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   }
 
   onProgress?.(0, '이미지 여는 중')
-  return { text: await ocrImage(file, onProgress), method: 'ocr' }
+  // D-432 브라우저가 못 여는 사진(PC 크롬의 아이폰 HEIC · 깨진 파일) — 예전에는 말없이 빈 글이 되어 '기타' 로 갔다. 까닭을 한 줄로(한글 인식 준비도 하지 않음)
+  const canvas = await imageToCanvas(file)
+  if (!canvas) throw new OfficeReadError(imageOpenFailNote(file))
+  return { text: await ocrImage(canvas, onProgress), method: 'ocr' }
+}
+
+/** D-432 사진을 못 열었을 때 사람 말 — 아이폰 HEIC 면 바꾸는 법까지 */
+export function imageOpenFailNote(file: { name: string; type: string }): string {
+  if (/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) return '아이폰 사진(HEIC)은 이 브라우저에서 글자를 읽을 수 없어요 — JPG 로 바꿔 올리거나(아이폰 설정 › 카메라 › 포맷 › 높은 호환성) PDF 로 보내 주세요.'
+  return '사진을 열지 못했어요(파일이 깨졌거나 이 브라우저가 모르는 형식) — 다시 찍거나 PDF 로 보내 주세요.'
 }
 
 export const EXTRACT_METHOD_LABEL: Record<ExtractMethod, string> = {
@@ -296,7 +308,7 @@ export function canExtractText(file: File): boolean {
     file.type === 'application/pdf' ||
     /\.pdf$/i.test(file.name) ||
     file.type.startsWith('image/') ||
-    /\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(file.name) ||
+    /\.(png|jpe?g|webp|bmp|gif|tiff?|heic|heif)$/i.test(file.name) ||
     file.type.startsWith('text/') ||
     /\.(txt|md|csv)$/i.test(file.name)
   )

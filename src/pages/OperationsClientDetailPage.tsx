@@ -614,7 +614,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       // D-144: 올린 서류를 읽어 — 확실한 회사 정보는 바로 넣고, 애매한 것은 까닭과 함께 묻는다 · 크레탑 · 명부는 그 엔진이 읽는다
       const reader = ok ? await import('../services/docTextExtract') : null
       if (reader && reader.canExtractText(file)) {
-        const res = await reader.extractTextFromFile(file).catch(() => null)
+        // D-432 못 읽은 까닭이 사람 말이면(아이폰 HEIC · 암호 문서) 알린다 — 파일은 이미 칸에 보관됨
+        const res = await reader.extractTextFromFile(file).catch((e: unknown) => {
+          if (e instanceof reader.OfficeReadError) showToast(`파일은 보관했어요. ${e.message}`)
+          return null
+        })
         if (res && res.text.trim()) {
           // D-209: 새 서류에 찍힌 발급일 · 유효기간 끝을 그 칸에(사람이 그새 적었으면 그대로)
           const dated = placeDocument({ text: res.text, fileName: file.name }, allDocumentMetas(current() ?? record).filter((m) => m.needsFile))

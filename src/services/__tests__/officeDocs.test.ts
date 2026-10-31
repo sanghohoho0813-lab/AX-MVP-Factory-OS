@@ -416,6 +416,17 @@ async function main() {
     check('E14 mimeOf — doc · xls · pptx', mimeOf('a.doc') === 'application/msword' && mimeOf('a.xls') === 'application/vnd.ms-excel' && mimeOf('a.pptx').includes('presentationml'))
   }
 
+  // D-432 브라우저가 못 여는 사진(아이폰 HEIC) — 말없이 빈 글이 아니라 까닭 한 줄(OfficeReadError → 서류 올리기 줄에 보임)
+  {
+    const heic = fileOf('IMG_0042.HEIC', new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99]))
+    let msg = ''
+    try {
+      await extractTextFromFile(heic)
+    } catch (e) {
+      msg = e instanceof OfficeReadError ? e.message : `other:${String(e)}`
+    }
+    check('D-432 아이폰 사진(.HEIC · 종류 비어 있어도) — 읽을 파일로 보고, 못 열면 "아이폰 사진(HEIC) … JPG 로 바꿔" 한 줄(예전: 말없이 빈 글 → 기타)', canExtractText(heic) && msg.includes('아이폰 사진(HEIC)') && msg.includes('높은 호환성'), msg)
+  }
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }

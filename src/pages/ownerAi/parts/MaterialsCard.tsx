@@ -78,7 +78,7 @@ export function MaterialsCard({
           text = ''
         }
       }
-      const m = makeMaterial({ kind: /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name) && !text.trim() ? 'image' : guessMaterialKind(f.name, text), title: f.name.replace(/\.[^.]+$/, ''), text, fileName: f.name, fileSize: f.size, source: '직접 올림' }, at)
+      const m = makeMaterial({ kind: /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(f.name) && !text.trim() ? 'image' : guessMaterialKind(f.name, text), title: f.name.replace(/\.[^.]+$/, ''), text, fileName: f.name, fileSize: f.size, source: '직접 올림' }, at)
       if (sameMaterial([...materials, ...added], m)) {
         dups += 1
         continue
