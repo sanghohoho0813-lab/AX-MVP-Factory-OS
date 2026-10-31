@@ -142,12 +142,24 @@ function insightOf(ctx: AdvisorContext, key: string): Insight | null {
   return (ctx.insights ?? buildInsights(ctx.record, ctx.today, ctx.notices)).find((i) => i.key === key) ?? null
 }
 
+/** D-399 직원 수를 어디서 알았는지 — 명부(재직) · 원천세 신고서(그달 급여 받은 사람) · 사업장현황신고서(연말)는 뜻이 조금씩 달라 같이 적는다 */
+function employeeSource(r: ClientOpsRecord): string {
+  const src = r.factMeta?.employeeCount?.source
+  if (src === 'payrollRoster') return '(4대보험 명부)'
+  if (src === 'withholding') {
+    const ym = r.factMeta?.employeeCount?.asOf ?? ''
+    return /^\d{4}-\d{2}$/.test(ym) ? `(원천세 신고 ${Number(ym.slice(5))}월분)` : '(원천세 신고서)'
+  }
+  if (src === 'siteReport') return `(사업장현황신고서${r.factMeta?.employeeCount?.asOf ? ` ${r.factMeta.employeeCount.asOf}년` : ''})`
+  return ''
+}
+
 function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
   return [
     f.address ? `소재지 ${f.address}` : '',
     f.establishedAt ? `설립 ${f.establishedAt}${f.years !== null ? ` · 업력 ${f.years}년` : ''}` : '',
     f.industryText ? `업종 ${f.industryText}` : '',
-    f.employeeCount !== null ? `직원 ${f.employeeCount}명` : '',
+    f.employeeCount !== null ? `직원 ${f.employeeCount}명${employeeSource(r)}` : '',
     f.revenue ? `매출 ${Math.round(f.revenue.won / 1e6).toLocaleString()}백만원${f.revenue.estimated ? '(예상)' : ''}` : '',
     f.businessType === 'corporation' ? '법인' : '',
     usableFactValue(r, 'certifications') ? `인증 ${usableFactValue(r, 'certifications')}` : '',

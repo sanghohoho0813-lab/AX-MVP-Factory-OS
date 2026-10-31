@@ -2250,19 +2250,25 @@ await (async () => {
   const SR = ['사업장현황신고서', '( 2025 년 귀속 )', '① 상호 미래의원 ② 성명 홍길동 ③ 사업자등록번호 124-81-00998', '④ 전화번호 02-1234-5678', '기본사항 ⑤ 종업원수 12 ⑥ 차량 2',
     '❶ 수입금액(매출액) 명세', '업태 종목 업종코드 합계 수입금액 수입금액제외', '보건업 일반의원 851201 850,000,000 850,000,000 0', '합계 850,000,000 850,000,000 0',
     '❷ 수입금액 구성명세', '합계 850,000,000 계산서발행 120,000,000 신용카드 600,000,000'].join('\n')
-  check('D-397 사업장현황신고서 → 2025년 수입금액 8억 5,000만원(앞 기본사항 · 업종코드 숫자는 아님)', JSON.stringify(readSiteReport(SR)) === '{"year":2025,"revenue":850000000}', JSON.stringify(readSiteReport(SR)))
+  check('D-397 사업장현황신고서 → 2025년 수입금액 8억 5,000만원(앞 기본사항 · 업종코드 숫자는 아님)', JSON.stringify(readSiteReport(SR)) === '{"year":2025,"revenue":850000000,"employees":12}', JSON.stringify(readSiteReport(SR)))
   check('D-397 귀속 연도가 없으면 · 본문에만 낱말이 있는 안내문은 읽지 않음', readSiteReport(SR.replace('( 2025 년 귀속 )', '')) === null && readSiteReport(['세무 일정', '2월 10일까지 사업장현황신고서를 내세요', '수입금액 합계 1,000,000'].join('\n')) === null)
   const empty = normalizeClientOps({ id: 'sr397', companyName: '미래의원', createdAt: NOW, updatedAt: NOW })
   const place = placeDocument({ text: SR, fileName: 'scan.pdf' }, allDocumentMetas(empty))
   check('D-397 서류함: "사업장현황신고서" 칸', place.kind === 'new' && place.label === '사업장현황신고서', JSON.stringify(place))
   const cands = factCandidatesFromDocText('customdoc_sr', SR, 'r')
-  check('D-397 후보는 매출 하나(2025 · 출처 사업장현황신고서) — 상호 · 번호 · 전화는 이 서류로 읽지 않음', cands.length === 1 && cands[0].key === 'revenue' && cands[0].value === '850000000' && cands[0].asOf === '2025' && cands[0].source === 'siteReport', JSON.stringify(cands))
+  check('D-397 후보는 매출(2025 · 출처 사업장현황신고서) · D-399 종업원수 12 — 상호 · 번호 · 전화는 이 서류로 읽지 않음', cands.map((c) => c.key).join() === 'revenue,employeeCount' && cands[0].value === '850000000' && cands[0].asOf === '2025' && cands[0].source === 'siteReport' && cands[1].value === '12', JSON.stringify(cands))
   let n = 0
   const a = await analyzeUploadedDocs(empty, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text: SR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `sr${++n}` })
   check('D-397 올리기 한 번 → 매출 8.5억 바로 · 묻지 않음', readFact(a.record, 'revenue')?.value === '850000000' && a.summary.flagged.length === 0, JSON.stringify(a.summary.flagged))
+  const sumSr = answerFor('summary', { record: a.record, today: '2026-10-31', notices: [] })
+  check('D-399 직원 수 12(비어 있었음) · 상담 요약 "직원 12명(사업장현황신고서 2025년)"', a.record.employeeCount === '12' && sumSr.facts.some((x) => x.includes('직원 12명(사업장현황신고서 2025년)')), JSON.stringify(sumSr.facts))
   const inc = normalizeClientOps({ ...empty, factValues: { revenue: '870000000' }, factMeta: { revenue: { source: 'incomeCertificate', status: 'entered', asOf: '2025', updatedAt: NOW } } } as never)
   const b = await analyzeUploadedDocs(inc, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text: SR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `sr${++n}` })
   check('D-397 같은 해 소득금액증명 매출이 있으면 묻지 않고 그 값 그대로', readFact(b.record, 'revenue')?.value === '870000000' && b.summary.flagged.length === 0, JSON.stringify(b.summary.flagged))
+  const wh = normalizeClientOps({ ...empty, employeeCount: '9', factMeta: { employeeCount: { source: 'withholding', status: 'entered', asOf: '2026-09', updatedAt: NOW } } } as never)
+  const c = await analyzeUploadedDocs(wh, [{ key: 'customdoc_sr', fileName: 'sr.pdf', text: SR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `sr${++n}` })
+  const sumWh = answerFor('summary', { record: c.record, today: '2026-10-31', notices: [] })
+  check('D-399 원천세 신고서 직원 수(9)가 있으면 종업원수(12)로 바꾸지도 묻지도 않음 · 요약 "직원 9명(원천세 신고 9월분)"', c.record.employeeCount === '9' && !c.summary.flagged.some((f) => f.key === 'employeeCount') && sumWh.facts.some((x) => x.includes('직원 9명(원천세 신고 9월분)')), JSON.stringify([c.record.employeeCount, sumWh.facts]))
 })()
 
 // D-398 개인사업자에게 매출 자료를 달라고 할 때 — 표준재무제표증명이 아니라 소득금액증명(면세는 사업장현황신고서 · 과세는 부가세 과세표준증명도)

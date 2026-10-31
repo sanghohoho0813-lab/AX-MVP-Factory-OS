@@ -11,6 +11,8 @@
 export interface SiteReportRead {
   year: number
   revenue: number
+  /** D-399 기본사항 '종업원수' — 못 읽으면 null */
+  employees: number | null
 }
 
 export function looksLikeSiteReport(text: string): boolean {
@@ -32,7 +34,10 @@ export function readSiteReport(text: string): SiteReportRead | null {
     const m = /합\s*계([^\n]*)/.exec(line)
     if (!m) continue
     const money = [...m[1].matchAll(/\d{1,3}(?:,\d{3})+|\d{5,}/g)].map((x) => Number(x[0].replace(/,/g, ''))).find((n) => n >= 10_000)
-    if (money !== undefined) return { year: Number(y[1]), revenue: money }
+    if (money !== undefined) {
+      const e = /종\s*업\s*원\s*수\s*[:：]?\s*(\d{1,4})(?![\d,])/.exec(raw)
+      return { year: Number(y[1]), revenue: money, employees: e && Number(e[1]) > 0 ? Number(e[1]) : null }
+    }
   }
   return null
 }

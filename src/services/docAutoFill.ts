@@ -135,7 +135,7 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     if (m?.source === c.source && c.asOf && m.asOf && c.asOf <= m.asOf) return true
   }
   // D-391 원천세 신고서의 근로자 수는 이미 적힌 직원 수(명부 · 직접 적음)에 밀린다 — 퇴사 · 대표 급여로 한두 명 달라도 묻지 않는다
-  if (c.source === 'withholding' && c.key === 'employeeCount') {
+  if ((c.source === 'withholding' || c.source === 'siteReport') && c.key === 'employeeCount') {
     const f = readFact(record, 'employeeCount')
     return !!f && f.status !== 'missing' && f.source !== c.source
   }

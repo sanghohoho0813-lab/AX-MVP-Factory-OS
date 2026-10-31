@@ -90,6 +90,8 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
   const site = readSiteReport(text)
   if (site) {
     out.push({ key: 'revenue', value: String(site.revenue), source: 'siteReport', asOf: String(site.year), ref })
+    // D-399 기본사항 종업원수 — 직원 수가 비어 있을 때만(명부 · 원천세 · 직접 적은 값이 있으면 그대로 · docAutoFill)
+    if (site.employees) out.push({ key: 'employeeCount', value: String(site.employees), source: 'siteReport', asOf: String(site.year), ref })
     return out
   }
   // D-395 부가가치세 신고서 → 그 기간 과세표준 — 한 기간 금액이라 '매출(한 해)' 칸이 아니라 '부가세 신고 매출' 칸에 기간과 함께
