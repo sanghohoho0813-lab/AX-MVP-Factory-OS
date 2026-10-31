@@ -2601,5 +2601,24 @@ await (async () => {
   check('D-417 스캔 세무조정계산서 → 통합고용 1,540만 · 연구 · 인력개발비 1,200만(띄운 이름 · 마침표 금액)', amt('통합고용') === 15_400_000 && amt('연구') === 12_000_000, JSON.stringify(r?.items))
 })()
 
+// D-418 스캔 재무제표 · 소득금액증명 — 서류 안의 셈이 맞으면 '사진 글자라 확인' 없이 바로
+await (async () => {
+  const FS = (rev: string) => ['표준재무제표증명', '재무상태표', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '자산총계 3,200,000,000 2,900,000,000', '부채총계 1,400,000,000 1,300,000,000', '자본총계 1,800,000,000 1,600,000,000',
+    '손익계산서', `매출액 ${rev} 2,000,000,000`, '매출원가 1,600,000,000 1,350,000,000', '매출총이익 800,000,000 650,000,000', '판매비와관리비 500,000,000 400,000,000', '영업이익 300,000,000 250,000,000',
+    '법인세비용차감전순이익 280,000,000 230,000,000', '법인세비용 60,000,000 50,000,000', '당기순이익 220,000,000 180,000,000'].join('\n')
+  const v = parseFinancialStatement(FS('2,400,000,000')).verified ?? []
+  check('D-418 셈 확인: 매출 · 영업이익 · 순이익 · 자산 · 부채(당기 · 전기)', ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities', 'revenuePrev', 'netIncomePrev'].every((k) => v.includes(k)), JSON.stringify(v))
+  const base = normalizeClientOps({ id: 'ocr418', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const up = (text: string, key = 'financialStatements') => analyzeUploadedDocs(base, [{ key, fileName: 'scan.jpg', text, method: 'ocr' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `o8${++n}` })
+  const a = await up(FS('2,400,000,000'))
+  check('D-418 셈이 맞는 스캔 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채 · 매출 추이 바로(묻는 것 0 — 예전 6개)', readFact(a.record, 'revenue')?.value === '2400000000' && readFact(a.record, 'totalLiabilities')?.value === '1400000000' && customFactValue(a.record, '매출 추이') !== '' && a.summary.flagged.length === 0, JSON.stringify(a.summary.flagged.map((f) => f.key)))
+  const b = await up(FS('2,480,000,000'))
+  check('D-418 매출을 한 글자 잘못 읽어 셈이 안 맞으면 매출 · 매출 추이는 예전처럼 "한 번 확인"(자산 · 순이익은 바로)', b.summary.flagged.some((f) => f.key === 'revenue') && readFact(b.record, 'revenue')?.value === '' && readFact(b.record, 'netIncome')?.value === '220000000', JSON.stringify([b.summary.flagged.map((f) => f.key), readFact(b.record, 'netIncome')?.value]))
+  const INC = ['소득금액 증명', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 240,000,000 180,000,000 60,000,000', '2024 214-05-01239 미래상사 사업소득 200,000,000 160,000,000 40,000,000'].join('\n')
+  const c = await up(INC, 'customdoc_inc')
+  check('D-418 검산이 맞는 스캔 소득금액증명 → 매출 · 순이익 · 매출 추이 바로', readFact(c.record, 'revenue')?.value === '240000000' && customFactValue(c.record, '매출 추이') !== '' && c.summary.flagged.length === 0, JSON.stringify(c.summary.flagged.map((f) => f.key)))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

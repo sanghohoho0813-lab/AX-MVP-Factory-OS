@@ -22,6 +22,7 @@ import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
 import { readSiteReport } from './siteReportDoc'
 import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
+import { parseFinancialStatement } from './finStatementParser'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -74,13 +75,34 @@ function shapeOk(key: string, value: string): boolean {
   return v.length > 0 && v.length <= 200
 }
 
-function noteFor(doc: ReadDoc, key: string, value: string, agreed: boolean): string {
+function noteFor(doc: ReadDoc, key: string, value: string, agreed: boolean, selfChecked = false): string {
   if (!shapeOk(key, value)) return NOTE_SHAPE
   // D-168: 서로 다른 두 서류가 같은 값을 말하면 — 종류가 애매하거나 스캔이어도 믿는다
   if (agreed) return ''
   if (!doc.docSure) return NOTE_DOC_UNSURE
-  if (doc.method === 'ocr' && key !== 'businessNumber') return NOTE_OCR
+  // D-418 서류 안의 셈이 원 단위까지 맞은 값은 스캔이어도 믿는다
+  if (doc.method === 'ocr' && key !== 'businessNumber' && !selfChecked) return NOTE_OCR
   return ''
+}
+
+/**
+ * D-418 스캔(OCR) 서류에서 서류 안의 셈으로 스스로 확인된 값 —
+ *  · 재무제표: 매출 − 매출원가 = 매출총이익 · 매출총이익 − 판관비 = 영업이익 · 법인세차감전순이익 − 법인세비용 = 당기순이익 · 자산 = 부채 + 자본.
+ *    매출 추이는 당기 · 전기 매출이 둘 다 확인됐을 때.
+ *  · 소득금액증명: 해마다 수입금액 − 필요경비 = 소득금액이 맞으면(검산) 매출 · 순이익 · 매출 추이.
+ * 확인 못 한 값은 예전처럼 '사진 · 스캔 글자라 한 번 확인'.
+ */
+function ocrSelfChecked(doc: ReadDoc): Set<string> {
+  const out = new Set<string>()
+  if (doc.method !== 'ocr') return out
+  if (looksLikeIncomeCert(doc.text, doc.fileName)) {
+    if (readIncomeCert(doc.text)?.sure) ['revenue', 'netIncome', TREND_KEY].forEach((k) => out.add(k))
+    return out
+  }
+  const v = parseFinancialStatement(doc.text).verified ?? []
+  for (const k of ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities']) if (v.includes(k)) out.add(k)
+  if (v.includes('revenue') && v.includes('revenuePrev')) out.add(TREND_KEY)
+  return out
 }
 
 /** 비교용 값 — 번호는 숫자만, 글은 띄어쓰기 · (주) 표기를 뺀다 */
@@ -235,11 +257,12 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   docs.forEach((doc, i) => {
     const ref = `doc:${doc.key}:${now}:${i}`
     const others = new Set(sureNos.filter((_, j) => j !== i).flat())
+    const checked = ocrSelfChecked(doc)
     const found = factCandidatesFromDocText(doc.key, doc.text, ref).map((c) => {
       const pick = c.key === 'businessNumber' && c.note ? [c.value, ...(c.choices ?? []), ...readBusinessNumber(doc.text).alternatives].find((v) => others.has(v.replace(/\D/g, ''))) : undefined
       if (pick) return { key: c.key, value: pick, source: c.source, asOf: c.asOf, ref: c.ref }
       const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`)
-      const note = noteFor(doc, c.key, c.value, isAgreed)
+      const note = noteFor(doc, c.key, c.value, isAgreed, checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate'))
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
