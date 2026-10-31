@@ -1708,6 +1708,9 @@ await (async () => {
   check('D-342 영수증 판별 · 소득자(대표자 성명 칸 아님) · 총급여 ㉑ · 12개월 → 월 780만', looksLikeWageReceipt(ceo) && r1.length === 1 && r1[0].name === '박지훈' && r1[0].payerCeo === '박지훈' && r1[0].totalPay === 93_600_000 && r1[0].months === 12 && r1[0].year === 2025 && monthlyPayOf(r1[0]) === 7_800_000, JSON.stringify(r1))
   const p1only = readWageReceipts(page('박지훈', '801231-1******', '2025.01.01~2025.12.31', '96,000,000', '2,400,000', null))
   check('D-342 1쪽만(㉑ 없음) → ⑯ 계 − 비과세 계 = 9,360만 · 안내 글의 "7,000만원" 은 금액 아님', p1only[0]?.totalPay === 93_600_000, JSON.stringify(p1only))
+  // D-417 스캔 영수증 — 마침표 금액 · 한 글자씩 띄운 이름
+  const scan = readWageReceipts(page('박 지 훈', '801231-1******', '2025.01.01~2025.12.31', '96.000.000', '2.400.000', '93.600.000'))
+  check('D-417 스캔 영수증("박 지 훈" · "93.600.000") → 박지훈 · 총급여 9,360만 · 월 780만(예전: 못 읽음)', scan.length === 1 && scan[0].name === '박지훈' && scan[0].totalPay === 93_600_000 && monthlyPayOf(scan[0]) === 7_800_000, JSON.stringify(scan))
   const mid = readWageReceipts(page('박지훈', '801231-1******', '2025.04.01~2025.12.31', '54,000,000', '0', '54,000,000'))
   check('D-342 4월 취임(근무기간 9개월) → 5,400만 ÷ 9 = 월 600만', mid[0]?.months === 9 && monthlyPayOf(mid[0]) === 6_000_000, JSON.stringify(mid))
   const bundle = [page('김민수', '950101-1******', '2025.01.01~2025.12.31', '42,000,000', '2,400,000', '39,600,000'), ceo].join('\n')

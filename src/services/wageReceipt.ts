@@ -8,6 +8,8 @@
  * 주민등록번호 · 주소는 읽지 않는다. 규칙 계산 — 외부 호출 없음.
  */
 
+import { fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
+
 export interface WageReceipt {
   /** 소득자 성명 — 못 읽으면 '' */
   name: string
@@ -87,7 +89,8 @@ function readOne(block: string, name: string, payerCeo: string): WageReceipt {
 
 /** 영수증 글 → 사람마다(성명 자리에서 다음 성명 자리까지) */
 export function readWageReceipts(text: string): WageReceipt[] {
-  const t = String(text || '').replace(/\r/g, '')
+  // D-417 스캔 영수증 — 마침표 금액('93.600.000') · 한 글자씩 띄운 이름('박 지 훈')을 먼저 고친다
+  const t = fixAmountNoise(joinSpacedHangul(String(text || '').replace(/\r/g, '')))
   const spots = nameSpots(t)
   if (spots.length === 0) return []
   const out: WageReceipt[] = []
