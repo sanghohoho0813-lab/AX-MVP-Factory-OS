@@ -2,7 +2,7 @@
  * D-199 상황 예시로 바로 설계 — 카탈로그 · 업체 숫자로 계산 · 필요한 숫자 ✓/✗ · 요청 문구 · 모듈 엔진과 같은 답.
  */
 import { normalizeClientOps, withToolResult } from '../clientOpsService'
-import { SCENARIO_PRESETS, labPresetFor, presetAssumptions, presetFieldsKept, scenarioPath, scenarioPreset, withoutPresetFields } from '../scenarioPresets'
+import { CALC_PLAN_PRESETS, planPresetsForCalc, SCENARIO_PRESETS, labPresetFor, presetAssumptions, presetFieldsKept, scenarioPath, scenarioPreset, withoutPresetFields } from '../scenarioPresets'
 import { fitDataRequest, runScenario, runScenarios, scenarioTaxProfile, scenariosRequest, type ScenarioRun } from '../scenarios'
 import { SCENARIO_QUESTIONS, fitContext, scenarioAnswer, scenarioFit, withScenarioAnswer, type QuestionKey } from '../scenarioFit'
 import { salaryPlan, parseGoalText } from '../taxPlan'
@@ -987,6 +987,14 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   check('D-385 사업소득 1,500만 → 차이 300만 아래(맞춤 추천과 같은 기준) · "아직 작아요" · 합계 0', sp.blocks[0].state === 'none' && /아직 작아요/.test(sp.blocks[0].headline) && sp.firstWon === 0 && sp.totalText === '', JSON.stringify(sp.blocks[0]))
   const noInc = buildSituationPlan('corp-convert', normalizeClientOps({ id: 'cv385n', companyName: '새상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC } as never), T)
   check('D-385 사업소득을 모르면 받을 자료(소득금액증명) · 요청 문구', noInc.blocks[0].state === 'need' && noInc.blocks[0].needs.some((x) => !x.ok && /소득금액증명/.test(x.label)), JSON.stringify(noInc.blocks[0]))
+}
+
+// D-393 계산기마다 같은 식을 쓰는 절세 설계 상황 — 01 · 02 · 03 · 04 · 07 · 08 · 09
+{
+  const ids = Object.values(CALC_PLAN_PRESETS).flat()
+  check('D-393 이어 둔 상황 id 가 모두 있는 절세 설계 상황(문장 있음 · 계산기 상황 아님)', ids.every((id) => { const p = scenarioPreset(id); return !!p && p.module === 'tax' && !!p.taxText && !p.calc }), JSON.stringify(ids.filter((id) => !scenarioPreset(id)?.taxText)))
+  check('D-393 계산기 7종에 1개 이상 · 05 · 06 은 계산기 상황만(절세 설계 상황 0)', ['t2', 't6', 't9', 't5', 't1', 't4', 't3'].every((k) => planPresetsForCalc(k).length >= 1) && planPresetsForCalc('t7').length === 0 && planPresetsForCalc('t8').length === 0 && planPresetsForCalc('zz').length === 0)
+  check('D-393 07 가지급금 → 가지급금 정리 · 02 퇴직급여 → 퇴직금 한도 · 08 상속세 → 상속세 미리 보기', planPresetsForCalc('t1')[0]?.id === 'tax-loan' && planPresetsForCalc('t6')[0]?.id === 'tax-retire' && planPresetsForCalc('t4')[0]?.id === 'tax-inherit')
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)

@@ -226,6 +226,24 @@ export function scenarioPreset(id: string | null | undefined): ScenarioPreset | 
   return SCENARIO_PRESETS.find((s) => s.id === id) ?? null
 }
 
+/**
+ * D-393 세금 계산기마다 이어 둘 절세 설계 상황 — 그 계산기와 같은 식을 쓰는 상황만.
+ * 계산기 화면 '상황 예시로 바로' 에 함께 놓아, 01 · 02 · 03 · 04 · 07 · 08 · 09 에서도 한 번 누르면 이 업체 숫자로 설계까지 간다(05 · 06 · 03 법인전환은 계산기 상황).
+ */
+export const CALC_PLAN_PRESETS: Readonly<Record<string, readonly string[]>> = {
+  t2: ['tax-salary-rate', 'tax-salary-net'],
+  t6: ['tax-retire'],
+  t9: ['tax-cash-1e', 'tax-cash-3e-split'],
+  t5: ['tax-gift-10', 'tax-gift-free'],
+  t1: ['tax-loan'],
+  t4: ['tax-inherit', 'tax-succession'],
+  t3: ['tax-gift-10', 'tax-treasury'],
+}
+
+export function planPresetsForCalc(calcKey: string): ScenarioPreset[] {
+  return (CALC_PLAN_PRESETS[calcKey] ?? []).map((id) => scenarioPreset(id)).filter((p): p is ScenarioPreset => !!p && p.module === 'tax' && !!p.taxText && !p.calc)
+}
+
 /** 모듈 화면 주소 — 업체 · 가정. D-243: 계산기 상황은 그 계산기 · 그 탭으로 */
 export function scenarioPath(s: Pick<ScenarioPreset, 'id' | 'module' | 'calc'>, clientId: string): string {
   const calc = s.calc ? `&m=calc&c=${s.calc.key}&s=${s.calc.sub}` : ''

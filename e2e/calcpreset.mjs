@@ -220,6 +220,22 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const total = await lineV(page, 'inc_a_out3', '종합소득세 총부담세액')
   const chipsT9 = await page.getByTestId('preset-chip').allInnerTexts()
   check('D-374 03 계산기 — 사업소득 60,000,000 · 총급여 0 · 종합소득세 총부담세액이 원 단위로 · 넣은 가정 칩 "사업소득만"', biz === '60,000,000' && (sal0 === '0' || sal0 === '') && /^[\d,]+원$/.test(total ?? '') && chipsT9.some((c) => c.includes('사업소득만')), `${biz} · ${sal0} · ${total} · ${JSON.stringify(chipsT9)}`)
+  // D-393 01 · 02 · 03 · 04 · 07 · 08 · 09 계산기에도 상황 단추 — 같은 식을 쓰는 절세 설계 상황(누르면 '원하는 결과로 찾기' 가 이 업체 숫자로 바로)
+  const planBtns = {}
+  for (const c of ['t2', 't6', 't9', 't5', 't1', 't4', 't3']) {
+    await openCalc(page, `/tools/tax?client=cli_fam&m=calc&c=${c}`)
+    planBtns[c] = await page.getByTestId('calc-plan-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
+  }
+  check('D-393 계산기 7종 모두 상황 단추 — 07 가지급금 정리 · 02 퇴직금 · 01 급여 둘 · 08 상속 · 04 증여', planBtns.t1.join() === 'tax-loan' && planBtns.t6.join() === 'tax-retire' && planBtns.t2.length === 2 && planBtns.t4.includes('tax-inherit') && planBtns.t5.includes('tax-gift-10') && planBtns.t9.length >= 1 && planBtns.t3.length >= 1, JSON.stringify(planBtns))
+  await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t1')
+  const headT1 = await page.getByTestId('calc-presets').innerText()
+  await page.locator('[data-testid="calc-plan-preset"][data-id="tax-loan"]').click()
+  await page.getByTestId('tax-preset-note').waitFor({ timeout: 15000 })
+  const noteT1 = await page.getByTestId('tax-preset-note').innerText()
+  const planText = (await page.getByTestId('plan-text').inputValue().catch(() => '')) ?? ''
+  check('D-393 07 → [가지급금 정리] 누르면 원하는 결과로 찾기 · 그 상황 문장 · "이 업체 숫자로 바로 계산" · 같은 업체', headT1.includes('이 업체 숫자로 설계') && noteT1.includes('가지급금 정리') && noteT1.includes('이 업체 숫자로 바로 계산') && planText.includes('가지급금') && page.url().includes('client=cli_fam') && page.url().includes('m=plan'), `${noteT1.slice(0, 120)} · ${planText} · ${page.url()}`)
+  await openCalc(page, '/tools/tax?m=calc&c=t1')
+  check('D-393 업체 없이 연 07 에는 상황 단추 없음', (await page.getByTestId('calc-plan-preset').count()) === 0)
   check('1440 페이지 오류 0', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
@@ -240,8 +256,15 @@ for (const width of [360, 390]) {
     const sizes = await page.locator('[data-testid="calc-preset"], [data-testid="preset-clear"]').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height), spill: e.scrollWidth - e.clientWidth })))
     check(`${width} · ${scale} — 가로 넘침 0 · 상황 단추 · 가정 빼기 44px 이상 · 단추 글자 넘침 0`, over <= 0 && sizes.length === 3 && sizes.every((s) => s.h >= 44 && s.spill <= 1), `${over} ${JSON.stringify(sizes)}`)
   }
+  await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t2')
+  const planSizes = await page.locator('[data-testid="calc-plan-preset"]').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height), spill: e.scrollWidth - e.clientWidth })))
+  const overT2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D-393 ${width} 01 계산기 상황 단추 2개 · 44px 이상 · 글자 넘침 0 · 가로 넘침 0`, planSizes.length === 2 && planSizes.every((s) => s.h >= 44 && s.spill <= 1) && overT2 <= 0, `${overT2} ${JSON.stringify(planSizes)}`)
   check(`${width} 페이지 오류 0`, errors.length === 0, errors.join(' | '))
   if (SHOTS) {
+    await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t1')
+    await page.getByTestId('calc-presets').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/calc-plan-${width}.png`, fullPage: false })
     for (const scale of ['default', 'extra_large']) {
       await openCalc(page, '/tools/tax?client=cli_fam&m=calc&c=t8&s=x1&preset=calc-t8-issue')
       await page.getByTestId('calc-preset-note').waitFor()

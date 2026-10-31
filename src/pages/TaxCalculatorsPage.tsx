@@ -22,7 +22,7 @@ import { calcPrefill } from '../services/taxCalcPrefill'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { PrefillNote } from '../tools/shared/PrefillNote'
 import { PresetNote } from '../tools/shared/PresetNote'
-import { SCENARIO_PRESETS, presetAssumptions, scenarioPreset, type PresetAssumption, type ScenarioPreset } from '../services/scenarioPresets'
+import { SCENARIO_PRESETS, planPresetsForCalc, presetAssumptions, scenarioPreset, type PresetAssumption, type ScenarioPreset } from '../services/scenarioPresets'
 import { calcPresetValues } from '../services/calcScenario'
 import { todayLocalDate } from '../lib/appClock'
 import {
@@ -257,6 +257,17 @@ export function TaxCalculatorsPage() {
   const presetShown = presetUsed && presetUsed.calcKey === calc.key ? presetUsed : null
   const presetKept = presetShown ? Object.keys(presetShown.applied).filter((k) => JSON.stringify(values[k]) === JSON.stringify(presetShown.applied[k])) : []
   const calcPresets = clientId ? presetsOf(calc.key) : []
+  // D-393 같은 계산기 식을 쓰는 절세 설계 상황 — 누르면 '원하는 결과로 찾기' 가 그 상황 · 이 업체 숫자로 바로 계산
+  const planPresets = clientId ? planPresetsForCalc(calc.key) : []
+  const openPlanPreset = (p: ScenarioPreset) => {
+    const next = new URLSearchParams()
+    const client = params.get('client')
+    if (client) next.set('client', client)
+    next.set('m', 'plan')
+    next.set('preset', p.id)
+    setParams(next)
+    window.scrollTo({ top: 0 })
+  }
   const applyPreset = (p: ScenarioPreset) => {
     if (!p.calc) return
     const next = new URLSearchParams()
@@ -596,9 +607,11 @@ export function TaxCalculatorsPage() {
             }}
           />
         )}
-        {calcPresets.length > 0 && (
+        {calcPresets.length + planPresets.length > 0 && (
           <div className="no-print flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="calc-presets">
-            <p className="t-sub font-semibold break-keep text-brand-900">상황 예시로 바로 — 누르면 이 업체 숫자(주주명부 · 순이익 · 1주 가치)로 계산</p>
+            <p className="t-sub font-semibold break-keep text-brand-900">
+              {calcPresets.length > 0 ? '상황 예시로 바로 — 누르면 이 업체 숫자(주주명부 · 순이익 · 1주 가치)로 계산' : '상황 예시로 바로 — 누르면 이 업체 숫자로 설계(이 계산기와 같은 식)'}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {calcPresets.map((p) => (
                 <button
@@ -608,6 +621,19 @@ export function TaxCalculatorsPage() {
                   data-id={p.id}
                   title={p.when}
                   onClick={() => applyPreset(p)}
+                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.92rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                >
+                  {p.title}
+                </button>
+              ))}
+              {planPresets.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-testid="calc-plan-preset"
+                  data-id={p.id}
+                  title={`${p.when} — 원하는 결과로 찾기에서 이 업체 숫자로 계산`}
+                  onClick={() => openPlanPreset(p)}
                   className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.92rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
                 >
                   {p.title}
