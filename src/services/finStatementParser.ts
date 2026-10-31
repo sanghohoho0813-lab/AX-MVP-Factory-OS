@@ -57,7 +57,42 @@ function valueOf(token: string): number | null {
   return neg ? -n : n
 }
 
+/** '제 7(당)기 2025년 12월 31일 현재' · '제 7(당)기 2024년 4월 1일부터 2025년 3월 31일까지' → 당기 끝 해(전기 글은 빼고) */
+const CUR_HEAD = /제\s*\d+\s*[(（]?\s*당\s*[)）]?\s*기/
+function curYearOfLine(line: string): number | null {
+  const m = CUR_HEAD.exec(line)
+  if (!m) return null
+  let span = line.slice(m.index + m[0].length)
+  const prevAt = span.search(/제\s*\d+\s*[(（]?\s*전\s*[)）]?\s*기/)
+  if (prevAt >= 0) span = span.slice(0, prevAt)
+  const ys = [...span.matchAll(/(20\d{2})/g)].map((x) => Number(x[1]))
+  return ys.length ? ys[ys.length - 1] : null
+}
+
+/**
+ * D-413 여러 해 재무제표를 한 PDF 로 합쳐 올리면(2023 · 2024 · 2025 순서로 붙인 파일) 예전에는 파일 앞쪽 해만 읽어
+ * 옛날 해가 앞이면 그 해 숫자가 회사 정보에 들어갔다. '(당)기' 머리줄의 해가 둘 이상이면 가장 최근 해 부분만 읽는다.
+ * 한 해 재무제표(재무상태표 · 손익계산서 머리줄이 같은 해)는 예전과 같다.
+ */
 export function parseFinancialStatement(text: string): FinStatementValues {
+  const all = String(text || '').split(/\r?\n/)
+  const heads = all.map((l, i) => ({ i, y: curYearOfLine(l) })).filter((h): h is { i: number; y: number } => h.y !== null)
+  const years = new Set(heads.map((h) => h.y))
+  if (years.size >= 2) {
+    const maxY = Math.max(...years)
+    const parts = heads.flatMap((h, k) => (h.y === maxY ? [all.slice(k === 0 ? 0 : h.i, k + 1 < heads.length ? heads[k + 1].i : all.length).join('\n')] : []))
+    let picked = parts.join('\n')
+    // 단위 줄이 그 부분에 없으면 파일의 첫 단위 줄을 앞에(천원 · 백만원 재무제표)
+    if (!/단\s*위/.test(picked)) {
+      const u = all.find((l) => /단\s*위\s*[:：]?\s*(백만\s*원|천\s*원|원)/.test(l))
+      if (u) picked = `${u}\n${picked}`
+    }
+    return parseOneStatement(picked)
+  }
+  return parseOneStatement(text)
+}
+
+function parseOneStatement(text: string): FinStatementValues {
   const out: FinStatementValues = {}
   if (!text || !/(재무|손익|대차|자산|매출)/.test(text)) return out
   const unit = unitOf(text)

@@ -2540,5 +2540,24 @@ await (async () => {
   check('D-412 2024 한 장만이면 추이 없음 → 다음에 2025 한 장을 올리면 이어서 추이', customFactValue(c1.record, '매출 추이') === '' && customFactValue(c2.record, '매출 추이') === want && c2.summary.flagged.length === 0, JSON.stringify([customFactValue(c1.record, '매출 추이'), customFactValue(c2.record, '매출 추이'), c2.summary.flagged]))
 })()
 
+// D-413 여러 해 재무제표를 한 PDF 로 합쳐 올려도 가장 최근 해
+await (async () => {
+  const FS = (y: number, rev: string, ni: string, unit = '') => ['표준재무제표증명', ...(unit ? [unit] : []), `제 ${y - 2018}(당)기 ${y}년 12월 31일 현재`, '손익계산서', `매출액 ${rev}`, `당기순이익 ${ni}`].join('\n')
+  const F25 = FS(2025, '2,400,000,000 2,000,000,000', '220,000,000 180,000,000')
+  const F24 = FS(2024, '2,000,000,000 1,700,000,000', '180,000,000 120,000,000')
+  const F23 = FS(2023, '1,700,000,000 1,500,000,000', '120,000,000 90,000,000')
+  const old1 = parseFinancialStatement([F23, F24, F25].join('\n'))
+  check('D-413 옛날 해가 앞인 합친 PDF → 2025년 매출 24억 · 순이익 2.2억(예전: 2023년 17억)', old1.year === '2025' && old1.revenue === 2_400_000_000 && old1.netIncome === 220_000_000 && old1.netIncomePrev === 180_000_000, JSON.stringify(old1))
+  const one = parseFinancialStatement(['재무상태표', '제 7(당)기 2025년 12월 31일 현재', '제 6(전)기 2024년 12월 31일 현재', '(단위 : 원)', '자산총계 3,200,000,000 2,900,000,000', '손익계산서', '제 7(당)기 2025년 1월 1일부터 2025년 12월 31일까지', '매출액 2,400,000,000 2,000,000,000'].join('\n'))
+  const nonCal = parseFinancialStatement(['재무상태표', '제 7(당)기 2025년 3월 31일 현재', '(단위 : 천원)', '자산총계 3,200,000 2,900,000', '손익계산서', '제 7(당)기 2024년 4월 1일부터 2025년 3월 31일까지', '매출액 2,400,000 2,000,000'].join('\n'))
+  check('D-413 한 해 재무제표(전기 머리줄 · 3월 결산 손익계산서 기간)는 예전과 같이 전부 읽음', one.totalAssets === 3_200_000_000 && one.revenue === 2_400_000_000 && nonCal.totalAssets === 3_200_000_000 && nonCal.revenue === 2_400_000_000 && nonCal.year === '2025', JSON.stringify([one, nonCal]))
+  const unitCarry = parseFinancialStatement([FS(2023, '1,700,000 1,500,000', '120,000 90,000', '(단위 : 천원)'), FS(2025, '2,400,000 2,000,000', '220,000 180,000')].join('\n'))
+  check('D-413 최근 해 부분에 단위 줄이 없으면 파일의 단위(천원)로', unitCarry.revenue === 2_400_000_000, JSON.stringify(unitCarry))
+  const base = normalizeClientOps({ id: 'fs413', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs_all.pdf', text: [F23, F24, F25].join('\n'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `f3${++n}` })
+  check('D-413 합친 PDF 올리기 → 회사 정보 매출 2025년 24억 · 매출 추이 2025년 줄 · 직전 연도 순이익 1.8억', readFact(a.record, 'revenue')?.value === '2400000000' && readFact(a.record, 'revenue')?.asOf === '2025' && customFactValue(a.record, '매출 추이').startsWith('2025년') && a.record.taxProfile?.vInc1 === '180000000', JSON.stringify([readFact(a.record, 'revenue'), customFactValue(a.record, '매출 추이'), a.record.taxProfile]))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
