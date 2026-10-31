@@ -362,7 +362,7 @@ const returnName = (facts: Pick<ClientFacts, 'businessType'>) => (facts.business
  * D-378 고용 — 가장 최근 신고서에 통합고용세액공제(· 고용증대 · 사회보험료)가 없을 때.
  * 명부로 그해(작년) 인원이 늘었는지 셀 수 있으면 금액까지(그해 단가표), 못 세면 '늘었다면' 으로만. 늘지 않았으면 말하지 않는다(맞게 안 받은 것).
  */
-export function employmentRefund(record: ClientOpsRecord, facts: ClientFacts, years: readonly ReliefYear[], past: RosterHeadcount | null): { line: string; won: number; year: number } {
+export function employmentRefund(record: ClientOpsRecord, facts: ClientFacts, years: readonly ReliefYear[], past: RosterHeadcount | null, hasRoster = false): { line: string; won: number; year: number } {
   const y = years[0]
   if (!y) return { line: '', won: 0, year: 0 }
   const doc = `${y.year}년 ${returnName(facts)}`
@@ -372,7 +372,8 @@ export function employmentRefund(record: ClientOpsRecord, facts: ClientFacts, ye
     if (c && c.won > 0) return { line: `${y.year}년 평균 ${headText(past.prev.total)} → ${headText(past.cur.total)}명으로 늘었는데 ${doc}에 통합고용세액공제가 없어요 — 경정청구 검토 약 ${manwonText(c.won)}(5년 안 · ★ 세무사)`, won: c.won, year: y.year }
     return { line: '', won: 0, year: y.year }
   }
-  return { line: `${doc}에 통합고용세액공제가 없어요 — 그해 직원이 늘었다면 경정청구 검토(5년 안)`, won: 0, year: y.year }
+  // D-382 명부는 있는데 그해 인원 기록이 없는 옛 결과 — 명부를 다시 올리면 그해 금액까지 센다
+  return { line: `${doc}에 통합고용세액공제가 없어요 — 그해 직원이 늘었다면 경정청구 검토(5년 안${hasRoster ? ' · 명부를 다시 올리면 그해 금액까지' : ''})`, won: 0, year: y.year }
 }
 
 /** 연구소 글 · 인정서 값에서 인정(설립)한 해 — '…까지' 날짜(유효기간)는 빼고 첫 날짜 */
@@ -448,7 +449,7 @@ const employmentInsight: Provider = ({ record, facts, today }) => {
   const three = typed > 0 ? 0 : (fromRoster?.threeYear ?? 0)
   const creditText = three > 0 ? `세액공제 1년 차 약 ${manwonText(credit)} · 3년 약 ${manwonText(three)}` : `세액공제 약 ${manwonText(credit)}`
   // D-378 신고서에 빠진 통합고용세액공제(그해 늘어난 인원 · 그해 단가) — 금액이 나오면 맨 앞 · 제안할 거리
-  const refund = employmentRefund(record, facts, years, headcountOf(data?.headcountPast))
+  const refund = employmentRefund(record, facts, years, headcountOf(data?.headcountPast), true)
   const refundText = refund.won > 0 ? `경정청구 약 ${manwonText(refund.won)}(${refund.year}년분)` : ''
   const amount =
     candidates && total > 0

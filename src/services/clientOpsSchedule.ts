@@ -16,7 +16,7 @@ import { documentsWithExpiry, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 import { applyDocViews } from './grants/grantApply'
 import { customFactValue } from './customerFacts'
-import { officerTermsOf } from './registryTax'
+import { officerEndsWith, officerTermsOf } from './registryTax'
 
 export type ScheduleKind = 'next' | 'task' | 'funding' | 'payment' | 'document' | 'tool'
 
@@ -107,7 +107,10 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
   }
 
   // D-380 임원 임기(회사 정보 '임원 임기' — 등기부에서 읽은 3년 끝나는 날) → 중임 등기. 한 달 넘게 지난 날은 옛 등기부일 수 있어 내려놓는다
-  for (const t of officerTermsOf(customFactValue(record, '임원 임기'))) {
+  // D-382 정관 이사 임기(1~3년)를 알면 그 임기로 다시 센다
+  const directorYears = Number(/^([1-3])\s*년/.exec(customFactValue(record, '이사 임기'))?.[1] ?? 0) || null
+  for (const t0 of officerTermsOf(customFactValue(record, '임원 임기'))) {
+    const t = { ...t0, ends: officerEndsWith(t0, directorYears) }
     const left = daysLeftFrom(today, t.ends)
     if (left === null || left < -30) continue
     out.push({
@@ -117,7 +120,7 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
       clientId: record.id,
       clientName: name,
       title: `임원 임기 만료 — ${t.role} ${t.name} 중임 등기`,
-      detail: '바뀐 임원은 2주 안에 등기 · 늦으면 과태료(정관 임기 확인)',
+      detail: `바뀐 임원은 2주 안에 등기 · 늦으면 과태료(${directorYears && !/감\s*사/.test(t.role) ? `정관 임기 ${directorYears}년` : '정관 임기 확인'})`,
       serviceKey: null,
       done: false,
       daysLeft: left,

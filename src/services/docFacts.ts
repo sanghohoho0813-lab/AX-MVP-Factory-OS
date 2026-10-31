@@ -22,7 +22,7 @@ import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vat
 import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
-import { officerTerms, officerTermsValue } from './registryTax'
+import { officerTerms, officerTermsValue, readDirectorTermYears } from './registryTax'
 import { creditScoreValue, readCreditScore } from './creditScoreDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
@@ -121,6 +121,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     if (rule) out.push({ key: `${CUSTOM_FACT_PREFIX}정년 · 계속고용`, label: '정년 · 계속고용', group: 'people', value: retireRuleLine(rule), source: 'workRules', asOf: '', ref })
     return out
   }
+  // D-382 정관 → '이사 임기(정관)' 칸 — 달력의 중임 등기 날짜를 정관 임기로 다시 센다(1~3년)
+  const termYears = /^정\s*관|정\s*관\s*$/m.test(text.slice(0, 600)) || /제\s*1\s*조\s*\(?\s*상\s*호/.test(text) ? readDirectorTermYears(text) : null
+  if (termYears) out.push({ key: `${CUSTOM_FACT_PREFIX}이사 임기(정관)`, label: '이사 임기(정관)', group: 'people', value: `${termYears}년`, source: 'articles', asOf: '', ref })
   // D-381 대표 신용점수 조회서 → '대표 신용점수' 칸(정책자금 대표 신용). 조회서의 다른 내용은 남기지 않는다
   const credit = readCreditScore(text)
   if (credit) {

@@ -19,7 +19,7 @@ import { policyEvidence } from './policyEvidence'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
-import { researchLabOf, usableFactValue } from './customerFacts'
+import { customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { buildInsights, employmentRefund, labRefund, pastStartupRefund, policyDocsLine, recommendNextSteps, reliefYears, startupRefund, type Insight, type InsightTone } from './clientInsights'
 import { headcountOf } from '../tools/employment/lib/taxCredit'
 import { pendingFacts } from './customerFacts'
@@ -357,6 +357,8 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
       ctx.record.shareholderRegister.length === 0 ? '주주가 대표님 혼자인가요? 가족 지분이 있나요?' : '',
       // D-306 납세증명서 · 완납증명서를 받아 두었으면 묻지 않는다
       policyEvidence(ctx.record, f, ctx.today).want.length ? '세금 · 4대보험 체납이 있나요? (있으면 자금 · 지원사업이 막혀요)' : '',
+      // D-382 대표 신용점수(조회서 · 칸)를 모를 때만 — 정책자금 1차 심사의 첫 질문
+      !customFactValue(ctx.record, '대표 신용점수') ? '대표님 신용점수가 대략 몇 점인가요? (나이스 · KCB — 정책자금 기관이 갈려요)' : '',
       '앞으로 1년 안에 사람을 뽑을 계획이 있나요?',
     ].filter(Boolean)
     a.steps = qs

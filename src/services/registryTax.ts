@@ -177,11 +177,32 @@ export function officerTermsValue(terms: readonly OfficerTerm[]): string {
     .join(' / ')
 }
 
-/** '임원 임기' 칸 글 → 사람마다 끝나는 날(사람이 고쳐 적은 날짜도 그대로) */
-export function officerTermsOf(value: string): { role: string; name: string; ends: string }[] {
-  const out: { role: string; name: string; ends: string }[] = []
-  for (const m of String(value || '').matchAll(/([가-힣]+)\s+([가-힣]{2,5})\s+\d{4}-\d{2}-\d{2}\s*(?:취임|중임)[^/]*?(\d{4}-\d{2}-\d{2})\s*만료/g)) out.push({ role: m[1], name: m[2], ends: m[3] })
+/** '임원 임기' 칸 글 → 사람마다 시작 · 끝나는 날(사람이 고쳐 적은 날짜도 그대로) */
+export function officerTermsOf(value: string): { role: string; name: string; start: string; ends: string }[] {
+  const out: { role: string; name: string; start: string; ends: string }[] = []
+  for (const m of String(value || '').matchAll(/([가-힣]+)\s+([가-힣]{2,5})\s+(\d{4}-\d{2}-\d{2})\s*(?:취임|중임)[^/]*?(\d{4}-\d{2}-\d{2})\s*만료/g)) out.push({ role: m[1], name: m[2], start: m[3], ends: m[4] })
   return out
+}
+
+/**
+ * D-382 정관의 이사 임기('이사의 임기는 취임 후 3년' · '2년으로 한다') — 1~3년만(상법 상한 3년). 정관 글이 아니거나 여러 숫자면 null.
+ * 감사 임기 조항('감사의 임기는 …')은 이사 임기가 아니다.
+ */
+export function readDirectorTermYears(text: string): number | null {
+  const t = flat(String(text || ''))
+  if (!/정\s*관/.test(t.slice(0, 2000)) && !/제\s*1\s*조/.test(t)) return null
+  const found = new Set<number>()
+  for (const m of t.matchAll(/(?<!감\s*사\s*의\s*)이\s*사\s*의\s*임\s*기\s*는\s*(?:취\s*임\s*후\s*)?(\d)\s*년/g)) {
+    const n = Number(m[1])
+    if (n >= 1 && n <= 3) found.add(n)
+  }
+  return found.size === 1 ? [...found][0] : null
+}
+
+/** 정관 임기로 다시 센 끝나는 날(감사는 그대로 · 이사 임기를 모르면 그대로) */
+export function officerEndsWith(t: { role: string; start: string; ends: string }, directorYears: number | null): string {
+  if (!directorYears || /감\s*사/.test(t.role) || !/^\d{4}-\d{2}-\d{2}$/.test(t.start)) return t.ends
+  return `${Number(t.start.slice(0, 4)) + directorYears}${t.start.slice(4)}`
 }
 
 /**

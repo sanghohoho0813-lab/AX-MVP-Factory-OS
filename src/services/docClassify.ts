@@ -11,6 +11,7 @@
  * 순수 함수. 단위 시험으로 고정한다.
  */
 
+import { readCreditScore } from './creditScoreDoc'
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import type { DocumentKey } from '../types/clientOps'
 import { looksLikeRealEstateRegistry, parseKoreanDate } from './koreanDocParser'
@@ -645,7 +646,10 @@ const LONG_TITLES: [RegExp, string][] = [
 
 function longTitleOf(text: string): string | null {
   const head = (text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 6).join('\n')
-  return LONG_TITLES.find(([re]) => re.test(head))?.[1] ?? null
+  const long = LONG_TITLES.find(([re]) => re.test(head))?.[1] ?? null
+  if (long) return long
+  // D-381 신용점수 조회서 — 제목('…신용정보 조회서' · '나의 신용') 모양이 제각각이라 '신용점수 812점' + 기관 이름으로 알아본다
+  return readCreditScore(text) ? '대표 신용점수 조회' : null
 }
 
 function placeDocumentBase(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {

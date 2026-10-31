@@ -26,6 +26,7 @@ import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 import { creditBandOf, lowestScoreOf } from './creditScoreDoc'
+import { wonOf } from './taxPlan'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
@@ -70,7 +71,7 @@ function freshest(record: ClientOpsRecord, today: string): Record<Kind, { day: s
 
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
 
-export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts, 'totalAssets' | 'totalLiabilities'>, today: string): PolicyEvidence {
+export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts, 'totalAssets' | 'totalLiabilities'> & Partial<Pick<ClientFacts, 'representativeAge' | 'netIncome'>>, today: string): PolicyEvidence {
   const input: PolicyEvidence['input'] = {}
   const notes: string[] = []
   const want: string[] = []
@@ -110,9 +111,12 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   }
   // D-307 가점 — 특허 · 연구소 · 벤처 · 이노비즈 · 메인비즈 · 여성기업 · 사회적기업(기술보증 · 혁신성장 쪽 추천이 달라진다)
   const bonus = policyBonus(record, today)
-  if (bonus.items.length) {
-    input.bonusItems = bonus.items
-    front.push(`가점 ${bonus.items.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
+  // D-383 업체 기록이 말해 주는 가점(정책자금 가점 리스트 — 대표 나이 · 수출 · 청년 고용지원금 · 매출 · 이익 10% 증가)
+  const extra = policyRecordBonus(record, facts)
+  const allBonus = [...bonus.items, ...extra.filter((x) => !bonus.items.includes(x))]
+  if (allBonus.length) {
+    input.bonusItems = allBonus
+    front.push(`가점 ${allBonus.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
   }
   // D-333 매출 추이(부가세 과세표준증명 → 회사 정보 '매출 추이') → 3년 추세 · 올해 추세 — 엔진의 '매출 성장세'
   const trendLine = customFactValue(record, '매출 추이')
@@ -225,7 +229,28 @@ export function policyDocs(record: ClientOpsRecord, today: string): { have: stri
   return { have: [...have], expired: [...new Set(expired.filter((e) => !fresh(e)).map((e) => e.replace(/\s*\(\d+\)$/, '')))] }
 }
 
-const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소' }
+const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소', '만39세 이하 청년기업': '청년기업(대표 만 39세 미만)', '수출 실적': '수출', '고용지원금 참여': '청년 고용지원금 참여', '매출 또는 영업이익 10% 이상 증가': '매출 · 순이익 10% 이상 증가' }
+
+/**
+ * D-383 정책자금 가점 리스트 가운데 업체 기록이 이미 말해 주는 것(인증서가 아닌 것) — 엔진 가점 선택지와 같은 이름.
+ *  - 만 39세 미만 청년 기업: 대표 생년월일로 센 만 나이 < 39(가점 리스트 '만 39세 미만').
+ *  - 수출: 회사 정보 '수출유망중소기업' 칸 · 서류함 '수출실적증명' (받음 · 파일).
+ *  - 청년고용지원금 참여: 고용지원금 회차 일정에 청년일자리도약장려금이 붙어 있으면.
+ *  - 작년 대비 매출액과 당기순이익 10% 이상 상승: 회사 정보 '매출 추이' 의 '…보다 +n%'(n ≥ 10) 그리고 순이익이 전년 순이익(절세 현황)의 1.1배 이상 — 둘 다 알 때만.
+ */
+export function policyRecordBonus(record: ClientOpsRecord, facts: Partial<Pick<ClientFacts, 'representativeAge' | 'netIncome'>>): BonusItem[] {
+  const out: BonusItem[] = []
+  if (typeof facts.representativeAge === 'number' && facts.representativeAge >= 19 && facts.representativeAge < 39) out.push('만39세 이하 청년기업')
+  const exportCert = customFactEntries(record).some(([k]) => /수출\s*유망/.test(k))
+  const exportDoc = allDocumentMetas(record).some((m) => /수출\s*실적/.test(m.label) && !!(record.documents?.[m.key]?.received || record.documents?.[m.key]?.fileName))
+  if (exportCert || exportDoc) out.push('수출 실적')
+  if (record.toolResults.some((r) => r.toolKey === 'employment' && (r.data as { tab?: unknown; programId?: unknown } | null)?.tab === 'schedule' && (r.data as { programId?: unknown }).programId === 'youth_jump')) out.push('고용지원금 참여')
+  const up = /보다\s*\+(\d+)%/.exec(customFactValue(record, '매출 추이'))
+  const prev = wonOf(record.taxProfile?.vInc1)
+  const cur = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : 0
+  if (up && Number(up[1]) >= 10 && prev > 0 && cur >= prev * 1.1) out.push('매출 또는 영업이익 10% 이상 증가')
+  return out
+}
 
 /** 이름 · 칸에서 찾을 가점 — 회사 정보 글(보유 인증 · 특허 · 연구소)과 올린 인증서(cf:이름) */
 const BONUS_RULES: { item: BonusItem; text: RegExp; cert: RegExp }[] = [

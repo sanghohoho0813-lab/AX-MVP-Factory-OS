@@ -40,7 +40,7 @@ import {
   withProfileFieldEdit,
 } from '../customerFacts'
 import { clientFacts, ventureConfirmedAt, ventureValidOn } from '../../tools/shared/clientPrefill'
-import { policyBonus, policyDocs, policyEvidence, policyHiring } from '../policyEvidence'
+import { policyBonus, policyDocs, policyEvidence, policyHiring, policyRecordBonus } from '../policyEvidence'
 import { continuingOf, looksLikeWorkRules, readRetireRule, retireRuleLine } from '../workRules'
 import { ceoWageReceipt, looksLikePayrollLedger, looksLikeWageReceipt, monthlyPayOf, readLedgerCeoPay, readWageReceipts } from '../wageReceipt'
 import { credentialsOf } from '../grants/grantProfile'
@@ -53,7 +53,7 @@ import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { readIncomeCert } from '../incomeDoc'
 import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
 import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
-import { officerTerms, officerTermsOf, officerTermsValue, readRegistryTax } from '../registryTax'
+import { officerTerms, officerTermsOf, officerTermsValue, readDirectorTermYears, readRegistryTax } from '../registryTax'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
@@ -1976,7 +1976,7 @@ await (async () => {
   const terms = officerTerms(REG)
   check('D-380 임원 임기: 마지막 중임부터 3년 · 대표이사 · 사내이사 같은 사람은 대표이사 하나 · 사임한 사람은 빠짐 · 끝나는 날 순서', JSON.stringify(terms.map((t) => `${t.role}:${t.name}:${t.start}:${t.ends}`)) === '["대표이사:박지훈:2023-03-02:2026-03-02","감사:최감사:2024-03-25:2027-03-25"]', JSON.stringify(terms))
   const val = officerTermsValue(terms)
-  check('D-380 회사 정보 글 → 다시 읽기(사람마다 끝나는 날)', val === '대표이사 박지훈 2023-03-02 중임 · 3년이면 2026-03-02 만료 / 감사 최감사 2024-03-25 취임 · 3년이면 2027-03-25 만료' && JSON.stringify(officerTermsOf(val)) === '[{"role":"대표이사","name":"박지훈","ends":"2026-03-02"},{"role":"감사","name":"최감사","ends":"2027-03-25"}]', val)
+  check('D-380 회사 정보 글 → 다시 읽기(사람마다 끝나는 날)', val === '대표이사 박지훈 2023-03-02 중임 · 3년이면 2026-03-02 만료 / 감사 최감사 2024-03-25 취임 · 3년이면 2027-03-25 만료' && JSON.stringify(officerTermsOf(val)) === '[{"role":"대표이사","name":"박지훈","start":"2023-03-02","ends":"2026-03-02"},{"role":"감사","name":"최감사","start":"2024-03-25","ends":"2027-03-25"}]', val)
   const cand = factCandidatesFromDocText('corporateRegistry', REG, 'r').find((c) => c.key === 'cf:임원 임기')
   check('D-380 등기부 올리기 → "임원 임기" 칸 후보(사람 묶음)', cand?.value === val && cand.group === 'people', JSON.stringify(cand))
   const rec = normalizeClientOps({ id: 'of380', companyName: '주식회사 가나테크', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'ot', group: 'people', label: '임원 임기', value: val }] } as never)
@@ -1997,7 +1997,7 @@ await (async () => {
   check('D-381 신용점수 낱말이 없는 서류 · 기업신용등급(크레탑)은 조회서 아님', !looksLikeCreditReport('사업자등록증 NICE 상호') && readCreditScore('CRETOP 기업종합보고서 기업신용등급 BB+') === null)
   const base = normalizeClientOps({ id: 'cs381', companyName: '대전정밀(주)', businessNumber: '124-81-00998', establishedAt: '2019-03-02', businessCategory: '제조업', businessItem: '전자부품', businessAddress: '대전광역시 유성구 대학로 99', employeeCount: '8', createdAt: NOW, updatedAt: NOW } as never)
   const pl = placeDocument({ text: NICE, fileName: 'scan_381.pdf' }, allDocumentMetas(base))
-  check('D-381 서류함: "대표 신용점수 조회" 칸 · 유효 1개월', pl.kind === 'new' && pl.label === '대표 신용점수 조회' && knownDocValidMonths('대표 신용점수 조회') === 1, JSON.stringify(pl))
+  check('D-381 서류함: "대표 신용점수 조회" 칸 · 확실(바로 넣기) · 유효 1개월', pl.kind === 'new' && pl.label === '대표 신용점수 조회' && pl.sure && knownDocValidMonths('대표 신용점수 조회') === 1, JSON.stringify(pl))
   let n = 0
   const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_cs', fileName: 'nice.pdf', text: NICE, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `cs${++n}` })
   check('D-381 올리기 한 번 → "대표 신용점수" NICE 812점 바로(묻지 않음)', customFactValue(a.record, '대표 신용점수') === 'NICE 812점' && a.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '대표 신용점수'), a.summary.flagged]))
@@ -2012,6 +2012,47 @@ await (async () => {
   check('D-381 사람이 "580" 만 적어도 → 600점 미만 · 일반 기관은 어려워요(뒤 줄)', evLow.input.creditBand === '600점 미만' && evLow.notes.some((x) => /580 — 일반 기관은 어려워요/.test(x)), JSON.stringify(evLow.notes))
   check('D-381 점수를 모르면 체납 확인 목록에 끼지 않음(예전 그대로)', !policyEvidence(base, clientFacts(base, new Date('2026-10-31T00:00:00')), '2026-10-31').want.some((w) => /신용/.test(w)))
 })()
+
+// D-382 정관 이사 임기 → 중임 등기 날짜 다시 세기 · 옛 명부 안내
+{
+  const ART = ['정 관', '제1조(상호) 이 회사는 주식회사 가나테크라 한다.', '제30조(이사의 임기) 이사의 임기는 취임 후 2년으로 한다.', '제35조(감사의 임기) 감사의 임기는 취임 후 3년 내의 최종의 결산기에 관한 정기주주총회 종결시까지로 한다.'].join('\n')
+  check('D-382 정관: 이사 임기 2년 · 감사 조항은 이사 임기가 아님 · 정관이 아니면 안 읽음', readDirectorTermYears(ART) === 2 && readDirectorTermYears('이사의 임기는 2년') === null && readDirectorTermYears(['정 관', '이사의 임기는 2년', '이사의 임기는 3년'].join('\n')) === null)
+  const cand = factCandidatesFromDocText('customdoc_art', ART, 'r').find((c) => c.key === 'cf:이사 임기(정관)')
+  check('D-382 정관 올리기 → "이사 임기(정관)" 2년 칸 후보(출처 정관)', cand?.value === '2년' && cand.source === 'articles', JSON.stringify(cand))
+  const val = '대표이사 박지훈 2024-03-02 중임 · 3년이면 2027-03-02 만료 / 감사 최감사 2024-03-25 취임 · 3년이면 2027-03-25 만료'
+  const rec = normalizeClientOps({ id: 'of382', companyName: '주식회사 가나테크', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'ot', group: 'people', label: '임원 임기', value: val }, { id: 'it', group: 'people', label: '이사 임기(정관)', value: '2년' }] } as never)
+  const ev = buildClientSchedule(rec, '2026-02-20').filter((e) => e.id.includes(':officer:'))
+  check('D-382 정관 2년 → 대표이사 중임 등기 2026-03-02(이사만 · 감사는 그대로 2027-03-25) · 설명에 정관 임기 2년', ev.length === 2 && ev[0].date === '2026-03-02' && /정관 임기 2년/.test(ev[0].detail) && ev[1].date === '2027-03-25' && /정관 임기 확인/.test(ev[1].detail), JSON.stringify(ev.map((e) => [e.date, e.detail])))
+  const base = normalizeClientOps({ id: 'er382', companyName: '대전정밀(주)', businessNumber: '124-81-00998', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'rl', group: 'identity', label: '받은 공제 · 감면 2025년', value: '법인세 신고서에 공제 · 감면 없음' }] } as never)
+  const f = clientFacts(base, new Date('2026-10-31T00:00:00'))
+  const ry = reliefYears(base, f, '2026-10-31')
+  check('D-382 옛 명부(그해 인원 기록 없음)면 "명부를 다시 올리면 그해 금액까지" · 명부가 없으면 그 말 없음', /명부를 다시 올리면 그해 금액까지/.test(employmentRefund(base, f, ry, null, true).line) && !/명부를 다시/.test(employmentRefund(base, f, ry, null).line))
+}
+
+// D-382 상담 '물어볼 것' 대표 신용점수 · D-383 업체 기록이 말해 주는 정책자금 가점
+{
+  const T = '2026-10-31'
+  const base = normalizeClientOps({ id: 'pb383', companyName: '청년정밀(주)', businessNumber: '124-81-00998', establishedAt: '2022-03-02', representativeBirth: '1992-06-01', businessCategory: '제조업', businessItem: '전자부품', businessAddress: '대전광역시 유성구 대학로 99', employeeCount: '6', createdAt: NOW, updatedAt: NOW } as never)
+  const ask = answerFor('ask', { record: base, today: T, notices: [] })
+  check('D-382 상담 물어볼 것: 신용점수를 모르면 "대표님 신용점수가 대략 몇 점인가요?"', ask.steps.some((x) => /대표님 신용점수가 대략 몇 점/.test(x)), JSON.stringify(ask.steps))
+  const knows = normalizeClientOps({ ...base, customFields: [{ id: 'cs', group: 'people', label: '대표 신용점수', value: 'NICE 812점' }] } as never)
+  check('D-382 신용점수를 알면 묻지 않음', !answerFor('ask', { record: knows, today: T, notices: [] }).steps.some((x) => /신용점수/.test(x)))
+  const f = clientFacts(base, new Date(`${T}T00:00:00`))
+  check('D-383 대표 만 34세 → "만39세 이하 청년기업" 가점(만 39세 미만)', policyRecordBonus(base, f).includes('만39세 이하 청년기업') && !policyRecordBonus(normalizeClientOps({ ...base, representativeBirth: '1987-01-01' } as never), clientFacts(normalizeClientOps({ ...base, representativeBirth: '1987-01-01' } as never), new Date(`${T}T00:00:00`))).includes('만39세 이하 청년기업'))
+  const grown = normalizeClientOps({ ...base, netIncome: '', factValues: { netIncome: '66000000' }, factMeta: { netIncome: { source: 'financialStatements', status: 'entered', asOf: '2025', updatedAt: NOW } }, taxProfile: { vInc1: '50000000' }, customFields: [{ id: 'tr', group: 'identity', label: '매출 추이', value: '2025년 12억(부가세 과세표준 · 2024년보다 +15%)' }] } as never)
+  const fg = clientFacts(grown, new Date(`${T}T00:00:00`))
+  check('D-383 매출 +15% · 순이익 5천만 → 6,600만(+32%) → "매출 또는 영업이익 10% 이상 증가"', policyRecordBonus(grown, fg).includes('매출 또는 영업이익 10% 이상 증가'), JSON.stringify({ b: policyRecordBonus(grown, fg), ni: fg.netIncome }))
+  const flatNi = normalizeClientOps({ ...grown, taxProfile: { vInc1: '65000000' } } as never)
+  check('D-383 순이익이 10% 안 늘었으면 그 가점 없음(매출만 늘어도)', !policyRecordBonus(flatNi, clientFacts(flatNi, new Date(`${T}T00:00:00`))).includes('매출 또는 영업이익 10% 이상 증가'))
+  const yj = normalizeClientOps({ ...base, toolResults: [{ id: 'sch', toolKey: 'employment', title: '고용지원금 · 회차 일정 · 김청년', verdict: null, verdictLabel: '', summary: '', data: { tab: 'schedule', programId: 'youth_jump' }, deadlines: [], createdAt: NOW, publishedUpdateId: null }] } as never)
+  check('D-383 청년일자리도약 회차 일정이 붙어 있으면 "고용지원금 참여"', policyRecordBonus(yj, f).includes('고용지원금 참여') && !policyRecordBonus(base, f).includes('고용지원금 참여'))
+  let ex = withCustomDocument(base, { label: '수출실적증명' })
+  ex = withDocument(ex, ex.customDocuments[ex.customDocuments.length - 1].key, { received: true, issuedAt: '2026-10-01', fileName: '수출.pdf' })
+  check('D-383 서류함 수출실적증명 → "수출 실적"', policyRecordBonus(ex, f).includes('수출 실적') && !policyRecordBonus(base, f).includes('수출 실적'))
+  const ev = policyEvidence(yj, f, T)
+  check('D-383 정책자금 근거: 가점 줄에 청년기업 · 청년 고용지원금 참여 · 엔진 가점 선택지에 들어감', ev.input.bonusItems?.includes('만39세 이하 청년기업') && ev.input.bonusItems.includes('고용지원금 참여') && ev.notes.some((x) => /가점 .*청년기업\(대표 만 39세 미만\).*청년 고용지원금 참여/.test(x)), JSON.stringify(ev.notes))
+  check('D-383 진단서 "보유" 칸은 인증서만(청년기업은 보유가 아님)', !policyBonus(yj, T).items.includes('만39세 이하 청년기업' as never))
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
