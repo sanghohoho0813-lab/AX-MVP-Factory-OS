@@ -16,6 +16,7 @@ import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, formatWon, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
+import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
@@ -59,6 +60,20 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'financialStatements', asOf: f.year ?? '', ref })
     }
     return out
+  }
+  // D-373 소득금액증명(개인사업자 · 종합소득세) → 가장 최근 해 수입금액(매출) · 사업소득금액(순이익) · 매출 추이. 검산이 안 맞으면 확인으로
+  if (looksLikeIncomeCert(text)) {
+    const inc = readIncomeCert(text)
+    const last = inc?.years[inc.years.length - 1]
+    if (inc && last) {
+      const note = inc.sure ? {} : { note: last.rows > 1 ? '같은 해에 사업 줄이 여럿이라 더했어요 — 이 업체 사업장 것만인지 확인' : '수입금액 · 소득금액 검산이 맞지 않아요 — 서류를 보고 확인' }
+      const asOf = String(last.year)
+      out.push({ key: 'revenue', value: String(last.revenue), source: 'incomeCertificate', asOf, ref, ...note })
+      out.push({ key: 'netIncome', value: String(last.income), source: 'incomeCertificate', asOf, ref, ...note })
+      const trend = incomeTrendLine(inc, formatWon)
+      if (trend && inc.sure) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'incomeCertificate', asOf, ref })
+    }
+    if (inc) return out
   }
   // D-311 부가세 과세표준증명 · 면세 수입금액증명 → 가장 최근 '다 찬 해'(1~12월 · 겹침 없음) 매출
   if (looksLikeVatCert(text)) {

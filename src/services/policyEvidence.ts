@@ -23,6 +23,7 @@ import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
 import { vatTrendOf } from './vatDoc'
+import { bizNoKind } from './koreanDocParser'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 
@@ -199,6 +200,8 @@ export function policyDocs(record: ClientOpsRecord, today: string): { have: stri
     if (!st || !(st.received || st.fileName)) continue
     const label = m.label.replace(/\s+/g, '')
     const hits = POLICY_DOC_RULES.filter(([, ok]) => ok(m.key, label)).map(([k]) => k)
+    // D-373 개인사업자는 재무제표 대신 소득금액증명(종합소득세) — 법인 대표 개인 소득금액증명은 재무제표가 아니다
+    if (/소득금액증명|종합소득세.*신고/.test(label) && bizNoKind(record.businessNumber) === 'individual' && !hits.includes('financial')) hits.push('financial')
     if (!hits.length) continue
     if (documentStatus(m.key, { ...st, received: true }, today, m).expired) {
       expired.push(m.label)

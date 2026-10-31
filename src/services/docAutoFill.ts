@@ -15,7 +15,7 @@
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
-import { pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, customFactValue, pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
@@ -110,6 +110,27 @@ function vatYields(record: ClientOpsRecord, year: string): boolean {
   return !y || Number(y) >= Number(year)
 }
 
+/**
+ * D-373 소득금액증명 매출 · 순이익도 같은 규칙 — 다른 출처(재무제표 · 크레탑 · 부가세 · 직접)의 같은 해 이상 값이 있으면 묻지 않는다.
+ * 매출 추이: 소득금액증명 줄은 이미 있는 줄에 밀리고, 부가세 줄은 소득금액증명 줄에 밀린다(둘 다 올려도 질문이 생기지 않게).
+ */
+function docYields(record: ClientOpsRecord, c: { key: string; source: string; asOf: string }): boolean {
+  if (c.key === 'revenue' && c.source === 'vatCertificate') return vatYields(record, c.asOf)
+  if (c.source !== 'incomeCertificate' && !(c.source === 'vatCertificate' && c.key === `${CUSTOM_FACT_PREFIX}매출 추이`)) return false
+  if (c.key === 'revenue' || c.key === 'netIncome') {
+    const f = readFact(record, c.key)
+    if (!f || f.status === 'missing' || f.source === c.source) return false
+    const y = /^(\d{4})/.exec(f.asOf)?.[1]
+    return !y || Number(y) >= Number(c.asOf)
+  }
+  if (c.key === `${CUSTOM_FACT_PREFIX}매출 추이`) {
+    if (!customFactValue(record, '매출 추이')) return false
+    const from = record.factMeta?.[c.key]?.source
+    return c.source === 'incomeCertificate' ? from !== 'incomeCertificate' : from === 'incomeCertificate'
+  }
+  return false
+}
+
 /** 올린 서류들 → 바로 넣기 · 확인 필요 */
 export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string): AutoFillOutcome {
   let rec = record
@@ -129,7 +150,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
-    }).filter((c) => !(c.key === 'revenue' && c.source === 'vatCertificate' && vatYields(rec, c.asOf)))
+    }).filter((c) => !docYields(rec, c))
     if (found.length === 0) return
     rec = withFactCandidates(rec, found, now, makeId)
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')

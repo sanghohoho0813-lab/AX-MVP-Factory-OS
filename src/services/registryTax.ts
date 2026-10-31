@@ -100,6 +100,8 @@ function tenureStart(events: OfficerEvent[]): { start: string | null; sure: bool
     .filter((e) => e.date >= from && e.act !== 'out')
     .slice(0, 4)
     .map((e) => `${e.date} ${e.act === 'renew' ? '중임' : '취임'}`)
+    // D-373 사내이사 · 대표이사 줄이 같은 날 '취임' 을 두 번 말하면 한 번만
+    .filter((x, i, a) => a.indexOf(x) === i)
     .join(' · ')
   if (start.act === 'renew') return { start: from, sure: false, note: `중임 날짜(${from})만 있어 처음 취임일을 몰라요 — 말소사항 포함 등기부로 확인` }
   return { start: from, sure: true, note: trail }

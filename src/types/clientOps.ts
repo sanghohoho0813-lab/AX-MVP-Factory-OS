@@ -712,6 +712,7 @@ export type FactSource =
   | 'certificate' // 인증서 · 확인서 · 인정서 (D-129)
   | 'vatCertificate' // 부가세 과세표준증명 · 면세 수입금액증명 (D-311)
   | 'workRules' // 취업규칙 — 정년 · 계속고용 (D-339)
+  | 'incomeCertificate' // 소득금액증명(종합소득세 신고자용) — 개인사업자 수입금액 · 사업소득금액 (D-373)
 
 export interface FactMeta {
   source: FactSource

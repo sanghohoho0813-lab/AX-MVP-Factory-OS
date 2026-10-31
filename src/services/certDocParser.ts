@@ -73,7 +73,8 @@ export function parseCertificateDocument(raw: string): ParsedCertificate | null 
 
   // 번호 — '인정번호 : 2024123456' · '확인번호 제 20240101-01 호' · '특허 제 10-1234567 호' · '인증번호 KR-QMS-123'
   let number = ''
-  const labeled = /(?:인정|확인|인증|등록|지정|관리)\s*번\s*호\s*[:：]?\s*(?:제\s*)?([A-Za-z0-9][A-Za-z0-9_/.-]{2,30})/.exec(text)
+  // D-373 '사업자등록번호 · 법인등록번호' 는 인증서 번호가 아니다(중소기업 확인서의 확인번호 칸에 사업자번호가 들어갔다)
+  const labeled = /(?<!사[ \t]*업[ \t]*자[ \t]*|법[ \t]*인[ \t]*|주[ \t]*민[ \t]*|\([ \t]*법[ \t]*인[ \t]*\)[ \t]*)(?:인정|확인|인증|등록|지정|관리)\s*번\s*호\s*[:：]?\s*(?:제\s*)?([A-Za-z0-9][A-Za-z0-9_/.-]{2,30})/.exec(text)
   if (labeled) number = labeled[1]
   if (!number) {
     const je = /제\s*([0-9][0-9-]{3,20})\s*호/.exec(text)

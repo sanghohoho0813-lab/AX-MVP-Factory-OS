@@ -171,6 +171,13 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /과세\s*표준|부가세|부가가치세/,
   },
   {
+    // D-373 개인사업자 소득금액증명(종합소득세) — 수입금액 · 사업소득금액을 읽는다(services/incomeDoc.ts). 기관들은 보통 발급 1개월 안을 받는다
+    label: '소득금액증명',
+    validMonths: 1,
+    signals: [{ re: /소\s*득\s*금\s*액\s*증\s*명/, weight: 4, say: "제목 '소득금액증명'" }],
+    nameHint: /소득\s*금액/,
+  },
+  {
     label: '면세사업자 수입금액증명',
     validMonths: 1,
     signals: [{ re: /면세\s*사업자\s*수입\s*금액\s*증명|수입\s*금액\s*증명/, weight: 3, say: "제목 '수입금액증명'" }],

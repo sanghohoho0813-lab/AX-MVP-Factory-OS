@@ -12,7 +12,7 @@ import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog,
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
-import { NOTE_RECHECK, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
+import { NOTE_RECHECK, customFactValue, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
 import { fitContext } from '../scenarioFit'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
@@ -50,6 +50,8 @@ import { requestFollowUpText } from '../recoRequest'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
+import { readIncomeCert } from '../incomeDoc'
+import { readRegistryTax } from '../registryTax'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
@@ -1826,6 +1828,45 @@ await (async () => {
   r = withDocument(r, r.customDocuments[r.customDocuments.length - 1].key, { received: true, issuedAt: '2026-10-01', fileName: '금융.pdf' })
   const pd = policyDocs(r, '2026-10-31')
   check('D-371 정책자금 준비 서류: 건물 등기부 → 사업장 건물 등기 확보 · 법인 등기부는 아님 · 이노비즈 → 보유 인증서 · 금융거래확인서 → 대출 내역', pd.have.includes('ownDeed') && !pd.have.includes('corpRegistry') && pd.have.includes('bizCert') && pd.have.includes('loanStatus'), JSON.stringify(pd))
+})()
+
+// D-373 개인사업자 소득금액증명 → 매출 · 순이익 · 매출 추이 · 정책자금 재무 서류 / 인증서 번호에 사업자번호 안 들어감 / 취임 한 번만
+await (async () => {
+  const INC = ['소득금액 증명', '(종합소득세 신고자용)', '성명 홍길동 주민등록번호 800101-1******', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 240,000,000 180,000,000 60,000,000', '2024 214-05-01239 미래상사 사업소득 200,000,000 160,000,000 40,000,000', '위와 같이 소득금액을 증명합니다.', '2026년 10월 20일', '강남세무서장'].join('\n')
+  const ir = readIncomeCert(INC)
+  check('D-373 소득금액증명 표(수입 · 경비 · 소득) → 해마다 · 검산 맞음 · 사업자번호 · 주민번호는 금액 아님', JSON.stringify(ir) === '{"years":[{"year":2024,"revenue":200000000,"income":40000000,"rows":1},{"year":2025,"revenue":240000000,"income":60000000,"rows":1}],"sure":true}', JSON.stringify(ir))
+  const ir2 = readIncomeCert(['소득금액증명원', '(단위 : 천원)', '귀속연도 2025', '사업소득 240,000 60,000'].join('\n'))
+  check('D-373 귀속연도가 위 줄 · 금액 둘(수입 · 소득) · 단위 천원', ir2?.years[0]?.year === 2025 && ir2.years[0].revenue === 240_000_000 && ir2.years[0].income === 60_000_000 && ir2.sure, JSON.stringify(ir2))
+  check('D-373 근로소득 줄만 있으면(법인 대표 개인 증명) 읽지 않음', readIncomeCert(['소득금액증명', '2025 근로소득 주식회사미래 84,000,000 70,000,000'].join('\n')) === null)
+  const bad = readIncomeCert(['소득금액증명', '2025 사업소득 240,000,000 180,000,000 70,000,000'].join('\n'))
+  check('D-373 검산이 안 맞으면 확실하지 않음', bad?.sure === false, JSON.stringify(bad))
+  const base = normalizeClientOps({ id: 'ic373', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  const pl = placeDocument({ text: INC, fileName: 'scan_07.pdf' }, allDocumentMetas(base))
+  check('D-373 서류함: "소득금액증명" 칸 · 유효 1개월 · 발급일 2026-10-20', pl.kind === 'new' && pl.label === '소득금액증명' && pl.issuedAt === '2026-10-20' && knownDocValidMonths('소득금액증명') === 1, JSON.stringify(pl))
+  const VAT = ['부가가치세 과세표준증명', '과세기간 신고구분 신고일 과세표준', '2024.01.01~2024.06.30 확정 2024.07.25 95,000,000', '2024.07.01~2024.12.31 확정 2025.01.24 100,000,000', '2025.01.01~2025.06.30 확정 2025.07.25 115,000,000', '2025.07.01~2025.12.31 확정 2026.01.25 120,000,000'].join('\n')
+  const doc = (key: string, text: string) => ({ key, fileName: `${key}.pdf`, text, method: 'pdf_text' as const, docSure: true })
+  let n = 0
+  const ctx = { now: NOW, today: '2026-10-31', makeId: () => `ic${++n}` }
+  const a = await analyzeUploadedDocs(base, [doc('customdoc_inc', INC)], ctx)
+  check('D-373 소득금액증명만: 매출 2.4억 · 순이익 6천만 · 매출 추이(2024년보다 +20%) 바로 · 묻지 않음', readFact(a.record, 'revenue')?.value === '240000000' && readFact(a.record, 'netIncome')?.value === '60000000' && customFactValue(a.record, '매출 추이').includes('2024년보다 +20%') && a.summary.flagged.length === 0, JSON.stringify([a.summary.entered, a.summary.flagged]))
+  const b = await analyzeUploadedDocs(base, [doc('customdoc_vat', VAT), doc('customdoc_inc', INC)], ctx)
+  check('D-373 부가세 + 소득금액증명 함께: 매출은 먼저 읽은 부가세 · 순이익은 소득금액 · 질문 0', readFact(b.record, 'revenue')?.value === '235000000' && readFact(b.record, 'netIncome')?.value === '60000000' && b.summary.flagged.length === 0, JSON.stringify(b.summary.flagged))
+  const c = await analyzeUploadedDocs(base, [doc('customdoc_inc', INC), doc('customdoc_vat', VAT)], ctx)
+  check('D-373 순서를 바꿔도 질문 0(부가세 매출 · 매출 추이가 소득금액증명 값에 밀림)', readFact(c.record, 'revenue')?.value === '240000000' && c.summary.flagged.length === 0, JSON.stringify(c.summary.flagged))
+  const d = await analyzeUploadedDocs(base, [doc('customdoc_bad', ['소득금액증명', '2025 사업소득 240,000,000 180,000,000 70,000,000'].join('\n'))], ctx)
+  check('D-373 검산이 안 맞으면 바로 넣지 않고 확인할 것으로(까닭)', !readFact(d.record, 'revenue')?.value && d.summary.flagged.some((f) => f.key === 'revenue' && /검산/.test(f.note)), JSON.stringify(d.summary.flagged))
+  const slot = (r: ReturnType<typeof normalizeClientOps>) => {
+    let x = withCustomDocument(r, { label: '소득금액증명', validMonths: 1 })
+    x = withDocument(x, x.customDocuments[x.customDocuments.length - 1].key, { received: true, issuedAt: '2026-10-20', fileName: '소득.pdf' })
+    return x
+  }
+  const ind = slot(normalizeClientOps({ id: 'ic373i', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOW, updatedAt: NOW }))
+  const corp = slot(normalizeClientOps({ id: 'ic373c', companyName: '(주)미래', businessNumber: '124-81-00998', createdAt: NOW, updatedAt: NOW }))
+  check('D-373 정책자금 준비 서류: 개인사업자 소득금액증명 → 재무 서류 확보 · 법인은 아님(대표 개인 증명)', policyDocs(ind, '2026-10-31').have.includes('financial') && !policyDocs(corp, '2026-10-31').have.includes('financial'))
+  const sme = parseCertificateDocument(['중소기업 확인서', '기업명 주식회사 미래바이오랩', '사업자등록번호 124-81-00998', '기업규모 소기업', '유효기간 2026.04.01 ~ 2027.03.31', '중소벤처기업부'].join('\n'))
+  check('D-373 중소기업 확인서 확인번호 칸에 사업자등록번호가 들어가지 않음', sme?.number === '' && sme.size === '소기업', JSON.stringify(sme))
+  const reg = readRegistryTax(['등기사항전부증명서(말소사항 포함)', '1주의 금액 금 5,000 원', '임원에 관한 사항', '사내이사 이대표 750101-******* 2021 년 03 월 02 일 취임', '대표이사 이대표 750101-******* 경기도 파주시 2021 년 03 월 02 일 취임', '회사성립연월일 2021 년 03 월 02 일'].join('\n'), '이대표')
+  check('D-373 대표 취임일 설명 — 같은 날 취임을 두 번 쓰지 않음', reg?.ceoStart === '2021-03-02' && reg.ceoStartNote === '2021-03-02 취임', JSON.stringify(reg))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
