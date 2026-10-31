@@ -18,6 +18,8 @@ import { factCandidatesFromDocText } from './docFacts'
 import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
 import { fullYearFromReturns, readVatReturn, type VatReturnRead } from './vatReturnDoc'
+import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
+import { withCustomField } from './clientOpsService'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -201,6 +203,16 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     }
     for (const p of mine) if (!auto.includes(p)) flagged.push({ ...label(p), note: p.note ?? NOTE_CONFLICT })
   })
+  // D-403 원천세 신고서 여러 달(이번에 · 예전에) → '원천세 인원 추이' 칸(달이 둘 이상일 때) — 작년 같은 달과 비교해 고용 증가를 본다
+  const whReads = docs.map((d) => readWithholdingReport(d.text)).filter((r): r is NonNullable<typeof r> => !!r && !!r.yearMonth && !r.until)
+  if (whReads.length) {
+    const cur = rec.customFields.find((f) => f.label === '원천세 인원 추이')
+    // 올리기 전 '원천세 신고 인원' 칸의 달(예: '2025년 9월분 근로자 9명')도 씨앗으로 — 이번 서류가 그 칸을 새 달로 바꿨어도 지난 달이 남게
+    const seed = /(20\d{2})년 (\d{1,2})월분 근로자 (\d{1,4})명/.exec(customFactValue(record, '원천세 신고 인원'))
+    const seedRead = seed ? [{ yearMonth: `${seed[1]}-${seed[2].padStart(2, '0')}`, employees: Number(seed[3]) }] : []
+    const merged = mergeHeadcountTrend(cur?.value ?? '', [...seedRead, ...whReads.map((r) => ({ yearMonth: r.yearMonth, employees: r.employees }))])
+    if (merged && merged !== cur?.value) rec = withCustomField(rec, { id: cur?.id, group: cur?.group ?? 'people', label: '원천세 인원 추이', value: merged })
+  }
   // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다
   const returns = docs.map((d) => ({ d, r: readVatReturn(d.text) })).filter((x): x is { d: ReadDoc; r: VatReturnRead } => !!x.r)
   const full = returns.length >= 2 ? fullYearFromReturns(returns.map((x) => x.r)) : null

@@ -8,7 +8,7 @@
  * 실행: npm run test:facts
  */
 
-import { readWithholdingReport, withholdingValue } from '../withholdingReport'
+import { mergeHeadcountTrend, readWithholdingReport, withholdingValue, yearOverYear } from '../withholdingReport'
 import { fullYearFromReturns, readVatReturn, vatReturnValue } from '../vatReturnDoc'
 import { readSiteReport } from '../siteReportDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
@@ -2310,6 +2310,22 @@ await (async () => {
   const line = (asOf: string) => buildInsights(mk(asOf), '2026-10-31', []).find((i) => i.key === 'employment')?.detail ?? ''
   check('D-402 2026년 3월분(7달 전) → "반년 넘었어요, 최근 달 신고서로 다시" · 9월분은 없음', line('2026-03').includes('반년 넘었어요') && !line('2026-09').includes('반년 넘었어요') && line('2026-09').includes('원천세 신고서 2026년 9월분'), `${line('2026-03')} | ${line('2026-09')}`)
 }
+
+// D-403 원천세 신고서 여러 달 → '원천세 인원 추이' 칸 · 작년 같은 달과 비교
+await (async () => {
+  const wh = (ym: string, n: number) => ['원천징수이행상황신고서', `② 귀속연월 ${ym.slice(0, 4)}년 ${Number(ym.slice(5))}월 ③ 지급연월 ${ym.slice(0, 4)}년 ${Number(ym.slice(5))}월`, `근로소득 간이세액 A01 ${n} ${(n * 3_000_000).toLocaleString('en-US')} 100,000`].join('\n')
+  check('D-403 추이 합치기 — 같은 달은 새것 · 달 순서 · 한 달만이면 없음', mergeHeadcountTrend('2025-09 9명', [{ yearMonth: '2026-09', employees: 12 }, { yearMonth: '2025-09', employees: 10 }]) === '2025-09 10명 · 2026-09 12명' && mergeHeadcountTrend('', [{ yearMonth: '2026-09', employees: 12 }]) === '')
+  check('D-403 작년 같은 달 찾기 — 2025-09 → 2026-09 · 없으면 null', JSON.stringify(yearOverYear('2025-09 9명 · 2026-08 11명 · 2026-09 12명')) === '{"now":{"ym":"2026-09","n":12},"before":{"ym":"2025-09","n":9}}' && yearOverYear('2026-08 11명 · 2026-09 12명') === null)
+  const base = normalizeClientOps({ id: 'wh403', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_w1', fileName: 'wh2509.pdf', text: wh('2025-09', 9), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `w3${++n}` })
+  check('D-403 한 달만 올리면 추이 칸은 아직 없음', !customFactValue(a.record, '원천세 인원 추이'))
+  const b = await analyzeUploadedDocs(a.record, [{ key: 'customdoc_w2', fileName: 'wh2609.pdf', text: wh('2026-09', 12), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `w3${++n}` })
+  const emp = buildInsights(b.record, '2026-10-31', []).find((i) => i.key === 'employment')
+  check('D-403 다음에 올해 9월분을 올리면 추이 "2025-09 9명 · 2026-09 12명" · 카드 "9명 → 12명(+3) — 늘었어요" · 묻지 않음', customFactValue(b.record, '원천세 인원 추이') === '2025-09 9명 · 2026-09 12명' && !!emp && emp.detail.includes('2025-09 9명 → 2026-09 12명(+3) — 늘었어요') && b.summary.flagged.length === 0, JSON.stringify([customFactValue(b.record, '원천세 인원 추이'), emp?.detail, b.summary.flagged]))
+  const c = await analyzeUploadedDocs(base, [{ key: 'customdoc_w1', fileName: 'a.pdf', text: wh('2026-08', 11), method: 'pdf_text' as const, docSure: true }, { key: 'customdoc_w2', fileName: 'b.pdf', text: wh('2026-09', 12), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `w3${++n}` })
+  check('D-403 두 달을 한 번에 올려도 추이 · 직원 수는 최근 달(12)', customFactValue(c.record, '원천세 인원 추이') === '2026-08 11명 · 2026-09 12명' && c.record.employeeCount === '12', JSON.stringify([customFactValue(c.record, '원천세 인원 추이'), c.record.employeeCount, c.summary.flagged]))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

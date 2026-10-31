@@ -13,6 +13,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
+import { yearOverYear } from './withholdingReport'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
@@ -417,7 +418,10 @@ const employmentInsight: Provider = ({ record, facts, today }) => {
     // D-402 반년 넘게 지난 달 신고서면 지금 인원과 다를 수 있다 — 최근 달 것을 다시 받도록
     const whAsOf = record.factMeta?.['cf:원천세 신고 인원']?.asOf ?? ''
     const whOld = /^\d{4}-\d{2}$/.test(whAsOf) && (Number(today.slice(0, 4)) - Number(whAsOf.slice(0, 4))) * 12 + Number(today.slice(5, 7)) - Number(whAsOf.slice(5, 7)) > 6
-    return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: [refund.line, wh ? `원천세 신고서 ${wh}${whOld ? ' — 반년 넘었어요, 최근 달 신고서로 다시' : ''}` : '', '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+    // D-403 원천세 신고서 여러 달 — 작년 같은 달보다 늘었으면 통합고용세액공제를 볼 때
+    const yoy = yearOverYear(customFactValue(record, '원천세 인원 추이'))
+    const yoyLine = yoy ? `원천세 신고 인원 ${yoy.before.ym} ${yoy.before.n}명 → ${yoy.now.ym} ${yoy.now.n}명(${yoy.now.n - yoy.before.n >= 0 ? '+' : ''}${yoy.now.n - yoy.before.n})${yoy.now.n > yoy.before.n ? ' — 늘었어요, 명부로 통합고용세액공제 확인' : ''}` : ''
+    return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: [refund.line, yoyLine, wh && !yoyLine ? `원천세 신고서 ${wh}${whOld ? ' — 반년 넘었어요, 최근 달 신고서로 다시' : ''}` : '', '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'

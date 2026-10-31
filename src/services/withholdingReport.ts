@@ -51,6 +51,28 @@ export function readWithholdingReport(text: string, fileName = ''): WithholdingR
   return null
 }
 
+/**
+ * D-403 '원천세 인원 추이' 칸 — 'YYYY-MM N명' 을 달 순서로(최근 24달). 예전 칸 글 + 이번에 읽은 달을 합친다(같은 달은 새것).
+ * 달이 둘 이상일 때만 글이 생긴다(한 달만이면 '원천세 신고 인원' 칸으로 충분).
+ */
+export function mergeHeadcountTrend(prev: string, reads: readonly { yearMonth: string; employees: number }[]): string {
+  const m = new Map<string, number>()
+  for (const x of String(prev || '').matchAll(/(20\d{2}-\d{2})\s*(\d{1,4})명/g)) m.set(x[1], Number(x[2]))
+  for (const r of reads) if (r.yearMonth) m.set(r.yearMonth, r.employees)
+  const list = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-24)
+  return list.length >= 2 ? list.map(([ym, n]) => `${ym} ${n}명`).join(' · ') : ''
+}
+
+/** 추이 글 → 가장 최근 달과 작년 같은 달(있으면) — 'YYYY-MM' · 인원 */
+export function yearOverYear(trend: string): { now: { ym: string; n: number }; before: { ym: string; n: number } } | null {
+  const list = [...String(trend || '').matchAll(/(20\d{2}-\d{2})\s*(\d{1,4})명/g)].map((x) => ({ ym: x[1], n: Number(x[2]) })).sort((a, b) => a.ym.localeCompare(b.ym))
+  const now = list[list.length - 1]
+  if (!now) return null
+  const target = `${Number(now.ym.slice(0, 4)) - 1}${now.ym.slice(4)}`
+  const before = list.find((x) => x.ym === target)
+  return before ? { now, before } : null
+}
+
 /** 회사 정보 '원천세 신고 인원' 칸 — '2026년 9월분 근로자 12명 · 총지급 4,500만원' */
 export function withholdingValue(r: WithholdingRead, won: (n: number) => string): string {
   const y = Number(r.yearMonth.slice(0, 4))
