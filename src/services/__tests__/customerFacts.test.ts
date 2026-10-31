@@ -2724,5 +2724,21 @@ await (async () => {
   check('D-428 주민번호 없는 표는 명부 아님', !(p3.kind === 'existing' && p3.key === 'payrollRoster'), JSON.stringify(p3))
 })()
 
+// D-429 제목이 다른 재무제표 · 자주 받는 서류 이름 · 완납증명 · 새 칸 띄어쓰기
+await (async () => {
+  const empty = normalizeClientOps({ id: 'doc429', companyName: '미래테크', status: 'active' })
+  const pl = (text: string) => placeDocument({ text, fileName: 'scan_0001.jpg' }, allDocumentMetas(empty))
+  const FSX = ['재무제표 확인원', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,400,000,000 2,000,000,000', '자산총계 3,200,000,000 2,900,000,000']
+  const p1 = pl(FSX.join('\n'))
+  check('D-429 "재무제표 확인원" → 최근 3개년 재무제표 칸(예전: "재무제표" 새 칸)', p1.kind === 'existing' && p1.key === 'financialStatements', JSON.stringify(p1))
+  const cands = factCandidatesFromDocText('customdoc_x', ['결산 감사보고서', '재무상태표', ...FSX.slice(1)].join('\n'), 'r')
+  check('D-429 다른 칸에 들어간 재무제표 글(감사보고서)도 매출 · 자산 읽음(예전: 칸이 재무제표가 아니면 0)', cands.some((c) => c.key === 'revenue' && c.value === '2400000000') && cands.some((c) => c.key === 'totalAssets'), JSON.stringify(cands.map((c) => c.key)))
+  check('D-429 제목만 있는 안내문은 재무제표로 읽지 않음', factCandidatesFromDocText('customdoc_x', ['재무제표 제출 안내', '3월 31일까지 재무제표를 내세요', '문의 02-123-4567'].join('\n'), 'r').length === 0)
+  const names = [['임 금 대 장\n2026년 9월분\n성명 기본급', '급여대장'], ['이사회 의사록\n일시 2026년 3월 2일', '이사회 의사록'], ['임시주주총회 의사록\n의안', '주주총회 의사록'], ['퇴직연금 규약\n확정기여형', '퇴직연금 규약'], ['국세 완납증명서\n발급일 2026.10.20', '납세증명서'], ['지방세 완납증명서\n발급일 2026.10.20', '지방세 납세증명서']] as const
+  const got = names.map(([t]) => pl(t).label)
+  check('D-429 임금대장 → 급여대장 · 의사록 · 퇴직연금 규약 · 국세/지방세 완납증명서 → 알려진 칸(예전: 기타 · 붙은 이름)', got.join() === names.map(([, l]) => l).join(), JSON.stringify(got))
+  check('D-429 모르는 긴 서류 이름은 적힌 띄어쓰기대로 새 칸("고용·산재보험료 완납증명서")', pl('고용·산재보험료 완납증명서\n발급일 2026.10.20').label === '고용·산재보험료 완납증명서', pl('고용·산재보험료 완납증명서\n발급일 2026.10.20').label)
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

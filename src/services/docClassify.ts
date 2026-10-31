@@ -144,6 +144,8 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     validMonths: 1,
     signals: [
       { re: /납세\s*증명서/, weight: 3, say: "제목 '납세증명서'" },
+      // D-429 '국세 완납증명서' 는 납세증명서와 같은 서류
+      { re: /국\s*세\s*완\s*납\s*증\s*명/, weight: 3, say: "제목 '국세 완납증명서'" },
       { re: /국세\s*완납|체납액?\s*없음|징수\s*유예/, weight: 1, say: "'체납액 없음'" },
     ],
     nameHint: /납세|국세\s*완납/,
@@ -151,7 +153,8 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
   {
     label: '지방세 납세증명서',
     validMonths: 1,
-    signals: [{ re: /지방세\s*납세\s*증명/, weight: 3, say: "제목 '지방세 납세증명서'" }],
+    // D-429 '지방세 완납증명서' 도 같은 서류(국세보다 이름이 길어 먼저 맞춘다)
+    signals: [{ re: /지방세\s*(?:납세|완납)\s*증명/, weight: 4, say: "제목 '지방세 납세증명서'" }],
     nameHint: /지방세/,
   },
   {
@@ -280,8 +283,9 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
   {
     // D-342 급여대장 — 대표 줄의 월 급여를 읽는다(services/wageReceipt.ts)
     label: '급여대장',
-    signals: [{ re: /급\s*여\s*대\s*장/, weight: 3, say: "제목 '급여대장'" }],
-    nameHint: /급여\s*대장/,
+    // D-429 '임금대장' 도 같은 서류
+    signals: [{ re: /급\s*여\s*대\s*장|임\s*금\s*대\s*장/, weight: 3, say: "제목 '급여대장'" }],
+    nameHint: /급여\s*대장|임금\s*대장/,
   },
   {
     // D-339 취업규칙 — 정년 · 계속고용 조항을 읽는다(services/workRules.ts)
@@ -363,6 +367,13 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     signals: [{ re: /계좌\s*번호|예금주/, weight: 2, say: "'계좌번호·예금주'" }],
     nameHint: /통장/,
   },
+  // D-429 자주 받는데 '기타' 로 가던 서류 — 이름만 알아본다(읽는 값은 없음)
+  { label: '이사회 의사록', signals: [{ re: /이\s*사\s*회\s*의\s*사\s*록/, weight: 4, say: "제목 '이사회 의사록'" }], nameHint: /이사회/ },
+  { label: '주주총회 의사록', signals: [{ re: /주\s*주\s*총\s*회\s*의\s*사\s*록/, weight: 4, say: "제목 '주주총회 의사록'" }], nameHint: /주주\s*총회|주총/ },
+  { label: '통장 거래내역', signals: [{ re: /거\s*래\s*내\s*역\s*(?:조\s*회|서)?|입\s*출\s*금\s*(?:거\s*래\s*)?내\s*역/, weight: 3, say: "제목 '거래내역'" }, { re: /계\s*좌\s*번\s*호/, weight: 1, say: "'계좌번호'" }], nameHint: /거래\s*내역|입출금/ },
+  { label: '카드 매출 내역', signals: [{ re: /(?:신\s*용\s*)?카\s*드\s*매\s*출\s*(?:내\s*역|자\s*료)/, weight: 4, say: "제목 '카드 매출 내역'" }], nameHint: /카드\s*매출/ },
+  { label: '특허 출원서', signals: [{ re: /특\s*허\s*출\s*원\s*서|출\s*원\s*번\s*호\s*10-/, weight: 3, say: "제목 '특허출원서'" }], nameHint: /출원/ },
+  { label: '퇴직연금 규약', signals: [{ re: /퇴\s*직\s*연\s*금\s*규\s*약/, weight: 4, say: "제목 '퇴직연금 규약'" }], nameHint: /퇴직연금/ },
   {
     // D-420 노란우산공제 가입증명서 · 공제부금 납입증명서 — 정책자금 가점 '노란우산공제'
     label: '노란우산공제 가입증명서',
@@ -598,7 +609,8 @@ const TITLE_TO_KEY: [RegExp, DocumentKey][] = [
   // D-428 고용보험 '피보험자격 이력 내역서' · '피보험자 내역' 도 명부 칸(취득 · 상실일이 있는 직원 목록 — 고용지원금 서류)
   [/가입자명부$|^4대(?:사회)?보험(?:사업장)?가입자|피보험자명부$|피보험자격(?:이력)?(?:내역서?)?$|피보험자(?:내역|목록)(?:서)?$/, 'payrollRoster'],
   [/기업종합보고서$|^CRETOP/i, 'cretopReport'],
-  [/^(?:표준)?재무제표(?:증명(?:원)?)?$|^재무상태표$|^손익계산서$/, 'financialStatements'],
+  // D-429 '재무제표 확인원' · '결산서' 도 재무제표 칸
+  [/^(?:표준)?재무제표(?:증명(?:원)?|확인원|확인서)?$|^재무상태표$|^손익계산서$|^결산서$|^(?:재무)?결산보고서$/, 'financialStatements'],
 ]
 
 /** 제목이 끝나는 모양 — '…증명서' '…확인서' '…등본' '…명부' … */
@@ -629,6 +641,21 @@ export function documentTitle(text: string): string | null {
     if (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c))) return c
   }
   return null
+}
+
+/**
+ * D-429 새 칸 이름은 서류에 적힌 띄어쓰기대로 — '고용·산재보험료 완납증명서'(예전 '고용산재보험료완납증명서').
+ * 9자 이상 · 두세 낱말(낱말마다 두 글자 이상)일 때만. 한 글자씩 띄운 제목('사 업 자')이나 짧은 이름은 붙인 그대로.
+ */
+function spacedTitle(text: string, compactName: string): string {
+  if (compactName.length < 9) return compactName
+  for (const raw of (text ?? '').split(/\r?\n/).slice(0, 18)) {
+    const o = raw.replace(/\([^)]{0,20}\)/g, '').replace(/\s+/g, ' ').trim()
+    if (compactTitle(o) !== compactName) continue
+    const words = o.split(' ')
+    return words.length >= 2 && words.length <= 4 && words.every((w) => w.replace(/[·ㆍ.,]/g, '').length >= 2) ? o : compactName
+  }
+  return compactName
 }
 
 /** D-148: 끝말만 남은 이름 — 이것만으로는 무슨 서류인지 모른다('사업자 등록증' 을 띄어 쓰면 '등록증' 만 남았다) */
@@ -724,7 +751,7 @@ function placeDocumentBase(input: { text: string; fileName: string }, metas: Doc
     const same = fileMetas.find((m) => compactTitle(m.label) === title || (title.length >= 4 && compactTitle(m.label).replace(/\(\d+\)$/, '') === title))
     if (same) return { kind: 'existing', key: same.key, label: same.label, sure: Boolean(fromText), reason: `${how} '${title}' — 같은 이름의 칸`, issuedAt }
     const known = estate && /등기/.test(title) ? KNOWN_EXTRA_DOCS.find((k) => k.label === '부동산 등기사항증명서') : knownDocForTitle(title)
-    return { kind: 'new', label: known?.label ?? title, sure: Boolean(fromText), reason: `${how} '${title}' — 그 이름으로 새 칸`, issuedAt }
+    return { kind: 'new', label: known?.label ?? (fromText ? spacedTitle(text, title) : title), sure: Boolean(fromText), reason: `${how} '${title}' — 그 이름으로 새 칸`, issuedAt }
   }
   // 제목이 없으면 — 낱말 판별이 '확실' 할 때만 기본 칸, 아니면 기타
   const r = classifyDocument(input, metas)

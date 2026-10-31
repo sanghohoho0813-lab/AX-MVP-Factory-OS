@@ -38,6 +38,17 @@ const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'busine
 /**
  * D-406 '2025년 24억원(재무제표 · 2024년보다 +20%)' — 정책자금 매출 추이 읽기(vatTrendOf)와 같은 말. 해를 모르거나 전기가 없으면 ''.
  */
+/**
+ * D-429 재무제표 글인가 — 첫머리에 재무상태표 · 손익계산서 · 재무제표 · 결산서 · 감사보고서 제목이 있고,
+ * 본문에 매출액 · 자산총계 · 부채총계 · 당기순이익 줄이 둘 이상(제목만 있는 안내문 · 다른 서류는 아님)
+ */
+export function looksLikeFinancialStatementText(text: string): boolean {
+  const head = String(text || '').slice(0, 1500)
+  if (!/재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|재\s*무\s*제\s*표|결\s*산\s*서|감\s*사\s*보\s*고\s*서/.test(head)) return false
+  const lines = [/매\s*출\s*액\s*[\d(△▲-]/, /자\s*산\s*총\s*계\s*[\d(△▲-]/, /부\s*채\s*총\s*계\s*[\d(△▲-]/, /당\s*기\s*순\s*(?:이\s*익|손\s*실)\s*[\d(△▲-]/]
+  return lines.filter((re) => re.test(text)).length >= 2
+}
+
 /** D-419 '2025년 1억 2,000만원(재무제표 · 매출의 5.0%)' — 매출을 모르면 비중 없이 */
 export function rndLine(rnd: number | undefined, revenue: number | undefined, year: string, what = '재무제표'): string {
   if (!(typeof rnd === 'number' && rnd > 0)) return ''
@@ -148,7 +159,8 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     }
   }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
-  if (key === 'financialStatements') {
+  // D-429 '재무제표 확인원' · '결산서' · '감사보고서' 처럼 제목이 달라 다른 칸(새 칸)에 들어간 재무제표도 — 글이 재무제표면 읽는다(신고서 묶음은 위에서)
+  if (key === 'financialStatements' || (!ret && looksLikeFinancialStatementText(text))) {
     const f = parseFinancialStatement(text)
     for (const k of ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'] as const) {
       const v = f[k]
