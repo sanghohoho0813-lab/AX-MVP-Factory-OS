@@ -145,7 +145,7 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     signals: [
       { re: /납세\s*증명서/, weight: 3, say: "제목 '납세증명서'" },
       // D-429 '국세 완납증명서' 는 납세증명서와 같은 서류
-      { re: /국\s*세\s*완\s*납\s*증\s*명/, weight: 3, say: "제목 '국세 완납증명서'" },
+      { re: /국\s*세\s*완\s*납\s*증\s*명/, weight: 2, say: "제목 '국세 완납증명서'" },
       { re: /국세\s*완납|체납액?\s*없음|징수\s*유예/, weight: 1, say: "'체납액 없음'" },
     ],
     nameHint: /납세|국세\s*완납/,
@@ -439,9 +439,23 @@ export function findIssuedDate(text: string): string | null {
   const labeled = /(?:발급\s*일자?|발행\s*일(?:자|시)?|교부\s*일자?|출력\s*일(?:자|시)?|열람\s*일(?:자|시)?)\s*[:：]?\s*([0-9년월일.\-/\s]{6,24})/.exec(text)
   const fromLabel = labeled ? parseKoreanDate(labeled[1]) : undefined
   if (fromLabel && plausible(fromLabel)) return fromLabel
-  // D-425 등기부는 본문에 취임 · 중임 · 등기 날짜가 가득해 '마지막 날짜' 가 발급일이 아니다 — 발급(열람)일 글이 없으면 모른다고 둔다
+  // D-425 등기부는 본문에 취임 · 중임 · 성립 날짜가 가득해 '마지막 날짜' 가 발급일이 아닐 수 있다 — 그런 줄의 날짜는 건너뛰고
+  //        (법원 발급본 끝 '2026년 09월 01일 서울중앙지방법원 등기국' · '서기 …' 처럼) 사건 말이 없는 줄의 마지막 날짜만. 없으면 모른다고 둔다
   //        (예전: 중임 날짜를 발급일로 읽어 '법인등기부등본 만료 · 523일 지남' 이 빨갛게 떴다)
-  if (/등\s*기\s*사\s*항\s*(?:전부|일부)?\s*증\s*명\s*서|등\s*기\s*부\s*등\s*본/.test(text.slice(0, 600)) && /임\s*원\s*에\s*관\s*한\s*사\s*항|취\s*임|중\s*임/.test(text)) return null
+  if (/등\s*기\s*사\s*항\s*(?:전부|일부)?\s*증\s*명\s*서|등\s*기\s*부\s*등\s*본/.test(text.slice(0, 600)) && /임\s*원\s*에\s*관\s*한\s*사\s*항|취\s*임|중\s*임/.test(text)) {
+    const EVENT = /취\s*임|중\s*임|사\s*임|퇴\s*임|해\s*임|선\s*임|만\s*료|변\s*경|이\s*전|성\s*립|설\s*립|일\s*등\s*기/
+    const ds = [...text.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
+    for (let i = ds.length - 1; i >= 0; i -= 1) {
+      const at = ds[i].index ?? 0
+      const lineStart = text.lastIndexOf('\n', at) + 1
+      const lineEnd = text.indexOf('\n', at)
+      const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd)
+      if (EVENT.test(line)) continue
+      const d = parseKoreanDate(ds[i][0])
+      if (d && plausible(d)) return d
+    }
+    return null
+  }
   const w = validityWindow(text)
   const body = w ? `${text.slice(0, w.start)} ${text.slice(w.end)}` : text
   const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
