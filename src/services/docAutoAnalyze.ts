@@ -26,7 +26,7 @@ import { withToolResult } from './clientOpsService'
 import { formatWon, pendingFacts, readFact, usableFactValue, withFactDecisions, withFactValue } from './customerFacts'
 import { placeOf } from './grants/grantMatch'
 import { withDocUploadLog } from './clientOpsService'
-import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
+import { autoFillFromDocs, latestFsYear, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type RegisterRead } from './shareholderDoc'
 import { readRegistryTax, readRetireMultiple } from './registryTax'
 import { ASSUMPTIONS, wonOf } from './taxPlan'
@@ -280,21 +280,27 @@ export async function analyzeUploadedDocs(
   }
 
   // 5. D-304 등기부등본 → 대표 취임일 · 1주의 금액 · 발행주식 총수 / 정관 · 퇴직금 지급규정 → 지급배수 (절세 현황 — 빈 칸만, 다르면 확인)
-  const putProfile = (key: string, value: string, label: string, display: string, fileName: string, sure: boolean, why: string) => {
+  const bare = (v: string) => v.replace(/[,\s원주배]/g, '')
+  /** replaceIf — 지금 값이 이것과 같으면(지난해 재무제표에서 온 값) 묻지 않고 바꾼다(D-409) */
+  const putProfile = (key: string, value: string, label: string, display: string, fileName: string, sure: boolean, why: string, replaceIf?: string) => {
     const cur = String(rec.taxProfile?.[key] ?? '').trim()
-    const same = cur !== '' && cur.replace(/[,\s원주배]/g, '') === value.replace(/[,\s원주배]/g, '')
+    const same = cur !== '' && bare(cur) === bare(value)
     if (same) return
     if (!sure) {
       flagged.push({ key: `taxProfile.${key}`, label, display, fileName, note: why })
       return
     }
-    if (cur !== '') {
+    if (cur !== '' && !(replaceIf !== undefined && bare(cur) === bare(replaceIf))) {
       flagged.push({ key: `taxProfile.${key}`, label, display, fileName, note: `지금 적힌 값(${cur})과 달라 바꾸지 않았어요 — 절세 설계에서 확인` })
       return
     }
     rec = { ...rec, taxProfile: { ...(rec.taxProfile ?? {}), [key]: value } }
     entered.push({ key: `taxProfile.${key}`, label, display, fileName })
   }
+  // D-409 재무제표 여러 해 — 절세 현황(가지급금 · 배당 가능 이익 · 직전 연도 순이익)은 가장 최근 해 재무제표로만.
+  //        바로 앞 해 재무제표의 전기 순이익은 '2년 전 순이익'(비상장주식 3년 가중평균의 셋째 해). 더 앞선 해는 서류함에만
+  const isFs = (d: ReadDoc) => d.key === 'financialStatements' || /재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|표준\s*재무제표/.test(d.text.slice(0, 3000))
+  const fsYearNow = Math.max(latestFsYear(rec), ...factDocs.filter(isFs).map((d) => Number(parseFinancialStatement(d.text).year) || 0))
   for (const d of factDocs) {
     // D-311 부가세 과세표준증명 · 면세 수입금액증명 — 매출은 1번(회사 정보)에서 넣었다. 여기서는 넣은 줄에 해마다 · 전년 대비를 붙인다
     const vat = looksLikeVatCert(d.text, d.fileName) ? readVatCert(d.text) : null
@@ -315,17 +321,34 @@ export async function analyzeUploadedDocs(
       continue
     }
     // D-305 재무제표 → 가지급금 잔액 · 배당 가능한 이익(미처분이익잉여금) · 직전 연도 순이익
-    if (d.key === 'financialStatements' || /재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서|표준\s*재무제표/.test(d.text.slice(0, 3000))) {
+    if (isFs(d)) {
       const f = parseFinancialStatement(d.text)
+      const fy = Number(f.year) || 0
+      if (fy && fsYearNow && fy < fsYearNow) {
+        if (fy === fsYearNow - 1 && f.netIncomePrev !== undefined) putProfile('vInc0', String(f.netIncomePrev), '2년 전 순이익', `${fy - 1}년 ${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
+        continue
+      }
             // 이름은 짧게(맞춤 추천 표의 이름 칸이 한 줄로) · 금액은 회사 정보와 같은 '억 · 만원' 글로
       const yrEnd = f.year ? `${f.year}년 말 ` : ''
-      if (f.loanBalance !== undefined && f.loanBalance > 0) putProfile('loanBalance', String(f.loanBalance), '가지급금', `${yrEnd}${formatWon(f.loanBalance)}`, d.fileName, true, '')
+      // D-409 더 최근 해 재무제표 — 지금 값이 이 재무제표의 전기 숫자와 같으면 지난해 재무제표에서 온 값이라 묻지 않고 한 해 넘긴다
+      const prevStr = (n: number | undefined) => (n !== undefined ? String(n) : undefined)
+      if (f.loanBalance !== undefined && f.loanBalance > 0) putProfile('loanBalance', String(f.loanBalance), '가지급금', `${yrEnd}${formatWon(f.loanBalance)}`, d.fileName, true, '', prevStr(f.loanBalancePrev))
       if (f.retainedEarnings !== undefined) {
-        if (f.retainedEarnings > 0) putProfile('retainedEarnings', String(f.retainedEarnings), '배당 가능 이익', `${yrEnd}${formatWon(f.retainedEarnings)}(미처분이익잉여금)`, d.fileName, true, '')
+        if (f.retainedEarnings > 0) putProfile('retainedEarnings', String(f.retainedEarnings), '배당 가능 이익', `${yrEnd}${formatWon(f.retainedEarnings)}(미처분이익잉여금)`, d.fileName, true, '', prevStr(f.retainedEarningsPrev))
         else if (f.retainedEarnings < 0 && !String(rec.taxProfile?.retainedEarnings ?? '').trim())
           flagged.push({ key: 'taxProfile.retainedEarnings', label: '배당 가능 이익', display: `${yrEnd}결손 ${formatWon(Math.abs(f.retainedEarnings))}`, fileName: d.fileName, note: '미처리결손금이라 배당할 이익이 없어요 — 배당 계획은 결손을 메운 뒤' })
       }
-      if (f.netIncomePrev !== undefined) putProfile('vInc1', String(f.netIncomePrev), '전년 순이익', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
+      if (f.netIncomePrev !== undefined) {
+        // 올리기 전 회사 정보 순이익(재무제표 · 바로 앞 해)이 이 재무제표의 전기와 같으면 — 지금 '직전 연도' 는 두 해 전 값이라 '2년 전' 으로 밀고 바꾼다
+        const before = readFact(record, 'netIncome')
+        const oldV1 = String(rec.taxProfile?.vInc1 ?? '').trim()
+        const rolls = !!fy && !!before && before.status !== 'missing' && (before.source === 'financialStatements' || before.source === 'taxReturn') &&
+          Number(/^(\d{4})/.exec(before.asOf)?.[1] ?? 0) === fy - 1 && wonOf(before.value) === f.netIncomePrev && oldV1 !== '' && bare(oldV1) !== bare(String(f.netIncomePrev))
+        if (rolls) {
+          putProfile('vInc0', oldV1, '2년 전 순이익', `${fy - 2}년 ${formatWon(wonOf(oldV1))}`, d.fileName, true, '', String(rec.taxProfile?.vInc0 ?? ''))
+          putProfile('vInc1', String(f.netIncomePrev), '전년 순이익', `${fy - 1}년 ${formatWon(f.netIncomePrev)}`, d.fileName, true, '', oldV1)
+        } else putProfile('vInc1', String(f.netIncomePrev), '전년 순이익', `${f.year ? `${Number(f.year) - 1}년 ` : ''}${formatWon(f.netIncomePrev)}`, d.fileName, true, '')
+      }
       continue
     }
     const mult = /정\s*관|퇴\s*직\s*금\s*(?:지\s*급\s*)?규\s*정|임원\s*퇴직/.test(`${d.fileName} ${d.text.slice(0, 600)}`) ? readRetireMultiple(d.text) : null

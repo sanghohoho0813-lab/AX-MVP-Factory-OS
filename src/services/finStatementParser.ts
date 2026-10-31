@@ -20,6 +20,10 @@ export interface FinStatementValues {
   netIncomePrev?: number
   /** D-406: 매출액 줄의 둘째 숫자(전기) — 매출 추이(작년보다 +N%) */
   revenuePrev?: number
+  /** D-409: 가지급금 · 주임종 채권 줄의 둘째 숫자(전기 말) 합 — 한 줄이라도 둘째 숫자가 없으면 없음 */
+  loanBalancePrev?: number
+  /** D-409: 미처분이익잉여금 줄의 둘째 숫자(전기 말) */
+  retainedEarningsPrev?: number
   /** 당기 결산 연도(찾았으면) */
   year?: string
 }
@@ -59,6 +63,7 @@ export function parseFinancialStatement(text: string): FinStatementValues {
   const unit = unitOf(text)
   const lines = text.split(/\r?\n/).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean)
   const loanSeen = new Set<string>()
+  let loanPrevOk = true
   for (const line of lines) {
     for (const [key, re, lossable] of ITEMS) {
       if (out[key] !== undefined) continue
@@ -81,18 +86,23 @@ export function parseFinancialStatement(text: string): FinStatementValues {
     const lm = LOAN.exec(line)
     const lk = lm ? lm[0].replace(/[^가-힣]/g, '') : ''
     if (lm && !loanSeen.has(lk)) {
-      const n = [...line.slice(lm[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).find((v): v is number => v !== null)
+      const ns = [...line.slice(lm[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).filter((v): v is number => v !== null)
+      const n = ns[0]
       if (n !== undefined) {
         loanSeen.add(lk)
         out.loanBalance = (out.loanBalance ?? 0) + Math.max(0, n) * unit
+        if (ns.length >= 2) out.loanBalancePrev = (out.loanBalancePrev ?? 0) + Math.max(0, ns[1]) * unit
+        else loanPrevOk = false
       }
     }
     const rm = out.retainedEarnings === undefined ? RETAINED.exec(line) : null
     if (rm) {
-      const n = [...line.slice(rm[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).find((v): v is number => v !== null)
-      if (n !== undefined) out.retainedEarnings = n * unit
+      const ns = [...line.slice(rm[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).filter((v): v is number => v !== null)
+      if (ns[0] !== undefined) out.retainedEarnings = ns[0] * unit
+      if (ns.length >= 2) out.retainedEarningsPrev = ns[1] * unit
     }
   }
+  if (!loanPrevOk) delete out.loanBalancePrev
   const y = /(20\d{2})\s*년\s*(?:0?1[0-2]|0?[1-9])\s*월\s*\d{1,2}\s*일\s*(?:현재|까지)/.exec(text) ?? /제\s*\d+\s*\(?\s*당\s*\)?\s*기[^\d]{0,12}(20\d{2})/.exec(text)
   if (y) out.year = y[1]
   return out

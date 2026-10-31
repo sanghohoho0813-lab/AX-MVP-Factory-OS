@@ -2455,5 +2455,36 @@ await (async () => {
   check('D-408 사업장현황신고서 두 해를 한 번에(앞선 해가 먼저) → 직원 12 · 매출 2025년 값 · 묻지 않음', e.record.employeeCount === '12' && readFact(e.record, 'revenue')?.value === '850000000' && e.summary.flagged.length === 0, JSON.stringify([e.record.employeeCount, readFact(e.record, 'revenue'), e.summary.flagged]))
 })()
 
+// D-409 '최근 3개년 재무제표' 를 세 장 따로 올려도 — 앞선 해 값은 묻지 않고, 절세 현황은 가장 최근 해로 · 2년 전 순이익까지 · 다음 해 재무제표는 한 해 넘김
+await (async () => {
+  const FS = (y: number, rev: [string, string], ni: [string, string], assets: [string, string], loan: [string, string] = ['30,000,000', '25,000,000'], re: [string, string] = ['800,000,000', '690,000,000']) =>
+    ['표준재무제표증명', '재무상태표', `제 ${y - 2018}(당)기 ${y}년 12월 31일 현재`, '(단위 : 원)', `가지급금 ${loan[0]} ${loan[1]}`, `자산총계 ${assets[0]} ${assets[1]}`, `미처분이익잉여금 ${re[0]} ${re[1]}`, '손익계산서', `매출액 ${rev[0]} ${rev[1]}`, `당기순이익 ${ni[0]} ${ni[1]}`].join('\n')
+  const F25 = FS(2025, ['2,400,000,000', '2,000,000,000'], ['220,000,000', '180,000,000'], ['3,200,000,000', '2,900,000,000'])
+  const F24 = FS(2024, ['2,000,000,000', '1,700,000,000'], ['180,000,000', '120,000,000'], ['2,900,000,000', '2,500,000,000'], ['25,000,000', '20,000,000'], ['690,000,000', '600,000,000'])
+  const F23 = FS(2023, ['1,700,000,000', '1,500,000,000'], ['120,000,000', '90,000,000'], ['2,500,000,000', '2,200,000,000'], ['20,000,000', '10,000,000'], ['600,000,000', '500,000,000'])
+  const p25 = parseFinancialStatement(F25)
+  check('D-409 재무상태표 둘째 숫자 = 전기 말 가지급금 · 미처분이익잉여금', p25.loanBalancePrev === 25_000_000 && p25.retainedEarningsPrev === 690_000_000, JSON.stringify(p25))
+  const pOne = parseFinancialStatement(F25.replace('가지급금 30,000,000 25,000,000', '가지급금 30,000,000\n주.임.종 단기채권 5,000,000 0'))
+  check('D-409 가지급금 줄 하나라도 전기 숫자가 없으면 전기 합은 내지 않음(짐작 안 함)', pOne.loanBalance === 35_000_000 && pOne.loanBalancePrev === undefined, JSON.stringify(pOne))
+  const base = normalizeClientOps({ id: 'fs409', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const doc = (text: string, i: number) => ({ key: i === 0 ? 'financialStatements' : `customdoc_fs${i}`, fileName: `fs${i}.pdf`, text, method: 'pdf_text' as const, docSure: true })
+  const up = (rec: typeof base, texts: string[], now: string) => analyzeUploadedDocs(rec, texts.map(doc), { now, today: '2026-10-31', makeId: () => `f9${++n}` })
+  const tp = (r: typeof base) => [r.taxProfile?.loanBalance, r.taxProfile?.retainedEarnings, r.taxProfile?.vInc1, r.taxProfile?.vInc0].join('/')
+  const a = await up(base, [F25, F24, F23], NOW)
+  check('D-409 세 장 한 번에(최근 해 먼저) → 묻는 것 0(예전 8) · 회사 정보 2025년 · 절세 현황 2025년 말 가지급금 3천만 · 배당 가능 8억 · 직전 연도 1.8억 · 2년 전 1.2억', a.summary.flagged.length === 0 && pendingFacts(a.record).length === 0 && readFact(a.record, 'revenue')?.asOf === '2025' && tp(a.record) === '30000000/800000000/180000000/120000000', JSON.stringify([a.summary.flagged.map((f) => f.key), tp(a.record)]))
+  const b = await up(base, [F23, F24, F25], NOW)
+  check('D-409 옛날 해 먼저 올려도 같은 값(예전에는 2023년 가지급금 · 2022년 순이익이 들어갔다)', b.summary.flagged.length === 0 && tp(b.record) === tp(a.record), JSON.stringify([b.summary.flagged.map((f) => f.key), tp(b.record)]))
+  const c1 = await up(base, [F25], NOW)
+  const c2 = await up(c1.record, [F24], '2026-10-31T03:00:00.000Z')
+  check('D-409 2025 뒤에 2024 를 올리면 묻지 않고 2년 전 순이익만 채움', c2.summary.flagged.length === 0 && pendingFacts(c2.record).length === 0 && tp(c2.record) === '30000000/800000000/180000000/120000000' && readFact(c2.record, 'revenue')?.value === '2400000000', JSON.stringify([c2.summary.flagged, tp(c2.record)]))
+  const F26 = FS(2026, ['3,000,000,000', '2,400,000,000'], ['300,000,000', '220,000,000'], ['3,600,000,000', '3,200,000,000'], ['40,000,000', '30,000,000'], ['1,000,000,000', '800,000,000'])
+  const d = await up(c1.record, [F26], '2026-10-31T04:00:00.000Z')
+  check('D-409 다음 해(2026) 재무제표 — 전기 숫자가 지금 값과 이어지면 묻지 않고 한 해 넘김(직전 2.2억 · 2년 전 1.8억 · 가지급금 4천만 · 배당 가능 10억)', d.summary.flagged.length === 0 && tp(d.record) === '40000000/1000000000/220000000/180000000', JSON.stringify([d.summary.flagged, tp(d.record)]))
+  const F26x = FS(2026, ['3,000,000,000', '2,400,000,000'], ['300,000,000', '210,000,000'], ['3,600,000,000', '3,200,000,000'], ['40,000,000', '28,000,000'], ['1,000,000,000', '790,000,000'])
+  const e = await up(c1.record, [F26x], '2026-10-31T05:00:00.000Z')
+  check('D-409 전기 숫자가 지금 값과 안 이어지면(수정된 재무제표 · 사람이 고친 값) 예전처럼 절세 설계에서 확인', ['taxProfile.loanBalance', 'taxProfile.retainedEarnings', 'taxProfile.vInc1'].every((k) => e.summary.flagged.some((f) => f.key === k)) && tp(e.record) === '30000000/800000000/180000000/', JSON.stringify([e.summary.flagged.map((f) => f.key), tp(e.record)]))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

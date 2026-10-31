@@ -118,7 +118,22 @@ function vatYields(record: ClientOpsRecord, year: string, source = 'vatCertifica
  * D-373 소득금액증명 매출 · 순이익도 같은 규칙 — 다른 출처(재무제표 · 크레탑 · 부가세 · 직접)의 같은 해 이상 값이 있으면 묻지 않는다.
  * 매출 추이: 소득금액증명 줄은 이미 있는 줄에 밀리고, 부가세 줄은 소득금액증명 줄에 밀린다(둘 다 올려도 질문이 생기지 않게).
  */
+/** D-409 회사 정보에 들어 있는 재무제표(세무조정계산서 포함) 숫자의 가장 최근 해 — 없으면 0 */
+export function latestFsYear(record: ClientOpsRecord): number {
+  let y = 0
+  for (const k of FIN_KEYS) {
+    const m = record.factMeta?.[k]
+    if (m && finFamily(m.source) === 'fs') y = Math.max(y, Number(yearOf(m.asOf)) || 0)
+  }
+  return y
+}
+
 function docYields(record: ClientOpsRecord, c: { key: string; source: string; asOf: string; value?: string }): boolean {
+  // D-409 '최근 3개년 재무제표' 를 따로 올리면 — 같은 종류 서류의 앞선 해 매출 · 이익 · 자산 · 부채는 묻지 않는다(더 최근 해 값이 회사 정보)
+  if (FIN_KEYS.has(c.key) && finFamily(c.source) !== '') {
+    const m = record.factMeta?.[c.key]
+    if (m && finFamily(m.source) === finFamily(c.source) && yearOf(c.asOf) && yearOf(m.asOf) && yearOf(c.asOf) < yearOf(m.asOf)) return true
+  }
   // D-390 세무조정계산서 안 표준재무제표 숫자는 다른 출처(재무제표 · 크레탑 · 직접)의 같은 해 이상 값에 밀린다 — 작년 신고서를 올려도 올해 값과 다르다고 묻지 않게
   if (c.source === 'taxReturn' && FIN_KEYS.has(c.key)) {
     const f = readFact(record, c.key)
