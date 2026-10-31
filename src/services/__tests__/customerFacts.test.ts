@@ -2706,5 +2706,12 @@ await (async () => {
   check('D-425 "발행일 2026/10/20" → 2026-10-20 · 다른 서류(납세증명서)의 마지막 날짜 규칙은 그대로', findIssuedDate([...REG, '발행일 2026/10/20'].join('\n')) === '2026-10-20' && findIssuedDate(['납세증명서', '위와 같이 증명합니다', '2026년 10월 20일'].join('\n')) === '2026-10-20')
 })()
 
+// D-427 숫자 사이의 영문 O
+await (async () => {
+  check('D-427 "2,4OO,OOO,OOO" · "2O25" → 0 · "A01" · "BOX 10" 그대로', fixAmountNoise('매출액 2,4OO,OOO,OOO 2O25 A01 BOX 10') === '매출액 2,400,000,000 2025 A01 BOX 10', fixAmountNoise('매출액 2,4OO,OOO,OOO 2O25 A01 BOX 10'))
+  const f = parseFinancialStatement(['표준재무제표증명', '제 7(당)기 2O25년 12월 31일 현재', '(단위 : 원)', '매출액 2,4OO,OOO,OOO 2,OOO,OOO,OOO'].join('\n'))
+  check('D-427 스캔 재무제표 "2,4OO,OOO,OOO" → 매출 24억 · 2025년', f.revenue === 2_400_000_000 && f.year === '2025', JSON.stringify(f))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
