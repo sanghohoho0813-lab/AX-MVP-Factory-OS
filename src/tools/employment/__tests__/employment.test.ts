@@ -1154,5 +1154,15 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   })())
 }
 
+// D-426 스캔 명부 — 주민번호의 영문 O · '2024년 3월 1일' 취득일
+{
+  const H = ['4대보험 사업장 가입자 명부', '성명 주민등록번호 자격취득일']
+  const o = parseRosterText([...H, '김가가 9OO1O1-1234567 2024-03-01', '이나나 950505-2234567 2025-01-02'].join('\n'))
+  check('D-426 주민번호를 "9OO1O1" 로 읽어도 두 명 모두(예전: 한 명 빠짐) · 생년월일 1990-01-01', o.employees.length === 2 && o.employees.some((e) => e.birthDate === '1990-01-01'), JSON.stringify(o.employees.map((e) => e.name)))
+  const k = parseRosterText([...H, '김가가 900101-1234567 2024년 3월 1일', '이나나 950505-2234567 2025년 1월 2일'].join('\n'))
+  check('D-426 취득일 "2024년 3월 1일" → 입사일 2024-03-01(예전: 비었음)', k.employees.map((e) => e.hireDate).join() === '2024-03-01,2025-01-02', JSON.stringify(k.employees.map((e) => e.hireDate)))
+  check('D-426 주민번호 원본은 남기지 않음(가림 그대로)', o.employees.every((e) => /\*{6}$/.test(e.rrnMasked)) && !JSON.stringify(o).includes('1234567'))
+}
+
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

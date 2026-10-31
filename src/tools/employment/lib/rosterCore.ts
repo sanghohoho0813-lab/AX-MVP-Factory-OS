@@ -466,6 +466,10 @@ function pickKoreanName(s: string, first: boolean): string {
 function normalizeRosterText(text: string): string {
   let t = String(text || '')
   t = t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xff10 + 0x30)) // 전각숫자->반각
+  // D-426 스캔 명부 — 주민번호 자리의 영문 O(OCR 이 0 을 O 로 읽음) → 0, '2024년 3월 1일' → 2024-03-01(자격취득일을 못 읽어 입사일이 비었다)
+  t = t.replace(/([0-9Oo]{6})(\s*-\s*)([0-9Oo])([0-9Oo*]{5,6})/g, (m, a: string, sep: string, g: string, b: string) =>
+    (a.match(/\d/g)?.length ?? 0) >= 3 && /[Oo]/.test(m) ? `${a.replace(/[Oo]/g, '0')}${sep}${g.replace(/[Oo]/g, '0')}${b.replace(/[Oo]/g, '0')}` : m)
+  t = t.replace(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g, (_m, y: string, mo: string, d: string) => `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`)
   t = t.replace(/[‐‑‒–—―−－ー]/g, '-') // 각종 하이픈/대시->'-'
   t = t.replace(/[＊∗⁎✱٭⁕]/g, '*') // 각종 별표/마스킹문자->'*'
   t = t.replace(/[ 　\t]/g, ' ') // 특수 공백 -> 일반 공백 (줄바꿈 유지)
