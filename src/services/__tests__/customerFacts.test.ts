@@ -2189,5 +2189,18 @@ await (async () => {
   check('D-392 사람이 적은 설립일과 등기부가 다르면 그대로 묻는다(덮지 않음)', c.record.establishedAt === '2019-01-15' && c.summary.flagged.some((f) => f.key === 'establishedAt'), JSON.stringify([c.record.establishedAt, c.summary.flagged]))
 })()
 
+// D-394 크레탑 보고서(지난 결산 · 예전 직원 수)가 서류로 넣은 더 최근 값과 달라도 '확인할 것' 에 남지 않음
+{
+  const meta = (source: string, asOf: string) => ({ source, status: 'entered', asOf, confirmedAt: '', updatedAt: NOW })
+  const cr = withCretop(base) // 크레탑: 2025 매출 12.34억 · 직원 12명 · 주소 '서울 강남구 테헤란로 1'
+  const newer = normalizeClientOps({ ...cr, employeeCount: '15', businessAddress: '서울특별시 강남구 테헤란로 1, 3층', factValues: { revenue: '1500000000' }, factMeta: { revenue: meta('taxReturn', '2026'), employeeCount: meta('payrollRoster', '2026-10-01') } } as never)
+  const keys = pendingFacts(newer).filter((p) => p.from === 'cretop').map((p) => p.key)
+  check('D-394 2026 신고서 매출 · 명부 직원 수 · 같은 주소(서울특별시 = 서울 · 3층만 더)면 크레탑 2025 값은 묻지 않음', !keys.includes('revenue') && !keys.includes('employeeCount') && !keys.includes('businessAddress'), JSON.stringify(keys))
+  const same = normalizeClientOps({ ...cr, factValues: { revenue: '1500000000' }, factMeta: { revenue: meta('financialStatements', '2025') } } as never)
+  check('D-394 같은 해(2025)인데 크레탑 매출과 다르면 예전처럼 묻는다', pendingFacts(same).some((p) => p.from === 'cretop' && p.key === 'revenue'))
+  const typed = normalizeClientOps({ ...cr, employeeCount: '20', factMeta: { employeeCount: meta('manual', '') } } as never)
+  check('D-394 사람이 직접 적은 직원 수(20)와 크레탑(12)이 다르면 예전처럼 묻는다', pendingFacts(typed).some((p) => p.from === 'cretop' && p.key === 'employeeCount'))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

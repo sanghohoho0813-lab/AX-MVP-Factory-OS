@@ -380,6 +380,22 @@ export function cretopFacts(record: ClientOpsRecord): { key: string; value: stri
 }
 
 /**
+ * D-394 크레탑 보고서 값이 서류로 넣은 더 최근 값보다 오래됐나 — 그러면 '확인할 것' 으로 묻지 않는다.
+ *  - 매출 · 이익 · 자산 · 부채: 이미 적힌 값의 해(재무제표 · 신고서 · 부가세)가 크레탑 결산 해보다 뒤.
+ *  - 직원 수: 이미 적힌 값이 4대보험 명부 · 원천세 신고서(올린 서류 · 크레탑보다 최근)에서 온 것.
+ * 같은 해인데 다르거나, 사람이 직접 적은 값과 다르면 예전처럼 묻는다.
+ */
+function cretopIsOlder(record: ClientOpsRecord, def: FactDef, cretopAsOf: string): boolean {
+  const meta = record.factMeta?.[def.key]
+  if (!meta) return false
+  if (def.key === 'employeeCount') return meta.source === 'payrollRoster' || meta.source === 'withholding'
+  if (def.group !== 'finance') return false
+  const curY = Number(/^(\d{4})/.exec(meta.asOf ?? '')?.[1] ?? 0)
+  const crY = Number(/^(\d{4})/.exec(cretopAsOf)?.[1] ?? 0)
+  return curY > 0 && crY > 0 && curY > crY
+}
+
+/**
  * 확인을 기다리는 것 — 받아 둔 후보 + 붙어 있는 크레탑 결과에서 읽은 것.
  * 지금 값과 같거나, 예전에 '틀림' 으로 뺀 자료면 다시 묻지 않는다.
  */
@@ -403,6 +419,7 @@ export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
     if (!def) return
     const cur = rawValue(record, def)
     if (cur && sameFactValue(def, cur, c.value)) return
+    if (from === 'cretop' && cur && cretopIsOlder(record, def, c.asOf)) return
     if (record.factMeta?.[c.key]?.dismissed?.includes(c.ref)) return
     // 같은 사실을 두 자료가 말하면 먼저 받아 둔 것 하나만 묻는다
     if (seen.has(c.key)) return
