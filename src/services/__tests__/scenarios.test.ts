@@ -394,7 +394,7 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
 {
   check(
     'P1 설계서 4가지(청년 채용 · 만 60세 이상 채용 · 연구소 · 창업 5년 안 채용 D-244) · 제목 · 상황 예시 기준과 같은 preset',
-    SITUATION_PLANS.length === 4 && planTitle('hire-youth', 2) === '청년 2명 채용' && planTitle('startup-hire', 1) === '창업 5년 안 청년 1명 채용' && planDef('startup-hire')?.hiring === 'emp-youth' && scenarioPreset(planDef('startup-hire')!.hiring!) !== null && planDef('lab-start')?.preset === 'lab-two' && planDef('nope') === null && SITUATION_PLANS.every((d) => scenarioPreset(d.preset) !== null),
+    SITUATION_PLANS.length === 5 && planTitle('corp-convert', 1) === '개인사업자 → 법인전환' && planTitle('hire-youth', 2) === '청년 2명 채용' && planTitle('startup-hire', 1) === '창업 5년 안 청년 1명 채용' && planDef('startup-hire')?.hiring === 'emp-youth' && scenarioPreset(planDef('startup-hire')!.hiring!) !== null && planDef('lab-start')?.preset === 'lab-two' && planDef('nope') === null && SITUATION_PLANS.every((d) => scenarioPreset(d.preset) !== null),
   )
   const youth2 = buildSituationPlan('hire-youth', full, today, 2)
   const sub = youth2.blocks.find((b) => b.key === 'subsidy')!
@@ -961,6 +961,32 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   const small = normalizeClientOps({ id: 'dr376', companyName: '미래상사', businessNumber: '214-05-01239', employeeCount: '4', createdAt: NOWD, updatedAt: NOWD } as unknown as Partial<ClientOpsRecord>)
   const em = buildInsights(small, '2026-10-31', []).find((i) => i.key === 'employment')
   check('D-376 명부 없이 직원 4명 — 고용지원금 카드(명부 올리면) 설명에 두루누리 · 판정 색은 그대로(정보가 더 필요해요)', em?.tone === 'need' && em.detail.includes('두루누리'), em)
+}
+
+// D-385 개인사업자 법인전환 한 장 설계서 — 세금 차이(계산기 식) · 정책자금 '법인전환 기업' 가점 · 진행 순서 · 법인에는 칩 없음
+{
+  const T = '2026-10-31'
+  const NOWC = '2026-10-31T00:00:00.000Z'
+  const indiv = withFactValue(normalizeClientOps({ id: 'cv385', companyName: '미래상사', businessNumber: '214-05-01239', establishedAt: '2019-04-01', businessCategory: '도매 및 소매업', businessItem: '전자부품 도매', businessAddress: '대전광역시 유성구 대학로 99', employeeCount: '4', createdAt: NOWC, updatedAt: NOWC } as never), 'netIncome', '60000000', { source: 'manual', status: 'entered', asOf: '2025', now: NOWC })
+  const ch = situationChoices(indiv, T)
+  const cv = ch.find((c) => c.def.id === 'corp-convert')
+  check('D-385 개인사업자: 고르는 판에 "법인전환"(맞음 — 1년 차이 300만 넘음)', cv?.fit.kind === 'fit', ch.map((c) => `${c.def.id}:${c.fit.kind}`))
+  const corp = normalizeClientOps({ id: 'cv385c', companyName: '(주)미래', businessNumber: '124-81-00998', createdAt: NOWC, updatedAt: NOWC } as never)
+  check('D-385 법인 업체에는 법인전환 칩이 없음 · 절세 모듈을 못 쓰면 없음', !situationChoices(corp, T).some((c) => c.def.id === 'corp-convert') && !situationChoices(indiv, T, (m) => m !== 'tax').some((c) => c.def.id === 'corp-convert'))
+  const plan = buildSituationPlan('corp-convert', indiv, T)
+  const c = convertCompare(60_000_000)!
+  const conv = plan.blocks.find((b) => b.key === 'convert')!
+  check('D-385 한 장: 법인전환 세금(맞춤 추천 · 계산기와 같은 값) — 1년 덜 내는 세금 = 개인 − 법인(다 가져갈 때) · 3년 합계', conv.state === 'ok' && conv.won === c.saving && plan.firstWon === c.saving && plan.keepWon === c.saving * 3 && plan.totalLabel === '1년에 덜 내는 세금' && plan.keepLabel === '사업소득이 같으면', JSON.stringify({ won: conv.won, first: plan.firstWon, keep: plan.keepWon }))
+  const pol = plan.blocks.find((b) => b.key === 'policy')!
+  check('D-385 정책자금: 법인으로 바꾼 뒤 · 가점 법인전환 기업 줄 · 대출은 합계에 안 넣음', pol.state === 'ok' && pol.won === 0 && pol.lines[0].includes('법인전환 기업'), JSON.stringify(pol))
+  check('D-385 진행 순서 5가지 — 세무사(현물출자 · 사업양수도) → 법인 설립 → 사업자등록 · 폐업 → 4대보험 · 지원금 명의 → 정책자금 · 날짜 오늘 뒤', plan.actions.map((a) => a.id).join() === 'tax,found,switch,staff,policy' && plan.actions.every((a) => a.date > T), JSON.stringify(plan.actions.map((a) => [a.id, a.date])))
+  const sum = planSummary(plan, '미래상사')
+  check('D-385 요약 글: "1년에 덜 내는 세금 약 …" · 받을 수 있는 돈이라고 하지 않음', sum.includes('1년에 덜 내는 세금 약') && !sum.includes('받을 수 있는 돈'), sum.slice(0, 200))
+  const small = withFactValue(normalizeClientOps({ id: 'cv385s', companyName: '작은상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC } as never), 'netIncome', '15000000', { source: 'manual', status: 'entered', asOf: '2025', now: NOWC })
+  const sp = buildSituationPlan('corp-convert', small, T)
+  check('D-385 사업소득 1,500만 → 차이 300만 아래(맞춤 추천과 같은 기준) · "아직 작아요" · 합계 0', sp.blocks[0].state === 'none' && /아직 작아요/.test(sp.blocks[0].headline) && sp.firstWon === 0 && sp.totalText === '', JSON.stringify(sp.blocks[0]))
+  const noInc = buildSituationPlan('corp-convert', normalizeClientOps({ id: 'cv385n', companyName: '새상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC } as never), T)
+  check('D-385 사업소득을 모르면 받을 자료(소득금액증명) · 요청 문구', noInc.blocks[0].state === 'need' && noInc.blocks[0].needs.some((x) => !x.ok && /소득금액증명/.test(x.label)), JSON.stringify(noInc.blocks[0]))
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)

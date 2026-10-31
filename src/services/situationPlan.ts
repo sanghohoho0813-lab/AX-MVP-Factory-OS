@@ -33,11 +33,13 @@ import type { Client as LabClient } from '../tools/labcare/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyAssumption, policyEvidence } from './policyEvidence'
+import { CONVERT_MIN, businessIncomeOf, convertCompare, diligentLine } from './corpConvert'
+import { formatWon } from './customerFacts'
 import { judge, VERDICT_LABEL } from '../tools/startupTax/lib/judgement'
 import { startupCreditOverlap, startupCreditOverlapLine } from '../tools/startupTax/lib/rules'
 import { josa } from '../lib/josa'
 
-export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire'
+export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire' | 'corp-convert'
 
 export interface PlanDef {
   id: PlanId
@@ -59,6 +61,8 @@ export const SITUATION_PLANS: readonly PlanDef[] = [
   { id: 'hire-senior', label: '만 60세 이상 채용', preset: 'emp-senior', counts: [1, 2, 3], defaultCount: 1, when: '경력 있는 만 60세 이상을 새로 뽑을 때 — 지원금 · 세액공제' },
   { id: 'lab-start', label: '연구소 만들기', preset: 'lab-two', counts: [1, 2, 3, 5], defaultCount: 2, when: '연구원을 두고 연구소(전담부서)를 만들 때 — 연구개발비 세액공제 · 정책자금 가점' },
   { id: 'startup-hire', label: '창업 5년 안 채용', preset: 'startup-new', hiring: 'emp-youth', counts: [1, 2, 3], defaultCount: 1, when: '창업감면 기간(5년) 안에 청년을 뽑을 때 — 창업감면 · 지원금 · 세액공제 · 정책자금' },
+  // D-385 개인사업자 법인전환 — 세금 차이(계산기 03 · 01 · 05 식 그대로) · 정책자금 '법인전환 기업' 가점 · 진행 순서. 법인 업체에는 보이지 않는다
+  { id: 'corp-convert', label: '법인전환', preset: 'calc-t9-convert', counts: [1], defaultCount: 1, when: '개인사업자 사업소득이 커졌을 때 — 법인으로 바꾸면 덜 내는 세금 · 정책자금 가점 · 진행 순서' },
 ]
 
 export function planDef(id: string | null | undefined): PlanDef | null {
@@ -70,10 +74,11 @@ export function planTitle(id: PlanId, count: number): string {
   if (id === 'hire-youth') return `청년 ${count}명 채용`
   if (id === 'hire-senior') return `만 60세 이상 ${count}명 채용`
   if (id === 'startup-hire') return `창업 5년 안 청년 ${count}명 채용`
+  if (id === 'corp-convert') return '개인사업자 → 법인전환'
   return `연구원 ${count}명으로 연구소 만들기`
 }
 
-export type BlockKey = 'startup' | 'subsidy' | 'credit' | 'rnd' | 'policy'
+export type BlockKey = 'startup' | 'subsidy' | 'credit' | 'rnd' | 'policy' | 'convert'
 /** ok: 금액 · 판정이 나옴 · need: 받을 것이 있어야 계산 · none: 이 조건에 맞는 것이 없음 */
 export type BlockState = 'ok' | 'need' | 'none'
 
@@ -119,6 +124,8 @@ export interface SituationPlan {
   keepYears: number
   /** '인원을 그대로 두면' · '연구를 이어 가면' */
   keepLabel: string
+  /** D-385 머리 금액 이름 — '1년 안에 받을 수 있는 돈' · 법인전환은 '1년에 덜 내는 세금' */
+  totalLabel: string
   /** 머리 금액 글 — '약 3,780만원(1차 추정)' · 계산 못 하면 '' */
   totalText: string
   actions: PlanAction[]
@@ -383,7 +390,8 @@ function startupBlock(record: ClientOpsRecord, facts: ClientFacts, today: string
 function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId, today: string): PlanBlock {
   const { input, missing } = policyInputFromFacts(facts)
   const needs = [need('업종', facts.industryText), need('설립일(업력)', facts.establishedAt), need('매출', facts.revenue && !facts.revenue.estimated ? man(facts.revenue.won) : '')]
-  const hiring = id !== 'lab-start'
+  const convert = id === 'corp-convert'
+  const hiring = id !== 'lab-start' && !convert
   const youth = id === 'hire-youth' || id === 'startup-hire'
   const openPath = hiring ? scenarioPath({ id: 'policy-hiring', module: 'policy-funding' }, record.id) : `/tools/policy-funding/diagnosis${q(record.id)}`
   const base = { key: 'policy' as const, label: '정책자금', won: 0, laterWon: 0, amount: '', needs, openPath, openLabel: '정책자금 진단에서 이어서' }
@@ -391,11 +399,13 @@ function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId, to
   if (core.length) return { ...base, state: 'need', headline: `${josa(core.join(' · '), '을/를')} 받으면 정책자금도 같이 봐요`, lines: [], assumptions: [] }
   // D-312 맞춤 추천 카드와 같은 근거(서류함) 위에 이 상황의 가정 — 연구소 상황은 가점에 연구소를 더한다
   const ev = policyEvidence(record, facts, today)
-  const bonus = [...new Set([...(ev.input.bonusItems ?? []), ...(input.bonusItems ?? []), '기업부설연구소 보유' as const])]
+  // D-385 법인전환 — 법인으로 바꾼 뒤 신청(법인사업자 · 가점 '법인전환 기업')
+  const bonus = [...new Set([...(ev.input.bonusItems ?? []), ...(input.bonusItems ?? []), convert ? ('법인전환 기업' as const) : ('기업부설연구소 보유' as const)])]
   const r = runDiagnosis({
     ...input,
     ...ev.input,
     purpose: '운전자금',
+    ...(convert ? { businessType: '법인사업자' as const } : {}),
     ...(hiring ? { hiringPlan: '있음' as const, ...(youth ? { youthEmployment: '예정' as const } : {}) } : { bonusItems: bonus }),
   })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
@@ -404,7 +414,7 @@ function policyBlock(record: ClientOpsRecord, facts: ClientFacts, id: PlanId, to
     state: 'ok',
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
     lines: [
-      hiring ? `채용 계획${youth ? '(청년)' : ''}이 가점이에요 — 신청서에 채용 계획을 적어요` : '연구소 인정 뒤 신청하면 가점이에요(기술 · R&D 자금도 열려요)',
+      hiring ? `채용 계획${youth ? '(청년)' : ''}이 가점이에요 — 신청서에 채용 계획을 적어요` : convert ? '법인으로 바꾼 뒤 신청하면 가점(법인전환 기업)이에요 — 업력은 개인사업자 때부터 이어져요(★ 기관 확인)' : '연구소 인정 뒤 신청하면 가점이에요(기술 · R&D 자금도 열려요)',
       ...(r.headline?.reasons ?? []).slice(0, 1),
       r.nextAction,
     ].filter(Boolean),
@@ -446,6 +456,40 @@ function labActions(today: string, policyOk: boolean): PlanAction[] {
   ]
 }
 
+/**
+ * D-385 법인전환 — 개인 종합소득세 vs 법인(이익을 다 대표 급여로) 세금 · 세금 계산기 식 그대로(corpConvert).
+ * 덜 내면 '1년에 덜 내는 세금' 에 더하고(사업소득이 같으면 3년), 더 내면 '아직' 이라고만.
+ */
+function convertBlock(record: ClientOpsRecord, facts: ClientFacts, today: string): PlanBlock {
+  const income = businessIncomeOf(record, today)
+  const needs = [need('사업소득(소득금액증명)', income > 0 ? man(income) : '')]
+  const base = { key: 'convert' as const, label: '법인전환 세금', needs, openPath: scenarioPath(scenarioPreset('calc-t9-convert')!, record.id), openLabel: '세금 계산기 03에서 이어서' }
+  const assumptions = ['세금만 비교 — 4대보험 · 법인 운영비(기장 · 등기) · 전환 비용(현물출자 · 사업양수도)은 뺐어요', '세금 계산기 01 · 03 · 05 식 그대로 · 세무사 확인']
+  if (!(income > 0)) return { ...base, state: 'need', headline: '사업소득(소득금액증명)을 받으면 세금 차이를 바로 계산해요', won: 0, laterWon: 0, amount: '', lines: [], assumptions }
+  const c = convertCompare(income)
+  if (!c) return { ...base, state: 'need', headline: '사업소득으로 세금을 계산하지 못했어요 — 계산기에서 확인', won: 0, laterWon: 0, amount: '', lines: [], assumptions }
+  const diligent = diligentLine(facts.revenue && !facts.revenue.estimated ? facts.revenue.won : 0, facts.industryText, formatWon)
+  const lines = [
+    `지금 개인 종합소득세 약 ${man(c.personal)} → 법인(이익을 다 대표 급여로 — 월 ${man(c.all.monthly)}) 약 ${man(c.all.total)}`,
+    ...(c.keep.monthly !== c.all.monthly ? [`회사에 남겨 두면(대표 급여 월 ${man(c.keep.monthly)}) 올해 세금 약 ${man(c.keep.total)} — 남긴 돈은 나중에 배당세`] : []),
+    ...(diligent ? [diligent] : []),
+  ]
+  if (c.saving <= 0) return { ...base, state: 'none', headline: '지금 사업소득이면 개인이 세금이 더 적어요 — 법인전환은 아직', won: 0, laterWon: 0, amount: '', lines, assumptions }
+  // 맞춤 추천 카드와 같은 기준(CONVERT_MIN) — 차이가 작으면 법인 운영비(기장 · 등기)를 생각해 '아직'
+  if (c.saving < CONVERT_MIN) return { ...base, state: 'none', headline: `1년 약 ${man(c.saving)} 차이 — 법인 운영비(기장 · 등기)를 생각하면 아직 작아요`, won: 0, laterWon: 0, amount: '', lines, assumptions }
+  return { ...base, state: 'ok', headline: '법인으로 바꾸면 — 이익을 다 가져가도 세금이 줄어요', won: c.saving, laterWon: c.saving * 2, amount: `1년 약 ${man(c.saving)} 덜 냄`, lines, assumptions: [...assumptions, `사업소득 ${man(income)}이 3년 같다고 보고 3년 합계`] }
+}
+
+function convertActions(today: string, policyOk: boolean): PlanAction[] {
+  return [
+    { id: 'tax', when: '이번 주', text: '세무사와 전환 방식 정하기 — 현물출자 · 사업양수도(사업용 부동산이 있으면 양도세 이월과세 · 취득세 요건 검토)', date: after(today, 7) },
+    { id: 'found', when: '이번 달', text: '법인 설립 — 자본금 · 정관(임원 퇴직금 규정 포함) · 대표 급여 정하기', date: after(today, 21) },
+    { id: 'switch', when: '설립하면', text: '법인 사업자등록 · 개인사업자 폐업(날짜가 이어지게) — 거래처 · 통장 · 카드 단말기 · 인허가 명의 바꾸기', date: after(today, 30) },
+    { id: 'staff', when: '설립하면', text: '직원 4대보험 · 진행 중인 고용지원금 명의 옮기기(승계 신청)', date: after(today, 35) },
+    ...(policyOk ? [{ id: 'policy', when: '설립 뒤', text: '정책자금 상담 — 법인전환 기업 가점', date: after(today, 45) }] : []),
+  ]
+}
+
 /* ------------------------------------------------------------------ */
 
 /**
@@ -474,7 +518,12 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
   const fit = planFit(def, ctx)
   const blocks: PlanBlock[] = []
   let actions: PlanAction[]
-  if (id === 'lab-start') {
+  if (id === 'corp-convert') {
+    blocks.push(convertBlock(record, f, today))
+    const pol = policyBlock(record, f, id, today)
+    blocks.push(pol)
+    actions = convertActions(today, pol.state === 'ok')
+  } else if (id === 'lab-start') {
     blocks.push(rndBlock(record, f, n))
     const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
@@ -504,7 +553,8 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
     firstWon,
     keepWon,
     keepYears: 3,
-    keepLabel: id === 'lab-start' ? '연구를 이어 가면' : '인원을 그대로 두면',
+    keepLabel: id === 'lab-start' ? '연구를 이어 가면' : id === 'corp-convert' ? '사업소득이 같으면' : '인원을 그대로 두면',
+    totalLabel: id === 'corp-convert' ? '1년에 덜 내는 세금' : '1년 안에 받을 수 있는 돈',
     totalText: firstWon > 0 ? `약 ${man(firstWon)}` : '',
     actions,
     assumptions: ['규칙 계산 · 1차 추정 — 실제 금액은 공고 · 세무사 확인으로 정해져요', '선정 · 승인을 보장하지 않아요'],
@@ -517,7 +567,9 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
 export function situationChoices(record: ClientOpsRecord, today: string, usable: (module: string) => boolean = () => true): { def: PlanDef; fit: ScenarioFit }[] {
   const ctx = fitContext(record, today)
   const rank = { fit: 0, ask: 1, data: 2, no: 3 } as const
-  return SITUATION_PLANS.filter((d) => usable(d.id === 'lab-start' ? 'labcare' : 'employment'))
+  // D-385 법인전환은 개인사업자에게만(법인에는 칩도 없다) · 절세 모듈이 쓰일 때
+  const individual = clientFacts(record, new Date(`${today}T00:00:00`)).businessType === 'individual'
+  return SITUATION_PLANS.filter((d) => (d.id === 'corp-convert' ? individual && usable('tax') : usable(d.id === 'lab-start' ? 'labcare' : 'employment')))
     .map((def, i) => ({ def, fit: planFit(def, ctx), i }))
     .sort((a, b) => rank[a.fit.kind] - rank[b.fit.kind] || a.i - b.i)
     .map(({ def, fit }) => ({ def, fit }))
@@ -526,7 +578,7 @@ export function situationChoices(record: ClientOpsRecord, today: string, usable:
 /** 한 장 글 — 업체에 붙이는 요약 · 카톡 · 인쇄에 같은 글(내부 메모 · 수수료 없음) */
 export function planSummary(plan: SituationPlan, companyName: string): string {
   const lines = [`[상황별 설계서] ${companyName} — ${plan.title}`]
-  if (plan.totalText) lines.push(`1년 안에 받을 수 있는 돈 ${plan.totalText}(1차 추정)${plan.keepWon > plan.firstWon ? ` · ${plan.keepLabel} ${plan.keepYears}년 합계 약 ${man(plan.keepWon)}` : ''}`)
+  if (plan.totalText) lines.push(`${plan.totalLabel} ${plan.totalText}(1차 추정)${plan.keepWon > plan.firstWon ? ` · ${plan.keepLabel} ${plan.keepYears}년 합계 약 ${man(plan.keepWon)}` : ''}`)
   for (const b of plan.blocks) {
     lines.push('', `■ ${b.label} — ${b.headline}`)
     for (const l of b.lines) lines.push(`· ${l}`)
@@ -553,7 +605,7 @@ export function planResultInput(plan: SituationPlan, companyName: string, action
     toolKey: 'situation-plan',
     title: `상황별 설계서 · ${plan.title}`,
     verdict: plan.firstWon > 0 ? 'amount' : 'plan',
-    verdictLabel: plan.totalText ? `1년 안 ${plan.totalText}(1차 추정)` : '설계서',
+    verdictLabel: plan.totalText ? `${plan.id === 'corp-convert' ? '1년 덜 냄' : '1년 안'} ${plan.totalText}(1차 추정)` : '설계서',
     summary: planSummary(plan, companyName),
     data: { planId: plan.id, count: plan.count, firstWon: plan.firstWon, keepWon: plan.keepWon, blocks: plan.blocks.map((b) => ({ key: b.key, state: b.state, won: b.won, headline: b.headline })) },
     deadlines,

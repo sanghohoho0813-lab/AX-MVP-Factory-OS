@@ -48,6 +48,8 @@ const FULL = {
   updatedAt: NOW,
 }
 const EMPTY = { id: 'cli_plan_empty', companyName: '빈칸상사', status: 'active', createdAt: NOW, updatedAt: NOW }
+// D-385 개인사업자 — 사업소득 6천만(소득금액증명) → 법인전환 설계서
+const IND = { id: 'cli_plan_ind', companyName: '미래상사', businessNumber: '214-05-01239', representativeName: '홍대표', establishedAt: '2019-05-02', businessCategory: '도매 및 소매업', businessItem: '전자부품 도매', businessAddress: '대전광역시 유성구 대학로 99', employeeCount: '4', status: 'active', factValues: { netIncome: '60000000' }, factMeta: { netIncome: { source: 'incomeCertificate', status: 'entered', asOf: '2025', updatedAt: NOW } }, createdAt: NOW, updatedAt: NOW }
 
 async function seed(page) {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
@@ -59,7 +61,7 @@ async function seed(page) {
       list.push(...rows)
       localStorage.setItem(k, JSON.stringify(list))
     },
-    [FULL, EMPTY],
+    [FULL, EMPTY, IND],
   )
 }
 
@@ -291,6 +293,30 @@ for (const width of [360, 390]) {
       await page.getByTestId('situation-plan').screenshot({ path: `${SHOTS}/plan-${width}-${scale}.png` })
     }
   }
+  await ctx.close()
+}
+
+/* ---------------- D-385 개인사업자 법인전환 한 장 설계서 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await seed(page)
+  await openSmart(page, 'cli_plan_ind')
+  const picks = await page.getByTestId('plan-pick').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-id')}:${e.getAttribute('data-fit')}`))
+  check(`D-385 ${width} 개인사업자 고르는 판에 법인전환(맞음)`, picks.includes('corp-convert:fit'), picks.join(','))
+  await pick(page, 'corp-convert').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="plan-body"]')?.getAttribute('data-plan') === 'corp-convert')
+  const total = (await page.getByTestId('plan-total').innerText()).replace(/\s+/g, ' ')
+  check(`D-385 ${width} 머리 금액 "1년에 덜 내는 세금" · 사업소득이 같으면 3년 합계 · 사람 수 단추 없음`, total.includes('개인사업자 → 법인전환 — 1년에 덜 내는 세금') && total.includes('사업소득이 같으면 3년 합계') && (await page.getByTestId('plan-count').count()) === 0, total.slice(0, 300))
+  const blocks = await page.getByTestId('plan-block').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-state')}`))
+  check(`D-385 ${width} 한 장에 법인전환 세금 · 정책자금(법인전환 기업 가점)`, blocks.join(',') === 'convert:ok,policy:ok', blocks.join(','))
+  const body = ((await page.getByTestId('situation-plan').innerText()) ?? '').replace(/\s+/g, ' ')
+  check(`D-385 ${width} 진행 순서(세무사 → 법인 설립 → 사업자등록 · 폐업)`, body.includes('세무사와 전환 방식 정하기') && body.includes('법인 설립') && body.includes('개인사업자 폐업'), body.slice(0, 300))
+  if (SHOTS) await page.getByTestId('situation-plan').screenshot({ path: `${SHOTS}/plan-${width}-convert.png` })
+  else await page.getByTestId('situation-plan').screenshot({ path: `/tmp/claude-0/shot385-${width}.png` }).catch(() => {})
+  check(`D-385 ${width} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 

@@ -158,10 +158,10 @@ export function ClientSituationPlan({
           })}
         </div>
 
-        {/* 2. 몇 명? */}
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={def.id === 'lab-start' ? '연구원 몇 명' : '몇 명 뽑나요'}>
-          <span className="t-sub mr-1 font-semibold text-slate-700">{def.id === 'lab-start' ? '연구원' : '몇 명'}</span>
-          {def.counts.map((n) => (
+        {/* 2. 몇 명? — D-385 사람 수가 없는 상황(법인전환)은 설명만 */}
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={def.id === 'lab-start' ? '연구원 몇 명' : def.counts.length > 1 ? '몇 명 뽑나요' : '상황 설명'}>
+          {def.counts.length > 1 && <span className="t-sub mr-1 font-semibold text-slate-700">{def.id === 'lab-start' ? '연구원' : '몇 명'}</span>}
+          {def.counts.length > 1 && def.counts.map((n) => (
             <button
               key={n}
               type="button"
@@ -222,7 +222,7 @@ export function ClientSituationPlan({
           <>
             {/* 4. 한눈에 — 1년 안에 받을 수 있는 돈 */}
             <div className="flex flex-col gap-1 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="plan-total">
-              <span className="t-sub font-semibold break-keep text-success-800">{plan.title} — 1년 안에 받을 수 있는 돈(1차 추정)</span>
+              <span className="t-sub font-semibold break-keep text-success-800">{plan.title} — {plan.totalLabel}(1차 추정)</span>
               <span className="t-page font-extrabold break-keep text-success-800 tabular-nums" data-testid="plan-total-amount">
                 {plan.totalText || '받을 숫자가 있으면 계산해요'}
               </span>
@@ -381,7 +381,7 @@ function PlanPrintSheet({ plan, companyName, today }: { plan: SituationPlan; com
         </header>
         {plan.totalText && (
           <section className="avoid-break rounded border border-slate-300 px-4 py-3">
-            <p className="text-[0.95rem]">1년 안에 받을 수 있는 돈(1차 추정)</p>
+            <p className="text-[0.95rem]">{plan.totalLabel}(1차 추정)</p>
             <p className="text-[1.6rem] font-extrabold">{plan.totalText}</p>
             {plan.keepWon > plan.firstWon && (
               <p className="text-[0.95rem]">
