@@ -228,14 +228,10 @@ export function startupRegion(address: string): { region: Region | ''; over: Sta
   return { region: '', over: '', popDecline: '' }
 }
 
-const startupInsight: Provider = ({ record, today, facts }) => {
-  const open = `/tools/startup-tax${q(record)}`
-  // 창업 5년이 지났으면 대표 나이와 상관없이 감면 기간 밖 — 묻지 않고 바로 말한다
-  if (facts.establishedAt && facts.months !== null && facts.months >= 60) return { key: 'startup-tax', label: '창업감면', tone: 'no', headline: '창업 5년이 지나 감면 기간이 끝났을 가능성이 커요', detail: `설립 ${facts.establishedAt}`, missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
-  const missing = [!facts.establishedAt ? '설립일(창업일)' : '', !facts.representativeBirth ? '대표 생년월일' : ''].filter(Boolean)
-  if (missing.length) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: `${josa(missing.join(' · '), '을/를')} 알면 판정해요`, detail: '사업자등록증 · 대표 신분 정보로 채워져요.', missing, openPath: open, openLabel: '창업감면 판정', action: null }
+/** 창업감면 판정기에 넣을 값 — 업체 기록 그대로(맞춤 추천 · 지난 해 다시 보기가 같이 쓴다) */
+function startupFormOf(facts: ClientFacts): StartupForm {
   const { region, over, popDecline } = startupRegion(facts.address)
-  const form: StartupForm = {
+  return {
     ...EMPTY_FORM,
     popDecline,
     ventureDate: facts.ventureConfirmedAt ?? '',
@@ -246,7 +242,37 @@ const startupInsight: Provider = ({ record, today, facts }) => {
     region,
     overconcentration: over,
   }
-  const r = judge(form, new Date(`${today}T00:00:00`))
+}
+
+/**
+ * D-379 창업 5년이 지난 업체 — 감면 기간 안 해의 신고서에 창업감면이 없으면, 그해 12월 31일로 판정기를 다시 돌려 그때 대상이었는지 본다.
+ * 대상이었으면 '감면 기간은 끝났지만 그해분은 경정청구(5년 안)'. 대표 생년월일을 모르면 판정하지 않는다(청년 감면율이 달라진다).
+ */
+export function pastStartupRefund(record: ClientOpsRecord, facts: ClientFacts, today: string): { year: number; line: string; rate: string } | null {
+  if (!facts.establishedAt || !facts.representativeBirth) return null
+  const est = Number(facts.establishedAt.slice(0, 4))
+  const y = reliefYears(record, facts, today).find((x) => x.year >= est && x.year <= est + 4 && !x.groups.has('startup'))
+  if (!y) return null
+  const r = judge(startupFormOf(facts), new Date(`${y.year}-12-31T00:00:00`))
+  // 창업 형태(새로 창업 · 이어받기)는 기록에 없어 보통 '조건부' — 지금 해 판정과 같이 '대상일 수 있어요' 로
+  if (r.notice || r.overall === 'bad') return null
+  const sme = y.groups.has('smeSpecial') ? '(중소기업 특별세액감면은 받음 — 둘 중 큰 쪽 확인)' : ''
+  const was = r.overall === 'good' ? '그해는 감면 대상이었어요' : '그해 감면 대상이었을 수 있어요(창업 형태 확인)'
+  return { year: y.year, line: `${y.year}년 ${returnName(facts)}에 창업중소기업 세액감면이 없어요${sme} — ${was}: 경정청구 검토(5년 안 · ★ 세무사)`, rate: r.taxRate.line }
+}
+
+const startupInsight: Provider = ({ record, today, facts }) => {
+  const open = `/tools/startup-tax${q(record)}`
+  // 창업 5년이 지났으면 대표 나이와 상관없이 감면 기간 밖 — 묻지 않고 바로 말한다
+  if (facts.establishedAt && facts.months !== null && facts.months >= 60) {
+    // D-379 다만 감면 기간 안 해의 신고서에 감면이 없었으면 그해분 경정청구 — 검토해 볼 만함
+    const past = pastStartupRefund(record, facts, today)
+    if (past) return { key: 'startup-tax', label: '창업감면', tone: 'maybe', headline: `감면 기간은 끝났지만 ${past.year}년분 창업감면이 신고서에 없어요 — 경정청구 검토`, detail: [past.line, past.rate, `설립 ${facts.establishedAt}`].filter(Boolean).join(' · '), missing: [], openPath: open, openLabel: '창업감면 판정', action: `창업감면 — ${past.year}년분 경정청구 세무사와 검토` }
+    return { key: 'startup-tax', label: '창업감면', tone: 'no', headline: '창업 5년이 지나 감면 기간이 끝났을 가능성이 커요', detail: `설립 ${facts.establishedAt}`, missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
+  }
+  const missing = [!facts.establishedAt ? '설립일(창업일)' : '', !facts.representativeBirth ? '대표 생년월일' : ''].filter(Boolean)
+  if (missing.length) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: `${josa(missing.join(' · '), '을/를')} 알면 판정해요`, detail: '사업자등록증 · 대표 신분 정보로 채워져요.', missing, openPath: open, openLabel: '창업감면 판정', action: null }
+  const r = judge(startupFormOf(facts), new Date(`${today}T00:00:00`))
   if (r.notice) return { key: 'startup-tax', label: '창업감면', tone: 'need', headline: r.notice, detail: '', missing: [], openPath: open, openLabel: '창업감면 판정', action: null }
   const tone: InsightTone = r.overall === 'good' ? 'good' : r.overall === 'bad' ? 'no' : 'maybe'
   // D-378 감면 대상인데 감면 기간 안 해의 신고서에 창업감면이 없으면 — 맨 앞 줄(받고 있으면 '받고 있어요')
@@ -703,7 +729,11 @@ export const isPick = (i: Pick<Insight, 'tone'>): boolean => i.tone === 'good' |
  */
 export function insightChanges(before: readonly Insight[], after: readonly Insight[]): Insight[] {
   const was = new Map(before.map((i) => [i.key, i]))
-  return after.filter((a) => a.tone !== 'need' && (was.get(a.key)?.tone ?? 'need') === 'need')
+  // 정보 필요 → 판정 · D-379 검토해 볼 만함 → 가능성 높음(신고서로 빠진 공제가 드러난 연구소 · 고용처럼)
+  return after.filter((a) => {
+    const prev = was.get(a.key)?.tone ?? 'need'
+    return (a.tone !== 'need' && prev === 'need') || (a.tone === 'good' && prev !== 'good')
+  })
 }
 
 /** 업체 상세 맨 위 — 먼저 제안할 것 많아야 n개(판정은 이미 좋은 것 먼저 · 같으면 모듈 순서) */

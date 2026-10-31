@@ -52,7 +52,7 @@ import { policyInputFromFacts } from '../../tools/policyFunding/clientInput'
 import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { readIncomeCert } from '../incomeDoc'
 import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
-import { employmentRefund, labRefund, labYearOf, reliefYears, startupRefund } from '../clientInsights'
+import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
 import { readRegistryTax } from '../registryTax'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
@@ -1726,7 +1726,7 @@ await (async () => {
   const beforeAll = buildInsights(normalizeClientOps({ ...base, taxProfile: { ceoStartDate: '2015-07-21' } } as never), '2026-10-29', [])
   const afterAll = buildInsights(withStart, '2026-10-29', [])
   const opened = insightChanges(beforeAll, afterAll)
-  check('D-345 이번 서류로 새로 판정: 절세 설계(정보 필요 → 판정) · 원래 판정 나던 모듈 · 아직 정보 필요한 모듈은 빠짐', opened.some((i) => i.key === 'tax') && opened.every((i) => i.tone !== 'need' && (beforeAll.find((b) => b.key === i.key)?.tone ?? 'need') === 'need') && insightChanges(afterAll, afterAll).length === 0, JSON.stringify(opened.map((i) => `${i.key}:${i.tone}`)))
+  check('D-345 이번 서류로 새로 판정: 절세 설계(정보 필요 → 판정) · 원래 판정 나던 모듈 · 아직 정보 필요한 모듈은 빠짐', opened.some((i) => i.key === 'tax') && opened.every((i) => { const prev = beforeAll.find((b) => b.key === i.key)?.tone ?? 'need'; return (i.tone !== 'need' && prev === 'need') || (i.tone === 'good' && prev !== 'good') }) && insightChanges(afterAll, afterAll).length === 0, JSON.stringify(opened.map((i) => `${i.key}:${i.tone}`)))
   check('D-345 올리기 전 기록(before)은 업체 기록의 올리기 기록에 남지 않음', !!out.summary.before && !('before' in docUploadLogOf(out.record, out.summary, 'u1')))
   check('D-342 맞춤 추천 절세: 영수증 전 "대표 급여" 필요 → 뒤 퇴직금 한도 계산 · 더 묻지 않음', !!taxBefore?.missing.includes('대표 급여') && !!tax && !tax.missing.includes('대표 급여') && tax.headline.includes('퇴직금'), JSON.stringify([taxBefore?.missing, tax?.headline, tax?.missing]))
   // 서류함 칸 — 제목('[ √ ]' 표시가 붙어도) · 취업규칙
@@ -1933,6 +1933,35 @@ await (async () => {
     return policyDocs(x, '2026-10-31').have.includes('financial')
   })())
 })()
+
+// D-379 창업 5년 지난 업체의 지난 감면 기간 경정청구 · 상담 '놓친 세액공제 · 경정청구 있나?'
+{
+  const T = '2026-10-31'
+  const mkRec = (relief: string | null, extra: Record<string, unknown> = {}) => normalizeClientOps({ id: 'st379', companyName: '대전정밀(주)', businessNumber: '124-81-00998', corporateNumber: '160111-0123456', establishedAt: '2020-06-01', representativeBirth: '1992-03-01', businessCategory: '제조업', businessItem: '전자부품', businessAddress: '대전광역시 유성구 대학로 99', createdAt: NOW, updatedAt: NOW, customFields: relief ? [{ id: 'rl', group: 'identity', label: '받은 공제 · 감면 2023년', value: relief }] : [], ...extra } as never)
+  const none = mkRec('법인세 신고서에 공제 · 감면 없음')
+  const f = clientFacts(none, new Date(`${T}T00:00:00`))
+  const past = pastStartupRefund(none, f, T)
+  check('D-379 창업 6년 업체 · 2023년 신고서에 창업감면 없음 → 그해(2023-12-31)로 다시 판정 → 대상이었음 · 경정청구', !!past && past.year === 2023 && /2023년 법인세 신고서에 창업중소기업 세액감면이 없어요 — 그해 감면 대상이었을 수 있어요\(창업 형태 확인\): 경정청구/.test(past.line) && /100%/.test(past.rate), JSON.stringify(past))
+  const card = buildInsights(none, T, []).find((i) => i.key === 'startup-tax')
+  check('D-379 맞춤 추천 창업감면: 감면 기간은 끝났지만 2023년분 경정청구 검토 · 검토해 볼 만함 · 다음 행동', card?.tone === 'maybe' && /감면 기간은 끝났지만 2023년분/.test(card.headline) && /경정청구/.test(card.action ?? ''), JSON.stringify(card))
+  const got = mkRec('창업중소기업 세액감면 1,200만원(법인세 신고서)')
+  check('D-379 그해 감면을 받았으면 예전대로 "기간 끝남"', buildInsights(got, T, []).find((i) => i.key === 'startup-tax')?.tone === 'no')
+  check('D-379 신고서가 없으면 예전대로 "기간 끝남"', buildInsights(mkRec(null), T, []).find((i) => i.key === 'startup-tax')?.tone === 'no')
+  const old = normalizeClientOps({ ...none, customFields: [{ id: 'rl', group: 'identity', label: '받은 공제 · 감면 2019년', value: '법인세 신고서에 공제 · 감면 없음' }] } as never)
+  check('D-379 감면 기간 밖(설립 전) · 경정청구 기한 지난 해는 말하지 않음', pastStartupRefund(old, f, T) === null)
+  const noBirth = mkRec('법인세 신고서에 공제 · 감면 없음', { representativeBirth: '' })
+  check('D-379 대표 생년월일을 모르면 판정하지 않음(청년 감면율)', pastStartupRefund(noBirth, clientFacts(noBirth, new Date(`${T}T00:00:00`)), T) === null)
+  const mk2 = (key: string, tone: Insight['tone']): Insight => ({ key, label: key, tone, headline: '', detail: '', missing: [], openPath: '', openLabel: '', action: null })
+  const ch = insightChanges([mk2('labcare', 'maybe'), mk2('tax', 'need'), mk2('grants', 'good'), mk2('cretop', 'maybe')], [mk2('labcare', 'good'), mk2('tax', 'maybe'), mk2('grants', 'good'), mk2('cretop', 'no')])
+  check('D-379 이번 서류로 새로 판정: 검토해 볼 만함 → 가능성 높음도(연구소 경정청구) · 정보 필요 → 판정 · 그대로 · 내려간 것은 빠짐', ch.map((i) => i.key).join() === 'labcare,tax', JSON.stringify(ch.map((i) => i.key)))
+  // 상담 질문
+  const q1 = matchQuestion('작년 법인세 신고서에서 빠진 공제 경정청구 되나요')
+  check('D-379 상담: 직접 친 "신고서 빠진 공제 경정청구" → 놓친 세액공제 질문(법인세 낱말이 있어도)', q1.best?.id === 'refund', JSON.stringify(q1.best))
+  const a1 = answerFor('refund', { record: none, today: T, notices: [] })
+  check('D-379 상담 답: 2023년 신고서 내용 · 빠진 공제 2가지(고용 "늘었다면" · 창업감면) · 경정청구 기한 줄 · 복사 글', a1.facts[0] === '2023년: 법인세 신고서에 공제 · 감면 없음' && /빠진 공제 2가지/.test(a1.verdict?.text ?? '') && a1.steps[1]?.endsWith('경정청구 검토(5년 안 · ★ 세무사)') && a1.steps.some((x) => /5년 안/.test(x)) && /놓친 세액공제 1차 검토/.test(a1.copyText), JSON.stringify(a1))
+  const a0 = answerFor('refund', { record: mkRec(null), today: T, notices: [] })
+  check('D-379 상담 답: 신고서가 없으면 무엇을 올리면 되는지(세무조정계산서 5년)', a0.verdict?.tone === 'need' && a0.docs.some((d) => /최근 5년 세무조정계산서/.test(d)), JSON.stringify(a0))
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

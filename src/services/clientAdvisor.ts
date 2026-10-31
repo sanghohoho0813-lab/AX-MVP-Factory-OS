@@ -20,7 +20,8 @@ import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { researchLabOf, usableFactValue } from './customerFacts'
-import { buildInsights, policyDocsLine, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
+import { buildInsights, employmentRefund, labRefund, pastStartupRefund, policyDocsLine, recommendNextSteps, reliefYears, startupRefund, type Insight, type InsightTone } from './clientInsights'
+import { headcountOf } from '../tools/employment/lib/taxCredit'
 import { pendingFacts } from './customerFacts'
 import { josa } from '../lib/josa'
 
@@ -66,6 +67,8 @@ export const ADVISOR_GROUPS: AdvisorGroup[] = [
     questions: [
       { id: 'startup', label: '창업감면 받을 수 있나?', words: /창업\s*감면|감면|법인세|소득세\s*감면|취득세/ },
       { id: 'salary', label: '대표 급여 · 배당 · 퇴직금은 어떻게 가져가면 좋아?', words: /급여|배당|퇴직|가지급|절세|주식|상속|증여/ },
+      // D-379 올린 신고서에서 빠진 공제 — 경정청구(5년)
+      { id: 'refund', label: '놓친 세액공제 · 경정청구 있나?', words: /경정\s*청구|놓친|빠진\s*(?:세액)?\s*공제|돌려\s*받|환급|신고서/ },
     ],
   },
   {
@@ -260,6 +263,35 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
         : ['창업 형태(새로 창업 · 이어받기) 확인 — 이어받은 창업은 감면이 안 될 수 있어요', '과밀억제권역(수도권 일부) 여부로 감면율이 달라져요', '감면을 안 받고 있었다면 경정청구로 돌려받을 수 있는지 확인']
     a.docs = ['사업자등록증', '대표 주민등록 초본(나이 확인 — 번호는 저장하지 않아요)', '법인등기부등본(법인)']
     a.copyText = [`[창업감면 1차 검토] ${name(ctx.record)}`, ins.headline, ...a.steps.map((s) => `· ${s}`)].join('\n')
+    return a
+  },
+  // D-379 올린 신고서(회사 정보 '받은 공제 · 감면 YYYY년') — 맞춤 추천 카드가 찾은 '신고서에 빠진 공제' 줄을 모아서
+  refund: (ctx) => {
+    const a = empty('refund', '놓친 세액공제 · 경정청구')
+    const f = factsOf(ctx)
+    const ret = f.businessType === 'individual' ? '종합소득세 신고서' : '세무조정계산서(법인세 신고서)'
+    a.links = [{ label: '서류함 열기', href: `/ops/clients/${encodeURIComponent(ctx.record.id)}?tab=docs` }]
+    a.docs = [`최근 5년 ${ret}`, '4대보험 가입자 명부(그만둔 사람까지)', ...(researchLabOf(ctx.record) ? ['연구원 인건비 · 연구노트'] : [])]
+    const years = reliefYears(ctx.record, f, ctx.today)
+    if (!years.length) {
+      a.verdict = { tone: 'need', text: `${ret}를 올리면 받은 공제 · 감면을 읽어 빠진 것을 찾아요` }
+      a.steps = [`${ret}를 해마다 올리기(경정청구는 5년 안)`, '명부 · 연구소 인정서가 있으면 그해 받을 수 있었던 공제와 맞춰 봐요']
+      a.missing = [ret]
+      a.copyText = [`${ceo(ctx.record)}, 지난 신고에서 빠진 세액공제가 있는지 봐 드리려고 합니다.`, `필요한 자료: ${a.docs.join(', ')}`].join('\n')
+      return a
+    }
+    a.facts = years.slice(0, 5).map((y) => `${y.year}년: ${y.text}`)
+    // 맞춤 추천 카드와 같은 함수 · 같은 말(고용 · 연구소 · 창업감면)
+    const past = headcountOf((latestEmploymentRoster(ctx.record)?.data as { headcountPast?: unknown } | null)?.headcountPast)
+    const emp = employmentRefund(ctx.record, f, years, past)
+    const lab = labRefund(researchLabOf(ctx.record), f, years)
+    const startupTone = insightOf(ctx, 'startup-tax')?.tone
+    const st = f.months !== null && f.months >= 60 ? (pastStartupRefund(ctx.record, f, ctx.today)?.line ?? '') : startupTone && startupTone !== 'no' ? startupRefund(f.establishedAt, f, years).line : ''
+    const misses = [emp.line, lab.line, st].filter((l) => /경정청구/.test(l))
+    const sure = emp.won > 0 || lab.sure
+    a.verdict = misses.length ? { tone: sure ? 'good' : 'maybe', text: `신고서에 빠진 공제 ${misses.length}가지 — 경정청구 검토` } : { tone: 'done', text: '올린 신고서에서 빠진 공제를 찾지 못했어요' }
+    a.steps = [...misses, '세무사와 그해 신고서 · 근거 서류(명부 · 인건비) 맞춰 보기', '경정청구는 법정신고기한부터 5년 안(법인 3월 말 · 개인 5월 말 기준)']
+    a.copyText = [`[놓친 세액공제 1차 검토] ${name(ctx.record)}`, ...misses.map((m) => `· ${m}`), '※ 세무사 확인 뒤 경정청구'].join('\n')
     return a
   },
   salary: (ctx) => {
