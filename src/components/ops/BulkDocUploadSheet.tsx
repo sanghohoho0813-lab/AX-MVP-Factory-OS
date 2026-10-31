@@ -193,6 +193,7 @@ export function BulkDocUploadSheet({
           const res = await extractTextFromFile(it.file, (ratio, label) => patch(it.id, { progress: { ratio, label } }))
           text = res.text
           method = res.method
+          if (res.note) readNote = res.note
         }
       } catch (e) {
         // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다(D-266 암호 · 배포용 한글 문서는 까닭을 보여 준다)

@@ -29,6 +29,8 @@ export interface ExtractResult {
   method: ExtractMethod
   /** 진행률 0~1 */
   pages?: number
+  /** D-433 읽기는 했지만 알려 둘 것(스캔 PDF 가 길어 앞쪽만 읽음) — 사람 말 한 줄 */
+  note?: string
 }
 
 export type ProgressFn = (ratio: number, label: string) => void
@@ -73,7 +75,7 @@ const OCR_MAX_WIDTH = 3300
  */
 const MAX_OCR_PAGES = 4
 
-async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<string | null> {
+async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<{ text: string; total: number } | null> {
   ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
@@ -92,7 +94,7 @@ async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<string 
       canvas.width = 0
       canvas.height = 0
     }
-    return texts.length ? texts.join('\n') : null
+    return texts.length ? { text: texts.join('\n'), total: doc.numPages } : null
   } finally {
     await task.destroy()
   }
@@ -271,7 +273,8 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     onProgress?.(0, '스캔본으로 보입니다. 글자 인식으로 전환합니다')
     const ocr = await ocrPdfPages(file, onProgress)
     if (ocr === null) return { text, method: 'pdf_text' }
-    return { text: ocr, method: 'ocr' }
+    // D-433 앞 4쪽만 읽었으면 알린다(예전: 말없이 뒷장을 건너뜀 — 손익계산서 · 임원 사항이 뒤에 있으면 못 읽은 줄 몰랐다)
+    return { text: ocr.text, method: 'ocr', pages: ocr.total, ...(ocr.total > MAX_OCR_PAGES ? { note: longScanNote(ocr.total) } : {}) }
   }
 
   onProgress?.(0, '이미지 여는 중')
@@ -279,6 +282,11 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   const canvas = await imageToCanvas(file)
   if (!canvas) throw new OfficeReadError(imageOpenFailNote(file))
   return { text: await ocrImage(canvas, onProgress), method: 'ocr' }
+}
+
+/** D-433 긴 스캔 PDF — 앞 4쪽만 읽었다는 한 줄 */
+export function longScanNote(total: number): string {
+  return `스캔본 ${total}쪽 중 앞 ${MAX_OCR_PAGES}쪽만 글자를 읽었어요 — 필요한 쪽(손익계산서 · 임원 사항 등)이 뒤에 있으면 그 쪽만 따로 올려 주세요.`
 }
 
 /** D-432 사진을 못 열었을 때 사람 말 — 아이폰 HEIC 면 바꾸는 법까지 */

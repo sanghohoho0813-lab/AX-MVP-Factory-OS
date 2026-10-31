@@ -5,7 +5,7 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote } from '../docTextExtract'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
 import { normalizeClientOps } from '../clientOpsService'
@@ -427,6 +427,7 @@ async function main() {
     }
     check('D-432 아이폰 사진(.HEIC · 종류 비어 있어도) — 읽을 파일로 보고, 못 열면 "아이폰 사진(HEIC) … JPG 로 바꿔" 한 줄(예전: 말없이 빈 글 → 기타)', canExtractText(heic) && msg.includes('아이폰 사진(HEIC)') && msg.includes('높은 호환성'), msg)
   }
+  check('D-433 긴 스캔 PDF — "스캔본 12쪽 중 앞 4쪽만 글자를 읽었어요 … 그 쪽만 따로"(예전: 말없이 뒷장 건너뜀)', longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만') && longScanNote(12).includes('따로 올려'))
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }

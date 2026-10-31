@@ -619,6 +619,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           if (e instanceof reader.OfficeReadError) showToast(`파일은 보관했어요. ${e.message}`)
           return null
         })
+        if (res?.note) showToast(res.note)
         if (res && res.text.trim()) {
           // D-209: 새 서류에 찍힌 발급일 · 유효기간 끝을 그 칸에(사람이 그새 적었으면 그대로)
           const dated = placeDocument({ text: res.text, fileName: file.name }, allDocumentMetas(current() ?? record).filter((m) => m.needsFile))
