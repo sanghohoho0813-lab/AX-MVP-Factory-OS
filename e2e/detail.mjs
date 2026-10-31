@@ -1801,6 +1801,39 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-381 대표 신용점수 조회서 → 회사 정보 · 정책자금 근거 '대표 신용 NICE 812점' ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const NICE = { name: 'scan_381.txt', mimeType: 'text/plain', buffer: Buffer.from(['NICE지키미 신용정보 조회서', '조회일 2026.10.20', '성명 김대표 생년월일 1978.05.10', '나의 신용점수 812 점', '(1,000점 만점)'].join('\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([NICE])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-381 스캔 이름이어도 "대표 신용점수 조회" 칸', placed.includes('→ 대표 신용점수 조회'), placed.slice(0, 300))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const batch = ((await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-381 바로 넣은 정보: 대표 신용점수 NICE 812점', batch.includes('대표 신용점수') && batch.includes('NICE 812점'), batch.slice(0, 500))
+  if ((await page.locator('[data-testid="smart-insight"]').count()) === 0) await page.getByRole('button', { name: /모듈별 판정/ }).first().click()
+  await page.waitForTimeout(400)
+  const pol = (await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
+  check('D-381 정책자금 카드 근거: 대표 신용 NICE 812점', pol.includes('대표 신용 NICE 812점'), pol.slice(0, 400))
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
+  const note = (await page.getByTestId('tool-prefill-note').innerText().catch(() => '')) ?? ''
+  check('D-381 정책자금 화면: 대표 신용 800점대(신용점수 조회서) 채움', note.includes('대표 신용 800점대(신용점수 조회서)'), note.slice(0, 400))
+  check('D-381 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
