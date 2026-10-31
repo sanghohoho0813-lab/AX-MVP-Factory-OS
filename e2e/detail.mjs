@@ -1834,6 +1834,39 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-386 여러 서류를 합친 파일 하나 → 쪽마다 나눠 칸 · 정보 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const pages = [
+    ['등기사항전부증명서(현재 유효사항)', '상호 한솔테크 주식회사', '1주의 금액 금 5,000 원', '발행주식의 총수 20,000 주', '보통주식 20,000 주 금 100,000,000 원'].join('\n'),
+    ['임원에 관한 사항', '사내이사 김대표 780510-1******', '2024 년 11 월 20 일 중임', '회사성립연월일 2019 년 03 월 02 일'].join('\n'),
+    ['NICE지키미 신용정보 조회서', '나의 신용점수 812 점', '(1,000점 만점)'].join('\n'),
+  ]
+  const MERGED = { name: 'scan_386.txt', mimeType: 'text/plain', buffer: Buffer.from(pages.join('\n\f\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([MERGED])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-386 합친 파일 하나 → 등기부(1~2쪽) · 신용점수 조회(3쪽) 두 칸으로', placed.includes('scan_386.txt → 법인등기부등본') && placed.includes('scan_386.txt 3쪽 → 대표 신용점수 조회'), placed.slice(0, 400))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const batch = ((await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-386 정보도 서류마다: 임원 임기 · 대표 신용점수 NICE 812점', batch.includes('임원 임기') && batch.includes('NICE 812점'), batch.slice(0, 500))
+  const r = await record(page)
+  const cell = (r.customDocuments ?? []).find((d) => d.label === '대표 신용점수 조회')
+  check('D-386 둘째 서류 칸은 받음 + "scan_386.txt 3쪽에 함께" 메모(파일은 한 번만)', !!cell && r.documents[cell.key]?.received === true && r.documents[cell.key]?.note === 'scan_386.txt 3쪽에 함께', JSON.stringify(cell && r.documents[cell.key]))
+  check('D-386 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

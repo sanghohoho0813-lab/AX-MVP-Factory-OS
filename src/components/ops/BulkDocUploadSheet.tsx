@@ -30,6 +30,7 @@ import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 import type { HandoffDoc } from '../../services/docHandoff'
 import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
 import { OfficeReadError } from '../../services/officeText'
+import { pagesLabel, splitBundle, type BundlePart } from '../../services/docBundle'
 
 /** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
 function shortName(fileName: string): string {
@@ -61,6 +62,8 @@ interface Item {
   from: string
   /** D-266 글자를 못 읽은 까닭(암호 걸린 한글 문서 등) — 그때는 파일 이름으로 칸을 정한다 */
   readNote: string
+  /** D-386 한 파일에 합쳐 온 다른 서류(둘째부터) — 칸은 '받음' + 몇 쪽 메모, 글자는 따로 읽는다 */
+  bundle?: BundlePart[] | null
 }
 
 export function BulkDocUploadSheet({
@@ -197,9 +200,12 @@ export function BulkDocUploadSheet({
         if (e instanceof OfficeReadError) readNote = `${e.message} 파일 이름으로 칸을 정했어요.`
       }
       // D-146: 서류 맨 위 제목으로 칸을 정한다 — 맞는 칸이 없으면 그 이름으로 새 칸, 모르면 '기타 · 확인 필요'(남는 파일 없음)
-      const result = placeDocument({ text, fileName: it.file.name }, metas)
+      // D-386 여러 서류를 한 PDF 로 합쳐 보냈으면 — 파일은 첫 서류 칸, 나머지 서류는 쪽마다 따로 읽는다
+      const bundle = splitBundle(text, metas)
+      const result = bundle ? bundle[0].placement : placeDocument({ text, fileName: it.file.name }, metas)
       const next: Partial<Item> = {
-        text,
+        text: bundle ? bundle[0].text : text,
+        bundle: bundle ? bundle.slice(1) : null,
         method,
         readNote,
         status: 'ready',
@@ -318,6 +324,14 @@ export function BulkDocUploadSheet({
         // D-148: '사업자등록증 (2)' 칸에 들어가도 사업자등록증으로 읽는다(칸 키가 아니라 서류 종류로)
         const factKey: DocumentKey = placement.kind === 'existing' ? placement.key : cell.key
         readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
+        // D-386 같은 파일 안의 다른 서류 — 칸은 '받음' + '○○.pdf 3쪽에 함께'(파일을 두 번 올리지 않는다) · 글자는 그 쪽만
+        for (const part of it.bundle ?? []) {
+          const where = `${it.file.name} ${pagesLabel(part)}`
+          const c2 = cellForPlacement(rec, part.placement, used)
+          rec = withDocument(c2.record, c2.key, { received: true, note: `${where}에 함께`, ...(part.placement.issuedAt ? { issuedAt: part.placement.issuedAt } : {}) })
+          placed.push({ fileName: where, label: c2.label, other: c2.label.startsWith(OTHER_DOC_LABEL), numbered: c2.numbered })
+          readDocs.push({ key: part.placement.kind === 'existing' ? part.placement.key : c2.key, fileName: where, text: part.text, method: it.method, docSure: part.placement.sure })
+        }
       }
       return { rec, readDocs, placed }
     }

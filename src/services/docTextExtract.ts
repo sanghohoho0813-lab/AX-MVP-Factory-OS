@@ -51,7 +51,8 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
     chunks.push(pdfItemsToText(content.items))
   }
   await task.destroy()
-  return chunks.join('\n')
+  // D-386 쪽 사이에 쪽 나눔(\f) — 여러 서류를 한 PDF 로 합쳐 보냈으면 쪽마다 나눠 읽는다(docBundle). 줄 나눔 사이라 다른 읽기에는 빈 줄
+  return chunks.join('\n\f\n')
 }
 
 /**

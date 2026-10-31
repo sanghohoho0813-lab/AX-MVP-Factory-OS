@@ -56,6 +56,7 @@ import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears,
 import { officerTerms, officerTermsOf, officerTermsValue, readDirectorTermYears, readRegistryTax } from '../registryTax'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
+import { pagesLabel, splitBundle } from '../docBundle'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
@@ -2054,6 +2055,23 @@ await (async () => {
   check('D-383 정책자금 근거: 가점 줄에 청년기업 · 청년 고용지원금 참여 · 엔진 가점 선택지에 들어감', ev.input.bonusItems?.includes('만39세 이하 청년기업') && ev.input.bonusItems.includes('고용지원금 참여') && ev.notes.some((x) => /가점 .*청년기업\(대표 만 39세 미만\).*청년 고용지원금 참여/.test(x)), JSON.stringify(ev.notes))
   check('D-383 진단서 "보유" 칸은 인증서만(청년기업은 보유가 아님)', !policyBonus(yj, T).items.includes('만39세 이하 청년기업' as never))
 }
+
+// D-386 여러 서류를 한 PDF 로 합쳐 보냈으면 — 쪽마다 제목을 보고 서류별로 나눠 읽는다
+await (async () => {
+  const BIZ = ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '사업장 소재지 : 경기도 파주시 탄현면 평화로 3', '업태 : 제조업', '종목 : 바이오 시약'].join('\n')
+  const REG1 = ['등기사항전부증명서(현재 유효사항)', '상호 주식회사 미래바이오랩', '1주의 금액 금 5,000 원', '발행주식의 총수 20,000 주', '보통주식 20,000 주 금 100,000,000 원'].join('\n')
+  const REG2 = ['임원에 관한 사항', '사내이사 이대표 750101-*******', '2024 년 01 월 10 일 중임', '회사성립연월일 2023 년 01 월 10 일'].join('\n')
+  const NICE = ['NICE지키미 신용정보 조회서', '나의 신용점수 812 점', '(1,000점 만점)'].join('\n')
+  const all = [BIZ, REG1, REG2, NICE].join('\n\f\n')
+  const base = normalizeClientOps({ id: 'bd386', companyName: '미래바이오랩', createdAt: NOW, updatedAt: NOW })
+  const parts = splitBundle(all, allDocumentMetas(base))
+  check('D-386 합친 PDF 4쪽 → 사업자등록증(1쪽) · 등기부(2~3쪽 — 제목 없는 쪽은 앞 서류에) · 신용점수 조회(4쪽)', !!parts && parts.map((x) => `${x.placement.label}:${pagesLabel(x)}`).join() === '사업자등록증:1쪽,법인등기부등본:2~3쪽,대표 신용점수 조회:4쪽', JSON.stringify(parts?.map((x) => [x.placement.label, x.from, x.to])))
+  check('D-386 쪽 나눔이 없거나 한 서류(등기부 여러 쪽)면 나누지 않음', splitBundle(BIZ, allDocumentMetas(base)) === null && splitBundle([REG1, REG2].join('\n\f\n'), allDocumentMetas(base)) === null)
+  let n = 0
+  const docs = (parts ?? []).map((x) => ({ key: x.placement.kind === 'existing' ? x.placement.key : 'customdoc_x', fileName: `합본.pdf ${pagesLabel(x)}`, text: x.text, method: 'pdf_text' as const, docSure: x.placement.sure }))
+  const a = await analyzeUploadedDocs(base, docs, { now: NOW, today: '2026-10-31', makeId: () => `bd${++n}` })
+  check('D-386 나눠 읽으면 서류마다 정보가 섞이지 않고 다 들어감 — 사업자번호 · 개업일 · 임원 임기 · 신용점수', a.record.businessNumber === '124-81-00998' && a.record.establishedAt === '2023-01-10' && customFactValue(a.record, '임원 임기').includes('2024-01-10 중임') && customFactValue(a.record, '대표 신용점수') === 'NICE 812점', JSON.stringify([a.record.businessNumber, a.record.establishedAt, customFactValue(a.record, '임원 임기'), customFactValue(a.record, '대표 신용점수'), a.summary.flagged.map((f) => f.label)]))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
