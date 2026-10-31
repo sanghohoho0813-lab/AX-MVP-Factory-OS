@@ -17,6 +17,7 @@ import { isPick, manwonText, topPicks, type Insight, type InsightTone } from './
 import { policyBonus } from './policyEvidence'
 import { requestItemsFrom, type RequestItem } from './recoRequest'
 import { customFactValue } from './customerFacts'
+import { vatYearOverYear } from './vatReturnDoc'
 
 export interface DiagnosisLine {
   key: string
@@ -168,7 +169,9 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   const vatRet = customFactValue(record, '부가세 신고 매출')
   const vatYear = Number(/^(20\d{2})년/.exec(vatRet)?.[1] ?? 0)
   const revYear = Number(facts.revenue?.asOf?.slice(0, 4) ?? 0)
-  if (vatRet && vatYear && (!facts.revenue || !revYear || vatYear > revYear)) snapshot.push({ label: '부가세 신고', value: vatRet.replace(' 과세표준 ', ' · ').slice(0, 60) })
+  const vy = vatYearOverYear(customFactValue(record, '부가세 신고 추이'))
+  const vyText = vy ? ` · 작년 같은 기간보다 ${vy.pct > 0 ? '+' : ''}${vy.pct}%` : ''
+  if (vatRet && vatYear && (!facts.revenue || !revYear || vatYear > revYear)) snapshot.push({ label: '부가세 신고', value: `${vatRet.replace(' 과세표준 ', ' · ')}${vyText}`.slice(0, 80) })
   // D-374 개인사업자는 사업소득(소득금액증명)이 법인전환 · 정책자금 판단의 근거 — 회사 한눈에 같이
   if (facts.businessType === 'individual' && facts.netIncome && facts.netIncome.won > 0 && !facts.netIncome.estimated) snapshot.push({ label: '사업소득', value: `${won(facts.netIncome.won)}${facts.netIncome.asOf ? `(${facts.netIncome.asOf.slice(0, 4)})` : ''}` })
   const held = policyBonus(record, today).items.map((x) => x.replace(/ 보유$/, ''))

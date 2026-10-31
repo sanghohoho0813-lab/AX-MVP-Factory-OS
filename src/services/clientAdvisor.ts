@@ -24,6 +24,7 @@ import { buildInsights, employmentRefund, labRefund, pastStartupRefund, policyDo
 import { headcountOf } from '../tools/employment/lib/taxCredit'
 import { pendingFacts } from './customerFacts'
 import { josa } from '../lib/josa'
+import { vatYearOverYear } from './vatReturnDoc'
 
 export interface AdvisorQuestion {
   id: string
@@ -142,6 +143,12 @@ function insightOf(ctx: AdvisorContext, key: string): Insight | null {
   return (ctx.insights ?? buildInsights(ctx.record, ctx.today, ctx.notices)).find((i) => i.key === key) ?? null
 }
 
+/** D-405 부가세 신고서 두 해(같은 기간)가 있으면 '(작년 같은 기간보다 +24%)' */
+function vatYoySuffix(r: ClientOpsRecord): string {
+  const y = vatYearOverYear(customFactValue(r, '부가세 신고 추이'))
+  return y ? `(작년 같은 기간보다 ${y.pct > 0 ? '+' : ''}${y.pct}%)` : ''
+}
+
 /** D-399 직원 수를 어디서 알았는지 — 명부(재직) · 원천세 신고서(그달 급여 받은 사람) · 사업장현황신고서(연말)는 뜻이 조금씩 달라 같이 적는다 */
 function employeeSource(r: ClientOpsRecord): string {
   const src = r.factMeta?.employeeCount?.source
@@ -168,7 +175,7 @@ function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
     customFactValue(r, '임원 임기') ? `임원 임기 ${customFactValue(r, '임원 임기').split(' / ')[0]}` : '',
     latestRelief(r),
     // D-395 올해 매출을 가장 먼저 보여 주는 부가세 신고서(한 기간)
-    customFactValue(r, '부가세 신고 매출') ? `부가세 신고 ${customFactValue(r, '부가세 신고 매출')}` : '',
+    customFactValue(r, '부가세 신고 매출') ? `부가세 신고 ${customFactValue(r, '부가세 신고 매출')}${vatYoySuffix(r)}` : '',
   ].filter(Boolean)
 }
 

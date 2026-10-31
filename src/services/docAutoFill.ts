@@ -15,9 +15,9 @@
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
-import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
-import { fullYearFromReturns, readVatReturn, type VatReturnRead } from './vatReturnDoc'
+import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
 
@@ -212,6 +212,16 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const seedRead = seed ? [{ yearMonth: `${seed[1]}-${seed[2].padStart(2, '0')}`, employees: Number(seed[3]) }] : []
     const merged = mergeHeadcountTrend(cur?.value ?? '', [...seedRead, ...whReads.map((r) => ({ yearMonth: r.yearMonth, employees: r.employees }))])
     if (merged && merged !== cur?.value) rec = withCustomField(rec, { id: cur?.id, group: cur?.group ?? 'people', label: '원천세 인원 추이', value: merged })
+  }
+  // D-405 부가세 신고서 여러 기간(이번에 · 예전에) → '부가세 신고 추이' 칸 — 작년 같은 기간과 비교해 올해 매출 흐름을 본다
+  const vrReads = docs.map((d) => readVatReturn(d.text)).filter((r): r is VatReturnRead => !!r && !!r.from && !!r.to)
+  if (vrReads.length) {
+    const curT = rec.customFields.find((f) => f.label === '부가세 신고 추이')
+    const seedP = periodOfReturnValue(customFactValue(record, '부가세 신고 매출'))
+    const seedWon = seedP ? parseWonInput(seedP.amountText) : null
+    const seed = seedP && seedWon !== null ? [{ from: seedP.from, to: seedP.to, base: seedWon }] : []
+    const merged = mergeVatTrend(curT?.value ?? '', [...seed, ...vrReads.map((r) => ({ from: r.from, to: r.to, base: r.base }))])
+    if (merged && merged !== curT?.value) rec = withCustomField(rec, { id: curT?.id, group: curT?.group ?? 'identity', label: '부가세 신고 추이', value: merged })
   }
   // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다
   const returns = docs.map((d) => ({ d, r: readVatReturn(d.text) })).filter((x): x is { d: ReadDoc; r: VatReturnRead } => !!x.r)

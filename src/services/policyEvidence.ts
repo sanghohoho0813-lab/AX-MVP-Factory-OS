@@ -23,6 +23,7 @@ import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
 import { yearOverYear } from './withholdingReport'
+import { vatYearOverYear, vatYoyText } from './vatReturnDoc'
 import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
@@ -124,7 +125,9 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
     front.push(`가점 ${allBonus.map((b) => BONUS_SHORT[b] ?? b).join(', ')}`)
   }
   // D-333 매출 추이(부가세 과세표준증명 → 회사 정보 '매출 추이') → 3년 추세 · 올해 추세 — 엔진의 '매출 성장세'
-  const trendLine = customFactValue(record, '매출 추이')
+  // D-405 매출 추이 칸이 없으면 부가세 신고서 두 해(같은 기간)로 올해 추세만
+  const vatYoy = vatYearOverYear(customFactValue(record, '부가세 신고 추이'))
+  const trendLine = customFactValue(record, '매출 추이') || (vatYoy ? `부가세 신고 ${vatYoyText(vatYoy)}` : '')
   if (trendLine) {
     const t = vatTrendOf(trendLine)
     if (t.trend3y && !input.revenueTrend3y) input.revenueTrend3y = t.trend3y

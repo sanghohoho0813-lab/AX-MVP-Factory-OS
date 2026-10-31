@@ -9,7 +9,7 @@
  */
 
 import { mergeHeadcountTrend, readWithholdingReport, withholdingValue, yearOverYear } from '../withholdingReport'
-import { fullYearFromReturns, readVatReturn, vatReturnValue } from '../vatReturnDoc'
+import { fullYearFromReturns, mergeVatTrend, readVatReturn, vatReturnValue, vatYearOverYear, vatYoyText } from '../vatReturnDoc'
 import { readSiteReport } from '../siteReportDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
@@ -2337,6 +2337,24 @@ await (async () => {
   const ev = policyEvidence(mk('2025-09 9명 · 2026-09 12명'), clientFacts(mk('2025-09 9명 · 2026-09 12명'), new Date('2026-10-31T00:00:00')), '2026-10-31')
   check('D-404 정책자금 판정 입력에 고용증가 · 근거 줄 맨 앞', (ev.input.strengths ?? []).includes('고용증가') && ev.notes.some((n) => n.startsWith('고용 증가(원천세 신고')), JSON.stringify([ev.input.strengths, ev.notes]))
 }
+
+// D-405 부가세 신고서 두 해(같은 기간) → '부가세 신고 추이' · 작년 같은 기간 대비 → 정책자금 올해 추세 · 상담 · 진단서
+await (async () => {
+  const vr = (y: number, base: string) => ['일반과세자 부가가치세 [ ]예정 [√]확정 신고서', `신고기간 ${y}년 제1기 ( 1월 1일 ~ 6월 30일 )`, '① 신고내용', `합계 (9) ${base} ㉮ 1,000,000`].join('\n')
+  check('D-405 추이 합치기 · 작년 같은 기간 +24% · 기간이 다르면 비교 안 함', mergeVatTrend('', [{ from: '2025-01', to: '2025-06', base: 500_000_000 }, { from: '2026-01', to: '2026-06', base: 620_000_000 }]) === '2025-01~06 500,000,000원 · 2026-01~06 620,000,000원' && vatYearOverYear('2025-01~06 500,000,000원 · 2026-01~06 620,000,000원')?.pct === 24 && vatYearOverYear('2025-07~12 500,000,000원 · 2026-01~06 620,000,000원') === null)
+  check('D-405 정책자금 추이 읽기와 같은 말 — "2026년 1~6월 작년 같은 기간보다 +24%" → 전년보다 증가', vatYoyText({ cur: { from: '2026-01', to: '2026-06', base: 1 }, pct: 24 }) === '2026년 1~6월 작년 같은 기간보다 +24%' && vatTrendOf(vatYoyText({ cur: { from: '2026-01', to: '2026-06', base: 1 }, pct: 24 })).thisYear === '전년보다 증가')
+  const base = normalizeClientOps({ id: 'vr405', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_v1', fileName: 'vat2025.pdf', text: vr(2025, '500,000,000'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `v5${++n}` })
+  check('D-405 한 해만 올리면 추이 칸 없음', !customFactValue(a.record, '부가세 신고 추이'))
+  const b = await analyzeUploadedDocs(a.record, [{ key: 'customdoc_v2', fileName: 'vat2026.pdf', text: vr(2026, '620,000,000'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `v5${++n}` })
+  check('D-405 다음 해 신고서 → 추이 "2025-01~06 500,000,000원 · 2026-01~06 620,000,000원" · 묻지 않음', customFactValue(b.record, '부가세 신고 추이') === '2025-01~06 500,000,000원 · 2026-01~06 620,000,000원' && b.summary.flagged.length === 0, JSON.stringify([customFactValue(b.record, '부가세 신고 추이'), b.summary.flagged]))
+  const ev = policyEvidence(b.record, clientFacts(b.record, new Date('2026-10-31T00:00:00')), '2026-10-31')
+  check('D-405 정책자금: 매출 추이 칸이 없어도 올해 추세 "전년보다 증가" · 근거 줄', ev.input.thisYearTrend === '전년보다 증가' && ev.notes.some((x) => x.includes('작년 같은 기간보다 +24%')), JSON.stringify([ev.input.thisYearTrend, ev.notes]))
+  const sum = answerFor('summary', { record: b.record, today: '2026-10-31', notices: [] })
+  const dg = buildDiagnosis(b.record, buildInsights(b.record, '2026-10-31', []), '2026-10-31').snapshot.find((x) => x.label === '부가세 신고')?.value ?? ''
+  check('D-405 상담 요약 · 진단서 회사 한눈에 "작년 같은 기간보다 +24%"', sum.facts.some((x) => x.includes('부가세 신고 2026년 1기') && x.includes('(작년 같은 기간보다 +24%)')) && dg.includes('작년 같은 기간보다 +24%'), JSON.stringify([sum.facts, dg]))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

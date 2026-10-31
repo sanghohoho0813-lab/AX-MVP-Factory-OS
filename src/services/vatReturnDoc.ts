@@ -77,6 +77,50 @@ export function fullYearFromReturns(reads: readonly VatReturnRead[]): { year: nu
   return null
 }
 
+/**
+ * D-405 '부가세 신고 추이' 칸 — 신고 기간마다 과세표준을 'YYYY-MM~MM N원' 으로 쌓는다(기간 순서 · 최근 12개 · 같은 기간은 새것).
+ * 기간이 둘 이상일 때만 글이 생긴다. 사람이 읽을 수 있게 원 단위 쉼표.
+ */
+export interface VatPeriodAmount {
+  from: string
+  to: string
+  base: number
+}
+
+export function parseVatTrend(text: string): VatPeriodAmount[] {
+  return [...String(text || '').matchAll(/(20\d{2})-(\d{2})~(\d{2})\s+(-?[\d,]+)원/g)].map((m) => ({ from: `${m[1]}-${m[2]}`, to: `${m[1]}-${m[3]}`, base: Number(m[4].replace(/,/g, '')) }))
+}
+
+export function mergeVatTrend(prev: string, adds: readonly VatPeriodAmount[]): string {
+  const m = new Map<string, VatPeriodAmount>()
+  for (const p of [...parseVatTrend(prev), ...adds]) if (p.from && p.to && p.from.slice(0, 4) === p.to.slice(0, 4) && p.from <= p.to) m.set(`${p.from}~${p.to}`, p)
+  const list = [...m.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to)).slice(-12)
+  return list.length >= 2 ? list.map((p) => `${p.from}~${p.to.slice(5)} ${p.base.toLocaleString('en-US')}원`).join(' · ') : ''
+}
+
+/** 가장 최근 기간과 작년 같은 기간(같은 달들) — 둘 다 있으면 증감 %(반올림) */
+export function vatYearOverYear(trend: string): { cur: VatPeriodAmount; prev: VatPeriodAmount; pct: number } | null {
+  const list = parseVatTrend(trend).sort((a, b) => a.to.localeCompare(b.to) || a.from.localeCompare(b.from))
+  const cur = list[list.length - 1]
+  if (!cur) return null
+  const shift = (ym: string) => `${Number(ym.slice(0, 4)) - 1}${ym.slice(4)}`
+  const prev = list.find((p) => p.from === shift(cur.from) && p.to === shift(cur.to))
+  if (!prev || prev.base <= 0) return null
+  return { cur, prev, pct: Math.round(((cur.base - prev.base) / prev.base) * 100) }
+}
+
+/** '2026년 1~6월 작년 같은 기간보다 +24%' — 정책자금 매출 추이 읽기(vatTrendOf)와 같은 말 */
+export function vatYoyText(y: { cur: VatPeriodAmount; pct: number }): string {
+  return `${y.cur.from.slice(0, 4)}년 ${Number(y.cur.from.slice(5))}~${Number(y.cur.to.slice(5))}월 작년 같은 기간보다 ${y.pct > 0 ? '+' : ''}${y.pct}%`
+}
+
+/** '부가세 신고 매출' 칸 글('2026년 1기 확정(1~6월) 과세표준 6억 2,000만원') → 기간 · 금액(금액은 부르는 쪽이 원으로) */
+export function periodOfReturnValue(value: string): { from: string; to: string; amountText: string } | null {
+  const m = /^(20\d{2})년[^(]*\((\d{1,2})~(\d{1,2})월\)\s*과세표준\s*(.+)$/.exec(String(value || '').trim())
+  if (!m) return null
+  return { from: `${m[1]}-${m[2].padStart(2, '0')}`, to: `${m[1]}-${m[3].padStart(2, '0')}`, amountText: m[4] }
+}
+
 /** 회사 정보 '부가세 신고 매출' 칸 — '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원' */
 export function vatReturnValue(r: VatReturnRead, won: (n: number) => string): string {
   const term = `${r.year}년${r.half ? ` ${r.half}기` : ''}${r.kind ? ` ${r.kind}` : ''}`
