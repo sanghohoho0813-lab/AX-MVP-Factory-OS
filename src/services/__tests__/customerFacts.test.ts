@@ -2073,5 +2073,17 @@ await (async () => {
   check('D-386 나눠 읽으면 서류마다 정보가 섞이지 않고 다 들어감 — 사업자번호 · 개업일 · 임원 임기 · 신용점수', a.record.businessNumber === '124-81-00998' && a.record.establishedAt === '2023-01-10' && customFactValue(a.record, '임원 임기').includes('2024-01-10 중임') && customFactValue(a.record, '대표 신용점수') === 'NICE 812점', JSON.stringify([a.record.businessNumber, a.record.establishedAt, customFactValue(a.record, '임원 임기'), customFactValue(a.record, '대표 신용점수'), a.summary.flagged.map((f) => f.label)]))
 })()
 
+// D-387 상담 '이 회사 한눈에' — 서류로 읽은 대표 신용 · 임원 임기 · 최근 신고서 공제
+{
+  const r = normalizeClientOps({ id: 'sm387', companyName: '요약정밀(주)', createdAt: NOW, updatedAt: NOW, customFields: [
+    { id: 'a', group: 'people', label: '대표 신용점수', value: 'NICE 812점' },
+    { id: 'b', group: 'people', label: '임원 임기', value: '대표이사 김대표 2024-11-20 중임 · 3년이면 2027-11-20 만료 / 감사 최감사 2025-03-25 취임 · 3년이면 2028-03-25 만료' },
+    { id: 'c', group: 'identity', label: '받은 공제 · 감면 2024년', value: '법인세 신고서에 공제 · 감면 없음' },
+    { id: 'd', group: 'identity', label: '받은 공제 · 감면 2025년', value: '통합고용세액공제 1,540만원(법인세 신고서)' },
+  ] } as never)
+  const a = answerFor('summary', { record: r, today: '2026-10-31', notices: [] })
+  check('D-387 요약: 대표 신용 NICE 812점 · 임원 임기(첫 사람) · 2025년 신고서 줄(최근 해)', a.facts.includes('대표 신용 NICE 812점') && a.facts.includes('임원 임기 대표이사 김대표 2024-11-20 중임 · 3년이면 2027-11-20 만료') && a.facts.includes('2025년 신고서 — 통합고용세액공제 1,540만원(법인세 신고서)'), JSON.stringify(a.facts))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

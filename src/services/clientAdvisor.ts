@@ -19,7 +19,7 @@ import { policyEvidence } from './policyEvidence'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { latestEmploymentRoster } from './toolResultGroups'
-import { customFactValue, researchLabOf, usableFactValue } from './customerFacts'
+import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { buildInsights, employmentRefund, labRefund, pastStartupRefund, policyDocsLine, recommendNextSteps, reliefYears, startupRefund, type Insight, type InsightTone } from './clientInsights'
 import { headcountOf } from '../tools/employment/lib/taxCredit'
 import { pendingFacts } from './customerFacts'
@@ -151,7 +151,20 @@ function profileLines(r: ClientOpsRecord, f: ClientFacts): string[] {
     f.revenue ? `매출 ${Math.round(f.revenue.won / 1e6).toLocaleString()}백만원${f.revenue.estimated ? '(예상)' : ''}` : '',
     f.businessType === 'corporation' ? '법인' : '',
     usableFactValue(r, 'certifications') ? `인증 ${usableFactValue(r, 'certifications')}` : '',
+    // D-387 서류로 읽은 것 — 대표 신용점수 · 임원 임기(가장 이른 만료) · 가장 최근 신고서의 공제 · 감면
+    customFactValue(r, '대표 신용점수') ? `대표 신용 ${customFactValue(r, '대표 신용점수')}` : '',
+    customFactValue(r, '임원 임기') ? `임원 임기 ${customFactValue(r, '임원 임기').split(' / ')[0]}` : '',
+    latestRelief(r),
   ].filter(Boolean)
+}
+
+/** 가장 최근 '받은 공제 · 감면 YYYY년' 칸 한 줄 */
+function latestRelief(r: ClientOpsRecord): string {
+  const rows = customFactEntries(r)
+    .map(([k, v]) => ({ y: Number(/받은\s*공제\s*[·ㆍ]?\s*감면\s*(20\d{2})\s*년$/.exec(k)?.[1] ?? 0), v }))
+    .filter((x) => x.y > 0)
+    .sort((a, b) => b.y - a.y)
+  return rows.length ? `${rows[0].y}년 신고서 — ${rows[0].v}` : ''
 }
 
 /* ------------------------------------------------------------------ */
