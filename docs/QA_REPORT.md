@@ -4566,7 +4566,8 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 ## §254 D-391 원천세 신고서 · D-392 주소 · 설립일 묻지 않기 · D-393 계산기 9종 상황 단추 · D-394 크레탑 오래된 값 — 병합 (2026-10-31)
 
 - tsc · oxlint · build 녹색 · test:all EXIT 0(2cca038 — 시험 도는 동안 코드를 고치지 않은 깨끗한 한 번 · customer-facts 608 · scenarios 166).
-- e2e(2cca038 빌드 · 0 실패): detail 482(D-391 원천세 신고서 → 직원 수 7 · 일용 · 가감계 아님) · facts 24 · diag 21 · calcpreset 41(D-393 1440 · 360 · 390) · board(아래).
+- e2e(2cca038 빌드 · 0 실패): detail 482(D-391 원천세 신고서 → 직원 수 7 · 일용 · 가감계 아님) · facts 24 · diag 21 · calcpreset 41(D-393 1440 · 360 · 390) · board 198.
+- main fast-forward(2cca038) 뒤 Production 화면 번들에 '이 계산기와 같은 식' · '원천징수이행상황신고서' · '원천세 신고 인원' 글이 들어 있음(확인).
   D-393 빌드(3fb8e19)에서 scenarios 69 · taxplan 96 · firstscreen 55 — 0 실패.
 - 새 사실 출처(원천세 신고서)를 더한 빌드(7c83ecb): qa:db 305/0 · qa:pilot 294/0 · board 198 · files 38 · facts 24.
 - 스크린샷(390): 07 가지급금 계산기 — 흰 바탕 · 회색 테두리 상자 '상황 예시로 바로 — 누르면 이 업체 숫자로 설계(이 계산기와 같은 식)' · [가지급금 정리] 단추 44px 이상 ·
