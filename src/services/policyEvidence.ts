@@ -25,10 +25,11 @@ import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue
 import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
+import { creditBandOf, lowestScoreOf } from './creditScoreDoc'
 
 export interface PolicyEvidence {
   /** 진단 입력에 덮어쓸 값(미확인을 채우는 것만) */
-  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment' | 'haveDocs' | 'revenueTrend3y' | 'thisYearTrend'>>
+  input: Partial<Pick<DiagnosisInput, 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'bonusItems' | 'strengths' | 'youthEmployment' | 'haveDocs' | 'revenueTrend3y' | 'thisYearTrend' | 'creditBand'>>
   /** 무엇으로 채웠는지 한 줄씩 */
   notes: string[]
   /** 받으면 확인되는 서류(있으면 더 정확) */
@@ -100,6 +101,13 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   }
   // 추천 기관이 바뀌는 근거(가점 · 고용)는 맨 앞에 — 맞춤 추천 카드는 앞의 몇 줄만 보인다
   const front: string[] = []
+  // D-381 대표 신용점수(조회서 · 직접 적은 칸) → 엔진 '대표 신용'. NICE · KCB 둘이면 낮은 쪽
+  const scoreText = customFactValue(record, '대표 신용점수')
+  const score = lowestScoreOf(scoreText)
+  if (score !== null) {
+    input.creditBand = creditBandOf(score)
+    ;(score < 700 ? notes : front).push(`대표 신용 ${scoreText.slice(0, 30)}${score < 600 ? ' — 일반 기관은 어려워요' : score < 700 ? ' — 한도가 줄 수 있어요' : ''}`)
+  }
   // D-307 가점 — 특허 · 연구소 · 벤처 · 이노비즈 · 메인비즈 · 여성기업 · 사회적기업(기술보증 · 혁신성장 쪽 추천이 달라진다)
   const bonus = policyBonus(record, today)
   if (bonus.items.length) {

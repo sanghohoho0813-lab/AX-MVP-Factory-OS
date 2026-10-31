@@ -214,7 +214,7 @@ function DiagnosisScreen() {
     // D-306 서류함 납세증명서 · 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음(맞춤 추천과 같은 근거) — 아직 '미확인' 인 칸만
     if (clientRecord && clientRecord.id === clientId) {
       const ev = policyEvidence(clientRecord, facts, todayLocalDate())
-      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'youthEmployment'>(k: K, label: string) => {
+      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'youthEmployment' | 'creditBand'>(k: K, label: string) => {
         const v = ev.input[k]
         if (v && isUntouched(k) && (next[k] ?? '미확인') === '미확인') {
           next[k] = v as DiagnosisInput[K]
@@ -230,6 +230,8 @@ function DiagnosisScreen() {
         filled.push('강점 고용 증가(4대보험 명부)')
       }
       put('youthEmployment', '청년 고용 있음(4대보험 명부)')
+      // D-381 대표 신용점수 조회서 → 대표 신용 칸(아직 '미확인' 일 때만)
+      if (ev.input.creditBand) put('creditBand', `대표 신용 ${ev.input.creditBand}(신용점수 조회서)`)
       // D-311 서류함에 있는 준비 서류 → 자료 체크 '확보' — 사람이 고르는 칸이 아니라 늘 지금 서류함대로
       const docs = ev.input.haveDocs ?? []
       if (docs.join() !== (next.haveDocs ?? []).join()) {

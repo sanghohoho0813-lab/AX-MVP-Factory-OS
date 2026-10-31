@@ -55,6 +55,7 @@ import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefY
 import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
 import { officerTerms, officerTermsOf, officerTermsValue, readRegistryTax } from '../registryTax'
 import { buildClientSchedule } from '../clientOpsSchedule'
+import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
@@ -1984,6 +1985,33 @@ await (async () => {
   check('D-380 한 달 넘게 지난 만료날은 내려놓음(옛 등기부일 수 있어)', buildClientSchedule(rec, '2026-04-15').filter((e) => e.id.includes(':officer:')).length === 1)
   check('D-380 임원 칸이 없는 등기부는 칸을 만들지 않음', !factCandidatesFromDocText('corporateRegistry', ['등기사항전부증명서', '상호 주식회사 가나', '1주의 금액 금 5,000 원'].join('\n'), 'r').some((c) => c.key === 'cf:임원 임기'))
 }
+
+// D-381 대표 신용점수 조회서 → 회사 정보 '대표 신용점수' → 정책자금 대표 신용(엔진 '미확인' 감점이 사라짐)
+await (async () => {
+  const NICE = ['NICE지키미 신용정보 조회서', '조회일 2026.10.20', '성명 김대표 생년월일 1978.05.10', '나의 신용점수 812 점', '(1,000점 만점)', '신용점수 산출 기준일 2026.10.19', '대출 2건 · 연체 없음'].join('\n')
+  const r1 = readCreditScore(NICE)
+  check('D-381 NICE 조회서: 812점 · 1,000점 만점 · 날짜 · 생년월일은 점수 아님', JSON.stringify(r1) === '{"scores":[{"bureau":"NICE","score":812}]}', JSON.stringify(r1))
+  const BOTH = ['신용정보 조회 결과', 'NICE 신용점수 : 812점', 'KCB(올크레딧) 신용점수 : 845점'].join('\n')
+  const r2 = readCreditScore(BOTH)
+  check('D-381 NICE · KCB 둘 다 → 둘 다 남기고 낮은 쪽으로 판정', !!r2 && creditScoreValue(r2) === 'NICE 812점 · KCB 845점' && lowestScoreOf(creditScoreValue(r2)) === 812 && creditBandOf(812) === '800점대' && creditBandOf(599) === '600점 미만' && creditBandOf(900) === '900점 이상', JSON.stringify(r2))
+  check('D-381 신용점수 낱말이 없는 서류 · 기업신용등급(크레탑)은 조회서 아님', !looksLikeCreditReport('사업자등록증 NICE 상호') && readCreditScore('CRETOP 기업종합보고서 기업신용등급 BB+') === null)
+  const base = normalizeClientOps({ id: 'cs381', companyName: '대전정밀(주)', businessNumber: '124-81-00998', establishedAt: '2019-03-02', businessCategory: '제조업', businessItem: '전자부품', businessAddress: '대전광역시 유성구 대학로 99', employeeCount: '8', createdAt: NOW, updatedAt: NOW } as never)
+  const pl = placeDocument({ text: NICE, fileName: 'scan_381.pdf' }, allDocumentMetas(base))
+  check('D-381 서류함: "대표 신용점수 조회" 칸 · 유효 1개월', pl.kind === 'new' && pl.label === '대표 신용점수 조회' && knownDocValidMonths('대표 신용점수 조회') === 1, JSON.stringify(pl))
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_cs', fileName: 'nice.pdf', text: NICE, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `cs${++n}` })
+  check('D-381 올리기 한 번 → "대표 신용점수" NICE 812점 바로(묻지 않음)', customFactValue(a.record, '대표 신용점수') === 'NICE 812점' && a.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '대표 신용점수'), a.summary.flagged]))
+  const facts = clientFacts(a.record, new Date('2026-10-31T00:00:00'))
+  const ev = policyEvidence(a.record, facts, '2026-10-31')
+  check('D-381 정책자금 근거: 대표 신용 800점대 · 앞줄 "대표 신용 NICE 812점"', ev.input.creditBand === '800점대' && ev.notes[0]?.startsWith('대표 신용 NICE 812점'), JSON.stringify(ev))
+  const before = runDiagnosis({ ...policyInputFromFacts(clientFacts(base, new Date('2026-10-31T00:00:00'))).input, ...policyEvidence(base, clientFacts(base, new Date('2026-10-31T00:00:00')), '2026-10-31').input })
+  const after = runDiagnosis({ ...policyInputFromFacts(facts).input, ...ev.input })
+  check('D-381 엔진: 800점대면 위험 점수가 내려감(신용 좋음 · 같은 엔진)', (after.risk?.score ?? 0) < (before.risk?.score ?? 0), JSON.stringify({ b: before.risk?.score, a: after.risk?.score }))
+  const low = normalizeClientOps({ ...base, customFields: [{ id: 'cs', group: 'people', label: '대표 신용점수', value: '580' }] } as never)
+  const evLow = policyEvidence(low, clientFacts(low, new Date('2026-10-31T00:00:00')), '2026-10-31')
+  check('D-381 사람이 "580" 만 적어도 → 600점 미만 · 일반 기관은 어려워요(뒤 줄)', evLow.input.creditBand === '600점 미만' && evLow.notes.some((x) => /580 — 일반 기관은 어려워요/.test(x)), JSON.stringify(evLow.notes))
+  check('D-381 점수를 모르면 체납 확인 목록에 끼지 않음(예전 그대로)', !policyEvidence(base, clientFacts(base, new Date('2026-10-31T00:00:00')), '2026-10-31').want.some((w) => /신용/.test(w)))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

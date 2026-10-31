@@ -204,6 +204,16 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /종합\s*소득세\s*신고/,
   },
   {
+    // D-381 대표 개인 신용점수 조회서(NICE 지키미 · KCB 올크레딧) — 정책자금 '대표 신용' 칸을 채운다(services/creditScoreDoc.ts). 점수는 자주 바뀌어 1개월
+    label: '대표 신용점수 조회',
+    validMonths: 1,
+    signals: [
+      { re: /신\s*용\s*(?:점\s*수|평\s*점)/, weight: 3, say: "'신용점수'" },
+      { re: /NICE|나이스\s*지키미|KCB|올크레딧|코리아\s*크레딧\s*뷰로/i, weight: 2, say: "'NICE · KCB'" },
+    ],
+    nameHint: /신용\s*(?:점수|정보|조회|평점)|지키미|올크레딧|nice|kcb/i,
+  },
+  {
     label: '재무제표',
     signals: [{ re: /재무제표|재무상태표|손익계산서/, weight: 3, say: "'재무제표'" }],
     nameHint: /재무제표|재무상태표|손익/,

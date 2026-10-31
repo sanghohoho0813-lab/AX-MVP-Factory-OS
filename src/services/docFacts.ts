@@ -9,6 +9,7 @@
  *  - 취업규칙 → '정년 · 계속고용' 칸(D-339)
  *  - 세무조정계산서 · 법인세 · 종합소득세 신고서 → '받은 공제 · 감면 YYYY년' 칸(D-378) — 경정청구 신호
  *  - 법인 등기부 → '임원 임기' 칸(D-380) — 3년이면 끝나는 날 · 달력에 중임 등기
+ *  - 대표 신용점수 조회서 → '대표 신용점수' 칸(D-381) — 정책자금 대표 신용
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -22,6 +23,7 @@ import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDo
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
 import { officerTerms, officerTermsValue } from './registryTax'
+import { creditScoreValue, readCreditScore } from './creditScoreDoc'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -117,6 +119,12 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
   if (looksLikeWorkRules(text)) {
     const rule = readRetireRule(text)
     if (rule) out.push({ key: `${CUSTOM_FACT_PREFIX}정년 · 계속고용`, label: '정년 · 계속고용', group: 'people', value: retireRuleLine(rule), source: 'workRules', asOf: '', ref })
+    return out
+  }
+  // D-381 대표 신용점수 조회서 → '대표 신용점수' 칸(정책자금 대표 신용). 조회서의 다른 내용은 남기지 않는다
+  const credit = readCreditScore(text)
+  if (credit) {
+    out.push({ key: `${CUSTOM_FACT_PREFIX}대표 신용점수`, label: '대표 신용점수', group: 'people', value: creditScoreValue(credit), source: 'creditReport', asOf: '', ref })
     return out
   }
   const cert = parseCertificateDocument(text)
