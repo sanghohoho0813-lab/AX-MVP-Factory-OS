@@ -17,6 +17,7 @@ import { REREAD_MARK } from './bizNoRead'
 import { ensureMapUpsert } from '../lib/mapUpsert'
 import { officeKindOf, officeText } from './officeText'
 import { legacyKindOf, legacyText } from './legacyOffice'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx'
 
@@ -63,8 +64,13 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
 const OCR_WIDTH = 2480
 const OCR_MAX_WIDTH = 3300
 
-/** PDF 첫 장을 그림으로 (스캔본 OCR용) — 300dpi 쯤으로 그린다 */
-async function renderPdfFirstPage(file: File): Promise<HTMLCanvasElement | null> {
+/**
+ * D-423 스캔 PDF 는 앞 4쪽까지 글자 인식 — 예전에는 첫 장만 읽어, 스캔 재무제표의 둘째 장(손익계산서 · 매출) ·
+ * 등기부 뒷장(임원에 관한 사항 · 대표 취임일) · 여러 장 명부를 못 읽었다. 한 쪽씩 그리고 읽고 지운다(메모리).
+ */
+const MAX_OCR_PAGES = 4
+
+async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<string | null> {
   ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
@@ -74,23 +80,38 @@ async function renderPdfFirstPage(file: File): Promise<HTMLCanvasElement | null>
   const task = pdfjs.getDocument({ data: buf })
   try {
     const doc = await task.promise
-    const page = await doc.getPage(1)
-    const base = page.getViewport({ scale: 1 })
-    const scale = Math.min(OCR_MAX_WIDTH / base.width, Math.max(2, OCR_WIDTH / base.width))
-    const viewport = page.getViewport({ scale })
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.floor(viewport.width)
-    canvas.height = Math.floor(viewport.height)
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    await page.render({ canvas, canvasContext: ctx, viewport }).promise
-    return canvas
+    const n = Math.min(doc.numPages, MAX_OCR_PAGES)
+    const texts: string[] = []
+    for (let i = 1; i <= n; i++) {
+      const canvas = await renderPdfPage(doc, i)
+      if (!canvas) continue
+      texts.push(await ocrImage(canvas, (r, label) => onProgress?.((i - 1 + r) / n, n > 1 ? `${i}/${n}쪽 · ${label}` : label)))
+      canvas.width = 0
+      canvas.height = 0
+    }
+    return texts.length ? texts.join('\n') : null
   } finally {
     await task.destroy()
   }
 }
+
+/** PDF 한 쪽을 그림으로 (스캔본 OCR용) — 300dpi 쯤으로 그린다 */
+async function renderPdfPage(doc: PDFDocumentProxy, pageNo: number): Promise<HTMLCanvasElement | null> {
+  const page = await doc.getPage(pageNo)
+  const base = page.getViewport({ scale: 1 })
+  const scale = Math.min(OCR_MAX_WIDTH / base.width, Math.max(2, OCR_WIDTH / base.width))
+  const viewport = page.getViewport({ scale })
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.floor(viewport.width)
+  canvas.height = Math.floor(viewport.height)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  await page.render({ canvas, canvasContext: ctx, viewport }).promise
+  return canvas
+}
+
 
 /** 사진 → 그림판(작으면 키우고 너무 크면 줄인다) */
 async function imageToCanvas(input: Blob): Promise<HTMLCanvasElement | null> {
@@ -243,11 +264,11 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     onProgress?.(0, 'PDF 여는 중')
     const text = await extractPdfText(file, onProgress)
     if (hasEnoughText(text)) return { text, method: 'pdf_text' }
-    // 스캔본 → 첫 장을 이미지로 만들어 OCR
+    // 스캔본 → 앞 4쪽까지 그림으로 만들어 OCR(D-423)
     onProgress?.(0, '스캔본으로 보입니다. 글자 인식으로 전환합니다')
-    const page = await renderPdfFirstPage(file)
-    if (!page) return { text, method: 'pdf_text' }
-    return { text: await ocrImage(page, onProgress), method: 'ocr' }
+    const ocr = await ocrPdfPages(file, onProgress)
+    if (ocr === null) return { text, method: 'pdf_text' }
+    return { text: ocr, method: 'ocr' }
   }
 
   onProgress?.(0, '이미지 여는 중')
