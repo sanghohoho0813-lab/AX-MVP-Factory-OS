@@ -54,9 +54,9 @@ export type HiringPreset = Pick<HiringAnswers, 'situation' | 'cats' | 'specials'
  * 업체 숫자(주주명부 · 순이익 · 1주 가치 · 액면가)는 calcPrefill 이, 여기는 상황 값만 — 금액(원) 또는 누가 몇 % 주식을 받거나(증자) 돌려주는지(감자).
  */
 export interface CalcPreset {
-  key: 't7' | 't8'
-  /** 계산기 안 탭 — w1 무상대여 · w2 채무면제 · w3 증여 · x1 유상증자 · x2 유상감자 */
-  sub: 'w1' | 'w2' | 'w3' | 'x1' | 'x2'
+  key: 't7' | 't8' | 't9'
+  /** 계산기 안 탭 — w1 무상대여 · w2 채무면제 · w3 증여 · x1 유상증자 · x2 유상감자 · inc_a 소득세(D-374 법인전환 — 사업소득만) */
+  sub: 'w1' | 'w2' | 'w3' | 'x1' | 'x2' | 'inc_a'
   /** 빌려준 돈 · 면제한 빚 · 준 재산(원) */
   amount?: number
   /** 증자: 자녀가 기존 주식 수의 pct% 만큼 신주 · 감자: 대표 주식의 pct% */
@@ -109,6 +109,8 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'calc-t7-gift', module: 'tax', title: '대표가 회사에 2억 재산 넣어 주기(증여)', when: '현금 · 부동산을 회사에 줄 때 — 주주 가족에게 증여세가 붙는지', calc: { key: 't7', sub: 'w3', amount: 200_000_000 } }),
   p({ id: 'calc-t8-issue', module: 'tax', title: '자녀만 액면가로 새 주식 받기(유상증자 20%)', when: '다른 주주는 신주를 포기하고 자녀만 싸게 받을 때 — 자녀 증여세', calc: { key: 't8', sub: 'x1', share: { who: 'child', pct: 20 } } }),
   p({ id: 'calc-t8-reduce', module: 'tax', title: '대표 주식 30%만 액면가로 감자', when: '대표 주식 일부를 회사가 액면가로 사서 없앨 때 — 남은 가족 주주의 이익', calc: { key: 't8', sub: 'x2', share: { who: 'ceo', pct: 30 } } }),
+  // D-374 개인사업자 법인전환 — 03 계산기(종합소득세)에 사업소득만 넣고, 법인이면(대표 급여 01 식 · 법인세 05 식) 얼마인지 나란히
+  p({ id: 'calc-t9-convert', module: 'tax', title: '개인사업자 → 법인으로 바꾸면 세금은?', when: '개인사업자 사업소득이 커졌을 때 — 지금 종합소득세 vs 법인세 + 대표 급여 세금', calc: { key: 't9', sub: 'inc_a' } }),
   // 고용지원금 4 — 채용 진단(같은 엔진)
   p({ id: 'emp-youth', module: 'employment', title: '청년(만 29세) 정규직 1명 채용', when: '청년을 새로 뽑을 계획이 있을 때 — 채용 전에 참여신청', hiring: { situation: 'new', cats: ['청년'], specials: [], age: 29, gender: null, empType: '정규직' } }),
   p({ id: 'emp-senior', module: 'employment', title: '만 60세 이상 고령자 채용', when: '경력직 고령자를 뽑을 때', hiring: { situation: 'new', cats: ['고령자'], specials: [], age: 61, gender: null, empType: '정규직' } }),
@@ -197,6 +199,7 @@ export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
     if (c.sub === 'w1') out.push({ field: '', text: '이자 없이' })
     if (c.share?.who === 'child') out.push({ field: 'x1_rows', text: `자녀 신주 — 기존 주식의 ${c.share.pct}%` }, { field: 'x1_issue', text: '인수가 = 액면가' })
     if (c.share?.who === 'ceo') out.push({ field: 'x2_rows', text: `대표 주식 ${c.share.pct}% 감자` }, { field: 'x2_redeem', text: '감자대가 = 액면가' })
+    if (c.key === 't9') out.push({ field: 'inc_a_business', text: '사업소득만(급여 · 배당 0)' })
   }
   if (s.hiring) {
     const h = s.hiring

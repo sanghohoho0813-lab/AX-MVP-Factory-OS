@@ -163,6 +163,8 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   if (region) snapshot.push({ label: '지역', value: region })
   if (facts.employeeCount !== null) snapshot.push({ label: '직원', value: `${facts.employeeCount}명` })
   if (facts.revenue && facts.revenue.won > 0) snapshot.push({ label: '매출', value: `${won(facts.revenue.won)}${facts.revenue.asOf ? `(${facts.revenue.asOf.slice(0, 4)}${facts.revenue.estimated ? ' 추정' : ''})` : ''}` })
+  // D-374 개인사업자는 사업소득(소득금액증명)이 법인전환 · 정책자금 판단의 근거 — 회사 한눈에 같이
+  if (facts.businessType === 'individual' && facts.netIncome && facts.netIncome.won > 0 && !facts.netIncome.estimated) snapshot.push({ label: '사업소득', value: `${won(facts.netIncome.won)}${facts.netIncome.asOf ? `(${facts.netIncome.asOf.slice(0, 4)})` : ''}` })
   const held = policyBonus(record, today).items.map((x) => x.replace(/ 보유$/, ''))
   if (held.length) snapshot.push({ label: '보유', value: held.join(' · ') })
 

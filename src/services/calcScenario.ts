@@ -14,6 +14,8 @@ import { CALC_AMOUNT_FIELD, type ScenarioPreset } from './scenarioPresets'
 import { filledTaxProfile, shareValueOf, viewProfile } from './taxPlan'
 import { formatWon } from './customerFacts'
 import { josa } from '../lib/josa'
+import { businessIncomeOf, convertCompare, diligentLine, personalValues } from './corpConvert'
+import { clientFacts } from '../tools/shared/clientPrefill'
 
 export interface CalcPresetValues {
   /** 업체 숫자 + 상황 값 — 계산기 칸에 그대로 */
@@ -40,6 +42,15 @@ export function calcPresetValues(s: Pick<ScenarioPreset, 'calc'>, record: Client
   const out: CalcPresetValues = { values: {}, applied: {}, filled: [], missing: [], notes: [] }
   const c = s.calc
   if (!c) return out
+  // D-374 법인전환 — 03 계산기에 사업소득만(급여 · 배당 · 다른 소득 0). 주주명부 · 절세 현황은 쓰지 않는다(개인사업자)
+  if (c.key === 't9') {
+    const income = record ? businessIncomeOf(record, today) : 0
+    if (!(income > 0)) out.missing.push('사업소득(소득금액증명)')
+    out.applied = personalValues(Math.max(0, income))
+    out.values = { ...out.applied }
+    if (income > 0) out.filled = ['사업소득']
+    return out
+  }
   const profile = record ? filledTaxProfile(record, today).profile : {}
   const pf = calcPrefill(c.key, record ? { ...record, taxProfile: profile } : null, today)
   const reg = record?.shareholderRegister ?? []
@@ -120,9 +131,26 @@ const largest = (vs: string[]) => [...vs].sort((a, b) => numOf(b) - numOf(a))[0]
 /** 05 계산기 표 구분 — 증여로 보는 사람(지배주주와 친족) */
 const isFamilyCat = (cat: string) => cat === '지배주주' || cat === '지배주주의 친족'
 
+/** D-374 법인전환 상황 — 다 가져갈 때(제목) · 회사에 남겨 둘 때(올해 세금만 · 나중에 배당세) */
+function runConvertScenario(record: ClientOpsRecord, today: string): CalcScenarioBody {
+  const income = businessIncomeOf(record, today)
+  const needs: CalcScenarioBody['needs'] = [{ label: '사업소득(소득금액증명)', ok: income > 0, value: income > 0 ? krw(income) : '' }]
+  const assumptions = ['세금 계산기 03(종합소득) · 01(대표 급여) 식 그대로 · 법인세는 2026 세율(계산기 05와 같은 식) + 지방소득세 10%', '4대보험(개인도 지역가입으로 냄) · 법인 운영비(기장 · 등기) · 전환 비용(현물출자 · 사업양수도 취득세)은 빼고 세금만 — 참고용 · 실행 전 세무사 검토']
+  const r = income > 0 ? convertCompare(income) : null
+  if (!r) return { state: 'need', headline: '사업소득(소득금액증명)을 받으면 바로 계산해요', lines: [], amount: '', needs, filledFrom: [], assumptions }
+  const lines = [`지금(개인) 종합소득세 약 ${krw(r.personal)} — 사업소득 ${krw(income)}`, `법인 · 이익 전부 대표 급여(월 ${krw(r.all.monthly)})로 — 급여 세금 약 ${krw(r.all.salaryTax)}`]
+  const f = clientFacts(record, new Date(`${today}T00:00:00`))
+  const diligent = diligentLine(f.revenue && !f.revenue.estimated ? f.revenue.won : 0, [f.industryText, record.businessCategory, record.businessItem].filter(Boolean).join(' '), krw)
+  if (diligent) lines.unshift(diligent)
+  if (r.keep.monthly !== r.all.monthly) lines.push(`법인 · 급여 월 ${krw(r.keep.monthly)}만 받고 ${krw(r.keep.kept)}는 회사에 — 올해 세금 약 ${krw(r.keep.total)}(법인세 ${krw(r.keep.corpTax)} · 급여 ${krw(r.keep.salaryTax)}) · 나중에 가져가면 배당세`)
+  const headline = r.saving > 0 ? `법인으로 바꾸면 이익을 다 가져가도 1년 약 ${krw(r.saving)} 덜 내요` : `지금 사업소득이면 개인이 세금이 더 적어요(법인 쪽이 약 ${krw(-r.saving)} 더)`
+  return { state: 'ready', headline, lines, amount: r.saving > 0 ? `1년 약 ${krw(r.saving)} 덜 냄` : '', needs, filledFrom: ['사업소득'], assumptions }
+}
+
 /** 계산기 05 · 06 상황 → 이 업체 숫자로 계산(계산기 식 그대로) */
 export function runCalcScenario(s: ScenarioPreset, record: ClientOpsRecord, today: string): CalcScenarioBody {
   const c = s.calc!
+  if (c.key === 't9') return runConvertScenario(record, today)
   const calc = calculatorOf(c.key)!
   const sub = calc.subs.find((x) => x.key === c.sub) ?? calc.subs[0]
   const pv = calcPresetValues(s, record, today)

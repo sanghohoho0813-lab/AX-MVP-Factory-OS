@@ -1478,15 +1478,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   id={`doc-card-${meta.key}`}
                   data-doc-card={meta.key}
                   tabIndex={-1}
-                  className={`flex scroll-mt-24 flex-col gap-2.5 rounded-(--radius-panel) border p-4 outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
-                    view.expired
-                      ? 'border-danger-200 bg-danger-50/40'
-                      : urgent
-                        ? 'border-danger-200 bg-white'
-                        : view.expiringSoon
-                          ? 'border-warning-200 bg-warning-50/40'
-                          : 'border-slate-200 bg-white'
-                  }`}
+                  // D-375 박스 색은 하나로 — 만료 · 지금 필요 · 곧 만료는 칸 안 알약(빨강 · 남은 날)이 말한다(분홍 · 노랑 바탕 없앰)
+                  className="flex scroll-mt-24 flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                 >
                   {meta.needsFile && (
                     <input

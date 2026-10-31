@@ -15,9 +15,11 @@ import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSumm
 import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
 import { formatWon, withFactValue } from '../customerFacts'
-import { buildInsights } from '../clientInsights'
+import { buildInsights, manwonText } from '../clientInsights'
+import { buildDiagnosis } from '../clientDiagnosis'
 import { calcPresetValues, runCalcScenario } from '../calcScenario'
-import { calculatorOf, defaultValues, type RowValues } from '../taxCalc'
+import { calculatorOf, computeSalary, defaultValues, type RowValues } from '../taxCalc'
+import { convertCompare, corpTaxWithLocal, diligentLimitOf } from '../corpConvert'
 
 let passed = 0
 let failed = 0
@@ -56,15 +58,15 @@ const empty = normalizeClientOps({ id: 'empty', companyName: '빈회사', create
 // S1 카탈로그
 const by = (m: string) => SCENARIO_PRESETS.filter((s) => s.module === m).length
 check(
-  'S1 카탈로그 42개 — 절세 11 + 계산기 05 · 06 5(D-243) · 고용 9 · 연구소 4 · 창업감면 6(D-328 벤처 확인) · 정책자금 7(NX-4 13개 더함) · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기',
-  SCENARIO_PRESETS.length === 42 && by('tax') === 16 && SCENARIO_PRESETS.filter((s) => s.calc).length === 5 && by('employment') === 9 && by('labcare') === 4 && by('startup-tax') === 6 && by('policy-funding') === 7 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 42 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
+  'S1 카탈로그 43개 — 절세 11 + 계산기 05 · 06 5(D-243) + 03 법인전환 1(D-374) · 고용 9 · 연구소 4 · 창업감면 6(D-328 벤처 확인) · 정책자금 7(NX-4 13개 더함) · 아이디 겹침 없음 · 주소에 업체 · 가정 · 계산기',
+  SCENARIO_PRESETS.length === 43 && by('tax') === 17 && SCENARIO_PRESETS.filter((s) => s.calc).length === 6 && by('employment') === 9 && by('labcare') === 4 && by('startup-tax') === 6 && by('policy-funding') === 7 && new Set(SCENARIO_PRESETS.map((s) => s.id)).size === 43 && scenarioPath(SCENARIO_PRESETS[0], 'c 1') === '/tools/tax?client=c%201&preset=tax-cash-1e' && scenarioPath(scenarioPreset('calc-t7-loan')!, 'c 1') === '/tools/tax?client=c%201&m=calc&c=t7&s=w1&preset=calc-t7-loan' && scenarioPreset('emp-youth')?.module === 'employment' && scenarioPreset('nope') === null,
   SCENARIO_PRESETS.map((s) => s.id),
 )
 
 // S2 숫자가 다 있는 업체
 const runs = runScenarios(full, today)
 const r = (id: string) => runs.find((x) => x.id === id)!
-check('S2 숫자가 다 있는 업체 — 42개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 42 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
+check('S2 숫자가 다 있는 업체 — 43개 모두 계산(멈춘 것 없음) · 바로 설계됨 15개 넘게', runs.length === 43 && runs.filter((x) => x.state === 'ready').length >= 15, runs.map((x) => `${x.id}:${x.state}`))
 const cash = r('tax-cash-1e')
 const p = viewProfile(scenarioTaxProfile(full, today).profile)
 const direct = cashPlan(p, full.shareholderRegister, shareValueOf(p, full.shareholderRegister), 100_000_000, today)
@@ -178,7 +180,7 @@ check(
   gyRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('2024-05-01') && gyRuns.find((x) => x.id === 'policy-working')!.fit.why.includes('1억 5,000만원') && gyRuns.find((x) => x.id === 'startup-move')!.fit.why.includes('서울'),
   gyRuns.filter((x) => x.fit.kind === 'fit').map((x) => x.fit.why),
 )
-check('F7 가연 — 맞는 상황이 맨 앞(42개 중 5개 · 정렬)', gyRuns.slice(0, 5).every((x) => x.fit.kind === 'fit') && gyRuns.length === 42)
+check('F7 가연 — 맞는 상황이 맨 앞(43개 중 5개 · 정렬)', gyRuns.slice(0, 5).every((x) => x.fit.kind === 'fit') && gyRuns.length === 43)
 
 // 대표가 답하면 — 같은 질문을 쓰는 상황이 함께 열린다
 const gyAns = withScenarioAnswer(withScenarioAnswer(withScenarioAnswer(gy, 'hireSenior', 'yes', '2026-10-15T00:00:00.000Z'), 'contract', 'no', '2026-10-15T00:00:00.000Z'), 'hireYouth', 'yes', '2026-10-15T00:00:00.000Z')
@@ -311,7 +313,9 @@ for (let i = 0; i < 2000; i++) {
     if (fk === 'data' && !(r.fit.dataNeeds ?? []).length) bad.push(`${rec.id} ${r.id}: 자료 없음`)
     if (r.fit.answered && scenarioAnswer(rec, r.fit.answered) !== (fk === 'fit' ? 'yes' : 'no')) bad.push(`${rec.id} ${r.id}: 답과 판단이 다름`)
     if (fk !== 'fit') continue
-    if (ctx.entity !== 'corporation' && (corpOnlyIds.includes(r.id) || r.id.startsWith('calc-'))) bad.push(`${rec.id} ${r.id}: 법인 아닌데 맞음`)
+    if (ctx.entity !== 'corporation' && (corpOnlyIds.includes(r.id) || (r.id.startsWith('calc-') && r.id !== 'calc-t9-convert'))) bad.push(`${rec.id} ${r.id}: 법인 아닌데 맞음`)
+    // D-374 법인전환은 개인사업자 일 — 법인이면 맞으면 안 된다
+    if (ctx.entity === 'corporation' && r.id === 'calc-t9-convert') bad.push(`${rec.id} ${r.id}: 법인인데 법인전환 맞음`)
     // D-243 계산기 05 · 06 — 친족 주주가 있어야 · 회사에 빌려줌/넣어 줌은 대표가 '예' 해야
     const kin = rec.shareholderRegister.filter((h) => h.shares > 0 && h.relation !== 'ceo')
     if (r.id.startsWith('calc-t7') && kin.length === 0) bad.push(`${rec.id} ${r.id}: 친족 주주 없는데 맞음`)
@@ -909,6 +913,42 @@ const formatWonText = (v: string) => formatWon(Number(v.replace(/[^\d-]/g, '')) 
   const withCerts = (fv: Record<string, string>) => clientFacts(normalizeClientOps({ ...full, id: 'cert329', factValues: { ...(full.factValues ?? {}), ...fv } } as unknown as Partial<ClientOpsRecord>), new Date(`${today}T00:00:00`))
   check('D-329 중소기업 확인서 규모 · 벤처 유효 — 중기업 · 소상공인 → 소기업 · 기한 지남은 모름 · 벤처 유효/만료', withCerts({ 'cf:중소기업 확인': '중기업 · 확인번호 1 · 2027-03-31까지' }).smeSize === '중기업' && withCerts({ 'cf:중소기업 확인': '소기업(소상공인) · 2027-03-31까지' }).smeSize === '소기업' && withCerts({ 'cf:중소기업 확인': '중기업 · 2025-03-31까지' }).smeSize === '' && withCerts({ 'cf:벤처기업': '확인일 2025-01-02 · 2028-01-01까지' }).ventureValidNow === true && withCerts({ 'cf:벤처기업': '확인일 2021-01-02 · 2024-01-01까지' }).ventureValidNow === false)
   check('D-318 한 장 설계서(창업 5년 안 채용)의 창업감면 줄 = 상황 예시 줄', planLine(gy26) === runLine(gy26) && planLine(gh26) === runLine(gh26), [planLine(gy26), runLine(gy26)])
+}
+
+// D-374 개인사업자 법인전환 — 03 계산기(종합소득) vs 01(대표 급여) + 법인세(2026 · 05 식) · 맞춤 추천 · 상황 예시
+{
+  const T = '2026-10-31'
+  const NOWC = '2026-10-31T00:00:00.000Z'
+  const r = convertCompare(60_000_000)!
+  const t9 = calculatorOf('t9')!
+  const o9 = t9.subs.find((x) => x.key === 'inc_a')!.compute({ ...defaultValues(t9), ...r.open.t9 })
+  const v9 = Number((o9.blocks.find((b) => b.id === 'inc_a_out3')?.lines.find((l) => l.k === '종합소득세 총부담세액')?.v ?? '').replace(/[^\d]/g, ''))
+  const sal = computeSalary(5_000_000)
+  check('D-374 개인 = 계산기 03 종합소득세 총부담세액(사업소득 6천만 · 같은 값으로 열면 같은 숫자)', r.personal === v9 && v9 > 0, [r.personal, v9])
+  check('D-374 다 가져갈 때 = 대표 급여 월 500만(01 식) · 법인세 0 · 차이 = 개인 − 급여 세금', r.all.monthly === 5_000_000 && r.all.corpTax === 0 && r.all.salaryTax === sal.finalTax + sal.localTax && r.saving === r.personal - r.all.total && r.saving > 3_000_000, r.all)
+  check('D-374 회사에 남겨 둘 때 — 법인세(2026 · 05 식 + 지방 10%) + 급여 세금이 더 작고 남는 돈을 따로', r.keep.total <= r.all.total && r.keep.kept > 0 && r.keep.corpTax === corpTaxWithLocal(60_000_000 - r.keep.monthly * 12), r.keep)
+  check('D-374 이익 1천만원 — 남겨 둘 것 없음(다 가져갈 때와 같음)', (() => { const x = convertCompare(10_000_000)!; return x.keep.monthly === x.all.monthly })())
+  const indiv = withFactValue(normalizeClientOps({ id: 'cv374', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC }), 'netIncome', '60000000', { source: 'manual', status: 'entered', asOf: '2025', now: NOWC })
+  const ins = buildInsights(indiv, T, []).find((i) => i.key === 'tax')
+  check('D-374 맞춤 추천(개인사업자) — 주주명부 · 대표 급여 대신 "법인전환 검토" · 검토해 볼 만함 · 1년 약 N 덜 냄 · 세무사와 확인', ins?.label === '법인전환 검토' && ins.tone === 'good' && ins.headline.includes('이익을 다 가져가도') && ins.amount === `1년 약 ${manwonText(r.saving)} 덜 냄` && !ins.missing.includes('주주명부') && !!ins.action, ins)
+  check('D-374 카드 [법인전환 계산] → 세금 계산기 03 · 사업소득 상황으로', !!ins && ins.openPath.includes('m=calc&c=t9&s=inc_a') && ins.openPath.includes('preset=calc-t9-convert'), ins?.openPath)
+  const none = buildInsights(normalizeClientOps({ id: 'cv374n', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC }), T, []).find((i) => i.key === 'tax')
+  check('D-374 사업소득을 모르면 "소득금액증명을 올리면" · 정보가 더 필요해요', none?.tone === 'need' && none.missing.includes('소득금액증명'), none)
+  const corp = buildInsights(normalizeClientOps({ id: 'cv374c', companyName: '(주)미래', businessNumber: '124-81-00998', createdAt: NOWC, updatedAt: NOWC }), T, []).find((i) => i.key === 'tax')
+  check('D-374 법인은 그대로 절세 설계', corp?.label === '절세 설계', corp)
+  const sp = scenarioPreset('calc-t9-convert')!
+  const run = runScenario(sp, indiv, T)
+  check('D-374 상황 예시: 맞는 상황 · 같은 숫자 · 세금 계산기 03에서 이어서', run.fit.kind === 'fit' && run.state === 'ready' && run.headline.includes(formatWon(r.saving)) && run.openLabel === '세금 계산기 03에서 이어서', [run.fit, run.headline, run.openLabel])
+  check('D-374 상황 예시: 법인이면 안 맞음 · 사업소득 모르면 받을 자료', scenarioFit(sp, fitContext(normalizeClientOps({ id: 'c2', companyName: '(주)미래', businessNumber: '124-81-00998', createdAt: NOWC, updatedAt: NOWC }), T)).kind === 'no' && scenarioFit(sp, fitContext(normalizeClientOps({ id: 'c3', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOWC, updatedAt: NOWC }), T)).kind === 'data')
+  const sheet = buildDiagnosis(indiv, buildInsights(indiv, T, []), T)
+  check('D-374 맞춤 진단서(개인사업자) — 회사 한눈에 "사업소득 6,000만원(2025)" · 먼저 제안할 것에 법인전환 검토', sheet.snapshot.some((x) => x.label === '사업소득' && x.value.startsWith(formatWon(60_000_000))) && sheet.picks.some((x) => x.label === '법인전환 검토'), [sheet.snapshot, sheet.picks.map((x) => x.label)])
+  check('D-374 성실신고확인 기준 — 도 · 소매 15억 · 제조 7.5억 · 컨설팅 5억 · 두 무리에 걸치면 말하지 않음', diligentLimitOf('도매 및 소매업 · 전자상거래')?.limit === 1_500_000_000 && diligentLimitOf('제조업 · 바이오 시약')?.limit === 750_000_000 && diligentLimitOf('경영 컨설팅')?.limit === 500_000_000 && diligentLimitOf('제조 · 도매') === null && diligentLimitOf('') === null)
+  let big = withFactValue(indiv, 'revenue', '800000000', { source: 'manual', status: 'entered', asOf: '2025', now: NOWC })
+  big = { ...big, businessCategory: '제조업', businessItem: '바이오 시약' }
+  const bigIns = buildInsights(big, T, []).find((i) => i.key === 'tax')
+  check('D-374 매출 8억 · 제조업 → 카드 설명 맨 앞 "성실신고확인 대상(7억 5천 이상)" · 상황 예시 첫 줄도', !!bigIns && bigIns.detail.startsWith('매출 8억원 — 성실신고확인 대상') && runScenario(sp, big, T).lines[0].startsWith('매출 8억원 — 성실신고확인 대상'), [bigIns?.detail, runScenario(sp, big, T).lines[0]])
+  const pv = calcPresetValues(sp, indiv, T)
+  check('D-374 계산기 03 칸: 사업소득 6천만 · 급여 · 배당 0 · 주주명부를 달라고 하지 않음', pv.values.inc_a_business === '60000000' && pv.values.inc_a_salary === '0' && pv.values.inc_a_dividend === '0' && pv.missing.length === 0, pv)
 }
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)

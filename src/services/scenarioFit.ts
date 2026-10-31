@@ -25,6 +25,7 @@ import { policyHiring } from './policyEvidence'
 import { isExcludedIndustryText } from '../tools/labcare/lib/assessmentOptions'
 import type { ScenarioPreset } from './scenarioPresets'
 import { parseGoalText, profileSuggestions, salaryPlan, viewProfile, type ProfileView, type TaxProfile } from './taxPlan'
+import { CONVERT_MIN, convertCompare } from './corpConvert'
 
 export type FitKind = 'fit' | 'ask' | 'data' | 'no'
 
@@ -319,6 +320,16 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (corp) return corp
       if (age !== null && age >= 60) return fit(`대표 만 ${age}세 — 퇴임 · 퇴직금을 준비할 때`)
       return byAnswer(c, 'retire', '퇴임 · 중간정산 생각 있음', '퇴임 · 중간정산 생각 없음')
+    }
+    /* D-374 개인사업자 → 법인전환 — 사업소득(소득금액증명 · 직접 적은 순이익)으로 */
+    case 'calc-t9-convert': {
+      if (c.entity === 'corporation') return no(`이미 법인이에요(${c.entityBasis})`)
+      const inc = f.netIncome && !f.netIncome.estimated ? f.netIncome.won : null
+      if (inc === null) return data('사업소득(소득금액증명)을 알면 판단해요', ['소득금액증명'])
+      if (inc <= 0) return no(`사업소득 ${krw(inc)} — 낼 세금이 거의 없어요`)
+      const r = convertCompare(inc)
+      if (r && r.saving >= CONVERT_MIN) return fit(`사업소득 ${krw(inc)} — 법인이면 다 가져가도 1년 약 ${krw(r.saving)} 덜 내요`)
+      return no(`사업소득 ${krw(inc)} — 법인으로 바꿔도 1년 차이가 ${krw(Math.max(0, r?.saving ?? 0))} 안쪽이에요`)
     }
     /* D-243 세금 계산기 05 · 06 — 가족이 주주인 회사 */
     case 'calc-t7-loan':

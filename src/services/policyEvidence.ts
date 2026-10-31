@@ -17,13 +17,12 @@
  *  거의 다 '요청 필요' 라고 했다. 서류함에 있는 서류(칸 이름 · 만료 안 됨)를 엔진에 넘겨 '확보' 로 본다.
  */
 import type { ClientOpsRecord } from '../types/clientOps'
-import type { ClientFacts } from '../tools/shared/clientPrefill'
+import { businessTypeOf, type ClientFacts } from '../tools/shared/clientPrefill'
 import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
 import { vatTrendOf } from './vatDoc'
-import { bizNoKind } from './koreanDocParser'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 
@@ -201,7 +200,7 @@ export function policyDocs(record: ClientOpsRecord, today: string): { have: stri
     const label = m.label.replace(/\s+/g, '')
     const hits = POLICY_DOC_RULES.filter(([, ok]) => ok(m.key, label)).map(([k]) => k)
     // D-373 개인사업자는 재무제표 대신 소득금액증명(종합소득세) — 법인 대표 개인 소득금액증명은 재무제표가 아니다
-    if (/소득금액증명|종합소득세.*신고/.test(label) && bizNoKind(record.businessNumber) === 'individual' && !hits.includes('financial')) hits.push('financial')
+    if (/소득금액증명|종합소득세.*신고/.test(label) && businessTypeOf(record) === 'individual' && !hits.includes('financial')) hits.push('financial')
     if (!hits.length) continue
     if (documentStatus(m.key, { ...st, received: true }, today, m).expired) {
       expired.push(m.label)

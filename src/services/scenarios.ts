@@ -31,6 +31,7 @@ import {
   type GoalKey,
   type TaxProfile,
   DEFAULT_GIFT_GOAL,
+  calcNo,
 } from './taxPlan'
 import { diagnoseHiring, type HiringAnswers } from '../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../tools/employment/lib/programs'
@@ -433,7 +434,7 @@ export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: s
     when: s.when,
     ...body,
     openPath: scenarioPath(s, record.id),
-    ...(s.calc ? { openLabel: `세금 계산기 ${s.calc.key === 't7' ? '05' : '06'}에서 이어서` } : {}),
+    ...(s.calc ? { openLabel: `세금 계산기 ${calcNo(s.calc.key)}에서 이어서` } : {}),
     request: items.length ? requestMessage(record, items) : '',
     fit: scenarioFit(s, ctx),
   }

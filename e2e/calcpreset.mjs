@@ -51,6 +51,8 @@ const FAM = {
   createdAt: NOW,
   updatedAt: NOW,
 }
+// D-374 개인사업자 — 사업소득 6천만(소득금액증명) → 법인전환 검토
+const IND = { id: 'cli_ind', companyName: '미래상사', businessNumber: '214-05-01239', representativeName: '홍대표', establishedAt: '2019-05-02', status: 'active', factValues: { netIncome: '60000000' }, factMeta: { netIncome: { source: 'incomeCertificate', status: 'entered', asOf: '2025', confirmedAt: '', updatedAt: NOW } }, createdAt: NOW, updatedAt: NOW }
 const NOREG = { id: 'cli_noreg', companyName: '(주)명부없음', corporateNumber: '110111-2222222', establishedAt: '2020-01-01', status: 'active', createdAt: NOW, updatedAt: NOW }
 
 async function seed(page) {
@@ -64,7 +66,7 @@ async function seed(page) {
       localStorage.setItem(k, JSON.stringify(list))
       for (const key of Object.keys(localStorage)) if (key.startsWith('axmvp.tax.')) localStorage.removeItem(key)
     },
-    [FAM, NOREG],
+    [FAM, NOREG, IND],
   )
 }
 
@@ -198,6 +200,26 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 업체 없이 연 계산기 — 상황 단추 없음
   await openCalc(page, '/tools/tax?m=calc&c=t7')
   check('업체 없이 연 계산기엔 "상황 예시로 바로" 단추가 없음(업체 숫자로 계산할 수 없어서)', (await page.getByTestId('calc-presets').count()) === 0)
+
+  // D-374 개인사업자 법인전환 — 맞춤 추천 카드 · 상황 예시 · 세금 계산기 03(사업소득만)
+  await page.goto(`${BASE}/ops/clients/cli_ind?tab=smart`, { waitUntil: 'networkidle' })
+  await page.getByTestId('smart-scenarios').waitFor({ timeout: 15000 })
+  const card = page.locator('[data-testid="smart-insight"][data-key="tax"]')
+  const cardText = await card.innerText()
+  check('D-374 개인사업자 맞춤 추천 — "법인전환 검토" · 이익을 다 가져가도 · 초록 줄 "1년 약 … 덜 냄" · 주주명부를 달라고 하지 않음', cardText.includes('법인전환 검토') && cardText.includes('이익을 다 가져가도') && /1년 약 [\d,.억만]+원 덜 냄/.test(cardText) && !cardText.includes('주주명부'), cardText.slice(0, 200))
+  const cv = await expand(page, 'calc-t9-convert')
+  const cvHead = await cv.getByTestId('scenario-detail').innerText()
+  const cvHref = (await cv.getByTestId('scenario-open').getAttribute('href')) ?? ''
+  check('D-374 상황 예시 "개인사업자 → 법인으로 바꾸면 세금은?" — 맞음 · 지금 종합소득세 · 다 가져갈 때 · 회사에 남겨 둘 때(배당세) 줄', (await cv.getAttribute('data-fit')) === 'fit' && cvHead.includes('지금(개인) 종합소득세') && cvHead.includes('이익 전부 대표 급여') && cvHead.includes('나중에 가져가면 배당세'), cvHead.slice(0, 300))
+  check('D-374 [세금 계산기 03에서 이어서] → 03 · 종합소득 탭 · 같은 업체 · 같은 상황', (await cv.getByTestId('scenario-open').innerText()).includes('세금 계산기 03에서 이어서') && cvHref.includes('c=t9') && cvHref.includes('s=inc_a') && cvHref.includes('client=cli_ind') && cvHref.includes('preset=calc-t9-convert'), cvHref)
+  await cv.getByTestId('scenario-open').click()
+  await page.locator('[data-block]').first().waitFor({ timeout: 15000 })
+  await page.getByTestId('calc-preset-note').waitFor()
+  const biz = await page.locator('#inc_a_business').inputValue()
+  const sal0 = await page.locator('#inc_a_salary').inputValue()
+  const total = await lineV(page, 'inc_a_out3', '종합소득세 총부담세액')
+  const chipsT9 = await page.getByTestId('preset-chip').allInnerTexts()
+  check('D-374 03 계산기 — 사업소득 60,000,000 · 총급여 0 · 종합소득세 총부담세액이 원 단위로 · 넣은 가정 칩 "사업소득만"', biz === '60,000,000' && (sal0 === '0' || sal0 === '') && /^[\d,]+원$/.test(total ?? '') && chipsT9.some((c) => c.includes('사업소득만')), `${biz} · ${sal0} · ${total} · ${JSON.stringify(chipsT9)}`)
   check('1440 페이지 오류 0', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }

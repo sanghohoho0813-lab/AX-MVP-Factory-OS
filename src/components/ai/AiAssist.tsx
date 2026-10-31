@@ -200,7 +200,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
             </button>
           )}
           {/* D-255 대표 "곳곳에 제미나이 3.1 플래시 라이트만 — 어디서든 내가 원하는 모델로": 이름만 보이던 칩 → 누르면 고르는 단추 */}
-          <ModelPicker popover className="ml-auto" testId="ai-assist-model-chip" />
+          {/* D-375 휴대폰은 띠가 세 줄이 되어 목록이 밀렸다 — 모델 고르기는 판 안(모델 줄)에서. PC 는 그대로 띠에 */}
+          <ModelPicker popover className="ml-auto max-sm:hidden" testId="ai-assist-model-chip" />
         </section>
       ) : (
         <OpenButton label={label} onClick={() => openWith(null)} className={className} />

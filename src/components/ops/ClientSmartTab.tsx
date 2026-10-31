@@ -364,7 +364,8 @@ function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
       <HintTip tip={hintFor('홍보도 같이')} label="홍보도 같이">
         <h3 className="t-card font-bold break-keep text-slate-900">홍보도 같이</h3>
       </HintTip>
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {/* D-375 상자 안 상자 대신 줄 — 판 하나 안에 두 줄(휴대폰은 가는 줄로 나눔) */}
+      <ul className="flex flex-col divide-y divide-slate-100 sm:grid sm:grid-cols-2 sm:gap-x-4 sm:divide-y-0">
         {tools.map((t) => {
           const last = latestToolResult(record, t.key)
           return (
@@ -373,7 +374,7 @@ function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
                 to={`${t.path}${q}`}
                 data-testid="smart-promo-open"
                 data-tool={t.key}
-                className="tap flex h-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-2.5 hover:border-brand-400"
+                className="tap flex h-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) px-1 py-2.5 hover:bg-slate-50"
               >
                 <span className="flex min-w-0 grow basis-[10rem] flex-col">
                   <span className="t-body font-bold text-slate-900">{t.label}</span>

@@ -31,6 +31,8 @@ import { continuingOf } from './workRules'
 import { creditYears, headcountOf, headcountTaxCredit, headText, regionTypeOf, type RosterHeadcount } from '../tools/employment/lib/taxCredit'
 import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
+import { CONVERT_MIN, businessIncomeOf, convertCompare, diligentLine } from './corpConvert'
+import { scenarioPath, scenarioPreset } from './scenarioPresets'
 
 export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
 
@@ -422,7 +424,37 @@ const cretopInsight: Provider = ({ record }) => {
 /** D-233 급여 vs 배당을 견줄 금액 — 상황 예시 '대표가 1억 가져오기'(tax-cash-1e)와 같은 세후 1억 */
 const PAY_COMPARE = 100_000_000
 
-const taxInsight: Provider = ({ record, today, light }) => {
+/**
+ * D-374 개인사업자 — '주주명부 · 대표 급여를 알면' 대신 법인전환 검토. 사업소득(소득금액증명 · 직접 적은 순이익)으로
+ * 지금 종합소득세 vs 법인(이익 전부 대표 급여 — 부풀리지 않게)을 세금 계산기 식 그대로. 회사에 남겨 두는 경우는 설명 칸에(나중에 배당세).
+ */
+function convertInsight(record: ClientOpsRecord, facts: ClientFacts, today: string): Insight {
+  const preset = scenarioPreset('calc-t9-convert')
+  const open = preset ? scenarioPath(preset, record.id) : `/tools/tax${q(record)}`
+  const base = { key: 'tax', label: '법인전환 검토', openPath: open, openLabel: '법인전환 계산' }
+  const income = businessIncomeOf(record, today)
+  const r = income > 0 ? convertCompare(income) : null
+  if (!r) return { ...base, tone: 'need', headline: '개인사업자 — 사업소득(소득금액증명)을 올리면 법인으로 바꿀 때 세금 차이를 바로 계산해요', detail: '지금 종합소득세 vs 법인세 + 대표 급여 세금 — 세금 계산기 식 그대로', missing: ['소득금액증명'], action: null }
+  const how = `사업소득 ${manwonText(income)} · 지금 종합소득세 약 ${manwonText(r.personal)} → 법인(대표 급여 월 ${manwonText(r.all.monthly)}) 약 ${manwonText(r.all.total) || '0원'}`
+  const keep = r.keep.monthly !== r.all.monthly ? `회사에 ${manwonText(r.keep.kept)} 남겨 두면 올해 세금 약 ${manwonText(r.keep.total)}(나중에 가져가면 배당세)` : ''
+  const note = '4대보험 · 법인 운영비 · 전환 비용은 빼고 세금만 · 세무사 확인'
+  // 성실신고확인 대상(업종별 매출 기준)이면 맨 앞에 — 법인전환을 검토하는 가장 흔한 계기
+  const rev = facts.revenue && !facts.revenue.estimated ? facts.revenue.won : 0
+  const diligent = diligentLine(rev, [facts.industryText, record.businessCategory, record.businessItem].filter(Boolean).join(' '), manwonText)
+  if (diligent) {
+    const tone: InsightTone = r.saving > 0 ? 'good' : 'maybe'
+    return { ...base, tone, headline: r.saving >= CONVERT_MIN ? '법인으로 바꾸면 — 이익을 다 가져가도 세금이 줄어요' : '성실신고확인 구간 — 법인전환을 같이 검토할 때', detail: [diligent, how, keep, note].filter(Boolean).join(' · '), missing: [], action: '법인전환 — 세무사와 시점 · 방법(현물출자 · 사업양수도) 확인', ...(r.saving > 0 ? { amount: `1년 약 ${manwonText(r.saving)} 덜 냄` } : {}) }
+  }
+  if (r.saving >= CONVERT_MIN)
+    return { ...base, tone: 'good', // 금액은 바로 아래 초록 줄(amount)에 — 머리글에 같은 숫자를 두 번 쓰지 않는다
+      headline: '법인으로 바꾸면 — 이익을 다 가져가도 세금이 줄어요', detail: [how, keep, note].filter(Boolean).join(' · '), missing: [], action: '법인전환 — 세무사와 시점 · 방법(현물출자 · 사업양수도) 확인', amount: `1년 약 ${manwonText(r.saving)} 덜 냄` }
+  if (r.saving > 0) return { ...base, tone: 'maybe', headline: `지금은 법인으로 바꿔도 1년 약 ${manwonText(r.saving)} 차이 — 아직 작아요`, detail: [how, keep, note].filter(Boolean).join(' · '), missing: [], action: null }
+  return { ...base, tone: 'no', headline: '지금 사업소득이면 개인이 세금이 더 적어요 — 법인전환은 아직', detail: [how, note].join(' · '), missing: [], action: null }
+}
+
+const taxInsight: Provider = ({ record, facts, today, light }) => {
+  // D-374 개인사업자에게는 주주명부 · 대표 급여가 없다 — 법인전환 검토로
+  if (facts.businessType === 'individual') return convertInsight(record, facts, today)
   const open = `/tools/tax${q(record)}`
   const hasShares = record.shareholderRegister.length > 0
   const filled = Object.values(record.taxProfile ?? {}).filter((v) => String(v).trim() !== '').length
