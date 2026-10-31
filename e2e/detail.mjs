@@ -2009,6 +2009,39 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-409 · D-411 최근 3개년 재무제표 세 장 → 묻지 않음 · 겹친 서류 아님 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const list = JSON.parse(localStorage.getItem(k) ?? '[]'); const now = '2026-10-01T00:00:00.000Z'; list.push({ id: 'cli_fs409', companyName: '미래테크', status: 'active', createdAt: now, updatedAt: now }); localStorage.setItem(k, JSON.stringify(list)) })
+  const fs = (y, rev, ni, loan, re) => ({ name: `재무제표_${y}.txt`, mimeType: 'text/plain', buffer: Buffer.from(['표준재무제표증명', '재무상태표', `제 ${y - 2018}(당)기 ${y}년 12월 31일 현재`, '(단위 : 원)', `가지급금 ${loan[0]} ${loan[1]}`, `미처분이익잉여금 ${re[0]} ${re[1]}`, '손익계산서', `매출액 ${rev[0]} ${rev[1]}`, `당기순이익 ${ni[0]} ${ni[1]}`].join('\n'), 'utf8') })
+  await page.goto(BASE + '/ops/clients/cli_fs409?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([
+    fs(2025, ['2,400,000,000', '2,000,000,000'], ['220,000,000', '180,000,000'], ['30,000,000', '25,000,000'], ['800,000,000', '690,000,000']),
+    fs(2024, ['2,000,000,000', '1,700,000,000'], ['180,000,000', '120,000,000'], ['25,000,000', '20,000,000'], ['690,000,000', '600,000,000']),
+    fs(2023, ['1,700,000,000', '1,500,000,000'], ['120,000,000', '90,000,000'], ['20,000,000', '10,000,000'], ['600,000,000', '500,000,000']),
+  ])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(900)
+  const placed = (await page.getByTestId('smart-placed').innerText()).replace(/\s+/g, ' ')
+  check('D-411 390 세 해 재무제표 → "함께 둠" · "최신 것만 남기거나" 안내 없음', placed.includes('함께 둠') && !placed.includes('최신 것만 남기거나'), placed.slice(0, 300))
+  const r = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_fs409'))
+  const tp = r?.taxProfile ?? {}
+  check('D-409 390 절세 현황 = 2025년 말 가지급금 3천만 · 배당 가능 8억 · 직전 연도 1.8억 · 2년 전 1.2억 · 매출 2025년', tp.loanBalance === '30000000' && tp.retainedEarnings === '800000000' && tp.vInc1 === '180000000' && tp.vInc0 === '120000000' && r?.factValues?.revenue === '2400000000', JSON.stringify([tp, r?.factValues?.revenue]))
+  const asks = await page.getByText('겹쳐 있어요').count()
+  check('D-411 390 확인할 것에 "겹쳐 있어요" 없음', asks === 0, String(asks))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check('D-409 390 넘침 0 · 오류 0', over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await page.screenshot({ path: '/tmp/claude-0/shots409/e2e-fs3-390.png', fullPage: false })
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
