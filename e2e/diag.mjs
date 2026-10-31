@@ -195,10 +195,20 @@ await ctx.close()
   p.on('pageerror', (e) => errs.push(String(e)))
   await p.goto(BASE + '/', { waitUntil: 'networkidle' })
   await p.evaluate(seedScript())
+  // D-401 올해 부가세 신고서(한 기간)가 있으면 회사 한눈에 한 줄
+  await p.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    r.customFields = [...(r.customFields ?? []), { id: 'cf_vr401', group: 'identity', label: '부가세 신고 매출', value: '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원' }]
+    localStorage.setItem(k, JSON.stringify(list))
+  })
   await p.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await p.getByTestId('top-picks').waitFor({ timeout: 8000 })
   await p.getByTestId('top-picks-diagnosis').click()
   await p.getByTestId('diagnosis-preview').waitFor({ timeout: 5000 })
+  const snap = (await p.getByTestId('diagnosis-snapshot').innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('D-401 390 회사 한눈에 "부가세 신고 2026년 1기 확정(1~6월) · 6억 2,000만원"', snap.includes('부가세 신고') && snap.includes('2026년 1기 확정(1~6월) · 6억 2,000만원'), snap.slice(0, 300))
   check('M390 진단서 창 — 넘침 0 · 오류 0', (await overflowX(p)) <= 0 && errs.length === 0, { ox: await overflowX(p), errs })
   await shot(p, 'M-390-diagnosis')
   await c.close()
