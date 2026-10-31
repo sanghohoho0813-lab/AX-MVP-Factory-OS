@@ -92,6 +92,14 @@ const pct = (cur: number, prev: number) => {
   return `${p > 0 ? '+' : ''}${p}%`
 }
 
+/** D-421 '사업소득 추이' 한 줄 — '2025년 6,000만원(소득금액증명 소득금액 · 2024년보다 +50%)'. 앞 해가 결손 · 0 이면 비교하지 않는다 */
+export function incomeProfitLine(read: IncomeRead, fmt: (won: number) => string): string {
+  const last = read.years[read.years.length - 1]
+  const prev = last ? read.years.find((y) => y.year === last.year - 1) : undefined
+  if (!last || !prev || prev.income <= 0 || last.income <= 0) return ''
+  return `${last.year}년 ${fmt(last.income)}(소득금액증명 소득금액 · ${prev.year}년보다 ${pct(last.income, prev.income)})`
+}
+
 /** 회사 정보 '매출 추이' 한 줄 — 정책자금 '매출 성장세' 가 같은 모양('2024년보다 +20%')을 읽는다(vatTrendOf) */
 export function incomeTrendLine(read: IncomeRead, fmt: (won: number) => string): string {
   const last = read.years[read.years.length - 1]

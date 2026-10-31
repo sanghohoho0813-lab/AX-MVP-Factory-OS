@@ -273,7 +273,10 @@ export function policyRecordBonus(record: ClientOpsRecord, facts: Partial<Pick<C
   const up = /보다\s*\+(\d+)%/.exec(customFactValue(record, '매출 추이'))
   const prev = wonOf(record.taxProfile?.vInc1)
   const cur = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : 0
-  if (up && Number(up[1]) >= 10 && prev > 0 && cur >= prev * 1.1) out.push('매출 또는 영업이익 10% 이상 증가')
+  // D-421 개인사업자 — 소득금액증명의 '사업소득 추이' 가 +10% 이상이면 순이익 증가로(법인은 재무제표 전기 순이익)
+  const profitUp = /보다\s*\+(\d+)%/.exec(customFactValue(record, '사업소득 추이'))
+  const incomeUp = (prev > 0 && cur >= prev * 1.1) || (!!profitUp && Number(profitUp[1]) >= 10)
+  if (up && Number(up[1]) >= 10 && incomeUp) out.push('매출 또는 영업이익 10% 이상 증가')
   // D-420 노란우산공제 — 서류함에 가입증명서(받음 · 파일) · 회사 정보에 '노란우산' 칸이 있으면('없음' 은 아님)
   const yellowDoc = allDocumentMetas(record).some((m) => /노란\s*우산/.test(m.label) && !!(record.documents?.[m.key]?.received || record.documents?.[m.key]?.fileName))
   const yellowFact = customFactEntries(record).some(([k, v]) => /노란\s*우산/.test(k) && !/^(없음|아니오|아니요|미가입|해당\s*없음|-)$/.test(v.trim()))

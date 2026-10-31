@@ -2655,5 +2655,18 @@ await (async () => {
   check('D-420 회사 정보 "노란우산공제" 칸 — "미가입" 은 아님 · 가입 글이면 가점', !policyRecordBonus(typedNo, {}).includes('노란우산공제') && policyRecordBonus(typedYes, {}).includes('노란우산공제'))
 })()
 
+// D-421 개인사업자 소득금액증명 → '사업소득 추이' · 정책자금 가점 '매출 · 순이익 10% 이상 증가'
+await (async () => {
+  const INC = (r25: string, i25: string) => ['소득금액 증명', '(종합소득세 신고자용)', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', `2025 214-05-01239 미래상사 사업소득 ${r25} ${i25}`, '2024 214-05-01239 미래상사 사업소득 200,000,000 160,000,000 40,000,000', '2026년 10월 20일', '송파세무서장'].join('\n')
+  const base = normalizeClientOps({ id: 'inc421', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const up = (text: string) => analyzeUploadedDocs(base, [{ key: 'customdoc_inc', fileName: 'inc.pdf', text, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `i1${++n}` })
+  const a = await up(INC('240,000,000', '180,000,000 60,000,000'))
+  check('D-421 "사업소득 추이" = 2025년 6,000만원(소득금액증명 소득금액 · 2024년보다 +50%)', customFactValue(a.record, '사업소득 추이') === '2025년 6,000만원(소득금액증명 소득금액 · 2024년보다 +50%)', customFactValue(a.record, '사업소득 추이'))
+  check('D-421 매출 +20% · 소득 +50% → 정책자금 가점 "매출 · 순이익 10% 이상 증가"(예전: 개인사업자는 전년 순이익을 몰라 못 받음)', policyRecordBonus(a.record, clientFacts(a.record, new Date('2026-10-31T00:00:00'))).includes('매출 또는 영업이익 10% 이상 증가'), JSON.stringify(policyRecordBonus(a.record, clientFacts(a.record, new Date('2026-10-31T00:00:00')))))
+  const b = await up(INC('240,000,000', '198,000,000 42,000,000'))
+  check('D-421 소득 +5% 면 가점 아님(매출만 늘어도)', !policyRecordBonus(b.record, clientFacts(b.record, new Date('2026-10-31T00:00:00'))).includes('매출 또는 영업이익 10% 이상 증가') && customFactValue(b.record, '사업소득 추이').includes('+5%'), customFactValue(b.record, '사업소득 추이'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

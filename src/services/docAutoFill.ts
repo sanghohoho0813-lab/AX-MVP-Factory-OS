@@ -21,7 +21,7 @@ import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn,
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
 import { readSiteReport } from './siteReportDoc'
-import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
+import { incomeProfitLine, incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
 import { parseFinancialStatement } from './finStatementParser'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
@@ -96,7 +96,7 @@ function ocrSelfChecked(doc: ReadDoc): Set<string> {
   const out = new Set<string>()
   if (doc.method !== 'ocr') return out
   if (looksLikeIncomeCert(doc.text, doc.fileName)) {
-    if (readIncomeCert(doc.text)?.sure) ['revenue', 'netIncome', TREND_KEY].forEach((k) => out.add(k))
+    if (readIncomeCert(doc.text)?.sure) ['revenue', 'netIncome', TREND_KEY, PROFIT_KEY].forEach((k) => out.add(k))
     return out
   }
   const v = parseFinancialStatement(doc.text).verified ?? []
@@ -175,7 +175,7 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
   //        더 최근 해(같은 해면 재무제표가 사업장현황신고서를)가 아래에서 바로 바꾸고, 같거나 앞선 해는 먼저 있던 줄 그대로.
   //        한 번에 같이 올려도(재무제표 + 과세표준증명) 먼저 읽힌 줄이 남고 묻지 않는다. 과세표준증명은 소득금액증명 줄에 늘 밀린다(D-373 — 면세 매출 빠짐)
   if (isYearlyLine(c.key) && TREND_DOCS.has(c.source)) {
-    if (!customFactValue(record, c.key === RND_KEY ? '연구개발비' : '매출 추이')) return false
+    if (!customFactValue(record, yearlyLabel(c.key))) return false
     const m = record.factMeta?.[c.key]
     if (m && TREND_DOCS.has(m.source)) {
       if (c.source === 'vatCertificate' && m.source === 'incomeCertificate') return true
@@ -223,7 +223,9 @@ const FIN_KEYS = new Set(['revenue', 'operatingProfit', 'netIncome', 'totalAsset
 const TREND_KEY = `${CUSTOM_FACT_PREFIX}매출 추이`
 /** D-419 '연구개발비' 칸도 해마다 한 줄 — 매출 추이와 같은 규칙(더 최근 해가 바꾸고 같거나 앞선 해는 그대로) */
 const RND_KEY = `${CUSTOM_FACT_PREFIX}연구개발비`
-const isYearlyLine = (k: string) => k === TREND_KEY || k === RND_KEY
+const PROFIT_KEY = `${CUSTOM_FACT_PREFIX}사업소득 추이`
+const isYearlyLine = (k: string) => k === TREND_KEY || k === RND_KEY || k === PROFIT_KEY
+const yearlyLabel = (k: string) => k.slice(CUSTOM_FACT_PREFIX.length)
 const TREND_DOCS = new Set(['financialStatements', 'taxReturn', 'vatCertificate', 'incomeCertificate', 'siteReport'])
 const yearOf = (s: string | undefined) => /^(\d{4})/.exec(s ?? '')?.[1] ?? ''
 /** 같은 해면 재무제표 · 세무조정계산서가 사업장현황신고서 줄을 바꾼다(D-407 — 더 자세한 장부) */
@@ -381,6 +383,15 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     if (line && replaceable && curF?.value !== line) {
       rec = withCustomField(rec, { id: curF?.id, group: curF?.group ?? 'identity', label: '매출 추이', value: line })
       rec = { ...rec, factMeta: { ...(rec.factMeta ?? {}), [TREND_KEY]: { source: 'incomeCertificate', status: 'entered', asOf: String(latest), confirmedAt: '', updatedAt: now } } }
+    }
+    // D-421 사업소득 추이도 같은 규칙(소득금액증명끼리 · 사람이 적은 줄은 그대로)
+    const pline = incomeProfitLine({ years, sure: true }, formatWon)
+    const pm = rec.factMeta?.[PROFIT_KEY]
+    const pCur = rec.customFields.find((f) => f.label === '사업소득 추이')
+    const pOk = !customFactValue(rec, '사업소득 추이') || (pm?.source === 'incomeCertificate' && (yearOf(pm.asOf) || '0') <= String(latest))
+    if (pline && pOk && pCur?.value !== pline) {
+      rec = withCustomField(rec, { id: pCur?.id, group: pCur?.group ?? 'identity', label: '사업소득 추이', value: pline })
+      rec = { ...rec, factMeta: { ...(rec.factMeta ?? {}), [PROFIT_KEY]: { source: 'incomeCertificate', status: 'entered', asOf: String(latest), confirmedAt: '', updatedAt: now } } }
     }
   }
   // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다

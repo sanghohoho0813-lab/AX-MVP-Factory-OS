@@ -23,7 +23,7 @@ import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, formatWon, withFactCandidates } from './customerFacts'
 import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
-import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
+import { incomeProfitLine, incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
 import { officerTerms, officerTermsValue, readDirectorTermYears } from './registryTax'
@@ -174,6 +174,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       out.push({ key: 'netIncome', value: String(last.income), source: 'incomeCertificate', asOf, ref, ...note })
       const trend = incomeTrendLine(inc, formatWon)
       if (trend && inc.sure) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'incomeCertificate', asOf, ref })
+      // D-421 사업소득 추이 — 정책자금 가점 '매출 · 순이익 10% 이상 증가' 를 개인사업자도(법인은 재무제표 전기 순이익)
+      const profit = incomeProfitLine(inc, formatWon)
+      if (profit && inc.sure) out.push({ key: `${CUSTOM_FACT_PREFIX}사업소득 추이`, label: '사업소득 추이', group: 'identity', value: profit, source: 'incomeCertificate', asOf, ref })
     }
     if (inc) return out
   }
