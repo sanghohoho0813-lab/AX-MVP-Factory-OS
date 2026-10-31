@@ -2681,5 +2681,22 @@ await (async () => {
   check('D-422 매출 추이 해(2025)가 회사 정보 매출 해(2024)와 다르면 붙이지 않음', sum2.facts.some((x) => /^매출 2,400백만원$/.test(x)), JSON.stringify(sum2.facts))
 })()
 
+// D-424 맞춤 진단서 '회사 한눈에' — 매출 · 사업소득 같은 해 성장률 · 연구개발비
+await (async () => {
+  const FS = ['표준재무제표증명', '손익계산서', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,400,000,000 2,000,000,000', '경상연구개발비 132,000,000 90,000,000', '당기순이익 220,000,000 180,000,000'].join('\n')
+  const base = normalizeClientOps({ id: 'dg424', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FS, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `g4${++n}` })
+  const dg = buildDiagnosis(a.record, buildInsights(a.record, '2026-10-31', []), '2026-10-31')
+  const row = (l: string) => dg.snapshot.find((x) => x.label === l)?.value ?? ''
+  check('D-424 진단서 매출 "24억원(2025 · 2024년보다 +20%)" · 연구개발비 줄', row('매출').includes('(2025 · 2024년보다 +20%)') && row('연구개발비').startsWith('2025년 1억 3,200만원'), JSON.stringify(dg.snapshot))
+  const INC = ['소득금액 증명', '(종합소득세 신고자용)', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 240,000,000 180,000,000 60,000,000', '2024 214-05-01239 미래상사 사업소득 200,000,000 160,000,000 40,000,000'].join('\n')
+  const ib = normalizeClientOps({ id: 'dg424b', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOW, updatedAt: NOW })
+  const b = await analyzeUploadedDocs(ib, [{ key: 'customdoc_inc', fileName: 'inc.pdf', text: INC, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `g4${++n}` })
+  const db = buildDiagnosis(b.record, buildInsights(b.record, '2026-10-31', []), '2026-10-31')
+  const rowB = (l: string) => db.snapshot.find((x) => x.label === l)?.value ?? ''
+  check('D-424 개인사업자 사업소득 "(2025 · 2024년보다 +50%)" · 매출 "(2025 · 2024년보다 +20%)"', rowB('사업소득').includes('(2025 · 2024년보다 +50%)') && rowB('매출').includes('(2025 · 2024년보다 +20%)'), JSON.stringify(db.snapshot))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

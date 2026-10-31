@@ -164,7 +164,15 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   const region = regionOf(facts.address || '')
   if (region) snapshot.push({ label: '지역', value: region })
   if (facts.employeeCount !== null) snapshot.push({ label: '직원', value: `${facts.employeeCount}명` })
-  if (facts.revenue && facts.revenue.won > 0) snapshot.push({ label: '매출', value: `${won(facts.revenue.won)}${facts.revenue.asOf ? `(${facts.revenue.asOf.slice(0, 4)}${facts.revenue.estimated ? ' 추정' : ''})` : ''}` })
+  // D-424 같은 해 '매출 추이' · '사업소득 추이' 의 성장률을 괄호 안에 함께 — 다른 해 줄은 섞지 않는다
+  const growthOf = (label: string, year: string) => {
+    const m = /^(20\d{2})년[^(]*\([^)]*?(\d{4}년보다\s*[+-]?\d+%)\)/.exec(customFactValue(record, label))
+    return m && year && year === m[1] ? ` · ${m[2]}` : ''
+  }
+  if (facts.revenue && facts.revenue.won > 0) {
+    const y = facts.revenue.asOf?.slice(0, 4) ?? ''
+    snapshot.push({ label: '매출', value: `${won(facts.revenue.won)}${y ? `(${y}${facts.revenue.estimated ? ' 추정' : growthOf('매출 추이', y)})` : ''}` })
+  }
   // D-401 부가세 신고서(한 기간) — 한 해 매출보다 최근 해면 '올해 매출이 이만큼' 을 같이(재무제표 전이라도 지금 흐름을 보여 준다)
   const vatRet = customFactValue(record, '부가세 신고 매출')
   const vatYear = Number(/^(20\d{2})년/.exec(vatRet)?.[1] ?? 0)
@@ -173,7 +181,13 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   const vyText = vy ? ` · 작년 같은 기간보다 ${vy.pct > 0 ? '+' : ''}${vy.pct}%` : ''
   if (vatRet && vatYear && (!facts.revenue || !revYear || vatYear > revYear)) snapshot.push({ label: '부가세 신고', value: `${vatRet.replace(' 과세표준 ', ' · ')}${vyText}`.slice(0, 80) })
   // D-374 개인사업자는 사업소득(소득금액증명)이 법인전환 · 정책자금 판단의 근거 — 회사 한눈에 같이
-  if (facts.businessType === 'individual' && facts.netIncome && facts.netIncome.won > 0 && !facts.netIncome.estimated) snapshot.push({ label: '사업소득', value: `${won(facts.netIncome.won)}${facts.netIncome.asOf ? `(${facts.netIncome.asOf.slice(0, 4)})` : ''}` })
+  if (facts.businessType === 'individual' && facts.netIncome && facts.netIncome.won > 0 && !facts.netIncome.estimated) {
+    const y = facts.netIncome.asOf?.slice(0, 4) ?? ''
+    snapshot.push({ label: '사업소득', value: `${won(facts.netIncome.won)}${y ? `(${y}${growthOf('사업소득 추이', y)})` : ''}` })
+  }
+  // D-424 재무제표 연구개발비(D-419) — 연구소 · 정책자금 가점의 근거
+  const rnd = customFactValue(record, '연구개발비')
+  if (rnd) snapshot.push({ label: '연구개발비', value: rnd.slice(0, 60) })
   const held = policyBonus(record, today).items.map((x) => x.replace(/ 보유$/, ''))
   if (held.length) snapshot.push({ label: '보유', value: held.join(' · ') })
 
