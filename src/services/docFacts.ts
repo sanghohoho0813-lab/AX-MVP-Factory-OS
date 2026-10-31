@@ -86,6 +86,16 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       ref,
       ...(ret.year ? {} : { note: '사업연도를 못 읽었어요 — 몇 년 신고서인지 칸 이름에 적어 주세요' }),
     })
+    // D-390 세무조정계산서 묶음 안의 표준재무상태표 · 표준손익계산서 → 매출 · 영업이익 · 순이익 · 자산 · 부채(그 부분부터만 읽는다 — 앞쪽 명세서의 '매출액' 은 아님)
+    const at = text.search(/표\s*준\s*(?:재\s*무\s*상\s*태\s*표|대\s*차\s*대\s*조\s*표|손\s*익\s*계\s*산\s*서)/)
+    if (at >= 0 && key !== 'financialStatements') {
+      const f = parseFinancialStatement(text.slice(at))
+      const asOf = f.year ?? (ret.year ? String(ret.year) : '')
+      for (const k of ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'] as const) {
+        const v = f[k]
+        if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'taxReturn', asOf, ref })
+      }
+    }
   }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
   if (key === 'financialStatements') {

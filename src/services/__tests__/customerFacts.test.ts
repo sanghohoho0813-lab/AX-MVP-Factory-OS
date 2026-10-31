@@ -2114,5 +2114,20 @@ await (async () => {
   check('D-389 글자 PDF 면 생년월일 바로 · 기록 어디에도 주민등록번호 없음', pdf.record.representativeBirth === '1990-03-15' && !JSON.stringify(pdf.record).includes('1234567'), JSON.stringify([pdf.record.representativeBirth, pdf.summary.flagged]))
 })()
 
+// D-390 세무조정계산서 안의 표준재무상태표 · 표준손익계산서 → 매출 · 순이익 · 자산 · 부채(그 부분부터)
+await (async () => {
+  const TR = ['법인세 과세표준 및 세액신고서', '사업연도 2025.01.01 ~ 2025.12.31', '공제감면세액 및 추가납부세액합계표(갑)', '중소기업에 대한 특별세액감면 조특법 제7조 112 8,500,000',
+    '수입금액조정명세서', '매출액 9,999,999,999', // 앞쪽 명세서의 매출액 — 읽지 않아야 한다
+    '표준재무상태표', '(단위 : 원)', '자산총계 3,000,000,000', '부채총계 1,200,000,000', '표준손익계산서', '매출액 2,400,000,000', '영업이익 300,000,000', '당기순이익 220,000,000 180,000,000'].join('\n')
+  const cands = factCandidatesFromDocText('customdoc_tr', TR, 'r')
+  const v = (k: string) => cands.find((c) => c.key === k)?.value
+  check('D-390 세무조정계산서 → 받은 공제 · 감면 + 표준재무제표 매출 24억(앞 명세서 99억 아님) · 영업이익 · 순이익 · 자산 · 부채 · 2025', v('revenue') === '2400000000' && v('operatingProfit') === '300000000' && v('netIncome') === '220000000' && v('totalAssets') === '3000000000' && v('totalLiabilities') === '1200000000' && cands.find((c) => c.key === 'revenue')?.asOf === '2025' && cands.some((c) => c.key === 'cf:받은 공제 · 감면 2025년'), JSON.stringify(cands.map((c) => [c.key, c.value, c.asOf])))
+  check('D-390 표준재무제표가 없는 신고서는 매출 등을 만들지 않음', !factCandidatesFromDocText('customdoc_tr', TR.split('\n표준재무상태표')[0], 'r').some((c) => c.key === 'revenue'))
+  const base = normalizeClientOps({ id: 'tr390', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_tr', fileName: 'tr.pdf', text: TR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `tr${++n}` })
+  check('D-390 올리기 한 번 → 매출 · 순이익 바로(정책자금 · 절세가 쓴다) · 묻지 않음', readFact(a.record, 'revenue')?.value === '2400000000' && readFact(a.record, 'netIncome')?.value === '220000000' && a.summary.flagged.length === 0, JSON.stringify(a.summary.flagged))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
