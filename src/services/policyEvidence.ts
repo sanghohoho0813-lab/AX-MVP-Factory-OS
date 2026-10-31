@@ -260,6 +260,7 @@ const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특�
  *  - 수출: 회사 정보 '수출유망중소기업' 칸 · 서류함 '수출실적증명' (받음 · 파일).
  *  - 청년고용지원금 참여: 고용지원금 회차 일정에 청년일자리도약장려금이 붙어 있으면.
  *  - 작년 대비 매출액과 당기순이익 10% 이상 상승: 회사 정보 '매출 추이' 의 '…보다 +n%'(n ≥ 10) 그리고 순이익이 전년 순이익(절세 현황)의 1.1배 이상 — 둘 다 알 때만.
+ *  - D-419 연구개발비 비중 5% 이상: 회사 정보 '연구개발비'(재무제표 · 세무조정계산서 손익계산서)의 '매출의 n%' (n ≥ 5).
  */
 export function policyRecordBonus(record: ClientOpsRecord, facts: Partial<Pick<ClientFacts, 'representativeAge' | 'netIncome'>>): BonusItem[] {
   const out: BonusItem[] = []
@@ -272,6 +273,9 @@ export function policyRecordBonus(record: ClientOpsRecord, facts: Partial<Pick<C
   const prev = wonOf(record.taxProfile?.vInc1)
   const cur = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : 0
   if (up && Number(up[1]) >= 10 && prev > 0 && cur >= prev * 1.1) out.push('매출 또는 영업이익 10% 이상 증가')
+  // D-419 재무제표 · 세무조정계산서의 연구개발비가 매출의 5% 이상
+  const rnd = /매출의\s*(\d+(?:\.\d+)?)%/.exec(customFactValue(record, '연구개발비'))
+  if (rnd && Number(rnd[1]) >= 5) out.push('연구개발비 비중 5% 이상')
   return out
 }
 

@@ -530,6 +530,23 @@ const labInsight: Provider = ({ record, facts, today }) => {
     const annual = d?.kind === 'tax' && typeof d.estimate?.annual === 'number' ? d.estimate.annual : 0
     return { key: 'labcare', label: '연구소', tone: /가능|추천/.test(last.verdictLabel) ? 'good' : 'maybe', headline: last.verdictLabel || last.title, detail: last.summary.split('\n')[0] ?? '', missing: [], openPath: open, openLabel: '연구소 진단 보기', action: null, amount: annual > 0 ? `세액공제 연간 약 ${manwonText(annual)}` : undefined }
   }
+  // D-419 연구소는 없는데 재무제표에 연구개발비가 있으면 — 연구소(전담부서)를 만들면 연구 · 인력개발비 세액공제 대상(인정 뒤 지출분부터)
+  const rnd = customFactValue(record, '연구개발비')
+  if (rnd) {
+    const amt = rnd.replace(/\s*\([^)]*\)\s*$/, '')
+    const pct = /매출의\s*[\d.]+%/.exec(rnd)?.[0] ?? ''
+    return {
+      key: 'labcare',
+      label: '연구소',
+      tone: 'maybe',
+      headline: `연구개발비를 쓰는데(${amt}${pct ? ` · ${pct}` : ''}) 연구소가 없어요 — 연구소(전담부서)를 만들면 연구 · 인력개발비 세액공제 대상`,
+      detail: '연구 인력(학위 · 경력)과 독립된 연구 공간이 있으면 인정받을 수 있어요 · 세액공제는 인정 뒤 쓴 연구개발비부터(★ 세무사)',
+      missing: ['연구 인력(학위 · 경력)', '연구 공간'],
+      openPath: open,
+      openLabel: '연구소 설립 가능성',
+      action: '연구소 — 연구개발비가 있어 설립 검토',
+    }
+  }
   const emp = facts.employeeCount
   return {
     key: 'labcare',

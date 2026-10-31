@@ -2620,5 +2620,24 @@ await (async () => {
   check('D-418 검산이 맞는 스캔 소득금액증명 → 매출 · 순이익 · 매출 추이 바로', readFact(c.record, 'revenue')?.value === '240000000' && customFactValue(c.record, '매출 추이') !== '' && c.summary.flagged.length === 0, JSON.stringify(c.summary.flagged.map((f) => f.key)))
 })()
 
+// D-419 재무제표 연구개발비 → '연구개발비' 칸 · 정책자금 가점(5% 이상) · 연구소 카드(연구소가 없을 때)
+await (async () => {
+  const FS = ['표준재무제표증명', '손익계산서', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,400,000,000 2,000,000,000', '판매비와관리비 500,000,000 400,000,000', '경상연구개발비 132,000,000 90,000,000', '영업이익 300,000,000 250,000,000', '당기순이익 220,000,000 180,000,000', '재무상태표', '개발비 50,000,000 40,000,000'].join('\n')
+  const f = parseFinancialStatement(FS)
+  check('D-419 경상연구개발비 1.32억 읽음(무형자산 "개발비" 5천만은 아님)', f.rnd === 132_000_000, JSON.stringify(f))
+  check('D-419 세액공제 줄("연구개발비에 대한 세액공제")은 연구개발비로 읽지 않음', parseFinancialStatement(['손익계산서', '(단위 : 원)', '연구개발비 세액공제 12,000,000'].join('\n')).rnd === undefined)
+  const base = normalizeClientOps({ id: 'rnd419', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  let n9 = 0
+  const a = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FS, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `r9${++n9}` })
+  const line = customFactValue(a.record, '연구개발비')
+  check('D-419 올리기 → "연구개발비" 칸 "2025년 1억 3,200만원(재무제표 · 매출의 5.5%)"', line === '2025년 1억 3,200만원(재무제표 · 매출의 5.5%)', line)
+  const bonus = policyRecordBonus(a.record, {})
+  check('D-419 정책자금 가점 "연구개발비 비중 5% 이상"', bonus.includes('연구개발비 비중 5% 이상'), JSON.stringify(bonus))
+  const lab = buildInsights(a.record, '2026-10-31', [], () => true).find((x) => x.key === 'labcare')
+  check('D-419 연구소가 없으면 연구소 카드 "연구개발비를 쓰는데 … 연구소가 없어요 — 세액공제 대상"(검토해 볼 만함)', !!lab && lab.tone === 'maybe' && lab.headline.includes('연구개발비를 쓰는데') && lab.headline.includes('매출의 5.5%'), JSON.stringify(lab))
+  const low = await analyzeUploadedDocs(base, [{ key: 'financialStatements', fileName: 'fs.pdf', text: FS.replace('경상연구개발비 132,000,000', '경상연구개발비 60,000,000'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `r9${++n9}` })
+  check('D-419 매출의 2.5%면 가점은 아님(연구소 카드는 그대로)', !policyRecordBonus(low.record, {}).includes('연구개발비 비중 5% 이상') && customFactValue(low.record, '연구개발비').includes('매출의 2.5%'), customFactValue(low.record, '연구개발비'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

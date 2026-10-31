@@ -174,8 +174,8 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
   // D-408 서류끼리(재무제표 · 세무조정계산서 · 과세표준증명 · 소득금액증명 · 사업장현황신고서)는 묻지 않는다 —
   //        더 최근 해(같은 해면 재무제표가 사업장현황신고서를)가 아래에서 바로 바꾸고, 같거나 앞선 해는 먼저 있던 줄 그대로.
   //        한 번에 같이 올려도(재무제표 + 과세표준증명) 먼저 읽힌 줄이 남고 묻지 않는다. 과세표준증명은 소득금액증명 줄에 늘 밀린다(D-373 — 면세 매출 빠짐)
-  if (c.key === TREND_KEY && TREND_DOCS.has(c.source)) {
-    if (!customFactValue(record, '매출 추이')) return false
+  if (isYearlyLine(c.key) && TREND_DOCS.has(c.source)) {
+    if (!customFactValue(record, c.key === RND_KEY ? '연구개발비' : '매출 추이')) return false
     const m = record.factMeta?.[c.key]
     if (m && TREND_DOCS.has(m.source)) {
       if (c.source === 'vatCertificate' && m.source === 'incomeCertificate') return true
@@ -221,6 +221,9 @@ const FIN_KEYS = new Set(['revenue', 'operatingProfit', 'netIncome', 'totalAsset
 /** D-406 매출 · 이익을 말하는 서류의 종류 — 같은 종류끼리만 더 최근 해가 바꾼다(재무제표 = 세무조정계산서의 표준재무제표) */
 /** D-408 '매출 추이' 줄을 만드는 서류 — 서류끼리는 묻지 않는다(더 최근 해가 바꾸고 같거나 앞선 해는 먼저 있던 줄 그대로) */
 const TREND_KEY = `${CUSTOM_FACT_PREFIX}매출 추이`
+/** D-419 '연구개발비' 칸도 해마다 한 줄 — 매출 추이와 같은 규칙(더 최근 해가 바꾸고 같거나 앞선 해는 그대로) */
+const RND_KEY = `${CUSTOM_FACT_PREFIX}연구개발비`
+const isYearlyLine = (k: string) => k === TREND_KEY || k === RND_KEY
 const TREND_DOCS = new Set(['financialStatements', 'taxReturn', 'vatCertificate', 'incomeCertificate', 'siteReport'])
 const yearOf = (s: string | undefined) => /^(\d{4})/.exec(s ?? '')?.[1] ?? ''
 /** 같은 해면 재무제표 · 세무조정계산서가 사업장현황신고서 줄을 바꾼다(D-407 — 더 자세한 장부) */
@@ -285,7 +288,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const newerMonth = (p: PendingFact) => {
       const m = rec.factMeta?.[p.key]
       // D-408 매출 추이 — 서류끼리면 더 최근 해(같은 해면 재무제표가 사업장현황신고서를)가 바로 바꾼다
-      if (p.key === TREND_KEY && TREND_DOCS.has(p.source) && m && TREND_DOCS.has(m.source)) return trendBeats(p, m)
+      if (isYearlyLine(p.key) && TREND_DOCS.has(p.source) && m && TREND_DOCS.has(m.source)) return trendBeats(p, m)
       if (!p.asOf || p.asOf <= (m?.asOf ?? '')) return false
       if ((p.source === 'withholding' || p.source === 'vatReturn' || p.source === 'siteReport') && m?.source === p.source) return true
       // D-406 매출 · 이익 · 자산 · 부채 — 같은 종류 서류끼리면 더 최근 해가 바꾼다(2025 재무제표 뒤 2026 재무제표 · 세무조정계산서).

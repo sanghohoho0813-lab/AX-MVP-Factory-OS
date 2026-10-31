@@ -26,6 +26,8 @@ export interface FinStatementValues {
   loanBalancePrev?: number
   /** D-409: 미처분이익잉여금 줄의 둘째 숫자(전기 말) */
   retainedEarningsPrev?: number
+  /** D-419: 손익계산서 경상연구개발비 · 연구개발비(당기) — 무형자산 '개발비' 는 아님 */
+  rnd?: number
   /** 당기 결산 연도(찾았으면) */
   year?: string
   /**
@@ -101,6 +103,9 @@ export function parseFinancialStatement(text: string): FinStatementValues {
   return parseOneStatement(text)
 }
 
+/** D-419 경상연구개발비 · 연구개발비 · 경상개발비 */
+const RND = /^(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩIVX]+\s*[.)]?\s*|\d{1,2}\s*[.)]\s*|[(（]?\d{1,2}[)）]\s*)?(?:경\s*상\s*(?:연\s*구\s*)?개\s*발\s*비|연\s*구\s*(?:개\s*발\s*)?비)/
+
 /** D-418 셈 확인에만 쓰는 과목(회사 정보로는 내지 않는다) */
 const PFX = String.raw`^(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩIVX]+\s*[.)]?\s*|\d{1,2}\s*[.)]\s*|[(（]?\d{1,2}[)）]\s*)?`
 const CHECK_ITEMS: [string, RegExp, boolean][] = [
@@ -164,6 +169,12 @@ function parseOneStatement(text: string): FinStatementValues {
         if (ns.length >= 2) out.loanBalancePrev = (out.loanBalancePrev ?? 0) + Math.max(0, ns[1]) * unit
         else loanPrevOk = false
       }
+    }
+    // D-419 경상연구개발비 · 연구개발비 — 세액공제 줄('…에 대한 세액공제')은 아님 · 무형자산 '개발비' 는 아님
+    const dm = out.rnd === undefined && !/공\s*제/.test(line) ? RND.exec(line) : null
+    if (dm) {
+      const ns = [...line.slice(dm[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).filter((v): v is number => v !== null)
+      if (ns[0] !== undefined && ns[0] > 0) out.rnd = ns[0] * unit
     }
     const rm = out.retainedEarnings === undefined ? RETAINED.exec(line) : null
     if (rm) {

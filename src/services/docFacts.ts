@@ -38,6 +38,14 @@ const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'busine
 /**
  * D-406 '2025년 24억원(재무제표 · 2024년보다 +20%)' — 정책자금 매출 추이 읽기(vatTrendOf)와 같은 말. 해를 모르거나 전기가 없으면 ''.
  */
+/** D-419 '2025년 1억 2,000만원(재무제표 · 매출의 5.0%)' — 매출을 모르면 비중 없이 */
+export function rndLine(rnd: number | undefined, revenue: number | undefined, year: string, what = '재무제표'): string {
+  if (!(typeof rnd === 'number' && rnd > 0)) return ''
+  const y = /^(20\d{2})/.exec(year)?.[1]
+  const pct = typeof revenue === 'number' && revenue > 0 ? ` · 매출의 ${(Math.round((rnd / revenue) * 1000) / 10).toFixed(1)}%` : ''
+  return `${y ? `${y}년 ` : ''}${formatWon(rnd)}(${what}${pct})`
+}
+
 function revenueTrendLine(cur: number | undefined, prev: number | undefined, year: string, what: string): string {
   const y = Number(/^(20\d{2})/.exec(year)?.[1] ?? 0)
   if (!y || !(typeof cur === 'number' && cur > 0) || !(typeof prev === 'number' && prev > 0)) return ''
@@ -135,6 +143,8 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       }
       const trend = revenueTrendLine(f.revenue, f.revenuePrev, asOf, '세무조정계산서')
       if (trend) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'taxReturn', asOf, ref })
+      const rnd = rndLine(f.rnd, f.revenue, asOf, '세무조정계산서')
+      if (rnd) out.push({ key: `${CUSTOM_FACT_PREFIX}연구개발비`, label: '연구개발비', group: 'identity', value: rnd, source: 'taxReturn', asOf, ref })
     }
   }
   // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
@@ -147,6 +157,9 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
     // D-406 매출액 줄의 전기 숫자 → '매출 추이'(정책자금 매출 성장세 · 가점 '매출 10% 이상 증가')
     const trend = revenueTrendLine(f.revenue, f.revenuePrev, f.year ?? '', '재무제표')
     if (trend) out.push({ key: `${CUSTOM_FACT_PREFIX}매출 추이`, label: '매출 추이', group: 'identity', value: trend, source: 'financialStatements', asOf: f.year ?? '', ref })
+    // D-419 손익계산서 연구개발비 → '연구개발비' 칸(정책자금 가점 '연구개발비 비중 5% 이상' · 연구소 설립 · 연구 · 인력개발비 세액공제 신호)
+    const rnd = rndLine(f.rnd, f.revenue, f.year ?? '')
+    if (rnd) out.push({ key: `${CUSTOM_FACT_PREFIX}연구개발비`, label: '연구개발비', group: 'identity', value: rnd, source: 'financialStatements', asOf: f.year ?? '', ref })
     return out
   }
   if (ret) return out
