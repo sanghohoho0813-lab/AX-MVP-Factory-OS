@@ -4596,4 +4596,4 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - D-395 덧붙임 '합계 ⑨'(740cf27) · D-402(d212847): test:all EXIT 0 → main.
 - 새 서류 2종 한 번에 올리기(390 · 스크린샷): '바로 넣은 정보' 직원 수 7명 · 원천세 신고 인원 · 부가세 신고 매출 + '서류함에 넣은 곳' 원천징수이행상황신고서 · 부가가치세 신고서 — 넘침 0 · 오류 0.
 - 최종 후보 빌드(82e3739) 넓은 회귀 14묶음: plan 73 · scenarios 69 · matrix 586 · firstscreen 55 · calcpreset 41 · taxplan 96 · real 188 · phone 184 · steady 76 ·
-  board 198 · files 38 · folder 19 · easy 83 · modules(아래) — 0 실패.
+  board 198 · files 38 · folder 19 · easy 83 · modules 894 — 14묶음 모두 0 실패.
