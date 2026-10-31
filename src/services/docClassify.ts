@@ -361,6 +361,16 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     signals: [{ re: /계좌\s*번호|예금주/, weight: 2, say: "'계좌번호·예금주'" }],
     nameHint: /통장/,
   },
+  {
+    // D-420 노란우산공제 가입증명서 · 공제부금 납입증명서 — 정책자금 가점 '노란우산공제'
+    label: '노란우산공제 가입증명서',
+    signals: [
+      { re: /노\s*란\s*우\s*산/, weight: 4, say: "'노란우산'" },
+      { re: /소기업\s*[·ㆍ]?\s*소상공인\s*공제/, weight: 3, say: "'소기업 · 소상공인공제'" },
+      { re: /공제\s*부금\s*(?:납입|납부)?\s*증명/, weight: 2, say: "'공제부금 납입증명'" },
+    ],
+    nameHint: /노란\s*우산/,
+  },
 ]
 
 /** D-147: 알려진 서류 이름 → 새 칸 유효기간(개월). 모르면 null */

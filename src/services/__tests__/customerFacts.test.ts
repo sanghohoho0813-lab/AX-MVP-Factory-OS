@@ -2639,5 +2639,21 @@ await (async () => {
   check('D-419 매출의 2.5%면 가점은 아님(연구소 카드는 그대로)', !policyRecordBonus(low.record, {}).includes('연구개발비 비중 5% 이상') && customFactValue(low.record, '연구개발비').includes('매출의 2.5%'), customFactValue(low.record, '연구개발비'))
 })()
 
+// D-420 노란우산공제 가입증명서 → 서류함 칸 · 정책자금 가점
+await (async () => {
+  const YU = ['노란우산 공제 가입증명서', '소기업·소상공인공제(노란우산)', '가입자 홍길동', '가입일자 2021.05.10', '월 부금 300,000원', '중소기업중앙회'].join('\n')
+  const empty = normalizeClientOps({ id: 'yu420', companyName: '미래상사', status: 'active' })
+  const place = placeDocument({ text: YU, fileName: 'scan_0007.jpg' }, allDocumentMetas(empty))
+  check('D-420 스캔 이름이어도 "노란우산공제 가입증명서" 칸', place.kind === 'new' && place.label === '노란우산공제 가입증명서' && place.sure, JSON.stringify(place))
+  let r = withCustomDocument(empty, { label: '노란우산공제 가입증명서', validMonths: null })
+  const k = r.customDocuments[r.customDocuments.length - 1].key
+  check('D-420 칸만 있고 파일 없으면 가점 아님', !policyRecordBonus(r, {}).includes('노란우산공제'))
+  r = withDocument(r, k, { received: true, fileName: 'yu.pdf', fileSize: 1, storagePath: 'ws/yu.pdf' })
+  check('D-420 가입증명서를 받으면 정책자금 가점 "노란우산공제"', policyRecordBonus(r, {}).includes('노란우산공제'), JSON.stringify(policyRecordBonus(r, {})))
+  const typedNo = normalizeClientOps({ ...empty, customFields: [{ id: 'y', group: 'identity', label: '노란우산공제', value: '미가입' }] } as never)
+  const typedYes = normalizeClientOps({ ...empty, customFields: [{ id: 'y', group: 'identity', label: '노란우산공제', value: '2021년 가입 · 월 30만원' }] } as never)
+  check('D-420 회사 정보 "노란우산공제" 칸 — "미가입" 은 아님 · 가입 글이면 가점', !policyRecordBonus(typedNo, {}).includes('노란우산공제') && policyRecordBonus(typedYes, {}).includes('노란우산공제'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
