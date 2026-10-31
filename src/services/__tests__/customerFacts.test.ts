@@ -2159,6 +2159,8 @@ await (async () => {
   check('D-391 다음 달(10월) 신고서 → 직원 수 13 · 칸 "10월분" 으로 바로 바꿈 · 묻지 않음', d.record.employeeCount === '13' && customFactValue(d.record, '원천세 신고 인원').startsWith('2026년 10월분 근로자 13명') && d.summary.flagged.length === 0, JSON.stringify([d.record.employeeCount, customFactValue(d.record, '원천세 신고 인원'), d.summary.flagged]))
   const e = await analyzeUploadedDocs(d.record, [{ key: 'customdoc_wh3', fileName: 'wh08.pdf', text: WH08, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-11-12', makeId: () => `wh${++n}` })
   check('D-391 앞선 달(8월) 신고서를 나중에 올려도 최근 달 값 그대로 · 묻지 않음', e.record.employeeCount === '13' && customFactValue(e.record, '원천세 신고 인원').startsWith('2026년 10월분') && e.summary.flagged.length === 0, JSON.stringify([e.record.employeeCount, e.summary.flagged]))
+  const CELLS = ['원천징수이행상황신고서', '귀속연월 2026년 9월', '지급연월 2026년 9월', '근로소득', '간이세액', 'A01', '12', '45,000,000', '1,234,560', '중도퇴사', 'A02', '1', '3,000,000'].join('\n')
+  check('D-391 PDF 표 칸이 줄마다 따로 나와도(A01 / 12 / 45,000,000) 12명 · 4,500만원 · 인원 칸이 빈 A01 뒤 A02 숫자는 아님', JSON.stringify(readWithholdingReport(CELLS)) === '{"yearMonth":"2026-09","until":"","employees":12,"pay":45000000}' && readWithholdingReport(CELLS.replace('A01\n12\n45,000,000\n1,234,560\n', 'A01\n')) === null, JSON.stringify(readWithholdingReport(CELLS)))
   const HALF = WH.replace('[√]매월 [ ]반기', '[ ]매월 [√]반기').replace('귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '귀속연월 2026년 1월 ③ 지급연월 2026년 6월')
   const hr = readWithholdingReport(HALF)
   check('D-391 반기 신고(귀속 1월 · 지급 6월) → "2026년 1~6월분(반기)"', hr?.until === '2026-06' && withholdingValue(hr!, formatWon).startsWith('2026년 1~6월분(반기) 근로자 12명'), JSON.stringify(hr))

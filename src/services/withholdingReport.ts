@@ -44,6 +44,10 @@ export function readWithholdingReport(text: string, fileName = ''): WithholdingR
     const pay = payDigits.length >= 4 ? Number(payDigits) : null
     return { yearMonth, until, employees, pay }
   }
+  // PDF 표 칸이 줄마다 따로 나온 경우(A01 / 12 / 45,000,000) — 줄을 이어 A01 바로 뒤 수 · 금액만(사이에 다른 코드가 끼면 아님)
+  const flat = raw.replace(/\s*\r?\n\s*/g, ' ')
+  const f = /(?<![A-Z0-9])A\s*0\s*1(?!\d)[\s|│]*(\d{1,4})(?![\d,])[\s|│]+([\d,]{4,15})/.exec(flat)
+  if (f && Number(f[1]) >= 1) return { yearMonth, until, employees: Number(f[1]), pay: Number(f[2].replace(/,/g, '')) || null }
   return null
 }
 
