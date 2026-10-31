@@ -1992,7 +1992,7 @@ await (async () => {
 await (async () => {
   const NICE = ['NICE지키미 신용정보 조회서', '조회일 2026.10.20', '성명 김대표 생년월일 1978.05.10', '나의 신용점수 812 점', '(1,000점 만점)', '신용점수 산출 기준일 2026.10.19', '대출 2건 · 연체 없음'].join('\n')
   const r1 = readCreditScore(NICE)
-  check('D-381 NICE 조회서: 812점 · 1,000점 만점 · 날짜 · 생년월일은 점수 아님', JSON.stringify(r1) === '{"scores":[{"bureau":"NICE","score":812}]}', JSON.stringify(r1))
+  check('D-381 NICE 조회서: 812점 · 1,000점 만점 · 날짜 · 생년월일은 점수 아님', JSON.stringify(r1) === '{"scores":[{"bureau":"NICE","score":812}],"date":"2026-10-20"}', JSON.stringify(r1))
   const BOTH = ['신용정보 조회 결과', 'NICE 신용점수 : 812점', 'KCB(올크레딧) 신용점수 : 845점'].join('\n')
   const r2 = readCreditScore(BOTH)
   check('D-381 NICE · KCB 둘 다 → 둘 다 남기고 낮은 쪽으로 판정', !!r2 && creditScoreValue(r2) === 'NICE 812점 · KCB 845점' && lowestScoreOf(creditScoreValue(r2)) === 812 && creditBandOf(812) === '800점대' && creditBandOf(599) === '600점 미만' && creditBandOf(900) === '900점 이상', JSON.stringify(r2))
@@ -2002,7 +2002,7 @@ await (async () => {
   check('D-381 서류함: "대표 신용점수 조회" 칸 · 확실(바로 넣기) · 유효 1개월', pl.kind === 'new' && pl.label === '대표 신용점수 조회' && pl.sure && knownDocValidMonths('대표 신용점수 조회') === 1, JSON.stringify(pl))
   let n = 0
   const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_cs', fileName: 'nice.pdf', text: NICE, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `cs${++n}` })
-  check('D-381 올리기 한 번 → "대표 신용점수" NICE 812점 바로(묻지 않음)', customFactValue(a.record, '대표 신용점수') === 'NICE 812점' && a.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '대표 신용점수'), a.summary.flagged]))
+  check('D-381 · D-388 올리기 한 번 → "대표 신용점수" NICE 812점 · 조회일 바로(묻지 않음)', customFactValue(a.record, '대표 신용점수') === 'NICE 812점 · 2026-10-20 조회' && a.summary.flagged.length === 0, JSON.stringify([customFactValue(a.record, '대표 신용점수'), a.summary.flagged]))
   const facts = clientFacts(a.record, new Date('2026-10-31T00:00:00'))
   const ev = policyEvidence(a.record, facts, '2026-10-31')
   check('D-381 정책자금 근거: 대표 신용 800점대 · 앞줄 "대표 신용 NICE 812점"', ev.input.creditBand === '800점대' && ev.notes[0]?.startsWith('대표 신용 NICE 812점'), JSON.stringify(ev))
@@ -2083,6 +2083,17 @@ await (async () => {
   ] } as never)
   const a = answerFor('summary', { record: r, today: '2026-10-31', notices: [] })
   check('D-387 요약: 대표 신용 NICE 812점 · 임원 임기(첫 사람) · 2025년 신고서 줄(최근 해)', a.facts.includes('대표 신용 NICE 812점') && a.facts.includes('임원 임기 대표이사 김대표 2024-11-20 중임 · 3년이면 2027-11-20 만료') && a.facts.includes('2025년 신고서 — 통합고용세액공제 1,540만원(법인세 신고서)'), JSON.stringify(a.facts))
+}
+
+// D-388 신용점수 조회일 — 날짜 숫자는 점수가 아님 · 석 달 넘은 조회는 새로 확인
+{
+  check('D-388 칸 글의 날짜(2026-10-20)는 점수로 안 읽음 · 사람이 쓴 "812" 그대로', lowestScoreOf('NICE 812점 · 2026-10-20 조회') === 812 && lowestScoreOf('812') === 812 && lowestScoreOf('2026-10-20 조회') === null)
+  const mk = (v: string) => normalizeClientOps({ id: 'cs388', companyName: '대전정밀(주)', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'cs', group: 'people', label: '대표 신용점수', value: v }] } as never)
+  const old = mk('NICE 812점 · 2026-06-01 조회')
+  const evOld = policyEvidence(old, clientFacts(old, new Date('2026-10-31T00:00:00')), '2026-10-31')
+  check('D-388 6/1 조회(석 달 넘음) → 근거 줄에 "석 달 넘었어요, 새로 확인" · 판정은 그 점수로', evOld.input.creditBand === '800점대' && evOld.notes.some((x) => x === '대표 신용 NICE 812점 · 6/1 조회 — 석 달 넘었어요, 새로 확인'), JSON.stringify(evOld.notes))
+  const fresh = mk('NICE 812점 · 2026-10-20 조회')
+  check('D-388 최근 조회면 날짜 줄 없이 "대표 신용 NICE 812점"', policyEvidence(fresh, clientFacts(fresh, new Date('2026-10-31T00:00:00')), '2026-10-31').notes.includes('대표 신용 NICE 812점'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

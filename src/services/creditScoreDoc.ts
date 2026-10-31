@@ -11,6 +11,8 @@ import type { CreditBand } from '../tools/policyFunding/types'
 
 export interface CreditScoreRead {
   scores: { bureau: 'NICE' | 'KCB' | null; score: number }[]
+  /** D-388 조회일(YYYY-MM-DD) — '조회일 · 조회일시 · 기준일 · 발급일' 줄. 모르면 '' */
+  date: string
 }
 
 const BUREAU = /NICE|나이스|지키미|KCB|코리아\s*크레딧\s*뷰로|올크레딧|신용\s*정보|신용\s*평가/i
@@ -43,18 +45,27 @@ export function readCreditScore(text: string, fileName = ''): CreditScoreRead | 
       if (!out.some((o) => o.bureau === bureau && o.score === n)) out.push({ bureau, score: n })
     }
   })
-  return out.length ? { scores: out } : null
+  if (!out.length) return null
+  const d = /(?:조\s*회\s*일(?:\s*시)?|기\s*준\s*일|발\s*급\s*일(?:\s*시)?|산\s*출\s*기\s*준\s*일)\s*[:：]?\s*(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/.exec(raw)
+  return { scores: out, date: d ? `${d[1]}-${d[2].padStart(2, '0')}-${d[3].padStart(2, '0')}` : '' }
 }
 
 /** 회사 정보 '대표 신용점수' 칸 — 'NICE 812점 · KCB 845점' */
 export function creditScoreValue(read: CreditScoreRead): string {
-  return read.scores.map((s) => `${s.bureau ? `${s.bureau} ` : ''}${s.score}점`).join(' · ')
+  const scores = read.scores.map((s) => `${s.bureau ? `${s.bureau} ` : ''}${s.score}점`).join(' · ')
+  return read.date ? `${scores} · ${read.date} 조회` : scores
 }
 
-/** 칸 글 → 낮은 점수(판정은 보수적으로). 사람이 '812' · '812점' 으로 적어도 */
+/** 칸 글 → 낮은 점수(판정은 보수적으로). 사람이 '812' · '812점' 으로 적어도 — 날짜(2026-10-20)의 숫자는 점수가 아니다 */
 export function lowestScoreOf(value: string): number | null {
-  const nums = [...String(value || '').matchAll(/(\d{3})\s*점?/g)].map((m) => Number(m[1])).filter((n) => n >= 100 && n <= 999)
+  const body = String(value || '').replace(/20\d{2}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*일?/g, ' ')
+  const nums = [...body.matchAll(/(?<!\d)(\d{3})(?!\d)\s*점?/g)].map((m) => Number(m[1])).filter((n) => n >= 100 && n <= 999)
   return nums.length ? Math.min(...nums) : null
+}
+
+/** D-388 칸 글의 조회일(YYYY-MM-DD) — 없으면 '' */
+export function creditScoreDateOf(value: string): string {
+  return /(20\d{2}-\d{2}-\d{2})\s*조회/.exec(String(value || ''))?.[1] ?? ''
 }
 
 export function creditBandOf(score: number): CreditBand {

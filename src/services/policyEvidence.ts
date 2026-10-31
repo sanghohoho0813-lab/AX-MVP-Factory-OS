@@ -25,7 +25,7 @@ import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue
 import { vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
-import { creditBandOf, lowestScoreOf } from './creditScoreDoc'
+import { creditBandOf, creditScoreDateOf, lowestScoreOf } from './creditScoreDoc'
 import { wonOf } from './taxPlan'
 
 export interface PolicyEvidence {
@@ -107,7 +107,11 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
   const score = lowestScoreOf(scoreText)
   if (score !== null) {
     input.creditBand = creditBandOf(score)
-    ;(score < 700 ? notes : front).push(`대표 신용 ${scoreText.slice(0, 30)}${score < 600 ? ' — 일반 기관은 어려워요' : score < 700 ? ' — 한도가 줄 수 있어요' : ''}`)
+    // D-388 석 달 넘은 조회면 새로 확인하라고(신청 땐 기관이 새로 조회한다)
+    const asked = creditScoreDateOf(scoreText)
+    const old = asked && daysBetween(asked, today) > FRESH_DAYS ? ` · ${md(asked)} 조회 — 석 달 넘었어요, 새로 확인` : ''
+    const shown = scoreText.replace(/\s*·\s*20\d{2}-\d{2}-\d{2}\s*조회/, '').slice(0, 30)
+    ;(score < 700 ? notes : front).push(`대표 신용 ${shown}${score < 600 ? ' — 일반 기관은 어려워요' : score < 700 ? ' — 한도가 줄 수 있어요' : ''}${old}`)
   }
   // D-307 가점 — 특허 · 연구소 · 벤처 · 이노비즈 · 메인비즈 · 여성기업 · 사회적기업(기술보증 · 혁신성장 쪽 추천이 달라진다)
   const bonus = policyBonus(record, today)
