@@ -592,7 +592,12 @@ function convertInsight(record: ClientOpsRecord, facts: ClientFacts, today: stri
   // 사업소득을 아는데 0 이하(결손)면 '올리면' 이 아니라 '줄일 세금이 없어요'
   if (!r && facts.netIncome && !facts.netIncome.estimated && facts.netIncome.won <= 0) return { ...base, tone: 'no', headline: '사업소득이 0 이하예요 — 법인전환으로 줄일 세금이 없어요', detail: `사업소득 ${facts.netIncome.won < 0 ? `△${manwonText(-facts.netIncome.won)}` : '0원'}${facts.netIncome.asOf ? `(${facts.netIncome.asOf.slice(0, 4)})` : ''}`, missing: [], action: null }
   if (!r) return { ...base, tone: 'need', headline: '개인사업자 — 사업소득(소득금액증명)을 올리면 법인으로 바꿀 때 세금 차이를 바로 계산해요', detail: '지금 종합소득세 vs 법인세 + 대표 급여 세금 — 세금 계산기 식 그대로', missing: ['소득금액증명'], action: null }
-  const how = `사업소득 ${manwonText(income)} · 지금 종합소득세 약 ${manwonText(r.personal)} → 법인(대표 급여 월 ${manwonText(r.all.monthly)}) 약 ${manwonText(r.all.total) || '0원'}`
+  // D-431 같은 해 '사업소득 추이'(소득금액증명 두 해 — D-421)가 있으면 성장률을 함께 · 빠르게 늘면 내년에 다시 보라는 한 줄(새 계산 없음)
+  const pg = /^(20\d{2})년[^(]*\([^)]*?(\d{4})년보다\s*([+-]?\d+)%\)/.exec(customFactValue(record, '사업소득 추이'))
+  const pgOk = !!pg && (facts.netIncome?.asOf ?? '').startsWith(pg[1])
+  const growth = pgOk && pg ? `${pg[2]}년보다 ${pg[3]}%` : ''
+  const fast = pgOk && pg && Number(pg[3]) >= 20 ? `사업소득이 1년에 ${Number(pg[3])}% 늘고 있어요 — 이 흐름이면 내년엔 차이가 커질 수 있어요(내년 소득금액증명으로 다시 계산)` : ''
+  const how = `사업소득 ${manwonText(income)}${growth ? `(${growth})` : ''} · 지금 종합소득세 약 ${manwonText(r.personal)} → 법인(대표 급여 월 ${manwonText(r.all.monthly)}) 약 ${manwonText(r.all.total) || '0원'}`
   const keep = r.keep.monthly !== r.all.monthly ? `회사에 ${manwonText(r.keep.kept)} 남겨 두면 올해 세금 약 ${manwonText(r.keep.total)}(나중에 가져가면 배당세)` : ''
   const note = '4대보험 · 법인 운영비 · 전환 비용은 빼고 세금만 · 세무사 확인'
   // 성실신고확인 대상(업종별 매출 기준)이면 맨 앞에 — 법인전환을 검토하는 가장 흔한 계기
@@ -605,8 +610,8 @@ function convertInsight(record: ClientOpsRecord, facts: ClientFacts, today: stri
   if (r.saving >= CONVERT_MIN)
     return { ...base, tone: 'good', // 금액은 바로 아래 초록 줄(amount)에 — 머리글에 같은 숫자를 두 번 쓰지 않는다
       headline: '법인으로 바꾸면 — 이익을 다 가져가도 세금이 줄어요', detail: [how, keep, note].filter(Boolean).join(' · '), missing: [], action: '법인전환 — 세무사와 시점 · 방법(현물출자 · 사업양수도) 확인', amount: `1년 약 ${manwonText(r.saving)} 덜 냄` }
-  if (r.saving > 0) return { ...base, tone: 'maybe', headline: `지금은 법인으로 바꿔도 1년 약 ${manwonText(r.saving)} 차이 — 아직 작아요`, detail: [how, keep, note].filter(Boolean).join(' · '), missing: [], action: null }
-  return { ...base, tone: 'no', headline: '지금 사업소득이면 개인이 세금이 더 적어요 — 법인전환은 아직', detail: [how, note].join(' · '), missing: [], action: null }
+  if (r.saving > 0) return { ...base, tone: 'maybe', headline: `지금은 법인으로 바꿔도 1년 약 ${manwonText(r.saving)} 차이 — 아직 작아요`, detail: [fast, how, keep, note].filter(Boolean).join(' · '), missing: [], action: null }
+  return { ...base, tone: 'no', headline: '지금 사업소득이면 개인이 세금이 더 적어요 — 법인전환은 아직', detail: [fast, how, note].filter(Boolean).join(' · '), missing: [], action: null }
 }
 
 const taxInsight: Provider = ({ record, facts, today, light }) => {

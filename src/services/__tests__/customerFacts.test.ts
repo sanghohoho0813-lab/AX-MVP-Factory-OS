@@ -2753,5 +2753,18 @@ await (async () => {
   check('D-430 대표가 "연구 · 개발 맡을 직원 없음" 이라고 답했으면 그 답(안 맞음)', scenarioFit(scenarioPreset('lab-one')!, fitContext(said, T)).kind === 'no', JSON.stringify(scenarioFit(scenarioPreset('lab-one')!, fitContext(said, T))))
 })()
 
+// D-431 법인전환 검토 카드 — 같은 해 '사업소득 추이' 가 있으면 성장률 · 빠르게 늘면 내년에 다시 보라는 한 줄(계산은 그대로)
+await (async () => {
+  const T = '2026-10-31'
+  const mk = (won: string, asOf: string, trend: string) => withFactValue(normalizeClientOps({ id: 'cv431', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOW, updatedAt: NOW, customFields: trend ? [{ id: 't', group: 'identity', label: '사업소득 추이', value: trend }] : [] } as never), 'netIncome', won, { source: 'manual', status: 'entered', asOf, now: NOW })
+  const big = buildInsights(mk('60000000', '2025', '2025년 6,000만원(소득금액증명 소득금액 · 2024년보다 +50%)'), T, []).find((i) => i.key === 'tax')
+  const plain = buildInsights(mk('60000000', '2025', ''), T, []).find((i) => i.key === 'tax')
+  check('D-431 사업소득 6천만 · 2024년보다 +50% → 카드 설명 "사업소득 6,000만원(2024년보다 +50%)" · 금액 · 판정은 그대로', !!big && big.detail.includes('사업소득 6,000만원(2024년보다 +50%)') && big.amount === plain?.amount && big.tone === plain?.tone, big?.detail)
+  const small = buildInsights(mk('25000000', '2025', '2025년 2,500만원(소득금액증명 소득금액 · 2024년보다 +25%)'), T, []).find((i) => i.key === 'tax')
+  check('D-431 아직 차이 작은데 소득이 1년에 25% 늘면 → "이 흐름이면 내년엔 차이가 커질 수 있어요" 맨 앞', !!small && small.tone !== 'good' && small.detail.startsWith('사업소득이 1년에 25% 늘고 있어요'), small?.detail)
+  const old = buildInsights(mk('25000000', '2025', '2024년 2,000만원(소득금액증명 소득금액 · 2023년보다 +40%)'), T, []).find((i) => i.key === 'tax')
+  check('D-431 다른 해 추이(2024) 면 붙이지 않음 — 지금 계산한 해와 같을 때만', !!old && !old.detail.includes('2023년보다') && !old.detail.includes('늘고 있어요'), old?.detail)
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
