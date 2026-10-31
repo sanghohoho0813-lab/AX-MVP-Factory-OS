@@ -1987,6 +1987,28 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-403 원천세 신고서 두 달 → 원천세 인원 추이 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const wh = (name, y, m, n) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(['원천징수이행상황신고서', `② 귀속연월 ${y}년 ${m}월 ③ 지급연월 ${y}년 ${m}월`, `근로소득 간이세액 A01 ${n} ${(n * 3000000).toLocaleString('en-US')} 100,000`].join('\n'), 'utf8') })
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([wh('scan_403a.txt', 2025, 9, 9), wh('scan_403b.txt', 2026, 9, 12)])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const r = await record(page)
+  const tr = (r.customFields ?? []).find((x) => x.label === '원천세 인원 추이')
+  check('D-403 390 두 달 한 번에 → "원천세 인원 추이" = 2025-09 9명 · 2026-09 12명', tr?.value === '2025-09 9명 · 2026-09 12명', JSON.stringify(tr))
+  check('D-403 390 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

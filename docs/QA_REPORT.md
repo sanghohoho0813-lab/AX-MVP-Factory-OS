@@ -4600,3 +4600,4 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - D-403(9bfc54f): test:all EXIT 0(customer-facts 641) · detail 488 · facts 24 — 0 실패 → main.
 - D-404(583f6c0): test:all EXIT 0(customer-facts 643) · scenarios 69 · plan 73 · detail 488 — 0 실패 → main.
 - Production 화면 번들(D-402 · 403 뒤): '원천세 인원 추이' · '반년 넘었어요' · '받으면 바로 채워져요' 글이 들어 있음(확인).
+- qa:detail 에 D-403 블록(390 · 원천세 신고서 두 달 한 번에 → '원천세 인원 추이') 더함 — D-404 빌드에서 detail 490/0. Production 번들에 '자금 대상 · 명부로 확인'(D-404) 글이 들어 있음(확인).
