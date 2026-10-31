@@ -21,7 +21,7 @@ import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
 import { documentStatus, documentsWithExpiry } from '../clientOpsAlerts'
-import { docShelfSummary, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfCellOf } from '../docShelf'
+import { docShelfSummary, dupShelfBases, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfBaseOf, shelfCellOf } from '../docShelf'
 import { applyResort, cellForPlacement, resortDecision, withFactRefs, withoutDocumentFile } from '../docPlacementApply'
 import {
   FACT_DEFS,
@@ -2501,6 +2501,27 @@ await (async () => {
   check('D-410 현재 유효사항만이면 예전처럼 확인(처음 취임일을 정말 모름)', c.summary.flagged.some((f) => f.key === 'taxProfile.ceoStartDate'), JSON.stringify(c.summary.flagged))
   const d = await up(b.record, [CUR], '2026-10-31T03:00:00.000Z')
   check('D-410 취임일을 안 뒤에 현재 유효사항을 다시 올려도 묻지 않고 그대로', d.record.taxProfile?.ceoStartDate === '2020-03-02' && d.summary.flagged.length === 0, JSON.stringify(d.summary.flagged))
+})()
+
+// D-411 해마다 · 기간마다 따로 내는 서류는 여러 장이 정상 — '겹쳐 있어요 · 최신 것만 남길까요?' 는 같은 기간일 때만
+await (async () => {
+  const T = '2026-10-31'
+  const add = (r: ClientOpsRecord, label: string, st: { fileName: string; issuedAt?: string }) => {
+    let x = withCustomDocument(r, { label, validMonths: null })
+    const k = x.customDocuments[x.customDocuments.length - 1].key
+    x = withDocument(x, k, { received: true, fileSize: 1, storagePath: `ws/p/${st.fileName}`, ...st })
+    return x
+  }
+  let r = normalizeClientOps({ id: 'p411', companyName: '기간상사', status: 'active' })
+  r = withDocument(r, 'financialStatements', { received: true, fileName: '재무제표_2025.pdf', fileSize: 1, storagePath: 'ws/p/fs25.pdf', issuedAt: '2025-12-31' })
+  r = add(r, '최근 3개년 재무제표 (2)', { fileName: '재무제표_2024.pdf', issuedAt: '2024-12-31' })
+  r = add(r, '최근 3개년 재무제표 (3)', { fileName: '재무제표_2023.pdf', issuedAt: '2023-12-31' })
+  r = add(r, '원천징수이행상황신고서', { fileName: '원천세_9월.pdf' })
+  r = add(r, '원천징수이행상황신고서 (2)', { fileName: '원천세_10월.pdf' })
+  check('D-411 재무제표 세 해 · 원천세 두 달은 겹친 서류가 아님 → 최신 것만 남길까요? 를 묻지 않음 · 안내도 "함께 둠"', docShelfSummary(r, T, new Set()).dupGroups.length === 0 && !buildDecisions(r, T, []).some((d) => d.kind === 'shelf' && d.title.includes('겹쳐')) && dupShelfBases(r).size === 0, JSON.stringify(docShelfSummary(r, T, new Set()).dupGroups))
+  const same = add(add(r, '최근 3개년 재무제표 (4)', { fileName: '재무제표_2025_다시.pdf', issuedAt: '2025-12-31' }), '원천징수이행상황신고서 (3)', { fileName: '원천세_10월.pdf' })
+  const g = docShelfSummary(same, T, new Set()).dupGroups
+  check('D-411 같은 해 재무제표 두 장 · 같은 파일 이름 원천세 두 장은 예전처럼 겹침(2묶음)', g.length === 2 && g.every((x) => x.length === 2) && dupShelfBases(same).has(shelfBaseOf('최근 3개년 재무제표')), JSON.stringify(g))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

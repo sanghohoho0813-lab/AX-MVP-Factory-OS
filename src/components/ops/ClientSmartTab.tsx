@@ -46,7 +46,7 @@ import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts } from '../../services/customerFacts'
 import { INSIGHT_TONE_LABEL, buildInsights, insightChanges, recommendNextSteps, type Insight, type InsightTone } from '../../services/clientInsights'
 import { batchOfLog, type DocBatchSummary } from '../../services/docAutoAnalyze'
-import { docShelfSummary } from '../../services/docShelf'
+import { docShelfSummary, dupShelfBases, shelfBaseOf } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
 import { activeApplications, applyReadiness, applyStage, openApplications } from '../../services/grants/grantApply'
@@ -97,6 +97,8 @@ export default function ClientSmartTab({
     const s = docShelfSummary(record, today, new Set())
     return { expired: s.expired.length, other: s.other.length, dup: s.dupGroups.length }
   }, [record, today])
+  // D-411 올린 결과 안내 — '최신 것만 남기세요' 는 정말 겹친 서류(같은 해 · 같은 파일)일 때만
+  const dupBases = useMemo(() => dupShelfBases(record), [record])
   // D-151: 신청 준비 중인 지원사업의 모자란 서류
   const applying = useMemo(
     () =>
@@ -178,9 +180,9 @@ export default function ClientSmartTab({
 
       {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
       {lastBatch ? (
-        <BatchSummary batch={lastBatch} fresh onRetry={onUpload} opened={opened} />
+        <BatchSummary dupBases={dupBases} batch={lastBatch} fresh onRetry={onUpload} opened={opened} />
       ) : record.docUploads?.[0] ? (
-        <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} />
+        <BatchSummary dupBases={dupBases} batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} />
       ) : null}
 
       {/* 3. 확인이 필요한 정보 */}
@@ -399,7 +401,7 @@ function goToInsight(key: string) {
   window.setTimeout(() => document.querySelector(`[data-testid="smart-insight"][data-key="${key}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
 }
 
-function BatchSummary({ batch, fresh, onRetry, opened = [] }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void; opened?: Insight[] }) {
+function BatchSummary({ batch, fresh, onRetry, opened = [], dupBases = new Set<string>() }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void; opened?: Insight[]; dupBases?: ReadonlySet<string> }) {
   const when = batch.at ? new Date(batch.at) : null
   const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
   const failed = batch.failed ?? []
@@ -500,7 +502,12 @@ function BatchSummary({ batch, fresh, onRetry, opened = [] }: { batch: DocBatchS
                 {x.same ? (
                   <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
                 ) : (
-                  x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
+                  x.numbered &&
+                  (dupBases.has(shelfBaseOf(x.label)) ? (
+                    <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
+                  ) : (
+                    <span className="t-meta text-slate-500">(해 · 기간이 다른 같은 종류 서류라 함께 둠)</span>
+                  ))
                 )}
               </li>
             ))}

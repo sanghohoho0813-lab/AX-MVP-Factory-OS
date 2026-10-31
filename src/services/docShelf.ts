@@ -41,6 +41,32 @@ export interface DocShelfSummary {
   missingNow: DocumentKey[]
 }
 
+/**
+ * D-411 해마다 · 기간마다 따로 내는 서류는 여러 장이 정상 — '겹쳐 있어요 · 최신 것만 남길까요?' 는 같은 기간일 때만.
+ *  - 최근 3개년 재무제표: 결산일(발급일 칸) 해가 같을 때만 겹침(2025 · 2024 · 2023 세 장은 겹침 아님)
+ *  - 원천세 신고서 · 부가세 신고서 · 사업장현황신고서: 기간을 칸에 남기지 않아 파일 이름이 같을 때만 겹침
+ */
+const YEARLY_DOCS = new Set(['최근3개년재무제표'])
+const PERIOD_DOCS = new Set(['원천징수이행상황신고서', '부가가치세신고서', '사업장현황신고서'])
+function splitPeriodGroup(record: ClientOpsRecord, b: string, g: DocumentKey[]): DocumentKey[][] {
+  const by = (keyOf: (k: DocumentKey) => string) => {
+    const m = new Map<string, DocumentKey[]>()
+    for (const k of g) m.set(keyOf(k), [...(m.get(keyOf(k)) ?? []), k])
+    return [...m.values()]
+  }
+  if (YEARLY_DOCS.has(b)) return by((k) => (record.documents[k]?.issuedAt ?? '').slice(0, 4))
+  if (PERIOD_DOCS.has(b)) return by((k) => (record.documents[k]?.fileName ?? k).trim().toLowerCase())
+  return [g]
+}
+
+/** D-411 지금 '겹쳐 있어요' 로 묻는 서류 이름(번호 뗀 이름) — 올린 결과 안내를 그와 맞춘다 */
+export function dupShelfBases(record: ClientOpsRecord): Set<string> {
+  const metas = allDocumentMetas(record)
+  const label = (k: DocumentKey) => metas.find((m) => m.key === k)?.label ?? k
+  return new Set(docShelfSummary(record, '', new Set()).dupGroups.map((g) => base(label(g[0]))))
+}
+export const shelfBaseOf = base
+
 export function docShelfSummary(record: ClientOpsRecord, today: string, urgent: ReadonlySet<string>): DocShelfSummary {
   const metas = allDocumentMetas(record)
   const hasFile = (key: string) => Boolean(record.documents[key]?.fileName || record.documents[key]?.storagePath)
@@ -52,7 +78,7 @@ export function docShelfSummary(record: ClientOpsRecord, today: string, urgent: 
     g.push(m.key)
     groups.set(base(m.label), g)
   }
-  const dupGroups = [...groups.values()].filter((g) => g.length > 1)
+  const dupGroups = [...groups.entries()].flatMap(([b, g]) => splitPeriodGroup(record, b, g)).filter((g) => g.length > 1)
   // D-148: 같은 서류를 새로 받았으면 옛 칸 만료는 세지 않는다(경고 · 달력과 같은 기준)
   const expired = documentsWithExpiry(record, today).filter((x) => x.view.expired).map((x) => x.meta.key)
   const missingNow = metas.filter((m) => urgent.has(m.key) && !record.documents[m.key]?.received).map((m) => m.key)
