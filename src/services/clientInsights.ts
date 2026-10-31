@@ -412,7 +412,9 @@ const employmentInsight: Provider = ({ record, facts, today }) => {
   const years = reliefYears(record, facts, today)
   if (!roster) {
     const refund = employmentRefund(record, facts, years, null)
-    return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: [refund.line, '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
+    // D-391 원천세 신고서로 그달 근로자 수를 알면 — 명부가 없어도 몇 명 회사인지 먼저 보여 준다
+    const wh = customFactValue(record, '원천세 신고 인원')
+    return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: [refund.line, wh ? `원천세 신고서 ${wh}` : '', '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한, 통합고용세액공제 예상까지.', durunuriLine(facts.employeeCount, 0)].filter(Boolean).join(' · '), missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'

@@ -1898,6 +1898,38 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-391 원천징수이행상황신고서 → 직원 수 · 원천세 신고 인원 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    r.employeeCount = ''
+    if (r.factMeta) delete r.factMeta.employeeCount
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  const WH = { name: 'scan_391.txt', mimeType: 'text/plain', buffer: Buffer.from(['원천징수이행상황신고서', '① 신고구분 [√]매월', '② 귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '원천징수의무자 법인명(상호) 한솔테크 대표자(성명) 김대표',
+    '소득자 소득구분 코드 인원 총지급액 소득세등', '근로소득 간이세액 A01 7 21,000,000 412,300', '일용근로 A03 2 900,000 0', '가감계 A10 9 21,900,000 412,300'].join('\n'), 'utf8') }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([WH])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(700)
+  const placed = ((await page.getByTestId('smart-placed').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-391 390 스캔 이름이어도 "원천징수이행상황신고서" 칸', /scan_391\.txt → 원천징수이행상황신고서/.test(placed), placed.slice(0, 300))
+  const r = await record(page)
+  check('D-391 390 직원 수 7 바로(일용 2명 · 가감계 9명은 아님) · 원천세 신고 인원 칸', String(r.employeeCount) === '7' && /2026년 9월분 근로자 7명/.test(r.factValues?.['cf:원천세 신고 인원'] ?? ''), JSON.stringify({ e: r.employeeCount, w: r.factValues?.['cf:원천세 신고 인원'] }))
+  check('D-391 390 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

@@ -115,6 +115,18 @@ function vatYields(record: ClientOpsRecord, year: string): boolean {
  * 매출 추이: 소득금액증명 줄은 이미 있는 줄에 밀리고, 부가세 줄은 소득금액증명 줄에 밀린다(둘 다 올려도 질문이 생기지 않게).
  */
 function docYields(record: ClientOpsRecord, c: { key: string; source: string; asOf: string }): boolean {
+  // D-390 세무조정계산서 안 표준재무제표 숫자는 다른 출처(재무제표 · 크레탑 · 직접)의 같은 해 이상 값에 밀린다 — 작년 신고서를 올려도 올해 값과 다르다고 묻지 않게
+  if (c.source === 'taxReturn' && FIN_KEYS.has(c.key)) {
+    const f = readFact(record, c.key)
+    if (!f || f.status === 'missing' || f.source === c.source) return false
+    const y = /^(\d{4})/.exec(f.asOf)?.[1]
+    return !y || Number(y) >= Number(c.asOf.slice(0, 4))
+  }
+  // D-391 원천세 신고서의 근로자 수는 이미 적힌 직원 수(명부 · 직접 적음)에 밀린다 — 퇴사 · 대표 급여로 한두 명 달라도 묻지 않는다
+  if (c.source === 'withholding' && c.key === 'employeeCount') {
+    const f = readFact(record, 'employeeCount')
+    return !!f && f.status !== 'missing' && f.source !== c.source
+  }
   if (c.key === 'revenue' && c.source === 'vatCertificate') return vatYields(record, c.asOf)
   if (c.source !== 'incomeCertificate' && !(c.source === 'vatCertificate' && c.key === `${CUSTOM_FACT_PREFIX}매출 추이`)) return false
   if (c.key === 'revenue' || c.key === 'netIncome') {
@@ -130,6 +142,8 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
   }
   return false
 }
+
+const FIN_KEYS = new Set(['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'])
 
 /** 올린 서류들 → 바로 넣기 · 확인 필요 */
 export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string): AutoFillOutcome {

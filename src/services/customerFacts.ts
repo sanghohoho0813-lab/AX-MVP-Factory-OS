@@ -98,6 +98,7 @@ export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   creditReport: '신용점수 조회서',
   articles: '정관',
   idCard: '대표 신분증',
+  withholding: '원천세 신고서',
 }
 
 export const FACT_STATUS_LABEL: Record<FactStatus, string> = {

@@ -8,6 +8,7 @@
  * 실행: npm run test:facts
  */
 
+import { readWithholdingReport } from '../withholdingReport'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
@@ -2127,6 +2128,32 @@ await (async () => {
   let n = 0
   const a = await analyzeUploadedDocs(base, [{ key: 'customdoc_tr', fileName: 'tr.pdf', text: TR, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `tr${++n}` })
   check('D-390 올리기 한 번 → 매출 · 순이익 바로(정책자금 · 절세가 쓴다) · 묻지 않음', readFact(a.record, 'revenue')?.value === '2400000000' && readFact(a.record, 'netIncome')?.value === '220000000' && a.summary.flagged.length === 0, JSON.stringify(a.summary.flagged))
+})()
+
+// D-390 작년 신고서를 올려도 올해 재무제표 숫자와 다르다고 묻지 않음 · D-391 원천징수이행상황신고서 → 직원 수 · 원천세 신고 인원
+await (async () => {
+  const TR = ['법인세 과세표준 및 세액신고서', '사업연도 2024.01.01 ~ 2024.12.31', '공제감면세액 및 추가납부세액합계표(갑)', '표준손익계산서', '매출액 2,000,000,000', '당기순이익 150,000,000']
+  const fin25 = normalizeClientOps({ id: 'tr390b', companyName: '미래테크', createdAt: NOW, updatedAt: NOW, factValues: { revenue: '2400000000' }, factMeta: { revenue: { source: 'financialStatements', status: 'entered', asOf: '2025', updatedAt: NOW } } } as never)
+  let n = 0
+  const a = await analyzeUploadedDocs(fin25, [{ key: 'customdoc_tr', fileName: 'tr2024.pdf', text: TR.join('\n'), method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `tb${++n}` })
+  check('D-390 2025 재무제표 매출이 있으면 2024 신고서 매출(20억)은 묻지 않고 그대로 24억', readFact(a.record, 'revenue')?.value === '2400000000' && !a.summary.flagged.some((f) => f.key === 'revenue'), JSON.stringify([readFact(a.record, 'revenue'), a.summary.flagged]))
+
+  const WH = ['원천징수이행상황신고서', '① 신고구분 [√]매월 [ ]반기 [ ]수정 [ ]연말', '② 귀속연월 2026년 9월 ③ 지급연월 2026년 9월', '원천징수의무자 법인명(상호) 주식회사 미래테크 대표자(성명) 홍길동', '사업자(주민)등록번호 123-45-67890',
+    '1. 원천징수 명세 및 납부세액', '소득자 소득구분 코드 인원 총지급액 소득세등', '근로소득 간이세액 A01 12 45,000,000 1,234,560', '중도퇴사 A02 1 3,000,000 0', '일용근로 A03 3 1,500,000 0', '가감계 A10 16 49,500,000 1,234,560', '사업소득 매월징수 A25 2 2,000,000 60,000'].join('\n')
+  check('D-391 간이세액(A01) 줄만 — 12명 · 4,500만원 · 2026-09(중도퇴사 · 일용 · 가감계 · 사업소득은 아님)', JSON.stringify(readWithholdingReport(WH)) === '{"yearMonth":"2026-09","employees":12,"pay":45000000}', JSON.stringify(readWithholdingReport(WH)))
+  check('D-391 본문에만 원천징수이행상황신고서가 있는 안내문은 아님 · 근로자 없는 달(A01 없음)은 읽지 않음', readWithholdingReport(['세무 일정 안내', '매월 10일까지 원천징수이행상황신고서를 제출하세요'].join('\n')) === null && readWithholdingReport(WH.replace(/근로소득 간이세액 A01 12 45,000,000 1,234,560\n/, '')) === null)
+  const empty = normalizeClientOps({ id: 'wh391', companyName: '미래테크', createdAt: NOW, updatedAt: NOW })
+  const place = placeDocument({ text: WH, fileName: 'scan.pdf' }, allDocumentMetas(empty))
+  check('D-391 서류함: "원천징수이행상황신고서" 칸(원천징수영수증 · 사업자등록증 칸 아님)', place.kind === 'new' && place.label === '원천징수이행상황신고서', JSON.stringify(place))
+  const cands = factCandidatesFromDocText('customdoc_wh', WH, 'r')
+  check('D-391 후보: 직원 수 12 · 원천세 신고 인원 — 회사 이름 · 번호 · 대표는 이 서류로 읽지 않음', cands.map((c) => c.key).join() === 'employeeCount,cf:원천세 신고 인원' && cands[1].value === '2026년 9월분 근로자 12명 · 총지급 4,500만원', JSON.stringify(cands))
+  const b = await analyzeUploadedDocs(empty, [{ key: 'customdoc_wh', fileName: 'wh.pdf', text: WH, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `wh${++n}` })
+  check('D-391 올리기 한 번 → 직원 수 12 바로 · 묻지 않음', b.record.employeeCount === '12' && b.summary.flagged.length === 0, JSON.stringify([b.record.employeeCount, b.summary.flagged]))
+  const emp = buildInsights(b.record, '2026-10-31', []).find((i) => i.key === 'employment')
+  check('D-391 고용지원금 카드(명부 없음) — "원천세 신고서 2026년 9월분 근로자 12명" · 두루누리는 10명 이상이라 없음', !!emp && emp.detail.includes('원천세 신고서 2026년 9월분 근로자 12명') && !emp.detail.includes('두루누리'), emp?.detail)
+  const roster = normalizeClientOps({ ...empty, employeeCount: '10', factMeta: { employeeCount: { source: 'payrollRoster', status: 'entered', asOf: '2026-10-01', updatedAt: NOW } } } as never)
+  const c = await analyzeUploadedDocs(roster, [{ key: 'customdoc_wh', fileName: 'wh.pdf', text: WH, method: 'pdf_text' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `wh${++n}` })
+  check('D-391 명부로 적힌 직원 수(10)가 있으면 그대로 · 다르다고 묻지 않음 · 원천세 신고 인원 칸은 들어감', c.record.employeeCount === '10' && c.summary.flagged.length === 0 && customFactValue(c.record, '원천세 신고 인원').includes('12명'), JSON.stringify([c.record.employeeCount, c.summary.flagged]))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

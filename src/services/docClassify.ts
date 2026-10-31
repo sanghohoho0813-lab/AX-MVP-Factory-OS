@@ -242,6 +242,15 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /퇴직금\s*(?:지급\s*)?규정/,
   },
   {
+    // D-391 원천징수이행상황신고서(매월 원천세 신고) — 그달 근로자 수 · 총지급액을 읽는다(services/withholdingReport.ts)
+    label: '원천징수이행상황신고서',
+    signals: [
+      { re: /원\s*천\s*징\s*수\s*이\s*행\s*상\s*황\s*신\s*고\s*서/, weight: 5, say: "제목 '원천징수이행상황신고서'" },
+      { re: /귀\s*속\s*연\s*월/, weight: 1, say: "'귀속연월'" },
+    ],
+    nameHint: /원천세\s*신고|이행\s*상황\s*신고|원천징수\s*이행/,
+  },
+  {
     // D-342 대표 원천징수영수증 — 대표 월 급여를 읽는다(services/wageReceipt.ts). 예전에는 제목을 못 찾아 '기타 · 확인 필요' 로 갔다
     label: '근로소득 원천징수영수증',
     signals: [

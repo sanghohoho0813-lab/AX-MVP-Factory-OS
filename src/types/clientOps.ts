@@ -717,6 +717,7 @@ export type FactSource =
   | 'creditReport' // 대표 신용점수 조회서(NICE · KCB) — 정책자금 대표 신용 (D-381)
   | 'articles' // 정관 — 이사 임기 (D-382)
   | 'idCard' // 대표 신분증 사본 — 대표 생년월일 · 이름(주민등록번호는 남기지 않음) (D-389)
+  | 'withholding' // 원천징수이행상황신고서 — 그달 근로자 수 · 총지급액 (D-391)
 
 export interface FactMeta {
   source: FactSource
