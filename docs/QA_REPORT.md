@@ -4602,3 +4602,10 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - Production 화면 번들(D-402 · 403 뒤): '원천세 인원 추이' · '반년 넘었어요' · '받으면 바로 채워져요' 글이 들어 있음(확인).
 - qa:detail 에 D-403 블록(390 · 원천세 신고서 두 달 한 번에 → '원천세 인원 추이') 더함 — D-404 빌드에서 detail 490/0. Production 번들에 '자금 대상 · 명부로 확인'(D-404) 글이 들어 있음(확인).
 - 최종 main(e25a3ec): qa:db 305/0 · qa:pilot 294/0 · qa:wording 6/6 — 마지막 안전 점검.
+
+## §257 D-405~407 매출 추이 세 갈래 — 병합 (2026-10-31)
+
+- D-405(1868230): test:all EXIT 0 · diag · facts · detail 490 — 0 실패 → main. Production 화면 번들에 '부가세 신고 추이'(확인).
+- D-406 · 407(85594ab): test:all EXIT 0(customer-facts 661) · facts · diag · scenarios · plan · detail 490 — 0 실패 → main.
+  Production 화면 번들에 '사업장현황신고서 · ' · '재무제표 · '(확인).
+- 확인하지 못한 것: 실제 홈택스 PDF(글자 견본으로만) · 간이과세자 부가세 신고서 서식.
