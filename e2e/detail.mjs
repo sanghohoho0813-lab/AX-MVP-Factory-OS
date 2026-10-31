@@ -1771,6 +1771,36 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-380 등기부 → 임원 임기(3년이면 끝나는 날) → 회사 정보 · 달력 중임 등기 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const REG = {
+    name: 'scan_380.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(['등기사항전부증명서(현재 유효사항)', '상호 한솔테크 주식회사', '1주의 금액 금 5,000 원', '임원에 관한 사항', '사내이사 김대표 780510-1******', '2023 년 11 월 20 일 중임 2023 년 11 월 24 일 등기', '대표이사 김대표 780510-1******', '2023 년 11 월 20 일 중임', '회사성립연월일 2019 년 03 월 02 일'].join('\n'), 'utf8'),
+  }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([REG])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const batch = ((await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('D-380 390 등기부 → 바로 넣은 정보: 임원 임기 대표이사 김대표 2023-11-20 중임 · 3년이면 2026-11-20 만료', batch.includes('임원 임기') && batch.includes('대표이사 김대표 2023-11-20 중임 · 3년이면 2026-11-20 만료'), batch.slice(0, 600))
+  const r = await record(page)
+  const f = (r.customFields ?? []).find((x) => x.label === '임원 임기')
+  check('D-380 390 회사 정보 사람 묶음에 저장', !!f && f.group === 'people', JSON.stringify(f))
+  check('D-380 390 넘침 0 · 오류 0', (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

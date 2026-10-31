@@ -4524,3 +4524,5 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - e2e(D-374 첫 판): calcpreset 36(D-374 4개) · scenarios 69 · plan 63 · diag 21 · matrix 586 · detail 456 · taxplan 96 · wording 6 — 0 실패.
 - 스크린샷: 개인사업자 맞춤 추천 카드(PC) · 상황 예시 펼침(390) · 업체 상세 탭 다섯(390) · 고객 관리 · 오늘(390).
 - 세금 계산기 식은 그대로(D-341) — 03 · 01 · 05 를 부르기만. qa:tax 대상 파일(taxCalc.ts)은 손대지 않음.
+- D-377(서류 탭 받은 칸 한 줄 · 오늘 기한 테두리 · 법인전환 결손) 병합 전: test:all EXIT 0 · e2e 18묶음 0 실패
+  (detail · connect · diag · assist · calcpreset · firstscreen · real · phone · board · files · folder · easy · todos · steady · simple · flow) → main c2ab2d8.

@@ -15,6 +15,8 @@ import {
 import { documentsWithExpiry, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 import { applyDocViews } from './grants/grantApply'
+import { customFactValue } from './customerFacts'
+import { officerTermsOf } from './registryTax'
 
 export type ScheduleKind = 'next' | 'task' | 'funding' | 'payment' | 'document' | 'tool'
 
@@ -101,6 +103,24 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
       serviceKey: meta.key,
       done: !open,
       daysLeft: daysLeftFrom(today, st.dueDate),
+    })
+  }
+
+  // D-380 임원 임기(회사 정보 '임원 임기' — 등기부에서 읽은 3년 끝나는 날) → 중임 등기. 한 달 넘게 지난 날은 옛 등기부일 수 있어 내려놓는다
+  for (const t of officerTermsOf(customFactValue(record, '임원 임기'))) {
+    const left = daysLeftFrom(today, t.ends)
+    if (left === null || left < -30) continue
+    out.push({
+      id: `${record.id}:officer:${t.name}:${t.ends}`,
+      date: t.ends,
+      kind: 'task',
+      clientId: record.id,
+      clientName: name,
+      title: `임원 임기 만료 — ${t.role} ${t.name} 중임 등기`,
+      detail: '바뀐 임원은 2주 안에 등기 · 늦으면 과태료(정관 임기 확인)',
+      serviceKey: null,
+      done: false,
+      daysLeft: left,
     })
   }
 

@@ -53,7 +53,8 @@ import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { readIncomeCert } from '../incomeDoc'
 import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
 import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
-import { readRegistryTax } from '../registryTax'
+import { officerTerms, officerTermsOf, officerTermsValue, readRegistryTax } from '../registryTax'
+import { buildClientSchedule } from '../clientOpsSchedule'
 import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
@@ -1961,6 +1962,27 @@ await (async () => {
   check('D-379 상담 답: 2023년 신고서 내용 · 빠진 공제 2가지(고용 "늘었다면" · 창업감면) · 경정청구 기한 줄 · 복사 글', a1.facts[0] === '2023년: 법인세 신고서에 공제 · 감면 없음' && /빠진 공제 2가지/.test(a1.verdict?.text ?? '') && a1.steps[1]?.endsWith('경정청구 검토(5년 안 · ★ 세무사)') && a1.steps.some((x) => /5년 안/.test(x)) && /놓친 세액공제 1차 검토/.test(a1.copyText), JSON.stringify(a1))
   const a0 = answerFor('refund', { record: mkRec(null), today: T, notices: [] })
   check('D-379 상담 답: 신고서가 없으면 무엇을 올리면 되는지(세무조정계산서 5년)', a0.verdict?.tone === 'need' && a0.docs.some((d) => /최근 5년 세무조정계산서/.test(d)), JSON.stringify(a0))
+}
+
+// D-380 등기부 → 지금 임원의 이번 임기(3년) → 회사 정보 '임원 임기' · 달력 '중임 등기'
+{
+  const REG = ['등기사항전부증명서(말소사항 포함)', '상호 주식회사 가나테크', '임원에 관한 사항',
+    '사내이사 박지훈 801231-1******', '2020 년 03 월 02 일 취임 2020 년 03 월 05 일 등기', '2023 년 03 월 02 일 중임 2023 년 03 월 06 일 등기',
+    '대표이사 박지훈 801231-1******', '2020 년 03 월 02 일 취임', '2023 년 03 월 02 일 중임',
+    '사내이사 이영희 850505-2******', '2021 년 05 월 10 일 취임', '2024 년 05 월 10 일 사임',
+    '감사 최감사 700101-1******', '2024 년 03 월 25 일 취임',
+    '회사성립연월일 2020 년 03 월 02 일'].join('\n')
+  const terms = officerTerms(REG)
+  check('D-380 임원 임기: 마지막 중임부터 3년 · 대표이사 · 사내이사 같은 사람은 대표이사 하나 · 사임한 사람은 빠짐 · 끝나는 날 순서', JSON.stringify(terms.map((t) => `${t.role}:${t.name}:${t.start}:${t.ends}`)) === '["대표이사:박지훈:2023-03-02:2026-03-02","감사:최감사:2024-03-25:2027-03-25"]', JSON.stringify(terms))
+  const val = officerTermsValue(terms)
+  check('D-380 회사 정보 글 → 다시 읽기(사람마다 끝나는 날)', val === '대표이사 박지훈 2023-03-02 중임 · 3년이면 2026-03-02 만료 / 감사 최감사 2024-03-25 취임 · 3년이면 2027-03-25 만료' && JSON.stringify(officerTermsOf(val)) === '[{"role":"대표이사","name":"박지훈","ends":"2026-03-02"},{"role":"감사","name":"최감사","ends":"2027-03-25"}]', val)
+  const cand = factCandidatesFromDocText('corporateRegistry', REG, 'r').find((c) => c.key === 'cf:임원 임기')
+  check('D-380 등기부 올리기 → "임원 임기" 칸 후보(사람 묶음)', cand?.value === val && cand.group === 'people', JSON.stringify(cand))
+  const rec = normalizeClientOps({ id: 'of380', companyName: '주식회사 가나테크', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'ot', group: 'people', label: '임원 임기', value: val }] } as never)
+  const ev = buildClientSchedule(rec, '2026-02-20').filter((e) => e.id.includes(':officer:'))
+  check('D-380 달력 · 오늘: 임기 만료날 "임원 임기 만료 — 대표이사 박지훈 중임 등기" · 업무 마감 · 2주 안 · 과태료', ev.length === 2 && ev[0].date === '2026-03-02' && ev[0].kind === 'task' && ev[0].title === '임원 임기 만료 — 대표이사 박지훈 중임 등기' && /2주 안/.test(ev[0].detail) && ev[0].daysLeft === 10, JSON.stringify(ev))
+  check('D-380 한 달 넘게 지난 만료날은 내려놓음(옛 등기부일 수 있어)', buildClientSchedule(rec, '2026-04-15').filter((e) => e.id.includes(':officer:')).length === 1)
+  check('D-380 임원 칸이 없는 등기부는 칸을 만들지 않음', !factCandidatesFromDocText('corporateRegistry', ['등기사항전부증명서', '상호 주식회사 가나', '1주의 금액 금 5,000 원'].join('\n'), 'r').some((c) => c.key === 'cf:임원 임기'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

@@ -501,7 +501,8 @@ const labInsight: Provider = ({ record, facts, today }) => {
         label: '연구소',
         tone: 'good',
         headline: refund.sure ? `연구소가 있는데 신고서에 연구개발비 세액공제가 없어요 — 연간 약 ${manwonText(credit)}` : `연구소가 있어요 — 연구개발비 세액공제 연간 약 ${manwonText(credit)}`,
-        detail: [refund.line, String(lab), refund.claimed || refund.line ? '' : '신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)'].filter(Boolean).join(' · '),
+        // D-380 경정청구 줄이 '…년부터 연구소가 있는데' 로 이미 말하면 인정서 글은 빼서 짧게
+        detail: [refund.line, refund.sure ? '' : String(lab), refund.claimed || refund.line ? '' : '신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)'].filter(Boolean).join(' · '),
         missing: [],
         openPath: taxOpen,
         openLabel: '세액공제 계산 보기',
@@ -509,7 +510,7 @@ const labInsight: Provider = ({ record, facts, today }) => {
         amount: `세액공제 연간 약 ${manwonText(credit)}`,
       }
     if (refund.sure)
-      return { key: 'labcare', label: '연구소', tone: 'good', headline: '연구소가 있는데 신고서에 연구개발비 세액공제가 없어요 — 경정청구 검토', detail: [refund.line, String(lab), '연구원 인건비를 넣으면 돌려받을 금액을 바로 계산해요'].join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 경정청구 세무사와 검토' }
+      return { key: 'labcare', label: '연구소', tone: 'good', headline: '연구소가 있는데 신고서에 연구개발비 세액공제가 없어요 — 경정청구 검토', detail: [refund.line, '연구원 인건비를 넣으면 돌려받을 금액을 바로 계산해요'].join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 경정청구 세무사와 검토' }
     return { key: 'labcare', label: '연구소', tone: 'maybe', headline: '연구소(전담부서)가 있어요 — 연구개발비 세액공제를 챙겼는지 볼 때', detail: [refund.line, String(lab), '연구원 인건비를 넣으면 연간 공제액을 바로 계산해요'].filter(Boolean).join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 확인' }
   }
   const last = latestToolResult(record, 'labcare')

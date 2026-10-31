@@ -135,6 +135,56 @@ export function readRegistryTax(text: string, ceoName = ''): RegistryTaxRead | n
 }
 
 /**
+ * D-380 지금 임원의 이번 임기 — 등기부 '임원에 관한 사항' 의 마지막 취임 · 중임(그 뒤 퇴임 · 사임 · 만료가 없는 사람만).
+ * 이사 임기는 3년을 넘지 못한다(상법 제383조) — 정관이 정한 임기를 모르면 3년으로 본다(★ 정관 확인).
+ * 바뀐 임원은 2주 안에 변경(중임) 등기를 해야 하고 늦으면 과태료다. 한 사람이 사내이사 · 대표이사로 함께 나오면 높은 직위 하나로.
+ */
+export interface OfficerTerm {
+  role: string
+  name: string
+  /** 이번 임기 시작(YYYY-MM-DD) */
+  start: string
+  act: 'in' | 'renew'
+  /** 3년이면 끝나는 날 */
+  ends: string
+}
+
+const ROLE_RANK = ['공동대표이사', '대표이사', '대표', '사내이사', '사외이사', '기타비상무이사', '이사', '감사']
+
+export function officerTerms(text: string, termYears = 3): OfficerTerm[] {
+  const events = officerEvents(text)
+  const byName = new Map<string, OfficerEvent[]>()
+  for (const e of events) byName.set(e.name, [...(byName.get(e.name) ?? []), e])
+  const out: OfficerTerm[] = []
+  for (const [name, list] of byName) {
+    // 같은 날 '만료' 와 '중임' 이면 만료를 먼저(이어진 임기)
+    const ev = [...list].sort((a, b) => a.date.localeCompare(b.date) || (a.act === 'out' ? -1 : 0) - (b.act === 'out' ? -1 : 0))
+    const last = ev[ev.length - 1]
+    if (!last || last.act === 'out') continue
+    const sameDay = ev.filter((e) => e.date === last.date && e.act !== 'out')
+    const role = [...sameDay].sort((a, b) => ROLE_RANK.indexOf(a.role) - ROLE_RANK.indexOf(b.role))[0].role
+    const y = Number(last.date.slice(0, 4)) + termYears
+    out.push({ role, name, start: last.date, act: last.act === 'renew' ? 'renew' : 'in', ends: `${y}${last.date.slice(4)}` })
+  }
+  return out.sort((a, b) => a.ends.localeCompare(b.ends) || ROLE_RANK.indexOf(a.role) - ROLE_RANK.indexOf(b.role))
+}
+
+/** 회사 정보 '임원 임기' 칸 — '대표이사 김대표 2023-03-02 취임 · 3년이면 2026-03-02 만료 / …'(많아야 넷) */
+export function officerTermsValue(terms: readonly OfficerTerm[]): string {
+  return terms
+    .slice(0, 4)
+    .map((t) => `${t.role} ${t.name} ${t.start} ${t.act === 'renew' ? '중임' : '취임'} · 3년이면 ${t.ends} 만료`)
+    .join(' / ')
+}
+
+/** '임원 임기' 칸 글 → 사람마다 끝나는 날(사람이 고쳐 적은 날짜도 그대로) */
+export function officerTermsOf(value: string): { role: string; name: string; ends: string }[] {
+  const out: { role: string; name: string; ends: string }[] = []
+  for (const m of String(value || '').matchAll(/([가-힣]+)\s+([가-힣]{2,5})\s+\d{4}-\d{2}-\d{2}\s*(?:취임|중임)[^/]*?(\d{4}-\d{2}-\d{2})\s*만료/g)) out.push({ role: m[1], name: m[2], ends: m[3] })
+  return out
+}
+
+/**
  * 정관 · 임원퇴직금 지급규정 — 대표이사 지급배수. 퇴직금 이야기가 있는 글에서만.
  *  표: 머리에 '지급배수 · 배수 · 지급률' 칸이 있고 대표이사 줄의 그 칸 숫자.  글: '대표이사 … 3배'.
  * 서로 다른 숫자가 나오면 고르지 않는다(null).

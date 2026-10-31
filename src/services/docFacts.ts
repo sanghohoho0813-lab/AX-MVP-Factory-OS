@@ -8,6 +8,7 @@
  *  - 인정서 · 확인서 · 인증서 · 특허증(어느 칸에 올렸든, 직접 만든 칸이어도) → 회사 기본 정보 '인증서' 묶음의 칸
  *  - 취업규칙 → '정년 · 계속고용' 칸(D-339)
  *  - 세무조정계산서 · 법인세 · 종합소득세 신고서 → '받은 공제 · 감면 YYYY년' 칸(D-378) — 경정청구 신호
+ *  - 법인 등기부 → '임원 임기' 칸(D-380) — 3년이면 끝나는 날 · 달력에 중임 등기
  */
 
 import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '../types/clientOps'
@@ -20,6 +21,7 @@ import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vat
 import { incomeTrendLine, looksLikeIncomeCert, readIncomeCert } from './incomeDoc'
 import { looksLikeWorkRules, readRetireRule, retireRuleLine } from './workRules'
 import { readTaxReturn, reliefFactLabel, reliefFactValue } from './taxReturnDoc'
+import { officerTerms, officerTermsValue } from './registryTax'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -51,6 +53,11 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       const cand = { key: 'businessNumber', value: bn.value || bn.candidates[0], source: bizSource, asOf: '', ref, note: bn.reason, ...(bn.candidates.length ? { choices: bn.candidates } : {}) }
       if (at >= 0) out[at] = cand
       else out.splice(1, 0, cand)
+    }
+    // D-380 등기부 → 지금 임원의 이번 임기(3년이면 끝나는 날) — 회사 정보 '임원 임기' · 달력 '중임 등기'
+    if (bizSource === 'corporateRegistry') {
+      const terms = officerTerms(text)
+      if (terms.length) out.push({ key: `${CUSTOM_FACT_PREFIX}임원 임기`, label: '임원 임기', group: 'people', value: officerTermsValue(terms), source: 'corporateRegistry', asOf: '', ref })
     }
     return out
   }
