@@ -61,6 +61,22 @@ export function readVatReturn(text: string): VatReturnRead | null {
   return null
 }
 
+/**
+ * D-396 같은 해 신고서 여러 장(1기 · 2기 확정 / 예정 · 확정)이 1~12월을 빈틈 · 겹침 없이 덮으면 그해 과세표준 합계 = 한 해 매출.
+ * 같은 기간이 두 번이면(같은 신고서를 두 번 올림) 하나만. 덮지 못하면 null — 짐작하지 않는다. 가장 최근 해 먼저.
+ */
+export function fullYearFromReturns(reads: readonly VatReturnRead[]): { year: number; total: number; count: number } | null {
+  const byPeriod = new Map<string, VatReturnRead>()
+  for (const r of reads) if (r.from && r.to && r.from.slice(0, 4) === r.to.slice(0, 4) && r.from <= r.to) byPeriod.set(`${r.from}~${r.to}`, r)
+  const years = [...new Set([...byPeriod.values()].map((r) => Number(r.from.slice(0, 4))))].sort((a, b) => b - a)
+  for (const y of years) {
+    const ps = [...byPeriod.values()].filter((r) => Number(r.from.slice(0, 4)) === y)
+    const months = ps.flatMap((r) => Array.from({ length: Number(r.to.slice(5)) - Number(r.from.slice(5)) + 1 }, (_, i) => Number(r.from.slice(5)) + i))
+    if (months.length === 12 && new Set(months).size === 12) return { year: y, total: ps.reduce((a, r) => a + r.base, 0), count: ps.length }
+  }
+  return null
+}
+
 /** 회사 정보 '부가세 신고 매출' 칸 — '2026년 1기 확정(1~6월) 과세표준 6억 2,000만원' */
 export function vatReturnValue(r: VatReturnRead, won: (n: number) => string): string {
   const term = `${r.year}년${r.half ? ` ${r.half}기` : ''}${r.kind ? ` ${r.kind}` : ''}`

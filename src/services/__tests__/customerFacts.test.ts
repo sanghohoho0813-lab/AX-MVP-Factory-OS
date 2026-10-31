@@ -9,7 +9,7 @@
  */
 
 import { readWithholdingReport, withholdingValue } from '../withholdingReport'
-import { readVatReturn, vatReturnValue } from '../vatReturnDoc'
+import { fullYearFromReturns, readVatReturn, vatReturnValue } from '../vatReturnDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
@@ -2223,6 +2223,25 @@ await (async () => {
   const sum = answerFor('summary', { record: a.record, today: '2026-10-31', notices: [] })
   check('D-395 상담 요약 "이 회사 한눈에" 에 부가세 신고 줄', sum.facts.some((x) => x.startsWith('부가세 신고 2026년 1기 확정(1~6월) 과세표준 6억 2,000만원')), JSON.stringify(sum.facts))
   check('D-395 올리기 → 칸 바로 · 묻지 않음 · 앞선 기간(예정) 신고서를 나중에 올려도 확정 값 그대로 · 상담 요약 한 줄', customFactValue(a.record, '부가세 신고 매출').startsWith('2026년 1기 확정') && a.summary.flagged.length === 0 && customFactValue(b.record, '부가세 신고 매출').startsWith('2026년 1기 확정') && b.summary.flagged.length === 0 && !a.record.factValues?.revenue, JSON.stringify([customFactValue(b.record, '부가세 신고 매출'), b.summary.flagged]))
+})()
+
+// D-396 같은 해 부가세 신고서 여러 장(1기 · 2기)을 함께 올리면 그해 매출(과세표준 합계)
+await (async () => {
+  const mk = (y: number, half: 1 | 2, kind: string, m1: number, m2: number, won: string) => [`일반과세자 부가가치세 ${kind === '예정' ? '[√]예정 [ ]확정' : '[ ]예정 [√]확정'} 신고서`, `신고기간 ${y}년 제${half}기 ( ${m1}월 1일 ~ ${m2}월 ${m2 === 6 || m2 === 9 ? 30 : 31}일 )`, '① 신고내용', `합계 (9) ${won} ㉮ 1,000,000`].join('\n')
+  const H1 = mk(2025, 1, '확정', 1, 6, '500,000,000')
+  const H2 = mk(2025, 2, '확정', 7, 12, '600,000,000')
+  const reads = [H1, H2].map((t) => readVatReturn(t)!)
+  check('D-396 1기(1~6월) + 2기(7~12월) → 2025년 11억 · 한 장만 · 겹치면 없음', JSON.stringify(fullYearFromReturns(reads)) === '{"year":2025,"total":1100000000,"count":2}' && fullYearFromReturns([reads[0]]) === null && fullYearFromReturns([reads[0], reads[0], readVatReturn(mk(2025, 1, '확정', 1, 9, '1'))!]) === null)
+  const corp = [mk(2025, 1, '예정', 1, 3, '200,000,000'), mk(2025, 1, '확정', 4, 6, '300,000,000'), mk(2025, 2, '예정', 7, 9, '250,000,000'), mk(2025, 2, '확정', 10, 12, '350,000,000')].map((t) => readVatReturn(t)!)
+  check('D-396 법인 예정 · 확정 네 장(석 달씩) → 2025년 11억', fullYearFromReturns(corp)?.total === 1_100_000_000)
+  const empty = normalizeClientOps({ id: 'vr396', companyName: '미래상사', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const docs = [H1, H2].map((t, i) => ({ key: `customdoc_v${i}` as never, fileName: `vat${i}.pdf`, text: t, method: 'pdf_text' as const, docSure: true }))
+  const a = await analyzeUploadedDocs(empty, docs, { now: NOW, today: '2026-10-31', makeId: () => `v6${++n}` })
+  check('D-396 두 장 함께 올리면 매출 11억(2025) 바로 · 출처 부가세 신고서 · 바로 넣은 것에 "부가세 신고서 2장" · 묻지 않음', readFact(a.record, 'revenue')?.value === '1100000000' && readFact(a.record, 'revenue')?.source === 'vatReturn' && readFact(a.record, 'revenue')?.asOf === '2025' && a.summary.entered.some((e) => e.key === 'revenue' && e.fileName.startsWith('부가세 신고서 2장')) && a.summary.flagged.length === 0, JSON.stringify([readFact(a.record, 'revenue'), a.summary.flagged]))
+  const fin = normalizeClientOps({ ...empty, factValues: { revenue: '1150000000' }, factMeta: { revenue: { source: 'financialStatements', status: 'entered', asOf: '2025', updatedAt: NOW } } } as never)
+  const b = await analyzeUploadedDocs(fin, docs, { now: NOW, today: '2026-10-31', makeId: () => `v6${++n}` })
+  check('D-396 같은 해 재무제표 매출이 있으면 신고서 합계는 묻지 않고 재무제표 값 그대로', readFact(b.record, 'revenue')?.value === '1150000000' && !b.summary.flagged.some((f) => f.key === 'revenue'), JSON.stringify(b.summary.flagged))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

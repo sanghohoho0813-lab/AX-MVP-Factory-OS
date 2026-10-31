@@ -15,8 +15,9 @@
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
-import { CUSTOM_FACT_PREFIX, customFactValue, pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
+import { fullYearFromReturns, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -102,10 +103,10 @@ function agreedFacts(docs: readonly ReadDoc[]): Set<string> {
  * D-311 부가세 과세표준증명 매출은 재무제표 · 크레탑 · 직접 적은 매출에 밀린다 — 같은 해이거나 더 최근 해 값이 이미 있으면(연도를 모르는 값도) 묻지 않는다.
  * 부가세 서류끼리면(다시 받은 증명) 다르면 묻는다.
  */
-function vatYields(record: ClientOpsRecord, year: string): boolean {
+function vatYields(record: ClientOpsRecord, year: string, source = 'vatCertificate'): boolean {
   const f = readFact(record, 'revenue')
   if (!f || f.status === 'missing') return false
-  if (f.source === 'vatCertificate') return false
+  if (f.source === source) return false
   const y = /^(\d{4})/.exec(f.asOf)?.[1]
   return !y || Number(y) >= Number(year)
 }
@@ -138,7 +139,7 @@ function docYields(record: ClientOpsRecord, c: { key: string; source: string; as
     const f = readFact(record, 'employeeCount')
     return !!f && f.status !== 'missing' && f.source !== c.source
   }
-  if (c.key === 'revenue' && c.source === 'vatCertificate') return vatYields(record, c.asOf)
+  if (c.key === 'revenue' && (c.source === 'vatCertificate' || c.source === 'vatReturn')) return vatYields(record, c.asOf, c.source)
   if (c.source !== 'incomeCertificate' && !(c.source === 'vatCertificate' && c.key === `${CUSTOM_FACT_PREFIX}매출 추이`)) return false
   if (c.key === 'revenue' || c.key === 'netIncome') {
     const f = readFact(record, c.key)
@@ -200,5 +201,26 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     }
     for (const p of mine) if (!auto.includes(p)) flagged.push({ ...label(p), note: p.note ?? NOTE_CONFLICT })
   })
+  // D-396 같은 해 부가세 신고서 여러 장이 1~12월을 다 덮으면 그해 매출(과세표준 합계) — 재무제표 · 크레탑 · 신고서 같은 해 이상 값이 있으면 묻지 않는다
+  const returns = docs.map((d) => ({ d, r: readVatReturn(d.text) })).filter((x): x is { d: ReadDoc; r: VatReturnRead } => !!x.r)
+  const full = returns.length >= 2 ? fullYearFromReturns(returns.map((x) => x.r)) : null
+  if (full) {
+    const used = returns.filter((x) => Number(x.r.from.slice(0, 4)) === full.year)
+    const note = used.some((x) => x.d.method === 'ocr') ? NOTE_OCR : used.some((x) => !x.d.docSure) ? NOTE_DOC_UNSURE : ''
+    const ref = `doc:vatReturns:${now}`
+    const cand = { key: 'revenue', value: String(full.total), source: 'vatReturn' as const, asOf: String(full.year), ref, ...(note ? { note } : {}) }
+    if (!docYields(rec, cand)) {
+      rec = withFactCandidates(rec, [cand], now, makeId)
+      const p = pendingFacts(rec).find((x) => x.ref === ref && x.key === 'revenue')
+      const fileName = `부가세 신고서 ${used.length}장(${full.year}년 1~12월)`
+      if (p && !p.note && p.current === '') {
+        rec = withFactDecisions(rec, [{ id: p.id, action: 'accept' }], now)
+        entered.push({ key: p.key, label: p.label, display: `${full.year}년 ${formatWon(full.total)}`, fileName })
+      } else if (p) {
+        if (!p.note) rec = { ...rec, factInbox: (rec.factInbox ?? []).map((c) => (c.id === p.id ? { ...c, note: NOTE_CONFLICT } : c)) }
+        flagged.push({ key: p.key, label: p.label, display: p.display, fileName, note: p.note ?? NOTE_CONFLICT })
+      }
+    }
+  }
   return { record: rec, entered, flagged }
 }
