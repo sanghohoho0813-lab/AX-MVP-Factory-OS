@@ -305,9 +305,15 @@ function findCompanyName(t: string, source: DocSource): string | undefined {
         ]
   for (const p of patterns) {
     const v = valueAfter(t, p)
-    if (v && v.length >= 2 && v.length <= 60) return v
+    if (v && v.length >= 2 && v.length <= 60) return joinSpacedSyllables(v)
   }
   return undefined
+}
+
+/** D-415 스캔 글자가 한 글자씩 띄워 읽은 이름('주 식 회 사 미 래 테 크') → 붙임. 낱말 사이 띄어쓰기('주식회사 미래테크')는 그대로 */
+function joinSpacedSyllables(v: string): string {
+  const tokens = v.trim().split(/\s+/)
+  return tokens.length >= 3 && tokens.every((x) => /^[가-힣]$/.test(x)) ? tokens.join('') : v
 }
 
 /** 대표자 이름 */
@@ -319,6 +325,9 @@ function findRepresentative(t: string, source: DocSource): string | undefined {
   for (const p of patterns) {
     const v = valueAfter(t, p)
     if (!v) continue
+    // D-415 스캔 글자가 이름을 한 글자씩 띄워 읽으면('김 대 표') 붙인다 — 한 글자씩 2~4개일 때만
+    const spaced = /^([가-힣](?:\s[가-힣]){1,3})(?=\s|$|[^가-힣\s])/.exec(v.trim())
+    if (spaced && !/[가-힣]{2}/.test(spaced[1])) return spaced[1].replace(/\s/g, '')
     // 이름만 남긴다 (뒤에 붙은 주민번호·주소 제거)
     const name = /^([가-힣]{2,6}|[A-Za-z][A-Za-z .]{1,40})/.exec(v.trim())
     if (name) return name[1].trim()

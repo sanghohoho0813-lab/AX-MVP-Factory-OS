@@ -258,6 +258,17 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   check('N19 파서 — 맞는 번호는 그대로', parseKoreanBusinessDocument(corp('178-81-47888')).businessNumber === '178-81-47888')
 }
 
+// D-415 스캔 글자가 이름 · 상호를 한 글자씩 띄워 읽으면 붙인다(낱말 사이 띄어쓰기는 그대로)
+{
+  const br = (rep: string, name: string) => parseKoreanBusinessDocument(['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', `법인명(단체명) : ${name}`, `대 표 자 : ${rep}`, '개업연월일 : 2019년 03월 04일'].join('\n'))
+  const a = br('김 대 표', '주 식 회 사 미 래 테 크')
+  check('D-415 "김 대 표" → 김대표 · "주 식 회 사 미 래 테 크" → 주식회사미래테크(예전: 대표자 빈칸)', a.representativeName === '김대표' && a.companyName === '주식회사미래테크', JSON.stringify(a))
+  const b = br('김대표', '주식회사 미래테크')
+  check('D-415 낱말 사이 띄어쓰기("주식회사 미래테크") · 붙은 이름은 그대로', b.representativeName === '김대표' && b.companyName === '주식회사 미래테크', JSON.stringify(b))
+  const c = parseKoreanBusinessDocument(['사업자등록증', '등록번호 : 214-05-01239', '상 호 : 미래상사', '성 명 : 홍 길 동 800101-1******', '개업연월일 : 2019년 03월 04일'].join('\n'))
+  check('D-415 띄운 이름 뒤 주민번호 앞자리 → 이름만', c.representativeName === '홍길동', JSON.stringify(c))
+}
+
 console.log(`\ndoc-parser: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 console.log('DOC_PARSER_PASS')
