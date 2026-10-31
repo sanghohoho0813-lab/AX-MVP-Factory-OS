@@ -422,9 +422,13 @@ export function findValidUntil(text: string): string | null {
  * 라벨도 다른 날짜도 없으면 유효기간 범위의 시작일.
  */
 export function findIssuedDate(text: string): string | null {
-  const labeled = /(?:발급\s*일자?|발행\s*일자?|교부\s*일자?|출력\s*일자?)\s*[:：]?\s*([0-9년월일.\-/\s]{6,24})/.exec(text)
+  // D-425 인터넷등기소 '열람일시 : 2026년10월30일 11시12분' · '발행일시' 도 발급일
+  const labeled = /(?:발급\s*일자?|발행\s*일(?:자|시)?|교부\s*일자?|출력\s*일(?:자|시)?|열람\s*일(?:자|시)?)\s*[:：]?\s*([0-9년월일.\-/\s]{6,24})/.exec(text)
   const fromLabel = labeled ? parseKoreanDate(labeled[1]) : undefined
   if (fromLabel && plausible(fromLabel)) return fromLabel
+  // D-425 등기부는 본문에 취임 · 중임 · 등기 날짜가 가득해 '마지막 날짜' 가 발급일이 아니다 — 발급(열람)일 글이 없으면 모른다고 둔다
+  //        (예전: 중임 날짜를 발급일로 읽어 '법인등기부등본 만료 · 523일 지남' 이 빨갛게 떴다)
+  if (/등\s*기\s*사\s*항\s*(?:전부|일부)?\s*증\s*명\s*서|등\s*기\s*부\s*등\s*본/.test(text.slice(0, 600)) && /임\s*원\s*에\s*관\s*한\s*사\s*항|취\s*임|중\s*임/.test(text)) return null
   const w = validityWindow(text)
   const body = w ? `${text.slice(0, w.start)} ${text.slice(w.end)}` : text
   const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
