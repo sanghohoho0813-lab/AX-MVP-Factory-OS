@@ -628,7 +628,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             await commit(withDocument(now0, key, { ...(dated.issuedAt ? { issuedAt: dated.issuedAt } : {}), ...(dated.validUntil ? { validUntil: dated.validUntil } : {}) }))
           }
           const latest = current() ?? record
-          const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
+          const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.ocrPages?.length ? 'ocr' : res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
           const sm = out.summary
           if ((sm.entered.length || sm.flagged.length || sm.cretop || sm.roster) && (await commit(out.record))) {
             // D-345 판정 비교는 칸에 파일을 넣기 전 기록과

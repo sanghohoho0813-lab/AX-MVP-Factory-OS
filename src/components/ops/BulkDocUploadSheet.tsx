@@ -64,6 +64,16 @@ interface Item {
   readNote: string
   /** D-386 한 파일에 합쳐 온 다른 서류(둘째부터) — 칸은 '받음' + 몇 쪽 메모, 글자는 따로 읽는다 */
   bundle?: BundlePart[] | null
+  /** D-445 글자 PDF 안에서 글자 인식으로 읽은 스캔 쪽 · 첫 서류의 쪽 범위(합친 파일일 때) */
+  ocrPages?: number[]
+  firstPages?: { from: number; to: number } | null
+}
+
+/** D-445 그 서류(쪽 범위)에 스캔 쪽이 섞였으면 사진 · 스캔처럼 확인을 묻는다 — 범위를 모르면(한 서류) 스캔 쪽이 하나라도 있으면 */
+function methodFor(it: Pick<Item, 'method' | 'ocrPages'>, range?: { from: number; to: number } | null): ReadMethod {
+  const o = it.ocrPages ?? []
+  if (!o.length) return it.method
+  return !range || o.some((p) => p >= range.from && p <= range.to) ? 'ocr' : it.method
 }
 
 export function BulkDocUploadSheet({
@@ -184,6 +194,7 @@ export function BulkDocUploadSheet({
       let text = ''
       let method: ReadMethod = 'none'
       let readNote = ''
+      let ocrPages: number[] = []
       const pre = prereadOf.get(it.file)
       try {
         if (pre) {
@@ -194,6 +205,7 @@ export function BulkDocUploadSheet({
           text = res.text
           method = res.method
           if (res.note) readNote = res.note
+          ocrPages = res.ocrPages ?? []
         }
       } catch (e) {
         // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다(D-266 암호 · 배포용 한글 문서는 까닭을 보여 준다)
@@ -208,6 +220,8 @@ export function BulkDocUploadSheet({
         text: bundle ? bundle[0].text : text,
         bundle: bundle ? bundle.slice(1) : null,
         method,
+        ocrPages,
+        firstPages: bundle ? { from: bundle[0].from, to: bundle[0].to } : null,
         readNote,
         status: 'ready',
         progress: null,
@@ -324,14 +338,14 @@ export function BulkDocUploadSheet({
         // D-144: 읽은 글자는 끝에 한 번에 — 회사 정보 · 크레탑 · 명부.
         // D-148: '사업자등록증 (2)' 칸에 들어가도 사업자등록증으로 읽는다(칸 키가 아니라 서류 종류로)
         const factKey: DocumentKey = placement.kind === 'existing' ? placement.key : cell.key
-        readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
+        readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: methodFor(it, it.firstPages), docSure: Boolean(it.result?.sure) || it.manual })
         // D-386 같은 파일 안의 다른 서류 — 칸은 '받음' + '○○.pdf 3쪽에 함께'(파일을 두 번 올리지 않는다) · 글자는 그 쪽만
         for (const part of it.bundle ?? []) {
           const where = `${it.file.name} ${pagesLabel(part)}`
           const c2 = cellForPlacement(rec, part.placement, used)
           rec = withDocument(c2.record, c2.key, { received: true, note: `${where}에 함께`, ...(part.placement.issuedAt ? { issuedAt: part.placement.issuedAt } : {}) })
           placed.push({ fileName: where, label: c2.label, other: c2.label.startsWith(OTHER_DOC_LABEL), numbered: c2.numbered })
-          readDocs.push({ key: part.placement.kind === 'existing' ? part.placement.key : c2.key, fileName: where, text: part.text, method: it.method, docSure: part.placement.sure })
+          readDocs.push({ key: part.placement.kind === 'existing' ? part.placement.key : c2.key, fileName: where, text: part.text, method: methodFor(it, part), docSure: part.placement.sure })
         }
       }
       return { rec, readDocs, placed }

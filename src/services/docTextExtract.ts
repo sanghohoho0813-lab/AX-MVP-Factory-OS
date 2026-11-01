@@ -31,12 +31,14 @@ export interface ExtractResult {
   pages?: number
   /** D-433 읽기는 했지만 알려 둘 것(스캔 PDF 가 길어 앞쪽만 읽음) — 사람 말 한 줄 */
   note?: string
+  /** D-445 글자 PDF 안에 끼운 스캔 쪽(1부터) — 그 쪽에서 나온 정보만 사진 · 스캔처럼 확인을 묻는다 */
+  ocrPages?: number[]
 }
 
 export type ProgressFn = (ratio: number, label: string) => void
 
 /** PDF에서 텍스트 추출 (스캔본이면 빈 문자열에 가깝다) */
-async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<string> {
+async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<{ text: string; pages: string[] }> {
   ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   // 워커를 번들에서 함께 제공한다 (CDN 의존 없음)
@@ -58,7 +60,7 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
   }
   await task.destroy()
   // D-386 쪽 사이에 쪽 나눔(\f) — 여러 서류를 한 PDF 로 합쳐 보냈으면 쪽마다 나눠 읽는다(docBundle). 줄 나눔 사이라 다른 읽기에는 빈 줄
-  return chunks.join('\n\f\n')
+  return { text: chunks.join('\n\f\n'), pages: chunks }
 }
 
 /**
@@ -75,7 +77,7 @@ const OCR_MAX_WIDTH = 3300
  */
 const MAX_OCR_PAGES = 4
 
-async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<{ text: string; total: number } | null> {
+async function ocrPdfPages(file: File, onProgress?: ProgressFn, only?: readonly number[]): Promise<{ text: string; total: number; byPage: Map<number, string> } | null> {
   ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
@@ -85,16 +87,21 @@ async function ocrPdfPages(file: File, onProgress?: ProgressFn): Promise<{ text:
   const task = pdfjs.getDocument({ data: buf })
   try {
     const doc = await task.promise
-    const n = Math.min(doc.numPages, MAX_OCR_PAGES)
+    // D-445 고른 쪽만(글자 PDF 안의 스캔 쪽) — 없으면 앞 4쪽
+    const list = (only?.length ? only.filter((p) => p >= 1 && p <= doc.numPages) : Array.from({ length: doc.numPages }, (_, k) => k + 1)).slice(0, MAX_OCR_PAGES)
+    const n = list.length
     const texts: string[] = []
-    for (let i = 1; i <= n; i++) {
-      const canvas = await renderPdfPage(doc, i)
+    const byPage = new Map<number, string>()
+    for (const [k, pageNo] of list.entries()) {
+      const canvas = await renderPdfPage(doc, pageNo)
       if (!canvas) continue
-      texts.push(await ocrImage(canvas, (r, label) => onProgress?.((i - 1 + r) / n, n > 1 ? `${i}/${n}쪽 · ${label}` : label)))
+      const t = await ocrImage(canvas, (r, label) => onProgress?.((k + r) / n, n > 1 || only ? `${pageNo}쪽 · ${label}` : label))
+      texts.push(t)
+      byPage.set(pageNo, t)
       canvas.width = 0
       canvas.height = 0
     }
-    return texts.length ? { text: texts.join('\n'), total: doc.numPages } : null
+    return texts.length ? { text: texts.join('\n'), total: doc.numPages, byPage } : null
   } finally {
     await task.destroy()
   }
@@ -267,8 +274,22 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
 
   if (isPdf) {
     onProgress?.(0, 'PDF 여는 중')
-    const text = await extractPdfText(file, onProgress)
-    if (hasEnoughText(text)) return { text, method: 'pdf_text' }
+    const { text, pages } = await extractPdfText(file, onProgress)
+    if (hasEnoughText(text)) {
+      // D-445 홈택스 PDF 사이에 스캔 쪽을 끼워 합친 파일 — 글자가 거의 없는 쪽(많아야 3쪽)만 글자 인식해 그 자리에 넣는다.
+      //        예전에는 글자 PDF 로 보고 스캔 쪽을 건너뛰어, 끼워 넣은 등기부 · 사업자등록증을 못 읽었다
+      const blank = mixedScanPages(pages)
+      if (blank.length) {
+        onProgress?.(0, `글자가 없는 ${blank.join(' · ')}쪽(스캔)을 읽는 중`)
+        const ocr = await ocrPdfPages(file, onProgress, blank).catch(() => null)
+        const got = ocr ? blank.filter((p) => ((ocr.byPage.get(p) ?? '').match(/[가-힣]/g) ?? []).length >= 10) : []
+        if (ocr && got.length) {
+          const merged = pages.map((t, i) => (got.includes(i + 1) ? (ocr.byPage.get(i + 1) ?? t) : t))
+          return { text: merged.join('\n\f\n'), method: 'pdf_text', ocrPages: got, note: `${got.join(' · ')}쪽은 스캔이라 글자 인식으로 읽었어요 — 그 쪽 정보는 한 번 확인해 주세요.` }
+        }
+      }
+      return { text, method: 'pdf_text' }
+    }
     // 스캔본 → 앞 4쪽까지 그림으로 만들어 OCR(D-423)
     onProgress?.(0, '스캔본으로 보입니다. 글자 인식으로 전환합니다')
     const ocr = await ocrPdfPages(file, onProgress)
@@ -282,6 +303,12 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   const canvas = await imageToCanvas(file)
   if (!canvas) throw new OfficeReadError(imageOpenFailNote(file))
   return { text: await ocrImage(canvas, onProgress), method: 'ocr' }
+}
+
+/** D-445 글자 PDF 안의 스캔 쪽 — 글자(공백 빼고)가 15자보다 적은 쪽, 2쪽 이상인 파일 · 앞 10쪽 안에서 많아야 3쪽 */
+export function mixedScanPages(pages: readonly string[]): number[] {
+  if (pages.length < 2) return []
+  return pages.map((t, i) => ({ p: i + 1, n: t.replace(/\s/g, '').length })).filter((x) => x.n < 15).map((x) => x.p).slice(0, 3)
 }
 
 /** D-433 긴 스캔 PDF — 앞 4쪽만 읽었다는 한 줄 */

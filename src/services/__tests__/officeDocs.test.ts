@@ -5,7 +5,7 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile, longScanNote } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote, mixedScanPages } from '../docTextExtract'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
 import { normalizeClientOps } from '../clientOpsService'
@@ -428,6 +428,7 @@ async function main() {
     check('D-432 아이폰 사진(.HEIC · 종류 비어 있어도) — 읽을 파일로 보고, 못 열면 "아이폰 사진(HEIC) … JPG 로 바꿔" 한 줄(예전: 말없이 빈 글 → 기타)', canExtractText(heic) && msg.includes('아이폰 사진(HEIC)') && msg.includes('높은 호환성'), msg)
   }
   check('D-433 긴 스캔 PDF — "스캔본 12쪽 중 앞 4쪽만 글자를 읽었어요 … 그 쪽만 따로"(예전: 말없이 뒷장 건너뜀)', longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만') && longScanNote(12).includes('따로 올려'))
+  check('D-445 글자 PDF 안의 스캔 쪽 — 글자 15자 미만인 쪽만(많아야 3쪽) · 한 쪽짜리는 아님', JSON.stringify(mixedScanPages(['사업자등록증명 등록번호 124-81-00998 상호 미래', ' ', '재무상태표 자산총계 3,200,000,000', '', '\n', '   '])) === '[2,4,5]' && mixedScanPages(['']).length === 0 && mixedScanPages(['가나다라마바사아자차카타파하 가나다', '가나다라마바사아자차카타파하 가나다']).length === 0)
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }
