@@ -306,6 +306,7 @@ for (const width of [360, 390, 430]) {
   check('다른 값: 이미 적힌 사업자번호(123-45-67890)는 덮지 않음', after === before && before === '123-45-67890', `${before} → ${after}`)
   const notes = await page.getByTestId('fact-note').allInnerTexts()
   check('다른 값: 확인할 정보에 "지금 적힌 값과 달라요" 표시', notes.some((t) => t.includes('지금 적힌 값과 달라요')), notes.join(' | '))
+  check('D-444 방금 올린 서류 칸은 "확인이 필요한 정보 N건 — 바로 아래 카드에서" 한 줄만(같은 목록 두 번 없음)', (await page.getByTestId('smart-flagged-jump').count()) === 1 && (await page.getByTestId('smart-flagged').count()) === 0, String(await page.getByTestId('smart-flagged').count()))
   check('D-144 오류 0', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }

@@ -187,9 +187,9 @@ export default function ClientSmartTab({
 
       {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
       {lastBatch ? (
-        <BatchSummary dupBases={dupBases} batch={lastBatch} fresh onRetry={onUpload} opened={opened} />
+        <BatchSummary dupBases={dupBases} batch={lastBatch} fresh onRetry={onUpload} opened={opened} inboxCount={pending} />
       ) : record.docUploads?.[0] ? (
-        <BatchSummary dupBases={dupBases} batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} />
+        <BatchSummary dupBases={dupBases} batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} inboxCount={pending} />
       ) : null}
 
       {/* 3. 확인이 필요한 정보 */}
@@ -408,7 +408,7 @@ function goToInsight(key: string) {
   window.setTimeout(() => document.querySelector(`[data-testid="smart-insight"][data-key="${key}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
 }
 
-function BatchSummary({ batch, fresh, onRetry, opened = [], dupBases = new Set<string>() }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void; opened?: Insight[]; dupBases?: ReadonlySet<string> }) {
+function BatchSummary({ batch, fresh, onRetry, opened = [], dupBases = new Set<string>(), inboxCount = 0 }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void; opened?: Insight[]; dupBases?: ReadonlySet<string>; inboxCount?: number }) {
   const when = batch.at ? new Date(batch.at) : null
   const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
   const failed = batch.failed ?? []
@@ -480,7 +480,15 @@ function BatchSummary({ batch, fresh, onRetry, opened = [], dupBases = new Set<s
           </ul>
         </div>
       )}
-      {batch.flagged.length > 0 && (
+      {/* D-444 바로 아래 '확인이 필요한 정보' 카드가 같은 것을 다 보여 주면 — 여기는 한 줄만(같은 목록을 두 번 늘어놓지 않는다) */}
+      {batch.flagged.length > 0 && inboxCount > 0 && (
+        <button type="button" onClick={() => document.getElementById('fact-inbox')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="tap t-sub flex w-full items-center gap-1.5 rounded-(--radius-control) px-1 text-left font-semibold break-keep text-warning-800 hover:underline" data-testid="smart-flagged-jump">
+          <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
+          확인이 필요한 정보 {batch.flagged.length}건 — 바로 아래 카드에서 한 번에 확인해요
+          <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0" />
+        </button>
+      )}
+      {batch.flagged.length > 0 && inboxCount === 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="t-sub font-semibold text-warning-800">확인이 필요한 정보 {batch.flagged.length}건 — 아래에서 맞는지 골라 주세요</p>
           <ul className="flex flex-col gap-1" data-testid="smart-flagged">
