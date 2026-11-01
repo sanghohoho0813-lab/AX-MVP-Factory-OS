@@ -125,6 +125,18 @@ import { pendingFacts } from '../services/customerFacts'
 const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 // D-190: 개요 맨 위 '이 업체에 먼저 제안할 것' — 판정 엔진(정책자금 · 창업감면 …)은 따로 받아 첫 화면을 무겁게 하지 않는다
 const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
+/** D-482 '먼저 제안할 것' 자리 — 판정 엔진을 받는 동안(모양 · 제목은 같고, 내용 대신 한 줄) */
+function TopPicksPlaceholder() {
+  return (
+    <section aria-busy="true" aria-label="이 업체에 먼저 제안할 것 — 판정하는 중" className="min-h-[11rem] rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-4 shadow-sm sm:px-5" data-testid="top-picks-loading">
+      <div className="flex items-center gap-3">
+        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+        <p className="text-[1.15rem] font-bold break-keep text-slate-900">이 업체에 먼저 제안할 것</p>
+      </div>
+      <p className="t-sub mt-3 text-slate-500">맞는 모듈을 판정하는 중…</p>
+    </section>
+  )
+}
 // 대표 AI 전략실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
 const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
 // D-479 첫 화면을 가볍게 — 서류 읽기 창(글자 읽기 엔진)은 누를 때 · 화면이 뜬 뒤 조용히 받는다. 계약 경로 카드는 지금 꺼져 있다(SALES_SIMPLE)
@@ -892,7 +904,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         D-190: 맨 위는 '이 업체에 먼저 제안할 것' — 대표 지시(고도화 목표 2) "서류가 다 들어오면 모듈 추천이 먼저, 눈에 잘 띄게".
         좋은 판정 3개만 크게, 누르면 그 모듈. 모든 판정은 맞춤 추천 탭에.
       */}
-      <Suspense fallback={null}>
+      {/* D-482 판정 엔진을 받는 동안 같은 모양의 빈 자리 — 뒤늦게 끼어들며 아래 회사 정보를 밀어내던 것 */}
+      <Suspense fallback={<TopPicksPlaceholder />}>
         <ClientTopPicks
           record={record}
           today={today}
