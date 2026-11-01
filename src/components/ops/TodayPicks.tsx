@@ -92,3 +92,19 @@ export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientO
     </section>
   )
 }
+
+/**
+ * D-482 판정을 기다리는 동안의 자리 — 같은 테두리 · 제목에 한 줄. 판정이 끝나 칸이 끼어들며 아래 칸을 밀어내던 것(휴대폰 화면 밀림의 남은 몫).
+ * 높이는 실제 칸과 비슷하게(휴대폰 2곳 · PC 3곳 한 줄).
+ */
+export function TodayPicksPlaceholder() {
+  return (
+    <section aria-busy="true" aria-label="오늘 먼저 제안할 것 — 맞는 모듈을 가리는 중" className="flex min-h-[13.5rem] flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:min-h-[8.5rem]" data-testid="today-picks-loading">
+      <p className="t-section flex items-center gap-2 break-keep text-slate-900">
+        <Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-500" />
+        오늘 먼저 제안할 것
+      </p>
+      <p className="t-sub text-slate-500">업체마다 맞는 모듈을 가리는 중…</p>
+    </section>
+  )
+}

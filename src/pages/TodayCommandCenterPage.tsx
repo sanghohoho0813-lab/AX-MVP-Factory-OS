@@ -11,7 +11,7 @@ import { TodayCare } from '../components/ops/TodayCare'
 import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
-import { TodayPicks } from '../components/ops/TodayPicks'
+import { TodayPicks, TodayPicksPlaceholder } from '../components/ops/TodayPicks'
 import { TodayKpis } from '../components/ops/TodayKpis'
 import { AppLauncher } from '../components/layout/AppLauncher'
 import { hasWeekData, subscribeWeekRunLoaded } from '../services/marketing/weekRunFlag'
@@ -537,7 +537,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </ArrangeItem>
         )}
         <ArrangeItem id="picks" label="오늘 먼저 제안할 것" hint="맞는 모듈이 있는 업체">
-          {!loading && <TodayPicks clients={clients} reco={reco} phone={phone} />}
+          {/* D-482 읽는 동안 · 판정을 기다리는 동안은 같은 모양의 자리(업체가 있을 때) — 끝나면 칸으로 바뀐다 */}
+          {loading || (!reco.ready && active.length > 0) ? <TodayPicksPlaceholder /> : <TodayPicks clients={clients} reco={reco} phone={phone} />}
         </ArrangeItem>
         <ArrangeItem id="assist" label="AI 도우미" hint="오늘 제일 중요한 것 · 직접 묻기">
           {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
