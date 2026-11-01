@@ -98,6 +98,30 @@ export function PackView({
   }
 
   const go = (id: PackSectionId) => document.getElementById(`pack-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // D-478 지금 보고 있는 칸 — 칩에 표시하고(진한 테두리) 칩 줄을 그 칩이 보이게 옮긴다
+  const [current, setCurrent] = useState<PackSectionId | ''>('')
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return
+    const els = pack.sections.map((x) => document.getElementById(`pack-${x.id}`)).filter((e): e is HTMLElement => !!e)
+    const seen = new Map<string, number>()
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting ? e.boundingClientRect.top : Number.POSITIVE_INFINITY)
+        const top = [...seen].filter(([, t]) => Number.isFinite(t)).sort((a, b) => a[1] - b[1])[0]
+        if (top) setCurrent(top[0].replace(/^pack-/, '') as PackSectionId)
+      },
+      { rootMargin: '-140px 0px -55% 0px' },
+    )
+    els.forEach((e) => io.observe(e))
+    return () => io.disconnect()
+  }, [pack.sections])
+  useEffect(() => {
+    if (!current) return
+    const chip = document.querySelector<HTMLElement>(`[data-testid="mk-pack-chip"][data-chip="${current}"]`)
+    const nav = chip?.parentElement
+    if (!chip || !nav || nav.scrollWidth <= nav.clientWidth + 1) return
+    nav.scrollTo({ left: Math.max(0, chip.offsetLeft - (nav.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' })
+  }, [current])
   const aiIds = new Set(Object.keys(saved?.sections ?? {}))
 
   return (
@@ -124,12 +148,13 @@ export function PackView({
             추천 제목: {pack.headline}
           </p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onCopy(packText(pack), '전체 묶음')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-slate-900 px-3.5 font-semibold text-white shadow-sm hover:bg-slate-800" data-testid="mk-pack-copy-all">
+        {/* D-478 휴대폰: 전체 복사 · 담기 한 줄에 둘 · '왜 이 키워드?' 는 아래 한 줄(예전: 한 줄에 하나씩 세 줄) */}
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button type="button" onClick={() => onCopy(packText(pack), '전체 묶음')} className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) bg-slate-900 px-3.5 font-semibold text-white shadow-sm hover:bg-slate-800" data-testid="mk-pack-copy-all">
             <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
           </button>
           {savedHref ? (
-            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-open-idea">
+            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-open-idea">
               <ExternalLink aria-hidden="true" className="size-4" /> 내 콘텐츠에서 보기
             </Link>
           ) : null}
@@ -139,7 +164,7 @@ export function PackView({
               onClick={() => setWhyOpen((v) => !v)}
               aria-expanded={whyOpen}
               aria-controls="mk-pack-why"
-              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
+              className="tap t-sub col-span-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50 max-sm:order-last"
               data-testid="mk-pack-why-toggle"
             >
               <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${whyOpen ? 'rotate-180' : ''}`} /> {whyOpen ? '접기' : '왜 이 키워드? · 관련 영상 펼쳐보기'}
@@ -150,10 +175,13 @@ export function PackView({
               type="button"
               onClick={() => void save()}
               disabled={saving}
-              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+              className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60 sm:gap-1.5 sm:px-3"
               data-testid="mk-pack-save"
             >
-              <BookmarkPlus aria-hidden="true" className="size-4" /> {savedHref ? '대본 다시 저장' : '내 콘텐츠에 담기'}
+              <BookmarkPlus aria-hidden="true" className="size-4" />
+              {/* D-478 휴대폰 반 칸(360 에서 약 140px)에 한 줄로 */}
+              <span className="sm:hidden">{savedHref ? '다시 저장' : '콘텐츠에 담기'}</span>
+              <span className="max-sm:hidden">{savedHref ? '대본 다시 저장' : '내 콘텐츠에 담기'}</span>
             </button>
           )}
         </div>
@@ -166,11 +194,12 @@ export function PackView({
 
       <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} onRun={runAi} />
 
-      <nav aria-label="묶음 칸으로 가기" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" data-testid="mk-pack-nav">
+      {/* D-478 칸 이동 칩은 스크롤해도 머리줄 바로 아래에 붙어 있다(휴대폰 묶음은 1만 px 넘게 길다 — 길을 잃지 않게) */}
+      <nav aria-label="묶음 칸으로 가기" className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-slate-50/95 px-1 py-1.5 backdrop-blur [scrollbar-width:none]" data-testid="mk-pack-nav">
         {pack.sections.map((x) => {
           const L = SECTION_LOOK[x.id]
           return (
-            <button key={x.id} type="button" onClick={() => go(x.id)} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 font-semibold whitespace-nowrap text-slate-700 hover:border-brand-400" data-testid="mk-pack-chip">
+            <button key={x.id} type="button" onClick={() => go(x.id)} aria-current={current === x.id ? 'true' : undefined} className={`tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 font-semibold whitespace-nowrap ${current === x.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-400'}`} data-testid="mk-pack-chip" data-chip={x.id}>
               <L.icon aria-hidden="true" className="size-4" />
               {x.label}
               {x.id === 'checks' && pack.holes > 0 && <span className="t-meta rounded-full bg-amber-100 px-1.5 font-bold text-amber-900">{pack.holes}</span>}
@@ -195,7 +224,7 @@ export function PackView({
         const ai = aiIds.has(x.id)
         const busy = running && PACK_AI_PARTS.some((p) => parts[p.part] === 'running' && p.sections.includes(x.id))
         return (
-          <section key={x.id} id={`pack-${x.id}`} className="flex scroll-mt-20 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
+          <section key={x.id} id={`pack-${x.id}`} className="flex scroll-mt-36 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${L.chip}`}>
                 <L.icon className="size-5" />
@@ -278,7 +307,13 @@ function AiBar({
             ? 'AI 가 검증된 방법대로 쓰는 중이에요(20~60초) — 그동안 아래 초안을 먼저 보세요.'
             : saved
               ? `AI 가 쓴 글이에요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-              : mkText('모델을 고르고 [AI로 다 쓰기] 를 누르면 제목 · 대본 · 블로그 · 카드뉴스를 검증된 방법대로 다시 써요. 누르기 전에는 부르지 않아요.')}
+              : (
+                <>
+                  {/* D-478 휴대폰은 네 줄이던 안내를 한 줄로(같은 뜻) */}
+                  <span className="sm:hidden">{mkText('[AI로 다 쓰기] 를 눌러야 AI 가 다시 써요')}</span>
+                  <span className="max-sm:hidden">{mkText('모델을 고르고 [AI로 다 쓰기] 를 누르면 제목 · 대본 · 블로그 · 카드뉴스를 검증된 방법대로 다시 써요. 누르기 전에는 부르지 않아요.')}</span>
+                </>
+              )}
         </p>
         <div className="flex flex-wrap items-start gap-2">
           <ModelPicker />
