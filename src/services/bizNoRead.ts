@@ -254,18 +254,20 @@ export function readBusinessNumber(text: string, opts: { scanned?: boolean; kind
  * 다시 읽은 숫자는 다른 날짜 읽기(발급일 · 유효기간)에 섞이지 않게 글자(0→A … 9→J)로 바꿔 서류 글 끝에 붙인다.
  */
 export const DATE_REREAD_MARK = '[날짜 다시 읽기]'
+/** D-470 개인사업자 사업자등록증 '생년월일' 줄 — 대표 생년월일 */
+export const BIRTH_REREAD_MARK = '[생일 다시 읽기]'
 const DIGIT_CODE = 'ABCDEFGHIJ'
-export function dateRereadLine(digits: string): string {
+export function dateRereadLine(digits: string, mark: string = DATE_REREAD_MARK): string {
   const d = digits.replace(/\D/g, '')
-  return d ? `${DATE_REREAD_MARK} ${[...d].map((c) => DIGIT_CODE[Number(c)]).join('')}` : ''
+  return d ? `${mark} ${[...d].map((c) => DIGIT_CODE[Number(c)]).join('')}` : ''
 }
 /** 서류 글 끝의 날짜 다시 읽기 → 숫자들 */
-export function dateRereads(text: string): string[] {
+export function dateRereads(text: string, mark: string = DATE_REREAD_MARK): string[] {
   const out: string[] = []
   for (const line of String(text || '').split('\n')) {
     const t = line.trim()
-    if (!t.startsWith(DATE_REREAD_MARK)) continue
-    const code = t.slice(DATE_REREAD_MARK.length).trim()
+    if (!t.startsWith(mark)) continue
+    const code = t.slice(mark.length).trim()
     if (/^[A-J]{6,8}$/.test(code)) out.push([...code].map((c) => String(DIGIT_CODE.indexOf(c))).join(''))
   }
   return out
@@ -274,11 +276,11 @@ export function dateRereads(text: string): string[] {
  * 'YYYY-MM-DD' 날짜가 다시 읽은 숫자와 같은가 — 두 크기로 다시 읽은 것이 모두 같아야 한다(하나라도 다르면 예전처럼 확인).
  * '2019 03 15' · '2019 3 15'(앞 0 없음) 둘 다 같은 날짜로 본다.
  */
-export function dateRereadAgrees(text: string, isoDate: string): boolean {
+export function dateRereadAgrees(text: string, isoDate: string, mark: string = DATE_REREAD_MARK): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
   if (!m) return false
   const padded = `${m[1]}${m[2]}${m[3]}`
   const loose = `${m[1]}${Number(m[2])}${Number(m[3])}`
-  const reads = dateRereads(text)
+  const reads = dateRereads(text, mark)
   return reads.length >= 2 && reads.every((d) => d === padded || d === loose)
 }

@@ -96,6 +96,7 @@ async function upload(id, company, files, during) {
   check(`B 네 장 모두 제 칸(사업자등록증 · 소득금액증명 · 부가세 과세표준증명 · 납세증명서 — 제목 글자 실수여도) · ${r.secs}초`, /IMG_2001\.jpg → 사업자등록증/.test(r.placed) && /IMG_2002\.jpg → 소득금액증명/.test(r.placed) && /IMG_2003\.jpg → 부가세 과세표준증명/.test(r.placed) && /IMG_2004\.jpg → 납세증명서/.test(r.placed), r.placed)
   check('B 사업자등록번호 · 매출 8억 6,000만원 바로 입력 · 사업소득 추이 생김', r.record?.businessNumber === '214-05-01239' && r.record?.factValues?.revenue === '860000000' && (r.record?.customFields ?? []).some((f) => f.label === '사업소득 추이' && f.value.includes('2024년보다 +56%')), JSON.stringify({ b: r.record?.businessNumber, rev: r.record?.factValues?.revenue }))
   check('B 매출 추이 = 소득금액증명 줄 + 올해 6개월(과세표준증명)', (r.record?.customFields ?? []).some((f) => f.label === '매출 추이' && f.value.includes('2024년보다 +41%') && f.value.includes('2026년 6개월')), JSON.stringify((r.record?.customFields ?? []).find((f) => f.label === '매출 추이')))
+  check('B D-470 개인사업자 생년월일 · 개업일 — 숫자만 두 번 다시 읽어 같음 → 대표 생년월일 1988-01-01 · 설립일 2022-05-02 바로 입력', r.record?.representativeBirth === '1988-01-01' && r.record?.establishedAt === '2022-05-02', JSON.stringify({ b: r.record?.representativeBirth, e: r.record?.establishedAt, inbox: r.inbox.slice(0, 200) }))
   check('B 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 

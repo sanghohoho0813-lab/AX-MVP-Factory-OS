@@ -13,7 +13,7 @@
 
 import { isXlsxFile, readXlsxText } from './xlsxText'
 import { pdfItemsToText } from './pdfTextLines'
-import { REREAD_MARK, dateRereadLine } from './bizNoRead'
+import { BIRTH_REREAD_MARK, REREAD_MARK, dateRereadLine } from './bizNoRead'
 import { ensureMapUpsert } from '../lib/mapUpsert'
 import { OfficeReadError, officeKindOf, officeText } from './officeText'
 import { legacyKindOf, legacyText } from './legacyOffice'
@@ -278,10 +278,10 @@ interface OcrLine {
 }
 
 /** D-467 '개업연월일' · D-468 '회사성립연월일' 줄의 숫자 낱말들(년 · 월 · 일 글자는 빼고 하나씩) — 생년월일 · 발급일 줄은 아님 */
-export function dateWordBoxes(lines: readonly OcrLine[]): Box[] {
+export function dateWordBoxes(lines: readonly OcrLine[], label: RegExp = /개업(?:연|년)?월?일|회사성립연월일|설립연월일/): Box[] {
   const flat = (t: string) => t.replace(/\s+/g, '')
-  // D-468 법인 등기부 '회사성립연월일' 줄도(등기부만 올린 법인의 설립일)
-  const line = lines.find((l) => /개업(?:연|년)?월?일|회사성립연월일|설립연월일/.test(flat(l.text)) && /\d{4}/.test(l.text))
+  // D-468 법인 등기부 '회사성립연월일' 줄도(등기부만 올린 법인의 설립일) · D-470 '생년월일' 줄은 label 로 따로
+  const line = lines.find((l) => label.test(flat(l.text)) && /\d{4}/.test(l.text))
   if (!line) return []
   const ws = line.words.filter((w) => /^\D{0,2}\d{1,4}\D{0,2}$/.test(w.text) && /\d/.test(w.text)).slice(0, 3)
   if (ws.length !== 3) return []
@@ -514,7 +514,9 @@ async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onPro
   const lines: OcrLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.map((l) => ({ text: l.text, bbox: l.bbox, words: l.words.map((w) => ({ text: w.text, bbox: w.bbox })) }))))
   const boxes = numberBoxes(lines)
   const dateBoxes = dateWordBoxes(lines)
-  if (boxes.length === 0 && dateBoxes.length === 0) return `${text}\n${REREAD_MARK}`
+  // D-470 개인사업자 사업자등록증 '생년월일' 줄(대표 생년월일) — 주민번호 줄은 아님(숫자 낱말이 년 · 월 · 일 셋일 때만)
+  const birthBoxes = dateWordBoxes(lines, /^생년월일/)
+  if (boxes.length === 0 && dateBoxes.length === 0 && birthBoxes.length === 0) return `${text}\n${REREAD_MARK}`
   onProgress?.(0.95, '번호를 한 번 더 읽는 중')
   await worker.setParameters({ tessedit_char_whitelist: '0123456789-', tessedit_pageseg_mode: '7' as never })
   const reads: string[] = []
@@ -527,14 +529,15 @@ async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onPro
   }
   // D-467 개업연월일 — 년 · 월 · 일 숫자를 하나씩 다시 읽어 붙인다(두 크기)
   const dateLines: string[] = []
-  if (dateBoxes.length === 3) {
+  for (const [bs, mark] of [[dateBoxes, undefined], [birthBoxes, BIRTH_REREAD_MARK]] as const) {
+    if (bs.length !== 3) continue
     for (const scale of [2, 3]) {
       let digits = ''
-      for (const b of dateBoxes) {
+      for (const b of bs) {
         const r = await worker.recognize(cropScaled(cropSrc, b, scale))
         digits += (r.data.text ?? '').replace(/\D/g, '')
       }
-      const line = dateRereadLine(digits)
+      const line = dateRereadLine(digits, mark)
       if (line) dateLines.push(line)
     }
   }

@@ -67,7 +67,7 @@ import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs, isStandardBizCategory } from '../docAutoFill'
-import { bizNoChecksumOk, dateRereadAgrees, dateRereadLine, dateRereads } from '../bizNoRead'
+import { BIRTH_REREAD_MARK, bizNoChecksumOk, dateRereadAgrees, dateRereadLine, dateRereads } from '../bizNoRead'
 import { pdfItemsToText } from '../pdfTextLines'
 import { dropSameFiles, filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
@@ -3026,6 +3026,19 @@ await (async () => {
   check('D-469 "서울특별시 … 123, 4층" · "서울 … 123" → 두 서류가 같은 주소 → 바로 입력', !!ok.record.businessAddress && !ok.flagged.some((f) => f.key === 'businessAddress'), JSON.stringify({ addr: ok.record.businessAddress, f: ok.flagged.map((f) => f.key + ':' + f.note) }))
   const diff = run('서울특별시 강남구 테헤란로 123', '서울 강남구 테헤란로 125')
   check('D-469 건물 번호가 다르면(123 · 125) 같은 값 아님 → 예전처럼 확인', diff.flagged.some((f) => f.key === 'businessAddress'))
+})()
+
+// D-470 개인사업자 스캔 사업자등록증 '생년월일' — 두 번 다시 읽어 같으면 대표 생년월일 바로 입력 · 설립일 다시 읽기와 섞이지 않음
+;(() => {
+  const BIZ = `사 업 자 등 록 증\n(일반과세자)\n등록번호 : 214-05-01239\n상 호 : 미래상사\n성 명 : 홍길동\n생 년 월 일 : 1988 년 01 월 01 일\n개업연월일 : 2022 년 05 월 02 일\n사업장 소재지 : 경상남도 창원시 성산구 중앙대로 10\n[번호 다시 읽기] 214-05-01239`
+  const empty = normalizeClientOps({ id: 'af470', companyName: '미래상사', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d470-${++n}`
+  const text = `${BIZ}\n${dateRereadLine('20220502')}\n${dateRereadLine('20220502')}\n${dateRereadLine('19880101', BIRTH_REREAD_MARK)}\n${dateRereadLine('19880101', BIRTH_REREAD_MARK)}`
+  const ok = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: 'IMG_2001.jpg', text, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-470 생년월일 1988-01-01 · 개업일 2022-05-02 — 각자 두 번 다시 읽어 같음 → 둘 다 바로 입력', ok.record.representativeBirth === '1988-01-01' && ok.record.establishedAt === '2022-05-02' && !ok.flagged.some((f) => f.key === 'representativeBirth' || f.key === 'establishedAt'), JSON.stringify({ b: ok.record.representativeBirth, e: ok.record.establishedAt, f: ok.flagged.map((f) => f.key) }))
+  const mixed = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: 'IMG_2001.jpg', text: `${BIZ}\n${dateRereadLine('19880101')}\n${dateRereadLine('19880101')}`, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-470 생년월일 숫자가 설립일 다시 읽기 줄로 붙어 있으면 생년월일로 쓰지 않음(그대로 확인)', mixed.record.representativeBirth === '' && mixed.flagged.some((f) => f.key === 'representativeBirth'))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
