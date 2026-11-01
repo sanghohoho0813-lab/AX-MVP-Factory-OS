@@ -19,6 +19,13 @@ export function fixAmountNoise(text: string): string {
     .replace(/(^|[^0-9A-Za-z])[Il]((?:[,.]\d{3})+)(?![0-9A-Za-z])/g, '$11$2')
     .replace(/(^|[^\d.,])(\d{1,3}(?:[.,]\d{3}){2,})(?!\d)/g, (_m, pre: string, num: string) => `${pre}${num.replace(/\./g, ',')}`)
     .replace(/(\d{1,3}(?:,\d{3})*),[ \t]+(\d{3}(?:,\d{3})*)(?![\d])/g, '$1,$2')
+    // D-446 숫자 사이에 낀 괄호('6(00,000,000') → 뺌. 앞뒤를 감싼 괄호('(1,000)' 음수)는 그대로
+    .replace(/(\d)[()](?=\d)/g, '$1')
+    // D-446 맨 앞 묶음이 네 자리 이상인 금액('1500,000,000' — 쉼표 하나가 빠짐) → 다시 묶음(1,500,000,000). 쉼표를 숫자로 읽은 것('22400,000,000')은 재무제표 셈이 고친다
+    .replace(/(^|[^\d.,])(\d{4,})((?:,\d{3})+)(?![\d,])/g, (m, pre: string, lead: string, rest: string) => {
+      const d = `${lead}${rest.replace(/,/g, '')}`
+      return d.length > 15 ? m : `${pre}${Number(d).toLocaleString('en-US')}`
+    })
     // D-416 한 묶음이라도 '원' · '주' 가 바로 붙으면 금액 · 주식 수('5.000 원' · '15.000주' → 5,000 · 15,000)
     .replace(/(^|[^\d.,])(\d{1,3})\.(\d{3})(?=\s*(?:원|주)(?![가-힣]))/g, '$1$2,$3')
 }
@@ -66,4 +73,16 @@ export function fixDateNoise(text: string): string {
     // '2O26.1O.2O' · '2O26-O3-15' · '2O26. 1O. 2O'
     .replace(new RegExp(`(^|[^0-9A-Za-z])([12]${Ch}{3})(\\s*[.\\-/]\\s*)(${Ch}{1,2})(\\s*[.\\-/]\\s*)(${Ch}{1,2})(?![0-9A-Za-z])`, 'g'), (m, pre: string, y: string, a: string, mo: string, b: string, d: string) =>
       ok(y, mo, d) ? `${pre}${fix(y)}${a}${fix(mo)}${b}${fix(d)}` : m)
+}
+
+/** D-446 원래 글자(숫자만)에서 한두 글자를 빼면 그 숫자가 되나 — 같으면 그대로(괄호 · 점이 낀 경우) */
+export function digitsFit(token: string, value: number): boolean {
+  const d = token.replace(/[^\d]/g, '')
+  const s = String(Math.abs(Math.round(value)))
+  if (s.length < 4 || !d) return false
+  if (d === s) return true
+  if (d.length - s.length < 1 || d.length - s.length > 2) return false
+  let i = 0
+  for (const ch of d) if (i < s.length && ch === s[i]) i++
+  return i === s.length
 }

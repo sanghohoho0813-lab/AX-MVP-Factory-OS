@@ -7,7 +7,7 @@
  * 규칙 계산이다. 못 읽으면 그 값은 내지 않는다(지어내지 않는다).
  */
 
-import { fixAmountNoise, joinNumberOnlyLines } from './ocrNumbers'
+import { digitsFit, fixAmountNoise, joinNumberOnlyLines } from './ocrNumbers'
 export interface FinStatementValues {
   revenue?: number
   operatingProfit?: number
@@ -117,6 +117,33 @@ const CHECK_ITEMS: [string, RegExp, boolean][] = [
   ['totalEquity', new RegExp(PFX + String.raw`자\s*본\s*총\s*계`), false],
 ]
 
+type Cols = Record<string, [number | undefined, number | undefined]>
+/** D-446 셈 넷(매출−원가=총이익 · 총이익−판관비=영업이익 · 세전−법인세=순이익 · 자산=부채+자본)에서 한 칸만 틀렸으면 고친다. 고친 [과목, 열] */
+function repairByIdentity(cols: Cols, raw: Record<string, string>, loss: Record<string, boolean>, unit: number): [string, 0 | 1][] {
+  const done: [string, 0 | 1][] = []
+  // a = b + c 꼴로: [a, b, c]
+  const ids: [string, string, string][] = [['revenue', 'costOfSales', 'grossProfit'], ['grossProfit', 'sga', 'operatingProfit'], ['pretax', 'incomeTax', 'netIncome'], ['totalAssets', 'totalLiabilities', 'totalEquity']]
+  const tokenOf = (k: string, c: 0 | 1) => (raw[k] ?? '').trim().split(/\s+/).filter((t) => /\d/.test(t))[c] ?? ''
+  for (let round = 0; round < 2; round++) {
+    for (const c of [0, 1] as const) {
+      for (const [a, b, d] of ids) {
+        const g = (k: string) => cols[k]?.[c]
+        const A = g(a), B = g(b), D = g(d)
+        if (A !== undefined && B !== undefined && D !== undefined && A === B + D) continue
+        // 고칠 후보 — 나머지 두 칸이 있어야 한다
+        const cands: [string, number | undefined][] = [[a, B !== undefined && D !== undefined ? B + D : undefined], [b, A !== undefined && D !== undefined ? A - D : undefined], [d, A !== undefined && B !== undefined ? A - B : undefined]]
+        const hits = cands.filter(([k, e]) => e !== undefined && e !== 0 && raw[k] !== undefined && digitsFit(tokenOf(k, c), e / unit) && (loss[k] || e > 0))
+        if (hits.length !== 1) continue
+        const [k, e] = hits[0]
+        const prev = cols[k] ?? [undefined, undefined]
+        cols[k] = c === 0 ? [e, prev[1]] : [prev[0], e]
+        done.push([k, c])
+      }
+    }
+  }
+  return done
+}
+
 function parseOneStatement(text: string): FinStatementValues {
   const out: FinStatementValues = {}
   if (!text || !/(재무|손익|대차|자산|매출)/.test(text)) return out
@@ -127,17 +154,22 @@ function parseOneStatement(text: string): FinStatementValues {
   let loanPrevOk = true
   // D-418 셈 확인용 — 과목마다 [당기, 전기](손실 과목은 음수)
   const cols: Record<string, [number | undefined, number | undefined]> = {}
-  const colOf = (key: string, nums: number[], loss: boolean) => {
+  // D-446 셈으로 고칠 때 볼 원래 글(과목 뒤) — 글자 인식이 쉼표를 숫자로('2,400,000,000' → '22400,000,000') 읽은 칸을 찾는다
+  const rawRest: Record<string, string> = {}
+  const lossOf: Record<string, boolean> = {}
+  const colOf = (key: string, nums: number[], loss: boolean, rest = '') => {
     if (cols[key]) return
     const sign = (v: number | undefined) => (v === undefined ? undefined : loss && v > 0 ? -v * unit : v * unit)
     cols[key] = [sign(nums[0]), sign(nums[1])]
+    rawRest[key] = rest
+    lossOf[key] = loss
   }
   for (const line of lines) {
     for (const [key, re, lossable] of CHECK_ITEMS) {
       const m = re.exec(line)
       if (!m || cols[key]) continue
       const nums = [...line.slice(m[0].length).matchAll(NUM)].map((x) => valueOf(x[0])).filter((v): v is number => v !== null)
-      if (nums.length) colOf(key, nums, lossable && /손\s*실/.test(m[0]) && !/이\s*익/.test(m[0]))
+      if (nums.length) colOf(key, nums, lossable && /손\s*실/.test(m[0]) && !/이\s*익/.test(m[0]), line.slice(m[0].length))
     }
     for (const [key, re, lossable] of ITEMS) {
       if (out[key] !== undefined) continue
@@ -150,7 +182,7 @@ function parseOneStatement(text: string): FinStatementValues {
       // '영업손실 30,000' — 손실 과목인데 부호가 없으면 음수로
       if (lossable && /손\s*실/.test(m[0]) && !/이\s*익/.test(m[0]) && v > 0) v = -v
       out[key] = v
-      colOf(key, nums, lossable && /손\s*실/.test(m[0]) && !/이\s*익/.test(m[0]))
+      colOf(key, nums, lossable && /손\s*실/.test(m[0]) && !/이\s*익/.test(m[0]), rest)
       // D-305: 당기순이익 줄의 둘째 숫자는 전기(직전 연도). '당기순손실' 처럼 손실만 적힌 줄은 전기 부호를 알 수 없어 내지 않는다
       if (key === 'netIncome' && nums.length >= 2 && /이\s*익/.test(m[0])) out.netIncomePrev = nums[1] * unit
       // D-406: 매출액 줄의 둘째 숫자도 전기(직전 연도) — 0 이하이면 비교하지 않는다
@@ -184,6 +216,16 @@ function parseOneStatement(text: string): FinStatementValues {
     }
   }
   if (!loanPrevOk) delete out.loanBalancePrev
+  // D-446 셈이 안 맞는 칸 하나 — 다른 두 칸으로 셈한 값이 그 칸의 원래 글자에서 한두 글자만 빼면 되는 숫자면(쉼표를 숫자로 · 괄호가 낌) 그 값으로.
+  //        예: 매출 '22400,000,000'(쉼표가 2 로) — 원가 15억 + 총이익 9억 = 24억, 글자 '22400000000' 에서 2 하나를 빼면 '2400000000' → 24억
+  const fixed = repairByIdentity(cols, rawRest, lossOf, unit)
+  for (const [k, c] of fixed) {
+    const v = cols[k]?.[c]
+    if (v === undefined) continue
+    if (c === 0 && (k === 'revenue' || k === 'operatingProfit' || k === 'netIncome' || k === 'totalAssets' || k === 'totalLiabilities')) out[k] = v
+    if (c === 1 && k === 'revenue' && v > 0) out.revenuePrev = v
+    if (c === 1 && k === 'netIncome') out.netIncomePrev = v
+  }
   // D-418 셈이 원 단위까지 맞는 값 — 스캔(OCR) 글이어도 잘못 읽었을 가능성이 아주 낮다
   const verified: string[] = []
   for (const c of [0, 1] as const) {

@@ -10,7 +10,7 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 import type { ShareholderRelation } from '../types/clientOps'
-import { fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
+import { digitsFit, fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
 
 export interface ReadHolder {
   name: string
@@ -207,8 +207,20 @@ export function readShareholderDoc(text: string, ceoName = ''): RegisterRead {
       same.pct = same.pct !== null && h.pct !== null ? Math.round((same.pct + h.pct) * 100) / 100 : null
     } else merged.push({ ...h })
   }
-  const sumShares = merged.reduce((a, h) => a + h.shares, 0)
+  let sumShares = merged.reduce((a, h) => a + h.shares, 0)
   const total = statedTotal ?? sumRow
+  // D-446 합계가 안 맞는 주주 한 명 — 합계에서 나머지를 뺀 값이 그 주식 수 글자에서 한두 글자만 빼면 되는 숫자면(글자 인식이 쉼표를 숫자로: '6,000' → '66000') 그 값으로.
+  //        지분율이 적혀 있으면 그것과도 맞아야 한다
+  if (merged.length >= 2 && total !== null && total > 0 && sumShares !== total) {
+    const hits = merged.filter((h) => {
+      const want = total - (sumShares - h.shares)
+      return want > 0 && digitsFit(String(h.shares), want) && (h.pct === null || Math.abs((want / total) * 100 - h.pct) <= 0.6)
+    })
+    if (hits.length === 1) {
+      hits[0].shares = total - (sumShares - hits[0].shares)
+      sumShares = total
+    }
+  }
   let check: RegisterRead['check'] = 'none'
   if (merged.length && total !== null && total > 0 && sumShares === total) check = 'sum'
   else if (merged.length && merged.every((h) => h.pct !== null)) {
