@@ -5,7 +5,7 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile, longScanNote, mixedScanPages, ocrParallelFor, whitenRedStamps } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote, maxOcrPagesFor, mixedScanPages, ocrParallelFor, whitenRedStamps } from '../docTextExtract'
 import { joinSplitAddress, parseKoreanBusinessDocument } from '../koreanDocParser'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
@@ -471,6 +471,7 @@ async function main() {
   check('D-454 도장 겹친 "범인명(단체명)" → 법인명으로 회사 이름', parseKoreanBusinessDocument('사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n범인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n').companyName === '주식회사 미래바이오랩')
   check('D-454 사업자등록증 글 — 떨어진 주소 붙여 회사 정보로', parseKoreanBusinessDocument('사업자등록증\n등록번호 : 124-81-00998\n사업장 소재지 : 경기도 성 남시 분당구 판교로 100\n').address === '경기도 성남시 분당구 판교로 100')
   check('D-455 PC(코어 8 · 메모리 8GB) 는 두 장씩 · 휴대폰(안드로이드 · 아이폰 · 아이패드 터치) · 코어 2 · 메모리 2GB 는 한 장씩', ocrParallelFor({ cores: 8, memoryGb: 8, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130', touchPoints: 0 }) === 2 && ocrParallelFor({ cores: 8, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605', touchPoints: 0 }) === 2 && ocrParallelFor({ cores: 8, memoryGb: 8, userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 6, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 8, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 2, memoryGb: 8, userAgent: 'Windows' }) === 1 && ocrParallelFor({ cores: 8, memoryGb: 2, userAgent: 'Windows' }) === 1)
+  check('D-459 긴 스캔 PDF — PC(두 장씩)는 앞 6쪽 · 휴대폰은 앞 4쪽 · 안내 글도 그 쪽 수로', maxOcrPagesFor(2) === 6 && maxOcrPagesFor(1) === 4 && longScanNote(12, 6).startsWith('스캔본 12쪽 중 앞 6쪽만') && longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만'))
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }

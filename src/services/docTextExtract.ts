@@ -76,6 +76,10 @@ const OCR_MAX_WIDTH = 3300
  * 등기부 뒷장(임원에 관한 사항 · 대표 취임일) · 여러 장 명부를 못 읽었다. 한 쪽씩 그리고 읽고 지운다(메모리).
  */
 const MAX_OCR_PAGES = 4
+/** D-459 PC(두 장씩 읽는 컴퓨터)는 두 쪽씩 함께 읽고 앞 6쪽까지 — 4쪽을 한 쪽씩 읽던 것보다 빠르다. 휴대폰은 그대로 4쪽 */
+export function maxOcrPagesFor(parallel: number): number {
+  return parallel >= 2 ? 6 : MAX_OCR_PAGES
+}
 
 async function ocrPdfPages(file: File, onProgress?: ProgressFn, only?: readonly number[]): Promise<{ text: string; total: number; byPage: Map<number, string> } | null> {
   ensureMapUpsert()
@@ -88,19 +92,37 @@ async function ocrPdfPages(file: File, onProgress?: ProgressFn, only?: readonly 
   try {
     const doc = await task.promise
     // D-445 고른 쪽만(글자 PDF 안의 스캔 쪽) — 없으면 앞 4쪽
-    const list = (only?.length ? only.filter((p) => p >= 1 && p <= doc.numPages) : Array.from({ length: doc.numPages }, (_, k) => k + 1)).slice(0, MAX_OCR_PAGES)
+    const list = (only?.length ? only.filter((p) => p >= 1 && p <= doc.numPages) : Array.from({ length: doc.numPages }, (_, k) => k + 1)).slice(0, maxOcrPagesFor(OCR_PARALLEL))
     const n = list.length
-    const texts: string[] = []
+    const got: (string | null)[] = list.map(() => null)
+    const done: number[] = list.map(() => 0)
+    let next = 0
+    // D-459 PC 는 두 쪽씩 함께(쪽마다 그리고 읽고 지운다) — 글은 쪽 순서대로 모은다
+    const lane = async () => {
+      for (;;) {
+        const k = next++
+        if (k >= n) return
+        const pageNo = list[k]
+        const canvas = await renderPdfPage(doc, pageNo)
+        if (!canvas) continue
+        got[k] = await ocrImage(canvas, (r, label) => {
+          done[k] = r
+          onProgress?.(done.reduce((a, b) => a + b, 0) / n, n > 1 || only ? `${pageNo}쪽 · ${label}` : label)
+        })
+        done[k] = 1
+        canvas.width = 0
+        canvas.height = 0
+      }
+    }
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(OCR_PARALLEL, n)) }, lane))
     const byPage = new Map<number, string>()
-    for (const [k, pageNo] of list.entries()) {
-      const canvas = await renderPdfPage(doc, pageNo)
-      if (!canvas) continue
-      const t = await ocrImage(canvas, (r, label) => onProgress?.((k + r) / n, n > 1 || only ? `${pageNo}쪽 · ${label}` : label))
+    const texts: string[] = []
+    list.forEach((pageNo, k) => {
+      const t = got[k]
+      if (t === null) return
       texts.push(t)
       byPage.set(pageNo, t)
-      canvas.width = 0
-      canvas.height = 0
-    }
+    })
     return texts.length ? { text: texts.join('\n'), total: doc.numPages, byPage } : null
   } finally {
     await task.destroy()
@@ -503,7 +525,8 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     const ocr = await ocrPdfPages(file, onProgress)
     if (ocr === null) return { text, method: 'pdf_text' }
     // D-433 앞 4쪽만 읽었으면 알린다(예전: 말없이 뒷장을 건너뜀 — 손익계산서 · 임원 사항이 뒤에 있으면 못 읽은 줄 몰랐다)
-    return { text: ocr.text, method: 'ocr', pages: ocr.total, ...(ocr.total > MAX_OCR_PAGES ? { note: longScanNote(ocr.total) } : {}) }
+    const maxPages = maxOcrPagesFor(OCR_PARALLEL)
+    return { text: ocr.text, method: 'ocr', pages: ocr.total, ...(ocr.total > maxPages ? { note: longScanNote(ocr.total, maxPages) } : {}) }
   }
 
   onProgress?.(0, '이미지 여는 중')
@@ -520,8 +543,8 @@ export function mixedScanPages(pages: readonly string[]): number[] {
 }
 
 /** D-433 긴 스캔 PDF — 앞 4쪽만 읽었다는 한 줄 */
-export function longScanNote(total: number): string {
-  return `스캔본 ${total}쪽 중 앞 ${MAX_OCR_PAGES}쪽만 글자를 읽었어요 — 필요한 쪽(손익계산서 · 임원 사항 등)이 뒤에 있으면 그 쪽만 따로 올려 주세요.`
+export function longScanNote(total: number, max = MAX_OCR_PAGES): string {
+  return `스캔본 ${total}쪽 중 앞 ${max}쪽만 글자를 읽었어요 — 필요한 쪽(손익계산서 · 임원 사항 등)이 뒤에 있으면 그 쪽만 따로 올려 주세요.`
 }
 
 /** D-432 사진을 못 열었을 때 사람 말 — 아이폰 HEIC 면 바꾸는 법까지 */
