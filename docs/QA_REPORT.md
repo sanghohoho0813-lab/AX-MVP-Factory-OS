@@ -4778,6 +4778,8 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   uxhome 46 · many 19 · detail 515 · grants 152 · simple 88 · steady 76 · real 188 · board 198 · keepui 10 · firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패 → main(3408255).
 - 2696899(+ 오늘 '먼저 제안할 것' 자리): test:all EXIT 0 · 빌드 0 · uxhome 46 · flow 171 · todos 50 · easy 83 · many 19 · simple 88 · steady 76 · real 188 · keepui 10 ·
   firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패 → main. qa:wording 6/0(작업본 빌드).
+- 넓은 회귀(466dbd4 · main 과 같은 코드 · 판정 이름표 · AI 지시문 묶음 · 업체 고르기 순서를 나눈 뒤 모듈 쪽 확인): test:all EXIT 0 · 빌드 0 · matrix 586 · scenarios 69 · plan 73 ·
+  journey 57 · calcpreset 41 · taxplan 96 · connect 45 · modsafe 42 · wayfinding 28 · enroll 48 · planner 42 · contract 72 — 0 실패.
 - 재 본 것(빌드본 · 업체 기록 복제 300 · 1,000곳 · 메뉴를 눌러 들어간 때부터 본문이 다 그려질 때까지 · 멈춤 = 50ms 넘는 긴 작업 합):
   · 1,000곳 — 고객 관리 3.96 → 0.56초(멈춤 3.46 → 0.16초) · 오늘 3.13 → 1.32초(멈춤 2.63 → 0.50초) · 영업 관리 1.20 → 0.41초(멈춤 0.80 → 0초).
   · 300곳 — 고객 관리 1.55 → 0.47초(멈춤 1.06 → 0.11초) · 오늘 멈춤 0.98 → 0.16초.
