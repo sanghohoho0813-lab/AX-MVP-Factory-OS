@@ -93,7 +93,7 @@ export function ChannelManager({
                 {list.length === 0 ? (
                   <p className="t-sub break-keep text-slate-500">이 묶음에 기본 채널이 없습니다{g === 'ai' || g === 'ax' ? ' — 위 [채널 추가] 로 더할 수 있습니다' : ''}.</p>
                 ) : (
-                  <ul className="flex flex-col divide-y divide-slate-100">
+                  <ul className="grid gap-x-6 lg:grid-cols-2" data-cols="2">
                     {list.map((c) => (
                       <ChannelRow key={c.id} c={c} group={g} enabled={prefs.overrides[c.id]?.enabled !== false} readOnly={readOnly} onOverride={setOverride}>
                         {c.note ? (
@@ -123,7 +123,7 @@ export function ChannelManager({
               아직 없습니다 — 위 [채널 추가] 에 유튜브 채널 주소를 넣으면 여기에 모입니다.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-slate-100">
+            <ul className="grid gap-x-6 lg:grid-cols-2" data-cols="2">
               {addedRows.map((c) => (
                 <ChannelRow key={c.id} c={c} group={groupOf(c, prefs.overrides)} enabled={prefs.overrides[c.id]?.enabled !== false} readOnly={readOnly} onOverride={setOverride} onRemove={() => removeAdded(c.id)} added>
                   <p className="t-meta text-slate-500">
@@ -163,7 +163,8 @@ function ChannelRow({
 }) {
   const vps = c.subs > 0 ? Math.round((c.views / c.subs) * 10) / 10 : 0
   return (
-    <li className={`flex flex-col gap-1.5 py-2.5 ${enabled ? '' : 'opacity-60'}`} data-testid="yt-channel-row" data-group={group} data-enabled={enabled ? '1' : '0'} data-source={added ? 'added' : 'default'}>
+    // D-478 넓은 화면은 채널을 두 칸으로(예전: 한 줄에 하나 — 오른쪽이 비고 화면이 두 배로 길었다) · 칸 사이 줄은 위쪽 선
+    <li className={`flex flex-col gap-1.5 border-t border-slate-100 py-2.5 first:border-t-0 lg:[&:nth-child(2)]:border-t-0 ${enabled ? '' : 'opacity-60'}`} data-testid="yt-channel-row" data-group={group} data-enabled={enabled ? '1' : '0'} data-source={added ? 'added' : 'default'}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="t-body min-w-0 flex-[1_1_10rem] font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{c.title}</span>
         {c.mine && <Badge tone="warning">내 채널</Badge>}

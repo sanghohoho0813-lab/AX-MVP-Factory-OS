@@ -108,25 +108,28 @@ export function PackView({
         </button>
       </div>
 
-      <header className="relative overflow-hidden rounded-(--radius-panel) bg-gradient-to-br from-red-600 via-red-600 to-rose-700 p-4 text-white sm:p-5">
-        <span aria-hidden="true" className="pointer-events-none absolute -top-14 -right-10 size-44 rounded-full bg-white/10" />
-        <div className="relative flex flex-col gap-1">
-          <p className="t-meta font-semibold text-white/90">{rank > 0 ? `이번 주 키워드 ${rank}번` : rank < 0 ? '고정 키워드' : '직접 고른 주제'}</p>
-          <HintTip tip="이 키워드 하나로 만든 묶음이에요 — 아래 칸마다 [이 칸 복사] 로 가져가 쓰고, 찍을 거면 [내 콘텐츠에 담기]." label={source.topic} onDark>
-            <h2 className="t-page break-keep text-white [overflow-wrap:anywhere]" data-testid="mk-pack-topic">
+      {/* D-478 빨간 그라데이션 머리 → 흰 칸 + 회색 테두리(박스 색은 하나 · 빨강 = 주의만). 단추: 주 단추 하나(전체 복사) + 나머지 테두리 단추 */}
+      <header className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card) sm:p-5">
+        <div className="flex flex-col gap-1">
+          <p className="t-meta inline-flex items-center gap-1.5 font-semibold text-slate-500">
+            <span aria-hidden="true" className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-bold ${rank > 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>{rank > 0 ? rank : rank < 0 ? '고정' : '직접'}</span>
+            {rank > 0 ? `이번 주 키워드 ${rank}번` : rank < 0 ? '고정 키워드' : '직접 고른 주제'}
+          </p>
+          <HintTip tip="이 키워드 하나로 만든 묶음이에요 — 아래 칸마다 [이 칸 복사] 로 가져가 쓰고, 찍을 거면 [내 콘텐츠에 담기]." label={source.topic}>
+            <h2 className="t-page break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-pack-topic">
               {source.topic}
             </h2>
           </HintTip>
-          <p className="t-sub break-keep text-white/95 [overflow-wrap:anywhere]" data-testid="mk-pack-headline">
+          <p className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]" data-testid="mk-pack-headline">
             추천 제목: {pack.headline}
           </p>
         </div>
-        <div className="relative mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onCopy(packText(pack), '전체 묶음')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-white px-3 font-semibold text-slate-900 shadow-sm hover:bg-white/90" data-testid="mk-pack-copy-all">
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => onCopy(packText(pack), '전체 묶음')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-slate-900 px-3.5 font-semibold text-white shadow-sm hover:bg-slate-800" data-testid="mk-pack-copy-all">
             <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
           </button>
           {savedHref ? (
-            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-white/15 px-3 font-semibold text-white ring-1 ring-white/40 hover:bg-white/25" data-testid="mk-pack-open-idea">
+            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-open-idea">
               <ExternalLink aria-hidden="true" className="size-4" /> 내 콘텐츠에서 보기
             </Link>
           ) : null}
@@ -136,7 +139,7 @@ export function PackView({
               onClick={() => setWhyOpen((v) => !v)}
               aria-expanded={whyOpen}
               aria-controls="mk-pack-why"
-              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-white/15 px-3 font-semibold text-white ring-1 ring-white/40 hover:bg-white/25"
+              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
               data-testid="mk-pack-why-toggle"
             >
               <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${whyOpen ? 'rotate-180' : ''}`} /> {whyOpen ? '접기' : '왜 이 키워드? · 관련 영상 펼쳐보기'}
@@ -147,7 +150,7 @@ export function PackView({
               type="button"
               onClick={() => void save()}
               disabled={saving}
-              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-white/15 px-3 font-semibold text-white ring-1 ring-white/40 hover:bg-white/25 disabled:opacity-60"
+              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
               data-testid="mk-pack-save"
             >
               <BookmarkPlus aria-hidden="true" className="size-4" /> {savedHref ? '대본 다시 저장' : '내 콘텐츠에 담기'}
@@ -155,7 +158,7 @@ export function PackView({
           )}
         </div>
         {whySlot && whyOpen && (
-          <div id="mk-pack-why" className="relative mt-3 rounded-xl bg-white p-3 text-slate-900 shadow-sm sm:p-4" data-testid="mk-pack-why">
+          <div id="mk-pack-why" className="mt-3 border-t border-slate-100 pt-3 text-slate-900" data-testid="mk-pack-why">
             {whySlot}
           </div>
         )}
@@ -167,7 +170,7 @@ export function PackView({
         {pack.sections.map((x) => {
           const L = SECTION_LOOK[x.id]
           return (
-            <button key={x.id} type="button" onClick={() => go(x.id)} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 font-semibold whitespace-nowrap text-slate-700 hover:border-red-300" data-testid="mk-pack-chip">
+            <button key={x.id} type="button" onClick={() => go(x.id)} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 font-semibold whitespace-nowrap text-slate-700 hover:border-brand-400" data-testid="mk-pack-chip">
               <L.icon aria-hidden="true" className="size-4" />
               {x.label}
               {x.id === 'checks' && pack.holes > 0 && <span className="t-meta rounded-full bg-amber-100 px-1.5 font-bold text-amber-900">{pack.holes}</span>}

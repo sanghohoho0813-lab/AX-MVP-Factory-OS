@@ -8,6 +8,7 @@
  * D-295 대표가 준 아이콘(마케팅 한 장 — config/iconSlots 'mk-*'): 찍을 것 = YouTube · 스레드 = Threads · 릴스 · 틱톡 = Reels · TikTok ·
  *   블로그 · 플레이스 = 블로그 실제 로고, 나머지(인기 · 채널 · 분석 · 내 콘텐츠 · 홈페이지)는 입체 아이콘. 여러 색 그림이라 흰 칸 위에 그린다.
  */
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, BarChart3, Clapperboard, Film, Flame, Globe, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
@@ -43,13 +44,28 @@ const TOOLS: Array<Item & { to: string; on: string }> = [
   { key: 'homepage', label: '홈페이지 만들기', short: '홈페이지', icon: slotIcon('mk-homepage', Globe), to: '/tools/homepage', on: 'from-emerald-700 to-teal-700' },
 ]
 
+/*
+ * D-478 대표 "마케팅 · 브랜딩 — 돈 받고 팔아도 될 만큼" — 휴대폰에서 목차가 첫 화면의 절반(약 250px · 아이콘 위 · 글자 아래 두 줄 9칸)을 먹었다.
+ *  - 휴대폰(sm 아래): 한 줄 가로 넘김 띠(칸마다 아이콘 + 짧은 이름 · 지금 화면은 파란 테두리 · 처음 열 때 지금 칸이 보이게 띠를 옮긴다).
+ *    두 묶음(콘텐츠 레이더 · 만들기)은 띠 안 작은 이름표로 — 묶음 칸은 display: contents 로 풀어 한 줄에 둔다(같은 단추 하나 — 시험 이름 · 순서 그대로).
+ *  - PC(sm 이상): 예전 두 줄 그대로(위 레이더 · 아래 만들기 칸 — D-282 · D-354).
+ */
 const cls = (on: boolean) =>
-  // 휴대폰: 아이콘 위 · 글자 아래(3칸 × 3줄 — D-273 스레드 · 릴스 · 틱톡이 늘어 9칸. 칸이 좁아도 글자가 잘리지 않게, 넘치면 줄바꿈) / sm 이상: 한 줄
-  `tap t-sub inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 py-1.5 text-center leading-tight font-semibold break-keep sm:min-w-max sm:flex-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 sm:whitespace-nowrap ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'text-slate-600 hover:bg-slate-50'}`
+  `tap t-sub inline-flex min-h-11 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 text-center leading-tight font-semibold whitespace-nowrap sm:min-w-max sm:flex-auto sm:flex-row sm:gap-1.5 sm:rounded-[8px] sm:border-transparent sm:px-3 sm:py-2 ${on ? 'border-brand-500 bg-white text-brand-700 ring-2 ring-brand-100 sm:bg-brand-50 sm:ring-1 sm:ring-brand-200' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`
 
 /** D-282 만들기 칸 — 흰 칸 + 형식 색 아이콘. 지금 화면이면 테두리 강조 */
 const makeCls = (on: boolean) =>
-  `tap t-sub flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-(--radius-control) border px-1.5 py-1.5 leading-tight font-semibold break-keep sm:flex-row sm:justify-start sm:gap-2 sm:px-2.5 ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`
+  `tap t-sub flex min-h-11 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 leading-tight font-semibold whitespace-nowrap sm:min-h-12 sm:min-w-0 sm:shrink sm:flex-row sm:justify-start sm:gap-2 sm:rounded-(--radius-control) sm:px-2.5 sm:py-1.5 sm:whitespace-normal sm:break-keep ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`
+
+/** 휴대폰 띠 안 묶음 이름표 · PC 왼쪽 이름 칸 */
+function GroupLabel({ long, short }: { long: string; short: string }) {
+  return (
+    <span className="t-meta flex shrink-0 items-center font-semibold whitespace-nowrap text-slate-500 max-sm:snap-start max-sm:px-1 max-sm:text-[0.6875rem] sm:w-[6.5rem]">
+      <span className="sm:hidden">{short}</span>
+      <span className="max-sm:hidden">{long}</span>
+    </span>
+  )
+}
 
 function Label({ it }: { it: Item }) {
   const Icon = it.icon
@@ -77,6 +93,16 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
   const pilot = useIsPilot()
   // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
   const open = usePilotMarketing() === 'open'
+  const strip = useRef<HTMLDivElement>(null)
+  // D-478 휴대폰 띠 — 처음 열 때 지금 칸이 화면 안에 오게(띠만 옮긴다 · 화면은 그대로)
+  useEffect(() => {
+    const el = strip.current
+    if (!el || el.scrollWidth <= el.clientWidth + 1) return
+    const on = el.querySelector<HTMLElement>('[aria-selected="true"], [aria-current="page"]')
+    if (!on) return
+    const left = on.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft
+    el.scrollLeft = Math.max(0, left - (el.clientWidth - on.offsetWidth) / 2)
+  }, [active])
   // 도구 화면에서 마케팅이 닫힌 팀장(Pilot)에게는 그리지 않는다
   if (pilot && !open && !onRadar) return null
   const tools = pilot ? TOOLS.filter((t) => t.key === 'threads' || t.key === 'shorts') : TOOLS
@@ -85,47 +111,50 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
    * 칸 순서 · 시험 이름 · 주소는 그대로(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 → 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지).
    */
   return (
-    <nav aria-label="마케팅 · 브랜딩 목차" className="flex flex-col gap-2" data-testid="mk-tabs">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-        <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">콘텐츠 레이더</span>
-        <div className="grid min-w-0 flex-1 grid-cols-5 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:flex sm:flex-wrap">
-          {RADAR_VIEWS.map((it) =>
-            onRadar ? (
-              <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={cls(active === it.key)}>
-                <Label it={it} />
-              </button>
-            ) : (
-              <Link key={it.key} to={it.key === 'plan' ? '/marketing' : `/marketing?view=${it.key}`} className={cls(false)} data-testid={`mk-tab-${it.key}`}>
-                <Label it={it} />
-              </Link>
-            ),
-          )}
+    <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs">
+      <div ref={strip} data-testid="mk-tabs-strip" className="flex gap-1.5 max-sm:snap-x max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none] sm:flex-col sm:gap-2">
+        <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
+          <GroupLabel long="콘텐츠 레이더" short="레이더" />
+          <div className="max-sm:contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:gap-1 sm:rounded-(--radius-control) sm:border sm:border-slate-200 sm:bg-white sm:p-1">
+            {RADAR_VIEWS.map((it) =>
+              onRadar ? (
+                <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={cls(active === it.key)}>
+                  <Label it={it} />
+                </button>
+              ) : (
+                <Link key={it.key} to={it.key === 'plan' ? '/marketing' : `/marketing?view=${it.key}`} className={cls(false)} data-testid={`mk-tab-${it.key}`}>
+                  <Label it={it} />
+                </Link>
+              ),
+            )}
+          </div>
         </div>
+        {(!pilot || open) && (
+          <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
+            <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-slate-200 sm:hidden" />
+            <GroupLabel long="만들기" short="만들기" />
+            {/* D-354 넓은 화면 4칸은 칸이 좁아 이름 · 설명이 서너 줄로 접혔다 — 칸 폭(@container)이 넉넉할 때만 4칸, 아니면 2칸에 한 줄씩 */}
+            <div className="max-sm:contents sm:@container sm:min-w-0 sm:flex-1">
+              <div className={`max-sm:contents sm:grid sm:min-w-0 sm:gap-1.5 ${tools.length < TOOLS.length ? 'sm:grid-cols-2' : 'sm:grid-cols-2 sm:@[70rem]:grid-cols-4'}`}>
+                {tools.map((it) => (
+                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
+                    <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1] sm:size-9">
+                      <it.icon className="size-5 sm:size-8" />
+                    </span>
+                    <span className="min-w-0 text-center sm:text-left">
+                      <span className="lg:hidden">{it.short}</span>
+                      <span className="hidden min-w-0 flex-col leading-tight lg:flex">
+                        <span className="truncate">{it.label}</span>
+                        {it.sub && <span className="t-meta truncate font-normal text-slate-500">{it.sub}</span>}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      {(!pilot || open) && (
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-          <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem]">만들기</span>
-          {/* D-354 넓은 화면 4칸은 칸이 좁아 이름 · 설명이 서너 줄로 접혔다 — 칸 폭(@container)이 넉넉할 때만 4칸, 아니면 2칸에 한 줄씩 */}
-          <div className="@container min-w-0 flex-1">
-          <div className={`grid min-w-0 gap-1.5 ${tools.length < TOOLS.length ? 'grid-cols-2' : 'grid-cols-4 sm:grid-cols-2 sm:@[70rem]:grid-cols-4'}`}>
-            {tools.map((it) => (
-              <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
-                <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1]">
-                  <it.icon className="size-8" />
-                </span>
-                <span className="min-w-0 text-center sm:text-left">
-                  <span className="lg:hidden">{it.short}</span>
-                  <span className="hidden min-w-0 flex-col leading-tight lg:flex">
-                    <span className="truncate">{it.label}</span>
-                    {it.sub && <span className="t-meta truncate font-normal text-slate-500">{it.sub}</span>}
-                  </span>
-                </span>
-              </Link>
-            ))}
-          </div>
-          </div>
-        </div>
-      )}
     </nav>
   )
 }

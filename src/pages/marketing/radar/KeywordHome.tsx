@@ -96,12 +96,12 @@ export function KeywordHome({
   const list = (keywords ?? []).slice(0, HOME_MAX)
   return (
     <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" aria-labelledby="mk-home-title" data-testid="mk-home">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-3">
-        {/* D-370 빨간 띠 대신 흰 칸 · 제목 글자만 빨강(강조는 글자색 하나) */}
-        <Flame aria-hidden="true" className="size-6 shrink-0 text-red-600" />
-        <div className="min-w-0 flex-1 basis-40">
+      <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
+        {/* D-478 불꽃 아이콘을 제목 줄 안으로(예전: 왼쪽 칸을 따로 먹어 휴대폰에서 설명이 세 줄로 꺾임) · 제목은 검정(빨강 = 주의 · 늦음만) */}
+        <div className="min-w-0 flex-1">
           <HintTip tip="고정 키워드 다섯은 우리 본업 주제라 늘 그 자리예요(칩 = 기업마당 이번 주 새 공고 수 · 매일 아침 9시). 이번 주 키워드는 경제 · 경영 · AI 벤치마킹 채널에서 최근 2주 동안 여러 곳이 함께 다루고 평소보다 잘된 주제예요(규칙 계산 · 6시간마다 새로). 근거는 화면 아래 [자세히 보기] 에 있어요." label="이번 주 키워드">
-            <h2 id="mk-home-title" className="t-section text-red-700">
+            <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
+              <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
               이번 주 키워드
             </h2>
           </HintTip>
@@ -125,7 +125,7 @@ export function KeywordHome({
           onClick={() => setHelp((v) => !v)}
           aria-expanded={help}
           aria-label="사용 방법"
-          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 self-start rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50 sm:self-center"
+          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50"
           data-testid="mk-howto-toggle"
         >
           <CircleHelp aria-hidden="true" className="size-4" /> <span className="hidden sm:inline">사용 방법</span>
@@ -136,7 +136,7 @@ export function KeywordHome({
         <ol className="flex flex-col gap-2 border-b border-slate-100 bg-white px-4 py-3" data-testid="mk-howto">
           {HOW_TO.map((h, i) => (
             <li key={h.title} className="flex gap-2.5">
-              <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-red-600 font-bold text-white">
+              <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
                 {i + 1}
               </span>
               <p className="t-sub min-w-0 break-keep text-slate-800">
@@ -153,7 +153,7 @@ export function KeywordHome({
         {fixed.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
             <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
-              <Pin aria-hidden="true" className="size-3.5 text-red-600" /> 고정 키워드 <span className="font-normal text-slate-500">· 우리 본업 — 늘 이 자리</span>
+              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 고정 키워드 <span className="font-normal text-slate-500">· 우리 본업 — 늘 이 자리</span>
             </p>
             <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-5" data-testid="mk-fixed-keys">
               {fixed.map((k) => (
@@ -161,7 +161,7 @@ export function KeywordHome({
                   <button
                     type="button"
                     onClick={() => onPick(k.key)}
-                    className="tap flex min-h-14 w-full min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-left hover:border-emerald-400 hover:bg-emerald-50"
+                    className="tap flex h-full min-h-14 w-full min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-left transition-colors hover:border-brand-400 hover:shadow-sm"
                     data-testid="mk-fixed-key"
                     data-key={k.key}
                   >
@@ -185,7 +185,7 @@ export function KeywordHome({
           </div>
         )}
         <p className="t-meta -mb-1.5 flex items-center gap-1 font-bold text-slate-700">
-          <Flame aria-hidden="true" className="size-3.5 text-red-600" /> 이번 주 키워드 <span className="font-normal text-slate-500">· 유튜브에서 지금 뜨는 것</span>
+          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 키워드 <span className="font-normal text-slate-500">· 유튜브에서 지금 뜨는 것</span>
         </p>
         {change && list.length > 0 && (
           <p className="t-meta break-keep rounded-lg bg-slate-50 px-3 py-1.5 text-slate-700 sm:py-2 sm:text-[0.9375rem]" data-testid="mk-change">
@@ -196,14 +196,15 @@ export function KeywordHome({
           <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="mk-keys">
             {list.map((k, i) => (
               <li key={k.key} className="min-w-0">
+                {/* D-478 칸 높이를 한 줄에서 맞춘다(h-full) · 1번은 분홍 바탕 대신 흰 칸 + 진한 테두리(박스 색은 하나) */}
                 <button
                   type="button"
                   onClick={() => onPick(k.key)}
-                  className={`tap group flex min-h-14 w-full min-w-0 items-center gap-2 rounded-xl border-2 px-2 py-2 text-left transition-colors sm:min-h-16 sm:gap-3 sm:px-3 sm:py-2.5 ${i === 0 ? 'border-red-400 bg-red-50 hover:border-red-500' : 'border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/50'}`}
+                  className={`tap group flex h-full min-h-14 w-full min-w-0 items-center gap-2 rounded-xl border bg-white px-2 py-2 text-left transition-colors sm:min-h-16 sm:gap-3 sm:px-3 sm:py-2.5 ${i === 0 ? 'border-slate-900 ring-1 ring-slate-900 hover:shadow-sm' : 'border-slate-200 hover:border-brand-400 hover:shadow-sm'}`}
                   data-testid="mk-key"
                   data-key={k.key}
                 >
-                  <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold sm:text-base sm:size-9 ${i === 0 ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                  <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold sm:text-base sm:size-9 ${i === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
                     {i + 1}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -220,7 +221,7 @@ export function KeywordHome({
                         </span>
                       )}
                       {fresh?.has(k.key) && (
-                        <span className="t-meta rounded-full bg-red-600 px-2 py-0.5 font-bold text-white" data-testid="mk-key-new">
+                        <span className="t-meta rounded-full bg-brand-600 px-2 py-0.5 font-bold text-white" data-testid="mk-key-new">
                           새로
                         </span>
                       )}
@@ -231,7 +232,7 @@ export function KeywordHome({
                       )}
                     </span>
                   </span>
-                  <ArrowRight aria-hidden="true" className="hidden size-5 shrink-0 text-red-500 transition-transform group-hover:translate-x-0.5 sm:block" />
+                  <ArrowRight aria-hidden="true" className="hidden size-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600 sm:block" />
                 </button>
               </li>
             ))}
@@ -250,7 +251,7 @@ export function KeywordHome({
           }}
           data-testid="mk-custom"
         >
-          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-100">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
             <PenLine aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
             <span className="sr-only">직접 주제 쓰기</span>
             <input

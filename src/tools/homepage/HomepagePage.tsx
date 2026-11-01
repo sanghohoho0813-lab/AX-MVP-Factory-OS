@@ -45,7 +45,7 @@ function ClientPicker() {
       tone="emerald"
       headIcon={<Globe className="size-5" />}
       title="누구 홈페이지인가요?"
-      desc="계약 고객 · 잠재고객 · 컨설턴트를 고르면 그 기록으로 초안을 바로 만들어요. 업체 상세의 [홈페이지 만들기] 로 와도 같아요."
+      desc="업체를 고르면 그 기록으로 홈페이지 초안을 바로 만들어요."
     />
   )
 }

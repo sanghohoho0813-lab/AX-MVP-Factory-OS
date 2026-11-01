@@ -169,7 +169,7 @@ export function SubjectPicker({
       <div className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${t.line} ${t.soft}`} data-testid="trial-start">
         <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>
           <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
-          고객 관리에 없어도 돼요 — 우리 회사(미래AI랩) · 잠재고객 · 동료 컨설턴트 · 가상의 업체로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
+          고객 관리에 없어도 돼요 — 미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
         </p>
         <div className="flex flex-wrap gap-2">
           {/* D-239 대표 "미래AI랩으로 만들기도 있었으면 — 기록이 다 쌓이게" */}

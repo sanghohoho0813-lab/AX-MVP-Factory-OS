@@ -173,7 +173,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
           aria-label="AI 도우미"
           data-testid="ai-assist-bar"
           data-ai-assist="bar"
-          className={`flex min-w-0 flex-wrap items-center gap-2 rounded-(--radius-panel) border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-fuchsia-50 px-3 py-2.5 ${className}`}
+          // D-478 휴대폰은 띠가 세 줄(약 160px)로 쌓였다 — 한 줄 가로 넘김(PC 는 그대로 줄바꿈)
+          className={`flex min-w-0 flex-wrap items-center gap-2 rounded-(--radius-panel) border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-fuchsia-50 px-3 py-2.5 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[scrollbar-width:none] ${className}`}
         >
           <OpenButton label={label} onClick={() => openWith(null)} />
           {list.slice(0, quick).map((p, i) => (
@@ -183,7 +184,7 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
               data-testid="ai-assist-chip"
               data-assist={p.id}
               onClick={() => openWith(p.id)}
-              className={`tap t-sub min-h-10 max-w-full min-w-0 items-center rounded-full border border-violet-300 bg-white px-3 py-1.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 ${i === 0 ? 'inline-flex' : 'hidden sm:inline-flex'}`}
+              className={`tap t-sub min-h-10 max-w-full min-w-0 items-center rounded-full border border-violet-300 bg-white px-3 py-1.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 max-sm:max-w-none max-sm:shrink-0 max-sm:whitespace-nowrap ${i === 0 ? 'inline-flex' : 'hidden sm:inline-flex'}`}
             >
               {p.label}
             </button>
@@ -194,7 +195,7 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
               type="button"
               data-testid="ai-assist-ask-chip"
               onClick={() => openWith(ASK_FIRST)}
-              className="tap t-sub inline-flex min-h-10 max-w-full min-w-0 items-center gap-1 rounded-full border border-dashed border-violet-400 bg-white px-3 py-1.5 font-semibold break-keep text-violet-800 hover:bg-violet-100"
+              className="tap t-sub inline-flex min-h-10 max-w-full min-w-0 items-center gap-1 rounded-full border border-dashed border-violet-400 bg-white px-3 py-1.5 font-semibold break-keep text-violet-800 hover:bg-violet-100 max-sm:max-w-none max-sm:shrink-0 max-sm:whitespace-nowrap"
             >
               직접 묻기
             </button>
