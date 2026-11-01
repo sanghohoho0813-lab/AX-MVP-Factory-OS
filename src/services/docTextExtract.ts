@@ -212,9 +212,26 @@ async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn
   })
   try {
     const canvas = input instanceof Blob ? await imageToCanvas(input) : input
-    const { data } = await worker.recognize(canvas ?? input, {}, { text: true, blocks: true })
+    // D-451 기울어진 사진(휴대폰으로 비스듬히) — 글자 인식기가 기울기를 재어 바로잡고 읽는다. 4도 기울기 · 그림자 사진에서 주소 · 번지가 틀리던 것
+    const { data } = await worker.recognize(canvas ?? input, { rotateAuto: true }, { text: true, blocks: true, imageColor: true })
     const text = data.text ?? ''
     if (!canvas) return text
+    // 바로잡았으면 번호를 다시 읽을 칸도 바로잡은 그림에서 자른다(칸 위치는 그 그림 기준)
+    let cropSrc: HTMLCanvasElement = canvas
+    const turned = (data as { rotateRadians?: number | null }).rotateRadians
+    if (turned && data.imageColor) {
+      try {
+        const bmp = await createImageBitmap(await (await fetch(data.imageColor)).blob())
+        const c = document.createElement('canvas')
+        c.width = bmp.width
+        c.height = bmp.height
+        c.getContext('2d')?.drawImage(bmp, 0, 0)
+        bmp.close()
+        cropSrc = c
+      } catch {
+        cropSrc = canvas
+      }
+    }
     const lines: OcrLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.map((l) => ({ text: l.text, bbox: l.bbox, words: l.words.map((w) => ({ text: w.text, bbox: w.bbox })) }))))
     const boxes = numberBoxes(lines)
     if (boxes.length === 0) return `${text}\n${REREAD_MARK}`
@@ -223,7 +240,7 @@ async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn
     const reads: string[] = []
     for (const b of boxes) {
       for (const scale of [2, 3]) {
-        const r = await worker.recognize(cropScaled(canvas, b, scale))
+        const r = await worker.recognize(cropScaled(cropSrc, b, scale))
         const t = (r.data.text ?? '').replace(/\s+/g, ' ').trim()
         if (t) reads.push(t)
       }

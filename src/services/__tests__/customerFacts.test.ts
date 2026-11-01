@@ -2916,5 +2916,12 @@ await (async () => {
   check('D-449 맨 위 카드 — "설립일 · 설립일(창업일)" 은 "설립일" 한 번', JSON.stringify(waitingLabels(['설립일', '설립일(창업일)', '업종'])) === JSON.stringify(['설립일', '업종']))
 }
 
+// D-451 흐린 사진 — '개업연월일' 이 'HEAR' 로 깨져도 대표자 줄과 소재지 줄 사이의 날짜 하나면 개업일
+{
+  const T = (label: string) => ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', `${label} : 2019 년 03 월 15 일`, '사업장 소재지 : 경기도 성남시 분당구 판교로 100', '2019 년 03 월 18 일', '성남세무서장'].join('\n')
+  check('D-451 "HEAR : 2019 년 03 월 15 일"(깨진 이름표) → 설립일 2019-03-15(예전: 없음)', parseKoreanBusinessDocument(T('HEAR')).establishedAt === '2019-03-15', parseKoreanBusinessDocument(T('HEAR')).establishedAt)
+  check('D-451 한글 이름표(생년월일)면 개업일로 보지 않음', parseKoreanBusinessDocument(T('생년월일')).establishedAt === undefined, parseKoreanBusinessDocument(T('생년월일')).establishedAt)
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

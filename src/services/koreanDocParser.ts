@@ -385,6 +385,17 @@ function findEstablishedAt(t: string, source: DocSource): string | undefined {
     const d = parseKoreanDate(v)
     if (d) return d
   }
+  // D-451 흐린 사진에서 '개업연월일' 글자가 깨짐('HEAR : 2019 년 03 월 15 일') — 사업자등록증의 '대표자(성명)' 줄과 '사업장 소재지' 줄 사이,
+  //        이름표가 한글로 읽히지 않은 '…: 날짜' 줄 하나만 개업일로 본다(생년월일 · 발급일 같은 한글 이름표는 아님)
+  if (source === 'business_registration') {
+    const lines = t.split('\n')
+    const ceoAt = lines.findIndex((l) => /대\s*표\s*자|성\s*명/.test(l))
+    const addrAt = lines.findIndex((l) => /소\s*재\s*지/.test(l))
+    if (ceoAt >= 0 && addrAt > ceoAt) {
+      const hits = lines.slice(ceoAt + 1, addrAt).map((l) => /^([^:：]{1,14})[:：]\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/.exec(l.trim())).filter((m): m is RegExpExecArray => !!m && !/[가-힣]/.test(m[1]))
+      if (hits.length === 1) return parseKoreanDate(hits[0][2])
+    }
+  }
   return undefined
 }
 

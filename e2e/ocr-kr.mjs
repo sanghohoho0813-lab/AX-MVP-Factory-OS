@@ -126,6 +126,22 @@ async function upload(id, company, files) {
   check('D 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 
+/* ---------------- E 휴대폰 사진처럼 — 4도 기울기 · 그림자 · 흐림(D-451) ---------------- */
+{
+  const photo = async (name, deg, bg, filter) => {
+    const p = await browser.newPage({ viewport: { width: 1240, height: 1754 } })
+    const L = ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2019 년 03 월 15 일', '사업장 소재지 : 경기도 성남시 분당구 판교로 100', '업태 : 제조업   종목 : 의약품', '성남세무서장']
+    await p.setContent(`<html><body style="margin:0;background:#ccc"><div style="transform:rotate(${deg}deg);margin:40px;padding:60px;${FONT};font-size:38px;line-height:1.75;color:#222;background:${bg};filter:${filter}">${L.join('<br>')}</div></body></html>`)
+    const buf = await p.screenshot({ type: 'jpeg', quality: 70 })
+    await p.close()
+    return { name, mimeType: 'image/jpeg', buffer: buf }
+  }
+  for (const [tag, deg, bg, filter] of [['4도 기울기', 4, '#fbfbf8', 'none'], ['그림자', 1.5, 'linear-gradient(115deg,#f4f1e8 0%,#d9d4c6 55%,#9c968a 100%)', 'none'], ['흐림', 1, '#fbfbf8', 'blur(1.2px)']]) {
+    const r = await upload(`cli_ocrE${deg}`, '미래바이오랩', [await photo('IMG_0001.jpg', deg, bg, filter)])
+    check(`E ${tag} 사진 — 사업자등록증 칸 · 사업자등록번호 바로 입력(두 번 읽어 같음) · 주소 '성남시 … 판교로 100' · 설립일 2019-03-15(확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && /설립일 2019-03-15/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+  }
+}
+
 await browser.close()
 console.log(`\n진짜 한글 스캔: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
