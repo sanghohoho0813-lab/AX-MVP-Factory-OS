@@ -2,7 +2,7 @@
  * 확인할 것 (D-158) — 모든 업체에서 프로그램이 준비한 것을 한 화면에.
  * 대표는 '맞아요 / 아니에요' 만 고른다. 서류를 올리면 여기로 결정 거리가 모인다.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCheck } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -11,10 +11,11 @@ import { Button } from '../components/ui/Button'
 import { Blank } from '../components/ui/primitives'
 import { useToast } from '../components/ui/toastContext'
 import { DecisionList, useDecisionAnswer } from '../components/ops/DecisionList'
+import { NO_DECISIONS, useAllDecisionsState } from '../components/ops/useAllDecisions'
 import { useGrantData } from '../components/grants/useGrants'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { listClients, saveClient } from '../services/clientOpsService'
-import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, buildAllDecisions, type DecisionKind } from '../services/decisions'
+import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, type DecisionKind } from '../services/decisions'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 
@@ -40,7 +41,10 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
       .finally(() => setLoaded(true))
   }, [workspaceId, showToast])
 
-  const all = useMemo(() => buildAllDecisions(records, today, notices, usable), [records, today, notices, usable])
+  // D-479 업체가 많으면(60곳 넘게) 나눠서 모은다 — 모으는 동안 화면은 움직이고, 다 모이면 목록이 뜬다
+  const { list, pending } = useAllDecisionsState(records, today, notices, usable)
+  const all = list ?? NO_DECISIONS
+  const gathering = pending && all.length === 0
   const shown = kind === 'all' ? all : all.filter((d) => d.kind === kind)
   const { answer, answerMany, busy } = useDecisionAnswer({
     workspaceId,
@@ -68,7 +72,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
         description="올린 서류 · 업체 기록 · 받아 둔 공고를 읽고 프로그램이 먼저 준비했습니다. 맞으면 [맞아요], 아니면 [아니에요] 만 누르세요."
       />
       <p className="t-body text-slate-700" data-testid="decide-summary">
-        {loaded ? (all.length ? <><b className="font-bold text-slate-900">{clients}곳</b>에서 <b className="font-bold text-brand-700">{all.length}건</b> 확인할 것이 있습니다.</> : '지금 확인할 것이 없습니다.') : '불러오는 중…'}
+        {loaded && !gathering ? (all.length ? <><b className="font-bold text-slate-900">{clients}곳</b>에서 <b className="font-bold text-brand-700">{all.length}건</b> 확인할 것이 있습니다.</> : '지금 확인할 것이 없습니다.') : loaded ? `업체 ${records.length}곳에서 확인할 것을 모으는 중…` : '불러오는 중…'}
       </p>
       {all.length > 0 && (
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="종류">
@@ -101,7 +105,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
           </Button>
         </div>
       )}
-      {loaded && all.length === 0 ? (
+      {loaded && !gathering && all.length === 0 ? (
         <Blank
           title="지금 확인할 것이 없습니다. 업체에 서류를 올리면 프로그램이 읽고 맞는지 물어볼 것을 여기로 가져옵니다."
           icon={<CheckCheck className="size-7" />}
@@ -112,7 +116,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
           }
         />
       ) : (
-        shown.length > 0 && <DecisionList decisions={shown} busy={busy} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
+        shown.length > 0 && <DecisionList decisions={shown} busy={busy} resetKey={kind} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
       )}
     </div>
   )

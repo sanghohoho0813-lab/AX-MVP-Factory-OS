@@ -15,6 +15,19 @@ const SLICE_MS = 12
 export const NO_DECISIONS: Decision[] = []
 
 export function useAllDecisions(clients: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable: (key: string) => boolean): Decision[] | null {
+  return useAllDecisionsState(clients, today, notices, usable).list
+}
+
+/**
+ * 확인할 것 모두 보기 화면용 — pending 이면 아직 모으는 중(빈 목록이어도 '없음' 이라고 하지 않는다).
+ * list 는 다 모인 목록, 모으는 중이면 직전 목록(없으면 null).
+ */
+export function useAllDecisionsState(
+  clients: readonly ClientOpsRecord[],
+  today: string,
+  notices: readonly GrantNotice[],
+  usable: (key: string) => boolean,
+): { list: Decision[] | null; pending: boolean } {
   const [tick, setTick] = useState(0)
   const missing = useMemo(() => {
     void tick
@@ -40,5 +53,5 @@ export function useAllDecisions(clients: readonly ClientOpsRecord[], today: stri
       window.clearTimeout(handle)
     }
   }, [missing, clients, today, notices, usable])
-  return list ?? last.current
+  return { list: list ?? last.current, pending: list === null }
 }

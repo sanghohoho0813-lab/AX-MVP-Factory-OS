@@ -20,6 +20,7 @@ import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
 import { Fold } from '../ui/fold'
 import { NO_DECISIONS, useAllDecisions } from './useAllDecisions'
+import { useGrowingCount } from '../../lib/useGrowingCount'
 
 const KIND_CLASS: Record<DecisionKind, string> = {
   fact: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700',
@@ -307,6 +308,7 @@ export function DecisionList({
   showClient = true,
   limit,
   linked,
+  resetKey,
 }: {
   decisions: Decision[]
   busy: string | null
@@ -315,8 +317,12 @@ export function DecisionList({
   limit?: number
   /** D-161: 고객 플랫폼이 연결된 업체 — 서류 요청은 고객 화면에도 올라간다고 단추에 밝힌다 */
   linked?: (clientId: string) => boolean
+  /** D-479 바뀌면(종류 칩) 처음 40건부터 다시 */
+  resetKey?: unknown
 }) {
-  const shown = limit ? decisions.slice(0, limit) : decisions
+  // D-479 limit 이 없으면 40건씩 — 업체 1,000곳이면 5,000건을 한 번에 그리느라 화면이 멈췄다(순서 · 모양은 그대로)
+  const [growCount, moreRef] = useGrowingCount(limit ? 0 : decisions.length, resetKey, 40)
+  const shown = limit ? decisions.slice(0, limit) : decisions.slice(0, growCount)
   // D-182: 펼친 공고 하나(다시 누르면 접힌다)
   const [openId, setOpenId] = useState<string | null>(null)
   // D-183: 고르는 결정 — 고른 칸(결정마다)
@@ -401,6 +407,11 @@ export function DecisionList({
           {!d.grant && d.rows && openId === `${d.clientId}:${d.id}` && <RowsPanel rows={d.rows} />}
         </li>
       ))}
+      {!limit && growCount < decisions.length && (
+        <li ref={moreRef} className="t-meta px-4 py-3 text-center text-slate-500" data-testid="decision-more-list" aria-live="polite">
+          아래로 내리면 {decisions.length - growCount}건 더 보여요
+        </li>
+      )}
     </ul>
   )
 }
