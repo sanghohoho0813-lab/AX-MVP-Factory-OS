@@ -31,6 +31,7 @@ import { holdersLine, looksLikeShareholderRegister, readShareholderDoc, type Reg
 import { readRegistryTax, readRetireMultiple } from './registryTax'
 import { ASSUMPTIONS, wonOf } from './taxPlan'
 import { detectDocSource } from './koreanDocParser'
+import { fixOcrHeads } from './docClassify'
 import { parseFinancialStatement } from './finStatementParser'
 import { latestFullYear, looksLikeVatCert, readVatCert, vatSummary } from './vatDoc'
 import { ceoWageReceipt, looksLikePayrollLedger, looksLikeWageReceipt, monthlyPayOf, readLedgerCeoPay, readWageReceipts } from './wageReceipt'
@@ -134,7 +135,8 @@ export async function analyzeUploadedDocs(
 ): Promise<{ record: ClientOpsRecord; summary: DocBatchSummary }> {
   const { now, today, makeId } = opts
   const warnings: string[] = []
-  const readable = docs.filter((d) => d.text.replace(/\s/g, '').length >= 10)
+  // D-452 사진 · 스캔 글은 깨진 제목 · 이름표를 바로잡고 읽는다('숭소기업 확인서' · '유흡기간')
+  const readable = docs.filter((d) => d.text.replace(/\s/g, '').length >= 10).map((d) => (d.method === 'ocr' ? { ...d, text: fixOcrHeads(d.text) } : d))
   // 1. 회사 정보(크레탑 · 명부 글은 회사 정보 읽기에 넣지 않는다 — 그 안의 숫자는 각 엔진이 읽는다)
   const cretopDocs = readable.filter(looksLikeCretop)
   // D-303 주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게 회사 정보 읽기에서 뺀다(주주표로 따로).

@@ -19,7 +19,7 @@ import { NOTE_RECHECK, sameAddress, customFactValue, researchLabOf, withProfileF
 import { fitContext, scenarioFit, withScenarioAnswer } from '../scenarioFit'
 import { scenarioPreset } from '../scenarioPresets'
 import { allDocumentMetas } from '../clientOpsDocuments'
-import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, fuzzyKnownTitle, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
+import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, fixOcrHeads, fuzzyKnownTitle, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
 import { documentStatus, documentsWithExpiry } from '../clientOpsAlerts'
 import { docShelfSummary, dupShelfBases, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfBaseOf, shelfCellOf } from '../docShelf'
@@ -2922,6 +2922,25 @@ await (async () => {
   check('D-451 "HEAR : 2019 년 03 월 15 일"(깨진 이름표) → 설립일 2019-03-15(예전: 없음)', parseKoreanBusinessDocument(T('HEAR')).establishedAt === '2019-03-15', parseKoreanBusinessDocument(T('HEAR')).establishedAt)
   check('D-451 한글 이름표(생년월일)면 개업일로 보지 않음', parseKoreanBusinessDocument(T('생년월일')).establishedAt === undefined, parseKoreanBusinessDocument(T('생년월일')).establishedAt)
 }
+
+// D-452 진짜 한글 스캔 — '단기대여금(가지급금)' · 깨진 제목 · 이름표('숭소기업 확인서' · '유흡기간')
+await (async () => {
+  const FS = parseFinancialStatement(['표준재무제표증명', '재무상태표', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '단기대여금(가지급금) 150,000,000 120,000,000', '자산총계 3,200,000,000 2,900,000,000'].join('\n'))
+  check('D-452 "단기대여금(가지급금)" → 가지급금 1억 5,000만원 · 전기 1억 2,000만원(예전: 못 읽음)', FS?.loanBalance === 150_000_000 && FS?.loanBalancePrev === 120_000_000, JSON.stringify(FS))
+  const plain = parseFinancialStatement(['재무상태표', '(단위 : 원)', '단기대여금 150,000,000 120,000,000', '자산총계 3,200,000,000 2,900,000,000'].join('\n'))
+  check('D-452 괄호 없는 "단기대여금" 은 가지급금 아님(남에게 빌려준 돈일 수 있음)', plain?.loanBalance === undefined, JSON.stringify(plain))
+  const SME = ['숭소기업 확인서', '기업명 주식회사 미래바이오랩', '사업자등록번호 124-81-00998', '기업규모 소기업', '유흡기간 2026.04.01 ~ 2027.03.31', '중소벤처기업부'].join('\n')
+  const fixed = fixOcrHeads(SME)
+  check('D-452 "숭소기업 확인서" → 중소기업확인서 · "유흡기간" → 유효기간', fixed.startsWith('중소기업확인서') && fixed.includes('유효기간 2026.04.01'), fixed)
+  check('D-452 비슷한 다른 이름표(인증번호)는 고치지 않음', fixOcrHeads('ISO 인증서\n인증번호 KR-123').includes('인증번호'))
+  const empty = normalizeClientOps({ id: 'sm452', companyName: '미래바이오랩', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const out = await analyzeUploadedDocs(empty, [{ key: 'smeCertificate', fileName: 'scan.jpg', text: SME, method: 'ocr' as const, docSure: true }], { now: NOW, today: '2026-10-31', makeId: () => `s4${++n}` })
+  const all = [...out.summary.entered, ...out.summary.flagged].map((x) => `${x.label}=${x.display}`).join(' | ')
+  check('D-452 스캔 중소기업 확인서 → "소기업 · … 2027-03-31까지" 를 읽음(예전: 제목 · 유효기간이 깨져 아무것도 못 읽음)', /소기업/.test(all) && /2027-03-31/.test(all), all)
+  const pl = placeDocument({ text: SME, fileName: 'scan.jpg' }, allDocumentMetas(empty))
+  check('D-452 칸 정할 때도 유효기간 끝 2027-03-31', pl.validUntil === '2027-03-31', JSON.stringify(pl))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

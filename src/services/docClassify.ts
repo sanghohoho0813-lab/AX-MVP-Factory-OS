@@ -736,6 +736,34 @@ export function fuzzyKnownTitle(title: string): string | null {
   return best.n
 }
 
+/**
+ * D-452 스캔 글자 인식이 깬 제목 · 이름표를 읽기 전에 바로잡는다 — 맨 위 4줄의 제목('숭소기업 확인서' → 중소기업확인서)과
+ * 줄 맨 앞 이름표('유흡기간' → 유효기간). 이름표는 비슷한 다른 이름표와 헷갈릴 일이 없는 것만(인정번호 ↔ 인증번호 같은 짝은 고치지 않는다).
+ */
+const OCR_LABELS = ['유효기간', '발급일자', '개업연월일', '사업장소재지', '기업규모', '등록번호']
+export function fixOcrHeads(text: string): string {
+  let seen = 0
+  return String(text || '').split('\n').map((line) => {
+    const t = line.trim()
+    if (!t) return line
+    seen += 1
+    if (seen <= 4) {
+      const c = compactTitle(t.replace(/\([^)]{0,20}\)/g, ''))
+      if (/^[가-힣]{4,16}$/.test(c) && !TITLE_TO_KEY.some(([re]) => re.test(c)) && !knownDocForTitle(c)) {
+        const fx = fuzzyKnownTitle(c)
+        if (fx) return fx
+      }
+    }
+    const m = /^([가-힣]{3,6})(?=\s*[:：]|\s)/.exec(t)
+    if (m && !OCR_LABELS.includes(m[1])) {
+      const w = jamoOf(m[1])
+      const best = OCR_LABELS.filter((l) => l.length === m[1].length).map((l) => ({ l, d: editDistance(w, jamoOf(l)), n: jamoOf(l).length })).sort((a, b) => a.d - b.d)[0]
+      if (best && best.d >= 1 && best.d <= (best.n >= 8 ? 2 : 1)) return line.replace(m[1], best.l)
+    }
+    return line
+  }).join('\n')
+}
+
 /** D-148: 제목 → 알려진 서류. 맞는 신호 점수가 3 이상인 것 중 가장 높은 것(같으면 이름이 긴 것 — '지방세 납세증명서' 가 '납세증명서' 보다 먼저) */
 function knownDocForTitle(title: string): (typeof KNOWN_EXTRA_DOCS)[number] | undefined {
   const exact = KNOWN_EXTRA_DOCS.find((k) => compactTitle(k.label) === title)
@@ -754,7 +782,9 @@ export type DocPlacement =
   | { kind: 'new'; label: string; sure: boolean; reason: string; issuedAt: string | null; validUntil?: string | null }
 
 /** 서류 하나 → 어느 칸(있는 칸 · 새 칸 · 기타). D-181: 서류에 유효기간 끝이 찍혀 있으면 함께 */
-export function placeDocument(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
+export function placeDocument(input0: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
+  // D-452 스캔 글자 인식이 깬 제목 · 이름표를 먼저 바로잡는다
+  const input = { ...input0, text: fixOcrHeads(input0.text ?? '') }
   const p = placeDocumentBase(input, metas)
   const text = input.text ?? ''
   const validUntil = compact(text).length >= 10 ? findValidUntil(text) : null
