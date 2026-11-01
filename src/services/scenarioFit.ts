@@ -16,7 +16,7 @@
  */
 import type { ClientOpsRecord, ShareholderRow } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { customFactValue, formatWon, researchLabOf } from './customerFacts'
+import { customFactValue, formatWon, parseWonInput, researchLabOf } from './customerFacts'
 import { continuingOf } from './workRules'
 import { startupRegion } from './clientInsights'
 import { entityKindOf } from './clientOrder'
@@ -449,8 +449,12 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (ageAtStart !== null && ageAtStart <= 34) return no(`대표가 창업 당시 만 ${ageAtStart}세(청년) — 청년 감면이 같거나 더 커요`)
       const { region, over, popDecline } = startupRegion(f.address)
       if (!region) return data('본점 주소를 알면 판단해요(과밀억제권역 · 수도권 일반 창업이 대상)', ['회사 주소'])
-      if (over === 'yes') return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 과밀억제권역 일반 창업은 지금 0%, 벤처 확인이면 50%`)
-      if (region === 'gyeonggi_incheon' && est >= '2026-01-01' && popDecline !== 'yes') return fit(`2026년 창업 · 본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 일반 창업 25%, 벤처 확인이면 50%`)
+      // D-443 재무제표 연구개발비가 5,000만원 이상이면 — 벤처 확인 길(연구개발기업 유형)을 같이(판정은 그대로 · 기업인증에서 확인)
+      const rv = customFactValue(c.record, '연구개발비')
+      const rw = rv ? parseWonInput(/^(?:20\d{2}년\s*)?([^(]+)/.exec(rv)?.[1] ?? '') : null
+      const rndRoute = rw !== null && rw >= 50_000_000 ? ` · 재무제표 연구개발비 ${rv.replace(/\s*\([^)]*\)\s*$/, '')} — 연구개발기업 유형으로 벤처 확인 검토(기업인증)` : ''
+      if (over === 'yes') return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 과밀억제권역 일반 창업은 지금 0%, 벤처 확인이면 50%${rndRoute}`)
+      if (region === 'gyeonggi_incheon' && est >= '2026-01-01' && popDecline !== 'yes') return fit(`2026년 창업 · 본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 일반 창업 25%, 벤처 확인이면 50%${rndRoute}`)
       if (over === 'unknown') return data(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 과밀억제권역인지 동까지 봐야 해요. 창업감면 판정에서 확인해요`, ['본점이 과밀억제권역 안인지'])
       return no('수도권 밖 일반 창업은 이미 50% — 벤처 확인으로 더 오르지 않아요')
     }
