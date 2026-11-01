@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { AiAssist } from '../components/ai/AiAssist'
 import { clientsBundle } from '../services/aiAssist/builders'
@@ -47,7 +47,6 @@ import {
   type ClientSortKey,
 } from '../services/clientOpsSort'
 import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
-import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
@@ -93,6 +92,9 @@ import { handDocsTo } from '../services/docHandoff'
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
+
+// D-481 서류 한꺼번에 올리기 창(글자 읽기 · 서류 분석 엔진)은 카드에서 누를 때 받는다 — 목록 첫 화면이 이것 때문에 무거웠다
+const BulkDocUploadSheet = lazy(() => import('../components/ops/BulkDocUploadSheet').then((m) => ({ default: m.BulkDocUploadSheet })))
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
 function initialClientType(): ClientType {
@@ -1141,11 +1143,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         들어간다 — 목록용 사본을 따로 두지 않는다.
       */}
       {bulkRecord && (
-        <BulkDocUploadSheet
-          record={bulkRecord}
-          onClose={() => setBulkDocsFor(null)}
-          onSaved={(saved) => setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))}
-        />
+        <Suspense fallback={null}>
+          <BulkDocUploadSheet
+            record={bulkRecord}
+            onClose={() => setBulkDocsFor(null)}
+            onSaved={(saved) => setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))}
+          />
+        </Suspense>
       )}
 
       {quick?.kind === 'service' && quickRecord && (

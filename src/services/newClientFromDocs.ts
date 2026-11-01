@@ -22,7 +22,7 @@ import { factCandidatesFromDocText } from './docFacts'
 import { isBizRegCertificate } from './koreanDocParser'
 import { type ReadMethod } from './docAutoFill'
 import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
-import { looksLikeCretop } from './docAutoAnalyze'
+import { looksLikeCretop } from './docSniff'
 import type { HandoffDoc } from './docHandoff'
 
 export type NewClientField = 'companyName' | 'contactName' | 'businessNumber'

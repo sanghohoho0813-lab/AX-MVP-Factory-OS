@@ -94,20 +94,9 @@ export function withUploadSummary(record: ClientOpsRecord, summary: DocBatchSumm
   return withDocUploadLog(record, docUploadLogOf(record, summary, id))
 }
 
-const CRETOP_SIGNAL = /크레탑|CRETOP|한국평가데이터|기업종합보고서|KoDATA/i
-/** 주민등록번호 모양(앞 6 · 뒤 첫 자리) — 명부인지 가리는 데만 쓴다. 저장하지 않는다 */
-const RRN_LIKE = /\d{6}\s*-\s*[1-8]/g
-
-export function looksLikeCretop(doc: Pick<ReadDoc, 'key' | 'text' | 'fileName'>): boolean {
-  if (doc.key === 'cretopReport') return doc.text.length > 300
-  return doc.text.length > 800 && CRETOP_SIGNAL.test(`${doc.fileName} ${doc.text.slice(0, 4000)}`)
-}
-
-export function looksLikeRoster(doc: Pick<ReadDoc, 'key' | 'text' | 'fileName'>): boolean {
-  const n = (doc.text.match(RRN_LIKE) ?? []).length
-  if (doc.key === 'payrollRoster' || doc.key === 'healthInsurance') return n >= 1
-  return n >= 2 && /(가입자|피보험자|취득일|자격\s*취득|명부)/.test(`${doc.fileName} ${doc.text.slice(0, 3000)}`)
-}
+// D-481 크레탑 · 명부 알아보기는 작은 파일에 — 새 업체 등록 창이 이것 때문에 서류 분석 엔진 전체를 받지 않게(여기서 다시 내보낸다)
+export { looksLikeCretop, looksLikeRoster } from './docSniff'
+import { looksLikeCretop, looksLikeRoster } from './docSniff'
 
 /** salesCretop.companyKey 와 같은 규칙 — 크레탑 엔진을 미리 불러오지 않으려고 여기 둔다 */
 function companyKey(name: string): string {
