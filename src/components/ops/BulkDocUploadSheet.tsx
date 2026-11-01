@@ -8,7 +8,7 @@
  * 규칙 계산이다 — 외부 호출 없음. 사진·스캔본은 처음 한 번 한글 인식 준비가 걸린다.
  */
 
-import { DROP_FILE_LIMIT, filesFromDrop, folderOfFile } from '../../lib/dropFiles'
+import { DROP_FILE_LIMIT, dropSameFiles, filesFromDrop, folderOfFile } from '../../lib/dropFiles'
 import { useEffect, useRef, useState } from 'react'
 import { Check, FileUp, FolderUp, Loader2, X } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey, DocumentState } from '../../types/clientOps'
@@ -167,9 +167,13 @@ export function BulkDocUploadSheet({
       showToast(archived)
     }
     if (picked.length === 0) return
+    // D-466 같은 파일이 두 번(겹쳐 받은 '… (1).pdf' · 같은 파일 다시 고름) — 하나만
+    const { kept: unique, dropped } = dropSameFiles(picked, items.map((it) => it.file))
+    if (dropped.length) showToast(`같은 파일이 두 번 들어 있어 한 번만 넣었어요 — ${dropped.slice(0, 3).join(' · ')}${dropped.length > 3 ? ` 외 ${dropped.length - 3}개` : ''}`)
+    if (unique.length === 0) return
     stoppedRef.current = false
     setPhase('reading')
-    const fresh: Item[] = picked.map((file) => ({
+    const fresh: Item[] = unique.map((file) => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       file,
       status: 'queued',

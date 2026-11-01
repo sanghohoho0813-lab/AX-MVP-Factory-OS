@@ -105,3 +105,28 @@ export function folderOfPath(path: string): string {
 export function folderOfFile(file: File): string {
   return folderOfPath(relativePathOf(file))
 }
+
+/**
+ * D-466 같은 파일이 두 번 — 브라우저가 겹쳐 받은 '사업자등록증 (1).pdf' 처럼 이름 끝 '(숫자)' 만 다르고 크기가 같은 파일,
+ * 또는 이름 · 크기가 똑같은 파일은 하나만 넣는다(이미 창에 있는 것과 같아도). 남긴 것 · 뺀 파일 이름.
+ */
+export function sameFileKey(file: { name: string; size: number }): string {
+  const name = file.name.replace(/\s*\(\d{1,3}\)(?=\.[^.]+$)/, '').replace(/\s*\(\d{1,3}\)$/, '').trim().toLowerCase()
+  return `${file.size}|${name}`
+}
+
+export function dropSameFiles<T extends { name: string; size: number }>(files: readonly T[], already: readonly { name: string; size: number }[] = []): { kept: T[]; dropped: string[] } {
+  const seen = new Set(already.map(sameFileKey))
+  const kept: T[] = []
+  const dropped: string[] = []
+  for (const f of files) {
+    const k = sameFileKey(f)
+    if (seen.has(k)) {
+      dropped.push(f.name)
+      continue
+    }
+    seen.add(k)
+    kept.push(f)
+  }
+  return { kept, dropped }
+}

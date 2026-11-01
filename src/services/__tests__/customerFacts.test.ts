@@ -69,7 +69,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs, isStandardBizCategory } from '../docAutoFill'
 import { bizNoChecksumOk } from '../bizNoRead'
 import { pdfItemsToText } from '../pdfTextLines'
-import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
+import { dropSameFiles, filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { readShareholderDoc } from '../shareholderDoc'
@@ -2972,6 +2972,15 @@ await (async () => {
   const typo = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: BIZ('재조업'), method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
   check('D-461 스캔 업태 "재조업"(글자 실수) → 예전처럼 한 번 확인', typo.flagged.some((f) => f.key === 'businessCategory' && f.note === NOTE_OCR))
   check('D-461 업태 이름 — 도매 및 소매업 · 제조업, 도매업 · 서비스 · 전문, 과학 및 기술 서비스업 ✓ / 제조업체 · HEAR · 업 ✗', isStandardBizCategory('도매 및 소매업') && isStandardBizCategory('제조업, 도매업') && isStandardBizCategory('서비스') && isStandardBizCategory('전문, 과학 및 기술 서비스업') && !isStandardBizCategory('제조업체') && !isStandardBizCategory('HEAR') && !isStandardBizCategory('업'))
+})()
+
+// D-466 같은 파일이 두 번 — 겹쳐 받은 '(1)' · 같은 이름 같은 크기는 하나만, 크기가 다르면 다른 파일
+;(() => {
+  const f = (name: string, size: number) => ({ name, size })
+  const r = dropSameFiles([f('사업자등록증.pdf', 1200), f('사업자등록증 (1).pdf', 1200), f('사업자등록증 (2).pdf', 999), f('재무제표.pdf', 5000), f('재무제표.pdf', 5000)], [f('통장.pdf', 10)])
+  check('D-466 겹쳐 받은 "(1)" · 같은 파일 다시 → 하나만 · 크기가 다른 "(2)" 는 남김', r.kept.map((x) => x.name).join(',') === '사업자등록증.pdf,사업자등록증 (2).pdf,재무제표.pdf' && r.dropped.join(',') === '사업자등록증 (1).pdf,재무제표.pdf', JSON.stringify(r))
+  const r2 = dropSameFiles([f('통장.pdf', 10), f('통장(1).pdf', 11)], [f('통장.pdf', 10)])
+  check('D-466 창에 이미 있는 파일과 같으면 뺌', r2.kept.map((x) => x.name).join(',') === '통장(1).pdf' && r2.dropped.join(',') === '통장.pdf')
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
