@@ -202,53 +202,117 @@ function cropScaled(src: HTMLCanvasElement, b: Box, scale: number): HTMLCanvasEl
  * 한국어 OCR — 전체를 한 번 읽고, 번호 줄은 숫자만 다시 두 번(크기 다르게) 읽어 끝에 붙인다.
  * 번호 고르기(bizNoRead)는 본문과 다시 읽은 것이 같은 번호를 말할 때만 '확실' 로 본다.
  */
-async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
-  const { createWorker } = await import('tesseract.js')
-  const worker = await createWorker('kor+eng', undefined, {
-    logger: (m: { status?: string; progress?: number }) => {
-      if (m.status === 'recognizing text') onProgress?.(m.progress ?? 0, '글자 읽는 중')
-      else onProgress?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
-    },
-  })
-  try {
-    const canvas = input instanceof Blob ? await imageToCanvas(input) : input
-    // D-451 기울어진 사진(휴대폰으로 비스듬히) — 글자 인식기가 기울기를 재어 바로잡고 읽는다. 4도 기울기 · 그림자 사진에서 주소 · 번지가 틀리던 것
-    const { data } = await worker.recognize(canvas ?? input, { rotateAuto: true }, { text: true, blocks: true, imageColor: true })
-    const text = data.text ?? ''
-    if (!canvas) return text
-    // 바로잡았으면 번호를 다시 읽을 칸도 바로잡은 그림에서 자른다(칸 위치는 그 그림 기준)
-    let cropSrc: HTMLCanvasElement = canvas
-    const turned = (data as { rotateRadians?: number | null }).rotateRadians
-    if (turned && data.imageColor) {
-      try {
-        const bmp = await createImageBitmap(await (await fetch(data.imageColor)).blob())
-        const c = document.createElement('canvas')
-        c.width = bmp.width
-        c.height = bmp.height
-        c.getContext('2d')?.drawImage(bmp, 0, 0)
-        bmp.close()
-        cropSrc = c
-      } catch {
-        cropSrc = canvas
-      }
-    }
-    const lines: OcrLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.map((l) => ({ text: l.text, bbox: l.bbox, words: l.words.map((w) => ({ text: w.text, bbox: w.bbox })) }))))
-    const boxes = numberBoxes(lines)
-    if (boxes.length === 0) return `${text}\n${REREAD_MARK}`
-    onProgress?.(0.95, '번호를 한 번 더 읽는 중')
-    await worker.setParameters({ tessedit_char_whitelist: '0123456789-', tessedit_pageseg_mode: '7' as never })
-    const reads: string[] = []
-    for (const b of boxes) {
-      for (const scale of [2, 3]) {
-        const r = await worker.recognize(cropScaled(cropSrc, b, scale))
-        const t = (r.data.text ?? '').replace(/\s+/g, ' ').trim()
-        if (t) reads.push(t)
-      }
-    }
-    return `${text}\n${reads.length ? reads.map((t) => `${REREAD_MARK} ${t}`).join('\n') : REREAD_MARK}`
-  } finally {
-    await worker.terminate()
+// D-453 글자 인식기는 한 번 켜서 이어 쓴다 — 여러 장 묶음 · 여러 쪽 스캔에서 장마다 켜고 끄던 시간을 줄인다.
+// 한 번에 한 장씩만 읽고(차례 줄), 다 읽고 잠시 쉬면 끈다(메모리). 오류가 나면 그 인식기는 버리고 다음에 새로 켠다.
+type OcrWorker = Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>>
+const OCR_IDLE_MS = 90_000
+let sharedWorker: Promise<OcrWorker> | null = null
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+let progressTo: ProgressFn | undefined
+let ocrQueue: Promise<unknown> = Promise.resolve()
+
+function getWorker(): Promise<OcrWorker> {
+  if (!sharedWorker) {
+    const made = (async () => {
+      const { createWorker } = await import('tesseract.js')
+      return createWorker('kor+eng', undefined, {
+        logger: (m: { status?: string; progress?: number }) => {
+          if (m.status === 'recognizing text') progressTo?.(m.progress ?? 0, '글자 읽는 중')
+          else progressTo?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
+        },
+      })
+    })()
+    sharedWorker = made
+    made.catch(() => {
+      if (sharedWorker === made) sharedWorker = null
+    })
   }
+  return sharedWorker
+}
+
+function dropWorker(): void {
+  const w = sharedWorker
+  sharedWorker = null
+  void w?.then((x) => x.terminate()).catch(() => undefined)
+}
+
+function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+  const run = ocrQueue.then(() => ocrImageNow(input, onProgress))
+  ocrQueue = run.catch(() => undefined)
+  return run
+}
+
+async function ocrImageNow(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = null
+  progressTo = onProgress
+  let worker: OcrWorker
+  try {
+    worker = await getWorker()
+  } catch (e) {
+    progressTo = undefined
+    throw e
+  }
+  let broken = false
+  try {
+    return await ocrWith(worker, input, onProgress)
+  } catch (e) {
+    broken = true
+    throw e
+  } finally {
+    progressTo = undefined
+    if (broken) dropWorker()
+    else {
+      // 번호 다시 읽기에서 바꾼 설정을 처음대로 — 다음 장은 전체 글을 읽어야 한다
+      try {
+        await worker.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '6' as never })
+      } catch {
+        dropWorker()
+      }
+      idleTimer = setTimeout(() => {
+        idleTimer = null
+        dropWorker()
+      }, OCR_IDLE_MS)
+    }
+  }
+}
+
+async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+  const canvas = input instanceof Blob ? await imageToCanvas(input) : input
+  // D-451 기울어진 사진(휴대폰으로 비스듬히) — 글자 인식기가 기울기를 재어 바로잡고 읽는다. 4도 기울기 · 그림자 사진에서 주소 · 번지가 틀리던 것
+  const { data } = await worker.recognize(canvas ?? input, { rotateAuto: true }, { text: true, blocks: true, imageColor: true })
+  const text = data.text ?? ''
+  if (!canvas) return text
+  // 바로잡았으면 번호를 다시 읽을 칸도 바로잡은 그림에서 자른다(칸 위치는 그 그림 기준)
+  let cropSrc: HTMLCanvasElement = canvas
+  const turned = (data as { rotateRadians?: number | null }).rotateRadians
+  if (turned && data.imageColor) {
+    try {
+      const bmp = await createImageBitmap(await (await fetch(data.imageColor)).blob())
+      const c = document.createElement('canvas')
+      c.width = bmp.width
+      c.height = bmp.height
+      c.getContext('2d')?.drawImage(bmp, 0, 0)
+      bmp.close()
+      cropSrc = c
+    } catch {
+      cropSrc = canvas
+    }
+  }
+  const lines: OcrLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.map((l) => ({ text: l.text, bbox: l.bbox, words: l.words.map((w) => ({ text: w.text, bbox: w.bbox })) }))))
+  const boxes = numberBoxes(lines)
+  if (boxes.length === 0) return `${text}\n${REREAD_MARK}`
+  onProgress?.(0.95, '번호를 한 번 더 읽는 중')
+  await worker.setParameters({ tessedit_char_whitelist: '0123456789-', tessedit_pageseg_mode: '7' as never })
+  const reads: string[] = []
+  for (const b of boxes) {
+    for (const scale of [2, 3]) {
+      const r = await worker.recognize(cropScaled(cropSrc, b, scale))
+      const t = (r.data.text ?? '').replace(/\s+/g, ' ').trim()
+      if (t) reads.push(t)
+    }
+  }
+  return `${text}\n${reads.length ? reads.map((t) => `${REREAD_MARK} ${t}`).join('\n') : REREAD_MARK}`
 }
 
 /** 글자가 의미 있게 들어있는지 (스캔본 판별) */
