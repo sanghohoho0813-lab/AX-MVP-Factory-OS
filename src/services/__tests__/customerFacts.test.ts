@@ -3065,5 +3065,27 @@ await (async () => {
   check('D-473 주주명부만 올리면 대표자 칸은 비워 둔다(주주명부만으로 채우지 않음)', alone.record.representativeName === '', alone.record.representativeName)
 })()
 
+// D-474 지난 묶음에서 '스캔이라 한 번 확인' 으로 남긴 대표자 · 주소 — 다른 날 올린 다른 종류 서류(등기부 · 주주명부)가 같은 값이면 바로 입력
+await (async () => {
+  const BIZ = `사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 한빛테크\n대표자 : 김한빛\n사업장 소재지 : 서울특별시 강남구 테헤란로 123, 4층\n업태 : 제조업`
+  const REG = (ceo: string) => `등기사항전부증명서(현재 유효사항)\n- 법 인 -\n상 호 주식회사 한빛테크\n본 점 서울 강남구 테헤란로 123\n대표이사 ${ceo}`
+  const SH = (ceo: string) => `주 주 명 부\n회사명 : 주식회사 한빛테크\n기준일 2026. 10. 01\n성명 주식수 지분율 비고\n${ceo} 14,000 70% 대표이사\n김배우 6,000 30% 배우자\n합계 20,000 100%`
+  const empty = normalizeClientOps({ id: 'af474', companyName: '한빛테크', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const ctx = (d: string) => ({ now: d, today: d.slice(0, 10), makeId: () => `d474-${++n}` })
+  const day1 = await analyzeUploadedDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: BIZ, method: 'ocr', docSure: true }], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-474 첫날 사업자등록증 스캔만 — 대표자 · 주소는 확인으로(예전처럼)', day1.record.representativeName === '' && day1.record.businessAddress === '' && day1.summary.flagged.some((f) => f.key === 'representativeName'))
+  const day2 = await analyzeUploadedDocs(day1.record, [{ key: 'corporateRegistry', fileName: '등기부.jpg', text: REG('김한빛'), method: 'ocr', docSure: true }], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-474 다음 날 등기부 스캔(같은 대표 · 같은 주소) → 대표자 · 주소 바로 입력 · 확인 목록에서 빠짐', day2.record.representativeName === '김한빛' && !!day2.record.businessAddress && !pendingFacts(day2.record).some((p) => p.key === 'representativeName' || p.key === 'businessAddress'), JSON.stringify({ r: day2.record.representativeName, a: day2.record.businessAddress, p: pendingFacts(day2.record).map((p) => p.key) }))
+  const other = await analyzeUploadedDocs(day1.record, [{ key: 'corporateRegistry', fileName: '등기부.jpg', text: REG('김한별'), method: 'ocr', docSure: true }], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-474 등기부 대표가 다르면(김한별) 대표자는 그대로 확인', other.record.representativeName === '' && pendingFacts(other.record).some((p) => p.key === 'representativeName'))
+  const again = await analyzeUploadedDocs(day1.record, [{ key: 'businessRegistration', fileName: '사업자(2).jpg', text: BIZ, method: 'ocr', docSure: true }], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-474 같은 사업자등록증 스캔을 또 올리면 세지 않음 → 그대로 확인', again.record.representativeName === '' && pendingFacts(again.record).some((p) => p.key === 'representativeName'))
+  const sh = await analyzeUploadedDocs(day1.record, [{ key: 'custom-주주명부', fileName: '주주명부.jpg', text: SH('김한빛'), method: 'ocr', docSure: true }], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-474 다음 날 주주명부(김한빛 … 대표이사)만 올려도 → 지난번 대표자 바로 입력 · 바로 넣은 정보에 한 줄 · 주소는 그대로 확인', sh.record.representativeName === '김한빛' && sh.summary.entered.some((e) => e.key === 'representativeName') && pendingFacts(sh.record).some((p) => p.key === 'businessAddress') && !pendingFacts(sh.record).some((p) => p.key === 'representativeName'), JSON.stringify({ r: sh.record.representativeName, e: sh.summary.entered.map((e) => e.key), p: pendingFacts(sh.record).map((p) => p.key) }))
+  const shOther = await analyzeUploadedDocs(day1.record, [{ key: 'custom-주주명부', fileName: '주주명부.jpg', text: SH('박대표'), method: 'ocr', docSure: true }], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-474 주주명부 대표 이름이 다르면 그대로 확인', shOther.record.representativeName === '' && pendingFacts(shOther.record).some((p) => p.key === 'representativeName'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

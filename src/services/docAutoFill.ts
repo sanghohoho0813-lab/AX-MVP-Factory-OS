@@ -325,6 +325,10 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
   const agreed = agreedFacts(docs, agreeOnly)
+  // D-474 지난 묶음에서 '사진 · 스캔이라 한 번 확인' 으로 남겨 둔 값 — 이번에 다른 종류 서류(사업자등록증 ↔ 등기부 · 신분증)가 같은 값을 말하면 두 서류가 같은 값.
+  //        같은 종류 서류를 다시 올린 것(같은 사진을 또)은 같은 글자 실수일 수 있어 세지 않는다
+  const priorHeld = (record.factInbox ?? []).filter((c) => (c.note === NOTE_OCR || c.note === NOTE_DOC_UNSURE) && c.ref.startsWith('doc:'))
+  const heldAgrees = (c: { key: string; value: string; source: string }) => priorHeld.some((p) => p.key === c.key && p.source !== c.source && sameKey(p.key, p.value) === sameKey(c.key, c.value))
   // D-437 과세표준증명 '매출 추이' 줄 — 올리기 전 줄(과세표준증명이 만든 것) · 이번 묶음 줄. 끝에서 새 해의 몇 달을 다른 서류 줄에 붙인다
   const vatTrendLines: string[] = record.factMeta?.[TREND_KEY]?.source === 'vatCertificate' ? [customFactValue(record, '매출 추이')].filter(Boolean) : []
   // D-255: 다른 서류가 확실하게 말한 사업자등록번호(크레탑 · 등기 · PDF 글자) — 스캔 후보 가운데 이것과 같은 게 있으면 그걸로
@@ -336,7 +340,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     const found = factCandidatesFromDocText(doc.key, doc.text, ref).map((c) => {
       const pick = c.key === 'businessNumber' && c.note ? [c.value, ...(c.choices ?? []), ...readBusinessNumber(doc.text).alternatives].find((v) => others.has(v.replace(/\D/g, ''))) : undefined
       if (pick) return { key: c.key, value: pick, source: c.source, asOf: c.asOf, ref: c.ref }
-      const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`)
+      const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`) || heldAgrees(c)
       const note = noteFor(doc, c.key, c.value, isAgreed, (checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate')) || (c.key === 'businessCategory' && isStandardBizCategory(c.value)) || ((c.key === 'establishedAt' || c.key === 'representativeBirth') && checked.has(c.key)))
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
@@ -386,6 +390,15 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     }
     for (const p of mine) if (!auto.includes(p)) flagged.push({ ...label(p), note: p.note ?? NOTE_CONFLICT })
   })
+  // D-474 지난 묶음의 대표자(스캔이라 확인으로 남김)를 이번에 올린 주주명부 '대표이사' 한 사람이 같은 이름으로 말하면 — 바로 넣는다(주주명부는 칸을 채우지 않고 맞춰 보기만)
+  for (const reg of agreeOnly) {
+    const ceo = registerCeoName(reg)
+    if (!ceo) continue
+    const held = pendingFacts(rec).find((p) => p.from === 'inbox' && p.key === 'representativeName' && p.current === '' && priorHeld.some((h) => h.id === p.id) && sameKey(p.key, p.value) === sameKey(p.key, ceo))
+    if (!held) continue
+    rec = withFactDecisions(rec, [{ id: held.id, action: 'accept' }], now)
+    entered.push({ key: held.key, label: held.label, display: held.display, fileName: reg.fileName })
+  }
   // D-403 원천세 신고서 여러 달(이번에 · 예전에) → '원천세 인원 추이' 칸(달이 둘 이상일 때) — 작년 같은 달과 비교해 고용 증가를 본다
   const whReads = docs.map((d) => readWithholdingReport(d.text)).filter((r): r is NonNullable<typeof r> => !!r && !!r.yearMonth && !r.until)
   if (whReads.length) {
