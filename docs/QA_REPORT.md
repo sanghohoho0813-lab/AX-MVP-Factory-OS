@@ -4767,7 +4767,14 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   real 188 · easy 83 · simple 88 · journey 57 · firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패.
 - a1f2049(+ 영업 보드 30장씩 · D-480 공개 찾기 · 오늘 '확인할 것' 많으면 나눠 계산 · 60곳 이하는 바로): test:all EXIT 0 · 빌드 0 · sales 201 · flow 171 · todos 50 · money 41 · grants 152 ·
   enroll 48 · planner 42 · contract 72 · board 198 · detail 515 · steady 76 · firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패.
-- bfdb0ee(+ D-481 첫 접속 가볍게 · AI 지시문 마케팅 묶음 분리 · '오늘 올릴 것' 조건부): 아래 줄에 결과.
+- 72fd571(+ D-481 첫 접속 가볍게 · AI 지시문 마케팅 묶음 분리 · '오늘 올릴 것' 조건부 · D-480 공개 찾기 30건씩): test:all EXIT 0 · 빌드 0 · mkweek 56 · youtube 246 · mkpack 68 ·
+  content 184 · siteai 13 · assist 92 · threads 86 · shorts 48 · uxpick 37 · ownerai 72 · board 198 · detail 515 · flow 171 · todos 50 · grants 152 · simple 88 · firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패.
+- b60667a(+ 상담신청함 · 확인할 것 모두 보기 · 영업자 정산 나눠 그리기 · 한글 이름순 비교기 하나로 · 업체 0곳 시작 순서 · qa:many · 업체 상세 · 고객 관리 첫 화면 가볍게):
+  test:all EXIT 0 · 빌드 0 · many 19 · detail 515 · files 38 · folder 19 · assist 92 · facts 24 · diag 22 · grants 152 · board 198 · flow 171 · todos 50 · sales 201 · steady 76 ·
+  real 188 · easy 83 · modules 894 · uxpick 37 · money 41 · contract 72 · simple 88 · firstscreen 55 · phone 184 · squeeze 0곳 — 0 실패 → main(b60667a).
+  Production 확인(os.miraeailab.com · 새 번들에서 '아래로 내리면' · '더 정확하게(선택)' · '시작 순서' 찾음). 공개 '지원사업 찾기'(실제 공고 854건 · 휴대폰 390 · 느린 4G 1.6Mbps/150ms · CPU 4배 · 캐시 없이 · 2회):
+  목록 첫 줄이 보이기까지 9.89 · 9.69초 → 7.83 · 7.18초 · 긴 작업 합 2.09 · 1.94초 → 1.14 · 1.24초 · 그린 줄 854 → 30 · 화면 전체 길이 142,754 → 6,114px.
+- (go487 줄 자리)
 - 재 본 것(빌드본 · 업체 기록 복제 300 · 1,000곳 · 메뉴를 눌러 들어간 때부터 본문이 다 그려질 때까지 · 멈춤 = 50ms 넘는 긴 작업 합):
   · 1,000곳 — 고객 관리 3.96 → 0.56초(멈춤 3.46 → 0.16초) · 오늘 3.13 → 1.32초(멈춤 2.63 → 0.50초) · 영업 관리 1.20 → 0.41초(멈춤 0.80 → 0초).
   · 300곳 — 고객 관리 1.55 → 0.47초(멈춤 1.06 → 0.11초) · 오늘 멈춤 0.98 → 0.16초.
