@@ -2829,5 +2829,13 @@ await (async () => {
   check('D-437 과세표준증명이 같은 해까지만이면 붙이지 않음', customFactValue(c.record, '매출 추이') === '2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%)', customFactValue(c.record, '매출 추이'))
 })()
 
+// D-440 정책자금 '매출 10% 증가' 가점은 한 해 성장률로만 — 올해 몇 달 성장률(D-437 덧붙인 줄)로는 아님
+{
+  const mk = (trend: string) => normalizeClientOps({ id: 'pb440', companyName: '미래상사', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 't', group: 'identity', label: '매출 추이', value: trend }, { id: 'p', group: 'identity', label: '사업소득 추이', value: '2025년 7,000만원(소득금액증명 소득금액 · 2024년보다 +56%)' }] } as never)
+  const has = (t: string) => policyRecordBonus(mk(t), {}).includes('매출 또는 영업이익 10% 이상 증가')
+  check('D-440 한 해 -5% · 올해 6개월 +27% → 가점 아님(예전: 뒤쪽 +27% 를 읽어 가점)', !has('2025년 8억원(소득금액증명 수입금액 · 2024년보다 -5%) · 2026년 6개월 5억원(부가세 과세표준 · 작년 같은 기간보다 +27%)'))
+  check('D-440 한 해 +41% → 가점(뒤에 몇 달 줄이 붙어도)', has('2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%) · 2026년 6개월 5억 2,000만원(부가세 과세표준 · 작년 같은 기간보다 +27%)'))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

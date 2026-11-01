@@ -270,11 +270,12 @@ export function policyRecordBonus(record: ClientOpsRecord, facts: Partial<Pick<C
   const exportDoc = allDocumentMetas(record).some((m) => /수출\s*실적/.test(m.label) && !!(record.documents?.[m.key]?.received || record.documents?.[m.key]?.fileName))
   if (exportCert || exportDoc) out.push('수출 실적')
   if (record.toolResults.some((r) => r.toolKey === 'employment' && (r.data as { tab?: unknown; programId?: unknown } | null)?.tab === 'schedule' && (r.data as { programId?: unknown }).programId === 'youth_jump')) out.push('고용지원금 참여')
-  const up = /보다\s*\+(\d+)%/.exec(customFactValue(record, '매출 추이'))
+  // D-440 한 해 성장률('2024년보다 +20%')만 — 같은 줄에 붙은 올해 몇 달('작년 같은 기간보다 +27%' · D-437)은 가점 기준이 아니다
+  const up = /\d{4}년보다\s*\+(\d+)%/.exec(customFactValue(record, '매출 추이'))
   const prev = wonOf(record.taxProfile?.vInc1)
   const cur = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : 0
   // D-421 개인사업자 — 소득금액증명의 '사업소득 추이' 가 +10% 이상이면 순이익 증가로(법인은 재무제표 전기 순이익)
-  const profitUp = /보다\s*\+(\d+)%/.exec(customFactValue(record, '사업소득 추이'))
+  const profitUp = /\d{4}년보다\s*\+(\d+)%/.exec(customFactValue(record, '사업소득 추이'))
   const incomeUp = (prev > 0 && cur >= prev * 1.1) || (!!profitUp && Number(profitUp[1]) >= 10)
   if (up && Number(up[1]) >= 10 && incomeUp) out.push('매출 또는 영업이익 10% 이상 증가')
   // D-420 노란우산공제 — 서류함에 가입증명서(받음 · 파일) · 회사 정보에 '노란우산' 칸이 있으면('없음' 은 아님)
