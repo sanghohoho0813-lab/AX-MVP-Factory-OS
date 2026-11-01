@@ -19,7 +19,7 @@ import { NOTE_RECHECK, sameAddress, customFactValue, researchLabOf, withProfileF
 import { fitContext, scenarioFit, withScenarioAnswer } from '../scenarioFit'
 import { scenarioPreset } from '../scenarioPresets'
 import { allDocumentMetas } from '../clientOpsDocuments'
-import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
+import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, fuzzyKnownTitle, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
 import { documentStatus, documentsWithExpiry } from '../clientOpsAlerts'
 import { docShelfSummary, dupShelfBases, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfBaseOf, shelfCellOf } from '../docShelf'
@@ -2884,6 +2884,27 @@ await (async () => {
   const base = normalizeClientOps({ id: 'rq447', companyName: '미래', representativeName: '김대표', createdAt: NOW, updatedAt: NOW })
   const msg = recoRequestMessage(base, ins, new Set(['businessCategory', 'establishedAt']))
   check('D-447 요청 문구 — 4대보험 가입자 명부만(이미 받은 사업자등록증 · 업종 · 설립일은 다시 달라고 하지 않음)', msg.includes('4대보험') && !/사업자등록증|업종|설립일/.test(msg), msg)
+}
+
+// D-448 진짜 한글 스캔에서 글자 인식이 제목을 잘못 읽음 — '사럼사등록증' · '남세증명서' → 알려진 이름으로(자모 한두 개 차이 · 가장 가까운 것 하나)
+{
+  check('D-448 "사럼사등록증" → 사업자등록증 · "남세증명서" → 납세증명서 · "용역계약서"는 그대로(비슷한 이름 없음)', fuzzyKnownTitle('사럼사등록증') === '사업자등록증' && fuzzyKnownTitle('남세증명서') === '납세증명서' && fuzzyKnownTitle('용역계약서') === null, [fuzzyKnownTitle('사럼사등록증'), fuzzyKnownTitle('남세증명서'), fuzzyKnownTitle('용역계약서')])
+  const empty = normalizeClientOps({ id: 'fz448', companyName: '미래상사', status: 'active' })
+  const BIZ = ['사 럼 사 등 록 증', '(일반과세자)', '등록번호 : 214-05-01239', '상 호 : 미래상사', '성 명 : 홍길동', '개업연월일 : 2022 년 05 월 02 일'].join('\n')
+  const p1 = placeDocument({ text: BIZ, fileName: 'IMG_2001.jpg' }, allDocumentMetas(empty))
+  const p2 = placeDocument({ text: ['남 세 증 명 서', '상호 미래상사', '체납액 없음', '발급일자 2026년 10월 20일'].join('\n'), fileName: 'IMG_2004.jpg' }, allDocumentMetas(empty))
+  check('D-448 실제 글자 인식 제목 → 사업자등록증 칸 · 납세증명서 칸(예전: "사럼사등록증" · "남세증명서" 새 칸)', p1.kind === 'existing' && p1.key === 'businessRegistration' && p2.label === '납세증명서', JSON.stringify([p1, p2]))
+  const p3 = placeDocument({ text: ['사업자등록증명', '등록번호 214-05-01239'].join('\n'), fileName: 'a.pdf' }, allDocumentMetas(empty))
+  check('D-448 제대로 읽힌 제목은 그대로(사업자등록증명은 사업자등록증명)', p3.label === '사업자등록증명', JSON.stringify(p3))
+}
+
+// D-448 진짜 한글 스캔 소득금액증명 — 2025 수입금액 '860' 을 '880' 으로(6↔8) · 수입 − 경비 = 소득으로 하나만 설명되면 고침
+{
+  const INC = ['소득금액증명', '(종합소득세 신고자용)', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 880,000,000 790,000,000 70,000,000', '2024 214-05-01239 미래상사 사업소득 610,000,000 565,000,000 45,000,000', '2026년 10월 20일', '창원세무서장'].join('\n')
+  const r = readIncomeCert(INC)
+  check('D-448 "880,000,000"(6↔8) → 860,000,000 · 확실(예전: 셈이 안 맞아 확실하지 않음 → 사업소득 추이 없음)', !!r && r.sure && r.years.find((y) => y.year === 2025)?.revenue === 860_000_000, JSON.stringify(r))
+  const AMB = INC.replace('880,000,000 790,000,000 70,000,000', '860,000,000 790,000,000 50,000,000')
+  check('D-448 헷갈리는 짝으로 설명되지 않으면 그대로(확실하지 않음)', readIncomeCert(AMB)?.sure === false, JSON.stringify(readIncomeCert(AMB)))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

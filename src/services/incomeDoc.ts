@@ -12,7 +12,7 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 
-import { fixAmountNoise } from './ocrNumbers'
+import { fixAmountNoise, ocrNear } from './ocrNumbers'
 
 export interface IncomeYear {
   year: number
@@ -67,8 +67,18 @@ export function readIncomeCert(text: string): IncomeRead | null {
       .replace(/20\d{2}\s*[.\-/]\s*\d{1,2}\s*[.\-/]\s*\d{1,2}/g, ' ')
       .replace(/^(20\d{2})(?:\s*년(?:\s*귀속)?)?/, ' ')
     const nums: number[] = []
-    for (const m of body.matchAll(MONEY)) nums.push((m[1] ? -1 : 1) * Number(m[2].replace(/,/g, '')) * unit)
+    const toks: string[] = []
+    for (const m of body.matchAll(MONEY)) {
+      nums.push((m[1] ? -1 : 1) * Number(m[2].replace(/,/g, '')) * unit)
+      toks.push(m[2])
+    }
     if (nums.length < 2 || !curYear || nums[0] <= 0) continue
+    // D-448 수입 − 경비 = 소득이 안 맞으면 — 한 칸만 글자 인식 실수('860' → '880')로 설명되면 그 칸을 셈한 값으로(후보가 하나일 때만)
+    if (nums.length >= 3 && nums[0] - nums[1] !== nums[2]) {
+      const want = [nums[1] + nums[2], nums[0] - nums[2], nums[0] - nums[1]]
+      const hits = [0, 1, 2].filter((i) => want[i] > 0 && ocrNear(toks[i], want[i] / unit))
+      if (hits.length === 1) nums[hits[0]] = want[hits[0]]
+    }
     const [rev, a, b] = nums
     // 셋이면 수입 · 경비 · 소득(수입 − 경비 = 소득이어야 확실) · 둘이면 수입 · 소득(소득 ≤ 수입)
     const income = nums.length >= 3 ? b : a

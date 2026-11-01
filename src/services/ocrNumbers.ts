@@ -86,3 +86,17 @@ export function digitsFit(token: string, value: number): boolean {
   for (const ch of d) if (i < s.length && ch === s[i]) i++
   return i === s.length
 }
+
+/** D-448 글자 인식이 자주 헷갈리는 숫자 짝(6↔8 · 3↔8 · 0↔8 · 5↔6 · 5↔8 · 1↔7 · 0↔6 · 0↔9 · 4↔9 · 8↔9) */
+const CONFUSABLE = new Set(['06', '08', '09', '17', '38', '49', '56', '58', '68', '89'])
+/**
+ * D-448 원래 글자가 그 숫자의 '글자 인식 실수' 로 설명되나 — 한두 글자가 더 낌(digitsFit) 또는 같은 길이에서 숫자 하나가 헷갈리는 짝으로 바뀜('860' → '880').
+ */
+export function ocrNear(token: string, value: number): boolean {
+  if (digitsFit(token, value)) return true
+  const d = token.replace(/[^\d]/g, '')
+  const s = String(Math.abs(Math.round(value)))
+  if (d.length !== s.length || s.length < 4) return false
+  const diff = [...d].map((ch, i) => [ch, s[i]] as const).filter(([a, b]) => a !== b)
+  return diff.length === 1 && CONFUSABLE.has([diff[0][0], diff[0][1]].sort().join(''))
+}

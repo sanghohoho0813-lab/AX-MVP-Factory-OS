@@ -695,6 +695,47 @@ export function titleFromFileName(fileName: string): string | null {
   return cands.find(({ c }) => !GENERIC_TITLE.test(c))?.c ?? null
 }
 
+/**
+ * D-448 글자 인식이 제목 한두 글자를 잘못 읽은 것('사럼사등록증' · '남세증명서') — 알려진 서류 이름과 자모가 조금만 다르면 그 이름으로.
+ * 자모(초성 · 중성 · 종성)로 풀어 고친 수를 센다 — 자모 10개 미만은 1개, 16개 미만은 2개, 그 이상은 3개까지. 가장 가까운 이름이 하나뿐일 때만.
+ */
+const FUZZY_TITLES = ['사업자등록증', '등기사항전부증명서', '등기사항일부증명서', '법인등기부등본', '주민등록증', '운전면허증', '중소기업확인서', '건강보험자격득실확인서', '사업장가입자명부', '4대보험가입자명부', '기업종합보고서', '표준재무제표증명', '재무상태표', '손익계산서']
+function jamoOf(s: string): string {
+  let out = ''
+  for (const ch of s) {
+    const c = ch.charCodeAt(0)
+    if (c >= 0xac00 && c <= 0xd7a3) {
+      const i = c - 0xac00
+      out += String.fromCharCode(0x1100 + Math.floor(i / 588), 0x1161 + Math.floor((i % 588) / 28)) + (i % 28 ? String.fromCharCode(0x11a7 + (i % 28)) : '')
+    } else out += ch
+  }
+  return out
+}
+function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]
+    dp[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const t = dp[j]
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = t
+    }
+  }
+  return dp[b.length]
+}
+export function fuzzyKnownTitle(title: string): string | null {
+  if (!/^[가-힣0-9]{4,16}$/.test(title)) return null
+  const names = [...new Set([...FUZZY_TITLES, ...KNOWN_EXTRA_DOCS.map((k) => compactTitle(k.label))])]
+  const t = jamoOf(title)
+  const scored = names.map((n) => ({ n, d: editDistance(t, jamoOf(n)), len: jamoOf(n).length })).filter((x) => Math.abs(x.n.length - title.length) <= 1 && x.d > 0).sort((a, b) => a.d - b.d)
+  const best = scored[0]
+  if (!best) return null
+  const limit = best.len < 10 ? 1 : best.len < 16 ? 2 : 3
+  if (best.d > limit || (scored[1] && scored[1].d === best.d)) return null
+  return best.n
+}
+
 /** D-148: 제목 → 알려진 서류. 맞는 신호 점수가 3 이상인 것 중 가장 높은 것(같으면 이름이 긴 것 — '지방세 납세증명서' 가 '납세증명서' 보다 먼저) */
 function knownDocForTitle(title: string): (typeof KNOWN_EXTRA_DOCS)[number] | undefined {
   const exact = KNOWN_EXTRA_DOCS.find((k) => compactTitle(k.label) === title)
@@ -750,8 +791,18 @@ function placeDocumentBase(input: { text: string; fileName: string }, metas: Doc
     return { kind: 'new', label: long, sure: true, reason: `서류 제목 '${long}' — 그 이름으로 새 칸`, issuedAt }
   }
   const fromText = hasText ? documentTitle(text) : null
-  const title = fromText ?? titleFromFileName(input.fileName)
-  const how = fromText ? '서류 제목' : '파일 이름'
+  let title = fromText ?? titleFromFileName(input.fileName)
+  let how = fromText ? '서류 제목' : '파일 이름'
+  // D-448 알아보지 못한 제목이 알려진 서류 이름과 자모 한두 개 차이면(스캔 글자 인식) 그 이름으로
+  if (fromText && title) {
+    const t0 = title
+    const recognized = TITLE_TO_KEY.some(([re]) => re.test(t0)) || fileMetas.some((m) => compactTitle(m.label).replace(/\(\d+\)$/, '') === t0) || !!knownDocForTitle(t0)
+    const fixed = recognized ? null : fuzzyKnownTitle(t0)
+    if (fixed) {
+      title = fixed
+      how = `서류 제목(글자 인식 '${t0}' → 비슷한 이름)`
+    }
+  }
   if (title) {
     // D-371 '등기사항전부증명서 - 건물' 은 법인 등기부 칸이 아니다 — 아래 '부동산 등기사항증명서' 로
     const estate = looksLikeRealEstateRegistry(hasText ? text : title)

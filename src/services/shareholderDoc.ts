@@ -10,7 +10,7 @@
  * 규칙 계산 — 외부 호출 없음.
  */
 import type { ShareholderRelation } from '../types/clientOps'
-import { digitsFit, fixAmountNoise, joinSpacedHangul } from './ocrNumbers'
+import { fixAmountNoise, joinSpacedHangul, ocrNear } from './ocrNumbers'
 
 export interface ReadHolder {
   name: string
@@ -214,7 +214,7 @@ export function readShareholderDoc(text: string, ceoName = ''): RegisterRead {
   if (merged.length >= 2 && total !== null && total > 0 && sumShares !== total) {
     const hits = merged.filter((h) => {
       const want = total - (sumShares - h.shares)
-      return want > 0 && digitsFit(String(h.shares), want) && (h.pct === null || Math.abs((want / total) * 100 - h.pct) <= 0.6)
+      return want > 0 && ocrNear(String(h.shares), want) && (h.pct === null || Math.abs((want / total) * 100 - h.pct) <= 0.6)
     })
     if (hits.length === 1) {
       hits[0].shares = total - (sumShares - hits[0].shares)

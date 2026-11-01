@@ -7,7 +7,7 @@
  * 규칙 계산이다. 못 읽으면 그 값은 내지 않는다(지어내지 않는다).
  */
 
-import { digitsFit, fixAmountNoise, joinNumberOnlyLines } from './ocrNumbers'
+import { fixAmountNoise, joinNumberOnlyLines, ocrNear } from './ocrNumbers'
 export interface FinStatementValues {
   revenue?: number
   operatingProfit?: number
@@ -132,7 +132,7 @@ function repairByIdentity(cols: Cols, raw: Record<string, string>, loss: Record<
         if (A !== undefined && B !== undefined && D !== undefined && A === B + D) continue
         // 고칠 후보 — 나머지 두 칸이 있어야 한다
         const cands: [string, number | undefined][] = [[a, B !== undefined && D !== undefined ? B + D : undefined], [b, A !== undefined && D !== undefined ? A - D : undefined], [d, A !== undefined && B !== undefined ? A - B : undefined]]
-        const hits = cands.filter(([k, e]) => e !== undefined && e !== 0 && raw[k] !== undefined && digitsFit(tokenOf(k, c), e / unit) && (loss[k] || e > 0))
+        const hits = cands.filter(([k, e]) => e !== undefined && e !== 0 && raw[k] !== undefined && ocrNear(tokenOf(k, c), e / unit) && (loss[k] || e > 0))
         if (hits.length !== 1) continue
         const [k, e] = hits[0]
         const prev = cols[k] ?? [undefined, undefined]
