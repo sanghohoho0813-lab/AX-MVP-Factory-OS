@@ -17,7 +17,7 @@
  *    1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 새로 가져오기 · CSV · 채널 설계 기준은 아래 [자세히 보기] 한 곳에(지운 것 없음).
  */
 import { AiAssist, answerText, type AssistActionResult, type AssistCtx, type AssistItemAction, type AssistResultAction } from '../../components/ai/AiAssist'
-import { radarBundle } from '../../services/aiAssist/builders'
+import { radarBundle } from '../../services/aiAssist/marketingBuilders'
 import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'

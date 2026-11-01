@@ -5,7 +5,7 @@
  */
 import { AssistError, callAssist, type AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
-import { briefSection } from '../aiAssist/builders'
+import { briefSection } from '../aiAssist/marketingBuilders'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import type { BrandCore } from './brandAngle'
 import type { ChannelBrief } from './radarStore'

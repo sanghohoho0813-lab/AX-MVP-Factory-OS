@@ -13,7 +13,7 @@ import { ArrowLeft, AtSign, BookmarkPlus, ChevronDown, ClipboardCopy, ExternalLi
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
-import { packBundle } from '../../../services/aiAssist/builders'
+import { packBundle } from '../../../services/aiAssist/marketingBuilders'
 import { todayLocalDate } from '../../../lib/appClock'
 import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
 import { ModelPicker } from '../../../components/ai/ModelPicker'

@@ -19,7 +19,7 @@
  *        올린 글에 조회 · 저장 · 문의 숫자 적기 → 보관함 '무엇이 잘 됐나'(각도 · 카드 유형별).
  */
 import { AiAssist } from '../../components/ai/AiAssist'
-import { contentBundle } from '../../services/aiAssist/builders'
+import { contentBundle } from '../../services/aiAssist/marketingBuilders'
 import { isMiraeSubject } from '../../services/marketingTrial'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'

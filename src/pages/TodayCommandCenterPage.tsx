@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { AiAssist } from '../components/ai/AiAssist'
 import { todayBundle } from '../services/aiAssist/builders'
 import { careList } from '../services/clientCare'
@@ -14,6 +14,7 @@ import { useClientReco } from '../components/ops/useClientReco'
 import { TodayPicks } from '../components/ops/TodayPicks'
 import { TodayKpis } from '../components/ops/TodayKpis'
 import { AppLauncher } from '../components/layout/AppLauncher'
+import { hasWeekData, subscribeWeekRunLoaded } from '../services/marketing/weekRunFlag'
 import { useAllDecisions } from '../components/ops/useAllDecisions'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
@@ -78,6 +79,8 @@ import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/
 
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
 const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
+// D-479 남긴 1주일치가 있거나 이번 접속에서 1주일치를 다뤘을 때만 '오늘 올릴 것' 부품을 받아 온다
+const weekDataNow = () => hasWeekData()
 
 /** D-159: 할 일이 4건 넘으면 휴대폰에서도 두 칸 — 여섯 건이면 세 줄로 끝난다 */
 const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2`
@@ -198,6 +201,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const navigate = useNavigate()
   const { showToast } = useToast()
   const now = useClock()
+  const weekData = useSyncExternalStore(subscribeWeekRunLoaded, weekDataNow)
   const today = todayLocalDate(now)
   const isLocal = getDataModeConfig().mode === 'local'
   // D-162: Pilot 은 고객 플랫폼 상담신청 · 영업자 정산을 쓰지 않는다 — 그 칸을 그리지 않는다
@@ -467,9 +471,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               </Link>
             </h1>
             {/* D-360 이번 주 1주일치 프로젝트가 있으면 오늘 올릴 것 한 줄(누르면 그 탭) */}
-            <Suspense fallback={null}>
-              <TodayPosts />
-            </Suspense>
+            {weekData && (
+              <Suspense fallback={null}>
+                <TodayPosts />
+              </Suspense>
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start">
             <span className="hidden sm:inline-flex">

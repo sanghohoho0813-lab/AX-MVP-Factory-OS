@@ -15,8 +15,9 @@
  */
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
-import { briefSection, packBundle } from '../aiAssist/builders'
+import { briefSection, packBundle } from '../aiAssist/marketingBuilders'
 import { HOLE, PACK_AVOID, aiSections, customSource, makePack, type PackBlock, type PackSectionId, type PackSource } from './contentPack'
+import { WEEK_STORE_KEY } from './weekRunFlag'
 import { isMarketingCustomer } from './persona'
 import type { ChannelBrief } from './radarStore'
 import { formatsFor, lintShort, parseShortDrafts, shortsContext, type ShortDraft, type ShortPlatform } from './shorts'
@@ -486,7 +487,8 @@ export function weekText(w: WeekView): string {
 /* 이 브라우저에 남기기 — 만든 주마다(최근 4주)                              */
 /* ------------------------------------------------------------------ */
 
-export const WEEK_STORE_KEY = 'axmvp.mkweek.v1'
+// D-479 이름은 가벼운 깃발 모듈에 하나만(오늘 화면이 이것만 읽고 1주일치 부품을 받을지 정한다)
+export { WEEK_STORE_KEY }
 const isDrafts = (v: unknown): boolean => Array.isArray(v) && v.every((d) => !!d && typeof d === 'object')
 
 /** 한 주 결과 하나 — 이 브라우저 · 클라우드 어느 쪽에서 읽어도 같은 검사 */

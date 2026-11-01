@@ -9,7 +9,7 @@
  * 이 파일은 계산 · 저장 · 모양만(화면 없음 · 단위 시험).
  */
 import { safeText, type AssistContext } from '../aiAssist/context'
-import { MIRAE_PROFILE, briefSection } from '../aiAssist/builders'
+import { MIRAE_PROFILE, briefSection } from '../aiAssist/marketingBuilders'
 import { customerProfileLines, isMarketingCustomer, mkText } from './persona'
 import { packRules } from './contentPack'
 import { defaultBrief, type ChannelBrief, type IdeaInput } from './radarStore'

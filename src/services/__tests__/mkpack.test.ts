@@ -4,7 +4,7 @@
  */
 import { ASSISTS, RADAR_RULES, buildAssistPrompt } from '../../../api/_ai/assists.js'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
-import { packBundle } from '../aiAssist/builders'
+import { packBundle } from '../aiAssist/marketingBuilders'
 import { BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, saveIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan } from '../marketing/ytRadar'
