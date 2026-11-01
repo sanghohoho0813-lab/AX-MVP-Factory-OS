@@ -9,6 +9,7 @@
  * 모양은 운영 OS 규칙을 따른다 — 원본의 여러 색 단계 표시 대신 테마색 하나와 회색, 급한 것만 경고색.
  */
 
+import { GrowingList } from '../../components/ui/GrowingList'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AiAssist } from '../../components/ai/AiAssist'
 import { salesBundle } from '../../services/aiAssist/builders'
@@ -474,11 +475,13 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       {list.length === 0 ? (
         <p className="t-meta rounded-(--radius-control) border border-dashed border-slate-200 px-2 py-4 text-center text-slate-400">없음</p>
       ) : (
-        <ul className={`grid gap-2 ${stage === 'hold' || stage === 'lost' ? 'sm:grid-cols-2 2xl:grid-cols-3' : ''}`}>
-          {list.map((r) => (
-            <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
-          ))}
-        </ul>
+        // D-479 업체가 많으면 칸마다 처음 30장 · 아래로 내리면 이어서
+        <GrowingList
+          items={list}
+          resetKey={stage}
+          className={`grid gap-2 ${stage === 'hold' || stage === 'lost' ? 'sm:grid-cols-2 2xl:grid-cols-3' : ''}`}
+          render={(r) => <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />}
+        />
       )}
     </section>
     )
@@ -726,11 +729,12 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
               {groups[picked].length === 0 ? (
                 <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-slate-400">이 단계에 있는 업체가 없습니다</p>
               ) : (
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {groups[picked].map((r) => (
-                    <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
-                  ))}
-                </ul>
+                <GrowingList
+                  items={groups[picked]}
+                  resetKey={picked}
+                  className="grid gap-2 sm:grid-cols-2"
+                  render={(r) => <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />}
+                />
               )}
             </div>
           </>
