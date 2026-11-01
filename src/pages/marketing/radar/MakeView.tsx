@@ -51,9 +51,9 @@ interface MineProps {
 }
 
 const PERF_TONE: Record<PerfTone, string> = {
-  good: 'border-emerald-300 bg-emerald-50 text-emerald-800',
-  normal: 'border-slate-200 bg-slate-50 text-slate-700',
-  low: 'border-amber-300 bg-amber-50 text-amber-800',
+  good: 'border-slate-200 bg-white text-success-700',
+  normal: 'border-slate-200 bg-white text-slate-700',
+  low: 'border-slate-200 bg-white text-warning-700',
   unknown: 'border-slate-200 bg-white text-slate-600',
 }
 const dayOf = (ms: number) => {
@@ -98,7 +98,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
         <p className="t-sub break-keep text-slate-600">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
       </div>
       {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
-      {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
+      {failed && <p className="t-sub px-1 py-1 font-semibold text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
       {projects}
 
       {/* D-357 화면 원칙 — 내 콘텐츠 첫 화면은 1주일치 프로젝트 · 만든 것 한눈에만. 롱폼 단계 · 일정 · 체크리스트 줄은 접힌 채 한 줄(펼친 것은 기억 · 줄로 오면 펼침) */}
@@ -127,9 +127,9 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           {/* 이번 주 일정 */}
-          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-rose-200 bg-white p-3 sm:p-4" data-testid="make-week">
+          <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" data-testid="make-week">
             <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
-              <CalendarDays aria-hidden="true" className="size-4 text-rose-600" /> 이번 주 일정
+              <CalendarDays aria-hidden="true" className="size-4 text-slate-500" /> 이번 주 일정
               <span className="t-meta font-normal text-slate-500">
                 {shortDay(range.from)} ~ {shortDay(range.to)}
               </span>
@@ -142,7 +142,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
               <ul className="flex flex-col divide-y divide-slate-100">
                 {week.map((w) => (
                   <li key={`${w.idea.id}-${w.what}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5" data-testid="make-week-item" data-what={w.what}>
-                    <span className={`t-sub w-[4.75rem] shrink-0 font-bold tabular-nums ${w.date === today ? 'text-rose-700' : 'text-slate-700'}`}>{w.date === today ? '오늘' : shortDay(w.date)}</span>
+                    <span className={`t-sub w-[4.75rem] shrink-0 font-bold tabular-nums ${w.date === today ? 'text-brand-700' : 'text-slate-700'}`}>{w.date === today ? '오늘' : shortDay(w.date)}</span>
                     <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${w.what === 'shoot' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>{w.what === 'shoot' ? '촬영' : '게시'}</span>
                     <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{w.idea.topic}</span>
                   </li>
@@ -150,7 +150,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
               </ul>
             )}
             {late.length > 0 && (
-              <p className="t-sub flex items-start gap-1.5 rounded-(--radius-control) bg-danger-50 px-3 py-2 break-keep text-danger-700" data-testid="make-late">
+              <p className="t-sub flex items-start gap-1.5 px-1 py-1 font-semibold break-keep text-danger-700" data-testid="make-late">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 <span className="min-w-0">
                   날짜가 지난 일 {late.length}개 — {late.slice(0, 2).map((i) => i.topic).join(' · ')}
@@ -204,7 +204,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
               </p>
             )}
             {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length > 0 && (
-              <p className="t-meta font-semibold text-rose-700" data-testid="make-learn-suggest">
+              <p className="t-meta font-semibold text-brand-700" data-testid="make-learn-suggest">
                 이 영상인가요? 확인할 것 {[...suggestions.keys()].filter((id) => !dismissed.has(id)).length}건 — 아래 줄에서 [맞아요] 한 번이면 이어져요
               </p>
             )}
@@ -298,7 +298,7 @@ function MakeRow({
     <li ref={rowRef} className={`flex min-w-0 scroll-mt-20 flex-col gap-2.5 rounded-(--radius-card) border bg-white p-3 sm:p-4 ${late ? 'border-danger-300' : focus ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`} data-testid="radar-idea" data-status={i.status} data-focus={focus ? '1' : undefined}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {i.source === 'custom' ? <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">직접 담음</span> : <AxisBadge axis={i.type} />}
-        <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-body min-w-0 flex-[1_1_12rem] text-left font-bold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-rose-700" data-testid="make-row-toggle">
+        <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-body min-w-0 flex-[1_1_12rem] text-left font-bold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700" data-testid="make-row-toggle">
           {i.topic}
         </button>
         {/* D-350 1주일치에서 모은 롱폼 — 그 주 묶음(쇼츠 · 스레드까지)으로 바로 */}
@@ -357,7 +357,7 @@ function MakeRow({
       {suggestion && !i.link && (
         <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="make-suggest">
           <p className="t-sub min-w-0 break-keep text-slate-800 [overflow-wrap:anywhere]">
-            <span className="font-bold text-rose-700">이 영상인가요? </span>'{suggestion.title}' <span className="t-meta text-slate-500">· {shortDay(dayOf(suggestion.publishedAt))} 올림</span>
+            <span className="font-bold text-brand-700">이 영상인가요? </span>'{suggestion.title}' <span className="t-meta text-slate-500">· {shortDay(dayOf(suggestion.publishedAt))} 올림</span>
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={() => accept(suggestion)} disabled={readOnly} data-testid="make-suggest-yes">
@@ -382,8 +382,8 @@ function MakeRow({
           {MAKE_CHECKS.map((c) => {
             const on = i.checks.includes(c.id)
             return (
-              <label key={c.id} className={`tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 ${on ? 'border-success-300 bg-success-50 font-semibold text-success-800' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300'}`} data-testid="make-check" data-id={c.id} data-on={on ? '1' : '0'}>
-                <input type="checkbox" className="size-4 accent-rose-600" checked={on} disabled={readOnly} onChange={() => toggle(c.id)} />
+              <label key={c.id} className={`tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 ${on ? 'border-success-300 bg-success-50 font-semibold text-success-800' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`} data-testid="make-check" data-id={c.id} data-on={on ? '1' : '0'}>
+                <input type="checkbox" className="size-4 accent-success-600" checked={on} disabled={readOnly} onChange={() => toggle(c.id)} />
                 {c.label}
               </label>
             )

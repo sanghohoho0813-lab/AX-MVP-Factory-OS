@@ -156,7 +156,7 @@ export function PlanView({
         {criteria && <Criteria plan={plan} basis={basis} readOnly={readOnly} onMix={onMix} onUnmute={onUnmute} onClose={() => setCriteria(false)} />}
 
         {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에) */}
-        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-rose-200 bg-white p-3 sm:p-4" data-testid="radar-guide">
+        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-guide">
           <div className="mx-auto w-full max-w-xl">
             <MkSteps
               steps={[
@@ -186,7 +186,7 @@ export function PlanView({
             </div>
           ) : (
             <p className="t-sub flex items-start gap-1.5 break-keep text-slate-700" data-testid="radar-guide-next">
-              <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-rose-600" />
+              <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
               <span className="min-w-0">
                 <b className="font-bold text-slate-900">지금 할 일 — </b>
                 {hero ? "1~10순위가 아래에 다 있어요 — 마음에 드는 주제의 '이번 주 이렇게 찍으세요' 를 눌러 제목 예 · 첫 문장을 보고, 찍을 만하면 [이번 주로 확정] 을 눌러 주세요." : '후보가 생기면 여기서 바로 고를 수 있어요.'}
@@ -408,11 +408,11 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
     <section className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white ${lg ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left" data-testid="radar-kit-toggle">
         <IconChip icon={Clapperboard} tone="rose" />
-        <span className={`font-extrabold text-rose-900 ${lg ? 't-card' : 't-sub'}`}>이번 주 이렇게 찍으세요</span>
+        <span className={`font-extrabold text-slate-900 ${lg ? 't-card' : 't-sub'}`}>이번 주 이렇게 찍으세요</span>
         <span className="t-meta inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200" data-testid="radar-kit-effort">
           <Clock aria-hidden="true" className="size-3.5" /> {kit.effort.label} · {kit.effort.minutes}분쯤
         </span>
-        <span className="t-meta ml-auto inline-flex items-center gap-0.5 font-bold text-rose-700">
+        <span className="t-meta ml-auto inline-flex items-center gap-0.5 font-bold text-brand-700">
           {open ? '접기' : '펼치기'}
           <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
         </span>
@@ -487,7 +487,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
           <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-hook">
             <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{kit.hook}"
           </p>
-          <div className="flex min-w-0 flex-col gap-3 border-t border-rose-100 pt-3" data-testid="radar-kit-body">
+          <div className="flex min-w-0 flex-col gap-3 border-t border-slate-100 pt-3" data-testid="radar-kit-body">
             {kit.frames.length > 0 && (
               <div className="flex flex-col gap-1.5" data-testid="radar-kit-frames">
                 <p className="t-sub font-bold text-slate-900">잘 된 틀 → 우리 제목 <span className="t-meta font-normal text-slate-500">구조만 가져오고 제목 · 대사는 새로</span></p>

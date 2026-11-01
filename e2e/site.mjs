@@ -715,7 +715,9 @@ check('19 휴대폰 화면 오류 0', errors.length === 0, errors)
   const rowN = await p.getByTestId('block-row').count()
   const rowIco = await p.locator('[data-testid="block-row"] > span:first-child > span[aria-hidden="true"]:first-child').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor))
   check(`H3 블록 ${rowN}줄 모두 색 아이콘 · 블록 종류마다 색 여러 가지`, rowIco.length === rowN && new Set(rowIco).size >= 5, rowIco.length)
-  check('H3 고른 탭(블록) — 초록 바탕', (await chroma('[data-testid="site-tab-blocks"]')) > 0.09)
+  // D-478(6차) D-370 '박스는 흰색 · 고르면 테마 강조색 하나' — 예전 초록 칠(D-226) 대신 테마 강조색 테두리(ring)로 고른 단계를 보인다
+  const selTab = await p.locator('[data-testid^="site-tab-"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-selected')}:${getComputedStyle(e).boxShadow !== 'none' ? 'ring' : '-'}`))
+  check('H3 고른 탭(블록) — 고른 단계만 aria-selected · 테마 강조색 테두리(진한 초록 칠 아님)', selTab.join() === 'true:ring,false:-,false:-' && (await chroma('[data-testid="site-tab-blocks"]')) < 0.09, selTab)
   await p.getByTestId('block-add').click()
   const palN = await p.getByTestId('palette-item').count()
   const palIco = await p.locator('[data-testid="palette-item"] svg').count()
@@ -770,9 +772,10 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   check(`D227-H5 ${T} 3단계 — 점검 목록 + 마무리 칸([HTML 내려받기] 크게 · 새 창으로 보기) · 내려받기 됨 · [다음 단계] 없음`, (await steps.getAttribute('data-current')) === 'checks' && /HTML 내려받기/.test(finTxt) && (await p.getByTestId('site-finish-open').count()) === 1 && dlHtml.startsWith('<!doctype html>') && dlHtml.includes('한솔정밀(주)') && (await p.getByTestId('site-next').count()) === 0, { finTxt: finTxt.slice(0, 80), head: dlHtml.slice(0, 40) })
   await steps.locator('[data-step="1"]').click()
   check(`D227-H6 ${T} 아무 단계나 눌러 돌아가기(3 → 1) · 블록 목록 그대로`, (await steps.getAttribute('data-current')) === 'blocks' && (await p.getByTestId('block-row').count()) > 5)
-  const tabW = await steps.locator('[role="tab"] .t-sub').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
+  // D-478(6차) 휴대폰은 번호를 아랫줄로 옮겨 이름 칸이 좁아졌다 — '한 줄' 은 폭이 아니라 이름 줄 높이(한 줄 = 글자 크기 × 1.55)로 잰다
+  const labelH = await steps.locator('[role="tab"] > .t-sub').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(e).lineHeight) || 24; return Math.round((r.height / lh) * 10) / 10 }))
   const tabH = await steps.locator('[role="tab"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-  check(`D227-H7 ${T} 단계 칸 44px 이상 · 이름 한 줄(높이) · 가로 넘침 0 · 오류 0`, tabH.every((h) => h >= 44) && tabW.every((w) => w >= 60) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { tabH, tabW, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
+  check(`D227-H7 ${T} 단계 칸 44px 이상 · 이름 한 줄(높이) · 가로 넘침 0 · 오류 0`, tabH.every((h) => h >= 44) && labelH.length === 3 && labelH.every((l) => l <= 1.3) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { tabH, labelH, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
   await ctx.close()
 }
 
