@@ -13,7 +13,7 @@ import { Check, FileUp, Loader2, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
-import { OCR_PARALLEL, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
+import { OCR_PARALLEL, OfficeReadError, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadMethod } from '../../services/docAutoFill'
 import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
@@ -36,6 +36,8 @@ interface Item {
   progress: string
   text: string
   method: ReadMethod
+  /** D-465 못 읽은 까닭(암호 · 깨진 파일 · TIFF · 아이폰 사진) — 사람 말 한 줄 */
+  readNote?: string
 }
 
 /** title · hint — 부르는 곳마다 다른 안내(D-255 AI 전략실은 서류함이 아니라 '자료' 로 들어간다) */
@@ -106,15 +108,17 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
       patch(next.id, { status: 'reading', progress: '읽는 중' })
       let text = ''
       let method: ReadMethod = 'none'
+      let readNote = ''
       try {
         if (canExtractText(next.file)) {
           const res = await extractTextFromFile(next.file, (ratio, label) => patch(next.id, { progress: ratio > 0 && ratio < 1 ? `${label} ${Math.round(ratio * 100)}%` : label }))
           text = res.text
           method = res.method
         }
-      } catch {
-        // 못 읽어도 멈추지 않는다 — 등록하면 서류함에는 그대로 들어간다
+      } catch (e) {
+        // 못 읽어도 멈추지 않는다 — 등록하면 서류함에는 그대로 들어간다. 까닭을 알 수 있으면 한 줄로(D-465)
         text = ''
+        if (e instanceof OfficeReadError) readNote = e.message
       }
       if (stoppedRef.current) return
       // 크레탑 보고서면 크레탑 엔진으로 회사 칸을 읽는다(무거워서 필요할 때만 불러온다)
@@ -128,8 +132,8 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
         }
       }
       // 읽는 사이 [빼기] 를 눌렀으면 그 줄은 이미 없다 — patch 가 아무것도 바꾸지 않는다
-      itemsRef.current = itemsRef.current.map((it) => (it.id === next.id ? { ...it, status: 'done', progress: '', text, method } : it))
-      patch(next.id, { status: 'done', progress: '', text, method })
+      itemsRef.current = itemsRef.current.map((it) => (it.id === next.id ? { ...it, status: 'done', progress: '', text, method, readNote } : it))
+      patch(next.id, { status: 'done', progress: '', text, method, readNote })
     }
   }
 
@@ -234,9 +238,11 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
                       ? it.progress || '차례를 기다리는 중'
                       : found.length > 0
                         ? `${note?.docLabel ? `${note.docLabel} — ` : ''}${found.map((f) => NEW_CLIENT_FIELD_LABEL[f]).join(' · ')} 찾음`
-                        : note?.docLabel
-                          ? `${note.docLabel} — 등록하면 서류함에 넣어요`
-                          : '등록하면 서류함에 넣어요(칸은 제목으로 정해요)'}
+                        : it.readNote
+                          ? `${it.readNote} 등록하면 서류함에는 넣어요.`
+                          : note?.docLabel
+                            ? `${note.docLabel} — 등록하면 서류함에 넣어요`
+                            : '등록하면 서류함에 넣어요(칸은 제목으로 정해요)'}
                   </span>
                 </span>
                 <button
