@@ -501,7 +501,8 @@ export function BulkDocUploadSheet({
             {autoNote}
           </p>
         )}
-        {!uploadable && (
+        {/* D-462 파일을 넣은 뒤에는 안내 · 넣는 곳을 줄여 진행 목록이 첫 화면에 보이게(휴대폰에서 목록이 아래로 밀려 안 보였다) */}
+        {!uploadable && items.length === 0 && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
             지금은 이 브라우저에만 저장되는 모드입니다. 종류 판별과 받음·발급일·파일 이름은 기록되고, 파일 자체는 클라우드(Supabase)를
             연결하면 보관됩니다.
@@ -512,7 +513,13 @@ export function BulkDocUploadSheet({
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="flex flex-col items-center gap-2 rounded-(--radius-panel) border-2 border-dashed border-slate-300 px-5 py-6 text-center"
+          data-testid="bulk-drop"
+          data-compact={items.length > 0 ? 'yes' : 'no'}
+          className={
+            items.length > 0
+              ? 'flex flex-wrap items-center justify-center gap-2 rounded-(--radius-panel) border-2 border-dashed border-slate-300 px-2 py-2 text-center'
+              : 'flex flex-col items-center gap-2 rounded-(--radius-panel) border-2 border-dashed border-slate-300 px-5 py-6 text-center'
+          }
         >
           <input
             ref={fileRef}
@@ -536,22 +543,24 @@ export function BulkDocUploadSheet({
               e.target.value = ''
             }}
           />
-          <FileUp aria-hidden="true" className="size-7 text-brand-500" />
-          <p className="text-[1.02rem] font-semibold text-slate-800">여기에 파일을 끌어다 놓거나</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
+          {items.length === 0 && <FileUp aria-hidden="true" className="size-7 text-brand-500" />}
+          <p className={items.length > 0 ? 'hidden t-sub text-slate-600 sm:block' : 'text-[1.02rem] font-semibold text-slate-800'}>{items.length > 0 ? '더 넣기 — 끌어다 놓거나' : '여기에 파일을 끌어다 놓거나'}</p>
+          <div className={`flex flex-wrap justify-center ${items.length > 0 ? 'gap-1.5' : 'gap-2'}`}>
+            <Button variant="secondary" size={items.length > 0 ? 'sm' : undefined} disabled={busy} onClick={() => fileRef.current?.click()}>
               <FileUp aria-hidden="true" className="size-4" />
               파일 고르기
             </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => folderRef.current?.click()}>
+            <Button variant="secondary" size={items.length > 0 ? 'sm' : undefined} disabled={busy} onClick={() => folderRef.current?.click()}>
               <FolderUp aria-hidden="true" className="size-4" />
               폴더째 고르기
             </Button>
           </div>
-          <p className="text-[0.88rem] break-keep text-slate-500">
-            PDF · 사진 · 엑셀(xlsx · 옛 xls) · 한글(hwp · hwpx) · 워드(docx · 옛 doc) · 파워포인트(pptx)는 내용을 읽어 어느 칸인지 가리고, 압축(zip)은 풀어서 하나씩 넣습니다.
-            그 밖의 파일은 파일 이름으로 가립니다. 사진과 스캔본은 처음 한 번 한글 인식 준비가 걸립니다.
-          </p>
+          {items.length === 0 && (
+            <p className="text-[0.88rem] break-keep text-slate-500">
+              PDF · 사진 · 엑셀(xlsx · 옛 xls) · 한글(hwp · hwpx) · 워드(docx · 옛 doc) · 파워포인트(pptx)는 내용을 읽어 어느 칸인지 가리고, 압축(zip)은 풀어서 하나씩 넣습니다.
+              그 밖의 파일은 파일 이름으로 가립니다. 사진과 스캔본은 처음 한 번 한글 인식 준비가 걸립니다.
+            </p>
+          )}
         </div>
 
         {items.length > 0 && (
