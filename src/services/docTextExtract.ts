@@ -556,6 +556,8 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
     // D-463 암호가 걸린 PDF(은행 거래내역 · 4대보험 EDI 명부 등) — 예전에는 까닭 없이 빈 글('기타'). 한 줄로 알린다(파일은 그대로 보관)
     const { text, pages } = await extractPdfText(file, onProgress).catch((e: unknown) => {
       if (isPdfPasswordError(e)) throw new OfficeReadError(PDF_PASSWORD_NOTE)
+      // D-464 깨진 PDF(받다 끊김 · 이름만 .pdf) — 까닭 한 줄
+      if ((e as { name?: string } | null)?.name === 'InvalidPDFException') throw new OfficeReadError(PDF_BROKEN_NOTE)
       throw e
     })
     if (hasEnoughText(text)) {
@@ -589,6 +591,7 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   return { text: await ocrImage(canvas, onProgress), method: 'ocr' }
 }
 
+export const PDF_BROKEN_NOTE = 'PDF 파일이 깨져 열 수 없습니다 — 받다가 끊겼거나 PDF 가 아닌 파일일 수 있어요. 원본을 다시 받아 올려 주세요.'
 export const PDF_PASSWORD_NOTE = '암호가 걸린 PDF 라 글자를 읽을 수 없습니다 — 암호를 풀어(열어서 인쇄 → PDF 로 저장) 다시 올려 주세요.'
 /** pdf.js 가 암호 때문에 못 열었을 때(PasswordException) */
 export function isPdfPasswordError(e: unknown): boolean {
@@ -611,6 +614,8 @@ export function longScanNote(total: number, max = MAX_OCR_PAGES): string {
 /** D-432 사진을 못 열었을 때 사람 말 — 아이폰 HEIC 면 바꾸는 법까지 */
 export function imageOpenFailNote(file: { name: string; type: string }): string {
   if (/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) return '아이폰 사진(HEIC)은 이 브라우저에서 글자를 읽을 수 없어요 — JPG 로 바꿔 올리거나(아이폰 설정 › 카메라 › 포맷 › 높은 호환성) PDF 로 보내 주세요.'
+  // D-464 스캐너가 흔히 저장하는 TIFF — 크롬 · 엣지는 열지 못한다
+  if (/tiff?/i.test(file.type) || /\.tiff?$/i.test(file.name)) return '스캐너 TIFF(.tif) 파일은 이 브라우저에서 글자를 읽을 수 없어요 — 스캐너에서 PDF 나 JPG 로 저장해 올려 주세요.'
   return '사진을 열지 못했어요(파일이 깨졌거나 이 브라우저가 모르는 형식) — 다시 찍거나 PDF 로 보내 주세요.'
 }
 

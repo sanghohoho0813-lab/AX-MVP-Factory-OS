@@ -5,7 +5,7 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile, longScanNote, isPdfPasswordError, maxOcrPagesFor, mixedScanPages, ocrParallelFor, PDF_PASSWORD_NOTE, pickQuarterTurn, TURN_CHECK_BELOW, whitenRedStamps } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote, imageOpenFailNote, isPdfPasswordError, maxOcrPagesFor, mixedScanPages, ocrParallelFor, PDF_BROKEN_NOTE, PDF_PASSWORD_NOTE, pickQuarterTurn, TURN_CHECK_BELOW, whitenRedStamps } from '../docTextExtract'
 import { joinSplitAddress, parseKoreanBusinessDocument } from '../koreanDocParser'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
@@ -474,6 +474,7 @@ async function main() {
   check('D-459 긴 스캔 PDF — PC(두 장씩)는 앞 6쪽 · 휴대폰은 앞 4쪽 · 안내 글도 그 쪽 수로', maxOcrPagesFor(2) === 6 && maxOcrPagesFor(1) === 4 && longScanNote(12, 6).startsWith('스캔본 12쪽 중 앞 6쪽만') && longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만'))
   check('D-460 누운 · 거꾸로 된 서류 — 처음 자신감 41 · 돌려 본 것 91 이면 그 방향 · 셋 다 낮거나(55) 차이가 작으면(처음 58 · 돌림 66) 그대로 · 바로 선 서류(77 이상)는 돌려 보지 않음', pickQuarterTurn(41, [{ deg: 90, conf: 37 }, { deg: 180, conf: 91 }, { deg: 270, conf: 39 }]) === 180 && pickQuarterTurn(40, [{ deg: 90, conf: 55 }, { deg: 180, conf: 44 }, { deg: 270, conf: 50 }]) === 0 && pickQuarterTurn(58, [{ deg: 90, conf: 66 }, { deg: 180, conf: 40 }, { deg: 270, conf: 41 }]) === 0 && TURN_CHECK_BELOW <= 77)
   check('D-463 암호 PDF — pdf.js 의 PasswordException 을 알아보고(다른 오류는 아님) "암호가 걸린 PDF … 암호를 풀어 … 다시 올려" 한 줄', isPdfPasswordError({ name: 'PasswordException', message: 'No password given' }) && !isPdfPasswordError(new Error('Invalid PDF structure')) && PDF_PASSWORD_NOTE.startsWith('암호가 걸린 PDF') && PDF_PASSWORD_NOTE.includes('다시 올려'))
+  check('D-464 스캐너 TIFF · 깨진 PDF — 까닭 한 줄("스캐너 TIFF(.tif) … PDF 나 JPG 로" · "PDF 파일이 깨져 …")', imageOpenFailNote({ name: 'scan001.TIF', type: '' }).startsWith('스캐너 TIFF') && imageOpenFailNote({ name: 'x', type: 'image/tiff' }).startsWith('스캐너 TIFF') && imageOpenFailNote({ name: 'a.jpg', type: 'image/jpeg' }).startsWith('사진을 열지 못했어요') && PDF_BROKEN_NOTE.startsWith('PDF 파일이 깨져'))
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }
