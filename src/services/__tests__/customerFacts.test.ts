@@ -14,6 +14,7 @@ import { readSiteReport } from '../siteReportDoc'
 import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog, analyzeUploadedDocs } from '../docAutoAnalyze'
+import { companyNoAnchor, foreignDocOf } from '../foreignDoc'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
 import { NOTE_RECHECK, sameAddress, customFactValue, researchLabOf, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
 import { fitContext, scenarioFit, withScenarioAnswer } from '../scenarioFit'
@@ -3111,6 +3112,36 @@ await (async () => {
   const day1 = await analyzeUploadedDocs(empty, [biz], ctx('2026-10-02T00:00:00.000Z'))
   const day2 = await analyzeUploadedDocs(day1.record, [tax(TAX('124-81-00998'))], ctx('2026-10-03T00:00:00.000Z'))
   check('D-475 다음 날 납세증명서만 올려도 → 지난번 대표자 · 주소 바로 입력(D-474)', day2.record.representativeName === '이대표' && day2.record.businessAddress === '경기도 성남시 분당구 판교로 100, 3층' && !pendingFacts(day2.record).some((p) => p.key === 'representativeName' || p.key === 'businessAddress'), JSON.stringify({ r: day2.record.representativeName, a: day2.record.businessAddress, p: pendingFacts(day2.record).map((p) => p.key) }))
+})()
+
+// D-476 다른 회사 서류(사업자등록번호가 확실히 다르고 이 업체 번호는 어디에도 없음) — 회사 정보 · 맞춰 보기에 쓰지 않고 알린다
+await (async () => {
+  const BIZ_A = `사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n사업장 소재지 : 경기도 성남시 분당구 판교로 100\n업태 : 제조업`
+  const BIZ_B = `사업자등록증\n(법인사업자)\n등록번호 : 214-86-12341\n법인명(단체명) : 주식회사 한빛상사\n대표자 : 김한빛\n사업장 소재지 : 서울특별시 중구 세종대로 1\n업태 : 도매`
+  const TAX_B = `납 세 증 명 서\n상호(법인명) 주식회사 한빛상사\n사업자등록번호 214-86-12341\n성명(대표자) 김한빛\n주소(본점) 서울특별시 중구 세종대로 1\n체납액 없음\n유효기간 2026년 11월 19일`
+  const LEASE = `부동산 임대차 계약서\n임대인 주식회사 한빛상사 사업자등록번호 214-86-12341\n임차인 주식회사 미래바이오랩 사업자등록번호 124-81-00998\n소재지 경기도 성남시 분당구 판교로 100`
+  const withNo = normalizeClientOps({ id: 'af476', companyName: '미래바이오랩', businessNumber: '124-81-00998', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const noNo = normalizeClientOps({ id: 'af476b', companyName: '미래바이오랩', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const ctx = { now: '2026-10-02T00:00:00.000Z', today: '2026-10-02', makeId: () => `d476-${++n}` }
+  const pdf = (key: string, fileName: string, text: string) => ({ key, fileName, text, method: 'pdf-text' as const, docSure: true })
+  const a = await analyzeUploadedDocs(withNo, [pdf('businessRegistration', '한빛_사업자.pdf', BIZ_B)], ctx)
+  check('D-476 업체 번호가 있는데 다른 회사 사업자등록증 → 대표자 · 주소 · 업태 넣지 않음(예전: 김한빛 · 서울 중구 · 도매가 빈 칸에 들어감)', a.record.representativeName === '' && a.record.businessAddress === '' && a.record.businessCategory === '' && a.summary.entered.length === 0, JSON.stringify({ r: a.record.representativeName, a: a.record.businessAddress, e: a.summary.entered.map((x) => x.key) }))
+  check('D-476 까닭 한 줄(파일 이름 · 그 번호 · 회사 이름 · 이 업체 번호)', a.summary.warnings.some((w) => w.includes('한빛_사업자.pdf') && w.includes('214-86-12341') && w.includes('한빛상사') && w.includes('124-81-00998')), JSON.stringify(a.summary.warnings))
+  const b = await analyzeUploadedDocs(noNo, [pdf('businessRegistration', '미래_사업자.pdf', BIZ_A), pdf('businessRegistration', '한빛_사업자.pdf', BIZ_B), pdf('taxClearance', '한빛_납세.pdf', TAX_B)], ctx)
+  check('D-476 업체 번호가 비어도 — 이름이 맞는 사업자등록증(미래바이오랩)이 이 업체 번호 → 그 값만 넣고 한빛상사 두 장은 알림', b.record.businessNumber === '124-81-00998' && b.record.representativeName === '이대표' && b.summary.warnings.length === 2 && !b.summary.flagged.some((f) => f.key === 'representativeName' || f.key === 'businessNumber'), JSON.stringify({ no: b.record.businessNumber, r: b.record.representativeName, w: b.summary.warnings.length, f: b.summary.flagged.map((f) => f.key) }))
+  const c = await analyzeUploadedDocs(withNo, [pdf('leaseContract', '임대차계약서.pdf', LEASE)], ctx)
+  check('D-476 두 회사 번호가 같이 적힌 서류(임대차계약서)는 다른 회사로 보지 않음', c.summary.warnings.length === 0, JSON.stringify(c.summary.warnings))
+  const d = await analyzeUploadedDocs(withNo, [pdf('businessRegistration', '미래_사업자.pdf', BIZ_A)], ctx)
+  check('D-476 이 업체 사업자등록증은 그대로(알림 없음 · 대표자 넣음)', d.summary.warnings.length === 0 && d.record.representativeName === '이대표')
+  const unsure = `사업자등록증\n(법인사업자)\n등록번호 : 214-86-1234l\n법인명(단체명) : 주식회사 한빛상사\n대표자 : 김한빛`
+  const e = await analyzeUploadedDocs(withNo, [{ key: 'businessRegistration', fileName: 'scan.jpg', text: unsure, method: 'ocr' as const, docSure: true }], ctx)
+  check('D-476 번호가 확실하지 않은 스캔은 다른 회사로 단정하지 않음(예전처럼 확인)', e.summary.warnings.length === 0, JSON.stringify(e.summary.warnings))
+  check('D-476 companyNoAnchor — 업체 번호 없고 이름 맞는 사업자등록증이 둘이면(번호 다름) 모름', companyNoAnchor({ businessNumber: '', companyName: '미래바이오랩' }, [{ key: 'businessRegistration', text: BIZ_A }, { key: 'businessRegistration', text: BIZ_A.replace('124-81-00998', '214-86-12341') }]) === '')
+  const typo = normalizeClientOps({ id: 'af476c', companyName: '한빛상사', businessNumber: '124-81-00998', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const g = await analyzeUploadedDocs(typo, [pdf('businessRegistration', '한빛_사업자.pdf', BIZ_B)], ctx)
+  check('D-476 서류 회사 이름이 이 업체 이름과 같으면(업체 번호를 잘못 적어 둔 것) 다른 회사로 보지 않고 예전처럼 번호를 물음', g.summary.warnings.length === 0 && g.summary.flagged.some((f) => f.key === 'businessNumber') && g.record.businessNumber === '124-81-00998', JSON.stringify({ w: g.summary.warnings, f: g.summary.flagged.map((f) => f.key) }))
+  check('D-476 foreignDocOf — 크레탑 · 재무제표처럼 서류 주인 번호 서류가 아니면 보지 않음', foreignDocOf({ key: 'financialStatements', text: '손익계산서\n상호 한빛상사 사업자등록번호 214-86-12341\n매출액 1,000,000' }, '1248100998') === null)
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

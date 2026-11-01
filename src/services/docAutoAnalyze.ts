@@ -21,6 +21,7 @@
  *
  * 무거운 엔진(크레탑 · 명부)은 필요할 때만 불러온다. 규칙 계산 — 외부 호출 없음. 저장은 부르는 쪽.
  */
+import { companyNoAnchor, foreignDocNote, foreignDocOf } from './foreignDoc'
 import type { ClientOpsRecord, DocUploadLog } from '../types/clientOps'
 import { withToolResult } from './clientOpsService'
 import { formatWon, pendingFacts, readFact, usableFactValue, withFactDecisions, withFactValue } from './customerFacts'
@@ -136,7 +137,14 @@ export async function analyzeUploadedDocs(
   const { now, today, makeId } = opts
   const warnings: string[] = []
   // D-452 사진 · 스캔 글은 깨진 제목 · 이름표를 바로잡고 읽는다('숭소기업 확인서' · '유흡기간')
-  const readable = docs.filter((d) => d.text.replace(/\s/g, '').length >= 10).map((d) => (d.method === 'ocr' ? { ...d, text: fixOcrHeads(d.text) } : d))
+  const fixed = docs.filter((d) => d.text.replace(/\s/g, '').length >= 10).map((d) => (d.method === 'ocr' ? { ...d, text: fixOcrHeads(d.text) } : d))
+  // D-476 다른 회사 서류(번호가 확실히 다르고 이 업체 번호는 어디에도 없음) — 회사 정보 · 맞춰 보기 · 크레탑 · 명부에 쓰지 않고 알린다(파일은 '기타' 칸에)
+  const anchor = companyNoAnchor(record, fixed)
+  const readable = fixed.filter((d) => {
+    const f = foreignDocOf(d, anchor, record.companyName)
+    if (f) warnings.push(foreignDocNote(d.fileName, f, anchor))
+    return !f
+  })
   // 1. 회사 정보(크레탑 · 명부 글은 회사 정보 읽기에 넣지 않는다 — 그 안의 숫자는 각 엔진이 읽는다)
   const cretopDocs = readable.filter(looksLikeCretop)
   // D-303 주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게 회사 정보 읽기에서 뺀다(주주표로 따로).

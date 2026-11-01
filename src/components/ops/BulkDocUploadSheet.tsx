@@ -31,6 +31,7 @@ import type { HandoffDoc } from '../../services/docHandoff'
 import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
 import { OfficeReadError } from '../../services/officeText'
 import { pagesLabel, splitBundle, type BundlePart } from '../../services/docBundle'
+import { companyNoAnchor, foreignDocOf, type ForeignDoc } from '../../services/foreignDoc'
 
 /** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
 function shortName(fileName: string): string {
@@ -345,7 +346,16 @@ export function BulkDocUploadSheet({
       const readDocs: ReadDoc[] = []
       const placed: NonNullable<DocBatchSummary['placed']> = []
       const used = new Set<string>()
-      for (const { it, placement, patch: filePatch } of stored) {
+      // D-476 다른 회사 서류(사업자등록번호가 확실히 다르고 이 업체 번호는 어디에도 없음) — 맞는 칸(납세증명서 등) 대신 '기타' 칸에 · 까닭을 메모로.
+      //        정책자금 '체납 없음' 같은 근거로 쓰이지 않게(회사 정보에도 쓰지 않음 — analyzeUploadedDocs)
+      const anchor = companyNoAnchor(base, stored.flatMap(({ it, placement }) => [{ key: placement.kind === 'existing' ? placement.key : '', text: it.text, method: methodFor(it, it.firstPages) }, ...(it.bundle ?? []).map((pt) => ({ key: pt.placement.kind === 'existing' ? pt.placement.key : '', text: pt.text, method: methodFor(it, pt) }))]))
+      const foreignOf = (key: string, text: string, method: string) => foreignDocOf({ key, text, method }, anchor, base.companyName)
+      const asForeign = (fileName: string): DocPlacement => ({ kind: 'new', label: `${OTHER_DOC_LABEL} · 다른 회사 · ${shortName(fileName)}`, sure: true, reason: '', issuedAt: null })
+      const foreignMemo = (f: ForeignDoc) => `다른 회사 서류 같아요 — 사업자등록번호 ${f.no}${f.name ? `(${f.name})` : ''}`
+      for (const { it, placement: chosen, patch: chosenPatch } of stored) {
+        const foreign = foreignOf(chosen.kind === 'existing' ? chosen.key : '', it.text, methodFor(it, it.firstPages))
+        const placement = foreign ? asForeign(it.file.name) : chosen
+        const filePatch = foreign ? { ...chosenPatch, note: foreignMemo(foreign) } : chosenPatch
         const cell = cellForPlacement(rec, placement, used)
         rec = withDocument(cell.record, cell.key, filePatch)
         const sig = `${it.file.name}|${it.file.size}`
@@ -358,10 +368,12 @@ export function BulkDocUploadSheet({
         // D-386 같은 파일 안의 다른 서류 — 칸은 '받음' + '○○.pdf 3쪽에 함께'(파일을 두 번 올리지 않는다) · 글자는 그 쪽만
         for (const part of it.bundle ?? []) {
           const where = `${it.file.name} ${pagesLabel(part)}`
-          const c2 = cellForPlacement(rec, part.placement, used)
-          rec = withDocument(c2.record, c2.key, { received: true, note: `${where}에 함께`, ...(part.placement.issuedAt ? { issuedAt: part.placement.issuedAt } : {}) })
+          const pf = foreignOf(part.placement.kind === 'existing' ? part.placement.key : '', part.text, methodFor(it, part))
+          const partPlacement = pf ? asForeign(where) : part.placement
+          const c2 = cellForPlacement(rec, partPlacement, used)
+          rec = withDocument(c2.record, c2.key, { received: true, note: pf ? `${where}에 함께 · ${foreignMemo(pf)}` : `${where}에 함께`, ...(part.placement.issuedAt ? { issuedAt: part.placement.issuedAt } : {}) })
           placed.push({ fileName: where, label: c2.label, other: c2.label.startsWith(OTHER_DOC_LABEL), numbered: c2.numbered })
-          readDocs.push({ key: part.placement.kind === 'existing' ? part.placement.key : c2.key, fileName: where, text: part.text, method: methodFor(it, part), docSure: part.placement.sure })
+          readDocs.push({ key: partPlacement.kind === 'existing' ? partPlacement.key : c2.key, fileName: where, text: part.text, method: methodFor(it, part), docSure: part.placement.sure })
         }
       }
       return { rec, readDocs, placed }

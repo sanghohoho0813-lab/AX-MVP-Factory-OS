@@ -2086,6 +2086,45 @@ for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440'
   await ctx.close()
 }
 
+/* ---------------- D-476 다른 회사 서류가 섞인 묶음 — 회사 정보에 쓰지 않고 '기타 · 다른 회사' 칸 · 빨간 한 줄 ---------------- */
+for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440' }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = '2026-10-01T00:00:00.000Z'
+    list.push({ id: 'cli_mix476', companyName: '미래바이오랩', status: 'active', createdAt: now, updatedAt: now })
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/ops/clients/cli_mix476?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const txt = (name, lines) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(lines.join('\n'), 'utf8') })
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([
+    txt('미래_사업자등록증.txt', ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', '사업장 소재지 : 경기도 성남시 분당구 판교로 100', '업태 : 제조업 종목 : 의약품']),
+    txt('한빛_사업자등록증.txt', ['사업자등록증', '(법인사업자)', '등록번호 : 214-86-12341', '법인명(단체명) : 주식회사 한빛상사', '대표자 : 김한빛', '사업장 소재지 : 서울특별시 중구 세종대로 1', '업태 : 도매']),
+    txt('한빛_납세증명서.txt', ['납 세 증 명 서', '상호(법인명) 주식회사 한빛상사', '사업자등록번호 214-86-12341', '성명(대표자) 김한빛', '주소(본점) 서울특별시 중구 세종대로 1', '체납액 없음', '유효기간 2026년 11월 19일', '발급일자 2026년 10월 20일']),
+  ])
+  await page.getByTestId('smart-batch').waitFor({ timeout: 60000 })
+  await page.waitForTimeout(1200)
+  const batch = (await page.getByTestId('smart-batch').innerText()).replace(/\s+/g, ' ')
+  const r = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_mix476'))
+  check(`D-476 ${vp.tag} 이 업체 사업자등록증 값만(대표자 이대표 · 판교로 · 제조업 · 번호 124-81-00998) — 한빛상사 대표 · 주소 · 업태가 들어가지 않음`, r?.representativeName === '이대표' && r?.businessAddress?.includes('판교로 100') && r?.businessCategory === '제조업' && r?.businessNumber === '124-81-00998', JSON.stringify([r?.representativeName, r?.businessAddress, r?.businessCategory, r?.businessNumber]))
+  const docs = Object.entries(r?.documents ?? {}).filter(([, d]) => d?.fileName)
+  const taxSlot = docs.find(([, d]) => d.fileName === '한빛_납세증명서.txt')
+  const labelOf = (key) => (r?.customDocuments ?? []).find((c) => c.key === key)?.label ?? key
+  check(`D-476 ${vp.tag} 한빛 납세증명서는 납세증명서 칸이 아니라 '기타 · 다른 회사' 칸 · 메모(정책자금 '체납 없음' 근거로 쓰이지 않게)`, !!taxSlot && labelOf(taxSlot[0]).includes('다른 회사') && (taxSlot[1].note ?? '').includes('214-86-12341'), JSON.stringify(taxSlot && [labelOf(taxSlot[0]), taxSlot[1].note]))
+  check(`D-476 ${vp.tag} 빨간 한 줄 두 개 — 파일 이름 · 한빛상사 · 그 번호 · 이 업체 번호`, (batch.match(/다른 회사\(주식회사 한빛상사 · 214-86-12341\) 서류 같아/g) ?? []).length === 2 && batch.includes('이 업체 124-81-00998'), batch.slice(0, 600))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D-476 ${vp.tag} 넘침 0 · 오류 0`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

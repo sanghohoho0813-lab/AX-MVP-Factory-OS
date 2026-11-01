@@ -25,6 +25,7 @@ import { readSiteReport } from './siteReportDoc'
 import { incomeProfitLine, incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
 import { parseFinancialStatement } from './finStatementParser'
 import { looksLikeShareholderRegister, readShareholderDoc } from './shareholderDoc'
+import { ID_CERT_RE } from './foreignDoc'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -148,11 +149,7 @@ function registerCeoName(doc: ReadDoc): string {
   return ceos.length === 1 ? ceos[0].name : ''
 }
 
-/**
- * D-475 회사 이름 · 번호 · 대표자 · 주소가 같이 적힌 증명서 · 확인서(사업자등록증 · 등기부 말고) — 국세 · 지방세 납세증명서 · 4대보험 완납증명서 ·
- * 중소기업(소상공인) · 벤처 · 이노비즈 · 메인비즈 · 여성기업 확인서 · 연구소 인정서 · 홈택스 과세표준 · 소득금액 · 표준재무제표 증명.
- */
-const ID_CERT_RE = /납\s*세\s*증\s*명|완\s*납\s*증\s*명|중\s*소\s*기\s*업\s*(?:\(\s*소\s*상\s*공\s*인\s*\)\s*)?확\s*인|소\s*상\s*공\s*인\s*확\s*인|벤\s*처\s*기\s*업\s*확\s*인|이\s*노\s*비\s*즈|메\s*인\s*비\s*즈|여\s*성\s*기\s*업\s*확\s*인|연\s*구\s*(?:소|개\s*발\s*전\s*담\s*부\s*서)\s*인\s*정|과\s*세\s*표\s*준\s*증\s*명|소\s*득\s*금\s*액\s*증\s*명|표\s*준\s*재\s*무\s*제\s*표\s*증\s*명/
+/** D-475 증명서 · 확인서(ID_CERT_RE — foreignDoc 와 같은 목록)의 주소는 시 · 도로 시작하는 것만 */
 const SIDO_START = /^(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남|제주)/
 
 /** 맞춰 보는 데만 쓰는 값 하나 — 칸을 채우지 않는다 */

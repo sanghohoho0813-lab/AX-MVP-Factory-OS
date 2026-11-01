@@ -12,6 +12,7 @@
  * 규칙 계산이다 — 외부 호출 없음. 클라우드가 아니면 파일이 없으니 파일 이름으로만 본다.
  */
 
+import { companyNoAnchor, foreignDocOf } from '../../services/foreignDoc'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -68,8 +69,14 @@ export function DocResortSheet({
         out.push({ ...resortDecision(meta.key, meta.label, state.fileName, placement), text, method })
         setReading({ done: i + 1, total: cells.length })
       }
-      setItems(out)
-      setPicked(new Set(out.filter((x) => x.move).map((x) => x.fromKey)))
+      // D-476 다른 회사 서류(사업자등록번호가 확실히 다르고 이 업체 번호는 어디에도 없음)는 맞는 칸으로 옮기자고 하지 않는다 — 정책자금 근거로 쓰이지 않게
+      const anchor = companyNoAnchor(record, out.map((x) => ({ key: x.fromKey, text: x.text, method: x.method })))
+      const marked = out.map((x) => {
+        const f = x.move ? foreignDocOf({ key: x.fromKey, text: x.text, method: x.method }, anchor, record.companyName) : null
+        return f ? { ...x, move: false, why: `다른 회사 서류 같아 그대로 둠 — 사업자등록번호 ${f.no}${f.name ? `(${f.name})` : ''}` } : x
+      })
+      setItems(marked)
+      setPicked(new Set(marked.filter((x) => x.move).map((x) => x.fromKey)))
       setReading(null)
     }
     void run()
