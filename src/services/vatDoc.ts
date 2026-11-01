@@ -189,6 +189,16 @@ export function vatSummary(read: VatRead, fmt: (won: number) => string): string 
  * D-333 매출 추이(부가세 과세표준증명 요약 줄) → 정책자금 엔진의 3년 추세 · 올해 추세.
  * '…(부가세 과세표준 · 2024년보다 +20%) · 2026년 6개월 …(작년 같은 기간보다 +17%)' 에서 숫자만 읽는다. ±3% 안은 유지 · 비슷.
  */
+/**
+ * D-441 '매출 추이' 줄 → 짧게 — '2024년보다 +41% · 올해 6개월 작년보다 +27%'. 한 해 · 몇 달 성장률이 하나도 없으면 ''.
+ * 정책자금 카드 · 진단서처럼 줄을 다 쓰면 넘치는 곳에서(D-437 로 줄이 길어짐).
+ */
+export function trendShort(line: string): string {
+  const y = /(\d{4}년보다\s*[+-]?\d+%)/.exec(line)?.[1]
+  const p = /(20\d{2})년 (\d{1,2})개월 [^(]*\([^)]*작년 같은 기간보다\s*([+-]?\d+%)\)/.exec(line)
+  return [y ?? '', p ? `${p[1]}년 ${p[2]}개월 작년보다 ${p[3]}` : ''].filter(Boolean).join(' · ')
+}
+
 export function vatTrendOf(summary: string): { trend3y: '증가' | '유지' | '감소' | null; thisYear: '전년보다 증가' | '비슷' | '감소' | null } {
   const y = /\d{4}년보다 ([+-]?\d+)%/.exec(summary)?.[1]
   const t = /작년 같은 기간보다 ([+-]?\d+)%/.exec(summary)?.[1]

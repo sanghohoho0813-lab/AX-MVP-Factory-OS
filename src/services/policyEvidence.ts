@@ -24,7 +24,7 @@ import { documentStatus } from './clientOpsAlerts'
 import { CUSTOM_FACT_PREFIX, customFactEntries, customFactValue, usableFactValue } from './customerFacts'
 import { yearOverYear } from './withholdingReport'
 import { vatYearOverYear, vatYoyText } from './vatReturnDoc'
-import { vatTrendOf } from './vatDoc'
+import { trendShort, vatTrendOf } from './vatDoc'
 import { latestEmploymentRoster } from './toolResultGroups'
 import { headcountOf, headText } from '../tools/employment/lib/taxCredit'
 import { creditBandOf, creditScoreDateOf, lowestScoreOf } from './creditScoreDoc'
@@ -132,8 +132,11 @@ export function policyEvidence(record: ClientOpsRecord, facts: Pick<ClientFacts,
     const t = vatTrendOf(trendLine)
     if (t.trend3y && !input.revenueTrend3y) input.revenueTrend3y = t.trend3y
     if (t.thisYear && !input.thisYearTrend) input.thisYearTrend = t.thisYear
-    if (t.trend3y === '증가' || t.thisYear === '전년보다 증가') front.push(`매출 증가(${trendLine.replace(/\(부가세 과세표준 · /, '(').slice(0, 60)})`)
-    else if (t.trend3y === '감소' || t.thisYear === '감소') notes.push(`매출 감소(${trendLine.slice(0, 60)}) — 부결 사유가 되기 쉬워요`)
+    // D-441 줄이 길면(한 해 + 올해 몇 달 — D-437) 성장률만 짧게
+    const short = trendShort(trendLine)
+    const shown = short && trendLine.length > 60 ? short : trendLine
+    if (t.trend3y === '증가' || t.thisYear === '전년보다 증가') front.push(`매출 증가(${shown.replace(/\(부가세 과세표준 · /, '(').slice(0, 60)})`)
+    else if (t.trend3y === '감소' || t.thisYear === '감소') notes.push(`매출 감소(${shown.slice(0, 60)}) — 부결 사유가 되기 쉬워요`)
   }
   // D-310 고용 증가 · 청년 직원 — 4대보험 명부
   const hire = policyHiring(record, today)

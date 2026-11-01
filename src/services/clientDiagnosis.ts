@@ -180,6 +180,11 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   const vy = vatYearOverYear(customFactValue(record, '부가세 신고 추이'))
   const vyText = vy ? ` · 작년 같은 기간보다 ${vy.pct > 0 ? '+' : ''}${vy.pct}%` : ''
   if (vatRet && vatYear && (!facts.revenue || !revYear || vatYear > revYear)) snapshot.push({ label: '부가세 신고', value: `${vatRet.replace(' 과세표준 ', ' · ')}${vyText}`.slice(0, 80) })
+  else {
+    // D-441 '매출 추이' 에 붙은 올해 몇 달(과세표준증명 · D-437) — 한 해 매출보다 새 해일 때만 '올해 매출' 한 줄
+    const part = /(20\d{2})년 (\d{1,2})개월 ([^(]+?)\s*\([^)]*작년 같은 기간보다\s*([+-]?\d+%)\)/.exec(customFactValue(record, '매출 추이'))
+    if (part && revYear && Number(part[1]) > revYear) snapshot.push({ label: '올해 매출', value: `${part[1]}년 ${part[2]}개월 ${part[3]} · 작년 같은 기간보다 ${part[4]}` })
+  }
   // D-374 개인사업자는 사업소득(소득금액증명)이 법인전환 · 정책자금 판단의 근거 — 회사 한눈에 같이
   if (facts.businessType === 'individual' && facts.netIncome && facts.netIncome.won > 0 && !facts.netIncome.estimated) {
     const y = facts.netIncome.asOf?.slice(0, 4) ?? ''

@@ -48,7 +48,7 @@ import { policyBonus, policyDocs, policyEvidence, policyHiring, policyRecordBonu
 import { continuingOf, looksLikeWorkRules, readRetireRule, retireRuleLine } from '../workRules'
 import { ceoWageReceipt, looksLikePayrollLedger, looksLikeWageReceipt, monthlyPayOf, readLedgerCeoPay, readWageReceipts } from '../wageReceipt'
 import { credentialsOf } from '../grants/grantProfile'
-import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, vatSummary, vatTrendOf } from '../vatDoc'
+import { latestFullYear, looksLikeVatCert, readVatCert, sameMonthsLastYear, trendShort, vatSummary, vatTrendOf } from '../vatDoc'
 import { policyApplyAsk, policyApplyMessage } from '../policyApply'
 import { requestFollowUpText } from '../recoRequest'
 import { runDiagnosis } from '../../tools/policyFunding/diagnosis'
@@ -2836,6 +2836,19 @@ await (async () => {
   check('D-440 한 해 -5% · 올해 6개월 +27% → 가점 아님(예전: 뒤쪽 +27% 를 읽어 가점)', !has('2025년 8억원(소득금액증명 수입금액 · 2024년보다 -5%) · 2026년 6개월 5억원(부가세 과세표준 · 작년 같은 기간보다 +27%)'))
   check('D-440 한 해 +41% → 가점(뒤에 몇 달 줄이 붙어도)', has('2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%) · 2026년 6개월 5억 2,000만원(부가세 과세표준 · 작년 같은 기간보다 +27%)'))
 }
+
+// D-441 긴 '매출 추이' 줄(한 해 + 올해 몇 달) — 정책자금 카드는 성장률만 짧게 · 진단서 '올해 매출' 한 줄
+await (async () => {
+  const LINE = '2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%) · 2026년 6개월 5억 2,000만원(부가세 과세표준 · 작년 같은 기간보다 +27%)'
+  check('D-441 짧게 — "2024년보다 +41% · 2026년 6개월 작년보다 +27%"', trendShort(LINE) === '2024년보다 +41% · 2026년 6개월 작년보다 +27%', trendShort(LINE))
+  const rec = withFactValue(normalizeClientOps({ id: 'dg441', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 't', group: 'identity', label: '매출 추이', value: LINE }] } as never), 'revenue', '860000000', { source: 'incomeCertificate', status: 'entered', asOf: '2025', now: NOW })
+  const ev = policyEvidence(rec, clientFacts(rec, new Date('2026-10-31T00:00:00')), '2026-10-31')
+  const line = ev.notes.find((n) => n.startsWith('매출 증가')) ?? ''
+  check('D-441 정책자금 근거 줄 "매출 증가(2024년보다 +41% · 2026년 6개월 작년보다 +27%)"(예전: 60자에서 잘린 긴 줄)', line === '매출 증가(2024년보다 +41% · 2026년 6개월 작년보다 +27%)', line)
+  const sheet = buildDiagnosis(rec, buildInsights(rec, '2026-10-31', []), '2026-10-31')
+  const row = sheet.snapshot.find((x) => x.label === '올해 매출')
+  check('D-441 진단서 회사 한눈에 "올해 매출 2026년 6개월 5억 2,000만원 · 작년 같은 기간보다 +27%"', row?.value === '2026년 6개월 5억 2,000만원 · 작년 같은 기간보다 +27%', JSON.stringify(sheet.snapshot))
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
