@@ -2951,5 +2951,15 @@ await (async () => {
   check('D-454 대표자 이름은 받침 하나 차이도 다름(사람 이름은 그대로 묻는다)', !sameFactValue(other, '이대표', '이대펴'))
 })()
 
+// D-456 자주 받는데 '기타' 로 빠지던 서류 — 고용보험 취득자 명단 → 명부 칸 · 기술신용평가서 · 매출처별 / 매입처별 세금계산서 합계표 → 제 이름 칸
+;(() => {
+  const metas = allDocumentMetas(normalizeClientOps({ id: 'x', companyName: '미래' } as never))
+  const at = (t: string) => placeDocument({ text: `${t}\n발급일 2026.10.20\n상호 미래\n내용 줄 하나 둘 셋`, fileName: 'x.pdf' }, metas)
+  const roster = at('고용보험 피보험자격 취득자 명단')
+  check('D-456 "고용보험 피보험자격 취득자 명단" → 4대보험 가입자 명부 칸', roster.kind === 'existing' && roster.key === 'payrollRoster', JSON.stringify(roster))
+  check('D-456 기술신용평가서 · TCB 기술평가서 → "기술신용평가서" 칸(예전 기타)', at('기술신용평가서').label === '기술신용평가서' && at('TCB 기술평가 등급확인서').label === '기술신용평가서')
+  check('D-456 매출처별 · 매입처별 세금계산서 합계표 → 제 이름 칸(예전 기타)', at('매출처별 세금계산서 합계표').label === '매출처별 세금계산서 합계표' && at('매입처별 전자세금계산서 합계표').label === '매입처별 세금계산서 합계표')
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
