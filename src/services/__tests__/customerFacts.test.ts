@@ -3144,5 +3144,21 @@ await (async () => {
   check('D-476 foreignDocOf — 크레탑 · 재무제표처럼 서류 주인 번호 서류가 아니면 보지 않음', foreignDocOf({ key: 'financialStatements', text: '손익계산서\n상호 한빛상사 사업자등록번호 214-86-12341\n매출액 1,000,000' }, '1248100998') === null)
 })()
 
+// D-477 부가세 과세표준증명의 업태 · 종목 — 사업자등록증 스캔 종목(자유 글)과 같으면 바로 입력
+await (async () => {
+  const BIZ = `사 업 자 등 록 증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n사업장 소재지 : 경기도 성남시 분당구 판교로 100\n업태 : 제조업   종목 : 의약품`
+  const VAT = (item: string) => `부가가치세 과세표준증명\n상호(법인명) 주식회사 미래바이오랩\n사업자등록번호 124-81-00998\n성명(대표자) 이대표\n사업장소재지 경기도 성남시 분당구 판교로 100\n업태 제조업 종목 ${item}\n과세기간 신고구분 신고일 과세표준\n2025.01.01~2025.06.30 확정 2025.07.25 410,000,000\n2025.07.01~2025.12.31 확정 2026.01.25 450,000,000`
+  const empty = normalizeClientOps({ id: 'af477', companyName: '미래바이오랩', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const ctx = { now: '2026-10-02T00:00:00.000Z', today: '2026-10-02', makeId: () => `d477-${++n}` }
+  const ocr = (key: string, fileName: string, text: string) => ({ key, fileName, text, method: 'ocr' as const, docSure: true })
+  const ok = await analyzeUploadedDocs(empty, [ocr('businessRegistration', 'scan_01.jpg', BIZ), ocr('vatCertificate', 'scan_08.jpg', VAT('의약품'))], ctx)
+  check('D-477 사업자등록증 스캔 종목 "의약품" = 과세표준증명 종목 → 바로 입력(확인 안 물음)', ok.record.businessItem === '의약품' && !ok.summary.flagged.some((f) => f.key === 'businessItem'), JSON.stringify({ i: ok.record.businessItem, f: ok.summary.flagged.map((f) => f.key) }))
+  const diff = await analyzeUploadedDocs(empty, [ocr('businessRegistration', 'scan_01.jpg', BIZ), ocr('vatCertificate', 'scan_08.jpg', VAT('화장품'))], ctx)
+  check('D-477 종목이 다르면(화장품) 예전처럼 확인', diff.record.businessItem === '' && diff.summary.flagged.some((f) => f.key === 'businessItem'))
+  const alone = await analyzeUploadedDocs(empty, [ocr('vatCertificate', 'scan_08.jpg', VAT('의약품'))], ctx)
+  check('D-477 과세표준증명만 올리면 종목 칸은 비워 둔다(맞춰 보기만)', alone.record.businessItem === '', alone.record.businessItem)
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

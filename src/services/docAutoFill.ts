@@ -154,13 +154,13 @@ const SIDO_START = /^(?:서울|부산|대구|인천|광주|대전|울산|세종|
 
 /** 맞춰 보는 데만 쓰는 값 하나 — 칸을 채우지 않는다 */
 interface AgreeOnlyValue {
-  key: 'representativeName' | 'businessAddress'
+  key: 'representativeName' | 'businessAddress' | 'businessCategory' | 'businessItem'
   value: string
   fileName: string
 }
 
 /**
- * D-475 증명서 · 확인서에 적힌 대표자 · 주소 — 사업자등록증 · 등기부 스캔 값과 맞춰 보는 데만 쓴다(이것만으로 칸을 채우지 않는다).
+ * D-475 증명서 · 확인서에 적힌 대표자 · 주소(D-477 업태 · 종목도) — 사업자등록증 · 등기부 스캔 값과 맞춰 보는 데만 쓴다(이것만으로 칸을 채우지 않는다).
  * 이름은 한글 2~5자('주식회사' · '대표자' · '성명' 같은 칸 이름을 잘못 읽은 것은 버림) · 주소는 시 · 도로 시작하는 것만. 서류에 적힌 사업자등록번호가 이 업체 번호와 다르면 쓰지 않는다.
  */
 function certAgreeValues(doc: ReadDoc, nos: ReadonlySet<string>): AgreeOnlyValue[] {
@@ -173,6 +173,11 @@ function certAgreeValues(doc: ReadDoc, nos: ReadonlySet<string>): AgreeOnlyValue
   if (/^[가-힣]{2,5}$/.test(ceo) && !/주식|회사|법인|사업자/.test(ceo) && !/^(?:대표|성명|상호|명칭|납세자)/.test(ceo)) out.push({ key: 'representativeName', value: ceo, fileName: doc.fileName })
   const addr = (p.address ?? '').replace(/^\s*\([^)]*\)\s*/, '').trim()
   if (addr.length >= 8 && SIDO_START.test(addr)) out.push({ key: 'businessAddress', value: addr, fileName: doc.fileName })
+  // D-477 홈택스 증명(부가세 과세표준 · 소득금액 · 사업자등록증명 밖 증명)의 업태 · 종목 — 사업자등록증 스캔의 업태 · 종목과 같으면 두 서류가 같은 값
+  for (const [key, v] of [['businessCategory', p.businessCategory], ['businessItem', p.businessItem]] as const) {
+    const t = (v ?? '').trim()
+    if (t.length >= 2 && t.length <= 40 && /[가-힣]{2}/.test(t) && !t.includes('/')) out.push({ key, value: t, fileName: doc.fileName })
+  }
   return out
 }
 
