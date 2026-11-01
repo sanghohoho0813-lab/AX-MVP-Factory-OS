@@ -117,7 +117,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
             const n = s === 'all' ? ideas.length : counts[s]
             const on = stage === s
             return (
-              <button key={s} type="button" role="tab" aria-selected={on} onClick={() => setStage(on ? 'all' : s)} className={`tap flex min-h-14 flex-col items-center justify-center rounded-(--radius-control) border-2 px-1 py-1.5 ${on ? 'border-transparent bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-sm' : `bg-white ${s === 'all' ? 'border-slate-300 text-slate-800' : STAGE_TONE[s]}`}`} data-testid="make-stage" data-status={s}>
+              <button key={s} type="button" role="tab" aria-selected={on} onClick={() => setStage(on ? 'all' : s)} className={`tap flex min-h-14 flex-col items-center justify-center rounded-(--radius-control) border-2 px-1 py-1.5 ${on ? 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-200' : `bg-white ${s === 'all' ? 'border-slate-300 text-slate-800' : STAGE_TONE[s]}`}`} data-testid="make-stage" data-status={s}>
                 <span className="text-xl leading-none font-extrabold tabular-nums">{n}</span>
                 <span className="t-meta mt-0.5 font-semibold break-keep">{s === 'all' ? '전체' : IDEA_STATUS_LABEL[s]}</span>
               </button>
@@ -375,7 +375,7 @@ function MakeRow({
         <p className="t-meta flex items-center gap-1.5 font-semibold text-slate-600">
           <CheckCircle2 aria-hidden="true" className={`size-4 ${done === MAKE_CHECKS.length ? 'text-success-600' : 'text-slate-400'}`} /> 할 일 {done}/{MAKE_CHECKS.length}
           <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
-            <span className="block h-full rounded-full bg-gradient-to-r from-red-500 to-rose-600" style={{ width: `${Math.round((done / MAKE_CHECKS.length) * 100)}%` }} />
+            <span className="block h-full rounded-full bg-success-600" style={{ width: `${Math.round((done / MAKE_CHECKS.length) * 100)}%` }} />
           </span>
         </p>
         <div className="flex flex-wrap gap-1.5" data-testid="make-checks">

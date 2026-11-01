@@ -202,33 +202,31 @@ export function WeekView({
       {/* D-356 대표 "1주일치 쓰면 밑으로 쫙 풀려 눈에 안 들어온다 — 프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 딱딱 나눠서".
           프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
       <section className="relative z-10 flex flex-col overflow-visible rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-week-project">
-        <header className="relative rounded-t-[calc(var(--radius-panel)-2px)] bg-gradient-to-br from-violet-700 via-violet-700 to-fuchsia-700 px-4 py-3 text-white sm:px-5">
-          <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-[calc(var(--radius-panel)-2px)]">
-            <span className="absolute -top-14 -right-10 size-40 rounded-full bg-white/10" />
-          </span>
-          <div className="relative flex flex-col gap-1.5">
+        {/* D-478 보라 그라데이션 머리 → 흰 머리 + 아래 선(박스 색은 하나 · 보라는 AI 단추 · AI 띠만) */}
+        <header className="rounded-t-[calc(var(--radius-panel)-2px)] border-b border-slate-100 bg-white px-4 py-3 sm:px-5">
+          <div className="flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <FolderOpen aria-hidden="true" className="size-5 shrink-0" />
-              <h2 className="t-card font-extrabold break-keep text-white">
+              <FolderOpen aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
+              <h2 className="t-card font-extrabold break-keep text-slate-900">
                 1주일치 프로젝트 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
               </h2>
-              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업" onDark>
-                <span className="t-meta rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white ring-1 ring-white/25">AI 는 미끼, 끝은 본업</span>
+              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업">
+                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">AI 는 미끼, 끝은 본업</span>
               </HintTip>
             </div>
-            <p className="t-meta font-semibold text-white/90" data-testid="mk-week-made">
+            <p className="t-meta font-semibold text-slate-500" data-testid="mk-week-made">
               {madeLine}
             </p>
             <ol className="flex flex-col gap-0.5" data-testid="mk-week-topics">
               {week.topics.map((t, i) => (
-                <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-white">
-                  <span className="t-meta shrink-0 rounded-full bg-white px-1.5 font-bold text-violet-800">짝 {i + 1}</span>
+                <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-slate-800">
+                  <span className="t-meta shrink-0 rounded-full bg-slate-900 px-1.5 font-bold text-white">짝 {i + 1}</span>
                   <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
                 </li>
               ))}
             </ol>
             {setup.trend.length > 0 && (
-              <p className="t-meta break-keep text-white/80" data-testid="mk-week-trend">
+              <p className="t-meta break-keep text-slate-500" data-testid="mk-week-trend">
                 이번 주 AI 흐름(미끼 후보): {setup.trend.slice(0, 6).join(' · ')}
               </p>
             )}
@@ -387,7 +385,7 @@ export function WeekView({
                 {week.long.headline}
               </p>
               {week.long.titles.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-lg bg-violet-50/60 px-3 py-2">
+                <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                   {week.long.titles.map((b, i) => (
                     <Block key={`t-${i}`} label={b.label} text={b.text} />
                   ))}

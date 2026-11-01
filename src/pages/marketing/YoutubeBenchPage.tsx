@@ -134,7 +134,8 @@ import { rememberWeekTopics } from '../../services/marketing/quickStart'
 /** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
 type View = RadarView
 // 롱폼 · 쇼츠 고르기 칸(인기 탭) — 고른 칸은 레이더 색(빨강)
-const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-(--shadow-card)' : 'text-slate-600 hover:bg-white/70'}`
+// D-478 고른 칸은 흰 칸 + 그림자(빨간 그라데이션 대신 — 빨강은 주의 · 늦음만)
+const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-white text-slate-900 shadow-(--shadow-card) ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`
 const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
 
@@ -726,7 +727,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                       <b>왜 지금</b> — {packOpp.summary}
                     </p>
                     {/* D-253: '미래AI랩 관점' 대신 — 찍을 때 말할 각도 */}
-                    <p className="t-sub break-keep rounded-lg bg-rose-50 px-3 py-2 text-rose-950">
+                    <p className="t-sub break-keep rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900">
                       <b>이렇게 말해요</b> — {packOpp.view}
                     </p>
                     {packOpp.facts.length > 0 && (
@@ -1019,8 +1020,8 @@ function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword:
       <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {topics.map((t, i) => (
           <li key={t.keyword} className="min-w-0">
-            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-red-400">
-              <span className="t-meta flex size-7 shrink-0 items-center justify-center rounded-full bg-red-500 font-bold text-white">{i + 1}</span>
+            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400">
+              <span className="t-meta flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">{i + 1}</span>
               <span className="flex min-w-0 flex-col">
                 <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.keyword}</span>
                 <span className="t-meta text-slate-600">
@@ -1189,7 +1190,7 @@ function TopView({
                 aria-pressed={kw === k.word}
                 onClick={() => onKeyword(kw === k.word ? '' : k.word)}
                 data-testid="yt-keyword"
-                className={`tap t-sub rounded-full border px-3 py-1 font-medium break-keep ${kw === k.word ? 'border-brand-600 bg-brand-600 text-white' : i < 3 ? 'border-red-200 bg-red-50 text-red-800' : 'border-slate-300 bg-white text-slate-700'}`}
+                className={`tap t-sub rounded-full border px-3 py-1 font-medium break-keep ${kw === k.word ? 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-200' : i < 3 ? 'border-slate-400 bg-white font-semibold text-slate-900' : 'border-slate-300 bg-white text-slate-700'}`}
               >
                 #{k.word} <span className="opacity-60">{k.videos}</span>
               </button>

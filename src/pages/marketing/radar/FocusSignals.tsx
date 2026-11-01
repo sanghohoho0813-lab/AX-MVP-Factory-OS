@@ -34,11 +34,14 @@ const DOMAIN_SCOPE: Record<DomainSignal['domain'], string> = {
   other: '',
 }
 
-/** 영역마다 아주 연한 바탕색 — 세 칸이 한눈에 나뉘게(D-197 대표 요청) */
+/**
+ * 영역 칸 — D-197 '세 칸이 한눈에 나뉘게' 는 영역 글자색(DOMAIN_TEXT)으로 지킨다.
+ * D-478 바탕색(옅은 하늘 · 노랑 · 보라)은 뺐다 — 박스 색은 하나(흰 바탕 · 회색 테두리, D-370).
+ */
 const DOMAIN_BOX: Record<DomainSignal['domain'], string> = {
-  economy: 'border-sky-100 bg-sky-50/50',
-  business: 'border-amber-100 bg-amber-50/50',
-  ai: 'border-violet-100 bg-violet-50/50',
+  economy: 'border-slate-200 bg-white',
+  business: 'border-slate-200 bg-white',
+  ai: 'border-slate-200 bg-white',
   other: 'border-slate-200 bg-white',
 }
 const DOMAIN_TEXT: Record<DomainSignal['domain'], string> = { economy: 'text-sky-800', business: 'text-amber-800', ai: 'text-violet-800', other: 'text-slate-900' }
