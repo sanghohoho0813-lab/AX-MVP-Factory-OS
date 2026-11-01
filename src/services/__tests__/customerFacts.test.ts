@@ -2942,5 +2942,14 @@ await (async () => {
   check('D-452 칸 정할 때도 유효기간 끝 2027-03-31', pl.validUntil === '2027-03-31', JSON.stringify(pl))
 })()
 
+// D-454 사진 글자 인식이 회사명 받침 하나를 틀림 — 같은 회사로(묻지 않음) · 진짜 다른 이름은 그대로 다름
+;(() => {
+  const def = FACT_DEFS.find((d) => d.key === 'companyName')
+  check('D-454 "주식회사 미래바이오램" = 기록 "미래바이오랩"(받침 하나)', sameFactValue(def, '주식회사 미래바이오램', '미래바이오랩'))
+  check('D-454 "미래상사" ≠ "미래산업" · "미래바이오" ≠ "미래바이오랩" · 세 글자 이하는 정확히', !sameFactValue(def, '미래상사', '미래산업') && !sameFactValue(def, '미래바이오', '미래바이오랩') && !sameFactValue(def, '한빛', '한별') && !sameFactValue(def, '대한기계', '대한전기'))
+  const other = FACT_DEFS.find((d) => d.key === 'representativeName')
+  check('D-454 대표자 이름은 받침 하나 차이도 다름(사람 이름은 그대로 묻는다)', !sameFactValue(other, '이대표', '이대펴'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

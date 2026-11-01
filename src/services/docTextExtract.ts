@@ -144,6 +144,101 @@ async function imageToCanvas(input: Blob): Promise<HTMLCanvasElement | null> {
   }
 }
 
+/**
+ * D-454 빨간 도장(직인 · 법인인감)이 글자 위에 찍힌 사진 — 도장 모양(가로세로가 비슷한 덩어리)의 빨강 점만 흰색으로 바꾼다.
+ * 도장과 겹친 글자는 검정이라 그대로 남는다. 빨간 글자 줄(제목 · 강조)은 가로로 긴 덩어리라 그대로 둔다. 옅은 분홍 바탕도 그대로.
+ * 바꾼 점 수를 돌려준다(0 이면 원래 그림 그대로 — 결과가 예전과 같다).
+ */
+const isRedInk = (r: number, g: number, b: number) => r >= 90 && r - Math.max(g, b) >= 40
+const STAMP_CELL = 8
+
+export function whitenRedStamps(px: Uint8ClampedArray, w: number, h: number): number {
+  const gw = Math.ceil(w / STAMP_CELL)
+  const gh = Math.ceil(h / STAMP_CELL)
+  const counts = new Uint16Array(gw * gh)
+  let any = 0
+  for (let y = 0; y < h; y++) {
+    const row = Math.floor(y / STAMP_CELL) * gw
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4
+      if (isRedInk(px[i], px[i + 1], px[i + 2])) {
+        counts[row + Math.floor(x / STAMP_CELL)]++
+        any++
+      }
+    }
+  }
+  if (any < 200) return 0
+  // 빨간 칸끼리 이어 덩어리로(두 칸 떨어진 것까지 — 도장 테두리 · 안 글자가 한 덩어리가 되게)
+  const seen = new Uint8Array(gw * gh)
+  const minSide = w * 0.05
+  let changed = 0
+  for (let start = 0; start < counts.length; start++) {
+    if (seen[start] || counts[start] < 3) continue
+    const stack = [start]
+    seen[start] = 1
+    let cx0 = gw, cy0 = gh, cx1 = -1, cy1 = -1, sum = 0
+    while (stack.length) {
+      const c = stack.pop() as number
+      const cx = c % gw
+      const cy = (c - cx) / gw
+      sum += counts[c]
+      if (cx < cx0) cx0 = cx
+      if (cx > cx1) cx1 = cx
+      if (cy < cy0) cy0 = cy
+      if (cy > cy1) cy1 = cy
+      for (let dy = -2; dy <= 2; dy++) {
+        const ny = cy + dy
+        if (ny < 0 || ny >= gh) continue
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = cx + dx
+          if (nx < 0 || nx >= gw) continue
+          const n = ny * gw + nx
+          if (seen[n] || counts[n] < 3) continue
+          seen[n] = 1
+          stack.push(n)
+        }
+      }
+    }
+    const bw = (cx1 - cx0 + 1) * STAMP_CELL
+    const bh = (cy1 - cy0 + 1) * STAMP_CELL
+    const ratio = bw / bh
+    if (sum < 150 || Math.min(bw, bh) < minSide || ratio < 0.55 || ratio > 1.8 || Math.max(bw, bh) > w * 0.5) continue
+    const x0 = Math.max(0, (cx0 - 1) * STAMP_CELL)
+    const x1 = Math.min(w, (cx1 + 2) * STAMP_CELL)
+    const y0 = Math.max(0, (cy0 - 1) * STAMP_CELL)
+    const y1 = Math.min(h, (cy1 + 2) * STAMP_CELL)
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const i = (y * w + x) * 4
+        if (!isRedInk(px[i], px[i + 1], px[i + 2])) continue
+        px[i] = 255
+        px[i + 1] = 255
+        px[i + 2] = 255
+        changed++
+      }
+    }
+  }
+  return changed
+}
+
+function withoutRedStamp(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  try {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return canvas
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    if (whitenRedStamps(img.data, canvas.width, canvas.height) === 0) return canvas
+    const out = document.createElement('canvas')
+    out.width = canvas.width
+    out.height = canvas.height
+    const octx = out.getContext('2d')
+    if (!octx) return canvas
+    octx.putImageData(img, 0, 0)
+    return out
+  } catch {
+    return canvas
+  }
+}
+
 interface Box {
   x0: number
   y0: number
@@ -278,7 +373,8 @@ async function ocrImageNow(input: HTMLCanvasElement | Blob, onProgress?: Progres
 }
 
 async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
-  const canvas = input instanceof Blob ? await imageToCanvas(input) : input
+  const drawn = input instanceof Blob ? await imageToCanvas(input) : input
+  const canvas = drawn ? withoutRedStamp(drawn) : null
   // D-451 기울어진 사진(휴대폰으로 비스듬히) — 글자 인식기가 기울기를 재어 바로잡고 읽는다. 4도 기울기 · 그림자 사진에서 주소 · 번지가 틀리던 것
   const { data } = await worker.recognize(canvas ?? input, { rotateAuto: true }, { text: true, blocks: true, imageColor: true })
   const text = data.text ?? ''

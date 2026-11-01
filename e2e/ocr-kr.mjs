@@ -154,6 +154,28 @@ async function upload(id, company, files) {
   check('F 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 
+/* ---------------- G 빨간 도장(직인)이 글자 위에 찍힌 사진(D-454) ---------------- */
+{
+  const stamped = async (name, line, left, redTitle) => {
+    const p = await browser.newPage({ viewport: { width: 1240, height: 1754 } })
+    const L = ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2019 년 03 월 15 일', '사업장 소재지 : 경기도 성남시 분당구 판교로 100', '업태 : 제조업   종목 : 의약품', '2026 년 04 월 01 일', '성남세무서장']
+    if (redTitle) L[0] = `<span style="color:#d22">${L[0]}</span>`
+    const stamp = `<div style="position:absolute;left:${left}%;top:${60 + line * 38 * 1.75}px;width:120px;height:120px;border:7px solid #d92b2b;border-radius:50%;color:#d92b2b;mix-blend-mode:multiply;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:bold;line-height:1.1;text-align:center;transform:rotate(-12deg);opacity:.85">세무<br>서장</div>`
+    await p.setContent(`<html><body style="margin:0;background:#ccc"><div style="position:relative;margin:40px;padding:60px;${FONT};font-size:38px;line-height:1.75;color:#222;background:#fbfbf8">${L.join('<br>')}${stamp}</div></body></html>`)
+    const buf = await p.screenshot({ type: 'jpeg', quality: 75 })
+    await p.close()
+    return { name, mimeType: 'image/jpeg', buffer: buf }
+  }
+  {
+    const r = await upload('cli_ocrG1', '미래바이오랩', [await stamped('IMG_0101.jpg', 4, 18, false)])
+    check(`G 도장이 대표자 · 개업일 줄 위 — 사업자등록번호 바로 입력 · 설립일 2019-03-15 · 주소 '성남시 … 판교로 100'(확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+  }
+  {
+    const r = await upload('cli_ocrG2', '미래바이오랩', [await stamped('IMG_0102.jpg', 2, 30, true)])
+    check(`G 도장이 사업자등록번호 위 + 빨간 제목 — 사업자등록증 칸(제목은 지우지 않음) · 번호 바로 입력 · ${r.secs}초`, /IMG_0102\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+  }
+}
+
 await browser.close()
 console.log(`\n진짜 한글 스캔: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

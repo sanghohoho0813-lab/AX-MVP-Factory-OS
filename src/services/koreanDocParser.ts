@@ -46,6 +46,8 @@ function normalize(raw: string): string {
     .replace(/[〇○]/g, '0'))
     .replace(/[ \t ]+/g, ' ')
     .replace(/ *\n */g, '\n')
+    // D-454 도장이 겹친 스캔에서 '법인명' 이 '범인명' 으로 — 줄 맨 앞 이름표일 때만 바로잡는다
+    .replace(/(^|\n)범(\s*인\s*명)/g, '$1법$2')
     .trim()
 }
 
@@ -412,9 +414,17 @@ function findAddress(t: string, source: DocSource): string | undefined {
       : ['본점소재지', '사업장소재지', '사업장', '소재지', '주소']
   for (const k of keys) {
     const v = valueAfter(t, spacedLabel(k))
-    if (v && v.length >= 5 && /[가-힣]/.test(v)) return v
+    if (v && v.length >= 5 && /[가-힣]/.test(v)) return joinSplitAddress(v)
   }
   return undefined
+}
+
+/**
+ * D-454 사진 · 스캔에서 '경기도 성 남시' 처럼 한 글자가 떨어져 읽힌 주소 — 홀로 선 한글 한 글자 뒤가
+ * 시 · 군 · 구 · 읍 · 면 · 동 · 리 · 로 · 길로 끝나는 말이면 붙인다('산 12' · '제 2공장' 처럼 뒤가 숫자면 그대로).
+ */
+export function joinSplitAddress(v: string): string {
+  return v.replace(/(^|\s)([가-힣])\s([가-힣]{1,4}(?:시|군|구|읍|면|동|리|로|길))(?=[\s,)]|\d|$)/g, '$1$2$3')
 }
 
 /**

@@ -17,6 +17,7 @@
 import type { ClientOpsRecord, FactCandidate, FactMeta, FactSource, FactStatus, ProfileGroupKey } from '../types/clientOps'
 import { withCustomField } from './clientOpsService'
 import { parseKoreanDate } from './koreanDocParser'
+import { editDistance, jamoOf } from './jamo'
 
 /* ------------------------------------------------------------------ */
 /* 사실 목록                                                             */
@@ -183,7 +184,14 @@ export function sameFactValue(def: FactDef | undefined, a: string, b: string): b
   }
   // 회사명은 (주) · 주식회사 · ㈜ 위치가 달라도 같다
   const norm = (v: string) => v.replace(/주식회사|\(주\)|㈜/g, '').replace(/[\s\-·,.()명]/g, '').toLowerCase()
-  return norm(a) === norm(b) && norm(a) !== ''
+  if (norm(a) === norm(b) && norm(a) !== '') return true
+  // D-454 회사명 — 네 글자 이상 · 글자 수 같고 받침 · 모음 하나만 다르면(사진 글자 인식 '미래바이오랩' → '미래바이오램') 같은 회사로 본다(묻지 않고 기록 값 그대로)
+  if (def?.key === 'companyName') {
+    const x = norm(a)
+    const y = norm(b)
+    return x.length >= 4 && x.length === y.length && /^[가-힣]+$/.test(x + y) && editDistance(jamoOf(x), jamoOf(y)) <= 1
+  }
+  return false
 }
 
 /* ------------------------------------------------------------------ */

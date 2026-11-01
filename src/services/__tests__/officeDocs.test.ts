@@ -5,7 +5,8 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile, longScanNote, mixedScanPages } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote, mixedScanPages, whitenRedStamps } from '../docTextExtract'
+import { joinSplitAddress, parseKoreanBusinessDocument } from '../koreanDocParser'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
 import { normalizeClientOps } from '../clientOpsService'
@@ -429,6 +430,46 @@ async function main() {
   }
   check('D-433 긴 스캔 PDF — "스캔본 12쪽 중 앞 4쪽만 글자를 읽었어요 … 그 쪽만 따로"(예전: 말없이 뒷장 건너뜀)', longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만') && longScanNote(12).includes('따로 올려'))
   check('D-445 글자 PDF 안의 스캔 쪽 — 글자 15자 미만인 쪽만(많아야 3쪽) · 한 쪽짜리는 아님', JSON.stringify(mixedScanPages(['사업자등록증명 등록번호 124-81-00998 상호 미래', ' ', '재무상태표 자산총계 3,200,000,000', '', '\n', '   '])) === '[2,4,5]' && mixedScanPages(['']).length === 0 && mixedScanPages(['가나다라마바사아자차카타파하 가나다', '가나다라마바사아자차카타파하 가나다']).length === 0)
+  // D-454 빨간 도장 지우기 — 도장 모양(가로세로 비슷한 덩어리)만 · 빨간 글자 줄 · 검정 글자 · 옅은 분홍은 그대로
+  {
+    const W = 400
+    const H = 300
+    const img = () => {
+      const px = new Uint8ClampedArray(W * H * 4).fill(250)
+      return px
+    }
+    const paint = (px: Uint8ClampedArray, x0: number, y0: number, x1: number, y1: number, rgb: [number, number, number], ring = false) => {
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          if (ring && x > x0 + 5 && x < x1 - 6 && y > y0 + 5 && y < y1 - 6) continue
+          const i = (y * W + x) * 4
+          px[i] = rgb[0]
+          px[i + 1] = rgb[1]
+          px[i + 2] = rgb[2]
+        }
+      }
+    }
+    const red: [number, number, number] = [214, 50, 50]
+    // 도장(60×60 테두리) + 그 안을 지나는 검정 글자 줄
+    const a = img()
+    paint(a, 100, 100, 160, 160, red, true)
+    paint(a, 60, 128, 220, 134, [30, 30, 30])
+    const changed = whitenRedStamps(a, W, H)
+    const at = (px: Uint8ClampedArray, x: number, y: number) => [px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]].join(',')
+    check('D-454 도장 테두리는 흰색으로 · 겹친 검정 글자는 그대로', changed > 1000 && at(a, 102, 110) === '255,255,255' && at(a, 130, 130) === '30,30,30' && at(a, 70, 130) === '30,30,30', `${changed} ${at(a, 102, 110)} ${at(a, 130, 130)}`)
+    // 빨간 제목 줄(가로로 긴 덩어리)은 그대로
+    const b = img()
+    paint(b, 40, 20, 360, 44, red)
+    check('D-454 빨간 제목 줄(가로로 긴 것)은 지우지 않음', whitenRedStamps(b, W, H) === 0 && at(b, 100, 30) === '214,50,50')
+    // 옅은 분홍 바탕 · 빨강이 거의 없는 그림은 그대로(원래 그림을 쓴다)
+    const c = img()
+    paint(c, 0, 0, W, H, [250, 228, 228])
+    paint(c, 10, 10, 18, 18, red)
+    check('D-454 옅은 분홍 바탕 · 작은 빨간 점은 그대로(바꾼 점 0 → 원래 그림)', whitenRedStamps(c, W, H) === 0)
+  }
+  check('D-454 주소 "성 남시" → "성남시" · "산 12" · "제 2공장" 은 그대로', joinSplitAddress('경기도 성 남시 분당구 판교로 100') === '경기도 성남시 분당구 판교로 100' && joinSplitAddress('경기도 광주시 오포읍 문형리 산 12') === '경기도 광주시 오포읍 문형리 산 12' && joinSplitAddress('충청북도 청주시 흥덕구 제 2공장') === '충청북도 청주시 흥덕구 제 2공장' && joinSplitAddress('서울특별시 중구 을지로 100') === '서울특별시 중구 을지로 100')
+  check('D-454 도장 겹친 "범인명(단체명)" → 법인명으로 회사 이름', parseKoreanBusinessDocument('사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n범인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n').companyName === '주식회사 미래바이오랩')
+  check('D-454 사업자등록증 글 — 떨어진 주소 붙여 회사 정보로', parseKoreanBusinessDocument('사업자등록증\n등록번호 : 124-81-00998\n사업장 소재지 : 경기도 성 남시 분당구 판교로 100\n').address === '경기도 성남시 분당구 판교로 100')
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }

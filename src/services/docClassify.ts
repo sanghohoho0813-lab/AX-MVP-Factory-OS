@@ -17,6 +17,7 @@ import type { DocumentKey } from '../types/clientOps'
 import { looksLikeRealEstateRegistry, parseKoreanDate } from './koreanDocParser'
 import { fixDateNoise } from './ocrNumbers'
 import { bizNoChecksumOk } from './docAutoFill'
+import { editDistance, jamoOf } from './jamo'
 
 export type ClassifyConfidence = 'sure' | 'maybe' | 'unknown'
 
@@ -700,30 +701,6 @@ export function titleFromFileName(fileName: string): string | null {
  * 자모(초성 · 중성 · 종성)로 풀어 고친 수를 센다 — 자모 10개 미만은 1개, 16개 미만은 2개, 그 이상은 3개까지. 가장 가까운 이름이 하나뿐일 때만.
  */
 const FUZZY_TITLES = ['사업자등록증', '등기사항전부증명서', '등기사항일부증명서', '법인등기부등본', '주민등록증', '운전면허증', '중소기업확인서', '건강보험자격득실확인서', '사업장가입자명부', '4대보험가입자명부', '기업종합보고서', '표준재무제표증명', '재무상태표', '손익계산서']
-function jamoOf(s: string): string {
-  let out = ''
-  for (const ch of s) {
-    const c = ch.charCodeAt(0)
-    if (c >= 0xac00 && c <= 0xd7a3) {
-      const i = c - 0xac00
-      out += String.fromCharCode(0x1100 + Math.floor(i / 588), 0x1161 + Math.floor((i % 588) / 28)) + (i % 28 ? String.fromCharCode(0x11a7 + (i % 28)) : '')
-    } else out += ch
-  }
-  return out
-}
-function editDistance(a: string, b: string): number {
-  const dp = Array.from({ length: b.length + 1 }, (_, j) => j)
-  for (let i = 1; i <= a.length; i++) {
-    let prev = dp[0]
-    dp[0] = i
-    for (let j = 1; j <= b.length; j++) {
-      const t = dp[j]
-      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
-      prev = t
-    }
-  }
-  return dp[b.length]
-}
 export function fuzzyKnownTitle(title: string): string | null {
   if (!/^[가-힣0-9]{4,16}$/.test(title)) return null
   const names = [...new Set([...FUZZY_TITLES, ...KNOWN_EXTRA_DOCS.map((k) => compactTitle(k.label))])]
