@@ -75,6 +75,7 @@ export function FactInboxCard({ record, now, onCommit, preview = [] }: { record:
     )
   }
 
+  const sameNote = pending.length > 1 && pending.every((p) => !!p.note && p.note === pending[0].note) ? pending[0].note ?? '' : ''
   // D-255: 고를 후보가 있는 것(확실히 못 읽은 사업자등록번호)은 '모두 확인' 으로 넣지 않는다 — 하나를 눌러야 들어간다
   const plain = pending.filter((p) => !p.choices?.length)
   const acceptAll = async () => {
@@ -125,6 +126,12 @@ export function FactInboxCard({ record, now, onCommit, preview = [] }: { record:
           <Badge tone="brand">{pending.length}건</Badge>
         </div>
         <p className="t-sub break-keep text-slate-600">서류에서 읽었지만 확실하지 않은 것만 남겼어요(확실한 것은 이미 넣었어요). 확인하면 모든 전문 모듈이 이 값을 씁니다.</p>
+        {/* D-439 까닭이 모두 같으면(스캔 묶음 — '사진 · 스캔 글자라 …') 한 번만 — 줄마다 되풀이하지 않는다 */}
+        {sameNote && !fixing && (
+          <p className="t-sub break-keep font-medium text-warning-800" data-testid="fact-note" data-same="1">
+            ⚠ {sameNote} — {pending.length}건 모두
+          </p>
+        )}
         <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
           {pending.map((p) => (
             <li key={p.id} className="flex flex-col gap-1.5 px-3 py-2.5" data-fact={p.key}>
@@ -134,7 +141,7 @@ export function FactInboxCard({ record, now, onCommit, preview = [] }: { record:
                 <span className="t-meta text-slate-500">{p.sourceLabel}</span>
               </div>
               {/* D-144: 왜 바로 넣지 않았는지 — 사진 글자 · 지금 값과 다름 · 모양이 이상함 */}
-              {p.note && !fixing && (
+              {p.note && !fixing && !sameNote && (
                 <span className="t-sub break-keep font-medium text-warning-800" data-testid="fact-note">
                   ⚠ {p.note}
                 </span>

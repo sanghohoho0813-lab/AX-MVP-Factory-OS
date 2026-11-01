@@ -2064,6 +2064,8 @@ for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440'
   })
   await page.goto(BASE + '/ops/clients/cli_scan438?tab=smart', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
+  const notes439 = await page.getByTestId('fact-note').allInnerTexts()
+  check(`D-439 ${vp.tag} 까닭이 모두 같으면 한 번만 — "사진 · 스캔 글자라 … — 4건 모두"(예전: 줄마다 4번)`, notes439.length === 1 && notes439[0].includes('4건 모두'), JSON.stringify(notes439))
   const pv = page.getByTestId('fact-accept-preview')
   const txt = (await pv.innerText().catch(() => '')).replace(/\s+/g, ' ')
   check(`D-438 ${vp.tag} 확인 기다리는 정보(설립일 · 업종 · 주소) → [모두 확인] 위에 "모두 맞으면 새로 판정돼요 — 정책자금 …"`, txt.includes('모두 맞으면 새로 판정돼요') && txt.includes('정책자금'), txt)
