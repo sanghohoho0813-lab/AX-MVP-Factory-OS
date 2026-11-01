@@ -1,4 +1,4 @@
-import { Suspense, useContext, useEffect, useState } from 'react'
+import { Suspense, lazy, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
@@ -16,7 +16,10 @@ import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
 import { ScrollTopButton } from './ScrollTopButton'
-import { WeekRunDock } from './WeekRunDock'
+import { subscribeWeekRunLoaded, weekRunLoaded } from '../../services/marketing/weekRunFlag'
+
+// D-479 1주일치를 실제로 돌렸을 때만 진행 표시 부품을 받아 온다(첫 접속에 1주일치 · AI 지시문 · 판정 엔진을 함께 받지 않게)
+const WeekRunDock = lazy(() => import('./WeekRunDock').then((m) => ({ default: m.WeekRunDock })))
 import { BackToCloseGuard } from '../../lib/backToClose'
 import { useScrollMemory } from '../../lib/scrollMemory'
 import { EntitlementsProvider } from '../../lib/entitlementsContext'
@@ -66,6 +69,7 @@ export function AppShell() {
   // D-257 팀장(대표가 팀장 화면으로 볼 때도)은 AI 회사 Gemini 만 — 모델 고르기 · 고른 것 읽기가 같이 따른다
   setAllowedProviders(useAiAssistAccess() === 'pilot' ? ['gemini'] : null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const weekLoaded = useSyncExternalStore(subscribeWeekRunLoaded, weekRunLoaded)
   // D-295 휴대폰 아래 메뉴 '더보기' = 아래에서 올라오는 판(왼쪽 위 ☰ 는 예전 서랍 그대로)
   const [moreOpen, setMoreOpen] = useState(false)
   const location = useLocation()
@@ -168,7 +172,11 @@ export function AppShell() {
         <MobileNav onOpenMore={() => setMoreOpen(true)} />
         <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
         <ScrollTopButton />
-        <WeekRunDock />
+        {weekLoaded && (
+          <Suspense fallback={null}>
+            <WeekRunDock />
+          </Suspense>
+        )}
         <SideDock />
       </div>
       </TutorialProvider>

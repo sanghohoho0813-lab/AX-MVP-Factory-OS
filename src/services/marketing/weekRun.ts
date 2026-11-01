@@ -9,6 +9,10 @@ import { AssistError, callAssist } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import { collectWeek, loadWeeksCloud, saveWeekCloud } from './weekCollect'
 import { WEEK_PARTS, WEEK_STORE_KEY, parseWeekStore, partResult, putWeekStore, type WeekPart, type WeekRequest, type WeekSaved } from './weekPlan'
+import { markWeekRunLoaded } from './weekRunFlag'
+
+// D-479 이 모듈이 읽혔다 — 앱 틀이 '1주일치 쓰는 중' 표시를 받아 와도 된다
+markWeekRunLoaded()
 
 /** D-350 stopped = [멈추기] 로 멈춘 갈래(다 쓴 갈래는 그대로 남는다) */
 export type WeekPartState = 'idle' | 'running' | 'done' | 'error' | 'stopped'
