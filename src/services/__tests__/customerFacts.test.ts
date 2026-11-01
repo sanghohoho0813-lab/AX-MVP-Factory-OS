@@ -74,7 +74,7 @@ import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { readShareholderDoc } from '../shareholderDoc'
 import { fixAmountNoise, fixDateNoise, joinSpacedHangul } from '../ocrNumbers'
-import { parseKoreanBusinessDocument } from '../koreanDocParser'
+import { birthFromMaskedPrefix, parseKoreanBusinessDocument } from '../koreanDocParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
@@ -2778,6 +2778,13 @@ await (async () => {
   check('D-434 스캔 주주명부 "14.OOO · 6.000 · 합계 20.000" → 주주 2명 · 14,000 · 6,000 · 총 20,000(예전: 주주 0 · 총 20주)', SH.holders.length === 2 && SH.holders[0].shares === 14000 && SH.holders[1].shares === 6000 && SH.totalShares === 20000 && SH.sure, JSON.stringify(SH))
   const SH2 = readShareholderDoc(['주주명부', '성명 주식수 지분율', '김갑동 10,000 33.333%', '이을순 10,000 33.333%', '박병철 10,000 33.334%'].join('\n'))
   check('D-434 지분율 "33.333%" 는 주식 수로 바꾸지 않음', SH2.holders.length === 3 && SH2.holders.every((h) => h.shares === 10000), JSON.stringify(SH2.holders))
+}
+
+// D-435 등기부 열람본 '750505-*******'(뒷자리 다 가림) → 대표 생년월일(세기는 대표 나이로 하나일 때만)
+{
+  const REG = ['등기사항전부증명서(현재 유효사항)', '상 호 주식회사 미래바이오랩', '임원에 관한 사항', '사내이사 김이사 820101-*******', '2019 년 03 월 15 일 취임', '대표이사 이대표 750505-******* 경기도 성남시', '2019 년 03 월 15 일 취임'].join('\n')
+  check('D-435 등기부 "대표이사 이대표 750505-*******" → 대표 생년월일 1975-05-05(사내이사 김이사 것은 아님 · 예전: 없음)', parseKoreanBusinessDocument(REG).representativeBirth === '1975-05-05', parseKoreanBusinessDocument(REG).representativeBirth)
+  check('D-435 세기 — 750505 → 1975 · 050505 → 2005 · 150505(만 11세 · 111세) → 모름', birthFromMaskedPrefix('750505', 2026) === '1975-05-05' && birthFromMaskedPrefix('050505', 2026) === '2005-05-05' && birthFromMaskedPrefix('150505', 2026) === undefined && birthFromMaskedPrefix('751305', 2026) === undefined)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

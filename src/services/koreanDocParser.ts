@@ -89,6 +89,15 @@ export function birthFromRrnPrefix(prefix6: string, genderCode?: string): string
   return `${century + yy}-${pad2(mm)}-${pad2(dd)}`
 }
 
+/**
+ * D-435 등기부 열람본은 뒷자리를 다 가린다('750505-*******') — 성별 숫자가 없으면 대표 나이(만 19~90세)로 맞는 세기가 하나일 때만.
+ * '750505' → 1975 · '050505' → 2005(1905 는 나이가 안 맞음) · 둘 다 안 맞거나 둘 다 맞으면 모른다.
+ */
+export function birthFromMaskedPrefix(prefix6: string, nowYear = new Date().getFullYear()): string | undefined {
+  const fits = [1900, 2000].map((c) => birthFromRrnPrefix(prefix6, c === 2000 ? '3' : '1')).filter((b): b is string => !!b && nowYear - Number(b.slice(0, 4)) >= 19 && nowYear - Number(b.slice(0, 4)) <= 90)
+  return fits.length === 1 ? fits[0] : undefined
+}
+
 /** 000-00-00000 형식으로 정리 */
 export function formatBusinessNumber(raw: string): string | undefined {
   const d = digits(raw)
@@ -344,13 +353,14 @@ function findRepresentative(t: string, source: DocSource): string | undefined {
  */
 function findRepresentativeBirth(t: string, repName: string | undefined): string | undefined {
   // 성별코드 뒤에 마스킹(*)이 오거나 6자리가 더 이어져야 주민등록번호로 본다.
-  const re = /([가-힣]{2,6})\s+(\d{6})\s*[-–]\s*([1-8])(\*{4,7}|\d{6})/g
+  // D-435 뒷자리를 다 가린 '750505-*******'(등기부 열람본)도 — 세기는 대표 나이로(birthFromMaskedPrefix)
+  const re = /([가-힣]{2,6})\s+(\d{6})\s*[-–]\s*(?:([1-8])(\*{4,7}|\d{6})|\*{6,7})/g
   let m: RegExpExecArray | null
   const found: { name: string; birth: string; line: string }[] = []
   while ((m = re.exec(t)) !== null) {
     // '법인등록번호 131111-0098765' 같은 항목은 이름이 아니므로 제외
     if (/번호$|번호\s*$/.test(m[1])) continue
-    const b = birthFromRrnPrefix(m[2], m[3])
+    const b = m[3] ? birthFromRrnPrefix(m[2], m[3]) : birthFromMaskedPrefix(m[2])
     if (!b) continue
     const lineStart = t.lastIndexOf('\n', m.index) + 1
     found.push({ name: m[1], birth: b, line: t.slice(lineStart, m.index) })
