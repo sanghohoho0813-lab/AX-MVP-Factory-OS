@@ -229,11 +229,34 @@ const yearlyLabel = (k: string) => k.slice(CUSTOM_FACT_PREFIX.length)
 const TREND_DOCS = new Set(['financialStatements', 'taxReturn', 'vatCertificate', 'incomeCertificate', 'siteReport'])
 const yearOf = (s: string | undefined) => /^(\d{4})/.exec(s ?? '')?.[1] ?? ''
 /** 같은 해면 재무제표 · 세무조정계산서가 사업장현황신고서 줄을 바꾼다(D-407 — 더 자세한 장부) */
+/**
+ * D-437 '매출 추이' 줄(소득금액증명 · 재무제표 · 세무조정계산서)에 그 줄의 해보다 새 해의 몇 달(과세표준증명 '2026년 6개월 5억 2,000만원(작년 같은 기간보다 +27%)')을 붙인다.
+ * 이미 몇 달 줄이 있으면(같은 해) 새 것으로 바꾼다. 줄의 출처 · 확인 상태는 그대로. 정책자금 '올해 매출 추이' 가 이 줄을 읽는다(vatTrendOf).
+ */
+export function withPartialYearTrend(record: ClientOpsRecord, vatLine: string): ClientOpsRecord {
+  const cur = customFactValue(record, '매출 추이')
+  const meta = record.factMeta?.[TREND_KEY]
+  if (!cur || !meta || meta.source === 'vatCertificate' || !TREND_DOCS.has(meta.source)) return record
+  const seg = /(20\d{2})년 (\d{1,2})개월 ([^(·]+?)\s*\(([^)]*작년 같은 기간보다 [+-]?\d+%)\)/.exec(vatLine)
+  if (!seg) return record
+  const lineYear = Number(/^(20\d{2})년/.exec(cur)?.[1] ?? 0)
+  if (!lineYear || Number(seg[1]) <= lineYear) return record
+  const add = `${seg[1]}년 ${seg[2]}개월 ${seg[3].trim()}(부가세 과세표준 · ${seg[4].replace(/^부가세 과세표준\s*·\s*/, '')})`
+  const base = cur.replace(/\s*·\s*20\d{2}년 \d{1,2}개월 [^(]+\([^)]*\)\s*$/, '')
+  const next = `${base} · ${add}`
+  if (next === cur) return record
+  const f = (record.customFields ?? []).find((x) => x.label.replace(/\s/g, '') === '매출추이')
+  return f ? withCustomField(record, { id: f.id, group: f.group, label: f.label, value: next }) : record
+}
+
 function trendBeats(cand: { source: string; asOf: string }, cur: { source: string; asOf?: string }): boolean {
   const cy = yearOf(cand.asOf)
   const my = yearOf(cur.asOf)
   if (!cy || !my) return false
   if (cy > my) return true
+  // D-437 같은 해면 소득금액증명이 과세표준증명 줄(면세 매출 빠짐 — D-373 '과세표준증명은 소득금액증명에 늘 밀린다')을 바꾼다 — 과세표준증명을 먼저 올렸을 때도.
+  //        재무제표 · 세무조정계산서는 예전처럼 과세표준증명 줄에 양보(D-406)
+  if (cy === my && cur.source === 'vatCertificate' && cand.source === 'incomeCertificate') return true
   return cy === my && (cand.source === 'financialStatements' || cand.source === 'taxReturn') && cur.source === 'siteReport'
 }
 
@@ -257,6 +280,8 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
   const agreed = agreedFacts(docs)
+  // D-437 과세표준증명 '매출 추이' 줄 — 올리기 전 줄(과세표준증명이 만든 것) · 이번 묶음 줄. 끝에서 새 해의 몇 달을 다른 서류 줄에 붙인다
+  const vatTrendLines: string[] = record.factMeta?.[TREND_KEY]?.source === 'vatCertificate' ? [customFactValue(record, '매출 추이')].filter(Boolean) : []
   // D-255: 다른 서류가 확실하게 말한 사업자등록번호(크레탑 · 등기 · PDF 글자) — 스캔 후보 가운데 이것과 같은 게 있으면 그걸로
   const sureNos = docs.map((d) => factCandidatesFromDocText(d.key, d.text, 'sure').filter((c) => c.key === 'businessNumber' && !c.note && bizNoChecksumOk(c.value)).map((c) => c.value.replace(/\D/g, '')))
   docs.forEach((doc, i) => {
@@ -271,9 +296,11 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
-    }).filter((c) => !docYields(rec, c))
-    if (found.length === 0) return
-    rec = withFactCandidates(rec, found, now, makeId)
+    })
+    if (doc.text && found.some((c) => c.key === TREND_KEY && c.source === 'vatCertificate')) vatTrendLines.push(found.find((c) => c.key === TREND_KEY && c.source === 'vatCertificate')!.value)
+    const kept = found.filter((c) => !docYields(rec, c))
+    if (kept.length === 0) return
+    rec = withFactCandidates(rec, kept, now, makeId)
     const mine = pendingFacts(rec).filter((p) => p.ref === ref && p.from === 'inbox')
     // 비어 있는 칸 · 까닭 없음 → 바로 넣는다. D-392 사업자등록증 개업일이 먼저 들어간 설립일은 등기부 회사성립일로 바꾼다(묻지 않음)
     const regWins = (p: PendingFact) =>
@@ -415,5 +442,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       }
     }
   }
+  // D-437 과세표준증명 줄이 소득금액증명 · 재무제표 줄에 밀려도(D-373) — 그 줄보다 새 해의 몇 달('2026년 6개월 … 작년 같은 기간보다 +27%')은 붙인다(순서 상관없이)
+  for (const v of vatTrendLines) rec = withPartialYearTrend(rec, v)
   return { record: rec, entered, flagged }
 }

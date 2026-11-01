@@ -2808,5 +2808,26 @@ await (async () => {
   check('D-436 국세 · 지방세 · 4대보험 증명서가 있으면 → 체납은 확인됨 · 남은 것 "회생 · 어음 거래정지 · 체불 명단 같은 제외 사유"(예전: 체납도 다시 물음)', ctx1.arrearsClear === true && !!inno && inno.missingFacts.some((m) => m.startsWith('회생 · 어음 거래정지')) && !inno.missingFacts.some((m) => m.startsWith('체납')), JSON.stringify(inno?.missingFacts))
 }
 
+// D-437 과세표준증명의 '올해 몇 달'(작년 같은 기간 대비) — 소득금액증명 · 재무제표 줄에 밀려도 그 줄 뒤에 붙인다(순서 · 날짜 상관없이)
+await (async () => {
+  const INC = ['소득금액 증명', '(종합소득세 신고자용)', '(단위 : 원)', '귀속연도 사업자등록번호 상호 소득구분 수입금액 필요경비 소득금액', '2025 214-05-01239 미래상사 사업소득 860,000,000 790,000,000 70,000,000', '2024 214-05-01239 미래상사 사업소득 610,000,000 565,000,000 45,000,000', '2026년 10월 20일', '창원세무서장'].join('\n')
+  const VAT = ['부가가치세 과세표준증명', '상호(법인명) 미래상사 사업자등록번호 214-05-01239', '과세기간 신고구분 신고일 과세표준', '2025.01.01~2025.06.30 확정 2025.07.25 410,000,000', '2025.07.01~2025.12.31 확정 2026.01.25 450,000,000', '2026.01.01~2026.06.30 확정 2026.07.25 520,000,000'].join('\n')
+  const base = normalizeClientOps({ id: 'vt437', companyName: '미래상사', businessNumber: '214-05-01239', createdAt: NOW, updatedAt: NOW })
+  let n = 0
+  const d = (key: string, text: string) => ({ key, fileName: `${key}.pdf`, text, method: 'pdf_text' as const, docSure: true })
+  const up = (rec: typeof base, docs: ReturnType<typeof d>[]) => analyzeUploadedDocs(rec, docs, { now: NOW, today: '2026-10-31', makeId: () => `v7${++n}` })
+  const WANT = '2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%) · 2026년 6개월 5억 2,000만원(부가세 과세표준 · 작년 같은 기간보다 +27%)'
+  const a = await up(base, [d('customdoc_inc', INC), d('customdoc_vat', VAT)])
+  const b = await up(base, [d('customdoc_vat', VAT), d('customdoc_inc', INC)])
+  check('D-437 한 묶음(소득금액증명 + 과세표준증명) — 순서 상관없이 "… 2024년보다 +41%) · 2026년 6개월 5억 2,000만원(부가세 과세표준 · 작년 같은 기간보다 +27%)"(예전: 올해 몇 달이 버려짐)', customFactValue(a.record, '매출 추이') === WANT && customFactValue(b.record, '매출 추이') === WANT, [customFactValue(a.record, '매출 추이'), customFactValue(b.record, '매출 추이')])
+  const v1 = await up(base, [d('customdoc_vat', VAT)])
+  const v2 = await up(v1.record, [d('customdoc_inc', INC)])
+  check('D-437 과세표준증명 먼저 · 소득금액증명은 다른 날 — 소득금액증명 줄로 바뀌어도 올해 몇 달은 남음', customFactValue(v2.record, '매출 추이') === WANT, customFactValue(v2.record, '매출 추이'))
+  check('D-437 정책자금 매출 추이 — 3년 흐름 "증가" · 올해 "전년보다 증가" 둘 다 읽힘', JSON.stringify(vatTrendOf(WANT)) === JSON.stringify({ trend3y: '증가', thisYear: '전년보다 증가' }), JSON.stringify(vatTrendOf(WANT)))
+  const OLD = VAT.split('\n').slice(0, 5).join('\n')
+  const c = await up(base, [d('customdoc_inc', INC), d('customdoc_vat', OLD)])
+  check('D-437 과세표준증명이 같은 해까지만이면 붙이지 않음', customFactValue(c.record, '매출 추이') === '2025년 8억 6,000만원(소득금액증명 수입금액 · 2024년보다 +41%)', customFactValue(c.record, '매출 추이'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
