@@ -5,7 +5,7 @@
  */
 import { OfficeReadError, hwpParaText, isCfb, officeKindOf, officeText, readCfb, xmlBodyText } from '../officeText'
 import { archiveOf, archiveSummary, expandArchives, isOtherArchive, isZipFile, mimeOf } from '../docArchive'
-import { canExtractText, extractTextFromFile, longScanNote, maxOcrPagesFor, mixedScanPages, ocrParallelFor, pickQuarterTurn, TURN_CHECK_BELOW, whitenRedStamps } from '../docTextExtract'
+import { canExtractText, extractTextFromFile, longScanNote, isPdfPasswordError, maxOcrPagesFor, mixedScanPages, ocrParallelFor, PDF_PASSWORD_NOTE, pickQuarterTurn, TURN_CHECK_BELOW, whitenRedStamps } from '../docTextExtract'
 import { joinSplitAddress, parseKoreanBusinessDocument } from '../koreanDocParser'
 import { folderOfFile, relativePathOf } from '../../lib/dropFiles'
 import { zipEntries, zipStore } from '../patent/zip'
@@ -473,6 +473,7 @@ async function main() {
   check('D-455 PC(코어 8 · 메모리 8GB) 는 두 장씩 · 휴대폰(안드로이드 · 아이폰 · 아이패드 터치) · 코어 2 · 메모리 2GB 는 한 장씩', ocrParallelFor({ cores: 8, memoryGb: 8, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130', touchPoints: 0 }) === 2 && ocrParallelFor({ cores: 8, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605', touchPoints: 0 }) === 2 && ocrParallelFor({ cores: 8, memoryGb: 8, userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 6, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 8, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605', touchPoints: 5 }) === 1 && ocrParallelFor({ cores: 2, memoryGb: 8, userAgent: 'Windows' }) === 1 && ocrParallelFor({ cores: 8, memoryGb: 2, userAgent: 'Windows' }) === 1)
   check('D-459 긴 스캔 PDF — PC(두 장씩)는 앞 6쪽 · 휴대폰은 앞 4쪽 · 안내 글도 그 쪽 수로', maxOcrPagesFor(2) === 6 && maxOcrPagesFor(1) === 4 && longScanNote(12, 6).startsWith('스캔본 12쪽 중 앞 6쪽만') && longScanNote(12).startsWith('스캔본 12쪽 중 앞 4쪽만'))
   check('D-460 누운 · 거꾸로 된 서류 — 처음 자신감 41 · 돌려 본 것 91 이면 그 방향 · 셋 다 낮거나(55) 차이가 작으면(처음 58 · 돌림 66) 그대로 · 바로 선 서류(77 이상)는 돌려 보지 않음', pickQuarterTurn(41, [{ deg: 90, conf: 37 }, { deg: 180, conf: 91 }, { deg: 270, conf: 39 }]) === 180 && pickQuarterTurn(40, [{ deg: 90, conf: 55 }, { deg: 180, conf: 44 }, { deg: 270, conf: 50 }]) === 0 && pickQuarterTurn(58, [{ deg: 90, conf: 66 }, { deg: 180, conf: 40 }, { deg: 270, conf: 41 }]) === 0 && TURN_CHECK_BELOW <= 77)
+  check('D-463 암호 PDF — pdf.js 의 PasswordException 을 알아보고(다른 오류는 아님) "암호가 걸린 PDF … 암호를 풀어 … 다시 올려" 한 줄', isPdfPasswordError({ name: 'PasswordException', message: 'No password given' }) && !isPdfPasswordError(new Error('Invalid PDF structure')) && PDF_PASSWORD_NOTE.startsWith('암호가 걸린 PDF') && PDF_PASSWORD_NOTE.includes('다시 올려'))
   console.log(`\nofficeDocs: ${pass} passed, ${fail} failed`)
   if (fail) process.exit(1)
 }

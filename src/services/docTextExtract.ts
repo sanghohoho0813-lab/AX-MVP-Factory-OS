@@ -553,7 +553,11 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
 
   if (isPdf) {
     onProgress?.(0, 'PDF 여는 중')
-    const { text, pages } = await extractPdfText(file, onProgress)
+    // D-463 암호가 걸린 PDF(은행 거래내역 · 4대보험 EDI 명부 등) — 예전에는 까닭 없이 빈 글('기타'). 한 줄로 알린다(파일은 그대로 보관)
+    const { text, pages } = await extractPdfText(file, onProgress).catch((e: unknown) => {
+      if (isPdfPasswordError(e)) throw new OfficeReadError(PDF_PASSWORD_NOTE)
+      throw e
+    })
     if (hasEnoughText(text)) {
       // D-445 홈택스 PDF 사이에 스캔 쪽을 끼워 합친 파일 — 글자가 거의 없는 쪽(많아야 3쪽)만 글자 인식해 그 자리에 넣는다.
       //        예전에는 글자 PDF 로 보고 스캔 쪽을 건너뛰어, 끼워 넣은 등기부 · 사업자등록증을 못 읽었다
@@ -583,6 +587,14 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   const canvas = await imageToCanvas(file)
   if (!canvas) throw new OfficeReadError(imageOpenFailNote(file))
   return { text: await ocrImage(canvas, onProgress), method: 'ocr' }
+}
+
+export const PDF_PASSWORD_NOTE = '암호가 걸린 PDF 라 글자를 읽을 수 없습니다 — 암호를 풀어(열어서 인쇄 → PDF 로 저장) 다시 올려 주세요.'
+/** pdf.js 가 암호 때문에 못 열었을 때(PasswordException) */
+export function isPdfPasswordError(e: unknown): boolean {
+  const name = (e as { name?: string } | null)?.name ?? ''
+  const msg = (e as { message?: string } | null)?.message ?? String(e ?? '')
+  return name === 'PasswordException' || /password/i.test(msg)
 }
 
 /** D-445 글자 PDF 안의 스캔 쪽 — 글자(공백 빼고)가 15자보다 적은 쪽, 2쪽 이상인 파일 · 앞 10쪽 안에서 많아야 3쪽 */
