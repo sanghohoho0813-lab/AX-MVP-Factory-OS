@@ -4729,3 +4729,4 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - 재 본 것: qa:ocrkr B 묶음(개인 4장) — 예전 대표 생년월일 · 설립일 확인 목록 → 1988-01-01 · 2022-05-02 바로 입력.
 - d752899(D-470): test:all EXIT 0 · 빌드 0 · facts 24 · ocrkr 31 · diag 22 · detail 507 — 0 실패 → main.
 - 로그인 · 권한 · DB · RLS · api · 저장 방식은 건드리지 않음. 주민등록번호는 그대로 저장하지 않음(생년월일 날짜만 — 예전과 같음).
+- 같은 빌드로 한 번 더(최종): board 198 · flow 171 · real 188 · phone 184 · simple 88 — 0 실패 · qa:wording 6/0. Production 화면 번들에 '생일 다시 읽기'(확인).
