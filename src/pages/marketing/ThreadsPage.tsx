@@ -627,7 +627,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           </div>
         </ToneSection>
         <details className="border-t border-slate-200 pt-3" data-testid="thr-ref-box">
-          <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">
+          <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">
             <span aria-hidden="true" className="mr-1.5 inline-flex size-6 items-center justify-center rounded-full bg-slate-700 text-[0.75rem] font-bold text-white">4</span>
             잘 된 남의 글 붙여넣기 (선택 — 뼈대만 빌림 · 저장 안 함)
           </summary>
@@ -717,7 +717,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
             <LintList lines={draft.body.trim() ? lint.lines : []} testId="thr-lint" />
             {!draft.body.trim() && <p className="t-sub break-keep text-slate-500">글을 쓰면 여기서 바로 확인해요.</p>}
             <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2">
-              <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">올리기 전 사람이 볼 것 {BEFORE_POST.length}가지</summary>
+              <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">올리기 전 사람이 볼 것 {BEFORE_POST.length}가지</summary>
               <ul className="t-sub mt-1 list-disc pl-5 break-keep text-slate-700">
                 {BEFORE_POST.map((b) => (
                   <li key={b}>{b}</li>
@@ -989,12 +989,12 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
               )}
               {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
               <details className="rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="thr-lib-sample">
-                <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">짧은 예시 보기</summary>
+                <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">짧은 예시 보기</summary>
                 <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{TEMPLATE_EASY[t.key].sample}</p>
               </details>
               {t.example && !isMarketingCustomer() && (
                 <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
-                  <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">우리 버전 예시</summary>
+                  <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">우리 버전 예시</summary>
                   <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{t.example}</p>
                 </details>
               )}

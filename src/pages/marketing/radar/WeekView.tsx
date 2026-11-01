@@ -550,7 +550,7 @@ function LintBadge({ lint }: { lint: LintSum }) {
     )
   return (
     <details className="t-meta rounded-lg bg-slate-50 px-2.5 py-1.5" data-testid="mk-week-lint-item" data-bad={lint.bad}>
-      <summary className={`tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : 'text-amber-800'}`}>
+      <summary className={`sum-chev tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : 'text-amber-800'}`}>
         {lint.bad ? `고칠 곳 ${lint.bad}` : '✓ 점검 통과'}
         {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
       </summary>

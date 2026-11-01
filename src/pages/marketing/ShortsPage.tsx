@@ -811,7 +811,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
                 <b>왜</b> {f.why}
               </p>
               <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
-                <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">예시 대본 보기</summary>
+                <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">예시 대본 보기</summary>
                 <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{exampleText(f.example)}</p>
                 <p className="t-sub mt-2 break-keep whitespace-pre-line text-slate-500">캡션: {f.exampleCaption}</p>
               </details>

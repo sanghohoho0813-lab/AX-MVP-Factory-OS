@@ -594,7 +594,7 @@ function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: st
       )}
       {k.outline.length > 0 && (
         <details className="t-sub rounded-lg bg-slate-50 px-2.5 py-1.5">
-          <summary className="cursor-pointer font-semibold text-slate-800">구성 {k.outline.length}줄</summary>
+          <summary className="sum-chev cursor-pointer font-semibold text-slate-800">구성 {k.outline.length}줄</summary>
           <ul className="mt-1 flex flex-col gap-0.5">
             {k.outline.map((x) => (
               <li key={x} className="break-keep text-slate-700 [overflow-wrap:anywhere]">· {x}</li>

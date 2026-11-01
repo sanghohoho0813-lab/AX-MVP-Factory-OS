@@ -326,8 +326,9 @@ export function RewriteTable({ testId }: { testId: string }) {
 /** D-274 사실 목록(이것만 씀) 보기 + 이번에 더 쓸 사실 — AI 와 숫자 대조가 같은 목록을 쓴다 */
 export function FactsBox({ value, onChange, testPrefix, what }: { value: string; onChange: (v: string) => void; testPrefix: string; what: string }) {
   return (
-    <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid={`${testPrefix}-facts-box`}>
-      <summary className="tap t-sub cursor-pointer font-semibold text-slate-700">사실 목록 보기 · 이번 {what}에 더 쓸 사실 (선택)</summary>
+    <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid={`${testPrefix}-facts-box`}>
+      {/* D-478 다른 접기와 같은 꺾쇠(예전: 브라우저 기본 ▶ 글자) — 공통 sum-chev */}
+      <summary className="sum-chev tap t-sub min-h-9 cursor-pointer font-semibold text-slate-700">사실 목록 보기 · 이번 {what}에 더 쓸 사실 (선택)</summary>
       <p className="t-sub mt-1 break-keep text-slate-600">AI 와 규칙 검사는 아래 사실만 씁니다. 목록에 없는 숫자가 나오면 규칙 검사가 알려 드려요.</p>
       <ul className="t-sub mt-1 list-disc pl-5 break-keep text-slate-700" data-testid={`${testPrefix}-kim-facts`}>
         {ourFactsList().map((f) => (
