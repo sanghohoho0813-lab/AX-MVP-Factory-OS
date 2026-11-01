@@ -18,12 +18,15 @@ import { nowDate } from '../../lib/appClock'
 interface Props {
   todo: { open: number; overdue: number; hard: number }
   clients: { contract: number; prospect: number }
-  decisions: number
+  /** null = 아직 모으는 중('–') */
+  decisions: number | null
   follow: { events: number; appointments: number; lateAppointments: number }
   pilot: boolean
   phone: boolean
   onTodos: () => void
   onFollow: () => void
+  /** D-482 업체 · 할 일을 읽는 동안 — 칸 자리를 미리 잡아(숫자 대신 '–') 다 읽은 뒤 아래 칸이 밀려 내려가지 않게 */
+  loading?: boolean
 }
 
 interface RecentAi {
@@ -67,7 +70,10 @@ function useRecentAiRuns(enabled: boolean): RecentAi | null {
   return state
 }
 
-export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTodos, onFollow }: Props) {
+export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTodos, onFollow, loading = false }: Props) {
+  // 읽는 중에는 숫자 · 설명 대신 자리만(지어낸 0 을 잠깐이라도 보이지 않게)
+  const val = (text: string) => (loading ? '–' : text)
+  const tip = (text: string) => (loading ? '불러오는 중…' : text)
   const aiOpen = useOwnerAiAccess() === 'yes'
   const ai = useRecentAiRuns(!pilot && aiOpen)
   const latest = ai?.latest ?? null
@@ -79,9 +85,9 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
       icon={ListTodo}
       tone="indigo"
       label="오늘 처리할 업무"
-      value={`${todo.open}건`}
-      urgency={todo.overdue > 0 || todo.hard > 0 ? 'danger' : 'neutral'}
-      hint={[todo.overdue > 0 ? `밀린 것 ${todo.overdue}건` : '', todo.hard > 0 ? `놓치면 끝나는 기한 ${todo.hard}건` : ''].filter(Boolean).join(' · ') || (todo.open === 0 ? '오늘 기한인 할 일 없음' : '오늘까지 할 일')}
+      value={val(`${todo.open}건`)}
+      urgency={loading ? 'neutral' : todo.overdue > 0 || todo.hard > 0 ? 'danger' : 'neutral'}
+      hint={tip([todo.overdue > 0 ? `밀린 것 ${todo.overdue}건` : '', todo.hard > 0 ? `놓치면 끝나는 기한 ${todo.hard}건` : ''].filter(Boolean).join(' · ') || (todo.open === 0 ? '오늘 기한인 할 일 없음' : '오늘까지 할 일'))}
       onClick={onTodos}
     />,
     <KpiCard
@@ -90,8 +96,8 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
       icon={Users}
       tone="blue"
       label="진행 중 고객사"
-      value={`${clients.contract + clients.prospect}곳`}
-      hint={`계약 ${clients.contract}곳 · 잠재 ${clients.prospect}곳`}
+      value={val(`${clients.contract + clients.prospect}곳`)}
+      hint={tip(`계약 ${clients.contract}곳 · 잠재 ${clients.prospect}곳`)}
       to="/ops/clients"
     />,
     <KpiCard
@@ -100,9 +106,9 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
       icon={CheckCheck}
       tone="indigo"
       label="확인 필요 항목"
-      value={`${decisions}개`}
-      urgency={decisions > 0 ? 'brand' : 'neutral'}
-      hint={decisions > 0 ? '맞다 · 아니다만 고르면 끝' : '확인할 것 없음'}
+      value={decisions === null ? '–' : val(`${decisions}개`)}
+      urgency={loading || decisions === null ? 'neutral' : decisions > 0 ? 'brand' : 'neutral'}
+      hint={decisions === null ? '모으는 중…' : tip(decisions > 0 ? '맞다 · 아니다만 고르면 끝' : '확인할 것 없음')}
       to="/ops/decide"
     />,
     ...(ai
@@ -113,8 +119,8 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
             icon={Sparkles}
             tone="purple"
             label="최근 AI 작업"
-            value={`${ai.count}건`}
-            hint={latest ? `지난 7일 · 최근 ${latest.task}${latest.company ? ` · ${latest.company}` : ''}` : '지난 7일 실행 없음'}
+            value={val(`${ai.count}건`)}
+            hint={tip(latest ? `지난 7일 · 최근 ${latest.task}${latest.company ? ` · ${latest.company}` : ''}` : '지난 7일 실행 없음')}
             to={latest ? `/ai/${latest.caseId}` : '/ai'}
           />,
         ]
@@ -125,9 +131,9 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
       icon={pilot ? CalendarClock : MessagesSquare}
       tone={pilot ? 'teal' : 'rose'}
       label={pilot ? '후속 약속' : '상담 · 후속'}
-      value={`${followCount}건`}
-      urgency={follow.lateAppointments > 0 ? 'warning' : !pilot && follow.events > 0 ? 'brand' : 'neutral'}
-      hint={[!pilot ? `새 상담신청 ${follow.events}` : '', `업체 약속 ${follow.appointments}${follow.lateAppointments > 0 ? `(지난 것 ${follow.lateAppointments})` : ''}`].filter(Boolean).join(' · ')}
+      value={val(`${followCount}건`)}
+      urgency={loading ? 'neutral' : follow.lateAppointments > 0 ? 'warning' : !pilot && follow.events > 0 ? 'brand' : 'neutral'}
+      hint={tip([!pilot ? `새 상담신청 ${follow.events}` : '', `업체 약속 ${follow.appointments}${follow.lateAppointments > 0 ? `(지난 것 ${follow.lateAppointments})` : ''}`].filter(Boolean).join(' · '))}
       onClick={onFollow}
     />,
   ]

@@ -372,7 +372,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const todoCount = openTodos.length
   // D-282 맨 위 KPI — 화면이 이미 센 것만(확인할 것은 아래 '확인할 것' 칸과 같은 판정)
   // D-479 업체가 많으면 나눠 계산(다 모이기 전엔 0) — 결과는 아래 '확인할 것' 목록과 함께 쓴다
-  const decisionCount = useAllDecisions(clients, today, grantNotices, usable)?.length ?? 0
+  // 아직 모으는 중이면 null — 숫자 칸에 지어낸 0 대신 '–'
+  const decisionCount = useAllDecisions(clients, today, grantNotices, usable)?.length ?? null
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   /** D-239: AI 도우미에 보낼 오늘 자료 — 화면이 이미 계산한 목록 그대로 */
@@ -462,8 +463,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
             <h1 className="t-page mt-0.5 flex flex-wrap items-baseline gap-x-3 break-keep text-slate-900">
+              {/* D-482 읽는 동안은 짧게(한 줄) — 긴 '불러오는 중' 문구가 휴대폰에서 두 줄이었다가 '오늘 할 일 n건' 한 줄로 줄며 아래가 통째로 밀렸다 */}
               {loading
-                ? '오늘 할 일을 불러오는 중…'
+                ? '오늘 할 일'
                 : todoCount > 0
                   ? `오늘 할 일 ${todoCount}건`
                   : '오늘 할 일을 적어 보세요'}
@@ -514,8 +516,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </ArrangeItem>
         )}
         <ArrangeItem id="kpis" label="숫자 다섯 칸" hint="오늘 처리할 업무 · 진행 중 고객사 · 확인 필요 · AI 작업 · 상담">
-          {!loading && (
+          {/* D-482 읽는 동안에도 칸 자리를 잡아 둔다 — 다 읽은 뒤 숫자 칸이 끼어들며 아래가 통째로 밀렸다(화면 밀림 CLS) */}
+          {(
                     <TodayKpis
+                      loading={loading}
                       todo={{ open: todoCount, overdue: overdueTodos.length, hard: hardDue.length }}
                       clients={{ contract: countContractClients(clients), prospect: clients.filter(isProspect).length }}
                       decisions={decisionCount}
