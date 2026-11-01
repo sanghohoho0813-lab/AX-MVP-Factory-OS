@@ -102,6 +102,8 @@ export function parseCertificateDocument(raw: string): ParsedCertificate | null 
   let issuer = ''
   const il = /(?:인정|확인|발급|인증|발행)\s*기\s*관\s*[:：]?\s*([가-힣A-Za-z()·\s]{2,30})/.exec(text)
   if (il) issuer = il[1].trim().split(/\s{2,}|\n/)[0].trim()
+  // D-449 '벤처기업확인기관장' 처럼 기관 다음 '장'(서명란)만 잡힌 것은 기관 이름이 아니다
+  if (issuer.replace(/\s/g, '').length < 2) issuer = ''
   if (!issuer) issuer = ISSUERS.find((n) => text.replace(/\s/g, '').includes(n)) ?? ''
 
   // D-181: 중소기업 확인서 — 기업 규모(소기업 · 중기업 · 소상공인). 적힌 그대로만, 못 찾으면 비운다

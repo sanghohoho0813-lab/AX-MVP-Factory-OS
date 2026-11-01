@@ -790,6 +790,19 @@ export function waitingNames(names: readonly string[], pendingKeys: ReadonlySet<
   return names.filter((n) => WAITING_KEYS.some(([re, keys]) => re.test(n) && keys.some((k) => pendingKeys.has(k))))
 }
 
+/** D-449 화면에 보일 때는 같은 사실을 한 번만('설립일' · '설립일(창업일)' → '설립일') */
+export function waitingLabels(names: readonly string[]): string[] {
+  const seen = new Set<number>()
+  const out: string[] = []
+  for (const n of names) {
+    const i = WAITING_KEYS.findIndex(([re]) => re.test(n))
+    if (i >= 0 && seen.has(i)) continue
+    if (i >= 0) seen.add(i)
+    out.push(n.replace(/\s*\([^)]*\)$/, ''))
+  }
+  return out
+}
+
 /** 아직 판정 못 한 모듈에 필요한 서류 · 정보 — 겹치지 않게, 많아야 n개 */
 export function missingForPicks(insights: readonly Insight[], n = 3): string[] {
   return [...new Set(insights.filter((i) => i.tone === 'need').flatMap((i) => i.missing))].slice(0, n)

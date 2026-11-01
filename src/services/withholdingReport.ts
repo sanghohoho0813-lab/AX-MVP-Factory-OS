@@ -39,7 +39,9 @@ export function readWithholdingReport(text: string, fileName = ''): WithholdingR
   const until = gap >= 5 && gap <= 6 ? `${pm![1]}-${pm![2].padStart(2, '0')}` : ''
   // '간이세액 A01 12 45,000,000 1,234,560' — A01 바로 뒤 쉼표 없는 수(인원) · 그다음 금액(총지급액). 인원 칸이 비면 읽지 않는다
   for (const line of raw.split(/\r?\n/)) {
-    const m = /(?<![A-Z0-9])A\s*0\s*1(?!\d)\s*[|│]?\s*(\d{1,4})(?![\d,])\s*[|│]?\s*([\d,]{1,15})?/.exec(line)
+    // D-449 스캔 글자 인식이 'A01' 을 '401' · 'AO1' · 'A0l' 로 — '간이세액' 줄에서만 그렇게 본다(다른 줄의 401 은 아님)
+    const code = /간\s*이\s*세\s*액/.test(line) ? String.raw`(?<![A-Z0-9])[A4]\s*[0O]\s*[1lI](?!\d)` : String.raw`(?<![A-Z0-9])A\s*0\s*1(?!\d)`
+    const m = new RegExp(code + String.raw`\s*[|│]?\s*(\d{1,4})(?![\d,])\s*[|│]?\s*([\d,]{1,15})?`).exec(line)
     if (!m) continue
     const employees = Number(m[1])
     if (!(employees >= 1 && employees <= 9999)) continue

@@ -17,7 +17,7 @@ import { Badge, type Tone } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
-import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, waitingNames, type Insight, type InsightTone } from '../../services/clientInsights'
+import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, waitingLabels, waitingNames, type Insight, type InsightTone } from '../../services/clientInsights'
 import { pendingFacts } from '../../services/customerFacts'
 import { recoRequestMessage } from '../../services/recoRequest'
 import { diagnosisNote } from '../../services/clientDiagnosis'
@@ -152,7 +152,7 @@ export function TopPicksCard({
           {/* D-447 이미 서류에서 읽어 확인만 남은 것 — 다시 받으라고 하지 않는다. 누르면 맞춤 추천 탭의 확인 카드로 */}
           {waiting.length > 0 && (
             <button type="button" onClick={() => document.getElementById('fact-inbox')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="tap t-sub flex min-w-0 flex-wrap items-center gap-1.5 text-left font-semibold break-keep text-brand-700 hover:underline" data-testid="top-picks-waiting">
-              확인만 하면 더 추천: {waiting.join(' · ')} — 서류에서 읽었어요
+              확인만 하면 더 추천: {waitingLabels(waiting).join(' · ')} — 서류에서 읽었어요
               <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
             </button>
           )}

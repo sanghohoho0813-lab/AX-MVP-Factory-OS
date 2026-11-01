@@ -82,7 +82,7 @@ import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, 
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
-import { manwonText, policyDocsLine, smeConfirmed, waitingNames } from '../clientInsights'
+import { manwonText, policyDocsLine, smeConfirmed, waitingLabels, waitingNames } from '../clientInsights'
 import { loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
@@ -2905,6 +2905,15 @@ await (async () => {
   check('D-448 "880,000,000"(6↔8) → 860,000,000 · 확실(예전: 셈이 안 맞아 확실하지 않음 → 사업소득 추이 없음)', !!r && r.sure && r.years.find((y) => y.year === 2025)?.revenue === 860_000_000, JSON.stringify(r))
   const AMB = INC.replace('880,000,000 790,000,000 70,000,000', '860,000,000 790,000,000 50,000,000')
   check('D-448 헷갈리는 짝으로 설명되지 않으면 그대로(확실하지 않음)', readIncomeCert(AMB)?.sure === false, JSON.stringify(readIncomeCert(AMB)))
+}
+
+// D-449 진짜 한글 스캔 — 원천세 'A01' 을 '401' 로 · 벤처확인서 '…확인기관장' 의 '장' · '설립일 · 설립일(창업일)' 겹침
+{
+  const wh = readWithholdingReport(['원천징수이행상황신고서', '귀속연월 2026년 09월 지급연월 2026년 09월', '근로소득 간이세액 401 12 48,000,000 1,200,000'].join('\n'))
+  check('D-449 원천세 "간이세액 401 12 48,000,000"(A 를 4 로) → 근로자 12명 · 4,800만원(예전: 못 읽음)', wh?.employees === 12 && wh?.pay === 48_000_000, JSON.stringify(wh))
+  const ven = parseCertificateDocument(['벤저키엽확인서', '기업명 주식회사 미래바이오랩', '벤처기업 확인유형 연구개발기업', '유효기간 2025.06.01 ~ 2028.05.31', '벤처기업확인기관장'].join('\n'))
+  check('D-449 벤처확인서 끝 "벤처기업확인기관장" — 기관 이름을 "장" 으로 잡지 않음', !!ven && ven.issuer === '', JSON.stringify(ven))
+  check('D-449 맨 위 카드 — "설립일 · 설립일(창업일)" 은 "설립일" 한 번', JSON.stringify(waitingLabels(['설립일', '설립일(창업일)', '업종'])) === JSON.stringify(['설립일', '업종']))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
