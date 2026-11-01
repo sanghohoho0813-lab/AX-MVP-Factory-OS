@@ -6,7 +6,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { GrantNotice } from '../../services/grants/grantMatch'
-import { buildAllDecisions, missingDecisionCount, warmDecisions, type Decision } from '../../services/decisions'
+import type { Decision } from '../../services/decisions'
+
+/*
+ * D-481 판정 엔진(decisions → clientInsights · 정책자금 · 인증 · 절세)은 화면이 뜬 뒤 따로 받는다 — 오늘 화면 첫 그림이 이것을 기다리지 않게.
+ * 한 번 받으면 다음부터는 바로(받기 전에는 '모으는 중' 과 같다 — 목록 칸을 그리지 않는다).
+ */
+type Engine = typeof import('../../services/decisions')
+let engine: Engine | null = null
+const loadEngine = () =>
+  import('../../services/decisions').then((m) => {
+    engine = m
+    return m
+  })
 
 /** 이만큼까지는 바로 계산(대표 · 팀장 실제 업체 수 — 화면 · 시험이 예전과 같다) */
 export const DECISION_SYNC_MAX = 60
@@ -28,22 +40,33 @@ export function useAllDecisionsState(
   notices: readonly GrantNotice[],
   usable: (key: string) => boolean,
 ): { list: Decision[] | null; pending: boolean } {
+  const [eng, setEng] = useState<Engine | null>(engine)
+  useEffect(() => {
+    if (eng) return
+    let alive = true
+    void loadEngine().then((m) => {
+      if (alive) setEng(m)
+    })
+    return () => {
+      alive = false
+    }
+  }, [eng])
   const [tick, setTick] = useState(0)
   const missing = useMemo(() => {
     void tick
-    return missingDecisionCount(clients, today, notices, usable)
-  }, [clients, today, notices, usable, tick])
-  const list = useMemo(() => (missing <= DECISION_SYNC_MAX ? buildAllDecisions(clients, today, notices, usable) : null), [missing, clients, today, notices, usable])
+    return eng ? eng.missingDecisionCount(clients, today, notices, usable) : Number.POSITIVE_INFINITY
+  }, [eng, clients, today, notices, usable, tick])
+  const list = useMemo(() => (eng && missing <= DECISION_SYNC_MAX ? eng.buildAllDecisions(clients, today, notices, usable) : null), [eng, missing, clients, today, notices, usable])
   // 공고 · 권한이 늦게 들어와 다시 계산하는 동안은 직전 목록을 그대로(칸이 사라졌다 나타나지 않게)
   const last = useRef<Decision[] | null>(null)
   if (list) last.current = list
   useEffect(() => {
-    if (missing <= DECISION_SYNC_MAX) return
+    if (!eng || missing <= DECISION_SYNC_MAX) return
     let alive = true
     let handle = 0
     const step = () => {
       if (!alive) return
-      const left = warmDecisions(clients, today, notices, usable, SLICE_MS)
+      const left = eng.warmDecisions(clients, today, notices, usable, SLICE_MS)
       if (left > 0) handle = window.setTimeout(step, 0)
       else setTick((t) => t + 1)
     }
@@ -52,6 +75,6 @@ export function useAllDecisionsState(
       alive = false
       window.clearTimeout(handle)
     }
-  }, [missing, clients, today, notices, usable])
+  }, [eng, missing, clients, today, notices, usable])
   return { list: list ?? last.current, pending: list === null }
 }

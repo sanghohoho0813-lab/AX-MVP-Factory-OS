@@ -7,7 +7,10 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Check, CheckCheck, ChevronDown, ExternalLink, X } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntry, PortalClientLink } from '../../types/bridge'
-import { DECISION_KIND_LABEL, undoDecision, weekdayOnOrAfter, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
+import { DECISION_KIND_LABEL, weekdayOnOrAfter, type DecisionKind } from '../../services/decisionLabels'
+import type { Decision } from '../../services/decisions'
+// D-481 답하기 · 되돌리기(판정 엔진 파일)는 누를 때 — 목록이 보일 때는 이미 받아 둔 상태라 바로 쓴다
+const decisionsEngine = () => import('../../services/decisions')
 import { saveClient } from '../../services/clientOpsService'
 import type { GrantNotice } from '../../services/grants/grantMatch'
 import type { GrantBrief } from '../../services/grants/grantBrief'
@@ -75,6 +78,7 @@ export function useDecisionAnswer({
       for (const st of [...steps].reverse()) {
         const cur = fresh.get(st.d.clientId) ?? latestRef.current(st.d.clientId)
         if (!cur) continue
+        const { undoDecision } = await decisionsEngine()
         const saved = await saveRef.current(undoDecision(cur, st.prev, st.next, st.d.id))
         if (saved) fresh.set(saved.id, saved)
       }
@@ -131,6 +135,8 @@ export function useDecisionAnswer({
       if (!rec) return null
       // D-161: 할 일을 먼저 만든다 — 기록부터 저장하면 할 일 만들기가 실패했을 때 질문만 사라졌다
       if (a === 'yes') made = await makeTodo(d)
+      // 복사는 위에서 이미 끝났다(클립보드는 누른 바로 그때만) — 엔진은 그 뒤에
+      const { withDecisionAnswer } = await decisionsEngine()
       const next = withDecisionAnswer(rec, d, a, notices, nowIso())
       let saved: ClientOpsRecord | null = null
       try {
@@ -199,6 +205,7 @@ export function useDecisionAnswer({
         if (!rec) continue
         // 할 일 먼저 — 기록 저장이 실패하면 지운다
         const todo = await makeTodo(d)
+        const { withDecisionAnswer } = await decisionsEngine()
         const next = withDecisionAnswer(rec, d, 'yes', notices, nowIso())
         let saved: ClientOpsRecord | null = null
         try {

@@ -44,23 +44,10 @@ import { SERVICES } from '../content/clientOpsCatalog'
 import type { ServiceKey } from '../types/clientOps'
 import { koCompare } from '../lib/koCompare'
 
-export type DecisionKind = 'fact' | 'module' | 'grant' | 'doc' | 'money' | 'stale' | 'next' | 'followup' | 'shelf' | 'autofill'
-
-export const DECISION_KIND_LABEL: Record<DecisionKind, string> = {
-  fact: '자료에서 읽은 정보',
-  module: '해 볼 만한 일',
-  grant: '맞는 지원사업',
-  doc: '서류 기한',
-  money: '받을 돈',
-  stale: '밀린 업무',
-  next: '다음 약속',
-  followup: '다시 연락',
-  shelf: '서류함 정리',
-  autofill: '바로 넣은 값',
-}
-
-/** D-160: 한 번에 '모두 맞아요' 해도 되는 종류 — 복사(카톡 문구)는 하나씩 보내야 하므로 뺀다 */
-export const DECISION_BULK_KINDS: DecisionKind[] = ['fact', 'module', 'stale', 'next', 'autofill']
+// D-481 이름표 · 주말 피하기는 작은 파일에 — 오늘 화면이 판정 엔진을 받기 전에 그릴 수 있게(여기서 다시 내보낸다)
+import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, weekdayOnOrAfter, type DecisionKind } from './decisionLabels'
+export { DECISION_BULK_KINDS, DECISION_KIND_LABEL, weekdayOnOrAfter }
+export type { DecisionKind }
 
 export type DecisionEffect =
   | { type: 'fact'; pendingId: string }
@@ -135,11 +122,6 @@ const isYmd = (d: string | null | undefined): d is string => typeof d === 'strin
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
-/** 주말이면 다음 월요일로 — 약속 · 기한을 토 · 일에 잡지 않는다 */
-export function weekdayOnOrAfter(date: string): string {
-  const day = new Date(`${date}T00:00:00Z`).getUTCDay()
-  return day === 6 ? addDaysLocal(date, 2) : day === 0 ? addDaysLocal(date, 1) : date
-}
 
 /** 받을 돈 — 입금 요청 문구(고객에게 보내는 말 · 안쪽 말 없음) */
 export function paymentReminderMessage(record: ClientOpsRecord, label: string, amount: number | null, dueDate: string): string {

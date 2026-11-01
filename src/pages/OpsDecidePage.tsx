@@ -15,7 +15,7 @@ import { NO_DECISIONS, useAllDecisionsState } from '../components/ops/useAllDeci
 import { useGrantData } from '../components/grants/useGrants'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { listClients, saveClient } from '../services/clientOpsService'
-import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, type DecisionKind } from '../services/decisions'
+import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, type DecisionKind } from '../services/decisionLabels'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 
