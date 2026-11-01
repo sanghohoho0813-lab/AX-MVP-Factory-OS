@@ -66,7 +66,7 @@ import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
+import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs, isStandardBizCategory } from '../docAutoFill'
 import { bizNoChecksumOk } from '../bizNoRead'
 import { pdfItemsToText } from '../pdfTextLines'
 import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
@@ -2959,6 +2959,19 @@ await (async () => {
   check('D-456 "고용보험 피보험자격 취득자 명단" → 4대보험 가입자 명부 칸', roster.kind === 'existing' && roster.key === 'payrollRoster', JSON.stringify(roster))
   check('D-456 기술신용평가서 · TCB 기술평가서 → "기술신용평가서" 칸(예전 기타)', at('기술신용평가서').label === '기술신용평가서' && at('TCB 기술평가 등급확인서').label === '기술신용평가서')
   check('D-456 매출처별 · 매입처별 세금계산서 합계표 → 제 이름 칸(예전 기타)', at('매출처별 세금계산서 합계표').label === '매출처별 세금계산서 합계표' && at('매입처별 전자세금계산서 합계표').label === '매입처별 세금계산서 합계표')
+})()
+
+// D-461 스캔 사업자등록증의 업태가 국세청 업태 이름이면 묻지 않고 넣는다 · 글자 실수('재조업')는 그대로 묻는다
+;(() => {
+  const BIZ = (cat: string) => `사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 한빛테크\n대표자 : 김한빛\n개업연월일 : 2019 년 03 월 02 일\n사업장 소재지 : 경기도 파주시 문산읍 돈유1로 12\n업태 : ${cat}\n종목 : 전자부품`
+  const empty = normalizeClientOps({ id: 'af461', companyName: '한빛테크', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d461-${++n}`
+  const ok = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: BIZ('제조업'), method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-461 스캔 업태 "제조업" → 바로 입력(확인 목록에 없음) · 설립일은 그대로 확인', ok.entered.some((f) => f.key === 'businessCategory') && !ok.flagged.some((f) => f.key === 'businessCategory') && ok.flagged.some((f) => f.key === 'establishedAt'), JSON.stringify({ e: ok.entered.map((f) => f.key), f: ok.flagged.map((f) => f.key) }))
+  const typo = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: BIZ('재조업'), method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-461 스캔 업태 "재조업"(글자 실수) → 예전처럼 한 번 확인', typo.flagged.some((f) => f.key === 'businessCategory' && f.note === NOTE_OCR))
+  check('D-461 업태 이름 — 도매 및 소매업 · 제조업, 도매업 · 서비스 · 전문, 과학 및 기술 서비스업 ✓ / 제조업체 · HEAR · 업 ✗', isStandardBizCategory('도매 및 소매업') && isStandardBizCategory('제조업, 도매업') && isStandardBizCategory('서비스') && isStandardBizCategory('전문, 과학 및 기술 서비스업') && !isStandardBizCategory('제조업체') && !isStandardBizCategory('HEAR') && !isStandardBizCategory('업'))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

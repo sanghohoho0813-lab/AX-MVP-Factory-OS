@@ -105,6 +105,22 @@ function ocrSelfChecked(doc: ReadDoc): Set<string> {
   return out
 }
 
+/**
+ * D-461 국세청 업태 이름 — 스캔에서 읽은 업태가 이 이름들로만 되어 있으면(띄어쓰기 · 쉼표 · '업' 은 상관없이) 글자 실수가 아니라 보고 묻지 않는다.
+ * '재조업' · '제조업체' · 'HEAR' 처럼 하나라도 이름에 없으면 예전처럼 '한 번 확인'.
+ */
+const BIZ_CATEGORY_NAMES = [
+  '도매및소매업?', '도소매업?', '도매업?', '소매업?', '제조업?', '서비스업?', '건설업?', '운수및창고업?', '운수업?', '창고업?', '숙박및음식점업?', '음식점업?', '숙박업?', '음식업', '요식업',
+  '부동산및임대업?', '부동산임대업?', '부동산업?', '임대업?', '정보통신업?', '출판업?', '전문,?과학및기술서비스업?', '교육서비스업?', '보건및사회복지서비스업?', '사회복지서비스업?', '보건업',
+  '농업', '임업', '어업', '광업', '금융및보험업?', '금융업?', '보험업?', '예술,?스포츠및여가관련서비스업?', '협회및단체', '수리및기타개인서비스업?', '개인서비스업?',
+  '사업시설관리,?사업지원및임대서비스업?', '사업지원서비스업?', '전기,?가스,?증기및공기조절공급업?', '수도,?하수및폐기물처리,?원료재생업?', '무역업?',
+]
+const BIZ_CATEGORY_RE = new RegExp(`^(?:${BIZ_CATEGORY_NAMES.join('|')})(?:[,·/]?(?:${BIZ_CATEGORY_NAMES.join('|')}))*$`)
+export function isStandardBizCategory(value: string): boolean {
+  const v = value.replace(/\s+/g, '')
+  return v.length >= 2 && BIZ_CATEGORY_RE.test(v)
+}
+
 /** 비교용 값 — 번호는 숫자만, 글은 띄어쓰기 · (주) 표기를 뺀다 */
 function sameKey(key: string, value: string): string {
   if (key === 'businessNumber' || key === 'corporateNumber') return value.replace(/\D/g, '')
@@ -292,7 +308,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       const pick = c.key === 'businessNumber' && c.note ? [c.value, ...(c.choices ?? []), ...readBusinessNumber(doc.text).alternatives].find((v) => others.has(v.replace(/\D/g, ''))) : undefined
       if (pick) return { key: c.key, value: pick, source: c.source, asOf: c.asOf, ref: c.ref }
       const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`)
-      const note = noteFor(doc, c.key, c.value, isAgreed, checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate'))
+      const note = noteFor(doc, c.key, c.value, isAgreed, (checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate')) || (c.key === 'businessCategory' && isStandardBizCategory(c.value)))
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c
