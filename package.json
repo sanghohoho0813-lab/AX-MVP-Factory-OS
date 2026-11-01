@@ -71,6 +71,7 @@
     "qa:steady": "node e2e/steady.mjs",
     "qa:flow": "node e2e/flow.mjs",
     "qa:real": "node e2e/real.mjs",
+    "qa:many": "node e2e/many.mjs",
     "qa:modules": "node e2e/modules.mjs",
     "qa:facts": "node e2e/facts.mjs",
     "qa:detail": "node e2e/detail.mjs",

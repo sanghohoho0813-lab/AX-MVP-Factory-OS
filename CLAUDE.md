@@ -76,6 +76,7 @@ npm run qa:easy -- http://localhost:4390           # 쉽고 튼튼하게(글자 
 npm run qa:steady -- http://localhost:4390         # 튼튼하게(저장 실패해도 적은 것 남음 · 삭제는 한 번 더 묻기 · 빠른 수금 두 번 눌러도 한 줄 · 다른 기기에서 고친 것 돌아오면 다시 읽기)
 npm run qa:flow -- http://localhost:4390           # 흐름 잇기(계약 완료 한 번에 · 상태 하나 · 미팅 → 서류함 · 오늘 돈 줄)
 npm run qa:real -- http://localhost:4390           # 실제 데이터처럼(긴 이름 · 많은 항목 · 360~430 · 큰 글자에서 잘림 · 넘침 0)
+npm run qa:many -- http://localhost:4390           # 업체가 많을 때(300곳 — 고객 관리 카드 40장씩 · '더 보여요' 숫자 · 오늘 '확인할 것' = 모두 보기 수 · 모두 보기 40건씩 · 종류 바꾸면 처음부터 · 영업 보드 · 정산 나눠 그림 · 견본은 예전 그대로 · 390)
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
 npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
 npm run qa:facts -- http://localhost:4390         # 고객 사실 창고(자료에서 찾은 정보 확인 → 모듈이 다시 씀)
