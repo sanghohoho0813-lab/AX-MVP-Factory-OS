@@ -823,8 +823,17 @@ export function cardRecoChips(record: ClientOpsRecord, today: string, grantFit: 
   // D-384 신고서에 빠진 공제가 드러난 카드(경정청구 세무사와 검토)는 띠에도 '· 경정청구' — 고객 관리에서 돌려받을 세금이 있는 업체가 바로 보이게
   const refund = (i: Insight) => /경정청구 세무사와 검토/.test(i.action ?? '')
   const chips: RecoChip[] = ins.map((i) => ({ key: i.key, label: refund(i) ? `${i.label} · 경정청구` : i.label, tone: i.tone as RecoChip['tone'] }))
-  if (grantFit > 0 && usable('grants')) chips.unshift({ key: 'grants', label: `지원사업 ${grantFit}건`, tone: 'good' })
-  return chips.map((c, i) => ({ c, i })).sort((a, b) => TONE_RANK[a.c.tone] - TONE_RANK[b.c.tone] || a.i - b.i).map((v) => v.c)
+  return withGrantChip(chips, grantFit, usable)
+}
+
+/**
+ * 띠에 '지원사업 n건' 을 얹고 가능성 순으로 — cardRecoChips 의 마지막 단계.
+ * D-479 고객 관리는 모듈 판정(무거움)을 업체마다 기억해 두고, 공고 수가 늦게 들어와도 이것만 다시 한다.
+ */
+export function withGrantChip(chips: readonly RecoChip[], grantFit: number, usable: (key: string) => boolean = () => true): RecoChip[] {
+  const out = chips.filter((c) => c.key !== 'grants')
+  if (grantFit > 0 && usable('grants')) out.unshift({ key: 'grants', label: `지원사업 ${grantFit}건`, tone: 'good' })
+  return out.map((c, i) => ({ c, i })).sort((a, b) => TONE_RANK[a.c.tone] - TONE_RANK[b.c.tone] || a.i - b.i).map((v) => v.c)
 }
 
 /** 추천 많은 순 — 가능성 높음 2점 · 검토해 볼 만함 1점 */

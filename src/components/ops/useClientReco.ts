@@ -3,6 +3,12 @@
  *
  * 판정 엔진(정책자금 · 창업감면 · 기업인증 …)은 목록 첫 화면과 따로 받는다 — 목록은 바로 뜨고, 띠는 곧이어 붙는다.
  * 지원사업은 목록이 이미 한 번에 센 '맞는 공고 수' 를 쓴다(업체마다 공고를 다시 대 보지 않는다).
+ *
+ * D-479 업체가 많을 때(1,000곳 기준 목록 2.9초 · 그중 2.4초 화면 멈춤 — 업체마다 판정 엔진 전체를 돌렸다):
+ *  - 업체별 모듈 판정을 기억한다 — 기록 · 오늘 날짜 · 권한이 그대로면 다시 계산하지 않는다(오늘 화면 ↔ 고객 관리가 같이 쓴다).
+ *    '지원사업 n건' 은 공고 수가 늦게 들어와도 판정을 다시 돌리지 않고 얹기만 한다(withGrantChip — cardRecoChips 마지막 단계와 같음).
+ *  - 처음 계산은 짧게 끊어서(한 번에 12ms) — 그 사이 화면은 움직이고, 다 되면 띠가 한 번에 붙는다.
+ *  판정 엔진 · 계산식은 그대로다(부르는 횟수 · 때만 바뀐다).
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -18,9 +24,69 @@ export interface ClientReco {
   ready: boolean
 }
 
+interface Memo {
+  rec: ClientOpsRecord
+  sig: string
+  ctx: string
+  chips: RecoChip[]
+}
+
+/** 업체 id → 마지막 계산(기록이 같고 ctx 가 같을 때만 다시 쓴다) */
+const memo = new Map<string, Memo>()
+/** 권한 묶음(ent)마다 번호 — 권한이 바뀌면 ctx 가 달라져 다시 계산 */
+const entIds = new WeakMap<object, number>()
+let entSeq = 0
+const entIdOf = (ent: object) => {
+  let id = entIds.get(ent)
+  if (id === undefined) {
+    id = ++entSeq
+    entIds.set(ent, id)
+  }
+  return id
+}
+
+const sigOf = (r: ClientOpsRecord) => {
+  try {
+    return JSON.stringify(r)
+  } catch {
+    return `${r.id}|${r.updatedAt}|${Math.random()}`
+  }
+}
+
+/** 기억해 둔 띠 — 없거나 낡았으면 undefined */
+function remembered(r: ClientOpsRecord, ctx: string): RecoChip[] | undefined {
+  const m = memo.get(r.id)
+  if (!m || m.ctx !== ctx) return undefined
+  if (m.rec === r) return m.chips
+  const sig = sigOf(r)
+  if (sig !== m.sig) return undefined
+  m.rec = r // 같은 내용의 새 객체(저장소를 다시 읽음) — 다음엔 바로 맞는다
+  return m.chips
+}
+
+function computeChips(engine: Engine, r: ClientOpsRecord, today: string, usable: (key: string) => boolean, ctx: string): RecoChip[] {
+  let list: RecoChip[]
+  try {
+    // 모듈 판정만(공고 0) — 공고 칩은 모을 때 얹는다
+    list = engine.cardRecoChips(r, today, 0, usable)
+  } catch {
+    // 한 업체 값이 엔진을 넘어뜨려도 목록은 그대로
+    list = []
+  }
+  memo.set(r.id, { rec: r, sig: sigOf(r), ctx, chips: list })
+  return list
+}
+
+const grantOnly = (fit: number): RecoChip[] => (fit > 0 ? [{ key: 'grants', label: `지원사업 ${fit}건`, tone: 'good' }] : [])
+const scoreOf = (list: RecoChip[]) => list.reduce((s, c) => s + (c.tone === 'good' ? 2 : 1), 0)
+
+/** 한 번에 이만큼만 계산하고 화면에 차례를 넘긴다 */
+const SLICE_MS = 12
+
 export function useClientReco(records: readonly ClientOpsRecord[], today: string, grantFit: (id: string) => number): ClientReco {
   const [engine, setEngine] = useState<Engine | null>(loaded)
   const { ent } = useEntitlements()
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     if (loaded) return
     let alive = true
@@ -32,21 +98,55 @@ export function useClientReco(records: readonly ClientOpsRecord[], today: string
       alive = false
     }
   }, [])
-  return useMemo(() => {
+
+  const result = useMemo(() => {
+    void tick // 계산이 끝나면 다시 모은다
     const chips = new Map<string, RecoChip[]>()
     const scores = new Map<string, number>()
+    const ctx = `${today}|${entIdOf(ent)}`
     const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+    let missing = 0
     for (const r of records) {
+      const fit = grantFit(r.id)
+      const mods = engine ? remembered(r, ctx) : undefined
       let list: RecoChip[]
-      try {
-        list = engine ? engine.cardRecoChips(r, today, grantFit(r.id), usable) : grantFit(r.id) > 0 ? [{ key: 'grants', label: `지원사업 ${grantFit(r.id)}건`, tone: 'good' }] : []
-      } catch {
-        // 한 업체 값이 엔진을 넘어뜨려도 목록은 그대로
-        list = []
+      if (mods === undefined || !engine) {
+        if (engine) missing++
+        list = grantOnly(fit)
+      } else {
+        list = engine.withGrantChip(mods, fit, usable)
       }
       chips.set(r.id, list)
-      scores.set(r.id, list.reduce((s, c) => s + (c.tone === 'good' ? 2 : 1), 0))
+      scores.set(r.id, scoreOf(list))
     }
-    return { chips, scores, ready: engine !== null }
-  }, [engine, records, today, grantFit, ent])
+    return { chips, scores, ready: engine !== null && missing === 0, missing }
+  }, [engine, records, today, grantFit, ent, tick])
+
+  const missing = result.missing
+  useEffect(() => {
+    if (!engine || missing === 0) return
+    let alive = true
+    let handle = 0
+    const ctx = `${today}|${entIdOf(ent)}`
+    const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+    const todo = records.slice()
+    let i = 0
+    const step = () => {
+      if (!alive) return
+      const t0 = performance.now()
+      while (i < todo.length && performance.now() - t0 < SLICE_MS) {
+        const r = todo[i++]
+        if (remembered(r, ctx) === undefined) computeChips(engine, r, today, usable, ctx)
+      }
+      if (i < todo.length) handle = window.setTimeout(step, 0)
+      else setTick((t) => t + 1)
+    }
+    handle = window.setTimeout(step, 0)
+    return () => {
+      alive = false
+      window.clearTimeout(handle)
+    }
+  }, [engine, missing, records, today, ent])
+
+  return useMemo(() => ({ chips: result.chips, scores: result.scores, ready: result.ready }), [result])
 }

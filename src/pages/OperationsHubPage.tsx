@@ -84,6 +84,7 @@ import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 import { useBackToClose } from '../lib/backToClose'
 import { useClientGrantSummaries } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
+import { useGrowingCount } from '../lib/useGrowingCount'
 import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
@@ -456,6 +457,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [sortKey])
   const recoScores = sortKey === 'reco' ? reco.scores : undefined
   const ordered = useMemo(() => sortClients(visible, sortKey, today, recoScores), [visible, sortKey, today, recoScores])
+  // D-479 업체가 많으면 카드는 처음 40장 · 아래로 내리면 이어서(보기 · 정렬 · 찾기가 바뀌면 처음부터)
+  const [shownCount, moreRef] = useGrowingCount(ordered.length, `${sortKey}|${filterKey}|${segment}|${query}`)
   const alerts = useMemo(() => buildAllAlerts(typed, today), [typed, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -990,7 +993,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   </div>
                 )}
                 <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
-                  {ordered.map((record, i) => {
+                  {ordered.slice(0, shownCount).map((record, i) => {
                     const p = clientOpsProgress(record, today)
                     const critical = summary.criticalByClient[record.id] ?? 0
                     const warning = summary.warningByClient[record.id] ?? 0
@@ -1017,6 +1020,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                     )
                   })}
                 </ul>
+                {shownCount < ordered.length && (
+                  <div ref={moreRef} className="t-sub py-3 text-center text-slate-500" data-testid="clients-more" aria-live="polite">
+                    아래로 내리면 {ordered.length - shownCount}곳 더 보여요
+                  </div>
+                )}
                 </>
               )}
 

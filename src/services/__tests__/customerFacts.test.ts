@@ -79,7 +79,7 @@ import { birthFromMaskedPrefix, parseKoreanBusinessDocument } from '../koreanDoc
 import { certContextOf } from '../../certification/integration/clientContext'
 import { assessAll, assessVenture } from '../../certification/core/assess'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
-import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
+import { buildInsights, cardRecoChips, withGrantChip, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
@@ -916,6 +916,13 @@ await (async () => {
   check('D-190 카드 추천 띠: 좋은 것 먼저', chips.every((c, i) => i === 0 || !(c.tone === 'good' && chips[i - 1].tone === 'maybe')))
   check('D-190 카드 추천 띠: 맞는 공고 0건이면 지원사업 칩 없음 · 요금제에 없으면 없음', !cardRecoChips(rec, T, 0).some((c) => c.key === 'grants') && !cardRecoChips(rec, T, 3, (k) => k !== 'grants').some((c) => c.key === 'grants'))
   check('D-190 카드 추천 띠: 판정 칩은 가능성 높음 · 검토해 볼 만함만', chips.every((c) => c.tone === 'good' || c.tone === 'maybe'))
+  // D-479 고객 관리는 모듈 판정(공고 0)을 기억해 두고 공고 칩만 얹는다 — 결과가 한 번에 계산한 것과 같아야 한다
+  {
+    const recs = [rec, normalizeClientOps({ ...rec, id: 'reco2', employeeCount: '12' }), normalizeClientOps({ ...rec, id: 'reco3', businessAddress: '서울특별시 강남구 테헤란로 1', establishedAt: '2016-01-01' })]
+    const same479 = recs.every((r) => [0, 1, 3, 12].every((fit) => [undefined, (k: string) => k !== 'grants'].every((u) => JSON.stringify(withGrantChip(cardRecoChips(r, T, 0, u), fit, u)) === JSON.stringify(cardRecoChips(r, T, fit, u)))))
+    check('D-479 판정 기억 + 공고 칩 얹기 = 한 번에 계산(업체 3 · 공고 0/1/3/12 · 요금제 두 가지)', same479)
+    check('D-479 공고 칩을 두 번 얹어도 하나', withGrantChip(withGrantChip(cardRecoChips(rec, T, 0), 3), 5).filter((c) => c.key === 'grants').map((c) => c.label).join() === '지원사업 5건')
+  }
   const empty = normalizeClientOps({ id: 'reco0', companyName: '빈업체', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
   check('D-190 정보가 없으면 짐작해서 추천하지 않음(칩 0)', cardRecoChips(empty, T, 0).length === 0, JSON.stringify(cardRecoChips(empty, T, 0)))
 

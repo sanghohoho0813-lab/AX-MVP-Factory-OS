@@ -509,7 +509,46 @@ const HOLDER_CHOICES: { value: ShareholderRelation; label: string }[] = (['ceo',
 
 /** 여러 업체 — 업체마다 위에서 몇 개씩, 급한 것(작은 rank) 먼저 */
 export function buildAllDecisions(records: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): Decision[] {
-  return records.flatMap((r) => buildDecisions(r, today, notices, usable)).sort((a, b) => a.rank - b.rank || a.clientName.localeCompare(b.clientName, 'ko'))
+  return records.flatMap((r) => decisionsFor(r, today, notices, usable)).sort((a, b) => a.rank - b.rank || a.clientName.localeCompare(b.clientName, 'ko'))
+}
+
+/*
+ * D-479 오늘 화면은 '결정할 것' 숫자 띠와 목록이 같은 계산을 두 번 했고(업체마다 판정 엔진 전체), 업체 1,000곳이면 몇 초씩 멈췄다.
+ * 업체별로 기억한다 — 기록 내용 · 오늘 날짜 · 공고 목록 · 권한이 그대로면 그대로 쓴다(buildDecisions 는 이 넷으로만 정해진다).
+ */
+const decisionMemo = new Map<string, { rec: ClientOpsRecord; sig: string; ctx: string; list: Decision[] }>()
+const memoIds = new WeakMap<object, number>()
+let memoSeq = 0
+const memoIdOf = (o: object | undefined) => {
+  if (!o) return 0
+  let id = memoIds.get(o)
+  if (id === undefined) {
+    id = ++memoSeq
+    memoIds.set(o, id)
+  }
+  return id
+}
+const recordSig = (r: ClientOpsRecord) => {
+  try {
+    return JSON.stringify(r)
+  } catch {
+    return ''
+  }
+}
+function decisionsFor(r: ClientOpsRecord, today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): Decision[] {
+  const ctx = `${today}|${memoIdOf(notices)}|${memoIdOf(usable)}`
+  const m = decisionMemo.get(r.id)
+  if (m && m.ctx === ctx) {
+    if (m.rec === r) return m.list
+    const sig = recordSig(r)
+    if (sig && sig === m.sig) {
+      m.rec = r
+      return m.list
+    }
+  }
+  const list = buildDecisions(r, today, notices, usable)
+  decisionMemo.set(r.id, { rec: r, sig: recordSig(r), ctx, list })
+  return list
 }
 
 /**
