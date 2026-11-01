@@ -7,7 +7,7 @@
  * D-479 업체가 많을 때(1,000곳 기준 목록 2.9초 · 그중 2.4초 화면 멈춤 — 업체마다 판정 엔진 전체를 돌렸다):
  *  - 업체별 모듈 판정을 기억한다 — 기록 · 오늘 날짜 · 권한이 그대로면 다시 계산하지 않는다(오늘 화면 ↔ 고객 관리가 같이 쓴다).
  *    '지원사업 n건' 은 공고 수가 늦게 들어와도 판정을 다시 돌리지 않고 얹기만 한다(withGrantChip — cardRecoChips 마지막 단계와 같음).
- *  - 처음 계산은 짧게 끊어서(한 번에 12ms) — 그 사이 화면은 움직이고, 다 되면 띠가 한 번에 붙는다.
+ *  - 처음 계산은 짧게 끊어서(한 번에 12ms) — 그 사이 화면은 움직이고, 다 되면 띠가 한 번에 붙는다(새로 계산할 업체가 60곳 이하면 예전처럼 바로).
  *  판정 엔진 · 계산식은 그대로다(부르는 횟수 · 때만 바뀐다).
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -82,6 +82,8 @@ const scoreOf = (list: RecoChip[]) => list.reduce((s, c) => s + (c.tone === 'goo
 
 /** 한 번에 이만큼만 계산하고 화면에 차례를 넘긴다 */
 const SLICE_MS = 12
+/** 이만큼까지는 바로 계산(대표 · 팀장 실제 업체 수 — 화면 · 시험이 예전과 같다) */
+const SYNC_MAX = 60
 
 export function useClientReco(records: readonly ClientOpsRecord[], today: string, grantFit: (id: string) => number): ClientReco {
   const [engine, setEngine] = useState<Engine | null>(loaded)
@@ -105,6 +107,11 @@ export function useClientReco(records: readonly ClientOpsRecord[], today: string
     const scores = new Map<string, number>()
     const ctx = `${today}|${entIdOf(ent)}`
     const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+    // 업체가 적으면(60곳 이하) 예전처럼 바로 계산 — 많을 때만 아래에서 나눠 계산한다
+    if (engine) {
+      const todo = records.filter((r) => remembered(r, ctx) === undefined)
+      if (todo.length > 0 && todo.length <= SYNC_MAX) for (const r of todo) computeChips(engine, r, today, usable, ctx)
+    }
     let missing = 0
     for (const r of records) {
       const fit = grantFit(r.id)

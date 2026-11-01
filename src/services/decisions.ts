@@ -535,6 +535,40 @@ const recordSig = (r: ClientOpsRecord) => {
     return ''
   }
 }
+/** 기억해 둔 것으로 바로 낼 수 없는 업체 수(오늘 화면이 바로 계산할지 · 나눠 계산할지 고른다) */
+export function missingDecisionCount(records: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): number {
+  const ctx = `${today}|${memoIdOf(notices)}|${memoIdOf(usable)}`
+  let n = 0
+  for (const r of records) {
+    const m = decisionMemo.get(r.id)
+    if (!m || m.ctx !== ctx) n++
+    else if (m.rec !== r) {
+      const sig = recordSig(r)
+      if (sig && sig === m.sig) m.rec = r
+      else n++
+    }
+  }
+  return n
+}
+
+/** budgetMs 동안만 계산해 기억해 둔다 — 남은 업체 수를 돌려준다(0 이면 끝) */
+export function warmDecisions(records: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable: ((key: string) => boolean) | undefined, budgetMs: number): number {
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+  const ctx = `${today}|${memoIdOf(notices)}|${memoIdOf(usable)}`
+  let left = 0
+  for (const r of records) {
+    const m = decisionMemo.get(r.id)
+    if (m && m.ctx === ctx && m.rec === r) continue
+    if (now() - t0 >= budgetMs) {
+      left++
+      continue
+    }
+    decisionsFor(r, today, notices, usable)
+  }
+  return left
+}
+
 function decisionsFor(r: ClientOpsRecord, today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): Decision[] {
   const ctx = `${today}|${memoIdOf(notices)}|${memoIdOf(usable)}`
   const m = decisionMemo.get(r.id)

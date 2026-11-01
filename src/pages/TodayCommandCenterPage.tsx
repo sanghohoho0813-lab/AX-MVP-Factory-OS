@@ -14,7 +14,7 @@ import { useClientReco } from '../components/ops/useClientReco'
 import { TodayPicks } from '../components/ops/TodayPicks'
 import { TodayKpis } from '../components/ops/TodayKpis'
 import { AppLauncher } from '../components/layout/AppLauncher'
-import { buildAllDecisions } from '../services/decisions'
+import { useAllDecisions } from '../components/ops/useAllDecisions'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -366,7 +366,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   )
   const todoCount = openTodos.length
   // D-282 맨 위 KPI — 화면이 이미 센 것만(확인할 것은 아래 '확인할 것' 칸과 같은 판정)
-  const decisionCount = useMemo(() => buildAllDecisions(clients, today, grantNotices, usable).length, [clients, today, grantNotices, usable])
+  // D-479 업체가 많으면 나눠 계산(다 모이기 전엔 0) — 결과는 아래 '확인할 것' 목록과 함께 쓴다
+  const decisionCount = useAllDecisions(clients, today, grantNotices, usable)?.length ?? 0
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   /** D-239: AI 도우미에 보낼 오늘 자료 — 화면이 이미 계산한 목록 그대로 */

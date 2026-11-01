@@ -2,12 +2,12 @@
  * 확인함 줄 (D-158) — 프로그램이 준비한 것에 '맞아요 / 아니에요' 만 고른다.
  * 맞아요: 정보 넣기 · 할 일 걸기 · 도전 체크 · 요청 문구 복사(결정마다 다름). 아니에요: 다시 묻지 않는다.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, CheckCheck, ChevronDown, ExternalLink, X } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntry, PortalClientLink } from '../../types/bridge'
-import { DECISION_KIND_LABEL, buildAllDecisions, undoDecision, weekdayOnOrAfter, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
+import { DECISION_KIND_LABEL, undoDecision, weekdayOnOrAfter, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
 import { saveClient } from '../../services/clientOpsService'
 import type { GrantNotice } from '../../services/grants/grantMatch'
 import type { GrantBrief } from '../../services/grants/grantBrief'
@@ -19,6 +19,7 @@ import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
 import { Fold } from '../ui/fold'
+import { NO_DECISIONS, useAllDecisions } from './useAllDecisions'
 
 const KIND_CLASS: Record<DecisionKind, string> = {
   fact: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700',
@@ -430,7 +431,8 @@ export function TodayDecisions({
   onSaved: (r: ClientOpsRecord) => void
   onTodo: (e: JournalEntry) => void
 }) {
-  const all = useMemo(() => buildAllDecisions(clients, today, notices, usable), [clients, today, notices, usable])
+  // D-479 업체가 많으면 나눠 계산 — 다 모이기 전에는 칸을 그리지 않는다
+  const all = useAllDecisions(clients, today, notices, usable) ?? NO_DECISIONS
   const { answer, busy } = useDecisionAnswer({
     workspaceId,
     userId,
