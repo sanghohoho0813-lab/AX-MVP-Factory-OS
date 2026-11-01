@@ -424,6 +424,10 @@ check('Q3 오류 0', errors.length === 0, errors)
 /* ---------------- D-360 그 주가 되면 오늘 화면 맨 위 '오늘 올릴 것' ---------------- */
 {
   const wk = (await page.getByTestId('mk-week').getAttribute('data-start')) ?? ''
+  // '만든 주가 오기 전' 은 그 주 앞 일요일로 잰다 — 오늘이 그 주 월~토이면 오늘 줄이 이미 있다(월요일에 돌리면 빨갛던 것)
+  const eve = new Date(`${wk}T10:00:00+09:00`)
+  eve.setDate(eve.getDate() - 1)
+  await page.clock.setFixedTime(eve)
   const before = await page.goto(BASE + '/', { waitUntil: 'networkidle' }).then(() => page.getByTestId('today-posts').count())
   const wed = new Date(`${wk}T10:00:00+09:00`)
   wed.setDate(wed.getDate() + 2)

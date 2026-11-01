@@ -300,7 +300,7 @@ export function WeekView({
           {/* D-349 어디에 모였나 */}
           {collect && gotAny && (
             <div
-              className={`flex flex-col gap-1 rounded-xl border px-3 py-2 ${sync.state === 'error' ? 'border-amber-300 bg-amber-50' : 'border-success-200 bg-success-50'}`}
+              className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2"
               data-testid="mk-week-collect"
               data-state={sync.state}
               data-kept={sync.kept}

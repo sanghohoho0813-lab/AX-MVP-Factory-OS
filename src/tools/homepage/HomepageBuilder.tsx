@@ -88,9 +88,9 @@ import { BLOCK_STYLE, MK_PRIMARY, TONE } from '../marketing/mkTheme'
 
 type Tab = 'blocks' | 'style' | 'checks'
 
-// D-226 고른 칸 · 칩은 테마 색이 아니라 홈페이지 색(초록)
-const onBox = 'border-emerald-500 ring-2 ring-emerald-200'
-const onSoft = 'border-emerald-500 bg-emerald-50 text-emerald-900'
+// D-478(6차) 고른 칸 · 칩은 다른 마케팅 화면과 같은 파랑(테마 강조색) — 예전 초록(D-226)에서
+const onBox = 'border-brand-600 ring-2 ring-brand-200'
+const onSoft = 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-200'
 
 function blockSummary(b: SiteBlock): string {
   const p = b.props
@@ -191,13 +191,13 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
         <p className="t-body break-keep text-slate-600">있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).</p>
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="site-start-facts">
           {rows.map(([k, v]) => (
-            <div key={k} className={`flex min-h-12 min-w-0 items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${v ? 'border-emerald-200 bg-emerald-50/60' : 'border-dashed border-slate-300 bg-slate-50'}`}>
+            <div key={k} className={`flex min-h-12 min-w-0 items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${v ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-white'}`}>
               {v ? (
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white" aria-label="있음">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-success-600 text-white" aria-label="있음">
                   <Check className="size-4" aria-hidden="true" />
                 </span>
               ) : (
-                <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-500" aria-label="없음">
+                <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-500" aria-label="없음">
                   –
                 </span>
               )}
@@ -214,7 +214,7 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
             블로그 · 플레이스 홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
           </p>
         )}
-        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-white p-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
           <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
             <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
             <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
@@ -445,7 +445,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <button
         type="button"
         onClick={() => setTab('checks')}
-        className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border px-3 font-semibold ${must ? 'border-danger-200 bg-danger-50 text-danger-700' : should ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}
+        className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border px-3 font-semibold border-slate-200 bg-white hover:border-slate-400 ${must ? 'text-danger-700' : should ? 'text-warning-700' : 'text-success-700'}`}
         data-testid="site-check-count"
         data-must={must}
         data-should={should}
@@ -482,13 +482,13 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const blocksTab = (
     <div className="flex flex-col gap-2" data-testid="site-blocks">
       {suggestions.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-white p-3" data-testid="site-suggest">
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="site-suggest">
           <button type="button" onClick={() => setSuggestOpen(!suggestOpen)} aria-expanded={suggestOpen} className="tap -m-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) p-1 text-left" data-testid="site-suggest-toggle">
-            <ChevronRight className={`size-4 shrink-0 text-emerald-700 transition-transform duration-150 ${suggestOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
-            <Sparkles className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
-            <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-emerald-900">
+            <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform duration-150 ${suggestOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+            <Sparkles className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900">
               {industryDef(doc.industry).label}에 있으면 좋은 블록 {suggestions.length}개
-              {!suggestOpen && <span className="font-normal text-emerald-800"> · {suggestions.map((sg) => blockDef(sg.type)?.label).join(' · ')}</span>}
+              {!suggestOpen && <span className="font-normal text-slate-600"> · {suggestions.map((sg) => blockDef(sg.type)?.label).join(' · ')}</span>}
             </span>
           </button>
           {suggestOpen && suggestions.map((sg) => (
@@ -510,7 +510,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         const open = selected === b.id
         const pinned = b.type === 'header' || b.type === 'footer'
         return (
-          <div key={b.id} data-block-row={b.id} data-type={b.type} className={`rounded-(--radius-control) border bg-white ${open ? 'border-emerald-400 shadow-md ring-1 ring-emerald-200' : `border-slate-200 ${TONE[BLOCK_STYLE[b.type].tone].hover}`}`}>
+          <div key={b.id} data-block-row={b.id} data-type={b.type} className={`rounded-(--radius-control) border bg-white ${open ? 'border-brand-500 shadow-md ring-1 ring-brand-200' : `border-slate-200 ${TONE[BLOCK_STYLE[b.type].tone].hover}`}`}>
             <button type="button" className="tap flex w-full min-h-14 items-center gap-3 px-3 py-2 text-left" onClick={() => setSelected(open ? null : b.id)} aria-expanded={open} data-testid="block-row">
               <span className="relative shrink-0">
                 <MkIcon icon={BLOCK_STYLE[b.type].icon} tone={BLOCK_STYLE[b.type].tone} />
@@ -532,7 +532,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             {open && def && (
               <div className="flex flex-col gap-4 border-t border-slate-100 p-3" data-testid="block-editor">
                 {b.sample?.length ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-amber-50 p-3">
+                  <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3">
                     <p className="t-sub min-w-0 flex-1 break-keep text-danger-700">견본 문구가 들어 있어요. 업체와 맞는지 확인하고 고쳐 주세요.</p>
                     <Button size="sm" onClick={() => change(confirmSample(doc, b.id, nowIso()))} data-testid="sample-confirm">
                       업체와 확인했어요
@@ -559,11 +559,11 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                     </IconBtn>
                   )}
                   <label className="tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 px-3 text-slate-700">
-                    <input type="checkbox" className="size-4 accent-emerald-600" checked={Boolean(b.hidePc)} onChange={(e) => change(setHidden(doc, b.id, 'pc', e.target.checked, nowIso()))} data-testid="block-hide-pc" />
+                    <input type="checkbox" className="size-4 accent-brand-600" checked={Boolean(b.hidePc)} onChange={(e) => change(setHidden(doc, b.id, 'pc', e.target.checked, nowIso()))} data-testid="block-hide-pc" />
                     <EyeOff className="size-4" aria-hidden="true" /> PC 숨김
                   </label>
                   <label className="tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 px-3 text-slate-700">
-                    <input type="checkbox" className="size-4 accent-emerald-600" checked={Boolean(b.hideMobile)} onChange={(e) => change(setHidden(doc, b.id, 'mobile', e.target.checked, nowIso()))} data-testid="block-hide-mobile" />
+                    <input type="checkbox" className="size-4 accent-brand-600" checked={Boolean(b.hideMobile)} onChange={(e) => change(setHidden(doc, b.id, 'mobile', e.target.checked, nowIso()))} data-testid="block-hide-mobile" />
                     <EyeOff className="size-4" aria-hidden="true" /> 휴대폰 숨김
                   </label>
                   <span className="ml-auto" />
@@ -579,7 +579,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border border-dashed border-slate-300 bg-white font-semibold text-emerald-800 hover:bg-emerald-100"
+        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border border-dashed border-slate-300 bg-white font-semibold text-brand-700 hover:border-slate-400 hover:bg-slate-50"
         data-testid="block-add"
       >
         <Plus className="size-5" aria-hidden="true" /> 블록 더하기
@@ -607,7 +607,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                   change(applyStylePreset(doc, sp.key, nowIso()))
                   showToast(`'${sp.label}' 스타일로 바꿨어요 — 마음에 안 들면 [되돌리기] 를 눌러 주세요.`)
                 }}
-                className={`tap flex min-h-16 w-full min-w-0 items-center gap-3 border px-3 py-2 text-left ${on ? onBox : 'border-slate-200 hover:border-emerald-300'}`}
+                className={`tap flex min-h-16 w-full min-w-0 items-center gap-3 border px-3 py-2 text-left ${on ? onBox : 'border-slate-200 hover:border-slate-400'}`}
                 style={{ borderRadius: sp.corner === 'square' ? 6 : sp.corner === 'round' ? 14 : 22 }}
                 data-testid="site-preset"
                 data-value={sp.key}
@@ -623,7 +623,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                   <span className={`t-sub flex flex-wrap items-center gap-x-1.5 font-semibold text-slate-900 ${sp.font === 'serif' ? 'font-serif' : ''}`}>
                     {sp.label}
                     {sp.key === recommendStyle && <span className="t-meta rounded-full bg-amber-100 px-1.5 font-semibold text-amber-800">이 업종 추천</span>}
-                    {on && <Check className="size-4 text-emerald-600" aria-label="지금 스타일" />}
+                    {on && <Check className="size-4 text-brand-600" aria-label="지금 스타일" />}
                   </span>
                   <span className="t-meta block break-keep text-slate-500">{sp.hint}</span>
                 </span>
@@ -641,7 +641,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
               type="button"
               aria-pressed={doc.theme.palette === p.key}
               onClick={() => change(setTheme(doc, { palette: p.key }, nowIso()))}
-              className={`tap flex min-h-14 items-center gap-2.5 rounded-(--radius-control) border px-3 py-2 text-left ${doc.theme.palette === p.key ? onBox : 'border-slate-200 hover:border-emerald-300'}`}
+              className={`tap flex min-h-14 items-center gap-2.5 rounded-(--radius-control) border px-3 py-2 text-left ${doc.theme.palette === p.key ? onBox : 'border-slate-200 hover:border-slate-400'}`}
               data-testid="theme-palette"
               data-value={p.key}
             >
@@ -711,13 +711,13 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   /* ---- 점검 ---- */
   const checksTab = (
     <div className="flex flex-col gap-2" data-testid="site-checks">
-      {checks.length === 0 && <p className="t-body text-emerald-700">점검할 것이 없어요. 내려받아도 됩니다.</p>}
+      {checks.length === 0 && <p className="t-body text-success-700">점검할 것이 없어요. 내려받아도 됩니다.</p>}
       {checks.map((c) => (
-        <div key={c.key} className={`flex flex-wrap items-start gap-2 rounded-(--radius-control) border p-3 ${c.level === 'must' ? 'border-danger-200 bg-danger-50' : c.level === 'should' ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`} data-testid="site-check" data-level={c.level} data-key={c.key}>
+        <div key={c.key} className="flex flex-wrap items-start gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="site-check" data-level={c.level} data-key={c.key}>
           <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${c.level === 'must' ? 'bg-danger-600 text-white' : c.level === 'should' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'}`}>
             {c.level === 'must' ? '꼭' : c.level === 'should' ? '확인' : '참고'}
           </span>
-          <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">{c.text}</p>
+          <p className={`t-sub min-w-0 flex-1 break-keep ${c.level === 'must' ? 'font-semibold text-danger-700' : 'text-slate-800'}`}>{c.text}</p>
           <div className="flex gap-2">
             {c.fix === 'useContactPhone' && (
               <Button size="sm" onClick={() => change(withContactPhone(doc, record.contactPhone, nowIso()))} data-testid="fix-contact-phone">
@@ -754,8 +754,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <ArrowRight className="size-4" aria-hidden="true" />
       </button>
     ) : (
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-emerald-200 bg-white p-3" data-testid="site-finish">
-        <p className="t-sub break-keep text-emerald-900">
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3 shadow-(--shadow-card)" data-testid="site-finish">
+        <p className={`t-sub break-keep ${must ? 'text-danger-700' : 'text-slate-800'}`}>
           <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 HTML 파일 하나가 홈페이지 전체예요.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -767,8 +767,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
           </Button>
         </div>
         {/* D-237 내려받은 뒤 어떻게 올리는지 — 접어 둔 세 줄 */}
-        <details className="group rounded-(--radius-control) bg-white/70 px-3 py-1" data-testid="site-howto">
-          <summary className="tap t-sub flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-semibold text-emerald-900">
+        <details className="group rounded-(--radius-control) bg-white px-1 py-1" data-testid="site-howto">
+          <summary className="tap t-sub flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-semibold text-slate-700">
             <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
             인터넷에 올리는 법
           </summary>
@@ -783,18 +783,27 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   const editor = (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-stretch gap-1 rounded-(--radius-control) bg-emerald-50 p-1 ring-1 ring-emerald-100" role="tablist" aria-label="홈페이지 만들기 단계" data-testid="site-steps" data-current={tab}>
+      <div className="flex items-stretch gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1" role="tablist" aria-label="홈페이지 만들기 단계" data-testid="site-steps" data-current={tab}>
         {tabs.map((t, i) => {
           const on = tab === t.key
           return (
-            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => goTab(t.key)} className={`tap flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) px-1 py-1.5 text-center ${on ? 'bg-emerald-700 text-white shadow-sm' : 'text-emerald-900 hover:bg-white/70'}`} data-testid={`site-tab-${t.key}`} data-step={i + 1}>
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => goTab(t.key)} className={`tap flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) px-1 py-1.5 text-center ${on ? 'bg-brand-50 text-brand-800 ring-1 ring-brand-200' : 'text-slate-700 hover:bg-slate-50'}`} data-testid={`site-tab-${t.key}`} data-step={i + 1}>
+              {/* 휴대폰은 칸이 좁아 번호를 아랫줄로 — '내용 고치기' 가 두 줄로 꺾이지 않게 */}
               <span className="t-sub flex items-center gap-1 font-bold break-keep">
-                <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs tabular-nums ${on ? 'bg-white text-emerald-800' : 'bg-emerald-700 text-white'}`}>{i + 1}</span>
+                <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs tabular-nums max-sm:hidden ${on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{i + 1}</span>
                 {t.label}
               </span>
-              <span className={`t-meta flex items-center gap-1 break-keep ${on ? 'text-white/90' : t.key === 'checks' && must ? 'font-semibold text-danger-700' : 'text-emerald-800'}`}>
-                {t.key === 'blocks' ? <LayoutGrid className="size-3.5" aria-hidden="true" /> : t.key === 'style' ? <Palette className="size-3.5" aria-hidden="true" /> : must ? <AlertTriangle className="size-3.5" aria-hidden="true" /> : <CheckCircle2 className="size-3.5" aria-hidden="true" />}
-                {t.sub}
+              <span className={`t-meta flex items-center gap-1 break-keep ${t.key === 'checks' && must ? 'font-semibold text-danger-700' : on ? 'text-brand-700' : 'text-slate-500'}`}>
+                <span className={`flex size-4 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-bold tabular-nums sm:hidden ${on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`} aria-hidden="true">{i + 1}</span>
+                <span className="max-sm:hidden">{t.key === 'blocks' ? <LayoutGrid className="size-3.5" aria-hidden="true" /> : t.key === 'style' ? <Palette className="size-3.5" aria-hidden="true" /> : must ? <AlertTriangle className="size-3.5" aria-hidden="true" /> : <CheckCircle2 className="size-3.5" aria-hidden="true" />}</span>
+                {t.key === 'checks' && must ? (
+                  <>
+                    <span className="max-sm:hidden">{t.sub}</span>
+                    <span className="sm:hidden">고칠 것 {must}</span>
+                  </>
+                ) : (
+                  t.sub
+                )}
               </span>
             </button>
           )
@@ -864,7 +873,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         </div>
       )}
       {score && (
-        <section className={`flex flex-col gap-3 rounded-(--radius-panel) border-2 p-3 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-4 ${score.score >= 80 ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50' : score.score >= 50 ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50' : 'border-danger-200 bg-gradient-to-br from-danger-50 to-rose-50'}`} data-testid="site-score" data-score={score.score}>
+        <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 shadow-(--shadow-card) sm:flex-row sm:items-center sm:gap-4 sm:p-4" data-testid="site-score" data-score={score.score}>
           <div className="flex shrink-0 items-center gap-3">
             {/* D-226 점수만큼 차오르는 고리 */}
             <span
@@ -872,14 +881,14 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
               style={{ background: `conic-gradient(${score.score >= 80 ? '#059669' : score.score >= 50 ? '#f59e0b' : '#dc2626'} ${Math.round(score.score * 3.6)}deg, #e2e8f0 0)` }}
               aria-hidden="true"
             >
-              <span className={`flex size-12 flex-col items-center justify-center rounded-full bg-white ${score.score >= 80 ? 'text-emerald-700' : score.score >= 50 ? 'text-amber-700' : 'text-danger-700'}`}>
+              <span className={`flex size-12 flex-col items-center justify-center rounded-full bg-white ${score.score >= 80 ? 'text-success-700' : score.score >= 50 ? 'text-warning-700' : 'text-danger-700'}`}>
                 <span className="text-lg leading-none font-bold tabular-nums">{score.score}</span>
                 <span className="t-meta leading-none">점</span>
               </span>
             </span>
             <span className="min-w-0">
               <span className="t-card flex items-center gap-1.5 font-semibold text-slate-900">
-                <Gauge className="size-4 text-emerald-700" aria-hidden="true" />
+                <Gauge className="size-4 text-slate-500" aria-hidden="true" />
                 홈페이지 점수 {score.score}점
               </span>
               <span className="t-meta block break-keep text-slate-500">손님이 믿고 연락하기까지 필요한 것 11가지(우리 기준 · 검색 순위 점수 아님)</span>
@@ -890,21 +899,21 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
               <span className="t-meta font-semibold text-slate-600">이것만 하면</span>
               <div className="flex flex-wrap gap-1.5">
                 {(scoreOpen ? score.next : score.next.slice(0, 1)).map((it) => (
-                  <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-emerald-200 bg-white px-3 text-left font-semibold text-emerald-900 shadow-sm hover:border-emerald-400" data-testid="site-score-item" data-key={it.key}>
-                    <span className="t-meta shrink-0 rounded-full bg-emerald-700 px-1.5 font-bold text-white tabular-nums">+{it.points}</span>
+                  <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-left font-semibold text-slate-900 shadow-sm hover:border-slate-400" data-testid="site-score-item" data-key={it.key}>
+                    <span className="t-meta shrink-0 rounded-full bg-success-50 px-1.5 font-bold text-success-700 tabular-nums">+{it.points}</span>
                     <span className="min-w-0 break-keep">{it.label}</span>
                     <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
                   </button>
                 ))}
                 {score.next.length > 1 && (
-                  <button type="button" onClick={() => setScoreOpen(!scoreOpen)} aria-expanded={scoreOpen} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-emerald-800 hover:bg-white/70" data-testid="site-score-more">
+                  <button type="button" onClick={() => setScoreOpen(!scoreOpen)} aria-expanded={scoreOpen} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50" data-testid="site-score-more">
                     {scoreOpen ? '접기' : `${score.next.length - 1}개 더 보기`}
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <p className="t-sub font-semibold text-emerald-700">다 갖췄어요 — 내려받아 올려도 좋아요.</p>
+            <p className="t-sub font-semibold text-success-700">다 갖췄어요 — 내려받아 올려도 좋아요.</p>
           )}
         </section>
       )}

@@ -833,7 +833,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           {shown ? (
             <section className={`${card} flex flex-col gap-3 overflow-hidden p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
               {pack && (
-                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-white p-3" data-testid="content-pack" data-key={pack.key}>
+                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="content-pack" data-key={pack.key}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-slate-900">
                       <MkIcon icon={packStyle(pack.key).icon} tone={packStyle(pack.key).tone} size="sm" />
@@ -899,7 +899,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               {(checks.length > 0 || shown.draft.notes.length > 0) && (
                 <ul className="flex flex-col gap-1.5" data-testid="content-checks">
                   {checks.map((c) => (
-                    <li key={c.key} data-level={c.level} className={`t-sub flex items-start gap-2 rounded-(--radius-control) px-3 py-2 break-keep ${c.level === 'must' ? 'bg-danger-50 text-danger-700' : c.level === 'should' ? 'bg-warning-50 text-warning-700' : 'bg-slate-50 text-slate-600'}`}>
+                    <li key={c.key} data-level={c.level} className={`t-sub flex items-start gap-2 px-1 py-1 break-keep ${c.level === 'must' ? 'font-semibold text-danger-700' : c.level === 'should' ? 'text-warning-700' : 'text-slate-600'}`}>
                       {c.level === 'info' ? <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
                       <span className="min-w-0">{c.text}</span>
                     </li>
@@ -907,7 +907,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   {shown.draft.notes
                     .filter((n) => !checks.some((c) => c.text === n))
                     .map((n) => (
-                      <li key={n} data-level="info" className="t-sub flex items-start gap-2 rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep text-slate-600">
+                      <li key={n} data-level="info" className="t-sub flex items-start gap-2 px-1 py-1 break-keep text-slate-600">
                         <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                         <span className="min-w-0">{n}</span>
                       </li>
@@ -1265,7 +1265,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap -my-1 flex min-h-11 w-full min-w-0 items-center gap-2 rounded-(--radius-control) text-left hover:bg-slate-50" data-testid="content-profile-toggle">
         <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
         <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">{open ? '홍보 정보 접기' : `홍보 정보 ${rows.length}칸 보기`}</span>
-        <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${missing ? 'bg-amber-100 text-amber-900' : 'bg-violet-50 text-violet-800'}`}>{missing ? `빈 칸 ${missing}` : '다 채움'}</span>
+        <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${missing ? 'bg-amber-100 text-amber-900' : 'bg-success-50 text-success-700'}`}>{missing ? `빈 칸 ${missing}` : '다 채움'}</span>
       </button>
       {open && (
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1441,7 +1441,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, start
                   <button
                     type="button"
                     onClick={() => (st.item ? onOpen(st.item) : onPick(sl))}
-                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-l-4 px-3 py-2 text-left ${KIND_ACCENT[sl.kind]} ${TONE[KIND_STYLE[sl.kind].tone].hover} ${st.posted ? 'border-success-200 bg-success-50/60' : st.item ? 'border-violet-200 bg-white' : 'border-slate-200 bg-white'}`}
+                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-l-4 px-3 py-2 text-left ${KIND_ACCENT[sl.kind]} ${TONE[KIND_STYLE[sl.kind].tone].hover} ${st.posted ? 'border-slate-200 bg-white' : st.item ? 'border-slate-300 bg-white' : 'border-slate-200 bg-white'}`}
                     data-testid="content-plan-slot"
                     data-kind={sl.kind}
                     data-state={st.posted ? 'posted' : st.item ? 'made' : 'none'}
@@ -2016,13 +2016,13 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
             </button>
             {result && (
               <div ref={resultRef} className="flex scroll-mt-4 flex-col gap-1.5" data-testid="content-ai-check-result" data-warn={warn.length}>
-                <p className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold break-keep ${warn.length ? 'bg-warning-50 text-warning-700' : 'bg-success-50 text-success-700'}`}>
+                <p className={`t-sub flex items-start gap-1.5 px-1 py-1 font-semibold break-keep ${warn.length ? 'text-warning-700' : 'text-success-700'}`}>
                   {warn.length ? <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
                   <span className="min-w-0">{warn.length ? `확인할 곳 ${warn.length}개 — 고친 뒤 다시 [점검하기] 를 눌러 보세요.` : '걸리는 곳이 없어요. 그래도 숫자 · 이름 · 날짜는 한 번 더 눈으로 봐 주세요.'}</span>
                 </p>
                 <ul className="flex flex-col gap-1.5">
                   {result.map((c) => (
-                    <li key={c.key} data-level={c.level} data-key={c.key} className={`t-sub flex items-start gap-2 rounded-(--radius-control) px-3 py-2 break-keep ${c.level === 'must' ? 'bg-danger-50 text-danger-700' : c.level === 'should' ? 'bg-warning-50 text-warning-700' : 'bg-slate-50 text-slate-600'}`} data-testid="content-ai-check-item">
+                    <li key={c.key} data-level={c.level} data-key={c.key} className={`t-sub flex items-start gap-2 px-1 py-1 break-keep ${c.level === 'must' ? 'font-semibold text-danger-700' : c.level === 'should' ? 'text-warning-700' : 'text-slate-600'}`} data-testid="content-ai-check-item">
                       {c.level === 'info' ? <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
                       <span className="min-w-0">{c.text}</span>
                     </li>
@@ -2250,7 +2250,7 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
           <PerfBox items={store.items} rows={rows} onOpen={onOpen} />
           <ul className="flex flex-col divide-y divide-slate-100">
             {shown.map(({ item, versions }) => (
-              <li key={item.rootId} className={`flex items-center gap-2 py-1.5 ${openId === item.rootId ? 'bg-violet-50' : ''}`} data-testid="content-archive-item" data-kind={item.kind}>
+              <li key={item.rootId} className={`flex items-center gap-2 py-1.5 ${openId === item.rootId ? 'bg-brand-50' : ''}`} data-testid="content-archive-item" data-kind={item.kind}>
                 <button
                   type="button"
                   className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) hover:bg-slate-50"
