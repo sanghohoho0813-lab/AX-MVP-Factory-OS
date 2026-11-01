@@ -15,7 +15,7 @@ import type { ClientOpsRecord, DocumentKey, DocumentState } from '../../types/cl
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
-import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
+import { OCR_PARALLEL, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { OTHER_DOC_LABEL, placeDocument, type DocPlacement } from '../../services/docClassify'
 import { cellForPlacement } from '../../services/docPlacementApply'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
@@ -187,9 +187,8 @@ export function BulkDocUploadSheet({
     }))
     setItems((list) => [...list, ...fresh])
     setBusy(true)
-    const read: Item[] = []
-    for (const it of fresh) {
-      if (stoppedRef.current) return
+    // D-455 두 장씩 함께 읽는다(코어가 넉넉한 컴퓨터) — 결과는 고른 순서대로 모은다
+    const readOne = async (it: Item): Promise<Item> => {
       patch(it.id, { status: 'reading', progress: { ratio: 0, label: '읽는 중' } })
       let text = ''
       let method: ReadMethod = 'none'
@@ -231,8 +230,20 @@ export function BulkDocUploadSheet({
         issuedAt: result.issuedAt ?? '',
       }
       patch(it.id, next)
-      read.push({ ...it, ...next } as Item)
+      return { ...it, ...next } as Item
     }
+    const slots: (Item | null)[] = fresh.map(() => null)
+    let nextAt = 0
+    const lane = async () => {
+      while (!stoppedRef.current) {
+        const at = nextAt++
+        if (at >= fresh.length) return
+        slots[at] = await readOne(fresh[at])
+      }
+    }
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(OCR_PARALLEL, fresh.length)) }, lane))
+    if (stoppedRef.current) return
+    const read = slots.filter((x): x is Item => x !== null)
     setBusy(false)
     setPhase('idle')
     if (stoppedRef.current) return

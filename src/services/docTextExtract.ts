@@ -298,77 +298,108 @@ function cropScaled(src: HTMLCanvasElement, b: Box, scale: number): HTMLCanvasEl
  * 번호 고르기(bizNoRead)는 본문과 다시 읽은 것이 같은 번호를 말할 때만 '확실' 로 본다.
  */
 // D-453 글자 인식기는 한 번 켜서 이어 쓴다 — 여러 장 묶음 · 여러 쪽 스캔에서 장마다 켜고 끄던 시간을 줄인다.
-// 한 번에 한 장씩만 읽고(차례 줄), 다 읽고 잠시 쉬면 끈다(메모리). 오류가 나면 그 인식기는 버리고 다음에 새로 켠다.
+// 인식기 하나는 한 번에 한 장씩만 읽고, 다 읽고 잠시 쉬면 끈다(메모리). 오류가 나면 그 인식기는 버리고 다음에 새로 켠다.
+// D-455 PC(코어 4개 이상 · 메모리 4GB 이상)는 인식기 두 개로 두 장을 함께 읽는다 — 한 장씩 올리면 켜져 있는 하나만 쓴다.
+//       휴대폰 · 태블릿은 그대로 한 장씩(인식기 두 개면 메모리가 모자라 멈출 수 있다).
 type OcrWorker = Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>>
 const OCR_IDLE_MS = 90_000
-let sharedWorker: Promise<OcrWorker> | null = null
-let idleTimer: ReturnType<typeof setTimeout> | null = null
-let progressTo: ProgressFn | undefined
-let ocrQueue: Promise<unknown> = Promise.resolve()
 
-function getWorker(): Promise<OcrWorker> {
-  if (!sharedWorker) {
+export function ocrParallelFor(env: { cores?: number; memoryGb?: number; userAgent?: string; touchPoints?: number }): number {
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(env.userAgent ?? '') || (env.touchPoints ?? 0) > 1
+  if (mobile) return 1
+  return (env.cores ?? 1) >= 4 && (env.memoryGb ?? 8) >= 4 ? 2 : 1
+}
+
+/** 한꺼번에 읽을 수 있는 장 수(서류 올리기 창이 이만큼 함께 읽는다) */
+export const OCR_PARALLEL =
+  typeof navigator === 'undefined'
+    ? 1
+    : ocrParallelFor({ cores: navigator.hardwareConcurrency, memoryGb: (navigator as { deviceMemory?: number }).deviceMemory, userAgent: navigator.userAgent, touchPoints: navigator.maxTouchPoints })
+
+interface OcrSlot {
+  worker: Promise<OcrWorker> | null
+  busy: boolean
+  idle: ReturnType<typeof setTimeout> | null
+  progressTo?: ProgressFn
+}
+const slots: OcrSlot[] = Array.from({ length: OCR_PARALLEL }, () => ({ worker: null, busy: false, idle: null }))
+const slotWaiters: (() => void)[] = []
+
+function workerOf(slot: OcrSlot): Promise<OcrWorker> {
+  if (!slot.worker) {
     const made = (async () => {
       const { createWorker } = await import('tesseract.js')
       return createWorker('kor+eng', undefined, {
         logger: (m: { status?: string; progress?: number }) => {
-          if (m.status === 'recognizing text') progressTo?.(m.progress ?? 0, '글자 읽는 중')
-          else progressTo?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
+          if (m.status === 'recognizing text') slot.progressTo?.(m.progress ?? 0, '글자 읽는 중')
+          else slot.progressTo?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
         },
       })
     })()
-    sharedWorker = made
+    slot.worker = made
     made.catch(() => {
-      if (sharedWorker === made) sharedWorker = null
+      if (slot.worker === made) slot.worker = null
     })
   }
-  return sharedWorker
+  return slot.worker
 }
 
-function dropWorker(): void {
-  const w = sharedWorker
-  sharedWorker = null
+function dropWorker(slot: OcrSlot): void {
+  const w = slot.worker
+  slot.worker = null
   void w?.then((x) => x.terminate()).catch(() => undefined)
 }
 
-function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
-  const run = ocrQueue.then(() => ocrImageNow(input, onProgress))
-  ocrQueue = run.catch(() => undefined)
-  return run
+/** 빈 인식기 하나 — 켜져 있는 것을 먼저(한 장씩 읽을 때 둘째를 켜지 않게) */
+async function takeSlot(): Promise<OcrSlot> {
+  for (;;) {
+    const free = slots.find((s) => !s.busy && s.worker) ?? slots.find((s) => !s.busy)
+    if (free) {
+      free.busy = true
+      if (free.idle) clearTimeout(free.idle)
+      free.idle = null
+      return free
+    }
+    await new Promise<void>((r) => slotWaiters.push(r))
+  }
 }
 
-async function ocrImageNow(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
-  if (idleTimer) clearTimeout(idleTimer)
-  idleTimer = null
-  progressTo = onProgress
-  let worker: OcrWorker
-  try {
-    worker = await getWorker()
-  } catch (e) {
-    progressTo = undefined
-    throw e
+function giveSlot(slot: OcrSlot): void {
+  slot.busy = false
+  slot.progressTo = undefined
+  if (slot.worker) {
+    slot.idle = setTimeout(() => {
+      slot.idle = null
+      if (!slot.busy) dropWorker(slot)
+    }, OCR_IDLE_MS)
   }
-  let broken = false
+  slotWaiters.shift()?.()
+}
+
+async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+  const slot = await takeSlot()
+  slot.progressTo = onProgress
   try {
-    return await ocrWith(worker, input, onProgress)
-  } catch (e) {
-    broken = true
-    throw e
-  } finally {
-    progressTo = undefined
-    if (broken) dropWorker()
-    else {
-      // 번호 다시 읽기에서 바꾼 설정을 처음대로 — 다음 장은 전체 글을 읽어야 한다
-      try {
-        await worker.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '6' as never })
-      } catch {
-        dropWorker()
+    const worker = await workerOf(slot)
+    let broken = false
+    try {
+      return await ocrWith(worker, input, onProgress)
+    } catch (e) {
+      broken = true
+      throw e
+    } finally {
+      if (broken) dropWorker(slot)
+      else {
+        // 번호 다시 읽기에서 바꾼 설정을 처음대로 — 다음 장은 전체 글을 읽어야 한다
+        try {
+          await worker.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '6' as never })
+        } catch {
+          dropWorker(slot)
+        }
       }
-      idleTimer = setTimeout(() => {
-        idleTimer = null
-        dropWorker()
-      }, OCR_IDLE_MS)
     }
+  } finally {
+    giveSlot(slot)
   }
 }
 
