@@ -74,6 +74,7 @@
     "qa:modules": "node e2e/modules.mjs",
     "qa:facts": "node e2e/facts.mjs",
     "qa:detail": "node e2e/detail.mjs",
+    "qa:ocrkr": "node e2e/ocr-kr.mjs",
     "qa:files": "node e2e/files-cloud.mjs",
     "qa:taxplan": "node e2e/taxplan.mjs",
     "qa:ventureplan": "node e2e/ventureplan.mjs",
