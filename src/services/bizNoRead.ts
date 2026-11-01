@@ -248,3 +248,37 @@ export function readBusinessNumber(text: string, opts: { scanned?: boolean; kind
     reason: candidates.length ? `읽은 번호(${shown})가 국세청 검증 숫자와 안 맞아요 — 원본을 보고 맞는 것을 골라 주세요` : `번호를 또렷하게 읽지 못했어요(${shown}) — 원본을 보고 적어 주세요`,
   }
 }
+
+/**
+ * D-467 사업자등록증 '개업연월일' 날짜도 숫자만 한 번 더 읽는다 — 본문에서 읽은 날짜와 다시 읽은 숫자가 같으면 스캔이어도 믿는다.
+ * 다시 읽은 숫자는 다른 날짜 읽기(발급일 · 유효기간)에 섞이지 않게 글자(0→A … 9→J)로 바꿔 서류 글 끝에 붙인다.
+ */
+export const DATE_REREAD_MARK = '[날짜 다시 읽기]'
+const DIGIT_CODE = 'ABCDEFGHIJ'
+export function dateRereadLine(digits: string): string {
+  const d = digits.replace(/\D/g, '')
+  return d ? `${DATE_REREAD_MARK} ${[...d].map((c) => DIGIT_CODE[Number(c)]).join('')}` : ''
+}
+/** 서류 글 끝의 날짜 다시 읽기 → 숫자들 */
+export function dateRereads(text: string): string[] {
+  const out: string[] = []
+  for (const line of String(text || '').split('\n')) {
+    const t = line.trim()
+    if (!t.startsWith(DATE_REREAD_MARK)) continue
+    const code = t.slice(DATE_REREAD_MARK.length).trim()
+    if (/^[A-J]{6,8}$/.test(code)) out.push([...code].map((c) => String(DIGIT_CODE.indexOf(c))).join(''))
+  }
+  return out
+}
+/**
+ * 'YYYY-MM-DD' 날짜가 다시 읽은 숫자와 같은가 — 두 크기로 다시 읽은 것이 모두 같아야 한다(하나라도 다르면 예전처럼 확인).
+ * '2019 03 15' · '2019 3 15'(앞 0 없음) 둘 다 같은 날짜로 본다.
+ */
+export function dateRereadAgrees(text: string, isoDate: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!m) return false
+  const padded = `${m[1]}${m[2]}${m[3]}`
+  const loose = `${m[1]}${Number(m[2])}${Number(m[3])}`
+  const reads = dateRereads(text)
+  return reads.length >= 2 && reads.every((d) => d === padded || d === loose)
+}

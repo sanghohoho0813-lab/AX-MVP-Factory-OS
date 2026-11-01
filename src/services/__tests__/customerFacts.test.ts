@@ -67,7 +67,7 @@ import { isBizRegCertificate } from '../koreanDocParser'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs, isStandardBizCategory } from '../docAutoFill'
-import { bizNoChecksumOk } from '../bizNoRead'
+import { bizNoChecksumOk, dateRereadAgrees, dateRereadLine, dateRereads } from '../bizNoRead'
 import { pdfItemsToText } from '../pdfTextLines'
 import { dropSameFiles, filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
 import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
@@ -2981,6 +2981,25 @@ await (async () => {
   check('D-466 겹쳐 받은 "(1)" · 같은 파일 다시 → 하나만 · 크기가 다른 "(2)" 는 남김', r.kept.map((x) => x.name).join(',') === '사업자등록증.pdf,사업자등록증 (2).pdf,재무제표.pdf' && r.dropped.join(',') === '사업자등록증 (1).pdf,재무제표.pdf', JSON.stringify(r))
   const r2 = dropSameFiles([f('통장.pdf', 10), f('통장(1).pdf', 11)], [f('통장.pdf', 10)])
   check('D-466 창에 이미 있는 파일과 같으면 뺌', r2.kept.map((x) => x.name).join(',') === '통장(1).pdf' && r2.dropped.join(',') === '통장.pdf')
+})()
+
+// D-467 스캔 사업자등록증 개업연월일 — 숫자만 두 크기로 다시 읽은 것이 모두 본문 날짜와 같으면 바로 입력 · 하나라도 다르면 확인
+;(() => {
+  check('D-467 날짜 다시 읽기 줄 — 숫자는 글자로(다른 날짜 읽기에 섞이지 않게) · 되돌리기', dateRereadLine('20190315') === '[날짜 다시 읽기] CABJADBF' && dateRereads('a\n[날짜 다시 읽기] CABJADBF\n[날짜 다시 읽기] CABJDBF').join(',') === '20190315,2019315')
+  const two = `x\n${dateRereadLine('20190315')}\n${dateRereadLine('2019315')}`
+  check('D-467 두 번 다 같으면(앞 0 없음도) 같음 · 하나라도 다르거나 한 번뿐이면 아님', dateRereadAgrees(two, '2019-03-15') && !dateRereadAgrees(`${two}\n${dateRereadLine('20190318')}`, '2019-03-15') && !dateRereadAgrees(`x\n${dateRereadLine('20190315')}`, '2019-03-15'))
+  const BIZ = `사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 한빛테크\n대표자 : 김한빛\n개업연월일 : 2019 년 03 월 02 일\n사업장 소재지 : 경기도 파주시 문산읍 돈유1로 12\n업태 : 제조업\n종목 : 전자부품\n2019 년 03 월 05 일\n파주세무서장\n[번호 다시 읽기] 124-81-00998`
+  const empty = normalizeClientOps({ id: 'af467', companyName: '한빛테크', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d467-${++n}`
+  const ok = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: `${BIZ}\n${dateRereadLine('20190302')}\n${dateRereadLine('20190302')}`, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-467 스캔 개업연월일 2019-03-02 — 두 번 다시 읽어 같음 → 설립일 바로 입력(확인 목록에 없음)', ok.record.establishedAt === '2019-03-02' && !ok.flagged.some((f) => f.key === 'establishedAt'), JSON.stringify({ e: ok.entered.map((f) => f.key), f: ok.flagged.map((f) => f.key) }))
+  const diff = autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: `${BIZ}\n${dateRereadLine('20190302')}\n${dateRereadLine('20190802')}`, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-467 다시 읽은 것 하나가 다르면(08월) → 예전처럼 확인', diff.record.establishedAt === '' && diff.flagged.some((f) => f.key === 'establishedAt' && f.note === NOTE_OCR))
+  const metas = allDocumentMetas(empty)
+  const plain = placeDocument({ text: BIZ, fileName: 'a.jpg' }, metas)
+  const marked = placeDocument({ text: `${BIZ}\n${dateRereadLine('20190302')}\n${dateRereadLine('20190302')}`, fileName: 'a.jpg' }, metas)
+  check('D-467 다시 읽기 줄이 붙어도 칸 · 발급일은 그대로', plain.label === marked.label && plain.issuedAt === marked.issuedAt, JSON.stringify({ plain: [plain.label, plain.issuedAt], marked: [marked.label, marked.issuedAt] }))
 })()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

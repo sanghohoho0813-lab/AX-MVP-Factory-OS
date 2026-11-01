@@ -16,7 +16,8 @@
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
 import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
-import { bizNoChecksumOk, readBusinessNumber } from './bizNoRead'
+import { bizNoChecksumOk, dateRereadAgrees, readBusinessNumber } from './bizNoRead'
+import { parseKoreanBusinessDocument } from './koreanDocParser'
 import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
@@ -95,6 +96,11 @@ function noteFor(doc: ReadDoc, key: string, value: string, agreed: boolean, self
 function ocrSelfChecked(doc: ReadDoc): Set<string> {
   const out = new Set<string>()
   if (doc.method !== 'ocr') return out
+  // D-467 사업자등록증 개업연월일 — 숫자만 다시 읽은 것과 같으면(두 번 읽어 같음)
+  if (doc.text.includes('[날짜 다시 읽기]')) {
+    const est = parseKoreanBusinessDocument(doc.text).establishedAt
+    if (est && dateRereadAgrees(doc.text, est)) out.add('establishedAt')
+  }
   if (looksLikeIncomeCert(doc.text, doc.fileName)) {
     if (readIncomeCert(doc.text)?.sure) ['revenue', 'netIncome', TREND_KEY, PROFIT_KEY].forEach((k) => out.add(k))
     return out
@@ -308,7 +314,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       const pick = c.key === 'businessNumber' && c.note ? [c.value, ...(c.choices ?? []), ...readBusinessNumber(doc.text).alternatives].find((v) => others.has(v.replace(/\D/g, ''))) : undefined
       if (pick) return { key: c.key, value: pick, source: c.source, asOf: c.asOf, ref: c.ref }
       const isAgreed = agreed.has(`${c.key}|${sameKey(c.key, c.value)}`)
-      const note = noteFor(doc, c.key, c.value, isAgreed, (checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate')) || (c.key === 'businessCategory' && isStandardBizCategory(c.value)))
+      const note = noteFor(doc, c.key, c.value, isAgreed, (checked.has(c.key) && (c.source === 'financialStatements' || c.source === 'taxReturn' || c.source === 'incomeCertificate')) || (c.key === 'businessCategory' && isStandardBizCategory(c.value)) || (c.key === 'establishedAt' && checked.has('establishedAt')))
       // D-255: 다른 서류(크레탑 · 등기)가 같은 번호를 말하면 — 스캔 한 번 읽기 · 후보 까닭을 지운다(서로 맞춰 봤다)
       if (isAgreed && !note) return { key: c.key, value: c.value, source: c.source, asOf: c.asOf, ref: c.ref, ...(c.label ? { label: c.label } : {}), ...(c.group ? { group: c.group } : {}) }
       return note ? { ...c, note } : c

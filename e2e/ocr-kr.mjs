@@ -81,6 +81,7 @@ async function upload(id, company, files, during) {
   check('A 재무제표 매출 24억 바로 입력(쉼표를 숫자로 읽어도 서류 안의 셈으로) · 잘못 읽은 "2만원" 없음', r.record?.factValues?.revenue === '2400000000' && !/매출 2만원/.test(r.inbox), JSON.stringify({ rev: r.record?.factValues?.revenue, inbox: r.inbox.slice(0, 200) }))
   check('A 주주명부 주주 2명 · 20,000주 바로 입력', /주주 2명 · 20,000주/.test(r.entered), r.entered.slice(0, 300))
   check('A 사업자등록번호 바로 입력(검증 숫자 맞음)', r.record?.businessNumber === '124-81-00998', r.record?.businessNumber)
+  check('A D-467 깨끗한 스캔 개업연월일 — 숫자만 두 번 다시 읽어 같음 → 설립일 2019-03-15 바로 입력(확인 목록에 없음)', r.record?.establishedAt === '2019-03-15' && !/설립일 2019-03-15/.test(r.inbox), JSON.stringify({ est: r.record?.establishedAt, inbox: r.inbox.slice(0, 200) }))
   check('A 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 
@@ -150,7 +151,7 @@ async function upload(id, company, files, during) {
   }
   for (const [tag, deg, bg, filter] of [['4도 기울기', 4, '#fbfbf8', 'none'], ['그림자', 1.5, 'linear-gradient(115deg,#f4f1e8 0%,#d9d4c6 55%,#9c968a 100%)', 'none'], ['흐림', 1, '#fbfbf8', 'blur(1.2px)']]) {
     const r = await upload(`cli_ocrE${deg}`, '미래바이오랩', [await photo('IMG_0001.jpg', deg, bg, filter)])
-    check(`E ${tag} 사진 — 사업자등록증 칸 · 사업자등록번호 바로 입력(두 번 읽어 같음) · 주소 '성남시 … 판교로 100' · 설립일 2019-03-15(확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && /설립일 2019-03-15/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+    check(`E ${tag} 사진 — 사업자등록증 칸 · 사업자등록번호 바로 입력(두 번 읽어 같음) · 주소 '성남시 … 판교로 100' · 설립일 2019-03-15(바로 입력 또는 확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && (r.record?.establishedAt === '2019-03-15' || /설립일 2019-03-15/.test(r.inbox)) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
   }
 }
 
@@ -180,11 +181,11 @@ async function upload(id, company, files, during) {
   }
   {
     const r = await upload('cli_ocrG1', '미래바이오랩', [await stamped('IMG_0101.jpg', 4, 18, false)])
-    check(`G 도장이 대표자 · 개업일 줄 위 — 사업자등록번호 바로 입력 · 설립일 2019-03-15 · 주소 '성남시 … 판교로 100'(확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+    check(`G 도장이 대표자 · 개업일 줄 위 — 사업자등록번호 바로 입력 · 설립일 2019-03-15(바로 입력 또는 확인) · 주소 '성남시 … 판교로 100'(확인 목록) · ${r.secs}초`, /사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && (r.record?.establishedAt === '2019-03-15' || /설립일 2019-03-15/.test(r.inbox)) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
   }
   {
     const r = await upload('cli_ocrG2', '미래바이오랩', [await stamped('IMG_0102.jpg', 2, 30, true)])
-    check(`G 도장이 사업자등록번호 위 + 빨간 제목 — 사업자등록증 칸(제목은 지우지 않음) · 번호 바로 입력 · ${r.secs}초`, /IMG_0102\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+    check(`G 도장이 사업자등록번호 위 + 빨간 제목 — 사업자등록증 칸(제목은 지우지 않음) · 번호 바로 입력 · ${r.secs}초`, /IMG_0102\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && (r.record?.establishedAt === '2019-03-15' || /설립일 2019-03-15/.test(r.inbox)) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
   }
 }
 
@@ -214,7 +215,7 @@ async function upload(id, company, files, during) {
   }
   for (const [tag, deg] of [['옆으로 누운(90도) 사진', 90], ['거꾸로 된(180도) 스캔', 180]]) {
     const r = await upload(`cli_ocrH${deg}`, '미래바이오랩', [await turned('IMG_0201.jpg', deg)])
-    check(`H ${tag} — 돌려 읽어 사업자등록증 칸 · 번호 바로 입력 · 설립일 2019-03-15 · 주소(확인 목록) · ${r.secs}초`, /IMG_0201\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+    check(`H ${tag} — 돌려 읽어 사업자등록증 칸 · 번호 바로 입력 · 설립일 2019-03-15(바로 입력 또는 확인) · 주소(확인 목록) · ${r.secs}초`, /IMG_0201\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && (r.record?.establishedAt === '2019-03-15' || /설립일 2019-03-15/.test(r.inbox)) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
   }
 }
 
