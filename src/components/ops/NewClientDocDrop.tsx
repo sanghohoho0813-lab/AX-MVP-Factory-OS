@@ -13,7 +13,7 @@ import { Check, FileUp, Loader2, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
-import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
+import { OCR_PARALLEL, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadMethod } from '../../services/docAutoFill'
 import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
@@ -47,7 +47,8 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
   const fileRef = useRef<HTMLInputElement>(null)
   /** 창을 닫으면(등록 · 취소) 남은 파일은 읽지 않는다 — 등록이면 넘겨받은 업체 상세가 마저 읽는다 */
   const stoppedRef = useRef(false)
-  const runningRef = useRef(false)
+  /** 지금 읽고 있는 줄 수(PC 는 둘까지) */
+  const lanesRef = useRef(0)
   const itemsRef = useRef<Item[]>([])
   itemsRef.current = items
   useEffect(() => {
@@ -82,45 +83,53 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
 
   const patch = (id: string, p: Partial<Item>) => setItems((list) => list.map((it) => (it.id === id ? { ...it, ...p } : it)))
 
-  /** 줄 선 파일을 하나씩 읽는다 — 동시에 여러 OCR 을 돌리면 휴대폰이 멈춘다 */
-  const drain = async () => {
-    if (runningRef.current) return
-    runningRef.current = true
-    try {
-      for (;;) {
-        if (stoppedRef.current) return
-        const next = itemsRef.current.find((it) => it.status === 'queued')
-        if (!next) return
-        patch(next.id, { status: 'reading', progress: '읽는 중' })
-        let text = ''
-        let method: ReadMethod = 'none'
-        try {
-          if (canExtractText(next.file)) {
-            const res = await extractTextFromFile(next.file, (ratio, label) => patch(next.id, { progress: ratio > 0 && ratio < 1 ? `${label} ${Math.round(ratio * 100)}%` : label }))
-            text = res.text
-            method = res.method
-          }
-        } catch {
-          // 못 읽어도 멈추지 않는다 — 등록하면 서류함에는 그대로 들어간다
-          text = ''
+  /**
+   * 줄 선 파일을 차례로 읽는다 — 휴대폰은 한 장씩(동시에 여러 OCR 을 돌리면 휴대폰이 멈춘다).
+   * D-458 PC(코어 · 메모리 넉넉)는 서류 올리기 창처럼 두 장씩 함께(OCR_PARALLEL).
+   */
+  const drain = () => {
+    while (lanesRef.current < OCR_PARALLEL && !stoppedRef.current && itemsRef.current.some((it) => it.status === 'queued')) {
+      lanesRef.current += 1
+      void lane().finally(() => {
+        lanesRef.current -= 1
+      })
+    }
+  }
+
+  const lane = async () => {
+    for (;;) {
+      if (stoppedRef.current) return
+      const next = itemsRef.current.find((it) => it.status === 'queued')
+      if (!next) return
+      // 다른 줄이 같은 파일을 집지 않게 바로 표시한다
+      itemsRef.current = itemsRef.current.map((it) => (it.id === next.id ? { ...it, status: 'reading' } : it))
+      patch(next.id, { status: 'reading', progress: '읽는 중' })
+      let text = ''
+      let method: ReadMethod = 'none'
+      try {
+        if (canExtractText(next.file)) {
+          const res = await extractTextFromFile(next.file, (ratio, label) => patch(next.id, { progress: ratio > 0 && ratio < 1 ? `${label} ${Math.round(ratio * 100)}%` : label }))
+          text = res.text
+          method = res.method
         }
-        if (stoppedRef.current) return
-        // 크레탑 보고서면 크레탑 엔진으로 회사 칸을 읽는다(무거워서 필요할 때만 불러온다)
-        if (looksLikeCretopForNewClient({ fileName: next.file.name, text, method })) {
-          try {
-            const [{ analyzeCretopText }, sc] = await Promise.all([import('../../tools/cretop/mini/analysisCore.js'), import('../../services/salesCretop')])
-            const co = sc.cretopCompany(analyzeCretopText(text))
-            if (!stoppedRef.current) setCretop((list) => [...list.filter((c) => c.fileName !== next.file.name), { fileName: next.file.name, method, name: co.name, bizNo: co.bizNo, ceo: co.ceo }])
-          } catch {
-            // 크레탑으로 못 읽어도 서류함에는 들어간다
-          }
-        }
-        // 읽는 사이 [빼기] 를 눌렀으면 그 줄은 이미 없다 — patch 가 아무것도 바꾸지 않는다
-        itemsRef.current = itemsRef.current.map((it) => (it.id === next.id ? { ...it, status: 'done', progress: '', text, method } : it))
-        patch(next.id, { status: 'done', progress: '', text, method })
+      } catch {
+        // 못 읽어도 멈추지 않는다 — 등록하면 서류함에는 그대로 들어간다
+        text = ''
       }
-    } finally {
-      runningRef.current = false
+      if (stoppedRef.current) return
+      // 크레탑 보고서면 크레탑 엔진으로 회사 칸을 읽는다(무거워서 필요할 때만 불러온다)
+      if (looksLikeCretopForNewClient({ fileName: next.file.name, text, method })) {
+        try {
+          const [{ analyzeCretopText }, sc] = await Promise.all([import('../../tools/cretop/mini/analysisCore.js'), import('../../services/salesCretop')])
+          const co = sc.cretopCompany(analyzeCretopText(text))
+          if (!stoppedRef.current) setCretop((list) => [...list.filter((c) => c.fileName !== next.file.name), { fileName: next.file.name, method, name: co.name, bizNo: co.bizNo, ceo: co.ceo }])
+        } catch {
+          // 크레탑으로 못 읽어도 서류함에는 들어간다
+        }
+      }
+      // 읽는 사이 [빼기] 를 눌렀으면 그 줄은 이미 없다 — patch 가 아무것도 바꾸지 않는다
+      itemsRef.current = itemsRef.current.map((it) => (it.id === next.id ? { ...it, status: 'done', progress: '', text, method } : it))
+      patch(next.id, { status: 'done', progress: '', text, method })
     }
   }
 
