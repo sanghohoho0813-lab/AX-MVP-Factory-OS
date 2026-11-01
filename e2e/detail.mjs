@@ -2045,6 +2045,39 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   await ctx.close()
 }
 
+/* ---------------- D-438 스캔 서류로 확인 기다리는 정보 — [모두 확인] 옆에 '모두 맞으면 새로 판정돼요' ---------------- */
+for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440' }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = '2026-10-01T00:00:00.000Z'
+    const note = '사진 · 스캔 글자라 한 번 확인해 주세요'
+    const c = (id, key, value) => ({ id, key, value, source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:scan', foundAt: now, note })
+    list.push({ id: 'cli_scan438', companyName: '미래상사', businessNumber: '214-05-01239', status: 'active', createdAt: now, updatedAt: now, factValues: { revenue: '860000000' }, factMeta: { revenue: { source: 'incomeCertificate', status: 'entered', asOf: '2025', confirmedAt: '', updatedAt: now } }, factInbox: [c('p1', 'establishedAt', '2022-05-02'), c('p2', 'businessCategory', '제조업'), c('p3', 'businessItem', '금속가공'), c('p4', 'businessAddress', '경상남도 창원시 성산구 중앙대로 10')] })
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/ops/clients/cli_scan438?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const pv = page.getByTestId('fact-accept-preview')
+  const txt = (await pv.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check(`D-438 ${vp.tag} 확인 기다리는 정보(설립일 · 업종 · 주소) → [모두 확인] 위에 "모두 맞으면 새로 판정돼요 — 정책자금 …"`, txt.includes('모두 맞으면 새로 판정돼요') && txt.includes('정책자금'), txt)
+  if (vp.tag === '390') await page.getByTestId('fact-accept-all').locator('xpath=ancestor::*[contains(@class,"flex-col")][1]').screenshot({ path: '/tmp/claude-0/shots438-preview-390.png' }).catch(() => {})
+  else await pv.locator('xpath=ancestor::*[contains(@class,"flex-col")][1]').screenshot({ path: '/tmp/claude-0/shots438-preview-1440.png' }).catch(() => {})
+  await page.getByTestId('fact-accept-all').click()
+  await page.waitForTimeout(700)
+  const after = await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').innerText().catch(() => '')
+  check(`D-438 ${vp.tag} 누르면 미리 말한 대로 — 정책자금 카드가 판정됨 · 미리보기 줄은 사라짐`, !/업종 · 설립일을 알면/.test(after) && after.length > 0 && (await page.getByTestId('fact-accept-preview').count()) === 0, after.slice(0, 160))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D-438 ${vp.tag} 넘침 0 · 오류 0`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

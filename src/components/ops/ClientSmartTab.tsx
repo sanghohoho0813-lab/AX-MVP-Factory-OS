@@ -43,7 +43,7 @@ import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
 import { DecisionList, useDecisionAnswer } from './DecisionList'
-import { pendingFacts } from '../../services/customerFacts'
+import { pendingFacts, withFactDecisions } from '../../services/customerFacts'
 import { INSIGHT_TONE_LABEL, buildInsights, insightChanges, recommendNextSteps, type Insight, type InsightTone } from '../../services/clientInsights'
 import { batchOfLog, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary, dupShelfBases, shelfBaseOf } from '../../services/docShelf'
@@ -91,6 +91,13 @@ export default function ClientSmartTab({
   const insights = useMemo(() => buildInsights(record, today, notices, usable), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   // D-345 방금 올린 서류 — 올리기 전 기록의 판정과 견줘 새로 판정이 난 모듈(한 번만 계산)
   const opened = useMemo(() => (lastBatch?.before ? insightChanges(buildInsights(lastBatch.before, today, notices, usable), insights) : []), [lastBatch, today, notices, insights]) // eslint-disable-line react-hooks/exhaustive-deps
+  // D-438 확인 기다리는 정보(고를 후보 없는 것)를 모두 맞다고 하면 새로 판정되는 모듈 — '모두 확인' 단추 옆에 미리(스캔본은 다 확인 전이라 판정이 비어 보였다)
+  const acceptPreview = useMemo(() => {
+    const plain = pendingFacts(record).filter((p) => !p.choices?.length)
+    if (!plain.length) return []
+    const after = buildInsights(withFactDecisions(record, plain.map((p) => ({ id: p.id, action: 'accept' as const })), nowIso()), today, notices, usable)
+    return insightChanges(insights, after).map((i) => ({ key: i.key, label: i.label, toneLabel: INSIGHT_TONE_LABEL[i.tone] }))
+  }, [record, today, notices, insights]) // eslint-disable-line react-hooks/exhaustive-deps
   const pending = pendingFacts(record).length
   // D-149: 서류함 손볼 것도 다음 행동에(만료 · 기타 칸 · 겹친 서류)
   const shelf = useMemo(() => {
@@ -186,7 +193,7 @@ export default function ClientSmartTab({
       ) : null}
 
       {/* 3. 확인이 필요한 정보 */}
-      <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} />
+      <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} preview={acceptPreview} />
 
       {/* 3-1. D-158: 프로그램이 준비한 것 — 맞다 · 아니다만(정보 확인은 위 칸이 맡는다) */}
       {decisions.length > 0 && (

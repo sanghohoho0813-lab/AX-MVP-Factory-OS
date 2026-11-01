@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { Check, FileSearch, Pencil } from 'lucide-react'
+import { Check, FileSearch, Pencil, Sparkles } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
   FACT_DEFS,
@@ -38,7 +38,14 @@ const inputCls =
 /* 1. 자료에서 찾은 정보                                                 */
 /* ------------------------------------------------------------------ */
 
-export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsRecord; now: string; onCommit: Commit }) {
+/** D-438 '모두 확인' 하면 새로 판정되는 모듈(맞춤 추천이 미리 셈 — 이름 · 판정 말만) */
+export interface FactPreviewItem {
+  key: string
+  label: string
+  toneLabel: string
+}
+
+export function FactInboxCard({ record, now, onCommit, preview = [] }: { record: ClientOpsRecord; now: string; onCommit: Commit; preview?: readonly FactPreviewItem[] }) {
   const pending = pendingFacts(record)
   const [later, setLater] = useState(false)
   const [fixing, setFixing] = useState(false)
@@ -176,6 +183,15 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
             </Button>
           </div>
         ) : (
+          <>
+          {/* D-438 확인 단추를 누르기 전에 — 맞으면 무엇이 열리는지(판정 말만 · 계산은 맞춤 추천이 이미 한 것) */}
+          {plain.length > 0 && preview.length > 0 && (
+            <p className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-0.5 break-keep text-brand-800" data-testid="fact-accept-preview">
+              <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+              <span className="font-semibold">모두 맞으면 새로 판정돼요</span>
+              <span className="min-w-0 [overflow-wrap:anywhere]">— {preview.slice(0, 4).map((x) => `${x.label} ${x.toneLabel}`).join(' · ')}{preview.length > 4 ? ` 외 ${preview.length - 4}개` : ''}</span>
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {plain.length > 0 && (
               <Button variant="primary" onClick={() => void acceptAll()} data-testid="fact-accept-all">
@@ -189,6 +205,7 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
               나중에 확인
             </Button>
           </div>
+          </>
         )}
       </div>
     </Surface>
