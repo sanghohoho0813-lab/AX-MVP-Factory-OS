@@ -7,7 +7,8 @@
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { clientFacts } from '../../tools/shared/clientPrefill'
-import { FACT_SOURCE_LABEL, readFact, usableFactValue } from '../../services/customerFacts'
+import { FACT_SOURCE_LABEL, readFact, rndFactOf, usableFactValue } from '../../services/customerFacts'
+import { policyEvidence } from '../../services/policyEvidence'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { documentStatus } from '../../services/clientOpsAlerts'
 import { RND_RANGE_LABEL, type LegacyVentureFacts, type BasisField, type BasisItem, type CertificationClientContext, type CertificationKey, type CompanySize, type EvidenceDoc, type HeldCertification, type ResearchUnit, type RndRange } from '../core/types'
@@ -386,7 +387,8 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     totalAssets: f.totalAssets?.won ?? null,
     totalLiabilities: f.totalLiabilities?.won ?? null,
     // AX: 정확한 금액만 — 범위 칩은 rndRange 로 따로(대표 금액으로 바꾸지 않는다)
-    rndExpense: profile.rndExactMan !== null ? profile.rndExactMan * 10_000 : null,
+    // D-436 직접 적은 금액이 없으면 재무제표 · 세무조정계산서에서 읽은 '연구개발비'(D-419)
+    rndExpense: profile.rndExactMan !== null ? profile.rndExactMan * 10_000 : (rndFactOf(record)?.won ?? null),
     rndRange: profile.rndRange,
     researchUnit: unit.value,
     researchers: researchers.value,
@@ -399,6 +401,7 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     policyFundPlan: profile.policyFundPlan ?? (policyService && ACTIVE_SERVICE.has(policyService.status) ? true : null),
     rndPlan: profile.rndPlan ?? (ventureService && ACTIVE_SERVICE.has(ventureService.status) ? true : null),
     exclusionFlags: profile.exclusion ? ['제외 사유 있음(체납 · 회생 · 체불 명단 공개 · 산재 공표 등 — 운영규정 제3조② 조건과 기간 확인)'] : [],
+    ...(arrearsClearOf(record, f, today) ? { arrearsClear: true } : {}),
     evidence: evidenceOf(record, today),
     basis: basisOf(record, f, profile, { unit, researchers, patents, smeDoc }),
     ...(conflicts.length ? { conflicts } : {}),
@@ -432,6 +435,12 @@ export function factPatchValue(key: 'patents' | 'researchLab', p: CertProfile): 
 }
 
 const chip = (field: BasisField, value: string): BasisItem => ({ field, label: BASIS_LABEL[field], value, state: 'estimated', from: CHIP_FROM })
+/** D-436 정책자금과 같은 근거(국세 · 지방세 납세증명서 + 4대보험 완납증명서, 기한 안)로 체납 없음 */
+function arrearsClearOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, today: string): boolean {
+  const ev = policyEvidence(record, f, today)
+  return ev.input.taxArrears === '없음' && ev.input.insuranceArrears === '없음'
+}
+
 const yn = (v: boolean | null) => (v === null ? '' : v ? '예' : '아니오')
 
 function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile, r: { unit: Resolved<ResearchUnit>; researchers: Resolved<number>; patents: Resolved<number>; smeDoc: boolean }): BasisItem[] {
@@ -446,7 +455,9 @@ function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: 
   else if (p.size) push({ ...chip('size', { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size]), from: '컨설턴트 선택(중소기업확인서 기준) · 서류함에 확인서 없음' })
   else if (f.employeeCount !== null && f.employeeCount < 50) push({ field: 'size', label: BASIS_LABEL.size, value: '중소기업으로 보임(확정 아님)', state: 'estimated', from: `직원 ${f.employeeCount}명으로 추정 — 중소기업확인서로 확인` })
   for (const [k, field] of [['revenue', 'revenue'], ['operatingProfit', 'operatingProfit'], ['totalAssets', 'totalAssets'], ['totalLiabilities', 'totalLiabilities']] as const) push(factItem(record, k, field))
+  const fsRnd = rndFactOf(record)
   if (p.rndExactMan !== null) push({ field: 'rndExpense', label: BASIS_LABEL.rndExpense, value: p.rndExactMan === 0 ? '없음' : `${p.rndExactMan.toLocaleString()}만원`, state: 'estimated', from: '직접 적은 정확한 금액(재무제표로 최종 확인)' })
+  else if (fsRnd) push({ field: 'rndExpense', label: BASIS_LABEL.rndExpense, value: fsRnd.text.replace(/\s*\([^)]*\)\s*$/, ''), state: 'estimated', from: '서류함 재무제표 · 세무조정계산서에서 읽음' })
   else if (p.rndRange && p.rndRange !== 'unknown') push(chip('rndExpense', p.rndRange === 'none' ? '없음' : `${RND_RANGE_LABEL[p.rndRange]}(범위 — 정확한 금액 확인 필요)`))
   push(r.unit.item)
   push(r.researchers.item)

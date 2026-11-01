@@ -153,6 +153,8 @@ export interface CertificationClientContext {
   rndPlan: boolean | null
   /** 체납 · 연체 · 회생 같은 제외 사유가 있다고 확인됨 */
   exclusionFlags: string[]
+  /** D-436 서류함 납세증명서(국세 · 지방세) · 4대보험 완납증명서로 체납 없음이 확인됨 — 회생 · 어음 같은 다른 제외 사유는 여전히 모름 */
+  arrearsClear?: boolean
   /** 서류함 증빙 */
   evidence: EvidenceDoc[]
   /** P1: 판정에 쓴 사실의 출처 · 확인 여부(OS 연결층이 채운다 — 없으면 '모름') */

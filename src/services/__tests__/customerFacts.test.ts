@@ -75,6 +75,8 @@ import { parseFinancialStatement } from '../finStatementParser'
 import { readShareholderDoc } from '../shareholderDoc'
 import { fixAmountNoise, fixDateNoise, joinSpacedHangul } from '../ocrNumbers'
 import { birthFromMaskedPrefix, parseKoreanBusinessDocument } from '../koreanDocParser'
+import { certContextOf } from '../../certification/integration/clientContext'
+import { assessAll, assessVenture } from '../../certification/core/assess'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
@@ -2785,6 +2787,25 @@ await (async () => {
   const REG = ['등기사항전부증명서(현재 유효사항)', '상 호 주식회사 미래바이오랩', '임원에 관한 사항', '사내이사 김이사 820101-*******', '2019 년 03 월 15 일 취임', '대표이사 이대표 750505-******* 경기도 성남시', '2019 년 03 월 15 일 취임'].join('\n')
   check('D-435 등기부 "대표이사 이대표 750505-*******" → 대표 생년월일 1975-05-05(사내이사 김이사 것은 아님 · 예전: 없음)', parseKoreanBusinessDocument(REG).representativeBirth === '1975-05-05', parseKoreanBusinessDocument(REG).representativeBirth)
   check('D-435 세기 — 750505 → 1975 · 050505 → 2005 · 150505(만 11세 · 111세) → 모름', birthFromMaskedPrefix('750505', 2026) === '1975-05-05' && birthFromMaskedPrefix('050505', 2026) === '2005-05-05' && birthFromMaskedPrefix('150505', 2026) === undefined && birthFromMaskedPrefix('751305', 2026) === undefined)
+}
+
+// D-436 기업인증 — 재무제표 연구개발비를 근거로 · 납세 · 완납증명서로 체납은 확인됨(남은 제외 사유만 묻기)
+{
+  const T = '2026-10-31'
+  let r = normalizeClientOps({ id: 'ct436', companyName: '미래바이오랩', revenue: '2400000000', createdAt: NOW, updatedAt: NOW, customFields: [{ id: 'r', group: 'identity', label: '연구개발비', value: '2025년 1억 3,200만원(재무제표 · 매출의 5.5%)' }] } as never)
+  const ctx0 = certContextOf(r, T)
+  check('D-436 기업인증 연구개발비 = 재무제표 1억 3,200만원(직접 적은 금액이 없을 때) · 근거 "서류함 재무제표"(예전: 모름)', ctx0.rndExpense === 132_000_000 && (ctx0.basis ?? []).some((b) => b.field === 'rndExpense' && b.from.includes('재무제표')), JSON.stringify({ rnd: ctx0.rndExpense, basis: ctx0.basis?.find((b) => b.field === 'rndExpense') }))
+  const v = assessVenture(ctx0)
+  check('D-436 벤처 연구개발기업 판정에 "연구개발비 1.3억원(5,000만원 이상)" 줄(예전: 연구개발비 모름)', v.reasons.some((x) => x.text.startsWith('연구개발비 1.3억원(5,000만원 이상)')), JSON.stringify(v.reasons.map((x) => x.text)))
+  check('D-436 납세 · 완납증명서 없으면 예전 문구("체납 · 회생 같은 제외 사유")', !ctx0.arrearsClear)
+  for (const label of ['납세증명서', '지방세 납세증명서', '4대보험 완납증명서']) {
+    r = withCustomDocument(r, { label })
+    const key = (r.customDocuments ?? []).find((d) => d.label === label)!.key
+    r = withDocument(r, key, { received: true, fileName: `${label}.pdf`, issuedAt: '2026-10-20' })
+  }
+  const ctx1 = certContextOf(r, T)
+  const inno = assessAll(ctx1).find((a) => a.key === 'innobiz')
+  check('D-436 국세 · 지방세 · 4대보험 증명서가 있으면 → 체납은 확인됨 · 남은 것 "회생 · 어음 거래정지 · 체불 명단 같은 제외 사유"(예전: 체납도 다시 물음)', ctx1.arrearsClear === true && !!inno && inno.missingFacts.some((m) => m.startsWith('회생 · 어음 거래정지')) && !inno.missingFacts.some((m) => m.startsWith('체납')), JSON.stringify(inno?.missingFacts))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

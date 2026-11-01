@@ -121,7 +121,9 @@ function yearsCheck(c: CertificationClientContext, need: number): Check {
 function exclusionCheck(c: CertificationClientContext): Check {
   if (c.exclusionFlags.length) return { weight: 'must', state: 'no', text: `제외 사유: ${c.exclusionFlags.join(' · ')}` }
   // FV: 근거 목록이 있는데 제외 사유를 누구도 확인하지 않았으면 ✓ 로 보이지 않게(아는 척 금지) — 판정을 막지는 않는다
-  if (c.basis && !c.basis.some((b) => b.field === 'exclusion' && b.state !== 'missing')) return { weight: 'note', state: 'unknown', text: '체납 · 회생 같은 제외 사유 — 신청 전 확인 필요' }
+  // D-436 체납은 서류함 증명서로 없음 — 남은 것(회생 · 어음 거래정지 · 체불 명단)만 묻는다(판정은 그대로)
+  if (c.basis && !c.basis.some((b) => b.field === 'exclusion' && b.state !== 'missing'))
+    return { weight: 'note', state: 'unknown', text: c.arrearsClear ? '회생 · 어음 거래정지 · 체불 명단 같은 제외 사유 — 신청 전 확인 필요(체납은 납세 · 완납증명서로 없음)' : '체납 · 회생 같은 제외 사유 — 신청 전 확인 필요' }
   return { weight: 'must', state: 'ok', text: '체납 · 회생 같은 제외 사유 확인된 것 없음(신청 전 최종 확인)' }
 }
 

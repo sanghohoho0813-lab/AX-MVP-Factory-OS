@@ -307,6 +307,17 @@ export function customFactValue(record: ClientOpsRecord, name: string): string {
 }
 
 /**
+ * D-436 회사 정보 '연구개발비' 칸(재무제표 · 세무조정계산서에서 읽음 — '2025년 1억 3,200만원(재무제표 · 매출의 5.5%)') → 원 · 해.
+ * 못 읽으면 null(짐작하지 않는다).
+ */
+export function rndFactOf(record: ClientOpsRecord): { won: number; year: string; text: string } | null {
+  const text = customFactValue(record, '연구개발비')
+  const m = /^(?:(20\d{2})년\s*)?([^(]+?)\s*(?:\(|$)/.exec(text)
+  const won = m ? parseWonInput(m[2]) : null
+  return m && won !== null && won > 0 ? { won, year: m[1] ?? '', text } : null
+}
+
+/**
  * D-340 연구소(전담부서) — 회사 정보 '연구소' 글. 비었으면 올린 인정서(기업부설연구소 · 연구개발전담부서 칸).
  * '없음 · 아니오 · 미보유' 같은 글은 연구소가 아니다(예전엔 글만 있으면 '있음' 으로 봤고, 올린 인정서는 못 봤다).
  */
