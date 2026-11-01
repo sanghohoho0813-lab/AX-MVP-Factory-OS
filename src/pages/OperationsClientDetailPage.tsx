@@ -119,7 +119,6 @@ import {
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
 import { FactNumbersCard, factNumbersCount } from '../components/ops/ClientFactsCards'
 import type { DocBatchSummary } from '../services/docAutoAnalyze'
-import { analyzeUploadedDocs } from '../services/docAutoAnalyze'
 import { pendingFacts } from '../services/customerFacts'
 
 /** D-144: 맞춤 추천 탭 — 모듈 엔진(정책자금 · 창업감면 …)을 담고 있어 이 탭을 열 때만 불러온다 */
@@ -128,14 +127,19 @@ const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
 // 대표 AI 전략실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
 const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
+// D-479 첫 화면을 가볍게 — 서류 읽기 창(글자 읽기 엔진)은 누를 때 · 화면이 뜬 뒤 조용히 받는다. 계약 경로 카드는 지금 꺼져 있다(SALES_SIMPLE)
+const loadDocImport = () => import('../components/ops/DocImportModal')
+const loadBulkSheet = () => import('../components/ops/BulkDocUploadSheet')
+const DocResortSheet = lazy(() => import('../components/ops/DocResortSheet').then((m) => ({ default: m.DocResortSheet })))
+const BulkDocUploadSheet = lazy(() => loadBulkSheet().then((m) => ({ default: m.BulkDocUploadSheet })))
+const DocImportModal = lazy(() => loadDocImport().then((m) => ({ default: m.DocImportModal })))
+const SalesJourneyCard = lazy(() => import('../components/sales/SalesJourneyCard').then((m) => ({ default: m.SalesJourneyCard })))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
-import { requestFollowUpText } from '../services/recoRequest'
+import { requestFollowUpText } from '../services/recoFollowUp'
 import { addDaysLocal } from '../services/clientOpsNextAction'
 import { FundingSection } from '../components/ops/FundingSection'
-import { DocImportModal } from '../components/ops/DocImportModal'
-import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { takeHandedDocs, type HandoffDoc } from '../services/docHandoff'
 import { netAmountOf } from '../services/feeMath'
 import { fundingFactsOf, isWaiting } from '../services/feeStatus'
@@ -145,9 +149,7 @@ import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocum
 import { placeDocument } from '../services/docClassify'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
-import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { SALES_SIMPLE } from '../config/salesSimple'
-import { withSalesPath } from '../services/salesJourney'
 import { isProspect, salesStageOf, withSalesStage } from '../services/salesPipeline'
 import { ContractCard } from '../components/ops/ContractCard'
 import { ContractPlanSheet } from '../components/ops/ContractPlanSheet'
@@ -177,7 +179,6 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
-import { DocResortSheet } from '../components/ops/DocResortSheet'
 import { DocKindPicker, DocShelfBar } from '../components/ops/DocShelfBar'
 import { docShelfSummary } from '../services/docShelf'
 import { withoutDocumentFile } from '../services/docPlacementApply'
@@ -261,6 +262,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
   const [message, setMessage] = useState<{ title: string; description: string; text: string } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  // D-479 서류 읽기 창 · 서류 분석은 첫 화면에서 빼고, 화면이 뜬 뒤 조용히 받아 둔다(누를 때 기다리지 않게)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void loadDocImport()
+      void loadBulkSheet()
+      void import('../services/docAutoAnalyze')
+    }, 2500)
+    return () => window.clearTimeout(t)
+  }, [])
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
   /** 개요에서 눌러 들어온 업무 카드로 화면을 옮긴다 */
   const focusedCardRef = useRef<HTMLDivElement | null>(null)
@@ -628,6 +638,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             await commit(withDocument(now0, key, { ...(dated.issuedAt ? { issuedAt: dated.issuedAt } : {}), ...(dated.validUntil ? { validUntil: dated.validUntil } : {}) }))
           }
           const latest = current() ?? record
+          const { analyzeUploadedDocs } = await import('../services/docAutoAnalyze')
           const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.ocrPages?.length ? 'ocr' : res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
           const sm = out.summary
           if ((sm.entered.length || sm.flagged.length || sm.cretop || sm.roster) && (await commit(out.record))) {
@@ -1061,7 +1072,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
       {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
       {/* D-167: 숨김(대표: 영업 흐름은 오히려 헷갈린다) — config/salesSimple 에서 다시 켤 수 있다 */}
-      {SALES_SIMPLE.showJourney && <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void commit(withSalesPath(record, path))} />}
+      {SALES_SIMPLE.showJourney && (
+        <Suspense fallback={null}>
+          <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void import('../services/salesJourney').then((m) => commit(m.withSalesPath(record, path)))} />
+        </Suspense>
+      )}
 
       <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
 
@@ -1391,16 +1406,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
 
         {resortOpen && (
-          <DocResortSheet
-            record={record}
-            onClose={() => setResortOpen(false)}
-            onApply={(next, moved) => {
-              setResortOpen(false)
-              void commit(next).then((ok) => {
-                if (ok) showToast(`서류 ${moved}개를 맞는 칸으로 옮겼습니다.`)
-              })
-            }}
-          />
+          <Suspense fallback={null}>
+            <DocResortSheet
+              record={record}
+              onClose={() => setResortOpen(false)}
+              onApply={(next, moved) => {
+                setResortOpen(false)
+                void commit(next).then((ok) => {
+                  if (ok) showToast(`서류 ${moved}개를 맞는 칸으로 옮겼습니다.`)
+                })
+              }}
+            />
+          </Suspense>
         )}
 
         {!uploadable && (
@@ -2247,45 +2264,47 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       )}
 
       {importOpen && (
-        <DocImportModal
-          currentValues={{
-            companyName: record.companyName,
-            businessNumber: record.businessNumber,
-            corporateNumber: record.corporateNumber,
-            representativeName: record.representativeName || record.contactName,
-            representativeBirth: record.representativeBirth,
-            establishedAt: record.establishedAt,
-            address: record.businessAddress,
-            businessCategory: record.businessCategory,
-            businessItem: record.businessItem,
-            businessItemsExtra: record.businessItemsExtra,
-          }}
-          onClose={() => setImportOpen(false)}
-          onApply={({ picked, source }) => {
-            // D-128: 서류에서 읽고 대표가 확인한 값 — 출처(사업자등록증 · 등기부등본)와 '확인됨' 을 함께 남긴다
-            const from = source === 'corporate_registry' ? 'corporateRegistry' : 'businessRegistration'
-            const now = nowIso()
-            let next = { ...record }
-            const put = (key: string, value: string | undefined) => {
-              if (value) next = withFactValue(next, key, value, { source: from, status: 'confirmed', now })
-            }
-            put('companyName', picked.companyName)
-            put('businessNumber', picked.businessNumber)
-            put('corporateNumber', picked.corporateNumber)
-            // 서류에서 읽은 대표자 이름은 대표자 칸으로 — 담당자 칸을 덮어쓰지 않는다
-            put('representativeName', picked.representativeName)
-            put('representativeBirth', picked.representativeBirth)
-            put('establishedAt', picked.establishedAt)
-            put('businessAddress', picked.address)
-            put('businessCategory', picked.businessCategory)
-            put('businessItem', picked.businessItem)
-            if (picked.businessItemsExtra) next.businessItemsExtra = picked.businessItemsExtra
-            const filled = Object.values(picked).filter((v) => typeof v === 'string' && v.trim() !== '').length
-            void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))
-            setImportOpen(false)
-            showToast('서류에서 읽은 정보를 반영했습니다.')
-          }}
-        />
+        <Suspense fallback={null}>
+          <DocImportModal
+            currentValues={{
+              companyName: record.companyName,
+              businessNumber: record.businessNumber,
+              corporateNumber: record.corporateNumber,
+              representativeName: record.representativeName || record.contactName,
+              representativeBirth: record.representativeBirth,
+              establishedAt: record.establishedAt,
+              address: record.businessAddress,
+              businessCategory: record.businessCategory,
+              businessItem: record.businessItem,
+              businessItemsExtra: record.businessItemsExtra,
+            }}
+            onClose={() => setImportOpen(false)}
+            onApply={({ picked, source }) => {
+              // D-128: 서류에서 읽고 대표가 확인한 값 — 출처(사업자등록증 · 등기부등본)와 '확인됨' 을 함께 남긴다
+              const from = source === 'corporate_registry' ? 'corporateRegistry' : 'businessRegistration'
+              const now = nowIso()
+              let next = { ...record }
+              const put = (key: string, value: string | undefined) => {
+                if (value) next = withFactValue(next, key, value, { source: from, status: 'confirmed', now })
+              }
+              put('companyName', picked.companyName)
+              put('businessNumber', picked.businessNumber)
+              put('corporateNumber', picked.corporateNumber)
+              // 서류에서 읽은 대표자 이름은 대표자 칸으로 — 담당자 칸을 덮어쓰지 않는다
+              put('representativeName', picked.representativeName)
+              put('representativeBirth', picked.representativeBirth)
+              put('establishedAt', picked.establishedAt)
+              put('businessAddress', picked.address)
+              put('businessCategory', picked.businessCategory)
+              put('businessItem', picked.businessItem)
+              if (picked.businessItemsExtra) next.businessItemsExtra = picked.businessItemsExtra
+              const filled = Object.values(picked).filter((v) => typeof v === 'string' && v.trim() !== '').length
+              void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))
+              setImportOpen(false)
+              showToast('서류에서 읽은 정보를 반영했습니다.')
+            }}
+          />
+        </Suspense>
       )}
 
       {closing && (
@@ -2307,41 +2326,45 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* D-209: 서류 탭의 '한꺼번에 올리기' 도 화면 맨 바깥에 — 서류 탭 안에 있으면 다른 탭으로 가는 순간 창이 없어져 읽어 둔 파일이 사라졌다 */}
       {bulkOpen && (
-        <BulkDocUploadSheet
-          showSignal={bulkShow}
-          record={record}
-          latest={() => latestRef.current ?? record}
-          onClose={() => setBulkOpen(false)}
-          onSaved={(saved, summary) => {
-            latestRef.current = saved
-            setRecord(saved)
-            setSavedAt(Date.now())
-            setLastBatch(summary)
-          }}
-        />
+        <Suspense fallback={null}>
+          <BulkDocUploadSheet
+            showSignal={bulkShow}
+            record={record}
+            latest={() => latestRef.current ?? record}
+            onClose={() => setBulkOpen(false)}
+            onSaved={(saved, summary) => {
+              latestRef.current = saved
+              setRecord(saved)
+              setSavedAt(Date.now())
+              setLastBatch(summary)
+            }}
+          />
+        </Suspense>
       )}
 
       {/* D-144: 머리줄 '서류 올리기' — 읽자마자 확실한 것은 저절로 올리고 분석 → 맞춤 추천으로 */}
       {autoUploadOpen && (
-        <BulkDocUploadSheet
-          auto
-          showSignal={uploadShow}
-          record={record}
-          latest={() => latestRef.current ?? record}
-          initialDocs={handedDocs}
-          onClose={() => {
-            setAutoUploadOpen(false)
-            setHandedDocs([])
-          }}
-          onSaved={(saved, summary) => {
-            latestRef.current = saved
-            setRecord(saved)
-            setSavedAt(Date.now())
-            setLastBatch(summary)
-            // D-209: 올리는 동안 다른 업체로 옮겨 갔으면 그 화면을 맞춤 추천으로 바꾸지 않는다
-            if (aliveRef.current) setTab('smart')
-          }}
-        />
+        <Suspense fallback={null}>
+          <BulkDocUploadSheet
+            auto
+            showSignal={uploadShow}
+            record={record}
+            latest={() => latestRef.current ?? record}
+            initialDocs={handedDocs}
+            onClose={() => {
+              setAutoUploadOpen(false)
+              setHandedDocs([])
+            }}
+            onSaved={(saved, summary) => {
+              latestRef.current = saved
+              setRecord(saved)
+              setSavedAt(Date.now())
+              setLastBatch(summary)
+              // D-209: 올리는 동안 다른 업체로 옮겨 갔으면 그 화면을 맞춤 추천으로 바꾸지 않는다
+              if (aliveRef.current) setTab('smart')
+            }}
+          />
+        </Suspense>
       )}
 
       {message && (

@@ -4,7 +4,6 @@
  */
 import { useCallback } from 'react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { buildInsights } from '../../services/clientInsights'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { useEntitlements } from '../../lib/entitlementsStore'
@@ -12,9 +11,10 @@ import { AiAssist } from './AiAssist'
 
 export function ClientAssistButton({ record, today }: { record: ClientOpsRecord; today: string }) {
   const { ent } = useEntitlements()
-  const build = useCallback(
-    () => clientBundle(record, today, buildInsights(record, today, [], (k) => k === 'grants' || ent.feature(k).usable), buildClientSchedule(record, today)),
-    [record, today, ent],
-  )
+  // D-479 판정 엔진(가장 큰 파일)은 AI 도우미 판을 열 때 받는다 — 업체 상세 첫 화면이 이것 때문에 무거웠다(판을 열어야 build 가 불린다)
+  const build = useCallback(async () => {
+    const { buildInsights } = await import('../../services/clientInsights')
+    return clientBundle(record, today, buildInsights(record, today, [], (k) => k === 'grants' || ent.feature(k).usable), buildClientSchedule(record, today))
+  }, [record, today, ent])
   return <AiAssist variant="button" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={build} defaultClientId={record.id} />
 }

@@ -36,15 +36,10 @@ import { CONVERT_MIN, businessIncomeOf, convertCompare, diligentLine } from './c
 import { scenarioPath, scenarioPreset } from './scenarioPresets'
 import { refundOpen, reliefYearsOf, type ReliefYear } from './taxReturnDoc'
 
-export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
-
-export const INSIGHT_TONE_LABEL: Record<InsightTone, string> = {
-  good: '가능성 높음',
-  maybe: '검토해 볼 만함',
-  done: '분석 있음',
-  need: '정보가 더 필요해요',
-  no: '지금은 어려움',
-}
+// D-479 판정 이름표는 작은 파일에 — AI 지시문 묶음이 이름표 때문에 판정 엔진 전체를 받지 않게(여기서 다시 내보낸다)
+import { INSIGHT_TONE_LABEL, type InsightTone } from './insightLabels'
+export { INSIGHT_TONE_LABEL }
+export type { InsightTone }
 
 export interface Insight {
   /** 기능 키(요금제 권한 · 모듈 경로와 같다). 지원사업은 'grants' */

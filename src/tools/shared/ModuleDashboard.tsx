@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AiAssist } from '../../components/ai/AiAssist'
-import { moduleBundle } from '../../services/aiAssist/builders'
+import { moduleBundle } from '../../services/aiAssist/moduleBuilders'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Building2, CalendarClock, FileWarning } from 'lucide-react'

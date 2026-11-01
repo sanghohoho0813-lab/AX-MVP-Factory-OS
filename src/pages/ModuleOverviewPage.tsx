@@ -8,7 +8,7 @@
 
 import { useCallback } from 'react'
 import { AiAssist } from '../components/ai/AiAssist'
-import { moduleBundle } from '../services/aiAssist/builders'
+import { moduleBundle } from '../services/aiAssist/moduleBuilders'
 import { listClients } from '../services/clientOpsService'
 import { useIsPilot } from '../auth/osAccess'
 import { isPilotHiddenPath } from '../config/moduleRegistry'
