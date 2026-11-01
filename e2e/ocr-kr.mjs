@@ -2,7 +2,7 @@
  * 진짜 한글 스캔 시험 (D-450) — 글꼴로 그린 한글 서류 그림을 [서류 올리기]로 올려, 글자 인식(한글)부터 칸 · 회사 정보 · 판정까지 끝까지 본다.
  * 글자 인식 언어 자료를 내려받으므로 인터넷(프록시)이 필요하다. 한글 글꼴(WenQuanYi Zen Hei)이 없으면 실패로 알린다(건너뛰지 않는다).
  *
- *  A 법인 3장(사업자등록증 · 표준재무제표증명 · 주주명부) — 쉼표를 숫자로 읽은 매출 · 주주 수 고침(D-446)
+ *  A 법인 3장(사업자등록증 · 표준재무제표증명 · 주주명부) — 쉼표를 숫자로 읽은 매출 · 주주 수 고침(D-446) · 대표자 = 주주명부 대표이사(D-473)
  *  B 개인 4장(사업자등록증 · 소득금액증명 · 부가세 과세표준증명 · 납세증명서) — 제목 글자 실수 · 6↔8(D-448)
  *  C 법인 5장(등기부 · 명부 사진 · 원천세 · 지방세 완납 · 벤처) — 원천세 A01(401) · 서명란(D-449)
  *  D 글자 쪽 + 스캔 쪽을 합친 PDF — 스캔 쪽도 읽어 서류 2개로(D-445)
@@ -85,6 +85,8 @@ async function upload(id, company, files, during, opts = {}) {
   check('A 주주명부 주주 2명 · 20,000주 바로 입력', /주주 2명 · 20,000주/.test(r.entered), r.entered.slice(0, 300))
   check('A 사업자등록번호 바로 입력(검증 숫자 맞음)', r.record?.businessNumber === '124-81-00998', r.record?.businessNumber)
   check('A D-467 깨끗한 스캔 개업연월일 — 숫자만 두 번 다시 읽어 같음 → 설립일 2019-03-15 바로 입력(확인 목록에 없음)', r.record?.establishedAt === '2019-03-15' && !/설립일 2019-03-15/.test(r.inbox), JSON.stringify({ est: r.record?.establishedAt, inbox: r.inbox.slice(0, 200) }))
+  // D-473 사업자등록증 대표자 '이대표' = 주주명부 '이대표 … 대표이사' → 두 서류가 같은 값 → 확인 없이 바로
+  check('A D-473 대표자 이대표 바로 입력(주주명부 대표이사와 같은 이름 — 확인 목록에 없음)', r.record?.representativeName === '이대표' && !/대표자?\s*이대표/.test(r.inbox), JSON.stringify({ ceo: r.record?.representativeName, inbox: r.inbox.slice(0, 200) }))
   check('A 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 

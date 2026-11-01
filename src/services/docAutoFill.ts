@@ -24,6 +24,7 @@ import { withCustomField } from './clientOpsService'
 import { readSiteReport } from './siteReportDoc'
 import { incomeProfitLine, incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
 import { parseFinancialStatement } from './finStatementParser'
+import { looksLikeShareholderRegister, readShareholderDoc } from './shareholderDoc'
 
 export type ReadMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx' | 'hwp' | 'docx' | 'xls' | 'doc' | 'pptx' | 'none'
 
@@ -137,16 +138,34 @@ function sameKey(key: string, value: string): string {
   return value.replace(/\s+/g, '').replace(/\(주\)|㈜|주식회사/g, '').toLowerCase()
 }
 
-/** 두 서류 이상이 같은 값을 말한 사실(키|값) */
-function agreedFacts(docs: readonly ReadDoc[]): Set<string> {
+/**
+ * D-473 주주명부에 '대표이사' · '대표자' · '본인' 으로 적힌 주주가 딱 한 사람이면 그 이름 —
+ * 사업자등록증 · 등기부 대표자와 맞춰 보는 데만 쓴다(주주명부만으로 대표자 칸을 채우지 않는다). 공동대표(두 사람 이상)면 쓰지 않는다.
+ */
+function registerCeoName(doc: ReadDoc): string {
+  if (!looksLikeShareholderRegister(doc)) return ''
+  const ceos = readShareholderDoc(doc.text).holders.filter((h) => h.relation === 'ceo' && h.relationSure)
+  return ceos.length === 1 ? ceos[0].name : ''
+}
+
+/**
+ * 두 서류 이상이 같은 값을 말한 사실(키|값).
+ * agreeOnly — 회사 정보 읽기에서 뺀 서류(주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게). 맞춰 보는 데만 쓴다(D-473 대표 이름).
+ */
+function agreedFacts(docs: readonly ReadDoc[], agreeOnly: readonly ReadDoc[] = []): Set<string> {
   const seen = new Map<string, Set<number>>()
+  const add = (key: string, value: string, i: number) => {
+    const k = `${key}|${sameKey(key, value)}`
+    const s = seen.get(k) ?? new Set<number>()
+    s.add(i)
+    seen.set(k, s)
+  }
   docs.forEach((doc, i) => {
-    for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) {
-      const k = `${c.key}|${sameKey(c.key, c.value)}`
-      const s = seen.get(k) ?? new Set<number>()
-      s.add(i)
-      seen.set(k, s)
-    }
+    for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) add(c.key, c.value, i)
+  })
+  agreeOnly.forEach((doc, j) => {
+    const ceo = registerCeoName(doc)
+    if (ceo) add('representativeName', ceo, docs.length + j)
   })
   return new Set([...seen].filter(([, s]) => s.size >= 2).map(([k]) => k))
 }
@@ -300,12 +319,12 @@ function finFamily(source: string | undefined): string {
   return ''
 }
 
-/** 올린 서류들 → 바로 넣기 · 확인 필요 */
-export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string): AutoFillOutcome {
+/** 올린 서류들 → 바로 넣기 · 확인 필요. agreeOnly — 칸을 채우지 않고 다른 서류 값과 맞춰 보는 데만 쓰는 서류(주주명부) */
+export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc[], now: string, makeId: () => string, agreeOnly: readonly ReadDoc[] = []): AutoFillOutcome {
   let rec = record
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
-  const agreed = agreedFacts(docs)
+  const agreed = agreedFacts(docs, agreeOnly)
   // D-437 과세표준증명 '매출 추이' 줄 — 올리기 전 줄(과세표준증명이 만든 것) · 이번 묶음 줄. 끝에서 새 해의 몇 달을 다른 서류 줄에 붙인다
   const vatTrendLines: string[] = record.factMeta?.[TREND_KEY]?.source === 'vatCertificate' ? [customFactValue(record, '매출 추이')].filter(Boolean) : []
   // D-255: 다른 서류가 확실하게 말한 사업자등록번호(크레탑 · 등기 · PDF 글자) — 스캔 후보 가운데 이것과 같은 게 있으면 그걸로

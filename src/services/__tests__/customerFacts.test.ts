@@ -3041,5 +3041,29 @@ await (async () => {
   check('D-470 생년월일 숫자가 설립일 다시 읽기 줄로 붙어 있으면 생년월일로 쓰지 않음(그대로 확인)', mixed.record.representativeBirth === '' && mixed.flagged.some((f) => f.key === 'representativeBirth'))
 })()
 
+// D-473 스캔 사업자등록증 대표자 — 같이 올린 주주명부에 '대표이사' 로 적힌 한 사람과 이름이 같으면 두 서류가 같은 값 → 바로 입력
+await (async () => {
+  const BIZ = `사 업 자 등 록 증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n사업장 소재지 : 경기도 성남시 분당구 판교로 100\n업태 : 제조업`
+  const REG = (rows: string) => `주 주 명 부\n회사명 : 주식회사 미래바이오랩\n기준일 2026. 10. 01\n성명 주식수 지분율 비고\n${rows}\n합계 20,000 100%`
+  const empty = normalizeClientOps({ id: 'af473', companyName: '미래바이오랩', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d473-${++n}`
+  const run = (rows: string) => autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: 'scan_01.jpg', text: BIZ, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk, [{ key: 'custom-주주명부', fileName: 'scan_06.jpg', text: REG(rows), method: 'ocr', docSure: true }])
+  const ok = run('이대표 14,000 70% 대표이사\n김배우 6,000 30% 배우자')
+  check('D-473 주주명부 "이대표 … 대표이사" = 사업자등록증 대표자 → 바로 입력(확인 안 물음)', ok.record.representativeName === '이대표' && !ok.flagged.some((f) => f.key === 'representativeName'), JSON.stringify({ r: ok.record.representativeName, f: ok.flagged.map((f) => f.key + ':' + f.note) }))
+  const other = run('박대표 14,000 70% 대표이사\n김배우 6,000 30% 배우자')
+  check('D-473 주주명부 대표 이름이 다르면(박대표) 예전처럼 확인', other.flagged.some((f) => f.key === 'representativeName'))
+  const two = run('이대표 10,000 50% 대표이사\n김공동 10,000 50% 대표이사')
+  check('D-473 대표이사가 두 사람(공동대표)이면 맞춰 보지 않음 → 예전처럼 확인', two.flagged.some((f) => f.key === 'representativeName'))
+  const plain = run('이대표 14,000 70%\n김배우 6,000 30% 배우자')
+  check('D-473 주주명부에 대표 표시가 없으면 이름만 같아도 맞춰 보지 않음 → 예전처럼 확인', plain.flagged.some((f) => f.key === 'representativeName'))
+  // 실제 올리기 길(analyzeUploadedDocs) — 주주명부는 회사 정보 읽기에서 빠지지만 맞춰 보기에는 들어간다 · 주주표는 예전처럼
+  let m = 0
+  const real = await analyzeUploadedDocs(empty, [{ key: 'businessRegistration', fileName: 'scan_01.jpg', text: BIZ, method: 'ocr', docSure: true }, { key: 'custom-주주명부', fileName: 'scan_06.jpg', text: REG('이대표 14,000 70% 대표이사\n김배우 6,000 30% 배우자'), method: 'ocr', docSure: true }], { now: '2026-10-02T00:00:00.000Z', today: '2026-10-02', makeId: () => `d473r-${++m}` })
+  check('D-473 실제 올리기 길: 사업자등록증 + 주주명부 → 대표자 이대표 바로 입력 · 주주표 2명', real.record.representativeName === '이대표' && !real.summary.flagged.some((f) => f.key === 'representativeName') && real.record.shareholderRegister.filter((h) => h.name).length === 2, JSON.stringify({ r: real.record.representativeName, f: real.summary.flagged.map((f) => f.key), sh: real.record.shareholderRegister.map((h) => h.name) }))
+  const alone = await analyzeUploadedDocs(empty, [{ key: 'custom-주주명부', fileName: 'scan_06.jpg', text: REG('이대표 14,000 70% 대표이사\n김배우 6,000 30% 배우자'), method: 'ocr', docSure: true }], { now: '2026-10-02T00:00:00.000Z', today: '2026-10-02', makeId: () => `d473a-${++m}` })
+  check('D-473 주주명부만 올리면 대표자 칸은 비워 둔다(주주명부만으로 채우지 않음)', alone.record.representativeName === '', alone.record.representativeName)
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

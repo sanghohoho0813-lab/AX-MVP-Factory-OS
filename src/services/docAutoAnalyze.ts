@@ -146,7 +146,8 @@ export async function analyzeUploadedDocs(
   const wageDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && looksLikeWageReceipt(d.text, d.fileName))
   const rosterDocs = readable.filter((d) => !cretopDocs.includes(d) && !holderDocs.includes(d) && !wageDocs.includes(d) && looksLikeRoster(d))
   const factDocs = readable.filter((d) => !cretopDocs.includes(d) && !rosterDocs.includes(d) && !holderDocs.includes(d) && !wageDocs.includes(d))
-  const filled = autoFillFromDocs(record, factDocs, now, makeId)
+  // D-473 주주명부는 칸을 채우지 않고 맞춰 보는 데만 — '대표이사' 로 적힌 한 사람 = 사업자등록증 대표자면 두 서류가 같은 값
+  const filled = autoFillFromDocs(record, factDocs, now, makeId, holderDocs)
   let rec = filled.record
   const entered = [...filled.entered]
   const flagged = [...filled.flagged]
