@@ -76,6 +76,7 @@ import { useIsPilot } from '../auth/osAccess'
 import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
+import { FirstClientSteps } from '../components/ops/FirstClientSteps'
 
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
 const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
@@ -498,6 +499,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
           </Button>
           <p className="t-body max-w-xl break-keep text-slate-600">업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.</p>
+          <FirstClientSteps />
         </section>
       )}
 

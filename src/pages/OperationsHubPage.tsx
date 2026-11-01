@@ -92,6 +92,7 @@ import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewC
 import { handDocsTo } from '../services/docHandoff'
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
+import { FirstClientSteps } from '../components/ops/FirstClientSteps'
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
 function initialClientType(): ClientType {
@@ -963,6 +964,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
                     업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.
                   </p>
+                  <div className="mt-5">
+                    <FirstClientSteps />
+                  </div>
                 </div>
               ) : (
                 <>
