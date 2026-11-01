@@ -99,6 +99,9 @@ export default function ClientSmartTab({
     return insightChanges(insights, after).map((i) => ({ key: i.key, label: i.label, toneLabel: INSIGHT_TONE_LABEL[i.tone] }))
   }, [record, today, notices, insights]) // eslint-disable-line react-hooks/exhaustive-deps
   const pending = pendingFacts(record).length
+  // D-447 확인 기다리는 사실 열쇠 — 맨 위 카드가 '받으면' 대신 '확인만 하면'
+  const pendingKeySet = useMemo(() => new Set(pendingFacts(record).map((p) => p.key)), [record])
+  const requestText = useMemo(() => recoRequestMessage(record, insights, pendingKeySet), [record, insights, pendingKeySet])
   // D-149: 서류함 손볼 것도 다음 행동에(만료 · 기타 칸 · 겹친 서류)
   const shelf = useMemo(() => {
     const s = docShelfSummary(record, today, new Set())
@@ -117,7 +120,6 @@ export default function ClientSmartTab({
   )
   const feeToSet = useMemo(() => activeApplications(record).filter((a) => applyStage(a) === 'selected').map((a) => a.programName || '지원사업'), [record])
   const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying, feeToSet), [insights, pending, shelf, applying, feeToSet])
-  const requestText = useMemo(() => recoRequestMessage(record, insights), [record, insights])
   // D-158: 확인할 것 — 이 업체 것만(자료에서 읽은 정보는 위 '확인이 필요한 정보' 칸이 맡는다)
   const decisions = useMemo(() => buildDecisions(record, today, notices, usable).filter((d) => d.kind !== 'fact'), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   const { answer, busy } = useDecisionAnswer({
@@ -161,7 +163,7 @@ export default function ClientSmartTab({
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} onGiven={onCommitQuiet} />}
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
+      <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')
           window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
         }} />

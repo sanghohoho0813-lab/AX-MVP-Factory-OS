@@ -82,7 +82,7 @@ import { buildInsights, cardRecoChips, insightChanges, isPick, missingForPicks, 
 import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
-import { manwonText, policyDocsLine, smeConfirmed } from '../clientInsights'
+import { manwonText, policyDocsLine, smeConfirmed, waitingNames } from '../clientInsights'
 import { loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
@@ -2873,6 +2873,17 @@ await (async () => {
   check('D-446 스캔 주주명부 "김배우 66000 30%" → 6,000 · 합계 맞음(예전: 합계 안 맞아 주주표 안 들어감)', SH.holders.length === 2 && SH.holders[1].shares === 6000 && SH.check === 'sum' && SH.sure, JSON.stringify(SH))
   const SH2 = readShareholderDoc(['주주명부', '성명 주식수 지분율', '이대표 14,000 70%', '김배우 9,000 30%', '합계 20,000 100%'].join('\n'))
   check('D-446 글자 차이로 설명 안 되는 합계 차이는 고치지 않음(확실하지 않음 그대로)', !SH2.sure && SH2.holders[1].shares === 9000, JSON.stringify(SH2))
+}
+
+// D-447 '받으면 더 추천' — 이미 서류에서 읽어 확인만 남은 것(업종 · 설립일)은 '확인만 하면' · 요청 문구에서 빼기
+{
+  const names = ['업종', '설립일', '4대보험 가입자 명부', '대표 생년월일']
+  check('D-447 확인 기다리는 업종 · 설립일만 골라냄', JSON.stringify(waitingNames(names, new Set(['businessCategory', 'establishedAt']))) === JSON.stringify(['업종', '설립일']))
+  const mk = (key: string, label: string, missing: string[]): Insight => ({ key, label, tone: 'need', headline: '', detail: '', missing, openPath: '/', openLabel: '', action: null })
+  const ins = [mk('policy-funding', '정책자금', ['업종', '설립일']), mk('employment', '고용지원금', ['4대보험 가입자 명부'])]
+  const base = normalizeClientOps({ id: 'rq447', companyName: '미래', representativeName: '김대표', createdAt: NOW, updatedAt: NOW })
+  const msg = recoRequestMessage(base, ins, new Set(['businessCategory', 'establishedAt']))
+  check('D-447 요청 문구 — 4대보험 가입자 명부만(이미 받은 사업자등록증 · 업종 · 설립일은 다시 달라고 하지 않음)', msg.includes('4대보험') && !/사업자등록증|업종|설립일/.test(msg), msg)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

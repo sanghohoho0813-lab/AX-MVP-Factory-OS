@@ -11,6 +11,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { Insight } from './clientInsights'
 import { businessTypeOf } from '../tools/shared/clientPrefill'
+import { waitingNames } from './clientInsights'
 
 interface RequestDef {
   match: RegExp
@@ -74,12 +75,14 @@ export interface RequestItem {
 }
 
 /** 정보가 더 필요한 모듈의 빠진 항목 → 고객에게 받을 자료(겹치지 않게) · 우리가 조회할 것 */
-export function requestItemsFrom(insights: readonly Insight[], opts: { individual?: boolean } = {}): { items: RequestItem[]; ours: string[] } {
+export function requestItemsFrom(insights: readonly Insight[], opts: { individual?: boolean; skip?: readonly string[] } = {}): { items: RequestItem[]; ours: string[] } {
   const items: RequestItem[] = []
   const ours: string[] = []
   for (const ins of insights) {
     if (ins.tone !== 'need') continue
     for (const raw of ins.missing) {
+      // D-447 이미 서류에서 읽어 확인만 남은 것은 다시 달라고 하지 않는다
+      if (opts.skip?.includes(raw)) continue
       const def = defFor(raw, !!opts.individual)
       const label = def?.label ?? raw.trim()
       if (!label) continue
@@ -97,8 +100,9 @@ export function requestItemsFrom(insights: readonly Insight[], opts: { individua
 }
 
 /** 카톡으로 보낼 자료 요청 문구 — 받을 것이 없으면 '' */
-export function recoRequestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'corporateNumber'> & Partial<Pick<ClientOpsRecord, 'businessNumber' | 'shareholderRegister'>>, insights: readonly Insight[]): string {
-  return requestMessage(record, requestItemsFrom(insights, { individual: businessTypeOf(record) === 'individual' }).items)
+export function recoRequestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'corporateNumber'> & Partial<Pick<ClientOpsRecord, 'businessNumber' | 'shareholderRegister'>>, insights: readonly Insight[], pendingKeys?: ReadonlySet<string>): string {
+  const skip = pendingKeys ? waitingNames([...new Set(insights.flatMap((i) => i.missing))], pendingKeys) : []
+  return requestMessage(record, requestItemsFrom(insights, { individual: businessTypeOf(record) === 'individual', skip }).items)
 }
 
 /** 빠진 항목(사람 말) 하나 → 고객에게 받을 자료(우리가 조회하는 것이면 null) — D-199 상황 예시도 같은 표를 쓴다 */

@@ -774,6 +774,22 @@ export function topPicks(insights: readonly Insight[], n = 3): Insight[] {
   return insights.filter(isPick).slice(0, n)
 }
 
+/**
+ * D-447 '받으면 더 추천' 이름 가운데 — 이미 서류에서 읽어 확인만 기다리는 것(스캔본 · 다른 값). 받으라고 하지 않고 '확인만 하면' 으로.
+ * 이름 → 사실 열쇠(맞춤 추천 missing 의 말).
+ */
+const WAITING_KEYS: [RegExp, string[]][] = [
+  [/^업종/, ['businessCategory', 'businessItem']],
+  [/^설립일/, ['establishedAt']],
+  [/^대표\s*생년월일/, ['representativeBirth']],
+  [/주소/, ['businessAddress']],
+  [/^직원\s*수/, ['employeeCount']],
+  [/^매출/, ['revenue']],
+]
+export function waitingNames(names: readonly string[], pendingKeys: ReadonlySet<string>): string[] {
+  return names.filter((n) => WAITING_KEYS.some(([re, keys]) => re.test(n) && keys.some((k) => pendingKeys.has(k))))
+}
+
 /** 아직 판정 못 한 모듈에 필요한 서류 · 정보 — 겹치지 않게, 많아야 n개 */
 export function missingForPicks(insights: readonly Insight[], n = 3): string[] {
   return [...new Set(insights.filter((i) => i.tone === 'need').flatMap((i) => i.missing))].slice(0, n)

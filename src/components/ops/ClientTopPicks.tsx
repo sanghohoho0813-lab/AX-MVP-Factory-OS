@@ -17,7 +17,8 @@ import { Badge, type Tone } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
-import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, type Insight, type InsightTone } from '../../services/clientInsights'
+import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, waitingNames, type Insight, type InsightTone } from '../../services/clientInsights'
+import { pendingFacts } from '../../services/customerFacts'
 import { recoRequestMessage } from '../../services/recoRequest'
 import { diagnosisNote } from '../../services/clientDiagnosis'
 import { HintTip } from '../ui/fold'
@@ -33,6 +34,7 @@ export function TopPicksCard({
   showUpload = true,
   onRequest,
   onPickRequest,
+  pendingKeys,
   onDiagnosis,
   diagNote,
 }: {
@@ -48,10 +50,14 @@ export function TopPicksCard({
   onRequest?: () => void
   /** D-313: 제안할 모듈의 '아직 받을 서류' 문구(정책자금 신청 서류) — 없으면 단추를 그리지 않는다 */
   onPickRequest?: (pick: Insight) => void
+  /** D-447 서류에서 읽어 확인만 기다리는 사실 열쇠 — 그 이름은 '받으면' 이 아니라 '확인만 하면' */
+  pendingKeys?: ReadonlySet<string>
 }) {
   const picks = topPicks(insights)
   const more = insights.filter(isPick).length - picks.length
-  const need = missingForPicks(insights)
+  const allNeed = missingForPicks(insights)
+  const waiting = pendingKeys ? waitingNames(allNeed, pendingKeys) : []
+  const need = allNeed.filter((m) => !waiting.includes(m))
   const asks = onPickRequest ? picks.filter((p) => p.request) : []
   return (
     <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-4 shadow-sm sm:px-5">
@@ -126,7 +132,7 @@ export function TopPicksCard({
         </ol>
       ) : (
         <p className="t-body mt-2 break-keep text-slate-700" data-testid="top-picks-none">
-          지금 바로 제안할 모듈은 아직 없어요.{need.length > 0 ? ' 아래 서류 · 정보를 받으면 판정이 바로 나와요.' : ''}
+          지금 바로 제안할 모듈은 아직 없어요.{waiting.length > 0 ? ' 서류에서 읽은 정보를 확인하면 판정이 바로 나와요.' : need.length > 0 ? ' 아래 서류 · 정보를 받으면 판정이 바로 나와요.' : ''}
         </p>
       )}
 
@@ -141,6 +147,13 @@ export function TopPicksCard({
           {more > 0 && onShowAll && (
             <button type="button" onClick={onShowAll} className="tap t-sub font-semibold text-slate-600 hover:text-brand-700 hover:underline">
               검토할 모듈 {more}개 더
+            </button>
+          )}
+          {/* D-447 이미 서류에서 읽어 확인만 남은 것 — 다시 받으라고 하지 않는다. 누르면 맞춤 추천 탭의 확인 카드로 */}
+          {waiting.length > 0 && (
+            <button type="button" onClick={() => document.getElementById('fact-inbox')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="tap t-sub flex min-w-0 flex-wrap items-center gap-1.5 text-left font-semibold break-keep text-brand-700 hover:underline" data-testid="top-picks-waiting">
+              확인만 하면 더 추천: {waiting.join(' · ')} — 서류에서 읽었어요
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
             </button>
           )}
           {need.length > 0 && (
@@ -193,9 +206,11 @@ export default function ClientTopPicks({
   const { ent } = useEntitlements()
   const notices = useGrantNotices(workspaceId)
   const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
-  const text = useMemo(() => recoRequestMessage(record, insights), [record, insights])
   // D-352 대표님께 드릴 맞춤 진단서 — 개요 맨 위에서도 바로
   const [diag, setDiag] = useState(false)
+  // D-447 확인 기다리는 사실(스캔본에서 읽음)
+  const pendingKeys = useMemo(() => new Set(pendingFacts(record).map((p) => p.key)), [record])
+  const text = useMemo(() => recoRequestMessage(record, insights, pendingKeys), [record, insights, pendingKeys])
   const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
   return (
     <>
@@ -208,6 +223,7 @@ export default function ClientTopPicks({
         diagNote={diagNote}
         onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
         onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
+        pendingKeys={pendingKeys}
       />
     </>
   )
