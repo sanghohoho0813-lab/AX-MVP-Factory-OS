@@ -2850,5 +2850,13 @@ await (async () => {
   check('D-441 진단서 회사 한눈에 "올해 매출 2026년 6개월 5억 2,000만원 · 작년 같은 기간보다 +27%"', row?.value === '2026년 6개월 5억 2,000만원 · 작년 같은 기간보다 +27%', JSON.stringify(sheet.snapshot))
 })()
 
+// D-442 숫자 1 을 영문 l · I 로 읽은 금액 — '2,l00,000' · 'l,200,000' · 'I.500.000.000' → 1
+{
+  check('D-442 "2,l00,000 · l,200,000 · I.500.000.000 · 3I0,000" → 2,100,000 · 1,200,000 · 1,500,000,000 · 310,000', fixAmountNoise('매출 2,l00,000 원가 l,200,000 자산 I.500.000.000 비용 3I0,000') === '매출 2,100,000 원가 1,200,000 자산 1,500,000,000 비용 310,000', fixAmountNoise('매출 2,l00,000 원가 l,200,000 자산 I.500.000.000 비용 3I0,000'))
+  check('D-442 낱말 · 코드는 그대로(Il · Total · A1l · 10lbs · ISO 9001)', fixAmountNoise('Il Total A1l 10lbs ISO 9001 l') === 'Il Total A1l 10lbs ISO 9001 l', fixAmountNoise('Il Total A1l 10lbs ISO 9001 l'))
+  const FS = parseFinancialStatement(['표준재무제표증명', '손익계산서', '제 7(당)기 2025년 12월 31일 현재', '(단위 : 원)', '매출액 2,4OO,OOO,OOO 2,OOO,OOO,OOO', '당기순이익 22O,OOO,OOO l8O,OOO,OOO'].join('\n'))
+  check('D-442 스캔 재무제표 "l8O,OOO,OOO"(전기 순이익) → 180,000,000', FS?.netIncomePrev === 180_000_000 && FS?.revenue === 2_400_000_000, JSON.stringify(FS))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

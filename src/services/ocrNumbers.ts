@@ -10,8 +10,13 @@
  */
 export function fixAmountNoise(text: string): string {
   return fixDateNoise(String(text || ''))
+    // D-442 숫자 덩어리 맨 앞의 l · I(1) — 'l8O,OOO,OOO' · 'I2,000' → 1(뒤가 숫자로 이어질 때만 · 영어 낱말은 그대로)
+    .replace(/(^|[^0-9A-Za-z])[Il](?=\d[\dOoIl,.]*(?![0-9A-Za-z]))/g, '$11')
     // D-427 숫자 덩어리 안의 영문 O(OCR 이 0 을 O 로 읽음) — '2,4OO,OOO,OOO' · '2O25' → 0. 숫자로 시작하는 덩어리 안에서만('A01' 같은 코드 · 영어 낱말은 그대로)
     .replace(/(^|[^0-9A-Za-z])(\d[\dOo,.]*[Oo][\dOo,.]*[\dOo]|\d[\dOo,.]*[Oo])(?![0-9A-Za-z])/g, (_m, pre: string, num: string) => `${pre}${num.replace(/[Oo]/g, '0')}`)
+    // D-442 숫자 1 을 영문 l · I 로 읽음 — 숫자 덩어리 안('2,l00,000' · '3I0,000') · 세 자리 묶음 앞('l,200,000' · 'I.500.000') → 1
+    .replace(/(^|[^0-9A-Za-z])(\d[\dIl,.]*[Il][\dIl,.]*\d)(?![0-9A-Za-z])/g, (_m, pre: string, num: string) => `${pre}${num.replace(/[Il]/g, '1')}`)
+    .replace(/(^|[^0-9A-Za-z])[Il]((?:[,.]\d{3})+)(?![0-9A-Za-z])/g, '$11$2')
     .replace(/(^|[^\d.,])(\d{1,3}(?:[.,]\d{3}){2,})(?!\d)/g, (_m, pre: string, num: string) => `${pre}${num.replace(/\./g, ',')}`)
     .replace(/(\d{1,3}(?:,\d{3})*),[ \t]+(\d{3}(?:,\d{3})*)(?![\d])/g, '$1,$2')
     // D-416 한 묶음이라도 '원' · '주' 가 바로 붙으면 금액 · 주식 수('5.000 원' · '15.000주' → 5,000 · 15,000)
