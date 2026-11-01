@@ -347,9 +347,14 @@ interface OcrSlot {
 const slots: OcrSlot[] = Array.from({ length: OCR_PARALLEL }, () => ({ worker: null, busy: false, idle: null }))
 const slotWaiters: (() => void)[] = []
 
+/** 먼저 켜지는 인식기 — 둘째는 이것이 다 켜진 뒤에 켠다(한글 자료를 두 번 내려받지 않고 저장해 둔 것을 쓰게) */
+let firstWorker: Promise<OcrWorker> | null = null
+
 function workerOf(slot: OcrSlot): Promise<OcrWorker> {
   if (!slot.worker) {
+    const before = firstWorker
     const made = (async () => {
+      if (before) await before.catch(() => undefined)
       const { createWorker } = await import('tesseract.js')
       return createWorker('kor+eng', undefined, {
         logger: (m: { status?: string; progress?: number }) => {
@@ -359,8 +364,10 @@ function workerOf(slot: OcrSlot): Promise<OcrWorker> {
       })
     })()
     slot.worker = made
+    if (!firstWorker) firstWorker = made
     made.catch(() => {
       if (slot.worker === made) slot.worker = null
+      if (firstWorker === made) firstWorker = null
     })
   }
   return slot.worker
@@ -369,6 +376,7 @@ function workerOf(slot: OcrSlot): Promise<OcrWorker> {
 function dropWorker(slot: OcrSlot): void {
   const w = slot.worker
   slot.worker = null
+  if (firstWorker === w) firstWorker = slots.find((x) => x.worker)?.worker ?? null
   void w?.then((x) => x.terminate()).catch(() => undefined)
 }
 
@@ -425,13 +433,54 @@ async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn
   }
 }
 
-async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+/**
+ * D-460 옆으로 누운 · 거꾸로 된 사진 · 스캔 — 글자 인식 자신감(0~100)이 낮으면 90 · 180 · 270도로 돌려 작게 읽어 보고,
+ * 확실히 나은 방향(65 이상 · 처음보다 15 이상 높음)이 있으면 그쪽으로 다시 읽는다. 바로 선 서류는 77~92 라 돌려 보지 않는다.
+ */
+export const TURN_CHECK_BELOW = 60
+export function pickQuarterTurn(base: number, tries: readonly { deg: number; conf: number }[]): number {
+  const best = tries.reduce((a, b) => (b.conf > a.conf ? b : a), { deg: 0, conf: -1 })
+  return best.conf >= 65 && best.conf >= base + 15 ? best.deg : 0
+}
+
+function turnedCanvas(src: HTMLCanvasElement, deg: number, maxWidth = 0): HTMLCanvasElement {
+  const side = deg % 180 !== 0
+  const w0 = side ? src.height : src.width
+  const h0 = side ? src.width : src.height
+  // 작게 읽어 볼 때는 maxWidth 로 줄이고, 다시 읽을 때는 처음 읽기처럼 작으면 키우고 너무 크면 줄인다
+  const scale = maxWidth > 0 ? Math.min(1, maxWidth / w0) : w0 < 1600 ? Math.min(2, OCR_WIDTH / w0) : w0 > OCR_MAX_WIDTH ? OCR_MAX_WIDTH / w0 : 1
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.round(w0 * scale))
+  c.height = Math.max(1, Math.round(h0 * scale))
+  const ctx = c.getContext('2d')
+  if (!ctx) return c
+  ctx.imageSmoothingQuality = 'high'
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, c.width, c.height)
+  ctx.translate(c.width / 2, c.height / 2)
+  ctx.rotate((deg * Math.PI) / 180)
+  ctx.scale(scale, scale)
+  ctx.drawImage(src, -src.width / 2, -src.height / 2)
+  return c
+}
+
+async function ocrWith(worker: OcrWorker, input: HTMLCanvasElement | Blob, onProgress?: ProgressFn, mayTurn = true): Promise<string> {
   const drawn = input instanceof Blob ? await imageToCanvas(input) : input
   const canvas = drawn ? withoutRedStamp(drawn) : null
   // D-451 기울어진 사진(휴대폰으로 비스듬히) — 글자 인식기가 기울기를 재어 바로잡고 읽는다. 4도 기울기 · 그림자 사진에서 주소 · 번지가 틀리던 것
   const { data } = await worker.recognize(canvas ?? input, { rotateAuto: true }, { text: true, blocks: true, imageColor: true })
   const text = data.text ?? ''
   if (!canvas) return text
+  if (mayTurn && (data.confidence ?? 100) < TURN_CHECK_BELOW) {
+    onProgress?.(0.9, '서류 방향 확인 중')
+    const tries: { deg: number; conf: number }[] = []
+    for (const deg of [90, 180, 270]) {
+      const r = await worker.recognize(turnedCanvas(canvas, deg, 1000))
+      tries.push({ deg, conf: r.data.confidence ?? 0 })
+    }
+    const deg = pickQuarterTurn(data.confidence ?? 0, tries)
+    if (deg) return ocrWith(worker, turnedCanvas(canvas, deg), onProgress, false)
+  }
   // 바로잡았으면 번호를 다시 읽을 칸도 바로잡은 그림에서 자른다(칸 위치는 그 그림 기준)
   let cropSrc: HTMLCanvasElement = canvas
   const turned = (data as { rotateRadians?: number | null }).rotateRadians

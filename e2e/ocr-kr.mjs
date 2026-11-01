@@ -188,6 +188,36 @@ async function upload(id, company, files, during) {
   }
 }
 
+/* ---------------- H 옆으로 누운 사진 · 거꾸로 된 스캔(D-460) ---------------- */
+{
+  const turned = async (name, deg) => {
+    const p = await browser.newPage({ viewport: { width: 1240, height: 1754 } })
+    const L = ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2019 년 03 월 15 일', '사업장 소재지 : 경기도 성남시 분당구 판교로 100', '업태 : 제조업   종목 : 의약품', '성남세무서장']
+    await p.setContent(`<html><body style="margin:0;background:#fbfbf8"><div style="padding:100px;${FONT};font-size:38px;line-height:1.75;color:#222">${L.join('<br>')}</div></body></html>`)
+    const b64 = (await p.screenshot({ type: 'jpeg', quality: 80 })).toString('base64')
+    const out = await p.evaluate(async ([b64, deg]) => {
+      const img = new Image()
+      img.src = `data:image/jpeg;base64,${b64}`
+      await img.decode()
+      const c = document.createElement('canvas')
+      const side = deg % 180 !== 0
+      c.width = side ? img.height : img.width
+      c.height = side ? img.width : img.height
+      const ctx = c.getContext('2d')
+      ctx.translate(c.width / 2, c.height / 2)
+      ctx.rotate((deg * Math.PI) / 180)
+      ctx.drawImage(img, -img.width / 2, -img.height / 2)
+      return c.toDataURL('image/jpeg', 0.85).split(',')[1]
+    }, [b64, deg])
+    await p.close()
+    return { name, mimeType: 'image/jpeg', buffer: Buffer.from(out, 'base64') }
+  }
+  for (const [tag, deg] of [['옆으로 누운(90도) 사진', 90], ['거꾸로 된(180도) 스캔', 180]]) {
+    const r = await upload(`cli_ocrH${deg}`, '미래바이오랩', [await turned('IMG_0201.jpg', deg)])
+    check(`H ${tag} — 돌려 읽어 사업자등록증 칸 · 번호 바로 입력 · 설립일 2019-03-15 · 주소(확인 목록) · ${r.secs}초`, /IMG_0201\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && /설립일 2019-03-15/.test(r.inbox) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
+  }
+}
+
 await browser.close()
 console.log(`\n진짜 한글 스캔: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
