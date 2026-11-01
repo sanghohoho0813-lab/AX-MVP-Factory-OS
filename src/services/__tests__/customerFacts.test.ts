@@ -3002,5 +3002,17 @@ await (async () => {
   check('D-467 다시 읽기 줄이 붙어도 칸 · 발급일은 그대로', plain.label === marked.label && plain.issuedAt === marked.issuedAt, JSON.stringify({ plain: [plain.label, plain.issuedAt], marked: [marked.label, marked.issuedAt] }))
 })()
 
+// D-468 스캔 법인 등기부 '회사성립연월일' 도 두 번 다시 읽어 같으면 설립일 바로 입력
+;(() => {
+  const REG = `등기사항전부증명서(현재 유효사항)\n- 법 인 -\n등록번호 110111-1234567\n상 호 주식회사 한빛테크\n본 점 경기도 파주시 문산읍 돈유1로 12\n회사성립연월일 2019 년 03 월 02 일\n대표이사 김한빛\n열람일시 : 2026년 10월 20일 14시 05분`
+  const empty = normalizeClientOps({ id: 'af468', companyName: '한빛테크', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d468-${++n}`
+  const ok = autoFillFromDocs(empty, [{ key: 'corporateRegistry', fileName: '등기부.jpg', text: `${REG}\n${dateRereadLine('20190302')}\n${dateRereadLine('20190302')}`, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-468 스캔 등기부 회사성립연월일 2019-03-02 — 두 번 다시 읽어 같음 → 설립일 바로 입력', ok.record.establishedAt === '2019-03-02' && !ok.flagged.some((f) => f.key === 'establishedAt'), JSON.stringify({ e: ok.entered.map((f) => f.key), f: ok.flagged.map((f) => f.key) }))
+  const none = autoFillFromDocs(empty, [{ key: 'corporateRegistry', fileName: '등기부.jpg', text: REG, method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  check('D-468 다시 읽기가 없으면 예전처럼 확인', none.record.establishedAt === '' && none.flagged.some((f) => f.key === 'establishedAt'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -277,10 +277,11 @@ interface OcrLine {
   words: OcrWord[]
 }
 
-/** D-467 '개업연월일' 줄의 숫자 낱말들(년 · 월 · 일 글자는 빼고 하나씩) — 생년월일 · 발급일 줄은 아님 */
+/** D-467 '개업연월일' · D-468 '회사성립연월일' 줄의 숫자 낱말들(년 · 월 · 일 글자는 빼고 하나씩) — 생년월일 · 발급일 줄은 아님 */
 export function dateWordBoxes(lines: readonly OcrLine[]): Box[] {
   const flat = (t: string) => t.replace(/\s+/g, '')
-  const line = lines.find((l) => /개업(?:연|년)?월?일/.test(flat(l.text)) && /\d{4}/.test(l.text))
+  // D-468 법인 등기부 '회사성립연월일' 줄도(등기부만 올린 법인의 설립일)
+  const line = lines.find((l) => /개업(?:연|년)?월?일|회사성립연월일|설립연월일/.test(flat(l.text)) && /\d{4}/.test(l.text))
   if (!line) return []
   const ws = line.words.filter((w) => /^\D{0,2}\d{1,4}\D{0,2}$/.test(w.text) && /\d/.test(w.text)).slice(0, 3)
   if (ws.length !== 3) return []

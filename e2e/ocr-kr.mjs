@@ -122,7 +122,8 @@ async function upload(id, company, files, during) {
   check(`C 다섯 장 모두 제 칸(등기부 · 명부 · 원천세 · 지방세 · 벤처) · ${r.secs}초`, /scan_0101\.jpg → 법인등기부등본/.test(r.placed) && /scan_0102\.jpg → 4대보험 가입자 명부/.test(r.placed) && /scan_0103\.jpg → 원천징수이행상황신고서/.test(r.placed) && /scan_0104\.jpg → 지방세 납세증명서/.test(r.placed) && /scan_0105\.jpg → 벤처기업확인서/.test(r.placed), r.placed)
   check('C 명부 사진 → 직원 5명 바로 입력 · 등기부 → 대표 취임일 · 1주 액면가 · 발행주식 총수 바로 입력', /직원 수 5명/.test(r.entered) && /대표 취임일 2019-03-15/.test(r.entered) && /1주 액면가 5,000원/.test(r.entered) && /발행주식 총수 20,000주/.test(r.entered), r.entered.slice(0, 400))
   check('C 원천세 신고 인원 12명 읽음(A01 을 401 로 읽어도) · 벤처 값에 서명란 찌꺼기 없음', /원천세 신고 인원 2026년 9월분 근로자 12명/.test(r.inbox + r.entered) && /벤처기업 확인일 2025-06-01 · 2028-05-31까지(?! · 장)/.test(r.inbox), r.inbox.slice(0, 600))
-  check('C 맨 위 카드 — 확인만 하면 더 추천에 "설립일" 한 번(겹침 없음)', /확인만 하면 더 추천: 설립일 — /.test(r.tops), r.tops.slice(0, 400))
+  check('C 맨 위 카드 — 설립일은 겹침 없이(바로 들어갔거나 "확인만 하면 더 추천: 설립일" 한 번)', (r.record?.establishedAt === '2019-03-15' && !/설립일[^]*설립일/.test(r.tops)) || /확인만 하면 더 추천: 설립일 — /.test(r.tops), r.tops.slice(0, 400))
+  check('C D-468 스캔 등기부 회사성립연월일 — 숫자만 두 번 다시 읽어 같음 → 설립일 2019-03-15 바로 입력', r.record?.establishedAt === '2019-03-15', JSON.stringify({ est: r.record?.establishedAt, inbox: r.inbox.slice(0, 200) }))
   check('C 화면 오류 0 · 1분 안', r.errors.length === 0 && r.secs < 60, `${r.secs} ${r.errors.join(' | ')}`)
 }
 
