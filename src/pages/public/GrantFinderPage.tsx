@@ -13,6 +13,7 @@ import { useSearchParams } from 'react-router-dom'
 import { BellRing, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { brand } from '../../brand/brand.config'
 import { Button } from '../../components/ui/Button'
+import { GrowingList } from '../../components/ui/GrowingList'
 import { BottomSheet } from '../../components/ui/primitives'
 import { CategoryChips, DeadlineText, NoticeLink, ReasonList, VerdictBadge } from '../../components/grants/GrantParts'
 import { todayLocalDate } from '../../lib/appClock'
@@ -248,9 +249,15 @@ export default function GrantFinderPage() {
                 {ready3 ? '지금은 우리 회사 지역 · 업력 · 업종에 꼭 맞는 공고가 없어요. 알림을 받아 두시면 새 공고가 나올 때 알려 드려요.' : '지역 · 업종 · 업력을 고르시면 꼭 맞는 공고를 골라 드려요.'}
               </p>
             ) : (
-              <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="finder-list">
-                {listed.map(row)}
-              </ul>
+              // D-480 공고가 많으면(실제 854건) 처음 30건만 · 아래로 내리면 이어서 — 조건 · 분야를 바꾸면 처음부터
+              <GrowingList
+                items={listed}
+                render={row}
+                resetKey={`${profileChipsText(profile)}|${category}`}
+                unit="건"
+                testId="finder-list"
+                className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white"
+              />
             )}
             {general.length > 0 && (
               <div className="flex flex-col gap-2">

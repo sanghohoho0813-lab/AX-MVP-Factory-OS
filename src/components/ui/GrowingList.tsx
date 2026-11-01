@@ -12,6 +12,7 @@ export function GrowingList<T>({
   resetKey,
   step = 30,
   unit = '곳',
+  testId,
 }: {
   items: readonly T[]
   render: (item: T, index: number) => ReactNode
@@ -20,11 +21,15 @@ export function GrowingList<T>({
   resetKey?: unknown
   step?: number
   unit?: string
+  /** ul 의 data-testid */
+  testId?: string
 }) {
   const [count, more] = useGrowingCount(items.length, resetKey, step)
   return (
     <>
-      <ul className={className}>{items.slice(0, count).map(render)}</ul>
+      <ul className={className} data-testid={testId}>
+        {items.slice(0, count).map(render)}
+      </ul>
       {count < items.length && (
         <div ref={more} className="t-meta py-2 text-center text-slate-500" data-testid="list-more" aria-live="polite">
           아래로 내리면 {items.length - count}
