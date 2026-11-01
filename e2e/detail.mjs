@@ -354,6 +354,8 @@ for (const width of [360, 390, 430]) {
   await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  // D-462 안내 글은 처음 열었을 때(파일 넣기 전) 보인다 — 파일을 넣으면 넣는 곳을 한 줄로 줄인다
+  const hint = ((await page.getByRole('dialog').innerText().catch(() => '')) ?? '')
   const LOCKED = makeHwp({ lines: ['비밀'], flags: 3 })
   await page.getByLabel('서류 파일 고르기').setInputFiles([{ name: '용역계약서.hwp', mimeType: 'application/x-hwp', buffer: Buffer.from(LOCKED) }, { name: '묶음.zip', mimeType: 'application/zip', buffer: Buffer.from(makeZip([{ name: '정관.docx', data: ARTICLES, utf8: true }])) }, { name: 'IMG_0042.HEIC', mimeType: 'image/heic', buffer: Buffer.from([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 0, 0, 0, 0]) }])
   await page.getByLabel('용역계약서.hwp 칸 고르기').waitFor({ timeout: 15000 })
@@ -365,8 +367,8 @@ for (const width of [360, 390, 430]) {
   check('D-432 아이폰 사진(HEIC) — 크롬이 못 여는 사진은 "아이폰 사진(HEIC) … JPG 로" 까닭 한 줄(예전: 말없이 기타)', notes.some((t) => t.includes('아이폰 사진(HEIC)') && t.includes('파일 이름으로')), notes)
   if (process.env.D432_SHOTS) await page.getByRole('dialog').screenshot({ path: `${process.env.D432_SHOTS}/heic-note.png` }).catch(() => {})
   check('Z8 압축에서 꺼낸 파일 줄에 "묶음.zip 안에서 꺼냄" · 위에 압축 알림 한 줄', notes.some((t) => t.includes('묶음.zip 안에서 꺼냄')) && ((await page.getByTestId('bulk-archive-note').innerText().catch(() => '')) ?? '').includes('묶음.zip 에서 서류 1개를 꺼냈어요'), notes)
-  const hint = (await page.getByRole('dialog').innerText()) ?? ''
-  check('Z9 안내 글 — 한글 · 워드는 내용을 읽고 압축은 풀어서', hint.includes('한글(hwp · hwpx)') && hint.includes('압축(zip)은 풀어서'))
+  check('Z9 안내 글(처음 열었을 때) — 한글 · 워드는 내용을 읽고 압축은 풀어서', hint.includes('한글(hwp · hwpx)') && hint.includes('압축(zip)은 풀어서'))
+  check('D-462 파일을 넣은 뒤 — 넣는 곳은 한 줄(긴 안내 글 접힘) · 진행 목록이 보임', (await page.getByTestId('bulk-drop').getAttribute('data-compact')) === 'yes' && !((await page.getByRole('dialog').innerText()) ?? '').includes('압축(zip)은 풀어서') && (await page.getByTestId('bulk-item').count()) >= 3)
   if (process.env.D266_SHOTS) await page.screenshot({ path: `${process.env.D266_SHOTS}/bulk-zip-hwp.png` })
   await page.getByTestId('bulk-discard').click().catch(() => {})
   // 새 업체 등록 창 — 압축 안 한글 사업자등록증만 넣어도 업체명 · 대표자 · 사업자번호가 채워진다
