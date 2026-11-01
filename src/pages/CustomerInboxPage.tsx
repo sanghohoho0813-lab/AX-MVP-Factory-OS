@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { GrowingList } from '../components/ui/GrowingList'
 import { AiAssist } from '../components/ai/AiAssist'
 import { inboxBundle } from '../services/aiAssist/builders'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -315,8 +316,13 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               )}
             </div>
           ) : (
-            <ul className="flex flex-col gap-3">
-              {visible.map((e) => (
+            // D-479 신청이 많이 쌓이면 처음 30건 · 아래로 내리면 이어서(보기 · 종류 · 순서를 바꾸면 처음부터)
+            <GrowingList
+              items={visible}
+              resetKey={`${filter}|${typeFilter}|${waitingFirst}`}
+              unit="건"
+              className="flex flex-col gap-3"
+              render={(e) => (
                 <li key={e.id}>
                   <EventCard
                     event={e}
@@ -327,8 +333,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
                     onStatus={(status) => void setStatus(e, status)}
                   />
                 </li>
-              ))}
-            </ul>
+              )}
+            />
           )}
         </ArrangeItem>
       </ArrangeArea>
