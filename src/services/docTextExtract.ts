@@ -370,12 +370,23 @@ function workerOf(slot: OcrSlot): Promise<OcrWorker> {
     const made = (async () => {
       if (before) await before.catch(() => undefined)
       const { createWorker } = await import('tesseract.js')
-      return createWorker('kor+eng', undefined, {
-        logger: (m: { status?: string; progress?: number }) => {
-          if (m.status === 'recognizing text') slot.progressTo?.(m.progress ?? 0, '글자 읽는 중')
-          else slot.progressTo?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
-        },
-      })
+      const make = () =>
+        withTimeout(
+          createWorker('kor+eng', undefined, {
+            logger: (m: { status?: string; progress?: number }) => {
+              if (m.status === 'recognizing text') slot.progressTo?.(m.progress ?? 0, '글자 읽는 중')
+              else slot.progressTo?.(0, '한글 인식 준비 중 (처음 한 번은 다소 걸립니다)')
+            },
+          }),
+          OCR_START_TIMEOUT_MS,
+        )
+      // D-471 인식기 프로그램 · 한글 자료를 인터넷에서 받다가 잠깐 끊기면 한 번 더(예전: 그 파일이 까닭 없이 '기타' 로)
+      try {
+        return await make()
+      } catch {
+        await new Promise((r) => setTimeout(r, 1200))
+        return make()
+      }
     })()
     slot.worker = made
     if (!firstWorker) firstWorker = made
@@ -420,11 +431,52 @@ function giveSlot(slot: OcrSlot): void {
   slotWaiters.shift()?.()
 }
 
+/** D-471 인식기를 켜지 못했거나 읽다가 멈췄을 때(한 번 더 해도) — 사람 말 한 줄. 파일은 그대로 보관된다 */
+export const OCR_START_FAIL_NOTE = '글자 인식을 준비하지 못했어요(인터넷 연결이 잠깐 끊겼을 수 있어요) — 잠시 뒤 다시 올려 주세요.'
+const OCR_START_TIMEOUT_MS = 90_000
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('ocr-start-timeout')), ms)
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
+
 async function ocrImage(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
+  try {
+    return await ocrImageOnce(input, onProgress)
+  } catch (e) {
+    if (e instanceof OfficeReadError) throw e
+    // D-471 인식기가 멈췄으면 버리고 새로 켜서 한 번 더 — 그래도 안 되면 까닭 한 줄
+    try {
+      return await ocrImageOnce(input, onProgress)
+    } catch (e2) {
+      if (e2 instanceof OfficeReadError) throw e2
+      throw new OfficeReadError(OCR_START_FAIL_NOTE)
+    }
+  }
+}
+
+async function ocrImageOnce(input: HTMLCanvasElement | Blob, onProgress?: ProgressFn): Promise<string> {
   const slot = await takeSlot()
   slot.progressTo = onProgress
   try {
-    const worker = await workerOf(slot)
+    let worker: OcrWorker
+    try {
+      worker = await workerOf(slot)
+    } catch (e) {
+      dropWorker(slot)
+      throw e
+    }
     let broken = false
     try {
       return await ocrWith(worker, input, onProgress)

@@ -46,8 +46,11 @@ const shot = async (lines, size = 40) => {
 const img = async (name, lines, size) => ({ name, mimeType: 'image/jpeg', buffer: await shot(lines, size) })
 
 /** 새 업체에 파일을 올리고 결과를 읽는다 */
-async function upload(id, company, files, during) {
+async function upload(id, company, files, during, opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ignoreHTTPSErrors: true })
+  // D-471 인식기 프로그램을 처음 받을 때 연결이 한 번 끊기는 경우
+  let dropped = 0
+  if (opts.dropWorkerOnce) await ctx.route(/tesseract\.js@.*worker\.min\.js/, (route) => (dropped++ === 0 ? route.abort('connectionreset') : route.continue()))
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -64,7 +67,7 @@ async function upload(id, company, files, during) {
   await page.waitForTimeout(1200)
   const secs = Math.round((Date.now() - t0) / 1000)
   const txt = async (tid) => ((await page.getByTestId(tid).first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-  const out = { seen, secs, placed: await txt('smart-placed'), entered: await txt('smart-entered'), inbox: await txt('fact-inbox'), tops: await txt('top-picks'), errors }
+  const out = { dropped, seen, secs, placed: await txt('smart-placed'), entered: await txt('smart-entered'), inbox: await txt('fact-inbox'), tops: await txt('top-picks'), errors }
   out.record = await page.evaluate((id) => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === id), id)
   await ctx.close()
   return out
@@ -219,6 +222,12 @@ async function upload(id, company, files, during) {
     const r = await upload(`cli_ocrH${deg}`, '미래바이오랩', [await turned('IMG_0201.jpg', deg)])
     check(`H ${tag} — 돌려 읽어 사업자등록증 칸 · 번호 바로 입력 · 설립일 2019-03-15(바로 입력 또는 확인) · 주소(확인 목록) · ${r.secs}초`, /IMG_0201\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && (r.record?.establishedAt === '2019-03-15' || /설립일 2019-03-15/.test(r.inbox)) && /경기도 성남시 분당구 판교로 100/.test(r.inbox) && r.errors.length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, inbox: r.inbox.slice(0, 300) }))
   }
+}
+
+/* ---------------- I 인식기 프로그램을 받다가 연결이 한 번 끊김(D-471) ---------------- */
+{
+  const r = await upload('cli_ocrI', '미래바이오랩', [await img('IMG_0301.jpg', ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 주식회사 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2019 년 03 월 15 일', '사업장 소재지 : 경기도 성남시 분당구 판교로 100'])], undefined, { dropWorkerOnce: true })
+  check(`I 인식기 프로그램을 받다 연결이 한 번 끊겨도(일부러 끊은 그 오류 말고 화면 오류 0) 다시 받아 읽음 — 사업자등록증 칸 · 번호 바로 입력(예전: 까닭 없이 '기타') · 끊김 ${r.dropped} · ${r.secs}초`, r.dropped >= 1 && /IMG_0301\.jpg → 사업자등록증/.test(r.placed) && r.record?.businessNumber === '124-81-00998' && r.errors.filter((e) => !/importScripts/.test(e)).length === 0, JSON.stringify({ placed: r.placed, b: r.record?.businessNumber, errors: r.errors }))
 }
 
 await browser.close()

@@ -213,7 +213,8 @@ export function BulkDocUploadSheet({
       } catch (e) {
         // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다(D-266 암호 · 배포용 한글 문서는 까닭을 보여 준다)
         text = ''
-        if (e instanceof OfficeReadError) readNote = `${e.message} 파일 이름으로 칸을 정했어요.`
+        // D-471 까닭을 모르는 실패도 말없이 '기타' 로 두지 않는다
+        readNote = e instanceof OfficeReadError ? `${e.message} 파일 이름으로 칸을 정했어요.` : '글자를 읽지 못했어요 — 파일 이름으로 칸을 정했어요(파일은 보관).'
       }
       // D-146: 서류 맨 위 제목으로 칸을 정한다 — 맞는 칸이 없으면 그 이름으로 새 칸, 모르면 '기타 · 확인 필요'(남는 파일 없음)
       // D-386 여러 서류를 한 PDF 로 합쳐 보냈으면 — 파일은 첫 서류 칸, 나머지 서류는 쪽마다 따로 읽는다
@@ -392,20 +393,15 @@ export function BulkDocUploadSheet({
       onSaved(saved, summary)
       const sm = analyzed.summary
       const others = placed.filter((x) => x.other).length
+      // D-472 알림은 한 줄로 — 예전에는 다섯 줄 알림이 휴대폰에서 맨 위 추천 카드를 몇 초 가렸다(자세한 것은 '방금 올린 서류' 칸에 그대로)
       const tail = [
+        failed ? `못 올린 ${failed}건은 창에 남겨 두었어요` : '',
+        others ? `'${OTHER_DOC_LABEL}' ${others}건` : '',
         sm.entered.length ? `바로 넣은 정보 ${sm.entered.length}건` : '',
         sm.flagged.length ? `확인할 정보 ${sm.flagged.length}건` : '',
-        sm.cretop ? '크레탑 분석 붙임' : '',
-        sm.roster ? `명부 진단(후보 지원금 ${sm.roster.candidates}건)` : '',
       ].filter(Boolean)
       // D-209: 어느 업체에 올렸는지 함께(다른 업체 화면에서 끝나도 헷갈리지 않게) · 못 올린 파일은 창에 남겨 다시 올리게
-      showToast(
-        `${saved.companyName} — ` +
-          (uploadable ? `서류 ${okCount}건을 서류함에 올렸습니다.` : `서류 ${okCount}건을 서류함에 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
-          (failed ? ` 못 올린 ${failed}건은 창에 빨간 줄로 남겨 두었습니다 — [다시 올리기] 를 눌러 주세요.` : '') +
-          (others ? ` 무슨 서류인지 모르는 ${others}건은 '${OTHER_DOC_LABEL}' 칸에 있습니다.` : '') +
-          (tail.length ? ` ${tail.join(' · ')} — 맞춤 추천에서 보세요.` : ''),
-      )
+      showToast(`${saved.companyName} — 서류 ${okCount}건을 넣었어요${uploadable ? '' : '(파일은 클라우드 연결 후 보관)'}${tail.length ? ` · ${tail.join(' · ')}` : ''}`)
       if (opts.closeWhenDone && failed === 0) onClose()
       else if (failed > 0) setHidden(false)
     } catch (cause) {
