@@ -46,7 +46,7 @@ const shot = async (lines, size = 40) => {
 const img = async (name, lines, size) => ({ name, mimeType: 'image/jpeg', buffer: await shot(lines, size) })
 
 /** 새 업체에 파일을 올리고 결과를 읽는다 */
-async function upload(id, company, files) {
+async function upload(id, company, files, during) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ignoreHTTPSErrors: true })
   const page = await ctx.newPage()
   const errors = []
@@ -59,11 +59,12 @@ async function upload(id, company, files) {
   const t0 = Date.now()
   await page.getByTestId('client-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles(files)
+  const seen = during ? await during(page) : null
   await page.getByTestId('smart-batch').waitFor({ timeout: 240000 })
   await page.waitForTimeout(1200)
   const secs = Math.round((Date.now() - t0) / 1000)
   const txt = async (tid) => ((await page.getByTestId(tid).first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-  const out = { secs, placed: await txt('smart-placed'), entered: await txt('smart-entered'), inbox: await txt('fact-inbox'), tops: await txt('top-picks'), errors }
+  const out = { seen, secs, placed: await txt('smart-placed'), entered: await txt('smart-entered'), inbox: await txt('fact-inbox'), tops: await txt('top-picks'), errors }
   out.record = await page.evaluate((id) => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === id), id)
   await ctx.close()
   return out
@@ -105,7 +106,18 @@ async function upload(id, company, files) {
     await img('scan_0103.jpg', ['원천징수이행상황신고서', '귀속연월 2026년 09월 지급연월 2026년 09월', '근로소득 간이세액 A01 12 48,000,000 1,200,000'], 34),
     await img('scan_0104.jpg', ['지방세 완납증명서', '납세자 주식회사 미래바이오랩', '체납액 없음', '발급일 2026.10.20', '성남시장']),
     await img('scan_0105.jpg', ['벤처기업확인서', '기업명 주식회사 미래바이오랩', '사업자등록번호 124-81-00998', '벤처기업 확인유형 연구개발기업', '유효기간 2025.06.01 ~ 2028.05.31', '벤처기업확인기관장']),
-  ])
+  ], async (page) => {
+    // D-455 · 457 PC 는 두 장씩 함께 읽고, 차례가 안 온 파일은 '차례를 기다려요'
+    let reading = 0
+    let queued = 0
+    for (let i = 0; i < 30 && !(reading >= 2 && queued >= 1); i++) {
+      await page.waitForTimeout(300)
+      reading = await page.locator('[data-testid="bulk-item"][data-status="reading"]').count()
+      queued = await page.getByTestId('bulk-item-queued').count()
+    }
+    return { reading, queued }
+  })
+  check(`C PC 는 두 장씩 함께 읽음 · 나머지는 '차례를 기다려요'(D-455 · 457) — 읽는 중 ${r.seen?.reading} · 기다림 ${r.seen?.queued}`, r.seen?.reading === 2 && r.seen?.queued >= 1, JSON.stringify(r.seen))
   check(`C 다섯 장 모두 제 칸(등기부 · 명부 · 원천세 · 지방세 · 벤처) · ${r.secs}초`, /scan_0101\.jpg → 법인등기부등본/.test(r.placed) && /scan_0102\.jpg → 4대보험 가입자 명부/.test(r.placed) && /scan_0103\.jpg → 원천징수이행상황신고서/.test(r.placed) && /scan_0104\.jpg → 지방세 납세증명서/.test(r.placed) && /scan_0105\.jpg → 벤처기업확인서/.test(r.placed), r.placed)
   check('C 명부 사진 → 직원 5명 바로 입력 · 등기부 → 대표 취임일 · 1주 액면가 · 발행주식 총수 바로 입력', /직원 수 5명/.test(r.entered) && /대표 취임일 2019-03-15/.test(r.entered) && /1주 액면가 5,000원/.test(r.entered) && /발행주식 총수 20,000주/.test(r.entered), r.entered.slice(0, 400))
   check('C 원천세 신고 인원 12명 읽음(A01 을 401 로 읽어도) · 벤처 값에 서명란 찌꺼기 없음', /원천세 신고 인원 2026년 9월분 근로자 12명/.test(r.inbox + r.entered) && /벤처기업 확인일 2025-06-01 · 2028-05-31까지(?! · 장)/.test(r.inbox), r.inbox.slice(0, 600))

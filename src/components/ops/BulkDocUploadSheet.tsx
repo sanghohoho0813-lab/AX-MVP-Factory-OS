@@ -602,7 +602,16 @@ export function BulkDocUploadSheet({
                     </p>
                   )}
                   {it.status === 'reading' && it.progress && (
-                    <p className="t-sub text-slate-500">{it.progress.label}</p>
+                    <p className="t-sub text-slate-500" data-testid="bulk-item-progress">
+                      {it.progress.label}
+                      {it.progress.ratio > 0 && it.progress.ratio < 1 ? ` ${Math.round(it.progress.ratio * 100)}%` : ''}
+                    </p>
+                  )}
+                  {/* D-457 아직 차례가 안 온 파일 — 빈 줄 대신 기다린다고 알린다 */}
+                  {it.status === 'queued' && (
+                    <p className="t-sub text-slate-400" data-testid="bulk-item-queued">
+                      차례를 기다려요
+                    </p>
                   )}
                   {(it.status === 'error' || (it.status === 'ready' && it.error !== '')) && <p className="t-sub break-keep text-danger-700 [overflow-wrap:anywhere]">{it.error}</p>}
                   {it.status === 'error' && (
