@@ -26,10 +26,13 @@ export const TONES: Readonly<Record<Tone, { wash: string; soft: string; line: st
   teal: { ...CALM, bar: 'bg-teal-400' },
 }
 
-/** 색 칩(주제 · 태그) — 고르면 그 색으로 채움 */
+/**
+ * 색 칩(주제 · 태그 · 어디에) — 고르면 파란 테두리 + 옅은 파랑(고른 것 = 파랑).
+ * D-478 예전에는 주 단추([AI로 바로 쓰기])와 같은 진한 칠이라 '주 단추가 둘' 로 보였다 — 진한 칠은 주 단추에만.
+ */
 export const toneChip = (tone: Tone, on: boolean) => {
   const t = TONES[tone]
-  return `tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border px-3.5 text-left font-semibold break-keep ${on ? t.solid : `${t.line} ${t.soft} ${t.ink} ${t.hover}`}`
+  return `tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border px-3.5 text-left font-semibold break-keep ${on ? 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-200' : `${t.line} ${t.soft} ${t.ink} ${t.hover}`}`
 }
 
 /** D-298 [형식 바꾸기] — 접힌 '형식 직접 고르기' 를 펼치고 그 자리로 내려간 뒤, 눈이 가게 잠깐 빛나게 */
