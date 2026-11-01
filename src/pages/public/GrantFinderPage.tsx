@@ -62,6 +62,9 @@ export default function GrantFinderPage() {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const ready3 = !!profile.sido && !!profile.industry && !!profile.years
   const [editing, setEditing] = useState(!ready3)
+  // D-480 첫 화면은 꼭 고를 세 가지만 — 직원 · 매출 · 대표 나이 · 인증은 접어 둔다(이미 고른 것이 있으면 펼친 채로)
+  const optChosen = [profile.employees, profile.revenueM, profile.ceoAge].filter(Boolean).length + (profile.female === true ? 1 : 0) + (profile.certsKnown ? 1 : 0)
+  const [moreOpen, setMoreOpen] = useState(optChosen > 0)
   const [category, setCategory] = useState<GrantCategory | 'all'>('all')
   const [open, setOpen] = useState('')
   const [asking, setAsking] = useState(false)
@@ -183,7 +186,21 @@ export default function GrantFinderPage() {
                 </div>
               </div>
               <ChipRow label="③ 업력(설립한 지)" chips={YEARS_CHIPS} value={profile.years} onPick={(r) => update({ years: r })} testid="finder-years" />
-              <p className="t-sub text-slate-500">아래는 고르면 더 정확해요(안 골라도 됩니다).</p>
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-expanded={moreOpen}
+                className="tap -mx-1 flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-1 text-left"
+                data-testid="finder-more"
+              >
+                <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-400 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+                <span className="t-sub min-w-0 break-keep">
+                  <b className="font-semibold text-slate-700">더 정확하게(선택)</b>
+                  <span className="text-slate-500"> · 직원 수 · 매출 · 대표 나이 · 인증{optChosen > 0 ? ` — ${optChosen}가지 고름` : ''}</span>
+                </span>
+              </button>
+              {moreOpen && (
+              <>
               <ChipRow label="직원 수" chips={EMPLOYEE_CHIPS} value={profile.employees} onPick={(r) => update({ employees: r })} testid="finder-employees" />
               <ChipRow label="작년 매출" chips={REVENUE_CHIPS} value={profile.revenueM} onPick={(r) => update({ revenueM: r })} testid="finder-revenue" />
               <ChipRow label="대표 나이" chips={AGE_CHIPS} value={profile.ceoAge} onPick={(r) => update({ ceoAge: r })} testid="finder-age" />
@@ -203,6 +220,8 @@ export default function GrantFinderPage() {
                   </Chip>
                 </div>
               </div>
+              </>
+              )}
               <Button variant="primary" onClick={() => setEditing(false)} className="w-full" data-testid="finder-apply">
                 {ready3 ? `맞는 지원사업 ${targetedCount}개 보기` : '고른 조건으로 보기'}
               </Button>
@@ -220,7 +239,7 @@ export default function GrantFinderPage() {
         {shownState === 'ready' && (
           <section className="flex flex-col gap-3" aria-label="맞는 지원사업">
             <h2 className="t-section break-keep text-slate-900" data-testid="finder-hero">
-              <span className="text-brand-700">{[profile.sido, profile.city].filter(Boolean).join(' ') || '전국'}</span> 에서 우리 회사에 맞는 지원사업 <span className="text-brand-700">{targetedCount}개</span>
+              <span className="text-brand-700">{[profile.sido, profile.city].filter(Boolean).join(' ') || '전국'}</span>에서 우리 회사에 맞는 지원사업 <span className="text-brand-700">{targetedCount}개</span>
               {fit > 0 && fit < targetedCount && <span className="t-sub ml-1 font-normal text-slate-500">(조건 맞음 {fit}개)</span>}
             </h2>
             {matches.length > 0 && <CategoryChips value={category} counts={counts} onChange={setCategory} />}
