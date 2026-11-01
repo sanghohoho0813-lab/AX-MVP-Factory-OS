@@ -17,6 +17,7 @@ import { buildClientReport, wonShort } from './clientReport'
 import { withActivity } from './clientOpsActivity'
 import { brand } from '../brand/brand.config'
 import { localDateOf, nowDate } from '../lib/appClock'
+import { koCompare } from '../lib/koCompare'
 
 export const CARE_QUIET_DAYS = 30
 export const CARE_URGENT_DAYS = 60
@@ -153,7 +154,7 @@ export function careList(records: ClientOpsRecord[], today: string): CareItem[] 
   const items = records.map((r) => careItemFor(r, today)).filter((x): x is CareItem => x !== null)
   const kind = (i: CareItem) => (i.reason === 'anniversary' ? 0 : 1)
   const score = (i: CareItem) => (i.reason === 'anniversary' ? (i.anniversary?.daysLeft ?? 0) : -i.quietDays)
-  return items.sort((a, b) => Number(b.urgent) - Number(a.urgent) || kind(a) - kind(b) || score(a) - score(b) || a.companyName.localeCompare(b.companyName, 'ko'))
+  return items.sort((a, b) => Number(b.urgent) - Number(a.urgent) || kind(a) - kind(b) || score(a) - score(b) || koCompare(a.companyName, b.companyName))
 }
 
 /** [연락했어요] — 오늘 챙긴 것으로. 미루기는 지운다. 활동 기록에 한 줄. */

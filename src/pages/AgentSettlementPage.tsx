@@ -18,6 +18,7 @@ import { MetricTile, ScreenTitle } from '../components/ui/primitives'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { Panel } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
+import { GrowingList } from '../components/ui/GrowingList'
 import { listClients, saveClient, withFee } from '../services/clientOpsService'
 import { agentLedger, agentLedgerTotals, type AgentLedgerItem } from '../services/feeMath'
 import { formatKrw, krwTile } from '../lib/format'
@@ -152,8 +153,14 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                         )}
                       </p>
                     </div>
-                    <ul className="divide-y divide-slate-100">
-                      {row.items.map((item) => {
+                    {/* D-479 한 사람 항목이 많으면 40건씩(업체 1,000곳이면 1,000줄을 한 번에 그렸다) */}
+                    <GrowingList
+                      items={row.items}
+                      className="divide-y divide-slate-100"
+                      resetKey={row.name}
+                      step={40}
+                      unit="건"
+                      render={(item) => {
                         const state = item.agentPaidAt ? 'paid' : item.receivedAt ? 'payable' : 'waiting'
                         return (
                           <li key={item.feeId} className="flex items-start gap-3 px-5 py-3">
@@ -206,8 +213,8 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                             </div>
                           </li>
                         )
-                      })}
-                    </ul>
+                      }}
+                    />
                   </Panel>
                 </li>
               ))}

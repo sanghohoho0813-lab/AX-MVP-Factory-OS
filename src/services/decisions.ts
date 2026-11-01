@@ -42,6 +42,7 @@ import { salesStageOf } from './salesPipeline'
 import { salesRecontacts, lastSalesTouch } from './salesSignals'
 import { SERVICES } from '../content/clientOpsCatalog'
 import type { ServiceKey } from '../types/clientOps'
+import { koCompare } from '../lib/koCompare'
 
 export type DecisionKind = 'fact' | 'module' | 'grant' | 'doc' | 'money' | 'stale' | 'next' | 'followup' | 'shelf' | 'autofill'
 
@@ -509,7 +510,7 @@ const HOLDER_CHOICES: { value: ShareholderRelation; label: string }[] = (['ceo',
 
 /** 여러 업체 — 업체마다 위에서 몇 개씩, 급한 것(작은 rank) 먼저 */
 export function buildAllDecisions(records: readonly ClientOpsRecord[], today: string, notices: readonly GrantNotice[], usable?: (key: string) => boolean): Decision[] {
-  return records.flatMap((r) => decisionsFor(r, today, notices, usable)).sort((a, b) => a.rank - b.rank || a.clientName.localeCompare(b.clientName, 'ko'))
+  return records.flatMap((r) => decisionsFor(r, today, notices, usable)).sort((a, b) => a.rank - b.rank || koCompare(a.clientName, b.clientName))
 }
 
 /*

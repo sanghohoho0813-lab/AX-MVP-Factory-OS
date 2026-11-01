@@ -10,6 +10,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import type { ClientReco } from './useClientReco'
 import { HelpHeading } from '../ui/fold'
 import { improvedSinceGiven } from '../../services/diagnosisGiven'
+import { koCompare } from '../../lib/koCompare'
 
 export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientOpsRecord[]; reco: ClientReco; phone: boolean }) {
   if (!reco.ready) return null
@@ -20,7 +21,7 @@ export function TodayPicks({ clients, reco, phone }: { clients: readonly ClientO
       return { c, chips, good: chips.filter((x) => x.tone === 'good').length, score: reco.scores.get(c.id) ?? 0 }
     })
     .filter((p) => p.chips.length > 0)
-    .sort((a, b) => b.good - a.good || b.score - a.score || a.c.companyName.localeCompare(b.c.companyName, 'ko'))
+    .sort((a, b) => b.good - a.good || b.score - a.score || koCompare(a.c.companyName, b.c.companyName))
   if (!picks.length) return null
   const shown = picks.slice(0, phone ? 2 : 3)
   const goodCount = picks.filter((p) => p.good > 0).length

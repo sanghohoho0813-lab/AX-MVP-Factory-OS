@@ -91,6 +91,7 @@ import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, g
 import { handDocsTo, peekHandedDocs, takeHandedDocs } from '../docHandoff'
 import { SECTION_HINT_COUNT, SECTION_HINT_KEYS, hintFor } from '../../content/sectionHints'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
+import { koCompare } from '../../lib/koCompare'
 
 let passed = 0
 let failed = 0
@@ -922,6 +923,14 @@ await (async () => {
     const same479 = recs.every((r) => [0, 1, 3, 12].every((fit) => [undefined, (k: string) => k !== 'grants'].every((u) => JSON.stringify(withGrantChip(cardRecoChips(r, T, 0, u), fit, u)) === JSON.stringify(cardRecoChips(r, T, fit, u)))))
     check('D-479 판정 기억 + 공고 칩 얹기 = 한 번에 계산(업체 3 · 공고 0/1/3/12 · 요금제 두 가지)', same479)
     check('D-479 공고 칩을 두 번 얹어도 하나', withGrantChip(withGrantChip(cardRecoChips(rec, T, 0), 3), 5).filter((c) => c.key === 'grants').map((c) => c.label).join() === '지원사업 5건')
+    // D-479 한글 이름순 비교기 하나로 — localeCompare(…, 'ko') 와 순서가 같아야 한다
+    {
+      const names = ['한솔테크(주)', '㈜가나', '주식회사 다라', 'ABC상사', 'abc상사', '가나다', '가나', '10번가', '2번가', '', ' 공백', '홍길동', '김밥천국', '(주)김밥', 'Ω테크', '가-나', '가나 다']
+      const a = [...names].sort((x, y) => x.localeCompare(y, 'ko'))
+      const b = [...names].sort(koCompare)
+      const pairs = names.flatMap((x) => names.map((y) => Math.sign(x.localeCompare(y, 'ko')) === Math.sign(koCompare(x, y))))
+      check('D-479 koCompare = localeCompare(ko)(순서 · 모든 짝)', a.join('|') === b.join('|') && pairs.every(Boolean))
+    }
   }
   const empty = normalizeClientOps({ id: 'reco0', companyName: '빈업체', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
   check('D-190 정보가 없으면 짐작해서 추천하지 않음(칩 0)', cardRecoChips(empty, T, 0).length === 0, JSON.stringify(cardRecoChips(empty, T, 0)))

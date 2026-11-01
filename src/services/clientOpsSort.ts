@@ -19,6 +19,7 @@ const localDateOf = (iso: string) => {
 import { yearsInBusiness } from './clientOpsProfile'
 import { monthsSinceContract } from './contractSummary'
 import { compareCompanyName } from './clientOrder'
+import { koCompare } from '../lib/koCompare'
 
 export type ClientSortKey = 'active' | 'reco' | 'urgency' | 'name' | 'years' | 'contract'
 
@@ -111,14 +112,14 @@ export function sortClients(
       // 계약 끝남 · 보관은 추천이 있어도 맨 뒤(지금 제안할 곳이 아니다) · 같으면 요즘 챙기는 순
       const rank = (r: ClientOpsRecord) => (r.archivedAt !== null || r.status === 'completed' ? -1 : recoScores?.get(r.id) ?? 0)
       const act = new Map(list.map((r) => [r.id, activityScore(r, today)]))
-      return list.sort((a, b) => rank(b) - rank(a) || act.get(b.id)!.score - act.get(a.id)!.score || a.companyName.localeCompare(b.companyName, 'ko'))
+      return list.sort((a, b) => rank(b) - rank(a) || act.get(b.id)!.score - act.get(a.id)!.score || koCompare(a.companyName, b.companyName))
     }
     case 'active': {
       const score = new Map(list.map((r) => [r.id, activityScore(r, today)]))
       return list.sort((a, b) => {
         const sa = score.get(a.id)!
         const sb = score.get(b.id)!
-        return sb.score - sa.score || sb.last.localeCompare(sa.last) || a.companyName.localeCompare(b.companyName, 'ko')
+        return sb.score - sa.score || sb.last.localeCompare(sa.last) || koCompare(a.companyName, b.companyName)
       })
     }
     case 'urgency':
@@ -133,7 +134,7 @@ export function sortClients(
           byNumberDesc(
             yearsInBusiness(a.establishedAt, today)?.nthYear ?? null,
             yearsInBusiness(b.establishedAt, today)?.nthYear ?? null,
-          ) || a.companyName.localeCompare(b.companyName, 'ko'),
+          ) || koCompare(a.companyName, b.companyName),
       )
     case 'contract':
       return list.sort(
@@ -141,7 +142,7 @@ export function sortClients(
           byNumberDesc(
             monthsSinceContract(a.contract.signedAt, today),
             monthsSinceContract(b.contract.signedAt, today),
-          ) || a.companyName.localeCompare(b.companyName, 'ko'),
+          ) || koCompare(a.companyName, b.companyName),
       )
   }
 }

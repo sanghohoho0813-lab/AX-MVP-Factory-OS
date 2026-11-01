@@ -8,6 +8,8 @@
  * D-171 대표: "주식회사라고 안 쓰여 있으면 개인사업자" — 위 셋에 걸리지 않으면 개인사업자. 묶음은 개인사업자 · 법인 둘뿐.
  */
 
+import { koCompare } from '../lib/koCompare'
+
 export type EntityKind = 'individual' | 'corporation' | 'unknown'
 
 export interface OrderableClient {
@@ -48,13 +50,13 @@ export function compareCompanyName(a: string, b: string): number {
   const x = sortName(a)
   const y = sortName(b)
   if (x === '' || y === '') return x === y ? 0 : x === '' ? 1 : -1
-  return x.localeCompare(y, 'ko')
+  return koCompare(x, y)
 }
 
 /** 개인사업자 → 법인, 묶음 안에서는 가나다 순 */
 export function orderForPicker<T extends OrderableClient>(list: readonly T[]): T[] {
   return [...list].sort(
-    (a, b) => RANK[entityKindOf(a)] - RANK[entityKindOf(b)] || sortName(a.companyName).localeCompare(sortName(b.companyName), 'ko'),
+    (a, b) => RANK[entityKindOf(a)] - RANK[entityKindOf(b)] || koCompare(sortName(a.companyName), sortName(b.companyName)),
   )
 }
 

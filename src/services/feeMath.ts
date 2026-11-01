@@ -13,6 +13,8 @@
 
 import type { FeeItem } from '../types/clientOps'
 import { isWaiting, NO_FUNDING, type FundingFacts } from './feeStatus'
+import { koCompare } from '../lib/koCompare'
+
 
 export interface FeeMath {
   /** 청구액 — 고객에게 받기로 한 돈. 미정이면 null */
@@ -147,7 +149,7 @@ export function agentShares(fees: Pick<FeeItem, 'agentFee' | 'agentName'>[]): Ag
   }
   return [...map.entries()]
     .map(([name, amount]) => ({ name, amount }))
-    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ko'))
+    .sort((a, b) => b.amount - a.amount || koCompare(a.name, b.name))
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,9 +236,9 @@ export function agentLedger(
     .map((row) => ({
       ...row,
       // 줄 돈 → 기다리는 돈 → 준 돈 순. 같은 단계면 업체 이름순
-      items: [...row.items].sort((a, b) => stage(a) - stage(b) || a.clientName.localeCompare(b.clientName, 'ko')),
+      items: [...row.items].sort((a, b) => stage(a) - stage(b) || koCompare(a.clientName, b.clientName)),
     }))
-    .sort((a, b) => b.payable - a.payable || b.total - a.total || a.name.localeCompare(b.name, 'ko'))
+    .sort((a, b) => b.payable - a.payable || b.total - a.total || koCompare(a.name, b.name))
 }
 
 /** 장부 전체 합계 — 위 칸 네 개 */
