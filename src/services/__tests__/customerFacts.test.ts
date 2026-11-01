@@ -3014,5 +3014,19 @@ await (async () => {
   check('D-468 다시 읽기가 없으면 예전처럼 확인', none.record.establishedAt === '' && none.flagged.some((f) => f.key === 'establishedAt'))
 })()
 
+// D-469 스캔 사업자등록증 · 등기부 주소가 표기만 다르고 같은 곳이면(서울특별시/서울 · 4층) 두 서류가 같은 값 → 바로 입력
+;(() => {
+  const BIZ = (addr: string) => `사업자등록증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 한빛테크\n대표자 : 김한빛\n사업장 소재지 : ${addr}\n업태 : 제조업`
+  const REG = (addr: string) => `등기사항전부증명서(현재 유효사항)\n- 법 인 -\n상 호 주식회사 한빛테크\n본 점 ${addr}\n대표이사 김한빛`
+  const empty = normalizeClientOps({ id: 'af469', companyName: '한빛테크', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const mk = () => `d469-${++n}`
+  const run = (a: string, b: string) => autoFillFromDocs(empty, [{ key: 'businessRegistration', fileName: '사업자.jpg', text: BIZ(a), method: 'ocr', docSure: true }, { key: 'corporateRegistry', fileName: '등기부.jpg', text: REG(b), method: 'ocr', docSure: true }], '2026-10-02T00:00:00.000Z', mk)
+  const ok = run('서울특별시 강남구 테헤란로 123, 4층', '서울 강남구 테헤란로 123')
+  check('D-469 "서울특별시 … 123, 4층" · "서울 … 123" → 두 서류가 같은 주소 → 바로 입력', !!ok.record.businessAddress && !ok.flagged.some((f) => f.key === 'businessAddress'), JSON.stringify({ addr: ok.record.businessAddress, f: ok.flagged.map((f) => f.key + ':' + f.note) }))
+  const diff = run('서울특별시 강남구 테헤란로 123', '서울 강남구 테헤란로 125')
+  check('D-469 건물 번호가 다르면(123 · 125) 같은 값 아님 → 예전처럼 확인', diff.flagged.some((f) => f.key === 'businessAddress'))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

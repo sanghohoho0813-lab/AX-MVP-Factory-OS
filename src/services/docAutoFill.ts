@@ -15,7 +15,7 @@
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
-import { CUSTOM_FACT_PREFIX, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
+import { CUSTOM_FACT_PREFIX, addressAgreeKey, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
 import { bizNoChecksumOk, dateRereadAgrees, readBusinessNumber } from './bizNoRead'
 import { parseKoreanBusinessDocument } from './koreanDocParser'
 import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
@@ -130,6 +130,8 @@ export function isStandardBizCategory(value: string): boolean {
 /** 비교용 값 — 번호는 숫자만, 글은 띄어쓰기 · (주) 표기를 뺀다 */
 function sameKey(key: string, value: string): string {
   if (key === 'businessNumber' || key === 'corporateNumber') return value.replace(/\D/g, '')
+  // D-469 주소는 시 · 도 줄임 · 층 · 호가 달라도 같은 곳이면 '두 서류가 같은 값' 으로(사업자등록증 '서울특별시 … 4층' · 등기부 '서울 …')
+  if (key === 'businessAddress') return addressAgreeKey(value)
   return value.replace(/\s+/g, '').replace(/\(주\)|㈜|주식회사/g, '').toLowerCase()
 }
 

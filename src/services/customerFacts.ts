@@ -160,6 +160,13 @@ function addressTokens(v: string): string[] {
   return t
 }
 
+/** D-469 서로 다른 서류의 주소를 맞춰 볼 열쇠 — sameAddress 와 같은 기준(시 · 도 줄임 · 괄호 · 쉼표 · '번지' · 끝의 층 · 호는 보지 않음) */
+export function addressAgreeKey(v: string): string {
+  const t = addressTokens(v)
+  while (t.length > 1 && /^(?:지하\s*)?제?\d+(?:층|호)$/.test(t[t.length - 1])) t.pop()
+  return t.join('')
+}
+
 /**
  * D-392 주소가 같은가 — 시 · 도 이름(서울특별시 = 서울) · 괄호 속 동 이름 · 쉼표 · '번지' 는 보지 않는다.
  * 한쪽에 층 · 호만 더 붙었으면(테헤란로 123 / 테헤란로 123, 4층) 같은 곳. 도로명 · 건물 번호가 다르면 다르다.
