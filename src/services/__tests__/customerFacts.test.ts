@@ -3087,5 +3087,31 @@ await (async () => {
   check('D-474 주주명부 대표 이름이 다르면 그대로 확인', shOther.record.representativeName === '' && pendingFacts(shOther.record).some((p) => p.key === 'representativeName'))
 })()
 
+// D-475 납세증명서 · 완납증명서 · 확인서에 적힌 대표자 · 주소 — 사업자등록증 스캔 값과 맞춰 보는 데만(칸은 채우지 않음)
+await (async () => {
+  const BIZ = `사 업 자 등 록 증\n(법인사업자)\n등록번호 : 124-81-00998\n법인명(단체명) : 주식회사 미래바이오랩\n대표자 : 이대표\n사업장 소재지 : 경기도 성남시 분당구 판교로 100, 3층\n업태 : 제조업`
+  const TAX = (no: string, ceo = '이대표', addr = '경기도 성남시 분당구 판교로 100') => `납 세 증 명 서\n발급번호 1234-567-8901\n납세자\n상호(법인명) 주식회사 미래바이오랩\n사업자등록번호 ${no}\n성명(대표자) ${ceo}\n법인등록번호 110111-*******\n주소(본점) ${addr}\n증명서의 사용목적 금융기관 제출용\n유효기간 2026년 11월 19일\n위와 같이 국세를 체납한 사실이 없음을 증명합니다.\n2026년 10월 20일\n성남세무서장`
+  const LOCAL = `지방세 납세증명서\n납세자 성명(법인명) 주식회사 미래바이오랩 (대표자 이대표)\n주소(영업소) 경기도 성남시 분당구 판교로 100\n사업자등록번호 124-81-00998\n체납액 없음`
+  const empty = normalizeClientOps({ id: 'af475', companyName: '미래바이오랩', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  let n = 0
+  const ctx = (d: string) => ({ now: d, today: d.slice(0, 10), makeId: () => `d475-${++n}` })
+  const biz = { key: 'businessRegistration', fileName: 'scan_01.jpg', text: BIZ, method: 'ocr' as const, docSure: true }
+  const tax = (text: string) => ({ key: 'taxClearance', fileName: 'scan_04.jpg', text, method: 'ocr' as const, docSure: true })
+  const one = await analyzeUploadedDocs(empty, [biz, tax(TAX('124-81-00998'))], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-475 사업자등록증 + 납세증명서(같은 대표 · 같은 주소, 층만 다름) 스캔 → 대표자 · 주소 바로 입력', one.record.representativeName === '이대표' && one.record.businessAddress.includes('판교로 100') && !one.summary.flagged.some((f) => f.key === 'representativeName' || f.key === 'businessAddress'), JSON.stringify({ r: one.record.representativeName, a: one.record.businessAddress, f: one.summary.flagged.map((f) => f.key) }))
+  check('D-475 주소는 사업자등록증 글 그대로(납세증명서 "(본점)" 이 섞이지 않음)', one.record.businessAddress === '경기도 성남시 분당구 판교로 100, 3층', one.record.businessAddress)
+  const alone = await analyzeUploadedDocs(empty, [tax(TAX('124-81-00998'))], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-475 납세증명서만 올리면 대표자 · 주소 칸은 비워 둔다(맞춰 보기만)', alone.record.representativeName === '' && alone.record.businessAddress === '', JSON.stringify({ r: alone.record.representativeName, a: alone.record.businessAddress }))
+  const otherNo = await analyzeUploadedDocs(empty, [biz, tax(TAX('214-05-01239'))], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-475 납세증명서의 사업자등록번호가 다른 회사면 맞춰 보지 않음 → 예전처럼 확인', otherNo.record.representativeName === '' && otherNo.summary.flagged.some((f) => f.key === 'representativeName'))
+  const otherCeo = await analyzeUploadedDocs(empty, [biz, tax(TAX('124-81-00998', '박대표', '서울특별시 중구 세종대로 1'))], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-475 납세증명서 대표 · 주소가 다르면 예전처럼 확인', otherCeo.record.representativeName === '' && otherCeo.record.businessAddress === '' && otherCeo.summary.flagged.some((f) => f.key === 'businessAddress'))
+  const local = await analyzeUploadedDocs(empty, [biz, { ...tax(LOCAL), key: 'localTaxClearance', fileName: 'scan_07.jpg' }], ctx('2026-10-02T00:00:00.000Z'))
+  check('D-475 지방세 서식(대표자를 "주식회사" 로 잘못 읽음)은 이름을 쓰지 않고 · 주소만 맞춰 봄', local.record.representativeName === '' && local.record.businessAddress.includes('판교로 100'), JSON.stringify({ r: local.record.representativeName, a: local.record.businessAddress }))
+  const day1 = await analyzeUploadedDocs(empty, [biz], ctx('2026-10-02T00:00:00.000Z'))
+  const day2 = await analyzeUploadedDocs(day1.record, [tax(TAX('124-81-00998'))], ctx('2026-10-03T00:00:00.000Z'))
+  check('D-475 다음 날 납세증명서만 올려도 → 지난번 대표자 · 주소 바로 입력(D-474)', day2.record.representativeName === '이대표' && day2.record.businessAddress === '경기도 성남시 분당구 판교로 100, 3층' && !pendingFacts(day2.record).some((p) => p.key === 'representativeName' || p.key === 'businessAddress'), JSON.stringify({ r: day2.record.representativeName, a: day2.record.businessAddress, p: pendingFacts(day2.record).map((p) => p.key) }))
+})()
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

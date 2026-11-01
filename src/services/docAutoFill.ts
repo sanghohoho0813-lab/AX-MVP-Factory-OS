@@ -17,7 +17,7 @@ import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
 import { CUSTOM_FACT_PREFIX, addressAgreeKey, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
 import { BIRTH_REREAD_MARK, bizNoChecksumOk, dateRereadAgrees, readBusinessNumber } from './bizNoRead'
-import { parseKoreanBusinessDocument } from './koreanDocParser'
+import { isBizRegCertificate, parseKoreanBusinessDocument } from './koreanDocParser'
 import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
@@ -149,10 +149,58 @@ function registerCeoName(doc: ReadDoc): string {
 }
 
 /**
- * 두 서류 이상이 같은 값을 말한 사실(키|값).
- * agreeOnly — 회사 정보 읽기에서 뺀 서류(주주명부 — 주주 주소 · 주민번호가 회사 정보로 읽히지 않게). 맞춰 보는 데만 쓴다(D-473 대표 이름).
+ * D-475 회사 이름 · 번호 · 대표자 · 주소가 같이 적힌 증명서 · 확인서(사업자등록증 · 등기부 말고) — 국세 · 지방세 납세증명서 · 4대보험 완납증명서 ·
+ * 중소기업(소상공인) · 벤처 · 이노비즈 · 메인비즈 · 여성기업 확인서 · 연구소 인정서 · 홈택스 과세표준 · 소득금액 · 표준재무제표 증명.
  */
-function agreedFacts(docs: readonly ReadDoc[], agreeOnly: readonly ReadDoc[] = []): Set<string> {
+const ID_CERT_RE = /납\s*세\s*증\s*명|완\s*납\s*증\s*명|중\s*소\s*기\s*업\s*(?:\(\s*소\s*상\s*공\s*인\s*\)\s*)?확\s*인|소\s*상\s*공\s*인\s*확\s*인|벤\s*처\s*기\s*업\s*확\s*인|이\s*노\s*비\s*즈|메\s*인\s*비\s*즈|여\s*성\s*기\s*업\s*확\s*인|연\s*구\s*(?:소|개\s*발\s*전\s*담\s*부\s*서)\s*인\s*정|과\s*세\s*표\s*준\s*증\s*명|소\s*득\s*금\s*액\s*증\s*명|표\s*준\s*재\s*무\s*제\s*표\s*증\s*명/
+const SIDO_START = /^(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남|제주)/
+
+/** 맞춰 보는 데만 쓰는 값 하나 — 칸을 채우지 않는다 */
+interface AgreeOnlyValue {
+  key: 'representativeName' | 'businessAddress'
+  value: string
+  fileName: string
+}
+
+/**
+ * D-475 증명서 · 확인서에 적힌 대표자 · 주소 — 사업자등록증 · 등기부 스캔 값과 맞춰 보는 데만 쓴다(이것만으로 칸을 채우지 않는다).
+ * 이름은 한글 2~5자('주식회사' · '대표자' · '성명' 같은 칸 이름을 잘못 읽은 것은 버림) · 주소는 시 · 도로 시작하는 것만. 서류에 적힌 사업자등록번호가 이 업체 번호와 다르면 쓰지 않는다.
+ */
+function certAgreeValues(doc: ReadDoc, nos: ReadonlySet<string>): AgreeOnlyValue[] {
+  if (!ID_CERT_RE.test(doc.text.slice(0, 600)) || isBizRegCertificate(doc.text)) return []
+  const p = parseKoreanBusinessDocument(doc.text)
+  const no = (p.businessNumber ?? '').replace(/\D/g, '')
+  if (no.length === 10 && nos.size && !nos.has(no)) return []
+  const out: AgreeOnlyValue[] = []
+  const ceo = (p.representativeName ?? '').trim()
+  if (/^[가-힣]{2,5}$/.test(ceo) && !/주식|회사|법인|사업자/.test(ceo) && !/^(?:대표|성명|상호|명칭|납세자)/.test(ceo)) out.push({ key: 'representativeName', value: ceo, fileName: doc.fileName })
+  const addr = (p.address ?? '').replace(/^\s*\([^)]*\)\s*/, '').trim()
+  if (addr.length >= 8 && SIDO_START.test(addr)) out.push({ key: 'businessAddress', value: addr, fileName: doc.fileName })
+  return out
+}
+
+/**
+ * 이번 묶음에서 맞춰 보는 데만 쓰는 값 — 서류마다 한 줄.
+ *  · 회사 정보 읽기에서 뺀 서류(agreeOnly — 주주명부: 주주 주소 · 주민번호가 회사 정보로 읽히지 않게)의 '대표이사' 한 사람(D-473)
+ *  · 증명서 · 확인서의 대표자 · 주소(D-475)
+ */
+function agreeOnlyValuesOf(record: ClientOpsRecord, docs: readonly ReadDoc[], agreeOnly: readonly ReadDoc[]): AgreeOnlyValue[][] {
+  const nos = new Set<string>([record.businessNumber.replace(/\D/g, '')].filter((n) => n.length === 10))
+  for (const d of docs) for (const c of factCandidatesFromDocText(d.key, d.text, 'nos')) if (c.key === 'businessNumber' && !c.note && bizNoChecksumOk(c.value)) nos.add(c.value.replace(/\D/g, ''))
+  return [
+    ...docs.map((d) => certAgreeValues(d, nos)),
+    ...agreeOnly.map((d) => {
+      const ceo = registerCeoName(d)
+      return ceo ? [{ key: 'representativeName' as const, value: ceo, fileName: d.fileName }] : []
+    }),
+  ]
+}
+
+/**
+ * 두 서류 이상이 같은 값을 말한 사실(키|값).
+ * only — 서류마다 맞춰 보는 데만 쓰는 값(앞쪽은 docs 와 같은 차례 · 뒤쪽은 회사 정보 읽기에서 뺀 서류).
+ */
+function agreedFacts(docs: readonly ReadDoc[], only: readonly AgreeOnlyValue[][] = []): Set<string> {
   const seen = new Map<string, Set<number>>()
   const add = (key: string, value: string, i: number) => {
     const k = `${key}|${sameKey(key, value)}`
@@ -163,10 +211,7 @@ function agreedFacts(docs: readonly ReadDoc[], agreeOnly: readonly ReadDoc[] = [
   docs.forEach((doc, i) => {
     for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) add(c.key, c.value, i)
   })
-  agreeOnly.forEach((doc, j) => {
-    const ceo = registerCeoName(doc)
-    if (ceo) add('representativeName', ceo, docs.length + j)
-  })
+  only.forEach((vals, i) => vals.forEach((v) => add(v.key, v.value, i)))
   return new Set([...seen].filter(([, s]) => s.size >= 2).map(([k]) => k))
 }
 
@@ -324,7 +369,8 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   let rec = record
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
-  const agreed = agreedFacts(docs, agreeOnly)
+  const only = agreeOnlyValuesOf(record, docs, agreeOnly)
+  const agreed = agreedFacts(docs, only)
   // D-474 지난 묶음에서 '사진 · 스캔이라 한 번 확인' 으로 남겨 둔 값 — 이번에 다른 종류 서류(사업자등록증 ↔ 등기부 · 신분증)가 같은 값을 말하면 두 서류가 같은 값.
   //        같은 종류 서류를 다시 올린 것(같은 사진을 또)은 같은 글자 실수일 수 있어 세지 않는다
   const priorHeld = (record.factInbox ?? []).filter((c) => (c.note === NOTE_OCR || c.note === NOTE_DOC_UNSURE) && c.ref.startsWith('doc:'))
@@ -390,14 +436,13 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
     }
     for (const p of mine) if (!auto.includes(p)) flagged.push({ ...label(p), note: p.note ?? NOTE_CONFLICT })
   })
-  // D-474 지난 묶음의 대표자(스캔이라 확인으로 남김)를 이번에 올린 주주명부 '대표이사' 한 사람이 같은 이름으로 말하면 — 바로 넣는다(주주명부는 칸을 채우지 않고 맞춰 보기만)
-  for (const reg of agreeOnly) {
-    const ceo = registerCeoName(reg)
-    if (!ceo) continue
-    const held = pendingFacts(rec).find((p) => p.from === 'inbox' && p.key === 'representativeName' && p.current === '' && priorHeld.some((h) => h.id === p.id) && sameKey(p.key, p.value) === sameKey(p.key, ceo))
+  // D-474 지난 묶음의 대표자 · 주소(스캔이라 확인으로 남김)를 이번에 올린 주주명부 '대표이사' · 증명서 · 확인서(D-475)가 같은 값으로 말하면 — 바로 넣는다
+  //        (그 서류들은 칸을 채우지 않고 맞춰 보기만)
+  for (const v of only.flat()) {
+    const held = pendingFacts(rec).find((p) => p.from === 'inbox' && p.key === v.key && p.current === '' && priorHeld.some((h) => h.id === p.id) && sameKey(p.key, p.value) === sameKey(v.key, v.value))
     if (!held) continue
     rec = withFactDecisions(rec, [{ id: held.id, action: 'accept' }], now)
-    entered.push({ key: held.key, label: held.label, display: held.display, fileName: reg.fileName })
+    entered.push({ key: held.key, label: held.label, display: held.display, fileName: v.fileName })
   }
   // D-403 원천세 신고서 여러 달(이번에 · 예전에) → '원천세 인원 추이' 칸(달이 둘 이상일 때) — 작년 같은 달과 비교해 고용 증가를 본다
   const whReads = docs.map((d) => readWithholdingReport(d.text)).filter((r): r is NonNullable<typeof r> => !!r && !!r.yearMonth && !r.until)
