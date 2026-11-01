@@ -53,6 +53,13 @@ const sigOf = (r: ClientOpsRecord) => {
   }
 }
 
+/** 기록은 같은데 날짜 · 권한이 바뀌어 다시 계산할 띠 — 다시 계산하는 동안 깜빡이지 않게 직전 것을 보여 준다 */
+function staleChips(r: ClientOpsRecord): RecoChip[] | undefined {
+  const m = memo.get(r.id)
+  if (!m) return undefined
+  return m.rec === r || m.sig === sigOf(r) ? m.chips : undefined
+}
+
 /** 기억해 둔 띠 — 없거나 낡았으면 undefined */
 function remembered(r: ClientOpsRecord, ctx: string): RecoChip[] | undefined {
   const m = memo.get(r.id)
@@ -119,7 +126,8 @@ export function useClientReco(records: readonly ClientOpsRecord[], today: string
       let list: RecoChip[]
       if (mods === undefined || !engine) {
         if (engine) missing++
-        list = grantOnly(fit)
+        const stale = engine ? staleChips(r) : undefined
+        list = stale && engine ? engine.withGrantChip(stale, fit, usable) : grantOnly(fit)
       } else {
         list = engine.withGrantChip(mods, fit, usable)
       }

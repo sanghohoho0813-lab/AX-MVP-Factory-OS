@@ -3,7 +3,7 @@
  * 계산 결과는 업체별로 기억한다(services/decisions.ts) — 숫자 띠와 목록이 같은 결과를 쓴다.
  * 다 모이기 전에는 null(목록 칸은 아직 그리지 않는다 — '없음' 으로 잘못 보이지 않게).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { GrantNotice } from '../../services/grants/grantMatch'
 import { buildAllDecisions, missingDecisionCount, warmDecisions, type Decision } from '../../services/decisions'
@@ -21,6 +21,9 @@ export function useAllDecisions(clients: readonly ClientOpsRecord[], today: stri
     return missingDecisionCount(clients, today, notices, usable)
   }, [clients, today, notices, usable, tick])
   const list = useMemo(() => (missing <= DECISION_SYNC_MAX ? buildAllDecisions(clients, today, notices, usable) : null), [missing, clients, today, notices, usable])
+  // 공고 · 권한이 늦게 들어와 다시 계산하는 동안은 직전 목록을 그대로(칸이 사라졌다 나타나지 않게)
+  const last = useRef<Decision[] | null>(null)
+  if (list) last.current = list
   useEffect(() => {
     if (missing <= DECISION_SYNC_MAX) return
     let alive = true
@@ -37,5 +40,5 @@ export function useAllDecisions(clients: readonly ClientOpsRecord[], today: stri
       window.clearTimeout(handle)
     }
   }, [missing, clients, today, notices, usable])
-  return list
+  return list ?? last.current
 }
