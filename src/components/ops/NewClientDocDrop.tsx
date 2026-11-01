@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, FileUp, Loader2, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
-import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
+import { DROP_FILE_LIMIT, dropSameFiles, filesFromDrop } from '../../lib/dropFiles'
 import { OCR_PARALLEL, OfficeReadError, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadMethod } from '../../services/docAutoFill'
@@ -146,9 +146,12 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
     const archived = archiveSummary(zipNotes)
     if (archived) showToast(archived)
     if (stoppedRef.current) return
+    // D-466 같은 파일이 두 번(겹쳐 받은 '… (1).pdf' · 이미 넣은 파일) — 하나만
+    const { kept: unique, dropped } = dropSameFiles(picked, itemsRef.current.map((it) => it.file))
+    if (dropped.length) showToast(`같은 파일이 두 번 들어 있어 한 번만 넣었어요 — ${dropped.slice(0, 3).join(' · ')}${dropped.length > 3 ? ` 외 ${dropped.length - 3}개` : ''}`)
     const room = MAX_FILES - itemsRef.current.length
-    if (picked.length > room) showToast(`등록 창에서는 ${MAX_FILES}개까지 받아요 — 나머지는 업체를 연 뒤 [서류 올리기] 로 넣어 주세요.`)
-    const fresh: Item[] = picked.slice(0, Math.max(0, room)).map((file) => ({
+    if (unique.length > room) showToast(`등록 창에서는 ${MAX_FILES}개까지 받아요 — 나머지는 업체를 연 뒤 [서류 올리기] 로 넣어 주세요.`)
+    const fresh: Item[] = unique.slice(0, Math.max(0, room)).map((file) => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       file,
       status: 'queued',
