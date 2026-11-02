@@ -769,7 +769,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const finTxt = await fin.innerText()
   const [dl] = await Promise.all([p.waitForEvent('download'), p.getByTestId('site-finish-download').click()])
   const dlHtml = readFileSync(await dl.path(), 'utf8')
-  check(`D227-H5 ${T} 3단계 — 점검 목록 + 마무리 칸([HTML 내려받기] 크게 · 새 창으로 보기) · 내려받기 됨 · [다음 단계] 없음`, (await steps.getAttribute('data-current')) === 'checks' && /HTML 내려받기/.test(finTxt) && (await p.getByTestId('site-finish-open').count()) === 1 && dlHtml.startsWith('<!doctype html>') && dlHtml.includes('한솔정밀(주)') && (await p.getByTestId('site-next').count()) === 0, { finTxt: finTxt.slice(0, 80), head: dlHtml.slice(0, 40) })
+  check(`D227-H5 ${T} 3단계 — 점검 목록 + 마무리 칸([홈페이지 파일 내려받기] 크게 · 새 창으로 보기) · 내려받기 됨 · [다음 단계] 없음`, (await steps.getAttribute('data-current')) === 'checks' && /홈페이지 파일 내려받기/.test(finTxt) && (await p.getByTestId('site-finish-open').count()) === 1 && dlHtml.startsWith('<!doctype html>') && dlHtml.includes('한솔정밀(주)') && (await p.getByTestId('site-next').count()) === 0, { finTxt: finTxt.slice(0, 80), head: dlHtml.slice(0, 40) })
   await steps.locator('[data-step="1"]').click()
   check(`D227-H6 ${T} 아무 단계나 눌러 돌아가기(3 → 1) · 블록 목록 그대로`, (await steps.getAttribute('data-current')) === 'blocks' && (await p.getByTestId('block-row').count()) > 5)
   // D-478(6차) 휴대폰은 번호를 아랫줄로 옮겨 이름 칸이 좁아졌다 — '한 줄' 은 폭이 아니라 이름 줄 높이(한 줄 = 글자 크기 × 1.55)로 잰다

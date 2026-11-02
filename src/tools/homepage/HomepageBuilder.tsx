@@ -312,7 +312,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const onDownload = async () => {
     await store.flush()
     download(siteFileName(doc), html())
-    showToast(must ? `내려받았어요 — 꼭 고칠 것 ${must}개가 남아 있어요.` : '홈페이지 HTML 을 내려받았어요 — 인터넷에 올리는 법은 ③ 내려받기 단계 아래에 있어요.')
+    showToast(must ? `내려받았어요 — 꼭 고칠 것 ${must}개가 남아 있어요.` : '홈페이지 파일(HTML)을 내려받았어요 — 인터넷에 올리는 법은 ③ 내려받기 단계 아래에 있어요.')
   }
   const onOpen = () => {
     const url = URL.createObjectURL(new Blob([html()], { type: 'text/html;charset=utf-8' }))
@@ -457,13 +457,13 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-violet-800 hover:border-violet-400" data-testid="site-to-content">
         <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
       </Link>
-      {/* D-507 휴대폰은 맨 위 단추를 줄인다 — [새 창으로 보기] · [HTML 내려받기] 는 ③ 내려받기 단계에 크게 그대로(PC 는 여기에도) */}
+      {/* D-507 휴대폰은 맨 위 단추를 줄인다 — [새 창으로 보기] · [홈페이지 파일 내려받기] 는 ③ 내려받기 단계에 크게 그대로(PC 는 여기에도) */}
       <span className="contents max-sm:hidden">
         <Button size="sm" onClick={onOpen} data-testid="site-open">
           <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
         </Button>
         <button type="button" className={MK_PRIMARY.emerald} onClick={() => void onDownload()} data-testid="site-download">
-          <Download className="size-4" aria-hidden="true" /> HTML 내려받기
+          <Download className="size-4" aria-hidden="true" /> 홈페이지 파일 내려받기
         </button>
       </span>
       {/* D-220: 가상 업체 · 컨설턴트는 붙일 업체 기록이 없다 — 임시등록하면 붙일 수 있다 */}
@@ -764,11 +764,11 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     ) : (
       <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3 shadow-(--shadow-card)" data-testid="site-finish">
         <p className={`t-sub break-keep ${must ? 'text-danger-700' : 'text-slate-800'}`}>
-          <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 HTML 파일 하나가 홈페이지 전체예요.
+          <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 파일(HTML) 하나가 홈페이지 전체예요.
         </p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${MK_PRIMARY.emerald} flex-1 justify-center`} onClick={() => void onDownload()} data-testid="site-finish-download">
-            <Download className="size-4" aria-hidden="true" /> HTML 내려받기
+          <button type="button" className={`${MK_PRIMARY.emerald} flex-1 justify-center max-sm:basis-full`} onClick={() => void onDownload()} data-testid="site-finish-download">
+            <Download className="size-4" aria-hidden="true" /> 홈페이지 파일 내려받기
           </button>
           <Button size="sm" onClick={onOpen} data-testid="site-finish-open">
             <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
@@ -781,7 +781,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             인터넷에 올리는 법
           </summary>
           <ol className="t-sub mb-2 flex list-decimal flex-col gap-1 pl-5 break-keep text-slate-700">
-            <li>내려받은 HTML 파일 하나가 홈페이지 전부예요.</li>
+            <li>내려받은 파일(HTML) 하나가 홈페이지 전부예요.</li>
             <li>쓰는 호스팅(카페24 · 아임웹 등)의 ‘HTML 올리기’ 에 넣거나, 업체 홈페이지 관리자에게 이 파일을 보내 주세요.</li>
             <li>고칠 일이 생기면 여기서 고친 뒤 다시 내려받아 같은 자리에 바꿔 올리면 돼요.</li>
           </ol>
