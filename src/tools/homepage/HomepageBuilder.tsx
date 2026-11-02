@@ -485,6 +485,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   /* ---- 블록 목록 ---- */
   const blocksTab = (
     <div className="flex flex-col gap-2" data-testid="site-blocks">
+      {/* D-507 60대+ — '블록' 이 무엇인지 한 줄(말은 그대로 두고 처음 보는 사람에게 뜻을) */}
+      <p className="t-sub break-keep text-slate-700" data-testid="site-blocks-what">
+        <b className="font-semibold text-slate-900">블록</b>은 홈페이지의 한 칸이에요(맨 위 소개 · 하는 일 · 연락처 …). 칸 이름을 누르면 글을 고칠 수 있어요.
+      </p>
       {suggestions.length > 0 && (
         <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="site-suggest">
           <button type="button" onClick={() => setSuggestOpen(!suggestOpen)} aria-expanded={suggestOpen} className="tap -m-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) p-1 text-left" data-testid="site-suggest-toggle">
