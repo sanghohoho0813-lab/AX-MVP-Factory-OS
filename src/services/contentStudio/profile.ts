@@ -367,7 +367,7 @@ export function briefSlots(p: ContentProfile, source: ProfileSource): BriefSlot[
     { key: 'target', label: '독자', ok: true, note: source.target === 'override' ? p.target : `업종 견본 — ${p.target}` },
     { key: 'item', label: '알리는 것', ok: source.item !== 'industry', note: source.item === 'industry' ? '업종 말뿐이에요 — 대표 상품을 적어 주세요' : p.item },
     { key: 'speaker', label: '화자 · 이름', ok: !!p.speaker && !TITLE_ONLY.test(p.speaker), note: !p.speaker ? '비어 있어요' : TITLE_ONLY.test(p.speaker) ? '직함만 있어요 — 이름도' : p.speaker },
-    { key: 'facts', label: '사실 목록', ok: facts >= 1, note: `재료 ${facts}/${MATERIAL_GOAL}` },
+    { key: 'facts', label: '사실 목록', ok: facts >= 1, note: `사실 ${facts}/${MATERIAL_GOAL}개` },
     { key: 'contact', label: '구매·문의처', ok: contactOf(p).length > 0, note: contactOf(p).join(' · ') || '비어 있어요 — 전화 · 매장 · 링크 중 하나' },
     { key: 'avoid', label: '넣지 말 것', ok: true, note: p.avoid.length ? `기본 금지 + 업체가 막은 것 ${p.avoid.length}개` : '기본 금지 목록' },
   ]

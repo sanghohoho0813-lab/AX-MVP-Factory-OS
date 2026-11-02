@@ -590,7 +590,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const { profile: rp, source: rs } = buildProfile(full, today, rov)
   check('C110 브리프 새 칸 — 흔한 반박(따옴표 벗김) · 배송 · 교환 조건 · 넣지 말 것(쉼표로 나눔 · 한 글자 버림)', rp.rebuttal === '소량은 아무 데나 맡겨도 똑같다' && rp.shipping.startsWith('전국 택배') && rp.avoid.join() === '최저가,할인' && normalizeOverrides({ avoid: 'x'.repeat(300) }).avoid?.length === 200, { r: rp.rebuttal, a: rp.avoid })
   const slots = briefSlots(rp, rs)
-  check('C111 브리프 7칸(D-234 ⟲4차) — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 / 직함만 적은 화자는 비었다고 · 재료 n/7', slots.map((x) => x.key).join() === 'company,target,item,speaker,facts,contact,avoid' && slots.find((x) => x.key === 'speaker')!.ok === false && slots.find((x) => x.key === 'speaker')!.note.includes('이름') && /재료 \d+\/7/.test(slots.find((x) => x.key === 'facts')!.note) && slots.find((x) => x.key === 'avoid')!.note.includes('2개') && profileGaps(rp).some((g) => g.key === 'speaker' && g.why.includes('이름도')), slots)
+  check('C111 브리프 7칸(D-234 ⟲4차) — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 / 직함만 적은 화자는 비었다고 · 재료 n/7', slots.map((x) => x.key).join() === 'company,target,item,speaker,facts,contact,avoid' && slots.find((x) => x.key === 'speaker')!.ok === false && slots.find((x) => x.key === 'speaker')!.note.includes('이름') && /사실 \d+\/7개/.test(slots.find((x) => x.key === 'facts')!.note) && slots.find((x) => x.key === 'avoid')!.note.includes('2개') && profileGaps(rp).some((g) => g.key === 'speaker' && g.why.includes('이름도')), slots)
   check('C112 재료 목록 — 경력 · 배송 조건 · 차별점 · 인증(설립 N년째는 경력으로 한 번만)', materialList(rp).includes('경력 12년') && materialList(rp).some((m) => m.startsWith('전국 택배')) && !materialList(rp).some((m) => /^설립/.test(m)) && materialList(ep).length === 0, materialList(rp))
 
   // 블로그 — 규칙집 3-1

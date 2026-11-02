@@ -1105,7 +1105,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await p.getByTestId('content-studio').waitFor()
   const slot = (k) => p.locator(`[data-testid="content-brief-slot"][data-key="${k}"]`)
   const keys0 = await p.getByTestId('content-brief-slot').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-ok')}`))
-  check('D229-1 브리프 7칸 줄(D-234) — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 · 화자 비면 노랑 · 재료 n/7', keys0.join() === 'company:1,target:1,item:1,speaker:0,facts:1,contact:1,avoid:1' && /브리프 7칸 · 6\/7/.test(await p.getByTestId('content-brief').innerText()) && /재료 \d+\/7/.test(await p.getByTestId('content-brief').innerText()), keys0)
+  check('D229-1 브리프 7칸 줄(D-234) — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 구매·문의처 · 넣지 말 것 · 화자 비면 노랑 · 재료 n/7', keys0.join() === 'company:1,target:1,item:1,speaker:0,facts:1,contact:1,avoid:1' && /글 재료 7칸 · 6\/7/.test(await p.getByTestId('content-brief').innerText()) && /사실 \d+\/7개/.test(await p.getByTestId('content-brief').innerText()), keys0)
   await p.getByTestId('content-brief').click()
   await p.getByTestId('content-ov-rebuttal').fill('소량은 아무 데나 맡겨도 똑같다')
   await p.getByTestId('content-ov-shipping').fill('전국 택배 · 3만 원 이상 무료 배송')
