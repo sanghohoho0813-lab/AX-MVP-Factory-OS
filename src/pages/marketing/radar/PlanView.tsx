@@ -782,7 +782,7 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
             <span className="font-semibold text-slate-900">{WHY_LABEL.small}</span> — 구독자 {shortNum(SMALL_CHANNEL_SUBS)} 이하 채널에서도 터졌는지
           </li>
           <li className="t-sub break-keep text-slate-700">
-            <span className="font-semibold text-slate-900">{WHY_LABEL.domain}</span> — 메인 후보는 경제 · 경영 · AI 주제에서만. 그 밖에서 크게 터진 영상은 아래 '사이드 급상승' 에 따로(포맷 참고용)
+            <span className="font-semibold text-slate-900">{WHY_LABEL.domain}</span> — 메인 후보는 경제 · 경영 · AI 주제에서만. 그 밖에서 크게 터진 영상은 아래 '사이드 급상승' 에 따로(형식 참고용)
           </li>
         </ol>
         <p className="t-meta break-keep text-slate-500">점수를 매기지 않습니다 — 신호 강함 = 최근 2주 3개 넘는 채널 + 터진 영상 · 신호 보통 = 2개 넘는 채널 + 늘어남이나 잘된 영상 · 그 밖은 초기 신호. 한 채널이 거의 다 올린 주제는 초기 신호까지만.</p>

@@ -190,7 +190,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
           <Stat label="조회수" value={`${fmt(v.views)}회`} />
           <Stat label="좋아요 · 댓글" value={`${shortNum(v.likes)} · ${shortNum(v.comments)}`} sub={`좋아요율 ${v.likeRate.toFixed(1)}%`} />
           <Stat label="구독자" value={`${shortNum(v.channelSubs)}명`} sub={v.channelSubs > 0 ? `조회수가 구독자의 ${v.viewsPerSub.toFixed(1)}배` : undefined} />
-          <Stat label="평소(같은 형식 중앙값)" value={v.baseline === null ? '기준 부족' : `${fmt(v.baseline)}회`} sub={v.baseline === null ? '7일 넘은 같은 형식 영상이 3편 안 됨' : `이 채널 7일 넘은 ${v.isShort ? '쇼츠' : '롱폼'} ${v.baselineN}편`} />
+          <Stat label="평소(같은 형식 중앙값)" value={v.baseline === null ? '기준 부족' : `${fmt(v.baseline)}회`} sub={v.baseline === null ? '7일 넘은 같은 형식 영상이 3편 안 됨' : `이 채널 7일 넘은 ${v.isShort ? '쇼츠' : '긴 영상'} ${v.baselineN}편`} />
           <Stat label="조회 속도" value={`하루 평균 ${shortNum(Math.round(v.perDay))}회`} sub={`올린 지 ${Math.max(1, Math.floor(v.ageDays))}일`} />
           <Stat label="채널 안 순위" value={`${v.rank}위 / ${v.rankOf}편`} sub={`받아 온 ${v.isShort ? '쇼츠' : '긴 영상'} 중`} />
         </div>
