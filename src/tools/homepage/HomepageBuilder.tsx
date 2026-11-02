@@ -188,7 +188,24 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
         </div>
       </MkHero>
       <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <p className="t-body break-keep text-slate-600">있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).</p>
+        {/* D-507 60대+ — 할 일(업종 고르고 [초안 만들기])이 맨 위 · 들어갈 내용 9가지는 그 아래(예전에는 9칸 아래 맨 끝이라 휴대폰에서 두 화면 내려야 보였다) */}
+        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
+          <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
+            <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
+            <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
+              {INDUSTRIES.map((i) => (
+                <option key={i.key} value={i.key}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className={MK_PRIMARY.emerald} onClick={() => onStart(industry)} data-testid="site-create">
+            <Wand2 className="size-5" aria-hidden="true" />
+            초안 만들기
+          </button>
+        </div>
+        <p className="t-body break-keep text-slate-600" data-testid="site-start-note"><b className="font-semibold text-slate-900">이 내용이 들어가요</b> — 있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).</p>
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="site-start-facts">
           {rows.map(([k, v]) => (
             <div key={k} className={`flex min-h-12 min-w-0 items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${v ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-white'}`}>
@@ -214,22 +231,6 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
             블로그 · 플레이스 홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
           </p>
         )}
-        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
-          <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
-            <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
-            <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
-              {INDUSTRIES.map((i) => (
-                <option key={i.key} value={i.key}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className={MK_PRIMARY.emerald} onClick={() => onStart(industry)} data-testid="site-create">
-            <Wand2 className="size-5" aria-hidden="true" />
-            초안 만들기
-          </button>
-        </div>
       </div>
     </section>
   )

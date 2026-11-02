@@ -323,6 +323,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const unsaved = dirty || packTouched
   /** D-227 길잡이 단계 — 0 고르기 · 1 다듬기(새 글 · 고치는 중) · 2 저장함(올리기 남음) · 3 올림까지 끝 */
   const step = !shown ? 0 : !shown.item || dirty ? 1 : shown.item.postedAt ? 3 : 2
+  // D-507 맨 위 길잡이 한 줄 — 홍보 정보 카드가 결과 아래로 내려가도 '빈 칸 채우기' 는 첫 화면에서 보이게
+  const topGaps = useMemo(() => profileGaps(profile).length, [profile])
   const [leaveAsk, setLeaveAsk] = useState<{ run: () => void } | null>(null)
   /** D-209 저장 전 고침이 있으면 다른 글을 열기 전에 묻는다(말없이 사라지지 않게) */
   const guard = (run: () => void) => (unsaved ? setLeaveAsk({ run }) : run())
@@ -546,17 +548,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   return (
     <div className="flex flex-col gap-4" data-testid="content-studio">
-      <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} onAiReq={() => setAiReqOpen(true)} />
-      {/* D-239: 규칙집(제목 각도 17 · 블로그 구성 · 넣지 말 것)을 그대로 지켜 AI 가 한 번에 쓰는 블로그 · 플레이스 글 — 만든 글은 보관함에 쌓인다 */}
-      <AiAssist
-        page="content"
-        scope={`content:${record.id}`}
-        title={`블로그 · 플레이스 홍보 글 · ${record.companyName}`}
-        presets={['content.blog', 'content.place', 'content.titles', 'content.keywords']}
-        build={assistBuild}
-        onSaveItem={saveAssistItem}
-      />
-
+      {/* D-507 60대+ — 업체를 고르고 들어오면 '지금 할 일 · 추천 3개' 가 맨 위(첫 화면 안). 홍보 정보 카드 · AI 도우미 띠는 결과 아래로(없앤 것 없음) */}
       {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 · 네 길 중 하나 */}
       <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-guide">
         <div className="mx-auto w-full max-w-xl">
@@ -585,6 +577,15 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   : '올린 글까지 표시했어요. 다음 글을 만들려면 위에서 다시 고르세요.'}
           </span>
         </p>
+        {topGaps > 0 && (
+          <button type="button" onClick={() => setProfileOpen(true)} className="tap t-sub -my-1 flex min-h-11 w-full min-w-0 items-start gap-2 rounded-(--radius-control) px-1 py-1.5 text-left break-keep text-slate-700 hover:bg-slate-50" data-testid="content-top-gaps">
+            <PencilLine aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-500" />
+            <span className="min-w-0 flex-1">
+              <b className="font-semibold text-slate-900">{record.companyName}</b> 홍보 정보 — 채우면 글이 더 좋아지는 칸 {topGaps}개
+            </span>
+            <span className="shrink-0 font-semibold text-brand-700">채우기</span>
+          </button>
+        )}
         <MkPick
           label="무엇을 만들까요"
           testId="content-mode"
@@ -1107,6 +1108,17 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           )}
         </div>
       </div>
+
+      <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} onAiReq={() => setAiReqOpen(true)} />
+      {/* D-239: 규칙집(제목 각도 17 · 블로그 구성 · 넣지 말 것)을 그대로 지켜 AI 가 한 번에 쓰는 블로그 · 플레이스 글 — 만든 글은 보관함에 쌓인다 */}
+      <AiAssist
+        page="content"
+        scope={`content:${record.id}`}
+        title={`블로그 · 플레이스 홍보 글 · ${record.companyName}`}
+        presets={['content.blog', 'content.place', 'content.titles', 'content.keywords']}
+        build={assistBuild}
+        onSaveItem={saveAssistItem}
+      />
 
       <ArchiveCard
         store={store}
