@@ -175,7 +175,7 @@ function ChannelRow({
         <p className="t-sub flex flex-wrap gap-x-3 text-slate-600">
           <span>구독자 {shortNum(c.subs)}</span>
           <span>영상 {fmt(c.videoCount)}</span>
-          <span className="font-semibold text-slate-800">구독자당 {vps.toFixed(1)}회</span>
+          <span className="font-semibold text-slate-800" title="채널 전체 조회수 ÷ 구독자 수 — 클수록 구독자에 비해 많이 봐요">구독자 1명당 조회 {vps.toFixed(1)}회</span>
         </p>
       )}
       {children}

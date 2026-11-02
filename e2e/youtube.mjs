@@ -204,7 +204,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('yt-view-channels').click()
   await page.waitForTimeout(400)
   const rows = await page.getByTestId('yt-channel-row').allInnerTexts()
-  check('채널 현황: 4곳 · 구독자 많은 순 · 구독자당 조회수', rows.length === 4 && rows[0].includes('세무 알려주는 채널') && rows[0].includes('구독자당 200.0회'), rows[0])
+  check('채널 현황: 4곳 · 구독자 많은 순 · 구독자당 조회수', rows.length === 4 && rows[0].includes('세무 알려주는 채널') && rows[0].includes('구독자 1명당 조회 200.0회'), rows[0])
   await page.getByTestId('yt-view-analysis').click()
   await page.waitForTimeout(400)
   check('내 채널 vs 벤치마킹 평균: 4줄', ((await page.getByTestId('yt-compare').innerText()) ?? '').includes('최근 30일 업로드'))
