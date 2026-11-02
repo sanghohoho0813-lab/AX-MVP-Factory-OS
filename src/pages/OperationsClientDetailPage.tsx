@@ -1905,7 +1905,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'journal' && (
         <>
-          <ClientJournalTab record={record} workspaceId={workspaceId} userId={userId} />
+          <ClientJournalTab record={record} workspaceId={workspaceId} userId={userId} onCommit={commit} latest={current} />
           <NotesSection
             record={record}
             allowAdd={false}

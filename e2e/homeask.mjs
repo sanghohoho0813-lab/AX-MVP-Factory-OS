@@ -5,6 +5,7 @@
  *
  *  1440  맨 위(숫자 칸보다 위) · 큰 글 · 안내 · 질문 세 줄 · 모델 고르기 · 빈 칸이면 보내기 막힘
  *        → "한솔테크 1차 미팅 정책자금" → home.chat 으로 · 보낸 자료에 그 업체 OS 모듈 판정 · 서류함 · 대표 이름 · 전화 0 → AI 답 · [열기] → 그 업체
+ *        → D-505 업체 상세 업무 일기에 적은 메모도 같은 카드 → [기록]
  *        → D-504 말한 다음 약속(다음 주 화요일 오후 2시 2차 미팅) → 다음 할 일 · 들은 말은 업무 일기 상담 메모
  *        → D-503 말한 숫자(작년 매출 52억 · 직원 18명) → [기록] → 회사 정보(상담 메모) · 달라지는 판정
  *        → D-502 말한 업체 사정(청년 뽑는대 · 가지급금 있대) → [업체에 기록] 한 번 → 새로 열린 상황 맨 앞
@@ -352,6 +353,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-504 [기록] → 한솔테크 다음 할 일 = 2차 미팅 · 오후 2시 · 그 날짜', hx.nextAction === '2차 미팅 · 오후 2시' && hx.nextActionDueDate === nxDate, { a: hx.nextAction, d: hx.nextActionDueDate })
   const memo = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((j) => j.entryType === 'note' && /^상담 메모 — 한솔테크 다음 주 화요일/.test(j.content)))
   check('D-504 들은 말은 업무 일기에 상담 메모(그 업체 · 할 일 아님)', !!memo && memo.clientId === 'cli_hansol' && !memo.dueDate, memo)
+
+  // D-505 업체 상세 › 업무 일기에 적은 메모도 같은 카드 → [기록] 한 번
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=journal', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.locator('textarea[aria-label="기록 내용"]').first().fill('대표님이 장애인 1명 채용할 계획이래, 직원 9명이고 모레 방문하기로 했어')
+  await page.getByRole('button', { name: '기록', exact: true }).first().click()
+  const jt = page.getByTestId('journal-talk')
+  const jtShown = await jt.waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+  const jtKeys = jtShown ? await jt.locator('[data-key]').evaluateAll((els) => els.map((e) => e.getAttribute('data-key'))) : []
+  check('D-505 업무 일기 메모 → 카드(장애인 채용 · 직원 9명 · 다음 약속)', jtShown && jtKeys.includes('hireDisabled') && jtKeys.includes('employeeCount') && (await jt.getByTestId('home-ask-talk-next').count()) === 1, jtKeys)
+  await shot(jt, 'pc-journal-talk')
+  await jt.getByTestId('home-ask-talk-save').click()
+  await page.locator('[data-testid="journal-talk"][data-saved="1"]').waitFor({ timeout: 8000 })
+  await page.waitForTimeout(400)
+  const mr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_mirae') ?? {})
+  check('D-505 [미래바이오랩에 기록] → 상황 답 · 직원 수 · 다음 할 일(방문)', mr.decided?.['scn.hireDisabled']?.a === 'yes' && mr.employeeCount === '9명' && mr.nextAction === '방문' && !!mr.nextActionDueDate, { d: mr.decided?.['scn.hireDisabled'], e: mr.employeeCount, n: mr.nextAction })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
   check('1440: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

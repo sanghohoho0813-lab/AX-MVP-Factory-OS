@@ -57,7 +57,7 @@ import { listClients, saveClient } from '../services/clientOpsService'
 import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
 import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
 import { CallButton } from '../components/ops/opsControls'
-import { addDaysLocal, friendlyDate, withNextAction } from '../services/clientOpsNextAction'
+import { addDaysLocal, friendlyDate } from '../services/clientOpsNextAction'
 import { countContractClients, isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, buildClientSchedule, upcomingWithin } from '../services/clientOpsSchedule'
@@ -556,13 +556,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   /** D-502 대화창에서 읽은 업체 사정을 업체에 기록 — 저장 직전에 새로 읽어(다른 창 · 팀장이 고친 것을 덮지 않게 · D-212) 답만 더한다 */
   const recordTalk = useCallback(
     async (clientId: string, answers: readonly TalkAnswer[], numbers: readonly TalkNumber[] = [], next?: TalkNext): Promise<boolean> => {
-      const [{ withScenarioAnswer }, { withFactValue }] = await Promise.all([import('../services/scenarioFit'), import('../services/customerFacts')])
+      const { applyTalk } = await import('../services/homeAsk/talkApply')
       try {
         const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId)
         if (!fresh) return false
-        const withNums = numbers.reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: nowIso() }), fresh)
-        const withAnswers = answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums)
-        const saved = await saveClient(next ? withNextAction(withAnswers, next.text, next.date, { at: nowIso() }) : withAnswers)
+        // D-505 업무 일기 메모와 같은 길(숫자 → 사정 → 다음 약속)
+        const saved = await saveClient(applyTalk(fresh, { answers: [...answers], numbers: [...numbers], next: next ?? null }, nowIso()))
         setClients((cs) => cs.map((c) => (c.id === saved.id ? saved : c)))
         return true
       } catch (cause) {

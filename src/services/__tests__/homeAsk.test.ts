@@ -10,6 +10,7 @@ import { dateOfTalk, newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, w
 import { openedBy } from '../homeAsk/homeAsk'
 import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
 import { withFactValue } from '../customerFacts'
+import { applyTalk, hasTalk, talkFound } from '../homeAsk/talkApply'
 import { buildInsights, insightChanges } from '../clientInsights'
 import { parseTurns } from '../homeAsk/homeAskStore'
 import { ASSISTS } from '../../../api/_ai/assists.js'
@@ -244,6 +245,17 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   check('D-504 내일 전화 · 11월 20일 방문 · 금요일 만나기 · 이번 주 수요일 10시 반 · 3일 뒤 통화', nx('내일 전화 드리기로 했어') === '2026-11-03 통화' && nx('11월 20일에 방문하기로') === '2026-11-20 방문' && nx('금요일에 다시 만나기로') === '2026-11-06 미팅' && nx('이번 주 수요일 10시 반 미팅') === '2026-11-04 미팅 · 10시 반' && nx('3일 뒤에 통화하기로') === '2026-11-05 통화', [nx('내일 전화 드리기로 했어'), nx('11월 20일에 방문하기로'), nx('금요일에 다시 만나기로'), nx('이번 주 수요일 10시 반 미팅'), nx('3일 뒤에 통화하기로')])
   check('D-504 안 읽을 말 — 어제 만났어 · 다음 미팅 언제 잡을까? · 다음 주에 자료 보내준대(약속 낱말 없음) · 월요일 미팅 어때?', nx('어제 만났어') === '' && nx('다음 미팅 언제 잡을까?') === '' && nx('다음 주에 매출 자료 보내준대') === '' && nx('월요일 미팅 어때?') === '')
   check('D-504 날짜 말 — 오늘이 월요일이면 "월요일"은 다음 주 · 다다음 주 · 다음 달 · 지난 날짜는 내년 · 없는 날짜 버림', dateOfTalk('월요일', '2026-11-02') === '2026-11-09' && dateOfTalk('다다음 주 금요일', '2026-11-02') === '2026-11-20' && dateOfTalk('다음 달 5일', '2026-11-02') === '2026-12-05' && dateOfTalk('1월 10일', '2026-11-02') === '2027-01-10' && dateOfTalk('2월 30일', '2026-11-02') === '')
+}
+
+// 16. D-505 업무 일기 메모 · 대화창 같은 길 — 아직 없는 것만 찾고(talkFound) 한 번에 넣기(applyTalk)
+{
+  const base = normalizeClientOps({ id: 'cli_memo', companyName: '메모테크', employeeCount: '10명', establishedAt: '2020-01-02', industry: '소프트웨어 개발' } as Parameters<typeof normalizeClientOps>[0])
+  const memo = '대표님이 청년 1명 뽑는대, 작년 매출 30억, 직원 10명, 다음 주 수요일에 통화하기로 했어'
+  const f = talkFound(memo, base, '2026-11-02')
+  check('D-505 메모에서 아직 없는 것만 — 청년 채용 · 매출 30억 · 다음 약속(직원 10명은 이미 같아서 뺌)', f.answers.map((a) => a.key).join(',') === 'hireYouth' && f.numbers.map((n) => `${n.key}=${n.value}`).join(',') === 'revenue=3000000000' && f.next?.date === '2026-11-11' && f.next.text === '통화', { a: f.answers.map((a) => a.key), n: f.numbers.map((n) => n.key), next: f.next })
+  const r = applyTalk(base, f, '2026-11-02T01:00:00Z')
+  check('D-505 한 번에 넣기 — 상황 답 · 사실 창고(상담 메모 · 2025) · 다음 할 일', r.decided?.['scn.hireYouth']?.a === 'yes' && r.factValues?.revenue === '3000000000' && r.factMeta?.revenue?.source === 'meeting' && r.factMeta?.revenue?.asOf === '2025' && r.nextAction === '통화' && r.nextActionDueDate === '2026-11-11')
+  check('D-505 넣은 뒤 같은 메모를 다시 적으면 카드 없음', !hasTalk(talkFound(memo, r, '2026-11-02')))
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

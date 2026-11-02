@@ -11,7 +11,7 @@ import { AuthContext } from '../../auth/authContext'
 import { createJournalEntry } from '../../services/journalService'
 import { requestDiagnosis } from '../../services/openDiagnosis'
 import { todayLocalDate } from '../../lib/appClock'
-import { addDaysLocal, friendlyDate } from '../../services/clientOpsNextAction'
+import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ArrowUp, Building2, Calculator, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -25,6 +25,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
 import type { TalkAnswer, TalkNext, TalkNumber } from '../../services/homeAsk/homeTalk'
+import { TalkCard } from './TalkCard'
 import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTalkSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
@@ -521,73 +522,33 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
           {turn.talk && (turn.talk.answers.length > 0 || (turn.talk.numbers?.length ?? 0) > 0 || !!turn.talk.next) && (
-            // D-502 질문에서 읽은 업체 사정 — 맞춤 추천 상황 예시가 예/아니요로 묻던 것. 한 번 누르면 업체에 남는다(최종 확인)
-            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="home-ask-talk" data-saved={turn.talk.saved ? '1' : '0'}>
-              <span className="t-meta font-semibold text-slate-500">이 말에서 알게 된 {turn.talk.company} 사정</span>
-              <ul className="t-sub flex flex-col gap-0.5 text-slate-700">
-                {turn.talk.answers.map((t) => (
-                  <li key={t.key} className="flex flex-wrap items-baseline gap-x-1.5 break-keep" data-testid="home-ask-talk-item" data-key={t.key} data-a={t.a}>
-                    <Check aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
-                    <span>{t.label}</span>
-                    <span className={`font-semibold ${t.a === 'yes' ? 'text-brand-700' : 'text-slate-500'}`}>— {t.a === 'yes' ? '있음' : '없음'}</span>
-                    <span className="t-meta min-w-0 truncate text-slate-400">“{t.phrase}”</span>
-                  </li>
-                ))}
-                {(turn.talk.numbers ?? []).map((n) => (
-                  <li key={n.key} className="flex flex-wrap items-baseline gap-x-1.5 break-keep" data-testid="home-ask-talk-num" data-key={n.key} data-value={n.value}>
-                    <Check aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
-                    <span>{n.label}{n.asOf ? `(${n.asOf}년)` : ''}</span>
-                    <span className="font-semibold text-brand-700">— {n.display}</span>
-                    <span className="t-meta min-w-0 truncate text-slate-400">“{n.phrase}”</span>
-                  </li>
-                ))}
-                {turn.talk.next && (
-                  <li className="flex flex-wrap items-baseline gap-x-1.5 break-keep" data-testid="home-ask-talk-next" data-date={turn.talk.next.date}>
-                    <Check aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
-                    <span>다음 약속</span>
-                    <span className="font-semibold text-brand-700">— {friendlyDate(turn.talk.next.date)} {turn.talk.next.text}</span>
-                    <span className="t-meta min-w-0 truncate text-slate-400">“{turn.talk.next.phrase}”</span>
-                  </li>
-                )}
-              </ul>
-              {(turn.talk.changes?.length ?? 0) > 0 && (
-                <p className="t-sub break-keep text-slate-700" data-testid="home-ask-talk-changes">
-                  <span className="font-semibold text-slate-500">이 말로 달라지는 판정 </span>
-                  {turn.talk.changes?.join(' · ')}
-                </p>
-              )}
-              {turn.talk.saved ? (
-                <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-600">
-                  <Check aria-hidden="true" className="size-4 text-success-700" />
-                  {turn.talk.company}에 기록했어요 — 회사 정보 · 상황 예시 · 다음 할 일에 들어가고, 들은 말은 업무 일기에 상담 메모로 남겼어요
-                </p>
-              ) : (
-                onRecordTalk && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    className="self-start"
-                    disabled={talkBusy}
-                    onClick={async () => {
-                      const tk = turn.talk
-                      if (!tk || talkBusy) return
-                      setTalkBusy(true)
-                      const ok = await onRecordTalk(tk.clientId, tk.answers, tk.numbers ?? [], tk.next).catch(() => false)
-                      setTalkBusy(false)
-                      if (ok) {
-                        markTalkSaved(turn.id)
-                        // D-504 들은 말 그대로 업무 일기에 '상담 메모'(언제 무엇을 들었나 — 고객에게는 안 보임)
-                        await createJournalEntry(auth?.currentWorkspaceId ?? null, auth?.session?.user.id ?? null, { entryType: 'note', entryDate: todayLocalDate(), content: `상담 메모 — ${turn.q}`.slice(0, 500), clientId: tk.clientId }).then(() => onRecorded?.()).catch(() => undefined)
-                        showToast(`${tk.company}에 기록했어요 — 상황 예시를 다시 맞췄어요`)
-                      }
-                    }}
-                    data-testid="home-ask-talk-save"
-                  >
-                    {talkBusy ? '기록하는 중…' : `${turn.talk.company}에 기록`}
-                  </Button>
-                )
-              )}
-            </div>
+            // D-502~D-504 질문에서 읽은 업체 사정 · 숫자 · 다음 약속 — 한 번 누르면 업체에 남는다(최종 확인 · 업무 일기 메모와 같은 카드)
+            <TalkCard
+              company={turn.talk.company}
+              answers={turn.talk.answers}
+              numbers={turn.talk.numbers}
+              next={turn.talk.next}
+              changes={turn.talk.changes}
+              saved={!!turn.talk.saved}
+              savedText={`${turn.talk.company}에 기록했어요 — 회사 정보 · 상황 예시 · 다음 할 일에 들어가고, 들은 말은 업무 일기에 상담 메모로 남겼어요`}
+              busy={talkBusy}
+              onRecord={
+                onRecordTalk &&
+                (async () => {
+                  const tk = turn.talk
+                  if (!tk || talkBusy) return
+                  setTalkBusy(true)
+                  const ok = await onRecordTalk(tk.clientId, tk.answers, tk.numbers ?? [], tk.next).catch(() => false)
+                  setTalkBusy(false)
+                  if (ok) {
+                    markTalkSaved(turn.id)
+                    // D-504 들은 말 그대로 업무 일기에 '상담 메모'(언제 무엇을 들었나 — 고객에게는 안 보임)
+                    await createJournalEntry(auth?.currentWorkspaceId ?? null, auth?.session?.user.id ?? null, { entryType: 'note', entryDate: todayLocalDate(), content: `상담 메모 — ${turn.q}`.slice(0, 500), clientId: tk.clientId }).then(() => onRecorded?.()).catch(() => undefined)
+                    showToast(`${tk.company}에 기록했어요 — 상황 예시를 다시 맞췄어요`)
+                  }
+                })
+              }
+            />
           )}
           {turn.plans && turn.plans.length > 0 && (
             // D-501 고도화 목표 3 — 이 업체에 맞는 상황 예시를 한 번 누르면 그 업체 숫자로 모듈이 열려 바로 결과

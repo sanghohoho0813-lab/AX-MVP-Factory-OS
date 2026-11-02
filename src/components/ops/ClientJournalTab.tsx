@@ -12,12 +12,33 @@ import {
   listJournal,
   updateJournalEntry,
 } from '../../services/journalService'
-import { todayLocalDate } from '../../lib/appClock'
+import { nowIso, todayLocalDate } from '../../lib/appClock'
+import { TalkCard } from '../home/TalkCard'
+import { applyTalk, hasTalk, talkFound, type TalkFound } from '../../services/homeAsk/talkApply'
 
-/** 업체 상세 > 업무 일기 탭 — 이 고객과 관련된 기록만. 고객에게는 보이지 않는다. */
-export function ClientJournalTab({ record, workspaceId, userId }: { record: ClientOpsRecord; workspaceId: string | null; userId: string | null }) {
+/**
+ * 업체 상세 > 업무 일기 탭 — 이 고객과 관련된 기록만. 고객에게는 보이지 않는다.
+ * D-505 적은 메모에서 사정 · 숫자 · 다음 약속을 읽어(오늘 대화창과 같은 규칙) [이 업체에 기록] 한 번 — onCommit 이 있을 때만.
+ */
+export function ClientJournalTab({
+  record,
+  workspaceId,
+  userId,
+  onCommit,
+  latest,
+}: {
+  record: ClientOpsRecord
+  workspaceId: string | null
+  userId: string | null
+  /** 업체 기록 저장(성공하면 true) */
+  onCommit?: (next: ClientOpsRecord) => Promise<boolean>
+  /** 저장 중에도 가장 새 기록 */
+  latest?: () => ClientOpsRecord | null
+}) {
   const { showToast } = useToast()
   const today = todayLocalDate()
+  const [told, setTold] = useState<{ found: TalkFound; saved: boolean } | null>(null)
+  const [talkBusy, setTalkBusy] = useState(false)
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null)
@@ -58,8 +79,39 @@ export function ClientJournalTab({ record, workspaceId, userId }: { record: Clie
       <QuickCapture
         clients={[record]}
         defaultClientId={record.id}
-        onCreate={(input) => mutate(() => createJournalEntry(workspaceId, userId, { ...input, clientId: record.id }), '기록했습니다.')}
+        onCreate={async (input) => {
+          const ok = await mutate(() => createJournalEntry(workspaceId, userId, { ...input, clientId: record.id }), '기록했습니다.')
+          // D-505 메모에 업체 사정 · 숫자 · 다음 약속이 있으면 카드로(이미 업체에 같은 값이면 안 보임)
+          if (ok && onCommit) {
+            const found = talkFound(input.content, latest?.() ?? record, today)
+            setTold(hasTalk(found) ? { found, saved: false } : null)
+          }
+          return ok
+        }}
       />
+      {told && (
+        <TalkCard
+          company={record.companyName}
+          title={`이 메모에서 알게 된 ${record.companyName} 사정`}
+          answers={told.found.answers}
+          numbers={told.found.numbers}
+          next={told.found.next}
+          saved={told.saved}
+          savedText={`${record.companyName}에 기록했어요 — 회사 정보 · 상황 예시 · 다음 할 일에 들어갔어요`}
+          busy={talkBusy}
+          testId="journal-talk"
+          onRecord={async () => {
+            if (!onCommit || talkBusy) return
+            setTalkBusy(true)
+            const ok = await onCommit(applyTalk(latest?.() ?? record, told.found, nowIso())).catch(() => false)
+            setTalkBusy(false)
+            if (ok) {
+              setTold({ ...told, saved: true })
+              showToast(`${record.companyName}에 기록했어요 — 상황 예시 · 판정을 다시 맞췄어요`)
+            }
+          }}
+        />
+      )}
       {loading ? (
         <p className="py-6 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
       ) : (
