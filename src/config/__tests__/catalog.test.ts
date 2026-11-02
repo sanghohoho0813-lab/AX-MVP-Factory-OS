@@ -10,6 +10,8 @@
 import { arrangeIds, hiddenIds, isCustomized, keepAbsent, localLayouts, mergeLayout, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
 import { pullLayouts, startLayoutSync } from '../../services/preferences/layoutSync'
 import { writeRaw } from '../../storage/localStore'
+import { ghostsByDate, mergeTrail, readTrail, recordMove } from '../../services/todoTrail'
+import type { JournalEntry } from '../../types/bridge'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { FOLD_ALL_KEY, foldAll } from '../../components/ui/fold'
 import {
@@ -386,6 +388,28 @@ async function layoutSync() {
   check('D-485 기기 시계가 늦어도 방금 숨긴 칸이 클라우드 · 이 기기에 남음(바꾼 때를 1ms 뒤로)', sent2.off.includes('care') && sent2.at > '2099-01-01T00:00:00.000Z' && readLayoutForTest('today').off.includes('care'), JSON.stringify(sent2))
 }
 await layoutSync()
+
+/* D-486 미룬 할 일 흔적 */
+{
+  const T = new Date('2026-11-02T01:00:00Z')
+  recordMove('t-1', '2026-11-01', '2026-11-02', T)
+  recordMove('t-1', '2026-11-02', '2026-11-03', T)
+  check('D-486 더 나중 날로 옮기면 떠난 날이 쌓임(11/1 → 11/2 → 11/3)', readTrail()['t-1']?.from.join() === '2026-11-01,2026-11-02')
+  recordMove('t-1', '2026-11-03', '2026-11-02', T)
+  check('D-486 흔적이 있던 날로 당겨 오면 그 날 흔적은 지움', readTrail()['t-1']?.from.join() === '2026-11-01')
+  recordMove('t-2', '2026-11-05', '2026-11-04', T)
+  check('D-486 앞당기기만 하면 흔적 없음', !readTrail()['t-2'])
+  recordMove('t-3', '', '2026-11-04', T)
+  check('D-486 날짜가 없으면 흔적 없음', !readTrail()['t-3'])
+  const e = (id: string, due: string, extra: Partial<JournalEntry> = {}): JournalEntry => ({ id, workspaceId: null, ownerId: null, entryDate: '2026-10-30', entryType: 'follow_up', content: id, clientId: null, projectId: null, serviceKey: null, dueDate: due, pinned: false, completed: false, completedAt: null, createdAt: '', updatedAt: '', ...extra })
+  const g = ghostsByDate(readTrail(), [e('t-1', '2026-11-02'), e('gone', '2026-11-02')])
+  check('D-486 달력 흔적 — 처음 날(11/1)에 → 11/2 · 지금 놓인 날에는 안 그림', g.get('2026-11-01')?.[0]?.movedTo === '2026-11-02' && !g.get('2026-11-02'))
+  check('D-486 지운 할 일 · 메모는 흔적 없음', ghostsByDate({ x: { from: ['2026-11-01'], at: '' } }, [e('x', '2026-11-02', { entryType: 'note' })]).size === 0 && ghostsByDate({ x: { from: ['2026-11-01'], at: '' } }, []).size === 0)
+  const m = mergeTrail({ a: { from: ['2026-11-01'], at: '1' } }, { a: { from: ['2026-10-31'], at: '2' }, b: { from: ['2026-11-03'], at: '1' } })
+  check('D-486 기기끼리 맞추기 — 날짜는 합치고(사라지지 않게) 양쪽에 다시 적음', m.merged.a.from.join() === '2026-10-31,2026-11-01' && m.merged.b.from.join() === '2026-11-03' && m.toLocal && m.toCloud)
+  const same = mergeTrail({ a: { from: ['2026-11-01'], at: '1' } }, { a: { from: ['2026-11-01'], at: '1' } })
+  check('D-486 같으면 아무 데도 안 씀', !same.toLocal && !same.toCloud)
+}
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

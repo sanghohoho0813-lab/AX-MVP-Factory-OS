@@ -78,6 +78,7 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
 import { PERSONAL_KEY } from '../services/journalKind'
+import { recordMove, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
 
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
@@ -221,6 +222,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const phone = useIsPhone()
   const [showAllAppts, setShowAllAppts] = useState(false)
   const [journal, setJournal] = useState<JournalEntry[]>([])
+  // D-486 미룬 할 일 흔적 — 줄에 '11/1에서 미룸'
+  const trail = useTodoTrail()
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [summaryOpen, setSummaryOpen] = useState(false)
@@ -399,11 +402,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     if (!edits || action === 'delete') setTodoPick(null)
     const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId, serviceKey: edits.serviceKey } : {}
     let ok: boolean
+    // D-486 더 나중 날로 옮기면 떠난 날에 흔적(달력에 옅은 주황)
+    const from = todoDay(entry)
+    let to = edits?.dueDate || from
     if (action === 'delete') ok = await journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
-    else if (action === 'today') ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
-    else if (action === 'tomorrow')
-      ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: postponedDue(entry.dueDate, today), completed: false }), '내일로 미뤘습니다.')
-    else ok = await journalMutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    else if (action === 'today') {
+      to = today
+      ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+    } else if (action === 'tomorrow') {
+      to = postponedDue(entry.dueDate, today)
+      ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: to, completed: false }), '내일로 미뤘습니다.')
+    } else ok = await journalMutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    if (ok && action !== 'delete') recordMove(entry.id, from, to)
     if (ok && edits) setTodoPick(null)
   }
 
@@ -582,6 +592,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                       today={today}
                       clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
                       onPick={() => setTodoPick(e)}
+                      movedFrom={trail[e.id]?.from}
                     />
                   ))}
                 </ul>
@@ -598,6 +609,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                     today={today}
                     clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
                     onPick={() => setTodoPick(e)}
+                      movedFrom={trail[e.id]?.from}
                   />
                 ))}
               </ul>
@@ -684,6 +696,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                       today={today}
                       clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
                       onPick={() => setTodoPick(e)}
+                      movedFrom={trail[e.id]?.from}
                     />
                   ))}
                 </ul>
@@ -1018,6 +1031,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           onSave={async (patch) => {
             // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
             const ok = await journalMutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+            if (ok && typeof patch.dueDate === 'string') recordMove(todoPick.id, todoDay(todoPick), patch.dueDate || todoDay(todoPick))
             if (ok) setTodoPick(null)
             return ok
           }}

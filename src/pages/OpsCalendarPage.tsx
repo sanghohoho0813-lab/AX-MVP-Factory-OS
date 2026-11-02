@@ -38,6 +38,7 @@ import { addDaysOff, dateLabel, daysOffByDate, listDaysOff, missingPublicHoliday
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import { PERSONAL_KEY, isPersonalEntry } from '../services/journalKind'
+import { ghostsByDate, recordMove, shortDay, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -111,6 +112,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     for (const [d, list] of map) map.set(d, todosOn(list, d))
     return map
   }, [journal])
+  // D-486 미룬 할 일 흔적 — 처음 하려던 날에 옅은 주황으로 남긴다(할 일 수에는 안 셈)
+  const trail = useTodoTrail()
+  const ghosts = useMemo(() => ghostsByDate(trail, journal), [trail, journal])
+  const pickedGhosts = picked ? (ghosts.get(picked) ?? []) : []
   const nameById = useMemo(() => new Map(records.map((r) => [r.id, r.companyName])), [records])
   const shortName = (n: string) => n.replace(/\(주\)|㈜|주식회사/g, '').trim()
   const clientNameOfId = (id: string | null | undefined) => (id ? (nameById.get(id) ?? '') : '')
@@ -205,11 +210,18 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     if (!edits || action === 'delete') setTodoPick(null)
     const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId, serviceKey: edits.serviceKey } : {}
     let ok: boolean
+    // D-486 더 나중 날로 옮기면 떠난 날에 흔적
+    const from = todoDay(entry)
+    let to = edits?.dueDate || from
     if (action === 'delete') ok = await mutate(() => deleteJournalEntry(entry), '지웠습니다.')
-    else if (action === 'today') ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
-    else if (action === 'tomorrow')
-      ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: postponedDue(entry.dueDate, today), completed: false }), '내일로 미뤘습니다.')
-    else ok = await mutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    else if (action === 'today') {
+      to = today
+      ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+    } else if (action === 'tomorrow') {
+      to = postponedDue(entry.dueDate, today)
+      ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: to, completed: false }), '내일로 미뤘습니다.')
+    } else ok = await mutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    if (ok && action !== 'delete') recordMove(entry.id, from, to)
     if (ok && edits) setTodoPick(null)
   }
 
@@ -233,7 +245,9 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     const entry = journal.find((x) => x.id === id)
     if (!entry || entry.dueDate === day || entry.completed) return
     void mutate(() => updateJournalEntry(entry, { dueDate: day }), `'${entry.content.slice(0, 20)}' — ${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일로 옮겼습니다.`).then((ok) => {
-      if (ok) setPicked(day)
+      if (!ok) return
+      recordMove(entry.id, todoDay(entry), day)
+      setPicked(day)
     })
   }
 
@@ -376,12 +390,15 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     const dow = new Date(`${d}T00:00:00Z`).getUTCDay()
                     const off = offMap.get(d)
                     const todos = todosByDate.get(d) ?? []
+                    const moved = ghosts.get(d) ?? []
                     // PC 칸: 할 일 → 업체 일정 순으로 3줄까지, 나머지는 +n건
                     // D-157: 끝낸 것은 맨 뒤로 — 끝낸 할 일 셋이 열린 업체 일정을 '+n건' 으로 밀어내지 않게
+                    // D-486 미룬 흔적은 열린 일 다음(끝낸 것보다 앞) — 옅은 주황 '→ 11/2'
                     const lines = [
-                      ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed, entry: t })),
-                      ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done, entry: null as JournalEntry | null })),
-                    ].sort((a, b) => Number(a.done) - Number(b.done))
+                      ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed, entry: t, movedTo: '' })),
+                      ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done, entry: null as JournalEntry | null, movedTo: '' })),
+                      ...moved.map((g) => ({ key: `m${g.entry.id}`, kind: 'moved' as const, title: g.entry.content, who: `→ ${shortDay(g.movedTo)}로 미룸`, done: false, entry: null as JournalEntry | null, movedTo: g.movedTo })),
+                    ].sort((a, b) => (a.done ? 2 : a.kind === 'moved' ? 1 : 0) - (b.done ? 2 : b.kind === 'moved' ? 1 : 0))
                     return (
                       <button
                         key={d}
@@ -446,6 +463,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                               className={`size-1.5 rounded-full ${e.done ? 'bg-slate-200' : SCHEDULE_KIND_CLASS[e.kind].dot}`}
                             />
                           ))}
+                          {/* D-486 미룬 흔적 — 옅은 주황 점 */}
+                          {moved.slice(0, 2).map((g) => (
+                            <span key={`m${g.entry.id}`} aria-hidden="true" data-moved="1" className="size-1.5 rounded-full bg-orange-300" />
+                          ))}
                         </span>
                         {/* D-156: '할 일 4' 숫자 대신 무슨 일인지 — 윗줄 할 일(진하게), 아랫줄 업체(작게). 내가 적은 할 일은 진한 브랜드색, 업체 일정은 종류색 */}
                         <span className="hidden min-w-0 flex-col gap-0.5 lg:flex" data-testid="cell-lines">
@@ -454,11 +475,14 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                               key={l.key}
                               title={l.who ? `${l.who} · ${l.title}` : l.title}
                               data-kind={l.kind}
+                              data-moved-to={l.movedTo || undefined}
                               {...(l.entry ? dragTodo(l.entry) : {})}
                               data-personal={l.entry && isPersonalEntry(l.entry) ? '1' : undefined}
                               className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
                                 l.done
                                   ? 'border-slate-100 bg-white text-slate-400 line-through'
+                                  : l.kind === 'moved'
+                                    ? 'border-orange-200 bg-orange-50 text-orange-900' // D-486 대표 지시 — 미룬 흔적은 연한 주황
                                   : l.kind === 'todo'
                                     ? l.entry && isPersonalEntry(l.entry)
                                       ? 'border-sky-300 bg-sky-50 text-sky-900' // 2026-11-02 개인 일정은 아주 연한 하늘색
@@ -559,6 +583,27 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                       {pickedTodos.some((t) => !t.completed) && (
                         <p className="t-sub hidden break-keep text-slate-500 lg:block" data-testid="drag-hint">할 일을 끌어 왼쪽 달력의 다른 날짜에 놓으면 그 날로 옮겨져요.</p>
                       )}
+                      {/* D-486 이 날 하려다 미룬 것 — 옅은 주황 · 누르면 그 할 일 창(지금 날짜에서) */}
+                      {pickedGhosts.length > 0 && (
+                        <div className="flex flex-col gap-1.5" data-testid="picked-moved">
+                          <p className="t-sub font-semibold text-orange-800">이 날 하려다 미룬 것 {pickedGhosts.length}건</p>
+                          <ul className="flex flex-col gap-1.5">
+                            {pickedGhosts.map((g) => (
+                              <li key={g.entry.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => setTodoPick(g.entry)}
+                                  data-testid="moved-row"
+                                  className="tap flex w-full min-w-0 items-center gap-2 rounded-(--radius-control) border border-orange-200 bg-orange-50 px-3 py-2 text-left hover:bg-orange-100/60"
+                                >
+                                  <span className={`t-sub min-w-0 flex-1 break-keep [overflow-wrap:anywhere] ${g.entry.completed ? 'text-slate-500 line-through' : 'text-orange-950'}`}>{g.entry.content}</span>
+                                  <span className="t-meta shrink-0 font-semibold whitespace-nowrap text-orange-700">→ {shortDay(g.movedTo)}로 미룸{g.entry.completed ? ' · 끝냄' : ''}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {pickedTodos.length > 0 && (
                         <ul className="flex flex-col gap-2">
                           {pickedTodos.map((e, i) => (
@@ -572,6 +617,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                                 e.clientId ? records.find((r) => r.id === e.clientId)?.companyName : undefined
                               }
                               onPick={() => setTodoPick(e)}
+                              movedFrom={trail[e.id]?.from}
                             />
                           ))}
                         </ul>
@@ -647,6 +693,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           onSave={async (patch) => {
             // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
             const ok = await mutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+            if (ok && typeof patch.dueDate === 'string') recordMove(todoPick.id, todoDay(todoPick), patch.dueDate || todoDay(todoPick))
             if (ok) setTodoPick(null)
             return ok
           }}

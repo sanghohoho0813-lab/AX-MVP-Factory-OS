@@ -12,6 +12,7 @@
  *   아니므로 일정 화면·일기 화면·업체 상세에서 같은 것이 보인다.
  */
 
+import { shortDay } from '../../services/todoTrail'
 import { useState, type LiHTMLAttributes } from 'react'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { ArrowRight, Check, Plus, X } from 'lucide-react'
@@ -179,9 +180,12 @@ export function TodoRow({
   onPick,
   dragProps,
   number,
+  movedFrom,
 }: {
   /** D-158: 그날 적은 순서 번호(일정 달력) — 눈에 잘 띄게 */
   number?: number
+  /** D-486 이 할 일이 있다가 떠난 날들(미룬 흔적) — '11/1 에서 미룸' */
+  movedFrom?: readonly string[]
   entry: JournalEntry
   today: string
   clientName?: string
@@ -220,6 +224,11 @@ export function TodoRow({
         </span>
         <span className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
           {personal && <span className="font-semibold text-sky-800" data-testid="todo-personal">개인 일정</span>}
+          {movedFrom && movedFrom.length > 0 && (
+            <span className="font-semibold text-orange-700" data-testid="todo-moved" title={`처음 ${shortDay(movedFrom[0])}에 하려던 일 · ${movedFrom.map(shortDay).join(' → ')} 에서 미룸`}>
+              {shortDay(movedFrom[0])}에서 미룸{movedFrom.length > 1 ? ` · ${movedFrom.length}번` : ''}
+            </span>
+          )}
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}
           {entry.completed && <span className="text-success-700">완료</span>}
           {clientName && <span>{clientName}</span>}

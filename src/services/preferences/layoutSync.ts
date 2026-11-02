@@ -9,13 +9,13 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { LAYOUT_CHANGED_EVENT, applyLayouts, localLayouts, mergeLayout, parseLayout, type PageLayout } from '../../lib/pageLayout'
+import { patchUiPayload, readUiPayload, type UiPayload } from './uiPayload'
 
-const TABLE = 'ui_preferences'
 /** 창으로 돌아올 때 다시 맞추는 간격(너무 자주 묻지 않게) */
 const PULL_GAP_MS = 15_000
 const PUSH_DELAY_MS = 600
 
-type Payload = Record<string, unknown>
+type Payload = UiPayload
 
 function cloudLayouts(payload: Payload | null): Record<string, PageLayout> {
   const raw = payload?.layouts
@@ -23,13 +23,6 @@ function cloudLayouts(payload: Payload | null): Record<string, PageLayout> {
   if (!raw || typeof raw !== 'object') return out
   for (const [page, v] of Object.entries(raw as Record<string, unknown>)) out[page] = parseLayout(page, v)
   return out
-}
-
-async function readPayload(client: SupabaseClient, userId: string, workspaceId: string): Promise<{ ok: boolean; payload: Payload | null }> {
-  const { data, error } = await client.from(TABLE).select('payload').eq('user_id', userId).eq('workspace_id', workspaceId).maybeSingle()
-  if (error) return { ok: false, payload: null }
-  const p = (data as { payload?: unknown } | null)?.payload
-  return { ok: true, payload: p && typeof p === 'object' ? (p as Payload) : null }
 }
 
 export interface LayoutSyncDeps {
@@ -41,7 +34,7 @@ export interface LayoutSyncDeps {
 
 /** 한 번 맞추기(열 때 · 창으로 돌아올 때) — 시험에서도 부른다 */
 export async function pullLayouts(client: SupabaseClient, userId: string, workspaceId: string, now = () => new Date().toISOString()): Promise<{ toLocal: string[]; toCloud: string[] }> {
-  const { ok, payload } = await readPayload(client, userId, workspaceId)
+  const { ok, payload } = await readUiPayload(client, userId, workspaceId)
   if (!ok) return { toLocal: [], toCloud: [] }
   const cloud = cloudLayouts(payload)
   const local = localLayouts()
@@ -54,7 +47,7 @@ export async function pullLayouts(client: SupabaseClient, userId: string, worksp
     if (m.toCloud) toCloud[page] = m.merged
   }
   if (Object.keys(toLocal).length) applyLayouts(toLocal)
-  if (Object.keys(toCloud).length) await writePages(client, userId, workspaceId, toCloud, payload)
+  if (Object.keys(toCloud).length) await writePages(client, userId, workspaceId, toCloud)
   return { toLocal: Object.keys(toLocal), toCloud: Object.keys(toCloud) }
 }
 
@@ -63,28 +56,23 @@ export async function pullLayouts(client: SupabaseClient, userId: string, worksp
  * 사람이 방금 바꾼 것이 언제나 이긴다: 기기 시계가 늦어 클라우드 쪽 바꾼 때가 더 나중이면, 보내는 것의 바꾼 때를 그보다 1ms 뒤로 올린다
  * (예전에는 '클라우드가 더 새것' 으로 보고 방금 숨긴 칸을 되돌릴 수 있었다).
  */
-async function writePages(client: SupabaseClient, userId: string, workspaceId: string, pages: Record<string, PageLayout>, base?: Payload | null): Promise<void> {
-  let payload = base
-  if (payload === undefined) {
-    const r = await readPayload(client, userId, workspaceId)
-    if (!r.ok) return
-    payload = r.payload
-  }
-  const cloud = cloudLayouts(payload ?? null)
-  const send: Record<string, PageLayout> = {}
-  const bumped: Record<string, PageLayout> = {}
-  for (const [page, l] of Object.entries(pages)) {
-    const c = cloud[page]
-    if (c?.at && (!l.at || c.at >= l.at)) {
-      const t = Date.parse(c.at)
-      send[page] = bumped[page] = { ...l, at: new Date((Number.isFinite(t) ? t : Date.now()) + 1).toISOString() }
-    } else send[page] = l
-  }
-  if (Object.keys(bumped).length) applyLayouts(bumped)
-  if (!Object.keys(send).length) return
-  const prev = (payload?.layouts && typeof payload.layouts === 'object' ? payload.layouts : {}) as Record<string, unknown>
-  const next: Payload = { ...(payload ?? {}), layouts: { ...prev, ...send } }
-  await client.from(TABLE).upsert({ user_id: userId, workspace_id: workspaceId, payload: next }, { onConflict: 'user_id,workspace_id' })
+function writePages(client: SupabaseClient, userId: string, workspaceId: string, pages: Record<string, PageLayout>): Promise<void> {
+  return patchUiPayload(client, userId, workspaceId, (payload) => {
+    const cloud = cloudLayouts(payload)
+    const send: Record<string, PageLayout> = {}
+    const bumped: Record<string, PageLayout> = {}
+    for (const [page, l] of Object.entries(pages)) {
+      const c = cloud[page]
+      if (c?.at && (!l.at || c.at >= l.at)) {
+        const t = Date.parse(c.at)
+        send[page] = bumped[page] = { ...l, at: new Date((Number.isFinite(t) ? t : Date.now()) + 1).toISOString() }
+      } else send[page] = l
+    }
+    if (Object.keys(bumped).length) applyLayouts(bumped)
+    if (!Object.keys(send).length) return null
+    const prev = (payload.layouts && typeof payload.layouts === 'object' ? payload.layouts : {}) as Record<string, unknown>
+    return { ...payload, layouts: { ...prev, ...send } }
+  })
 }
 
 /** 로그인 · 작업공간이 정해지면 켠다. 끄는 함수를 돌려준다 */

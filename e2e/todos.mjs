@@ -357,6 +357,71 @@ if ((await moveBtn.count()) > 0) {
   check('일정 화면: 나만 보는 칸 안내', (await page.getByTestId('private-note').count()) >= 1)
 }
 
+// D-486 2026-11-02 대표 지시 — 밀린 할 일을 '오늘로' 옮겨도 처음 하려던 날에 옅은 주황 흔적
+{
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const t0 = new Date()
+  const y = new Date(); y.setDate(y.getDate() - 1)
+  const was = ymd(y)
+  const md = `${y.getMonth() + 1}/${y.getDate()}`
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate((due) => {
+    const k = 'axmvp.v1.ops_journal_entries'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const base = list[0]
+    list.push({ ...base, id: 'trail-e2e-1', content: '미룸 흔적 시험', entryType: 'follow_up', dueDate: due, completed: false, completedAt: null, clientId: null, serviceKey: null })
+    localStorage.setItem(k, JSON.stringify(list))
+  }, was)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByText('미룸 흔적 시험').first().click()
+  await page.getByRole('dialog').getByText('오늘 할 일로 바꾸기', { exact: true }).click()
+  await page.waitForTimeout(800)
+  const trail = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.todo.trail') ?? '{}')['trail-e2e-1'])
+  check('D-486 오늘로 옮기면 처음 날(어제)을 흔적으로 기억', trail?.from?.includes(was) === true, JSON.stringify(trail))
+  const chip = page.locator('li', { hasText: '미룸 흔적 시험' }).first().getByTestId('todo-moved')
+  check(`D-486 오늘 할 일 줄에 '${md}에서 미룸'`, (await chip.count()) === 1 && (await chip.textContent()).includes(`${md}에서 미룸`), await chip.count())
+  // 일정(휴대폰): 그날 점 · 그날 목록에 옅은 주황 흔적
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  if ((await page.locator(`[data-date="${was}"]`).count()) === 0) {
+    await page.getByLabel('이전 달').click()
+    await page.waitForTimeout(400)
+  }
+  const cell = page.locator(`[data-date="${was}"]`).first()
+  check('D-486 휴대폰 달력 — 처음 날 칸에 주황 점', (await cell.locator('[data-moved="1"]').count()) >= 1)
+  await cell.click()
+  await page.waitForTimeout(400)
+  const ghost = page.getByTestId('moved-row').filter({ hasText: '미룸 흔적 시험' })
+  const gLook = (await ghost.count()) ? await ghost.first().evaluate((el) => ({ txt: el.textContent, bg: getComputedStyle(el).backgroundColor })) : null
+  check(`D-486 그날 목록 '이 날 하려다 미룬 것' — 옅은 주황 · '→ ${t0.getMonth() + 1}/${t0.getDate()}로 미룸'`, !!gLook && gLook.txt.includes(`→ ${t0.getMonth() + 1}/${t0.getDate()}로 미룸`) && gLook.bg !== 'rgb(255, 255, 255)', gLook)
+  check('D-486 그날 할 일 수에는 안 셈(흔적은 따로)', (await page.getByTestId('picked-panel').locator('li[data-kind]', { hasText: '미룸 흔적 시험' }).count()) === 0)
+  await ghost.first().click()
+  check('D-486 흔적을 누르면 그 할 일 창', await page.getByRole('dialog').isVisible())
+  await page.keyboard.press('Escape')
+  // PC 달력 칸에도 흔적 줄
+  const store = await page.evaluate(() => ({ j: localStorage.getItem('axmvp.v1.ops_journal_entries'), t: localStorage.getItem('axmvp.todo.trail') }))
+  const pc = await browser.newContext({ viewport: { width: 1366, height: 900 } })
+  await pc.addInitScript((st) => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem('axmvp.v1.ops_journal_entries', st.j)
+      localStorage.setItem('axmvp.todo.trail', st.t)
+      sessionStorage.setItem('seeded', '1')
+    }
+  }, store)
+  const pp = await pc.newPage()
+  await pp.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await pp.waitForTimeout(800)
+  if ((await pp.locator(`[data-date="${was}"]`).count()) === 0) {
+    await pp.getByLabel('이전 달').click()
+    await pp.waitForTimeout(400)
+  }
+  const line = pp.locator(`[data-date="${was}"] [data-kind="moved"]`).first()
+  const lLook = (await line.count()) ? await line.evaluate((el) => ({ txt: el.textContent, bg: getComputedStyle(el).backgroundColor, moved: el.getAttribute('data-moved-to') })) : null
+  check('D-486 PC 달력 — 처음 날 칸에 옅은 주황 줄 · → 옮긴 날', !!lLook && lLook.txt.includes('미룸 흔적 시험') && lLook.txt.includes('로 미룸') && lLook.bg !== 'rgb(255, 255, 255)', lLook)
+  await pc.close()
+}
+
 await browser.close()
 console.log(`\n오늘 할 일: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)
