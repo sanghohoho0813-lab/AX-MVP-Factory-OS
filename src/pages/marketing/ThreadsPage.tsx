@@ -261,7 +261,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
         title="마케팅 · 브랜딩"
         showOnPhone
         descriptionAsHint
-        description="스레드 글을 실측 공식대로 씁니다 — 원하는 반응을 고르면 맞는 틀이 나오고, 쓰는 동안 500자 · 첫 줄 · 끝 · 본문 판매 · 보장 문구를 규칙으로 바로 확인합니다(규칙 계산). 올린 뒤 숫자를 적으면 우리 계정에서 되는 틀이 숫자로 나옵니다."
+        description="스레드 글을 검증된 방법대로 씁니다 — 원하는 반응을 고르면 맞는 틀이 나오고, 쓰는 동안 500자 · 첫 줄 · 끝 · 본문 판매 · 보장 문구를 규칙으로 바로 확인합니다(규칙 계산). 올린 뒤 숫자를 적으면 우리 계정에서 되는 틀이 숫자로 나옵니다."
       />
       <MarketingTabs active="threads" />
       <InnerTabs tabs={TABS} value={tab} onPick={go} label="스레드" testPrefix="thr" />
@@ -850,7 +850,7 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
             <Download aria-hidden="true" className="size-4" /> CSV
           </Button>
         </div>
-        <p className="t-sub break-keep text-slate-600">점수 = 좋아요 + 답글×3 + 리포스트×2 + 공유×3 (남의 계정 실측과 같은 계산). 틀마다 글이 3개 넘게 쌓이면 그 숫자를 공식보다 먼저 믿어요.{best ? ` 지금은 ${best.key} ${josa(best.name, '이/가')} 가장 좋아요.` : ''}</p>
+        <p className="t-sub break-keep text-slate-600">점수는 좋아요 1점 · 답글 3점 · 다시 올림(리포스트) 2점 · 공유 3점으로 더해요. 같은 틀로 글이 3개 넘게 쌓이면 우리 계정 숫자를 먼저 믿어요.{best ? ` 지금은 ${best.key} ${josa(best.name, '이/가')} 가장 좋아요.` : ''}</p>
         {recs.length ? (
           <ul className="flex flex-col divide-y divide-slate-100" data-testid="thr-rec-templates">
             {recs.map((r) => (

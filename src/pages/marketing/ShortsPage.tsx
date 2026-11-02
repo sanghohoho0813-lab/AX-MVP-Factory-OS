@@ -196,7 +196,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
         title="마케팅 · 브랜딩"
         showOnPhone
         descriptionAsHint
-        description="릴스 · 틱톡 · 유튜브 쇼츠 대본을 실측 공식대로 만듭니다 — 어디에 · 무엇을 · 어떤 형식을 하나씩 고르면 예시 대본이나 AI 대본이 나오고, 첫마디 · 길이 · 권유 · 캡션 · 해시태그를 규칙으로 바로 확인합니다(규칙 계산)."
+        description="릴스 · 틱톡 · 유튜브 쇼츠 대본을 검증된 방법대로 만듭니다 — 어디에 · 무엇을 · 어떤 형식을 하나씩 고르면 예시 대본이나 AI 대본이 나오고, 첫마디 · 길이 · 권유 · 설명 글 · #태그를 규칙으로 바로 확인합니다(규칙 계산)."
       />
       <MarketingTabs active="shorts" />
       <InnerTabs tabs={TABS} value={tab} onPick={go} label="릴스 · 틱톡" testPrefix="sht" />
@@ -666,7 +666,7 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
             <Download aria-hidden="true" className="size-4" /> CSV
           </Button>
         </div>
-        <p className="t-sub break-keep text-slate-600">점수 = 좋아요 + 댓글×3 (실측에서 잘 된 · 안 된 영상을 가른 계산). 형식마다 3개 넘게 쌓이면 그 숫자를 먼저 믿어요.</p>
+        <p className="t-sub break-keep text-slate-600">점수는 좋아요 1점 · 댓글 3점으로 더해요(실제로 잘된 영상과 안 된 영상을 가른 방법). 같은 형식으로 3개 넘게 쌓이면 우리 숫자를 먼저 믿어요.</p>
         {recs.length ? (
           <ul className="flex flex-col divide-y divide-slate-100" data-testid="sht-rec-formats">
             {recs.map((r) => (
