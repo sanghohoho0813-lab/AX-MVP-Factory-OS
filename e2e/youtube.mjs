@@ -438,9 +438,9 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   // 비중 가이드 — 시장 100 이면 앞 3장이 시장수요
   await page.getByTestId('radar-mix').click()
   const panel = page.getByTestId('radar-mix-panel')
-  await panel.getByLabel('시장수요 비중').fill('100')
-  await panel.getByLabel('AX · AI 비중').fill('0')
-  await panel.getByLabel('BRIDGE 비중').fill('0')
+  await panel.getByLabel('경제 · 경영 비중').fill('100')
+  await panel.getByLabel('AI · 업무 비중').fill('0')
+  await panel.getByLabel('경영 × AI 비중').fill('0')
   await panel.getByRole('button', { name: '적용' }).click()
   await page.waitForTimeout(400)
   const mAxes = await page.getByTestId('radar-top').getByTestId('radar-opp').evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))
