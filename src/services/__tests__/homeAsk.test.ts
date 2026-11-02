@@ -10,6 +10,7 @@ import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
 import { NEW_DOCS_TTL_MS, clearNewClientDocs, handNewClientDocs, peekNewClientDocs } from '../docHandoff'
 import { normalizeClientOps } from '../clientOpsService'
+import { DIAG_REQUEST_TTL_MS, clearDiagnosisRequest, diagnosisRequested, requestDiagnosis } from '../openDiagnosis'
 import { guessNewClientFromDocs } from '../newClientFromDocs'
 import { findClientForCretop } from '../salesCretop'
 
@@ -155,6 +156,15 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   check('D-499 요청 문구 — 업체 이름 · 서류 줄(겹치면 한 번 · 끝의 "— 확인" 뺌)', /한솔테크\(주\) 상담 준비/.test(t) && (t.match(/- 재무제표 3년/g) ?? []).length === 1 && /- 국세 납세증명서$/m.test(t), t)
   check('D-499 서류가 없으면 빈 글', docRequestText('x', []) === '')
   check('D-499 받아 올 서류 항목만(목록이 있을 때)', isDocListItem('받아 올 서류', ['a']) && isDocListItem('한솔 · 받아 올 서류', ['a']) && !isDocListItem('받아 올 서류', []) && !isDocListItem('첫마디', ['a']))
+}
+
+// 11. D-499 [맞춤 진단서] 한 번 — 그 업체만 · 30초 · 닫으면 지움
+{
+  requestDiagnosis('cli_a')
+  check('D-499 진단서 열기 요청 — 그 업체에만', diagnosisRequested('cli_a') && !diagnosisRequested('cli_b'))
+  check('D-499 30초 지나면 안 염(나중에 그 업체를 열어도 진단서가 저절로 뜨지 않게)', !diagnosisRequested('cli_a', Date.now() + DIAG_REQUEST_TTL_MS + 1000))
+  clearDiagnosisRequest()
+  check('D-499 닫으면 지움', !diagnosisRequested('cli_a'))
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

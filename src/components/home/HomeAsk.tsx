@@ -9,6 +9,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { AuthContext } from '../../auth/authContext'
 import { createJournalEntry } from '../../services/journalService'
+import { requestDiagnosis } from '../../services/openDiagnosis'
 import { todayLocalDate } from '../../lib/appClock'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
@@ -422,6 +423,12 @@ function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string
               {n.name}
             </Link>
           ))}
+          {/* D-499 대표님께 드릴 한 장 — 누르면 그 업체 맞춤 진단서가 바로 열린다 */}
+          {names[0] && (
+            <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&diag=1`} onClick={() => requestDiagnosis(names[0].id)} className="tap ml-1 rounded-full border border-slate-300 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-diag">
+              맞춤 진단서
+            </Link>
+          )}
         </p>
       )}
       {turn.docs && (

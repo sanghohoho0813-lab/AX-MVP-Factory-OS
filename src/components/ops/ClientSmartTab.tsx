@@ -16,7 +16,9 @@ import { CriticalIdCheck } from './CriticalIdCheck'
 import { AiAssist } from '../ai/AiAssist'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { clearDiagnosisRequest, diagnosisRequested } from '../../services/openDiagnosis'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageSquareText, Sparkles } from 'lucide-react'
 import { activityTimeText } from '../../services/clientOpsActivity'
@@ -138,7 +140,21 @@ export default function ClientSmartTab({
   const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
   const assistBuild = useCallback(() => clientBundle(record, today, insights, buildClientSchedule(record, today)), [record, today, insights])
   // D-352 맞춤 진단서 한 장(대표님께 드릴 종이)
-  const [diagOpen, setDiagOpen] = useState(false)
+  // D-499 오늘 대화창 [맞춤 진단서] 한 번 → 바로 열림(화면 사이 메모리 30초 · 주소 ?diag=1 도)
+  const [params, setParams] = useSearchParams()
+  const [diagOpen, setDiagOpen] = useState(() => diagnosisRequested(record.id) || params.get('diag') === '1')
+  useEffect(() => {
+    if (params.get('diag') === '1') setDiagOpen(true)
+  }, [params])
+  const closeDiag = () => {
+    setDiagOpen(false)
+    clearDiagnosisRequest()
+    if (params.get('diag') !== null) {
+      const next = new URLSearchParams(params)
+      next.delete('diag')
+      setParams(next, { replace: true })
+    }
+  }
   // D-366 지난번 드린 진단서와 견준 한 줄
   const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
   // D-242: 아래 상황 예시 줄의 '한 장 설계서로' → 위 설계서가 그 상황으로 펼쳐진다
@@ -162,7 +178,7 @@ export default function ClientSmartTab({
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
-      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} onGiven={onCommitQuiet} />}
+      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
       {/* D-492 서류에서 읽어 넣은 중요 번호 — 맨 위에서 처음 한 번만 원본과 맞춰 보기(다 확인하면 사라진다) */}
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
