@@ -126,6 +126,7 @@ import { listClients, saveClient } from '../../services/clientOpsService'
 import { withToolDeadlineDone } from '../../services/toolResultGroups'
 import { inputClass } from '../homepage/BlockFields'
 import { sendDraftToOwnerAi } from './aiHandoff'
+import { plainLabel } from '../../services/marketing/plainWords'
 import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import type { ContentStore } from './useContentStore'
 import { KindGlyph, MkHead, MkHero, MkIcon, MkPick, MkSteps, MkTag } from '../marketing/mkKit'
@@ -985,7 +986,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                       <div className="min-w-0 flex-1">
                         {(b.label || b.hint) && (
                           <p className="flex flex-wrap items-baseline gap-x-2">
-                            {b.label && <span className={`t-body font-semibold break-keep ${TONE[KIND_STYLE[shown.draft.kind].tone].deep}`}>{b.label}</span>}
+                            {/* D-507 칸 이름만 쉬운 말(해시태그 → #태그 · 썸네일 → 표지 글) — 복사되는 글은 그대로 */}
+                            {b.label && <span className={`t-body font-semibold break-keep ${TONE[KIND_STYLE[shown.draft.kind].tone].deep}`}>{plainLabel(b.label)}</span>}
                             {b.hint && <span className="t-meta break-keep text-slate-500">{b.hint}</span>}
                           </p>
                         )}
