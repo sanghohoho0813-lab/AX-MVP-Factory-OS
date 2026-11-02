@@ -49,6 +49,7 @@ import {
   byHour,
   byLength,
   byWeekday,
+  analysisAnswer,
   bestOf,
   compareMine,
   dateKo,
@@ -692,7 +693,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           // D-507 내 콘텐츠(만든 것 모음)에는 유튜브 새로 가져오기 · CSV 가 필요 없다 — 헷갈리지 않게 숨김
-          actions={(view === 'plan' && (prepared || packKey || weekOn)) || view === 'make' ? undefined : feedButtons}
+          // 휴대폰에서는 맨 위 [지금 새로 가져오기] · [CSV] 를 접는다(6시간마다 저절로 새로 · 첫 화면 [자세히 보기] 안에 그대로) — 첫 화면 한 줄을 아낀다
+          actions={(view === 'plan' && (prepared || packKey || weekOn)) || view === 'make' ? undefined : <span className="contents max-sm:hidden">{feedButtons}</span>}
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         {!packKey && !weekOn && (
@@ -1354,8 +1356,17 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
   const week = useMemo(() => extractTopics(periodVideos(prepared.videos, 'week'), prepared.channelWords), [prepared])
   const month = useMemo(() => extractTopics(periodVideos(prepared.videos, 'month'), prepared.channelWords), [prepared])
   const best = (g: GroupStat | null) => (g ? `1위 ${g.label} · 평균 ${shortNum(g.avg)}회` : undefined)
+  // D-507 표보다 결론 먼저 — 60대도 한 줄만 읽고 '언제 · 얼마나 길게' 를 정하게
+  const answer = analysisAnswer(wd, hr, ln)
   return (
     <div className="flex flex-col gap-3" data-testid="yt-analysis">
+      {answer && (
+        <section className="flex flex-col gap-1 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="yt-analysis-answer" aria-label="한 줄로">
+          <p className="t-meta font-semibold text-slate-600">한 줄로 — 참고 채널에서 요즘 잘된 때 · 길이</p>
+          <p className="t-body font-bold break-keep text-slate-900">{answer}</p>
+          <p className="t-sub break-keep text-slate-700">우리 영상도 이때 · 이 길이로 올려 보세요. 자세한 숫자는 아래 칸을 누르면 보여요.</p>
+        </section>
+      )}
       <MyChannelCard s={mine} />
       {cmp.length > 0 && (
         <Fold panel id="yt.compare" title="내 채널 vs 참고 채널 평균" defaultOpen testId="yt-compare">

@@ -151,6 +151,8 @@ await page.waitForTimeout(150)
 const tplTip = page.getByTestId('thr-tpltip')
 check('H6 틀 [T 닿아라] 에 마우스 → 무슨 뜻인지 + 예시(데려다줘) · 화면 안', /T 닿아라/.test(await tplTip.innerText().catch(() => '')) && /내 손님을 부르는 글/.test(await tplTip.innerText()) && /예시\n?[\s\S]*데려다줘/.test(await tplTip.innerText()) && (await inView(tplTip)))
 await page.mouse.move(5, 700)
+// 마우스를 뗀 뒤 테두리 색이 바뀌는 동안(전환 효과) 읽으면 중간색이 잡힌다 — 다 바뀐 뒤에 잰다
+await page.waitForTimeout(400)
 const goalBg = await page.locator('[data-testid^="thr-goal-"]').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).borderColor))
 check('H7 원하는 반응 4개 — 같은 테두리(고른 것만 강조) · 뜻 색은 작은 점에만 — D-370', new Set(goalBg).size <= 2, goalBg)
 // D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천 · 23개가 조그맣게라도 다 나열 · 마우스를 올리면 정의 · 예시"

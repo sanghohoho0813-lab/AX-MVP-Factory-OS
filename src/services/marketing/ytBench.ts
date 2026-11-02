@@ -509,6 +509,26 @@ export function byLength(videos: readonly YtVideo[]): GroupStat[] {
   return groupStats(videos, (v) => v.bucket, (b) => b).sort((a, b) => LENGTH_BUCKETS.indexOf(a.key) - LENGTH_BUCKETS.indexOf(b.key))
 }
 
+/** D-507 '19:00~19:59' → '저녁 7시' (60대도 바로 읽게) — 모르는 모양이면 그대로 */
+export function plainHour(label: string): string {
+  const m = /^(\d{1,2}):00/.exec(label)
+  if (!m) return label
+  const h = Number(m[1])
+  if (h === 0) return '밤 12시'
+  if (h < 6) return `새벽 ${h}시`
+  if (h < 12) return `오전 ${h}시`
+  if (h === 12) return '낮 12시'
+  if (h < 18) return `오후 ${h - 12}시`
+  return `저녁 ${h - 12}시`
+}
+
+/** D-507 분석 화면 맨 위 한 줄 — 가장 잘된 요일 · 시간 · 길이(영상 2편 넘는 묶음만 · 없으면 빼고) */
+export function analysisAnswer(wd: readonly GroupStat[], hr: readonly GroupStat[], ln: readonly GroupStat[]): string {
+  const pick = (xs: readonly GroupStat[]) => bestOf(xs.filter((x) => x.count >= 2))
+  const parts = [pick(wd)?.label, pick(hr) ? plainHour(pick(hr)!.label) : undefined, pick(ln) ? `${pick(ln)!.label} 길이` : undefined].filter(Boolean)
+  return parts.length ? `${parts.join(' · ')}에 올린 영상이 평균 조회수가 가장 높았어요.` : ''
+}
+
 export function bestOf(stats: readonly GroupStat[]): GroupStat | null {
   return stats.reduce<GroupStat | null>((best, g) => (!best || g.avg > best.avg ? g : best), null)
 }

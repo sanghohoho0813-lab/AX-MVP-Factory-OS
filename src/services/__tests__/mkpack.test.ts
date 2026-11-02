@@ -20,6 +20,7 @@ import { listThreadPosts, saveThreadPost, sortThreadPosts, type ThreadDraft } fr
 import { listShortPosts, type ShortDraft } from '../marketing/shorts'
 import { plainLabel } from '../marketing/plainWords'
 import { madeResume } from '../marketing/allMade'
+import { analysisAnswer, plainHour } from '../marketing/ytBench'
 import { IDEA_RESUME_STEP } from '../marketing/radarStore'
 import type { GrantNotice } from '../grants/grantMatch'
 import {
@@ -465,6 +466,12 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
     check('SR4 지난번 하던 것 — 세 형식 중 가장 최근 안 올린 것(스레드 글 · 복사해서 올리기) · 만드는 중 2 · 이번 달 올린 것 2(긴 영상 게시일 · 릴스 올린 날)', !!r && r.kind === 'thread' && r.next === '복사해서 올리기' && r.href === '/marketing/threads?open=t1' && r.making === 2 && r.posted === 2, r)
     const longOnly = madeResume([idea('a', 'script', '2026-11-01T09:00:00Z')], [], [], '2026-11-02')
     check('SR5 긴 영상만 — 대본 준비 중 → 다음은 찍기 · 다 올렸으면 카드 없음(null)', !!longOnly && longOnly.kind === 'long' && longOnly.next === '찍기' && longOnly.href === '/marketing?view=make&idea=a' && madeResume([idea('b', 'published', '2026-10-20T09:00:00Z')], [], [], '2026-11-02') === null, longOnly)
+  }
+  {
+    const g = (label: string, avg: number, count = 3) => ({ label, avg, count, max: avg })
+    check('SR6 시간 쉬운 말 — 19:00~19:59 → 저녁 7시 · 09:00 → 오전 9시 · 12:00 → 낮 12시 · 14:00 → 오후 2시', plainHour('19:00~19:59') === '저녁 7시' && plainHour('09:00~09:59') === '오전 9시' && plainHour('12:00~12:59') === '낮 12시' && plainHour('14:00~14:59') === '오후 2시')
+    const a = analysisAnswer([g('화요일', 900), g('월요일', 500)], [g('19:00~19:59', 800), g('07:00~07:59', 2000, 1)], [g('5~15분', 700), g('1~3분(쇼츠)', 300)])
+    check('SR7 분석 한 줄 — 가장 잘된 요일 · 시간 · 길이(1편뿐인 묶음은 빼고) · 묶음이 없으면 빈 글', a === '화요일 · 저녁 7시 · 5~15분 길이에 올린 영상이 평균 조회수가 가장 높았어요.' && analysisAnswer([], [], []) === '', a)
   }
   check('SR3 지난번 하던 것 — 단계마다 지금 · 다음 할 일(쉬운 말) · 게시 완료는 이어서 하기에 없음', IDEA_RESUME_STEP.script.next === '찍기' && IDEA_RESUME_STEP.filmed.next === '올리기' && IDEA_RESUME_STEP.idea.next === '대본 쓰기' && !('published' in IDEA_RESUME_STEP))
 }
