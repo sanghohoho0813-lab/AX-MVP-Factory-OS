@@ -183,8 +183,11 @@ let caseUrl = ''
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   await page.getByTestId('mk-tabs').waitFor({ timeout: 10000 })
   const t = await page.getByTestId('mk-tabs').innerText()
-  check("G1 마케팅 목차 두 줄 — '콘텐츠 레이더' · '만들기'", t.includes('콘텐츠 레이더') && t.includes('만들기'))
-  check('G2 이번 주 키워드 — 한 번에 나오는 형식 4(유튜브 대본 · 릴스 · 블로그 · 카드뉴스)', (await page.getByTestId('mk-formats').locator('li').count()) === 4)
+  check("G1 마케팅 목차 두 줄 — '살펴보기'(예전 콘텐츠 레이더 — D-507 쉬운 말) · '만들기'", t.includes('살펴보기') && t.includes('만들기'))
+  // D-507 첫 화면은 1 → 2 → 3, 한 번에 나오는 형식 넷은 [사용 방법] 안
+  const steps = await page.getByTestId('mk-steps').locator('li').count().catch(() => 0)
+  if (await page.getByTestId('mk-howto-toggle').count()) await page.getByTestId('mk-howto-toggle').click()
+  check('G2 첫 화면 1 → 2 → 3 · [사용 방법] 안에 한 번에 나오는 형식 4(유튜브 대본 · 릴스 · 블로그 · 카드뉴스)', steps === 3 && (await page.getByTestId('mk-formats').locator('li').count()) === 4, steps)
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 844 })
   await m.goto(BASE + '/marketing', { waitUntil: 'networkidle' })

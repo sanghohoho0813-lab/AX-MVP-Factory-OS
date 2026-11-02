@@ -19,6 +19,7 @@ import { SubjectPicker } from '../marketing/SubjectPicker'
 import { TrialBanner } from '../marketing/TrialBanner'
 import { useTrials } from '../marketing/trialStore'
 import { MarketingTabs } from '../marketing/MarketingTabs'
+import { ScreenGuide } from '../marketing/ScreenGuide'
 
 const LIST = '/tools/homepage'
 const BUILD = '/tools/homepage/build'
@@ -103,6 +104,8 @@ export function HomepagePage() {
       />
       {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홍보 글과 같은 줄) */}
       <MarketingTabs active="homepage" />
+      {/* D-507 이 화면은 — 무엇을 해 주는 곳인지 한 줄 + 1 → 2 → 3(업체를 고르기 전 첫 화면에서만) */}
+      {section !== 'build' && <ScreenGuide id="homepage" what="업체 소개 홈페이지 한 장을 업체 기록으로 만들어 줘요. 고친 뒤 파일 하나로 내려받아요." steps={['업체 고르기', '고치고 미리 보기', '내려받기']} />}
       {section === 'build' ? <BuildScreen /> : <ClientPicker />}
     </div>
   )

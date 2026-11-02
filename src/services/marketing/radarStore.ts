@@ -27,6 +27,13 @@ const PREFS = 'radar_prefs'
 export type IdeaStatus = 'idea' | 'selected' | 'script' | 'filmed' | 'published'
 export const IDEA_STATUSES: readonly IdeaStatus[] = ['idea', 'selected', 'script', 'filmed', 'published']
 export const IDEA_STATUS_LABEL: Record<IdeaStatus, string> = { idea: '아이디어', selected: '제작 예정', script: '대본 준비', filmed: '촬영 완료', published: '게시 완료' }
+/** D-507 마케팅 첫 화면 '지난번 하던 것' — 단계마다 지금 · 다음에 할 일(쉬운 말) */
+export const IDEA_RESUME_STEP: Record<Exclude<IdeaStatus, 'published'>, { stage: string; next: string }> = {
+  idea: { stage: '아이디어만 적어 둠', next: '대본 쓰기' },
+  selected: { stage: '만들 예정', next: '대본 쓰기' },
+  script: { stage: '대본 준비 중', next: '찍기' },
+  filmed: { stage: '찍어 둠', next: '올리기' },
+}
 
 export interface ContentIdea {
   id: string

@@ -21,6 +21,7 @@ import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtub
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { AxisBadge, IconChip } from './RadarParts'
 import { isMarketingCustomer } from '../../../services/marketing/persona'
+import { plainLabel } from '../../../services/marketing/plainWords'
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 const shortDay = (d: string) => {
@@ -105,10 +106,10 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
       <Fold
         panel
         id="mk.make.long"
-        title="유튜브 롱폼 진행판"
+        title="유튜브 긴 영상 진행판"
         forceOpen={!!focusId}
         count={ideas.length}
-        summary={ideas.length ? [...IDEA_STATUSES.filter((x) => counts[x] > 0).map((x) => `${IDEA_STATUS_LABEL[x]} ${counts[x]}`), late.length ? `늦은 일 ${late.length}` : ''].filter(Boolean).join(' · ') : '아직 담은 롱폼이 없어요 — 누르면 주제를 직접 담는 칸'}
+        summary={ideas.length ? [...IDEA_STATUSES.filter((x) => counts[x] > 0).map((x) => `${IDEA_STATUS_LABEL[x]} ${counts[x]}`), late.length ? `늦은 일 ${late.length}` : ''].filter(Boolean).join(' · ') : '아직 담은 긴 영상이 없어요 — 누르면 주제를 직접 담는 칸'}
         testId="mk-make-long"
       >
         {/* 단계판 */}
@@ -384,7 +385,7 @@ function MakeRow({
             return (
               <label key={c.id} className={`tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 ${on ? 'border-success-300 bg-success-50 font-semibold text-success-800' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`} data-testid="make-check" data-id={c.id} data-on={on ? '1' : '0'}>
                 <input type="checkbox" className="size-4 accent-success-600" checked={on} disabled={readOnly} onChange={() => toggle(c.id)} />
-                {c.label}
+                {plainLabel(c.label)}
               </label>
             )
           })}
@@ -469,8 +470,8 @@ function MakeRow({
         <Button size="sm" variant="ghost" onClick={() => setOpen((x) => !x)} aria-expanded={open}>
           <Clapperboard aria-hidden="true" className="size-4" /> {open ? '접기' : '관점 · 제목 · 메모'}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => onCopy(briefText(i), '브리프')} data-testid="radar-idea-brief">
-          <ClipboardCopy aria-hidden="true" className="size-4" /> 브리프 복사
+        <Button size="sm" variant="ghost" onClick={() => onCopy(briefText(i), '요약')} data-testid="radar-idea-brief">
+          <ClipboardCopy aria-hidden="true" className="size-4" /> 요약 복사
         </Button>
         {/* SAAS-2 홍보 글 만들기는 고객 계정에 아직 닫혀 있어 그 입구도 보이지 않는다 */}
         {!isMarketingCustomer() && (

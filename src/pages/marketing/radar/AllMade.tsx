@@ -15,7 +15,7 @@ import { listShortPosts, type ShortPost } from '../../../services/marketing/shor
 import { madeItems, type MadeKind } from '../../../services/marketing/allMade'
 
 const KIND: Record<MadeKind, { label: string; icon: LucideIcon; tone: string; list: string; listLabel: string }> = {
-  long: { label: '유튜브 롱폼', icon: MonitorPlay, tone: 'bg-red-50 text-red-700 ring-red-200', list: '/marketing?view=make', listLabel: '롱폼 줄' },
+  long: { label: '유튜브 긴 영상', icon: MonitorPlay, tone: 'bg-red-50 text-red-700 ring-red-200', list: '/marketing?view=make', listLabel: '긴 영상 줄' },
   short: { label: '릴스 · 틱톡', icon: Film, tone: 'bg-pink-50 text-pink-700 ring-pink-200', list: '/marketing/shorts?tab=records', listLabel: '릴스 · 틱톡 기록표' },
   thread: { label: '스레드', icon: AtSign, tone: 'bg-slate-100 text-slate-800 ring-slate-300', list: '/marketing/threads?tab=records', listLabel: '스레드 기록표' },
 }
@@ -52,7 +52,7 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
         <h3 id="mk-allmade-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <Layers aria-hidden="true" className="size-5 text-rose-600" /> 만든 것 한눈에
         </h3>
-        <p className="t-meta break-keep text-slate-500">롱폼 · 릴스 · 틱톡 · 스레드 — 어디서 만들었든 최근 것부터 · 누르면 그 글이 바로 열려요</p>
+        <p className="t-meta break-keep text-slate-500">긴 영상 · 릴스 · 틱톡 · 스레드 — 어디서 만들었든 최근 것부터 · 누르면 그 글이 바로 열려요</p>
       </div>
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="형식" data-testid="mk-allmade-kinds">
         {(['all', 'long', 'short', 'thread'] as const).map((k) => {

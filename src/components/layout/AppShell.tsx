@@ -139,6 +139,10 @@ export function AppShell() {
             className="pb-safe-nav mx-auto w-full flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-9 2xl:px-14"
             style={{ maxWidth: CONTENT_WIDTH_PX[contentWidth] }}
             data-content-width={contentWidth}
+            // D-507 마케팅 · 브랜딩(60대 이상 — 글자 · 대비를 이 안에서만 키운다)
+            data-area={isMarketingArea(location.pathname) ? 'marketing' : undefined}
+            // D-507 마케팅 첫 화면(목차 칸)은 휴대폰에서 경로 줄을 접는다 — 머리줄이 이미 '영업 › 마케팅 · 브랜딩' · 목차 띠가 지금 칸을 보여 준다
+            data-crumbs-phone={MARKETING_ROOTS.includes(location.pathname) ? 'off' : undefined}
           >
             {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다.
                 모듈(/tools/<모듈>/<화면>) 안에서 화면만 바꿀 때는 그대로 둔다 — 원본 앱의 고른 고객·열린 창이 살아 있어야 한다 (D-93) */}
@@ -193,4 +197,11 @@ export function AppShell() {
 function shellKeyOf(pathname: string): string {
   const m = /^\/tools\/([^/]+)/.exec(pathname)
   return m ? `/tools/${m[1]}` : pathname
+}
+
+/** D-507 마케팅 · 브랜딩 화면(레이더 · 내 콘텐츠 · 스레드 · 릴스 · 홍보 글 · 홈페이지) */
+const MARKETING_ROOTS: readonly string[] = ['/marketing', '/marketing/youtube', '/marketing/threads', '/marketing/shorts', '/tools/content', '/tools/homepage']
+
+export function isMarketingArea(pathname: string): boolean {
+  return pathname === '/marketing' || pathname.startsWith('/marketing/') || pathname === '/tools/content' || pathname.startsWith('/tools/content/') || pathname === '/tools/homepage' || pathname.startsWith('/tools/homepage/')
 }

@@ -190,7 +190,7 @@ await page.evaluate(() => {
 await openHome(page)
 const open = page.getByTestId('mk-week-open')
 const keysTop = (await page.getByTestId('mk-keys').boundingBox())?.y ?? 0
-check('H1 첫 화면 이번 주 키워드 위에 [1주일치 콘텐츠 한 번에 만들기] — 롱폼 1 · 릴스 · 쇼츠 3 · 스레드 7', (await open.count()) === 1 && ((await open.boundingBox())?.y ?? 9999) < keysTop && ['1주일치 콘텐츠 한 번에 만들기', '롱폼 1', '릴스 · 쇼츠 3', '스레드 7'].every(async () => true) && (await open.innerText()).includes('스레드 7') && (await open.innerText()).includes('롱폼 1'), await open.innerText())
+check('H1 첫 화면 이번 주 키워드 위에 [1주일치 콘텐츠 한 번에 만들기] — 유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7(D-507 쉬운 말)', (await open.count()) === 1 && ((await open.boundingBox())?.y ?? 9999) < keysTop && (await open.innerText()).includes('1주일치 콘텐츠 한 번에 만들기') && (await open.innerText()).includes('스레드 글 7') && (await open.innerText()).includes('긴 영상 1') && (await open.innerText()).includes('짧은 영상 3'), await open.innerText())
 await shot(page, 'H-home')
 // 고정 키워드(본업) 이름들 — 짝의 앞쪽이 이 가운데 하나여야
 const fixedText = await page.getByTestId('mk-fixed').innerText().catch(() => '')
@@ -249,7 +249,7 @@ const badFri = await page.locator('[data-testid="mk-week-thread"][data-day="5"]'
 const badMon = await page.locator('[data-testid="mk-week-thread"][data-day="1"]').getAttribute('data-bad')
 await tabTo(page, 'plan')
 const cal = await page.getByTestId('mk-week-day').evaluateAll((els) => els.map((e) => e.textContent ?? ''))
-check('V4 달력 7일 — 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 매일 스레드', cal.length === 7 && cal[2].includes('유튜브 롱폼') && cal[1].includes('쇼츠 ①') && cal[3].includes('쇼츠 ②') && cal[5].includes('릴스 ③') && cal.every((d) => d.includes('스레드')), cal)
+check('V4 달력 7일 — 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 매일 스레드', cal.length === 7 && cal[2].includes('유튜브 긴 영상') && cal[1].includes('쇼츠 ①') && cal[3].includes('쇼츠 ②') && cal[5].includes('릴스 ③') && cal.every((d) => d.includes('스레드')), cal)
 const lintLine = await page.getByTestId('mk-week-lint').innerText()
 check("V5 점검 — 이번 주 글 11개 중 통과 · 링크가 든 금요일 스레드는 '고칠 곳'", lintLine.includes('이번 주 글 11개') && badFri !== '0' && badMon === '0' && /고칠 곳 [1-9]/.test(lintLine), lintLine)
 await page.locator('[data-testid="mk-week-day"][data-day="3"] button').first().click()
@@ -271,7 +271,7 @@ check('C2 [텍스트 파일로] → week-content-YYYY-MM-DD.txt(영문 이름 �
 /* ---------------- D-349 목록으로 모으기 ---------------- */
 await page.waitForSelector('[data-testid="mk-week-collect"][data-state="done"]', { timeout: 10000 }).catch(() => {})
 const collectTxt = await page.getByTestId('mk-week-collect').innerText().catch(() => '')
-check("C3 AI 결과를 목록에 모았다는 줄 — 내 콘텐츠 · 롱폼 1 · 릴스 · 틱톡 3 · 스레드 7 · [롱폼을 내 콘텐츠에 담기] 는 따로 안 보임(이미 모음)", collectTxt.includes('모아 뒀어요') && collectTxt.includes('롱폼 1') && collectTxt.includes('릴스 · 틱톡 3') && collectTxt.includes('스레드 7') && (await page.getByTestId('mk-week-save-long').count()) === 0, collectTxt)
+check("C3 AI 결과를 목록에 모았다는 줄 — 내 콘텐츠 · 롱폼 1 · 릴스 · 틱톡 3 · 스레드 7 · [롱폼을 내 콘텐츠에 담기] 는 따로 안 보임(이미 모음)", collectTxt.includes('모아 뒀어요') && collectTxt.includes('긴 영상 1') && collectTxt.includes('릴스 · 틱톡 3') && collectTxt.includes('스레드 7') && (await page.getByTestId('mk-week-save-long').count()) === 0, collectTxt)
 const recCount = async (base, list, item) => {
   await page.goto(BASE + base, { waitUntil: 'networkidle' })
   await page.getByTestId(list).waitFor({ timeout: 8000 }).catch(() => {})
@@ -329,7 +329,7 @@ await page.getByTestId('mk-projects').waitFor({ timeout: 8000 })
 await page.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('스레드 7/7'), null, { timeout: 8000 }).catch(() => {})
 const proj = page.locator('[data-testid="mk-project"]').first()
 const projTxt = (await proj.textContent().catch(() => '')) ?? ''
-check('W1 내 콘텐츠 맨 위 1주일치 프로젝트 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('롱폼 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
+check('W1 내 콘텐츠 맨 위 1주일치 프로젝트 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('긴 영상 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
 check('W2 내 콘텐츠의 롱폼 줄에 [1주일치 프로젝트 보기]', (await page.getByTestId('make-week-badge').count()) === 1)
 await shot(page, 'W-projects')
 await proj.click()
@@ -436,7 +436,7 @@ check('Q3 오류 0', errors.length === 0, errors)
   await page.getByTestId('today-posts').waitFor({ timeout: 8000 }).catch(() => {})
   const line = (await page.getByTestId('today-posts').innerText().catch(() => '')) ?? ''
   const href = (await page.getByTestId('today-posts').getAttribute('href').catch(() => '')) ?? ''
-  check('T1 그 주 수요일이 되면 오늘 화면 맨 위 "오늘 올릴 것 · 날짜(수) 유튜브 롱폼 · 스레드(신뢰)" (만든 주가 오기 전엔 없음)', before === 0 && /오늘 올릴 것/.test(line) && line.includes('(수)') && line.includes('유튜브 롱폼') && line.includes('스레드(신뢰)'), { before, line })
+  check('T1 그 주 수요일이 되면 오늘 화면 맨 위 "오늘 올릴 것 · 날짜(수) 유튜브 롱폼 · 스레드(신뢰)" (만든 주가 오기 전엔 없음)', before === 0 && /오늘 올릴 것/.test(line) && line.includes('(수)') && line.includes('유튜브 긴 영상') && line.includes('스레드(신뢰)'), { before, line })
   await page.getByTestId('today-posts').click()
   await page.waitForURL(/\/marketing\?/, { timeout: 5000 }).catch(() => {})
   await page.getByTestId('mk-week').waitFor({ timeout: 8000 }).catch(() => {})
@@ -447,7 +447,7 @@ check('Q3 오류 0', errors.length === 0, errors)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.getByTestId('today-posts').waitFor({ timeout: 8000 }).catch(() => {})
   const fline = (await page.getByTestId('today-posts').innerText().catch(() => '')) ?? ''
-  check('T3 금요일은 스레드(답글 · 리드)만 → 스레드 탭', fline.includes('(금)') && fline.includes('스레드(답글 · 리드)') && !fline.includes('롱폼') && /wt=threads/.test((await page.getByTestId('today-posts').getAttribute('href')) ?? ''), fline)
+  check('T3 금요일은 스레드(답글 · 리드)만 → 스레드 탭', fline.includes('(금)') && fline.includes('스레드(답글 · 리드)') && !fline.includes('긴 영상') && /wt=threads/.test((await page.getByTestId('today-posts').getAttribute('href')) ?? ''), fline)
   await shot(page, 'T-today')
   check('T4 오류 0', errors.length === 0, errors)
 }

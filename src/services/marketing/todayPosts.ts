@@ -13,7 +13,7 @@ export function postingDay(today: string): { monday: string; day: number } {
 /** 그날 올릴 것 — 1주일치 일정(롱폼 수요일 · 쇼츠 화 · 목 · 릴스 토 · 스레드 매일) 그대로 */
 export function postsOfDay(day: number): { text: string; tab: 'long' | 'shorts' | 'threads' }[] {
   const out: { text: string; tab: 'long' | 'shorts' | 'threads' }[] = []
-  if (day === LONG_DAY) out.push({ text: '유튜브 롱폼', tab: 'long' })
+  if (day === LONG_DAY) out.push({ text: '유튜브 긴 영상', tab: 'long' })
   for (const s of SHORT_SLOTS) if (s.n > 0 && s.day === day) out.push({ text: `${s.platform === 'reels' ? '릴스' : '쇼츠'} ${'①②③'[s.n - 1]}`, tab: 'shorts' })
   const th = THREAD_SLOTS.find((t) => t.day === day)
   if (th) out.push({ text: `스레드(${th.aim})`, tab: 'threads' })

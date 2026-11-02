@@ -79,8 +79,8 @@ export function ChannelManager({
       <div className="flex flex-col gap-5" data-testid="yt-channel-table">
         <section className="flex flex-col gap-3" aria-labelledby="radar-default-h" data-testid="radar-default-channels" data-count={defaultCount}>
           <div className="flex flex-col gap-0.5">
-            <HelpHeading as="h3" tight id="radar-default-h" label="기본 벤치마킹 채널" className="t-card font-bold text-slate-900">
-              기본 벤치마킹 채널 <span className="t-sub font-semibold text-slate-500">{defaultCount}곳</span>
+            <HelpHeading as="h3" tight id="radar-default-h" label="기본 참고 채널" className="t-card font-bold text-slate-900">
+              기본 참고 채널 <span className="t-sub font-semibold text-slate-500">{defaultCount}곳</span>
             </HelpHeading>
             <p className="t-meta break-keep text-slate-500">{mkText("MIRAE 가 미리 골라 둔 채널입니다 — 채널마다 '왜 보는 채널인지' 를 적어 두었습니다.")}</p>
           </div>
@@ -168,7 +168,7 @@ function ChannelRow({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="t-body min-w-0 flex-[1_1_10rem] font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{c.title}</span>
         {c.mine && <Badge tone="warning">내 채널</Badge>}
-        {added ? <Badge tone="warning">내가 추가</Badge> : !c.mine && <Badge>기본 벤치마킹</Badge>}
+        {added ? <Badge tone="warning">내가 추가</Badge> : !c.mine && <Badge>기본 참고</Badge>}
         {c.pending && <Badge>영상 받는 중</Badge>}
       </div>
       {!c.pending && (

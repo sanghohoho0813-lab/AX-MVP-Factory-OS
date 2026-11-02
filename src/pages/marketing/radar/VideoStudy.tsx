@@ -29,7 +29,7 @@ export interface StudyProps {
 const ORDER: { tag: string; title: RegExp; label: string }[] = [
   { tag: '분석', title: /왜/, label: '왜 잘 됐나' },
   { tag: '제목', title: /제목/, label: '제목 후보' },
-  { tag: '썸네일', title: /썸네일/, label: '썸네일 문구' },
+  { tag: '썸네일', title: /썸네일/, label: '표지 글(썸네일)' },
   { tag: '첫문장', title: /첫\s*문장/, label: '첫 문장' },
   { tag: '구성', title: /구성/, label: '구성 시간표' },
   { tag: '재료', title: /재료/, label: '우리가 보여 줄 재료' },
@@ -177,7 +177,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
           <p className="t-body min-w-0 flex-1 font-bold text-violet-950">AI로 우리 회사 버전 만들기</p>
         </div>
         <p className="t-sub break-keep text-violet-950/80">
-          이 영상이 잘 된 틀(건드린 고민 · 제목 · 구성)을 우리 채널 기준에 맞게 — 제목 · 썸네일 · 첫 문장 · 구성 시간표 · 우리 재료 · 쇼츠까지. 제목 · 대사는 베끼지 않아요.
+          이 영상이 잘 된 틀(건드린 고민 · 제목 · 구성)을 우리 채널 기준에 맞게 — 제목 · 표지 글 · 첫 문장 · 구성 시간표 · 우리 재료 · 쇼츠까지. 제목 · 대사는 베끼지 않아요.
         </p>
         {can && !lines.length && !a && <p className="t-meta break-keep text-violet-900">대본을 먼저 받으면 구성까지 더 정확해요(없어도 만들 수 있어요).</p>}
         <div className="flex flex-wrap items-center gap-2">

@@ -151,7 +151,7 @@ const bridgeSection = (p: WeekPair, trend: readonly string[]) => ({
 
 export type WeekPart = 'long' | 'shortA' | 'shortB' | 'th0' | 'th1' | 'th2'
 export const WEEK_PARTS: readonly { part: WeekPart; assistId: string; page: 'radar' | 'shorts' | 'threads'; label: string }[] = [
-  { part: 'long', assistId: 'radar.pack.video', page: 'radar', label: '유튜브 롱폼' },
+  { part: 'long', assistId: 'radar.pack.video', page: 'radar', label: '유튜브 긴 영상' },
   { part: 'shortA', assistId: 'shorts.write', page: 'shorts', label: '쇼츠 ① ②' },
   { part: 'shortB', assistId: 'shorts.write', page: 'shorts', label: '릴스 ③' },
   { part: 'th0', assistId: 'threads.write', page: 'threads', label: '스레드 월~수' },
@@ -456,7 +456,8 @@ export function weekLintSummary(w: WeekView): { total: number; pass: number; bad
 export function weekCalendar(w: WeekView): { day: number; label: string; items: { kind: 'long' | 'short' | 'thread'; text: string; anchor: string }[] }[] {
   return [1, 2, 3, 4, 5, 6, 7].map((day) => {
     const items: { kind: 'long' | 'short' | 'thread'; text: string; anchor: string }[] = []
-    if (day === LONG_DAY) items.push({ kind: 'long', text: '유튜브 롱폼', anchor: 'mk-week-long' })
+    // D-507 화면 글은 쉬운 말(긴 영상) — 복사되는 글(■ 유튜브 롱폼)은 그대로
+    if (day === LONG_DAY) items.push({ kind: 'long', text: '유튜브 긴 영상', anchor: 'mk-week-long' })
     for (const s of w.shorts) if (s.slot.day === day) items.push({ kind: 'short', text: `${s.slot.platform === 'reels' ? '릴스' : '쇼츠'} ${'①②③'[s.slot.n - 1]}`, anchor: `mk-week-short-${s.slot.n}` })
     for (const x of w.threads) if (x.slot.day === day) items.push({ kind: 'thread', text: `스레드 · ${x.slot.aim}`, anchor: `mk-week-thread-${day}` })
     return { day, label: dayLabel(w.start, day), items }

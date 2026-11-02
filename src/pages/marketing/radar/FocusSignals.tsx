@@ -186,7 +186,7 @@ export function SideBreakouts({ items, noThumb, onOpenVideo }: { items: readonly
             <IconChip icon={Zap} tone="amber" /> 사이드 급상승
           </h2>
         </HintTip>
-        <span className="t-meta break-keep text-slate-500">경제 · 경영 · AI 밖에서 크게 터진 영상 — 주제가 아니라 포맷 · 훅 · 구성 참고</span>
+        <span className="t-meta break-keep text-slate-500">경제 · 경영 · AI 밖에서 크게 터진 영상 — 주제가 아니라 형식 · 첫마디 · 구성 참고</span>
       </div>
       {items.length === 0 ? (
         <p className="t-meta break-keep text-slate-500" data-testid="radar-side-none">

@@ -38,7 +38,7 @@ import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
-import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_RESUME_STEP, IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
@@ -94,7 +94,7 @@ import {
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
-import { KeywordHome, type HomeKeyword } from './radar/KeywordHome'
+import { KeywordHome, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
@@ -130,6 +130,7 @@ import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketin
 import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 import { rememberWeekTopics } from '../../services/marketing/quickStart'
+import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
 
 /** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
 type View = RadarView
@@ -187,6 +188,14 @@ const RADAR_ASSIST: Record<string, string[]> = {
 /** D-241 기획이 나오는 질문 — 답 한 줄마다 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지] */
 const PLAN_ASSISTS = new Set(['radar.top5', 'radar.view', 'bench.copy', 'rising.shorts', 'rising.ref', 'mine.next'])
 const ideaHref = (id: string) => `/marketing?view=make&idea=${encodeURIComponent(id)}`
+
+/** D-507 탭마다 '이 화면은' 한 줄 — 무엇을 해 주는 곳인지 · 무엇을 누르면 어떻게 되는지(쉬운 말) */
+const RADAR_GUIDE: Record<Exclude<View, 'plan'>, { what: string; steps?: string[] }> = {
+  top: { what: '남의 유튜브에서 요즘 많이 본 영상을 모아 보여 줘요. 제목을 누르면 왜 잘됐는지 · 영상 정보가 열려요.' },
+  channels: { what: '이번 주 주제를 고를 때 살펴보는 유튜브 채널 목록이에요. 평소엔 그대로 두셔도 되고, 보고 싶은 채널이 있으면 [+ 채널 추가] 로 더해요.' },
+  analysis: { what: '참고 채널 영상이 어느 요일 · 몇 시 · 몇 분 길이일 때 잘됐는지 보여 줘요. 우리 영상 올릴 때 · 길이를 정할 때 보세요.' },
+  make: { what: '만든 대본 · 글이 모두 모이는 곳이에요.', steps: ['하나 누르기', '찍고 · 올리기', '[게시 완료] 누르기'] },
+}
 
 function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const yt = useYtFeed()
@@ -307,6 +316,16 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   const weekVer = useSyncExternalStore(subscribeWeek, weekVersion)
   const weekDone = useMemo(() => !!weekSaved(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
+  // D-507 첫 화면 '지난번 하던 것' — 아직 올리지 않은 가장 최근 줄(담은 때 순) · 이번 달 올린 수(계속 쓰기 쉽게)
+  const resume = useMemo<HomeResume | null>(() => {
+    const open = notebook.ideas.filter((i) => i.status !== 'published').sort((a, b) => b.savedAt.localeCompare(a.savedAt))
+    const last = open[0]
+    if (!last) return null
+    const month = today.slice(0, 7)
+    const posted = notebook.ideas.filter((i) => i.status === 'published' && (i.publishDate || i.savedAt).slice(0, 7) === month).length
+    const step = last.status === 'published' ? IDEA_RESUME_STEP.idea : IDEA_RESUME_STEP[last.status]
+    return { topic: last.topic, stage: step.stage, next: step.next, href: ideaHref(last.id), making: open.length, posted }
+  }, [notebook.ideas, today])
   // D-349 1주일치 — 열 때 클라우드와 맞추고(휴대폰에서 만든 주도 여기서) · 목록으로 모은 뒤 내 콘텐츠를 다시 읽는다
   const weekSyncNow = useMemo(() => weekSync(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -664,15 +683,16 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           title="마케팅 · 브랜딩"
           showOnPhone
           descriptionAsHint
-          description={mkText('이번 주 키워드 하나를 누르면 제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글이 한 번에 나옵니다. 키워드는 벤치마킹 채널의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 주제를 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
+          description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           actions={view === 'plan' && (prepared || packKey || weekOn) ? undefined : feedButtons}
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         {!packKey && !weekOn && (
           <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
-            <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
-              콘텐츠 레이더 · YouTube 벤치마킹
+            {/* D-507 이곳이 무엇을 해 주는지 한 줄(쉬운 말) — 예전 이름(콘텐츠 레이더)은 괄호로 남긴다 */}
+            <span className="font-semibold text-slate-700" data-testid="radar-subtitle">
+              우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳 <span className="font-normal text-slate-600 max-sm:hidden">(콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>
             </span>
             {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
           </p>
@@ -693,6 +713,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
         </div>
       )}
+      {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
+      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
+      {weekOn && <ScreenGuide id="radar.week" what="일주일 동안 올릴 것 — 유튜브 긴 영상 1편 · 짧은 영상 3편 · 스레드 글 7개를 한 번에 만든 곳이에요." steps={['위 탭에서 고르기', '[복사] 하기', '올릴 날에 올리기']} />}
       {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(인기 급상승 · 분석 · 내 콘텐츠). 이번 주 찍을 것의 질문 판은 D-251 부터 [자세히 보기] 안 */}
       {!readOnly && view !== 'plan' && (prepared || view === 'make') && (
         <AiAssist
@@ -785,7 +808,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           <div className="flex flex-col items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="mk-pack-missing">
             <p className="t-body break-keep text-slate-800">{!prepared && homeStatus === 'loading' ? '이번 주 키워드를 불러오는 중이에요…' : '이 키워드는 이번 주 목록에 없어요 — 새로 받은 데이터로 순위가 바뀌었을 수 있어요.'}</p>
             <Button variant="secondary" onClick={() => setParam({ pack: '' })} data-testid="mk-pack-missing-back">
-              이번 주 키워드 보기
+              주제 다시 고르기
             </Button>
           </div>
         )
@@ -795,7 +818,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           brief={brief}
           ws={readOnly ? undefined : workspaceId}
           start={weekStartParam || undefined}
-          backLabel={weekFromMake ? '내 콘텐츠' : '이번 주 키워드'}
+          backLabel={weekFromMake ? '내 콘텐츠' : '주제 고르기'}
           readOnly={readOnly}
           ownerAi={mkAi}
           savedLongHref={(() => {
@@ -838,11 +861,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             status={homeStatus}
             aiDone={aiDone}
             fresh={change.fresh}
-            basis={`이번 주 키워드: 벤치마킹 채널 최근 2주 영상(6시간마다 새로) · 고정 키워드 칩: 기업마당 이번 주(${spanText}) 새 공고(매일 아침 9시)`}
+            basis={`이번 주 뜨는 주제: 참고 채널의 최근 2주 영상(6시간마다 새로) · 본업 주제 작은 글씨: 기업마당 이번 주(${spanText}) 새 공고(매일 아침 9시)`}
             change={change.line}
             onPick={openPack}
             onCustom={(t) => openPack(`custom:${t}`)}
             week={{ ai: mkAi && !readOnly && weekPlanSetup.pairs.length > 0, done: weekDone, onOpen: openWeek }}
+            resume={readOnly ? null : resume}
           />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
@@ -876,7 +900,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   rising={rising.filter((r) => r.fit)}
                   breakouts={breakouts}
                   focus={focus}
-                  basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
+                  basis={`최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
                   ideas={notebook.ideas}
                   readOnly={readOnly}
                   noThumb={yt.sample}
@@ -958,7 +982,7 @@ function SetupCard({ status, message, onSample }: { status: string; message: str
           <ol className="t-sub flex list-decimal flex-col gap-1 pl-6 break-keep text-slate-600" data-testid="yt-key-steps">
             <li>Google Cloud 콘솔에서 'YouTube Data API v3' 를 켜고 API 키를 만듭니다(예전 대시보드에 쓰던 키도 됩니다).</li>
             <li>Vercel › 이 프로젝트 › Settings › Environment Variables 에 이름 YOUTUBE_API_KEY 로 넣습니다.</li>
-            <li>다시 배포(Redeploy)하면 이 화면이 실제 벤치마킹 채널로 바뀝니다.</li>
+            <li>다시 배포(Redeploy)하면 이 화면이 실제 참고 채널로 바뀝니다.</li>
           </ol>
         </>
       )}
@@ -992,7 +1016,7 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
     <div className="flex flex-col gap-2">
       {sample && (
         <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" data-testid="yt-sample-banner">
-          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 벤치마킹 채널로 바뀝니다.
+          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 참고 채널로 바뀝니다.
         </p>
       )}
       {message && (
@@ -1062,7 +1086,7 @@ function Filters({
 }) {
   const [open, setOpen] = useState(false)
   const chName = prepared.channels.find((c) => c.id === channel)?.title
-  const summary = [type === 'long' ? '롱폼' : type === 'short' ? '쇼츠' : '전체', chName ?? '전체 채널', `TOP ${topN}`].join(' · ')
+  const summary = [type === 'long' ? '긴 영상' : type === 'short' ? '쇼츠' : '전체', chName ?? '전체 채널', `TOP ${topN}`].join(' · ')
   const active = (type !== 'all' ? 1 : 0) + (channel ? 1 : 0)
   return (
     <div className="flex flex-col gap-2">
@@ -1081,7 +1105,7 @@ function Filters({
               {(
                 [
                   ['all', '전체'],
-                  ['long', '롱폼'],
+                  ['long', '긴 영상'],
                   ['short', '쇼츠'],
                 ] as Array<[YtType, string]>
               ).map(([k, l]) => (
@@ -1276,11 +1300,12 @@ function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: Rad
             </span>
           )}
         </span>
-        <span className="t-meta absolute right-1.5 bottom-1.5 rounded bg-slate-900/80 px-1.5 font-semibold text-white">{v.isShort ? '쇼츠' : '롱폼'}</span>
+        <span className="t-meta absolute right-1.5 bottom-1.5 rounded bg-slate-900/80 px-1.5 font-semibold text-white">{v.isShort ? '쇼츠' : '긴 영상'}</span>
       </button>
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         <p className="t-meta truncate text-slate-500">{v.channelName}</p>
-        <button type="button" onClick={() => onOpen(v)} className="t-sub line-clamp-2 text-left font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
+        {/* D-507 휴대폰에서 제목도 손가락 하나(44px) — 25px 줄을 정확히 누르기 어려웠다 */}
+        <button type="button" onClick={() => onOpen(v)} className="tap t-sub line-clamp-2 text-left font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
           {v.title}
         </button>
         {r && r.ratio !== null && <RatioChip v={r} />}
@@ -1326,11 +1351,11 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
     <div className="flex flex-col gap-3" data-testid="yt-analysis">
       <MyChannelCard s={mine} />
       {cmp.length > 0 && (
-        <Fold panel id="yt.compare" title="내 채널 vs 벤치마킹 평균" defaultOpen testId="yt-compare">
+        <Fold panel id="yt.compare" title="내 채널 vs 참고 채널 평균" defaultOpen testId="yt-compare">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
             <span className="t-meta text-slate-400" />
             <span className="t-meta text-right font-semibold text-amber-700">내 채널</span>
-            <span className="t-meta text-right font-semibold text-slate-500">벤치마킹 평균</span>
+            <span className="t-meta text-right font-semibold text-slate-500">참고 채널 평균</span>
             {cmp.map((r) => (
               <Row3 key={r.label} a={r.label} b={r.mine} c={r.bench} />
             ))}
@@ -1347,10 +1372,10 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
       <Fold panel id="yt.length" title="영상 길이별" summary={best(bestOf(ln))} testId="yt-length">
         <StatList stats={ln} />
       </Fold>
-      <Fold panel id="yt.format" title="롱폼 vs 쇼츠" testId="yt-format">
+      <Fold panel id="yt.format" title="긴 영상 vs 쇼츠" testId="yt-format">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
           <span className="t-meta text-slate-400">채널</span>
-          <span className="t-meta text-right font-semibold text-slate-500">롱폼 평균(편)</span>
+          <span className="t-meta text-right font-semibold text-slate-500">긴 영상 평균(편)</span>
           <span className="t-meta text-right font-semibold text-slate-500">쇼츠 평균(편)</span>
           {fm.map((r) => (
             <Row3 key={r.channel} a={r.channel} b={`${shortNum(r.longAvg)} (${r.longCount})`} c={`${shortNum(r.shortAvg)} (${r.shortCount})`} />

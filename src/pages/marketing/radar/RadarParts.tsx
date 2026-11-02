@@ -123,7 +123,7 @@ export function VideoRow({ v, onOpen, noThumb }: { v: RadarVideo; onOpen: (v: Ra
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="t-sub line-clamp-2 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{v.title}</span>
           <span className="t-meta truncate text-slate-500">
-            {v.channelName} · 구독자 {shortNum(v.channelSubs)} · {v.isShort ? '쇼츠' : '롱폼'}
+            {v.channelName} · 구독자 {shortNum(v.channelSubs)} · {v.isShort ? '쇼츠' : '긴 영상'}
           </span>
           <RatioChip v={v} />
         </span>
@@ -153,7 +153,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
   const lessons = lessonsOf(v, clusters)
   const share = Math.round(expectedShare(v.ageDays) * 100)
   return (
-    <Modal open title="벤치마킹 영상" onClose={onClose} size="lg">
+    <Modal open title="참고 영상" onClose={onClose} size="lg">
       <div className="flex flex-col gap-4" data-testid="radar-video-detail">
         <div className="flex flex-col gap-3 sm:flex-row">
           <Thumb v={v} noThumb={noThumb} className="w-full sm:w-64 sm:shrink-0" />
@@ -165,7 +165,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
               {!v.mine && (
                 <Badge tone={v.added ? 'warning' : 'neutral'}>
                   <span data-testid="radar-detail-source" data-added={v.added ? '1' : '0'}>
-                    {v.added ? '내가 추가' : '기본 벤치마킹'}
+                    {v.added ? '내가 추가' : '기본 참고 채널'}
                   </span>
                 </Badge>
               )}
@@ -176,7 +176,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
               )}
             </p>
             <p className="t-sub text-slate-500">
-              {dateKo(v.publishedAt)} · {v.isShort ? '쇼츠' : '롱폼'} {lengthText(v.durationSec)}
+              {dateKo(v.publishedAt)} · {v.isShort ? '쇼츠' : '긴 영상'} {lengthText(v.durationSec)}
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className={`t-sub rounded-full px-2.5 py-1 font-bold ${v.tier === 'breakout' ? 'bg-red-50 text-red-700' : v.tier === 'above' ? 'bg-amber-50 text-amber-900' : 'bg-slate-100 text-slate-700'}`} data-testid="radar-detail-tier">
@@ -192,7 +192,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
           <Stat label="구독자" value={`${shortNum(v.channelSubs)}명`} sub={v.channelSubs > 0 ? `조회수가 구독자의 ${v.viewsPerSub.toFixed(1)}배` : undefined} />
           <Stat label="평소(같은 형식 중앙값)" value={v.baseline === null ? '기준 부족' : `${fmt(v.baseline)}회`} sub={v.baseline === null ? '7일 넘은 같은 형식 영상이 3편 안 됨' : `이 채널 7일 넘은 ${v.isShort ? '쇼츠' : '롱폼'} ${v.baselineN}편`} />
           <Stat label="조회 속도" value={`하루 평균 ${shortNum(Math.round(v.perDay))}회`} sub={`올린 지 ${Math.max(1, Math.floor(v.ageDays))}일`} />
-          <Stat label="채널 안 순위" value={`${v.rank}위 / ${v.rankOf}편`} sub={`받아 온 ${v.isShort ? '쇼츠' : '롱폼'} 중`} />
+          <Stat label="채널 안 순위" value={`${v.rank}위 / ${v.rankOf}편`} sub={`받아 온 ${v.isShort ? '쇼츠' : '긴 영상'} 중`} />
         </div>
 
         {v.young && v.ratio !== null && (

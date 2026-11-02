@@ -21,6 +21,7 @@ import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { PACK_AI_PARTS, PACK_LABEL, makePack, packPartLabel, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import { mkText } from '../../../services/marketing/persona'
+import { plainLabel } from '../../../services/marketing/plainWords'
 
 const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = {
   titles: { icon: Type, chip: 'bg-violet-100 text-violet-700' },
@@ -128,7 +129,7 @@ export function PackView({
     <div className="flex flex-col gap-4" data-testid="mk-pack" data-key={source.key}>
       <div>
         <button type="button" onClick={onBack} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-slate-700 hover:bg-slate-100" data-testid="mk-pack-back">
-          <ArrowLeft aria-hidden="true" className="size-4" /> 이번 주 키워드
+          <ArrowLeft aria-hidden="true" className="size-4" /> 주제 다시 고르기
         </button>
       </div>
 
@@ -137,7 +138,7 @@ export function PackView({
         <div className="flex flex-col gap-1">
           <p className="t-meta inline-flex items-center gap-1.5 font-semibold text-slate-500">
             <span aria-hidden="true" className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-bold ${rank > 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>{rank > 0 ? rank : rank < 0 ? '고정' : '직접'}</span>
-            {rank > 0 ? `이번 주 키워드 ${rank}번` : rank < 0 ? '고정 키워드' : '직접 고른 주제'}
+            {rank > 0 ? `이번 주 뜨는 주제 ${rank}번` : rank < 0 ? '우리 본업 주제' : '직접 고른 주제'}
           </p>
           <HintTip tip="이 키워드 하나로 만든 묶음이에요 — 아래 칸마다 [이 칸 복사] 로 가져가 쓰고, 찍을 거면 [내 콘텐츠에 담기]." label={source.topic}>
             <h2 className="t-page break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-pack-topic">
@@ -201,7 +202,7 @@ export function PackView({
           return (
             <button key={x.id} type="button" onClick={() => go(x.id)} aria-current={current === x.id ? 'true' : undefined} className={`tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 font-semibold whitespace-nowrap ${current === x.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-400'}`} data-testid="mk-pack-chip" data-chip={x.id}>
               <L.icon aria-hidden="true" className="size-4" />
-              {x.label}
+              {plainLabel(x.label)}
               {x.id === 'checks' && pack.holes > 0 && <span className="t-meta rounded-full bg-amber-100 px-1.5 font-bold text-amber-900">{pack.holes}</span>}
             </button>
           )
@@ -230,7 +231,7 @@ export function PackView({
                 <L.icon className="size-5" />
               </span>
               <div className="min-w-0 flex-1 basis-40">
-                <h3 className="t-section break-keep text-slate-900">{x.label}</h3>
+                <h3 className="t-section break-keep text-slate-900">{plainLabel(x.label)}</h3>
                 <p className="t-meta break-keep text-slate-500">{x.hint}</p>
               </div>
               {x.id !== 'checks' && (
@@ -247,7 +248,7 @@ export function PackView({
               {x.blocks.map((b, i) => (
                 <div key={`${b.label}-${i}`} className="flex flex-col gap-1 rounded-xl bg-slate-50 px-3 py-2.5" data-testid="mk-pack-block">
                   <div className="flex items-start gap-2">
-                    <p className="t-sub min-w-0 flex-1 font-bold break-keep text-slate-800 [overflow-wrap:anywhere]">{b.label}</p>
+                    <p className="t-sub min-w-0 flex-1 font-bold break-keep text-slate-800 [overflow-wrap:anywhere]">{plainLabel(b.label)}</p>
                     <button type="button" onClick={() => onCopy(b.text, b.label)} className="tap t-meta -my-1 inline-flex min-h-9 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-600 hover:bg-white hover:text-slate-900">
                       <ClipboardCopy aria-hidden="true" className="size-3.5" /> 복사
                     </button>

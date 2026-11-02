@@ -25,6 +25,7 @@ import { markWeekSeen, startWeekAi, stopWeekAi, subscribeWeek, weekRun, weekSave
 import { weekItemId } from '../../../services/marketing/weekCollect'
 import { listThreadPosts } from '../../../services/marketing/threads'
 import { listShortPosts } from '../../../services/marketing/shorts'
+import { plainLabel } from '../../../services/marketing/plainWords'
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -184,7 +185,7 @@ export function WeekView({
     return 'idle'
   }
   const TABS: { key: WeekTab; label: string; count: string; icon: typeof MonitorPlay; tone: string; state: WeekPartState | null; ai: boolean }[] = [
-    { key: 'long', label: '유튜브 롱폼', count: '1', icon: MonitorPlay, tone: 'text-red-600', state: tabState(['long']), ai: week.long.ai },
+    { key: 'long', label: '유튜브 긴 영상', count: '1', icon: MonitorPlay, tone: 'text-red-600', state: tabState(['long']), ai: week.long.ai },
     { key: 'shorts', label: '릴스 · 쇼츠', count: `${shortsMain.length}`, icon: Film, tone: 'text-fuchsia-700', state: tabState(['shortA', 'shortB']), ai: shortsMain.some((x) => x.ai) },
     { key: 'threads', label: '스레드', count: `${threadsMain.length}${threadsSpare.length ? `+${threadsSpare.length}` : ''}`, icon: AtSign, tone: 'text-slate-800', state: tabState(['th0', 'th1', 'th2']), ai: threadsMain.some((x) => x.ai) },
     { key: 'plan', label: '올릴 날', count: '7일', icon: CalendarDays, tone: 'text-violet-700', state: null, ai: false },
@@ -210,7 +211,7 @@ export function WeekView({
               <h2 className="t-card font-extrabold break-keep text-slate-900">
                 1주일치 프로젝트 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
               </h2>
-              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(벤치마킹 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업">
+              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(참고 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업">
                 <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">AI 는 미끼, 끝은 본업</span>
               </HintTip>
             </div>
@@ -246,7 +247,7 @@ export function WeekView({
                       ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
                       : saved
                         ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-                        : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 롱폼 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
+                        : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
                 </p>
                 <div className="flex flex-wrap items-start gap-2">
                   {running ? (
@@ -319,7 +320,7 @@ export function WeekView({
                 <p className="t-sub flex flex-wrap gap-x-3 gap-y-1">
                   {got.long > 0 && (
                     <Link to={`/marketing?view=make&idea=${encodeURIComponent(weekItemId(ws ?? null, start, 'l'))}`} className="font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-collect-long">
-                      내 콘텐츠 · 롱폼 1
+                      내 콘텐츠 · 긴 영상 1
                     </Link>
                   )}
                   {got.shorts > 0 && (
@@ -375,11 +376,11 @@ export function WeekView({
           <section id="mk-week-long" className="scroll-mt-32" data-testid="mk-week-long" data-ai={week.long.ai ? '1' : '0'}>
             <Card
               icon={<MonitorPlay aria-hidden="true" className="size-5 text-red-600" />}
-              title={`유튜브 롱폼 · ${dayLabel(start, LONG_DAY)}`}
+              title={`유튜브 긴 영상 · ${dayLabel(start, LONG_DAY)}`}
               sub={`짝 1 · ${week.long.topic}`}
               ai={week.long.ai}
               lint={week.long.lint}
-              onCopy={() => onCopy([`제목: ${week.long.headline}`, ...[...week.long.titles, ...week.long.script].map((b) => `[${b.label}]\n${b.text}`)].join('\n\n'), '롱폼')}
+              onCopy={() => onCopy([`제목: ${week.long.headline}`, ...[...week.long.titles, ...week.long.script].map((b) => `[${b.label}]\n${b.text}`)].join('\n\n'), '긴 영상')}
             >
               <p className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-week-long-title">
                 {week.long.headline}
@@ -387,14 +388,14 @@ export function WeekView({
               {week.long.titles.length > 0 && (
                 <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                   {week.long.titles.map((b, i) => (
-                    <Block key={`t-${i}`} label={b.label} text={b.text} />
+                    <Block key={`t-${i}`} label={plainLabel(b.label)} text={b.text} />
                   ))}
                 </div>
               )}
               <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} summary="그대로 읽는 말 + 화면에 띄울 것 — 누르면 펼쳐져요">
                 <div className="flex flex-col gap-3">
                   {week.long.script.map((b, i) => (
-                    <Block key={`s-${i}`} label={b.label} text={b.text} />
+                    <Block key={`s-${i}`} label={plainLabel(b.label)} text={b.text} />
                   ))}
                 </div>
               </Fold>
@@ -478,11 +479,11 @@ export function WeekView({
           !(collect && week.long.ai) &&
           (savedHref ? (
             <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-2 font-semibold text-brand-700 underline underline-offset-2" data-testid="mk-week-long-saved">
-              롱폼 — 내 콘텐츠에서 보기
+              긴 영상 — 내 콘텐츠에서 보기
             </Link>
           ) : (
             <Button size="sm" variant="secondary" onClick={() => void saveLong()} disabled={saving} data-testid="mk-week-save-long">
-              <BookmarkPlus aria-hidden="true" className="size-4" /> 롱폼을 내 콘텐츠에 담기
+              <BookmarkPlus aria-hidden="true" className="size-4" /> 긴 영상을 내 콘텐츠에 담기
             </Button>
           ))}
         <p className={`t-sub min-w-0 flex-1 basis-60 break-keep font-semibold ${lint.bad ? 'text-danger-700' : 'text-success-700'}`} data-testid="mk-week-lint" data-bad={lint.bad}>
@@ -580,7 +581,7 @@ function ShortCard({ s, start, onCopy, link }: { s: WeekShort; start: string; on
       <Card icon={<Film aria-hidden="true" className="size-5 text-fuchsia-700" />} title={title} sub={`${s.topic} · ${plat?.label ?? ''}${s.draft.seconds ? ` · ${s.draft.seconds}` : ''}`} ai={s.ai} lint={s.lint} onCopy={() => onCopy(all, title)}>
         <p className="t-meta break-keep text-slate-600">{s.slot.role}</p>
         <p className="t-sub whitespace-pre-wrap break-keep text-slate-800 [overflow-wrap:anywhere]">{s.draft.script}</p>
-        {s.draft.caption && <Block label="캡션" text={s.draft.caption} />}
+        {s.draft.caption && <Block label="설명 글(캡션)" text={s.draft.caption} />}
         {s.draft.hashtags && <p className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]">{s.draft.hashtags}</p>}
         <PostRow link={link} what="릴스 · 틱톡" />
       </Card>

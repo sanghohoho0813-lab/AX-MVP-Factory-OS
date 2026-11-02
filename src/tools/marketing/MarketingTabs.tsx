@@ -27,21 +27,22 @@ interface Item {
   sub?: string
 }
 
+// D-507 대표 "60대 이상도 처음 딱 봐도" — 칸 이름은 쉬운 말(인기 영상 · 참고 채널 · 올리는 때 · 길이) · 열쇠(key) · 시험 이름은 그대로
 export const RADAR_VIEWS: Item[] = [
   { key: 'plan', label: '이번 주 찍을 것', short: '찍을 것', icon: slotIcon('mk-plan', Clapperboard) },
-  { key: 'top', label: '인기 · 급상승', short: '인기', icon: slotIcon('mk-top', Flame) },
-  { key: 'channels', label: '채널', short: '채널', icon: slotIcon('mk-channels', Tv) },
-  { key: 'analysis', label: '분석', short: '분석', icon: slotIcon('mk-analysis', BarChart3) },
-  { key: 'make', label: '내 콘텐츠', short: '내 콘텐츠', icon: slotIcon('mk-make', NotebookPen) },
+  { key: 'top', label: '인기 영상', short: '인기 영상', icon: slotIcon('mk-top', Flame) },
+  { key: 'channels', label: '참고 채널', short: '참고 채널', icon: slotIcon('mk-channels', Tv) },
+  { key: 'analysis', label: '올리는 때 · 길이', short: '분석', icon: slotIcon('mk-analysis', BarChart3) },
+  { key: 'make', label: '내 콘텐츠', short: '내 콘텐츠', sub: '(만든 것 모음)', icon: slotIcon('mk-make', NotebookPen) },
 ]
 const TOOLS: Array<Item & { to: string; on: string }> = [
   // D-273 대표 "쓰레드는 원래 없던 부분 — 기능을 잘 만들어 달라" — 실측 공식 틀 23가지 · 규칙 검사 · 기록표
-  { key: 'threads', label: '스레드', short: '스레드', sub: '(틀 23가지 · 글쓰기 · 기록표)', icon: slotIcon('mk-threads', AtSign), to: '/marketing/threads', on: 'from-slate-800 to-slate-950' },
+  { key: 'threads', label: '스레드', short: '스레드', sub: '(짧은 글 SNS · 틀 23가지 · 기록표)', icon: slotIcon('mk-threads', AtSign), to: '/marketing/threads', on: 'from-slate-800 to-slate-950' },
   // D-273 대표 "릴스 틱톡 파트도 따로" — 숏폼 실측 공식 · 형식 5 · 대본 · 기록표
-  { key: 'shorts', label: '릴스 · 틱톡', short: '릴스 · 틱톡', sub: '(쇼츠 · 대본 · 기록표)', icon: slotIcon('mk-shorts', Film), to: '/marketing/shorts', on: 'from-pink-600 to-orange-500' },
+  { key: 'shorts', label: '릴스 · 틱톡', short: '릴스 · 틱톡', sub: '(1분 세로 영상 대본 · 기록표)', icon: slotIcon('mk-shorts', Film), to: '/marketing/shorts', on: 'from-pink-600 to-orange-500' },
   // D-239 대표 "홍보 글 만들기 이름이 별로 — 블로그 · 플레이스 홍보 글 만들기, 아래에 (키워드 · 플레이스 · 블로그 등)"
-  { key: 'content', label: '블로그 · 플레이스 홍보 글 만들기', short: '블로그 · 플레이스', sub: '(키워드 · 플레이스 · 블로그 등)', icon: slotIcon('mk-content', PenLine), to: '/tools/content', on: 'from-violet-700 to-fuchsia-700' },
-  { key: 'homepage', label: '홈페이지 만들기', short: '홈페이지', icon: slotIcon('mk-homepage', Globe), to: '/tools/homepage', on: 'from-emerald-700 to-teal-700' },
+  { key: 'content', label: '블로그 · 플레이스 홍보 글 만들기', short: '블로그 · 플레이스', sub: '(네이버 블로그 · 플레이스 · 검색어)', icon: slotIcon('mk-content', PenLine), to: '/tools/content', on: 'from-violet-700 to-fuchsia-700' },
+  { key: 'homepage', label: '홈페이지 만들기', short: '홈페이지', sub: '(업체 소개 한 장 · 내려받기)', icon: slotIcon('mk-homepage', Globe), to: '/tools/homepage', on: 'from-emerald-700 to-teal-700' },
 ]
 
 /*
@@ -114,7 +115,8 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs">
       <div ref={strip} data-testid="mk-tabs-strip" className="flex gap-1.5 max-sm:snap-x max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none] sm:flex-col sm:gap-2">
         <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
-          <GroupLabel long="콘텐츠 레이더" short="레이더" />
+          {/* D-507 '콘텐츠 레이더' → 쉬운 말 '살펴보기'(남의 인기 영상을 보고 고른다) */}
+          <GroupLabel long="살펴보기" short="살펴보기" />
           <div className="max-sm:contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:gap-1 sm:rounded-(--radius-control) sm:border sm:border-slate-200 sm:bg-white sm:p-1">
             {RADAR_VIEWS.map((it) =>
               onRadar ? (

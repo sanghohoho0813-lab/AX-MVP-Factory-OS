@@ -20,6 +20,7 @@ import { SubjectPicker } from '../marketing/SubjectPicker'
 import { TrialBanner } from '../marketing/TrialBanner'
 import { useTrials } from '../marketing/trialStore'
 import { MarketingTabs } from '../marketing/MarketingTabs'
+import { ScreenGuide } from '../marketing/ScreenGuide'
 
 const LIST = '/tools/content'
 const BUILD = '/tools/content/build'
@@ -117,6 +118,8 @@ export function ContentPage() {
       />
       {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홈페이지와 같은 줄) */}
       <MarketingTabs active="content" />
+      {/* D-507 이 화면은 — 무엇을 해 주는 곳인지 한 줄 + 1 → 2 → 3(업체를 고르기 전 첫 화면에서만) */}
+      {section !== 'build' && <ScreenGuide id="content" what="네이버 블로그 · 플레이스에 올릴 홍보 글을 업체 기록으로 바로 만들어 줘요." steps={['업체 고르기', '글 종류 고르기', '[복사] 해서 올리기']} />}
       {section === 'build' ? <StudioScreen /> : <ClientPicker />}
     </div>
   )

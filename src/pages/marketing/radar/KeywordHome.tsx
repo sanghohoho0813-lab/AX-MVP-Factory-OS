@@ -11,12 +11,17 @@
  * D-295 대표: "정책자금 · 고용지원금 · 기업인증은 새 공고가 떴다고 키워드에 올리지 말고 고정 키워드로 따로(정부지원금 · 정부지원사업까지 5개) ·
  *        이번 주 키워드 10개는 유튜브에서 실제로 뜨는 것만 · 폰에서는 2열로 · 한참 내려가지 않게"
  *  - 맨 위 '고정 키워드' 다섯 칸(새 공고 칩) → 아래 '이번 주 키워드' 10칸(폰 2열 · 작은 칸). 폰에서는 형식 칩 · 기준 줄을 접어 둔다(물음표에 그대로).
+ * D-507 대표 "60대 이상이 처음 딱 봐도 이해하기 쉽고 계속 쓰기 쉽게"
+ *  - 맨 위 한 줄 질문(이번 주 무엇을 올릴까요?) + 1 → 2 → 3(주제 누르기 → 글 · 대본이 나와요 → [복사] 해서 올리기).
+ *  - 어려운 기준 줄(벤치마킹 채널 · 칩)은 [사용 방법] 안으로 — 지운 것 없음(같은 글 · 같은 시험 이름).
+ *  - 지난번 하던 것이 있으면 맨 위에 [이어서 하기] 한 장 — 다음에 할 일(대본 쓰기 · 찍기 · 올리기)과 이번 달 올린 수.
+ *  - 말은 쉬운 말로(롱폼 → 긴 영상 · 고정 키워드 → 우리 본업 주제 · 이번 주 키워드 → 이번 주 뜨는 주제).
  */
 import { useState } from 'react'
-import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, History, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
-import { HintTip } from '../../../components/ui/fold'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
 import { cleanTopic } from '../../../services/marketing/contentPack'
 import { isMarketingCustomer, mkText } from '../../../services/marketing/persona'
@@ -54,11 +59,32 @@ export interface HomeKeyword {
 }
 
 const HOW_TO: readonly { title: string; body: string }[] = [
-  { title: '키워드 하나를 누르세요', body: '맨 위 고정 키워드 다섯(정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업)은 늘 그 자리예요 — 칩은 기업마당 이번 주 새 공고 수. 아래 이번 주 키워드는 경제 · 경영 · AI 채널에서 최근 2주 함께 오르는 주제예요(1번이 가장 강한 흐름).' },
-  { title: '글이 한 번에 나와요', body: '제목 · 유튜브 대본 · 릴스 대본 · 블로그 글 · 카드뉴스 · 올릴 때 글까지. 대표 계정이면 [AI로 다 쓰기] 를 눌렀을 때 AI 가 검증된 방법대로 다시 써요(20~60초 — 그동안 초안을 먼저 보여 드려요).' },
-  { title: '칸마다 [복사] 해서 쓰세요', body: '[공식 자료 확인] 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요. 금액 · 날짜는 지어내지 않아요.' },
-  { title: '찍을 거면 [내 콘텐츠에 담기]', body: '대본이 그대로 저장돼요. 촬영일 · 게시일 · 체크리스트는 위 목차의 [내 콘텐츠] 에서 적어요.' },
+  { title: '주제를 하나 누르세요', body: '맨 위 다섯(정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업)은 우리 본업 주제라 늘 그 자리예요 — 작은 글씨는 기업마당에 이번 주 새로 나온 공고 수예요. 아래 \'이번 주 뜨는 주제\' 는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요).' },
+  { title: '글이 한 번에 나와요', body: '제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글까지. 대표 계정이면 [AI로 다 쓰기] 를 눌렀을 때 AI 가 검증된 방법대로 더 자연스럽게 다시 써요(20~60초 — 그동안 초안을 먼저 보여 드려요).' },
+  { title: '칸마다 [복사] 해서 쓰세요', body: '[공식 자료 확인] 이라고 적힌 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요. 금액 · 날짜는 지어내지 않아요.' },
+  { title: '찍을 거면 [내 콘텐츠에 담기]', body: '대본이 그대로 저장돼요. 찍는 날 · 올리는 날 · 할 일 표는 위 목차의 [내 콘텐츠] 에서 적어요. 다음에 오면 맨 위 [이어서 하기] 로 바로 돌아와요.' },
 ]
+
+/** D-507 첫 화면 1 → 2 → 3 — 누르면 무엇이 되는지 먼저 보이게 */
+const STEPS: readonly { t: string; short: string }[] = [
+  { t: '주제 누르기', short: '주제 누르기' },
+  { t: '글 · 대본이 나와요', short: '글 · 대본 나옴' },
+  { t: '[복사] 해서 올리기', short: '복사해 올리기' },
+]
+
+/** D-507 지난번 하던 것(내 콘텐츠 수첩에서 아직 올리지 않은 가장 최근 줄) */
+export interface HomeResume {
+  topic: string
+  /** 지금 단계(쉬운 말) */
+  stage: string
+  /** 다음에 할 일(쉬운 말) */
+  next: string
+  href: string
+  /** 아직 올리지 않은 것 수 */
+  making: number
+  /** 이번 달 올린 것 수 */
+  posted: number
+}
 
 export function KeywordHome({
   fixed = [],
@@ -71,7 +97,10 @@ export function KeywordHome({
   onPick,
   onCustom,
   week,
+  resume,
 }: {
+  /** D-507 지난번 하던 것 — 없으면 카드 없음 */
+  resume?: HomeResume | null
   /** D-346 1주일치 한 번에 — ai: 누르면 AI 를 부를 수 있음(두 번 눌러 확인) · done: 이번에 만들 주를 이미 써 둠 */
   week?: { ai: boolean; done: boolean; onOpen: (startAi: boolean) => void }
   /** D-295 고정 키워드(늘 다섯 — 유튜브 데이터가 없어도 보인다) */
@@ -97,28 +126,31 @@ export function KeywordHome({
   return (
     <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" aria-labelledby="mk-home-title" data-testid="mk-home">
       <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
-        {/* D-478 불꽃 아이콘을 제목 줄 안으로(예전: 왼쪽 칸을 따로 먹어 휴대폰에서 설명이 세 줄로 꺾임) · 제목은 검정(빨강 = 주의 · 늦음만) */}
+        {/* D-507 한 줄 질문 + 1 → 2 → 3 — 처음 온 사람도 무엇을 누르면 어떻게 되는지 먼저 보이게(예전 형식 칩 · 기준 줄은 [사용 방법] 안) */}
         <div className="min-w-0 flex-1">
-          <HintTip tip="고정 키워드 다섯은 우리 본업 주제라 늘 그 자리예요(칩 = 기업마당 이번 주 새 공고 수 · 매일 아침 9시). 이번 주 키워드는 경제 · 경영 · AI 벤치마킹 채널에서 최근 2주 동안 여러 곳이 함께 다루고 평소보다 잘된 주제예요(규칙 계산 · 6시간마다 새로). 근거는 화면 아래 [자세히 보기] 에 있어요." label="이번 주 키워드">
-            <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
-              <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
-              이번 주 키워드
-            </h2>
-          </HintTip>
-          <p className="t-sub break-keep text-slate-600">{mkText('누르면 유튜브 대본 · 릴스 · 블로그 · 카드뉴스가 한 번에 나와요')}</p>
-          <ul className="mt-1.5 hidden flex-wrap gap-1.5 sm:flex" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
-            {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
-              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
-                <f.icon aria-hidden="true" className="size-3.5" />
-                {f.label}
+          {/* 물음표는 오른쪽 [사용 방법] 하나만(두 개면 어느 것을 눌러야 할지 헷갈린다) */}
+          <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
+            <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
+            <span>
+              <span className="max-sm:hidden">이번 주 </span>무엇을 올릴까요?
+            </span>
+          </h2>
+          <p className="t-sub break-keep text-slate-700 max-sm:hidden">{mkText('주제를 하나 누르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요')}</p>
+          {/* 휴대폰은 세 칸(번호 위 · 글 아래), PC 는 한 줄 화살표 */}
+          <ol className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
+            {STEPS.map((st, i) => (
+              <li key={st.t} className="t-sub flex flex-col items-center gap-1 rounded-lg border border-slate-200 px-1 py-1.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:rounded-none sm:border-0 sm:p-0 sm:text-left">
+                {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 max-sm:hidden" />}
+                <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[0.8125rem] font-bold text-white">
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="sm:hidden">{st.short}</span>
+                  <span className="max-sm:hidden">{st.t}</span>
+                </span>
               </li>
             ))}
-          </ul>
-          {basis && (
-            <p className="t-meta hidden break-keep text-slate-500 sm:block" data-testid="mk-basis">
-              {basis}
-            </p>
-          )}
+          </ol>
         </div>
         <button
           type="button"
@@ -133,27 +165,44 @@ export function KeywordHome({
       </div>
 
       {help && (
-        <ol className="flex flex-col gap-2 border-b border-slate-100 bg-white px-4 py-3" data-testid="mk-howto">
-          {HOW_TO.map((h, i) => (
-            <li key={h.title} className="flex gap-2.5">
-              <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
-                {i + 1}
-              </span>
-              <p className="t-sub min-w-0 break-keep text-slate-800">
-                <b className="text-slate-900">{h.title}</b> — {isMarketingCustomer() ? mkText(h.body).replace('대표 계정이면 ', '') : h.body}
-              </p>
-            </li>
-          ))}
-          <li className="t-sub break-keep pl-8 text-slate-600">왜 이 키워드인지 · 관련 영상 · 시장 신호는 화면 맨 아래 [자세히 보기] 에 있어요.</li>
-        </ol>
+        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-4 py-3">
+          <ol className="flex flex-col gap-2" data-testid="mk-howto">
+            {HOW_TO.map((h, i) => (
+              <li key={h.title} className="flex gap-2.5">
+                <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+                  {i + 1}
+                </span>
+                <p className="t-sub min-w-0 break-keep text-slate-800">
+                  <b className="text-slate-900">{h.title}</b> — {isMarketingCustomer() ? mkText(h.body).replace('대표 계정이면 ', '') : h.body}
+                </p>
+              </li>
+            ))}
+            <li className="t-sub break-keep pl-8 text-slate-600">왜 이 주제인지 · 관련 영상 · 시장 신호는 화면 맨 아래 [자세히 보기] 에 있어요.</li>
+          </ol>
+          {/* 한 번에 나오는 형식 · 무엇을 기준으로 골랐나(예전 첫 화면 위 두 줄) — 처음 화면을 가볍게 하려고 여기로 */}
+          <ul className="flex flex-wrap gap-1.5 pl-8" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
+            {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
+              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                <f.icon aria-hidden="true" className="size-3.5" />
+                {f.label}
+              </li>
+            ))}
+          </ul>
+          {basis && (
+            <p className="t-meta break-keep pl-8 text-slate-600" data-testid="mk-basis">
+              {basis}
+            </p>
+          )}
+        </div>
       )}
 
       <div className="flex flex-col gap-3 p-3 sm:p-4">
+        {resume && <ResumeCard {...resume} />}
         {week && <WeekButton {...week} />}
         {fixed.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
             <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
-              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 고정 키워드 <span className="font-normal text-slate-500">· 우리 본업 — 늘 이 자리</span>
+              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 우리 본업 주제 <span className="font-normal text-slate-600">· 늘 이 자리</span>
             </p>
             <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-5" data-testid="mk-fixed-keys">
               {fixed.map((k) => (
@@ -185,7 +234,7 @@ export function KeywordHome({
           </div>
         )}
         <p className="t-meta -mb-1.5 flex items-center gap-1 font-bold text-slate-700">
-          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 키워드 <span className="font-normal text-slate-500">· 유튜브에서 지금 뜨는 것</span>
+          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제 <span className="font-normal text-slate-600">· 유튜브에서 지금 많이 보는 것</span>
         </p>
         {change && list.length > 0 && (
           <p className="t-meta break-keep rounded-lg bg-slate-50 px-3 py-1.5 text-slate-700 sm:py-2 sm:text-[0.9375rem]" data-testid="mk-change">
@@ -258,7 +307,7 @@ export function KeywordHome({
               value={custom}
               onChange={(e) => setCustom(e.target.value)}
               maxLength={60}
-              placeholder="직접 주제 쓰기 — 예) 2027 정책자금 달라지는 점"
+              placeholder="원하는 주제를 직접 써도 돼요 — 예) 2027 정책자금 달라지는 점"
               className="t-body min-h-11 min-w-0 flex-1 bg-transparent outline-none placeholder:text-slate-400"
               data-testid="mk-custom-input"
             />
@@ -288,13 +337,13 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
       <CalendarDays aria-hidden="true" className="size-6 shrink-0" />
       <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
         <span className="t-body font-bold break-keep">{done ? '1주일치 콘텐츠 보기' : '1주일치 콘텐츠 한 번에 만들기'}</span>
-        <span className="t-meta break-keep text-white/90">AI 는 미끼, 끝은 본업 — 이번 주 흐름 × 고정 키워드 · 검증된 방법 그대로</span>
+        <span className="t-meta break-keep text-white/90">이번 주 뜨는 주제에 우리 본업을 엮어, 일주일 동안 올릴 것을 AI 가 한 번에 써요</span>
       </span>
       <span className="flex flex-wrap gap-1">
         {[
-          { icon: MonitorPlay, t: '롱폼 1' },
-          { icon: Film, t: '릴스 · 쇼츠 3' },
-          { icon: AtSign, t: '스레드 7' },
+          { icon: MonitorPlay, t: '유튜브 긴 영상 1' },
+          { icon: Film, t: '짧은 영상 3' },
+          { icon: AtSign, t: '스레드 글 7' },
         ].map((c) => (
           <span key={c.t} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold ring-1 ring-white/25">
             <c.icon aria-hidden="true" className="size-3.5" /> {c.t}
@@ -311,4 +360,34 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
     </button>
   )
   return ai && !done ? <AiConfirm confirmLabel="이대로 1주일치 만들기">{body}</AiConfirm> : body
+}
+
+/**
+ * D-507 지난번 하던 것 — 다시 왔을 때 어디서부터인지 찾지 않게(계속 쓰기 쉽게).
+ * 흰 칸 + 회색 테두리(박스 색 하나) · 큰 단추 하나.
+ */
+function ResumeCard({ topic, stage, next, href, making, posted }: HomeResume) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4" data-testid="mk-resume">
+      <History aria-hidden="true" className="size-6 shrink-0 text-slate-500" />
+      <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
+        <span className="t-meta font-semibold text-slate-600">지난번 하던 것</span>
+        <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-resume-topic">
+          {topic}
+        </span>
+        <span className="t-sub break-keep text-slate-700">
+          지금 <b className="font-semibold text-slate-900">{stage}</b> · 다음은 <b className="font-semibold text-brand-700">{next}</b>
+          {making > 1 || posted > 0 ? (
+            <span className="text-slate-600" data-testid="mk-resume-count">
+              {' '}
+              ({[making > 1 ? `만드는 중 ${making}개` : '', posted > 0 ? `이번 달 올린 것 ${posted}개` : ''].filter(Boolean).join(' · ')})
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <Link to={href} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="mk-resume-go">
+        이어서 하기 <ArrowRight aria-hidden="true" className="size-4" />
+      </Link>
+    </div>
+  )
 }

@@ -18,13 +18,13 @@ function Row({ a, b, c }: { a: string; b: string; c?: string }) {
 
 export function MyChannelCard({ s }: { s: MyChannelStats | null }) {
   return (
-    <Fold panel id="radar.mine" title="내 채널(최근 20편)" defaultOpen summary={s ? `롱폼 평소 ${s.longMedian === null ? '—' : `${shortNum(s.longMedian)}회`} · 쇼츠 평소 ${s.shortMedian === null ? '—' : `${shortNum(s.shortMedian)}회`}` : '내 채널 영상이 없습니다'} testId="radar-mine">
+    <Fold panel id="radar.mine" title="내 채널(최근 20편)" defaultOpen summary={s ? `긴 영상 평소 ${s.longMedian === null ? '—' : `${shortNum(s.longMedian)}회`} · 쇼츠 평소 ${s.shortMedian === null ? '—' : `${shortNum(s.shortMedian)}회`}` : '내 채널 영상이 없습니다'} testId="radar-mine">
       {!s ? (
         <p className="t-sub text-slate-500">받아 온 데이터에 내 채널 영상이 없습니다.</p>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
-            <Row a="평소 조회수 · 롱폼" b={s.longMedian === null ? '—' : `${fmt(s.longMedian)}회`} c={`${s.longCount}편 중앙값`} />
+            <Row a="평소 조회수 · 긴 영상" b={s.longMedian === null ? '—' : `${fmt(s.longMedian)}회`} c={`${s.longCount}편 중앙값`} />
             <Row a="평소 조회수 · 쇼츠" b={s.shortMedian === null ? '—' : `${fmt(s.shortMedian)}회`} c={`${s.shortCount}편 중앙값`} />
             <Row a="평소 조회 속도" b={`하루 ${fmt(Math.round(s.perDayMedian))}회`} c="올린 뒤 하루 평균의 중앙값" />
             <Row a="가장 잘된 주제" b={s.bestTopic ? s.bestTopic.label : '아직 모름'} c={s.bestTopic ? `${s.bestTopic.count}편 · 중앙값 ${shortNum(s.bestTopic.median)}회` : '같은 주제 2편 넘게 필요'} />

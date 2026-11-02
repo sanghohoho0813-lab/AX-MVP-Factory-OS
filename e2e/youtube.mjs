@@ -123,7 +123,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
   // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
-  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 "콘텐츠 레이더 · YouTube 벤치마킹"', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 3 && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
+  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 한 줄 = 무엇을 하는 곳인지(쉬운 말 · D-507) + (콘텐츠 레이더)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 3 && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('만드는 곳') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
   await page.getByTestId('yt-view-top').click()
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
@@ -580,7 +580,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   // 사이드 영상 상세 — [기본 벤치마킹] · 영역 · 형식
   await page.getByTestId('radar-side-row').filter({ hasText: '풀버전' }).locator('button').click()
   await page.waitForTimeout(300)
-  check(`F15 ${T} 영상 상세: [기본 벤치마킹] 표시 · 영역 · 기타 · 형식 · 전문가 인터뷰`, ((await page.getByTestId('radar-detail-source').innerText()) ?? '').includes('기본 벤치마킹') && (await page.getByTestId('radar-detail-source').getAttribute('data-added')) === '0' && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('영역 · 기타') && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('형식 · 전문가 인터뷰'))
+  check(`F15 ${T} 영상 상세: [기본 참고 채널](예전 기본 벤치마킹 — D-507 쉬운 말) 표시 · 영역 · 기타 · 형식 · 전문가 인터뷰`, ((await page.getByTestId('radar-detail-source').innerText()) ?? '').includes('기본 참고 채널') && (await page.getByTestId('radar-detail-source').getAttribute('data-added')) === '0' && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('영역 · 기타') && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('형식 · 전문가 인터뷰'))
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
   check(`${T} 첫 화면 넘침 0`, (await over()) <= 0, await over())

@@ -441,8 +441,11 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   check('K2 고정 키워드 칩 = 이번 주 새 공고 수(지난달 공고는 안 셈 · 1건도 · 없으면 칩 대신 짧은 설명)', (await noteOf('notice:policy_fund')) === '새 공고 3건' && (await noteOf('notice:employ_subsidy')) === '새 공고 2건' && (await noteOf('notice:sme_subsidy')) === '새 공고 2건' && (await noteOf('notice:certification')) === '새 공고 1건' && (await noteOf('notice:grant_program')) === '', { pf: await noteOf('notice:policy_fund'), cert: await noteOf('notice:certification') })
   const FIXED_TOPICS = ['policy_fund', 'employ_subsidy', 'certification', 'sme_subsidy', 'grant_program']
   check('K3 이번 주 키워드 10개는 유튜브에서 뜨는 주제만 — 고정 키워드 주제 · 공고 키워드 0(경영 × AI 다리 주제도)', keyIds.length === 10 && !keyIds.some((k) => k.startsWith('notice:') || FIXED_TOPICS.includes(k.split(':')[1])), keyIds)
+  // D-507 기준 줄은 첫 화면을 가볍게 하려고 [사용 방법] 안으로 — 펼쳐서 읽는다(글은 그대로)
+  await p.getByTestId('mk-howto-toggle').click()
   const basis = (await p.getByTestId('mk-basis').innerText()) ?? ''
-  check('K4 기준 한 줄 — 이번 주 키워드: 벤치마킹 채널 최근 2주 · 고정 키워드 칩: 기업마당 이번 주(날짜) 새 공고 · 받는 때', basis.includes('최근 2주') && basis.includes('기업마당 이번 주') && /\d+\/\d+~\d+\/\d+/.test(basis) && basis.includes('6시간마다') && basis.includes('아침 9시'), basis)
+  await p.getByTestId('mk-howto-toggle').click()
+  check('K4 기준 한 줄([사용 방법] 안) — 이번 주 뜨는 주제: 참고 채널 최근 2주 · 고정 키워드 칩: 기업마당 이번 주(날짜) 새 공고 · 받는 때', basis.includes('최근 2주') && basis.includes('기업마당 이번 주') && /\d+\/\d+~\d+\/\d+/.test(basis) && basis.includes('6시간마다') && basis.includes('아침 9시'), basis)
   const change = (await p.getByTestId('mk-change').innerText().catch(() => '')) ?? ''
   const isNew = async (key) => (await p.locator(`[data-testid="mk-key"][data-key="${key}"] [data-testid="mk-key-new"]`).count()) === 1
   const newCount = await p.locator('[data-testid="mk-key"] [data-testid="mk-key-new"]').count()
@@ -457,7 +460,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   const why = (await p.getByTestId('mk-pack-notices').innerText().catch(() => '')) ?? ''
   check('K6 고정 키워드(정부지원금) 누르면 묶음 — 왜 지금(이번 주 새 공고 2건 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 2건') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
   const packAll = (await p.getByTestId('mk-pack').innerText()) ?? ''
-  check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('고정 키워드') && packAll.includes('이번 주에만 정부지원금 공고가 2건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
+  check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('우리 본업 주제') && packAll.includes('이번 주에만 정부지원금 공고가 2건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
   await shot(p, 'K-pack')
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
@@ -473,7 +476,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await p.getByTestId('mk-pack').waitFor()
   await aiDone(p)
   const gpText = (await p.getByTestId('mk-pack').innerText()) ?? ''
-  check('K8b 이번 주 새 공고가 없는 고정 키워드(정부지원사업)도 묶음이 열림 — 늘 찾는 본업 주제', gpText.includes('고정 키워드') && gpText.includes('정부지원사업'), gpText.slice(0, 160))
+  check('K8b 이번 주 새 공고가 없는 고정 키워드(정부지원사업)도 묶음이 열림 — 늘 찾는 본업 주제', gpText.includes('우리 본업 주제') && gpText.includes('정부지원사업'), gpText.slice(0, 160))
   // 휴대폰 — 고정 키워드 · 이번 주 키워드 모두 2열 · 넘침 0
   await p.setViewportSize({ width: 390, height: 844 })
   await p.goBack()

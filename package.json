@@ -88,6 +88,7 @@
     "qa:uxpick": "node e2e/uxpick.mjs",
     "qa:firstscreen": "node e2e/firstscreen.mjs",
     "qa:hover": "node e2e/hover.mjs",
+    "qa:senior": "node e2e/senior.mjs",
     "qa:mkkit": "node e2e/mkkit.mjs",
     "qa:mkweek": "node e2e/mkweek.mjs",
     "qa:threads": "node e2e/threads.mjs",

@@ -157,7 +157,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const kinds = await hub.getByTestId('mk-allmade-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind')))
   check('H1 내 콘텐츠 맨 위 "만든 것 한눈에" — 스레드 · 릴스 · 롱폼 섞어 최근 것부터(스레드 5분 · 쇼츠 1시간 · 롱폼 2시간 · 스레드 5시간)', kinds.join(',') === 'thread,short,long,thread', kinds)
   const chips = await hub.getByTestId('mk-allmade-kind').evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()))
-  check('H2 형식 칩 — 전체 4 · 유튜브 롱폼 1 · 릴스 · 틱톡 1 · 스레드 2', chips.join('|') === '전체 4|유튜브 롱폼 1|릴스 · 틱톡 1|스레드 2', chips)
+  check('H2 형식 칩 — 전체 4 · 유튜브 롱폼 1 · 릴스 · 틱톡 1 · 스레드 2', chips.join('|') === '전체 4|유튜브 긴 영상 1|릴스 · 틱톡 1|스레드 2', chips)
   const order = await page.evaluate(() => {
     const a = document.querySelector('[data-testid="mk-projects"]')
     const b = document.querySelector('[data-testid="mk-allmade"]')

@@ -34,7 +34,7 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
         <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
-        <p className="t-meta break-keep text-slate-500">누르면 그 주 프로젝트 안에서 롱폼 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
+        <p className="t-meta break-keep text-slate-500">누르면 그 주 프로젝트 안에서 긴 영상 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
       </div>
       {weeks.length === 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-3 py-3" data-testid="mk-projects-empty">
@@ -83,7 +83,7 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
                     </span>
                   )}
                   <span className="flex flex-wrap gap-1.5" data-testid="mk-project-counts">
-                    <Count icon={MonitorPlay} label="롱폼" n={c.long} of={1} />
+                    <Count icon={MonitorPlay} label="긴 영상" n={c.long} of={1} />
                     <Count icon={Film} label="쇼츠 · 릴스" n={c.shorts} of={3} />
                     <Count icon={AtSign} label="스레드" n={c.threads} of={7} />
                   </span>

@@ -1679,7 +1679,7 @@ function KeywordVolumeBox({ onPick }: { onPick: (word: string) => void }) {
       </div>
       {hasNum && under > 0 && (
         <p className="t-meta break-keep text-slate-600" data-testid="content-volume-tip">
-          한 달 검색이 100 아래인 말 {under}개는 따로 글을 쓰기보다 다른 글의 본문 · 해시태그에 같이 넣는 편이 나아요.
+          한 달 검색이 100 아래인 말 {under}개는 따로 글을 쓰기보다 다른 글의 본문 · #태그에 같이 넣는 편이 나아요.
         </p>
       )}
       {rows && list.length > 0 && (

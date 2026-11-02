@@ -522,7 +522,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           <div id="sht-editor" className="scroll-mt-24" data-testid="sht-editor-closed">
             <StepTitle n="2">고치고 확인하기</StepTitle>
           </div>
-          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · 해시태그를 바로 검사해요.</p>
+          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요.</p>
           <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
             <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
           </Button>
@@ -546,14 +546,14 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               <textarea value={draft.script} onChange={(e) => set({ script: e.target.value })} rows={11} placeholder={'[0:00] 첫마디 10자 안팎  (화면 큰 글자: …)\n[0:03] 딱 세 가지만 보세요.\n[0:06] 첫째, …'} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 leading-relaxed" data-testid="sht-script" />
             </label>
             <label className="flex flex-col gap-1">
-              <HintTip tip="영상 아래에 붙는 설명 글이에요. 영상을 다 안 본 사람도 무슨 내용인지 알게 짧게 적어요." label="캡션" tight>
-                <span className="t-sub font-semibold text-slate-700">캡션 {draft.platform === 'tiktok' ? '(한 줄)' : draft.aim === 'convert' ? '(200자 안팎 · 요약 3줄 + 키워드)' : '(100자 안팎)'}</span>
+              <HintTip tip="영상 아래에 붙는 설명 글이에요. 영상을 다 안 본 사람도 무슨 내용인지 알게 짧게 적어요." label="설명 글(캡션)" tight>
+                <span className="t-sub font-semibold text-slate-700">설명 글(캡션) {draft.platform === 'tiktok' ? '(한 줄)' : draft.aim === 'convert' ? '(200자 안팎 · 요약 3줄 + 키워드)' : '(100자 안팎)'}</span>
               </HintTip>
               <textarea value={draft.caption} onChange={(e) => set({ caption: e.target.value })} rows={3} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" data-testid="sht-caption" />
             </label>
             <label className="flex flex-col gap-1">
-              <HintTip tip="#으로 시작하는 검색 낱말이에요. 이 낱말을 찾는 사람에게 영상이 보여요. 예: #창업 #세금" label="해시태그" tight>
-                <span className="t-sub font-semibold text-slate-700">해시태그 {draft.platform === 'tiktok' ? '(3~5개)' : '(0~3개)'}</span>
+              <HintTip tip="#으로 시작하는 검색 낱말이에요. 이 낱말을 찾는 사람에게 영상이 보여요. 예: #창업 #세금" label="#태그(해시태그)" tight>
+                <span className="t-sub font-semibold text-slate-700">#태그(해시태그) {draft.platform === 'tiktok' ? '(3~5개)' : '(0~3개)'}</span>
               </HintTip>
               <input value={draft.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#벤처기업확인 #창업" className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-tags" />
             </label>
@@ -571,8 +571,8 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
               <Button variant="secondary" onClick={() => copy(draft.script.trim(), '대본을')} disabled={!draft.script.trim()} data-testid="sht-copy-script">
                 <ClipboardCopy aria-hidden="true" className="size-4" /> 대본 복사
               </Button>
-              <Button variant="secondary" onClick={() => copy(`${draft.caption.trim()}\n\n${draft.hashtags.trim()}`.trim(), '캡션을')} disabled={!draft.caption.trim() && !draft.hashtags.trim()} data-testid="sht-copy-caption">
-                <ClipboardCopy aria-hidden="true" className="size-4" /> 캡션 복사
+              <Button variant="secondary" onClick={() => copy(`${draft.caption.trim()}\n\n${draft.hashtags.trim()}`.trim(), '설명 글을')} disabled={!draft.caption.trim() && !draft.hashtags.trim()} data-testid="sht-copy-caption">
+                <ClipboardCopy aria-hidden="true" className="size-4" /> 설명 글 복사
               </Button>
               {!readOnly && (
                 <>
@@ -597,7 +597,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           </div>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 캡션 · 해시태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
+              <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 설명 글 · #태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>
               </HintTip>
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
@@ -626,7 +626,7 @@ function AiDraftCard({ n, d, draft, facts, onUse }: { n: number; d: ShortDraft; 
         </Badge>
       </div>
       <p className="t-sub max-h-56 overflow-y-auto break-keep whitespace-pre-line text-slate-800">{d.script}</p>
-      {d.caption && <p className="t-sub break-keep text-slate-500">캡션: {d.caption}</p>}
+      {d.caption && <p className="t-sub break-keep text-slate-500">설명 글: {d.caption}</p>}
       <Button variant="secondary" onClick={onUse} data-testid="sht-ai-use">
         이 대본으로 고치기
       </Button>
@@ -770,7 +770,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
             <li>말로 설명 — 1초에 6~7자</li>
             <li>리스트 · 화면 시연 · 대화형</li>
             <li>많이 보이게: 끝에 권유 없이 / 문의로: 끝 한 줄</li>
-            <li>캡션 한 줄 + 해시태그 3~5개</li>
+            <li>설명 글 한 줄 + #태그 3~5개</li>
           </ul>
         </Surface>
         <Surface className="flex flex-col gap-1.5">
@@ -782,7 +782,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
             <li>말 없이 글자만도 됨 (말을 넣으면 첫 문장에 숫자)</li>
             <li>한 화면 목록 · 화면 시연 · 짧은 글자 정보</li>
             <li>많이 보이게: 권유 없이 / 댓글 받기: "키워드 댓글" 하나</li>
-            <li>캡션 100자(댓글형 200자) · 해시태그 0~3개</li>
+            <li>설명 글 100자(댓글형 200자) · #태그 0~3개</li>
           </ul>
         </Surface>
       </div>
@@ -815,7 +815,7 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
               <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
                 <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">예시 대본 보기</summary>
                 <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{exampleText(f.example)}</p>
-                <p className="t-sub mt-2 break-keep whitespace-pre-line text-slate-500">캡션: {f.exampleCaption}</p>
+                <p className="t-sub mt-2 break-keep whitespace-pre-line text-slate-500">설명 글: {f.exampleCaption}</p>
               </details>
               <div className="mt-auto">
                 <Button variant="secondary" onClick={() => onUse(f)} data-testid="sht-guide-use">

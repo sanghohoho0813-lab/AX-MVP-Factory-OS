@@ -59,13 +59,14 @@ export const GROUP_LABEL: Record<BenchmarkChannelGroup, string> = {
   direct: '직접 경쟁 · 시장수요',
   ai: 'AI 실무',
   ax: 'AX · 업무자동화',
-  format: '포맷 벤치마킹',
+  // D-507 쉬운 말(예전 '포맷 벤치마킹') — 열쇠(format)는 그대로
+  format: '형식 참고(표현 방식)',
 }
 export const GROUP_PURPOSE: Record<BenchmarkChannelGroup, string> = {
   direct: '중소기업 대표가 지금 무엇에 관심 있는지(정책자금 · 지원사업 · 지원금 · 절세 · 법인)',
   ai: 'AI 콘텐츠에서 사람들이 반응하는 실무 주제와 설명 방식(ChatGPT · Claude · 자동화 · 생산성)',
   ax: 'MIRAE AI LAB 의 핵심 차별화 영역(업무자동화 · 노코드 · 기업 AI 도입 · 사내 시스템)',
-  format: '주제가 아니라 표현 방식 — 제목 · 썸네일 · 오프닝 · 구성',
+  format: '주제가 아니라 표현 방식 — 제목 · 표지 그림 · 첫머리 · 구성',
 }
 
 export const isGroup = (g: unknown): g is BenchmarkChannelGroup => typeof g === 'string' && (GROUPS as readonly string[]).includes(g)
@@ -375,7 +376,7 @@ export interface GroupCoverage {
 }
 
 /** 화면에 쓰는 짧은 묶음 이름 */
-export const GROUP_SHORT: Record<BenchmarkChannelGroup, string> = { direct: '직접 경쟁', ai: 'AI 실무', ax: 'AX · 자동화', format: '포맷' }
+export const GROUP_SHORT: Record<BenchmarkChannelGroup, string> = { direct: '직접 경쟁', ai: 'AI 실무', ax: 'AX · 자동화', format: '형식 참고' }
 
 /** '직접 경쟁 채널 18곳 중 6곳' */
 export const coverageLine = (g: GroupCoverage) => `${GROUP_SHORT[g.group]} 채널 ${g.total}곳 중 ${g.covered}곳`
@@ -1142,7 +1143,7 @@ export function sideNotes(v: RadarVideo): string[] {
     if (p) out.push(id === 'number' && /^\s*[\d[(]/.test(v.title) ? '숫자를 제목 맨 앞에 둠' : p.note)
   }
   if (out.length < 3 && v.small && v.viewsPerSub >= 1) out.push(`구독자 ${shortSubs(v.channelSubs)} 채널인데 조회수가 구독자의 ${v.viewsPerSub.toFixed(1)}배`)
-  if (out.length < 3) out.push(v.isShort ? `${v.durationSec}초 쇼츠` : `${Math.round(v.durationSec / 60)}분 롱폼`)
+  if (out.length < 3) out.push(v.isShort ? `${v.durationSec}초 쇼츠` : `${Math.round(v.durationSec / 60)}분 긴 영상`)
   return out.slice(0, 3)
 }
 

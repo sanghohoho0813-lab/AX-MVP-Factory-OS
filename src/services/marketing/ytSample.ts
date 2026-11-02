@@ -86,7 +86,7 @@ const EXTRA = [
   { title: '예시 AI 채널 아', group: 'ai', subs: 9_000 },
   { title: '예시 AI 채널 자', group: 'ai', subs: 38_000 },
   { title: '예시 자동화 채널 차', group: 'ax', subs: 21_000 },
-  { title: '예시 포맷 채널 카', group: 'format', subs: 420_000 },
+  { title: '예시 형식 채널 카', group: 'format', subs: 420_000 },
 ] as const
 const AI_TOPICS = ['ChatGPT 업무', 'Claude', '업무 자동화', 'n8n 자동화', '엑셀 자동화', 'AI 에이전트', '프롬프트']
 const FORMAT_TOPICS = ['창업 실패', '부자 습관', '대표의 하루', '회사 돈 관리']

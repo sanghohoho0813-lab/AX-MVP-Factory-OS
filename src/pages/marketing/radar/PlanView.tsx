@@ -199,7 +199,7 @@ export function PlanView({
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-slate-300 bg-slate-50 px-3 py-2 break-keep text-slate-700" data-testid="radar-ai-short">
             <Info aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
             <span className="min-w-0 flex-1">
-              AI 벤치마킹 데이터가 부족합니다 — {plan.aiChannels === 0 ? 'AI 실무 · AX 채널이 아직 없습니다.' : '최근 30일에 AI · 자동화 주제 영상이 거의 없습니다.'} AX · AI 후보는 데이터가 쌓이면 나옵니다.
+              AI 참고 영상이 부족합니다 — {plan.aiChannels === 0 ? 'AI 실무 · AX 채널이 아직 없습니다.' : '최근 30일에 AI · 자동화 주제 영상이 거의 없습니다.'} AX · AI 후보는 데이터가 쌓이면 나옵니다.
             </span>
             <button type="button" onClick={onGoChannels} className="tap t-sub font-semibold text-brand-700 hover:underline">
               채널 보기
@@ -512,7 +512,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
               </div>
             )}
             <div className="flex min-w-0 flex-col gap-1.5" data-testid="radar-kit-titles">
-              <p className="t-sub font-bold text-slate-900">제목 후보 · 썸네일</p>
+              <p className="t-sub font-bold text-slate-900">제목 후보 · 표지 글(썸네일)</p>
               <ul className="flex flex-col gap-0.5">
                 {kit.titles.map((t) => (
                   <li key={t} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">· {t}</li>
@@ -688,7 +688,7 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <p className="t-sub font-bold text-slate-900">벤치마킹 영상 {o.benchmarks.length > 0 && <span className="t-meta font-normal text-slate-500">평소보다 잘된 것만 · {o.benchmarks.length}편</span>}</p>
+        <p className="t-sub font-bold text-slate-900">참고 영상 {o.benchmarks.length > 0 && <span className="t-meta font-normal text-slate-500">평소보다 잘된 것만 · {o.benchmarks.length}편</span>}</p>
         {o.benchmarks.length === 0 ? (
           <p className="t-sub break-keep text-slate-500" data-testid="radar-bench-none">
             평소보다 잘된 영상은 아직 없습니다 — 관련 영상 {c.videos30}편이 모두 채널 평소 수준입니다.
@@ -728,7 +728,7 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
         </ul>
       </section>
       <section className="flex flex-col gap-1.5">
-        <p className="t-sub font-bold text-slate-900">썸네일 문구</p>
+        <p className="t-sub font-bold text-slate-900">표지 글(썸네일)</p>
         <div className="flex flex-wrap gap-1.5">
           {o.thumbs.map((t) => (
             <span key={t} className="t-sub rounded-[6px] border border-slate-800 bg-slate-900 px-2.5 py-1 font-bold text-white" data-testid="radar-thumb-text">
@@ -773,7 +773,7 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
             <span className="font-semibold text-slate-900">{WHY_LABEL.spread}</span> — 최근 2주 여러 채널이 같은 주제를 다뤘는지
           </li>
           <li className="t-sub break-keep text-slate-700">
-            <span className="font-semibold text-slate-900">{WHY_LABEL.hot}</span> — 그 채널 평소(같은 롱폼/쇼츠 중앙값)보다 2배 넘게 잘됐는지 · 3배 넘으면 '터짐'(올린 지 7일 안 된 영상은 나이를 반영)
+            <span className="font-semibold text-slate-900">{WHY_LABEL.hot}</span> — 그 채널 평소(같은 긴 영상/쇼츠 중앙값)보다 2배 넘게 잘됐는지 · 3배 넘으면 '터짐'(올린 지 7일 안 된 영상은 나이를 반영)
           </li>
           <li className="t-sub break-keep text-slate-700">
             <span className="font-semibold text-slate-900">{WHY_LABEL.growing}</span> — 그 전 6주보다 최근 2주에 빠르게 늘었는지
@@ -931,7 +931,7 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
           { key: 'flow', label: '지금 강한 흐름', hint: '경제 · 경영 · AI', icon: BarChart3, tone: 'indigo', badge: flowN },
           { key: 'ai', label: 'AI 핵심 키워드', hint: '회사별 · 업무 흐름', icon: Sparkles, tone: 'violet', badge: aiN },
           { key: 'hot', label: '급상승 · 터진 영상', hint: '2주 · 평소보다', icon: Flame, tone: 'red', badge: rising.length + breakouts.length },
-          { key: 'side', label: '사이드 급상승', hint: '분야 밖 · 포맷 참고', icon: Zap, tone: 'amber', badge: focus.side.length },
+          { key: 'side', label: '사이드 급상승', hint: '분야 밖 · 형식 참고', icon: Zap, tone: 'amber', badge: focus.side.length },
           { key: 'all', label: '전부 보기', hint: '네 판을 한 화면에', icon: LayoutList, tone: 'slate' },
         ]}
         cols={5}
