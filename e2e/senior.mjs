@@ -271,6 +271,21 @@ for (const vp of [
     const u = new URL(page.url())
     const rowNext = (await page.locator('[data-testid="radar-idea"][data-focus="1"] [data-testid="make-row-next"]').innerText().catch(() => '')) ?? ''
     check(`${vp.tag} [이어서 하기] → 내 콘텐츠의 그 줄(?view=make&idea=) · 줄 맨 위 '지금 대본 준비 중 · 다음은 찍기 — 무엇을 누르면 되는지'`, u.searchParams.get('view') === 'make' && !!u.searchParams.get('idea') && (await page.locator('[data-testid="radar-idea"][data-focus="1"]').count()) === 1 && rowNext.includes('다음은 찍기') && rowNext.includes('촬영 완료'), { url: page.url(), rowNext })
+
+    // D-507 홍보 글 업체 고르기 — 처음엔 '지난번 하던 곳' 없음 → 글 하나 저장 → 맨 위 [이어서 하기] 가 그 업체 화면으로
+    await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
+    await page.getByTestId('content-picker').waitFor({ timeout: 8000 }).catch(() => {})
+    const pickBefore = await page.getByTestId('subject-resume').count()
+    await page.goto(BASE + '/tools/content/build?client=cli_hansol', { waitUntil: 'networkidle' })
+    await page.getByTestId('content-pick').first().click()
+    await page.getByTestId('content-save').click()
+    await page.waitForTimeout(600)
+    await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
+    await page.getByTestId('subject-resume').waitFor({ timeout: 5000 }).catch(() => {})
+    const pickName = (await page.getByTestId('subject-resume-name').innerText().catch(() => '')) ?? ''
+    await page.getByTestId('subject-resume-go').click().catch(() => {})
+    await page.waitForURL(/\/tools\/content\/build/, { timeout: 5000 }).catch(() => {})
+    check(`${vp.tag} 홍보 글 업체 고르기 — 처음엔 '지난번 하던 곳' 없음 · 글을 저장하면 맨 위 [이어서 하기](한솔테크) → 그 업체 화면`, pickBefore === 0 && pickName.includes('한솔테크') && new URL(page.url()).searchParams.get('client') === 'cli_hansol', { pickBefore, pickName, url: page.url() })
   }
   // D-507 큰 글자(설정 › 글자 크기 '매우 크게' = 130%)에서도 휴대폰 화면이 옆으로 넘치지 않게
   if (vp.phone && !ONLY) {

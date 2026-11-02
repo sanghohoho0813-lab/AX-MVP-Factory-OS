@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { BriefcaseBusiness, Building, Plus, Search, Sparkles } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, Building, History, Plus, Search, Sparkles } from 'lucide-react'
 import { useToolClient } from '../shared/toolClientContext'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isContractClient } from '../../services/salesPipeline'
@@ -119,6 +119,16 @@ export function SubjectPicker({
     return shown.sort((a, b) => (made.get(b.id) ?? '').localeCompare(made.get(a.id) ?? '') || a.name.localeCompare(b.name, 'ko'))
   }, [rows, filter, q, made])
 
+  // D-507 60대+ 계속 쓰기 쉽게 — 마지막으로 만든 곳 하나를 맨 위에 [이어서 하기](목록을 다시 찾지 않게)
+  const last = useMemo(() => {
+    let best: Row | null = null
+    for (const r of rows) {
+      const at = made.get(r.id)
+      if (at && (!best || at > (made.get(best.id) ?? ''))) best = r
+    }
+    return best
+  }, [rows, made])
+
   const openForm = (kind: TrialKind) => setForm(emptyTrial(kind))
 
   const saveTrial = async (p: TrialProfile) => {
@@ -163,6 +173,22 @@ export function SubjectPicker({
             콘텐츠 레이더에서 가져온 주제 <b className="font-bold">‘{kw}’</b> — 아래에서 업체를 고르면 이 주제로 바로 써요.
           </span>
         </p>
+      )}
+
+      {last && !kw && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="subject-resume">
+          <History aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
+          <span className="min-w-0 flex-1 basis-40">
+            <span className="t-meta block font-semibold text-slate-600">지난번 하던 곳</span>
+            <span className="t-body block font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="subject-resume-name">
+              {last.name}
+            </span>
+            <span className={`t-meta block font-semibold ${t.text}`}>{madeLabel(last.id)}</span>
+          </span>
+          <Link to={last.href} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="subject-resume-go">
+            이어서 하기 <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
       )}
 
       {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 */}
