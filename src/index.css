@@ -393,7 +393,7 @@ main[data-area='marketing'] .t-card { font-size: 1.125rem; }
 main[data-area='marketing'] :is(.text-xs, .text-sm, .text-\[0\.6875rem\], .text-\[0\.75rem\], .text-\[0\.78rem\], .text-\[0\.8rem\], .text-\[0\.82rem\], .text-\[0\.85rem\], .text-\[0\.86rem\], .text-\[0\.875rem\], .text-\[0\.88rem\], .text-\[0\.9rem\], .text-\[0\.92rem\]) { font-size: 0.9375rem; }
 main[data-area='marketing'] .text-slate-400 { color: var(--color-slate-500); }
 main[data-area='marketing'] ::placeholder { color: var(--color-slate-500); opacity: 1; }
-/* D-507 마케팅 목차 칸(첫 화면)은 휴대폰에서 경로 줄을 접는다 — 머리줄 · 목차 띠가 이미 자리를 말한다(첫 화면이 길지 않게) */
+/* D-507 마케팅 · 브랜딩은 휴대폰에서 경로 줄을 접는다 — 머리줄 · 목차 띠 · 업체 띠가 이미 자리를 말한다(첫 화면이 길지 않게) */
 @media (max-width: 639.98px) {
   main[data-crumbs-phone='off'] [data-testid='crumbs'] {
     display: none;

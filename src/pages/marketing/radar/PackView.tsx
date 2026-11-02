@@ -266,6 +266,29 @@ export function PackView({
           {briefSlot}
         </Fold>
       )}
+      {/* D-507 끝까지 내려온 사람에게 '다음엔 이것' — 담아 두면 다음에 첫 화면 [이어서 하기] 에서 바로 이어진다(계속 쓰기 쉽게) */}
+      <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-next" aria-label="다음엔 이것">
+        <p className="t-card font-bold text-slate-900">다 쓰셨나요? 다음엔 이것</p>
+        <p className="t-sub break-keep text-slate-700">
+          {savedHref ? '내 콘텐츠에 담아 두었어요 — 찍는 날 · 올리는 날을 적어 두면 첫 화면 [이어서 하기] 에서 바로 이어져요.' : '찍을 거면 내 콘텐츠에 담아 두세요 — 다음에 마케팅을 열면 첫 화면 [이어서 하기] 에서 바로 이어져요.'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {savedHref ? (
+            <Link to={savedHref} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="mk-pack-next-open">
+              <FileText aria-hidden="true" className="size-4" /> 내 콘텐츠에서 이어서 하기
+            </Link>
+          ) : (
+            !readOnly && (
+              <Button onClick={() => void save()} disabled={saving} data-testid="mk-pack-next-save">
+                <BookmarkPlus aria-hidden="true" className="size-4" /> 내 콘텐츠에 담기
+              </Button>
+            )
+          )}
+          <Button variant="secondary" onClick={onBack} data-testid="mk-pack-next-back">
+            <ArrowLeft aria-hidden="true" className="size-4" /> 다른 주제 고르기
+          </Button>
+        </div>
+      </section>
       <p className="t-meta break-keep text-slate-500">{PACK_LABEL.checks} 칸의 □ 를 모두 확인한 뒤 올리세요. 규칙 초안은 규칙으로 만든 글이고(AI 아님), ✨ 표시가 있는 칸만 AI 가 쓴 글이에요.</p>
     </div>
   )

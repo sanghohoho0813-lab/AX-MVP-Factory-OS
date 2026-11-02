@@ -99,7 +99,7 @@ export function QuickStart({
         <input
           value={topic}
           onChange={(e) => onTopic(e.target.value)}
-          placeholder="주제를 아래에서 누르거나 한 줄로 적어요"
+          placeholder="주제를 적거나 아래에서 고르세요"
           aria-label="무엇에 대해 쓸까요"
           className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3"
           data-testid={`${testPrefix}-qs-topic`}

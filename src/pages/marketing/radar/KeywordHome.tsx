@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, History, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
+import { HintTip } from '../../../components/ui/fold'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
 import { cleanTopic } from '../../../services/marketing/contentPack'
@@ -128,13 +129,15 @@ export function KeywordHome({
       <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
         {/* D-507 한 줄 질문 + 1 → 2 → 3 — 처음 온 사람도 무엇을 누르면 어떻게 되는지 먼저 보이게(예전 형식 칩 · 기준 줄은 [사용 방법] 안) */}
         <div className="min-w-0 flex-1">
-          {/* 물음표는 오른쪽 [사용 방법] 하나만(두 개면 어느 것을 눌러야 할지 헷갈린다) */}
-          <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
-            <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
-            <span>
-              <span className="max-sm:hidden">이번 주 </span>무엇을 올릴까요?
-            </span>
-          </h2>
+          {/* 제목 옆 ⓘ 는 앱 어디서나 같은 '설명 보기'(qa:easy) · 오른쪽 단추는 글자로 [사용법](둘이 헷갈리지 않게) */}
+          <HintTip tip="맨 위 다섯은 우리 본업 주제라 늘 그 자리예요(작은 글씨 = 기업마당 이번 주 새 공고 수). 아래 이번 주 뜨는 주제는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 많이 본 주제예요. 하나를 누르면 올릴 글 · 대본이 바로 나와요." label="이번 주 무엇을 올릴까요?">
+            <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
+              <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
+              <span>
+                <span className="max-sm:hidden">이번 주 </span>무엇을 올릴까요?
+              </span>
+            </h2>
+          </HintTip>
           <p className="t-sub break-keep text-slate-700 max-sm:hidden">{mkText('주제를 하나 누르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요')}</p>
           {/* 휴대폰은 세 칸(번호 위 · 글 아래), PC 는 한 줄 화살표 */}
           <ol className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
@@ -157,10 +160,12 @@ export function KeywordHome({
           onClick={() => setHelp((v) => !v)}
           aria-expanded={help}
           aria-label="사용 방법"
-          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50"
+          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
           data-testid="mk-howto-toggle"
         >
-          <CircleHelp aria-hidden="true" className="size-4" /> <span className="hidden sm:inline">사용 방법</span>
+          {/* 휴대폰은 글자만(제목이 두 줄로 꺾이지 않게 · 제목 옆 ⓘ 와 헷갈리지 않게) */}
+          <CircleHelp aria-hidden="true" className="size-4 max-sm:hidden" /> <span className="sm:hidden">사용법</span>
+          <span className="hidden sm:inline">사용 방법</span>
         </button>
       </div>
 
