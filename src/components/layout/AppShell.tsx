@@ -37,6 +37,7 @@ import { useSideAi } from '../../lib/sideAi'
 import { SideDock } from './SideDock'
 import { SideAiButton } from './SideAiButton'
 import { ArrangeButton } from '../ui/arrange'
+import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders } from '../../services/aiAssist/store'
 
@@ -119,6 +120,8 @@ export function AppShell() {
       <BackToCloseGuard />
       {/* D-164: 보기 무대(iframe) 안에서 주소 · 저장을 바깥과 맞춘다 */}
       <FrameBridge />
+      {/* D-485 화면 꾸미기 — 이 사람의 모든 기기에서 같게(클라우드) */}
+      <LayoutCloudSync />
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 다시 보기는 설정 › 계정 · 보기(D-296) */}
       <TutorialProvider>

@@ -7,7 +7,10 @@
  * 실행: npm run test:catalog
  */
 
-import { arrangeIds, hiddenIds, isCustomized, keepAbsent, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
+import { arrangeIds, hiddenIds, isCustomized, keepAbsent, localLayouts, mergeLayout, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
+import { pullLayouts, startLayoutSync } from '../../services/preferences/layoutSync'
+import { writeRaw } from '../../storage/localStore'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { FOLD_ALL_KEY, foldAll } from '../../components/ui/fold'
 import {
   FEATURE_CATALOG,
@@ -303,6 +306,86 @@ await storage()
   foldAll(true)
   check("D-315 [모두 펼치기] → 'open'", localStorage.getItem(FOLD_ALL_KEY) === 'open')
 }
+
+/* D-485 화면 꾸미기를 기기끼리 같게 — 숨긴 칸이 기기를 맞추다가 다시 보이지 않는다 */
+async function layoutSync() {
+  const L = (o: Partial<{ order: string[]; off: string[]; today: Record<string, string>; at: string }>) => ({ order: [], off: [], today: {}, ...o })
+  const NOW = '2026-01-01T10:00:00.000Z'
+  // 둘 다 바꾼 때가 있으면 나중 것이 이긴다(다시 보이게 한 것도 따라간다)
+  const a = mergeLayout(L({ off: ['kpis'], at: '2026-01-01T09:00:00.000Z' }), L({ off: [], at: '2026-01-01T09:30:00.000Z' }), NOW)
+  check('D-485 둘 다 바꾼 때가 있으면 나중 것(다시 보이기도 따라감)', a.merged.off.length === 0 && a.toLocal && !a.toCloud)
+  const b = mergeLayout(L({ off: ['kpis', 'picks'], at: '2026-01-01T09:40:00.000Z' }), L({ off: ['kpis'], at: '2026-01-01T09:30:00.000Z' }), NOW)
+  check('D-485 이 기기가 더 새것이면 클라우드로', b.merged.off.join() === 'kpis,picks' && !b.toLocal && b.toCloud)
+  // 예전 기억(바꾼 때 없음)끼리 · 한쪽만 — 숨긴 칸을 합친다
+  const c = mergeLayout(L({ off: ['assist'], order: ['todos', 'kpis'] }), L({ off: ['kpis', 'picks'], order: ['picks'], at: '2026-01-01T09:00:00.000Z' }), NOW)
+  check('D-485 예전 기억과 맞추면 숨긴 칸 합침 · 순서는 이 기기 것 · 양쪽에 다시 적음', c.merged.off.sort().join() === 'assist,kpis,picks' && c.merged.order.join() === 'todos,kpis' && c.merged.at === NOW && c.toLocal && c.toCloud)
+  const d = mergeLayout(L({ off: ['kpis'] }), undefined, NOW)
+  check('D-485 클라우드에 없으면 이 기기 것을 올림(바꾼 때 찍음)', d.merged.off.join() === 'kpis' && d.merged.at === NOW && d.toCloud && d.toLocal)
+  const e = mergeLayout(undefined, L({ off: ['picks'], at: '2025-12-31T00:00:00.000Z' }), NOW)
+  check('D-485 이 기기에 없으면(새 휴대폰 · 카톡 안 브라우저) 클라우드 것을 그대로', e.merged.off.join() === 'picks' && e.toLocal && !e.toCloud)
+  const f = mergeLayout(L({ today: { kpis: '2026-11-01' } }), L({ today: { kpis: '2026-11-02' }, at: NOW }), NOW)
+  check("D-485 '오늘만' 은 더 늦은 날을 남김", f.merged.today.kpis === '2026-11-02')
+
+  // 가짜 클라우드(ui_preferences 한 줄) — payload 의 다른 칸은 그대로, layouts 만 고쳐 쓴다
+  let row: { payload: Record<string, unknown> } | null = { payload: { textScale: 'large', layouts: { today: { order: [], off: ['assist', 'sales'], today: {}, at: '2026-01-01T08:00:00.000Z' } } } }
+  let fail = false
+  const writes: unknown[] = []
+  const client = {
+    from: () => ({
+      select: () => {
+        const q = { eq: () => q, maybeSingle: async () => (fail ? { data: null, error: { message: 'down' } } : { data: row, error: null }) }
+        return q
+      },
+      upsert: async (v: { payload: Record<string, unknown> }) => {
+        writes.push(v)
+        row = { payload: v.payload }
+        return { error: null }
+      },
+    }),
+  } as unknown as SupabaseClient
+  // 이 기기(휴대폰): 이 기능 전에 숨겨 둔 예전 기억(바꾼 때 없음) — kpis 만 숨김
+  writeRaw('axmvp.ui.layout.today', JSON.stringify({ order: [], off: ['kpis'], today: {} }))
+  const r1 = await pullLayouts(client, 'u1', 'w1', () => NOW)
+  const loc = readLayoutForTest('today')
+  const cl = (row!.payload.layouts as Record<string, { off: string[] }>).today
+  check('D-485 맞추기 — 숨긴 칸이 기기에서도 클라우드에서도 합쳐짐(다시 보이지 않음)', r1.toLocal.includes('today') && loc.off.sort().join() === 'assist,kpis,sales' && cl.off.sort().join() === 'assist,kpis,sales', JSON.stringify({ r1, loc, cl }))
+  check('D-485 payload 의 다른 칸(글자 크기)은 그대로', row!.payload.textScale === 'large')
+  // 클라우드를 못 읽으면 아무것도 덮지 않는다
+  fail = true
+  const before = JSON.stringify(readLayoutForTest('today'))
+  const n = writes.length
+  const r2 = await pullLayouts(client, 'u1', 'w1', () => NOW)
+  check('D-485 클라우드를 못 읽으면 이 기기 기억 그대로 · 쓰지 않음', r2.toLocal.length === 0 && writes.length === n && JSON.stringify(readLayoutForTest('today')) === before)
+  fail = false
+  // (시험의 때는 지난 시각으로 — 이 기기에서 실제로 바꾸는 때가 언제나 더 나중이게)
+  // 다른 기기(PC)에서 나중에 바꿈 → 이 기기(휴대폰)가 창으로 돌아오면 따라감
+  ;(row!.payload.layouts as Record<string, unknown>).today = { order: ['todos'], off: ['assist', 'kpis', 'sales', 'picks'], today: {}, at: '2026-01-01T11:00:00.000Z' }
+  await pullLayouts(client, 'u1', 'w1', () => '2026-01-01T11:05:00.000Z')
+  check('D-485 PC 에서 나중에 숨긴 칸 → 휴대폰도 숨김', readLayoutForTest('today').off.includes('picks') && readLayoutForTest('today').order.join() === 'todos')
+  // 이 기기에서 바꾸면 곧 클라우드로(신호 → 잠깐 뒤 보냄)
+  const listeners = new Map<string, (e: Event) => void>()
+  const target = { addEventListener: (k: string, fn: (e: Event) => void) => void listeners.set(k, fn), removeEventListener: (k: string) => void listeners.delete(k) }
+  const stop = startLayoutSync(client, 'u1', 'w1', { target: target as unknown as Window, doc: null })
+  await new Promise((r) => setTimeout(r, 30))
+  setSectionVisibility('today', 'agenda', 'off')
+  listeners.get('axmvp:page-layout')?.({ detail: 'today' } as unknown as Event)
+  await new Promise((r) => setTimeout(r, 900))
+  stop()
+  const sent = (row!.payload.layouts as Record<string, { off: string[] }>).today
+  check('D-485 이 기기에서 숨기면 클라우드로 보냄(다른 기기가 따라오게)', sent.off.includes('agenda') && sent.off.includes('picks'), JSON.stringify(sent))
+  check('D-485 이 기기에 기억한 화면 목록', Object.keys(localLayouts()).includes('today'))
+  // 기기 시계가 늦어도 방금 바꾼 것이 이긴다 — 클라우드 바꾼 때를 먼 뒤로 두고 숨기기
+  ;(row!.payload.layouts as Record<string, unknown>).today = { order: [], off: ['assist'], today: {}, at: '2099-01-01T00:00:00.000Z' }
+  const stop2 = startLayoutSync(client, 'u1', 'w1', { target: target as unknown as Window, doc: null })
+  await new Promise((r) => setTimeout(r, 30))
+  setSectionVisibility('today', 'care', 'off')
+  listeners.get('axmvp:page-layout')?.({ detail: 'today' } as unknown as Event)
+  await new Promise((r) => setTimeout(r, 900))
+  stop2()
+  const sent2 = (row!.payload.layouts as Record<string, { off: string[]; at: string }>).today
+  check('D-485 기기 시계가 늦어도 방금 숨긴 칸이 클라우드 · 이 기기에 남음(바꾼 때를 1ms 뒤로)', sent2.off.includes('care') && sent2.at > '2099-01-01T00:00:00.000Z' && readLayoutForTest('today').off.includes('care'), JSON.stringify(sent2))
+}
+await layoutSync()
 
 console.log(`\ncatalog: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

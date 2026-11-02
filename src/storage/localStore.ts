@@ -143,6 +143,22 @@ export function readRaw(key: string): string | null {
   return rawGet(key)
 }
 
+/** 이 접두어로 시작하는 키 이름들(D-485 화면 꾸미기를 기기끼리 맞출 때) */
+export function listKeys(prefix: string): string[] {
+  const fromMemory = () => [...memoryFallback.keys()].filter((k) => k.startsWith(prefix))
+  if (!storageAvailable) return fromMemory()
+  try {
+    const out: string[] = []
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)
+      if (k && k.startsWith(prefix)) out.push(k)
+    }
+    return out
+  } catch {
+    return fromMemory()
+  }
+}
+
 /** 원문 그대로 쓰기 (백업 복원용) */
 export function writeRaw(key: string, value: string): void {
   rawSet(key, value)

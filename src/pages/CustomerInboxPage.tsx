@@ -212,9 +212,13 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           {events.length > 0 && <AiAssist page="inbox" title="잠재고객 상담신청" presets={['inbox.rank', 'inbox.first', 'inbox.waiting']} build={assistBuild} />}
         </ArrangeItem>
         <ArrangeItem id="list" label="상담신청 목록" hint="상태 · 종류 · 정렬 · 신청">
+          {/* D-484 거르기 줄끼리 겹치던 것(PC) — 감싸는 칸에 간격이 없는데 줄마다 -mt-2 로 당겨 8px 씩 포개졌다. 줄 사이를 띄우고 '상태 · 종류' 이름표를 맞춘다 */}
+          <div className="flex flex-col gap-3" data-testid="inbox-filters">
+          <div className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2.5 sm:px-4">
           {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
           {/* D-122: 오른쪽에 더 있으면 '›' */}
-          <ScrollHintRow className="-mx-4 sm:mx-0" innerClassName="flex gap-1.5 px-4 sm:flex-wrap sm:px-0">
+          <ScrollHintRow className="-mx-3 sm:mx-0" innerClassName="flex items-center gap-1.5 px-3 sm:flex-wrap sm:px-0" fade="from-white via-white/90" ariaLabel="상태별 보기">
+            <span className="t-meta w-8 shrink-0 text-slate-500">상태</span>
             {filters.map((f) => (
               <button
                 key={f.key}
@@ -238,9 +242,9 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               role="group"
               aria-label="종류별 보기"
               data-testid="inbox-type-filter"
-              className="-mx-4 -mt-2 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="-mx-3 flex items-center gap-1.5 overflow-x-auto border-t border-slate-100 px-3 pt-2 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              <span className="t-meta shrink-0 pr-0.5 text-slate-400">종류</span>
+              <span className="t-meta w-8 shrink-0 text-slate-500">종류</span>
               {[{ key: 'all' as const, label: '전부', count: typeChips.total }, ...typeChips.items].map((t) => (
                 <button
                   key={t.key}
@@ -259,10 +263,11 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               ))}
             </div>
           )}
+          </div>
 
           {/* D-111: 정렬 — 기본은 급한 것 · 새것 먼저, 켜면 오래 기다린 것 먼저 */}
           {!loading && visible.length > 1 && (
-            <div className="-mt-2 flex items-center justify-end gap-1" role="group" aria-label="정렬">
+            <div className="-mt-1 flex items-center justify-end gap-1" role="group" aria-label="정렬">
               {[
                 { on: false, label: '새것 먼저' },
                 { on: true, label: '오래 기다린 것 먼저' },
@@ -336,6 +341,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               )}
             />
           )}
+          </div>
         </ArrangeItem>
       </ArrangeArea>
       {linking && (
