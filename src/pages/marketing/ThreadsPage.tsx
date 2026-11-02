@@ -519,7 +519,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           <div className="flex flex-wrap items-center gap-2">
             <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700" data-testid="thr-picks-why">
               <b className="text-brand-700">★ 추천</b> ·{' '}
-              {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실측 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 딱지 = 그 틀이 잘 되는 반응. 아래에서 다른 틀도 바로 골라요.
+              {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실제 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 작은 이름표는 그 틀로 잘 받는 반응이에요. 아래에서 다른 틀도 바로 골라요.
             </p>
             <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
               <BookOpen aria-hidden="true" className="size-4" /> 틀 설명서
