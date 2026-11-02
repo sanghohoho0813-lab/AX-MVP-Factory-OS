@@ -979,7 +979,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
               <ol className="flex flex-col gap-2" data-testid="content-blocks">
                 {blocks.map((b, i) => (
-                  <li key={i} className={`rounded-(--radius-control) border border-l-4 border-slate-200 bg-white p-3 ${KIND_ACCENT[shown.draft.kind]}`} data-testid="content-block">
+                  <li key={i} className={`rounded-(--radius-control) border border-slate-200 bg-white p-3`} data-testid="content-block">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         {(b.label || b.hint) && (
@@ -1441,12 +1441,13 @@ function PlanCard({ record, profile, today, store, onPick, onOpen, onCopy, start
                   <button
                     type="button"
                     onClick={() => (st.item ? onOpen(st.item) : onPick(sl))}
-                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-l-4 px-3 py-2 text-left ${KIND_ACCENT[sl.kind]} ${TONE[KIND_STYLE[sl.kind].tone].hover} ${st.posted ? 'border-slate-200 bg-white' : st.item ? 'border-slate-300 bg-white' : 'border-slate-200 bg-white'}`}
+                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3 py-2 text-left ${TONE[KIND_STYLE[sl.kind].tone].hover} ${st.posted ? 'border-slate-200 bg-white' : st.item ? 'border-slate-300 bg-white' : 'border-slate-200 bg-white'}`}
                     data-testid="content-plan-slot"
                     data-kind={sl.kind}
                     data-state={st.posted ? 'posted' : st.item ? 'made' : 'none'}
                   >
                     <span className="t-meta flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-slate-500">
+                      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${KIND_ACCENT[sl.kind]}`} />
                       <span className="tabular-nums">{shortDate(sl.date)}</span>
                       <span className={`inline-flex items-center gap-1 font-semibold ${TONE[KIND_STYLE[sl.kind].tone].text}`}>
                         <KindGlyph kind={sl.kind} className="size-3.5" />

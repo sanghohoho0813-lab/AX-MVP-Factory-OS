@@ -157,7 +157,7 @@ function ChatTab() {
               </div>
             )}
             {t.status === 'done' && (
-              <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-l-4 border-slate-200 border-l-violet-500 bg-white px-3 py-2.5" data-testid="dock-answer">
+              <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-violet-200 bg-white px-3 py-2.5" data-testid="dock-answer">
                 <p className="t-meta flex items-center gap-1 font-semibold text-slate-500">
                   <Sparkles aria-hidden="true" className="size-3.5 text-violet-600" /> AI 답{t.model ? ` · ${t.model}` : ''}
                 </p>

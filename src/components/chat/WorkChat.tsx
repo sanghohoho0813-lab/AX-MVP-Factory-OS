@@ -87,11 +87,12 @@ function saveTurns(module: ChatModule, clientId: string, turns: readonly ChatTur
   }
 }
 
-const TONE_EDGE: Record<ChatAnswer['tone'], string> = { ok: 'border-l-success-500', warn: 'border-l-warning-500', info: 'border-l-brand-500' }
+// D-483 한쪽만 칠하지 않는다 — 네 변을 옅은 같은 색으로
+const TONE_EDGE: Record<ChatAnswer['tone'], string> = { ok: 'border-success-200', warn: 'border-warning-200', info: 'border-brand-200' }
 
 function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: ChatAnswer; owner: boolean; aiReady: boolean; onAct: (k: ChatActKind) => void; onAsk: (text: string) => void; onAiMore: () => void; onCopy: (text: string, what: string) => void }) {
   return (
-    <div className={`flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-l-4 border-slate-200 bg-white px-3.5 py-3 shadow-(--shadow-card) ${TONE_EDGE[a.tone]}`} data-testid="chat-answer" data-source={a.source} data-topic={a.topic ?? ''}>
+    <div className={`flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border bg-white px-3.5 py-3 shadow-(--shadow-card) ${TONE_EDGE[a.tone]}`} data-testid="chat-answer" data-source={a.source} data-topic={a.topic ?? ''}>
       <p className="t-meta flex items-center gap-1 font-semibold text-slate-500">
         {a.source === 'ai' ? (
           <>

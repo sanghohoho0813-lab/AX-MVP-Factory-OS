@@ -31,7 +31,7 @@ function CustomerCardBase({
   return (
     <Link
       href={`/customers/${c.id}`}
-      className={`group flex flex-col rounded-2xl border border-l-4 border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${borderClass}`}
+      className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${borderClass}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>

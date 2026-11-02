@@ -704,7 +704,7 @@ export function TaxCalculatorsPage() {
                 )}
               </div>
             ))}
-            {sub.note && <p className="t-sub rounded-(--radius-control) border-l-4 border-amber-400 bg-amber-50 px-3 py-2 break-keep text-slate-600">{sub.note}</p>}
+            {sub.note && <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 break-keep text-slate-600">{sub.note}</p>}
             {/* 계산 결과도 업체 기록에 붙는다 (D-89) — 다른 도구와 같은 단추 */}
             {out.blocks.length > 0 && (
               <div className="no-print flex flex-wrap items-center gap-2">
@@ -754,7 +754,7 @@ export function TaxCalculatorsPage() {
           </div>
         ))}
 
-        {calc.note && <p className="t-sub rounded-(--radius-control) border-l-4 border-amber-400 bg-amber-50 px-3 py-2 break-keep text-slate-600">{calc.note}</p>}
+        {calc.note && <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 break-keep text-slate-600">{calc.note}</p>}
       </section>
       </>
       )}

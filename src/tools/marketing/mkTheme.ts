@@ -118,15 +118,15 @@ export const KIND_STYLE: Record<ContentKind, { icon: LucideIcon; tone: MkTone }>
   place: { icon: MapPin, tone: 'teal' },
 }
 
-/** 글 칸 왼쪽 색 줄 */
+/** 글 종류 점 색 — D-483 칸 왼쪽 색 줄(한쪽만 칠하기)은 없앴다. 칸은 회색 네 변, 종류 색은 작은 점에만 */
 export const KIND_ACCENT: Record<ContentKind, string> = {
-  keywords: 'border-l-sky-400',
-  blog: 'border-l-green-500',
-  shorts: 'border-l-rose-400',
-  video: 'border-l-red-500',
-  cards: 'border-l-fuchsia-400',
-  kakao: 'border-l-amber-400',
-  place: 'border-l-teal-500',
+  keywords: 'bg-sky-400',
+  blog: 'bg-green-500',
+  shorts: 'bg-rose-400',
+  video: 'bg-red-500',
+  cards: 'bg-fuchsia-400',
+  kakao: 'bg-amber-400',
+  place: 'bg-teal-500',
 }
 
 export const SITUATION_STYLE: Record<SituationKey, { icon: LucideIcon; tone: MkTone }> = {

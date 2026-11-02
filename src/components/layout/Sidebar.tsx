@@ -200,13 +200,13 @@ function SidebarContent({
                       onClick={() => toggleGroup(group.key, isCollapsed)}
                       className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300 hover:text-white"
                     >
-                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
+                      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
                       <span className="flex-1 text-left">{group.title}</span>
                       <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                     </button>
                   ) : (
                     <p id={`nav-${group.key}`} className="flex items-center gap-1.5 px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300">
-                      <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
+                      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
                       {group.title}
                     </p>
                   )
@@ -454,7 +454,6 @@ function NavLinkRow({
         isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
       }`}
     >
-      {isActive && !collapsed && <span aria-hidden="true" className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90" />}
       {nested || !tone ? (
         <item.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? 'text-white' : 'text-navy-300'}`} />
       ) : (

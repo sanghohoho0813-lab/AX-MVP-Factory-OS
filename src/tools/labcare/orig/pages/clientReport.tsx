@@ -536,7 +536,7 @@ function Summary({ label, value }: { label: string; value: string }) {
 function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="mb-3 border-l-4 border-navy-700 pl-3 text-lg font-bold text-slate-900">
+      <h3 className="mb-3 text-lg font-bold text-slate-900">
         {title}
       </h3>
       {children}
@@ -564,7 +564,7 @@ function SummaryReport({
     <div className="space-y-4 px-8 py-4">
       {/* 1. 이번 달 관리 상태 */}
       <section>
-        <h3 className="mb-2 border-l-4 border-navy-700 pl-3 text-base font-bold text-slate-900">이번 달 관리 상태</h3>
+        <h3 className="mb-2 text-base font-bold text-slate-900">이번 달 관리 상태</h3>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <CheckLine ok={notesOk} okText={`연구노트 작성 완료 (${savedNotes}/${noteRows.length}건)`} warnText={`연구노트 작성 필요 (${savedNotes}/${noteRows.length}건)`} />
           <CheckLine ok={changes.length === 0} okText="변경신고 대상 없음" warnText={`변경사항 ${changes.length}건 — 신고 검토 중`} />
@@ -573,7 +573,7 @@ function SummaryReport({
 
       {/* 2. 예상 절세 효과 */}
       <section>
-        <h3 className="mb-2 border-l-4 border-navy-700 pl-3 text-base font-bold text-slate-900">예상 절세 효과 (검토용)</h3>
+        <h3 className="mb-2 text-base font-bold text-slate-900">예상 절세 효과 (검토용)</h3>
         {tax.available ? (
           <>
             <div className="rounded-xl bg-navy-900 px-5 py-3.5 text-white">
@@ -598,7 +598,7 @@ function SummaryReport({
 
       {/* 3. 다음 달 조치사항 */}
       <section>
-        <h3 className="mb-2 border-l-4 border-navy-700 pl-3 text-base font-bold text-slate-900">다음 달 조치사항</h3>
+        <h3 className="mb-2 text-base font-bold text-slate-900">다음 달 조치사항</h3>
         <ol className="space-y-1.5">
           {nextActions.slice(0, 4).map((t, i) => (
             <li key={i} className="flex gap-2.5 text-sm">
@@ -796,7 +796,7 @@ function VisitReport({
 
       {/* 5. 대표님 설명용 요약 문구 */}
       <ReportSection title="대표님 설명용 요약">
-        <div className="rounded-xl border-l-4 border-navy-700 bg-slate-50 px-4 py-3.5">
+        <div className="rounded-xl border border-slate-300 bg-white px-4 py-3.5">
           <p className="text-base leading-relaxed text-slate-700">“{ceoSummary}”</p>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-slate-500">{opinion}</p>

@@ -44,12 +44,32 @@
   --color-danger-500: #ef4444;
   --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
+  /* D-483 상태 색도 빠진 단계(100 · 300 · 400 · 800 · 900)를 이웃 칸으로 — 없는 단계를 쓰면 테두리가 검게, 글자 · 바탕은 아무 색도 안 나왔다 */
+  --color-success-100: var(--color-success-50);
+  --color-success-300: var(--color-success-200);
+  --color-success-400: var(--color-success-500);
+  --color-success-800: var(--color-success-700);
+  --color-success-900: var(--color-success-700);
+  --color-warning-100: var(--color-warning-50);
+  --color-warning-300: var(--color-warning-200);
+  --color-warning-400: var(--color-warning-500);
+  --color-warning-800: var(--color-warning-700);
+  --color-warning-900: var(--color-warning-700);
+  --color-danger-100: var(--color-danger-50);
+  --color-danger-300: var(--color-danger-200);
+  --color-danger-400: var(--color-danger-500);
+  --color-danger-800: var(--color-danger-700);
+  --color-danger-900: var(--color-danger-700);
 
   /* AI / design accent — 테마 Accent 로 치환된다 */
   --color-accent-50: #f5f3ff;
   --color-accent-200: #ddd6fe;
   --color-accent-600: #7c3aed;
   --color-accent-700: #6d28d9;
+  --color-accent-100: var(--color-accent-50);
+  --color-accent-300: var(--color-accent-200);
+  --color-accent-400: var(--color-accent-600);
+  --color-accent-500: var(--color-accent-600);
 
   /* 테마 Secondary — 보조 배지·차트 */
   --color-second-50: #ecfeff;

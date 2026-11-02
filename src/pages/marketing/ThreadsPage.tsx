@@ -578,7 +578,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                   <b>쉽게 말하면</b> {TEMPLATE_EASY[tpl.key].plain}
                 </span>
               </p>
-              <p className="t-sub border-l-2 border-slate-300 pl-3 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
+              <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
                 <b className="text-slate-900">예시</b>
                 {'\n'}
                 {TEMPLATE_EASY[tpl.key].sample}
@@ -957,8 +957,8 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
         {list.map((t) => (
           <li key={t.key} className="min-w-0">
             <Surface className="flex h-full flex-col gap-2" as="article">
-              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[toneOfTemplate(t, goal)].bar}`} />
               <div className="flex flex-wrap items-center gap-1.5" data-testid="thr-lib-card" data-key={t.key}>
+                <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${TONES[toneOfTemplate(t, goal)].bar}`} />
                 <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border font-bold ${TONES[toneOfTemplate(t, goal)].solid}`}>{t.key}</span>
                 {/* 태그가 많으면 제목을 짜부라뜨리지 말고 태그가 다음 줄로 — 큰 글자 360 에서 한 줄 2자였다 */}
                 <h3 className="t-body min-w-[8em] flex-1 font-bold break-keep text-slate-900">{t.name}</h3>
@@ -1101,7 +1101,7 @@ function RoutinePanel({ week, readOnly, onWrite, onRecords }: { week: ReturnType
             const tone = TONES[ROUTINE_TONE[r.key] ?? 'slate']
             return (
               <li key={r.key}>
-                <label className={`tap flex min-h-12 cursor-pointer items-start gap-2.5 rounded-(--radius-control) border border-l-4 px-3 py-2 ${tone.line} ${on ? 'bg-slate-50' : tone.wash}`}>
+                <label className={`tap flex min-h-12 cursor-pointer items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${tone.line} ${on ? 'bg-slate-50' : tone.wash}`}>
                   <input type="checkbox" checked={on} onChange={() => toggle(r.key)} className="mt-1 size-5 shrink-0 accent-slate-900" data-testid={`thr-routine-${r.key}`} />
                   <span className="min-w-0 flex-1">
                     <span className={`t-sub font-bold ${tone.ink}`}>

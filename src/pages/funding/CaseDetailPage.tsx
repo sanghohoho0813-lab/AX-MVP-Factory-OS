@@ -516,7 +516,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
               {caseStudy.customerQuote.trim() !== '' && (
                 <div>
                   <p className="text-[0.9rem] font-semibold text-slate-500">고객 인용</p>
-                  <blockquote className="mt-1 border-l-2 border-brand-200 pl-3 text-[0.95rem] break-keep text-slate-600 italic">
+                  <blockquote className="mt-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600 italic">
                     “{caseStudy.customerQuote}”
                   </blockquote>
                 </div>

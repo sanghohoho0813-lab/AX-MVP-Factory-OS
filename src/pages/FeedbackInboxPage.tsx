@@ -70,7 +70,7 @@ function EntryCard({ e, fresh }: { e: InboxEntry; fresh: boolean }) {
                   <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-0.5 text-[0.9rem] font-semibold text-slate-800">{v}</span>
                 )}
                 {q.kind === 'text' && typeof v === 'string' && (
-                  <p className="rounded-(--radius-control) border-l-4 border-orange-400 bg-orange-50/60 px-3 py-2 text-[0.98rem] break-keep whitespace-pre-wrap text-slate-800">{v}</p>
+                  <p className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[0.98rem] break-keep whitespace-pre-wrap text-slate-800">{v}</p>
                 )}
               </dd>
             </div>
@@ -197,7 +197,7 @@ export function FeedbackInboxPage() {
                 </h3>
                 <ul className="flex flex-col gap-1.5">
                   {sum.texts.slice(0, 5).map((t, i) => (
-                    <li key={i} className="rounded-(--radius-control) border-l-4 border-orange-400 bg-orange-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-800">
+                    <li key={i} className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-800">
                       {t.text}
                       <span className="t-meta ml-2 text-slate-500">— {t.name} · {whenText(t.at)}</span>
                     </li>

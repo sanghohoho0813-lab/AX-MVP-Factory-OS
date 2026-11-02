@@ -36,7 +36,7 @@ export default function PrintSheet({ form, result, baseDate }: Props) {
 
       {/* 종합판정 + 한줄결론 (대표 박스) */}
       <div
-        className="mt-3 rounded-md border-l-[6px] px-4 py-3"
+        className="mt-3 rounded-md border-2 px-4 py-3"
         style={{ borderColor: verdictColor, backgroundColor: '#f8fafc' }}
       >
         <div className="flex items-center justify-between">
@@ -218,7 +218,7 @@ function youthShort(state: boolean | null): string {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-l-4 border-gray-900 pl-2 text-[12px] font-bold text-gray-900">
+    <div className="text-[12px] font-bold text-gray-900">
       {children}
     </div>
   )

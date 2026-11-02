@@ -207,7 +207,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                   return (
                     <section key={group.key} aria-label={group.title} data-testid="more-group" data-group={group.key}>
                       <h3 className="t-meta mb-1 flex items-center gap-1.5 font-bold text-slate-600">
-                        <span aria-hidden="true" className={`h-3 w-1 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
+                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${toneClass(groupTone(group.key)).bar}`} />
                         {group.title}
                       </h3>
                       {(plain.length > 0 || futureRow) && (

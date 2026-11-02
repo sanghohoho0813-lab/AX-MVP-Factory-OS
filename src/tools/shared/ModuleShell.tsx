@@ -200,7 +200,7 @@ function ModuleNavList({
         <div key={g.name || `g${gi}`} className="flex flex-col gap-0.5">
           {g.name && (
             <span className="t-meta flex items-center gap-1.5 px-2 pt-1 font-bold tracking-wide text-slate-500" data-group-accent={sectionAccent(g.items[0])}>
-              <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${GROUP_BAR[sectionAccent(g.items[0])]}`} />
+              <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${GROUP_BAR[sectionAccent(g.items[0])]}`} />
               {g.name}
             </span>
           )}

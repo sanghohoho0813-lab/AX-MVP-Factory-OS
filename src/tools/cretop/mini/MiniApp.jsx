@@ -1388,7 +1388,7 @@ function OneLinerSummary({ ui, onTab, grade, manualGrade }) {
         <Sec n="2" title={`오늘 반드시 확인할 핵심 이슈 (${issues.length})`}>
           <div style={{ display: "grid", gap: 9 }}>
             {issues.length ? issues.map((r, i) => { const tn = SUMMARY_TONE[r.tone] || SUMMARY_TONE.info; return (
-              <div key={i} style={{ borderLeft: `3px solid ${tn.color}`, background: tn.bg, borderRadius: 8, padding: "8px 11px" }}>
+              <div key={i} style={{ border: `1px solid ${tn.color}`, background: "#fff", borderRadius: 8, padding: "8px 11px" }}>
                 <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 900, color: tn.color }}>{tn.label}</span>
                 <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: T.ink, lineHeight: 1.5, marginTop: 2 }}>{r.text}</div>
                 {r.q ? <div style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.sub, marginTop: 4 }}>❓ {r.q}</div> : null}

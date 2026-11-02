@@ -37,7 +37,7 @@ function Group({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span aria-hidden="true" className={`h-4 w-1 rounded-full ${bar}`} />
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${bar}`} />
         <h2 className="text-[1.15rem] font-bold text-slate-900">
           {title} <span className="text-slate-400">{events.length}</span>
         </h2>

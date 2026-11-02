@@ -674,9 +674,7 @@ export function EventRow({
       <button
         type="button"
         onClick={onOpen}
-        className={`flex w-full items-start gap-3 rounded-(--radius-card) border border-l-4 bg-white px-4 py-3 text-left hover:bg-slate-50 ${cls.bar} ${
-          event.done ? 'border-slate-200 opacity-60' : 'border-slate-200'
-        }`}
+        className={`flex w-full items-start gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50 ${event.done ? 'opacity-60' : ''}`}
       >
         <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${cls.dot}`} />
         <span className="min-w-0 flex-1">

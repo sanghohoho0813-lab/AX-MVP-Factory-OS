@@ -496,7 +496,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                   <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
                 </span>
               </p>
-              <p className="t-sub border-l-2 border-slate-300 pl-3 break-keep text-slate-800">
+              <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-slate-800">
                 <b className="text-slate-900">예시</b> {FORMAT_EASY[fmt.key].sample}
               </p>
               <p className="t-sub break-keep text-slate-700">
@@ -762,8 +762,9 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
     <div className="flex flex-col gap-4" data-testid="sht-guide">
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 20rem), 1fr))' }}>
         <Surface className="flex flex-col gap-1.5">
-          <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES.teal.bar}`} />
-          <h2 className="t-section break-keep text-teal-900">틱톡 · 유튜브 쇼츠</h2>
+          <h2 className="t-section flex items-center gap-2 break-keep text-teal-900">
+            <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${TONES.teal.bar}`} />틱톡 · 유튜브 쇼츠
+          </h2>
           <ul className="t-body flex list-disc flex-col gap-1 pl-5 break-keep text-slate-800">
             <li>정보형 40~70초 (답을 끝으로) · 이미지형 25~30초</li>
             <li>말로 설명 — 1초에 6~7자</li>
@@ -773,8 +774,9 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
           </ul>
         </Surface>
         <Surface className="flex flex-col gap-1.5">
-          <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES.fuchsia.bar}`} />
-          <h2 className="t-section break-keep text-slate-900">인스타 릴스</h2>
+          <h2 className="t-section flex items-center gap-2 break-keep text-slate-900">
+            <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${TONES.fuchsia.bar}`} />인스타 릴스
+          </h2>
           <ul className="t-body flex list-disc flex-col gap-1 pl-5 break-keep text-slate-800">
             <li>20~25초 · 한 화면 목록은 6~15초</li>
             <li>말 없이 글자만도 됨 (말을 넣으면 첫 문장에 숫자)</li>
@@ -789,8 +791,8 @@ function GuidePanel({ onUse }: { onUse: (f: ShortFormat) => void }) {
         {SHORT_FORMATS.map((f) => (
           <li key={f.key} className="min-w-0">
             <Surface className="flex h-full flex-col gap-2" as="article">
-              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${TONES[FORMAT_TONE[f.key]].bar}`} />
               <div className="flex flex-wrap items-baseline gap-x-2" data-testid="sht-guide-card" data-key={f.key}>
+                <span aria-hidden="true" className={`size-2.5 shrink-0 self-center rounded-full ${TONES[FORMAT_TONE[f.key]].bar}`} />
                 <h3 className="t-body font-bold break-keep text-slate-900">{f.name}</h3>
                 <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${TONES[FORMAT_TONE[f.key]].soft} ${TONES[FORMAT_TONE[f.key]].ink}`}>{f.seconds}</span>
               </div>

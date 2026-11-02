@@ -445,7 +445,7 @@ export function NoticeRow({ notice, today, extra, onOpen, facts, verdict }: { no
         data-testid="grant-row"
         data-id={notice.id}
         data-filtered={filtered ? verdict?.stage : undefined}
-        className={`tap relative flex w-full items-start gap-3 px-4 py-3.5 text-left before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r hover:bg-slate-50 sm:px-5 ${filtered ? 'before:bg-slate-200' : tone.bar}`}
+        className="tap relative flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:px-5"
       >
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${filtered ? 'opacity-70' : ''}`}>
           <span className="t-body line-clamp-2 break-keep font-semibold text-slate-900">{notice.title}</span>
