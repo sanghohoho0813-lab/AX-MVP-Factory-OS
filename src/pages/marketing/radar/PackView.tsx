@@ -50,6 +50,7 @@ export function PackView({
   onSave,
   briefSlot,
   whySlot,
+  guide,
 }: {
   source: PackSource
   brief: ChannelBrief
@@ -67,6 +68,8 @@ export function PackView({
   briefSlot?: ReactNode
   /** 이 키워드를 고른 이유 · 관련 영상(레이더 후보) — 빨간 머리 상자 안 [펼쳐보기] 로(D-253) */
   whySlot?: ReactNode
+  /** D-507 '이 화면은' 한 줄(뒤로 단추 아래) */
+  guide?: ReactNode
 }) {
   const rule = useMemo(() => makePack(source, brief), [source, brief])
   // AI 진행 · 결과는 화면 밖(packAi)에 — 나갔다 들어와도 쓰는 중 · 나간 사이에 온 답이 그대로 보인다
@@ -132,6 +135,7 @@ export function PackView({
           <ArrowLeft aria-hidden="true" className="size-4" /> 주제 다시 고르기
         </button>
       </div>
+      {guide}
 
       {/* D-478 빨간 그라데이션 머리 → 흰 칸 + 회색 테두리(박스 색은 하나 · 빨강 = 주의만). 단추: 주 단추 하나(전체 복사) + 나머지 테두리 단추 */}
       <header className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card) sm:p-5">

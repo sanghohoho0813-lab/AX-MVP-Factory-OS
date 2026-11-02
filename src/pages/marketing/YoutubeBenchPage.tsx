@@ -741,6 +741,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {packKey ? (
         packSource ? (
           <PackView
+            guide={<ScreenGuide id="radar.pack" what="고른 주제로 제목 · 대본 · 블로그 글 · 카드뉴스가 한 번에 나온 곳이에요." steps={['위 칩으로 칸 고르기', '[이 칸 복사]', '올릴 곳에 붙여넣기']} />}
             source={packSource}
             brief={brief}
             rank={homeRank(packKey)}
