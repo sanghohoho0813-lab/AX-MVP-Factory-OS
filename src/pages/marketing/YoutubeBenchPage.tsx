@@ -22,6 +22,7 @@ import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
+import { useIsPhone } from '../../lib/useIsPhone'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
@@ -1186,6 +1187,13 @@ function TopView({
   const top = board.rows[0]
   const second = board.rows[1]
   const shownKw = allKw ? keywords : keywords.slice(0, 8)
+  // D-507 60대+ — 휴대폰은 처음 10편만(한 줄 목록이라 30편이면 아홉 화면) · [나머지 n편 더 보기] · 기간 · 키워드 · TOP 을 바꾸면 다시 10편부터. PC 는 그대로
+  const phone = useIsPhone()
+  const listKey = `${period}|${kw}|${topN}|${filter.type}|${filter.channels.join(',')}`
+  const [moreKey, setMoreKey] = useState('')
+  const PHONE_FIRST = 10
+  const cut = phone && moreKey !== listKey && board.rows.length > PHONE_FIRST
+  const rows = cut ? board.rows.slice(0, PHONE_FIRST) : board.rows
   return (
     <div className="flex flex-col gap-4" data-testid="yt-top">
       <div className="flex flex-wrap gap-2" role="group" aria-label="기간" data-testid="yt-periods">
@@ -1272,10 +1280,15 @@ function TopView({
             )}
           </div>
           <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
-            {board.rows.map((v, i) => (
+            {rows.map((v, i) => (
               <VideoCard key={v.id} v={v} r={rv.get(v.id)} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} onOpen={onOpen} />
             ))}
           </ol>
+          {cut && (
+            <button type="button" onClick={() => setMoreKey(listKey)} className="tap t-body flex min-h-12 w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:border-brand-400" data-testid="yt-top-more">
+              나머지 {board.rows.length - PHONE_FIRST}편 더 보기 <ChevronDown aria-hidden="true" className="size-5" />
+            </button>
+          )}
         </>
       )}
     </div>
