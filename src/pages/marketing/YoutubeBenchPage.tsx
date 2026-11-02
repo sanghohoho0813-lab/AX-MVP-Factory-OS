@@ -685,7 +685,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           descriptionAsHint
           description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 첫 화면 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
-          actions={view === 'plan' && (prepared || packKey || weekOn) ? undefined : feedButtons}
+          // D-507 내 콘텐츠(만든 것 모음)에는 유튜브 새로 가져오기 · CSV 가 필요 없다 — 헷갈리지 않게 숨김
+          actions={(view === 'plan' && (prepared || packKey || weekOn)) || view === 'make' ? undefined : feedButtons}
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         {!packKey && !weekOn && (
@@ -715,7 +716,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       )}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
       {!packKey && !weekOn && view !== 'plan' && <ScreenGuide id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
-      {weekOn && <ScreenGuide id="radar.week" what="일주일 동안 올릴 것 — 유튜브 긴 영상 1편 · 짧은 영상 3편 · 스레드 글 7개를 한 번에 만든 곳이에요." steps={['위 탭에서 고르기', '[복사] 하기', '올릴 날에 올리기']} />}
       {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(인기 급상승 · 분석 · 내 콘텐츠). 이번 주 찍을 것의 질문 판은 D-251 부터 [자세히 보기] 안 */}
       {!readOnly && view !== 'plan' && (prepared || view === 'make') && (
         <AiAssist
@@ -827,6 +827,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             return idea?.script ? ideaHref(idea.id) : null
           })()}
           onBack={closeWeek}
+          guide={<ScreenGuide id="radar.week" what="일주일 동안 올릴 것 — 유튜브 긴 영상 1편 · 짧은 영상 3편 · 스레드 글 7개를 한 번에 만든 곳이에요." steps={['아래 탭에서 고르기', '[복사] 하기', '올릴 날에 올리기']} />}
           onCopy={(t, what) => copy(t, what)}
           onSaveLong={savePack}
         />

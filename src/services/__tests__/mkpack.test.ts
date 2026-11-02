@@ -18,6 +18,8 @@ import { kitContext, parseKitAnswer, parseKitStore, putKitStore } from '../marke
 import { shootKit } from '../marketing/shootKit'
 import { listThreadPosts, saveThreadPost, sortThreadPosts, type ThreadDraft } from '../marketing/threads'
 import { listShortPosts, type ShortDraft } from '../marketing/shorts'
+import { plainLabel } from '../marketing/plainWords'
+import { IDEA_RESUME_STEP } from '../marketing/radarStore'
 import type { GrantNotice } from '../grants/grantMatch'
 import {
   HOLE,
@@ -446,6 +448,15 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   const sent = buildAssistPrompt(ASSISTS['radar.kit'], kc, '').user
   check('S9 AI 추천 단추(radar.kit) — 서버에 있음 · 보내는 자료에 채널 설계 기준 전부 · 후보 · 고른 본업 · 레이더 숫자 근거 없음', !!ASSISTS['radar.kit'] && ASSIST_PRESETS.some((p) => p.id === 'radar.kit') && sent.includes('채널 설계 기준') && sent.includes(k0.topic) && sent.includes('이 본업으로') && sent.includes('우리가 실제로 하는 일') && !k0.facts.some((f) => sent.includes(f)), sent.slice(0, 300))
   if (process.env.MK_SHOW) for (const o of branded.slice(0, 10)) console.log(`  ${o.axis} ${o.topic} → ${o.brand?.label ?? '(그대로)'}\n    ${o.titles.map((t) => t.text).join('\n    ')}\n    첫 문장: ${shootKit(o).hook}\n    말해요: ${o.view}`)
+}
+
+/* ---------------- D-507 60대 이상도 — 화면 칸 이름 쉬운 말 · 지난번 하던 것 ---------------- */
+{
+  check('SR1 칸 이름 쉬운 말 — 썸네일 문구 → 표지 글(썸네일) · 제목 · 썸네일 → 제목 · 표지 글(썸네일) · 캡션(…) → 설명 글(캡션) · 롱폼 → 긴 영상 · 해시태그 → #태그(해시태그)',
+    plainLabel('썸네일 문구') === '표지 글(썸네일)' && plainLabel('제목 · 썸네일') === '제목 · 표지 글(썸네일)' && plainLabel('캡션 (릴스 · 쇼츠 공통 · 200자 안팎)') === '설명 글(캡션) (릴스 · 쇼츠 공통 · 200자 안팎)' && plainLabel('8~10분 롱폼 — 그대로 읽는 말') === '8~10분 긴 영상 — 그대로 읽는 말' && plainLabel('해시태그') === '#태그(해시태그)',
+    [plainLabel('썸네일 문구'), plainLabel('제목 · 썸네일'), plainLabel('캡션 (릴스 · 쇼츠 공통 · 200자 안팎)')])
+  check('SR2 이미 풀어 쓴 이름 · 상관없는 이름은 그대로(두 번 바꾸지 않음)', plainLabel('표지 글(썸네일)') === '표지 글(썸네일)' && plainLabel('블로그 글') === '블로그 글' && plainLabel(plainLabel('썸네일 문구')) === '표지 글(썸네일)')
+  check('SR3 지난번 하던 것 — 단계마다 지금 · 다음 할 일(쉬운 말) · 게시 완료는 이어서 하기에 없음', IDEA_RESUME_STEP.script.next === '찍기' && IDEA_RESUME_STEP.filmed.next === '올리기' && IDEA_RESUME_STEP.idea.next === '대본 쓰기' && !('published' in IDEA_RESUME_STEP))
 }
 
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)

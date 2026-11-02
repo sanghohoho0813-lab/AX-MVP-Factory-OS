@@ -53,11 +53,12 @@ export function WeekView({
   brief,
   ws,
   start: startProp,
-  backLabel = '이번 주 키워드',
+  backLabel = '주제 고르기',
   readOnly,
   ownerAi,
   savedLongHref,
   onBack,
+  guide,
   onCopy,
   onSaveLong,
 }: {
@@ -70,6 +71,8 @@ export function WeekView({
   start?: string
   /** D-350 뒤로 단추 글 — 내 콘텐츠에서 열었으면 '내 콘텐츠' */
   backLabel?: string
+  /** D-507 '이 화면은' 한 줄(뒤로 단추 아래) */
+  guide?: ReactNode
   readOnly: boolean
   ownerAi: boolean
   /** 롱폼 주제가 이미 내 콘텐츠에 있으면 그 줄 주소 */
@@ -199,6 +202,7 @@ export function WeekView({
           <ArrowLeft aria-hidden="true" className="size-4" /> {backLabel}
         </button>
       </div>
+      {guide}
 
       {/* D-356 대표 "1주일치 쓰면 밑으로 쫙 풀려 눈에 안 들어온다 — 프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 딱딱 나눠서".
           프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
@@ -211,8 +215,8 @@ export function WeekView({
               <h2 className="t-card font-extrabold break-keep text-slate-900">
                 1주일치 프로젝트 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
               </h2>
-              <HintTip tip="본업(고정 키워드 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며) × 미끼(참고 채널에서 최근 2주 함께 뜨는 AI · 경영 주제)로 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 롱폼 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 는 미끼, 끝은 본업">
-                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">AI 는 미끼, 끝은 본업</span>
+              <HintTip tip="우리 본업 주제(정책자금 · 고용지원금 같은 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며)와 요즘 뜨는 AI 주제(참고 채널에서 최근 2주 함께 뜨는 것)를 하나씩 묶어 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 긴 영상 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 이야기로 시작 → 본업으로 끝">
+                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">AI 이야기로 시작 → 본업으로 끝</span>
               </HintTip>
             </div>
             <p className="t-meta font-semibold text-slate-500" data-testid="mk-week-made">
@@ -228,7 +232,7 @@ export function WeekView({
             </ol>
             {setup.trend.length > 0 && (
               <p className="t-meta break-keep text-slate-500" data-testid="mk-week-trend">
-                이번 주 AI 흐름(미끼 후보): {setup.trend.slice(0, 6).join(' · ')}
+                이번 주 뜨는 AI 주제 후보: {setup.trend.slice(0, 6).join(' · ')}
               </p>
             )}
           </div>

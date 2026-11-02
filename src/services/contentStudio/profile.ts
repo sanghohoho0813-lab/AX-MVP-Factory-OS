@@ -306,7 +306,7 @@ export function profileGaps(p: ContentProfile): { key: GapKey; label: string; wh
   const out: { key: GapKey; label: string; why: string }[] = []
   if (!p.differ) out.push({ key: 'differ', label: '차별점', why: '다른 곳과 다른 점 한 가지 — 모든 글의 중심이에요' })
   if (!p.phone) out.push({ key: 'phone', label: '대표 전화', why: '글 끝 문의 칸 · 카톡 · 플레이스에 들어가요' })
-  if (!p.services.length) out.push({ key: 'services', label: '하는 일', why: '소개 · 플레이스 · 해시태그에 들어가요' })
+  if (!p.services.length) out.push({ key: 'services', label: '하는 일', why: '소개 · 플레이스 · #태그에 들어가요' })
   if (!p.hours) out.push({ key: 'hours', label: '운영 시간', why: '문의 칸 · 플레이스 이용 안내에 들어가요' })
   if (!p.objection) out.push({ key: 'objection', label: '손님이 망설이는 점', why: '카드뉴스 · 블로그에서 그 걱정을 먼저 풀어 줘요' })
   // D-229 규칙집 0-4 — 화자는 직함과 이름을 둘 다(직함만 적으면 엉뚱한 실명이 붙을 수 있다)

@@ -1249,7 +1249,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
       <div className="flex flex-col gap-3 p-4 sm:p-5">
       <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
         <span className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-keep">
-          <b className="font-bold text-slate-900">브리프 {slots.length}칸 · {filled}/{slots.length}</b>
+          <b className="font-bold text-slate-900">글 재료 {slots.length}칸 · {filled}/{slots.length}</b>
           <span className="t-meta font-semibold text-slate-500">{slots.find((x) => x.key === 'facts')?.note}</span>
           <span className="t-meta text-slate-500">모든 글이 이 한 장에서 시작해요</span>
         </span>

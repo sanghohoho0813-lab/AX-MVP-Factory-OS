@@ -38,6 +38,10 @@ const SCREENS = [
   ['릴스 · 틱톡', '/marketing/shorts'],
   ['홍보 글', '/tools/content'],
   ['홈페이지', '/tools/homepage'],
+  // 고른 뒤 화면 — 주제 묶음(첫 주제를 눌러서) · 업체로 연 홍보 글 · 홈페이지
+  ['주제 묶음', '/marketing', 'pack'],
+  ['홍보 글 만들기', '/tools/content/build?client=cli_hansol'],
+  ['홈페이지 만들기', '/tools/homepage/build?client=cli_hansol'],
 ]
 
 /** 설명 없이 쓰면 60대가 멈추는 말 — 바로 뒤 괄호 설명이 있거나(롱폼(긴 영상)) 쉬운 말 뒤 괄호 안에 있으면(긴 영상(롱폼)) 셈하지 않는다 */
@@ -199,13 +203,18 @@ for (const vp of [
     await sample.first().click()
     await page.waitForTimeout(900)
   }
-  for (const [name, path] of SCREENS.filter(([n]) => !ONLY || n.includes(ONLY))) {
+  for (const [name, path, then] of SCREENS.filter(([n]) => !ONLY || n.includes(ONLY))) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
     await page.waitForTimeout(700)
     const ys = page.getByTestId('yt-sample')
     if (await ys.count()) {
       await ys.first().click().catch(() => {})
       await page.waitForTimeout(900)
+    }
+    if (then === 'pack') {
+      await page.getByTestId('mk-key').first().click().catch(() => {})
+      await page.getByTestId('mk-pack').waitFor({ timeout: 8000 }).catch(() => {})
+      await page.waitForTimeout(500)
     }
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(200)
@@ -224,7 +233,8 @@ for (const vp of [
       check(`${vp.tag} ${name}: 옅은 글 0`, m.lowContrast === 0, m.samples.lowC)
       if (vp.phone) check(`${vp.tag} ${name}: 작은 단추(40px 미만) 0`, m.smallTap === 0, m.samples.smallTap)
       check(`${vp.tag} ${name}: 설명 없는 어려운 말 0`, m.jargon === 0, m.samples.jargon)
-      check(`${vp.tag} ${name}: 무엇을 하는 곳인지 한 줄이 첫 화면 안`, m.guide)
+      // 고른 뒤 화면(주제 묶음 · 업체로 연 도구)은 화면 머리가 이미 무엇인지 말한다 — 목차 칸 첫 화면만 본다
+      if (!then && !path.includes('/build')) check(`${vp.tag} ${name}: 무엇을 하는 곳인지 한 줄이 첫 화면 안`, m.guide)
     }
   }
   check(`${vp.tag} JS 오류 0`, errs.length === 0, errs)

@@ -38,7 +38,7 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
       </div>
       {weeks.length === 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-3 py-3" data-testid="mk-projects-empty">
-          <p className="t-sub min-w-0 flex-1 basis-60 break-keep text-slate-700">아직 만든 1주일치가 없어요 — 이번 주 키워드에서 [1주일치 콘텐츠 한 번에 만들기] 를 누르면 여기에 주마다 쌓여요.</p>
+          <p className="t-sub min-w-0 flex-1 basis-60 break-keep text-slate-700">아직 만든 1주일치가 없어요 — 마케팅 첫 화면에서 [1주일치 콘텐츠 한 번에 만들기] 를 누르면 여기에 주마다 쌓여요.</p>
           <Button size="sm" variant="secondary" onClick={onMake} data-testid="mk-projects-make">
             1주일치 만들러 가기
           </Button>

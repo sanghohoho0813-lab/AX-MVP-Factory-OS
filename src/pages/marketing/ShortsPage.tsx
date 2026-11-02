@@ -66,7 +66,7 @@ type Tab = 'write' | 'records' | 'guide'
 const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof Clapperboard; tone: Tone; tip: string }> = [
   { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.' },
   { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 영상의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 형식이 잘 되는지 숫자로 알려 줘요.' },
-  { key: 'guide', label: '형식 · 공식', short: '공식', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.' },
+  { key: 'guide', label: '형식 · 공식', short: '설명서', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.' },
 ]
 
 /** D-298 어디에 · 무엇을 · 형식마다 색(같은 뜻은 어느 화면에서나 같은 색) */

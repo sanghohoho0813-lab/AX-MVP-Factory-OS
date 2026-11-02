@@ -232,7 +232,7 @@ export function PackView({
               </span>
               <div className="min-w-0 flex-1 basis-40">
                 <h3 className="t-section break-keep text-slate-900">{plainLabel(x.label)}</h3>
-                <p className="t-meta break-keep text-slate-500">{x.hint}</p>
+                <p className="t-meta break-keep text-slate-500">{plainLabel(x.hint)}</p>
               </div>
               {x.id !== 'checks' && (
                 <span className={`t-meta inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${ai ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-600'}`} data-testid="mk-pack-origin">

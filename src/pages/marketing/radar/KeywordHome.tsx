@@ -139,7 +139,7 @@ export function KeywordHome({
           {/* 휴대폰은 세 칸(번호 위 · 글 아래), PC 는 한 줄 화살표 */}
           <ol className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
             {STEPS.map((st, i) => (
-              <li key={st.t} className="t-sub flex flex-col items-center gap-1 rounded-lg border border-slate-200 px-1 py-1.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:rounded-none sm:border-0 sm:p-0 sm:text-left">
+              <li key={st.t} className="t-sub flex flex-col items-center gap-1 px-0.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:p-0 sm:text-left">
                 {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 max-sm:hidden" />}
                 <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[0.8125rem] font-bold text-white">
                   {i + 1}

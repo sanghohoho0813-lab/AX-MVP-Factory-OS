@@ -52,17 +52,21 @@ function ClientPicker() {
   }, [workspaceId])
   const made = useMemo(() => new Map([...count].map(([id, v]) => [id, v.last] as const)), [count])
   return (
-    <SubjectPicker
-      buildPath={BUILD}
-      made={made}
-      madeLabel={(id) => `글 ${count.get(id)?.roots.size ?? 0}편`}
-      icon={(on) => <PenLine className={`size-4 shrink-0 ${on ? 'text-violet-600' : 'text-slate-300'}`} aria-hidden="true" />}
-      testPrefix="content-picker"
-      tone="violet"
-      headIcon={<PenLine className="size-5" />}
-      title="누구 홍보 글인가요?"
-      desc="업체를 고르면 그 기록으로 홍보 정보를 채우고, 먼저 만들 글 3개를 골라 드려요."
-    />
+    <>
+      {/* D-507 이 화면은 — 무엇을 해 주는 곳인지 한 줄 + 1 → 2 → 3(업체를 고르기 전 첫 화면 · 이 도구는 칸이 '만들기' 하나라 업체 고르기 화면에서 그린다) */}
+      <ScreenGuide id="content" what="네이버 블로그 · 플레이스에 올릴 홍보 글을 업체 기록으로 바로 만들어 줘요." steps={['업체 고르기', '글 종류 고르기', '[복사] 해서 올리기']} />
+      <SubjectPicker
+        buildPath={BUILD}
+        made={made}
+        madeLabel={(id) => `글 ${count.get(id)?.roots.size ?? 0}편`}
+        icon={(on) => <PenLine className={`size-4 shrink-0 ${on ? 'text-violet-600' : 'text-slate-300'}`} aria-hidden="true" />}
+        testPrefix="content-picker"
+        tone="violet"
+        headIcon={<PenLine className="size-5" />}
+        title="누구 홍보 글인가요?"
+        desc="업체를 고르면 그 기록으로 홍보 정보를 채우고, 먼저 만들 글 3개를 골라 드려요."
+      />
+    </>
   )
 }
 
@@ -118,8 +122,6 @@ export function ContentPage() {
       />
       {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홈페이지와 같은 줄) */}
       <MarketingTabs active="content" />
-      {/* D-507 이 화면은 — 무엇을 해 주는 곳인지 한 줄 + 1 → 2 → 3(업체를 고르기 전 첫 화면에서만) */}
-      {section !== 'build' && <ScreenGuide id="content" what="네이버 블로그 · 플레이스에 올릴 홍보 글을 업체 기록으로 바로 만들어 줘요." steps={['업체 고르기', '글 종류 고르기', '[복사] 해서 올리기']} />}
       {section === 'build' ? <StudioScreen /> : <ClientPicker />}
     </div>
   )

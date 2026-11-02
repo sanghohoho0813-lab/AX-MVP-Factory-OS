@@ -299,7 +299,7 @@ function videoBlocks(s: PackSource, b: ChannelBrief, headline: string): PackBloc
     { label: `${at[1]} 왜 지금`, text: `${whyNow}\n\n[화면] 관련 기사 · 공고 제목 캡처(출처 표시)` },
     // D-273 번호형 챕터(설명란 타임스탬프와 같은 이름) · 혼자 설명만 하지 않게 챕터마다 화면 시연 자리
     ...ps.map((p, i) => ({ label: `${at[i + 2]} ${['①', '②', '③'][i]} ${p.head}`, text: `${p.say} ${ours[i]}\n\n[화면] ${p.screen} · 가능하면 실제 화면 시연 한 꼭지` })),
-    { label: `${at[5]} 정리 · 다음 편`, text: `${closing}\n\n[화면] 3줄 요약 자막 · CTA 자막에 보장 고지 한 줄(진단 링크는 설명란 · 고정 댓글)` },
+    { label: `${at[5]} 정리 · 다음 편`, text: `${closing}\n\n[화면] 3줄 요약 자막 · 마지막 부탁 자막에 보장 고지 한 줄(진단 링크는 설명란 · 고정 댓글)` },
   ]
 }
 
