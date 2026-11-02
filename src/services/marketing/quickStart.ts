@@ -83,7 +83,8 @@ export function recommendShort(input: { topic: string; platform: ShortPlatform; 
   const aimName = (a: ShortAim) => AIMS[platform].find((x) => x.key === a)?.label ?? ''
   const where = PLATFORMS.find((p) => p.key === platform)?.label ?? ''
   // 이유는 한 줄로(형식 설명 · 예시는 '형식 직접 고르기' 안에)
-  const why = `이번 주 ${where} ${aimName('reach')} ${mix.reach} : ${aimName('convert')} ${mix.convert}${platform === 'tiktok' ? ' (권장 3 : 1)' : ''}${aim === 'convert' && format === 'comment' ? ' · 나눠 줄 점검표가 있어요' : ''}`
+  // D-507 60대+ — '많이 보이게 0 : 문의로 잇기 0 (권장 3 : 1)' 같은 비율 표기 대신 '몇 편' 과 쉬운 말
+  const why = `이번 주 ${where} — ${aimName('reach')} ${mix.reach}편 · ${aimName('convert')} ${mix.convert}편${platform === 'tiktok' ? ` (${aimName('reach')} 3편에 ${aimName('convert')} 1편이 좋아요)` : ''}${aim === 'convert' && format === 'comment' ? ' · 나눠 줄 점검표가 있어요' : ''}`
   return { aim, format, why }
 }
 
