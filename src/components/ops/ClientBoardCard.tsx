@@ -110,12 +110,12 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
  */
 /**
  * D-483 카드 테두리 — 네 변을 같은 색으로(왼쪽 3px 선만 긋던 것 · 대표 지시: 한쪽만 칠하기 금지).
- * 늦음 · 곧 마감은 진하게(두 겹), 이상 없음은 옅은 초록 한 겹 — 급한 카드가 먼저 눈에 들어오게.
+ * 늦음 · 곧 마감은 진하게, 이상 없음은 옅은 초록 — 급한 카드가 먼저 눈에 들어오게.
  */
 const CARD_FILL: Record<Tone, string> = {
   danger: `${EDGE_BOX.danger} bg-white`,
   warning: `${EDGE_BOX.warning} bg-white`,
-  success: 'border-success-300 bg-white',
+  success: 'border-success-200 ring-1 ring-inset ring-success-200 bg-white',
   neutral: 'border-slate-200 bg-white',
   brand: `${EDGE_BOX.brand} bg-white`,
 }
