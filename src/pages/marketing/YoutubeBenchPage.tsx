@@ -430,7 +430,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     // 파일 이름은 영문(브라우저마다 한글 이름이 'download' 로 바뀌는 일이 있다) — 매출 · 비용 CSV 와 같은 꼴
     downloadText(`youtube-benchmark-${d}${yt.sample ? '-sample' : ''}.csv`, videosCsv(prepared.videos), 'text/csv')
   }
-  const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}${particle(what, '을/를')} 복사했습니다.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
+  const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}${particle(what, '을/를')} 복사했어요 — 올릴 곳(유튜브 · 인스타 · 블로그)의 글 칸을 길게 누르고 [붙여넣기] 하세요.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
   const openVideo = useCallback((v: YtVideo | RadarVideo) => setDetail(rvById.get(v.id) ?? null), [rvById])
   // 숫자 뒤 영상 목록(D-198)에서 영상을 누르면 같은 영상 상세 창
   const peekEnv = useMemo(() => ({ onOpenVideo: openVideo, noThumb: yt.sample }), [openVideo, yt.sample])

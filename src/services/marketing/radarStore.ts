@@ -34,6 +34,13 @@ export const IDEA_RESUME_STEP: Record<Exclude<IdeaStatus, 'published'>, { stage:
   script: { stage: '대본 준비 중', next: '찍기' },
   filmed: { stage: '찍어 둠', next: '올리기' },
 }
+/** D-507 내 콘텐츠 줄 '다음엔 이것' — 무엇을 누르면 되는지 한 줄(쉬운 말) */
+export const IDEA_NEXT_HINT: Record<Exclude<IdeaStatus, 'published'>, string> = {
+  idea: '마케팅 첫 화면에서 이 주제를 다시 누르면 대본이 나와요 — [내 콘텐츠에 담기] 로 여기에 붙여 두세요.',
+  selected: '마케팅 첫 화면에서 이 주제를 다시 누르면 대본이 나와요 — [내 콘텐츠에 담기] 로 여기에 붙여 두세요.',
+  script: '찍는 날을 적어 두고, 다 찍으면 오른쪽 단계를 \'촬영 완료\' 로 바꿔 주세요.',
+  filmed: '올린 뒤 단계를 \'게시 완료\' 로 바꾸고, 아래 올린 주소를 붙여 두면 성과를 이어서 봐요.',
+}
 
 export interface ContentIdea {
   id: string

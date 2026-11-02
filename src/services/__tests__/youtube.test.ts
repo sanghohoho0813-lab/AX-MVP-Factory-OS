@@ -1111,7 +1111,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   check("P9 이어진 영상 1편 — '아직 한 편' (비교는 두 편부터)", one.linked === 1 && one.measured === 1 && one.lines.length === 1 && one.lines[0].startsWith('아직 한 편'), one.lines)
   const A3 = { ...A, link: youtubeWatchUrl('mineVid0001') }
   const two = learnFromMine([A3, B, C], mine)
-  check('P10 두 편부터 — 축별 평균 평소 대비(높은 순) · 가장 잘 된 영상 · 직접 담은 주제는 따로', two.measured === 2 && two.byAxis[0].label === '직접 담은 주제' && two.byAxis.some((r) => r.label === 'AX · AI') && two.best?.idea.id === 'A' && two.lines[0].startsWith('우리 채널에서는 직접 담은 주제') && two.lines.some((l) => l.startsWith('가장 잘 된 영상')), two.lines)
+  check('P10 두 편부터 — 축별 평균 평소 대비(높은 순) · 가장 잘 된 영상 · 직접 담은 주제는 따로', two.measured === 2 && two.byAxis[0].label === '직접 담은 주제' && two.byAxis.some((r) => r.label === 'AI · 업무') && two.best?.idea.id === 'A' && two.lines[0].startsWith('우리 채널에서는 직접 담은 주제') && two.lines.some((l) => l.startsWith('가장 잘 된 영상')), two.lines)
   check('P11 내 채널 영상이 없으면 아무것도 잇지 않음(빈 결과)', suggestMatches([A], []).size === 0 && learnFromMine([A3], []).linked === 0)
 }
 

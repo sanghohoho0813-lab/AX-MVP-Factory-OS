@@ -78,7 +78,8 @@ export function groupOf(c: Pick<YtChannel, 'id'> & { group?: unknown }, override
   return isGroup(c.group) ? c.group : 'direct'
 }
 
-export const AXIS_LABEL: Record<ContentAxis, string> = { market: '시장수요', axai: 'AX · AI', bridge: 'BRIDGE' }
+// D-507 화면 이름은 쉬운 말(예전 시장수요 · AX · AI · BRIDGE) — 열쇠(market · axai · bridge)는 그대로 · 첫 화면 칩과 같은 말
+export const AXIS_LABEL: Record<ContentAxis, string> = { market: '경제 · 경영', axai: 'AI · 업무', bridge: '경영 × AI' }
 export const AXIS_HINT: Record<ContentAxis, string> = {
   market: '사람들이 이미 찾는 주제(정책자금 · 지원사업 · 지원금 · 절세 · 법인)',
   axai: '중소기업 업무 자동화 · AI 활용 · AX 사례',

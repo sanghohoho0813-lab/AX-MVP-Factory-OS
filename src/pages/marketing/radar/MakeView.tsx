@@ -16,7 +16,7 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard,
 import { Button } from '../../../components/ui/Button'
 import { Fold, HelpHeading, openFold } from '../../../components/ui/fold'
 import { todayLocalDate } from '../../../lib/appClock'
-import { IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
+import { IDEA_NEXT_HINT, IDEA_RESUME_STEP, IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
 import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl, type PerfTone } from '../../../services/marketing/myPerformance'
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { AxisBadge, IconChip } from './RadarParts'
@@ -137,7 +137,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
             </p>
             {week.length === 0 ? (
               <p className="t-sub break-keep text-slate-500" data-testid="make-week-empty">
-                아래 줄에서 촬영일 · 게시일을 적으면 여기 이번 주 일정으로 모여요.
+                아래 줄에서 찍는 날 · 올리는 날을 적으면 여기 이번 주 일정으로 모여요.
               </p>
             ) : (
               <ul className="flex flex-col divide-y divide-slate-100">
@@ -325,18 +325,24 @@ function MakeRow({
         </label>
       </div>
 
+      {/* D-507 펼친 줄(이어서 하기로 온 줄)에는 지금 · 다음에 할 일 한 줄 — 무엇을 누르면 되는지 바로 */}
+      {(focus || open) && i.status !== 'published' && (
+        <p className="t-sub break-keep text-slate-700" data-testid="make-row-next">
+          지금 <b className="font-semibold text-slate-900">{IDEA_RESUME_STEP[i.status].stage}</b> · 다음은 <b className="font-semibold text-brand-700">{IDEA_RESUME_STEP[i.status].next}</b> — {IDEA_NEXT_HINT[i.status]}
+        </p>
+      )}
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex items-center gap-2">
-          <span className="t-sub w-12 shrink-0 font-semibold text-sky-800">촬영일</span>
-          <input type="date" value={i.shootDate} disabled={readOnly} onChange={(e) => onPatch(i, { shootDate: e.target.value }, '촬영일')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-shoot-date" />
+          <span className="t-sub shrink-0 font-semibold text-sky-800">찍는 날</span>
+          <input type="date" value={i.shootDate} disabled={readOnly} onChange={(e) => onPatch(i, { shootDate: e.target.value }, '찍는 날')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-shoot-date" />
         </label>
         <label className="flex items-center gap-2">
-          <span className="t-sub w-12 shrink-0 font-semibold text-emerald-800">게시일</span>
-          <input type="date" value={i.publishDate} disabled={readOnly} onChange={(e) => onPatch(i, { publishDate: e.target.value }, '게시일')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-publish-date" />
+          <span className="t-sub shrink-0 font-semibold text-emerald-800">올리는 날</span>
+          <input type="date" value={i.publishDate} disabled={readOnly} onChange={(e) => onPatch(i, { publishDate: e.target.value }, '올리는 날')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-publish-date" />
         </label>
         {late && (
           <span className="t-meta inline-flex items-center gap-1 rounded-full bg-danger-50 px-2 py-0.5 font-bold text-danger-700" data-testid="make-row-late">
-            <AlertTriangle aria-hidden="true" className="size-3.5" /> {late === 'shoot' ? '촬영일이 지났어요' : '게시일이 지났어요'}
+            <AlertTriangle aria-hidden="true" className="size-3.5" /> {late === 'shoot' ? '찍는 날이 지났어요' : '올리는 날이 지났어요'}
           </span>
         )}
       </div>

@@ -269,7 +269,8 @@ for (const vp of [
     await page.getByTestId('mk-resume-go').click()
     await page.waitForTimeout(800)
     const u = new URL(page.url())
-    check(`${vp.tag} [이어서 하기] → 내 콘텐츠의 그 줄(?view=make&idea=)`, u.searchParams.get('view') === 'make' && !!u.searchParams.get('idea') && (await page.locator('[data-testid="radar-idea"][data-focus="1"]').count()) === 1, page.url())
+    const rowNext = (await page.locator('[data-testid="radar-idea"][data-focus="1"] [data-testid="make-row-next"]').innerText().catch(() => '')) ?? ''
+    check(`${vp.tag} [이어서 하기] → 내 콘텐츠의 그 줄(?view=make&idea=) · 줄 맨 위 '지금 대본 준비 중 · 다음은 찍기 — 무엇을 누르면 되는지'`, u.searchParams.get('view') === 'make' && !!u.searchParams.get('idea') && (await page.locator('[data-testid="radar-idea"][data-focus="1"]').count()) === 1 && rowNext.includes('다음은 찍기') && rowNext.includes('촬영 완료'), { url: page.url(), rowNext })
   }
   // D-507 큰 글자(설정 › 글자 크기 '매우 크게' = 130%)에서도 휴대폰 화면이 옆으로 넘치지 않게
   if (vp.phone && !ONLY) {
