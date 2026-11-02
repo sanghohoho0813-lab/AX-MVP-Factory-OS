@@ -384,3 +384,15 @@ export function nearNames(text: string, clients: readonly NamedClient[]): string
     .sort((a, b) => b.best - a.best)
   return scored.slice(0, 3).map((x) => x.name)
 }
+
+/**
+ * D-499 '받아 올 서류' → 대표님께 보낼 카톡 문구(그대로 복사해 보내게). 서류 이름만 — 지어낸 기한 · 금액 없음.
+ */
+export function docRequestText(company: string, docs: readonly string[]): string {
+  const list = [...new Set(docs.map((d) => d.replace(/\s*—\s*확인$/, '').trim()).filter(Boolean))].slice(0, 10)
+  if (list.length === 0) return ''
+  return [`안녕하세요 대표님${company ? `, ${company}` : ''} 상담 준비를 위해 아래 서류를 보내 주시면 바로 검토해 드리겠습니다.`, '', ...list.map((d) => `- ${d}`), '', '사진으로 찍어 보내셔도 됩니다. 감사합니다.'].join('\n')
+}
+
+/** D-499 답의 한 항목이 '받아 올 서류' 목록인가 */
+export const isDocListItem = (title: string, outline: readonly string[] | undefined): boolean => /받아\s*올\s*서류|받을\s*서류|준비\s*서류|필요\s*서류/.test(title) && (outline?.length ?? 0) > 0

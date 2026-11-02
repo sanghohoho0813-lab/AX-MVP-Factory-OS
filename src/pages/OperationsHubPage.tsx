@@ -88,7 +88,7 @@ import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, is
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
 import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
-import { handDocsTo } from '../services/docHandoff'
+import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/docHandoff'
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
@@ -147,6 +147,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [error, setError] = useState('')
   // D-162: 오늘 화면의 '첫 업체 등록' 이 ?new=1 로 등록 창을 바로 연다
   const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1')
+  // D-498 오늘 대화창에서 [새 업체로 등록] — 거기서 읽은 서류가 등록 창에 미리 들어온다(한 번만 꺼냄)
+  const [preDocs] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1' ? peekNewClientDocs() : []))
   /** D-125: 이번 등록에서 이미 만든 업체(영업 칸 저장만 실패한 경우 다시 쓰려고) */
   const createdRef = useRef<ClientOpsRecord | null>(null)
   /** D-187: 등록 창에 넣은 서류 — 읽은 글자 · 찾은 값. 등록하면 업체 상세로 넘긴다 */
@@ -594,6 +596,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       if (!pilot) rememberClientTypeView(newType)
       // D-187: 등록 창에 넣은 서류 — 업체를 열자마자 서류함에 올리고 회사 정보 · 크레탑 · 명부까지 분석한다
       handDocsTo(record.id, docsRead.docs)
+      clearNewClientDocs()
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -1203,7 +1206,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
               {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
               {/* D-187: 서류만 넣어도 — 사업자등록증 · 크레탑 · 등기부등본을 읽어 아래 칸을 채운다 */}
-              <NewClientDocDrop onChange={setDocsRead} />
+              <NewClientDocDrop onChange={setDocsRead} preload={preDocs} />
               <label className="text-[0.95rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input

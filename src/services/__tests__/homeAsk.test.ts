@@ -4,9 +4,14 @@
  */
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { RefBook, type AssistBundle } from '../aiAssist/context'
-import { DOWN_REASONS, EMPTY_FEEDBACK, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback } from '../homeAsk/homeAsk'
+import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback } from '../homeAsk/homeAsk'
 import { parseTurns } from '../homeAsk/homeAskStore'
 import { ASSISTS } from '../../../api/_ai/assists.js'
+import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
+import { NEW_DOCS_TTL_MS, clearNewClientDocs, handNewClientDocs, peekNewClientDocs } from '../docHandoff'
+import { normalizeClientOps } from '../clientOpsService'
+import { guessNewClientFromDocs } from '../newClientFromDocs'
+import { findClientForCretop } from '../salesCretop'
 
 let passed = 0
 let failed = 0
@@ -115,6 +120,42 @@ const p = ASSIST_PRESETS.find((x) => x.id === 'home.chat')
 const sv = (ASSISTS as Record<string, { page: string; label: string; instruction: string[] }>)['home.chat']
 check('home.chat — 화면 · 서버 같은 page · label', !!p && !!sv && p.page === sv.page && p.label === sv.label && p.page === 'today', { p, sv: sv && { page: sv.page, label: sv.label } })
 check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · 지어내지 않기', !!sv && /그대로 옮기고/.test(sv.instruction.join(' ')) && /먼저 제안할 것/.test(sv.instruction.join(' ')) && /추측하지 말고/.test(sv.instruction.join(' ')))
+
+// 9. D-498 대화창 서류 — 회사 찾기 · 보낼 칸 거르기 · 새 업체 넘기기 · 임시 판정(저장 안 함)
+{
+  const recs = [normalizeClientOps({ id: 'm', companyName: '미래바이오랩', businessNumber: '124-81-00998' } as never), normalizeClientOps({ id: 'h', companyName: '한솔테크(주)' } as never)]
+  const bizText = ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '업태 : 제조업', '종목 : 바이오 시약'].join('\n')
+  const g = guessNewClientFromDocs([{ fileName: '사업자등록증.txt', text: bizText, method: 'text' }]).guess
+  const c1 = docCompanyOf(g, recs, findClientForCretop)
+  check('D-498 서류의 회사 — 번호로 등록된 업체(미래바이오랩)', c1?.clientId === 'm' && c1.name === '미래바이오랩', c1)
+  const g2 = guessNewClientFromDocs([{ fileName: '새봄.txt', text: bizText.replace('124-81-00998', '214-86-12303').replace('미래바이오랩', '새봄식품'), method: 'text' }]).guess
+  const c2 = docCompanyOf(g2, recs, findClientForCretop)
+  check('D-498 등록 안 된 회사 → clientId 없음 · 서류의 이름', c2?.clientId === null && c2.name === '새봄식품', c2)
+  check('D-498 회사를 못 찾은 서류 → null', docCompanyOf({}, recs, findClientForCretop) === null)
+  check('D-498 서류만 보낼 때 묻는 말', /사업자등록증 · 재무제표 받았어/.test(defaultDocQuestion(['사업자등록증', '재무제표', '사업자등록증', ''])) && /이 서류로/.test(defaultDocQuestion([''])))
+  const summary = { entered: [{ key: 'representativeName', label: '대표자', display: '이대표', fileName: 'a' }, { key: 'businessNumber', label: '사업자등록번호', display: '124-81-00998', fileName: 'a' }, { key: 'establishedAt', label: '설립일', display: '2023-01-10', fileName: 'a' }, { key: 'businessCategory', label: '업태', display: '제조업', fileName: 'a' }, { key: 'businessAddress', label: '주소', display: '경기도 파주시', fileName: 'a' }], flagged: [{ key: 'representativeBirth', label: '대표 생년월일', display: '1980-01-01', fileName: 'a', note: '' }] }
+  const ai = aiFactLines(summary)
+  check('D-498 AI 에 보내는 읽은 것 — 이름 · 번호 · 주소 · 생년월일 빼고(설립일 · 업태만)', ai.length === 2 && ai.some((l) => l.includes('설립일')) && ai.some((l) => l.includes('업태')) && !ai.join().includes('이대표') && !ai.join().includes('124-81'), ai)
+  check('D-498 화면에 보이는 읽은 것(이 기기 안) — 전부 · 확인 필요 표시', readFactsLines(summary).length === 6 && readFactsLines(summary).some((l) => /확인 필요/.test(l)))
+  const f = { file: new File(['x'], 'a.txt'), text: 'x', method: 'text' as const }
+  handNewClientDocs([f])
+  check('D-498 새 업체 넘기기 — 등록 창이 봐도 남아 있음(두 번 그려져도)', peekNewClientDocs().length === 1 && peekNewClientDocs().length === 1)
+  check('D-498 넘긴 지 2분 넘으면 안 받음(다른 길로 연 등록 창에 옛 서류가 끼지 않게)', peekNewClientDocs(Date.now() + NEW_DOCS_TTL_MS + 1000).length === 0)
+  clearNewClientDocs()
+  check('D-498 등록하면 지움', peekNewClientDocs().length === 0)
+  const base = normalizeClientOps({ id: 'chat_new', companyName: '미래바이오랩' } as never)
+  const doc: ChatDoc = { id: 'd1', file: new File([bizText], '사업자등록증.txt', { type: 'text/plain' }), status: 'done', text: bizText, method: 'text', label: '사업자등록증' }
+  const prev = await previewWithDocs(base, [doc], { now: '2026-11-02T00:00:00Z', today: '2026-11-02', makeId: () => Math.random().toString(36).slice(2) })
+  check('D-498 임시 판정 — 서류 칸 받음 · 읽은 값(설립일 · 업태) · 원래 기록은 그대로', prev.record.documents.businessRegistration?.received === true && prev.summary.entered.some((e) => e.key === 'establishedAt') && base.documents.businessRegistration?.received !== true, prev.summary.entered.map((e) => e.key))
+}
+
+// 10. D-499 서류 요청 문구 · 서류 목록 항목 알아보기
+{
+  const t = docRequestText('한솔테크(주)', ['재무제표 3년', '재무제표 3년', '국세 납세증명서 — 확인', ''])
+  check('D-499 요청 문구 — 업체 이름 · 서류 줄(겹치면 한 번 · 끝의 "— 확인" 뺌)', /한솔테크\(주\) 상담 준비/.test(t) && (t.match(/- 재무제표 3년/g) ?? []).length === 1 && /- 국세 납세증명서$/m.test(t), t)
+  check('D-499 서류가 없으면 빈 글', docRequestText('x', []) === '')
+  check('D-499 받아 올 서류 항목만(목록이 있을 때)', isDocListItem('받아 올 서류', ['a']) && isDocListItem('한솔 · 받아 올 서류', ['a']) && !isDocListItem('받아 올 서류', []) && !isDocListItem('첫마디', ['a']))
+}
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

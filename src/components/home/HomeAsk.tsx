@@ -6,17 +6,24 @@
  *   AI 를 못 부르면(연결 없음 · 오류) 판정 그대로 '먼저 제안할 것 · 확인할 것 · 받아 올 서류' 를 규칙으로 정리해 같은 자리에 — AI 라고 부르지 않는다.
  *   답마다 👍 · 👎(까닭) — 다음 답의 말하기 규칙으로 쌓인다. 화면 꾸미기로 숨길 수 있다(칸 id 'ask').
  */
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { AuthContext } from '../../auth/authContext'
+import { createJournalEntry } from '../../services/journalService'
+import { todayLocalDate } from '../../lib/appClock'
+import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowUp, Building2, CalendarClock, Check, ChevronRight, Copy, FileText, Lightbulb, ListChecks, Loader2, Mic, MicOff, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
+import { ArrowUp, Building2, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
+import { Button } from '../ui/Button'
+import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
+import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
 import { useIsPhone } from '../../lib/useIsPhone'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
-import { DOWN_REASONS, findClients, intentsOf, learnAliases, type HomeIntent, type HomeSuggestion, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
-import { addAliases, askHome, clearHomeTurns, homeAliases, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
+import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
+import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
 
@@ -24,7 +31,10 @@ export interface HomeAskProps {
   clients: readonly ClientOpsRecord[]
   suggestions: readonly HomeSuggestion[]
   canAI: boolean
-  prepare: (question: string, clientIds: string[], intents: HomeIntent[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer }>
+  /** docs — D-498 함께 올린 서류(읽기 끝난 것 · 없으면 빈 배열) */
+  prepare: (question: string, clientIds: string[], intents: HomeIntent[], docs: readonly ChatDoc[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null }>
+  /** D-499 답에서 할 일을 넣은 뒤 — 오늘 할 일 목록을 다시 읽게 */
+  onRecorded?: () => void
 }
 
 /* 말로 적기 — 브라우저가 받아 적기를 지원할 때만 단추가 보인다(크롬 · 엣지 · 사파리) */
@@ -44,7 +54,7 @@ function speechCtor(): (new () => SpeechLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
-export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) {
+export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded }: HomeAskProps) {
   const { turns, busy } = useHomeAsk()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -55,6 +65,10 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
   const [picking, setPicking] = useState(false)
   const [listening, setListening] = useState(false)
   const [showOld, setShowOld] = useState(false)
+  // D-498 함께 보낼 서류(이 기기에서 읽기만 — 저장은 답 아래 단추로)
+  const [docs, setDocs] = useState<ChatDoc[]>([])
+  const [over, setOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const rec = useRef<SpeechLike | null>(null)
@@ -88,9 +102,39 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
   }, [menu])
   useEffect(() => () => rec.current?.stop(), [])
 
+  /** D-498 서류 넣기 — 하나씩 읽는다(사진 · 스캔은 처음 한 번 글자 인식 준비가 걸린다) */
+  const addFiles = async (list: File[]) => {
+    const room = CHAT_DOC_MAX - docs.length
+    const picked = list.filter((f) => f.size > 0).slice(0, Math.max(0, room))
+    if (list.length > picked.length) showToast(`대화창에는 서류 ${CHAT_DOC_MAX}개까지 — 더 많으면 업체 화면 [서류 올리기] 로 넣어 주세요.`)
+    if (picked.length === 0) return
+    const fresh: ChatDoc[] = picked.map((file, i) => ({ id: `cd_${Date.now().toString(36)}_${i}`, file, status: 'reading', text: '', method: 'none', label: '' }))
+    setDocs((cur) => [...cur, ...fresh])
+    const { canExtractText, extractTextFromFile } = await import('../../services/docTextExtract')
+    for (const d of fresh) {
+      let text = ''
+      let method: ChatDoc['method'] = 'none'
+      let note = ''
+      try {
+        if (canExtractText(d.file)) {
+          const res = await extractTextFromFile(d.file)
+          text = res.text
+          method = res.method
+        } else note = '글자를 읽을 수 없는 파일이에요 — 파일 이름으로만 봐요'
+      } catch {
+        note = '글자를 읽지 못했어요 — 파일 이름으로만 봐요'
+      }
+      const label = await labelOfDoc(text, d.file.name).catch(() => '')
+      setDocs((cur) => cur.map((x) => (x.id === d.id ? { ...x, status: 'done', text, method, label, ...(note ? { note } : {}) } : x)))
+    }
+  }
+  const reading = docs.some((d) => d.status === 'reading')
+  const readyDocs = docs.filter((d) => d.status === 'done')
+
   const send = (raw: string, forceClient?: string) => {
-    const q = raw.trim()
-    if (!q || busy) return
+    // 서류만 넣고 보내면 — 서류 종류로 묻는 말을 대신 만든다
+    const q = raw.trim() || (readyDocs.length ? defaultDocQuestion(readyDocs.map((d) => d.label)) : '')
+    if (!q || busy || reading) return
     const found = findClients(q, clients, homeAliases())
     const extra = forceClient || pinned
     // 이름이 잡히지 않았는데 업체를 골라 두었으면 — 질문 속 그 업체 이름 조각을 별명으로 배운다
@@ -100,8 +144,10 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
     }
     const ids = [...new Set([...found, ...(extra ? [extra] : [])])].slice(0, 3)
     const intents = intentsOf(q)
+    const sent = readyDocs
     setText('')
-    void askHome({ question: q, clientIds: ids, canAI, prepare: () => prepare(q, ids, intents) })
+    setDocs([])
+    void askHome({ question: q, clientIds: ids, canAI, docs: sent, prepare: () => prepare(q, ids, intents, sent) })
   }
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -148,13 +194,43 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
   const shown = showOld ? turns : turns.slice(-2)
 
   return (
-    <section aria-label="무엇이든 물어보기" data-testid="home-ask" className="rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-5 sm:px-8 sm:py-7">
+    <section
+      aria-label="무엇이든 물어보기"
+      data-testid="home-ask"
+      // D-498 서류를 끌어다 놓아도 된다
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return
+        e.preventDefault()
+        setOver(false)
+        void addFiles(Array.from(e.dataTransfer.files))
+      }}
+      className={`rounded-(--radius-panel) border bg-white px-3 py-5 sm:px-8 sm:py-7 ${over ? 'border-brand-400' : 'border-slate-200'}`}
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        hidden
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.txt,.pptx"
+        onChange={(e) => {
+          const list = Array.from(e.target.files ?? [])
+          e.target.value = ''
+          void addFiles(list)
+        }}
+        data-testid="home-ask-file"
+      />
       {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
       <p className="text-center text-[1.3rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
         무엇을 도와드릴까요?
       </p>
       <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
-        업체 이름과 함께 물어보면 그 업체 서류 · 모듈 판정까지 보고 답해요
+        업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요
       </p>
 
       <form onSubmit={onSubmit} className="relative mx-auto mt-4 flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400" data-testid="home-ask-form">
@@ -164,6 +240,9 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
           </button>
           {menu && (
             <div className="absolute bottom-12 left-0 z-40 w-64 rounded-(--radius-control) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)" data-testid="home-ask-menu">
+              <button type="button" onClick={() => { setMenu(false); fileRef.current?.click() }} className="tap t-body flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-slate-800 hover:bg-slate-50" data-testid="home-ask-attach">
+                <FileUp aria-hidden="true" className="size-4 text-slate-500" /> 서류 올리기(사업자등록증 · 재무제표 …)
+              </button>
               <button type="button" onClick={() => { setMenu(false); setPicking(true) }} className="tap t-body flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-slate-800 hover:bg-slate-50" data-testid="home-ask-pick-open">
                 <Building2 aria-hidden="true" className="size-4 text-slate-500" /> 어느 업체 이야기인지 고르기
               </button>
@@ -174,6 +253,20 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
+          {docs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1" data-testid="home-ask-docs">
+              {docs.map((d) => (
+                <span key={d.id} className="t-sub inline-flex max-w-full items-center gap-1 rounded-full border border-slate-300 bg-white py-0.5 pr-1 pl-2.5 text-slate-700" data-testid="home-ask-doc" data-status={d.status} title={d.note || d.file.name}>
+                  {d.status === 'reading' ? <Loader2 aria-hidden="true" className="size-3.5 shrink-0 animate-spin" /> : <Paperclip aria-hidden="true" className="size-3.5 shrink-0 text-slate-500" />}
+                  {/* 종류를 알면 종류만(긴 파일 이름은 마우스를 올리면) — 휴대폰에서 '사업자등…' 으로 잘리지 않게 */}
+                  <span className="max-w-[14rem] truncate">{d.status === 'reading' ? `${d.file.name} 읽는 중` : d.label || d.file.name}</span>
+                  <button type="button" aria-label={`${d.file.name} 빼기`} onClick={() => setDocs((cur) => cur.filter((x) => x.id !== d.id))} className="tap flex size-6 items-center justify-center rounded-full hover:bg-slate-100">
+                    <X aria-hidden="true" className="size-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           {(pinnedName || picking) && (
             <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1">
               {picking ? (
@@ -205,7 +298,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
             // 휴대폰은 칸이 좁아 긴 예시가 두 줄로 잘린다 — 짧게
-            placeholder={pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
+            placeholder={readyDocs.length && !phone ? '서류만 보내도 돼요 — 무엇을 제안할지 정리해요' : pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
             aria-label="질문"
             className={`t-body min-h-10 w-full resize-none ${text ? 'overflow-y-auto' : 'overflow-hidden'} bg-transparent px-1.5 py-2 leading-snug text-slate-900 outline-none placeholder:text-slate-400`}
             data-testid="home-ask-input"
@@ -217,7 +310,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
             {listening ? <MicOff aria-hidden="true" className="size-5" /> : <Mic aria-hidden="true" className="size-5" />}
           </button>
         )}
-        <button type="submit" aria-label="보내기" disabled={busy || !text.trim()} className="tap flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400" data-testid="home-ask-send">
+        <button type="submit" aria-label="보내기" disabled={busy || reading || (!text.trim() && readyDocs.length === 0)} className="tap flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400" data-testid="home-ask-send">
           {busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <ArrowUp aria-hidden="true" className="size-5" />}
         </button>
       </form>
@@ -249,7 +342,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
             </button>
           </div>
           {shown.map((t) => (
-            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} />
+            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} onRecorded={onRecorded} />
           ))}
         </div>
       )}
@@ -257,8 +350,53 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
   )
 }
 
-function Turn({ turn, names }: { turn: HomeTurn; names: { id: string; name: string }[] }) {
+function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string; name: string }[]; onRecorded?: () => void }) {
   const { showToast } = useToast()
+  const navigate = useNavigate()
+  const auth = useContext(AuthContext)
+  // D-499 '다음에 할 일' 한 줄 → 할 일(물어본 첫 업체에 · 내일 기한) — 한 번 누르면 끝
+  const company = names[0]?.name ?? turn.docs?.company?.name ?? ''
+  const addTodo = async (text: string, index: number) => {
+    const today = todayLocalDate()
+    const due = addDaysLocal(today, 1)
+    try {
+      await createJournalEntry(auth?.currentWorkspaceId ?? null, auth?.session?.user.id ?? null, {
+        entryType: 'follow_up',
+        entryDate: today,
+        content: company && !text.includes(company) ? `${company} — ${text}` : text,
+        clientId: names[0]?.id ?? null,
+        dueDate: due,
+      })
+      markTodoDone(turn.id, index)
+      onRecorded?.()
+      showToast(`할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')}`)
+    } catch {
+      showToast('할 일에 넣지 못했습니다. 잠시 뒤 다시 눌러 주세요.')
+    }
+  }
+  const copyText = async (text: string, done: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast(done)
+    } catch {
+      showToast('복사하지 못했습니다')
+    }
+  }
+  const files = docsOfTurn(turn.id)
+  // D-498 답 아래 한 번 — 기존 업체는 그 업체 '서류 올리기'(D-187 넘기기), 새 업체는 '새 업체 등록' 창(서류로 칸이 채워진 채)
+  const saveDocs = () => {
+    const handed = files.map((d) => ({ file: d.file, text: d.text, method: d.method }))
+    const company = turn.docs?.company
+    if (company?.clientId) {
+      handDocsTo(company.clientId, handed)
+      markDocsSaved(turn.id, 'client')
+      navigate(`/ops/clients/${encodeURIComponent(company.clientId)}`)
+    } else {
+      handNewClientDocs(handed)
+      markDocsSaved(turn.id, 'new')
+      navigate('/ops/clients?new=1')
+    }
+  }
   const [why, setWhy] = useState(false)
   const a = turn.answer
   const copy = async () => {
@@ -284,6 +422,12 @@ function Turn({ turn, names }: { turn: HomeTurn; names: { id: string; name: stri
               {n.name}
             </Link>
           ))}
+        </p>
+      )}
+      {turn.docs && (
+        <p className="t-meta flex flex-wrap items-center justify-end gap-1 self-end text-slate-500" data-testid="home-ask-turn-docs">
+          <Paperclip aria-hidden="true" className="size-3.5" />
+          {turn.docs.labels.map((l, i) => l || turn.docs?.names[i]).join(' · ')}
         </p>
       )}
       {turn.status === 'pending' ? (
@@ -326,6 +470,21 @@ function Turn({ turn, names }: { turn: HomeTurn; names: { id: string; name: stri
                     </ul>
                   )}
                   {it.body && <p className="t-body rounded-[8px] border border-slate-200 bg-white px-3 py-2 break-keep whitespace-pre-wrap text-slate-800">{it.body}</p>}
+                  {/* D-499 한 번에 — 받아 올 서류는 대표님께 보낼 요청 문구로, 말할 글은 그대로 복사 */}
+                  {(isDocListItem(it.title, it.outline) || it.body) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {isDocListItem(it.title, it.outline) && (
+                        <Button size="sm" variant="secondary" onClick={() => void copyText(docRequestText(company, it.outline ?? []), '서류 요청 문구를 복사했어요 — 카톡에 붙여 넣으세요')} data-testid="home-ask-docreq">
+                          <Copy aria-hidden="true" className="size-4" /> 서류 요청 문구 복사
+                        </Button>
+                      )}
+                      {it.body && (
+                        <Button size="sm" variant="ghost" onClick={() => void copyText(it.body ?? '', '복사했어요')} data-testid="home-ask-body-copy">
+                          <Copy aria-hidden="true" className="size-4" /> 이 글 복사
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>
@@ -334,16 +493,45 @@ function Turn({ turn, names }: { turn: HomeTurn; names: { id: string; name: stri
             <div className="flex flex-col gap-1">
               <span className="t-meta font-semibold text-slate-500">다음에 할 일</span>
               <ul className="t-sub flex flex-col gap-0.5 text-slate-700">
-                {a.next.map((n, k) => (
-                  <li key={k} className="flex gap-1.5 break-keep">
-                    <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
-                    {n}
-                  </li>
-                ))}
+                {a.next.map((n, k) => {
+                  const done = turn.todoDone?.includes(k)
+                  return (
+                    <li key={k} className="flex items-start gap-1.5 break-keep" data-testid="home-ask-next">
+                      <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                      <span className="min-w-0 flex-1">{n}</span>
+                      <button type="button" disabled={done} onClick={() => void addTodo(n, k)} className={`tap t-meta shrink-0 rounded-full border px-2.5 py-1 font-semibold ${done ? 'border-slate-200 text-slate-400' : 'border-slate-300 bg-white text-brand-700 hover:bg-slate-50'}`} data-testid="home-ask-todo">
+                        {done ? '할 일에 넣음' : '할 일로'}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
+          {turn.docs && (
+            // D-498 아직 저장 전 서류 — 한 번 누르면 서류함 · 새 업체 등록으로(저장 · 분류 · 분석은 원래 화면이)
+            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="home-ask-docsave">
+              {turn.docs.saved ? (
+                <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-600">
+                  <Check aria-hidden="true" className="size-4 text-success-700" />
+                  {turn.docs.saved === 'client' ? '서류함으로 넘겼어요 — 그 업체 화면에서 저장 · 분석까지 했어요' : '새 업체 등록 창으로 넘겼어요'}
+                </p>
+              ) : files.length > 0 ? (
+                <>
+                  <p className="t-sub break-keep text-slate-600">
+                    올린 서류는 아직 저장 전이에요{turn.docs.company?.name ? ` — ${turn.docs.company.name}${turn.docs.company.clientId ? '' : '(등록 안 된 업체)'}` : ''}. 누르면 서류함에 넣고 회사 정보 · 판정까지 저장해요.
+                  </p>
+                  <Button size="sm" variant="primary" className="self-start" onClick={saveDocs} data-testid="home-ask-docsave-go" data-target={turn.docs.company?.clientId ? 'client' : 'new'}>
+                    <FileUp aria-hidden="true" className="size-4" />
+                    {turn.docs.company?.clientId ? `${turn.docs.company.name} 서류함에 넣기` : turn.docs.company?.name ? `새 업체로 등록 — ${turn.docs.company.name}` : '새 업체로 등록'}
+                  </Button>
+                </>
+              ) : (
+                <p className="t-sub break-keep text-slate-500">올린 파일은 저장 전이라 새로 고치면 사라져요 — 저장하려면 서류를 다시 올려 주세요.</p>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-1.5" data-testid="home-ask-rate">
             <IconBtn label="좋아요" on={turn.rated === 'up'} disabled={!!turn.rated} onClick={() => { rateTurn(turn.id, { up: true }); showToast('좋은 답으로 기억했어요 — 다음 답에 참고해요') }} testid="home-ask-up">
               <ThumbsUp aria-hidden="true" className="size-4" />

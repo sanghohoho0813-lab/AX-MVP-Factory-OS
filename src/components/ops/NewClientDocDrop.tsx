@@ -16,6 +16,7 @@ import { DROP_FILE_LIMIT, dropSameFiles, filesFromDrop } from '../../lib/dropFil
 import { OCR_PARALLEL, OfficeReadError, canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadMethod } from '../../services/docAutoFill'
+import type { HandoffDoc } from '../../services/docHandoff'
 import { archiveOf, archiveSummary, expandArchives } from '../../services/docArchive'
 import {
   NEW_CLIENT_FIELD_LABEL,
@@ -41,7 +42,8 @@ interface Item {
 }
 
 /** title · hint — 부르는 곳마다 다른 안내(D-255 AI 전략실은 서류함이 아니라 '자료' 로 들어간다) */
-export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증(증명) · 크레탑 보고서 · 등기부등본 — PDF · 사진 · 한글 · 워드 · 압축(zip) 그대로 · 등록하면 서류함에도 들어갑니다' }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string }) {
+/** preload — D-498 대화창에서 이미 읽어 넘긴 서류(읽은 글자째 · 다시 읽지 않는다) */
+export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이 채워집니다', hint = '사업자등록증(증명) · 크레탑 보고서 · 등기부등본 — PDF · 사진 · 한글 · 워드 · 압축(zip) 그대로 · 등록하면 서류함에도 들어갑니다', preload }: { onChange: (read: NewClientDocsRead) => void; title?: string; hint?: string; preload?: readonly HandoffDoc[] }) {
   const { showToast } = useToast()
   const [items, setItems] = useState<Item[]>([])
   const [cretop, setCretop] = useState<CretopCompanyLite[]>([])
@@ -136,6 +138,25 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
       patch(next.id, { status: 'done', progress: '', text, method, readNote })
     }
   }
+
+  // D-498 대화창에서 넘겨받은 서류 — 읽은 글자가 있으면 바로 '다 읽음', 없으면 줄 세워 읽는다(처음 한 번)
+  const preloaded = useRef(false)
+  useEffect(() => {
+    if (preloaded.current || !preload || preload.length === 0) return
+    preloaded.current = true
+    const fresh: Item[] = preload.slice(0, MAX_FILES).map((d, i) => ({
+      id: `pre-${Date.now().toString(36)}-${i}`,
+      file: d.file,
+      status: d.text !== undefined ? 'done' : 'queued',
+      progress: '',
+      text: d.text ?? '',
+      method: d.method ?? 'none',
+    }))
+    itemsRef.current = [...itemsRef.current, ...fresh]
+    setItems((cur) => [...cur, ...fresh])
+    void drain()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preload])
 
   const addFiles = async (list: File[]) => {
     const kept = list.filter((f) => f.size > 0 && !isSystemFile(f))

@@ -8,6 +8,7 @@ import { callAssist, type AssistAnswer } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type RuleAnswer } from './homeAsk'
+import type { ChatDoc, DocCompany } from './homeDocs'
 
 export const HOME_ASK_KEY = 'axmvp.home.ask.v1'
 export const HOME_FB_KEY = 'axmvp.home.ask.fb.v1'
@@ -27,6 +28,10 @@ export interface HomeTurn {
   /** rule 일 때 까닭(AI 연결 오류 문구) — 연결이 없어서가 아니라 고른 것이면 '' */
   why?: string
   rated?: 'up' | 'down'
+  /** D-498 이 질문과 함께 올린 서류(이름 · 종류) · 서류의 회사 · 저장했나 — 파일 자체는 메모리(pendingDocs)에만 */
+  docs?: { names: string[]; labels: string[]; company?: DocCompany | null; saved?: 'client' | 'new' }
+  /** D-499 답에서 이미 할 일로 넣은 것(다음에 할 일 번호) — 다시 눌러 같은 할 일이 두 번 생기지 않게 */
+  todoDone?: number[]
 }
 
 export interface HomeAskState {
@@ -98,8 +103,20 @@ export interface AskPlan {
   clientIds: string[]
   /** AI 를 부를 수 있나(대표 · 팀장) */
   canAI: boolean
+  /** D-498 함께 올린 서류(읽기 끝난 것) */
+  docs?: readonly ChatDoc[]
   /** 보낼 자료 · 규칙 답 — 묻는 순간 만든다(판정 엔진은 이때 받는다) */
-  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer }>
+  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null }>
+}
+
+/** D-498 질문마다 올린 파일(메모리에만 — 새로 고치면 사라진다 · 저장하면 지운다) */
+const pendingDocs = new Map<string, ChatDoc[]>()
+export const docsOfTurn = (id: string): ChatDoc[] => pendingDocs.get(id) ?? []
+
+/** 서류를 업체 서류함 · 새 업체 등록으로 넘긴 뒤 — 같은 파일을 두 번 넘기지 않게 */
+export function markDocsSaved(id: string, how: 'client' | 'new'): void {
+  pendingDocs.delete(id)
+  commit((cur) => cur.map((t) => (t.id === id && t.docs ? { ...t, docs: { ...t.docs, saved: how } } : t)))
 }
 
 /** 묻기 — 묻는 중이면 무시. AI 가 안 되면(연결 없음 · 오류) 규칙으로 정리한 답을 같은 자리에 */
@@ -109,7 +126,9 @@ export async function askHome(plan: AskPlan): Promise<void> {
   const id = uid()
   const owner = liveOwner()
   const before = state.turns
-  commit((cur) => [...cur, { id, at: new Date().toISOString(), q, clientIds: plan.clientIds, status: 'pending' }])
+  const docs = (plan.docs ?? []).filter((d) => d.status === 'done')
+  if (docs.length) pendingDocs.set(id, [...docs])
+  commit((cur) => [...cur, { id, at: new Date().toISOString(), q, clientIds: plan.clientIds, status: 'pending', ...(docs.length ? { docs: { names: docs.map((d) => d.file.name), labels: docs.map((d) => d.label) } } : {}) }])
   set({ busy: true })
   const finish = (patch: Partial<HomeTurn>) => {
     if (liveOwner() !== owner) return
@@ -119,6 +138,11 @@ export async function askHome(plan: AskPlan): Promise<void> {
   try {
     const prep = await plan.prepare()
     rule = prep.rule
+    // 서류의 회사(등록된 업체 · 새 업체) — 답 아래 [서류함에 넣기 · 새 업체로 등록] 단추가 쓴다
+    if (docs.length && prep.docCompany !== undefined) {
+      const company = prep.docCompany
+      commit((cur) => cur.map((t) => (t.id === id && t.docs ? { ...t, docs: { ...t.docs, company }, clientIds: company?.clientId && !t.clientIds.includes(company.clientId) ? [company.clientId, ...t.clientIds].slice(0, 3) : t.clientIds } : t)))
+    }
     if (!plan.canAI) {
       finish({ status: 'rule', answer: prep.rule, links: prep.rule.links, why: '' })
       return
@@ -147,6 +171,11 @@ export function rateTurn(id: string, vote: { up: true } | { up: false; reason: D
   if (!t) return
   write(HOME_FB_KEY, withFeedback(homeFeedback(), vote.up ? { up: true, q: t.q, headline: t.answer?.headline ?? '' } : vote))
   commit((cur) => cur.map((x) => (x.id === id ? { ...x, rated: vote.up ? 'up' : 'down' } : x)))
+}
+
+/** D-499 '다음에 할 일' 한 줄을 할 일로 넣었다 */
+export function markTodoDone(id: string, index: number): void {
+  commit((cur) => cur.map((t) => (t.id === id ? { ...t, todoDone: [...new Set([...(t.todoDone ?? []), index])] } : t)))
 }
 
 export function clearHomeTurns(): HomeTurn[] {

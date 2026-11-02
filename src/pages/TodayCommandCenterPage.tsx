@@ -3,6 +3,11 @@ import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
 import { homeSuggestions, mergeBundles, nearNames, ruleAnswer, type HomeIntent, type PickLite } from '../services/homeAsk/homeAsk'
+import { CHAT_NEW_ID, aiFactLines, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc, type DocCompany } from '../services/homeAsk/homeDocs'
+import { personNames, safeText, type AssistSection } from '../services/aiAssist/context'
+import { generateId } from '../storage/localStore'
+import { nowIso } from '../lib/appClock'
+import type { DocBatchSummary } from '../services/docAutoAnalyze'
 import { assistOn, useAiAssistAccess } from '../auth/ownerAiAccess'
 import { INSIGHT_TONE_LABEL } from '../services/insightLabels'
 import { careList } from '../services/clientCare'
@@ -418,10 +423,35 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     return homeSuggestions({ appointments: appointments.map((e) => ({ clientId: e.clientId ?? null, clientName: e.clientName, daysLeft: e.daysLeft })), freshDocs, recos, overdueMoney: money.overdue.count, hasTodos: todoCount > 0 })
   }, [active, today, reco, appointments, money, todoCount])
   const homePrepare = useCallback(
-    async (question: string, ids: string[], intents: HomeIntent[]) => {
+    async (question: string, ids: string[], intents: HomeIntent[], docs: readonly ChatDoc[] = []) => {
       const base = await assistBuild()
       const { buildInsights, topPicks } = await import('../services/clientInsights')
-      const focus = ids.map((id) => clients.find((c) => c.id === id)).filter((c): c is ClientOpsRecord => !!c)
+      let focus = ids.map((id) => clients.find((c) => c.id === id)).filter((c): c is ClientOpsRecord => !!c)
+      /*
+       * D-498 함께 올린 서류 — 어느 회사 서류인지(번호 · 이름) 찾고, 그 업체(없으면 빈 새 업체)에 서류를 얹어 임시 판정. 저장하지 않는다.
+       * 서류에서 회사를 못 찾으면 질문에 나온 업체에 얹는다.
+       */
+      let docCompany: DocCompany | null = null
+      let docSummary: DocBatchSummary | null = null
+      const docSections: AssistSection[] = []
+      const docFacts: string[] = []
+      if (docs.length) {
+        const [{ guessNewClientFromDocs }, { findClientForCretop }, { normalizeClientOps }] = await Promise.all([import('../services/newClientFromDocs'), import('../services/salesCretop'), import('../services/clientOpsService')])
+        const { guess } = guessNewClientFromDocs(docs.filter((d) => d.text).map((d) => ({ fileName: d.file.name, text: d.text, method: d.method })))
+        docCompany = docCompanyOf(guess, clients, findClientForCretop)
+        const named = focus[0]
+        const target = docCompany?.clientId ? clients.find((c) => c.id === docCompany?.clientId) ?? null : !docCompany && named ? named : null
+        if (docCompany && named && docCompany.clientId !== named.id) docFacts.push(`질문의 업체(${named.companyName})와 서류의 회사(${docCompany.name || '다른 회사'})가 달라요 — 서류의 회사로 판정했어요`)
+        if (!docCompany && target) docCompany = { clientId: target.id, name: target.companyName, bizNo: target.businessNumber, contact: '' }
+        const blank = target ?? normalizeClientOps({ id: CHAT_NEW_ID, companyName: docCompany?.name || '새 업체', businessNumber: docCompany?.bizNo ?? '' } as Parameters<typeof normalizeClientOps>[0])
+        const prev = await previewWithDocs(blank, docs, { now: nowIso(), today, makeId: generateId })
+        docSummary = prev.summary
+        focus = [prev.record, ...focus.filter((r) => r.id !== prev.record.id)].slice(0, 3)
+        const names = personNames(prev.record)
+        docSections.push({ name: '방금 올린 서류(아직 저장 전 · 임시 판정)', rows: docs.map((d) => ({ 서류: d.label || '종류 모름', 파일: safeText(d.file.name, names, 80), 등록된업체: target ? '예' : '아니요(새 업체)' })) })
+        const facts = aiFactLines(prev.summary)
+        if (facts.length) docSections.push({ name: '방금 올린 서류에서 읽은 것', rows: facts.map((f) => ({ 읽은것: f })) })
+      }
       const DOCISH = /서류|증명|명부|재무|등본|등기|계약서|확인서|등록증|신고서|원천징수|정관|규정|주주/
       const focusData = focus.map((r) => {
         const insights = buildInsights(r, today, grantNotices, usable)
@@ -437,9 +467,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           { bundle: base, take: (n: string) => (focus.length ? TODAY_FOCUS : TODAY_ALL).has(n), rename: (n: string) => `오늘 · ${n}` },
           ...(focus.length ? [] : [{ bundle: clientsBundle(active, today, reco), rename: (n: string) => `고객 · ${n}` }]),
         ],
-        { title: '오늘 대화창', today: todayLabel(today), purpose: focus.length ? `물어본 업체(${focus.map((f) => f.companyName).join(' · ')}) — 무엇을 제안하고 무엇을 확인할지` : '오늘 · 이번 주 · 고객 전체 — 물어본 것에 바로 답' },
-        { facts: focus.length ? [] : [`등록된 업체 ${active.length}곳`] },
+        { title: '오늘 대화창', today: todayLabel(today), purpose: docs.length ? `방금 올린 서류(${docCompany?.name || '회사 모름'}) — 이 서류로 무엇을 제안하고 무엇을 더 받을지(아직 저장 전 · 임시 판정)` : focus.length ? `물어본 업체(${focus.map((f) => f.companyName).join(' · ')}) — 무엇을 제안하고 무엇을 확인할지` : '오늘 · 이번 주 · 고객 전체 — 물어본 것에 바로 답' },
+        { before: docSections, facts: [...docFacts, ...(focus.length ? [] : [`등록된 업체 ${active.length}곳`])] },
       )
+      // 아직 등록 안 된 업체(임시 기록)로 가는 이동 주소는 뺀다 — 눌러도 없는 화면
+      for (const [ref, href] of Object.entries(bundle.links)) if (href.includes(CHAT_NEW_ID)) delete bundle.links[ref]
       const companyish = intents.includes('meeting') || intents.includes('docs') || /업체|회사|기업|대표님/.test(question)
       const rule = ruleAnswer({
         question,
@@ -453,7 +485,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         },
         nearNames: focus.length === 0 && companyish ? nearNames(question, active) : [],
       })
-      return { bundle, rule }
+      if (docs.length) {
+        for (const [ref, href] of Object.entries(rule.links)) if (href.includes(CHAT_NEW_ID)) delete rule.links[ref]
+        const read = readFactsLines(docSummary)
+        if (read.length) rule.items.unshift({ title: '이 서류에서 읽은 것', outline: read })
+        if (docFacts.length) rule.caution = docFacts.join(' ')
+      }
+      return { bundle, rule, ...(docs.length ? { docCompany } : {}) }
     },
     [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
   )
@@ -590,7 +628,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         {/* D-497 맨 위 대화창 — 처음엔 보이고, 화면 꾸미기로 숨길 수 있다(대표 · 팀장 — AI 도우미와 같은 자격) */}
         {assistOn(aiAccess) && (
           <ArrangeItem id="ask" label="무엇이든 물어보기(대화창)" hint="업체 이름과 함께 물으면 그 업체 판정 · 서류로 답해요">
-            <HomeAsk clients={clients} suggestions={homeTips} canAI={assistOn(aiAccess)} prepare={homePrepare} />
+            <HomeAsk clients={clients} suggestions={homeTips} canAI={assistOn(aiAccess)} prepare={homePrepare} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
           </ArrangeItem>
         )}
         {phone && (
