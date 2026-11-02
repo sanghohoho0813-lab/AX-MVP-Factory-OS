@@ -339,7 +339,7 @@ function AiBar({
                 </>
               )}
         </p>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex min-w-0 flex-wrap items-start gap-2 max-sm:basis-full">
           <ModelPicker />
           <AiConfirm><Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={onRun} disabled={running} data-testid="mk-pack-ai-run">
             {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}

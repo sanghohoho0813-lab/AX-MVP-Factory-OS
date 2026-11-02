@@ -253,7 +253,7 @@ export function WeekView({
                         ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
                         : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
                 </p>
-                <div className="flex flex-wrap items-start gap-2">
+                <div className="flex min-w-0 flex-wrap items-start gap-2 max-sm:basis-full">
                   {running ? (
                     <Button size="sm" variant="secondary" onClick={() => stopWeekAi(start)} data-testid="mk-week-stop">
                       <Square aria-hidden="true" className="size-4" /> 멈추기

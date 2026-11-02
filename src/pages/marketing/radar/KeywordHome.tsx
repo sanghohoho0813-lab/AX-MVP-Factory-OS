@@ -22,6 +22,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, History, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { HintTip } from '../../../components/ui/fold'
+import { TextScaleQuickButton } from '../../../components/ui/TextScaleQuickButton'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
 import { cleanTopic } from '../../../services/marketing/contentPack'
@@ -200,6 +201,10 @@ export function KeywordHome({
               {basis}
             </p>
           )}
+          {/* D-507 글자가 작게 보이면 바로 여기서 — 앱 전체 글자 크기(설정 › 보기 와 같은 값 · 누를 때마다 기본 → 크게 → 매우 크게) */}
+          <p className="t-sub flex flex-wrap items-center gap-2 pl-8 break-keep text-slate-700" data-testid="mk-howto-text">
+            글자가 작게 보이면 <TextScaleQuickButton showLabel /> <span className="t-meta text-slate-600">누를 때마다 기본 → 크게 → 매우 크게</span>
+          </p>
         </div>
       )}
 

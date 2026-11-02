@@ -271,6 +271,27 @@ for (const vp of [
     const u = new URL(page.url())
     check(`${vp.tag} [이어서 하기] → 내 콘텐츠의 그 줄(?view=make&idea=)`, u.searchParams.get('view') === 'make' && !!u.searchParams.get('idea') && (await page.locator('[data-testid="radar-idea"][data-focus="1"]').count()) === 1, page.url())
   }
+  // D-507 큰 글자(설정 › 글자 크기 '매우 크게' = 130%)에서도 휴대폰 화면이 옆으로 넘치지 않게
+  if (vp.phone && !ONLY) {
+    const wide = []
+    for (const [name, path, then] of SCREENS) {
+      await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
+      await page.waitForTimeout(500)
+      if (await page.getByTestId('yt-sample').count()) {
+        await page.getByTestId('yt-sample').first().click().catch(() => {})
+        await page.waitForTimeout(700)
+      }
+      if (then === 'pack') {
+        await page.getByTestId('mk-key').first().click().catch(() => {})
+        await page.getByTestId('mk-pack').waitFor({ timeout: 8000 }).catch(() => {})
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'extra_large'))
+      await page.waitForTimeout(300)
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      if (over > 1) wide.push(`${name} +${over}px`)
+    }
+    check(`${vp.tag} 글자 '매우 크게'(130%) — 마케팅 ${SCREENS.length}화면 옆으로 넘침 0`, wide.length === 0, wide)
+  }
   check(`${vp.tag} JS 오류 0`, errs.length === 0, errs)
   await ctx.close()
 }
