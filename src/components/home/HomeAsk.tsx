@@ -149,7 +149,10 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
 
   return (
     <section aria-label="무엇이든 물어보기" data-testid="home-ask" className="rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-5 sm:px-8 sm:py-7">
-      <h2 className="text-center text-[1.3rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]">무엇을 도와드릴까요?</h2>
+      {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
+      <p className="text-center text-[1.3rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
+        무엇을 도와드릴까요?
+      </p>
       <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
         업체 이름과 함께 물어보면 그 업체 서류 · 모듈 판정까지 보고 답해요
       </p>
