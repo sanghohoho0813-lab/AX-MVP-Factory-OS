@@ -45,7 +45,7 @@ function project(p: Partial<ConsultingProject> = {}): ConsultingProject {
 }
 
 function client(p: Partial<ClientOpsRecord> = {}): ClientOpsRecord {
-  return normalizeClientOps({ id: 'c1', companyName: '한솔테크', representativeName: '김대표', establishedAt: '2019-03-02', businessAddress: '경기도 남양주시 진접읍 1', businessNumber: '123-45-67890', corporateNumber: '110111-1234567', businessCategory: '제조업', businessItem: '간판', employeeCount: '7', ...p })
+  return normalizeClientOps({ id: 'c1', companyName: '한솔테크', representativeName: '김대표', establishedAt: '2019-03-02', businessAddress: '경기도 남양주시 진접읍 1', businessNumber: '123-45-67890', corporateNumber: '110111-1234569', businessCategory: '제조업', businessItem: '간판', employeeCount: '7', ...p })
 }
 
 /* ------------------------------------------------------------------ */
@@ -203,8 +203,8 @@ check('thread: 낱말 겹침 없음 — 예약 플랫폼 vs 재고 최적화', s
   check('privacy: 주민번호가 나가지 않는다', !lp.prompt.includes('900101-1234567') && !lp.context.includes('900101-1234567'))
   check('privacy: 계좌·비밀번호·휴대폰·이메일·API키 가림', !/110-123-456789|abcd1234|010-1234-5678|kim@example\.com|sk-abcdefghijklmnop/.test(lp.prompt + lp.context))
   check('privacy: 보고서 합계 (본문+맥락)', lp.privacy.rrn >= 1 && lp.privacy.account >= 1 && lp.privacy.password >= 1 && lp.privacy.phone >= 1 && lp.privacy.email >= 1 && lp.privacy.secret >= 1)
-  const r = redactSensitive('사업자등록번호 123-45-67890 은 그대로, 법인 110111-1234567 도 그대로')
-  check('privacy: 사업자·법인번호는 가리지 않는다', r.report.total === 0 && r.text.includes('123-45-67890') && r.text.includes('110111-1234567'))
+  const r = redactSensitive('사업자등록번호 123-45-67890 은 그대로, 법인 110111-1234569 도 그대로')
+  check('privacy: 사업자·법인번호는 가리지 않는다', r.report.total === 0 && r.text.includes('123-45-67890') && r.text.includes('110111-1234569'))
   const r2 = redactSensitive('인증서 비밀번호 Qwer!234 를 전달')
   check('privacy: 인증서 비밀번호 값만 가림', r2.text.includes('[가림:비밀번호]') && !r2.text.includes('Qwer!234'))
   const r3 = redactSensitive('service_role=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.abcdefghijklmnopqrstuvwxyz')

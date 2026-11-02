@@ -634,7 +634,7 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
 {
   const os = {
     id: 'cli_a', workspaceId: null, companyName: '(주)한솔테크', contactName: '이과장', contactPhone: '010-1111-2222', contactEmail: 'a@b.kr',
-    businessNumber: '123-45-67890', corporateNumber: '110111-1234567', businessAddress: '경기 성남시 분당구', industry: '제조업',
+    businessNumber: '123-45-67890', corporateNumber: '110111-1234569', businessAddress: '경기 성남시 분당구', industry: '제조업',
     representativeName: '김대표', employeeCount: '12명(대표 포함)', establishedAt: '2019-03-02', contactTitle: '과장', companyPhone: '031-000-0000',
     businessCategory: '', archivedAt: null, createdAt: '2026-01-01T00:00:00Z',
   } as unknown as ClientOpsRecord

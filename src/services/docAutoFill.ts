@@ -17,10 +17,11 @@ import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { factCandidatesFromDocText } from './docFacts'
 import { CUSTOM_FACT_PREFIX, addressAgreeKey, customFactValue, formatWon, pendingFacts, readFact, withFactCandidates, withFactDecisions, parseWonInput, type PendingFact } from './customerFacts'
 import { BIRTH_REREAD_MARK, bizNoChecksumOk, dateRereadAgrees, readBusinessNumber } from './bizNoRead'
-import { isBizRegCertificate, parseKoreanBusinessDocument } from './koreanDocParser'
+import { corpNoChecksumOk, isBizRegCertificate, parseKoreanBusinessDocument } from './koreanDocParser'
 import { fullYearFromReturns, mergeVatTrend, periodOfReturnValue, readVatReturn, type VatReturnRead } from './vatReturnDoc'
 import { mergeHeadcountTrend, readWithholdingReport } from './withholdingReport'
 import { withCustomField } from './clientOpsService'
+import { allDocumentMetas } from './clientOpsDocuments'
 import { readSiteReport } from './siteReportDoc'
 import { incomeProfitLine, incomeTrendLine, looksLikeIncomeCert, readIncomeCert, type IncomeYear } from './incomeDoc'
 import { parseFinancialStatement } from './finStatementParser'
@@ -68,7 +69,8 @@ export { bizNoChecksumOk }
 function shapeOk(key: string, value: string): boolean {
   const v = value.trim()
   if (key === 'businessNumber') return bizNoChecksumOk(v)
-  if (key === 'corporateNumber') return v.replace(/\D/g, '').length === 13
+  // D-490 법인등록번호도 끝자리 검산(1 · 2 가중치) — 13자리이기만 하면 넣던 것을, 검산이 틀리면 묻는다(스캔 오독 · 주민등록번호 섞임)
+  if (key === 'corporateNumber') return corpNoChecksumOk(v)
   if (key === 'establishedAt' || key === 'representativeBirth') {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
     if (!m) return false
@@ -202,19 +204,26 @@ function agreeOnlyValuesOf(record: ClientOpsRecord, docs: readonly ReadDoc[], ag
  * 두 서류 이상이 같은 값을 말한 사실(키|값).
  * only — 서류마다 맞춰 보는 데만 쓰는 값(앞쪽은 docs 와 같은 차례 · 뒤쪽은 회사 정보 읽기에서 뺀 서류).
  */
-function agreedFacts(docs: readonly ReadDoc[], only: readonly AgreeOnlyValue[][] = []): Set<string> {
-  const seen = new Map<string, Set<number>>()
-  const add = (key: string, value: string, i: number) => {
+function agreedFacts(docs: readonly ReadDoc[], only: readonly AgreeOnlyValue[][] = [], kindOf: (key: DocumentKey) => string = (k) => k): Set<string> {
+  // D-491 '두 서류가 같은 값' 은 서로 다른 종류 서류끼리만 — 같은 사업자등록증 사진 두 장은 같은 글자 실수를 할 수 있어 하나로 센다(D-474 와 같은 규칙)
+  const seen = new Map<string, Set<string>>()
+  const add = (key: string, value: string, who: string) => {
     const k = `${key}|${sameKey(key, value)}`
-    const s = seen.get(k) ?? new Set<number>()
-    s.add(i)
+    const s = seen.get(k) ?? new Set<string>()
+    s.add(who)
     seen.set(k, s)
   }
-  docs.forEach((doc, i) => {
-    for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) add(c.key, c.value, i)
+  docs.forEach((doc) => {
+    for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) add(c.key, c.value, kindOf(doc.key))
   })
-  only.forEach((vals, i) => vals.forEach((v) => add(v.key, v.value, i)))
+  only.forEach((vals, i) => vals.forEach((v) => add(v.key, v.value, i < docs.length ? kindOf(docs[i].key) : `only:${i}`)))
   return new Set([...seen].filter(([, s]) => s.size >= 2).map(([k]) => k))
+}
+
+/** D-491 서류 종류 — 칸 이름에서 겹친 번호 ' (2)' 를 뗀 것(사업자등록증 · 사업자등록증 (2) 는 같은 종류) */
+function docKindOf(record: ClientOpsRecord): (key: DocumentKey) => string {
+  const labels = new Map(allDocumentMetas(record).map((m) => [m.key, m.label]))
+  return (key) => (labels.get(key) ?? key).replace(/\s*\(\d+\)\s*$/, '')
 }
 
 /**
@@ -372,7 +381,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
   const only = agreeOnlyValuesOf(record, docs, agreeOnly)
-  const agreed = agreedFacts(docs, only)
+  const agreed = agreedFacts(docs, only, docKindOf(record))
   // D-474 지난 묶음에서 '사진 · 스캔이라 한 번 확인' 으로 남겨 둔 값 — 이번에 다른 종류 서류(사업자등록증 ↔ 등기부 · 신분증)가 같은 값을 말하면 두 서류가 같은 값.
   //        같은 종류 서류를 다시 올린 것(같은 사진을 또)은 같은 글자 실수일 수 있어 세지 않는다
   const priorHeld = (record.factInbox ?? []).filter((c) => (c.note === NOTE_OCR || c.note === NOTE_DOC_UNSURE) && c.ref.startsWith('doc:'))
@@ -428,7 +437,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       const ids = new Set(conflicts.map((p) => p.id))
       rec = { ...rec, factInbox: (rec.factInbox ?? []).map((c) => (ids.has(c.id) ? { ...c, note: NOTE_CONFLICT } : c)) }
     }
-    if (auto.length) rec = withFactDecisions(rec, auto.map((p) => ({ id: p.id, action: 'accept' as const })), now)
+    if (auto.length) rec = withFactDecisions(rec, auto.map((p) => ({ id: p.id, action: 'accept' as const })), now, { auto: true })
     const label = (p: PendingFact) => ({ key: p.key, label: p.label, display: p.display, fileName: doc.fileName })
     for (const p of auto) {
       // 같은 칸을 앞 서류가 넣었으면(개업일 → 회사성립일) 앞 줄은 지운다 — '바로 넣은 것' 에 한 줄만
@@ -443,7 +452,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   for (const v of only.flat()) {
     const held = pendingFacts(rec).find((p) => p.from === 'inbox' && p.key === v.key && p.current === '' && priorHeld.some((h) => h.id === p.id) && sameKey(p.key, p.value) === sameKey(v.key, v.value))
     if (!held) continue
-    rec = withFactDecisions(rec, [{ id: held.id, action: 'accept' }], now)
+    rec = withFactDecisions(rec, [{ id: held.id, action: 'accept' }], now, { auto: true })
     entered.push({ key: held.key, label: held.label, display: held.display, fileName: v.fileName })
   }
   // D-403 원천세 신고서 여러 달(이번에 · 예전에) → '원천세 인원 추이' 칸(달이 둘 이상일 때) — 작년 같은 달과 비교해 고용 증가를 본다
@@ -539,7 +548,7 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
       const p = pendingFacts(rec).find((x) => x.ref === ref && x.key === 'revenue')
       const fileName = `부가세 신고서 ${used.length}장(${full.year}년 1~12월)`
       if (p && !p.note && p.current === '') {
-        rec = withFactDecisions(rec, [{ id: p.id, action: 'accept' }], now)
+        rec = withFactDecisions(rec, [{ id: p.id, action: 'accept' }], now, { auto: true })
         entered.push({ key: p.key, label: p.label, display: `${full.year}년 ${formatWon(full.total)}`, fileName })
       } else if (p) {
         if (!p.note) rec = { ...rec, factInbox: (rec.factInbox ?? []).map((c) => (c.id === p.id ? { ...c, note: NOTE_CONFLICT } : c)) }

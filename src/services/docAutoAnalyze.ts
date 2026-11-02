@@ -166,7 +166,7 @@ export async function analyzeUploadedDocs(
         // 크레탑 숫자(매출 · 이익 · 자산 · 부채) — 비어 있는 칸은 바로 넣는다(보고서 표에서 읽은 숫자)
         const fromCretop = pendingFacts(rec).filter((p) => p.from === 'cretop')
         const auto = fromCretop.filter((p) => p.current === '')
-        if (auto.length) rec = withFactDecisions(rec, auto.map((p) => ({ id: p.id, action: 'accept' as const })), now)
+        if (auto.length) rec = withFactDecisions(rec, auto.map((p) => ({ id: p.id, action: 'accept' as const })), now, { auto: true })
         for (const p of auto) entered.push({ key: p.key, label: p.label, display: p.display, fileName: cDoc.fileName })
         for (const p of fromCretop) if (!auto.includes(p)) flagged.push({ key: p.key, label: p.label, display: p.display, fileName: cDoc.fileName, note: '크레탑 숫자가 지금 적힌 값과 달라요' })
         cretop = { fileName: cDoc.fileName, company: name, filled: applied.filled }

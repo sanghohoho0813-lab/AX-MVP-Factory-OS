@@ -440,7 +440,7 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   const REGISTRY = [
     '등기사항전부증명서(말소사항 포함) - 주식회사',
     '등기번호 111111',
-    '등록번호 110111-1234567',
+    '등록번호 110111-1234569',
     '상 호 주식회사 대한정밀',
     '본 점 경기도 화성시 동탄산단6길 22, 3층',
     '회사성립연월일 2018 년 03 월 02 일',
@@ -472,7 +472,7 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   check('두 장: 본점은 등기부 것을 쓴다', val('headOffice')?.includes('3층') === true, val('headOffice'))
   check('두 장: 설립일은 등기부의 회사성립연월일', val('establishedAt') === '2018-03-02', val('establishedAt'))
   check('두 장: 사업자등록번호는 등록증 것을 쓴다', val('businessNumber') === '214-88-01232' && src('businessNumber') === '사업자등록증', `${val('businessNumber')} / ${src('businessNumber')}`)
-  check('두 장: 법인등록번호도 함께 채워진다', val('corporateNumber') === '110111-1234567', val('corporateNumber'))
+  check('두 장: 법인등록번호도 함께 채워진다', val('corporateNumber') === '110111-1234569', val('corporateNumber'))
   check('두 장: 사람이 읽을 출처 한 줄', documentsSummary([fromReg, fromRegistry]) === '사업자등록증 · 법인등기부등본', documentsSummary([fromReg, fromRegistry]))
 
   // 없는 것을 만들어 내지 않는다 (§31)

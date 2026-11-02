@@ -191,8 +191,9 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
-import { DocKindPicker, DocShelfBar } from '../components/ops/DocShelfBar'
-import { docShelfSummary } from '../services/docShelf'
+import { DocKindPicker, DocShelfBar, OtherDocsPanel } from '../components/ops/DocShelfBar'
+import { CriticalIdCheck } from '../components/ops/CriticalIdCheck'
+import { docShelfSummary, isOtherCell } from '../services/docShelf'
 import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
@@ -481,6 +482,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     },
     [showToast, load],
   )
+
+  /**
+   * D-489 '무슨 서류인가요?' 로 맞는 칸에 옮기면 그 파일을 다시 읽어 회사 정보로(사업자등록증 → 번호 · 설립일 …).
+   * 값 넣기 규칙(검산 · 다른 회사 · 이미 적힌 값과 다르면 묻기)은 서류 올리기와 같다. 파일이 클라우드에 있을 때만.
+   */
+  const moveAndReread = (next: ClientOpsRecord, to: string, key: DocumentKey) => {
+    void commit(next).then(async (ok) => {
+      if (!ok) return
+      showToast(`'${to}' 칸으로 옮겼습니다.`)
+      const { rereadMovedDoc } = await import('../services/docMoveReread')
+      const out = await rereadMovedDoc(latestRef.current ?? next, key)
+      if (!out || out.record === (latestRef.current ?? next)) return
+      if (await commit(out.record)) showToast(out.entered > 0 ? `옮긴 서류를 다시 읽어 회사 정보 ${out.entered}개를 채웠습니다.` : '옮긴 서류를 다시 읽었습니다 — 확인할 것이 있으면 맞춤 추천에 보여요.')
+    })
+  }
 
   /** 지금 화면의 가장 새 기록 — 기다린 뒤(파일 올리기 등) 이것에 얹어 저장한다 */
   const current = useCallback((): ClientOpsRecord | null => latestRef.current ?? record, [record])
@@ -930,6 +946,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         D-144: 그다음 회사 정보 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
         지금 챙길 것 · 맞는 지원사업 · 확인할 정보는 '맞춤 추천' 탭으로 옮겼다(여기는 한 줄로 알려만 준다).
       */}
+      {/* D-492 서류에서 읽어 넣은 중요 번호(사업자 · 법인번호 · 설립일) — 처음 한 번만 원본과 맞춰 보기(없으면 그리지 않음) */}
+      <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void commit(next).then((ok) => ok && showToast(msg))} />
       <FoldAllButton className="-my-2 self-end" />
       {/* D-192: 카드마다 접는 목차 — 제목 줄(▸ · 숫자 · 한 줄 요약)만 보이고, 마우스를 올리면 무슨 칸인지. 회사 정보만 펼친 채로 */}
       <div data-testid="overview-company" className="flex flex-col gap-3">
@@ -1474,11 +1492,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <DocFolderView
             record={record}
             cloud={uploadable}
-            onMove={(next, to) => {
-              void commit(next).then((ok) => {
-                if (ok) showToast(`'${to}' 칸으로 옮겼습니다.`)
-              })
-            }}
+            onMove={(next, to, key) => moveAndReread(next, to, key)}
             onShowInList={(key) => {
               changeDocView('list')
               setOpenDocs((cur) => new Set(cur).add(key))
@@ -1490,8 +1504,25 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }}
           />
         ) : (
+        <>
+        {/* D-488 무슨 서류인지 모르는 것은 맨 위 판 하나에 한 줄씩 — 큰 카드가 여러 개 늘어서지 않게 */}
+        <OtherDocsPanel
+          record={record}
+          openKeys={openDocs}
+          onMove={(next, to, key) => moveAndReread(next, to, key)}
+          onDetail={(key) => {
+            setOpenDocs((cur) => new Set(cur).add(key))
+            window.setTimeout(() => {
+              const el = document.getElementById(`doc-card-${key}`)
+              el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+              el?.focus({ preventScroll: true })
+            }, 80)
+          }}
+        />
         <div className="grid gap-3 lg:grid-cols-2">
           {docOrder(allDocumentMetas(record), urgentDocs)
+            // D-488 모음 판에 있는 기타 칸은 목차에서 빼 둔다([자세히] 로 펼치면 다시)
+            .filter((meta) => !(isOtherCell(meta.label) && !!record.documents[meta.key]?.fileName && !openDocs.has(meta.key)))
             .map((meta) => {
               const state = record.documents[meta.key] ?? emptyDocumentState()
               const view = documentStatus(meta.key, state, today, meta)
@@ -1726,15 +1757,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   )}
 
                   {/* D-147: 기타 칸 — 무슨 서류인지 고르면 맞는 칸으로 */}
-                  <DocKindPicker
-                    record={record}
-                    docKey={meta.key}
-                    onMove={(next, to) => {
-                      void commit(next).then((ok) => {
-                        if (ok) showToast(`'${to}' 칸으로 옮겼습니다.`)
-                      })
-                    }}
-                  />
+                  <DocKindPicker record={record} docKey={meta.key} onMove={(next, to, key) => moveAndReread(next, to, key)} />
 
                   {custom &&
                     (renamingDoc === custom.id ? (
@@ -1790,6 +1813,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               )
             })}
         </div>
+        </>
         )}
 
         {/*

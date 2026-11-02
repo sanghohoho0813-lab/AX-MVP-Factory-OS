@@ -714,7 +714,7 @@ function check(name: string, cond: boolean, detail?: string): void {
     id: 'p2',
     companyName: '한솔테크(주)',
     workspaceId: null,
-    corporateNumber: '110111-1234567',
+    corporateNumber: '110111-1234569',
     representativeBirth: '1978-05-10',
     establishedAt: '2019-03-02',
     industry: '자동차 부품 제조',
@@ -963,7 +963,7 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('정책자금 주소: 고객 상세·리포트는 ?cid= (+ 업체 띠용 client, D-94)', pfHref('/customers/x') === '/tools/policy-funding/customers?cid=x&client=x' && pfHref('/customers/x/report') === '/tools/policy-funding/report?cid=x&client=x')
   check('정책자금 주소: 진단은 ?client= 를 그대로 (업체로 열기)', pfHref('/diagnosis?client=x') === '/tools/policy-funding/diagnosis?client=x')
 
-  const os = { id: 'cli_a', companyName: '가나(주)', industry: '제조업', corporateNumber: '110111-1234567' } as never
+  const os = { id: 'cli_a', companyName: '가나(주)', industry: '제조업', corporateNumber: '110111-1234569' } as never
   const old = customerFromRow('cli_a', { stage: '서류 요청', nextAction: '서류 받기', lastContactedAt: '2026-09-01', memo: 'm', topAgency: '기술보증기금', score: 71 }, os)
   check('상담 기록: D-91 기록도 원본 고객 모양으로 읽힌다', old.id === 'cli_a' && old.companyName === '가나(주)' && old.recommendedAgency === '기술보증기금' && old.stage === '서류 요청' && old.score === 71)
   check('상담 기록: 법인번호가 있으면 법인사업자', old.businessType === '법인사업자')
@@ -1149,7 +1149,7 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
 /* ---------------- D-135 업체 ↔ AX 스튜디오 고객사 ---------------- */
 {
   const rec = normalizeClientOps({
-    id: 'cli_ax', companyName: '한솔테크(주)', workspaceId: null, businessNumber: '123-45-67890', corporateNumber: '110111-1234567',
+    id: 'cli_ax', companyName: '한솔테크(주)', workspaceId: null, businessNumber: '123-45-67890', corporateNumber: '110111-1234569',
     industry: '제조업', businessAddress: '경기도 성남시 분당구 판교로 1', establishedAt: '2015-03-02', employeeCount: '12명',
     contactName: '김대표', contactPhone: '010-1111-2222', contactEmail: 'ceo@example.com',
   })

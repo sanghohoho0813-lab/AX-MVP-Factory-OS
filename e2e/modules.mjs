@@ -139,7 +139,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   const pdfPath = join(tmpdir(), 'axmvp-bizreg-sample.pdf')
   await page.setContent(`<html><body style="font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:2">
     <h2>사업자등록증</h2><div>(법인사업자)</div><div>등록번호 : 214-88-01232</div><div>법인명(단체명) : 주식회사 대한정밀</div>
-    <div>대 표 자 : 홍길동</div><div>개 업 연 월 일 : 2019 년 03 월 02 일</div><div>법인등록번호 : 110111-1234567</div>
+    <div>대 표 자 : 홍길동</div><div>개 업 연 월 일 : 2019 년 03 월 02 일</div><div>법인등록번호 : 110111-1234569</div>
     <div>사업장 소재지 : 서울특별시 강남구 테헤란로 123</div></body></html>`)
   await page.pdf({ path: pdfPath, format: 'A4' })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })

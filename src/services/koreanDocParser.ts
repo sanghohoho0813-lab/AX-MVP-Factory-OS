@@ -8,7 +8,7 @@
  * (잘못된 값을 자동으로 채우는 것보다 비워두는 편이 안전하다.)
  */
 
-import { readBusinessNumber } from './bizNoRead'
+import { collapseSpacedDigits, normalizeNumberText, readBusinessNumber } from './bizNoRead'
 import { fixDateNoise } from './ocrNumbers'
 
 export { readBusinessNumber }
@@ -48,6 +48,10 @@ function normalize(raw: string): string {
     .replace(/ *\n */g, '\n')
     // D-454 도장이 겹친 스캔에서 '법인명' 이 '범인명' 으로 — 줄 맨 앞 이름표일 때만 바로잡는다
     .replace(/(^|\n)범(\s*인\s*명)/g, '$1법$2')
+    // D-493 자간을 띄운 번호('1 1 0 1 1 1-1 2 3 4 5 6 9')를 붙인다
+    .split('\n')
+    .map(collapseSpacedDigits)
+    .join('\n')
     .trim()
 }
 
@@ -276,16 +280,19 @@ export function bizNoKind(bizNo: string | undefined): 'corp' | 'individual' | 'u
  *  - '주민(법인)등록번호' · 등기부 '등록번호' → 법인 서류(사업자번호 가운데 81~88 · 등기부)일 때만
  *  - 이름표 없는 13자리 → 법인 서류 + 법인번호 검증 숫자가 맞고 + 바로 앞이 사람 이름 · '주민' 이 아닐 때만
  */
-function findCorporateNumber(t: string, source: DocSource, bizNo: string | undefined): string | undefined {
-  const labeled = /법\s*인\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
+function findCorporateNumber(raw: string, source: DocSource, bizNo: string | undefined): string | undefined {
+  // D-493 스캔에서 번호 줄의 O · l · S · B 를 숫자로(사업자번호 읽기와 같은 고치기) — 넣을 때는 검산 · 스캔 확인을 거친다
+  const t = raw.split('\n').map((l) => (/등\s*록\s*번\s*호/.test(l) ? normalizeNumberText(l) : l)).join('\n')
+  // D-493 대시 없이 13자리를 붙여 쓴 것도(1101111234569) — 넣을 때는 검산이 맞아야 한다(docAutoFill)
+  const labeled = /법\s*인\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7}|(?<!\d)\d{13}(?!\d))/.exec(t)
   if (labeled) return formatCorporateNumber(labeled[1])
   const kind = bizNoKind(bizNo)
   const corpDoc = kind === 'corp' || (source === 'corporate_registry' && kind !== 'individual')
   if (!corpDoc) return undefined
-  const mixed = /주\s*민\s*\(\s*법\s*인\s*\)\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
+  const mixed = /주\s*민\s*\(\s*법\s*인\s*\)\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7}|(?<!\d)\d{13}(?!\d))/.exec(t)
   if (mixed) return formatCorporateNumber(mixed[1])
   // 등기부 맨 위 '등기번호 012345  등록번호 110111-0123456' — 사업자 · 주민 등록번호 이름표는 아님
-  const plain = /(?<![가-힣)]\s*)등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
+  const plain = /(?<![가-힣)]\s*)등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7}|(?<!\d)\d{13}(?!\d))/.exec(t)
   if (plain && source === 'corporate_registry') return formatCorporateNumber(plain[1])
   const re = /\b(\d{6}\s*-\s*\d{7})\b/g
   let m: RegExpExecArray | null

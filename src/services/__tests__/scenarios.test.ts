@@ -146,7 +146,7 @@ const fitIds = (runs: readonly ScenarioRun[]) => runs.filter((x) => x.fit.kind =
 const gayeonBase = {
   id: 'gy',
   companyName: '가연인터내셔널 주식회사',
-  corporateNumber: '110111-1234567',
+  corporateNumber: '110111-1234569',
   businessCategory: '도매 및 소매업',
   businessItem: '무역',
   establishedAt: '2024-05-01',
@@ -348,7 +348,7 @@ check('F23 무작위 업체 2,000곳 — 계산기(사실 창고)와 상황 예�
 
 /* ---------------- D-209 점검 결과 ---------------- */
 const moveOf = (addr: string) => {
-  const r = mk({ id: `mv-${addr}`, companyName: '(주)이전정밀', corporateNumber: '110111-1234567', establishedAt: '2024-05-02', businessAddress: addr })
+  const r = mk({ id: `mv-${addr}`, companyName: '(주)이전정밀', corporateNumber: '110111-1234569', establishedAt: '2024-05-02', businessAddress: addr })
   return scenarioFit(SCENARIO_PRESETS.find((x) => x.id === 'startup-move')!, fitContext(r, today))
 }
 const mvSn = moveOf('경기도 성남시 분당구 판교로 1')
@@ -609,7 +609,7 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
       id: `fz${i}`,
       companyName: pick(['', '가', '테스트(주)', '아주긴이름'.repeat(30)]),
       representativeName: pick(['', '김대표']),
-      corporateNumber: pick(['', '110111-1234567']),
+      corporateNumber: pick(['', '110111-1234569']),
       establishedAt: pick(DATES),
       representativeBirth: pick(DATES),
       businessCategory: pick(CATS),

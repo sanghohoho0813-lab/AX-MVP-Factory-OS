@@ -81,7 +81,7 @@ export function DocFolderView({
   cloud: boolean
   onShowInList: (key: DocumentKey) => void
   /** D-212: 기타 · 확인 필요 파일을 폴더 보기에서 바로 맞는 칸으로(목차 보기로 가지 않고) */
-  onMove?: (next: ClientOpsRecord, to: string) => void
+  onMove?: (next: ClientOpsRecord, to: string, key: DocumentKey) => void
 }) {
   const tree = useMemo(() => docFolderTree(record), [record])
   const [path, setPath] = useState('')
@@ -188,9 +188,9 @@ export function DocFolderView({
               <DocKindPicker
                 record={record}
                 docKey={open.key}
-                onMove={(next, to) => {
+                onMove={(next, to, key) => {
                   setOpen(null)
-                  onMove(next, to)
+                  onMove(next, to, key)
                 }}
               />
             )}

@@ -168,7 +168,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(800)
   const moved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((x) => x.content === '급여 증빙 요청').map((x) => x.dueDate).sort())
   check('끌어 옮기기: 10/12 할 일이 10/14 로(다른 달 반복분은 그대로)', moved.join() === '2026-10-14,2026-11-12,2026-12-11,2027-01-12', moved.join())
-  check('끌어 옮기기: 옮긴 날이 골라지고 칸에 글이 보임', (await cell(page, '2026-10-14').innerText()).includes('급여 증빙 요청') && !(await cell(page, '2026-10-12').innerText()).includes('급여 증빙 요청') && (await page.getByTestId('picked-panel').innerText()).includes('10월 14일'))
+  // D-486 떠난 날(10/12)에는 할 일 줄 대신 옅은 주황 흔적('→ 10/14로 미룸')만 남는다
+  check('끌어 옮기기: 옮긴 날이 골라지고 칸에 글이 보임 · 떠난 날은 할 일 줄 없이 흔적만', (await cell(page, '2026-10-14').innerText()).includes('급여 증빙 요청') && (await cell(page, '2026-10-12').locator('[data-kind="todo"]', { hasText: '급여 증빙 요청' }).count()) === 0 && (await cell(page, '2026-10-12').locator('[data-kind="moved"]', { hasText: '급여 증빙 요청' }).count()) === 1 && (await page.getByTestId('picked-panel').innerText()).includes('10월 14일'))
   // 칸 안의 할 일 줄도 끌 수 있다 — 다시 10/12 로
   await cell(page, '2026-10-14').locator('[data-kind="todo"][draggable="true"]').filter({ hasText: '급여 증빙 요청' }).first().dragTo(cell(page, '2026-10-12'))
   await page.waitForTimeout(800)

@@ -102,7 +102,7 @@ export function moveTargets(record: ClientOpsRecord, fromKey: DocumentKey): Move
 }
 
 /** 고른 곳으로 옮긴다 — `value` 는 moveTargets 의 값, 또는 'new:<직접 적은 이름>' */
-export function moveDocTo(record: ClientOpsRecord, fromKey: DocumentKey, value: string): { record: ClientOpsRecord; to: string } | null {
+export function moveDocTo(record: ClientOpsRecord, fromKey: DocumentKey, value: string): { record: ClientOpsRecord; to: string; key: DocumentKey } | null {
   const meta = allDocumentMetas(record).find((m) => m.key === fromKey)
   const state = record.documents[fromKey]
   if (!meta || !state || !(state.fileName || state.storagePath)) return null
@@ -128,7 +128,7 @@ export function moveDocTo(record: ClientOpsRecord, fromKey: DocumentKey, value: 
     { withDoc: withDocument, withoutCustom: withoutCustomDocument },
   )
   const moved = out.moved[0]
-  return moved ? { record: out.record, to: moved.to } : null
+  return moved ? { record: out.record, to: moved.to, key: moved.key } : null
 }
 
 /* ------------------------------------------------------------------ */

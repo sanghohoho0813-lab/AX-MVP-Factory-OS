@@ -807,7 +807,7 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
     companyName: '한솔테크(주)',
     establishedAt: '2019-03-05',
     businessNumber: '123-45-67890',
-    corporateNumber: '110111-1234567',
+    corporateNumber: '110111-1234569',
     businessAddress: '서울시 강남구 …',
     representativeName: '김대표',
     representativeBirth: '1980-12-31',
@@ -916,7 +916,7 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   // 기록에 어떤 모양으로 들어와 있든 화면은 서류에 적히는 모양으로 보여 준다
   check('번호: 붙은 사업자번호에 하이픈', formatNumberOf('business', '3138112508') === '313-81-12508')
   check('번호: 이미 하이픈이면 그대로', formatNumberOf('business', '313-81-12508') === '313-81-12508')
-  check('번호: 법인등록번호 6-7', formatNumberOf('corporate', '1101111234567') === '110111-1234567')
+  check('번호: 법인등록번호 6-7', formatNumberOf('corporate', '1101111234569') === '110111-1234569')
   check('번호: 휴대폰', formatNumberOf('phone', '01023456789') === '010-2345-6789')
   check('번호: 서울 지역번호', formatNumberOf('phone', '0212345678') === '02-1234-5678')
   // 자릿수가 안 맞으면 지어내지 않는다 — 원문 그대로 둔다
@@ -945,7 +945,7 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 
   // 조각마다 따로 복사 — 칸이 나뉜 신청서용
   check('조각: 사업자등록번호 3조각', JSON.stringify(numberSegments('313-81-12508')) === JSON.stringify(['313', '81', '12508']))
-  check('조각: 법인등록번호 앞뒤 2조각', JSON.stringify(numberSegments('110111-1234567')) === JSON.stringify(['110111', '1234567']))
+  check('조각: 법인등록번호 앞뒤 2조각', JSON.stringify(numberSegments('110111-1234569')) === JSON.stringify(['110111', '1234569']))
   check('조각: 휴대폰 3조각', JSON.stringify(numberSegments('010-2345-6789')) === JSON.stringify(['010', '2345', '6789']))
   check('조각: 나눌 것이 없으면 빈 배열', numberSegments('3138112508').length === 0)
   check('조각: 빈 값', numberSegments('').length === 0 && numberSegments('-').length === 0)
@@ -1188,7 +1188,7 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 {
   let r = normalizeClientOps({
     id: 's1', companyName: '한솔테크', contactName: '박담당', contactPhone: '010-1234-5678',
-    corporateNumber: '110111-1234567', businessNumber: '123-45-67890',
+    corporateNumber: '110111-1234569', businessNumber: '123-45-67890',
   })
   r = withCustomField(r, { group: 'contact', label: '담당 세무사', value: '김세무' })
   r = withNewFee(r, { kind: 'success', amount: 1_000_000, agentFee: 100_000, agentName: '최영업' })
@@ -1284,7 +1284,7 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 업 태 : 정보통신업   종 목 : 소프트웨어 개발
 교부일자 : 2026 년 08 월 20 일`
   const reg = `등기사항전부증명서(말소사항 포함) - 법인
-등기번호 012345   등록번호 110111-1234567
+등기번호 012345   등록번호 110111-1234569
 상호 주식회사 한솔테크
 회사성립연월일 2020 년 02 월 28 일
 1주의 금액 금 5,000 원
@@ -2341,7 +2341,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
 
 /* ---- D-168: 업체 고르는 칸 — 개인사업자 먼저 · 법인 가나다 ---- */
 {
-  check('업체 구분: 법인번호 → 법인', entityKindOf({ companyName: '하늘', corporateNumber: '110111-1234567' }) === 'corporation')
+  check('업체 구분: 법인번호 → 법인', entityKindOf({ companyName: '하늘', corporateNumber: '110111-1234569' }) === 'corporation')
   check('업체 구분: 사업자번호 가운데 81 · 86 → 법인, 12 · 95 → 개인', entityKindOf({ companyName: 'a', businessNumber: '123-81-45678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '1238645678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '123-12-45678' }) === 'individual' && entityKindOf({ companyName: 'a', businessNumber: '123-95-45678' }) === 'individual')
   check('업체 구분(D-171): 이름의 (주) · 주식회사 → 법인, 아무것도 없으면 개인사업자', entityKindOf({ companyName: '(주)가나' }) === 'corporation' && entityKindOf({ companyName: '다라 주식회사' }) === 'corporation' && entityKindOf({ companyName: '마바상회' }) === 'individual')
   const list = [

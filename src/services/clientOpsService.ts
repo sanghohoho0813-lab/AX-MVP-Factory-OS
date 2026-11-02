@@ -207,6 +207,7 @@ function normalizeFactMeta(raw: unknown): Record<string, FactMeta> {
       confirmedAt: str(v.confirmedAt),
       updatedAt: str(v.updatedAt),
       ...(Array.isArray(v.dismissed) ? { dismissed: v.dismissed.filter((x): x is string => typeof x === 'string') } : {}),
+      ...(v.byPerson === true ? { byPerson: true } : {}),
     }
   }
   return out

@@ -55,6 +55,16 @@ const LIKE: Record<string, Array<[string, number]>> = (() => {
   return m
 })()
 
+/**
+ * D-493 글자 사이를 띄운 번호('1 2 4-8 1-0 0 9 9 8' · '1 1 0 1 1 1-1 2 3 4 5 6 9') — 자간을 넓힌 PDF · 스캔에서 나온다.
+ * 대시가 낀 '한 자리씩 띄운' 덩어리, 또는 한 자리씩 9개 넘게 띄운 덩어리만 붙인다(보통 글 · 표의 숫자 둘셋은 그대로).
+ */
+export function collapseSpacedDigits(s: string): string {
+  return s
+    .replace(/(?<!\d)(?<!\d )\d(?: \d)+(?: ?- ?\d(?: \d)*)+(?!\d)/g, (tok) => tok.replace(/ /g, ''))
+    .replace(/(?<!\d)(?<!\d )\d(?: \d){8,}(?!\d)/g, (tok) => tok.replace(/ /g, ''))
+}
+
 /** 번호 근처 글자 고치기 — 전각 숫자 · 대시 변형 · 숫자 사이에 낀 영문(O → 0, l/I/| → 1, S → 5, B → 8, Z → 2) */
 export function normalizeNumberText(line: string): string {
   let s = line
@@ -66,7 +76,7 @@ export function normalizeNumberText(line: string): string {
   const fix: Record<string, string> = { O: '0', o: '0', l: '1', I: '1', '|': '1', '!': '1', S: '5', s: '5', B: '8', Z: '2', z: '2' }
   // 번호 덩어리(숫자 · 대시 · 헷갈리는 영문만 8자 넘게 이어지고 숫자가 5개 넘는 것) 안의 영문만 숫자로 — 일반 글자는 건드리지 않는다
   s = s.replace(/[0-9OolI|!SsBZz-]{8,}/g, (tok) => (tok.replace(/\D/g, '').length >= 5 ? tok.replace(/[OolI|!SsBZz]/g, (c) => fix[c] ?? c) : tok))
-  return s
+  return collapseSpacedDigits(s)
 }
 
 interface Raw {

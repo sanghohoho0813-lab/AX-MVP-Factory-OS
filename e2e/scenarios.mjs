@@ -52,7 +52,7 @@ const EMPTY = { id: 'cli_scen_empty', companyName: '빈칸상사', status: 'acti
 const SMALL = {
   id: 'cli_scen_small',
   companyName: '가연인터내셔널 주식회사',
-  corporateNumber: '110111-1234567',
+  corporateNumber: '110111-1234569',
   representativeName: '이가연',
   businessCategory: '도매 및 소매업',
   businessItem: '무역',

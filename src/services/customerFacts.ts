@@ -519,7 +519,7 @@ export function withFactConfirmed(record: ClientOpsRecord, key: string, now: str
   const prev = record.factMeta?.[key]
   return {
     ...record,
-    factMeta: { ...(record.factMeta ?? {}), [key]: { source: prev?.source ?? 'manual', status: 'confirmed', asOf: prev?.asOf ?? '', confirmedAt: now, updatedAt: now, ...(prev?.dismissed ? { dismissed: prev.dismissed } : {}) } },
+    factMeta: { ...(record.factMeta ?? {}), [key]: { source: prev?.source ?? 'manual', status: 'confirmed', asOf: prev?.asOf ?? '', confirmedAt: now, updatedAt: now, ...(prev?.dismissed ? { dismissed: prev.dismissed } : {}), byPerson: true } },
   }
 }
 
@@ -543,9 +543,11 @@ export interface FactDecision {
  * 확인 필요 → 사실. 맞음은 그 자료를 출처로 '확인됨', 고친 값은 대표가 확인한 값(직접 적음 · 확인됨),
  * 틀림은 그 자료를 다시 묻지 않는다. 결정하지 않은 후보는 그대로 남는다(나중에 확인).
  */
-export function withFactDecisions(record: ClientOpsRecord, decisions: FactDecision[], now: string): ClientOpsRecord {
+/** opts.auto — 서류에서 저절로 넣을 때(D-492 사람이 확인한 것과 가른다). 화면에서 사람이 고르면 byPerson */
+export function withFactDecisions(record: ClientOpsRecord, decisions: FactDecision[], now: string, opts: { auto?: boolean } = {}): ClientOpsRecord {
   const pending = pendingFacts(record)
   let next = record
+  const byPerson = (r: ClientOpsRecord, key: string): ClientOpsRecord => (opts.auto || !r.factMeta?.[key] ? r : { ...r, factMeta: { ...r.factMeta, [key]: { ...r.factMeta[key], byPerson: true } } })
   const doneInbox = new Set<string>()
   for (const d of decisions) {
     const p = pending.find((x) => x.id === d.id)
@@ -568,14 +570,15 @@ export function withFactDecisions(record: ClientOpsRecord, decisions: FactDecisi
       const cur = customFieldOf(next, p.label)
       next = withCustomField(next, { id: cur?.id, group: cur?.group ?? p.customGroup ?? 'credential', label: cur?.label ?? p.label, value })
       next = { ...next, factMeta: { ...(next.factMeta ?? {}), [p.key]: { source: d.action === 'fix' ? 'manual' : p.source, status: 'confirmed', asOf: p.asOf, confirmedAt: now, updatedAt: now, dismissed: [...new Set([...(next.factMeta?.[p.key]?.dismissed ?? []), p.ref])] } } }
+      next = byPerson(next, p.key)
       continue
     }
     if (d.action === 'fix') {
       next = withFactValue(next, p.key, d.value ?? '', { source: 'manual', status: 'confirmed', now })
-      next = dismiss(next)
+      next = byPerson(dismiss(next), p.key)
       continue
     }
-    next = withFactValue(next, p.key, p.value, { source: p.source, status: 'confirmed', asOf: p.asOf, now })
+    next = byPerson(withFactValue(next, p.key, p.value, { source: p.source, status: 'confirmed', asOf: p.asOf, now }), p.key)
   }
   if (doneInbox.size > 0) next = { ...next, factInbox: (next.factInbox ?? []).filter((c) => !doneInbox.has(c.id)) }
   return next

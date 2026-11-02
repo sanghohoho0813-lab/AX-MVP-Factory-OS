@@ -245,7 +245,7 @@ for (const width of [360, 390, 430]) {
   const BIZ = {
     name: '사업자등록증.txt',
     mimeType: 'text/plain',
-    buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '법인등록번호 : 110111-1234567', '사업장 소재지 : 경기도 파주시 탄현면 평화로 3', '업태 : 제조업', '종목 : 바이오 시약'].join('\n'), 'utf8'),
+    buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '법인등록번호 : 110111-1234569', '사업장 소재지 : 경기도 파주시 탄현면 평화로 3', '업태 : 제조업', '종목 : 바이오 시약'].join('\n'), 'utf8'),
   }
   const ROSTER = {
     name: '사업장가입자명부.txt',
@@ -288,6 +288,36 @@ for (const width of [360, 390, 430]) {
   check('D-302 명부: 작년 · 올해 매월 말 인원이 결과에 붙음(고용보험 없는 1명 뺌 · 지금 직원만 있는 명부)', !!hcd && hcd.counted === 1 && hcd.excluded.noEi === 1 && hcd.basis === 'current' && hcd.cur.total > hcd.prev.total, JSON.stringify(hcd))
   const empCard = (await page.locator('[data-testid="smart-insight"][data-key="employment"]').evaluate((el) => el.textContent ?? '').catch(() => '')) ?? ''
   check('D-302 · D-330 맞춤 추천 고용지원금: 세액공제 금액(2026 개편이면 1년 차 · 3년) · 명부 날짜로 셈 · 작년 퇴사자 주의', /세액공제 (1년 차 )?약 [\d,.]+(만원|억원)/.test(empCard) && empCard.includes('명부 날짜로 셈') && empCard.includes('작년에 그만둔 사람'), empCard.slice(0, 400))
+  // D-492 중요 번호 — 처음 한 번만 원본과 맞춰 보기(사업자 · 법인번호 · 설립일)
+  const crit = page.getByTestId('critical-ids')
+  const critText = (await crit.count()) ? await crit.innerText() : ''
+  check('D-492 맞춤 추천 맨 위: 중요 번호 확인 — 사업자등록번호 · 법인등록번호 · 설립일(서류에서 읽음)', critText.includes('124-81-00998') && critText.includes('110111-1234569') && critText.includes('2023-01-10') && critText.includes('사업자등록증에서 읽음'), critText.slice(0, 300))
+  await page.getByTestId('critical-yes-businessNumber').click()
+  await page.waitForTimeout(600)
+  const rc = await rec()
+  check('D-492 [맞아요] → 사업자등록번호 확인됨 · 그 줄 사라짐 · 다른 둘은 남음', rc.factMeta?.businessNumber?.status === 'confirmed' && (await page.locator('[data-critical="businessNumber"]').count()) === 0 && (await page.locator('[data-critical="corporateNumber"]').count()) === 1, JSON.stringify(rc.factMeta?.businessNumber))
+  await page.getByTestId('critical-edit-establishedAt').click()
+  await page.getByTestId('critical-input-establishedAt').fill('2023-01-11')
+  await page.getByTestId('critical-save-establishedAt').click()
+  await page.waitForTimeout(600)
+  const rc2 = await rec()
+  check('D-492 [고치기] → 그 자리에서 고친 값 저장 · 확인됨', rc2.establishedAt === '2023-01-11' && rc2.factMeta?.establishedAt?.status === 'confirmed', JSON.stringify({ e: rc2.establishedAt, m: rc2.factMeta?.establishedAt }))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('D-492 새로 열어도 확인한 줄은 다시 묻지 않음(법인번호만 남음)', (await page.locator('[data-critical]').count()) === 1 && (await page.locator('[data-critical="corporateNumber"]').count()) === 1)
+  await page.getByTestId('critical-yes-corporateNumber').click()
+  await page.waitForTimeout(500)
+  check('D-492 다 확인하면 카드 없음', (await page.getByTestId('critical-ids').count()) === 0)
+  // D-488 무슨 서류인지 모르는 파일은 서류 탭 맨 위 판에 한 줄 — 큰 카드로 늘어서지 않음
+  await page.getByRole('tab', { name: /서류/ }).first().click()
+  await page.waitForTimeout(600)
+  const otherPanel = page.getByTestId('other-docs')
+  const otherRow = otherPanel.locator('[data-other-row]')
+  const rowBox = (await otherRow.count()) ? await otherRow.first().boundingBox() : null
+  check('D-488 서류 탭: 무슨 서류인지 확인 판 · 메모.txt 한 줄(카드 아님 · 낮음)', (await otherPanel.count()) === 1 && (await otherRow.count()) === 1 && (await otherRow.first().innerText()).includes('메모.txt') && !!rowBox && rowBox.height < 130, JSON.stringify(rowBox))
+  check('D-488 목차에는 그 기타 카드가 없음(판에만)', (await page.locator('[data-doc-card]').filter({ hasText: '기타 · 확인 필요' }).count()) === 0)
+  await page.getByRole('tab', { name: /맞춤 추천/ }).first().click()
+  await page.waitForTimeout(500)
   check('다음 행동 추천이 있다', (await page.getByTestId('smart-step').count()) >= 1)
   await page.getByTestId('smart-step-next').first().click()
   await page.waitForTimeout(600)

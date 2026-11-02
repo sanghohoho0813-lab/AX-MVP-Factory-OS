@@ -20,7 +20,7 @@
 import type { ClientOpsRecord, ShareholderRelation } from '../types/clientOps'
 import { localDateOf } from '../lib/appClock'
 import { contractStageOf } from '../types/clientOps'
-import { factDef, pendingFacts, readFact, sameFactValue, withFactDecisions, withFactValue, withRecheckFacts } from './customerFacts'
+import { factDef, pendingFacts, readFact, sameFactValue, withFactConfirmed, withFactDecisions, withFactValue, withRecheckFacts } from './customerFacts'
 import { birthFromRrnPrefix, bizNoKind, corpNoChecksumOk } from './koreanDocParser'
 import { entityKindOf } from './clientOrder'
 import { docShelfSummary, moveDocTo, moveTargets, newestOf, otherCellSuggestion, withDedupedShelf } from './docShelf'
@@ -437,7 +437,8 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
     const items = log.entered.filter((e) => {
       if (!isImportantFactKey(e.key) || !e.value) return false
       const cur = readFact(record, e.key)
-      return !!cur && cur.value !== '' && sameFactValue(factDef(e.key), cur.value, e.value)
+      // D-492 사람이 이미 '맞아요' 한 값(중요 번호 확인 카드 등)은 다시 묻지 않는다
+      return !!cur && cur.value !== '' && !record.factMeta?.[e.key]?.byPerson && sameFactValue(factDef(e.key), cur.value, e.value)
     })
     if (items.length === 0) continue
     push({
@@ -597,6 +598,12 @@ export function withDecisionAnswer(record: ClientOpsRecord, d: Pick<Decision, 'i
     if (answer === 'yes') next = { ...next, shareholderRegister: next.shareholderRegister.map((h) => (h.id === rowId ? { ...h, relation: relation as ShareholderRelation } : h)) }
   } else if (d.effect.type === 'recheck' && answer === 'no') {
     next = withRecheckFacts(next, d.effect.items, d.effect.logId, now)
+  } else if (d.effect.type === 'recheck' && answer === 'yes') {
+    // D-492 '모두 맞아요' — 그 값들을 사실 창고에서 '확인됨' 으로(중요 번호 확인 카드도 따라 사라진다)
+    for (const it of d.effect.items) {
+      const cur = readFact(next, it.key)
+      if (cur && cur.status !== 'missing' && sameFactValue(factDef(it.key), cur.value, it.value)) next = withFactConfirmed(next, it.key, now)
+    }
   } else if (d.effect.type === 'copy' && answer === 'yes' && d.effect.log) {
     // 입금 요청은 고객에게 연락한 것(안부와 같은 칸) · 다시 연락은 영업 기록
     next = withActivity(next, d.effect.log.startsWith('입금') ? 'care' : 'sales', d.effect.log, null, now)

@@ -12,6 +12,7 @@
  *
  * 판정은 규칙 계산이다(모듈 화면과 같은 엔진) — 'AI' 라고 부르지 않는다. 선정 · 승인 가능성을 보장하지 않는다.
  */
+import { CriticalIdCheck } from './CriticalIdCheck'
 import { AiAssist } from '../ai/AiAssist'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
@@ -162,6 +163,8 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiagOpen(false)} onGiven={onCommitQuiet} />}
+      {/* D-492 서류에서 읽어 넣은 중요 번호 — 맨 위에서 처음 한 번만 원본과 맞춰 보기(다 확인하면 사라진다) */}
+      <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
       <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')
@@ -186,6 +189,7 @@ export default function ClientSmartTab({
           <FileUp aria-hidden="true" className="size-4" /> 서류 올리기
         </Button>
       </Surface>
+
 
       {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
       {lastBatch ? (

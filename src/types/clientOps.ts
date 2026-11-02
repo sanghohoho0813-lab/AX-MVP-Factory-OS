@@ -731,6 +731,8 @@ export interface FactMeta {
   updatedAt: string
   /** 다시 묻지 않을 자료 후보(틀렸다고 뺀 것) — 'cretop:<결과 id>' 같은 이름 */
   dismissed?: string[]
+  /** D-492 사람이 직접 '맞아요' · 고친 값 — 서류에서 저절로 넣은 '확인됨' 과 가른다(중요 번호를 처음 한 번 묻는 기준) */
+  byPerson?: boolean
 }
 
 /** 자료에서 읽었지만 아직 확인하지 않은 값 — 확인하기 전에는 어떤 모듈도 쓰지 않는다 */
