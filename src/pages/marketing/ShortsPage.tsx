@@ -682,8 +682,8 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
           <HelpHeading help="올린 영상의 숫자를 모아 형식마다 평균을 낸 표예요. 점수가 높은 형식을 더 자주 만들면 돼요." wrapClassName="min-w-[12rem] flex-1" className="t-section break-keep text-slate-900">
             우리 계정에서 되는 형식
           </HelpHeading>
-          <Button size="sm" variant="ghost" onClick={() => downloadText(`릴스-틱톡-기록표-${today}.csv`, `﻿${shortsCsv(store.posts)}`, 'text/csv')} disabled={!posted.length} data-testid="sht-rec-csv">
-            <Download aria-hidden="true" className="size-4" /> CSV
+          <Button size="sm" variant="ghost" onClick={() => downloadText(`릴스-틱톡-기록표-${today}.csv`, `﻿${shortsCsv(store.posts)}`, 'text/csv')} disabled={!posted.length} title="CSV 파일 — 엑셀에서 열려요" data-testid="sht-rec-csv">
+            <Download aria-hidden="true" className="size-4" /> 엑셀로 받기
           </Button>
         </div>
         <p className="t-sub break-keep text-slate-600">점수는 좋아요 1점 · 댓글 3점으로 더해요(실제로 잘된 영상과 안 된 영상을 가른 방법). 같은 형식으로 3개 넘게 쌓이면 우리 숫자를 먼저 믿어요.</p>

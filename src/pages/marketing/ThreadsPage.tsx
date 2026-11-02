@@ -866,8 +866,8 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
           <HelpHeading help="올린 글의 숫자를 모아 틀마다 평균을 낸 표예요. 점수가 높은 틀을 더 자주 쓰면 돼요." wrapClassName="min-w-[12rem] flex-1" className="t-section break-keep text-slate-900">
             우리 계정에서 되는 틀
           </HelpHeading>
-          <Button size="sm" variant="ghost" onClick={() => downloadText(`스레드-기록표-${today}.csv`, `﻿${recordsCsv(store.posts)}`, 'text/csv')} disabled={!posted.length} data-testid="thr-rec-csv">
-            <Download aria-hidden="true" className="size-4" /> CSV
+          <Button size="sm" variant="ghost" onClick={() => downloadText(`스레드-기록표-${today}.csv`, `﻿${recordsCsv(store.posts)}`, 'text/csv')} disabled={!posted.length} title="CSV 파일 — 엑셀에서 열려요" data-testid="thr-rec-csv">
+            <Download aria-hidden="true" className="size-4" /> 엑셀로 받기
           </Button>
         </div>
         <p className="t-sub break-keep text-slate-600">점수는 좋아요 1점 · 답글 3점 · 다시 올림(리포스트) 2점 · 공유 3점으로 더해요. 같은 틀로 글이 3개 넘게 쌓이면 우리 계정 숫자를 먼저 믿어요.{best ? ` 지금은 ${best.key} ${josa(best.name, '이/가')} 가장 좋아요.` : ''}</p>

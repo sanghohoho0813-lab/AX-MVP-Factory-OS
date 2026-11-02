@@ -673,8 +673,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
         <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
       </Button>
-      <Button variant="secondary" onClick={csv} disabled={!prepared} data-testid="yt-csv">
-        <Download aria-hidden="true" className="size-4" /> CSV
+      <Button variant="secondary" onClick={csv} disabled={!prepared} title="CSV 파일 — 엑셀에서 열려요" data-testid="yt-csv">
+        <Download aria-hidden="true" className="size-4" /> 엑셀로 받기
       </Button>
     </>
   )
@@ -887,7 +887,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             <Fold
               id="mk-more"
               title="자세히 보기 — 왜 이 키워드인지 · 관련 영상 · 시장 신호"
-              hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · CSV · 채널 설계 기준."
+              hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준."
               summary="1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 채널 설계 기준"
               panel
               testId="mk-more"
