@@ -24,11 +24,14 @@ import { Button } from '../ui/Button'
 import { DueDateField } from '../ops/opsControls'
 import { todayLocalDate } from '../../lib/appClock'
 import { BottomSheet } from '../ui/primitives'
+import { PERSONAL_KEY, PERSONAL_TINT, TODO_KIND_LABEL, isPersonalEntry, kindOfEntry, type TodoKind } from '../../services/journalKind'
 
 export interface TodoDraft {
   content: string
   dueDate: string
   clientId: string | null
+  /** 2026-11-02 대표 지시 — 업무(기본) · 개인 일정 */
+  kind?: TodoKind
 }
 
 /**
@@ -43,6 +46,7 @@ export function TodoComposer({
   onAdd,
   autoFocus = false,
   compact = false,
+  kinds = true,
 }: {
   date: string
   clients: { id: string; companyName: string; businessNumber?: string; corporateNumber?: string }[]
@@ -50,9 +54,13 @@ export function TodoComposer({
   onAdd: (draft: TodoDraft) => void | boolean | Promise<void | boolean>
   autoFocus?: boolean
   compact?: boolean
+  /** 업무 · 개인 일정 고르기(업체 화면 안처럼 늘 업무인 곳은 false) */
+  kinds?: boolean
 }) {
   const [text, setText] = useState('')
   const [clientId, setClientId] = useState('')
+  // 2026-11-02 대표 지시: 기본은 늘 '업무' — 개인 일정은 골랐을 때만(한 번 넣으면 다시 업무로)
+  const [kind, setKind] = useState<TodoKind>('work')
   const [open, setOpen] = useState(autoFocus)
 
   const [busy, setBusy] = useState(false)
@@ -60,9 +68,13 @@ export function TodoComposer({
     const content = text.trim()
     if (content === '' || busy) return
     setBusy(true)
-    const ok = await onAdd({ content, dueDate: date, clientId: clientId === '' ? null : clientId })
+    const personal = kinds && kind === 'personal'
+    const ok = await onAdd({ content, dueDate: date, clientId: personal || clientId === '' ? null : clientId, kind: personal ? 'personal' : 'work' })
     setBusy(false)
-    if (ok !== false) setText('')
+    if (ok !== false) {
+      setText('')
+      setKind('work')
+    }
   }
 
   if (!open) {
@@ -79,7 +91,7 @@ export function TodoComposer({
   }
 
   return (
-    <div className="rounded-(--radius-control) border border-brand-200 bg-white p-3">
+    <div className={`rounded-(--radius-control) border p-3 ${kinds && kind === 'personal' ? PERSONAL_TINT : 'border-brand-200 bg-white'}`} data-testid="todo-composer" data-kind={kinds ? kind : 'work'}>
       <div className="flex items-start gap-2">
         <input
           autoFocus
@@ -90,7 +102,7 @@ export function TodoComposer({
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit()
             if (e.key === 'Escape') setOpen(false)
           }}
-          placeholder="예: 한솔테크 대표님 통화 — 벤처인증 서류 요청"
+          placeholder={kinds && kind === 'personal' ? '개인 일정' : '할 일'}
           aria-label="할 일 내용"
           className="t-body min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
         />
@@ -120,7 +132,20 @@ export function TodoComposer({
       </ScrollHintRow>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {!compact && clients.length > 0 && (
+        {kinds && (
+          // 2026-11-02 대표 지시 — 업체 고르기 옆 '업무 · 개인 일정' 두 가지만(기본 업무)
+          <select
+            aria-label="할 일 종류"
+            data-testid="todo-kind"
+            value={kind}
+            onChange={(e) => setKind(e.target.value === 'personal' ? 'personal' : 'work')}
+            className="min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem]"
+          >
+            <option value="work">{TODO_KIND_LABEL.work}</option>
+            <option value="personal">{TODO_KIND_LABEL.personal}</option>
+          </select>
+        )}
+        {!compact && clients.length > 0 && !(kinds && kind === 'personal') && (
           <select
             aria-label="관련 업체"
             value={clientId}
@@ -167,16 +192,15 @@ export function TodoRow({
 }) {
   const left = entry.dueDate ? daysLeftFrom(today, entry.dueDate) : null
   const overdue = !entry.completed && left !== null && left < 0
+  const personal = isPersonalEntry(entry)
 
   return (
     <li
       {...dragProps}
+      data-kind={personal ? 'personal' : 'work'}
       className={`flex min-w-0 items-start rounded-(--radius-card) border px-3 py-3 sm:px-4 sm:py-3.5 ${dragProps?.draggable ? 'lg:cursor-grab ' : ''}${
-        entry.completed
-          ? 'border-slate-200 bg-white'
-          : overdue
-            ? 'border-slate-200 bg-white' // D-370 밀린 것도 흰 칸 — '55일 지남' 빨간 글자로 알린다
-            : 'border-slate-200 bg-white'
+        // 2026-11-02 대표 지시 — 개인 일정은 아주 연한 하늘색 칸. 업무 · 밀린 것은 흰 칸(D-370 '55일 지남' 빨간 글자로 알린다)
+        personal ? PERSONAL_TINT : 'border-slate-200 bg-white'
       }`}
     >
       <button
@@ -195,6 +219,7 @@ export function TodoRow({
           {entry.content}
         </span>
         <span className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
+          {personal && <span className="font-semibold text-sky-800" data-testid="todo-personal">개인 일정</span>}
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}
           {entry.completed && <span className="text-success-700">완료</span>}
           {clientName && <span>{clientName}</span>}
@@ -221,6 +246,8 @@ export interface TodoEdits {
   content: string
   dueDate: string
   clientId: string | null
+  /** 업무(null) · 개인 일정('personal') — 업무 일기 service_key 칸 */
+  serviceKey: string | null
 }
 
 export function TodoActionSheet({
@@ -254,6 +281,7 @@ export function TodoActionSheet({
   const [dueDate, setDueDate] = useState(entry.dueDate)
   const today = todayLocalDate()
   const [clientId, setClientId] = useState(entry.clientId ?? '')
+  const [kind, setKind] = useState<TodoKind>(kindOfEntry(entry))
   /*
    * 지금 붙어 있는 업체가 목록(보관·종료 제외)에 없어도 고르는 칸에서 사라지면 안 된다 —
    * 저장하는 순간 소리 없이 '업체 없음' 이 된다. 그래서 목록 맨 위에 그대로 남겨 둔다.
@@ -263,9 +291,12 @@ export function TodoActionSheet({
       ? [{ id: entry.clientId, companyName: clientName }, ...clients]
       : clients
 
-  const edits: TodoEdits = { content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId }
+  // 개인 일정은 업체 없이 · 업무로 되돌리면 service_key 를 비운다(다른 값이 있던 할 일은 그대로)
+  const kindKey = kind === 'personal' ? PERSONAL_KEY : isPersonalEntry(entry) ? null : (entry.serviceKey ?? null)
+  const edits: TodoEdits = { content: content.trim(), dueDate, clientId: kind === 'personal' || clientId === '' ? null : clientId, serviceKey: kindKey }
   const dirty =
-    editable && (edits.content !== entry.content.trim() || edits.dueDate !== entry.dueDate || edits.clientId !== (entry.clientId ?? null))
+    editable &&
+    (edits.content !== entry.content.trim() || edits.dueDate !== entry.dueDate || edits.clientId !== (entry.clientId ?? null) || edits.serviceKey !== (entry.serviceKey ?? null))
   const emptyContent = edits.content === ''
   // D-210: 할 일은 기한이 있어야 오늘 · 달력에 보인다 — 비우면(기한 없애기) 전체 기록에만 남아 사라진 것처럼 됐다
   const emptyDue = editable && edits.dueDate === '' && entry.dueDate !== ''
@@ -301,7 +332,7 @@ export function TodoActionSheet({
   // D-240: '업체 열기' 는 지금 고른 업체 — 붙어 있던 업체가 목록에 없으면 받은 이름으로
   const openId = editable ? clientId : (entry.clientId ?? '')
   const openName = openId === '' ? undefined : (clientOptions.find((c) => c.id === openId)?.companyName ?? (openId === entry.clientId ? clientName : undefined))
-  const showClientPick = editable && (clientOptions.length > 0 || clientId !== '')
+  const showClientPick = editable && kind !== 'personal' && (clientOptions.length > 0 || clientId !== '')
 
   // D-167: 밀린(빨간) 할 일은 맨 위에 '오늘 할 일로' — 기한을 오늘로 옮겨 밀린 것에서 뺀다(대표 요청)
   const overdue = !entry.completed && entry.dueDate !== '' && entry.dueDate < today
@@ -363,6 +394,19 @@ export function TodoActionSheet({
          */}
         <div className="flex min-w-0 flex-wrap items-center gap-2" data-testid="todo-head">
           <span className="t-sub shrink-0 font-medium text-slate-700">할 일</span>
+          {/* 2026-11-02 업무 · 개인 일정 바꾸기 */}
+          {editable && (
+            <select
+              aria-label="할 일 종류 바꾸기"
+              data-testid="todo-edit-kind"
+              value={kind}
+              onChange={(e) => setKind(e.target.value === 'personal' ? 'personal' : 'work')}
+              className="tap t-sub min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5 text-slate-800"
+            >
+              <option value="work">{TODO_KIND_LABEL.work}</option>
+              <option value="personal">{TODO_KIND_LABEL.personal}</option>
+            </select>
+          )}
           {/* 업체를 잘못 붙였거나 안 붙였을 때 — 지우고 다시 적지 않아도 된다 */}
           {showClientPick && (
             <select

@@ -30,6 +30,7 @@ import { formatKrw } from '../../lib/format'
 import { SERVICE_OVERDUE_LOOK, SERVICE_STATUS_LOOK } from './serviceStatusLook'
 import { Badge, type Tone } from '../ui/primitives'
 import type { RecoChip } from '../../services/clientInsights'
+import { EDGE_BOX } from '../ui/edge'
 
 /* ------------------------------------------------------------------ */
 /* 업무 조각                                                            */
@@ -107,20 +108,16 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
  * 바탕을 칠하면 목록의 다섯 장 중 네 장이 물들어 정작 제일 급한 한 장이 안 보인다.
  * 카드가 모두 흰색이면 왼쪽 선 네 개도 눈에 들어온다 — 순서가 이미 급한 순이기 때문이다.
  */
+/**
+ * D-483 카드 테두리 — 네 변을 같은 색으로(왼쪽 3px 선만 긋던 것 · 대표 지시: 한쪽만 칠하기 금지).
+ * 늦음 · 곧 마감은 진하게(두 겹), 이상 없음은 옅은 초록 한 겹 — 급한 카드가 먼저 눈에 들어오게.
+ */
 const CARD_FILL: Record<Tone, string> = {
-  danger: 'border-slate-200 bg-white',
-  warning: 'border-slate-200 bg-white',
-  success: 'border-slate-200 bg-white',
+  danger: `${EDGE_BOX.danger} bg-white`,
+  warning: `${EDGE_BOX.warning} bg-white`,
+  success: 'border-success-300 bg-white',
   neutral: 'border-slate-200 bg-white',
-  brand: 'border-slate-200 bg-white',
-}
-
-const CARD_EDGE: Record<Tone, string> = {
-  danger: 'bg-danger-500',
-  warning: 'bg-warning-500',
-  success: 'bg-success-400',
-  neutral: 'bg-slate-300',
-  brand: 'bg-brand-500',
+  brand: `${EDGE_BOX.brand} bg-white`,
 }
 
 export function ClientBoardCard({
@@ -231,11 +228,10 @@ export function ClientBoardCard({
         if ((window.getSelection?.()?.toString() ?? '') !== '') return
         onOpen()
       }}
-      className={`relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors hover:border-brand-300 ${CARD_FILL[tone]}`}
+      className={`relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors ${tone === 'neutral' || tone === 'success' ? 'hover:border-brand-300' : ''} ${CARD_FILL[tone]}`}
     >
-      <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${CARD_EDGE[tone]}`} />
 
-      <div className="flex flex-col gap-2 p-3.5 pl-[1.15rem] sm:p-4 sm:pl-[1.15rem]">
+      <div className="flex flex-col gap-2 p-3.5 sm:p-4">
         {/* 이름 줄 */}
         {/* D-122: 좁으면 배지 · 진행률이 아랫줄로 — 휴대폰 큰 글자에서 이름이 몇 글자로 잘렸다 */}
         <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">

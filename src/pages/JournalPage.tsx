@@ -109,7 +109,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
       {/* D-103: 기록은 '일정' 안의 탭 — 제목도 일정, 아래 탭으로 달력과 오간다 */}
       <PageHeader
         title="일정"
-        description={`${RANGE_TITLE[range]} — 고객에게는 보이지 않는 나만의 기록입니다.`}
+        description={`${RANGE_TITLE[range]} — 관리자 · 다른 사람 · 고객 누구에게도 공유되지 않는 나만의 기록입니다.`}
         actions={
           <>
             {/* D-142: 나중에 GPT · Claude 를 붙일 자리 — 지금은 아무것도 보내지 않는다 */}

@@ -25,6 +25,7 @@ import { Fold, HintTip } from './fold'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
 import { useTitleIcon } from './titleIcon'
+import { EDGE_BOX, EDGE_INSET } from './edge'
 
 /* ------------------------------------------------------------------ */
 /* 색 계약                                                              */
@@ -40,13 +41,6 @@ const BADGE_TONE: Record<Tone, string> = {
   success: 'border-success-200 bg-success-50 text-success-700',
 }
 
-const EDGE_TONE: Record<Tone, string> = {
-  neutral: 'bg-slate-200',
-  brand: 'bg-brand-500',
-  danger: 'bg-danger-500',
-  warning: 'bg-warning-500',
-  success: 'bg-success-500',
-}
 
 const DOT_TONE: Record<Tone, string> = {
   neutral: 'bg-slate-300',
@@ -63,8 +57,8 @@ const DOT_TONE: Record<Tone, string> = {
 /**
  * 카드 한 장.
  *
- * 중요한 카드라고 배경 전체를 빨갛게 칠하지 않는다. 왼쪽에 3px 선만 긋는다 —
- * 목록이 길어져도 눈이 아프지 않고, 급한 것이 어디인지는 여전히 한눈에 보인다.
+ * 중요한 카드라고 배경 전체를 빨갛게 칠하지 않는다. D-483 테두리 네 변을 같은 색으로 —
+ * 한쪽 선만 긋던 것은 눈에 잘 안 들어왔다(대표 지시: 한쪽만 칠하기 금지).
  */
 export function Surface({
   children,
@@ -76,7 +70,7 @@ export function Surface({
 }: {
   children: ReactNode
   edge?: Tone
-  /** 왼쪽 강조선 표시 여부 */
+  /** 강조 테두리(네 변) 표시 여부 */
   showEdge?: boolean
   as?: 'div' | 'section' | 'li' | 'article'
   className?: string
@@ -85,11 +79,10 @@ export function Surface({
   const Tag = as
   return (
     <Tag
-      className={`relative overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${
+      className={`relative overflow-hidden rounded-(--radius-panel) border ${showEdge ? EDGE_BOX[edge] : 'border-slate-200'} bg-white ${
         padded ? 'p-4 sm:p-5' : ''
       } ${className}`}
     >
-      {showEdge && <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${EDGE_TONE[edge]}`} />}
       {children}
     </Tag>
   )
@@ -272,7 +265,6 @@ export function ListRow({
 }) {
   const inner = (
     <>
-      {showEdge && <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${EDGE_TONE[edge]}`} />}
       {leading && <span className="mt-0.5 shrink-0">{leading}</span>}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -286,8 +278,8 @@ export function ListRow({
     </>
   )
 
-  const cls =
-    'tap relative flex w-full items-start gap-3 px-4 py-3.5 text-left sm:px-5'
+  // D-483 강조는 안쪽 네 변(목록 상자 안의 줄이라 테두리가 없다)
+  const cls = `tap relative flex w-full items-start gap-3 px-4 py-3.5 text-left sm:px-5 ${showEdge ? EDGE_INSET[edge] : ''}`
 
   if (!onClick) return <div className={cls}>{inner}</div>
   return (
@@ -336,7 +328,7 @@ export function MetricTile({
   const valueColor =
     tone === 'danger' ? 'text-danger-700' : tone === 'warning' ? 'text-warning-700' : 'text-slate-900'
   /*
-   * 바탕은 칠하지 않는다 (화면 규칙 §2). 위쪽 3px 선과 숫자 색만으로 급한 정도를 말한다.
+   * 바탕은 칠하지 않는다 (화면 규칙 §2). D-483 테두리 네 변의 색과 숫자 색으로 급한 정도를 말한다(위쪽 선만 긋지 않는다).
    * 네 칸 중 세 칸이 물들면 어느 칸이 제일 급한지 오히려 안 보인다.
    */
   const fill = 'bg-white'
@@ -345,12 +337,9 @@ export function MetricTile({
     <Tag
       {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': active } : {})}
       className={`tap relative overflow-hidden rounded-(--radius-panel) border px-3.5 py-2.5 text-left sm:py-3 ${fill} ${
-        active ? 'border-brand-400 ring-1 ring-brand-400' : 'border-slate-200'
+        active ? 'border-brand-500 ring-2 ring-brand-400' : EDGE_BOX[tone]
       } ${onClick ? 'ax-lift cursor-pointer' : ''}`}
     >
-      {tone !== 'neutral' && (
-        <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] ${EDGE_TONE[tone]}`} />
-      )}
       {/* 휴대폰에서는 이름과 숫자를 한 줄에 눕힌다 — 네 칸이 300px 를 먹으면 정작 볼 목록이 밀린다 */}
       {/*
         이름 줄 · 숫자 줄 두 단. 옆으로 눕히는 쪽이 더 낮지만, 글자를 크게 쓰는

@@ -320,6 +320,43 @@ if ((await moveBtn.count()) > 0) {
   check('업체 마감 → 할 일 단추가 있다 (그 날 마감이 있을 때)', true)
 }
 
+// 2026-11-02 대표 지시 — 할 일 적기: 예시 문구 없음 · 업무(기본) / 개인 일정 · 개인 일정은 연한 하늘색 · 나만 보는 칸 안내
+{
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: '할 일 적기' }).first().click()
+  const input = page.getByLabel('할 일 내용').first()
+  const ph = (await input.getAttribute('placeholder')) ?? ''
+  check('할 일 적기: 예시 문구(한솔테크 · 벤처인증)가 없다', !/한솔테크|벤처|예:/.test(ph), ph)
+  const kind = page.getByTestId('todo-kind').first()
+  check('할 일 적기: 종류 고르기 기본은 업무 · 둘뿐(업무 · 개인 일정)', (await kind.inputValue()) === 'work' && (await kind.locator('option').allTextContents()).join('|') === '업무|개인 일정', await kind.locator('option').allTextContents())
+  check('할 일 카드: 나만 보는 칸 안내(관리자 · 다른 사람 · 고객에게 공유되지 않음)', /관리자 · 다른 사람 · 고객에게 공유되지 않아요/.test((await page.getByTestId('private-note').first().textContent()) ?? ''))
+  await kind.selectOption('personal')
+  check('개인 일정을 고르면 업체 고르기는 숨김', (await page.getByLabel('관련 업체').count()) === 0)
+  await input.fill('치과 예약 개인시험')
+  await page.getByRole('button', { name: '넣기' }).first().click()
+  await page.waitForTimeout(700)
+  const row = page.locator('li', { hasText: '치과 예약 개인시험' }).first()
+  const look = await row.evaluate((el) => ({ kind: el.getAttribute('data-kind'), bg: getComputedStyle(el).backgroundColor, chip: el.textContent.includes('개인 일정') }))
+  check('개인 일정 줄: 표시 · 연한 바탕(흰색 아님)', look.kind === 'personal' && look.chip && look.bg !== 'rgb(255, 255, 255)', look)
+  check('넣은 뒤 종류는 다시 업무', (await page.getByTestId('todo-kind').first().inputValue()) === 'work')
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const kept = await page.locator('li[data-kind="personal"]', { hasText: '치과 예약 개인시험' }).count()
+  check('새로 열어도 개인 일정 그대로', kept === 1)
+  // 창에서 업무로 바꾸기
+  await page.locator('li', { hasText: '치과 예약 개인시험' }).first().getByRole('button').first().click()
+  await page.getByTestId('todo-edit-kind').waitFor({ timeout: 5000 })
+  check('할 일 창: 종류가 개인 일정으로 열림', (await page.getByTestId('todo-edit-kind').inputValue()) === 'personal')
+  await page.getByTestId('todo-edit-kind').selectOption('work')
+  await page.getByRole('button', { name: '저장' }).first().click()
+  await page.waitForTimeout(700)
+  check('창에서 업무로 바꾸면 흰 칸', (await page.locator('li[data-kind="work"]', { hasText: '치과 예약 개인시험' }).count()) === 1)
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('일정 화면: 나만 보는 칸 안내', (await page.getByTestId('private-note').count()) >= 1)
+}
+
 await browser.close()
 console.log(`\n오늘 할 일: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

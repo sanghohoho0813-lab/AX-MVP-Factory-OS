@@ -207,6 +207,7 @@ import { ClientReportSheet } from '../components/ops/ClientReportSheet'
 import type { ReportPeriod } from '../services/clientReport'
 import { CLIENT_FLOW, flowPosition } from '../content/flowSteps'
 import { StepGuide, StepNext } from '../components/ui/StepGuide'
+import { EDGE_BOX } from '../components/ui/edge'
 
 
 
@@ -1057,6 +1058,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         date={today}
         clients={[]}
         compact
+        kinds={false}
         onAdd={(draft) =>
           createJournalEntry(workspaceId, userId, {
             entryDate: today,
@@ -1196,18 +1198,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 key={meta.key}
                 id={meta.key}
                 ref={meta.key === focusedService ? focusedCardRef : undefined}
-                className={`relative overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${
+                // 급한 카드도 배경을 칠하지 않는다 — D-483 테두리 네 변의 색으로 말한다(왼쪽 선만 긋던 것).
+                // 서류가 없는 것은 급한 것이 아니라 '아직 안 받은 것' 이라 여기서 뺐다
+                className={`relative overflow-hidden rounded-(--radius-panel) border bg-white ${overdue ? EDGE_BOX.danger : dueSoon ? EDGE_BOX.warning : 'border-slate-200'} ${
                   meta.key === focusedService ? 'ring-2 ring-brand-400 ring-offset-2' : ''
                 } ${expanded ? 'xl:col-span-2' : ''}`}
               >
-                {/* 급한 카드도 배경을 칠하지 않는다 — 왼쪽 3px 선으로만 말한다.
-                    서류가 없는 것은 급한 것이 아니라 '아직 안 받은 것' 이라 여기서 뺐다 */}
-                {(overdue || dueSoon) && (
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-y-0 left-0 w-[3px] ${overdue ? 'bg-danger-500' : 'bg-warning-500'}`}
-                  />
-                )}
                 {/*
                   머리 부분은 두 줄이다.
                     1줄 — 펼치기 단추: 점 · 이름 · 급한 배지

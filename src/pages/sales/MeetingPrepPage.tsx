@@ -998,8 +998,7 @@ function FirstMeetingScript({ item }: { item: EngineItem }) {
         <ScriptBlock title="먼저 볼 전략 3가지">
           <ol className="grid gap-2 lg:grid-cols-3">
             {strategies.map((st, i) => (
-              <li key={st.id} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
-                <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, 3)} />
+              <li key={st.id} className="ramp-edge relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border bg-white p-3" style={rampAt(i, 3)}>
                 <span className="t-sub font-bold text-slate-900">
                   <span className="ramp-text tabular-nums" style={rampAt(i, 3)}>{i + 1}.</span> {st.name}
                 </span>

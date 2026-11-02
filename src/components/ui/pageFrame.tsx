@@ -169,7 +169,7 @@ export function NextActionBar({
   extra?: ReactNode
   action?: ReactNode
   icon?: LucideIcon
-  /** 아이콘 칸 · 왼쪽 옅은 빛만 그 화면 기능 색(D-282 — 색은 아이콘 칸에만). 판 · 글자 · 단추는 화면마다 같다 */
+  /** 아이콘 칸만 그 화면 기능 색(D-282 — 색은 아이콘 칸에만). 판 · 글자 · 단추는 화면마다 같다. D-483 왼쪽 옅은 빛(한쪽만 칠함)은 없앰 */
   tone?: FeatureTone
   testId?: string
   attrs?: Record<string, string>
@@ -182,7 +182,6 @@ export function NextActionBar({
       data-frame="next"
       {...attrs}
     >
-      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r ${NEXT_GLOW[tone]} to-transparent`} />
       <span aria-hidden="true" className={`relative hidden size-11 shrink-0 items-center justify-center rounded-xl sm:flex ${t.tile}`}>
         <Icon className="size-5" />
       </span>
@@ -195,21 +194,6 @@ export function NextActionBar({
       {action && <div className="relative flex shrink-0 flex-wrap gap-2 *:w-full sm:*:w-auto">{action}</div>}
     </section>
   )
-}
-
-/** 지금 할 일 줄 왼쪽 옅은 빛 — 통째로 적는다(D-26) */
-const NEXT_GLOW: Record<FeatureTone, string> = {
-  indigo: 'from-indigo-50',
-  teal: 'from-teal-50',
-  blue: 'from-blue-50',
-  purple: 'from-violet-50',
-  amber: 'from-amber-50',
-  orange: 'from-orange-50',
-  coral: 'from-coral-50',
-  green: 'from-emerald-50',
-  cyan: 'from-cyan-50',
-  rose: 'from-rose-50',
-  slate: 'from-slate-50',
 }
 
 /** ④ 본문 작업 판 — 일 하나에 판 하나 */

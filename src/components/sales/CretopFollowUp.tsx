@@ -29,8 +29,7 @@ export function CretopFollowUp({ record, round, onGoFirst }: { record: ClientOps
       {picks.map((p, i) => {
         const steps = p.flow.filter((f) => FLOW_ROUND[f.step] === round)
         return (
-          <li key={p.name} data-cretop-pick={p.name} className="relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 pl-4">
-            <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, Math.max(2, picks.length))} />
+          <li key={p.name} data-cretop-pick={p.name} className="ramp-edge relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border bg-white px-3.5 py-2.5" style={rampAt(i, Math.max(2, picks.length))}>
             <p className="t-sub font-bold text-slate-900">{p.name}</p>
             {steps.map((f) => (
               <div key={f.step} className="flex flex-col gap-1">

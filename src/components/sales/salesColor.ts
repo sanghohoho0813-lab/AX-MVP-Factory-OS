@@ -27,12 +27,14 @@ export interface StageColor {
   soft: string
   text: string
   border: string
+  /** D-483 칸 머리 작은 박스의 네 변 테두리(진한 색) */
+  edge: string
   style?: CSSProperties
 }
 
 export function stageColor(stage: SalesStage): StageColor {
-  if (stage === 'contracted') return { bar: 'bg-success-500', dot: 'bg-success-500', soft: 'bg-success-50', text: 'text-success-700', border: 'border-success-200' }
-  if (stage === 'hold') return { bar: 'bg-slate-300', dot: 'bg-slate-400', soft: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }
-  if (stage === 'lost') return { bar: 'bg-slate-200', dot: 'bg-slate-300', soft: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' }
-  return { bar: 'ramp-bar', dot: 'ramp-dot', soft: 'ramp-soft', text: 'ramp-text', border: 'ramp-border', style: rampStyle(STAGE_SHIFT[stage] ?? 0) }
+  if (stage === 'contracted') return { bar: 'bg-success-500', dot: 'bg-success-500', soft: 'bg-success-50', text: 'text-success-700', border: 'border-success-200', edge: 'border-success-500' }
+  if (stage === 'hold') return { bar: 'bg-slate-300', dot: 'bg-slate-400', soft: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200', edge: 'border-slate-400' }
+  if (stage === 'lost') return { bar: 'bg-slate-200', dot: 'bg-slate-300', soft: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200', edge: 'border-slate-300' }
+  return { bar: 'ramp-bar', dot: 'ramp-dot', soft: 'ramp-soft', text: 'ramp-text', border: 'ramp-border', edge: 'ramp-edge', style: rampStyle(STAGE_SHIFT[stage] ?? 0) }
 }

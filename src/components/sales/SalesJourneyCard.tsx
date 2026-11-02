@@ -159,7 +159,8 @@ export function SalesJourneyCard({
           const total = s.tasks.filter((t) => !t.soon).length
           const c = STEP_COLORS[i % STEP_COLORS.length]
           const now = s.state === 'now'
-          const tone = now ? `${c.border} bg-white border-2` : s.state === 'optional' ? 'border-dashed border-slate-300 bg-white' : 'border-slate-200 bg-white'
+          // D-483 걸음 색은 테두리 네 변으로(위쪽 띠만 칠하던 것) — 지금 걸음은 진하게 두 겹
+          const tone = now ? `${c.border} bg-white border-2` : s.state === 'optional' ? 'border-dashed border-slate-300 bg-white' : s.state === 'done' ? `${c.border} bg-white` : 'border-slate-200 bg-white'
           return (
             <li key={s.key}>
               <button
@@ -168,9 +169,8 @@ export function SalesJourneyCard({
                 data-state={s.state}
                 aria-pressed={sel}
                 onClick={() => setPicked(s.key)}
-                className={`tap relative flex h-full w-full flex-col items-start gap-1 overflow-hidden rounded-(--radius-control) border px-2.5 pt-3 pb-2 text-left ${tone} ${sel ? 'ring-2 ring-brand-500/50' : ''}`}
+                className={`tap relative flex h-full w-full flex-col items-start gap-1 overflow-hidden rounded-(--radius-control) border px-2.5 py-2 text-left ${tone} ${sel ? 'ring-2 ring-brand-500/50' : ''}`}
               >
-                <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 ${c.bar} ${s.state === 'next' || s.state === 'optional' ? 'opacity-40' : ''}`} />
                 <span className="t-meta inline-flex items-center gap-1.5 font-semibold text-slate-600">
                   {s.state === 'done' ? (
                     <span className="inline-flex size-5 items-center justify-center rounded-full bg-success-600 text-white">

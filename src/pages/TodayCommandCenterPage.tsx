@@ -39,7 +39,7 @@ import { HeroFrame } from '../components/ui/pageFrame'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
-import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoEdits } from '../components/journal/TodoBoard'
+import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoDraft, type TodoEdits } from '../components/journal/TodoBoard'
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
@@ -77,6 +77,8 @@ import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
+import { PERSONAL_KEY } from '../services/journalKind'
+import { PrivateNote } from '../components/journal/PrivateNote'
 
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
 const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
@@ -395,7 +397,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     // D-201: 같은 창에서 고친 내용 · 기한 · 업체가 있으면 상태와 함께 한 번에 저장한다.
     // 고친 것이 있으면 저장이 된 뒤에만 창을 닫는다(실패하면 적은 것이 창에 그대로 남는다).
     if (!edits || action === 'delete') setTodoPick(null)
-    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId } : {}
+    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId, serviceKey: edits.serviceKey } : {}
     let ok: boolean
     if (action === 'delete') ok = await journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
     else if (action === 'today') ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
@@ -407,7 +409,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
 
   /** 오늘 할 일 한 줄 넣기 — 업무 일기의 '할 일' 로 저장된다 */
-  const addTodo = (draft: { content: string; dueDate: string; clientId: string | null }) =>
+  const addTodo = (draft: TodoDraft) =>
     journalMutate(
       () =>
         createJournalEntry(workspaceId, userId, {
@@ -416,6 +418,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           content: draft.content,
           clientId: draft.clientId,
           dueDate: draft.dueDate,
+          // 2026-11-02 개인 일정은 service_key 'personal'(업무 일기 칸 그대로 — 본인만 읽는다)
+          serviceKey: draft.kind === 'personal' ? PERSONAL_KEY : null,
         }),
       '할 일을 넣었습니다.',
     )
@@ -562,6 +566,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               오늘 할 일
             </h2>
             <TodoComposer date={today} clients={active} onAdd={addTodo} />
+            {/* 2026-11-02 대표 지시 — 내 할 일은 나만 본다는 것을 분명히(사실: 업무 일기 RLS 본인만) */}
+            <PrivateNote />
 
             {/* 밀린 것 — 어제까지가 기한인데 아직 안 끝난 것 */}
             {overdueTodos.length > 0 && (

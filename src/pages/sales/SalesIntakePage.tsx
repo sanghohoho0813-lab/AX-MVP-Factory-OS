@@ -387,8 +387,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                   <ol className="flex flex-col gap-1.5">
                     {picks.map((p, i) =>
                       p ? (
-                        <li key={p.name} className="relative flex flex-col gap-0.5 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 pl-3.5">
-                          <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, 5)} />
+                        <li key={p.name} className="ramp-edge relative flex flex-col gap-0.5 overflow-hidden rounded-(--radius-control) border bg-white px-3 py-2" style={rampAt(i, 5)}>
                           <span className="t-sub inline-flex flex-wrap items-center gap-1.5 font-bold text-slate-900">
                             {p.name}
                             <Badge tone={TIER_TONE[p.tier]}>{CRETOP_TIER_LABEL[p.tier]}</Badge>

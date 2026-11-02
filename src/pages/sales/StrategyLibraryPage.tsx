@@ -209,8 +209,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
         {/* D-122: 연락할 곳이 있는 주제만 칸으로 — 없는 주제는 한 줄에 모은다(휴대폰에서 8칸이 화면 두 장이었다) */}
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-testid="topic-list">
           {topics.map(({ t, list: cs }, ti) => cs.length === 0 ? null : (
-            <li key={t.key} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
-              <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(ti, topics.length)} />
+            <li key={t.key} className="ramp-edge relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border bg-white p-3" style={rampAt(ti, topics.length)}>
               <span className="flex items-baseline justify-between gap-2">
                 <span className="t-sub font-bold text-slate-900">{t.name}</span>
                 <span className={`t-meta rounded-full px-2 font-semibold tabular-nums ${cs.length > 0 ? 'ramp-soft ramp-text' : 'bg-white text-slate-400'}`} style={cs.length > 0 ? rampAt(ti, topics.length) : undefined}>{cs.length}곳</span>

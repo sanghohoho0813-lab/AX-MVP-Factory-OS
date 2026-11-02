@@ -11,6 +11,7 @@ import { Check, Lock, type LucideIcon } from 'lucide-react'
 import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { Tone } from './primitives'
 import { KpiGroupContext } from './kpiGroup'
+import { EDGE_BOX, EDGE_INSET } from './edge'
 
 const TILE_SIZE = {
   sm: { box: 'size-8 rounded-lg', icon: 'size-4' },
@@ -121,13 +122,6 @@ export function AppTile({
   )
 }
 
-const KPI_EDGE: Record<Tone, string> = {
-  neutral: '',
-  brand: 'bg-brand-500',
-  danger: 'bg-danger-500',
-  warning: 'bg-warning-500',
-  success: 'bg-success-500',
-}
 
 const KPI_VALUE: Record<Tone, string> = {
   neutral: 'text-slate-900',
@@ -164,7 +158,6 @@ export function KpiCard({
 }) {
   const body = (
     <>
-      {urgency !== 'neutral' && <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] ${KPI_EDGE[urgency]}`} />}
       <span className="flex items-center gap-2">
         <IconTile icon={icon} tone={tone} size="sm" />
         <span className="t-sub min-w-0 font-medium break-keep text-slate-600">{label}</span>
@@ -175,10 +168,11 @@ export function KpiCard({
   )
   // UXS-1 요약 줄 안이면 한 판 안의 칸(테두리 · 들썩임 없이 칸 사이 1px 선) — 박스 수를 늘리지 않는다
   const inGroup = useContext(KpiGroupContext)
+  // D-483 급한 칸은 테두리 네 변을 같은 색으로(위쪽 3px 선만 긋던 것 — 대표 지시: 한쪽만 칠하기 금지)
   const cls = inGroup
-    ? 'relative flex min-w-0 flex-col gap-1.5 overflow-hidden bg-white px-4 py-3.5 text-left'
-    : 'ax-lift relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white px-3.5 py-3 text-left'
-  const hover = inGroup ? 'hover:bg-slate-50' : 'hover:border-slate-300'
+    ? `relative flex min-w-0 flex-col gap-1.5 overflow-hidden bg-white px-4 py-3.5 text-left ${EDGE_INSET[urgency]}`
+    : `ax-lift relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-(--radius-panel) border bg-white px-3.5 py-3 text-left ${EDGE_BOX[urgency]}`
+  const hover = inGroup ? 'hover:bg-slate-50' : urgency === 'neutral' ? 'hover:border-slate-300' : ''
   if (to)
     return (
       <Link to={to} onClick={onClick} className={`tap ${cls} ${hover}`} data-testid={testId}>

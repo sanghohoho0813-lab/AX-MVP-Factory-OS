@@ -31,6 +31,7 @@ import {
   serviceMeta,
 } from '../../content/clientOpsCatalog'
 import { dueText, missingDocumentsFor } from '../../services/clientOpsAlerts'
+import { EDGE_BOX } from '../ui/edge'
 
 /* ------------------------------------------------------------------ */
 /* 심각도                                                               */
@@ -106,16 +107,15 @@ export function AlertRow({
 }) {
   const Icon = ALERT_KIND_ICON[alert.kind]
   const tone: Tone = alert.severity === 'critical' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'neutral'
-  const edge = tone === 'danger' ? 'bg-danger-500' : tone === 'warning' ? 'bg-warning-500' : 'bg-slate-200'
   return (
     <li>
       <button
         type="button"
         onClick={() => onOpen(alert)}
         title={`${ALERT_KIND_LABEL[alert.kind]} · ${alert.clientName}`}
-        className="tap relative flex w-full items-start gap-3 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white py-3 pr-3 pl-4 text-left hover:bg-slate-50"
+        // D-483 급한 알림은 테두리 네 변을 같은 색으로(왼쪽 선만 긋지 않는다)
+        className={`tap relative flex w-full items-start gap-3 overflow-hidden rounded-(--radius-card) border bg-white px-3 py-3 text-left hover:bg-slate-50 ${EDGE_BOX[tone]}`}
       >
-        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${edge}`} />
         <Icon
           aria-hidden="true"
           className={`mt-0.5 size-4 shrink-0 ${

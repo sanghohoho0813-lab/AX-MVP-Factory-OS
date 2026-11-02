@@ -68,6 +68,7 @@ import { useIsPilot } from '../../auth/osAccess'
 import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, type ClientType } from '../../services/clientType'
 import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 import { HintTip } from '../../components/ui/fold'
+import { EDGE_BOX } from '../../components/ui/edge'
 
 const PICK_KEY = 'axmvp.sales.board.stage'
 
@@ -102,8 +103,8 @@ function SalesCard({ record, today, grants, consultant = false, onOpen, onMove }
   const who = record.representativeName.trim() || record.contactName.trim()
   const overdue = record.nextActionDueDate !== '' && record.nextActionDueDate < today
   return (
-    <li data-testid="sales-card" className="relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white p-3">
-      {stale && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-warning-500" />}
+    // D-483 오래 멈춘 카드는 테두리 네 변을 주황으로(왼쪽 선만 긋던 것)
+    <li data-testid="sales-card" data-stale={stale ? '' : undefined} className={`relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border bg-white p-3 ${stale ? EDGE_BOX.warning : 'border-slate-200'}`}>
       <div className="flex min-w-0 items-center gap-1">
         <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-1 items-center gap-1 text-left">
           <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
@@ -458,11 +459,10 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const column = (stage: SalesStage, list: ClientOpsRecord[]) => {
     const c = stageColor(stage)
     return (
-    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-(--radius-panel) bg-slate-50 p-2 pt-3">
-      {/* D-118: 칸 머리 위 3px 띠 + 옅은 머리 바탕 — 단계 구분색(테마를 따라간다). 칸 전체는 칠하지 않는다 */}
+    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-(--radius-panel) bg-slate-50 p-2">
+      {/* D-118 단계 구분색(테마를 따라간다). D-483 대표 지시 — 칸 위쪽 띠 · 옅은 머리 바탕 대신 칸 머리 작은 박스의 네 변에만 색 */}
       {/* UXS-1 영업 보드 판 안이라 칸에는 테두리를 두르지 않는다(옅은 바탕으로만 — 상자 안 상자 안 상자를 만들지 않게) */}
-      <span aria-hidden="true" data-stage-bar className={`absolute inset-x-0 top-0 h-[3px] ${c.bar}`} style={c.style} />
-      <div data-stage-head className={`-mx-2 -mt-3 flex flex-col gap-0.5 px-3 pt-3.5 pb-2 ${c.soft}`} style={c.style}>
+      <div data-stage-head data-stage-bar className={`flex flex-col gap-0.5 rounded-(--radius-control) border-2 bg-white px-2.5 py-2 ${c.edge}`} style={c.style}>
         <div className="flex items-baseline justify-between gap-2">
           {/* D-192: 좁은 칸 머리 — ⓘ 없이 마우스를 올리면 단계 설명(아래 한 줄은 휴대폰에서만) */}
           <HintTip tip={SALES_STAGE_HINT[stage]} label={SALES_STAGE_LABEL[stage]} dot={false}>

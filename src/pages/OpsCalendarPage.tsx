@@ -37,6 +37,8 @@ import { CalendarQuickSheet, HolidayImportSheet, type QuickTodoInput } from '../
 import { addDaysOff, dateLabel, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, removeDayOff, type DayOff, type DayOffKind } from '../services/daysOff'
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
+import { PERSONAL_KEY, isPersonalEntry } from '../services/journalKind'
+import { PrivateNote } from '../components/journal/PrivateNote'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KINDS: ScheduleKind[] = ['next', 'task', 'funding', 'payment', 'document', 'tool']
@@ -201,7 +203,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     // D-201: 같은 창에서 고친 내용 · 기한 · 업체가 있으면 상태와 함께 한 번에 저장한다.
     // 고친 것이 있으면 저장이 된 뒤에만 창을 닫는다(실패하면 적은 것이 창에 그대로 남는다).
     if (!edits || action === 'delete') setTodoPick(null)
-    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId } : {}
+    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId, serviceKey: edits.serviceKey } : {}
     let ok: boolean
     if (action === 'delete') ok = await mutate(() => deleteJournalEntry(entry), '지웠습니다.')
     else if (action === 'today') ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
@@ -435,7 +437,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           {/* 내가 적은 할 일은 브랜드색 점으로 — 마감(회사 일정)과 구분된다 */}
                           {/* D-210: 끝낸 할 일은 회색 점(업체 일정처럼) — 다 끝낸 날이 할 일 남은 날처럼 보이지 않게 */}
                           {todos.slice(0, 3).map((t) => (
-                            <span key={`t${t.id}`} aria-hidden="true" data-done={t.completed ? '1' : '0'} className={`size-1.5 rounded-full ${t.completed ? 'bg-slate-200' : 'bg-brand-500'}`} />
+                            <span key={`t${t.id}`} aria-hidden="true" data-done={t.completed ? '1' : '0'} data-personal={isPersonalEntry(t) ? '1' : undefined} className={`size-1.5 rounded-full ${t.completed ? 'bg-slate-200' : isPersonalEntry(t) ? 'bg-sky-400' : 'bg-brand-500'}`} />
                           ))}
                           {list.slice(0, 4).map((e) => (
                             <span
@@ -453,11 +455,14 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                               title={l.who ? `${l.who} · ${l.title}` : l.title}
                               data-kind={l.kind}
                               {...(l.entry ? dragTodo(l.entry) : {})}
+                              data-personal={l.entry && isPersonalEntry(l.entry) ? '1' : undefined}
                               className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
                                 l.done
                                   ? 'border-slate-100 bg-white text-slate-400 line-through'
                                   : l.kind === 'todo'
-                                    ? 'border-brand-600 bg-brand-600 text-white'
+                                    ? l.entry && isPersonalEntry(l.entry)
+                                      ? 'border-sky-300 bg-sky-50 text-sky-900' // 2026-11-02 개인 일정은 아주 연한 하늘색
+                                      : 'border-brand-600 bg-brand-600 text-white'
                                     : SCHEDULE_KIND_CLASS[l.kind].cell
                               }`}
                             >
@@ -544,11 +549,13 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                                 content: draft.content,
                                 clientId: draft.clientId,
                                 dueDate: draft.dueDate,
+                                serviceKey: draft.kind === 'personal' ? PERSONAL_KEY : null,
                               }),
                             '할 일을 넣었습니다.',
                           )
                         }
                       />
+                      <PrivateNote />
                       {pickedTodos.some((t) => !t.completed) && (
                         <p className="t-sub hidden break-keep text-slate-500 lg:block" data-testid="drag-hint">할 일을 끌어 왼쪽 달력의 다른 날짜에 놓으면 그 날로 옮겨져요.</p>
                       )}

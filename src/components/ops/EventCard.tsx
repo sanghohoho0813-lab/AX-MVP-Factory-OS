@@ -14,6 +14,7 @@ import { todayLocalDate } from '../../lib/appClock'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { Badge, type Tone } from '../ui/primitives'
 import { suggestServiceForProduct } from '../../config/serviceCatalog'
+import { EDGE_BOX } from '../ui/edge'
 
 /**
  * 상태 색 — 분류색(cat-*)을 쓰지 않는다. 이벤트함은 '새로 왔다/처리했다' 두 가지가
@@ -96,16 +97,11 @@ export function EventCard({
 
   return (
     <article
-      className={`relative overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white ${
-        compact ? 'p-3' : 'p-4'
-      }`}
+      // D-483 새 신청은 테두리 네 변을 같은 색으로(급하면 빨강 · 아니면 파랑) — 왼쪽 선만 긋던 것
+      className={`relative overflow-hidden rounded-(--radius-card) border bg-white ${
+        event.status === 'new' && isOpenEvent(event) ? EDGE_BOX[event.priority === 'high' ? 'danger' : 'brand'] : 'border-slate-200'
+      } ${compact ? 'p-3' : 'p-4'}`}
     >
-      {event.status === 'new' && isOpenEvent(event) && (
-        <span
-          aria-hidden="true"
-          className={`absolute inset-y-0 left-0 w-[3px] ${event.priority === 'high' ? 'bg-danger-500' : 'bg-brand-500'}`}
-        />
-      )}
       {/* 머리줄 — 급한 것 · 오래 기다린 날 · 처리 상태만 남긴다 */}
       <div className="t-meta flex flex-wrap items-center gap-1.5">
         {event.priority === 'high' && isOpenEvent(event) && <Badge tone="danger">지금</Badge>}
