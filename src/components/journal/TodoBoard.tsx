@@ -204,11 +204,13 @@ export function TodoRow({
       data-kind={personal ? 'personal' : 'work'}
       className={`flex min-w-0 items-start rounded-(--radius-card) border px-3 py-3 sm:px-4 sm:py-3.5 ${dragProps?.draggable ? 'lg:cursor-grab ' : ''}${
         // 2026-11-02 대표 지시 — 개인 일정은 아주 연한 하늘색 칸. 업무 · 밀린 것은 흰 칸(D-370 '55일 지남' 빨간 글자로 알린다)
-        personal ? PERSONAL_TINT : 'border-slate-200 bg-white'
-      }`}
+        // D-500 마우스를 올리면 칸 전체가 살짝 색칠(안쪽 단추만 네모로 칠해지지 않게 단추는 막을 뺀다)
+        personal ? `${PERSONAL_TINT} hover:border-sky-300 hover:bg-sky-100` : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+      } transition-colors`}
     >
       <button
         type="button"
+        data-no-veil
         onClick={onPick}
         aria-label={`${entry.content} — ${entry.completed ? '완료' : '진행 중'}. 눌러서 바꾸기`}
         className="tap min-w-0 flex-1 text-left"

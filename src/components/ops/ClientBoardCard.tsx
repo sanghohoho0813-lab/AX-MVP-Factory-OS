@@ -228,7 +228,7 @@ export function ClientBoardCard({
         if ((window.getSelection?.()?.toString() ?? '') !== '') return
         onOpen()
       }}
-      className={`relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors ${tone === 'neutral' || tone === 'success' ? 'hover:border-brand-300' : ''} ${CARD_FILL[tone]}`}
+      className={`ax-lift relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors ${tone === 'neutral' || tone === 'success' ? 'hover:border-brand-300' : ''} ${CARD_FILL[tone]}`}
     >
 
       <div className="flex flex-col gap-2 p-3.5 sm:p-4">
