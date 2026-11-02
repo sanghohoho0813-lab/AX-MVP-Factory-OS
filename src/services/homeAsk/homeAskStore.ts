@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react'
 import { callAssist, type AssistAnswer } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import type { AssistBundle } from '../aiAssist/context'
-import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type RuleAnswer } from './homeAsk'
+import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
 
 export const HOME_ASK_KEY = 'axmvp.home.ask.v1'
@@ -32,6 +32,8 @@ export interface HomeTurn {
   docs?: { names: string[]; labels: string[]; company?: DocCompany | null; saved?: 'client' | 'new' }
   /** D-499 답에서 이미 할 일로 넣은 것(다음에 할 일 번호) — 다시 눌러 같은 할 일이 두 번 생기지 않게 */
   todoDone?: number[]
+  /** D-501 물어본 업체에 맞는 상황 예시(최대 3) — 누르면 그 업체 숫자로 모듈이 열린다 */
+  plans?: PlanChip[]
 }
 
 export interface HomeAskState {
@@ -106,7 +108,7 @@ export interface AskPlan {
   /** D-498 함께 올린 서류(읽기 끝난 것) */
   docs?: readonly ChatDoc[]
   /** 보낼 자료 · 규칙 답 — 묻는 순간 만든다(판정 엔진은 이때 받는다) */
-  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null }>
+  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[] }>
 }
 
 /** D-498 질문마다 올린 파일(메모리에만 — 새로 고치면 사라진다 · 저장하면 지운다) */
@@ -142,6 +144,11 @@ export async function askHome(plan: AskPlan): Promise<void> {
     if (docs.length && prep.docCompany !== undefined) {
       const company = prep.docCompany
       commit((cur) => cur.map((t) => (t.id === id && t.docs ? { ...t, docs: { ...t.docs, company }, clientIds: company?.clientId && !t.clientIds.includes(company.clientId) ? [company.clientId, ...t.clientIds].slice(0, 3) : t.clientIds } : t)))
+    }
+    // 맞는 상황 예시 — AI 답이든 규칙 정리든 답 아래 같은 단추
+    if (prep.plans?.length) {
+      const plans = prep.plans
+      commit((cur) => cur.map((t) => (t.id === id ? { ...t, plans } : t)))
     }
     if (!plan.canAI) {
       finish({ status: 'rule', answer: prep.rule, links: prep.rule.links, why: '' })

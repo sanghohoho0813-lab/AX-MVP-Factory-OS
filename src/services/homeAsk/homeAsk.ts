@@ -396,3 +396,53 @@ export function docRequestText(company: string, docs: readonly string[]): string
 
 /** D-499 답의 한 항목이 '받아 올 서류' 목록인가 */
 export const isDocListItem = (title: string, outline: readonly string[] | undefined): boolean => /받아\s*올\s*서류|받을\s*서류|준비\s*서류|필요\s*서류/.test(title) && (outline?.length ?? 0) > 0
+
+/* ------------------------------------------------------------------ */
+/* D-501 답 아래 '상황 예시로 바로 설계' — 누르면 그 업체 숫자로 모듈이 열린다(고도화 목표 3)            */
+/* ------------------------------------------------------------------ */
+
+export interface PlanChip {
+  id: string
+  module: string
+  moduleLabel: string
+  title: string
+  /** 엔진이 계산한 금액만(없으면 '') */
+  amount: string
+  /** 결과 한 줄(자료 칸 · 마우스 설명) */
+  headline: string
+  /** 모듈 화면 — 같은 가정 · 같은 업체로 열린다 */
+  path: string
+}
+
+/** 상황 예시 실행 결과에서 쓰는 것만(services/scenarios 의 ScenarioRun 과 같은 모양) */
+export interface PlanRunLite {
+  id: string
+  module: string
+  moduleLabel: string
+  title: string
+  amount: string
+  headline: string
+  openPath: string
+  state: 'ready' | 'partial' | 'need'
+  fit: { kind: 'fit' | 'ask' | 'data' | 'no' }
+}
+
+/**
+ * 이 업체에 맞고(근거 있음) 결과가 나온 상황만 — 질문에 나온 모듈 먼저, 그다음 들어온 순서(맞음 · 바로 설계 먼저), 최대 3개.
+ * 아직 등록 안 된 업체(임시 기록)는 열 화면이 없어 뺀다.
+ */
+export function planChips(runs: readonly PlanRunLite[], intents: readonly HomeIntent[], max = 3, skipId = 'chat_new'): PlanChip[] {
+  const want = new Set(intents.flatMap((k) => INTENT_MODULES[k] ?? []))
+  return runs
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.fit.kind === 'fit' && r.state !== 'need' && r.openPath && !r.openPath.includes(skipId))
+    .sort((a, b) => Number(want.has(b.r.module)) - Number(want.has(a.r.module)) || a.i - b.i)
+    .slice(0, max)
+    .map(({ r }) => ({ id: r.id, module: r.module, moduleLabel: r.moduleLabel, title: r.title, amount: r.amount, headline: r.headline, path: r.openPath }))
+}
+
+/** AI 에 보내는 '맞는 상황 예시' 칸 — 금액은 엔진 값 그대로 */
+export function planSection(chips: readonly PlanChip[], company: string): AssistSection | null {
+  if (!chips.length) return null
+  return { name: `물어본 업체 · ${company} 맞는 상황 예시(답 아래 단추로 바로 설계)`, rows: chips.map((c) => ({ 상황: c.title, 모듈: c.moduleLabel, 결과: c.headline.slice(0, 120), 금액: c.amount || '금액 없음' })) }
+}

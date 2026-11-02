@@ -13,7 +13,7 @@ import { requestDiagnosis } from '../../services/openDiagnosis'
 import { todayLocalDate } from '../../lib/appClock'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowUp, Building2, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
+import { ArrowRight, ArrowUp, Building2, Calculator, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
 import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
@@ -23,7 +23,7 @@ import { useToast } from '../ui/toastContext'
 import { useIsPhone } from '../../lib/useIsPhone'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
-import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
+import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
 import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
@@ -33,7 +33,7 @@ export interface HomeAskProps {
   suggestions: readonly HomeSuggestion[]
   canAI: boolean
   /** docs — D-498 함께 올린 서류(읽기 끝난 것 · 없으면 빈 배열) */
-  prepare: (question: string, clientIds: string[], intents: HomeIntent[], docs: readonly ChatDoc[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null }>
+  prepare: (question: string, clientIds: string[], intents: HomeIntent[], docs: readonly ChatDoc[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[] }>
   /** D-499 답에서 할 일을 넣은 뒤 — 오늘 할 일 목록을 다시 읽게 */
   onRecorded?: () => void
 }
@@ -425,7 +425,7 @@ function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string
           ))}
           {/* D-499 대표님께 드릴 한 장 — 누르면 그 업체 맞춤 진단서가 바로 열린다 */}
           {names[0] && (
-            <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&diag=1`} onClick={() => requestDiagnosis(names[0].id)} className="tap ml-1 rounded-full border border-slate-300 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-diag">
+            <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&diag=1`} onClick={() => requestDiagnosis(names[0].id)} className="tap ml-1 inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-diag">
               맞춤 진단서
             </Link>
           )}
@@ -516,6 +516,25 @@ function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string
             </div>
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
+          {turn.plans && turn.plans.length > 0 && (
+            // D-501 고도화 목표 3 — 이 업체에 맞는 상황 예시를 한 번 누르면 그 업체 숫자로 모듈이 열려 바로 결과
+            <div className="flex flex-col gap-1" data-testid="home-ask-plans">
+              <span className="t-meta inline-flex items-center gap-1 font-semibold text-slate-500">
+                <Calculator aria-hidden="true" className="size-3.5" />
+                상황 예시로 바로 설계{names[0] ? ` — 누르면 ${names[0].name} 숫자로` : ''}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {turn.plans.map((p) => (
+                  <Link key={p.id} to={p.path} title={p.headline} className="tap t-meta inline-flex max-w-full min-w-0 items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:border-brand-300 hover:bg-slate-50" data-testid="home-ask-plan" data-module={p.module}>
+                    <span className="shrink-0 text-slate-500">{p.moduleLabel}</span>
+                    <span className="min-w-0 truncate">{p.title}</span>
+                    {p.amount && <span className="shrink-0 text-brand-700">{p.amount}</span>}
+                    <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           {turn.docs && (
             // D-498 아직 저장 전 서류 — 한 번 누르면 서류함 · 새 업체 등록으로(저장 · 분류 · 분석은 원래 화면이)
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="home-ask-docsave">

@@ -5,6 +5,7 @@
  *
  *  1440  맨 위(숫자 칸보다 위) · 큰 글 · 안내 · 질문 세 줄 · 모델 고르기 · 빈 칸이면 보내기 막힘
  *        → "한솔테크 1차 미팅 정책자금" → home.chat 으로 · 보낸 자료에 그 업체 OS 모듈 판정 · 서류함 · 대표 이름 · 전화 0 → AI 답 · [열기] → 그 업체
+ *        → D-501 답 아래 '상황 예시로 바로 설계'(맞는 상황 · 질문의 모듈 먼저) → 누르면 그 업체 숫자로 모듈
  *        → D-499 답에서 한 번에: [서류 요청 문구 복사] · [이 글 복사] · 다음에 할 일 [할 일로](그 업체 · 내일)
  *        → 질문 세 줄 한 번 누르면 바로 답 · 👎 너무 길어요 → 다음 요청 [규칙집] 에 '너무 길다' · 👍 → 예시
  *        → [+] 업체 고르기 → 이름 없이 물어도 그 업체 자료 · 질문 속 이름 조각을 별명으로 배움 → 다음엔 고르지 않아도 그 업체
@@ -158,6 +159,19 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('다른 화면에 다녀와도 대화 그대로', (await page.getByTestId('home-ask-turn').count()) === 1)
+  // D-501 답 아래 '상황 예시로 바로 설계' — 이 업체에 맞는 상황(최대 3) · 정책자금을 물었으면 정책자금 먼저 · 누르면 그 업체 숫자로 모듈
+  const plans = t1.getByTestId('home-ask-plan')
+  const planMods = await plans.evaluateAll((els) => els.map((e) => e.getAttribute('data-module')))
+  check('D-501 상황 예시 단추 1~3개(새로 고쳐도 남음)', planMods.length >= 1 && planMods.length <= 3, planMods)
+  check('D-501 정책자금을 물으면 정책자금 상황이 먼저(있으면)', !planMods.includes('policy-funding') || planMods[0] === 'policy-funding', planMods)
+  check('D-501 AI 에도 같은 상황(금액은 엔진 값)', call.user.includes('맞는 상황 예시'), call.user.slice(0, 300))
+  const planHref = await plans.first().getAttribute('href')
+  await plans.first().click()
+  await page.waitForURL(/preset=/)
+  const presetShown = await page.getByTestId('preset-chip').first().waitFor({ timeout: 15000 }).then(() => true).catch(() => false)
+  check('D-501 누르면 그 업체 · 그 가정으로 모듈이 열림(넣은 가정 칩)', presetShown && page.url().includes('client=cli_hansol') && !!planHref && page.url().includes(planHref.split('?')[0]), page.url())
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
 
   // 👎 너무 길어요 → 다음 요청에 말하기 규칙 · 👍 → 예시
   await lastTurn(page).getByTestId('home-ask-down').click()

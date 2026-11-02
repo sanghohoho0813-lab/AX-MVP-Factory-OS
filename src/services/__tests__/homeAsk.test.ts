@@ -4,7 +4,8 @@
  */
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { RefBook, type AssistBundle } from '../aiAssist/context'
-import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback } from '../homeAsk/homeAsk'
+import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, planChips, planSection, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback, type PlanRunLite } from '../homeAsk/homeAsk'
+import { runScenarios } from '../scenarios'
 import { parseTurns } from '../homeAsk/homeAskStore'
 import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
@@ -165,6 +166,24 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   check('D-499 30초 지나면 안 염(나중에 그 업체를 열어도 진단서가 저절로 뜨지 않게)', !diagnosisRequested('cli_a', Date.now() + DIAG_REQUEST_TTL_MS + 1000))
   clearDiagnosisRequest()
   check('D-499 닫으면 지움', !diagnosisRequested('cli_a'))
+}
+
+// 12. D-501 답 아래 '상황 예시로 바로 설계' — 맞는 상황 · 결과 나온 것만 · 질문에 나온 모듈 먼저 · 최대 3 · 임시 업체 뺌
+{
+  const run = (id: string, module: string, kind: PlanRunLite['fit']['kind'], state: PlanRunLite['state'], path = `/tools/${module}?client=cli_a&preset=${id}`): PlanRunLite => ({ id, module, moduleLabel: module, title: `상황 ${id}`, amount: id === 'e1' ? '연 1,550만 원' : '', headline: `결과 ${id}`, openPath: path, state, fit: { kind } })
+  const runs = [run('t1', 'tax', 'fit', 'ready'), run('e1', 'employment', 'fit', 'partial'), run('l1', 'labcare', 'ask', 'ready'), run('p1', 'policy-funding', 'fit', 'need'), run('s1', 'startup-tax', 'no', 'ready'), run('p2', 'policy-funding', 'fit', 'ready'), run('x1', 'tax', 'fit', 'ready', '/tools/tax?client=chat_new&preset=x1')]
+  const plain = planChips(runs, [])
+  check('D-501 맞는 상황 · 결과 나온 것만(물어볼 것 · 안 맞음 · 받으면 설계 · 임시 업체 뺌) · 최대 3', plain.map((p) => p.id).join(',') === 't1,e1,p2', plain.map((p) => p.id))
+  const pol = planChips(runs, ['policy'])
+  check('D-501 정책자금을 물으면 정책자금 상황이 먼저', pol[0]?.id === 'p2' && pol.length === 3, pol.map((p) => p.id))
+  check('D-501 단추 주소는 모듈 화면 그대로 · 금액은 엔진 값 그대로', plain[1].path === '/tools/employment?client=cli_a&preset=e1' && plain[1].amount === '연 1,550만 원')
+  const sec = planSection(plain, '한솔테크(주)')
+  check('D-501 AI 자료 칸 — 상황 · 모듈 · 결과 · 금액(없으면 금액 없음)', !!sec && sec.rows.length === 3 && sec.rows[0].금액 === '금액 없음' && sec.rows[1].금액 === '연 1,550만 원' && sec.name.includes('한솔테크(주)'))
+  check('D-501 맞는 상황이 없으면 칸도 없음', planSection([], 'x') === null && planChips([run('a', 'tax', 'no', 'ready')], []).length === 0)
+  // 실제 엔진 — 매출 · 직원 · 업력이 있는 업체는 맞는 상황이 하나 이상 · 모듈 주소에 업체 id
+  const rec = normalizeClientOps({ id: 'cli_plan', companyName: '플랜테크', businessNumber: '123-45-67890', establishedAt: '2019-03-02', employeeCount: '12명', industry: '소프트웨어 개발', businessCategory: '정보통신업', address: '서울특별시 강남구 테헤란로 1', annualRevenue: '3500000000' } as Parameters<typeof normalizeClientOps>[0])
+  const real = planChips(runScenarios(rec, '2026-11-02', () => true, true) as unknown as PlanRunLite[], ['meeting'])
+  check('D-501 실제 엔진 — 맞는 상황이 나오고 주소에 그 업체', real.length > 0 && real.every((p) => p.path.includes('cli_plan')), real.map((p) => `${p.module}:${p.title}`))
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

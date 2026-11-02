@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExter
 import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
-import { homeSuggestions, mergeBundles, nearNames, ruleAnswer, type HomeIntent, type PickLite } from '../services/homeAsk/homeAsk'
+import { homeSuggestions, mergeBundles, nearNames, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
 import { CHAT_NEW_ID, aiFactLines, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc, type DocCompany } from '../services/homeAsk/homeDocs'
 import { personNames, safeText, type AssistSection } from '../services/aiAssist/context'
 import { generateId } from '../storage/localStore'
@@ -459,6 +459,21 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         const missingDocs = [...new Set(insights.flatMap((x) => x.missing).filter((m) => DOCISH.test(m)))]
         return { r, insights, picks, missingDocs }
       })
+      /*
+       * D-501 물어본 업체에 맞는 상황 예시(맞음 · 결과 나옴 · 질문에 나온 모듈 먼저 · 최대 3) — 답 아래 단추 · AI 자료 칸.
+       * 모듈은 저장된 업체 기록으로 열리므로 상황도 저장된 기록으로 계산한다(올린 서류는 저장한 뒤 반영).
+       */
+      const planRec = focus[0] ? clients.find((c) => c.id === focus[0].id) : undefined
+      let plans: PlanChip[] = []
+      if (planRec) {
+        try {
+          const { runScenariosCached } = await import('../services/scenarios')
+          plans = planChips(runScenariosCached(planRec, today, usable, true), intents)
+        } catch {
+          plans = [] // 상황 계산이 실패해도 답은 나간다
+        }
+      }
+      const plansSec = planRec ? planSection(plans, planRec.companyName) : null
       const TODAY_FOCUS = new Set(['오늘 할 일', '놓치면 끝나는 기한(7일 안)', '업체 약속(지난 것 · 오늘 · 내일)'])
       const TODAY_ALL = new Set(['밀린 할 일', '오늘 할 일', '놓치면 끝나는 기한(7일 안)', '업체 약속(지난 것 · 오늘 · 내일)', '다가오는 마감 · 약속(14일)', '밀린 돈(받을 날 지남)', '영업 — 챙길 곳', '영업 — 다시 연락할 곳'])
       const bundle = mergeBundles(
@@ -468,7 +483,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           ...(focus.length ? [] : [{ bundle: clientsBundle(active, today, reco), rename: (n: string) => `고객 · ${n}` }]),
         ],
         { title: '오늘 대화창', today: todayLabel(today), purpose: docs.length ? `방금 올린 서류(${docCompany?.name || '회사 모름'}) — 이 서류로 무엇을 제안하고 무엇을 더 받을지(아직 저장 전 · 임시 판정)` : focus.length ? `물어본 업체(${focus.map((f) => f.companyName).join(' · ')}) — 무엇을 제안하고 무엇을 확인할지` : '오늘 · 이번 주 · 고객 전체 — 물어본 것에 바로 답' },
-        { before: docSections, facts: [...docFacts, ...(focus.length ? [] : [`등록된 업체 ${active.length}곳`])] },
+        { before: [...docSections, ...(plansSec ? [plansSec] : [])], facts: [...docFacts, ...(focus.length ? [] : [`등록된 업체 ${active.length}곳`])] },
       )
       // 아직 등록 안 된 업체(임시 기록)로 가는 이동 주소는 뺀다 — 눌러도 없는 화면
       for (const [ref, href] of Object.entries(bundle.links)) if (href.includes(CHAT_NEW_ID)) delete bundle.links[ref]
@@ -491,7 +506,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         if (read.length) rule.items.unshift({ title: '이 서류에서 읽은 것', outline: read })
         if (docFacts.length) rule.caution = docFacts.join(' ')
       }
-      return { bundle, rule, ...(docs.length ? { docCompany } : {}) }
+      return { bundle, rule, plans, ...(docs.length ? { docCompany } : {}) }
     },
     [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
   )
