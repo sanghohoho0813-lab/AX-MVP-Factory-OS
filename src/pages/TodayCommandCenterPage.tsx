@@ -1,6 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { AiAssist } from '../components/ai/AiAssist'
-import { todayBundle } from '../services/aiAssist/builders'
+import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
+import { HomeAsk } from '../components/home/HomeAsk'
+import { homeSuggestions, mergeBundles, nearNames, ruleAnswer, type HomeIntent, type PickLite } from '../services/homeAsk/homeAsk'
+import { assistOn, useAiAssistAccess } from '../auth/ownerAiAccess'
+import { INSIGHT_TONE_LABEL } from '../services/insightLabels'
 import { careList } from '../services/clientCare'
 import { listSubscriptions } from '../services/finance/financeStore'
 import { upcomingCharges } from '../services/finance/financeCore'
@@ -50,7 +54,7 @@ import { CallButton } from '../components/ops/opsControls'
 import { addDaysLocal } from '../services/clientOpsNextAction'
 import { countContractClients, isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
-import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
+import { buildAllSchedule, buildClientSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
   applyJournalFilter,
   createJournalEntry,
@@ -395,6 +399,65 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
   const clientNameOf = (id: string) => clientNames.get(id)
 
+  /*
+   * D-497 맨 위 대화창 — 질문 세 줄은 지금 자료에서(약속 → 새 서류 → 추천 많은 업체), 묻는 순간 자료를 묶는다.
+   * 물어본 업체: 회사 · OS 모듈 판정 · 일정 · 받을 돈 · 서류함(업체 상세 AI 도우미와 같은 자료) → 오늘 → (업체가 없으면) 고객 전체.
+   */
+  const aiAccess = useAiAssistAccess()
+  const homeTips = useMemo(() => {
+    const weekAgo = addDaysLocal(today, -7)
+    const freshDocs = active
+      .map((c) => ({ c, at: Object.values(c.documents ?? {}).reduce((m, d) => (d && typeof d.uploadedAt === 'string' && d.uploadedAt > m ? d.uploadedAt : m), '') }))
+      .filter((x) => x.at && x.at.slice(0, 10) >= weekAgo)
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .map((x) => ({ clientId: x.c.id, clientName: x.c.companyName }))
+    const recos = active
+      .map((c) => ({ clientId: c.id, clientName: c.companyName, labels: (reco.chips.get(c.id) ?? []).map((ch) => ch.label), score: reco.scores.get(c.id) ?? 0 }))
+      .filter((r) => r.labels.length > 0)
+      .sort((a, b) => b.score - a.score || b.labels.length - a.labels.length)
+    return homeSuggestions({ appointments: appointments.map((e) => ({ clientId: e.clientId ?? null, clientName: e.clientName, daysLeft: e.daysLeft })), freshDocs, recos, overdueMoney: money.overdue.count, hasTodos: todoCount > 0 })
+  }, [active, today, reco, appointments, money, todoCount])
+  const homePrepare = useCallback(
+    async (question: string, ids: string[], intents: HomeIntent[]) => {
+      const base = await assistBuild()
+      const { buildInsights, topPicks } = await import('../services/clientInsights')
+      const focus = ids.map((id) => clients.find((c) => c.id === id)).filter((c): c is ClientOpsRecord => !!c)
+      const DOCISH = /서류|증명|명부|재무|등본|등기|계약서|확인서|등록증|신고서|원천징수|정관|규정|주주/
+      const focusData = focus.map((r) => {
+        const insights = buildInsights(r, today, grantNotices, usable)
+        const picks: PickLite[] = topPicks(insights, 4).map((x) => ({ key: x.key, label: x.label, tone: x.tone, toneLabel: INSIGHT_TONE_LABEL[x.tone], headline: x.headline, amount: x.amount, missing: x.missing, openPath: x.openPath }))
+        const missingDocs = [...new Set(insights.flatMap((x) => x.missing).filter((m) => DOCISH.test(m)))]
+        return { r, insights, picks, missingDocs }
+      })
+      const TODAY_FOCUS = new Set(['오늘 할 일', '놓치면 끝나는 기한(7일 안)', '업체 약속(지난 것 · 오늘 · 내일)'])
+      const TODAY_ALL = new Set(['밀린 할 일', '오늘 할 일', '놓치면 끝나는 기한(7일 안)', '업체 약속(지난 것 · 오늘 · 내일)', '다가오는 마감 · 약속(14일)', '밀린 돈(받을 날 지남)', '영업 — 챙길 곳', '영업 — 다시 연락할 곳'])
+      const bundle = mergeBundles(
+        [
+          ...focusData.map((f) => ({ bundle: clientBundle(f.r, today, f.insights, buildClientSchedule(f.r, today)), rename: (n: string) => `물어본 업체 · ${n}` })),
+          { bundle: base, take: (n: string) => (focus.length ? TODAY_FOCUS : TODAY_ALL).has(n), rename: (n: string) => `오늘 · ${n}` },
+          ...(focus.length ? [] : [{ bundle: clientsBundle(active, today, reco), rename: (n: string) => `고객 · ${n}` }]),
+        ],
+        { title: '오늘 대화창', today: todayLabel(today), purpose: focus.length ? `물어본 업체(${focus.map((f) => f.companyName).join(' · ')}) — 무엇을 제안하고 무엇을 확인할지` : '오늘 · 이번 주 · 고객 전체 — 물어본 것에 바로 답' },
+        { facts: focus.length ? [] : [`등록된 업체 ${active.length}곳`] },
+      )
+      const companyish = intents.includes('meeting') || intents.includes('docs') || /업체|회사|기업|대표님/.test(question)
+      const rule = ruleAnswer({
+        question,
+        intents,
+        focus: focusData.map((f) => ({ id: f.r.id, name: f.r.companyName, picks: f.picks, missingDocs: f.missingDocs })),
+        today: {
+          overdue: overdueTodos.length,
+          todos: todayTodos.slice(0, 3).map((t) => t.content.slice(0, 60)),
+          hardDue: hardDue.slice(0, 3).map((h) => `${h.clientName ? `${h.clientName} · ` : ''}${h.title}`),
+          appointments: appointments.filter((e) => (e.daysLeft ?? 9) >= 0).slice(0, 3).map((e) => `${e.clientName} — ${e.title}${e.daysLeft === 0 ? ' (오늘)' : e.daysLeft === 1 ? ' (내일)' : ''}`),
+        },
+        nearNames: focus.length === 0 && companyish ? nearNames(question, active) : [],
+      })
+      return { bundle, rule }
+    },
+    [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
+  )
+
   /** 할 일 시트에서 고른 것을 실행한다 */
   const applyTodoAction = async (entry: JournalEntry, action: TodoAction, edits?: TodoEdits) => {
     // D-201: 같은 창에서 고친 내용 · 기한 · 업체가 있으면 상태와 함께 한 번에 저장한다.
@@ -524,6 +587,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         기본 순서는 예전 그대로(휴대폰은 바로가기가 숫자 칸 위). 머리(인사 · 오늘 할 일 수)와 '첫 업체 등록' 안내는 늘 위.
       */}
       <ArrangeArea page="today" title="오늘" className="flex flex-col gap-4 sm:gap-6">
+        {/* D-497 맨 위 대화창 — 처음엔 보이고, 화면 꾸미기로 숨길 수 있다(대표 · 팀장 — AI 도우미와 같은 자격) */}
+        {assistOn(aiAccess) && (
+          <ArrangeItem id="ask" label="무엇이든 물어보기(대화창)" hint="업체 이름과 함께 물으면 그 업체 판정 · 서류로 답해요">
+            <HomeAsk clients={clients} suggestions={homeTips} canAI={assistOn(aiAccess)} prepare={homePrepare} />
+          </ArrangeItem>
+        )}
         {phone && (
           <ArrangeItem id="launcher" label="바로가기" hint="자주 쓰는 화면 아이콘">
             <TodayLauncher phone />

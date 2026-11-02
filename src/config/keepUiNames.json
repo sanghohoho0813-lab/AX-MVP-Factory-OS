@@ -27,6 +27,7 @@
       "sales-board:signals",
       "sales-board:summary",
       "today:agenda",
+      "today:ask",
       "today:assist",
       "today:capture",
       "today:care",

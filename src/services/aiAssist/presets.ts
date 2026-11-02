@@ -129,6 +129,8 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
   { id: 'side.chat', page: 'side', label: 'AI 대화 — 무엇이든 물어보기', kind: 'list', hint: 'OS 안 오른쪽 판에서 — 어느 화면에서나' },
+  // D-497 오늘 맨 위 대화창(띠 · 판 단추에는 없음)
+  { id: 'home.chat', page: 'today', label: '오늘 대화창 — 무엇이든 물어보기', kind: 'list', hint: '업체 이름과 함께 물으면 그 업체 판정 · 서류까지' },
   // D-252 기업인증 타자 없이 — 준비 화면의 [AI로 나눠 넣기] · [AI로 말할 답 쓰기] 가 부른다(띠 · 판 단추에는 없음)
   { id: 'cert.reply', page: 'cert', label: '기업인증 — 대표님 답장 질문마다 나누기', kind: 'list', hint: '카톡 답장 통째로 → 질문마다' },
   { id: 'cert.say', page: 'cert', label: '기업인증 — 실사 예상 질문 말할 답 쓰기', kind: 'write', hint: '확인된 사실 · 대표 답만으로' },
