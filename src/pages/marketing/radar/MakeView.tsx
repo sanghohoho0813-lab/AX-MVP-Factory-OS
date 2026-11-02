@@ -96,7 +96,8 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
           <IconChip icon={NotebookPen} tone="rose" size="lg" />
           내 콘텐츠 만들기
         </HelpHeading>
-        <p className="t-sub break-keep text-slate-600">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
+        {/* D-507 휴대폰은 위 '이 화면은' 한 줄과 같은 말이라 접는다(제목 ⓘ 에 그대로) */}
+        <p className="t-sub break-keep text-slate-600 max-sm:hidden">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
       </div>
       {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
       {failed && <p className="t-sub px-1 py-1 font-semibold text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
