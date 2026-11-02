@@ -278,6 +278,11 @@ for (const vp of [
     const pickBefore = await page.getByTestId('subject-resume').count()
     await page.goto(BASE + '/tools/content/build?client=cli_hansol', { waitUntil: 'networkidle' })
     await page.getByTestId('content-pick').first().click()
+    // D-507 결과 칸 이름도 쉬운 말(해시태그 → #태그(해시태그)) — 글 본문은 복사되는 글이라 재지 않는다
+    await page.getByTestId('content-block').first().waitFor({ timeout: 5000 }).catch(() => {})
+    const blockLabels = await page.locator('[data-testid="content-block"] p > span:first-child').allInnerTexts()
+    const hardLabels = blockLabels.filter((t) => JARGON.some((w) => new RegExp(`${w}(?!\\s*\\))`).test(t.replace(/\([^()]{0,40}\)/g, '()'))))
+    check(`${vp.tag} 홍보 글 결과 칸 이름 — 설명 없는 어려운 말 0`, blockLabels.length > 0 && hardLabels.length === 0, { blockLabels, hardLabels })
     await page.getByTestId('content-save').click()
     await page.waitForTimeout(600)
     await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
