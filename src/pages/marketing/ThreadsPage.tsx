@@ -862,7 +862,7 @@ function RecordsPanel({ store, readOnly, onOpen }: { store: Store; readOnly: boo
                 <span className="t-sub font-bold tabular-nums text-slate-900">평균 {r.avgScore == null ? '—' : r.avgScore.toLocaleString('ko-KR')}</span>
                 <span className="t-sub tabular-nums text-slate-600">조회 {r.avgViews == null ? '—' : r.avgViews.toLocaleString('ko-KR')}</span>
                 {r.inquiries > 0 && <Badge tone="brand">문의 {r.inquiries}</Badge>}
-                {r.scored < 3 && <Badge>표본 적음</Badge>}
+                {r.scored < 3 && <Badge>아직 글이 적어요</Badge>}
               </li>
             ))}
           </ul>
@@ -962,7 +962,7 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
                 <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border font-bold ${TONES[toneOfTemplate(t, goal)].solid}`}>{t.key}</span>
                 {/* 태그가 많으면 제목을 짜부라뜨리지 말고 태그가 다음 줄로 — 큰 글자 360 에서 한 줄 2자였다 */}
                 <h3 className="t-body min-w-[8em] flex-1 font-bold break-keep text-slate-900">{t.name}</h3>
-                {t.few && <Badge>표본 적음</Badge>}
+                {t.few && <Badge>아직 글이 적어요</Badge>}
                 <GoalTags t={t} />
               </div>
               {/* D-298 쉽게 말하면 — 카드 맨 위 한 줄(초등학생도) · 예시는 펼쳐서 */}

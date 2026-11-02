@@ -381,7 +381,7 @@ export const WEEK_PLAN: Readonly<Record<number, { label: string; goal: ThreadGoa
   2: { label: '관계 · 팔로워', goal: 'follow', picks: ['T', 'I', 'F'] },
   3: { label: '신뢰', goal: 'like', picks: ['C', 'R'] },
   4: { label: '공감 · 논쟁', goal: 'like', picks: ['D', 'N', 'K', 'S'] },
-  5: { label: '답글 · 리드', goal: 'reply', picks: ['P', 'A', 'G'] },
+  5: { label: '답글 · 문의', goal: 'reply', picks: ['P', 'A', 'G'] },
 }
 const DAY = ['일', '월', '화', '수', '목', '금', '토']
 

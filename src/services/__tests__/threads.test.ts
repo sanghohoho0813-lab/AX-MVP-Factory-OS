@@ -177,7 +177,7 @@ check('D2 AI 답 → 글 3개(빈 글 버림) · 틀 글자 · 본인 댓글 · 
 check('D3 답이 없으면 빈 목록', parseThreadDrafts(null).drafts.length === 0)
 const ctx = threadsContext({ goal: 'reply', template: 'P', topic: '벤처 점검표', tag: '벤처기업확인', facts: '점검표 4칸 · 카드 6장\n\n', reference: '남의 글 첫 줄\n남의 글 둘째 줄', recent: posts, today: '2026-10-23' })
 const ctxText = JSON.stringify(ctx)
-check('D4 보낼 자료 — 목표 · 고른 틀 뼈대 · 소재 · 태그 · 요일 계획 · 참고 글(줄마다) · 최근 올린 글 · 더 쓸 사실', ctx.sections[0].name === '쓸 글' && /P 자료 나눔 조건 — 뼈대: 막막한 사람 부르기/.test(ctxText) && /금요일 답글 · 리드/.test(ctxText) && ctx.sections.some((s) => s.name.startsWith('참고 글') && s.rows.length === 2) && ctx.sections.some((s) => s.name === '최근 올린 글' && s.rows.length === 4) && (ctx.facts ?? []).length === 1, ctx)
+check('D4 보낼 자료 — 목표 · 고른 틀 뼈대 · 소재 · 태그 · 요일 계획 · 참고 글(줄마다) · 최근 올린 글 · 더 쓸 사실', ctx.sections[0].name === '쓸 글' && /P 자료 나눔 조건 — 뼈대: 막막한 사람 부르기/.test(ctxText) && /금요일 답글 · 문의/.test(ctxText) && ctx.sections.some((s) => s.name.startsWith('참고 글') && s.rows.length === 2) && ctx.sections.some((s) => s.name === '최근 올린 글' && s.rows.length === 4) && (ctx.facts ?? []).length === 1, ctx)
 const noRef = threadsContext({ goal: '', template: '', topic: '', tag: '', facts: '', reference: '', recent: [], today: '2026-10-25' })
 check('D5 아무것도 안 골라도 자료가 만들어짐 · 참고 글 칸 없음 · 주말', !noRef.sections.some((s) => s.name.startsWith('참고 글')) && /주말/.test(JSON.stringify(noRef)) && !noRef.facts)
 

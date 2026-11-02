@@ -201,7 +201,7 @@ export const THREAD_SLOTS: readonly ThreadSlot[] = [
   { day: 2, goal: 'follow', template: 'T', topic: 0, part: 'th0', aim: '관계 · 팔로워' },
   { day: 3, goal: 'follow', template: 'X', topic: 0, part: 'th0', aim: '신뢰' },
   { day: 4, goal: 'like', template: 'D', topic: 1, part: 'th1', aim: '공감 · 논쟁' },
-  { day: 5, goal: 'reply', template: 'G', topic: 1, part: 'th1', aim: '답글 · 리드' },
+  { day: 5, goal: 'reply', template: 'G', topic: 1, part: 'th1', aim: '답글 · 문의' },
   { day: 6, goal: 'share', template: 'Q', topic: 1, part: 'th1', aim: '저장 · 공유' },
   { day: 7, goal: 'reply', template: 'I', topic: 2, part: 'th2', aim: '관계 · 팔로워' },
   { day: 0, goal: 'like', template: 'S', topic: 2, part: 'th2', aim: '예비 — 공감 · 비교' },

@@ -447,7 +447,7 @@ check('Q3 오류 0', errors.length === 0, errors)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.getByTestId('today-posts').waitFor({ timeout: 8000 }).catch(() => {})
   const fline = (await page.getByTestId('today-posts').innerText().catch(() => '')) ?? ''
-  check('T3 금요일은 스레드(답글 · 리드)만 → 스레드 탭', fline.includes('(금)') && fline.includes('스레드(답글 · 리드)') && !fline.includes('긴 영상') && /wt=threads/.test((await page.getByTestId('today-posts').getAttribute('href')) ?? ''), fline)
+  check('T3 금요일은 스레드(답글 · 문의)만 → 스레드 탭', fline.includes('(금)') && fline.includes('스레드(답글 · 문의)') && !fline.includes('긴 영상') && /wt=threads/.test((await page.getByTestId('today-posts').getAttribute('href')) ?? ''), fline)
   await shot(page, 'T-today')
   check('T4 오류 0', errors.length === 0, errors)
 }

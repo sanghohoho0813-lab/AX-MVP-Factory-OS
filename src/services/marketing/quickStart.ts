@@ -50,7 +50,7 @@ export function recommendThread(input: { topic: string; today?: string; weekRef?
   const hotPick = picks.find((k) => hot.has(k))
   const template: ThreadTemplateKey = hotPick ?? picks[0] ?? 'B'
   const t = templateOf(template)
-  const why = [plan ? `오늘(${plan.day}) 계획 '${plan.label}'` : "주말 — '답글 · 리드'", hotPick ? '이번 주 잘 된 틀' : '', template === 'P' ? '나눠 줄 점검표가 있어요' : ''].filter(Boolean).join(' · ')
+  const why = [plan ? `오늘(${plan.day}) 계획 '${plan.label}'` : "주말 — '답글 · 문의'", hotPick ? '이번 주 잘 된 틀' : '', template === 'P' ? '나눠 줄 점검표가 있어요' : ''].filter(Boolean).join(' · ')
   return { goal: t && !t.goals.includes(goal) ? t.goals[0] : goal, template, tag: topicTag(input.topic), why }
 }
 
