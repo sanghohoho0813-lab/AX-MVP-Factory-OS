@@ -9,6 +9,7 @@ import { newRequestId, readChoice } from '../aiAssist/store'
 import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
+import type { TalkAnswer } from './homeTalk'
 
 export const HOME_ASK_KEY = 'axmvp.home.ask.v1'
 export const HOME_FB_KEY = 'axmvp.home.ask.fb.v1'
@@ -34,6 +35,8 @@ export interface HomeTurn {
   todoDone?: number[]
   /** D-501 물어본 업체에 맞는 상황 예시(최대 3) — 누르면 그 업체 숫자로 모듈이 열린다 */
   plans?: PlanChip[]
+  /** D-502 질문에서 읽은 업체 사정(상황 질문의 답 · 아직 업체에 없는 것만) — [업체에 기록] 한 번 */
+  talk?: { clientId: string; company: string; answers: TalkAnswer[]; saved?: boolean }
 }
 
 export interface HomeAskState {
@@ -108,7 +111,7 @@ export interface AskPlan {
   /** D-498 함께 올린 서류(읽기 끝난 것) */
   docs?: readonly ChatDoc[]
   /** 보낼 자료 · 규칙 답 — 묻는 순간 만든다(판정 엔진은 이때 받는다) */
-  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[] }>
+  prepare: () => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[]; talk?: HomeTurn['talk'] }>
 }
 
 /** D-498 질문마다 올린 파일(메모리에만 — 새로 고치면 사라진다 · 저장하면 지운다) */
@@ -146,9 +149,9 @@ export async function askHome(plan: AskPlan): Promise<void> {
       commit((cur) => cur.map((t) => (t.id === id && t.docs ? { ...t, docs: { ...t.docs, company }, clientIds: company?.clientId && !t.clientIds.includes(company.clientId) ? [company.clientId, ...t.clientIds].slice(0, 3) : t.clientIds } : t)))
     }
     // 맞는 상황 예시 — AI 답이든 규칙 정리든 답 아래 같은 단추
-    if (prep.plans?.length) {
-      const plans = prep.plans
-      commit((cur) => cur.map((t) => (t.id === id ? { ...t, plans } : t)))
+    if (prep.plans?.length || prep.talk?.answers.length) {
+      const extra: Partial<HomeTurn> = { ...(prep.plans?.length ? { plans: prep.plans } : {}), ...(prep.talk?.answers.length ? { talk: prep.talk } : {}) }
+      commit((cur) => cur.map((t) => (t.id === id ? { ...t, ...extra } : t)))
     }
     if (!plan.canAI) {
       finish({ status: 'rule', answer: prep.rule, links: prep.rule.links, why: '' })
@@ -178,6 +181,11 @@ export function rateTurn(id: string, vote: { up: true } | { up: false; reason: D
   if (!t) return
   write(HOME_FB_KEY, withFeedback(homeFeedback(), vote.up ? { up: true, q: t.q, headline: t.answer?.headline ?? '' } : vote))
   commit((cur) => cur.map((x) => (x.id === id ? { ...x, rated: vote.up ? 'up' : 'down' } : x)))
+}
+
+/** D-502 말한 사정을 업체에 기록했다 */
+export function markTalkSaved(id: string): void {
+  commit((cur) => cur.map((t) => (t.id === id && t.talk ? { ...t, talk: { ...t.talk, saved: true } } : t)))
 }
 
 /** D-499 '다음에 할 일' 한 줄을 할 일로 넣었다 */

@@ -6,6 +6,9 @@ import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { RefBook, type AssistBundle } from '../aiAssist/context'
 import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, planChips, planSection, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback, type PlanRunLite } from '../homeAsk/homeAsk'
 import { runScenarios } from '../scenarios'
+import { newFacts, talkAnswers } from '../homeAsk/homeTalk'
+import { openedBy } from '../homeAsk/homeAsk'
+import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
 import { parseTurns } from '../homeAsk/homeAskStore'
 import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
@@ -184,6 +187,29 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   const rec = normalizeClientOps({ id: 'cli_plan', companyName: '플랜테크', businessNumber: '123-45-67890', establishedAt: '2019-03-02', employeeCount: '12명', industry: '소프트웨어 개발', businessCategory: '정보통신업', address: '서울특별시 강남구 테헤란로 1', annualRevenue: '3500000000' } as Parameters<typeof normalizeClientOps>[0])
   const real = planChips(runScenarios(rec, '2026-11-02', () => true, true) as unknown as PlanRunLite[], ['meeting'])
   check('D-501 실제 엔진 — 맞는 상황이 나오고 주소에 그 업체', real.length > 0 && real.every((p) => p.path.includes('cli_plan')), real.map((p) => `${p.module}:${p.title}`))
+}
+
+// 13. D-502 말한 업체 사정 → 상황 질문의 답(규칙) — 사실 · 없음 · 가정 · 안 읽을 말
+{
+  const ans = (t: string) => talkAnswers(t).map((a) => `${a.key}:${a.a}:${a.mode}`).sort().join(',')
+  check('D-502 "청년 2명 뽑는대, 설비도 살 계획이래" → 청년 채용 있음 · 설비 있음(사실)', ans('한솔테크 대표님이 내년에 청년 2명 뽑는대, 설비도 살 계획이래') === 'facility:yes:fact,hireYouth:yes:fact', ans('한솔테크 대표님이 내년에 청년 2명 뽑는대, 설비도 살 계획이래'))
+  check('D-502 "청년 채용 계획은 없대" → 없음', ans('청년 채용 계획은 없대') === 'hireYouth:no:fact')
+  check('D-502 "청년 2명 채용하면 얼마 받아?" → 가정(기록하자고 안 함)', ans('청년 2명 채용하면 얼마 받아?') === 'hireYouth:yes:if')
+  check('D-502 가지급금 있어 / 없어', ans('가지급금이 2억 정도 있어') === 'loan:yes:fact' && ans('가지급금은 없어요') === 'loan:no:fact')
+  check('D-502 "청년 안 뽑고 경력직만 뽑는대" → 청년 없음(마디 나누기)', ans('청년 안 뽑고 경력직만 뽑는대') === 'hireYouth:no:fact', ans('청년 안 뽑고 경력직만 뽑는대'))
+  check('D-502 연구원 · 자녀 지분 · 정년 앞둔 직원 · 매출 급감 · 재택', ans('연구원 3명 있어') === 'researchStaff:yes:fact' && ans('아들에게 지분 넘길 생각이래') === 'succession:yes:fact' && ans('정년 앞둔 직원이 2명이야') === 'retireKeep:yes:fact' && ans('올해 매출이 반토막 났어') === 'salesDrop:yes:fact' && ans('재택 근무 도입한대') === 'flexWork:yes:fact')
+  check('D-502 안 읽을 말 — 매출 늘었어 · 청년 직원이 3명 있어(지금 직원 ≠ 채용 계획) · 법인 전환 검토 중 · 미팅 잘 했어', ans('매출이 작년보다 많이 늘었어') === '' && ans('청년 직원이 3명 있어') === '' && ans('법인 전환 검토 중이야') === '' && ans('오늘 미팅 잘 했어') === '' && ans('한솔테크 1차 미팅 가는데 정책자금 어떻게 제안할까?') === '')
+  check('D-502 고쳐 말하면 마지막 말 — "청년 뽑는대. 아 아니다 청년은 안 뽑는대"', ans('청년 뽑는대. 아 아니다 청년은 안 뽑는대') === 'hireYouth:no:fact')
+  const rec0 = normalizeClientOps({ id: 'cli_talk', companyName: '말테크', establishedAt: '2019-03-02', employeeCount: '12명', industry: '소프트웨어 개발', address: '서울특별시 강남구 테헤란로 1', annualRevenue: '3500000000' } as Parameters<typeof normalizeClientOps>[0])
+  const stored = withScenarioAnswer(rec0, 'hireYouth', 'yes', '2026-11-02T00:00:00Z')
+  const facts = newFacts(talkAnswers('청년 뽑는대, 가지급금도 있어'), (k) => scenarioAnswer(stored, k))
+  check('D-502 이미 같은 답이 적힌 사정은 다시 기록하자고 안 함 · 가정은 기록 대상 아님', facts.map((f) => f.key).join(',') === 'loan' && newFacts(talkAnswers('청년 뽑으면 얼마?'), () => null).length === 0)
+  // 실제 엔진 — 청년 채용 '예' 를 넣으면 전에 물어보던 상황이 맞음으로 열린다
+  const before = runScenarios(rec0, '2026-11-02', () => true, true) as unknown as PlanRunLite[]
+  const after = runScenarios(withScenarioAnswer(rec0, 'hireYouth', 'yes', '2026-11-02T00:00:00Z'), '2026-11-02', () => true, true) as unknown as PlanRunLite[]
+  const opened = openedBy(before, after, 'talk')
+  const chips = planChips(after, [], 3, 'chat_new', opened)
+  check('D-502 실제 엔진 — 청년 채용 있음 → 새로 맞는 상황이 생기고 단추 맨 앞(방금 말한 것)', opened.size > 0 && chips[0]?.tag === 'talk' && chips[0].module === 'employment', { opened: [...opened.keys()], chips: chips.map((c) => `${c.module}:${c.tag ?? ''}`) })
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

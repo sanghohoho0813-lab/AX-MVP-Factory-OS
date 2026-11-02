@@ -5,6 +5,7 @@
  *
  *  1440  맨 위(숫자 칸보다 위) · 큰 글 · 안내 · 질문 세 줄 · 모델 고르기 · 빈 칸이면 보내기 막힘
  *        → "한솔테크 1차 미팅 정책자금" → home.chat 으로 · 보낸 자료에 그 업체 OS 모듈 판정 · 서류함 · 대표 이름 · 전화 0 → AI 답 · [열기] → 그 업체
+ *        → D-502 말한 업체 사정(청년 뽑는대 · 가지급금 있대) → [업체에 기록] 한 번 → 새로 열린 상황 맨 앞
  *        → D-501 답 아래 '상황 예시로 바로 설계'(맞는 상황 · 질문의 모듈 먼저) → 누르면 그 업체 숫자로 모듈
  *        → D-499 답에서 한 번에: [서류 요청 문구 복사] · [이 글 복사] · 다음에 할 일 [할 일로](그 업체 · 내일)
  *        → 질문 세 줄 한 번 누르면 바로 답 · 👎 너무 길어요 → 다음 요청 [규칙집] 에 '너무 길다' · 👍 → 예시
@@ -300,6 +301,26 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('arrange-done').click()
   await page.waitForTimeout(300)
   check('다시 보이기', (await page.getByTestId('home-ask').count()) === 1)
+
+  // D-502 말한 업체 사정 → 상황 질문의 답 → [업체에 기록] 한 번 → 새로 열린 상황이 단추 맨 앞
+  await ask(page, '한솔테크 대표님이 내년에 청년 2명 뽑는대, 가지급금도 좀 있대')
+  const tcall = llm.at(-1)
+  const tt = lastTurn(page)
+  const talkKeys = await tt.getByTestId('home-ask-talk-item').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-a')}`))
+  check('D-502 이 말에서 알게 된 사정 — 청년 채용 계획 있음 · 가지급금 있음', talkKeys.includes('hireYouth:yes') && talkKeys.includes('loan:yes'), talkKeys)
+  check('D-502 AI 에도 같은 사정(아직 기록 전)', tcall.user.includes('대화에서 알게 된 사정'), tcall.user.slice(0, 400))
+  const firstTag = await tt.getByTestId('home-ask-plan').first().getByTestId('home-ask-plan-tag').innerText().catch(() => '')
+  check('D-502 새로 맞게 된 상황이 단추 맨 앞(방금 말한 것)', firstTag.includes('방금 말한 것'), firstTag)
+  const scnBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol')?.decided?.['scn.hireYouth'] ?? null)
+  check('D-502 누르기 전에는 업체에 안 적힘(최종 확인 한 번)', scnBefore === null, scnBefore)
+  await shot(tt, 'pc-talk')
+  await tt.getByTestId('home-ask-talk-save').click()
+  await tt.locator('[data-testid="home-ask-talk"][data-saved="1"]').waitFor({ timeout: 8000 })
+  const decided = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol')?.decided ?? {})
+  check('D-502 [한솔테크(주)에 기록] → 업체에 답이 남음(청년 채용 예 · 가지급금 예)', decided['scn.hireYouth']?.a === 'yes' && decided['scn.loan']?.a === 'yes', decided)
+  await ask(page, '청년 2명 채용하면 얼마 받아? 한솔테크')
+  const tt2 = lastTurn(page)
+  check('D-502 이미 기록한 사정 · 가정 질문은 다시 기록하자고 안 함', (await tt2.getByTestId('home-ask-talk').count()) === 0)
   check('1440: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

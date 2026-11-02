@@ -412,6 +412,8 @@ export interface PlanChip {
   headline: string
   /** 모듈 화면 — 같은 가정 · 같은 업체로 열린다 */
   path: string
+  /** D-502 방금 말한 사정으로 새로 맞게 된 상황(talk) · 물어본 가정으로 설계한 상황(if) */
+  tag?: 'talk' | 'if'
 }
 
 /** 상황 예시 실행 결과에서 쓰는 것만(services/scenarios 의 ScenarioRun 과 같은 모양) */
@@ -431,14 +433,24 @@ export interface PlanRunLite {
  * 이 업체에 맞고(근거 있음) 결과가 나온 상황만 — 질문에 나온 모듈 먼저, 그다음 들어온 순서(맞음 · 바로 설계 먼저), 최대 3개.
  * 아직 등록 안 된 업체(임시 기록)는 열 화면이 없어 뺀다.
  */
-export function planChips(runs: readonly PlanRunLite[], intents: readonly HomeIntent[], max = 3, skipId = 'chat_new'): PlanChip[] {
+export function planChips(runs: readonly PlanRunLite[], intents: readonly HomeIntent[], max = 3, skipId = 'chat_new', tags: ReadonlyMap<string, 'talk' | 'if'> = new Map()): PlanChip[] {
   const want = new Set(intents.flatMap((k) => INTENT_MODULES[k] ?? []))
   return runs
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => r.fit.kind === 'fit' && r.state !== 'need' && r.openPath && !r.openPath.includes(skipId))
-    .sort((a, b) => Number(want.has(b.r.module)) - Number(want.has(a.r.module)) || a.i - b.i)
+    // D-502 방금 말한 사정 · 물어본 가정으로 열린 상황이 맨 앞(그 말에 대한 답이니까)
+    .sort((a, b) => Number(tags.has(b.r.id)) - Number(tags.has(a.r.id)) || Number(want.has(b.r.module)) - Number(want.has(a.r.module)) || a.i - b.i)
     .slice(0, max)
-    .map(({ r }) => ({ id: r.id, module: r.module, moduleLabel: r.moduleLabel, title: r.title, amount: r.amount, headline: r.headline, path: r.openPath }))
+    .map(({ r }) => {
+      const tag = tags.get(r.id)
+      return { id: r.id, module: r.module, moduleLabel: r.moduleLabel, title: r.title, amount: r.amount, headline: r.headline, path: r.openPath, ...(tag ? { tag } : {}) }
+    })
+}
+
+/** D-502 말한 사정 · 가정으로 새로 맞게 된 상황 — 전에는 맞지 않던(물어볼 것 · 안 맞음) 상황이 이제 맞음 */
+export function openedBy(before: readonly PlanRunLite[], after: readonly PlanRunLite[], mode: 'talk' | 'if'): Map<string, 'talk' | 'if'> {
+  const was = new Map(before.map((r) => [r.id, r.fit.kind]))
+  return new Map(after.filter((r) => r.fit.kind === 'fit' && was.get(r.id) !== 'fit').map((r) => [r.id, mode]))
 }
 
 /** AI 에 보내는 '맞는 상황 예시' 칸 — 금액은 엔진 값 그대로 */

@@ -24,7 +24,8 @@ import { useIsPhone } from '../../lib/useIsPhone'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
-import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
+import type { TalkAnswer } from '../../services/homeAsk/homeTalk'
+import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTalkSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
 
@@ -33,9 +34,11 @@ export interface HomeAskProps {
   suggestions: readonly HomeSuggestion[]
   canAI: boolean
   /** docs — D-498 함께 올린 서류(읽기 끝난 것 · 없으면 빈 배열) */
-  prepare: (question: string, clientIds: string[], intents: HomeIntent[], docs: readonly ChatDoc[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[] }>
+  prepare: (question: string, clientIds: string[], intents: HomeIntent[], docs: readonly ChatDoc[]) => Promise<{ bundle: AssistBundle; rule: RuleAnswer; docCompany?: DocCompany | null; plans?: PlanChip[]; talk?: HomeTurn['talk'] }>
   /** D-499 답에서 할 일을 넣은 뒤 — 오늘 할 일 목록을 다시 읽게 */
   onRecorded?: () => void
+  /** D-502 말한 업체 사정을 업체에 기록(성공하면 true) */
+  onRecordTalk?: (clientId: string, answers: readonly TalkAnswer[]) => Promise<boolean>
 }
 
 /* 말로 적기 — 브라우저가 받아 적기를 지원할 때만 단추가 보인다(크롬 · 엣지 · 사파리) */
@@ -55,7 +58,7 @@ function speechCtor(): (new () => SpeechLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
-export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded }: HomeAskProps) {
+export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRecordTalk }: HomeAskProps) {
   const { turns, busy } = useHomeAsk()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -343,7 +346,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded }: Ho
             </button>
           </div>
           {shown.map((t) => (
-            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} onRecorded={onRecorded} />
+            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} onRecorded={onRecorded} onRecordTalk={onRecordTalk} />
           ))}
         </div>
       )}
@@ -351,7 +354,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded }: Ho
   )
 }
 
-function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string; name: string }[]; onRecorded?: () => void }) {
+function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names: { id: string; name: string }[]; onRecorded?: () => void; onRecordTalk?: HomeAskProps['onRecordTalk'] }) {
+  const [talkBusy, setTalkBusy] = useState(false)
   const { showToast } = useToast()
   const navigate = useNavigate()
   const auth = useContext(AuthContext)
@@ -516,6 +520,51 @@ function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string
             </div>
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
+          {turn.talk && turn.talk.answers.length > 0 && (
+            // D-502 질문에서 읽은 업체 사정 — 맞춤 추천 상황 예시가 예/아니요로 묻던 것. 한 번 누르면 업체에 남는다(최종 확인)
+            <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="home-ask-talk" data-saved={turn.talk.saved ? '1' : '0'}>
+              <span className="t-meta font-semibold text-slate-500">이 말에서 알게 된 {turn.talk.company} 사정</span>
+              <ul className="t-sub flex flex-col gap-0.5 text-slate-700">
+                {turn.talk.answers.map((t) => (
+                  <li key={t.key} className="flex flex-wrap items-baseline gap-x-1.5 break-keep" data-testid="home-ask-talk-item" data-key={t.key} data-a={t.a}>
+                    <Check aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
+                    <span>{t.label}</span>
+                    <span className={`font-semibold ${t.a === 'yes' ? 'text-brand-700' : 'text-slate-500'}`}>— {t.a === 'yes' ? '있음' : '없음'}</span>
+                    <span className="t-meta min-w-0 truncate text-slate-400">“{t.phrase}”</span>
+                  </li>
+                ))}
+              </ul>
+              {turn.talk.saved ? (
+                <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-600">
+                  <Check aria-hidden="true" className="size-4 text-success-700" />
+                  {turn.talk.company}에 기록했어요 — 맞춤 추천 상황 예시에도 같은 답이 들어가요
+                </p>
+              ) : (
+                onRecordTalk && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className="self-start"
+                    disabled={talkBusy}
+                    onClick={async () => {
+                      const tk = turn.talk
+                      if (!tk || talkBusy) return
+                      setTalkBusy(true)
+                      const ok = await onRecordTalk(tk.clientId, tk.answers).catch(() => false)
+                      setTalkBusy(false)
+                      if (ok) {
+                        markTalkSaved(turn.id)
+                        showToast(`${tk.company}에 기록했어요 — 상황 예시를 다시 맞췄어요`)
+                      }
+                    }}
+                    data-testid="home-ask-talk-save"
+                  >
+                    {talkBusy ? '기록하는 중…' : `${turn.talk.company}에 기록`}
+                  </Button>
+                )
+              )}
+            </div>
+          )}
           {turn.plans && turn.plans.length > 0 && (
             // D-501 고도화 목표 3 — 이 업체에 맞는 상황 예시를 한 번 누르면 그 업체 숫자로 모듈이 열려 바로 결과
             <div className="flex flex-col gap-1" data-testid="home-ask-plans">
@@ -526,6 +575,7 @@ function Turn({ turn, names, onRecorded }: { turn: HomeTurn; names: { id: string
               <div className="flex flex-wrap gap-1.5">
                 {turn.plans.map((p) => (
                   <Link key={p.id} to={p.path} title={p.headline} className="tap t-meta inline-flex max-w-full min-w-0 items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:border-brand-300 hover:bg-slate-50" data-testid="home-ask-plan" data-module={p.module}>
+                    {p.tag && <span className="shrink-0 text-brand-700" data-testid="home-ask-plan-tag">{p.tag === 'talk' ? '방금 말한 것' : '가정'}</span>}
                     <span className="shrink-0 text-slate-500">{p.moduleLabel}</span>
                     <span className="min-w-0 truncate">{p.title}</span>
                     {p.amount && <span className="shrink-0 text-brand-700">{p.amount}</span>}

@@ -2,7 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExter
 import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
-import { homeSuggestions, mergeBundles, nearNames, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
+import { homeSuggestions, mergeBundles, nearNames, openedBy, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
+import { newFacts, talkAnswers, type TalkAnswer } from '../services/homeAsk/homeTalk'
 import { CHAT_NEW_ID, aiFactLines, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc, type DocCompany } from '../services/homeAsk/homeDocs'
 import { personNames, safeText, type AssistSection } from '../services/aiAssist/context'
 import { generateId } from '../storage/localStore'
@@ -52,7 +53,7 @@ import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoDraft
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
-import { listClients } from '../services/clientOpsService'
+import { listClients, saveClient } from '../services/clientOpsService'
 import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
 import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
 import { CallButton } from '../components/ops/opsControls'
@@ -465,10 +466,32 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
        */
       const planRec = focus[0] ? clients.find((c) => c.id === focus[0].id) : undefined
       let plans: PlanChip[] = []
+      /*
+       * D-502 질문에서 읽은 업체 사정(청년 뽑는대 · 설비 살 계획 · 가지급금 있어 …) — 상황 예시 질문의 답.
+       * 사실은 [업체에 기록] 한 번으로 남기고(아직 업체에 없는 답만), 가정(… 하면 얼마?)은 그 가정으로 설계만 보여 준다.
+       * 단추의 상황은 그 답을 넣은 기록으로 계산 — 새로 맞게 된 상황이 맨 앞.
+       */
+      const talk = talkAnswers(question)
+      let talkFacts: TalkAnswer[] = []
+      let talkSec: AssistSection | null = null
       if (planRec) {
         try {
-          const { runScenariosCached } = await import('../services/scenarios')
-          plans = planChips(runScenariosCached(planRec, today, usable, true), intents)
+          const [{ runScenarios, runScenariosCached }, { scenarioAnswer, withScenarioAnswer }] = await Promise.all([import('../services/scenarios'), import('../services/scenarioFit')])
+          const before = runScenariosCached(planRec, today, usable, true)
+          talkFacts = newFacts(talk, (k) => scenarioAnswer(planRec, k))
+          const ifs = talk.filter((t) => t.mode === 'if')
+          if (talkFacts.length || ifs.length) {
+            const withFacts = talkFacts.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), planRec)
+            const afterFacts = talkFacts.length ? runScenarios(withFacts, today, usable, true) : before
+            const withIfs = ifs.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withFacts)
+            const after = ifs.length ? runScenarios(withIfs, today, usable, true) : afterFacts
+            const tags = new Map([...openedBy(afterFacts, after, 'if'), ...openedBy(before, afterFacts, 'talk')])
+            plans = planChips(after, intents, 3, CHAT_NEW_ID, tags)
+          } else {
+            plans = planChips(before, intents)
+          }
+          const told = [...talkFacts, ...ifs]
+          if (told.length) talkSec = { name: `물어본 업체 · ${planRec.companyName} 대화에서 알게 된 사정(아직 기록 전 · 가정은 가정)`, rows: told.map((t) => ({ 사정: t.label, 답: t.a === 'yes' ? '있음' : '없음', 종류: t.mode === 'if' ? '가정(물어본 것)' : '말한 사실' })) }
         } catch {
           plans = [] // 상황 계산이 실패해도 답은 나간다
         }
@@ -483,7 +506,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           ...(focus.length ? [] : [{ bundle: clientsBundle(active, today, reco), rename: (n: string) => `고객 · ${n}` }]),
         ],
         { title: '오늘 대화창', today: todayLabel(today), purpose: docs.length ? `방금 올린 서류(${docCompany?.name || '회사 모름'}) — 이 서류로 무엇을 제안하고 무엇을 더 받을지(아직 저장 전 · 임시 판정)` : focus.length ? `물어본 업체(${focus.map((f) => f.companyName).join(' · ')}) — 무엇을 제안하고 무엇을 확인할지` : '오늘 · 이번 주 · 고객 전체 — 물어본 것에 바로 답' },
-        { before: [...docSections, ...(plansSec ? [plansSec] : [])], facts: [...docFacts, ...(focus.length ? [] : [`등록된 업체 ${active.length}곳`])] },
+        { before: [...docSections, ...(talkSec ? [talkSec] : []), ...(plansSec ? [plansSec] : [])], facts: [...docFacts, ...(focus.length ? [] : [`등록된 업체 ${active.length}곳`])] },
       )
       // 아직 등록 안 된 업체(임시 기록)로 가는 이동 주소는 뺀다 — 눌러도 없는 화면
       for (const [ref, href] of Object.entries(bundle.links)) if (href.includes(CHAT_NEW_ID)) delete bundle.links[ref]
@@ -506,9 +529,27 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         if (read.length) rule.items.unshift({ title: '이 서류에서 읽은 것', outline: read })
         if (docFacts.length) rule.caution = docFacts.join(' ')
       }
-      return { bundle, rule, plans, ...(docs.length ? { docCompany } : {}) }
+      return { bundle, rule, plans, ...(planRec && talkFacts.length ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts } } : {}), ...(docs.length ? { docCompany } : {}) }
     },
     [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
+  )
+
+  /** D-502 대화창에서 읽은 업체 사정을 업체에 기록 — 저장 직전에 새로 읽어(다른 창 · 팀장이 고친 것을 덮지 않게 · D-212) 답만 더한다 */
+  const recordTalk = useCallback(
+    async (clientId: string, answers: readonly TalkAnswer[]): Promise<boolean> => {
+      const { withScenarioAnswer } = await import('../services/scenarioFit')
+      try {
+        const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId)
+        if (!fresh) return false
+        const saved = await saveClient(answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), fresh))
+        setClients((cs) => cs.map((c) => (c.id === saved.id ? saved : c)))
+        return true
+      } catch (cause) {
+        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+        return false
+      }
+    },
+    [workspaceId, clients, showToast],
   )
 
   /** 할 일 시트에서 고른 것을 실행한다 */
@@ -643,7 +684,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         {/* D-497 맨 위 대화창 — 처음엔 보이고, 화면 꾸미기로 숨길 수 있다(대표 · 팀장 — AI 도우미와 같은 자격) */}
         {assistOn(aiAccess) && (
           <ArrangeItem id="ask" label="무엇이든 물어보기(대화창)" hint="업체 이름과 함께 물으면 그 업체 판정 · 서류로 답해요">
-            <HomeAsk clients={clients} suggestions={homeTips} canAI={assistOn(aiAccess)} prepare={homePrepare} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
+            <HomeAsk clients={clients} suggestions={homeTips} canAI={assistOn(aiAccess)} prepare={homePrepare} onRecordTalk={recordTalk} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
           </ArrangeItem>
         )}
         {phone && (
