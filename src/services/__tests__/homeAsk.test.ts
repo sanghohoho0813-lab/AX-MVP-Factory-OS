@@ -6,9 +6,11 @@ import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { RefBook, type AssistBundle } from '../aiAssist/context'
 import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, planChips, planSection, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback, type PlanRunLite } from '../homeAsk/homeAsk'
 import { runScenarios } from '../scenarios'
-import { newFacts, talkAnswers } from '../homeAsk/homeTalk'
+import { newFacts, newNumbers, talkAnswers, talkNumbers, wonOfTalk } from '../homeAsk/homeTalk'
 import { openedBy } from '../homeAsk/homeAsk'
 import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
+import { withFactValue } from '../customerFacts'
+import { buildInsights, insightChanges } from '../clientInsights'
 import { parseTurns } from '../homeAsk/homeAskStore'
 import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
@@ -210,6 +212,26 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   const opened = openedBy(before, after, 'talk')
   const chips = planChips(after, [], 3, 'chat_new', opened)
   check('D-502 실제 엔진 — 청년 채용 있음 → 새로 맞는 상황이 생기고 단추 맨 앞(방금 말한 것)', opened.size > 0 && chips[0]?.tag === 'talk' && chips[0].module === 'employment', { opened: [...opened.keys()], chips: chips.map((c) => `${c.module}:${c.tag ?? ''}`) })
+}
+
+// 14. D-503 말한 숫자 → 회사 정보(매출 · 영업이익 · 순이익 · 자산 · 부채 · 올해 예상 매출 · 직원 수)
+{
+  const nums = (t: string) => talkNumbers(t, 2026).map((n) => `${n.key}=${n.value}${n.asOf ? `@${n.asOf}` : ''}`).sort().join(',')
+  check('D-503 "작년 매출 52억이고 직원 18명이래" → 매출 52억(2025) · 직원 18명', nums('한솔테크 작년 매출 52억이고 직원 18명이래') === 'employeeCount=18명,revenue=5200000000@2025', nums('한솔테크 작년 매출 52억이고 직원 18명이래'))
+  check('D-503 한 마디에 두 숫자 — "매출 35억에 영업이익 3억"', nums('매출 35억에 영업이익 3억') === 'operatingProfit=300000000,revenue=3500000000', nums('매출 35억에 영업이익 3억'))
+  check('D-503 숫자 없는 주제는 앞 숫자를 가져오지 않음 — "매출 35억에 영업이익은 아직 몰라"', nums('매출 35억에 영업이익은 아직 몰라') === 'revenue=3500000000', nums('매출 35억에 영업이익은 아직 몰라'))
+  check('D-503 "올해 매출 60억 정도 될 것 같대" → 올해 예상 매출', nums('올해 매출 60억 정도 될 것 같대') === 'expectedRevenue=6000000000@2026', nums('올해 매출 60억 정도 될 것 같대'))
+  check('D-503 안 읽을 말 — 매출 반토막 · 부채비율 · 매출총이익 · 청년 2명 뽑는대 · 매출 50억이면?', nums('매출이 반토막 났어') === '' && nums('부채비율 200%래') === '' && nums('매출총이익 10억') === '' && nums('청년 2명 뽑는대') === '' && nums('매출 50억이면 정책자금 얼마?') === '')
+  check('D-503 "직원은 12명이고 청년 2명 더 뽑는대" → 직원 12명(채용 2명은 직원 수 아님)', nums('직원은 12명이고 청년 2명 더 뽑는대') === 'employeeCount=12명', nums('직원은 12명이고 청년 2명 더 뽑는대'))
+  check('D-503 돈 글자 — 12억 5천만 · 1.5억 · 8천만 · 1,200만', wonOfTalk('12억 5천만') === 1_250_000_000 && wonOfTalk('1.5억') === 150_000_000 && wonOfTalk('8천만') === 80_000_000 && wonOfTalk('1,200만') === 12_000_000 && wonOfTalk('많이') === null)
+  const stored: Record<string, string> = { revenue: '5200000000', employeeCount: '18명(대표 포함)' }
+  const fresh = newNumbers(talkNumbers('작년 매출 52억, 직원 18명, 영업이익 4억', 2026), (k) => stored[k] ?? '')
+  check('D-503 이미 같은 숫자는 다시 기록하자고 안 함(직원 18명 = 18명(대표 포함))', fresh.map((n) => n.key).join(',') === 'operatingProfit', fresh.map((n) => n.key))
+  // 실제 엔진 — 매출 · 직원 수가 없던 업체에 말한 숫자를 넣으면 '정보 필요' 이던 판정이 판정으로 바뀐다(대화창 '이 말로 달라지는 판정')
+  const bare = normalizeClientOps({ id: 'cli_num', companyName: '숫자테크', establishedAt: '2020-05-01', industry: '소프트웨어 개발', businessCategory: '정보통신업', businessAddress: '경기도 성남시 분당구 판교로 1' } as Parameters<typeof normalizeClientOps>[0])
+  const told = talkNumbers('작년 매출 20억, 직원 9명', 2026).reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: '2026-11-02T00:00:00Z' }), bare)
+  const changed = insightChanges(buildInsights(bare, '2026-11-02', [], () => true), buildInsights(told, '2026-11-02', [], () => true))
+  check('D-503 실제 엔진 — 말한 매출 · 직원 수로 판정이 달라짐(하나 이상) · 출처 상담 메모', changed.length > 0 && told.factMeta?.revenue?.source === 'meeting' && told.employeeCount === '9명', changed.map((c) => `${c.label}:${c.tone}`))
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

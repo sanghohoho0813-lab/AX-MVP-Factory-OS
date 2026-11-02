@@ -3,7 +3,7 @@ import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
 import { homeSuggestions, mergeBundles, nearNames, openedBy, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
-import { newFacts, talkAnswers, type TalkAnswer } from '../services/homeAsk/homeTalk'
+import { newFacts, newNumbers, talkAnswers, talkNumbers, type TalkAnswer, type TalkNumber } from '../services/homeAsk/homeTalk'
 import { CHAT_NEW_ID, aiFactLines, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc, type DocCompany } from '../services/homeAsk/homeDocs'
 import { personNames, safeText, type AssistSection } from '../services/aiAssist/context'
 import { generateId } from '../storage/localStore'
@@ -472,17 +472,27 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
        * 단추의 상황은 그 답을 넣은 기록으로 계산 — 새로 맞게 된 상황이 맨 앞.
        */
       const talk = talkAnswers(question)
+      // D-503 말한 숫자(작년 매출 52억 · 직원 18명 …) — 회사 정보(사실 창고 · 출처 '상담 메모')로. 이 숫자로 달라지는 판정도 함께 보여 준다
+      const nums = talkNumbers(question, Number(today.slice(0, 4)))
       let talkFacts: TalkAnswer[] = []
+      let talkNums: TalkNumber[] = []
+      let talkChanges: string[] = []
       let talkSec: AssistSection | null = null
       if (planRec) {
         try {
-          const [{ runScenarios, runScenariosCached }, { scenarioAnswer, withScenarioAnswer }] = await Promise.all([import('../services/scenarios'), import('../services/scenarioFit')])
+          const [{ runScenarios, runScenariosCached }, { scenarioAnswer, withScenarioAnswer }, { readFact, withFactValue }] = await Promise.all([import('../services/scenarios'), import('../services/scenarioFit'), import('../services/customerFacts')])
           const before = runScenariosCached(planRec, today, usable, true)
           talkFacts = newFacts(talk, (k) => scenarioAnswer(planRec, k))
+          talkNums = newNumbers(nums, (k) => readFact(planRec, k)?.value ?? '')
           const ifs = talk.filter((t) => t.mode === 'if')
-          if (talkFacts.length || ifs.length) {
-            const withFacts = talkFacts.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), planRec)
-            const afterFacts = talkFacts.length ? runScenarios(withFacts, today, usable, true) : before
+          const withNums = talkNums.reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: nowIso() }), planRec)
+          if (talkFacts.length || talkNums.length) {
+            const { insightChanges } = await import('../services/clientInsights')
+            talkChanges = insightChanges(buildInsights(planRec, today, grantNotices, usable), buildInsights(talkFacts.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums), today, grantNotices, usable)).map((i) => `${i.label} — ${INSIGHT_TONE_LABEL[i.tone]}`)
+          }
+          if (talkFacts.length || talkNums.length || ifs.length) {
+            const withFacts = talkFacts.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums)
+            const afterFacts = talkFacts.length || talkNums.length ? runScenarios(withFacts, today, usable, true) : before
             const withIfs = ifs.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withFacts)
             const after = ifs.length ? runScenarios(withIfs, today, usable, true) : afterFacts
             const tags = new Map([...openedBy(afterFacts, after, 'if'), ...openedBy(before, afterFacts, 'talk')])
@@ -491,7 +501,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             plans = planChips(before, intents)
           }
           const told = [...talkFacts, ...ifs]
-          if (told.length) talkSec = { name: `물어본 업체 · ${planRec.companyName} 대화에서 알게 된 사정(아직 기록 전 · 가정은 가정)`, rows: told.map((t) => ({ 사정: t.label, 답: t.a === 'yes' ? '있음' : '없음', 종류: t.mode === 'if' ? '가정(물어본 것)' : '말한 사실' })) }
+          const rows = [
+            ...told.map((t) => ({ 사정: t.label, 답: t.a === 'yes' ? '있음' : '없음', 종류: t.mode === 'if' ? '가정(물어본 것)' : '말한 사실' })),
+            ...talkNums.map((n) => ({ 사정: `${n.label}${n.asOf ? `(${n.asOf}년)` : ''}`, 답: n.display, 종류: '말한 숫자' })),
+            ...talkChanges.map((c) => ({ 사정: '이 말로 달라지는 판정', 답: c, 종류: '규칙 계산' })),
+          ]
+          if (rows.length) talkSec = { name: `물어본 업체 · ${planRec.companyName} 대화에서 알게 된 사정(아직 기록 전 · 가정은 가정)`, rows }
         } catch {
           plans = [] // 상황 계산이 실패해도 답은 나간다
         }
@@ -529,19 +544,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         if (read.length) rule.items.unshift({ title: '이 서류에서 읽은 것', outline: read })
         if (docFacts.length) rule.caution = docFacts.join(' ')
       }
-      return { bundle, rule, plans, ...(planRec && talkFacts.length ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts } } : {}), ...(docs.length ? { docCompany } : {}) }
+      return { bundle, rule, plans, ...(planRec && (talkFacts.length || talkNums.length) ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts, numbers: talkNums, changes: talkChanges } } : {}), ...(docs.length ? { docCompany } : {}) }
     },
     [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
   )
 
   /** D-502 대화창에서 읽은 업체 사정을 업체에 기록 — 저장 직전에 새로 읽어(다른 창 · 팀장이 고친 것을 덮지 않게 · D-212) 답만 더한다 */
   const recordTalk = useCallback(
-    async (clientId: string, answers: readonly TalkAnswer[]): Promise<boolean> => {
-      const { withScenarioAnswer } = await import('../services/scenarioFit')
+    async (clientId: string, answers: readonly TalkAnswer[], numbers: readonly TalkNumber[] = []): Promise<boolean> => {
+      const [{ withScenarioAnswer }, { withFactValue }] = await Promise.all([import('../services/scenarioFit'), import('../services/customerFacts')])
       try {
         const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId)
         if (!fresh) return false
-        const saved = await saveClient(answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), fresh))
+        const withNums = numbers.reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: nowIso() }), fresh)
+        const saved = await saveClient(answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums))
         setClients((cs) => cs.map((c) => (c.id === saved.id ? saved : c)))
         return true
       } catch (cause) {

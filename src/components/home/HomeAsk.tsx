@@ -24,7 +24,7 @@ import { useIsPhone } from '../../lib/useIsPhone'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
-import type { TalkAnswer } from '../../services/homeAsk/homeTalk'
+import type { TalkAnswer, TalkNumber } from '../../services/homeAsk/homeTalk'
 import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTalkSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
@@ -38,7 +38,7 @@ export interface HomeAskProps {
   /** D-499 답에서 할 일을 넣은 뒤 — 오늘 할 일 목록을 다시 읽게 */
   onRecorded?: () => void
   /** D-502 말한 업체 사정을 업체에 기록(성공하면 true) */
-  onRecordTalk?: (clientId: string, answers: readonly TalkAnswer[]) => Promise<boolean>
+  onRecordTalk?: (clientId: string, answers: readonly TalkAnswer[], numbers?: readonly TalkNumber[]) => Promise<boolean>
 }
 
 /* 말로 적기 — 브라우저가 받아 적기를 지원할 때만 단추가 보인다(크롬 · 엣지 · 사파리) */
@@ -520,7 +520,7 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
             </div>
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
-          {turn.talk && turn.talk.answers.length > 0 && (
+          {turn.talk && (turn.talk.answers.length > 0 || (turn.talk.numbers?.length ?? 0) > 0) && (
             // D-502 질문에서 읽은 업체 사정 — 맞춤 추천 상황 예시가 예/아니요로 묻던 것. 한 번 누르면 업체에 남는다(최종 확인)
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="home-ask-talk" data-saved={turn.talk.saved ? '1' : '0'}>
               <span className="t-meta font-semibold text-slate-500">이 말에서 알게 된 {turn.talk.company} 사정</span>
@@ -533,11 +533,25 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
                     <span className="t-meta min-w-0 truncate text-slate-400">“{t.phrase}”</span>
                   </li>
                 ))}
+                {(turn.talk.numbers ?? []).map((n) => (
+                  <li key={n.key} className="flex flex-wrap items-baseline gap-x-1.5 break-keep" data-testid="home-ask-talk-num" data-key={n.key} data-value={n.value}>
+                    <Check aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
+                    <span>{n.label}{n.asOf ? `(${n.asOf}년)` : ''}</span>
+                    <span className="font-semibold text-brand-700">— {n.display}</span>
+                    <span className="t-meta min-w-0 truncate text-slate-400">“{n.phrase}”</span>
+                  </li>
+                ))}
               </ul>
+              {(turn.talk.changes?.length ?? 0) > 0 && (
+                <p className="t-sub break-keep text-slate-700" data-testid="home-ask-talk-changes">
+                  <span className="font-semibold text-slate-500">이 말로 달라지는 판정 </span>
+                  {turn.talk.changes?.join(' · ')}
+                </p>
+              )}
               {turn.talk.saved ? (
                 <p className="t-sub inline-flex items-center gap-1.5 font-semibold text-slate-600">
                   <Check aria-hidden="true" className="size-4 text-success-700" />
-                  {turn.talk.company}에 기록했어요 — 맞춤 추천 상황 예시에도 같은 답이 들어가요
+                  {turn.talk.company}에 기록했어요 — 회사 정보 · 맞춤 추천 상황 예시에도 같은 값이 들어가요
                 </p>
               ) : (
                 onRecordTalk && (
@@ -550,7 +564,7 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
                       const tk = turn.talk
                       if (!tk || talkBusy) return
                       setTalkBusy(true)
-                      const ok = await onRecordTalk(tk.clientId, tk.answers).catch(() => false)
+                      const ok = await onRecordTalk(tk.clientId, tk.answers, tk.numbers ?? []).catch(() => false)
                       setTalkBusy(false)
                       if (ok) {
                         markTalkSaved(turn.id)

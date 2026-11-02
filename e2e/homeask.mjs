@@ -5,6 +5,7 @@
  *
  *  1440  맨 위(숫자 칸보다 위) · 큰 글 · 안내 · 질문 세 줄 · 모델 고르기 · 빈 칸이면 보내기 막힘
  *        → "한솔테크 1차 미팅 정책자금" → home.chat 으로 · 보낸 자료에 그 업체 OS 모듈 판정 · 서류함 · 대표 이름 · 전화 0 → AI 답 · [열기] → 그 업체
+ *        → D-503 말한 숫자(작년 매출 52억 · 직원 18명) → [기록] → 회사 정보(상담 메모) · 달라지는 판정
  *        → D-502 말한 업체 사정(청년 뽑는대 · 가지급금 있대) → [업체에 기록] 한 번 → 새로 열린 상황 맨 앞
  *        → D-501 답 아래 '상황 예시로 바로 설계'(맞는 상황 · 질문의 모듈 먼저) → 누르면 그 업체 숫자로 모듈
  *        → D-499 답에서 한 번에: [서류 요청 문구 복사] · [이 글 복사] · 다음에 할 일 [할 일로](그 업체 · 내일)
@@ -321,6 +322,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ask(page, '청년 2명 채용하면 얼마 받아? 한솔테크')
   const tt2 = lastTurn(page)
   check('D-502 이미 기록한 사정 · 가정 질문은 다시 기록하자고 안 함', (await tt2.getByTestId('home-ask-talk').count()) === 0)
+
+  // D-503 말한 숫자 → 회사 정보(출처 '상담 메모') — 작년 매출 · 직원 수
+  await ask(page, '한솔테크 작년 매출 52억이고 직원 18명이래')
+  const tn = lastTurn(page)
+  const numKeys = await tn.getByTestId('home-ask-talk-num').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}=${e.getAttribute('data-value')}`))
+  check('D-503 이 말에서 읽은 숫자 — 매출 52억 · 직원 18명', numKeys.includes('revenue=5200000000') && numKeys.includes('employeeCount=18명'), numKeys)
+  check('D-503 AI 에도 같은 숫자(말한 숫자)', llm.at(-1).user.includes('말한 숫자'), llm.at(-1).user.slice(0, 300))
+  await shot(tn, 'pc-talk-num')
+  await tn.getByTestId('home-ask-talk-save').click()
+  await tn.locator('[data-testid="home-ask-talk"][data-saved="1"]').waitFor({ timeout: 8000 })
+  const hs = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
+  check('D-503 [기록] → 회사 정보: 매출 52억(2025 · 상담 메모) · 직원 18명', hs.factValues?.revenue === '5200000000' && hs.factMeta?.revenue?.source === 'meeting' && hs.factMeta?.revenue?.asOf === String(Number(new Date().getFullYear()) - 1) && hs.employeeCount === '18명', { v: hs.factValues?.revenue, m: hs.factMeta?.revenue, e: hs.employeeCount })
+  await ask(page, '한솔테크 직원 18명이고 작년 매출 52억')
+  check('D-503 같은 숫자를 다시 말하면 다시 기록하자고 안 함', (await lastTurn(page).getByTestId('home-ask-talk').count()) === 0)
   check('1440: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
@@ -352,6 +367,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ask(page, '한솔테크 미팅 준비')
   check('390: 답 · 넘침 0', (await page.getByTestId('home-ask-answer').count()) === 1 && (await ox()) <= 0, await ox())
   await shot(page, 'phone-ai-answer')
+  // D-502 · D-503 휴대폰 — 말한 사정 · 숫자 카드 · 상황 단추 넘침 0 · [기록] 단추 누르기 높이
+  await ask(page, '한솔테크 작년 매출 52억이고 직원 18명이래, 청년 2명 더 뽑는대')
+  const pt = lastTurn(page)
+  const ptCard = pt.getByTestId('home-ask-talk')
+  check('390: 말한 사정 · 숫자 카드(사정 1 · 숫자 2) · 넘침 0', (await ptCard.count()) === 1 && (await pt.getByTestId('home-ask-talk-item').count()) === 1 && (await pt.getByTestId('home-ask-talk-num').count()) === 2 && (await ox()) <= 0, await ox())
+  check('390: [기록] 단추 누르기 높이 40px 이상', (await pt.getByTestId('home-ask-talk-save').boundingBox()).height >= 39.5)
+  await ptCard.scrollIntoViewIfNeeded()
+  await shot(ptCard, 'phone-talk')
   check('390: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

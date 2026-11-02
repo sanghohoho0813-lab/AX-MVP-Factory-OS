@@ -113,3 +113,116 @@ export function talkAnswers(text: string): TalkAnswer[] {
 export function newFacts(answers: readonly TalkAnswer[], stored: (key: QuestionKey) => 'yes' | 'no' | null): TalkAnswer[] {
   return answers.filter((t) => t.mode === 'fact' && stored(t.key) !== t.a)
 }
+
+/* ------------------------------------------------------------------ */
+/* D-503 말한 숫자 → 회사 정보(사실 창고) — 매출 · 영업이익 · 순이익 · 자산 · 부채 · 올해 예상 매출 · 직원 수        */
+/* ------------------------------------------------------------------ */
+
+export type TalkNumberKey = 'revenue' | 'expectedRevenue' | 'operatingProfit' | 'netIncome' | 'totalAssets' | 'totalLiabilities' | 'employeeCount'
+
+export interface TalkNumber {
+  key: TalkNumberKey
+  /** 저장할 값(사실 창고 모양 — 원은 숫자 글자, 직원 수는 'N명') */
+  value: string
+  /** 화면 값(35억원 · 18명) */
+  display: string
+  /** 몇 년 숫자인지('2025' · 모르면 '') */
+  asOf: string
+  label: string
+  phrase: string
+}
+
+export const TALK_NUMBER_LABEL: Record<TalkNumberKey, string> = {
+  revenue: '매출',
+  expectedRevenue: '올해 예상 매출',
+  operatingProfit: '영업이익',
+  netIncome: '순이익',
+  totalAssets: '자산',
+  totalLiabilities: '부채',
+  employeeCount: '직원 수',
+}
+
+/** 돈 글자 → 원(12억 · 12억 5천만 · 3억5000만 · 8천만 · 1,200만 · 1.5억) — 못 읽으면 null */
+export function wonOfTalk(text: string): number | null {
+  const t = String(text ?? '').replace(/[\s,원]/g, '')
+  const m = /^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)천만)?(?:(\d+(?:\.\d+)?)만)?$/.exec(t)
+  if (!m || (!m[1] && !m[2] && !m[3])) return null
+  return Math.round(Number(m[1] ?? 0) * 1e8 + Number(m[2] ?? 0) * 1e7 + Number(m[3] ?? 0) * 1e4)
+}
+
+/** 12억 3,400만원 · 8,000만원 */
+export function wonText(won: number): string {
+  const eok = Math.floor(won / 1e8)
+  const man = Math.round((won % 1e8) / 1e4)
+  return eok > 0 ? `${eok.toLocaleString('ko-KR')}억${man > 0 ? ` ${man.toLocaleString('ko-KR')}만` : ''}원` : `${man.toLocaleString('ko-KR')}만원`
+}
+
+const MONEY = /\d[\d,]*(?:\.\d+)?\s*억(?:\s*\d[\d,]*\s*천?\s*만)?|\d[\d,]*(?:\.\d+)?\s*천\s*만|\d[\d,]*\s*만/
+/** 돈 주제 — 앞의 것이 먼저(매출총이익 · 매출원가는 매출이 아니다) */
+const MONEY_TOPICS: readonly { key: TalkNumberKey; re: RegExp }[] = [
+  { key: 'operatingProfit', re: /영업\s*이익/ },
+  { key: 'netIncome', re: /당기\s*순\s*이익|순\s*이익/ },
+  { key: 'revenue', re: /(?:연\s*)?매출(?:액)?(?!\s*(?:총\s*이익|원가))/ },
+  { key: 'totalLiabilities', re: /부채(?:\s*총액)?(?!\s*비율)/ },
+  { key: 'totalAssets', re: /자산(?:\s*총액)?/ },
+]
+const EXPECT = /예상|목표|전망|될\s*것|예정|정도\s*될|찍을|바라보/
+const STAFF = /(?:직원|근로자|인원|사원|상시\s*근로자|식구)\s*(?:이|은|는|수|수가|가)?\s*(?:총|모두|전부)?\s*(?:약)?\s*(\d{1,4})\s*명/
+
+function yearOf(clause: string, thisYear: number): string {
+  if (/재작년/.test(clause)) return String(thisYear - 2)
+  if (/작년|지난\s*해|전년/.test(clause)) return String(thisYear - 1)
+  const y = /(20\d{2})\s*년/.exec(clause)
+  if (y) return y[1]
+  if (/올해|금년|이번\s*해/.test(clause)) return String(thisYear)
+  return ''
+}
+
+/**
+ * 말에서 회사 숫자 읽기 — 주제 낱말 바로 뒤(없으면 바로 앞) 25자 안의 돈 · 사람 수만. 가정(…이면?)은 읽지 않는다.
+ * 같은 숫자가 여러 번 나오면 마지막 말.
+ */
+export function talkNumbers(text: string, thisYear: number): TalkNumber[] {
+  const out = new Map<TalkNumberKey, TalkNumber>()
+  const put = (n: TalkNumber) => {
+    out.delete(n.key)
+    out.set(n.key, n)
+  }
+  for (const c of clausesOf(text)) {
+    if (IF.test(c)) continue
+    let rest = c
+    for (const t of MONEY_TOPICS) {
+      const m = t.re.exec(rest)
+      if (!m) continue
+      const after = rest.slice(m.index + m[0].length, m.index + m[0].length + 25)
+      const before = rest.slice(Math.max(0, m.index - 14), m.index)
+      // 뒤에 없으면 바로 앞에 붙은 숫자만('35억 매출') — 앞 주제의 숫자를 가져오지 않게
+      const a = MONEY.exec(after)
+      const b = a ? null : new RegExp(`(${MONEY.source})\\s*(?:의|짜리)?\\s*$`).exec(before)
+      const moneyText = a ? a[0] : b ? b[1] : ''
+      // 한 마디에 '매출 35억에 영업이익 3억' 처럼 두 주제가 있으면 앞 주제가 쓴 부분은 지운다
+      rest = rest.slice(0, m.index) + ' '.repeat(m[0].length) + rest.slice(m.index + m[0].length)
+      const won = moneyText ? wonOfTalk(moneyText) : null
+      if (won === null || won <= 0) continue
+      rest = rest.replace(moneyText, ' '.repeat(moneyText.length))
+      const key: TalkNumberKey = t.key === 'revenue' && EXPECT.test(c) ? 'expectedRevenue' : t.key
+      put({ key, value: String(won), display: wonText(won), asOf: key === 'expectedRevenue' ? String(thisYear) : yearOf(c, thisYear), label: TALK_NUMBER_LABEL[key], phrase: c.slice(0, 60) })
+    }
+    const s = STAFF.exec(c)
+    if (s && !HIRE.test(c.replace(STAFF, ' '))) {
+      const n = Number(s[1])
+      if (n > 0 && n < 5000) put({ key: 'employeeCount', value: `${n}명`, display: `${n}명`, asOf: '', label: TALK_NUMBER_LABEL.employeeCount, phrase: c.slice(0, 60) })
+    }
+  }
+  return [...out.values()]
+}
+
+/** 이미 같은 숫자가 적혀 있으면 뺀다 — stored 는 사실 창고의 지금 값(원 숫자 글자 · '12명(대표 포함)') */
+export function newNumbers(nums: readonly TalkNumber[], stored: (key: TalkNumberKey) => string): TalkNumber[] {
+  return nums.filter((n) => {
+    const cur = String(stored(n.key) ?? '').trim()
+    if (!cur) return true
+    if (n.key === 'employeeCount') return Number(/\d+/.exec(cur)?.[0] ?? NaN) !== Number(/\d+/.exec(n.value)?.[0])
+    return Number(cur.replace(/[^\d.-]/g, '')) !== Number(n.value)
+  })
+}
