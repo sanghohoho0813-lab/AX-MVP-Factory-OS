@@ -309,6 +309,22 @@ for (const vp of [
     await page.waitForTimeout(300)
     const thrBody = await page.getByTestId('thr-body').inputValue().catch(() => '')
     check(`${vp.tag} 스레드 쓰다 둔 글 — 처음엔 없음 · 저장 뒤 새 글이면 맨 위 [이어서 쓰기] → 그 글이 글 칸에`, thrBefore === 0 && thrLine.includes('정책자금 신청 전에') && thrBody.startsWith('정책자금 신청 전에') && (await page.getByTestId('thr-resume').count()) === 0, { thrBefore, thrLine, thrBody: thrBody.slice(0, 30) })
+
+    // D-507 릴스 · 틱톡 — 같은 방식 '써 둔 대본 [이어서 쓰기]'
+    await page.goto(BASE + '/marketing/shorts', { waitUntil: 'networkidle' })
+    await page.getByTestId('sht-write').waitFor({ timeout: 8000 }).catch(() => {})
+    const shtBefore = await page.getByTestId('sht-resume').count()
+    if ((await page.getByTestId('sht-script').count()) === 0) await page.getByTestId('sht-hand').click().catch(() => {})
+    await page.getByTestId('sht-script').fill('[0:00] 정책자금 거절되는 세 가지\n[0:03] 첫째 체납')
+    await page.getByTestId('sht-save').click()
+    await page.waitForTimeout(500)
+    page.once('dialog', (d) => void d.accept())
+    await page.getByTestId('sht-new').click()
+    await page.getByTestId('sht-resume').waitFor({ timeout: 5000 }).catch(() => {})
+    await page.getByTestId('sht-resume-go').click().catch(() => {})
+    await page.waitForTimeout(300)
+    const shtScript = await page.getByTestId('sht-script').inputValue().catch(() => '')
+    check(`${vp.tag} 릴스 써 둔 대본 — 처음엔 없음 · 저장 뒤 새로 만들기면 맨 위 [이어서 쓰기] → 그 대본이 칸에`, shtBefore === 0 && shtScript.startsWith('[0:00] 정책자금 거절') && (await page.getByTestId('sht-resume').count()) === 0, { shtBefore, shtScript: shtScript.slice(0, 30) })
   }
   // D-507 큰 글자(설정 › 글자 크기 '매우 크게' = 130%)에서도 휴대폰 화면이 옆으로 넘치지 않게
   if (vp.phone && !ONLY) {

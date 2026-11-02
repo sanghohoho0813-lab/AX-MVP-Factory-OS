@@ -354,8 +354,28 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   }
   const copy = (text: string, what: string) => void copyText(text).then((ok) => showToast(ok ? `${what} 복사했어요.` : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요.'))
 
+  // D-507 계속 쓰기 — 대본 칸이 비어 있고 써 둔 대본이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
+  const lastDraft = !draft.script.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.script.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
   return (
     <div className="flex flex-col gap-4" data-testid="sht-write">
+      {lastDraft && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="sht-resume">
+          <span className="min-w-0 flex-1 basis-48">
+            <span className="t-meta block font-semibold text-slate-600">써 둔 대본</span>
+            <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="sht-resume-line">
+              {(lastDraft.topic.trim() || lastDraft.script.trim().split('\n')[0]).slice(0, 40)}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setDraft(() => ({ ...EMPTY, id: lastDraft.id, platform: lastDraft.platform, aim: lastDraft.aim, format: lastDraft.format, topic: lastDraft.topic, script: lastDraft.script, caption: lastDraft.caption, hashtags: lastDraft.hashtags, checks: lastDraft.checks, source: lastDraft.source }))}
+            className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700"
+            data-testid="sht-resume-go"
+          >
+            이어서 쓰기
+          </button>
+        </div>
+      )}
       {/* MUX-2 주제 하나 → 바로 쓰기 — 목적 · 형식은 이번 주 올린 비율 · 주제 낱말로 추천(규칙). 직접 고르기는 아래에 접어 둠(지운 것 없음) */}
       <QuickStart
         testPrefix="sht"
