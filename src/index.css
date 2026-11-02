@@ -398,6 +398,19 @@ main[data-area='marketing'] ::placeholder { color: var(--color-slate-500); opaci
   main[data-crumbs-phone='off'] [data-testid='crumbs'] {
     display: none;
   }
+  /* D-507 AI 도우미 띠 — 휴대폰 한 줄 가로 넘김(D-478)이면 첫 단추 글이 화면 끝에서 잘렸다. 마케팅에서는 [AI 도우미][직접 묻기] 한 줄 + 질문 단추는 아랫줄 전체 폭(글 다 보이게) */
+  main[data-area='marketing'] [data-testid='ai-assist-bar'] {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  main[data-area='marketing'] [data-testid='ai-assist-ask-chip'] {
+    order: 1;
+  }
+  main[data-area='marketing'] [data-testid='ai-assist-chip'] {
+    order: 2;
+    flex: 1 1 100%;
+    white-space: normal;
+  }
 }
 
 .t-num {             /* 큰 숫자 — 줄바꿈 금지, 자릿수 정렬 */
