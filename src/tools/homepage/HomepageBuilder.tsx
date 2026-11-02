@@ -457,12 +457,15 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-violet-800 hover:border-violet-400" data-testid="site-to-content">
         <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
       </Link>
-      <Button size="sm" onClick={onOpen} data-testid="site-open">
-        <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
-      </Button>
-      <button type="button" className={MK_PRIMARY.emerald} onClick={() => void onDownload()} data-testid="site-download">
-        <Download className="size-4" aria-hidden="true" /> HTML 내려받기
-      </button>
+      {/* D-507 휴대폰은 맨 위 단추를 줄인다 — [새 창으로 보기] · [HTML 내려받기] 는 ③ 내려받기 단계에 크게 그대로(PC 는 여기에도) */}
+      <span className="contents max-sm:hidden">
+        <Button size="sm" onClick={onOpen} data-testid="site-open">
+          <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
+        </Button>
+        <button type="button" className={MK_PRIMARY.emerald} onClick={() => void onDownload()} data-testid="site-download">
+          <Download className="size-4" aria-hidden="true" /> HTML 내려받기
+        </button>
+      </span>
       {/* D-220: 가상 업체 · 컨설턴트는 붙일 업체 기록이 없다 — 임시등록하면 붙일 수 있다 */}
       {!isTrialId(record.id) && (
       <ToolResultAttach
