@@ -291,6 +291,24 @@ for (const vp of [
     await page.getByTestId('subject-resume-go').click().catch(() => {})
     await page.waitForURL(/\/tools\/content\/build/, { timeout: 5000 }).catch(() => {})
     check(`${vp.tag} 홍보 글 업체 고르기 — 처음엔 '지난번 하던 곳' 없음 · 글을 저장하면 맨 위 [이어서 하기](한솔테크) → 그 업체 화면`, pickBefore === 0 && pickName.includes('한솔테크') && new URL(page.url()).searchParams.get('client') === 'cli_hansol', { pickBefore, pickName, url: page.url() })
+
+    // D-507 스레드 쓰기 — 글 칸이 비고 쓰다 둔 글이 있으면 맨 위 '쓰다 둔 글 [이어서 쓰기]' → 누르면 그 글이 글 칸에
+    await page.goto(BASE + '/marketing/threads', { waitUntil: 'networkidle' })
+    await page.getByTestId('thr-write').waitFor({ timeout: 8000 }).catch(() => {})
+    const thrBefore = await page.getByTestId('thr-resume').count()
+    // 글 칸이 접혀 있으면(글이 없을 때 2단계 한 줄) [직접 쓰기] 로 연다
+    if ((await page.getByTestId('thr-body').count()) === 0) await page.getByTestId('thr-hand').click().catch(() => {})
+    await page.getByTestId('thr-body').fill('정책자금 신청 전에 꼭 볼 세 가지\n1. 체납 없는지')
+    await page.getByTestId('thr-save').click()
+    await page.waitForTimeout(500)
+    page.once('dialog', (d) => void d.accept())
+    await page.getByTestId('thr-new').click()
+    await page.getByTestId('thr-resume').waitFor({ timeout: 5000 }).catch(() => {})
+    const thrLine = (await page.getByTestId('thr-resume-line').innerText().catch(() => '')) ?? ''
+    await page.getByTestId('thr-resume-go').click().catch(() => {})
+    await page.waitForTimeout(300)
+    const thrBody = await page.getByTestId('thr-body').inputValue().catch(() => '')
+    check(`${vp.tag} 스레드 쓰다 둔 글 — 처음엔 없음 · 저장 뒤 새 글이면 맨 위 [이어서 쓰기] → 그 글이 글 칸에`, thrBefore === 0 && thrLine.includes('정책자금 신청 전에') && thrBody.startsWith('정책자금 신청 전에') && (await page.getByTestId('thr-resume').count()) === 0, { thrBefore, thrLine, thrBody: thrBody.slice(0, 30) })
   }
   // D-507 큰 글자(설정 › 글자 크기 '매우 크게' = 130%)에서도 휴대폰 화면이 옆으로 넘치지 않게
   if (vp.phone && !ONLY) {

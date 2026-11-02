@@ -417,8 +417,28 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
     }
   }
 
+  // D-507 계속 쓰기 — 글 칸이 비어 있고 쓰다 둔 글이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
+  const lastDraft = !draft.body.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.body.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
+      {lastDraft && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-resume">
+          <span className="min-w-0 flex-1 basis-48">
+            <span className="t-meta block font-semibold text-slate-600">쓰다 둔 글</span>
+            <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="thr-resume-line">
+              {lastDraft.body.trim().split('\n')[0].slice(0, 40)}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setDraft(() => ({ ...EMPTY_DRAFT, id: lastDraft.id, goal: lastDraft.goal, template: lastDraft.template, topic: lastDraft.topic, tag: lastDraft.tag, body: lastDraft.body, selfComment: lastDraft.selfComment, checks: lastDraft.checks, source: lastDraft.source }))}
+            className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700"
+            data-testid="thr-resume-go"
+          >
+            이어서 쓰기
+          </button>
+        </div>
+      )}
       {/* MUX-2 주제 하나 → 바로 쓰기 — 형식은 오늘 계획 · 이번 주 잘 된 틀로 추천(규칙). 직접 고르기는 아래에 접어 둠(지운 것 없음) */}
       <QuickStart
         testPrefix="thr"
