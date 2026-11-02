@@ -9,7 +9,7 @@ import { newRequestId, readChoice } from '../aiAssist/store'
 import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
-import type { TalkAnswer, TalkNumber } from './homeTalk'
+import type { TalkAnswer, TalkNext, TalkNumber } from './homeTalk'
 
 export const HOME_ASK_KEY = 'axmvp.home.ask.v1'
 export const HOME_FB_KEY = 'axmvp.home.ask.fb.v1'
@@ -36,7 +36,7 @@ export interface HomeTurn {
   /** D-501 물어본 업체에 맞는 상황 예시(최대 3) — 누르면 그 업체 숫자로 모듈이 열린다 */
   plans?: PlanChip[]
   /** D-502 질문에서 읽은 업체 사정(상황 질문의 답 · 아직 업체에 없는 것만) — [업체에 기록] 한 번 */
-  talk?: { clientId: string; company: string; answers: TalkAnswer[]; numbers?: TalkNumber[]; changes?: string[]; saved?: boolean }
+  talk?: { clientId: string; company: string; answers: TalkAnswer[]; numbers?: TalkNumber[]; changes?: string[]; next?: TalkNext; saved?: boolean }
 }
 
 export interface HomeAskState {
@@ -149,7 +149,7 @@ export async function askHome(plan: AskPlan): Promise<void> {
       commit((cur) => cur.map((t) => (t.id === id && t.docs ? { ...t, docs: { ...t.docs, company }, clientIds: company?.clientId && !t.clientIds.includes(company.clientId) ? [company.clientId, ...t.clientIds].slice(0, 3) : t.clientIds } : t)))
     }
     // 맞는 상황 예시 — AI 답이든 규칙 정리든 답 아래 같은 단추
-    const hasTalk = !!prep.talk && (prep.talk.answers.length > 0 || (prep.talk.numbers?.length ?? 0) > 0)
+    const hasTalk = !!prep.talk && (prep.talk.answers.length > 0 || (prep.talk.numbers?.length ?? 0) > 0 || !!prep.talk.next)
     if (prep.plans?.length || hasTalk) {
       const extra: Partial<HomeTurn> = { ...(prep.plans?.length ? { plans: prep.plans } : {}), ...(hasTalk ? { talk: prep.talk } : {}) }
       commit((cur) => cur.map((t) => (t.id === id ? { ...t, ...extra } : t)))

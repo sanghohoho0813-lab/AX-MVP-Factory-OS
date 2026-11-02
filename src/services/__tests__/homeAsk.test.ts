@@ -6,7 +6,7 @@ import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { RefBook, type AssistBundle } from '../aiAssist/context'
 import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, planChips, planSection, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback, type PlanRunLite } from '../homeAsk/homeAsk'
 import { runScenarios } from '../scenarios'
-import { newFacts, newNumbers, talkAnswers, talkNumbers, wonOfTalk } from '../homeAsk/homeTalk'
+import { dateOfTalk, newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, wonOfTalk } from '../homeAsk/homeTalk'
 import { openedBy } from '../homeAsk/homeAsk'
 import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
 import { withFactValue } from '../customerFacts'
@@ -232,6 +232,18 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   const told = talkNumbers('작년 매출 20억, 직원 9명', 2026).reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: '2026-11-02T00:00:00Z' }), bare)
   const changed = insightChanges(buildInsights(bare, '2026-11-02', [], () => true), buildInsights(told, '2026-11-02', [], () => true))
   check('D-503 실제 엔진 — 말한 매출 · 직원 수로 판정이 달라짐(하나 이상) · 출처 상담 메모', changed.length > 0 && told.factMeta?.revenue?.source === 'meeting' && told.employeeCount === '9명', changed.map((c) => `${c.label}:${c.tone}`))
+}
+
+// 15. D-504 말한 다음 약속 → 다음 할 일(2026-11-02 월요일 기준)
+{
+  const nx = (t: string) => {
+    const n = talkNext(t, '2026-11-02')
+    return n ? `${n.date} ${n.text}` : ''
+  }
+  check('D-504 "다음 주 화요일 오후 2시에 2차 미팅 하기로 했어" → 11/10 2차 미팅 · 오후 2시', nx('다음 주 화요일 오후 2시에 2차 미팅 하기로 했어') === '2026-11-10 2차 미팅 · 오후 2시', nx('다음 주 화요일 오후 2시에 2차 미팅 하기로 했어'))
+  check('D-504 내일 전화 · 11월 20일 방문 · 금요일 만나기 · 이번 주 수요일 10시 반 · 3일 뒤 통화', nx('내일 전화 드리기로 했어') === '2026-11-03 통화' && nx('11월 20일에 방문하기로') === '2026-11-20 방문' && nx('금요일에 다시 만나기로') === '2026-11-06 미팅' && nx('이번 주 수요일 10시 반 미팅') === '2026-11-04 미팅 · 10시 반' && nx('3일 뒤에 통화하기로') === '2026-11-05 통화', [nx('내일 전화 드리기로 했어'), nx('11월 20일에 방문하기로'), nx('금요일에 다시 만나기로'), nx('이번 주 수요일 10시 반 미팅'), nx('3일 뒤에 통화하기로')])
+  check('D-504 안 읽을 말 — 어제 만났어 · 다음 미팅 언제 잡을까? · 다음 주에 자료 보내준대(약속 낱말 없음) · 월요일 미팅 어때?', nx('어제 만났어') === '' && nx('다음 미팅 언제 잡을까?') === '' && nx('다음 주에 매출 자료 보내준대') === '' && nx('월요일 미팅 어때?') === '')
+  check('D-504 날짜 말 — 오늘이 월요일이면 "월요일"은 다음 주 · 다다음 주 · 다음 달 · 지난 날짜는 내년 · 없는 날짜 버림', dateOfTalk('월요일', '2026-11-02') === '2026-11-09' && dateOfTalk('다다음 주 금요일', '2026-11-02') === '2026-11-20' && dateOfTalk('다음 달 5일', '2026-11-02') === '2026-12-05' && dateOfTalk('1월 10일', '2026-11-02') === '2027-01-10' && dateOfTalk('2월 30일', '2026-11-02') === '')
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

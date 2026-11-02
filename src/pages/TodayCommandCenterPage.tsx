@@ -3,7 +3,7 @@ import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
 import { homeSuggestions, mergeBundles, nearNames, openedBy, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
-import { newFacts, newNumbers, talkAnswers, talkNumbers, type TalkAnswer, type TalkNumber } from '../services/homeAsk/homeTalk'
+import { newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, type TalkAnswer, type TalkNext, type TalkNumber } from '../services/homeAsk/homeTalk'
 import { CHAT_NEW_ID, aiFactLines, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc, type DocCompany } from '../services/homeAsk/homeDocs'
 import { personNames, safeText, type AssistSection } from '../services/aiAssist/context'
 import { generateId } from '../storage/localStore'
@@ -57,7 +57,7 @@ import { listClients, saveClient } from '../services/clientOpsService'
 import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
 import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
 import { CallButton } from '../components/ops/opsControls'
-import { addDaysLocal } from '../services/clientOpsNextAction'
+import { addDaysLocal, friendlyDate, withNextAction } from '../services/clientOpsNextAction'
 import { countContractClients, isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, buildClientSchedule, upcomingWithin } from '../services/clientOpsSchedule'
@@ -474,6 +474,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       const talk = talkAnswers(question)
       // D-503 말한 숫자(작년 매출 52억 · 직원 18명 …) — 회사 정보(사실 창고 · 출처 '상담 메모')로. 이 숫자로 달라지는 판정도 함께 보여 준다
       const nums = talkNumbers(question, Number(today.slice(0, 4)))
+      // D-504 말한 다음 약속(다음 주 화요일 오후 2시 2차 미팅) — 업체 '다음 할 일'(날짜 · 무엇). 이미 같으면 다시 묻지 않는다
+      const said = talkNext(question, today)
+      const talkNx: TalkNext | null = said && planRec && !(planRec.nextActionDueDate === said.date && planRec.nextAction === said.text) ? said : null
       let talkFacts: TalkAnswer[] = []
       let talkNums: TalkNumber[] = []
       let talkChanges: string[] = []
@@ -505,6 +508,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             ...told.map((t) => ({ 사정: t.label, 답: t.a === 'yes' ? '있음' : '없음', 종류: t.mode === 'if' ? '가정(물어본 것)' : '말한 사실' })),
             ...talkNums.map((n) => ({ 사정: `${n.label}${n.asOf ? `(${n.asOf}년)` : ''}`, 답: n.display, 종류: '말한 숫자' })),
             ...talkChanges.map((c) => ({ 사정: '이 말로 달라지는 판정', 답: c, 종류: '규칙 계산' })),
+            ...(talkNx ? [{ 사정: '다음 약속', 답: `${friendlyDate(talkNx.date)} ${talkNx.text}`, 종류: '말한 일정' }] : []),
           ]
           if (rows.length) talkSec = { name: `물어본 업체 · ${planRec.companyName} 대화에서 알게 된 사정(아직 기록 전 · 가정은 가정)`, rows }
         } catch {
@@ -544,20 +548,21 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         if (read.length) rule.items.unshift({ title: '이 서류에서 읽은 것', outline: read })
         if (docFacts.length) rule.caution = docFacts.join(' ')
       }
-      return { bundle, rule, plans, ...(planRec && (talkFacts.length || talkNums.length) ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts, numbers: talkNums, changes: talkChanges } } : {}), ...(docs.length ? { docCompany } : {}) }
+      return { bundle, rule, plans, ...(planRec && (talkFacts.length || talkNums.length || talkNx) ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts, numbers: talkNums, changes: talkChanges, ...(talkNx ? { next: talkNx } : {}) } } : {}), ...(docs.length ? { docCompany } : {}) }
     },
     [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
   )
 
   /** D-502 대화창에서 읽은 업체 사정을 업체에 기록 — 저장 직전에 새로 읽어(다른 창 · 팀장이 고친 것을 덮지 않게 · D-212) 답만 더한다 */
   const recordTalk = useCallback(
-    async (clientId: string, answers: readonly TalkAnswer[], numbers: readonly TalkNumber[] = []): Promise<boolean> => {
+    async (clientId: string, answers: readonly TalkAnswer[], numbers: readonly TalkNumber[] = [], next?: TalkNext): Promise<boolean> => {
       const [{ withScenarioAnswer }, { withFactValue }] = await Promise.all([import('../services/scenarioFit'), import('../services/customerFacts')])
       try {
         const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === clientId) ?? clients.find((c) => c.id === clientId)
         if (!fresh) return false
         const withNums = numbers.reduce((r, n) => withFactValue(r, n.key, n.value, { source: 'meeting', asOf: n.asOf, now: nowIso() }), fresh)
-        const saved = await saveClient(answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums))
+        const withAnswers = answers.reduce((r, t) => withScenarioAnswer(r, t.key, t.a, nowIso()), withNums)
+        const saved = await saveClient(next ? withNextAction(withAnswers, next.text, next.date, { at: nowIso() }) : withAnswers)
         setClients((cs) => cs.map((c) => (c.id === saved.id ? saved : c)))
         return true
       } catch (cause) {

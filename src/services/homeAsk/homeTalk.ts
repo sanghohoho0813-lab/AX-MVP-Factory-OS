@@ -226,3 +226,79 @@ export function newNumbers(nums: readonly TalkNumber[], stored: (key: TalkNumber
     return Number(cur.replace(/[^\d.-]/g, '')) !== Number(n.value)
   })
 }
+
+/* ------------------------------------------------------------------ */
+/* D-504 말한 다음 약속 → 업체 '다음 할 일'(날짜 · 무엇) — "다음 주 화요일 오후 2시에 2차 미팅"                    */
+/* ------------------------------------------------------------------ */
+
+export interface TalkNext {
+  /** 다음 할 일 글(2차 미팅 · 오후 2시) */
+  text: string
+  /** YYYY-MM-DD */
+  date: string
+  phrase: string
+}
+
+const MEET = /만나|미팅|방문|찾아|통화|전화|연락|보기로|뵙|약속|상담|들르|오시기로|오기로/
+const DOW: Record<string, number> = { 일: 0, 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6 }
+
+const isoOf = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+const dayOf = (iso: string) => new Date(`${iso}T00:00:00Z`)
+const plus = (iso: string, n: number) => {
+  const d = dayOf(iso)
+  d.setUTCDate(d.getUTCDate() + n)
+  return isoOf(d)
+}
+/** 있는 날짜만(2월 30일 같은 것은 버림) */
+const realIso = (y: number, m: number, d: number): string => {
+  const t = new Date(Date.UTC(y, m - 1, d))
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? isoOf(t) : ''
+}
+
+/** 마디의 날짜 말 → 날짜(오늘 기준 · 지난 날은 '') — 주는 월요일부터 */
+export function dateOfTalk(clause: string, today: string): string {
+  const c = clause
+  const dow = dayOf(today).getUTCDay()
+  const monday = plus(today, -((dow + 6) % 7))
+  const wk = /(다다음\s*주|다음\s*주|이번\s*주|담주)?\s*([월화수목금토일])요일/.exec(c)
+  let d = ''
+  if (wk) {
+    const target = DOW[wk[2]]
+    const off = (target + 6) % 7 // 월=0 … 일=6
+    if (wk[1]) d = plus(monday, (/다다음/.test(wk[1]) ? 14 : /다음|담주/.test(wk[1]) ? 7 : 0) + off)
+    else d = plus(today, ((target - dow + 7) % 7) || 7) // 'X요일' 만 — 다가오는 그 요일(오늘이면 다음 주)
+  } else if (/글피/.test(c)) d = plus(today, 3)
+  else if (/모레/.test(c)) d = plus(today, 2)
+  else if (/내일/.test(c)) d = plus(today, 1)
+  else if (/오늘/.test(c)) d = today
+  else {
+    const md = /(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(c) ?? /(?<![\d/])(\d{1,2})\s*\/\s*(\d{1,2})(?![\d/])/.exec(c)
+    const nextMonth = /다음\s*달\s*(\d{1,2})\s*일/.exec(c)
+    const after = /(\d{1,2})\s*(일|주)\s*(뒤|후)/.exec(c)
+    const y = Number(today.slice(0, 4))
+    if (md) {
+      d = realIso(y, Number(md[1]), Number(md[2]))
+      if (d && d < today) d = realIso(y + 1, Number(md[1]), Number(md[2]))
+    } else if (nextMonth) {
+      const m = Number(today.slice(5, 7))
+      d = m === 12 ? realIso(y + 1, 1, Number(nextMonth[1])) : realIso(y, m + 1, Number(nextMonth[1]))
+    } else if (after) d = plus(today, Number(after[1]) * (after[2] === '주' ? 7 : 1))
+  }
+  return d && d >= today ? d : ''
+}
+
+/** 말에서 다음 약속 읽기 — 약속 낱말 + 날짜가 한 마디에 있을 때만. 물음표 마디는 빼고, 여러 번이면 마지막 말 */
+export function talkNext(text: string, today: string): TalkNext | null {
+  let out: TalkNext | null = null
+  for (const c of clausesOf(text)) {
+    if (!MEET.test(c) || /\?/.test(c)) continue
+    const date = dateOfTalk(c, today)
+    if (!date) continue
+    const kind = /통화|전화/.test(c) ? '통화' : /방문|찾아|들르/.test(c) ? '방문' : '미팅'
+    const nth = /(\d)\s*차/.exec(c)
+    const tm = /(오전|오후|아침|저녁|낮)?\s*(\d{1,2})\s*시(?:\s*(반|\d{1,2}\s*분))?/.exec(c)
+    const time = tm ? `${tm[1] ? `${tm[1]} ` : ''}${tm[2]}시${tm[3] ? ` ${tm[3].replace(/\s/g, '')}` : ''}` : ''
+    out = { text: `${nth ? `${nth[1]}차 ` : ''}${kind}${time ? ` · ${time}` : ''}`, date, phrase: c.slice(0, 60) }
+  }
+  return out
+}
