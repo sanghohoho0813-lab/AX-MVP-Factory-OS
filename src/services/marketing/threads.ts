@@ -438,7 +438,7 @@ export const ROUTINE: ReadonlyArray<{ key: string; when: string; what: string; m
   { key: 'write', when: '매일 아침', what: '오늘 글 1개 — 틀 고르기 → 쓰는 순서대로 → 규칙 검사', min: '4분' },
   { key: 'answer', when: '올린 뒤', what: '1시간은 답글에 바로 답하기 · "저요" 에는 링크로', min: '수시' },
   { key: 'expert', when: '점심 · 저녁', what: '업계 상위 글에 전문가 답글 3개(칭찬 한 줄 말고 사실 하나 더하기)', min: '3분' },
-  { key: 'weekref', when: '월요일', what: '주제 태그 인기 글 3~5개를 훑고, 잘 터진 글의 형식(틀 · 첫 줄 · 끝)만 "이번 주 잘 터진 형식" 에 적기 — 원문은 적지 않아요', min: '10분' },
+  { key: 'weekref', when: '월요일', what: '주제 태그 인기 글 3~5개를 훑고, 반응 좋았던 글의 형식(틀 · 첫 줄 · 끝)만 "이번 주 반응 좋았던 형식" 에 적기 — 원문은 적지 않아요', min: '10분' },
   { key: 'record', when: '금요일', what: '기록표 채우기 → 틀별 평균 비교 → 다음 주 틀 비중 정하기', min: '10분' },
 ]
 

@@ -475,13 +475,13 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
 
       {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
       <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-week-hint">
-        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700">
+        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700 max-sm:basis-full">
           {hotKeys.size ? (
             <>
-              <b className="text-slate-900">이번 주 잘 터진 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
+              <b className="text-slate-900">이번 주 반응 좋았던 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
             </>
           ) : (
-            '이번 주 잘 터진 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 형식만 적으면 돼요(매일 모을 필요 없어요)'
+            '이번 주 반응이 좋았던 글의 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 모양만 적으면 돼요(매일 모을 필요 없어요)'
           )}
         </p>
         <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
@@ -1127,7 +1127,7 @@ function RoutinePanel({ week, readOnly, onWrite, onRecords }: { week: ReturnType
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <h2 className="t-section break-keep text-slate-900">주제 태그 인기 글 보기</h2>
-          <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 스레드 검색을 새 창으로 열고 잘 터진 글 3~5개의 형식만 위 "이번 주 잘 터진 형식" 에 적어요. 매일 모을 필요는 없어요.</p>
+          <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 스레드 검색을 새 창으로 열고 반응 좋았던 글 3~5개의 형식만 위 "이번 주 반응 좋았던 형식" 에 적어요. 매일 모을 필요는 없어요.</p>
           <div className="flex flex-wrap gap-1.5">
             {TOPIC_TAGS.map((t) => (
               <a key={t} href={`https://www.threads.com/search?q=${encodeURIComponent(t)}&serp_type=default`} target="_blank" rel="noreferrer noopener" className={`${chip(false)} gap-1`} data-testid="thr-search-link">
@@ -1202,7 +1202,7 @@ function WeekRefEditor({ week, readOnly }: { week: ReturnType<typeof useWeekRef>
     try {
       await week.save(items)
       setDirty(false)
-      showToast('이번 주 잘 터진 형식을 저장했어요 — AI 는 글 하나에만 참고하고, 기본은 우리 공식이에요.')
+      showToast('이번 주 반응 좋았던 형식을 저장했어요 — AI 는 글 하나에만 참고하고, 기본은 우리 공식이에요.')
     } catch (e) {
       showToast(e instanceof Error && e.message ? `저장하지 못했어요 — ${e.message}` : '저장하지 못했어요.')
     } finally {
@@ -1213,10 +1213,10 @@ function WeekRefEditor({ week, readOnly }: { week: ReturnType<typeof useWeekRef>
   return (
     <Surface className="flex flex-col gap-3" as="section">
       <div className="flex flex-wrap items-center gap-2" data-testid="thr-weekref">
-        <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">이번 주 잘 터진 형식</h2>
+        <h2 className="t-section min-w-[12rem] flex-1 break-keep text-slate-900">이번 주 반응 좋았던 형식</h2>
         <Badge>{mondayOf().slice(5).replace('-', '/')} 주</Badge>
       </div>
-      <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 잘 터진 글 3~5개의 형식만 적어요(원문 문장은 적지 않아요). 기본은 우리가 정리해 둔 공식이고, AI 는 이 형식을 글 하나에만 참고해요.</p>
+      <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 반응 좋았던 글 3~5개의 형식만 적어요(원문 문장은 적지 않아요). 기본은 우리가 정리해 둔 공식이고, AI 는 이 형식을 글 하나에만 참고해요.</p>
       {items.length === 0 && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep text-slate-600">아직 적은 형식이 없어요.</p>}
       <ul className="flex flex-col gap-2" data-testid="thr-weekref-list">
         {items.map((x, i) => (
