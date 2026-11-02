@@ -970,34 +970,40 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
                 <Lightbulb aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${TONES[toneOfTemplate(t, goal)].icon}`} />
                 <span className="min-w-0">{TEMPLATE_EASY[t.key].plain}</span>
               </p>
-              <p className="t-meta break-keep text-slate-600">
-                {t.reaction}
-                {t.median != null ? ` · 점수 중앙값 ${t.median.toLocaleString('ko-KR')}` : ''}
-              </p>
-              <ol className="t-sub list-decimal pl-5 break-keep text-slate-800">
-                {t.skeleton.map((s) => (
-                  <li key={s}>{s}</li>
-                ))}
-              </ol>
-              <p className="t-sub break-keep text-slate-700">
-                <b>왜</b> {t.why}
-              </p>
-              {!isMarketingCustomer() && (
-                <p className="t-sub break-keep text-slate-700">
-                  <b>우리가 쓰면</b> {t.ours}
-                </p>
-              )}
-              {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
-              <details className="rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="thr-lib-sample">
-                <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">짧은 예시 보기</summary>
-                <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{TEMPLATE_EASY[t.key].sample}</p>
+              {/* D-507 60대+ — 처음에는 이름 · 쉽게 말하면 · [이 틀로 쓰기] 만(23장을 다 펼치면 휴대폰 약 21화면). 틀 모양 · 까닭 · 예시는 [자세히] 안에 그대로 */}
+              <details className="group rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="thr-lib-more">
+                <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">자세히 — 틀 모양 · 까닭 · 예시</summary>
+                <div className="mt-2 flex flex-col gap-2">
+                  <p className="t-meta break-keep text-slate-600">
+                    {t.reaction}
+                    {t.median != null ? ` · 점수 중앙값 ${t.median.toLocaleString('ko-KR')}` : ''}
+                  </p>
+                  <ol className="t-sub list-decimal pl-5 break-keep text-slate-800">
+                    {t.skeleton.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ol>
+                  <p className="t-sub break-keep text-slate-700">
+                    <b>왜</b> {t.why}
+                  </p>
+                  {!isMarketingCustomer() && (
+                    <p className="t-sub break-keep text-slate-700">
+                      <b>우리가 쓰면</b> {t.ours}
+                    </p>
+                  )}
+                  {t.caution && <p className="t-sub break-keep text-warning-800">⚠ {t.caution}</p>}
+                  <details className="rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3 py-2" data-testid="thr-lib-sample">
+                    <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">짧은 예시 보기</summary>
+                    <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{TEMPLATE_EASY[t.key].sample}</p>
+                  </details>
+                  {t.example && !isMarketingCustomer() && (
+                    <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
+                      <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">우리 버전 예시</summary>
+                      <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{t.example}</p>
+                    </details>
+                  )}
+                </div>
               </details>
-              {t.example && !isMarketingCustomer() && (
-                <details className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
-                  <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">우리 버전 예시</summary>
-                  <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-800">{t.example}</p>
-                </details>
-              )}
               <div className="mt-auto">
                 <Button size="sm" variant="secondary" onClick={() => onUse(t)} data-testid="thr-lib-use">
                   이 틀로 쓰기
