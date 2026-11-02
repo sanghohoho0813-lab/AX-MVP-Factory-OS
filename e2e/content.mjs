@@ -1403,7 +1403,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await wait(500)
   const gaps2 = await p.getByTestId('content-profile-gap').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
   const n2 = Number(/좋아져요 · (\d+)개/.exec(await p.getByTestId('content-profile-gaps').innerText())?.[1] ?? 0)
-  check('D234-2 후기만 있고 출처가 없을 때 · 가격에 단위가 없을 때 채울 칸 2개 → 출처 · 단위를 적으면 2개 줄어듦 · 브리프 7/7', n1 - n2 === 2 && !gaps2.includes('reviewSource') && !gaps2.includes('price') && /브리프 7칸 · 7\/7/.test(await p.getByTestId('content-brief').innerText()), { n1, n2, gaps1, gaps2 })
+  check('D234-2 후기만 있고 출처가 없을 때 · 가격에 단위가 없을 때 채울 칸 2개 → 출처 · 단위를 적으면 2개 줄어듦 · 브리프 7/7', n1 - n2 === 2 && !gaps2.includes('reviewSource') && !gaps2.includes('price') && /글 재료 7칸 · 7\/7/.test(await p.getByTestId('content-brief').innerText()), { n1, n2, gaps1, gaps2 })
 
   await p.getByTestId('content-ai-req').click()
   await p.getByTestId('content-ai-sheet').waitFor()
