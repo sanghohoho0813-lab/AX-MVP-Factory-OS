@@ -75,6 +75,8 @@ const STEPS: readonly { t: string; short: string }[] = [
 
 /** D-507 지난번 하던 것(내 콘텐츠 수첩에서 아직 올리지 않은 가장 최근 줄) */
 export interface HomeResume {
+  /** 형식 이름(유튜브 긴 영상 · 릴스 · 틱톡 · 스레드 글) — 없으면 안 보임 */
+  kindLabel?: string
   topic: string
   /** 지금 단계(쉬운 말) */
   stage: string
@@ -371,12 +373,14 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
  * D-507 지난번 하던 것 — 다시 왔을 때 어디서부터인지 찾지 않게(계속 쓰기 쉽게).
  * 흰 칸 + 회색 테두리(박스 색 하나) · 큰 단추 하나.
  */
-function ResumeCard({ topic, stage, next, href, making, posted }: HomeResume) {
+function ResumeCard({ kindLabel, topic, stage, next, href, making, posted }: HomeResume) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4" data-testid="mk-resume">
       <History aria-hidden="true" className="size-6 shrink-0 text-slate-500" />
       <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
-        <span className="t-meta font-semibold text-slate-600">지난번 하던 것</span>
+        <span className="t-meta font-semibold text-slate-600" data-testid="mk-resume-kind">
+          지난번 하던 것{kindLabel ? ` · ${kindLabel}` : ''}
+        </span>
         <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-resume-topic">
           {topic}
         </span>

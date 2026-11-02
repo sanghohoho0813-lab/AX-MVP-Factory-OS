@@ -19,6 +19,7 @@ import { shootKit } from '../marketing/shootKit'
 import { listThreadPosts, saveThreadPost, sortThreadPosts, type ThreadDraft } from '../marketing/threads'
 import { listShortPosts, type ShortDraft } from '../marketing/shorts'
 import { plainLabel } from '../marketing/plainWords'
+import { madeResume } from '../marketing/allMade'
 import { IDEA_RESUME_STEP } from '../marketing/radarStore'
 import type { GrantNotice } from '../grants/grantMatch'
 import {
@@ -456,6 +457,15 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
     plainLabel('썸네일 문구') === '표지 글(썸네일)' && plainLabel('제목 · 썸네일') === '제목 · 표지 글(썸네일)' && plainLabel('캡션 (릴스 · 쇼츠 공통 · 200자 안팎)') === '설명 글(캡션) (릴스 · 쇼츠 공통 · 200자 안팎)' && plainLabel('8~10분 롱폼 — 그대로 읽는 말') === '8~10분 긴 영상 — 그대로 읽는 말' && plainLabel('해시태그') === '#태그(해시태그)',
     [plainLabel('썸네일 문구'), plainLabel('제목 · 썸네일'), plainLabel('캡션 (릴스 · 쇼츠 공통 · 200자 안팎)')])
   check('SR2 이미 풀어 쓴 이름 · 상관없는 이름은 그대로(두 번 바꾸지 않음)', plainLabel('표지 글(썸네일)') === '표지 글(썸네일)' && plainLabel('블로그 글') === '블로그 글' && plainLabel(plainLabel('썸네일 문구')) === '표지 글(썸네일)')
+  {
+    // 세 형식에서 아직 올리지 않은 가장 최근 것 · 이번 달 올린 수
+    const idea = (id: string, status: string, savedAt: string, publishDate = '') => ({ id, topic: `영상 ${id}`, status, savedAt, publishDate }) as unknown as Parameters<typeof madeResume>[0][number]
+    const post = (id: string, status: 'draft' | 'posted', savedAt: string, postedOn = '') => ({ id, topic: `글 ${id}`, script: '', body: '', status, savedAt, postedOn }) as never
+    const r = madeResume([idea('a', 'script', '2026-11-01T09:00:00Z'), idea('b', 'published', '2026-10-20T09:00:00Z', '2026-11-02')], [post('s1', 'posted', '2026-11-01T10:00:00Z', '2026-11-01')], [post('t1', 'draft', '2026-11-02T08:00:00Z')], '2026-11-02')
+    check('SR4 지난번 하던 것 — 세 형식 중 가장 최근 안 올린 것(스레드 글 · 복사해서 올리기) · 만드는 중 2 · 이번 달 올린 것 2(긴 영상 게시일 · 릴스 올린 날)', !!r && r.kind === 'thread' && r.next === '복사해서 올리기' && r.href === '/marketing/threads?open=t1' && r.making === 2 && r.posted === 2, r)
+    const longOnly = madeResume([idea('a', 'script', '2026-11-01T09:00:00Z')], [], [], '2026-11-02')
+    check('SR5 긴 영상만 — 대본 준비 중 → 다음은 찍기 · 다 올렸으면 카드 없음(null)', !!longOnly && longOnly.kind === 'long' && longOnly.next === '찍기' && longOnly.href === '/marketing?view=make&idea=a' && madeResume([idea('b', 'published', '2026-10-20T09:00:00Z')], [], [], '2026-11-02') === null, longOnly)
+  }
   check('SR3 지난번 하던 것 — 단계마다 지금 · 다음 할 일(쉬운 말) · 게시 완료는 이어서 하기에 없음', IDEA_RESUME_STEP.script.next === '찍기' && IDEA_RESUME_STEP.filmed.next === '올리기' && IDEA_RESUME_STEP.idea.next === '대본 쓰기' && !('published' in IDEA_RESUME_STEP))
 }
 

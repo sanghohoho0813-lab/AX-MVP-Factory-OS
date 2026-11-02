@@ -237,6 +237,40 @@ for (const vp of [
       if (!then && !path.includes('/build')) check(`${vp.tag} ${name}: 무엇을 하는 곳인지 한 줄이 첫 화면 안`, m.guide)
     }
   }
+  // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 맨 위 [이어서 하기] · 묶음 끝 '다음엔 이것'
+  if (!REPORT && !ONLY) {
+    await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
+    await page.waitForTimeout(500)
+    if (await page.getByTestId('yt-sample').count()) {
+      await page.getByTestId('yt-sample').first().click()
+      await page.waitForTimeout(900)
+    }
+    const before = await page.getByTestId('mk-resume').count()
+    await page.getByTestId('mk-key').first().click()
+    await page.getByTestId('mk-pack').waitFor({ timeout: 8000 })
+    const topic = (await page.getByTestId('mk-pack-topic').innerText()).split('\n')[0].trim()
+    const next = page.getByTestId('mk-pack-next')
+    const nextOk = (await next.count()) === 1 && (await page.getByTestId('mk-pack-next-save').count()) === 1
+    await page.getByTestId('mk-pack-next-save').click()
+    await page.getByTestId('mk-pack-next-open').waitFor({ timeout: 5000 }).catch(() => {})
+    const saved = (await page.getByTestId('mk-pack-next-open').count()) === 1
+    await page.getByTestId('mk-pack-next-back').click()
+    await page.getByTestId('mk-home').waitFor({ timeout: 8000 })
+    if (await page.getByTestId('yt-sample').count()) {
+      await page.getByTestId('yt-sample').first().click()
+      await page.waitForTimeout(900)
+    }
+    await page.getByTestId('mk-resume').waitFor({ timeout: 5000 }).catch(() => {})
+    const card = page.getByTestId('mk-resume')
+    const cardText = (await card.innerText().catch(() => '')) ?? ''
+    const resumeTop = (await card.boundingBox())?.y ?? 9999
+    const keyTop = (await page.getByTestId('mk-key').first().boundingBox())?.y ?? 0
+    check(`${vp.tag} 이어서 하기 — 처음엔 없음 · 묶음 끝 [내 콘텐츠에 담기] → [이어서 하기] 단추로 바뀜 · [다른 주제 고르기] → 첫 화면 맨 위 '지난번 하던 것'(주제 · 다음은 찍기) · 주제 단추보다 위`, before === 0 && nextOk && saved && cardText.includes(topic) && cardText.includes('찍기') && resumeTop < keyTop, { before, nextOk, saved, cardText: cardText.slice(0, 120), topic })
+    await page.getByTestId('mk-resume-go').click()
+    await page.waitForTimeout(800)
+    const u = new URL(page.url())
+    check(`${vp.tag} [이어서 하기] → 내 콘텐츠의 그 줄(?view=make&idea=)`, u.searchParams.get('view') === 'make' && !!u.searchParams.get('idea') && (await page.locator('[data-testid="radar-idea"][data-focus="1"]').count()) === 1, page.url())
+  }
   check(`${vp.tag} JS 오류 0`, errs.length === 0, errs)
   await ctx.close()
 }

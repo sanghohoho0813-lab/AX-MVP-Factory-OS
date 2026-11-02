@@ -38,7 +38,7 @@ import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
-import { IDEA_RESUME_STEP, IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
@@ -131,6 +131,9 @@ import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 import { rememberWeekTopics } from '../../services/marketing/quickStart'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
+import { madeResume } from '../../services/marketing/allMade'
+import { listShortPosts, type ShortPost } from '../../services/marketing/shorts'
+import { listThreadPosts, type ThreadPost } from '../../services/marketing/threads'
 
 /** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
 type View = RadarView
@@ -316,16 +319,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   const weekVer = useSyncExternalStore(subscribeWeek, weekVersion)
   const weekDone = useMemo(() => !!weekSaved(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
-  // D-507 첫 화면 '지난번 하던 것' — 아직 올리지 않은 가장 최근 줄(담은 때 순) · 이번 달 올린 수(계속 쓰기 쉽게)
-  const resume = useMemo<HomeResume | null>(() => {
-    const open = notebook.ideas.filter((i) => i.status !== 'published').sort((a, b) => b.savedAt.localeCompare(a.savedAt))
-    const last = open[0]
-    if (!last) return null
-    const month = today.slice(0, 7)
-    const posted = notebook.ideas.filter((i) => i.status === 'published' && (i.publishDate || i.savedAt).slice(0, 7) === month).length
-    const step = last.status === 'published' ? IDEA_RESUME_STEP.idea : IDEA_RESUME_STEP[last.status]
-    return { topic: last.topic, stage: step.stage, next: step.next, href: ideaHref(last.id), making: open.length, posted }
-  }, [notebook.ideas, today])
+  // D-507 첫 화면 '지난번 하던 것' — 세 형식(긴 영상 · 릴스/틱톡 · 스레드)에서 아직 올리지 않은 가장 최근 것 · 이번 달 올린 수(계속 쓰기 쉽게)
+  //  릴스 · 스레드 목록은 첫 화면에서만 한 번 읽는다(못 읽으면 긴 영상만으로)
+  const [snsMade, setSnsMade] = useState<{ shorts: ShortPost[]; threads: ThreadPost[] } | null>(null)
+  const homeView = view === 'plan' && !params.get('pack') && params.get('week') !== '1'
+  useEffect(() => {
+    if (!homeView || readOnly || snsMade) return
+    let alive = true
+    void Promise.all([listShortPosts(workspaceId).catch(() => [] as ShortPost[]), listThreadPosts(workspaceId).catch(() => [] as ThreadPost[])]).then(([shorts, threads]) => alive && setSnsMade({ shorts, threads }))
+    return () => {
+      alive = false
+    }
+  }, [homeView, readOnly, snsMade, workspaceId])
+  const resume = useMemo<HomeResume | null>(() => madeResume(notebook.ideas, snsMade?.shorts ?? [], snsMade?.threads ?? [], today), [notebook.ideas, snsMade, today])
   // D-349 1주일치 — 열 때 클라우드와 맞추고(휴대폰에서 만든 주도 여기서) · 목록으로 모은 뒤 내 콘텐츠를 다시 읽는다
   const weekSyncNow = useMemo(() => weekSync(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
