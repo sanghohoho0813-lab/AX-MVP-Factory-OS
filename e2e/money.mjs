@@ -2,6 +2,7 @@
  * 매출 · 비용 (D-142) + 오늘 할 일 PC 두 칸 · AI 자리 단추.
  *
  *  1440  메뉴 → 매출 · 비용 → 이 달 들어온 돈 · 들어올 예정(미수금 포함) · 앞으로 6달 · 시기 미정
+ *        → D-496 매출 적기(110만 · 강의료) → 들어온 돈 · 받을 예정 → [받았어요] · 고치기 · 지우기 · 새로 고쳐도 그대로
  *        → 정기 결제(Claude $20 · 이틀 뒤) → 매달 28,000원 · 환율 1,500 → 30,000원 → 오늘 '3일 안 결제'
  *        → 비용 적기('2.8만' · 택시 · 오늘) → 비용 탭 · 분류 · 영업자 수수료 줄 · 엑셀(CSV) 내려받기 → 고치기 · 지우기(한 번 더 묻기)
  *        → 해지 → 해지한 것 · 오늘에서 빠짐 → 지난달로 넘기기
@@ -77,6 +78,50 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('매출 줄: 입금 완료 먼저 · 성공보수(조건 대기)는 없음', kinds[0] === 'received' && !(await page.getByTestId('revenue-list').innerText()).includes('성공보수'), kinds)
   check('앞으로 6달', (await page.getByTestId('money-outlook').locator('li').count()) === 6)
   check('시기 미정: 성공보수 700만(조건 대기)', /700만원/.test(await page.getByTestId('money-undated').innerText()))
+
+  // D-496 매출 직접 적기 — 대표: "매출도 넣게 해 줘야 돼. 비용이랑 정기 결제만 넣게 돼 있네"
+  check('D-496 머리 단추: 매출 적기 · 비용 적기 · 정기 결제 넣기 — 매출 탭에선 매출 적기가 진하게',
+    (await page.getByTestId('income-open').count()) === 1 && /bg-brand-600/.test(await page.getByTestId('income-open').getAttribute('class')) && !/bg-brand-600/.test(await page.getByTestId('expense-open').getAttribute('class')))
+  await page.getByTestId('income-open').click()
+  await page.getByTestId('income-sheet').waitFor()
+  await page.getByTestId('income-amount').fill('110만')
+  check('D-496 금액 읽기: 110만 → 1,100,000원', /1,100,000원/.test(await page.getByTestId('income-amount-read').innerText()), await page.getByTestId('income-amount-read').innerText())
+  await page.getByTestId('income-name').fill('창업 교육 강의료')
+  await page.getByTestId('income-cat-lecture').click()
+  await page.getByTestId('income-client').selectOption('cli_hansol')
+  check('D-496 계약 · 수금이 있는 업체를 고르면 같은 돈 또 적지 말라는 안내', (await page.getByTestId('income-fee-note').count()) === 1)
+  await page.getByTestId('income-client').selectOption('')
+  await page.getByTestId('income-save').click()
+  await page.getByTestId('income-sheet').waitFor({ state: 'detached' })
+  await page.waitForTimeout(300)
+  check('D-496 받은 매출 → 들어온 돈 610만원', /들어온 돈 610만원/.test(await tile(page, 0)), await tile(page, 0))
+  const manual = page.locator('[data-testid="revenue-line"][data-source="manual"]')
+  check('D-496 매출 목록에 직접 적은 줄(강의 · 교육 · 직접 적음 · 입금 완료)', (await manual.count()) === 1 && /창업 교육 강의료/.test(await manual.first().innerText()) && /강의 · 교육 · 직접 적음/.test(await manual.first().innerText()) && /입금 완료/.test(await manual.first().innerText()), await manual.first().innerText())
+  // 받을 예정 → [받았어요] 한 번
+  await page.getByTestId('income-open').click()
+  await page.getByTestId('income-amount').fill('300,000')
+  await page.getByTestId('income-name').fill('자문료')
+  await page.getByTestId('income-expected').click()
+  await page.getByTestId('income-save').click()
+  await page.getByTestId('income-sheet').waitFor({ state: 'detached' })
+  await page.waitForTimeout(300)
+  const t1b = await tile(page, 1)
+  check('D-496 받을 예정 → 들어올 예정에 30만원 더해짐', t1b.includes(`${((expected + 300_000) / 10_000).toLocaleString('ko-KR')}만원`), t1b)
+  check('D-496 받을 예정 줄에 [받았어요] 단추', (await page.getByTestId('income-mark-received').count()) === 1)
+  await page.getByTestId('income-mark-received').click()
+  await page.waitForTimeout(400)
+  check('D-496 [받았어요] → 들어온 돈 640만원 · 단추 사라짐', /들어온 돈 640만원/.test(await tile(page, 0)) && (await page.getByTestId('income-mark-received').count()) === 0, await tile(page, 0))
+  // 고치기 · 지우기(한 번 더 묻기)
+  await manual.filter({ hasText: '자문료' }).getByTestId('income-row').click()
+  await page.getByTestId('income-sheet').waitFor()
+  check('D-496 누르면 매출 고치기 창(적은 값 그대로)', (await page.getByTestId('income-name').inputValue()) === '자문료' && /300,000/.test(await page.getByTestId('income-amount').inputValue()))
+  await page.getByTestId('income-delete').click()
+  await page.getByTestId('income-delete-yes').click()
+  await page.waitForTimeout(400)
+  check('D-496 지우기 → 610만원으로', /들어온 돈 610만원/.test(await tile(page, 0)) && (await manual.count()) === 1, await tile(page, 0))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check('D-496 새로 고쳐도 직접 적은 매출 그대로', (await manual.count()) === 1 && /들어온 돈 610만원/.test(await tile(page, 0)))
 
   // 정기 결제
   await page.getByTestId('sub-open').click()

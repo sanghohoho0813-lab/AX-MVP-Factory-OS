@@ -215,9 +215,54 @@ export function cornerSpot(limit: number, textRight: number, btnW: number): 'mar
   return btnW > 0 && limit - CORNER_GAP - btnW >= textRight + CORNER_GAP ? 'margin' : 'inline'
 }
 
-/** 팝업 창 모양(window.open 세 번째 값) */
+/**
+ * D-494 팝업 창 틀(제목 줄 + 주소 줄 · 좌우 테두리) — window.open 의 width · height 는 '안쪽' 크기라, 틀만큼 창이 더 커져
+ * 작업 표시줄 아래로 넘쳤고 Windows 가 창을 위로 밀어 OS 머리줄(시각 · 김상호 대표)을 덮었다(대표: "위아래를 꽉 채워 매번 손으로 맞춤").
+ * 그래서 안쪽 크기 = 놓을 자리 − 틀. 열자마자(아직 빈 창일 때) resizeTo · moveTo 로 바깥 크기를 한 번 더 맞춘다.
+ */
+export const POPUP_FRAME = { x: 16, y: 72 }
+/** 팝업 창 모양(window.open 세 번째 값) — r 은 바깥(화면) 자리 */
 export function featuresOf(r: Rect): string {
-  return `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`
+  const w = Math.max(200, r.width - POPUP_FRAME.x)
+  const h = Math.max(200, r.height - POPUP_FRAME.y)
+  return `popup=yes,left=${r.left},top=${r.top},width=${w},height=${h}`
+}
+
+/**
+ * D-494 옆 창 왼쪽 끝 배우기 — 다른 사이트 창(ChatGPT 등)은 보안상 OS 가 크기를 읽을 수 없다.
+ * 대신 마우스가 OS ↔ 옆 창 사이를 넘나든 자리가 곧 옆 창 왼쪽 끝이다 — 그 자리로 본문 여백을 맞춘다(크기를 바꾼 뒤 마우스가 넘어오는 순간).
+ * 창 가장자리(위 머리줄 · 아래 · 좌우 끝)로 나간 것, 지금 끝에서 너무 먼 곳(다른 프로그램 창)은 배우지 않는다.
+ * 돌려주는 값: 새 여백(px) · 바꿀 것 없으면 null.
+ */
+export const LEARN_MAX = 480
+export function learnedReserve(p: { x: number; y: number }, vw: number, vh: number, reserve: number, top: number): number | null {
+  if (!(reserve > 0)) return null
+  // 옆 창 제목 줄(닫기 단추 자리 · 위 40px)로 드나든 것은 배우지 않는다 — 닫으려고 누른 뒤 들어온 마우스를 '좁힘' 으로 읽지 않게
+  if (p.y < top + 40 || p.y > vh - 16 || p.x > vw - 30 || p.x < 30) return null
+  const boundary = vw - reserve
+  const d = p.x - boundary
+  if (Math.abs(d) < 8 || Math.abs(d) > LEARN_MAX) return null
+  return Math.max(0, Math.min(Math.round(vw - p.x), Math.round(vw - MIN_MAIN)))
+}
+
+/**
+ * D-495 대표: "옆 창을 안 띄웠는데 갑자기 왼쪽 정렬 · 또 가운데로(매출 · 비용 화면)".
+ * 브라우저 기본 팝업(고르기 칸 목록 · 날짜 고르기 · 자동 완성 · 오른쪽 클릭 메뉴)으로 마우스가 들어가도 이 화면은 '마우스가 나갔다' 로 받는다.
+ * 그 자리가 옆 창 끝 근처면 '옆 창이 다시 보임 · 옆 창 폭이 바뀜' 으로 잘못 읽었다 — 고르기 · 입력 칸에 커서가 있거나 메뉴가 떠 있으면 읽지 않는다.
+ */
+export function formPopupLikely(el: { tagName?: string } | null | undefined, menuOpen: boolean): boolean {
+  if (menuOpen) return true
+  const tag = el?.tagName?.toUpperCase()
+  return tag === 'SELECT' || tag === 'INPUT'
+}
+
+/**
+ * D-495 마우스가 이 화면을 나간 자리 — 빠르게 움직이면 '나감' 이 옆 창 안쪽 좌표로 올 수 있다(그대로 쓰면 본문이 옆 창 밑으로 들어감).
+ * 이 화면이 마지막으로 받은 자리(옆 창이 덮지 않은 곳)가 막 전이면 그것을 쓴다.
+ */
+export function exitPoint(e: { x: number; y: number }, last: { x: number; y: number; t: number } | null, now: number): { x: number; y: number } {
+  if (last && now - last.t <= 200 && Math.abs(last.x - e.x) <= 160 && Math.abs(last.y - e.y) <= 160) return { x: Math.min(last.x, e.x), y: last.y }
+  return e
 }
 
 /* ------------------------------------------------------------------ */
@@ -275,7 +320,13 @@ let openedAt = 0
 /** D-265 옆 창을 놓은 자리(화면 px) */
 let placed: Rect | null = null
 /** D-265 그 자리에 없다고 본 옆 창 — 다시 그 자리에 보이면 비켜 준다(연결이 끊긴 창은 닫혔는지 몰라 남겨 둔다) */
-let parked: { rect: Rect; label: string; cut: boolean } | null = null
+let parked: { rect: Rect; label: string; cut: boolean; at: number } | null = null
+/**
+ * D-494 대표: "옆 창을 안 띄웠는데 갑자기 왼쪽 정렬 · 또 가운데로 — 기준 없이 움직이지 않게".
+ * 끊긴 창(ChatGPT 등)은 닫혀도 OS 가 몰라 '숨은 창' 으로 계속 기억했고, 한참 뒤 마우스가 그 끝 근처로 나가기만 해도 다시 비켜 줬다.
+ * 이제 숨은 창 기억은 이만큼만 — 그 뒤로는 저절로 움직이지 않고, 머리줄 단추로만 다시 비킨다.
+ */
+export const PARK_MS = 90_000
 
 function savePrefs() {
   try {
@@ -337,7 +388,7 @@ function startWatch() {
 
 /** D-265 옆 창이 그 자리에 없다 → 가운데로(단추도 '옆에 띄우기' 로) */
 function sideAway() {
-  parked = placed ? { rect: placed, label: state.at, cut: state.cut } : null
+  parked = placed ? { rect: placed, label: state.at, cut: state.cut, at: Date.now() } : null
   set({ open: false, reserve: 0, cut: false })
 }
 
@@ -346,6 +397,7 @@ function sideBack() {
   const p = parked
   if (!p) return
   parked = null
+  if (Date.now() - p.at > PARK_MS) return
   if (!p.cut && (!sideWin || sideWin.closed)) return
   set({ open: true, reserve: reserveFor(window, p.rect), at: p.label, cut: p.cut })
 }
@@ -375,18 +427,24 @@ export function addressLabel(url: string): string {
 /** D-258 판에서도 — 막는 사이트를 같은 옆 창으로 */
 export function openInSide(url: string, label: string): boolean {
   const side = sideRect()
-  const w = window.open(url, SIDE_WIN_NAME, featuresOf(side))
+  // D-494 먼저 빈 창(같은 출처)으로 열어 바깥 크기 · 자리를 맞춘 뒤 그 주소로 — 다른 사이트로 넘어간 뒤에는 옮기기 · 크기 바꾸기가 막힌다
+  let w = window.open('about:blank', SIDE_WIN_NAME, featuresOf(side))
   if (!w) {
     set({ blocked: true })
     return false
   }
-  sideWin = w
   try {
     w.moveTo(side.left, side.top)
     w.resizeTo(side.width, side.height)
   } catch {
-    /* 다른 사이트 창 — 옮기기가 막혀도 연 자리 그대로 */
+    /* 이미 다른 사이트에 가 있는 같은 이름 창 — 크기는 그대로 두고 주소만 */
   }
+  try {
+    w.location.replace(url)
+  } catch {
+    w = window.open(url, SIDE_WIN_NAME, featuresOf(side)) ?? w
+  }
+  sideWin = w
   try {
     w.focus()
   } catch {
@@ -454,10 +512,21 @@ if (typeof window !== 'undefined') {
   }
   window.addEventListener('pointermove', seen, { capture: true, passive: true })
   window.addEventListener('pointerdown', seen, { capture: true, passive: true })
+  // D-495 마지막으로 받은 마우스 자리 · 오른쪽 클릭 메뉴가 떠 있는지(다음 누름 · 키까지)
+  let lastMove: { x: number; y: number; t: number } | null = null
+  let menuOpen = false
+  window.addEventListener('pointermove', (e) => { lastMove = { x: e.clientX, y: e.clientY, t: Date.now() } }, { capture: true, passive: true })
+  window.addEventListener('contextmenu', () => { menuOpen = true }, { capture: true, passive: true })
+  const menuGone = () => { menuOpen = false }
+  window.addEventListener('pointerdown', menuGone, { capture: true, passive: true })
+  window.addEventListener('keydown', menuGone, { capture: true, passive: true })
+  window.addEventListener('blur', menuGone)
+  const popupNow = () => formPopupLikely(document.activeElement, menuOpen)
   // 옆 창 왼쪽 끝 근처에서 마우스가 이 화면을 나가거나 들어옴 → 그 창이 다시 보인다(이 화면 안 다른 칸 · 판 안 사이트로 옮긴 것은 빼고)
   const edge = (e: MouseEvent) => {
     if (e.relatedTarget || state.open || !parked) return
-    const p = { x: e.clientX, y: e.clientY }
+    if (popupNow()) return
+    const p = e.type === 'mouseout' ? exitPoint({ x: e.clientX, y: e.clientY }, lastMove, Date.now()) : { x: e.clientX, y: e.clientY }
     const nearFrame = Array.from(document.querySelectorAll('iframe')).some((f) => {
       const r = f.getBoundingClientRect()
       return p.x >= r.left - 12 && p.x <= r.right + 12 && p.y >= r.top - 12 && p.y <= r.bottom + 12
@@ -467,6 +536,26 @@ if (typeof window !== 'undefined') {
   }
   document.addEventListener('mouseout', edge)
   document.addEventListener('mouseover', edge)
+  // D-494 옆 창 크기를 바꾼 뒤 마우스가 넘어오면 그 자리로 본문 여백을 맞춘다(겹치지 않게 · 안 비게)
+  const learn = (e: MouseEvent) => {
+    if (e.relatedTarget || !state.open || !state.reserve || !placed) return
+    if (Date.now() - openedAt < SETTLE_MS) return
+    if (popupNow()) return
+    const p = e.type === 'mouseout' ? exitPoint({ x: e.clientX, y: e.clientY }, lastMove, Date.now()) : { x: e.clientX, y: e.clientY }
+    const nearFrame = Array.from(document.querySelectorAll('iframe')).some((f) => {
+      const r = f.getBoundingClientRect()
+      return p.x >= r.left - 12 && p.x <= r.right + 12 && p.y >= r.top - 12 && p.y <= r.bottom + 12
+    })
+    if (nearFrame) return
+    const next = learnedReserve(p, window.innerWidth, window.innerHeight, state.reserve, headerBottom())
+    if (next === null) return
+    const z = zoomOf(window)
+    const shift = Math.round((state.reserve - next) * z)
+    placed = { ...placed, left: placed.left + shift, width: Math.max(MIN_SIDE, placed.width - shift) }
+    set({ reserve: next })
+  }
+  document.addEventListener('mouseout', learn, { capture: true })
+  document.addEventListener('mouseover', learn, { capture: true })
 }
 
 function subscribe(l: () => void): () => void {

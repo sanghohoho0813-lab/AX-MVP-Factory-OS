@@ -20,6 +20,7 @@ import {
   moneyText,
   nextCharge,
   normalizeExpense,
+  normalizeIncome,
   normalizeSettings,
   normalizeSubscription,
   outlook,
@@ -209,6 +210,22 @@ const recs = [
   check('D211 처음 정한 환율은 지난 달에도 그 환율(예전: 9월은 1,400 가정 그대로)', rateFor(first, '2026-09') === 1380 && rateFor(first, '2026-10') === 1380 && first.rateSet === true, JSON.stringify(first))
   const second = withRate(first, 1450, '2026-11')
   check('D211 그 뒤에 바꾸면 그 달부터(10월 1,380 · 11월 1,450)', rateFor(second, '2026-10') === 1380 && rateFor(second, '2026-11') === 1450)
+}
+
+// D-496 직접 적는 매출 — 받았어요 · 받을 예정 · 미수금(계약 수금과 같은 규칙)
+{
+  const T = '2026-10-15'
+  const inc = (id: string, date: string, amount: number, received: boolean) => normalizeIncome({ date, name: id, category: 'lecture', amount, received }, id, '2026-10-01T00:00:00Z')!
+  const list = [inc('강의', '2026-10-03', 1_100_000, true), inc('자문', '2026-10-20', 300_000, false), inc('밀린', '2026-09-28', 200_000, false), inc('지난달 받은', '2026-09-10', 500_000, true)]
+  const oct = revenueInMonth([], '2026-10', T, list)
+  check('D-496 10월: 받은 110만 → 들어온 돈 · 20일 받을 30만 → 예정 · 9월에 못 받은 20만 → 이번 달 미수금', oct.received === 1_100_000 && oct.expected === 500_000 && oct.overdue === 200_000, JSON.stringify(oct))
+  check('D-496 직접 적은 줄 표시(source manual · incomeId)', oct.lines.every((l) => l.source === 'manual' && !!l.incomeId) && oct.lines[0].kind === 'received')
+  const sep = revenueInMonth([], '2026-09', T, list)
+  check('D-496 9월 화면: 받은 50만 · 못 받고 지난 20만', sep.received === 500_000 && sep.overdue === 200_000 && sep.expected === 0, JSON.stringify(sep))
+  const sum = monthSummary({ records: [], subscriptions: [], expenses: [], settings: DEFAULT_SETTINGS, incomes: list }, '2026-10', T)
+  check('D-496 한 달 요약에 들어감(남는 돈 예상 = 110만 + 50만)', sum.netExpected === 1_600_000, sum.netExpected)
+  check('D-496 다듬기: 금액 · 날짜 없으면 버림 · 받았는지 빠지면 받은 것으로 · 모르는 분류는 기타', normalizeIncome({ date: '2026-10-01' }, 'x', T) === null && normalizeIncome({ amount: 1000 }, 'y', T) === null && normalizeIncome({ date: '2026-10-01', amount: 1000 }, 'z', T)?.received === true && normalizeIncome({ date: '2026-10-01', amount: 1000, category: 'xx' }, 'w', T)?.category === 'etc')
+  check('D-496 예전처럼 부르면(직접 적은 매출 없이) 그대로', revenueInMonth([], '2026-10', T).lines.length === 0)
 }
 
 console.log(`\nfinance: ${pass} passed, ${fail} failed`)

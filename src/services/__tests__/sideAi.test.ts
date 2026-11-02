@@ -4,7 +4,7 @@
  * D-258 OS 안 오른쪽 판 — 안에 띄울 수 있는 곳 · Google igu · 놓는 법(붙이기 · 덮기 · 없음) · 기억 · 대화 기록.
  * D-261 옆 창 자리(이 OS 창 안 · 머리줄 아래) · 연결을 끊는 곳(ChatGPT 등)을 닫힘으로 오해하지 않기.
  */
-import { SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, atSideEdge, cornerSpot, cutsOpener, featuresOf, inVacated, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
+import { PARK_MS, SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, atSideEdge, cornerSpot, cutsOpener, exitPoint, featuresOf, formPopupLikely, inVacated, learnedReserve, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
 import { NAV_ICONS, NAV_MAX, NAV_MIN, navMaxFor, navPx, parseNavSize, sizeAtDrag, stepNav, type NavSize } from '../../lib/navWidth'
 import { DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockChatContext, dockLayout, frameUrlOf, parseDock, parseDockChat } from '../../lib/sideDock'
 
@@ -43,7 +43,8 @@ const FHD = { left: 0, top: 0, width: 1920, height: 1040 }
   const tiny = reserveFor({ screenX: 700, outerWidth: 1000, innerWidth: 1000 }, sideLayout(FHD, 'half').side)
   check('S8 본문이 640px 아래로 좁아지게는 안 비킴', tiny === 360, tiny)
 }
-check('S9 창 모양 글 — popup · 자리 · 크기', featuresOf({ left: 1152, top: 0, width: 768, height: 1040 }) === 'popup=yes,left=1152,top=0,width=768,height=1040')
+// D-494 width · height 는 안쪽 크기 — 창 틀(좌우 16 · 위 72)만큼 빼야 바깥이 놓을 자리에 딱 맞는다(작업 표시줄 아래로 넘쳐 위로 밀리지 않게)
+check('S9 창 모양 글 — popup · 자리 · 안쪽 크기 = 자리 − 창 틀', featuresOf({ left: 1152, top: 0, width: 768, height: 1040 }) === 'popup=yes,left=1152,top=0,width=752,height=968')
 check('S10 기억한 설정 — 모르는 값 · 깨진 글은 기본(ChatGPT · 보통)', parsePrefs('{"service":"claude","width":"half"}').service === 'claude' && parsePrefs('{"service":"x","width":"y"}').service === 'chatgpt' && parsePrefs('{"service":"x","width":"y"}').width === 'twofifths' && parsePrefs('not json').width === 'twofifths' && parsePrefs(null).service === 'chatgpt')
 check('S11 서비스 주소 — https 공식 주소만 · 넷(구글 포함)', Object.values(SIDE_SERVICES).length === 4 && Object.values(SIDE_SERVICES).every((s) => /^https:\/\/(chatgpt\.com|claude\.ai|gemini\.google\.com|www\.google\.com)\//.test(s.url)))
 
@@ -149,6 +150,29 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   // 단추 자리 — 1920 · 메뉴 288 · 본문 1280(안쪽 여백 56) · 스크롤 막대 15: 쓸 수 있는 끝 1905 · 본문 글 끝 1681 · 단추 194
   check('V5 단추 자리 — 1920 은 오른쪽 여백(194px 이 양쪽 12px 띄우고 들어감) · 1440 은 맨 위 줄 · 단추 폭을 못 재면 맨 위 줄',
     cornerSpot(1905, 1681, 194) === 'margin' && cornerSpot(1425, 1385, 194) === 'inline' && cornerSpot(1905, 1681, 0) === 'inline' && cornerSpot(1905, 1681, 201) === 'inline')
+}
+
+// D-494 옆 창 왼쪽 끝 배우기 — 마우스가 넘나든 자리로 본문 여백을 맞춤(1920 창 · 여백 768 · 머리줄 64)
+{
+  const vw = 1920, vh = 1040, top = 64
+  check('D-494 옆 창을 넓힘 → 왼쪽으로 넘어온 자리(1000)로 여백 920', learnedReserve({ x: 1000, y: 500 }, vw, vh, 768, top) === 920)
+  check('D-494 옆 창을 좁힘 → 넘어온 자리(1300)로 여백 620', learnedReserve({ x: 1300, y: 500 }, vw, vh, 768, top) === 620)
+  check('D-494 지금 끝 근처(8px 안)는 그대로', learnedReserve({ x: 1155, y: 500 }, vw, vh, 768, top) === null)
+  check('D-494 머리줄 · 아래 끝 · 오른쪽 끝으로 나간 것은 배우지 않음', learnedReserve({ x: 1000, y: 70 }, vw, vh, 768, top) === null && learnedReserve({ x: 1000, y: 1030 }, vw, vh, 768, top) === null && learnedReserve({ x: 1900, y: 500 }, vw, vh, 768, top) === null)
+  check('D-494 지금 끝에서 너무 먼 곳(다른 프로그램 창)은 배우지 않음', learnedReserve({ x: 400, y: 500 }, vw, vh, 768, top) === null)
+  check('D-494 본문이 640 보다 좁아지게는 비키지 않음', learnedReserve({ x: 500, y: 500 }, 1200, vh, 450, top) === 560)
+  check('D-494 옆 창이 없으면(여백 0) 배우지 않음', learnedReserve({ x: 1000, y: 500 }, vw, vh, 0, top) === null)
+}
+
+// D-495 옆 창을 안 띄웠는데 왼쪽으로 쏠림 — 브라우저 기본 팝업 · 오래된 숨은 창 · 빠른 마우스
+{
+  check('D-495 고르기 칸 · 입력 칸에 커서(목록 · 날짜 · 자동 완성 팝업)면 옆 창 끝으로 읽지 않음',
+    formPopupLikely({ tagName: 'SELECT' }, false) && formPopupLikely({ tagName: 'input' }, false) && formPopupLikely({ tagName: 'BODY' }, true))
+  check('D-495 그 밖(본문 · 단추 · 글 상자)은 읽음', !formPopupLikely({ tagName: 'BODY' }, false) && !formPopupLikely({ tagName: 'BUTTON' }, false) && !formPopupLikely({ tagName: 'TEXTAREA' }, false) && !formPopupLikely(null, false))
+  check('D-495 숨은 창 기억은 1분 반까지(그 뒤로는 저절로 비키지 않음)', PARK_MS === 90_000)
+  const now = 10_000
+  check('D-495 빠르게 나가면 마지막으로 받은 자리(옆 창이 덮지 않은 곳)를 씀', JSON.stringify(exitPoint({ x: 1190, y: 500 }, { x: 1150, y: 498, t: now - 16 }, now)) === JSON.stringify({ x: 1150, y: 498 }))
+  check('D-495 오래된 자리 · 먼 자리는 쓰지 않음', exitPoint({ x: 1190, y: 500 }, { x: 1150, y: 498, t: now - 900 }, now).x === 1190 && exitPoint({ x: 1190, y: 500 }, { x: 700, y: 498, t: now - 16 }, now).x === 1190 && exitPoint({ x: 1190, y: 500 }, null, now).x === 1190)
 }
 
 console.log(`\nsideAi: ${pass} passed, ${fail} failed`)

@@ -4,6 +4,7 @@
  * 대표: "계약하면 받을 돈을 적어 두잖아 — 그걸 예상 매출로. 매월 AI 비용 등 며칠에 결제되는지, 자잘한 사업 비용을 한곳에 모으고 싶다."
  *
  *  매출  계약 수금 항목에서 바로 계산한다(따로 적지 않는다 — 두 벌이 되지 않게).
+ *        D-496 대표: "매출도 넣게 해 줘야 돼 — 비용이랑 정기 결제만 넣게 돼 있네". 계약 밖 매출(강의료 · 일회성 수수료 등)은 직접 적는다(Income).
  *        입금 완료일이 그 달이면 '들어온 돈(실매출)', 받기로 한 날이 그 달이면 '들어올 예정(예상 매출)'.
  *        조건 대기(정책자금 조달 후 등)는 달에 넣지 않고 '시기 미정' 으로 따로 — D-140 과 같은 규칙.
  *        이번 달에는 날짜 지난 미수금 · 지금 청구할 수 있는 돈도 '들어올 예정' 에 넣는다(받아야 할 돈이므로).
@@ -100,6 +101,35 @@ export interface FinanceSettings {
 }
 
 export const DEFAULT_SETTINGS: FinanceSettings = { usdKrw: 1400, rateSet: false }
+
+/** D-496 직접 적는 매출의 분류 */
+export type IncomeCategory = 'consulting' | 'lecture' | 'commission' | 'grant' | 'etc'
+export const INCOME_CATEGORY_ORDER: IncomeCategory[] = ['consulting', 'lecture', 'commission', 'grant', 'etc']
+export const INCOME_CATEGORY_LABEL: Record<IncomeCategory, string> = {
+  consulting: '컨설팅',
+  lecture: '강의 · 교육',
+  commission: '수수료 · 중개',
+  grant: '지원금 · 보조금',
+  etc: '기타',
+}
+
+/**
+ * D-496 계약 밖 매출 — 직접 적는 들어온 돈(또는 들어올 돈). 원으로만.
+ * 받았으면 date = 받은 날, 아직이면 date = 받기로 한 날(지나면 미수금).
+ */
+export interface Income {
+  id: string
+  date: string
+  name: string
+  category: IncomeCategory
+  amount: number
+  received: boolean
+  /** 어느 업체 돈인가(없으면 '') */
+  clientId: string
+  memo: string
+  createdAt: string
+  updatedAt: string
+}
 
 /** 자주 쓰는 정기 결제 — 이름 · 분류 · 통화만. 금액은 사람이 적는다(요금은 자주 바뀐다) */
 export const SUBSCRIPTION_PRESETS: { name: string; category: CostCategory; currency: Currency }[] = [
@@ -232,6 +262,10 @@ export function monthlyEquivalent(s: Subscription, settings: FinanceSettings): n
 export type RevenueKind = 'received' | 'expected' | 'overdue'
 
 export interface RevenueLine {
+  /** D-496 어디서 왔나 — 계약 수금(fee) · 직접 적은 매출(manual). 없으면 fee */
+  source?: 'fee' | 'manual'
+  /** D-496 직접 적은 매출이면 그 id */
+  incomeId?: string
   clientId: string
   clientName: string
   feeId: string
@@ -253,10 +287,23 @@ export interface MonthRevenue {
 
 const amountOf = (f: FeeItem) => (typeof f.amount === 'number' && Number.isFinite(f.amount) && f.amount > 0 ? f.amount : 0)
 
-/** 그 달의 매출 — 들어온 돈 · 들어올 예정 */
-export function revenueInMonth(records: readonly ClientOpsRecord[], ym: string, today: string): MonthRevenue {
+/** 그 달의 매출 — 들어온 돈 · 들어올 예정 (D-496 직접 적은 매출 포함) */
+export function revenueInMonth(records: readonly ClientOpsRecord[], ym: string, today: string, incomes: readonly Income[] = []): MonthRevenue {
   const lines: RevenueLine[] = []
   const isThisMonth = ym === ymOf(today)
+  const nameOf = new Map(records.map((r) => [r.id, r.companyName]))
+  for (const inc of incomes) {
+    if (!(inc.amount > 0) || !isYmd(inc.date)) continue
+    const base = { source: 'manual' as const, incomeId: inc.id, clientId: inc.clientId, clientName: nameOf.get(inc.clientId) ?? '', feeId: `inc:${inc.id}`, label: inc.name, amount: inc.amount, date: inc.date }
+    if (inc.received) {
+      if (ymOf(inc.date) === ym) lines.push({ ...base, kind: 'received' })
+      continue
+    }
+    // 아직 못 받은 돈 — 계약 수금과 같은 규칙(그 달 받을 날 → 예정 · 이번 달엔 밀린 것 전부 미수금 · 지난 달엔 그 달 것만)
+    if (ymOf(inc.date) === ym && inc.date >= today) lines.push({ ...base, kind: 'expected' })
+    else if (isThisMonth && inc.date < today) lines.push({ ...base, kind: 'overdue' })
+    else if (!isThisMonth && ym < ymOf(today) && ymOf(inc.date) === ym) lines.push({ ...base, kind: 'overdue' })
+  }
   for (const r of records) {
     const funding = fundingFactsOf(r.fundingApplications)
     for (const f of r.fees) {
@@ -278,7 +325,7 @@ export function revenueInMonth(records: readonly ClientOpsRecord[], ym: string, 
       else if (isThisMonth && st === 'claimable' && !due) lines.push({ ...base, kind: 'expected', date: '' })
     }
   }
-  lines.sort((a, b) => (a.kind === 'received' ? 0 : 1) - (b.kind === 'received' ? 0 : 1) || (a.date || '9').localeCompare(b.date || '9') || a.clientName.localeCompare(b.clientName))
+  lines.sort((a, b) => (a.kind === 'received' ? 0 : 1) - (b.kind === 'received' ? 0 : 1) || (a.date || '9').localeCompare(b.date || '9') || (a.clientName || a.label).localeCompare(b.clientName || b.label))
   const sum = (k: RevenueKind[]) => lines.filter((l) => k.includes(l.kind)).reduce((s, l) => s + l.amount, 0)
   // 지난 달의 못 받은 돈은 '예정' 이 아니다(이미 지났다) — overdue 로만 센다
   return { ym, received: sum(['received']), expected: isThisMonth ? sum(['expected', 'overdue']) : sum(['expected']), overdue: sum(['overdue']), lines }
@@ -414,18 +461,18 @@ export interface MonthSummary {
 }
 
 export function monthSummary(
-  input: { records: readonly ClientOpsRecord[]; subscriptions: readonly Subscription[]; expenses: readonly Expense[]; settings: FinanceSettings },
+  input: { records: readonly ClientOpsRecord[]; subscriptions: readonly Subscription[]; expenses: readonly Expense[]; settings: FinanceSettings; incomes?: readonly Income[] },
   ym: string,
   today: string,
 ): MonthSummary {
-  const revenue = revenueInMonth(input.records, ym, today)
+  const revenue = revenueInMonth(input.records, ym, today, input.incomes ?? [])
   const cost = costInMonth(input, ym)
   return { ym, revenue, cost, netSoFar: revenue.received - cost.total, netExpected: revenue.received + revenue.expected - cost.total }
 }
 
 /** 이번 달부터 n달 — 예상 매출 흐름 */
 export function outlook(
-  input: { records: readonly ClientOpsRecord[]; subscriptions: readonly Subscription[]; expenses: readonly Expense[]; settings: FinanceSettings },
+  input: { records: readonly ClientOpsRecord[]; subscriptions: readonly Subscription[]; expenses: readonly Expense[]; settings: FinanceSettings; incomes?: readonly Income[] },
   today: string,
   n = 6,
 ): MonthSummary[] {
@@ -491,6 +538,26 @@ export function normalizeExpense(raw: unknown, id: string, now: string): Expense
     memo: str(r.memo, 300),
     clientId: str(r.clientId, 80),
     ...(cur(r.currency) === 'USD' && typeof r.usdKrw === 'number' && r.usdKrw >= 100 && r.usdKrw <= 10_000 ? { usdKrw: r.usdKrw } : {}),
+    createdAt: str(r.createdAt, 40) || now,
+    updatedAt: str(r.updatedAt, 40) || now,
+  }
+}
+
+/** D-496 직접 적는 매출 다듬기 — 금액 · 날짜가 없으면 버린다 */
+export function normalizeIncome(raw: unknown, id: string, now: string): Income | null {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const amount = posNum(r.amount)
+  if (!amount || !isYmd(r.date)) return null
+  const category: IncomeCategory = INCOME_CATEGORY_ORDER.includes(r.category as IncomeCategory) ? (r.category as IncomeCategory) : 'etc'
+  return {
+    id,
+    date: r.date as string,
+    name: str(r.name, 80) || INCOME_CATEGORY_LABEL[category],
+    category,
+    amount: Math.round(amount),
+    received: r.received !== false,
+    clientId: str(r.clientId, 80),
+    memo: str(r.memo, 300),
     createdAt: str(r.createdAt, 40) || now,
     updatedAt: str(r.updatedAt, 40) || now,
   }

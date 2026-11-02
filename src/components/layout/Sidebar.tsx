@@ -1,8 +1,9 @@
 import type { FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { MAIN_MIN, NAV_MIN, navMaxFor, navPx, setNavSize, showNav, sizeAtDrag, stepNav, toggleNavIcons, useNavSize, type NavSize } from '../../lib/navWidth'
+import { useSideAi } from '../../lib/sideAi'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, X, type LucideIcon } from 'lucide-react'
@@ -295,7 +296,13 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   // D-124: 서랍 메뉴가 열렸을 때 휴대폰 뒤로가기는 서랍만 닫는다
   useBackToClose(mobileOpen, onCloseMobile)
   // D-256 메뉴 폭 — 넓게(끈 폭) · 아이콘 · 숨김. 끈 적 없으면 예전 폭(256 · 큰 화면 288) 그대로
-  const nav = useNavSize()
+  const saved = useNavSize()
+  // D-494 옆 창(ChatGPT 등)이 본문을 비켜 세워 본문이 너무 좁아지면 메뉴를 잠시 아이콘으로(저장한 설정은 그대로 · 넓어지면 돌아옴)
+  const side = useSideAi()
+  const vw = useViewportWidth()
+  const fullPx = navPx(saved) ?? (vw >= 1280 ? 288 : 256)
+  const squeezed = saved.mode === 'full' && side.reserve > 0 && vw - side.reserve - fullPx < MAIN_MIN
+  const nav: NavSize = squeezed ? { mode: 'icons', width: saved.width } : saved
   const px = navPx(nav)
   const [dragging, setDragging] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
@@ -306,6 +313,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
         // 큰 화면에서 넓혀 둔 폭도 좁은 화면에서는 본문 768px 을 남기고 줄여 보인다
         style={{ ...(px == null ? {} : { width: px }), ...(nav.mode === 'full' ? { maxWidth: `max(${NAV_MIN}px, calc(100vw - ${MAIN_MIN}px))` } : {}) }}
         data-nav-mode={nav.mode}
+        data-nav-squeezed={squeezed ? '1' : undefined}
         className={`no-print sticky top-0 z-30 hidden h-screen shrink-0 lg:block ${dragging ? '' : 'transition-[width] duration-200'} ${px == null ? 'w-64 xl:w-72' : ''}`}
       >
         {nav.mode !== 'hidden' && <SidebarContent collapsed={nav.mode === 'icons'} onToggleCollapsed={toggleNavIcons} />}
@@ -679,4 +687,13 @@ function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition[
       {text}
     </span>
   )
+}
+
+/** D-494 지금 창 안쪽 폭(창 크기를 바꾸면 따라감) */
+function subscribeWidth(l: () => void) {
+  window.addEventListener('resize', l)
+  return () => window.removeEventListener('resize', l)
+}
+function useViewportWidth(): number {
+  return useSyncExternalStore(subscribeWidth, () => window.innerWidth, () => 1440)
 }

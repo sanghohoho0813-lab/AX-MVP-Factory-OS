@@ -131,7 +131,7 @@ export function AppShell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* D-261 오른쪽 판(--dock-w) · 옆 창(reserve)은 머리줄(시각 · 찾기) 아래에만 놓인다 — 머리줄은 그대로, 본문만 그만큼 비킨다 */}
-          <div className="flex min-w-0 flex-1 flex-col lg:pr-(--dock-w)" style={sideAi.reserve ? { paddingRight: `calc(${sideAi.reserve}px + var(--dock-w, 0px))` } : undefined} data-side-reserve={sideAi.reserve || undefined}>
+          <div className="flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-out motion-reduce:transition-none lg:pr-(--dock-w)" style={sideAi.reserve ? { paddingRight: `calc(${sideAi.reserve}px + var(--dock-w, 0px))` } : undefined} data-side-reserve={sideAi.reserve || undefined}>
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
           {/* pb-safe-nav: 하단 내비게이션과 iOS 홈 인디케이터가 본문 마지막 줄을 가리지 않게 한다 */}
           {/* D-201: PC 본문 폭 — 머리줄 [폭] 단추로 좁게 · 보통(기본) · 넓게. 화면이 더 좁으면 바뀌는 것 없음 */}

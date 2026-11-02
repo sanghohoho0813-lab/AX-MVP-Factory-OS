@@ -1,5 +1,5 @@
 /**
- * 매출 · 비용 — 비용 적기 · 정기 결제 · 환율 창 (D-142).
+ * 매출 · 비용 — 매출 적기(D-496) · 비용 적기 · 정기 결제 · 환율 창 (D-142).
  * 금액은 '2.8만' · '$20' 처럼 말하듯 적어도 읽는다. 분류 · 결제 수단 · 날짜는 누르기로.
  */
 import { useMemo, useState, type ReactNode } from 'react'
@@ -10,6 +10,8 @@ import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import {
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
+  INCOME_CATEGORY_LABEL,
+  INCOME_CATEGORY_ORDER,
   PAY_METHOD_LABEL,
   SUBSCRIPTION_PRESETS,
   moneyText,
@@ -20,6 +22,8 @@ import {
   type Cycle,
   type Expense,
   type FinanceSettings,
+  type Income,
+  type IncomeCategory,
   type PayMethod,
   type Subscription,
 } from '../../services/finance/financeCore'
@@ -79,6 +83,148 @@ function AmountField({ text, onText, currency, onCurrency, settings, testid }: {
 
 function readAmount(text: string, currency: Currency) {
   return parseAmount(currency === 'USD' && text && !/^\$/.test(text) ? `$${text}` : text)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-496 매출 적기 — 계약 밖 매출(강의료 · 일회성 수수료 등)                  */
+/* ------------------------------------------------------------------ */
+
+export type IncomeInput = Omit<Income, 'id' | 'createdAt' | 'updatedAt'>
+
+export function IncomeSheet({
+  initial,
+  today,
+  clients,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  initial?: Income
+  today: string
+  /** hasFees = 그 업체 계약 · 수금에 금액이 적혀 있음(같은 돈을 또 적지 않게 알림) */
+  clients: { id: string; name: string; hasFees: boolean }[]
+  onSave: (v: IncomeInput) => Promise<void>
+  onDelete?: () => Promise<void>
+  onClose: () => void
+}) {
+  const [amountText, setAmountText] = useState(initial ? initial.amount.toLocaleString('ko-KR') : '')
+  const [name, setName] = useState(initial?.name ?? '')
+  const [category, setCategory] = useState<IncomeCategory>(initial?.category ?? 'consulting')
+  const [received, setReceived] = useState(initial?.received ?? true)
+  const [date, setDate] = useState(initial?.date ?? today)
+  const [clientId, setClientId] = useState(initial?.clientId ?? '')
+  const [memo, setMemo] = useState(initial?.memo ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [confirmDel, setConfirmDel] = useState(false)
+  const parsed = parseAmount(amountText)
+  const won = parsed && parsed.currency === 'KRW' ? parsed.amount : null
+  const picked = clients.find((c) => c.id === clientId)
+
+  const save = async () => {
+    if (!won) return setError('금액을 원으로 적어 주세요.')
+    setBusy(true)
+    setError('')
+    try {
+      await onSave({ amount: won, name: name.trim(), category, received, date, clientId, memo: memo.trim() })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <BottomSheet
+      title={initial ? '매출 고치기' : '매출 적기'}
+      onClose={onClose}
+      footer={
+        <Button variant="primary" className="w-full" onClick={() => void save()} disabled={busy} data-testid="income-save">
+          {busy ? '저장 중…' : '저장'}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-4" data-testid="income-sheet">
+        {!initial && <p className="t-sub text-slate-500">업체 계약 · 수금에 적은 돈은 저절로 매출에 들어와요. 여기는 그 밖의 매출(강의료 · 일회성 수수료 등)을 적는 곳이에요.</p>}
+        <Row label="금액(원)">
+          <input id="income-amount" data-testid="income-amount" value={amountText} onChange={(e) => setAmountText(e.target.value)} inputMode="decimal" placeholder="1,100,000 · 110만" className={`${inputCls} t-section font-semibold tabular-nums`} />
+          <span className="t-sub text-slate-500" data-testid="income-amount-read">
+            {amountText.trim() === '' ? ' ' : won ? `${won.toLocaleString('ko-KR')}원` : '금액을 읽지 못했어요 — 원으로 적어 주세요'}
+          </span>
+        </Row>
+        <Row label="무슨 돈인가요">
+          <input id="income-name" data-testid="income-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 창업 교육 강의료 · 정책자금 성공 보수" className={inputCls} />
+        </Row>
+        <Row label="분류">
+          <div className="flex flex-wrap gap-1.5">
+            {INCOME_CATEGORY_ORDER.map((c) => (
+              <Chip key={c} on={category === c} onClick={() => setCategory(c)} testid={`income-cat-${c}`}>
+                {INCOME_CATEGORY_LABEL[c]}
+              </Chip>
+            ))}
+          </div>
+        </Row>
+        <Row label="받았나요">
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="받았나요">
+            <Chip on={received} onClick={() => setReceived(true)} testid="income-received">
+              받았어요
+            </Chip>
+            <Chip on={!received} onClick={() => setReceived(false)} testid="income-expected">
+              받을 예정
+            </Chip>
+          </div>
+        </Row>
+        <Row label={received ? '받은 날' : '받기로 한 날'}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip on={date === today} onClick={() => setDate(today)}>
+              오늘
+            </Chip>
+            <input type="date" id="income-date" data-testid="income-date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className={`${inputCls} w-auto`} />
+          </div>
+        </Row>
+        {clients.length > 0 && (
+          <Row label="어느 업체 돈인가요(선택)">
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={inputCls} data-testid="income-client">
+              <option value="">업체와 상관없음</option>
+              <ClientPickerOptions clients={clients.map((c) => ({ id: c.id, companyName: c.name }))} />
+            </select>
+            {picked?.hasFees && (
+              <span className="t-sub text-warning-700" data-testid="income-fee-note">
+                이 업체 계약 · 수금에 적은 돈은 이미 매출에 들어 있어요 — 같은 돈을 또 적지 마세요.
+              </span>
+            )}
+          </Row>
+        )}
+        <Row label="메모(선택)">
+          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
+        </Row>
+        {error && (
+          <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">
+            {error}
+          </p>
+        )}
+        {initial && onDelete && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+            {confirmDel ? (
+              <>
+                <span className="t-sub text-danger-700">이 매출을 지울까요?</span>
+                <Button size="sm" variant="danger" onClick={() => void onDelete()} data-testid="income-delete-yes">
+                  네, 지우기
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDel(false)}>
+                  아니요
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDel(true)} data-testid="income-delete">
+                지우기
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </BottomSheet>
+  )
 }
 
 /* ------------------------------------------------------------------ */

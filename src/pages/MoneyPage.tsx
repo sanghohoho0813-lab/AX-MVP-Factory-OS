@@ -3,6 +3,7 @@
  *
  *  위: 달 넘기기 · 네 숫자(들어온 돈 · 들어올 예정 · 나간 돈 · 남는 돈)
  *  매출 탭    계약 수금 항목에서 자동 — 그 달 입금 · 받을 예정 · 미수금, 앞으로 6달, 시기 미정 예상 매출
+ *             + D-496 계약 밖 매출은 [매출 적기]로 직접(받았어요 · 받을 예정)
  *  비용 탭    그 달 쓴 돈 + 정기 결제 + 영업자 수수료 · 분류별 · 엑셀(CSV)
  *  정기 결제  매월/해마다 며칠 · 다음 결제일 · 한 달 · 1년 합계 · 달러 환율
  */
@@ -10,19 +11,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AiAssist } from '../components/ai/AiAssist'
 import { moneyBundle } from '../services/aiAssist/builders'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Plus, Repeat } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Download, Plus, Repeat } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
 import { Blank, MetricTile, ScreenTitle, Section } from '../components/ui/primitives'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
-import { ExpenseSheet, RateSheet, SubscriptionSheet } from '../components/money/MoneySheets'
+import { ExpenseSheet, IncomeSheet, RateSheet, SubscriptionSheet } from '../components/money/MoneySheets'
 import { listClients } from '../services/clientOpsService'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import {
   COST_CATEGORY_LABEL,
   DEFAULT_SETTINGS,
+  INCOME_CATEGORY_LABEL,
   PAY_METHOD_LABEL,
   addMonths,
   costCsv,
@@ -39,11 +41,12 @@ import {
   ymOf,
   type Expense,
   type FinanceSettings,
+  type Income,
   type PayMethod,
   type Subscription,
   withRate,
 } from '../services/finance/financeCore'
-import { listExpenses, listSubscriptions, loadSettings, removeExpense, removeSubscription, saveExpense, saveSettings, saveSubscription } from '../services/finance/financeStore'
+import { listExpenses, listIncomes, listSubscriptions, loadSettings, removeExpense, removeIncome, removeSubscription, saveExpense, saveIncome, saveSettings, saveSubscription } from '../services/finance/financeStore'
 import { hintFor } from '../content/sectionHints'
 
 type Tab = 'revenue' | 'cost' | 'subs'
@@ -68,18 +71,20 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [subs, setSubs] = useState<Subscription[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [incomes, setIncomes] = useState<Income[]>([])
   const [settings, setSettings] = useState<FinanceSettings>(DEFAULT_SETTINGS)
   const [error, setError] = useState('')
-  const [sheet, setSheet] = useState<{ kind: 'expense'; item?: Expense } | { kind: 'sub'; item?: Subscription } | { kind: 'rate' } | null>(null)
+  const [sheet, setSheet] = useState<{ kind: 'income'; item?: Income } | { kind: 'expense'; item?: Expense } | { kind: 'sub'; item?: Subscription } | { kind: 'rate' } | null>(null)
   const [showEnded, setShowEnded] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [c, s, e, st] = await Promise.all([listClients(workspaceId), listSubscriptions(workspaceId), listExpenses(workspaceId), loadSettings(workspaceId)])
+      const [c, s, e, st, inc] = await Promise.all([listClients(workspaceId), listSubscriptions(workspaceId), listExpenses(workspaceId), loadSettings(workspaceId), listIncomes(workspaceId)])
       setRecords(c)
       setSubs(s)
       setExpenses(e)
       setSettings(st)
+      setIncomes(inc)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
     }
@@ -88,11 +93,11 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
-  const input = useMemo(() => ({ records, subscriptions: subs, expenses, settings }), [records, subs, expenses, settings])
+  const input = useMemo(() => ({ records, subscriptions: subs, expenses, settings, incomes }), [records, subs, expenses, settings, incomes])
   const sum = useMemo(() => monthSummary(input, ym, today), [input, ym, today])
   const ahead = useMemo(() => outlook(input, today, 6), [input, today])
   const undated = useMemo(() => undatedRevenue(records, today), [records, today])
-  const assistBuild = useCallback(() => moneyBundle({ today, ym, records, subscriptions: subs, expenses, settings }), [today, ym, records, subs, expenses, settings])
+  const assistBuild = useCallback(() => moneyBundle({ today, ym, records, subscriptions: subs, expenses, settings, incomes }), [today, ym, records, subs, expenses, settings, incomes])
   const clientName = useCallback((id: string) => records.find((r) => r.id === id)?.companyName ?? '', [records])
   const isPast = ym < ymOf(today)
   const isNow = ym === ymOf(today)
@@ -119,19 +124,38 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
     window.setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
   }
 
+  // D-496 매출 저장 — 새로 적기 · 고치기 · '받았어요' 한 번
+  const putIncome = async (v: Omit<Income, 'id' | 'createdAt' | 'updatedAt'>, prev?: Income) => {
+    const saved = await saveIncome(workspaceId, { ...v, id: prev?.id, createdAt: prev?.createdAt })
+    setIncomes((list) => [saved, ...list.filter((x) => x.id !== saved.id)].sort((a, b) => b.date.localeCompare(a.date)))
+    return saved
+  }
+  const markReceived = async (it: Income) => {
+    try {
+      await putIncome({ ...it, received: true, date: today }, it)
+      showToast(`${it.name} 받은 돈으로 바꿨습니다`)
+    } catch {
+      showToast('저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.')
+    }
+  }
+
   const maxBar = Math.max(1, ...ahead.map((m) => Math.max(m.revenue.received + m.revenue.expected, m.cost.total)))
 
   return (
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="매출 · 비용"
-        sub="매출은 업체 계약 · 수금에서 저절로 · 비용은 정기 결제와 쓴 돈"
+        sub="매출은 계약 · 수금에서 저절로(그 밖 매출은 직접 적기) · 비용은 정기 결제와 쓴 돈"
         actions={
           <>
-            <Button variant="primary" onClick={() => setSheet({ kind: 'expense' })} data-testid="expense-open">
+            {/* D-496 지금 보는 탭의 단추가 진하게 — 매출 탭이면 [매출 적기] */}
+            <Button variant={tab === 'revenue' ? 'primary' : 'secondary'} onClick={() => setSheet({ kind: 'income' })} data-testid="income-open">
+              <Plus aria-hidden="true" className="size-4" /> 매출 적기
+            </Button>
+            <Button variant={tab === 'cost' ? 'primary' : 'secondary'} onClick={() => setSheet({ kind: 'expense' })} data-testid="expense-open">
               <Plus aria-hidden="true" className="size-4" /> 비용 적기
             </Button>
-            <Button variant="secondary" onClick={() => setSheet({ kind: 'sub' })} data-testid="sub-open">
+            <Button variant={tab === 'subs' ? 'primary' : 'secondary'} onClick={() => setSheet({ kind: 'sub' })} data-testid="sub-open">
               <Repeat aria-hidden="true" className="size-4" /> 정기 결제 넣기
             </Button>
           </>
@@ -206,10 +230,48 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
             <>
               <Section title={`${Number(ym.slice(5, 7))}월 매출`} hint={hintFor('매출 상세')} count={sum.revenue.lines.length}>
                 {sum.revenue.lines.length === 0 ? (
-                  <Blank title={isPast ? '이 달에 들어온 돈이 없습니다.' : '이 달에 받을 돈이 없습니다. 업체 수금 탭에서 계약 · 수금을 적으면 여기 저절로 들어옵니다.'} />
+                  <Blank
+                    title={isPast ? '이 달에 들어온 돈이 없습니다.' : '이 달에 받을 돈이 없습니다. 업체 수금 탭에서 계약 · 수금을 적으면 여기 저절로 들어옵니다. 그 밖의 매출은 [매출 적기]로.'}
+                    action={
+                      <Button variant="primary" onClick={() => setSheet({ kind: 'income' })}>
+                        매출 적기
+                      </Button>
+                    }
+                  />
                 ) : (
                   <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="revenue-list">
-                    {sum.revenue.lines.map((l) => (
+                    {sum.revenue.lines.map((l) => {
+                      const inc = l.source === 'manual' ? incomes.find((x) => x.id === l.incomeId) : undefined
+                      const badge = (
+                        <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${l.kind === 'received' ? 'bg-success-50 text-success-700' : l.kind === 'overdue' ? 'bg-danger-50 text-danger-700' : 'bg-brand-50 text-brand-700'}`}>
+                          {l.kind === 'received' ? '입금 완료' : l.kind === 'overdue' ? '미수금' : '받을 예정'}
+                        </span>
+                      )
+                      if (inc) {
+                        // D-496 직접 적은 매출 — 누르면 고치기 · 아직이면 [받았어요] 한 번
+                        return (
+                          <li key={`inc:${inc.id}`} className="flex items-start gap-3 px-4 py-3 sm:px-5" data-testid="revenue-line" data-kind={l.kind} data-source="manual">
+                            <button type="button" onClick={() => setSheet({ kind: 'income', item: inc })} className="tap flex min-w-0 flex-1 flex-col gap-0.5 text-left" data-testid="income-row">
+                              <span className="t-body break-keep font-semibold text-slate-900 hover:text-brand-700">{inc.name}</span>
+                              <span className="t-sub text-slate-500">
+                                {INCOME_CATEGORY_LABEL[inc.category]} · 직접 적음
+                                {l.clientName ? ` · ${l.clientName}` : ''}
+                                {` · ${md(inc.date)}`}
+                              </span>
+                            </button>
+                            <span className="flex shrink-0 flex-col items-end gap-1">
+                              <strong className="t-body font-semibold text-slate-900 tabular-nums">{l.amount.toLocaleString('ko-KR')}원</strong>
+                              {badge}
+                              {!inc.received && (
+                                <Button size="sm" variant="secondary" onClick={() => void markReceived(inc)} data-testid="income-mark-received">
+                                  <Check aria-hidden="true" className="size-4" /> 받았어요
+                                </Button>
+                              )}
+                            </span>
+                          </li>
+                        )
+                      }
+                      return (
                       <li key={`${l.clientId}:${l.feeId}`} className="flex items-start gap-3 px-4 py-3 sm:px-5" data-testid="revenue-line" data-kind={l.kind}>
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <Link to={`/ops/clients/${l.clientId}?tab=fees`} className="tap t-body truncate font-semibold text-slate-900 hover:text-brand-700 hover:underline">
@@ -222,12 +284,11 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-0.5">
                           <strong className="t-body font-semibold text-slate-900 tabular-nums">{l.amount.toLocaleString('ko-KR')}원</strong>
-                          <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${l.kind === 'received' ? 'bg-success-50 text-success-700' : l.kind === 'overdue' ? 'bg-danger-50 text-danger-700' : 'bg-brand-50 text-brand-700'}`}>
-                            {l.kind === 'received' ? '입금 완료' : l.kind === 'overdue' ? '미수금' : '받을 예정'}
-                          </span>
+                          {badge}
                         </span>
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 )}
               </Section>
@@ -421,6 +482,32 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           )}
         </ArrangeItem>
       </ArrangeArea>
+      {sheet?.kind === 'income' && (
+        <IncomeSheet
+          initial={sheet.item}
+          today={today}
+          clients={records.filter((r) => !r.archivedAt).map((r) => ({ id: r.id, name: r.companyName, hasFees: r.fees.some((f) => typeof f.amount === 'number' && f.amount > 0) }))}
+          onClose={() => setSheet(null)}
+          onSave={async (v) => {
+            const saved = await putIncome(v, sheet.item)
+            setSheet(null)
+            if (tab !== 'revenue') setParam('tab', '')
+            if (ymOf(saved.date) !== ym) setParam('m', ymOf(saved.date))
+            showToast(`${saved.name} ${saved.amount.toLocaleString('ko-KR')}원 ${saved.received ? '받은 돈으로' : '받을 돈으로'} 적었습니다`)
+          }}
+          onDelete={
+            sheet.item
+              ? async () => {
+                  const it = sheet.item as Income
+                  await removeIncome(workspaceId, it.id)
+                  setIncomes((prev) => prev.filter((x) => x.id !== it.id))
+                  setSheet(null)
+                  showToast('매출을 지웠습니다')
+                }
+              : undefined
+          }
+        />
+      )}
       {sheet?.kind === 'expense' && (
         <ExpenseSheet
           initial={sheet.item}

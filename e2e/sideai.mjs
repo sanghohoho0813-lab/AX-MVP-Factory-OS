@@ -210,6 +210,13 @@ await shot(page, 'S5c-cut')
   await page.waitForTimeout(300)
   check(`S5h AI 사이트 창(끊는 곳)을 닫고 마우스가 그 자리로 오면 → 비킨 자리 0 · 본문 가운데 · 단추 'ChatGPT 옆에 띄우기'`, (await reserveNow()) === 0 && (await centered()) && (await btn.getAttribute('data-open')) === '0' && (await btn.innerText()).includes('옆에 띄우기'), { reserve: await reserveNow() })
   await shot(page, 'S5h-centered')
+  // D-495 대표: "옆 창을 안 띄웠는데 갑자기 왼쪽 정렬(매출 · 비용)" — 고르기 칸 목록 · 날짜 고르기 같은 브라우저 팝업으로 마우스가 들어가도 '나감' 이 온다
+  await page.evaluate(() => { const s = document.createElement('select'); s.id = '__probe'; s.innerHTML = '<option>a</option><option>b</option>'; document.querySelector('main').prepend(s); s.focus() })
+  await leaveAt(1440 - cutReserve + 3, 520)
+  await page.waitForTimeout(250)
+  const keptCenter = { reserve: await reserveNow(), centered: await centered() }
+  await page.evaluate(() => document.getElementById('__probe')?.remove())
+  check('D-495 고르기 칸을 연 채(브라우저 팝업으로 마우스가 들어감) 옆 창 끝 근처에서 \'나감\' 이 와도 가운데 그대로', keptCenter.reserve === 0 && keptCenter.centered, keptCenter)
   // 바깥(머리줄 · 화면 끝)으로 나간 것은 창이 다시 보인 것이 아니다
   await leaveAt(1440 - cutReserve + 3, 30)
   await leaveAt(1435, 520)

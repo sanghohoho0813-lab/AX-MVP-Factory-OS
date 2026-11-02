@@ -15,7 +15,7 @@ import { UNNAMED_AGENT, agentLedger, agentLedgerTotals } from '../feeMath'
 import { isOpenEvent, waitingDays } from '../customerBridgeService'
 import { regionOf } from '../clientOpsProfile'
 import { COST_CATEGORY_LABEL, PAY_METHOD_LABEL, isActiveSub, monthlyEquivalent, nextCharge, outlook, toKrw } from '../finance/financeCore'
-import type { Expense, FinanceSettings, Subscription } from '../finance/financeCore'
+import type { Expense, FinanceSettings, Income, Subscription } from '../finance/financeCore'
 import { GRANT_CATEGORY_LABEL, VERDICT_LABEL, deadlineOf } from '../grants/grantMatch'
 import type { GrantNotice } from '../grants/grantMatch'
 import type { GrantClient, GrantIndex } from '../grants/grantView'
@@ -404,9 +404,11 @@ export function moneyBundle(i: {
   subscriptions: readonly Subscription[]
   expenses: readonly Expense[]
   settings: FinanceSettings
+  /** D-496 직접 적은 매출 */
+  incomes?: readonly Income[]
 }): AssistBundle {
   const book = new RefBook()
-  const input = { records: i.records, subscriptions: i.subscriptions, expenses: i.expenses, settings: i.settings }
+  const input = { records: i.records, subscriptions: i.subscriptions, expenses: i.expenses, settings: i.settings, incomes: i.incomes ?? [] }
   const ahead = outlook(input, i.today, 6)
   const now = ahead[0]
   const subs = i.subscriptions.filter((s) => isActiveSub(s, i.today))
@@ -443,7 +445,7 @@ export function moneyBundle(i: {
           name: `이번 달(${i.ym}) 들어올 돈 · 들어온 돈`,
           rows: now.revenue.lines.slice(0, 60).map((l) => {
             const rec = byId.get(l.clientId)
-            return { ref: rec ? book.client(rec) : undefined, 업체: l.clientName, 항목: safeText(l.label, rec ? personNames(rec) : [], 60), 금액: wonText(l.amount), 상태: l.kind === 'received' ? '들어옴' : l.kind === 'overdue' ? '밀림' : '예정', 날짜: l.date }
+            return { ref: rec ? book.client(rec) : undefined, 업체: l.clientName, 항목: safeText(l.label, rec ? personNames(rec) : [], 60), 금액: wonText(l.amount), 상태: l.kind === 'received' ? '들어옴' : l.kind === 'overdue' ? '밀림' : '예정', 날짜: l.date, ...(l.source === 'manual' ? { 출처: '직접 적은 매출' } : {}) }
           }),
         },
         {

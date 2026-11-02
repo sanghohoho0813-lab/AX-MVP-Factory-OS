@@ -1,12 +1,13 @@
 /**
  * 매출 · 비용 저장 (D-142) — 모듈 기록 `finance/subscriptions` · `finance/expenses` · `finance/settings`.
- * 매출은 저장하지 않는다(계약 수금 항목에서 매번 계산 — 두 벌이 되지 않게).
+ * 계약 매출은 저장하지 않는다(계약 수금 항목에서 매번 계산 — 두 벌이 되지 않게).
+ * D-496 계약 밖 매출(강의료 · 일회성 수수료 등)만 `finance/incomes` 에 직접 적는다.
  * 카드번호 · 계좌번호 칸은 없다. 결제 수단은 '법인카드' 같은 구분만.
  */
 import { generateId } from '../../storage/localStore'
 import { nowIso } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
-import { DEFAULT_SETTINGS, normalizeExpense, normalizeSettings, normalizeSubscription, type Expense, type FinanceSettings, type Subscription } from './financeCore'
+import { DEFAULT_SETTINGS, normalizeExpense, normalizeIncome, normalizeSettings, normalizeSubscription, type Expense, type FinanceSettings, type Income, type Subscription } from './financeCore'
 
 const MODULE = 'finance'
 
@@ -52,6 +53,30 @@ export async function saveExpense(workspaceId: string | null, input: Omit<Expens
 
 export async function removeExpense(workspaceId: string | null, id: string): Promise<void> {
   await deleteRow(workspaceId, MODULE, 'expenses', id)
+}
+
+/** D-496 직접 적는 매출 */
+export async function listIncomes(workspaceId: string | null): Promise<Income[]> {
+  const rows = await listRows(workspaceId, MODULE, 'incomes')
+  return rows
+    .map((r) => normalizeIncome({ ...r.data, createdAt: r.createdAt, updatedAt: r.updatedAt }, r.id, r.updatedAt))
+    .filter((e): e is Income => e !== null)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function saveIncome(workspaceId: string | null, input: Omit<Income, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string }): Promise<Income> {
+  const id = input.id ?? `inc_${generateId()}`
+  const now = nowIso()
+  const clean = normalizeIncome({ ...input, createdAt: input.createdAt ?? now, updatedAt: now }, id, now)
+  if (!clean) throw new Error('금액과 날짜를 확인해 주세요.')
+  const { id: _i, ...data } = clean
+  void _i
+  await saveRow(workspaceId, MODULE, 'incomes', { id, clientId: clean.clientId || undefined, data: data as unknown as Record<string, unknown> })
+  return clean
+}
+
+export async function removeIncome(workspaceId: string | null, id: string): Promise<void> {
+  await deleteRow(workspaceId, MODULE, 'incomes', id)
 }
 
 /**
