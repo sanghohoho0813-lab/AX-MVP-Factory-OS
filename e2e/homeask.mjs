@@ -23,6 +23,9 @@ const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
+// HOMEASK_SHOTS=<폴더> 면 첫 화면 · AI 답 · 휴대폰을 찍어 둔다(눈 확인용)
+const SHOTS = process.env.HOMEASK_SHOTS ?? ''
+const shot = async (loc, name) => { if (SHOTS) await loc.screenshot({ path: path.join(SHOTS, `${name}.png`) }) }
 let pass = 0
 let fail = 0
 const check = (n, c, d) => {
@@ -124,6 +127,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const t1 = lastTurn(page)
   check('AI 답 · 모델 이름 · 헤드라인 · 첫마디 글', (await t1.getAttribute('data-status')) === 'ai' && /AI 답/.test(await t1.getByTestId('home-ask-source').innerText()) && /정책자금부터/.test(await t1.getByTestId('home-ask-headline').innerText()) && /운전자금이 필요하신/.test(await t1.innerText()))
   check('이 업체 자료로: 한솔테크(주)', /한솔테크/.test(await t1.getByTestId('home-ask-clients').innerText()))
+  await shot(page.getByTestId('home-ask'), 'pc-ai-answer')
   check('질문 세 줄은 대화가 생기면 접힘', (await page.getByTestId('home-ask-suggest').count()) === 0)
   await t1.getByTestId('home-ask-ref').first().click()
   await page.waitForURL(/\/ops\/clients\/cli_hansol/)
@@ -226,6 +230,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('390: 질문 줄 누르기 높이 40px 이상', (await page.getByTestId('home-ask-chip').first().boundingBox()).height >= 39.5)
   await ask(page, '한솔테크 미팅 준비')
   check('390: 답 · 넘침 0', (await page.getByTestId('home-ask-answer').count()) === 1 && (await ox()) <= 0, await ox())
+  await shot(page, 'phone-ai-answer')
   check('390: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

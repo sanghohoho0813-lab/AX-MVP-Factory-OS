@@ -12,6 +12,7 @@ import { ArrowUp, Building2, CalendarClock, Check, ChevronRight, Copy, FileText,
 import { ModelPicker } from '../ai/ModelPicker'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
+import { useIsPhone } from '../../lib/useIsPhone'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, findClients, intentsOf, learnAliases, type HomeIntent, type HomeSuggestion, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
@@ -47,6 +48,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
   const { turns, busy } = useHomeAsk()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const phone = useIsPhone()
   const [text, setText] = useState('')
   const [pinned, setPinned] = useState<string>('')
   const [menu, setMenu] = useState(false)
@@ -199,7 +201,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare }: HomeAskProps) 
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
-            placeholder={pinnedName ? `${pinnedName} — 무엇이 궁금하세요?` : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
+            // 휴대폰은 칸이 좁아 긴 예시가 두 줄로 잘린다 — 짧게
+            placeholder={pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
             aria-label="질문"
             className={`t-body min-h-10 w-full resize-none ${text ? 'overflow-y-auto' : 'overflow-hidden'} bg-transparent px-1.5 py-2 leading-snug text-slate-900 outline-none placeholder:text-slate-400`}
             data-testid="home-ask-input"
@@ -271,7 +274,7 @@ function Turn({ turn, names }: { turn: HomeTurn; names: { id: string; name: stri
         {turn.q}
       </p>
       {names.length > 0 && (
-        <p className="t-meta flex flex-wrap items-center gap-1 self-end text-slate-500" data-testid="home-ask-clients">
+        <p className="t-meta flex flex-wrap items-baseline justify-end gap-x-1 self-end text-right text-slate-500" data-testid="home-ask-clients">
           이 업체 자료로:
           {names.map((n) => (
             <Link key={n.id} to={`/ops/clients/${encodeURIComponent(n.id)}?tab=smart`} className="tap font-semibold text-brand-700 hover:underline">
