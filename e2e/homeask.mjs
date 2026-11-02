@@ -5,6 +5,7 @@
  *
  *  1440  맨 위(숫자 칸보다 위) · 큰 글 · 안내 · 질문 세 줄 · 모델 고르기 · 빈 칸이면 보내기 막힘
  *        → "한솔테크 1차 미팅 정책자금" → home.chat 으로 · 보낸 자료에 그 업체 OS 모듈 판정 · 서류함 · 대표 이름 · 전화 0 → AI 답 · [열기] → 그 업체
+ *        → D-506 일정 기록 · 오늘 '할 일 적기'(업체 고른 메모)도 같은 카드
  *        → D-505 업체 상세 업무 일기에 적은 메모도 같은 카드 → [기록]
  *        → D-504 말한 다음 약속(다음 주 화요일 오후 2시 2차 미팅) → 다음 할 일 · 들은 말은 업무 일기 상담 메모
  *        → D-503 말한 숫자(작년 매출 52억 · 직원 18명) → [기록] → 회사 정보(상담 메모) · 달라지는 판정
@@ -369,6 +370,26 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   const mr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_mirae') ?? {})
   check('D-505 [미래바이오랩에 기록] → 상황 답 · 직원 수 · 다음 할 일(방문)', mr.decided?.['scn.hireDisabled']?.a === 'yes' && mr.employeeCount === '9명' && mr.nextAction === '방문' && !!mr.nextActionDueDate, { d: mr.decided?.['scn.hireDisabled'], e: mr.employeeCount, n: mr.nextAction })
+
+  // D-506 일정 기록(빠른 기록)에서 업체를 골라 적은 메모도 같은 카드 → [기록]
+  await page.goto(BASE + '/journal', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.locator('textarea[aria-label="기록 내용"]').first().fill('대표님이 계약직 직원이 2명 있대, 다음 달 5일에 통화하기로 했어')
+  await page.locator('select[aria-label="연결할 업체"]').first().selectOption('cli_wooil')
+  await page.getByRole('button', { name: '기록', exact: true }).first().click()
+  const ct = page.getByTestId('capture-talk')
+  const ctShown = await ct.waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+  check('D-506 일정 기록 메모(업체 고름) → 카드(계약직 · 다음 약속)', ctShown && (await ct.locator('[data-key="contract"]').count()) === 1 && (await ct.getByTestId('home-ask-talk-next').count()) === 1)
+  await ct.getByTestId('home-ask-talk-save').click()
+  await page.locator('[data-testid="capture-talk"][data-saved="1"]').waitFor({ timeout: 8000 })
+  await page.waitForTimeout(300)
+  const wr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_wooil') ?? {})
+  check('D-506 [우일산업에 기록] → 상황 답(계약직) · 다음 할 일(통화)', wr.decided?.['scn.contract']?.a === 'yes' && wr.nextAction === '통화' && /^\d{4}-\d{2}-05$/.test(wr.nextActionDueDate ?? ''), { d: wr.decided?.['scn.contract'], n: wr.nextAction, dd: wr.nextActionDueDate })
+  await page.locator('textarea[aria-label="기록 내용"]').first().fill('통화했고 서류 보내 드렸어')
+  await page.locator('select[aria-label="연결할 업체"]').first().selectOption('cli_wooil')
+  await page.getByRole('button', { name: '기록', exact: true }).first().click()
+  await page.waitForTimeout(600)
+  check('D-506 읽을 것이 없는 메모는 카드 없음(메모만)', (await page.getByTestId('capture-talk').count()) === 0)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('1440: 오류 0', errors.length === 0, errors)

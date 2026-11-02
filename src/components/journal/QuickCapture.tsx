@@ -7,6 +7,8 @@ import { DueDateField } from '../ops/opsControls'
 import { todayLocalDate } from '../../lib/appClock'
 import { useSessionDraft } from '../../lib/useSessionDraft'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
+import { TalkCard } from '../home/TalkCard'
+import { hasTalk, talkFound, type TalkFound } from '../../services/homeAsk/talkApply'
 
 /**
  * 빠른 기록 — "무슨 일이 있었나요?" 한 줄이면 저장된다.
@@ -19,6 +21,8 @@ export function QuickCapture({
   onCreate,
   compact = false,
   autoFocus = false,
+  onTalkRecord,
+  talkTestId = 'capture-talk',
 }: {
   clients: ClientOpsRecord[]
   defaultClientId?: string | null
@@ -26,7 +30,15 @@ export function QuickCapture({
   onCreate: (input: CreateJournalInput) => Promise<void | boolean>
   compact?: boolean
   autoFocus?: boolean
+  /**
+   * D-506 업체를 골라 적은 메모에서 사정 · 숫자 · 다음 약속을 읽어(오늘 대화창과 같은 규칙) [그 업체에 기록] 카드 — 성공하면 true.
+   * 없으면 카드도 없다(지금처럼 메모만).
+   */
+  onTalkRecord?: (clientId: string, found: TalkFound) => Promise<boolean>
+  talkTestId?: string
 }) {
+  const [told, setTold] = useState<{ clientId: string; company: string; found: TalkFound; saved: boolean } | null>(null)
+  const [talkBusy, setTalkBusy] = useState(false)
   const [type, setType] = useState<JournalEntryType>('note')
   // D-126: 적던 글은 탭 · 화면을 오가도 남는다(이 브라우저 탭 안에서만) — 업체 메모 칸과 같은 약속
   const [content, setContent, clearContent] = useSessionDraft(`axmvp.draft.capture.${defaultClientId ?? 'all'}`, '')
@@ -62,6 +74,12 @@ export function QuickCapture({
         dueDate: type === 'follow_up' ? dueDate : '',
       })
       if (ok === false) return
+      // D-506 업체를 골랐으면 그 메모에서 업체 사정 · 숫자 · 다음 약속(이미 같은 값이면 안 보임)
+      const rec = onTalkRecord && clientId ? clients.find((c) => c.id === clientId) : undefined
+      if (rec) {
+        const found = talkFound(text, rec, todayLocalDate())
+        setTold(hasTalk(found) ? { clientId: rec.id, company: rec.companyName, found, saved: false } : null)
+      } else setTold(null)
       clearContent()
       setDueDate('')
       if (type !== 'note') setType('note')
@@ -166,6 +184,28 @@ export function QuickCapture({
         <p role="alert" className="t-sub mt-2 text-danger-600">
           {error}
         </p>
+      )}
+      {told && onTalkRecord && (
+        <div className="mt-3">
+          <TalkCard
+            company={told.company}
+            title={`이 메모에서 알게 된 ${told.company} 사정`}
+            answers={told.found.answers}
+            numbers={told.found.numbers}
+            next={told.found.next}
+            saved={told.saved}
+            savedText={`${told.company}에 기록했어요 — 회사 정보 · 상황 예시 · 다음 할 일에 들어갔어요`}
+            busy={talkBusy}
+            testId={talkTestId}
+            onRecord={async () => {
+              if (talkBusy) return
+              setTalkBusy(true)
+              const ok = await onTalkRecord(told.clientId, told.found).catch(() => false)
+              setTalkBusy(false)
+              if (ok) setTold({ ...told, saved: true })
+            }}
+          />
+        </div>
       )}
     </div>
   )

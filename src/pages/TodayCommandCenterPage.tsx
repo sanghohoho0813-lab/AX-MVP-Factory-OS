@@ -1028,6 +1028,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               clients={active}
               compact
               onCreate={(input) => journalMutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
+              // D-506 업체를 골라 적은 메모 → 사정 · 숫자 · 다음 약속 [그 업체에 기록](대화창과 같은 저장 길)
+              onTalkRecord={(id, f) => recordTalk(id, f.answers, f.numbers, f.next ?? undefined)}
             />
             <JournalList
               entries={todayJournal.slice(0, 4)}

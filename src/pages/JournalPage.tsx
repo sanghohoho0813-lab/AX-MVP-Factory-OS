@@ -9,7 +9,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
 import { JournalList } from '../components/journal/JournalList'
-import { listClients } from '../services/clientOpsService'
+import { listClients, saveClient } from '../services/clientOpsService'
 import {
   JOURNAL_TYPES,
   JOURNAL_TYPE_LABEL,
@@ -20,7 +20,7 @@ import {
   updateJournalEntry,
   type JournalRange,
 } from '../services/journalService'
-import { todayLocalDate } from '../lib/appClock'
+import { nowIso, todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry, JournalEntryType } from '../types/bridge'
 import { ClientPickerOptions } from '../components/ops/ClientPickerOptions'
@@ -122,6 +122,21 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
       <QuickCapture
         clients={clients}
         onCreate={(input) => mutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
+        // D-506 업체를 골라 적은 메모 → 사정 · 숫자 · 다음 약속 [그 업체에 기록] — 저장 직전에 새로 읽는다(다른 창에서 고친 것을 덮지 않게)
+        onTalkRecord={async (id, found) => {
+          try {
+            const { applyTalk } = await import('../services/homeAsk/talkApply')
+            const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === id) ?? clients.find((c) => c.id === id)
+            if (!fresh) return false
+            const saved = await saveClient(applyTalk(fresh, found, nowIso()))
+            setClients((cs) => cs.map((c) => (c.id === saved.id ? saved : c)))
+            showToast(`${saved.companyName}에 기록했어요 — 회사 정보 · 상황 예시 · 다음 할 일`)
+            return true
+          } catch (cause) {
+            showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+            return false
+          }
+        }}
       />
 
       {/* 거르기 · 건수 (기간은 위 일정 탭) */}
