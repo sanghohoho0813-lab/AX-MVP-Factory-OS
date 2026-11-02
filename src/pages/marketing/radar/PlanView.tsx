@@ -773,7 +773,7 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
             <span className="font-semibold text-slate-900">{WHY_LABEL.spread}</span> — 최근 2주 여러 채널이 같은 주제를 다뤘는지
           </li>
           <li className="t-sub break-keep text-slate-700">
-            <span className="font-semibold text-slate-900">{WHY_LABEL.hot}</span> — 그 채널 평소(같은 긴 영상/쇼츠 중앙값)보다 2배 넘게 잘됐는지 · 3배 넘으면 '터짐'(올린 지 7일 안 된 영상은 나이를 반영)
+            <span className="font-semibold text-slate-900">{WHY_LABEL.hot}</span> — 그 채널 평소(같은 긴 영상/쇼츠의 보통 조회수)보다 2배 넘게 잘됐는지 · 3배 넘으면 '터짐'(올린 지 7일 안 된 영상은 나이를 반영)
           </li>
           <li className="t-sub break-keep text-slate-700">
             <span className="font-semibold text-slate-900">{WHY_LABEL.growing}</span> — 그 전 6주보다 최근 2주에 빠르게 늘었는지

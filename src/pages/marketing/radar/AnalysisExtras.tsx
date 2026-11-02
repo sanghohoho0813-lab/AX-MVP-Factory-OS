@@ -24,12 +24,12 @@ export function MyChannelCard({ s }: { s: MyChannelStats | null }) {
       ) : (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
-            <Row a="평소 조회수 · 긴 영상" b={s.longMedian === null ? '—' : `${fmt(s.longMedian)}회`} c={`${s.longCount}편 중앙값`} />
-            <Row a="평소 조회수 · 쇼츠" b={s.shortMedian === null ? '—' : `${fmt(s.shortMedian)}회`} c={`${s.shortCount}편 중앙값`} />
-            <Row a="평소 조회 속도" b={`하루 ${fmt(Math.round(s.perDayMedian))}회`} c="올린 뒤 하루 평균의 중앙값" />
-            <Row a="가장 잘된 주제" b={s.bestTopic ? s.bestTopic.label : '아직 모름'} c={s.bestTopic ? `${s.bestTopic.count}편 · 중앙값 ${shortNum(s.bestTopic.median)}회` : '같은 주제 2편 넘게 필요'} />
-            <Row a="가장 잘된 제목 구조" b={s.bestPattern ? s.bestPattern.label : '아직 모름'} c={s.bestPattern ? `${s.bestPattern.count}편 · 중앙값 ${shortNum(s.bestPattern.median)}회` : ''} />
-            <Row a="잘된 길이" b={s.bestLength ? s.bestLength.label : '아직 모름'} c={s.bestLength ? `${s.bestLength.count}편 · 중앙값 ${shortNum(s.bestLength.median)}회` : ''} />
+            <Row a="평소 조회수 · 긴 영상" b={s.longMedian === null ? '—' : `${fmt(s.longMedian)}회`} c={`${s.longCount}편의 보통값`} />
+            <Row a="평소 조회수 · 쇼츠" b={s.shortMedian === null ? '—' : `${fmt(s.shortMedian)}회`} c={`${s.shortCount}편의 보통값`} />
+            <Row a="평소 조회 속도" b={`하루 ${fmt(Math.round(s.perDayMedian))}회`} c="올린 뒤 하루 평균의 보통값" />
+            <Row a="가장 잘된 주제" b={s.bestTopic ? s.bestTopic.label : '아직 모름'} c={s.bestTopic ? `${s.bestTopic.count}편 · 보통 ${shortNum(s.bestTopic.median)}회` : '같은 주제 2편 넘게 필요'} />
+            <Row a="가장 잘된 제목 구조" b={s.bestPattern ? s.bestPattern.label : '아직 모름'} c={s.bestPattern ? `${s.bestPattern.count}편 · 보통 ${shortNum(s.bestPattern.median)}회` : ''} />
+            <Row a="잘된 길이" b={s.bestLength ? s.bestLength.label : '아직 모름'} c={s.bestLength ? `${s.bestLength.count}편 · 보통 ${shortNum(s.bestLength.median)}회` : ''} />
             <Row a="업로드 주기" b={s.cadenceDays === null ? '데이터 부족' : `${s.cadenceDays.toFixed(1)}일에 한 편`} c={`최근 ${s.count}편 기준`} />
           </div>
           <p className="t-meta rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep text-slate-600" data-testid="radar-analytics-note">

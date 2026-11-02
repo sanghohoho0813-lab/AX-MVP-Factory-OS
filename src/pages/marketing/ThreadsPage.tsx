@@ -976,7 +976,7 @@ function LibraryPanel({ onUse }: { onUse: (t: ThreadTemplate) => void }) {
                 <div className="mt-2 flex flex-col gap-2">
                   <p className="t-meta break-keep text-slate-600">
                     {t.reaction}
-                    {t.median != null ? ` · 점수 중앙값 ${t.median.toLocaleString('ko-KR')}` : ''}
+                    {t.median != null ? ` · 보통 점수 ${t.median.toLocaleString('ko-KR')}` : ''}
                   </p>
                   <ol className="t-sub list-decimal pl-5 break-keep text-slate-800">
                     {t.skeleton.map((s) => (
