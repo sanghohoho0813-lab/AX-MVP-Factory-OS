@@ -434,6 +434,12 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
               맞춤 진단서
             </Link>
           )}
+          {/* D-508 상담 자리에서 읽을 말 — 그 업체 판정 그대로 미팅 순서 · 고객에게 이렇게 말하세요 */}
+          {names[0] && (
+            <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&talk=1`} className="tap ml-1 inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-talkscript">
+              말하기 대본
+            </Link>
+          )}
         </p>
       )}
       {turn.docs && (
