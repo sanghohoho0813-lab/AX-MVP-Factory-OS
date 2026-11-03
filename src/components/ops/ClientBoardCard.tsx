@@ -146,6 +146,7 @@ export function ClientBoardCard({
   onChip,
   onMoney,
   onBulkDocs,
+  onDocs,
   hit = null,
   grants = null,
   onGrants,
@@ -171,6 +172,8 @@ export function ClientBoardCard({
   onMoney: () => void
   /** 서류를 한꺼번에 올리는 시트 열기 (D-84) — 없으면 단추를 그리지 않는다 */
   onBulkDocs?: () => void
+  /** D-526 '서류 n/m' · '서류 요청 n일째' 를 누르면 그 업체 서류함으로(개요가 아니라) — 없으면 글자만 */
+  onDocs?: () => void
 }) {
   const moneyWords = useMoneyWords()
   const [allChips, setAllChips] = useState(false)
@@ -337,11 +340,20 @@ export function ClientBoardCard({
           </div>
         )}
         {/* D-512 고객에게 부탁한 서류 — 며칠째 · 몇 개 받았나(접힌 휴대폰 카드에도). 3일 넘게 덜 왔으면 빨간 글자 */}
-        {docReq && (
-          <p data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={`t-sub flex flex-wrap items-baseline gap-x-1.5 font-semibold ${docReq.done ? 'text-success-700' : docReq.waitingDays >= 3 ? 'text-danger-700' : 'text-slate-700'}`}>
-            {docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`}
-          </p>
-        )}
+        {docReq && (() => {
+          const cls = `t-sub flex flex-wrap items-baseline gap-x-1.5 font-semibold ${docReq.done ? 'text-success-700' : docReq.waitingDays >= 3 ? 'text-danger-700' : 'text-slate-700'}`
+          const text = docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`
+          // D-526 누르면 그 업체 서류함(요청한 서류 줄이 맨 위)
+          return onDocs ? (
+            <button type="button" onClick={onDocs} title="서류함 열기" data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={`tap self-start text-left hover:underline ${cls}`}>
+              {text}
+            </button>
+          ) : (
+            <p data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={cls}>
+              {text}
+            </p>
+          )
+        })()}
         {/* D-159: 맞는 지원사업 · 사업자번호 · 업무 조각 · 돈 줄은 휴대폰에서 접어 둔다(펼쳐보기) */}
         <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more">
         {!reco && grants && grants.fit > 0 && onGrants && (
@@ -490,11 +502,17 @@ export function ClientBoardCard({
               {p.overduePayments > 0 && ` · 예정일 지남 ${p.overduePayments}`}
             </button>
           )}
-          {p.documentsUsable > 0 && (
-            <span className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600">
-              서류 {p.documentsUsable}/{p.documentsTotal}
-            </span>
-          )}
+          {p.documentsUsable > 0 &&
+            (onDocs ? (
+              // D-526 누르면 그 업체 서류함으로
+              <button type="button" onClick={onDocs} title="서류함 열기" data-testid="card-docs" className="tap t-sub rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600 hover:border-brand-300 hover:text-brand-700">
+                서류 {p.documentsUsable}/{p.documentsTotal}
+              </button>
+            ) : (
+              <span className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600">
+                서류 {p.documentsUsable}/{p.documentsTotal}
+              </span>
+            ))}
           {/* 서류는 목록에서 바로 올린다 — 업체를 열고 서류 탭까지 가는 두 번을 줄인다 (D-84) */}
           {onBulkDocs && (
             <button

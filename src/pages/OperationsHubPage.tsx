@@ -1055,6 +1055,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                         onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
                         onMoney={() => setQuick({ id: record.id, kind: 'money' })}
                         onBulkDocs={() => setBulkDocsFor(record.id)}
+                        onDocs={() => navigate(`/ops/clients/${record.id}?tab=docs`)}
                         hit={query.trim() !== '' ? searchHit(record, query) : null}
                         grants={grantSums.get(record.id) ?? null}
                         reco={reco.chips.get(record.id) ?? []}

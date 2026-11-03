@@ -103,6 +103,22 @@ check('D7 남은 것만 다시 요청 문구(n-1) · 받은 줄 없음 · [다�
 await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
 const cardLine = await page.locator('[data-testid="client-card"]').filter({ hasText: '한솔테크' }).first().getByTestId('card-docreq').innerText().catch(() => '')
 check('D8 고객 관리 카드 \'서류 요청 오늘 · 1/n 받음\'', cardLine === `서류 요청 오늘 · 1/${n} 받음`, cardLine)
+// D-526 카드의 '서류 요청' 줄 · '서류 n/m' 을 누르면 그 업체 서류함으로(개요가 아니라)
+await page.locator('[data-testid="client-card"]').filter({ hasText: '한솔테크' }).first().getByTestId('card-docreq').click()
+await page.waitForURL(/tab=docs/, { timeout: 8000 }).catch(() => {})
+await page.getByTestId('doc-shelf-wrap').first().waitFor({ timeout: 8000 }).catch(() => {})
+const afterClick = page.url()
+const toDocs = /\/ops\/clients\/cli_hansol\?tab=docs/.test(afterClick) && (await page.getByTestId('doc-shelf-wrap').count()) >= 1
+await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+const pill = page.locator('[data-testid="client-card"]').filter({ hasText: '한솔테크' }).first().getByTestId('card-docs')
+let pillOk = true
+if (await pill.count()) {
+  await pill.click()
+  await page.waitForURL(/tab=docs/, { timeout: 8000 }).catch(() => {})
+  pillOk = /tab=docs/.test(page.url())
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+}
+check('D8b (D-526) 카드 \'서류 요청\' 줄 · \'서류 n/m\' → 그 업체 서류함(한 번)', toDocs && pillOk, { afterClick, toDocs, pillOk })
 
 // D9 — 3일 뒤
 const later = new Date(Date.now() + 3 * 86_400_000)
