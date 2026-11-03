@@ -11,7 +11,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { josa } from '../lib/josa'
-import { missingForPicks, topPicks, type Insight } from './clientInsights'
+import { manwonText, missingForPicks, topPicks, type Insight } from './clientInsights'
 import type { ScenarioRun } from './scenarios'
 import type { InsightTone } from './insightLabels'
 
@@ -511,6 +511,39 @@ export function practiceDeck(insights: readonly Insight[]): FaqHit[] {
     }
   }
   return out
+}
+
+/** D-510 상황별 한 장 설계서 → 고객에게 읽을 말(설계서 숫자 그대로 · 새 숫자 0) */
+export interface PlanTalkInput {
+  id: string
+  title: string
+  totalLabel: string
+  totalText: string
+  firstWon: number
+  keepWon: number
+  keepYears: number
+  keepLabel: string
+  blocks: readonly { key: string; label: string; state: string; headline: string; amount: string }[]
+  actions: readonly { when: string; text: string }[]
+}
+
+export function planTalk(plan: PlanTalkInput): TalkCard {
+  const topic = plan.id === 'lab-start' ? 'lab' : plan.id === 'corp-convert' ? 'convert' : 'employment'
+  const t = TOPICS[topic]
+  const say: string[] = [`대표님, '${plan.title}' 하시면 이 회사 숫자로 이렇게 계산돼요.`]
+  if (plan.totalText) say.push(`${josa(plan.totalLabel, '이/가')} ${plan.totalText}이에요 — 확정 금액이 아니라 지금 자료로 계산한 값이에요.`)
+  for (const b of plan.blocks) {
+    if (b.state !== 'ok' || b.key === 'policy') continue
+    const said = b.amount ? (/덜 냄$/.test(b.amount) ? b.amount.replace(/덜 냄$/, '덜 내요') : `${b.amount}이에요`) : spoken(b.headline)
+    say.push(`${josa(b.label, '은/는')} ${said}.`.replace(/\.\.$/, '.'))
+  }
+  const pol = plan.blocks.find((b) => b.key === 'policy' && b.state === 'ok')
+  if (pol) say.push(`정책자금도 ${pol.headline}이에요 — 갚는 돈(대출)이라 위 금액에는 넣지 않았어요.`)
+  if (plan.keepWon > plan.firstWon) say.push(`${plan.keepLabel} ${plan.keepYears}년 합계 약 ${manwonText(plan.keepWon)}까지 볼 수 있어요.`)
+  say.push('괜찮으시면 아래 순서대로 준비해 보겠습니다.')
+  // 진행 순서는 설계서 '이렇게 진행해요' 그대로(앞 4개 · 긴 설명은 첫 마디까지)
+  const steps = plan.actions.slice(0, 4).map((a) => `${a.when} ${a.text.split(/\s—\s/)[0].replace(/\s*\([^)]*\)/g, '').trim()}`)
+  return { key: plan.id, topic, label: plan.title, tone: plan.firstWon > 0 ? 'good' : 'maybe', say, basis: '', easy: t.easy, faq: t.faq, avoid: t.avoid, steps: steps.length >= 2 ? steps : t.steps }
 }
 
 /** 이야기 이름(찾기 결과 표지) */

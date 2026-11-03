@@ -11,6 +11,7 @@ import { diagnoseHiring } from '../../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../../tools/employment/lib/programs'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { businessTypeOf, clientFacts } from '../../tools/shared/clientPrefill'
+import { planTalk } from '../consultTalk'
 import { SITUATION_PLANS, buildSituationPlan, planDef, planResultInput, planSummary, planTitle, situationChoices, smeConfirmed } from '../situationPlan'
 import { defaultTaxUnits } from '../../tools/employment/lib/rosterCore'
 import { startupRegion } from '../clientInsights'
@@ -520,6 +521,18 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
       cr(w).lines.some((l) => l.includes('세법 요건')) && cr(d).lines.some((l) => l.includes('장애인 근로자')) && ['ok', 'none'].includes(sb(w).state) && ['ok', 'none'].includes(sb(d).state) &&
       w.blocks.some((b) => b.key === 'policy') && w.actions.some((a) => a.id === 'contract') && w.actions.some((a) => a.id === 'tax'),
     [w.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`), d.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`)],
+  )
+  // 설계서 → 고객에게 이렇게 말하세요(설계서 숫자 그대로)
+  const conv = buildSituationPlan('corp-convert', normalizeClientOps({ ...full, id: 'cv1', businessType: 'individual' } as unknown as Partial<ClientOpsRecord>), today, 1)
+  const talks = [w, d, buildSituationPlan('lab-start', full, today, 2), conv].map((p) => ({ p, t: planTalk(p) }))
+  const src = (p: typeof w) => JSON.stringify(p) + manwonText(p.keepWon)
+  const nums = (x: string) => x.match(/[\d,.]+(만원|억원)/g) ?? []
+  check(
+    'P22 설계서 [이렇게 말하기] — 제목 · 합계 · 계산된 칸 금액 · 정책자금은 합계 밖 · 진행 순서(설계서 앞 4개) · 금액은 설계서에 있던 것만 · 「덜 냄이에요」 같은 말 0',
+    talks.every(({ p, t }) => t.say[0].includes(p.title) && (!p.totalText || t.say.some((x) => x.includes(p.totalText))) && t.say.flatMap(nums).every((n) => src(p).includes(n)) && t.steps.length === Math.min(4, p.actions.length) && !t.say.some((x) => /냄이에요|\.\.$/.test(x))) &&
+      talks[0].t.say.some((x) => x.includes('넣지 않았어요')) && talks[2].t.topic === 'lab' && talks[0].t.topic === 'employment' &&
+      talks[2].t.steps.some((x) => x.includes('한국산업기술진흥협회에 연구소')) && talks.every(({ t }) => t.steps.every((x) => !/[(]/.test(x) || /[)]/.test(x))),
+    talks.map(({ t }) => t.say),
   )
   const ask = buildSituationPlan('hire-woman', full, today, 1).fit
   const noAns = buildSituationPlan('hire-disabled', withScenarioAnswer(full, 'hireDisabled', 'no', '2026-10-01T00:00:00.000Z'), today, 1).fit

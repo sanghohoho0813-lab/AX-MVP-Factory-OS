@@ -15,7 +15,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { openFold } from '../ui/fold'
 import { createPortal, flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, ClipboardCopy, MessageSquareText, Minus, Paperclip, Printer } from 'lucide-react'
+import { ArrowRight, Check, ClipboardCopy, Copy, MessageCircle, MessageSquareText, Minus, Paperclip, Printer } from 'lucide-react'
+import { TALK_CAUTION, planTalk, talkText } from '../../services/consultTalk'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, type Tone } from '../ui/primitives'
@@ -128,6 +129,8 @@ export function ClientSituationPlan({
   const copy = async () => {
     showToast((await copyText(planSummary(plan, record.companyName))) ? '설계서 요약을 복사했어요 — 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')
   }
+  // D-510 이 설계서를 고객에게 이렇게 말하세요(설계서 숫자 그대로) — 누를 때만 펼침
+  const [talkOpen, setTalkOpen] = useState(false)
 
   return (
     <div ref={boxRef} className="scroll-mt-36">
@@ -292,7 +295,11 @@ export function ClientSituationPlan({
                   <MessageSquareText aria-hidden="true" className="size-4" /> 빠진 숫자 요청 문구
                 </Button>
               )}
+              <Button variant="ghost" onClick={() => setTalkOpen((v) => !v)} aria-expanded={talkOpen} data-testid="plan-talk">
+                <MessageCircle aria-hidden="true" className="size-4" /> {talkOpen ? '말하기 접기' : '이렇게 말하기'}
+              </Button>
             </div>
+            {talkOpen && <PlanTalkBox plan={plan} />}
             {attached?.key === key && (
               <p className="t-sub flex flex-wrap items-center gap-x-2 break-keep text-success-800" role="status" data-testid="plan-attached">
                 <Check aria-hidden="true" className="size-4 shrink-0" />
@@ -425,6 +432,43 @@ function PlanPrintSheet({ plan, companyName, today }: { plan: SituationPlan; com
           ))}
         </footer>
       </article>
+    </div>
+  )
+}
+
+/** D-510 설계서 → 고객에게 이렇게 말하세요 · 진행 순서 · 대표님이 물으면 2 · 복사(설계서 숫자 그대로 — 새 숫자 0) */
+function PlanTalkBox({ plan }: { plan: SituationPlan }) {
+  const { showToast } = useToast()
+  const card = useMemo(() => planTalk(plan), [plan])
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="plan-talk-box" data-topic={card.topic}>
+      <p className="t-meta font-semibold text-slate-500">고객에게 이렇게 말하세요</p>
+      <ul className="flex flex-col gap-1" data-testid="plan-talk-say">
+        {card.say.map((x) => (
+          <li key={x} className="t-sub font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">
+            “{x}”
+          </li>
+        ))}
+      </ul>
+      <ol className="flex flex-col gap-0.5" data-testid="plan-talk-steps">
+        {card.steps.map((x, i) => (
+          <li key={x} className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
+            {i + 1}. {x}
+          </li>
+        ))}
+      </ol>
+      <dl className="flex flex-col gap-1">
+        {card.faq.slice(0, 2).map((f) => (
+          <div key={f.q}>
+            <dt className="t-sub font-bold break-keep text-slate-900">Q. {f.q}</dt>
+            <dd className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">{f.a}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="t-meta break-keep text-slate-600">※ {TALK_CAUTION}</p>
+      <Button size="sm" variant="ghost" className="self-start" onClick={async () => showToast((await copyText(talkText(card))) ? '말하기를 복사했어요 — 메모나 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')} data-testid="plan-talk-copy">
+        <Copy aria-hidden="true" className="size-4" /> 이 말하기 복사
+      </Button>
     </div>
   )
 }
