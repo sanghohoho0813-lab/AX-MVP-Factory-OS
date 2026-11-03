@@ -71,6 +71,7 @@ check(
   secIds,
 )
 check("T2-1 대본에 수수료 · 영업자 · 업무 일기 · 'AI' 말 0 · 확정이라고 말하지 않는다는 한 줄", !/수수료|영업자|업무 일기|\bAI\b/.test(scriptText) && scriptText.includes("'확정 · 무조건'이라고 말하지 않아요"), scriptText.slice(0, 300))
+check('T2-3 제안 바로 뒤 「대표님이 망설이시면」 — 이렇게 말씀하시면 문답 5(생각 좀 해 볼게요 · 세무사님 · 전에 안 됐어요 · 서류 시간 · 정말 받을 수 있어요?)', secIds[2 + pickKeys.length] === 'hesitate' && (await sheet.locator('[data-testid="talk-script-section"][data-id="hesitate"] dd').count()) === 5 && scriptText.includes('이렇게 말씀하시면'), secIds)
 check('T2-2 먼저 여쭤볼 것 — 서류는 "받아 볼 수 있을까요?" · 정보(연구 인원 · 공간)는 서류처럼 묻지 않음', /받아 볼 수 있을까요\?/.test(scriptText) && !/(수|공간|활동)을 받아 볼/.test(scriptText), scriptText.slice(0, 500))
 
 // T3

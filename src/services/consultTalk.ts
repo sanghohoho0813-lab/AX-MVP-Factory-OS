@@ -340,6 +340,8 @@ export interface ScriptSection {
   lines: string[]
   /** 제안 칸 — 대표님이 물을 만한 것(두 개만) */
   faq?: TalkQA[]
+  /** 문답 머리(없으면 '대표님이 물으면') */
+  faqTitle?: string
   /** 제안 칸 — 그 모듈(말하기 카드 탭으로 이어짐) */
   key?: string
 }
@@ -350,6 +352,18 @@ export interface MeetingScript {
   pickCount: number
   sections: ScriptSection[]
 }
+
+/**
+ * D-508 대표님이 망설이시면 — 제안을 들은 뒤 자주 나오는 말에 초보 컨설턴트가 할 말(일반 응대 · 어느 회사에나).
+ * 밀어붙이지 않는다 — 기다려 드리고, 자료만 먼저 · 세무사와 함께 · 안 된 이유부터 · 서류는 우리가 정리. 수수료 이야기는 여기 넣지 않는다(컨설턴트 메모).
+ */
+export const HESITATE: readonly TalkQA[] = [
+  { q: '생각 좀 해 볼게요', a: '네, 천천히 정하셔도 돼요. 자료만 먼저 받아 두면, 정하실 때 바로 시작할 수 있고 기한을 놓치지 않게 챙겨 드려요.' },
+  { q: '세무사님이 다 알아서 해 줘요', a: '세무사님은 신고를 맡으시고, 저희는 받을 수 있는 지원 · 공제를 찾아 신청까지 챙겨요. 찾은 내용은 세무사님과 함께 확인해서 진행해요.' },
+  { q: '전에 해 봤는데 안 됐어요', a: '그때 어떤 이유로 안 됐는지 알려 주시면 그 부분부터 먼저 점검해요. 해마다 조건 · 예산이 바뀌기도 해요.' },
+  { q: '서류 챙길 시간이 없어요', a: '어디서 떼는지까지 정리한 목록을 보내 드려요. 종이 서류는 휴대폰으로 찍어 보내 주셔도 돼요.' },
+  { q: '정말 받을 수 있어요?', a: "확정은 기관 심사(세금은 세무서)로 정해져요. 지금 자료로 될 만한 것과 어려운 것을 솔직하게 나눠 말씀드릴게요." },
+]
 
 /**
  * 미팅 대본 한 장 — 먼저 제안할 것(같은 엔진 · 같은 순서) 그대로.
@@ -376,6 +390,8 @@ export function meetingScript(record: Pick<ClientOpsRecord, 'companyName'>, insi
   picks.forEach(({ p, card }, i) => {
     sections.push({ id: `pick-${p.key}`, key: p.key, title: `제안 ${i + 1} · ${p.label}`, lines: card.say, faq: card.faq.slice(0, 2) })
   })
+  // 제안을 들은 뒤 망설이시면 — 밀어붙이지 않는 응대(제안이 있을 때만)
+  if (picks.length) sections.push({ id: 'hesitate', title: '대표님이 망설이시면', lines: [], faq: [...HESITATE], faqTitle: '이렇게 말씀하시면' })
   // 받을 서류는 종이 · 파일만(직원 수 · 연구 공간 같은 것은 위 '먼저 여쭤볼 것' 에서 듣는다)
   const docs = [...new Set([...picks.flatMap(({ p }) => (p.request ? [`${p.label} 신청 서류 ${p.request.count}가지(목록은 따로 보내 드림)`] : [])), ...need.filter(isDocName).map(shortName)])]
   if (docs.length) sections.push({ id: 'docs', title: '받을 서류', lines: ['다음 자료만 보내 주시면 바로 이어서 진행할게요.', ...docs.map((d) => `· ${d}`)] })
@@ -398,7 +414,7 @@ export function meetingScriptText(s: MeetingScript): string {
     out.push(`${i + 1}. ${sec.title}`)
     out.push(...sec.lines.map((l) => (l.startsWith('· ') ? `   ${l}` : `   ${l}`)))
     if (sec.faq?.length) {
-      out.push('   대표님이 물으면')
+      out.push(`   ${sec.faqTitle ?? '대표님이 물으면'}`)
       out.push(...sec.faq.flatMap((f) => [`   Q. ${f.q}`, `   A. ${f.a}`]))
     }
     out.push('')
@@ -465,6 +481,7 @@ export const TOPIC_LABEL: Record<string, string> = {
   gift: '증여 · 상속',
   cert: '기업인증',
   grants: '지원사업',
+  hesitate: '대표님이 망설이시면',
 }
 
 export interface FaqHit {
@@ -507,6 +524,14 @@ export function faqSearch(query: string, terms: Record<string, string> = {}, lim
         hits.push({ topic, label, q: f.q, a: f.a, score })
       }
     }
+  }
+  for (const f of HESITATE) {
+    let score = 0
+    for (const w of qs) {
+      if (f.q.includes(w)) score += 3
+      if (f.a.includes(w)) score += 1
+    }
+    if (score > 0) hits.push({ topic: 'hesitate', label: TOPIC_LABEL.hesitate, q: f.q, a: f.a, score })
   }
   for (const [term, def] of Object.entries(terms)) {
     let score = 0

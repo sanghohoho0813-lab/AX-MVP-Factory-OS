@@ -4,7 +4,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
-import { TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
+import { HESITATE, TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
 import { runScenarios } from '../scenarios'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { CONSULT_TERMS, splitTerms } from '../consultTerms'
@@ -222,6 +222,18 @@ check(
   'T25 대표님이 자주 묻는 말 더 — 대표 가족 → 고용 · 세무조사 → 돌려받기 · 가지급금 두 곳 이상 · 벤처 몇 년 → 인증 3년',
   f5[0]?.topic === 'employment' && f6.length >= 2 && f6.some((h) => h.a.includes('경정청구')) && f7[0]?.topic === 'cert' && f7[0]?.a.includes('3년'),
   { f5: f5.map((h) => h.topic), f6: f6.map((h) => `${h.topic}:${h.q}`), f7: f7.map((h) => `${h.topic}:${h.q}`) },
+)
+
+const hIdx = ids.indexOf('hesitate')
+const lastPick = Math.max(...ids.map((id, i) => (id.startsWith('pick-') ? i : -1)))
+const hSec = script.sections.find((x) => x.id === 'hesitate')
+const f8 = faqSearch('생각해 볼게요')
+const f9 = faqSearch('서류 챙길 시간')
+check(
+  'T26 대표님이 망설이시면 — 제안 바로 뒤 · 문답 5(이렇게 말씀하시면) · 수수료 · 확정 말 0 · 제안 없으면 없음 · 찾기에서도(생각해 볼게요 · 서류 챙길 시간)',
+  hIdx === lastPick + 1 && hSec?.faq?.length === HESITATE.length && hSec.faqTitle === '이렇게 말씀하시면' && !/수수료|무조건|100%/.test(JSON.stringify(HESITATE)) &&
+    !emptyScript.sections.some((x) => x.id === 'hesitate') && f8[0]?.topic === 'hesitate' && f9[0]?.topic === 'hesitate' && meetingScriptText(script).includes('   이렇게 말씀하시면\n   Q. 생각 좀 해 볼게요'),
+  { ids, f8: f8.map((h) => h.topic), f9: f9.map((h) => h.topic) },
 )
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)

@@ -61,7 +61,7 @@ function ScriptDocument({ s, printing }: { s: MeetingScript; printing?: boolean 
             </ul>
             {sec.faq && sec.faq.length > 0 && (
               <dl className="mt-2 flex flex-col gap-1 pl-8" data-testid="talk-script-faq">
-                <dt className="t-meta font-semibold text-slate-500">대표님이 물으면</dt>
+                <dt className="t-meta font-semibold text-slate-500">{sec.faqTitle ?? '대표님이 물으면'}</dt>
                 {sec.faq.map((f) => (
                   <dd key={f.q} className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
                     <b className="font-semibold text-slate-900">Q. {f.q}</b> {f.a}
@@ -142,7 +142,7 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
 function AskFinder() {
   const [q, setQ] = useState('')
   const hits = useMemo(() => faqSearch(q, CONSULT_TERMS), [q])
-  const EXAMPLES = ['갚아야 하나요', '직원이 그만두면', '세무조사', '얼마나 걸려요', '인정이자']
+  const EXAMPLES = ['갚아야 하나요', '직원이 그만두면', '세무조사', '얼마나 걸려요', '인정이자', '생각해 볼게요']
   return (
     <div className="flex flex-col gap-3" data-testid="talk-ask">
       <label className="flex flex-col gap-1.5">
