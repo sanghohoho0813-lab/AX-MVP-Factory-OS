@@ -195,7 +195,9 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
-      {talk !== undefined && <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} />}
+      {talk !== undefined && (
+        <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} memo={onCommitQuiet ? { workspaceId, userId: userId ?? null, onCommit: onCommitQuiet } : undefined} />
+      )}
       {/* D-492 서류에서 읽어 넣은 중요 번호 — 맨 위에서 처음 한 번만 원본과 맞춰 보기(다 확인하면 사라진다) */}
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}

@@ -12,6 +12,7 @@
  *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
  *   T11 상황 예시 펼침 [이렇게 말하기] → 같은 계산 결과로 말하기 · 복사 · 접기
  *   T12 [대표님이 물으면 찾기] — 낱말 → 가장 가까운 답 · 용어 뜻 · 못 찾으면 안내
+ *   T13 [미팅 메모] — 여쭤볼 것(미팅 순서와 같은 줄) · 적은 답 → 업무 일기 · 읽은 사정 · 숫자 · 다음 약속 [이 업체에 기록] → 업체 기록
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -46,7 +47,7 @@ await page.getByTestId('top-picks-talk').click()
 const sheet = page.getByTestId('talk-sheet')
 await sheet.waitFor()
 const tabKeys = await sheet.getByTestId('talk-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
-check('T1 [말하기 대본] → 창 · 탭 = 미팅 순서 + 먼저 제안할 것과 같은 순서 + 대표님이 물으면 찾기', tabKeys[0] === 'script' && JSON.stringify(tabKeys.slice(1, 1 + pickKeys.length)) === JSON.stringify(pickKeys) && tabKeys.at(-1) === 'ask' && tabKeys.length === pickKeys.length + 2 && pickKeys.length > 0, { tabKeys, pickKeys })
+check('T1 [말하기 대본] → 창 · 탭 = 미팅 순서 + 먼저 제안할 것과 같은 순서 + 대표님이 물으면 찾기 + 미팅 메모', tabKeys[0] === 'script' && JSON.stringify(tabKeys.slice(1, 1 + pickKeys.length)) === JSON.stringify(pickKeys) && tabKeys.at(-2) === 'ask' && tabKeys.at(-1) === 'memo' && tabKeys.length === pickKeys.length + 3 && pickKeys.length > 0, { tabKeys, pickKeys })
 // T12 대표님이 물으면 찾기 — 낱말 → 가장 가까운 답(모든 모듈 · 용어 뜻) · 예시 단추 · 못 찾으면 안내
 await sheet.locator('[data-testid="talk-tab"][data-key="ask"]').click()
 const askBox = sheet.getByTestId('talk-ask')
@@ -113,7 +114,8 @@ if (outside) {
   await page.locator(`[data-testid="smart-insight"][data-key="${outside}"] [data-testid="smart-insight-talk"]`).click()
   await page.getByTestId('talk-sheet').waitFor()
   const tk = await page.getByTestId('talk-tab').evaluateAll((els) => els.map((e) => [e.getAttribute('data-key'), e.getAttribute('aria-selected')]))
-  check('T5-1 제안 밖 모듈 → 찾기 앞 탭으로 바로 열림(그 모듈 말하기)', tk.at(-2)[0] === outside && tk.at(-2)[1] === 'true' && (await page.getByTestId('talk-card').getAttribute('data-key')) === outside, tk)
+  const askAt = tk.findIndex(([k]) => k === 'ask')
+  check('T5-1 제안 밖 모듈 → 찾기 앞 탭으로 바로 열림(그 모듈 말하기)', askAt > 0 && tk[askAt - 1][0] === outside && tk[askAt - 1][1] === 'true' && (await page.getByTestId('talk-card').getAttribute('data-key')) === outside, tk)
   await page.keyboard.press('Escape')
 }
 
@@ -212,6 +214,34 @@ if (apptCount) {
   check('T10-1 누르면 그 업체 말하기 대본 창이 바로', (await page.getByTestId('talk-sheet').count()) === 1)
   await page.keyboard.press('Escape')
 }
+
+// T13 미팅 메모 — 여쭤볼 것을 보며 답 적기 → 업무 일기 · [이 업체에 기록]
+await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart&talk=1', { waitUntil: 'networkidle' })
+await page.getByTestId('talk-sheet').waitFor()
+const scriptAsks = await page.getByTestId('talk-script-section').filter({ hasText: '먼저 여쭤볼 것' }).locator('li').allInnerTexts()
+const journalBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol').length)
+await page.locator('[data-testid="talk-tab"][data-key="memo"]').click()
+const memo = page.getByTestId('talk-memo')
+await memo.waitFor()
+await memo.getByTestId('talk-memo-asks').locator('summary').click()
+const memoAsks = await memo.getByTestId('talk-memo-asks').locator('li').allInnerTexts()
+const focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? '')
+check('T13 [미팅 메모] — 여쭤볼 것 = 미팅 순서 「먼저 여쭤볼 것」 과 같은 줄 · 적는 칸에 바로 커서 · 이렇게 적으면 예시', memoAsks.length > 0 && memoAsks.length === scriptAsks.length && memoAsks.every((a, i) => scriptAsks[i]?.includes(a.replace(/^·\s*/, ''))) && (await memo.getByTestId('talk-memo-example').count()) === 1, { memoAsks, scriptAsks, focused })
+await memo.locator('textarea[aria-label="기록 내용"]').fill('대표님 말씀 — 직원 23명, 내년에 기계 설비 살 계획, 다음 주 화요일 오후 2시 2차 미팅')
+await memo.getByRole('button', { name: '기록', exact: true }).click()
+const memoTalk = page.getByTestId('talk-memo-talk')
+const memoShown = await memoTalk.waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+const memoKeys = memoShown ? await memoTalk.locator('[data-key]').evaluateAll((els) => els.map((e) => e.getAttribute('data-key'))) : []
+const journalAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol').length)
+check('T13-1 [기록] → 업무 일기에 이 업체로 한 줄 · 읽은 것 카드(설비 계획 · 직원 23명 · 다음 약속)', journalAfter === journalBefore + 1 && memoShown && memoKeys.includes('facility') && memoKeys.includes('employeeCount') && (await memoTalk.getByTestId('home-ask-talk-next').count()) === 1, { journalBefore, journalAfter, memoKeys })
+if (memoShown) {
+  await memoTalk.getByTestId('home-ask-talk-save').click()
+  await page.locator('[data-testid="talk-memo-talk"][data-saved="1"]').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(400)
+  const hr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
+  check('T13-2 [이 업체에 기록] → 설비 답 · 직원 수 · 다음 할 일(2차 미팅) · 창은 그대로 열림', hr.decided?.['scn.facility']?.a === 'yes' && hr.employeeCount === '23명' && /미팅/.test(hr.nextAction ?? '') && !!hr.nextActionDueDate && (await page.getByTestId('talk-sheet').count()) === 1, { d: hr.decided?.['scn.facility'], e: hr.employeeCount, n: hr.nextAction })
+}
+await page.keyboard.press('Escape')
 
 // T7 390
 const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })

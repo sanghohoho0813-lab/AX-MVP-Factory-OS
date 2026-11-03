@@ -927,6 +927,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           record={record}
           today={today}
           workspaceId={workspaceId}
+          userId={userId}
           onUpload={openUpload}
           onCommitQuiet={commit}
           onRequestText={(text, meta) =>
