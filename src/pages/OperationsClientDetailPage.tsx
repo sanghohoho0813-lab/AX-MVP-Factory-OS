@@ -196,6 +196,7 @@ import { DocFileActions } from '../components/ops/DocFileActions'
 import { DocKindPicker, DocShelfBar, OtherDocsPanel } from '../components/ops/DocShelfBar'
 import { CriticalIdCheck } from '../components/ops/CriticalIdCheck'
 import { docReviewCounts, docShelfSummary, isOtherCell } from '../services/docShelf'
+import { serviceLine } from '../services/serviceLine'
 import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
@@ -1213,6 +1214,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           {SERVICES.map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
+            const svcLine = serviceLine(record, meta.key, today, reqKeys)
             const started = isServiceStarted(state.status)
             const blocked = started && missing.length > 0
             const open = isServiceOpen(state.status)
@@ -1279,10 +1281,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   </button>
 
                   {/* 다음 할 일은 제목 아래에 붙이고, 상태 칸은 넓은 화면에서 제목 옆으로 간다 */}
-                  {(state.nextStep || meta.recurring) && (
-                    <p className="t-sub w-full min-w-0 truncate pl-6 text-slate-500 sm:order-3 sm:pl-6">
-                      {state.nextStep ? `다음: ${state.nextStep}` : ''}
-                      {state.nextStep && meta.recurring ? ' · ' : ''}
+                  {/* D-520 업무 한 줄 — 서류 n/m · 회신 대기 · 목표 · 다음(고객 관리 카드와 같은 규칙 · services/serviceLine) */}
+                  {(svcLine.parts.length > 0 || meta.recurring) && (
+                    <p className="t-sub w-full min-w-0 truncate pl-6 text-slate-500 sm:order-3 sm:pl-6" data-testid="svc-line" title={[...svcLine.parts, ...(meta.recurring ? ['반복'] : [])].join(' · ')}>
+                      {svcLine.parts.map((part, i) => (
+                        <span key={part} className={part.startsWith('회신 대기') && svcLine.waiting.days >= 3 ? 'font-semibold text-danger-700' : part.startsWith('회신 대기') ? 'font-semibold text-brand-700' : ''}>
+                          {i > 0 ? ' · ' : ''}
+                          {part}
+                        </span>
+                      ))}
+                      {svcLine.parts.length > 0 && meta.recurring ? ' · ' : ''}
                       {meta.recurring ? '반복' : ''}
                     </p>
                   )}

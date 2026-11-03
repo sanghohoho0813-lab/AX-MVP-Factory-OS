@@ -4,6 +4,7 @@
  * 사람이 [받았어요] · 다시 보냄 · 끝내기 · 남은 것만 다시 요청 문구 · 저장 모양 다듬기 · 고객 관리 · 오늘 한 줄.
  * D-518 서류 단계 — 받음 · 요청함 · 확인할 정보(받은 서류에서 읽었지만 확인 전) · 칸마다 확인할 정보 수.
  * D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠 단계 · 다음 단계 · 언제 띄우나.
+ * D-520 업무 한 줄 — 서류 n/m · 회신 대기(요청함) · 목표 · 다음 · 업체 상세와 고객 관리 카드가 같은 규칙.
  */
 import { normalizeClientOps, withCustomDocument, withDocument } from '../clientOpsService'
 import { buildDocumentRequestMessage } from '../clientOpsMessages'
@@ -30,6 +31,9 @@ import {
 import type { ClientOpsRecord, DocRequest } from '../../types/clientOps'
 import { docReviewCounts, docShelfSummary } from '../docShelf'
 import { firstUseNext, firstUseSteps, firstUseVisible, isNewAccount } from '../firstUse'
+import { serviceLine } from '../serviceLine'
+import { withService } from '../clientOpsService'
+import { chipStateFor } from '../../components/ops/ClientBoardCard'
 import type { JournalEntry } from '../../types/bridge'
 
 let passed = 0
@@ -225,6 +229,26 @@ check('R3c 업체 기록에 붙음 · 끝내지 않은 요청 1', openRequests(r
   check('F6 다 함 — 다음 없음 · 안 띄움', firstUseNext(s4) === null && !firstUseVisible(s4, [withDoc], today))
   const s5 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'follow_up', clientId: 'n1' })], ideas: 0, marketing: false })
   check('F7 마케팅이 닫힌 계정(팀장) — 세 단계 · 다 했으면 안 띄움', s5.length === 3 && firstUseNext(s5) === null && !firstUseVisible(s5, [withDoc], today))
+}
+
+/* L D-520 업무 한 줄 */
+{
+  let r = withService(base(), 'businessScope', { status: 'in_progress', dueDate: '2026-11-20', nextStep: '법무사 확인' })
+  r = withDocument(r, 'businessRegistration', { received: true })
+  const l0 = serviceLine(r, 'businessScope', today)
+  check('L1 서류 1/3 · 목표 11/20 · 다음 · 시작했는데 서류 모자람(blocked) · 회신 대기 없음', l0.parts.join(' · ') === '서류 1/3 · 목표 11/20 · 다음: 법무사 확인' && l0.blocked && l0.waiting.count === 0, l0.parts)
+  const req = newDocRequest(r, { id: 'qL', title: '서류 요청 문구', text: '아래 서류를 보내 주시면 바로 검토해 드리겠습니다.\n\n1. 법인등기부등본\n   - 인터넷등기소', today: '2026-10-30', nowIso: '2026-10-30T09:00:00.000Z' })
+  const r2 = req ? withDocRequest(r, req) : r
+  const l1 = serviceLine(r2, 'businessScope', today)
+  check('L2 이 업무 서류 중 고객에게 요청해 둔 것 → \'회신 대기 1건 4일째\'', !!req && l1.waiting.count === 1 && l1.waiting.days === 4 && l1.parts.includes('회신 대기 1건 4일째'), { parts: l1.parts, req: req?.items })
+  const l2 = serviceLine(withService(r2, 'businessScope', { status: 'done' }), 'businessScope', today)
+  check('L3 완료한 업무 — 목표는 빼고(열린 업무만) · 서류 n/m 은 남김', !l2.parts.some((p) => p.startsWith('목표')) && l2.parts[0] === '서류 1/3' && !l2.blocked)
+  const l3 = serviceLine(withService(r2, 'businessScope', { status: 'in_progress', dueDate: '2026-11-01' }), 'businessScope', today)
+  check('L4 목표일 지남 → \'목표 11/1 지남\'', l3.parts.includes('목표 11/1 지남') && !!l3.due?.overdue)
+  const chip = chipStateFor(r2, 'businessScope', '업종추가', today, 7)
+  check('L5 고객 관리 카드 칩도 같은 규칙 — 시작했는데 서류 모자람 → \'서류 1/3\' · 마우스를 올리면 한 줄 전부', chip.docs === '서류 1/3' && (chip.line ?? '').includes('회신 대기 1건 4일째'), chip)
+  const none = chipStateFor(base(), 'businessScope', '업종추가', today, 7)
+  check('L6 시작 전 업무 — 칩에 서류 글자 없음(예전 그대로)', none.docs === undefined)
 }
 
 console.log(`\ndocRequests: ${passed} passed, ${failed} failed`)

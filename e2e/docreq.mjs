@@ -206,6 +206,33 @@ await m.close()
 // D12
 check('D12 JS 오류 0', errs.length === 0, errs.slice(0, 3))
 
+/* ---------------- D-520 업무 한 줄(서류 n/m · 회신 대기 · 목표 · 다음) ---------------- */
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await c.newPage()
+  const e4 = []
+  p.on('pageerror', (e) => e4.push(String(e)))
+  await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await p.evaluate(seedScript())
+  await p.goto(DETAIL, { waitUntil: 'networkidle' })
+  await p.locator('#docs').waitFor()
+  await p.getByRole('button', { name: '서류 요청 문구', exact: true }).first().click()
+  const d = p.getByRole('dialog', { name: '서류 요청 문구' })
+  await d.waitFor()
+  await d.getByTestId('message-followup').click()
+  await d.getByTestId('message-followup-done').waitFor()
+  await d.getByRole('button', { name: '닫기' }).last().click()
+  await p.goto(BASE + '/ops/clients/cli_hansol?tab=work', { waitUntil: 'networkidle' })
+  const lines = await p.getByTestId('svc-line').allInnerTexts()
+  const waitLine = lines.find((t) => t.includes('회신 대기')) ?? ''
+  check('L1 업무 카드 한 줄 — 서류 n/m · 회신 대기 n건 오늘 요청 · 목표 · 다음(진행 중 업무)', /서류 \d+\/\d+/.test(waitLine) && /회신 대기 \d+건 오늘 요청/.test(waitLine), lines)
+  await p.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  const chipDocs = await p.getByTestId('chip-docs').allInnerTexts()
+  check('L2 고객 관리 카드 업무 칩 — 같은 규칙으로 \'· 서류 n/m\'(시작했는데 서류 모자란 업무)', chipDocs.length >= 1 && chipDocs.every((t) => /· 서류 \d+\/\d+/.test(t)), chipDocs)
+  check('L3 오류 0', e4.length === 0, e4)
+  await c.close()
+}
+
 /* ---------------- D-519 처음 시작(오늘 맨 위 한 줄) ---------------- */
 {
   const c = await browser.newContext({ viewport: { width: 1440, height: 900 } })

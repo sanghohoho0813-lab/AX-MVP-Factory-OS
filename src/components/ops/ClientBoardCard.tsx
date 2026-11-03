@@ -20,10 +20,11 @@ import { ArrowRight, BellRing, ChevronRight, FileUp, Sparkles } from 'lucide-rea
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageLabelOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
-import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
+import type { ClientOpsRecord, DocumentKey, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
-import { requestSummary } from '../../services/docRequests'
+import { pendingDocKeys, requestSummary } from '../../services/docRequests'
+import { serviceLine } from '../../services/serviceLine'
 import { GENDER_LABEL, yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
 import { ageOf } from '../../tools/shared/clientPrefill'
 import { contractAgeShort } from '../../services/contractSummary'
@@ -46,6 +47,10 @@ export interface ChipState {
   /** 7일 이내 마감 */
   dueSoon: boolean
   daysLeft: number | null
+  /** D-520 업무 한 줄(업체 상세 업무 탭과 같은 규칙) — 시작했는데 서류가 모자라면 '서류 2/5' */
+  docs?: string
+  /** D-520 마우스를 올리면 보이는 한 줄 전부 */
+  line?: string
 }
 
 export function chipStateFor(
@@ -54,10 +59,13 @@ export function chipStateFor(
   label: string,
   today: string,
   dueSoonDays: number,
+  /** D-520 이미 구한 요청함 칸(카드 한 장에서 한 번만) */
+  pending?: Map<DocumentKey, { days: number }>,
 ): ChipState {
   const st = record.services[key]
   const open = isServiceOpen(st.status)
   const left = st.dueDate ? daysLeftFrom(today, st.dueDate) : null
+  const line = serviceLine(record, key, today, pending)
   return {
     key,
     label,
@@ -65,6 +73,8 @@ export function chipStateFor(
     overdue: open && left !== null && left < 0,
     dueSoon: open && left !== null && left >= 0 && left <= dueSoonDays,
     daysLeft: left,
+    ...(line.blocked ? { docs: `서류 ${line.docs.have}/${line.docs.need}` } : {}),
+    ...(line.parts.length ? { line: line.parts.join(' · ') } : {}),
   }
 }
 
@@ -88,13 +98,15 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      title={`${chip.label} · ${SERVICE_STATUS_LABEL[chip.status]} — 눌러서 상태 바꾸기`}
+      title={`${chip.label} · ${SERVICE_STATUS_LABEL[chip.status]}${chip.line ? ` · ${chip.line}` : ''} — 눌러서 상태 바꾸기`}
       data-chip-status={chip.status}
       className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-500 ${look}`}
     >
       <span className="whitespace-nowrap font-semibold">{chip.label}</span>
       <span className="whitespace-nowrap">{danger ? `기한 지남 ${due}`.trim() : SHORT[chip.status]}</span>
       {!danger && due !== '' && <span className="whitespace-nowrap font-bold">{due}</span>}
+      {/* D-520 시작했는데 서류가 모자람 — 업체 상세 업무 카드와 같은 규칙 */}
+      {chip.docs && <span className="whitespace-nowrap text-slate-600" data-testid="chip-docs">· {chip.docs}</span>}
     </button>
   )
 }
@@ -166,7 +178,8 @@ export function ClientBoardCard({
   const p = clientOpsProgress(record, today)
   /** D-512 고객에게 부탁한 서류 — 끝내지 않은 요청이 없으면 null */
   const docReq = requestSummary(record, today)
-  const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays))
+  const pendingReq = pendingDocKeys(record, today)
+  const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays, pendingReq))
   /*
    * 접는 기준은 한 문장이다: **손이 갈 일이 남았으면 보이고, 끝났거나 아직 시작 안 했으면 접힌다.**
    *   보인다 — 마감 지남 · 마감 임박 · 진행 중 · 고객 대기 · 보류(사람이 멈춰 둔 것, 왜 멈췄는지 봐야 한다)
