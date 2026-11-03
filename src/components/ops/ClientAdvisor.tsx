@@ -21,6 +21,7 @@ import { Badge, Surface, type Tone } from '../ui/primitives'
 import { AiAssist } from '../ai/AiAssist'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { useToast } from '../ui/toastContext'
+import { TermText } from '../ui/TermText'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
@@ -217,7 +218,9 @@ function AnswerCard({ a, onAsk, onCopy, onSetNext }: { a: AdvisorAnswer; onAsk: 
             <p className="t-meta font-semibold text-slate-500">이 회사 기준</p>
             <ul className="t-sub mt-1 flex flex-col gap-0.5 break-keep text-slate-700">
               {a.facts.map((f) => (
-                <li key={f} className="[overflow-wrap:anywhere]">· {f}</li>
+                <li key={f} className="[overflow-wrap:anywhere]">
+                  · <TermText text={f} />
+                </li>
               ))}
             </ul>
           </div>
@@ -229,7 +232,9 @@ function AnswerCard({ a, onAsk, onCopy, onSetNext }: { a: AdvisorAnswer; onAsk: 
               {a.steps.map((s, i) => (
                 <li key={`${i}-${s}`} className="flex gap-2">
                   <span className="shrink-0 font-bold text-brand-700">{i + 1}.</span>
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{s}</span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    <TermText text={s} />
+                  </span>
                 </li>
               ))}
             </ol>

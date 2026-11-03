@@ -25,6 +25,7 @@ import { copyText } from '../../services/grants/grantView'
 import { manwonText } from '../../services/clientInsights'
 import { SCENARIO_QUESTIONS, type QuestionKey } from '../../services/scenarioFit'
 import { buildSituationPlan, planSummary, situationChoices, type BlockState, type PlanBlock, type PlanId, type SituationPlan } from '../../services/situationPlan'
+import { TermText } from '../ui/TermText'
 
 const BLOCK_TONE: Record<BlockState, Tone> = { ok: 'success', need: 'warning', none: 'neutral' }
 const BLOCK_LABEL: Record<BlockState, string> = { ok: '계산됨', need: '받으면 계산', none: '해당 없음' }
@@ -326,13 +327,17 @@ function PlanBlockRow({ b }: { b: PlanBlock }) {
           </span>
         )}
       </div>
-      <p className="t-body font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{b.headline}</p>
+      <p className="t-body font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">
+        <TermText text={b.headline} />
+      </p>
       {b.lines.length > 0 && (
         <ul className="flex flex-col gap-1">
           {b.lines.map((l) => (
             <li key={l} className="t-sub flex gap-2 break-keep text-slate-700 [overflow-wrap:anywhere]">
               <span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
-              <span className="min-w-0">{l}</span>
+              <span className="min-w-0">
+                <TermText text={l} />
+              </span>
             </li>
           ))}
         </ul>
