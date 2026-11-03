@@ -80,7 +80,7 @@ import { certContextOf } from '../../certification/integration/clientContext'
 import { assessAll, assessVenture } from '../../certification/core/assess'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, withGrantChip, insightChanges, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
-import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
+import { buildDiagnosis, customerText, diagnosisKakao, diagnosisNote, givenOf, meetingFollowUp, sinceLines, withDiagnosisGiven } from '../clientDiagnosis'
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText, policyDocsLine, smeConfirmed, waitingLabels, waitingNames } from '../clientInsights'
@@ -393,6 +393,18 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('D-352 정보가 없으면 — 제안 0 · 보내 주실 자료(어디서 떼는지 · 어느 진단에) · 다음 순서 첫 줄이 자료 요청', dn.picks.length === 0 && dn.requests.length > 0 && dn.requests.every((r) => r.for.length > 0) && dn.steps[0].includes('자료'), JSON.stringify([dn.requests, dn.steps]))
   const kt = diagnosisKakao(dg, '미래AI랩 김팀장')
   check('D-352 카톡 요약 — 회사 이름 · 먼저 제안드릴 것 · 서명 · 빈 줄 셋 없음', kt.startsWith(`[${dg.companyName}] 맞춤 진단 요약`) && (dg.picks.length === 0 || kt.includes('■ 먼저 제안드릴 것')) && kt.endsWith('미래AI랩 김팀장') && !/\n{3,}/.test(kt), kt)
+  // D-508 미팅 뒤 정리 문자 — 진단서와 같은 제안 · 받을 자료 + 다음 만남(미팅 · 방문 약속만 · 지난 날짜 · 내부 할 일은 빼고)
+  const fu = meetingFollowUp(dg, { date: '2026-10-07', text: '2차 미팅' }, '미래AI랩 김팀장')
+  const fuNo = meetingFollowUp(dg, { date: '2026-10-07', text: '서류 독촉 전화' })
+  const fuPast = meetingFollowUp(dg, { date: '2026-09-30', text: '2차 미팅' })
+  const fuEmpty = meetingFollowUp(dn, null)
+  check(
+    'D-508 미팅 뒤 정리 문자 — 감사 인사 · 오늘 말씀드린 것(진단서 제안 그대로) · 다음 만남 10월 7일(수) · 서명 · 내부 할 일 · 지난 약속은 안 넣음 · 제안 없으면 보내 주실 자료',
+    fu.startsWith('대표님, 오늘 시간 내 주셔서 감사합니다.') && (dg.picks.length === 0 || (fu.includes('■ 오늘 말씀드린 것') && dg.picks.every((p) => fu.includes(`${p.label} — ${p.text}`)))) &&
+      fu.includes('- 다음 만남: 10월 7일(수) · 2차 미팅') && fu.endsWith('미래AI랩 김팀장') && !fuNo.includes('다음 만남') && !fuNo.includes('독촉') && !fuPast.includes('다음 만남') &&
+      !fuEmpty.includes('■ 오늘 말씀드린 것') && fuEmpty.includes('■ 보내 주실 자료') && !/\n{3,}|업무 일기|수수료|영업자/.test(fu + fuEmpty),
+    fu,
+  )
   check('D-352 고객 말로 — ★ 세무사 표시 · 신고 누락 안내는 빼고', customerText('연구소가 있어요 · 신고 때 빠졌으면 지난 5년 경정청구 확인(★ 세무사)') === '연구소가 있어요')
   // D-363 진단서 드린 기록 — 같은 날 두 번 눌러도 한 줄 · 다음에 열면 '지난번 뒤 달라진 것'(판정 · 받은 자료)
   const g1 = withDiagnosisGiven(empty, givenOf(dn, 'print', '2026-09-20T01:00:00.000Z'))

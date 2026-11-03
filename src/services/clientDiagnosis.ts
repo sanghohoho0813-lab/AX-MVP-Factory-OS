@@ -242,6 +242,38 @@ export function sinceLines(since: DiagnosisSince | null): string[] {
   return out
 }
 
+/** 다음 약속이 대표님을 뵙는 일일 때만 문자에 넣는다(내부 할 일 '서류 독촉 전화' 같은 것은 고객 문자에 안 들어감) */
+const MEET_WORDS = /미팅|상담|방문|제안|만남|브리핑|설명회|회의|뵙/
+const dayK = (iso: string): string => {
+  const d = new Date(`${iso}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? iso : `${d.getMonth() + 1}월 ${d.getDate()}일(${'일월화수목금토'[d.getDay()]})`
+}
+
+/**
+ * D-508 미팅 뒤 대표님께 보내는 정리 문자 — 진단서와 같은 판정 · 같은 받을 자료(고객 말 그대로) + 다음 만남(약속이 미팅 · 방문일 때만).
+ * 고객에게 가는 글 — 업무 일기 · 미팅 메모 · 수수료 · 영업자는 넣지 않는다. 새 숫자 0(진단서 금액 그대로).
+ */
+export function meetingFollowUp(d: DiagnosisSheet, next: { date: string; text: string } | null, sender = ''): string {
+  const out: string[] = [`대표님, 오늘 시간 내 주셔서 감사합니다. ${d.companyName} 건 오늘 말씀드린 내용을 정리해 드려요.`, '']
+  if (d.picks.length) {
+    out.push('■ 오늘 말씀드린 것')
+    d.picks.forEach((p, i) => out.push(`${i + 1}. ${p.label} — ${p.text}${p.amount ? ` (${p.amount})` : ''}`))
+    out.push('')
+  }
+  if (d.requests.length) {
+    out.push('■ 보내 주실 자료')
+    for (const r of d.requests) out.push(`- ${r.label}${r.where ? ` (${r.where})` : ''}`)
+    out.push('')
+  }
+  out.push('■ 다음 순서')
+  const meet = next && next.date >= d.today && MEET_WORDS.test(next.text) ? next : null
+  if (meet) out.push(`- 다음 만남: ${dayK(meet.date)} · ${meet.text.trim().slice(0, 40)}`)
+  out.push(d.requests.length ? '- 자료 받는 대로 결과를 정리해서 연락드리겠습니다.' : '- 진행하실 것을 정해 주시면 마감 · 서류는 저희가 챙기겠습니다.')
+  out.push('', `※ ${d.notes[0]}`)
+  if (sender) out.push(sender)
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 /** 카톡 요약 — 먼저 제안할 것 · 받을 자료 · 다음 순서(짧게) */
 export function diagnosisKakao(d: DiagnosisSheet, sender = ''): string {
   const out: string[] = [`[${d.companyName}] 맞춤 진단 요약 (${d.today})`, '']

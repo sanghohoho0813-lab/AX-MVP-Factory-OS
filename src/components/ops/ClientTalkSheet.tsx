@@ -24,7 +24,9 @@ import { TermText } from '../ui/TermText'
 import { QuickCapture } from '../journal/QuickCapture'
 import { createJournalEntry } from '../../services/journalService'
 import { applyTalk } from '../../services/homeAsk/talkApply'
-import { nowIso } from '../../lib/appClock'
+import { nowIso, todayLocalDate } from '../../lib/appClock'
+import { buildDiagnosis, meetingFollowUp } from '../../services/clientDiagnosis'
+import { useSenderLine } from '../layout/useCurrentUser'
 
 /** 미팅 메모를 저장할 곳 — 없으면 [미팅 메모] 탭도 없다 */
 export interface TalkMemoTarget {
@@ -179,8 +181,15 @@ function AskFinder() {
 }
 
 /** 미팅 메모 — 여쭤볼 것(미팅 순서와 같은 줄)을 보며 답을 적으면 업무 일기 + 읽은 것 [이 업체에 기록] */
-function MemoView({ record, asks, memo }: { record: ClientOpsRecord; asks: readonly string[]; memo: TalkMemoTarget }) {
+function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; insights: readonly Insight[]; asks: readonly string[]; memo: TalkMemoTarget }) {
   const { showToast } = useToast()
+  const sender = useSenderLine()
+  // 미팅이 끝나면 대표님께 — 진단서와 같은 판정 · 받을 자료(고객 말) + 다음 만남(방금 기록한 약속도 바로)
+  const followUp = useMemo(() => {
+    const today = todayLocalDate()
+    const next = record.nextAction?.trim() && record.nextActionDueDate ? { date: record.nextActionDueDate, text: record.nextAction } : null
+    return meetingFollowUp(buildDiagnosis(record, insights, today), next, sender)
+  }, [record, insights, sender])
   return (
     <div className="flex flex-col gap-3" data-testid="talk-memo">
       <p className="t-sub break-keep text-slate-700">
@@ -224,6 +233,26 @@ function MemoView({ record, asks, memo }: { record: ClientOpsRecord; asks: reado
           return ok
         }}
       />
+      <div className="flex flex-col gap-2 border-t border-slate-200 pt-3" data-testid="talk-followup">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
+            <b className="font-semibold text-slate-900">미팅이 끝나면</b> — 오늘 말씀드린 것 · 보내 주실 자료 · 다음 만남을 정리한 문자를 대표님께 보내세요.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={async () => showToast((await copyText(followUp)) ? '정리 문자를 복사했어요 — 카톡이나 문자에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')}
+            data-testid="talk-followup-copy"
+          >
+            <Copy aria-hidden="true" className="size-4" /> 정리 문자 복사
+          </Button>
+        </div>
+        <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
+          <summary className="t-sub cursor-pointer font-semibold text-slate-800">보낼 글 미리 보기</summary>
+          <pre className="t-sub mt-2 font-sans break-keep whitespace-pre-wrap text-slate-800" data-testid="talk-followup-text">
+            {followUp}
+          </pre>
+        </details>
+      </div>
     </div>
   )
 }
@@ -301,7 +330,7 @@ export function ClientTalkSheet({
               </button>
             ))}
           </div>
-          {cur.id === 'memo' && memo ? <MemoView record={record} asks={asks} memo={memo} /> : cur.id === 'ask' ? <AskFinder /> : cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
+          {cur.id === 'memo' && memo ? <MemoView record={record} insights={insights} asks={asks} memo={memo} /> : cur.id === 'ask' ? <AskFinder /> : cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
         </div>
       </Modal>
       {/* 인쇄 종이 — 미팅 순서만(진단서와 같은 틀: body 바로 아래) */}

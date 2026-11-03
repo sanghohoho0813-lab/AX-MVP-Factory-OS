@@ -12,7 +12,7 @@
  *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
  *   T11 상황 예시 펼침 [이렇게 말하기] → 같은 계산 결과로 말하기 · 복사 · 접기
  *   T12 [대표님이 물으면 찾기] — 낱말 → 가장 가까운 답 · 용어 뜻 · 못 찾으면 안내
- *   T13 [미팅 메모] — 여쭤볼 것(미팅 순서와 같은 줄) · 적은 답 → 업무 일기 · 읽은 사정 · 숫자 · 다음 약속 [이 업체에 기록] → 업체 기록
+ *   T13 [미팅 메모] — 여쭤볼 것(미팅 순서와 같은 줄) · 적은 답 → 업무 일기 · 읽은 사정 · 숫자 · 다음 약속 [이 업체에 기록] → 업체 기록 · 미팅 뒤 정리 문자(다음 만남)
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -240,6 +240,18 @@ if (memoShown) {
   await page.waitForTimeout(400)
   const hr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
   check('T13-2 [이 업체에 기록] → 설비 답 · 직원 수 · 다음 할 일(2차 미팅) · 창은 그대로 열림', hr.decided?.['scn.facility']?.a === 'yes' && hr.employeeCount === '23명' && /미팅/.test(hr.nextAction ?? '') && !!hr.nextActionDueDate && (await page.getByTestId('talk-sheet').count()) === 1, { d: hr.decided?.['scn.facility'], e: hr.employeeCount, n: hr.nextAction })
+  // 미팅이 끝나면 — 정리 문자(방금 기록한 다음 약속이 바로 · 업무 일기 메모 글은 고객 문자에 안 들어감)
+  const fuBox = page.getByTestId('talk-followup')
+  await fuBox.locator('summary').click()
+  const fuText = await fuBox.getByTestId('talk-followup-text').innerText()
+  await fuBox.getByTestId('talk-followup-copy').click()
+  await page.waitForTimeout(250)
+  const fuClip = await page.evaluate(() => navigator.clipboard.readText())
+  check(
+    'T13-3 미팅이 끝나면 [정리 문자 복사] — 감사 인사 · 오늘 말씀드린 것 · 다음 만남(방금 기록한 날짜 · 2차 미팅) · 메모 글(대표님 말씀 —)은 안 들어감 · 복사 = 미리 보기',
+    fuText.startsWith('대표님, 오늘 시간 내 주셔서 감사합니다.') && fuText.includes('■ 오늘 말씀드린 것') && /- 다음 만남: \d{1,2}월 \d{1,2}일\([일월화수목금토]\) · .*미팅/.test(fuText) && !fuText.includes('대표님 말씀') && fuClip.trim() === fuText.trim(),
+    fuText.slice(0, 400),
+  )
 }
 await page.keyboard.press('Escape')
 
