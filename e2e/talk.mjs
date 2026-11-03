@@ -10,6 +10,7 @@
  *   T7 390 — 창 안 옆 넘침 0 · 탭 단추 40px 이상 · 오류 0
  *   T9 D-509 판정 카드 · 말하기 카드의 용어(인정이자 · 경정청구 …) 점선 밑줄 → 한 줄 뜻
  *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
+ *   T11 상황 예시 펼침 [이렇게 말하기] → 같은 계산 결과로 말하기 · 복사 · 접기
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -130,6 +131,23 @@ await page.getByTestId('talk-tab').nth(1).click()
 const talkTerms = await page.getByTestId('talk-card').getByTestId('term').count()
 check('T9-1 말하기 카드(쉽게 말하면 · 대표님이 물으면 · 근거)에도 용어 밑줄 · 누르면 화면이 넘어가지 않음', talkTerms > 0 && page.url() === insightUrl, { talkTerms })
 await page.keyboard.press('Escape')
+
+// T11 상황 예시 — 펼치면 [이렇게 말하기] → 같은 계산 결과로 말하기(쉽게 말하면 · 대표님이 물으면 · 복사)
+const scRow = page.getByTestId('scenario-row').first()
+await scRow.scrollIntoViewIfNeeded()
+const scTitle = (await scRow.locator('[data-testid="scenario-toggle"] .t-body').first().innerText()).trim()
+await scRow.getByTestId('scenario-toggle').click()
+await scRow.getByTestId('scenario-talk').click()
+const scBox = scRow.getByTestId('scenario-talk-box')
+await scBox.waitFor({ timeout: 5000 }).catch(() => {})
+const scSay = (await scBox.count()) ? await scBox.getByTestId('scenario-talk-say').innerText() : ''
+check("T11 상황 예시 [이렇게 말하기] — \"대표님, '{상황}' 경우를 …\" · 쉽게 말하면 · Q 2개", scSay.includes(`'${scTitle}' 경우를`) && (await scBox.locator('dt').count()) === 2 && (await scBox.innerText()).includes('쉽게 말하면'), { scTitle, scSay })
+await scBox.getByTestId('scenario-talk-copy').click()
+await page.waitForTimeout(200)
+const clip3 = await page.evaluate(() => navigator.clipboard.readText())
+check('T11-1 상황 말하기 복사 — [상황] 고객에게 이렇게 말하세요', clip3.startsWith(`[${scTitle}] 고객에게 이렇게 말하세요`), clip3.slice(0, 80))
+await scRow.getByTestId('scenario-talk').click()
+check('T11-2 [말하기 접기] 로 다시 접힘', (await scRow.getByTestId('scenario-talk-box').count()) === 0)
 
 // T6 주소 ?talk=1
 await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart&talk=1', { waitUntil: 'networkidle' })

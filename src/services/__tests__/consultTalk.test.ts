@@ -4,7 +4,8 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
-import { TALK_CAUTION, meetingScript, meetingScriptText, talkCard, talkText, talkTopic } from '../consultTalk'
+import { TALK_CAUTION, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
+import { runScenarios } from '../scenarios'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { CONSULT_TERMS, splitTerms } from '../consultTerms'
 
@@ -180,6 +181,27 @@ const seen = new Set<string>()
 const card0 = cards.find(({ c }) => c)!.c!
 const used = [card0.easy, ...card0.faq.map((f) => f.a)].flatMap((t) => splitTerms(t, seen).filter((p) => p.term).map((p) => p.term))
 check('T20 여러 글에 걸쳐 seen 을 넘기면 한 번만', used.length === new Set(used).size, used)
+
+// D-508 상황 예시 말하기
+const runs = runScenarios(full, today)
+const talks = runs.map((r) => ({ r, t: scenarioTalk(r) }))
+const strayS = talks.flatMap(({ r, t }) => {
+  const allowed = new Set([...numbers(r.title), ...numbers(r.headline), ...numbers(r.amount), ...numbers(r.needs.map((n) => n.label).join(' '))])
+  return numbers(t.say.join(' ')).filter((n) => !allowed.has(n)).map((n) => `${r.id}:${n}`)
+})
+check(
+  "T21 상황 예시 말하기 — 43개 모두 · 계산된 것은 \"'{상황}' 경우를 이 회사 숫자로 계산해 봤어요\" → 결과 → 금액 · 숫자는 계산 결과에 있던 것뿐",
+  talks.length === runs.length && talks.every(({ r, t }) => (r.state === 'need' ? t.say[0].includes('계산해 보려면') : t.say[0] === `대표님, '${r.title}' 경우를 이 회사 숫자로 계산해 봤어요.`)) && strayS.length === 0,
+  { strayS, sample: talks.slice(0, 2).map(({ t }) => t.say) },
+)
+check(
+  'T22 상황 예시 갈래 — 가지급금 · 퇴직금 · 1억/급여 · 증여/승계/05·06 · 법인전환 · 고용 · 연구소 · 창업감면 · 정책자금',
+  scenarioTopic({ id: 'tax-loan', module: 'tax' }) === 'loan' && scenarioTopic({ id: 'tax-retire', module: 'tax' }) === 'retire' && scenarioTopic({ id: 'tax-cash-1e', module: 'tax' }) === 'pay' && scenarioTopic({ id: 'tax-salary-net', module: 'tax' }) === 'pay' &&
+    scenarioTopic({ id: 'tax-succession', module: 'tax' }) === 'gift' && scenarioTopic({ id: 'calc-t8-issue', module: 'tax' }) === 'gift' && scenarioTopic({ id: 'calc-t9-convert', module: 'tax' }) === 'convert' &&
+    scenarioTopic({ id: 'emp-youth', module: 'employment' }) === 'employment' && scenarioTopic({ id: 'lab-two', module: 'labcare' }) === 'lab' && scenarioTopic({ id: 'startup-move', module: 'startup-tax' }) === 'startup' && scenarioTopic({ id: 'policy-facility', module: 'policy-funding' }) === 'policy',
+)
+const giftT = talks.find(({ r }) => r.id === 'tax-gift-10')!.t
+check('T23 증여 이야기 — 10년 합산 · 성인 5,000만원 · 미성년 2,000만원 · 특례는 세무사', giftT.faq.some((f) => f.a.includes('10년 안에 다시 주면 합쳐서')) && giftT.faq.some((f) => f.a.includes('5,000만원') && f.a.includes('2,000만원')) && giftT.faq.some((f) => f.a.includes('세무사')), giftT.faq)
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

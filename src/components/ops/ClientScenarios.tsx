@@ -14,7 +14,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, ChevronDown, FileStack, MessageSquareText, Minus } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, ChevronDown, Copy, FileStack, MessageCircle, MessageSquareText, Minus } from 'lucide-react'
+import { TALK_CAUTION, scenarioTalk, talkText } from '../../services/consultTalk'
+import { copyText } from '../consulting/studioParts'
+import { useToast } from '../ui/toastContext'
+import { TermText } from '../ui/TermText'
 import { SITUATION_PLANS } from '../../services/situationPlan'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Button } from '../ui/Button'
@@ -361,6 +365,41 @@ export function ClientScenarios({
   )
 }
 
+/** D-508 상황 예시를 고객에게 어떻게 말할지 — 같은 계산 결과 그대로(새 숫자 없음) */
+function ScenarioTalkBox({ r }: { r: ScenarioRun }) {
+  const { showToast } = useToast()
+  const card = useMemo(() => scenarioTalk(r), [r])
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="scenario-talk-box" data-topic={card.topic}>
+      <p className="t-meta font-semibold text-slate-500">고객에게 이렇게 말하세요</p>
+      <ul className="flex flex-col gap-1" data-testid="scenario-talk-say">
+        {card.say.map((x) => (
+          <li key={x} className="t-sub font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">
+            “{x}”
+          </li>
+        ))}
+      </ul>
+      <p className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
+        <b className="font-semibold text-slate-900">쉽게 말하면</b> — <TermText text={card.easy} />
+      </p>
+      <dl className="flex flex-col gap-1">
+        {card.faq.slice(0, 2).map((f) => (
+          <div key={f.q}>
+            <dt className="t-sub font-bold break-keep text-slate-900">Q. {f.q}</dt>
+            <dd className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
+              <TermText text={f.a} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="t-meta break-keep text-slate-600">※ {TALK_CAUTION}</p>
+      <Button size="sm" variant="ghost" className="self-start" onClick={async () => showToast((await copyText(talkText(card))) ? '말하기를 복사했어요 — 메모나 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')} data-testid="scenario-talk-copy">
+        <Copy aria-hidden="true" className="size-4" /> 이 말하기 복사
+      </Button>
+    </div>
+  )
+}
+
 function ScenarioRow({
   r,
   open,
@@ -385,6 +424,7 @@ function ScenarioRow({
 }) {
   // 머리글과 같은 줄은 펼친 곳에서 다시 쓰지 않는다
   const lines = r.lines.filter((l) => l !== r.headline)
+  const [talk, setTalk] = useState(false)
   return (
     <li
       className={`flex min-w-0 scroll-mt-32 flex-col rounded-(--radius-card) border bg-white transition-shadow ${fresh ? 'border-success-400 ring-2 ring-success-300' : 'border-slate-200'}`}
@@ -474,6 +514,7 @@ function ScenarioRow({
               ))}
             </ul>
           )}
+          {talk && <ScenarioTalkBox r={r} />}
           <div className="flex flex-wrap gap-2">
             <Link to={r.openPath} className="tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700" data-testid="scenario-open">
               {r.openLabel ?? `${r.moduleLabel}에서 이어서`} <ArrowRight aria-hidden="true" className="size-4" />
@@ -488,6 +529,9 @@ function ScenarioRow({
                 <MessageSquareText aria-hidden="true" className="size-4" /> 빠진 것 요청 문구
               </Button>
             )}
+            <Button size="sm" variant="secondary" onClick={() => setTalk((v) => !v)} aria-expanded={talk} data-testid="scenario-talk">
+              <MessageCircle aria-hidden="true" className="size-4" /> {talk ? '말하기 접기' : '이렇게 말하기'}
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => onSetNext(`${r.moduleLabel} — ${r.title} 설계 보여 드리기`)} data-testid="scenario-next">
               <CalendarPlus aria-hidden="true" className="size-4" /> 다음 약속으로
             </Button>

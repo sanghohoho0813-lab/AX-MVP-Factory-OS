@@ -12,6 +12,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { josa } from '../lib/josa'
 import { missingForPicks, topPicks, type Insight } from './clientInsights'
+import type { ScenarioRun } from './scenarios'
 import type { InsightTone } from './insightLabels'
 
 export interface TalkQA {
@@ -147,6 +148,15 @@ const TOPICS: Record<string, Topic> = {
       { q: '세무사님이 하던 것과 달라요?', a: '세무사님은 신고를 맡고, 저희는 돈을 가져가는 방법을 숫자로 비교해 드려요. 실행은 세무사님과 함께 확인해요.' },
     ],
     avoid: ["'세금이 반으로 줄어요' — 계산 전에는 숫자를 말하지 않아요."],
+  },
+  gift: {
+    easy: '대표님 재산이나 회사 주식을 가족에게 미리 넘길 때 드는 세금(증여세)과, 나중에 드는 세금(상속세)을 미리 계산해 두는 설계예요.',
+    faq: [
+      { q: '미리 넘기면 세금이 줄어요?', a: '주식 가치가 오르기 전에 넘기면 나중에 오른 만큼의 세금을 줄일 수 있는 경우가 있어요. 다만 같은 사람에게 10년 안에 다시 주면 합쳐서 계산해요.' },
+      { q: '자녀에게 세금 없이 줄 수 있는 돈은요?', a: '성인 자녀는 10년 동안 5,000만원, 미성년 자녀는 2,000만원까지 증여재산공제가 있어요. 혼인 · 출산 공제가 따로 있을 수 있어요.' },
+      { q: '가업승계 특례가 뭐예요?', a: '조건을 갖춘 회사 주식을 자녀에게 넘길 때 증여세를 낮춰 주는 제도예요. 대표 나이 · 경영 기간 · 사후관리 조건이 있어 세무사와 함께 확인해요.' },
+    ],
+    avoid: ["'세금 없이 넘길 수 있어요' — 공제 한도 · 10년 합산 규칙이 있어요."],
   },
   cert: {
     easy: '벤처기업 확인 · 이노비즈 · 메인비즈 같은 인증은 정책자금 · 보증 우대와 지원사업 가점에 쓰이고, 벤처는 세금 감면과도 이어질 수 있어요.',
@@ -379,4 +389,45 @@ export function meetingScriptText(s: MeetingScript): string {
   })
   out.push(`※ ${TALK_CAUTION}`)
   return out.join('\n')
+}
+
+/** D-508 상황 예시(scenarios — 같은 엔진) 하나 → 그 모듈 이야기 */
+export function scenarioTopic(r: Pick<ScenarioRun, 'id' | 'module'>): string {
+  switch (r.module) {
+    case 'policy-funding':
+      return 'policy'
+    case 'employment':
+      return 'employment'
+    case 'labcare':
+      return 'lab'
+    case 'startup-tax':
+      return 'startup'
+    default:
+      if (r.id === 'tax-loan') return 'loan'
+      if (r.id === 'tax-retire') return 'retire'
+      if (r.id === 'calc-t9-convert') return 'convert'
+      if (/^tax-(cash|salary|treasury)/.test(r.id)) return 'pay'
+      if (/^tax-(gift|succession|inherit)|^calc-t[78]/.test(r.id)) return 'gift'
+      return 'tax'
+  }
+}
+
+/**
+ * 상황 예시 말하기 — '{상황}' 경우를 이 회사 숫자로 계산해 봤어요 → 결과 한 줄 → 금액(엔진 값 그대로) → 빠진 숫자.
+ * 아직 계산하지 못한 상황(need)은 무엇만 알려 주시면 되는지.
+ */
+export function scenarioTalk(r: ScenarioRun): TalkCard {
+  const topic = scenarioTopic(r)
+  const t = TOPICS[topic]
+  const missing = r.needs.filter((n) => !n.ok).map((n) => n.label)
+  const say: string[] = []
+  if (r.state === 'need') {
+    say.push(`대표님, '${r.title}' 경우를 계산해 보려면 ${missing.length ? `${listOf(missing)}만 ${giveVerb(missing)}` : '몇 가지만 더 알려 주시면'} 바로 숫자로 보여 드릴게요.`)
+  } else {
+    say.push(`대표님, '${r.title}' 경우를 이 회사 숫자로 계산해 봤어요.`)
+    say.push(spoken(r.headline))
+    if (r.amount) say.push(`숫자로는 ${josa(r.amount, '으로/로')} 나와요 — 확정 금액이 아니라 지금 자료로 계산한 값이에요.`)
+    if (r.state === 'partial' && missing.length) say.push(`${josa(listOf(missing), '을/를')} ${giveVerb(missing)} 더 정확하게 다시 계산해 드릴게요.`)
+  }
+  return { key: r.module, topic, label: r.title, tone: r.state === 'need' ? 'need' : 'maybe', say, basis: r.lines.filter((l) => l !== r.headline).slice(0, 2).join(' · '), easy: t.easy, faq: t.faq, avoid: t.avoid }
 }
