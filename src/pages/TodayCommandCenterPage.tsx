@@ -91,6 +91,9 @@ import { PERSONAL_KEY } from '../services/journalKind'
 import { recordMove, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
 
+/** D-508 업체 약속 글이 미팅 · 상담이면 말하기 대본을 바로 */
+const MEETING_WORDS = /미팅|상담|방문|제안|만남|브리핑|설명회|회의/
+
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
 const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
 // D-479 남긴 1주일치가 있거나 이번 접속에서 1주일치를 다뤘을 때만 '오늘 올릴 것' 부품을 받아 온다
@@ -843,6 +846,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                           </Link>
                           <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
                           <span className="ml-auto flex shrink-0 items-center gap-2">
+                            {/* D-508 오늘 · 내일 미팅 · 상담이면 — 그 업체 판정 그대로 말하기 대본(미팅 순서 · 고객에게 이렇게 말하세요) */}
+                            {(e.daysLeft === 0 || e.daysLeft === 1) && MEETING_WORDS.test(e.title) && (
+                              <Link to={`/ops/clients/${e.clientId}?tab=smart&talk=1`} className="tap t-sub inline-flex items-center font-semibold text-slate-700 hover:text-brand-700 hover:underline" data-testid="today-appt-talk">
+                                말하기 대본
+                              </Link>
+                            )}
                             {prospectIds.has(e.clientId) ? (
                               <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
                                 미팅 준비 →

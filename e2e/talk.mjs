@@ -9,6 +9,7 @@
  *   T6 주소 ?talk=1 → 바로 열림 · 닫으면 주소에서 빠짐(영업 › 미팅 준비에서 이어 옴)
  *   T7 390 — 창 안 옆 넘침 0 · 탭 단추 40px 이상 · 오류 0
  *   T9 D-509 판정 카드 · 말하기 카드의 용어(인정이자 · 경정청구 …) 점선 밑줄 → 한 줄 뜻
+ *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -154,6 +155,31 @@ if (mtHas) await mt.click()
 await page.getByTestId('talk-sheet').waitFor({ timeout: 8000 }).catch(() => {})
 check('T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세 맞춤 추천에서 대본 창이 바로', mtHas && (await page.getByTestId('talk-sheet').count()) === 1 && page.url().includes('/ops/clients/cli_hansol'), page.url())
 await page.keyboard.press('Escape')
+
+// T10 오늘 › 업체 약속 — 오늘 · 내일 미팅 · 상담이면 [말하기 대본](업무 약속은 없음)
+await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+await page.evaluate(() => {
+  const k = 'axmvp.v1.operations_clients'
+  const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+  const t = new Date()
+  const tomorrow = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)
+  const ymd = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+  for (const c of list) if (c.id === 'cli_hansol') Object.assign(c, { nextAction: '2차 미팅 — 정책자금 · 연구소 제안', nextActionDueDate: ymd })
+  localStorage.setItem(k, JSON.stringify(list))
+})
+await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+await page.getByTestId('today-appointments').waitFor({ timeout: 8000 }).catch(() => {})
+const apptTalk = page.getByTestId('today-appointments').getByTestId('today-appt-talk')
+const apptCount = await apptTalk.count()
+const apptHref = apptCount ? await apptTalk.first().getAttribute('href') : ''
+const allRows = await page.getByTestId('today-appointments').locator('li').count()
+check('T10 오늘 › 업체 약속 — 내일 2차 미팅 줄에 [말하기 대본](그 업체 ?talk=1) · 미팅 아닌 약속엔 없음', apptCount === 1 && apptHref === '/ops/clients/cli_hansol?tab=smart&talk=1' && allRows >= 1, { apptCount, apptHref, allRows })
+if (apptCount) {
+  await apptTalk.first().click()
+  await page.getByTestId('talk-sheet').waitFor({ timeout: 8000 }).catch(() => {})
+  check('T10-1 누르면 그 업체 말하기 대본 창이 바로', (await page.getByTestId('talk-sheet').count()) === 1)
+  await page.keyboard.press('Escape')
+}
 
 // T7 390
 const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
