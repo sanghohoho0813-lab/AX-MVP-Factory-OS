@@ -88,6 +88,8 @@ check(
   { firstKey, head, sayText },
 )
 const openHref = await card.getByTestId('talk-open-module').getAttribute('href')
+const stepN = await page.getByTestId('talk-steps').locator('li').count()
+check('T3-2 하겠다고 하시면 — 진행은 이렇게 돼요(번호 3~4단계)', stepN >= 3 && stepN <= 4, stepN)
 check('T3-1 모듈 열기 — 이 업체로(주소에 client)', !!openHref && openHref.includes('cli_hansol'), openHref)
 
 // T4 복사 · 인쇄 종이

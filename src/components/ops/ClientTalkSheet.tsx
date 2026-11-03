@@ -103,6 +103,20 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
           <TermText text={card.easy} />
         </p>
       </section>
+      {card.steps.length > 0 && (
+        <section className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="talk-steps">
+          <p className="t-meta font-semibold text-slate-500">하겠다고 하시면 — 진행은 이렇게 돼요</p>
+          <ol className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            {card.steps.map((x, i) => (
+              <li key={x} className="t-sub flex items-center gap-1.5 break-keep text-slate-800">
+                {i > 0 && <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />}
+                <span className="t-meta flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-300 font-bold text-slate-700">{i + 1}</span>
+                <TermText text={x} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <section className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="talk-faq">
         <p className="t-meta font-semibold text-slate-500">대표님이 물으면</p>
         <dl className="mt-1.5 flex flex-col gap-2">

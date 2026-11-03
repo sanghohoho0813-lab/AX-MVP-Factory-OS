@@ -4,7 +4,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
-import { HESITATE, TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
+import { HESITATE, TALK_CAUTION, faqSearch, stepsText, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
 import { runScenarios } from '../scenarios'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { CONSULT_TERMS, splitTerms } from '../consultTerms'
@@ -234,6 +234,15 @@ check(
   hIdx === lastPick + 1 && hSec?.faq?.length === HESITATE.length && hSec.faqTitle === '이렇게 말씀하시면' && !/수수료|무조건|100%/.test(JSON.stringify(HESITATE)) &&
     !emptyScript.sections.some((x) => x.id === 'hesitate') && f8[0]?.topic === 'hesitate' && f9[0]?.topic === 'hesitate' && meetingScriptText(script).includes('   이렇게 말씀하시면\n   Q. 생각 좀 해 볼게요'),
   { ids, f8: f8.map((h) => h.topic), f9: f9.map((h) => h.topic) },
+)
+
+const allCards = [...ins.map(talkCard), ...emptyIns.map(talkCard), ...talks.map(({ t }) => t)].filter((c): c is NonNullable<typeof c> => !!c)
+const f10 = faqSearch('정책자금 어떻게 진행')
+check(
+  'T27 진행은 이렇게 돼요 — 모든 말하기 카드(판정 · 상황 예시) 3~4단계 · 복사 글에 한 줄 · 정책자금은 심사 → 약정 · 경정청구는 2개월 · 찾기 「어떻게 진행」',
+  allCards.length > 5 && allCards.every((c) => c.steps.length >= 3 && c.steps.length <= 4) && allCards.every((c) => talkText(c).includes(`진행은 이렇게 돼요 — ${stepsText(c.steps)}`)) &&
+    f10[0]?.topic === 'policy' && f10[0]?.q === '어떻게 진행돼요?' && f10[0].a.includes('약정') && faqSearch('경정청구 어떻게 진행').some((h) => h.q === '어떻게 진행돼요?' && h.a.includes('2개월')),
+  { n: allCards.length, bad: allCards.filter((c) => c.steps.length < 3 || c.steps.length > 4).map((c) => c.topic), f10: f10.map((h) => `${h.topic}:${h.q}`) },
 )
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)
