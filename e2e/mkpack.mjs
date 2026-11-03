@@ -444,12 +444,13 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   // D-507 기준 줄은 첫 화면을 가볍게 하려고 [사용 방법] 안으로 — 펼쳐서 읽는다(글은 그대로)
   await p.getByTestId('mk-howto-toggle').click()
   const basis = (await p.getByTestId('mk-basis').innerText()) ?? ''
+  // D-511 지난주와 비교 줄도 [사용 방법] 안(첫 화면 글 줄이기)
+  const change = (await p.getByTestId('mk-change').innerText().catch(() => '')) ?? ''
   await p.getByTestId('mk-howto-toggle').click()
   check('K4 기준 한 줄([사용 방법] 안) — 이번 주 뜨는 주제: 참고 채널 최근 2주 · 고정 키워드 칩: 기업마당 이번 주(날짜) 새 공고 · 받는 때', basis.includes('최근 2주') && basis.includes('기업마당 이번 주') && /\d+\/\d+~\d+\/\d+/.test(basis) && basis.includes('6시간마다') && basis.includes('아침 9시'), basis)
-  const change = (await p.getByTestId('mk-change').innerText().catch(() => '')) ?? ''
   const isNew = async (key) => (await p.locator(`[data-testid="mk-key"][data-key="${key}"] [data-testid="mk-key-new"]`).count()) === 1
   const newCount = await p.locator('[data-testid="mk-key"] [data-testid="mk-key-new"]').count()
-  check('K5 지난주와 비교 한 줄 · 지난주에 없던 키워드에만 "새로"(Claude 는 지난주에도 있어 없음 · 정책자금은 빠진 것)', change.startsWith('지난주와 비교: 새로') && change.includes('빠진 것') && newCount > 0 && !(await isNew('axai:claude')), change)
+  check('K5 지난주와 비교 한 줄([사용 방법] 안) · 지난주에 없던 키워드에만 "새로"(Claude 는 지난주에도 있어 없음 · 정책자금은 빠진 것)', change.startsWith('지난주와 비교: 새로') && change.includes('빠진 것') && newCount > 0 && !(await isNew('axai:claude')), change)
   await shot(p, 'K-home')
   const k3 = p.locator('[data-testid="mk-fixed-key"][data-key="notice:sme_subsidy"]')
   await k3.click()
