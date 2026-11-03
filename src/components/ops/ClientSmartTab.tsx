@@ -37,6 +37,7 @@ import { ClientSituationPlan } from './ClientSituationPlan'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
 import { ClientTalkSheet } from './ClientTalkSheet'
 import { talkCard } from '../../services/consultTalk'
+import { TermText } from '../ui/TermText'
 import { diagnosisNote } from '../../services/clientDiagnosis'
 import { SITUATION_PLANS, planResultInput, type PlanId, type SituationPlan } from '../../services/situationPlan'
 import { withToolResult } from '../../services/clientOpsService'
@@ -329,9 +330,10 @@ export default function ClientSmartTab({
                   <span className="t-card font-bold text-slate-900">{ins.label}</span>
                   <Badge tone={TONE[ins.tone]}>{INSIGHT_TONE_LABEL[ins.tone]}</Badge>
                 </div>
-                <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]">{ins.headline}</p>
+                {/* D-509 처음 보는 말(인정이자 · 경정청구 · 과밀억제권역 …)은 점선 밑줄 — 누르면 한 줄 설명 */}
+                <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]"><TermText text={ins.headline} /></p>
                 {ins.amount && <p className="t-sub font-bold break-keep text-success-700" data-testid="smart-insight-amount">{ins.amount}</p>}
-                {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]">{ins.detail}</p>}
+                {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]"><TermText text={ins.detail} /></p>}
                 {ins.last && (
                   <p className="t-sub flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="smart-insight-last">
                     <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />

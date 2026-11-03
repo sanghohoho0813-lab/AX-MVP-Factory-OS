@@ -6,6 +6,7 @@ import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
 import { TALK_CAUTION, meetingScript, meetingScriptText, talkCard, talkText, talkTopic } from '../consultTalk'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { CONSULT_TERMS, splitTerms } from '../consultTerms'
 
 let passed = 0
 let failed = 0
@@ -159,6 +160,26 @@ check(
   { askLines, docLines },
 )
 check('T15 조사 — "한솔정밀(주)를"(괄호 앞 글자) · 받을 것 "…을/를 받아 볼 수 있을까요?"', script.sections[0].lines[0].includes('한솔정밀(주)를 먼저 정리해 왔습니다') && !/을\(를\)|이\(가\)|은\(는\)/.test(text + meetingScriptText(emptyScript)))
+
+// D-509 처음 보는 말 한 줄 설명
+const p1 = splitTerms('가지급금 1.2억원 — 그대로 두면 인정이자 · 세금으로 해마다 새요 · 가지급금 정리')
+check(
+  'T17 용어 나누기 — 사전 말만 따로 · 같은 글에서 처음 한 번만 · 이어 붙이면 원래 글 그대로',
+  p1.filter((p) => p.term).map((p) => p.term).join(',') === '가지급금,인정이자' && p1.map((p) => p.text).join('') === '가지급금 1.2억원 — 그대로 두면 인정이자 · 세금으로 해마다 새요 · 가지급금 정리',
+  p1,
+)
+const p2 = splitTerms('2025년 신고서에 통합고용세액공제가 빠졌어요 — 경정청구 · 연구개발비 세액공제')
+check('T18 긴 말 먼저 — 통합고용세액공제를 세액공제로 자르지 않음 · 뒤의 세액공제는 따로', p2.filter((p) => p.term).map((p) => p.term).join(',') === '통합고용세액공제,경정청구,세액공제', p2)
+const defs = Object.entries(CONSULT_TERMS)
+check(
+  "T19 사전 — 뜻이 모두 한 줄(70자 안팎 이하) · 'AI' 0 · 판정 글 · 대본에 실제로 나오는 말(가지급금 · 경정청구 · 체납 · 1차 추정 …)",
+  defs.length >= 20 && defs.every(([, v]) => v.length > 8 && v.length <= 80 && !/\bAI\b/.test(v)) && ['가지급금', '경정청구', '체납', '1차 추정', '과밀억제권역', '거치', '자부담'].every((k) => k in CONSULT_TERMS),
+  defs.filter(([, v]) => v.length > 80).map(([k]) => k),
+)
+const seen = new Set<string>()
+const card0 = cards.find(({ c }) => c)!.c!
+const used = [card0.easy, ...card0.faq.map((f) => f.a)].flatMap((t) => splitTerms(t, seen).filter((p) => p.term).map((p) => p.term))
+check('T20 여러 글에 걸쳐 seen 을 넘기면 한 번만', used.length === new Set(used).size, used)
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

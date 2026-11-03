@@ -8,6 +8,7 @@
  *   T5 모듈별 판정 카드 [이렇게 말하기] → 그 모듈 탭으로 바로(제안 밖 모듈은 맨 뒤 탭)
  *   T6 주소 ?talk=1 → 바로 열림 · 닫으면 주소에서 빠짐(영업 › 미팅 준비에서 이어 옴)
  *   T7 390 — 창 안 옆 넘침 0 · 탭 단추 40px 이상 · 오류 0
+ *   T9 D-509 판정 카드 · 말하기 카드의 용어(인정이자 · 경정청구 …) 점선 밑줄 → 한 줄 뜻
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -99,6 +100,35 @@ if (outside) {
   check('T5-1 제안 밖 모듈 → 맨 뒤 탭으로 바로 열림(그 모듈 말하기)', tk.at(-1)[0] === outside && tk.at(-1)[1] === 'true' && (await page.getByTestId('talk-card').getAttribute('data-key')) === outside, tk)
   await page.keyboard.press('Escape')
 }
+
+// T9 D-509 처음 보는 말 — 판정 카드 · 말하기 대본의 용어에 점선 밑줄 → 마우스를 올리면 · 누르면 한 줄 설명
+const terms = page.getByTestId('smart-insights').getByTestId('term')
+const termCount = await terms.count()
+let hoverShown = false
+let clickShown = false
+let tipText = ''
+if (termCount > 0) {
+  const t0 = terms.first()
+  await t0.scrollIntoViewIfNeeded()
+  await t0.hover()
+  await page.waitForTimeout(150)
+  const tip = t0.locator('xpath=..').getByTestId('term-tip')
+  hoverShown = await tip.isVisible()
+  await page.mouse.move(5, 5)
+  await t0.click()
+  await page.mouse.move(5, 5)
+  await page.waitForTimeout(150)
+  clickShown = await tip.isVisible()
+  tipText = await tip.innerText()
+}
+check('T9 판정 카드 용어 점선 밑줄 — 올리면 · 누르면 한 줄 뜻(용어 — 뜻)', termCount > 0 && hoverShown && clickShown && / — .{8,}/.test(tipText), { termCount, hoverShown, clickShown, tipText })
+const insightUrl = page.url()
+await page.getByTestId('top-picks-talk').click()
+await page.getByTestId('talk-sheet').waitFor()
+await page.getByTestId('talk-tab').nth(1).click()
+const talkTerms = await page.getByTestId('talk-card').getByTestId('term').count()
+check('T9-1 말하기 카드(쉽게 말하면 · 대표님이 물으면 · 근거)에도 용어 밑줄 · 누르면 화면이 넘어가지 않음', talkTerms > 0 && page.url() === insightUrl, { talkTerms })
+await page.keyboard.press('Escape')
 
 // T6 주소 ?talk=1
 await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart&talk=1', { waitUntil: 'networkidle' })

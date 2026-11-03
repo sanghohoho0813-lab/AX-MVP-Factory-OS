@@ -18,6 +18,7 @@ import { Button } from '../ui/Button'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { josa } from '../../lib/josa'
+import { TermText } from '../ui/TermText'
 
 type Tab = { id: string; label: string; card: TalkCard | null; ins: Insight | null }
 
@@ -74,11 +75,17 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
             </li>
           ))}
         </ul>
-        {card.basis && <p className="t-sub mt-2 break-keep text-slate-500 [overflow-wrap:anywhere]">판정 근거(화면에만) — {card.basis}</p>}
+        {card.basis && (
+          <p className="t-sub mt-2 break-keep text-slate-500 [overflow-wrap:anywhere]">
+            판정 근거(화면에만) — <TermText text={card.basis} />
+          </p>
+        )}
       </section>
       <section className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="talk-easy">
         <p className="t-meta font-semibold text-slate-500">쉽게 말하면</p>
-        <p className="t-body mt-1 break-keep text-slate-800 [overflow-wrap:anywhere]">{card.easy}</p>
+        <p className="t-body mt-1 break-keep text-slate-800 [overflow-wrap:anywhere]">
+          <TermText text={card.easy} />
+        </p>
       </section>
       <section className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid="talk-faq">
         <p className="t-meta font-semibold text-slate-500">대표님이 물으면</p>
@@ -86,7 +93,9 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
           {card.faq.map((f) => (
             <div key={f.q}>
               <dt className="t-body font-bold break-keep text-slate-900">Q. {f.q}</dt>
-              <dd className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">{f.a}</dd>
+              <dd className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
+                <TermText text={f.a} />
+              </dd>
             </div>
           ))}
         </dl>
