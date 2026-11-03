@@ -21,3 +21,13 @@ export function writePackStore(key: string, saved: PackAiSaved): boolean {
     return false
   }
 }
+
+/** D-514 다른 기기 결과를 가져와 통째로 — false = 남기지 못함(이번 접속 동안은 메모리에) */
+export function writePackStoreAll(store: Record<string, PackAiSaved>): boolean {
+  try {
+    window.localStorage.setItem(PACK_STORE_KEY, JSON.stringify(store))
+    return true
+  } catch {
+    return false
+  }
+}

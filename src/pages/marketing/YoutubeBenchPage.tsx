@@ -41,7 +41,7 @@ import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { cleanTopic, customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
-import { packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
+import { openPackSync, packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
   PERIOD_HINT,
@@ -342,20 +342,30 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-349 1주일치 — 열 때 클라우드와 맞추고(휴대폰에서 만든 주도 여기서) · 목록으로 모은 뒤 내 콘텐츠를 다시 읽는다
   const weekSyncNow = useMemo(() => weekSync(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (readOnly) return
+    // D-514 콘텐츠 묶음 AI 결과도 같이 맞춘다(팀장 화면 보기에서는 올리지 않음)
+    if (readOnly) {
+      void openPackSync(null)
+      return
+    }
     void openWeekSync(workspaceId, weekStart(todayLocalDate()))
+    void openPackSync(workspaceId)
     // D-350 다른 기기에서 만든 것 — 이 창으로 돌아올 때마다 다시 맞춘다(새로 고치지 않아도 휴대폰에서 만든 주가 PC 에 뜬다)
     let last = Date.now()
     const again = () => {
       if (document.visibilityState !== 'visible' || Date.now() - last < 15_000) return
       last = Date.now()
       void openWeekSync(workspaceId, weekStart(todayLocalDate()))
+      void openPackSync(workspaceId)
     }
+    // D-514 인터넷이 다시 되면 못 올린 AI 글을 올린다
+    const online = () => void openPackSync(workspaceId)
     document.addEventListener('visibilitychange', again)
     window.addEventListener('focus', again)
+    window.addEventListener('online', online)
     return () => {
       document.removeEventListener('visibilitychange', again)
       window.removeEventListener('focus', again)
+      window.removeEventListener('online', online)
     }
   }, [workspaceId, readOnly])
   useEffect(() => {

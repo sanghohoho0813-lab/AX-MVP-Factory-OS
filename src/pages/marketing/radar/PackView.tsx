@@ -9,13 +9,13 @@
  *  - 팀장 화면을 보는 중이면 AI 를 부르지 않는다(규칙 초안만 · 저장 안 함).
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ArrowLeft, AtSign, BookmarkPlus, ChevronDown, ClipboardCopy, ExternalLink, FileText, Film, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, AtSign, BookmarkPlus, ChevronDown, ClipboardCopy, CloudOff, ExternalLink, FileText, Film, GalleryHorizontalEnd, ListChecks, Loader2, MonitorPlay, RotateCcw, Send, Smartphone, Sparkles, Type, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
 import { packBundle } from '../../../services/aiAssist/marketingBuilders'
 import { todayLocalDate } from '../../../lib/appClock'
-import { packAiVersion, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
+import { packAiVersion, packCloudFailed, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { PACK_AI_PARTS, PACK_LABEL, makePack, packPartLabel, packText, sectionText, withAi, type ContentPack, type PackAiPart, type PackAiSaved, type PackSectionId, type PackSource } from '../../../services/marketing/contentPack'
@@ -197,7 +197,7 @@ export function PackView({
         )}
       </header>
 
-      <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} onRun={runAi} />
+      <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} cloudFailed={!readOnly && packCloudFailed()} onRun={runAi} />
 
       {/* D-478 칸 이동 칩은 스크롤해도 머리줄 바로 아래에 붙어 있다(휴대폰 묶음은 1만 px 넘게 길다 — 길을 잃지 않게) */}
       <nav aria-label="묶음 칸으로 가기" className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-slate-50/95 px-1 py-1.5 backdrop-blur [scrollbar-width:none]" data-testid="mk-pack-nav">
@@ -298,6 +298,13 @@ export function PackView({
   )
 }
 
+/** D-514 다른 기기에서 쓴 결과면 한마디 — 같은 기기면 아무것도 */
+function otherDevice(saved: PackAiSaved): string {
+  if (!saved.device || typeof window === 'undefined') return ''
+  const here = window.innerWidth < 640 ? 'phone' : 'pc'
+  return saved.device === here ? '' : saved.device === 'phone' ? ' · 휴대폰에서 씀' : ' · PC에서 씀'
+}
+
 function AiBar({
   canAi,
   ownerAi,
@@ -306,6 +313,7 @@ function AiBar({
   errors,
   saved,
   storeFull,
+  cloudFailed,
   onRun,
 }: {
   canAi: boolean
@@ -315,6 +323,8 @@ function AiBar({
   errors: string[]
   saved: PackAiSaved | null
   storeFull: boolean
+  /** D-514 클라우드에 못 올려 이 기기에만 있음 */
+  cloudFailed: boolean
   onRun: () => void
 }) {
   if (!canAi) {
@@ -334,7 +344,7 @@ function AiBar({
           {running
             ? 'AI 가 검증된 방법대로 쓰는 중이에요(20~60초) — 그동안 아래 초안을 먼저 보세요.'
             : saved
-              ? `AI 가 쓴 글이에요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
+              ? `AI 가 쓴 글이에요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}${otherDevice(saved)}`
               : (
                 <>
                   {/* D-478 휴대폰은 네 줄이던 안내를 한 줄로(같은 뜻) */}
@@ -363,6 +373,12 @@ function AiBar({
       {errors.length > 0 && (
         <p role="alert" className="t-sub break-keep text-danger-700" data-testid="mk-pack-ai-error">
           일부를 AI 로 쓰지 못했어요 — {errors.join(' · ')} 그 칸은 규칙 초안 그대로예요.
+        </p>
+      )}
+      {cloudFailed && saved && !running && (
+        <p role="status" className="t-sub flex items-center gap-1.5 break-keep text-slate-700" data-testid="mk-pack-cloud-failed">
+          <CloudOff aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+          인터넷이 불안해 AI 글을 이 기기에만 남겼어요 — 연결되면 다시 올려요.
         </p>
       )}
       {storeFull && <p className="t-meta break-keep text-danger-700">이 브라우저 저장 공간이 가득 차 AI 결과를 남기지 못했어요 — 지금 화면의 글은 [전체 복사] 로 가져가세요.</p>}

@@ -665,6 +665,8 @@ export interface PackAiSaved {
   at: string
   model: string
   sections: Partial<Record<PackSectionId, PackBlock[]>>
+  /** D-514 어느 기기에서 AI 로 썼나(다른 기기에서 열면 'PC에서 쓴 글' 한마디) — 예전 기록에는 없다 */
+  device?: 'pc' | 'phone'
 }
 
 /** 한 칸(axmvp.* — 로그인한 사람별 금고)에 키워드별 AI 결과 · 최근 12개만 */
@@ -685,24 +687,31 @@ function parseSaved(v: unknown): PackAiSaved | null {
       .map((b) => ({ label: b.label.slice(0, 80), text: b.text.slice(0, 12000) }))
     if (ok.length) sections[id] = ok
   }
-  return Object.keys(sections).length ? { at: o.at, model: typeof o.model === 'string' ? o.model : '', sections } : null
+  if (!Object.keys(sections).length) return null
+  const out: PackAiSaved = { at: o.at, model: typeof o.model === 'string' ? o.model : '', sections }
+  if (o.device === 'pc' || o.device === 'phone') out.device = o.device
+  return out
 }
 
 /** 저장된 칸 읽기 — 깨진 값 · 모르는 칸은 버린다 */
 export function parsePackStore(raw: string | null): Record<string, PackAiSaved> {
   if (!raw) return {}
   try {
-    const v = JSON.parse(raw) as unknown
-    if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
-    const out: Record<string, PackAiSaved> = {}
-    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
-      const s = parseSaved(x)
-      if (s && k.length <= 120) out[k] = s
-    }
-    return out
+    return packStoreOf(JSON.parse(raw) as unknown)
   } catch {
     return {}
   }
+}
+
+/** D-514 이미 읽은 값(클라우드 한 줄 등)을 같은 규칙으로 다듬기 */
+export function packStoreOf(v: unknown): Record<string, PackAiSaved> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, PackAiSaved> = {}
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    const s = parseSaved(x)
+    if (s && k.length <= 120) out[k] = s
+  }
+  return out
 }
 
 /** 한 키워드 결과를 넣고 오래된 것부터 버린다(최근 12개) */

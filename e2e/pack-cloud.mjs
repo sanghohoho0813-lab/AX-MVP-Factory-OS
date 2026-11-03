@@ -1,0 +1,273 @@
+/**
+ * qa:packcloud — D-514 콘텐츠 묶음 AI 결과 다른 기기에서도(클라우드 흉내 — 서버 한 벌을 PC · 휴대폰 · 예전 PC 세 기기가 같이 쓴다).
+ *
+ *   K1 PC 에서 키워드 묶음 [AI로 다 쓰기] → 세 갈래 답이 오면 클라우드 한 줄(marketing / packs · mkpacks_<작업공간>)에 그 키워드 · 기기 PC · 칸 전부
+ *   K2 휴대폰(빈 브라우저)에서 같은 키워드를 열면 AI 를 다시 부르지 않고 AI 글 그대로 · 'AI 가 쓴 글이에요 · … PC에서 씀' · [AI로 다시 쓰기]
+ *   K3 휴대폰에서 다른 키워드를 AI 로 쓰면 올라감(기기 휴대폰 · 앞 키워드도 그대로) → PC 로 돌아오면(창 다시 보임) 그 키워드도 다시 안 부르고 보임
+ *   K4 이 기능 전에 이 브라우저에만 있던 결과(예전 PC) → 마케팅 화면을 열면 클라우드로 올라감 · 다른 기기 결과는 이 브라우저로 들어옴
+ *   K5 인터넷이 끊긴 채 AI 로 쓰면 글은 보이고 '이 기기에만 남겼어요' 한 줄 → 인터넷이 다시 되면 올라가고 한 줄 사라짐
+ *   K6 클라우드 한 줄은 최근 12개까지 · 휴대폰 390 넘침 0 · JS 오류 0
+ *
+ *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
+ */
+import { chromium } from 'playwright'
+import { spawn, execSync } from 'node:child_process'
+
+const REF = 'qaproject'
+/** SHOTS=폴더 를 주면 휴대폰 화면 · 실패 한 줄을 찍어 둔다(눈 확인용) */
+const SHOTS = process.env.SHOTS ?? ''
+const shot = async (page, name) => {
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` }).catch(() => {})
+}
+const PORT = 4538
+const BASE = `http://localhost:${PORT}`
+const OUT = 'dist-qa-pack'
+let pass = 0
+let fail = 0
+function check(name, ok, detail) {
+  if (ok) pass += 1
+  else fail += 1
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || detail === undefined ? '' : ' ' + JSON.stringify(detail).slice(0, 600)}`)
+}
+
+execSync(`npx vite build --outDir ${OUT} --emptyOutDir`, {
+  stdio: 'ignore',
+  env: { ...process.env, VITE_DATA_MODE: 'supabase', VITE_SUPABASE_URL: `https://${REF}.supabase.co`, VITE_SUPABASE_ANON_KEY: 'qa-anon' },
+})
+const server = spawn('npx', ['vite', 'preview', '--outDir', OUT, '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true })
+const stop = () => {
+  try {
+    process.kill(-server.pid)
+  } catch {
+    /* 이미 꺼짐 */
+  }
+}
+for (let i = 0; i < 40; i += 1) {
+  try {
+    const r = await fetch(BASE)
+    if (r.ok) break
+  } catch {
+    /* 아직 */
+  }
+  await new Promise((r) => setTimeout(r, 250))
+}
+
+const WS = '11111111-1111-4111-8111-111111111111'
+const ROW_ID = `mkpacks_${WS.replace(/[^a-zA-Z0-9]/g, '')}`
+const OWNER = '00000000-0000-4000-8000-000000000001'
+const session = {
+  access_token: 'qa.' + Buffer.from(JSON.stringify({ sub: OWNER, role: 'authenticated', exp: 4102444800 })).toString('base64url') + '.sig',
+  token_type: 'bearer',
+  expires_in: 3600,
+  expires_at: 4102444800,
+  refresh_token: 'qa-refresh',
+  user: { id: OWNER, aud: 'authenticated', role: 'authenticated', email: 'owner-test@miraeailab.com', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' },
+}
+const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+
+/** 가짜 AI 답(갈래마다) — 브라우저가 부른 /api/ai-assist 를 여기서 받는다 */
+const ANSWERS = {
+  'radar.pack.video': {
+    headline: 'AI 확정 제목 — 채용 전에 꼭 볼 3가지',
+    items: [
+      { title: '0:00 오프닝', tag: '유튜브 대본', body: 'AI 대본 오프닝 — 대표님, 직원 뽑기 전에 이것부터 보세요.' },
+      { title: '제목 후보', tag: '제목', outline: ['AI 제목 1', 'AI 제목 2', 'AI 제목 3'] },
+    ],
+    next: ['노트북 화면 녹화'],
+  },
+  'radar.pack.short': {
+    headline: 'AI 릴스',
+    items: [
+      { title: '① 핵심 셋 (50초)', tag: '릴스', body: 'AI 릴스 대본 — 0~3초 말: "뽑기 전에"' },
+      { title: '유튜브 설명란', tag: '올릴 때 글', body: 'AI 설명란' },
+    ],
+  },
+  'radar.pack.blog': {
+    headline: 'AI 블로그',
+    items: [
+      { title: '제목', tag: '블로그', body: 'AI 블로그 제목' },
+      { title: '도입', tag: '블로그', body: 'AI 블로그 도입' },
+    ],
+    next: ['AI태그1'],
+  },
+}
+
+/** 서버 한 벌 — 세 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
+const cloud = { rows: new Map(), down: false, writes: [] }
+const packsRow = () => cloud.rows.get(ROW_ID)
+const cloudPacks = () => packsRow()?.payload?.packs ?? {}
+
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+
+/** seed = 이 기능 전부터 이 브라우저에 있던 묶음 결과(axmvp.mkpack.v1) */
+async function device(name, vp, mobile, seed = null) {
+  const ctx = await browser.newContext({ viewport: vp, locale: 'ko-KR', timezoneId: 'Asia/Seoul', isMobile: mobile, hasTouch: mobile })
+  await ctx.addInitScript(([ref, s, ws, seedRaw]) => {
+    if (!localStorage.getItem(`sb-${ref}-auth-token`)) localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
+    localStorage.setItem('axmvp.active_workspace', ws)
+    localStorage.setItem('axmvp.onboarding.prefs', '{"tutorialVersion":1,"autoShowEnabled":false,"firstSeenAt":"2026-01-01T00:00:00.000Z","lastShownDate":"2099-01-01","snoozedUntilDate":"2099-12-31","completedChapterIds":["system"],"lastOpenedChapterId":"system","selectedLearningPath":"ax","guideMode":"core","updatedAt":"2026-01-01T00:00:00.000Z"}')
+    if (seedRaw && !sessionStorage.getItem('qa.seeded')) {
+      localStorage.setItem('axmvp.mkpack.v1', seedRaw)
+      sessionStorage.setItem('qa.seeded', '1')
+    }
+  }, [REF, session, WS, seed ? JSON.stringify(seed) : ''])
+  const ai = []
+  await ctx.route('**/api/ai-assist**', async (route) => {
+    const body = route.request().postDataJSON() ?? {}
+    ai.push(body.assistId)
+    const a = ANSWERS[body.assistId] ?? { headline: '기타', items: [{ title: '기타' }] }
+    const run = { requestId: body.requestId, assistId: body.assistId, page: body.page, provider: 'gemini', model: 'gemini-qa', status: 'succeeded', structured: a, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 0, rowsCut: 0 }, createdAt: new Date().toISOString() }
+    await route.fulfill(json({ ok: true, run }))
+  })
+  await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
+    const req = route.request()
+    const url = new URL(req.url())
+    const path = decodeURIComponent(url.pathname)
+    const method = req.method()
+    if (path.endsWith('/auth/v1/token')) return route.fulfill(json(session))
+    if (path.endsWith('/auth/v1/user')) return route.fulfill(json(session.user))
+    if (path.endsWith('/rest/v1/rpc/my_os_access')) return route.fulfill(json('full'))
+    if (path.endsWith('/rest/v1/rpc/my_capabilities')) return route.fulfill(json(['can_use_owner_ai_workspace']))
+    if (path.includes('/rest/v1/workspace_members')) {
+      return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
+    }
+    if (path.includes('/rest/v1/workspaces')) return route.fulfill(json([{ id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' }]))
+    if (path.includes('/rest/v1/module_data')) {
+      const bucket = (url.searchParams.get('bucket') ?? '').replace(/^eq\./, '')
+      if (cloud.down) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'upstream connect error' }) })
+      if (method === 'GET') return route.fulfill(json([...cloud.rows.values()].filter((r) => !bucket || r.bucket === bucket)))
+      if (method === 'POST') {
+        const body = JSON.parse(req.postData() ?? '{}')
+        const row = Array.isArray(body) ? body[0] : body
+        const one = { ...row, created_at: row.updated_at }
+        cloud.rows.set(row.id, one)
+        cloud.writes.push({ bucket: row.bucket, id: row.id, payload: row.payload, device: name })
+        return route.fulfill(json(/object/.test(req.headers().accept ?? '') ? one : [one]))
+      }
+      return route.fulfill(json([]))
+    }
+    return route.fulfill(json([]))
+  })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  return { ctx, page, errors, ai }
+}
+
+const refocus = (page) =>
+  page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+const waitFor = async (fn, ms = 8000) => {
+  const end = Date.now() + ms
+  while (Date.now() < end) {
+    if (await fn()) return true
+    await new Promise((r) => setTimeout(r, 150))
+  }
+  return false
+}
+const KEY_A = 'custom:채용 지원금 바뀌는 점'
+const KEY_B = 'custom:직원 뽑기 전 확인할 것'
+const KEY_C = 'custom:예전에 써 둔 주제'
+const KEY_D = 'custom:끊긴 사이 쓴 주제'
+const openPack = async (page, key) => {
+  await page.goto(`${BASE}/marketing?view=plan&pack=${encodeURIComponent(key)}`, { waitUntil: 'networkidle' })
+  await page.getByTestId('mk-pack').waitFor({ timeout: 15000 })
+}
+const aiState = (page) => page.getByTestId('mk-pack-ai').getAttribute('data-state').catch(() => '')
+const aiSections = (page) => page.locator('[data-testid="mk-pack-section"][data-ai="1"]').count()
+const runAi = async (page) => {
+  const b = page.getByTestId('mk-pack-ai-run')
+  await b.click()
+  await page.waitForTimeout(450)
+  await b.click() // D-289 AI 단추 두 번(한 번 더 묻기)
+}
+
+const errorsAll = []
+try {
+  const pc = await device('pc', { width: 1440, height: 900 }, false)
+  const ph = await device('phone', { width: 390, height: 844 }, true)
+
+  // K1
+  await openPack(pc.page, KEY_A)
+  check('K1a 열 때는 AI 를 부르지 않음(누를 때만 — D-253 그대로)', pc.ai.length === 0 && (await aiState(pc.page)) === 'idle')
+  await runAi(pc.page)
+  const done1 = await waitFor(async () => (await aiState(pc.page)) === 'done')
+  const up1 = await waitFor(() => Object.keys(cloudPacks()[KEY_A]?.sections ?? {}).length >= 4)
+  const a1 = cloudPacks()[KEY_A]
+  check('K1b AI 세 갈래 → 클라우드 한 줄(marketing / packs · 작업공간 행 id)에 그 키워드 · 기기 PC · 칸 4개 넘게', done1 && up1 && pc.ai.length === 3 && a1?.device === 'pc' && packsRow()?.bucket === 'packs' && packsRow()?.module_key === 'marketing' && packsRow()?.workspace_id === WS, { ai: pc.ai, sections: Object.keys(a1?.sections ?? {}), row: packsRow()?.id })
+
+  // K2
+  await openPack(ph.page, KEY_A)
+  const done2 = await waitFor(async () => (await aiState(ph.page)) === 'done')
+  const bar2 = await ph.page.getByTestId('mk-pack-ai').innerText().catch(() => '')
+  const n2 = await aiSections(ph.page)
+  await shot(ph.page, 'pack-phone-from-pc')
+  check('K2a 휴대폰(빈 브라우저)에서 같은 키워드 → AI 다시 안 부르고 AI 글 그대로', done2 && ph.ai.length === 0 && n2 >= 4, { ai: ph.ai, n2 })
+  check('K2b \'AI 가 쓴 글이에요 · … PC에서 씀\' · [AI로 다시 쓰기]', /AI 가 쓴 글이에요/.test(bar2) && /PC에서 씀/.test(bar2) && (await ph.page.getByTestId('mk-pack-ai-run').innerText()).includes('다시 쓰기'), bar2)
+  const text2 = await ph.page.locator('[data-sec="video"]').innerText().catch(() => '')
+  check('K2c 휴대폰 화면 글 = PC 에서 AI 가 쓴 글(대본 오프닝)', text2.includes('AI 대본 오프닝'), text2.slice(0, 80))
+
+  // K3
+  await openPack(ph.page, KEY_B)
+  await runAi(ph.page)
+  await waitFor(async () => (await aiState(ph.page)) === 'done')
+  const up3 = await waitFor(() => cloudPacks()[KEY_B]?.device === 'phone' && Object.keys(cloudPacks()[KEY_B]?.sections ?? {}).length >= 4)
+  check('K3a 휴대폰에서 다른 키워드 AI → 올라감 · 기기 휴대폰 · 앞 키워드(PC)도 그대로', up3 && cloudPacks()[KEY_A]?.device === 'pc', Object.keys(cloudPacks()))
+  const pcBefore = pc.ai.length
+  await pc.page.goto(`${BASE}/marketing?view=plan`, { waitUntil: 'networkidle' })
+  await pc.page.waitForTimeout(400)
+  await refocus(pc.page)
+  const gotB = await waitFor(() => pc.page.evaluate((k) => Object.keys(JSON.parse(localStorage.getItem('axmvp.mkpack.v1') ?? '{}')).includes(k), KEY_B))
+  await openPack(pc.page, KEY_B)
+  const done3 = await waitFor(async () => (await aiState(pc.page)) === 'done')
+  const bar3 = await pc.page.getByTestId('mk-pack-ai').innerText().catch(() => '')
+  check('K3b PC 로 돌아오면 휴대폰에서 쓴 키워드도 이 브라우저로 · 열면 다시 안 부르고 \'휴대폰에서 씀\'', gotB && done3 && pc.ai.length === pcBefore && /휴대폰에서 씀/.test(bar3), { gotB, bar3, ai: pc.ai.length - pcBefore })
+
+  // K4 예전 PC — 이 기능 전부터 이 브라우저에만 있던 결과
+  const oldAt = '2026-10-20T03:00:00.000Z'
+  const old = await device('old-pc', { width: 1280, height: 860 }, false, { [KEY_C]: { at: oldAt, model: 'gemini-old', sections: { blog: [{ label: '블로그 제목', text: '예전에 AI 로 쓴 블로그' }] } } })
+  await old.page.goto(`${BASE}/marketing?view=plan`, { waitUntil: 'networkidle' })
+  const up4 = await waitFor(() => cloudPacks()[KEY_C]?.at === oldAt)
+  const in4 = await waitFor(() => old.page.evaluate(([a, b]) => { const s = Object.keys(JSON.parse(localStorage.getItem('axmvp.mkpack.v1') ?? '{}')); return s.includes(a) && s.includes(b) }, [KEY_A, KEY_B]))
+  check('K4a 이 브라우저에만 있던 예전 결과 → 마케팅 화면을 열면 클라우드로 올라감(기기 표시 없음 그대로)', up4 && cloudPacks()[KEY_C]?.device === undefined && !!cloudPacks()[KEY_A] && !!cloudPacks()[KEY_B], Object.keys(cloudPacks()))
+  check('K4b 다른 기기 결과(PC · 휴대폰)는 이 브라우저로 들어옴 · AI 다시 안 부름', in4 && old.ai.length === 0)
+  await openPack(ph.page, KEY_C)
+  const done4 = await waitFor(async () => (await aiState(ph.page)) === 'done')
+  check('K4c 휴대폰에서도 예전 결과가 보임(AI 안 부름)', done4 && (await ph.page.locator('[data-sec="blog"]').innerText()).includes('예전에 AI 로 쓴 블로그') && ph.ai.length === 3, ph.ai.length)
+
+  // K5 인터넷이 끊긴 채
+  cloud.down = true
+  await openPack(pc.page, KEY_D)
+  await runAi(pc.page)
+  await waitFor(async () => (await aiState(pc.page)) === 'done')
+  const failShown = await waitFor(async () => (await pc.page.getByTestId('mk-pack-cloud-failed').count()) === 1)
+  const failText = await pc.page.getByTestId('mk-pack-cloud-failed').innerText().catch(() => '')
+  await shot(pc.page, 'pack-pc-failed')
+  check('K5a 끊긴 채 AI → 글은 보이고 \'이 기기에만 남겼어요\' 한 줄 · 클라우드엔 아직 없음', failShown && /이 기기에만 남겼어요/.test(failText) && (await aiSections(pc.page)) >= 4 && !cloudPacks()[KEY_D], failText)
+  cloud.down = false
+  await pc.page.evaluate(() => window.dispatchEvent(new Event('online')))
+  const up5 = await waitFor(() => Object.keys(cloudPacks()[KEY_D]?.sections ?? {}).length >= 4)
+  const gone = await waitFor(async () => (await pc.page.getByTestId('mk-pack-cloud-failed').count()) === 0)
+  check('K5b 인터넷이 다시 되면 올라가고 한 줄 사라짐', up5 && gone)
+
+  // K6
+  const n6 = Object.keys(cloudPacks()).length
+  const writesByOld = cloud.writes.filter((w) => w.device === 'old-pc').length
+  check('K6a 클라우드 한 줄 · 12개 넘지 않음 · 작업공간 줄은 하나', n6 >= 4 && n6 <= 12 && [...cloud.rows.keys()].filter((k) => k.startsWith('mkpacks_')).length === 1, { n6, rows: [...cloud.rows.keys()] })
+  check('K6b 같은 내용이면 다시 올리지 않음(예전 PC 는 한 번만 올림)', writesByOld === 1, writesByOld)
+  const geo = await ph.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('K6c 휴대폰 390 넘침 0', geo <= 0, geo)
+  errorsAll.push(...pc.errors, ...ph.errors, ...old.errors)
+  check('K6d JS 오류 0', errorsAll.length === 0, errorsAll.slice(0, 3))
+} catch (e) {
+  check('시험이 끝까지 돌았다', false, String(e).slice(0, 400))
+} finally {
+  await browser.close()
+  stop()
+}
+console.log(`\nqa:packcloud: ${pass} passed, ${fail} failed`)
+process.exit(fail ? 1 : 0)
