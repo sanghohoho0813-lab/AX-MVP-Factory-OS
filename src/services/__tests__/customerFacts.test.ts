@@ -388,6 +388,7 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('D-352 진단서 — 먼저 제안할 것 = 맨 위 제안과 같은 모듈 · 같은 순서 · 나머지 모듈도 전부 한 줄 · 회사 한눈에(업종 · 설립)', dg.picks.map((p) => p.key).join() === topPicks(ins).map((p) => p.key).join() && dg.picks.length + dg.others.length === ins.length && dg.snapshot.some((x) => x.label === '설립') && dg.snapshot.some((x) => x.label === '업종'), JSON.stringify([dg.picks.map((p) => p.key), dg.snapshot]))
   const dgText = JSON.stringify(dg)
   check('D-352 고객에게 드리는 종이 — 화면 안내 말(올리면 · 판정해요) · 내부 표시(★) 없음 · 지금은 어려운 것은 맨 뒤', !/올리면|판정해요|★/.test(dgText) && dg.others.every((o, i, a) => i === 0 || !(a[i - 1].tone === 'no' && o.tone !== 'no')), [dgText.match(/.{0,50}(올리면|판정해요|★).{0,30}/g), dg.others.map((o) => o.tone)])
+  check('D-508 진단서 먼저 제안마다 쉽게 말하면 한 줄(말하기 대본과 같은 글) · 나머지 모듈엔 없음', dg.picks.length > 0 && dg.picks.every((p) => (p.easy ?? '').length > 20) && dg.others.every((o) => !o.easy), dg.picks.map((p) => p.easy))
   const dn = buildDiagnosis(empty, none, '2026-10-02')
   check('D-352 정보가 없으면 — 제안 0 · 보내 주실 자료(어디서 떼는지 · 어느 진단에) · 다음 순서 첫 줄이 자료 요청', dn.picks.length === 0 && dn.requests.length > 0 && dn.requests.every((r) => r.for.length > 0) && dn.steps[0].includes('자료'), JSON.stringify([dn.requests, dn.steps]))
   const kt = diagnosisKakao(dg, '미래AI랩 김팀장')

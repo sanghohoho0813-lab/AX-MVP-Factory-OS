@@ -95,6 +95,11 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
                 </span>
                 <span className="text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]">{p.text}</span>
                 {p.amount && <span className="text-[1rem] font-bold break-keep text-emerald-800 [overflow-wrap:anywhere]">{p.amount}</span>}
+                {p.easy && (
+                  <span className="text-[0.88rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-easy">
+                    쉽게 말하면 — {p.easy}
+                  </span>
+                )}
               </span>
             </li>
           ))}

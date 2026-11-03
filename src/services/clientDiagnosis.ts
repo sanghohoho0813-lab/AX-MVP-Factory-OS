@@ -18,6 +18,7 @@ import { policyBonus } from './policyEvidence'
 import { requestItemsFrom, type RequestItem } from './recoRequest'
 import { customFactValue } from './customerFacts'
 import { vatYearOverYear } from './vatReturnDoc'
+import { talkCard } from './consultTalk'
 
 export interface DiagnosisLine {
   key: string
@@ -28,6 +29,8 @@ export interface DiagnosisLine {
   text: string
   /** 엔진이 계산한 금액(없으면 '') */
   amount: string
+  /** D-508 먼저 제안할 것만 — 쉽게 말하면(이 제도가 무엇인지 · 말하기 대본과 같은 글) */
+  easy?: string
 }
 
 /** D-363 지난번 드린 진단서 뒤 달라진 것(고객 종이 · 화면 같은 내용) */
@@ -196,7 +199,8 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   const held = policyBonus(record, today).items.map((x) => x.replace(/ 보유$/, ''))
   if (held.length) snapshot.push({ label: '보유', value: held.join(' · ') })
 
-  const picks = topPicks(insights).map(lineOf)
+  // D-508 먼저 제안드리는 것마다 '쉽게 말하면' 한 줄(말하기 대본과 같은 글 — 대표님이 종이만 봐도 무슨 제도인지)
+  const picks = topPicks(insights).map((i) => ({ ...lineOf(i), easy: talkCard(i)?.easy ?? '' }))
   const pickKeys = new Set(picks.map((p) => p.key))
   const others = insights
     .filter((i) => !pickKeys.has(i.key))
