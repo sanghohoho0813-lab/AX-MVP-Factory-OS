@@ -8,6 +8,7 @@
  * 대표 전용(마케팅 · 브랜딩 모듈 · 팀장에게 안 보임). 저장은 기존 모듈 기록(marketing / threads).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, Heart, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, Share2, SlidersHorizontal, TriangleAlert, UserPlus } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -175,15 +176,21 @@ const EMPTY_DRAFT: Draft = { goal: '', template: '', topic: '', tag: '', facts: 
 
 /** 아직 저장 안 한 글 — 이 브라우저에만(새로고침 · 저장 실패에도 적은 것이 남게) */
 const DRAFT_KEY = 'mirae.threads.draft.v1'
+/** 저장된 글 모양 다듬기 — 이 기기 · 클라우드(D-513) 같은 규칙 · 참고 글(남의 글)은 남기지 않는다 */
+function cleanDraft(raw: unknown): Draft {
+  const v = raw && typeof raw === 'object' ? (raw as Partial<Draft>) : null
+  if (!v) return EMPTY_DRAFT
+  return { ...EMPTY_DRAFT, ...v, reference: '', checks: Array.isArray(v.checks) ? v.checks.filter((x) => typeof x === 'string') : [] }
+}
 function readDraft(): Draft {
   try {
-    const v = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Partial<Draft> | null
-    if (v && typeof v === 'object') return { ...EMPTY_DRAFT, ...v, reference: '', checks: Array.isArray(v.checks) ? v.checks.filter((x) => typeof x === 'string') : [] }
+    return cleanDraft(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'))
   } catch {
     // 못 읽으면 빈 글
   }
   return EMPTY_DRAFT
 }
+const draftEmpty = (d: Draft) => !d.body.trim() && !d.topic.trim() && !d.selfComment.trim() && !d.facts.trim()
 function writeDraft(d: Draft): void {
   try {
     // 참고 글(남의 글)은 남기지 않는다
@@ -232,6 +239,10 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       writeDraft(n)
       return n
     })
+  // D-513 다른 기기에서 이어 쓰기 — 주소로 주제 · 글을 들고 왔으면 클라우드 글로 바꾸지 않는다 · 참고 글은 올리지 않는다
+  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open')))
+  const syncDraft = useMemo(() => ({ ...draft, reference: '' }), [draft])
+  const sync = useDraftSync<Draft>({ kind: 'threads', workspaceId, readOnly, draft: syncDraft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ThreadPost): Draft => ({ ...EMPTY_DRAFT, id: p.id, goal: p.goal, template: p.template, topic: p.topic, tag: p.tag, body: p.body, selfComment: p.selfComment, checks: p.checks, source: p.source })
   const openPost = (p: ThreadPost) => {
     setDraft(() => draftOf(p))
@@ -274,6 +285,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
+      {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="thr" />}
       {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} weekRef={week.ref} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'library' && <LibraryPanel onUse={pickTemplate} />}

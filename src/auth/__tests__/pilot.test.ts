@@ -90,6 +90,7 @@ check('키: 로그인 토큰 sb-* 는 옮기지 않는다', !isUserScopedKey('sb
 check('키: 금고 안 키는 다시 옮기지 않는다', !isUserScopedKey('axmvp.u.x.axmvp.clients'))
 check('키: 공용 값(판 번호 · 공개 공고 캐시)은 옮기지 않는다', !isUserScopedKey('axmvp.schema_version') && !isUserScopedKey('axmvp.grants.feed.v1') && !isUserScopedKey('axmvp.vault.live'))
 check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserScopedKey('theme') && !isUserScopedKey(''))
+check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft · 적은 시각 · 이번 주 주제)도 사람 것', isUserScopedKey('mirae.threads.draft.v1') && isUserScopedKey('mirae.shorts.draft.v1') && isUserScopedKey('mirae.threads.draft.at.v1') && isUserScopedKey('mirae.mk.weekTopics.v1'))
 
 // ---------- 1. 이 기능 전부터 쓰던 브라우저에 Pilot 이 먼저 로그인 ----------
 {

@@ -30,6 +30,8 @@ const GLOBAL_KEYS = new Set(['axmvp.schema_version', 'axmvp.staleChunkReloadAt',
 export function isUserScopedKey(key: string): boolean {
   if (!key || key.startsWith('sb-') || key.startsWith(VAULT_PREFIX) || GLOBAL_KEYS.has(key)) return false
   if (key.startsWith('axmvp.') || key.startsWith('axmvp:')) return true
+  // D-513 마케팅 쓰던 글(스레드 · 릴스 쓰던 글 · 적은 시각 · 하루 10분 · 이번 주 주제) — 예전에는 금고 밖이라 같은 브라우저 다음 계정에 보였다
+  if (key.startsWith('mirae.')) return true
   // 옛 도구(연구소 · 정책자금)가 쓰는 이름 — 회사 이름이 키에 들어간 것도 있다
   return /^(planChecklist:|assessment:|setupdoc:|changes:|survey:|pm:|scroll:|guide:)/.test(key)
 }

@@ -7,6 +7,7 @@
  * 대표 전용(마케팅 · 브랜딩 모듈). 저장은 기존 모듈 기록(marketing / shorts).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -108,15 +109,21 @@ interface Draft {
 }
 const EMPTY: Draft = { platform: 'tiktok', aim: '', format: '', topic: '', facts: '', script: '', caption: '', hashtags: '', checks: [], source: 'hand' }
 const DRAFT_KEY = 'mirae.shorts.draft.v1'
+/** 저장된 대본 모양 다듬기 — 이 기기 · 클라우드(D-513) 같은 규칙 */
+function cleanDraft(raw: unknown): Draft {
+  const v = raw && typeof raw === 'object' ? (raw as Partial<Draft>) : null
+  if (!v) return EMPTY
+  return { ...EMPTY, ...v, platform: v.platform === 'reels' ? 'reels' : 'tiktok', checks: Array.isArray(v.checks) ? v.checks.filter((x) => typeof x === 'string') : [] }
+}
 function readDraft(): Draft {
   try {
-    const v = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Partial<Draft> | null
-    if (v && typeof v === 'object') return { ...EMPTY, ...v, platform: v.platform === 'reels' ? 'reels' : 'tiktok', checks: Array.isArray(v.checks) ? v.checks.filter((x) => typeof x === 'string') : [] }
+    return cleanDraft(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'))
   } catch {
     // 못 읽으면 빈 대본
   }
   return EMPTY
 }
+const draftEmpty = (d: Draft) => !d.script.trim() && !d.topic.trim() && !d.caption.trim() && !d.facts.trim()
 function writeDraft(d: Draft): void {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(d))
@@ -163,6 +170,9 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       writeDraft(n)
       return n
     })
+  // D-513 다른 기기에서 이어 쓰기 — 주소로 주제 · 글을 들고 왔으면 클라우드 글로 바꾸지 않는다
+  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open')))
+  const sync = useDraftSync<Draft>({ kind: 'shorts', workspaceId, readOnly, draft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ShortPost): Draft => ({ ...EMPTY, id: p.id, platform: p.platform, aim: p.aim, format: p.format, topic: p.topic, script: p.script, caption: p.caption, hashtags: p.hashtags, checks: p.checks, source: p.source })
   const openPost = (p: ShortPost) => {
     setDraft(() => draftOf(p))
@@ -209,6 +219,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
+      {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="sht" />}
       {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'guide' && <GuidePanel onUse={pickFormat} />}
