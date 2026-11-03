@@ -13,6 +13,9 @@ import { useToast } from '../../components/ui/toastContext'
 import { CloudSaveStatus } from '../../components/cloud/CloudSaveStatus'
 import { notifyStoreChanged } from '../../storage/localStore'
 import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataImport/localBackup'
+import { exportWorkspace } from '../../services/workspaceExport'
+import { todayLocalDate } from '../../lib/appClock'
+import { Download } from 'lucide-react'
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
@@ -71,8 +74,22 @@ function NameEditor() {
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
+  const { currentWorkspaceId } = useAuth()
   const [confirmClear, setConfirmClear] = useState(false)
   const [busy, setBusy] = useState(false)
+  /** D-528 작업공간 전체 내보내기 — 고객 관리 › 더보기 › [백업 내려받기] 와 같은 함수 · 같은 파일 */
+  const [exporting, setExporting] = useState(false)
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const { line } = await exportWorkspace(currentWorkspaceId, true, todayLocalDate())
+      showToast(line)
+    } catch {
+      showToast('업체 목록을 읽지 못해 내려받지 못했어요 — 인터넷을 확인하고 다시 눌러 주세요.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   function handleClear() {
     setBusy(true)
@@ -90,6 +107,16 @@ function DataPanelSupabase() {
 
   return (
     <>
+      <Panel title="작업공간 전체 내보내기">
+        <p className="t-sub break-keep text-slate-600">
+          업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸지 않아요. 고객 관리 › 더보기 › [백업 내려받기] 와 같은 파일이에요.
+        </p>
+        <Button variant="secondary" className="mt-3" onClick={() => void handleExport()} disabled={exporting || !currentWorkspaceId} data-testid="settings-export">
+          <Download aria-hidden="true" className="size-4" />
+          {exporting ? '모으는 중…' : '전체 내려받기'}
+        </Button>
+      </Panel>
+
       <Panel title="로컬 데이터 가져오기">
         <HelpNote summary="이 브라우저의 로컬 데이터를 현재 작업공간(클라우드)로 옮깁니다. 멱등하며 원본은 지워지지 않습니다." />
         <div className="mt-4">

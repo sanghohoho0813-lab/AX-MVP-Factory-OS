@@ -12,7 +12,8 @@
  *   V  D-516 영상 대본 · 우리 회사 버전 — PC 에서 받아 적기(3구간) · 우리 버전 → 영상마다 한 줄(transcript_<영상>) + 목록 한 줄 + 우리 버전 한 줄 ·
  *      휴대폰에서 같은 영상 → 다시 안 부르고 9줄 · 우리 버전 · 'PC에서 씀' · 휴대폰에서 [처음부터 다시 받기] → PC 로 돌아오면 휴대폰 대본으로
  *   X  D-521 작업공간 전체 내보내기 — 고객 관리 [백업 내려받기] 한 번 → 파일 하나에 업체 · 업무 일기(서버) · 모듈 기록(서버 전부) · 서류 파일 목록 ·
- *      서버에 쓰기 0 · 모듈 기록을 못 읽으면 나머지로 받고 '못 담은 것' 한 줄 · [백업 불러오기] 가 그 파일을 읽고 '보관용' 한 줄
+ *      서버에 쓰기 0 · 모듈 기록을 못 읽으면 나머지로 받고 '못 담은 것' 한 줄 · [백업 불러오기] 가 그 파일을 읽고 '보관용' 한 줄 ·
+ *      D-528 설정 › 데이터 [전체 내려받기] 도 같은 파일
  *   I  D-523 보낸 초대 목록 · 취소 — 설정 › 작업공간: 기다리는 초대만 펴 둠(이메일 · 역할 · n일 남음) · 지난 초대(들어옴 · 취소 · 기한 지남) 접힘 ·
  *      토큰 칸은 읽지 않음 · [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만) · 새 초대를 만들면 목록에 바로
  *
@@ -489,6 +490,16 @@ try {
   check('X3 [백업 불러오기] 가 3판 파일을 읽음 · 업무 일기 · 모듈 기록은 보관용이라고 한 줄', note.includes('업무 일기 3건') && note.includes('보관용'), note)
   await pc.page.getByRole('button', { name: '취소' }).click()
   fs.unlinkSync(tmp)
+  // X4 D-528 설정 › 데이터에서도 같은 파일(업체를 그 자리에서 읽어서)
+  await pc.page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
+  await pc.page.getByRole('button', { name: '데이터' }).first().click()
+  const sBtn = pc.page.getByTestId('settings-export')
+  await sBtn.waitFor({ timeout: 8000 })
+  const [sdl] = await Promise.all([pc.page.waitForEvent('download', { timeout: 15000 }), sBtn.click()])
+  const sfile = JSON.parse(fs.readFileSync(await sdl.path(), 'utf8'))
+  const stoast = await pc.page.getByText(/백업을 내려받았어요/).first().innerText({ timeout: 8000 }).catch(() => '')
+  await shot(pc.page, 'd528-settings-export-pc')
+  check('X4 (D-528) 설정 › 데이터 [전체 내려받기] → 같은 파일(3판 · 업체 1 · 업무 일기 3 · 파일 목록 2) · 한 줄', sfile.version === 3 && sfile.clients?.length === 1 && sfile.workspace?.journal?.length === 3 && sfile.workspace?.files?.length === 2 && /업체 1곳/.test(stoast), { v: sfile.version, c: sfile.clients?.length, stoast })
   cloud.clients = []
   cloud.journal = []
   cloud.rows.delete('emp-1')

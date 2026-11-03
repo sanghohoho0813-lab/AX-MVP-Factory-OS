@@ -64,7 +64,7 @@ import {
   normalizeClientOps,
 } from '../services/clientOpsService'
 import { downloadBackup, MODULE_DATA_PREFIX, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
-import { collectWorkspaceBackup, downloadWorkspaceBackup, workspaceBackupLine, workspaceSectionOf, type WorkspaceSummary } from '../services/workspaceExport'
+import { exportWorkspace, workspaceSectionOf, type WorkspaceSummary } from '../services/workspaceExport'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -538,10 +538,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setExporting(true)
     setError('')
     try {
-      const file = await collectWorkspaceBackup(workspaceId, records, getDataModeConfig().mode === 'supabase')
-      downloadWorkspaceBackup(file, today)
-      const miss = file.workspace.missing
-      showToast(`백업을 내려받았어요 — ${workspaceBackupLine(file.workspace.summary)}${miss.length ? ` · 못 담은 것: ${miss.join(', ')}(인터넷을 확인하고 한 번 더 받아 주세요)` : ''}`)
+      const { line } = await exportWorkspace(workspaceId, getDataModeConfig().mode === 'supabase', today, records)
+      showToast(line)
       setMoreOpen(false)
     } catch {
       downloadBackup(records, today)

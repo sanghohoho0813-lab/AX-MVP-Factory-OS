@@ -16,6 +16,7 @@ import type { JournalEntry } from '../types/bridge'
 import { BACKUP_FORMAT, MODULE_DATA_PREFIX, buildBackup, readToolInputs, type BackupFile } from './clientOpsBackup'
 import { documentMetaOf } from './clientOpsDocuments'
 import { listJournal } from './journalService'
+import { listClients } from './clientOpsService'
 import { listWorkspaceRows, type WorkspaceModuleRow } from './moduleData'
 import { nowIso } from '../lib/appClock'
 
@@ -206,4 +207,16 @@ export function workspaceSectionOf(text: string): WorkspaceSummary | null {
   } catch {
     return null
   }
+}
+
+/**
+ * D-528 한 길로 — 고객 관리 › 더보기 · 설정 › 데이터 두 곳이 같은 함수를 쓴다.
+ * 업체를 이미 읽은 화면은 records 를 넘기고, 안 읽은 화면(설정)은 여기서 읽는다. 받은 뒤 보여 줄 한 줄도 함께 돌려준다.
+ */
+export async function exportWorkspace(workspaceId: string | null, cloud: boolean, today: string, records?: ClientOpsRecord[]): Promise<{ file: WorkspaceBackupFile; line: string }> {
+  const list = records ?? (await listClients(workspaceId))
+  const file = await collectWorkspaceBackup(workspaceId, list, cloud)
+  downloadWorkspaceBackup(file, today)
+  const miss = file.workspace.missing
+  return { file, line: `백업을 내려받았어요 — ${workspaceBackupLine(file.workspace.summary)}${miss.length ? ` · 못 담은 것: ${miss.join(', ')}(인터넷을 확인하고 한 번 더 받아 주세요)` : ''}` }
 }
