@@ -218,7 +218,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const [params, setParams] = useSearchParams()
   const view = viewOf(params.get('view'))
   // D-511 첫 화면(주소에 view · pack · week 가 없을 때) = 대화창 + 살펴보기 · 만들기 목록만. 이번 주 찍을 것(키워드 판)은 ?view=plan
-  const firstScreen = !params.get('view') && !params.get('pack') && params.get('week') !== '1'
+  const location = useLocation()
+  // 예전 주소 /marketing/youtube(콘텐츠 레이더)는 그대로 이번 주 찍을 것 — 첫 화면(대화창)은 /marketing 만
+  const firstScreen = /^\/marketing\/?$/.test(location.pathname) && !params.get('view') && !params.get('pack') && params.get('week') !== '1'
   // D-235 경로 줄 끝에 지금 보는 탭(영업 › 마케팅 · 브랜딩 › 콘텐츠 레이더 › 이번 주 찍을 것) — 첫 화면은 꼬리 없음
   usePageCrumbs(firstScreen ? [] : [{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
@@ -234,7 +236,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-350 내 콘텐츠의 '1주일치 묶음' 에서 연 주(지난 주도) — 뒤로 가면 내 콘텐츠로
   const weekStartParam = /^\d{4}-\d{2}-\d{2}$/.test(params.get('start') ?? '') ? (params.get('start') ?? '') : ''
   const weekFromMake = params.get('from') === 'make'
-  const location = useLocation()
   const navigate = useNavigate()
   // SAAS-2 고객도 서버가 마케팅을 열었으면 묶음 AI 를 쓴다(사용량 장부로 셈) — 대표 판정은 그대로
   const mkAi = useMarketingAiOn()
