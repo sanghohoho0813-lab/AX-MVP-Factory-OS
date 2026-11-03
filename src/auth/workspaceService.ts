@@ -158,8 +158,11 @@ export function inviteView(inv: WorkspaceInvite, now: number = Date.now()): { st
 
 /** 기다리는 것 먼저(곧 만료 순) · 그다음 지난 것(최근 순) */
 export function sortInvites(list: readonly WorkspaceInvite[], now: number = Date.now()): { open: WorkspaceInvite[]; past: WorkspaceInvite[] } {
-  const open = list.filter((i) => inviteView(i, now).state === 'pending').sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
-  const past = list.filter((i) => inviteView(i, now).state !== 'pending').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const open: WorkspaceInvite[] = []
+  const past: WorkspaceInvite[] = []
+  for (const i of list) (inviteView(i, now).state === 'pending' ? open : past).push(i)
+  open.sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
+  past.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return { open, past }
 }
 

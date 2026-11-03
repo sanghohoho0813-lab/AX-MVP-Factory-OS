@@ -15,7 +15,7 @@
  */
 
 import { useMoneyWords } from './useMoneyWords'
-import { useState } from 'react'
+import { createElement, useState } from 'react'
 import { ArrowRight, BellRing, ChevronRight, FileUp, Sparkles } from 'lucide-react'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageLabelOf } from '../../services/salesPipeline'
@@ -340,20 +340,18 @@ export function ClientBoardCard({
           </div>
         )}
         {/* D-512 고객에게 부탁한 서류 — 며칠째 · 몇 개 받았나(접힌 휴대폰 카드에도). 3일 넘게 덜 왔으면 빨간 글자 */}
-        {docReq && (() => {
-          const cls = `t-sub flex flex-wrap items-baseline gap-x-1.5 font-semibold ${docReq.done ? 'text-success-700' : docReq.waitingDays >= 3 ? 'text-danger-700' : 'text-slate-700'}`
-          const text = docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`
-          // D-526 누르면 그 업체 서류함(요청한 서류 줄이 맨 위)
-          return onDocs ? (
-            <button type="button" onClick={onDocs} title="서류함 열기" data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={`tap self-start text-left hover:underline ${cls}`}>
-              {text}
-            </button>
-          ) : (
-            <p data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={cls}>
-              {text}
-            </p>
-          )
-        })()}
+        {docReq &&
+          // D-526 누르면 그 업체 서류함(요청한 서류 줄이 맨 위) — 서류함으로 갈 길이 없는 화면에서는 글자만
+          createElement(
+            onDocs ? 'button' : 'p',
+            {
+              ...(onDocs ? { type: 'button', onClick: onDocs, title: '서류함 열기' } : {}),
+              'data-testid': 'card-docreq',
+              'data-done': docReq.done ? '1' : '0',
+              className: `${onDocs ? 'tap self-start text-left hover:underline ' : ''}t-sub flex flex-wrap items-baseline gap-x-1.5 font-semibold ${docReq.done ? 'text-success-700' : docReq.waitingDays >= 3 ? 'text-danger-700' : 'text-slate-700'}`,
+            },
+            docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`,
+          )}
         {/* D-159: 맞는 지원사업 · 사업자번호 · 업무 조각 · 돈 줄은 휴대폰에서 접어 둔다(펼쳐보기) */}
         <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more">
         {!reco && grants && grants.fit > 0 && onGrants && (

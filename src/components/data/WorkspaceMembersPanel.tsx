@@ -293,13 +293,16 @@ export function WorkspaceMembersPanel() {
             {past.length > 0 && (
               <Disclosure title="지난 초대" hint={`${past.length}건 — 들어옴 · 취소 · 기한 지남`}>
                 <ul className="flex flex-col divide-y divide-slate-100" data-testid="invite-past">
-                  {past.map((inv) => (
-                    <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[0.875rem]">
-                      <span className="min-w-0 flex-[1_1_12rem] truncate text-slate-700">{inv.email}</span>
-                      <span className="text-slate-500">{ROLE_LABEL[inv.role]} · {md(inv.createdAt)} 보냄</span>
-                      <span className={`font-semibold ${inviteView(inv).state === 'accepted' ? 'text-slate-700' : 'text-slate-500'}`}>{INVITE_STATE[inviteView(inv).state]}</span>
-                    </li>
-                  ))}
+                  {past.map((inv) => {
+                    const state = inviteView(inv).state
+                    return (
+                      <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[0.875rem]">
+                        <span className="min-w-0 flex-[1_1_12rem] truncate text-slate-700">{inv.email}</span>
+                        <span className="text-slate-500">{ROLE_LABEL[inv.role]} · {md(inv.createdAt)} 보냄</span>
+                        <span className={`font-semibold ${state === 'accepted' ? 'text-slate-700' : 'text-slate-500'}`}>{INVITE_STATE[state]}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               </Disclosure>
             )}
