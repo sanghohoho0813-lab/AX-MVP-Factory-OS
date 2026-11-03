@@ -3,14 +3,14 @@
  * 확인 필요(기타 칸) · 겹친 서류 · 만료 · 지금 필요한데 없음. 누르면 그 칸으로 간다(차례로 돈다).
  */
 import { useEffect, useRef, useState } from 'react'
-import { CircleAlert, Copy, FileWarning, FileX, Paperclip } from 'lucide-react'
+import { CircleAlert, Copy, FileWarning, FileX, ListChecks, Paperclip } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { DocShelfSummary } from '../../services/docShelf'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { isOtherCell, moveDocTo, moveTargets } from '../../services/docShelf'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
-export function DocShelfBar({ summary, onJump }: { summary: DocShelfSummary; onJump: (key: DocumentKey) => void }) {
+export function DocShelfBar({ summary, onJump, onReview }: { summary: DocShelfSummary; onJump: (key: DocumentKey) => void; /** D-518 '확인할 정보' — 맞춤 추천의 확인 칸으로 */ onReview?: () => void }) {
   // 같은 칩을 다시 누르면 다음 칸으로
   const turn = useRef<Record<string, number>>({})
   const chip = (id: string, keys: DocumentKey[], label: string, icon: ReactNode, tone: string) => {
@@ -33,8 +33,28 @@ export function DocShelfBar({ summary, onJump }: { summary: DocShelfSummary; onJ
     )
   }
   const dupKeys = summary.dupGroups.flat()
-  const none = summary.other.length + dupKeys.length + summary.expired.length + summary.missingNow.length === 0
+  const review = summary.review ?? []
+  const none = summary.other.length + dupKeys.length + summary.expired.length + summary.missingNow.length + review.length === 0
+  const st = summary.stages
   return (
+    <div className="flex flex-col gap-1.5" data-testid="doc-shelf-wrap">
+      {/* D-518 서류 단계 한 줄 — 받음 · 요청함(고객이 아직 안 보냄) · 확인할 정보(읽은 값 확인 전) */}
+      {st && st.received + st.requested > 0 && (
+        <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-600" data-testid="doc-stages">
+          <span>받음 <b className="font-bold text-slate-900" data-testid="doc-stage-received">{st.received}</b></span>
+          {st.requested > 0 && (
+            <span>
+              · 요청함 <b className="font-bold text-brand-700" data-testid="doc-stage-requested">{st.requested}</b>
+            </span>
+          )}
+          {st.review > 0 && (
+            <span>
+              · 확인할 정보 <b className="font-bold text-warning-800" data-testid="doc-stage-review">{st.reviewFacts}</b>
+            </span>
+          )}
+          {st.review === 0 && st.received > 0 && <span className="text-success-700" data-testid="doc-stage-done">· 받은 서류에서 읽은 정보는 모두 확인했어요</span>}
+        </p>
+      )}
     <div className="flex flex-wrap items-center gap-2" data-testid="doc-shelf">
       {none ? (
         <span className="t-sub text-success-700">손볼 서류가 없습니다.</span>
@@ -43,10 +63,23 @@ export function DocShelfBar({ summary, onJump }: { summary: DocShelfSummary; onJ
           <span className="t-sub font-semibold text-slate-700">손볼 것</span>
           {chip('missing', summary.missingNow, `지금 필요한데 없음 ${summary.missingNow.length}`, <FileX aria-hidden="true" className="size-4" />, 'border-danger-200 bg-danger-50 text-danger-700')}
           {chip('expired', summary.expired, `만료 ${summary.expired.length}`, <FileWarning aria-hidden="true" className="size-4" />, 'border-danger-200 bg-danger-50 text-danger-700')}
+          {review.length > 0 && (
+            <button
+              key="review"
+              type="button"
+              data-testid="shelf-review"
+              onClick={() => (onReview ? onReview() : onJump(review[0]))}
+              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-3 font-semibold text-warning-800"
+            >
+              <ListChecks aria-hidden="true" className="size-4" />
+              확인할 정보 {st?.reviewFacts ?? review.length}
+            </button>
+          )}
           {chip('other', summary.other, `무슨 서류인지 확인 ${summary.other.length}`, <CircleAlert aria-hidden="true" className="size-4" />, 'border-warning-200 bg-warning-50 text-warning-800')}
           {chip('dup', dupKeys, `겹친 서류 ${summary.dupGroups.length}묶음`, <Copy aria-hidden="true" className="size-4" />, 'border-slate-300 bg-white text-slate-700')}
         </>
       )}
+    </div>
     </div>
   )
 }

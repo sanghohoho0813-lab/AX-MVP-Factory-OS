@@ -15,6 +15,8 @@ import { documentsWithExpiry } from './clientOpsAlerts'
 import { KNOWN_EXTRA_DOCS, OTHER_DOC_LABEL, placeDocument, type DocPlacement } from './docClassify'
 import { applyResort, cellForPlacement, withFactRefs, withoutDocumentFile } from './docPlacementApply'
 import { withDocument, withoutCustomDocument } from './clientOpsService'
+import { pendingFacts } from './customerFacts'
+import { pendingDocKeys } from './docRequests'
 
 /**
  * D-147: 폴더째 넣으면 딸려 오는 컴퓨터 파일 — 서류가 아니다(윈도 미리보기 · 맥 압축 찌꺼기 · 열려 있던 오피스 임시 파일)
@@ -39,6 +41,24 @@ export interface DocShelfSummary {
   expired: DocumentKey[]
   /** 진행 중인 업무에 지금 필요한데 아직 없는 서류 */
   missingNow: DocumentKey[]
+  /** D-518 받았는데 그 서류에서 읽은 정보를 아직 확인하지 않은 칸(정보 수) */
+  review: DocumentKey[]
+  /** D-518 서류 단계 — 받음 · 요청함(고객이 아직 안 보냄) · 확인할 정보(읽은 값 확인 전) */
+  stages: { received: number; requested: number; review: number; reviewFacts: number }
+}
+
+/**
+ * D-518 서류에서 읽었지만 아직 확인하지 않은 정보 — 칸마다 몇 개(자료 후보의 'doc:<칸>:' 표지로 센다).
+ * 크레탑(붙인 보고서) · 직접 만든 칸 후보도 그 서류 칸 표지가 있으면 센다.
+ */
+export function docReviewCounts(record: ClientOpsRecord): Map<DocumentKey, number> {
+  const out = new Map<DocumentKey, number>()
+  for (const p of pendingFacts(record)) {
+    const m = /^doc:([^:]+):/.exec(p.ref ?? '')
+    if (!m) continue
+    out.set(m[1], (out.get(m[1]) ?? 0) + 1)
+  }
+  return out
 }
 
 /**
@@ -82,7 +102,14 @@ export function docShelfSummary(record: ClientOpsRecord, today: string, urgent: 
   // D-148: 같은 서류를 새로 받았으면 옛 칸 만료는 세지 않는다(경고 · 달력과 같은 기준)
   const expired = documentsWithExpiry(record, today).filter((x) => x.view.expired).map((x) => x.meta.key)
   const missingNow = metas.filter((m) => urgent.has(m.key) && !record.documents[m.key]?.received).map((m) => m.key)
-  return { other, dupGroups, expired, missingNow }
+  // D-518 단계 — 받음 · 요청함 · 확인할 정보(받은 서류 중 읽은 값을 아직 확인하지 않은 칸)
+  const counts = docReviewCounts(record)
+  const received = metas.filter((m) => record.documents[m.key]?.received)
+  const review = received.filter((m) => (counts.get(m.key) ?? 0) > 0).map((m) => m.key)
+  const req = today ? pendingDocKeys(record, today) : new Map()
+  const requested = metas.filter((m) => !record.documents[m.key]?.received && req.has(m.key)).length
+  const stages = { received: received.length, requested, review: review.length, reviewFacts: review.reduce((n, k) => n + (counts.get(k) ?? 0), 0) }
+  return { other, dupGroups, expired, missingNow, review, stages }
 }
 
 export interface MoveTarget {

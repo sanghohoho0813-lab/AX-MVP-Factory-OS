@@ -2,6 +2,7 @@
  * D-512 서류 요청 → 회신 대기 → 받으면 줄어든다.
  * 요청 문구 세 가지(서류 요청 · 받을 자료 · 정책자금 신청 서류)를 줄로 읽기 · 서류함 칸 짝 · 받음(새 발급본은 보낸 뒤 올린 파일만) ·
  * 사람이 [받았어요] · 다시 보냄 · 끝내기 · 남은 것만 다시 요청 문구 · 저장 모양 다듬기 · 고객 관리 · 오늘 한 줄.
+ * D-518 서류 단계 — 받음 · 요청함 · 확인할 정보(받은 서류에서 읽었지만 확인 전) · 칸마다 확인할 정보 수.
  */
 import { normalizeClientOps, withCustomDocument, withDocument } from '../clientOpsService'
 import { buildDocumentRequestMessage } from '../clientOpsMessages'
@@ -26,6 +27,7 @@ import {
   withRequestResent,
 } from '../docRequests'
 import type { ClientOpsRecord, DocRequest } from '../../types/clientOps'
+import { docReviewCounts, docShelfSummary } from '../docShelf'
 
 let passed = 0
 let failed = 0
@@ -176,6 +178,27 @@ check('R3c 업체 기록에 붙음 · 끝내지 않은 요청 1', openRequests(r
   check('R8c 업체 기록을 다시 읽어도(저장 → 불러오기) 요청 기록이 남음', round.docRequests?.length === 1 && round.docRequests[0].items.length === 3 && round.docRequests[0].sentAtIso === sentIso)
   const old = normalizeClientOps({ id: 'old', companyName: '옛 업체' })
   check('R8d 예전 업체 기록(요청 칸 없음)은 칸이 생기지 않음 · 화면 한 줄 없음', !('docRequests' in old) && requestSummary(old, today) === null && pendingDocKeys(old, today).size === 0)
+}
+
+/* U D-518 서류 단계 */
+{
+  let r = base()
+  r = withDocument(r, 'businessRegistration', { received: true, fileName: '사업자등록증.pdf' })
+  r = withDocument(r, 'corporateRegistry', { received: true, fileName: '등기부.pdf' })
+  r = { ...r, factInbox: [
+    { id: 'f1', key: 'establishedAt', value: '2019-03-02', source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:1', foundAt: '2026-11-03T00:00:00Z', note: '사진 글자라 확인 필요' },
+    { id: 'f2', key: 'representativeName', value: '김한솔2', source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:1', foundAt: '2026-11-03T00:00:00Z' },
+    { id: 'f3', key: 'employeeCount', value: '7', source: 'cretop', asOf: '', ref: 'cretop:x', foundAt: '2026-11-03T00:00:00Z' },
+  ] }
+  const counts = docReviewCounts(r)
+  check('U1 칸마다 확인할 정보 — 사업자등록증 2 · 등기부 0 · 서류 표지 없는 후보(크레탑)는 안 셈', counts.get('businessRegistration') === 2 && !counts.has('corporateRegistry') && counts.size === 1, [...counts])
+  const req = newDocRequest(r, { id: 'qU', title: '서류 요청 문구', text: '아래 서류를 보내 주시면 바로 검토해 드리겠습니다.\n\n1. 표준재무제표증명(최근 3년)\n   - 홈택스 › 표준재무제표증명(PDF)', today: '2026-10-31', nowIso: '2026-10-31T09:00:00.000Z' })
+  const r2 = req ? withDocRequest(r, req) : r
+  const sum = docShelfSummary(r2, today, new Set())
+  check('U2 단계 한 줄 — 받음 2 · 확인할 정보 2(칸 1) · 손볼 것에 그 칸', sum.stages.received === 2 && sum.stages.review === 1 && sum.stages.reviewFacts === 2 && sum.review.join() === 'businessRegistration', sum.stages)
+  check('U3 요청한 서류(아직 안 옴 · 서류함 칸이 있는 것)는 요청함으로 셈', !!req && sum.stages.requested === pendingDocKeys(r2, today).size && sum.stages.requested >= 1, { requested: sum.stages.requested, keys: [...pendingDocKeys(r2, today).keys()] })
+  const none = docShelfSummary(base(), today, new Set())
+  check('U4 빈 업체 — 받음 0 · 요청함 0 · 확인할 정보 0', none.stages.received === 0 && none.stages.requested === 0 && none.review.length === 0)
 }
 
 console.log(`\ndocRequests: ${passed} passed, ${failed} failed`)

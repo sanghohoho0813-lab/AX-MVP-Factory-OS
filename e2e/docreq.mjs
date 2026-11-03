@@ -170,6 +170,39 @@ const geo = await mp.evaluate(() => {
 check('D11 390 — 판 · 목록 넘침 0 · 단추 36px 이상(손가락 칸)', geo.over <= 0 && geo.right <= geo.w && geo.minBtn >= 36, geo)
 await m.close()
 
+/* ---------------- D-518 서류 단계 · 확인할 정보 ---------------- */
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await c.newPage()
+  const e2 = []
+  p.on('pageerror', (e) => e2.push(String(e)))
+  await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await p.evaluate(seedScript())
+  // 사업자등록증을 받았는데 거기서 읽은 값 둘을 아직 확인하지 않은 상태(서류 올리기가 남기는 후보와 같은 모양)
+  await p.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.documents = { ...(r.documents ?? {}), businessRegistration: { ...(r.documents?.businessRegistration ?? {}), received: true, fileName: '사업자등록증.pdf', issuedAt: '2026-10-01' } }
+    r.factInbox = [
+      { id: 'u1', key: 'cf:시험 칸 하나', label: '시험 칸 하나', group: 'identity', value: '읽은 값 하나', source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:e2e', foundAt: '2026-11-03T00:00:00Z', note: '사진 글자라 확인 필요' },
+      { id: 'u2', key: 'cf:시험 칸 둘', label: '시험 칸 둘', group: 'identity', value: '읽은 값 둘', source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:e2e', foundAt: '2026-11-03T00:00:00Z', note: '사진 글자라 확인 필요' },
+    ]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await p.goto(DETAIL, { waitUntil: 'networkidle' })
+  await p.locator('#docs').waitFor()
+  const stages = await p.getByTestId('doc-stages').innerText().catch(() => '')
+  const review = await p.getByTestId('doc-stage-review').innerText().catch(() => '')
+  const shelf = await p.getByTestId('shelf-review').innerText().catch(() => '')
+  const chip = await p.locator('#doc-card-businessRegistration').getByTestId('doc-review-chip').innerText().catch(() => '')
+  check('S1 서류 단계 한 줄 — 받음 n · 확인할 정보 2 · 손볼 것 [확인할 정보 2] · 사업자등록증 칸 알약 \'확인할 정보 2\'', /받음 \d+/.test(stages) && review === '2' && shelf.includes('확인할 정보 2') && chip.includes('확인할 정보 2'), { stages, review, shelf, chip })
+  await p.locator('#doc-card-businessRegistration').getByTestId('doc-review-chip').click()
+  const inbox = await p.waitForSelector('#fact-inbox', { timeout: 6000 }).then(() => true).catch(() => false)
+  check('S2 알약을 누르면 맞춤 추천 탭의 확인 칸(#fact-inbox)으로', inbox && /tab=smart/.test(p.url()), p.url())
+  check('S3 오류 0', e2.length === 0, e2)
+  await c.close()
+}
+
 // D12
 check('D12 JS 오류 0', errs.length === 0, errs.slice(0, 3))
 

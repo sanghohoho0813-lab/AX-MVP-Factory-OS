@@ -195,7 +195,7 @@ import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
 import { DocKindPicker, DocShelfBar, OtherDocsPanel } from '../components/ops/DocShelfBar'
 import { CriticalIdCheck } from '../components/ops/CriticalIdCheck'
-import { docShelfSummary, isOtherCell } from '../services/docShelf'
+import { docReviewCounts, docShelfSummary, isOtherCell } from '../services/docShelf'
 import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
@@ -611,6 +611,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
   /** D-512 요청한 뒤 아직 안 온 서류 칸 — 칸 알약 '요청함 · N일째' */
   const reqKeys = useMemo(() => (record ? pendingDocKeys(record, today) : new Map<DocumentKey, { days: number; renew: boolean }>()), [record, today])
+  // D-518 받은 서류에서 읽었지만 아직 확인하지 않은 정보 — 칸마다 몇 개
+  const reviewKeys = useMemo(() => (record ? docReviewCounts(record) : new Map<DocumentKey, number>()), [record])
+  /** D-518 '확인할 정보' — 맞춤 추천 탭의 확인 칸으로 */
+  const goReview = () => {
+    setTab('smart')
+    window.setTimeout(() => document.getElementById('fact-inbox')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120)
+  }
 
   /** 가장 임박한 마감 (헤더 표시) */
   const [todoOpen, setTodoOpen] = useState(false)
@@ -1495,6 +1502,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         {/* D-147: 손볼 것만 한 줄 — 누르면 그 칸으로 */}
         <DocShelfBar
           summary={docShelfSummary(record, today, urgentDocs)}
+          onReview={goReview}
           onJump={(key) => {
             setOpenDocs((cur) => new Set(cur).add(key))
             requestAnimationFrame(() => {
@@ -1634,6 +1642,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             <span data-testid="doc-req-chip" className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 font-semibold text-brand-700">
                               새 발급본 요청함
                             </span>
+                          )}
+                          {/* D-518 받았지만 이 서류에서 읽은 정보를 아직 확인하지 않음 — 누르면 맞춤 추천의 확인 칸으로 */}
+                          {state.received && (reviewKeys.get(meta.key) ?? 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                goReview()
+                              }}
+                              data-testid="doc-review-chip"
+                              className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-warning-200 bg-warning-50 px-1.5 py-0.5 font-semibold text-warning-800"
+                            >
+                              확인할 정보 {reviewKeys.get(meta.key)}
+                            </button>
                           )}
                           <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
                           {urgent && (
