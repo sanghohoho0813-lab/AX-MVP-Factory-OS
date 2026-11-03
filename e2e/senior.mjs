@@ -29,6 +29,7 @@ const ONLY = oi > 0 ? process.argv[oi + 1] : ''
 /** [이름, 주소] */
 const SCREENS = [
   ['마케팅 첫 화면', '/marketing'],
+  ['이번 주 찍을 것', '/marketing?view=plan'],
   ['인기 · 급상승', '/marketing?view=top'],
   ['채널', '/marketing?view=channels'],
   ['분석', '/marketing?view=analysis'],
@@ -39,7 +40,7 @@ const SCREENS = [
   ['홍보 글', '/tools/content'],
   ['홈페이지', '/tools/homepage'],
   // 고른 뒤 화면 — 주제 묶음(첫 주제를 눌러서) · 업체로 연 홍보 글 · 홈페이지
-  ['주제 묶음', '/marketing', 'pack'],
+  ['주제 묶음', '/marketing?view=plan', 'pack'],
   ['홍보 글 만들기', '/tools/content/build?client=cli_hansol'],
   ['홈페이지 만들기', '/tools/homepage/build?client=cli_hansol'],
 ]
@@ -195,8 +196,8 @@ for (const vp of [
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
   await page.evaluate(seedScript())
   await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
-  // 로컬 미리보기에는 유튜브 함수가 없다 — 예시 자료로(대표 화면과 같은 모양)
-  await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
+  // 로컬 미리보기에는 유튜브 함수가 없다 — 예시 자료로(대표 화면과 같은 모양 · D-511 예시 단추는 [이번 주 찍을 것] 안)
+  await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' }).catch(() => {})
   await page.waitForTimeout(600)
   const sample = page.getByTestId('yt-sample')
   if (await sample.count()) {
@@ -239,7 +240,7 @@ for (const vp of [
   }
   // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 맨 위 [이어서 하기] · 묶음 끝 '다음엔 이것'
   if (!REPORT && !ONLY) {
-    await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
+    await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' }).catch(() => {})
     await page.waitForTimeout(500)
     if (await page.getByTestId('yt-sample').count()) {
       await page.getByTestId('yt-sample').first().click()
@@ -256,16 +257,14 @@ for (const vp of [
     const saved = (await page.getByTestId('mk-pack-next-open').count()) === 1
     await page.getByTestId('mk-pack-next-back').click()
     await page.getByTestId('mk-home').waitFor({ timeout: 8000 })
-    if (await page.getByTestId('yt-sample').count()) {
-      await page.getByTestId('yt-sample').first().click()
-      await page.waitForTimeout(900)
-    }
+    // D-511 [이어서 하기] 는 첫 화면(대화창 아래 · 살펴보기 · 만들기 목록 위)
+    await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
     await page.getByTestId('mk-resume').waitFor({ timeout: 5000 }).catch(() => {})
     const card = page.getByTestId('mk-resume')
     const cardText = (await card.innerText().catch(() => '')) ?? ''
     const resumeTop = (await card.boundingBox())?.y ?? 9999
-    const keyTop = (await page.getByTestId('mk-key').first().boundingBox())?.y ?? 0
-    check(`${vp.tag} 이어서 하기 — 처음엔 없음 · 묶음 끝 [내 콘텐츠에 담기] → [이어서 하기] 단추로 바뀜 · [다른 주제 고르기] → 첫 화면 맨 위 '지난번 하던 것'(주제 · 다음은 찍기) · 주제 단추보다 위`, before === 0 && nextOk && saved && cardText.includes(topic) && cardText.includes('찍기') && resumeTop < keyTop, { before, nextOk, saved, cardText: cardText.slice(0, 120), topic })
+    const keyTop = (await page.getByTestId('mk-tabs').first().boundingBox())?.y ?? 0
+    check(`${vp.tag} 이어서 하기 — 처음엔 없음 · 묶음 끝 [내 콘텐츠에 담기] → [이어서 하기] 단추로 바뀜 · [다른 주제 고르기] → 첫 화면 대화창 아래 '지난번 하던 것'(주제 · 다음은 찍기) · 살펴보기 · 만들기 목록보다 위`, before === 0 && nextOk && saved && cardText.includes(topic) && cardText.includes('찍기') && resumeTop < keyTop, { before, nextOk, saved, cardText: cardText.slice(0, 120), topic })
     await page.getByTestId('mk-resume-go').click()
     await page.waitForTimeout(800)
     const u = new URL(page.url())

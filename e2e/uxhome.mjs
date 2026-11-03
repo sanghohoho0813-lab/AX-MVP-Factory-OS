@@ -167,9 +167,11 @@ let caseUrl = ''
 /* ---- P 특허 · 벤처 ---- */
 {
   await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
-  await page.getByTestId('pv-steps').waitFor({ timeout: 10000 })
-  const st = await page.getByTestId('pv-steps').locator('li[data-step]').evaluateAll((els) => els.map((e) => `${e.dataset.step}:${e.dataset.state}`))
-  check('P1 회사 고르기 전 — 다섯 단계 · 회사 고르기가 지금 단계', st.join() === 'company:current,idea:todo,spec:todo,check:todo,plan:todo', st)
+  await page.getByTestId('chat-panel').waitFor({ timeout: 10000 })
+  // D-511 회사 고르기 전 — 단계 판 없음 · 대화창이 머리 바로 아래(첫 화면은 대화창만)
+  const headBottom = (await page.getByTestId('chat-head').boundingBox())?.y ?? 0
+  const chatTop = (await page.getByTestId('chat-panel').boundingBox())?.y ?? 9999
+  check('P1 회사 고르기 전 — 단계 판 없음 · 대화창이 머리 바로 아래 · 첫 화면 안', (await page.getByTestId('pv-steps').count()) === 0 && chatTop > headBottom && chatTop < 900, { chatTop, headBottom })
   await page.goto(BASE + '/patent-venture?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-brief').waitFor({ timeout: 10000 })
   const li = await page.getByTestId('pv-brief-steps').locator('li[data-step]').count()
@@ -183,7 +185,9 @@ let caseUrl = ''
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   await page.getByTestId('mk-tabs').waitFor({ timeout: 10000 })
   const t = await page.getByTestId('mk-tabs').innerText()
-  check("G1 마케팅 목차 두 줄 — '살펴보기'(예전 콘텐츠 레이더 — D-507 쉬운 말) · '만들기'", t.includes('살펴보기') && t.includes('만들기'))
+  check("G1 마케팅 첫 화면 — 대화창(무엇을 만들까요?) + 목차 두 줄 '살펴보기' · '만들기'(D-511)", t.includes('살펴보기') && t.includes('만들기') && (await page.getByTestId('mk-ask').count()) === 1)
+  // D-511 1 → 2 → 3 · 키워드 판은 [이번 주 찍을 것] 안
+  await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   // D-507 첫 화면은 1 → 2 → 3, 한 번에 나오는 형식 넷은 [사용 방법] 안
   const steps = await page.getByTestId('mk-steps').locator('li').count().catch(() => 0)
   if (await page.getByTestId('mk-howto-toggle').count()) await page.getByTestId('mk-howto-toggle').click()

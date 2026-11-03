@@ -66,7 +66,8 @@ export interface WorkChatProps {
    * UXS-1 화면 문법(공통 다섯 칸) — 주면 ① 머리(PageHero · 회사 고르기 · 사용 방법 · 자세히) ② summary ③ next ④ 대화 판 ⑤ aside 로 그린다.
    * 없으면 예전 모양(가운데 좁은 칸 — 기업인증 대화창). 대화 · 답 · 저장은 두 모양이 같다.
    */
-  frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode }
+  /** chatFirst — D-511 대화창을 머리 바로 아래(요약 · 지금 할 일은 대화창 아래로) */
+  frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode; chatFirst?: boolean }
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -460,8 +461,8 @@ export function WorkChat(p: WorkChatProps) {
     return (
       <div className="flex flex-col gap-4 sm:gap-5" data-testid={`chat-${p.module}`} data-turns={turns.length}>
         <PageHero art={p.frame.art} title={p.title} sub={p.frame.sub} context={pickClient} actions={headButtons} testId="chat-head" />
-        {p.frame.summary}
-        {p.frame.next}
+        {!p.frame.chatFirst && p.frame.summary}
+        {!p.frame.chatFirst && p.frame.next}
         {fileInput}
         <PageColumns aside={p.frame.aside} asideLabel="도움 · 이어서 할 것">
           <section className="flex min-w-0 flex-col gap-4 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" aria-label="대화창" data-testid="chat-panel">
@@ -470,6 +471,8 @@ export function WorkChat(p: WorkChatProps) {
             {clearRow}
           </section>
         </PageColumns>
+        {p.frame.chatFirst && p.frame.next}
+        {p.frame.chatFirst && p.frame.summary}
         {dock}
         {guideSheet}
       </div>

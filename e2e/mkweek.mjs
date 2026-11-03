@@ -142,7 +142,7 @@ async function wire(page) {
 }
 
 async function openHome(p) {
-  await p.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await p.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   await p.waitForTimeout(500)
   const sample = p.getByTestId('yt-sample')
   if (await sample.count()) {

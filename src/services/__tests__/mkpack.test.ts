@@ -4,6 +4,7 @@
  */
 import { ASSISTS, RADAR_RULES, buildAssistPrompt } from '../../../api/_ai/assists.js'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
+import { MK_ASK_CHIPS, mkRoute, mkTopicOf } from '../marketing/mkAsk'
 import { packBundle } from '../aiAssist/marketingBuilders'
 import { BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, saveIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
@@ -474,6 +475,33 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
     check('SR7 분석 한 줄 — 가장 잘된 요일 · 시간 · 길이(1편뿐인 묶음은 빼고) · 묶음이 없으면 빈 글', a === '화요일 · 저녁 7시 · 5~15분 길이에 올린 영상이 평균 조회수가 가장 높았어요.' && analysisAnswer([], [], []) === '', a)
   }
   check('SR3 지난번 하던 것 — 단계마다 지금 · 다음 할 일(쉬운 말) · 게시 완료는 이어서 하기에 없음', IDEA_RESUME_STEP.script.next === '찍기' && IDEA_RESUME_STEP.filmed.next === '올리기' && IDEA_RESUME_STEP.idea.next === '대본 쓰기' && !('published' in IDEA_RESUME_STEP))
+}
+
+// ---------------- D-511 마케팅 첫 화면 대화창 — 한 줄 → 갈 곳(규칙) ----------------
+{
+  const r = (t: string) => mkRoute(t)
+  const href = (t: string) => { const x = r(t); return x.kind === 'link' ? x.href : x.kind }
+  check(
+    'MA1 형식 말 → 그 화면 · 남은 말은 주제로(스레드 · 릴스 · 틱톡 · 블로그 · 플레이스 · 홈페이지)',
+    href('정책자금 달라지는 점 스레드 글 써줘') === `/marketing/threads?topic=${encodeURIComponent('정책자금 달라지는 점')}` &&
+      href('고용지원금 릴스 대본') === `/marketing/shorts?topic=${encodeURIComponent('고용지원금')}` && href('틱톡').startsWith('/marketing/shorts') && href('틱톡') === '/marketing/shorts' &&
+      href('우리 동네 맛집 플레이스 홍보 글') === `/tools/content?kw=${encodeURIComponent('우리 동네 맛집')}` && href('홈페이지 만들어줘') === '/tools/homepage',
+    [href('정책자금 달라지는 점 스레드 글 써줘'), href('고용지원금 릴스 대본'), href('우리 동네 맛집 플레이스 홍보 글')],
+  )
+  const v = (t: string) => { const x = r(t); return x.kind === 'view' ? x.view : x.kind }
+  check(
+    'MA2 1주일치 → 한 번에 · 칸 이름 → 그 칸(이번 주 · 인기 · 참고 채널 · 올리는 때 · 내 콘텐츠)',
+    v('1주일치 한 번에') === 'week' && v('일주일 치 콘텐츠') === 'week' && v('이번 주 뭐 올릴까') === 'plan' && v('요즘 인기 영상') === 'top' && v('참고 채널 추가') === 'channels' &&
+      v('언제 올리는 게 좋아') === 'analysis' && v('영상 길이는') === 'analysis' && v('내 콘텐츠') === 'make',
+    ['1주일치 한 번에', '이번 주 뭐 올릴까', '요즘 인기 영상', '참고 채널 추가', '언제 올리는 게 좋아', '내 콘텐츠'].map(v),
+  )
+  const p = r('2027 정책자금 달라지는 점')
+  check(
+    'MA3 그 밖의 주제 → 콘텐츠 묶음(주제 그대로) · 빈 말 · 한 글자 → 아무것도 안 함 · 주제 다듬기(써줘 · 으로 · 따옴표 뗌) · 바로 가기 셋(이번 주 · 1주일치 · 쓰는 법 예시)',
+    p.kind === 'pack' && p.topic === '2027 정책자금 달라지는 점' && r('  ').kind === 'none' && r('a').kind === 'none' && mkTopicOf('"AI 자동화"로 써줘') === 'AI 자동화' && MK_ASK_CHIPS.length === 3 && href(MK_ASK_CHIPS[2].say) === `/marketing/threads?topic=${encodeURIComponent('정책자금 바뀌는 점')}` &&
+      MK_ASK_CHIPS.every((c) => r(c.say).kind !== 'none' && r(c.say).kind !== 'pack'),
+    [p, mkTopicOf('"AI 자동화"로 써줘'), MK_ASK_CHIPS.map((c) => r(c.say).kind)],
+  )
 }
 
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)

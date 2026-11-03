@@ -36,7 +36,9 @@ const SCREENS = [
   ['세금 계산기', '/tools/tax', 3.2, 4.0],
   ['기업인증', '/tools/cert-os', 1.4, 1.4],
   ['크레탑', '/tools/cretop', 1.8, 2.1],
-  ['마케팅', '/marketing', 1.7, 2.4],
+  // D-511 첫 화면 = 대화창 + 살펴보기 · 만들기 목록만(한 화면 안) · 키워드 판은 [이번 주 찍을 것]
+  ['마케팅', '/marketing', 1.1, 1.6],
+  ['이번 주 찍을 것', '/marketing?view=plan', 1.7, 2.4],
   ['내 콘텐츠', '/marketing?view=make', 1.7, 2.6],
   ['1주일치', '/marketing?week=1', 1.9, 2.8],
   ['스레드', '/marketing/threads', 2.5, 3.5],

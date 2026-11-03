@@ -124,7 +124,7 @@ async function wire(page) {
 
 /** 로컬 미리보기에는 유튜브 함수가 없다 — [예시로 보기] 를 눌러야 키워드가 생긴다 */
 async function openHome(p) {
-  await p.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await p.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   await p.waitForTimeout(500)
   const sample = p.getByTestId('yt-sample')
   if (await sample.count()) {

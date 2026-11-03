@@ -189,7 +189,7 @@ check('S5 나눠 줄 점검표가 있는 주제(벤처) + 릴스 → 댓글 받�
 
 /* ---------------- P 묶음 → 스레드 ---------------- */
 await page.evaluate(() => localStorage.removeItem('mirae.mk.weekTopics.v1'))
-await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: /예시로 보기/ }).first().click()
 await page.getByTestId('mk-key').first().waitFor({ timeout: 15000 })
 const keyTopic = (await page.getByTestId('mk-key').first().innerText()).split('\n').map((x) => x.trim()).filter((x) => x && !/^\d+$/.test(x))[0] ?? ''

@@ -99,7 +99,8 @@ export function PatentVentureChatPage() {
   const pickResume = (r: (typeof resumeRows)[number]) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))
   const summary = brief ? (
     <PvBriefSummary company={clientName || '이 회사'} clientId={clientId} brief={brief} />
-  ) : steps ? (
+  ) : steps && clientId ? (
+    // D-511 회사를 고르기 전에는 단계 판을 그리지 않는다(1 '회사 고르기' 는 머리의 회사 칸이 같은 말 · 첫 화면은 대화창만)
     <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-3 sm:px-4" aria-label="특허 · 벤처 단계" data-testid="pv-steps">
       <StepProgress
         label={clientName ? `${clientName} 특허 · 벤처 단계` : '특허 · 벤처 단계'}
@@ -145,6 +146,8 @@ export function PatentVentureChatPage() {
           summary,
           next,
           aside,
+          // D-511 대표 "특허 벤처도 누르면 아직 복잡 — 진짜 심플하게 딱" — 대화창이 머리 바로 아래, 준비 현황 · 이어서 하기는 그 아래
+          chatFirst: true,
         }}
         clients={clients}
         clientId={clientId}

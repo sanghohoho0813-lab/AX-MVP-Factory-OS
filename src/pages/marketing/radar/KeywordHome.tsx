@@ -16,6 +16,9 @@
  *  - 어려운 기준 줄(벤치마킹 채널 · 칩)은 [사용 방법] 안으로 — 지운 것 없음(같은 글 · 같은 시험 이름).
  *  - 지난번 하던 것이 있으면 맨 위에 [이어서 하기] 한 장 — 다음에 할 일(대본 쓰기 · 찍기 · 올리기)과 이번 달 올린 수.
  *  - 말은 쉬운 말로(롱폼 → 긴 영상 · 고정 키워드 → 우리 본업 주제 · 이번 주 키워드 → 이번 주 뜨는 주제).
+ * D-511 대표 "이번 주 무엇을 올릴까요? 안에도 글자가 너무 많다" — 첫 화면은 대화창 + 목록(MkAsk)이 되고, 이 판은 [이번 주 찍을 것] 을 눌러야 열린다.
+ *  - 제목 아래 설명 줄 · 주제마다 분야 칩(경제 · 경영 등) · 묶음 이름 옆 설명 · 지난주 비교 줄은 [사용 방법] 안으로(지운 것 없음 — 같은 시험 이름).
+ *  - [이어서 하기] 는 첫 화면(대화창 아래)으로 옮겼다(ResumeCard 를 내보낸다).
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -30,11 +33,6 @@ import { isMarketingCustomer, mkText } from '../../../services/marketing/persona
 
 /** 처음 쓰는 사람도 알아보게 — 레이더 축 이름(시장수요 · BRIDGE)을 쉬운 말로 */
 const AXIS_EASY: Record<ContentAxis, string> = { market: '경제 · 경영', axai: 'AI · 업무', bridge: '경영 × AI' }
-const AXIS_TONE: Record<ContentAxis, string> = {
-  market: 'bg-slate-100 text-slate-700',
-  axai: 'bg-violet-100 text-violet-800',
-  bridge: 'bg-amber-100 text-amber-900',
-}
 
 const HOME_MAX = 10
 
@@ -141,7 +139,6 @@ export function KeywordHome({
               </span>
             </h2>
           </HintTip>
-          <p className="t-sub break-keep text-slate-700 max-sm:hidden">{mkText('주제를 하나 누르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요')}</p>
           {/* 휴대폰은 세 칸(번호 위 · 글 아래), PC 는 한 줄 화살표 */}
           <ol className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
             {STEPS.map((st, i) => (
@@ -185,7 +182,7 @@ export function KeywordHome({
                 </p>
               </li>
             ))}
-            <li className="t-sub break-keep pl-8 text-slate-600">왜 이 주제인지 · 관련 영상 · 시장 신호는 화면 맨 아래 [자세히 보기] 에 있어요.</li>
+            <li className="t-sub break-keep pl-8 text-slate-600">{mkText('주제를 하나 누르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요.')} 왜 이 주제인지 · 관련 영상 · 시장 신호는 이 판 아래 [자세히 보기] 에 있어요.</li>
           </ol>
           {/* 한 번에 나오는 형식 · 무엇을 기준으로 골랐나(예전 첫 화면 위 두 줄) — 처음 화면을 가볍게 하려고 여기로 */}
           <ul className="flex flex-wrap gap-1.5 pl-8" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
@@ -201,6 +198,11 @@ export function KeywordHome({
               {basis}
             </p>
           )}
+          {change && list.length > 0 && (
+            <p className="t-meta break-keep pl-8 text-slate-700" data-testid="mk-change">
+              {change}
+            </p>
+          )}
           {/* D-507 글자가 작게 보이면 바로 여기서 — 앱 전체 글자 크기(설정 › 보기 와 같은 값 · 누를 때마다 기본 → 크게 → 매우 크게) */}
           <p className="t-sub flex flex-wrap items-center gap-2 pl-8 break-keep text-slate-700" data-testid="mk-howto-text">
             글자가 작게 보이면 <TextScaleQuickButton showLabel /> <span className="t-meta text-slate-600">누를 때마다 기본 → 크게 → 매우 크게</span>
@@ -214,7 +216,7 @@ export function KeywordHome({
         {fixed.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
             <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
-              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 우리 본업 주제 <span className="font-normal text-slate-600">· 늘 이 자리</span>
+              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 우리 본업 주제
             </p>
             <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-5" data-testid="mk-fixed-keys">
               {fixed.map((k) => (
@@ -246,13 +248,8 @@ export function KeywordHome({
           </div>
         )}
         <p className="t-meta -mb-1.5 flex items-center gap-1 font-bold text-slate-700">
-          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제 <span className="font-normal text-slate-600">· 유튜브에서 지금 많이 보는 것</span>
+          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제
         </p>
-        {change && list.length > 0 && (
-          <p className="t-meta break-keep rounded-lg bg-slate-50 px-3 py-1.5 text-slate-700 sm:py-2 sm:text-[0.9375rem]" data-testid="mk-change">
-            {change}
-          </p>
-        )}
         {list.length > 0 ? (
           <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="mk-keys">
             {list.map((k, i) => (
@@ -264,6 +261,7 @@ export function KeywordHome({
                   className={`tap group flex h-full min-h-14 w-full min-w-0 items-center gap-2 rounded-xl border bg-white px-2 py-2 text-left transition-colors sm:min-h-16 sm:gap-3 sm:px-3 sm:py-2.5 ${i === 0 ? 'border-slate-900 ring-1 ring-slate-900 hover:shadow-sm' : 'border-slate-200 hover:border-brand-400 hover:shadow-sm'}`}
                   data-testid="mk-key"
                   data-key={k.key}
+                  title={k.notice ? '지원사업 · 공고' : AXIS_EASY[k.axis]}
                 >
                   <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold sm:text-base sm:size-9 ${i === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
                     {i + 1}
@@ -271,11 +269,6 @@ export function KeywordHome({
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="t-sub font-bold break-keep text-slate-900 [overflow-wrap:anywhere] sm:text-base">{k.topic}</span>
                     <span className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-                      {k.notice ? (
-                        <span className="t-meta rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-900">지원사업 · 공고</span>
-                      ) : (
-                        <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${AXIS_TONE[k.axis]}`}>{AXIS_EASY[k.axis]}</span>
-                      )}
                       {k.note && (
                         <span className="t-meta rounded-full border border-emerald-300 bg-white px-2 py-0.5 font-semibold text-emerald-800" data-testid="mk-key-note">
                           {k.note}
@@ -378,7 +371,7 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
  * D-507 지난번 하던 것 — 다시 왔을 때 어디서부터인지 찾지 않게(계속 쓰기 쉽게).
  * 흰 칸 + 회색 테두리(박스 색 하나) · 큰 단추 하나.
  */
-function ResumeCard({ kindLabel, topic, stage, next, href, making, posted }: HomeResume) {
+export function ResumeCard({ kindLabel, topic, stage, next, href, making, posted }: HomeResume) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4" data-testid="mk-resume">
       <History aria-hidden="true" className="size-6 shrink-0 text-slate-500" />

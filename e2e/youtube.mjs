@@ -1006,7 +1006,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(() => { localStorage.removeItem('axmvp.fold.all'); localStorage.setItem('axmvp.fold.mk-more', '1') })
-  await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   const T = vp.tag
   const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

@@ -725,7 +725,7 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
     check('메뉴(D-233): 마케팅 · 브랜딩 아래 펼친 줄 없음 — 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기 줄 0', (await nav.locator('[data-nav-children="marketing"]').count()) === 0 && (await nav.getByRole('link', { name: /콘텐츠 레이더|홍보 글 만들기/ }).count()) === 0)
     // 레이더 칸은 그 자리에서 바뀌는 단추(yt-view-* · aria-selected) · 홍보 글 · 홈페이지는 주소 링크(mk-tab-* · aria-current)
     const tabOn = async (tab) => (tab.startsWith('yt-') ? (await page.getByTestId(tab).getAttribute('aria-selected')) === 'true' : (await page.getByTestId(tab).getAttribute('aria-current')) === 'page')
-    for (const [path, tab] of [['/marketing', 'yt-view-plan'], ['/tools/content', 'mk-tab-content'], ['/tools/homepage', 'mk-tab-homepage']]) {
+    for (const [path, tab] of [['/marketing?view=plan', 'yt-view-plan'], ['/tools/content', 'mk-tab-content'], ['/tools/homepage', 'mk-tab-homepage']]) {
       await page.goto(BASE + path, { waitUntil: 'networkidle' })
       await page.waitForTimeout(300)
       const lit = await nav.locator('a[aria-current="page"]').allInnerTexts()

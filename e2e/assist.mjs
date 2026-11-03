@@ -98,7 +98,7 @@ async function wire(page) {
 
 /** 로컬 미리보기에는 유튜브 함수가 없다 — 레이더는 [예시로 보기] 를 눌러야 후보가 생긴다 */
 async function openRadar(p) {
-  await p.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await p.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   await p.waitForTimeout(600)
   const sample = p.getByTestId('yt-sample')
   if (await sample.count()) {

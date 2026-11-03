@@ -58,10 +58,10 @@ const cls = (on: boolean) =>
 const makeCls = (on: boolean) =>
   `tap t-sub flex min-h-11 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 leading-tight font-semibold whitespace-nowrap sm:min-h-12 sm:min-w-0 sm:shrink sm:flex-row sm:justify-start sm:gap-2 sm:rounded-(--radius-control) sm:px-2.5 sm:py-1.5 sm:whitespace-normal sm:break-keep ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`
 
-/** 휴대폰 띠 안 묶음 이름표 · PC 왼쪽 이름 칸 */
-function GroupLabel({ long, short }: { long: string; short: string }) {
+/** 휴대폰 띠 안 묶음 이름표 · PC 왼쪽 이름 칸 · D-511 첫 화면(home)은 휴대폰에서 한 줄 머리 */
+function GroupLabel({ long, short, home }: { long: string; short: string; home?: boolean }) {
   return (
-    <span className="t-meta flex shrink-0 items-center font-semibold whitespace-nowrap text-slate-500 max-sm:snap-start max-sm:px-1 max-sm:text-[0.6875rem] sm:w-[6.5rem]">
+    <span className={`t-meta flex shrink-0 items-center font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem] ${home ? 'max-sm:basis-full max-sm:pt-1 max-sm:text-[0.9375rem] max-sm:text-slate-700' : 'max-sm:snap-start max-sm:px-1 max-sm:text-[0.6875rem]'}`}>
       <span className="sm:hidden">{short}</span>
       <span className="max-sm:hidden">{long}</span>
     </span>
@@ -90,7 +90,10 @@ function Label({ it }: { it: Item }) {
 }
 
 /** onRadar 가 있으면(레이더 화면) 레이더 칸은 그 자리에서 바꾼다 — 예전 시험 이름(yt-view-*) 그대로 */
-export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRadar?: (v: RadarView) => void }) {
+/** D-511 첫 화면 목록 — 휴대폰에서 띠(옆으로 넘김) 대신 두 칸씩 다 보이게 */
+const HOME_CELL = 'max-sm:grow max-sm:basis-[calc((100%-0.375rem)/2)]'
+
+export function MarketingTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
   const pilot = useIsPilot()
   // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
   const open = usePilotMarketing() === 'open'
@@ -113,18 +116,18 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
    */
   return (
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs">
-      <div ref={strip} data-testid="mk-tabs-strip" className="flex gap-1.5 max-sm:snap-x max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none] sm:flex-col sm:gap-2">
+      <div ref={strip} data-testid="mk-tabs-strip" data-home={home ? '1' : undefined} className={`flex gap-1.5 sm:flex-col sm:gap-2 ${home ? 'max-sm:flex-wrap' : 'max-sm:snap-x max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none]'}`}>
         <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
           {/* D-507 '콘텐츠 레이더' → 쉬운 말 '살펴보기'(남의 인기 영상을 보고 고른다) */}
-          <GroupLabel long="살펴보기" short="살펴보기" />
+          <GroupLabel long="살펴보기" short="살펴보기" home={home} />
           <div className="max-sm:contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:gap-1 sm:rounded-(--radius-control) sm:border sm:border-slate-200 sm:bg-white sm:p-1">
             {RADAR_VIEWS.map((it) =>
               onRadar ? (
-                <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={cls(active === it.key)}>
+                <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={`${cls(active === it.key)} ${home ? HOME_CELL : ''}`}>
                   <Label it={it} />
                 </button>
               ) : (
-                <Link key={it.key} to={it.key === 'plan' ? '/marketing' : `/marketing?view=${it.key}`} className={cls(false)} data-testid={`mk-tab-${it.key}`}>
+                <Link key={it.key} to={`/marketing?view=${it.key}`} className={`${cls(false)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`}>
                   <Label it={it} />
                 </Link>
               ),
@@ -133,13 +136,13 @@ export function MarketingTabs({ active, onRadar }: { active: MarketingTab; onRad
         </div>
         {(!pilot || open) && (
           <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
-            <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-slate-200 sm:hidden" />
-            <GroupLabel long="만들기" short="만들기" />
+            {!home && <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-slate-200 sm:hidden" />}
+            <GroupLabel long="만들기" short="만들기" home={home} />
             {/* D-354 넓은 화면 4칸은 칸이 좁아 이름 · 설명이 서너 줄로 접혔다 — 칸 폭(@container)이 넉넉할 때만 4칸, 아니면 2칸에 한 줄씩 */}
             <div className="max-sm:contents sm:@container sm:min-w-0 sm:flex-1">
               <div className={`max-sm:contents sm:grid sm:min-w-0 sm:gap-1.5 ${tools.length < TOOLS.length ? 'sm:grid-cols-2' : 'sm:grid-cols-2 sm:@[70rem]:grid-cols-4'}`}>
                 {tools.map((it) => (
-                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={makeCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
+                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={`${makeCls(active === it.key)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`}>
                     <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1] sm:size-9">
                       <it.icon className="size-5 sm:size-8" />
                     </span>
