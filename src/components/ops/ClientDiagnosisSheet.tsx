@@ -11,6 +11,7 @@ import type { Insight, InsightTone } from '../../services/clientInsights'
 import { buildDiagnosis, diagnosisKakao, givenOf, sinceLines, withDiagnosisGiven, type DiagnosisLine, type DiagnosisSheet } from '../../services/clientDiagnosis'
 import { localDateOf, nowIso } from '../../lib/appClock'
 import { useSenderLine } from '../layout/useCurrentUser'
+import { stepsText } from '../../services/consultTalk'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { copyText } from '../consulting/studioParts'
@@ -98,6 +99,11 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
                 {p.easy && (
                   <span className="text-[0.88rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-easy">
                     쉽게 말하면 — {p.easy}
+                  </span>
+                )}
+                {p.steps && p.steps.length > 0 && (
+                  <span className="text-[0.88rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-steps">
+                    진행 순서 — {stepsText(p.steps)}
                   </span>
                 )}
               </span>

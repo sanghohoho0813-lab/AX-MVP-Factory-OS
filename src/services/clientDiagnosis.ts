@@ -31,6 +31,8 @@ export interface DiagnosisLine {
   amount: string
   /** D-508 먼저 제안할 것만 — 쉽게 말하면(이 제도가 무엇인지 · 말하기 대본과 같은 글) */
   easy?: string
+  /** D-508 먼저 제안할 것만 — 하시면 진행은 이렇게(말하기 카드와 같은 3~4단계 · 일반 순서) */
+  steps?: string[]
 }
 
 /** D-363 지난번 드린 진단서 뒤 달라진 것(고객 종이 · 화면 같은 내용) */
@@ -200,7 +202,7 @@ export function buildDiagnosis(record: ClientOpsRecord, insights: readonly Insig
   if (held.length) snapshot.push({ label: '보유', value: held.join(' · ') })
 
   // D-508 먼저 제안드리는 것마다 '쉽게 말하면' 한 줄(말하기 대본과 같은 글 — 대표님이 종이만 봐도 무슨 제도인지)
-  const picks = topPicks(insights).map((i) => ({ ...lineOf(i), easy: talkCard(i)?.easy ?? '' }))
+  const picks = topPicks(insights).map((i) => ({ ...lineOf(i), easy: talkCard(i)?.easy ?? '', steps: talkCard(i)?.steps ?? [] }))
   const pickKeys = new Set(picks.map((p) => p.key))
   const others = insights
     .filter((i) => !pickKeys.has(i.key))
