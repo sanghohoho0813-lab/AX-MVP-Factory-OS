@@ -215,5 +215,14 @@ check(
   { f1: f1.map((h) => h.q), f2: f2.map((h) => h.topic), f3: f3.map((h) => h.q), f4: f4.map((h) => h.q) },
 )
 
+const f5 = faqSearch('대표 가족도')
+const f6 = faqSearch('세무조사')
+const f7 = faqSearch('벤처 확인 몇 년')
+check(
+  'T25 대표님이 자주 묻는 말 더 — 대표 가족 → 고용 · 세무조사 → 돌려받기 · 가지급금 두 곳 이상 · 벤처 몇 년 → 인증 3년',
+  f5[0]?.topic === 'employment' && f6.length >= 2 && f6.some((h) => h.a.includes('경정청구')) && f7[0]?.topic === 'cert' && f7[0]?.a.includes('3년'),
+  { f5: f5.map((h) => h.topic), f6: f6.map((h) => `${h.topic}:${h.q}`), f7: f7.map((h) => `${h.topic}:${h.q}`) },
+)
+
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
