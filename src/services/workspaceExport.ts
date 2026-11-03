@@ -6,17 +6,19 @@
  * 3판: 예전과 같은 모양(업체 · 도구 입력값 — 예전 [백업 불러오기] 가 그대로 읽는다) + `workspace` 칸
  *   - journal   업무 일기 전부(내가 쓴 것 — 서버도 쓴 사람 본인 것만 준다)
  *   - moduleRows 모듈 기록 전부(클라우드 모드 · 서버 표). 이 브라우저에만 있는 모듈 기록은 예전처럼 도구 입력값 칸에 들어 있다
+ *   - events    상담신청 · 고객 이벤트(D-529 · 최근 500건 — 화면과 같은 읽기)
  *   - files     서류 파일 목록(업체 · 서류 칸 · 파일 이름 · 크기 · 폴더 · 올린 날 · 저장 위치) — 파일 자체(PDF · 사진)는 담지 않는다
  *   - summary   숫자 요약 · missing 못 담은 것(인터넷이 끊기는 등) — 담지 못한 것을 감추지 않는다
  * 읽기만 — 서버에 아무것도 쓰지 않는다. 열어 볼 수 있는 임시 주소(서명 주소)는 넣지 않는다(파일이 퍼져도 서류가 열리지 않게).
  * 주민등록번호 · 비밀번호는 원래 저장하지 않으므로 파일에도 없다. 규칙 정리 — AI 아님.
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
-import type { JournalEntry } from '../types/bridge'
+import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { BACKUP_FORMAT, MODULE_DATA_PREFIX, buildBackup, readToolInputs, type BackupFile } from './clientOpsBackup'
 import { documentMetaOf } from './clientOpsDocuments'
 import { listJournal } from './journalService'
 import { listClients } from './clientOpsService'
+import { listEvents } from './customerBridgeService'
 import { listWorkspaceRows, type WorkspaceModuleRow } from './moduleData'
 import { nowIso } from '../lib/appClock'
 
@@ -43,6 +45,8 @@ export interface WorkspaceSummary {
   documents: number
   files: number
   journal: number
+  /** D-529 상담신청 · 고객 이벤트(최근 500건) */
+  events: number
   moduleRows: number
   /** 모듈마다 줄 수 */
   modules: Record<string, number>
@@ -55,6 +59,8 @@ export interface WorkspaceSection {
   workspaceId: string | null
   summary: WorkspaceSummary
   journal: JournalEntry[]
+  /** D-529 상담신청 · 고객 이벤트(고객이 직접 낸 값 — 최근 500건). 예전 3판 파일에는 없을 수 있다 */
+  events: CustomerEvent[]
   moduleRows: WorkspaceModuleRow[]
   files: ExportFileRow[]
   /** 못 담은 것(쉬운 말) — 비어 있으면 전부 담았다 */
@@ -90,6 +96,7 @@ export function exportFileRows(records: readonly ClientOpsRecord[]): ExportFileR
 export function summarizeWorkspace(input: {
   records: readonly ClientOpsRecord[]
   journal: readonly JournalEntry[]
+  events?: readonly CustomerEvent[]
   moduleRows: readonly WorkspaceModuleRow[]
   files: readonly ExportFileRow[]
   toolInputs: Record<string, string>
@@ -102,6 +109,7 @@ export function summarizeWorkspace(input: {
     documents,
     files: input.files.length,
     journal: input.journal.length,
+    events: input.events?.length ?? 0,
     moduleRows: input.moduleRows.length,
     modules,
     localModuleKeys: Object.keys(input.toolInputs).filter((k) => k.startsWith(MODULE_DATA_PREFIX)).length,
@@ -112,6 +120,7 @@ export function summarizeWorkspace(input: {
 export function buildWorkspaceBackup(input: {
   records: ClientOpsRecord[]
   journal: JournalEntry[]
+  events?: CustomerEvent[]
   moduleRows: WorkspaceModuleRow[]
   toolInputs: Record<string, string>
   mode: 'cloud' | 'local'
@@ -129,6 +138,7 @@ export function buildWorkspaceBackup(input: {
       workspaceId: input.workspaceId,
       summary: summarizeWorkspace({ ...input, files }),
       journal: input.journal,
+      events: input.events ?? [],
       moduleRows: input.moduleRows,
       files,
       missing: input.missing ?? [],
@@ -139,6 +149,7 @@ export function buildWorkspaceBackup(input: {
 /** 내려받은 뒤 한 줄 — '업체 3곳 · 업무 일기 12건 · 모듈 기록 40줄 · 서류 파일 9개' */
 export function workspaceBackupLine(s: WorkspaceSummary): string {
   const parts = [`업체 ${s.clients}곳`, `업무 일기 ${s.journal}건`]
+  if ((s.events ?? 0) > 0) parts.push(`상담신청 ${s.events}건`)
   const mod = s.moduleRows + s.localModuleKeys
   if (mod > 0) parts.push(`모듈 기록 ${s.moduleRows > 0 ? `${s.moduleRows}줄` : `${s.localModuleKeys}칸`}`)
   parts.push(`서류 파일 목록 ${s.files}개`)
@@ -164,12 +175,14 @@ export function onlyThisWorkspace(inputs: Record<string, string>, workspaceId: s
  */
 export async function collectWorkspaceBackup(workspaceId: string | null, records: ClientOpsRecord[], cloud: boolean): Promise<WorkspaceBackupFile> {
   const missing: string[] = []
-  const [journal, rows] = await Promise.allSettled([listJournal(workspaceId), cloud ? listWorkspaceRows(workspaceId) : Promise.resolve(null)])
+  const [journal, rows, events] = await Promise.allSettled([listJournal(workspaceId), cloud ? listWorkspaceRows(workspaceId) : Promise.resolve(null), listEvents(workspaceId)])
   if (journal.status === 'rejected') missing.push('업무 일기')
   if (rows.status === 'rejected') missing.push('모듈 기록(서버)')
+  if (events.status === 'rejected') missing.push('상담신청')
   return buildWorkspaceBackup({
     records,
     journal: journal.status === 'fulfilled' ? journal.value : [],
+    events: events.status === 'fulfilled' ? events.value : [],
     moduleRows: rows.status === 'fulfilled' ? rows.value ?? [] : [],
     toolInputs: cloud ? onlyThisWorkspace(readToolInputs(), workspaceId) : readToolInputs(),
     mode: cloud ? 'cloud' : 'local',

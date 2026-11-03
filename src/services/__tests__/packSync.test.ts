@@ -197,6 +197,9 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   check('W3b 3판이면 보관용 요약을 꺼낸다 · 2판이면 없음', workspaceSectionOf(text)?.journal === 2 && workspaceSectionOf(JSON.stringify(buildBackup([a], {}))) === null && workspaceSectionOf('글') === null)
   check('W4 열어 볼 수 있는 주소(서명 주소 · http) 0', !/signedUrl|token=|https?:\/\//i.test(JSON.stringify(file.workspace.files)))
   check('W5a 한 줄 요약', workspaceBackupLine(s) === '업체 2곳 · 업무 일기 2건 · 모듈 기록 3줄 · 서류 파일 목록 3개', workspaceBackupLine(s))
+  // D-529 상담신청도 — 있으면 한 줄에, 없으면 빼고
+  const ev = buildWorkspaceBackup({ records: [a], journal: [], events: [{ id: 'e1' }, { id: 'e2' }] as never, moduleRows: [], toolInputs: {}, mode: 'cloud', workspaceId: 'ws-1' })
+  check('W5d (D-529) 상담신청 2건 담김 · 한 줄에', ev.workspace.events.length === 2 && ev.workspace.summary.events === 2 && workspaceBackupLine(ev.workspace.summary).includes('상담신청 2건'), workspaceBackupLine(ev.workspace.summary))
   check('W5b 서버 모듈 기록이 없으면 브라우저 칸 수로', workspaceBackupLine({ ...s, moduleRows: 0 }).includes('모듈 기록 1칸'))
   check('W5c 파일 이름은 영문(브라우저가 한글 이름을 버림) · 예전 백업과 갈림', /^[\x20-\x7E]+$/.test(workspaceBackupFileName('2026-11-03')) && workspaceBackupFileName('2026-11-03') === 'client-ops-workspace-2026-11-03.json')
 

@@ -133,7 +133,7 @@ const ANSWERS = {
 }
 
 /** 서버 한 벌 — 세 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
-const cloud = { rows: new Map(), down: false, writes: [], clients: [], journal: [], mut: [], invites: [], inviteReads: [], invitePatches: [] }
+const cloud = { rows: new Map(), down: false, writes: [], clients: [], journal: [], events: [], mut: [], invites: [], inviteReads: [], invitePatches: [] }
 const packsRow = () => cloud.rows.get(ROW_ID)
 const kitsRow = () => cloud.rows.get(KIT_ROW_ID)
 const cloudKits = () => kitsRow()?.payload?.kits ?? {}
@@ -182,6 +182,11 @@ async function device(name, vp, mobile, seed = null) {
       return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
     }
     if (path.includes('/rest/v1/workspaces')) return route.fulfill(json([{ id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' }]))
+    // D-529 상담신청(X) — 읽기만
+    if (path.includes('/rest/v1/customer_events')) {
+      if (method !== 'GET') cloud.mut.push(`${method} events`)
+      return route.fulfill(json(method === 'GET' ? cloud.events : []))
+    }
     // D-523 보낸 초대(I) — 읽기 · 취소(상태만) · 새 초대
     if (path.includes('/rest/v1/workspace_invites')) {
       if (method === 'GET') {
@@ -450,6 +455,7 @@ try {
   }]
   const jrow = (id, type, content, due = null) => ({ id, workspace_id: WS, owner_id: OWNER, entry_date: '2026-11-02', entry_type: type, content, client_id: 'client-hansol', project_id: null, service_key: null, due_date: due, pinned: false, completed: false, completed_at: null, created_at: '2026-11-02T01:00:00Z', updated_at: '2026-11-02T01:00:00Z' })
   cloud.journal = [jrow('j1', 'note', '상담 메모 — 청년 채용 계획'), jrow('j2', 'follow_up', '납세증명서 받기', '2026-11-06'), jrow('j3', 'call', '대표님 통화')]
+  cloud.events = [{ id: 'ev1', workspace_id: WS, portal_client_link_id: null, operations_client_id: null, profile_id: null, event_type: 'consultation_requested', source_type: 'public_form', source_id: 's1', dedupe_key: 'd1', payload_version: 1, payload: { company: '새봄식품', name: '이대표' }, priority: 'normal', status: 'new', occurred_at: '2026-11-02T02:00:00Z', created_at: '2026-11-02T02:00:00Z', updated_at: '2026-11-02T02:00:00Z' }]
   for (const [id, name] of [['emp-1', '직원 김'], ['emp-2', '직원 이']]) {
     cloud.rows.set(id, { id, workspace_id: WS, module_key: 'employment', bucket: 'employees', client_id: 'client-hansol', payload: { name }, created_at: '2026-10-05T00:00:00Z', updated_at: '2026-10-05T00:00:00Z' })
   }
@@ -473,7 +479,7 @@ try {
   const f = (w.files ?? []).find((x) => x.slot === 'businessRegistration')
   check('X1c 서류 파일 목록 2개 — 업체 · 칸 이름 · 파일 · 폴더 · 저장 위치 · 받기만 한 칸은 빼고', w.files?.length === 2 && f?.company === '한솔정밀(주)' && f?.label === '사업자등록증' && f?.folderPath === '한솔/기본' && f?.storagePath.endsWith('a.pdf'), w.files)
   check('X1d 열어 볼 수 있는 주소 0 · 못 담은 것 0', !/signedUrl|token=|https?:\/\//i.test(JSON.stringify(w.files)) && (w.missing ?? []).length === 0, w.missing)
-  check('X1e 다 받으면 한 줄 — 업체 · 업무 일기 · 모듈 기록 · 서류 파일 목록', /업체 1곳 · 업무 일기 3건 · 모듈 기록 \d+줄 · 서류 파일 목록 2개/.test(x1.toast), x1.toast)
+  check('X1e 다 받으면 한 줄 — 업체 · 업무 일기 · 상담신청 · 모듈 기록 · 서류 파일 목록', /업체 1곳 · 업무 일기 3건 · 상담신청 1건 · 모듈 기록 \d+줄 · 서류 파일 목록 2개/.test(x1.toast) && w.events?.length === 1 && w.summary?.events === 1, x1.toast)
   check('X1f 내보내기는 서버에 쓰기 0', cloud.mut.length === mutBefore && cloud.writes.slice(writesBefore).every((x) => x.bucket !== 'employees'), cloud.mut.slice(mutBefore))
   cloud.down = true
   const x2 = await exportOnce().catch((e) => ({ file: {}, toast: String(e) }))
@@ -499,9 +505,10 @@ try {
   const sfile = JSON.parse(fs.readFileSync(await sdl.path(), 'utf8'))
   const stoast = await pc.page.getByText(/백업을 내려받았어요/).first().innerText({ timeout: 8000 }).catch(() => '')
   await shot(pc.page, 'd528-settings-export-pc')
-  check('X4 (D-528) 설정 › 데이터 [전체 내려받기] → 같은 파일(3판 · 업체 1 · 업무 일기 3 · 파일 목록 2) · 한 줄', sfile.version === 3 && sfile.clients?.length === 1 && sfile.workspace?.journal?.length === 3 && sfile.workspace?.files?.length === 2 && /업체 1곳/.test(stoast), { v: sfile.version, c: sfile.clients?.length, stoast })
+  check('X4 (D-528) 설정 › 데이터 [전체 내려받기] → 같은 파일(3판 · 업체 1 · 업무 일기 3 · 상담신청 1 · 파일 목록 2) · 한 줄', sfile.version === 3 && sfile.clients?.length === 1 && sfile.workspace?.journal?.length === 3 && sfile.workspace?.events?.length === 1 && sfile.workspace?.files?.length === 2 && /업체 1곳/.test(stoast), { v: sfile.version, c: sfile.clients?.length, stoast })
   cloud.clients = []
   cloud.journal = []
+  cloud.events = []
   cloud.rows.delete('emp-1')
   cloud.rows.delete('emp-2')
 
