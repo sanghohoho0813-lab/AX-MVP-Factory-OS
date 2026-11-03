@@ -60,6 +60,7 @@ import { CallButton } from '../components/ops/opsControls'
 import { addDaysLocal, friendlyDate } from '../services/clientOpsNextAction'
 import { countContractClients, isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
+import { todoRequestProgress } from '../services/docRequests'
 import { buildAllSchedule, buildClientSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
   applyJournalFilter,
@@ -296,6 +297,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const active = useMemo(() => clients.filter((c) => c.archivedAt === null), [clients])
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
+  /** D-512 '받았는지 확인' 할 일 → 그 요청의 진행(서류 7/10 받음) */
+  const docReqByTodo = useMemo(() => todoRequestProgress(clients, today), [clients, today])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
   // '이번 주 마감' 은 마감만 — 다음 약속(D-120)은 아래 '약속' 줄에 따로
   // D-210: '이번 주' 는 오늘 ~ 6일 뒤(7일) — 아래 '이번 주 받을 것' 과 같은 기간(예전: 8일을 셌다)
@@ -779,6 +782,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                       clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
                       onPick={() => setTodoPick(e)}
                       movedFrom={trail[e.id]?.from}
+                      docReq={docReqByTodo.get(e.id)}
                     />
                   ))}
                 </ul>
@@ -796,6 +800,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                     clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
                     onPick={() => setTodoPick(e)}
                       movedFrom={trail[e.id]?.from}
+                      docReq={docReqByTodo.get(e.id)}
                   />
                 ))}
               </ul>

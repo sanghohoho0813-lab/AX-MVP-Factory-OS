@@ -7,6 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lu
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { listClients } from '../services/clientOpsService'
+import { todoRequestProgress } from '../services/docRequests'
 import {
   createJournalEntry,
   deleteJournalEntry,
@@ -66,6 +67,9 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   /** D-139: 달력에서 바로 적기 창 */
   const [quick, setQuick] = useState<{ date: string; tab: 'todo' | 'off' } | null>(null)
   const [holidayImport, setHolidayImport] = useState(false)
+
+  /** D-512 '받았는지 확인' 할 일 → 그 요청의 진행(서류 7/10 받음) */
+  const docReqByTodo = useMemo(() => todoRequestProgress(records, today), [records, today])
 
   const load = useCallback(async () => {
     try {
@@ -618,6 +622,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                               }
                               onPick={() => setTodoPick(e)}
                               movedFrom={trail[e.id]?.from}
+                              docReq={docReqByTodo.get(e.id)}
                             />
                           ))}
                         </ul>

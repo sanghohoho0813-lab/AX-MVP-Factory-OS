@@ -116,7 +116,7 @@ export function MessageModal({
   text: string
   onClose: () => void
   /** D-314 보낸 뒤 할 일 — 누르면 run(성공하면 보일 글 · 실패면 false). 없으면 단추를 그리지 않는다 */
-  followUp?: { label: string; run: () => Promise<string | false> }
+  followUp?: { label: string; run: () => Promise<string | false>; /** D-512 누른 뒤 단추 글(기본 '할 일에 넣음') */ doneLabel?: string }
 }) {
   useBackToClose(true, onClose)
   const [copied, setCopied] = useState(false)
@@ -187,7 +187,7 @@ export function MessageModal({
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 px-5 py-3" data-testid="message-followup-row">
             <Button variant="secondary" size="sm" disabled={follow.busy || !!follow.done} onClick={() => void runFollow()} data-testid="message-followup">
               {follow.done ? <Check aria-hidden="true" className="size-4" /> : <CalendarCheck aria-hidden="true" className="size-4" />}
-              {follow.done ? '할 일에 넣음' : followUp.label}
+              {follow.done ? (followUp.doneLabel ?? '할 일에 넣음') : followUp.label}
             </Button>
             {follow.done && (
               <span role="status" className="text-[0.88rem] break-keep text-success-700" data-testid="message-followup-done">
@@ -196,7 +196,7 @@ export function MessageModal({
             )}
             {follow.failed && (
               <span role="alert" className="text-[0.88rem] break-keep text-danger-700">
-                할 일에 넣지 못했어요 — 다시 눌러 주세요
+                {followUp.doneLabel ? '저장하지 못했어요' : '할 일에 넣지 못했어요'} — 다시 눌러 주세요
               </span>
             )}
           </div>

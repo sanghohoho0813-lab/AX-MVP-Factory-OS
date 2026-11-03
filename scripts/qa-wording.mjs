@@ -23,6 +23,9 @@ const BAD = new RegExp(
     'Judge\\s*Scorecard',
     'RED\\s+FLAG', // 화면 글(낱말 사이 빈칸) — 코드 이름(redFlags)은 화면에 안 보임
     '\\uBCA4\\uCC98\\s*\\uC694\\uAD6C\\uC0AC\\uD56D\\s*v\\d',
+    // D-512 벤치마킹 기준서(docs/)가 참고한 서비스 이름 — 저장소 문서에만 있고 화면 · 서버 글에는 0
+    '\\uC2A4\\uD398\\uC774\\uC2A4\\s*\\uB178\\uD2B8',
+    'space' + 'note',
   ].join('|'),
   'gi',
 )

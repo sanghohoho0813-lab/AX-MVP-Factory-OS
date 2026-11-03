@@ -23,6 +23,7 @@ import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
+import { requestSummary } from '../../services/docRequests'
 import { GENDER_LABEL, yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
 import { ageOf } from '../../tools/shared/clientPrefill'
 import { contractAgeShort } from '../../services/contractSummary'
@@ -163,6 +164,8 @@ export function ClientBoardCard({
   // D-159: 휴대폰은 처음에 접어 둔다(대표) — 이름 · 회사 정보 한 줄 · 다음 약속 · 진행 중인 일만. [펼쳐보기] 로 나머지
   const [open, setOpen] = useState(false)
   const p = clientOpsProgress(record, today)
+  /** D-512 고객에게 부탁한 서류 — 끝내지 않은 요청이 없으면 null */
+  const docReq = requestSummary(record, today)
   const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays))
   /*
    * 접는 기준은 한 문장이다: **손이 갈 일이 남았으면 보이고, 끝났거나 아직 시작 안 했으면 접힌다.**
@@ -316,6 +319,12 @@ export function ClientBoardCard({
             })}
             {reco.length > 3 && <span className="t-meta font-semibold text-slate-500">+{reco.length - 3}</span>}
           </div>
+        )}
+        {/* D-512 고객에게 부탁한 서류 — 며칠째 · 몇 개 받았나(접힌 휴대폰 카드에도). 3일 넘게 덜 왔으면 빨간 글자 */}
+        {docReq && (
+          <p data-testid="card-docreq" data-done={docReq.done ? '1' : '0'} className={`t-sub flex flex-wrap items-baseline gap-x-1.5 font-semibold ${docReq.done ? 'text-success-700' : docReq.waitingDays >= 3 ? 'text-danger-700' : 'text-slate-700'}`}>
+            {docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`}
+          </p>
         )}
         {/* D-159: 맞는 지원사업 · 사업자번호 · 업무 조각 · 돈 줄은 휴대폰에서 접어 둔다(펼쳐보기) */}
         <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more">

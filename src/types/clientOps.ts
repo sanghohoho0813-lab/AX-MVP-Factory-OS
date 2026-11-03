@@ -877,10 +877,42 @@ export interface ClientOpsRecord {
    * 다음에 진단서를 열면 '지난번 드린 뒤 달라진 것' 을 이 기록과 견준다. payload 에 함께 저장된다(DB 변경 없음).
    */
   diagnosisGiven?: DiagnosisGiven[]
+  /** D-512 고객에게 보낸 서류 요청(무엇을 · 언제) — 서류가 들어오면 그 줄이 저절로 받음 */
+  docRequests?: DocRequest[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** D-512 고객에게 부탁한 자료 한 줄 */
+export interface DocRequestItem {
+  /** 고객에게 보낸 이름('표준재무제표증명(최근 3년)' · '대표님 생년월일') */
+  label: string
+  /** 어디서 떼는지(문구의 '- …' 줄) — 다시 부탁할 때 같은 글 */
+  where: string
+  /** 부탁할 때 이미 받은 칸이 있었다(새 발급본 요청 등) — 그 뒤에 올라온 파일만 받음으로 센다 */
+  had?: boolean
+  /** 칸이 없는 줄을 사람이 [받았어요] 한 날 */
+  doneAt?: string
+}
+
+/** D-512 요청 문구를 보낸 한 번 — 업체 기록에 남아 서류함 · 고객 관리 · 오늘 할 일이 같이 본다 */
+export interface DocRequest {
+  id: string
+  /** 보낸 날(YYYY-MM-DD) */
+  sentAt: string
+  /** 보낸 시각(ISO) — 새 발급본은 이 뒤에 올라온 파일만 */
+  sentAtIso: string
+  /** 요청 문구 제목('정책자금 신청 서류 요청 문구') */
+  title: string
+  items: DocRequestItem[]
+  /** [보냈어요] 로 만든 할 일(업무 일기) */
+  todoId?: string
+  /** 남은 것을 다시 부탁한 날 — 기다린 날은 이 날부터 */
+  resentAt?: string
+  /** [요청 끝내기] 한 날 */
+  closedAt?: string
 }
 
 /** D-220: 임시등록 표시 — 언제 · 어디서(마케팅 도구) · 부탁한 동료(있으면) */

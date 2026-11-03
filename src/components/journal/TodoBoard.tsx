@@ -181,7 +181,10 @@ export function TodoRow({
   dragProps,
   number,
   movedFrom,
+  docReq,
 }: {
+  /** D-512 이 할 일로 기다리는 서류 요청 — '서류 7/10 받음' · 다 오면 '요청한 서류 다 받음' */
+  docReq?: { got: number; total: number; done: boolean }
   /** D-158: 그날 적은 순서 번호(일정 달력) — 눈에 잘 띄게 */
   number?: number
   /** D-486 이 할 일이 있다가 떠난 날들(미룬 흔적) — '11/1 에서 미룸' */
@@ -232,6 +235,11 @@ export function TodoRow({
             </span>
           )}
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}
+          {docReq && !entry.completed && (
+            <span data-testid="todo-docreq" data-done={docReq.done ? '1' : '0'} className={`font-semibold ${docReq.done ? 'text-success-700' : 'text-slate-700'}`}>
+              {docReq.done ? '요청한 서류 다 받음' : `서류 ${docReq.got}/${docReq.total} 받음`}
+            </span>
+          )}
           {entry.completed && <span className="text-success-700">완료</span>}
           {clientName && <span>{clientName}</span>}
         </span>

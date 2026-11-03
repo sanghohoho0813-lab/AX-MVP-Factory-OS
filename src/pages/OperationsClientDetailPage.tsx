@@ -148,7 +148,9 @@ const DocImportModal = lazy(() => loadDocImport().then((m) => ({ default: m.DocI
 const SalesJourneyCard = lazy(() => import('../components/sales/SalesJourneyCard').then((m) => ({ default: m.SalesJourneyCard })))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
-import { createJournalEntry } from '../services/journalService'
+import { createJournalEntry, listJournal, updateJournalEntry } from '../services/journalService'
+import { newDocRequest, pendingDocKeys, resendText, withDocRequest, withRequestResent } from '../services/docRequests'
+import { DocRequestPanel } from '../components/ops/DocRequestPanel'
 import { requestFollowUpText } from '../services/recoFollowUp'
 import { addDaysLocal } from '../services/clientOpsNextAction'
 import { FundingSection } from '../components/ops/FundingSection'
@@ -274,7 +276,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [notFound, setNotFound] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
-  const [message, setMessage] = useState<{ title: string; description: string; text: string } | null>(null)
+  const [message, setMessage] = useState<{ title: string; description: string; text: string; /** D-512 '아직 안 온 것 다시 요청' 문구 — 새 요청이 아니라 그 요청에 '다시 보냄' */ resendId?: string } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   // D-479 서류 읽기 창 · 서류 분석은 첫 화면에서 빼고, 화면이 뜬 뒤 조용히 받아 둔다(누를 때 기다리지 않게)
   useEffect(() => {
@@ -606,6 +608,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     }
     return set
   }, [record, today])
+
+  /** D-512 요청한 뒤 아직 안 온 서류 칸 — 칸 알약 '요청함 · N일째' */
+  const reqKeys = useMemo(() => (record ? pendingDocKeys(record, today) : new Map<DocumentKey, { days: number; renew: boolean }>()), [record, today])
 
   /** 가장 임박한 마감 (헤더 표시) */
   const [todoOpen, setTodoOpen] = useState(false)
@@ -1454,6 +1459,39 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </p>
         )}
 
+        {/* D-512 보낸 요청 문구가 남아 — 며칠째 · n/m 받음 · 남은 것만 다시 요청 · 다 받으면 할 일까지 끝내기 */}
+        <DocRequestPanel
+          record={record}
+          today={today}
+          onCommit={commit}
+          onResend={(req) =>
+            setMessage({
+              title: '아직 안 온 서류 다시 요청',
+              description: '지난번 부탁한 것 중 아직 안 온 것만 모았습니다. 보낸 뒤 [다시 보냈어요] 를 누르면 기다린 날을 새로 셉니다.',
+              text: resendText(record, req, today),
+              resendId: req.id,
+            })
+          }
+          onJump={(key) => {
+            setOpenDocs((cur) => new Set(cur).add(key))
+            requestAnimationFrame(() => {
+              const el = document.getElementById(`doc-card-${key}`)
+              el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+              el?.focus({ preventScroll: true })
+            })
+          }}
+          onFinish={async (req) => {
+            if (!req.todoId) return
+            // 이 요청으로 만든 '받았는지 확인' 할 일 — 아직 안 끝났으면 끝낸다(못 찾거나 실패해도 요청은 끝낸다)
+            try {
+              const todo = (await listJournal(workspaceId)).find((e) => e.id === req.todoId)
+              if (todo && !todo.completed) await updateJournalEntry(todo, { completed: true })
+            } catch {
+              showToast('할 일은 끝내지 못했어요 — 오늘 화면에서 직접 끝내 주세요.')
+            }
+          }}
+        />
+
         {/* D-147: 손볼 것만 한 줄 — 누르면 그 칸으로 */}
         <DocShelfBar
           summary={docShelfSummary(record, today, urgentDocs)}
@@ -1580,10 +1618,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             한눈에 보이면 된다 — 서류는 '해야 할 일' 이 아니라 '상태' 다.
                           */}
                           {/* D-122: 점만으로는 뜻을 모른다 — '안 받음' 글자로 */}
-                          {!state.received && (
+                          {/* D-512 고객에게 부탁해 둔 서류는 '안 받음' 대신 '요청함 · N일째'(3일 넘으면 빨간 글자) */}
+                          {!state.received && reqKeys.has(meta.key) && (
+                            <span data-testid="doc-req-chip" className={`t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 font-semibold ${(reqKeys.get(meta.key)?.days ?? 0) >= 3 ? 'text-danger-700' : 'text-brand-700'}`}>
+                              요청함 · {(reqKeys.get(meta.key)?.days ?? 0) === 0 ? '오늘' : `${reqKeys.get(meta.key)?.days}일째`}
+                            </span>
+                          )}
+                          {!state.received && !reqKeys.has(meta.key) && (
                             <span className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-50 px-1.5 py-0.5 font-semibold text-danger-700">
                               <span aria-hidden="true" className="size-1.5 rounded-full bg-danger-500" />
                               안 받음
+                            </span>
+                          )}
+                          {state.received && reqKeys.has(meta.key) && (
+                            <span data-testid="doc-req-chip" className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 font-semibold text-brand-700">
+                              새 발급본 요청함
                             </span>
                           )}
                           <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
@@ -2408,6 +2457,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           text={message.text}
           onClose={() => setMessage(null)}
           followUp={(() => {
+            // D-512 '아직 안 온 것 다시 요청' 문구 — 새 요청 · 새 할 일을 만들지 않고 그 요청에 '다시 보낸 날' 만 적는다(기다린 날을 새로 셈)
+            const resendId = message.resendId
+            if (resendId) {
+              return {
+                label: '다시 보냈어요',
+                doneLabel: '다시 보냄으로 적음',
+                run: async () => {
+                  const base = latestRef.current ?? record
+                  const ok = await commit(withRequestResent(base, resendId, today))
+                  return ok ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
+                },
+              }
+            }
             // D-314 요청 문구(받을 자료 · 서류 요청 · 정책자금 신청 서류)를 보냈으면 — 3일 뒤 '받았는지 확인' 할 일(오늘 · 일정). 다음 약속은 덮지 않는다
             const follow = /요청/.test(message.title) ? requestFollowUpText(message.text) : ''
             if (!follow) return undefined
@@ -2415,8 +2477,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               label: '보냈어요 · 3일 뒤 받았는지 확인',
               run: async () => {
                 const due = addDaysLocal(today, 3)
-                await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
-                return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요`
+                const todo = await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
+                // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
+                const base = latestRef.current ?? record
+                const req = newDocRequest(base, { id: generateId(), title: message.title, text: message.text, today, nowIso: nowIso(), todoId: todo.id })
+                const kept = req ? await commit(withDocRequest(base, req)) : false
+                return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
               },
             }
           })()}

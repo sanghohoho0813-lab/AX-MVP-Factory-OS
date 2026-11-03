@@ -61,6 +61,7 @@ import type {
 import { CONTRACT_KIND_LABEL, FEE_CONDITION_ORDER, emptyContract, isCustomDocumentKey, isCustomServiceKey, isProfileGroupKey, type FeeConditionKind } from '../types/clientOps'
 import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
 import { normalizeSales } from './salesPipeline'
+import { normalizeDocRequests } from './docRequests'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -593,6 +594,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     ...normalizeDecided(value.decided),
     ...normalizeDocUploads(value.docUploads),
     ...normalizeDiagnosisGiven(value.diagnosisGiven),
+    ...normalizeDocRequests(value.docRequests),
     // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
     ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     ...normalizeProvisional(value.provisional),
