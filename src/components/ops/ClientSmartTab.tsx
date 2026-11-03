@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { clearDiagnosisRequest, diagnosisRequested } from '../../services/openDiagnosis'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageSquareText, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageCircle, MessageSquareText, Sparkles } from 'lucide-react'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { latestToolResult } from '../../services/toolResultGroups'
 import { useIsPilot } from '../../auth/osAccess'
@@ -35,6 +35,8 @@ import { TopPicksCard } from './ClientTopPicks'
 import { ClientScenarios } from './ClientScenarios'
 import { ClientSituationPlan } from './ClientSituationPlan'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
+import { ClientTalkSheet } from './ClientTalkSheet'
+import { talkCard } from '../../services/consultTalk'
 import { diagnosisNote } from '../../services/clientDiagnosis'
 import { SITUATION_PLANS, planResultInput, type PlanId, type SituationPlan } from '../../services/situationPlan'
 import { withToolResult } from '../../services/clientOpsService'
@@ -155,6 +157,19 @@ export default function ClientSmartTab({
       setParams(next, { replace: true })
     }
   }
+  // D-508 말하기 대본 — undefined 닫힘 · null 미팅 순서 · 키는 그 모듈 말하기(주소 ?talk=1 · 영업 미팅 준비에서 이어 옴)
+  const [talk, setTalk] = useState<string | null | undefined>(() => (params.get('talk') === '1' ? null : undefined))
+  useEffect(() => {
+    if (params.get('talk') === '1') setTalk(null)
+  }, [params])
+  const closeTalk = () => {
+    setTalk(undefined)
+    if (params.get('talk') !== null) {
+      const next = new URLSearchParams(params)
+      next.delete('talk')
+      setParams(next, { replace: true })
+    }
+  }
   // D-366 지난번 드린 진단서와 견준 한 줄
   const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
   // D-242: 아래 상황 예시 줄의 '한 장 설계서로' → 위 설계서가 그 상황으로 펼쳐진다
@@ -179,10 +194,11 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
+      {talk !== undefined && <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} />}
       {/* D-492 서류에서 읽어 넣은 중요 번호 — 맨 위에서 처음 한 번만 원본과 맞춰 보기(다 확인하면 사라진다) */}
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
+      <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onTalk={() => setTalk(null)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
           openFold('smart.verdicts')
           window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
         }} />
@@ -346,9 +362,17 @@ export default function ClientSmartTab({
                     {ins.request.label}
                   </button>
                 )}
-                <Link to={ins.openPath} className="tap t-sub mt-auto inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
-                  {ins.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
-                </Link>
+                <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <Link to={ins.openPath} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
+                    {ins.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
+                  </Link>
+                  {/* D-508 이 판정을 고객에게 어떻게 말할지(쉽게 말하면 · 대표님이 물으면 · 조심할 말) */}
+                  {talkCard(ins) && (
+                    <button type="button" onClick={() => setTalk(ins.key)} className="tap t-sub inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-700 hover:underline" data-testid="smart-insight-talk">
+                      <MessageCircle aria-hidden="true" className="size-4" /> 이렇게 말하기
+                    </button>
+                  )}
+                </div>
               </Surface>
             </li>
           ))}

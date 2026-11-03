@@ -21,7 +21,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { NEXT_QUICK_DAYS } from '../../services/clientOpsNextAction'
 import { useDraftState } from '../../lib/useSessionDraft'
-import { Check, ChevronRight, FileText, NotebookPen, Phone, Presentation, ScanSearch, Send } from 'lucide-react'
+import { Check, ChevronRight, FileText, MessageCircle, NotebookPen, Phone, Presentation, ScanSearch, Send } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
@@ -753,6 +753,10 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   <LeadLevel tier={tier.key} score={score} withHint />
                   {theme && <span className="t-sub text-slate-500">미팅 테마 · {theme.label}</span>}
                 </div>
+                {/* D-508 이 업체 맞춤 추천 판정 그대로 만든 말하기 대본(미팅 순서 · 제안마다 '고객에게 이렇게 말하세요') */}
+                <Link to={`/ops/clients/${record.id}?tab=smart&talk=1`} state={fromState(location)} data-testid="meeting-talk" className="tap t-sub inline-flex min-h-10 items-center gap-1.5 self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:border-brand-400">
+                  <MessageCircle aria-hidden="true" className="size-4" /> 판정 그대로 말하기 대본 — 미팅 순서 · 고객에게 이렇게 말하세요
+                </Link>
                 <div className="border-t border-slate-100 pt-2.5">
                   {/* D-218: 업체를 바꾸면 새로 — 예전엔 열어 둔 고치기 창이 앞 업체의 글 · 날짜를 다음 업체로 가져갔다 */}
                   <NextStepEditor key={record.id} record={record} today={today} onSave={(n, m) => persist(n, m)} />

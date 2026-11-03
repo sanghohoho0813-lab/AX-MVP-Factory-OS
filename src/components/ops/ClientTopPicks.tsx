@@ -9,8 +9,9 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileText, FileUp, History, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, FileText, FileUp, History, MessageCircle, Send, Sparkles } from 'lucide-react'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
+import { ClientTalkSheet } from './ClientTalkSheet'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, type Tone } from '../ui/primitives'
@@ -37,7 +38,10 @@ export function TopPicksCard({
   pendingKeys,
   onDiagnosis,
   diagNote,
+  onTalk,
 }: {
+  /** D-508 상담 자리에서 읽을 말하기 대본(미팅 순서 · 제안마다 말하기) — 없으면 단추를 그리지 않는다 */
+  onTalk?: () => void
   /** D-352 대표님께 드릴 맞춤 진단서 한 장(없으면 단추를 그리지 않는다) */
   onDiagnosis?: () => void
   /** D-366 지난번 드린 진단서와 견준 한 줄(드린 적 없으면 없음) */
@@ -69,13 +73,18 @@ export function TopPicksCard({
             이 업체에 먼저 제안할 것
           </h2>
         </HintTip>
+        {onTalk && insights.length > 0 && (
+          <Button size="sm" variant="secondary" onClick={onTalk} className="ml-auto" data-testid="top-picks-talk" title="상담 자리에서 읽을 말 — 미팅 순서 · 제안마다 '고객에게 이렇게 말하세요' · 대표님이 물으면">
+            <MessageCircle aria-hidden="true" className="size-4" /> 말하기 대본
+          </Button>
+        )}
         {onDiagnosis && insights.length > 0 && (
-          <Button size="sm" variant="secondary" onClick={onDiagnosis} className="ml-auto" data-testid="top-picks-diagnosis" title="이 판정 그대로 대표님께 드릴 한 장 — 인쇄 · PDF · 카톡 요약">
+          <Button size="sm" variant="secondary" onClick={onDiagnosis} className={onTalk ? '' : 'ml-auto'} data-testid="top-picks-diagnosis" title="이 판정 그대로 대표님께 드릴 한 장 — 인쇄 · PDF · 카톡 요약">
             <FileText aria-hidden="true" className="size-4" /> 맞춤 진단서
           </Button>
         )}
         {onShowAll && insights.length > 0 && (
-          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className={`tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline ${onDiagnosis ? '' : 'ml-auto'}`}>
+          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className={`tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline ${onDiagnosis || onTalk ? '' : 'ml-auto'}`}>
             모듈별 판정 {insights.length}개 <ArrowRight aria-hidden="true" className="size-4" />
           </button>
         )}
@@ -208,6 +217,8 @@ export default function ClientTopPicks({
   const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
   // D-352 대표님께 드릴 맞춤 진단서 — 개요 맨 위에서도 바로
   const [diag, setDiag] = useState(false)
+  // D-508 말하기 대본(미팅 순서 · 제안마다 말하기)
+  const [talk, setTalk] = useState(false)
   // D-447 확인 기다리는 사실(스캔본에서 읽음)
   const pendingKeys = useMemo(() => new Set(pendingFacts(record).map((p) => p.key)), [record])
   const text = useMemo(() => recoRequestMessage(record, insights, pendingKeys), [record, insights, pendingKeys])
@@ -215,11 +226,13 @@ export default function ClientTopPicks({
   return (
     <>
       {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}
+      {talk && <ClientTalkSheet record={record} insights={insights} onClose={() => setTalk(false)} />}
       <TopPicksCard
         insights={insights}
         onUpload={onUpload}
         onShowAll={onShowAll}
         onDiagnosis={() => setDiag(true)}
+        onTalk={() => setTalk(true)}
         diagNote={diagNote}
         onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
         onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}
