@@ -13,6 +13,8 @@
  *      휴대폰에서 같은 영상 → 다시 안 부르고 9줄 · 우리 버전 · 'PC에서 씀' · 휴대폰에서 [처음부터 다시 받기] → PC 로 돌아오면 휴대폰 대본으로
  *   X  D-521 작업공간 전체 내보내기 — 고객 관리 [백업 내려받기] 한 번 → 파일 하나에 업체 · 업무 일기(서버) · 모듈 기록(서버 전부) · 서류 파일 목록 ·
  *      서버에 쓰기 0 · 모듈 기록을 못 읽으면 나머지로 받고 '못 담은 것' 한 줄 · [백업 불러오기] 가 그 파일을 읽고 '보관용' 한 줄
+ *   I  D-523 보낸 초대 목록 · 취소 — 설정 › 작업공간: 기다리는 초대만 펴 둠(이메일 · 역할 · n일 남음) · 지난 초대(들어옴 · 취소 · 기한 지남) 접힘 ·
+ *      토큰 칸은 읽지 않음 · [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만) · 새 초대를 만들면 목록에 바로
  *
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
@@ -130,7 +132,7 @@ const ANSWERS = {
 }
 
 /** 서버 한 벌 — 세 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
-const cloud = { rows: new Map(), down: false, writes: [], clients: [], journal: [], mut: [] }
+const cloud = { rows: new Map(), down: false, writes: [], clients: [], journal: [], mut: [], invites: [], inviteReads: [], invitePatches: [] }
 const packsRow = () => cloud.rows.get(ROW_ID)
 const kitsRow = () => cloud.rows.get(KIT_ROW_ID)
 const cloudKits = () => kitsRow()?.payload?.kits ?? {}
@@ -179,6 +181,27 @@ async function device(name, vp, mobile, seed = null) {
       return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
     }
     if (path.includes('/rest/v1/workspaces')) return route.fulfill(json([{ id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' }]))
+    // D-523 보낸 초대(I) — 읽기 · 취소(상태만) · 새 초대
+    if (path.includes('/rest/v1/workspace_invites')) {
+      if (method === 'GET') {
+        cloud.inviteReads.push(url.searchParams.get('select') ?? '')
+        return route.fulfill(json(cloud.invites))
+      }
+      if (method === 'PATCH') {
+        const body = JSON.parse(req.postData() ?? '{}')
+        const id = (url.searchParams.get('id') ?? '').replace(/^eq\./, '')
+        const onlyPending = url.searchParams.get('status') === 'eq.pending'
+        cloud.invitePatches.push({ id, body, onlyPending })
+        for (const inv of cloud.invites) if (inv.id === id && (!onlyPending || inv.status === 'pending')) Object.assign(inv, body)
+        return route.fulfill(json([]))
+      }
+      if (method === 'POST') {
+        const body = JSON.parse(req.postData() ?? '{}')
+        const row = Array.isArray(body) ? body[0] : body
+        cloud.invites.unshift({ id: `inv-new-${cloud.invites.length}`, email: row.email, role: row.role, status: 'pending', expires_at: row.expires_at, created_at: new Date().toISOString() })
+        return route.fulfill({ status: 201, contentType: 'application/json', body: '' })
+      }
+    }
     // D-521 내보내기(X) — 업체 · 업무 일기. 읽기 말고 다른 요청이 오면 적어 둔다(내보내기는 쓰기 0)
     if (path.includes('/rest/v1/operations_clients') || path.includes('/rest/v1/ops_journal_entries')) {
       const isJ = path.includes('ops_journal_entries')
@@ -467,6 +490,48 @@ try {
   cloud.journal = []
   cloud.rows.delete('emp-1')
   cloud.rows.delete('emp-2')
+
+  // I D-523 보낸 초대 목록 · 취소
+  const dayMs = 86400_000
+  const iso = (ms) => new Date(Date.now() + ms).toISOString()
+  cloud.invites = [
+    { id: 'inv-open', email: 'teamlead@qa.kr', role: 'editor', status: 'pending', expires_at: iso(3 * dayMs + 3600_000), created_at: iso(-4 * dayMs) },
+    { id: 'inv-late', email: 'late@qa.kr', role: 'viewer', status: 'pending', expires_at: iso(-dayMs), created_at: iso(-9 * dayMs) },
+    { id: 'inv-in', email: 'joined@qa.kr', role: 'editor', status: 'accepted', expires_at: iso(2 * dayMs), created_at: iso(-5 * dayMs) },
+    { id: 'inv-off', email: 'off@qa.kr', role: 'admin', status: 'revoked', expires_at: iso(2 * dayMs), created_at: iso(-6 * dayMs) },
+  ]
+  await pc.page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
+  await pc.page.getByRole('button', { name: '작업공간' }).first().click()
+  const sent = pc.page.getByTestId('sent-invites')
+  await sent.waitFor({ timeout: 8000 }).catch(() => {})
+  const rows = await pc.page.getByTestId('invite-row').allInnerTexts()
+  check('I1 기다리는 초대만 펴 둠 — 이메일 · 역할 · 4일 남음(기한 지난 기다림은 지난 초대로)', rows.length === 1 && rows[0].includes('teamlead@qa.kr') && rows[0].includes('편집자') && /4일 남음/.test(rows[0]), rows)
+  const pastClosed = (await pc.page.getByTestId('invite-past').count()) === 0
+  await sent.getByRole('button', { name: /지난 초대/ }).click()
+  const past = await pc.page.getByTestId('invite-past').innerText().catch(() => '')
+  check('I2 지난 초대는 접혀 있다가 펴면 — 들어옴 · 취소함 · 기한 지남', pastClosed && past.includes('joined@qa.kr') && past.includes('들어옴') && past.includes('취소함') && past.includes('late@qa.kr') && past.includes('기한 지남'), past)
+  await shot(pc.page, 'd523-invites-pc')
+  check('I3 토큰(해시) 칸은 읽지 않음', cloud.inviteReads.length > 0 && cloud.inviteReads.every((q) => !/token/.test(q)), cloud.inviteReads)
+  await pc.page.getByTestId('invite-revoke').click()
+  const dlg = pc.page.getByRole('dialog')
+  const askText = await dlg.innerText({ timeout: 5000 }).catch(() => '')
+  await dlg.getByRole('button', { name: '초대 취소' }).click()
+  const revoked = await waitFor(() => cloud.invites.find((i) => i.id === 'inv-open')?.status === 'revoked')
+  const patch = cloud.invitePatches[0]
+  check('I4 [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만 · 줄은 남음)', askText.includes('teamlead@qa.kr') && revoked && patch?.body?.status === 'revoked' && patch?.onlyPending === true && cloud.invites.length === 4, { askText: askText.slice(0, 80), patch })
+  const emptyNow = await waitFor(async () => (await pc.page.getByTestId('invite-row').count()) === 0 && (await sent.innerText()).includes('기다리는 초대가 없어요'))
+  check('I5 취소하면 목록에서 빠지고 지난 초대로', emptyNow)
+  await pc.page.locator('#invite-email').fill('new@qa.kr')
+  await pc.page.getByRole('button', { name: '초대 코드 만들기' }).click()
+  const added = await waitFor(async () => (await pc.page.getByTestId('invite-row').allInnerTexts()).some((t) => t.includes('new@qa.kr') && /7일 남음/.test(t)))
+  check('I6 새 초대를 만들면 기다리는 초대에 바로(7일 남음) · 링크도 그대로', added && (await pc.page.getByTestId('invite-link').count()) === 1)
+  await ph.page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
+  await ph.page.getByRole('button', { name: '작업공간' }).first().click()
+  await ph.page.getByTestId('invite-row').first().waitFor({ timeout: 8000 }).catch(() => {})
+  await shot(ph.page, 'd523-invites-phone')
+  const phOver = await ph.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('I7 휴대폰 390 보낸 초대 — 줄 보임 · 넘침 0', (await ph.page.getByTestId('invite-row').count()) >= 1 && phOver <= 0, phOver)
+  cloud.invites = []
 
   // K6
   const n6 = Object.keys(cloudPacks()).length

@@ -899,7 +899,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                           <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
                             {e.clientName}
                           </Link>
-                          <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
+                          <span className="t-body min-w-0 flex-[1_1_8rem] break-keep text-slate-700">{e.title}</span>
                           <span className="ml-auto flex shrink-0 items-center gap-2">
                             {/* D-508 오늘 · 내일 미팅 · 상담이면 — 그 업체 판정 그대로 말하기 대본(미팅 순서 · 고객에게 이렇게 말하세요) */}
                             {(e.daysLeft === 0 || e.daysLeft === 1) && MEETING_WORDS.test(e.title) && (

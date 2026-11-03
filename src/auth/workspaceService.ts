@@ -132,6 +132,66 @@ export async function createInvite(
   return { inviteToken: token }
 }
 
+/* ------------------------------------------------------------------ */
+/* D-523 보낸 초대 목록 · 취소 (TEAM-1)                                    */
+/* 서버가 소유자 · 관리자에게만 준다(workspace_invites RLS). 토큰(해시)은 읽지 않는다.  */
+/* 취소 = 상태만 'revoked'(줄은 남음 — 언제 누구를 초대했는지 기록). 취소된 링크는 서버가 막는다. */
+/* ------------------------------------------------------------------ */
+
+export type InviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired'
+
+export interface WorkspaceInvite {
+  id: string
+  email: string
+  role: WorkspaceRole
+  status: InviteStatus
+  expiresAt: string
+  createdAt: string
+}
+
+/** 화면에 보일 상태 — 기다림인데 기한이 지났으면 '만료'(서버는 누가 링크를 열 때 바꾼다) */
+export function inviteView(inv: WorkspaceInvite, now: number = Date.now()): { state: InviteStatus; daysLeft: number } {
+  const left = (Date.parse(inv.expiresAt) - now) / 86_400_000
+  const state: InviteStatus = inv.status === 'pending' && !(left > 0) ? 'expired' : inv.status
+  return { state, daysLeft: state === 'pending' ? Math.max(1, Math.ceil(left)) : 0 }
+}
+
+/** 기다리는 것 먼저(곧 만료 순) · 그다음 지난 것(최근 순) */
+export function sortInvites(list: readonly WorkspaceInvite[], now: number = Date.now()): { open: WorkspaceInvite[]; past: WorkspaceInvite[] } {
+  const open = list.filter((i) => inviteView(i, now).state === 'pending').sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
+  const past = list.filter((i) => inviteView(i, now).state !== 'pending').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return { open, past }
+}
+
+export async function listInvites(workspaceId: string): Promise<WorkspaceInvite[]> {
+  const { data, error } = await getSupabaseClient()
+    .from('workspace_invites')
+    .select('id, email, role, status, expires_at, created_at')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw new Error('보낸 초대를 불러오지 못했습니다.')
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    email: String(r.email ?? ''),
+    role: (r.role as WorkspaceRole) ?? 'viewer',
+    status: (r.status as InviteStatus) ?? 'pending',
+    expiresAt: String(r.expires_at ?? ''),
+    createdAt: String(r.created_at ?? ''),
+  }))
+}
+
+/** 기다리는 초대를 취소(상태만 바꾼다 — 이미 수락 · 취소된 것은 그대로) */
+export async function revokeInvite(workspaceId: string, inviteId: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from('workspace_invites')
+    .update({ status: 'revoked', updated_at: new Date().toISOString() })
+    .eq('workspace_id', workspaceId)
+    .eq('id', inviteId)
+    .eq('status', 'pending')
+  if (error) throw new Error('초대를 취소하지 못했습니다.')
+}
+
 /** 멤버 역할 변경. */
 export async function updateMemberRole(
   workspaceId: string,

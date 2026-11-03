@@ -5,16 +5,23 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, Loader2, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import { Copy, Loader2, MailX, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { Disclosure } from '../ui/primitives'
 import { useToast } from '../ui/toastContext'
 import { useAuth } from '../../auth/AuthProvider'
 import {
   createInvite,
+  inviteView,
+  listInvites,
   listMembers,
   removeMember,
+  revokeInvite,
+  sortInvites,
   updateMemberRole,
+  type InviteStatus,
+  type WorkspaceInvite,
   type WorkspaceMember,
   type WorkspaceRole,
 } from '../../auth/workspaceService'
@@ -26,6 +33,9 @@ const ROLE_LABEL: Record<WorkspaceRole, string> = {
   editor: '편집자',
   viewer: '뷰어',
 }
+
+const INVITE_STATE: Record<InviteStatus, string> = { pending: '기다리는 중', accepted: '들어옴', revoked: '취소함', expired: '기한 지남' }
+const md = (iso: string) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
 /** 받는 분이 그대로 여는 초대 링크(/join/코드) */
 const inviteLink = (token: string) => `${window.location.origin}/join/${encodeURIComponent(token)}`
@@ -44,6 +54,10 @@ export function WorkspaceMembersPanel() {
   const [issuedToken, setIssuedToken] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState<WorkspaceMember | null>(null)
+  /** D-523 보낸 초대 — 소유자 · 관리자만(서버도 그 사람에게만 준다) */
+  const [invites, setInvites] = useState<WorkspaceInvite[]>([])
+  const [invitesFailed, setInvitesFailed] = useState(false)
+  const [confirmRevoke, setConfirmRevoke] = useState<WorkspaceInvite | null>(null)
 
   const load = useCallback(async () => {
     if (!currentWorkspaceId) return
@@ -57,6 +71,35 @@ export function WorkspaceMembersPanel() {
       setLoading(false)
     }
   }, [currentWorkspaceId])
+
+  const loadInvites = useCallback(async () => {
+    if (!currentWorkspaceId || !canManage) return
+    try {
+      setInvites(await listInvites(currentWorkspaceId))
+      setInvitesFailed(false)
+    } catch {
+      setInvitesFailed(true)
+    }
+  }, [currentWorkspaceId, canManage])
+
+  useEffect(() => {
+    void loadInvites()
+  }, [loadInvites])
+
+  async function handleRevoke() {
+    if (!currentWorkspaceId || !confirmRevoke) return
+    setBusy(true)
+    try {
+      await revokeInvite(currentWorkspaceId, confirmRevoke.id)
+      setConfirmRevoke(null)
+      showToast(`${confirmRevoke.email} 초대를 취소했어요 — 그 링크로는 들어올 수 없어요.`)
+      await loadInvites()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '초대를 취소하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -72,6 +115,7 @@ export function WorkspaceMembersPanel() {
       const { inviteToken } = await createInvite(currentWorkspaceId, inviteEmail.trim(), inviteRole, session.user.id)
       setIssuedToken(inviteToken)
       setInviteEmail('')
+      void loadInvites()
       showToast('초대 코드를 생성했습니다. 지금 복사해 전달하세요(다시 표시되지 않습니다).')
     } catch (err) {
       setError(err instanceof Error ? err.message : '초대를 생성하지 못했습니다.')
@@ -214,6 +258,64 @@ export function WorkspaceMembersPanel() {
       ) : (
         <p className="text-[0.875rem] text-slate-500">구성원 관리는 소유자·관리자만 할 수 있습니다.</p>
       )}
+
+      {/* D-523 보낸 초대 — 기다리는 것만 펴 두고, 지난 것(들어옴 · 취소 · 기한 지남)은 접어 둔다 */}
+      {canManage && (invites.length > 0 || invitesFailed) && (() => {
+        const { open, past } = sortInvites(invites)
+        return (
+          <section aria-labelledby="sent-invites" className="flex flex-col gap-2" data-testid="sent-invites">
+            <h3 id="sent-invites" className="text-sm font-semibold text-slate-800">
+              보낸 초대 {open.length > 0 && <span className="text-brand-700">기다리는 중 {open.length}</span>}
+            </h3>
+            {invitesFailed && <p className="text-[0.875rem] text-danger-700">보낸 초대를 불러오지 못했어요 — 인터넷을 확인하고 다시 열어 주세요.</p>}
+            {open.length > 0 ? (
+              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-card) border border-slate-200 bg-white">
+                {open.map((inv) => (
+                  <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3" data-testid="invite-row">
+                    <span className="min-w-0 flex-[1_1_12rem] truncate text-sm font-medium text-slate-800">{inv.email}</span>
+                    <span className="text-[0.875rem] text-slate-600">{ROLE_LABEL[inv.role]}</span>
+                    <span className="text-[0.875rem] text-slate-500" data-testid="invite-left">{md(inv.createdAt)} 보냄 · {inviteView(inv).daysLeft}일 남음</span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRevoke(inv)}
+                      className="tap ml-auto inline-flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem] text-slate-700 hover:bg-danger-50 hover:text-danger-700"
+                      data-testid="invite-revoke"
+                    >
+                      <MailX aria-hidden="true" className="size-3.5" /> 초대 취소
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !invitesFailed && <p className="text-[0.875rem] text-slate-500">기다리는 초대가 없어요.</p>
+            )}
+            {past.length > 0 && (
+              <Disclosure title="지난 초대" hint={`${past.length}건 — 들어옴 · 취소 · 기한 지남`}>
+                <ul className="flex flex-col divide-y divide-slate-100" data-testid="invite-past">
+                  {past.map((inv) => (
+                    <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[0.875rem]">
+                      <span className="min-w-0 flex-[1_1_12rem] truncate text-slate-700">{inv.email}</span>
+                      <span className="text-slate-500">{ROLE_LABEL[inv.role]} · {md(inv.createdAt)} 보냄</span>
+                      <span className={`font-semibold ${inviteView(inv).state === 'accepted' ? 'text-slate-700' : 'text-slate-500'}`}>{INVITE_STATE[inviteView(inv).state]}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Disclosure>
+            )}
+          </section>
+        )
+      })()}
+
+      <ConfirmModal
+        open={confirmRevoke !== null}
+        title="초대 취소"
+        message={`${confirmRevoke?.email ?? ''} 에게 보낸 초대를 취소할까요? 이미 보낸 링크로는 들어올 수 없어요. 다시 부르려면 새로 초대하면 돼요.`}
+        confirmLabel="초대 취소"
+        danger
+        busy={busy}
+        onConfirm={handleRevoke}
+        onCancel={() => setConfirmRevoke(null)}
+      />
 
       <ConfirmModal
         open={confirmRemove !== null}

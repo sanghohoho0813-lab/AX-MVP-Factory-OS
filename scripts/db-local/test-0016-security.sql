@@ -83,6 +83,33 @@ reset role;
 select qa.eq('C 권한', (select role::text from public.workspace_members where workspace_id=:'wv' and user_id=:C), 'editor');
 delete from public.workspace_members where workspace_id=:'wv' and user_id=:C;
 
+-- 3-1. D-523 보낸 초대 목록 · 취소 — 소유자 · 관리자만 보고 취소(상태만 revoked · 줄은 남음) · 편집자 · 남은 못 봄 · 취소된 초대로는 못 들어옴
+select set_config('request.jwt.claim.sub', '', false);
+insert into public.workspace_invites (workspace_id, email, role, token_hash, expires_at)
+values (:'wv', 'r@x.kr', 'editor', encode(extensions.digest('tok-r','sha256'),'hex'), now() + interval '7 day');
+insert into public.workspace_members (workspace_id,user_id,role) values (:'wv', :C, 'editor') on conflict do nothing;
+select set_config('request.jwt.claim.sub', :C, false); set role authenticated;
+select qa.eq('(D-523) 편집자 C 는 보낸 초대를 못 봄', (select count(*)::text from public.workspace_invites where workspace_id=:'wv'), '0');
+update public.workspace_invites set status='revoked' where email='r@x.kr';
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+select qa.eq('(D-523) 편집자 C 가 취소해도 그대로 기다림', (select status::text from public.workspace_invites where email='r@x.kr'), 'pending');
+select set_config('request.jwt.claim.sub', :A, false); set role authenticated;
+select qa.eq('(D-523) 다른 작업공간 A 는 못 봄', (select count(*)::text from public.workspace_invites where workspace_id=:'wv'), '0');
+reset role;
+select set_config('request.jwt.claim.sub', :M, false); set role authenticated;
+select qa.eq('(D-523) 관리자 M 은 보낸 초대를 봄', (select (count(*) >= 1)::text from public.workspace_invites where workspace_id=:'wv' and email='r@x.kr'), 'true');
+select qa.ok('(D-523) 관리자 M 이 기다리는 초대 취소', format($q$update public.workspace_invites set status='revoked', updated_at=now() where workspace_id=%L and email='r@x.kr' and status='pending'$q$, :'wv'));
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+select qa.eq('(D-523) 취소하면 상태 revoked · 줄은 남음', (select string_agg(status::text, ',') from public.workspace_invites where email='r@x.kr'), 'revoked');
+select set_config('request.jwt.claim.sub', :A, false); set role authenticated;
+select qa.no('(D-523) 취소된 초대 링크로는 못 들어옴', $q$select public.accept_workspace_invite('tok-r')$q$);
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+select qa.eq('(D-523) A 는 멤버가 아님', (select count(*)::text from public.workspace_members where workspace_id=:'wv' and user_id=:A), '0');
+delete from public.workspace_members where workspace_id=:'wv' and user_id=:C;
+
 -- 4. portal 표 — 같은 워크스페이스만
 select set_config('request.jwt.claim.sub', :V, false); set role authenticated;
 select qa.ok('V 업체 만들기', format($q$insert into public.operations_clients (id,workspace_id,company_name) values ('11111111-0000-0000-0000-00000000000f',%L,'피해 업체')$q$, :'wv'));

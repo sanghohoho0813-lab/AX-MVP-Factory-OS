@@ -5,6 +5,7 @@
  * D-516 영상 대본(영상마다 한 줄 + 목록 한 줄) · 우리 회사 버전(한 줄) — 줄 이름 · 모양 · 기기 · 빈 대본.
  * D-517 오늘 대화창이 배운 것(별명 · 평가) — 칸 모양 · 예전 기록 · 별명마다 나중 것.
  * D-521 작업공간 전체 내보내기 — 서류 파일 목록 · 3판 모양(예전 불러오기가 그대로 읽음) · 요약 · 못 담은 것 · 서명 주소 0.
+ * D-523 보낸 초대 — 화면 상태(기한 지난 기다림 = 기한 지남) · 남은 날 · 기다리는 것 먼저(곧 만료 순) · 지난 것(최근 순).
  */
 import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
@@ -19,6 +20,7 @@ import { listWorkspaceRows, type WorkspaceModuleRow } from '../moduleData'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntry } from '../../types/bridge'
+import { inviteView, sortInvites, type WorkspaceInvite } from '../../auth/workspaceService'
 
 let passed = 0
 let failed = 0
@@ -201,6 +203,26 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   check('W6a 브라우저 저장 모드면 서버 모듈 기록을 읽지 않는다(null)', (await listWorkspaceRows('ws-1')) === null && (await listWorkspaceRows(null)) === null)
   const local = await collectWorkspaceBackup(null, [a], false)
   check('W6b 브라우저 저장 모드 — 업무 일기(이 브라우저) · 서버 모듈 0 · 못 담은 것 0', local.workspace.mode === 'local' && local.workspace.moduleRows.length === 0 && local.workspace.missing.length === 0 && local.clients.length === 1, local.workspace)
+}
+
+/* I D-523 보낸 초대 */
+{
+  const NOW = Date.parse('2026-11-03T12:00:00.000Z')
+  const inv = (id: string, status: WorkspaceInvite['status'], expiresAt: string, createdAt: string): WorkspaceInvite => ({ id, email: `${id}@x.kr`, role: 'editor', status, expiresAt, createdAt })
+  const list = [
+    inv('a', 'pending', '2026-11-06T13:00:00.000Z', '2026-10-30T00:00:00.000Z'),
+    inv('b', 'pending', '2026-11-04T00:00:00.000Z', '2026-10-28T00:00:00.000Z'),
+    inv('late', 'pending', '2026-11-02T00:00:00.000Z', '2026-10-26T00:00:00.000Z'),
+    inv('in', 'accepted', '2026-11-08T00:00:00.000Z', '2026-11-01T00:00:00.000Z'),
+    inv('off', 'revoked', '2026-11-08T00:00:00.000Z', '2026-10-31T00:00:00.000Z'),
+  ]
+  check('I1 기다림 · 남은 날(올림 · 최소 1)', inviteView(list[0], NOW).state === 'pending' && inviteView(list[0], NOW).daysLeft === 4 && inviteView(list[1], NOW).daysLeft === 1)
+  check('I2 기한이 지난 기다림은 화면에서 기한 지남 · 남은 날 0', inviteView(list[2], NOW).state === 'expired' && inviteView(list[2], NOW).daysLeft === 0)
+  check('I3 들어옴 · 취소는 그대로', inviteView(list[3], NOW).state === 'accepted' && inviteView(list[4], NOW).state === 'revoked')
+  const { open, past } = sortInvites(list, NOW)
+  check('I4 기다리는 것만 위 — 곧 만료 순', open.map((i) => i.id).join() === 'b,a', open.map((i) => i.id))
+  check('I5 지난 것 — 최근 보낸 순(기한 지남 포함)', past.map((i) => i.id).join() === 'in,off,late', past.map((i) => i.id))
+  check('I6 기한을 못 읽으면 기다림으로 두지 않음', inviteView(inv('x', 'pending', '', '2026-11-01T00:00:00.000Z'), NOW).state === 'expired')
 }
 
 console.log(`\npackSync: ${passed} passed, ${failed} failed`)
