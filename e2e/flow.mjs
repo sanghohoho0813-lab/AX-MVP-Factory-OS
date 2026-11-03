@@ -291,6 +291,9 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`전화: 영업 보드 카드에 전화 단추 ${tag}`, (await page.getByTestId('sales-card').getByTestId('call-button').count()) >= 1)
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
+  // D-524 고객 관리 카드에도 전화 단추 — 누르면 카드가 열리지 않고 tel:
+  const cardCall = page.getByTestId('client-card').getByTestId('call-button')
+  check(`전화: 고객 관리 카드에 전화 단추(tel:) ${tag}`, (await cardCall.count()) >= 1 && ((await cardCall.first().getAttribute('href')) ?? '').startsWith('tel:'))
   const allList = await clients(page)
   const todayStr = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
   const lateNames = allList.filter((c) => c.archivedAt == null && c.nextActionDueDate && c.nextActionDueDate < todayStr).map((c) => c.companyName)

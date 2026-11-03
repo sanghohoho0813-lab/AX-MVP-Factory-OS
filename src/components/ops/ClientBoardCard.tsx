@@ -33,6 +33,7 @@ import { SERVICE_OVERDUE_LOOK, SERVICE_STATUS_LOOK } from './serviceStatusLook'
 import { Badge, type Tone } from '../ui/primitives'
 import type { RecoChip } from '../../services/clientInsights'
 import { EDGE_BOX } from '../ui/edge'
+import { CallButton } from './opsControls'
 
 /* ------------------------------------------------------------------ */
 /* 업무 조각                                                            */
@@ -289,6 +290,8 @@ export function ClientBoardCard({
               <Badge tone="success">이상 없음</Badge>
             )}
             {/* D-159: 진행률(%)은 뺐다 — 대표: 몇 % 진행됐는지는 의미가 없다 */}
+            {/* D-524 고객 관리 카드에서도 바로 전화(D-125 — 업체가 나오는 줄마다) — 휴대폰: 고객 → 전화 두 번. 번호가 없으면 단추 없음 */}
+            <CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} />
           </div>
         </div>
 
