@@ -207,7 +207,8 @@ export function WorkspaceMembersPanel() {
             <UserPlus aria-hidden="true" className="size-4 text-brand-600" /> 구성원 초대
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-0 flex-1">
+            {/* D-523 휴대폰에서 이메일 칸이 글자 몇 자 폭으로 눌렸다 — 좁으면 한 줄 전부 */}
+            <div className="min-w-[14rem] flex-1">
               <label htmlFor="invite-email" className="mb-1 block text-[0.875rem] text-slate-500">이메일</label>
               <input
                 id="invite-email"
