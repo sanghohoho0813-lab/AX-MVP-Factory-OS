@@ -11,6 +11,8 @@
  *      휴대폰에서 같은 후보를 펼치면 AI 다시 안 부르고 그 추천 · 'PC에서 씀' · 묶음 줄과 다른 줄
  *   V  D-516 영상 대본 · 우리 회사 버전 — PC 에서 받아 적기(3구간) · 우리 버전 → 영상마다 한 줄(transcript_<영상>) + 목록 한 줄 + 우리 버전 한 줄 ·
  *      휴대폰에서 같은 영상 → 다시 안 부르고 9줄 · 우리 버전 · 'PC에서 씀' · 휴대폰에서 [처음부터 다시 받기] → PC 로 돌아오면 휴대폰 대본으로
+ *   X  D-521 작업공간 전체 내보내기 — 고객 관리 [백업 내려받기] 한 번 → 파일 하나에 업체 · 업무 일기(서버) · 모듈 기록(서버 전부) · 서류 파일 목록 ·
+ *      서버에 쓰기 0 · 모듈 기록을 못 읽으면 나머지로 받고 '못 담은 것' 한 줄 · [백업 불러오기] 가 그 파일을 읽고 '보관용' 한 줄
  *
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
@@ -128,7 +130,7 @@ const ANSWERS = {
 }
 
 /** 서버 한 벌 — 세 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
-const cloud = { rows: new Map(), down: false, writes: [] }
+const cloud = { rows: new Map(), down: false, writes: [], clients: [], journal: [], mut: [] }
 const packsRow = () => cloud.rows.get(ROW_ID)
 const kitsRow = () => cloud.rows.get(KIT_ROW_ID)
 const cloudKits = () => kitsRow()?.payload?.kits ?? {}
@@ -177,6 +179,12 @@ async function device(name, vp, mobile, seed = null) {
       return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
     }
     if (path.includes('/rest/v1/workspaces')) return route.fulfill(json([{ id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' }]))
+    // D-521 내보내기(X) — 업체 · 업무 일기. 읽기 말고 다른 요청이 오면 적어 둔다(내보내기는 쓰기 0)
+    if (path.includes('/rest/v1/operations_clients') || path.includes('/rest/v1/ops_journal_entries')) {
+      const isJ = path.includes('ops_journal_entries')
+      if (method !== 'GET') cloud.mut.push(`${method} ${isJ ? 'journal' : 'clients'}`)
+      return route.fulfill(json(method === 'GET' ? (isJ ? cloud.journal : cloud.clients) : []))
+    }
     if (path.includes('/rest/v1/module_data')) {
       const bucket = (url.searchParams.get('bucket') ?? '').replace(/^eq\./, '')
       if (cloud.down) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'upstream connect error' }) })
@@ -401,6 +409,64 @@ try {
     return a['해성'] === 'client-haesung' && a['미래랩'] === 'client-mirae' && f.up === 3 && f.down?.tooLong === 1
   }))
   check('H2 휴대폰 오늘을 열면 같은 별명 · 평가(다음 답의 말하기 규칙)가 이 기기로', gotH)
+
+  // X D-521 작업공간 전체 내보내기
+  const doc = (o) => ({ received: true, issuedAt: '2026-10-01', fileName: '', fileSize: 0, storagePath: '', note: '', updatedAt: '2026-10-02T01:00:00.000Z', ...o })
+  cloud.clients = [{
+    id: 'client-hansol', workspace_id: WS, company_name: '한솔정밀(주)', status: 'active', next_action: '', next_action_due_date: null,
+    created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-02T00:00:00Z',
+    payload: { documents: {
+      businessRegistration: doc({ fileName: '사업자등록증.pdf', fileSize: 1200, storagePath: `${WS}/client-hansol/businessRegistration/a.pdf`, folderPath: '한솔/기본', uploadedAt: '2026-10-02T02:00:00.000Z' }),
+      corporateRegistry: doc({ fileName: '등기부.pdf', fileSize: 3400, storagePath: `${WS}/client-hansol/corporateRegistry/b.pdf` }),
+      smeCertificate: doc(),
+    } },
+  }]
+  const jrow = (id, type, content, due = null) => ({ id, workspace_id: WS, owner_id: OWNER, entry_date: '2026-11-02', entry_type: type, content, client_id: 'client-hansol', project_id: null, service_key: null, due_date: due, pinned: false, completed: false, completed_at: null, created_at: '2026-11-02T01:00:00Z', updated_at: '2026-11-02T01:00:00Z' })
+  cloud.journal = [jrow('j1', 'note', '상담 메모 — 청년 채용 계획'), jrow('j2', 'follow_up', '납세증명서 받기', '2026-11-06'), jrow('j3', 'call', '대표님 통화')]
+  for (const [id, name] of [['emp-1', '직원 김'], ['emp-2', '직원 이']]) {
+    cloud.rows.set(id, { id, workspace_id: WS, module_key: 'employment', bucket: 'employees', client_id: 'client-hansol', payload: { name }, created_at: '2026-10-05T00:00:00Z', updated_at: '2026-10-05T00:00:00Z' })
+  }
+  const exportOnce = async () => {
+    await pc.page.goto(`${BASE}/ops/clients`, { waitUntil: 'networkidle' })
+    await pc.page.getByRole('button', { name: '더보기' }).first().click()
+    const btn = pc.page.getByTestId('clients-export')
+    await btn.waitFor({ timeout: 8000 })
+    const [dl] = await Promise.all([pc.page.waitForEvent('download', { timeout: 15000 }), btn.click()])
+    const fs = await import('node:fs')
+    const text = fs.readFileSync(await dl.path(), 'utf8')
+    const toast = await pc.page.getByText(/백업을 내려받았어요/).first().innerText({ timeout: 8000 }).catch(() => '')
+    return { name: dl.suggestedFilename(), text, file: JSON.parse(text), toast }
+  }
+  const mutBefore = cloud.mut.length
+  const writesBefore = cloud.writes.length
+  const x1 = await exportOnce()
+  const w = x1.file.workspace ?? {}
+  check('X1a [백업 내려받기] 한 번 → 영문 이름 파일 하나 · 같은 형식 3판 · 업체 1곳', x1.name === `client-ops-workspace-${x1.name.slice(-15, -5)}.json` && x1.file.format === 'ax-client-ops' && x1.file.version === 3 && x1.file.clients?.length === 1, { name: x1.name, v: x1.file.version })
+  check('X1b 업무 일기 3건(서버) · 모듈 기록 = 서버 줄 전부', w.mode === 'cloud' && w.journal?.length === 3 && w.moduleRows?.length === cloud.rows.size && w.summary?.modules?.employment === 2, { j: w.journal?.length, m: w.moduleRows?.length, cloud: cloud.rows.size })
+  const f = (w.files ?? []).find((x) => x.slot === 'businessRegistration')
+  check('X1c 서류 파일 목록 2개 — 업체 · 칸 이름 · 파일 · 폴더 · 저장 위치 · 받기만 한 칸은 빼고', w.files?.length === 2 && f?.company === '한솔정밀(주)' && f?.label === '사업자등록증' && f?.folderPath === '한솔/기본' && f?.storagePath.endsWith('a.pdf'), w.files)
+  check('X1d 열어 볼 수 있는 주소 0 · 못 담은 것 0', !/signedUrl|token=|https?:\/\//i.test(JSON.stringify(w.files)) && (w.missing ?? []).length === 0, w.missing)
+  check('X1e 다 받으면 한 줄 — 업체 · 업무 일기 · 모듈 기록 · 서류 파일 목록', /업체 1곳 · 업무 일기 3건 · 모듈 기록 \d+줄 · 서류 파일 목록 2개/.test(x1.toast), x1.toast)
+  check('X1f 내보내기는 서버에 쓰기 0', cloud.mut.length === mutBefore && cloud.writes.slice(writesBefore).every((x) => x.bucket !== 'employees'), cloud.mut.slice(mutBefore))
+  cloud.down = true
+  const x2 = await exportOnce().catch((e) => ({ file: {}, toast: String(e) }))
+  cloud.down = false
+  check('X2 모듈 기록을 못 읽으면 — 나머지(업체 · 업무 일기)로 받고 못 담은 것을 알림', x2.file.workspace?.missing?.includes('모듈 기록(서버)') && x2.file.workspace?.journal?.length === 3 && /못 담은 것: 모듈 기록/.test(x2.toast), { miss: x2.file.workspace?.missing, toast: x2.toast })
+  // [백업 불러오기] — 같은 파일을 읽고 '보관용' 한 줄(합치지 않고 닫는다)
+  const fs = await import('node:fs')
+  const tmp = `/tmp/claude-0/ws-export-${Date.now()}.json`
+  fs.writeFileSync(tmp, x1.text)
+  await pc.page.getByRole('button', { name: '더보기' }).first().click()
+  const [chooser] = await Promise.all([pc.page.waitForEvent('filechooser'), pc.page.getByRole('button', { name: '백업 불러오기' }).click()])
+  await chooser.setFiles(tmp)
+  const note = await pc.page.getByTestId('restore-ws-note').innerText({ timeout: 8000 }).catch(() => '')
+  check('X3 [백업 불러오기] 가 3판 파일을 읽음 · 업무 일기 · 모듈 기록은 보관용이라고 한 줄', note.includes('업무 일기 3건') && note.includes('보관용'), note)
+  await pc.page.getByRole('button', { name: '취소' }).click()
+  fs.unlinkSync(tmp)
+  cloud.clients = []
+  cloud.journal = []
+  cloud.rows.delete('emp-1')
+  cloud.rows.delete('emp-2')
 
   // K6
   const n6 = Object.keys(cloudPacks()).length

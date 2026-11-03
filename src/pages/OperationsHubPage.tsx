@@ -64,6 +64,7 @@ import {
   normalizeClientOps,
 } from '../services/clientOpsService'
 import { downloadBackup, MODULE_DATA_PREFIX, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
+import { collectWorkspaceBackup, downloadWorkspaceBackup, workspaceBackupLine, workspaceSectionOf, type WorkspaceSummary } from '../services/workspaceExport'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -281,7 +282,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])
   const [migrating, setMigrating] = useState(false)
   /** 백업 파일을 읽은 뒤 합칠지/바꿀지 묻는 단계 */
-  const [restorePrompt, setRestorePrompt] = useState<{ clients: ClientOpsRecord[]; toolInputs: Record<string, string> } | null>(null)
+  const [restorePrompt, setRestorePrompt] = useState<{ clients: ClientOpsRecord[]; toolInputs: Record<string, string>; workspace: WorkspaceSummary | null } | null>(null)
+  /** D-521 작업공간 전체 내보내기 — 업무 일기 · 모듈 기록을 서버에서 모으는 중 */
+  const [exporting, setExporting] = useState(false)
   const { showToast } = useToast()
   const restoreRef = useRef<HTMLInputElement>(null)
 
@@ -519,11 +522,33 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setError('')
     try {
       const text = await file.text()
-      setRestorePrompt({ clients: parseBackup(text), toolInputs: parseBackupToolInputs(text) })
+      setRestorePrompt({ clients: parseBackup(text), toolInputs: parseBackupToolInputs(text), workspace: workspaceSectionOf(text) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
     } finally {
       if (restoreRef.current) restoreRef.current.value = ''
+    }
+  }
+
+  /**
+   * D-521 [백업 내려받기] = 작업공간 전체 — 업체 · 도구 입력값(예전 그대로) + 업무 일기 · 모듈 기록(서버에서 전부) · 서류 파일 목록.
+   * 일부를 못 읽으면 나머지로 받고 못 담은 것을 알린다. 모으기 자체가 실패하면 예전 백업(업체 · 도구 입력값)이라도 받는다.
+   */
+  const onExport = async () => {
+    setExporting(true)
+    setError('')
+    try {
+      const file = await collectWorkspaceBackup(workspaceId, records, getDataModeConfig().mode === 'supabase')
+      downloadWorkspaceBackup(file, today)
+      const miss = file.workspace.missing
+      showToast(`백업을 내려받았어요 — ${workspaceBackupLine(file.workspace.summary)}${miss.length ? ` · 못 담은 것: ${miss.join(', ')}(인터넷을 확인하고 한 번 더 받아 주세요)` : ''}`)
+      setMoreOpen(false)
+    } catch {
+      downloadBackup(records, today)
+      showToast('업무 일기 · 모듈 기록을 모으지 못해 업체 · 입력값만 내려받았어요.')
+      setMoreOpen(false)
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -641,11 +666,15 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={records.length === 0}
-              onClick={() => { downloadBackup(records, today); setError(''); setMoreOpen(false) }}
+              disabled={records.length === 0 || exporting}
+              onClick={() => void onExport()}
+              data-testid="clients-export"
             >
-              <Download aria-hidden="true" className="size-4" />
-              백업 내려받기
+              <Download aria-hidden="true" className="size-4 shrink-0" />
+              <span className="flex min-w-0 flex-col items-start text-left">
+                <span>{exporting ? '모으는 중…' : '백업 내려받기'}</span>
+                <span className="text-xs font-normal break-keep text-slate-500">업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록까지 한 파일</span>
+              </span>
             </Button>
             <Button variant="secondary" className="w-full justify-start" onClick={() => restoreRef.current?.click()} disabled={restoring}>
               <Upload aria-hidden="true" className="size-4" />
@@ -730,6 +759,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           백업에 고객 {restorePrompt?.clients.length ?? 0}곳
           {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구·모듈 기록 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
         </p>
+        {restorePrompt?.workspace && (restorePrompt.workspace.journal > 0 || restorePrompt.workspace.moduleRows > 0) && (
+          <p data-testid="restore-ws-note" className="mt-2 text-[0.92rem] break-keep text-slate-600">
+            이 파일의 업무 일기 {restorePrompt.workspace.journal}건{restorePrompt.workspace.moduleRows > 0 ? ` · 서버 모듈 기록 ${restorePrompt.workspace.moduleRows}줄` : ''}은 보관용이에요 — 불러오기는 업체 · 도구 입력값만 되살리고, 지금 있는 업무 일기 · 모듈 기록은 건드리지 않아요.
+          </p>
+        )}
         <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
           <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
           <li><strong>전부 바꾸기</strong> — 지금 목록을 지우고 백업 내용으로 채웁니다. 되돌릴 수 없습니다.</li>

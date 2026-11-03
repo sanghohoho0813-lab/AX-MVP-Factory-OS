@@ -4,6 +4,7 @@
  * D-515 맞추는 길 하나로(keyedSync) — '이렇게 찍으세요' AI 추천(kitAi)도 같은 길: 한 줄 이름 · 한도 40 · 모양 · 기기 · 맞추는 일.
  * D-516 영상 대본(영상마다 한 줄 + 목록 한 줄) · 우리 회사 버전(한 줄) — 줄 이름 · 모양 · 기기 · 빈 대본.
  * D-517 오늘 대화창이 배운 것(별명 · 평가) — 칸 모양 · 예전 기록 · 별명마다 나중 것.
+ * D-521 작업공간 전체 내보내기 — 서류 파일 목록 · 3판 모양(예전 불러오기가 그대로 읽음) · 요약 · 못 담은 것 · 서명 주소 0.
  */
 import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
@@ -12,6 +13,12 @@ import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '.
 import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
 import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
 import { LEARN_ROW, learnedOf, learnedStore } from '../homeAsk/homeAskStore'
+import { buildWorkspaceBackup, collectWorkspaceBackup, exportFileRows, workspaceBackupFileName, workspaceBackupLine, workspaceSectionOf } from '../workspaceExport'
+import { buildBackup, parseBackup, parseBackupToolInputs } from '../clientOpsBackup'
+import { listWorkspaceRows, type WorkspaceModuleRow } from '../moduleData'
+import { normalizeClientOps } from '../clientOpsService'
+import type { ClientOpsRecord } from '../../types/clientOps'
+import type { JournalEntry } from '../../types/bridge'
 
 let passed = 0
 let failed = 0
@@ -144,6 +151,56 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   sync.push()
   await sync.open(null)
   check('R1 브라우저 저장 모드 · 작업공간 없음 → 읽기 · 올리기 0 · 못 올림 표시 없음', calls === 0 && changed === 0 && sync.failed() === false, { calls, changed })
+}
+
+/* W D-521 작업공간 전체 내보내기 */
+{
+  const doc = (over: Record<string, unknown> = {}) => ({ received: true, issuedAt: '2026-10-01', fileName: '', fileSize: 0, storagePath: '', note: '', updatedAt: '2026-10-02T01:00:00.000Z', ...over })
+  const a = normalizeClientOps({
+    id: 'ca', workspaceId: 'ws-1', companyName: '한솔정밀(주)', status: 'active', createdAt: at(1), updatedAt: at(2),
+    customDocuments: [{ id: 'x1', key: 'customdoc_keep', label: '시험 성적서', validMonths: null, sensitive: false }],
+    documents: {
+      businessRegistration: doc({ fileName: '사업자등록증.pdf', fileSize: 1200, storagePath: 'ws-1/ca/businessRegistration/a.pdf', folderPath: '한솔/기본', uploadedAt: '2026-10-02T02:00:00.000Z' }),
+      smeCertificate: doc(),
+      customdoc_keep: doc({ fileName: '성적서.jpg', storagePath: 'ws-1/ca/customdoc_keep/b.jpg' }),
+      customdoc_gone: doc({ fileName: '남은 파일.pdf', storagePath: 'ws-1/ca/customdoc_gone/c.pdf' }),
+    },
+  } as Partial<ClientOpsRecord>)
+  const b = normalizeClientOps({ id: 'cb', workspaceId: 'ws-1', companyName: '빈 업체', status: 'waiting', createdAt: at(1), updatedAt: at(1) } as Partial<ClientOpsRecord>)
+  const files = exportFileRows([a, b])
+  check('W1a 파일이 붙은 칸만 목록에(받았다고만 적은 칸 · 빈 업체 빼고)', files.length === 3, files.map((f) => f.slot))
+  const br = files.find((f) => f.slot === 'businessRegistration')
+  check('W1b 업체 · 칸 이름 · 파일 이름 · 크기 · 폴더 · 올린 날 · 저장 위치', !!br && br.company === '한솔정밀(주)' && br.label.length > 0 && br.fileName === '사업자등록증.pdf' && br.fileSize === 1200 && br.folderPath === '한솔/기본' && br.uploadedAt === '2026-10-02T02:00:00.000Z' && br.storagePath.endsWith('a.pdf'), br)
+  check('W1c 직접 만든 칸은 그 이름 · 지운 칸에 남은 파일은 (지운 서류 칸)', files.find((f) => f.slot === 'customdoc_keep')?.label === '시험 성적서' && files.find((f) => f.slot === 'customdoc_gone')?.label === '(지운 서류 칸)')
+  check('W1d 올린 날이 없던 예전 파일은 고친 날로', files.find((f) => f.slot === 'customdoc_keep')?.uploadedAt === '2026-10-02T01:00:00.000Z')
+
+  const journal = [
+    { id: 'j1', workspaceId: 'ws-1', ownerId: 'u', entryDate: '2026-11-01', entryType: 'consulting', content: '상담 메모', clientId: 'ca', projectId: null, serviceKey: null, dueDate: '', pinned: false, completed: false, completedAt: null, createdAt: at(3), updatedAt: at(3) },
+    { id: 'j2', workspaceId: 'ws-1', ownerId: 'u', entryDate: '2026-11-02', entryType: 'follow_up', content: '서류 받기', clientId: 'ca', projectId: null, serviceKey: null, dueDate: '2026-11-05', pinned: false, completed: false, completedAt: null, createdAt: at(4), updatedAt: at(4) },
+  ] as unknown as JournalEntry[]
+  const rows: WorkspaceModuleRow[] = [
+    { id: 'r1', clientId: 'ca', data: { name: '직원 1' }, createdAt: at(1), updatedAt: at(2), moduleKey: 'employment', bucket: 'employees' },
+    { id: 'r2', clientId: 'ca', data: { name: '직원 2' }, createdAt: at(1), updatedAt: at(2), moduleKey: 'employment', bucket: 'employees' },
+    { id: 'r3', clientId: '', data: { packs: {} }, createdAt: at(1), updatedAt: at(2), moduleKey: 'marketing', bucket: 'packs' },
+  ]
+  const tools = { 'axmvp.tools.cretop': '{"raw":"붙여넣은 글"}', 'axmvp.module.sales-kit.accounts.local': '[]' }
+  const file = buildWorkspaceBackup({ records: [a, b], journal, moduleRows: rows, toolInputs: tools, mode: 'cloud', workspaceId: 'ws-1', missing: ['업무 일기'] })
+  check('W2a 같은 형식 · 3판 · 업체 수', file.format === 'ax-client-ops' && file.version === 3 && file.count === 2 && file.clients.length === 2)
+  const s = file.workspace.summary
+  check('W2b 요약 — 업체 2 · 받은 서류 4 · 파일 3 · 업무 일기 2 · 모듈 기록 3 · 모듈마다', s.clients === 2 && s.documents === 4 && s.files === 3 && s.journal === 2 && s.moduleRows === 3 && s.modules.employment === 2 && s.modules.marketing === 1, s)
+  check('W2c 이 브라우저에만 있는 모듈 기록 칸도 센다', s.localModuleKeys === 1, s.localModuleKeys)
+  check('W2d 못 담은 것을 감추지 않는다', file.workspace.missing.join() === '업무 일기')
+  const text = JSON.stringify(file)
+  check('W3a 예전 [백업 불러오기] 가 그대로 읽는다 — 업체 · 도구 입력값', parseBackup(text).length === 2 && parseBackupToolInputs(text)['axmvp.tools.cretop'] === '{"raw":"붙여넣은 글"}')
+  check('W3b 3판이면 보관용 요약을 꺼낸다 · 2판이면 없음', workspaceSectionOf(text)?.journal === 2 && workspaceSectionOf(JSON.stringify(buildBackup([a], {}))) === null && workspaceSectionOf('글') === null)
+  check('W4 열어 볼 수 있는 주소(서명 주소 · http) 0', !/signedUrl|token=|https?:\/\//i.test(JSON.stringify(file.workspace.files)))
+  check('W5a 한 줄 요약', workspaceBackupLine(s) === '업체 2곳 · 업무 일기 2건 · 모듈 기록 3줄 · 서류 파일 목록 3개', workspaceBackupLine(s))
+  check('W5b 서버 모듈 기록이 없으면 브라우저 칸 수로', workspaceBackupLine({ ...s, moduleRows: 0 }).includes('모듈 기록 1칸'))
+  check('W5c 파일 이름은 영문(브라우저가 한글 이름을 버림) · 예전 백업과 갈림', /^[\x20-\x7E]+$/.test(workspaceBackupFileName('2026-11-03')) && workspaceBackupFileName('2026-11-03') === 'client-ops-workspace-2026-11-03.json')
+
+  check('W6a 브라우저 저장 모드면 서버 모듈 기록을 읽지 않는다(null)', (await listWorkspaceRows('ws-1')) === null && (await listWorkspaceRows(null)) === null)
+  const local = await collectWorkspaceBackup(null, [a], false)
+  check('W6b 브라우저 저장 모드 — 업무 일기(이 브라우저) · 서버 모듈 0 · 못 담은 것 0', local.workspace.mode === 'local' && local.workspace.moduleRows.length === 0 && local.workspace.missing.length === 0 && local.clients.length === 1, local.workspace)
 }
 
 console.log(`\npackSync: ${passed} passed, ${failed} failed`)

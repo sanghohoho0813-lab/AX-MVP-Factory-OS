@@ -149,6 +149,40 @@ export async function listRows(
   return readLocal(keyOf(moduleKey, bucket, workspaceId))
 }
 
+/** D-521 내보내기용 — 어느 상자 · 갈래의 줄인지까지 */
+export interface WorkspaceModuleRow extends ModuleRow {
+  moduleKey: string
+  bucket: string
+}
+
+/**
+ * D-521 이 작업공간의 모듈 기록 전부(작업공간 전체 내보내기 — 읽기만).
+ * 클라우드 모드가 아니거나 서버 표가 아직 없으면 null — 그때 모듈 기록은 이 브라우저에 있고 백업의 도구 입력값 칸에 이미 담긴다.
+ * 1000줄씩 끝까지 읽는다(안전 상한 50,000줄). 서버가 이 작업공간 구성원에게만 준다(RLS).
+ */
+export async function listWorkspaceRows(workspaceId: string | null): Promise<WorkspaceModuleRow[] | null> {
+  if (!isCloud() || !workspaceId) return null
+  const PAGE = 1000
+  const out: WorkspaceModuleRow[] = []
+  for (let from = 0; from < 50_000; from += PAGE) {
+    const { data, error } = await getSupabaseClient()
+      .from('module_data')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) {
+      if (missingTable(error.message)) return null
+      throw error
+    }
+    const rows = (data ?? []) as Record<string, unknown>[]
+    out.push(...rows.map((row) => ({ ...fromRow(row), moduleKey: String(row.module_key ?? ''), bucket: String(row.bucket ?? '') })))
+    if (rows.length < PAGE) break
+  }
+  return out
+}
+
 export async function saveRow(
   workspaceId: string | null,
   moduleKey: string,
