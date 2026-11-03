@@ -855,8 +855,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               </ul>
             )}
 
-            {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '다가오는 마감 · 약속' 이 화면 밖으로 밀렸다 */}
-            <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4" data-testid="today-side-grid">
+            {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '다가오는 마감 · 약속' 이 화면 밖으로 밀렸다
+                D-522: 칸이 하나뿐이면(대개 업체 약속만) 반쪽에 몰려 줄마다 [업체 열기] 가 다음 줄로 밀렸다 — 하나면 넓게 */}
+            <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:[&>*:only-child]:col-span-2" data-testid="today-side-grid">
               {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
               {hardDue.length > 0 && (
                 <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
