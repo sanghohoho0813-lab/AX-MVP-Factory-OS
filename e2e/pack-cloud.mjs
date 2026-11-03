@@ -385,6 +385,23 @@ try {
   const countV3 = await pc.page.getByTestId('vs-count').innerText().catch(() => '')
   check('V3 휴대폰 [처음부터 다시 받기] → 새 대본이 올라감(기기 휴대폰) → PC 로 돌아오면 휴대폰 대본 · \'휴대폰에서 씀\'', upV3 && backV && /휴대폰에서 씀/.test(countV3), { upV3, backV, countV3 })
 
+  // H 오늘 대화창이 배운 것
+  const learnRow = () => cloud.rows.get(`homelearn_${WSTAG}`)?.payload?.learned ?? {}
+  await pc.page.evaluate(() => {
+    localStorage.setItem('axmvp.home.ask.alias.v1', JSON.stringify({ 해성: 'client-haesung', 미래랩: 'client-mirae' }))
+    localStorage.setItem('axmvp.home.ask.fb.v1', JSON.stringify({ up: 3, down: { tooLong: 1 }, liked: [{ q: '정책자금 되나', headline: '세 가지 확인' }] }))
+  })
+  await pc.page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+  const upH = await waitFor(() => learnRow()['alias:해성']?.client === 'client-haesung' && learnRow().fb?.fb?.up === 3)
+  check('H1 PC 오늘을 열면 대화창이 배운 별명 · 평가(예전 기록)가 클라우드 한 줄(home / ask)로', upH && !!learnRow()['alias:미래랩'] && cloud.rows.get(`homelearn_${WSTAG}`)?.bucket === 'ask', learnRow())
+  await ph.page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+  const gotH = await waitFor(() => ph.page.evaluate(() => {
+    const a = JSON.parse(localStorage.getItem('axmvp.home.ask.alias.v1') ?? '{}')
+    const f = JSON.parse(localStorage.getItem('axmvp.home.ask.fb.v1') ?? '{}')
+    return a['해성'] === 'client-haesung' && a['미래랩'] === 'client-mirae' && f.up === 3 && f.down?.tooLong === 1
+  }))
+  check('H2 휴대폰 오늘을 열면 같은 별명 · 평가(다음 답의 말하기 규칙)가 이 기기로', gotH)
+
   // K6
   const n6 = Object.keys(cloudPacks()).length
   const writesByOld = cloud.writes.filter((w) => w.device === 'old-pc').length

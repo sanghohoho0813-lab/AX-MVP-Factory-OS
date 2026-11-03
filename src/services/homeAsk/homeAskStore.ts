@@ -2,6 +2,8 @@
  * D-497 오늘 대화창 — 대화 · 묻는 중 · 평가 · 별명을 화면 밖(이 모듈)에 둔다.
  * 답을 기다리는 사이 다른 화면으로 가도 답은 여기로 와서 저장되고, 오늘로 돌아오면 그대로 보인다(오른쪽 판 AI 대화와 같은 방식).
  * 저장은 이 기기(axmvp.home.ask.* — 사람별 금고로 옮겨짐 · 대표 ↔ 팀장 섞이지 않음).
+ * D-517 대화창이 배운 것(업체 별명 · 👍👎 평가)은 작업공간 기록에도 — PC 에서 가르친 별명 · 말투를 휴대폰 대화창도 안다(keyedSync · 별명마다 한 칸).
+ *   대화 기록 자체는 이 기기에만 둔다 — 남길 것(업체 사정 · 숫자 · 다음 약속 · 할 일)은 [업체에 기록] · [할 일로] 로 업체 기록에 들어간다(D-502~D-506).
  */
 import { useSyncExternalStore } from 'react'
 import { callAssist, type AssistAnswer } from '../aiAssist/client'
@@ -10,6 +12,7 @@ import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
 import type { TalkAnswer, TalkNext, TalkNumber } from './homeTalk'
+import { keyedCloudSync, type KeyedRowSpec } from '../marketing/keyedSync'
 
 export const HOME_ASK_KEY = 'axmvp.home.ask.v1'
 export const HOME_FB_KEY = 'axmvp.home.ask.fb.v1'
@@ -101,7 +104,89 @@ export const homeAliases = (): Record<string, string> => read(HOME_ALIAS_KEY, pa
 export function addAliases(list: readonly string[], clientId: string): void {
   if (!list.length) return
   write(HOME_ALIAS_KEY, { ...homeAliases(), ...Object.fromEntries(list.map((a) => [a, clientId])) })
+  const at = readLearnAt()
+  const now = new Date().toISOString()
+  for (const a of list) at.aliases[a] = now
+  write(HOME_LEARN_AT_KEY, at)
+  learnCloud.push()
 }
+
+/* ------------------------------------------------------------------ */
+/* D-517 배운 것(별명 · 평가) — 다른 기기에서도                             */
+/* ------------------------------------------------------------------ */
+
+/** 배운 때 — 별명마다 · 평가 한 번(예전 기록에는 없다 → 빈 값 = 가장 예전) */
+const HOME_LEARN_AT_KEY = 'axmvp.home.ask.learnat.v1'
+interface LearnAt {
+  aliases: Record<string, string>
+  fb: string
+}
+const parseLearnAt = (raw: string | null): LearnAt => {
+  const v = (raw ? JSON.parse(raw) : {}) as { aliases?: unknown; fb?: unknown }
+  const aliases = v.aliases && typeof v.aliases === 'object' && !Array.isArray(v.aliases) ? Object.fromEntries(Object.entries(v.aliases as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string')) : {}
+  return { aliases, fb: typeof v.fb === 'string' ? v.fb : '' }
+}
+const readLearnAt = (): LearnAt => read(HOME_LEARN_AT_KEY, parseLearnAt, { aliases: {}, fb: '' })
+
+/** 한 칸 — 별명('alias:별명' → 업체) 또는 평가('fb' → 쌓인 평가) */
+export interface Learned {
+  at: string
+  client?: string
+  fb?: HomeFeedback
+}
+
+/** 클라우드 한 줄 다듬기 — 모르는 칸 · 깨진 값은 버린다 */
+export function learnedOf(v: unknown): Record<string, Learned> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, Learned> = {}
+  for (const [k, x0] of Object.entries(v as Record<string, unknown>)) {
+    const x = x0 as Record<string, unknown>
+    if (!x || typeof x !== 'object' || typeof x.at !== 'string') continue
+    if (k === 'fb' && x.fb && typeof x.fb === 'object') out.fb = { at: x.at, fb: parseFeedback(JSON.stringify(x.fb)) }
+    else if (k.startsWith('alias:') && k.length >= 8 && k.length <= 66 && typeof x.client === 'string' && x.client) out[k] = { at: x.at, client: x.client.slice(0, 80) }
+  }
+  return out
+}
+
+/** 이 기기의 별명 · 평가 → 칸들(배운 때가 없는 예전 기록은 빈 시각 — 클라우드 쪽이 있으면 그쪽이 이긴다) */
+export function learnedStore(aliases: Record<string, string>, fb: HomeFeedback, at: LearnAt): Record<string, Learned> {
+  const out: Record<string, Learned> = {}
+  for (const [a, client] of Object.entries(aliases)) out[`alias:${a}`] = { at: at.aliases[a] ?? '', client }
+  const used = fb.up > 0 || Object.keys(fb.down).length > 0 || fb.liked.length > 0
+  if (used || at.fb) out.fb = { at: at.fb, fb }
+  return out
+}
+
+/** 별명 200 + 평가 1 */
+export const LEARN_ROW: KeyedRowSpec<Learned> = { module: 'home', bucket: 'ask', rowPrefix: 'homelearn_', field: 'learned', max: 201, parse: learnedOf }
+
+const learnCloud = keyedCloudSync<Learned>({
+  ...LEARN_ROW,
+  local: () => learnedStore(homeAliases(), homeFeedback(), readLearnAt()),
+  running: () => new Set(),
+  adopt: (next, keys) => {
+    const aliases = homeAliases()
+    const at = readLearnAt()
+    let fb: HomeFeedback | null = null
+    for (const k of keys) {
+      const x = next[k]
+      if (k === 'fb' && x.fb) {
+        fb = x.fb
+        at.fb = x.at
+      } else if (k.startsWith('alias:') && x.client) {
+        aliases[k.slice(6)] = x.client
+        at.aliases[k.slice(6)] = x.at
+      }
+    }
+    write(HOME_ALIAS_KEY, aliases)
+    if (fb) write(HOME_FB_KEY, fb)
+    write(HOME_LEARN_AT_KEY, at)
+  },
+  changed: () => undefined,
+})
+
+/** 오늘 화면을 열 때 · 돌아올 때 · 인터넷이 다시 될 때 — ws 가 null 이면(팀장 화면 보기 · 브라우저 저장 모드) 올리지 않는다 */
+export const openHomeLearnSync = (ws: string | null): Promise<void> => learnCloud.open(ws)
 
 export interface AskPlan {
   question: string
@@ -181,6 +266,8 @@ export function rateTurn(id: string, vote: { up: true } | { up: false; reason: D
   const t = state.turns.find((x) => x.id === id)
   if (!t) return
   write(HOME_FB_KEY, withFeedback(homeFeedback(), vote.up ? { up: true, q: t.q, headline: t.answer?.headline ?? '' } : vote))
+  write(HOME_LEARN_AT_KEY, { ...readLearnAt(), fb: new Date().toISOString() })
+  learnCloud.push()
   commit((cur) => cur.map((x) => (x.id === id ? { ...x, rated: vote.up ? 'up' : 'down' } : x)))
 }
 

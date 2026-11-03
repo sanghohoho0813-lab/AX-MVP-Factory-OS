@@ -3,6 +3,7 @@
  * 같은지 · 행 id · 저장 모양(기기) · 브라우저 저장 모드에서는 올리지 않음.
  * D-515 맞추는 길 하나로(keyedSync) — '이렇게 찍으세요' AI 추천(kitAi)도 같은 길: 한 줄 이름 · 한도 40 · 모양 · 기기 · 맞추는 일.
  * D-516 영상 대본(영상마다 한 줄 + 목록 한 줄) · 우리 회사 버전(한 줄) — 줄 이름 · 모양 · 기기 · 빈 대본.
+ * D-517 오늘 대화창이 배운 것(별명 · 평가) — 칸 모양 · 예전 기록 · 별명마다 나중 것.
  */
 import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
@@ -10,6 +11,7 @@ import { KIT_MAX, KIT_ROW, kitStoreOf, parseKitStore, type KitAi } from '../mark
 import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '../marketing/keyedSync'
 import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
 import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
+import { LEARN_ROW, learnedOf, learnedStore } from '../homeAsk/homeAskStore'
 
 let passed = 0
 let failed = 0
@@ -106,6 +108,18 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   check('S3 대본 — 기기는 휴대폰 · PC 만 · 빈 대본(처음부터 다시 받기)도 그대로 읽힘(다른 기기 옛 대본을 덮게)', docs[VID]?.device === 'phone' && docs[VID]?.parts.length === 0 && docs.qqqQQQ11111?.device === undefined && docs.qqqQQQ11111?.parts.length === 1)
   const ad = adaptsOf({ [VID]: { at: at(5), model: 'm', withTranscript: true, device: 'pc', answer: { headline: 'h', items: [{ title: '제목' }] } }, x: { at: at(5) } })
   check('S4 우리 버전 모양 — 기기 남김 · 답 없는 칸 버림 · 깨진 값 → 빈 칸', ad[VID]?.device === 'pc' && ad[VID]?.withTranscript === true && !ad.x && Object.keys(adaptsOf(null)).length === 0 && Object.keys(adaptsOf([1])).length === 0)
+}
+
+/* H D-517 대화창이 배운 것 */
+{
+  const fb = { up: 2, down: { tooLong: 1 }, liked: [{ q: '정책자금', headline: '세 가지' }] }
+  const st = learnedStore({ 해성: 'c1', 미래: 'c2' }, fb as never, { aliases: { 해성: at(5) }, fb: at(6) })
+  check('H1 이 기기 → 칸 — 별명마다 한 칸(배운 때 · 없으면 빈 시각) · 평가 한 칸', st['alias:해성']?.client === 'c1' && st['alias:해성']?.at === at(5) && st['alias:미래']?.at === '' && st.fb?.fb?.up === 2 && st.fb?.at === at(6), st)
+  check('H2 평가를 한 번도 안 했으면 평가 칸 없음', !learnedStore({}, { up: 0, down: {}, liked: [] }, { aliases: {}, fb: '' }).fb)
+  const back = learnedOf(JSON.parse(JSON.stringify({ ...st, 'alias:x': { at: at(1), client: 'c3' }, other: { at: at(1) }, 'alias:긴': { at: at(1) }, fb2: { at: at(1), fb: {} } })))
+  check('H3 클라우드 칸 다듬기 — 별명(업체 있는 것) · 평가만 · 모르는 칸 · 업체 없는 별명은 버림', !!back['alias:해성'] && !!back['alias:미래'] && !back.other && !back['alias:긴'] && !back.fb2 && back.fb?.fb?.liked.length === 1 && back.fb?.fb?.down.tooLong === 1, Object.keys(back))
+  const merged = mergeKeyed({ 'alias:해성': { at: at(5), client: 'c1' } }, { 'alias:해성': { at: at(7), client: 'c9' }, 'alias:새': { at: at(6), client: 'c4' } }, LEARN_ROW.max)
+  check('H4 같은 별명은 나중에 배운 업체 · 다른 별명은 모두(합침) · 한 줄에 별명 200 + 평가 1', merged['alias:해성'].client === 'c9' && merged['alias:새'].client === 'c4' && LEARN_ROW.max === 201 && LEARN_ROW.module === 'home')
 }
 
 /* R 맞추는 일 — 브라우저 저장 모드에서는 아무것도 부르지 않음 · 못 올림 표시 없음 */

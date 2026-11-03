@@ -83,7 +83,8 @@ import { localDateOf, nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { Fold, HelpHeading } from '../components/ui/fold'
-import { useIsPilot } from '../auth/osAccess'
+import { useIsPilot, useViewingPilot } from '../auth/osAccess'
+import { openHomeLearnSync } from '../services/homeAsk/homeAskStore'
 import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
@@ -224,6 +225,26 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const isLocal = getDataModeConfig().mode === 'local'
   // D-162: Pilot 은 고객 플랫폼 상담신청 · 영업자 정산을 쓰지 않는다 — 그 칸을 그리지 않는다
   const pilot = useIsPilot()
+  // D-517 대화창이 배운 것(별명 · 평가) — 열 때 · 돌아올 때(15초에 한 번) · 인터넷이 다시 될 때 맞춘다. 팀장 화면 보기에서는 올리지 않음(대표가 배운 것이 팀장 작업공간으로 가지 않게)
+  const viewingPilot = useViewingPilot() !== null
+  useEffect(() => {
+    const ws = viewingPilot ? null : workspaceId
+    void openHomeLearnSync(ws)
+    if (!ws) return
+    let last = Date.now()
+    const again = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 15_000) return
+      last = Date.now()
+      void openHomeLearnSync(ws)
+    }
+    const online = () => void openHomeLearnSync(ws)
+    document.addEventListener('visibilitychange', again)
+    window.addEventListener('online', online)
+    return () => {
+      document.removeEventListener('visibilitychange', again)
+      window.removeEventListener('online', online)
+    }
+  }, [workspaceId, viewingPilot])
 
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
   // D-238: 먼저 제안할 것(가능성 높은 모듈)이 있는 업체 수 — 고객 관리 카드 띠와 같은 판정(지원사업 공고 수는 빼고 모듈 판정만)
