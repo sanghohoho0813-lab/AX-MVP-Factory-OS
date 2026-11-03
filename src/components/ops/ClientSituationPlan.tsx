@@ -61,6 +61,8 @@ export function ClientSituationPlan({
   const [busy, setBusy] = useState(false)
   const [attached, setAttached] = useState<{ key: string; todos: number; asked: number } | null>(null)
   const [printing, setPrinting] = useState(false)
+  // D-510 이 설계서를 고객에게 이렇게 말하세요(설계서 숫자 그대로) — 누를 때만 펼침(일찍 돌아가는 줄보다 위 — 훅 순서)
+  const [talkOpen, setTalkOpen] = useState(false)
   const answering = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -129,8 +131,6 @@ export function ClientSituationPlan({
   const copy = async () => {
     showToast((await copyText(planSummary(plan, record.companyName))) ? '설계서 요약을 복사했어요 — 카톡에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')
   }
-  // D-510 이 설계서를 고객에게 이렇게 말하세요(설계서 숫자 그대로) — 누를 때만 펼침
-  const [talkOpen, setTalkOpen] = useState(false)
 
   return (
     <div ref={boxRef} className="scroll-mt-36">
