@@ -43,6 +43,7 @@ import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, cust
 import { cleanTopic, customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { openPackSync, packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { openKitSync } from '../../services/marketing/kitAi'
+import { openStudySync } from '../../services/marketing/videoStudyRun'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
   PERIOD_HINT,
@@ -343,10 +344,11 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-349 1주일치 — 열 때 클라우드와 맞추고(휴대폰에서 만든 주도 여기서) · 목록으로 모은 뒤 내 콘텐츠를 다시 읽는다
   const weekSyncNow = useMemo(() => weekSync(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // D-514 콘텐츠 묶음 AI 결과 · D-515 '이렇게 찍으세요' AI 추천도 같이 맞춘다(팀장 화면 보기에서는 올리지 않음)
+    // D-514 콘텐츠 묶음 AI 결과 · D-515 '이렇게 찍으세요' AI 추천 · D-516 영상 대본 · 우리 버전도 같이 맞춘다(팀장 화면 보기에서는 올리지 않음)
     const aiSync = (ws: string | null) => {
       void openPackSync(ws)
       void openKitSync(ws)
+      void openStudySync(ws)
     }
     if (readOnly) {
       aiSync(null)

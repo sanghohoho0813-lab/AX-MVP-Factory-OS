@@ -2,11 +2,14 @@
  * D-514 콘텐츠 묶음 AI 결과 다른 기기에서도 — 합치기(같은 키워드는 나중 것 · 최근 12개) · 가져올 것 고르기(쓰는 중 빼기) ·
  * 같은지 · 행 id · 저장 모양(기기) · 브라우저 저장 모드에서는 올리지 않음.
  * D-515 맞추는 길 하나로(keyedSync) — '이렇게 찍으세요' AI 추천(kitAi)도 같은 길: 한 줄 이름 · 한도 40 · 모양 · 기기 · 맞추는 일.
+ * D-516 영상 대본(영상마다 한 줄 + 목록 한 줄) · 우리 회사 버전(한 줄) — 줄 이름 · 모양 · 기기 · 빈 대본.
  */
 import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
 import { KIT_MAX, KIT_ROW, kitStoreOf, parseKitStore, type KitAi } from '../marketing/kitAi'
 import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '../marketing/keyedSync'
+import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
+import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
 
 let passed = 0
 let failed = 0
@@ -91,6 +94,18 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   const r = adoptKeyed({ 'w:a': kit(at(5)) }, { 'w:a': kit(at(7), 'phone'), 'w:b': kit(at(6), 'phone') }, new Set(['w:b']), KIT_MAX)
   check('Q5 가져오기 — 나중 것만 · 쓰는 중인 후보는 빼기', r.adopted.join(',') === 'w:a' && r.local['w:a'].device === 'phone' && !r.local['w:b'])
   check('Q6 같은지(기본 표지 = 시각)', sameKeyed({ x: kit(at(5)) }, { x: kit(at(5), 'phone') }) && !sameKeyed({ x: kit(at(5)) }, { x: kit(at(6)) }))
+}
+
+/* S D-516 영상 대본 · 우리 회사 버전 */
+{
+  const VID = 'abcDEF12345'
+  check('S1 줄 이름 — 대본 목록(transcripts) · 영상마다 칸(transcript_<영상>) · 우리 버전(adapts) · 모두 작업공간마다 · 30개', TRANSCRIPT_INDEX_ROW.bucket === 'transcripts' && transcriptBucket(VID) === `transcript_${VID}` && transcriptRowId('ws-1', VID) !== transcriptRowId('ws-2', VID) && transcriptRowId('ws-1', VID).includes(VID) && ADAPT_ROW.bucket === 'adapts' && keyedRowId(ADAPT_ROW.rowPrefix, 'ws-1') !== keyedRowId(TRANSCRIPT_INDEX_ROW.rowPrefix, 'ws-1') && ADAPT_ROW.max === STUDY_KEEP && STUDY_KEEP === 30)
+  const idx = transcriptIndexOf({ [VID]: { at: at(5), title: '영상', parts: 3 }, sample_xx: { at: at(5), parts: 1 }, bad: { at: '어제' }, ['zzzZZZ99999']: { at: at(6), title: 7, parts: 'x' } })
+  check('S2 대본 목록 모양 — 받아 적을 수 있는 영상 번호만 · 시각 틀리면 버림 · 구간 수 숫자만', Object.keys(idx).join(',') === `${VID},zzzZZZ99999` && idx[VID].parts === 3 && idx.zzzZZZ99999.parts === 0 && idx.zzzZZZ99999.title === '', idx)
+  const docs = parseTranscripts(JSON.stringify({ [VID]: { id: VID, title: 't', at: at(5), model: 'm', duration: 600, parts: [], device: 'phone' }, ['qqqQQQ11111']: { id: 'q', title: 't', at: at(4), model: 'm', duration: 60, parts: [{ start: 0, end: 60, status: 'done', lines: [{ t: 1, text: '말' }] }], device: 'tv' } }))
+  check('S3 대본 — 기기는 휴대폰 · PC 만 · 빈 대본(처음부터 다시 받기)도 그대로 읽힘(다른 기기 옛 대본을 덮게)', docs[VID]?.device === 'phone' && docs[VID]?.parts.length === 0 && docs.qqqQQQ11111?.device === undefined && docs.qqqQQQ11111?.parts.length === 1)
+  const ad = adaptsOf({ [VID]: { at: at(5), model: 'm', withTranscript: true, device: 'pc', answer: { headline: 'h', items: [{ title: '제목' }] } }, x: { at: at(5) } })
+  check('S4 우리 버전 모양 — 기기 남김 · 답 없는 칸 버림 · 깨진 값 → 빈 칸', ad[VID]?.device === 'pc' && ad[VID]?.withTranscript === true && !ad.x && Object.keys(adaptsOf(null)).length === 0 && Object.keys(adaptsOf([1])).length === 0)
 }
 
 /* R 맞추는 일 — 브라우저 저장 모드에서는 아무것도 부르지 않음 · 못 올림 표시 없음 */

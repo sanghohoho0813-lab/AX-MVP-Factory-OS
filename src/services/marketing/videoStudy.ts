@@ -85,6 +85,8 @@ export interface TranscriptDoc {
   model: string
   duration: number
   parts: TranscriptPart[]
+  /** D-516 어느 기기에서 받아 적었나(다른 기기에서 열면 'PC에서 씀') — 예전 기록에는 없다 */
+  device?: 'pc' | 'phone'
 }
 
 /**
@@ -149,7 +151,7 @@ export function parseTranscripts(raw: string | null): Record<string, TranscriptD
           : []
         parts.push({ start, end, status: p0.status === 'done' ? 'done' : 'error', lines, headline: str(p0.headline, 300) || undefined, error: p0.status === 'done' ? undefined : str(p0.error, 300) || '받지 못했어요' })
       }
-      out[id] = { id, title: str(d.title, 200), at: str(d.at, 40), model: str(d.model, 80), duration: Number(d.duration) || 0, parts }
+      out[id] = { id, title: str(d.title, 200), at: str(d.at, 40), model: str(d.model, 80), duration: Number(d.duration) || 0, parts, ...(d.device === 'pc' || d.device === 'phone' ? { device: d.device } : {}) }
     }
     return out
   } catch {
@@ -170,11 +172,22 @@ export interface AdaptSaved {
   answer: AssistAnswer
   /** 대본을 보고 썼는지 */
   withTranscript: boolean
+  /** D-516 어느 기기에서 만들었나 — 예전 기록에는 없다 */
+  device?: 'pc' | 'phone'
 }
 
 export function parseAdapts(raw: string | null): Record<string, AdaptSaved> {
   try {
-    const v = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+    return adaptsOf(raw ? (JSON.parse(raw) as unknown) : {})
+  } catch {
+    return {}
+  }
+}
+
+/** D-516 이미 읽은 값(클라우드 한 줄 등)을 같은 규칙으로 다듬기 */
+export function adaptsOf(raw: unknown): Record<string, AdaptSaved> {
+  try {
+    const v = raw as Record<string, unknown>
     if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
     const out: Record<string, AdaptSaved> = {}
     for (const [id, a0] of Object.entries(v)) {
@@ -185,6 +198,7 @@ export function parseAdapts(raw: string | null): Record<string, AdaptSaved> {
         at: str(a.at, 40),
         model: str(a.model, 80),
         withTranscript: a.withTranscript === true,
+        ...(a.device === 'pc' || a.device === 'phone' ? { device: a.device } : {}),
         answer: {
           headline: str(ans.headline, 300),
           items: (ans.items as Record<string, unknown>[]).filter((i) => i && typeof i.title === 'string').slice(0, 12).map((i) => ({ title: str(i.title, 200), tag: str(i.tag, 40) || undefined, detail: str(i.detail, 1000) || undefined, body: str(i.body, 6000) || undefined, outline: Array.isArray(i.outline) ? (i.outline as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 12).map((x) => x.slice(0, 300)) : undefined })),

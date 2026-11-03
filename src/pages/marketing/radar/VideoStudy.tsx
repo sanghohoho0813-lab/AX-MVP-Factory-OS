@@ -5,7 +5,7 @@
  */
 import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
-import { BookmarkPlus, ClipboardCopy, ExternalLink, FileText, Loader2, RotateCcw, Sparkles } from 'lucide-react'
+import { BookmarkPlus, ClipboardCopy, CloudOff, ExternalLink, FileText, Loader2, RotateCcw, Sparkles } from 'lucide-react'
 import { useAiAssistAccess } from '../../../auth/ownerAiAccess'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import { useToast } from '../../../components/ui/toastContext'
@@ -14,7 +14,8 @@ import { todayLocalDate } from '../../../lib/appClock'
 import type { ChannelBrief, IdeaInput } from '../../../services/marketing/radarStore'
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { adaptContext, adaptIdea, adaptItem, adaptText, canTranscribe, clockOf, transcriptContext, transcriptDone, transcriptLines, transcriptSegments, transcriptText } from '../../../services/marketing/videoStudy'
-import { adaptOf, resetTranscript, startAdapt, startTranscript, studyRun, studyVersion, subscribeStudy, transcriptOf } from '../../../services/marketing/videoStudyRun'
+import { adaptOf, resetTranscript, startAdapt, startTranscript, studyCloudFailed, studyRun, studyVersion, subscribeStudy, transcriptOf } from '../../../services/marketing/videoStudyRun'
+import { otherDeviceNote } from '../../../services/marketing/keyedSync'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 
 export interface StudyProps {
@@ -81,6 +82,13 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
 
   return (
     <section className="flex flex-col gap-3" data-ai-assist data-testid="video-study">
+      {/* D-516 클라우드에 못 올림 — 연결되면 다시(평소에는 없음) */}
+      {studyCloudFailed() && (lines.length > 0 || !!a) && run.running === 0 && !run.adapting && (
+        <p role="status" className="t-sub flex items-center gap-1.5 break-keep text-slate-700" data-testid="vs-cloud-failed">
+          <CloudOff aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+          인터넷이 불안해 대본 · 우리 버전을 이 기기에만 남겼어요 — 연결되면 다시 올려요.
+        </p>
+      )}
       {/* 대본 */}
       <div className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-3 sm:p-4" data-testid="vs-transcript">
         <div className="flex flex-wrap items-center gap-2">
@@ -88,7 +96,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
           <p className="t-body flex-1 font-bold whitespace-nowrap text-slate-900">영상 대본</p>
           {lines.length > 0 && (
             <span className="t-meta text-slate-500" data-testid="vs-count">
-              {lines.length}줄 · {gotParts}/{segs.length} 구간{doc?.model ? ` · ${doc.model}` : ''}
+              {lines.length}줄 · {gotParts}/{segs.length} 구간{doc?.model ? ` · ${doc.model}` : ''}{otherDeviceNote(doc?.device) ? ` · ${otherDeviceNote(doc?.device)}` : ''}
             </span>
           )}
         </div>
@@ -150,7 +158,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
                   <ClipboardCopy aria-hidden="true" className="size-4" /> 대본 전체 복사
                 </button>
               )}
-              {doc && run.running === 0 && (
+              {doc && doc.parts.length > 0 && run.running === 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -186,7 +194,7 @@ export function VideoStudy({ v, lessons, study }: { v: RadarVideo; lessons: read
             {run.adapting ? '만드는 중…' : a ? '다시 만들기' : 'AI로 우리 회사 버전 만들기'}
           </button></AiConfirm>
           <ModelPicker popover testId="vs-model" />
-          {a && adapt && <span className="t-meta text-violet-900/70">{adapt.withTranscript ? '대본을 보고 만듦' : '제목 · 숫자로 만듦'} · {adapt.model}</span>}
+          {a && adapt && <span className="t-meta text-violet-900/70" data-testid="vs-adapt-meta">{adapt.withTranscript ? '대본을 보고 만듦' : '제목 · 숫자로 만듦'} · {adapt.model}{otherDeviceNote(adapt.device) ? ` · ${otherDeviceNote(adapt.device)}` : ''}</span>}
         </div>
         {run.adaptError && (
           <p role="alert" className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700" data-testid="vs-adapt-error">

@@ -9,6 +9,8 @@
  *   K6 클라우드 한 줄은 최근 12개까지 · 휴대폰 390 넘침 0 · JS 오류 0
  *   T  D-515 '이렇게 찍으세요' AI 추천도 같은 길 — PC 에서 [AI로 내 채널에 맞게 추천] → 클라우드 한 줄(marketing / kits · mkkits_<작업공간>) ·
  *      휴대폰에서 같은 후보를 펼치면 AI 다시 안 부르고 그 추천 · 'PC에서 씀' · 묶음 줄과 다른 줄
+ *   V  D-516 영상 대본 · 우리 회사 버전 — PC 에서 받아 적기(3구간) · 우리 버전 → 영상마다 한 줄(transcript_<영상>) + 목록 한 줄 + 우리 버전 한 줄 ·
+ *      휴대폰에서 같은 영상 → 다시 안 부르고 9줄 · 우리 버전 · 'PC에서 씀' · 휴대폰에서 [처음부터 다시 받기] → PC 로 돌아오면 휴대폰 대본으로
  *
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
@@ -57,6 +59,26 @@ for (let i = 0; i < 40; i += 1) {
 const WS = '11111111-1111-4111-8111-111111111111'
 const ROW_ID = `mkpacks_${WS.replace(/[^a-zA-Z0-9]/g, '')}`
 const KIT_ROW_ID = `mkkits_${WS.replace(/[^a-zA-Z0-9]/g, '')}`
+const WSTAG = WS.replace(/[^a-zA-Z0-9]/g, '')
+const feed = { on: false }
+const VID = 'vidQAa1xxxx'
+const FEED_NOW = Date.now()
+const FEED = {
+  fetchedAt: new Date(FEED_NOW - 2 * 3600_000).toISOString(),
+  channels: [{ id: 'UCa', handle: '@UCa', title: '로뎀세무법인', customUrl: '@UCa', thumb: '', subs: 150_000, videoCount: 120, views: 30_000_000, mine: false }],
+  videos: [{ id: VID, ch: 'UCa', t: '세무 기장 수수료 전부 공개합니다', at: new Date(FEED_NOW - 86400_000).toISOString(), d: 1421, v: 120_000, l: 3600, c: 480 }],
+  failed: [],
+  units: 20,
+}
+const ADAPT = {
+  headline: '기장료 얼마가 적당할까 — 대표님이 손해 안 보는 기준 3가지',
+  items: [
+    { title: '제목 후보', tag: '제목', outline: ['기장료 이 정도면 적당합니다'] },
+    { title: '첫 문장', tag: '첫 문장', body: '오늘은 기장료가 적당한지 판단하는 기준을 드립니다.' },
+  ],
+  next: [],
+  caution: '',
+}
 const OWNER = '00000000-0000-4000-8000-000000000001'
 const session = {
   access_token: 'qa.' + Buffer.from(JSON.stringify({ sub: OWNER, role: 'authenticated', exp: 4102444800 })).toString('base64url') + '.sig',
@@ -129,10 +151,16 @@ async function device(name, vp, mobile, seed = null) {
     }
   }, [REF, session, WS, seed ? JSON.stringify(seed) : ''])
   const ai = []
+  await ctx.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+  // 영상 목록은 V 에서만(앞 시험은 예시 데이터로 — 이번 주 후보 카드)
+  await ctx.route('**/api/yt-bench**', (r) => (feed.on ? r.fulfill(json(FEED)) : r.fallback()))
   await ctx.route('**/api/ai-assist**', async (route) => {
     const body = route.request().postDataJSON() ?? {}
     ai.push(body.assistId)
-    const a = ANSWERS[body.assistId] ?? { headline: '기타', items: [{ title: '기타' }] }
+    const mm = (x) => `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`
+    const st = body.video?.start ?? 0
+    const tr = { headline: `구간 ${st}`, items: [{ title: mm(st), body: `${name} 구간${st} 첫 말` }, { title: mm(st + 30), body: `${name} 구간${st} 두 번째 말` }, { title: mm(st + 65), body: `${name} 구간${st} 세 번째 말` }], next: [], caution: '' }
+    const a = body.assistId === 'radar.transcript' ? tr : body.assistId === 'radar.adapt' ? ADAPT : (ANSWERS[body.assistId] ?? { headline: '기타', items: [{ title: '기타' }] })
     const run = { requestId: body.requestId, assistId: body.assistId, page: body.page, provider: 'gemini', model: 'gemini-qa', status: 'succeeded', structured: a, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 0, rowsCut: 0 }, createdAt: new Date().toISOString() }
     await route.fulfill(json({ ok: true, run }))
   })
@@ -311,6 +339,51 @@ try {
   const txtT = await t1.kit.getByTestId('radar-kit-ai-result').innerText().catch(() => '')
   await shot(ph.page, 'kit-phone-from-pc')
   check('T2 휴대폰에서 같은 후보를 펼치면 AI 다시 안 부르고 그 추천 · \'PC에서 씀\'', gotT && ph.ai.filter((x) => x === 'radar.kit').length === 0 && /AI 추천이 있어요/.test(barT) && /PC에서 씀/.test(barT) && txtT.includes('AI 추천 첫 문장'), { barT, txt: txtT.slice(0, 120) })
+
+  // V 영상 대본 · 우리 회사 버전
+  const openTop = async (page) => {
+    await page.goto(`${BASE}/marketing/youtube`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(900)
+    await page.getByTestId('yt-view-top').click()
+    await page.waitForTimeout(400)
+    await page.locator('[data-testid="yt-card"]').filter({ hasText: '세무 기장 수수료 전부 공개' }).first().getByTestId('yt-card-thumb').click()
+    await page.getByTestId('radar-video-detail').waitFor()
+  }
+  const twice = async (loc) => {
+    await loc.click()
+    await loc.page().waitForTimeout(450)
+    await loc.click()
+  }
+  const vsRow = () => cloud.rows.get(`mkvs_${VID}_${WSTAG}`)
+  const vsIdx = () => cloud.rows.get(`mkvsidx_${WSTAG}`)?.payload?.videos ?? {}
+  const adapts = () => cloud.rows.get(`mkadapts_${WSTAG}`)?.payload?.adapts ?? {}
+  feed.on = true
+  await openTop(pc.page)
+  await twice(pc.page.getByTestId('vs-get'))
+  await pc.page.waitForFunction(() => document.querySelectorAll('[data-testid="vs-lines"] li').length === 9, null, { timeout: 15000 })
+  await twice(pc.page.getByTestId('vs-adapt-run'))
+  await pc.page.getByTestId('vs-adapt-result').waitFor({ timeout: 10000 })
+  const upV = await waitFor(() => vsIdx()[VID]?.parts === 3 && (vsRow()?.payload?.doc?.parts ?? []).filter((p) => p.status === 'done').length === 3 && !!adapts()[VID])
+  check('V1 PC 받아 적기 3구간 · 우리 버전 → 영상마다 한 줄(transcript_<영상>) · 목록 한 줄(3구간) · 우리 버전 한 줄 · 기기 PC', upV && vsRow()?.bucket === `transcript_${VID}` && vsRow()?.payload?.doc?.device === 'pc' && adapts()[VID]?.device === 'pc' && pc.ai.filter((x) => x === 'radar.transcript').length === 3, { idx: vsIdx(), row: vsRow()?.id, adapt: Object.keys(adapts()) })
+  const phBefore = ph.ai.length
+  await openTop(ph.page)
+  const gotV = await waitFor(async () => (await ph.page.locator('[data-testid="vs-lines"] li').count()) === 9)
+  const countV = await ph.page.getByTestId('vs-count').innerText().catch(() => '')
+  const metaV = await ph.page.getByTestId('vs-adapt-meta').innerText().catch(() => '')
+  const firstV = await ph.page.locator('[data-testid="vs-lines"] li').first().innerText().catch(() => '')
+  await ph.page.getByTestId('vs-transcript').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(ph.page, 'study-phone-from-pc')
+  check('V2 휴대폰에서 같은 영상 → 다시 안 부르고 대본 9줄(PC 글) · 우리 버전 · \'PC에서 씀\'', gotV && ph.ai.length === phBefore && /PC에서 씀/.test(countV) && /PC에서 씀/.test(metaV) && firstV.includes('pc 구간0') && (await ph.page.getByTestId('vs-adapt-result').count()) === 1, { countV, metaV, firstV, ai: ph.ai.slice(phBefore) })
+  ph.page.once('dialog', (d) => void d.accept())
+  await ph.page.getByTestId('vs-reset').click()
+  await ph.page.waitForFunction(() => document.querySelectorAll('[data-testid="vs-lines"] li').length === 9 && document.body.innerText.includes('phone 구간0'), null, { timeout: 15000 }).catch(() => {})
+  const upV3 = await waitFor(() => vsRow()?.payload?.doc?.device === 'phone' && (vsRow()?.payload?.doc?.parts ?? []).filter((p) => p.status === 'done').length === 3)
+  // 창으로 돌아올 때 맞추기는 15초에 한 번(D-350) — 그만큼 지난 뒤 돌아온 것처럼
+  await pc.page.waitForTimeout(15500)
+  await refocus(pc.page)
+  const backV = await waitFor(async () => ((await pc.page.locator('[data-testid="vs-lines"] li').first().innerText().catch(() => '')) || '').includes('phone 구간0'), 10000)
+  const countV3 = await pc.page.getByTestId('vs-count').innerText().catch(() => '')
+  check('V3 휴대폰 [처음부터 다시 받기] → 새 대본이 올라감(기기 휴대폰) → PC 로 돌아오면 휴대폰 대본 · \'휴대폰에서 씀\'', upV3 && backV && /휴대폰에서 씀/.test(countV3), { upV3, backV, countV3 })
 
   // K6
   const n6 = Object.keys(cloudPacks()).length
