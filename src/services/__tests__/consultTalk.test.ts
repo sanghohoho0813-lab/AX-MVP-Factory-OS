@@ -4,7 +4,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
-import { HESITATE, TALK_CAUTION, faqSearch, stepsText, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
+import { HESITATE, TALK_CAUTION, faqSearch, practiceDeck, stepsText, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
 import { runScenarios } from '../scenarios'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { CONSULT_TERMS, splitTerms } from '../consultTerms'
@@ -243,6 +243,15 @@ check(
   allCards.length > 5 && allCards.every((c) => c.steps.length >= 3 && c.steps.length <= 4) && allCards.every((c) => talkText(c).includes(`진행은 이렇게 돼요 — ${stepsText(c.steps)}`)) &&
     f10[0]?.topic === 'policy' && f10[0]?.q === '어떻게 진행돼요?' && f10[0].a.includes('약정') && faqSearch('경정청구 어떻게 진행').some((h) => h.q === '어떻게 진행돼요?' && h.a.includes('2개월')),
   { n: allCards.length, bad: allCards.filter((c) => c.steps.length < 3 || c.steps.length > 4).map((c) => c.topic), f10: f10.map((h) => `${h.topic}:${h.q}`) },
+)
+
+const deck = practiceDeck(ins)
+const pickCards = topPicks(ins).map(talkCard).filter((c): c is NonNullable<typeof c> => !!c)
+check(
+  'T28 미팅 전 연습 — 먼저 제안할 것 문답 + 망설이시면 전부 · 같은 질문 한 번 · 앞 장은 제안마다 첫 질문(제안 순서) · 제안 없으면 망설이시면만',
+  deck.length === new Set(deck.map((d) => d.q + d.a)).size && pickCards.every((c, i) => deck[i]?.q === c.faq[0].q) && deck.filter((d) => d.topic === 'hesitate').length === HESITATE.length &&
+    practiceDeck(emptyIns).every((d) => d.topic === 'hesitate'),
+  deck.slice(0, 5).map((d) => `${d.topic}:${d.q}`),
 )
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)

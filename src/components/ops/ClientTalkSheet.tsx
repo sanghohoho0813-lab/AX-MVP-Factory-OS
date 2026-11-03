@@ -10,10 +10,10 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Copy, MessageCircle, NotebookPen, Printer, Search } from 'lucide-react'
+import { ArrowRight, Copy, GraduationCap, MessageCircle, NotebookPen, Printer, RotateCcw, Search } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { INSIGHT_TONE_LABEL, topPicks, type Insight } from '../../services/clientInsights'
-import { TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, talkCard, talkText, type MeetingScript, type TalkCard } from '../../services/consultTalk'
+import { TALK_CAUTION, faqSearch, meetingScript, practiceDeck, meetingScriptText, talkCard, talkText, type MeetingScript, type TalkCard } from '../../services/consultTalk'
 import { CONSULT_TERMS } from '../../services/consultTerms'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -152,13 +152,79 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
   )
 }
 
+/** D-508 미팅 전 연습 — 한 장에 질문 하나 → 내 말로 먼저 떠올리고 [답 보기] → [다음 질문] */
+function PracticeView({ insights, onExit }: { insights: readonly Insight[]; onExit: () => void }) {
+  const deck = useMemo(() => practiceDeck(insights), [insights])
+  const [i, setI] = useState(0)
+  const [shown, setShown] = useState(false)
+  const done = i >= deck.length
+  const cur = deck[i]
+  const go = (n: number) => {
+    setI(n)
+    setShown(false)
+  }
+  return (
+    <div className="flex flex-col gap-3" data-testid="talk-practice">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">대표님이 이렇게 물으시면 뭐라고 하실 건가요? 먼저 내 말로 떠올리고 답을 보세요.</p>
+        <button type="button" onClick={onExit} className="tap t-sub min-h-10 rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:underline" data-testid="talk-practice-exit">
+          찾기로 돌아가기
+        </button>
+      </div>
+      {done || !cur ? (
+        <div className="flex flex-col items-start gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-4" data-testid="talk-practice-done">
+          <p className="t-card font-bold text-slate-900">{deck.length}가지 다 연습했어요 — 이제 미팅에서 막히지 않을 거예요.</p>
+          <Button size="sm" variant="secondary" onClick={() => go(0)} data-testid="talk-practice-again">
+            <RotateCcw aria-hidden="true" className="size-4" /> 처음부터 다시
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-4" data-testid="talk-practice-card" data-topic={cur.topic}>
+          <p className="t-meta flex flex-wrap items-center gap-2 font-semibold text-slate-500">
+            <span data-testid="talk-practice-count">
+              {i + 1} / {deck.length}
+            </span>
+            <span className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-700">{cur.label}</span>
+          </p>
+          <p className="t-card font-bold break-keep text-slate-900">대표님: “{cur.q}”</p>
+          {shown ? (
+            <p className="t-body break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="talk-practice-answer">
+              <TermText text={cur.a} />
+            </p>
+          ) : (
+            <Button variant="primary" className="self-start" onClick={() => setShown(true)} data-testid="talk-practice-show">
+              답 보기
+            </Button>
+          )}
+          {shown && (
+            <Button variant="secondary" className="self-start" onClick={() => go(i + 1)} data-testid="talk-practice-next">
+              {i + 1 < deck.length ? '다음 질문' : '끝내기'} <ArrowRight aria-hidden="true" className="size-4" />
+            </Button>
+          )}
+        </div>
+      )}
+      <p className="t-meta break-keep text-slate-600">※ {TALK_CAUTION}</p>
+    </div>
+  )
+}
+
 /** D-508 대표님이 물은 말 → 가장 가까운 답(모든 모듈 '대표님이 물으면' · 용어 뜻) — 규칙으로 찾는다 */
-function AskFinder() {
+function AskFinder({ insights }: { insights: readonly Insight[] }) {
+  const [practice, setPractice] = useState(false)
   const [q, setQ] = useState('')
   const hits = useMemo(() => faqSearch(q, CONSULT_TERMS), [q])
   const EXAMPLES = ['갚아야 하나요', '직원이 그만두면', '세무조사', '얼마나 걸려요', '인정이자', '생각해 볼게요']
+  if (practice) return <PracticeView insights={insights} onExit={() => setPractice(false)} />
   return (
     <div className="flex flex-col gap-3" data-testid="talk-ask">
+      <button
+        type="button"
+        onClick={() => setPractice(true)}
+        className="tap t-sub flex min-h-11 items-center gap-2 self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:border-slate-300"
+        data-testid="talk-practice-open"
+      >
+        <GraduationCap aria-hidden="true" className="size-4 text-slate-600" /> 미팅 전 연습 — 대표님 질문에 먼저 답해 보기
+      </button>
       <label className="flex flex-col gap-1.5">
         <span className="t-sub font-semibold text-slate-800">대표님이 물은 말을 낱말 한두 개로 적어 보세요</span>
         <span className="relative">
@@ -344,7 +410,7 @@ export function ClientTalkSheet({
               </button>
             ))}
           </div>
-          {cur.id === 'memo' && memo ? <MemoView record={record} insights={insights} asks={asks} memo={memo} /> : cur.id === 'ask' ? <AskFinder /> : cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
+          {cur.id === 'memo' && memo ? <MemoView record={record} insights={insights} asks={asks} memo={memo} /> : cur.id === 'ask' ? <AskFinder insights={insights} /> : cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
         </div>
       </Modal>
       {/* 인쇄 종이 — 미팅 순서만(진단서와 같은 틀: body 바로 아래) */}

@@ -492,6 +492,27 @@ export function scenarioTalk(r: ScenarioRun): TalkCard {
   return { key: r.module, topic, label: r.title, tone: r.state === 'need' ? 'need' : 'maybe', say, basis: r.lines.filter((l) => l !== r.headline).slice(0, 2).join(' · '), easy: t.easy, faq: t.faq, avoid: t.avoid, steps: t.steps }
 }
 
+/**
+ * D-508 미팅 전 연습 — 이 업체 먼저 제안할 것의 '대표님이 물으면' + 망설이시면을 한 장씩(같은 질문은 한 번).
+ * 제안 순서대로 섞어서(제안 1 첫 질문 → 제안 2 첫 질문 → … → 망설이시면) 앞 몇 장만 봐도 모든 제안을 한 번씩 연습한다.
+ */
+export function practiceDeck(insights: readonly Insight[]): FaqHit[] {
+  const cards = topPicks(insights).map(talkCard).filter((c): c is TalkCard => !!c)
+  const lists = [...cards.map((c) => c.faq.map((f) => ({ topic: c.topic, label: c.label, q: f.q, a: f.a }))), HESITATE.map((f) => ({ topic: 'hesitate', label: '대표님이 망설이시면', q: f.q, a: f.a }))]
+  const out: FaqHit[] = []
+  const seen = new Set<string>()
+  for (let i = 0; i < Math.max(0, ...lists.map((l) => l.length)); i++) {
+    for (const l of lists) {
+      const h = l[i]
+      if (h && !seen.has(h.q + h.a)) {
+        seen.add(h.q + h.a)
+        out.push(h)
+      }
+    }
+  }
+  return out
+}
+
 /** 이야기 이름(찾기 결과 표지) */
 export const TOPIC_LABEL: Record<string, string> = {
   policy: '정책자금',

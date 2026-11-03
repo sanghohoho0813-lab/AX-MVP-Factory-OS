@@ -11,7 +11,7 @@
  *   T9 D-509 판정 카드 · 말하기 카드의 용어(인정이자 · 경정청구 …) 점선 밑줄 → 한 줄 뜻
  *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
  *   T11 상황 예시 펼침 [이렇게 말하기] → 같은 계산 결과로 말하기 · 복사 · 접기
- *   T12 [대표님이 물으면 찾기] — 낱말 → 가장 가까운 답 · 용어 뜻 · 못 찾으면 안내
+ *   T12 [대표님이 물으면 찾기] — 낱말 → 가장 가까운 답 · 용어 뜻 · 못 찾으면 안내 · 미팅 전 연습(한 장씩 · 답 보기 · 다음)
  *   T13 [미팅 메모] — 여쭤볼 것(미팅 순서와 같은 줄) · 적은 답 → 업무 일기 · 읽은 사정 · 숫자 · 다음 약속 [이 업체에 기록] → 업체 기록 · 미팅 뒤 정리 문자(다음 만남)
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
@@ -60,6 +60,21 @@ const hitTopics = await askBox.getByTestId('talk-ask-hit').evaluateAll((els) => 
 await askBox.getByTestId('talk-ask-input').fill('외계인 우주선')
 const none = (await askBox.getByTestId('talk-ask-none').count()) === 1
 check('T12 대표님이 물으면 찾기 — 예시 단추 · "직원이 그만두면" → 고용 답 · "인정이자" → 용어 뜻 · 엉뚱한 말 → 안내', exN >= 3 && hit1.includes('직원이 금방 그만두면요?') && hitTopics.includes('term') && none, { exN, hit1: hit1.slice(0, 80), hitTopics })
+// T12-1 미팅 전 연습 — 한 장에 질문 하나 · 답은 [답 보기] 뒤에 · 다음 질문 · 찾기로 돌아가기
+await askBox.getByTestId('talk-practice-open').click()
+const pr = sheet.getByTestId('talk-practice')
+await pr.waitFor()
+const c1 = await pr.getByTestId('talk-practice-count').innerText()
+const ans0 = await pr.getByTestId('talk-practice-answer').count()
+await pr.getByTestId('talk-practice-show').click()
+const ans1 = await pr.getByTestId('talk-practice-answer').innerText()
+await pr.getByTestId('talk-practice-next').click()
+const c2 = await pr.getByTestId('talk-practice-count').innerText()
+const ans2 = await pr.getByTestId('talk-practice-answer').count()
+const total = Number(/\/\s*(\d+)/.exec(c1)?.[1] ?? 0)
+check('T12-1 미팅 전 연습 — 1 / N(제안 문답 + 망설이시면) · 답은 누르기 전 숨김 · 다음 질문 → 2 / N · 답 다시 숨김', /^1 \/ \d+$/.test(c1.trim()) && total >= 6 && ans0 === 0 && ans1.length > 10 && c2.trim() === `2 / ${total}` && ans2 === 0, { c1, c2, ans0, ans2 })
+await pr.getByTestId('talk-practice-exit').click()
+check('T12-2 찾기로 돌아가기', (await sheet.getByTestId('talk-ask').count()) === 1)
 await sheet.getByTestId('talk-tab').first().click()
 
 // T2
