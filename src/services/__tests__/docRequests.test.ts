@@ -3,6 +3,7 @@
  * 요청 문구 세 가지(서류 요청 · 받을 자료 · 정책자금 신청 서류)를 줄로 읽기 · 서류함 칸 짝 · 받음(새 발급본은 보낸 뒤 올린 파일만) ·
  * 사람이 [받았어요] · 다시 보냄 · 끝내기 · 남은 것만 다시 요청 문구 · 저장 모양 다듬기 · 고객 관리 · 오늘 한 줄.
  * D-518 서류 단계 — 받음 · 요청함 · 확인할 정보(받은 서류에서 읽었지만 확인 전) · 칸마다 확인할 정보 수.
+ * D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠 단계 · 다음 단계 · 언제 띄우나.
  */
 import { normalizeClientOps, withCustomDocument, withDocument } from '../clientOpsService'
 import { buildDocumentRequestMessage } from '../clientOpsMessages'
@@ -28,6 +29,8 @@ import {
 } from '../docRequests'
 import type { ClientOpsRecord, DocRequest } from '../../types/clientOps'
 import { docReviewCounts, docShelfSummary } from '../docShelf'
+import { firstUseNext, firstUseSteps, firstUseVisible, isNewAccount } from '../firstUse'
+import type { JournalEntry } from '../../types/bridge'
 
 let passed = 0
 let failed = 0
@@ -199,6 +202,29 @@ check('R3c 업체 기록에 붙음 · 끝내지 않은 요청 1', openRequests(r
   check('U3 요청한 서류(아직 안 옴 · 서류함 칸이 있는 것)는 요청함으로 셈', !!req && sum.stages.requested === pendingDocKeys(r2, today).size && sum.stages.requested >= 1, { requested: sum.stages.requested, keys: [...pendingDocKeys(r2, today).keys()] })
   const none = docShelfSummary(base(), today, new Set())
   check('U4 빈 업체 — 받음 0 · 요청함 0 · 확인할 정보 0', none.stages.received === 0 && none.stages.requested === 0 && none.review.length === 0)
+}
+
+/* F D-519 처음 시작 */
+{
+  const fresh = base({ id: 'n1', createdAt: '2026-11-02T00:00:00Z' })
+  const todo = (over: Partial<JournalEntry>): JournalEntry => ({ id: 'j', workspaceId: null, ownerId: null, entryDate: today, entryType: 'note', content: 'x', clientId: null, projectId: null, serviceKey: null, dueDate: '', pinned: false, completed: false, completedAt: null, createdAt: '', updatedAt: '', ...over })
+  const s0 = firstUseSteps({ clients: [], journal: [], ideas: 0, marketing: true })
+  check('F1 업체 0곳 — 네 단계 · 다음 = 첫 업체 등록(새 업체 창) · 오늘 한 줄은 띄우지 않음(빈 화면 안내가 대신)', s0.length === 4 && firstUseNext(s0)?.key === 'client' && firstUseNext(s0)?.href === '/ops/clients?new=1' && !firstUseVisible(s0, [], today))
+  const s1 = firstUseSteps({ clients: [fresh], journal: [], ideas: 0, marketing: true })
+  check('F2 첫 업체만 — 다음 = 서류 올리기 · 그 업체 서류함으로 · 띄움', firstUseNext(s1)?.key === 'doc' && firstUseNext(s1)?.href === '/ops/clients/n1?tab=docs' && firstUseVisible(s1, [fresh], today))
+  const withDoc = withDocument(fresh, 'businessRegistration', { received: true })
+  const s2 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'call', clientId: 'n1' })], ideas: 0, marketing: true })
+  check('F3 서류 하나 — 다음 = 맞춤 추천 · 할 일(통화 기록은 할 일 아님) · 맞춤 추천 탭으로', firstUseNext(s2)?.key === 'todo' && firstUseNext(s2)?.href === '/ops/clients/n1?tab=smart')
+  const s3 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'follow_up', clientId: 'n1', dueDate: '2026-11-05' })], ideas: 0, marketing: true })
+  check('F4 할 일 하나 — 다음 = 첫 콘텐츠(마케팅) · 새 계정(30일 안)이면 띄움', firstUseNext(s3)?.key === 'content' && firstUseVisible(s3, [withDoc], today) && isNewAccount([withDoc], today))
+  const old = { ...withDoc, createdAt: '2026-08-01T00:00:00Z' }
+  check('F5 오래 써 온 계정 — 첫 콘텐츠만 남았으면 띄우지 않음(매일 조르지 않게)', !isNewAccount([old], today) && !firstUseVisible(s3, [old], today))
+  const many = [1, 2, 3, 4].map((i) => ({ ...withDoc, id: `m${i}` }))
+  check('F5b 업체가 4곳 넘으면(이미 쓰는 계정) — 첫 콘텐츠만 남았어도 띄우지 않음', !isNewAccount(many, today) && !firstUseVisible(s3, many, today))
+  const s4 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'follow_up', clientId: 'n1' })], ideas: 2, marketing: true })
+  check('F6 다 함 — 다음 없음 · 안 띄움', firstUseNext(s4) === null && !firstUseVisible(s4, [withDoc], today))
+  const s5 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'follow_up', clientId: 'n1' })], ideas: 0, marketing: false })
+  check('F7 마케팅이 닫힌 계정(팀장) — 세 단계 · 다 했으면 안 띄움', s5.length === 3 && firstUseNext(s5) === null && !firstUseVisible(s5, [withDoc], today))
 }
 
 console.log(`\ndocRequests: ${passed} passed, ${failed} failed`)

@@ -206,6 +206,61 @@ await m.close()
 // D12
 check('D12 JS 오류 0', errs.length === 0, errs.slice(0, 3))
 
+/* ---------------- D-519 처음 시작(오늘 맨 위 한 줄) ---------------- */
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await c.newPage()
+  const e3 = []
+  p.on('pageerror', (e) => e3.push(String(e)))
+  await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await p.evaluate(seedScript())
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  check('F0 오래 써 온 계정(견본) — 처음 시작 한 줄 없음', (await p.getByTestId('today-firstuse').count()) === 0)
+  // 새 계정 모양 — 오늘 등록한 업체 하나 · 서류 · 할 일 없음
+  const setState = (fn) => p.evaluate(fn)
+  await setState(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.createdAt = new Date().toISOString()
+    r.documents = {}
+    r.customDocuments = []
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify([r]))
+    localStorage.setItem('axmvp.v1.ops_journal_entries', '[]')
+  })
+  const clicks = {}
+  const step = async (want, url) => {
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+    const card = p.getByTestId('today-firstuse')
+    await card.waitFor({ timeout: 8000 }).catch(() => {})
+    const next = await card.getAttribute('data-next').catch(() => '')
+    const count = await p.getByTestId('today-firstuse-count').innerText().catch(() => '')
+    await p.getByTestId('today-firstuse-go').click()
+    await p.waitForURL(url, { timeout: 8000 }).catch(() => {})
+    clicks[want] = 1
+    return { next, count, at: p.url() }
+  }
+  const a = await step('doc', /tab=docs/)
+  check('F1 새 계정 업체 하나 — \'처음 시작 1/4 · 다음: 서류 한 장 올리기\' · 단추 한 번 → 그 업체 서류함', a.next === 'doc' && a.count === '처음 시작 1/4' && /\/ops\/clients\/cli_hansol\?tab=docs/.test(a.at), a)
+  await setState(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    all[0].documents = { businessRegistration: { received: true, fileName: '사업자등록증.pdf' } }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  const b2 = await step('todo', /tab=smart/)
+  check('F2 서류 하나 받음 → 2/4 · 다음: 맞춤 추천 보고 할 일 하나 · 한 번 → 맞춤 추천 탭', b2.next === 'todo' && b2.count === '처음 시작 2/4' && /tab=smart/.test(b2.at), b2)
+  await setState(() => {
+    localStorage.setItem('axmvp.v1.ops_journal_entries', JSON.stringify([{ id: 'jf', workspaceId: null, ownerId: null, entryDate: new Date().toISOString().slice(0, 10), entryType: 'follow_up', content: '서류 받기', clientId: 'cli_hansol', projectId: null, serviceKey: null, dueDate: new Date().toISOString().slice(0, 10), pinned: false, completed: false, completedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]))
+  })
+  const c3 = await step('content', /\/marketing/)
+  check('F3 할 일 하나 → 3/4 · 다음: 첫 콘텐츠 · 한 번 → 마케팅', c3.next === 'content' && c3.count === '처음 시작 3/4' && /\/marketing/.test(c3.at), c3)
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.getByTestId('today-firstuse-close').click()
+  await p.reload({ waitUntil: 'networkidle' })
+  check('F4 [닫기] → 새로 고쳐도 안 보임(이 기기)', (await p.getByTestId('today-firstuse').count()) === 0)
+  check('F5 단계마다 오늘에서 한 번 누르면 그 자리(서류함 · 맞춤 추천 · 마케팅) · 오류 0', Object.values(clicks).every((n) => n === 1) && Object.keys(clicks).length === 3 && e3.length === 0, { clicks, e3 })
+  await c.close()
+}
+
 await browser.close()
 console.log(`\nqa:docreq: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

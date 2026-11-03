@@ -88,7 +88,9 @@ import { openHomeLearnSync } from '../services/homeAsk/homeAskStore'
 import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
-import { FirstClientSteps } from '../components/ops/FirstClientSteps'
+import { FirstClientSteps, FirstUseCard } from '../components/ops/FirstClientSteps'
+import { FIRST_USE_CLOSED_KEY, firstUseSteps, firstUseVisible } from '../services/firstUse'
+import { usePilotMarketing } from '../config/pilotMarketing'
 import { PERSONAL_KEY } from '../services/journalKind'
 import { recordMove, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
@@ -381,6 +383,16 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * 위 칸(오늘 할 일 · 업체 약속 · 놓치면 끝나는 기한)에 이미 있는 것은 뺀다.
    */
   const contentDue = useMemo(() => contentAgenda(ideas, today), [ideas, today])
+  // D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠를 다 해 볼 때까지 오늘 맨 위 한 줄
+  const pilotMarketing = usePilotMarketing()
+  const firstSteps = useMemo(() => firstUseSteps({ clients, journal, ideas: ideas.length, marketing: !pilot || pilotMarketing === 'open' }), [clients, journal, ideas, pilot, pilotMarketing])
+  const [firstUseClosed, setFirstUseClosed] = useState(() => {
+    try {
+      return localStorage.getItem(FIRST_USE_CLOSED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const agendaAll = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14, extra: contentDue }), [schedule, journal, clientNames, prospectIds, today, contentDue])
   // 앞으로 올 것을 먼저 — 마감이 지난 업무 · 신청은 아래 한 줄로 접는다(다가오는 것을 밀어내지 않게)
   const agenda = useMemo(() => agendaAll.filter((a) => a.daysLeft >= 0), [agendaAll])
@@ -709,6 +721,22 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </div>
         </HeroFrame>
       </section>
+
+      {/* D-519 처음 시작 — 첫 업체를 등록한 뒤에도 다 해 볼 때까지 '다음: …' 한 줄 + 큰 단추 하나 */}
+      {!loading && !firstUseClosed && firstUseVisible(firstSteps, clients, today) && (
+        <FirstUseCard
+          steps={firstSteps}
+          onGo={(href) => navigate(href)}
+          onClose={() => {
+            setFirstUseClosed(true)
+            try {
+              localStorage.setItem(FIRST_USE_CLOSED_KEY, '1')
+            } catch {
+              /* 이번 접속 동안만 닫힘 */
+            }
+          }}
+        />
+      )}
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}
       {!loading && clients.length === 0 && (
