@@ -119,6 +119,12 @@ if (await pill.count()) {
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
 }
 check('D8b (D-526) 카드 \'서류 요청\' 줄 · \'서류 n/m\' → 그 업체 서류함(한 번)', toDocs && pillOk, { afterClick, toDocs, pillOk })
+// D-527 보기 '서류 덜 받음(요청함)' — 서류를 요청해 두고 덜 받은 업체만
+await page.goto(BASE + '/ops/clients?filter=docs', { waitUntil: 'networkidle' })
+const docsCards = await page.locator('[data-testid="client-card"]').allInnerTexts()
+check('D8c (D-527) 보기 \'서류 덜 받음\' → 요청한 업체만(한솔테크 1곳)', docsCards.length === 1 && docsCards[0].includes('한솔테크'), docsCards.map((t) => t.slice(0, 20)))
+await page.evaluate(() => localStorage.removeItem('axmvp.clients.filter'))
+await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
 
 // D9 — 3일 뒤
 const later = new Date(Date.now() + 3 * 86_400_000)

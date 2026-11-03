@@ -13,16 +13,18 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { CONTRACT_KIND_LABEL, contractStageOf } from '../types/clientOps'
 import { clientOpsProgress } from './clientOpsAlerts'
+import { requestSummary } from './docRequests'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue' | 'late' | 'waiting'
+export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue' | 'late' | 'waiting' | 'docs'
 
-export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'late', 'waiting', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
+export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'late', 'waiting', 'docs', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
 
 export const CLIENT_FILTER_LABEL: Record<ClientFilterKey, string> = {
   all: '전체',
   late: '다음 약속 지남',
   waiting: '고객 회신 대기',
+  docs: '서류 덜 받음(요청함)',
   unpaid: '못 받은 돈 있음',
   overdue: '연체 있음',
   cash: `${CONTRACT_KIND_LABEL.cash} 계약`,
@@ -57,6 +59,11 @@ export function matchesClientFilter(r: ClientOpsRecord, key: ClientFilterKey, to
     case 'waiting':
       // D-126: 고객 회신을 기다리는 업무가 하나라도 있는 업체 — 오늘 화면 '고객 회신 대기' 칸이 여기로 온다
       return Object.values(r.services).some((s) => s.status === 'waiting_client')
+    case 'docs': {
+      // D-527: 고객에게 서류를 요청해 두고(D-512) 아직 다 받지 못한 업체 — "서류 기다리는 데 한 번에 보자"
+      const s = requestSummary(r, today)
+      return s !== null && !s.done
+    }
   }
 }
 

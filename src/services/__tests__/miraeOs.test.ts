@@ -1541,6 +1541,14 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('보기: 키 검사', isClientFilterKey('overdue') && !isClientFilterKey('x') && CLIENT_FILTER_ORDER[0] === 'all')
   // D-125: 다음 약속 지남 — 오늘보다 앞 날짜만(오늘 · 빈 날짜는 아님)
   check('보기: 고객 회신 대기 — waiting_client 업무가 있는 업체만', matchesClientFilter({ ...cash, services: { ...cash.services, ax: { ...cash.services.ax, status: 'waiting_client' } } }, 'waiting', T) && !matchesClientFilter(cash, 'waiting', T))
+  // D-527 서류 덜 받음(요청함) — 끝내지 않은 요청에 아직 안 온 줄이 있을 때만
+  {
+    const req = { id: 'q1', sentAt: '2026-09-10', sentAtIso: '2026-09-10T01:00:00Z', title: '서류 요청', items: [{ label: '납세증명서', where: '홈택스' }] }
+    const asked = { ...cash, docRequests: [req] } as typeof cash
+    const gotAll = { ...cash, docRequests: [{ ...req, items: [{ label: '납세증명서', where: '홈택스', doneAt: '2026-09-12' }] }] } as typeof cash
+    const closedReq = { ...cash, docRequests: [{ ...req, closedAt: '2026-09-12' }] } as typeof cash
+    check('보기(D-527): 서류 덜 받음 — 요청 중 · 다 받음/끝낸 요청 · 요청 없음은 아님', matchesClientFilter(asked, 'docs', T) && !matchesClientFilter(gotAll, 'docs', T) && !matchesClientFilter(closedReq, 'docs', T) && !matchesClientFilter(cash, 'docs', T) && CLIENT_FILTER_ORDER[3] === 'docs')
+  }
   check('보기: 다음 약속 지남', matchesClientFilter({ ...lead, nextActionDueDate: '2026-09-13' }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: T }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: '' }, 'late', T) && CLIENT_FILTER_ORDER[1] === 'late')
 }
 
