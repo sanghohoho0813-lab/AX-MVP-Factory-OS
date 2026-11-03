@@ -27,7 +27,7 @@
 import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Fold } from '../../../components/ui/fold'
 import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
-import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
+import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, CloudOff, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
 import { HintTip } from '../../../components/ui/fold'
@@ -36,7 +36,8 @@ import { shortNum } from '../../../services/marketing/ytBench'
 import { IDEA_STATUS_LABEL, type ContentIdea, type IdeaStatus } from '../../../services/marketing/radarStore'
 import { kitText, shootKit } from '../../../services/marketing/shootKit'
 import { coreChoices, type BrandCore } from '../../../services/marketing/brandAngle'
-import { kitContext, kitError, kitKey, kitRunning, kitSaved, kitVersion, startKitAi, subscribeKit, type KitAi } from '../../../services/marketing/kitAi'
+import { kitCloudFailed, kitContext, kitError, kitKey, kitRunning, kitSaved, kitVersion, startKitAi, subscribeKit, type KitAi } from '../../../services/marketing/kitAi'
+import { otherDeviceNote } from '../../../services/marketing/keyedSync'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { weekStart } from '../../../services/marketing/weekPlan'
 import { todayLocalDate } from '../../../lib/appClock'
@@ -438,7 +439,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
             <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-(--radius-control) bg-violet-50 px-2.5 py-2" data-testid="radar-kit-ai">
               <Sparkles aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
               <span className="t-meta min-w-0 flex-1 basis-40 break-keep text-violet-950">
-                {aiBusy ? 'AI 가 내 채널 기준으로 쓰는 중이에요(10~30초) — 다른 화면으로 가도 답은 남아요.' : aiKit ? `AI 추천이 있어요${aiKit.core ? ` · ${aiKit.core}` : ''}` : '규칙 추천이 아쉬우면 — 채널 설계 기준 전부로 AI 가 다시 써요(누를 때만).'}
+                {aiBusy ? 'AI 가 내 채널 기준으로 쓰는 중이에요(10~30초) — 다른 화면으로 가도 답은 남아요.' : aiKit ? `AI 추천이 있어요${aiKit.core ? ` · ${aiKit.core}` : ''}${otherDeviceNote(aiKit.device) ? ` · ${otherDeviceNote(aiKit.device)}` : ''}` : '규칙 추천이 아쉬우면 — 채널 설계 기준 전부로 AI 가 다시 써요(누를 때만).'}
               </span>
               {!aiBusy && <ModelPicker />}
               <AiConfirm>
@@ -450,6 +451,13 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
               {aiErr && (
                 <p role="alert" className="t-meta basis-full break-keep text-danger-700" data-testid="radar-kit-ai-error">
                   AI 추천을 받지 못했어요 — {aiErr}
+                </p>
+              )}
+              {/* D-515 클라우드에 못 올림 — 연결되면 다시(평소에는 없음) */}
+              {aiKit && !aiBusy && kitCloudFailed() && (
+                <p role="status" className="t-meta flex basis-full items-center gap-1.5 break-keep text-slate-700" data-testid="radar-kit-cloud-failed">
+                  <CloudOff aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+                  인터넷이 불안해 AI 추천을 이 기기에만 남겼어요 — 연결되면 다시 올려요.
                 </p>
               )}
             </div>

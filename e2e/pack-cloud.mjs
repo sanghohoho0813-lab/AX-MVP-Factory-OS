@@ -7,6 +7,8 @@
  *   K4 이 기능 전에 이 브라우저에만 있던 결과(예전 PC) → 마케팅 화면을 열면 클라우드로 올라감 · 다른 기기 결과는 이 브라우저로 들어옴
  *   K5 인터넷이 끊긴 채 AI 로 쓰면 글은 보이고 '이 기기에만 남겼어요' 한 줄 → 인터넷이 다시 되면 올라가고 한 줄 사라짐
  *   K6 클라우드 한 줄은 최근 12개까지 · 휴대폰 390 넘침 0 · JS 오류 0
+ *   T  D-515 '이렇게 찍으세요' AI 추천도 같은 길 — PC 에서 [AI로 내 채널에 맞게 추천] → 클라우드 한 줄(marketing / kits · mkkits_<작업공간>) ·
+ *      휴대폰에서 같은 후보를 펼치면 AI 다시 안 부르고 그 추천 · 'PC에서 씀' · 묶음 줄과 다른 줄
  *
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
@@ -54,6 +56,7 @@ for (let i = 0; i < 40; i += 1) {
 
 const WS = '11111111-1111-4111-8111-111111111111'
 const ROW_ID = `mkpacks_${WS.replace(/[^a-zA-Z0-9]/g, '')}`
+const KIT_ROW_ID = `mkkits_${WS.replace(/[^a-zA-Z0-9]/g, '')}`
 const OWNER = '00000000-0000-4000-8000-000000000001'
 const session = {
   access_token: 'qa.' + Buffer.from(JSON.stringify({ sub: OWNER, role: 'authenticated', exp: 4102444800 })).toString('base64url') + '.sig',
@@ -90,11 +93,23 @@ const ANSWERS = {
     ],
     next: ['AI태그1'],
   },
+  'radar.kit': {
+    headline: 'AI 추천 관점 — AI 는 미끼, 본업으로 대표님이 얻는 것까지',
+    items: [
+      { title: 'AI 추천 제목 숫자형 — 3가지', tag: '제목', when: '숫자형' },
+      { title: 'AI 추천 제목 질문형 — 왜?', tag: '제목', when: '질문형' },
+      { title: '첫 문장', tag: '첫 문장', body: 'AI 추천 첫 문장 — 결과부터 보여 드릴게요' },
+      { title: '썸네일', tag: '썸네일', outline: ['AI 썸네일 하나'] },
+      { title: '구성', tag: '구성', outline: ['0:00 결과 먼저'] },
+    ],
+  },
 }
 
 /** 서버 한 벌 — 세 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
 const cloud = { rows: new Map(), down: false, writes: [] }
 const packsRow = () => cloud.rows.get(ROW_ID)
+const kitsRow = () => cloud.rows.get(KIT_ROW_ID)
+const cloudKits = () => kitsRow()?.payload?.kits ?? {}
 const cloudPacks = () => packsRow()?.payload?.packs ?? {}
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
@@ -105,6 +120,8 @@ async function device(name, vp, mobile, seed = null) {
   await ctx.addInitScript(([ref, s, ws, seedRaw]) => {
     if (!localStorage.getItem(`sb-${ref}-auth-token`)) localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
     localStorage.setItem('axmvp.active_workspace', ws)
+    // '자세히 보기'(이번 주 후보 카드 · 이렇게 찍으세요)는 펼친 채
+    localStorage.setItem('axmvp.fold.mk-more', '1')
     localStorage.setItem('axmvp.onboarding.prefs', '{"tutorialVersion":1,"autoShowEnabled":false,"firstSeenAt":"2026-01-01T00:00:00.000Z","lastShownDate":"2099-01-01","snoozedUntilDate":"2099-12-31","completedChapterIds":["system"],"lastOpenedChapterId":"system","selectedLearningPath":"ax","guideMode":"core","updatedAt":"2026-01-01T00:00:00.000Z"}')
     if (seedRaw && !sessionStorage.getItem('qa.seeded')) {
       localStorage.setItem('axmvp.mkpack.v1', seedRaw)
@@ -186,6 +203,27 @@ const runAi = async (page) => {
   await b.click() // D-289 AI 단추 두 번(한 번 더 묻기)
 }
 
+/** 이번 주 후보 판 — 로컬 미리보기에는 유튜브 함수가 없어 [예시로 보기] 를 눌러야 후보가 생긴다 */
+const openPlan = async (page) => {
+  await page.goto(`${BASE}/marketing?view=plan`, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const sample = page.getByTestId('yt-sample')
+  if (await sample.count()) {
+    await sample.first().click()
+    await page.waitForTimeout(900)
+  }
+  await page.getByTestId('radar-plan').waitFor({ timeout: 10000 })
+}
+const kitOf = async (page, topic) => {
+  const card = topic
+    ? page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+    : page.getByTestId('radar-plan').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
+  const kit = card.getByTestId('radar-kit')
+  if ((await kit.getAttribute('data-open')) !== '1') await kit.getByTestId('radar-kit-toggle').click()
+  await page.waitForTimeout(250)
+  return { card, kit }
+}
+
 const errorsAll = []
 try {
   const pc = await device('pc', { width: 1440, height: 900 }, false)
@@ -253,6 +291,26 @@ try {
   const up5 = await waitFor(() => Object.keys(cloudPacks()[KEY_D]?.sections ?? {}).length >= 4)
   const gone = await waitFor(async () => (await pc.page.getByTestId('mk-pack-cloud-failed').count()) === 0)
   check('K5b 인터넷이 다시 되면 올라가고 한 줄 사라짐', up5 && gone)
+
+  // T '이렇게 찍으세요' AI 추천
+  await openPlan(pc.page)
+  const t0 = await kitOf(pc.page, '')
+  const topic = (await t0.card.getByTestId('radar-opp-topic').innerText()).trim()
+  const kitRun = t0.kit.getByTestId('radar-kit-ai-run')
+  await kitRun.click()
+  await pc.page.waitForTimeout(450)
+  await kitRun.click()
+  await t0.kit.getByTestId('radar-kit-ai-result').waitFor({ timeout: 15000 }).catch(() => {})
+  const upT = await waitFor(() => Object.keys(cloudKits()).length === 1)
+  const kitKey = Object.keys(cloudKits())[0] ?? ''
+  check('T1 PC 에서 AI 추천 → 클라우드 한 줄(marketing / kits) · 그 후보 · 기기 PC · 묶음 줄과 다른 줄', upT && pc.ai.filter((x) => x === 'radar.kit').length === 1 && cloudKits()[kitKey]?.device === 'pc' && kitsRow()?.bucket === 'kits' && kitsRow()?.module_key === 'marketing' && KIT_ROW_ID !== ROW_ID && !!packsRow(), { topic, kitKey, row: kitsRow()?.id })
+  await openPlan(ph.page)
+  const t1 = await kitOf(ph.page, topic)
+  const gotT = await waitFor(async () => (await t1.kit.getByTestId('radar-kit-ai-result').count()) === 1)
+  const barT = await t1.kit.getByTestId('radar-kit-ai').innerText().catch(() => '')
+  const txtT = await t1.kit.getByTestId('radar-kit-ai-result').innerText().catch(() => '')
+  await shot(ph.page, 'kit-phone-from-pc')
+  check('T2 휴대폰에서 같은 후보를 펼치면 AI 다시 안 부르고 그 추천 · \'PC에서 씀\'', gotT && ph.ai.filter((x) => x === 'radar.kit').length === 0 && /AI 추천이 있어요/.test(barT) && /PC에서 씀/.test(barT) && txtT.includes('AI 추천 첫 문장'), { barT, txt: txtT.slice(0, 120) })
 
   // K6
   const n6 = Object.keys(cloudPacks()).length

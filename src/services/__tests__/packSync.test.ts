@@ -1,9 +1,12 @@
 /**
  * D-514 콘텐츠 묶음 AI 결과 다른 기기에서도 — 합치기(같은 키워드는 나중 것 · 최근 12개) · 가져올 것 고르기(쓰는 중 빼기) ·
  * 같은지 · 행 id · 저장 모양(기기) · 브라우저 저장 모드에서는 올리지 않음.
+ * D-515 맞추는 길 하나로(keyedSync) — '이렇게 찍으세요' AI 추천(kitAi)도 같은 길: 한 줄 이름 · 한도 40 · 모양 · 기기 · 맞추는 일.
  */
-import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, type PackStore } from '../marketing/packSync'
+import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
+import { KIT_MAX, KIT_ROW, kitStoreOf, parseKitStore, type KitAi } from '../marketing/kitAi'
+import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '../marketing/keyedSync'
 
 let passed = 0
 let failed = 0
@@ -73,6 +76,46 @@ check('P4a 행 id 는 작업공간마다(다른 작업공간과 안 겹침) · �
   check('P4d 예전 기록(기기 없음)도 그대로 읽힘', parsePackStore(JSON.stringify({ k: saved(at(5)) })).k.device === undefined)
 }
 check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않음', !cloudPacksOn(null) && !cloudPacksOn(undefined) && !cloudPacksOn('ws-1'))
+
+/* Q D-515 '이렇게 찍으세요' AI 추천 — 같은 길 */
+{
+  const kit = (t: string, device?: 'pc' | 'phone'): KitAi => ({ at: t, model: 'm', core: '정책자금', view: '관점', hook: '첫 문장', titles: [{ text: '제목', type: '숫자형' }], thumbs: [], outline: [], ...(device ? { device } : {}) })
+  check('Q1 행 id — 묶음(mkpacks_)과 추천(mkkits_)은 다른 줄 · 같은 작업공간', keyedRowId(KIT_ROW.rowPrefix, 'ws-1').startsWith('mkkits_') && keyedRowId(KIT_ROW.rowPrefix, 'ws-1') !== keyedRowId(PACK_ROW.rowPrefix, 'ws-1') && KIT_ROW.bucket === 'kits' && PACK_ROW.bucket === 'packs' && KIT_ROW.module === 'marketing')
+  const st = kitStoreOf({ a: kit(at(5), 'phone'), b: { ...kit(at(6)), device: 'tablet' }, c: { ...kit('어제') }, d: { ...kit(at(7)), titles: [] }, e: kit(at(8)) })
+  check('Q2 모양 — 기기는 휴대폰 · PC 만 · 시각이 틀리거나 제목 없는 칸은 버림 · 예전 기록(기기 없음) 그대로', st.a.device === 'phone' && !!st.b && st.b.device === undefined && !st.c && !st.d && st.e.device === undefined, Object.keys(st))
+  check('Q3 브라우저 칸 읽기도 같은 규칙(깨진 값 → 빈 칸)', Object.keys(parseKitStore('{')).length === 0 && Object.keys(parseKitStore(JSON.stringify({ a: kit(at(5)) }))).length === 1 && Object.keys(kitStoreOf([1])).length === 0)
+  let many: Record<string, KitAi> = {}
+  for (let i = 0; i < 50; i++) many = { ...many, [`w:k${i}`]: kit(`2026-11-03T0${Math.floor(i / 10)}:${String(i % 60).padStart(2, '0')}:00.000Z`) }
+  const kept = mergeKeyed(many, {}, KIT_ROW.max)
+  check('Q4 추천은 최근 40개(이 브라우저와 같은 한도)', KIT_MAX === 40 && Object.keys(kept).length === 40 && !!kept['w:k49'] && !kept['w:k0'])
+  const r = adoptKeyed({ 'w:a': kit(at(5)) }, { 'w:a': kit(at(7), 'phone'), 'w:b': kit(at(6), 'phone') }, new Set(['w:b']), KIT_MAX)
+  check('Q5 가져오기 — 나중 것만 · 쓰는 중인 후보는 빼기', r.adopted.join(',') === 'w:a' && r.local['w:a'].device === 'phone' && !r.local['w:b'])
+  check('Q6 같은지(기본 표지 = 시각)', sameKeyed({ x: kit(at(5)) }, { x: kit(at(5), 'phone') }) && !sameKeyed({ x: kit(at(5)) }, { x: kit(at(6)) }))
+}
+
+/* R 맞추는 일 — 브라우저 저장 모드에서는 아무것도 부르지 않음 · 못 올림 표시 없음 */
+{
+  let calls = 0
+  let changed = 0
+  const sync = keyedCloudSync<KitAi>({
+    ...KIT_ROW,
+    local: () => {
+      calls += 1
+      return {}
+    },
+    running: () => new Set(),
+    adopt: () => {
+      calls += 1
+    },
+    changed: () => {
+      changed += 1
+    },
+  })
+  await sync.open('ws-1')
+  sync.push()
+  await sync.open(null)
+  check('R1 브라우저 저장 모드 · 작업공간 없음 → 읽기 · 올리기 0 · 못 올림 표시 없음', calls === 0 && changed === 0 && sync.failed() === false, { calls, changed })
+}
 
 console.log(`\npackSync: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

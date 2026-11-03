@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/Button'
 import { Fold, HintTip } from '../../../components/ui/fold'
 import { packBundle } from '../../../services/aiAssist/marketingBuilders'
 import { todayLocalDate } from '../../../lib/appClock'
+import { otherDeviceNote } from '../../../services/marketing/keyedSync'
 import { packAiVersion, packCloudFailed, packRun, packSaved, startPackAi, subscribePackAi, type PartState } from '../../../services/marketing/packAi'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
@@ -299,10 +300,9 @@ export function PackView({
 }
 
 /** D-514 다른 기기에서 쓴 결과면 한마디 — 같은 기기면 아무것도 */
-function otherDevice(saved: PackAiSaved): string {
-  if (!saved.device || typeof window === 'undefined') return ''
-  const here = window.innerWidth < 640 ? 'phone' : 'pc'
-  return saved.device === here ? '' : saved.device === 'phone' ? ' · 휴대폰에서 씀' : ' · PC에서 씀'
+const otherDevice = (saved: PackAiSaved): string => {
+  const n = otherDeviceNote(saved.device)
+  return n ? ` · ${n}` : ''
 }
 
 function AiBar({
