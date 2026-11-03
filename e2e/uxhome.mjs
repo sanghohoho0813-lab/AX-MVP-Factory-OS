@@ -227,7 +227,8 @@ let caseUrl = ''
   const screens = [
     ['AI 전략실', '/ai', 'ai', 'ai-summary', 'ai-next', 'case-list-panel', true],
     ['업체 작업실', caseUrl, 'ai', 'snapshot-fields', 'case-next', 'case-purposes', false],
-    ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'chat-panel', false],
+    // D-511 특허 · 벤처는 대화창이 머리 바로 아래(chatFirst) — 요약 · 지금 할 일은 대화창 아래(휴대폰은 지금 할 일 한 줄이 대화창 위)
+    ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'chat-panel', false, true],
     ['영업 보드', '/sales/board', 'sales', 'sales-summary', 'sales-next', 'sales-board-panel', true],
   ]
   const layout = (pg, ids) =>
@@ -251,25 +252,27 @@ let caseUrl = ''
         over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       }
     }, ids)
-  for (const [name, url, art, summary, next, panel, kpis] of screens) {
+  for (const [name, url, art, summary, next, panel, kpis, chatFirst] of screens) {
     await page.goto(BASE + url, { waitUntil: 'networkidle' })
     await page.getByTestId(next).waitFor({ timeout: 10000 })
     await page.waitForTimeout(400)
     const L = await layout(page, [art, summary, next, panel])
+    const order = chatFirst ? L.hero < L.panel && L.panel < L.next && L.next < L.summary : L.hero < L.summary && L.summary < L.next && L.next < L.panel
     check(
-      `U ${name} 1440 — 머리(그림 '${art}') → 요약 → 지금 할 일 → 본문 판 순서 · 지금 할 일 하나${kpis ? ' · 숫자 칸은 한 판(칸 테두리 0)' : ''}`,
-      L.heroArt === art && L.artShown && L.hero < L.summary && L.summary < L.next && L.next < L.panel && L.nextBars === 1 && (!kpis || L.kpiBorder === '0px') && L.over <= 0,
+      `U ${name} 1440 — 머리(그림 '${art}') → ${chatFirst ? '대화창 → 지금 할 일 → 요약' : '요약 → 지금 할 일 → 본문 판'} 순서 · 지금 할 일 하나${kpis ? ' · 숫자 칸은 한 판(칸 테두리 0)' : ''}`,
+      L.heroArt === art && L.artShown && order && L.nextBars === 1 && (!kpis || L.kpiBorder === '0px') && L.over <= 0,
       L,
     )
   }
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 844 })
-  for (const [name, url, art, summary, next, panel] of screens) {
+  for (const [name, url, art, summary, next, panel, , chatFirst] of screens) {
     await m.goto(BASE + url, { waitUntil: 'networkidle' })
     await m.getByTestId(next).waitFor({ timeout: 10000 })
     await m.waitForTimeout(400)
     const L = await layout(m, [art, summary, next, panel])
-    check(`U ${name} 390 — 머리 → 지금 할 일 → 요약 → 본문 판 · 그림 대신 옅은 빛 · 넘침 0`, L.hero < L.next && L.next < L.summary && L.summary < L.panel && !L.artShown && L.over <= 0, L)
+    const order = chatFirst ? L.hero < L.next && L.next < L.panel && L.panel < L.summary : L.hero < L.next && L.next < L.summary && L.summary < L.panel
+    check(`U ${name} 390 — 머리 → 지금 할 일 → ${chatFirst ? '대화창 → 요약' : '요약 → 본문 판'} · 그림 대신 옅은 빛 · 넘침 0`, order && !L.artShown && L.over <= 0, L)
   }
   await m.close()
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
