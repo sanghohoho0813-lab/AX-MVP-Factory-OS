@@ -90,9 +90,9 @@ export function WorkspaceMembersPanel() {
     if (!currentWorkspaceId || !confirmRevoke) return
     setBusy(true)
     try {
-      await revokeInvite(currentWorkspaceId, confirmRevoke.id)
+      const done = await revokeInvite(currentWorkspaceId, confirmRevoke.id)
       setConfirmRevoke(null)
-      showToast(`${confirmRevoke.email} 초대를 취소했어요 — 그 링크로는 들어올 수 없어요.`)
+      showToast(done ? `${confirmRevoke.email} 초대를 취소했어요 — 그 링크로는 들어올 수 없어요.` : `${confirmRevoke.email} 초대는 그새 들어왔거나 이미 처리됐어요 — 목록을 다시 불러왔어요.`)
       await loadInvites()
     } catch (err) {
       showToast(err instanceof Error ? err.message : '초대를 취소하지 못했습니다.')

@@ -185,15 +185,18 @@ async function device(name, vp, mobile, seed = null) {
     if (path.includes('/rest/v1/workspace_invites')) {
       if (method === 'GET') {
         cloud.inviteReads.push(url.searchParams.get('select') ?? '')
-        return route.fulfill(json(cloud.invites))
+        const st = url.searchParams.get('status') ?? ''
+        const rows = cloud.invites.filter((i) => (st === 'eq.pending' ? i.status === 'pending' : st === 'neq.pending' ? i.status !== 'pending' : true))
+        return route.fulfill(json(rows))
       }
       if (method === 'PATCH') {
         const body = JSON.parse(req.postData() ?? '{}')
         const id = (url.searchParams.get('id') ?? '').replace(/^eq\./, '')
         const onlyPending = url.searchParams.get('status') === 'eq.pending'
         cloud.invitePatches.push({ id, body, onlyPending })
-        for (const inv of cloud.invites) if (inv.id === id && (!onlyPending || inv.status === 'pending')) Object.assign(inv, body)
-        return route.fulfill(json([]))
+        const changed = []
+        for (const inv of cloud.invites) if (inv.id === id && (!onlyPending || inv.status === 'pending')) { Object.assign(inv, body); changed.push({ id: inv.id }) }
+        return route.fulfill(json(changed))
       }
       if (method === 'POST') {
         const body = JSON.parse(req.postData() ?? '{}')
@@ -518,7 +521,8 @@ try {
   await dlg.getByRole('button', { name: '초대 취소' }).click()
   const revoked = await waitFor(() => cloud.invites.find((i) => i.id === 'inv-open')?.status === 'revoked')
   const patch = cloud.invitePatches[0]
-  check('I4 [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만 · 줄은 남음)', askText.includes('teamlead@qa.kr') && revoked && patch?.body?.status === 'revoked' && patch?.onlyPending === true && cloud.invites.length === 4, { askText: askText.slice(0, 80), patch })
+  const revToast = await pc.page.getByText(/초대를 취소했어요/).first().isVisible().catch(() => false)
+  check('I4 [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만 · 줄은 남음) · 취소했다는 알림', askText.includes('teamlead@qa.kr') && revoked && patch?.body?.status === 'revoked' && patch?.onlyPending === true && cloud.invites.length === 4 && revToast, { askText: askText.slice(0, 80), patch, revToast })
   const emptyNow = await waitFor(async () => (await pc.page.getByTestId('invite-row').count()) === 0 && (await sent.innerText()).includes('기다리는 초대가 없어요'))
   check('I5 취소하면 목록에서 빠지고 지난 초대로', emptyNow)
   await pc.page.locator('#invite-email').fill('new@qa.kr')

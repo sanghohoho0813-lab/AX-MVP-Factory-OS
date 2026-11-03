@@ -164,14 +164,14 @@ export function sortInvites(list: readonly WorkspaceInvite[], now: number = Date
 }
 
 export async function listInvites(workspaceId: string): Promise<WorkspaceInvite[]> {
-  const { data, error } = await getSupabaseClient()
-    .from('workspace_invites')
-    .select('id, email, role, status, expires_at, created_at')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  if (error) throw new Error('보낸 초대를 불러오지 못했습니다.')
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+  // 기다리는 초대는 전부(오래돼도 아직 살아 있는 링크를 숨기지 않게) + 지난 초대는 최근 50건
+  const cols = 'id, email, role, status, expires_at, created_at'
+  const [open, past] = await Promise.all([
+    getSupabaseClient().from('workspace_invites').select(cols).eq('workspace_id', workspaceId).eq('status', 'pending').order('created_at', { ascending: false }).limit(500),
+    getSupabaseClient().from('workspace_invites').select(cols).eq('workspace_id', workspaceId).neq('status', 'pending').order('created_at', { ascending: false }).limit(50),
+  ])
+  if (open.error || past.error) throw new Error('보낸 초대를 불러오지 못했습니다.')
+  return ([...(open.data ?? []), ...(past.data ?? [])] as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
     email: String(r.email ?? ''),
     role: (r.role as WorkspaceRole) ?? 'viewer',
@@ -181,15 +181,17 @@ export async function listInvites(workspaceId: string): Promise<WorkspaceInvite[
   }))
 }
 
-/** 기다리는 초대를 취소(상태만 바꾼다 — 이미 수락 · 취소된 것은 그대로) */
-export async function revokeInvite(workspaceId: string, inviteId: string): Promise<void> {
-  const { error } = await getSupabaseClient()
+/** 기다리는 초대를 취소(상태만 바꾼다 — 이미 수락 · 취소된 것은 그대로). 실제로 바꿨으면 true — 그새 들어왔거나 처리됐으면 false */
+export async function revokeInvite(workspaceId: string, inviteId: string): Promise<boolean> {
+  const { data, error } = await getSupabaseClient()
     .from('workspace_invites')
     .update({ status: 'revoked', updated_at: new Date().toISOString() })
     .eq('workspace_id', workspaceId)
     .eq('id', inviteId)
     .eq('status', 'pending')
+    .select('id')
   if (error) throw new Error('초대를 취소하지 못했습니다.')
+  return (data ?? []).length > 0
 }
 
 /** 멤버 역할 변경. */

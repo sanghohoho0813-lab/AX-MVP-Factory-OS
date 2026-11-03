@@ -14,7 +14,7 @@ import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '.
 import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
 import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
 import { LEARN_ROW, learnedOf, learnedStore } from '../homeAsk/homeAskStore'
-import { buildWorkspaceBackup, collectWorkspaceBackup, exportFileRows, workspaceBackupFileName, workspaceBackupLine, workspaceSectionOf } from '../workspaceExport'
+import { buildWorkspaceBackup, collectWorkspaceBackup, exportFileRows, onlyThisWorkspace, workspaceBackupFileName, workspaceBackupLine, workspaceSectionOf } from '../workspaceExport'
 import { buildBackup, parseBackup, parseBackupToolInputs } from '../clientOpsBackup'
 import { listWorkspaceRows, type WorkspaceModuleRow } from '../moduleData'
 import { normalizeClientOps } from '../clientOpsService'
@@ -203,6 +203,7 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   check('W6a 브라우저 저장 모드면 서버 모듈 기록을 읽지 않는다(null)', (await listWorkspaceRows('ws-1')) === null && (await listWorkspaceRows(null)) === null)
   const local = await collectWorkspaceBackup(null, [a], false)
   check('W6b 브라우저 저장 모드 — 업무 일기(이 브라우저) · 서버 모듈 0 · 못 담은 것 0', local.workspace.mode === 'local' && local.workspace.moduleRows.length === 0 && local.workspace.missing.length === 0 && local.clients.length === 1, local.workspace)
+  check('W7 클라우드 — 다른 작업공간 모듈 칸은 빼고 이 작업공간 · 도구 입력값만', JSON.stringify(Object.keys(onlyThisWorkspace({ 'axmvp.module.a.b.ws-1': '1', 'axmvp.module.a.b.ws-2': '2', 'axmvp.module.a.b': '3', 'axmvp.tools.x': '4' }, 'ws-1')).sort()) === JSON.stringify(['axmvp.module.a.b.ws-1', 'axmvp.tools.x']))
 }
 
 /* I D-523 보낸 초대 */

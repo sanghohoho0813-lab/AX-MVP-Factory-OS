@@ -169,7 +169,7 @@ export async function listWorkspaceRows(workspaceId: string | null): Promise<Wor
       .from('module_data')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('updated_at', { ascending: false })
+      // 고정 순서(id) — 내보내는 사이 다른 기기가 저장해도 쪽이 밀려 줄이 겹치거나 빠지지 않게
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1)
     if (error) {

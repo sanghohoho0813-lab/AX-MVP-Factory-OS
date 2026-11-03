@@ -145,6 +145,19 @@ export function workspaceBackupLine(s: WorkspaceSummary): string {
 }
 
 /**
+ * 클라우드 모드 — 이 브라우저의 모듈 기록 칸(`axmvp.module.<모듈>.<갈래>.<작업공간>`) 중 다른 작업공간 것은 빼고 담는다
+ * (같은 브라우저로 다른 작업공간을 본 적이 있어도 그 자료가 이 파일에 섞이지 않게). 도구 입력값은 그대로.
+ */
+export function onlyThisWorkspace(inputs: Record<string, string>, workspaceId: string | null): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(inputs)) {
+    if (k.startsWith(MODULE_DATA_PREFIX) && !(workspaceId && k.endsWith(`.${workspaceId}`))) continue
+    out[k] = v
+  }
+  return out
+}
+
+/**
  * 이 작업공간 자료를 모은다 — 업무 일기 · 모듈 기록은 서버에서 다시 읽는다(화면에 띄운 것만이 아니라 전부).
  * 한쪽을 못 읽어도(인터넷 · 권한) 나머지로 파일을 만들고 missing 에 적는다.
  */
@@ -157,7 +170,7 @@ export async function collectWorkspaceBackup(workspaceId: string | null, records
     records,
     journal: journal.status === 'fulfilled' ? journal.value : [],
     moduleRows: rows.status === 'fulfilled' ? rows.value ?? [] : [],
-    toolInputs: readToolInputs(),
+    toolInputs: cloud ? onlyThisWorkspace(readToolInputs(), workspaceId) : readToolInputs(),
     mode: cloud ? 'cloud' : 'local',
     workspaceId,
     missing,
