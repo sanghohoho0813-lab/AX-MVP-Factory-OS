@@ -39,7 +39,7 @@ import { judge, VERDICT_LABEL } from '../tools/startupTax/lib/judgement'
 import { startupCreditOverlap, startupCreditOverlapLine } from '../tools/startupTax/lib/rules'
 import { josa } from '../lib/josa'
 
-export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire' | 'corp-convert'
+export type PlanId = 'hire-youth' | 'hire-senior' | 'lab-start' | 'startup-hire' | 'corp-convert' | 'hire-woman' | 'hire-disabled'
 
 export interface PlanDef {
   id: PlanId
@@ -63,7 +63,19 @@ export const SITUATION_PLANS: readonly PlanDef[] = [
   { id: 'startup-hire', label: '창업 5년 안 채용', preset: 'startup-new', hiring: 'emp-youth', counts: [1, 2, 3], defaultCount: 1, when: '창업감면 기간(5년) 안에 청년을 뽑을 때 — 창업감면 · 지원금 · 세액공제 · 정책자금' },
   // D-385 개인사업자 법인전환 — 세금 차이(계산기 03 · 01 · 05 식 그대로) · 정책자금 '법인전환 기업' 가점 · 진행 순서. 법인 업체에는 보이지 않는다
   { id: 'corp-convert', label: '법인전환', preset: 'calc-t9-convert', counts: [1], defaultCount: 1, when: '개인사업자 사업소득이 커졌을 때 — 법인으로 바꾸면 덜 내는 세금 · 정책자금 가점 · 진행 순서' },
+  // D-510 채용 상황 둘 더 — 상황 예시(채용 진단 같은 단추 값) · 통합고용세액공제 '청년 등'(장애인 · 경력단절 여성 포함) 같은 식
+  { id: 'hire-woman', label: '경력단절 여성 채용', preset: 'emp-woman', counts: [1, 2, 3], defaultCount: 1, when: '육아 · 가사로 일을 쉬었던 여성을 정규직으로 뽑을 때 — 지원금 · 세액공제 · 정책자금 가점' },
+  { id: 'hire-disabled', label: '장애인 채용', preset: 'emp-disabled', counts: [1, 2, 3], defaultCount: 1, when: '장애인을 정규직으로 새로 뽑을 때 — 지원금 · 세액공제 · 정책자금 가점' },
 ]
+
+/** 채용 상황마다 세액공제 줄의 '누가' · 그 사람이 '청년 등' 단가를 받는 요건(세무사 확인) */
+const HIRE_WHO: Partial<Record<PlanId, { who: string; note?: string }>> = {
+  'hire-youth': { who: '청년' },
+  'startup-hire': { who: '청년' },
+  'hire-senior': { who: '만 60세 이상' },
+  'hire-woman': { who: '경력단절 여성', note: '★ 경력단절 여성은 세법 요건(결혼 · 임신 · 출산 · 육아 · 자녀교육으로 그만둔 뒤 정해진 기간 안에 재취업 등)이 맞아야 청년 등 단가 — 세무사 확인' },
+  'hire-disabled': { who: '장애인', note: '★ 장애인 근로자(등록 장애인 · 상이 국가유공자 등)라야 청년 등 단가 — 장애인증명서 · 세무사 확인' },
+}
 
 export function planDef(id: string | null | undefined): PlanDef | null {
   return SITUATION_PLANS.find((p) => p.id === id) ?? null
@@ -75,6 +87,8 @@ export function planTitle(id: PlanId, count: number): string {
   if (id === 'hire-senior') return `만 60세 이상 ${count}명 채용`
   if (id === 'startup-hire') return `창업 5년 안 청년 ${count}명 채용`
   if (id === 'corp-convert') return '개인사업자 → 법인전환'
+  if (id === 'hire-woman') return `경력단절 여성 ${count}명 채용`
+  if (id === 'hire-disabled') return `장애인 ${count}명 채용`
   return `연구원 ${count}명으로 연구소 만들기`
 }
 
@@ -246,7 +260,7 @@ function subsidyBlock(record: ClientOpsRecord, facts: ClientFacts, presetId: str
   }
 }
 
-/** 통합고용세액공제 — 청년 등(만 15~34세 · 만 60세 이상 포함) 상시근로자가 늘어난 만큼(명부 화면과 같은 식) */
+/** 통합고용세액공제 — 청년 등(만 15~34세 · 장애인 · 만 60세 이상 · 경력단절 여성) 상시근로자가 늘어난 만큼(명부 화면과 같은 식) */
 function creditBlock(record: ClientOpsRecord, facts: ClientFacts, count: number, who: string, today: string, extra: readonly string[] = []): PlanBlock {
   const sido = sidoOf(facts)
   const region: RegionType | null = regionTypeOf(sido || null)
@@ -532,7 +546,8 @@ export function buildSituationPlan(id: PlanId, record: ClientOpsRecord, today: s
     const startup = id === 'startup-hire'
     if (startup) blocks.push(startupBlock(record, f, today))
     const { block, main } = subsidyBlock(record, f, def.hiring ?? def.preset, n)
-    blocks.push(block, creditBlock(record, f, n, id === 'hire-senior' ? '만 60세 이상' : '청년', today, startup ? startupCreditNotes(f.establishedAt) : []))
+    const hw = HIRE_WHO[id] ?? { who: '청년' }
+    blocks.push(block, creditBlock(record, f, n, hw.who, today, startup ? startupCreditNotes(f.establishedAt) : hw.note ? [hw.note] : []))
     const pol = policyBlock(record, f, id, today)
     blocks.push(pol)
     actions = hiringActions(today, main, n, pol.state === 'ok', startup)

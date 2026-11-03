@@ -393,8 +393,8 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
 // ---------------- D-242 상황별 한 장 설계서(로드맵 7) — 여러 모듈을 한 장에 · 같은 엔진 · 합계 · 추천 행동 → 붙이기 ----------------
 {
   check(
-    'P1 설계서 4가지(청년 채용 · 만 60세 이상 채용 · 연구소 · 창업 5년 안 채용 D-244) · 제목 · 상황 예시 기준과 같은 preset',
-    SITUATION_PLANS.length === 5 && planTitle('corp-convert', 1) === '개인사업자 → 법인전환' && planTitle('hire-youth', 2) === '청년 2명 채용' && planTitle('startup-hire', 1) === '창업 5년 안 청년 1명 채용' && planDef('startup-hire')?.hiring === 'emp-youth' && scenarioPreset(planDef('startup-hire')!.hiring!) !== null && planDef('lab-start')?.preset === 'lab-two' && planDef('nope') === null && SITUATION_PLANS.every((d) => scenarioPreset(d.preset) !== null),
+    'P1 설계서 7가지(청년 · 만 60세 이상 · 연구소 · 창업 5년 안 채용 D-244 · 법인전환 D-385 · 경력단절 여성 · 장애인 D-510) · 제목 · 상황 예시 기준과 같은 preset',
+    SITUATION_PLANS.length === 7 && planTitle('hire-woman', 2) === '경력단절 여성 2명 채용' && planTitle('corp-convert', 1) === '개인사업자 → 법인전환' && planTitle('hire-youth', 2) === '청년 2명 채용' && planTitle('startup-hire', 1) === '창업 5년 안 청년 1명 채용' && planDef('startup-hire')?.hiring === 'emp-youth' && scenarioPreset(planDef('startup-hire')!.hiring!) !== null && planDef('lab-start')?.preset === 'lab-two' && planDef('nope') === null && SITUATION_PLANS.every((d) => scenarioPreset(d.preset) !== null),
   )
   const youth2 = buildSituationPlan('hire-youth', full, today, 2)
   const sub = youth2.blocks.find((b) => b.key === 'subsidy')!
@@ -503,6 +503,28 @@ check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우�
   // D-334 새로 뽑는 만 60세 이상에게 계속고용장려금(정년 도달 기존 직원용)을 '또는' 으로 보여 주지 않는다
   check('P15b 만 60세 이상 새 채용 — 지원금 줄에 계속고용장려금 없음 · 시니어 인턴십', !senior.blocks.find((b) => b.key === 'subsidy')!.lines.some((l) => l.includes('계속고용')) && senior.blocks.find((b) => b.key === 'subsidy')!.headline.includes('시니어 인턴십'), JSON.stringify(senior.blocks.find((b) => b.key === 'subsidy')?.lines))
   check('P15 만 60세 이상 1명 — 세액공제는 청년 등 단가(만 60세 이상 포함) · 제목', senior.title === '만 60세 이상 1명 채용' && senior.blocks.find((b) => b.key === 'credit')!.won === unit && senior.blocks.find((b) => b.key === 'credit')!.headline.includes('만 60세 이상'), senior.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`))
+}
+
+// ---------------- D-510 상황별 설계서 '경력단절 여성 채용' · '장애인 채용' — 채용 진단 같은 단추 값 · 통합고용 청년 등 단가 · 요건 ★ ----------------
+{
+  const unit = defaultTaxUnits('metro', 'sme', 2026).youth * 10_000
+  const wYes = withScenarioAnswer(full, 'hireWoman', 'yes', '2026-10-01T00:00:00.000Z')
+  const dYes = withScenarioAnswer(full, 'hireDisabled', 'yes', '2026-10-01T00:00:00.000Z')
+  const w = buildSituationPlan('hire-woman', wYes, today, 2)
+  const d = buildSituationPlan('hire-disabled', dYes, today, 1)
+  const cr = (p: typeof w) => p.blocks.find((b) => b.key === 'credit')!
+  const sb = (p: typeof w) => p.blocks.find((b) => b.key === 'subsidy')!
+  check(
+    'P20 경력단절 여성 2명 · 장애인 1명 — 제목 · 세액공제는 청년 등 단가(장애인 · 경력단절 여성 포함) × 사람 수 · 누가 · 요건 ★ 줄 · 지원금 칸 · 정책자금 채용 가점 · 진행 순서',
+    w.title === '경력단절 여성 2명 채용' && d.title === '장애인 1명 채용' && cr(w).won === unit * 2 && cr(d).won === unit && cr(w).headline.includes('경력단절 여성 2명') && cr(d).headline.includes('장애인 1명') &&
+      cr(w).lines.some((l) => l.includes('세법 요건')) && cr(d).lines.some((l) => l.includes('장애인 근로자')) && ['ok', 'none'].includes(sb(w).state) && ['ok', 'none'].includes(sb(d).state) &&
+      w.blocks.some((b) => b.key === 'policy') && w.actions.some((a) => a.id === 'contract') && w.actions.some((a) => a.id === 'tax'),
+    [w.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`), d.blocks.map((b) => `${b.key}:${b.state}:${b.headline}`)],
+  )
+  const ask = buildSituationPlan('hire-woman', full, today, 1).fit
+  const noAns = buildSituationPlan('hire-disabled', withScenarioAnswer(full, 'hireDisabled', 'no', '2026-10-01T00:00:00.000Z'), today, 1).fit
+  const choices = situationChoices(full, today).map((c) => c.def.id)
+  check('P21 맞는지 — 답 없으면 채용 계획 질문(hireWoman) · 아니요면 안 맞음 · 고르는 판에 두 상황(기존 상황 뒤)', ask.kind === 'ask' && ask.question === 'hireWoman' && noAns.kind === 'no' && choices.includes('hire-woman') && choices.includes('hire-disabled'), { ask, noAns, choices })
 }
 
 // ---------------- D-244 상황별 설계서 '창업 5년 안 채용' — 창업감면(판정기 그대로) + 청년 채용(지원금 · 세액공제 · 정책자금) ----------------

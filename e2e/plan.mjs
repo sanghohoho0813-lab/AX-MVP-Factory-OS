@@ -90,7 +90,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 1. 고르는 판 — 맞는 상황이 먼저
   const picks = await page.getByTestId('plan-pick').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-id')}:${e.getAttribute('data-fit')}`))
-  check('고르는 판 4가지 · 맞는 상황(연구소 — 제조 · 직원 12명 · 연구소 없음)이 먼저 · 채용 · 창업 5년 안 채용은 확인', picks.join(',') === 'lab-start:fit,hire-youth:ask,hire-senior:ask,startup-hire:ask', picks.join(','))
+  check('고르는 판 6가지 · 맞는 상황(연구소 — 제조 · 직원 12명 · 연구소 없음)이 먼저 · 채용 · 창업 5년 안 채용 · 경력단절 여성 · 장애인 채용은 확인', picks.join(',') === 'lab-start:fit,hire-youth:ask,hire-senior:ask,startup-hire:ask,hire-woman:ask,hire-disabled:ask', picks.join(','))
   check('처음엔 맞는 상황(연구소 2명)으로 바로 설계 · 왜 이 업체에', (await attr(page, 'data-plan')) === 'lab-start' && (await page.getByTestId('plan-fit').innerText()).includes('왜 이 업체에') && (await page.getByTestId('plan-total-amount').innerText()).includes('2,000만원'))
   if (SHOTS) await page.getByTestId('situation-plan').screenshot({ path: `${SHOTS}/plan-1440-lab.png` })
 
@@ -217,6 +217,19 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const againMsg = await page.getByTestId('plan-attached').innerText()
   check('청년 2명으로 다시 붙이기 — 앞서 건 4개(참여신청 · 계약 · 세무사 · 정책자금)는 다시 안 걸고 새 1차 신청(2명 금액) 1개만', afterAgain - beforeAgain === 1 && againMsg.includes('할 일 1개'), `${beforeAgain}→${afterAgain} ${againMsg}`)
 
+  // 9-2. D-510 경력단절 여성 채용 — 예 → 지원금(채용 진단 그대로) · 세액공제 청년 등 단가 · 요건 ★ 줄 · 장애인 채용도 칩
+  await pick(page, 'hire-woman').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="plan-body"]')?.getAttribute('data-plan') === 'hire-woman')
+  const wAsk = await page.getByTestId('plan-ask').innerText()
+  await page.getByTestId('plan-answer-yes').click()
+  await page.waitForFunction(() => !document.querySelector('[data-testid="plan-ask"]'), null, { timeout: 10000 }).catch(() => {})
+  const wCredit = await page.locator('[data-testid="plan-block"][data-key="credit"]').innerText()
+  const wSub = await page.locator('[data-testid="plan-block"][data-key="subsidy"]').innerText()
+  check('경력단절 여성 채용 — 계획 묻기 → 예 → 세액공제 「경력단절 여성 1명 늘면」 · 세법 요건 ★ · 지원금 칸(채용 진단 그대로) · 기록에 답', wAsk.includes('경력단절') && wCredit.includes('경력단절 여성 1명') && wCredit.includes('세법 요건') && wSub.length > 10 && (await record(page, 'cli_plan'))?.decided?.['scn.hireWoman']?.a === 'yes', { wAsk: wAsk.slice(0, 60), wCredit: wCredit.slice(0, 120), wSub: wSub.slice(0, 80) })
+  await pick(page, 'hire-disabled').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid="plan-body"]')?.getAttribute('data-plan') === 'hire-disabled')
+  check('장애인 채용 칩 → 그 설계(계획 묻기)', (await page.getByTestId('plan-ask').innerText()).includes('장애인'))
+
   // 10. 빈 업체 — 받을 숫자 요청 문구
   await openSmart(page, 'cli_plan_empty')
   // 10-0. D-244 고르지 않은 채 맨 앞 상황(청년 채용)에 '아니요' — 다른 상황으로 넘어가지 않고 안 맞음 · 답 바꾸기
@@ -247,7 +260,7 @@ for (const width of [360, 390]) {
   await seed(page)
   await openSmart(page, 'cli_plan')
   // D-244: 창업 5년 안 채용(창업감면 칸이 더 길다)도 같이 잰다
-  for (const planId of ['hire-youth', 'startup-hire'])
+  for (const planId of ['hire-youth', 'startup-hire', 'hire-woman'])
   for (const scale of ['default', 'extra_large']) {
     if ((await attr(page, 'data-plan')) !== planId) {
       await pick(page, planId).click()
