@@ -431,3 +431,74 @@ export function scenarioTalk(r: ScenarioRun): TalkCard {
   }
   return { key: r.module, topic, label: r.title, tone: r.state === 'need' ? 'need' : 'maybe', say, basis: r.lines.filter((l) => l !== r.headline).slice(0, 2).join(' · '), easy: t.easy, faq: t.faq, avoid: t.avoid }
 }
+
+/** 이야기 이름(찾기 결과 표지) */
+export const TOPIC_LABEL: Record<string, string> = {
+  policy: '정책자금',
+  employment: '고용지원금',
+  'employment-refund': '빠진 공제 돌려받기',
+  lab: '연구소',
+  'lab-refund': '빠진 공제 돌려받기',
+  startup: '창업감면',
+  'startup-refund': '빠진 공제 돌려받기',
+  loan: '가지급금',
+  retire: '퇴직금',
+  pay: '급여 · 배당',
+  convert: '법인전환',
+  tax: '절세',
+  gift: '증여 · 상속',
+  cert: '기업인증',
+  grants: '지원사업',
+}
+
+export interface FaqHit {
+  topic: string
+  label: string
+  q: string
+  a: string
+}
+
+/** 찾기에 쓰는 낱말 — 두 글자 이상 · 조사 · 어미는 뗀다 */
+function tokensOf(text: string): string[] {
+  return text
+    .replace(/[?!.,·()'"“”‘’~\-—]/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|도|만|요|나요|까요|세요|해요|돼요|되나요|인가요|있어요|없어요)$/, ''))
+    .filter((w) => w.length >= 2)
+}
+
+/**
+ * D-508 대표님이 물은 말 → 가장 가까운 '대표님이 물으면' 답(모든 이야기) · 용어 뜻 — 규칙으로 찾는다(AI 아님).
+ * 같은 답이 여러 이야기에 있으면(경정청구 세 가지) 한 번만. 맞는 것이 없으면 빈 목록.
+ */
+export function faqSearch(query: string, terms: Record<string, string> = {}, limit = 5): FaqHit[] {
+  const qs = tokensOf(query)
+  if (!qs.length) return []
+  const hits: (FaqHit & { score: number })[] = []
+  const seen = new Set<string>()
+  for (const [topic, t] of Object.entries(TOPICS)) {
+    const label = TOPIC_LABEL[topic] ?? topic
+    for (const f of t.faq) {
+      if (seen.has(f.q + f.a)) continue
+      let score = 0
+      for (const w of qs) {
+        if (f.q.includes(w)) score += 3
+        if (f.a.includes(w)) score += 1
+        if (label.includes(w)) score += 2
+      }
+      if (score > 0) {
+        seen.add(f.q + f.a)
+        hits.push({ topic, label, q: f.q, a: f.a, score })
+      }
+    }
+  }
+  for (const [term, def] of Object.entries(terms)) {
+    let score = 0
+    for (const w of qs) if (term.includes(w) || w.includes(term)) score += 4
+    if (score > 0) hits.push({ topic: 'term', label: '용어', q: `${josa(term, '이/가')} 뭐예요?`, a: def, score })
+  }
+  return hits
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((h) => ({ topic: h.topic, label: h.label, q: h.q, a: h.a }))
+}

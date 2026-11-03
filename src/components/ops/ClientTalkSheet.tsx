@@ -9,10 +9,11 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Copy, MessageCircle, Printer } from 'lucide-react'
+import { ArrowRight, Copy, MessageCircle, Printer, Search } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { INSIGHT_TONE_LABEL, topPicks, type Insight } from '../../services/clientInsights'
-import { TALK_CAUTION, meetingScript, meetingScriptText, talkCard, talkText, type MeetingScript, type TalkCard } from '../../services/consultTalk'
+import { TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, talkCard, talkText, type MeetingScript, type TalkCard } from '../../services/consultTalk'
+import { CONSULT_TERMS } from '../../services/consultTerms'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { copyText } from '../consulting/studioParts'
@@ -122,6 +123,48 @@ function CardView({ card, ins, onCopy }: { card: TalkCard; ins: Insight; onCopy:
   )
 }
 
+/** D-508 대표님이 물은 말 → 가장 가까운 답(모든 모듈 '대표님이 물으면' · 용어 뜻) — 규칙으로 찾는다 */
+function AskFinder() {
+  const [q, setQ] = useState('')
+  const hits = useMemo(() => faqSearch(q, CONSULT_TERMS), [q])
+  const EXAMPLES = ['갚아야 하나요', '직원이 그만두면', '세무조사', '얼마나 걸려요', '인정이자']
+  return (
+    <div className="flex flex-col gap-3" data-testid="talk-ask">
+      <label className="flex flex-col gap-1.5">
+        <span className="t-sub font-semibold text-slate-800">대표님이 물은 말을 낱말 한두 개로 적어 보세요</span>
+        <span className="relative">
+          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="예: 갚아야 하나요 · 직원 그만두면 · 세무조사" className="t-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white pr-3 pl-9" data-testid="talk-ask-input" />
+        </span>
+      </label>
+      {!q.trim() && (
+        <div className="flex flex-wrap gap-1.5" data-testid="talk-ask-examples">
+          {EXAMPLES.map((x) => (
+            <button key={x} type="button" onClick={() => setQ(x)} className="tap t-sub min-h-10 rounded-full border border-slate-200 bg-white px-3 font-semibold text-slate-700 hover:border-slate-300">
+              {x}
+            </button>
+          ))}
+        </div>
+      )}
+      {q.trim() && hits.length === 0 && <p className="t-sub break-keep text-slate-600" data-testid="talk-ask-none">맞는 답을 못 찾았어요 — 다른 낱말로 적어 보세요(예: 대출 · 직원 · 세금 · 연구소).</p>}
+      {hits.length > 0 && (
+        <ul className="flex flex-col gap-2" data-testid="talk-ask-hits">
+          {hits.map((h) => (
+            <li key={h.q + h.a} className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid="talk-ask-hit" data-topic={h.topic}>
+              <p className="t-meta font-semibold text-slate-500">{h.label}</p>
+              <p className="t-body font-bold break-keep text-slate-900">Q. {h.q}</p>
+              <p className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
+                <TermText text={h.a} />
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="t-meta break-keep text-slate-600">※ {TALK_CAUTION}</p>
+    </div>
+  )
+}
+
 export function ClientTalkSheet({ record, insights, focus, onClose }: { record: ClientOpsRecord; insights: readonly Insight[]; focus?: string | null; onClose: () => void }) {
   const { showToast } = useToast()
   const script = useMemo(() => meetingScript(record, insights), [record, insights])
@@ -132,6 +175,7 @@ export function ClientTalkSheet({ record, insights, focus, onClose }: { record: 
     picks.forEach((p, i) => list.push({ id: p.key, label: `${i + 1} ${p.label}`, card: talkCard(p), ins: p }))
     const f = focus ? insights.find((i) => i.key === focus) : null
     if (f && !picks.some((p) => p.key === f.key) && talkCard(f)) list.push({ id: f.key, label: f.label, card: talkCard(f), ins: f })
+    list.push({ id: 'ask', label: '대표님이 물으면 찾기', card: null, ins: null })
     return list
   }, [insights, focus])
   const [tab, setTab] = useState(() => (focus && tabs.some((t) => t.id === focus) ? focus : 'script'))
@@ -178,7 +222,7 @@ export function ClientTalkSheet({ record, insights, focus, onClose }: { record: 
               </button>
             ))}
           </div>
-          {cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
+          {cur.id === 'ask' ? <AskFinder /> : cur.id === 'script' || !cur.card || !cur.ins ? <ScriptDocument s={script} /> : <CardView card={cur.card} ins={cur.ins} onCopy={() => void copy(talkText(cur.card!), '말하기 카드')} />}
         </div>
       </Modal>
       {/* 인쇄 종이 — 미팅 순서만(진단서와 같은 틀: body 바로 아래) */}

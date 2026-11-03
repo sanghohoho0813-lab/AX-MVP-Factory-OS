@@ -11,6 +11,7 @@
  *   T9 D-509 판정 카드 · 말하기 카드의 용어(인정이자 · 경정청구 …) 점선 밑줄 → 한 줄 뜻
  *   T10 오늘 › 업체 약속(오늘 · 내일 미팅 · 상담) [말하기 대본]
  *   T11 상황 예시 펼침 [이렇게 말하기] → 같은 계산 결과로 말하기 · 복사 · 접기
+ *   T12 [대표님이 물으면 찾기] — 낱말 → 가장 가까운 답 · 용어 뜻 · 못 찾으면 안내
  *   T8 영업 › 미팅 준비 [판정 그대로 말하기 대본] → 업체 상세에서 바로 열림
  */
 import { chromium } from 'playwright'
@@ -45,7 +46,20 @@ await page.getByTestId('top-picks-talk').click()
 const sheet = page.getByTestId('talk-sheet')
 await sheet.waitFor()
 const tabKeys = await sheet.getByTestId('talk-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
-check('T1 [말하기 대본] → 창 · 탭 = 미팅 순서 + 먼저 제안할 것과 같은 순서', tabKeys[0] === 'script' && JSON.stringify(tabKeys.slice(1)) === JSON.stringify(pickKeys) && pickKeys.length > 0, { tabKeys, pickKeys })
+check('T1 [말하기 대본] → 창 · 탭 = 미팅 순서 + 먼저 제안할 것과 같은 순서 + 대표님이 물으면 찾기', tabKeys[0] === 'script' && JSON.stringify(tabKeys.slice(1, 1 + pickKeys.length)) === JSON.stringify(pickKeys) && tabKeys.at(-1) === 'ask' && tabKeys.length === pickKeys.length + 2 && pickKeys.length > 0, { tabKeys, pickKeys })
+// T12 대표님이 물으면 찾기 — 낱말 → 가장 가까운 답(모든 모듈 · 용어 뜻) · 예시 단추 · 못 찾으면 안내
+await sheet.locator('[data-testid="talk-tab"][data-key="ask"]').click()
+const askBox = sheet.getByTestId('talk-ask')
+await askBox.waitFor()
+const exN = await askBox.getByTestId('talk-ask-examples').locator('button').count()
+await askBox.getByTestId('talk-ask-input').fill('직원이 그만두면')
+const hit1 = await askBox.getByTestId('talk-ask-hit').first().innerText().catch(() => '')
+await askBox.getByTestId('talk-ask-input').fill('인정이자')
+const hitTopics = await askBox.getByTestId('talk-ask-hit').evaluateAll((els) => els.map((e) => e.getAttribute('data-topic')))
+await askBox.getByTestId('talk-ask-input').fill('외계인 우주선')
+const none = (await askBox.getByTestId('talk-ask-none').count()) === 1
+check('T12 대표님이 물으면 찾기 — 예시 단추 · "직원이 그만두면" → 고용 답 · "인정이자" → 용어 뜻 · 엉뚱한 말 → 안내', exN >= 3 && hit1.includes('직원이 금방 그만두면요?') && hitTopics.includes('term') && none, { exN, hit1: hit1.slice(0, 80), hitTopics })
+await sheet.getByTestId('talk-tab').first().click()
 
 // T2
 const secIds = await sheet.getByTestId('talk-script-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
@@ -99,7 +113,7 @@ if (outside) {
   await page.locator(`[data-testid="smart-insight"][data-key="${outside}"] [data-testid="smart-insight-talk"]`).click()
   await page.getByTestId('talk-sheet').waitFor()
   const tk = await page.getByTestId('talk-tab').evaluateAll((els) => els.map((e) => [e.getAttribute('data-key'), e.getAttribute('aria-selected')]))
-  check('T5-1 제안 밖 모듈 → 맨 뒤 탭으로 바로 열림(그 모듈 말하기)', tk.at(-1)[0] === outside && tk.at(-1)[1] === 'true' && (await page.getByTestId('talk-card').getAttribute('data-key')) === outside, tk)
+  check('T5-1 제안 밖 모듈 → 찾기 앞 탭으로 바로 열림(그 모듈 말하기)', tk.at(-2)[0] === outside && tk.at(-2)[1] === 'true' && (await page.getByTestId('talk-card').getAttribute('data-key')) === outside, tk)
   await page.keyboard.press('Escape')
 }
 

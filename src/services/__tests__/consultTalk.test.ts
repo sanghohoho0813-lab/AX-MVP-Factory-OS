@@ -4,7 +4,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { buildInsights, topPicks, type Insight } from '../clientInsights'
-import { TALK_CAUTION, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
+import { TALK_CAUTION, faqSearch, meetingScript, meetingScriptText, scenarioTalk, scenarioTopic, talkCard, talkText, talkTopic } from '../consultTalk'
 import { runScenarios } from '../scenarios'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { CONSULT_TERMS, splitTerms } from '../consultTerms'
@@ -202,6 +202,18 @@ check(
 )
 const giftT = talks.find(({ r }) => r.id === 'tax-gift-10')!.t
 check('T23 증여 이야기 — 10년 합산 · 성인 5,000만원 · 미성년 2,000만원 · 특례는 세무사', giftT.faq.some((f) => f.a.includes('10년 안에 다시 주면 합쳐서')) && giftT.faq.some((f) => f.a.includes('5,000만원') && f.a.includes('2,000만원')) && giftT.faq.some((f) => f.a.includes('세무사')), giftT.faq)
+
+// D-508 대표님이 물으면 찾기
+const f1 = faqSearch('직원이 그만두면')
+const f2 = faqSearch('갚아야 하나요')
+const f3 = faqSearch('인정이자', CONSULT_TERMS)
+const f4 = faqSearch('경정청구 언제까지')
+check(
+  'T24 찾기 — 그만두면 → 고용 답 맨 앞 · 갚아야 → 정책자금 · 고용 · 지원사업 답 · 인정이자 → 용어 뜻(이/가 조사) · 경정청구 같은 답은 한 번만 · 빈 말 → 0',
+  f1[0]?.q === '직원이 금방 그만두면요?' && ['policy', 'employment', 'grants'].every((t) => f2.some((h) => h.topic === t)) && f3.some((h) => h.topic === 'term' && h.q === '인정이자가 뭐예요?') &&
+    f4.filter((h) => h.q === '언제까지 신청할 수 있어요?').length === 1 && faqSearch('  ').length === 0 && faqSearch('외계인 우주선').length === 0,
+  { f1: f1.map((h) => h.q), f2: f2.map((h) => h.topic), f3: f3.map((h) => h.q), f4: f4.map((h) => h.q) },
+)
 
 console.log(`\nconsultTalk: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
