@@ -840,9 +840,42 @@ async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> 
 }
 
 /**
+ * D-530 이 id 들 중 **다른 작업공간에 이미 있는** 업체 id — 읽기만.
+ * 서버는 내가 구성원인 작업공간의 줄만 준다(RLS) → 여기 나온 것은 '내가 쓸 수도 있는 다른 작업공간' 의 업체다.
+ * 같은 id 로 지금 작업공간에 upsert 하면 그 업체가 이쪽으로 옮겨지므로(D-530 재현), 부르는 쪽은 이 업체를 넣지 않는다.
+ * 로컬 모드는 저장소가 하나라 늘 빈 목록.
+ */
+export async function findForeignClientIds(workspaceId: string | null, ids: readonly string[]): Promise<Set<string>> {
+  const out = new Set<string>()
+  if (isLocal() || !workspaceId || ids.length === 0) return out
+  const unique = [...new Set(ids.filter(Boolean))]
+  // 주소 길이를 넘지 않게 100개씩
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100)
+    const { data, error } = await getSupabaseClient().from('operations_clients').select('id, workspace_id').in('id', chunk)
+    if (error) throw error
+    for (const row of (data ?? []) as { id: string; workspace_id: string }[]) {
+      if (row.workspace_id !== workspaceId) out.add(row.id)
+    }
+  }
+  return out
+}
+
+/** D-530 다른 작업공간 업체를 이쪽으로 옮기려 할 때 — 아무것도 바꾸지 않고 멈춘다 */
+export class ForeignClientError extends Error {
+  ids: string[]
+  constructor(ids: string[]) {
+    super(`다른 작업공간에 있는 업체 ${ids.length}곳이 들어 있어 아무것도 바꾸지 않았어요 — 그 업체는 그 작업공간에서 고쳐 주세요.`)
+    this.name = 'ForeignClientError'
+    this.ids = ids
+  }
+}
+
+/**
  * 백업 복원용 일괄 저장.
  * local: 전체 목록을 통째로 교체한다(추가·삭제 모두 반영).
  * supabase: 전달된 레코드를 upsert 하고, 목록에 없는 행은 지운다.
+ * D-530: upsert 전에 다른 작업공간에 있는 id 가 섞였는지 본다 — 있으면 아무것도 바꾸지 않는다(옮기기 · 지우기 0).
  */
 export async function replaceAllClients(
   workspaceId: string | null,
@@ -854,6 +887,8 @@ export async function replaceAllClients(
     return normalized
   }
   if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
+  const foreign = await findForeignClientIds(workspaceId, normalized.map((r) => r.id))
+  if (foreign.size > 0) throw new ForeignClientError([...foreign])
   const client = getSupabaseClient()
   const rows = normalized.map((r) => ({
     id: r.id,

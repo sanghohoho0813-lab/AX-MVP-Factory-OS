@@ -539,7 +539,8 @@ try {
   await dlg.getByRole('button', { name: '초대 취소' }).click()
   const revoked = await waitFor(() => cloud.invites.find((i) => i.id === 'inv-open')?.status === 'revoked')
   const patch = cloud.invitePatches[0]
-  const revToast = await pc.page.getByText(/초대를 취소했어요/).first().isVisible().catch(() => false)
+  // 흉내 서버가 고침을 받은 '바로 그 순간' 에는 화면이 아직 답을 못 받았다 — 알림이 뜰 때까지 기다린다(예전엔 바로 봐서 가끔 빨갛게)
+  const revToast = await pc.page.getByText(/초대를 취소했어요/).first().waitFor({ timeout: 5000 }).then(() => true).catch(() => false)
   check('I4 [초대 취소] → 한 번 더 묻고 → 상태만 revoked(기다리는 것만 · 줄은 남음) · 취소했다는 알림', askText.includes('teamlead@qa.kr') && revoked && patch?.body?.status === 'revoked' && patch?.onlyPending === true && cloud.invites.length === 4 && revToast, { askText: askText.slice(0, 80), patch, revToast })
   const emptyNow = await waitFor(async () => (await pc.page.getByTestId('invite-row').count()) === 0 && (await sent.innerText()).includes('기다리는 초대가 없어요'))
   check('I5 취소하면 목록에서 빠지고 지난 초대로', emptyNow)

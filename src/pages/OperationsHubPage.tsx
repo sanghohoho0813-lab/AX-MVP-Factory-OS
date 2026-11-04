@@ -57,13 +57,15 @@ import { CloudUpload, Handshake } from 'lucide-react'
 import {
   createClient,
   dismissLocalMigration,
+  findForeignClientIds,
   listClients,
   pendingLocalClients,
   replaceAllClients,
   saveClient,
   normalizeClientOps,
 } from '../services/clientOpsService'
-import { downloadBackup, MODULE_DATA_PREFIX, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
+import { downloadBackup, MODULE_DATA_PREFIX, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
+import { allowedModes, backupSourceWorkspace, checkRestoreSource, planRestore, removedNamesLine, restoreErrorLine, restoreSourceLine, type RestorePlan } from '../services/restoreGuard'
 import { exportWorkspace, workspaceSectionOf, type WorkspaceSummary } from '../services/workspaceExport'
 import {
   buildAllAlerts,
@@ -139,7 +141,7 @@ function clientTone(dLeft: number | null, overduePayments: number, critical: num
   return 'success'
 }
 
-function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
+function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId: string | null; myWorkspaces?: { id: string; name: string }[] }) {
   const navigate = useNavigate()
   const pilot = useIsPilot()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
@@ -282,7 +284,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])
   const [migrating, setMigrating] = useState(false)
   /** 백업 파일을 읽은 뒤 합칠지/바꿀지 묻는 단계 */
-  const [restorePrompt, setRestorePrompt] = useState<{ clients: ClientOpsRecord[]; toolInputs: Record<string, string>; workspace: WorkspaceSummary | null } | null>(null)
+  const [restorePrompt, setRestorePrompt] = useState<{ clients: ClientOpsRecord[]; toolInputs: Record<string, string>; workspace: WorkspaceSummary | null; sourceWs: string | null } | null>(null)
+  /** D-530 '전부 바꾸기' 로 지워질 업체를 보여 준 뒤 한 번 더 묻는 단계 */
+  const [replaceConfirm, setReplaceConfirm] = useState<RestorePlan | null>(null)
+  /** D-530 막았거나 건너뛴 까닭(창 안에 빨간 한 줄) */
+  const [restoreNote, setRestoreNote] = useState('')
   /** D-521 작업공간 전체 내보내기 — 업무 일기 · 모듈 기록을 서버에서 모으는 중 */
   const [exporting, setExporting] = useState(false)
   const { showToast } = useToast()
@@ -522,7 +528,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setError('')
     try {
       const text = await file.text()
-      setRestorePrompt({ clients: parseBackup(text), toolInputs: parseBackupToolInputs(text), workspace: workspaceSectionOf(text) })
+      const clients = parseBackup(text)
+      // 더보기 판은 닫는다 — 불러오기 창 뒤에 판이 하나 더 겹쳐 보이지 않게
+      setMoreOpen(false)
+      setReplaceConfirm(null)
+      setRestoreNote('')
+      setRestorePrompt({ clients, toolInputs: parseBackupToolInputs(text), workspace: workspaceSectionOf(text), sourceWs: backupSourceWorkspace(text, clients) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
     } finally {
@@ -550,32 +561,59 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
-  const applyRestore = async (mode: MergeMode) => {
+  const cloudMode = getDataModeConfig().mode === 'supabase'
+  const restoreSource = checkRestoreSource({ cloud: cloudMode, targetWs: workspaceId, sourceWs: restorePrompt?.sourceWs ?? null, myWorkspaceIds: myWorkspaces.map((w) => w.id) })
+  const restoreAllowed = allowedModes(restoreSource)
+  const restoreSourceName = myWorkspaces.find((w) => w.id === restorePrompt?.sourceWs)?.name
+  const closeRestore = () => {
+    setRestorePrompt(null)
+    setReplaceConfirm(null)
+    setRestoreNote('')
+  }
+
+  /**
+   * D-530 불러오기 — 파일이 나온 작업공간 확인 → 다른 작업공간에 이미 있는 업체는 넣지 않음(옮기지 않음)
+   * → '전부 바꾸기' 는 지워질 업체를 보여 주고 한 번 더 → 그다음에야 저장. 막히면 아무것도 바꾸지 않는다.
+   */
+  const applyRestore = async (mode: MergeMode, confirmed = false) => {
     const incoming = restorePrompt?.clients
     if (!incoming) return
     setRestoring(true)
     setError('')
+    setRestoreNote('')
     try {
       // D-120: 화면을 연 뒤 다른 곳에서 만든 업체가 지워지지 않게 — 합치기 직전에 가장 새 목록을 다시 읽는다
       const fresh = await listClients(workspaceId)
-      const result = mergeBackup(fresh, incoming, mode)
+      const foreignIds = await findForeignClientIds(workspaceId, incoming.map((c) => c.id))
+      const plan = planRestore({ current: fresh, incoming, mode, source: restoreSource, foreignIds })
+      if (plan.blocked) {
+        setRestoreNote(plan.blocked)
+        return
+      }
+      if (mode === 'replace' && plan.removed.length > 0 && !confirmed) {
+        setReplaceConfirm(plan)
+        return
+      }
+      const result = plan.result
       await replaceAllClients(workspaceId, result.records)
       // 도구함 입력값도 되돌린다 (D-89) — 창업감면 폼·크레탑 붙여넣기 같은 것
       const toolCount = writeToolInputs(restorePrompt?.toolInputs)
       await load()
-      setRestorePrompt(null)
+      const hadModuleKeys = Object.keys(restorePrompt?.toolInputs ?? {}).some((k) => k.startsWith(MODULE_DATA_PREFIX))
+      closeRestore()
       const toolNote = toolCount > 0 ? ` · 도구·모듈 기록 ${toolCount}개` : ''
+      const skipNote = plan.skipped.length > 0 ? ` · 다른 작업공간에 있는 업체 ${plan.skipped.length}곳은 넣지 않았어요` : ''
       showToast(
         mode === 'merge'
-          ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳${toolNote}`
-          : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳${toolNote}`,
+          ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳${toolNote}${skipNote}`
+          : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳 · 지운 업체 ${plan.removed.length}곳${toolNote}${skipNote}`,
       )
       // D-94: 모듈 기록까지 되돌렸으면 한 번 새로 연다 — 열려 있던 모듈이 옛 기록을 들고 있다가 덮어쓰지 않게
-      if (Object.keys(restorePrompt?.toolInputs ?? {}).some((k) => k.startsWith(MODULE_DATA_PREFIX))) {
+      if (hadModuleKeys) {
         window.setTimeout(() => window.location.reload(), 1500)
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
+      setRestoreNote(restoreErrorLine(cause))
     } finally {
       setRestoring(false)
     }
@@ -587,11 +625,15 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setError('')
     try {
       const fresh = await listClients(workspaceId)
-      const result = mergeBackup(fresh, leftover, 'merge')
+      // D-530 다른 작업공간에 이미 올린 업체(같은 id)는 이쪽으로 옮기지 않는다
+      const foreignIds = await findForeignClientIds(workspaceId, leftover.map((c) => c.id))
+      const plan = planRestore({ current: fresh, incoming: leftover, mode: 'merge', source: 'unknown', foreignIds })
+      const result = plan.result
       await replaceAllClients(workspaceId, result.records)
       await load()
       setLeftover([])
-      showToast(`이 브라우저에 있던 고객 ${leftover.length}곳을 클라우드로 옮겼습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳. 브라우저 원본은 그대로 남아 있습니다.`)
+      const skipNote = plan.skipped.length > 0 ? ` 다른 작업공간에 이미 있는 ${plan.skipped.length}곳은 옮기지 않았어요.` : ''
+      showToast(`이 브라우저에 있던 고객 ${leftover.length}곳을 클라우드로 옮겼습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳. 브라우저 원본은 그대로 남아 있습니다.${skipNote}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '옮기지 못했습니다.')
     } finally {
@@ -744,28 +786,58 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       <Modal
         open={restorePrompt !== null}
         title="백업 불러오기"
-        onClose={() => { if (!restoring) setRestorePrompt(null) }}
+        onClose={() => { if (!restoring) closeRestore() }}
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setRestorePrompt(null)} disabled={restoring}>취소</Button>
-            <Button variant="secondary" onClick={() => void applyRestore('replace')} disabled={restoring}>백업 내용으로 전부 바꾸기</Button>
-            <Button variant="primary" onClick={() => void applyRestore('merge')} disabled={restoring}>{restoring ? '복원 중…' : '지금 데이터와 합치기'}</Button>
-          </>
+          replaceConfirm ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={() => setReplaceConfirm(null)} disabled={restoring}>돌아가기</Button>
+              <Button variant="danger" data-testid="restore-replace-confirm" onClick={() => void applyRestore('replace', true)} disabled={restoring}>
+                {restoring ? '바꾸는 중…' : `정말 바꾸기(${replaceConfirm.removed.length}곳 지움)`}
+              </Button>
+            </div>
+          ) : (
+            // 단추 셋이 창 폭을 넘으면 다음 줄로(예전에는 [취소] 가 창 밖으로 삐져나왔다)
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={closeRestore} disabled={restoring}>취소</Button>
+              <Button variant="secondary" data-testid="restore-replace" onClick={() => void applyRestore('replace')} disabled={restoring || !restoreAllowed.replace}>백업 내용으로 전부 바꾸기</Button>
+              <Button variant="primary" data-testid="restore-merge" onClick={() => void applyRestore('merge')} disabled={restoring || !restoreAllowed.merge}>{restoring ? '복원 중…' : '지금 데이터와 합치기'}</Button>
+            </div>
+          )
         }
       >
         <p className="text-[0.98rem] break-keep text-slate-700">
           백업에 고객 {restorePrompt?.clients.length ?? 0}곳
           {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구·모듈 기록 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
         </p>
-        {restorePrompt?.workspace && (restorePrompt.workspace.journal > 0 || restorePrompt.workspace.moduleRows > 0) && (
-          <p data-testid="restore-ws-note" className="mt-2 text-[0.92rem] break-keep text-slate-600">
-            이 파일의 업무 일기 {restorePrompt.workspace.journal}건{restorePrompt.workspace.moduleRows > 0 ? ` · 서버 모듈 기록 ${restorePrompt.workspace.moduleRows}줄` : ''}은 보관용이에요 — 불러오기는 업체 · 도구 입력값만 되살리고, 지금 있는 업무 일기 · 모듈 기록은 건드리지 않아요.
+        {restoreSourceLine(restoreSource, restoreSourceName) && (
+          <p data-testid="restore-source" data-source={restoreSource} className="mt-2 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.92rem] font-semibold break-keep text-red-700">
+            {restoreSourceLine(restoreSource, restoreSourceName)}
           </p>
         )}
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
-          <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
-          <li><strong>전부 바꾸기</strong> — 지금 목록을 지우고 백업 내용으로 채웁니다. 되돌릴 수 없습니다.</li>
-        </ul>
+        {restoreNote && (
+          <p data-testid="restore-note" role="alert" className="mt-2 text-[0.92rem] font-semibold break-keep text-red-700">{restoreNote}</p>
+        )}
+        {replaceConfirm ? (
+          <div data-testid="restore-removed" className="mt-3 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.92rem] break-keep text-slate-700">
+            <p className="font-semibold text-red-700">지금 목록에서 {replaceConfirm.removed.length}곳이 지워져요 — 되돌릴 수 없어요.</p>
+            <p className="mt-1">{removedNamesLine(replaceConfirm.removed)}</p>
+            {replaceConfirm.skipped.length > 0 && <p className="mt-1 text-slate-600">다른 작업공간에 있는 업체 {replaceConfirm.skipped.length}곳은 넣지 않아요.</p>}
+            <p className="mt-1 text-slate-600">지우기 전에 [백업 내려받기] 로 지금 목록을 한 번 받아 두면 안전해요.</p>
+          </div>
+        ) : (
+          <>
+            {restorePrompt?.workspace && (restorePrompt.workspace.journal > 0 || restorePrompt.workspace.moduleRows > 0) && (
+              <p data-testid="restore-ws-note" className="mt-2 text-[0.92rem] break-keep text-slate-600">
+                이 파일의 업무 일기 {restorePrompt.workspace.journal}건{restorePrompt.workspace.moduleRows > 0 ? ` · 서버 모듈 기록 ${restorePrompt.workspace.moduleRows}줄` : ''}은 보관용이에요 — 불러오기는 업체 · 도구 입력값만 되살리고, 지금 있는 업무 일기 · 모듈 기록은 건드리지 않아요.
+              </p>
+            )}
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
+              <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
+              <li><strong>전부 바꾸기</strong> — 지금 목록에서 백업에 없는 업체를 지우고 백업 내용으로 채웁니다. 지워질 업체를 먼저 보여 드려요.</li>
+              <li>다른 작업공간에 이미 있는 업체는 넣지 않아요(그 작업공간에서 옮겨 오지 않아요).</li>
+            </ul>
+          </>
+        )}
       </Modal>
 
       {/* D-287 화면 꾸미기 — AI 도우미 · 업체 목록(고르개 · 찾기 · 요약 · 현황표) · 지금 챙길 것 */}
@@ -1353,8 +1425,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 }
 
 function CloudOperationsHub() {
-  const { currentWorkspaceId } = useAuth()
-  return <OperationsHubContent workspaceId={currentWorkspaceId} />
+  const { currentWorkspaceId, workspaces } = useAuth()
+  // D-530 백업 불러오기가 '파일이 나온 작업공간이 내 다른 작업공간인지' 를 알도록
+  const mine = workspaces.map((w) => ({ id: w.workspaceId, name: w.workspace?.name ?? '' }))
+  return <OperationsHubContent workspaceId={currentWorkspaceId} myWorkspaces={mine} />
 }
 
 export function OperationsHubPage() {

@@ -32,6 +32,7 @@ import {
   withoutFunding,
 } from '../clientOpsService'
 import { clientTypeOf, isClientType, suggestClientType, withClientType } from '../clientType'
+import { allowedModes, backupSourceWorkspace, checkRestoreSource, planRestore, removedNamesLine, restoreErrorLine } from '../restoreGuard'
 import { splitContact } from '../inboxToSales'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
@@ -200,6 +201,49 @@ function withDocs(r: ClientOpsRecord, keys: DocumentKey[], issuedAt = TODAY): Cl
 
   const r4 = mergeBackup([mine, other], [newer], 'replace')
   check('교체: 백업 내용만 남음', r4.records.length === 1 && r4.records[0].companyName === '새것')
+}
+
+/* ---------------- D-530 백업 불러오기 안전장치 — 다른 작업공간 업체를 옮기지 · 지우지 않는다 ---------------- */
+{
+  const WS_A = 'aaaaaaaa-0000-0000-0000-000000000001'
+  const WS_B = 'bbbbbbbb-0000-0000-0000-000000000002'
+  const fromA = [client({ id: 'a1', companyName: '대표 업체', workspaceId: WS_A }), client({ id: 'a2', companyName: '대표 업체2', workspaceId: WS_A })]
+  // 파일이 나온 작업공간: 3판 칸이 먼저 · 없으면 업체마다 같은 작업공간 · 섞였거나 없으면 모름
+  check('D-530 출처: 3판 workspace.workspaceId', backupSourceWorkspace(JSON.stringify({ workspace: { workspaceId: WS_A } }), []) === WS_A)
+  check('D-530 출처: 예전 파일은 업체 작업공간이 하나면 그것', backupSourceWorkspace('{}', fromA) === WS_A)
+  check('D-530 출처: 섞이면 모름', backupSourceWorkspace('{}', [fromA[0], client({ id: 'b1', workspaceId: WS_B })]) === null)
+  check('D-530 출처: 로컬 파일(작업공간 없음)은 모름', backupSourceWorkspace('{}', [client({ id: 'l1', workspaceId: null })]) === null)
+  // 출처 판정
+  const mine = [WS_A, WS_B]
+  check('D-530 판정: 같은 작업공간', checkRestoreSource({ cloud: true, targetWs: WS_A, sourceWs: WS_A, myWorkspaceIds: mine }) === 'same')
+  check('D-530 판정: 내 다른 작업공간 파일 → other-mine', checkRestoreSource({ cloud: true, targetWs: WS_B, sourceWs: WS_A, myWorkspaceIds: mine }) === 'other-mine')
+  check('D-530 판정: 지금 없는 작업공간 파일 → other-gone', checkRestoreSource({ cloud: true, targetWs: WS_B, sourceWs: 'gone', myWorkspaceIds: mine }) === 'other-gone')
+  check('D-530 판정: 로컬 모드는 늘 같음', checkRestoreSource({ cloud: false, targetWs: null, sourceWs: WS_A, myWorkspaceIds: [] }) === 'same')
+  check('D-530 허락: 내 다른 작업공간 파일은 합치기 · 바꾸기 모두 막음', JSON.stringify(allowedModes('other-mine')) === JSON.stringify({ merge: false, replace: false }))
+  check('D-530 허락: 사라진 작업공간 파일은 더하기만', JSON.stringify(allowedModes('other-gone')) === JSON.stringify({ merge: true, replace: false }))
+  // 재현한 사고: 대표가 팀장 작업공간(B)을 보며 대표 백업(A)을 불러옴 → 예전에는 A 업체가 B 로 옮겨졌다
+  const teamB = [client({ id: 'b1', companyName: '팀장 업체', workspaceId: WS_B })]
+  const blocked = planRestore({ current: teamB, incoming: fromA, mode: 'merge', source: 'other-mine', foreignIds: new Set(['a1', 'a2']) })
+  check('D-530 사고 재현(합치기): 막고 지금 목록 그대로', !!blocked.blocked && blocked.result.records.length === 1 && blocked.result.records[0].id === 'b1', JSON.stringify(blocked))
+  const blockedR = planRestore({ current: teamB, incoming: fromA, mode: 'replace', source: 'other-mine', foreignIds: new Set(['a1', 'a2']) })
+  check('D-530 사고 재현(전부 바꾸기): 막고 지울 것 0', !!blockedR.blocked && blockedR.removed.length === 0)
+  // 출처를 모르는 예전 파일이라도 다른 작업공간에 있는 id 는 넣지 않는다
+  const legacy = planRestore({ current: teamB, incoming: [...fromA, client({ id: 'n1', companyName: '새 업체' })], mode: 'merge', source: 'unknown', foreignIds: new Set(['a1', 'a2']) })
+  check('D-530 모르는 파일: 다른 작업공간 업체 2곳 건너뜀 · 새 업체만 더함', !legacy.blocked && legacy.skipped.length === 2 && legacy.result.added === 1 && legacy.result.records.every((r) => r.id !== 'a1' && r.id !== 'a2'), JSON.stringify(legacy.result.records.map((r) => r.id)))
+  // 전부 바꾸기: 넣을 것이 모두 다른 작업공간 것이면 막음(예전에는 지금 목록이 통째로 지워졌다)
+  const allForeign = planRestore({ current: teamB, incoming: fromA, mode: 'replace', source: 'unknown', foreignIds: new Set(['a1', 'a2']) })
+  check('D-530 전부 바꾸기: 넣을 업체 0 → 막고 지울 것 0', !!allForeign.blocked && allForeign.removed.length === 0)
+  const emptyFile = planRestore({ current: teamB, incoming: [], mode: 'replace', source: 'same', foreignIds: new Set() })
+  check('D-530 전부 바꾸기: 빈 백업 → 막음', !!emptyFile.blocked)
+  // 전부 바꾸기: 지워질 업체를 알려 준다
+  const cur = [client({ id: 'k1', companyName: '남을 곳' }), client({ id: 'k2', companyName: '지워질 곳' })]
+  const rep = planRestore({ current: cur, incoming: [client({ id: 'k1', companyName: '남을 곳' })], mode: 'replace', source: 'same', foreignIds: new Set() })
+  check('D-530 전부 바꾸기: 지워질 업체 = 백업에 없는 지금 업체', rep.removed.length === 1 && rep.removed[0].id === 'k2' && !rep.blocked)
+  check('D-530 지울 업체 이름 줄: 다섯 곳 넘으면 외 n곳', removedNamesLine(Array.from({ length: 7 }, (_, i) => client({ id: `r${i}`, companyName: `업체${i}` }))) === '업체0 · 업체1 · 업체2 · 업체3 · 업체4 외 2곳')
+  check('D-530 합치기는 지울 것 0', planRestore({ current: cur, incoming: [], mode: 'merge', source: 'same', foreignIds: new Set() }).removed.length === 0)
+  // 서버가 막은 오류를 쉬운 말로
+  check('D-530 서버 권한 오류 → 쉬운 말', restoreErrorLine({ code: '42501', message: 'new row violates row-level security policy' }).includes('다른 작업공간'))
+  check('D-530 다른 오류는 그대로', restoreErrorLine(new Error('인터넷 끊김')) === '인터넷 끊김')
 }
 
 /* ---------------- 백업 2판: 도구함 입력값 (D-89) ---------------- */
