@@ -113,7 +113,9 @@ npm run qa:radar                                  # 콘텐츠 레이더 클라�
 npm run qa:session                                # 로그인 · 작업공간 클라우드(다른 탭 신호에 작업공간 안 바뀜 · 끊겨도 화면 유지 · 나가기 취소 · 팀장님 이름 · 초대 링크)
 npm run qa:matrix -- http://localhost:4390        # 모듈 × 여러 상황(업체 8유형 × 상황 예시 펼침 · 상황→모듈 · 모듈 20화면 · 상세 탭 · 390 — 화면 오류 · NaN/undefined · 넘침 0)
 npm run qa:modsafe -- http://localhost:4390       # 모듈 안전(정책자금 칸 바꾸면 알림 · 저장 실패 알림 · 연구소 CSV 덮지 않음 · 점검 달 · 연구노트 과제/버리기 묻기 · 고용 일괄등록 중복 · 지원금 바꾸면 회차 · 보고서 태그)
-npm run qa:db                                     # DB 보안(로컬 PostgreSQL · 마이그레이션 전부 · RLS · 0016~0019 공격 · 모든 표 격리) · 보낸 초대 취소(관리자만 · 상태만 · 취소된 링크 막힘) — pg_ctlcluster 16 main start 먼저
+npm run qa:db                                     # DB 보안(로컬 PostgreSQL · 마이그레이션 전부 · RLS · 0016~0019 공격 · 모든 표 격리) · 보낸 초대 취소(관리자만 · 상태만 · 취소된 링크 막힘) · 0023 작업공간 고정(옮기기 막힘 · 앱 길 그대로) · 0024 고객 ↔ 내부 팀장 분리(대표 자동 편집자 0 · 고객 AI internal 금지) · run-0024-customer(대표가 실행할 pilot/customer_provision · 점검 SQL 그대로) — pg_ctlcluster 16 main start 먼저
+npm run qa:restore                                # 백업 불러오기 안전(D-530 — 진짜 RLS · 대표 백업을 팀장 화면에 → 막힘 · DB 그대로 · 예전 파일 다른 작업공간 업체 건너뜀 · 바꾸기 지울 업체 먼저 · 불러오기 창 보장 범위 · 0023 있으면 REST 직접 옮기기도 막힘)
+npm run qa:modconflict                            # 모듈 기록 두 기기 동시 저장(D-535 — 실제 moduleData + 진짜 PostgREST · 다른 기기 판 보관 뒤 저장 · 같은 기기 연달아 보관 0 · 지워진 줄 다시 만듦)
 npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB + PostgREST 진짜 RLS · 대표 ↔ Pilot ↔ 가입자 · 같은 브라우저 · 주소 · 찾기 · 업무 흐름 · 390 · 팀장 업무 항목(기본 6종 숨김 · 상품표 40) · 피드백 → 받은 피드백함 · 팀장 AI 는 Gemini 만 — 진짜 서버 함수 · DB 가 등급 판단)
 npm run qa:isolation                              # 팀장 격리 집중(진짜 RLS · 모든 표 API 공격 · 저장소 조작 · 무작위 80걸음 — 팀장은 대표 화면/자료 0) — pg_ctlcluster 16 main start 먼저
 npm run qa:ownerai -- http://localhost:4390       # 대표 AI 작업실(진짜 서버 함수 + 가짜 공급자 · 시나리오 A~E · 기억 판 · 채택 · 제안서/화면 스튜디오 · 키 노출 0 · 360/390)
