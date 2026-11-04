@@ -7825,3 +7825,28 @@ D-530 은 화면을 막았다. 화면을 거치지 않은 직접 호출(REST)로
 - 기존 기록 보존: 이미 저장된 12개 이하 기록은 그대로(순서 · 내용). 저장 모양(payload 의 docRequests) 같음 — DB 변경 없음.
 - 미검증: 이 배포 전 버전을 연 채로 둔 다른 기기의 탭은 옛 코드라 저장할 때 12개로 자를 수 있다(새로 고치면 새 코드).
 - 시험: test:docreq P1~P5(13개 그대로 · 할 일 진행 13 · 끝낸 40 → 30 · 읽기 20 → 20 · 예전 12개 그대로) — 62/0 · qa:docreq D10b2 · P1~P3(13개 → 3 + 10개 더 보기 · 저장 · 새로 고쳐도 13) — 34/0 · qa:detail 522/0.
+
+## D-533 외부 구독 고객 ↔ 내부 팀장 권한 분리 — SQL 0024 · 고객 준비 SQL (2026-11-04 SEC-4 · 운영 미적용)
+
+점검 B1: 등급이 full · pilot 둘뿐이라 외부 유료 고객을 Pilot 준비 SQL 로 열면 ① 0020 연결 함수가 대표를 **모든 pilot 작업공간 편집자**로 넣고 ② 팀장 화면 전환 목록에 고객이 다 뜨고 ③ AI 가 internal(한도 없음)이 됐다.
+대표 지시(2026-11-04): "대표의 팀장 화면 전환 기능은 유지하되, 일반 고객에게 대표가 자동 편집자로 들어가는 구조는 절대 허용하지 마세요."
+
+- `supabase/migrations/20261104000024_customer_audience.sql`(추가만) — `os_access.audience` 칸(internal 기본 · customer). **지금 있는 계정은 모두 internal** → 대표 ↔ 최은혜 팀장 화면 · 연결 · AI 그대로.
+  - 대표 연결(`os_access_link_owner_to_pilots`) · 팀장 화면 목록(`my_pilot_views`)은 internal pilot 만(같은 이름으로 다시 만들고 조건 하나 더함).
+  - DB 장치: 대표 쪽(full) 계정은 customer 작업공간 구성원이 될 수 없다 — 초대 · 서버 작업(SQL Editor) 모두 · 예외 없음.
+  - customer 로 바꿀 때 대표가 이미 구성원이거나 AI 가 internal 이면 **멈춘다**(자동으로 지우지 않음 — 구성원 줄 정리는 대표 승인 뒤).
+  - customer 의 AI 권한은 internal(한도 없음)이 될 수 없다(0022 가 있을 때).
+- `supabase/manual/customer_provision.sql` — 외부 고객 준비: pilot 등급(자기 작업공간 하나 · 대표 자료 0) + customer + AI customer 요금제(한도 · 기한 · 마케팅 여부) · 대표 연결 안 함.
+  `pilot_provision.sql` 머리에 '내부 팀장 전용' 경고. 고객 이메일로 잘못 실행해도 대표는 고객 작업공간에 들어가지 않는다(시험).
+- 앱 코드 변경 없음 — 고객 화면은 지금 Pilot 화면(대표 메뉴 숨김)을 그대로 쓴다. 고객용 메뉴 네 묶음(UX-1)은 별도 단계.
+- **운영 DB 에는 적용하지 않았다**(대표 승인 뒤 0023 → 0024 순서로).
+- 시험: qa:db `test-0024`(고객 자기 작업공간 · 대표 자료 0 · 연결 함수 0줄 · 서버 작업으로도 대표 못 넣음 · 팀장 화면 목록 = 내부 팀장만 · internal → customer 멈춤 · 고객 AI internal 막힘 · full → customer 막힘) ·
+  `run-0024-customer.sh`(대표가 실행할 파일 그대로 — pilot_provision → 대표 연결 · customer_provision 두 번 → 대표 없음 · AI customer growth 600) · qa:pilot 297/0 · qa:isolation 24/0.
+
+## D-534 운영 DB 적용 여부 점검 SQL(읽기 전용) — 0016 ~ 0024 (2026-11-04 SEC-5)
+
+- `supabase/manual/check_applied_0016_0024.sql` — SQL Editor 에 붙여 넣고 실행하면 마이그레이션마다 '들어감 / 없음'(그 파일만 만드는 함수 · 트리거 · 표 · 칸으로 판단) + 안전 상태 요약
+  (주요 표 RLS 켜짐 · 등급/대상별 수 · AI 권한 종류별 수 — 숫자만, 이메일 · 이름 없음).
+- 맨 위 `begin transaction read only;` · 끝 `rollback;` — 무엇을 잘못 붙여 넣어도 DB 에 쓰지 못한다. 표가 없는 단계(0019 · 0022 전)에서도 오류 없이 '표 없음' 이라고 말한다.
+- 시험(`run-0024-customer.sh`): 0015 까지만 있는 DB → 아홉 줄 모두 '없음' · 오류 0 · 쓰기 0 / 전부 적용한 DB → 아홉 줄 모두 '들어감' · 개인 정보 0.
+- 실제 운영 결과: **미확인** — 대표가 실행한 결과를 받아야 안다.

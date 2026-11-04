@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -58,6 +58,9 @@ sed "s/여기에_Pilot_이메일@example.com/pilot@e2e.kr/; s/'Pilot 작업공�
 
 # 0020 — 대표가 팀장 화면을 바로 본다(대표를 Pilot 작업공간 편집자로)
 psqlq < supabase/migrations/20261008000020_owner_views_pilot.sql > /dev/null
+
+# 0024 — 외부 구독 고객 ↔ 내부 팀장 분리(D-533) — 0019 · 0020 뒤라야 한다. 지금 계정은 모두 internal(대표 ↔ 팀장 화면 그대로)
+psqlq < supabase/migrations/20261104000024_customer_audience.sql > /dev/null
 
 # PostgREST 가 붙을 역할(로컬 시험용 비밀번호)
 psqlq > /dev/null <<'SQL'
