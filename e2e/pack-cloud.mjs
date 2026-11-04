@@ -480,6 +480,7 @@ try {
   check('X1c 서류 파일 목록 2개 — 업체 · 칸 이름 · 파일 · 폴더 · 저장 위치 · 받기만 한 칸은 빼고', w.files?.length === 2 && f?.company === '한솔정밀(주)' && f?.label === '사업자등록증' && f?.folderPath === '한솔/기본' && f?.storagePath.endsWith('a.pdf'), w.files)
   check('X1d 열어 볼 수 있는 주소 0 · 못 담은 것 0', !/signedUrl|token=|https?:\/\//i.test(JSON.stringify(w.files)) && (w.missing ?? []).length === 0, w.missing)
   check('X1e 다 받으면 한 줄 — 업체 · 업무 일기 · 상담신청 · 모듈 기록 · 서류 파일 목록', /업체 1곳 · 업무 일기 3건 · 상담신청 1건 · 모듈 기록 \d+줄 · 서류 파일 목록 2개/.test(x1.toast) && w.events?.length === 1 && w.summary?.events === 1, x1.toast)
+  check('X1g (D-536) 한 줄 끝에 되살리기 범위 — "되살리기는 업체 · 입력값만(나머지는 보관용)"', /되살리기는 업체 · 입력값만\(나머지는 보관용\)/.test(x1.toast), x1.toast)
   check('X1f 내보내기는 서버에 쓰기 0', cloud.mut.length === mutBefore && cloud.writes.slice(writesBefore).every((x) => x.bucket !== 'employees'), cloud.mut.slice(mutBefore))
   cloud.down = true
   const x2 = await exportOnce().catch((e) => ({ file: {}, toast: String(e) }))

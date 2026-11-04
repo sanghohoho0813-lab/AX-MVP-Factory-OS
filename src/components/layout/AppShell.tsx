@@ -15,6 +15,7 @@ import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
 import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
+import { ModuleOverwroteNotice } from './ModuleOverwroteNotice'
 import { ScrollTopButton } from './ScrollTopButton'
 import { subscribeWeekRunLoaded, weekRunLoaded } from '../../services/marketing/weekRunFlag'
 
@@ -147,6 +148,7 @@ export function AppShell() {
             {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다.
                 모듈(/tools/<모듈>/<화면>) 안에서 화면만 바꿀 때는 그대로 둔다 — 원본 앱의 고른 고객·열린 창이 살아 있어야 한다 (D-93) */}
             <StorageFullNotice />
+            <ModuleOverwroteNotice />
             {/* D-164: 대표가 팀장 화면을 보는 동안 */}
             <ViewingPilotBanner />
             {/* D-235: 경로 줄 — 어디를 눌러 들어와도 지금 어디 안에 있는지(앞 칸을 누르면 그 단계로) */}

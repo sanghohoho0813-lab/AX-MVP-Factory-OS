@@ -38,6 +38,7 @@ dist-ssr
 .client-ops-out
 .client-operations-out
 .client-ops-alerts-out
+.modconflict-out
 .doc-parser-out
 .client-ops-stage2-out
 .youtube-out

@@ -20,9 +20,24 @@ import { listJournal } from './journalService'
 import { listClients } from './clientOpsService'
 import { listEvents } from './customerBridgeService'
 import { listWorkspaceRows, type WorkspaceModuleRow } from './moduleData'
+import { listCustomServices, type CustomService } from './customServiceService'
 import { nowIso } from '../lib/appClock'
 
 export const WORKSPACE_BACKUP_VERSION = 3
+
+/**
+ * D-536 이 파일이 실제로 보장하는 것(점검 A7) — 화면 세 곳(고객 관리 › 더보기 · 설정 › 데이터 · 백업 불러오기)이 같은 말을 쓴다.
+ * '백업' 이라는 말 때문에 모두 되살아난다고 오해하지 않게, 되살아나는 것 · 보관용으로만 담기는 것 · 담기지 않는 것을 나눈다.
+ */
+export const BACKUP_SCOPE = {
+  restore: ['업체(회사 정보 · 서류 칸 기록 · 계약 · 수금 · 서류 요청)', '이 브라우저의 도구 입력값'],
+  archive: ['업무 일기(내가 쓴 것)', '모듈 기록(서버)', '상담신청(최근 500건)', '직접 만든 업무 항목', '서류 파일 목록(이름 · 크기 · 저장 위치)'],
+  excluded: ['서류 파일 원본(PDF · 사진) — 서류함에서 따로 내려받기', '다른 구성원의 업무 일기', '컨설팅 기록 · 고객 플랫폼 자료 · 화면 꾸미기'],
+} as const
+
+/** 모듈 기록 · 상담신청을 한 번에 담는 상한 — 넘으면 '일부만 담음' 으로 알린다(조용히 자르지 않는다) */
+export const EXPORT_MODULE_ROWS_MAX = 50_000
+export const EXPORT_EVENTS_MAX = 500
 
 export interface ExportFileRow {
   clientId: string
@@ -52,6 +67,8 @@ export interface WorkspaceSummary {
   modules: Record<string, number>
   /** 도구 입력값 중 이 브라우저에만 있는 모듈 기록 칸 수 */
   localModuleKeys: number
+  /** D-536 직접 만든 업무 항목(예전 파일에는 없을 수 있다) */
+  customServices?: number
 }
 
 export interface WorkspaceSection {
@@ -63,8 +80,12 @@ export interface WorkspaceSection {
   events: CustomerEvent[]
   moduleRows: WorkspaceModuleRow[]
   files: ExportFileRow[]
+  /** D-536 직접 만든 업무 항목(보관용 — 되살리기는 하지 않는다) */
+  customServices?: CustomService[]
   /** 못 담은 것(쉬운 말) — 비어 있으면 전부 담았다 */
   missing: string[]
+  /** D-536 상한 때문에 일부만 담은 것(쉬운 말) — 예전에는 알림 없이 잘랐다 */
+  capped?: string[]
 }
 
 export type WorkspaceBackupFile = BackupFile & { workspace: WorkspaceSection }
@@ -100,6 +121,7 @@ export function summarizeWorkspace(input: {
   moduleRows: readonly WorkspaceModuleRow[]
   files: readonly ExportFileRow[]
   toolInputs: Record<string, string>
+  customServices?: readonly CustomService[]
 }): WorkspaceSummary {
   const modules: Record<string, number> = {}
   for (const row of input.moduleRows) modules[row.moduleKey] = (modules[row.moduleKey] ?? 0) + 1
@@ -113,6 +135,7 @@ export function summarizeWorkspace(input: {
     moduleRows: input.moduleRows.length,
     modules,
     localModuleKeys: Object.keys(input.toolInputs).filter((k) => k.startsWith(MODULE_DATA_PREFIX)).length,
+    customServices: input.customServices?.length ?? 0,
   }
 }
 
@@ -126,6 +149,8 @@ export function buildWorkspaceBackup(input: {
   mode: 'cloud' | 'local'
   workspaceId: string | null
   missing?: string[]
+  capped?: string[]
+  customServices?: CustomService[]
 }): WorkspaceBackupFile {
   const files = exportFileRows(input.records)
   const base = buildBackup(input.records, input.toolInputs)
@@ -141,7 +166,9 @@ export function buildWorkspaceBackup(input: {
       events: input.events ?? [],
       moduleRows: input.moduleRows,
       files,
+      customServices: input.customServices ?? [],
       missing: input.missing ?? [],
+      capped: input.capped ?? [],
     },
   }
 }
@@ -152,6 +179,7 @@ export function workspaceBackupLine(s: WorkspaceSummary): string {
   if ((s.events ?? 0) > 0) parts.push(`상담신청 ${s.events}건`)
   const mod = s.moduleRows + s.localModuleKeys
   if (mod > 0) parts.push(`모듈 기록 ${s.moduleRows > 0 ? `${s.moduleRows}줄` : `${s.localModuleKeys}칸`}`)
+  if ((s.customServices ?? 0) > 0) parts.push(`직접 만든 업무 항목 ${s.customServices}개`)
   parts.push(`서류 파일 목록 ${s.files}개`)
   return parts.join(' · ')
 }
@@ -175,10 +203,20 @@ export function onlyThisWorkspace(inputs: Record<string, string>, workspaceId: s
  */
 export async function collectWorkspaceBackup(workspaceId: string | null, records: ClientOpsRecord[], cloud: boolean): Promise<WorkspaceBackupFile> {
   const missing: string[] = []
-  const [journal, rows, events] = await Promise.allSettled([listJournal(workspaceId), cloud ? listWorkspaceRows(workspaceId) : Promise.resolve(null), listEvents(workspaceId)])
+  const capped: string[] = []
+  const [journal, rows, events, custom] = await Promise.allSettled([
+    listJournal(workspaceId),
+    cloud ? listWorkspaceRows(workspaceId) : Promise.resolve(null),
+    listEvents(workspaceId),
+    listCustomServices(workspaceId),
+  ])
   if (journal.status === 'rejected') missing.push('업무 일기')
   if (rows.status === 'rejected') missing.push('모듈 기록(서버)')
   if (events.status === 'rejected') missing.push('상담신청')
+  if (custom.status === 'rejected') missing.push('직접 만든 업무 항목')
+  // D-536 상한에 닿았으면 '일부만' 이라고 적는다(예전: 알림 없이 잘림)
+  if (rows.status === 'fulfilled' && (rows.value?.length ?? 0) >= EXPORT_MODULE_ROWS_MAX) capped.push(`모듈 기록(앞 ${EXPORT_MODULE_ROWS_MAX.toLocaleString('ko-KR')}줄만)`)
+  if (events.status === 'fulfilled' && events.value.length >= EXPORT_EVENTS_MAX) capped.push(`상담신청(최근 ${EXPORT_EVENTS_MAX}건만)`)
   return buildWorkspaceBackup({
     records,
     journal: journal.status === 'fulfilled' ? journal.value : [],
@@ -188,6 +226,8 @@ export async function collectWorkspaceBackup(workspaceId: string | null, records
     mode: cloud ? 'cloud' : 'local',
     workspaceId,
     missing,
+    capped,
+    customServices: custom.status === 'fulfilled' ? custom.value : [],
   })
 }
 
@@ -230,6 +270,12 @@ export async function exportWorkspace(workspaceId: string | null, cloud: boolean
   const list = records ?? (await listClients(workspaceId))
   const file = await collectWorkspaceBackup(workspaceId, list, cloud)
   downloadWorkspaceBackup(file, today)
+  return { file, line: exportResultLine(file) }
+}
+
+/** 내려받은 뒤 한 줄(순수 — 시험이 직접 부른다) — 일부만 담은 것 · 못 담은 것 · 되살리기 범위까지(D-536) */
+export function exportResultLine(file: WorkspaceBackupFile): string {
   const miss = file.workspace.missing
-  return { file, line: `백업을 내려받았어요 — ${workspaceBackupLine(file.workspace.summary)}${miss.length ? ` · 못 담은 것: ${miss.join(', ')}(인터넷을 확인하고 한 번 더 받아 주세요)` : ''}` }
+  const cap = file.workspace.capped ?? []
+  return `백업을 내려받았어요 — ${workspaceBackupLine(file.workspace.summary)}${cap.length ? ` · 일부만 담음: ${cap.join(', ')}` : ''}${miss.length ? ` · 못 담은 것: ${miss.join(', ')}(인터넷을 확인하고 한 번 더 받아 주세요)` : ''} · 되살리기는 업체 · 입력값만(나머지는 보관용)`
 }

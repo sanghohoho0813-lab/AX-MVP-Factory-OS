@@ -14,6 +14,7 @@ import { CloudSaveStatus } from '../../components/cloud/CloudSaveStatus'
 import { notifyStoreChanged } from '../../storage/localStore'
 import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataImport/localBackup'
 import { exportWorkspace } from '../../services/workspaceExport'
+import { BackupScopeNote } from '../../components/data/BackupScopeNote'
 import { todayLocalDate } from '../../lib/appClock'
 import { Download } from 'lucide-react'
 import { useAuth } from '../../auth/AuthProvider'
@@ -115,6 +116,10 @@ function DataPanelSupabase() {
           <Download aria-hidden="true" className="size-4" />
           {exporting ? '모으는 중…' : '전체 내려받기'}
         </Button>
+        {/* D-536 이 파일로 되살아나는 것 · 보관용 · 담기지 않는 것(접어 둠) */}
+        <div className="mt-3">
+          <BackupScopeNote />
+        </div>
       </Panel>
 
       <Panel title="로컬 데이터 가져오기">

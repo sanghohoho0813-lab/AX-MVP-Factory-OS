@@ -67,6 +67,7 @@ import {
 import { downloadBackup, MODULE_DATA_PREFIX, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
 import { allowedModes, backupSourceWorkspace, checkRestoreSource, planRestore, removedNamesLine, restoreErrorLine, restoreSourceLine, type RestorePlan } from '../services/restoreGuard'
 import { exportWorkspace, workspaceSectionOf, type WorkspaceSummary } from '../services/workspaceExport'
+import { BackupScopeNote } from '../components/data/BackupScopeNote'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -720,6 +721,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               <Upload aria-hidden="true" className="size-4" />
               {restoring ? '복원 중…' : '백업 불러오기'}
             </Button>
+            {/* D-536 백업이 보장하는 것(접어 둠) — '백업' 이라는 말만 보고 모두 되살아난다고 오해하지 않게 */}
+            <BackupScopeNote />
             <Button variant="secondary" className="w-full justify-start" onClick={() => { setCatalogOpen(true); setMoreOpen(false) }}>
               <ListPlus aria-hidden="true" className="size-4" />
               업무 항목 관리
@@ -831,6 +834,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 이 파일의 업무 일기 {restorePrompt.workspace.journal}건{restorePrompt.workspace.moduleRows > 0 ? ` · 서버 모듈 기록 ${restorePrompt.workspace.moduleRows}줄` : ''}은 보관용이에요 — 불러오기는 업체 · 도구 입력값만 되살리고, 지금 있는 업무 일기 · 모듈 기록은 건드리지 않아요.
               </p>
             )}
+            <BackupScopeNote open />
             <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
               <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
               <li><strong>전부 바꾸기</strong> — 지금 목록에서 백업에 없는 업체를 지우고 백업 내용으로 채웁니다. 지워질 업체를 먼저 보여 드려요.</li>

@@ -21,6 +21,14 @@ import { nowIso } from '../lib/appClock'
 
 const PREFIX = 'axmvp.module.'
 
+/** D-535 이 창이 마지막으로 본 판(줄 id → updated_at). 서버가 고칠 때마다 updated_at 을 서버 시각으로 바꾼다(트리거) */
+const rowVersions = new Map<string, string>()
+/** D-535 같은 줄 저장은 부른 순서대로 하나씩(앞 저장이 끝나 새 판을 기억한 뒤 다음 저장) — 이 창 스스로와 '충돌' 하지 않게 */
+const rowChains = new Map<string, Promise<unknown>>()
+/** D-535 다른 기기가 먼저 고친 판을 덮기 전에 보관해 두는 갈래 이름 — 같은 모듈 안 `<갈래>.overwritten` */
+export const OVERWRITTEN_SUFFIX = '.overwritten'
+export const MODULE_OVERWROTE_EVENT = 'axmvp:module-overwrote'
+
 export interface ModuleRow {
   id: string
   /** 어느 업체의 기록인가 (업체와 상관없는 것은 '') */
@@ -115,7 +123,10 @@ async function cloudList(workspaceId: string, moduleKey: string, bucket: string)
       if (missingTable(error.message)) return null
       throw error
     }
-    return (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
+    const rows = (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
+    // D-535 이 창이 읽은 판을 기억 — 나중에 고쳐 저장할 때 '그새 다른 기기가 고쳤나' 를 이 판과 견준다
+    for (const r of rows) rowVersions.set(r.id, r.updatedAt)
+    return rows
   } catch (cause) {
     if (cause instanceof Error && missingTable(cause.message)) return null
     throw cause
@@ -230,6 +241,100 @@ export async function saveRow(
   else rows.unshift(row)
   writeLocal(key, rows)
   return row
+}
+
+/**
+ * D-535 고쳐 저장하기 — 다른 기기의 고침을 **알림 없이 지우지 않는다**(점검 A3).
+ *
+ * 예전 saveRow 는 줄을 통째로 덮었다(나중에 저장한 쪽이 이김 · 알림 없음). PC 와 휴대폰에서 같은 기록을 고치면 한쪽 고침이 조용히 사라졌다.
+ * 이 함수는 저장을 막지 않는다(저장이 새로 실패하는 길을 만들지 않는다). 대신
+ *   1. 이 창이 읽은 판 그대로면 → 그 판에만 고쳐 쓴다(보통 이 길 — 요청 하나).
+ *   2. 그새 다른 기기가 고쳤으면 → 그 판을 같은 모듈의 `<갈래>.overwritten` 에 **보관해 두고** 내 것을 저장한다 + OS 띠로 알린다.
+ *      보관 줄은 백업(전체 내보내기 · 모듈 기록)에 그대로 담긴다. 보관을 못 하면 덮지 않고 오류를 낸다(두 판 모두 지킨다).
+ *   3. 그 줄이 그새 지워졌으면 → 다시 만든다(내 글을 잃지 않게).
+ *   이 창이 그 줄을 읽은 적이 없으면(새 줄 · 처음) → 예전 saveRow 그대로.
+ * 로컬 모드(브라우저 하나)는 예전 그대로.
+ */
+export async function saveRowChecked(
+  workspaceId: string | null,
+  moduleKey: string,
+  bucket: string,
+  input: { id?: string; clientId?: string; data: Record<string, unknown> },
+): Promise<ModuleRow> {
+  const id = input.id
+  if (!id || !isCloud() || !workspaceId) return saveRow(workspaceId, moduleKey, bucket, input)
+  const prev = rowChains.get(id) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(() => saveCheckedNow(workspaceId, moduleKey, bucket, { ...input, id }))
+  const tail = run.catch(() => undefined)
+  rowChains.set(id, tail)
+  void tail.then(() => {
+    if (rowChains.get(id) === tail) rowChains.delete(id)
+  })
+  return run
+}
+
+async function saveCheckedNow(
+  workspaceId: string,
+  moduleKey: string,
+  bucket: string,
+  input: { id: string; clientId?: string; data: Record<string, unknown> },
+): Promise<ModuleRow> {
+  const base = rowVersions.get(input.id)
+  if (!base) {
+    const row = await saveRow(workspaceId, moduleKey, bucket, input)
+    rowVersions.set(row.id, row.updatedAt)
+    return row
+  }
+  const db = getSupabaseClient()
+  const now = nowIso()
+  const { data, error } = await db
+    .from('module_data')
+    .update({ client_id: input.clientId || null, payload: input.data, updated_at: now })
+    .eq('id', input.id)
+    .eq('workspace_id', workspaceId)
+    .eq('updated_at', base)
+    .select()
+    .maybeSingle()
+  if (error) {
+    if (missingTable(error.message)) return saveRow(workspaceId, moduleKey, bucket, input)
+    throw error
+  }
+  if (data) {
+    const row = fromRow(data as Record<string, unknown>)
+    rowVersions.set(row.id, row.updatedAt)
+    return row
+  }
+  // 0줄 — 판이 바뀌었거나(다른 기기가 먼저 고침) 줄이 없다(지워짐)
+  const { data: cur, error: readError } = await db.from('module_data').select('*').eq('id', input.id).eq('workspace_id', workspaceId).maybeSingle()
+  if (readError) throw readError
+  if (cur) {
+    const theirs = cur as Record<string, unknown>
+    const keepId = `ow_${input.id}_${Date.now().toString(36)}`.slice(0, 120)
+    const { error: keepError } = await db.from('module_data').insert({
+      id: keepId,
+      workspace_id: workspaceId,
+      module_key: moduleKey,
+      bucket: `${bucket}${OVERWRITTEN_SUFFIX}`,
+      client_id: typeof theirs.client_id === 'string' ? theirs.client_id : null,
+      payload: { originalId: input.id, originalUpdatedAt: theirs.updated_at ?? '', replacedAt: now, data: theirs.payload ?? {} },
+    })
+    if (keepError) {
+      throw new Error('다른 기기에서 먼저 고친 내용이 있어 저장하지 않았어요(그 내용을 보관하지 못했어요) — 새로 고친 뒤 다시 저장해 주세요.')
+    }
+    announceOverwrote(moduleKey, bucket)
+  }
+  const row = await saveRow(workspaceId, moduleKey, bucket, input)
+  rowVersions.set(row.id, row.updatedAt)
+  return row
+}
+
+function announceOverwrote(moduleKey: string, bucket: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(new CustomEvent(MODULE_OVERWROTE_EVENT, { detail: { moduleKey, bucket } }))
+  } catch {
+    /* 알림을 못 보내도 보관 · 저장은 끝났다 */
+  }
 }
 
 export async function deleteRow(

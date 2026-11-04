@@ -14,7 +14,7 @@ import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '.
 import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
 import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
 import { LEARN_ROW, learnedOf, learnedStore } from '../homeAsk/homeAskStore'
-import { buildWorkspaceBackup, collectWorkspaceBackup, exportFileRows, onlyThisWorkspace, workspaceBackupFileName, workspaceBackupLine, workspaceSectionOf } from '../workspaceExport'
+import { BACKUP_SCOPE, buildWorkspaceBackup, collectWorkspaceBackup, exportFileRows, exportResultLine, onlyThisWorkspace, workspaceBackupFileName, workspaceBackupLine, workspaceSectionOf } from '../workspaceExport'
 import { buildBackup, parseBackup, parseBackupToolInputs } from '../clientOpsBackup'
 import { listWorkspaceRows, type WorkspaceModuleRow } from '../moduleData'
 import { normalizeClientOps } from '../clientOpsService'
@@ -207,6 +207,21 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   const local = await collectWorkspaceBackup(null, [a], false)
   check('W6b 브라우저 저장 모드 — 업무 일기(이 브라우저) · 서버 모듈 0 · 못 담은 것 0', local.workspace.mode === 'local' && local.workspace.moduleRows.length === 0 && local.workspace.missing.length === 0 && local.clients.length === 1, local.workspace)
   check('W7 클라우드 — 다른 작업공간 모듈 칸은 빼고 이 작업공간 · 도구 입력값만', JSON.stringify(Object.keys(onlyThisWorkspace({ 'axmvp.module.a.b.ws-1': '1', 'axmvp.module.a.b.ws-2': '2', 'axmvp.module.a.b': '3', 'axmvp.tools.x': '4' }, 'ws-1')).sort()) === JSON.stringify(['axmvp.module.a.b.ws-1', 'axmvp.tools.x']))
+}
+
+/* D-536 백업 보장 범위 · 일부만 담음 · 직접 만든 업무 항목 */
+{
+  const base = { records: [], journal: [], moduleRows: [], toolInputs: {}, mode: 'cloud' as const, workspaceId: 'ws-1' }
+  const plain = buildWorkspaceBackup(base)
+  check('B1 내려받은 한 줄 끝에 "되살리기는 업체 · 입력값만(나머지는 보관용)"', exportResultLine(plain).endsWith('되살리기는 업체 · 입력값만(나머지는 보관용)'), exportResultLine(plain))
+  const capped = buildWorkspaceBackup({ ...base, capped: ['상담신청(최근 500건만)'] })
+  check('B2 상한에 닿으면 "일부만 담음" — "못 담은 것(인터넷…)" 과 다른 말', exportResultLine(capped).includes('일부만 담음: 상담신청(최근 500건만)') && !exportResultLine(capped).includes('인터넷'), exportResultLine(capped))
+  const missing = buildWorkspaceBackup({ ...base, missing: ['업무 일기'] })
+  check('B3 못 읽은 것은 예전처럼 "못 담은 것: … 인터넷"', exportResultLine(missing).includes('못 담은 것: 업무 일기(인터넷을 확인하고'))
+  const cs = buildWorkspaceBackup({ ...base, customServices: [{ key: 'custom_x', label: '세무기장', shortLabel: '세무기장', order: 101, archived: false, createdAt: '', updatedAt: '', id: 'c1', workspaceId: 'ws-1' } as never] })
+  check('B4 직접 만든 업무 항목이 파일 · 한 줄에 담김', cs.workspace.customServices?.length === 1 && cs.workspace.summary.customServices === 1 && workspaceBackupLine(cs.workspace.summary).includes('직접 만든 업무 항목 1개'), workspaceBackupLine(cs.workspace.summary))
+  check('B5 보장 범위: 원본 파일은 "담기지 않아요" · 업무 일기는 "보관용" · 업체는 "되살릴 수 있어요"', BACKUP_SCOPE.excluded.some((x) => x.includes('원본')) && BACKUP_SCOPE.archive.some((x) => x.includes('업무 일기')) && BACKUP_SCOPE.restore.some((x) => x.includes('업체')))
+  check('B6 예전 파일(직접 만든 업무 항목 칸 없음)도 한 줄 그대로', !workspaceBackupLine(plain.workspace.summary).includes('직접 만든'))
 }
 
 /* I D-523 보낸 초대 */

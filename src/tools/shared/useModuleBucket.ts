@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { deleteRow, listRows, saveRow } from '../../services/moduleData'
+import { deleteRow, listRows, saveRowChecked } from '../../services/moduleData'
 import { useToolClient } from './toolClientContext'
 
 export interface BucketRow<T> {
@@ -62,7 +62,8 @@ export function useModuleBucket<T extends Record<string, unknown>>(moduleKey: st
 
   const save = useCallback(
     async (input: { id?: string; clientId?: string; data: T }) => {
-      const row = await saveRow(workspaceId, moduleKey, bucket, {
+      // D-535 다른 기기가 먼저 고친 줄이면 그 판을 보관해 두고 저장(조용히 덮지 않음)
+      const row = await saveRowChecked(workspaceId, moduleKey, bucket, {
         id: input.id,
         clientId: input.clientId ?? '',
         data: input.data,

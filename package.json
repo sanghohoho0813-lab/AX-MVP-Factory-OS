@@ -150,7 +150,8 @@
     "test:packsync": "vite build --config vite.packsync.config.mjs && node .packsync-out/packsync.mjs",
     "qa:draftcloud": "node e2e/draft-cloud.mjs",
     "qa:packcloud": "node e2e/pack-cloud.mjs",
-    "qa:restore": "node e2e/restore-guard.mjs"
+    "qa:restore": "node e2e/restore-guard.mjs",
+    "qa:modconflict": "node e2e/module-conflict.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

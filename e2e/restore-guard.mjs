@@ -189,6 +189,9 @@ try {
   const mergeOn = await enabled(dlg(page).getByRole('button', { name: '지금 데이터와 합치기' }))
   const replaceOn = await enabled(dlg(page).getByRole('button', { name: '백업 내용으로 전부 바꾸기' }))
   await shot(page, 'restore-other-workspace')
+  const scope = page.getByTestId('backup-scope').filter({ visible: true }).first()
+  const scopeText = (await scope.innerText().catch(() => '')) ?? ''
+  check('R2b (D-536) 불러오기 창에 되살아나는 것 · 보관용 · 담기지 않는 것(원본 파일)이 펴져 있음', (await scope.getAttribute('data-open').catch(() => '')) === '1' && /되살릴 수 있어요/.test(scopeText) && /보관용으로만/.test(scopeText) && /원본/.test(scopeText), scopeText.slice(0, 200))
   check('R2 팀장 화면에 대표 파일 → "다른 작업공간 파일" 한 줄 · 합치기 · 바꾸기 둘 다 막힘', srcKind === 'other-mine' && !mergeOn && !replaceOn, { srcKind, mergeOn, replaceOn })
   // 예전 코드처럼 단추가 살아 있으면 눌러 본다 — 그때 DB 에서 무슨 일이 생기는지가 '수정 전' 의 재현이다
   if (mergeOn) {
