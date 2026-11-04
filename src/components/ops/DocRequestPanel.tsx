@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { Check, ChevronDown, ChevronUp, Circle, MailCheck, Send } from 'lucide-react'
 import type { ClientOpsRecord, DocRequest, DocumentKey } from '../../types/clientOps'
-import { openRequests, requestProgress, withItemDone, withRequestClosed } from '../../services/docRequests'
+import { closedRequests, DOC_REQUEST_SHOWN, openRequests, requestProgress, withItemDone, withRequestClosed } from '../../services/docRequests'
 import { Button } from '../ui/Button'
 
 /** 보낸 뒤 이만큼 지나도 덜 왔으면 빨간 글자 — [보냈어요] 할 일 기한(3일)과 같게 */
@@ -33,13 +33,63 @@ export function DocRequestPanel({
   /** 다 받았을 때 — 이 요청으로 만든 할 일을 끝낸다(없으면 요청만 끝냄) */
   onFinish?: (req: DocRequest) => Promise<void>
 }) {
-  const open = openRequests(record).slice(0, 3)
-  if (!open.length) return null
+  // D-532 표시만 줄인다 — 끝내지 않은 요청은 기록에 전부 남아 있고, 넘는 것은 [n개 더 보기] 로 연다(예전: 3개만 보이고 나머지는 말없이 숨음)
+  const [allOpen, setAllOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const openAll = openRequests(record)
+  const closed = closedRequests(record)
+  if (!openAll.length && !closed.length) return null
+  const open = allOpen ? openAll : openAll.slice(0, DOC_REQUEST_SHOWN)
+  const hidden = openAll.length - open.length
   return (
-    <section aria-label="요청한 서류" data-testid="doc-req" className="flex flex-col gap-2">
+    // 기다리는 요청이 없으면 '요청한 서류' 판은 없다(예전 그대로) — 지난 요청 한 줄만 남는다
+    <section aria-label={openAll.length ? '요청한 서류' : '지난 서류 요청'} data-testid={openAll.length ? 'doc-req' : 'doc-req-history-wrap'} className="flex flex-col gap-2">
       {open.map((req) => (
         <RequestRow key={req.id} record={record} req={req} today={today} onCommit={onCommit} onResend={onResend} onJump={onJump} onFinish={onFinish} />
       ))}
+      {(hidden > 0 || (allOpen && openAll.length > DOC_REQUEST_SHOWN) || closed.length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {(hidden > 0 || allOpen) && openAll.length > DOC_REQUEST_SHOWN && (
+            <button
+              type="button"
+              aria-expanded={allOpen}
+              onClick={() => setAllOpen((v) => !v)}
+              data-testid="doc-req-more"
+              className="tap t-sub inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50"
+            >
+              {allOpen ? '요청 접기' : `기다리는 요청 ${hidden}개 더 보기`}
+              {allOpen ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
+            </button>
+          )}
+          {closed.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={historyOpen}
+              onClick={() => setHistoryOpen((v) => !v)}
+              data-testid="doc-req-history-toggle"
+              className="tap t-sub inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {historyOpen ? '지난 요청 접기' : `지난 요청 ${closed.length}건`}
+              {historyOpen ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
+            </button>
+          )}
+        </div>
+      )}
+      {historyOpen && closed.length > 0 && (
+        <ul data-testid="doc-req-history" className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white px-4">
+          {closed.map((req) => {
+            const p = requestProgress(record, req, today)
+            return (
+              <li key={req.id} data-testid="doc-req-history-row" className="t-sub flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 break-keep text-slate-700">
+                <span className="min-w-0 [overflow-wrap:anywhere]">
+                  {req.title || '서류 요청'} · {md(req.sentAt)} 보냄 · {md(req.closedAt ?? req.sentAt)} 끝냄
+                </span>
+                <span className="shrink-0 tabular-nums text-slate-600">{p.got}/{p.total} 받음</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }

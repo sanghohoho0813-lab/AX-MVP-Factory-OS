@@ -12,8 +12,17 @@
 import type { ClientOpsRecord, DocRequest, DocRequestItem, DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 
-/** 업체 한 곳에 남기는 요청 기록 수 — 오래된 것부터 버린다 */
-export const DOC_REQUEST_LIMIT = 12
+/**
+ * D-532 보관 ≠ 표시. 예전에는 업체마다 요청 기록을 12개만 남기고 넘으면 **끝내지 않은 요청까지** 오래된 것부터 버렸다(읽을 때도 12개로 잘랐다).
+ * 이제 끝내지 않은 요청은 몇 개든 버리지 않는다. '끝낸' 요청만 최근 것부터 이만큼 남긴다.
+ */
+export const DOC_REQUEST_KEEP_CLOSED = 30
+/** 저장된 값을 읽을 때 한 번에 보는 줄 수 상한(망가진 값 · 아주 큰 값 막기) — 끝내지 않은 요청은 이 안에서 전부 남는다 */
+const DOC_REQUEST_READ_MAX = 500
+/** 서류함 맨 위에 펼쳐 보이는 끝내지 않은 요청 수 — 나머지는 [n개 더 보기](표시만 줄인다 · 기록은 그대로) */
+export const DOC_REQUEST_SHOWN = 3
+/** @deprecated D-532 — 예전 '업체당 12개' 상한. 기록을 버리는 데는 더 쓰지 않는다(이름만 남김) */
+export const DOC_REQUEST_LIMIT = DOC_REQUEST_KEEP_CLOSED
 /** 한 요청 안의 줄 수 */
 const ITEM_LIMIT = 30
 
@@ -257,8 +266,25 @@ const replace = (record: ClientOpsRecord, id: string, fn: (r: DocRequest) => Doc
   docRequests: (record.docRequests ?? []).map((r) => (r.id === id ? fn(r) : r)),
 })
 
+/**
+ * D-532 남길 기록 고르기 — 끝내지 않은 요청은 전부, 끝낸 요청은 앞(최근)부터 DOC_REQUEST_KEEP_CLOSED 개. 순서는 그대로.
+ */
+export function pruneDocRequests(list: readonly DocRequest[]): DocRequest[] {
+  let closed = 0
+  return list.filter((r) => {
+    if (!r.closedAt) return true
+    closed += 1
+    return closed <= DOC_REQUEST_KEEP_CLOSED
+  })
+}
+
+/** 끝낸 요청(최근 것 먼저) — 서류함 '지난 요청' 에 읽기만으로 보여 준다 */
+export function closedRequests(record: Pick<ClientOpsRecord, 'docRequests'>): DocRequest[] {
+  return (record.docRequests ?? []).filter((r) => !!r.closedAt)
+}
+
 export function withDocRequest(record: ClientOpsRecord, req: DocRequest): ClientOpsRecord {
-  return { ...record, docRequests: [req, ...(record.docRequests ?? []).filter((r) => r.id !== req.id)].slice(0, DOC_REQUEST_LIMIT) }
+  return { ...record, docRequests: pruneDocRequests([req, ...(record.docRequests ?? []).filter((r) => r.id !== req.id)]) }
 }
 
 /** 칸이 없는 줄(생년월일 · 금액 …)을 사람이 [받았어요] — 되돌리면 doneAt 을 지운다 */
@@ -311,7 +337,8 @@ export function normalizeDocRequests(value: unknown): { docRequests?: DocRequest
   if (!Array.isArray(value)) return {}
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
   const out: DocRequest[] = []
-  for (const raw of value.slice(0, DOC_REQUEST_LIMIT)) {
+  // D-532 읽을 때는 자르지 않는다(예전: 12개) — 남길지는 pruneDocRequests 가 정한다(끝내지 않은 요청은 전부)
+  for (const raw of value.slice(0, DOC_REQUEST_READ_MAX)) {
     if (!raw || typeof raw !== 'object') continue
     const v = raw as Record<string, unknown>
     if (typeof v.id !== 'string' || typeof v.sentAt !== 'string' || !DAY.test(v.sentAt)) continue
@@ -339,5 +366,5 @@ export function normalizeDocRequests(value: unknown): { docRequests?: DocRequest
       ...(typeof v.closedAt === 'string' && DAY.test(v.closedAt) ? { closedAt: v.closedAt } : {}),
     })
   }
-  return out.length ? { docRequests: out } : {}
+  return out.length ? { docRequests: pruneDocRequests(out) } : {}
 }

@@ -156,6 +156,14 @@ check('D10a 남은 것 [받았어요] → 다 받았어요 · n/n · [끝내기(
 await finish.click()
 await page.waitForTimeout(800)
 check('D10b [끝내기] → 판 사라짐', (await page.getByTestId('doc-req').count()) === 0)
+// D-532 끝낸 요청은 지워지지 않고 '지난 요청 1건' 한 줄로 남는다(판은 없음)
+{
+  const hist = page.getByTestId('doc-req-history-toggle')
+  const line = await hist.innerText().catch(() => '')
+  await hist.click().catch(() => {})
+  const rows = await page.getByTestId('doc-req-history-row').allInnerTexts()
+  check('D10b2 (D-532) 끝낸 요청은 기록에 남아 "지난 요청 1건" → 펴면 n/n 받음 · 끝냄 날짜', /지난 요청 1건/.test(line) && rows.length === 1 && rows[0].includes(`${n}/${n} 받음`) && /끝냄/.test(rows[0]), { line, rows })
+}
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.getByTestId('today-hero').waitFor()
 const openTodo = await page.getByTestId('today-todo-grid').filter({ hasText: '자료 받았는지 확인' }).count()
@@ -307,6 +315,40 @@ check('D12 JS 오류 0', errs.length === 0, errs.slice(0, 3))
   await p.reload({ waitUntil: 'networkidle' })
   check('F4 [닫기] → 새로 고쳐도 안 보임(이 기기)', (await p.getByTestId('today-firstuse').count()) === 0)
   check('F5 단계마다 오늘에서 한 번 누르면 그 자리(서류함 · 맞춤 추천 · 마케팅) · 오류 0', Object.values(clicks).every((n) => n === 1) && Object.keys(clicks).length === 3 && e3.length === 0, { clicks, e3 })
+  await c.close()
+}
+
+// D-532 보관 ≠ 표시 — 기다리는 요청 13개(예전엔 12개만 남기고 가장 오래된 것을 버렸다) → 서류함은 3개 + [10개 더 보기]
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await c.newPage()
+  const e5 = []
+  p.on('pageerror', (e) => e5.push(String(e)))
+  await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await p.evaluate(seedScript())
+  await p.evaluate(() => {
+    const key = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(key) ?? '[]')
+    const reqs = Array.from({ length: 13 }, (_, i) => ({ id: `r532-${i}`, sentAt: '2026-10-01', sentAtIso: '2026-10-01T00:00:00.000Z', title: `요청 ${i}`, items: [{ label: `생년월일 ${i}`, where: '' }] }))
+    localStorage.setItem(key, JSON.stringify(list.map((x) => (x.id === 'cli_hansol' ? { ...x, docRequests: reqs } : x))))
+  })
+  await p.goto(DETAIL, { waitUntil: 'networkidle' })
+  await p.locator('#docs').waitFor()
+  const shown = await p.getByTestId('doc-req-row').count()
+  const moreText = await p.getByTestId('doc-req-more').innerText().catch(() => '')
+  await p.getByTestId('doc-req-more').click().catch(() => {})
+  const all = await p.getByTestId('doc-req-row').count()
+  const ids = await p.getByTestId('doc-req-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))
+  check('P1 (D-532) 기다리는 요청 13개 → 처음 3개 + "10개 더 보기" → 펴면 13개 · 가장 오래된 것(r532-12)도 남음', shown === 3 && /10개 더 보기/.test(moreText) && all === 13 && ids.includes('r532-12'), { shown, moreText, all })
+  // 하나를 고쳐 저장해도(업체 기록 다시 쓰기) 13개 그대로 — 예전엔 저장할 때 12개로 잘렸다
+  await p.getByTestId('doc-req-row').first().getByTestId('doc-req-list-toggle').click()
+  await p.getByTestId('doc-req-row').first().getByTestId('doc-req-item-done').first().click()
+  await p.waitForTimeout(500)
+  await p.reload({ waitUntil: 'networkidle' })
+  await p.locator('#docs').waitFor()
+  const kept = await p.evaluate(() => (JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_hansol')?.docRequests ?? []).length)
+  check('P2 (D-532) 한 줄 [받았어요] 로 저장 → 새로 고쳐도 기록 13개 그대로', kept === 13, kept)
+  check('P3 JS 오류 0', e5.length === 0, e5)
   await c.close()
 }
 

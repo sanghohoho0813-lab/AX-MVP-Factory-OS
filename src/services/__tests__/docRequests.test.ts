@@ -12,8 +12,11 @@ import { requestMessage } from '../recoRequest'
 import { policyApplyMessage } from '../policyApply'
 import { requestFollowUpText } from '../recoFollowUp'
 import {
+  closedRequests,
+  DOC_REQUEST_KEEP_CLOSED,
   itemView,
   newDocRequest,
+  pruneDocRequests,
   normalizeDocRequests,
   openRequests,
   pendingDocKeys,
@@ -249,6 +252,41 @@ check('R3c 업체 기록에 붙음 · 끝내지 않은 요청 1', openRequests(r
   check('L5 고객 관리 카드 칩도 같은 규칙 — 시작했는데 서류 모자람 → \'서류 1/3\' · 마우스를 올리면 한 줄 전부', chip.docs === '서류 1/3' && (chip.line ?? '').includes('회신 대기 1건 4일째'), chip)
   const none = chipStateFor(base(), 'businessScope', '업종추가', today, 7)
   check('L6 시작 전 업무 — 칩에 서류 글자 없음(예전 그대로)', none.docs === undefined)
+}
+
+/* ---------------- D-532 보관 ≠ 표시 — 끝내지 않은 요청은 버리지 않는다 ---------------- */
+{
+  const req = (i: number, closed = false): DocRequest => ({
+    id: `r${i}`,
+    sentAt: '2026-10-01',
+    sentAtIso: '2026-10-01T00:00:00.000Z',
+    title: `요청 ${i}`,
+    items: [{ label: '사업자등록증', where: '홈택스' }],
+    todoId: `todo-${i}`,
+    ...(closed ? { closedAt: '2026-10-05' } : {}),
+  })
+  // 예전 사고: 끝내지 않은 요청 13개 → 12개 넘으면 가장 오래된(r0) 요청 · 할 일 연결이 사라졌다
+  let rec = base()
+  for (let i = 0; i < 13; i++) rec = withDocRequest(rec, req(i))
+  check('P1 끝내지 않은 요청 13개 → 13개 그대로(가장 오래된 r0 · 할 일 연결 남음)', rec.docRequests?.length === 13 && rec.docRequests.some((r) => r.id === 'r0' && r.todoId === 'todo-0'), rec.docRequests?.map((r) => r.id))
+  check('P1b 오늘 · 일정의 할 일 진행도 13개 모두', todoRequestProgress([rec], '2026-10-10').size === 13)
+  // 끝낸 요청만 오래된 것부터 정리 — 끝내지 않은 것은 몇 개든 그대로
+  let mix = base()
+  for (let i = 0; i < 40; i++) mix = withDocRequest(mix, req(i, true))
+  for (let i = 100; i < 105; i++) mix = withDocRequest(mix, req(i))
+  const closedLeft = (mix.docRequests ?? []).filter((r) => r.closedAt)
+  check(`P2 끝낸 요청 40개 → 최근 ${DOC_REQUEST_KEEP_CLOSED}개만 · 끝내지 않은 5개는 전부`, closedLeft.length === DOC_REQUEST_KEEP_CLOSED && openRequests(mix).length === 5 && closedLeft[0].id === 'r39', { closed: closedLeft.length, open: openRequests(mix).length, first: closedLeft[0]?.id })
+  check('P2b 끝낸 요청 목록(지난 요청) = 최근 것 먼저', closedRequests(mix)[0].id === 'r39' && closedRequests(mix).length === DOC_REQUEST_KEEP_CLOSED)
+  // 읽을 때도 자르지 않는다(예전: 12개로 잘라 다시 저장하면 사라졌다)
+  const stored = Array.from({ length: 20 }, (_, i) => req(i))
+  const read = normalizeDocRequests(stored).docRequests ?? []
+  check('P3 저장된 끝내지 않은 요청 20개 → 읽어도 20개(예전 12개로 잘림)', read.length === 20 && read[19].id === 'r19', read.length)
+  const viaClient = normalizeClientOps({ ...base(), docRequests: stored } as Partial<ClientOpsRecord>)
+  check('P3b 업체 기록 다듬기(normalizeClientOps)를 거쳐도 20개', viaClient.docRequests?.length === 20)
+  // 기존 기록 보존 — 예전 모양(12개 이하)은 그대로
+  const old = Array.from({ length: 12 }, (_, i) => req(i, i % 2 === 0))
+  check('P4 예전 기록 12개(반은 끝냄) → 12개 · 순서 그대로', JSON.stringify((normalizeDocRequests(old).docRequests ?? []).map((r) => r.id)) === JSON.stringify(old.map((r) => r.id)))
+  check('P5 pruneDocRequests 는 순서를 바꾸지 않는다', JSON.stringify(pruneDocRequests([req(3), req(2, true), req(1)]).map((r) => r.id)) === JSON.stringify(['r3', 'r2', 'r1']))
 }
 
 console.log(`\ndocRequests: ${passed} passed, ${failed} failed`)
