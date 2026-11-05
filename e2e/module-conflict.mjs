@@ -8,6 +8,13 @@
  *   M4 다른 기기가 그 줄을 지운 뒤 저장 → 다시 만들어짐(내 글 안 잃음) · 보관 0
  *   M5 읽은 적 없는 줄(새 줄) → 예전처럼 저장 · 보관 0
  *   M6 보관 줄은 같은 작업공간 · 같은 모듈 — 전체 내보내기(모듈 기록)에 담긴다
+ *   D-538 고정 id(자체점검 기준 self-check · 스레드 이번 주 참고 wk_<주>) — 대표가 대표 작업공간 · 팀장 작업공간(편집자) 둘 다에 저장할 때
+ *   F1 (수정 전 재현 · 0023 없음) 예전 id 로 팀장 작업공간에 저장 → 대표 줄이 팀장 작업공간으로 옮겨짐
+ *   F2 (수정 전 재현 · 0023 있음) 예전 id 로 저장 → 막힘 · 대표 줄은 제자리
+ *   F3 (수정 뒤 · 0023 있음) 자체점검 기준: 두 작업공간 저장 둘 다 됨 · 각자 제 줄 · 대표 줄 안 옮겨짐 · 읽기도 제 것
+ *   F4 (수정 뒤) 예전 줄만 있는 작업공간은 예전 줄을 이어서 읽음 · 새로 저장해도 예전 줄은 그대로(지우지 않음)
+ *   F5 (수정 뒤 · 0023 있음) 이번 주 참고: 두 작업공간 저장 둘 다 됨 · 각자 제 것
+ *   F6 팀장 본인(팀장 토큰) — 예전 id 는 대표 줄 때문에 저장 안 됨 → 고친 뒤 저장 · 읽기 됨 · 대표 줄은 안 보임
  *
  *   sudo node e2e/module-conflict.mjs   (pg_ctlcluster 16 main start 먼저)
  */
@@ -22,6 +29,7 @@ const PGRST_PORT = Number(process.env.PGRST_PORT ?? 4566)
 const SECRET = 'e2e-local-jwt-secret-at-least-32-characters-long'
 const OWNER = { id: '0e000000-0000-4000-8000-0000000000a1', email: 'owner@e2e.kr' }
 const WS = '0e0000aa-0000-4000-8000-00000000000a'
+const PILOT_ID = '0e000000-0000-4000-8000-0000000000b1'
 let pass = 0
 let fail = 0
 const check = (n, ok, d) => {
@@ -102,6 +110,65 @@ try {
 
   // M6 보관 줄 위치 — 같은 작업공간 · 같은 모듈(전체 내보내기가 작업공간 전체 module_data 를 읽으므로 담긴다)
   check('M6 보관 줄 = 같은 작업공간 · 같은 모듈 · 갈래 notes.overwritten', sql(`select workspace_id || '|' || module_key from public.module_data where bucket = 'notes${A.OVERWRITTEN_SUFFIX}'`) === `${WS}|${MOD}`)
+
+  // ---- D-538 고정 id ----
+  const PW = sql(`select w.id from public.workspaces w join public.os_access p on p.user_id = w.owner_id and p.tier = 'pilot' order by w.created_at limit 1`)
+  const ownerIn = sql(`select role from public.workspace_members where workspace_id = '${PW}' and user_id = '${OWNER.id}'`)
+  check('F0 준비 — 대표가 팀장 작업공간 편집자(0020 · 팀장 화면 전환) · 0023 장치 있음', !!PW && ownerIn === 'editor' && sql(`select count(*) from pg_trigger where tgname = 'zz_workspace_id_lock' and tgrelid = 'public.module_data'::regclass`) === '1', { PW, ownerIn })
+  const wsOf = (id) => sql(`select coalesce(string_agg(workspace_id::text, ','), '') from public.module_data where id = '${id}'`)
+  const tryOld = async (id) => A.saveRow(PW, 'ai', 'skills', { id, data: { text: '팀장 화면에서 저장' } }).then(() => 'saved', (e) => `error:${String(e?.message ?? e).slice(0, 80)}`)
+
+  // F1 수정 전 재현(0023 없음 — 이 시험 DB 에서만 잠깐 끔)
+  await A.saveRow(WS, 'ai', 'skills', { id: 'self-check-f1', data: { text: '대표 정의' } })
+  sql(`alter table public.module_data disable trigger zz_workspace_id_lock`)
+  const f1 = await tryOld('self-check-f1')
+  sql(`alter table public.module_data enable trigger zz_workspace_id_lock`)
+  check('F1 (수정 전 · 0023 없음) 예전 같은 id 로 팀장 작업공간에 저장 → 대표 줄이 팀장 작업공간으로 옮겨짐(섞임)', f1 === 'saved' && wsOf('self-check-f1') === PW, { f1, at: wsOf('self-check-f1') })
+
+  // F2 수정 전 재현(0023 있음)
+  await A.saveRow(WS, 'ai', 'skills', { id: 'self-check', data: { text: '대표 예전 정의' } })
+  const f2 = await tryOld('self-check')
+  check('F2 (수정 전 · 0023 있음) 예전 같은 id 저장 → 막힘 · 대표 줄은 대표 작업공간에 그대로', f2.startsWith('error') && wsOf('self-check') === WS, { f2, at: wsOf('self-check') })
+
+  // F3 수정 뒤 — 실제 saveJudgeSkill
+  const okOwner = await A.saveJudgeSkill(WS, '대표 정의(새)')
+  const okPilot = await A.saveJudgeSkill(PW, '팀장 화면에서 쓴 정의')
+  A.__resetJudgeSkill()
+  const readOwner = await A.syncJudgeSkill(WS)
+  A.__resetJudgeSkill()
+  const readPilot = await A.syncJudgeSkill(PW)
+  check('F3 (수정 뒤 · 0023 있음) 자체점검 기준 — 두 작업공간 저장 둘 다 됨 · 각자 제 줄 · 읽기도 제 것',
+    okOwner && okPilot && wsOf(A.workspaceRowId('self-check', WS)) === WS && wsOf(A.workspaceRowId('self-check', PW)) === PW && readOwner === '대표 정의(새)' && readPilot === '팀장 화면에서 쓴 정의',
+    { okOwner, okPilot, readOwner, readPilot })
+  check('F4 예전 줄(self-check)은 지우지 않고 대표 작업공간에 그대로 · 내용도 그대로', wsOf('self-check') === WS && sql(`select payload->>'text' from public.module_data where id = 'self-check'`) === '대표 예전 정의', sql(`select payload::text from public.module_data where id = 'self-check'`))
+
+  // F5 이번 주 참고 — 실제 saveWeekRef · loadWeekRef
+  const day = '2026-11-05'
+  const week = A.mondayOf(day)
+  await A.saveRow(WS, A.THREADS_MODULE, A.WEEK_BUCKET, { id: `wk_${week}`, data: { items: [{ template: 'P', firstLine: '', ending: '', note: '예전 줄' }], savedAt: '2026-11-03T00:00:00Z' } })
+  const oldRead = (await A.loadWeekRef(WS, day))?.items?.[0]?.note
+  const w1 = await A.saveWeekRef(WS, [{ template: 'B', firstLine: '', ending: '', note: '대표 것' }], day).then(() => 'ok', (e) => String(e?.message ?? e))
+  const w2 = await A.saveWeekRef(PW, [{ template: 'E', firstLine: '', ending: '', note: '팀장 화면 것' }], day).then(() => 'ok', (e) => String(e?.message ?? e))
+  const rOwner = (await A.loadWeekRef(WS, day))?.items?.[0]?.note
+  const rPilot = (await A.loadWeekRef(PW, day))?.items?.[0]?.note
+  check('F5 (수정 뒤 · 0023 있음) 이번 주 참고 — 예전 줄 이어 읽음 → 두 작업공간 저장 둘 다 됨 · 각자 제 것 · 예전 줄 제자리',
+    oldRead === '예전 줄' && w1 === 'ok' && w2 === 'ok' && rOwner === '대표 것' && rPilot === '팀장 화면 것' && wsOf(A.weekRefId(week, PW)) === PW && wsOf(`wk_${week}`) === WS,
+    { oldRead, w1, w2, rOwner, rPilot })
+
+  // F6 팀장 본인(팀장 토큰) — 예전에는 대표가 먼저 만든 같은 id 줄을 고칠 수 없어(RLS) 저장이 안 됐다
+  const ownerJwt = globalThis.__PGRST_JWT
+  const pp = b64({ sub: PILOT_ID, email: 'pilot@e2e.kr', role: 'authenticated', aud: 'authenticated', exp: 4102444800 })
+  globalThis.__PGRST_JWT = `${h}.${pp}.${createHmac('sha256', SECRET).update(`${h}.${pp}`).digest('base64url')}`
+  const p0 = await C.saveRow(PW, 'ai', 'skills', { id: 'self-check', data: { text: '팀장 예전 방식' } }).then(() => 'saved', () => 'error')
+  const p1 = await C.saveJudgeSkill(PW, '팀장 본인 정의')
+  C.__resetJudgeSkill()
+  const p2 = await C.syncJudgeSkill(PW)
+  const p3 = await C.saveWeekRef(PW, [{ template: 'L', firstLine: '', ending: '', note: '팀장 본인' }], day).then(() => 'ok', (e) => String(e?.message ?? e))
+  const ownerRows = await C.listRows(WS, 'ai', 'skills')
+  globalThis.__PGRST_JWT = ownerJwt
+  check('F6 팀장 본인 — 예전 id 는 대표 줄 때문에 저장 안 됨(수정 전 재현) → 고친 뒤 자체점검 기준 · 이번 주 참고 저장 · 읽기 됨 · 대표 줄은 안 보임',
+    p0 === 'error' && p1 === true && p2 === '팀장 본인 정의' && p3 === 'ok' && ownerRows.length === 0 && wsOf('self-check') === WS,
+    { p0, p1, p2, p3, ownerRows: ownerRows.length })
 } catch (e) {
   check('실행 중 오류 없음', false, String(e).slice(0, 300))
 } finally {

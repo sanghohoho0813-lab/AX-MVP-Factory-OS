@@ -38,9 +38,7 @@ with fn(name) as (
                  from public.os_access a left join public.ai_entitlements e on e.user_id = a.user_id where a.tier = 'pilot' group by 1) s$q$),
   ('fixed_in_pilot', $q$select count(*)::text as v from public.module_data d join public.workspaces w on w.id = d.workspace_id
                         join public.os_access p on p.user_id = w.owner_id and p.tier = 'pilot'
-                        where d.id = 'self-check' or d.id like 'wk\_%'$q$),
-  ('grant_outside', $q$select count(*)::text as v from public.portal_grant_notices g
-                       where g.id like 'biz\_%' and g.workspace_id is distinct from public.default_intake_workspace()$q$),
+                        where d.id = 'self-check' or d.id ~ '^wk_[0-9]{4}-[0-9]{2}-[0-9]{2}$'$q$),
   ('owner_only_in_pilot', $q$select count(*)::text as v from public.module_data d join public.workspaces w on w.id = d.workspace_id
                              join public.os_access p on p.user_id = w.owner_id and p.tier = 'pilot'
                              where d.module_key = 'marketing'$q$)
@@ -102,15 +100,11 @@ with fn(name) as (
   union all
   select 14, '팀장 계정 AI 권한', 'pilot 계정의 ai_entitlements.kind(internal 이어야 함)', coalesce((select v from qv where name = 'pilot_ai'), '표 없음(0022 전)'), '참고'
   union all
-  select 15, '고정 이름 기록이 팀장 작업공간에', '자체점검 스킬(self-check) · 주간 참고(wk_*) — 옛 저장 길로 옮겨졌을 수 있음', coalesce((select v from qv where name = 'fixed_in_pilot'), '표 없음'),
+  select 15, '고정 이름 기록이 팀장 작업공간에', '예전 id 의 자체점검 기준(self-check) · 이번 주 참고(wk_<주>) — 대표 기록이 옮겨졌을 수 있음(D-538 뒤 새 줄은 작업공간마다 따로라 세지 않음)', coalesce((select v from qv where name = 'fixed_in_pilot'), '표 없음'),
          case when coalesce((select v from qv where name = 'fixed_in_pilot'), '0') = '0' then '좋음' else '참고 — 대표 기록이 팀장 작업공간에 있음(적용과 무관 · 따로 정리)' end
   union all
   select 16, '대표 전용 모듈 기록이 팀장 작업공간에', 'marketing 모듈 줄 수(마케팅은 대표 전용)', coalesce((select v from qv where name = 'owner_only_in_pilot'), '표 없음'),
          case when coalesce((select v from qv where name = 'owner_only_in_pilot'), '0') = '0' then '좋음' else '참고 — 섞인 흔적일 수 있음(적용과 무관 · 따로 확인)' end
-  union all
-  select 18, '공고(기업마당 biz_*)가 대표 작업공간 밖에', '공개 지원사업 화면은 대표 작업공간 공고만 보여 줌 — 밖에 있으면 옮겨졌을 수 있음',
-         coalesce((select v from qv where name = 'grant_outside'), '표 없음'),
-         case when coalesce((select v from qv where name = 'grant_outside'), '0') = '0' then '좋음' else '참고 — 적용과 무관 · 따로 확인' end
   union all
   select 17, '오래 걸린 거래', '1분 넘게 열린 거래(있으면 트리거 만들기가 기다림)',
          (select count(*)::text from pg_stat_activity where pid <> pg_backend_pid() and xact_start < now() - interval '1 minute' and state <> 'idle'),

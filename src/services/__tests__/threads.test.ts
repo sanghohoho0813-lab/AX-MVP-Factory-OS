@@ -27,6 +27,7 @@ import {
 import { MK_KNOWLEDGE, MK_KNOWLEDGE_META } from '../../../api/_ai/mkKnowledge.js'
 import { hasMaterial, readWeekTopics, recommendShort, recommendThread, rememberWeekTopics, topicChips, topicTag, WEEK_TOPICS_MAX } from '../marketing/quickStart'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
+import { listRows as listModuleRows, saveRow as saveModuleRow } from '../moduleData'
 import {
   ENDINGS,
   GOALS,
@@ -36,6 +37,11 @@ import {
   ROUTINE,
   WEEK_REF_MAX,
   mondayOf,
+  THREADS_MODULE,
+  WEEK_BUCKET,
+  loadWeekRef,
+  saveWeekRef,
+  weekRefId,
   normalizeWeekRef,
   TOPIC_TAGS,
   WEEK_PLAN,
@@ -306,6 +312,22 @@ const qsMem = new Map<string, string>()
 ;(globalThis as unknown as { localStorage: Pick<Storage, 'getItem' | 'setItem'> }).localStorage = { getItem: (k) => qsMem.get(k) ?? null, setItem: (k, v) => void qsMem.set(k, String(v)) }
 rememberWeekTopics(['고용지원금', '고용지원금', '정책자금', 'a', 'b', 'c', 'd', 'e'], '2026-10-23')
 check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘 · 다음 주 월요일엔 비어 있음 · 겹침 없이 6개까지 · 빈 목록은 덮지 않음', readWeekTopics('2026-10-25').join() === '고용지원금,정책자금,a,b,c,d' && readWeekTopics('2026-10-26').length === 0 && (rememberWeekTopics([], '2026-10-23'), readWeekTopics('2026-10-23').length === 6))
+
+// D-538 이번 주 참고 — 작업공간마다 다른 줄(wk_<주>_<작업공간>) · 예전 줄(wk_<주>)은 읽기만 · 지우지 않음
+{
+  const WA = '0a000000-0000-4000-8000-00000000000a'
+  const WB = '0b000000-0000-4000-8000-00000000000b'
+  const day = '2026-11-05'
+  const week = mondayOf(day)
+  check('WR1 줄 id — 작업공간 있으면 wk_<주>_<작업공간> · 없으면 예전 wk_<주>', weekRefId(week, WA) === `wk_${week}_${WA.replace(/-/g, '')}` && weekRefId(week) === `wk_${week}` && weekRefId(week, WA) !== weekRefId(week, WB))
+  await saveModuleRow(WA, THREADS_MODULE, WEEK_BUCKET, { id: `wk_${week}`, data: { items: [{ template: 'P', firstLine: '', ending: '', note: '예전' }], savedAt: '2026-11-03T00:00:00Z' } })
+  check('WR2 예전 줄만 있는 작업공간 → 그대로 읽힘', (await loadWeekRef(WA, day))?.items[0]?.note === '예전')
+  await saveWeekRef(WA, [{ template: 'B', firstLine: '', ending: '', note: '대표 것' }], day)
+  await saveWeekRef(WB, [{ template: 'E', firstLine: '', ending: '', note: '팀장 것' }], day)
+  const rowsA = await listModuleRows(WA, THREADS_MODULE, WEEK_BUCKET)
+  check('WR3 저장 — 작업공간마다 제 줄 · 예전 줄은 지우지 않음', rowsA.some((r) => r.id === weekRefId(week, WA)) && rowsA.some((r) => r.id === `wk_${week}`) && (await listModuleRows(WB, THREADS_MODULE, WEEK_BUCKET)).some((r) => r.id === weekRefId(week, WB)), rowsA.map((r) => r.id))
+  check('WR4 읽기 — 새 줄 먼저 · 다른 작업공간은 제 것', (await loadWeekRef(WA, day))?.items[0]?.note === '대표 것' && (await loadWeekRef(WB, day))?.items[0]?.note === '팀장 것')
+}
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

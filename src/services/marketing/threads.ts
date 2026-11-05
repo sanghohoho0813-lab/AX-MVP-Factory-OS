@@ -8,6 +8,7 @@
 import { generateId } from '../../storage/localStore'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
+import { pickScopedRow, workspaceRowId } from '../workspaceRowId'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, EMOJI, HYPE, LINK, numberLint, principleLint } from './snsRules'
@@ -634,13 +635,14 @@ export function normalizeWeekRef(raw: unknown, week: string): WeekRef | null {
   return { week, items, savedAt: str(r.savedAt, 40) || nowIso() }
 }
 
-export const weekRefId = (week: string) => `wk_${week}`
+/** D-538 클라우드 줄은 `wk_<주>_<작업공간>`(작업공간마다 따로) — 예전 `wk_<주>` 줄은 읽기만 */
+export const weekRefId = (week: string, workspaceId: string | null = null) => workspaceRowId(`wk_${week}`, workspaceId)
 
 /** 이번 주 것 — 없으면 null(지난주 것은 쓰지 않는다: 주 단위로 새로 본다) */
 export async function loadWeekRef(workspaceId: string | null, today: string = todayLocalDate()): Promise<WeekRef | null> {
   const week = mondayOf(today)
   const rows = await listRows(workspaceId, THREADS_MODULE, WEEK_BUCKET)
-  const row = rows.find((r) => r.id === weekRefId(week))
+  const row = pickScopedRow(rows, `wk_${week}`, workspaceId)
   return row ? normalizeWeekRef(row.data, week) : null
 }
 
@@ -648,7 +650,7 @@ export async function saveWeekRef(workspaceId: string | null, items: readonly We
   const week = mondayOf(today)
   const clean = normalizeWeekRef({ items, savedAt: nowIso() }, week)
   if (!clean) throw new Error('적은 형식이 없습니다.')
-  await saveRow(workspaceId, THREADS_MODULE, WEEK_BUCKET, { id: weekRefId(week), data: { items: clean.items, savedAt: clean.savedAt } as unknown as Record<string, unknown> })
+  await saveRow(workspaceId, THREADS_MODULE, WEEK_BUCKET, { id: weekRefId(week, workspaceId), data: { items: clean.items, savedAt: clean.savedAt } as unknown as Record<string, unknown> })
   return clean
 }
 

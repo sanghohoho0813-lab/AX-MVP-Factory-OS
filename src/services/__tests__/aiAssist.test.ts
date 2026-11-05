@@ -18,6 +18,8 @@ import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText,
 import { AssistError, callAssist, providerMessage } from '../aiAssist/client'
 import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
 import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
+import { listRows as listModuleRows, saveRow as saveModuleRow } from '../moduleData'
+import { pickScopedRow, workspaceRowId } from '../workspaceRowId'
 import type { AssistRun, AssistStatus } from '../aiAssist/client'
 import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
@@ -674,6 +676,27 @@ async function d263Tests() {
   await saveJudgeSkill(null, '')
   __resetJudgeSkill()
   check('DS9 지우면 다시 기본', (await syncJudgeSkill(null)) === '')
+
+  // D-538 작업공간마다 다른 줄 — 두 작업공간(대표 · 팀장 화면)에 저장해도 줄 id 가 겹치지 않음 · 예전 줄은 지우지 않고 읽기만
+  const WA = '0a000000-0000-4000-8000-00000000000a'
+  const WB = '0b000000-0000-4000-8000-00000000000b'
+  check('DS10 줄 id — 작업공간 있으면 self-check_<작업공간(글자만)> · 없으면 예전 그대로', workspaceRowId('self-check', WA) === `self-check_${WA.replace(/-/g, '')}` && workspaceRowId('self-check', null) === 'self-check' && workspaceRowId('self-check', WA) !== workspaceRowId('self-check', WB), workspaceRowId('self-check', WA))
+  await saveModuleRow(WA, 'ai', 'skills', { id: 'self-check', data: { text: '예전 정의' } })
+  __resetJudgeSkill()
+  check('DS11 예전 줄(self-check)만 있는 작업공간 → 그대로 읽힘(이어서 씀)', (await syncJudgeSkill(WA)) === '예전 정의')
+  const okA = await saveJudgeSkill(WA, '새 정의 A')
+  const okB = await saveJudgeSkill(WB, '정의 B')
+  const rowsA = await listModuleRows(WA, 'ai', 'skills')
+  const rowsB = await listModuleRows(WB, 'ai', 'skills')
+  check('DS12 저장 — 작업공간마다 제 줄(self-check_<작업공간>) · 예전 줄은 지우지 않음', okA && okB && rowsA.some((r) => r.id === workspaceRowId('self-check', WA)) && rowsB.some((r) => r.id === workspaceRowId('self-check', WB)) && rowsA.some((r) => r.id === 'self-check' && r.data.text === '예전 정의'), rowsA.map((r) => r.id))
+  __resetJudgeSkill()
+  const readA = await syncJudgeSkill(WA)
+  __resetJudgeSkill()
+  const readB = await syncJudgeSkill(WB)
+  check('DS13 읽기 — 새 줄 먼저(예전 줄보다) · 다른 작업공간은 제 정의', readA === '새 정의 A' && readB === '정의 B', { readA, readB })
+  check('DS14 고르기 — 제 줄 → 예전 줄 → 하루 쓴 옛 이름 순 · 없으면 없음', pickScopedRow([{ id: 'old2' }, { id: 'self-check' }], 'self-check', WA, 'old2')?.id === 'self-check' && pickScopedRow([{ id: 'old2' }], 'self-check', WA, 'old2')?.id === 'old2' && pickScopedRow([{ id: 'x' }], 'self-check', WA) === undefined)
+  await saveJudgeSkill(null, '')
+  __resetJudgeSkill()
 
   // 다시 부르기 — 답 모양 어긋남 · 잠깐 끊김 · 많이 부름
   __setRetryTimes(0, 0)

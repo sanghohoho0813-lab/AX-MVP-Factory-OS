@@ -7,10 +7,12 @@
  *  - 비어 있으면 서버의 기본 정의(내부 기준 문서 §40~42 · 명세서 §12~14 에서 만든 자체점검)만 쓴다.
  */
 import { listRows, saveRow } from '../moduleData'
+import { pickScopedRow, workspaceRowId } from '../workspaceRowId'
 
 const KEY = 'axmvp.ai.judgeSkill.v1'
 const MODULE = 'ai'
 const BUCKET = 'skills'
+/** D-538 클라우드 줄은 `self-check_<작업공간>`(작업공간마다 따로) — 예전 `self-check` 줄은 읽기만 */
 const ROW_ID = 'self-check'
 /** D-264 예전 줄 이름(D-263 하루 동안 쓴 것) — 읽기만 · 글자 그대로 두지 않는다 */
 const LEGACY_ROW_ID = atob('ZGV2aWwtanVkZ2U=')
@@ -49,7 +51,7 @@ export async function saveJudgeSkill(workspaceId: string | null, text: string): 
   const t = String(text ?? '').replace(/\r\n?/g, '\n').trim().slice(0, JUDGE_SKILL_MAX)
   remember(t)
   try {
-    await saveRow(workspaceId, MODULE, BUCKET, { id: ROW_ID, data: { text: t, updatedAt: new Date().toISOString() } })
+    await saveRow(workspaceId, MODULE, BUCKET, { id: workspaceRowId(ROW_ID, workspaceId), data: { text: t, updatedAt: new Date().toISOString() } })
     return true
   } catch {
     return false
@@ -60,7 +62,7 @@ export async function saveJudgeSkill(workspaceId: string | null, text: string): 
 export async function syncJudgeSkill(workspaceId: string | null): Promise<string> {
   try {
     const rows = await listRows(workspaceId, MODULE, BUCKET)
-    const row = rows.find((r) => r.id === ROW_ID) ?? rows.find((r) => r.id === LEGACY_ROW_ID)
+    const row = pickScopedRow(rows, ROW_ID, workspaceId, LEGACY_ROW_ID)
     const t = typeof row?.data?.text === 'string' ? (row.data.text as string).slice(0, JUDGE_SKILL_MAX) : null
     if (t != null && t !== readJudgeSkill()) remember(t)
   } catch {
