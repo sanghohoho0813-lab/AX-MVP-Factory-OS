@@ -52,17 +52,17 @@ export function ValidationProjectPage() {
         className="rounded-(--radius-panel) border border-slate-200 bg-white p-5"
       >
         <p className="text-[0.875rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
-        <p className="mt-1.5 text-[1.05rem] font-semibold break-keep text-slate-900">
+        <p className="mt-1.5 text-[1rem] font-semibold break-keep text-slate-900">
           트랙별로 실제 사용 테스트를 진행하고 단계별 검토로 다음 진행을 판정합니다.
         </p>
-        <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+        <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
           ① 계획 → ② 제작·참여자 → ③ 시나리오 → ④ 회차 실행 → ⑤ 피드백·이슈 → ⑥ 성과 측정 → ⑦ 단계 판정 → ⑧ 다음 결정.
           관찰·측정 근거 없이 통과로 단정하지 않으며, 테스트를 막는 중대한 문제가 있으면 확정할 수 없습니다.
         </p>
       </section>
 
       {isCombined && (
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.95rem] break-keep text-slate-500">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.9375rem] break-keep text-slate-500">
           이 프로젝트는 AX MVP와 홈페이지 두 트랙을 각각 독립적으로 검증합니다. 두 트랙의 통과율·판정은 절대 합산하지 않습니다.
         </p>
       )}
@@ -101,11 +101,11 @@ function TrackCard({
 
       {!track.eligibility.available ? (
         <div className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-4">
-          <p className="flex items-center gap-1.5 text-[1.05rem] font-semibold break-keep text-slate-800">
+          <p className="flex items-center gap-1.5 text-[1rem] font-semibold break-keep text-slate-800">
             <Lock aria-hidden="true" className="size-4 text-warning-600" />
             {meta.label}를 시작할 수 없습니다
           </p>
-          <p className="text-[0.95rem] break-keep text-slate-600">{track.eligibility.reason}</p>
+          <p className="text-[0.9375rem] break-keep text-slate-600">{track.eligibility.reason}</p>
           <div className="mt-1">
             <Button variant="secondary" size="sm" disabled>
               검증 시작
@@ -114,7 +114,7 @@ function TrackCard({
         </div>
       ) : !workspace ? (
         <div className="flex flex-col gap-3">
-          <p className="text-[0.95rem] break-keep text-slate-600">
+          <p className="text-[0.9375rem] break-keep text-slate-600">
             확정된 출처 설계로 검증 작업공간을 생성해 실제 사용 테스트를 시작할 수 있습니다.
           </p>
           <div>
@@ -127,16 +127,16 @@ function TrackCard({
       ) : (
         <div className="flex flex-col gap-3">
           {track.needsRevalidationFlag && (
-            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] break-keep text-warning-700">
+            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] break-keep text-warning-700">
               <RefreshCw aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
               출처 설계가 새 버전으로 확정됨 — 새 버전 검증 필요
             </p>
           )}
 
-          <p className="text-[0.95rem] break-keep text-slate-600">{summary?.headline}</p>
+          <p className="text-[0.9375rem] break-keep text-slate-600">{summary?.headline}</p>
 
           {summary?.hasOpenCritical && (
-            <p className="flex items-center gap-1.5 text-[0.9rem] font-medium text-danger-600">
+            <p className="flex items-center gap-1.5 text-[0.875rem] font-medium text-danger-600">
               <AlertTriangle aria-hidden="true" className="size-3.5" />
               테스트를 막는 중대한 문제가 남아 있어 확정할 수 없습니다
             </p>
@@ -164,7 +164,7 @@ function TrackCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.9rem] text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="text-lg font-bold text-slate-800">{value}</dd>
     </div>
   )

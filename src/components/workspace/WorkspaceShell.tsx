@@ -51,7 +51,7 @@ export function WorkspaceSaveStatus({ state = 'local' }: { state?: WorkspaceSave
   const it = map[state]
   if (!it.label) return null
   return (
-    <span aria-live="polite" className={`inline-flex items-center gap-1.5 text-[0.9rem] font-medium ${it.cls}`}>
+    <span aria-live="polite" className={`inline-flex items-center gap-1.5 text-[0.875rem] font-medium ${it.cls}`}>
       {it.icon}
       {it.label}
     </span>
@@ -77,7 +77,7 @@ export function WorkspaceHeader({
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
           <h1 className="text-[1.6rem] leading-tight font-bold break-keep text-slate-900 sm:text-[1.75rem]">{moduleName}</h1>
-          <p className="mt-1 max-w-3xl text-[1.05rem] break-keep text-slate-600">{moduleDescription}</p>
+          <p className="mt-1 max-w-3xl text-[1rem] break-keep text-slate-600">{moduleDescription}</p>
         </div>
         {saveStatus && <WorkspaceSaveStatus state={saveStatus} />}
       </div>
@@ -122,7 +122,7 @@ export function WorkspaceStepNav({
               <NavLink
                 to={s.path}
                 aria-current={state === 'current' ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-(--radius-control) px-3 py-2.5 text-[0.9rem] font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-(--radius-control) px-3 py-2.5 text-[0.875rem] font-medium transition-colors ${
                   state === 'current' ? 'bg-brand-50 text-brand-800' : state === 'done' ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
@@ -167,12 +167,12 @@ export function WorkspaceNextAction({
   tone?: 'brand' | 'success'
 }) {
   const box = tone === 'success' ? 'border-success-200 bg-success-50/50' : 'border-brand-100 bg-brand-50/60'
-  const btn = 'inline-flex h-auto min-h-13 items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-6 py-2.5 text-[1.05rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50'
+  const btn = 'inline-flex h-auto min-h-13 items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-6 py-2.5 text-[1rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50'
   return (
     <section className={`rounded-(--radius-panel) border p-5 sm:p-6 ${box}`}>
-      <p className="text-[0.9rem] font-medium tracking-wide text-slate-500">지금 해야 할 일</p>
+      <p className="text-[0.875rem] font-medium tracking-wide text-slate-500">지금 해야 할 일</p>
       <h2 className="mt-1.5 text-[1.45rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]">{title}</h2>
-      {why && <p className="mt-2.5 max-w-3xl text-[1.02rem] leading-relaxed break-keep text-slate-600">{why}</p>}
+      {why && <p className="mt-2.5 max-w-3xl text-[1rem] leading-relaxed break-keep text-slate-600">{why}</p>}
       <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
         {actionPath && !onAction ? (
           <NavLink to={actionPath} className={`${btn} w-full sm:w-auto`}>
@@ -185,7 +185,7 @@ export function WorkspaceNextAction({
             <ArrowRight aria-hidden="true" className="size-5 shrink-0" />
           </button>
         )}
-        {disabled && disabledReason && <p className="text-[0.9rem] break-keep text-slate-500">{disabledReason}</p>}
+        {disabled && disabledReason && <p className="text-[0.875rem] break-keep text-slate-500">{disabledReason}</p>}
         {secondary && <div className="flex flex-wrap items-center gap-x-4 gap-y-1">{secondary}</div>}
       </div>
     </section>
@@ -200,8 +200,8 @@ export function WorkspaceSummaryLine({ label, value, tone }: { label: string; va
   const valueCls = tone === 'warn' ? 'text-warning-700' : tone === 'ok' ? 'text-success-700' : 'text-slate-800'
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 py-2 last:border-0">
-      <span className="shrink-0 text-[0.9rem] text-slate-500">{label}</span>
-      <span className={`min-w-0 break-keep text-right text-[0.9rem] font-medium ${valueCls}`}>{value}</span>
+      <span className="shrink-0 text-[0.875rem] text-slate-500">{label}</span>
+      <span className={`min-w-0 break-keep text-right text-[0.875rem] font-medium ${valueCls}`}>{value}</span>
     </div>
   )
 }
@@ -222,13 +222,13 @@ export function WorkspaceCompletionChecklist({ title = '완료 조건', items }:
   const done = items.filter((i) => i.ok).length
   return (
     <div>
-      <p className="mb-2 flex items-center justify-between gap-2 text-[0.95rem] font-semibold text-slate-700">
+      <p className="mb-2 flex items-center justify-between gap-2 text-[0.9375rem] font-semibold text-slate-700">
         {title}
         <span className="text-[0.875rem] font-medium text-slate-400">{done}/{items.length}</span>
       </p>
       <ul className="flex flex-col gap-2">
         {items.map((c) => (
-          <li key={c.label} className="flex items-start gap-2 text-[0.92rem]">
+          <li key={c.label} className="flex items-start gap-2 text-[0.9375rem]">
             <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`} aria-hidden="true">
               {c.ok ? '✓' : '·'}
             </span>
@@ -264,10 +264,10 @@ export function WorkspaceWarningPanel({ warnings }: { warnings: WorkspaceWarning
   if (warnings.length === 0) return null
   return (
     <div>
-      <p className="mb-2 text-[0.95rem] font-semibold text-slate-700">확인이 필요한 항목</p>
+      <p className="mb-2 text-[0.9375rem] font-semibold text-slate-700">확인이 필요한 항목</p>
       <ul className="flex flex-col gap-2">
         {warnings.map((w, i) => (
-          <li key={i} className={`flex items-start gap-2 rounded-(--radius-control) border px-3 py-2 text-[0.9rem] break-keep ${w.tone === 'error' ? 'border-danger-200 bg-danger-50 text-danger-700' : 'border-warning-200 bg-warning-50 text-warning-800'}`}>
+          <li key={i} className={`flex items-start gap-2 rounded-(--radius-control) border px-3 py-2 text-[0.875rem] break-keep ${w.tone === 'error' ? 'border-danger-200 bg-danger-50 text-danger-700' : 'border-warning-200 bg-warning-50 text-warning-800'}`}>
             <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             <span className="min-w-0 flex-1">
               {w.message}
@@ -292,8 +292,8 @@ export function WorkspaceWarningPanel({ warnings }: { warnings: WorkspaceWarning
 export function WorkspaceNextStep({ label, path }: { label: string; path: string }) {
   return (
     <div>
-      <p className="mb-2 text-[0.95rem] font-semibold text-slate-700">완료 후 다음 단계</p>
-      <NavLink to={path} className="flex items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-[0.92rem] font-medium text-slate-700 hover:border-brand-300">
+      <p className="mb-2 text-[0.9375rem] font-semibold text-slate-700">완료 후 다음 단계</p>
+      <NavLink to={path} className="flex items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-[0.9375rem] font-medium text-slate-700 hover:border-brand-300">
         <span className="min-w-0 break-keep">{label}</span>
         <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
       </NavLink>
@@ -313,7 +313,7 @@ export function WorkspaceSummaryPanel({ title = '현재 요약', children }: { t
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] font-semibold text-slate-700 lg:hidden"
+        className="flex w-full items-center justify-between rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] font-semibold text-slate-700 lg:hidden"
       >
         {title}
         <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />

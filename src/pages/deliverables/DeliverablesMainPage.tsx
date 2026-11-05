@@ -79,13 +79,13 @@ export function DeliverablesMainPage() {
   const go = (r: Row) => navigate(`/deliverables/projects/${r.project.id}`)
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.9rem] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.875rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'project', header: '프로젝트', className: 'min-w-[150px]',
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-[0.9rem] text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -94,7 +94,7 @@ export function DeliverablesMainPage() {
       key: 'sources', header: '사용 가능한 확정 결과', className: 'hidden lg:table-cell',
       cell: (r) => {
         const labels = eligibleSources(r.eligibility)
-        if (labels.length === 0) return <span className="text-[0.9rem] text-slate-400">없음</span>
+        if (labels.length === 0) return <span className="text-[0.875rem] text-slate-400">없음</span>
         return (
           <div className="flex flex-wrap gap-1">
             {labels.map((label) => (
@@ -106,12 +106,12 @@ export function DeliverablesMainPage() {
     },
     {
       key: 'latest', header: '최신 자료 상태', className: 'hidden xl:table-cell',
-      cell: (r) => (r.latest ? <PackageStatusBadge status={r.latest.status} /> : <span className="text-[0.9rem] text-slate-400">없음</span>),
+      cell: (r) => (r.latest ? <PackageStatusBadge status={r.latest.status} /> : <span className="text-[0.875rem] text-slate-400">없음</span>),
     },
     {
       key: 'action', header: '', className: 'text-right',
       cell: (r) => (
-        <span className="inline-flex items-center gap-1 text-[0.9rem] font-semibold text-brand-600">
+        <span className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
           {r.latest ? '자료 보기' : '자료 만들기'}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
@@ -185,9 +185,9 @@ export function DeliverablesMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.9rem] text-slate-400">{eligibleSources(r.eligibility).join(' · ') || '확정 결과 없음'}</p>
+                      <p className="text-[0.875rem] text-slate-400">{eligibleSources(r.eligibility).join(' · ') || '확정 결과 없음'}</p>
                     </div>
-                    <span className="shrink-0 text-[0.9rem] font-semibold text-brand-600">{r.latest ? '자료 보기' : '자료 만들기'}</span>
+                    <span className="shrink-0 text-[0.875rem] font-semibold text-brand-600">{r.latest ? '자료 보기' : '자료 만들기'}</span>
                   </button>
                 </li>
               ))}
@@ -199,7 +199,7 @@ export function DeliverablesMainPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel title="작성 중" flush>
           {inProgress.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">작성 중인 자료가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">작성 중인 자료가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {inProgress.map((r) => (
@@ -207,7 +207,7 @@ export function DeliverablesMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.9rem] text-slate-400">{r.latest?.name}</p>
+                      <p className="text-[0.875rem] text-slate-400">{r.latest?.name}</p>
                     </div>
                     {r.latest && <PackageStatusBadge status={r.latest.status} />}
                   </button>
@@ -219,7 +219,7 @@ export function DeliverablesMainPage() {
 
         <Panel title="원본 변경 확인 필요" flush>
           {stale.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">원본이 변경된 자료가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">원본이 변경된 자료가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {stale.map((r) => (
@@ -227,7 +227,7 @@ export function DeliverablesMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.9rem] text-warning-600">출처 원본이 변경됨 · 새 버전 검토 필요</p>
+                      <p className="text-[0.875rem] text-warning-600">출처 원본이 변경됨 · 새 버전 검토 필요</p>
                     </div>
                     <RefreshCw aria-hidden="true" className="size-4 shrink-0 text-warning-500" />
                   </button>
@@ -240,7 +240,7 @@ export function DeliverablesMainPage() {
 
       <Panel title="최근 확정 자료" flush>
         {finalized.length === 0 ? (
-          <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">확정된 자료가 없습니다.</div>
+          <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">확정된 자료가 없습니다.</div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {finalized.map((r) => (
@@ -248,7 +248,7 @@ export function DeliverablesMainPage() {
                 <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                   <div className="min-w-0 text-left">
                     <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                    <p className="text-[0.9rem] text-slate-400">{r.latest?.name} · v{r.latest?.version}</p>
+                    <p className="text-[0.875rem] text-slate-400">{r.latest?.name} · v{r.latest?.version}</p>
                   </div>
                   {r.latest && <PackageStatusBadge status={r.latest.status} />}
                 </button>

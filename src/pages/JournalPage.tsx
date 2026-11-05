@@ -189,7 +189,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
       )}
 
       {loading ? (
-        <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
+        <p className="py-8 text-center text-[0.9375rem] text-slate-500">불러오는 중…</p>
       ) : (
         <JournalList
           entries={visible}

@@ -40,7 +40,7 @@ import { useIsPilot } from '../../auth/osAccess'
 import { rememberClientTypeView, type ClientType } from '../../services/clientType'
 import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 
-const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 const TIER_TONE: Record<CretopTier, Tone> = { top: 'brand', rec: 'success', cond: 'warning', low: 'neutral' }
 const DIAG_DOT: Record<string, string> = { bad: 'bg-danger-500', warn: 'bg-warning-500', good: 'bg-success-500', info: 'bg-slate-300' }
 
@@ -251,7 +251,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                 ['text', '글 붙여넣기'],
               ] as const
             ).map(([k, label]) => (
-              <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)} className={`tap rounded-[8px] px-4 py-1.5 text-[0.9rem] font-semibold ${mode === k ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
+              <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)} className={`tap rounded-[8px] px-4 py-1.5 text-[0.875rem] font-semibold ${mode === k ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>
                 {label}
               </button>
             ))}

@@ -229,7 +229,7 @@ export function OrganizationDetailPage() {
       />
 
       {organization.clientOpsId && (
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-2.5 text-[0.95rem] break-keep text-slate-700" data-testid="org-client-link">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-2.5 text-[0.9375rem] break-keep text-slate-700" data-testid="org-client-link">
           고객 관리 업체와 이어진 고객사입니다 — 연락 · 수금 · 서류는 업체 기록에서.
           <Link to={`/ops/clients/${encodeURIComponent(organization.clientOpsId)}`} className="tap ml-auto inline-flex items-center font-semibold text-brand-700 hover:underline">
             업체 기록 열기
@@ -249,7 +249,7 @@ export function OrganizationDetailPage() {
         {([['overview', '개요'], ['projects', `프로젝트 (${projects.length})`], ['info', '기업정보'], ['activity', '활동이력']] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             aria-current={tab === k ? 'page' : undefined}
-            className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-[0.95rem] font-medium transition-colors ${tab === k ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-[0.9375rem] font-medium transition-colors ${tab === k ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
             {label}
           </button>
         ))}
@@ -263,8 +263,8 @@ export function OrganizationDetailPage() {
               const j = computeProjectJourney(primaryProject)
               return (
                 <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
-                  <p className="text-[0.9rem] font-semibold text-brand-700">현재 가장 중요한 일</p>
-                  <p className="mt-1.5 text-[1.3rem] leading-snug font-bold break-keep text-slate-900">{primaryProject.name} · {j.actionText}</p>
+                  <p className="text-[0.875rem] font-semibold text-brand-700">현재 가장 중요한 일</p>
+                  <p className="mt-1.5 text-[1.2rem] leading-snug font-bold break-keep text-slate-900">{primaryProject.name} · {j.actionText}</p>
                   <p className="mt-2 text-[1rem] break-keep text-slate-600">{j.reason}</p>
                   <Button variant="primary" className="mt-4" onClick={() => { setActiveProject(primaryProject.id); navigate(j.actionPath) }}>{j.actionLabel}</Button>
                 </section>
@@ -315,7 +315,7 @@ export function OrganizationDetailPage() {
               <InfoItem label="담당자 연락처" value={[organization.primaryContact.phone, organization.primaryContact.email].filter(Boolean).join(' · ')} />
             </dl>
             {organization.notes && (
-              <p className="mt-5 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.95rem] break-keep text-slate-600">{organization.notes}</p>
+              <p className="mt-5 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.9375rem] break-keep text-slate-600">{organization.notes}</p>
             )}
           </Panel>
           <Panel title="운영 요약">

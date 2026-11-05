@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             role="status"
-            className="flex w-full max-w-md items-start gap-2.5 rounded-(--radius-card) border border-navy-700 bg-navy-900 py-3 pr-2 pl-4 text-[0.95rem] text-white shadow-(--shadow-overlay) sm:w-auto"
+            className="flex w-full max-w-md items-start gap-2.5 rounded-(--radius-card) border border-navy-700 bg-navy-900 py-3 pr-2 pl-4 text-[0.9375rem] text-white shadow-(--shadow-overlay) sm:w-auto"
           >
             <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-500" />
             <p className="min-w-0 flex-1 break-keep">{toast.message}</p>

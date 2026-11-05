@@ -332,7 +332,7 @@ export function OrganizationFormPage() {
         summary={summary}
       >
         {existing?.archivedAt && (
-          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem] break-keep text-warning-700">
             보관 처리된 고객사입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지 않습니다.
           </p>
         )}
@@ -372,7 +372,7 @@ export function OrganizationFormPage() {
 
         {step === 3 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-[1.15rem] font-bold text-slate-900">입력 내용 확인</h2>
+            <h2 className="text-[1.2rem] font-bold text-slate-900">입력 내용 확인</h2>
             <dl className="rounded-(--radius-card) border border-slate-200">
               {[
                 ['고객사명', form.name], ['업종', form.industry], ['세부 업종', form.subIndustry], ['지역', form.region],
@@ -380,17 +380,17 @@ export function OrganizationFormPage() {
                 ['직원 수', form.employeeCount ? `${form.employeeCount}명` : ''],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
-                  <dt className="shrink-0 text-[0.95rem] text-slate-500">{label}</dt>
-                  <dd className="min-w-0 break-keep text-right text-[0.95rem] font-medium text-slate-800">{value || <span className="text-slate-300">미입력</span>}</dd>
+                  <dt className="shrink-0 text-[0.9375rem] text-slate-500">{label}</dt>
+                  <dd className="min-w-0 break-keep text-right text-[0.9375rem] font-medium text-slate-800">{value || <span className="text-slate-300">미입력</span>}</dd>
                 </div>
               ))}
             </dl>
             {missingRequired.length > 0 ? (
-              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-warning-700">
+              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] break-keep text-warning-700">
                 아직 필요한 정보가 있습니다: {missingRequired.join(', ')}. 이전 단계에서 입력해 주세요.
               </p>
             ) : (
-              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-brand-800">
+              <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] break-keep text-brand-800">
                 등록 후 이 고객사로 <b>새 프로젝트</b>를 만들어 진단을 시작할 수 있습니다.
               </p>
             )}

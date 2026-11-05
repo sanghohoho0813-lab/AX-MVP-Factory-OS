@@ -98,7 +98,7 @@ const ROUNDS: { key: Round; label: string }[] = [
 ]
 
 
-const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 function addDays(date: string, n: number): string {
   const d = new Date(`${date}T00:00:00`)
@@ -702,7 +702,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
       <SalesTabs />
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700">
           {error}
         </p>
       )}
@@ -780,7 +780,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     aria-pressed={round === r.key}
                     data-ahead={r.key > liveRound ? '1' : undefined}
                     onClick={() => setRound(r.key)}
-                    className={`tap rounded-[8px] px-2 py-2 text-[0.875rem] font-semibold break-keep sm:px-4 sm:text-[0.9rem] ${round === r.key ? 'bg-brand-600 text-white' : r.key > liveRound ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`tap rounded-[8px] px-2 py-2 text-[0.875rem] font-semibold break-keep sm:px-4 ${round === r.key ? 'bg-brand-600 text-white' : r.key > liveRound ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-600 hover:bg-slate-50'}`}
                   >
                     {r.label}
                   </button>
@@ -837,7 +837,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   {/* D-167: 1차 준비 방법 둘 — 크레탑 분석기로 · 크레탑 없이 항목만 바로 고르기(경험 많은 컨설턴트) */}
                   <div role="radiogroup" aria-label="1차 미팅 준비 방법" data-testid="prep-mode" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
                     {([['cretop', '크레탑 분석기로'], ['direct', '항목만 바로 고르기']] as const).map(([k, label]) => (
-                      <button key={k} type="button" role="radio" aria-checked={prepMode === k} onClick={() => setPrepMode(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.9rem] font-semibold break-keep sm:px-4 ${prepMode === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      <button key={k} type="button" role="radio" aria-checked={prepMode === k} onClick={() => setPrepMode(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.875rem] font-semibold break-keep sm:px-4 ${prepMode === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
                         {label}
                       </button>
                     ))}

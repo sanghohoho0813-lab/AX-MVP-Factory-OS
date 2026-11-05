@@ -75,7 +75,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
       <ReadOnlyNotice pkg={pkg} />
 
       {showLeakWarning && (
-        <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-danger-700">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem] break-keep text-danger-700">
           대상이 {pkg.audience === 'client' ? '고객용' : '기관 준비용'}인데 <span className="font-semibold">내부 전용</span> Section {leakingSections.length}개가 포함되어 있습니다. 공개 범위를 조정하거나 제외하세요.
         </div>
       )}
@@ -120,7 +120,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
 
                     {!readOnly && (
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-[0.9rem] text-slate-600">
+                        <label className="flex items-center gap-1.5 text-[0.875rem] text-slate-600">
                           <input
                             type="checkbox"
                             checked={!excluded}
@@ -134,7 +134,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
                           onChange={(e) => handleVisibility(section, e.target.value)}
                           disabled={excluded}
                           aria-label={`${section.title} 공개 범위`}
-                          className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.9rem] disabled:opacity-50"
+                          className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.875rem] disabled:opacity-50"
                         >
                           {VISIBILITIES.map((v) => (
                             <option key={v} value={v}>

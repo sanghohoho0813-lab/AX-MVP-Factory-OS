@@ -97,8 +97,8 @@ export function SupabaseHealthPanel() {
                 <XCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
               )}
               <span className="min-w-0">
-                <span className="block text-[0.98rem] font-semibold text-slate-800">{r.label}</span>
-                <span className="block text-[0.9rem] break-keep text-slate-600">{r.detail}</span>
+                <span className="block text-[1rem] font-semibold text-slate-800">{r.label}</span>
+                <span className="block text-[0.875rem] break-keep text-slate-600">{r.detail}</span>
               </span>
             </li>
           ))}

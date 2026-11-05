@@ -209,9 +209,9 @@ export function LinkCustomerModal({
 
   const accountBlock = (
     <div className="mt-4 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3">
-      <p className="text-[0.9rem] font-semibold text-slate-700">고객 플랫폼 계정</p>
+      <p className="text-[0.875rem] font-semibold text-slate-700">고객 플랫폼 계정</p>
       {event.profileId ? (
-        <p className="mt-1 text-[0.9rem] text-slate-600">이 이벤트를 만든 계정이 확인되었습니다{guessEmail ? ` · ${guessEmail}` : ''}.</p>
+        <p className="mt-1 text-[0.875rem] text-slate-600">이 이벤트를 만든 계정이 확인되었습니다{guessEmail ? ` · ${guessEmail}` : ''}.</p>
       ) : (
         <>
           <label className="mt-1 block text-[0.875rem] text-slate-500">
@@ -220,7 +220,7 @@ export function LinkCustomerModal({
               value={accountEmail}
               onChange={(e) => { setAccountEmail(e.target.value); setProfile(null); setProfileChecked(false) }}
               placeholder="고객이 miraeailab.com 에 가입한 이메일"
-              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] focus:border-brand-500 focus:outline-none"
+              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] focus:border-brand-500 focus:outline-none"
             />
           </label>
           {profileChecked && accountEmail.trim() && !profile && (
@@ -231,7 +231,7 @@ export function LinkCustomerModal({
         </>
       )}
       {profile && (
-        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[0.9rem] text-slate-700">
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[0.875rem] text-slate-700">
           <input type="checkbox" checked={linkAccount} onChange={(e) => setLinkAccount(e.target.checked)} className="size-4 accent-brand-600" />
           이 계정({profile.email})을 업체와 연결해 고객 화면(My MIRAE)을 열어 준다
         </label>
@@ -262,7 +262,7 @@ export function LinkCustomerModal({
             role="tab"
             aria-selected={tab === t}
             onClick={() => { setTab(t); setError('') }}
-            className={`tap flex-1 rounded-[8px] px-3 py-1.5 text-[0.92rem] font-semibold ${tab === t ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}
+            className={`tap flex-1 rounded-[8px] px-3 py-1.5 text-[0.9375rem] font-semibold ${tab === t ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}
           >
             {t === 'existing' ? '기존 업체' : '새 업체 만들기'}
           </button>
@@ -272,7 +272,7 @@ export function LinkCustomerModal({
       {tab === 'existing' ? (
         <div className="mt-4">
           {likely.length > 0 && !query && (
-            <p className="mb-2 text-[0.88rem] text-slate-500">
+            <p className="mb-2 text-[0.875rem] text-slate-500">
               회사명·연락처가 같은 업체가 위에 있습니다. 맞는지 확인하고 고르세요 — 자동으로 합치지 않습니다.
             </p>
           )}
@@ -283,11 +283,11 @@ export function LinkCustomerModal({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="업체명·대표자·사업자번호로 찾기"
               aria-label="업체 검색"
-              className="w-full rounded-(--radius-control) border border-slate-300 py-2 pr-3 pl-9 text-[0.95rem] focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-(--radius-control) border border-slate-300 py-2 pr-3 pl-9 text-[0.9375rem] focus:border-brand-500 focus:outline-none"
             />
           </div>
           <ul role="radiogroup" aria-label="업체" className="mt-2 max-h-64 overflow-y-auto rounded-(--radius-control) border border-slate-200">
-            {candidates.length === 0 && <li className="px-3 py-4 text-center text-[0.9rem] text-slate-500">일치하는 업체가 없습니다.</li>}
+            {candidates.length === 0 && <li className="px-3 py-4 text-center text-[0.875rem] text-slate-500">일치하는 업체가 없습니다.</li>}
             {candidates.map(({ c, s }) => (
               <li key={c.id} className="border-b border-slate-100 last:border-0">
                 <button
@@ -299,7 +299,7 @@ export function LinkCustomerModal({
                 >
                   <span className="min-w-0">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[0.95rem] font-semibold text-slate-800">{c.companyName}</span>
+                      <span className="truncate text-[0.9375rem] font-semibold text-slate-800">{c.companyName}</span>
                       {!pilot && clientTypeOf(c) === 'consultant' && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 t-meta font-semibold text-slate-600">컨설턴트</span>}
                     </span>
                     <span className="block truncate text-[0.875rem] text-slate-500">{[c.contactName, c.contactPhone, c.industry].filter(Boolean).join(' · ') || '정보 없음'}</span>
@@ -319,7 +319,7 @@ export function LinkCustomerModal({
               <ClientTypePicker value={ctype} onChange={setCtype} testId="link-client-type" hint={ctype === suggested.type ? suggested.reason : ''} />
             </div>
           )}
-          <p className="text-[0.88rem] break-keep text-slate-500">
+          <p className="text-[0.875rem] break-keep text-slate-500">
             고객이 제출한 값으로 채웠습니다. 저장 전 확인하세요. 계약 전이라 <strong className="font-semibold text-slate-700">잠재고객</strong>으로 등록되고,{' '}
             {pilot ? '' : <>고객 관리 <strong className="font-semibold text-slate-700">'{CLIENT_TYPE_LABEL[asType]}'</strong> 쪽과 </>}영업 관리 보드의 '잠재 고객' 칸에 올라갑니다.
           </p>
@@ -338,7 +338,7 @@ export function LinkCustomerModal({
                 <input
                   value={form[key]}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none"
                 />
               </label>
             ))}
@@ -346,7 +346,7 @@ export function LinkCustomerModal({
           {accountBlock}
         </div>
       )}
-      {error && <p role="alert" className="mt-3 text-[0.9rem] text-danger-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-[0.875rem] text-danger-600">{error}</p>}
     </Modal>
   )
 }

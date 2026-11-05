@@ -61,8 +61,8 @@ export function WebsiteGateNotice({ context }: { context: ProjectWebsiteContext 
         <div className="flex items-start gap-3">
           <Palette aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
           <div className="min-w-0">
-            <p className="text-[1.05rem] font-semibold text-slate-800">AX 전용 프로젝트입니다</p>
-            <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+            <p className="text-[1rem] font-semibold text-slate-800">AX 전용 프로젝트입니다</p>
+            <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
               이 프로젝트에는 홈페이지 트랙이 없어 홈페이지 설계 대상이 아닙니다. AX 설계로 이동하거나, 홈페이지가
               필요하면 프로젝트 유형을 변경하거나 별도 홈페이지 프로젝트를 만드세요.
             </p>
@@ -81,8 +81,8 @@ export function WebsiteGateNotice({ context }: { context: ProjectWebsiteContext 
   }
   return (
     <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 shadow-(--shadow-card)">
-      <p className="text-[1.05rem] font-semibold text-slate-800">홈페이지 설계를 시작할 수 있습니다</p>
-      <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+      <p className="text-[1rem] font-semibold text-slate-800">홈페이지 설계를 시작할 수 있습니다</p>
+      <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
         개요 화면에서 설계를 생성하세요.
       </p>
     </div>
@@ -95,7 +95,7 @@ export function ReadinessNotice({ show }: { show: boolean }) {
   return (
     <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-      <p className="text-[0.95rem] break-keep text-warning-800">
+      <p className="text-[0.9375rem] break-keep text-warning-800">
         홈페이지 준비도 분석을 먼저 확정하면 더 정확한 설계를 만들 수 있습니다. 지금은 기본 가정으로 초안을 생성합니다.
       </p>
     </div>
@@ -107,7 +107,7 @@ export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => vo
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
-      <p className="min-w-0 flex-1 text-[0.95rem] break-keep text-warning-800">
+      <p className="min-w-0 flex-1 text-[0.9375rem] break-keep text-warning-800">
         홈페이지 진단 결과가 변경되어 재설계가 필요합니다. 확정된 설계는 그대로 보존됩니다.
       </p>
       <Button variant="secondary" size="sm" onClick={onRun}>새 버전 설계</Button>
@@ -133,7 +133,7 @@ export function WebsiteSectionFrame({
       {!eligibility.canDesign ? (
         <WebsiteGateNotice context={context} />
       ) : !design ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] text-slate-500">
           <span className="min-w-0 flex-1">아직 설계 초안이 없습니다. 개요 화면에서 설계를 생성하세요.</span>
         </div>
       ) : (

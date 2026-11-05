@@ -83,8 +83,8 @@ export function ActivityLog({
       {entries.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <History aria-hidden="true" className="size-7 text-slate-300" />
-          <p className="text-[0.95rem] text-slate-500">아직 기록이 없습니다.</p>
-          <p className="text-[0.88rem] break-keep text-slate-400">
+          <p className="text-[0.9375rem] text-slate-500">아직 기록이 없습니다.</p>
+          <p className="text-[0.875rem] break-keep text-slate-400">
             업무 단계를 바꾸거나 서류를 받음으로 표시하면 여기에 남습니다.
           </p>
         </div>
@@ -104,7 +104,7 @@ export function ActivityLog({
                     {!last && <span aria-hidden="true" className="w-px flex-1 bg-slate-200" />}
                   </div>
                   <div className={`min-w-0 flex-1 ${last ? 'pb-0' : 'pb-3'}`}>
-                    <p className="text-[0.95rem] break-keep text-slate-800">{a.text}</p>
+                    <p className="text-[0.9375rem] break-keep text-slate-800">{a.text}</p>
                     <p className="text-[0.875rem] text-slate-400">
                       <time dateTime={a.at}>{activityTimeText(a.at)}</time>
                     </p>
@@ -117,7 +117,7 @@ export function ActivityLog({
             <button
               type="button"
               onClick={() => setShown((n) => n + PAGE)}
-              className="mt-3 w-full rounded-(--radius-control) border border-slate-200 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
+              className="mt-3 w-full rounded-(--radius-control) border border-slate-200 py-2 text-[0.9375rem] font-medium text-slate-600 hover:bg-slate-50"
             >
               이전 기록 더 보기 ({entries.length - shown}건)
             </button>

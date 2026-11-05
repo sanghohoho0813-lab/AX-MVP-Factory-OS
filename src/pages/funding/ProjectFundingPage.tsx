@@ -154,7 +154,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
       summary={summaryPanel}
     >
       <div className="flex flex-col gap-5">
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/70 px-4 py-3 text-[0.9rem] leading-relaxed break-keep text-slate-600">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/70 px-4 py-3 text-[0.875rem] leading-relaxed break-keep text-slate-600">
           {NO_PREDICTION_NOTE}
         </p>
 
@@ -165,7 +165,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
             <DefItem label="지원 유형" value={supportLabels.length > 0 ? supportLabels.join(', ') : '아직 지정되지 않았습니다.'} />
           </dl>
           {strategy.strategySummary && (
-            <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.9rem] leading-relaxed break-keep text-slate-600">
+            <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.875rem] leading-relaxed break-keep text-slate-600">
               {strategy.strategySummary}
             </p>
           )}
@@ -180,7 +180,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
               ))}
             </ul>
           ) : (
-            <p className="text-[0.9rem] break-keep text-slate-500">
+            <p className="text-[0.875rem] break-keep text-slate-500">
               아직 우선 검토로 지정한 기관이 없습니다. 기관 후보에서 먼저 확인할 곳을 우선 검토로 지정하세요.
             </p>
           )}
@@ -191,13 +191,13 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
               <p className="text-[0.875rem] font-semibold text-slate-500">현재 근거</p>
-              <p className="mt-1 text-[0.9rem] break-keep text-slate-700">
+              <p className="mt-1 text-[0.875rem] break-keep text-slate-700">
                 {summary.evidenceCount > 0 ? `근거 ${summary.evidenceCount}건 중 ${summary.verifiedEvidenceCount}건 확인됨 (기초 근거 있음)` : '연결할 근거가 아직 없습니다. 근거 확인이 필요합니다.'}
               </p>
             </div>
             <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
               <p className="text-[0.875rem] font-semibold text-slate-500">부족조건</p>
-              <p className="mt-1 text-[0.9rem] break-keep text-slate-700">
+              <p className="mt-1 text-[0.875rem] break-keep text-slate-700">
                 {openGaps.length > 0 ? `미해결 ${openGaps.length}건 — 자료 보강 필요` : '미해결 부족조건이 없습니다.'}
               </p>
             </div>
@@ -205,7 +205,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
           {openGaps.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1.5">
               {openGaps.slice(0, 5).map((g) => (
-                <li key={g.id} className="flex items-start gap-2 text-[0.9rem] text-slate-700">
+                <li key={g.id} className="flex items-start gap-2 text-[0.875rem] text-slate-700">
                   <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-500" />
                   <span className="min-w-0 break-keep">
                     <span className="font-medium">{GAP_SEVERITY_META[g.severity].label}</span> · {g.title}
@@ -218,13 +218,13 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
 
         {/* 준비자료 */}
         <Panel title="준비자료">
-          <p className="text-[0.9rem] break-keep text-slate-700">
+          <p className="text-[0.875rem] break-keep text-slate-700">
             {summary.docCount > 0 ? `준비자료 ${summary.docCount}건 중 ${summary.docReadyCount}건 준비 완료` : '아직 준비자료 요건이 정리되지 않았습니다.'}
           </p>
           {pendingDocs.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1.5">
               {pendingDocs.slice(0, 5).map((d) => (
-                <li key={d.id} className="flex items-start gap-2 text-[0.9rem] text-slate-700">
+                <li key={d.id} className="flex items-start gap-2 text-[0.875rem] text-slate-700">
                   <CircleDashed aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-300" />
                   <span className="min-w-0 break-keep">{d.title}</span>
                 </li>
@@ -242,7 +242,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
               ))}
             </ul>
           ) : (
-            <p className="text-[0.9rem] break-keep text-slate-500">아직 신청 건이 없습니다. 준비가 끝나면 신청·심사에서 진행 상태를 기록하세요.</p>
+            <p className="text-[0.875rem] break-keep text-slate-500">아직 신청 건이 없습니다. 준비가 끝나면 신청·심사에서 진행 상태를 기록하세요.</p>
           )}
         </Panel>
 
@@ -282,7 +282,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
                   ].map(([label, value]) => (
                     <div key={label}>
                       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-                      <dd className="text-[1.15rem] font-bold text-slate-800">{value}</dd>
+                      <dd className="text-[1.2rem] font-bold text-slate-800">{value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -292,7 +292,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
                 <Panel title="후보 검토 신뢰도 (승인 보장 아님)">
                   <ul className="flex flex-col gap-1.5">
                     {strategy.matches.slice(0, 8).map((m) => (
-                      <li key={m.id} className="flex items-center justify-between gap-2 text-[0.9rem]">
+                      <li key={m.id} className="flex items-center justify-between gap-2 text-[0.875rem]">
                         <span className="min-w-0 truncate text-slate-600">{institutionName(m.institutionId)}</span>
                         <span className="shrink-0 text-[0.875rem] font-medium text-slate-500">{MATCH_CONFIDENCE_META[m.confidence].label}</span>
                       </li>
@@ -305,7 +305,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
                 <Panel title="점검 상세">
                   <ul className="flex flex-col gap-1.5">
                     {blockingChecks.slice(0, 6).map((c) => (
-                      <li key={c.id} className="flex items-start gap-1.5 text-[0.9rem] break-keep text-slate-600">
+                      <li key={c.id} className="flex items-start gap-1.5 text-[0.875rem] break-keep text-slate-600">
                         <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-500" />
                         <span className="min-w-0">{c.description || c.title}</span>
                       </li>
@@ -331,7 +331,7 @@ function InstitutionCard({ match }: { match: FundingMatch }) {
     <li className="rounded-(--radius-card) border border-slate-200 px-4 py-3.5">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <Building2 aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-        <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{name}</p>
+        <p className="text-[1rem] font-semibold break-keep text-slate-900">{name}</p>
         <span className="text-[0.875rem] break-keep text-slate-400">{programName(match.programId)}</span>
       </div>
       <dl className="mt-2.5 flex flex-col gap-2">
@@ -351,7 +351,7 @@ function ApplicationCard({ strategy, app }: { strategy: FundingStrategy; app: Fu
   const title = app.applicationName || (match ? institutionName(match.institutionId) : '신청 건')
   return (
     <li className="rounded-(--radius-card) border border-slate-200 px-4 py-3.5">
-      <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{title}</p>
+      <p className="text-[1rem] font-semibold break-keep text-slate-900">{title}</p>
       <dl className="mt-2.5 flex flex-col gap-2">
         <CardRow label="현재 진행상태" value={APPLICATION_STAGE_META[app.applicationStage].label} />
         <CardRow label="최근 행동" value={app.notes || '기록 없음'} />
@@ -367,7 +367,7 @@ function CardRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
       <dt className="shrink-0 text-[0.875rem] font-semibold text-slate-500 sm:w-24">{label}</dt>
-      <dd className="min-w-0 text-[0.9rem] break-keep text-slate-700">{value}</dd>
+      <dd className="min-w-0 text-[0.875rem] break-keep text-slate-700">{value}</dd>
     </div>
   )
 }
@@ -376,7 +376,7 @@ function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-700">{value || '-'}</dd>
+      <dd className="mt-0.5 text-[0.875rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
 }
@@ -419,7 +419,7 @@ function StartFunding({ projectId, eligibility, objective }: { projectId: string
       }
     >
       <div className="flex flex-col gap-5">
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/70 px-4 py-3 text-[0.9rem] leading-relaxed break-keep text-slate-600">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/70 px-4 py-3 text-[0.875rem] leading-relaxed break-keep text-slate-600">
           {NO_PREDICTION_NOTE}
         </p>
 
@@ -439,7 +439,7 @@ function StartFunding({ projectId, eligibility, objective }: { projectId: string
                 ) : (
                   <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
                 )}
-                <span className="min-w-0 flex-1 truncate text-[0.9rem] font-medium text-slate-700">{row.label}</span>
+                <span className="min-w-0 flex-1 truncate text-[0.875rem] font-medium text-slate-700">{row.label}</span>
                 <span className={`shrink-0 text-[0.875rem] font-medium ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
                   {row.ready ? '사용 가능' : '선행 필요'}
                 </span>
@@ -450,7 +450,7 @@ function StartFunding({ projectId, eligibility, objective }: { projectId: string
 
         {!eligibility.canCreate && eligibility.reasons.length > 0 && (
           <Panel title="연계 시작 전 확인">
-            <ul className="list-disc space-y-1 pl-5 text-[0.9rem] break-keep text-warning-700">
+            <ul className="list-disc space-y-1 pl-5 text-[0.875rem] break-keep text-warning-700">
               {eligibility.reasons.map((reason, i) => (
                 <li key={i}>{reason}</li>
               ))}

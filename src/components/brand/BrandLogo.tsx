@@ -55,7 +55,7 @@ export function BrandLogo({
 export function ProductWordmark({ tone = 'light', className = '' }: { tone?: 'light' | 'dark'; className?: string }) {
   return (
     <span className={`block leading-tight ${className}`}>
-      <span className={`block text-[0.95rem] font-bold ${tone === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+      <span className={`block text-[0.9375rem] font-bold ${tone === 'dark' ? 'text-white' : 'text-slate-900'}`}>
         {brand.productName}
       </span>
       <span className={`block text-[0.875rem] font-medium tracking-wide ${tone === 'dark' ? 'text-navy-300' : 'text-slate-500'}`}>

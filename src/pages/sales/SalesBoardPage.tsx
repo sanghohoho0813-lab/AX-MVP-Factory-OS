@@ -168,7 +168,7 @@ interface ProspectForm {
 
 const EMPTY_FORM: ProspectForm = { companyName: '', contactName: '', contactPhone: '', source: '', referrer: '', interests: [], concern: '', feeManwon: '', clientType: 'sme' }
 
-const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: boolean; busy: boolean; records: ClientOpsRecord[]; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
   const [f, setF] = useState<ProspectForm>(EMPTY_FORM)
@@ -515,7 +515,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       />
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700">
           {error}
         </p>
       )}
@@ -669,7 +669,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="업체명·담당자·유입 경로로 찾기"
                   aria-label="영업 업체 검색"
-                  className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+                  className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-[1rem] focus:border-brand-500 focus:outline-none sm:py-2"
                 />
               </div>
             ) : undefined

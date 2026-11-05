@@ -167,7 +167,7 @@ export function HintTip({
         role="tooltip"
         style={shift ? { transform: `translateX(${shift}px)` } : undefined}
         data-testid="hint-tip"
-        className={`pointer-events-none absolute top-full left-0 z-40 mt-0.5 w-max max-w-[min(24rem,calc(100vw-2.5rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.92rem] leading-snug font-medium break-keep whitespace-pre-line text-white shadow-lg ${
+        className={`pointer-events-none absolute top-full left-0 z-40 mt-0.5 w-max max-w-[min(24rem,calc(100vw-2.5rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.9375rem] leading-snug font-medium break-keep whitespace-pre-line text-white shadow-lg ${
           shown ? 'block' : 'hidden group-hover/hint:block group-has-[:focus-visible]/hint:block'
         }`}
       >

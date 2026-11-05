@@ -55,7 +55,7 @@ export function CriticalIdCheck({ record, now, onSave }: { record: ClientOpsReco
                   data-testid={`critical-input-${r.key}`}
                 />
               ) : (
-                <span className="text-[1.15rem] font-bold tracking-wide text-slate-900 tabular-nums" data-testid={`critical-value-${r.key}`}>
+                <span className="text-[1.2rem] font-bold tracking-wide text-slate-900 tabular-nums" data-testid={`critical-value-${r.key}`}>
                   {r.display}
                 </span>
               )}

@@ -42,7 +42,7 @@ type Tab = { id: string; label: string; card: TalkCard | null; ins: Insight | nu
 function ScriptDocument({ s, printing }: { s: MeetingScript; printing?: boolean }) {
   return (
     <article className={printing ? 'px-8 py-6' : 'flex flex-col gap-3'} data-testid={printing ? 'talk-script-print' : 'talk-script'}>
-      {printing && <h2 className="mb-3 border-b border-slate-300 pb-1 text-[1.3rem] font-bold text-slate-900">{s.company} 미팅 대본</h2>}
+      {printing && <h2 className="mb-3 border-b border-slate-300 pb-1 text-[1.2rem] font-bold text-slate-900">{s.company} 미팅 대본</h2>}
       <ol className="flex flex-col gap-3">
         {s.sections.map((sec, i) => (
           <li key={sec.id} className="avoid-break rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3" data-testid={printing ? 'talk-script-print-section' : 'talk-script-section'} data-id={sec.id}>

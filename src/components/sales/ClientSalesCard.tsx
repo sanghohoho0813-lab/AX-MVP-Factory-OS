@@ -15,7 +15,7 @@ import { SALES_INTERESTS, SALES_SOURCES } from '../../content/salesCatalog'
 import { formatKrwCompact } from '../../lib/format'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
 
-const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 interface Draft {
   source: string

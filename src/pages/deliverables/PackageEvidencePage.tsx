@@ -25,7 +25,7 @@ const EVIDENCE_TYPE_LABEL: Record<DeliverableEvidenceType, string> = {
 function EvidenceTable({ pkg }: { pkg: DeliverablePackage }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[0.9rem]">
+      <table className="w-full border-collapse text-[0.875rem]">
         <thead>
           <tr className="border-b border-slate-200">
             <th scope="col" className="px-2.5 py-2 text-left font-semibold text-slate-600">출처</th>

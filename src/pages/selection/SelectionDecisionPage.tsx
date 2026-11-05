@@ -186,17 +186,17 @@ export function SelectionDecisionPage() {
       {/* §7 핵심 업무 확정 결과 히어로 */}
       {finalized && primary && (
         <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 sm:p-7">
-          <p className="flex items-center gap-1.5 text-[0.95rem] font-semibold text-success-700">
+          <p className="flex items-center gap-1.5 text-[0.9375rem] font-semibold text-success-700">
             <Trophy aria-hidden="true" className="size-4.5" />핵심 업무 확정
           </p>
           <h1 className="mt-1.5 text-[1.5rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.65rem]">
             첫 번째로 만들 업무가 정해졌습니다
           </h1>
-          <p className="mt-3 text-[1.15rem] font-bold break-keep text-slate-900">{primary.name}</p>
-          <p className="mt-1.5 max-w-3xl text-[1.02rem] leading-relaxed break-keep text-slate-600">
+          <p className="mt-3 text-[1.2rem] font-bold break-keep text-slate-900">{primary.name}</p>
+          <p className="mt-1.5 max-w-3xl text-[1rem] leading-relaxed break-keep text-slate-600">
             {summary.trim() || decision.autoSummary}
           </p>
-          <Button variant="primary" className="mt-5 h-auto w-full py-2.5 text-[1.05rem] sm:w-auto" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
+          <Button variant="primary" className="mt-5 h-auto w-full py-2.5 text-[1rem] sm:w-auto" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
             <span className="whitespace-normal">기능·화면 설계 시작하기</span><ArrowRight aria-hidden="true" className="size-5 shrink-0" />
           </Button>
         </section>
@@ -421,7 +421,7 @@ export function SelectionDecisionPage() {
       {/* §7 시스템 정보 (버전·스냅샷·규칙 — 접힘) */}
       <div className="rounded-(--radius-panel) border border-slate-200 bg-white">
         <button type="button" onClick={() => setShowSystem((v) => !v)} aria-expanded={showSystem}
-          className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left text-[0.95rem] font-semibold text-slate-600">
+          className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left text-[0.9375rem] font-semibold text-slate-600">
           시스템 정보 (버전·스냅샷·규칙)
           <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${showSystem ? 'rotate-180' : ''}`} />
         </button>
@@ -453,7 +453,7 @@ function SysItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className="truncate text-[0.9rem] font-medium text-slate-700">{value}</dd>
+      <dd className="truncate text-[0.875rem] font-medium text-slate-700">{value}</dd>
     </div>
   )
 }

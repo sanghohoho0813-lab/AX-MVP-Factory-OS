@@ -129,7 +129,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
           onClick={() => setDrawer(true)}
           data-testid="module-menu-open"
           aria-label={`${current.label} — ${tool.label} 목차 열기`}
-          className="tap inline-flex min-w-0 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] font-bold text-slate-800"
+          className="tap inline-flex min-w-0 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] font-bold text-slate-800"
         >
           {/* D-127: 머리줄이 이미 '분야 › 도구 이름' 을 보여 준다 — 여기는 지금 화면 이름(누르면 목차) */}
           <Menu aria-hidden="true" className="size-4 shrink-0" />

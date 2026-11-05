@@ -39,7 +39,7 @@ export function deliverableSteps(projectId: string, packageId: string): Workspac
 function PackageIdentity({ pkg }: { pkg: DeliverablePackage }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
-      <h2 className="min-w-0 text-[1.05rem] font-bold break-keep text-slate-900">{pkg.name}</h2>
+      <h2 className="min-w-0 text-[1rem] font-bold break-keep text-slate-900">{pkg.name}</h2>
       <PackageTypeBadge type={pkg.type} />
       <AudienceBadge audience={pkg.audience} />
       <PackageStatusBadge status={pkg.status} />
@@ -64,7 +64,7 @@ export function StaleBanner({ show }: { show: boolean }) {
   return (
     <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-      <p className="text-[0.9rem] break-keep text-warning-800">
+      <p className="text-[0.875rem] break-keep text-warning-800">
         자료 원본이 변경되었습니다. 확정된 자료는 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.
       </p>
     </div>
@@ -74,7 +74,7 @@ export function StaleBanner({ show }: { show: boolean }) {
 export function ReadOnlyNotice({ pkg }: { pkg: DeliverablePackage }) {
   if (pkg.status !== 'finalized' && pkg.status !== 'superseded' && pkg.status !== 'archived') return null
   return (
-    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.9rem] text-slate-500">
+    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] text-slate-500">
       {pkg.status === 'finalized' ? '확정된 자료입니다. 원본 보존을 위해 읽기 전용입니다. 수정하려면 새 버전을 만드세요.' : '이전 버전입니다. 읽기 전용입니다.'}
     </div>
   )

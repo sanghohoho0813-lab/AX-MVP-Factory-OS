@@ -738,7 +738,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       {error && (
         <div
           role="alert"
-          className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700"
+          className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700"
         >
           {error}
         </div>
@@ -754,7 +754,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
         <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5">
           <div className="flex items-start gap-2.5">
             <CloudUpload aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
-            <p className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-800">
+            <p className="min-w-0 flex-1 text-[1rem] break-keep text-slate-800">
               이 브라우저에 예전에 입력한 고객 <strong>{leftover.length}곳</strong>이 남아 있습니다. 클라우드로
               옮기면 휴대폰·다른 PC에서도 볼 수 있습니다.
             </p>
@@ -808,20 +808,20 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
           )
         }
       >
-        <p className="text-[0.98rem] break-keep text-slate-700">
+        <p className="text-[1rem] break-keep text-slate-700">
           백업에 고객 {restorePrompt?.clients.length ?? 0}곳
           {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구·모듈 기록 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
         </p>
         {restoreSourceLine(restoreSource, restoreSourceName) && (
-          <p data-testid="restore-source" data-source={restoreSource} className="mt-2 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.92rem] font-semibold break-keep text-red-700">
+          <p data-testid="restore-source" data-source={restoreSource} className="mt-2 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.9375rem] font-semibold break-keep text-red-700">
             {restoreSourceLine(restoreSource, restoreSourceName)}
           </p>
         )}
         {restoreNote && (
-          <p data-testid="restore-note" role="alert" className="mt-2 text-[0.92rem] font-semibold break-keep text-red-700">{restoreNote}</p>
+          <p data-testid="restore-note" role="alert" className="mt-2 text-[0.9375rem] font-semibold break-keep text-red-700">{restoreNote}</p>
         )}
         {replaceConfirm ? (
-          <div data-testid="restore-removed" className="mt-3 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.92rem] break-keep text-slate-700">
+          <div data-testid="restore-removed" className="mt-3 rounded-(--radius-control) border border-red-200 bg-white px-3 py-2 text-[0.9375rem] break-keep text-slate-700">
             <p className="font-semibold text-red-700">지금 목록에서 {replaceConfirm.removed.length}곳이 지워져요 — 되돌릴 수 없어요.</p>
             <p className="mt-1">{removedNamesLine(replaceConfirm.removed)}</p>
             {replaceConfirm.skipped.length > 0 && <p className="mt-1 text-slate-600">다른 작업공간에 있는 업체 {replaceConfirm.skipped.length}곳은 넣지 않아요.</p>}
@@ -830,12 +830,12 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
         ) : (
           <>
             {restorePrompt?.workspace && (restorePrompt.workspace.journal > 0 || restorePrompt.workspace.moduleRows > 0) && (
-              <p data-testid="restore-ws-note" className="mt-2 text-[0.92rem] break-keep text-slate-600">
+              <p data-testid="restore-ws-note" className="mt-2 text-[0.9375rem] break-keep text-slate-600">
                 이 파일의 업무 일기 {restorePrompt.workspace.journal}건{restorePrompt.workspace.moduleRows > 0 ? ` · 서버 모듈 기록 ${restorePrompt.workspace.moduleRows}줄` : ''}은 보관용이에요 — 불러오기는 업체 · 도구 입력값만 되살리고, 지금 있는 업무 일기 · 모듈 기록은 건드리지 않아요.
               </p>
             )}
             <BackupScopeNote open />
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.9375rem] break-keep text-slate-600">
               <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
               <li><strong>전부 바꾸기</strong> — 지금 목록에서 백업에 없는 업체를 지우고 백업 내용으로 채웁니다. 지워질 업체를 먼저 보여 드려요.</li>
               <li>다른 작업공간에 이미 있는 업체는 넣지 않아요(그 작업공간에서 옮겨 오지 않아요).</li>
@@ -902,7 +902,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                       onClick={() => setSegment(sg.key)}
                       className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                     >
-                      <span className="text-[0.9rem]">{sg.label}</span>
+                      <span className="text-[0.875rem]">{sg.label}</span>
                       <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
                     </button>
                   )
@@ -922,7 +922,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="업체명·담당자·번호·직접 만든 칸으로 찾기"
                     aria-label="업체 검색"
-                    className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
+                    className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[1rem] focus:border-brand-500 focus:outline-none sm:py-2"
                   />
                 </div>
                 {/* 보관한 업체가 하나도 없으면 단추도 두지 않는다 — 빈 서랍을 여는 단추는 자리만 먹는다 */}
@@ -931,7 +931,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     type="button"
                     aria-pressed={showArchived}
                     onClick={() => setShowArchived((v) => !v)}
-                    className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
+                    className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium ${
                       showArchived
                         ? 'border-brand-300 bg-brand-50 text-brand-700'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -951,7 +951,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   aria-expanded={filtersOpen}
                   data-testid="client-filters-toggle"
                   onClick={() => setFiltersOpen((v) => !v)}
-                  className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium sm:hidden ${
+                  className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:hidden ${
                     filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
                   }`}
                 >
@@ -966,7 +966,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     value={filterKey}
                     aria-label="업체 보기 조건"
                     onChange={(e) => setFilterKey(isClientFilterKey(e.target.value) ? e.target.value : 'all')}
-                    className={`rounded-(--radius-control) border bg-white px-2 py-2 text-[0.92rem] font-medium focus:border-brand-500 focus:outline-none sm:py-1.5 ${
+                    className={`rounded-(--radius-control) border bg-white px-2 py-2 text-[0.9375rem] font-medium focus:border-brand-500 focus:outline-none sm:py-1.5 ${
                       filterKey === 'all' ? 'border-slate-300 text-slate-700' : 'border-brand-300 text-brand-700'
                     }`}
                   >
@@ -983,7 +983,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     value={sortKey}
                     aria-label="업체 정렬 기준"
                     onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'active')}
-                    className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
+                    className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.9375rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
                   >
                     {CLIENT_SORT_ORDER.map((k) => (
                       <option key={k} value={k}>
@@ -995,7 +995,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
                 </div>
                 {(query !== '' || filterKey !== 'all') && (
-                  <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
+                  <span className="text-[0.875rem] text-slate-500">{visible.length}곳 찾음</span>
                 )}
               </div>
             )}
@@ -1058,7 +1058,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 // D-181: 컨설턴트 고객이 아직 없을 때 — 새로 넣거나, 이미 넣은 업체를 옮기는 길을 알려 준다
                 <div data-testid="clients-empty-consultant" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
                   <BriefcaseBusiness aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-                  <p className="mt-3 text-[1.25rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
+                  <p className="mt-3 text-[1.2rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
                   <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-consultant-add">
                     <CirclePlus aria-hidden="true" className="size-4" />컨설턴트 고객 등록
                   </Button>
@@ -1070,7 +1070,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 // D-162: 빈 화면 자체가 다음 행동을 알려 준다 — 안내 창을 따로 띄우지 않는다
                 <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
                   <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-                  <p className="mt-3 text-[1.25rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
+                  <p className="mt-3 text-[1.2rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
                   <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-add">
                     <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
                   </Button>
@@ -1093,7 +1093,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 {/* D-120: 고른 보기 · 검색에 맞는 업체가 없으면 빈 화면 대신 알려 주고 바로 풀 수 있게 */}
                 {ordered.length === 0 && (
                   <div data-testid="clients-empty-filter" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
-                    <p className="text-[1.1rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
+                    <p className="text-[1.2rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
                     <p className="t-body break-keep text-slate-600">
                       {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {typed.length}곳이 보입니다.
                     </p>
@@ -1168,7 +1168,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 id="ops-alerts"
                 aria-expanded={alertsOpen}
                 onClick={() => setAlertsOpen((v) => !v)}
-                className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900"
+                className="flex items-center gap-2 text-[1.2rem] font-bold text-slate-900"
               >
                 <ChevronRight
                   aria-hidden="true"
@@ -1194,7 +1194,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                         setTab(t.key)
                         setShowAllAlerts(false)
                       }}
-                      className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
+                      className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.875rem] font-medium ${
                         tab === t.key
                           ? 'border-brand-300 bg-brand-50 text-brand-700'
                           : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -1210,16 +1210,16 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
             {alertsOpen && (
               <>
               {loading ? (
-                <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.95rem] text-slate-500">
+                <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.9375rem] text-slate-500">
                   불러오는 중…
                 </p>
               ) : visibleAlerts.length === 0 ? (
                 <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-center">
                   <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
-                  <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
+                  <p className="mt-2 text-[1rem] font-semibold text-slate-800">
                     {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
                   </p>
-                  <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+                  <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
                     {tab === 'all'
                       ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
                       : '다른 분류를 눌러 확인해 보세요.'}
@@ -1236,7 +1236,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     <button
                       type="button"
                       onClick={() => setShowAllAlerts(true)}
-                      className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
+                      className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9375rem] font-medium text-slate-600 hover:bg-slate-50"
                     >
                       {visibleAlerts.length - shownAlerts.length}건 더 보기
                     </button>
@@ -1299,16 +1299,16 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
             className="ax-pop max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-[1.3rem] font-bold text-slate-900">{!pilot && newType === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</h2>
+              <h2 className="text-[1.2rem] font-bold text-slate-900">{!pilot && newType === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</h2>
               <button
                 type="button"
-                className="tap text-[0.95rem] text-slate-500 hover:text-slate-800"
+                className="tap text-[0.9375rem] text-slate-500 hover:text-slate-800"
                 onClick={() => setFormOpen(false)}
               >
                 닫기
               </button>
             </div>
-            <p className="mt-1 text-[0.95rem] break-keep text-slate-500">
+            <p className="mt-1 text-[0.9375rem] break-keep text-slate-500">
               {!pilot && newType === 'consultant' ? '이름(회사명)만 넣어도 됩니다.' : '업체명만 넣어도 됩니다.'} 나머지는 나중에 채울 수 있습니다.
             </p>
             <div className="mt-5 grid gap-4">
@@ -1316,7 +1316,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
               {/* D-187: 서류만 넣어도 — 사업자등록증 · 크레탑 · 등기부등본을 읽어 아래 칸을 채운다 */}
               <NewClientDocDrop onChange={setDocsRead} preload={preDocs} />
-              <label className="text-[0.95rem] font-medium text-slate-700">
+              <label className="text-[0.9375rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input
                   autoFocus
@@ -1331,7 +1331,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 {docLine('companyName')}
               </label>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-[0.95rem] font-medium text-slate-700">
+                <label className="text-[0.9375rem] font-medium text-slate-700">
                   대표자·담당자
                   <input
                     value={form.contactName}
@@ -1343,7 +1343,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   />
                   {docLine('contactName')}
                 </label>
-                <label className="text-[0.95rem] font-medium text-slate-700">
+                <label className="text-[0.9375rem] font-medium text-slate-700">
                   휴대폰번호
                   <input
                     value={form.contactPhone}
@@ -1353,7 +1353,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   />
                 </label>
               </div>
-              <label className="text-[0.95rem] font-medium text-slate-700">
+              <label className="text-[0.9375rem] font-medium text-slate-700">
                 사업자등록번호
                 <input
                   value={form.businessNumber}
@@ -1367,7 +1367,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 {docLine('businessNumber')}
               </label>
               <fieldset>
-                <legend className="text-[0.95rem] font-medium text-slate-700">{!pilot && newType === 'consultant' ? '계약했나요' : '어떤 업체인가요'}</legend>
+                <legend className="text-[0.9375rem] font-medium text-slate-700">{!pilot && newType === 'consultant' ? '계약했나요' : '어떤 업체인가요'}</legend>
                 <div className="mt-1.5 grid grid-cols-2 gap-2">
                   {[
                     { on: true, label: '잠재고객', hint: '아직 계약 전 — 영업 보드로' },
@@ -1380,7 +1380,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                       onClick={() => setAsProspect(o.on)}
                       className={`tap flex flex-col items-start rounded-(--radius-control) border px-3 py-2 text-left ${asProspect === o.on ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                     >
-                      <span className="text-[0.98rem] font-bold text-slate-900">{o.label}</span>
+                      <span className="text-[1rem] font-bold text-slate-900">{o.label}</span>
                       <span className="t-meta text-slate-500">{o.hint}</span>
                     </button>
                   ))}

@@ -43,7 +43,7 @@ export function DiagnosisStepNav({ current, projectId }: { current: DiagnosisSte
               <NavLink
                 to={stepPath(s.key, projectId)}
                 aria-current={state === 'current' ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-(--radius-control) px-3 py-2.5 text-[0.9rem] font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-(--radius-control) px-3 py-2.5 text-[0.875rem] font-medium transition-colors ${
                   state === 'current' ? 'bg-brand-50 text-brand-800' : state === 'done' ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
@@ -71,14 +71,14 @@ export function DiagnosisSummaryPanel({ title = '현재 요약', children }: { t
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] font-semibold text-slate-700 lg:hidden"
+        className="flex w-full items-center justify-between rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] font-semibold text-slate-700 lg:hidden"
       >
         {title}
         <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       <div className={`${open ? 'block' : 'hidden'} lg:block`}>
         <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50/60 p-4 lg:sticky lg:top-6">
-          <p className="mb-3 hidden text-[0.95rem] font-semibold text-slate-700 lg:block">{title}</p>
+          <p className="mb-3 hidden text-[0.9375rem] font-semibold text-slate-700 lg:block">{title}</p>
           {children}
         </div>
       </div>
@@ -120,8 +120,8 @@ export function SummaryLine({ label, value, tone }: { label: string; value: Reac
   const valueCls = tone === 'warn' ? 'text-warning-700' : tone === 'ok' ? 'text-success-700' : 'text-slate-800'
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 py-2 last:border-0">
-      <span className="shrink-0 text-[0.9rem] text-slate-500">{label}</span>
-      <span className={`min-w-0 break-keep text-right text-[0.9rem] font-medium ${valueCls}`}>{value}</span>
+      <span className="shrink-0 text-[0.875rem] text-slate-500">{label}</span>
+      <span className={`min-w-0 break-keep text-right text-[0.875rem] font-medium ${valueCls}`}>{value}</span>
     </div>
   )
 }

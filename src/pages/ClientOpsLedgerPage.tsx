@@ -141,7 +141,7 @@ function MobileLedgerCard({
 
       <div className="mt-4 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-3 py-3">
         <p className="text-[0.875rem] font-semibold text-slate-500">다음 운영 행동</p>
-        <p className="mt-1 text-[0.88rem] leading-relaxed break-keep text-slate-700">{row.recommendedMove}</p>
+        <p className="mt-1 text-[0.875rem] leading-relaxed break-keep text-slate-700">{row.recommendedMove}</p>
       </div>
 
       <div className="mt-4">
@@ -213,7 +213,7 @@ export function ClientOpsLedgerPage() {
       cell: (row) => (
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="max-w-56 truncate text-[0.98rem] font-bold text-slate-900">{row.clientName}</p>
+            <p className="max-w-56 truncate text-[1rem] font-bold text-slate-900">{row.clientName}</p>
             <StatusBadge tone={row.tone}>{row.statusLabel}</StatusBadge>
           </div>
           <p className="mt-0.5 truncate text-[0.875rem] text-slate-500">{row.primaryContact}</p>
@@ -225,7 +225,7 @@ export function ClientOpsLedgerPage() {
       header: '프로젝트·단계',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="max-w-72 truncate text-[0.9rem] font-medium text-slate-700">{row.projectName}</p>
+          <p className="max-w-72 truncate text-[0.875rem] font-medium text-slate-700">{row.projectName}</p>
           <div className="mt-1 flex items-center gap-2">
             <ProgressBar value={row.progressPercent} tone={row.tone} label={`${row.clientName} 진행률`} />
             <span className="shrink-0 text-[0.875rem] font-semibold text-slate-500">{row.progressPercent}%</span>
@@ -239,7 +239,7 @@ export function ClientOpsLedgerPage() {
       header: '병목',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="max-w-52 truncate text-[0.9rem] font-semibold text-slate-700">{row.bottleneck}</p>
+          <p className="max-w-52 truncate text-[0.875rem] font-semibold text-slate-700">{row.bottleneck}</p>
           <p className="mt-0.5 text-[0.875rem] text-slate-400">{row.dueLabel}</p>
         </div>
       ),
@@ -254,7 +254,7 @@ export function ClientOpsLedgerPage() {
       header: '다음 행동',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="max-w-72 truncate text-[0.9rem] font-medium text-brand-700">{row.nextAction}</p>
+          <p className="max-w-72 truncate text-[0.875rem] font-medium text-brand-700">{row.nextAction}</p>
           <p className="mt-0.5 text-[0.875rem] text-slate-400">예상 {row.estimatedMinutes}분</p>
         </div>
       ),
@@ -375,7 +375,7 @@ export function ClientOpsLedgerPage() {
             </span>
             <div>
               <p className="text-[0.875rem] font-medium text-slate-500">운영 판단</p>
-              <p className="mt-0.5 text-[0.95rem] font-semibold break-keep text-slate-800">
+              <p className="mt-0.5 text-[0.9375rem] font-semibold break-keep text-slate-800">
                 {ledger.summary.focusLabel}으로 큐를 정렬했습니다.
               </p>
             </div>
@@ -421,7 +421,7 @@ export function ClientOpsLedgerPage() {
         </>
       ) : (
         <Panel title="고객 관리 레저">
-          <p className="text-[0.9rem] break-keep text-slate-500">
+          <p className="text-[0.875rem] break-keep text-slate-500">
             조건에 맞는 고객 관리 항목이 없습니다. 검색어 또는 필터를 조정하세요.
           </p>
         </Panel>

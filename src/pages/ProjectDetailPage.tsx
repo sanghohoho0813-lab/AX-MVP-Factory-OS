@@ -340,7 +340,7 @@ export function ProjectDetailPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                     <span
-                      className={`text-[0.95rem] font-semibold break-keep ${blocked ? 'text-slate-400' : 'text-slate-800'}`}
+                      className={`text-[0.9375rem] font-semibold break-keep ${blocked ? 'text-slate-400' : 'text-slate-800'}`}
                     >
                       {step.label}
                     </span>
@@ -395,7 +395,7 @@ export function ProjectDetailPage() {
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-success-100 text-success-700">
                     <Check aria-hidden="true" className="size-3.5" />
                   </span>
-                  <span className="text-[0.95rem] font-semibold break-keep text-slate-800">
+                  <span className="text-[0.9375rem] font-semibold break-keep text-slate-800">
                     {item.label}
                   </span>
                   <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
@@ -410,7 +410,7 @@ export function ProjectDetailPage() {
                   <Minus aria-hidden="true" className="size-3.5" />
                 </span>
                 <div className="min-w-0">
-                  <span className="text-[0.95rem] font-medium break-keep text-slate-500">
+                  <span className="text-[0.9375rem] font-medium break-keep text-slate-500">
                     {item.label}
                   </span>
                   <p className="mt-0.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
@@ -657,7 +657,7 @@ export function ProjectDetailPage() {
             >
               <SearchCheck aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
               <div className="min-w-0">
-                <span className="text-[0.95rem] font-semibold text-slate-800">
+                <span className="text-[0.9375rem] font-semibold text-slate-800">
                   실제 사용 테스트
                 </span>
                 <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
@@ -672,7 +672,7 @@ export function ProjectDetailPage() {
             >
               <Landmark aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
               <div className="min-w-0">
-                <span className="text-[0.95rem] font-semibold text-slate-800">
+                <span className="text-[0.9375rem] font-semibold text-slate-800">
                   기관·자금 연계
                 </span>
                 <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">

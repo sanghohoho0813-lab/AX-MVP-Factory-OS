@@ -81,7 +81,7 @@ export function ViewAsSwitchCompact() {
   if (!t) return null
   const viewing = t.views.find((v) => v.workspaceId === t.current)
   const short = viewing ? viewing.personTitle || (viewing.personName === 'Pilot' ? '팀장님' : viewing.personName) : brand.ownerTitle
-  const item = (on: boolean) => `tap flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.9rem] font-semibold whitespace-nowrap ${on ? 'bg-slate-100 text-navy-900' : 'text-slate-700 hover:bg-slate-50'}`
+  const item = (on: boolean) => `tap flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.875rem] font-semibold whitespace-nowrap ${on ? 'bg-slate-100 text-navy-900' : 'text-slate-700 hover:bg-slate-50'}`
   return (
     <div ref={containerRef} className="relative inline-flex" data-testid="view-as-compact">
       <button

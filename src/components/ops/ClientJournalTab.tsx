@@ -88,7 +88,7 @@ export function ClientJournalTab({
         }
       />
       {loading ? (
-        <p className="py-6 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
+        <p className="py-6 text-center text-[0.9375rem] text-slate-500">불러오는 중…</p>
       ) : (
         <JournalList
           entries={mine}

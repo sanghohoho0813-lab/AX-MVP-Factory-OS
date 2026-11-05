@@ -191,7 +191,7 @@ function SectionChip({ icon: Icon, accent }: { icon: typeof Clock; accent: Secti
 /** 목차 오른쪽 '모두 보기' — 접혀 있어도 바로 간다 */
 function AllLink({ to }: { to: string }) {
   return (
-    <Link to={to} className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline">
+    <Link to={to} className="tap inline-flex items-center text-[0.875rem] font-medium text-brand-700 hover:underline">
       모두 보기
     </Link>
   )
@@ -1255,13 +1255,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           ] as const
         ).map(([title, items, cls]) => (
           <div key={title} className="mt-4">
-            <HelpHeading as="h3" tight label={title} className={`text-[0.95rem] font-bold ${cls}`}>
+            <HelpHeading as="h3" tight label={title} className={`text-[0.9375rem] font-bold ${cls}`}>
               {title} <span className="font-semibold text-slate-400">{items.length}</span>
             </HelpHeading>
             {items.length === 0 ? (
-              <p className="mt-1 text-[0.9rem] text-slate-400">없음</p>
+              <p className="mt-1 text-[0.875rem] text-slate-400">없음</p>
             ) : (
-              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.92rem] break-keep text-slate-700">
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.9375rem] break-keep text-slate-700">
                 {items.slice(0, 12).map((i, idx) => <li key={idx}>{i}</li>)}
                 {items.length > 12 && <li className="text-slate-400">외 {items.length - 12}건</li>}
               </ul>

@@ -46,12 +46,12 @@ export function HeaderClock() {
       <span aria-label={`지금 ${date} ${time}`} className="flex shrink-0 flex-col items-end leading-tight lg:hidden">
         <span className="text-[0.875rem] font-semibold whitespace-nowrap text-slate-500 max-[379px]:hidden">{formatClockDateShort(now)}</span>
         {/* D-166: 380px 밑(작은 폰)은 날짜 줄을 접어 화면 제목 자리를 낸다. 휴대폰은 시 · 분만 — 초가 화면 제목 자리를 먹어 '잠재고객 상…' 처럼 제목이 잘렸다(PC 는 초까지 그대로) */}
-        <span className="text-[0.95rem] font-bold whitespace-nowrap text-slate-700 tabular-nums">{time.slice(0, 5)}</span>
+        <span className="text-[0.9375rem] font-bold whitespace-nowrap text-slate-700 tabular-nums">{time.slice(0, 5)}</span>
       </span>
       {/* 데스크톱 — 날짜는 작게 위, 시각은 크게 아래 */}
       <span aria-label={`지금 ${date} ${time}`} className="hidden shrink-0 flex-col items-end leading-tight lg:flex">
         <span className="text-[0.875rem] font-medium whitespace-nowrap text-slate-500">{date}</span>
-        <span className="text-[1.25rem] font-bold whitespace-nowrap text-slate-900 tabular-nums">{time}</span>
+        <span className="text-[1.2rem] font-bold whitespace-nowrap text-slate-900 tabular-nums">{time}</span>
       </span>
     </>
   )

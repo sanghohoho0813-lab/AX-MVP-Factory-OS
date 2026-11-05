@@ -33,7 +33,7 @@ export function InlineConfirm({
         type="button"
         data-testid={testId}
         onClick={() => setAsking(true)}
-        className={`tap inline-flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-500 hover:bg-danger-50 hover:text-danger-700 ${className}`}
+        className={`tap inline-flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-500 hover:bg-danger-50 hover:text-danger-700 ${className}`}
       >
         {icon === undefined ? <Trash2 aria-hidden="true" className="size-4" /> : icon}
         {label}
@@ -50,11 +50,11 @@ export function InlineConfirm({
           setAsking(false)
           onConfirm()
         }}
-        className="tap inline-flex h-9 items-center rounded-(--radius-control) bg-danger-600 px-3 text-[0.9rem] font-semibold text-white hover:bg-danger-700"
+        className="tap inline-flex h-9 items-center rounded-(--radius-control) bg-danger-600 px-3 text-[0.875rem] font-semibold text-white hover:bg-danger-700"
       >
         {confirmLabel}
       </button>
-      <button type="button" onClick={() => setAsking(false)} className="tap inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9rem] text-slate-700 hover:bg-slate-50">
+      <button type="button" onClick={() => setAsking(false)} className="tap inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.875rem] text-slate-700 hover:bg-slate-50">
         취소
       </button>
     </span>

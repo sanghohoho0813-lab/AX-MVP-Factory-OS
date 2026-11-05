@@ -93,7 +93,7 @@ export function ExtractorScreen() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="요약 손익계산서 … 매출액 1,250 1,860 2,430 …"
-            className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900"
+            className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.9375rem] text-slate-900"
           />
           <div className="flex flex-wrap gap-2">
             {last && (

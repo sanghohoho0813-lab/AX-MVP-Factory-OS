@@ -136,16 +136,16 @@ export function ServiceCatalogModal({
     <div className="ax-fade fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
       <div className="ax-pop max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)">
         <div className="flex items-center justify-between">
-          <h2 className="text-[1.3rem] font-bold text-slate-900">업무 항목 관리</h2>
+          <h2 className="text-[1.2rem] font-bold text-slate-900">업무 항목 관리</h2>
           <button
             type="button"
-            className="tap text-[0.95rem] text-slate-500 hover:text-slate-800"
+            className="tap text-[0.9375rem] text-slate-500 hover:text-slate-800"
             onClick={onClose}
           >
             닫기
           </button>
         </div>
-        <p className="mt-1 text-[0.95rem] break-keep text-slate-500">
+        <p className="mt-1 text-[0.9375rem] break-keep text-slate-500">
           여기서 만든 항목은 <b className="font-semibold text-slate-700">내 작업공간</b>의 모든 업체 현황표에 열로 추가됩니다(다른 사람
           화면에는 보이지 않습니다). 해당 없는 업체에서는 상태를 &lsquo;보류&rsquo;로 두면 경고에서 빠집니다.
         </p>
@@ -153,7 +153,7 @@ export function ServiceCatalogModal({
         {/* 기본 항목 — 지울 수 없다(팀장 화면은 쓰지 않아 대개 비어 있다) */}
         {shownBuiltins.length > 0 && (
         <div className="mt-5" data-testid="service-builtins">
-          <p className="text-[0.9rem] font-semibold text-slate-500">{builtinServicesHidden() ? '예전에 적어 둔 기본 항목' : '기본 항목 (고정)'}</p>
+          <p className="text-[0.875rem] font-semibold text-slate-500">{builtinServicesHidden() ? '예전에 적어 둔 기본 항목' : '기본 항목 (고정)'}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {shownBuiltins.map((s) => (
               <li
@@ -169,9 +169,9 @@ export function ServiceCatalogModal({
 
         {/* 직접 만든 항목 */}
         <div className="mt-5">
-          <p className="text-[0.9rem] font-semibold text-slate-500">{builtinServicesHidden() ? '내 업무 항목' : '직접 만든 항목'} {live.length}개</p>
+          <p className="text-[0.875rem] font-semibold text-slate-500">{builtinServicesHidden() ? '내 업무 항목' : '직접 만든 항목'} {live.length}개</p>
           {live.length === 0 ? (
-            <p className="mt-2 text-[0.95rem] break-keep text-slate-400">아직 없습니다. 아래 상품표에서 누르면 바로 생깁니다.</p>
+            <p className="mt-2 text-[0.9375rem] break-keep text-slate-400">아직 없습니다. 아래 상품표에서 누르면 바로 생깁니다.</p>
           ) : (
             <ul className="mt-2 flex flex-col gap-1.5">
               {live.map((c) => (
@@ -182,13 +182,13 @@ export function ServiceCatalogModal({
                   <span className="min-w-0">
                     <span className="text-[1rem] font-semibold text-slate-800">{c.label}</span>
                     {c.description && (
-                      <span className="block text-[0.88rem] break-keep text-slate-500">{c.description}</span>
+                      <span className="block text-[0.875rem] break-keep text-slate-500">{c.description}</span>
                     )}
                   </span>
                   <button
                     type="button"
                     onClick={() => void toggleArchive(c)}
-                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-50"
+                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50"
                   >
                     <Archive aria-hidden="true" className="size-3.5" />
                     내리기
@@ -201,18 +201,18 @@ export function ServiceCatalogModal({
 
         {archived.length > 0 && (
           <div className="mt-4">
-            <p className="text-[0.9rem] font-semibold text-slate-500">내려둔 항목 {archived.length}개</p>
+            <p className="text-[0.875rem] font-semibold text-slate-500">내려둔 항목 {archived.length}개</p>
             <ul className="mt-2 flex flex-col gap-1.5">
               {archived.map((c) => (
                 <li
                   key={c.id}
                   className="flex items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2"
                 >
-                  <span className="text-[0.98rem] text-slate-500">{c.label}</span>
+                  <span className="text-[1rem] text-slate-500">{c.label}</span>
                   <button
                     type="button"
                     onClick={() => void toggleArchive(c)}
-                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-100"
+                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-100"
                   >
                     <RotateCcw aria-hidden="true" className="size-3.5" />
                     되살리기
@@ -226,14 +226,14 @@ export function ServiceCatalogModal({
         {/* 상품표에서 골라 추가 — 누르면 바로 만들어진다 */}
         <div className="mt-6 border-t border-slate-200 pt-5" data-testid="service-pkg-picker">
           <p className="text-[1rem] font-bold text-slate-900">상품표에서 골라 추가</p>
-          <p className="mt-1 text-[0.92rem] break-keep text-slate-500">누르면 바로 항목이 생깁니다. 이미 있는 항목은 회색입니다.</p>
+          <p className="mt-1 text-[0.9375rem] break-keep text-slate-500">누르면 바로 항목이 생깁니다. 이미 있는 항목은 회색입니다.</p>
           <div className="mt-3 flex flex-col gap-3">
             {PKG_CATEGORIES.map((cat) => {
               const items = PKG_ITEMS.filter((i) => i.cat === cat)
               if (items.length === 0) return null
               return (
                 <div key={cat}>
-                  <p className="text-[0.88rem] font-semibold text-slate-600">{cat}</p>
+                  <p className="text-[0.875rem] font-semibold text-slate-600">{cat}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {items.map((i) => {
                       const have = liveLabels.has(i.label)
@@ -244,7 +244,7 @@ export function ServiceCatalogModal({
                           disabled={have || busy}
                           title={i.description}
                           onClick={() => void addFromCatalog(i)}
-                          className={`tap inline-flex min-h-10 items-center gap-1 rounded-full border px-3 text-[0.9rem] font-medium break-keep ${
+                          className={`tap inline-flex min-h-10 items-center gap-1 rounded-full border px-3 text-[0.875rem] font-medium break-keep ${
                             have ? 'border-slate-200 bg-slate-100 text-slate-400' : `${ACCENT_CLASS[CAT_ACCENT[cat] ?? 'neutral'].chip} hover:ring-2 hover:ring-brand-300`
                           }`}
                           data-testid="service-pkg"
@@ -266,7 +266,7 @@ export function ServiceCatalogModal({
         <div className="mt-6 border-t border-slate-200 pt-5">
           <p className="text-[1rem] font-bold text-slate-900">직접 써서 추가</p>
           <div className="mt-3 grid gap-3">
-            <label className="text-[0.95rem] font-medium text-slate-700">
+            <label className="text-[0.9375rem] font-medium text-slate-700">
               항목 이름
               <input
                 value={label}
@@ -275,7 +275,7 @@ export function ServiceCatalogModal({
                 className={`mt-1.5 ${inputClass}`}
               />
             </label>
-            <label className="text-[0.95rem] font-medium text-slate-700">
+            <label className="text-[0.9375rem] font-medium text-slate-700">
               설명 (선택)
               <input
                 value={description}
@@ -285,7 +285,7 @@ export function ServiceCatalogModal({
               />
             </label>
             <div>
-              <span className="text-[0.95rem] font-medium text-slate-700">색 구분</span>
+              <span className="text-[0.9375rem] font-medium text-slate-700">색 구분</span>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {ACCENTS.map((a) => (
                   <button
@@ -293,7 +293,7 @@ export function ServiceCatalogModal({
                     type="button"
                     aria-pressed={accent === a.key}
                     onClick={() => setAccent(a.key)}
-                    className={`tap rounded-full border px-2.5 py-1 text-[0.88rem] font-medium ${ACCENT_CLASS[a.key].chip} ${
+                    className={`tap rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${ACCENT_CLASS[a.key].chip} ${
                       accent === a.key ? 'ring-2 ring-brand-400' : ''
                     }`}
                   >
@@ -305,7 +305,7 @@ export function ServiceCatalogModal({
           </div>
 
           {error && (
-            <p role="alert" className="mt-3 text-[0.92rem] font-medium text-danger-700">
+            <p role="alert" className="mt-3 text-[0.9375rem] font-medium text-danger-700">
               {error}
             </p>
           )}

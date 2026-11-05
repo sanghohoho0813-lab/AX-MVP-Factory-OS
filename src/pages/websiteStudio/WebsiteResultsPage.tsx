@@ -46,7 +46,7 @@ export function WebsiteResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/website-studio')}
-        className="inline-flex w-fit items-center gap-1.5 text-[0.9rem] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         홈페이지 설계
@@ -89,7 +89,7 @@ export function WebsiteResultsPage() {
                   </div>
                   <WebsiteStatusBadge status={r.design.status} />
                 </div>
-                <p className="line-clamp-2 text-[0.9rem] break-keep text-slate-600">{r.design.designSummary || r.design.strategy.purpose}</p>
+                <p className="line-clamp-2 text-[0.875rem] break-keep text-slate-600">{r.design.designSummary || r.design.strategy.purpose}</p>
                 <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-slate-500">
                   <WebsiteTypeBadge type={r.design.strategy.websiteType} />
                   <span>페이지 {pages}개</span>

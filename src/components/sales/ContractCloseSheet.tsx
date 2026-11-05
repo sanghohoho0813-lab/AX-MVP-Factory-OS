@@ -128,7 +128,7 @@ export function ContractCloseSheet({
                 />
               </label>
               {d.lines.length > 1 && (
-                <button type="button" onClick={() => setD({ ...d, lines: d.lines.filter((_, j) => j !== i) })} className="tap mb-1 inline-flex items-center gap-1 rounded-(--radius-control) px-2 text-[0.9rem] text-slate-500 hover:bg-slate-100">
+                <button type="button" onClick={() => setD({ ...d, lines: d.lines.filter((_, j) => j !== i) })} className="tap mb-1 inline-flex items-center gap-1 rounded-(--radius-control) px-2 text-[0.875rem] text-slate-500 hover:bg-slate-100">
                   <X aria-hidden="true" className="size-4" /> 빼기
                 </button>
               )}

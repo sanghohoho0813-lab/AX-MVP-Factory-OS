@@ -38,10 +38,10 @@ function Group({
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${bar}`} />
-        <h2 className="text-[1.15rem] font-bold text-slate-900">
+        <h2 className="text-[1.2rem] font-bold text-slate-900">
           {title} <span className="text-slate-400">{events.length}</span>
         </h2>
-        <span className="text-[0.9rem] text-slate-500">{hint}</span>
+        <span className="text-[0.875rem] text-slate-500">{hint}</span>
       </div>
       <ul className="flex flex-col gap-2">
         {events.map((e) => (
@@ -114,11 +114,11 @@ function TodayContent({ workspaceId }: { workspaceId: string | null }) {
       </section>
 
       {loading ? (
-        <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
+        <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.9375rem] text-slate-500">
           불러오는 중…
         </p>
       ) : failed ? (
-        <p role="alert" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] break-keep text-danger-800">
+        <p role="alert" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.9375rem] break-keep text-danger-800">
           {failed} — 잠시 뒤 새로고침해 주세요.
         </p>
       ) : nothing ? (

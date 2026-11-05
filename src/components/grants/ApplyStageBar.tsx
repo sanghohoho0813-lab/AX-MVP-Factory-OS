@@ -14,7 +14,7 @@ import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { formatKrwCompact as formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
 
-const inputCls = 'min-h-11 rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.95rem] focus:border-brand-500 focus:outline-none'
+const inputCls = 'min-h-11 rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.9375rem] focus:border-brand-500 focus:outline-none'
 const RATES = [5, 10, 15]
 const md = (iso: string | null | undefined) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
@@ -135,7 +135,7 @@ export function ApplyStageBar({
                     setFeeText('')
                   }}
                   aria-pressed={rate === r && !feeText}
-                  className={`tap min-h-11 min-w-12 rounded-(--radius-control) border px-2 text-[0.95rem] font-semibold ${rate === r && !feeText ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}
+                  className={`tap min-h-11 min-w-12 rounded-(--radius-control) border px-2 text-[0.9375rem] font-semibold ${rate === r && !feeText ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}
                 >
                   {r}%
                 </button>

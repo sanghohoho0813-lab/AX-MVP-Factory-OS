@@ -175,8 +175,8 @@ export function PortalTab({
     return (
       <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
         {/* D-122: 개발자 말(READY · 브릿지 테이블 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
-        <p className="text-[0.98rem] font-semibold text-warning-700">고객 플랫폼 연결을 아직 켜지 않았습니다</p>
-        <p className="mt-1 text-[0.92rem] break-keep text-slate-700">연결이 켜지면 이 탭에서 고객에게 소식 · 서류 요청을 보낼 수 있습니다. 관리자에게 '고객 플랫폼 연결을 켜 달라' 고 알려 주세요.</p>
+        <p className="text-[1rem] font-semibold text-warning-700">고객 플랫폼 연결을 아직 켜지 않았습니다</p>
+        <p className="mt-1 text-[0.9375rem] break-keep text-slate-700">연결이 켜지면 이 탭에서 고객에게 소식 · 서류 요청을 보낼 수 있습니다. 관리자에게 '고객 플랫폼 연결을 켜 달라' 고 알려 주세요.</p>
         <details className="mt-2 text-[0.875rem] text-slate-500">
           <summary className="cursor-pointer">관리자용 안내</summary>
           <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. docs/SETUP.md 의 순서대로 마이그레이션을 적용하면 켜집니다.</p>
@@ -191,43 +191,43 @@ export function PortalTab({
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <HelpHeading as="h3" tight label="고객 화면 연결" className="flex items-center gap-2 text-[1.05rem] font-bold text-slate-900">
+            <HelpHeading as="h3" tight label="고객 화면 연결" className="flex items-center gap-2 text-[1rem] font-bold text-slate-900">
               <Link2 aria-hidden="true" className="size-4 text-slate-400" /> {brand.customerPlatformLabel} 연결
             </HelpHeading>
             {loading ? (
-              <p className="mt-1 text-[0.92rem] text-slate-500">확인 중…</p>
+              <p className="mt-1 text-[0.9375rem] text-slate-500">확인 중…</p>
             ) : link ? (
-              <div className="mt-1 text-[0.92rem] text-slate-600">
+              <div className="mt-1 text-[0.9375rem] text-slate-600">
                 <p>
                   <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {localDateOf(link.linkedAt)}
                   {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">연습용</span>}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <label className="text-[0.88rem] text-slate-500">
+                  <label className="text-[0.875rem] text-slate-500">
                     고객에게 보이는 단계
                     <select
                       value={link.customerStage}
                       onChange={(e) => void run(() => updateLink(link, { customerStage: e.target.value as CustomerStage }), '고객 단계를 바꿨습니다.')}
-                      className="ml-2 rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.9rem] text-slate-800"
+                      className="ml-2 rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.875rem] text-slate-800"
                     >
                       {CUSTOMER_STAGE_ORDER.map((s) => (
                         <option key={s} value={s}>{CUSTOMER_STAGE_LABEL[s]}</option>
                       ))}
                     </select>
                   </label>
-                  <label className="text-[0.88rem] text-slate-500">
+                  <label className="text-[0.875rem] text-slate-500">
                     프로젝트명
                     <input
                       defaultValue={link.displayName}
                       placeholder={record.companyName}
                       onBlur={(e) => { if (e.target.value !== link.displayName) void run(() => updateLink(link, { displayName: e.target.value }), '저장했습니다.') }}
-                      className="ml-2 w-44 rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.9rem] text-slate-800"
+                      className="ml-2 w-44 rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.875rem] text-slate-800"
                     />
                   </label>
                 </div>
               </div>
             ) : (
-              <p className="mt-1 text-[0.92rem] break-keep text-slate-600">
+              <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
                 이 고객은 아직 {brand.customerPlatformUrl.replace('https://', '')} 계정과 연결되지 않았습니다. 고객이 가입한 이메일을 넣고 연결하면 고객 화면(My MIRAE)이 열립니다.
               </p>
             )}
@@ -249,7 +249,7 @@ export function PortalTab({
                   value={linkEmail}
                   onChange={(e) => setLinkEmail(e.target.value)}
                   placeholder="customer@example.com"
-                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none"
                 />
               </label>
               <Button variant="primary" onClick={() => void connect()} disabled={linkBusy}>
@@ -274,19 +274,19 @@ export function PortalTab({
           {/* 공유 서류 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <HelpHeading as="h3" tight label="고객과 주고받는 서류" className="text-[1.05rem] font-bold text-slate-900">고객과 주고받는 서류 <span className="text-slate-400">{documents.length}</span></HelpHeading>
+              <HelpHeading as="h3" tight label="고객과 주고받는 서류" className="text-[1rem] font-bold text-slate-900">고객과 주고받는 서류 <span className="text-slate-400">{documents.length}</span></HelpHeading>
               <Button variant="secondary" onClick={() => setDocForm((f) => ({ ...f, open: true }))}>
                 <Plus aria-hidden="true" className="size-4" /> 서류 요청
               </Button>
             </div>
             {documents.length === 0 ? (
-              <p className="mt-2 text-[0.92rem] text-slate-500">요청하거나 공유한 서류가 없습니다. "서류 요청"을 누르면 고객 화면의 "해야 할 일"에 나타납니다.</p>
+              <p className="mt-2 text-[0.9375rem] text-slate-500">요청하거나 공유한 서류가 없습니다. "서류 요청"을 누르면 고객 화면의 "해야 할 일"에 나타납니다.</p>
             ) : (
               <ul className="mt-3 divide-y divide-slate-100">
                 {documents.map((d) => (
                   <li key={d.id} className="flex flex-wrap items-center gap-2 py-2.5">
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[0.95rem] font-semibold text-slate-800">{d.title}</span>
+                      <span className="block text-[0.9375rem] font-semibold text-slate-800">{d.title}</span>
                       <span className="block text-[0.875rem] text-slate-500">
                         {DOCUMENT_STATUS_LABEL[d.status]}
                         {d.visibility === 'shared_with_customer' && ' · 고객에게 공유됨'}
@@ -338,7 +338,7 @@ export function PortalTab({
             {/* 내부 파일 공유 — D-212: 제목은 그 칸의 이름(직접 만든 칸 · (2) 칸도). 예전에는 'customdoc_…' 가 고객 화면 제목이 됐다 */}
             {Object.entries(record.documents).some(([, v]) => v.storagePath) && (
               <div className="mt-3 rounded-(--radius-control) bg-slate-50 p-3">
-                <p className="text-[0.88rem] font-semibold text-slate-600">내 서류함 파일을 고객에게 공유</p>
+                <p className="text-[0.875rem] font-semibold text-slate-600">내 서류함 파일을 고객에게 공유</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {(Object.entries(record.documents) as [DocumentKey, ClientOpsRecord['documents'][DocumentKey]][])
                     // D-212: 지운 칸에 남은 파일은 내놓지 않는다
@@ -368,7 +368,7 @@ export function PortalTab({
           {/* 고객 요청 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <HelpHeading as="h3" tight label="고객이 보낸 요청" className="text-[1.05rem] font-bold text-slate-900">고객이 보낸 요청 <span className="text-slate-400">{openRequests.length} 열림</span></HelpHeading>
+              <HelpHeading as="h3" tight label="고객이 보낸 요청" className="text-[1rem] font-bold text-slate-900">고객이 보낸 요청 <span className="text-slate-400">{openRequests.length} 열림</span></HelpHeading>
               {isLocal && (
                 <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoRequest(link.id, workspaceId), '샘플 요청을 만들었습니다 (연습용).')}>
                   <Sparkles aria-hidden="true" className="size-4" /> 샘플 요청 (연습용)
@@ -376,7 +376,7 @@ export function PortalTab({
               )}
             </div>
             {requests.length === 0 ? (
-              <p className="mt-2 text-[0.92rem] text-slate-500">아직 요청이 없습니다.</p>
+              <p className="mt-2 text-[0.9375rem] text-slate-500">아직 요청이 없습니다.</p>
             ) : (
               <ul className="mt-3 flex flex-col gap-3">
                 {requests.map((r) => (
@@ -386,10 +386,10 @@ export function PortalTab({
                       <span className="text-slate-500">{REQUEST_STATUS_LABEL[r.status]}</span>
                       <span className="text-slate-400">{activityTimeText(r.createdAt)}</span>
                     </div>
-                    <p className="mt-1 text-[0.98rem] font-semibold text-slate-900">{r.title}</p>
-                    {r.body && <p className="text-[0.92rem] break-keep whitespace-pre-wrap text-slate-600">{r.body}</p>}
+                    <p className="mt-1 text-[1rem] font-semibold text-slate-900">{r.title}</p>
+                    {r.body && <p className="text-[0.9375rem] break-keep whitespace-pre-wrap text-slate-600">{r.body}</p>}
                     {r.answer && (
-                      <p className="mt-2 rounded-(--radius-control) bg-success-50 px-3 py-2 text-[0.92rem] text-success-700">
+                      <p className="mt-2 rounded-(--radius-control) bg-success-50 px-3 py-2 text-[0.9375rem] text-success-700">
                         <MessageSquareReply aria-hidden="true" className="mr-1 inline size-4" /> 답변: {r.answer}
                       </p>
                     )}
@@ -400,7 +400,7 @@ export function PortalTab({
                           onChange={(e) => setAnswerDraft((d) => ({ ...d, [r.id]: e.target.value }))}
                           placeholder="고객에게 보일 답변"
                           aria-label="답변"
-                          className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] focus:border-brand-500 focus:outline-none"
+                          className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.9375rem] focus:border-brand-500 focus:outline-none"
                         />
                         <Button variant="primary" size="sm" onClick={() => void run(() => answerRequest(r, answerDraft[r.id] ?? r.answer, 'answered'), '답변을 보냈습니다.')}>
                           답변
@@ -418,9 +418,9 @@ export function PortalTab({
 
           {/* 공개한 업데이트 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
-            <HelpHeading as="h3" tight label="고객에게 공개한 업데이트" className="text-[1.05rem] font-bold text-slate-900">고객에게 공개한 업데이트 <span className="text-slate-400">{published.length}</span></HelpHeading>
+            <HelpHeading as="h3" tight label="고객에게 공개한 업데이트" className="text-[1rem] font-bold text-slate-900">고객에게 공개한 업데이트 <span className="text-slate-400">{published.length}</span></HelpHeading>
             {published.length === 0 ? (
-              <p className="mt-2 text-[0.92rem] text-slate-500">아직 공개한 업데이트가 없습니다. 내부 상태는 자동으로 나가지 않으니, "고객에게 업데이트"로 알려 주세요.</p>
+              <p className="mt-2 text-[0.9375rem] text-slate-500">아직 공개한 업데이트가 없습니다. 내부 상태는 자동으로 나가지 않으니, "고객에게 업데이트"로 알려 주세요.</p>
             ) : (
               <ol className="mt-3 flex flex-col gap-2">
                 {published.map((u) => (
@@ -442,8 +442,8 @@ export function PortalTab({
                         onConfirm={() => void run(() => archiveUpdate(u), '고객 화면에서 내렸습니다.')}
                       />
                     </div>
-                    <p className="mt-1 text-[0.98rem] font-semibold text-slate-900">{u.title}</p>
-                    {u.body && <p className="text-[0.92rem] break-keep whitespace-pre-wrap text-slate-600">{u.body}</p>}
+                    <p className="mt-1 text-[1rem] font-semibold text-slate-900">{u.title}</p>
+                    {u.body && <p className="text-[0.9375rem] break-keep whitespace-pre-wrap text-slate-600">{u.body}</p>}
                   </li>
                 ))}
               </ol>
@@ -455,11 +455,11 @@ export function PortalTab({
       {/* 고객 이벤트 */}
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-2">
-          <HelpHeading as="h3" tight label="이 고객의 상담신청 · 요청" className="text-[1.05rem] font-bold text-slate-900">이 고객의 상담신청 · 요청 <span className="text-slate-400">{events.length}</span></HelpHeading>
-          <Link to="/ops/inbox" className="text-[0.9rem] font-medium text-brand-700 hover:underline">상담신청함</Link>
+          <HelpHeading as="h3" tight label="이 고객의 상담신청 · 요청" className="text-[1rem] font-bold text-slate-900">이 고객의 상담신청 · 요청 <span className="text-slate-400">{events.length}</span></HelpHeading>
+          <Link to="/ops/inbox" className="text-[0.875rem] font-medium text-brand-700 hover:underline">상담신청함</Link>
         </div>
         {events.length === 0 ? (
-          <p className="mt-2 text-[0.92rem] text-slate-500">아직 이 고객과 연결된 이벤트가 없습니다.</p>
+          <p className="mt-2 text-[0.9375rem] text-slate-500">아직 이 고객과 연결된 이벤트가 없습니다.</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {events.slice(0, 6).map((e) => (
@@ -520,7 +520,7 @@ export function PortalTab({
           </>
         }
       >
-        <label className="block text-[0.9rem] font-medium text-slate-600">
+        <label className="block text-[0.875rem] font-medium text-slate-600">
           서류 종류
           <select
             value={docForm.key}
@@ -529,7 +529,7 @@ export function PortalTab({
               const meta = docOptions.find((d) => d.key === key)
               setDocForm((f) => ({ ...f, key, title: meta?.label ?? f.title }))
             }}
-            className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]"
+            className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem]"
           >
             {docOptions.map((d) => (
               <option key={d.key} value={d.key}>{d.label}</option>
@@ -537,13 +537,13 @@ export function PortalTab({
             <option value="other">기타</option>
           </select>
         </label>
-        <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
+        <label className="mt-3 block text-[0.875rem] font-medium text-slate-600">
           고객에게 보일 이름
-          <input value={docForm.title} onChange={(e) => setDocForm((f) => ({ ...f, title: e.target.value }))} className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]" />
+          <input value={docForm.title} onChange={(e) => setDocForm((f) => ({ ...f, title: e.target.value }))} className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem]" />
         </label>
-        <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
+        <label className="mt-3 block text-[0.875rem] font-medium text-slate-600">
           안내 (선택)
-          <input value={docForm.note} onChange={(e) => setDocForm((f) => ({ ...f, note: e.target.value }))} placeholder="예: 최근 3개월 이내 발급분" className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]" />
+          <input value={docForm.note} onChange={(e) => setDocForm((f) => ({ ...f, note: e.target.value }))} placeholder="예: 최근 3개월 이내 발급분" className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem]" />
         </label>
       </Modal>
 
@@ -553,7 +553,7 @@ export function PortalTab({
           <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-4">
             <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">{brand.customerPortalLabel} · 내 프로젝트</p>
             <h3 className="mt-1 text-[1.2rem] font-bold text-slate-900">{preview.project.name}</h3>
-            <p className="text-[0.9rem] text-slate-500">
+            <p className="text-[0.875rem] text-slate-500">
               {CUSTOMER_STAGE_LABEL[preview.project.stage]}{preview.project.consultant_name ? ` · 담당 ${preview.project.consultant_name}` : ''}
             </p>
             <ol className="mt-3 flex flex-wrap gap-1">
@@ -568,30 +568,30 @@ export function PortalTab({
             </ol>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-[0.88rem] font-semibold text-slate-700">해야 할 일</p>
-                <ul className="mt-1 text-[0.9rem] text-slate-700">
+                <p className="text-[0.875rem] font-semibold text-slate-700">해야 할 일</p>
+                <ul className="mt-1 text-[0.875rem] text-slate-700">
                   {preview.updates.filter((u) => u.action_required && !u.completed_at).map((u) => <li key={u.id}>· {u.action_label ?? u.title}</li>)}
                   {preview.documents.filter((d) => d.status === 'requested' || d.status === 'rejected').map((d) => <li key={d.id}>· {d.title} 올리기</li>)}
                   {preview.updates.filter((u) => u.action_required && !u.completed_at).length + preview.documents.filter((d) => d.status === 'requested' || d.status === 'rejected').length === 0 && <li className="text-slate-400">없음</li>}
                 </ul>
               </div>
               <div>
-                <p className="text-[0.88rem] font-semibold text-slate-700">진행 업데이트</p>
-                <ul className="mt-1 text-[0.9rem] text-slate-700">
+                <p className="text-[0.875rem] font-semibold text-slate-700">진행 업데이트</p>
+                <ul className="mt-1 text-[0.875rem] text-slate-700">
                   {preview.updates.slice(0, 4).map((u) => <li key={u.id}>· [{UPDATE_CATEGORY_LABEL[u.category]}] {u.title}</li>)}
                   {preview.updates.length === 0 && <li className="text-slate-400">없음</li>}
                 </ul>
               </div>
               <div>
-                <p className="text-[0.88rem] font-semibold text-slate-700">서류</p>
-                <ul className="mt-1 text-[0.9rem] text-slate-700">
+                <p className="text-[0.875rem] font-semibold text-slate-700">서류</p>
+                <ul className="mt-1 text-[0.875rem] text-slate-700">
                   {preview.documents.map((d) => <li key={d.id}>· {d.title} — {DOCUMENT_STATUS_LABEL[d.status]}</li>)}
                   {preview.documents.length === 0 && <li className="text-slate-400">없음</li>}
                 </ul>
               </div>
               <div>
-                <p className="text-[0.88rem] font-semibold text-slate-700">내가 보낸 요청</p>
-                <ul className="mt-1 text-[0.9rem] text-slate-700">
+                <p className="text-[0.875rem] font-semibold text-slate-700">내가 보낸 요청</p>
+                <ul className="mt-1 text-[0.875rem] text-slate-700">
                   {preview.requests.slice(0, 4).map((r) => <li key={r.id}>· {r.title} — {REQUEST_STATUS_LABEL[r.status]}</li>)}
                   {preview.requests.length === 0 && <li className="text-slate-400">없음</li>}
                 </ul>

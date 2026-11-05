@@ -48,7 +48,7 @@ export function Modal({ open, title, onClose, children, footer, size = 'md' }: M
         }`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="text-[1.1rem] font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-[1.2rem] font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
             aria-label="닫기"

@@ -64,7 +64,7 @@ export function DesignGateNotice({ context }: { context: ProjectDesignContext })
           <PencilRuler aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800">홈페이지 단독 프로젝트입니다</p>
-            <p className="mt-1 text-[0.92rem] break-keep text-slate-600">
+            <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
               홈페이지 제작 프로젝트에는 AX MVP 설계를 적용하지 않습니다. 제작 방향은 웹사이트 스튜디오에서 설계합니다.
             </p>
             <div className="mt-3">
@@ -94,7 +94,7 @@ export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => vo
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <RefreshCw aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
-      <p className="min-w-0 flex-1 text-[0.92rem] break-keep text-warning-800">
+      <p className="min-w-0 flex-1 text-[0.9375rem] break-keep text-warning-800">
         확정된 핵심 과제가 변경되어 재설계가 필요합니다. 확정된 설계는 그대로 보존됩니다.
       </p>
       <Button variant="secondary" size="sm" onClick={onRun}>
@@ -109,7 +109,7 @@ export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => vo
 export function DesignEmptyNotice({ projectId }: { projectId: string }) {
   const navigate = useNavigate()
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.92rem] text-slate-500">
+    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] text-slate-500">
       <span className="min-w-0 flex-1">아직 설계 초안이 없습니다. 개요 화면에서 설계를 생성하세요.</span>
       <Button variant="secondary" size="sm" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
         개요로 이동

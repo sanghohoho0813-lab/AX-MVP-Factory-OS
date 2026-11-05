@@ -140,7 +140,7 @@ export function TodoComposer({
             data-testid="todo-kind"
             value={kind}
             onChange={(e) => setKind(e.target.value === 'personal' ? 'personal' : 'work')}
-            className="min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem]"
+            className="min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.9375rem]"
           >
             <option value="work">{TODO_KIND_LABEL.work}</option>
             <option value="personal">{TODO_KIND_LABEL.personal}</option>
@@ -151,7 +151,7 @@ export function TodoComposer({
             aria-label="관련 업체"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] sm:flex-none"
+            className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.9375rem] sm:flex-none"
           >
             <option value="">업체 없음</option>
             <ClientPickerOptions clients={clients} />
@@ -221,7 +221,7 @@ export function TodoRow({
         {/* D-159: 번호는 글 앞에 붙여 흐르게 — 두 칸 그리드에서 번호 칸만큼 글 폭이 줄지 않게 */}
         <span className={`t-body block break-keep [overflow-wrap:anywhere] ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
           {number !== undefined && (
-            <span aria-hidden="true" data-testid="todo-number" className={`mr-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 align-[0.1em] text-[0.85rem] leading-none font-bold ${entry.completed ? 'bg-slate-100 text-slate-400' : 'bg-brand-600 text-white'}`}>
+            <span aria-hidden="true" data-testid="todo-number" className={`mr-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 align-[0.1em] text-[0.875rem] leading-none font-bold ${entry.completed ? 'bg-slate-100 text-slate-400' : 'bg-brand-600 text-white'}`}>
               {number}
             </span>
           )}

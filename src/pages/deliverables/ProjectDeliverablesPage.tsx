@@ -234,14 +234,14 @@ export function ProjectDeliverablesPage() {
         </p>
 
         {project.projectType === 'ax_website' && (
-          <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9rem] break-keep text-slate-600">
+          <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.875rem] break-keep text-slate-600">
             AX와 홈페이지는 별도 트랙으로 관리되며 결과를 하나의 점수로 합산하지 않습니다. 각 트랙의 결과는 자료에서 구분되어 표시됩니다.
           </div>
         )}
 
         {/* 누구에게 보여줄 자료인지 — 자료 유형 선택 */}
         <Panel title="누구에게 보여줄 자료인가요?">
-          <p className="mb-3 text-[0.9rem] break-keep text-slate-500">
+          <p className="mb-3 text-[0.875rem] break-keep text-slate-500">
             보여줄 대상에 맞춰 자료를 만듭니다. 유형을 고르면 확정된 결과로 초안이 자동으로 준비됩니다.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -255,17 +255,17 @@ export function ProjectDeliverablesPage() {
                   onClick={() => navigate(createPath)}
                   className="flex h-full flex-col gap-1.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left transition-colors hover:border-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <span className="flex items-center gap-2 text-[1.05rem] font-semibold break-keep text-slate-900">
+                  <span className="flex items-center gap-2 text-[1rem] font-semibold break-keep text-slate-900">
                     <meta.icon aria-hidden="true" className="size-5 shrink-0 text-brand-500" />
                     {easyLabel}
                   </span>
-                  <span className="text-[0.9rem] leading-relaxed break-keep text-slate-500">{meta.description}</span>
+                  <span className="text-[0.875rem] leading-relaxed break-keep text-slate-500">{meta.description}</span>
                 </button>
               )
             })}
           </div>
           {!canCreate && (
-            <p className="mt-3 text-[0.9rem] break-keep text-slate-400">
+            <p className="mt-3 text-[0.875rem] break-keep text-slate-400">
               먼저 진단 또는 설계를 확정하면 자료를 만들 수 있습니다.
             </p>
           )}
@@ -282,7 +282,7 @@ export function ProjectDeliverablesPage() {
                   ) : (
                     <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
                   )}
-                  <span className="min-w-0 flex-1 break-keep text-[0.9rem] font-medium text-slate-700">{row.label}</span>
+                  <span className="min-w-0 flex-1 break-keep text-[0.875rem] font-medium text-slate-700">{row.label}</span>
                   <span className={`shrink-0 text-[0.875rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
                     {row.ready ? '준비됨' : row.pendingState}
                   </span>
@@ -309,7 +309,7 @@ export function ProjectDeliverablesPage() {
         <Panel title="개발 지시문">
           {latest ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="min-w-0 text-[0.9rem] break-keep text-slate-600">
+              <p className="min-w-0 text-[0.875rem] break-keep text-slate-600">
                 Claude Code용·범용 개발용·디자인용·콘텐츠용 개발 지시문을 복사·다운로드할 수 있습니다.
               </p>
               <Button variant="secondary" size="sm" onClick={() => navigate(`${latestBase}/prompts`)}>
@@ -318,7 +318,7 @@ export function ProjectDeliverablesPage() {
               </Button>
             </div>
           ) : (
-            <p className="text-[0.9rem] break-keep text-slate-500">
+            <p className="text-[0.875rem] break-keep text-slate-500">
               전달자료 묶음을 만들면 개발 지시문이 함께 준비됩니다.
             </p>
           )}
@@ -327,17 +327,17 @@ export function ProjectDeliverablesPage() {
         {/* 개인정보 가림 상태 */}
         <Panel title="개인정보 가림 상태">
           {!latest ? (
-            <p className="text-[0.9rem] break-keep text-slate-500">
+            <p className="text-[0.875rem] break-keep text-slate-500">
               자료를 만들면 담당자 연락처·내부 메모 등 민감정보를 가릴 수 있습니다.
             </p>
           ) : redactionRules.length === 0 ? (
-            <p className="text-[0.9rem] break-keep text-slate-500">
+            <p className="text-[0.875rem] break-keep text-slate-500">
               최근 자료에는 가림 설정이 없습니다. 고객·기관에 보내는 자료라면 자료 확정 화면에서 민감정보 가림을 확인하세요.
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
               {redactionRules.slice(0, 4).map((rule) => (
-                <li key={rule.id} className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-700">
+                <li key={rule.id} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
                   <EyeOff aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
                   <span className="min-w-0">{rule.description}</span>
                 </li>
@@ -369,7 +369,7 @@ export function ProjectDeliverablesPage() {
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{pkg.name}</p>
+                          <p className="text-[1rem] font-semibold break-keep text-slate-900">{pkg.name}</p>
                           <p className="mt-0.5 text-[0.875rem] text-slate-400">확정 당시 내용 v{pkg.version}</p>
                         </div>
                         <span className="shrink-0"><PackageStatusBadge status={pkg.status} /></span>
@@ -378,13 +378,13 @@ export function ProjectDeliverablesPage() {
                         <PackageTypeBadge type={pkg.type} />
                         <AudienceBadge audience={pkg.audience} />
                       </div>
-                      <p className="text-[0.9rem] break-keep text-slate-600">{s.headline}</p>
+                      <p className="text-[0.875rem] break-keep text-slate-600">{s.headline}</p>
                       {stale && (
                         <span className="w-fit rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           출처 원본 변경됨 · 새 버전 검토 필요
                         </span>
                       )}
-                      <span className="mt-auto inline-flex items-center gap-1 text-[0.9rem] font-semibold text-brand-600">
+                      <span className="mt-auto inline-flex items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
                         열기
                         <ArrowRight aria-hidden="true" className="size-3.5" />
                       </span>

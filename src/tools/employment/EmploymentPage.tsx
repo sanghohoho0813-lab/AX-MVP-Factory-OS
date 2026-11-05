@@ -107,7 +107,7 @@ function useStored<T extends object>(tab: string, fallback: T) {
 }
 
 const inputCls =
-  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
+  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.9375rem] text-slate-900 focus:border-brand-500 focus:outline-none'
 
 const DISCLAIMER = '이 화면의 결과는 규칙표 기준 1차 검토이며 확정이 아닙니다. 실제 신청 전 최신 공고와 운영기관 안내를 확인하고, 세액공제는 세무 대리인의 검토를 받으세요.'
 

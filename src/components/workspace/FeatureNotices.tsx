@@ -45,12 +45,12 @@ function NoticeFrame({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[0.875rem] font-semibold tracking-wide text-slate-500">{badge}</p>
-          <h2 className="mt-0.5 text-[1.15rem] font-bold break-keep text-slate-900">{title}</h2>
-          <p className="mt-1.5 text-[0.95rem] leading-relaxed break-keep text-slate-600">{description}</p>
+          <h2 className="mt-0.5 text-[1.2rem] font-bold break-keep text-slate-900">{title}</h2>
+          <p className="mt-1.5 text-[0.9375rem] leading-relaxed break-keep text-slate-600">{description}</p>
           {bullets && bullets.length > 0 && (
             <ul className="mt-2.5 flex flex-col gap-1">
               {bullets.map((b) => (
-                <li key={b} className="flex items-start gap-1.5 text-[0.9rem] break-keep text-slate-500">
+                <li key={b} className="flex items-start gap-1.5 text-[0.875rem] break-keep text-slate-500">
                   <span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-slate-300" />
                   {b}
                 </li>
@@ -162,7 +162,7 @@ export function LocalModeNotice({ context }: { context?: string }) {
   return (
     <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Cloud aria-hidden="true" className="mt-0.5 size-4.5 shrink-0 text-warning-600" />
-      <p className="min-w-0 text-[0.9rem] leading-relaxed break-keep text-warning-800">
+      <p className="min-w-0 text-[0.875rem] leading-relaxed break-keep text-warning-800">
         <span className="font-semibold">현재 로컬 모드</span> — 이 브라우저에만 저장됩니다.
         {context ? ` ${context}` : ''} 다른 기기에서 사용하거나 여러 명이 함께 쓰려면 클라우드 연결이 필요합니다.
       </p>

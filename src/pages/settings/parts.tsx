@@ -38,7 +38,7 @@ export function TabNav({ active, onChange }: { active: TabKey; onChange: (k: Tab
           type="button"
           aria-current={active === t.key ? 'page' : undefined}
           onClick={() => onChange(t.key)}
-          className={`-mb-px flex min-w-0 flex-col items-center gap-0.5 border-b-2 px-1 py-2 text-[0.875rem] font-medium break-keep transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-[0.875rem] ${
+          className={`-mb-px flex min-w-0 flex-col items-center gap-0.5 border-b-2 px-1 py-2 text-[0.875rem] font-medium break-keep transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2.5 ${
             active === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -91,8 +91,8 @@ function ContentWidthControl() {
   const w = useContentWidth()
   return (
     <fieldset className="mt-5" data-testid="settings-content-width">
-      <legend className="text-[0.95rem] font-semibold text-slate-800">PC 본문 폭</legend>
-      <p className="mt-0.5 text-[0.88rem] break-keep text-slate-500">글자 크기는 그대로 두고 본문 가로 길이만 바꿉니다 — 큰 모니터에서 눈이 좌우로 덜 움직이게. 머리줄 [폭] 단추와 같습니다.</p>
+      <legend className="text-[0.9375rem] font-semibold text-slate-800">PC 본문 폭</legend>
+      <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">글자 크기는 그대로 두고 본문 가로 길이만 바꿉니다 — 큰 모니터에서 눈이 좌우로 덜 움직이게. 머리줄 [폭] 단추와 같습니다.</p>
       <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="PC 본문 폭">
         {(['narrow', 'normal', 'wide'] as const).map((k) => (
           <button
@@ -101,10 +101,10 @@ function ContentWidthControl() {
             aria-pressed={w === k}
             onClick={() => setContentWidth(k)}
             data-width={k}
-            className={`tap min-h-11 rounded-full border px-4 text-[0.95rem] font-semibold ${w === k ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-400'}`}
+            className={`tap min-h-11 rounded-full border px-4 text-[0.9375rem] font-semibold ${w === k ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-400'}`}
           >
             {CONTENT_WIDTH_LABEL[k]}
-            <span className="ml-1 text-[0.85rem] font-medium text-slate-500">{CONTENT_WIDTH_PX[k].toLocaleString('ko-KR')}px{k === 'normal' ? ' · 기본' : ''}</span>
+            <span className="ml-1 text-[0.875rem] font-medium text-slate-500">{CONTENT_WIDTH_PX[k].toLocaleString('ko-KR')}px{k === 'normal' ? ' · 기본' : ''}</span>
           </button>
         ))}
       </div>
@@ -122,8 +122,8 @@ export function FeatureVisibilityPanel() {
       <HelpNote summary="테스트 운영, 기관 연계, 사례 관리처럼 프로젝트 후반에 사용하는 기능을 추가로 표시합니다. 꺼도 데이터는 삭제되지 않으며 직접 주소로는 계속 접근할 수 있습니다." />
       <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-(--radius-control) border border-slate-200 px-4 py-3">
         <span className="min-w-0">
-          <span className="block text-[0.95rem] font-semibold text-slate-800">고급 운영 기능 보기</span>
-          <span className="block text-[0.88rem] break-keep text-slate-500">
+          <span className="block text-[0.9375rem] font-semibold text-slate-800">고급 운영 기능 보기</span>
+          <span className="block text-[0.875rem] break-keep text-slate-500">
             {advanced ? '목차 AX 스튜디오에 검증 · 기관 전략 · 사례가 보입니다.' : '지금은 핵심 흐름만 — 검증 · 기관 전략 · 사례는 목차에서 뺐습니다(주소로는 열립니다).'}
           </span>
         </span>

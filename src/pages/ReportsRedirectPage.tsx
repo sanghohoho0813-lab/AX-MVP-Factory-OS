@@ -16,8 +16,8 @@ export function ReportsRedirectPage() {
           <FileCheck2 aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0">
-          <h1 className="text-[1.15rem] font-bold break-keep text-slate-900">전체 진행 리포트는 결과자료로 통합되었습니다</h1>
-          <p className="mt-1.5 text-[0.95rem] leading-relaxed break-keep text-slate-600">
+          <h1 className="text-[1.2rem] font-bold break-keep text-slate-900">전체 진행 리포트는 결과자료로 통합되었습니다</h1>
+          <p className="mt-1.5 text-[0.9375rem] leading-relaxed break-keep text-slate-600">
             프로젝트별 진단·설계·전달자료와 전체 자료 목록은 결과자료 화면에서 확인할 수 있습니다.
           </p>
           <Button variant="primary" className="mt-4" onClick={() => navigate('/deliverables/results')}>

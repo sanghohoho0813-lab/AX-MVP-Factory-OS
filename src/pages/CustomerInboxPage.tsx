@@ -194,8 +194,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
       {notReady && (
         <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
           {/* D-122: 개발자 말(READY · 브릿지 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
-          <p className="text-[0.98rem] font-semibold text-warning-700">홈페이지 상담신청 연결을 아직 켜지 않았습니다</p>
-          <p className="mt-1 text-[0.92rem] break-keep text-slate-700">
+          <p className="text-[1rem] font-semibold text-warning-700">홈페이지 상담신청 연결을 아직 켜지 않았습니다</p>
+          <p className="mt-1 text-[0.9375rem] break-keep text-slate-700">
             연결이 켜지면 홈페이지에서 들어온 상담신청 · 주문 · 서류 업로드가 여기 저절로 쌓입니다. 관리자에게 '상담신청 연결을 켜 달라' 고 알려 주세요.
           </p>
           <details className="mt-2 text-[0.875rem] text-slate-500">
@@ -289,7 +289,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           )}
 
           {loading ? (
-            <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
+            <p className="py-8 text-center text-[0.9375rem] text-slate-500">불러오는 중…</p>
           ) : visible.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
               <Inbox aria-hidden="true" className="size-8 text-slate-300" />
@@ -298,7 +298,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
                   : filter === 'open'
                     ? '새 고객 요청이 없습니다.'
                     : '해당하는 상담신청이 없습니다.'}</p>
-              <p className="max-w-md text-[0.9rem] break-keep text-slate-500">
+              <p className="max-w-md text-[0.875rem] break-keep text-slate-500">
                 고객이 {brand.customerPlatformLabel}에서 진단을 마치거나, 서비스를 주문하거나, 서류를 올리거나, 요청을 보내면 여기에 나타납니다.
               </p>
               {typeFilter !== 'all' && (

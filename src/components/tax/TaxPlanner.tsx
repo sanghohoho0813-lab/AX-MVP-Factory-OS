@@ -125,7 +125,7 @@ const krw = (n: number) => (Number.isFinite(n) ? formatWon(n) : '-')
 const wrapBtn = '!h-auto min-h-11 max-w-full !justify-start !whitespace-normal !shrink break-keep py-2 text-left'
 
 const inputCls =
-  'mt-1 block min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.98rem] text-slate-900 focus:border-brand-500 focus:outline-none'
+  'mt-1 block min-h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[1rem] text-slate-900 focus:border-brand-500 focus:outline-none'
 
 /* ------------------------------------------------------------------ */
 
@@ -755,7 +755,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                   {inherit?.ok && inherit.familyBiz && (
                     <div className="flex flex-col gap-2 rounded-(--radius-control) border border-amber-300 bg-white p-3" data-testid="family-biz">
                       <p className="t-card font-bold text-slate-900">★ 가업상속공제를 받으면</p>
-                      <p className="text-[1.1rem] font-bold text-navy-900 tabular-nums">
+                      <p className="text-[1.2rem] font-bold text-navy-900 tabular-nums">
                         상속세 {krw(inherit.familyBiz.tax)} <span className="t-body font-semibold text-brand-800">(공제 {krw(inherit.familyBiz.deduction)} · 지금보다 {krw(inherit.taxNow - inherit.familyBiz.tax)} 적음)</span>
                       </p>
                       <ProofBadge proof={inherit.familyBiz.proof} outside={inherit.familyBiz.outside} />
@@ -1214,7 +1214,7 @@ function SuccessionBlock({ r }: { r: SuccessionResult }) {
         <p className="t-body font-semibold break-keep text-danger-800">요건이 맞지 않아 특례를 받을 수 없습니다 — 위 일반 증여세가 적용됩니다.</p>
       ) : (
         <>
-          <p className="text-[1.15rem] font-bold text-navy-900 tabular-nums">
+          <p className="text-[1.2rem] font-bold text-navy-900 tabular-nums">
             특례 적용 시 증여세 {won(r.total)}
             {r.saving > 0 && <span className="t-body font-semibold text-brand-800"> · 일반보다 {krw(r.saving)} 적음</span>}
           </p>
@@ -1420,7 +1420,7 @@ function Outcome(props: {
   return (
     <div className="flex flex-col gap-2" data-outcome>
       {props.message && <p className="t-sub break-keep text-slate-600">{props.message}</p>}
-      <p className="text-[1.25rem] font-bold break-keep text-navy-900 tabular-nums">{props.headline}</p>
+      <p className="text-[1.2rem] font-bold break-keep text-navy-900 tabular-nums">{props.headline}</p>
       <ul className="flex flex-col gap-1">
         {props.lines.map((l) => (
           <li key={l} className="t-body break-keep text-slate-800 tabular-nums">
@@ -1572,7 +1572,7 @@ function RouteCard({ r, best, onOpen }: { r: CashRoute; best: boolean; onOpen: (
             {r.verify.length > 0 && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-bold whitespace-nowrap text-amber-900">★ 검증 필요</span>}
             {r.key === 'retire' && r.ok && <span className="t-meta rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 font-semibold whitespace-nowrap text-slate-700">퇴임할 때만</span>}
           </span>
-          <span className={`ml-auto shrink-0 text-right font-bold whitespace-nowrap tabular-nums ${r.ok ? 'text-[1.05rem] text-navy-900' : 't-sub text-slate-500'}`}>
+          <span className={`ml-auto shrink-0 text-right font-bold whitespace-nowrap tabular-nums ${r.ok ? 'text-[1rem] text-navy-900' : 't-sub text-slate-500'}`}>
             {!r.ok ? '안 됨' : r.netBurden < 0 ? `이득 ${krw(-r.netBurden)}` : `순부담 ${krw(r.netBurden)}`}
           </span>
           <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />

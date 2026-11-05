@@ -34,22 +34,22 @@ export function NextActionHero({
   return (
     <section className="rounded-(--radius-panel) border border-brand-100 bg-white p-6 sm:p-8">
       {eyebrow && (
-        <p className="mb-2 text-[0.95rem] font-semibold text-brand-700">{eyebrow}</p>
+        <p className="mb-2 text-[0.9375rem] font-semibold text-brand-700">{eyebrow}</p>
       )}
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 max-w-3xl">
-          <p className="text-[0.9rem] font-medium tracking-wide text-slate-500">지금 해야 할 일</p>
+          <p className="text-[0.875rem] font-medium tracking-wide text-slate-500">지금 해야 할 일</p>
           <h2 className="mt-1.5 text-[1.6rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.8rem]">
             {actionText}
           </h2>
-          {reason && <p className="mt-3 text-[1.05rem] leading-relaxed break-keep text-slate-600">{reason}</p>}
-          {due && <p className="mt-3 inline-flex items-center rounded-full bg-warning-50 px-3 py-1 text-[0.9rem] font-medium text-warning-700">기한 · {due}</p>}
+          {reason && <p className="mt-3 text-[1rem] leading-relaxed break-keep text-slate-600">{reason}</p>}
+          {due && <p className="mt-3 inline-flex items-center rounded-full bg-warning-50 px-3 py-1 text-[0.875rem] font-medium text-warning-700">기한 · {due}</p>}
         </div>
         <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
           {actionPath ? (
             <NavLink
               to={actionPath}
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-7 text-[1.1rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-7 text-[1.2rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
             >
               {actionLabel}
               <ArrowRight aria-hidden="true" className="size-5" />
@@ -58,7 +58,7 @@ export function NextActionHero({
             <button
               type="button"
               onClick={onAction}
-              className="inline-flex h-14 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-7 text-[1.1rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+              className="inline-flex h-14 cursor-pointer items-center justify-center gap-2 rounded-(--radius-control) bg-brand-600 px-7 text-[1.2rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
             >
               {actionLabel}
               <ArrowRight aria-hidden="true" className="size-5" />

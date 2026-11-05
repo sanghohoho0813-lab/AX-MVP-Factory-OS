@@ -90,7 +90,7 @@ export function SignOutButton({ collapsed = false, testId = 'account-signout', t
         clearSwitchTarget()
         void signOut()
       }}
-      className={`tap flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-3 py-2 text-left text-[0.95rem] ${tone === 'light' ? 'border border-slate-200 bg-white font-semibold text-slate-700 hover:bg-slate-50' : 'text-navy-100 hover:bg-navy-800 hover:text-white'} ${collapsed ? 'justify-center px-0' : ''}`}
+      className={`tap flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-3 py-2 text-left text-[0.9375rem] ${tone === 'light' ? 'border border-slate-200 bg-white font-semibold text-slate-700 hover:bg-slate-50' : 'text-navy-100 hover:bg-navy-800 hover:text-white'} ${collapsed ? 'justify-center px-0' : ''}`}
     >
       <LogOut aria-hidden="true" className={`size-[18px] shrink-0 ${tone === 'light' ? 'text-slate-500' : 'text-navy-300'}`} />
       {!collapsed && <span>로그아웃</span>}

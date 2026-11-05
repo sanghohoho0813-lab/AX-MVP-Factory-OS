@@ -149,7 +149,7 @@ function SidebarContent({
           className="flex min-w-0 cursor-pointer items-center gap-2.5"
         >
           {collapsed ? (
-            <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.15rem] font-black text-white ${onToggleCollapsed ? 'size-10' : 'size-12'}`}>
+            <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.2rem] font-black text-white ${onToggleCollapsed ? 'size-10' : 'size-12'}`}>
               M
             </span>
           ) : (
@@ -458,7 +458,7 @@ function NavLinkRow({
       data-nav-tip={collapsed ? item.label : undefined}
       // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
       aria-current={isActive ? 'page' : undefined}
-      className={`relative flex items-center gap-3 rounded-(--radius-control) font-medium transition-colors ${nested ? 'min-h-11 px-3 py-2 text-[0.92rem]' : 'min-h-11 px-2 py-1.5 text-[0.95rem]'} ${collapsed ? 'justify-center px-0' : ''} ${
+      className={`relative flex items-center gap-3 rounded-(--radius-control) font-medium transition-colors ${nested ? 'min-h-11 px-3 py-2 text-[0.9375rem]' : 'min-h-11 px-2 py-1.5 text-[0.9375rem]'} ${collapsed ? 'justify-center px-0' : ''} ${
         isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
       }`}
     >
@@ -538,7 +538,7 @@ function CategoryRow({
         data-nav-category={item.moduleKey}
         onClick={() => onToggle(item.key, open)}
         title={item.hint}
-        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.95rem] font-medium transition-colors ${
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.9375rem] font-medium transition-colors ${
           selfActive ? 'bg-navy-800 text-white' : childActive ? 'text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
         }`}
       >
@@ -563,7 +563,7 @@ function CategoryRow({
               to={item.path}
               onClick={onNavigate}
               aria-current={selfActive ? 'page' : undefined}
-              className={`flex min-h-11 items-center gap-2 rounded-(--radius-control) px-3 py-2 text-[0.92rem] font-medium ${selfActive ? 'bg-brand-600 text-white' : 'text-navy-300 hover:bg-navy-800 hover:text-white'}`}
+              className={`flex min-h-11 items-center gap-2 rounded-(--radius-control) px-3 py-2 text-[0.9375rem] font-medium ${selfActive ? 'bg-brand-600 text-white' : 'text-navy-300 hover:bg-navy-800 hover:text-white'}`}
             >
               {item.label} 살펴보기
             </Link>
@@ -580,7 +580,7 @@ function SidebarAccount({ collapsed }: { collapsed: boolean }) {
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-1.5">
-        <span title={`${me.name} ${me.title}`} aria-label={`${me.name} ${me.title}`} role="img" className="flex size-9 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
+        <span title={`${me.name} ${me.title}`} aria-label={`${me.name} ${me.title}`} role="img" className="flex size-9 items-center justify-center rounded-full bg-white/10 text-[0.875rem] font-bold text-white">
           {me.initial}
         </span>
       </div>
@@ -588,10 +588,10 @@ function SidebarAccount({ collapsed }: { collapsed: boolean }) {
   }
   return (
     <div data-testid="sidebar-account" className="flex min-h-11 items-center gap-2.5 px-1.5">
-      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
+      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-[0.875rem] font-bold text-white">
         {me.initial}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[0.95rem] text-navy-100">
+      <span className="min-w-0 flex-1 truncate text-[0.9375rem] text-navy-100">
         <b className="font-bold text-white">{me.name}</b> {me.title}
       </span>
     </div>
@@ -616,7 +616,7 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
         title={collapsed ? undefined : item.hint}
         aria-label={collapsed ? item.label : undefined}
         data-nav-tip={collapsed ? item.label : undefined}
-        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.95rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.9375rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
       >
         <NavIcon icon={item.icon} tone="slate" active={false} collapsed={collapsed} />
         {!collapsed && <span className="truncate">{item.label}</span>}
@@ -638,7 +638,7 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
                   onClick={() => setPicked(f)}
                   title={collapsed ? f.short : f.label}
                   data-future={f.key}
-                  className={`flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left text-[0.9rem] text-navy-200 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+                  className={`flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left text-[0.875rem] text-navy-200 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
                 >
                   <Icon aria-hidden="true" className="size-4 shrink-0 text-navy-300" />
                   {collapsed ? <span className="sr-only">{f.short}</span> : <span className="truncate">{f.short}</span>}

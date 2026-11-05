@@ -25,16 +25,16 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
     ['끝낸 업무', `${r.headline.doneCount}건`],
     ['정리된 서류', `${r.headline.documentsReady}가지`],
   ]
-  const H = ({ children }: { children: string }) => <h3 className="mt-5 mb-2 border-b border-slate-300 pb-1 text-[1.05rem] font-bold text-slate-900">{children}</h3>
-  const Empty = ({ children }: { children: string }) => <p className="text-[0.95rem] text-slate-500">{children}</p>
+  const H = ({ children }: { children: string }) => <h3 className="mt-5 mb-2 border-b border-slate-300 pb-1 text-[1rem] font-bold text-slate-900">{children}</h3>
+  const Empty = ({ children }: { children: string }) => <p className="text-[0.9375rem] text-slate-500">{children}</p>
   return (
     <article className={printing ? 'px-8 py-6' : ''} data-testid={printing ? 'report-print' : 'report-preview'}>
       <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-brand-700 pb-2">
         <div className="min-w-0">
-          <p className="text-[0.9rem] font-semibold text-brand-700">{REPORT_PERIOD_LABEL[r.period]} 함께 만든 성과</p>
+          <p className="text-[0.875rem] font-semibold text-brand-700">{REPORT_PERIOD_LABEL[r.period]} 함께 만든 성과</p>
           <h2 className="text-[1.5rem] font-bold break-keep [overflow-wrap:anywhere] text-slate-900">{r.companyName} 성과 보고서</h2>
         </div>
-        <p className="text-[0.9rem] text-slate-600">
+        <p className="text-[0.875rem] text-slate-600">
           {ymd(r.from)} ~ {ymd(r.to)}
         </p>
       </header>
@@ -42,8 +42,8 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
       <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 avoid-break">
         {tiles.map(([k, v]) => (
           <div key={k} className="rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2">
-            <dt className="text-[0.85rem] text-slate-600">{k}</dt>
-            <dd className="text-[1.15rem] font-bold break-keep text-slate-900" data-testid={`report-tile-${k}`}>{v}</dd>
+            <dt className="text-[0.875rem] text-slate-600">{k}</dt>
+            <dd className="text-[1.2rem] font-bold break-keep text-slate-900" data-testid={`report-tile-${k}`}>{v}</dd>
           </div>
         ))}
       </dl>
@@ -52,14 +52,14 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
       {r.money.length === 0 ? (
         <Empty>이 기간에 선정 · 입금된 자금은 아직 없습니다.</Empty>
       ) : (
-        <table className="w-full text-[0.95rem]">
+        <table className="w-full text-[0.9375rem]">
           <tbody>
             {r.money.map((m, i) => (
               <tr key={i} className="border-b border-slate-100 avoid-break">
                 <td className="w-16 py-1.5 align-top text-slate-600">{md(m.date)}</td>
                 <td className="py-1.5 align-top break-keep [overflow-wrap:anywhere] text-slate-900">
                   {m.name}
-                  <span className="block text-[0.85rem] text-slate-500">{m.kind === 'executed' ? `${m.selectedAt ? `선정 ${md(m.selectedAt)} → ` : ''}입금` : '선정 · 입금 전'}</span>
+                  <span className="block text-[0.875rem] text-slate-500">{m.kind === 'executed' ? `${m.selectedAt ? `선정 ${md(m.selectedAt)} → ` : ''}입금` : '선정 · 입금 전'}</span>
                 </td>
                 <td className="py-1.5 text-right align-top font-semibold whitespace-nowrap text-slate-900">{won(m.amount)}</td>
               </tr>
@@ -70,7 +70,7 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
 
       <H>끝낸 업무</H>
       {r.done.length === 0 ? <Empty>이 기간에 끝낸 업무는 아직 없습니다.</Empty> : (
-        <ul className="flex flex-col gap-1 text-[0.95rem]">
+        <ul className="flex flex-col gap-1 text-[0.9375rem]">
           {r.done.map((d, i) => (
             <li key={i} className="avoid-break"><span className="inline-block w-16 text-slate-600">{md(d.date)}</span>{d.label}</li>
           ))}
@@ -80,7 +80,7 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
       {r.inProgress.length > 0 && (
         <>
           <H>진행 중인 업무</H>
-          <ul className="flex flex-col gap-1.5 text-[0.95rem]">
+          <ul className="flex flex-col gap-1.5 text-[0.9375rem]">
             {r.inProgress.map((d, i) => (
               <li key={i} className="avoid-break [overflow-wrap:anywhere]">
                 <b className="font-semibold">{d.label}</b> <span className="text-slate-500">· {d.status}</span>
@@ -98,7 +98,7 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
       {r.tools.length > 0 && (
         <>
           <H>분석 · 판정 요약</H>
-          <ul className="flex flex-col gap-2 text-[0.95rem]">
+          <ul className="flex flex-col gap-2 text-[0.9375rem]">
             {r.tools.map((t, i) => (
               <li key={i} className="avoid-break [overflow-wrap:anywhere]">
                 <b className="font-semibold">{t.title}</b> <span className="text-slate-600">· {t.verdict} ({md(t.date)})</span>
@@ -111,7 +111,7 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
 
       <H>다음에 챙길 것(60일)</H>
       {r.next.length === 0 ? <Empty>60일 안에 챙길 마감은 없습니다.</Empty> : (
-        <ul className="flex flex-col gap-1 text-[0.95rem]">
+        <ul className="flex flex-col gap-1 text-[0.9375rem]">
           {r.next.map((n, i) => (
             <li key={i} className="avoid-break [overflow-wrap:anywhere]"><span className="inline-block w-16 font-semibold text-slate-800">{md(n.date)}</span>{n.text}</li>
           ))}

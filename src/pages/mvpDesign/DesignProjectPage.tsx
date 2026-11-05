@@ -158,7 +158,7 @@ export function DesignProjectPage() {
             <DefItem label="목표 사용자" value={design.targetUsers} />
             <DefItem label="이번 MVP 목표" value={design.goalStatement} />
           </dl>
-          <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.95rem] leading-relaxed break-keep text-slate-600">{design.autoSummary}</p>
+          <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed break-keep text-slate-600">{design.autoSummary}</p>
         </Panel>
 
         {/* 기능 범위 (쉬운 표현) */}
@@ -171,7 +171,7 @@ export function DesignProjectPage() {
           {must.length > 0 && (
             <ul className="mt-4 flex flex-col gap-1.5">
               {must.slice(0, 6).map((f) => (
-                <li key={f.id} className="flex items-start gap-2 text-[0.98rem] text-slate-700">
+                <li key={f.id} className="flex items-start gap-2 text-[1rem] text-slate-700">
                   <BadgeCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-500" />
                   <span className="min-w-0 break-keep">{f.name}</span>
                 </li>
@@ -186,8 +186,8 @@ export function DesignProjectPage() {
             <ul className="flex flex-col gap-2">
               {activeScreens.slice(0, 6).map((s) => (
                 <li key={s.id} className="rounded-(--radius-control) border border-slate-100 px-3.5 py-2.5">
-                  <p className="text-[0.98rem] font-medium break-keep text-slate-800">{s.name}</p>
-                  {s.purpose && <p className="mt-0.5 text-[0.9rem] break-keep text-slate-500">{s.purpose}</p>}
+                  <p className="text-[1rem] font-medium break-keep text-slate-800">{s.name}</p>
+                  {s.purpose && <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">{s.purpose}</p>}
                 </li>
               ))}
             </ul>
@@ -220,7 +220,7 @@ export function DesignProjectPage() {
                     ].map(([label, value]) => (
                       <div key={label as string}>
                         <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-                        <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
+                        <dd className="text-[1.2rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -228,7 +228,7 @@ export function DesignProjectPage() {
                 <Panel title="범위 가드레일">
                   <ul className="flex flex-col gap-2">
                     {design.guardrailChecks.filter((g) => g.limit !== null).map((g) => (
-                      <li key={g.key} className="flex items-center justify-between gap-2 text-[0.9rem]">
+                      <li key={g.key} className="flex items-center justify-between gap-2 text-[0.875rem]">
                         <span className="min-w-0 truncate text-slate-600">{g.label}</span>
                         <GuardrailStatusBadge status={g.status} />
                       </li>
@@ -240,7 +240,7 @@ export function DesignProjectPage() {
                 <Panel title="점검 상세">
                   <ul className="flex flex-col gap-1.5">
                     {[...errors, ...warnings].slice(0, 6).map((c, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-[0.88rem] break-keep text-slate-600">
+                      <li key={i} className="flex items-start gap-1.5 text-[0.875rem] break-keep text-slate-600">
                         <QualitySeverityBadge severity={c.severity} />
                         <span className="min-w-0">{c.message}</span>
                       </li>
@@ -261,7 +261,7 @@ function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
+      <dd className="mt-0.5 text-[1rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
 }
@@ -270,7 +270,7 @@ function ScopeStat({ label, value, tone }: { label: string; value: number; tone:
   return (
     <div className="rounded-(--radius-card) border border-slate-200 px-3 py-3 text-center">
       <p className={`text-[1.6rem] font-bold ${tone}`}>{value}</p>
-      <p className="mt-0.5 text-[0.9rem] break-keep text-slate-500">{label}</p>
+      <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">{label}</p>
     </div>
   )
 }

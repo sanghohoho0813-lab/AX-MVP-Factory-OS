@@ -202,13 +202,13 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
           className="flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-800 sm:w-auto sm:gap-1.5 sm:px-3"
         >
           <Search aria-hidden="true" className="size-5" />
-          <span className="hidden text-[0.95rem] font-medium sm:inline">찾기</span>
+          <span className="hidden text-[0.9375rem] font-medium sm:inline">찾기</span>
         </button>
       ) : (
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.92rem] text-slate-400 hover:border-slate-300"
+        className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.9375rem] text-slate-400 hover:border-slate-300"
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />
         {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
@@ -230,12 +230,12 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="업체 이름 · 대표 · 전화번호 뒷자리 · 도구"
-                className="h-14 w-full bg-transparent text-[1.05rem] text-slate-900 outline-none placeholder:text-slate-400"
+                className="h-14 w-full bg-transparent text-[1rem] text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {hits.length === 0 ? (
-                <p className="px-3 py-6 text-center text-[0.95rem] text-slate-400">일치하는 항목이 없습니다.</p>
+                <p className="px-3 py-6 text-center text-[0.9375rem] text-slate-400">일치하는 항목이 없습니다.</p>
               ) : (
                 grouped.map((g) => (
                   <div key={g.group} className="mb-1">

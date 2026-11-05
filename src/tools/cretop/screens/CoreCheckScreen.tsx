@@ -59,7 +59,7 @@ export function CoreCheckScreen() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="크레탑 기업종합보고서 글자를 그대로 붙여 넣으세요"
-            className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900"
+            className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.9375rem] text-slate-900"
           />
           <div className="flex flex-wrap gap-2">
             {last && (

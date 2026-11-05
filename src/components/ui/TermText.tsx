@@ -34,7 +34,7 @@ function TermTip({ term, children }: { term: string; children: string }) {
         <span
           role="tooltip"
           data-testid="term-tip"
-          className="pointer-events-none absolute top-full left-0 z-40 mt-1 block w-max max-w-[min(20rem,calc(100vw-3rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.92rem] leading-snug font-medium break-keep whitespace-normal text-white shadow-lg"
+          className="pointer-events-none absolute top-full left-0 z-40 mt-1 block w-max max-w-[min(20rem,calc(100vw-3rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.9375rem] leading-snug font-medium break-keep whitespace-normal text-white shadow-lg"
         >
           <b className="font-bold">{term}</b> — {CONSULT_TERMS[term]}
         </span>

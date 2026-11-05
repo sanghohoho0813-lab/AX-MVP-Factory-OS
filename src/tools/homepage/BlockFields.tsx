@@ -18,7 +18,7 @@ import {
 } from '../../services/siteBuilder'
 
 export const inputClass =
-  'mt-1 w-full min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+  'mt-1 w-full min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 /** 올린 사진을 줄여 data URL 로 — 긴 변 1600 → 1200 → 900 으로 줄이며 상한 안에 맞춘다 */
 export async function imageFileToDataUrl(file: File): Promise<string> {

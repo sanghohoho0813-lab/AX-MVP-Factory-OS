@@ -320,7 +320,7 @@ export function ProjectFormPage() {
 
   const orgName = organizations.find((o) => o.id === form.organizationId)?.name ?? '미선택'
   const summary = (
-    <dl className="text-[0.9rem]">
+    <dl className="text-[0.875rem]">
       {[['고객사', orgName], ['프로젝트명', form.name], ['유형', PROJECT_TYPE_META[form.projectType].label], ['담당자', INTERNAL_MEMBERS.find((m) => m.id === form.ownerId)?.name ?? '']].map(([l, v]) => (
         <div key={l} className="flex items-start justify-between gap-3 border-b border-slate-100 py-2 last:border-0">
           <dt className="shrink-0 text-slate-500">{l}</dt>
@@ -346,7 +346,7 @@ export function ProjectFormPage() {
         summary={summary}
       >
         {existing?.archivedAt && (
-          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+          <p className="mb-4 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem] break-keep text-warning-700">
             보관 처리된 프로젝트입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지 않습니다.
           </p>
         )}
@@ -367,8 +367,8 @@ export function ProjectFormPage() {
         {step === 2 && (
           <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-[1.15rem] font-bold text-slate-900">프로젝트 유형</h2>
-              <p className="mt-1 text-[0.95rem] text-slate-500">유형에 따라 진행 단계가 달라집니다.</p>
+              <h2 className="text-[1.2rem] font-bold text-slate-900">프로젝트 유형</h2>
+              <p className="mt-1 text-[0.9375rem] text-slate-500">유형에 따라 진행 단계가 달라집니다.</p>
             </div>
             <div className="grid grid-cols-1 gap-3">
               {(Object.keys(PROJECT_TYPE_META) as ProjectType[]).map((type) => {
@@ -376,8 +376,8 @@ export function ProjectFormPage() {
                 return (
                   <button key={type} type="button" onClick={() => handleTypeChange(type)}
                     className={`flex flex-col items-start gap-1 rounded-(--radius-card) border-2 p-4 text-left transition-colors ${selected ? 'border-brand-500 bg-brand-50/60' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <span className="text-[1.05rem] font-bold text-slate-900">{PROJECT_TYPE_META[type].label}</span>
-                    <span className="text-[0.95rem] break-keep text-slate-600">{TYPE_DESC[type] ?? ''}</span>
+                    <span className="text-[1rem] font-bold text-slate-900">{PROJECT_TYPE_META[type].label}</span>
+                    <span className="text-[0.9375rem] break-keep text-slate-600">{TYPE_DESC[type] ?? ''}</span>
                   </button>
                 )
               })}
@@ -414,16 +414,16 @@ export function ProjectFormPage() {
 
         {step === 4 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-[1.15rem] font-bold text-slate-900">입력 내용 확인</h2>
+            <h2 className="text-[1.2rem] font-bold text-slate-900">입력 내용 확인</h2>
             <dl className="rounded-(--radius-card) border border-slate-200">
               {[['고객사', orgName], ['프로젝트명', form.name], ['유형', PROJECT_TYPE_META[form.projectType].label], ['목적', form.objective], ['담당자', INTERNAL_MEMBERS.find((m) => m.id === form.ownerId)?.name ?? ''], ['목표 완료일', form.dueDate], ['다음 행동', form.nextAction]].map(([l, v]) => (
                 <div key={l} className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
-                  <dt className="shrink-0 text-[0.95rem] text-slate-500">{l}</dt>
-                  <dd className="min-w-0 break-keep text-right text-[0.95rem] font-medium text-slate-800">{v || <span className="text-slate-300">미입력</span>}</dd>
+                  <dt className="shrink-0 text-[0.9375rem] text-slate-500">{l}</dt>
+                  <dd className="min-w-0 break-keep text-right text-[0.9375rem] font-medium text-slate-800">{v || <span className="text-slate-300">미입력</span>}</dd>
                 </div>
               ))}
             </dl>
-            <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] break-keep text-brand-800">
+            <p className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] break-keep text-brand-800">
               시작하면 프로젝트 코드가 자동 생성되고, 프로젝트 컨트롤 센터에서 첫 번째 해야 할 일을 안내합니다.
             </p>
           </div>
@@ -438,13 +438,13 @@ export function ProjectFormPage() {
           return (
             <div className="flex flex-col gap-3">
               <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-                <p className="text-[0.9rem] text-slate-500">{saved?.projectCode} · {saved ? PROJECT_TYPE_META[saved.projectType].label : ''}</p>
-                <p className="mt-0.5 text-[1.1rem] font-bold text-slate-900">{saved?.name}</p>
+                <p className="text-[0.875rem] text-slate-500">{saved?.projectCode} · {saved ? PROJECT_TYPE_META[saved.projectType].label : ''}</p>
+                <p className="mt-0.5 text-[1.2rem] font-bold text-slate-900">{saved?.name}</p>
               </div>
               {j && (
                 <div className="rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                   <p className="text-[0.875rem] font-semibold text-brand-700">첫 번째 해야 할 일</p>
-                  <p className="mt-0.5 text-[0.95rem] break-keep text-slate-700">{j.actionText}</p>
+                  <p className="mt-0.5 text-[0.9375rem] break-keep text-slate-700">{j.actionText}</p>
                 </div>
               )}
               <Button variant="primary" onClick={() => { const id = savedProjectId; setSavedProjectId(null); if (id) { setActiveProject(id); navigate(`/projects/${id}`) } }}>프로젝트 열기</Button>

@@ -85,7 +85,7 @@ export function ProjectStepRail({
               <Icon aria-hidden="true" className="size-4" />
             </span>
             <div className="min-w-0 md:px-1">
-              <p className={`text-[0.95rem] leading-tight ${meta.text}`}>{step.label}</p>
+              <p className={`text-[0.9375rem] leading-tight ${meta.text}`}>{step.label}</p>
               <p className="mt-0.5 text-[0.875rem] text-slate-400" aria-current={st === 'current' ? 'step' : undefined}>
                 {meta.badge}
               </p>

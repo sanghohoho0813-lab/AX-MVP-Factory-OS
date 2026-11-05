@@ -771,7 +771,7 @@ function TemplateButton({ t, on, hot = false, ctx = '', onClick }: { t: ThreadTe
     <HoverTip block className="h-full" tip={<TipBody title={`${t.key} ${t.name}`} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
       <button type="button" aria-pressed={on} onClick={onClick} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border px-3 py-2.5 text-left ${on ? 'border-brand-500 bg-white ring-2 ring-brand-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`thr-tpl-${t.key}`}>
         <span className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
-          <span className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-[0.85rem] font-bold ${tone.solid}`}>{t.key}</span>
+          <span className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-[0.875rem] font-bold ${tone.solid}`}>{t.key}</span>
           <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{t.name}</span>
           {hot && (
             <Badge tone="warning" className="shrink-0">

@@ -17,7 +17,7 @@ export function SavedBadge({ savedAt }: { savedAt: number | null }) {
   return (
     <span
       aria-live="polite"
-      className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-success-200 bg-success-50 px-4 py-2 text-[0.95rem] font-semibold text-success-700 shadow-(--shadow-card)"
+      className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-success-200 bg-success-50 px-4 py-2 text-[0.9375rem] font-semibold text-success-700 shadow-(--shadow-card)"
     >
       <Check aria-hidden="true" className="mr-1 inline size-4" />
       저장했습니다
@@ -67,14 +67,14 @@ export function DueDateField({
 }) {
   return (
     <div>
-      <label className="block text-[0.9rem] font-medium text-slate-600">
+      <label className="block text-[0.875rem] font-medium text-slate-600">
         {label}
         <input
           type="date"
           value={value}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
-          className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none"
+          className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] focus:border-brand-500 focus:outline-none"
         />
       </label>
       <div className="mt-1.5 flex flex-wrap gap-1">
@@ -160,8 +160,8 @@ export function MessageModal({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-[1.25rem] font-bold text-slate-900">{title}</h2>
-            <p className="mt-0.5 text-[0.92rem] break-keep text-slate-500">{description}</p>
+            <h2 className="text-[1.2rem] font-bold text-slate-900">{title}</h2>
+            <p className="mt-0.5 text-[0.9375rem] break-keep text-slate-500">{description}</p>
           </div>
           <button
             type="button"
@@ -178,7 +178,7 @@ export function MessageModal({
             readOnly
             value={text}
             rows={14}
-            className="w-full resize-none rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-[0.92rem] leading-relaxed text-slate-800"
+            className="w-full resize-none rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-[0.9375rem] leading-relaxed text-slate-800"
           />
         </div>
         {/* D-191: 휴대폰에서 [복사] 가 창 밖으로 삐져나왔다 — 좁으면 안내 글 아래로 단추 줄을 내린다 */}
@@ -190,19 +190,19 @@ export function MessageModal({
               {follow.done ? (followUp.doneLabel ?? '할 일에 넣음') : followUp.label}
             </Button>
             {follow.done && (
-              <span role="status" className="text-[0.88rem] break-keep text-success-700" data-testid="message-followup-done">
+              <span role="status" className="text-[0.875rem] break-keep text-success-700" data-testid="message-followup-done">
                 {follow.done}
               </span>
             )}
             {follow.failed && (
-              <span role="alert" className="text-[0.88rem] break-keep text-danger-700">
+              <span role="alert" className="text-[0.875rem] break-keep text-danger-700">
                 {followUp.doneLabel ? '저장하지 못했어요' : '할 일에 넣지 못했어요'} — 다시 눌러 주세요
               </span>
             )}
           </div>
         )}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
-          <span className="min-w-0 flex-[1_1_12rem] text-[0.88rem] break-keep text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
+          <span className="min-w-0 flex-[1_1_12rem] text-[0.875rem] break-keep text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
           <div className="ml-auto flex shrink-0 gap-2">
             <Button variant="secondary" onClick={onClose}>
               닫기
@@ -287,7 +287,7 @@ export function AmountField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="text-[0.88rem] font-medium text-slate-600">
+      <label htmlFor={id} className="text-[0.875rem] font-medium text-slate-600">
         {label}
       </label>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -304,7 +304,7 @@ export function AmountField({
             key={s.value}
             type="button"
             onClick={() => onChange(value + s.value)}
-            className="tap rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 text-[0.9rem] font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            className="tap rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 text-[0.875rem] font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
           >
             {s.label}
           </button>
@@ -313,7 +313,7 @@ export function AmountField({
           type="button"
           onClick={() => onChange(0)}
           disabled={value === 0}
-          className="tap rounded-(--radius-control) px-2 py-2 text-[0.9rem] text-slate-500 hover:text-slate-700 disabled:opacity-40"
+          className="tap rounded-(--radius-control) px-2 py-2 text-[0.875rem] text-slate-500 hover:text-slate-700 disabled:opacity-40"
         >
           <X aria-hidden="true" className="mr-0.5 inline size-3.5" />
           지우기

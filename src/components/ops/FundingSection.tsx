@@ -33,7 +33,7 @@ const STATUS_CLASS: Record<FundingStatus, string> = {
 }
 
 const inputCls =
-  'rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.95rem] focus:border-brand-500 focus:outline-none'
+  'rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.9375rem] focus:border-brand-500 focus:outline-none'
 
 /** 정책자금·정부지원금은 공고마다 반복 신청하므로 건별로 관리한다 */
 export function FundingSection({
@@ -96,11 +96,11 @@ export function FundingSection({
   return (
     <section aria-labelledby="funding" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <HelpHeading id="funding" label="정책자금 · 정부지원금 신청" className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900">
+        <HelpHeading id="funding" label="정책자금 · 정부지원금 신청" className="flex items-center gap-2 text-[1.2rem] font-bold text-slate-900">
           <Landmark aria-hidden="true" className="size-5 text-slate-400" />
           정책자금 · 정부지원금 신청
         </HelpHeading>
-        <p className="text-[0.95rem] text-slate-600">
+        <p className="text-[0.9375rem] text-slate-600">
           공고마다 건을 추가하세요.
           {selectedTotal > 0 && (
             <>
@@ -113,7 +113,7 @@ export function FundingSection({
 
       <Panel flush>
         {apps.length === 0 ? (
-          <p className="px-5 py-6 text-[0.95rem] text-slate-500">
+          <p className="px-5 py-6 text-[0.9375rem] text-slate-500">
             아직 등록한 신청 건이 없습니다. 공고를 발견하면 마감일과 함께 추가해 두세요. 마감이 다가오면 알려드립니다.
           </p>
         ) : (
@@ -131,7 +131,7 @@ export function FundingSection({
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[1.05rem] font-bold break-keep text-slate-900">
+                        <span className="text-[1rem] font-bold break-keep text-slate-900">
                           {a.programName || '(공고명 없음)'}
                         </span>
                         <span className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-semibold ${STATUS_CLASS[a.status]}`}>
@@ -151,7 +151,7 @@ export function FundingSection({
                           </span>
                         )}
                       </div>
-                      {a.institution && <p className="mt-0.5 text-[0.9rem] text-slate-500">{a.institution}</p>}
+                      {a.institution && <p className="mt-0.5 text-[0.875rem] text-slate-500">{a.institution}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <select

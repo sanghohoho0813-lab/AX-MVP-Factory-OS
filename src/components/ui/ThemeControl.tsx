@@ -33,7 +33,7 @@ export function ThemeControl() {
               ))}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{t.label}</span>
+              <span className="block truncate text-[0.9375rem] font-semibold text-slate-800">{t.label}</span>
               <span className="block truncate text-[0.875rem] text-slate-500">{t.hint}</span>
             </span>
             {on && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-700" />}
@@ -51,8 +51,8 @@ export function MotionControl() {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-(--radius-control) border border-slate-200 px-4 py-3">
       <span className="min-w-0">
-        <span className="block text-[0.95rem] font-semibold text-slate-800">화면 움직임 줄이기</span>
-        <span className="block text-[0.88rem] break-keep text-slate-500">
+        <span className="block text-[0.9375rem] font-semibold text-slate-800">화면 움직임 줄이기</span>
+        <span className="block text-[0.875rem] break-keep text-slate-500">
           {reduced
             ? '열고 닫힐 때의 부드러운 효과를 끕니다.'
             : '메뉴·팝업이 부드럽게 나타납니다. 어지러우면 꺼 주세요.'}

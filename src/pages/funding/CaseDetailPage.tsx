@@ -41,7 +41,7 @@ import {
 const MODULE_NAME = '사례 정리'
 const MODULE_DESC = '실제 프로젝트 결과와 배운 점을 내부 학습자료 또는 고객 공개 사례로 정리합니다.'
 
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-200 px-3 py-2 text-[0.95rem]'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-200 px-3 py-2 text-[0.9375rem]'
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : '처리 중 오류가 발생했습니다.'
@@ -391,7 +391,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
       summary={summary}
     >
       <div className="flex flex-col gap-5">
-        <NavLink to="/cases" className="inline-flex w-fit items-center gap-1.5 text-[0.9rem] font-medium text-slate-500 hover:text-slate-700">
+        <NavLink to="/cases" className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-700">
           <ArrowLeft aria-hidden="true" className="size-4" />
           사례 라이브러리로
         </NavLink>
@@ -444,7 +444,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
           >
             <div className="flex flex-col gap-4">
               <div>
-                <p className="text-[1.15rem] font-bold break-keep text-slate-900">{caseStudy.title || '제목 없음'}</p>
+                <p className="text-[1.2rem] font-bold break-keep text-slate-900">{caseStudy.title || '제목 없음'}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <CaseStatusBadge status={caseStudy.status} />
                   <CaseVisibilityBadge visibility={caseStudy.visibility} />
@@ -490,14 +490,14 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
               {!hasAnyOutcome && (
                 <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-2.5">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-                  <p className="text-[0.92rem] break-keep text-warning-800">
+                  <p className="text-[0.9375rem] break-keep text-warning-800">
                     아직 검증된 결과가 없습니다. 결과가 없거나 부결·보류된 경우라도 실패가 아니라 <b>내부 학습 사례</b>로 정리할 수 있습니다.
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-[0.9rem] font-semibold text-slate-500">결과 요약 (실제 결과)</p>
-                <p className="mt-1 rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-700">
+                <p className="text-[0.875rem] font-semibold text-slate-500">결과 요약 (실제 결과)</p>
+                <p className="mt-1 rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[0.9375rem] break-keep text-slate-700">
                   {caseStudy.outcomeSummary || '결과 요약 없음'}
                 </p>
               </div>
@@ -515,8 +515,8 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
               <DetailList title="재사용 인사이트" items={caseStudy.reusableInsights} />
               {caseStudy.customerQuote.trim() !== '' && (
                 <div>
-                  <p className="text-[0.9rem] font-semibold text-slate-500">고객 인용</p>
-                  <blockquote className="mt-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-600 italic">
+                  <p className="text-[0.875rem] font-semibold text-slate-500">고객 인용</p>
+                  <blockquote className="mt-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9375rem] break-keep text-slate-600 italic">
                     “{caseStudy.customerQuote}”
                   </blockquote>
                 </div>
@@ -530,21 +530,21 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
           <Panel title="익명화 점검">
             <div aria-live="polite">
               {anonymization.ok ? (
-                <p className="text-[0.95rem] break-keep text-success-700">재식별 가능한 정보가 발견되지 않았습니다.</p>
+                <p className="text-[0.9375rem] break-keep text-success-700">재식별 가능한 정보가 발견되지 않았습니다.</p>
               ) : (
                 <div className="rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5">
-                  <p className="flex items-center gap-2 text-[0.95rem] font-medium text-warning-800">
+                  <p className="flex items-center gap-2 text-[0.9375rem] font-medium text-warning-800">
                     <AlertTriangle aria-hidden="true" className="size-4" />
                     익명화 검토가 필요합니다 ({anonymization.issues.length}건)
                   </p>
                   <ul className="mt-1.5 flex flex-col gap-0.5">
                     {anonymization.issues.map((issue, idx) => (
-                      <li key={idx} className="text-[0.9rem] break-keep text-warning-700">· {issue}</li>
+                      <li key={idx} className="text-[0.875rem] break-keep text-warning-700">· {issue}</li>
                     ))}
                   </ul>
                 </div>
               )}
-              <p className="mt-2.5 text-[0.9rem] break-keep text-slate-500">
+              <p className="mt-2.5 text-[0.875rem] break-keep text-slate-500">
                 익명화·공개 사례는 회사명·대표자·연락처·주소 등 회사를 알아볼 수 있는 정보를 남기면 안 됩니다.
               </p>
             </div>
@@ -553,7 +553,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
           <Panel title="공개 범위·고객 동의">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[0.9rem] font-medium text-slate-600">고객 동의 상태</span>
+                <span className="text-[0.875rem] font-medium text-slate-600">고객 동의 상태</span>
                 <select
                   className={inputClass}
                   value={caseStudy.consentStatus}
@@ -566,7 +566,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
                 </select>
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[0.9rem] font-medium text-slate-600">공개 범위</span>
+                <span className="text-[0.875rem] font-medium text-slate-600">공개 범위</span>
                 <select
                   className={inputClass}
                   value={caseStudy.visibility}
@@ -579,11 +579,11 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
                 </select>
               </label>
             </div>
-            <p className="mt-3 text-[0.9rem] break-keep text-slate-500">
+            <p className="mt-3 text-[0.875rem] break-keep text-slate-500">
               고객 승인·공개 범위는 고객 동의(‘동의’)가 있어야 설정할 수 있습니다. 동의가 없으면 저장되지 않습니다.
             </p>
             {!consentAgreed && wantsPublic && (
-              <p className="mt-2 flex items-start gap-1.5 text-[0.9rem] break-keep text-danger-600">
+              <p className="mt-2 flex items-start gap-1.5 text-[0.875rem] break-keep text-danger-600">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 고객 동의가 없어 이 공개 범위로는 사례를 확정할 수 없습니다.
               </p>
@@ -596,10 +596,10 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
           <Panel title="사례 확정·보관">
             {!canApprove.ok && !readOnly && (
               <div className="mb-3 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5">
-                <p className="text-[0.95rem] font-medium text-warning-800">확정 전 해결할 항목 {canApprove.reasons.length}건</p>
+                <p className="text-[0.9375rem] font-medium text-warning-800">확정 전 해결할 항목 {canApprove.reasons.length}건</p>
                 <ul className="mt-1.5 flex flex-col gap-0.5">
                   {canApprove.reasons.map((r, idx) => (
-                    <li key={idx} className="text-[0.9rem] break-keep text-warning-700">· {r}</li>
+                    <li key={idx} className="text-[0.875rem] break-keep text-warning-700">· {r}</li>
                   ))}
                 </ul>
               </div>
@@ -616,7 +616,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
               )}
             </div>
             {!readOnly && !canApprove.ok && wantsPublic && !consentAgreed && (
-              <p className="mt-2.5 text-[0.9rem] break-keep text-danger-600">
+              <p className="mt-2.5 text-[0.875rem] break-keep text-danger-600">
                 고객 동의가 없어 공개·고객 승인 사례로는 확정할 수 없습니다. 위에서 고객 동의를 ‘동의’로 바꾸거나 공개 범위를 내부 전용으로 낮추세요.
               </p>
             )}
@@ -666,23 +666,23 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
         >
           <div className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[0.9rem] font-medium text-slate-600">제목</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">제목</span>
               <input className={inputClass} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[0.9rem] font-medium text-slate-600">결과 요약</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">결과 요약</span>
               <textarea className={inputClass} rows={3} value={form.outcomeSummary} onChange={(e) => setForm((f) => ({ ...f, outcomeSummary: e.target.value }))} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[0.9rem] font-medium text-slate-600">배운 점 (줄바꿈으로 구분)</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">배운 점 (줄바꿈으로 구분)</span>
               <textarea className={inputClass} rows={3} value={form.lessons} onChange={(e) => setForm((f) => ({ ...f, lessons: e.target.value }))} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[0.9rem] font-medium text-slate-600">재사용 인사이트 (줄바꿈으로 구분)</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">재사용 인사이트 (줄바꿈으로 구분)</span>
               <textarea className={inputClass} rows={3} value={form.reusableInsights} onChange={(e) => setForm((f) => ({ ...f, reusableInsights: e.target.value }))} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[0.9rem] font-medium text-slate-600">고객 인용</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">고객 인용</span>
               <textarea className={inputClass} rows={2} value={form.customerQuote} onChange={(e) => setForm((f) => ({ ...f, customerQuote: e.target.value }))} />
             </label>
           </div>
@@ -726,7 +726,7 @@ function StatusLine({ ok, neutral, label, text }: { ok?: boolean; neutral?: bool
   return (
     <li className="flex items-start gap-2.5">
       <span className={`mt-1.5 size-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-      <span className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-700">
+      <span className="min-w-0 flex-1 text-[1rem] break-keep text-slate-700">
         <span className="font-semibold text-slate-800">{label}: </span>
         {text}
       </span>
@@ -737,8 +737,8 @@ function StatusLine({ ok, neutral, label, text }: { ok?: boolean; neutral?: bool
 function DetailText({ title, value }: { title: string; value: string }) {
   return (
     <div>
-      <p className="text-[0.9rem] font-semibold text-slate-500">{title}</p>
-      <p className="mt-1 text-[0.95rem] break-keep text-slate-700">{value.trim() === '' ? '미입력' : value}</p>
+      <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
+      <p className="mt-1 text-[0.9375rem] break-keep text-slate-700">{value.trim() === '' ? '미입력' : value}</p>
     </div>
   )
 }
@@ -746,13 +746,13 @@ function DetailText({ title, value }: { title: string; value: string }) {
 function DetailList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <p className="text-[0.9rem] font-semibold text-slate-500">{title}</p>
+      <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
       {items.length === 0 ? (
-        <p className="mt-1 text-[0.95rem] text-slate-400">미입력</p>
+        <p className="mt-1 text-[0.9375rem] text-slate-400">미입력</p>
       ) : (
         <ul className="mt-1 flex flex-col gap-0.5">
           {items.map((item, idx) => (
-            <li key={idx} className="text-[0.95rem] break-keep text-slate-700">· {item}</li>
+            <li key={idx} className="text-[0.9375rem] break-keep text-slate-700">· {item}</li>
           ))}
         </ul>
       )}
@@ -764,7 +764,7 @@ function SysItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-600">{value}</dd>
+      <dd className="mt-0.5 text-[0.875rem] break-keep text-slate-600">{value}</dd>
     </div>
   )
 }

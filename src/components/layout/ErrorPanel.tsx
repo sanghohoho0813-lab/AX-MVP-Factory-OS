@@ -23,19 +23,19 @@ export function ErrorPanel({ error, onRetry, withHomeLink = true }: { error: unk
       </p>
       <div className="flex flex-wrap gap-2">
         {onRetry && !stale && (
-          <button type="button" onClick={onRetry} className="tap rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] font-semibold text-slate-800 hover:bg-slate-50">
+          <button type="button" onClick={onRetry} className="tap rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-50">
             다시 시도
           </button>
         )}
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-3 py-2 text-[0.95rem] font-semibold text-white hover:bg-brand-700"
+          className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-3 py-2 text-[0.9375rem] font-semibold text-white hover:bg-brand-700"
         >
           <RefreshCw aria-hidden="true" className="size-4" /> 새로고침
         </button>
         {withHomeLink && (
-          <Link to="/" className="tap rounded-(--radius-control) px-3 py-2 text-[0.95rem] font-medium text-brand-700 hover:underline">
+          <Link to="/" className="tap rounded-(--radius-control) px-3 py-2 text-[0.9375rem] font-medium text-brand-700 hover:underline">
             오늘 화면으로
           </Link>
         )}

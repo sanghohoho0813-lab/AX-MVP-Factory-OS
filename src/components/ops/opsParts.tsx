@@ -229,7 +229,7 @@ export function ServiceCell({
       title={`${label} · ${SERVICE_STATUS_LABEL[cell.status]}${note ? ` · ${note}` : ''}`}
       className={`flex w-full min-w-[86px] flex-col items-center gap-0.5 rounded-(--radius-control) border px-2 py-2 transition-colors hover:brightness-[0.97] ${cls}`}
     >
-      <span className="flex items-center gap-1 text-[0.88rem] font-semibold">
+      <span className="flex items-center gap-1 text-[0.875rem] font-semibold">
         <Icon aria-hidden="true" className="size-3.5 shrink-0" />
         {look.short}
       </span>
@@ -329,7 +329,7 @@ export function StatTile({
       className={`block w-full rounded-(--radius-panel) border p-4 ${cls} ${interactive}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.95rem] font-medium text-slate-600">{label}</span>
+        <span className="text-[0.9375rem] font-medium text-slate-600">{label}</span>
         <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
       </div>
       <strong className="mt-1.5 block text-[1.7rem] leading-tight font-bold text-slate-900">
@@ -344,8 +344,8 @@ export function StatTile({
 export function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-50 py-2 last:border-0">
-      <span className="text-[0.92rem] text-slate-500">{label}</span>
-      <span className="text-[0.98rem] font-medium break-keep text-slate-800">{children}</span>
+      <span className="text-[0.9375rem] text-slate-500">{label}</span>
+      <span className="text-[1rem] font-medium break-keep text-slate-800">{children}</span>
     </div>
   )
 }

@@ -60,17 +60,17 @@ function EntryCard({ e, fresh }: { e: InboxEntry; fresh: boolean }) {
                 {Array.isArray(v) && (
                   <span className="flex flex-wrap gap-1">
                     {v.map((o) => (
-                      <span key={o} className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-[0.88rem] font-medium text-orange-800">
+                      <span key={o} className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-[0.875rem] font-medium text-orange-800">
                         {o}
                       </span>
                     ))}
                   </span>
                 )}
                 {q.kind === 'single' && typeof v === 'string' && (
-                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-0.5 text-[0.9rem] font-semibold text-slate-800">{v}</span>
+                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-0.5 text-[0.875rem] font-semibold text-slate-800">{v}</span>
                 )}
                 {q.kind === 'text' && typeof v === 'string' && (
-                  <p className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[0.98rem] break-keep whitespace-pre-wrap text-slate-800">{v}</p>
+                  <p className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[1rem] break-keep whitespace-pre-wrap text-slate-800">{v}</p>
                 )}
               </dd>
             </div>
@@ -127,7 +127,7 @@ export function FeedbackInboxPage() {
       {entries !== null && total === 0 && (
         <div data-testid="feedback-inbox-empty" className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
           <Inbox aria-hidden="true" className="size-9 text-slate-400" />
-          <p className="text-[1.05rem] font-semibold text-slate-800">아직 받은 피드백이 없습니다</p>
+          <p className="text-[1rem] font-semibold text-slate-800">아직 받은 피드백이 없습니다</p>
           <p className="t-sub break-keep text-slate-600">팀장님이 왼쪽 아래 [개발자에게 피드백]으로 보내면 여기에 정리되고, 종 · 이 메뉴에 빨간 숫자가 뜹니다.</p>
         </div>
       )}
@@ -143,7 +143,7 @@ export function FeedbackInboxPage() {
                   role="tab"
                   aria-selected={round === id}
                   onClick={() => setRound(id)}
-                  className={`tap min-h-10 rounded-full border px-3.5 text-[0.92rem] font-semibold ${round === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                  className={`tap min-h-10 rounded-full border px-3.5 text-[0.9375rem] font-semibold ${round === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                 >
                   {r.label} {r.n}
                 </button>
@@ -181,7 +181,7 @@ export function FeedbackInboxPage() {
                           <span className="h-2 w-20 overflow-hidden rounded-full bg-slate-100 sm:w-28">
                             <span className="block h-full rounded-full bg-orange-400" style={{ width: `${(x.count / Math.max(1, sum.responses)) * 100}%` }} />
                           </span>
-                          <b className="w-8 shrink-0 text-right text-[0.9rem] text-slate-900">{x.count}</b>
+                          <b className="w-8 shrink-0 text-right text-[0.875rem] text-slate-900">{x.count}</b>
                         </li>
                       ))}
                     </ul>
@@ -197,7 +197,7 @@ export function FeedbackInboxPage() {
                 </h3>
                 <ul className="flex flex-col gap-1.5">
                   {sum.texts.slice(0, 5).map((t, i) => (
-                    <li key={i} className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[0.95rem] break-keep text-slate-800">
+                    <li key={i} className="rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 text-[0.9375rem] break-keep text-slate-800">
                       {t.text}
                       <span className="t-meta ml-2 text-slate-500">— {t.name} · {whenText(t.at)}</span>
                     </li>

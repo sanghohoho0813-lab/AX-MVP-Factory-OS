@@ -107,7 +107,7 @@ export function FeedbackPage() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
         <div data-testid="feedback-sent" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-6 py-8 text-center">
           <CheckCircle2 aria-hidden="true" className="size-10 text-success-600" />
-          <p className="text-[1.25rem] font-bold text-slate-900">보냈어요 — 고맙습니다!</p>
+          <p className="text-[1.2rem] font-bold text-slate-900">보냈어요 — 고맙습니다!</p>
           <p className="t-sub break-keep text-slate-700">대표님 [받은 피드백함]에 바로 전달됐어요. 읽으시면 아래에 '대표님 읽음' 이 표시됩니다.</p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button variant="secondary" onClick={() => setSent(false)}>
@@ -152,7 +152,7 @@ export function FeedbackPage() {
         const v = answers[q.id]
         return (
           <section key={q.id} data-testid="feedback-q" data-kind={q.kind} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4 sm:px-5">
-            <p className="text-[1.02rem] font-bold break-keep text-slate-900">
+            <p className="text-[1rem] font-bold break-keep text-slate-900">
               <span className="mr-1.5 text-orange-600">{no}.</span>
               {q.title}
             </p>
@@ -169,7 +169,7 @@ export function FeedbackPage() {
                         aria-checked={on}
                         aria-label={`${n}점`}
                         onClick={() => set(q.id, on ? undefined : n)}
-                        className={`tap min-h-12 rounded-(--radius-control) border text-[1.1rem] font-bold ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-orange-50'}`}
+                        className={`tap min-h-12 rounded-(--radius-control) border text-[1.2rem] font-bold ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-orange-50'}`}
                       >
                         {n}
                       </button>
@@ -198,7 +198,7 @@ export function FeedbackPage() {
                           const cur = Array.isArray(v) ? v : []
                           set(q.id, on ? cur.filter((x) => x !== o) : [...cur, o])
                         }}
-                        className={`tap inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-[0.95rem] font-medium break-keep ${on ? 'border-orange-500 bg-orange-50 text-orange-800 ring-1 ring-orange-400' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                        className={`tap inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-[0.9375rem] font-medium break-keep ${on ? 'border-orange-500 bg-orange-50 text-orange-800 ring-1 ring-orange-400' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
                       >
                         {on && <Check aria-hidden="true" className="size-4 shrink-0" />}
                         {o}

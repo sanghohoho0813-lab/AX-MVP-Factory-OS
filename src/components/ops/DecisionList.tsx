@@ -243,7 +243,7 @@ function GrantBriefPanel({ b, morePath }: { b: GrantBrief; morePath: string | nu
     value ? (
       <div className="flex min-w-0 flex-col gap-0.5">
         <dt className="t-meta font-semibold text-slate-500">{label}</dt>
-        <dd className={`break-keep [overflow-wrap:anywhere] ${strong ? 'text-[1.05rem] font-bold text-slate-900' : 't-sub text-slate-800'}`}>{value}</dd>
+        <dd className={`break-keep [overflow-wrap:anywhere] ${strong ? 'text-[1rem] font-bold text-slate-900' : 't-sub text-slate-800'}`}>{value}</dd>
       </div>
     ) : null
   return (
@@ -483,7 +483,7 @@ export function TodayDecisions({
       count={all.length}
       countTone="brand"
       action={
-        <Link to="/ops/decide" className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline" data-testid="today-decide-all">
+        <Link to="/ops/decide" className="tap inline-flex items-center text-[0.875rem] font-medium text-brand-700 hover:underline" data-testid="today-decide-all">
           모두 보기
         </Link>
       }

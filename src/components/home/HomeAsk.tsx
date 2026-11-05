@@ -231,7 +231,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         data-testid="home-ask-file"
       />
       {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
-      <p className="text-center text-[1.3rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
+      <p className="text-center text-[1.2rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
         무엇을 도와드릴까요?
       </p>
       <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">

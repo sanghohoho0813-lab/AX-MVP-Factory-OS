@@ -86,7 +86,7 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
         <Panel title="범위 가드레일">
           <ul className="flex flex-col gap-2">
             {design.scopeGuardrails.filter((g) => g.limitValue !== null).map((g) => (
-              <li key={g.key} className="flex items-center justify-between gap-2 text-[0.9rem]">
+              <li key={g.key} className="flex items-center justify-between gap-2 text-[0.875rem]">
                 <span className="min-w-0 truncate text-slate-600">{g.label}</span>
                 <GuardrailStatusBadge status={g.status} />
               </li>
@@ -95,18 +95,18 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
         </Panel>
         <Panel title="품질 점검">
           {design.qualityChecks.filter((c) => !c.passed).length === 0 ? (
-            <p className="text-[0.9rem] text-success-700">점검 항목을 모두 통과했습니다.</p>
+            <p className="text-[0.875rem] text-success-700">점검 항목을 모두 통과했습니다.</p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {design.qualityChecks.filter((c) => !c.passed).map((c) => (
-                <li key={c.id} className="flex items-start gap-2 text-[0.9rem]">
+                <li key={c.id} className="flex items-start gap-2 text-[0.875rem]">
                   <QualitySeverityBadge severity={c.severity} />
                   <span className="min-w-0 break-keep text-slate-600">{c.description}</span>
                 </li>
               ))}
             </ul>
           )}
-          {errors.length > 0 && <p className="mt-3 text-[0.9rem] font-medium text-danger-600">오류 {errors.length}건을 해결해야 확정할 수 있습니다.</p>}
+          {errors.length > 0 && <p className="mt-3 text-[0.875rem] font-medium text-danger-600">오류 {errors.length}건을 해결해야 확정할 수 있습니다.</p>}
         </Panel>
       </div>
 
@@ -152,7 +152,7 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
 
       {!check.ok && editable && (
         <ul className="flex flex-col gap-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3" aria-live="polite">
-          {check.reasons.map((r) => <li key={r} className="text-[0.9rem] break-keep text-warning-800">• {r}</li>)}
+          {check.reasons.map((r) => <li key={r} className="text-[0.875rem] break-keep text-warning-800">• {r}</li>)}
         </ul>
       )}
 
@@ -180,7 +180,7 @@ function Item({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-700">{value}</dd>
+      <dd className="mt-0.5 text-[0.875rem] break-keep text-slate-700">{value}</dd>
     </div>
   )
 }

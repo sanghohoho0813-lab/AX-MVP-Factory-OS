@@ -490,7 +490,7 @@ export function ClientBoardCard({
               onClick={onMoney}
               // 내 몫 기준이다 (D-74). 청구액이 다르면 마우스를 올렸을 때만 보여 준다 — 조각이 길어지면 줄이 는다
               title={p.unpaidAmount !== p.unpaidNet ? `청구 기준 ${formatKrw(p.unpaidAmount)}` : undefined}
-              className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-2.5 py-1.5 text-[0.88rem] font-medium hover:border-brand-300 ${
+              className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-2.5 py-1.5 text-[0.875rem] font-medium hover:border-brand-300 ${
                 p.overduePayments > 0
                   ? 'border-danger-200 bg-danger-50 text-danger-700'
                   : 'border-slate-200 bg-white text-slate-700'

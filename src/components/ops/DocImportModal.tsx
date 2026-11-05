@@ -113,8 +113,8 @@ export function DocImportModal({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-[1.3rem] font-bold text-slate-900">서류에서 정보 불러오기</h2>
-            <p className="mt-0.5 text-[0.92rem] break-keep text-slate-500">
+            <h2 className="text-[1.2rem] font-bold text-slate-900">서류에서 정보 불러오기</h2>
+            <p className="mt-0.5 text-[0.9375rem] break-keep text-slate-500">
               사업자등록증·법인등기부등본을 올리면 회사명·사업자번호·대표자·설립일 등을 자동으로 읽습니다.
             </p>
           </div>
@@ -140,7 +140,7 @@ export function DocImportModal({
                 type="button"
                 aria-pressed={tab === t.key}
                 onClick={() => setTab(t.key)}
-                className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.92rem] font-medium ${
+                className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.9375rem] font-medium ${
                   tab === t.key
                     ? 'border-brand-300 bg-brand-50 text-brand-700'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -176,10 +176,10 @@ export function DocImportModal({
                 ) : (
                   <FileUp aria-hidden="true" className="size-7 text-brand-500" />
                 )}
-                <span className="text-[1.02rem] font-semibold text-slate-800">
+                <span className="text-[1rem] font-semibold text-slate-800">
                   {busy ? (progress?.label ?? '읽는 중…') : 'PDF 또는 사진 선택'}
                 </span>
-                <span className="text-[0.88rem] break-keep text-slate-500">
+                <span className="text-[0.875rem] break-keep text-slate-500">
                   인터넷등기소·홈택스에서 받은 PDF는 거의 정확하게 읽습니다. 사진은 글자 인식(OCR)을 씁니다.
                 </span>
               </button>
@@ -199,7 +199,7 @@ export function DocImportModal({
                 onChange={(e) => setPasted(e.target.value)}
                 rows={8}
                 placeholder={'서류의 글자를 복사해서 여기에 붙여넣으세요.\n예) 등록번호 : 214-88-01234\n     상호 : 주식회사 대한정밀'}
-                className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[0.95rem] focus:border-brand-500 focus:outline-none"
+                className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[0.9375rem] focus:border-brand-500 focus:outline-none"
               />
               <Button variant="secondary" className="mt-2" disabled={pasted.trim() === ''} onClick={onParsePaste}>
                 글자에서 읽기
@@ -210,7 +210,7 @@ export function DocImportModal({
           {error && (
             <p
               role="alert"
-              className="mt-3 flex items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.92rem] break-keep text-danger-700"
+              className="mt-3 flex items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.9375rem] break-keep text-danger-700"
             >
               <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               {error}
@@ -233,12 +233,12 @@ export function DocImportModal({
               </div>
 
               {found.length === 0 ? (
-                <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.92rem] break-keep text-warning-800">
+                <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-[0.9375rem] break-keep text-warning-800">
                   읽을 수 있는 항목을 찾지 못했습니다. 사진이 흐리거나 기울어졌을 수 있습니다. "글자 붙여넣기"로 다시 시도해 보세요.
                 </p>
               ) : (
                 <>
-                  <p className="mt-1 text-[0.88rem] text-slate-500">
+                  <p className="mt-1 text-[0.875rem] text-slate-500">
                     맞으면 그대로 두고, 틀린 것만 체크를 빼세요. 확인한 값은 '확인됨' 으로 남고 모든 전문 모듈이 씁니다.
                   </p>
                   <ul className="mt-2 flex flex-col gap-1.5">
@@ -256,7 +256,7 @@ export function DocImportModal({
                               className="mt-0.5 size-5 shrink-0 accent-brand-600"
                             />
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[0.88rem] text-slate-500">{PARSED_FIELD_LABEL[k]}</span>
+                              <span className="block text-[0.875rem] text-slate-500">{PARSED_FIELD_LABEL[k]}</span>
                               <span className="block text-[1rem] font-semibold break-keep text-slate-900">{value}</span>
                               {willOverwrite && (
                                 <span className="mt-0.5 block text-[0.875rem] text-warning-800">
@@ -276,7 +276,7 @@ export function DocImportModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
-          <span className="text-[0.88rem] text-slate-500">
+          <span className="text-[0.875rem] text-slate-500">
             {parsed ? `${pickedCount}개 확인 예정` : '읽은 내용은 확인한 뒤에만 넣습니다'}
           </span>
           <div className="flex gap-2">

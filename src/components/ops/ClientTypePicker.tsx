@@ -22,7 +22,7 @@ export function ClientTypePicker({
 }) {
   return (
     <fieldset data-testid={testId}>
-      <legend className="text-[0.95rem] font-semibold text-slate-800">{legend}</legend>
+      <legend className="text-[0.9375rem] font-semibold text-slate-800">{legend}</legend>
       <div className="mt-1.5 grid grid-cols-2 gap-2">
         {CLIENT_TYPES.map((t) => {
           const on = value === t
@@ -38,7 +38,7 @@ export function ClientTypePicker({
             >
               <Icon aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${on ? 'text-brand-700' : 'text-slate-400'}`} />
               <span className="flex min-w-0 flex-col">
-                <span className="text-[0.98rem] font-bold break-keep text-slate-900">{t === 'sme' ? '중소기업 대표님' : '컨설턴트'}</span>
+                <span className="text-[1rem] font-bold break-keep text-slate-900">{t === 'sme' ? '중소기업 대표님' : '컨설턴트'}</span>
                 <span className="t-meta break-keep text-slate-500">{t === 'sme' ? '지금까지 고객' : '따로 관리'}</span>
               </span>
             </button>

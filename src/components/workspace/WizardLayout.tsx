@@ -50,12 +50,12 @@ export function WizardLayout({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <div>
         <h1 className="text-[1.6rem] font-bold break-keep text-slate-900">{title}</h1>
-        {description && <p className="mt-1.5 text-[1.05rem] break-keep text-slate-600">{description}</p>}
+        {description && <p className="mt-1.5 text-[1rem] break-keep text-slate-600">{description}</p>}
       </div>
 
       {/* 진행률 */}
       <div>
-        <div className="flex items-center justify-between text-[0.9rem] font-medium text-slate-500">
+        <div className="flex items-center justify-between text-[0.875rem] font-medium text-slate-500">
           <span>{steps[current]?.title}</span>
           <span>{current + 1} / {steps.length} 단계</span>
         </div>
@@ -77,7 +77,7 @@ export function WizardLayout({
                     onClick={() => onStepChange?.(i)}
                     disabled={i > current}
                     aria-current={state === 'current' ? 'step' : undefined}
-                    className={`flex w-full items-center gap-2.5 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.95rem] transition-colors disabled:cursor-not-allowed ${
+                    className={`flex w-full items-center gap-2.5 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.9375rem] transition-colors disabled:cursor-not-allowed ${
                       state === 'current' ? 'bg-brand-50 font-semibold text-brand-800' : state === 'done' ? 'text-slate-700 hover:bg-slate-50' : 'text-slate-400'
                     }`}
                   >
@@ -103,7 +103,7 @@ export function WizardLayout({
         {summary && (
           <aside className="min-w-0">
             <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50/60 p-4 lg:sticky lg:top-6">
-              <p className="mb-3 text-[0.95rem] font-semibold text-slate-700">입력 요약</p>
+              <p className="mb-3 text-[0.9375rem] font-semibold text-slate-700">입력 요약</p>
               {summary}
             </div>
           </aside>
@@ -138,8 +138,8 @@ export function WizardLayout({
 export function WizardSummaryRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-100 py-2 last:border-0">
-      <span className="shrink-0 text-[0.9rem] text-slate-500">{label}</span>
-      <span className="min-w-0 break-keep text-right text-[0.9rem] font-medium text-slate-800">{value || <span className="text-slate-300">미입력</span>}</span>
+      <span className="shrink-0 text-[0.875rem] text-slate-500">{label}</span>
+      <span className="min-w-0 break-keep text-right text-[0.875rem] font-medium text-slate-800">{value || <span className="text-slate-300">미입력</span>}</span>
     </div>
   )
 }

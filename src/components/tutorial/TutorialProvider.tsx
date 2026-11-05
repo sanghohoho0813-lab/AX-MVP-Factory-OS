@@ -128,7 +128,7 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
       >
         <div className="flex shrink-0 items-center gap-2 px-3 pt-3 sm:px-5 sm:pt-4">
           <PlayCircle aria-hidden="true" className="size-5 shrink-0 text-[#e8c995]" />
-          <h2 className="min-w-0 flex-1 truncate text-[1.05rem] font-bold">안내 영상</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[1rem] font-bold">안내 영상</h2>
           <button
             type="button"
             aria-label="닫기"
@@ -150,7 +150,7 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
                 aria-selected={on}
                 data-testid={`tutorial-tab-${v.key}`}
                 onClick={() => onPart(v.key)}
-                className={`tap flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-left text-[0.9rem] ${on ? 'border-[#d2a45f] bg-[#d2a45f]/15 text-white' : 'border-white/15 text-white/75 hover:border-white/30'}`}
+                className={`tap flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-left text-[0.875rem] ${on ? 'border-[#d2a45f] bg-[#d2a45f]/15 text-white' : 'border-white/15 text-white/75 hover:border-white/30'}`}
               >
                 <b className="font-bold">{v.label}</b>
                 {/* 휴대폰에서는 편 · 길이만(두 편이 한 줄에 들어가게) */}
@@ -187,7 +187,7 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
                 type="button"
                 data-testid="tutorial-hide-today"
                 onClick={hideToday}
-                className="tap min-h-11 cursor-pointer rounded-(--radius-control) border border-white/20 px-4 text-[0.95rem] font-semibold text-white/90 hover:bg-white/10"
+                className="tap min-h-11 cursor-pointer rounded-(--radius-control) border border-white/20 px-4 text-[0.9375rem] font-semibold text-white/90 hover:bg-white/10"
               >
                 오늘 하루 안 보기
               </button>
@@ -195,18 +195,18 @@ function TutorialDialog({ part, auto, onPart, onClose }: { part: Part; auto: boo
                 type="button"
                 data-testid="tutorial-hide-forever"
                 onClick={hideForever}
-                className="tap min-h-11 cursor-pointer rounded-(--radius-control) border border-white/20 px-4 text-[0.95rem] font-semibold text-white/90 hover:bg-white/10"
+                className="tap min-h-11 cursor-pointer rounded-(--radius-control) border border-white/20 px-4 text-[0.9375rem] font-semibold text-white/90 hover:bg-white/10"
               >
                 앞으로 보지 않기
               </button>
             </>
           ) : (
-            <p className="text-[0.9rem] text-white/60">설정 › 계정 · 보기에서 언제든 다시 볼 수 있어요.</p>
+            <p className="text-[0.875rem] text-white/60">설정 › 계정 · 보기에서 언제든 다시 볼 수 있어요.</p>
           )}
           <button
             type="button"
             onClick={onClose}
-            className="tap ml-auto min-h-11 cursor-pointer rounded-(--radius-control) bg-[#d2a45f] px-5 text-[0.95rem] font-bold text-[#171b20] hover:bg-[#e8c995]"
+            className="tap ml-auto min-h-11 cursor-pointer rounded-(--radius-control) bg-[#d2a45f] px-5 text-[0.9375rem] font-bold text-[#171b20] hover:bg-[#e8c995]"
           >
             닫기
           </button>

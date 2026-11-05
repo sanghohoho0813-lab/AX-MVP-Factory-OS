@@ -96,18 +96,18 @@ export function NextStepEditor({
         <CalendarClock aria-hidden="true" className="size-5 text-brand-600" />
         {label} 정하기
       </p>
-      <label className="block text-[0.95rem] font-medium text-slate-700">
+      <label className="block text-[0.9375rem] font-medium text-slate-700">
         무엇을
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="예) 1차 미팅, 자료 받기, 견적 회신 확인" className={inputClass} />
       </label>
       <div className="flex flex-wrap gap-2" aria-label="자주 쓰는 말">
         {nextSuggestions(record).map((s) => (
-          <button key={s} type="button" onClick={() => setText(s)} className="tap rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-[0.95rem] font-medium text-slate-700 hover:border-brand-400 hover:text-brand-700">
+          <button key={s} type="button" onClick={() => setText(s)} className="tap rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-[0.9375rem] font-medium text-slate-700 hover:border-brand-400 hover:text-brand-700">
             {s}
           </button>
         ))}
       </div>
-      <label className="block text-[0.95rem] font-medium text-slate-700">
+      <label className="block text-[0.9375rem] font-medium text-slate-700">
         언제
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="날짜" className={inputClass} />
       </label>
@@ -121,7 +121,7 @@ export function NextStepEditor({
               type="button"
               aria-pressed={on}
               onClick={() => setDate(v)}
-              className={`tap rounded-full border px-3.5 py-1.5 text-[0.95rem] font-medium ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
+              className={`tap rounded-full border px-3.5 py-1.5 text-[0.9375rem] font-medium ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
             >
               {q.label}
             </button>

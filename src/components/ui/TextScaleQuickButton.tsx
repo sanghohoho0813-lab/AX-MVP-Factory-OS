@@ -22,10 +22,10 @@ export function TextScaleQuickButton({ showLabel = false }: { showLabel?: boolea
     >
       <span aria-hidden="true" className="font-bold leading-none">
         <span className="text-[0.875rem]">가</span>
-        <span className="text-[1.1rem]">가</span>
+        <span className="text-[1.2rem]">가</span>
       </span>
       {/* 글은 넓은 화면에서만(머리줄이 넘치지 않게) — 좁으면 '가가' 와 풍선 도움말 */}
-      <span className={showLabel ? 'text-[0.9rem] font-medium whitespace-nowrap' : 'hdr-opt hidden text-[0.9rem] font-medium whitespace-nowrap min-[1700px]:inline'}>글자 {label}</span>
+      <span className={showLabel ? 'text-[0.875rem] font-medium whitespace-nowrap' : 'hdr-opt hidden text-[0.875rem] font-medium whitespace-nowrap min-[1700px]:inline'}>글자 {label}</span>
     </button>
   )
 }

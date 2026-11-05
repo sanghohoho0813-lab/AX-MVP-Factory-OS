@@ -69,7 +69,7 @@ export function TopPicksCard({
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
         {/* D-192: 설명은 화면에 깔지 않고 ⓘ · 마우스를 올리면 */}
         <HintTip tip={hintFor('이 업체에 먼저 제안할 것')} label="이 업체에 먼저 제안할 것">
-          <h2 id="top-picks-title" className="text-[1.15rem] font-bold break-keep text-slate-900">
+          <h2 id="top-picks-title" className="text-[1.2rem] font-bold break-keep text-slate-900">
             이 업체에 먼저 제안할 것
           </h2>
         </HintTip>

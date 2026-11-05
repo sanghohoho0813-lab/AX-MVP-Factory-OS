@@ -200,8 +200,8 @@ export function CandidateBoardPage() {
                   <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[0.875rem] font-bold text-brand-700">추천 {i + 1}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">추천도 {Math.round(c.priorityScore)}</span>
                 </div>
-                <p className="text-[1.15rem] font-bold break-keep text-slate-900">{c.name}</p>
-                <dl className="flex flex-col gap-2 text-[0.92rem]">
+                <p className="text-[1.2rem] font-bold break-keep text-slate-900">{c.name}</p>
+                <dl className="flex flex-col gap-2 text-[0.9375rem]">
                   <div><dt className="text-slate-400">가장 큰 문제</dt><dd className="break-keep text-slate-700">{c.problemStatement || '—'}</dd></div>
                   <div><dt className="text-slate-400">현재 방식</dt><dd className="break-keep text-slate-700">{c.currentProcess || '—'}</dd></div>
                   <div><dt className="text-slate-400">추천 이유</dt><dd className="break-keep text-slate-700">{c.aiReason || '—'}</dd></div>
@@ -216,7 +216,7 @@ export function CandidateBoardPage() {
             </Button>
           </div>
           <button type="button" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}
-            className="flex w-fit items-center gap-1.5 text-[0.95rem] font-semibold text-slate-500 hover:text-slate-800">
+            className="flex w-fit items-center gap-1.5 text-[0.9375rem] font-semibold text-slate-500 hover:text-slate-800">
             {showAll ? '후보 관리 접기' : '다른 후보 모두 보기·관리'}
           </button>
         </section>
@@ -224,7 +224,7 @@ export function CandidateBoardPage() {
 
       {!showAll && activeCandidates.length > 0 ? null : (
       <>
-      <p className="text-[0.95rem] break-keep text-slate-500">
+      <p className="text-[0.9375rem] break-keep text-slate-500">
         진단 응답에서 발견된 업무를 검토하고 중복·범위·효과·위험을 정리합니다.
       </p>
 

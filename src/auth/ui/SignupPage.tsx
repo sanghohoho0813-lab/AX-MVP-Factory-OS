@@ -66,13 +66,13 @@ export function SignupPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               to="/login"
-              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-semibold text-brand-700 hover:bg-brand-100"
+              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.9375rem] font-semibold text-brand-700 hover:bg-brand-100"
             >
               로그인하러 가기
             </Link>
             <Link
               to="/forgot-password"
-              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.92rem] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-medium text-slate-700 hover:bg-slate-50"
             >
               비밀번호 찾기
             </Link>

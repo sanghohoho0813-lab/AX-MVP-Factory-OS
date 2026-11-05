@@ -104,7 +104,7 @@ function CopyFallback({ id, text, copyState }: { id: string; text: string; copyS
 /* ───────────────── 공용 입력 조각 ───────────────── */
 
 const inputCls =
-  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
+  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.9375rem] text-slate-900 focus:border-brand-500 focus:outline-none'
 
 function ChoiceGroup<T extends string>({
   label,

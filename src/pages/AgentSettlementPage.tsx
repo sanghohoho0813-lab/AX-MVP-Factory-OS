@@ -90,7 +90,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700">
           {error}
         </p>
       )}

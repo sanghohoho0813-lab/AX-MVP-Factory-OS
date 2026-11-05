@@ -36,7 +36,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
         <Panel title="홈페이지 제작 전에 반드시 받아야 할 자료">
           <ul className="flex flex-col gap-1.5">
             {mustHave.map((m) => (
-              <li key={m} className="flex items-center gap-2 text-[0.9rem] text-slate-700">
+              <li key={m} className="flex items-center gap-2 text-[0.875rem] text-slate-700">
                 <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0 text-warning-500" />{m}
               </li>
             ))}
@@ -46,7 +46,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
 
       <Panel title="콘텐츠 준비 상태" flush>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-[0.9rem]">
+          <table className="w-full min-w-[560px] text-left text-[0.875rem]">
             <thead>
               <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                 <th scope="col" className="px-5 py-2.5 font-medium">콘텐츠</th>
@@ -79,7 +79,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
 
       <Panel title="이미지·영상·로고 자산 준비 상태" flush>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-[0.9rem]">
+          <table className="w-full min-w-[520px] text-left text-[0.875rem]">
             <thead>
               <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                 <th scope="col" className="px-5 py-2.5 font-medium">자산</th>

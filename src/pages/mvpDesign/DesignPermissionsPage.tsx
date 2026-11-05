@@ -31,7 +31,7 @@ export function DesignPermissionsPage() {
           <>
             <Panel title={`역할 · ${roles.length}개`}>
               {overLimit && overLimit.status === 'exceeded' && (
-                <p className="mb-3 text-[0.92rem] font-medium text-danger-600">역할이 상한(3개)을 초과했습니다. 1차 범위에서는 역할을 최소화하세요.</p>
+                <p className="mb-3 text-[0.9375rem] font-medium text-danger-600">역할이 상한(3개)을 초과했습니다. 1차 범위에서는 역할을 최소화하세요.</p>
               )}
               <ul className="flex flex-col gap-3">
                 {roles.map((role) => (
@@ -45,7 +45,7 @@ export function DesignPermissionsPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-[0.92rem] break-keep text-slate-500">{role.description}</p>
+                    <p className="mt-1 text-[0.9375rem] break-keep text-slate-500">{role.description}</p>
                     <p className="mt-1 text-[0.875rem] text-slate-400">실제 사용자: {role.sourceUsers}</p>
                   </li>
                 ))}
@@ -54,7 +54,7 @@ export function DesignPermissionsPage() {
 
             <Panel title="권한 매트릭스">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-[0.92rem]">
+                <table className="w-full min-w-[520px] text-left text-[0.9375rem]">
                   <thead>
                     <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                       <th className="py-2 pr-3 font-medium">데이터</th>

@@ -22,7 +22,7 @@ export function AccountViewRow({ label, hint, children, testId }: { label: strin
   return (
     <div data-testid={testId} className="flex flex-col gap-2 border-b border-slate-100 py-3.5 last:border-0 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="min-w-0">
-        <p className="text-[0.95rem] font-semibold break-keep text-slate-800">{label}</p>
+        <p className="text-[0.9375rem] font-semibold break-keep text-slate-800">{label}</p>
         {hint && <p className="t-sub mt-0.5 break-keep text-slate-500">{hint}</p>}
       </div>
       <div className="w-full min-w-0 md:w-[min(24rem,55%)] md:shrink-0">{children}</div>
@@ -54,7 +54,7 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
               type="button"
               onClick={() => tutorial.open()}
               data-testid="settings-tutorial-open"
-              className="tap inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.95rem] font-semibold text-slate-700 hover:bg-slate-50"
+              className="tap inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.9375rem] font-semibold text-slate-700 hover:bg-slate-50"
             >
               <PlayCircle aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
               안내 영상 보기
@@ -69,7 +69,7 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
             target="_blank"
             rel="noopener noreferrer"
             data-testid="settings-portal-link"
-            className="tap inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.95rem] font-semibold text-slate-700 hover:bg-slate-50"
+            className="tap inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.9375rem] font-semibold text-slate-700 hover:bg-slate-50"
           >
             <ExternalLink aria-hidden="true" className="size-4 shrink-0" />
             <span className="min-w-0 truncate">{brand.customerPlatformLabel} 열기</span>

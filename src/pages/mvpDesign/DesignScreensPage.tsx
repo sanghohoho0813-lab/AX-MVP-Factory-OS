@@ -20,7 +20,7 @@ export function DesignScreensPage() {
         const overLimit = design.guardrailChecks.find((g) => g.key === 'max_screens')
         return (
           <>
-            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.92rem]">
+            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem]">
               <LayoutList aria-hidden="true" className="size-4 text-slate-400" />
               <span className="text-slate-600">활성 화면 {screens.length}개</span>
               {overLimit && overLimit.limit !== null && (

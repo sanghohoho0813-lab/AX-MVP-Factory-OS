@@ -203,7 +203,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
           <div className="min-w-0">
             <p className="t-sub break-keep text-slate-500">{label}</p>
-            <p className="text-[1.15rem] font-bold text-slate-900" data-testid="big-calendar-selected">
+            <p className="text-[1.2rem] font-bold text-slate-900" data-testid="big-calendar-selected">
               {headline}
             </p>
           </div>
@@ -252,7 +252,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                     setView((v) => ({ ...v, y }))
                     setMode('months')
                   }}
-                  className={`tap h-14 rounded-(--radius-control) text-[1.05rem] font-semibold tabular-nums ${y === view.y ? 'bg-brand-600 text-white' : y === today.y ? 'border border-brand-300 text-brand-800' : 'text-slate-800 hover:bg-slate-100'}`}
+                  className={`tap h-14 rounded-(--radius-control) text-[1rem] font-semibold tabular-nums ${y === view.y ? 'bg-brand-600 text-white' : y === today.y ? 'border border-brand-300 text-brand-800' : 'text-slate-800 hover:bg-slate-100'}`}
                 >
                   {y}
                 </button>
@@ -269,7 +269,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                     setView((v) => ({ ...v, m }))
                     setMode('days')
                   }}
-                  className={`tap h-14 rounded-(--radius-control) text-[1.05rem] font-semibold ${m === view.m ? 'bg-brand-600 text-white' : 'text-slate-800 hover:bg-slate-100'}`}
+                  className={`tap h-14 rounded-(--radius-control) text-[1rem] font-semibold ${m === view.m ? 'bg-brand-600 text-white' : 'text-slate-800 hover:bg-slate-100'}`}
                 >
                   {m + 1}월
                 </button>
@@ -280,7 +280,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
             <div role="grid" aria-label={`${view.y}년 ${view.m + 1}월`}>
               <div className="grid grid-cols-7" role="row" data-testid="big-calendar-week">
                 {WEEK.map((w, i) => (
-                  <span key={w} role="columnheader" className={`py-1.5 text-center text-[0.95rem] font-bold ${i === 0 ? 'text-danger-600' : i === 6 ? 'text-brand-700' : 'text-slate-600'}`}>
+                  <span key={w} role="columnheader" className={`py-1.5 text-center text-[0.9375rem] font-bold ${i === 0 ? 'text-danger-600' : i === 6 ? 'text-brand-700' : 'text-slate-600'}`}>
                     {w}
                   </span>
                 ))}
@@ -305,7 +305,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                       onClick={() => pick(v)}
                       data-day={v}
                       data-off={offs.has(v) ? 'true' : undefined}
-                      className={`mx-auto flex size-12 items-center justify-center rounded-full text-[1.05rem] font-semibold tabular-nums disabled:cursor-not-allowed disabled:opacity-30 ${
+                      className={`mx-auto flex size-12 items-center justify-center rounded-full text-[1rem] font-semibold tabular-nums disabled:cursor-not-allowed disabled:opacity-30 ${
                         isSel
                           ? 'bg-brand-600 text-white'
                           : isToday
@@ -353,7 +353,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
             {typedErr && <span className="t-sub mt-1 block text-danger-700">{typedErr}</span>}
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => pick(iso(today.y, today.m, today.d))} disabled={!allowed(iso(today.y, today.m, today.d))} className="tap min-h-12 flex-1 rounded-(--radius-control) bg-brand-600 px-4 text-[1.05rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-40">
+            <button type="button" onClick={() => pick(iso(today.y, today.m, today.d))} disabled={!allowed(iso(today.y, today.m, today.d))} className="tap min-h-12 flex-1 rounded-(--radius-control) bg-brand-600 px-4 text-[1rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-40">
               오늘
             </button>
             {!input.required && (
@@ -363,12 +363,12 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                   setInputValue(input, '')
                   onClose()
                 }}
-                className="tap min-h-12 rounded-(--radius-control) border border-slate-300 px-4 text-[1.05rem] font-semibold text-slate-700 hover:bg-slate-50"
+                className="tap min-h-12 rounded-(--radius-control) border border-slate-300 px-4 text-[1rem] font-semibold text-slate-700 hover:bg-slate-50"
               >
                 지우기
               </button>
             )}
-            <button type="button" onClick={onClose} className="tap min-h-12 rounded-(--radius-control) border border-slate-300 px-4 text-[1.05rem] font-semibold text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={onClose} className="tap min-h-12 rounded-(--radius-control) border border-slate-300 px-4 text-[1rem] font-semibold text-slate-700 hover:bg-slate-50">
               닫기
             </button>
           </div>

@@ -100,7 +100,7 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={() => { setActiveProject(hero.project.id); navigate(`/projects/${hero.project.id}`) }}
-              className="text-[0.95rem] font-medium text-brand-700 underline-offset-2 hover:underline"
+              className="text-[0.9375rem] font-medium text-brand-700 underline-offset-2 hover:underline"
             >
               프로젝트 열기
             </button>
@@ -109,7 +109,7 @@ export function DashboardPage() {
       ) : (
         <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-8">
           <h2 className="text-[1.4rem] font-bold break-keep text-slate-900">시작할 준비가 되었습니다</h2>
-          <p className="mt-2 max-w-2xl text-[1.05rem] break-keep text-slate-600">
+          <p className="mt-2 max-w-2xl text-[1rem] break-keep text-slate-600">
             고객 프로젝트를 진단하고, 먼저 만들 업무를 정하고, 설계·검증까지 이어가는 업무 운영 시스템입니다. 새 프로젝트를 시작하거나 샘플로 전체 흐름을 확인해 보세요.
           </p>
           <div className="mt-5 flex flex-wrap gap-2.5">
@@ -132,8 +132,8 @@ export function DashboardPage() {
       {continueList.length > 0 && (
         <section aria-labelledby="home-continue" data-tour="home-projects" className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <HelpHeading id="home-continue" className="text-[1.25rem] font-bold text-slate-900">이어서 할 프로젝트</HelpHeading>
-            <button type="button" onClick={() => navigate('/clients')} className="text-[0.95rem] font-medium text-brand-700 hover:underline">
+            <HelpHeading id="home-continue" className="text-[1.2rem] font-bold text-slate-900">이어서 할 프로젝트</HelpHeading>
+            <button type="button" onClick={() => navigate('/clients')} className="text-[0.9375rem] font-medium text-brand-700 hover:underline">
               전체 보기
             </button>
           </div>
@@ -147,17 +147,17 @@ export function DashboardPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-1.5 text-[0.95rem] text-slate-500">
+                      <p className="flex items-center gap-1.5 text-[0.9375rem] text-slate-500">
                         <span className="truncate">{j.orgName}</span>
                         {j.progress.isSample && (
                           <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">샘플</span>
                         )}
                       </p>
-                      <p className="mt-0.5 text-[1.15rem] leading-tight font-bold break-keep text-slate-900">{j.project.name}</p>
+                      <p className="mt-0.5 text-[1.2rem] leading-tight font-bold break-keep text-slate-900">{j.project.name}</p>
                     </div>
                     <StatusPill status={toFriendlyStatus(j.project.status)} size="sm" />
                   </div>
-                  <p className="text-[0.9rem] text-slate-500">
+                  <p className="text-[0.875rem] text-slate-500">
                     <span className="font-semibold text-slate-700">{j.progress.stepText}</span> · 현재 {j.progress.currentStep.label}
                   </p>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -177,7 +177,7 @@ export function DashboardPage() {
       {/* C. 확인이 필요한 항목 */}
       {attention.length > 0 && (
         <section aria-labelledby="home-attention" className="flex flex-col gap-3">
-          <HelpHeading id="home-attention" className="text-[1.25rem] font-bold text-slate-900">확인이 필요한 항목</HelpHeading>
+          <HelpHeading id="home-attention" className="text-[1.2rem] font-bold text-slate-900">확인이 필요한 항목</HelpHeading>
           <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
             {attention.map((j) => (
               <li key={j.project.id}>
@@ -187,8 +187,8 @@ export function DashboardPage() {
                   className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
                 >
                   <div className="min-w-0">
-                    <p className="text-[1.05rem] font-semibold break-keep text-slate-800">{j.orgName} · {j.project.name}</p>
-                    <p className="mt-0.5 text-[0.95rem] break-keep text-slate-500">{j.project.riskSummary || j.actionText}</p>
+                    <p className="text-[1rem] font-semibold break-keep text-slate-800">{j.orgName} · {j.project.name}</p>
+                    <p className="mt-0.5 text-[0.9375rem] break-keep text-slate-500">{j.project.riskSummary || j.actionText}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <StatusPill status={j.project.healthStatus === 'risk' ? 'blocked' : 'attention'} label={j.project.healthStatus === 'risk' ? '중대한 이슈' : '보완 필요'} size="sm" />
@@ -223,13 +223,13 @@ export function DashboardPage() {
                 </Button>
               )}
               {demoExists && (
-                <button type="button" onClick={() => setResetOpen(true)} className="text-[0.9rem] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">
+                <button type="button" onClick={() => setResetOpen(true)} className="text-[0.875rem] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">
                   샘플 데이터 초기화
                 </button>
               )}
             </div>
             {demo.available && (
-              <p className="text-[0.9rem] break-keep text-slate-400">
+              <p className="text-[0.875rem] break-keep text-slate-400">
                 샘플 프로젝트는 모든 단계의 결과가 준비되어 있어 전체 기능을 둘러볼 수 있습니다. 실제 진단·선정 엔진을 호출해 채우며, 여러 번 눌러도 중복되지 않고 직접 등록한 데이터는 보존됩니다.
               </p>
             )}
@@ -268,7 +268,7 @@ function ChoiceButton({ title, desc, onClick }: { title: string; desc: string; o
     <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-(--radius-control) border border-slate-200 px-4 py-3 text-left hover:border-brand-300 hover:bg-brand-50/40">
       <span className="min-w-0 flex-1">
         <span className="block text-[1rem] font-semibold text-slate-800">{title}</span>
-        <span className="block text-[0.9rem] break-keep text-slate-500">{desc}</span>
+        <span className="block text-[0.875rem] break-keep text-slate-500">{desc}</span>
       </span>
       <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-slate-300" />
     </button>

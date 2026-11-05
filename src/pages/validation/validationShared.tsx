@@ -61,8 +61,8 @@ export function ValidationProjectNotFound() {
 export function TrackGateNotice({ track }: { track: TrackContext }) {
   return (
     <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-6">
-      <p className="text-[1.05rem] font-semibold break-keep text-slate-800">{TRACK_META[track.trackType].label}를 시작할 수 없습니다</p>
-      <p className="mt-1 text-[0.95rem] break-keep text-slate-600">{track.eligibility.reason}</p>
+      <p className="text-[1rem] font-semibold break-keep text-slate-800">{TRACK_META[track.trackType].label}를 시작할 수 없습니다</p>
+      <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">{track.eligibility.reason}</p>
     </div>
   )
 }
@@ -70,7 +70,7 @@ export function TrackGateNotice({ track }: { track: TrackContext }) {
 /** 워크스페이스 미생성 안내 (개요에서 생성) */
 export function NoWorkspaceNotice({ projectId, trackType }: { projectId: string; trackType: ValidationTrackType }) {
   return (
-    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] break-keep text-slate-500">
+    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] break-keep text-slate-500">
       아직 이 트랙의 검증 작업공간이 없습니다. 개요 화면에서{' '}
       <NavLink to={`/validation/projects/${projectId}/${trackType}`} className="font-medium text-brand-700 underline">
         검증 시작
@@ -116,7 +116,7 @@ export function TrackSectionFrame({
 export function ReadOnlyNotice({ workspace }: { workspace: ValidationWorkspace }) {
   if (workspace.status !== 'finalized' && workspace.status !== 'superseded') return null
   return (
-    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.9rem] break-keep text-slate-500">
+    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] break-keep text-slate-500">
       {workspace.status === 'finalized' ? '확정된 검증입니다. 원본 보존을 위해 읽기 전용입니다.' : '이전 버전입니다. 읽기 전용입니다.'}
     </div>
   )

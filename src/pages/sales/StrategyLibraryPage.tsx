@@ -242,7 +242,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
         <HelpHeading label="컨설팅 주제" className="t-section text-slate-900">컨설팅 주제 <span className="t-sub font-medium text-slate-500">· 같은 주제는 하나로 합침</span></HelpHeading>
         <div className="relative w-full sm:max-w-md">
           <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가지급금 · 승계 · 연구소 … 로 찾기" aria-label="전략 찾기" className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.95rem] focus:border-brand-500 focus:outline-none" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="가지급금 · 승계 · 연구소 … 로 찾기" aria-label="전략 찾기" className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.9375rem] focus:border-brand-500 focus:outline-none" />
         </div>
         <p className="t-sub text-slate-500" data-testid="library-count">{list.length}개</p>
         <ul className="grid gap-2 lg:grid-cols-2" data-testid="library-list">

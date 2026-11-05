@@ -36,7 +36,7 @@ function DesignBody({ design }: { design: WebsiteDesign }) {
             const on = d.personalities.includes(p)
             return (
               <button key={p} type="button" onClick={() => run(() => togglePersonality(design.id, p), '변경했습니다.')}
-                className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium transition-colors ${on ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.875rem] font-medium transition-colors ${on ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                 aria-pressed={on}>
                 {BRAND_PERSONALITY_META[p].label}
               </button>
@@ -47,7 +47,7 @@ function DesignBody({ design }: { design: WebsiteDesign }) {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Panel title="색상·배경 방향">
-          <dl className="flex flex-col gap-2 text-[0.9rem]">
+          <dl className="flex flex-col gap-2 text-[0.875rem]">
             <Row label="전체 분위기" value={d.moodDescription} />
             <Row label="메인 색상" value={d.primaryColorDirection} />
             <Row label="보조 색상" value={d.secondaryColorDirection} />
@@ -57,7 +57,7 @@ function DesignBody({ design }: { design: WebsiteDesign }) {
           <p className="mt-3 text-[0.875rem] break-keep text-slate-400">근거 없는 브랜드 색상은 확정하지 않고 방향만 제시합니다. 실제 로고·브랜드 컬러가 확인되면 반영하세요.</p>
         </Panel>
         <Panel title="타이포·레이아웃·모바일">
-          <dl className="flex flex-col gap-2 text-[0.9rem]">
+          <dl className="flex flex-col gap-2 text-[0.875rem]">
             <Row label="타이포그래피" value={d.typographyDirection} />
             <Row label="본문 스타일" value={d.bodyStyle} />
             <Row label="정보 밀도" value={d.spacingDensity} />

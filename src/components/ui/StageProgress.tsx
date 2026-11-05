@@ -46,7 +46,7 @@ export function StageProgress({ flow, currentStage }: StageProgressProps) {
                 />
               </div>
               <span
-                className={`w-full truncate text-center text-[0.875rem] font-medium sm:text-[0.875rem] ${
+                className={`w-full truncate text-center text-[0.875rem] font-medium ${
                   current ? 'text-brand-700' : done ? 'text-slate-600' : 'text-slate-400'
                 }`}
                 title={PROJECT_STAGE_META[stage].label}

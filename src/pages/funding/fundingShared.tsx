@@ -57,7 +57,7 @@ export function StaleBanner({ show }: { show: boolean }) {
   return (
     <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-      <p className="text-[0.9rem] break-keep text-warning-800">
+      <p className="text-[0.875rem] break-keep text-warning-800">
         출처 원본이 변경되었습니다. 확정된 전략은 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.
       </p>
     </div>
@@ -67,7 +67,7 @@ export function StaleBanner({ show }: { show: boolean }) {
 export function ReadOnlyNotice({ strategy }: { strategy: FundingStrategy }) {
   if (strategy.status !== 'finalized' && strategy.status !== 'superseded') return null
   return (
-    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.9rem] break-keep text-slate-500">
+    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] break-keep text-slate-500">
       {strategy.status === 'finalized' ? '확정된 전략입니다. 원본 보존을 위해 읽기 전용입니다. 수정하려면 새 버전을 만드세요.' : '이전 버전입니다. 읽기 전용입니다.'}
     </div>
   )
@@ -93,7 +93,7 @@ export function FundingStrategyFrame({
       <div className="flex flex-col gap-5">
         <FundingHeader />
         <FundingNav projectId={projectId} />
-        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9rem] break-keep text-slate-500">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.875rem] break-keep text-slate-500">
           아직 연계 전략이 없습니다. 개요 화면에서{' '}
           <NavLink to={`/funding/projects/${projectId}`} className="font-medium text-brand-700 underline">연계 시작</NavLink>
           을 눌러 생성하세요.

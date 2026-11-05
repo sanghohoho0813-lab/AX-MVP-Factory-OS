@@ -72,12 +72,12 @@ function CaseContent({ context, projectId }: { context: ProjectFundingContext; p
       <WorkspaceShell moduleName={MODULE_NAME} moduleDescription={MODULE_DESC}>
         <Panel title="사례 만들기" flush>
           <div className="flex flex-col items-start gap-3 px-5 py-6">
-            <p className="text-[0.95rem] break-keep text-slate-600">
+            <p className="text-[0.9375rem] break-keep text-slate-600">
               아직 연계 전략이 없습니다. 먼저 기관·자금 연계에서 전략을 만들고 실제 결과를 기록해야 사례로 정리할 수 있습니다.
             </p>
             <NavLink
               to={`/funding/projects/${projectId}`}
-              className="text-[0.95rem] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+              className="text-[0.9375rem] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
             >
               기관·자금 연계 화면으로 이동하기
             </NavLink>
@@ -151,11 +151,11 @@ function CaseContent({ context, projectId }: { context: ProjectFundingContext; p
             <div className="flex flex-col items-start gap-3 px-5 py-6">
               <div className="flex items-start gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-                <p className="text-[0.95rem] break-keep text-warning-800">{creatable.reason}</p>
+                <p className="text-[0.9375rem] break-keep text-warning-800">{creatable.reason}</p>
               </div>
               <NavLink
                 to={`/funding/projects/${projectId}/outcome`}
-                className="text-[0.95rem] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                className="text-[0.9375rem] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
               >
                 결과·성과 화면으로 이동해 실제 결과 기록하기
               </NavLink>
@@ -164,7 +164,7 @@ function CaseContent({ context, projectId }: { context: ProjectFundingContext; p
         ) : cases.length === 0 ? (
           <Panel title="사례 만들기" flush>
             <div className="flex flex-col items-start gap-4 px-5 py-6">
-              <p className="text-[0.95rem] break-keep text-slate-600">
+              <p className="text-[0.9375rem] break-keep text-slate-600">
                 실제 결과가 기록되어 사례로 정리할 수 있습니다. 초안을 만들면 사례 편집 화면으로 이동합니다.
               </p>
               <Button variant="primary" onClick={createDraft}>
@@ -188,14 +188,14 @@ function CaseContent({ context, projectId }: { context: ProjectFundingContext; p
               {cases.map((c) => (
                 <li key={c.id} className="flex flex-col gap-3 rounded-(--radius-card) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="min-w-0 text-[1.05rem] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
+                    <p className="min-w-0 text-[1rem] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <CaseStatusBadge status={c.status} />
                     <CaseVisibilityBadge visibility={c.visibility} />
                     <ConsentBadge status={c.consentStatus} />
                   </div>
-                  <p className="text-[0.95rem] break-keep text-slate-600">{c.outcomeSummary || '아직 결과 요약이 없습니다'}</p>
+                  <p className="text-[0.9375rem] break-keep text-slate-600">{c.outcomeSummary || '아직 결과 요약이 없습니다'}</p>
                   <div className="mt-1">
                     <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${c.id}`)}>열기</Button>
                   </div>

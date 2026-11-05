@@ -49,7 +49,7 @@ export function DeviceSwitch({ wide = false, stacked = false }: { wide?: boolean
             onClick={() => setDeviceMode(m)}
             title={label}
             aria-label={label}
-            className={`inline-flex h-full min-w-9 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] px-2 text-[0.85rem] font-semibold whitespace-nowrap ${stacked ? 'min-w-0 flex-auto' : ''} ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300 ring-inset' : 'text-slate-600 hover:bg-slate-100'}`}
+            className={`inline-flex h-full min-w-9 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] px-2 text-[0.875rem] font-semibold whitespace-nowrap ${stacked ? 'min-w-0 flex-auto' : ''} ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300 ring-inset' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             <Icon aria-hidden="true" className={`size-4 shrink-0 ${stacked ? 'dev-stacked-icon' : ''}`} />
             {/* 머리줄도 글자(D-290 대표 "PC 화면 상단에도" — 예전엔 1900px 부터) · 자리가 모자라면 고르지 않은 둘의 글자부터 뺀다(data-fit 1 → 2) · 무대 위쪽 줄 · 설정에서는 늘 글자 */}
@@ -80,7 +80,7 @@ export function DeviceSwitchCompact() {
       >
         <cur.Icon aria-hidden="true" className="size-4" />
         {/* D-290 지금 보기 방식 이름도(아이콘만으로는 무엇인지 몰랐다) */}
-        <span aria-hidden="true" className="hdr-dev-label-on ml-1 text-[0.85rem] font-semibold whitespace-nowrap">{cur.label}</span>
+        <span aria-hidden="true" className="hdr-dev-label-on ml-1 text-[0.875rem] font-semibold whitespace-nowrap">{cur.label}</span>
         <ChevronDown aria-hidden="true" className="size-3.5 opacity-70" />
       </button>
       {open && (
@@ -96,7 +96,7 @@ export function DeviceSwitchCompact() {
                 setOpen(false)
                 setDeviceMode(m)
               }}
-              className={`tap flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.9rem] font-semibold ${mode === m ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50'}`}
+              className={`tap flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.875rem] font-semibold ${mode === m ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50'}`}
             >
               <Icon aria-hidden="true" className="size-4" />
               {label}
@@ -277,7 +277,7 @@ export function DeviceStage() {
         </div>
       ) : (
         <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5">
-          <p className="min-w-0 truncate text-[0.95rem] font-semibold text-slate-700">{STAGE_TITLE[mode]}</p>
+          <p className="min-w-0 truncate text-[0.9375rem] font-semibold text-slate-700">{STAGE_TITLE[mode]}</p>
           <DeviceSwitch wide />
         </div>
       )}

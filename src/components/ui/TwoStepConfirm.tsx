@@ -23,7 +23,7 @@ export function TwoStepConfirm({
   const [step, setStep] = useState<0 | 1 | 2>(0)
   if (step === 0) {
     return (
-      <button type="button" data-testid={testId} onClick={() => setStep(1)} className={`tap inline-flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-500 hover:bg-danger-50 hover:text-danger-700 ${className}`}>
+      <button type="button" data-testid={testId} onClick={() => setStep(1)} className={`tap inline-flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-500 hover:bg-danger-50 hover:text-danger-700 ${className}`}>
         <Trash2 aria-hidden="true" className="size-4" />
         {label}
       </button>
@@ -44,11 +44,11 @@ export function TwoStepConfirm({
           setStep(0)
           onConfirm()
         }}
-        className={`tap inline-flex h-9 items-center rounded-(--radius-control) px-3 text-[0.9rem] font-semibold ${step === 1 ? 'border border-danger-300 bg-white text-danger-800 hover:bg-danger-100' : 'bg-danger-600 text-white hover:bg-danger-700'}`}
+        className={`tap inline-flex h-9 items-center rounded-(--radius-control) px-3 text-[0.875rem] font-semibold ${step === 1 ? 'border border-danger-300 bg-white text-danger-800 hover:bg-danger-100' : 'bg-danger-600 text-white hover:bg-danger-700'}`}
       >
         {step === 1 ? '한 번 더 확인' : label}
       </button>
-      <button type="button" onClick={() => setStep(0)} className="tap inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9rem] text-slate-700 hover:bg-slate-50">
+      <button type="button" onClick={() => setStep(0)} className="tap inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.875rem] text-slate-700 hover:bg-slate-50">
         취소
       </button>
     </span>

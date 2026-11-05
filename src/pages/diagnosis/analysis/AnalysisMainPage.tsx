@@ -138,9 +138,9 @@ export function AnalysisMainPage() {
           <h1 className="text-[1.5rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.65rem]">
             {isWebsite ? '홈페이지 제작 준비 상태를 확인했습니다.' : '이 기업에서 먼저 개선할 업무를 비교할 준비가 되었습니다.'}
           </h1>
-          <p className="mt-3 max-w-3xl text-[1.05rem] leading-relaxed break-keep text-slate-600">{latest.autoSummary}</p>
+          <p className="mt-3 max-w-3xl text-[1rem] leading-relaxed break-keep text-slate-600">{latest.autoSummary}</p>
           {!isWebsite && (
-            <Button variant="primary" className="mt-5 h-12 px-6 text-[1.05rem]" onClick={() => navigate(`/selection/projects/${projectId}`)}>
+            <Button variant="primary" className="mt-5 h-12 px-6 text-[1rem]" onClick={() => navigate(`/selection/projects/${projectId}`)}>
               먼저 만들 업무 비교하기<ArrowRight aria-hidden="true" className="size-5" />
             </Button>
           )}
@@ -157,23 +157,23 @@ export function AnalysisMainPage() {
 
         {/* 역할별 의견 차이 */}
         {!isWebsite && (
-          <Panel title="역할별 의견 차이" actions={<Link to="compare" className="text-[0.9rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
+          <Panel title="역할별 의견 차이" actions={<Link to="compare" className="text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
             <ComparisonView items={latest.comparisons.filter((c) => c.status === 'major_gap' || c.status === 'minor_gap').slice(0, 3)} />
           </Panel>
         )}
 
         {/* 주요 문제 */}
-        <Panel title="주요 문제" actions={<Link to="issues" className="text-[0.9rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
+        <Panel title="주요 문제" actions={<Link to="issues" className="text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
           {topIssues.length === 0 ? (
-            <p className="text-[0.95rem] text-slate-500">확인이 필요한 항목이 없습니다.</p>
+            <p className="text-[0.9375rem] text-slate-500">확인이 필요한 항목이 없습니다.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {topIssues.map((issue) => (
                 <li key={issue.id} className="flex items-start gap-2 rounded-(--radius-control) border border-slate-100 px-3.5 py-2.5">
                   <TriangleAlert aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${issue.severity === 'critical' ? 'text-danger-500' : 'text-warning-500'}`} />
                   <div className="min-w-0">
-                    <p className="text-[0.98rem] font-medium text-slate-700">{issue.title}</p>
-                    <p className="break-keep text-[0.9rem] text-slate-500">{issue.description}</p>
+                    <p className="text-[1rem] font-medium text-slate-700">{issue.title}</p>
+                    <p className="break-keep text-[0.875rem] text-slate-500">{issue.description}</p>
                   </div>
                 </li>
               ))}
@@ -182,15 +182,15 @@ export function AnalysisMainPage() {
         </Panel>
 
         {/* 추가 확인 질문 */}
-        <Panel title="추가로 확인할 질문" actions={<Link to="interview" className="text-[0.9rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
+        <Panel title="추가로 확인할 질문" actions={<Link to="interview" className="text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700">전체 보기</Link>}>
           {topInterviews.length === 0 ? (
-            <p className="text-[0.95rem] text-slate-500">제안된 추가 질문이 없습니다.</p>
+            <p className="text-[0.9375rem] text-slate-500">제안된 추가 질문이 없습니다.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {topInterviews.map((q) => (
                 <li key={q.id} className="rounded-(--radius-control) border border-slate-100 px-3.5 py-2.5">
-                  <p className="text-[0.98rem] break-keep text-slate-700">{q.question}</p>
-                  <p className="mt-0.5 text-[0.88rem] text-slate-500">{RESPONDENT_ROLE_META[q.targetRespondentRole].label} 대상 · 왜 필요한지 확인 후 질문하세요.</p>
+                  <p className="text-[1rem] break-keep text-slate-700">{q.question}</p>
+                  <p className="mt-0.5 text-[0.875rem] text-slate-500">{RESPONDENT_ROLE_META[q.targetRespondentRole].label} 대상 · 왜 필요한지 확인 후 질문하세요.</p>
                 </li>
               ))}
             </ul>
@@ -218,7 +218,7 @@ export function AnalysisMainPage() {
               <div className="flex flex-wrap gap-2">
                 {quickLinks.map((item) => (
                   <button key={item.to} type="button" onClick={() => navigate(item.to)}
-                    className="flex items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50">
+                    className="flex items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5 text-[0.875rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50">
                     <item.icon aria-hidden="true" className="size-4 text-slate-400" />{item.label}
                     <ArrowRight aria-hidden="true" className="size-4 text-slate-300" />
                   </button>

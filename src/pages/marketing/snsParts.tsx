@@ -101,7 +101,7 @@ export function HoverTip({ tip, children, className = '', block = false, testId 
           role="tooltip"
           style={{ position: 'fixed', top: place?.top ?? rect.bottom + 6, left: place?.left ?? rect.left, visibility: place ? 'visible' : 'hidden' }}
           data-testid={testId}
-          className="pointer-events-none z-[70] block w-max max-w-[min(22rem,calc(100vw-1rem))] rounded-xl bg-slate-900 px-3 py-2.5 text-left text-[0.92rem] leading-snug font-normal break-keep whitespace-pre-line text-white shadow-lg"
+          className="pointer-events-none z-[70] block w-max max-w-[min(22rem,calc(100vw-1rem))] rounded-xl bg-slate-900 px-3 py-2.5 text-left text-[0.9375rem] leading-snug font-normal break-keep whitespace-pre-line text-white shadow-lg"
         >
           {tip}
         </span>

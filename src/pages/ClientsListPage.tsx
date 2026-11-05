@@ -164,8 +164,8 @@ export function ClientsListPage() {
       header: '고객사',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="truncate text-[1.1rem] font-bold text-slate-900">{row.organization.name}</p>
-          <p className="mt-0.5 text-[0.9rem] text-slate-500">{row.organization.industry}</p>
+          <p className="truncate text-[1.2rem] font-bold text-slate-900">{row.organization.name}</p>
+          <p className="mt-0.5 text-[0.875rem] text-slate-500">{row.organization.industry}</p>
         </div>
       ),
     },
@@ -176,7 +176,7 @@ export function ClientsListPage() {
         row.primaryProject ? (
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
-              <p className="max-w-52 truncate text-[0.95rem] font-medium text-slate-700">{row.primaryProject.name}</p>
+              <p className="max-w-52 truncate text-[0.9375rem] font-medium text-slate-700">{row.primaryProject.name}</p>
               {row.primaryProgress?.isSample && (
                 <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.875rem] font-medium text-brand-700">
                   샘플
@@ -191,7 +191,7 @@ export function ClientsListPage() {
             {row.projects.length > 1 && <p className="mt-0.5 text-[0.875rem] text-slate-400">외 {row.projects.length - 1}건</p>}
           </div>
         ) : (
-          <span className="text-[0.95rem] text-slate-400">프로젝트 없음</span>
+          <span className="text-[0.9375rem] text-slate-400">프로젝트 없음</span>
         ),
     },
     {
@@ -203,7 +203,7 @@ export function ClientsListPage() {
       key: 'next-action',
       header: '다음 행동',
       cell: (row) => (
-        <span className="block max-w-64 truncate text-[0.95rem] font-medium text-brand-700">
+        <span className="block max-w-64 truncate text-[0.9375rem] font-medium text-brand-700">
           {row.primaryProgress?.nextActionLabel || '다음 행동 없음'}
         </span>
       ),
@@ -211,7 +211,7 @@ export function ClientsListPage() {
     {
       key: 'contact',
       header: '담당자',
-      cell: (row) => <span className="text-[0.95rem] whitespace-nowrap text-slate-600">{row.organization.primaryContact.name}</span>,
+      cell: (row) => <span className="text-[0.9375rem] whitespace-nowrap text-slate-600">{row.organization.primaryContact.name}</span>,
     },
     {
       key: 'actions',

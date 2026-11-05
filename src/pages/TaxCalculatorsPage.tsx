@@ -153,7 +153,7 @@ function summaryOf(title: string, subLabel: string, blocks: Block[]): string {
 }
 
 const inputCls =
-  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
+  'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.9375rem] text-slate-900 focus:border-brand-500 focus:outline-none'
 
 export function TaxCalculatorsPage() {
   const [params, setParams] = useSearchParams()
@@ -394,7 +394,7 @@ export function TaxCalculatorsPage() {
     const rows = Array.isArray(values[f.id]) ? (values[f.id] as RowValues[]) : []
     return (
       <div key={f.id} className="overflow-x-auto">
-        <table className="w-full min-w-[420px] text-[0.9rem]" data-rows={f.id}>
+        <table className="w-full min-w-[420px] text-[0.875rem]" data-rows={f.id}>
           <thead>
             <tr>
               {f.columns.map((c) => (
@@ -490,7 +490,7 @@ export function TaxCalculatorsPage() {
             aria-selected={mode === m}
             data-mode={m}
             onClick={() => mode !== m && setMode(m)}
-            className={`tap rounded-(--radius-control) px-3 py-2 text-[0.98rem] font-semibold break-keep ${mode === m ? 'bg-white text-brand-800 shadow-(--shadow-card)' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`tap rounded-(--radius-control) px-3 py-2 text-[1rem] font-semibold break-keep ${mode === m ? 'bg-white text-brand-800 shadow-(--shadow-card)' : 'text-slate-600 hover:text-slate-900'}`}
           >
             {label}
           </button>
@@ -545,7 +545,7 @@ export function TaxCalculatorsPage() {
                     className={`tap flex w-full items-center gap-3 px-4 py-3 text-left ${on ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
                   >
                     <span className={`t-meta w-6 shrink-0 font-bold tabular-nums ${on ? 'text-brand-700' : 'text-slate-400'}`}>{c.no}</span>
-                    <span className={`min-w-0 flex-1 text-[0.95rem] break-keep ${on ? 'font-semibold text-brand-700' : 'font-medium text-slate-800'}`}>{c.title}</span>
+                    <span className={`min-w-0 flex-1 text-[0.9375rem] break-keep ${on ? 'font-semibold text-brand-700' : 'font-medium text-slate-800'}`}>{c.title}</span>
                     {on && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
                   </button>
                 </li>
@@ -562,7 +562,7 @@ export function TaxCalculatorsPage() {
             type="button"
             aria-pressed={c.key === calc.key}
             onClick={() => pick(c.key)}
-            className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[0.9rem] font-medium whitespace-nowrap ${
+            className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[0.875rem] font-medium whitespace-nowrap ${
               c.key === calc.key ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
@@ -621,7 +621,7 @@ export function TaxCalculatorsPage() {
                   data-id={p.id}
                   title={p.when}
                   onClick={() => applyPreset(p)}
-                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.92rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.9375rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
                 >
                   {p.title}
                 </button>
@@ -634,7 +634,7 @@ export function TaxCalculatorsPage() {
                   data-id={p.id}
                   title={`${p.when} — 원하는 결과로 찾기에서 이 업체 숫자로 계산`}
                   onClick={() => openPlanPreset(p)}
-                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.92rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                  className="tap max-w-full rounded-full border border-brand-200 bg-white px-3 py-1.5 text-left text-[0.9375rem] font-medium break-keep text-brand-800 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
                 >
                   {p.title}
                 </button>
@@ -652,7 +652,7 @@ export function TaxCalculatorsPage() {
                 role="tab"
                 aria-selected={s.key === sub.key}
                 onClick={() => pick(calc.key, s.key)}
-                className={`tap rounded-full border px-3.5 py-1.5 text-[0.9rem] font-medium ${
+                className={`tap rounded-full border px-3.5 py-1.5 text-[0.875rem] font-medium ${
                   s.key === sub.key ? 'border-navy-900 bg-navy-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
@@ -667,7 +667,7 @@ export function TaxCalculatorsPage() {
             <div className="flex flex-col gap-4">
               {groups.map((g) => (
                 <div key={g.title} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-                  <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[0.98rem] font-bold text-slate-900">{g.title}</HelpHeading>
+                  <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[1rem] font-bold text-slate-900">{g.title}</HelpHeading>
                   <div className={`grid gap-3 ${g.fields.some(isRowsField) ? '' : 'sm:grid-cols-2'}`}>{g.fields.map(renderField)}</div>
                 </div>
               ))}
@@ -681,7 +681,7 @@ export function TaxCalculatorsPage() {
                 data-block={b.id}
                 className={`rounded-(--radius-panel) border p-4 ${b.tone === 'light' ? 'border-slate-200 bg-white' : 'border-navy-900 bg-navy-900 text-slate-100'}`}
               >
-                <HelpHeading as="h3" tight onDark={b.tone !== 'light'} wrapClassName={`mb-2 border-b pb-2 ${b.tone === 'light' ? 'border-slate-100' : 'border-white/15'}`} className={`text-[0.98rem] font-bold ${b.tone === 'light' ? 'text-slate-900' : 'text-amber-200'}`}>{b.title}</HelpHeading>
+                <HelpHeading as="h3" tight onDark={b.tone !== 'light'} wrapClassName={`mb-2 border-b pb-2 ${b.tone === 'light' ? 'border-slate-100' : 'border-white/15'}`} className={`text-[1rem] font-bold ${b.tone === 'light' ? 'text-slate-900' : 'text-amber-200'}`}>{b.title}</HelpHeading>
                 {b.lines.map((l, i) =>
                   l.cls === 'divider' ? (
                     <p key={i} className={`mt-3 mb-1 t-meta font-bold tracking-wide uppercase ${b.tone === 'light' ? 'text-brand-700' : 'text-amber-300'}`}>
@@ -693,12 +693,12 @@ export function TaxCalculatorsPage() {
                       data-line
                       data-k={l.k}
                       data-v={l.v}
-                      className={`flex items-baseline justify-between gap-3 py-1.5 text-[0.9rem] ${
+                      className={`flex items-baseline justify-between gap-3 py-1.5 text-[0.875rem] ${
                         l.cls === 'highlight' ? `-mx-2 rounded-(--radius-control) px-2 ${b.tone === 'light' ? 'bg-brand-50' : 'bg-amber-200/15'}` : `border-b border-dashed ${b.tone === 'light' ? 'border-slate-200' : 'border-white/15'}`
                       }`}
                     >
                       <span className={b.tone === 'light' ? 'text-slate-500' : 'text-slate-300'}>{l.k}</span>
-                      <span className={`text-right font-bold tabular-nums ${l.cls === 'big' ? (b.tone === 'light' ? 'text-[1.15rem] text-brand-700' : 'text-[1.15rem] text-amber-200') : ''}`}>{l.v}</span>
+                      <span className={`text-right font-bold tabular-nums ${l.cls === 'big' ? (b.tone === 'light' ? 'text-[1.2rem] text-brand-700' : 'text-[1.2rem] text-amber-200') : ''}`}>{l.v}</span>
                     </div>
                   ),
                 )}
@@ -724,7 +724,7 @@ export function TaxCalculatorsPage() {
 
         {(out.tables ?? []).map((t) => (
           <div key={t.id} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-            <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[0.98rem] font-bold text-slate-900">{t.title}</HelpHeading>
+            <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[1rem] font-bold text-slate-900">{t.title}</HelpHeading>
             {/* D-102: 인쇄하면 오른쪽 칸이 잘렸다 — 종이에서는 가로 넘김 대신 글자를 줄여 한 폭에 */}
             <div className="overflow-x-auto print:overflow-visible">
               <table data-table={t.id} className="w-full min-w-[640px] text-[0.875rem] print:min-w-0 print:text-[7pt]">

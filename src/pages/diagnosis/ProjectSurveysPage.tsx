@@ -136,7 +136,7 @@ export function ProjectSurveysPage() {
         <>
           {/* 지금 무엇이 더 필요한가 */}
           <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
-            <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">진단 결과를 만들려면 어떤 응답이 더 필요할까요?</h2>
+            <h2 className="text-[1.2rem] font-bold break-keep text-slate-900">진단 결과를 만들려면 어떤 응답이 더 필요할까요?</h2>
             <p className="mt-2 text-[1rem] break-keep text-slate-600">
               {pendingRoles.length === 0
                 ? '필요한 역할의 응답이 모두 제출되었습니다. 이제 진단 결과를 만들 수 있습니다.'
@@ -145,7 +145,7 @@ export function ProjectSurveysPage() {
             <Button variant="primary" className="mt-4 h-auto w-full py-2.5 sm:w-auto" disabled={!canBuildResult} onClick={() => navigate(`/diagnosis/projects/${projectId}/analysis`)}>
               <span className="whitespace-normal">제출된 응답으로 진단 결과 만들기</span>
             </Button>
-            {!canBuildResult && <p className="mt-2 text-[0.9rem] text-slate-500">아직 제출된 응답이 없습니다. 아래에서 역할별 링크를 만들어 응답을 받으세요.</p>}
+            {!canBuildResult && <p className="mt-2 text-[0.875rem] text-slate-500">아직 제출된 응답이 없습니다. 아래에서 역할별 링크를 만들어 응답을 받으세요.</p>}
           </section>
 
           {/* 역할별 응답 상태 */}
@@ -158,10 +158,10 @@ export function ProjectSurveysPage() {
               return (
                 <div key={view.respondentRole} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[1.1rem] font-bold text-slate-900">{roleLabel}</p>
+                    <p className="text-[1.2rem] font-bold text-slate-900">{roleLabel}</p>
                     <span className={`rounded-full border px-2.5 py-0.5 text-[0.875rem] font-semibold ${stateCls}`}>{stateLabel}</span>
                   </div>
-                  <p className="text-[0.9rem] text-slate-500">문항 {view.questionCount}개 · 약 {view.estimatedMinutes}분 · 발급 {links.length} · 제출 {submitted}</p>
+                  <p className="text-[0.875rem] text-slate-500">문항 {view.questionCount}개 · 약 {view.estimatedMinutes}분 · 발급 {links.length} · 제출 {submitted}</p>
                   {hasLink && <ProgressBar value={submitted > 0 ? 100 : 10} tone={submitted > 0 ? 'success' : 'info'} label={`${roleLabel} 진행률`} />}
                   <div className="mt-auto flex flex-wrap gap-2">
                     {submitted > 0 && primaryLink ? (
@@ -182,7 +182,7 @@ export function ProjectSurveysPage() {
 
           {/* 진단 결과 생성 조건 */}
           <Panel title="진단 결과 생성 조건">
-            <ul className="flex flex-col gap-2 text-[0.95rem]">
+            <ul className="flex flex-col gap-2 text-[0.9375rem]">
               {[
                 { ok: canBuildResult, label: '필요한 역할의 응답이 제출됨' },
                 { ok: pendingRoles.length === 0, label: '모든 대상 역할의 응답 제출 완료' },
@@ -289,7 +289,7 @@ export function ProjectSurveysPage() {
                 <dt className="text-[0.875rem] text-slate-400">평균 진행률</dt>
                 <dd className="mt-1 flex items-center gap-2">
                   <ProgressBar value={responseSummary.averageProgress} tone="info" label="평균 진행률" />
-                  <span className="shrink-0 text-[0.95rem] font-semibold text-slate-700">
+                  <span className="shrink-0 text-[0.9375rem] font-semibold text-slate-700">
                     {responseSummary.averageProgress}%
                   </span>
                 </dd>

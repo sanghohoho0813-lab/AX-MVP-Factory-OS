@@ -90,7 +90,7 @@ export function ClientToolsCard({
               <button
                 type="button"
                 onClick={onOpenDocs}
-                className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) border border-danger-300 bg-white px-3 py-1.5 text-[0.92rem] font-medium text-danger-700 hover:bg-danger-50"
+                className="tap inline-flex items-center gap-1.5 rounded-(--radius-control) border border-danger-300 bg-white px-3 py-1.5 text-[0.9375rem] font-medium text-danger-700 hover:bg-danger-50"
               >
                 <FileUp aria-hidden="true" className="size-4" /> 서류함에서 올리기
               </button>

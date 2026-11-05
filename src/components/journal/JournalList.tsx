@@ -6,7 +6,7 @@ import { JOURNAL_TYPE_CLASS, JOURNAL_TYPE_LABEL } from '../../services/journalSe
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 
 const ROW_BTN =
-  'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50'
+  'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50'
 
 /**
  * 업무 일기 목록 — 시간순 타임라인.
@@ -67,8 +67,8 @@ export function JournalList({
       <div className="flex items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-4 sm:flex-col sm:justify-center sm:py-8 sm:text-center">
         <NotebookPen aria-hidden="true" className="size-6 shrink-0 text-slate-300 sm:size-7" />
         <div className="min-w-0">
-          <p className="text-[0.98rem] font-medium break-keep text-slate-600">{emptyTitle}</p>
-          {emptyHint && <p className="mt-0.5 max-w-md text-[0.9rem] break-keep text-slate-500">{emptyHint}</p>}
+          <p className="text-[1rem] font-medium break-keep text-slate-600">{emptyTitle}</p>
+          {emptyHint && <p className="mt-0.5 max-w-md text-[0.875rem] break-keep text-slate-500">{emptyHint}</p>}
         </div>
       </div>
     )
@@ -122,28 +122,28 @@ export function JournalList({
                   onChange={(ev) => setDraft(ev.target.value)}
                   rows={3}
                   aria-label="기록 수정"
-                  className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] focus:border-brand-500 focus:outline-none"
                 />
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
                     onClick={() => void saveEdit(e)}
                     disabled={draft.trim() === '' || busyId === e.id}
-                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3.5 text-[0.95rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3.5 text-[0.9375rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                   >
                     <Check aria-hidden="true" className="size-4" /> {busyId === e.id ? '저장 중…' : '저장'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingId(null)}
-                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3.5 text-[0.95rem] text-slate-600 hover:bg-slate-50"
+                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3.5 text-[0.9375rem] text-slate-600 hover:bg-slate-50"
                   >
                     <X aria-hidden="true" className="size-4" /> 취소
                   </button>
                 </div>
               </div>
             ) : (
-              <p className={`mt-1.5 text-[0.98rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-800 ${e.completed ? 'line-through' : ''}`}>
+              <p className={`mt-1.5 text-[1rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-800 ${e.completed ? 'line-through' : ''}`}>
                 {e.content}
               </p>
             )}
@@ -156,7 +156,7 @@ export function JournalList({
                     onClick={() => void run(e, () => onToggleComplete(e))}
                     disabled={busyId === e.id}
                     aria-pressed={e.completed}
-                    className={`tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border px-3 text-[0.9rem] font-medium disabled:opacity-50 ${
+                    className={`tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border px-3 text-[0.875rem] font-medium disabled:opacity-50 ${
                       e.completed ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >

@@ -16,7 +16,7 @@ export function TutorialButton({ roomy = false }: { roomy?: boolean }) {
       aria-label="안내 영상 보기"
       title="안내 영상 보기"
       onClick={() => t.open()}
-      className={`${roomy ? '' : 'lg:max-[1365px]:hidden '}tap hdr-tight flex size-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:h-10 lg:w-auto lg:border lg:border-slate-200 lg:px-2.5 lg:text-[0.9rem] lg:font-medium`}
+      className={`${roomy ? '' : 'lg:max-[1365px]:hidden '}tap hdr-tight flex size-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:h-10 lg:w-auto lg:border lg:border-slate-200 lg:px-2.5 lg:text-[0.875rem] lg:font-medium`}
     >
       <PlayCircle aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
       <span className={roomy ? 'hidden min-[1440px]:inline' : 'hidden min-[1700px]:inline'}>안내 영상</span>

@@ -99,7 +99,7 @@ export function PublishUpdateModal({
         </>
       }
     >
-      <p className="text-[0.88rem] break-keep text-slate-500">
+      <p className="text-[0.875rem] break-keep text-slate-500">
         여기 적은 내용만 {brand.customerPortalLabel}에 보입니다. 내부 메모·수임료·업무 세부 단계는 자동으로 나가지 않습니다.
       </p>
 
@@ -109,10 +109,10 @@ export function PublishUpdateModal({
           <p className="mt-2 text-[0.875rem] text-slate-500">{projectName} · {stage ? CUSTOMER_STAGE_LABEL[stage] : CUSTOMER_STAGE_LABEL[link.customerStage]}</p>
           <div className="mt-2 rounded-(--radius-card) border border-slate-200 bg-white p-4">
             <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.875rem] font-semibold text-brand-700">{UPDATE_CATEGORY_LABEL[category]}</span>
-            <h3 className="mt-2 text-[1.05rem] font-bold text-slate-900">{title || '(제목)'}</h3>
-            <p className="mt-1 text-[0.95rem] break-keep whitespace-pre-wrap text-slate-700">{body || '(내용 없음)'}</p>
+            <h3 className="mt-2 text-[1rem] font-bold text-slate-900">{title || '(제목)'}</h3>
+            <p className="mt-1 text-[0.9375rem] break-keep whitespace-pre-wrap text-slate-700">{body || '(내용 없음)'}</p>
             {actionRequired && (
-              <div className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] text-warning-700">
+              <div className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9375rem] text-warning-700">
                 <strong>해주실 일:</strong> {actionLabel || '(해야 할 일)'}{dueDate ? ` · ${dueDate}까지` : ''}
               </div>
             )}
@@ -128,55 +128,55 @@ export function PublishUpdateModal({
                 role="radio"
                 aria-checked={category === c}
                 onClick={() => { setCategory(c); if (c === 'document_request' || c === 'question') setActionRequired(true) }}
-                className={`tap rounded-full border px-3 py-1 text-[0.88rem] font-semibold ${category === c ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                className={`tap rounded-full border px-3 py-1 text-[0.875rem] font-semibold ${category === c ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
                 {UPDATE_CATEGORY_LABEL[c]}
               </button>
             ))}
           </div>
-          <label className="block text-[0.9rem] font-medium text-slate-600">
+          <label className="block text-[0.875rem] font-medium text-slate-600">
             제목
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="예: 벤처인증 서류 접수를 마쳤습니다"
-              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] text-slate-800 focus:border-brand-500 focus:outline-none"
+              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] text-slate-800 focus:border-brand-500 focus:outline-none"
             />
           </label>
-          <label className="block text-[0.9rem] font-medium text-slate-600">
+          <label className="block text-[0.875rem] font-medium text-slate-600">
             고객에게 보일 내용
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
               placeholder="지금 어디까지 왔고, 다음에 무엇이 진행되는지 고객 눈높이로 적습니다."
-              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none"
+              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none"
             />
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-[0.92rem] text-slate-700">
+          <label className="flex cursor-pointer items-center gap-2 text-[0.9375rem] text-slate-700">
             <input type="checkbox" checked={actionRequired} onChange={(e) => setActionRequired(e.target.checked)} className="size-4 accent-brand-600" />
             고객이 해야 할 일이 있습니다
           </label>
           {actionRequired && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-[0.9rem] font-medium text-slate-600">
+              <label className="block text-[0.875rem] font-medium text-slate-600">
                 해야 할 일 (한 줄)
                 <input
                   value={actionLabel}
                   onChange={(e) => setActionLabel(e.target.value)}
                   placeholder="예: 사업자등록증 최신본 올리기"
-                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] text-slate-800 focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] text-slate-800 focus:border-brand-500 focus:outline-none"
                 />
               </label>
               <DueDateField label="기한(선택)" value={dueDate} today={today} onChange={setDueDate} />
             </div>
           )}
-          <label className="block text-[0.9rem] font-medium text-slate-600">
+          <label className="block text-[0.875rem] font-medium text-slate-600">
             고객에게 보이는 단계
             <select
               value={stage}
               onChange={(e) => setStage(e.target.value as CustomerStage | '')}
-              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] text-slate-800 focus:border-brand-500 focus:outline-none"
+              className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] text-slate-800 focus:border-brand-500 focus:outline-none"
             >
               <option value="">그대로 둠 ({CUSTOMER_STAGE_LABEL[link.customerStage]})</option>
               {CUSTOMER_STAGE_ORDER.map((s) => (
@@ -188,7 +188,7 @@ export function PublishUpdateModal({
           </label>
         </div>
       )}
-      {error && <p role="alert" className="mt-3 text-[0.9rem] text-danger-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-[0.875rem] text-danger-600">{error}</p>}
     </Modal>
   )
 }

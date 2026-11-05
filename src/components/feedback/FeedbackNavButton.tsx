@@ -19,11 +19,11 @@ import { useFeedbackInbox, useMyFeedback } from './useFeedback'
 
 // D-189 대표: "노란 버튼 조금만 눈에 덜 띄게 — 좀 과하다." 꽉 찬 금색 대신 옅은 금색 테두리 · 살짝 비치는 바탕
 const LOOK =
-  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-amber-300/30 bg-amber-300/[0.07] px-3 py-2 text-[0.95rem] font-semibold text-amber-100 hover:border-amber-300/50 hover:bg-amber-300/15 hover:text-white'
+  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-amber-300/30 bg-amber-300/[0.07] px-3 py-2 text-[0.9375rem] font-semibold text-amber-100 hover:border-amber-300/50 hover:bg-amber-300/15 hover:text-white'
 
 // D-290 설정 화면(밝은 바탕)용
 const LOOK_LIGHT =
-  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.95rem] font-semibold text-amber-950 hover:bg-amber-100'
+  'tap relative flex min-h-11 w-full items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9375rem] font-semibold text-amber-950 hover:bg-amber-100'
 
 type Tone = 'dark' | 'light'
 

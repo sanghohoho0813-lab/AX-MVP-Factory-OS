@@ -233,7 +233,7 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <FileUp aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-brand-600" />
           <div className="min-w-0">
-            <p className="text-[0.98rem] font-bold break-keep text-slate-900">{title}</p>
+            <p className="text-[1rem] font-bold break-keep text-slate-900">{title}</p>
             <p className="t-meta break-keep text-slate-600">{hint}</p>
           </div>
         </div>
@@ -255,7 +255,7 @@ export function NewClientDocDrop({ onChange, title = '서류만 넣어도 칸이
                   <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-brand-600" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[0.92rem] font-semibold text-slate-800">{it.file.name}</span>
+                  <span className="block truncate text-[0.9375rem] font-semibold text-slate-800">{it.file.name}</span>
                   {archiveOf(it.file) && <span className="t-meta block truncate text-slate-500">{archiveOf(it.file)} 안에서 꺼냄</span>}
                   <span className="t-meta block break-keep text-slate-600" data-testid="new-client-doc-note">
                     {it.status !== 'done'

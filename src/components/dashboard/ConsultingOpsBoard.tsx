@@ -45,11 +45,11 @@ function OpsItemRow({ item }: { item: ConsultingOpsItem }) {
         className="grid gap-3 px-5 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto]"
       >
         <div className="min-w-0">
-          <p className="truncate text-[0.95rem] font-semibold text-slate-900">{item.clientName}</p>
+          <p className="truncate text-[0.9375rem] font-semibold text-slate-900">{item.clientName}</p>
           <p className="mt-0.5 truncate text-[0.875rem] text-slate-500">{item.projectName}</p>
         </div>
         <div className="min-w-0">
-          <p className="truncate text-[0.92rem] font-medium text-slate-700">{item.nextAction}</p>
+          <p className="truncate text-[0.9375rem] font-medium text-slate-700">{item.nextAction}</p>
           <p className="mt-0.5 truncate text-[0.875rem] text-slate-400">{item.reason}</p>
         </div>
         <div className="flex items-center gap-2 md:justify-end">
@@ -63,7 +63,7 @@ function OpsItemRow({ item }: { item: ConsultingOpsItem }) {
 
 function EmptyLane({ children }: { children: string }) {
   return (
-    <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">
+    <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">
       {children}
     </div>
   )
@@ -73,7 +73,7 @@ function OpsLane({ title, items, emptyText }: { title: string; items: Consulting
   return (
     <div className="min-w-0">
       <div className="border-b border-slate-100 px-5 py-3">
-        <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">{title}</HelpHeading>
+        <HelpHeading as="h3" className="text-[0.9375rem] font-semibold text-slate-800">{title}</HelpHeading>
       </div>
       {items.length > 0 ? (
         <ul className="divide-y divide-slate-100">
@@ -92,7 +92,7 @@ function RecommendationCard({ item }: { item: ConsultingOpsRecommendation }) {
   return (
     <li className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[0.95rem] font-semibold break-keep text-slate-900">{item.title}</p>
+        <p className="text-[0.9375rem] font-semibold break-keep text-slate-900">{item.title}</p>
         <StatusBadge tone={item.tone}>권장</StatusBadge>
       </div>
       <p className="mt-1.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">{item.detail}</p>
@@ -181,7 +181,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         <div className="min-w-0 border-b border-slate-100 px-5 py-4 xl:border-r xl:border-b-0">
           <div className="mb-3 flex items-center gap-2">
             <ListChecks aria-hidden="true" className="size-4 text-slate-400" />
-            <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">자동 운영 판단</HelpHeading>
+            <HelpHeading as="h3" className="text-[0.9375rem] font-semibold text-slate-800">자동 운영 판단</HelpHeading>
           </div>
           {brief.recommendations.length > 0 ? (
             <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-1">
@@ -197,7 +197,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         <div className="min-w-0 px-5 py-4">
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp aria-hidden="true" className="size-4 text-slate-400" />
-            <HelpHeading as="h3" className="text-[0.95rem] font-semibold text-slate-800">단계별 부하</HelpHeading>
+            <HelpHeading as="h3" className="text-[0.9375rem] font-semibold text-slate-800">단계별 부하</HelpHeading>
           </div>
           {brief.stageLoads.length > 0 ? (
             <ul className="flex flex-col gap-3">
@@ -205,7 +205,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
                 <li key={stage.stage} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-[0.9rem] font-medium text-slate-700">{stage.label}</p>
+                      <p className="truncate text-[0.875rem] font-medium text-slate-700">{stage.label}</p>
                       <span className="text-[0.875rem] font-semibold text-slate-400">{stage.count}건</span>
                     </div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">

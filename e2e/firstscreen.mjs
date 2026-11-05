@@ -6,14 +6,35 @@
  * 화면마다 한도(지금 길이 + 여유)를 넘으면 실패 — 새 기능이 첫 화면을 다시 길게 만들면 여기서 걸린다.
  * 한도를 올려야 하면 접기 · 탭 · 다음 단계로 줄일 수 없는지 먼저 본다.
  *
- *   node e2e/firstscreen.mjs <baseUrl> [--shots <dir>]
+ * U0(§10 UI 개편 · 2026-11-05) 다섯 화면은 정돈 숫자도 잰다 — 핵심 내용 시작 위치 · 글자 크기 종류 · 상자 안 상자(e2e/uiMetrics.mjs).
+ * 한도는 '지금보다 나빠지지 않게' — 화면을 고쳐 좋아지면 한도를 따라 내린다(다시 나빠지면 여기서 걸린다).
+ *
+ *   node e2e/firstscreen.mjs <baseUrl> [--shots <dir>] [--json <file>]
  */
+import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
+import { KEY_SCREENS, measureUi } from './uiMetrics.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const si = process.argv.indexOf('--shots')
 const SHOTS = si > 0 ? process.argv[si + 1] : ''
+const ji = process.argv.indexOf('--json')
+const JSON_OUT = ji > 0 ? process.argv[ji + 1] : ''
+
+/**
+ * U0 한도 [핵심 내용 시작 px, 글자 크기 종류, 상자 안 상자] — PC / 휴대폰.
+ * 기준선(2026-11-05 a43c319): 오늘 1546·8·15 / 1566·10·10 · 고객 관리 800·10·30 / 907·10·5 · 서류 681·10·13 / 1011·10·13 · 일정 464·9·11 / 584·8·3 · 마케팅 341·5·10 / 308·5·5
+ * U1(글자 여섯 단계) 뒤: 글자 크기 종류 오늘 6 / 6 · 고객 관리 6 / 6 · 서류 5 / 5 · 일정 5 / 4 · 마케팅 5 / 5 — 한도도 따라 내림(6종을 넘지 않게).
+ */
+const KEY_LIMITS = {
+  오늘: { PC: [1546, 6, 15], 휴대폰: [1566, 6, 10] },
+  '고객 관리': { PC: [800, 6, 30], 휴대폰: [907, 6, 5] },
+  서류: { PC: [681, 5, 13], 휴대폰: [1011, 5, 13] },
+  일정: { PC: [464, 5, 11], 휴대폰: [584, 4, 3] },
+  마케팅: { PC: [341, 5, 10], 휴대폰: [308, 5, 5] },
+}
+const metricsOut = {}
 
 /** [이름, 주소, PC 한도, 휴대폰 한도] — 2026-10-30 D-357 · D-358 뒤 길이 + 여유(창업감면 D-361 · 고용지원금 D-362 · 연구소 D-367 에서 줄임) */
 const SCREENS = [
@@ -83,6 +104,18 @@ for (const vp of [
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${vp.tag}-${name.replace(/[^가-힣a-z0-9]+/gi, '_')}.png`, fullPage: true })
   }
   console.log(`${vp.tag}: ${rows.join(' · ')}`)
+  // U0 다섯 화면 정돈 숫자
+  for (const [name, path, core] of KEY_SCREENS) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
+    await page.waitForTimeout(900)
+    const m = await measureUi(page, core)
+    metricsOut[`${vp.tag} ${name}`] = m
+    const [startMax, kindsMax, nestedMax] = KEY_LIMITS[name][vp.tag]
+    console.log(`  ${vp.tag} ${name}: 시작 ${m.start}px(${m.startScreens}화면) · 글자 ${m.fontKinds}종 [${m.fonts}] · 상자 ${m.boxes} / 안 ${m.nested}`)
+    check(`${vp.tag} ${name} 핵심 내용 시작 ${m.start}px ≤ ${startMax + 40}px`, m.start != null && m.start <= startMax + 40, core)
+    check(`${vp.tag} ${name} 글자 크기 ${m.fontKinds}종 ≤ ${kindsMax}종`, m.fontKinds <= kindsMax, m.fonts)
+    check(`${vp.tag} ${name} 상자 안 상자 ${m.nested} ≤ ${nestedMax + 2}`, m.nested <= nestedMax + 2)
+  }
   if (vp.tag === '휴대폰') {
     // D-369 휴대폰 전문 모듈 — 모듈마다 기능 3개 먼저 · [n개 더 보기] 로 전부(PC 는 처음부터 전부)
     await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
@@ -99,5 +132,6 @@ for (const vp of [
   await ctx.close()
 }
 await browser.close()
+if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(metricsOut, null, 2))
 console.log(`\nfirstscreen: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

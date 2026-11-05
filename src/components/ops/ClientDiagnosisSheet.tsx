@@ -31,22 +31,22 @@ function ToneTag({ l }: { l: DiagnosisLine }) {
 }
 
 function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender: string; printing?: boolean }) {
-  const H = ({ children }: { children: string }) => <h3 className="mt-5 mb-2 border-b border-slate-300 pb-1 text-[1.05rem] font-bold text-slate-900">{children}</h3>
+  const H = ({ children }: { children: string }) => <h3 className="mt-5 mb-2 border-b border-slate-300 pb-1 text-[1rem] font-bold text-slate-900">{children}</h3>
   return (
     <article className={printing ? 'px-8 py-6' : ''} data-testid={printing ? 'diagnosis-print' : 'diagnosis-preview'}>
       <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-brand-700 pb-2">
         <div className="min-w-0">
-          <p className="text-[0.9rem] font-semibold text-brand-700">우리 회사 맞춤 진단</p>
+          <p className="text-[0.875rem] font-semibold text-brand-700">우리 회사 맞춤 진단</p>
           <h2 className="text-[1.5rem] font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{d.companyName} 맞춤 진단서</h2>
         </div>
-        <p className="text-[0.9rem] text-slate-600">{ymd(d.today)} 기준</p>
+        <p className="text-[0.875rem] text-slate-600">{ymd(d.today)} 기준</p>
       </header>
 
       {d.snapshot.length > 0 && (
         <dl className="avoid-break mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="diagnosis-snapshot">
           {d.snapshot.map((x) => (
             <div key={x.label} className="min-w-0 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2">
-              <dt className="text-[0.85rem] text-slate-600">{x.label}</dt>
+              <dt className="text-[0.875rem] text-slate-600">{x.label}</dt>
               <dd className="text-[1rem] font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{x.value}</dd>
             </div>
           ))}
@@ -58,7 +58,7 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
           <H>{`지난 진단(${ymd(d.since.date)}) 뒤 달라진 것`}</H>
           <ul className="flex flex-col gap-1" data-testid="diagnosis-since">
             {d.since.changed.map((c) => (
-              <li key={c.key} className="avoid-break text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]" data-better={c.better ? '1' : '0'}>
+              <li key={c.key} className="avoid-break text-[0.9375rem] break-keep text-slate-800 [overflow-wrap:anywhere]" data-better={c.better ? '1' : '0'}>
                 <span aria-hidden="true" className={c.better ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
                   {c.better ? '▲ ' : '▼ '}
                 </span>
@@ -66,7 +66,7 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
               </li>
             ))}
             {d.since.received.length > 0 && (
-              <li className="avoid-break text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]">
+              <li className="avoid-break text-[0.9375rem] break-keep text-slate-800 [overflow-wrap:anywhere]">
                 <span aria-hidden="true" className="font-bold text-emerald-700">
                   ✓{' '}
                 </span>
@@ -79,30 +79,30 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
 
       <H>먼저 제안드리는 것</H>
       {d.picks.length === 0 ? (
-        <p className="text-[0.95rem] text-slate-600" data-testid="diagnosis-no-picks">
+        <p className="text-[0.9375rem] text-slate-600" data-testid="diagnosis-no-picks">
           지금 자료로는 바로 제안드릴 것이 아직 없습니다 — 아래 자료를 받으면 바로 다시 진단해 드립니다.
         </p>
       ) : (
         <ol className="flex flex-col gap-2" data-testid="diagnosis-picks">
           {d.picks.map((p, i) => (
             <li key={p.key} className="avoid-break flex min-w-0 gap-3 rounded-[10px] border border-slate-200 bg-white px-3 py-2.5" data-testid="diagnosis-pick" data-key={p.key}>
-              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[0.95rem] font-bold text-white">
+              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[0.9375rem] font-bold text-white">
                 {i + 1}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-2">
-                  <b className="text-[1.05rem] text-slate-900">{p.label}</b>
+                  <b className="text-[1rem] text-slate-900">{p.label}</b>
                   <ToneTag l={p} />
                 </span>
-                <span className="text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]">{p.text}</span>
+                <span className="text-[0.9375rem] break-keep text-slate-800 [overflow-wrap:anywhere]">{p.text}</span>
                 {p.amount && <span className="text-[1rem] font-bold break-keep text-emerald-800 [overflow-wrap:anywhere]">{p.amount}</span>}
                 {p.easy && (
-                  <span className="text-[0.88rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-easy">
+                  <span className="text-[0.875rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-easy">
                     쉽게 말하면 — {p.easy}
                   </span>
                 )}
                 {p.steps && p.steps.length > 0 && (
-                  <span className="text-[0.88rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-steps">
+                  <span className="text-[0.875rem] break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="diagnosis-pick-steps">
                     진행 순서 — {stepsText(p.steps)}
                   </span>
                 )}
@@ -115,7 +115,7 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
       {d.others.length > 0 && (
         <>
           <H>함께 살펴본 것</H>
-          <table className="w-full text-[0.95rem]" data-testid="diagnosis-others">
+          <table className="w-full text-[0.9375rem]" data-testid="diagnosis-others">
             <tbody>
               {d.others.map((o) => (
                 <tr key={o.key} className="avoid-break border-b border-slate-100">
@@ -140,22 +140,22 @@ function DiagnosisDocument({ d, sender, printing }: { d: DiagnosisSheet; sender:
           {d.requests.length > 0 && (
             <ul className="flex flex-col gap-1" data-testid="diagnosis-requests">
               {d.requests.map((r) => (
-                <li key={r.label} className="avoid-break text-[0.95rem] break-keep text-slate-800 [overflow-wrap:anywhere]">
+                <li key={r.label} className="avoid-break text-[0.9375rem] break-keep text-slate-800 [overflow-wrap:anywhere]">
                   ☐ <b>{r.label}</b>
                   {r.where && <span className="text-slate-600"> — {r.where}</span>}
-                  <span className="text-[0.85rem] text-slate-500"> · {r.for.join(' · ')} 진단에 씁니다</span>
+                  <span className="text-[0.875rem] text-slate-500"> · {r.for.join(' · ')} 진단에 씁니다</span>
                 </li>
               ))}
             </ul>
           )}
-          {d.ours.length > 0 && <p className="mt-1 text-[0.9rem] text-slate-600">저희가 직접 조회할 것: {d.ours.join(' · ')}</p>}
+          {d.ours.length > 0 && <p className="mt-1 text-[0.875rem] text-slate-600">저희가 직접 조회할 것: {d.ours.join(' · ')}</p>}
         </>
       )}
 
       <H>이렇게 진행합니다</H>
       <ol className="flex flex-col gap-1 pl-5" data-testid="diagnosis-steps">
         {d.steps.map((s) => (
-          <li key={s} className="list-decimal text-[0.95rem] break-keep text-slate-800">
+          <li key={s} className="list-decimal text-[0.9375rem] break-keep text-slate-800">
             {s}
           </li>
         ))}

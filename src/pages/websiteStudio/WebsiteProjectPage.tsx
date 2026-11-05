@@ -187,7 +187,7 @@ export function WebsiteProjectPage() {
             <DefItem label="핵심 행동" value={primaryActionLabel} />
             <DefItem label="핵심 메시지" value={strategy.keyMessage} />
           </dl>
-          <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.95rem] leading-relaxed break-keep text-slate-600">
+          <p className="mt-3 rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.9375rem] leading-relaxed break-keep text-slate-600">
             {buildWebsiteAutoSummary(design, organization)}
           </p>
         </Panel>
@@ -197,7 +197,7 @@ export function WebsiteProjectPage() {
           <div className="flex items-center gap-2">
             <WebsiteTypeBadge type={strategy.websiteType} />
           </div>
-          <p className="mt-2 text-[0.95rem] break-keep text-slate-600">{strategy.websiteTypeReason}</p>
+          <p className="mt-2 text-[0.9375rem] break-keep text-slate-600">{strategy.websiteTypeReason}</p>
         </Panel>
 
         {/* 주요 페이지 (쉬운 표현: 페이지명·필요한 이유·대상 고객·핵심 메시지·준비 상태) */}
@@ -210,7 +210,7 @@ export function WebsiteProjectPage() {
                 return (
                   <li key={p.id} className="rounded-(--radius-control) border border-slate-100 px-3.5 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[1.05rem] font-semibold break-keep text-slate-800">{p.name}</p>
+                      <p className="text-[1rem] font-semibold break-keep text-slate-800">{p.name}</p>
                       <div className="flex items-center gap-2">
                         <PageStatusBadge status={p.status} />
                         <span className={`text-[0.875rem] font-medium ${needsContent ? 'text-warning-700' : 'text-success-700'}`}>
@@ -218,9 +218,9 @@ export function WebsiteProjectPage() {
                         </span>
                       </div>
                     </div>
-                    {p.purpose && <p className="mt-1 text-[0.95rem] break-keep text-slate-600">{p.purpose}</p>}
-                    {p.primaryMessage && <p className="mt-1 text-[0.9rem] break-keep text-slate-500">핵심 메시지: {p.primaryMessage}</p>}
-                    {audienceNames && <p className="mt-0.5 text-[0.9rem] break-keep text-slate-500">대상 고객: {audienceNames}</p>}
+                    {p.purpose && <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">{p.purpose}</p>}
+                    {p.primaryMessage && <p className="mt-1 text-[0.875rem] break-keep text-slate-500">핵심 메시지: {p.primaryMessage}</p>}
+                    {audienceNames && <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">대상 고객: {audienceNames}</p>}
                   </li>
                 )
               })}
@@ -231,7 +231,7 @@ export function WebsiteProjectPage() {
         {/* 디자인 방향 (쉬운 표현) */}
         {hasDesignDirection && (
           <Panel title="디자인 방향">
-            <p className="text-[0.98rem] leading-relaxed break-keep text-slate-700">{designWords}</p>
+            <p className="text-[1rem] leading-relaxed break-keep text-slate-700">{designWords}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {designDirection.personalities.map((p) => (
                 <span key={p} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.875rem] font-medium text-slate-600">
@@ -272,7 +272,7 @@ export function WebsiteProjectPage() {
                     ].map(([label, value]) => (
                       <div key={label as string}>
                         <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-                        <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
+                        <dd className="text-[1.2rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -280,7 +280,7 @@ export function WebsiteProjectPage() {
                 <Panel title="페이지 코드">
                   <ul className="flex flex-col gap-1.5">
                     {activePages.slice(0, 10).map((p) => (
-                      <li key={p.id} className="flex items-center justify-between gap-2 text-[0.88rem]">
+                      <li key={p.id} className="flex items-center justify-between gap-2 text-[0.875rem]">
                         <span className="min-w-0 truncate text-slate-600">{p.name}</span>
                         <span className="shrink-0 text-slate-400">{p.pageType} · /{p.slug}</span>
                       </li>
@@ -292,7 +292,7 @@ export function WebsiteProjectPage() {
                 <Panel title="점검 상세">
                   <ul className="flex flex-col gap-1.5">
                     {[...errors, ...warnings].slice(0, 6).map((c) => (
-                      <li key={c.id} className="flex items-start gap-1.5 text-[0.88rem] break-keep text-slate-600">
+                      <li key={c.id} className="flex items-start gap-1.5 text-[0.875rem] break-keep text-slate-600">
                         <QualitySeverityBadge severity={c.severity} />
                         <span className="min-w-0">{c.description}</span>
                       </li>
@@ -313,7 +313,7 @@ function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
+      <dd className="mt-0.5 text-[1rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
 }

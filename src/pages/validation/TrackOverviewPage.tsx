@@ -237,7 +237,7 @@ function OverviewBody({
 
         {/* 쉬운 말 요약 */}
         <Panel title="이 테스트 요약">
-          <p className="text-[1.05rem] leading-relaxed break-keep text-slate-800">{summary.headline}</p>
+          <p className="text-[1rem] leading-relaxed break-keep text-slate-800">{summary.headline}</p>
           <dl className="mt-4 flex flex-col gap-3">
             {w.objective && <DefItem label="테스트 목표" value={w.objective} />}
             {w.targetUsers && <DefItem label="대상 사용자" value={w.targetUsers} />}
@@ -247,13 +247,13 @@ function OverviewBody({
         {/* 확인할 시나리오 — 사용자가 해야 할 일 / 기대 결과 / 통과 기준 / 필요한 증거 / 필수 여부 */}
         <Panel title="확인할 시나리오">
           {requiredScenarios.length === 0 ? (
-            <p className="text-[0.95rem] break-keep text-slate-500">아직 확인할 필수 시나리오가 없습니다. ‘확인할 시나리오’ 화면에서 준비하세요.</p>
+            <p className="text-[0.9375rem] break-keep text-slate-500">아직 확인할 필수 시나리오가 없습니다. ‘확인할 시나리오’ 화면에서 준비하세요.</p>
           ) : (
             <ul className="flex flex-col gap-3">
               {requiredScenarios.slice(0, 4).map((s) => (
                 <li key={s.id} className="rounded-(--radius-control) border border-slate-200 px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="min-w-0 text-[1.05rem] font-semibold break-keep text-slate-800">{s.title}</p>
+                    <p className="min-w-0 text-[1rem] font-semibold break-keep text-slate-800">{s.title}</p>
                     <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${s.required ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                       {s.required ? '필수' : '선택'}
                     </span>
@@ -267,7 +267,7 @@ function OverviewBody({
                 </li>
               ))}
               {requiredScenarios.length > 4 && (
-                <li className="text-[0.9rem] text-slate-400">외 {requiredScenarios.length - 4}건</li>
+                <li className="text-[0.875rem] text-slate-400">외 {requiredScenarios.length - 4}건</li>
               )}
             </ul>
           )}
@@ -277,10 +277,10 @@ function OverviewBody({
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Panel title="사용자 피드백 (의견·불편·요청)">
             {w.feedbackItems.length === 0 ? (
-              <p className="text-[0.95rem] break-keep text-slate-500">아직 기록된 사용자 피드백이 없습니다.</p>
+              <p className="text-[0.9375rem] break-keep text-slate-500">아직 기록된 사용자 피드백이 없습니다.</p>
             ) : (
               <>
-                <p className="flex items-center gap-1.5 text-[0.9rem] break-keep text-slate-500">
+                <p className="flex items-center gap-1.5 text-[0.875rem] break-keep text-slate-500">
                   <MessageSquare aria-hidden="true" className="size-4 text-slate-400" />
                   사용자의 의견·불편·요청입니다. 수정 대상 오류가 아닙니다.
                 </p>
@@ -288,7 +288,7 @@ function OverviewBody({
                   {w.feedbackItems.slice(0, 5).map((f) => (
                     <li key={f.id} className="flex items-start gap-2 rounded-(--radius-control) border border-slate-100 px-3.5 py-2.5">
                       <FeedbackTypeBadge type={f.type} />
-                      <span className="min-w-0 flex-1 text-[0.95rem] break-keep text-slate-700">{f.title}</span>
+                      <span className="min-w-0 flex-1 text-[0.9375rem] break-keep text-slate-700">{f.title}</span>
                     </li>
                   ))}
                 </ul>
@@ -298,10 +298,10 @@ function OverviewBody({
 
           <Panel title="수정할 이슈 (오류·차단 문제)">
             {openIssues.length === 0 ? (
-              <p className="text-[0.95rem] break-keep text-slate-500">미해결 이슈가 없습니다.</p>
+              <p className="text-[0.9375rem] break-keep text-slate-500">미해결 이슈가 없습니다.</p>
             ) : (
               <>
-                <p className="flex items-center gap-1.5 text-[0.9rem] break-keep text-slate-500">
+                <p className="flex items-center gap-1.5 text-[0.875rem] break-keep text-slate-500">
                   <Wrench aria-hidden="true" className="size-4 text-slate-400" />
                   실제로 수정해야 할 오류·차단 문제입니다.
                 </p>
@@ -309,7 +309,7 @@ function OverviewBody({
                   {openIssues.slice(0, 5).map((i) => (
                     <li key={i.id} className="flex items-start gap-2 rounded-(--radius-control) border border-slate-100 px-3.5 py-2.5">
                       <SeverityBadge severity={i.severity} />
-                      <span className="min-w-0 flex-1 text-[0.95rem] break-keep text-slate-700">{i.title}</span>
+                      <span className="min-w-0 flex-1 text-[0.9375rem] break-keep text-slate-700">{i.title}</span>
                       <IssueStatusBadge status={i.status} />
                     </li>
                   ))}
@@ -339,7 +339,7 @@ function OverviewBody({
               </div>
 
               <Panel title="단계별 판정 상태">
-                <p className="mb-3 flex items-center gap-1.5 text-[0.9rem] break-keep text-slate-500">
+                <p className="mb-3 flex items-center gap-1.5 text-[0.875rem] break-keep text-slate-500">
                   <ListChecks aria-hidden="true" className="size-4 text-slate-400" />
                   문제 확인부터 다음 결정까지 8단계 판정 상태입니다.
                 </p>
@@ -349,7 +349,7 @@ function OverviewBody({
                     return (
                       <li key={gate} className="flex items-center justify-between gap-3 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
                         <span className="flex min-w-0 flex-col">
-                          <span className="text-[0.95rem] font-medium break-keep text-slate-700">{PLAIN_GATE_LABEL[gate]}</span>
+                          <span className="text-[0.9375rem] font-medium break-keep text-slate-700">{PLAIN_GATE_LABEL[gate]}</span>
                           <span className="text-[0.875rem] text-slate-400">Gate {GATE_META[gate].index}</span>
                         </span>
                         {gr ? <GateStatusBadge status={gr.status} /> : <span className="text-[0.875rem] text-slate-400">미생성</span>}
@@ -372,14 +372,14 @@ function OverviewBody({
                     ].map(([label, value]) => (
                       <div key={label}>
                         <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-                        <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
+                        <dd className="text-[1.2rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}
                   </dl>
                 </Panel>
 
                 <Panel title="점검 상태">
-                  <div className="flex items-center justify-between text-[0.95rem]">
+                  <div className="flex items-center justify-between text-[0.9375rem]">
                     <span className="text-slate-600">해결할 오류</span>
                     <span className={blockingQuality.length > 0 ? 'font-semibold text-danger-600' : 'text-slate-400'}>
                       {blockingQuality.length}건
@@ -390,12 +390,12 @@ function OverviewBody({
                       {blockingQuality.map((c) => (
                         <li key={c.id} className="flex items-start gap-2">
                           <QualitySeverityBadge severity={c.severity} />
-                          <span className="min-w-0 text-[0.9rem] break-keep text-slate-600">{c.description}</span>
+                          <span className="min-w-0 text-[0.875rem] break-keep text-slate-600">{c.description}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-3 text-[0.95rem] break-keep text-slate-500">해결해야 할 오류가 없습니다.</p>
+                    <p className="mt-3 text-[0.9375rem] break-keep text-slate-500">해결해야 할 오류가 없습니다.</p>
                   )}
                 </Panel>
               </div>
@@ -411,7 +411,7 @@ function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
+      <dd className="mt-0.5 text-[1rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
 }
@@ -420,7 +420,7 @@ function ScenarioField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
       <dt className="shrink-0 text-[0.875rem] font-medium text-slate-400 sm:w-28">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[0.92rem] break-keep text-slate-700">{value || '-'}</dd>
+      <dd className="min-w-0 flex-1 text-[0.9375rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
 }
@@ -453,7 +453,7 @@ export function TrackOverviewPage() {
         steps={validationSteps(projectId, tt)}
         currentKey="overview"
       >
-        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] break-keep text-slate-500">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem] break-keep text-slate-500">
           아직 이 트랙의 검증 작업공간이 없습니다. 트랙 선택 화면에서 ‘검증 시작’을 눌러 생성하세요.
         </div>
       </WorkspaceShell>

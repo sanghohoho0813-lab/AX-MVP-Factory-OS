@@ -94,8 +94,8 @@ export function CasesLibraryPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
-                    {c.industry && <p className="mt-0.5 text-[0.9rem] text-slate-400">{c.industry}</p>}
+                    <p className="text-[1rem] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
+                    {c.industry && <p className="mt-0.5 text-[0.875rem] text-slate-400">{c.industry}</p>}
                   </div>
                   {c.visibility === 'internal' && (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-danger-700">
@@ -109,11 +109,11 @@ export function CasesLibraryPage() {
                   <CaseVisibilityBadge visibility={c.visibility} />
                   <ConsentBadge status={c.consentStatus} />
                 </div>
-                <p className="text-[0.95rem] break-keep text-slate-600">{c.outcomeSummary || '아직 결과 요약이 없습니다'}</p>
+                <p className="text-[0.9375rem] break-keep text-slate-600">{c.outcomeSummary || '아직 결과 요약이 없습니다'}</p>
                 {c.keyProblems[0] && (
-                  <p className="text-[0.9rem] break-keep text-slate-500">처음 문제: {c.keyProblems[0]}</p>
+                  <p className="text-[0.875rem] break-keep text-slate-500">처음 문제: {c.keyProblems[0]}</p>
                 )}
-                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] text-slate-500">
                   <span>연결 기관 {c.selectedInstitutions.length}곳</span>
                   <span>검증된 성과 {c.verifiedMetrics.length}건</span>
                 </div>

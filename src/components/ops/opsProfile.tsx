@@ -242,7 +242,7 @@ export function CompanyProfileCard({
                             if (e.key === 'Enter') saveEdit(f)
                             if (e.key === 'Escape') setEditingKey(null)
                           }}
-                          className="w-full rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.9rem] text-slate-700 focus:border-brand-400 focus:outline-none"
+                          className="w-full rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.875rem] text-slate-700 focus:border-brand-400 focus:outline-none"
                         />
                       )}
                       {f.options ? (
@@ -274,7 +274,7 @@ export function CompanyProfileCard({
                           if (e.key === 'Enter') saveEdit(f)
                           if (e.key === 'Escape') setEditingKey(null)
                         }}
-                        className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[0.98rem] font-semibold text-slate-900 focus:outline-none"
+                        className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[1rem] font-semibold text-slate-900 focus:outline-none"
                       />
                       )}
                       <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
@@ -338,7 +338,7 @@ export function CompanyProfileCard({
                       disabled={!canEdit(f)}
                       aria-label={canEdit(f) ? `${f.label} 입력` : undefined}
                       onClick={() => startEdit(f)}
-                      className="text-[0.95rem] text-slate-500 hover:text-brand-700 hover:underline disabled:hover:text-slate-500 disabled:hover:no-underline"
+                      className="text-[0.9375rem] text-slate-500 hover:text-brand-700 hover:underline disabled:hover:text-slate-500 disabled:hover:no-underline"
                     >
                       {canEdit(f) ? '+ 입력' : '미입력'}
                     </button>
@@ -358,7 +358,7 @@ export function CompanyProfileCard({
                                 <Fragment key={`${f.key}-seg-${i}`}>
                                   {/* 하이픈도 조각과 같은 글자 크기·줄높이로 — 다르면 글자가 서로 다른 줄에 앉는다 */}
                                   {i > 0 && (
-                                    <span aria-hidden="true" className="inline-block py-1 text-[0.98rem] font-semibold tabular-nums text-slate-400">
+                                    <span aria-hidden="true" className="inline-block py-1 text-[1rem] font-semibold tabular-nums text-slate-400">
                                       -
                                     </span>
                                   )}
@@ -367,7 +367,7 @@ export function CompanyProfileCard({
                                     onClick={() => void copy(`${f.key}__s${i}`, seg)}
                                     aria-label={`${f.label} ${seg} 만 복사`}
                                     title={`${seg} 만 복사 — 칸이 나뉜 신청서용`}
-                                    className={`tap !min-w-0 rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
+                                    className={`tap !min-w-0 rounded px-1 py-1 text-[1rem] font-semibold tabular-nums ${
                                       copiedKey === `${f.key}__s${i}`
                                         ? 'bg-success-50 text-success-700'
                                         : 'text-slate-800 hover:bg-brand-50 hover:text-brand-700'
@@ -399,7 +399,7 @@ export function CompanyProfileCard({
                               title="눌러서 복사 — 보이는 그대로"
                               className="group inline-flex min-w-0 items-center gap-1 text-left sm:text-right"
                             >
-                              <span className={`min-w-0 text-[0.98rem] font-semibold [overflow-wrap:anywhere] text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
+                              <span className={`min-w-0 text-[1rem] font-semibold [overflow-wrap:anywhere] text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
                                 {f.value}
                               </span>
                               {copiedKey === f.key ? (
@@ -426,7 +426,7 @@ export function CompanyProfileCard({
                           )}
                         </span>
                       ) : (
-                        <span className="min-w-0 text-[0.98rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-800">{f.value}</span>
+                        <span className="min-w-0 text-[1rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-800">{f.value}</span>
                       )}
                       {canEdit(f) && (
                         <button
@@ -572,7 +572,7 @@ export function CompanyProfileCard({
 /* 메모                                                                 */
 /* ------------------------------------------------------------------ */
 
-const NOTE_BTN = 'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+const NOTE_BTN = 'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800'
 
 export function NotesSection({
   record,
@@ -623,10 +623,10 @@ export function NotesSection({
   return (
     <section aria-labelledby="notes" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <HelpHeading id="notes" className="text-[1.3rem] font-bold text-slate-900">
+        <HelpHeading id="notes" className="text-[1.2rem] font-bold text-slate-900">
           메모
         </HelpHeading>
-        <p className="text-[0.9rem] text-slate-500">{allowAdd ? '통화 내용 · 요청사항을 적어 두세요. 고치거나 지울 수 있습니다.' : '예전에 적은 메모입니다. 새로 적을 것은 위 기록 칸에 적으세요.'}</p>
+        <p className="text-[0.875rem] text-slate-500">{allowAdd ? '통화 내용 · 요청사항을 적어 두세요. 고치거나 지울 수 있습니다.' : '예전에 적은 메모입니다. 새로 적을 것은 위 기록 칸에 적으세요.'}</p>
       </div>
 
       {allowAdd && <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-3">
@@ -652,7 +652,7 @@ export function NotesSection({
 
       {notes.length === 0 ? (
         allowAdd ? (
-          <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
+          <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.9375rem] text-slate-500">
             아직 메모가 없습니다.
           </p>
         ) : null
@@ -671,7 +671,7 @@ export function NotesSection({
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
                     rows={3}
-                    className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none"
+                    className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] focus:border-brand-500 focus:outline-none"
                   />
                   <div className="flex justify-end gap-2">
                     <Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>

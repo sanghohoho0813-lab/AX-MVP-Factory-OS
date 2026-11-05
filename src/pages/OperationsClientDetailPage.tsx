@@ -131,7 +131,7 @@ function TopPicksPlaceholder() {
     <section aria-busy="true" aria-label="이 업체에 먼저 제안할 것 — 판정하는 중" className="min-h-[11rem] rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-4 shadow-sm sm:px-5" data-testid="top-picks-loading">
       <div className="flex items-center gap-3">
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-        <p className="text-[1.15rem] font-bold break-keep text-slate-900">이 업체에 먼저 제안할 것</p>
+        <p className="text-[1.2rem] font-bold break-keep text-slate-900">이 업체에 먼저 제안할 것</p>
       </div>
       <p className="t-sub mt-3 text-slate-500">맞는 모듈을 판정하는 중…</p>
     </section>
@@ -216,7 +216,7 @@ import { EDGE_BOX } from '../components/ui/edge'
 
 
 const inputCls =
-  'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
+  'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem] focus:border-brand-500 focus:outline-none'
 
 /** 계약 정보가 하나라도 적혀 있나 — 계약일 · 방식 · 현금 금액 · 보험 */
 function hasContractInfo(r: ClientOpsRecord): boolean {
@@ -635,7 +635,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     focusedCardRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [focusedService, tab])
 
-  if (loading) return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
+  if (loading) return <p className="px-1 py-10 text-[1rem] text-slate-500">불러오는 중…</p>
   if (notFound || !record || !progress) {
     return (
       <NotFoundState
@@ -714,7 +714,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           type="button"
           data-testid="client-back"
           onClick={goBack}
-          className="tap inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
+          className="tap inline-flex w-fit items-center gap-1.5 text-[0.9375rem] font-medium text-slate-500 hover:text-slate-800"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {navFrom ? `${navFrom.label}로` : '고객 관리 현황'}
@@ -840,7 +840,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
 
         {record.archivedAt && (
-          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[0.92rem] break-keep text-slate-600">
+          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[0.9375rem] break-keep text-slate-600">
             보관된 업체입니다. 현황표·경고·일정에 나타나지 않습니다. 데이터는 그대로 있습니다.
           </p>
         )}
@@ -1301,7 +1301,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       onChange={(e) =>
                         void commit(withService(record, meta.key, { status: e.target.value as ServiceStatus }))
                       }
-                      className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.92rem] font-medium"
+                      className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.9375rem] font-medium"
                     >
                       {SERVICE_STATUS_ORDER.map((s) => (
                         <option key={s} value={s}>
@@ -1314,12 +1314,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
                 {expanded && (
                   <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5">
-                    <p className="text-[0.92rem] break-keep text-slate-500">{meta.description}</p>
+                    <p className="text-[0.9375rem] break-keep text-slate-500">{meta.description}</p>
 
                     {/* 서류는 경고가 아니라 상태다 — 빨간 판이 아니라 회색 판으로 알린다 */}
                     {blocked && (
                       <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5">
-                        <p className="flex items-start gap-1.5 text-[0.95rem] font-semibold break-keep text-slate-700">
+                        <p className="flex items-start gap-1.5 text-[0.9375rem] font-semibold break-keep text-slate-700">
                           <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                           아직 안 받은 서류
                         </p>
@@ -1358,7 +1358,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         today={today}
                         onChange={(v) => void commit(withService(record, meta.key, { dueDate: v }))}
                       />
-                      <label className="text-[0.9rem] font-medium text-slate-600">
+                      <label className="text-[0.875rem] font-medium text-slate-600">
                         다음에 할 일
                         <input
                           value={state.nextStep}
@@ -1369,7 +1369,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       </label>
                     </div>
 
-                    <label className="text-[0.9rem] font-medium text-slate-600">
+                    <label className="text-[0.875rem] font-medium text-slate-600">
                       메모
                       <textarea
                         value={state.note}
@@ -1434,7 +1434,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           {/* D-192: '발급일을 넣으면 유효기간…' 설명은 목차 설명(ⓘ)으로 */}
           <HintTip tip={hintFor('서류함')} label="서류함">
-            <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
+            <h2 id="docs" className="text-[1.2rem] font-bold text-slate-900">
               서류함
             </h2>
           </HintTip>
@@ -1469,7 +1469,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         )}
 
         {!uploadable && (
-          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
+          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.9375rem] break-keep text-slate-600">
             이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.
           </p>
         )}
@@ -1665,7 +1665,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                               확인할 정보 {reviewKeys.get(meta.key)}
                             </button>
                           )}
-                          <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
+                          <span className="text-[1rem] font-bold break-keep text-slate-900">{meta.label}</span>
                           {urgent && (
                             <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">
                               지금 필요
@@ -1683,7 +1683,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             </span>
                           )}
                         </span>
-                        {!compact && !later && <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>}
+                        {!compact && !later && <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">{meta.hint}</span>}
                       </span>
                     </label>
                     {view.expired && (
@@ -1748,7 +1748,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {state.received && (
                     <div className="grid gap-2 sm:grid-cols-2">
                       {(meta.validMonths !== null || !!state.validUntil) && (
-                        <label className="text-[0.88rem] font-medium text-slate-600">
+                        <label className="text-[0.875rem] font-medium text-slate-600">
                           발급일
                           <input
                             type="date"
@@ -1766,7 +1766,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           </span>
                         </label>
                       )}
-                      <label className="text-[0.88rem] font-medium text-slate-600">
+                      <label className="text-[0.875rem] font-medium text-slate-600">
                         {meta.key === 'jointCertificate' ? '보관 위치 (비밀번호는 적지 마세요)' : '메모'}
                         <input
                           value={state.note}
@@ -1903,7 +1903,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         */}
         <div className="flex flex-wrap items-end gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white p-4">
           {/* 휴대폰에서는 이름 칸이 한 줄을 다 쓴다 — 유효기간·단추와 나눠 쓰면 이름 칸이 짜부라진다(화면 규칙 §9) */}
-          <label className="w-full text-[0.88rem] font-medium text-slate-600 sm:w-auto sm:max-w-xs sm:flex-1">
+          <label className="w-full text-[0.875rem] font-medium text-slate-600 sm:w-auto sm:max-w-xs sm:flex-1">
             서류 이름
             <input
               aria-label="새 서류 칸 이름"
@@ -1913,7 +1913,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               className={`mt-1 ${inputCls}`}
             />
           </label>
-          <label className="w-28 text-[0.88rem] font-medium text-slate-600">
+          <label className="w-28 text-[0.875rem] font-medium text-slate-600">
             유효기간(개월)
             <input
               aria-label="새 서류 칸 유효기간"
@@ -2357,7 +2357,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <TextField label="이메일" value={record.contactEmail} onChange={(v) => void commit({ ...record, contactEmail: v })} />
             <TextField label="홈페이지" value={record.homepage} onChange={(v) => void commit({ ...record, homepage: v })} />
           </div>
-          <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
+          <label className="mt-3 block text-[0.875rem] font-medium text-slate-600">
             메모
             <textarea
               value={record.notes}
@@ -2537,7 +2537,7 @@ function TextField({
   field?: string
 }) {
   return (
-    <label className="block py-1.5 text-[0.9rem] font-medium text-slate-600">
+    <label className="block py-1.5 text-[0.875rem] font-medium text-slate-600">
       {label}
       <input
         value={value}

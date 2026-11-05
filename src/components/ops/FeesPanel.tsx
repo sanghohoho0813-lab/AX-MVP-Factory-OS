@@ -339,7 +339,7 @@ export function FeesPanel({
     <section aria-labelledby="fees" className="flex flex-col gap-3" data-testid="fees-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <HintTip tip={hintFor('계약 · 수금')} label="계약 · 수금">
-          <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
+          <h2 id="fees" className="text-[1.2rem] font-bold text-slate-900">
             계약 · 수금
           </h2>
         </HintTip>
@@ -413,9 +413,9 @@ export function FeesPanel({
       ) : (
         <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="fee-add">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="text-[0.88rem] font-medium text-slate-600">
+            <label className="text-[0.875rem] font-medium text-slate-600">
               종류
-              <select value={kind} onChange={(e) => setKind(e.target.value as FeeKind)} className="mt-1 block h-11 rounded-(--radius-control) border border-slate-300 px-2 text-[0.95rem]">
+              <select value={kind} onChange={(e) => setKind(e.target.value as FeeKind)} className="mt-1 block h-11 rounded-(--radius-control) border border-slate-300 px-2 text-[0.9375rem]">
                 {FEE_KIND_ORDER.map((k) => (
                   <option key={k} value={k}>
                     {FEE_KIND_LABEL[k]}
@@ -423,9 +423,9 @@ export function FeesPanel({
                 ))}
               </select>
             </label>
-            <label className="text-[0.88rem] font-medium text-slate-600">
+            <label className="text-[0.875rem] font-medium text-slate-600">
               관련 업무
-              <select value={serviceKey} onChange={(e) => setServiceKey(e.target.value as ServiceKey | '')} className="mt-1 block h-11 rounded-(--radius-control) border border-slate-300 px-2 text-[0.95rem]">
+              <select value={serviceKey} onChange={(e) => setServiceKey(e.target.value as ServiceKey | '')} className="mt-1 block h-11 rounded-(--radius-control) border border-slate-300 px-2 text-[0.9375rem]">
                 <option value="">전체 계약</option>
                 {SERVICES.map((s) => (
                   <option key={s.key} value={s.key}>
@@ -448,9 +448,9 @@ export function FeesPanel({
           <div className="flex flex-wrap items-end gap-2">
             <AmountField id="fee-new-agent" label="영업자 수수료" value={agentFee} onChange={setAgentFee} />
             {agentFee > 0 && (
-              <label className="text-[0.88rem] font-medium text-slate-600">
+              <label className="text-[0.875rem] font-medium text-slate-600">
                 영업자 이름
-                <input value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder="누구에게" className="mt-1 block h-11 w-28 rounded-(--radius-control) border border-slate-300 px-2 text-[0.95rem]" />
+                <input value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder="누구에게" className="mt-1 block h-11 w-28 rounded-(--radius-control) border border-slate-300 px-2 text-[0.9375rem]" />
               </label>
             )}
             {draftMargin !== null && <span className="t-sub self-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700 tabular-nums">이익률 {marginText(draftMargin)}</span>}

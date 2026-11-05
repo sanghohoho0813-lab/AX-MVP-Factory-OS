@@ -193,7 +193,7 @@ export function ClientMoneySheet({
                     aria-label={`${fee.label} 받기로 한 날`}
                     value={fee.dueDate}
                     onChange={(e) => onSave(withFee(record, fee.id, { dueDate: e.target.value }))}
-                    className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem]"
+                    className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.9375rem]"
                   />}
                   <input
                     aria-label={`${fee.label} 금액`}
@@ -229,7 +229,7 @@ export function ClientMoneySheet({
             aria-label="수금 종류"
             value={kind}
             onChange={(e) => setKind(e.target.value as FeeKind)}
-            className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.95rem]"
+            className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.9375rem]"
           >
             {FEE_KIND_ORDER.map((k) => (
               <option key={k} value={k}>
@@ -250,7 +250,7 @@ export function ClientMoneySheet({
             aria-label="받기로 한 날"
             value={due}
             onChange={(e) => setDue(e.target.value)}
-            className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem]"
+            className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.9375rem]"
           />
         </div>
         <Button variant="primary" size="sm" className="mt-2 w-full" disabled={adding || amount <= 0} onClick={() => void add()} data-testid="quick-fee-add">

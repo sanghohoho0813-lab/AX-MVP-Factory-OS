@@ -149,13 +149,13 @@ export function EventCard({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="tap inline-flex items-center gap-1 text-[0.9rem] font-medium text-slate-600 hover:text-slate-800"
+            className="tap inline-flex items-center gap-1 text-[0.875rem] font-medium text-slate-600 hover:text-slate-800"
           >
             {open ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
             고객이 제출한 내용 {fields.length}개
           </button>
           {open && (
-            <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-(--radius-control) bg-slate-50 p-3 text-[0.9rem] sm:grid-cols-2">
+            <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-(--radius-control) bg-slate-50 p-3 text-[0.875rem] sm:grid-cols-2">
               {fields.map(([k, v]) => (
                 <div key={k} className="flex gap-2">
                   <dt className="w-24 shrink-0 text-slate-500">{FIELD_LABEL[k] ?? '기타 항목'}</dt>
@@ -168,7 +168,7 @@ export function EventCard({
       )}
 
       {event.handlingNote && (
-        <p className="mt-2 rounded-(--radius-control) bg-slate-50 px-3 py-2 text-[0.88rem] text-slate-600">처리 메모 · {event.handlingNote}</p>
+        <p className="mt-2 rounded-(--radius-control) bg-slate-50 px-3 py-2 text-[0.875rem] text-slate-600">처리 메모 · {event.handlingNote}</p>
       )}
 
       <div className="mt-3 flex flex-wrap gap-1.5">

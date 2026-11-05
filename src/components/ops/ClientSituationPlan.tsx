@@ -386,17 +386,17 @@ function PlanPrintSheet({ plan, companyName, today }: { plan: SituationPlan; com
     <div className="print-document print-solo hidden bg-white text-slate-900 print:block" aria-hidden="true" data-testid="plan-print-sheet">
       <article className="flex flex-col gap-4 px-8 py-6">
         <header className="flex flex-col gap-1 border-b border-slate-300 pb-3">
-          <p className="text-[0.85rem] text-slate-500">상황별 설계서 · {today} 기준 · 규칙 계산 1차 추정</p>
+          <p className="text-[0.875rem] text-slate-500">상황별 설계서 · {today} 기준 · 규칙 계산 1차 추정</p>
           <h1 className="text-[1.5rem] font-bold">
             {companyName} — {plan.title}
           </h1>
         </header>
         {plan.totalText && (
           <section className="avoid-break rounded border border-slate-300 px-4 py-3">
-            <p className="text-[0.95rem]">{plan.totalLabel}(1차 추정)</p>
+            <p className="text-[0.9375rem]">{plan.totalLabel}(1차 추정)</p>
             <p className="text-[1.6rem] font-extrabold">{plan.totalText}</p>
             {plan.keepWon > plan.firstWon && (
-              <p className="text-[0.95rem]">
+              <p className="text-[0.9375rem]">
                 {plan.keepLabel} {plan.keepYears}년 합계 약 {manwonText(plan.keepWon)}
               </p>
             )}
@@ -404,10 +404,10 @@ function PlanPrintSheet({ plan, companyName, today }: { plan: SituationPlan; com
         )}
         {plan.blocks.map((b) => (
           <section key={b.key} className="avoid-break flex flex-col gap-1">
-            <h2 className="text-[1.1rem] font-bold">
+            <h2 className="text-[1.2rem] font-bold">
               {b.label} — {b.headline}
             </h2>
-            <ul className="flex flex-col gap-0.5 pl-4 text-[0.95rem]">
+            <ul className="flex flex-col gap-0.5 pl-4 text-[0.9375rem]">
               {b.lines.map((l) => (
                 <li key={l} className="list-disc">
                   {l}
@@ -417,8 +417,8 @@ function PlanPrintSheet({ plan, companyName, today }: { plan: SituationPlan; com
           </section>
         ))}
         <section className="avoid-break flex flex-col gap-1">
-          <h2 className="text-[1.1rem] font-bold">이렇게 진행해요</h2>
-          <ol className="flex flex-col gap-0.5 pl-5 text-[0.95rem]">
+          <h2 className="text-[1.2rem] font-bold">이렇게 진행해요</h2>
+          <ol className="flex flex-col gap-0.5 pl-5 text-[0.9375rem]">
             {plan.actions.map((a) => (
               <li key={a.id} className="list-decimal">
                 [{a.when}] {a.text}

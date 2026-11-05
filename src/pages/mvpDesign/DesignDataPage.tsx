@@ -14,7 +14,7 @@ export function DesignDataPage() {
         const entities = [...design.entities].sort((a, b) => a.order - b.order)
         return (
           <>
-            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.92rem]">
+            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9375rem]">
               <Boxes aria-hidden="true" className="size-4 text-slate-400" />
               <span className="text-slate-600">데이터 {entities.length}종</span>
               {entities.some((e) => e.hasSensitiveData) && (
@@ -28,9 +28,9 @@ export function DesignDataPage() {
             ) : (
               entities.map((entity) => (
                 <Panel key={entity.id} title={`${entity.label} · ${entity.name}`}>
-                  <p className="mb-3 text-[0.92rem] break-keep text-slate-500">{entity.description}</p>
+                  <p className="mb-3 text-[0.9375rem] break-keep text-slate-500">{entity.description}</p>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[520px] text-left text-[0.92rem]">
+                    <table className="w-full min-w-[520px] text-left text-[0.9375rem]">
                       <thead>
                         <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                           <th className="py-2 pr-3 font-medium">필드</th>

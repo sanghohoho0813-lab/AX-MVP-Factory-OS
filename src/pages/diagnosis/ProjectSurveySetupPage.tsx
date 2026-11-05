@@ -331,7 +331,7 @@ export function ProjectSurveySetupPage() {
       <div className="flex flex-col gap-5">
         {/* §3 진단 대상 선택 */}
         <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">누구의 업무 경험을 확인할까요?</h2>
+          <h2 className="text-[1.2rem] font-bold break-keep text-slate-900">누구의 업무 경험을 확인할까요?</h2>
           <p className="mt-1.5 text-[1rem] break-keep text-slate-600">
             역할마다 보는 관점이 다릅니다. 지금 준비할 대상을 고르면 그 역할에 맞는 질문이 자동으로 구성됩니다. 최소 한 명은 있어야 진단을 시작할 수 있습니다.
           </p>
@@ -357,12 +357,12 @@ export function ProjectSurveySetupPage() {
                     active ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-200' : 'border-slate-200 bg-white hover:border-brand-300'
                   }`}
                 >
-                  <span className="flex items-center gap-2 text-[1.1rem] font-bold break-keep text-slate-900">
+                  <span className="flex items-center gap-2 text-[1.2rem] font-bold break-keep text-slate-900">
                     <RoleIcon aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
                     {meta.label}
                   </span>
-                  <p className="text-[0.92rem] break-keep text-slate-500">{ROLE_PERSPECTIVE[role]}</p>
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.88rem] text-slate-500">
+                  <p className="text-[0.9375rem] break-keep text-slate-500">{ROLE_PERSPECTIVE[role]}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.875rem] text-slate-500">
                     <span className="break-keep">예상 질문 {qText}</span>
                     <span className="inline-flex items-center gap-1"><Clock aria-hidden="true" className="size-3.5" />약 {minutes}분</span>
                   </div>
@@ -384,15 +384,15 @@ export function ProjectSurveySetupPage() {
         {/* §4 질문 구성 — 그룹 카드 */}
         <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">{roleLabel}에게 물어볼 질문</h2>
-            <span className="text-[0.9rem] text-slate-500">전체 {summary.totalQuestions}개 · 약 {summary.estimatedMinutes}분</span>
+            <h2 className="text-[1.2rem] font-bold break-keep text-slate-900">{roleLabel}에게 물어볼 질문</h2>
+            <span className="text-[0.875rem] text-slate-500">전체 {summary.totalQuestions}개 · 약 {summary.estimatedMinutes}분</span>
           </div>
           <p className="mt-1.5 text-[1rem] break-keep text-slate-600">
             주제별로 묶어 두었습니다. 그룹을 펼치면 실제 질문을 볼 수 있고, 필요 없는 질문은 제외할 수 있습니다.
           </p>
 
           {composed.length === 0 ? (
-            <p className="mt-4 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.95rem] text-slate-500">
+            <p className="mt-4 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.9375rem] text-slate-500">
               아직 질문이 없습니다. 아래 전문가 설정에서 템플릿이나 모듈을 선택하면 질문이 구성됩니다.
             </p>
           ) : (
@@ -409,8 +409,8 @@ export function ProjectSurveySetupPage() {
                       className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
                     >
                       <span className="min-w-0">
-                        <span className="block text-[1.05rem] font-semibold break-keep text-slate-800">{section.title}</span>
-                        <span className="block text-[0.88rem] text-slate-500">질문 {activeCount}개</span>
+                        <span className="block text-[1rem] font-semibold break-keep text-slate-800">{section.title}</span>
+                        <span className="block text-[0.875rem] text-slate-500">질문 {activeCount}개</span>
                       </span>
                       <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
                     </button>
@@ -422,7 +422,7 @@ export function ProjectSurveySetupPage() {
                           return (
                             <li key={p.placementId} className={`flex items-start gap-2.5 px-4 py-3 ${excluded ? 'opacity-50' : ''}`}>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[0.98rem] break-keep text-slate-700">{q?.text}</p>
+                                <p className="text-[1rem] break-keep text-slate-700">{q?.text}</p>
                                 {expertOpen && (
                                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                                     <span className="font-mono text-[0.875rem] text-slate-400">{q?.code}</span>
@@ -476,16 +476,16 @@ export function ProjectSurveySetupPage() {
             {expertOpen && (
               <div className="flex flex-col gap-5 border-t border-slate-100 px-4 py-5">
                 {quality.verdict === 'error' && (
-                  <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] text-danger-700">
+                  <p className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.875rem] text-danger-700">
                     확인이 필요한 항목이 있어 전문가 설정을 펼쳤습니다. 아래에서 템플릿·모듈 구성을 조정해 주세요.
                   </p>
                 )}
                 {/* 기본 템플릿 */}
                 <div>
-                  <p className="mb-2 text-[0.95rem] font-semibold text-slate-700">기본 템플릿</p>
+                  <p className="mb-2 text-[0.9375rem] font-semibold text-slate-700">기본 템플릿</p>
                   <div className="flex flex-col gap-2">
                     {publishedTemplates.length === 0 && draftTemplates.length === 0 && (
-                      <p className="text-[0.9rem] text-slate-400">사용할 수 있는 템플릿이 없습니다.</p>
+                      <p className="text-[0.875rem] text-slate-400">사용할 수 있는 템플릿이 없습니다.</p>
                     )}
                     {publishedTemplates.map((t) => {
                       const active = t.id === templateId
@@ -494,7 +494,7 @@ export function ProjectSurveySetupPage() {
                         <label key={t.id} className={`flex cursor-pointer items-center gap-3 rounded-(--radius-control) border px-3.5 py-2.5 ${active ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                           <input type="radio" name="template" checked={active} onChange={() => setTemplateId(t.id)} className="size-4 accent-brand-600" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[0.95rem] font-medium text-slate-800">{t.name}</p>
+                            <p className="truncate text-[0.9375rem] font-medium text-slate-800">{t.name}</p>
                             <p className="text-[0.875rem] text-slate-400">문항 {t.sections.reduce((n, s) => n + s.placements.length, 0)}개 · 약 {t.estimatedMinutes}분</p>
                           </div>
                           <RespondentRoleBadge role={t.respondentRole} />
@@ -508,7 +508,7 @@ export function ProjectSurveySetupPage() {
                         <label key={t.id} className={`flex cursor-pointer items-center gap-3 rounded-(--radius-control) border px-3.5 py-2.5 ${active ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                           <input type="radio" name="template" checked={active} onChange={() => setTemplateId(t.id)} className="size-4 accent-brand-600" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[0.95rem] font-medium text-slate-800">{t.name}</p>
+                            <p className="truncate text-[0.9375rem] font-medium text-slate-800">{t.name}</p>
                             <p className="text-[0.875rem] text-warning-600">초안 템플릿입니다. 게시본을 우선 사용하는 것을 권장합니다.</p>
                           </div>
                           <TemplateStatusBadge status={t.status} />
@@ -519,10 +519,10 @@ export function ProjectSurveySetupPage() {
                 </div>
                 {/* 추천 모듈 */}
                 <div>
-                  <p className="mb-2 text-[0.95rem] font-semibold text-slate-700">추천 모듈</p>
+                  <p className="mb-2 text-[0.9375rem] font-semibold text-slate-700">추천 모듈</p>
                   <div className="flex flex-col gap-2">
                     {recommendations.length === 0 ? (
-                      <p className="text-[0.9rem] text-slate-400">이 프로젝트에 추천되는 모듈이 없습니다.</p>
+                      <p className="text-[0.875rem] text-slate-400">이 프로젝트에 추천되는 모듈이 없습니다.</p>
                     ) : (
                       recommendations.map(({ module, reason }) => {
                         const active = selectedModuleIds.includes(module.id)
@@ -530,7 +530,7 @@ export function ProjectSurveySetupPage() {
                           <label key={module.id} className={`flex cursor-pointer items-start gap-3 rounded-(--radius-control) border px-3.5 py-2.5 ${active ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                             <input type="checkbox" checked={active} onChange={() => toggleModule(module.id)} className="mt-0.5 size-4 accent-brand-600" />
                             <div className="min-w-0 flex-1">
-                              <p className="text-[0.95rem] font-medium text-slate-800">{module.name}</p>
+                              <p className="text-[0.9375rem] font-medium text-slate-800">{module.name}</p>
                               <p className="text-[0.875rem] text-slate-500">질문 {module.questionIds.length}개 · {reason}</p>
                             </div>
                           </label>
@@ -544,10 +544,10 @@ export function ProjectSurveySetupPage() {
                 </div>
                 {/* 맞춤 질문 추가 */}
                 <div>
-                  <p className="mb-2 text-[0.95rem] font-semibold text-slate-700">맞춤 질문 추가</p>
+                  <p className="mb-2 text-[0.9375rem] font-semibold text-slate-700">맞춤 질문 추가</p>
                   <div className="relative">
                     <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                    <input type="search" aria-label="맞춤 질문 검색" value={customQuery} onChange={(e) => setCustomQuery(e.target.value)} placeholder="추가할 질문을 코드·문구로 검색" className="h-10 w-full rounded-(--radius-control) border border-slate-300 pr-3 pl-9 text-[0.95rem] focus:border-brand-500" />
+                    <input type="search" aria-label="맞춤 질문 검색" value={customQuery} onChange={(e) => setCustomQuery(e.target.value)} placeholder="추가할 질문을 코드·문구로 검색" className="h-10 w-full rounded-(--radius-control) border border-slate-300 pr-3 pl-9 text-[0.9375rem] focus:border-brand-500" />
                   </div>
                   {customCandidates.length > 0 && (
                     <ul className="mt-1.5 divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
@@ -555,7 +555,7 @@ export function ProjectSurveySetupPage() {
                         <li key={q.id} className="flex items-center gap-2 px-3 py-2">
                           <div className="min-w-0 flex-1">
                             <span className="font-mono text-[0.875rem] text-slate-400">{q.code}</span>
-                            <p className="truncate text-[0.9rem] text-slate-700">{q.text}</p>
+                            <p className="truncate text-[0.875rem] text-slate-700">{q.text}</p>
                           </div>
                           <button type="button" onClick={() => addCustom(q.id)} className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50">
                             <Plus aria-hidden="true" className="size-3" />추가
@@ -584,7 +584,7 @@ export function ProjectSurveySetupPage() {
 
         {/* §5 발송 전 확인 */}
         <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 className="text-[1.25rem] font-bold break-keep text-slate-900">설문을 만들기 전에 마지막으로 확인하세요</h2>
+          <h2 className="text-[1.2rem] font-bold break-keep text-slate-900">설문을 만들기 전에 마지막으로 확인하세요</h2>
           <p className="mt-1.5 text-[1rem] break-keep text-slate-600">
             {quality.verdict === 'error'
               ? '아직 확인이 필요한 항목이 있습니다. 위 전문가 설정에서 질문 구성을 조정한 뒤 준비를 마칠 수 있습니다.'
@@ -592,7 +592,7 @@ export function ProjectSurveySetupPage() {
           </p>
 
           <div className="mt-4 rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-            <div className="mb-2 flex items-center gap-2 text-[0.95rem] font-semibold text-slate-700">
+            <div className="mb-2 flex items-center gap-2 text-[0.9375rem] font-semibold text-slate-700">
               {quality.verdict === 'error' ? (
                 <TriangleAlert aria-hidden="true" className="size-4.5 text-warning-500" />
               ) : (
@@ -603,7 +603,7 @@ export function ProjectSurveySetupPage() {
             <SurveyQualityPanel checks={quality.checks} />
           </div>
 
-          <p className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-[0.9rem] break-keep text-slate-500">
+          <p className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-[0.875rem] break-keep text-slate-500">
             로컬 모드는 이 브라우저에만 저장됩니다. 준비한 설문과 응답은 같은 브라우저에서만 열 수 있으며, 외부 공유는 클라우드 연결 후 제공됩니다.
           </p>
 
@@ -618,13 +618,13 @@ export function ProjectSurveySetupPage() {
 
           {/* 고급 링크 관리 (접힘) */}
           <div className="mt-4 rounded-(--radius-panel) border border-slate-200 bg-white">
-            <button type="button" onClick={() => setShowAdvancedLink((v) => !v)} aria-expanded={showAdvancedLink} className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-[0.95rem] font-semibold text-slate-600">
+            <button type="button" onClick={() => setShowAdvancedLink((v) => !v)} aria-expanded={showAdvancedLink} className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-[0.9375rem] font-semibold text-slate-600">
               고급 링크 관리
               <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${showAdvancedLink ? 'rotate-180' : ''}`} />
             </button>
             {showAdvancedLink && (
               <div className="border-t border-slate-100 px-4 py-4">
-                <p className="text-[0.9rem] break-keep text-slate-500">
+                <p className="text-[0.875rem] break-keep text-slate-500">
                   준비를 마치면 <span className="font-medium text-slate-700">역할별 응답관리</span> 화면에서 설문 링크를 만들고 응답 현황을 관리할 수 있습니다. 링크 발급·만료·토큰 관리는 그곳에서 처리합니다.
                 </p>
                 <Button variant="secondary" className="mt-3" onClick={() => navigate(`/diagnosis/projects/${projectId}/surveys`)}>

@@ -320,7 +320,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 다음 달
                 <ChevronRight aria-hidden="true" className="size-4" />
               </button>
-              <span className="w-full text-[0.9rem] text-slate-500 sm:ml-1 sm:w-auto" data-testid="calendar-month-summary">
+              <span className="w-full text-[0.875rem] text-slate-500 sm:ml-1 sm:w-auto" data-testid="calendar-month-summary">
                 <span className="whitespace-nowrap">이 달 남은 일정 {monthOpen.length}건</span> · <span className="whitespace-nowrap">영업일 {workdays.workdays}일</span>
                 {workdays.weekdayOffs > 0 && <span className="whitespace-nowrap text-danger-700"> · 평일 쉬는 날 {workdays.weekdayOffs}일</span>}
               </span>
@@ -355,7 +355,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </div>
 
           {loadError && (
-            <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
+            <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700">
               일정을 불러오지 못했습니다 — {loadError}
               <button type="button" onClick={() => void load()} className="tap font-semibold underline">
                 다시 불러오기
@@ -363,7 +363,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             </p>
           )}
           {loading ? (
-            <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
+            <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.9375rem] text-slate-500">
               불러오는 중…
             </p>
           ) : (
@@ -377,7 +377,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                   {WEEKDAYS.map((w, i) => (
                     <div
                       key={w}
-                      className={`py-2 text-center text-[0.88rem] font-semibold ${
+                      className={`py-2 text-center text-[0.875rem] font-semibold ${
                         i === 0 ? 'text-weekday-sun' : i === 6 ? 'text-weekday-sat' : 'text-slate-600'
                       }`}
                     >
@@ -530,10 +530,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:rounded-(--radius-panel) xl:border xl:border-slate-200 xl:bg-slate-50/60 xl:p-4" data-testid="picked-panel">
                 <div className="flex flex-col gap-2">
                   <HintTip tip={hintFor('그날 할 일')} label="고른 날 할 일">
-                  <h2 className="text-[1.15rem] font-bold text-slate-900">
+                  <h2 className="text-[1.2rem] font-bold text-slate-900">
                     {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
                     {picked && pickedTodos.length > 0 && (
-                      <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedTodos.length}건</span>
+                      <span className="ml-2 text-[0.9375rem] font-medium text-slate-500">{pickedTodos.length}건</span>
                     )}
                   </h2>
                   </HintTip>
@@ -633,13 +633,13 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
 
                 <div className="flex flex-col gap-2">
                   <HintTip tip={hintFor('업체 일정')} label="업체 일정">
-                    <h2 className="text-[1.15rem] font-bold text-slate-900">
+                    <h2 className="text-[1.2rem] font-bold text-slate-900">
                       업체 일정
-                      {picked && <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
+                      {picked && <span className="ml-2 text-[0.9375rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
                     </h2>
                   </HintTip>
                   {pickedEvents.length === 0 ? (
-                    <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
+                    <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.9375rem] text-slate-500">
                       이 날에는 업체 쪽 마감이 없습니다.
                     </p>
                   ) : (
@@ -731,7 +731,7 @@ export function EventRow({
         <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${cls.dot}`} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-[1.02rem] font-bold break-keep text-slate-900">{event.clientName}</span>
+            <span className="text-[1rem] font-bold break-keep text-slate-900">{event.clientName}</span>
             <span className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-medium ${cls.chip}`}>
               {SCHEDULE_KIND_LABEL[event.kind]}
             </span>
@@ -744,7 +744,7 @@ export function EventRow({
           <span className={`mt-0.5 block text-[1rem] break-keep ${event.done ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
             {event.title}
           </span>
-          {event.detail && <span className="block text-[0.9rem] break-keep text-slate-500">{event.detail}</span>}
+          {event.detail && <span className="block text-[0.875rem] break-keep text-slate-500">{event.detail}</span>}
         </span>
         {!event.done && event.daysLeft !== null && (
           <span

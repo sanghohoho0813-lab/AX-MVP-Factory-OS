@@ -59,7 +59,7 @@ import { josa } from '../../lib/josa'
 const CATALOG_MODULE = 'sales-os'
 const CATALOG_BUCKET = 'catalog'
 
-const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
+const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 type DocKey = 'visit' | 'client' | 'internal' | 'scope' | 'quote' | 'kakao' | 'docs'
 const ALL_DOCS: { key: DocKey; label: string }[] = [
@@ -112,7 +112,7 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
       </div>
       <div className="relative w-full sm:max-w-md">
         <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="상품 이름 · 설명으로 찾기" aria-label="상품 검색" className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.95rem] focus:border-brand-500 focus:outline-none" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="상품 이름 · 설명으로 찾기" aria-label="상품 검색" className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.9375rem] focus:border-brand-500 focus:outline-none" />
       </div>
       <ul className="grid gap-2 lg:grid-cols-2">
         {list.map((p) => {
@@ -124,7 +124,7 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
                 <span className="t-body min-w-0 font-bold text-slate-900">{p.name}</span>
                 {editing === p.id ? (
                   <span className="flex shrink-0 items-center gap-1">
-                    <input value={draft} inputMode="numeric" aria-label={`${p.name} 가격(만원)`} onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))} className="w-20 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.9rem] tabular-nums focus:border-brand-500 focus:outline-none" />
+                    <input value={draft} inputMode="numeric" aria-label={`${p.name} 가격(만원)`} onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))} className="w-20 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.875rem] tabular-nums focus:border-brand-500 focus:outline-none" />
                     <span className="t-meta text-slate-500">만원</span>
                     <Button size="sm" variant="primary" onClick={() => { onSavePrice(p.id, draft === '' ? null : Number(draft)); setEditing(null) }}>저장</Button>
                   </span>
@@ -178,7 +178,7 @@ function MonthlySimulation({ months, rate, net, current, onPick }: { months: num
         시뮬레이션 <span className="t-meta font-medium text-slate-500">· {months}개월 · 환급률 {rate}%{net ? ` · 순이익 ${net.toLocaleString('ko-KR')}만원 기준` : ' · 순이익을 넣으면 적정성도 나옵니다'}</span>
       </p>
       <div className="overflow-x-auto rounded-(--radius-control) border border-slate-200">
-        <table className="w-full min-w-[30rem] text-left text-[0.9rem]">
+        <table className="w-full min-w-[30rem] text-left text-[0.875rem]">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
               <th className="px-3 py-2 font-semibold">월납</th>
@@ -695,14 +695,14 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
 
       <div role="group" aria-label="상품·제안 보기" data-testid="proposal-view" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
         {([['client', '고객 제안'], ['catalog', `상품표 ${catalog.length}`]] as const).map(([k, label]) => (
-          <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.9rem] font-semibold sm:px-4 ${view === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+          <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.875rem] font-semibold sm:px-4 ${view === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
             {label}
           </button>
         ))}
       </div>
 
       {error && (
-        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.95rem] text-danger-700">
+        <p role="alert" className="rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-[0.9375rem] text-danger-700">
           {error}
         </p>
       )}

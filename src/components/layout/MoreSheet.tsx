@@ -276,7 +276,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                   <DeviceSwitch stacked />
                 </div>
                 <div className="flex min-h-12 items-center gap-2.5 rounded-xl bg-white px-3 py-2" data-testid="more-account">
-                  <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-navy-900 text-[0.9rem] font-bold text-white">
+                  <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-navy-900 text-[0.875rem] font-bold text-white">
                     {me.initial}
                   </span>
                   <span className="min-w-0 flex-1">

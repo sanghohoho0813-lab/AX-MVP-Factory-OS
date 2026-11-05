@@ -339,7 +339,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
                 placeholder="업체명 · 사업자번호 · 담당자"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none"
+                className="w-full rounded-(--radius-control) border border-slate-300 bg-white py-2 pr-3 pl-9 text-[0.9375rem] text-slate-900 focus:border-brand-500 focus:outline-none"
               />
             </label>
             {loading ? (
