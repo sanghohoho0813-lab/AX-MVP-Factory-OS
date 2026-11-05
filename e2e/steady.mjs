@@ -327,7 +327,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.evaluate(seedScript())
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  const moneyBtn = page.locator('main button:visible', { hasText: /못 받은|미수/ }).first()
+  // U3(D-543) 위 숫자 줄의 '못 받은 내 돈' 칩(누르면 거르기)이 아니라 업체 카드 안의 빠른 수금 단추
+  const moneyBtn = page.locator('main [data-testid="client-card"] button:visible', { hasText: /못 받은|미수/ }).first()
   if ((await moneyBtn.count()) === 0) check('D-210 빠른 수금: 못 받은 돈 단추가 있는 업체', false)
   else {
     await moneyBtn.click()

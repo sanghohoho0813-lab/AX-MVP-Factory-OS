@@ -714,7 +714,9 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   check(`마케팅 · 브랜딩(${tag}): 도입 예정 안내`, (await page.getByTestId('marketing-planned').locator('li').count()) === 5 && (await page.getByTestId('marketing-planned').innerText()).includes('릴스 · 쇼츠 (세로 영상)') && (await page.getByTestId('marketing-planned').innerText()).includes('유튜브 (가로 영상)'))
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   // D-239: 예전 'AI 비서 · 준비 중' 자리 → 실제 AI 도우미 띠(누르기 전에는 아무것도 보내지 않음)
-  check(`고객 관리(${tag}): AI 도우미 띠 — 예전 준비 중 단추 없음`, (await page.getByTestId('ai-assist-bar').count()) === 1 && (await page.getByTestId('ai-client-assistant').count()) === 0)
+  // U3(D-543) 띠 → 머리 [AI 도우미] 단추 하나(질문은 판 안)
+  await page.getByTestId('ai-assist-open').first().waitFor({ timeout: 8000 }).catch(() => {})
+  check(`고객 관리(${tag}): AI 도우미 머리 단추 — 예전 준비 중 단추 없음`, (await page.getByTestId('ai-assist-open').count()) === 1 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('ai-client-assistant').count()) === 0)
   check(`D-169(${tag}): 가로 넘침 0 · JS 오류 없음`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
   if (tag === 'PC') {
     await page.keyboard.press('Escape')

@@ -164,7 +164,8 @@ for (const width of [360, 390]) {
     await go(page, p)
     const o = await over(page)
     const crumbRight = await page.getByTestId('crumbs').evaluate((n) => Math.max(...[...n.querySelectorAll('li')].map((li) => li.getBoundingClientRect().right))).catch(() => 0)
-    const btnH = await page.locator('[data-testid="step-guide"] a, [data-testid="step-guide"] button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    // U4(D-544) 접힌 한 줄일 때 휴대폰은 이전 · 다음 단추를 숨긴다(높이 0) — 보이는 단추만 잰다
+    const btnH = await page.locator('[data-testid="step-guide"] a, [data-testid="step-guide"] button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)).filter((h) => h > 0))
     if (o > 1 || crumbRight > width + 1 || btnH.some((h) => h < 44)) bad.push({ p, o, crumbRight, btnH })
   }
   check(`M${width} 경로 줄 · 단계 안내 — 가로 넘침 0 · 경로 줄 화면 안 · 단계 단추 44px 이상`, bad.length === 0, bad)

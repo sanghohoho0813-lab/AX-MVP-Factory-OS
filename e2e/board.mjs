@@ -117,7 +117,8 @@ const back = await page.evaluate(() => {
 check('해당 없음에서 다시 바꿀 수 있다', back === 'in_progress', String(back))
 
 // 수금 시트
-await page.getByRole('button', { name: /^못 받은 내 돈/ }).first().click()
+// U3(D-543) 위 숫자 줄에도 '못 받은 내 돈' 칩(누르면 거르기)이 생겼다 — 수금 시트는 업체 카드 안의 단추
+await page.getByTestId('client-card').first().getByRole('button', { name: /^못 받은 내 돈/ }).first().click()
 await page.waitForTimeout(400)
 check('수금 시트가 열린다', await page.getByRole('dialog').isVisible())
 check('수금 항목 넣기 칸이 있다', await page.getByRole('button', { name: '넣기' }).isVisible())
@@ -233,7 +234,9 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   check('내 몫: 목록 카드가 청구액이 아니라 내 몫을 보여 준다', hub.includes('못 받은 내 돈 4,000,000원'), hub.slice(0, 400))
   check('내 몫: 목록 카드에 청구액 550만이 그대로 찍히지 않는다', !hub.includes('5,500,000원'))
   check('내 몫: 고객 운영 위 칸 합계도 내 몫(750만)', hub.includes('750만원'), hub.slice(0, 400))
-  check('내 몫: 청구 기준(900만)은 힌트로 남긴다', hubAll.includes('청구 기준 900만원'), hubAll.slice(0, 300))
+  // U3(D-543) 숫자 칸 → 한 줄 칩 — 힌트는 칩에 마우스를 올리면(title)
+  const unpaidTip = (await page.getByTestId('clients-kpi-unpaid').getAttribute('title')) ?? ''
+  check('내 몫: 청구 기준(900만)은 힌트로 남긴다', unpaidTip.includes('청구 기준 900만원') || hubAll.includes('청구 기준 900만원'), unpaidTip)
 
   // 검색 — 회사명 말고 직접 만든 칸 · 전화 뒷자리 · 법인번호
   const box = page.getByLabel('업체 검색')

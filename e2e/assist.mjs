@@ -494,7 +494,9 @@ for (const w of [360, 390]) {
     await mp.goto(BASE + p, { waitUntil: 'networkidle' })
     await mp.waitForTimeout(500)
     const over = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-    check(`E ${w} ${p}: 띠 있음 · 넘침 0`, (await mp.getByTestId('ai-assist-bar').count()) === 1 && over <= 0, over)
+    // U3(D-543) 고객 관리는 띠 대신 머리 [AI 도우미] 단추
+    const entry = p === '/ops/clients' ? (await mp.getByTestId('ai-assist-open').count()) === 1 : (await mp.getByTestId('ai-assist-bar').count()) === 1
+    check(`E ${w} ${p}: ${p === '/ops/clients' ? '머리 [AI 도우미] 단추' : '띠'} 있음 · 넘침 0`, entry && over <= 0, over)
   }
   await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
   await mp.waitForTimeout(400)

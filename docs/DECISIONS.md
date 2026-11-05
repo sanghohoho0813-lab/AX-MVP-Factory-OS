@@ -8007,3 +8007,7 @@ D-540 보고의 두 확인에 대한 답: ① (다) 기본 순서에서 할 일 
   [목록 접기] → 상세를 넓게(이 기기에 기억) · [업체 목록 펴기] 로 다시.
 - 휴대폰 · 좁은 PC(1280 화면 · 메뉴를 넓힌 PC)는 예전 그대로(목록 없음). 업체를 읽는 길은 고객 관리와 같은 `listClients`(작업공간 · RLS 그대로 — 팀장은 자기 업체만).
 - 상세 화면 안 배치는 손대지 않았다 — 1440 에서 상세 칸이 약 800px 로 좁아지지만 탭 7개 모두 넘침 0(잰 것).
+- 시험(D-543~545 함께): uxhome 60/0(U3-1~3 · U4-1~2 · U7-0~4 새로) · firstscreen 87/0(한도 내림) · assist 92/0 · detail 523/0 · docreq 34/0 · flow 173/0 · wayfinding 28/0 · board 198/0 ·
+  steady 76/0 · many · real · phone · mobile · easy · hover · taps · talk · diag · keepui · todos · nextstep · connect · contract · facts · scenarios · folder · files · squeeze · pilot 297/0.
+  시험이 머리 단추 · 숫자 칩 자리를 찾던 곳은 새 자리로 고침(board · steady 의 '못 받은 내 돈' 은 업체 카드 안 단추로 · docreq · detail 의 문구는 [더보기] 안으로).
+  qa:sales 는 이 일과 상관없이 지금 main 에서도 같은 줄(미팅 준비 › '미팅에서 알게 된 회사 사정' 펼치기)에서 멈춘다 — 그 한 덩어리를 건너뛰고 돌리면 199/0(고객 관리 AI 머리 단추 확인 포함). 따로 고칠 일로 올려 둠.
