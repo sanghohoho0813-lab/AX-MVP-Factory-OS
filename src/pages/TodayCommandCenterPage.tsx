@@ -23,7 +23,7 @@ import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
 import { TodayPicks, TodayPicksPlaceholder } from '../components/ops/TodayPicks'
 import { TodayKpis } from '../components/ops/TodayKpis'
-import { AppLauncher } from '../components/layout/AppLauncher'
+import { AppLauncher, useLauncherItems } from '../components/layout/AppLauncher'
 import { hasWeekData, subscribeWeekRunLoaded } from '../services/marketing/weekRunFlag'
 import { useAllDecisions } from '../components/ops/useAllDecisions'
 import { useEntitlements } from '../lib/entitlementsStore'
@@ -197,20 +197,31 @@ function AllLink({ to }: { to: string }) {
   )
 }
 
-/** D-282 바로가기 — 목차 머리 + 앱 런처(PC 흰 카드 · 휴대폰 큰 아이콘) */
+/**
+ * D-282 바로가기 — 앱 런처(PC 흰 카드 · 휴대폰 큰 아이콘).
+ * U2(2026-11-05) 처음엔 접어 둔다 — 접힌 줄에도 이름 링크가 있어 한 번 눌러 바로 간다. 펼친 것은 기억(today.launcher).
+ */
 function TodayLauncher({ phone }: { phone: boolean }) {
+  const items = useLauncherItems()
   return (
-    <section aria-labelledby="today-launcher-title" className="flex flex-col gap-2" data-testid="today-launcher">
-      <HelpHeading
-        id="today-launcher-title"
-        label="바로가기"
-        help="자주 여는 기능으로 바로 가요. 왼쪽 메뉴와 같은 기능이고, 계정에 열린 것만 보여요. 나머지는 [전체 도구] 에 있어요."
-        className={`${phone ? 't-card' : 't-section'} flex items-center gap-2 break-keep text-slate-900`}
-      >
-        바로가기
-      </HelpHeading>
+    <Fold
+      id="today.launcher"
+      title="바로가기"
+      hint="자주 여는 기능으로 바로 가요. 왼쪽 메뉴와 같은 기능이고, 계정에 열린 것만 보여요. 나머지는 [전체 도구] 에 있어요."
+      headingId="today-launcher-title"
+      testId="today-launcher"
+      summary={
+        <span className="flex gap-x-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:whitespace-normal [&::-webkit-scrollbar]:hidden" data-testid="app-mini-row">
+          {items.map((it) => (
+            <Link key={it.key} to={it.path} className="tap inline-flex shrink-0 items-center rounded-full px-2.5 font-medium text-brand-700 hover:bg-slate-50 hover:underline" data-testid="app-mini" data-key={it.key}>
+              {it.short}
+            </Link>
+          ))}
+        </span>
+      }
+    >
       <AppLauncher variant={phone ? 'icon' : 'card'} />
-    </section>
+    </Fold>
   )
 }
 
@@ -687,37 +698,36 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       <section aria-label="오늘" data-tour="home-today" className="flex flex-col gap-3">
         {/* UXS-1 웰컴 띠 — 화면 공통 머리 바탕(HeroFrame) + 대표 그림 1번. 글 · 단추 · 셈은 그대로 */}
         <HeroFrame art="home" testId="today-hero">
-        <div className="flex flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 lg:min-h-[9.5rem] lg:justify-center">
-          <div className="min-w-0 flex-1 lg:max-w-[62%]">
-            <p className="t-sub font-medium text-slate-500">
-              <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
-            </p>
-            <h1 className="t-page mt-0.5 flex flex-wrap items-baseline gap-x-3 break-keep text-slate-900">
-              {/* D-482 읽는 동안은 짧게(한 줄) — 긴 '불러오는 중' 문구가 휴대폰에서 두 줄이었다가 '오늘 할 일 n건' 한 줄로 줄며 아래가 통째로 밀렸다 */}
-              {loading
-                ? '오늘 할 일'
-                : todoCount > 0
-                  ? `오늘 할 일 ${todoCount}건`
-                  : '오늘 할 일을 적어 보세요'}
-              <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
-                모두 보기
-              </Link>
-            </h1>
-            {/* D-360 이번 주 1주일치 프로젝트가 있으면 오늘 올릴 것 한 줄(누르면 그 탭) */}
-            {weekData && (
+        {/* U2(2026-11-05) 인사 띠 한 줄 — 제목(오늘 할 일 n건) · 날짜 · 인사 · [오늘 정리하기] 를 한 줄에. 휴대폰은 위쪽 띠가 날짜를 말하니 제목만 */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 sm:px-6" data-testid="today-hero-line">
+          <h1 className="t-page flex min-w-0 flex-wrap items-baseline gap-x-3 break-keep text-slate-900">
+            {/* D-482 읽는 동안은 짧게(한 줄) — 긴 '불러오는 중' 문구가 휴대폰에서 두 줄이었다가 '오늘 할 일 n건' 한 줄로 줄며 아래가 통째로 밀렸다 */}
+            {loading
+              ? '오늘 할 일'
+              : todoCount > 0
+                ? `오늘 할 일 ${todoCount}건`
+                : '오늘 할 일을 적어 보세요'}
+            <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
+              모두 보기
+            </Link>
+          </h1>
+          <p className="t-sub hidden font-medium text-slate-500 sm:block">
+            <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
+          </p>
+          <span className="ml-auto hidden shrink-0 sm:inline-flex">
+            {/* NX-1 하루를 마칠 때 누르는 단추 — 아침 첫 화면의 강조는 '오늘 먼저 제안할 것' 에 양보(단추 · 하는 일은 그대로) */}
+            <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
+              <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
+            </Button>
+          </span>
+          {/* D-360 이번 주 1주일치 프로젝트가 있으면 오늘 올릴 것 한 줄(누르면 그 탭) */}
+          {weekData && (
+            <div className="basis-full">
               <Suspense fallback={null}>
                 <TodayPosts />
               </Suspense>
-            )}
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2 self-start">
-            <span className="hidden sm:inline-flex">
-              {/* NX-1 하루를 마칠 때 누르는 단추 — 아침 첫 화면의 강조는 '오늘 먼저 제안할 것' 에 양보(단추 · 하는 일은 그대로) */}
-              <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
-                <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
-              </Button>
-            </span>
-          </div>
+            </div>
+          )}
         </div>
         </HeroFrame>
       </section>

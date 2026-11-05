@@ -61,9 +61,13 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
   check('K2 오늘 처리할 업무 = 제목의 오늘 할 일 수(같은 셈)', todo === (/(\d+)건/.test(h1) ? num(h1) : 0), { h1, todo })
   const live = (await clientsLs()).filter((c) => !c.archivedAt).length
   const kc = num(await page.getByTestId('kpi-clients').locator('strong').innerText())
-  check(`K3 진행 중 고객사 = 보관 안 한 업체 수(${live}) · 계약 · 잠재로 나눠 적음`, kc === live && /계약 \d+곳 · 잠재 \d+곳/.test(await page.getByTestId('kpi-clients').innerText()), kc)
-  check("K4 최근 AI 작업 — 기록 없으면 '0건 · 지난 7일 실행 없음'(지어낸 숫자 없음)", (await page.getByTestId('kpi-ai').innerText()).includes('0건') && (await page.getByTestId('kpi-ai').innerText()).includes('지난 7일 실행 없음'))
-  check('K5 상담 · 후속 — 새 상담신청 · 업체 약속 수를 함께 적음', /새 상담신청 \d+ · 업체 약속 \d+/.test(await page.getByTestId('kpi-follow').innerText()), await page.getByTestId('kpi-follow').innerText())
+  // U2(2026-11-05) 숫자 칸 → 한 줄 요약 칩 — 설명은 칩에 마우스를 올리면(title)
+  const tipOf = (id) => page.getByTestId(id).getAttribute('title')
+  check(`K3 진행 중 고객사 = 보관 안 한 업체 수(${live}) · 계약 · 잠재로 나눠 적음`, kc === live && /계약 \d+곳 · 잠재 \d+곳/.test(await tipOf('kpi-clients')), kc)
+  check("K4 최근 AI 작업 — 기록 없으면 '0건 · 지난 7일 실행 없음'(지어낸 숫자 없음)", (await page.getByTestId('kpi-ai').innerText()).includes('0건') && (await tipOf('kpi-ai')).includes('지난 7일 실행 없음'))
+  check('K5 상담 · 후속 — 새 상담신청 · 업체 약속 수를 함께 적음', /새 상담신청 \d+ · 업체 약속 \d+/.test(await tipOf('kpi-follow')), await tipOf('kpi-follow'))
+  const kH = (await page.getByTestId('today-kpis').boundingBox())?.height ?? 999
+  check('K5b U2 숫자 다섯은 한 줄(높이 ≤ 56px)', kH <= 56, kH)
   const yK = (await page.getByTestId('today-kpis').boundingBox())?.y ?? 9e9
   const yTodo = (await page.locator('#today-todo-card').boundingBox())?.y ?? 0
   check('K6 KPI 는 할 일 칸보다 위(첫 화면에)', yK < yTodo && yK < 1000, { yK, yTodo })
@@ -76,6 +80,11 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
 /* ---- L 바로가기 ---- */
 {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  // U2(2026-11-05) 바로가기는 처음엔 접힘 — 접힌 줄에도 이름 링크(한 번 눌러 바로) · 펼치면 큰 칸
+  await page.getByTestId('today-launcher').waitFor({ timeout: 10000 })
+  const minis = await page.getByTestId('app-mini').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('L0 U2 바로가기 접힘 · 접힌 줄 이름 링크 8개(같은 순서)', (await page.getByTestId('app-launcher').count()) === 0 && minis.join() === 'client-ops,ai-workspace,patent-venture,cat-growth,sales,marketing,calendar,tools', minis)
+  await page.getByTestId('today-launcher').getByTestId('fold-toggle').click()
   await page.getByTestId('app-launcher').waitFor({ timeout: 10000 })
   const tiles = await page.getByTestId('app-tile').evaluateAll((els) => els.map((e) => ({ k: e.dataset.key, h: e.getAttribute('href'), t: e.innerText })))
   check('L1 바로가기 8칸 — 고객 관리 · AI 전략실 · 특허 · 벤처 · 자금 · 지원사업 · 영업 관리 · 마케팅 · 브랜딩 · 일정 · 전체 도구', tiles.map((x) => x.k).join() === 'client-ops,ai-workspace,patent-venture,cat-growth,sales,marketing,calendar,tools', tiles.map((x) => x.k))
@@ -118,15 +127,17 @@ for (const [w, scale] of [[390, ''], [360, 'extra_large']]) {
     if (s) p.textScale = s
     else delete p.textScale
     localStorage.setItem(k, JSON.stringify(p))
+    // U2 위 L 에서 펼친 바로가기 기억을 지운다(처음 여는 모습 그대로)
+    localStorage.removeItem('axmvp.fold.today.launcher')
   }, scale)
   await m.goto(BASE + '/', { waitUntil: 'networkidle' })
   await m.getByTestId('today-kpis').waitFor({ timeout: 10000 }).catch(() => {})
   const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   const yL = (await m.getByTestId('today-launcher').boundingBox())?.y ?? 9e9
   const yK = (await m.getByTestId('today-kpis').boundingBox())?.y ?? 0
-  const n = await m.getByTestId('app-tile').count()
+  const n = await m.getByTestId('app-mini').count()
   const bottom = await m.locator('nav[aria-label="주요 화면"]').locator('a, button').count()
-  check(`M ${w}${scale ? ' 아주 큰 글자' : ''} — 큰 아이콘 바로가기(${n}칸)가 KPI 위 · 아래 메뉴 6칸(5 + 더보기) 그대로 · 넘침 0`, over <= 0 && yL < yK && n === 8 && bottom === 6, { over, yL, yK, n, bottom })
+  check(`M ${w}${scale ? ' 아주 큰 글자' : ''} — 바로가기(접힌 줄 링크 ${n}개)가 KPI 위 · 아래 메뉴 6칸(5 + 더보기) 그대로 · 넘침 0`, over <= 0 && yL < yK && n === 8 && bottom === 6, { over, yL, yK, n, bottom })
   await shot(m, `M-today-${w}${scale ? '-xl' : ''}`)
   await m.evaluate(() => {
     const k = 'axmvp.ui.preferences'

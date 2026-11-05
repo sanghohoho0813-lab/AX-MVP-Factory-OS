@@ -70,6 +70,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
   const [picking, setPicking] = useState(false)
   const [listening, setListening] = useState(false)
   const [showOld, setShowOld] = useState(false)
+  // U2(2026-11-05 대표 승인) 평소에는 입력칸 한 줄 — 누르면(입력칸 · [+] · 말로 적기) 지금처럼 큰 글 · 안내 · 질문 세 줄까지 펼친다. 한 번 펼치면 이 화면에 있는 동안 그대로
+  const [open, setOpen] = useState(false)
   // D-498 함께 보낼 서류(이 기기에서 읽기만 — 저장은 답 아래 단추로)
   const [docs, setDocs] = useState<ChatDoc[]>([])
   const [over, setOver] = useState(false)
@@ -191,17 +193,22 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
     }
   }
   const clear = () => {
+    // U2 대화를 지운 직후에는 펼친 채로(질문 세 줄이 바로 보이게) — 한 줄로 접히면 다음 질문을 찾기 어렵다
+    setOpen(true)
     const prev = clearHomeTurns()
     showToast('대화를 지웠습니다', { label: '되돌리기', onClick: () => restoreHomeTurns(prev) })
   }
 
   const pinnedName = pinned ? byId.get(pinned)?.companyName ?? '' : ''
   const shown = showOld ? turns : turns.slice(-2)
+  // 대화 · 올린 서류 · 고른 업체 · 적던 글이 있으면 늘 펼친 채로(지금처럼)
+  const expanded = open || turns.length > 0 || docs.length > 0 || !!pinned || !!text || menu || picking || listening || over
 
   return (
     <section
       aria-label="무엇이든 물어보기"
       data-testid="home-ask"
+      data-open={expanded ? '1' : '0'}
       // D-498 서류를 끌어다 놓아도 된다
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return
@@ -215,7 +222,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         setOver(false)
         void addFiles(Array.from(e.dataTransfer.files))
       }}
-      className={`rounded-(--radius-panel) border bg-white px-3 py-5 sm:px-8 sm:py-7 ${over ? 'border-brand-400' : 'border-slate-200'}`}
+      className={expanded ? `rounded-(--radius-panel) border bg-white px-3 py-5 sm:px-8 sm:py-7 ${over ? 'border-brand-400' : 'border-slate-200'}` : ''}
     >
       <input
         ref={fileRef}
@@ -231,14 +238,18 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         data-testid="home-ask-file"
       />
       {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
-      <p className="text-center text-[1.2rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
-        무엇을 도와드릴까요?
-      </p>
-      <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
-        업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요
-      </p>
+      {expanded && (
+        <>
+          <p className="text-center text-[1.2rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
+            무엇을 도와드릴까요?
+          </p>
+          <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
+            업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요
+          </p>
+        </>
+      )}
 
-      <form onSubmit={onSubmit} className="relative mx-auto mt-4 flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400" data-testid="home-ask-form">
+      <form onSubmit={onSubmit} className={`relative mx-auto ${expanded ? 'mt-4' : ''} flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400`} data-testid="home-ask-form">
         <div ref={menuRef} className="relative shrink-0">
           <button type="button" aria-label="업체 고르기 · 서류로 새 업체" aria-expanded={menu} onClick={() => setMenu((v) => !v)} className="tap flex size-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" data-testid="home-ask-plus">
             <Plus aria-hidden="true" className="size-5" />
@@ -302,8 +313,9 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
+            onFocus={() => setOpen(true)}
             // 휴대폰은 칸이 좁아 긴 예시가 두 줄로 잘린다 — 짧게
-            placeholder={readyDocs.length && !phone ? '서류만 보내도 돼요 — 무엇을 제안할지 정리해요' : pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
+            placeholder={!expanded && !phone ? '무엇이든 물어보세요 · 업체 이름과 함께' : readyDocs.length && !phone ? '서류만 보내도 돼요 — 무엇을 제안할지 정리해요' : pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
             aria-label="질문"
             className={`t-body min-h-10 w-full resize-none ${text ? 'overflow-y-auto' : 'overflow-hidden'} bg-transparent px-1.5 py-2 leading-snug text-slate-900 outline-none placeholder:text-slate-400`}
             data-testid="home-ask-input"
@@ -320,7 +332,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         </button>
       </form>
 
-      {turns.length === 0 ? (
+      {!expanded ? null : turns.length === 0 ? (
         <ul className="mx-auto mt-3 flex w-full max-w-3xl flex-col" data-testid="home-ask-suggest">
           {suggestions.map((s) => {
             const Icon = ICON[s.icon]

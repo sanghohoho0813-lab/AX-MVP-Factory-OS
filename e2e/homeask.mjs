@@ -121,6 +121,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('맨 위 대화창 하나', (await box.count()) === 1)
   const order = await page.evaluate(() => [...document.querySelectorAll('[data-arrange-item]')].map((e) => e.getAttribute('data-arrange-item')))
   check('화면 꾸미기 칸 중 맨 처음(숫자 칸 · AI 도우미보다 위)', order[0] === 'ask' && order.indexOf('assist') > 0, order)
+  // U2(2026-11-05) 평소에는 입력칸 한 줄 — 큰 글 · 질문 세 줄은 숨김 · 누르면 펼침
+  const compactH = (await box.boundingBox())?.height ?? 999
+  check('U2 평소엔 한 줄(큰 글 · 안내 · 질문 세 줄 없음 · 높이 ≤ 70px)', (await box.getAttribute('data-open')) === '0' && (await page.getByTestId('home-ask-title').count()) === 0 && (await page.getByTestId('home-ask-chip').count()) === 0 && compactH <= 70, compactH)
+  await page.getByTestId('home-ask-input').click()
+  await page.waitForTimeout(200)
+  check('U2 입력칸을 누르면 펼침(지금처럼)', (await box.getAttribute('data-open')) === '1')
   check('큰 글 · 안내 글', /무엇을 도와드릴까요/.test(await box.innerText()) && /업체 이름과 함께 물어보거나 서류를 올리면/.test(await page.getByTestId('home-ask-guide').innerText()))
   const chips = await page.getByTestId('home-ask-chip').allInnerTexts()
   check('지금 자료에 맞춘 질문 세 줄(아이콘)', chips.length === 3 && (await page.getByTestId('home-ask-chip').first().getAttribute('data-icon')) !== null, chips)
@@ -422,6 +428,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const ib = await page.getByTestId('home-ask-input').boundingBox()
   const sb = await page.getByTestId('home-ask-send').boundingBox()
   check('390: 빈 입력은 한 줄(안내 글이 칸을 키우지 않음) · 보내기 40px', ib && ib.height <= 48 && sb && sb.width >= 39.5 && sb.height >= 39.5, { ib, sb })
+  await page.getByTestId('home-ask-input').click()
+  await page.waitForTimeout(200)
   check('390: 질문 줄 누르기 높이 40px 이상', (await page.getByTestId('home-ask-chip').first().boundingBox()).height >= 39.5)
   // D-498 휴대폰에서도 서류 넣기 — 칩 · 넘침 0
   await page.getByTestId('home-ask-file').setInputFiles([{ name: '아주긴파일이름_사업자등록증_2026년_최신본_스캔.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증\n등록번호 : 214-86-12303\n상호 : 새봄식품\n개업연월일 : 2024 년 03 월 02 일', 'utf8') }])

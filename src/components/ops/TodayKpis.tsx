@@ -6,10 +6,11 @@
  *   최근 AI 작업     = AI 전략실 지난 7일 실행 — 기능 권한이 있는 사람만(팀장 화면에는 칸이 없다)
  *   상담 · 후속      = 새 상담신청(대표) + 업체 약속(지난 것 · 오늘 · 내일)
  * 누르면 그 목록으로. 0 이면 색 없음(화면 규칙 §2).
+ * U2(2026-11-05 대표 승인): 큰 칸 다섯 개 → 목록 위 한 줄 요약(칩 다섯) — 숫자 · 셈 · 누르면 가는 곳은 그대로, 설명은 칩에 마우스를 올리면(title).
  */
-import { useContext, useEffect, useState } from 'react'
-import { CalendarClock, CheckCheck, ListTodo, MessagesSquare, Sparkles, Users } from 'lucide-react'
-import { KpiCard } from '../ui/visual'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { CalendarClock, CheckCheck, ListTodo, MessagesSquare, Sparkles, Users, type LucideIcon } from 'lucide-react'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { AuthContext } from '../../auth/authContext'
@@ -78,81 +79,109 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
   const ai = useRecentAiRuns(!pilot && aiOpen)
   const latest = ai?.latest ?? null
   const followCount = (pilot ? 0 : follow.events) + follow.appointments
-  const cards = [
-    <KpiCard
-      key="todo"
-      testId="kpi-todo"
-      icon={ListTodo}
-      tone="indigo"
-      label="오늘 처리할 업무"
-      value={val(`${todo.open}건`)}
-      urgency={loading ? 'neutral' : todo.overdue > 0 || todo.hard > 0 ? 'danger' : 'neutral'}
-      hint={tip([todo.overdue > 0 ? `밀린 것 ${todo.overdue}건` : '', todo.hard > 0 ? `놓치면 끝나는 기한 ${todo.hard}건` : ''].filter(Boolean).join(' · ') || (todo.open === 0 ? '오늘 기한인 할 일 없음' : '오늘까지 할 일'))}
-      onClick={onTodos}
-    />,
-    <KpiCard
-      key="clients"
-      testId="kpi-clients"
-      icon={Users}
-      tone="blue"
-      label="진행 중 고객사"
-      value={val(`${clients.contract + clients.prospect}곳`)}
-      hint={tip(`계약 ${clients.contract}곳 · 잠재 ${clients.prospect}곳`)}
-      to="/ops/clients"
-    />,
-    <KpiCard
-      key="decide"
-      testId="kpi-decide"
-      icon={CheckCheck}
-      tone="indigo"
-      label="확인 필요 항목"
-      value={decisions === null ? '–' : val(`${decisions}개`)}
-      urgency={loading || decisions === null ? 'neutral' : decisions > 0 ? 'brand' : 'neutral'}
-      hint={decisions === null ? '모으는 중…' : tip(decisions > 0 ? '맞다 · 아니다만 고르면 끝' : '확인할 것 없음')}
-      to="/ops/decide"
-    />,
+  const chips: ChipProps[] = [
+    {
+      testId: 'kpi-todo',
+      icon: ListTodo,
+      label: '오늘 처리할 업무',
+      value: val(`${todo.open}건`),
+      urgency: loading ? 'neutral' : todo.overdue > 0 || todo.hard > 0 ? 'danger' : 'neutral',
+      hint: tip([todo.overdue > 0 ? `밀린 것 ${todo.overdue}건` : '', todo.hard > 0 ? `놓치면 끝나는 기한 ${todo.hard}건` : ''].filter(Boolean).join(' · ') || (todo.open === 0 ? '오늘 기한인 할 일 없음' : '오늘까지 할 일')),
+      onClick: onTodos,
+    },
+    {
+      testId: 'kpi-clients',
+      icon: Users,
+      label: '진행 중 고객사',
+      value: val(`${clients.contract + clients.prospect}곳`),
+      hint: tip(`계약 ${clients.contract}곳 · 잠재 ${clients.prospect}곳`),
+      to: '/ops/clients',
+    },
+    {
+      testId: 'kpi-decide',
+      icon: CheckCheck,
+      label: '확인 필요 항목',
+      value: decisions === null ? '–' : val(`${decisions}개`),
+      urgency: loading || decisions === null ? 'neutral' : decisions > 0 ? 'brand' : 'neutral',
+      hint: decisions === null ? '모으는 중…' : tip(decisions > 0 ? '맞다 · 아니다만 고르면 끝' : '확인할 것 없음'),
+      to: '/ops/decide',
+    },
     ...(ai
       ? [
-          <KpiCard
-            key="ai"
-            testId="kpi-ai"
-            icon={Sparkles}
-            tone="purple"
-            label="최근 AI 작업"
-            value={val(`${ai.count}건`)}
-            hint={tip(latest ? `지난 7일 · 최근 ${latest.task}${latest.company ? ` · ${latest.company}` : ''}` : '지난 7일 실행 없음')}
-            to={latest ? `/ai/${latest.caseId}` : '/ai'}
-          />,
+          {
+            testId: 'kpi-ai',
+            icon: Sparkles,
+            label: '최근 AI 작업',
+            value: val(`${ai.count}건`),
+            hint: tip(latest ? `지난 7일 · 최근 ${latest.task}${latest.company ? ` · ${latest.company}` : ''}` : '지난 7일 실행 없음'),
+            to: latest ? `/ai/${latest.caseId}` : '/ai',
+          } satisfies ChipProps,
         ]
       : []),
-    <KpiCard
-      key="follow"
-      testId="kpi-follow"
-      icon={pilot ? CalendarClock : MessagesSquare}
-      tone={pilot ? 'teal' : 'rose'}
-      label={pilot ? '후속 약속' : '상담 · 후속'}
-      value={val(`${followCount}건`)}
-      urgency={loading ? 'neutral' : follow.lateAppointments > 0 ? 'warning' : !pilot && follow.events > 0 ? 'brand' : 'neutral'}
-      hint={tip([!pilot ? `새 상담신청 ${follow.events}` : '', `업체 약속 ${follow.appointments}${follow.lateAppointments > 0 ? `(지난 것 ${follow.lateAppointments})` : ''}`].filter(Boolean).join(' · '))}
-      onClick={onFollow}
-    />,
+    {
+      testId: 'kpi-follow',
+      icon: pilot ? CalendarClock : MessagesSquare,
+      label: pilot ? '후속 약속' : '상담 · 후속',
+      value: val(`${followCount}건`),
+      urgency: loading ? 'neutral' : follow.lateAppointments > 0 ? 'warning' : !pilot && follow.events > 0 ? 'brand' : 'neutral',
+      hint: tip([!pilot ? `새 상담신청 ${follow.events}` : '', `업체 약속 ${follow.appointments}${follow.lateAppointments > 0 ? `(지난 것 ${follow.lateAppointments})` : ''}`].filter(Boolean).join(' · ')),
+      onClick: onFollow,
+    },
   ]
+  const row = chips.map((c) => <SummaryChip key={c.testId} {...c} />)
   if (phone) {
     return (
       <section aria-label="오늘 숫자" data-testid="today-kpis">
         <ScrollHintRow fade="from-white via-white/90" innerClassName="flex gap-2 pb-1">
-          {cards.map((c) => (
-            <div key={c.key} className="w-[10.5rem] shrink-0">
-              {c}
-            </div>
-          ))}
+          {row}
         </ScrollHintRow>
       </section>
     )
   }
   return (
-    <section aria-label="오늘 숫자" data-testid="today-kpis" className={`ax-stagger grid grid-cols-2 gap-2.5 md:grid-cols-3 ${cards.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
-      {cards}
+    <section aria-label="오늘 숫자" data-testid="today-kpis" className="flex flex-wrap items-center gap-2">
+      {row}
     </section>
+  )
+}
+
+type Urgency = 'neutral' | 'danger' | 'warning' | 'brand'
+interface ChipProps {
+  testId: string
+  icon: LucideIcon
+  label: string
+  value: string
+  hint: string
+  urgency?: Urgency
+  to?: string
+  onClick?: () => void
+}
+
+/** 요약 칩 하나 — 흰 바탕 · 회색 테두리(박스 색 하나) · 급한 것은 숫자 글자색으로만(빨강 = 늦음 · 파랑 = 볼 것 · 주황 = 지난 약속) */
+const VALUE_TONE: Record<Urgency, string> = {
+  neutral: 'text-slate-900',
+  danger: 'text-danger-700',
+  warning: 'text-warning-800',
+  brand: 'text-brand-700',
+}
+function SummaryChip({ testId, icon: Icon, label, value, hint, urgency = 'neutral', to, onClick }: ChipProps) {
+  const inner: ReactNode = (
+    <>
+      <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+      <span className="t-sub break-keep whitespace-nowrap text-slate-600">{label}</span>
+      <strong className={`t-body font-bold whitespace-nowrap tabular-nums ${VALUE_TONE[urgency]}`}>{value}</strong>
+    </>
+  )
+  const cls = 'tap inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-left hover:border-slate-300 hover:bg-slate-50'
+  if (to)
+    return (
+      <Link to={to} title={hint} aria-label={`${label} ${value} — ${hint}`} className={cls} data-testid={testId}>
+        {inner}
+      </Link>
+    )
+  return (
+    <button type="button" title={hint} aria-label={`${label} ${value} — ${hint}`} onClick={onClick} className={cls} data-testid={testId}>
+      {inner}
+    </button>
   )
 }
