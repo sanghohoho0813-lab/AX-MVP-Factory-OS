@@ -59,10 +59,12 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
   const card = page.getByTestId('today-picks')
   await card.waitFor({ timeout: 10000 }).catch(() => {})
   const picks = await page.getByTestId('today-pick').evaluateAll((els) => els.map((e) => ({ id: e.dataset.client, chips: [...e.querySelectorAll('[data-testid="today-pick-chip"]')].map((c) => c.textContent?.trim()) })))
-  check('T1 오늘 화면 맨 위 "오늘 먼저 제안할 것" — 처음 쓰는 사람에게도 보임 · 업체마다 모듈 칩', (await card.isVisible()) && picks.length >= 1 && picks.every((p) => p.chips.length >= 1), picks)
-  const yCard = (await card.boundingBox())?.y ?? 9e9
-  const yTodos = (await page.locator('#todos').boundingBox())?.y ?? 0
-  check('T2 할 일 칸보다 위(아침 첫 화면에 바로)', yCard < yTodos, { yCard, yTodos })
+  check('T1 오늘 화면 "오늘 먼저 제안할 것" — 처음 쓰는 사람에게도 보임 · 업체마다 모듈 칩', (await card.isVisible()) && picks.length >= 1 && picks.every((p) => p.chips.length >= 1), picks)
+  // D-541(2026-11-05 대표 '(다)') 기본 순서에서 할 일 목록이 먼저 — 제안 칸은 할 일 바로 다음 칸(지우거나 접지 않음)
+  const yCard = (await card.boundingBox())?.y ?? 0
+  const yTodos = (await page.locator('#today-todo-card').boundingBox())?.y ?? 9e9
+  const order = await page.evaluate(() => [...document.querySelectorAll('[data-arrange-item]')].map((e) => e.getAttribute('data-arrange-item')))
+  check('T2 D-541 할 일 칸 바로 다음 칸(할 일이 먼저)', yTodos < yCard && order.indexOf('picks') === order.indexOf('todos') + 1, { yCard, yTodos, order })
   const closeBtn = page.getByRole('button', { name: /오늘 정리하기/ }).first()
   const cls = (await closeBtn.getAttribute('class')) ?? ''
   check("T3 '오늘 정리하기' 는 그대로 있고 보조 단추(주 단추 색 아님)", (await closeBtn.count()) === 1 && !cls.includes('bg-brand-600'), cls.slice(0, 120))

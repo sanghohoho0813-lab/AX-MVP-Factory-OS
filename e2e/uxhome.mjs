@@ -370,6 +370,17 @@ let caseUrl = ''
   await page.waitForTimeout(300)
   check('R7 영업 보드 — AI 도우미 띠 계속 숨기기 → 띠 없음 · 보드 · 요약은 그대로', barBefore === 1 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('sales-board-panel').count()) === 1 && (await page.getByTestId('sales-summary').count()) === 1)
   await page.evaluate(() => localStorage.removeItem('axmvp.ui.layout.sales-board'))
+  // D-542 일정 — AI 도우미는 머리 단추 하나 · 꾸미기의 'AI 도우미' 줄(calendar:assist)을 계속 숨기면 단추도 숨고 맨 아래 '숨긴 칸' 줄
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const calBtn = await page.getByTestId('ai-assist-open').count()
+  await page.getByTestId('arrange-open').click()
+  await page.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
+  await page.getByTestId('arrange-done').click()
+  await page.waitForTimeout(300)
+  const calHidden = await page.getByTestId('arrange-hidden').innerText().catch(() => '')
+  check("R7b 일정 — 머리 [AI 도우미] 하나 · 꾸미기 'AI 도우미' 계속 숨기기 → 단추 없음 · 달력 그대로 · '숨긴 칸' 줄", calBtn === 1 && (await page.getByTestId('ai-assist-open').count()) === 0 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('month-calendar').count()) === 1 && calHidden.includes('AI 도우미'), { calBtn, calHidden })
+  await page.evaluate(() => localStorage.removeItem('axmvp.ui.layout.calendar'))
   // 휴대폰 390
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 844 })
