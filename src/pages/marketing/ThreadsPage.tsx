@@ -23,6 +23,7 @@ import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection, chip } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
+import { FirstLineMaker } from './FirstLineMaker'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
@@ -386,6 +387,29 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
     if (!draft.template || !draft.tag) set({ goal: pick.goal, template: pick.template, tag: pick.tag, ...(draft.template ? {} : { formatBy: 'rec' as const }) })
     return runAi(pick, true)
   }
+  /**
+   * D-546 첫마디 10개 → [이걸로 쓰기] — 글이 비어 있으면 첫마디 + 추천 틀의 나머지 뼈대로 시작,
+   * 쓰던 글이 있으면 첫 줄만 바꾼다(한 번 묻고).
+   */
+  const applyFirstLine = (line: string) => {
+    const cur = draft.body
+    if (!cur.trim()) {
+      const t = templateOf(eff.template)
+      const rest = t ? skeletonDraft(t, '').split('\n\n').slice(1).join('\n\n') : ''
+      if (!draft.template) set({ goal: eff.goal, template: eff.template, tag: draft.tag || rec.tag, formatBy: 'rec' })
+      startBody(rest ? `${line}\n\n${rest}` : line, 'hand')
+      showToast('첫마디로 글을 시작했어요 — 아래 [ ] 칸을 채워 주세요.')
+      return
+    }
+    const rows = cur.split('\n')
+    const i = rows.findIndex((r) => r.trim())
+    if (rows[i]?.trim() === line.trim()) return
+    if (!window.confirm('지금 글의 첫 줄을 이 첫마디로 바꿀까요? (나머지는 그대로예요)')) return
+    rows[i] = line
+    set({ body: rows.join('\n') })
+    showToast('첫 줄을 바꿨어요.')
+    document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const takeDraft = (d: ThreadDraft) => {
     startBody(d.body, 'ai')
     set({ selfComment: d.selfComment, checks: d.checks, ...(d.template ? { template: d.template, goal: goalFor(d.template, draft.goal) } : {}) })
@@ -466,6 +490,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
+        hooks={<FirstLineMaker testPrefix="thr" channel="threads" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
       >
         {ai.drafts.length > 0 && (
           <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">

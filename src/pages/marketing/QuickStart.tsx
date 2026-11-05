@@ -32,6 +32,7 @@ export function QuickStart({
   ai,
   fallback,
   children,
+  hooks,
 }: {
   testPrefix: string
   topic: string
@@ -57,6 +58,8 @@ export function QuickStart({
   fallback?: { label: string; onClick: () => void }
   /** AI 가 쓴 다른 안 */
   children?: ReactNode
+  /** D-546 첫마디 10개(평소 단추 한 줄 · 누르면 펼침) — 상자 맨 끝 */
+  hooks?: ReactNode
 }) {
   const week = chips.filter((c) => c.from === 'week')
   const ours = chips.filter((c) => c.from === 'ours')
@@ -149,6 +152,7 @@ export function QuickStart({
           )}
           {children}
         </div>
+        {hooks}
       </div>
     </div>
   )

@@ -27,6 +27,7 @@ import {
 import { MK_KNOWLEDGE, MK_KNOWLEDGE_META } from '../../../api/_ai/mkKnowledge.js'
 import { hasMaterial, readWeekTopics, recommendShort, recommendThread, rememberWeekTopics, topicChips, topicTag, WEEK_TOPICS_MAX } from '../marketing/quickStart'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
+import { HOOK_AIMS, HOOK_PATTERNS, draftFirstLines, hookOrder, hookWarn, hooksContext, parseHookAnswer } from '../marketing/hookPatterns'
 import { listRows as listModuleRows, saveRow as saveModuleRow } from '../moduleData'
 import {
   ENDINGS,
@@ -327,6 +328,35 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   const rowsA = await listModuleRows(WA, THREADS_MODULE, WEEK_BUCKET)
   check('WR3 저장 — 작업공간마다 제 줄 · 예전 줄은 지우지 않음', rowsA.some((r) => r.id === weekRefId(week, WA)) && rowsA.some((r) => r.id === `wk_${week}`) && (await listModuleRows(WB, THREADS_MODULE, WEEK_BUCKET)).some((r) => r.id === weekRefId(week, WB)), rowsA.map((r) => r.id))
   check('WR4 읽기 — 새 줄 먼저 · 다른 작업공간은 제 것', (await loadWeekRef(WA, day))?.items[0]?.note === '대표 것' && (await loadWeekRef(WB, day))?.items[0]?.note === '팀장 것')
+}
+
+// D-546 첫마디 26가지 · 10개 바로(규칙) · AI 단추 두 개(스레드 · 릴스)
+{
+  const HYPE = /역대급|대박|충격|무조건|꿀팁|\d+\s*분\s*컷|100\s*%|보장|누구나\s*받|공짜|선착순/
+  check('HK1 방법 26가지 — 번호 1~26 · 이름 겹침 0 · 언제 좋은지 · 방향 하나 이상', HOOK_PATTERNS.length === 26 && HOOK_PATTERNS.every((h, i) => h.no === i + 1 && !!h.when && h.aims.length > 0) && new Set(HOOK_PATTERNS.map((h) => h.name)).size === 26)
+  const all = HOOK_PATTERNS.flatMap((h) => [h.line('정책자금', '대표님'), h.short('정책자금', '대표님'), h.line('벤처기업확인', '창업 3년 안 된 대표님')])
+  check('HK2 틀 글에 부풀리는 말 0 · 화면에 쓰지 않는 말(훅 · 후킹 · 썸네일 · 롱폼) 0 · 조사 바르게(정책자금으로 · 고용지원금을 · AX가)', all.every((l) => !HYPE.test(l) && !/훅|후킹|썸네일|롱폼/.test(l)) && HOOK_PATTERNS.flatMap((h) => [h.name, h.when, h.caution ?? '']).every((l) => !/훅|후킹|썸네일|롱폼/.test(l)) && /정책자금으로 달라진/.test(HOOK_PATTERNS[7].line('정책자금', '')) && /^고용지원금을 /.test(HOOK_PATTERNS[13].line('고용지원금', '')) && /AX가 기회/.test(HOOK_PATTERNS[19].line('AX', '대표님')), all.find((l) => HYPE.test(l)))
+  const ten = draftFirstLines({ topic: '고용지원금', target: '', aim: '' })
+  check('HK3 주제만 → 서로 다른 방법 10개 · 비우면 대표님 · 숫자는 대괄호로 비움(지어낸 숫자 0)', ten.length === 10 && new Set(ten.map((l) => l.no)).size === 10 && ten.every((l) => l.line.includes('고용지원금') || /\[/.test(l.line)) && ten.some((l) => l.line.startsWith('대표님')) && ten.every((l) => !/\d+(만|억|%|배|명)/.test(l.line)), ten.map((l) => l.line))
+  const warn = draftFirstLines({ topic: '정책자금', target: '제조업 대표님', aim: 'warn' })
+  check('HK4 방향 손해 막기 → 그 방향 방법 먼저 · 누구에게가 문장에', warn.slice(0, 4).every((l) => HOOK_PATTERNS[l.no - 1].aims.includes('warn')) && warn.some((l) => l.line.includes('제조업 대표님')), warn.map((l) => `${l.no}:${l.line}`))
+  const p0 = draftFirstLines({ topic: '정책자금', aim: '', page: 0 }).map((l) => l.no)
+  const p1 = draftFirstLines({ topic: '정책자금', aim: '', page: 1 }).map((l) => l.no)
+  const p2 = draftFirstLines({ topic: '정책자금', aim: '', page: 2 }).map((l) => l.no)
+  check('HK5 [다른 방법으로 10개] — 앞 10개와 겹치지 않음 · 세 번이면 26가지를 다 봄', p0.every((n) => !p1.includes(n)) && new Set([...p0, ...p1, ...p2]).size === 26 && HOOK_AIMS.every((a) => new Set(hookOrder(a.key)).size === 26))
+  const sh = draftFirstLines({ topic: '벤처기업확인', aim: '', channel: 'shorts' })
+  check('HK6 릴스 · 틱톡은 짧게 — 첫마디 평균 18자 안 · 빈 주제는 0개', sh.length === 10 && sh.reduce((a, l) => a + l.line.length, 0) / sh.length < 18 && draftFirstLines({ topic: '  ' }).length === 0, sh.map((l) => l.line))
+  check('HK7 부풀리는 말 표시 — 역대급 · 3분 컷 · 100% 는 표시 · 보통 첫마디는 표시 없음', !!hookWarn('역대급 결과') && !!hookWarn('3분 컷 정리') && !!hookWarn('100% 받는 법') && !hookWarn('정책자금, 딱 세 가지만 알면 돼요.'))
+  const ctx = hooksContext({ topic: '정책자금', target: '', aim: 'curious', channel: 'threads', today: '2026-11-05' })
+  const rows = ctx.sections[1].rows
+  check('HK8 AI 에 보낼 자료 — 주제 · 누구에게(비우면 대표님) · 방향 · 어디에 + 26가지(궁금하게 먼저 · 예시 틀은 [주제])', ctx.sections[0].rows[0].주제 === '정책자금' && ctx.sections[0].rows[0].누구에게 === '대표님' && /궁금하게/.test(String(ctx.sections[0].rows[0].방향)) && rows.length === 26 && HOOK_PATTERNS.find((h) => h.name === rows[0].방법)?.aims.includes('curious') === true && rows.every((r) => /\[주제\]|\[/.test(String(r.예시틀))), rows.slice(0, 3))
+  const parsed = parseHookAnswer({ items: [{ title: '정책자금, 이거 모르면 손해예요.', tag: '아는 사람만 아는 것', detail: '손해 걱정' }, { title: '정책자금, 이거 모르면 손해예요.', tag: '' }, { title: '', tag: 'x' }, { title: '두 번째', tag: '모르는 방법' }] })
+  check('HK9 AI 답 읽기 — 같은 줄 · 빈 줄 버림 · 아는 방법은 번호 · 모르는 이름은 0', parsed.length === 2 && parsed[0].no === 2 && parsed[0].when === '손해 걱정' && parsed[1].no === 0 && parsed[1].name === '모르는 방법')
+  const th = ASSISTS['threads.hooks']
+  const shh = ASSISTS['shorts.hooks']
+  check('HK10 서버 단추 threads.hooks · shorts.hooks — 화면 단추 이름 같음 · 스레드 공식 / 숏폼 공식 · 부풀리는 말 금지 · 대괄호로 비우기', !!th && !!shh && th.page === 'threads' && shh.page === 'shorts' && ASSIST_PRESETS.some((p) => p.id === 'threads.hooks' && p.label === th.label && p.page === 'threads') && ASSIST_PRESETS.some((p) => p.id === 'shorts.hooks' && p.label === shh.label && p.page === 'shorts') && knowledgeOf(th).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_threads,mk_facts' && knowledgeOf(shh).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_common,mk_short,mk_facts' && [th, shh].every((a) => /역대급/.test(a.instruction.join(' ')) && /\[기간\]/.test(a.instruction.join(' ')) && /서로 다른 방법/.test(a.instruction.join(' '))))
+  const sys = assistSystem(th)
+  check('HK11 지시문 — 비공개 규칙 맨 앞 · 운영 원칙 · 스레드 규칙 실림', sys.indexOf('[대표 운영 원칙') > 0 && sys.includes('[스레드 규칙]') && sys.includes('(threads.hooks'))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

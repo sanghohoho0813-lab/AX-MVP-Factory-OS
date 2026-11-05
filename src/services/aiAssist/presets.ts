@@ -126,6 +126,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   // D-273 스레드 화면의 [AI로 글 3개 쓰기] · 릴스 · 틱톡 화면의 [AI로 대본 2개 쓰기] 가 부른다(띠 · 판 단추에는 없음)
   { id: 'threads.write', page: 'threads', label: '스레드 글 3개 쓰기', kind: 'write', hint: '고른 목표 · 틀 · 소재로 — 500자 안 · 본문에서 팔지 않기' },
   { id: 'shorts.write', page: 'shorts', label: '릴스 · 틱톡 대본 2개 쓰기', kind: 'write', hint: '고른 플랫폼 · 목적 · 형식 · 소재로 — 첫마디 10자 · 영상 · 캡션에서 팔지 않기' },
+  // D-546 스레드 · 릴스 화면 '첫마디 10개' 판의 [AI로 10개 새로 쓰기](띠 · 판 단추에는 없음)
+  { id: 'threads.hooks', page: 'threads', label: '첫마디 10개 쓰기 (주제 · 누구에게 · 방향)', kind: 'write', hint: '26가지 방법 가운데 서로 다른 10개 — 숫자는 대괄호로 비움' },
+  { id: 'shorts.hooks', page: 'shorts', label: '첫마디 10개 쓰기 (주제 · 누구에게 · 방향)', kind: 'write', hint: '26가지 방법 가운데 서로 다른 10개 — 10자 안팎 · 숫자는 대괄호로 비움' },
   { id: 'pv.chat', page: 'patent', label: '특허 · 벤처 — 물어본 것에 답', kind: 'list', hint: '이 회사 명세서 · 사업계획서 기록으로' },
   { id: 'cert.chat', page: 'cert', label: '기업인증 — 물어본 것에 답', kind: 'list', hint: '이 회사 인증 판정 · 빠진 서류로' },
   { id: 'side.chat', page: 'side', label: 'AI 대화 — 무엇이든 물어보기', kind: 'list', hint: 'OS 안 오른쪽 판에서 — 어느 화면에서나' },

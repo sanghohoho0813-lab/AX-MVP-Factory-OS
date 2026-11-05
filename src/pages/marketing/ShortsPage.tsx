@@ -56,6 +56,7 @@ import {
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
+import { FirstLineMaker } from './FirstLineMaker'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
@@ -296,6 +297,29 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
     if (!draft.format) set({ aim: eff.aim, format: eff.format, formatBy: 'rec' })
     start({ ...exampleOf(f, draft.platform), hashtags: f.exampleTags, source: 'example' })
   }
+  /**
+   * D-546 첫마디 10개 → [이걸로 쓰기] — 대본이 비어 있으면 첫마디로 시작하는 뼈대(0초 첫마디 · 본론 · 마무리),
+   * 쓰던 대본이 있으면 첫 줄만 바꾼다(시각 '[0:00]' 은 그대로 · 한 번 묻고).
+   */
+  const applyFirstLine = (line: string) => {
+    const cur = draft.script
+    if (!cur.trim()) {
+      if (!draft.format) set({ aim: eff.aim, format: eff.format, formatBy: 'rec' })
+      start({ script: `[0:00] ${line}  (화면: 큰 글자)\n[0:03] [본론 — 2~3가지 + 숫자]\n[끝] [답 · 마무리 한 줄]`, caption: draft.caption, hashtags: draft.hashtags, source: 'hand' })
+      showToast('첫마디로 대본을 시작했어요 — [ ] 칸을 채워 주세요.')
+      return
+    }
+    const rows = cur.split('\n')
+    const i = rows.findIndex((r) => r.trim())
+    const time = /^\s*(\[\d+:\d{2}\])\s*/.exec(rows[i] ?? '')?.[1]
+    const next = time ? `${time} ${line}` : line
+    if (rows[i]?.trim() === next.trim()) return
+    if (!window.confirm('지금 대본의 첫 줄을 이 첫마디로 바꿀까요? (나머지는 그대로예요)')) return
+    rows[i] = next
+    set({ script: rows.join('\n') })
+    showToast('첫 줄을 바꿨어요.')
+    document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   /** auto — 대본 칸이 비어 있으면 1안을 바로 넣는다(쓰던 대본은 덮지 않는다) */
   const runAi = async (pick?: { aim: ShortAim | ''; format: ShortFormatKey | '' }, auto = false) => {
     if (ai.busy) return
@@ -413,6 +437,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: '형식 예시로 시작', onClick: startExample }}
+        hooks={<FirstLineMaker testPrefix="sht" channel="shorts" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
       >
         {ai.drafts.length > 0 && (
           <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 22rem), 1fr))' }} data-testid="sht-ai-drafts">
