@@ -1,30 +1,29 @@
 /**
- * D-282 오늘 화면 맨 위 KPI 다섯 칸 — 화면이 이미 센 숫자만 쓴다(지어낸 숫자 0).
- *   오늘 처리할 업무 = 기한이 오늘까지인 안 끝난 할 일(제목 '오늘 할 일 n건' 과 같은 수)
+ * D-282 오늘 화면 맨 위 KPI — 화면이 이미 센 숫자만 쓴다(지어낸 숫자 0).
  *   진행 중 고객사   = 보관하지 않은 업체(계약 · 잠재)
  *   확인 필요 항목   = '확인할 것' 과 같은 판정(buildAllDecisions)
  *   최근 AI 작업     = AI 전략실 지난 7일 실행 — 기능 권한이 있는 사람만(팀장 화면에는 칸이 없다)
  *   상담 · 후속      = 새 상담신청(대표) + 업체 약속(지난 것 · 오늘 · 내일)
  * 누르면 그 목록으로. 0 이면 색 없음(화면 규칙 §2).
- * U2(2026-11-05 대표 승인): 큰 칸 다섯 개 → 목록 위 한 줄 요약(칩 다섯) — 숫자 · 셈 · 누르면 가는 곳은 그대로, 설명은 칩에 마우스를 올리면(title).
+ * U2(2026-11-05 대표 승인): 큰 칸 다섯 개 → 목록 위 한 줄 요약(칩) — 숫자 · 셈 · 누르면 가는 곳은 그대로, 설명은 칩에 마우스를 올리면(title).
+ * D-541(2026-11-05 대표 지시): '오늘 처리할 업무' 칩은 뺐다 — 제목 '오늘 할 일 n건' 과 같은 숫자가 두 번 보였다.
+ *   밀린 것 · 놓치면 끝나는 기한은 바로 아래 할 일 목록이 빨간 글자로 말한다(D-541 로 목록이 숫자 줄 바로 아래).
  */
 import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarClock, CheckCheck, ListTodo, MessagesSquare, Sparkles, Users, type LucideIcon } from 'lucide-react'
+import { CalendarClock, CheckCheck, MessagesSquare, Sparkles, Users, type LucideIcon } from 'lucide-react'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { AuthContext } from '../../auth/authContext'
 import { nowDate } from '../../lib/appClock'
 
 interface Props {
-  todo: { open: number; overdue: number; hard: number }
   clients: { contract: number; prospect: number }
   /** null = 아직 모으는 중('–') */
   decisions: number | null
   follow: { events: number; appointments: number; lateAppointments: number }
   pilot: boolean
   phone: boolean
-  onTodos: () => void
   onFollow: () => void
   /** D-482 업체 · 할 일을 읽는 동안 — 칸 자리를 미리 잡아(숫자 대신 '–') 다 읽은 뒤 아래 칸이 밀려 내려가지 않게 */
   loading?: boolean
@@ -71,7 +70,7 @@ function useRecentAiRuns(enabled: boolean): RecentAi | null {
   return state
 }
 
-export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTodos, onFollow, loading = false }: Props) {
+export function TodayKpis({ clients, decisions, follow, pilot, phone, onFollow, loading = false }: Props) {
   // 읽는 중에는 숫자 · 설명 대신 자리만(지어낸 0 을 잠깐이라도 보이지 않게)
   const val = (text: string) => (loading ? '–' : text)
   const tip = (text: string) => (loading ? '불러오는 중…' : text)
@@ -80,15 +79,6 @@ export function TodayKpis({ todo, clients, decisions, follow, pilot, phone, onTo
   const latest = ai?.latest ?? null
   const followCount = (pilot ? 0 : follow.events) + follow.appointments
   const chips: ChipProps[] = [
-    {
-      testId: 'kpi-todo',
-      icon: ListTodo,
-      label: '오늘 처리할 업무',
-      value: val(`${todo.open}건`),
-      urgency: loading ? 'neutral' : todo.overdue > 0 || todo.hard > 0 ? 'danger' : 'neutral',
-      hint: tip([todo.overdue > 0 ? `밀린 것 ${todo.overdue}건` : '', todo.hard > 0 ? `놓치면 끝나는 기한 ${todo.hard}건` : ''].filter(Boolean).join(' · ') || (todo.open === 0 ? '오늘 기한인 할 일 없음' : '오늘까지 할 일')),
-      onClick: onTodos,
-    },
     {
       testId: 'kpi-clients',
       icon: Users,

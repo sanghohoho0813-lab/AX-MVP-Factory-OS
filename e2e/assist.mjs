@@ -183,7 +183,6 @@ const pages = [
   ['/ops/clients', '고객 관리', null],
   ['/ops/agents', '영업자 정산', 'agents.soon'],
   ['/money', '매출 · 비용', 'money.top'],
-  ['/ops/calendar', '일정', 'calendar.week'],
   ['/tools/employment', '고용지원금 · 고객 전체', 'module.all'],
   ['/modules/growth', '기업성장 모듈', 'module.all'],
   ['/marketing?view=make', '마케팅 · 내 콘텐츠', 'mine.detail'],
@@ -200,6 +199,20 @@ for (const [p, label, first] of pages) {
     const y = (await bar.boundingBox())?.y ?? 9999
     check('C 고용지원금 › 한눈에 보기: 띠가 화면 맨 위(첫 화면 안 · 원래 대시보드 위)', y < 500, y)
   }
+}
+{
+  // U5(D-542) 일정 — 띠 대신 머리 오른쪽 [AI 도우미] 단추 하나 · 질문 단추(이번 주 한눈에 · 빡빡한 날 · 꼭 지킬 마감)는 판 안에 그대로
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const open = page.getByTestId('ai-assist-open')
+  const y = (await open.first().boundingBox())?.y ?? 9999
+  const cal = (await page.getByTestId('month-calendar').boundingBox())?.y ?? 0
+  await open.first().click()
+  await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+  const ids = await page.getByTestId('ai-assist-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-assist')))
+  check('C 일정(U5): 띠 없음 · 머리 오른쪽 [AI 도우미] 하나(달력 위) → 판에 이번 주 한눈에 · 빡빡한 날 · 꼭 지킬 마감', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await open.count()) === 1 && y < cal && ids.join() === 'calendar.week,calendar.busy,calendar.month', { y, cal, ids })
+  await shot(page, 'C-calendar-button')
+  await page.keyboard.press('Escape')
 }
 await page.goto(BASE + '/money', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
@@ -241,13 +254,17 @@ await page.keyboard.press('Escape')
     await page.goto(BASE + p, { waitUntil: 'networkidle' })
     await page.waitForTimeout(700)
     const bar = page.getByTestId('ai-assist-bar').first()
-    if (!(await bar.count())) {
+    // U5(D-542) 일정은 띠 대신 머리 [AI 도우미] 단추 — 판을 열고 질문 칸을 누른다
+    const viaButton = pg === 'calendar'
+    if (!viaButton && !(await bar.count())) {
       check(`G ${title}: AI 도우미 띠`, false, '띠 없음')
       continue
     }
-    await bar.getByTestId('ai-assist-ask-chip').click()
+    if (viaButton) await page.getByTestId('ai-assist-open').first().click()
+    else await bar.getByTestId('ai-assist-ask-chip').click()
     await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
     await page.waitForTimeout(250)
+    if (viaButton) await page.getByTestId('ai-assist-ask').click()
     const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))
     const mode = await page.getByTestId('ai-assist-ask-preset').inputValue()
     const q = pg === 'calendar' ? '이번 달에 메모가 가장 많았던 업체는?' : `${title} 화면에서 단추에 없는 것 하나 — 지금 제일 오래 손 안 댄 건 뭐야?`

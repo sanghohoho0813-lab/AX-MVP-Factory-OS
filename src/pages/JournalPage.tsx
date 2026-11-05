@@ -110,6 +110,8 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
       <PageHeader
         title="일정"
         description={`${RANGE_TITLE[range]} — 관리자 · 다른 사람 · 고객 누구에게도 공유되지 않는 나만의 기록입니다.`}
+        // U5(D-542) 일정 탭은 달력 화면과 같은 자리(넓은 PC 는 제목 옆 한 줄)
+        nav={<ScheduleTabs />}
         actions={
           <>
             {/* D-142: 나중에 GPT · Claude 를 붙일 자리 — 지금은 아무것도 보내지 않는다 */}
@@ -117,7 +119,6 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
           </>
         }
       />
-      <ScheduleTabs />
 
       <QuickCapture
         clients={clients}

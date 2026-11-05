@@ -763,7 +763,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
       {/*
         D-287 화면 꾸미기 — 아래 칸은 사람마다 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]).
-        기본 순서는 예전 그대로(휴대폰은 바로가기가 숫자 칸 위). 머리(인사 · 오늘 할 일 수)와 '첫 업체 등록' 안내는 늘 위.
+        머리(인사 · 오늘 할 일 수)와 '첫 업체 등록' 안내는 늘 위. 휴대폰은 바로가기가 숫자 줄 위.
+        D-541(2026-11-05 대표 지시 '(다)') 기본 순서에서 할 일 목록을 '오늘 먼저 제안할 것' · AI 도우미보다 위로 —
+        순서를 바꿔 둔 사람은 그 순서 그대로(저장된 순서가 기본 순서를 이긴다 · lib/pageLayout arrangeIds).
       */}
       <ArrangeArea page="today" title="오늘" className="flex flex-col gap-4 sm:gap-6">
         {/* D-497 맨 위 대화창 — 처음엔 보이고, 화면 꾸미기로 숨길 수 있다(대표 · 팀장 — AI 도우미와 같은 자격) */}
@@ -777,18 +779,16 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <TodayLauncher phone />
           </ArrangeItem>
         )}
-        <ArrangeItem id="kpis" label="숫자 다섯 칸" hint="오늘 처리할 업무 · 진행 중 고객사 · 확인 필요 · AI 작업 · 상담">
+        <ArrangeItem id="kpis" label="숫자 한 줄" hint="진행 중 고객사 · 확인 필요 · AI 작업 · 상담">
           {/* D-482 읽는 동안에도 칸 자리를 잡아 둔다 — 다 읽은 뒤 숫자 칸이 끼어들며 아래가 통째로 밀렸다(화면 밀림 CLS) */}
           {(
                     <TodayKpis
                       loading={loading}
-                      todo={{ open: todoCount, overdue: overdueTodos.length, hard: hardDue.length }}
                       clients={{ contract: countContractClients(clients), prospect: clients.filter(isProspect).length }}
                       decisions={decisionCount}
                       follow={{ events: openEvents.length, appointments: appointments.length, lateAppointments: appointments.filter((e) => (e.daysLeft ?? 0) < 0).length }}
                       pilot={pilot}
                       phone={phone}
-                      onTodos={() => scrollTo('today-todo-card')}
                       onFollow={() => (!pilot && openEvents.length > 0 ? navigate('/ops/inbox') : appointments.length > 0 ? scrollTo('today-appointments') : navigate('/ops/calendar'))}
                     />
                   )}
@@ -798,13 +798,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <TodayLauncher phone={false} />
           </ArrangeItem>
         )}
-        <ArrangeItem id="picks" label="오늘 먼저 제안할 것" hint="맞는 모듈이 있는 업체">
-          {/* D-482 읽는 동안 · 판정을 기다리는 동안은 같은 모양의 자리(업체가 있을 때) — 끝나면 칸으로 바뀐다 */}
-          {loading || (!reco.ready && active.length > 0) ? <TodayPicksPlaceholder /> : <TodayPicks clients={clients} reco={reco} phone={phone} />}
-        </ArrangeItem>
-        <ArrangeItem id="assist" label="AI 도우미" hint="오늘 제일 중요한 것 · 직접 묻기">
-          {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
-        </ArrangeItem>
         <ArrangeItem id="todos" label="오늘 할 일" hint="할 일 적기 · 밀린 것 · 오늘 · 끝낸 것">
           {/*
             B. 오늘 할 일 — 내가 적은 것.
@@ -960,6 +953,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               </Disclosure>
             )}
           </section>
+        </ArrangeItem>
+        <ArrangeItem id="picks" label="오늘 먼저 제안할 것" hint="맞는 모듈이 있는 업체">
+          {/* D-482 읽는 동안 · 판정을 기다리는 동안은 같은 모양의 자리(업체가 있을 때) — 끝나면 칸으로 바뀐다 */}
+          {loading || (!reco.ready && active.length > 0) ? <TodayPicksPlaceholder /> : <TodayPicks clients={clients} reco={reco} phone={phone} />}
+        </ArrangeItem>
+        <ArrangeItem id="assist" label="AI 도우미" hint="오늘 제일 중요한 것 · 직접 묻기">
+          {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
         </ArrangeItem>
         <ArrangeItem id="decisions" label="확인할 것" hint="자료에서 읽은 정보 — 맞다 · 아니다">
           {/* D-158: 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만(없으면 칸 없음) */}

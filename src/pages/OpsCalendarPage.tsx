@@ -1,6 +1,7 @@
 import { AiAssist } from '../components/ai/AiAssist'
 import { calendarBundle } from '../services/aiAssist/builders'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
+import { usePageLayout, visibilityOf } from '../lib/pageLayout'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
@@ -266,14 +267,21 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       return next
     })
 
+  // U5(D-542) AI 도우미는 머리 오른쪽 단추 하나 — 화면 꾸미기에서 'AI 도우미' 를 숨기면 단추도 숨는다(꾸미기 열쇠 calendar:assist 그대로)
+  const calLayout = usePageLayout('calendar')
+  const assistShown = visibilityOf(calLayout, 'assist') === 'show'
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="일정"
         descriptionAsHint
         description="모든 업체의 마감·신청·수금·서류 만료를 한 달력에서 봅니다."
+        nav={<ScheduleTabs />}
         actions={
           <>
+            {/* U5(D-542) 예전 띠의 질문 단추(이번 주 한눈에 · 빡빡한 날 · 꼭 지킬 마감 · 직접 묻기)는 누르면 열리는 판 안에 그대로 */}
+            {assistShown && <AiAssist variant="button" page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
             <Button variant="secondary" onClick={() => { const [y,m]=today.split('-'); setYm([Number(y),Number(m)]); setPicked(today) }}>
               <CalendarDays aria-hidden="true" className="size-4" />
               오늘로
@@ -286,12 +294,14 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </>
         }
       />
-      <ScheduleTabs />
       {/* D-287 화면 꾸미기 — 칸 순서 · 오늘만 숨기기 · 계속 숨기기(경로 줄 [화면 꾸미기]) */}
       <ArrangeArea page="calendar" title="일정" className="flex flex-col gap-5">
-        <ArrangeItem id="assist" label="AI 도우미" hint="이번 주 한눈에 · 빡빡한 날 · 직접 묻기">
-          {/* D-239: 일정 AI 도우미 — 이번 주 한눈에 · 빡빡한 날 · 이번 달 꼭 지킬 마감 */}
-          <AiAssist page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
+        {/*
+          D-239 일정 AI 도우미 — U5(D-542) 띠 대신 머리 오른쪽 [AI 도우미] 단추(위 PageHeader). 칸 자리는 비워 두고
+          꾸미기 창의 'AI 도우미' 줄은 남긴다 — 숨기기 · 다시 보이기가 그 단추에 걸린다(저장된 꾸미기 그대로).
+        */}
+        <ArrangeItem id="assist" label="AI 도우미" hint="머리 오른쪽 [AI 도우미] 단추 — 숨기면 단추도 숨어요">
+          {null}
         </ArrangeItem>
         <ArrangeItem id="month" label="달력 · 선택한 날" hint="달 이동 · 종류 · 달력 · 그날 할 일 · 업체 일정">
           {/* 월 이동 + 종류 필터 */}

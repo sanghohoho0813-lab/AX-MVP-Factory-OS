@@ -55,10 +55,10 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
   await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
   await page.waitForTimeout(600)
   const ids = await page.getByTestId('today-kpis').locator('[data-testid^="kpi-"]').evaluateAll((els) => els.map((e) => e.dataset.testid))
-  check('K1 KPI 다섯 칸(오늘 처리할 업무 · 진행 중 고객사 · 확인 필요 항목 · 최근 AI 작업 · 상담 · 후속)', JSON.stringify(ids) === '["kpi-todo","kpi-clients","kpi-decide","kpi-ai","kpi-follow"]', ids)
+  check('K1 숫자 줄 네 칩(진행 중 고객사 · 확인 필요 항목 · 최근 AI 작업 · 상담 · 후속) — D-541 오늘 처리할 업무 칩은 뺌', JSON.stringify(ids) === '["kpi-clients","kpi-decide","kpi-ai","kpi-follow"]', ids)
   const h1 = await page.locator('main h1').first().innerText()
-  const todo = num(await page.getByTestId('kpi-todo').locator('strong').innerText())
-  check('K2 오늘 처리할 업무 = 제목의 오늘 할 일 수(같은 셈)', todo === (/(\d+)건/.test(h1) ? num(h1) : 0), { h1, todo })
+  const kText = await page.getByTestId('today-kpis').innerText()
+  check("K2 D-541 같은 숫자 두 번 0 — 제목에만 '오늘 할 일 n건' · 숫자 줄엔 '오늘 처리할 업무' 없음", /오늘 할 일 \d+건/.test(h1) && !kText.includes('오늘 처리할 업무') && (await page.getByTestId('kpi-todo').count()) === 0, { h1, kText })
   const live = (await clientsLs()).filter((c) => !c.archivedAt).length
   const kc = num(await page.getByTestId('kpi-clients').locator('strong').innerText())
   // U2(2026-11-05) 숫자 칸 → 한 줄 요약 칩 — 설명은 칩에 마우스를 올리면(title)
@@ -67,7 +67,7 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
   check("K4 최근 AI 작업 — 기록 없으면 '0건 · 지난 7일 실행 없음'(지어낸 숫자 없음)", (await page.getByTestId('kpi-ai').innerText()).includes('0건') && (await tipOf('kpi-ai')).includes('지난 7일 실행 없음'))
   check('K5 상담 · 후속 — 새 상담신청 · 업체 약속 수를 함께 적음', /새 상담신청 \d+ · 업체 약속 \d+/.test(await tipOf('kpi-follow')), await tipOf('kpi-follow'))
   const kH = (await page.getByTestId('today-kpis').boundingBox())?.height ?? 999
-  check('K5b U2 숫자 다섯은 한 줄(높이 ≤ 56px)', kH <= 56, kH)
+  check('K5b U2 숫자 칩은 한 줄(높이 ≤ 56px)', kH <= 56, kH)
   const yK = (await page.getByTestId('today-kpis').boundingBox())?.y ?? 9e9
   const yTodo = (await page.locator('#today-todo-card').boundingBox())?.y ?? 0
   check('K6 KPI 는 할 일 칸보다 위(첫 화면에)', yK < yTodo && yK < 1000, { yK, yTodo })
@@ -304,7 +304,19 @@ let caseUrl = ''
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
   const def = await order(page)
-  check('R1 오늘 — [화면 꾸미기] 단추 · 기본 순서(D-498 맨 위 대화창 → 숫자 → 바로가기 → 제안 → AI → 할 일 → 확인할 것 → 마감 · 메모 → 상담 · 영업 · 돌봄)', (await page.getByTestId('arrange-open').count()) === 1 && def.join() === 'ask,kpis,launcher,picks,assist,todos,decisions,agenda,capture,events,sales,care', def)
+  check('R1 오늘 — [화면 꾸미기] 단추 · 기본 순서(D-498 맨 위 대화창 → 숫자 → 바로가기 → D-541 할 일 → 제안 → AI → 확인할 것 → 마감 · 메모 → 상담 · 영업 · 돌봄)', (await page.getByTestId('arrange-open').count()) === 1 && def.join() === 'ask,kpis,launcher,todos,picks,assist,decisions,agenda,capture,events,sales,care', def)
+  // D-541 기본 순서를 바꿔도 순서를 꾸며 둔 사람은 그 순서 그대로(저장된 순서가 이긴다)
+  {
+    const saved = ['ask', 'kpis', 'launcher', 'picks', 'assist', 'todos', 'decisions', 'agenda', 'capture', 'events', 'sales', 'care']
+    await page.evaluate((order) => localStorage.setItem('axmvp.ui.layout.today', JSON.stringify({ order, off: [], today: {} })), saved)
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
+    const kept = await order(page)
+    check('R1b D-541 예전 순서를 저장해 둔 사람 → 제안 · AI 도우미가 할 일보다 위 그대로', kept.indexOf('picks') < kept.indexOf('todos') && kept.indexOf('assist') < kept.indexOf('todos'), kept)
+    await page.evaluate(() => localStorage.removeItem('axmvp.ui.layout.today'))
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
+  }
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   const rows = await page.locator('[data-arrange-row]').count()
