@@ -130,6 +130,7 @@ export function ScreenTitle({
   actions,
   back,
   icon,
+  subOnPhone = true,
 }: {
   title: string
   sub?: string
@@ -137,6 +138,11 @@ export function ScreenTitle({
   back?: ReactNode
   /** D-282 기능 아이콘 칸(IconTile) — 제목 왼쪽. 휴대폰에서 제목을 숨기는 화면이면 아이콘도 함께 숨긴다 */
   icon?: ReactNode
+  /**
+   * U3(D-543) false 면 휴대폰(제목을 숨기는 폭)에서 설명 줄도 숨기고 단추를 한 줄에 — 휴대폰 위쪽 띠가 이미 날짜 · 화면 이름을 말할 때.
+   * 설명이 날짜뿐인 화면만 쓴다(뜻이 담긴 설명은 숨기지 않는다).
+   */
+  subOnPhone?: boolean
 }) {
   const { pathname } = useLocation()
   // D-282 아이콘을 따로 안 주면 메뉴와 같은 기능 아이콘(제목이 메뉴 이름으로 시작할 때만)
@@ -151,13 +157,13 @@ export function ScreenTitle({
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         {/* 제목을 숨긴 폭에서는 설명 줄이 한 줄을 다 쓰게 둔다 — 버튼과 나눠 쓰면 두 줄로 접힌다 */}
         {/* D-273 기준폭 0(flex-1)만 주면 단추 묶음 옆에서 설명이 한 줄 4~5자로 짜부라졌다 — 15rem 아래로는 줄을 바꾼다 */}
-        <div className={`${sameAsHeader ? 'w-full min-w-0 lg:w-auto lg:flex-1' : 'min-w-[min(100%,15rem)] flex-1'} ${shownIcon ? 'flex items-start gap-3' : ''}`}>
+        <div className={`${sameAsHeader ? (subOnPhone ? 'w-full min-w-0 lg:w-auto lg:flex-1' : 'w-0 min-w-0 lg:w-auto lg:flex-1') : 'min-w-[min(100%,15rem)] flex-1'} ${shownIcon ? 'flex items-start gap-3' : ''}`}>
           {shownIcon && <span className={sameAsHeader ? 'hidden lg:flex' : 'flex'}>{shownIcon}</span>}
           <div className="min-w-0 flex-1">
             <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
               {title}
             </h1>
-            {sub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'}`}>{sub}</p>}
+            {sub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'} ${sameAsHeader && !subOnPhone ? 'hidden lg:block' : ''}`}>{sub}</p>}
           </div>
         </div>
         {/* D-124: 휴대폰 큰 글자에서 버튼이 화면 밖으로 밀리지 않게 — 좁으면 버튼끼리도 줄을 바꾼다 */}

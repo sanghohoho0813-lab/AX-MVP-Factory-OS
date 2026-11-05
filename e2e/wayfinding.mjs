@@ -52,7 +52,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 업체 일 순서 — 다음 · 이전
   await go(page, '/ops/clients/cli_hansol?tab=smart')
   const g = guide(page)
-  check('W2 맞춤 추천 = 업체 일 순서 3 / 6단계 · 무엇을 위한 단계인지 한 문장', (await g.getAttribute('data-index')) === '3' && (await g.getAttribute('data-total')) === '6' && /맞춤 추천 — .+/.test(await page.getByTestId('step-why').innerText()), await g.innerText())
+  // U4(D-544) 업체 상세는 처음엔 한 줄(몇 번째 · 이름) — [펼치기] 한 번에 무엇을 위한 단계인지
+  const firstMin = (await g.getAttribute('data-min')) === '1' && (await page.getByTestId('step-why').count()) === 0 && /맞춤 추천/.test(await g.innerText())
+  await page.getByTestId('step-min').click()
+  await page.waitForTimeout(250)
+  check('W2 맞춤 추천 = 업체 일 순서 3 / 6단계 · 처음엔 한 줄 · [펼치기] → 무엇을 위한 단계인지 한 문장', firstMin && (await g.getAttribute('data-index')) === '3' && (await g.getAttribute('data-total')) === '6' && /맞춤 추천 — .+/.test(await page.getByTestId('step-why').innerText()), await g.innerText())
   await page.getByTestId('step-next-top').click()
   await settle(page, 'work')
   check('W2 [다음: 업무 진행] → 업무 탭 · 4 / 6 · 경로 줄 끝 = 업무', /tab=work/.test(page.url()) && (await guide(page).getAttribute('data-index')) === '4' && (await crumbText(page)).endsWith('› 업무'), [page.url(), await crumbText(page)])

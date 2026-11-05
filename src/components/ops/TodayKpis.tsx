@@ -9,9 +9,9 @@
  * D-541(2026-11-05 대표 지시): '오늘 처리할 업무' 칩은 뺐다 — 제목 '오늘 할 일 n건' 과 같은 숫자가 두 번 보였다.
  *   밀린 것 · 놓치면 끝나는 기한은 바로 아래 할 일 목록이 빨간 글자로 말한다(D-541 로 목록이 숫자 줄 바로 아래).
  */
-import { useContext, useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { CalendarClock, CheckCheck, MessagesSquare, Sparkles, Users, type LucideIcon } from 'lucide-react'
+import { useContext, useEffect, useState } from 'react'
+import { CalendarClock, CheckCheck, MessagesSquare, Sparkles, Users } from 'lucide-react'
+import { SummaryChip, type SummaryChipProps as ChipProps } from '../ui/SummaryChip'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import { AuthContext } from '../../auth/authContext'
@@ -132,46 +132,5 @@ export function TodayKpis({ clients, decisions, follow, pilot, phone, onFollow, 
     <section aria-label="오늘 숫자" data-testid="today-kpis" className="flex flex-wrap items-center gap-2">
       {row}
     </section>
-  )
-}
-
-type Urgency = 'neutral' | 'danger' | 'warning' | 'brand'
-interface ChipProps {
-  testId: string
-  icon: LucideIcon
-  label: string
-  value: string
-  hint: string
-  urgency?: Urgency
-  to?: string
-  onClick?: () => void
-}
-
-/** 요약 칩 하나 — 흰 바탕 · 회색 테두리(박스 색 하나) · 급한 것은 숫자 글자색으로만(빨강 = 늦음 · 파랑 = 볼 것 · 주황 = 지난 약속) */
-const VALUE_TONE: Record<Urgency, string> = {
-  neutral: 'text-slate-900',
-  danger: 'text-danger-700',
-  warning: 'text-warning-800',
-  brand: 'text-brand-700',
-}
-function SummaryChip({ testId, icon: Icon, label, value, hint, urgency = 'neutral', to, onClick }: ChipProps) {
-  const inner: ReactNode = (
-    <>
-      <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
-      <span className="t-sub break-keep whitespace-nowrap text-slate-600">{label}</span>
-      <strong className={`t-body font-bold whitespace-nowrap tabular-nums ${VALUE_TONE[urgency]}`}>{value}</strong>
-    </>
-  )
-  const cls = 'tap inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-left hover:border-slate-300 hover:bg-slate-50'
-  if (to)
-    return (
-      <Link to={to} title={hint} aria-label={`${label} ${value} — ${hint}`} className={cls} data-testid={testId}>
-        {inner}
-      </Link>
-    )
-  return (
-    <button type="button" title={hint} aria-label={`${label} ${value} — ${hint}`} onClick={onClick} className={cls} data-testid={testId}>
-      {inner}
-    </button>
   )
 }

@@ -20,6 +20,10 @@ import {
   Search,
   Upload,
   SlidersHorizontal,
+  AlarmClock,
+  Clock,
+  Users,
+  Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useIsPilot } from '../auth/osAccess'
@@ -47,7 +51,9 @@ import {
   type ClientSortKey,
 } from '../services/clientOpsSort'
 import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
-import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
+import { BottomSheet, ScreenTitle, type Tone } from '../components/ui/primitives'
+import { SummaryChip } from '../components/ui/SummaryChip'
+import { usePageLayout, visibilityOf } from '../lib/pageLayout'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { withNewProspect } from '../services/salesPipeline'
@@ -425,6 +431,9 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
     }
   }, [segment])
   const assistBuild = useCallback(() => clientsBundle(typed, today, reco, segment), [typed, today, reco, segment])
+  // U3(D-543) 꾸미기 'AI 도우미'(clients:assist) 를 숨겼으면 머리 단추도 숨긴다
+  const hubLayout = usePageLayout('clients')
+  const assistShown = visibilityOf(hubLayout, 'assist') === 'show'
   const contractCount = typed.filter(isContractClient).length
   const prospectCount = typed.filter(isProspect).length
   const moneyWords = useMoneyWords()
@@ -673,11 +682,26 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
 
   return (
     <div className="flex flex-col gap-6">
+      {/*
+        U3(D-543) 머리 한 줄 — 날짜만(계약 · 잠재 숫자는 바로 아래 고르개 줄에 있다 · 같은 숫자 두 번 0) · 휴대폰은 위쪽 띠가 날짜를 말하니 단추만 한 줄.
+        AI 도우미는 예전 띠 대신 머리 단추 하나(질문 단추는 누르면 열리는 판 안에 그대로) — 꾸미기에서 'AI 도우미' 를 숨기면 단추도 숨는다.
+      */}
       <ScreenTitle
         title="고객 관리"
-        sub={`${today} · ${!pilot && ctype === 'consultant' ? '컨설턴트 고객 · ' : ''}계약 고객 ${contractCount}곳 · 잠재고객 ${prospectCount}곳`}
+        sub={today}
+        subOnPhone={false}
         actions={
           <>
+            {assistShown && typed.length > 0 && (
+              <AiAssist
+                variant="button"
+                page="clients"
+                scope={`clients:${segment}`}
+                title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
+                presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
+                build={assistBuild}
+              />
+            )}
             <Button variant="primary" onClick={openForm} data-testid="clients-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               <span className="hidden sm:inline">{!pilot && ctype === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</span>
@@ -846,76 +870,47 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
 
       {/* D-287 화면 꾸미기 — AI 도우미 · 업체 목록(고르개 · 찾기 · 요약 · 현황표) · 지금 챙길 것 */}
       <ArrangeArea page="clients" title="고객 관리" className="flex flex-col gap-6">
-        <ArrangeItem id="assist" label="AI 도우미" hint="여러 달 연락 안 된 곳 · 계약 가능성 · 직접 묻기">
-          {/* D-239: 고객 관리 AI 도우미(예전 'AI 비서 · 준비 중' 자리) — 고른 구분(계약 고객 · 잠재고객)에 맞춘 질문 */}
-          {typed.length > 0 && (
-            <AiAssist
-              page="clients"
-              scope={`clients:${segment}`}
-              title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
-              presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
-              build={assistBuild}
-            />
-          )}
-
+        {/* D-239 고객 관리 AI 도우미 — U3(D-543) 띠 대신 머리 [AI 도우미] 단추. 칸 자리는 비워 두고 꾸미기 줄(clients:assist)은 남긴다(숨기면 단추도 숨음) */}
+        <ArrangeItem id="assist" label="AI 도우미" hint="머리 오른쪽 [AI 도우미] 단추 — 숨기면 단추도 숨어요">
+          {null}
         </ArrangeItem>
         <ArrangeItem id="list" label="업체 목록" hint="고객 종류 · 계약/잠재 · 찾기 · 요약 숫자 · 업체별 현황표">
           <div className="flex flex-col gap-6">
-            {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) */}
-            {!pilot && (records.length > 0 || ctype === 'consultant') && (
-              <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="flex gap-1 overflow-x-auto border-b border-slate-200">
-                {CLIENT_TYPES.map((t) => {
-                  const on = ctype === t
-                  const Icon = t === 'sme' ? Building2 : BriefcaseBusiness
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      role="tab"
-                      aria-selected={on}
-                      data-testid={`client-type-${t}`}
-                      onClick={() => switchType(t)}
-                      className={`tap -mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[1rem] font-semibold whitespace-nowrap ${
-                        on ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      <Icon aria-hidden="true" className="size-4" />
-                      {CLIENT_TYPE_LABEL[t]}
-                      <span className={`t-meta tabular-nums ${on ? 'text-brand-600' : 'text-slate-400'}`}>{typeCount[t]}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
-            {typed.length > 0 && !showArchived && (
-              <div role="group" aria-label="고객 구분" data-testid="client-segment" className="grid grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto sm:self-start">
-                {SEGMENTS.map((sg) => {
-                  const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
-                  const on = segment === sg.key
-                  return (
-                    <button
-                      key={sg.key}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setSegment(sg.key)}
-                      className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      <span className="text-[0.875rem]">{sg.label}</span>
-                      <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* 검색 · 보관 */}
-            {typed.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
+            {/*
+              U3(D-543) 고르개 한 줄 — 예전엔 '고객 종류' 탭 줄 · '계약 고객 · 잠재고객 · 전체' 줄 · 찾기 줄이 따로였다.
+              PC: [중소기업 · 컨설턴트] [계약 · 잠재 · 전체] 한 줄 → 찾기 · 보기 · 정렬 한 줄.
+              휴대폰: [계약 · 잠재 · 전체] → 찾기 → [거르기 · 보관함 … 중소기업 · 컨설턴트]. 고르는 것 · 숫자 · 누르면 하는 일은 그대로.
+            */}
+            {(typed.length > 0 || (!pilot && (records.length > 0 || ctype === 'consultant'))) && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-3" data-testid="client-pickers">
+                {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
+                {typed.length > 0 && !showArchived && (
+                  <div role="group" aria-label="고객 구분" data-testid="client-segment" className="order-1 grid w-full grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:order-2 sm:inline-flex sm:w-auto">
+                    {SEGMENTS.map((sg) => {
+                      const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
+                      const on = segment === sg.key
+                      return (
+                        <button
+                          key={sg.key}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setSegment(sg.key)}
+                          className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <span className="text-[0.875rem]">{sg.label}</span>
+                          <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* PC 는 위 두 고르개 다음에 줄을 바꾼다 */}
+                <span aria-hidden="true" className="hidden h-0 basis-full sm:order-3 sm:block" />
+                {typed.length > 0 && (
+                  <>
                 {/* 휴대폰에서는 검색칸이 한 줄을 다 쓴다 — 보관함 단추와 나눠 쓰면
                     안내 문구가 '…번호로' 에서 잘렸다 */}
-                <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
+                <div className="relative order-2 w-full min-w-0 sm:order-4 sm:w-auto sm:flex-1 sm:max-w-md">
                   <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={query}
@@ -931,7 +926,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     type="button"
                     aria-pressed={showArchived}
                     onClick={() => setShowArchived((v) => !v)}
-                    className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium ${
+                    className={`tap order-3 inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:order-5 ${
                       showArchived
                         ? 'border-brand-300 bg-brand-50 text-brand-700'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -941,24 +936,52 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     보관함 {archivedCount}
                   </button>
                 )}
-                {/*
-                  정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
-                  좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
-                */}
                 {/* D-126: 휴대폰에서는 '거르기' 단추 하나 — 누르면 보기 · 정렬이 펼쳐진다 */}
                 <button
                   type="button"
                   aria-expanded={filtersOpen}
                   data-testid="client-filters-toggle"
                   onClick={() => setFiltersOpen((v) => !v)}
-                  className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:hidden ${
+                  className={`tap order-3 inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:hidden ${
                     filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
                   }`}
                 >
                   <SlidersHorizontal aria-hidden="true" className="size-4" />
                   거르기{filterKey !== 'all' ? ` · ${CLIENT_FILTER_LABEL[filterKey]}` : ''}
                 </button>
-                <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
+                  </>
+                )}
+                {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) · 휴대폰은 거르기 줄 오른쪽 끝에 작게 */}
+                {!pilot && (records.length > 0 || ctype === 'consultant') && (
+                  <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="order-3 ml-auto inline-flex gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:order-1 sm:ml-0">
+                    {CLIENT_TYPES.map((t) => {
+                      const on = ctype === t
+                      const Icon = t === 'sme' ? Building2 : BriefcaseBusiness
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          role="tab"
+                          aria-selected={on}
+                          aria-label={`${CLIENT_TYPE_LABEL[t]} ${typeCount[t]}`}
+                          title={CLIENT_TYPE_LABEL[t]}
+                          data-testid={`client-type-${t}`}
+                          onClick={() => switchType(t)}
+                          className={`tap inline-flex shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 py-2 text-[0.875rem] font-semibold whitespace-nowrap sm:px-3 ${
+                            on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Icon aria-hidden="true" className="size-4" />
+                          <span className="max-sm:sr-only">{CLIENT_TYPE_LABEL[t]}</span>
+                          <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{typeCount[t]}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {typed.length > 0 && (
+                  <>
+                <div className={`${filtersOpen ? 'flex' : 'hidden'} order-4 w-full flex-wrap items-center gap-2 sm:order-6 sm:flex sm:w-auto`}>
                 {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
                 <label className="flex shrink-0 items-center gap-1.5">
                   <span className="t-sub text-slate-500">보기</span>
@@ -995,45 +1018,58 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
                 </div>
                 {(query !== '' || filterKey !== 'all') && (
-                  <span className="text-[0.875rem] text-slate-500">{visible.length}곳 찾음</span>
+                  <span className="order-5 text-[0.875rem] text-slate-500 sm:order-7">{visible.length}곳 찾음</span>
+                )}
+                  </>
                 )}
               </div>
             )}
 
-            {/* 요약 — 0 일 때는 색을 쓰지 않는다 */}
-            <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-5">
-              <MetricTile
-                label="지금 처리할 일"
-                value={`${summary.critical}건`}
-                tone={summary.critical > 0 ? 'danger' : 'neutral'}
-                hint="마감 지남 · 서류 없음"
-                onClick={() => { setTab('critical'); setAlertsOpen(true) }}
-              />
-              <MetricTile
-                label="곧 처리할 일"
-                value={`${summary.warning}건`}
-                tone={summary.warning > 0 ? 'warning' : 'neutral'}
-                hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
-                onClick={() => { setTab('warning'); setAlertsOpen(true) }}
-              />
-              <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳`} />
-              {/* D-171: 잠재고객(가망고객) — 누르면 잠재고객만 */}
-              <MetricTile label="잠재고객" value={`${prospectCount}곳`} hint="계약 전 · 영업 중" onClick={() => setSegment('prospect')} />
-              <MetricTile
-                label={moneyWords.unpaid}
-                value={krwTile(money.unpaid)}
-                tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
-                hint={
-                  // 연체 건수와 청구 기준은 둘 다 사실이라 둘 다 적는다 — 하나만 고르면 다른 하나를 잃는다
-                  [
-                    money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '',
-                    money.unpaidGross !== money.unpaid ? `청구 기준 ${krwTile(money.unpaidGross)}` : '',
-                  ]
-                    .filter((v) => v !== '')
-                    .join(' · ') || '연체 없음'
-                }
-              />
-            </section>
+            {/*
+              요약 — U3(D-543) 큰 칸 다섯 → 한 줄 칩(오늘 화면과 같은 모양). 0 일 때는 색을 쓰지 않는다.
+              '잠재고객 n곳' 칸은 뺐다 — 바로 위 고르개 [잠재고객 n] 과 같은 숫자 · 같은 일(누르면 잠재고객만)이었다.
+              못 받은 내 돈은 누르면 '받을 돈 남음' 으로 거른다(예전엔 누를 수 없었다).
+            */}
+            {typed.length > 0 && (
+              <section aria-label="요약" data-testid="clients-summary" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <SummaryChip
+                  testId="clients-kpi-critical"
+                  icon={AlarmClock}
+                  label="지금 처리할 일"
+                  value={`${summary.critical}건`}
+                  urgency={summary.critical > 0 ? 'danger' : 'neutral'}
+                  hint="마감 지남 · 서류 없음"
+                  onClick={() => { setTab('critical'); setAlertsOpen(true) }}
+                />
+                <SummaryChip
+                  testId="clients-kpi-warning"
+                  icon={Clock}
+                  label="곧 처리할 일"
+                  value={`${summary.warning}건`}
+                  urgency={summary.warning > 0 ? 'warning' : 'neutral'}
+                  hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
+                  onClick={() => { setTab('warning'); setAlertsOpen(true) }}
+                />
+                <SummaryChip testId="clients-kpi-active" icon={Users} label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳 · 계약 끝난 곳 · 보관한 곳 빼고`} />
+                <SummaryChip
+                  testId="clients-kpi-unpaid"
+                  icon={Wallet}
+                  label={moneyWords.unpaid}
+                  value={krwTile(money.unpaid)}
+                  urgency={money.overdueCount > 0 ? 'danger' : 'neutral'}
+                  hint={
+                    // 연체 건수와 청구 기준은 둘 다 사실이라 둘 다 적는다 — 하나만 고르면 다른 하나를 잃는다
+                    [
+                      money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '',
+                      money.unpaidGross !== money.unpaid ? `청구 기준 ${krwTile(money.unpaidGross)}` : '',
+                    ]
+                      .filter((v) => v !== '')
+                      .join(' · ') || '연체 없음'
+                  }
+                  onClick={money.unpaid > 0 ? () => setFilterKey('unpaid') : undefined}
+                />
+              </section>
+            )}
 
             {/* B. 업체별 현황표 */}
             <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">

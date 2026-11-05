@@ -178,7 +178,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForTimeout(400)
   check(`뒤로: 미팅 준비에서 연 업체 → 뒤로 → 그 미팅 준비로 ${tag}`, path().startsWith('/sales/meeting?client=cli_hansol'), path())
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
-  check(`뒤로: 고객 관리에서 연 업체는 그대로 '고객 관리 현황' ${tag}`, ((await page.getByTestId('client-back').innerText()) ?? '').includes('고객 관리'))
+  // U4(D-544) 고객 관리에서 연 업체는 돌아가는 단추를 또 두지 않는다 — 맨 위 경로 줄 '고객 관리' 가 그 길
+  check(`뒤로: 고객 관리에서 연 업체는 돌아가는 단추 없음 · 경로 줄 '고객 관리' 하나 ${tag}`, (await page.getByTestId('client-back').count()) === 0 && (await page.getByTestId('crumbs').getByRole('link', { name: '고객 관리' }).count()) === 1)
 
   /* 10 (D-124) 세금 계산기 목록 — 밀면 안 닫힘 · 누르면 닫힘 (휴대폰) */
   if (mob) {

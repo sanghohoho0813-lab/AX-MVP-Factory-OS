@@ -668,12 +668,10 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(600)
   const shelf = (await page.getByTestId('doc-shelf').innerText()) ?? ''
   check(`서류 탭 손볼 것: 만료(납세증명서) ${tag}`, /만료 [1-9]/.test(shelf), shelf)
-  // D-166: 휴대폰은 머리 단추를 줄여 '서류 요청 문구' 가 더보기 안에 있다
-  if (width < 640) {
-    check(`휴대폰 머리에는 서류 요청 문구 단추가 숨는다 ${tag}`, (await page.getByRole('button', { name: '서류 요청 문구', exact: true }).filter({ visible: true }).count()) === 0)
-    await page.locator('main').getByRole('button', { name: '더보기', exact: true }).first().click()
-    await page.getByTestId('more-doc-request').click()
-  } else await page.getByRole('button', { name: '서류 요청 문구' }).first().click()
+  // D-166 → U4(D-544) PC 도 머리 단추를 줄여 '서류 요청 문구' 는 [더보기] 안에 있다
+  check(`머리에는 서류 요청 문구 단추가 없다(더보기 안) ${tag}`, (await page.getByRole('button', { name: '서류 요청 문구', exact: true }).filter({ visible: true }).count()) === 0)
+  await page.getByTestId('client-more').click()
+  await page.getByTestId('more-doc-request').click()
   await page.waitForTimeout(400)
   const msg = (await page.getByRole('dialog').locator('textarea').inputValue()) ?? ''
   check(`서류 요청 문구: 만료된 납세증명서 새 발급본도 ${tag}`, msg.includes('납세증명서') && msg.includes('새 발급본'), msg.slice(0, 300))
@@ -1651,12 +1649,9 @@ for (const vp of [{ tag: '1440', w: 1440, h: 900 }, { tag: '390', w: 390, h: 844
   // 진행 상황 보고 문구에는 단추가 없다(요청이 아니다)
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
-  if (vp.tag === '1440') {
-    await page.getByRole('button', { name: '진행 상황 보고' }).first().click()
-  } else {
-    await page.getByRole('button', { name: /더보기/ }).first().click()
-    await page.getByRole('button', { name: '진행 상황 보고 문구' }).first().click()
-  }
+  // U4(D-544) PC · 휴대폰 모두 [더보기] 안
+  await page.getByTestId('client-more').click()
+  await page.getByTestId('more-status-report').click()
   await page.locator('[role="dialog"] textarea').first().waitFor({ timeout: 4000 })
   check(`D-314 ${vp.tag} 진행 상황 보고 문구에는 [보냈어요] 없음`, (await page.getByTestId('message-followup').count()) === 0)
   check(`D-314 ${vp.tag} 넘침 0 · 오류 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))

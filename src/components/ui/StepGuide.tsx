@@ -79,18 +79,24 @@ function GoButton({
 
 const MIN_KEY = 'axmvp.stepguide.min'
 
-function readMin(): boolean {
+/** 사람이 접기 · 펼치기를 한 번이라도 눌렀으면 그 선택(모든 화면 같이) · 안 눌렀으면 화면이 정한 기본값 */
+function readMin(fallback = false): boolean {
   try {
-    return localStorage.getItem(MIN_KEY) === '1'
+    const v = localStorage.getItem(MIN_KEY)
+    return v === null ? fallback : v === '1'
   } catch {
-    return false
+    return fallback
   }
 }
 
 /** 화면 위 — 지금 몇 번째 단계 · 무엇을 위한 것인지 · 이전/다음 */
-export function StepGuide({ pos, onGo, hrefOf, className = '' }: GoProps & { pos: FlowPosition; className?: string }) {
+/**
+ * defaultMin — U4(D-544) 업체 상세처럼 머리가 긴 화면은 처음엔 한 줄(몇 번째 · 이름 · 다음 단추)로.
+ * 설명은 [펼치기] 한 번 · 한 번 고른 것은 기억(모든 화면 같이).
+ */
+export function StepGuide({ pos, onGo, hrefOf, className = '', defaultMin = false }: GoProps & { pos: FlowPosition; className?: string; defaultMin?: boolean }) {
   const { flow, index, prev, next, here } = pos
-  const [min, setMinState] = useState(readMin)
+  const [min, setMinState] = useState(() => readMin(defaultMin))
   const setMin = (v: boolean) => {
     setMinState(v)
     try {
@@ -156,7 +162,8 @@ export function StepGuide({ pos, onGo, hrefOf, className = '' }: GoProps & { pos
           )}
         </div>
         {(prev || next) && (
-          <div className="flex flex-wrap items-center gap-2">
+          // U4(D-544) 접힌 한 줄일 때 휴대폰은 이전 · 다음 단추를 숨긴다(바로 위 탭 줄 · 화면 끝 [다음 단계]가 같은 일) — 펼치면 보인다
+          <div className={`flex-wrap items-center gap-2 ${min ? 'hidden sm:flex' : 'flex'}`}>
             {prev && <GoButton step={prev} dir="prev" onGo={onGo} hrefOf={hrefOf} testId="step-prev" />}
             {next && <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-top" />}
           </div>

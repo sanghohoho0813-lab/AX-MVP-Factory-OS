@@ -7,6 +7,7 @@ import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
 import { ClientAssistButton } from '../components/ai/ClientAssistButton'
+import { ClientSplit } from '../components/ops/ClientSideList'
 import { navFromOf } from '../lib/navFrom'
 import {
   ArrowLeft,
@@ -710,15 +711,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* 헤더 */}
       <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          data-testid="client-back"
-          onClick={goBack}
-          className="tap inline-flex w-fit items-center gap-1.5 text-[0.9375rem] font-medium text-slate-500 hover:text-slate-800"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          {navFrom ? `${navFrom.label}로` : '고객 관리 현황'}
-        </button>
+        {/*
+          U4(D-544) 돌아가는 길 하나 — 고객 관리에서 열었으면 맨 위 경로 줄(고객 관리 › 업체 › 탭)이 그 길이라 단추를 또 두지 않는다.
+          다른 곳(영업 관리 · 미팅 준비 …)에서 왔을 때만 그곳으로 돌아가는 단추.
+        */}
+        {navFrom && (
+          <button
+            type="button"
+            data-testid="client-back"
+            onClick={goBack}
+            className="tap inline-flex w-fit items-center gap-1.5 text-[0.9375rem] font-medium text-slate-500 hover:text-slate-800"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            {`${navFrom.label}로`}
+          </button>
+        )}
         {/*
           머리말은 세 줄로 끝낸다 — 회사명 / 연락처 / 다음 행동.
           상태 변경·보고 문구·보관·가이드는 모바일에서 '더보기' 안으로 넣는다.
@@ -782,8 +789,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </div>
         </div>
 
-        {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다. D-126: 잠재고객은 서류보다 미팅이 먼저 */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다. D-126: 잠재고객은 서류보다 미팅이 먼저 · U4 휴대폰은 사이를 좁혀 세 단추가 한 줄에 */}
+        <div className="flex flex-wrap items-center gap-2 max-sm:gap-1.5">
           {prospect && (
             <Link to={`/sales/meeting?client=${record.id}`} data-testid="client-primary-meeting" className={LINK_BUTTON.primary}>
               <Presentation aria-hidden="true" className="size-4" />
@@ -791,50 +798,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </Link>
           )}
           {/* D-144: 서류 올리기 — 파일 · 폴더째. 읽자마자 확실한 것은 바로 넣고, 모듈 판정은 맞춤 추천에 */}
-          <Button variant={prospect ? 'secondary' : 'primary'} onClick={openUpload} data-testid="client-upload">
+          <Button variant={prospect ? 'secondary' : 'primary'} onClick={openUpload} data-testid="client-upload" className="max-sm:px-3">
             <FileUp aria-hidden="true" className="size-4" />
             서류 올리기
           </Button>
-          {/* D-295 대표: 업체를 등록하고 바로 AI 전략실로(반대로 AI 전략실 → 고객 관리처럼) — 머리 단추라 어느 탭에서든 · 휴대폰에서도. 이어 둔 작업실이 없으면 그 탭에서 한 번에 이어 만든다 · 팀장에게는 없다 */}
-          {!pilot && ownerAi !== 'no' && tab !== 'ai' && (
-            <Button variant="secondary" onClick={() => setTab('ai')} data-testid="client-open-ai">
-              <Sparkles aria-hidden="true" className="size-4 text-violet-600" />
-              AI 전략실
-            </Button>
-          )}
-          {/* D-166: 휴대폰은 머리 단추를 줄인다 — 서류 요청 문구는 '더보기' 안에(PC 는 그대로) */}
-          <Button
-            variant="secondary"
-            className="hidden sm:inline-flex"
-            onClick={() =>
-              setMessage({
-                title: '서류 요청 문구',
-                description: '지금 진행 중인 업무에 필요한데 아직 없는 서류만 골라 정리했습니다.',
-                text: buildDocumentRequestMessage(record, today),
-              })
-            }
-          >
-            <Send aria-hidden="true" className="size-4" />
-            서류 요청 문구
-          </Button>
-          <Button
-            variant="secondary"
-            className="hidden sm:inline-flex"
-            onClick={() =>
-              setMessage({
-                title: '진행 상황 보고 문구',
-                description: '업무별 현재 상태와 다음 단계를 정리했습니다.',
-                text: buildStatusReportMessage(record, today),
-              })
-            }
-          >
-            <ClipboardCopy aria-hidden="true" className="size-4" />
-            진행 상황 보고
-          </Button>
+          {/*
+            U4(D-544) 머리 단추는 [서류 올리기] · [AI 도우미] · [더보기] 만 — AI 전략실 · 서류 요청 문구 · 진행 상황 보고는 [더보기] 맨 위에(하는 일 그대로).
+          */}
           {/* D-239: 이 업체 AI 도우미 — 대표 계정에서만(팀장 화면 · 팀장 보기에는 없음) */}
           <ClientAssistButton record={record} today={today} />
-          <Button variant="ghost" onClick={() => setMoreOpen(true)}>
-            <MoreHorizontal aria-hidden="true" className="size-4" />
+          {/* U4 휴대폰은 점 아이콘 없이 글자만 — 세 단추가 한 줄에(D-122 점 세 개만 두지 않는다 — 글자는 남긴다) */}
+          <Button variant="ghost" onClick={() => setMoreOpen(true)} data-testid="client-more" className="max-sm:px-2.5">
+            <MoreHorizontal aria-hidden="true" className="size-4 max-sm:hidden" />
             더보기
           </Button>
         </div>
@@ -889,7 +864,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       </ScrollHintRow>
 
       {/* D-235: 지금 몇 번째 단계 · 무엇을 위한 것인지 · 이전/다음(탭 순서는 그대로 — 처음 쓰는 사람이 따라갈 순서만) */}
-      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
+      {/* U4(D-544) 처음엔 한 줄 — 설명은 [펼치기](한 번 고르면 기억) */}
+      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} defaultMin />
 
       {tab === 'smart' && (
         <Suspense fallback={<p className="t-sub text-slate-500">맞춤 추천을 계산하는 중…</p>}>
@@ -1431,7 +1407,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'docs' && (
       <section aria-labelledby="docs" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        {/* U4(D-544) 제목 · 단추 한 줄(휴대폰도) — '서류 다시 분류' 는 휴대폰에서 '다시 분류' */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {/* D-192: '발급일을 넣으면 유효기간…' 설명은 목차 설명(ⓘ)으로 */}
           <HintTip tip={hintFor('서류함')} label="서류함">
             <h2 id="docs" className="text-[1.2rem] font-bold text-slate-900">
@@ -1447,7 +1424,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             {allDocumentMetas(record).some((m) => m.needsFile && record.documents[m.key]?.fileName) && (
               <Button variant="secondary" size="sm" data-testid="doc-resort" onClick={() => setResortOpen(true)}>
                 <ArrowRightLeft aria-hidden="true" className="size-3.5" />
-                서류 다시 분류
+                <span><span className="max-sm:hidden">서류 </span>다시 분류</span>
               </Button>
             )}
           </div>
@@ -1469,7 +1446,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         )}
 
         {!uploadable && (
-          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.9375rem] break-keep text-slate-600">
+          // U4(D-544) 상자 대신 한 줄 글(클라우드에 연결한 화면에는 없는 안내)
+          <p className="t-sub break-keep text-slate-500" data-testid="docs-local-note">
             이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.
           </p>
         )}
@@ -2022,9 +2000,24 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <div className="flex flex-col gap-4">
 
             <div className="flex flex-col gap-2">
+              {/* D-295 업체에서 바로 AI 전략실로 — U4(D-544) 머리 단추에서 [더보기] 맨 위로(팀장에게는 없음) */}
+              {!pilot && ownerAi !== 'no' && tab !== 'ai' && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="client-open-ai"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setTab('ai')
+                  }}
+                >
+                  <Sparkles aria-hidden="true" className="size-4 text-violet-600" />
+                  AI 전략실
+                </Button>
+              )}
               <Button
                 variant="secondary"
-                className="w-full justify-start sm:hidden"
+                className="w-full justify-start"
                 data-testid="more-doc-request"
                 onClick={() => {
                   setMoreOpen(false)
@@ -2040,7 +2033,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               </Button>
               <Button
                 variant="secondary"
-                className="w-full justify-start sm:hidden"
+                className="w-full justify-start"
+                data-testid="more-status-report"
                 onClick={() => {
                   setMoreOpen(false)
                   setMessage({
@@ -2577,9 +2571,10 @@ function docOrder<T extends { key: string; label: string }>(metas: T[], urgent: 
 }
 
 export function OperationsClientDetailPage() {
-  return getDataModeConfig().mode === 'supabase' ? (
-    <CloudClientDetail />
-  ) : (
-    <LocalClientDetail />
+  // U7(D-545) 넓은 PC 는 왼쪽에 업체 목록(업체를 바꿔도 목록은 그대로 · 같은 탭으로) — 좁으면 예전 그대로
+  return (
+    <ClientSplit>
+      {getDataModeConfig().mode === 'supabase' ? <CloudClientDetail /> : <LocalClientDetail />}
+    </ClientSplit>
   )
 }
