@@ -87,4 +87,5 @@ dist-qa*/
 .draftsync-out
 .packsync-out
 .docoriginals-out
+.overwritten-out
 .originals-out

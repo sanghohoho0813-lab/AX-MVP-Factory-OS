@@ -4,6 +4,7 @@
 
 import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
 import { HelpNote } from '../../components/ui/HelpNote'
@@ -21,6 +22,7 @@ import { buildOriginalsZip, originalsDoneLine, originalsZipName } from '../../se
 import { fetchDocumentBytes, listClients, saveBytesAs } from '../../services/clientOpsService'
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
+import { OverwrittenPanel } from '../../components/data/OverwrittenPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
@@ -75,7 +77,7 @@ function NameEditor() {
   )
 }
 
-function DataPanelSupabase() {
+function DataPanelSupabase({ focus = '' }: { focus?: string }) {
   const { showToast } = useToast()
   const { currentWorkspaceId, workspaces } = useAuth()
   /**
@@ -162,6 +164,9 @@ function DataPanelSupabase() {
         </div>
       </Panel>
 
+      {/* D-550 SYNC-5 다른 기기 때문에 덮인 내용 — 보관된 것이 있을 때만(알림 줄이 데려오면 '없어요' 한 줄) */}
+      <OverwrittenPanel focus={focus === 'overwritten'} />
+
       <Panel title="로컬 데이터 가져오기">
         <HelpNote summary="이 브라우저의 로컬 데이터를 현재 작업공간(클라우드)로 옮깁니다. 멱등하며 원본은 지워지지 않습니다." />
         <div className="mt-4">
@@ -212,7 +217,10 @@ function CloudAccountView() {
 }
 
 export function SupabaseSettingsView() {
-  const [tab, setTab] = useState<TabKey>('me')
+  // D-550 알림 줄이 ?tab=data&focus=overwritten 으로 데려온다 — 처음 탭만 정하고 그 뒤는 누른 탭
+  const [params] = useSearchParams()
+  const focus = params.get('focus') ?? ''
+  const [tab, setTab] = useState<TabKey>(() => (params.get('tab') === 'data' ? 'data' : 'me'))
   const { session, workspaces, currentWorkspaceId } = useAuth()
   const current = workspaces.find((w) => w.workspaceId === currentWorkspaceId)
   const roleLabel: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
@@ -232,6 +240,8 @@ export function SupabaseSettingsView() {
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
           <SettingRow label="작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
         </Panel>
+        {/* D-550 팀장 작업공간의 덮인 내용(있을 때만) */}
+        <OverwrittenPanel focus={focus === 'overwritten'} />
         <TextScalePanel />
         <AppearancePanel />
       </div>
@@ -261,7 +271,7 @@ export function SupabaseSettingsView() {
           <WorkspaceMembersPanel />
         </Panel>
       )}
-      {tab === 'data' && <DataPanelSupabase />}
+      {tab === 'data' && <DataPanelSupabase focus={focus} />}
       {tab === 'system' && <SupabaseHealthPanel />}
       {tab === 'system' && <SystemPanel mode="supabase" connection={<CloudSaveStatus state="saved" />} />}
     </div>

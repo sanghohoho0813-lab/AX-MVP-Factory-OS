@@ -337,6 +337,142 @@ function announceOverwrote(moduleKey: string, bucket: string): void {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* D-550 SYNC-5 덮이기 전 판 보기 · 되돌리기                              */
+/* ------------------------------------------------------------------ */
+
+/** D-550 보관해 둔 '덮이기 전 판' 하나(D-535 가 `<갈래>.overwritten` 에 넣은 줄) */
+export interface OverwrittenEntry {
+  /** 보관 줄 id */
+  id: string
+  moduleKey: string
+  /** 원래 갈래(.overwritten 을 뺀 것) */
+  bucket: string
+  clientId: string
+  /** 덮인 원래 줄 id */
+  originalId: string
+  /** 덮이기 전 그 판의 시각(서버) */
+  originalUpdatedAt: string
+  /** 덮인 때 */
+  replacedAt: string
+  data: Record<string, unknown>
+  /** 이 판으로 되돌린 때(되돌린 적 없으면 '') */
+  restoredAt: string
+  /** 'restore' = 되돌리기 직전에 보관한 그때 내용 · '' = 다른 기기 저장에 덮인 내용 */
+  reason: '' | 'restore'
+}
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+
+function toEntry(row: Record<string, unknown>): OverwrittenEntry {
+  const p = (row.payload ?? {}) as Record<string, unknown>
+  const bucket = String(row.bucket ?? '')
+  const data = p.data
+  return {
+    id: String(row.id ?? ''),
+    moduleKey: String(row.module_key ?? ''),
+    bucket: bucket.endsWith(OVERWRITTEN_SUFFIX) ? bucket.slice(0, -OVERWRITTEN_SUFFIX.length) : bucket,
+    clientId: typeof row.client_id === 'string' ? row.client_id : '',
+    originalId: str(p.originalId),
+    originalUpdatedAt: str(p.originalUpdatedAt),
+    replacedAt: str(p.replacedAt) || str(row.created_at),
+    data: data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {},
+    restoredAt: str(p.restoredAt),
+    reason: p.reason === 'restore' ? 'restore' : '',
+  }
+}
+
+/**
+ * D-550 이 작업공간에 보관된 '덮이기 전 판' — 새것부터(최근 limit 개).
+ * 클라우드가 아니면 null(보관은 클라우드에서만 생긴다 — D-535). 서버가 이 작업공간 구성원에게만 준다(RLS).
+ */
+export async function listOverwritten(workspaceId: string | null, limit = 200): Promise<OverwrittenEntry[] | null> {
+  if (!isCloud() || !workspaceId) return null
+  const { data, error } = await getSupabaseClient()
+    .from('module_data')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .like('bucket', `%${OVERWRITTEN_SUFFIX}`)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    if (missingTable(error.message)) return null
+    throw error
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map(toEntry).filter((e) => e.originalId && e.bucket)
+}
+
+/** D-550 지금 그 기록(원래 줄) — 달라진 곳을 견주려고 읽기만. 지워졌으면 null */
+export async function readModuleRow(workspaceId: string, id: string): Promise<ModuleRow | null> {
+  const { data, error } = await getSupabaseClient().from('module_data').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle()
+  if (error) throw error
+  return data ? fromRow(data as Record<string, unknown>) : null
+}
+
+/**
+ * D-550 보관한 판으로 되돌리기 — **지금 내용을 먼저 보관하고** 되돌린다(되돌린 것도 다시 되돌릴 수 있게 · 지우는 것 0).
+ *   1. 지금 줄이 있으면 → 그 내용을 같은 보관 갈래에 넣는다(reason 'restore'). 못 넣으면 되돌리지 않는다.
+ *   2. 읽은 판 그대로일 때만 덮는다(그새 다른 기기가 또 고쳤으면 멈추고 알림 — 그 내용도 지키게).
+ *   3. 지금 줄이 지워졌으면 → 같은 id 로 다시 만든다.
+ *   4. 보관 줄에 '되돌린 때' 를 적는다(실패해도 되돌리기는 끝 — 표시만 빠짐).
+ * 이 창이 기억한 판(rowVersions)은 일부러 그대로 둔다 — 이 창에 그 기록을 연 화면이 남아 예전 내용으로 저장하면 D-535 길로 되돌린 판을 다시 보관한다(조용히 덮지 않음).
+ */
+export async function restoreOverwritten(workspaceId: string, entryId: string): Promise<{ recreated: boolean }> {
+  const db = getSupabaseClient()
+  const { data: arch, error } = await db.from('module_data').select('*').eq('id', entryId).eq('workspace_id', workspaceId).maybeSingle()
+  if (error) throw error
+  if (!arch) throw new Error('보관한 내용을 찾지 못했어요 — 목록을 새로 읽어 주세요.')
+  const archRow = arch as Record<string, unknown>
+  const entry = toEntry(archRow)
+  if (!entry.originalId || !entry.bucket) throw new Error('어느 기록의 내용인지 알 수 없어 되돌리지 않았어요.')
+  const now = nowIso()
+  const { data: cur, error: curError } = await db.from('module_data').select('*').eq('id', entry.originalId).eq('workspace_id', workspaceId).maybeSingle()
+  if (curError) throw curError
+  if (cur) {
+    const theirs = cur as Record<string, unknown>
+    const { error: keepError } = await db.from('module_data').insert({
+      id: `ow_${entry.originalId}_${Date.now().toString(36)}`.slice(0, 120),
+      workspace_id: workspaceId,
+      module_key: entry.moduleKey,
+      bucket: `${entry.bucket}${OVERWRITTEN_SUFFIX}`,
+      client_id: typeof theirs.client_id === 'string' ? theirs.client_id : null,
+      payload: { originalId: entry.originalId, originalUpdatedAt: theirs.updated_at ?? '', replacedAt: now, data: theirs.payload ?? {}, reason: 'restore', restoredFrom: entry.id },
+    })
+    if (keepError) throw new Error('지금 내용을 보관하지 못해 되돌리지 않았어요 — 인터넷을 확인하고 다시 눌러 주세요.')
+    const { data: done, error: saveError } = await db
+      .from('module_data')
+      .update({ client_id: entry.clientId || null, payload: entry.data, updated_at: now })
+      .eq('id', entry.originalId)
+      .eq('workspace_id', workspaceId)
+      .eq('updated_at', String(theirs.updated_at ?? ''))
+      .select()
+      .maybeSingle()
+    if (saveError) throw saveError
+    if (!done) throw new Error('그사이 다른 기기에서 이 기록을 또 고쳤어요 — 목록을 새로 읽고 다시 눌러 주세요(방금 내용도 보관해 두었어요).')
+  } else {
+    const { error: makeError } = await db.from('module_data').insert({
+      id: entry.originalId,
+      workspace_id: workspaceId,
+      module_key: entry.moduleKey,
+      bucket: entry.bucket,
+      client_id: entry.clientId || null,
+      payload: entry.data,
+    })
+    if (makeError) throw new Error('지워진 기록을 다시 만들지 못했어요 — 다시 눌러 주세요.')
+  }
+  const p = (archRow.payload ?? {}) as Record<string, unknown>
+  await db
+    .from('module_data')
+    .update({ payload: { ...p, restoredAt: now } })
+    .eq('id', entry.id)
+    .eq('workspace_id', workspaceId)
+    .then(
+      () => undefined,
+      () => undefined,
+    )
+  return { recreated: !cur }
+}
+
 export async function deleteRow(
   workspaceId: string | null,
   moduleKey: string,
