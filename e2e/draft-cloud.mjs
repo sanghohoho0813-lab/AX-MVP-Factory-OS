@@ -9,6 +9,9 @@
  *   C6 주소로 주제를 들고 오면(?topic=) 클라우드 글로 바꾸지 않고 그 주제 글을 올림
  *   C7 릴스/틱톡 대본도 같은 길(PC → 휴대폰)
  *   C8 참고 글(남의 글)은 클라우드에 올라가지 않음 · 휴대폰 390 넘침 0 · JS 오류 0
+ *   C9 (D-551) 시계가 1시간 빠른 PC — 휴대폰이 그 뒤 고친 글을 PC 로 돌아와도 예전 글로 덮지 않고 휴대폰 글을 가져옴 ·
+ *      PC 가 서버와의 시계 차이(-1시간)를 재 두고, 그 뒤 적은 시각은 서버 시계로 맞춰 남김
+ *   (흉내 서버는 저장할 때 updated_at 을 서버 시각으로 바꾼다 — 진짜 DB 트리거처럼)
  *
  *   node e2e/draft-cloud.mjs            (dist-qa-draft 로 따로 빌드하고 4537 에 띄운다)
  */
@@ -67,13 +70,29 @@ const session = {
 const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
 
 /** 서버 한 벌 — 두 기기가 같이 쓴다. down 이면 module_data 읽기 · 쓰기 모두 500 */
-const cloud = { rows: new Map(), down: false, writes: [] }
+const cloud = { rows: new Map(), down: false, writes: [], lastAt: 0 }
 const draftRow = (kind) => cloud.rows.get(`mkdraft_${kind}_${WS}`)
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 
-async function device(vp, mobile) {
+async function device(vp, mobile, skewMs = 0) {
   const ctx = await browser.newContext({ viewport: vp, locale: 'ko-KR', isMobile: mobile, hasTouch: mobile })
+  // D-551 기기 시계가 틀린 기기 — 이 기기의 Date 만 skewMs 만큼 어긋나게
+  if (skewMs) {
+    await ctx.addInitScript((off) => {
+      const RealDate = Date
+      class SkewDate extends RealDate {
+        constructor(...a) {
+          if (a.length === 0) super(RealDate.now() + off)
+          else super(...a)
+        }
+        static now() {
+          return RealDate.now() + off
+        }
+      }
+      globalThis.Date = SkewDate
+    }, skewMs)
+  }
   await ctx.addInitScript(([ref, s, ws]) => {
     if (!localStorage.getItem(`sb-${ref}-auth-token`)) localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
     localStorage.setItem('axmvp.active_workspace', ws)
@@ -98,7 +117,10 @@ async function device(vp, mobile) {
       if (method === 'POST') {
         const body = JSON.parse(req.postData() ?? '{}')
         const row = Array.isArray(body) ? body[0] : body
-        const one = { ...row, created_at: row.updated_at }
+        // 진짜 DB 처럼 서버 시각(트리거) — 기기 시계와 상관없이
+        const serverNow = new Date(Math.max(Date.now(), cloud.lastAt + 1)).toISOString()
+        cloud.lastAt = Date.parse(serverNow)
+        const one = { ...row, updated_at: serverNow, created_at: cloud.rows.get(row.id)?.created_at ?? serverNow }
         cloud.rows.set(row.id, one)
         cloud.writes.push({ bucket: row.bucket, id: row.id, payload: row.payload })
         return route.fulfill(json(/object/.test(req.headers().accept ?? '') ? one : [one]))
@@ -228,6 +250,35 @@ try {
   check('C8a 참고 글(남의 글)은 클라우드에 올라가지 않음', !leaked)
   check('C8b 휴대폰 390 넘침 0', geo <= 0, geo)
   errorsAll.push(...pc.errors, ...ph.errors)
+
+  // C9 D-551 시계가 1시간 빠른 PC(A) · 맞는 휴대폰(B) — 새 브라우저 둘
+  const HOUR = 3600 * 1000
+  const A = await device({ width: 1440, height: 900 }, false, HOUR)
+  const B = await device({ width: 390, height: 844 }, true)
+  await openThreads(A.page)
+  await startHand(A.page)
+  const A_TEXT = '시계 빠른 PC 에서 쓴 글'
+  await A.page.getByTestId('thr-body').fill(A_TEXT)
+  const upA = await waitFor(() => draftRow('threads')?.payload?.draft?.body === A_TEXT)
+  const atA = draftRow('threads')?.payload?.at ?? ''
+  await openThreads(B.page)
+  await B.page.getByTestId('thr-body').waitFor({ timeout: 8000 }).catch(() => {})
+  const B_TEXT = A_TEXT + '\n휴대폰이 그 뒤 고친 줄'
+  await B.page.getByTestId('thr-body').fill(B_TEXT)
+  const upB = await waitFor(() => draftRow('threads')?.payload?.draft?.body === B_TEXT)
+  const atB = draftRow('threads')?.payload?.at ?? ''
+  await refocus(A.page)
+  const gotB = await waitFor(async () => (await A.page.getByTestId('thr-body').inputValue()) === B_TEXT)
+  await A.page.waitForTimeout(1500)
+  check('C9a 시계가 1시간 빠른 PC 로 돌아와도 휴대폰이 그 뒤 고친 글을 가져옴(예전 글로 덮지 않음 · 클라우드도 휴대폰 글)',
+    upA && upB && gotB && draftRow('threads')?.payload?.draft?.body === B_TEXT && atA > atB, { upA, upB, gotB, atA, atB, now: draftRow('threads')?.payload?.draft?.body?.slice(-12) })
+  const skewA = Number(await A.page.evaluate(() => localStorage.getItem('axmvp.clock.skew.v1')))
+  check('C9b PC 가 서버와의 시계 차이를 잼(약 -1시간)', Math.abs(skewA + HOUR) < 10000, skewA)
+  await A.page.getByTestId('thr-body').fill(B_TEXT + '\nPC 가 덧붙인 줄')
+  await waitFor(() => /PC 가 덧붙인 줄/.test(draftRow('threads')?.payload?.draft?.body ?? ''))
+  const atA2 = Date.parse(draftRow('threads')?.payload?.at ?? '')
+  check('C9c 그 뒤 PC 가 적은 시각은 서버 시계로 맞춰 남김(실제 시각과 1분 안)', Math.abs(atA2 - Date.now()) < 60000, { at: draftRow('threads')?.payload?.at, real: new Date().toISOString() })
+  errorsAll.push(...A.errors, ...B.errors)
   check('C8c JS 오류 0', errorsAll.length === 0, errorsAll.slice(0, 3))
 } catch (e) {
   check('시험이 끝까지 돌았다', false, String(e).slice(0, 400))

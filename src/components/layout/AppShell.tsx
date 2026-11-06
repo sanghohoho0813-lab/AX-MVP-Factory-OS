@@ -16,6 +16,7 @@ import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
 import { ModuleOverwroteNotice } from './ModuleOverwroteNotice'
+import { AiStoreEvictedNotice } from './AiStoreEvictedNotice'
 import { ClientConflictNotice } from './ClientConflictNotice'
 import { ScrollTopButton } from './ScrollTopButton'
 import { subscribeWeekRunLoaded, weekRunLoaded } from '../../services/marketing/weekRunFlag'
@@ -150,6 +151,8 @@ export function AppShell() {
                 모듈(/tools/<모듈>/<화면>) 안에서 화면만 바꿀 때는 그대로 둔다 — 원본 앱의 고른 고객·열린 창이 살아 있어야 한다 (D-93) */}
             <StorageFullNotice />
             <ModuleOverwroteNotice />
+            {/* D-551 SYNC-4 AI 결과가 보관 한도(묶음 12 · 추천 40)에서 밀려났을 때 한 줄 */}
+            <AiStoreEvictedNotice />
             {/* SYNC-2(D-547) 업체 저장이 부딪혔을 때 — 합쳐 저장했다는 한 줄 · 같은 칸이면 고르기(화면 아래 고정) */}
             <ClientConflictNotice />
             {/* D-164: 대표가 팀장 화면을 보는 동안 */}

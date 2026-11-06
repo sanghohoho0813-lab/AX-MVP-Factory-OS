@@ -4,6 +4,7 @@
  * 결과는 이 브라우저(사람별 금고)에 후보마다 — 화면을 나갔다 와도(같은 접속 · 새로 고침) 그대로. 쓰는 중에 다른 화면으로 가도 답은 남는다.
  * D-515 작업공간 기록(marketing / kits · 한 줄 · 최근 40개)에도 — 다른 기기에서 같은 후보를 열면 다시 부르지 않고 그 추천이 보인다(keyedSync).
  */
+import { announceEvicted, evictedKeys, keyLabel } from './storeEvicted'
 import { AssistError, callAssist, type AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { briefSection } from '../aiAssist/marketingBuilders'
@@ -192,7 +193,11 @@ export function startKitAi(key: string, context: AssistContext, core: string): v
       got.device = deviceNow()
       memory.set(key, got)
       try {
-        window.localStorage.setItem(KIT_STORE_KEY, JSON.stringify(putKitStore(readStore(), key, got)))
+        const before = readStore()
+        const after = putKitStore(before, key, got)
+        window.localStorage.setItem(KIT_STORE_KEY, JSON.stringify(after))
+        // D-551 SYNC-4 한도(40개)에서 밀려난 추천이 있으면 한 줄로 알린다
+        announceEvicted({ what: "'이렇게 찍으세요' AI 추천", labels: evictedKeys(before, after, key).map(keyLabel), max: KIT_MAX })
       } catch {
         /* 저장 공간이 막혀도 이번 접속 동안은 보인다 */
       }

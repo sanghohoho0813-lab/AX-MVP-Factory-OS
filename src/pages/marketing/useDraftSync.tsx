@@ -4,19 +4,23 @@
  *  - 화면을 열 때 한 번 · 다른 창에 갔다 돌아올 때 클라우드 글을 본다(쓰는 중 · 올리는 중에는 보지 않음).
  *  - 고치면 이 기기에 적은 시각을 바로 남기고, 1.2초 멈추면 클라우드에 올린다. 못 올리면 한 줄로 알리고 다음에 다시.
  *  - 팀장 화면 보기(readOnly) · 브라우저 저장 모드에서는 아무것도 하지 않는다(예전처럼 이 기기에만).
+ *  - D-551 맞출 때마다(올림 · 가져옴 · 같음) 그 서버 판을 기억한다 — 다음에 '어느 쪽이 새것' 을 기기 시계 대신 이것으로 정한다.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloudOff, MonitorSmartphone, X } from 'lucide-react'
-import { nowIso } from '../../lib/appClock'
 import {
   chooseDraft,
   cloudDraftOn,
   loadCloudDraft,
   readLocalAt,
+  readSynced,
   saveCloudDraft,
   sameDraft,
+  serverNowIso,
   whenWhere,
   writeLocalAt,
+  writeSynced,
+  type CloudDraft,
   type DraftDevice,
   type DraftEnvelope,
   type DraftKind,
@@ -69,7 +73,9 @@ export function useDraftSync<T>(opts: {
     async (env: DraftEnvelope<T>) => {
       if (!workspaceId) return
       try {
-        await saveCloudDraft(workspaceId, kind, env)
+        const serverAt = await saveCloudDraft(workspaceId, kind, env)
+        // D-551 올린 판을 기억 — 그 뒤 이 기기에서 고치면 적은 시각이 달라져 '이 기기가 새것' 이 된다
+        writeSynced(kind, { ws: workspaceId, serverAt, localAt: env.at })
         if (pending.current === env) pending.current = null
         setFailed(false)
       } catch {
@@ -93,7 +99,7 @@ export function useDraftSync<T>(opts: {
     async (first: boolean) => {
       if (!on || !workspaceId) return
       const { replace, empty, clean } = fns.current
-      let cloud: DraftEnvelope<T> | null
+      let cloud: CloudDraft<T> | null
       try {
         cloud = await loadCloudDraft(workspaceId, kind, clean)
       } catch {
@@ -109,14 +115,19 @@ export function useDraftSync<T>(opts: {
         blocked: first ? blockedAtOpen.current || touched.current : pending.current !== null || timer.current !== null,
         same: sameDraft,
         empty,
+        synced: readSynced(kind, workspaceId),
       })
       if (choice === 'cloud' && cloud) {
         skipNext.current = cloud.draft
         replace(cloud.draft)
         writeLocalAt(kind, cloud.at)
+        if (cloud.serverAt) writeSynced(kind, { ws: workspaceId, serverAt: cloud.serverAt, localAt: cloud.at })
         setNote({ from: whenWhere(cloud), prev: empty(local) ? null : local })
+      } else if (choice === 'keep' && cloud?.serverAt && sameDraft(local, cloud.draft)) {
+        // 같은 글 — 이 판까지 맞춘 것으로(예전 기록도 여기서 기억이 생긴다)
+        writeSynced(kind, { ws: workspaceId, serverAt: cloud.serverAt, localAt: readLocalAt(kind) })
       } else if (choice === 'push' && first) {
-        const at = readLocalAt(kind) || nowIso()
+        const at = readLocalAt(kind) || serverNowIso()
         writeLocalAt(kind, at)
         void push({ draft: local, at, device: deviceNow() })
       }
@@ -141,7 +152,8 @@ export function useDraftSync<T>(opts: {
     }
     skipNext.current = null
     if (!ready.current) touched.current = true
-    const at = nowIso()
+    // D-551 서버 시계로 맞춘 시각 — 다른 기기와 견줄 때 기기 시계가 틀려도 덜 틀리게
+    const at = serverNowIso()
     writeLocalAt(kind, at)
     pending.current = { draft, at, device: deviceNow() }
     if (!ready.current) return

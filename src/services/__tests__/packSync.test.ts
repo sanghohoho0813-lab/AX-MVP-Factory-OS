@@ -6,10 +6,13 @@
  * D-517 오늘 대화창이 배운 것(별명 · 평가) — 칸 모양 · 예전 기록 · 별명마다 나중 것.
  * D-521 작업공간 전체 내보내기 — 서류 파일 목록 · 3판 모양(예전 불러오기가 그대로 읽음) · 요약 · 못 담은 것 · 서명 주소 0.
  * D-523 보낸 초대 — 화면 상태(기한 지난 기다림 = 기한 지남) · 남은 날 · 기다리는 것 먼저(곧 만료 순) · 지난 것(최근 순).
+ * D-551 SYNC-4 보관 한도에서 밀려난 것 — 빠진 키 · 사람이 읽는 이름 · 한 줄 글 · 넣을 때 알림.
  */
 import { adoptPacks, cloudPacksOn, mergePackStores, packsRowId, samePackStores, PACK_ROW, type PackStore } from '../marketing/packSync'
 import { PACK_STORE_MAX, packStoreOf, parsePackStore, type PackAiSaved } from '../marketing/contentPack'
 import { KIT_MAX, KIT_ROW, kitStoreOf, parseKitStore, type KitAi } from '../marketing/kitAi'
+import { EVICTED_EVENT, evictedKeys, evictedLine, keyLabel, type EvictedDetail } from '../marketing/storeEvicted'
+import { putPackStore } from '../marketing/contentPack'
 import { adoptKeyed, keyedCloudSync, keyedRowId, mergeKeyed, sameKeyed } from '../marketing/keyedSync'
 import { ADAPT_ROW, TRANSCRIPT_INDEX_ROW, transcriptBucket, transcriptIndexOf, transcriptRowId } from '../marketing/videoStudyRun'
 import { adaptsOf, parseTranscripts, STUDY_KEEP } from '../marketing/videoStudy'
@@ -242,6 +245,35 @@ check('P4e 브라우저 저장 모드 · 작업공간 없음 → 올리지 않�
   check('I4 기다리는 것만 위 — 곧 만료 순', open.map((i) => i.id).join() === 'b,a', open.map((i) => i.id))
   check('I5 지난 것 — 최근 보낸 순(기한 지남 포함)', past.map((i) => i.id).join() === 'in,off,late', past.map((i) => i.id))
   check('I6 기한을 못 읽으면 기다림으로 두지 않음', inviteView(inv('x', 'pending', '', '2026-11-01T00:00:00.000Z'), NOW).state === 'expired')
+}
+
+/* V D-551 SYNC-4 보관 한도에서 밀려난 것 */
+{
+  const sv = (at: string): PackAiSaved => saved(at)
+  const before: Record<string, PackAiSaved> = {}
+  for (let i = 0; i < 12; i += 1) before[`shorts:주제${i}`] = sv(`2026-11-0${(i % 9) + 1}T0${i % 10}:00:00.000Z`)
+  const after = putPackStore(before, 'custom:새 주제', sv('2026-11-06T12:00:00.000Z'))
+  const out = evictedKeys(before, after, 'custom:새 주제')
+  check('V1 12개 꽉 찬 데서 새 결과 → 가장 오래된 1개가 빠짐(방금 넣은 키는 빼고 셈)', out.length === 1 && !(out[0] in after) && Object.keys(after).length === 12, out)
+  check('V1b 같은 키를 고쳐 넣으면 빠진 것 0', evictedKeys(after, putPackStore(after, 'custom:새 주제', sv('2026-11-06T13:00:00.000Z')), 'custom:새 주제').length === 0)
+  check('V2 이름 — 축:주제 · 주:축:주제 · custom:주제 → 주제', keyLabel('shorts:정책자금 바뀐 점') === '정책자금 바뀐 점' && keyLabel('2026-W45:longform:고용지원금') === '고용지원금' && keyLabel('custom:새 주제') === '새 주제' && keyLabel('그냥') === '그냥')
+  const line = evictedLine({ what: '콘텐츠 묶음', labels: ['정책자금', '고용지원금', '연구소'], max: 12 })
+  check('V3 한 줄 — 최근 12개 · 앞 두 개 이름 + 외 1개 · 다시 열면 초안 · 담아 둔 글은 그대로', /최근 12개까지만/.test(line) && /'정책자금' · '고용지원금' 외 1개/.test(line) && /규칙으로 만든 초안/.test(line) && /그대로/.test(line), line)
+  // 넣을 때 알림 — 이 시험에서는 window 를 흉내
+  const got: EvictedDetail[] = []
+  const w = globalThis as unknown as { window?: unknown; localStorage?: unknown }
+  const mem = new Map<string, string>()
+  const ls = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) }
+  const listeners: ((e: Event) => void)[] = []
+  w.window = { localStorage: ls, dispatchEvent: (e: Event) => (listeners.forEach((f) => f(e)), true), addEventListener: (_: string, f: (e: Event) => void) => listeners.push(f) }
+  listeners.push((e) => got.push((e as CustomEvent<EvictedDetail>).detail))
+  const { writePackStore } = await import('../marketing/packStore')
+  mem.set('axmvp.mkpack.v1', JSON.stringify(before))
+  writePackStore('custom:새 주제', sv('2026-11-06T12:00:00.000Z'))
+  check('V4 콘텐츠 묶음 남길 때 밀려난 것이 있으면 알림 하나(무엇 · 이름 · 한도)', got.length === 1 && got[0].what === '콘텐츠 묶음' && got[0].max === PACK_STORE_MAX && got[0].labels.length === 1 && typeof EVICTED_EVENT === 'string', got)
+  writePackStore('custom:새 주제', sv('2026-11-06T13:00:00.000Z'))
+  check('V4b 빠진 것이 없으면 알림 없음', got.length === 1)
+  delete w.window
 }
 
 console.log(`\npackSync: ${passed} passed, ${failed} failed`)

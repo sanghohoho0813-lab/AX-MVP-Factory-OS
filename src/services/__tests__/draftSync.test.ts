@@ -1,7 +1,7 @@
 /**
  * D-513 쓰던 글 다른 기기에서 이어 쓰기 — 어느 글을 쓸지(chooseDraft) · 같은 글 비교 · 저장 모양 · 행 id · 언제 · 어디서.
  */
-import { chooseDraft, draftRowId, envelopeOf, localAtKey, readLocalAt, sameDraft, whenWhere, writeLocalAt, type DraftEnvelope } from '../marketing/draftSync'
+import { chooseDraft, clockSkew, draftRowId, envelopeOf, localAtKey, noteServerTime, readLocalAt, readSynced, sameDraft, serverNowIso, syncedKey, whenWhere, writeLocalAt, writeSynced, type CloudDraft, type DraftEnvelope } from '../marketing/draftSync'
 import { isUserScopedKey } from '../../auth/storageVault'
 
 let passed = 0
@@ -72,6 +72,49 @@ check('S3c 적은 시각 키도 계정 금고에 들어감(같은 브라우저 �
 /* S4 언제 · 어디서 */
 const w = whenWhere({ at: T1, device: 'phone' })
 check('S4 언제 · 어디서 한 줄 — 월/일 시:분 기기', /^\d{1,2}\/\d{1,2} \d{2}:\d{2} 휴대폰$/.test(w) && whenWhere({ at: 'x', device: 'pc' }) === 'PC', w)
+
+/* S5 D-551 서버 판으로 — 시계가 틀린 기기 */
+{
+  const S1 = '2026-11-03T05:00:00.100+00:00'
+  const S2 = '2026-11-03T05:30:00.200+00:00'
+  const cloudAt = (d: Partial<D>, at: string, serverAt: string): CloudDraft<D> => ({ ...env(d, at), serverAt })
+  const pickS = (local: Partial<D>, localAt: string, cloud: CloudDraft<D>, synced: { serverAt: string; localAt: string } | null) =>
+    chooseDraft({ local: { ...E, ...local }, localAt, cloud, blocked: false, same: sameDraft, empty, synced })
+  // 기기 A 시계가 1시간 빠름: A 가 적은 시각 = 실제+1h. B(맞는 시계)가 그 뒤 고쳐 올림 → 클라우드 판이 바뀜
+  const A_AT = '2026-11-03T06:00:00.000Z' // A 시계로 05:00 에 쓴 것
+  const B_AT = '2026-11-03T05:20:00.000Z' // B 가 실제 05:20 에 쓴 것(A 시각보다 '예전' 처럼 보임)
+  const before = pick({ body: 'A 예전 글' }, A_AT, env({ body: 'B 새 글' }, B_AT))
+  check('S5a (수정 전 규칙) 시계 빠른 기기 A 로 돌아오면 예전 글을 올려 B 의 새 글을 덮음(재현)', before === 'push', before)
+  const after = pickS({ body: 'A 예전 글' }, A_AT, cloudAt({ body: 'B 새 글' }, B_AT, S2), { serverAt: S1, localAt: A_AT })
+  check('S5b (D-551) 클라우드 판이 바뀌었고 A 는 그 뒤 안 고침 → B 의 새 글을 가져옴', after === 'cloud', after)
+  check('S5c 클라우드 판 그대로 · A 가 고침 → 올림(클라우드 적은 시각이 더 나중처럼 보여도)',
+    pickS({ body: 'A 가 고친 글' }, '2026-11-03T06:10:00.000Z', cloudAt({ body: '옛 글' }, '2026-11-03T09:00:00.000Z', S1), { serverAt: S1, localAt: A_AT }) === 'push')
+  check('S5d 둘 다 고침 → 적은 시각 견줌(클라우드가 나중 → 가져옴 · 이 기기가 나중 → 올림)',
+    pickS({ body: 'A 고침' }, '2026-11-03T05:40:00.000Z', cloudAt({ body: 'B 고침' }, '2026-11-03T05:50:00.000Z', S2), { serverAt: S1, localAt: A_AT }) === 'cloud' &&
+    pickS({ body: 'A 고침' }, '2026-11-03T05:55:00.000Z', cloudAt({ body: 'B 고침' }, '2026-11-03T05:50:00.000Z', S2), { serverAt: S1, localAt: A_AT }) === 'push')
+  check('S5e 이 기기 글이 비었으면 클라우드를 비우지 않음(예전 규칙 — 가져옴)', pickS({}, A_AT, cloudAt({ body: '클라우드 글' }, B_AT, S1), { serverAt: S1, localAt: A_AT }) === 'cloud')
+  check('S5f 기억이 없으면 예전 규칙 그대로', pickS({ body: 'A' }, A_AT, cloudAt({ body: 'B' }, B_AT, S2), null) === 'push')
+  check('S5g 주소로 주제를 들고 왔으면 기억과 상관없이 올림', chooseDraft({ local: { ...E, topic: '소재' }, localAt: A_AT, cloud: cloudAt({ body: 'B' }, B_AT, S2), blocked: true, same: sameDraft, empty, synced: { serverAt: S1, localAt: A_AT } }) === 'push')
+  writeSynced('threads', { ws: 'ws1', serverAt: S1, localAt: A_AT })
+  check('S5h 기억 — 같은 작업공간만 읽음 · 계정 금고 키', readSynced('threads', 'ws1')?.serverAt === S1 && readSynced('threads', 'ws2') === null && readSynced('shorts', 'ws1') === null && isUserScopedKey(syncedKey('threads')))
+  mem.set(syncedKey('shorts'), '{깨짐')
+  check('S5i 깨진 기억 → 없음(예전 규칙)', readSynced('shorts', 'ws1') === null)
+}
+
+/* S6 D-551 시계 차이 */
+{
+  const sent = Date.parse('2026-11-03T05:00:00.000Z')
+  const got = sent + 2000
+  const skew = noteServerTime('2026-11-03T05:00:05.000Z', sent, got)
+  check('S6a 서버가 5초 앞(왕복 2초) → 차이 +4초 · 남김', skew === 4000 && clockSkew() === 4000, { skew, saved: clockSkew() })
+  check('S6b 서버 시계로 맞춘 지금 = 기기 시각 + 4초', serverNowIso('2026-11-03T05:10:00.000Z') === '2026-11-03T05:10:04.000Z')
+  check('S6c 말이 안 되는 값(8일 차이 · 받은 때가 보낸 때보다 앞 · 시각 아님)은 버림 — 남긴 값 그대로',
+    noteServerTime('2026-11-11T05:00:00.000Z', sent, got) === null && noteServerTime('2026-11-03T05:00:05.000Z', got, sent) === null && noteServerTime('어제', sent, got) === null && clockSkew() === 4000)
+  noteServerTime('2026-11-03T04:59:59.000Z', sent, sent)
+  check('S6d 기기가 앞서면 음수 차이 · 맞춘 시각이 당겨짐', clockSkew() === -1000 && serverNowIso('2026-11-03T05:10:00.000Z') === '2026-11-03T05:09:59.000Z')
+  mem.set('axmvp.clock.skew.v1', 'abc')
+  check('S6e 깨진 값 → 차이 0', clockSkew() === 0 && serverNowIso('2026-11-03T05:10:00.000Z') === '2026-11-03T05:10:00.000Z')
+}
 
 console.log(`\ndraftSync: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

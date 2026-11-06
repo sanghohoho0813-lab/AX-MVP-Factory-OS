@@ -564,7 +564,25 @@ try {
   check('K6b 같은 내용이면 다시 올리지 않음(예전 PC 는 한 번만 올림)', writesByOld === 1, writesByOld)
   const geo = await ph.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('K6c 휴대폰 390 넘침 0', geo <= 0, geo)
-  errorsAll.push(...pc.errors, ...ph.errors, ...old.errors)
+  // E D-551 SYNC-4 보관 한도(12개)에서 밀려날 때 한 줄 — 꽉 찬 브라우저(클라우드는 잠깐 끊긴 채 — 이 브라우저 12개 그대로)
+  const seed12 = {}
+  for (let i = 0; i < 12; i += 1) seed12[`custom:예전 주제 ${i + 1}`] = { at: `2026-10-${String(10 + i).padStart(2, '0')}T03:00:00.000Z`, model: 'gemini-old', sections: { blog: [{ label: '블로그 제목', text: `예전 글 ${i + 1}` }] } }
+  cloud.down = true
+  const full = await device('full-pc', { width: 1280, height: 860 }, false, seed12)
+  await openPack(full.page, 'custom:새로 쓰는 주제')
+  const e0 = await full.page.getByTestId('ai-store-evicted').count()
+  await runAi(full.page)
+  const shownE = await waitFor(async () => (await full.page.getByTestId('ai-store-evicted').count()) === 1)
+  const lineE = await full.page.getByTestId('ai-store-evicted').innerText().catch(() => '')
+  await shot(full.page, 'd551-evicted')
+  check("E1 꽉 찬(12개) 브라우저에서 새 묶음 AI → 한 줄 — 최근 12개까지만 · 가장 오래된 '예전 주제 1' 빠짐 · 담아 둔 글은 그대로(전에는 아무 말 없음)",
+    e0 === 0 && shownE && /최근 12개까지만/.test(lineE) && /'예전 주제 1'/.test(lineE) && /그대로/.test(lineE), { e0, lineE })
+  await full.page.getByTestId('ai-store-evicted-close').click()
+  const keysE = await full.page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('axmvp.mkpack.v1') ?? '{}')))
+  check('E2 닫으면 사라짐 · 이 브라우저는 12개(새 주제 들어오고 가장 오래된 것 빠짐)', (await full.page.getByTestId('ai-store-evicted').count()) === 0 && keysE.length === 12 && keysE.includes('custom:새로 쓰는 주제') && !keysE.includes('custom:예전 주제 1'), keysE)
+  cloud.down = false
+
+  errorsAll.push(...pc.errors, ...ph.errors, ...old.errors, ...full.errors)
   check('K6d JS 오류 0', errorsAll.length === 0, errorsAll.slice(0, 3))
 } catch (e) {
   check('시험이 끝까지 돌았다', false, String(e).slice(0, 400))
