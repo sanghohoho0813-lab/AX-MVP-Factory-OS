@@ -86,3 +86,5 @@ dist-qa*/
 .docreq-out
 .draftsync-out
 .packsync-out
+.docoriginals-out
+.originals-out

@@ -1635,6 +1635,31 @@ export async function downloadDocumentFile(state: Pick<DocumentState, 'storagePa
   }
 }
 
+/**
+ * D-549 원본 파일 내용 받기(서류 원본 묶음 · docOriginals) — 서명 주소(5분)로 받아 바이트로.
+ * 저장소가 거절하면(지워짐 · 권한) 사람 말 까닭으로 던진다 — 묶음은 그 파일만 건너뛰고 목록에 적는다.
+ */
+export async function fetchDocumentBytes(storagePath: string): Promise<Uint8Array> {
+  if (!canUploadFiles()) throw new Error('클라우드에 연결해야 원본 파일을 받을 수 있어요')
+  const url = await documentFileUrl(storagePath)
+  if (!url) throw new Error('보관함에서 이 파일을 찾지 못했어요(지워졌거나 권한이 없음)')
+  let res: Response
+  try {
+    res = await fetch(url)
+  } catch {
+    throw new Error('인터넷이 잠깐 끊겨 받지 못했어요')
+  }
+  if (!res.ok) throw new Error(res.status === 404 || res.status === 400 ? '보관함에서 이 파일을 찾지 못했어요(지워졌거나 권한이 없음)' : `보관함이 응답하지 않았어요(${res.status})`)
+  return new Uint8Array(await res.arrayBuffer())
+}
+
+/** D-549 만든 압축 파일(바이트)을 이름 그대로 내려받기 */
+export function saveBytesAs(bytes: Uint8Array, name: string, type = 'application/zip'): void {
+  const href = URL.createObjectURL(new Blob([bytes as BlobPart], { type }))
+  clickDownload(href, name)
+  setTimeout(() => URL.revokeObjectURL(href), 60_000)
+}
+
 function clickDownload(href: string, name: string): void {
   const a = document.createElement('a')
   a.href = href

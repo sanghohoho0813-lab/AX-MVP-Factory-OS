@@ -16,7 +16,7 @@
  * D-311 준비 서류 — 정책자금 엔진의 '자료 체크'(사업자등록증 · 재무제표 · 부가세 과세표준증명원 · 사업계획서 …)는 입력만 보고
  *  거의 다 '요청 필요' 라고 했다. 서류함에 있는 서류(칸 이름 · 만료 안 됨)를 엔진에 넘겨 '확보' 로 본다.
  */
-import type { ClientOpsRecord } from '../types/clientOps'
+import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { businessTypeOf, type ClientFacts } from '../tools/shared/clientPrefill'
 import type { BonusItem, DiagnosisInput } from '../tools/policyFunding/types'
 import { allDocumentMetas } from './clientOpsDocuments'
@@ -231,8 +231,22 @@ const POLICY_DOC_RULES: [string, (key: string, label: string) => boolean][] = [
 
 /** 서류함에 있는(받음 · 기한 안) 정책자금 준비 서류 key · 기한이 지난 서류 이름 */
 export function policyDocs(record: ClientOpsRecord, today: string): { have: string[]; expired: string[] } {
+  const { have, expired } = policyDocScan(record, today)
+  return { have, expired }
+}
+
+/**
+ * D-549 서류함에서 정책자금 신청에 쓰는 칸(받음 · 기한 안) — '신청 서류 묶음 내려받기' 가 담는 칸.
+ * policyDocs 와 같은 규칙 · 같은 판단(기한 지난 칸은 빼고, 다시 받은 '(2)' 칸이 있으면 그 칸).
+ */
+export function policyDocKeys(record: ClientOpsRecord, today: string): DocumentKey[] {
+  return policyDocScan(record, today).keys
+}
+
+function policyDocScan(record: ClientOpsRecord, today: string): { have: string[]; expired: string[]; keys: DocumentKey[] } {
   const have = new Set<string>()
   const expired: string[] = []
+  const keys: DocumentKey[] = []
   for (const m of allDocumentMetas(record)) {
     const st = record.documents?.[m.key]
     if (!st || !(st.received || st.fileName)) continue
@@ -246,13 +260,14 @@ export function policyDocs(record: ClientOpsRecord, today: string): { have: stri
       continue
     }
     for (const h of hits) have.add(h)
+    keys.push(m.key)
   }
   // 같은 서류가 다시 받은 칸('(2)')에 유효하면 기한 지남 목록에서 뺀다
   const fresh = (name: string) => {
     const base = name.replace(/\s*\(\d+\)$/, '').replace(/\s+/g, '')
     return POLICY_DOC_RULES.filter(([, ok]) => ok('', base)).every(([k]) => have.has(k))
   }
-  return { have: [...have], expired: [...new Set(expired.filter((e) => !fresh(e)).map((e) => e.replace(/\s*\(\d+\)$/, '')))] }
+  return { have: [...have], expired: [...new Set(expired.filter((e) => !fresh(e)).map((e) => e.replace(/\s*\(\d+\)$/, '')))], keys }
 }
 
 const BONUS_SHORT: Partial<Record<BonusItem, string>> = { '특허 보유': '특허', '기업부설연구소 보유': '연구소', '만39세 이하 청년기업': '청년기업(대표 만 39세 미만)', '수출 실적': '수출', '고용지원금 참여': '청년 고용지원금 참여', '매출 또는 영업이익 10% 이상 증가': '매출 · 순이익 10% 이상 증가' }

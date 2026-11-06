@@ -16,7 +16,9 @@ import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataIm
 import { exportWorkspace } from '../../services/workspaceExport'
 import { BackupScopeNote } from '../../components/data/BackupScopeNote'
 import { todayLocalDate } from '../../lib/appClock'
-import { Download } from 'lucide-react'
+import { Download, FileArchive } from 'lucide-react'
+import { buildOriginalsZip, originalsDoneLine, originalsZipName } from '../../services/docOriginals'
+import { fetchDocumentBytes, listClients, saveBytesAs } from '../../services/clientOpsService'
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
@@ -75,7 +77,35 @@ function NameEditor() {
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
-  const { currentWorkspaceId } = useAuth()
+  const { currentWorkspaceId, workspaces } = useAuth()
+  /**
+   * D-549 SAFE-5 서류 원본 전부 — 업체마다 폴더 · 칸 이름 그대로 압축 하나(백업 파일에는 목록만 들어간다).
+   * 읽기만 한다. 너무 크면(300MB) 그 뒤는 목록에만 — 업체 서류함 [원본 내려받기] 로 나눠 받게.
+   */
+  const [originals, setOriginals] = useState<{ done: number; total: number } | null>(null)
+  const [originalsLine, setOriginalsLine] = useState('')
+  async function handleOriginals() {
+    if (originals || !currentWorkspaceId) return
+    setOriginals({ done: 0, total: 0 })
+    setOriginalsLine('')
+    try {
+      const records = await listClients(currentWorkspaceId)
+      const today = todayLocalDate()
+      const r = await buildOriginalsZip(records.map((record) => ({ record })), {
+        fetchBytes: fetchDocumentBytes,
+        today,
+        title: '작업공간 서류 원본 전부',
+        onProgress: (done, total) => setOriginals({ done, total }),
+      })
+      const name = workspaces.find((w) => w.workspaceId === currentWorkspaceId)?.workspace?.name ?? ''
+      if (r.got > 0) saveBytesAs(r.zip, originalsZipName('workspace', name, today))
+      setOriginalsLine(originalsDoneLine(r, true))
+    } catch {
+      setOriginalsLine('업체 목록을 읽지 못해 내려받지 못했어요 — 인터넷을 확인하고 다시 눌러 주세요.')
+    } finally {
+      setOriginals(null)
+    }
+  }
   const [confirmClear, setConfirmClear] = useState(false)
   const [busy, setBusy] = useState(false)
   /** D-528 작업공간 전체 내보내기 — 고객 관리 › 더보기 › [백업 내려받기] 와 같은 함수 · 같은 파일 */
@@ -110,12 +140,22 @@ function DataPanelSupabase() {
     <>
       <Panel title="작업공간 전체 내보내기">
         <p className="t-sub break-keep text-slate-600">
-          업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸지 않아요. 고객 관리 › 더보기 › [백업 내려받기] 와 같은 파일이에요.
+          업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸지 않아요. 고객 관리 › 더보기 › [백업 내려받기] 와 같은 파일이에요. 서류 원본 파일(PDF · 사진)은 [서류 원본 파일 전부] 로 따로 받아요.
         </p>
         <Button variant="secondary" className="mt-3" onClick={() => void handleExport()} disabled={exporting || !currentWorkspaceId} data-testid="settings-export">
           <Download aria-hidden="true" className="size-4" />
           {exporting ? '모으는 중…' : '전체 내려받기'}
         </Button>
+        {/* D-549 SAFE-5 원본 파일(PDF · 사진 …)은 위 파일에 목록만 — 원본은 여기서 압축 하나로 */}
+        <Button variant="secondary" className="mt-3 ml-0 sm:ml-2" onClick={() => void handleOriginals()} disabled={!!originals || !currentWorkspaceId} data-testid="settings-originals">
+          <FileArchive aria-hidden="true" className="size-4" />
+          {originals ? (originals.total ? `원본 받는 중 ${originals.done} / ${originals.total}` : '업체 목록 읽는 중…') : '서류 원본 파일 전부(ZIP)'}
+        </Button>
+        {originalsLine && (
+          <p role="status" className="t-sub mt-2 break-keep text-slate-800" data-testid="settings-originals-done">
+            {originalsLine}
+          </p>
+        )}
         {/* D-536 이 파일로 되살아나는 것 · 보관용 · 담기지 않는 것(접어 둠) */}
         <div className="mt-3">
           <BackupScopeNote />

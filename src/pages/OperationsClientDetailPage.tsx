@@ -37,7 +37,9 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
-import { FlaskConical, FolderOpen, ListTree } from 'lucide-react'
+import { FileArchive, FlaskConical, FolderOpen, ListTree } from 'lucide-react'
+import { DocOriginalsSheet } from '../components/ops/DocOriginalsSheet'
+import { originalItems } from '../services/docOriginals'
 import { withoutProvisional } from '../services/marketingTrial'
 import { DocFolderView } from '../components/ops/DocFolderView'
 import { readDocView, writeDocView, type DocView } from '../lib/docViewPref'
@@ -298,6 +300,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 모바일에서 부가 행동을 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
+  // D-549 SAFE-5 서류 원본 묶음(ZIP) 판
+  const [originalsOpen, setOriginalsOpen] = useState(false)
   // D-154: 성과 보고서 한 장
   // D-155: 오늘 '안부 챙길 계약 고객' 의 [성과 보고서] 는 ?report=1 로 들어와 바로 연다
   const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
@@ -1460,6 +1464,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <span><span className="max-sm:hidden">서류 </span>다시 분류</span>
               </Button>
             )}
+            {/* D-549 SAFE-5 원본 파일을 압축 하나로(클라우드에 올린 파일이 있을 때만) — 전부 · 정책자금 신청 서류만 */}
+            {uploadable && originalItems(record).length > 0 && (
+              <Button variant="secondary" size="sm" data-testid="doc-originals-open" onClick={() => setOriginalsOpen(true)}>
+                <FileArchive aria-hidden="true" className="size-3.5" />
+                <span>원본<span className="max-sm:hidden"> 내려받기</span></span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -2028,6 +2039,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         />
       )}
 
+      {originalsOpen && <DocOriginalsSheet record={record} today={today} onClose={() => setOriginalsOpen(false)} />}
+
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
@@ -2106,6 +2119,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <FileUp aria-hidden="true" className="size-4" />
                 서류 한꺼번에 올리기(파일 · 폴더)
               </Button>
+              {/* D-549 SAFE-5 서류 원본 한 번에 — 칸 이름 그대로 압축 하나(정책자금 신청 서류만도) */}
+              {uploadable && originalItems(record).length > 0 && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-doc-originals"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setOriginalsOpen(true)
+                  }}
+                >
+                  <FileArchive aria-hidden="true" className="size-4" />
+                  서류 원본 한 번에 내려받기(ZIP · {originalItems(record).length}개)
+                </Button>
+              )}
               {/* D-129: 기본 탭 줄에서 뺀 두 영역 — 기능과 기록은 그대로, 여기서 연다 */}
               {!pilot && (
                 <Button
