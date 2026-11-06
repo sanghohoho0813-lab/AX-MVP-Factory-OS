@@ -8069,4 +8069,6 @@ D-540 보고의 두 확인에 대한 답: ① (다) 기본 순서에서 할 일 
 - 시험 맞춤: qa:shell — D-296(고객 플랫폼 단추는 설정 › 계정 · 보기로) 뒤로 멈춰 있던 '시계는 고객 플랫폼 왼쪽' → '설정 아이콘 왼쪽 · 머리줄에 고객 플랫폼 단추 없음'.
   qa:assist — 영업 관리 띠 → 머리 단추.
 - 지킨 것: 꾸미기 열쇠(칸 id · 접기 id) 그대로 · 기능 지움 0 · 세금 계산기(taxCalc) 0 · DB · api · 로그인 · 저장 방식 0.
+- 전체 점검(병합 전 QA 전부 · 따로 작업 폴더 · d3c062c): **77묶음 모두 녹색** — test:all · 화면 e2e 60 · mobile · squeeze · ocrkr · shell 68 · files · folder · radar · session · draftcloud · packcloud · wording · tax 74 ·
+  db 413 PASS / 0 FAIL · restore 14 · modconflict 13 · clientconflict 19 · pilot 297/0 · isolation 24/0. 그 뒤 커밋(문서 · 비교 사진 · 미팅 준비 설명 한 줄)은 tsc · oxlint · build · test:all · qa:sales 202/0.
 - 못 한 것: 고용지원금(PC 9종 · 휴대폰 8종) · 내 콘텐츠(7종)는 아직 6종 넘음(원본 화면 안 인라인 글자 · 이모지 아이콘 크기까지 세는 자). 상자 안 상자 합계는 거의 그대로(PC 431 → 427).
