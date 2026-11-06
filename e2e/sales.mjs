@@ -418,6 +418,16 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('D-218 저장 실패 뒤 다시 저장: 미팅 기록은 한 건만 더해진다(4건)', (await rec('cli_d218')).sales.meetings.length === 4, String((await rec('cli_d218')).sales.meetings.length))
 
   // 5) 회사 사정 저장 실패 — 적은 메모가 사라지지 않는다
+  {
+    // STAB(D-548) 화면 아래쪽 소제목에 마우스를 올려 두면 설명 상자가 문서 끝을 늘였다 줄였다 해서 화면이 떨렸다(시험이 30초 멈춤) — 이제 위로 열리고 문서 길이 그대로
+    const ctxBtn = page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ })
+    await ctxBtn.scrollIntoViewIfNeeded()
+    const bb = await ctxBtn.boundingBox()
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2)
+    const jitter = await page.evaluate(() => new Promise((res) => { const seen = new Set(); let n = 0; const tick = () => { seen.add(`${document.documentElement.scrollHeight}/${Math.round(scrollY)}`); if (++n < 40) requestAnimationFrame(tick); else res([...seen]) }; tick() }))
+    const place = await page.locator('[data-testid="hint-tip"]:visible').first().getAttribute('data-place').catch(() => null)
+    check('STAB 화면 아래 소제목에 마우스 — 문서 길이 · 스크롤이 떨리지 않음(설명 상자는 위로)', jitter.length === 1 && place === 'above', { jitter, place })
+  }
   await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).click()
   const memoBox = page.getByLabel('상담 메모')
   await memoBox.fill('가지급금 2억 · 자녀 1명 근무')

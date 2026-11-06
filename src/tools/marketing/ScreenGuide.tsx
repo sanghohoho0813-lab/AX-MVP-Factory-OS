@@ -59,7 +59,7 @@ export function ScreenGuide({ id, what, steps = [], testId = 'mk-guide' }: { id:
           {steps.map((t, i) => (
             <li key={t} className="t-sub flex flex-col items-center gap-1 px-0.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:p-0 sm:text-left">
               {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 max-sm:hidden" />}
-              <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[0.8125rem] font-bold text-white">
+              <span aria-hidden="true" className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
                 {i + 1}
               </span>
               <span>{t}</span>

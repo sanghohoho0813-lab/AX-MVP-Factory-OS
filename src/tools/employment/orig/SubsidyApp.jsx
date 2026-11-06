@@ -2054,13 +2054,13 @@ function ExcelImport(props){
               <div onClick={function(){if(!stBusy[0]&&fileRef.current)fileRef.current.click();}}
                 style={{border:"2px dashed var(--color-brand-200)",borderRadius:14,padding:"38px 20px",textAlign:"center",cursor:"pointer",background:"#F8FBFF"}}>
                 <div style={{fontSize:40,marginBottom:12}}>📄</div>
-                <div style={{fontSize:16.5,fontWeight:800,color:"#1E293B",marginBottom:7,letterSpacing:"-0.3px"}}>{stBusy[0]?"파일을 읽는 중…":"클릭해서 엑셀 파일 선택"}</div>
-                <div style={{fontSize:13.5,color:"#64748B"}}>.xlsx · .xls · .csv · 권장 컬럼: 업체명, 사업자등록번호, 직원명, 입사일, 지원금명</div>
+                <div style={{fontSize:16,fontWeight:800,color:"#1E293B",marginBottom:7,letterSpacing:"-0.3px"}}>{stBusy[0]?"파일을 읽는 중…":"클릭해서 엑셀 파일 선택"}</div>
+                <div style={{fontSize:14,color:"#64748B"}}>.xlsx · .xls · .csv · 권장 컬럼: 업체명, 사업자등록번호, 직원명, 입사일, 지원금명</div>
                 <div style={{fontSize:12.5,color:"#94A3B8",marginTop:5}}>제목·안내 문구가 위에 있어도 헤더 행을 자동으로 찾아냅니다.</div>
               </div>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}}
                 onChange={function(e){handleFile(e.target.files&&e.target.files[0]);}}/>
-              <button onClick={downloadTemplate} style={Object.assign({},btnS,{padding:"10px 16px",fontSize:13.5})}>⬇️ 샘플 양식 다운로드 (.xlsx)</button>
+              <button onClick={downloadTemplate} style={Object.assign({},btnS,{padding:"10px 16px",fontSize:14})}>⬇️ 샘플 양식 다운로드 (.xlsx)</button>
             </div>
           )}
 
@@ -2121,7 +2121,7 @@ function ExcelImport(props){
                 style={Object.assign({},btnP,{padding:"13px",fontSize:15,opacity:reqMissingList.length>0?0.45:1,cursor:reqMissingList.length>0?"not-allowed":"pointer"})}>
                 이대로 미리보기 진행 →
               </button>
-              <button onClick={function(){stAdv[1](!stAdv[0]);}} style={Object.assign({},btnS,{padding:"10px 16px",fontSize:13.5})}>
+              <button onClick={function(){stAdv[1](!stAdv[0]);}} style={Object.assign({},btnS,{padding:"10px 16px",fontSize:14})}>
                 {showAdv&&reqMissingList.length===0?"상세 설정 접기 ⌃":"🔧 직접 수정하기 (컬럼·제목 줄 변경)"}
               </button>
               {/* 고급 설정: 제목 줄 변경 + 상세 컬럼 매핑 (기존 기능 그대로) */}
@@ -2237,7 +2237,7 @@ function ExcelImport(props){
             var canSave=willSave>0&&!stSaving[0];
             return(
             <div style={{display:"grid",gap:12}}>
-              <div style={{padding:"16px 18px",background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:12,fontSize:13.5,lineHeight:1.9,color:"#334155"}}>
+              <div style={{padding:"16px 18px",background:"#F8FAFC",border:"1px solid #E2E8F0",borderRadius:12,fontSize:14,lineHeight:1.9,color:"#334155"}}>
                 <div style={{fontWeight:800,color:"#0F172A",marginBottom:6}}>등록 예정 요약</div>
                 <div>· 신규 업체 생성: <strong>{pv.companies.length-mergeCnt}개</strong></div>
                 <div>· 기존 업체 병합(직원 추가): <strong>{mergeCnt}개</strong></div>
@@ -2298,7 +2298,7 @@ function ExcelImport(props){
                 var undoDisabled=stUndoBusy[0]||undone||((r.undoEmpIds||[]).length===0&&(r.undoCompIds||[]).length===0);
                 return(
                   <button disabled={undoDisabled} onClick={undoImport}
-                    style={{background:"#fff",color:undoDisabled?"#94A3B8":"#DC2626",border:"1px solid "+(undoDisabled?"#E2E8F0":"#FECACA"),borderRadius:10,padding:"10px 16px",fontSize:13.5,fontWeight:700,cursor:undoDisabled?"default":"pointer",fontFamily:FF,opacity:undoDisabled?0.7:1}}>
+                    style={{background:"#fff",color:undoDisabled?"#94A3B8":"#DC2626",border:"1px solid "+(undoDisabled?"#E2E8F0":"#FECACA"),borderRadius:10,padding:"10px 16px",fontSize:14,fontWeight:700,cursor:undoDisabled?"default":"pointer",fontFamily:FF,opacity:undoDisabled?0.7:1}}>
                     {stUndoBusy[0]?"취소 중…":undone?"✓ 가져오기 취소 완료":"↩️ 이번 가져오기 취소 (방금 등록한 데이터만 삭제)"}
                   </button>
                 );
@@ -2597,7 +2597,7 @@ function PayrollDiagnosis(props){
   }
 
   var inpS={width:"100%",boxSizing:"border-box",padding:"11px 13px",fontSize:19,borderRadius:9,border:"1.5px solid #E2E8F0",fontFamily:FF,background:"#fff",color:"#1E293B"};
-  var labS={fontSize:17.5,fontWeight:700,color:"#475569",marginBottom:6,display:"block"};
+  var labS={fontSize:17,fontWeight:700,color:"#475569",marginBottom:6,display:"block"};
 
   // 진입 버튼 (업체 관리 상단 / 채용 진단 등에서 재사용)
   var btn=compact?(
@@ -2624,7 +2624,7 @@ function PayrollDiagnosis(props){
                   style={{padding:"7px 14px",fontSize:17,fontWeight:800,borderRadius:9,border:"1.5px solid #E2E8F0",background:canBack?"#fff":"#F1F5F9",color:canBack?"#0F766E":"#CBD5E1",cursor:canBack?"pointer":"default",fontFamily:FF}}>← 뒤로가기</button>
                 <button type="button" disabled={!canFwd||stBusy[0]} onClick={function(){if(canFwd)stStep[1](stStep[0]+1);}}
                   style={{padding:"7px 14px",fontSize:17,fontWeight:800,borderRadius:9,border:"1.5px solid #E2E8F0",background:canFwd?"#fff":"#F1F5F9",color:canFwd?"#0F766E":"#CBD5E1",cursor:canFwd?"pointer":"default",fontFamily:FF}}>앞으로가기 →</button>
-                <span style={{fontSize:15.5,color:"#94A3B8",marginLeft:"auto"}}>{stStep[0]}/4 단계</span>
+                <span style={{fontSize:15,color:"#94A3B8",marginLeft:"auto"}}>{stStep[0]}/4 단계</span>
               </div>
             );
           })()}
@@ -2644,7 +2644,7 @@ function PayrollDiagnosis(props){
               var n=s[0],on=stStep[0]===n,done=stStep[0]>n;
               return(<React.Fragment key={n}>
                 {i>0&&<span style={{flex:"0 0 12px",height:2,background:(done||on)?"#5EEAD4":"#E2E8F0"}}/>}
-                <span style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:17.5,fontWeight:800,color:(on||done)?"#0F766E":"#94A3B8",whiteSpace:"nowrap"}}>
+                <span style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:17,fontWeight:800,color:(on||done)?"#0F766E":"#94A3B8",whiteSpace:"nowrap"}}>
                   <span style={{width:25,height:25,borderRadius:13,background:on?"#0F766E":done?"#CCFBF1":"#F1F5F9",color:on?"#fff":done?"#0F766E":"#94A3B8",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800}}>{done?"✓":n}</span>
                   <span className="hide-mobile">{s[1]}</span>
                 </span>
@@ -2661,7 +2661,7 @@ function PayrollDiagnosis(props){
           )}
           {/* 오류/안내 (공통, 모달 내부 유지 — 앱이 홈으로 튕기지 않음) */}
           {stErr[0]&&!stBusy[0]&&stStep[0]!==4&&(
-            <div style={{padding:"12px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:9,fontSize:17.5,color:"#991B1B",lineHeight:1.7}}>⚠️ {stErr[0]}</div>
+            <div style={{padding:"12px 14px",background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:9,fontSize:17,color:"#991B1B",lineHeight:1.7}}>⚠️ {stErr[0]}</div>
           )}
 
           {/* ── 1단계: 파일 선택 / 텍스트 붙여넣기 ── */}
@@ -2690,7 +2690,7 @@ function PayrollDiagnosis(props){
                       <button type="button" onClick={function(){openPicker("any");}}
                         style={{background:"#F1F5F9",color:"#475569",border:"1px solid #E2E8F0",borderRadius:11,padding:"11px 18px",fontSize:17,fontWeight:700,cursor:"pointer",fontFamily:FF}}>📁 파일이 안 보이면 전체 파일에서 선택</button>
                     </div>
-                    <div style={{fontSize:15.5,color:"#64748B",marginTop:11,lineHeight:1.7,wordBreak:"keep-all"}}>
+                    <div style={{fontSize:15,color:"#64748B",marginTop:11,lineHeight:1.7,wordBreak:"keep-all"}}>
                       📱 스마트폰에서는 ‘내 파일’ 또는 ‘구글드라이브’에서 PDF 명부를 선택해주세요.<br/>
                       PDF가 목록에 안 보이면 ‘전체 파일에서 선택’을 눌러 직접 고를 수 있습니다.<br/>
                       사진첩 이미지나 캡처본은 현재 분석하지 않습니다. 글자 선택이 가능한 PDF가 가장 안정적입니다.
@@ -2721,12 +2721,12 @@ function PayrollDiagnosis(props){
                             <div style={{fontSize:16,color:"#64748B",marginTop:2}}>형식: {ext?ext.toUpperCase():(isPdf?"PDF":"알 수 없음")} · 크기: {fmtSize(stFile[0].size)} · {supported?"처리 가능":isImg?"이미지(미지원)":"미지원 형식"}</div>
                           </div>
                         </div>
-                        <div style={{fontSize:15.5,color:"#475569",lineHeight:1.6}}>파일은 아직 저장되지 않습니다. 브라우저에서만 읽고, 주민등록번호 등 민감정보는 화면에 마스킹합니다.</div>
+                        <div style={{fontSize:15,color:"#475569",lineHeight:1.6}}>파일은 아직 저장되지 않습니다. 브라우저에서만 읽고, 주민등록번호 등 민감정보는 화면에 마스킹합니다.</div>
                         {isPdf&&isMobileEnv()&&(
-                          <div style={{padding:"10px 13px",background:"#FEF9C3",border:"1px solid #FDE68A",borderRadius:9,fontSize:15.5,color:"#92400E",lineHeight:1.7}}>💡 스마트폰에서는 PDF 글자 읽기가 제한될 수 있습니다. PDF 내용을 복사해 <strong>‘텍스트 붙여넣기’</strong>로 올리거나, 엑셀 파일로 올리면 더 안정적입니다.</div>
+                          <div style={{padding:"10px 13px",background:"#FEF9C3",border:"1px solid #FDE68A",borderRadius:9,fontSize:15,color:"#92400E",lineHeight:1.7}}>💡 스마트폰에서는 PDF 글자 읽기가 제한될 수 있습니다. PDF 내용을 복사해 <strong>‘텍스트 붙여넣기’</strong>로 올리거나, 엑셀 파일로 올리면 더 안정적입니다.</div>
                         )}
                         <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
-                          <button type="button" disabled={stBusy[0]} onClick={function(){openPicker("any");}} style={Object.assign({},btnS,{padding:"11px 16px",fontSize:17.5,opacity:stBusy[0]?0.6:1})}>파일 다시 선택</button>
+                          <button type="button" disabled={stBusy[0]} onClick={function(){openPicker("any");}} style={Object.assign({},btnS,{padding:"11px 16px",fontSize:17,opacity:stBusy[0]?0.6:1})}>파일 다시 선택</button>
                           <button type="button" disabled={!supported||stBusy[0]} onClick={startFromFile}
                             style={{flex:"1 1 200px",background:(!supported||stBusy[0])?"#CBD5E1":"#0F766E",color:"#fff",border:"none",borderRadius:10,padding:"12px 18px",fontSize:18.5,fontWeight:800,cursor:(!supported||stBusy[0])?"default":"pointer",fontFamily:FF}}>
                             {stBusy[0]?"읽는 중…":isPdf?"PDF에서 글자 읽기 →":"이 파일로 명부 정리하기 →"}
@@ -2771,14 +2771,14 @@ function PayrollDiagnosis(props){
               <textarea value={stText[0]} onChange={function(e){stText[1](e.target.value);}} rows={11}
                 placeholder={"PDF에서 읽은 내용이 여기에 표시됩니다. 비어 있다면 PDF 내용을 복사해 직접 붙여넣어 주세요."}
                 style={{width:"100%",boxSizing:"border-box",padding:"13px 15px",fontSize:18,lineHeight:1.7,borderRadius:10,border:"1.5px solid #E2E8F0",fontFamily:FF,resize:"vertical"}}/>
-              <div style={{fontSize:14.5,color:"#92400E",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:9,padding:"9px 12px",lineHeight:1.6}}>
+              <div style={{fontSize:14,color:"#92400E",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:9,padding:"9px 12px",lineHeight:1.6}}>
                 텍스트가 거의 비어 있다면, 해당 PDF는 스캔 이미지일 가능성이 높습니다. 이 경우 엑셀 파일로 내려받아 올리거나, PDF 내용을 복사해 붙여넣어 주세요.
               </div>
               {/* 분석 로그(접이식) — 추출은 됐는데 후보가 안 잡히는지 진단 */}
               {(function(){
                 var quickRrn=(stText[0].match(/\d{6}\s*-\s*[0-9*]/g)||[]).length;
                 return(
-                  <details style={{fontSize:14.5,color:"#64748B"}}>
+                  <details style={{fontSize:14,color:"#64748B"}}>
                     <summary style={{cursor:"pointer",fontWeight:700}}>분석 로그 보기</summary>
                     <div style={{marginTop:6,padding:"8px 11px",background:"#F8FAFC",border:"1px solid #EEF2F6",borderRadius:8,lineHeight:1.7}}>
                       읽은 글자 수: {stText[0].length}자 · 발견된 주민번호 패턴(원문): 약 {quickRrn}건
@@ -2817,15 +2817,15 @@ function PayrollDiagnosis(props){
                   );})}
                 </div>
                 {stStats[0]&&(
-                  <details style={{fontSize:14.5,color:"#64748B"}}>
+                  <details style={{fontSize:14,color:"#64748B"}}>
                     <summary style={{cursor:"pointer",fontWeight:700}}>분석 로그 보기</summary>
                     <div style={{marginTop:6,padding:"8px 11px",background:"#F8FAFC",border:"1px solid #EEF2F6",borderRadius:8,lineHeight:1.7}}>읽은 글자 {stStats[0].rawLen||stStats[0].textLen}자 · 정규화 후 {stStats[0].normLen}자 · 주민번호 {stStats[0].rrnCount}건 · 날짜 {stStats[0].dateCount}개 · 직원 후보 {stStats[0].candCount}명</div>
                   </details>
                 )}
                 <div style={{display:"flex",gap:9,flexWrap:"wrap",alignItems:"center"}}>
-                  <button type="button" onClick={addCand} style={Object.assign({},btnS,{padding:"8px 14px",fontSize:15.5})}>+ 직원 직접 추가</button>
-                  <button type="button" onClick={confirmAll} style={Object.assign({},btnS,{padding:"8px 14px",fontSize:15.5})}>전체 확인 완료</button>
-                  <label style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:15.5,color:"#475569",cursor:"pointer",marginLeft:"auto"}}>
+                  <button type="button" onClick={addCand} style={Object.assign({},btnS,{padding:"8px 14px",fontSize:15})}>+ 직원 직접 추가</button>
+                  <button type="button" onClick={confirmAll} style={Object.assign({},btnS,{padding:"8px 14px",fontSize:15})}>전체 확인 완료</button>
+                  <label style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:15,color:"#475569",cursor:"pointer",marginLeft:"auto"}}>
                     <input type="checkbox" checked={stOnlyCheck[0]} onChange={function(e){stOnlyCheck[1](e.target.checked);}}/> 확인 필요만 보기
                   </label>
                 </div>
@@ -2845,7 +2845,7 @@ function PayrollDiagnosis(props){
                             <tr key={c.id} style={{borderBottom:"1px solid #F1F5F9",opacity:c.excluded?0.5:1}}>
                               <td style={cellS}>
                                 <input value={c.name||""} onChange={function(e){updateCand(c.id,{name:e.target.value});}} style={Object.assign({},smInp,{minWidth:84})} placeholder="이름"/>
-                                {(function(){var miss=c.ins?[c.ins.np,c.ins.hi,c.ins.wc,c.ins.ei].filter(function(b){return !b;}).length:0;return (miss>=2&&c.rel==="none")?<div style={{fontSize:15.5,fontWeight:700,color:"#C2410C",marginTop:3,whiteSpace:"normal",lineHeight:1.45}}>⚠ 특수관계자·대표자·임원 여부 확인 필요</div>:null;})()}
+                                {(function(){var miss=c.ins?[c.ins.np,c.ins.hi,c.ins.wc,c.ins.ei].filter(function(b){return !b;}).length:0;return (miss>=2&&c.rel==="none")?<div style={{fontSize:15,fontWeight:700,color:"#C2410C",marginTop:3,whiteSpace:"normal",lineHeight:1.45}}>⚠ 특수관계자·대표자·임원 여부 확인 필요</div>:null;})()}
                               </td>
                               <td style={Object.assign({},cellS,{fontFamily:"monospace",color:"#64748B",whiteSpace:"nowrap"})}>{c.rrnMasked||"—"}</td>
                               <td style={cellS}><input type="date" value={c.birthDate||""} onChange={function(e){updateCand(c.id,{birthDate:e.target.value});}} style={Object.assign({},smInp,{minWidth:130})}/></td>
@@ -2872,7 +2872,7 @@ function PayrollDiagnosis(props){
                                 </select>
                               </td>
                               <td style={Object.assign({},cellS,{whiteSpace:"nowrap"})}>
-                                {c.confirmed?<span style={{fontSize:15.5,fontWeight:800,color:"#059669"}}>✓ 확인</span>:need?<span style={{fontSize:15.5,fontWeight:800,color:"#B45309"}}>확인 필요</span>:<span style={{fontSize:15.5,color:"#64748B"}}>—</span>}
+                                {c.confirmed?<span style={{fontSize:15,fontWeight:800,color:"#059669"}}>✓ 확인</span>:need?<span style={{fontSize:15,fontWeight:800,color:"#B45309"}}>확인 필요</span>:<span style={{fontSize:15,color:"#64748B"}}>—</span>}
                               </td>
                               <td style={Object.assign({},cellS,{whiteSpace:"nowrap"})}>
                                 <button type="button" onClick={function(){updateCand(c.id,{confirmed:!c.confirmed});}} style={{marginRight:5,padding:"4px 8px",borderRadius:6,border:"1px solid "+(c.confirmed?"#A7F3D0":"#E2E8F0"),background:c.confirmed?"#ECFDF5":"#fff",color:c.confirmed?"#059669":"#64748B",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:FF}}>확인</button>
@@ -2943,7 +2943,7 @@ function PayrollDiagnosis(props){
                   <label style={labS}>귀속연도</label>
                   <input type="number" value={stYear[0]} onChange={function(e){stYear[1](Number(e.target.value)||stYear[0]);}} style={Object.assign({},inpS,{width:110})}/>
                 </div>
-                <button onClick={reset} style={Object.assign({},btnS,{padding:"9px 14px",fontSize:15.5})}>↻ 다른 명부 올리기</button>
+                <button onClick={reset} style={Object.assign({},btnS,{padding:"9px 14px",fontSize:15})}>↻ 다른 명부 올리기</button>
               </div>
 
               {/* 추가 입력 카드 (E: 전년/올해 구분 · F: 소재지) — Toss 스타일: 기본 접힘 */}
@@ -2959,7 +2959,7 @@ function PayrollDiagnosis(props){
                       <button key={o[0]} type="button" onClick={function(){stRegion[1](o[0]);}} style={{padding:"10px 16px",fontSize:18,fontWeight:800,border:"none",background:on?"#0F766E":"#fff",color:on?"#fff":"#475569",cursor:"pointer",fontFamily:FF}}>{o[1]}</button>
                     );})}
                   </div>
-                  <div style={{fontSize:15.5,color:"#64748B",marginTop:7,lineHeight:1.6}}>통합고용세액공제 예상 검토는 사업장 소재지에 따라 달라질 수 있습니다. 이번 단계에서는 <strong>수도권/비수도권</strong> 기준으로 1차 검토합니다. (경기도 시흥시는 수도권) <span style={{color:"#B45309"}}>금액 단가는 최신 법령 확인 필요·직접 수정 가능</span></div>
+                  <div style={{fontSize:15,color:"#64748B",marginTop:7,lineHeight:1.6}}>통합고용세액공제 예상 검토는 사업장 소재지에 따라 달라질 수 있습니다. 이번 단계에서는 <strong>수도권/비수도권</strong> 기준으로 1차 검토합니다. (경기도 시흥시는 수도권) <span style={{color:"#B45309"}}>금액 단가는 최신 법령 확인 필요·직접 수정 가능</span></div>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,marginBottom:14}}>
                   <div><label style={labS}>기업 구분</label>
@@ -3014,7 +3014,7 @@ function PayrollDiagnosis(props){
               {/* 탭: 직원별 진단 */}
               {stTab[0]==="emp"&&(
                 <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:17.5}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:17}}>
                     <thead><tr style={{background:"#F8FAFC",textAlign:"left",color:"#64748B"}}>
                       {["직원명","주민(마스킹)","나이","성별","입사일","청년 추정","1차 검토 후보 / 확인 필요"].map(function(h){return <th key={h} style={{padding:"9px 10px",fontWeight:700,whiteSpace:"nowrap",borderBottom:"1px solid #E2E8F0",fontSize:17}}>{h}</th>;})}
                     </tr></thead>
@@ -3028,25 +3028,25 @@ function PayrollDiagnosis(props){
                         return(
                         <tr key={idx} style={{borderBottom:"1px solid #F1F5F9",opacity:d.active?1:0.55}}>
                           <td style={{padding:"10px",fontWeight:700,color:"#1E293B",fontSize:19,minWidth:88}}>
-                            {e.name}{!d.active&&<span style={{marginLeft:6,fontSize:14.5,color:"#94A3B8"}}>(상실 추정)</span>}
-                            {flags.length>0&&<div style={{marginTop:3,fontSize:14.5,fontWeight:700,color:"#B45309",lineHeight:1.5,whiteSpace:"normal"}}>{flags.join(" · ")}</div>}
+                            {e.name}{!d.active&&<span style={{marginLeft:6,fontSize:14,color:"#94A3B8"}}>(상실 추정)</span>}
+                            {flags.length>0&&<div style={{marginTop:3,fontSize:14,fontWeight:700,color:"#B45309",lineHeight:1.5,whiteSpace:"normal"}}>{flags.join(" · ")}</div>}
                           </td>
                           <td style={{padding:"10px",color:"#64748B",whiteSpace:"nowrap",fontFamily:"monospace",fontSize:17}}>{e.rrnMasked||"—"}</td>
                           <td style={{padding:"10px",whiteSpace:"nowrap",fontSize:18}}>{d.age!=null?d.age+"세":"—"}</td>
                           <td style={{padding:"10px",whiteSpace:"nowrap",fontSize:18}}>{e.gender==="M"?"남":e.gender==="F"?"여":"—"}</td>
-                          <td style={{padding:"10px",whiteSpace:"nowrap",color:"#475569",fontSize:17.5}}>{e.hireDate||"—"}</td>
-                          <td style={{padding:"10px",whiteSpace:"nowrap"}}>{d.isYouth?<span style={{fontSize:15.5,fontWeight:800,color:"#0F766E"}}>청년 추정</span>:<span style={{color:"#CBD5E1"}}>—</span>}</td>
+                          <td style={{padding:"10px",whiteSpace:"nowrap",color:"#475569",fontSize:17}}>{e.hireDate||"—"}</td>
+                          <td style={{padding:"10px",whiteSpace:"nowrap"}}>{d.isYouth?<span style={{fontSize:15,fontWeight:800,color:"#0F766E"}}>청년 추정</span>:<span style={{color:"#CBD5E1"}}>—</span>}</td>
                           <td style={{padding:"10px"}}>
                             {d.candidates.length===0?<span style={{color:"#94A3B8",fontSize:17}}>{(d.expired||[]).length>0?"지금 새로 신청할 지원금 없음":"현재 자료만으로 판단 불가"}</span>:(
                               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                                 {d.candidates.map(function(c,ci){return(
                                   <span key={ci} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:999,background:(PD.LEVELS[c.level]||PD.LEVELS.unknown).bg,border:"1px solid "+(PD.LEVELS[c.level]||PD.LEVELS.unknown).bd}}>
-                                    <span style={{fontSize:15.5,fontWeight:800,color:(PD.LEVELS[c.level]||PD.LEVELS.unknown).color}}>{PD.subsidyName(c.key)}</span>
+                                    <span style={{fontSize:15,fontWeight:800,color:(PD.LEVELS[c.level]||PD.LEVELS.unknown).color}}>{PD.subsidyName(c.key)}</span>
                                   </span>
                                 );})}
                               </div>
                             )}
-                            {(d.expired||[]).length>0&&<div data-testid="roster-expired-row" style={{marginTop:5,fontSize:14.5,color:"#64748B",lineHeight:1.55,whiteSpace:"normal",wordBreak:"keep-all"}}>{/* [D-137] 입사일로 신청 기한이 지난 지원금 — 후보에서 뺀 까닭 */}{d.expired.map(function(c){return <div key={c.key}>✕ {PD.subsidyName(c.key)} — {c.note}</div>;})}</div>}
+                            {(d.expired||[]).length>0&&<div data-testid="roster-expired-row" style={{marginTop:5,fontSize:14,color:"#64748B",lineHeight:1.55,whiteSpace:"normal",wordBreak:"keep-all"}}>{/* [D-137] 입사일로 신청 기한이 지난 지원금 — 후보에서 뺀 까닭 */}{d.expired.map(function(c){return <div key={c.key}>✕ {PD.subsidyName(c.key)} — {c.note}</div>;})}</div>}
                           </td>
                         </tr>
                       );})}
@@ -3063,9 +3063,9 @@ function PayrollDiagnosis(props){
                       <div style={{flex:"1 1 260px",minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                           <span style={{fontSize:20.5,fontWeight:800,color:"#1E293B"}}>{s.name}</span>
-                          <span style={{fontSize:14.5,fontWeight:800,padding:"2px 9px",borderRadius:999,background:cm.bg,color:cm.color,border:"1px solid "+cm.color+"33"}}>신뢰도: {cm.label}</span>
+                          <span style={{fontSize:14,fontWeight:800,padding:"2px 9px",borderRadius:999,background:cm.bg,color:cm.color,border:"1px solid "+cm.color+"33"}}>신뢰도: {cm.label}</span>
                         </div>
-                        <div style={{fontSize:15.5,color:"#64748B",marginTop:5,lineHeight:1.55}}>사유: {s.confReason||s.note}</div>
+                        <div style={{fontSize:15,color:"#64748B",marginTop:5,lineHeight:1.55}}>사유: {s.confReason||s.note}</div>
                       </div>
                       <div style={{display:"flex",gap:16,flexShrink:0}}>
                         <div style={{textAlign:"center"}}><div style={{fontSize:14,color:"#94A3B8",fontWeight:700}}>후보</div><div style={{fontSize:23,fontWeight:800,color:"var(--color-brand-700)"}}>{s.candidateCount}</div></div>
@@ -3073,10 +3073,10 @@ function PayrollDiagnosis(props){
                         <div style={{textAlign:"center"}}><div style={{fontSize:14,color:"#94A3B8",fontWeight:700}}>추가자료</div><div style={{fontSize:23,fontWeight:800,color:"#64748B"}}>{s.more}</div></div>
                         {s.expired>0&&<div data-testid="roster-expired" style={{textAlign:"center"}}><div style={{fontSize:14,color:"#94A3B8",fontWeight:700}}>기한 지나 뺌</div><div style={{fontSize:23,fontWeight:800,color:"#94A3B8"}}>{s.expired}</div></div>}
                       </div>
-                      <button type="button" onClick={function(e){e.preventDefault();e.stopPropagation();try{window.open(s.site,"_blank","noopener,noreferrer");}catch(err){void err;}}} style={{flexShrink:0,fontSize:15.5,fontWeight:700,color:"#0F766E",background:"#fff",border:"1px solid #99F6E4",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontFamily:FF}}>공식 안내 ↗</button>
+                      <button type="button" onClick={function(e){e.preventDefault();e.stopPropagation();try{window.open(s.site,"_blank","noopener,noreferrer");}catch(err){void err;}}} style={{flexShrink:0,fontSize:15,fontWeight:700,color:"#0F766E",background:"#fff",border:"1px solid #99F6E4",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontFamily:FF}}>공식 안내 ↗</button>
                     </div>
                   );})}
-                  <div style={{padding:"10px 14px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,fontSize:15.5,color:"#92400E",lineHeight:1.7}}>
+                  <div style={{padding:"10px 14px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,fontSize:15,color:"#92400E",lineHeight:1.7}}>
                     이 결과는 4대보험 명부 기준 1차 검토입니다. 실제 신청 가능 여부는 공식 요건과 추가자료 확인이 필요합니다.
                   </div>
                   {/* 하단 큰 요약: 조건 충족 시 최대 예상 지원금 */}
@@ -3105,20 +3105,20 @@ function PayrollDiagnosis(props){
                     <div style={{fontSize:17,fontWeight:800,color:"#1E293B",marginBottom:9}}>① 명부 기준 직원 분류</div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10}}>
                       {[["전체 직원",analysis.counts.totalEmp],["청년 등 추정",analysis.counts.youthCount],["일반 추정",analysis.counts.generalCount],["신규 입사 추정",analysis.counts.newHireCount]].map(function(k){return(
-                        <div key={k[0]} style={{background:"#F8FAFC",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:14.5,color:"#94A3B8",fontWeight:700}}>{k[0]}</div><div style={{fontSize:21.5,fontWeight:800,color:"#1E293B"}}>{k[1]}명</div></div>
+                        <div key={k[0]} style={{background:"#F8FAFC",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:14,color:"#94A3B8",fontWeight:700}}>{k[0]}</div><div style={{fontSize:21.5,fontWeight:800,color:"#1E293B"}}>{k[1]}명</div></div>
                       );})}
                     </div>
                   </div>
 
                   {/* 2) 예상 증가 인원 */}
                   <div style={{border:"1px solid #EEF2F6",borderRadius:12,padding:"13px 15px"}}>
-                    <div style={{fontSize:17,fontWeight:800,color:"#1E293B",marginBottom:9}}>② 예상 증가 인원 <span style={{fontSize:14.5,color:"#94A3B8",fontWeight:600}}>(올해 − 전년)</span></div>
+                    <div style={{fontSize:17,fontWeight:800,color:"#1E293B",marginBottom:9}}>② 예상 증가 인원 <span style={{fontSize:14,color:"#94A3B8",fontWeight:600}}>(올해 − 전년)</span></div>
                     {!estimate.computable?(
-                      <div style={{fontSize:15.5,color:"#B45309"}}>전년도 평균 상시근로자 수를 입력하면 증가 인원을 계산합니다. (현재 “모름” 또는 미입력)</div>
+                      <div style={{fontSize:15,color:"#B45309"}}>전년도 평균 상시근로자 수를 입력하면 증가 인원을 계산합니다. (현재 “모름” 또는 미입력)</div>
                     ):(
                       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10}}>
                         {[["전체 증가",estimate.incTotal],["청년 등 증가",estimate.incYouth],["일반 증가",estimate.incNormal]].map(function(k){return(
-                          <div key={k[0]} style={{background:"#F0FDFA",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:14.5,color:"#0F766E",fontWeight:700}}>{k[0]}</div><div style={{fontSize:21.5,fontWeight:800,color:"#0F766E"}}>{k[1]==null?"확인 필요":k[1]+"명"}</div></div>
+                          <div key={k[0]} style={{background:"#F0FDFA",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:14,color:"#0F766E",fontWeight:700}}>{k[0]}</div><div style={{fontSize:21.5,fontWeight:800,color:"#0F766E"}}>{k[1]==null?"확인 필요":k[1]+"명"}</div></div>
                         );})}
                       </div>
                     )}
@@ -3127,7 +3127,7 @@ function PayrollDiagnosis(props){
                   {/* 3) 단가 + 예상 세액공제 */}
                   <div style={{border:"1px solid #EEF2F6",borderRadius:12,padding:"13px 15px"}}>
                     <div style={{fontSize:18.5,fontWeight:800,color:"#1E293B",marginBottom:4}}>③ 예상 세액공제 <span style={{fontSize:15,color:"#B45309",fontWeight:700}}>· 입력값 기준 1차 추정 · 법령표 확인 필요</span></div>
-                    <div style={{fontSize:14.5,color:"#94A3B8",marginBottom:11}}>1인당 단가(만원)는 {stSize[0]==="sme"?"중소기업":stSize[0]==="mid"?"중견기업":"기타"}·{stRegion[0]==="metro"?"수도권":"지방"} 기본값입니다. 실제 귀속연도 법령표에 맞게 수정하세요.</div>
+                    <div style={{fontSize:14,color:"#94A3B8",marginBottom:11}}>1인당 단가(만원)는 {stSize[0]==="sme"?"중소기업":stSize[0]==="mid"?"중견기업":"기타"}·{stRegion[0]==="metro"?"수도권":"지방"} 기본값입니다. 실제 귀속연도 법령표에 맞게 수정하세요.</div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:13}}>
                       <div><label style={labS}>청년 등 1인당 단가(만원)</label><input type="number" min="0" value={stUnitY[0]} onChange={function(e){stUnitY[1](Number(e.target.value)||0);}} style={inpS}/></div>
                       <div><label style={labS}>일반 1인당 단가(만원)</label><input type="number" min="0" value={stUnitN[0]} onChange={function(e){stUnitN[1](Number(e.target.value)||0);}} style={inpS}/></div>
@@ -3140,7 +3140,7 @@ function PayrollDiagnosis(props){
                         </div>
                       );})}
                     </div>
-                    <div style={{marginTop:10,fontSize:15.5,fontWeight:700,color:"#DC2626"}}>※ 확정 아님 / 입력값 기준 1차 추정 / 세무 검토 필요</div>
+                    <div style={{marginTop:10,fontSize:15,fontWeight:700,color:"#DC2626"}}>※ 확정 아님 / 입력값 기준 1차 추정 / 세무 검토 필요</div>
                   </div>
 
                   {/* 4) 확인 필요 체크리스트 */}
@@ -3194,7 +3194,7 @@ function PayrollDiagnosis(props){
                   </div>
                   <div style={{border:"1px solid #EEF2F6",borderRadius:12,padding:"14px 16px"}}>
                     <div style={{fontSize:19,fontWeight:800,color:"#1E293B",marginBottom:4}}>공통 추가 확인자료</div>
-                    <div style={{fontSize:15.5,color:"#94A3B8",marginBottom:10}}>요건에 따라 필요할 수 있는 자료입니다(확정 필수서류 아님).</div>
+                    <div style={{fontSize:15,color:"#94A3B8",marginBottom:10}}>요건에 따라 필요할 수 있는 자료입니다(확정 필수서류 아님).</div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:7}}>
                       {PD.EMP_DOC_CHECKLIST.map(function(t){return(
                         <div key={t} style={{display:"flex",alignItems:"center",gap:8,fontSize:17,color:"#475569"}}><span>⬜</span><span>{t}</span></div>
@@ -3206,7 +3206,7 @@ function PayrollDiagnosis(props){
                     <div style={{display:"grid",gap:10}}>
                       {analysis.subsidySummary.filter(function(s){return s.candidateCount>0||s.more>0;}).map(function(s){return(
                         <div key={s.key} style={{background:"#F8FAFC",borderRadius:10,padding:"11px 13px"}}>
-                          <div style={{fontSize:17.5,fontWeight:800,color:"#1E293B",marginBottom:5}}>{s.name}</div>
+                          <div style={{fontSize:17,fontWeight:800,color:"#1E293B",marginBottom:5}}>{s.name}</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                             {(s.docs||[]).map(function(dn){return <span key={dn} style={{fontSize:15,color:"#475569",background:"#fff",border:"1px solid #E2E8F0",borderRadius:8,padding:"4px 9px"}}>📄 {dn}</span>;})}
                           </div>
@@ -3230,7 +3230,7 @@ function PayrollDiagnosis(props){
                 <button onClick={function(){stStep[1](3);}} style={Object.assign({},btnS,{padding:"11px 16px",fontSize:17})}>← 명부 정리로 돌아가기</button>
                 <button onClick={doCopy} style={Object.assign({},btnP,{background:stCopied[0]?"#059669":"#0F766E",padding:"12px 20px",fontSize:18.5})}>{stCopied[0]?"✓ 복사됨 (주민번호 미포함)":"📋 상담용 요약 복사"}</button>
                 {/* [D-126] 아무 일도 하지 않던 '보고서 반영·저장·PDF (다음 단계)' 단추는 뺐다 */}
-                <span style={{fontSize:14.5,color:"#94A3B8",marginLeft:"auto"}}>분석은 브라우저에서만 처리 · 저장되지 않음</span>
+                <span style={{fontSize:14,color:"#94A3B8",marginLeft:"auto"}}>분석은 브라우저에서만 처리 · 저장되지 않음</span>
               </div>
             </div>
           )}
@@ -3417,7 +3417,7 @@ function Dashboard(props){
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
               <span style={{fontSize:27,fontWeight:800,color:"#0F172A",letterSpacing:"-0.6px"}}>이번 달 업무 현황</span>
-              <span style={{fontSize:14.5,color:"#94A3B8",fontWeight:500}}>{dstr} 기준 · 한눈에 보는 핵심 지표</span>
+              <span style={{fontSize:14,color:"#94A3B8",fontWeight:500}}>{dstr} 기준 · 한눈에 보는 핵심 지표</span>
             </div>
           </div>
           <div className="brief-grid">
@@ -3428,13 +3428,13 @@ function Dashboard(props){
               <div key={i} className="hover-card brief-card" style={{background:b.bg,border:"none",borderRadius:"var(--radius-panel)",padding:"22px 24px",display:"flex",flexDirection:"column",minHeight:158,boxShadow:"0 6px 20px rgba(15,23,42,0.12)"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
                   <span className="brief-icon" style={{fontSize:19,flexShrink:0,width:36,height:36,borderRadius:11,background:"rgba(255,255,255,0.18)",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{b.icon}</span>
-                  <span className="brief-label" style={{fontSize:15.5,fontWeight:600,color:"rgba(255,255,255,0.92)",flex:1}}>{b.label}</span>
+                  <span className="brief-label" style={{fontSize:15,fontWeight:600,color:"rgba(255,255,255,0.92)",flex:1}}>{b.label}</span>
                   {b.badge&&<span style={{fontSize:11.5,fontWeight:700,color:"#fff",background:"rgba(255,255,255,0.22)",padding:"4px 11px",borderRadius:999}}>{b.badge}</span>}
                 </div>
                 <div className="brief-num" style={{fontSize:50,fontWeight:800,color:"#fff",letterSpacing:"-1.2px",lineHeight:1.02}}>
                   {b.val}{b.unit&&<span className="brief-num-unit" style={{fontSize:23,opacity:0.80,marginLeft:4}}>{b.unit}</span>}
                 </div>
-                <div className="brief-sub" style={{fontSize:14.5,color:"rgba(255,255,255,0.82)",marginTop:8,fontWeight:500,flex:1,lineHeight:1.45}}>{b.sub}</div>
+                <div className="brief-sub" style={{fontSize:14,color:"rgba(255,255,255,0.82)",marginTop:8,fontWeight:500,flex:1,lineHeight:1.45}}>{b.sub}</div>
                 {b.spark&&<div className="brief-spark" style={{marginTop:8}}><Sparkline data={metrics.spark} width={120} height={22} color="rgba(255,255,255,0.75)"/></div>}
                 {b.btn&&<button onClick={b.on} className="brief-btn" style={b.btnKind==="cta"?btnCta:btnGhost}>{b.btn} →</button>}
               </div>
@@ -3533,7 +3533,7 @@ function Dashboard(props){
       <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"15px 20px",borderBottom:"1px solid #EDF2F7",background:"#FAFBFC"}}>
         <input value={stCoQ[0]} onChange={function(e){stCoQ[1](e.target.value);}} placeholder="🔍 업체명·사업자번호·대표자 검색"
           style={Object.assign({},inp,{flex:"1 1 220px",minWidth:180,maxWidth:340,margin:0,fontSize:15,padding:"11px 14px"})}/>
-        <select value={stCoSort[0]} onChange={function(e){stCoSort[1](e.target.value);}} style={Object.assign({},inp,{width:"auto",margin:0,fontSize:14.5,fontWeight:600,padding:"11px 12px"})}>
+        <select value={stCoSort[0]} onChange={function(e){stCoSort[1](e.target.value);}} style={Object.assign({},inp,{width:"auto",margin:0,fontSize:14,fontWeight:600,padding:"11px 12px"})}>
           <option value="name">정렬: 가나다순</option>
           <option value="targets">대상자 많은 순</option>
           <option value="emps">직원 수 많은 순</option>
@@ -3542,7 +3542,7 @@ function Dashboard(props){
           <option value="newest">최신 등록순</option>
           <option value="yearsDesc">업력 높은 순</option>
         </select>
-        <select value={stCoFilter[0]} onChange={function(e){stCoFilter[1](e.target.value);}} style={Object.assign({},inp,{width:"auto",margin:0,fontSize:14.5,fontWeight:600,padding:"11px 12px"})}>
+        <select value={stCoFilter[0]} onChange={function(e){stCoFilter[1](e.target.value);}} style={Object.assign({},inp,{width:"auto",margin:0,fontSize:14,fontWeight:600,padding:"11px 12px"})}>
           <option value="all">필터: 전체</option>
           <option value="corp">법인</option>
           <option value="indiv">개인</option>
@@ -3555,7 +3555,7 @@ function Dashboard(props){
         <PayrollDiagnosis/>
         <span style={{fontSize:12.5,color:"#94A3B8",fontWeight:600,marginLeft:"auto"}}>{companyRowsView.length}개 업체</span>
       </div>
-      {companyRowsView.length===0&&<div style={{padding:"34px 0",textAlign:"center",fontSize:14.5,color:"#94A3B8"}}>조건에 맞는 업체가 없습니다.</div>}
+      {companyRowsView.length===0&&<div style={{padding:"34px 0",textAlign:"center",fontSize:14,color:"#94A3B8"}}>조건에 맞는 업체가 없습니다.</div>}
       {companyRowsView.map(function(r,ci){var c=r.c;return(
       <div key={c.id} onClick={function(){props.goCompany(c.id);}}
         style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",padding:"15px 18px",cursor:"pointer",borderBottom:ci<companyRowsView.length-1?"1px solid #F1F5F9":"none",transition:"background 0.15s"}}
@@ -3566,19 +3566,19 @@ function Dashboard(props){
         <div style={{flex:"1 1 340px",minWidth:240}}>
           {/* 1순위: 업체명 + 배지 */}
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-            <span style={{fontSize:17.5,fontWeight:700,color:"#1E293B",lineHeight:1.35}}>{c.name}</span>
+            <span style={{fontSize:17,fontWeight:700,color:"#1E293B",lineHeight:1.35}}>{c.name}</span>
             {(c.tags||[]).map(function(tid){var tag=TAGS.find(function(t){return t.id===tid;});if(!tag)return null;return <span key={tid} style={{fontSize:11.5,fontWeight:700,padding:"2px 9px",borderRadius:10,background:tag.bg,color:tag.color,whiteSpace:"nowrap"}}>{tag.label}</span>;})}
             {r.upcoming>0&&<span style={{fontSize:11.5,fontWeight:700,padding:"2px 9px",borderRadius:10,background:"#FEE2E2",color:"#DC2626",whiteSpace:"nowrap"}}>🔔 {r.upcoming}건 임박</span>}
             {r.reviewCnt>0&&<span style={{fontSize:11.5,fontWeight:700,padding:"2px 9px",borderRadius:10,background:"#FEF3C7",color:"#B45309",whiteSpace:"nowrap"}}>⚠️ 확인 필요 {r.reviewCnt}건</span>}
           </div>
           {/* 2순위: 사업자번호 · 법인구분 · 대표 · 지역 · 업력 */}
-          <div style={{fontSize:13.5,color:"#64748B",marginTop:5,lineHeight:1.5}}>
+          <div style={{fontSize:14,color:"#64748B",marginTop:5,lineHeight:1.5}}>
             {[c.bizNo,c.corpType,c.ceoName?"대표 "+c.ceoName:null,r.region,r.yearsText].filter(Boolean).join(" · ")}
           </div>
           {/* 3순위: 직원 수 · 대상자 수 · 주요 지원금 */}
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:6}}>
-            <span style={{fontSize:13.5,fontWeight:700,color:"#334155",whiteSpace:"nowrap"}}>{r.totalEmp>0?"직원 "+r.totalEmp+"명":"직원 수 미입력"}</span>
-            <span style={{fontSize:13.5,fontWeight:700,color:r.targetCount>0?"var(--color-brand-700)":"#94A3B8",whiteSpace:"nowrap"}}>대상자 {r.targetCount}명</span>
+            <span style={{fontSize:14,fontWeight:700,color:"#334155",whiteSpace:"nowrap"}}>{r.totalEmp>0?"직원 "+r.totalEmp+"명":"직원 수 미입력"}</span>
+            <span style={{fontSize:14,fontWeight:700,color:r.targetCount>0?"var(--color-brand-700)":"#94A3B8",whiteSpace:"nowrap"}}>대상자 {r.targetCount}명</span>
             {r.progShorts.length===0?(
               <span style={{fontSize:11.5,fontWeight:600,padding:"2px 9px",borderRadius:10,background:"#F1F5F9",color:"#94A3B8",whiteSpace:"nowrap"}}>지원금 미지정</span>
             ):(r.progShorts.length>=3?r.progShorts.slice(0,1):r.progShorts).map(function(pn){return(
@@ -3589,7 +3589,7 @@ function Dashboard(props){
         </div>
         {/* 4순위(우측 고정): 수령완료 금액 */}
         <div style={{textAlign:"right",flexShrink:0,minWidth:100,marginLeft:"auto"}}>
-          <div style={{fontSize:17.5,fontWeight:800,color:r.rcv>0?"#059669":"#94A3B8",lineHeight:1.2}}>{fMan(r.rcv)}</div>
+          <div style={{fontSize:17,fontWeight:800,color:r.rcv>0?"#059669":"#94A3B8",lineHeight:1.2}}>{fMan(r.rcv)}</div>
           <div style={{fontSize:11.5,color:"#94A3B8",marginTop:2}}>수령완료</div>
         </div>
       </div>);})}
@@ -3632,7 +3632,7 @@ function Dashboard(props){
             {[["관리 업체",trialInfo.comp+"개"],["대상자",trialInfo.emp+"명"],["예상 지원금",fMan(trialInfo.expect)],["신청 일정",trialInfo.sched+"건"]].map(function(it,i){return(
               <div key={i} style={{background:"#fff",padding:"9px 12px"}}>
                 <div style={{fontSize:11.5,color:"#64748B",fontWeight:600,marginBottom:2}}>{it[0]}</div>
-                <div style={{fontSize:14.5,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>{it[1]}</div>
+                <div style={{fontSize:14,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>{it[1]}</div>
               </div>
             );})}
           </div>
@@ -4406,7 +4406,7 @@ function CompDet(props){
         return(
           <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,padding:"12px 16px",marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
-              <span style={{fontSize:13.5,fontWeight:800,color:"#92400E"}}>⚠️ 엑셀 가져오기에서 확인이 필요한 항목이 있습니다.</span>
+              <span style={{fontSize:14,fontWeight:800,color:"#92400E"}}>⚠️ 엑셀 가져오기에서 확인이 필요한 항목이 있습니다.</span>
               <button onClick={function(){
                 if(!window.confirm("확인 완료로 처리할까요? 이 업체와 소속 직원의 '확인 필요' 표시가 제거됩니다.\n(데이터 자체는 변경되지 않습니다)"))return;
                 if(company.reviewNeeded||cIss.length>0)props.onPatchCompany(company.id,{reviewNeeded:false,reviewIssues:[]});
@@ -5164,9 +5164,9 @@ function ProgramsList(props){
             <div style={{marginBottom:18,paddingBottom:16,borderBottom:"1px solid "+tint.border}}>
               <div style={{display:"flex",alignItems:"center",gap:13,flexWrap:"wrap"}}>
                 <span style={{fontSize:34,fontWeight:900,color:gp.dark,letterSpacing:"-1.2px",lineHeight:1.12}}>{gp.icon} {grp}</span>
-                <span style={{fontSize:13.5,fontWeight:700,padding:"6px 14px",borderRadius:999,background:"#fff",border:"1px solid "+tint.border,color:gp.text,whiteSpace:"nowrap"}}>{items.length}개 · ON {grpOn}</span>
+                <span style={{fontSize:14,fontWeight:700,padding:"6px 14px",borderRadius:999,background:"#fff",border:"1px solid "+tint.border,color:gp.text,whiteSpace:"nowrap"}}>{items.length}개 · ON {grpOn}</span>
               </div>
-              <div style={{fontSize:14.5,color:"#64748B",marginTop:9,marginLeft:2,lineHeight:1.5}}>{grpDesc}</div>
+              <div style={{fontSize:14,color:"#64748B",marginTop:9,marginLeft:2,lineHeight:1.5}}>{grpDesc}</div>
             </div>
             {/* 지원금 카드 (개별 번호 1~15 · 여유 있는 반응형 그리드) */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:14}}>
@@ -5188,11 +5188,11 @@ function ProgramsList(props){
                       {p.year&&<span style={pill("#475569","#F1F5F9")}>{p.year}년</span>}
                       {isYouth&&<span style={pill("#D97706","#FEF3C7")}>⭐ 추천</span>}
                       {isCustom&&<span style={pill(gp.text,gp.badge)}>커스텀</span>}
-                      <span style={Object.assign({},pill(gp.dark,gp.light),{fontSize:14.5,fontWeight:800})}>{fMan(p.totalAmount||0)}</span>
+                      <span style={Object.assign({},pill(gp.dark,gp.light),{fontSize:14,fontWeight:800})}>{fMan(p.totalAmount||0)}</span>
                       {!isEnabled&&<span style={pill("#94A3B8","#F1F5F9")}>비활성</span>}
                     </div>
                     {/* 위계 4: 회차 · 지급시점 · 신청처 */}
-                    <div style={{display:"flex",gap:15,fontSize:13.5,color:"#475569",flexWrap:"wrap",lineHeight:1.7}}>
+                    <div style={{display:"flex",gap:15,fontSize:14,color:"#475569",flexWrap:"wrap",lineHeight:1.7}}>
                       <span>🔢 {(p.rounds||[]).length}회차</span>
                       <span>📅 {(p.rounds||[]).map(function(r){return r.month+"개월";}).join("/")}</span>
                       {p.applyUrl&&<span style={{color:"var(--color-brand-600)"}}>📍 {p.applyUrl}</span>}
@@ -5836,7 +5836,7 @@ function OfficialSites(props){
   return(
     <div style={{background:"#fff",border:"1px solid #E8EDF3",borderRadius:"var(--radius-panel)",padding:"20px 22px",marginBottom:16,boxShadow:"0 1px 2px rgba(15,23,42,0.03)"}}>
       <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap",marginBottom:14}}>
-        <span style={{fontSize:17.5,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>🔗 공식 사이트 바로가기</span>
+        <span style={{fontSize:17,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>🔗 공식 사이트 바로가기</span>
         <span style={{fontSize:13,color:"#94A3B8"}}>신청·공고 확인은 공식 사이트, 고객사 관리는 이곳에서</span>
       </div>
       {/* 고용24 — 가장 먼저 눈에 띄는 대표 버튼 */}
@@ -5857,7 +5857,7 @@ function OfficialSites(props){
                style={{display:"flex",alignItems:"center",gap:11,padding:"13px 15px",borderRadius:12,background:s.bg,border:"1px solid "+s.bd,textDecoration:"none"}}>
               <span style={{fontSize:21,flexShrink:0,lineHeight:1}}>{s.emoji}</span>
               <span style={{minWidth:0,flex:1}}>
-                <span style={{display:"block",fontSize:14.5,fontWeight:800,color:s.color,letterSpacing:"-0.3px"}}>{s.name} ↗</span>
+                <span style={{display:"block",fontSize:14,fontWeight:800,color:s.color,letterSpacing:"-0.3px"}}>{s.name} ↗</span>
                 <span style={{display:"block",fontSize:12,color:"#64748B",marginTop:2,lineHeight:1.4}}>{s.desc}</span>
               </span>
             </a>
@@ -5886,7 +5886,7 @@ function BeginnerSubsidyGuide(){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
         <div style={{minWidth:0}}>
           <div style={{fontSize:18.5,fontWeight:800,color:"#0F172A",letterSpacing:"-0.4px"}}>📚 대표 지원금 한눈에 보기</div>
-          <div style={{fontSize:14.5,color:"#64748B",marginTop:6,lineHeight:1.55}}>이름만 봐선 감이 안 잡히죠. 어떤 상황에 쓰는지 쉽게 정리했어요.</div>
+          <div style={{fontSize:14,color:"#64748B",marginTop:6,lineHeight:1.55}}>이름만 봐선 감이 안 잡히죠. 어떤 상황에 쓰는지 쉽게 정리했어요.</div>
         </div>
         <button className="prog-tap" style={Object.assign({},btnSm,{flexShrink:0})} onClick={function(){stOpen[1](!stOpen[0]);}}>{stOpen[0]?"접기 ▲":"펼치기 ▼"}</button>
       </div>
@@ -5901,7 +5901,7 @@ function BeginnerSubsidyGuide(){
                   <span style={{fontSize:16,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px",wordBreak:"keep-all",lineHeight:1.3}}>{s.name}</span>
                 </div>
                 <span style={{alignSelf:"flex-start",fontSize:12.5,fontWeight:700,color:t.c,background:t.pill,borderRadius:999,padding:"4px 12px",whiteSpace:"nowrap"}}>{s.tag}</span>
-                <div style={{fontSize:14.5,color:"#334155",lineHeight:1.5,wordBreak:"keep-all"}}>{s.one}</div>
+                <div style={{fontSize:14,color:"#334155",lineHeight:1.5,wordBreak:"keep-all"}}>{s.one}</div>
                 <div style={{fontSize:13,color:"#64748B",lineHeight:1.5,paddingTop:8,borderTop:"1px dashed "+t.bd,wordBreak:"keep-all"}}>📍 활용: {s.use}</div>
               </div>
             );
@@ -5932,7 +5932,7 @@ function StarterGuide(props){
     return(
       <div className="fade-in" data-testid="emp-guide-mini" style={{background:"linear-gradient(135deg,var(--color-brand-50),#FFFFFF)",border:"1px solid var(--color-brand-100)",borderRadius:"var(--radius-panel)",padding:"14px 16px",marginBottom:18}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <div style={{fontSize:15.5,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px",wordBreak:"keep-all"}}>👋 이렇게 써요 — 단계를 누르면 그 화면으로</div>
+          <div style={{fontSize:15,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px",wordBreak:"keep-all"}}>👋 이렇게 써요 — 단계를 누르면 그 화면으로</div>
           <button className="prog-tap" style={btnSm} onClick={function(){stOpen[1](true);}} data-testid="emp-guide-more">자세히 ▼</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8}}>
@@ -5941,7 +5941,7 @@ function StarterGuide(props){
               <button key={s.n} type="button" className="prog-tap" onClick={s.on} data-testid="emp-guide-step" data-step={s.n} style={{display:"flex",alignItems:"center",gap:8,minWidth:0,minHeight:44,background:"#fff",border:"1px solid "+s.bd,borderRadius:12,padding:"9px 12px",textAlign:"left",cursor:"pointer",fontFamily:FF}}>
                 <span style={{width:24,height:24,borderRadius:8,background:s.tint,color:s.c,fontWeight:800,fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.n}</span>
                 <span aria-hidden="true" style={{fontSize:18,lineHeight:1,flexShrink:0}}>{s.emoji}</span>
-                <span style={{fontSize:14.5,fontWeight:700,color:"#0F172A",lineHeight:1.3,wordBreak:"keep-all",minWidth:0}}>{s.title}</span>
+                <span style={{fontSize:14,fontWeight:700,color:"#0F172A",lineHeight:1.3,wordBreak:"keep-all",minWidth:0}}>{s.title}</span>
               </button>
             );
           })}
@@ -5989,7 +5989,7 @@ function StarterGuide(props){
       {/* 안내 영상 자리 + 하루 동안 다시 보지 않기 */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginTop:12,flexWrap:"wrap"}}>
         <div style={{flex:1}}/>{/* [D-94] ‘3분 사용법 영상 준비 중’ 빈 자리는 뺐다 — 없는 영상을 약속하지 않는다 */}
-        <button className="prog-tap" onClick={hideForDay} style={{background:"none",border:"none",color:"#94A3B8",fontSize:13.5,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",padding:"6px 4px"}}>하루 동안 다시 보지 않기</button>
+        <button className="prog-tap" onClick={hideForDay} style={{background:"none",border:"none",color:"#94A3B8",fontSize:14,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",padding:"6px 4px"}}>하루 동안 다시 보지 않기</button>
       </div>
     </div>
   );
@@ -6064,7 +6064,7 @@ function SettingsScreen(props){
               style={{flex:"1 1 120px",minWidth:120,display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"16px 12px",borderRadius:13,cursor:"pointer",fontFamily:FF,
                 background:on?"var(--color-brand-50)":"#fff",border:on?"2px solid var(--color-brand-600)":"1px solid #E2E8F0"}}>
               <span style={{fontSize:o.v==="normal"?20:o.v==="large"?25:30,fontWeight:800,color:on?"var(--color-brand-700)":"#475569",lineHeight:1}}>{o.sample}</span>
-              <span style={{fontSize:14.5,fontWeight:700,color:on?"var(--color-brand-700)":"#475569"}}>{o.label}</span>
+              <span style={{fontSize:14,fontWeight:700,color:on?"var(--color-brand-700)":"#475569"}}>{o.label}</span>
               {on&&<span style={{fontSize:14,fontWeight:700,color:"var(--color-brand-600)"}}>✓ 사용 중</span>}
             </button>
           );})}
@@ -6078,13 +6078,13 @@ function SettingsScreen(props){
             <div style={{fontSize:18,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>화면 안내 다시 보기</div>
             <div style={{fontSize:14,color:"#64748B",marginTop:6,lineHeight:1.5}}>처음 보는 화면 설명을 다시 켤 수 있어요. (각 화면 상단 안내 카드)</div>
           </div>
-          <button className="prog-tap" onClick={resetAll} style={{flexShrink:0,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:10,padding:"11px 18px",fontSize:14.5,fontWeight:800,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 25%, transparent)"}}>모든 화면 안내 다시 켜기</button>
+          <button className="prog-tap" onClick={resetAll} style={{flexShrink:0,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:10,padding:"11px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 25%, transparent)"}}>모든 화면 안내 다시 켜기</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10,marginTop:16}}>
           {guideItems.map(function(g){return(
             <div key={g[0]} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"13px 15px",borderRadius:12,background:"#F8FAFC",border:"1px solid #EEF1F5"}}>
               <span style={{fontSize:15,fontWeight:700,color:"#334155"}}>{g[1]}</span>
-              <button className="prog-tap" onClick={function(){resetOne(g[0],g[1]);}} style={{flexShrink:0,background:"#fff",color:"var(--color-brand-600)",border:"1px solid var(--color-brand-200)",borderRadius:9,padding:"8px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:FF}}>다시 보기</button>
+              <button className="prog-tap" onClick={function(){resetOne(g[0],g[1]);}} style={{flexShrink:0,background:"#fff",color:"var(--color-brand-600)",border:"1px solid var(--color-brand-200)",borderRadius:9,padding:"8px 14px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:FF}}>다시 보기</button>
             </div>
           );})}
         </div>
@@ -6097,7 +6097,7 @@ function SettingsScreen(props){
         <div style={{fontSize:18,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>데이터 백업</div>
         <div style={{fontSize:14,color:"#64748B",margin:"6px 0 14px",lineHeight:1.6}}>현재 화면에 보이는 업체·직원·지원금·메모 데이터를 JSON 파일로 내려받아 보관할 수 있습니다.</div>
         <button className="prog-tap" style={{...btnP,whiteSpace:"normal",maxWidth:"100%",wordBreak:"keep-all"}} onClick={exportBackup}>⬇️ 전체 데이터 백업 내보내기 (JSON)</button>{/* [D-127] 좁은 휴대폰에서 옆으로 넘쳤다 */}
-        <div style={{marginTop:14,padding:"13px 16px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,fontSize:13.5,color:"#92400E",lineHeight:1.7}}>
+        <div style={{marginTop:14,padding:"13px 16px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,fontSize:14,color:"#92400E",lineHeight:1.7}}>
           <div style={{fontWeight:800,marginBottom:4}}>안전한 사용 안내</div>
           · <strong>주 1회 백업</strong>을 권장합니다.<br/>
           · <strong>공용 PC</strong> 사용 시 로그아웃에 주의하세요.<br/>
@@ -6111,7 +6111,7 @@ function SettingsScreen(props){
         <div style={{fontSize:14,color:"#64748B",margin:"6px 0 14px",lineHeight:1.6}}>이 브라우저에 저장된 <strong>화면 설정(글자 크기·안내 표시)</strong>만 초기화합니다. <strong>업체·직원 등 업무 데이터는 모듈 기록에 보관되어 삭제되지 않습니다.</strong></div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
           <input value={stResetText[0]} onChange={function(e){stResetText[1](e.target.value);}} style={Object.assign({},inp,{width:200})} placeholder="초기화 라고 입력"/>
-          <button className="prog-tap" style={{background:stResetText[0]==="초기화"?"#DC2626":"#FCA5A5",color:"#fff",border:"none",borderRadius:10,padding:"11px 18px",fontSize:14.5,fontWeight:800,cursor:stResetText[0]==="초기화"?"pointer":"not-allowed",fontFamily:FF}} onClick={resetLocalPrefs}>화면 설정 초기화</button>
+          <button className="prog-tap" style={{background:stResetText[0]==="초기화"?"#DC2626":"#FCA5A5",color:"#fff",border:"none",borderRadius:10,padding:"11px 18px",fontSize:14,fontWeight:800,cursor:stResetText[0]==="초기화"?"pointer":"not-allowed",fontFamily:FF}} onClick={resetLocalPrefs}>화면 설정 초기화</button>
         </div>
       </div>
 
@@ -6178,7 +6178,7 @@ function ScreenGuide(props){
     return(
       <div className="fade-in" style={{display:"flex",alignItems:"center",gap:11,background:"#fff",border:"1px solid #E8EDF3",borderRadius:12,padding:"12px 16px",marginBottom:16,boxShadow:"0 1px 2px rgba(15,23,42,0.03)"}}>
         <div style={{flex:1,minWidth:0}}>
-          <span style={{fontSize:14.5,fontWeight:800,color:"#0F172A"}}>{g.title} 안내</span>
+          <span style={{fontSize:14,fontWeight:800,color:"#0F172A"}}>{g.title} 안내</span>
           <span style={{fontSize:13,color:"#94A3B8",marginLeft:8}} className="hide-mobile">{g.desc}</span>
         </div>
         <button className="prog-tap" style={Object.assign({},btnSm,{flexShrink:0})} onClick={function(){stOpen[1](true);}}>안내 펼치기 ▾</button>
@@ -6207,7 +6207,7 @@ function ScreenGuide(props){
           {g.can.map(function(c,i){return(
             <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:i<g.can.length-1?9:0}}>
               <span style={{color:"var(--color-brand-600)",fontWeight:800,flexShrink:0,fontSize:16}}>·</span>
-              <span style={{fontSize:15.5,color:"#334155",lineHeight:1.5,wordBreak:"keep-all"}}>{c}</span>
+              <span style={{fontSize:15,color:"#334155",lineHeight:1.5,wordBreak:"keep-all"}}>{c}</span>
             </div>
           );})}
         </div>
@@ -6224,10 +6224,10 @@ function ScreenGuide(props){
       <div style={{display:"flex",gap:9,marginTop:18,flexWrap:"wrap",alignItems:"center"}}>
         {(g.ctas||[]).map(function(c,i){return(
           <button key={i} className="prog-tap" onClick={function(){runCta(c.act);}}
-            style={c.primary?{background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:11,padding:"13px 24px",fontSize:15.5,fontWeight:800,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 25%, transparent)"}
-                            :{background:"#fff",color:"#475569",border:"1px solid #E2E8F0",borderRadius:11,padding:"13px 22px",fontSize:15.5,fontWeight:700,cursor:"pointer",fontFamily:FF}}>{c.label} →</button>
+            style={c.primary?{background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:11,padding:"13px 24px",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 25%, transparent)"}
+                            :{background:"#fff",color:"#475569",border:"1px solid #E2E8F0",borderRadius:11,padding:"13px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FF}}>{c.label} →</button>
         );})}
-        <button className="prog-tap" onClick={hideForDay} style={{marginLeft:"auto",background:"none",border:"none",color:"#94A3B8",fontSize:13.5,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",padding:"6px 4px"}}>하루 동안 다시 보지 않기</button>
+        <button className="prog-tap" onClick={hideForDay} style={{marginLeft:"auto",background:"none",border:"none",color:"#94A3B8",fontSize:14,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",padding:"6px 4px"}}>하루 동안 다시 보지 않기</button>
       </div>
     </div>
   );
@@ -7095,7 +7095,7 @@ export default function SubsidyApp(props){
             var bd=ap.tone==="expired"?"rgba(220,38,38,0.35)":ap.tone==="warn"?"rgba(251,191,36,0.3)":"color-mix(in srgb, var(--color-brand-500) 30%, transparent)";
             return(<div className="sb-trial" style={{marginTop:10,display:"inline-flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:"var(--radius-panel)",background:bg,border:"1px solid "+bd}}>
               <span style={{fontSize:15}}>🗓️</span>
-              <span style={{fontSize:14.5,color:col,fontWeight:600,lineHeight:1.35}}>{ap.text}</span>
+              <span style={{fontSize:14,color:col,fontWeight:600,lineHeight:1.35}}>{ap.text}</span>
             </div>);
           })()}
         </div>
@@ -7174,9 +7174,9 @@ export default function SubsidyApp(props){
             <button className="app-hamburger" onClick={function(){stMobileNav[1](true);}} title="메뉴" style={{display:"none",alignItems:"center",justifyContent:"center",width:44,height:44,borderRadius:10,border:"1px solid #E2E8F0",background:"#F8FAFC",fontSize:22,cursor:"pointer",flexShrink:0}}>☰</button>
             {stView[0]==="company"&&selectedCompany?(
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                <button onClick={function(){stCompany[1](null);stView[1]("companies");}} title="업체 목록으로" className="prog-tap" style={{display:"inline-flex",alignItems:"center",gap:5,background:"#F1F5F9",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14.5,fontWeight:700,padding:"8px 14px",borderRadius:10,whiteSpace:"nowrap",fontFamily:FF}}>← 업체 목록</button>
+                <button onClick={function(){stCompany[1](null);stView[1]("companies");}} title="업체 목록으로" className="prog-tap" style={{display:"inline-flex",alignItems:"center",gap:5,background:"#F1F5F9",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14,fontWeight:700,padding:"8px 14px",borderRadius:10,whiteSpace:"nowrap",fontFamily:FF}}>← 업체 목록</button>
                 <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
-                  <span style={{fontSize:14.5,color:"#94A3B8",fontWeight:600,whiteSpace:"nowrap"}} className="hide-mobile">업체 관리</span>
+                  <span style={{fontSize:14,color:"#94A3B8",fontWeight:600,whiteSpace:"nowrap"}} className="hide-mobile">업체 관리</span>
                   <span style={{color:"#CBD5E1",fontSize:16}} className="hide-mobile">›</span>
                   <span style={{fontSize:24,fontWeight:800,color:"#0F172A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"-0.4px"}}>{selectedCompany.name}</span>
                 </div>
@@ -7208,7 +7208,7 @@ export default function SubsidyApp(props){
           <div style={{background:"#F8FAFC",borderBottom:"1px solid #E2E8F0",padding:"9px 48px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <span style={{...neutralBadge(),flexShrink:0}}>샘플</span>
             <div style={{flex:1,minWidth:200}}>
-              <span style={{fontSize:13.5,color:"#64748B"}}>지금 보이는 건 둘러보기용 <strong style={{color:"#475569"}}>가상 데이터</strong>예요. 언제든 삭제할 수 있습니다.</span>
+              <span style={{fontSize:14,color:"#64748B"}}>지금 보이는 건 둘러보기용 <strong style={{color:"#475569"}}>가상 데이터</strong>예요. 언제든 삭제할 수 있습니다.</span>
             </div>
             <button disabled={sampleBusy} onClick={function(){if(!requirePlan())return;deleteSampleData();}} style={{background:"#fff",color:sampleBusy?"#94A3B8":"#DC2626",border:"1px solid "+(sampleBusy?"#E2E8F0":"#FECACA"),borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:sampleBusy?"default":"pointer",fontFamily:FF,flexShrink:0,whiteSpace:"nowrap",opacity:sampleBusy?0.7:1}}>{sampleBusy?"처리 중…":"샘플 데이터 삭제"}</button>
           </div>
@@ -7246,7 +7246,7 @@ export default function SubsidyApp(props){
                 <h3 style={{margin:0,fontSize:18,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>고용지원금으로 관리할 업체를 고르세요</h3>
                 <p style={{margin:"4px 0 0",fontSize:14,color:"#475569",lineHeight:1.6,wordBreak:"keep-all"}}>고객 관리에 있는 업체 가운데 고릅니다 — 직원을 넣으면 회차 · 서류 · 수수료 · 보고서가 이어져요.</p>
               </div>
-              <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{flexShrink:0,minHeight:44,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"11px 22px",fontSize:15.5,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
+              <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{flexShrink:0,minHeight:44,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"11px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
             </div>
           )}
 
@@ -7319,7 +7319,7 @@ export default function SubsidyApp(props){
               <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",padding:"14px 16px",marginBottom:16,background:"#F0FDFA",border:"1px solid #99F6E4",borderRadius:14}}>
                 <div style={{flex:"1 1 280px",minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:800,color:"#0F766E"}}>이미 채용된 직원이 있다면? 4대보험 명부로 한 번에 진단</div>
-                  <div style={{fontSize:14.5,color:"#475569",marginTop:3,lineHeight:1.5}}>{/* [D-127] 12.5 → 14.5 */}가입자 명부를 올리면 지원금 후보와 세액공제 가능성을 자동으로 분류합니다. (1차 검토 · 저장되지 않음)</div>
+                  <div style={{fontSize:14,color:"#475569",marginTop:3,lineHeight:1.5}}>{/* [D-127] 12.5 → 14.5 */}가입자 명부를 올리면 지원금 후보와 세액공제 가능성을 자동으로 분류합니다. (1차 검토 · 저장되지 않음)</div>
                 </div>
                 <PayrollDiagnosis compact/>
               </div>

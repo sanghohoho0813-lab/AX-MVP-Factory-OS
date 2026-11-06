@@ -48,37 +48,37 @@
 html[data-fontscale="large"] .hr-app, html[data-fontscale="large"] .hr-portal { --fsm: 1.1; }
 html[data-fontscale="xlarge"] .hr-app, html[data-fontscale="xlarge"] .hr-portal { --fsm: 1.22; }
 
-/* ── PC 전용 타이포 상향 ── */
+/* ── PC 전용 타이포 상향 ── UIX-3(D-548) 반 픽셀 크기(14.5 · 15.5 · 16.5 · 17.5 · 12.5)는 OS 글자 단계(14 · 15 · 16 · 17)로 맞춤 — 글자 종류가 줄어 덜 어수선 */
 @container hr (min-width: 641px) {
   .hr-app {
     --fs-meta: calc(15px * var(--fsm));
-    --fs-sub: calc(15.5px * var(--fsm));
+    --fs-sub: calc(15px * var(--fsm));
     --fs-name: calc(18px * var(--fsm));
-    --fs-row: calc(16.5px * var(--fsm));
-    --fs-badge: calc(14.5px * var(--fsm));
+    --fs-row: calc(16px * var(--fsm));
+    --fs-badge: calc(14px * var(--fsm));
     --fs-btn: calc(16px * var(--fsm));
-    --fs-tab: calc(17.5px * var(--fsm));
+    --fs-tab: calc(17px * var(--fsm));
     --fs-label: calc(15px * var(--fsm));
     --fs-dday: calc(15px * var(--fsm));
-    --fs-body: calc(16.5px * var(--fsm));
-    --fs-list: calc(17.5px * var(--fsm));
-    --fs-mini: calc(12.5px * var(--fsm));
+    --fs-body: calc(16px * var(--fsm));
+    --fs-list: calc(17px * var(--fsm));
+    --fs-mini: calc(14px * var(--fsm));
   }
 }
 @media (min-width: 861px) {
   .hr-portal {
     --fs-meta: calc(15px * var(--fsm));
-    --fs-sub: calc(15.5px * var(--fsm));
+    --fs-sub: calc(15px * var(--fsm));
     --fs-name: calc(18px * var(--fsm));
-    --fs-row: calc(16.5px * var(--fsm));
-    --fs-badge: calc(14.5px * var(--fsm));
+    --fs-row: calc(16px * var(--fsm));
+    --fs-badge: calc(14px * var(--fsm));
     --fs-btn: calc(16px * var(--fsm));
-    --fs-tab: calc(17.5px * var(--fsm));
+    --fs-tab: calc(17px * var(--fsm));
     --fs-label: calc(15px * var(--fsm));
     --fs-dday: calc(15px * var(--fsm));
-    --fs-body: calc(16.5px * var(--fsm));
-    --fs-list: calc(17.5px * var(--fsm));
-    --fs-mini: calc(12.5px * var(--fsm));
+    --fs-body: calc(16px * var(--fsm));
+    --fs-list: calc(17px * var(--fsm));
+    --fs-mini: calc(14px * var(--fsm));
   }
 }
 

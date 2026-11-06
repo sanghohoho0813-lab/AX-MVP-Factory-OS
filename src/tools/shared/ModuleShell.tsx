@@ -216,7 +216,7 @@ function ModuleNavList({
                 data-accent={accent}
                 aria-current={on ? 'page' : undefined}
                 title={item.hint}
-                className={`tap flex items-center gap-2.5 rounded-(--radius-control) px-2 py-1.5 text-[0.94rem] ${
+                className={`tap flex items-center gap-2.5 rounded-(--radius-control) px-2 py-1.5 text-[0.9375rem] ${
                   on ? 'bg-brand-600 font-bold text-white' : 'font-medium text-slate-700 hover:bg-slate-100'
                 }`}
               >

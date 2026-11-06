@@ -1258,7 +1258,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => toggleCard(meta.key, auto)}
-                    className="flex w-full min-w-0 items-center gap-2 text-left sm:w-auto sm:flex-1"
+                    // UIX-2(D-548) 휴대폰은 누르는 높이 40px 넘게 — 바깥 여백을 같은 만큼 빼서 카드 높이는 그대로
+                    className="-my-2.5 flex w-full min-w-0 items-center gap-2 py-2.5 text-left sm:my-0 sm:w-auto sm:flex-1 sm:py-0"
                   >
                     <ChevronDown
                       aria-hidden="true"
@@ -1309,7 +1310,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       onChange={(e) =>
                         void commit(withService(record, meta.key, { status: e.target.value as ServiceStatus }))
                       }
-                      className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.9375rem] font-medium"
+                      className="min-h-10 shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.9375rem] font-medium sm:min-h-0"
                     >
                       {SERVICE_STATUS_ORDER.map((s) => (
                         <option key={s} value={s}>

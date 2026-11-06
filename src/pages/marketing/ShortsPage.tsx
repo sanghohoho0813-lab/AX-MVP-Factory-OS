@@ -491,7 +491,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
             <li key={b.title} className="min-w-0 rounded-lg border border-amber-200 bg-white px-2.5 py-2" data-testid="sht-basic">
               <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
                 <span className="t-body flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
-                  <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[0.78rem] font-bold text-white">
+                  <span aria-hidden="true" className="t-meta inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
                     {i + 1}
                   </span>
                   <span className="min-w-0">{b.title}</span>

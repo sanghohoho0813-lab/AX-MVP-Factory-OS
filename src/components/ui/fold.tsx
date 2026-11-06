@@ -125,6 +125,19 @@ export function HintTip({
   const tipRef = useRef<HTMLSpanElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [shift, setShift] = useState(0)
+  /*
+   * STAB(D-548) 화면 아래쪽 소제목은 설명 상자를 위로 연다 — 아래로 열면 상자가 문서 끝을 늘였다(+100px 남짓).
+   * 페이지 맨 아래에서 마우스를 올려 두면 늘어난 만큼 화면이 밀리고 → 마우스가 소제목에서 벗어나 상자가 닫히고 → 다시 올라오는 일이
+   * 끝없이 되풀이돼 화면이 떨렸다(영업 미팅 준비 '미팅에서 알게 된 회사 사정'). 마우스를 올리는 그 순간 자리로 정한다(그리기 전에).
+   */
+  const [above, setAbove] = useState(false)
+  const place = () => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const r = wrap.getBoundingClientRect()
+    const vh = document.documentElement.clientHeight
+    setAbove(r.bottom > vh * 0.6 && r.top > 180)
+  }
   // 상자는 소제목 줄 왼쪽 끝(left-0)에서 시작한다 — 그 자리와 상자 폭만으로 계산해 여러 번 불려도 같은 값
   const fit = () =>
     window.requestAnimationFrame(() => {
@@ -141,7 +154,7 @@ export function HintTip({
   if (!tip) return <>{children}</>
   return (
     // 긴 이름이 붙은 소제목(업체 이름 등)도 줄을 바꿔 ? 가 화면 밖으로 밀리지 않게 — 첫 칸(소제목)이 줄어들 수 있고, 띄어쓰기 없는 긴 낱말도 필요하면 끊는다
-    <div ref={wrapRef} className={`group/hint relative flex min-w-0 items-center [overflow-wrap:anywhere] [&>:first-child]:min-w-0 ${className}`} onMouseEnter={fit} onFocusCapture={fit} onMouseLeave={() => setShown(false)}>
+    <div ref={wrapRef} className={`group/hint relative flex min-w-0 items-center [overflow-wrap:anywhere] [&>:first-child]:min-w-0 ${className}`} onMouseEnter={() => { place(); fit() }} onFocusCapture={() => { place(); fit() }} onMouseLeave={() => setShown(false)}>
       {children}
       {dot && (
       <button
@@ -153,6 +166,7 @@ export function HintTip({
         aria-describedby={id}
         onClick={() => {
           setShown((v) => !v)
+          place()
           fit()
         }}
         data-testid="hint-dot"
@@ -167,7 +181,8 @@ export function HintTip({
         role="tooltip"
         style={shift ? { transform: `translateX(${shift}px)` } : undefined}
         data-testid="hint-tip"
-        className={`pointer-events-none absolute top-full left-0 z-40 mt-0.5 w-max max-w-[min(24rem,calc(100vw-2.5rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.9375rem] leading-snug font-medium break-keep whitespace-pre-line text-white shadow-lg ${
+        data-place={above ? 'above' : 'below'}
+        className={`pointer-events-none absolute ${above ? 'bottom-full mb-0.5' : 'top-full mt-0.5'} left-0 z-40 w-max max-w-[min(24rem,calc(100vw-2.5rem))] rounded-(--radius-control) bg-slate-900 px-3 py-2 text-[0.9375rem] leading-snug font-medium break-keep whitespace-pre-line text-white shadow-lg ${
           shown ? 'block' : 'hidden group-hover/hint:block group-has-[:focus-visible]/hint:block'
         }`}
       >

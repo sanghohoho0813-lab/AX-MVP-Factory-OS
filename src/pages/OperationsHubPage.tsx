@@ -1204,7 +1204,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 id="ops-alerts"
                 aria-expanded={alertsOpen}
                 onClick={() => setAlertsOpen((v) => !v)}
-                className="flex items-center gap-2 text-[1.2rem] font-bold text-slate-900"
+                className="flex min-h-10 items-center gap-2 text-[1.2rem] font-bold text-slate-900"
               >
                 <ChevronRight
                   aria-hidden="true"

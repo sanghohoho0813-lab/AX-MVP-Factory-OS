@@ -1728,32 +1728,32 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
           </button>
         ) : null}
         {tab === "overview" && (!ui || inputOpen) ? (
-          <div style={{ ...card, padding: isMobile ? 16 : 22, marginBottom: 8, "--fs": isMobile ? effScale : effScale * 1.3 }}>
-            {ui ? <button type="button" onClick={() => setInputOpen(false)} style={{ float: "right", border: "none", background: "transparent", color: T.mute, fontFamily: FF, fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>접기 ▴</button> : null}
-            <div style={{ fontSize: "calc(14.5px * var(--fs,1))", fontWeight: 800, marginBottom: 6 }}>{ui ? "새 분석 / 다시 분석" : "크레탑 보고서로 재무진단 시작"}</div>
-            <div style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub, marginBottom: 16, lineHeight: 1.5 }}>크레탑(KRD) 기업종합보고서 PDF를 올리거나 텍스트를 붙여넣고 진단을 실행하세요. 데이터는 브라우저에서만 처리됩니다.</div>
+          <div style={{ ...card, padding: isMobile ? 16 : 22, marginBottom: 8, "--fs": isMobile ? effScale : effScale * 1.3 }}>{/* UIX-3(D-548) 시작 칸 글자는 OS 글자 단계(rem — 화면 글자 크기 설정을 따른다)로: 예전엔 PC 에서 배율 1.69 가 걸려 19.4 · 20.3 · 21.1 · 22.8 · 24.5px 다섯 가지가 섞였다 */}
+            {ui ? <button type="button" onClick={() => setInputOpen(false)} style={{ float: "right", border: "none", background: "transparent", color: T.mute, fontFamily: FF, fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>접기 ▴</button> : null}
+            <div style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: 6 }}>{ui ? "새 분석 / 다시 분석" : "크레탑 보고서로 재무진단 시작"}</div>
+            <div style={{ fontSize: "0.9375rem", color: T.sub, marginBottom: 16, lineHeight: 1.5 }}>크레탑(KRD) 기업종합보고서 PDF를 올리거나 텍스트를 붙여넣고 진단을 실행하세요. 데이터는 브라우저에서만 처리됩니다.</div>
             <div style={{ display: "flex", width: "100%", maxWidth: 380, background: T.lineSoft, borderRadius: 10, padding: 4, marginBottom: 16 }}>{/* [D-94] 좁은 칸에서도 두 단추가 한 줄에 반씩 */}
               {[["pdf", "PDF 업로드"], ["text", "텍스트 붙여넣기"]].map(([k, label]) => (
-                <button key={k} onClick={() => setMode(k)} style={{ flex: "1 1 0", minWidth: 0, border: "none", cursor: "pointer", borderRadius: 8, padding: "9px 10px", fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, wordBreak: "keep-all", background: mode === k ? T.surface : "transparent", color: mode === k ? T.brand : T.sub, boxShadow: mode === k ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{label}</button>
+                <button key={k} onClick={() => setMode(k)} style={{ flex: "1 1 0", minWidth: 0, border: "none", cursor: "pointer", borderRadius: 8, padding: "9px 10px", fontSize: "1rem", fontWeight: 700, fontFamily: FF, wordBreak: "keep-all", background: mode === k ? T.surface : "transparent", color: mode === k ? T.brand : T.sub, boxShadow: mode === k ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{label}</button>
               ))}
             </div>
             {mode === "pdf" ? (
               <label style={{ display: "block", border: `1.5px dashed ${T.brand}55`, borderRadius: 14, background: T.brandSoft, padding: "30px 18px", textAlign: "center", cursor: "pointer" }}>
                 <input type="file" accept="application/pdf,.pdf,.txt,text/plain" aria-label="크레탑 보고서 파일" onChange={onPickFile} style={{ display: "none" }} />
-                <div style={{ fontSize: "calc(13.5px * var(--fs,1))", fontWeight: 700, color: T.brand }}>📄 크레탑 PDF 선택</div>
-                <div style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.sub, marginTop: 8, wordBreak: "break-all" }}>{fileName ? `선택됨: ${fileName}` : "클릭해서 PDF 파일을 선택하세요"}</div>
+                <div style={{ fontSize: "1rem", fontWeight: 700, color: T.brand }}>📄 크레탑 PDF 선택</div>
+                <div style={{ fontSize: "0.9375rem", color: T.sub, marginTop: 8, wordBreak: "break-all" }}>{fileName ? `선택됨: ${fileName}` : "클릭해서 PDF 파일을 선택하세요"}</div>
               </label>
             ) : (
               <textarea aria-label="크레탑 원문" value={text} onChange={(e) => { setText(e.target.value); setPdfPages(null); }} placeholder="크레탑 기업종합보고서 텍스트를 붙여넣으세요."
-                style={{ width: "100%", minHeight: 172, boxSizing: "border-box", border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, fontSize: "calc(12px * var(--fs,1))", fontFamily: FF, color: T.ink, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
+                style={{ width: "100%", minHeight: 172, boxSizing: "border-box", border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, fontSize: "0.9375rem", fontFamily: FF, color: T.ink, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
             )}
             {extraInput ? <div style={{ marginTop: 12 }}>{extraInput}</div> : null}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <button onClick={runDiagnosis} disabled={busy} data-testid="cretop-run" style={{ border: "none", borderRadius: 11, padding: "14px 26px", fontSize: "calc(13.5px * var(--fs,1))", fontWeight: 800, fontFamily: FF, whiteSpace: "nowrap", cursor: busy ? "default" : "pointer", color: "#fff", background: busy ? T.mute : `linear-gradient(135deg,${T.brand},${T.teal})`, opacity: busy ? 0.8 : 1 }}>{busy ? "처리 중…" : "재무진단 실행"}</button>
-              {status ? <span style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub }}>{status}</span> : null}
+              <button onClick={runDiagnosis} disabled={busy} data-testid="cretop-run" style={{ border: "none", borderRadius: 11, padding: "14px 26px", fontSize: "1rem", fontWeight: 800, fontFamily: FF, whiteSpace: "nowrap", cursor: busy ? "default" : "pointer", color: "#fff", background: busy ? T.mute : `linear-gradient(135deg,${T.brand},${T.teal})`, opacity: busy ? 0.8 : 1 }}>{busy ? "처리 중…" : "재무진단 실행"}</button>
+              {status ? <span style={{ fontSize: "0.9375rem", color: T.sub }}>{status}</span> : null}
             </div>
-            {err ? <div style={{ marginTop: 12, fontSize: "calc(12px * var(--fs,1))", color: T.warnInk, background: T.warnBg, border: `1px solid ${T.warnInk}22`, borderRadius: 8, padding: "10px 12px" }}>{err}</div> : null}
-            {(text || (pdfPages && pdfPages.length)) ? <button onClick={() => setRawViewOpen(true)} style={{ marginTop: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.mute, borderRadius: 8, padding: "7px 12px", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>🔎 PDF 에서 읽은 원문 보기</button> : null}
+            {err ? <div style={{ marginTop: 12, fontSize: "0.9375rem", color: T.warnInk, background: T.warnBg, border: `1px solid ${T.warnInk}22`, borderRadius: 8, padding: "10px 12px" }}>{err}</div> : null}
+            {(text || (pdfPages && pdfPages.length)) ? <button onClick={() => setRawViewOpen(true)} style={{ marginTop: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.mute, borderRadius: 8, padding: "7px 12px", fontSize: "0.9375rem", fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>🔎 PDF 에서 읽은 원문 보기</button> : null}
           </div>
         ) : null}
 

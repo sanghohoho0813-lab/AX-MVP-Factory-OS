@@ -336,7 +336,7 @@ export function DecisionList({
   const [picked, setPicked] = useState<Record<string, string>>({})
   return (
     <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="decision-list">
-      {shown.map((d) => (
+      {shown.map((d, idx) => (
         <li key={`${d.clientId}:${d.id}`} className="flex flex-col gap-2 px-4 py-3" data-testid="decision" data-kind={d.kind} data-client={d.clientId}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${KIND_CLASS[d.kind]}`}>{DECISION_KIND_LABEL[d.kind]}</span>
@@ -368,9 +368,11 @@ export function DecisionList({
             </label>
           )}
           <div className="flex flex-wrap items-center gap-2">
+            {/* UIX-2(D-548) 칠한 단추는 맨 위(가장 급한) 한 건만 — 예전엔 카드마다 칠해져 화면에 검은 단추가 줄줄이 섰다. 나머지는 테두리 단추(같은 일) */}
             <Button
               size="sm"
-              variant="primary"
+              variant={idx === 0 ? 'primary' : 'secondary'}
+              className={idx === 0 ? '' : 'font-semibold text-slate-900'}
               disabled={busy !== null || (!!d.choices && !picked[`${d.clientId}:${d.id}`])}
               onClick={() => {
                 const choice = picked[`${d.clientId}:${d.id}`]
@@ -388,7 +390,7 @@ export function DecisionList({
             >
               <Check aria-hidden="true" className="size-4" /> {d.kind === 'doc' && linked?.(d.clientId) ? '요청 보내기(문구 · 고객 화면)' : d.yesLabel}
             </Button>
-            <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => onAnswer(d, 'no')} data-testid="decision-no">
+            <Button size="sm" variant={idx === 0 ? 'secondary' : 'ghost'} disabled={busy !== null} onClick={() => onAnswer(d, 'no')} data-testid="decision-no">
               <X aria-hidden="true" className="size-4" /> {d.noLabel}
             </Button>
             {d.grant || d.rows ? (

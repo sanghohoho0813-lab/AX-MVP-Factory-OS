@@ -36,7 +36,7 @@ export function DeviceSwitch({ wide = false, stacked = false }: { wide?: boolean
   const { mode, available } = useDeviceView()
   if (!available) return null
   return (
-    <div role="radiogroup" aria-label="보기 방식" data-testid="device-switch" className={`inline-flex shrink-0 items-center rounded-(--radius-control) border border-slate-200 bg-white p-0.5 ${stacked ? 'h-11 w-full' : 'h-10'}`}>
+    <div role="radiogroup" aria-label="보기 방식" data-testid="device-switch" className={`inline-flex shrink-0 items-center rounded-(--radius-control) border border-slate-200 bg-white p-0.5 ${stacked ? 'h-12 w-full' : 'h-10'}`}>
       {OPTIONS.map(({ mode: m, label, Icon }) => {
         const on = mode === m
         return (

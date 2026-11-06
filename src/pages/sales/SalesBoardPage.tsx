@@ -23,8 +23,9 @@ import { useClientGrantSummaries, type ClientGrantSummary } from '../../componen
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure } from '../../components/ui/primitives'
-import { KpiCard } from '../../components/ui/visual'
-import { NextActionBar, PageHero, PageStack, SummaryStrip, WorkPanel } from '../../components/ui/pageFrame'
+import { SummaryChip } from '../../components/ui/SummaryChip'
+import { usePageLayout, visibilityOf } from '../../lib/pageLayout'
+import { NextActionBar, PageHero, PageStack, WorkPanel } from '../../components/ui/pageFrame'
 import { ArrangeArea, ArrangeItem } from '../../components/ui/arrange'
 import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
 import { CopyButton } from '../../components/sales/salesParts'
@@ -338,6 +339,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const risks = useMemo(() => salesRisks(records, today), [records, today])
   const recontacts = useMemo(() => salesRecontacts(records), [records])
   const assistBuild = useCallback(() => salesBundle(records, today, risks), [records, today, risks])
+  // UIX-1(D-548) AI 도우미는 머리 단추 하나(일정 · 고객 관리와 같게) — 꾸미기에서 'AI 도우미'(sales-board:assist)를 숨기면 단추도 숨는다
+  const salesLayout = usePageLayout('sales-board')
+  const assistShown = visibilityOf(salesLayout, 'assist') === 'show'
 
   /** D-122: '계약 완료' 로 옮기면 확인 시트 — 수금 항목 · 받을 날 · 영업자 · 계약 방식까지 한 번에 */
   const [closing, setClosing] = useState<{ record: ClientOpsRecord; draft: ContractCloseDraft } | null>(null)
@@ -501,6 +505,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         context={<SalesTabs part="tabs" />}
         actions={
           <>
+            {/* UIX-1(D-548) 예전 띠의 질문 단추(건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액 · 직접 묻기)는 누르면 열리는 판 안에 그대로 */}
+            {assistShown && records.length > 0 && <AiAssist variant="button" page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
             {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 */}
             <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
               <ScanSearch aria-hidden="true" className="size-4" />
@@ -560,13 +566,16 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           </ArrangeItem>
         )}
         <ArrangeItem id="summary" label="한눈에 숫자" hint="진행 중 · 예상 수임료 · 이번 달 계약 · 멈춤">
-        {/* ② 요약 — 같은 숫자 · 같은 판정(아이콘 칸만 더함) */}
-        <SummaryStrip label="영업 요약" testId="sales-summary">
-          <KpiCard icon={TrendingUp} tone="orange" label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
-          <KpiCard icon={Coins} tone="orange" label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
-          <KpiCard icon={CalendarCheck} tone="green" label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'success' : 'neutral'} hint="계약 완료로 옮긴 곳" />
-          <KpiCard icon={Hourglass} tone="slate" label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
-        </SummaryStrip>
+        {/*
+          ② 요약 — UIX-1(D-548) 큰 칸 넷 → 한 줄 칩(오늘 · 고객 관리와 같은 모양). 같은 숫자 · 같은 판정, 설명은 마우스를 올리면.
+          0 일 때는 색을 쓰지 않는다 · 휴대폰은 한 줄 가로 넘김.
+        */}
+        <section aria-label="영업 요약" data-testid="sales-summary" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <SummaryChip testId="sales-kpi-flow" icon={TrendingUp} label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
+          <SummaryChip testId="sales-kpi-fee" icon={Coins} label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
+          <SummaryChip testId="sales-kpi-won" icon={CalendarCheck} label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'brand' : 'neutral'} hint="계약 완료로 옮긴 곳" />
+          <SummaryChip testId="sales-kpi-stale" icon={Hourglass} label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
+        </section>
         </ArrangeItem>
         {!phone && (
           <ArrangeItem id="next" label="지금 챙길 영업" hint="가장 급한 한 곳 · 다음 단계">
@@ -605,8 +614,12 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           {/* D-239: 영업 관리 AI 도우미 — 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액(대표 계정에서만) */}
           </ArrangeItem>
         )}
-        <ArrangeItem id="assist" label="AI 도우미" hint="건마다 특징 · 밀어붙일 건 · 직접 묻기">
-        {records.length > 0 && <AiAssist page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
+        {/*
+          D-239 영업 관리 AI 도우미 — UIX-1(D-548) 띠 대신 머리 [AI 도우미] 단추(위 PageHero). 칸 자리는 비워 두고
+          꾸미기 창의 'AI 도우미' 줄은 남긴다 — 숨기기 · 다시 보이기가 그 단추에 걸린다(저장된 꾸미기 그대로).
+        */}
+        <ArrangeItem id="assist" label="AI 도우미" hint="머리 [AI 도우미] 단추 — 숨기면 단추도 숨어요">
+          {null}
         </ArrangeItem>
         <ArrangeItem id="signals" label="지금 챙길 영업 · 다시 연락할 곳" hint="목록(있을 때만)">
         {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}

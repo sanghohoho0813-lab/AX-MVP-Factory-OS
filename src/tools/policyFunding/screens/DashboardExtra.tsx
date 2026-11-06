@@ -64,12 +64,16 @@ export function PolicyDashboardExtra() {
     return (
       <Surface>
         <p className="t-sub break-keep text-slate-600">
-          아직 상담으로 저장한 업체가 없습니다.{' '}
-          <Link to={clientId ? `/tools/policy-funding/diagnosis?client=${clientId}` : '/tools/policy-funding/diagnosis'} className="font-bold text-brand-700 hover:underline">
-            진단하기
-          </Link>{' '}
-          에서 업체를 물고 진단한 뒤 결과 아래 <b>기록에 붙이기</b>(또는 <b>이 업체 상담으로 저장</b>)를 누르면 여기에 단계별로 모입니다.
+          아직 상담으로 저장한 업체가 없습니다. 진단한 뒤 결과 아래 <b>기록에 붙이기</b>(또는 <b>이 업체 상담으로 저장</b>)를 누르면 여기에 단계별로 모입니다.
         </p>
+        {/* UIX-2(D-548) 글 속 작은 글자 링크(17px) → 누르기 쉬운 단추 하나(휴대폰 44px) */}
+        <Link
+          to={clientId ? `/tools/policy-funding/diagnosis?client=${clientId}` : '/tools/policy-funding/diagnosis'}
+          className="tap t-sub mt-2 inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3.5 font-bold text-slate-900 hover:border-slate-400 hover:bg-slate-50"
+          data-testid="pf-empty-diagnose"
+        >
+          {clientId ? '이 업체 진단하기' : '진단하기'} →
+        </Link>
       </Surface>
     )
   }

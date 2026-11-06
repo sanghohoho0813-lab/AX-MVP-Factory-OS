@@ -179,7 +179,7 @@ await page.keyboard.press('Escape')
 
 /* ---------------- C 화면마다 띠 ---------------- */
 const pages = [
-  ['/sales/board', '영업 관리', 'sales.brief'],
+  // UIX-1(D-548) 영업 관리는 띠 대신 머리 [AI 도우미] 단추 — 아래 일정 · 고객 관리 묶음에서 본다
   ['/ops/agents', '영업자 정산', 'agents.soon'],
   ['/money', '매출 · 비용', 'money.top'],
   ['/tools/employment', '고용지원금 · 고객 전체', 'module.all'],
@@ -223,6 +223,18 @@ for (const [p, label, first] of pages) {
   const cIds = await page.getByTestId('ai-assist-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-assist')))
   check('C 고객 관리(U3): 띠 없음 · 머리 [AI 도우미] 하나(업체 카드 위) → 판에 여러 달 연락 안 된 곳 · 계약 가능성 · 추천 · 챙길 곳', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await cOpen.count()) === 1 && cY < cCard && cIds.join() === 'clients.quiet,clients.convert,clients.reco,clients.care', { cY, cCard, cIds })
   await page.keyboard.press('Escape')
+  // UIX-1(D-548) 영업 관리도 띠 대신 머리 [AI 도우미] — 판 안 질문(건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액) 그대로 · 영업 보드 위
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const sOpen = page.getByTestId('ai-assist-open')
+  const sY = (await sOpen.first().boundingBox())?.y ?? 9999
+  const sBoard = (await page.getByTestId('sales-board-panel').boundingBox())?.y ?? 0
+  await sOpen.first().click()
+  await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+  const sIds = await page.getByTestId('ai-assist-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-assist')))
+  check('C 영업 관리(UIX-1): 띠 없음 · 머리 [AI 도우미] 하나(영업 보드 위) → 판에 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await sOpen.count()) === 1 && sY < sBoard && sIds.join() === 'sales.brief,sales.push,sales.stuck,sales.money', { sY, sBoard, sIds })
+  await shot(page, 'C-sales-button')
+  await page.keyboard.press('Escape')
 }
 await page.goto(BASE + '/money', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
@@ -264,8 +276,8 @@ await page.keyboard.press('Escape')
     await page.goto(BASE + p, { waitUntil: 'networkidle' })
     await page.waitForTimeout(700)
     const bar = page.getByTestId('ai-assist-bar').first()
-    // U5(D-542) 일정 · U3(D-543) 고객 관리는 띠 대신 머리 [AI 도우미] 단추 — 판을 열고 질문 칸을 누른다
-    const viaButton = pg === 'calendar' || pg === 'clients'
+    // U5(D-542) 일정 · U3(D-543) 고객 관리 · UIX-1(D-548) 영업 관리는 띠 대신 머리 [AI 도우미] 단추 — 판을 열고 질문 칸을 누른다
+    const viaButton = pg === 'calendar' || pg === 'clients' || pg === 'sales'
     if (!viaButton && !(await bar.count())) {
       check(`G ${title}: AI 도우미 띠`, false, '띠 없음')
       continue
