@@ -42,11 +42,14 @@ import { withoutProvisional } from '../services/marketingTrial'
 import { DocFolderView } from '../components/ops/DocFolderView'
 import { readDocView, writeDocView, type DocView } from '../lib/docViewPref'
 import { useAuth } from '../auth/AuthProvider'
+import { applyMine, mergeClientEdits } from '../services/clientMerge'
 import { getDataModeConfig } from '../data/dataMode'
 import {
   canUploadFiles,
   listClients,
+  onClientSaveNews,
   saveClient,
+  ClientSaveConflictError,
   storeDocumentFile,
   withContract,
   withCustomDocument,
@@ -461,9 +464,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       const run = (async (): Promise<boolean> => {
         await Promise.resolve() // loopRef 에 먼저 걸고 시작한다
         try {
+          // SYNC-2(D-547) 글자마다 저장하는 화면이라, 앞 저장이 도는 사이 친 글자는 그 앞 판(옛 판)에서 나온다.
+          // 다음 저장 전에 '그 사이 고친 것만' 방금 저장된 판(다른 곳 고침과 합쳐졌을 수도 있다)에 얹는다 — 내 앞 글자를 남의 고침으로 보지 않게.
+          let prevTarget: ClientOpsRecord | null = null
+          let prevSaved: ClientOpsRecord | null = null
           for (;;) {
-            const target: ClientOpsRecord | null = latestRef.current
+            let target: ClientOpsRecord | null = latestRef.current
             if (!target) break
+            if (prevTarget && prevSaved && target.updatedAt !== prevSaved.updatedAt) {
+              const m = mergeClientEdits(prevTarget, target, prevSaved)
+              const rebased = m.conflicts.length > 0 ? applyMine(m.merged, m.conflicts) : m.merged
+              if (latestRef.current === target) latestRef.current = rebased
+              target = rebased
+            }
             const saved: ClientOpsRecord = await saveClient(target)
             if (latestRef.current === target) {
               latestRef.current = saved
@@ -471,10 +484,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               setSavedAt(Date.now())
               break
             }
+            prevTarget = target
+            prevSaved = saved
           }
           return true
         } catch (cause) {
-          showToast(cause instanceof Error ? `${cause.message} — 저장된 내용으로 다시 불러왔습니다.` : '저장하지 못했습니다. 저장된 내용으로 다시 불러왔습니다.')
+          // SYNC-2(D-547) 같은 칸이 겹쳤으면 화면 위 고르기 판이 알린다 — 같은 말을 또 띄우지 않는다(먼저 저장된 내용을 보여 주고, 고르면 그 판으로 바뀐다)
+          if (!(cause instanceof ClientSaveConflictError && cause.conflicts.length > 0))
+            showToast(cause instanceof Error ? `${cause.message} — 저장된 내용으로 다시 불러왔습니다.` : '저장하지 못했습니다. 저장된 내용으로 다시 불러왔습니다.')
           void load(true)
           return false
         } finally {
@@ -501,6 +518,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       if (await commit(out.record)) showToast(out.entered > 0 ? `옮긴 서류를 다시 읽어 회사 정보 ${out.entered}개를 채웠습니다.` : '옮긴 서류를 다시 읽었습니다 — 확인할 것이 있으면 맞춤 추천에 보여요.')
     })
   }
+
+  /**
+   * SYNC-2(D-547) 다른 곳 고침과 합쳐 저장했거나 · 겹친 칸을 골라 저장했으면 이 화면도 그 판으로(다른 칸 · 다른 창에서 저장한 것도).
+   * 이 화면이 저장하는 중이면 건드리지 않는다 — 그 저장이 끝나며 맞춘다.
+   */
+  useEffect(
+    () =>
+      onClientSaveNews((n) => {
+        if (n.kind === 'conflict' || n.record.id !== clientId || loopRef.current) return
+        latestRef.current = n.record
+        setRecord(n.record)
+        setSavedAt(Date.now())
+      }),
+    [clientId],
+  )
 
   /** 지금 화면의 가장 새 기록 — 기다린 뒤(파일 올리기 등) 이것에 얹어 저장한다 */
   const current = useCallback((): ClientOpsRecord | null => latestRef.current ?? record, [record])

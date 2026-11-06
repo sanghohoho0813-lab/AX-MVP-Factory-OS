@@ -844,13 +844,18 @@ try {
     const t0 = typeOf()
     const c0 = contactOf()
     sql(`update public.operations_clients set payload = jsonb_set(payload, '{contactName}', '"다른 곳에서 고친 담당자"') where id = '${OWNER_CLIENT}'`)
+    // D-547(SYNC-2) 예전(INT-1)에는 막고 '먼저 고쳐서…' 알림 뒤 다시 눌러야 했다 — 지금은 서로 다른 칸이면 둘 다 살려 합쳐 저장
     const toastC = await toggleType()
-    check('안정(INT-1): 화면을 연 사이 다른 곳이 고친 업체 — 이 화면 저장이 덮어쓰지 않음(진짜 DB) · 알림', toastC.includes('먼저 고쳐서') && contactOf() === '다른 곳에서 고친 담당자' && typeOf() === t0, JSON.stringify({ toastC, c: contactOf(), t: typeOf(), t0 }))
+    check('안정(INT-1 → D-547): 화면을 연 사이 다른 곳이 담당자를 고친 업체 — 덮어쓰지 않고 합쳐서 저장(진짜 DB) · "합쳐서 저장" 알림 · 고객 종류도 저장', toastC.includes('합쳐서 저장') && contactOf() === '다른 곳에서 고친 담당자' && typeOf() !== t0, JSON.stringify({ toastC, c: contactOf(), t: typeOf(), t0 }))
     await page.waitForTimeout(800)
     await toggleType()
-    check('안정(INT-1): 새로 불러온 뒤 다시 누르면 저장 · 다른 곳이 고친 담당자도 그대로', typeOf() !== t0 && contactOf() === '다른 곳에서 고친 담당자', JSON.stringify({ t: typeOf(), t0, c: contactOf() }))
+    check('안정(INT-1 → D-547): 같은 창에서 이어서 저장(되돌림)은 막히지 않음 · 다른 곳 담당자 그대로', typeOf() === t0 && contactOf() === '다른 곳에서 고친 담당자', JSON.stringify({ t: typeOf(), t0, c: contactOf() }))
+    sql(`update public.operations_clients set payload = jsonb_set(payload, '{contactName}', '"두 번째로 고친 담당자"') where id = '${OWNER_CLIENT}'`)
+    await page.waitForTimeout(800)
     await toggleType()
-    check('안정(INT-1): 같은 창에서 이어서 저장은 막히지 않음(되돌림)', typeOf() === t0, JSON.stringify({ t: typeOf(), t0 }))
+    check('안정(INT-1 → D-547): 한 번 더 다른 곳이 고쳐도 다시 합쳐 저장 · 덮어쓰기 0', typeOf() !== t0 && contactOf() === '두 번째로 고친 담당자', JSON.stringify({ t: typeOf(), t0, c: contactOf() }))
+    await page.waitForTimeout(800)
+    await toggleType()
     sql(`update public.operations_clients set payload = jsonb_set(payload, '{contactName}', '${JSON.stringify(c0)}') where id = '${OWNER_CLIENT}'`)
   }
 

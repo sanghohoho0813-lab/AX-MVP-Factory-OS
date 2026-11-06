@@ -39,6 +39,8 @@ dist-ssr
 .client-operations-out
 .client-ops-alerts-out
 .modconflict-out
+.clientconflict-out
+.clientmerge-out
 .doc-parser-out
 .client-ops-stage2-out
 .youtube-out

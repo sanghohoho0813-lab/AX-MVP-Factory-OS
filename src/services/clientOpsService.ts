@@ -62,6 +62,7 @@ import { CONTRACT_KIND_LABEL, FEE_CONDITION_ORDER, emptyContract, isCustomDocume
 import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
 import { normalizeSales } from './salesPipeline'
 import { normalizeDocRequests } from './docRequests'
+import { applyMine, conflictLabels, mergeClientEdits, type MergeConflict } from './clientMerge'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -693,6 +694,56 @@ function fromRow(row: Record<string, unknown>): ClientOpsRecord {
   })
 }
 
+/**
+ * SYNC-2(D-547) 읽은 판 기억 — 화면이 받은 업체 기록(id · 판)을 이 창에 잠깐 기억해 둔다.
+ * 저장이 부딪히면 '이 화면이 무엇을 읽고 무엇을 고쳤는지' 를 이것과 견줘, 다른 곳 고침과 합친다(clientMerge).
+ * 최근 600판까지 · 새로 고치면 사라진다(그때는 예전처럼 막고 알린다).
+ */
+const snapshots = new Map<string, ClientOpsRecord>()
+const SNAPSHOT_MAX = 600
+
+function rememberSnapshot(record: ClientOpsRecord): void {
+  if (!record.updatedAt) return
+  const key = `${record.id}|${record.updatedAt}`
+  snapshots.delete(key)
+  snapshots.set(key, structuredClone(record))
+  while (snapshots.size > SNAPSHOT_MAX) {
+    const oldest = snapshots.keys().next().value
+    if (oldest === undefined) break
+    snapshots.delete(oldest)
+  }
+}
+
+function snapshotOf(id: string, version: string): ClientOpsRecord | null {
+  return version ? (snapshots.get(`${id}|${version}`) ?? null) : null
+}
+
+/** 시험용 — 이 창의 읽은 판 기억을 비운다(새로 고친 창처럼) */
+export function __forgetClientSnapshots(): void {
+  snapshots.clear()
+  ownVersions.clear()
+}
+
+/** SYNC-2 저장 소식 — 다른 곳 고침과 합쳐 저장했을 때 · 같은 칸이 겹쳐 고르기가 필요할 때 · 고른 뒤 저장했을 때 */
+export type ClientSaveNews =
+  | { kind: 'merged'; record: ClientOpsRecord }
+  | { kind: 'conflict'; error: ClientSaveConflictError }
+  | { kind: 'resolved'; record: ClientOpsRecord }
+const saveNewsListeners = new Set<(n: ClientSaveNews) => void>()
+export function onClientSaveNews(fn: (n: ClientSaveNews) => void): () => void {
+  saveNewsListeners.add(fn)
+  return () => saveNewsListeners.delete(fn)
+}
+function announce(n: ClientSaveNews): void {
+  for (const fn of saveNewsListeners) {
+    try {
+      fn(n)
+    } catch {
+      // 듣는 쪽 오류는 저장에 영향 없음
+    }
+  }
+}
+
 function isLocal(): boolean {
   return getDataModeConfig().mode === 'local'
 }
@@ -711,6 +762,7 @@ export async function listClients(workspaceId: string | null): Promise<ClientOps
     .order('updated_at', { ascending: false })
   if (error) throw error
   const list = (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
+  for (const r of list) rememberSnapshot(r)
   // D-188: 팀장 화면에서 숨긴 기본 6종이라도 적어 둔 기록이 있으면 다시 보이게
   noteBuiltinServiceUse(list)
   return list
@@ -754,7 +806,9 @@ export async function createClient(
     .select()
     .single()
   if (error) throw error
-  return fromRow(data as Record<string, unknown>)
+  const created = fromRow(data as Record<string, unknown>)
+  rememberSnapshot(created)
+  return created
 }
 
 /**
@@ -782,10 +836,23 @@ export function saveClient(record: ClientOpsRecord): Promise<ClientOpsRecord> {
 export class ClientSaveConflictError extends Error {
   /** 지금 DB 에 있는 최신 업체 기록 */
   latest: ClientOpsRecord
-  constructor(latest: ClientOpsRecord) {
-    super('다른 화면이나 다른 사람이 이 업체를 먼저 고쳐서 덮어쓰지 않았어요 — 최신 내용을 보고 다시 해 주세요')
+  /** SYNC-2 내가 저장하려던 것 */
+  mine: ClientOpsRecord | null
+  /** SYNC-2 겹치지 않은 것은 합친 판(겹친 칸은 먼저 저장된 값) — 아직 저장 안 됨 */
+  merged: ClientOpsRecord | null
+  /** SYNC-2 둘 다 다르게 고친 칸 */
+  conflicts: MergeConflict[]
+  constructor(latest: ClientOpsRecord, detail?: { mine: ClientOpsRecord; merged: ClientOpsRecord; conflicts: MergeConflict[] }) {
+    super(
+      detail && detail.conflicts.length > 0
+        ? `다른 곳에서 같은 칸(${conflictLabels(detail.conflicts).slice(0, 3).join(' · ')})을 먼저 고쳤어요 — 화면 위 알림에서 어느 쪽으로 할지 골라 주세요`
+        : '다른 화면이나 다른 사람이 이 업체를 먼저 고쳐서 덮어쓰지 않았어요 — 최신 내용을 보고 다시 해 주세요',
+    )
     this.name = 'ClientSaveConflictError'
     this.latest = latest
+    this.mine = detail?.mine ?? null
+    this.merged = detail?.merged ?? null
+    this.conflicts = detail?.conflicts ?? []
   }
 }
 
@@ -805,7 +872,7 @@ function rememberVersion(id: string, from: string, to: string): void {
   ownVersions.set(id, own)
 }
 
-async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> {
+async function saveClientNow(record: ClientOpsRecord, attempt = 0): Promise<ClientOpsRecord> {
   const next = normalizeClientOps({ ...record, updatedAt: nowIso() })
   if (isLocal()) {
     writeLocal(readLocal().map((item) => (item.id === next.id ? next : item)))
@@ -831,11 +898,41 @@ async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> 
     // 0줄 — 판이 바뀌었거나(다른 곳이 먼저 고침) 업체가 없다(지워짐 · 권한 없음)
     const { data: cur, error: readError } = await getSupabaseClient().from('operations_clients').select('*').eq('id', next.id).eq('workspace_id', next.workspaceId).maybeSingle()
     if (readError) throw readError
-    if (cur) throw new ClientSaveConflictError(fromRow(cur as Record<string, unknown>))
+    if (cur) {
+      const latest = fromRow(cur as Record<string, unknown>)
+      rememberSnapshot(latest)
+      // SYNC-2 이 화면이 읽은 판을 기억하고 있으면 — 다른 곳 고침과 합친다. 서로 다른 칸이면 합친 판으로 다시 저장(세 번까지)
+      const read = snapshotOf(record.id, record.updatedAt)
+      if (read && attempt < 3) {
+        const { merged, conflicts } = mergeClientEdits(read, record, latest)
+        if (conflicts.length === 0) {
+          const saved = await saveClientNow(merged, attempt + 1)
+          announce({ kind: 'merged', record: saved })
+          return saved
+        }
+        const err = new ClientSaveConflictError(latest, { mine: record, merged, conflicts })
+        announce({ kind: 'conflict', error: err })
+        throw err
+      }
+      throw new ClientSaveConflictError(latest)
+    }
     throw new Error('업체를 찾지 못했습니다 — 지워졌거나 볼 수 없는 업체입니다.')
   }
   const saved = fromRow(data as Record<string, unknown>)
   rememberVersion(saved.id, base, saved.updatedAt)
+  rememberSnapshot(saved)
+  return saved
+}
+
+/**
+ * SYNC-2 같은 칸이 겹쳤을 때 고른 쪽으로 저장 — mine = 내가 고친 것으로(겹친 칸에 내 값) · theirs = 먼저 저장된 것으로(겹친 칸은 그대로).
+ * 어느 쪽이든 겹치지 않은 내 고침은 함께 저장된다. 저장한 판은 듣는 화면에 알린다.
+ */
+export async function resolveClientConflict(error: ClientSaveConflictError, pick: 'mine' | 'theirs'): Promise<ClientOpsRecord> {
+  if (!error.merged) throw new Error('고를 것이 없습니다 — 화면을 새로 고쳐 주세요.')
+  const target = pick === 'mine' ? applyMine(error.merged, error.conflicts) : error.merged
+  const saved = await saveClient(target)
+  announce({ kind: 'resolved', record: saved })
   return saved
 }
 
