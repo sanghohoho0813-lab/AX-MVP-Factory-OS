@@ -172,7 +172,8 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
   }
 
   return (
-    <Disclosure title="미팅에서 알게 된 회사 사정" hint={`대표 나이 · 매출 · 가지급금 같은 사정 — 적으면 중요도 · 대본이 맞춰집니다 · 지금 대표 ${d.ceoAge || (fact.ceoAge ? `${fact.ceoAge}(서류)` : '?')}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : fact.revenueM ? `${Math.round(fact.revenueM) / 100}억(서류)` : '?'} · 체크 ${onCount}개`}>
+    // D-548 설명 상자에 같은 말이 두 번 — "무엇을 적는 곳인지" 는 목차 사전(sectionHints)이 말하니 여기는 지금 상황만
+    <Disclosure title="미팅에서 알게 된 회사 사정" hint={`지금 대표 ${d.ceoAge || (fact.ceoAge ? `${fact.ceoAge}(서류)` : '?')}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : fact.revenueM ? `${Math.round(fact.revenueM) / 100}억(서류)` : '?'} · 체크 ${onCount}개`}>
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block text-[0.875rem] text-slate-500">
