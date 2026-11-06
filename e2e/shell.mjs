@@ -73,10 +73,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(1400)
   check('시계: 1초마다 움직인다', ((await clock.innerText()) ?? '') !== t1, t1)
 
-  // 시계는 고객 플랫폼 단추 왼쪽
+  // 시계는 머리줄 오른쪽 묶음의 맨 앞 — D-296 뒤로 고객 플랫폼 단추는 설정 › 계정 · 보기로 옮겼다(아래 D-290 확인). 이제 설정 아이콘 왼쪽 · 머리줄에 고객 플랫폼 단추 없음
   const clockBox = await clock.boundingBox()
-  const portalBox = await page.locator('header').getByRole('link', { name: /고객 플랫폼/ }).first().boundingBox()
-  check('시계: 고객 플랫폼 왼쪽에 있다', clockBox && portalBox && clockBox.x < portalBox.x, JSON.stringify({ clockBox, portalBox }))
+  const settingsBox = await page.locator('header').getByRole('link', { name: '설정' }).first().boundingBox()
+  check('시계: 설정 아이콘 왼쪽에 있다 · 머리줄에 고객 플랫폼 단추 없음(D-296)', clockBox && settingsBox && clockBox.x < settingsBox.x && (await page.locator('header').getByRole('link', { name: /고객 플랫폼/ }).count()) === 0, JSON.stringify({ clockBox, settingsBox }))
   check('시계: 글자가 크다(16px 이상)', (await clock.locator('span').last().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 16)
 
   // 로고 1.5배 (32 → 48px)
