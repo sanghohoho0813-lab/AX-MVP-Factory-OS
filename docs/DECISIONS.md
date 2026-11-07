@@ -8194,4 +8194,7 @@ D-540 보고의 두 확인에 대한 답: ① (다) 기본 순서에서 할 일 
 mkpack 은 블로그 칩을 누른 뒤 복사(그 칸 하나만 보임 확인 더함) · assist 는 마케팅을 띠 목록에서 머리 단추 확인으로.
 **바로잡은 시험 둘(이번 변경 전부터 빨강 — main 빌드로 돌려도 같은 2개 실패)**: qa:uxhome 영업 보드 — D-548 에서 요약이 한 줄 칩(칩마다 테두리) · AI 띠가 머리 단추로 바뀌었는데 예전 모양을 기대.
 
+**빠른 점검(모두 실패 0)**: tsc · oxlint · build · test:all · qa:wording 6 · qa:youtube 246 · qa:mkpack 69 · qa:uxhome 60 · qa:assist 92 · qa:threads 86 · qa:shorts 48 ·
+qa:senior 135 · qa:firstscreen 87 · qa:hover 113 · qa:vstudy 16 · qa:phone 184 · qa:uxpick 37 · qa:content 184 · qa:site 140 · qa:packcloud 42.
+
 - 지킨 것: DB · RLS · api · 서버 함수 · 저장 방식 변경 0 · 꾸미기 키 0(D-315) · 세금 계산기 0(D-341) · 내부 자료 잠금(D-264).
