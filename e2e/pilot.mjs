@@ -919,7 +919,8 @@ try {
 
   /* ---------- D-168: 연구소 메뉴를 여러 번 오가도 화면이 멈추지 않는다(클라우드 모드에서 연구노트 뒤 멈춤) ---------- */
   {
-    await go(page, '/tools/labcare')
+    // D-552 맨 첫 주소는 대화창 — 목차를 오가는 시험이라 목차 화면(한눈에 보기)에서 시작
+    await go(page, '/tools/labcare/dashboard')
     const labNames = ['한눈에 보기', '오늘 할 일', '업체 목록', '설립 가능성 체크', '설립서류 관리', '조직도·도면', '연구노트', '변경사항 관리', '활동조사 관리', '월간 점검', '현장조사 대비', '결과서', '안내문·자료실', '설정·백업']
     const labKey = { '한눈에 보기': 'dashboard', '오늘 할 일': 'tasks', '업체 목록': 'clients', '설립 가능성 체크': 'assessment', '설립서류 관리': 'setup-docs', '조직도·도면': 'org-diagram', '연구노트': 'notes', '변경사항 관리': 'changes', '활동조사 관리': 'survey', '월간 점검': 'check', '현장조사 대비': 'inspection', '결과서': 'reports', '안내문·자료실': 'resources', '설정·백업': 'settings' }
     const stuck = []

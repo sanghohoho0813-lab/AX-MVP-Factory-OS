@@ -8160,5 +8160,10 @@ D-540 보고의 두 확인에 대한 답: ① (다) 기본 순서에서 할 일 
 - test:modchat 37/0(F 언제 뜨나 6 · M 기억 6 — 모르는 값은 그대로(D-315) · T 쓴 말 → 주제 6 · A 답 카드 19 — 9곳 × 예시 4 · 큰 단추 4 모두 주제 있음 · 답 단추 주소가 대화창으로 되돌아가지 않음 · AI 자료 개인정보 0 · 규칙 답에 'AI' 0).
 - qa:modchat 23/0(9곳 PC 대화창 · 예시 → 질문창 · 업체 판정 → 예전 화면 · 세금 계산기 쓴 질문 AI 실패 → 정해진 답 → 계산기 · 직접 눌러서 하기 → 목차 · [대화로 묻기] · 모듈마다 바로 화면 기억 · 설정 9곳 한 번에 · 깊은 주소 7가지 예전 화면 · 지원사업 · 손가락 커서 · 390 · 360 넘침 0 · 오류 0).
 - 다른 e2e 시드는 '바로 화면'(axmvp.chatfirst.v1 = {all:'direct'}) — 예전 화면을 보는 시험은 그대로.
+- 빠른 점검 그대로 녹색: tsc · oxlint · build · test:all(끝 0) · qa:wording 6/0 · qa:chat 64 · qa:grants 152 · qa:content 184 · qa:site 140 · qa:calcpreset 41 · qa:scenarios 69 ·
+  qa:uxpick 37 · qa:firstscreen 87 · qa:hover 113 · qa:modfirst 20 · qa:modules 894 · qa:senior 135 · qa:keepui 10 · qa:phone 184 · qa:overwritten 20 · qa:matrix 586 · qa:homeask 83 · qa:assist 92 ·
+  qa:pilot 297 · qa:isolation 24 · qa:tax 74 (모두 실패 0).
+- 바로잡은 시험 둘: qa:modfirst S1 — 창업감면 상황 예시가 6개(벤처 확인 포함)인데 5개를 기대하고 있었다(**지금 main 으로 돌려도 19/1 — 이번 변경 전부터 빨강**). 6개 · 이름으로 확인하게 고침.
+  qa:pilot 연구소 목차 오가기 — 맨 첫 주소가 대화창이 되어 목차 화면(/tools/labcare/dashboard)에서 시작하게.
 
 - 지킨 것: DB · RLS · api · 서버 함수 변경 0 · 브라우저 칸 하나(axmvp.chatfirst.v1 — 고친 칸만 바꿔 씀) · 세금 계산기 계산식 0(D-341) · 꾸미기 키 0(D-315).

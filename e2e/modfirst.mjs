@@ -114,7 +114,9 @@ const spaGo = (url) => page.evaluate((u) => {
 {
   await page.goto(`${BASE}/tools/startup-tax`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
-  check('S1 창업감면 상황 예시 5개(양수 · 재창업 — 감면이 안 될 수 있는 형태 포함)', (await page.getByTestId('module-preset').count()) === 5)
+  // 6개 — 신규 · 법인전환 · 이전 · 벤처 확인(SCN-VENTURE) · 양수 · 재창업(감면이 안 될 수 있는 형태 포함). 예전 5개 기대는 벤처 확인이 더해진 뒤 맞추지 못한 채 남아 있었다(D-552 에서 바로잡음)
+  const presetIds = await page.locator('[data-testid="module-preset"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-preset')))
+  check('S1 창업감면 상황 예시 6개(신규 · 법인전환 · 이전 · 벤처 확인 · 양수 · 재창업 — 감면이 안 될 수 있는 형태 포함)', presetIds.length === 6 && ['startup-acquire', 'startup-reopen', 'startup-venture'].every((id) => presetIds.includes(id)), presetIds)
   await page.locator('[data-testid="module-preset"][data-preset="startup-convert"]').click()
   await page.waitForURL(/\/tools\/startup-tax/, { timeout: 10000 })
   await page.waitForTimeout(800)
