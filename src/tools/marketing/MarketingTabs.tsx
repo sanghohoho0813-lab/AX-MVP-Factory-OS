@@ -8,9 +8,9 @@
  * D-295 대표가 준 아이콘(마케팅 한 장 — config/iconSlots 'mk-*'): 찍을 것 = YouTube · 스레드 = Threads · 릴스 · 틱톡 = Reels · TikTok ·
  *   블로그 · 플레이스 = 블로그 실제 로고, 나머지(인기 · 채널 · 분석 · 내 콘텐츠 · 홈페이지)는 입체 아이콘. 여러 색 그림이라 흰 칸 위에 그린다.
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AtSign, BarChart3, Clapperboard, Film, Flame, Globe, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
+import { AtSign, BarChart3, ChevronDown, ChevronUp, Clapperboard, Film, Flame, Globe, Home, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
 import { usePilotMarketing } from '../../config/pilotMarketing'
 import { slotIcon } from '../../config/iconSlots'
@@ -94,6 +94,11 @@ function Label({ it }: { it: Item }) {
 const HOME_CELL = 'max-sm:grow max-sm:basis-[calc((100%-0.375rem)/2)]'
 
 export function MarketingTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
+  // MK-SIMPLE(D-553) 첫 화면(살펴보기 · 만들기 목록)만 예전 큰 목록 — 나머지 화면은 얇은 한 줄(PC) · '다른 화면' 판(휴대폰)
+  return home ? <BigTabs active={active} onRadar={onRadar} home /> : <SlimTabs active={active} onRadar={onRadar} />
+}
+
+function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
   const pilot = useIsPilot()
   // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
   const open = usePilotMarketing() === 'open'
@@ -159,6 +164,112 @@ export function MarketingTabs({ active, onRadar, home = false }: { active: Marke
             </div>
           </div>
         )}
+      </div>
+    </nav>
+  )
+}
+
+/*
+ * MK-SIMPLE(D-553) 대표 "60대 컨설턴트가 써도 이해되게 — 너무 복잡한 곳은 간편하게" — 화면마다 맨 위 큰 목록(두 줄 · 칸마다 설명 · PC 약 200px ·
+ * 휴대폰은 옆으로 미는 띠)이 일보다 먼저 자리를 차지했다. 첫 화면(살펴보기 · 만들기 목록)만 큰 목록으로 두고, 나머지 화면은:
+ *  - PC: 얇은 한 줄 — [⌂ 처음] · 살펴보기 다섯 · 만들기 넷(아이콘 + 짧은 이름 · 지금 화면은 파란 칸). 좁으면 두 줄로 접힌다.
+ *  - 휴대폰: [⌂ 처음] · 지금 화면 이름 · [다른 화면 ▾] — 누르면 아래로 두 칸씩 전부(묶음 이름과 함께). 옆으로 밀어 찾지 않는다.
+ * 칸 순서 · 시험 이름(yt-view-* · mk-tab-*) · 주소는 그대로 — 같은 단추 하나를 PC · 휴대폰이 함께 쓴다.
+ */
+const slimCls = (on: boolean) =>
+  `tap t-sub inline-flex shrink-0 items-center gap-1.5 border font-semibold whitespace-nowrap max-sm:min-h-12 max-sm:w-full max-sm:justify-start max-sm:rounded-(--radius-control) max-sm:px-3 sm:min-h-10 sm:rounded-full sm:px-3 ${on ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50'}`
+
+function SlimIcon({ it }: { it: Item }) {
+  const Icon = it.icon
+  return (
+    <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-white [--icon-art-scale:1]">
+      <Icon aria-hidden="true" className="size-5 shrink-0" />
+    </span>
+  )
+}
+
+function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void }) {
+  const pilot = useIsPilot()
+  const open = usePilotMarketing() === 'open'
+  const [more, setMore] = useState(false)
+  // 다른 화면으로 옮기면 휴대폰 판은 닫는다
+  useEffect(() => setMore(false), [active])
+  if (pilot && !open && !onRadar) return null
+  const tools = pilot ? TOOLS.filter((t) => t.key === 'threads' || t.key === 'shorts') : TOOLS
+  const showTools = !pilot || open
+  const now = [...RADAR_VIEWS, ...TOOLS].find((t) => t.key === active) ?? null
+  const homeLink = (phone: boolean) => (
+    <Link
+      to="/marketing"
+      className={phone ? 'tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50' : slimCls(false)}
+      data-testid={phone ? 'mk-home-link-m' : 'mk-home-link'}
+    >
+      <Home aria-hidden="true" className="size-4 shrink-0" />
+      {phone ? '처음' : '마케팅 처음으로'}
+    </Link>
+  )
+  const groupHead = (title: string, sub: string) => (
+    <p className="t-sub col-span-2 pt-1 font-semibold break-keep text-slate-700 sm:hidden">
+      {title} <span className="font-normal text-slate-600">— {sub}</span>
+    </p>
+  )
+  return (
+    <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs" data-slim="1" className="flex flex-col gap-2">
+      {/* 휴대폰 — 처음 · 지금 화면 · 다른 화면 */}
+      <div className="flex items-center gap-2 sm:hidden" data-testid="mk-tabs-phone">
+        {homeLink(true)}
+        <span className="t-sub flex min-w-0 flex-1 items-center gap-1.5 font-bold text-slate-900" data-testid="mk-tabs-now">
+          {now && <SlimIcon it={now} />}
+          <span className="min-w-0 leading-tight break-keep">{now ? (TOOLS.some((t) => t.key === now.key) ? now.short : now.label) : '마케팅'}</span>
+        </span>
+        <button
+          type="button"
+          aria-expanded={more}
+          onClick={() => setMore((v) => !v)}
+          className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
+          data-testid="mk-tabs-more"
+        >
+          다른 화면
+          {more ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
+        </button>
+      </div>
+      {/* PC — 두 줄(살펴보기 · 만들기, 칸마다 아이콘 + 짧은 이름) · 휴대폰 — [다른 화면] 을 누르면 두 칸씩(묶음 이름과 함께) */}
+      <div
+        data-testid="mk-tabs-strip"
+        className={`${more ? 'max-sm:grid' : 'max-sm:hidden'} grid-cols-2 gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-2 sm:flex sm:flex-col sm:gap-1.5 sm:border-0 sm:bg-transparent sm:p-0`}
+      >
+        <div className="max-sm:contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
+          {groupHead('살펴보기', '남의 인기 영상을 보고 고르기')}
+          <span className="t-sub w-[4.5rem] shrink-0 font-semibold text-slate-600 max-sm:hidden">살펴보기</span>
+          {RADAR_VIEWS.map((it) =>
+            onRadar ? (
+              <button key={it.key} type="button" role="tab" aria-selected={active === it.key} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={slimCls(active === it.key)}>
+                <SlimIcon it={it} />
+                {it.label}
+              </button>
+            ) : (
+              <Link key={it.key} to={`/marketing?view=${it.key}`} className={slimCls(false)} data-testid={`mk-tab-${it.key}`}>
+                <SlimIcon it={it} />
+                {it.label}
+              </Link>
+            ),
+          )}
+        </div>
+        <div className="max-sm:contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
+          {showTools && (
+            <>
+              {groupHead('만들기', '우리 글 · 대본 · 홈페이지 만들기')}
+              <span className="t-sub w-[4.5rem] shrink-0 font-semibold text-slate-600 max-sm:hidden">만들기</span>
+              {tools.map((it) => (
+                <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={slimCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
+                  <SlimIcon it={it} />
+                  {it.short}
+                </Link>
+              ))}
+            </>
+          )}
+          <span className="max-sm:hidden sm:ml-auto">{homeLink(false)}</span>
+        </div>
       </div>
     </nav>
   )

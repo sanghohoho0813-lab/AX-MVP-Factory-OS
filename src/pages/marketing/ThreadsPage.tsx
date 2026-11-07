@@ -80,7 +80,7 @@ const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof
   { key: 'write', label: '오늘 쓸 글', short: '쓰기', icon: NotebookPen, tone: 'rose', tip: '주제만 고르면 스레드 글을 써 주는 곳이에요. 고치고 복사해서 올려요.' },
   { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 글의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 틀이 잘 되는지 숫자로 알려 줘요.' },
   { key: 'library', label: '틀 23가지', short: '글 틀', icon: BookOpen, tone: 'violet', tip: '잘 된 글의 모양 23가지를 모은 설명서예요. 틀 = 글을 쓰는 순서예요.' },
-  { key: 'routine', label: '하루 10분', short: '매일 할 일', icon: CheckCircle2, tone: 'amber', tip: '매일 10분 할 일 체크표예요 — 글 쓰기 · 답글 달기 · 월요일 · 금요일 할 일.' },
+  { key: 'routine', label: '하루 10분', short: '매일', icon: CheckCircle2, tone: 'amber', tip: '매일 10분 할 일 체크표예요 — 글 쓰기 · 답글 달기 · 월요일 · 금요일 할 일.' },
 ]
 
 /** D-298 원하는 반응마다 색 · 그림 — 틀 번호 딱지도 그 틀의 첫 반응 색 */

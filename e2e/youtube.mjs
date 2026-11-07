@@ -17,6 +17,7 @@
  * D-196 6시간 자동 갱신: 같은 날 18채널 예전 저장본 + 서버 판 → 열자마자 새로 · 5시간 59분 그대로 · 6시간 넘으면 새로 ·
  *   돌아올 때(focus · visibilitychange) · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때 · PC 1440 = 휴대폰 390 같은 추천
  */
+import { mkTab } from './support/mkTabs.mjs'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -124,7 +125,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
   // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
   check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 한 줄 = 무엇을 하는 곳인지(쉬운 말 · D-507) + (콘텐츠 레이더)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 3 && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('만드는 곳') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
-  await page.getByTestId('yt-view-top').click()
+  await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
   // 한글 3자 이상만 낱말로 친다(예전 앱 그대로) — '청년 · 채용 · 절세' 같은 두 글자는 빠진다
@@ -187,7 +188,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FEED) }))
 
   // 5. 콘텐츠 추천
-  await page.getByTestId('yt-view-analysis').click()
+  await mkTab(page, 'yt-view-analysis')
   await page.waitForTimeout(400)
   await page.getByTestId('yt-ideas').getByTestId('fold-toggle').click()
   await page.waitForTimeout(300)
@@ -201,11 +202,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('제목 [복사] → 그 제목이 복사된다', clip === firstIdea && clip.includes('가업승계 증여특례'), { clip, firstIdea })
 
   // 채널 · 분석
-  await page.getByTestId('yt-view-channels').click()
+  await mkTab(page, 'yt-view-channels')
   await page.waitForTimeout(400)
   const rows = await page.getByTestId('yt-channel-row').allInnerTexts()
   check('채널 현황: 4곳 · 구독자 많은 순 · 구독자당 조회수', rows.length === 4 && rows[0].includes('세무 알려주는 채널') && rows[0].includes('구독자 1명당 조회 200.0회'), rows[0])
-  await page.getByTestId('yt-view-analysis').click()
+  await mkTab(page, 'yt-view-analysis')
   await page.waitForTimeout(400)
   check('내 채널 vs 벤치마킹 평균: 4줄', ((await page.getByTestId('yt-compare').innerText()) ?? '').includes('최근 30일 업로드'))
   const wdSum = (await page.getByTestId('yt-weekday').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
@@ -223,7 +224,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 6. 목차 설명 · 바깥 연결 · 오류 — 탭 넷 모두
   const noHintAll = []
   for (const k of ['plan', 'top', 'channels', 'analysis']) {
-    await page.getByTestId(`yt-view-${k}`).click()
+    await mkTab(page, `yt-view-${k}`)
     await page.waitForTimeout(300)
     noHintAll.push(
       ...(await page.evaluate(() =>
@@ -337,11 +338,11 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
 
   // 수첩(D-231 부터 [내 콘텐츠] 탭) — 저장 · 다시 읽기 · 단계 · 브리프 · 빼기([아이디어로 담기] 는 근거 보기 안)
   const toMake = async () => {
-    await page.getByTestId('yt-view-make').click()
+    await mkTab(page, 'yt-view-make')
     await page.waitForTimeout(300)
   }
   const toPlan = async () => {
-    await page.getByTestId('yt-view-plan').click()
+    await mkTab(page, 'yt-view-plan')
     await page.waitForTimeout(300)
   }
   const topic = ((await first.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
@@ -451,7 +452,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(300)
 
   // 채널 — 네 묶음 · 끄기 · 채널 추가(로컬은 안내)
-  await page.getByTestId('yt-view-channels').click()
+  await mkTab(page, 'yt-view-channels')
   await page.waitForTimeout(400)
   check('채널: 네 묶음(직접 경쟁 · AI 실무 · AX · 포맷) · 채널마다 묶음 고르기', ['direct', 'ai', 'ax', 'format'].every(() => true) && (await page.getByTestId('radar-group-direct').count()) === 1 && (await page.getByTestId('radar-group-ai').count()) === 1 && (await page.getByTestId('radar-group-ax').count()) === 1 && (await page.getByTestId('radar-group-format').count()) === 1 && (await page.locator('[data-testid="yt-channel-row"][data-group="ai"]').count()) === 2)
   for (const g of ['ai', 'ax']) {
@@ -460,10 +461,10 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   }
   await page.waitForTimeout(400)
   check('채널 끄기: 끈 채널은 "꺼 둠" 으로', (await page.locator('[data-testid="yt-channel-row"][data-enabled="0"]').count()) === 3)
-  await page.getByTestId('yt-view-plan').click()
+  await mkTab(page, 'yt-view-plan')
   await page.waitForTimeout(400)
   check('AI · AX 채널을 모두 끄면 "AI 벤치마킹 데이터가 부족합니다" · AX·AI 카드는 억지로 만들지 않는다', (await page.getByTestId('radar-ai-short').count()) === 1 && (await page.locator('[data-testid^="radar-opp"][data-axis="axai"]').count()) === 0)
-  await page.getByTestId('yt-view-channels').click()
+  await mkTab(page, 'yt-view-channels')
   await page.waitForTimeout(300)
   const offRows = page.locator('[data-testid="yt-channel-row"][data-enabled="0"]')
   while ((await offRows.count()) > 0) await offRows.first().getByTestId('radar-ch-toggle').click()
@@ -474,7 +475,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   check('채널 추가: 로컬(로그인 없음)에서는 안내만 · 서버에 묻지 않는다(할당량 0)', ((await page.getByTestId('radar-add-msg').innerText()) ?? '').includes('로그인') && !asked.some((u) => u.includes('resolve=') || u.includes('extra=')), asked.filter((u) => u.includes('resolve') || u.includes('extra')))
 
   // 분석 — 내 채널 · 제목 구조
-  await page.getByTestId('yt-view-analysis').click()
+  await mkTab(page, 'yt-view-analysis')
   await page.waitForTimeout(400)
   check('분석: 내 채널(최근 20편) · "시청 지속시간 · 노출 클릭률은 YouTube Analytics 연결 예정"(어림하지 않음)', ((await page.getByTestId('radar-mine').innerText()) ?? '').includes('평소 조회수') && ((await page.getByTestId('radar-analytics-note').innerText()) ?? '').includes('YouTube Analytics 연결 예정'))
   check('분석: 이번 달 잘된 제목 구조(접힘 · 한 줄 요약)', (await page.getByTestId('radar-patterns').count()) === 1)
@@ -585,12 +586,12 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.waitForTimeout(200)
   check(`${T} 첫 화면 넘침 0`, (await over()) <= 0, await over())
   // 채널 — 기본 벤치마킹(왜 보나) · 내가 추가한 채널
-  await page.getByTestId('yt-view-channels').click()
+  await mkTab(page, 'yt-view-channels')
   await page.waitForTimeout(400)
   check(`F16 ${T} 채널: "기본 벤치마킹 채널" 10곳(내 채널 포함) · 채널마다 "왜 보나" 한 줄 · "내가 추가한 채널" 0곳(빈 안내)`, (await page.getByTestId('radar-default-channels').getAttribute('data-count')) === '10' && (await page.getByTestId('radar-ch-note').count()) === 10 && (await page.getByTestId('radar-added-channels').getAttribute('data-count')) === '0' && (await page.getByTestId('radar-added-empty').isVisible()) && (await page.locator('[data-testid="yt-channel-row"][data-source="default"]').count()) === 10)
   check(`${T} 채널 화면 넘침 0`, (await over()) <= 0, await over())
   // 인기 탭 — 핵심 키워드 / 기타 급상승
-  await page.getByTestId('yt-view-top').click()
+  await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   const core = await page.getByTestId('yt-keyword').allInnerTexts()
   const other = await page.getByTestId('yt-keyword-other').allInnerTexts()
@@ -711,7 +712,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
       await page.waitForTimeout(200)
     }
     // 분석 탭 '단어로 본 주목 주제' 도
-    await page.getByTestId('yt-view-analysis').click()
+    await mkTab(page, 'yt-view-analysis')
     await page.waitForTimeout(400)
     if ((await page.getByTestId('yt-ideas').getAttribute('data-open')) !== '1') await page.getByTestId('yt-ideas').getByTestId('fold-toggle').click()
     await page.waitForTimeout(300)
@@ -774,7 +775,7 @@ for (const width of [360, 390, 430]) {
   await page.waitForTimeout(300)
   check(`${width} 영상 상세 창 넘침 0`, (await page.getByTestId('radar-video-detail').isVisible()) && (await over()) <= 0, await over())
   await page.keyboard.press('Escape')
-  await page.getByTestId('yt-view-top').tap()
+  await mkTab(page, 'yt-view-top', 'tap')
   await page.waitForTimeout(300)
   const list = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('[data-testid="yt-card"]')].slice(0, 2).map((e) => e.getBoundingClientRect())
@@ -783,7 +784,7 @@ for (const width of [360, 390, 430]) {
   })
   check(`${width} 인기 영상: 휴대폰은 한 줄 목록(썸네일 왼쪽 · PC 카드를 줄이지 않음) · 넘침 0`, list && (await over()) <= 0, await over())
   for (const k of ['channels', 'analysis']) {
-    await page.getByTestId(`yt-view-${k}`).tap()
+    await mkTab(page, `yt-view-${k}`, 'tap')
     await page.waitForTimeout(300)
     check(`${width} ${k}: 넘침 0`, (await over()) <= 0, await over())
   }
@@ -1010,7 +1011,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.waitForTimeout(900)
   const T = vp.tag
   const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  const tabIds = await page.getByTestId('mk-tabs').locator('a, button').evaluateAll((els) => els.map((e) => e.dataset.testid))
+  // MK-SIMPLE(D-553) 목차 안에 [마케팅 처음으로] · 휴대폰 [다른 화면] 도 있다 — 칸(yt-view-* · mk-tab-*)만 순서대로 본다
+  const tabIds = (await page.getByTestId('mk-tabs').locator('a, button').evaluateAll((els) => els.map((e) => e.dataset.testid))).filter((id) => /^(yt-view|mk-tab)-/.test(id ?? ''))
   check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 9칸(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 · 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-plan,yt-view-top,yt-view-channels,yt-view-analysis,yt-view-make,mk-tab-threads,mk-tab-shorts,mk-tab-content,mk-tab-homepage', tabIds)
   const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
   // D-253: '미래AI랩 관점' 상자 + 찍기 키트 두 상자 → '이번 주 이렇게 찍으세요' 한 상자(이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 · 제목 후보 · 썸네일)
@@ -1087,7 +1089,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.waitForTimeout(900)
   const kwVal = await page.getByTestId('content-keyword').inputValue().catch(() => '')
   check(`D231-11 ${T} 업체를 고르면 '직접 고르기' 가 열리고 키워드 칸에 그 주제`, kwVal.startsWith('정책자금 상담 전') && (await page.locator('[data-testid="content-mode"] [data-key="direct"]').getAttribute('aria-selected')) === 'true', kwVal)
-  await page.getByTestId('mk-tab-make').click()
+  await mkTab(page, 'mk-tab-make')
   await page.waitForTimeout(700)
   check(`D231-12 ${T} 홍보 글 화면 목차의 [내 콘텐츠] → 레이더 내 콘텐츠로 돌아옴`, page.url().includes('/marketing') && (await page.getByTestId('make-view').count()) === 1)
   check(`D231-13 ${T} 가로 넘침 0(레이더 ${ov1} · 내 콘텐츠 ${ov2}) · 체크 칸 44px · 오류 0`, ov1 <= 0 && ov2 <= 0 && checkH.length > 0 && checkH.every((h) => h >= 44) && errs.length === 0, { ov1, ov2, checkH: checkH.slice(0, 4), errs })

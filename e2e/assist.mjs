@@ -184,7 +184,7 @@ const pages = [
   ['/money', '매출 · 비용', 'money.top'],
   ['/tools/employment', '고용지원금 · 고객 전체', 'module.all'],
   ['/modules/growth', '기업성장 모듈', 'module.all'],
-  ['/marketing?view=make', '마케팅 · 내 콘텐츠', 'mine.detail'],
+  // MK-SIMPLE(D-553) 마케팅 · 내 콘텐츠는 띠 대신 머리 [AI 도우미] — 아래 일정 · 고객 관리 묶음에서 본다
 ]
 for (const [p, label, first] of pages) {
   await page.goto(BASE + p, { waitUntil: 'networkidle' })
@@ -235,6 +235,18 @@ for (const [p, label, first] of pages) {
   check('C 영업 관리(UIX-1): 띠 없음 · 머리 [AI 도우미] 하나(영업 보드 위) → 판에 건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await sOpen.count()) === 1 && sY < sBoard && sIds.join() === 'sales.brief,sales.push,sales.stuck,sales.money', { sY, sBoard, sIds })
   await shot(page, 'C-sales-button')
   await page.keyboard.press('Escape')
+  // MK-SIMPLE(D-553) 마케팅(내 콘텐츠 · 인기 영상 · 참고 채널 · 올리는 때)도 띠 대신 머리 [AI 도우미] — 판 안 질문(만든 것 자세히 정리 …) 그대로 · 목차 바로 위
+  await page.goto(BASE + '/marketing?view=make', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const mOpen = page.getByTestId('ai-assist-open')
+  const mY = (await mOpen.first().boundingBox())?.y ?? 9999
+  const mTabs = (await page.getByTestId('mk-tabs').boundingBox())?.y ?? 0
+  await mOpen.first().click()
+  await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
+  const mIds = await page.getByTestId('ai-assist-preset').evaluateAll((els) => els.map((e) => e.getAttribute('data-assist')))
+  check('C 마케팅 · 내 콘텐츠(D-553): 띠 없음 · 머리 [AI 도우미] 하나(목차 위) → 판 첫 질문 만든 것 자세히 정리(mine.detail)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await mOpen.count()) === 1 && mY < mTabs && mIds[0] === 'mine.detail', { mY, mTabs, mIds })
+  await shot(page, 'C-marketing-button')
+  await page.keyboard.press('Escape')
 }
 await page.goto(BASE + '/money', { waitUntil: 'networkidle' })
 await page.waitForTimeout(500)
@@ -277,7 +289,7 @@ await page.keyboard.press('Escape')
     await page.waitForTimeout(700)
     const bar = page.getByTestId('ai-assist-bar').first()
     // U5(D-542) 일정 · U3(D-543) 고객 관리 · UIX-1(D-548) 영업 관리는 띠 대신 머리 [AI 도우미] 단추 — 판을 열고 질문 칸을 누른다
-    const viaButton = pg === 'calendar' || pg === 'clients' || pg === 'sales'
+    const viaButton = pg === 'calendar' || pg === 'clients' || pg === 'sales' || pg === 'radar'
     if (!viaButton && !(await bar.count())) {
       check(`G ${title}: AI 도우미 띠`, false, '띠 없음')
       continue
@@ -373,10 +385,14 @@ await page.keyboard.press('Escape')
 }
 
 /* ---------------- D 블로그 · 플레이스 홍보 글 ---------------- */
-await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
+// MK-SIMPLE(D-553) 긴 이름 · 설명은 마케팅 첫 화면 큰 목록에 — 홍보 글 화면 안 얇은 목차는 짧은 이름(블로그 · 플레이스) · 켜짐
+await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
 const tab = await page.getByTestId('mk-tab-content').innerText()
-check("D1 목차 이름 '블로그 · 플레이스 홍보 글 만들기' + 아래 '(키워드 · 플레이스 · 블로그 등)'", tab.includes('블로그 · 플레이스 홍보 글 만들기') && tab.includes('(키워드 · 플레이스 · 블로그 등)'), tab)
+await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
+await page.waitForTimeout(600)
+const slimTab = page.getByTestId('mk-tab-content')
+check("D1 목차 이름 '블로그 · 플레이스 홍보 글 만들기' + 아래 '(키워드 · 플레이스 · 블로그 등)'(첫 화면) · 홍보 글 화면 안은 짧은 이름 '블로그 · 플레이스' · 켜짐", tab.includes('블로그 · 플레이스 홍보 글 만들기') && tab.includes('(키워드 · 플레이스 · 블로그 등)') && (await slimTab.innerText()).includes('블로그 · 플레이스') && (await slimTab.getAttribute('aria-current')) === 'page', tab)
 await page.getByTestId('trial-mirae').click()
 await page.waitForURL(/trial=trial_miraeailab/, { timeout: 8000 })
 await page.waitForTimeout(800)

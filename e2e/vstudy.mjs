@@ -13,6 +13,7 @@
  *   V8 창을 닫았다 열어도 · 새로고침해도 대본 · 우리 버전 그대로(다시 부르지 않음)
  *   V9 예시 영상은 받아 적기 대신 안내 · 휴대폰 390 넘침 0 · JS 오류 0
  */
+import { mkTab } from './support/mkTabs.mjs'
 import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -119,7 +120,7 @@ async function setup(ctx, opts = {}) {
 }
 
 const openTop = async (page) => {
-  await page.getByTestId('yt-view-top').click()
+  await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   const card = page.locator('[data-testid="yt-card"]').filter({ hasText: '세무 기장 수수료 전부 공개' }).first()
   await card.getByTestId('yt-card-thumb').click()
@@ -217,7 +218,7 @@ const openTop = async (page) => {
   await page.waitForTimeout(700)
   await page.getByTestId('yt-sample').click()
   await page.waitForTimeout(500)
-  await page.getByTestId('yt-view-top').click()
+  await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   await page.getByTestId('yt-card').first().getByTestId('yt-card-thumb').click()
   await page.getByTestId('radar-video-detail').waitFor()

@@ -19,6 +19,7 @@
  *
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
+import { mkTab } from './support/mkTabs.mjs'
 import { chromium } from 'playwright'
 import { spawn, execSync } from 'node:child_process'
 
@@ -384,7 +385,7 @@ try {
   const openTop = async (page) => {
     await page.goto(`${BASE}/marketing/youtube`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
-    await page.getByTestId('yt-view-top').click()
+    await mkTab(page, 'yt-view-top')
     await page.waitForTimeout(400)
     await page.locator('[data-testid="yt-card"]').filter({ hasText: '세무 기장 수수료 전부 공개' }).first().getByTestId('yt-card-thumb').click()
     await page.getByTestId('radar-video-detail').waitFor()

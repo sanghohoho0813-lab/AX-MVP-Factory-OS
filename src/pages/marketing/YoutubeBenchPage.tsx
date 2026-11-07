@@ -714,6 +714,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     else if (r.kind === 'pack') openPack(`custom:${cleanTopic(r.topic)}`)
   }
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
+  const radarAssist =
+    !readOnly && !firstScreen && !packKey && !weekOn && view !== 'plan' && (prepared || view === 'make') ? (
+      <AiAssist
+        variant="button"
+        page="radar"
+        scope={`radar:${view}`}
+        title={`마케팅 · ${RADAR_VIEWS.find((v) => v.key === view)?.label ?? ''}`}
+        presets={RADAR_ASSIST[view] ?? RADAR_ASSIST.plan}
+        build={assistBuild}
+        itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
+        resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
+      />
+    ) : null
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5" data-testid="yt-page">
@@ -727,16 +740,27 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           // D-507 내 콘텐츠(만든 것 모음)에는 유튜브 새로 가져오기 · CSV 가 필요 없다 — 헷갈리지 않게 숨김
           // 휴대폰에서는 맨 위 [지금 새로 가져오기] · [CSV] 를 접는다(6시간마다 저절로 새로 · 첫 화면 [자세히 보기] 안에 그대로) — 첫 화면 한 줄을 아낀다
-          actions={firstScreen || (view === 'plan' && (prepared || packKey || weekOn)) || view === 'make' ? undefined : <span className="contents max-sm:hidden">{feedButtons}</span>}
+          actions={
+            firstScreen || (view === 'plan' && (prepared || packKey || weekOn)) ? undefined : (
+              <>
+                {/* MK-SIMPLE(D-553) 예전 큰 보라 띠(질문 단추 서너 개 · 직접 묻기 · 모델) → 머리 오른쪽 [AI 도우미] 하나 — 질문 단추는 누르면 열리는 판 안에 그대로 */}
+                {radarAssist}
+                {view !== 'make' && <span className="contents max-sm:hidden">{feedButtons}</span>}
+              </>
+            )
+          }
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
-        {!packKey && !weekOn && (
+        {/* MK-SIMPLE(D-553) '무엇을 하는 곳' 한 줄은 첫 화면 · 이번 주 찍을 것에만 — 다른 화면은 아래 '이 화면은' 한 줄이 그 화면을 말한다(같은 말 두 번 0) */}
+        {!packKey && !weekOn && (firstScreen || view === 'plan' || (prepared && view !== 'make')) && (
           <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
             {/* D-507 이곳이 무엇을 해 주는지 한 줄(쉬운 말) — 예전 이름(콘텐츠 레이더)은 괄호로 남긴다 */}
-            <span className="font-semibold text-slate-700" data-testid="radar-subtitle">
-              우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳 <span className="font-normal text-slate-600 max-sm:hidden">(콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>
-            </span>
-            {prepared && !firstScreen && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
+            {(firstScreen || view === 'plan') && (
+              <span className="font-semibold text-slate-700" data-testid="radar-subtitle">
+                우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳 <span className="font-normal text-slate-600 max-sm:hidden">(콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>
+              </span>
+            )}
+            {prepared && !firstScreen && view !== 'make' && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
           </p>
         )}
       </div>
@@ -757,18 +781,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       )}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
       {!packKey && !weekOn && view !== 'plan' && <ScreenGuide id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
-      {/* D-239: 마케팅 AI 도우미 — 탭마다 다른 질문(인기 급상승 · 분석 · 내 콘텐츠). 이번 주 찍을 것의 질문 판은 D-251 부터 [자세히 보기] 안 */}
-      {!readOnly && view !== 'plan' && (prepared || view === 'make') && (
-        <AiAssist
-          page="radar"
-          scope={`radar:${view}`}
-          title={`마케팅 · ${RADAR_VIEWS.find((v) => v.key === view)?.label ?? ''}`}
-          presets={RADAR_ASSIST[view] ?? RADAR_ASSIST.plan}
-          build={assistBuild}
-          itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
-          resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
-        />
-      )}
+      {/* D-239 마케팅 AI 도우미(탭마다 다른 질문) — MK-SIMPLE(D-553) 띠 대신 위 머리 오른쪽 [AI 도우미] 단추(radarAssist). 이번 주 찍을 것의 질문 판은 [자세히 보기] 안 그대로 */}
 
       {packKey ? (
         packSource ? (

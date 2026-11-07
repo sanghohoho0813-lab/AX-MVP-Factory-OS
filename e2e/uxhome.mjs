@@ -240,7 +240,8 @@ let caseUrl = ''
     ['업체 작업실', caseUrl, 'ai', 'snapshot-fields', 'case-next', 'case-purposes', false],
     // D-511 특허 · 벤처는 대화창이 머리 바로 아래(chatFirst) — 요약 · 지금 할 일은 대화창 아래(휴대폰은 지금 할 일 한 줄이 대화창 위)
     ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'chat-panel', false, true],
-    ['영업 보드', '/sales/board', 'sales', 'sales-summary', 'sales-next', 'sales-board-panel', true],
+    // D-548 영업 보드 요약은 한 줄 칩(SummaryChip — 칩마다 얇은 테두리)이라 '한 판(칸 테두리 0)' 숫자 칸 규칙 밖
+    ['영업 보드', '/sales/board', 'sales', 'sales-summary', 'sales-next', 'sales-board-panel', false],
   ]
   const layout = (pg, ids) =>
     pg.evaluate((ids) => {
@@ -360,15 +361,15 @@ let caseUrl = ''
   await page.waitForTimeout(400)
   const none = await page.getByTestId('arrange-open').count()
   check('R6 다른 화면 8곳에 [화면 꾸미기](칸 2개 이상) · 꾸밀 칸이 없는 화면(확인할 것)에는 없음', withBtn.every((x) => /:1:([2-9]|\d\d)$/.test(x)) && none === 0, { withBtn, none })
-  // 영업 보드 — AI 도우미 띠 숨기기
+  // 영업 보드 — AI 도우미 숨기기(D-548 띠 → 머리 [AI 도우미] 단추 하나)
   await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
-  const barBefore = await page.getByTestId('ai-assist-bar').count()
+  const btnBefore = await page.getByTestId('ai-assist-open').count()
   await page.getByTestId('arrange-open').click()
   await page.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
   await page.getByTestId('arrange-done').click()
   await page.waitForTimeout(300)
-  check('R7 영업 보드 — AI 도우미 띠 계속 숨기기 → 띠 없음 · 보드 · 요약은 그대로', barBefore === 1 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('sales-board-panel').count()) === 1 && (await page.getByTestId('sales-summary').count()) === 1)
+  check('R7 영업 보드 — AI 도우미 계속 숨기기 → 머리 단추 없음 · 띠 없음 · 보드 · 요약은 그대로', btnBefore === 1 && (await page.getByTestId('ai-assist-open').count()) === 0 && (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('sales-board-panel').count()) === 1 && (await page.getByTestId('sales-summary').count()) === 1, { btnBefore })
   await page.evaluate(() => localStorage.removeItem('axmvp.ui.layout.sales-board'))
   // D-542 일정 — AI 도우미는 머리 단추 하나 · 꾸미기의 'AI 도우미' 줄(calendar:assist)을 계속 숨기면 단추도 숨고 맨 아래 '숨긴 칸' 줄
   await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })

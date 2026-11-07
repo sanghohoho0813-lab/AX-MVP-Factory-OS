@@ -102,26 +102,17 @@ export function PackView({
     }
   }
 
-  const go = (id: PackSectionId) => document.getElementById(`pack-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  // D-478 지금 보고 있는 칸 — 칩에 표시하고(진한 테두리) 칩 줄을 그 칩이 보이게 옮긴다
-  const [current, setCurrent] = useState<PackSectionId | ''>('')
+  /*
+   * MK-SIMPLE(D-553) 칸 일곱 개를 줄줄이(휴대폰 16화면 · PC 9.5화면) 대신 탭 — 위 칩 하나를 누르면 그 칸 하나만 보인다(화면 원칙 '여러 형식 결과는
+   * 프로젝트 박스 → 안에서 탭'). 칸은 모두 그대로 있고(전체 복사 · AI 결과 · 시험 이름 그대로) 고른 칸만 보인다. 칸 끝 [다음 칸 →] 로 차례대로.
+   */
+  const [current, setCurrent] = useState<PackSectionId>(pack.sections[0]?.id ?? 'titles')
+  const go = (id: PackSectionId) => {
+    setCurrent(id)
+    const nav = document.querySelector<HTMLElement>('[data-testid="mk-pack-nav"]')
+    if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: 'start' })
+  }
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
-    const els = pack.sections.map((x) => document.getElementById(`pack-${x.id}`)).filter((e): e is HTMLElement => !!e)
-    const seen = new Map<string, number>()
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) seen.set(e.target.id, e.isIntersecting ? e.boundingClientRect.top : Number.POSITIVE_INFINITY)
-        const top = [...seen].filter(([, t]) => Number.isFinite(t)).sort((a, b) => a[1] - b[1])[0]
-        if (top) setCurrent(top[0].replace(/^pack-/, '') as PackSectionId)
-      },
-      { rootMargin: '-140px 0px -55% 0px' },
-    )
-    els.forEach((e) => io.observe(e))
-    return () => io.disconnect()
-  }, [pack.sections])
-  useEffect(() => {
-    if (!current) return
     const chip = document.querySelector<HTMLElement>(`[data-testid="mk-pack-chip"][data-chip="${current}"]`)
     const nav = chip?.parentElement
     if (!chip || !nav || nav.scrollWidth <= nav.clientWidth + 1) return
@@ -201,7 +192,7 @@ export function PackView({
       <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} cloudFailed={!readOnly && packCloudFailed()} onRun={runAi} />
 
       {/* D-478 칸 이동 칩은 스크롤해도 머리줄 바로 아래에 붙어 있다(휴대폰 묶음은 1만 px 넘게 길다 — 길을 잃지 않게) */}
-      <nav aria-label="묶음 칸으로 가기" className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-slate-50/95 px-1 py-1.5 backdrop-blur [scrollbar-width:none]" data-testid="mk-pack-nav">
+      <nav aria-label="묶음 칸 고르기" className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-slate-50/95 px-1 py-1.5 backdrop-blur [scrollbar-width:none]" data-testid="mk-pack-nav">
         {pack.sections.map((x) => {
           const L = SECTION_LOOK[x.id]
           return (
@@ -225,12 +216,13 @@ export function PackView({
         </Link>
       </div>
 
-      {pack.sections.map((x) => {
+      {pack.sections.map((x, idx) => {
         const L = SECTION_LOOK[x.id]
         const ai = aiIds.has(x.id)
         const busy = running && PACK_AI_PARTS.some((p) => parts[p.part] === 'running' && p.sections.includes(x.id))
+        const next = pack.sections[idx + 1]
         return (
-          <section key={x.id} id={`pack-${x.id}`} className="flex scroll-mt-36 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
+          <section key={x.id} id={`pack-${x.id}`} hidden={current !== x.id} className="flex scroll-mt-36 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${L.chip}`}>
                 <L.icon className="size-5" />
@@ -262,6 +254,11 @@ export function PackView({
                 </div>
               ))}
             </div>
+            {next && (
+              <button type="button" onClick={() => go(next.id)} className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-next-sec">
+                다음 칸 — {plainLabel(next.label)} →
+              </button>
+            )}
           </section>
         )
       })}
