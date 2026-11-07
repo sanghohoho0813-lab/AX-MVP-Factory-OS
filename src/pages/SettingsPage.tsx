@@ -10,6 +10,7 @@ import {
   SettingRow,
   AppearancePanel,
   TextScalePanel,
+  ModuleStartPanel,
   FeatureVisibilityPanel,
   SystemPanel,
   LocalDataSummaryPanel,
@@ -37,6 +38,7 @@ function LocalSettings() {
             <SettingRow label="역할">{CURRENT_USER.role}</SettingRow>
           </Panel>
           <TextScalePanel />
+          <ModuleStartPanel />
           <AppearancePanel />
           <FeatureVisibilityPanel />
         </>

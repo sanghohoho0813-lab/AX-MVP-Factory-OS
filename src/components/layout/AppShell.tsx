@@ -40,6 +40,7 @@ import { useSideAi } from '../../lib/sideAi'
 import { SideDock } from './SideDock'
 import { SideAiButton } from './SideAiButton'
 import { ArrangeButton } from '../ui/arrange'
+import { ChatModeButton } from '../chat/ChatFirst'
 import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders } from '../../services/aiAssist/store'
@@ -165,6 +166,8 @@ export function AppShell() {
                 <Breadcrumbs />
               </div>
               <ArrangeButton />
+              {/* D-552 대화창으로 시작하는 모듈의 예전 화면 — [대화로 묻기] */}
+              <ChatModeButton />
               <SideAiButton />
             </div>
             <div key={shellKeyOf(location.pathname)} className="ax-rise">

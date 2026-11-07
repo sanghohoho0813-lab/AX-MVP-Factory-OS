@@ -25,7 +25,7 @@ import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPan
 import { OverwrittenPanel } from '../../components/data/OverwrittenPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
-import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
+import { TabNav, SettingRow, AppearancePanel, TextScalePanel, ModuleStartPanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 import { updateMyName } from '../../auth/authService'
 import { AccountViewPanel, AccountViewRow } from './AccountViewPanel'
@@ -243,6 +243,7 @@ export function SupabaseSettingsView() {
         {/* D-550 팀장 작업공간의 덮인 내용(있을 때만) */}
         <OverwrittenPanel focus={focus === 'overwritten'} />
         <TextScalePanel />
+        <ModuleStartPanel />
         <AppearancePanel />
       </div>
     )
@@ -262,6 +263,7 @@ export function SupabaseSettingsView() {
           </Panel>
           <BrandSettingsPanel />
           <TextScalePanel />
+          <ModuleStartPanel />
           <AppearancePanel />
           <FeatureVisibilityPanel />
         </>

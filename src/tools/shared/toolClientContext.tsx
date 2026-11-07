@@ -20,6 +20,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { setToolWorkspace } from './toolStorage'
 import { ToolClientPicker } from './ToolClientPicker'
 import { pickerOn } from './toolClientPick'
+import { chatShown, readChatFirst } from '../../services/workChat/chatFirst'
 
 export interface ToolClientValue {
   /** 주소에 실린 업체 id (없으면 null) */
@@ -81,7 +82,9 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
   const [params] = useSearchParams()
   const clientId = params.get('client')
   // D-354 업체 고르기 — 업체 숫자로 채우는 모듈(세금 계산기 · 창업감면 · 고용지원금 · 연구소 · 정책자금 · 크레탑)만
-  const picker = pickerOn(useLocation().pathname)
+  const loc = useLocation()
+  // D-552 대화창으로 연 첫 화면은 대화창이 회사를 고른다 — 위 '어느 업체 일인가요?' 띠는 예전 화면에서만
+  const picker = pickerOn(loc.pathname) && !chatShown(loc.pathname, loc.search, readChatFirst())
   const [client, setClient] = useState<ClientOpsRecord | null>(null)
   const cache = useRef<Promise<ClientOpsRecord[]> | null>(null)
 

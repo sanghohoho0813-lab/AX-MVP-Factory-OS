@@ -8,7 +8,10 @@ import { redactSensitive } from '../../domain/consulting/privacyFilter'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistRow } from '../aiAssist/context'
 
-export type ChatModule = 'pv' | 'cert'
+import type { ChatFirstKey } from './chatFirst'
+
+/** D-552 모듈 대화창 9곳도 같은 틀(대화는 모듈 · 회사마다 따로) */
+export type ChatModule = 'pv' | 'cert' | ChatFirstKey
 
 /** 화면이 직접 처리하는 단추(주소 이동 · 복사가 아닌 것) */
 export type ChatActKind = 'file' | 'sample' | 'new-spec' | 'pick-client' | 'ai'

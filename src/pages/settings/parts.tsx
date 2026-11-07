@@ -2,7 +2,7 @@
  * 설정 화면 공유 조각 (local·supabase 모두 사용). Supabase 의존성이 없다.
  */
 
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CONTENT_WIDTH_LABEL, CONTENT_WIDTH_PX, setContentWidth, useContentWidth } from '../../lib/contentWidth'
 import { Database, Info, SlidersHorizontal, Users } from 'lucide-react'
 import { Panel } from '../../components/ui/Panel'
@@ -18,6 +18,7 @@ import { downloadLocalBackup } from '../../services/dataImport/localBackup'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible, setFeatureVisibility } from '../../lib/featureVisibility'
 import { brand } from '../../brand/brand.config'
+import { CHAT_FIRST_EVENT, CHAT_FIRST_KEYS, CHAT_FIRST_LABEL, readChatFirst, writeChatFirst, type ChatFirstMode } from '../../services/workChat/chatFirst'
 
 export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
@@ -82,6 +83,60 @@ export function TextScalePanel() {
         <TextScaleControl showPreview />
       </div>
       <ContentWidthControl />
+    </Panel>
+  )
+}
+
+/**
+ * D-552 모듈 첫 화면 — 메뉴로 들어가면 대화창부터 / 예전 화면(바로 화면) 바로.
+ * 전체를 고르면 모듈마다 고른 것은 비워 전체를 따른다(모듈 대화창 아래 '처음에 무엇을 보여 줄까요?' 와 같은 값).
+ */
+export function ModuleStartPanel() {
+  const [prefs, setPrefs] = useState(readChatFirst)
+  useEffect(() => {
+    const on = () => setPrefs(readChatFirst())
+    window.addEventListener(CHAT_FIRST_EVENT, on)
+    window.addEventListener('storage', on)
+    return () => {
+      window.removeEventListener(CHAT_FIRST_EVENT, on)
+      window.removeEventListener('storage', on)
+    }
+  }, [])
+  const all: ChatFirstMode = prefs.all ?? 'chat'
+  const own = CHAT_FIRST_KEYS.filter((k) => prefs.mods?.[k] && prefs.mods[k] !== all)
+  const opts: { k: ChatFirstMode; label: string; sub: string }[] = [
+    { k: 'chat', label: '대화창부터', sub: '물어보면 그 업체 판정 · 숫자로 답해요' },
+    { k: 'direct', label: '바로 화면', sub: '예전처럼 목차 · 입력 칸이 바로 보여요' },
+  ]
+  return (
+    <Panel title="모듈 첫 화면">
+      <p className="text-[0.875rem] break-keep text-slate-600">
+        정책자금 · 고용지원금 · 연구소 · 창업감면 · 세금 계산기 · 지원사업 · 크레탑 · 홍보 글 · 홈페이지를 메뉴로 열 때 처음 보이는 화면이에요. 어느 쪽이든 화면 위 [대화로 묻기] · [바로 화면] 으로 바로 오갈 수 있어요.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="모듈 첫 화면" data-testid="settings-chatfirst">
+        {opts.map((o) => (
+          <button
+            key={o.k}
+            type="button"
+            role="radio"
+            aria-checked={all === o.k}
+            data-mode={o.k}
+            onClick={() => writeChatFirst({ all: o.k, clearMods: true })}
+            className={`tap flex min-h-11 flex-col items-start rounded-(--radius-control) border bg-white px-4 py-2.5 text-left ${all === o.k ? 'border-brand-600' : 'border-slate-200 hover:border-brand-400'}`}
+          >
+            <span className={`text-[0.9375rem] font-semibold ${all === o.k ? 'text-brand-700' : 'text-slate-800'}`}>
+              {all === o.k ? '● ' : ''}
+              {o.label}
+            </span>
+            <span className="text-[0.875rem] break-keep text-slate-500">{o.sub}</span>
+          </button>
+        ))}
+      </div>
+      {own.length > 0 && (
+        <p className="mt-2 text-[0.875rem] break-keep text-slate-600" data-testid="settings-chatfirst-own">
+          따로 고른 곳 {own.length}곳 — {own.map((k) => `${CHAT_FIRST_LABEL[k]}(${prefs.mods?.[k] === 'chat' ? '대화창부터' : '바로 화면'})`).join(' · ')}. 위에서 고르면 모두 같게 바뀌어요.
+        </p>
+      )}
     </Panel>
   )
 }

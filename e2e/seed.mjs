@@ -273,6 +273,8 @@ export function seedScript() {
     localStorage.setItem('axmvp.v1.ops_journal_entries', ${JSON.stringify(JSON.stringify(journal))});
     localStorage.setItem('axmvp.v1.customer_events', ${JSON.stringify(JSON.stringify(events))});
     localStorage.setItem('axmvp.fold.all', 'open');
+    // D-552 모듈 첫 화면 = 대화창 — 예전 화면을 보는 시험들은 '바로 화면' 으로(대화창 자체는 qa:modchat 이 본다)
+    localStorage.setItem('axmvp.chatfirst.v1', JSON.stringify({ all: 'direct' }));
   `
 }
 

@@ -68,6 +68,16 @@ export interface WorkChatProps {
    */
   /** chatFirst — D-511 대화창을 머리 바로 아래(요약 · 지금 할 일은 대화창 아래로) */
   frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode; chatFirst?: boolean }
+  /** D-552 큰 제목 아래 한 줄 — 이 화면이 무엇을 해 주는지 */
+  heroSub?: ReactNode
+  /** D-552 '이렇게 물어보세요' — 누르면 질문칸에 들어간다(바로 보내지 않음 · 업체 이름만 바꿔 보내게) */
+  examples?: readonly string[]
+  /** D-552 대화 판 아래(처음 · 대화 중 모두) — 직접 눌러서 하기 칸 */
+  /** false 면 쓴 질문도 정해진 답으로(AI 단추 · 모델 고르기 없음) */
+  aiOn?: boolean
+  below?: ReactNode
+  /** 머리 [자세히] 단추 글(없으면 '자세히') */
+  detailLabel?: string
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -168,7 +178,8 @@ export function WorkChat(p: WorkChatProps) {
   // D-257 팀장도 AI(Gemini 만)
   const access = useAiAssistAccess()
   const owner = access !== 'no'
-  const aiReady = assistOn(access)
+  // D-552 화면마다 AI 를 끌 수 있다(팀장에게 닫힌 홈페이지 · 마케팅이 닫힌 홍보 글 — 서버가 403 하기 전에 정해진 답으로)
+  const aiReady = assistOn(access) && p.aiOn !== false
   const [turns, setTurns] = useState<ChatTurn[]>(() => loadTurns(p.module, p.clientId))
   const [text, setText] = useState('')
   const [guide, setGuide] = useState(false)
@@ -176,6 +187,7 @@ export function WorkChat(p: WorkChatProps) {
   const turnsRef = useRef(turns)
   turnsRef.current = turns
   const fileRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const pickRef = useRef<HTMLSelectElement>(null)
   const endRef = useRef<HTMLLIElement>(null)
   const keyRef = useRef(`${p.module}|${p.clientId}`)
@@ -301,6 +313,7 @@ export function WorkChat(p: WorkChatProps) {
           </Button>
         )}
         <textarea
+          ref={docked ? undefined : inputRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 500))}
           onKeyDown={(e) => {
@@ -361,7 +374,7 @@ export function WorkChat(p: WorkChatProps) {
         <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
       </Button>
       <Link to={p.detailHref} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100" data-testid="chat-detail">
-        <LayoutList aria-hidden="true" className="size-4" /> 자세히
+        <LayoutList aria-hidden="true" className="size-4" /> {p.detailLabel ?? '자세히'}
       </Link>
     </>
   )
@@ -390,9 +403,37 @@ export function WorkChat(p: WorkChatProps) {
 
   const body = empty ? (
     <section className={`flex flex-col gap-4 ${p.frame ? '' : p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
-      <h2 className={`${small ? 't-section' : 't-page'} ${p.frame ? 'text-left' : 'text-center'} font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
+      <div className="flex flex-col gap-1">
+        <h2 className={`${small ? 't-section' : 't-page'} ${p.frame ? 'text-left' : 'text-center'} font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
+        {p.heroSub && <p className={`t-sub break-keep text-slate-600 ${p.frame ? '' : 'text-center'}`} data-testid="chat-hero-sub">{p.heroSub}</p>}
+      </div>
       {composer(false)}
       {starterButtons(false)}
+      {p.examples && p.examples.length > 0 && (
+        // D-552 '이렇게 물어보세요' — 누르면 질문칸에 들어간다(업체 이름만 바꿔 Enter)
+        <div className="flex flex-col gap-1.5" data-testid="chat-examples">
+          <p className="t-sub font-semibold text-slate-700">
+            이렇게 물어보세요 <span className="font-normal text-slate-500">— 누르면 질문칸에 들어가요</span>
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {p.examples.map((ex) => (
+              <li key={ex}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setText(ex)
+                    inputRef.current?.focus()
+                  }}
+                  className="tap t-sub rounded-full border border-slate-200 bg-white px-3 py-1.5 text-left break-keep text-slate-700 hover:border-brand-300 hover:bg-slate-50"
+                  data-testid="chat-example"
+                >
+                  “{ex}”
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   ) : null
   const turnsList = !empty && (
@@ -486,8 +527,9 @@ export function WorkChat(p: WorkChatProps) {
       {fileInput}
       {body}
       {turnsList}
-      {dock}
       {clearRow}
+      {p.below}
+      {dock}
       {guideSheet}
     </div>
   )

@@ -88,4 +88,5 @@ dist-qa*/
 .packsync-out
 .docoriginals-out
 .overwritten-out
+.modchat-out
 .originals-out

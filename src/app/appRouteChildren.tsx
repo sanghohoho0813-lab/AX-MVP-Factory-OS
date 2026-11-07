@@ -3,6 +3,7 @@
  * (App.tsx 에서 추출; 도메인 페이지는 route-level lazy loading 유지)
  */
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
+import { ChatFirst } from '../components/chat/ChatFirst'
 import { AxOpenPage } from '../pages/AxOpenPage'
 import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
@@ -394,8 +395,12 @@ function toolRoute(element: ReactElement): ReactElement {
  * `/tools/<key>` 는 그 모듈의 첫 화면, `/tools/<key>/<화면>` 은 목차에서 고른 화면이다.
  * 2단 목차는 여기서 한 번만 붙는다 — 모듈 화면마다 다시 짜지 않는다.
  */
+/** D-552 첫 주소가 대화창인 모듈(메뉴로 들어오면 대화창 · 목차 화면 · 업체 주소는 예전 화면) */
+const CHAT_FIRST_TOOLS = new Set(['policy-funding', 'employment', 'labcare', 'startup-tax', 'cretop', 'content', 'homepage'])
+
 function moduleRoutes(toolKey: string, element: ReactElement): { path: string; element: ReactElement }[] {
-  const wrapped = toolRoute(<ModuleRoute toolKey={toolKey}>{element}</ModuleRoute>)
+  const inner = <ModuleRoute toolKey={toolKey}>{element}</ModuleRoute>
+  const wrapped = toolRoute(CHAT_FIRST_TOOLS.has(toolKey) ? <ChatFirst k={toolKey as 'policy-funding'}>{inner}</ChatFirst> : inner)
   return [
     { path: `tools/${toolKey}`, element: wrapped },
     { path: `tools/${toolKey}/:section`, element: wrapped },
@@ -429,7 +434,8 @@ export const appRouteChildren = [
       { path: 'ops/decide', element: <OpsDecidePage /> },
       // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)
       { path: 'ops/agents', element: <AgentSettlementPage /> },
-      { path: 'grants', element: <GrantsPage /> },
+      // D-552 메뉴로 들어오면 대화창 · 뒤에 무엇이 붙은 주소(?view= · ?client=)는 예전 화면 그대로
+      { path: 'grants', element: <ChatFirst k="grants"><GrantsPage /></ChatFirst> },
       { path: 'money', element: <MoneyPage /> },
       { path: 'upcoming', element: <UpcomingPage /> },
       { path: 'upcoming/:key', element: <UpcomingPage /> },
@@ -475,7 +481,7 @@ export const appRouteChildren = [
       { path: 'modules/:moduleKey', element: toolRoute(<ModuleOverviewPage />) },
       // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
       // 도구 화면은 모두 같은 틀로 감싼다 — 업체에서 열었으면(`?client=`) 띠가 뜨고 결과가 그 업체로 간다 (D-89)
-      { path: 'tools/tax', element: toolRoute(<TaxCalculatorsPage />) },
+      { path: 'tools/tax', element: toolRoute(<ChatFirst k="tax"><TaxCalculatorsPage /></ChatFirst>) },
       // D-142: 예전 · 손으로 친 '/tools/tax/계산기' 주소가 오늘 화면으로 튕기지 않게
       { path: 'tools/tax/:section', element: <Navigate to="/tools/tax" replace /> },
       { path: 'tools/review', element: <ToolsReviewPage /> },
