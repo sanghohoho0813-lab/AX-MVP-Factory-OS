@@ -8223,6 +8223,9 @@ qa:senior 135 · qa:firstscreen 87 · qa:hover 113 · qa:vstudy 16 · qa:phone 1
 
 **지운 것 0 · 바꾼 기존 규칙 둘**: 가점 검사 범위 넓힘 · 자금 + AX 알림 문구(괄호 문장은 그대로 들어 있음).
 
+- 시험(모두 실패 0): tsc · oxlint · build · test:all(test:threads 138 — R1~R9 · test:content 151 — D554-1~5 · test:mkpack 122 — M5b 포함) · qa:wording 6 ·
+  qa:threads 86 · qa:shorts 48 · qa:content 184 · qa:mkpack 69 · qa:mkweek 56 · qa:assist 92 · qa:hooks 21 · qa:senior 135 · qa:youtube 246 · qa:siteai 13 ·
+  서버 지시문(api/)을 손대 qa:db 413 PASS · qa:pilot 297.
 - 지킨 것: DB · RLS · 저장 방식 변경 0 · 서버 함수는 지시문 글만(규칙 줄) · 내부 자료 잠금(D-264 — qa:wording 6/0) · 세금 계산기 0(D-341) · 꾸미기 키 0(D-315).
 - 못 한 것: 진짜 AI(공급자)로 새 규칙의 효과를 다시 재 보지는 않았다(대표가 바깥 도구로 잰 숫자를 근거로 넣음) — 시험은 규칙 계산 · 지시문 글 · 화면만.
   카드뉴스 이미지 · 영상 제목의 % 는 규칙으로도 잘 안 줄어든다는 것이 대표 측정 결과라, 사람이 마지막에 보는 칸(발행 전 확인 · 점검 줄)으로 받쳤다.
