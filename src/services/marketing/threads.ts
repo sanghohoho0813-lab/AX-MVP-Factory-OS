@@ -13,7 +13,7 @@ import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, EMOJI, HYPE, LINK, numberLint, principleLint } from './snsRules'
 import { consultLint } from './consultRules'
-import { isMarketingCustomer } from './persona'
+import { axShown, isMarketingCustomer, withoutAx } from './persona'
 
 export const THREADS_MODULE = 'marketing'
 export const THREADS_BUCKET = 'threads'
@@ -421,6 +421,8 @@ export const ENDINGS: ReadonlyArray<{ key: EndingKind; label: string; note: stri
 ]
 
 export const TOPIC_TAGS = ['정책자금', '벤처기업확인', '정부지원사업', 'AX', '경영컨설팅'] as const
+/** D-555 지금 계정의 주제 태그 — AX 는 대표만 하는 컨설팅이라 대표가 아닌 계정은 'AX' 없이 넷 */
+export const topicTags = (): string[] => (axShown() ? [...TOPIC_TAGS] : TOPIC_TAGS.filter((t) => t !== 'AX'))
 
 /** 소재가 멀면 이 순서로(우리 분야 우선 주제) */
 /** short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다 */
@@ -430,6 +432,8 @@ export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_
   { topic: 'AI에 뒤처질까 걱정, 어디부터 할지 모름', tag: 'AX', short: 'AI 어디부터?' },
   { topic: '반복 입력 · 대표가 다 확인해야 돌아가는 회사', tag: 'AX', short: '대표가 다 확인하는 회사' },
 ]
+/** D-555 지금 계정의 우리 분야 주제 — 대표가 아닌 계정은 AX 주제 없이 */
+export const priorityTopics = () => withoutAx(PRIORITY_TOPICS, (p) => p.tag)
 
 /** 남의 글에 다는 전문가 답글(하루 3개) */
 export const EXPERT_REPLY = '현장에서 보면 [사실 하나]도 같이 봐요.\n[그게 왜 중요한지 한 줄].'
@@ -732,7 +736,8 @@ export function lintThreadPost(input: { body: string; template?: string; tag?: s
   const hype = HYPE.exec(text)
   if (hype) add('hype', 'bad', `"${hype[0]}" — 보장 · 과장 · 지어낸 선착순은 쓰지 않아요`)
   if (/벤처/.test(text) && /감면|혜택|세금|받으면|받을|확인받|신청/.test(text) && !/확인\s*기관/.test(text)) add('venture', 'warn', '벤처 이야기 — "(결과는 확인기관이 정하고, 회사마다 달라)" 괄호를 붙여요')
-  if (AX_AS_MONEY.test(text) && !AX_DENIED.test(text)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — AX 는 일하는 방식을 바꾸는 일, 자금은 기관 심사')
+  // D-555 AX 점검은 대표 계정만(AX 는 대표만 하는 컨설팅)
+  if (axShown() && AX_AS_MONEY.test(text) && !AX_DENIED.test(text)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — AX 는 일하는 방식을 바꾸는 일, 자금은 기관 심사')
   // D-274 대표 운영 원칙(가점 · 성공 약속 · 기본 컨디션 괄호) · 사실 목록에 없는 숫자
   // D-554 컨설팅 · AX 글 점검(수치 후킹 · 숫자 늘리기 · 대행 말 · 성공보수 · 로고 · 지어낸 사례 · AX 키우기)
   if (text) out.push(...principleLint(text), ...consultLint(text), ...numberLint(text, input.facts ?? ''))
@@ -756,7 +761,7 @@ export function lintThreadPost(input: { body: string; template?: string; tag?: s
       endLabel?.good || noneOk ? 'ok' : ending === 'link' ? 'bad' : 'warn',
       endLabel?.good ? `끝: ${endLabel.label}` : noneOk ? '끝: 그냥 끝 · 단정(이 틀은 괜찮아요)' : ending === 'open' ? '끝이 열린 질문 — 고르기 쉬운 질문(A/B/C · 몇 년 차)이나 자료 나눔으로 바꾸면 더 퍼져요' : ending === 'link' ? '끝이 링크 · 상담 안내 — 본인 댓글로 옮기기' : '끝에 대답하기 쉬운 것 하나(고르기 쉬운 질문 · 쓸 사람? · 자료 나눔 · 후속편)를 붙이면 답글이 붙어요',
     )
-  add('tag', input.tag ? 'ok' : 'warn', input.tag ? `주제 태그: ${input.tag}` : '주제 태그 1개를 고르세요(정책자금 · 벤처기업확인 · 정부지원사업 · AX · 경영컨설팅)')
+  add('tag', input.tag ? 'ok' : 'warn', input.tag ? `주제 태그: ${input.tag}` : `주제 태그 1개를 고르세요(${topicTags().join(' · ')})`)
   if (input.selfComment && LINK.test(input.selfComment)) add('comment', 'ok', '링크는 본인 댓글에 — 조회 1,000 넘은 글에만 달기')
 
   const others = (input.recent ?? []).filter((p) => p.id !== input.id)

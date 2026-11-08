@@ -23,6 +23,7 @@ import {
   type RadarVideo,
   type SideBreakout,
 } from '../../../services/marketing/ytRadar'
+import { mkText } from '../../../services/marketing/persona'
 import { Peek } from './EvidencePeek'
 import { IconChip, RatioChip, Thumb } from './RadarParts'
 
@@ -58,7 +59,7 @@ export function DomainBoard({ signals }: { signals: readonly DomainSignal[] }) {
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         {signals.map((d) => (
           <div key={d.domain} className={`flex min-w-0 flex-col gap-1 rounded-(--radius-card) border p-3 ${DOMAIN_BOX[d.domain]}`} data-testid={`radar-domain-${d.domain}`} data-count={d.items.length}>
-            <p className={`t-card font-bold ${DOMAIN_TEXT[d.domain]}`}>{DOMAIN_LABEL[d.domain]}</p>
+            <p className={`t-card font-bold ${DOMAIN_TEXT[d.domain]}`}>{mkText(DOMAIN_LABEL[d.domain])}</p>
             {d.items.length === 0 ? (
               <p className="t-meta break-keep text-slate-500" data-testid="radar-domain-empty">
                 최근 2주에 여러 채널이 함께 다룬 주제가 아직 없습니다 <span className="text-slate-400">({DOMAIN_SCOPE[d.domain]})</span>
@@ -164,8 +165,8 @@ export function AiKeywordBoard({
             {fresh.map((k) => (
               <span key={k.word} className="t-meta inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2.5 py-1 text-slate-700" data-testid="radar-ai-new-kw">
                 <span className="font-bold text-slate-900">{k.word}</span>
-                <Peek videos={k.hits} title={k.word} basis="AI · AX 채널 최근 2주" kind="ai-new">
-                  AI · AX {k.channels}개 채널 · {k.videos}편
+                <Peek videos={k.hits} title={k.word} basis={mkText('AI · AX 채널 최근 2주')} kind="ai-new">
+                  {mkText('AI · AX')} {k.channels}개 채널 · {k.videos}편
                 </Peek>
               </span>
             ))}

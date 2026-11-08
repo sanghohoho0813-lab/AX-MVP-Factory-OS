@@ -37,6 +37,7 @@ import { BasisBox } from './BasisBox'
 import { RulesInfoButton } from './RulesSheet'
 import { sectionHref, venturePlanHref } from './certNav'
 import { planProgress, readPlan } from '../core/venturePlan'
+import { noAxText } from '../../services/marketing/persona'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
 const labelOf = (id: string) => EVIDENCE_LABEL[id] ?? id
@@ -286,7 +287,7 @@ export function CertWorkspace({
             {a.key === 'venture' && plan && (
               <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2.5 sm:flex-row sm:items-center" data-testid="cert-venture-plan-row">
                 <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
-                  <b className="font-semibold">사업계획서</b> · 받지 않고 여기서 바로 쓸 수 있어요 — 신청 사이트와 같은 순서 · 특허 명세서 · AX 와 한 이야기로{plan.filled > 0 ? ` · 지금 서술 ${plan.narrativeFilled}/${plan.narrativeTotal}칸` : ''}
+                  <b className="font-semibold">사업계획서</b> · 받지 않고 여기서 바로 쓸 수 있어요 — 신청 사이트와 같은 순서 · {noAxText('특허 명세서 · AX 와 한 이야기로')}{plan.filled > 0 ? ` · 지금 서술 ${plan.narrativeFilled}/${plan.narrativeTotal}칸` : ''}
                 </p>
                 <Button variant="secondary" size="sm" className="self-start sm:self-auto" onClick={openPlan} data-testid="cert-venture-plan-step1">
                   사업계획서 쓰기

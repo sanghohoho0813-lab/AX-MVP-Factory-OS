@@ -9,6 +9,7 @@ import { VideoStudy, type StudyProps } from './VideoStudy'
 import { Badge } from '../../../components/ui/primitives'
 import { dateKo, fmt, shortNum } from '../../../services/marketing/ytBench'
 import { TOPIC_BY_ID } from '../../../services/marketing/radarPlaybook'
+import { mkText } from '../../../services/marketing/persona'
 import {
   AXIS_LABEL,
   DOMAIN_LABEL,
@@ -66,7 +67,7 @@ export function DomainBadge({ axis, domain }: { axis: ContentAxis; domain: Conte
   if (axis === 'axai' || domain === 'ai' || domain === 'other') return null
   return (
     <span className="t-meta inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid="radar-domain-badge" data-domain={domain}>
-      {DOMAIN_LABEL[domain]}
+      {mkText(DOMAIN_LABEL[domain])}
     </span>
   )
 }
@@ -161,7 +162,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
             <p className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{v.title}</p>
             <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-600">
               <span className="font-semibold text-slate-800">{v.channelName}</span>
-              <Badge>{GROUP_LABEL[v.group]}</Badge>
+              <Badge>{mkText(GROUP_LABEL[v.group])}</Badge>
               {!v.mine && (
                 <Badge tone={v.added ? 'warning' : 'neutral'}>
                   <span data-testid="radar-detail-source" data-added={v.added ? '1' : '0'}>
@@ -205,7 +206,7 @@ export function VideoDetail({ v, clusters, onClose, noThumb, study }: { v: Radar
           <div className="flex flex-wrap gap-1.5" data-testid="radar-detail-tags">
             {v.domains.map((d) => (
               <Badge key={d} tone={d === 'other' ? 'neutral' : 'success'}>
-                영역 · {DOMAIN_LABEL[d]}
+                영역 · {mkText(DOMAIN_LABEL[d])}
               </Badge>
             ))}
             {v.formats.map((f) => (

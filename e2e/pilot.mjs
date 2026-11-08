@@ -1227,6 +1227,9 @@ try {
   // 본문(main)만 — 왼쪽 위 제품 이름(MIRAE AI LAB OS)은 이 서비스 이름이라 대표 개인 정보가 아니다
   const OWNER_WORDS = /김상호|김팀장|미래AI랩|MIRAE|경영노트|AX Fit|3분 진단/
   const mainText = (pg) => pg.locator('main').innerText().catch(() => '')
+  // D-555 AX 는 대표만 하는 컨설팅 — 접힌 칸까지(textContent) 'AX' 낱말을 찾는다
+  const AXW = /.{0,24}(?<![A-Za-z])AX(?![A-Za-z]).{0,24}/g
+  const axIn = async (pg) => ((await pg.locator('main').evaluate((el) => el.textContent ?? '').catch(() => '')).match(AXW) ?? [])
   const todayCtx = { title: '오늘', today: '2026-10-25', sections: [] }
   check('SAAS-2.1 내부 팀장: 장부를 켜도 마케팅 메뉴 닫힘(권한에 마케팅 없음)', (await p4.locator('aside a[href="/marketing"]').count()) === 0, await p4.locator('aside').innerText().catch(() => ''))
   const inRun = await assistDirect(PILOT, { requestId: 'req-saas21-int-000001', assistId: 'today.top3', page: 'today', context: todayCtx })
@@ -1249,6 +1252,8 @@ try {
   const thrText = await mainText(p4)
   check('SAAS-2 팀장: 스레드 화면에 대표 이름 · 회사 · 대표 사실 0 · 대표 예시 글 단추 없음', !OWNER_WORDS.test(thrText) && !thrText.includes('100억') && (await p4.getByTestId('thr-use-example').count()) === 0, (thrText.match(OWNER_WORDS) ?? []).join())
   await shot(p4, 'saas2-pilot-threads')
+  const thrAx = await axIn(p4)
+  check('D-555 구독 고객: 스레드 화면(접힌 칸 · 주제 태그 · 바꿔쓰기 표 · 점검 포함)에 AX 0', thrAx.length === 0, thrAx.slice(0, 6))
   // 화면에서 AI 로 바로 쓰기(D-289 두 번 누르기) — 고객 AI 도 켜져 있고, 부르면 DB 장부에 한 줄
   aiCalls.length = 0
   await p4.locator('[data-testid="thr-qs-chip"]').first().click()
@@ -1262,15 +1267,26 @@ try {
   for (let i = 0; i < 30 && aiCalls.length === 0; i += 1) await p4.waitForTimeout(500)
   await p4.waitForTimeout(1500) // 정산까지
   const uiRows = sql(`select count(*) || ':' || coalesce(sum(units), 0) from public.ai_usage_ledger where user_id = '${PILOT.id}' and assist_id = 'threads.write' and status = 'settled'`)
+  check('D-555 구독 고객: 스레드 AI 지시문에 AX 0 · 컨설팅 글 규칙은 감', aiCalls.length === 1 && !/(?<![A-Za-z])AX(?![A-Za-z])/.test(aiCalls[0]?.sys ?? '') && (aiCalls[0]?.sys ?? '').includes('[컨설팅 글 규칙'), ((aiCalls[0]?.sys ?? '').match(AXW) ?? []).slice(0, 4))
   check('SAAS-2 팀장 화면: 스레드 [AI로 바로 쓰기] 켜짐 → AI 한 번 · 지시문에 대표 이름 0 · DB 장부에 정산 1줄(글 쓰기 2단위)', qsEnabled && aiCalls.length === 1 && !OWNER_WORDS.test(aiCalls[0]?.sys ?? '') && uiRows === '1:2', `${qsEnabled} n=${aiCalls.length} ${uiRows}`)
   sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`) // 아래 한도 시험을 0 부터(시험 DB 만)
   await go(p4, '/marketing/shorts')
+  const shtAx = await axIn(p4)
+  check('D-555 구독 고객: 릴스 · 틱톡 화면(접힌 칸 포함)에 AX 0', shtAx.length === 0, shtAx.slice(0, 6))
   check('SAAS-2 팀장: 릴스 · 틱톡 화면 열림 · 대표 이름 0', (await p4.getByTestId('sht-page').count()) === 1 && !OWNER_WORDS.test(await mainText(p4)), ((await mainText(p4)).match(OWNER_WORDS) ?? []).join())
   await go(p4, '/marketing')
   await p4.waitForTimeout(800)
   const ytText = await mainText(p4)
   check('SAAS-2 팀장: 콘텐츠 레이더 열림 · 대표 이름 · 대표 채널 0 · 대표 레이더 기록 0', (await p4.getByTestId('yt-page').count()) === 1 && !OWNER_WORDS.test(ytText) && leaked(ytText).length === 0 && (await p4.locator('[data-testid="yt-card"][data-mine="1"]').count()) === 0, (ytText.match(OWNER_WORDS) ?? []).join())
   await shot(p4, 'saas2-pilot-radar')
+  const ytAx = await axIn(p4)
+  check('D-555 구독 고객: 콘텐츠 레이더 첫 화면(접힌 칸 포함)에 AX 0', ytAx.length === 0, ytAx.slice(0, 6))
+  for (const v of ['plan', 'channels']) {
+    await go(p4, `/marketing/youtube?view=${v}`)
+    await p4.waitForTimeout(800)
+    const vAx = await axIn(p4)
+    check(`D-555 구독 고객: 레이더 ?view=${v}(접힌 칸 포함)에 AX 0`, vAx.length === 0, vAx.slice(0, 6))
+  }
   for (const pth of ['/tools/content', '/tools/homepage', '/marketing/more', '/patent-venture']) {
     await go(p4, pth)
     check(`SAAS-2 팀장: ${pth} 는 열려도 그대로 닫힘`, (await bodyText(p4)).includes('화면을 찾지 못했습니다'))
@@ -1290,7 +1306,9 @@ try {
   for (let i = 2; i <= 6; i += 1) await assistDirect(PILOT, { requestId: `req-saas2-e2e-00000${i}`, assistId: 'radar.top5', page: 'radar', context: mkCtx })
   const over = await assistDirect(PILOT, { requestId: 'req-saas2-e2e-000007', assistId: 'radar.top5', page: 'radar', context: mkCtx })
   check('SAAS-2 팀장 AI: 한도 12단위를 다 쓰면 429 quota_exceeded · AI 안 부름 · 장부 합계 12', over.statusCode === 429 && over.body.code === 'quota_exceeded' && aiCalls.length === 6 && sql(`select sum(units) from public.ai_usage_ledger where user_id = '${PILOT.id}' and status <> 'released'`) === '12', `${over.statusCode} ${over.raw.slice(0, 160)} n=${aiCalls.length}`)
+  check('D-555 구독 고객: 레이더 AI 지시문에 AX 0', aiCalls.length >= 1 && aiCalls.every((c) => !/(?<![A-Za-z])AX(?![A-Za-z])/.test(c.sys)), aiCalls.map((c) => (c.sys.match(AXW) ?? []).slice(0, 2)))
   const ownRun = await assistDirect(OWNER, { requestId: 'req-saas2-e2e-owner01', assistId: 'radar.top5', page: 'radar', context: mkCtx })
+  check('D-555 대표 계정: 레이더 AI 지시문에 [컨설팅 · AX 글 규칙] 그대로', (aiCalls.at(-1)?.sys ?? '').includes('[컨설팅 · AX 글 규칙') && (aiCalls.at(-1)?.sys ?? '').includes('AX 뜻 ='))
   check('SAAS-2 대표 AI: 장부에 대표 줄 0(대표는 세지 않음) · 대표 마케팅 그대로', ownRun.statusCode === 200 && sql(`select count(*) from public.ai_usage_ledger where user_id = '${OWNER.id}'`) === '0')
   await go(p4, '/settings')
   await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})

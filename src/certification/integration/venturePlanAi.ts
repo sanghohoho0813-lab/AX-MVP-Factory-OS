@@ -14,6 +14,8 @@ import { VPLAN_FIELD, VPLAN_FIELDS, type DraftItem, type VPlanBatch, type VPlanF
 import { PLAN_LINE_LABEL, PLAN_MAX, RD_ORG_SHORT, chosenPlan, marketRows, patentNoOf, rdOf, type GateState, type PlanPick } from './ventureGate'
 import { addFresh, rankByScore, rerankByAnswer, scoreOf, stripRank, titleKey } from '../../services/aiAssist/candidates'
 import { TALK_RULE, talkRows } from '../../services/aiAssist/talk'
+// D-555 AX 는 대표만 하는 컨설팅 — 대표가 아닌 계정(팀장)은 재료 이름 · 규칙을 'MVP' 로
+import { axShown, noAxText } from '../../services/marketing/persona'
 
 /**
  * D-263 요약을 본문보다 먼저(기준 문서 23-1B · 대표: "시장조사 → 출원번호 · 기술인력 → 요약") — 요약 묶음이 맨 앞.
@@ -135,7 +137,7 @@ function materialSections(state: VPlanState, gate?: GateState | null): AssistCon
   }
   return [
     { name: '특허 명세서(출원본 · 사람이 확인한 요약)', rows: rowsOfText(state.materials.patent, '명세서') },
-    { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
+    { name: noAxText('AX · MVP(실제 구현 · 계획)'), rows: rowsOfText(state.materials.ax, axShown() ? 'AX' : 'MVP') },
     { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
     ...(written.length ? [{ name: '이미 쓴 칸', rows: written.slice(0, 20) }] : []),
     ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
@@ -221,7 +223,7 @@ export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState;
   }
   const sections = [
     { name: '특허 명세서(출원본 · 사람이 확인한 요약)', rows: rowsOfText(state.materials.patent, '명세서') },
-    { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
+    { name: noAxText('AX · MVP(실제 구현 · 계획)'), rows: rowsOfText(state.materials.ax, axShown() ? 'AX' : 'MVP') },
     { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
     { name: '이미 쓴 칸(이야기를 이어 갈 것)', rows: written },
     ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
@@ -235,7 +237,7 @@ export function buildBatchContext(input: { batch: VPlanBatch; state: VPlanState;
     purpose: `이번에 쓸 칸: ${[...mine].map((id) => VPLAN_FIELD[id].title).join(' · ')}`,
     sections,
     facts: factLines(facts, gateLines(state, facts, gate)),
-    rules: [...VENTURE_RULES, ...(plan ? [PLAN_RULE] : []), ...batchRules(batch)],
+    rules: [...VENTURE_RULES.map(noAxText), ...(plan ? [PLAN_RULE] : []), ...batchRules(batch)],
   }
 }
 
@@ -253,7 +255,7 @@ export function buildMarketContext(input: { state: VPlanState; facts: VPlanFacts
     purpose: '요약을 쓰기 전에 목표시장을 TAM → SAM → SOM 으로',
     sections: [
       { name: '특허 명세서(출원본 · 사람이 확인한 요약)', rows: rowsOfText(state.materials.patent, '명세서') },
-      { name: 'AX · MVP(실제 구현 · 계획)', rows: rowsOfText(state.materials.ax, 'AX') },
+      { name: noAxText('AX · MVP(실제 구현 · 계획)'), rows: rowsOfText(state.materials.ax, axShown() ? 'AX' : 'MVP') },
       { name: '컨설턴트 메모(확인된 사실 · 숫자 · 출처)', rows: rowsOfText(state.materials.memo, '메모') },
       { name: '이미 쓴 칸', rows: written },
       ...(gate?.market ? [{ name: '지난 시장조사(고칠 것)', rows: marketRows(gate.market) }] : []),
@@ -274,7 +276,7 @@ export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: 
     for (const [i, c] of chunks(t).entries()) rows.push({ part: `${f.id}${i ? ' (이어서)' : ''} · ${f.title}`, memo: c })
   }
   const rules = [
-    ...VENTURE_RULES.slice(0, 7),
+    ...VENTURE_RULES.slice(0, 7).map(noAxText),
     ...fields.map((f) => `칸 ${f.id} = ${f.no} ${f.title}${f.limit ? ` (${f.limit}자 안 · 850~950자 권장)` : ''}${f.template ? ` · 문장 틀: ${f.template}` : ''}${f.checks ? ` · 체크 선택지: ${f.checks.join(' / ')}` : ''}`),
   ]
   return {
@@ -286,7 +288,7 @@ export function buildVentureJudgeContext(input: { scope: 'sum' | 'full'; state: 
       ...(gate && chosenPlan(gate.plan) ? [{ name: '고른 기획 방향(이 줄거리에서 벗어났는지도 본다)', rows: planRows(chosenPlan(gate.plan)) }] : []),
       ...(gate?.market ? [{ name: '시장조사(TAM · SAM · SOM)', rows: marketRows(gate.market) }] : []),
       { name: '특허 명세서(출원본 · 요약)', rows: rowsOfText(state.materials.patent, '명세서').slice(0, 4) },
-      { name: 'AX · MVP', rows: rowsOfText(state.materials.ax, 'AX').slice(0, 3) },
+      { name: noAxText('AX · MVP'), rows: rowsOfText(state.materials.ax, axShown() ? 'AX' : 'MVP').slice(0, 3) },
     ],
     facts: factLines(facts, gateLines(state, facts, gate)),
     rules,

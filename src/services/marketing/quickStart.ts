@@ -10,6 +10,7 @@
  * 고른 사람이 직접 바꾼 형식은 덮어쓰지 않는다(화면이 판단).
  */
 import { todayLocalDate } from '../../lib/appClock'
+import { axShown } from './persona'
 import { GOALS, mondayOf, templateOf, todayPlan, type ThreadGoal, type ThreadTemplateKey, type WeekRef } from './threads'
 import { AIMS, PLATFORMS, formatsFor, weekMix, type ShortAim, type ShortFormatKey, type ShortPlatform, type ShortPost } from './shorts'
 
@@ -23,7 +24,8 @@ export function topicTag(topic: string): string {
   if (/벤처/.test(t)) return '벤처기업확인'
   if (/정책\s*자금|자금|보증|융자|대출/.test(t)) return '정책자금'
   if (/지원\s*사업|공고|바우처|지원금|고용/.test(t)) return '정부지원사업'
-  if (/(?<![A-Za-z])A[IX](?![A-Za-z])|자동화|화면|MVP|ChatGPT|Claude|챗GPT|디지털/i.test(t)) return 'AX'
+  // D-555 AX 태그는 대표 계정만 — 대표가 아닌 계정의 AI 주제는 '경영컨설팅'
+  if (axShown() && /(?<![A-Za-z])A[IX](?![A-Za-z])|자동화|화면|MVP|ChatGPT|Claude|챗GPT|디지털/i.test(t)) return 'AX'
   return '경영컨설팅'
 }
 

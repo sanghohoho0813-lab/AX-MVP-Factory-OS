@@ -7,7 +7,7 @@ import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, type
 import { Button } from '../../components/ui/Button'
 import { HelpHeading } from '../../components/ui/fold'
 import { TONES, type Tone } from './snsTone'
-import { REWRITES, VENTURE_CARDS, ourFactsList } from '../../services/marketing/snsRules'
+import { VENTURE_CARDS, ourFactsList, rewritesFor } from '../../services/marketing/snsRules'
 import { isMarketingCustomer } from '../../services/marketing/persona'
 
 export function StepTitle({ n, children }: { n: string; children: ReactNode }) {
@@ -313,7 +313,7 @@ export function ShareKit({ testId }: { testId: string }) {
 export function RewriteTable({ testId }: { testId: string }) {
   return (
     <ul className="flex flex-col divide-y divide-slate-100" data-testid={testId}>
-      {REWRITES.map((r) => (
+      {rewritesFor().map((r) => (
         <li key={r.no} className="flex flex-col gap-0.5 py-2">
           <span className="t-sub break-keep text-danger-700">✕ {r.no}</span>
           <span className="t-sub break-keep text-success-800">○ {r.yes}</span>

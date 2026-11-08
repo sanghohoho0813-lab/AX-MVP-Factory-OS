@@ -13,7 +13,7 @@ import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, HYPE, LINK, numberLint, principleLint } from './snsRules'
 import { consultLint } from './consultRules'
-import { isMarketingCustomer, mkText } from './persona'
+import { axShown, isMarketingCustomer, mkText, noAxText } from './persona'
 
 export const SHORTS_MODULE = 'marketing'
 export const SHORTS_BUCKET = 'shorts'
@@ -150,6 +150,8 @@ const CUSTOMER_SWAPS: ReadonlyArray<[RegExp, string]> = [
 ]
 export const exampleText = (s: string): string => (isMarketingCustomer() ? mkText(CUSTOMER_SWAPS.reduce((t, [re, rep]) => t.replace(re, rep), s)) : s)
 export const exampleOf = (f: ShortFormat, p: ShortPlatform) => ({ script: exampleText(p === 'reels' && f.reelsExample ? f.reelsExample : f.example), caption: exampleText(p === 'reels' && f.reelsCaption ? f.reelsCaption : f.exampleCaption) })
+/** D-555 예시 #태그 — 대표가 아닌 계정은 #AX 없이 */
+export const exampleTagsOf = (f: ShortFormat): string => noAxText(f.exampleTags).trim()
 export const aimLabel = (p: ShortPlatform, a: ShortAim) => AIMS[p].find((x) => x.key === a)?.label ?? ''
 
 /** 한 줄 공식 — 화면 맨 위 "이것만 지키면 돼요" */
@@ -278,7 +280,8 @@ export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; 
     if (NARROW.test(all)) add('narrow', 'warn', '대상을 좁게 불렀어요 — "사장님 누구나" 처럼 넓게')
     const hype = HYPE.exec(all)
     if (hype) add('hype', 'bad', `"${hype[0]}" — 보장 · 과장 · 지어낸 선착순은 쓰지 않아요`)
-    if (AX_AS_MONEY.test(all) && !AX_DENIED.test(all)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — 자금은 기관 심사')
+    // D-555 AX 점검은 대표 계정만
+    if (axShown() && AX_AS_MONEY.test(all) && !AX_DENIED.test(all)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — 자금은 기관 심사')
     if (/벤처/.test(all) && /감면|혜택|세금/.test(all) && !/확인\s*기관|기관\s*심사/.test(all)) add('venture', 'warn', '벤처 세금 이야기 — 캡션에 "(요건 충족 시 · 결과는 확인기관이 정합니다)"')
     // D-274 대표 운영 원칙 · 사실 목록에 없는 숫자(말 · 화면 글자 · 캡션만 — 시간 표시는 빼고)
     // D-554 컨설팅 · AX 글 점검(화면 지시 · 캡션까지 — 로고 · 도장 장면도)

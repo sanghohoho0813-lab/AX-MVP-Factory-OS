@@ -41,12 +41,12 @@ import {
   GOAL_EASY,
   TEMPLATE_EASY,
   NOT_THIS,
-  PRIORITY_TOPICS,
+  priorityTopics,
   ROUTINE,
   STAT_KEYS,
   THREAD_MAX,
   THREAD_TEMPLATES,
-  TOPIC_TAGS,
+  topicTags,
   WEEK_PLAN,
   EMPTY_STATS,
   firstLineOf,
@@ -332,7 +332,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   // MUX-2 추천 형식(규칙) — 사람이 직접 고른 틀이 있으면 그것, 없으면 주제 · 오늘 계획 · 이번 주 잘 된 틀로
   const rec = useMemo(() => recommendThread({ topic: draft.topic, today, weekRef }), [draft.topic, today, weekRef])
   const eff = draft.template ? { goal: (draft.goal || templateOf(draft.template)?.goals[0] || rec.goal) as ThreadGoal, template: draft.template } : { goal: rec.goal, template: rec.template }
-  const chips = useMemo(() => topicChips(readWeekTopics(today), PRIORITY_TOPICS), [today])
+  const chips = useMemo(() => topicChips(readWeekTopics(today), priorityTopics()), [today])
   const pickTopic = (t: string) => {
     // 칩으로 새 주제를 고르면 형식도 그 주제에 맞춰 다시 추천 — 사람이 직접 고른 틀은 덮지 않는다
     if (draft.formatBy === 'hand' && draft.template) return set({ topic: t, tag: draft.tag || topicTag(t) })
@@ -676,7 +676,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         </ToneSection>
         <ToneSection n="3" tone="emerald" title="주제 태그 1개" help="스레드에서 글 주제를 묶어 주는 낱말이에요. 하나만 붙이면 그 주제를 찾는 사람에게 더 잘 보여요." testId="thr-sec-tag">
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그">
-            {TOPIC_TAGS.map((t) => (
+            {topicTags().map((t) => (
               <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={toneChip('emerald', draft.tag === t)} data-testid={`thr-tag-${t}`}>
                 #{t}
               </button>
@@ -1192,7 +1192,7 @@ function RoutinePanel({ week, readOnly, onWrite, onRecords }: { week: ReturnType
           <h2 className="t-section break-keep text-slate-900">주제 태그 인기 글 보기</h2>
           <p className="t-sub break-keep text-slate-600">월요일에 한 번 — 스레드 검색을 새 창으로 열고 반응 좋았던 글 3~5개의 형식만 위 "이번 주 반응 좋았던 형식" 에 적어요. 매일 모을 필요는 없어요.</p>
           <div className="flex flex-wrap gap-1.5">
-            {TOPIC_TAGS.map((t) => (
+            {topicTags().map((t) => (
               <a key={t} href={`https://www.threads.com/search?q=${encodeURIComponent(t)}&serp_type=default`} target="_blank" rel="noreferrer noopener" className={`${chip(false)} gap-1`} data-testid="thr-search-link">
                 #{t} <ExternalLink aria-hidden="true" className="size-3.5" />
               </a>

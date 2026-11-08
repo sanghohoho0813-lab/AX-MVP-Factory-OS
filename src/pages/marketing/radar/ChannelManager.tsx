@@ -72,7 +72,7 @@ export function ChannelManager({
       <AddChannel readOnly={readOnly} full={prefs.added.length >= MAX_ADDED} known={new Set(rows.map((r) => r.id))} onAdd={(c, group) => {
         // D-222 저장된 뒤에만 '더했습니다'(설정을 못 읽었거나 저장 실패면 그 안내만) · 더한 날은 한국 날짜로 보이게 시각 그대로
         void Promise.resolve(onPrefs({ ...prefs, added: [...prefs.added, { id: c.id, title: c.title, handle: c.handle, group, note: '', subs: c.subs, addedAt: new Date().toISOString() }] })).then((ok) => {
-          if (ok !== false) notify(`${q(c.title, '을/를')} ${GROUP_LABEL[group]} 묶음에 더했습니다 — 영상은 곧 받아 옵니다.`)
+          if (ok !== false) notify(`${q(c.title, '을/를')} ${mkText(GROUP_LABEL[group])} 묶음에 더했습니다 — 영상은 곧 받아 옵니다.`)
         })
       }} />
       {failed.length > 0 && <p className="t-meta break-keep text-warning-700">이번에 못 받은 채널: {failed.join(' · ')}</p>}
@@ -88,7 +88,7 @@ export function ChannelManager({
             const list = byGroup.get(g) ?? []
             const on = list.filter((c) => prefs.overrides[c.id]?.enabled !== false).length
             return (
-              <Fold key={g} panel id={`radar.ch.${g}`} title={GROUP_LABEL[g]} count={list.length} defaultOpen={list.length > 0} summary={list.length ? `사용 중 ${on}곳` : '아직 채널이 없습니다'} testId={`radar-group-${g}`}>
+              <Fold key={g} panel id={`radar.ch.${g}`} title={mkText(GROUP_LABEL[g])} count={list.length} defaultOpen={list.length > 0} summary={list.length ? `사용 중 ${on}곳` : '아직 채널이 없습니다'} testId={`radar-group-${g}`}>
                 <p className="t-meta mb-1 break-keep text-slate-500">{mkText(GROUP_PURPOSE[g])}</p>
                 {list.length === 0 ? (
                   <p className="t-sub break-keep text-slate-500">이 묶음에 기본 채널이 없습니다{g === 'ai' || g === 'ax' ? ' — 위 [채널 추가] 로 더할 수 있습니다' : ''}.</p>
@@ -127,7 +127,7 @@ export function ChannelManager({
               {addedRows.map((c) => (
                 <ChannelRow key={c.id} c={c} group={groupOf(c, prefs.overrides)} enabled={prefs.overrides[c.id]?.enabled !== false} readOnly={readOnly} onOverride={setOverride} onRemove={() => removeAdded(c.id)} added>
                   <p className="t-meta text-slate-500">
-                    {GROUP_LABEL[groupOf(c, prefs.overrides)]} 묶음{addedAt.get(c.id) ? ` · ${localDateOf(String(addedAt.get(c.id)))} 더함` : ''}
+                    {mkText(GROUP_LABEL[groupOf(c, prefs.overrides)])} 묶음{addedAt.get(c.id) ? ` · ${localDateOf(String(addedAt.get(c.id)))} 더함` : ''}
                   </p>
                 </ChannelRow>
               ))}
@@ -186,7 +186,7 @@ function ChannelRow({
             <select value={group} disabled={readOnly} onChange={(e) => onOverride(c.id, { group: e.target.value as BenchmarkChannelGroup })} className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5 text-slate-800" aria-label={`${c.title} 묶음`} data-testid="radar-ch-group">
               {GROUPS.map((x) => (
                 <option key={x} value={x}>
-                  {GROUP_LABEL[x]}
+                  {mkText(GROUP_LABEL[x])}
                 </option>
               ))}
             </select>
@@ -264,7 +264,7 @@ function AddChannel({ readOnly, full, known, onAdd }: { readOnly: boolean; full:
               <select value={group} onChange={(e) => setGroup(e.target.value as BenchmarkChannelGroup)} className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" aria-label="넣을 묶음">
                 {GROUPS.map((x) => (
                   <option key={x} value={x}>
-                    {GROUP_LABEL[x]}
+                    {mkText(GROUP_LABEL[x])}
                   </option>
                 ))}
               </select>

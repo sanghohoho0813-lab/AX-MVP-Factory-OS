@@ -8,6 +8,8 @@
  *  - 100% · 무조건 · 보장 · 마감 임박은 기존 점검(HYPE)이 이미 잡으므로 여기서는 겹치지 않게 뺀다.
  */
 
+import { axShown } from './persona'
+
 export type ConsultLevel = 'bad' | 'warn'
 export interface ConsultLine {
   key: string
@@ -51,8 +53,12 @@ export const RIVAL = /\d+\s*%\s*(?:가\s*)?사기|사기(?:입니다|예요|일\
 export const AX_INFLATE =
   /(?:AX|업무\s*자동화)[^\n]{0,40}(?:심사(?:에서)?\s*유리|유리하게\s*작용|좋은\s*평가|차별화|눈에\s*띄게\s*만들어|가산|가점|승인\s*(?:률|확률|가능성))|AX\s*(?:인증|자격|보험)|AX\s*(?:를\s*)?받(?:으면|고\s)/
 
-/** 컨설팅 · AX 글 점검 — 걸린 것만(통과 줄 없음) */
-export function consultLint(text: string): ConsultLine[] {
+/**
+ * 컨설팅 · AX 글 점검 — 걸린 것만(통과 줄 없음).
+ * D-555 AX 점검(ax-inflate)은 대표 계정만(AX 는 대표만 하는 컨설팅) — opts.ax 로 바꿀 수 있다(홍보 글처럼 대표만 여는 곳).
+ */
+export function consultLint(text: string, opts: { ax?: boolean } = {}): ConsultLine[] {
+  const axOn = opts.ax ?? axShown()
   const out: ConsultLine[] = []
   if (!text.trim()) return out
   const hit = (re: RegExp) => re.exec(text)?.[0]?.trim() ?? ''
@@ -77,7 +83,7 @@ export function consultLint(text: string): ConsultLine[] {
   if (crit) add('criteria', 'warn', `"${crit}" — 확인 안 된 기준 · 요건일 수 있어요. "기관 공고 확인" 으로 쓰거나 공고 원문으로 확인해요`)
   const rival = hit(RIVAL)
   if (rival) add('rival', 'bad', `"${rival}" — 다른 업체를 겨냥한 말 대신 우리 방식만 말해요`)
-  const ax = hit(AX_INFLATE)
+  const ax = axOn ? hit(AX_INFLATE) : ''
   if (ax) add('ax-inflate', 'bad', `"${ax}" — AX 는 업무 자동화 시스템이에요(인증 · 보험 · 심사 이점 아님). 자금 · 인증 글에는 넣지 않고 따로 써요`)
   return out
 }
@@ -94,3 +100,8 @@ export const CONSULT_CHECKS: readonly string[] = [
   '□ 많이 보이게 할 글이면 끝에 진단 · 상담 안내가 없다',
   '□ 글자 수 · 키워드 횟수는 AI 가 적은 값 말고 직접 셌다',
 ]
+
+/** D-555 지금 계정의 발행 전 확인 칸 — 대표가 아닌 계정은 AX 칸 없이 8칸 */
+export function consultChecks(): string[] {
+  return axShown() ? [...CONSULT_CHECKS] : CONSULT_CHECKS.filter((l) => !/(?<![A-Za-z])AX(?![A-Za-z])/.test(l))
+}

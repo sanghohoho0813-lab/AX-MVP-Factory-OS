@@ -18,11 +18,11 @@ import type { AssistContext } from '../aiAssist/context'
 import { briefSection, packBundle } from '../aiAssist/marketingBuilders'
 import { HOLE, PACK_AVOID, aiSections, customSource, makePack, type PackBlock, type PackSectionId, type PackSource } from './contentPack'
 import { WEEK_STORE_KEY } from './weekRunFlag'
-import { isMarketingCustomer } from './persona'
+import { axShown, isMarketingCustomer, noAxText } from './persona'
 import { consultLint } from './consultRules'
 import type { ChannelBrief } from './radarStore'
 import { formatsFor, lintShort, parseShortDrafts, shortsContext, type ShortDraft, type ShortPlatform } from './shorts'
-import { GOALS, TOPIC_TAGS, lintThreadPost, parseThreadDrafts, skeletonDraft, templateOf, threadsContext, type ThreadDraft, type ThreadGoal, type ThreadTemplateKey } from './threads'
+import { GOALS, lintThreadPost, topicTags, parseThreadDrafts, skeletonDraft, templateOf, threadsContext, type ThreadDraft, type ThreadGoal, type ThreadTemplateKey } from './threads'
 
 /* ------------------------------------------------------------------ */
 /* 주 · 주제                                                             */
@@ -86,7 +86,8 @@ const CORE_ANGLES: ReadonlyArray<[RegExp, string]> = [
   [/지원\s*사업/, 'AI 로 공고를 읽고 사업계획서 초안을 써서 지원사업 신청 준비를 앞당기기'],
 ]
 const angleOf = (core: string, hook: string) => {
-  const how = CORE_ANGLES.find(([re]) => re.test(core))?.[1] ?? `${core}에서 대표가 이번 주 바로 할 일 하나로`
+  // D-555 대표가 아닌 계정은 AX 칸 없이(AX 는 대표만 하는 컨설팅)
+  const how = noAxText(CORE_ANGLES.find(([re]) => re.test(core))?.[1] ?? `${core}에서 대표가 이번 주 바로 할 일 하나로`)
   return `${hook}(이번 주 뜨는 미끼)로 시작 → ${core}(본업)로 잇기 — ${how} → 끝은 중소기업 대표가 이번 주에 바로 써먹을 정보`
 }
 
@@ -211,7 +212,8 @@ export const THREAD_SLOTS: readonly ThreadSlot[] = [
 export const slotsOf = (part: WeekPart) => THREAD_SLOTS.filter((s) => s.part === part)
 
 /** 주제 태그(정책자금 · 벤처기업확인 · 정부지원사업 · AX · 경영컨설팅) — 주제 글에 있으면 */
-export const tagOf = (topic: string) => TOPIC_TAGS.find((t) => topic.replace(/\s+/g, '').includes(t.replace(/\s+/g, ''))) ?? (/AI|인공지능|자동화/.test(topic) ? 'AX' : '')
+// D-555 대표가 아닌 계정은 'AX' 태그 없이(AX 는 대표만 하는 컨설팅)
+export const tagOf = (topic: string) => topicTags().find((t) => topic.replace(/\s+/g, '').includes(t.replace(/\s+/g, ''))) ?? (axShown() && /AI|인공지능|자동화/.test(topic) ? 'AX' : '')
 
 /* ------------------------------------------------------------------ */
 /* 서버에 보낼 자료 — 기존 단추의 자료에 '이번 주 계획' 을 붙인다             */

@@ -26,6 +26,7 @@
  */
 import { SHORT_MAX_SEC, extractTopics, periodVideos, type Prepared, type YtChannel, type YtVideo } from './ytBench'
 import { quoted } from '../../lib/josa'
+import { noAxText } from './persona'
 import {
   AI_KEYWORDS,
   CORE_DOMAINS,
@@ -611,7 +612,7 @@ function summaryOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Clust
   if (axis === 'bridge') {
     const tail =
       c.bridgeHits > 0
-        ? `이미 '${label} + AI · 자동화' 영상이 ${c.bridgeHits}편 나와 우리 AX 이야기를 붙이기 좋습니다`
+        ? noAxText(`이미 '${label} + AI · 자동화' 영상이 ${c.bridgeHits}편 나와 우리 AX 이야기를 붙이기 좋습니다`)
         : axSignal && axSignal.strength !== 'early'
           ? `AI 실무 채널에서는 지금 ${quoted(axSignal.label, '이/가')} 오르고 있어 둘을 붙여 말하기 좋은 때입니다`
           : `'${label} + AI' 를 다룬 영상은 아직 없어 먼저 말할 수 있습니다`
@@ -693,8 +694,8 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
     : axis === 'market'
       ? '사람들이 이미 찾는 주제 — 우리 관점으로 정리해 바로 찍을 만합니다'
       : axis === 'bridge'
-        ? '시장 수요가 확인된 주제에 우리 AX 이야기를 붙입니다'
-        : '실무 장면으로 보여 주는 MIRAE AX형'
+        ? noAxText('시장 수요가 확인된 주제에 우리 AX 이야기를 붙입니다')
+        : noAxText('실무 장면으로 보여 주는 MIRAE AX형')
   return {
     key: `${axis}:${c.topicId}`,
     axis,
@@ -1197,7 +1198,7 @@ export function whyRecommended(o: Pick<Opportunity, 'axis' | 'domain' | 'cluster
     ),
     item('growing', c.growing, c.growing ? (c.prior === 0 ? `최근 2주 ${c.videos14}편 — 그 전 6주에는 없던 주제` : `최근 2주 ${c.videos14}편 — 그 전 6주보다 빠르게 늘었습니다`) : '그 전 6주보다 뚜렷하게 늘지는 않았습니다'),
     item('small', c.smallBreakouts > 0, c.smallBreakouts > 0 ? `구독자 3만 이하 채널에서도 터진 영상 ${c.smallBreakouts}편` : '작은 채널에서 터진 영상은 아직 없습니다'),
-    item('domain', o.domain !== 'other', o.axis === 'bridge' ? `${DOMAIN_LABEL[o.domain]} 주제 — 여기에 우리 AX 이야기를 붙입니다` : `${DOMAIN_LABEL[o.domain]} 주제입니다`),
+    item('domain', o.domain !== 'other', noAxText(o.axis === 'bridge' ? `${DOMAIN_LABEL[o.domain]} 주제 — 여기에 우리 AX 이야기를 붙입니다` : `${DOMAIN_LABEL[o.domain]} 주제입니다`)),
   ]
 }
 

@@ -14,7 +14,7 @@ import { finalRules, ideaJudgeBlock, judgeBlock } from './judge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from './specSamples.js'
 import { CONFIDENTIAL_RULES, sanitizeKnowledge, scrubBrand } from './guard.js'
 import { brandBlock, brandIdentity, CUSTOMER_NOTE, customerize } from './brand.js'
-import { CUSTOMER_KB_EXCLUDE, customerChannelRules, customerInstruction, customerLabel, customerPack, customerRadarRules } from './customerMarketing.js'
+import { CUSTOMER_KB_EXCLUDE, customerChannelRules, customerInstruction, customerLabel, customerNoAx, customerPack, customerRadarRules } from './customerMarketing.js'
 
 /** SAAS-2 마케팅 · 브랜딩 화면(고객판 단추 지시 · 이름을 쓰는 곳) — ai-assist.js MARKETING_PAGES 와 같다 */
 export const MARKETING_ASSIST_PAGES = new Set(['radar', 'content', 'threads', 'shorts'])
@@ -168,8 +168,12 @@ export const CONSULT_RULES = [
   '기관 일을 대신해 주는 것처럼 들리는 말 금지 — "심사 대응 · 기관 담당자 동행 · 대행" 대신 "예상 질문 준비 · 신청 전 점검". 세무 판단은 "세무사님과 함께 검토", 결과는 "결과는 기관 심사로 정해집니다".',
   '이미지 · 장면 · 썸네일 지시에 기관 로고 · 인증 마크 · 도장 · 공문 모양을 넣지 않는다 — 사람 · 서류 · 실제 화면으로.',
   '지어낸 사례 · 기준 금지 — "실제로 한 대표님은 …" · "A사 2억 조달" · "확정서", "신용 6등급이면 탈락" · "업력 1년 이상" 같은 요건. 제도 숫자(한도 · 감면율 · 기간 · 요건)는 [사실 목록] · [자료] 에 있는 것만 — 없으면 "기관 공고 확인" 으로 쓰거나 [대괄호] 로 비운다.',
-  'AX 뜻 = 회사 업무를 자동화하는 시스템을 만들어 주는 서비스(인증 · 보험 · 자격 · 신청 서류를 빨리 만드는 도구가 아님). 자금 · 인증 글에는 AX 를 넣지 않는 것이 기본 — AX 는 따로 AX 글로 쓴다. 꼭 엮을 때만 "비슷한 회사들 사이에서 눈에 띄게 해 주는 좋은 자료" 를 고치지 않고 쓰고 "(기본 컨디션이 가장 중요하며, 그 부분까지 함께 점검·설계합니다 / 결과는 기관 심사로 정해집니다)" 를 그대로 붙인다 — "심사에 유리 · 좋은 평가 · 차별화 · 눈에 띄게 만들어 드림" 으로 키우지 않는다. AX 효과 숫자 · AX 사례는 지어내지 않는다.',
   '많이 보이게 할 글(노출형)은 끝에 진단 · 상담 · 문의 안내를 붙이지 않고 정보로 끝낸다.',
+]
+
+/** D-555 AX 는 대표만 하는 컨설팅 — 이 줄은 대표 계정 지시문에만(대표가 아닌 계정은 CONSULT_RULES 7줄만) */
+export const AX_RULES = [
+  'AX 뜻 = 회사 업무를 자동화하는 시스템을 만들어 주는 서비스(인증 · 보험 · 자격 · 신청 서류를 빨리 만드는 도구가 아님). 자금 · 인증 글에는 AX 를 넣지 않는 것이 기본 — AX 는 따로 AX 글로 쓴다. 꼭 엮을 때만 "비슷한 회사들 사이에서 눈에 띄게 해 주는 좋은 자료" 를 고치지 않고 쓰고 "(기본 컨디션이 가장 중요하며, 그 부분까지 함께 점검·설계합니다 / 결과는 기관 심사로 정해집니다)" 를 그대로 붙인다 — "심사에 유리 · 좋은 평가 · 차별화 · 눈에 띄게 만들어 드림" 으로 키우지 않는다. AX 효과 숫자 · AX 사례는 지어내지 않는다.',
 ]
 
 /** 화면마다 단추 — 순서 = 화면에 보이는 순서 */
@@ -638,7 +642,9 @@ export function assistSystem(assist, opts = {}) {
   // SAAS-1 대표 운영 원칙(김팀장 화자 · 끝인사 · 대표 경력)은 대표 계정에만
   const principles = !customer && !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[대표 운영 원칙 — 다른 공식보다 먼저]', ...PRINCIPLE_RULES] : []
   // D-554 컨설팅 · AX 글 규칙 — 채널 규칙 다음(영상 받아 적기는 들린 그대로라 빼고)
-  const consult = !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[컨설팅 · AX 글 규칙 — 기준 문서보다 먼저]', ...CONSULT_RULES] : []
+  // D-555 AX 는 대표만 하는 컨설팅 — 대표가 아닌 계정은 AX 줄 없이 '컨설팅 글 규칙' 7줄만
+  const consultOn = !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page)
+  const consult = consultOn ? (customer ? ['', '[컨설팅 글 규칙 — 기준 문서보다 먼저]', ...CONSULT_RULES] : ['', '[컨설팅 · AX 글 규칙 — 기준 문서보다 먼저]', ...CONSULT_RULES.slice(0, -1), ...AX_RULES, ...CONSULT_RULES.slice(-1)]) : []
   const extra = [...principles, ...own, ...consult]
   const skill = typeof opts.skill === 'string' ? opts.skill : ''
   const topicText = typeof opts.topicText === 'string' ? opts.topicText : ''
@@ -666,7 +672,8 @@ export function assistSystem(assist, opts = {}) {
     const ID = '\u0000BRAND_ID\u0000'
     const rules = [ID, ASSIST_RULES[1].replace('대표가 바로', '사용자가 바로'), ...ASSIST_RULES.slice(2)]
     const body = [...CONFIDENTIAL_RULES, '', ...rules, ...channel, ...consult, '', `[단추] ${label} (${assist.id} v${assist.version})`, ...instruction, ...judge, ...ckbLines]
-    const server = customerize(body.join('\n'), customer.brand).replace(ID, () => brandIdentity(customer.brand))
+    // D-555 AX 칸 · 줄을 빼고 나서 첫 줄(그 사람 이름 · 회사)을 넣는다 — 그 사람이 적은 글은 건드리지 않게
+    const server = customerNoAx(customerize(body.join('\n'), customer.brand)).replace(ID, () => brandIdentity(customer.brand))
     const brand = brandBlock(customer.brand)
     return scrubBrand([server, ...(brand.length ? ['', ...brand] : []), '', CUSTOMER_NOTE, ...tail].join('\n'))
   }

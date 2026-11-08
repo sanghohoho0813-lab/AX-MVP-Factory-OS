@@ -83,6 +83,46 @@ export function customerBrief(): ChannelBrief {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* D-555 AX(업무 자동화 시스템 구축)는 대표만 하는 컨설팅                       */
+/*   대표가 아닌 계정(팀장 · 구독 고객)의 화면 · 점검 · 태그 · 예시에는 보이지 않는다(대표 계정은 그대로).  */
+/*   서버 지시문도 같은 규칙(api/_ai/customerMarketing.js customerNoAx).               */
+/* ------------------------------------------------------------------ */
+
+/** 낱말 AX(영문 낱말 안의 AX 는 아님) */
+export const AX_WORD = /(?<![A-Za-z])AX(?![A-Za-z])/
+
+/** 이 계정 화면에 AX 를 보이는가 — 대표 계정만 */
+export function axShown(): boolean {
+  return !customer
+}
+
+/** 목록에서 AX 가 들어간 것을 뺀다(대표 계정은 그대로) */
+export function withoutAx<T>(items: readonly T[], text: (t: T) => string): T[] {
+  return customer ? items.filter((t) => !AX_WORD.test(text(t))) : [...items]
+}
+
+/** 화면 글의 AX 칸 → 쉬운 말(고객 쪽만) — 이름표 · 안내 · 예시 글. 남은 AX 는 '업무 자동화' */
+const AX_TEXT_SWAPS: ReadonlyArray<[RegExp, string]> = [
+  [/\s*#AX(?![A-Za-z])/g, ''],
+  [/\(AX\s*—[^)]*\)/g, ''],
+  [/MIRAE\s*AX\s*형/g, '실무형'],
+  [/우리\s*AX\s*이야기/g, '우리 이야기'],
+  [/AX\s*[·/]\s*(?:업무\s*)?자동화/g, '업무 자동화'],
+  [/(?:업무\s*)?자동화\s*[·/]\s*AX/g, '업무 자동화'],
+  [/AX\s*[·/]\s*AI|AI\s*[·/]\s*AX/g, 'AI'],
+  [/AX\s*[·/]\s*MVP/g, 'MVP'],
+  [/AX\s*\(MVP\)/g, 'MVP'],
+  // 벤처 사업계획서 재료(특허 · AX → 특허 · MVP)
+  [/AX\s*분석\s*·\s*MVP/g, 'MVP'],
+  [/(특허(?:\s*명세서)?(?:나|\s*·)\s*)AX(?=\s*(?:와|내용))/g, '$1MVP'],
+  [/(?<![A-Za-z])AX(?![A-Za-z])/g, '업무 자동화'],
+]
+export function noAxText(s: string): string {
+  if (!customer || !AX_WORD.test(s)) return s
+  return AX_TEXT_SWAPS.reduce((t, [re, rep]) => t.replace(re, rep), s).replace(/업무 자동화\s*업무 자동화/g, '업무 자동화')
+}
+
 /**
  * 화면 글(이름표 · 안내 · 추천 이유)의 대표 이름 → 고객 쪽 말. 대표 계정은 그대로.
  * 사실 · 경력 문장에는 쓰지 않는다(그런 줄은 고객 쪽에서 아예 빼거나 고객 설정으로 바꾼다).
@@ -92,7 +132,7 @@ export function mkText(s: string | undefined): string | undefined
 export function mkText(s: string | undefined): string | undefined {
   if (!customer || !s) return s
   const name = ourName()
-  return s
+  return noAxText(s)
     .replace(/김팀장의\s*경영\s*노트/g, '내 채널')
     .replace(/MIRAE\s*AI\s*LAB\s*의|MIRAE\s*의|MIRAE\s*가|미래AI랩이/g, (m) => (/의$/.test(m) ? '우리의' : '내가'))
     .replace(/MIRAE\s*AI\s*LAB|MIRAE|미래AI랩/g, name === '우리 회사' ? '우리' : name)

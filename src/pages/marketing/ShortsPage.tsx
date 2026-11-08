@@ -35,6 +35,7 @@ import {
   aimLabel,
   aimsOf,
   exampleOf,
+  exampleTagsOf,
   firstWordsOf,
   formatOf,
   formatRecords,
@@ -295,7 +296,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
     const f = formatOf(eff.format)
     if (!f) return
     if (!draft.format) set({ aim: eff.aim, format: eff.format, formatBy: 'rec' })
-    start({ ...exampleOf(f, draft.platform), hashtags: f.exampleTags, source: 'example' })
+    start({ ...exampleOf(f, draft.platform), hashtags: exampleTagsOf(f), source: 'example' })
   }
   /**
    * D-546 첫마디 10개 → [이걸로 쓰기] — 대본이 비어 있으면 첫마디로 시작하는 뼈대(0초 첫마디 · 본론 · 마무리),
@@ -564,7 +565,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                 </p>
               )}
               <div>
-                <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: fmt.exampleTags, source: 'example' })} data-testid="sht-use-example">
+                <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: exampleTagsOf(fmt), source: 'example' })} data-testid="sht-use-example">
                   <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
                 </Button>
               </div>

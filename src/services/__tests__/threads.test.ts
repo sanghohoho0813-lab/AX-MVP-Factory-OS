@@ -1,14 +1,18 @@
 /**
  * D-273 스레드 · 릴스 · 틱톡 · 마케팅 공식 내재화 — 틀 23가지 · 숏폼 형식 5 · 규칙 검사(규칙 계산) · 기록표 점수 · AI 에 보내는 자료 · 서버 단추 · 공식 묶음.
  */
-import { ASSISTS, CONSULT_RULES, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
-import { CONSULT_CHECKS, consultLint } from '../marketing/consultRules'
-import { CONDITION_NOTE, KIM_FACTS, REWRITES, VENTURE_CARDS, VENTURE_PROMISE, numberLint, principleLint, unknownNumbers } from '../marketing/snsRules'
+import { ASSISTS, AX_RULES, CONSULT_RULES, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { CONSULT_CHECKS, consultChecks, consultLint } from '../marketing/consultRules'
+import { customerNoAx } from '../../../api/_ai/customerMarketing.js'
+import { __setMarketingCustomerForTest, axShown, mkText, noAxText } from '../marketing/persona'
+import { CONDITION_NOTE, KIM_FACTS, REWRITES, VENTURE_CARDS, VENTURE_PROMISE, numberLint, principleLint, rewritesFor, unknownNumbers } from '../marketing/snsRules'
 import {
   AIMS,
   PLATFORMS,
   aimsOf,
   exampleOf,
+  exampleTagsOf,
+  formatOf,
   SHORT_FORMATS,
   firstWordsOf,
   formatRecords,
@@ -49,6 +53,8 @@ import {
   WEEK_PLAN,
   endingOf,
   lintThreadPost,
+  priorityTopics,
+  topicTags,
   normalizeThreadPost,
   parseThreadDrafts,
   postsThisWeek,
@@ -393,10 +399,40 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('R6 바꿔쓰기 표에 컨설팅 · AX 줄(수치 후킹 · 숫자 늘리기 · 대행 · 성공보수 · 지어낸 사례 · 요건 · AX · 로고)', ['99%', '250건 넘게', '동행', '성공보수', '한 대표님', '6등급', 'AX 인증', '도장'].every((w) => REWRITES.some((r) => r.no.includes(w))))
   const ownerSys = ['radar.top5', 'radar.script', 'threads.write', 'shorts.write'].map((id) => assistSystem(ASSISTS[id]))
   const custSys = assistSystem(ASSISTS['threads.write'], { customer: { brand: { name: '홍길동', company: '길동경영' } } })
-  check('R7 AI 지시문 — 마케팅 채널 단추(대표 · 고객 모두)에 [컨설팅 · AX 글 규칙] 8줄 · 채널 규칙 다음 · 오늘 · 영상 받아 적기에는 없음',
-    CONSULT_RULES.length === 8 && ownerSys.every((t) => CONSULT_RULES.every((r: string) => t.includes(r)) && t.indexOf('[컨설팅 · AX 글 규칙') > t.search(/\[(?:마케팅|스레드|숏폼) 규칙\]/)) && custSys.includes('[컨설팅 · AX 글 규칙') && !assistSystem(ASSISTS['today.top3']).includes('[컨설팅 · AX'))
-  check('R8 지시문 규칙에 대표 개인 숫자 · 이름 없음(고객에게도 그대로 감)', CONSULT_RULES.every((r: string) => !/김팀장|미래AI랩|250건|100억|9년/.test(r)))
+  // D-555 AX 는 대표만 하는 컨설팅 — 대표는 7줄 + AX 1줄, 대표가 아닌 계정은 AX 없는 7줄만
+  check('R7 AI 지시문 — 대표 마케팅 채널 단추에 [컨설팅 · AX 글 규칙] 7줄 + AX 1줄(채널 규칙 다음) · 대표가 아닌 계정은 [컨설팅 글 규칙] 7줄만 · 오늘 · 영상 받아 적기에는 없음',
+    CONSULT_RULES.length === 7 && AX_RULES.length === 1 && ownerSys.every((t) => [...CONSULT_RULES, ...AX_RULES].every((r: string) => t.includes(r)) && t.indexOf('[컨설팅 · AX 글 규칙') > t.search(/\[(?:마케팅|스레드|숏폼) 규칙\]/)) && custSys.includes('[컨설팅 글 규칙') && CONSULT_RULES.every((r: string) => custSys.includes(r)) && !custSys.includes('[컨설팅 · AX') && !custSys.includes(AX_RULES[0]) && !assistSystem(ASSISTS['today.top3']).includes('[컨설팅'))
+  check('R8 지시문 규칙에 대표 개인 숫자 · 이름 없음(고객에게도 그대로 감) · 고객에게 가는 7줄에 AX 0', CONSULT_RULES.every((r: string) => !/(?<![A-Za-z])AX(?![A-Za-z])/.test(r)) && CONSULT_RULES.every((r: string) => !/김팀장|미래AI랩|250건|100억|9년/.test(r)))
   check('R9 발행 전 확인 9칸(로고 · 수치 후킹 · 받은 숫자 · 지어낸 사례 · 가산점 · 공고 확인 · AX · 노출형 끝 · 직접 세기)', CONSULT_CHECKS.length === 9 && ['로고', '수치 후킹', '받은 그대로', '지어낸 사례', '성공보수', '공고 원문', '업무 자동화', '진단 · 상담 안내', '직접 셌다'].every((w) => CONSULT_CHECKS.some((c) => c.includes(w))))
+}
+
+/* D-555 AX 는 대표만 하는 컨설팅 — 대표가 아닌 계정(팀장 · 구독 고객)의 지시문 · 화면 · 점검 · 태그에서 AX 0, 대표 계정은 그대로 */
+{
+  const AXW = /(?<![A-Za-z])AX(?![A-Za-z])/
+  const brand = { name: '홍길동', company: '길동경영' }
+  const leaks = Object.values(ASSISTS).filter((a) => AXW.test(assistSystem(a, { customer: { brand } }))).map((a) => a.id)
+  check('D555-1 대표가 아닌 계정 — 모든 AI 단추 지시문에 AX 0(마케팅 · 기업인증 · 벤처 사업계획서 포함)', leaks.length === 0, leaks)
+  const ownMk = ['radar.top5', 'radar.script', 'threads.write', 'threads.hooks', 'shorts.write'].map((id) => assistSystem(ASSISTS[id]))
+  check('D555-2 대표 계정 — 마케팅 지시문에 AX 규칙 · 채널 규칙의 AX 줄 그대로', ownMk.every((t) => t.includes(AX_RULES[0]) && t.includes('AX 를 자금 받는 수단으로')))
+  const brandSys = assistSystem(ASSISTS['threads.write'], { customer: { brand: { name: 'AX컨설팅 김철수', company: 'AX 파트너스' } } })
+  check('D555-3 그 사람이 직접 적은 브랜드(이름 · 회사)는 지우지 않음', brandSys.includes('AX 파트너스'))
+  const swapped = customerNoAx('넣지 말 것: 승인 · 선정 보장 · AX 를 자금 받는 수단으로 쓰기 · 고객 실명\nnext = 주제 태그 하나(정책자금 · 벤처기업확인 · 정부지원사업 · AX · 경영컨설팅 가운데)\n금지 명령 | 4 | AX 처음이면 이것부터 만들지 마.\n그대로 둘 줄')
+  check('D555-4 서버 고객판 — 넣지 말 것 · 태그 목록의 AX 칸만 빼고 줄은 남김 · 칸을 빼도 AX 가 남는 예시 줄은 줄째 뺌', !AXW.test(swapped) && swapped.includes('고객 실명') && swapped.includes('정부지원사업 · 경영컨설팅') && swapped.includes('그대로 둘 줄') && !swapped.includes('처음이면'), swapped)
+
+  __setMarketingCustomerForTest(true)
+  const axKeys = (t: string) => consultLint(t).map((l) => l.key)
+  check('D555-5 고객 화면 — 컨설팅 점검은 그대로(수치 후킹 · 대행) · AX 점검(ax-inflate)만 없음', !axKeys('AX 하면 심사에서 유리해요').includes('ax-inflate') && axKeys('대표 90%가 모르는 가지급금').includes('pct-hook') && axKeys('심사 대응까지').includes('proxy'))
+  check('D555-6 고객 화면 — 발행 전 확인 8칸(AX 칸 없음) · 바꿔쓰기 표에 AX 줄 없음', consultChecks().length === 8 && consultChecks().every((c) => !AXW.test(c)) && rewritesFor().length > 0 && rewritesFor().every((r) => !AXW.test(`${r.no} ${r.yes}`)) && rewritesFor().length === REWRITES.filter((r) => !AXW.test(`${r.no} ${r.yes}`)).length)
+  const custThread = lintThreadPost({ body: 'AX 하면 정책자금 받을 수 있어요\n정책자금 심사 전에 AX 화면 하나', tag: '' })
+  check('D555-7 고객 스레드 점검 — AX 줄(ax-money · 자금+AX 알림) 없음 · 태그 안내에 AX 없음', !custThread.lines.some((l) => ['ax-money', 'condition', 'ax-inflate'].includes(l.key)) && custThread.lines.every((l) => !AXW.test(l.text)), custThread.lines.filter((l) => AXW.test(l.text)).map((l) => l.text))
+  const custShort = lintShort({ platform: 'reels', aim: 'reach', script: '[0:00] AX 하면 정책자금 받을 수 있어요', caption: '한 줄', hashtags: '' })
+  check('D555-8 고객 릴스 점검 — AX 줄 없음', custShort.lines.every((l) => !AXW.test(l.text)), custShort.lines.map((l) => l.text))
+  check('D555-9 고객 주제 태그 — AX 없이 넷 · 우리 분야 주제에 AX 주제 없음 · AI 주제는 경영컨설팅', !axShown() && topicTags().length === 4 && !topicTags().includes('AX') && priorityTopics().every((p) => p.tag !== 'AX') && topicTag('ChatGPT 로 보고서 쓰기') === '경영컨설팅')
+  const talk = formatOf('talk')
+  check('D555-10 고객 예시 — #AX 태그 없음 · 예시 대본 · 설명 글에 AX 없음', !!talk && exampleTagsOf(talk) === '#정책자금 #중소기업' && !AXW.test(exampleOf(talk, 'tiktok').script + exampleOf(talk, 'tiktok').caption))
+  check('D555-11 고객 화면 글 — 레이더 이름표 · 벤처 재료 이름에 AX 0', ['MIRAE AX형', 'AI · AX 채널 최근 2주', 'AX · 업무자동화', '시장 수요가 확인된 주제에 우리 AX 이야기를 붙입니다', '2. AX · MVP — 실제로 만든 것과 계획', '특허 명세서 · AX 와 한 이야기로', 'AX(MVP) 내용'].every((t) => !AXW.test(mkText(t)) && !AXW.test(noAxText(t))) && noAxText('특허 명세서 · AX 와 한 이야기로') === '특허 명세서 · MVP 와 한 이야기로' && mkText('AI · AX 채널 최근 2주') === 'AI 채널 최근 2주')
+  __setMarketingCustomerForTest(false)
+  check('D555-12 대표 계정은 그대로 — AX 점검 · 9칸 · 태그 다섯 · AX 주제 · 이름표', axShown() && axKeys('AX 하면 심사에서 유리해요').includes('ax-inflate') && consultChecks().length === 9 && topicTags().includes('AX') && priorityTopics().some((p) => p.tag === 'AX') && topicTag('ChatGPT 로 보고서 쓰기') === 'AX' && rewritesFor().length === REWRITES.length && noAxText('MIRAE AX형') === 'MIRAE AX형' && exampleTagsOf(talk!) === '#AX #정책자금 #중소기업' && principleLint('정책자금 심사 전에 AX 화면 하나').some((l) => l.key === 'condition'))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

@@ -200,7 +200,7 @@ export function PlanView({
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-slate-300 bg-slate-50 px-3 py-2 break-keep text-slate-700" data-testid="radar-ai-short">
             <Info aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
             <span className="min-w-0 flex-1">
-              AI 참고 영상이 부족합니다 — {plan.aiChannels === 0 ? 'AI 실무 · AX 채널이 아직 없습니다.' : '최근 30일에 AI · 자동화 주제 영상이 거의 없습니다.'} AX · AI 후보는 데이터가 쌓이면 나옵니다.
+              AI 참고 영상이 부족합니다 — {mkText(plan.aiChannels === 0 ? 'AI 실무 · AX 채널이 아직 없습니다.' : '최근 30일에 AI · 자동화 주제 영상이 거의 없습니다.')} {mkText('AX · AI 후보는 데이터가 쌓이면 나옵니다.')}
             </span>
             <button type="button" onClick={onGoChannels} className="tap t-sub font-semibold text-brand-700 hover:underline">
               채널 보기
@@ -687,8 +687,8 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
           <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600" data-testid="radar-coverage">
             <span className="text-slate-400">최근 {c.coverageDays === 14 ? '2주' : '30일'} 묶음별</span>
             {c.coverage.map((g) => (
-              <Peek key={g.group} videos={coverageHits(c, g.group)} title={o.topic} basis={`${coverageLine(g)} · 최근 ${c.coverageDays === 14 ? '2주' : '30일'}`} kind="coverage">
-                {coverageLine(g)}
+              <Peek key={g.group} videos={coverageHits(c, g.group)} title={o.topic} basis={`${mkText(coverageLine(g))} · 최근 ${c.coverageDays === 14 ? '2주' : '30일'}`} kind="coverage">
+                {mkText(coverageLine(g))}
               </Peek>
             ))}
           </p>

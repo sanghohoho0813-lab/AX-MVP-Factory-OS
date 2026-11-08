@@ -5,7 +5,7 @@
  *  - '이렇게 말고 → 이렇게' 바꿔쓰기 표(1-3 "금지 표현은 금지 → 바꿔쓰기 표로").
  *  - 김팀장 사실 목록(이것만 씀) · 사실 목록에 없는 숫자 찾기 — 2~3부에서 가장 흔한 실수가 '숫자를 지어내거나 뜻을 바꾸는 것' 이었다.
  */
-import { customerFacts, isMarketingCustomer } from './persona'
+import { axShown, customerFacts, isMarketingCustomer, withoutAx } from './persona'
 
 export const LINK = /https?:\/\/|www\.|litt\.ly|\b[\w-]+\.(?:com|kr|net|io|co)\b/i
 export const HYPE = /100\s*%|무조건|보장|누구나\s*(?:받|가능|됩)|공짜|선착순|마감\s*임박|대박|충격|꿀팁|확실히\s*(?:받|승인|통과)|반드시\s*(?:받|승인|통과)/
@@ -43,6 +43,9 @@ export const REWRITES: ReadonlyArray<{ no: string; yes: string }> = [
   { no: '"AX 하면 정책자금 잘 나와요?" 에 "네"', yes: '"반은 맞고 반은 틀립니다. AX 는 눈에 띄는 자료가 될 수 있지만, 대표자 신용 · 재무 · 체납 같은 기본 컨디션을 대신할 수는 없습니다."' },
   { no: '카드 · 영상 장면에 기관 로고 · 인증 마크 · 도장 · 공문', yes: '사람 · 서류 · 실제 화면으로' },
 ]
+
+/** D-555 지금 계정에 보일 '이렇게 말고 → 이렇게' — 대표가 아닌 계정은 AX 줄 없이 */
+export const rewritesFor = (): Array<{ no: string; yes: string }> => withoutAx(REWRITES, (r) => `${r.no} ${r.yes}`)
 
 /**
  * 김팀장 사실 목록(이것만 씀) — 서버 기준 묶음(mk_facts)과 같은 줄. 화면에 보여 주고, 숫자 대조의 기준으로 쓴다.
@@ -94,7 +97,8 @@ export function principleLint(text: string): RuleLine[] {
   const money = /정책\s*자금|자금|보증|심사|지원금/.test(text)
   const ax = /AX|MVP|업무\s*자동화|작동하는\s*화면/.test(text)
   // D-554 자금 · 인증 글에는 AX 를 빼는 게 기본 — 꼭 엮을 때만 우리 문구 그대로 + 괄호
-  if (money && ax && !/기본\s*컨디션/.test(text) && !AX_DENIED.test(text)) out.push({ key: 'condition', level: 'warn', text: `자금 · 인증 글에는 AX 를 빼는 게 기본이에요(AX 는 따로 글로). 꼭 엮으면 "비슷한 회사들 사이에서 눈에 띄게 해 주는 좋은 자료" 그대로 + 괄호 — "${CONDITION_NOTE}"` })
+  // D-555 AX 는 대표만 하는 컨설팅 — 대표가 아닌 계정에는 이 점검(AX 문구)을 보이지 않는다
+  if (axShown() && money && ax && !/기본\s*컨디션/.test(text) && !AX_DENIED.test(text)) out.push({ key: 'condition', level: 'warn', text: `자금 · 인증 글에는 AX 를 빼는 게 기본이에요(AX 는 따로 글로). 꼭 엮으면 "비슷한 회사들 사이에서 눈에 띄게 해 주는 좋은 자료" 그대로 + 괄호 — "${CONDITION_NOTE}"` })
   return out
 }
 

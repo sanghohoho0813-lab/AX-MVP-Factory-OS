@@ -44,6 +44,7 @@ import { VenturePlanAi, type AiRow } from './VenturePlanAi'
 import type { VPlanBatch } from '../core/venturePlan'
 import { liveRows } from '../../services/patent/specTrash'
 import { AiConfirm } from '../../components/ai/AiConfirm'
+import { noAxText } from '../../services/marketing/persona'
 
 type Tab = 'mat' | VPlanPart | 'check'
 const TABS: readonly { key: Tab; label: string }[] = [
@@ -100,7 +101,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
   }
 
   const next = !hasMaterial
-    ? { text: '먼저 재료 — 특허 명세서를 올리거나 AX(MVP) 내용을 붙여 넣으면 사업계획서가 특허 · AX 와 한 이야기로 이어집니다', tab: 'mat' as Tab, label: '재료 넣기' }
+    ? { text: noAxText('먼저 재료 — 특허 명세서를 올리거나 AX(MVP) 내용을 붙여 넣으면 사업계획서가 특허 · AX 와 한 이야기로 이어집니다'), tab: 'mat' as Tab, label: '재료 넣기' }
     : prog.narrativeFilled < prog.narrativeTotal
       ? { text: `서술 칸 ${prog.narrativeTotal - prog.narrativeFilled}개가 비어 있습니다`, tab: (VPLAN_FIELDS.find((f) => f.limit === 1000 && !(s.text[f.id] ?? '').trim())?.part ?? 'problem') as Tab, label: '빈 칸으로' }
       : coreFilled < 7
@@ -193,7 +194,7 @@ export function VenturePlanWorkbench({ ctx, notes, onSave, onBack, backLabel = '
                       ready: hasMaterial,
                       run: () => {
                         if (!hasMaterial) {
-                          showToast('먼저 재료 — 특허 명세서나 AX 내용이 있어야 AI 가 지어내지 않고 씁니다')
+                          showToast(noAxText('먼저 재료 — 특허 명세서나 AX 내용이 있어야 AI 가 지어내지 않고 씁니다'))
                           setTab('mat')
                           return
                         }
@@ -553,7 +554,7 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
     <div className="flex flex-col gap-3" data-testid="vplan-part-mat">
       <Surface>
         <div className="flex flex-col gap-3">
-          <p className="t-sub break-keep text-slate-700">사업계획서는 <b className="font-semibold">특허(무엇을 발명했나) → AX · MVP(실제로 무엇을 만들었나) → 시장</b> 이 한 이야기여야 심사에서 설득됩니다. 여기 넣은 재료를 보고 칸을 씁니다(AI 초안도 이 재료만 씁니다).</p>
+          <p className="t-sub break-keep text-slate-700">사업계획서는 <b className="font-semibold">{noAxText('특허(무엇을 발명했나) → AX · MVP(실제로 무엇을 만들었나) → 시장')}</b> 이 한 이야기여야 심사에서 설득됩니다. 여기 넣은 재료를 보고 칸을 씁니다(AI 초안도 이 재료만 씁니다).</p>
           <div className="flex flex-col gap-1.5">
             <p className="t-body font-bold text-slate-900">1. 특허 명세서</p>
             <p className="t-sub break-keep text-slate-600">특허로 서식 파일(.hwpx) 또는 MD 를 고르면 명칭 · 과제 · 해결 수단 · 효과 · 독립 청구항 · 구성요소만 뽑아 넣습니다. 원문 파일은 저장하지 않아요.</p>
@@ -603,7 +604,7 @@ function MaterialsPanel({ s, save }: { s: VPlanState; save: (patch: Record<strin
         </div>
       </Surface>
       <Surface>
-        {area('2. AX · MVP — 실제로 만든 것과 계획', 'AX 분석 · MVP 에서 실제로 구현한 화면 · 기능 · 시험 결과, 그리고 앞으로 만들 것을 나눠서 붙여 넣으세요. 특허의 어느 구성요소가 어느 기능이 되는지 적으면 가장 좋습니다.', ax, 'vplan-mat-ax', 8, '실제로 만든 것: …\n계획: …')}
+        {area(noAxText('2. AX · MVP — 실제로 만든 것과 계획'), noAxText('AX 분석 · MVP 에서 실제로 구현한 화면 · 기능 · 시험 결과, 그리고 앞으로 만들 것을 나눠서 붙여 넣으세요. 특허의 어느 구성요소가 어느 기능이 되는지 적으면 가장 좋습니다.'), ax, 'vplan-mat-ax', 8, '실제로 만든 것: …\n계획: …')}
       </Surface>
       <Surface>
         {area('3. 컨설턴트 메모 — 확인된 숫자와 출처', '시장 규모 · 성장률(출처) · 고객 수 · 매출 · 팀 경력 · 투자/대출 상담 같은 확인된 사실만. 여기 없는 숫자는 쓰지 않습니다.', memo, 'vplan-mat-memo', 6, '예: 거래처 49곳(2026-06, 대표 확인) · 국내 시장 1.2조 원(○○보고서 2025)')}
