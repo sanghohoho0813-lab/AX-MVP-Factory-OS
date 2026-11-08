@@ -84,6 +84,8 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('M4 숫자 · 조건은 지어내지 않음 — [공식 자료 확인] 빈칸 수 = 발행 전 확인에 적힌 수', holesOk, packs.map((p) => p.holes))
   const leak = packs.filter((p) => p.source.facts.some((f) => allText(p).includes(f))).map((p) => p.topic)
   check('M5 레이더가 센 근거(채널 · 영상 수)는 시청자 글에 안 들어감 — 우리만 보는 칸에만', leak.length === 0 && packs.filter((p) => p.source.facts.length).every((p) => sec(p, 'checks').blocks.some((b) => b.label.includes('우리만'))), leak)
+  // D-554 컨설팅 · AX 글 — 발행 전 확인 칸에 사람이 마지막에 볼 9칸(로고 · 수치 후킹 · 받은 숫자 · AX …)
+  check('M5b 발행 전 확인에 [컨설팅 · AX 글 확인] 9칸 — 모든 묶음', packs.every((p) => sec(p, 'checks').blocks.some((b) => b.label === '컨설팅 · AX 글 확인' && b.text.split('\n').length === 9 && b.text.includes('로고'))))
   const copied = packs.filter((p) => p.source.refs.some((r) => r.length >= 8 && allText(p).includes(r))).map((p) => p.topic)
   check('M6 참고 영상 제목을 그대로 쓰지 않음', copied.length === 0, copied)
   const same = JSON.stringify(makePack(sources[0], null)) === JSON.stringify(makePack(sources[0], null))

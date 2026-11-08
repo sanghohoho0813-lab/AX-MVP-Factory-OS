@@ -12,6 +12,7 @@ import { deleteRow, listRows, saveRow } from '../moduleData'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, HYPE, LINK, numberLint, principleLint } from './snsRules'
+import { consultLint } from './consultRules'
 import { isMarketingCustomer, mkText } from './persona'
 
 export const SHORTS_MODULE = 'marketing'
@@ -280,7 +281,8 @@ export function lintShort(input: { platform: ShortPlatform; aim: ShortAim | ''; 
     if (AX_AS_MONEY.test(all) && !AX_DENIED.test(all)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — 자금은 기관 심사')
     if (/벤처/.test(all) && /감면|혜택|세금/.test(all) && !/확인\s*기관|기관\s*심사/.test(all)) add('venture', 'warn', '벤처 세금 이야기 — 캡션에 "(요건 충족 시 · 결과는 확인기관이 정합니다)"')
     // D-274 대표 운영 원칙 · 사실 목록에 없는 숫자(말 · 화면 글자 · 캡션만 — 시간 표시는 빼고)
-    out.push(...principleLint(all), ...numberLint(`${script.split('\n').map(spokenOf).join('\n')}\n${caption}`, input.facts ?? ''))
+    // D-554 컨설팅 · AX 글 점검(화면 지시 · 캡션까지 — 로고 · 도장 장면도)
+    out.push(...principleLint(all), ...consultLint(all), ...numberLint(`${script.split('\n').map(spokenOf).join('\n')}\n${caption}`, input.facts ?? ''))
     const brackets = script.match(/\[[^\]\n]{1,40}\]/g)?.filter((b) => !/^\[\d{1,2}:\d{2}\]$/.test(b)) ?? []
     if (brackets.length) add('brackets', 'warn', `[대괄호] ${brackets.length}칸 남음 — 사실을 확인해 채우기: ${brackets.slice(0, 2).join(' ')}`)
   }

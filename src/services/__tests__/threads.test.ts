@@ -1,7 +1,8 @@
 /**
  * D-273 스레드 · 릴스 · 틱톡 · 마케팅 공식 내재화 — 틀 23가지 · 숏폼 형식 5 · 규칙 검사(규칙 계산) · 기록표 점수 · AI 에 보내는 자료 · 서버 단추 · 공식 묶음.
  */
-import { ASSISTS, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { ASSISTS, CONSULT_RULES, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { CONSULT_CHECKS, consultLint } from '../marketing/consultRules'
 import { CONDITION_NOTE, KIM_FACTS, REWRITES, VENTURE_CARDS, VENTURE_PROMISE, numberLint, principleLint, unknownNumbers } from '../marketing/snsRules'
 import {
   AIMS,
@@ -357,6 +358,45 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('HK10 서버 단추 threads.hooks · shorts.hooks — 화면 단추 이름 같음 · 스레드 공식 / 숏폼 공식 · 부풀리는 말 금지 · 대괄호로 비우기', !!th && !!shh && th.page === 'threads' && shh.page === 'shorts' && ASSIST_PRESETS.some((p) => p.id === 'threads.hooks' && p.label === th.label && p.page === 'threads') && ASSIST_PRESETS.some((p) => p.id === 'shorts.hooks' && p.label === shh.label && p.page === 'shorts') && knowledgeOf(th).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_threads,mk_facts' && knowledgeOf(shh).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_common,mk_short,mk_facts' && [th, shh].every((a) => /역대급/.test(a.instruction.join(' ')) && /\[기간\]/.test(a.instruction.join(' ')) && /서로 다른 방법/.test(a.instruction.join(' '))))
   const sys = assistSystem(th)
   check('HK11 지시문 — 비공개 규칙 맨 앞 · 운영 원칙 · 스레드 규칙 실림', sys.indexOf('[대표 운영 원칙') > 0 && sys.includes('[스레드 규칙]') && sys.includes('(threads.hooks'))
+}
+
+/* D-554 컨설팅 · AX 글 규칙 — 점검 · AI 지시문 · 발행 전 확인 */
+{
+  const keysOf = (t: string) => consultLint(t).map((l) => `${l.key}:${l.level}`)
+  const cases: [string, string][] = [
+    ['이거 모르면 99% 부결됩니다', 'pct-hook:bad'],
+    ['대표 10명 중 8명이 놓치는 것', 'pct-hook:bad'],
+    ['순서만 바꿔도 승인률 3배', 'pct-hook:bad'],
+    ['상담 · 진행 사례 250건 넘게', 'inflate:bad'],
+    ['9년간 수백 건을 봤어요', 'inflate:bad'],
+    ['250건의 연구소 상담', 'narrowed:warn'],
+    ['심사 대응까지 해 드려요', 'proxy:bad'],
+    ['기관 담당자 상담 동행', 'proxy:bad'],
+    ['승인 후 수수료만 받아요', 'success-fee:bad'],
+    ['성공보수 없이', 'success-fee:bad'],
+    ['연말까지 예산 소진 전에', 'pressure:warn'],
+    ['(이미지: 중진공 로고와 반려 도장)', 'logo:bad'],
+    ['실제로 한 대표님은 2억을 받았어요', 'made-case:warn'],
+    ['제조업 A사 2억 조달', 'made-case:warn'],
+    ['신용 6등급이면 바로 탈락', 'criteria:warn'],
+    ['무조건 해 준다는 곳 99% 사기', 'rival:bad'],
+    ['AX 하면 심사에서 유리해요', 'ax-inflate:bad'],
+    ['AX 인증 받으면 정책자금', 'ax-inflate:bad'],
+  ]
+  const miss = cases.filter(([t, k]) => !keysOf(t).includes(k))
+  check(`R1 컨설팅 · AX 위험 표현 ${cases.length}가지가 각각 걸림(수치 후킹 · 숫자 늘리기 · 뜻 좁히기 · 대행 · 성공보수 · 시간 압박 · 로고 · 지어낸 사례 · 요건 · 비방 · AX 키우기)`, miss.length === 0, miss.map(([t, k]) => `${t} → ${k} / ${keysOf(t).join()}`))
+  const clean = ['정책자금, 순서만 알아도 손해를 줄여요.', '부결된 회사에서 자주 보이는 것 3가지', '상담 · 진행 사례 250건 · 자금 · 지원금 100억+', '결과는 기관 심사로 정해집니다. 신청 전 점검부터 해요.', 'AX 는 엑셀 · 카톡으로 하던 일을 시스템으로 옮기는 거예요.']
+  check('R2 깨끗한 글(받은 숫자 그대로 · 신청 전 점검 · 기관 심사 · AX = 업무 자동화)은 걸림 0', clean.every((t) => consultLint(t).length === 0), clean.map((t) => `${t} → ${keysOf(t).join()}`))
+  check('R3 가점 · 가산점 · 우대 단정은 모두 원칙 검사에 걸림(예전: 큰 가점 · 가점 요소만)', ['인증 있으면 가점 받아요', '가산점이 붙어요', '심사에서 우대받아요'].every((t) => principleLint(t).some((l) => l.key === 'gajeom' && l.level === 'bad')))
+  check('R4 자금 + AX 알림 문구 — 자금 글에는 AX 를 빼는 게 기본 · 꼭 엮으면 우리 문구 + 괄호', principleLint('정책자금 심사 전에 AX 화면 하나')[0]?.text.includes('AX 를 빼는 게 기본') && principleLint('정책자금 심사 전에 AX 화면 하나')[0]?.text.includes(CONDITION_NOTE))
+  check('R5 스레드 · 릴스 점검에 컨설팅 줄이 붙음', lintThreadPost({ body: '대표 90%가 모르는 가지급금\n심사 대응까지 해 드려요', tag: '세금' }).lines.some((l) => l.key === 'pct-hook') && lintShort({ platform: 'reels', aim: 'reach', script: '[0:00] 승인률 3배 비결\n(화면: 신보 로고)', caption: '한 줄', hashtags: '' }).lines.some((l) => l.key === 'logo'))
+  check('R6 바꿔쓰기 표에 컨설팅 · AX 줄(수치 후킹 · 숫자 늘리기 · 대행 · 성공보수 · 지어낸 사례 · 요건 · AX · 로고)', ['99%', '250건 넘게', '동행', '성공보수', '한 대표님', '6등급', 'AX 인증', '도장'].every((w) => REWRITES.some((r) => r.no.includes(w))))
+  const ownerSys = ['radar.top5', 'radar.script', 'threads.write', 'shorts.write'].map((id) => assistSystem(ASSISTS[id]))
+  const custSys = assistSystem(ASSISTS['threads.write'], { customer: { brand: { name: '홍길동', company: '길동경영' } } })
+  check('R7 AI 지시문 — 마케팅 채널 단추(대표 · 고객 모두)에 [컨설팅 · AX 글 규칙] 8줄 · 채널 규칙 다음 · 오늘 · 영상 받아 적기에는 없음',
+    CONSULT_RULES.length === 8 && ownerSys.every((t) => CONSULT_RULES.every((r: string) => t.includes(r)) && t.indexOf('[컨설팅 · AX 글 규칙') > t.search(/\[(?:마케팅|스레드|숏폼) 규칙\]/)) && custSys.includes('[컨설팅 · AX 글 규칙') && !assistSystem(ASSISTS['today.top3']).includes('[컨설팅 · AX'))
+  check('R8 지시문 규칙에 대표 개인 숫자 · 이름 없음(고객에게도 그대로 감)', CONSULT_RULES.every((r: string) => !/김팀장|미래AI랩|250건|100억|9년/.test(r)))
+  check('R9 발행 전 확인 9칸(로고 · 수치 후킹 · 받은 숫자 · 지어낸 사례 · 가산점 · 공고 확인 · AX · 노출형 끝 · 직접 세기)', CONSULT_CHECKS.length === 9 && ['로고', '수치 후킹', '받은 그대로', '지어낸 사례', '성공보수', '공고 원문', '업무 자동화', '진단 · 상담 안내', '직접 셌다'].every((w) => CONSULT_CHECKS.some((c) => c.includes(w))))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

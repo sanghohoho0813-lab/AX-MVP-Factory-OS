@@ -19,6 +19,7 @@ import { briefSection, packBundle } from '../aiAssist/marketingBuilders'
 import { HOLE, PACK_AVOID, aiSections, customSource, makePack, type PackBlock, type PackSectionId, type PackSource } from './contentPack'
 import { WEEK_STORE_KEY } from './weekRunFlag'
 import { isMarketingCustomer } from './persona'
+import { consultLint } from './consultRules'
 import type { ChannelBrief } from './radarStore'
 import { formatsFor, lintShort, parseShortDrafts, shortsContext, type ShortDraft, type ShortPlatform } from './shorts'
 import { GOALS, TOPIC_TAGS, lintThreadPost, parseThreadDrafts, skeletonDraft, templateOf, threadsContext, type ThreadDraft, type ThreadGoal, type ThreadTemplateKey } from './threads'
@@ -384,12 +385,13 @@ export interface WeekView {
   threads: WeekThread[]
 }
 
-/** 빈칸 · 쓰지 않는 말 — 롱폼(공식 점검이 따로 없어 이 둘만) */
+/** 빈칸 · 쓰지 않는 말 · D-554 컨설팅 · AX 글 점검 — 롱폼(공식 점검이 따로 없어 이 셋만) */
 function longLint(text: string): LintSum {
   const holes = text.match(HOLE) ?? []
   const avoid = PACK_AVOID.exec(text)
-  const lines = [...(avoid ? [`"${avoid[0]}" — 쓰지 않는 말`] : []), ...(holes.length ? [`[공식 자료 확인] 빈칸 ${holes.length}칸 — 공고 · 보도자료로 채우기`] : [])]
-  return { bad: avoid ? 1 : 0, warn: holes.length ? 1 : 0, lines }
+  const consult = consultLint(text)
+  const lines = [...(avoid ? [`"${avoid[0]}" — 쓰지 않는 말`] : []), ...consult.map((l) => l.text), ...(holes.length ? [`[공식 자료 확인] 빈칸 ${holes.length}칸 — 공고 · 보도자료로 채우기`] : [])]
+  return { bad: (avoid ? 1 : 0) + consult.filter((l) => l.level === 'bad').length, warn: (holes.length ? 1 : 0) + consult.filter((l) => l.level === 'warn').length, lines }
 }
 
 /** 공식 점검 줄 — 주제 태그(올릴 때 고른다)는 세지 않는다 */

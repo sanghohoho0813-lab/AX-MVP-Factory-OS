@@ -30,6 +30,10 @@ const NEVER = [
   '다른 업체 · 다른 상품을 깎아내리는 말',
 ]
 
+/** D-554 AX 를 말하는 업체 — 뜻을 주지 않으면 '인증' · '보험' 으로 오해했고, 한 줄 뜻을 주자 바로 고쳐졌다 */
+const AX_TALK = /\bAX\b|업무\s*자동화/
+export const AX_MEANING = 'AX 뜻: 회사 업무를 자동화하는 시스템을 만들어 주는 서비스(인증 · 보험 · 자격이 아님). 자금 · 심사와 엮지 않음.'
+
 /** 업종마다 광고 규정 — 의료는 예약 · 상담만. D-234 규제 업종은 규칙집 5장 표(금지 · 꼭 넣을 문구 · 카드뉴스 두 안) */
 function ruleLines(p: ContentProfile, kind?: ContentKind): string[] {
   const rule = regulatedOf(p)
@@ -40,6 +44,13 @@ function ruleLines(p: ContentProfile, kind?: ContentKind): string[] {
       ...(rule.notice ? [`꼭 넣을 안내 문구(글 끝에 그대로): "${rule.notice}"`] : []),
       ...(!kind || kind === 'cards' ? [`카드뉴스는 ${keep.join(' · ')} 안만 만드세요(전후 변화 · 문제 해결 · 권위 안은 쓰지 않기).`] : []),
       '금지한 것을 다른 이름으로 바꿔 넣지 마세요(할인 → 1+1, 대출 알선 → 원스톱 안내, 상담 건수 → 경력 · 인원).',
+      // D-554 경영컨설팅 — 금지 목록이 잘 안 닿던 두 곳(카드 · 장면 그림, 영상 제목)과 세무 · 제도 숫자
+      ...(rule.kind === 'consulting'
+        ? [
+            '카드뉴스 이미지 · 영상 장면 지시에는 기관 로고 · 인증 마크 · 도장 · 공문 모양 대신 사람 · 서류 · 실제 화면을 넣으세요. 영상 제목 · 썸네일에도 % · 배수 · "N명 중 M명" 을 쓰지 마세요.',
+            '세무 판단은 "세무사님과 함께 검토", 제도 숫자(한도 · 감면율 · 기간 · 요건)는 "기관 공고 확인" 으로 쓰세요.',
+          ]
+        : []),
     ]
   }
   if (p.industry === 'health') return [`의료광고 규정: 가격 · 할인 · 비교 · 순위 · 전후 사진 · 후기 · 효과 보장은 쓰지 마세요. 끝맺음은 예약 · 상담만. 꼭 넣을 안내 문구: "${rule?.notice ?? ''}"`]
@@ -156,7 +167,10 @@ export function aiRequestText(p: ContentProfile, o: AiRequestOpts = {}): string 
   const facts = aiRequestFacts(p)
   const len = lengthLine(p, o)
   const region = regionLine(p, o)
-  const never = [...NEVER, ...p.avoid.map((w) => `"${w}"`)]
+  // D-554 경영컨설팅 업체 글에서는 '자금 · 컨설팅 이야기 금지' 두 줄을 빼고(그 업체의 본업) 계정에 적힌 다른 사업 이야기만 막는다
+  const consulting = regulatedOf(p)?.kind === 'consulting'
+  const never = [...(consulting ? NEVER.slice(2) : NEVER), ...p.avoid.map((w) => `"${w}"`)]
+  const axLine = AX_TALK.test([p.item, ...p.services, p.differ].join(' ')) ? [AX_MEANING] : []
   return [
     `업체: ${p.company}${where ? `(${where})` : ''}.`,
     `독자(보는 사람): ${p.target}.`,
@@ -167,10 +181,11 @@ export function aiRequestText(p: ContentProfile, o: AiRequestOpts = {}): string 
     ...(region ? [`지역: ${region}.`] : []),
     ...(p.objection ? [`독자의 걱정 1개: "${p.objection}"`] : []),
     ...(p.rebuttal ? [`흔한 반박 1개: "${p.rebuttal}" — 이 생각을 풀어 주며 시작하세요.`] : []),
-    `사실 목록 — 이 목록 밖의 숫자 · 혜택 · 후기 · 정책 · 사례는 쓰지 마세요. 받은 숫자의 뜻(후기 수 · 평점 · 가격 단위)을 바꾸지 마세요:\n${facts.length ? facts.map((f) => `- ${f}`).join('\n') : '- (적어 둔 사실이 없어요 — 숫자 · 혜택 · 후기를 넣지 마세요)'}`,
+    `사실 목록 — 이 목록 밖의 숫자 · 혜택 · 후기 · 정책 · 사례는 쓰지 마세요. 받은 숫자의 뜻(후기 수 · 평점 · 가격 단위)을 바꾸지 마세요 — 숫자에 '이상 · 넘게 · 수백' 도 붙이지 마세요:\n${facts.length ? facts.map((f) => `- ${f}`).join('\n') : '- (적어 둔 사실이 없어요 — 숫자 · 혜택 · 후기를 넣지 마세요)'}`,
     contactLine(p),
     ...(o.kind && o.kind !== 'keywords' ? [`${contentLib(p.industry).offerRule}.`] : []),
     `넣지 말 것: ${never.join(', ')}.`,
+    ...axLine,
     ...ruleLines(p, o.kind),
   ].join('\n')
 }
@@ -185,4 +200,9 @@ export const AI_REQUEST_TIPS = [
   '영상 기획 · 대본은 숫자(% · 배수 · 기간)를 가장 많이 지어내요 — 숫자를 두 번 확인하세요.',
   '키워드 검색량 조회는 하루 500번 한도에서 빠져요 — 한 번에 여러 개(최대 50개)를 같이 조회하세요.',
   '받은 글은 아래 [받은 글 점검] 에 붙여 넣어 한 번 더 보세요 — 숫자의 뜻 · 가격 단위 · 판매처 이름이 바뀌거나 주지 않은 혜택 · 후기가 끼어들 수 있어요.',
+  // D-554 컨설팅 · AX 주제로 크게 돌려 보고 더한 것
+  '많이 보이게 할 글(정보만 주는 글)은 요청문의 구매·문의처 줄을 지우고 "이번 글은 문의처를 넣지 않음" 으로 바꾸세요 — 줄이 있으면 "상담 유도 없이" 라고 적어도 끝에 상담 안내를 붙였어요(16번 중 15번).',
+  '카드뉴스 이미지 지시와 영상 기획 제목은 사람이 마지막에 고치세요 — 금지 목록을 넣어도 기관 로고 · 도장과 제목의 % 는 거의 줄지 않았어요.',
+  '다른 도구의 계정 업체 정보(내 사업체 정보 · 추가 정보 칸)를 지금 사업 기준으로 고쳐 두세요 — 요청문 없이 쓰면 카드뉴스 · 릴스에 옛 상호 · 대표 실명이 들어갔어요.',
+  'AI 가 적은 글자 수 · 키워드 횟수 · 점수는 믿지 말고 직접 세세요. 고쳐 달라고 한 답도 처음부터 다시 보세요 — 고친 곳 옆에 새 숫자를 지어 넣었어요.',
 ]

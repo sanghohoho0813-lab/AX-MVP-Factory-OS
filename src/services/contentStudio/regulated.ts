@@ -12,8 +12,9 @@
  * 이 목록은 실험에서 실제로 본 위험을 모은 최소 목록이다 — 업종 법규 검토를 대신하지 않는다.
  */
 import type { ContentProfile } from './profile'
+import { AX_INFLATE, INFLATE, LOGO_STAMP, MADE_CASE, MADE_CRITERIA, PROXY_WORK, SUCCESS_FEE, TIME_PRESSURE } from '../marketing/consultRules'
 
-export type RegulatedKind = 'medical' | 'hfood' | 'insurance' | 'realty' | 'law' | 'education'
+export type RegulatedKind = 'medical' | 'hfood' | 'insurance' | 'realty' | 'law' | 'education' | 'consulting'
 
 /** 카드뉴스 5안 이름(generate.ts AdType 중 5안에 쓰는 것) — 순환 import 를 피하려고 글자로 둔다 */
 export type CardFiveType = 'objection' | 'problem' | 'before' | 'curious' | 'proof'
@@ -105,6 +106,40 @@ const RULES: Record<RegulatedKind, Omit<RegulatedRule, 'kind' | 'notice'> & { no
     ],
     cardsKeep: KEEP_SAFE,
   },
+  // D-554 경영컨설팅(정책자금 · 보증 · 인증 · 법인 세무) — 대표가 이 주제로 AI 결과를 크게 돌려 보고 정한 줄(대화 120회 · 생성 455건 · 고친 목록 다시 돌려 확인)
+  //   고친 금지 목록을 넣으면 가산점 3→0 · 숫자 늘리기 10→3 · 승인률 4→1 · 지어낸 사례 4→2 로 줄었지만, 그림(로고 · 도장)과 영상 제목의 % 는 거의 그대로
+  consulting: {
+    label: '경영컨설팅',
+    never: [
+      "100% · 99% · N배 · 'N명 중 M명' · 승인률 · 통과율 같은 수치 표현(부정형 '100% 부결' · '99%가 모르는', 비율형 '10명 중 8명이 놓치는'도)",
+      '승인 · 선정 보장',
+      '가산점 · 가점 · 우대 단정',
+      '기관 로고 · 마크 · 도장 · 공문 모양(이미지 · 디자인 지시에도)',
+      '기관 담당자 동행 · 심사 대응 · 대행처럼 기관 일을 대신해 주는 것처럼 들리는 표현',
+      '성공보수 · 승인 후 수수료',
+      '연말 · 예산 소진 · 마감 임박 같은 시간 압박',
+      "지어낸 승인 사례 · 금액('A사 2억 조달' · '실제로 한 대표님은 …' · '확정서')",
+      "확인 안 된 기준 · 요건('신용 6등급이면 탈락' · '업력 1년 이상')",
+      "세무 판단 단정(절세 수법 · '이렇게 하면 세금 안 냅니다')",
+      '제도 숫자(한도 · 감면율 · 기간 · 요건)를 공고 확인 없이 쓰기',
+      'AX(업무 자동화)를 자금 · 심사 수단처럼 말하기',
+    ],
+    notice: () => '결과는 기관 심사로 정해집니다.',
+    noticeRe: /기관\s*심사로\s*정해/,
+    risky: [
+      { re: /(?:100|9\d)\s*%|\d+\s*명\s*중\s*\d+\s*명|(?:승인|통과|선정)\s*률/, word: '수치 후킹', why: "'100% · 99% · 10명 중 8명 · 승인률' 같은 수치 후킹은 쓰지 않아요" },
+      { re: INFLATE, word: '숫자 늘리기', why: "받은 숫자에 '이상 · 넘게 · 수백' 을 붙이지 않아요" },
+      { re: /가산점|가점|우대\s*(?:받|해\s*드|돼|됩)/, word: '가산점 단정', why: '가산점 · 가점 · 우대를 단정하지 않아요' },
+      { re: PROXY_WORK, word: '대행 말', why: "기관 일을 대신해 주는 말 대신 '예상 질문 준비 · 신청 전 점검' 으로 써요" },
+      { re: SUCCESS_FEE, word: '성공보수', why: '성공보수 · 승인 후 수수료 이야기는 쓰지 않아요' },
+      { re: LOGO_STAMP, word: '로고 · 도장', why: '기관 로고 · 도장 · 공문 모양은 이미지에도 넣지 않아요' },
+      { re: MADE_CASE, word: '지어낸 사례', why: '실제 사례(사실 목록)가 아니면 빼요' },
+      { re: MADE_CRITERIA, word: '확인 안 된 요건', why: "확인 안 된 기준 · 요건은 '기관 공고 확인' 으로 써요" },
+      { re: TIME_PRESSURE, word: '시간 압박', why: '연말 · 예산 소진 같은 시간 압박은 쓰지 않아요' },
+      { re: AX_INFLATE, word: 'AX 수단화', why: 'AX 는 업무 자동화 시스템이에요 — 자금 · 심사 이점처럼 쓰지 않아요' },
+    ],
+    cardsKeep: KEEP_SAFE,
+  },
   education: {
     label: '교육',
     never: ["압박형('지금 안 하면 [다음 학년]에서 후회')", '지어낸 성적 향상 폭 · 순위 · 실적'],
@@ -127,6 +162,12 @@ const DETECT: { kind: Exclude<RegulatedKind, 'medical' | 'education'>; re: RegEx
   { kind: 'insurance', re: /보험\s*(?:설계|대리점|상담|가입|리모델링|비교|보장\s*분석)|손해\s*보험|생명\s*보험|암\s*보험/, not: /4대\s*보험/, skip: ['health'] },
   { kind: 'hfood', re: /건강\s*기능\s*식품|건기식/ },
   { kind: 'hfood', re: /유산균|프로바이오틱스|영양제|비타민|오메가\s*3|홍삼|콜라겐|루테인|밀크\s*씨슬/, skip: ['health', 'food'] },
+  // D-554 경영컨설팅 — 하는 일이 정책자금 · 인증 · 보증 · 세무 컨설팅인 곳만(제조사가 '연구소 보유' 라고 적은 것은 걸리지 않게 '컨설팅' 이 붙은 말만)
+  {
+    kind: 'consulting',
+    re: /경영\s*(?:컨설팅|지도)|정책\s*자금|(?:자금|인증|보증|절세|세무|R&D|지원\s*사업|벤처|연구소|고용\s*지원금|기업)\s*(?:컨설팅|컨설턴트)/,
+    skip: ['health'],
+  },
 ]
 
 /** 이 업체가 규제 업종이면 그 규칙(아니면 null) */

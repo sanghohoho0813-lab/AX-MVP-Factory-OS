@@ -156,6 +156,22 @@ export const THREADS_RULES = [
   '넣지 말 것: 승인 · 확인 · 선정 보장(벤처면 "(결과는 확인기관이 정하고, 회사마다 달라)" 괄호) · AX 를 자금 받는 수단으로 쓰기 · 고객 실명 · 매출 · 계약금액 · 다른 컨설턴트 · 업체 깎아내리기 · 문장 중간 이모지 장식(줄 맨 앞 표시만) · 남의 글 문장.',
 ]
 
+/*
+ * D-554 컨설팅 · AX 글 규칙 — 대표가 정책자금 · 보증 · 인증 · 법인 세무 · AX 주제로 AI 결과를 크게 돌려 보고(대화 120회 · 생성 455건) 규칙집에 더한 것.
+ * 마케팅 채널 단추(레이더 · 스레드 · 릴스 · 틱톡) — 대표 · 고객 모두(대표 개인 사실 · 이름은 없다). 채널 규칙 다음, 기준 문서보다 먼저.
+ * 금지 목록을 넣으면 말은 줄었지만 그림(기관 로고 · 도장)과 영상 기획 제목의 % 는 잘 안 줄었다 — 그 두 곳을 줄마다 다시 짚는다.
+ */
+export const CONSULT_RULES = [
+  '수치 후킹 금지 — 100% · 99% · N배 · "N명 중 M명" · 승인률 · 통과율. 부정형("모르면 100% 떨어집니다" · "99% 부결되는" · "대표 90%가 모르는") · 비율형("10명 중 8명이 놓치는")도 같다. 대신 "모르고 신청하면 손해 봅니다" · "부결된 회사에서 자주 보이는 것". 영상 제목 · 썸네일 글자 · 첫마디에서 특히 지킨다.',
+  '받은 숫자는 그대로 — [사실 목록] 의 숫자에 "이상 · 넘게 · 넘는 · 수백" 을 붙이거나 뜻을 좁히지 않는다("사례 N건" → "N건 이상" · "N건 넘게" · "N건의 ○○ 상담" 금지).',
+  '가산점 · 가점 · 우대 단정 금지. 성공보수 · 승인 후 수수료 이야기 금지. 연말 · 예산 소진 · 마감 임박 같은 시간 압박 금지. 다른 업체를 겨냥한 말("무조건 해 준다는 곳 조심" · "사기") 대신 우리 방식만 말한다.',
+  '기관 일을 대신해 주는 것처럼 들리는 말 금지 — "심사 대응 · 기관 담당자 동행 · 대행" 대신 "예상 질문 준비 · 신청 전 점검". 세무 판단은 "세무사님과 함께 검토", 결과는 "결과는 기관 심사로 정해집니다".',
+  '이미지 · 장면 · 썸네일 지시에 기관 로고 · 인증 마크 · 도장 · 공문 모양을 넣지 않는다 — 사람 · 서류 · 실제 화면으로.',
+  '지어낸 사례 · 기준 금지 — "실제로 한 대표님은 …" · "A사 2억 조달" · "확정서", "신용 6등급이면 탈락" · "업력 1년 이상" 같은 요건. 제도 숫자(한도 · 감면율 · 기간 · 요건)는 [사실 목록] · [자료] 에 있는 것만 — 없으면 "기관 공고 확인" 으로 쓰거나 [대괄호] 로 비운다.',
+  'AX 뜻 = 회사 업무를 자동화하는 시스템을 만들어 주는 서비스(인증 · 보험 · 자격 · 신청 서류를 빨리 만드는 도구가 아님). 자금 · 인증 글에는 AX 를 넣지 않는 것이 기본 — AX 는 따로 AX 글로 쓴다. 꼭 엮을 때만 "비슷한 회사들 사이에서 눈에 띄게 해 주는 좋은 자료" 를 고치지 않고 쓰고 "(기본 컨디션이 가장 중요하며, 그 부분까지 함께 점검·설계합니다 / 결과는 기관 심사로 정해집니다)" 를 그대로 붙인다 — "심사에 유리 · 좋은 평가 · 차별화 · 눈에 띄게 만들어 드림" 으로 키우지 않는다. AX 효과 숫자 · AX 사례는 지어내지 않는다.',
+  '많이 보이게 할 글(노출형)은 끝에 진단 · 상담 · 문의 안내를 붙이지 않고 정보로 끝낸다.',
+]
+
 /** 화면마다 단추 — 순서 = 화면에 보이는 순서 */
 const LIST = [
   /* 오늘 할 일 — 하루를 놓치지 않게 */
@@ -621,7 +637,9 @@ export function assistSystem(assist, opts = {}) {
   // D-274 김팀장 채널(레이더 · 스레드 · 릴스 · 틱톡)은 대표 운영 원칙을 채널 규칙보다 먼저 — 영상 받아 적기는 들린 그대로라 빼고
   // SAAS-1 대표 운영 원칙(김팀장 화자 · 끝인사 · 대표 경력)은 대표 계정에만
   const principles = !customer && !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[대표 운영 원칙 — 다른 공식보다 먼저]', ...PRINCIPLE_RULES] : []
-  const extra = [...principles, ...own]
+  // D-554 컨설팅 · AX 글 규칙 — 채널 규칙 다음(영상 받아 적기는 들린 그대로라 빼고)
+  const consult = !assist.video && ['radar', 'threads', 'shorts'].includes(assist.page) ? ['', '[컨설팅 · AX 글 규칙 — 기준 문서보다 먼저]', ...CONSULT_RULES] : []
+  const extra = [...principles, ...own, ...consult]
   const skill = typeof opts.skill === 'string' ? opts.skill : ''
   const topicText = typeof opts.topicText === 'string' ? opts.topicText : ''
   const judge = assist.judge ? ['', ...judgeBlock(assist.judge, skill)] : assist.final ? finalRules(assist.final, skill) : assist.ideaJudge ? ideaJudgeBlock(assist.ideaJudge, skill) : []
@@ -647,7 +665,7 @@ export function assistSystem(assist, opts = {}) {
     // 그 사람이 적은 첫 줄 · [내 브랜드] 는 이름 바꾸기를 거치지 않는다(고객 본인 이름이 대표 측 이름과 같아도 그대로)
     const ID = '\u0000BRAND_ID\u0000'
     const rules = [ID, ASSIST_RULES[1].replace('대표가 바로', '사용자가 바로'), ...ASSIST_RULES.slice(2)]
-    const body = [...CONFIDENTIAL_RULES, '', ...rules, ...channel, '', `[단추] ${label} (${assist.id} v${assist.version})`, ...instruction, ...judge, ...ckbLines]
+    const body = [...CONFIDENTIAL_RULES, '', ...rules, ...channel, ...consult, '', `[단추] ${label} (${assist.id} v${assist.version})`, ...instruction, ...judge, ...ckbLines]
     const server = customerize(body.join('\n'), customer.brand).replace(ID, () => brandIdentity(customer.brand))
     const brand = brandBlock(customer.brand)
     return scrubBrand([server, ...(brand.length ? ['', ...brand] : []), '', CUSTOMER_NOTE, ...tail].join('\n'))

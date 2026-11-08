@@ -12,6 +12,7 @@ import { pickScopedRow, workspaceRowId } from '../workspaceRowId'
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
 import { AX_AS_MONEY, AX_DENIED, EMOJI, HYPE, LINK, numberLint, principleLint } from './snsRules'
+import { consultLint } from './consultRules'
 import { isMarketingCustomer } from './persona'
 
 export const THREADS_MODULE = 'marketing'
@@ -733,7 +734,8 @@ export function lintThreadPost(input: { body: string; template?: string; tag?: s
   if (/벤처/.test(text) && /감면|혜택|세금|받으면|받을|확인받|신청/.test(text) && !/확인\s*기관/.test(text)) add('venture', 'warn', '벤처 이야기 — "(결과는 확인기관이 정하고, 회사마다 달라)" 괄호를 붙여요')
   if (AX_AS_MONEY.test(text) && !AX_DENIED.test(text)) add('ax-money', 'bad', 'AX · 화면을 자금 받는 수단처럼 썼어요 — AX 는 일하는 방식을 바꾸는 일, 자금은 기관 심사')
   // D-274 대표 운영 원칙(가점 · 성공 약속 · 기본 컨디션 괄호) · 사실 목록에 없는 숫자
-  if (text) out.push(...principleLint(text), ...numberLint(text, input.facts ?? ''))
+  // D-554 컨설팅 · AX 글 점검(수치 후킹 · 숫자 늘리기 · 대행 말 · 성공보수 · 로고 · 지어낸 사례 · AX 키우기)
+  if (text) out.push(...principleLint(text), ...consultLint(text), ...numberLint(text, input.facts ?? ''))
   if (PRIVATE.test(text)) add('private', 'warn', '매출 · 계약금액 · 수수료 숫자 — 고객 숫자라면 빼요')
   if (KNOCK.test(text)) add('knock', 'bad', '다른 컨설턴트 · 업체를 깎아내리는 말은 쓰지 않아요')
   const brackets = text.match(/\[[^\]\n]{1,40}\]/g) ?? []

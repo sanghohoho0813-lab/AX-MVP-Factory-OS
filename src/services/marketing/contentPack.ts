@@ -15,6 +15,7 @@
  * 레이더가 센 숫자(채널 수 · 영상 수)는 우리가 고른 근거일 뿐 — 시청자에게 하는 말에는 넣지 않는다.
  * AI 로 다듬기는 화면이 따로 부른다(대표만 · packContext 가 보낼 자료).
  */
+import { CONSULT_CHECKS } from './consultRules'
 import { batchimOf, particle } from '../../lib/josa'
 import type { ContentAxis } from './radarPlaybook'
 import type { Opportunity } from './ytRadar'
@@ -503,6 +504,8 @@ function checkBlocks(s: PackSource, holes: number): PackBlock[] {
         ...(s.refs.length ? [`□ 참고한 영상(${s.refs.length}편)의 제목 · 대사를 그대로 쓰지 않았다`] : []),
       ].join('\n'),
     },
+    // D-554 컨설팅 · AX 글 — 금지 목록을 넣어도 그림(로고 · 도장)과 영상 제목의 % 는 잘 안 줄었다 → 사람이 마지막에 보는 칸
+    { label: '컨설팅 · AX 글 확인', text: CONSULT_CHECKS.join('\n') },
     ...(s.facts.length ? [{ label: '이 키워드를 고른 근거(우리만 보기)', text: s.facts.map((f) => `- ${f}`).join('\n') }] : []),
   ]
 }

@@ -991,7 +991,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await p.getByTestId('content-ai-req-copy').click()
   await wait(200)
   const clip = await p.evaluate(() => navigator.clipboard.readText())
-  check('D228-6 [요청문 복사] → 클립보드에 요청문 그대로 · 쓰는 법 8줄(D-234 ⟲4차 부록 A)', clip.trim() === req.trim() && (await p.getByTestId('content-ai-tips').locator('li').count()) === 8, clip.slice(0, 80))
+  // D-554 쓰는 법 12줄(컨설팅 · AX 4줄 더함) — 처음 3줄만 보이고 나머지 9줄은 [더 보기] 안
+  check('D228-6 [요청문 복사] → 클립보드에 요청문 그대로 · 쓰는 법 12줄(처음 3줄 · 나머지는 접힘)', clip.trim() === req.trim() && (await p.getByTestId('content-ai-tips').locator('li').count()) === 12 && (await p.getByTestId('content-ai-tips').locator('li:visible').count()) === 3 && (await p.getByTestId('content-ai-tips-more').getAttribute('open')) === null, clip.slice(0, 80))
   await p.getByTestId('content-ai-next').click()
   check('D228-7 [글을 받았으면 · 점검하기] → 2단계(받은 글 점검)', (await p.getByTestId('content-ai-sheet').getAttribute('data-stage')) === 'check' && (await p.getByTestId('content-ai-steps').getAttribute('data-current')) === 'check')
   const bad = '[주제 내용]\n10년 차 전문가가 직접 만든 부품이에요. 1,240명이 재구매! 무료 배송 · 선착순 100명 사은품 증정. 식품연구소에서 권장한 방법이에요.'

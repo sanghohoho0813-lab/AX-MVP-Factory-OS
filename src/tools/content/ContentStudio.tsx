@@ -2003,14 +2003,31 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
             )}
             <div className="flex flex-col gap-1.5 rounded-(--radius-control) bg-slate-50 p-3" data-testid="content-ai-tips">
               <span className="t-sub font-bold text-slate-800">쓰는 법</span>
+              {/* D-554 쓰는 법이 12가지로 늘어 — 처음 3가지만 보이고 나머지는 접어 둔다(첫 화면 단순하게) */}
               <ol className="flex flex-col gap-1">
-                {AI_REQUEST_TIPS.map((tip, i) => (
+                {AI_REQUEST_TIPS.slice(0, 3).map((tip, i) => (
                   <li key={tip} className="t-meta flex gap-1.5 break-keep text-slate-700">
                     <span className="shrink-0 font-bold text-sky-700 tabular-nums">{i + 1}</span>
                     <span className="min-w-0">{tip}</span>
                   </li>
                 ))}
               </ol>
+              {AI_REQUEST_TIPS.length > 3 && (
+                <details className="group" data-testid="content-ai-tips-more">
+                  <summary className="t-meta flex cursor-pointer list-none items-center gap-1 font-semibold text-sky-700 [&::-webkit-details-marker]:hidden">
+                    쓰는 법 {AI_REQUEST_TIPS.length - 3}가지 더 보기
+                    <ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
+                  </summary>
+                  <ol className="mt-1 flex flex-col gap-1">
+                    {AI_REQUEST_TIPS.slice(3).map((tip, i) => (
+                      <li key={tip} className="t-meta flex gap-1.5 break-keep text-slate-700">
+                        <span className="shrink-0 font-bold text-sky-700 tabular-nums">{i + 4}</span>
+                        <span className="min-w-0">{tip}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
             </div>
           </>
         ) : (

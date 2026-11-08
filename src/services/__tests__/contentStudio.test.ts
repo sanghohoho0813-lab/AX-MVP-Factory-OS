@@ -93,6 +93,7 @@ import {
   priceWithoutUnit,
   reviewPlaceIn,
   AI_REQUEST_TIPS,
+  AX_MEANING,
 } from '../contentStudio'
 import type { IndustryKey, SiteDoc } from '../siteBuilder'
 
@@ -883,6 +884,27 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   check('D234-8 필수 안내 빠짐 점검 — 보험 카드뉴스에 약관 문구 없으면 "직접 넣기" · 넣으면 통과 · 카톡 · 플레이스는 안 봄 · 의료는 예전 그대로(개인차)',
     insCard.some((c) => c.key === 'notice' && c.text.includes('카드뉴스는 다른 도구가')) && !dkn(ins, 'cards', `보장 분석 ${noticeOf(ins)}`).some((c) => c.key === 'notice') && !dkn(ins, 'kakao', '보장 분석').some((c) => c.key === 'notice') && dkn(md, 'blog', '치료 이야기').some((c) => c.key === 'care'), insCard.map((c) => c.key))
 
+  /* D-554 경영컨설팅(정책자금 · 보증 · 인증 · 법인 세무) — 규제 업종 · 요청문 · 받은 글 점검 */
+  {
+    const cs = mk(rec('r-cs', '바른경영컨설팅', '경영 컨설팅업', '정책자금 · 인증 컨설팅 · AX 업무 자동화'))
+    const mfg = mk(rec('r-mfg', '한빛정밀', '제조업', '정밀 부품 가공 · 기업부설연구소 보유'))
+    const cr = regulatedOf(cs)
+    check('D554-1 경영컨설팅 업체 → 규제 업종(경영컨설팅) · 연구소를 가진 제조사는 아님 · 카드뉴스는 두 안 · 끝 문구 "결과는 기관 심사로 정해집니다"',
+      cr?.kind === 'consulting' && regulatedOf(mfg) === null && cardFiveTypes(cs).join() === 'objection,curious' && cr.notice === '결과는 기관 심사로 정해집니다.' && noticeOf(cs).includes('기관 심사'), { kind: cr?.kind, mfg: regulatedOf(mfg)?.kind })
+    check('D554-2 금지 목록 — 수치 후킹 · 가산점 · 로고 · 도장 · 대행 · 성공보수 · 시간 압박 · 지어낸 사례 · 요건 · AX 수단화',
+      ['N명 중 M명', '가산점', '도장', '동행', '성공보수', '예산 소진', '확정서', '업력 1년 이상', 'AX'].every((w) => cr?.never.some((n) => n.includes(w))), cr?.never)
+    const rq = aiRequestText(cs, { kind: 'cards' })
+    check('D554-3 요청문 — 본업이라 "정책자금 · 컨설팅 이야기 금지" 줄 없음 · 다른 사업 이야기는 그대로 막음 · AX 뜻 한 줄 · 카드 이미지 로고 대신 사람 · 서류 · 화면 · 세무 · 제도 숫자 · 받은 숫자 그대로',
+      !rq.includes('사업 자금 · 정책자금 · 지원금 · 컨설팅 이야기') && rq.includes('다른 업체 · 전자책 · 강의 소개') && rq.includes(AX_MEANING) && rq.includes('사람 · 서류 · 실제 화면') && rq.includes('세무사님과 함께 검토') && rq.includes('기관 공고 확인') && rq.includes("'이상 · 넘게 · 수백'") && rq.includes('경영컨설팅 광고 규정'), rq)
+    check('D554-4 다른 업종 요청문은 예전처럼 "정책자금 · 컨설팅 이야기" 를 막고 AX 뜻 줄 없음',
+      aiRequestText(hf).includes('사업 자금 · 정책자금 · 지원금 · 컨설팅 이야기') && !aiRequestText(hf).includes('AX 뜻'))
+    const bad = '이거 모르면 99% 부결됩니다. 10명 중 8명이 놓쳐요. 상담·진행 250건 넘게. 가산점 받아요. 심사 대응까지 해 드려요. 승인 후 수수료만. 중진공 로고와 반려 도장. 실제로 한 대표님은 2억. 신용 6등급이면 탈락. 연말까지 예산 소진. AX 하면 심사에서 유리'
+    const keys = factChecks(bad, cs).map((x) => x.key)
+    const want = ['수치 후킹', '숫자 늘리기', '가산점 단정', '대행 말', '성공보수', '로고 · 도장', '지어낸 사례', '확인 안 된 요건', '시간 압박', 'AX 수단화'].map((w) => `reg-${w}`)
+    check('D554-5 받은 글 점검 — 컨설팅 위험 표현 10가지가 모두 걸림 · 깨끗한 글은 0',
+      want.every((k) => keys.includes(k)) && !factChecks('신청 전에 기본 조건부터 점검해요. 결과는 기관 심사로 정해집니다.', cs).some((x) => x.key.startsWith('reg-')), { missing: want.filter((k) => !keys.includes(k)) })
+  }
+
   const reqHf = aiRequestText(hf)
   const reqNo = aiRequestText(ep)
   const lines = reqHf.split('\n')
@@ -894,7 +916,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
     reqHf.includes('건강기능식품 광고 규정 — 넣지 말 것: 질병의 예방') && reqHf.includes('"이 제품은 질병의 예방 및 치료를 위한 의약품이 아닙니다.') && reqHf.includes('카드뉴스는 망설임 풀기 · 궁금증 안만') && reqHf.includes('할인 → 1+1') &&
     !reqHf.includes('620') && !reqHf.includes('1+1 ') && aiRequestText(ins).includes('- 후기·평점: 후기 620개 · 평점 4.8 / 후기 출처: 자사몰') && aiRequestText(fp, {}).includes('후기 출처') === false && aiRequestText(pr).includes("- 가격: 1회 32,000원 (단위 그대로") &&
     speakerLine({ ...fp, speaker: '김한솔 대표' }) === "화자: 한솔정밀(주)의 대표 '김한솔' (이름은 이것만 쓰세요)." && speakerLine({ ...fp, speaker: 'MD 지은' }).includes("의 MD '지은'") && speakerLine({ ...fp, speaker: '원장' }).includes('(사람 이름은 쓰지 마세요)') && speakerLine({ ...fp, speaker: '' }) === '화자: 한솔정밀(주) (사람 이름은 쓰지 마세요).' && contactLine(ep).includes('아직 없음') &&
-    AI_REQUEST_TIPS.length === 8 && AI_REQUEST_TIPS.some((x) => x.includes('500번')) && AI_REQUEST_TIPS.some((x) => x.includes('수정 요청 단추가 없어요')) && AI_REQUEST_TIPS.some((x) => x.includes('넘어가는 칸의 숫자부터')),
+    AI_REQUEST_TIPS.length === 12 && AI_REQUEST_TIPS.some((x) => x.includes('500번')) && AI_REQUEST_TIPS.some((x) => x.includes('수정 요청 단추가 없어요')) && AI_REQUEST_TIPS.some((x) => x.includes('넘어가는 칸의 숫자부터')),
     reqHf)
 
   const noSrc = buildProfile(full, today, normalizeOverrides({ reviews: '후기 620개', price: '32,000원' })).profile
