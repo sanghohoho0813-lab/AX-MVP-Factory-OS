@@ -238,7 +238,13 @@ check('G5 스레드 자료 — 짝 셋 · 글마다 요일 목적 · 틀(ETX / D
 await tabTo(page, 'threads')
 await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-week-thread"][data-ai="1"]').length === 9, null, { timeout: 8000 }).catch(() => {})
 await tabTo(page, 'long')
-check('V1 롱폼 = AI 확정 제목 · 대본 · 제목 후보', (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.getByTestId('mk-week-long-title').innerText()).includes('AI 확정 제목') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 챕터 1') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 제목 1'))
+// D-558 제목 후보 · 표지 글 · 첫 문장은 접혀 있다 — 펼쳐서 본다
+{
+  const titlesFold = page.locator('[data-fold="mk-week-long-titles"]')
+  if ((await titlesFold.getAttribute('data-open')) === '0') await titlesFold.getByTestId('fold-toggle').first().click()
+  await page.waitForTimeout(150)
+}
+check('V1 롱폼 = AI 확정 제목 · 대본 · 제목 후보(접힌 칸을 펼쳐서)', (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await page.getByTestId('mk-week-long-title').innerText()).includes('AI 확정 제목') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 챕터 1') && (await page.getByTestId('mk-week-long').innerText()).includes('AI 롱폼 제목 1'))
 await tabTo(page, 'shorts')
 const shortTxt = await page.locator('[data-testid="mk-week-short"]:not([data-n="0"])').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-n')}:${e.getAttribute('data-ai')}:${(e.textContent ?? '').includes('AI 쇼츠 대본 1') ? 's1' : (e.textContent ?? '').includes('AI 쇼츠 대본 2') ? 's2' : (e.textContent ?? '').includes('AI 릴스 대본 1') ? 'r1' : '?'}`))
 check('V2 쇼츠 ① ② = 짝 1 틱톡 · 쇼츠 대본 1 · 2 / ③ = 짝 2 릴스 대본 1 · 다른 버전 = 릴스 대본 2', shortTxt.join() === '1:1:s1,2:1:s2,3:1:r1' && ((await page.locator('[data-testid="mk-week-short"][data-n="0"]').textContent()) ?? '').includes('AI 릴스 대본 2'), shortTxt)

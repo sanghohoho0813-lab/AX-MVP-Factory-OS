@@ -389,12 +389,15 @@ export function WeekView({
               <p className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-week-long-title">
                 {week.long.headline}
               </p>
+              {/* D-558 제목 후보 · 표지 글 · 첫 문장은 대본처럼 접어 둔다 — 본업 주제 이름이 길어져(정부지원금 · 고용지원금) 휴대폰 첫 화면이 길어졌다 · [복사] 는 전부 */}
               {week.long.titles.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  {week.long.titles.map((b, i) => (
-                    <Block key={`t-${i}`} label={plainLabel(b.label)} text={b.text} />
-                  ))}
-                </div>
+                <Fold id="mk-week-long-titles" title="다른 제목 · 표지 글 · 첫 문장" summary="제목 후보 · 표지에 넣을 글 · 영상 첫 3초 말 — 누르면 펼쳐져요">
+                  <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    {week.long.titles.map((b, i) => (
+                      <Block key={`t-${i}`} label={plainLabel(b.label)} text={b.text} />
+                    ))}
+                  </div>
+                </Fold>
               )}
               <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} summary="그대로 읽는 말 + 화면에 띄울 것 — 누르면 펼쳐져요">
                 <div className="flex flex-col gap-3">
