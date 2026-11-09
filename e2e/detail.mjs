@@ -2191,10 +2191,10 @@ for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440'
     const sideEl = document.querySelector('[data-testid="client-sidelist"]')
     const detail = sideEl?.nextElementSibling
     const r = (el) => (el ? el.getBoundingClientRect() : null)
-    return { main: r(main)?.width ?? 0, side: r(sideEl), detail: r(detail) }
+    return { main: r(main)?.width ?? 0, side: r(sideEl), detail: r(detail), clip: detail ? getComputedStyle(detail).overflowX : '' }
   })
   const pad = 56 * 2
-  check('D-558 업체 목록이 펴지면 본문 상자 = 고른 폭 + 목록 폭(업체 화면 칸 ≥ 1,280 − 안쪽 여백) · 목록 · 업체 화면 겹침 0', !!geo.side && !!geo.detail && geo.main >= 1280 + 250 && geo.detail.width >= 1280 - pad - 4 && geo.side.right <= geo.detail.left + 1, JSON.stringify(geo))
+  check('D-558 업체 목록이 펴지면 본문 상자 = 고른 폭 + 목록 폭(업체 화면 칸 ≥ 1,280 − 안쪽 여백) · 목록 · 업체 화면 겹침 0(탭 줄 넘침도 상세 칸 안에서 자름)', !!geo.side && !!geo.detail && geo.main >= 1280 + 250 && geo.detail.width >= 1280 - pad - 4 && geo.side.right <= geo.detail.left + 1 && geo.clip === 'clip', JSON.stringify(geo))
   await page.getByTestId('client-sidelist-close').click()
   await page.waitForTimeout(300)
   const closedMain = await page.evaluate(() => document.querySelector('main')?.getBoundingClientRect().width ?? 0)

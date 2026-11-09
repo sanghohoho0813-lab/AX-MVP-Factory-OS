@@ -444,7 +444,7 @@ await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
 const plan5 = llm.at(-1)
-check('F6 TOP5 기획 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 미래AI랩 일 · 상투어 금지)', plan5.sys.includes('[마케팅 규칙]') && plan5.sys.includes('채널 설계 기준') && plan5.sys.includes('N분 컷'), plan5.sys.slice(0, 300))
+check('F6 TOP5 기획 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 미래AI랩 일 · 상투어 금지 · D-558 숫자는 막지 않고 [완성도 규칙])', plan5.sys.includes('[마케팅 규칙]') && plan5.sys.includes('채널 설계 기준') && plan5.sys.includes('꿀팁') && plan5.sys.includes('[완성도 규칙') && !plan5.sys.includes('N분 컷'), plan5.sys.slice(0, 300))
 check('F7 보낸 자료 맨 앞 — 채널 설계 기준(김팀장의 경영노트) · 내 채널 최근 영상 · 후보 번호 o1 · 찍기 키트', plan5.user.includes('[자료 · 채널 설계 기준') && plan5.user.includes('김팀장의 경영노트') && plan5.user.includes('[자료 · 내 채널 최근 영상') && /o1/.test(plan5.user) && plan5.user.includes('첫문장_규칙'), plan5.user.slice(0, 600))
 check("F8 마케팅 답에는 판만 닫던 '열어 보기' 가 없음 · 할 일 단추 대신 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지] 가 줄마다", (await page.getByTestId('ai-assist-ref').count()) === 0 && (await page.locator('[data-testid="ai-assist-item"] [data-action="take"]').count()) === 3 && (await page.locator('[data-testid="ai-assist-item"] [data-action="script"]').count()) === 3 && (await page.locator('[data-testid="ai-assist-item"] [data-action="todo"]').count()) === 0)
 await shot(page, 'F-radar-top5-actions')

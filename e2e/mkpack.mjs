@@ -444,7 +444,8 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   check('K1 고정 키워드 5개 — 정책자금 · 정부지원금 · 고용지원금(한 칸) · 기업인증 · 정부지원사업 · 절세 · 세금 신고(늘 그 자리)', JSON.stringify(fixedNames) === JSON.stringify(['정책자금', '정부지원금 · 고용지원금', '기업인증', '정부지원사업', '절세 · 세금 신고']) && JSON.stringify(fixedIds) === JSON.stringify(['notice:policy_fund', 'notice:sme_subsidy', 'notice:certification', 'notice:grant_program', 'notice:tax_saving']), { fixedNames, fixedIds })
   check('K2 고정 키워드 칩 = 이번 주 새 공고 수(지난달 공고는 안 셈 · 1건도 · 묶은 칸은 지원금 + 고용지원금 공고를 함께 · 없으면 칩 대신 짧은 설명)', (await noteOf('notice:policy_fund')) === '새 공고 3건' && (await noteOf('notice:sme_subsidy')) === '새 공고 4건' && (await noteOf('notice:certification')) === '새 공고 1건' && (await noteOf('notice:grant_program')) === '' && (await noteOf('notice:tax_saving')) === '', { pf: await noteOf('notice:policy_fund'), sme: await noteOf('notice:sme_subsidy'), cert: await noteOf('notice:certification') })
   const FIXED_TOPICS = ['policy_fund', 'employ_subsidy', 'certification', 'sme_subsidy', 'grant_program', 'tax_saving']
-  check('K3 이번 주 키워드 10개는 유튜브에서 뜨는 주제만 — 고정 키워드 주제 · 공고 키워드 0(경영 × AI 다리 주제도)', keyIds.length === 10 && !keyIds.some((k) => k.startsWith('notice:') || FIXED_TOPICS.includes(k.split(':')[1])), keyIds)
+  // D-558 절세 · 세금 신고가 고정 칸으로 가면서 견본 영상에서는 남는 후보가 8개(10개를 억지로 채우지 않는다)
+  check('K3 이번 주 키워드(최대 10개)는 유튜브에서 뜨는 주제만 — 고정 키워드 주제(절세 포함) · 공고 키워드 0(경영 × AI 다리 주제도)', keyIds.length >= 8 && keyIds.length <= 10 && !keyIds.some((k) => k.startsWith('notice:') || FIXED_TOPICS.includes(k.split(':')[1])), keyIds)
   // D-507 기준 줄은 첫 화면을 가볍게 하려고 [사용 방법] 안으로 — 펼쳐서 읽는다(글은 그대로)
   await p.getByTestId('mk-howto-toggle').click()
   const basis = (await p.getByTestId('mk-basis').innerText()) ?? ''
@@ -463,9 +464,9 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await p.getByTestId('mk-pack-why-toggle').click()
   await p.waitForTimeout(200)
   const why = (await p.getByTestId('mk-pack-notices').innerText().catch(() => '')) ?? ''
-  check('K6 고정 키워드(정부지원금) 누르면 묶음 — 왜 지금(이번 주 새 공고 2건 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 2건') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
+  check('K6 고정 키워드(정부지원금 · 고용지원금 한 칸) 누르면 묶음 — 왜 지금(이번 주 새 공고 4건 = 지원금 + 고용지원금 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 4건') && why.includes('정부지원금 · 고용지원금') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
   const packAll = (await p.getByTestId('mk-pack').innerText()) ?? ''
-  check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('우리 본업 주제') && packAll.includes('이번 주에만 정부지원금 공고가 2건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
+  check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('우리 본업 주제') && packAll.includes('이번 주에만 정부지원금 · 고용지원금 공고가 4건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
   await shot(p, 'K-pack')
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })

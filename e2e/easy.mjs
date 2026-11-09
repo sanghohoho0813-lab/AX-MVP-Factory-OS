@@ -404,10 +404,12 @@ for (const width of [390, 360]) {
   await page.evaluate(seedScript())
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   const mainW = () => page.evaluate(() => Math.round(document.querySelector('main').getBoundingClientRect().width))
+  // D-558 업체 상세는 왼쪽 업체 목록(15rem + 사이 1.25rem = 260px)만큼 본문 상자를 넓힌다 — 업체 화면 자체는 고른 폭 그대로
+  const SIDE = 260
   const fontPx = () => page.evaluate(() => getComputedStyle(document.querySelector('main h1') ?? document.body).fontSize)
   // D-296 대표 "머리줄이 지저분" — [폭] 단추는 머리줄에서 빼고 설정 › 화면에서만 고른다
   const f0 = await fontPx()
-  check('D-201 · D-296 1920: 머리줄에 [폭] 단추 없음 · 처음엔 보통 · 본문 1,280px', (await page.locator('header [data-testid="content-width"]').count()) === 0 && (await mainW()) === 1280, String(await mainW()))
+  check('D-201 · D-296 1920: 머리줄에 [폭] 단추 없음 · 처음엔 보통 · 본문 1,280px(+ 업체 목록 260)', (await page.locator('header [data-testid="content-width"]').count()) === 0 && (await mainW()) === 1280 + SIDE, String(await mainW()))
   const pickWidth = async (w) => {
     await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
     if ((await page.getByTestId('settings-content-width').count()) === 0) {
@@ -420,12 +422,12 @@ for (const width of [390, 360]) {
   }
   const wWide = await pickWidth('wide')
   const wNarrow = await pickWidth('narrow')
-  check('D-201 설정 › 화면에서 넓게(예전 폭) · 좁게(1,100px)', wWide > 1500 && wNarrow === 1100, `${wWide} · ${wNarrow}`)
+  check('D-201 설정 › 화면에서 넓게(예전 폭) · 좁게(1,100px + 업체 목록)', wWide > 1500 && wNarrow === 1100 + SIDE, `${wWide} · ${wNarrow}`)
   check('D-201 폭을 바꿔도 글자 크기는 그대로', (await fontPx()) === f0, `${f0} → ${await fontPx()}`)
   await page.reload({ waitUntil: 'networkidle' })
-  check('D-201 고른 폭은 새로고침해도 남는다(좁게)', (await mainW()) === 1100)
+  check('D-201 고른 폭은 새로고침해도 남는다(좁게)', (await mainW()) === 1100 + SIDE)
   const wBack = await pickWidth('normal')
-  check('D-201 설정에서 보통으로 → 1,280px', wBack === 1280, String(wBack))
+  check('D-201 설정에서 보통으로 → 1,280px(+ 업체 목록)', wBack === 1280 + SIDE, String(wBack))
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   check('D-201 1920: 옆으로 넘침 0', over <= 0, String(over))
   await ctx.close()

@@ -68,7 +68,8 @@ export function ClientSplit({ children }: { children: ReactNode }) {
     <div className="@container">
       <div className={open ? '@5xl:grid @5xl:grid-cols-[15rem_minmax(0,1fr)] @5xl:items-start @5xl:gap-5' : ''}>
         {open && <ClientSideList onClose={() => setOpen(false)} />}
-        <div className="min-w-0">
+        {/* 상세의 탭 줄은 화면 끝까지 칠하려고 양옆으로 40px 넘친다 — 목록과 나란히 있을 때는 그 넘침을 상세 칸 안에서 자른다(목록과 겹침 0) */}
+        <div className={open ? 'min-w-0 @5xl:[overflow-x:clip]' : 'min-w-0'}>
           {!open && (
             <button
               type="button"
