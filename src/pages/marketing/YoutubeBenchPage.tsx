@@ -44,6 +44,7 @@ import { cleanTopic, customSource, packSourceOf, packText, type ContentPack, typ
 import { openPackSync, packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { openKitSync, type KitAi } from '../../services/marketing/kitAi'
 import { originMemo, originOf, type KitScript } from '../../services/marketing/kitScript'
+import { interestTopics } from '../../services/marketing/interests'
 import { openStudySync } from '../../services/marketing/videoStudyRun'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
@@ -267,7 +268,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const feed = useMemo(() => (fullFeed ? withoutDisabled(fullFeed, prefs.overrides) : null), [fullFeed, prefs.overrides])
   const prepared = useMemo(() => (feed ? prepareFeed(feed) : null), [feed])
   // D-295 고정 키워드 주제(정책자금 · 고용지원금 · 인증 · 지원금 · 지원사업)는 이번 주 키워드 후보에서 뺀다 — 늘 따로 보인다
-  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted, fixedTopics: FIXED_TOPIC_IDS }), [prefs.overrides, prefs.mix, prefs.muted])
+  // D-558 계정마다 고른 관심 분야 → 그 분야 주제가 '이번 주 뜨는 주제' 맨 앞
+  const interestIds = useMemo(() => interestTopics(prefs.interests ?? []), [prefs.interests])
+  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted, fixedTopics: FIXED_TOPIC_IDS, interests: interestIds }), [prefs.overrides, prefs.mix, prefs.muted, interestIds])
   const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
   // D-232 내 콘텐츠 성과 — 레이더가 이미 받은 내 채널 영상만(유튜브를 더 부르지 않음)
@@ -981,6 +984,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             onCustom={(t) => openPack(`custom:${t}`)}
             week={{ ai: mkAi && !readOnly && weekPlanSetup.pairs.length > 0, done: weekDone, onOpen: openWeek }}
             resume={null}
+            interests={{ picked: prefs.interests ?? [], topics: interestIds, readOnly, onSave: (ids) => savePrefs({ ...prefs, interests: ids }) }}
           />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}

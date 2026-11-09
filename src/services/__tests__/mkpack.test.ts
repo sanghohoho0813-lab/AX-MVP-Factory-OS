@@ -521,6 +521,27 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('SR3 지난번 하던 것 — 단계마다 지금 · 다음 할 일(쉬운 말) · 게시 완료는 이어서 하기에 없음', IDEA_RESUME_STEP.script.next === '찍기' && IDEA_RESUME_STEP.filmed.next === '올리기' && IDEA_RESUME_STEP.idea.next === '대본 쓰기' && !('published' in IDEA_RESUME_STEP))
 }
 
+// ---------------- D-558 관심 분야(계정마다) → 이번 주 뜨는 주제 ----------------
+{
+  const { INTEREST_GROUPS, interestTopics, normalizeInterests, interestLine } = await import('../marketing/interests')
+  const { withInterests } = await import('../marketing/ytRadar')
+  const { normalizePrefs } = await import('../marketing/radarStore')
+  const { TOPICS } = await import('../marketing/radarPlaybook')
+  const known = new Set(TOPICS.map((t) => t.id))
+  const bad = INTEREST_GROUPS.flatMap((g) => g.topics).filter((t) => !known.has(t))
+  check('D558-I1 관심 분야 10묶음 — 모든 주제 번호가 분류표에 있음 · 고른 묶음 → 주제 번호(겹침 없이) · 모르는 값은 버림 · 한 줄', INTEREST_GROUPS.length === 10 && bad.length === 0 && interestTopics(['tax', 'gov_money']).includes('tax_saving') && interestTopics(['hr', 'gov_money']).filter((t) => t === 'employ_subsidy').length === 1 && normalizeInterests(['tax', 'x', 'tax', 3]).join() === 'tax' && interestLine(['tax', 'ai_tools']) === '세금 · 절세 · AI 도구', bad)
+  const base = radarPlan(prepareFeed(sampleFeed(NOW), NOW), { now: NOW })
+  const ai = radarPlan(prepareFeed(sampleFeed(NOW), NOW), { now: NOW, interests: interestTopics(['ai_tools']) })
+  const want = new Set(interestTopics(['ai_tools']))
+  const firstHits = ai.picks.findIndex((o) => !want.has(o.topicId))
+  const hits = ai.picks.filter((o) => want.has(o.topicId)).length
+  check('D558-I2 AI 도구를 고르면 — 그 분야 주제가 10개 맨 앞에 몰림(중간에 끼지 않음) · 개수는 그대로 · 같은 후보 한 번', hits > 0 && (firstHits === -1 || ai.picks.slice(firstHits).every((o) => !want.has(o.topicId))) && ai.picks.length === base.picks.length && new Set(ai.picks.map((o) => o.key)).size === ai.picks.length, { hits, firstHits, keys: ai.picks.map((o) => o.key) })
+  check('D558-I3 아무것도 안 고르면 예전 그대로(같은 순서) · withInterests 빈 값은 그대로 돌려줌', JSON.stringify(radarPlan(prepareFeed(sampleFeed(NOW), NOW), { now: NOW, interests: [] }).picks.map((o) => o.key)) === JSON.stringify(base.picks.map((o) => o.key)) && withInterests(base.picks, { market: [], axai: [], bridge: [] }).length === base.picks.length)
+  const p1 = normalizePrefs({ interests: ['tax', 'nope'] })
+  const p0 = normalizePrefs({})
+  check('D558-I4 설정에 저장 — 아는 묶음만 남김 · 안 고른 계정은 칸 자체가 없음(예전 설정 그대로)', JSON.stringify(p1.interests) === '["tax"]' && !('interests' in p0))
+}
+
 // ---------------- D-511 마케팅 첫 화면 대화창 — 한 줄 → 갈 곳(규칙) ----------------
 {
   const r = (t: string) => mkRoute(t)

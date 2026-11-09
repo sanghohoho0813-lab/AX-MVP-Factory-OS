@@ -9,6 +9,7 @@
  *  - 나중에 대본 만들기(LLM)를 붙일 때는 toContentBrief() 가 넘길 모양이다 — 지금은 호출 0(복사해서 쓰는 글만).
  *  - D-231 '내 콘텐츠' — 같은 수첩 줄에 촬영일 · 게시일 · 체크리스트 · 게시 주소 · 첫 문장 · 직접 적은 주제(custom)를 더했다(새 표 없음).
  */
+import { normalizeInterests } from './interests'
 import { generateId } from '../../storage/localStore'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
@@ -450,6 +451,8 @@ export interface RadarPrefs {
   muted: string[]
   /** D-241 채널 설계 기준(null = 기본값 DEFAULT_BRIEF) */
   brief: ChannelBrief | null
+  /** D-558 관심 분야 묶음 번호(interests.ts) — 비면 모든 분야(예전 그대로) */
+  interests?: string[]
 }
 
 export const MAX_ADDED = 10
@@ -494,7 +497,8 @@ export function normalizePrefs(raw: unknown): RadarPrefs {
     }
   }
   const muted = Array.isArray(r.muted) ? [...new Set((r.muted as unknown[]).filter((k): k is string => typeof k === 'string' && MUTED_KEY.test(k)))].slice(0, MAX_MUTED) : []
-  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined), muted, brief: normalizeBrief(r.brief) }
+  const interests = normalizeInterests(r.interests)
+  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined), muted, brief: normalizeBrief(r.brief), ...(interests.length ? { interests } : {}) }
 }
 
 /** 작업공간마다 한 줄 — 번호는 작업공간 번호로(클라우드 표의 번호는 모든 작업공간에서 하나여야 한다) */

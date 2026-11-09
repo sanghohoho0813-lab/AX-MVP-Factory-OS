@@ -22,7 +22,8 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, History, MonitorPlay, PenLine, Pin, Sparkles, type LucideIcon } from 'lucide-react'
+import { ArrowRight, AtSign, CalendarDays, CircleHelp, Clapperboard, Film, Flame, GalleryHorizontalEnd, History, MonitorPlay, PenLine, Pin, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
+import { INTEREST_GROUPS, interestLine } from '../../../services/marketing/interests'
 import { Button } from '../../../components/ui/Button'
 import { HintTip } from '../../../components/ui/fold'
 import { TextScaleQuickButton } from '../../../components/ui/TextScaleQuickButton'
@@ -59,7 +60,7 @@ export interface HomeKeyword {
 }
 
 const HOW_TO: readonly { title: string; body: string }[] = [
-  { title: '주제를 하나 누르세요', body: '맨 위 다섯(정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업)은 우리 본업 주제라 늘 그 자리예요 — 작은 글씨는 기업마당에 이번 주 새로 나온 공고 수예요. 아래 \'이번 주 뜨는 주제\' 는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요).' },
+  { title: '주제를 하나 누르세요', body: '맨 위 다섯(정책자금 · 정부지원금/고용지원금 · 기업인증 · 정부지원사업 · 절세)은 우리 본업 주제라 늘 그 자리예요 — 작은 글씨는 기업마당에 이번 주 새로 나온 공고 수예요. 아래 \'이번 주 뜨는 주제\' 는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요). [내 관심 분야 고르기] 로 분야를 고르면 그 분야 주제가 맨 앞에 와요.' },
   { title: '글이 한 번에 나와요', body: '제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글까지. 대표 계정이면 [AI로 다 쓰기] 를 눌렀을 때 AI 가 검증된 방법대로 더 자연스럽게 다시 써요(20~60초 — 그동안 초안을 먼저 보여 드려요).' },
   { title: '칸마다 [복사] 해서 쓰세요', body: '[공식 자료 확인] 이라고 적힌 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요. 금액 · 날짜는 지어내지 않아요.' },
   { title: '찍을 거면 [내 콘텐츠에 담기]', body: '대본이 그대로 저장돼요. 찍는 날 · 올리는 날 · 할 일 표는 위 목차의 [내 콘텐츠] 에서 적어요. 다음에 오면 맨 위 [이어서 하기] 로 바로 돌아와요.' },
@@ -100,7 +101,10 @@ export function KeywordHome({
   onCustom,
   week,
   resume,
+  interests,
 }: {
+  /** D-558 계정마다 관심 분야 — 고른 분야 주제가 '이번 주 뜨는 주제' 맨 앞 */
+  interests?: { picked: string[]; topics: readonly string[]; readOnly: boolean; onSave: (ids: string[]) => Promise<boolean> }
   /** D-507 지난번 하던 것 — 없으면 카드 없음 */
   resume?: HomeResume | null
   /** D-346 1주일치 한 번에 — ai: 누르면 AI 를 부를 수 있음(두 번 눌러 확인) · done: 이번에 만들 주를 이미 써 둠 */
@@ -123,6 +127,23 @@ export function KeywordHome({
 }) {
   const [custom, setCustom] = useState('')
   const [help, setHelp] = useState(false)
+  const [pickOpen, setPickOpen] = useState(false)
+  const [pickDraft, setPickDraft] = useState<string[]>([])
+  const [pickSaving, setPickSaving] = useState(false)
+  const interestSet = new Set(interests?.topics ?? [])
+  const openPicker = () => {
+    setPickDraft(interests?.picked ?? [])
+    setPickOpen((x) => !x)
+  }
+  const savePick = async (ids: string[]) => {
+    if (!interests || pickSaving) return
+    setPickSaving(true)
+    try {
+      if (await interests.onSave(ids)) setPickOpen(false)
+    } finally {
+      setPickSaving(false)
+    }
+  }
   const topic = cleanTopic(custom)
   const list = (keywords ?? []).slice(0, HOME_MAX)
   return (
@@ -247,9 +268,61 @@ export function KeywordHome({
             </ul>
           </div>
         )}
-        <p className="t-meta -mb-1.5 flex items-center gap-1 font-bold text-slate-700">
-          <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제
-        </p>
+        <div className="-mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
+            <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제
+          </p>
+          {interests && (
+            <button
+              type="button"
+              onClick={openPicker}
+              aria-expanded={pickOpen}
+              className="tap t-meta ml-auto inline-flex min-h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
+              data-testid="mk-interest-open"
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-3.5" />
+              {interests.picked.length ? <>내 관심 분야 · <span className="text-brand-700">{interestLine(interests.picked)}</span></> : '내 관심 분야 고르기'}
+            </button>
+          )}
+        </div>
+        {interests && pickOpen && (
+          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3" data-testid="mk-interest-panel">
+            <p className="t-sub break-keep text-slate-700">고른 분야의 주제가 아래 10개 맨 앞에 와요 — 남은 자리는 요즘 뜨는 다른 주제예요. 계정마다 따로 저장돼요.</p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="관심 분야">
+              {INTEREST_GROUPS.map((g) => {
+                const on = pickDraft.includes(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    aria-pressed={on}
+                    title={g.hint}
+                    onClick={() => setPickDraft((d) => (on ? d.filter((x) => x !== g.id) : [...d, g.id]))}
+                    className={`tap t-sub inline-flex min-h-10 flex-col items-start rounded-xl border px-3 py-1 text-left ${on ? 'border-brand-500 bg-white text-brand-800 ring-1 ring-brand-300' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'}`}
+                    data-testid="mk-interest-chip"
+                    data-id={g.id}
+                  >
+                    <span className="font-bold">{on ? '✓ ' : ''}{g.label}</span>
+                    <span className="t-meta text-slate-600">{g.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="primary" onClick={() => void savePick(pickDraft)} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-save">
+                {pickDraft.length ? `이 ${pickDraft.length}가지로 맞추기` : '모든 분야로 보기'}
+              </Button>
+              {interests.picked.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => void savePick([])} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-clear">
+                  고른 것 지우기(모든 분야)
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setPickOpen(false)}>
+                닫기
+              </Button>
+            </div>
+          </div>
+        )}
         {list.length > 0 ? (
           <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3" data-testid="mk-keys">
             {list.map((k, i) => (
@@ -272,6 +345,11 @@ export function KeywordHome({
                       {k.note && (
                         <span className="t-meta rounded-full border border-emerald-300 bg-white px-2 py-0.5 font-semibold text-emerald-800" data-testid="mk-key-note">
                           {k.note}
+                        </span>
+                      )}
+                      {k.topicId && interestSet.has(k.topicId) && (
+                        <span className="t-meta rounded-full border border-brand-300 bg-white px-2 py-0.5 font-semibold text-brand-700" data-testid="mk-key-interest">
+                          내 관심
                         </span>
                       )}
                       {fresh?.has(k.key) && (

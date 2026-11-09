@@ -495,6 +495,38 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await c.close()
 }
 
+/* ---------------- I D-558 관심 분야(계정마다) → 이번 주 뜨는 주제 ---------------- */
+{
+  const c = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const p = await c.newPage()
+  const errs = []
+  p.on('pageerror', (e) => errs.push(String(e)))
+  await wire(p)
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await p.evaluate(seedScript())
+  await openHome(p)
+  const before = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('I1 이번 주 뜨는 주제 머리에 [내 관심 분야 고르기] 한 칸 · 처음엔 접힘 · "내 관심" 표시 0', (await p.getByTestId('mk-interest-open').innerText()).includes('내 관심 분야 고르기') && (await p.getByTestId('mk-interest-panel').count()) === 0 && (await p.getByTestId('mk-key-interest').count()) === 0)
+  await p.getByTestId('mk-interest-open').click()
+  check('I2 펼치면 관심 분야 10묶음(정부 돈 · 세금 · … · AI 도구 · 업무 자동화)', (await p.getByTestId('mk-interest-chip').count()) === 10)
+  await p.locator('[data-testid="mk-interest-chip"][data-id="ai_tools"]').click()
+  await p.getByTestId('mk-interest-save').click()
+  await p.waitForTimeout(600)
+  const after = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => ({ key: e.dataset.key, mine: !!e.querySelector('[data-testid="mk-key-interest"]') })))
+  const firstNot = after.findIndex((x) => !x.mine)
+  check('I3 AI 도구 고르고 저장 → 그 분야 주제가 맨 앞(내 관심 표시) · 개수 그대로 · 머리 단추에 고른 분야 이름', after.length === before.length && after[0]?.mine && (firstNot === -1 || after.slice(firstNot).every((x) => !x.mine)) && (await p.getByTestId('mk-interest-open').innerText()).includes('AI 도구'), after)
+  await openHome(p)
+  const again = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('I4 새로 열어도 그대로(계정 설정에 저장)', JSON.stringify(again) === JSON.stringify(after.map((x) => x.key)))
+  await p.getByTestId('mk-interest-open').click()
+  await p.getByTestId('mk-interest-clear').click()
+  await p.waitForTimeout(600)
+  const cleared = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
+  check('I5 [고른 것 지우기] → 예전 순서 그대로 · 내 관심 표시 0', JSON.stringify(cleared) === JSON.stringify(before) && (await p.getByTestId('mk-key-interest').count()) === 0, { cleared, before })
+  check('I JS 오류 0', errs.length === 0, errs.join(' | '))
+  await c.close()
+}
+
 await browser.close()
 console.log(`\nqa:mkpack: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
