@@ -459,7 +459,7 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D558-T6 릴스 자료도 같은 순서(채널 설계 기준 · 만들 영상 · 요청)', sx.sections[0].name.startsWith('채널 설계 기준') && sx.sections[1].name === '만들 영상' && sx.sections[2].name === '요청', sx.sections.map((x) => x.name))
   const tw = ASSISTS['threads.write']
   const sw = ASSISTS['shorts.write']
-  check('D558-T7 서버 지시 — 스레드 1안 · 릴스 1안은 바로 올리는 완성 글/대본 · [자료 · 요청] 먼저 · [자료 · 채널 설계 기준] · 태그는 내태그에서', tw.instruction.join(' ').includes('바로 올리는 완성 글') && tw.instruction.join(' ').includes('[자료 · 요청]') && tw.instruction.join(' ').includes('내태그') && sw.instruction.join(' ').includes('바로 찍는 완성 대본') && sw.instruction.join(' ').includes('[자료 · 채널 설계 기준]'))
+  check('D558-T7 서버 지시 — 스레드 1안은 그대로 올리는 글(완성 글이라는 말은 고객 지시문에 안 씀) · 릴스 1안은 바로 찍는 완성 대본 · [자료 · 요청] 먼저 · [자료 · 채널 설계 기준] · 태그는 내태그에서', tw.instruction.join(' ').includes('그대로 올리는 글') && !tw.instruction.join(' ').includes('완성 글') && tw.instruction.join(' ').includes('[자료 · 요청]') && tw.instruction.join(' ').includes('내태그') && sw.instruction.join(' ').includes('바로 찍는 완성 대본') && sw.instruction.join(' ').includes('[자료 · 채널 설계 기준]'))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)
