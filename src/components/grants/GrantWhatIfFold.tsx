@@ -6,7 +6,27 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { VERDICT_LABEL } from '../../services/grants/grantMatch'
-import { whatIfLine, type GrantWhatIf } from '../../services/grants/grantWhatIf'
+import { renewalRiskLine, whatIfLine, type GrantRenewalRisk, type GrantWhatIf } from '../../services/grants/grantWhatIf'
+
+/** D-557 곧 끝나는 인증 — 갱신하지 않으면 못 하는 공고(빨간 글자 = 주의) */
+export function GrantRenewalLines({ risks }: { risks: readonly GrantRenewalRisk[] }) {
+  if (!risks.length) return null
+  return (
+    <ul className="mt-3 flex flex-col gap-2" data-testid="grants-renewal">
+      {risks.map((r) => (
+        <li key={r.cert} className="flex flex-col gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="grants-renewal-item" data-cert={r.cert}>
+          <p className="t-sub break-keep font-semibold text-danger-700">{renewalRiskLine(r)}</p>
+          <p className="t-sub break-keep text-slate-600">{r.lost.slice(0, 3).map((m) => `${m.notice.title} — ${m.deadline.label}`).join(' · ')}{r.lost.length > 3 ? ` 외 ${r.lost.length - 3}건` : ''}</p>
+          {r.next ? (
+            <Link to={r.next.href} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline" data-testid="grants-renewal-next">
+              {r.next.label} <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function GrantWhatIfFold({ list }: { list: readonly GrantWhatIf[] }) {
   if (!list.length) return null

@@ -12,8 +12,8 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { GrantNotice } from './grants/grantMatch'
 import { matchesFor } from './grants/grantMatch'
-import { credentialsOf, profileOfRecord } from './grants/grantProfile'
-import { grantWhatIfs } from './grants/grantWhatIf'
+import { certExpiries, credentialsOf, profileOfRecord } from './grants/grantProfile'
+import { grantRenewalRisks, grantWhatIfs, renewalRiskLine } from './grants/grantWhatIf'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyEvidence } from './policyEvidence'
@@ -394,6 +394,8 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     a.links = [{ label: '회사 정보에 인증 적기', href: `/ops/clients/${encodeURIComponent(ctx.record.id)}` }]
     // D-556 받아 둔 공고로 — 이 인증을 받으면 지금 열린 지원사업이 몇 건 더 맞는지(공고 조건 그대로)
     const certWi = grantWhatIfs(ctx.notices, profileOfRecord(ctx.record, ctx.today), ctx.today, { expired: credentialsOf(ctx.record, ctx.today).expired, clientId: ctx.record.id }).filter((w) => w.key.startsWith('cert:'))
+    // D-557 곧 끝나는 인증 — 갱신하지 않으면 못 하는 공고
+    for (const r of grantRenewalRisks(ctx.notices, profileOfRecord(ctx.record, ctx.today), ctx.today, certExpiries(ctx.record, ctx.today), { clientId: ctx.record.id })) a.facts.unshift(renewalRiskLine(r))
     for (const w of certWi.slice(0, 3)) a.facts.push(`${w.label} 지금 열린 지원사업 ${w.gained.length}건이 더 맞아요 — ${w.gained.slice(0, 2).map((m) => m.notice.title).join(' · ')}${w.gained.length > 2 ? ' 외' : ''}`)
     a.copyText = [`[인증 검토] ${name(ctx.record)}`, ...a.steps.map((s) => `· ${s}`)].join('\n')
     return a

@@ -38,6 +38,8 @@ import { RulesInfoButton } from './RulesSheet'
 import { sectionHref, venturePlanHref } from './certNav'
 import { planProgress, readPlan } from '../core/venturePlan'
 import { noAxText } from '../../services/marketing/persona'
+import { CertGrantGain } from '../../components/grants/CertGrantGain'
+import type { ClientOpsRecord } from '../../types/clientOps'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
 const labelOf = (id: string) => EVIDENCE_LABEL[id] ?? id
@@ -57,6 +59,8 @@ export function CertWorkspace({
   onComplete,
   onPatchLife,
   onRequestDocs,
+  grantRecord = null,
+  workspaceId = null,
 }: {
   a: CertificationAssessment
   ctx: CertificationClientContext
@@ -74,6 +78,9 @@ export function CertWorkspace({
   onPatchLife: (patch: Partial<Pick<CertLifecycle, 'memo' | 'postAuditAt'>>) => Promise<void>
   /** 서류함에 빈 칸(없는 것만) — 만든 칸 수 */
   onRequestDocs: (labels: string[]) => Promise<number>
+  /** D-557 지금 열린 지원사업과 이 인증 — 업체 기록 · 작업공간(공고를 읽는 곳) */
+  grantRecord?: ClientOpsRecord | null
+  workspaceId?: string | null
 }) {
   const rule = CERT_RULES[a.key]
   const { showToast } = useToast()
@@ -180,6 +187,8 @@ export function CertWorkspace({
             {a.expired && <ExpiredBadge />}
           </div>
           <p className="t-body font-semibold break-keep text-slate-800">{a.oneLine}</p>
+          {/* D-557 받으면(또는 갱신하지 않으면) 지금 열린 지원사업이 어떻게 달라지는지 한 줄 — 있을 때만 */}
+          <CertGrantGain compact certKey={a.key} record={grantRecord} workspaceId={workspaceId} validUntil={a.renewal && !a.expired ? a.renewal.validUntil : null} />
         </div>
       </Surface>
       <StepTabs
@@ -488,6 +497,7 @@ export function CertWorkspace({
         <Surface>
           <div className="flex flex-col gap-3" data-testid="cert-step-body-3">
             <BenefitPicks picks={a.benefits} />
+            <CertGrantGain certKey={a.key} record={grantRecord} workspaceId={workspaceId} validUntil={a.renewal && !a.expired ? a.renewal.validUntil : null} />
             <details className="rounded-(--radius-control) border border-slate-200">
               <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-800" data-testid="cert-all-benefits">
                 모든 혜택 보기({rule.benefits.length})

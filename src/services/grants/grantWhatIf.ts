@@ -9,8 +9,10 @@
  *  - 안 맞는 까닭이 둘 이상(인증 + 직원 수)이면 '한 가지만' 이 아니라 세지 않는다.
  *  - 규칙 계산이다(AI 아님). 저장하지 않고 볼 때마다 계산한다.
  */
-import { CERT_LABEL, deadlineOf, exact, matchGrant, verdictRank, deadlineRank, type CertKey, type CompanyProfile, type GrantMatch, type GrantNotice } from './grantMatch'
+import { CERT_LABEL, daysBetween, deadlineOf, exact, matchGrant, verdictRank, deadlineRank, type CertKey, type CompanyProfile, type GrantMatch, type GrantNotice } from './grantMatch'
 import { sectionHref } from '../../certification/ui/certNav'
+import type { ClientOpsRecord } from '../../types/clientOps'
+import { certExpiries, credentialsOf, profileOfRecord } from './grantProfile'
 
 export interface GrantWhatIf {
   /** 'cert:venture' · 'employees:5' */
@@ -107,3 +109,96 @@ export function whatIfLine(list: readonly GrantWhatIf[], max = 3): string {
     .map((w) => `${w.short} +${w.gained.length}`)
     .join(' · ')
 }
+
+/* ------------------------------------------------------------------ */
+/* D-557 인증이 곧 끝나면 — 갱신하지 않으면 못 하는 공고                       */
+/* ------------------------------------------------------------------ */
+
+export interface GrantRenewalRisk {
+  cert: CertKey
+  /** 인증 끝나는 날 */
+  until: string
+  daysLeft: number
+  /** 갱신하지 않으면 못 하는 공고 — 지금은 맞는데(맞음 · 확인 필요) 이 인증이 빠지면 '안 맞음', 접수가 끝나는 날보다 먼저 인증이 끝나는 것 */
+  lost: GrantMatch[]
+  next: { label: string; href: string } | null
+}
+
+/** 이만큼 남았을 때부터 알린다(갱신 준비 기간) */
+export const RENEWAL_WARN_DAYS = 120
+
+/**
+ * 곧 끝나는 인증(오늘 ~ 120일 안)마다, 그 인증 덕분에 지금 맞는 공고 가운데 접수 마감이 인증 끝나는 날보다 늦은 것(또는 상시 · 선착순).
+ * 같은 판정 규칙(matchGrant)으로 '그 인증이 없는 업체' 를 다시 판정한다 — 다른 인증으로도 맞으면 세지 않는다.
+ */
+export function grantRenewalRisks(notices: readonly GrantNotice[], p: CompanyProfile, today: string, expiries: Partial<Record<CertKey, string>>, opts: { clientId?: string | null } = {}): GrantRenewalRisk[] {
+  const out: GrantRenewalRisk[] = []
+  for (const [cert, until] of Object.entries(expiries) as [CertKey, string][]) {
+    if (!until || !p.certs.includes(cert)) continue
+    const daysLeft = daysBetween(today, until)
+    if (daysLeft === null || daysLeft < 0 || daysLeft > RENEWAL_WARN_DAYS) continue
+    const lost: GrantMatch[] = []
+    const without = { ...p, certs: p.certs.filter((c) => c !== cert) }
+    for (const n of notices) {
+      if (!n.rules.certs.includes(cert)) continue
+      const deadline = deadlineOf(n, today)
+      if (deadline.state === 'closed') continue
+      // 인증이 끝나기 전에 접수가 끝나는 공고는 갱신과 상관없다
+      if (n.deadlineKind === 'date' && n.applyEnd && n.applyEnd <= until) continue
+      const now = matchGrant(n, p, today, deadline)
+      if (now.verdict === 'no') continue
+      if (matchGrant(n, without, today, deadline).verdict !== 'no') continue
+      lost.push(now)
+    }
+    if (!lost.length) continue
+    const section = CERT_ACTION[cert].section
+    lost.sort((a, b) => verdictRank(a.verdict) - verdictRank(b.verdict) || deadlineRank(a.deadline) - deadlineRank(b.deadline))
+    out.push({ cert, until, daysLeft, lost, next: section ? { label: `기업인증 › ${CERT_LABEL[cert]} 갱신 준비`, href: sectionHref(section, opts.clientId ?? null) } : null })
+  }
+  return out.sort((a, b) => a.until.localeCompare(b.until))
+}
+
+/** '벤처기업 확인이 2026-12-20에 끝나요(41일 남음) — 갱신하지 않으면 공고 2건을 못 해요' */
+export function renewalRiskLine(r: GrantRenewalRisk): string {
+  return `${CERT_LABEL[r.cert]} ${r.cert === 'lab' ? '인정' : r.cert === 'venture' || r.cert === 'women' ? '확인' : '인증'}이 ${r.until}에 끝나요(${r.daysLeft}일 남음) — 갱신하지 않으면 공고 ${r.lost.length}건을 못 해요`
+}
+
+/* ------------------------------------------------------------------ */
+/* D-557 기업인증 화면 — 이 인증과 지금 열린 지원사업                            */
+/* ------------------------------------------------------------------ */
+
+export interface CertGrantView {
+  cert: CertKey
+  held: boolean
+  /** 없는 인증: 받으면 새로 맞는 공고 · 있는 인증: 이 인증 덕분에 지금 맞는 공고 */
+  matches: GrantMatch[]
+  /** 있는 인증이 곧 끝날 때 — 갱신하지 않으면 못 하는 공고 줄 */
+  risk: string
+  riskCount: number
+}
+
+/** 화면 없이 계산만(시험 · 다른 화면) */
+export function certGrantView(cert: CertKey, record: ClientOpsRecord, notices: readonly GrantNotice[], today: string, validUntil?: string | null): CertGrantView {
+  const p = profileOfRecord(record, today)
+  const held = p.certs.includes(cert)
+  if (!held) {
+    const w = grantWhatIfs(notices, p, today, { expired: credentialsOf(record, today).expired, clientId: record.id }).find((x) => x.key === `cert:${cert}`)
+    return { cert, held, matches: w?.gained ?? [], risk: '', riskCount: 0 }
+  }
+  // 이 인증 덕분에 맞는 공고 — 인증이 빠지면 '안 맞음' 이 되는 것
+  const without = { ...p, certs: p.certs.filter((c) => c !== cert) }
+  const matches: GrantMatch[] = []
+  for (const n of notices) {
+    if (!n.rules.certs.includes(cert)) continue
+    const deadline = deadlineOf(n, today)
+    if (deadline.state === 'closed' || deadline.state === 'upcoming') continue
+    const now = matchGrant(n, p, today, deadline)
+    if (now.verdict === 'no' || matchGrant(n, without, today, deadline).verdict !== 'no') continue
+    matches.push(now)
+  }
+  matches.sort((a, b) => verdictRank(a.verdict) - verdictRank(b.verdict) || deadlineRank(a.deadline) - deadlineRank(b.deadline))
+  const until = validUntil || certExpiries(record, today)[cert] || ''
+  const r = until ? grantRenewalRisks(notices, p, today, { [cert]: until }, { clientId: record.id })[0] : undefined
+  return { cert, held, matches, risk: r ? renewalRiskLine(r) : '', riskCount: r?.lost.length ?? 0 }
+}
+

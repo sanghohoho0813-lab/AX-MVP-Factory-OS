@@ -116,6 +116,8 @@ export default function CertPage() {
           onComplete={(input, toProfile) => d.complete(a.key, input, { toProfile })}
           onPatchLife={(patch) => d.patchLife(a.key, patch)}
           onRequestDocs={(labels) => d.requestDocs(labels)}
+          grantRecord={d.clientRecord}
+          workspaceId={d.workspaceId}
         />
       )}
     </div>

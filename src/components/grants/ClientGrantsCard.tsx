@@ -14,9 +14,9 @@ import { applicationFor, withGrantChallenge, withoutGrantChallenge } from '../..
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { ClientGrantPanel } from './GrantSheets'
 import { useGrantActions, useGrantData } from './useGrants'
-import { grantWhatIfs } from '../../services/grants/grantWhatIf'
-import { credentialsOf } from '../../services/grants/grantProfile'
-import { GrantWhatIfFold } from './GrantWhatIfFold'
+import { grantRenewalRisks, grantWhatIfs } from '../../services/grants/grantWhatIf'
+import { certExpiries, credentialsOf } from '../../services/grants/grantProfile'
+import { GrantRenewalLines, GrantWhatIfFold } from './GrantWhatIfFold'
 
 export function ClientGrantsCard({
   workspaceId,
@@ -45,6 +45,8 @@ export function ClientGrantsCard({
   // 알릴 것은 이 업체를 겨냥한 공고(맞음 · 확인 필요)만 — 전국 공통은 패널에서 접어 보여 준다
   const targeted = useMemo(() => matches.filter((m) => m.verdict !== 'general'), [matches])
   // D-556 한 가지만 갖추면 더 맞는 공고(인증 하나 · 직원 수)
+  // D-557 곧 끝나는 인증 — 갱신하지 않으면 못 하는 공고
+  const risks = useMemo(() => (client ? grantRenewalRisks(notices, client.profile, today, certExpiries(record, today), { clientId: record.id }) : []), [client, notices, record, today])
   const whatIfs = useMemo(() => (client ? grantWhatIfs(notices, client.profile, today, { expired: credentialsOf(record, today).expired, clientId: record.id }) : []), [client, notices, record, today])
   const byId = useMemo(() => new Map(notices.map((n) => [n.id, n])), [notices])
   const challenge = onCommit
@@ -98,6 +100,7 @@ export function ClientGrantsCard({
             challenge={challenge}
           />
         )}
+        <GrantRenewalLines risks={risks} />
         <GrantWhatIfFold list={whatIfs} />
       </div>
     </Section>

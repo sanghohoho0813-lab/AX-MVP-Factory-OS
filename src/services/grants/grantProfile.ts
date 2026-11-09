@@ -39,6 +39,22 @@ export function credentialsOf(record: ClientOpsRecord, today: string): { certs: 
   return { certs, known: text.trim() !== '' || active.length > 0 || expired.size > 0, expired: [...expired].filter((c) => !fromActive.has(c)) }
 }
 
+/**
+ * D-557 아직 유효한 인증의 끝나는 날 — 올린 인증서(회사 정보 칸)에 적힌 '…까지'. 같은 인증이 여럿이면 가장 늦은 날.
+ * 날짜가 없거나 이미 지난 것은 넣지 않는다(지난 것은 credentialsOf 의 expired).
+ */
+export function certExpiries(record: ClientOpsRecord, today: string): Partial<Record<CertKey, string>> {
+  const out: Partial<Record<CertKey, string>> = {}
+  for (const [k, v] of customFactEntries(record)) {
+    if (!k.startsWith(CUSTOM_FACT_PREFIX) || !String(v).trim()) continue
+    const keys = certsFromText(k.slice(CUSTOM_FACT_PREFIX.length))
+    const until = /(\d{4}-\d{2}-\d{2})\s*까지/.exec(String(v))?.[1]
+    if (!keys.length || !until || until < today) continue
+    for (const c of keys) if (!out[c] || out[c]! < until) out[c] = until
+  }
+  return out
+}
+
 /** '12명' · '12' · '약 12명(대표 포함)' → 12 */
 function countOf(text: string): number | null {
   const m = /(\d[\d,]*)/.exec(text ?? '')

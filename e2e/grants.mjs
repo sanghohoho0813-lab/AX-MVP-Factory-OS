@@ -781,6 +781,39 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.getByTestId('grants-whatif-next').first().click()
   await page.waitForTimeout(800)
   check('D-556 [기업인증 › 벤처기업에서 준비] → 그 업체 벤처 화면', /\/tools\/cert-os\/venture\?client=cli_hansol/.test(page.url()), page.url())
+  // D-557 기업인증 › 벤처 — 맨 위 한 줄 · '받으면 무엇이 달라지나요?' 칸
+  const vLine = page.getByTestId('cert-grant-line')
+  await vLine.waitFor({ timeout: 8000 }).catch(() => {})
+  check('D-557 기업인증 › 벤처 맨 위: "벤처기업 확인을 받으면 지금 열린 지원사업 1건이 더 맞아요"', /벤처기업 확인을 받으면 지금 열린 지원사업 1건이 더 맞아요/.test(await vLine.innerText().catch(() => '')), await vLine.innerText().catch(() => ''))
+  await page.getByTestId('cert-step-3').click()
+  const gain = await page.getByTestId('cert-grant-gain').innerText().catch(() => '')
+  check('D-557 기업인증 › 벤처 4단계: 받으면 더 맞는 공고 제목 · 선정 약속 아님', /벤처기업 확인을 받으면 1건이 더 맞아요/.test(gain) && /벤처기업 성장 바우처/.test(gain) && /선정을 약속하지 않아요/.test(gain), gain)
+  // D-557 인증이 곧 끝나면 — 이노비즈 60일 뒤 끝 · 그 뒤에도 접수하는 이노비즈 공고
+  await page.evaluate((until) => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    // 실제 서류 올리기(확인서 → 회사 정보 '인증서' 칸)와 같은 모양 — 기업인증 화면도 같은 칸을 읽는다
+    for (const c of list) if (c.id === 'cli_hansol') c.customFields = [...(c.customFields ?? []).filter((f) => f.label !== '이노비즈'), { id: 'cf_inno', group: 'credential', label: '이노비즈', value: `확인번호 R-2023-0001 · 확인일 2023-01-02 · ${until}까지 · 중소벤처기업부` }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  }, kst(60))
+  const r3 = await paste(`[경기] 2026년 이노비즈 기업 기술고도화 지원
+소관부처·지자체 경기도
+신청기간 ${dot(kst(-1))} ~ ${dot(kst(90))}
+사업개요 기업당 최대 4,000만원 이내
+지원대상 경기도 소재 이노비즈 인증 제조업 중소기업`)
+  check('D-557 준비: 이노비즈 대상 공고를 읽음', /이노비즈/.test(r3), r3)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1500)
+  const ren = page.getByTestId('grants-renewal-item')
+  await ren.first().waitFor({ timeout: 8000 }).catch(() => {})
+  const renText = (await ren.count()) ? await ren.first().innerText() : ''
+  check('D-557 업체 상세: "이노비즈 인증이 …에 끝나요(60일 남음) — 갱신하지 않으면 공고 1건을 못 해요" · 공고 · 갱신 준비 주소', (await ren.first().getAttribute('data-cert').catch(() => '')) === 'innobiz' && new RegExp(`이노비즈 인증이 ${kst(60)}에 끝나요\\(60일 남음\\) — 갱신하지 않으면 공고 1건을 못 해요`).test(renText) && /이노비즈 기업 기술고도화/.test(renText) && (await page.getByTestId('grants-renewal-next').first().getAttribute('href')) === '/tools/cert-os/innobiz?client=cli_hansol', renText)
+  if (SHOTS) await page.getByTestId('detail-grants').screenshot({ path: `${SHOTS}/d557-renewal.png` }).catch(() => {})
+  await page.getByTestId('grants-renewal-next').first().click()
+  await page.waitForTimeout(1200)
+  const iLine = page.getByTestId('cert-grant-line')
+  await iLine.waitFor({ timeout: 8000 }).catch(() => {})
+  check('D-557 기업인증 › 이노비즈 맨 위: 빨간 갱신 줄', /갱신하지 않으면 공고 1건을 못 해요/.test(await iLine.innerText().catch(() => '')), await iLine.innerText().catch(() => ''))
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d557-cert-innobiz.png` }).catch(() => {})
   check('D-556 화면 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

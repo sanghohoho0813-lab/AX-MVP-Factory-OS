@@ -24,7 +24,7 @@ import {
   type GrantRules,
   type Range,
 } from '../grants/grantMatch'
-import { credentialsOf, missingForMatch, profileOfRecord } from '../grants/grantProfile'
+import { certExpiries, credentialsOf, missingForMatch, profileOfRecord } from '../grants/grantProfile'
 import { DEFAULT_GRANT_FILTER, amountOf, eventWord, factsOf, judgeGrant, manText, normalizeFilter, slotsOf, type GrantFilterSettings } from '../grants/grantFilter'
 import {
   EMPLOYEE_CHIPS,
@@ -41,13 +41,14 @@ import {
   shareMessage,
 } from '../grants/grantText'
 import { exampleNotices } from '../grants/grantExamples'
-import { grantWhatIfs, whatIfLine } from '../grants/grantWhatIf'
+import { certGrantView, grantRenewalRisks, grantWhatIfs, renewalRiskLine, whatIfLine } from '../grants/grantWhatIf'
 import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertRequest } from '../grants/grantStore'
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { industryClasses } from '../grants/grantMatch'
 import { sentAt } from '../grants/grantStore'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
+import { answerFor } from '../clientAdvisor'
 import { applyNews, grantYearStats, withApplyExecuted, applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withGrantChallenge, withoutGrantChallenge, withResultDueDate, withSuccessFee } from '../grants/grantApply'
 import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
@@ -1066,6 +1067,45 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('D556-9 만료된 인증이면 "다시 받으면"', renew.find((w) => w.key === 'cert:venture')?.label === '벤처기업 확인을 다시 받으면' && renew.find((w) => w.key === 'cert:venture')?.renew === true)
   check('D556-10 한 줄 요약', whatIfLine(wi, 2) === '벤처 확인 +2 · 여성기업 +1' || /^벤처 확인 \+2 · /.test(whatIfLine(wi, 2)), whatIfLine(wi, 2))
   check('D556-11 받아 둔 공고가 없으면 빈 목록', grantWhatIfs([], known, TODAY).length === 0)
+}
+
+
+/* ---------------- D-557 인증이 곧 끝나면 · 기업인증 화면의 지원사업 ---------------- */
+{
+  const T = TODAY // 2026-10-01
+  const rec = (fv: Record<string, string>, over: Record<string, unknown> = {}) =>
+    normalizeClientOps({ id: 'c557', companyName: '갱신테스트', businessAddress: '경기도 파주시 문산읍 1', industry: '제조업', establishedAt: '2023-01-01', employeeCount: '3', factValues: fv, ...over } as never)
+  const N = (id: string, rules: Partial<GrantRules>, over: Partial<GrantNotice> = {}) => notice(rules, { id, title: `공고 ${id}`, ...over })
+  const soon = rec({ 'cf:벤처기업': '확인일 2024-01-02 · 2026-12-15까지' })
+  check('D557-1 끝나는 날 — 올린 인증서의 "…까지" · 지난 것은 빼고', certExpiries(soon, T).venture === '2026-12-15' && certExpiries(rec({ 'cf:벤처기업': '2026-09-01까지' }), T).venture === undefined)
+  const list = [
+    N('late', { certs: ['venture'] }, { applyEnd: '2027-01-31' }), // 인증 끝난 뒤에도 접수 — 잃음
+    N('early', { certs: ['venture'] }, { applyEnd: '2026-11-30' }), // 인증 끝나기 전에 마감 — 상관없음
+    N('always', { certs: ['venture'] }, { applyEnd: '', deadlineKind: 'always' }), // 상시 — 잃음
+    N('either', { certs: ['venture', 'innobiz'] }, { applyEnd: '2027-01-31' }), // 이노비즈도 있으면 상관없음
+    N('none', {}, { applyEnd: '2027-01-31' }),
+  ]
+  const p = profileOfRecord(soon, T)
+  const risks = grantRenewalRisks(list, p, T, certExpiries(soon, T), { clientId: 'c557' })
+  const lost = (risks[0]?.lost ?? []).map((m) => m.notice.id).sort().join(',')
+  check('D557-2 갱신하지 않으면 못 하는 공고 — 인증이 끝난 뒤에도 접수하는 것(날짜 · 상시)만', risks.length === 1 && risks[0].cert === 'venture' && lost === 'always,either,late', lost)
+  const both = rec({ 'cf:벤처기업': '2026-12-15까지', certifications: '이노비즈' })
+  const lost2 = (grantRenewalRisks(list, profileOfRecord(both, T), T, certExpiries(both, T))[0]?.lost ?? []).map((m) => m.notice.id).sort().join(',')
+  check('D557-3 다른 인증으로도 맞는 공고(벤처 또는 이노비즈)는 세지 않음', lost2 === 'always,late', lost2)
+  check('D557-4 한 줄 — "벤처기업 확인이 2026-12-15에 끝나요(75일 남음) — 갱신하지 않으면 공고 3건을 못 해요"', renewalRiskLine(risks[0]) === '벤처기업 확인이 2026-12-15에 끝나요(75일 남음) — 갱신하지 않으면 공고 3건을 못 해요', renewalRiskLine(risks[0]))
+  check('D557-5 120일보다 멀면 알리지 않음 · 이어서 준비할 곳 = 기업인증 › 벤처기업', grantRenewalRisks(list, p, T, { venture: '2027-06-01' }).length === 0 && risks[0].next?.href === '/tools/cert-os/venture?client=c557')
+  // 기업인증 화면 — 없는 인증이면 '받으면 n건 더', 있는 인증이면 '이 인증으로 맞는 공고' + 갱신 줄
+  const noCert = rec({ certifications: '없음' })
+  const v1 = certGrantView('venture', noCert, list, T)
+  check('D557-6 기업인증 화면(벤처 없음): 받으면 더 맞는 공고(early · late · always · either)', !v1.held && v1.matches.map((m) => m.notice.id).sort().join(',') === 'always,early,either,late' && v1.risk === '', v1.matches.map((m) => m.notice.id))
+  const v2 = certGrantView('venture', soon, list, T)
+  check('D557-7 기업인증 화면(벤처 있음 · 곧 끝남): 이 인증 덕분에 맞는 공고 · 갱신 줄', v2.held && v2.matches.length === 4 && v2.riskCount === 3 && /갱신하지 않으면 공고 3건/.test(v2.risk), v2)
+  const v3 = certGrantView('venture', soon, list, T, '2027-09-01')
+  check('D557-8 기업인증 진행 기록의 유효기간이 멀면 갱신 줄 없음', v3.held && v3.risk === '')
+  // 업체 질문 답(인증) — 곧 끝나는 인증이 있으면 사실 맨 앞에 같은 한 줄
+  const ans = answerFor('cert', { record: soon, today: T, notices: list })
+  check('D557-9 업체 질문 답(인증): 사실 맨 앞 "…갱신하지 않으면 공고 3건을 못 해요"', ans.facts[0] === renewalRiskLine(risks[0]), ans.facts)
+  check('D557-10 곧 끝나는 인증이 없으면 그 줄 없음', !answerFor('cert', { record: noCert, today: T, notices: list }).facts.some((f) => /갱신하지 않으면/.test(f)))
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

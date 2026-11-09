@@ -341,6 +341,7 @@ export function useCertData() {
     clientId,
     clientName,
     clientRecord,
+    workspaceId,
     loaded,
     loadError,
     reloadAll,
