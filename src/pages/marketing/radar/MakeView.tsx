@@ -221,7 +221,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
         <section className="flex flex-col" data-testid="radar-notebook">
           {ideas.length === 0 ? (
             <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-500" data-testid="make-empty">
-              아직 담은 콘텐츠가 없어요. [이번 주 찍을 것] 에서 카드의 [이번 주로 확정] 을 누르거나, 위에 주제를 직접 적어 담아 주세요.
+              아직 담은 콘텐츠가 없어요. [유튜브] 에서 카드의 [이번 주로 확정] 을 누르거나, 위에 주제를 직접 적어 담아 주세요.
             </p>
           ) : shown.length === 0 ? (
             <p className="t-sub break-keep text-slate-500">이 단계의 콘텐츠가 없어요.</p>

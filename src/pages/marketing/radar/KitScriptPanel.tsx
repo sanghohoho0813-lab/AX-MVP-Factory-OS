@@ -10,6 +10,7 @@ import { AiConfirm } from '../../../components/ai/AiConfirm'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import { charsFor, clampMinutes, localStamp, MINUTES_MAX, SCRIPT_MINUTES, scriptError, scriptRunning, scriptSaved, scriptVersion, subscribeScript, startKitScript, type KitScript } from '../../../services/marketing/kitScript'
 import type { AssistContext } from '../../../services/aiAssist/context'
+import { scoreScript } from '../../../services/marketing/postScore'
 
 export interface KitScriptPanelProps {
   sKey: string
@@ -118,6 +119,7 @@ export function KitScriptPanel({ sKey, title, titleType, titleIndex, context, on
             {saved.minutes}분 · {localStamp(saved.at)}
             {saved.model ? ` · ${saved.model}` : ''}
           </p>
+          <ScriptScore title={saved.title} text={saved.parts.map((p) => p.body).join('\n')} minutes={saved.minutes} />
           <div className="max-h-[28rem] overflow-y-auto rounded-(--radius-control) border border-slate-200 px-3 py-2">
             {saved.parts.map((p, i) => (
               <div key={i} className="mb-3 last:mb-0">
@@ -145,5 +147,31 @@ export function KitScriptPanel({ sKey, title, titleType, titleIndex, context, on
         </div>
       )}
     </div>
+  )
+}
+
+/** D-559 올리기 전 점수(규칙 — AI 아님) — 고른 길이에 맞는 분량 · 제목 숫자 · 컨설팅 글 점검 · 기계 같은 말 · 긴 문장 · 빈칸 */
+function ScriptScore({ title, text, minutes }: { title: string; text: string; minutes: number }) {
+  const sc = scoreScript({ title, text, target: charsFor(minutes) })
+  if (!sc) return null
+  const tone = sc.pass ? 'text-success-700' : sc.bad ? 'text-danger-700' : 'text-warning-800'
+  if (!sc.items.length)
+    return (
+      <p className={`t-sub font-semibold ${tone}`} data-testid="kit-script-score" data-score={sc.score} data-pass="1">
+        올리기 전 점수 {sc.score}점 · 바로 찍어도 돼요
+      </p>
+    )
+  return (
+    <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="kit-script-score" data-score={sc.score} data-pass={sc.pass ? '1' : '0'}>
+      <summary className={`sum-chev tap t-sub cursor-pointer font-semibold ${tone}`}>
+        올리기 전 점수 {sc.score}점 · {sc.pass ? '바로 찍어도 돼요' : `고칠 곳 ${sc.items.length}`}
+      </summary>
+      <ul className="t-sub mt-1 flex list-disc flex-col gap-0.5 pl-5 break-keep text-slate-700">
+        {sc.items.map((x) => (
+          <li key={x.key}>{x.text}</li>
+        ))}
+      </ul>
+      {!sc.pass && <p className="t-meta mt-1 break-keep text-slate-500">위 '더 바라는 점' 칸에 고칠 곳을 적고 다시 만들면 그대로 반영해요.</p>}
+    </details>
   )
 }

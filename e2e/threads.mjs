@@ -242,6 +242,42 @@ await page.waitForTimeout(200)
 check('A5 [이 글로 고치기] → 글 칸 · 본인 댓글 · 확인할 것 · 틀 B 로', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()) && (await page.getByTestId('thr-comment').inputValue()) === '3분 진단은 프로필 링크에서' && /이익 1억/.test(await page.getByTestId('thr-checks').innerText()) && (await page.getByTestId('thr-tpl-B').count()) <= 1)
 check('A6 AI 글 규칙 검사 — 고칠 것 0 · 끝 고르기 쉬운 질문', (await lintKeys(page, 'bad')).length === 0 && /고르기 쉬운 질문/.test(await page.getByTestId('thr-lint').innerText()))
 
+/* ---------------- SC D-559 올리기 전 점수 · [AI로 고칠 곳만 고쳐 쓰기] · 되돌리기 ---------------- */
+{
+  const sc = page.getByTestId('thr-score')
+  check('SC1 AI 1안 — 올리기 전 점수가 글 칸 위에 · 90점 이상이면 "바로 올려도 돼요" · 고쳐 쓰기 단추 없음', Number(await sc.getAttribute('data-score')) >= 90 && (await sc.getAttribute('data-pass')) === '1' && /바로 올려도 돼요/.test(await sc.innerText()) && (await page.getByTestId('thr-score-fix').count()) === 0, await sc.innerText())
+  const cards = await page.getByTestId('thr-ai-draft-score').evaluateAll((xs) => xs.map((x) => Number(x.getAttribute('data-score'))))
+  check('SC2 AI 1~3안 카드마다 점수', cards.length === 3 && cards.every((n) => n >= 0 && n <= 100), cards)
+  const poor = '오늘은 정책자금에 대해 알아보겠습니다\n결론적으로 다양한 방법이 있습니다.\n[실제 사례]\n자세한 건 https://example.kr 에서 상담 신청하세요'
+  await page.getByTestId('thr-body').fill(poor)
+  await page.waitForTimeout(200)
+  const s1 = Number(await sc.getAttribute('data-score'))
+  check('SC3 손볼 글 — 90점 아래 · 고칠 곳 수 · 기계 같은 말 · 첫 줄 숫자 줄이 규칙 검사에 더해짐', s1 < 90 && (await sc.getAttribute('data-pass')) === '0' && /고칠 곳 \d+/.test(await sc.innerText()) && (await lintKeys(page, 'warn')).includes('ai-tone') && (await lintKeys(page, 'warn')).includes('first-num'), { s1, warn: await lintKeys(page, 'warn') })
+  const n0 = llm.length
+  const fixBtn = page.getByTestId('thr-score-fix')
+  check('SC4 보라 단추 [AI로 고칠 곳만 고쳐 쓰기 (n곳)]', (await fixBtn.count()) === 1 && /AI로 고칠 곳만 고쳐 쓰기 \(\d+곳\)/.test(await fixBtn.innerText()))
+  await fixBtn.click()
+  await page.waitForTimeout(450)
+  await fixBtn.click() // D-289 AI 단추 두 번
+  await page.waitForFunction(() => /세금 더 내고/.test(document.querySelector('[data-testid="thr-body"]')?.value ?? ''), null, { timeout: 10000 }).catch(() => {})
+  const fcall = llm.slice(n0).find((x) => x.sys.includes('(threads.write'))
+  check('SC5 한 번만 부름 · 보낸 자료에 [자료 · 고칠 글](지금 글 한 줄씩) · [자료 · 고칠 곳](감점 항목) · 지시문에 고칠 곳만', llm.length - n0 === 1 && !!fcall && /\[자료 · 고칠 글[^\]]*\][\s\S]*줄: 오늘은 정책자금에 대해 알아보겠습니다/.test(fcall.user) && /\[자료 · 고칠 곳[^\]]*\][\s\S]*고칠곳: 1\)/.test(fcall.user) && /본문에 링크/.test(fcall.user) && fcall.sys.includes('[자료 · 고칠 곳] 만 고친 글'), { n: llm.length - n0, heads: [...(fcall?.user ?? '').matchAll(/\[자료 · [^\]]+\]/g)].map((m) => m[0]) })
+  const s2 = Number(await sc.getAttribute('data-score'))
+  check('SC6 고친 글이 글 칸에 · 점수가 올라감 · [고치기 전으로] 보임', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()) && s2 > s1 && (await page.getByTestId('thr-score-undo').count()) === 1, { s1, s2 })
+  await page.getByTestId('thr-score-undo').click()
+  await page.waitForTimeout(150)
+  check('SC7 [고치기 전으로] → 예전 글 · 단추 사라짐', (await page.getByTestId('thr-body').inputValue()) === poor && (await page.getByTestId('thr-score-undo').count()) === 0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByTestId('thr-score').scrollIntoViewIfNeeded()
+  await page.waitForTimeout(200)
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'score-390.png') })
+  check('SC8 390 — 점수 줄 · 단추 넘침 0', (await overflowX(page)) <= 0)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  // 다음 시험(저장)을 위해 AI 1안으로 되돌린다
+  await page.getByTestId('thr-ai-use').first().click()
+  await page.waitForTimeout(200)
+}
+
 /* ---------------- S 저장 · 기록표 ---------------- */
 await page.getByTestId('thr-save').click()
 await page.waitForTimeout(400)

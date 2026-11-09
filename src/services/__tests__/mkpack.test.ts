@@ -569,5 +569,29 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   )
 }
 
+// ---------------- D-560 고정 본업 주제 → 관련 영상(레이더 분류 그대로) · 1주일치 점수 ----------------
+{
+  const { fixedTopicVideos, withFixedVideos, fixedKeywords, fixedPackSource } = await import('../marketing/noticeKeywords')
+  const { weekLintSummary: wls } = await import('../marketing/weekPlan')
+  const keys = fixedKeywords([], '2026-11-09')
+  const sub = keys.find((k) => k.topicId === 'sme_subsidy')!
+  const v = (id: string, ratio: number, mine = false) => ({ id, ratio, mine, title: `영상 ${id}` })
+  const cs = [
+    { topicId: 'sme_subsidy', hits: [v('a', 1.2), v('b', 3.1), v('m', 9, true)] },
+    { topicId: 'employ_subsidy', hits: [v('c', 2.0), v('b', 3.1)] },
+    { topicId: 'policy_fund', hits: [v('z', 5)] },
+  ]
+  const got = fixedTopicVideos(cs, sub)
+  check('D560-F1 고정 주제 영상 — 묶은 주제(정부지원금 · 고용지원금)까지 · 평소보다 잘된 순 · 겹침 0 · 내 채널 영상 빼고 · 다른 주제 섞이지 않음', got.map((x) => x.id).join() === 'b,c,a', got.map((x) => x.id))
+  const src = fixedPackSource(sub, '2026-11-09')!
+  const with2 = withFixedVideos(src, got)
+  check('D560-F2 묶음 재료에 영상 근거 — 편수 한 줄 · 참고 영상 제목 셋까지 · 영상이 없으면 그대로', with2.refs.length === 3 && /관련 영상 3편/.test(with2.why) && with2.facts.some((f) => f.includes('관련 영상 3편')) && withFixedVideos(src, []) === src)
+  check('D560-F3 고정 주제 다섯 모두 영상 함수가 돈다(분류가 없으면 0)', keys.length === 5 && keys.every((k) => Array.isArray(fixedTopicVideos([], k))))
+  const tp2 = weekSetup([], keys.map((k) => ({ source: fixedPackSource(k, '2026-11-09')!, fresh: 0 })), '2026-11-09')
+  const wk = buildWeek(tp2, DEFAULT_BRIEF, '2026-11-09', null)
+  const sum2 = wls(wk)
+  check('D559-W1 1주일치 — 올리기 전 점수 평균(0~100) · 바로 올릴 글 수(0~전체)', sum2.avg >= 0 && sum2.avg <= 100 && sum2.ready >= 0 && sum2.ready <= sum2.total, sum2)
+}
+
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

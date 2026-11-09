@@ -80,6 +80,8 @@ import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
 import { briefCores } from '../../services/marketing/brandAngle'
 import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
 import { AiConfirm } from '../../components/ai/AiConfirm'
+import { EXTRA_SCORE_KEYS, fixLines, scorePost } from '../../services/marketing/postScore'
+import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -321,6 +323,9 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   const tpl = draft.template ? templateOf(draft.template) : undefined
   const hotKeys = new Set((weekRef?.items ?? []).map((x) => x.template))
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
+  // D-559 [AI로 고칠 곳만 고쳐 쓰기] — 고친 글(fixed)이 글 칸에 그대로 있는 동안만 [고치기 전으로](before)
+  // D-560 직접 [완성 글 쓰기] 를 누르면 새 1안이 글 칸에 — 예전 글은 같은 [되돌리기] 로(why = 'new')
+  const [fix, setFix] = useState<{ busy: boolean; error: string; before: string; fixed: string; why?: 'fix' | 'new' }>({ busy: false, error: '', before: '', fixed: '' })
   const [saving, setSaving] = useState(false)
   // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
   const [request, setRequest] = useState('')
@@ -328,8 +333,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   const baseTags = useMemo(() => myTopicTags({ used: [...store.posts].sort((a, b) => b.savedAt.localeCompare(a.savedAt)).map((p) => p.tag), cores: briefCores(brief).map((c) => c.label) }), [store.posts, brief])
   const myTags = draft.tag && !baseTags.includes(cleanTag(draft.tag)) ? [cleanTag(draft.tag), ...baseTags].slice(0, 9) : baseTags
   const [tagInput, setTagInput] = useState('')
-  const writeContext = (use: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }) =>
-    withWriteExtras(threadsContext({ goal: use.goal, template: use.template, topic: draft.topic, tag: use.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef, myTags }), { brief, request })
+  const writeContext = (use: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }, revise?: { body: string; fixes: readonly string[] }) =>
+    withWriteExtras(threadsContext({ goal: use.goal, template: use.template, topic: draft.topic, tag: use.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef, myTags }), { brief, request, revise })
   /**
    * D-364 📐 한 단계씩 — 글이 아직 없으면 2단계(글 칸 · 규칙 검사)는 한 줄 + [직접 쓰기].
    * AI · 예시 · 빈 틀 · 기록표에서 연 글이 들어오면 펼치고, 쓰는 동안(글을 다 지워도) 접지 않는다. [모두 펼치기] 면 처음부터 펼침.
@@ -343,6 +348,9 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   const editorOpen = editorAll || handOpen || hasBody
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today, factsText])
+  // D-559 올리기 전 점수(규칙) — 규칙 검사 줄 + 공통 점검(기계 같은 말 · 긴 문장 · 첫 줄 숫자)
+  const score = useMemo(() => scorePost({ kind: 'thread', text: draft.body, lines: lint.lines }), [draft.body, lint])
+  const lintShown = useMemo(() => [...lint.lines, ...(score?.items ?? []).filter((x) => EXTRA_SCORE_KEYS.has(x.key)).map((x) => ({ key: x.key, level: x.level, text: x.text }))], [lint, score])
   const set = (part: Partial<Draft>) => setDraft((d) => ({ ...d, ...part }))
   const bodyNow = useRef(draft.body)
   bodyNow.current = draft.body
@@ -374,9 +382,14 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     startBody(skeletonDraft(t, draft.topic), 'hand')
   }
 
-  /** auto — 글 칸이 비어 있으면 1안을 바로 넣는다(쓰던 글은 덮지 않는다) */
+  /**
+   * auto — 누른 단추가 [완성 글 쓰기] 면 1안을 글 칸에 바로 넣는다.
+   * D-560 대표 "뭐 눌러도 오른쪽 아래 문구만 뜨고 변화가 없다" — 예전에는 글 칸에 글이 있으면 넣지 않아(아래로 내려 보면) 아무 일도 안 일어난 것처럼 보였다.
+   * 이제 누른 순간의 글 칸 → 새 1안(예전 글은 [이전 글로 되돌리기]). 기다리는 사이 직접 고친 글만 덮지 않는다.
+   */
   const runAi = async (pick?: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }, auto = false) => {
     if (ai.busy) return
+    const atClick = bodyNow.current
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { goal: draft.goal, template: draft.template, tag: draft.tag }
     try {
@@ -387,12 +400,17 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
       setAi({ busy: false, error: '', drafts })
       if (tag) setDraft((d) => (d.tag ? d : { ...d, tag }))
       if (auto) {
-        // 기다리는 사이 글 칸에 쓴 것이 있으면 덮지 않는다(가장 최근 화면 값으로 본다)
+        // 기다리는 사이 글 칸을 직접 고쳤으면 덮지 않는다(누른 순간의 글과 지금 글이 다르면)
         const first = drafts[0]
-        const fill = !bodyNow.current.trim()
-        if (fill) set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template, goal: goalFor(first.template, use.goal) } : {}) })
-        showToast(fill ? '완성 글(1안)을 글 칸에 넣었어요 — 다른 안은 "AI로 완성 글 쓰기" 아래에 있어요.' : '쓰던 글은 그대로 두었어요 — AI 글은 "AI로 완성 글 쓰기" 아래에서 골라 넣어요.')
-        if (fill) window.setTimeout(() => document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+        const fill = bodyNow.current === atClick
+        if (fill) {
+          set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template, goal: goalFor(first.template, use.goal) } : {}) })
+          const had = atClick.trim() && atClick.trim() !== first.body.trim()
+          setFix(had ? { busy: false, error: '', before: atClick, fixed: first.body, why: 'new' } : { busy: false, error: '', before: '', fixed: '' })
+          showToast(`${had ? '새 글(1안)로 바꿨어요 — 예전 글은 [이전 글로 되돌리기] 로 돌릴 수 있어요.' : '완성 글(1안)을 글 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 글 칸 바로 위 단추로 바꿔 봐요.' : ''}`)
+          // D-560 대표 "생기면 아래에 딱 떠야 눈에 바로 띈다" — 글 칸으로 내려가 잠깐 빛나게
+          scrollAndFlash('thr-editor')
+        } else showToast('기다리는 사이 고치신 글은 그대로 두었어요 — AI 글은 위 "AI로 완성 글 쓰기" 아래에서 골라 넣어요.')
       }
     } catch (e) {
       setAi({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', drafts: [] })
@@ -427,6 +445,46 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     set({ body: rows.join('\n') })
     showToast('첫 줄을 바꿨어요.')
     document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const runFix = async () => {
+    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
+    const before = draft.body
+    const from = score.score
+    setFix({ busy: true, error: '', before: '', fixed: '' })
+    try {
+      const use = { goal: draft.goal, template: draft.template, tag: draft.tag }
+      const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context: writeContext(use, { body: before, fixes: fixLines(score) }) })
+      const { drafts } = parseThreadDrafts(run.structured, myTags)
+      const first = drafts[0]
+      if (!first?.body.trim()) throw new AssistError('provider_error', 'AI 답에서 고친 글을 찾지 못했어요 — 다시 눌러 주세요.')
+      setAi({ busy: false, error: '', drafts })
+      // 기다리는 사이 글 칸을 고쳤으면 덮지 않는다 — 고친 글은 아래 1안에
+      if (bodyNow.current !== before) {
+        setFix({ busy: false, error: '', before: '', fixed: '' })
+        showToast('기다리는 사이 글을 고치셔서 그대로 두었어요 — AI가 고친 글은 "AI로 완성 글 쓰기" 아래 1안에 있어요.')
+        return
+      }
+      set({ body: first.body, source: 'ai', checks: first.checks, ...(first.selfComment ? { selfComment: first.selfComment } : {}) })
+      setFix({ busy: false, error: '', before, fixed: first.body })
+      const after = scorePost({ kind: 'thread', text: first.body, lines: lintThreadPost({ body: first.body, template: draft.template, tag: draft.tag, recent: store.posts, id: draft.id, today, facts: factsText }).lines })
+      showToast(`고쳐 썼어요 — ${from}점 → ${after?.score ?? from}점`)
+    } catch (e) {
+      setFix({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', before: '', fixed: '' })
+    }
+  }
+  const undoFix = () => {
+    if (!fix.before) return
+    set({ body: fix.before })
+    setFix({ busy: false, error: '', before: '', fixed: '' })
+    showToast(fix.why === 'new' ? '이전 글로 돌렸어요.' : '고치기 전 글로 돌렸어요.')
+  }
+
+  /** D-560 글 칸 위 '다른 안' — 바로 바꾸고 예전 글은 [이전 글로 되돌리기] */
+  const swapDraft = (d: ThreadDraft) => {
+    const prev = draft.body
+    if (prev.trim() === d.body.trim()) return
+    set({ body: d.body, source: 'ai', selfComment: d.selfComment, checks: d.checks, ...(d.template ? { template: d.template, goal: goalFor(d.template, draft.goal) } : {}) })
+    setFix(prev.trim() ? { busy: false, error: '', before: prev, fixed: d.body, why: 'new' } : { busy: false, error: '', before: '', fixed: '' })
   }
   const takeDraft = (d: ThreadDraft) => {
     startBody(d.body, 'ai')
@@ -759,6 +817,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" data-testid="thr-editor">
           <div className="flex min-w-0 flex-col gap-2">
+            {ai.drafts.length > 1 && <AltDrafts drafts={ai.drafts} current={draft.body} tag={draft.tag} recent={store.posts} facts={factsText} onPick={swapDraft} />}
             <label className="flex flex-col gap-1">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="t-sub font-semibold text-slate-700">
@@ -814,6 +873,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
             {(draft.template === 'P' || lint.ending === 'material') && <ShareKit testId="thr-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
+            <PostScoreBar score={draft.body.trim() ? score : null} testPrefix="thr" aiOk={aiOk} busy={fix.busy} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.body ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 글로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
             <div className="flex flex-wrap items-center gap-2">
               <HintTip tip="글이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산). 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>
@@ -821,7 +881,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
               {lint.warn > 0 && <Badge tone="warning">볼 것 {lint.warn}</Badge>}
             </div>
-            <LintList lines={draft.body.trim() ? lint.lines : []} testId="thr-lint" />
+            <LintList lines={draft.body.trim() ? lintShown : []} testId="thr-lint" />
             {!draft.body.trim() && <p className="t-sub break-keep text-slate-500">글을 쓰면 여기서 바로 확인해요.</p>}
             <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2">
               <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">올리기 전 사람이 볼 것 {BEFORE_POST.length}가지</summary>
@@ -900,8 +960,37 @@ function MiniTemplate({ t, on, rec, hot, ctx, onClick }: { t: ThreadTemplate; on
   )
 }
 
+/** D-560 글 칸 바로 위 — AI 가 함께 쓴 안(1 · 2 · 3안)을 점수와 함께 · 누르면 그 안으로(예전 글은 되돌리기) */
+function AltDrafts({ drafts, current, tag, recent, facts, onPick }: { drafts: readonly ThreadDraft[]; current: string; tag: string; recent: readonly ThreadPost[]; facts: string; onPick: (d: ThreadDraft) => void }) {
+  return (
+    <span className="flex flex-wrap items-center gap-1.5" data-testid="thr-alt">
+      <span className="t-sub font-semibold text-slate-700">AI가 쓴 안</span>
+      {drafts.map((d, i) => {
+        const sc = scorePost({ kind: 'thread', text: d.body, lines: lintThreadPost({ body: d.body, template: d.template, tag, recent, facts }).lines })
+        const on = d.body.trim() === current.trim()
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(d)}
+            aria-pressed={on}
+            className={`tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50'}`}
+            data-testid="thr-alt-btn"
+            data-on={on ? '1' : '0'}
+          >
+            {i + 1}안{d.template ? ` · ${d.template}` : ''}
+            {sc && <span className={`t-meta font-bold ${sc.pass ? 'text-success-700' : 'text-warning-800'}`}>{sc.score}점</span>}
+            {on && <span className="t-meta font-normal">(지금)</span>}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
+
 function AiDraftCard({ n, d, tag, recent, facts, onUse }: { n: number; d: ThreadDraft; tag: string; recent: readonly ThreadPost[]; facts: string; onUse: () => void }) {
   const lint = lintThreadPost({ body: d.body, template: d.template, tag, recent, facts })
+  const sc = scorePost({ kind: 'thread', text: d.body, lines: lint.lines })
   const t = d.template ? templateOf(d.template) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-ai-draft">
@@ -909,6 +998,11 @@ function AiDraftCard({ n, d, tag, recent, facts, onUse }: { n: number; d: Thread
         <span className="t-sub font-bold text-slate-900">{n}안</span>
         {t && <Badge tone="brand">{t.key} {t.name}</Badge>}
         <Badge tone={lint.bad ? 'danger' : 'success'}>{lint.chars}자 · 고칠 것 {lint.bad}</Badge>
+        {sc && (
+          <span className="contents" data-testid="thr-ai-draft-score" data-score={sc.score}>
+            <Badge tone={sc.pass ? 'success' : sc.bad ? 'danger' : 'warning'}>{sc.score}점</Badge>
+          </span>
+        )}
       </div>
       <p className="t-sub max-h-48 overflow-y-auto break-keep whitespace-pre-line text-slate-800">{d.body}</p>
       {d.selfComment && <p className="t-meta break-keep text-slate-500">본인 댓글: {d.selfComment}</p>}

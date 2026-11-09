@@ -140,11 +140,20 @@ check('Q4 [AI로 바로 쓰기] 한 번 → 1안이 글 칸에 바로 · 다른 
 check('Q5 AI 에 보낸 자료 — 추천한 틀 · 소재 · 주제 태그(정부지원사업)', !!call && call.user.includes(`고른틀: ${recKey} `) && /소재: 고용지원금/.test(call.user) && /정부지원사업/.test(call.user), call?.user.slice(0, 400))
 check('Q6 1안의 확인할 것 · 규칙 검사가 바로 보임', /신청 시기 원문 확인/.test(await page.getByTestId('thr-checks').innerText()) && (await page.getByTestId('thr-lint').count()) === 1)
 console.log(`MEASURE threads-after pc clicks=${clicks + 1} typed=0 (마케팅 목차 [스레드] 1 + 칩 1 + AI 1)`)
-// 쓰던 글은 덮지 않는다
+// D-560 대표 "뭐 눌러도 오른쪽 아래 문구만 뜨고 변화가 없다" — 다시 누르면 새 1안이 글 칸에 · 예전 글은 [이전 글로 되돌리기] · 글 칸 위 'AI가 쓴 안' 3개
 await page.getByTestId('thr-body').fill('대표님이 직접 고친 글')
 { const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
-await page.waitForTimeout(600)
-check('Q7 글 칸에 쓴 것이 있으면 다시 눌러도 덮지 않음(다른 안만 새로)', (await page.getByTestId('thr-body').inputValue()) === '대표님이 직접 고친 글' && (await page.getByTestId('thr-ai-draft').count()) === 3)
+await page.waitForFunction(() => /직원 뽑기 전에 이것부터/.test(document.querySelector('[data-testid="thr-body"]')?.value ?? ''), null, { timeout: 10000 }).catch(() => {})
+await page.waitForTimeout(400)
+const undo7 = page.getByTestId('thr-score-undo')
+const editorTop = await page.getByTestId('thr-editor').evaluate((e) => e.getBoundingClientRect().top)
+check('Q7 다시 누르면 새 1안이 글 칸에 · [이전 글로 되돌리기] · 글 칸 위 AI가 쓴 안 3개(지금 = 1안) · 글 칸이 화면 안으로', /직원 뽑기 전에 이것부터/.test(await page.getByTestId('thr-body').inputValue()) && (await undo7.count()) === 1 && /이전 글로 되돌리기/.test(await undo7.innerText()) && (await page.getByTestId('thr-alt-btn').count()) === 3 && (await page.locator('[data-testid="thr-alt-btn"][data-on="1"]').count()) === 1 && editorTop >= -50 && editorTop < 700, { editorTop })
+await undo7.click()
+await page.waitForTimeout(150)
+check('Q7b [이전 글로 되돌리기] → 직접 고친 글 그대로 돌아옴', (await page.getByTestId('thr-body').inputValue()) === '대표님이 직접 고친 글' && (await page.getByTestId('thr-score-undo').count()) === 0)
+await page.getByTestId('thr-alt-btn').nth(1).click()
+await page.waitForTimeout(150)
+check('Q7c 글 칸 위 [2안] → 2안으로 바뀜 · 다시 되돌리기 보임', (await page.locator('[data-testid="thr-alt-btn"][data-on="1"]').count()) === 1 && (await page.getByTestId('thr-alt-btn').nth(1).getAttribute('data-on')) === '1' && (await page.getByTestId('thr-score-undo').count()) === 1)
 // 형식 바꾸기 → 펼쳐지고, 직접 고른 틀은 칩이 덮지 않는다
 // D-298 AI 1안이 다른 틀(A)로 썼으면 지금 형식은 그 틀 — 원하는 반응도 그 틀에 맞춰서, 펼치면 그 틀이 골라져 있다(예전: 반응 목록에 없어 아무것도 안 골라져 보임)
 const nowKey = /· ([A-X]) /.exec(await page.getByTestId('thr-qs-rec-label').innerText())?.[1] ?? ''

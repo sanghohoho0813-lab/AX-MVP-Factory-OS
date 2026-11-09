@@ -438,6 +438,8 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   const keyIds = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
   const fixedIds = await p.getByTestId('mk-fixed-key').evaluateAll((els) => els.map((e) => e.dataset.key))
   const fixedNames = (await p.getByTestId('mk-fixed-key').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  // D-560 대표: "고정 키워드는 왜 관련 영상이 하나도 안 떠" — 고정 칸에도 참고 채널 최근 30일 관련 영상 수
+  const fixedVideoNs = await p.getByTestId('mk-fixed-videos').evaluateAll((els) => els.map((e) => ({ key: e.closest('[data-testid="mk-fixed-key"]')?.dataset.key, n: Number(e.dataset.n) })))
   const noteOf = async (key) => (await p.locator(`[data-testid="mk-fixed-key"][data-key="${key}"] [data-testid="mk-key-note"]`).innerText().catch(() => '')) ?? ''
   // D-295 대표: 정책자금 · 고용지원금 · 기업인증은 새 공고가 떴다고 이번 주 키워드에 올리지 말고 고정 키워드로(정부지원금 · 정부지원사업까지 5개)
   // D-558 대표: 정부지원금 · 고용지원금은 한 칸으로 묶고, 빈 칸에 절세 · 세금 신고를 고정
@@ -465,6 +467,9 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await p.waitForTimeout(200)
   const why = (await p.getByTestId('mk-pack-notices').innerText().catch(() => '')) ?? ''
   check('K6 고정 키워드(정부지원금 · 고용지원금 한 칸) 누르면 묶음 — 왜 지금(이번 주 새 공고 4건 = 지원금 + 고용지원금 · 곧 마감) · 실제 공고 이름 · 마감 · [공고] 링크', why.includes('새로 4건') && why.includes('정부지원금 · 고용지원금') && why.includes('2026 소상공인 경영개선 지원사업 모집') && why.includes('마감') && (await p.getByTestId('mk-pack-notices').getByRole('link', { name: /공고/ }).count()) >= 2, why.slice(0, 300))
+  const fixedPackVids = await p.getByTestId('mk-pack-videos').locator('li').count()
+  const fixedPackNone = await p.getByTestId('mk-pack-videos-none').count()
+  check('K6b D-560 고정 키워드 칸에 \'영상 n편\'(하나 이상 칸 > 0) · 묶음 \'왜 지금\' 에 그 영상 목록(없으면 없다는 한 줄)', fixedVideoNs.some((v) => v.n > 0) && (fixedPackVids > 0 || fixedPackNone === 1), { fixedVideoNs, fixedPackVids, fixedPackNone })
   const packAll = (await p.getByTestId('mk-pack').innerText()) ?? ''
   check('K7 묶음 머리 "고정 키워드" · 첫 문장 이번 주 공고 수(금액은 짓지 않음)', packAll.includes('우리 본업 주제') && packAll.includes('이번 주에만 정부지원금 · 고용지원금 공고가 4건') && !/\d+\s*억\s*원/.test(packAll), packAll.slice(0, 200))
   await shot(p, 'K-pack')

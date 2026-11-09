@@ -192,6 +192,36 @@ await page.getByTestId('sht-ai-use').first().click()
 await page.waitForTimeout(200)
 check('A4 [이 대본으로 고치기] → 대본 · 캡션 · 해시태그 · 확인할 것', /둘 다 걸리면/.test(await page.getByTestId('sht-script').inputValue()) && /확인기관/.test(await page.getByTestId('sht-caption').inputValue()) && (await page.getByTestId('sht-tags').inputValue()) === '#벤처기업확인 #창업 #세금' && /특허 출원/.test(await page.getByTestId('sht-checks').innerText()))
 
+/* ---------------- SC D-559 올리기 전 점수 · [AI로 고칠 곳만 고쳐 쓰기] · 되돌리기 ---------------- */
+{
+  const sc = page.getByTestId('sht-score')
+  const first = Number(await sc.getAttribute('data-score'))
+  const cards = await page.getByTestId('sht-ai-draft-score').evaluateAll((xs) => xs.map((x) => Number(x.getAttribute('data-score'))))
+  check('SC1 대본 칸 위에 올리기 전 점수 · AI 1 · 2안 카드마다 점수', first >= 0 && first <= 100 && /\d+점/.test(await sc.innerText()) && cards.length === 2, { first, cards })
+  const keep = { script: await page.getByTestId('sht-script').inputValue(), caption: await page.getByTestId('sht-caption').inputValue() }
+  const poor = '[0:00] 안녕하세요 여러분 오늘은 정책자금에 대해 알아보겠습니다\n[0:05] 결론적으로 다양한 방법이 있습니다 [실제 사례]\n[0:10] 지금 바로 상담 신청하세요'
+  await page.getByTestId('sht-script').fill(poor)
+  await page.waitForTimeout(200)
+  const s1 = Number(await sc.getAttribute('data-score'))
+  check('SC2 손볼 대본 — 90점 아래 · 기계 같은 말 줄 · 보라 단추', s1 < 90 && (await sc.getAttribute('data-pass')) === '0' && (await lintKeys(page, 'warn')).includes('ai-tone') && (await page.getByTestId('sht-score-fix').count()) === 1, { s1, warn: await lintKeys(page, 'warn') })
+  const n0 = llm.length
+  const fixBtn = page.getByTestId('sht-score-fix')
+  await fixBtn.click()
+  await page.waitForTimeout(450)
+  await fixBtn.click() // D-289 AI 단추 두 번
+  await page.waitForFunction(() => /둘 다 걸리면/.test(document.querySelector('[data-testid="sht-script"]')?.value ?? ''), null, { timeout: 10000 }).catch(() => {})
+  const fcall = llm.slice(n0).find((x) => x.sys.includes('(shorts.write'))
+  check('SC3 한 번만 부름 · [자료 · 고칠 글](대본 한 줄씩 + 설명 글) · [자료 · 고칠 곳] · 지시문에 고칠 곳만', llm.length - n0 === 1 && !!fcall && /\[자료 · 고칠 글[^\]]*\][\s\S]*줄: \[0:00\] 안녕하세요/.test(fcall.user) && /설명 글: /.test(fcall.user) && /\[자료 · 고칠 곳[^\]]*\][\s\S]*고칠곳: 1\)/.test(fcall.user) && fcall.sys.includes('[자료 · 고칠 곳] 만 고친 대본'), { n: llm.length - n0, heads: [...(fcall?.user ?? '').matchAll(/\[자료 · [^\]]+\]/g)].map((m) => m[0]) })
+  const s2 = Number(await sc.getAttribute('data-score'))
+  check('SC4 고친 대본이 칸에 · 점수가 올라감 · [고치기 전으로]', /둘 다 걸리면/.test(await page.getByTestId('sht-script').inputValue()) && s2 > s1 && (await page.getByTestId('sht-score-undo').count()) === 1, { s1, s2 })
+  await page.getByTestId('sht-score-undo').click()
+  await page.waitForTimeout(150)
+  check('SC5 [고치기 전으로] → 예전 대본 · 설명 글 그대로', (await page.getByTestId('sht-script').inputValue()) === poor && (await page.getByTestId('sht-caption').inputValue()) === keep.caption)
+  // 다음 시험(저장)을 위해 AI 1안 대본으로
+  await page.getByTestId('sht-script').fill(keep.script)
+  await page.waitForTimeout(150)
+}
+
 /* ---------------- S 저장 · 기록표 ---------------- */
 await page.getByTestId('sht-save').click()
 await page.waitForTimeout(400)

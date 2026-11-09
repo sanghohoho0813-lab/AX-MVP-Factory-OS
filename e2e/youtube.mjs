@@ -124,7 +124,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
   // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
-  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 한 줄 = 무엇을 하는 곳인지(쉬운 말 · D-507) + (콘텐츠 레이더)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 3 && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('만드는 곳') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
+  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 한 줄 = 무엇을 하는 곳인지(쉬운 말 · D-507) + (콘텐츠 레이더)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 2 && (await page.getByTestId('mk-fixed-key').count()) === 5 /* D-558 고정 주제(고용지원금 · 법인세)는 10개에서 빠짐 — 이 시험 자료는 뜨는 주제 2 + 고정 5 */ && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('만드는 곳') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'), { home: await page.getByTestId('mk-home').isVisible(), keys: await page.getByTestId('mk-key').count(), more: await page.getByTestId('mk-more').isVisible(), plan: await page.getByTestId('radar-plan').isVisible(), h1: await page.locator('main h1').first().innerText().catch(() => ''), sub: await page.getByTestId('radar-subtitle').innerText().catch(() => '') })
   await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
@@ -445,7 +445,8 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await panel.getByRole('button', { name: '적용' }).click()
   await page.waitForTimeout(400)
   const mAxes = await page.getByTestId('radar-top').getByTestId('radar-opp').evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))
-  check('비중 가이드: 시장 100 · 나머지 0 → 앞 3장 시장수요(가이드는 바꿀 수 있다)', mAxes.length === 3 && mAxes.every((a) => a === 'market'), mAxes)
+  // D-558 고정 본업 주제(고용지원금 · 절세 · 세금 신고 …)는 '이번 주 뜨는 주제' 에 다시 나오지 않는다 — 이 시험 자료(채널 4곳 · 영상 16편)의 시장 후보는 둘만 남는다
+  check('비중 가이드: 시장 100 · 나머지 0 → 시장 후보가 먼저(남은 시장 후보 둘이 앞 2장 · AI 후보 0 · 가이드는 바꿀 수 있다)', mAxes.length === 3 && mAxes[0] === 'market' && mAxes[1] === 'market' && !mAxes.includes('axai'), mAxes)
   await page.getByTestId('radar-mix').click()
   await page.getByTestId('radar-mix-panel').getByRole('button', { name: /기본값/ }).click()
   await page.getByTestId('radar-mix-panel').getByRole('button', { name: '적용' }).click()
@@ -985,7 +986,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const order = await page.evaluate(() => ['radar-domain-economy', 'radar-ai-keywords', 'radar-rising', 'radar-side'].map((id) => Math.round(document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1)))
   check(`D227-6 ${T} [전부 보기] — 예전처럼 네 판이 한 화면에(흐름 → AI → 급상승 → 사이드 순) · 지운 기능 0`, all.flow === 1 && all.ai === 1 && all.hot === 1 && all.side === 1 && order.every((y, i) => i === 0 || y > order[i - 1]), { all, order })
   const tabs = await page.locator('[data-testid^="yt-view-"]').evaluateAll((els) => els.map((e) => ({ k: e.dataset.testid, svg: e.querySelectorAll('svg, [data-icon-slot]').length, on: e.getAttribute('aria-selected') === 'true', img: getComputedStyle(e).backgroundImage })))
-  check(`D227-7 ${T} 화면 탭 5개(D-231 내 콘텐츠 더함) 모두 아이콘(D-295 대표 아이콘 · YouTube 로고 포함) · 고른 탭은 하나 — D-370 빨강 그라데이션 대신 차분한 강조(그라데이션 없음)`, tabs.length === 5 && tabs.every((t) => t.svg >= 1) && tabs.filter((t) => t.on).length === 1 && !/gradient/.test(tabs.find((t) => t.on)?.img ?? ''), tabs)
+  // D-560 목차 칸 = 유튜브(만들기 줄) · 남의 인기 영상(인기 · 채널 · 올리는 때를 한 칸으로) · 내 콘텐츠 — 이 화면(유튜브)에서는 셋
+  check(`D227-7 ${T} 화면 탭 3개(D-560 유튜브 · 남의 인기 영상 · 내 콘텐츠) 모두 아이콘(D-295 대표 아이콘 · YouTube 로고 포함) · 고른 탭은 하나 — D-370 빨강 그라데이션 대신 차분한 강조(그라데이션 없음)`, tabs.length === 3 && tabs.every((t) => t.svg >= 1) && tabs.filter((t) => t.on).length === 1 && !/gradient/.test(tabs.find((t) => t.on)?.img ?? ''), tabs)
   const pickH = await boards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
   const labelW = await page.locator('[data-testid="radar-board-pick"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check(`D227-8 ${T} 판 칸 44px 이상 · 이름 칸 짜부라짐 0(폭 ≥ 90) · 가로 넘침 0 · 오류 0`, pickH.every((h) => h >= 44) && labelW.every((w) => w >= 90) && (await over()) <= 0 && errs.length === 0, { pickH, labelW, over: await over(), errs })
@@ -1013,7 +1015,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   // MK-SIMPLE(D-553) 목차 안에 [마케팅 처음으로] · 휴대폰 [다른 화면] 도 있다 — 칸(yt-view-* · mk-tab-*)만 순서대로 본다
   const tabIds = (await page.getByTestId('mk-tabs').locator('a, button').evaluateAll((els) => els.map((e) => e.dataset.testid))).filter((id) => /^(yt-view|mk-tab)-/.test(id ?? ''))
-  check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 9칸(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 · 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-plan,yt-view-top,yt-view-channels,yt-view-analysis,yt-view-make,mk-tab-threads,mk-tab-shorts,mk-tab-content,mk-tab-homepage', tabIds)
+  // D-560 대표 "이번 주 찍을 것 이름을 유튜브로 바꾸고 스레드 옆에 · 인기 영상 ~ 나머지도 합칠 수 있으면 합쳐" — 살펴보기 2칸 · 만들기 5칸(유튜브가 스레드 옆 맨 앞)
+  check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 7칸(살펴보기: 남의 인기 영상 · 내 콘텐츠 / 만들기: 유튜브 · 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-top,yt-view-make,yt-view-plan,mk-tab-threads,mk-tab-shorts,mk-tab-content,mk-tab-homepage', tabIds)
   const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
   // D-253: '미래AI랩 관점' 상자 + 찍기 키트 두 상자 → '이번 주 이렇게 찍으세요' 한 상자(이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 · 제목 후보 · 썸네일)
   const kit = hero.getByTestId('radar-kit')

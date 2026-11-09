@@ -49,13 +49,21 @@ export const briefSection = (brief: ChannelBrief) => ({ name: '채널 설계 기
  * D-558 스레드 · 릴스 [AI로 완성 글 쓰기] — 화면이 만든 자료에 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙)을 맨 앞에,
  * 요청 한 줄을 두 번째에 붙인다([자료 · 요청] — 서버 지시문이 먼저 따른다). 요청이 비면 붙이지 않는다.
  */
-export function withWriteExtras<T extends { sections: { name: string; rows: unknown[] }[] }>(ctx: T, extra: { brief?: ChannelBrief | null; request?: string }): T {
+export function withWriteExtras<T extends { sections: { name: string; rows: unknown[] }[] }>(
+  ctx: T,
+  extra: { brief?: ChannelBrief | null; request?: string; revise?: { body: string; fixes: readonly string[] } | null },
+): T {
   const req = (extra.request ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)
   const [first, ...rest] = ctx.sections
+  // D-559 [고칠 곳만 AI로 고쳐 쓰기] — 지금 글을 한 줄씩(서버가 칸 안 줄바꿈을 없애므로) + 점수에서 뺀 곳
+  const lines = (extra.revise?.body ?? '').replace(/\r\n?/g, '\n').split('\n').map((l) => l.trim())
+  const reviseRows = lines.some(Boolean) ? lines.slice(0, 80).map((l) => ({ 줄: l || '(빈 줄)' })) : []
+  const fixRows = (extra.revise?.fixes ?? []).filter((f) => f.trim()).slice(0, 8).map((f) => ({ 고칠곳: f.trim() }))
   const sections = [
     ...(extra.brief ? [briefSection(extra.brief)] : []),
     ...(first ? [first] : []),
     ...(req ? [{ name: '요청', rows: [{ 요청: req }] }] : []),
+    ...(reviseRows.length ? [{ name: '고칠 글', rows: reviseRows }, { name: '고칠 곳', rows: fixRows.length ? fixRows : [{ 고칠곳: '읽기 쉽게 다듬기' }] }] : []),
     ...rest,
   ]
   return { ...ctx, sections }

@@ -20,6 +20,7 @@ import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { makePack, withAi, type ContentPack } from '../../../services/marketing/contentPack'
 import { templateOf } from '../../../services/marketing/threads'
 import { PLATFORMS } from '../../../services/marketing/shorts'
+import { scoreFromCounts } from '../../../services/marketing/postScore'
 import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
 import { markWeekSeen, startWeekAi, stopWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
 import { weekItemId } from '../../../services/marketing/weekCollect'
@@ -497,6 +498,9 @@ export function WeekView({
           점검: 이번 주 글 {lint.total}개 중 통과 {lint.pass}
           {lint.bad ? ` · 고칠 곳 ${lint.bad}` : ''}
           {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
+          <span className="block font-normal text-slate-700 sm:inline" data-testid="mk-week-score" data-avg={lint.avg} data-ready={lint.ready}>
+            <span className="hidden sm:inline"> · </span>올리기 전 점수 평균 {lint.avg}점 · 바로 올릴 글 {lint.ready}/{lint.total}
+          </span>
         </p>
       </div>
 
@@ -548,16 +552,18 @@ function Card({ icon, title, sub, ai, lint, onCopy, children }: { icon: ReactNod
 }
 
 function LintBadge({ lint }: { lint: LintSum }) {
+  // D-559 올리기 전 점수(규칙) — 꼭 고칠 것 −15 · 볼 것 −5
+  const sc = scoreFromCounts(lint.bad, lint.warn)
   if (lint.bad === 0 && lint.warn === 0)
     return (
-      <p className="t-meta self-start rounded-full bg-success-50 px-2 py-0.5 font-semibold text-success-700" data-testid="mk-week-lint-item" data-bad="0">
-        ✓ 점검 통과
+      <p className="t-meta self-start rounded-full bg-success-50 px-2 py-0.5 font-semibold text-success-700" data-testid="mk-week-lint-item" data-bad="0" data-score={sc.score}>
+        100점 · ✓ 점검 통과
       </p>
     )
   return (
-    <details className="t-meta rounded-lg bg-slate-50 px-2.5 py-1.5" data-testid="mk-week-lint-item" data-bad={lint.bad}>
+    <details className="t-meta rounded-lg bg-slate-50 px-2.5 py-1.5" data-testid="mk-week-lint-item" data-bad={lint.bad} data-score={sc.score}>
       <summary className={`sum-chev tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : 'text-amber-800'}`}>
-        {lint.bad ? `고칠 곳 ${lint.bad}` : '✓ 점검 통과'}
+        {sc.score}점 · {lint.bad ? `고칠 곳 ${lint.bad}` : '✓ 점검 통과'}
         {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
       </summary>
       <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 break-keep text-slate-700">

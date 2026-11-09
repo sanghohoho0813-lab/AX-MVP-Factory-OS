@@ -60,7 +60,8 @@ function toolSection(pathname: string): { tool: (typeof TOOLS)[number]; section:
 /** 마케팅 · 브랜딩이 함께 맡는 화면 이름(D-233 — 화면 제목은 '마케팅 · 브랜딩' 하나라 경로 줄에서 갈라 준다) */
 function marketingTool(pathname: string): Crumb | null {
   // D-507 경로 줄은 쉬운 말 — 예전 '콘텐츠 레이더'(찾기 이름은 그대로)
-  if (under(pathname, '/marketing/youtube') || pathname === '/marketing') return { label: '유튜브', to: '/marketing/youtube' }
+  // D-560 목차가 '유튜브(만들기) · 남의 인기 영상 · 내 콘텐츠(살펴보기)' 로 바뀌어 가운데 칸은 화면이 정한다(usePageCrumbs) — 겹치는 '유튜브 › 유튜브' 0
+  if (under(pathname, '/marketing/youtube') || pathname === '/marketing') return null
   if (under(pathname, '/marketing/threads')) return { label: '스레드', to: '/marketing/threads' }
   if (under(pathname, '/marketing/shorts')) return { label: '릴스 · 틱톡', to: '/marketing/shorts' }
   if (under(pathname, '/tools/content')) return { label: '블로그 · 플레이스 홍보 글 만들기', to: '/tools/content' }

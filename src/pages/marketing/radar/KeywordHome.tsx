@@ -57,6 +57,8 @@ export interface HomeKeyword {
   note?: string
   /** D-295 고정 키워드 둘째 줄(짧게 — '융자 · 보증') */
   sub?: string
+  /** D-560 고정 키워드 — 참고 채널 최근 30일 관련 영상 수 */
+  videos?: number
 }
 
 const HOW_TO: readonly { title: string; body: string }[] = [
@@ -250,13 +252,21 @@ export function KeywordHome({
                     data-key={k.key}
                   >
                     <span className="t-sub w-full font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{k.topic}</span>
-                    {k.note ? (
-                      <span className="t-meta max-w-full truncate rounded-full border border-emerald-300 bg-white px-1.5 font-semibold text-emerald-800" data-testid="mk-key-note">
-                        {k.note}
-                      </span>
-                    ) : (
-                      k.sub && <span className="t-meta max-w-full truncate text-slate-500">{k.sub}</span>
-                    )}
+                    <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      {k.note ? (
+                        <span className="t-meta max-w-full truncate rounded-full border border-emerald-300 bg-white px-1.5 font-semibold text-emerald-800" data-testid="mk-key-note">
+                          {k.note}
+                        </span>
+                      ) : (
+                        k.sub && <span className="t-meta max-w-full truncate text-slate-500">{k.sub}</span>
+                      )}
+                      {/* D-560 그 주제 영상 수(참고 채널 최근 30일) — 누르면 묶음 화면 '관련 영상 펼쳐보기' 에 그 영상 */}
+                      {!!k.videos && (
+                        <span className="t-meta shrink-0 font-semibold text-slate-600" data-testid="mk-fixed-videos" data-n={k.videos}>
+                          영상 {k.videos}편
+                        </span>
+                      )}
+                    </span>
                     {aiDone.has(k.key) && (
                       <span className="t-meta inline-flex items-center gap-0.5 font-semibold text-violet-700" data-testid="mk-key-ai">
                         <Sparkles aria-hidden="true" className="size-3" /> AI로 써 둠

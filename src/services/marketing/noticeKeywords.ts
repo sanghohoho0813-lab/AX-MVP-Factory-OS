@@ -208,6 +208,27 @@ export function fixedPackSource(k: FixedKeyword, today: string): PackSource | nu
   }
 }
 
+/**
+ * D-560 대표 "고정 키워드는 왜 관련 영상이 안 뜨나 — 5개 모두 하나도" — 고정 주제는 '이번 주 뜨는 주제' 후보에서 빼면서(겹치지 않게)
+ * 그 주제 영상까지 버렸다. 레이더가 그 주제(묶은 주제까지)로 분류한 최근 30일 영상을 평소보다 잘된 순으로 붙인다(내 채널 영상 빼고 · 겹치지 않게).
+ */
+export function fixedTopicVideos<V extends { id: string; mine?: boolean; ratio?: number | null }>(clusters: readonly { topicId: string; hits: readonly V[] }[], k: Pick<FixedKeyword, 'topicId' | 'fixed'>, max = 200): V[] {
+  const ids = new Set([k.topicId, ...(k.fixed.also ?? [])])
+  const seen = new Set<string>()
+  return clusters
+    .filter((c) => ids.has(c.topicId))
+    .flatMap((c) => c.hits)
+    .filter((v) => !v.mine && !seen.has(v.id) && (seen.add(v.id), true))
+    .sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0))
+    .slice(0, max)
+}
+
+/** 고정 키워드 묶음 재료에 관련 영상 근거(제목 셋 · 편수)를 덧붙인다 — 영상이 없으면 그대로 */
+export function withFixedVideos(s: PackSource, videos: readonly { title: string }[]): PackSource {
+  if (!videos.length) return s
+  return { ...s, why: `${s.why} 참고 채널 최근 30일 관련 영상 ${videos.length}편.`, facts: [...s.facts, `참고 채널 최근 30일 관련 영상 ${videos.length}편`], refs: videos.map((v) => v.title).slice(0, 3) }
+}
+
 /** 이미 있는 레이더 묶음에 같은 주제 공고 근거를 덧붙인다(같은 주제가 레이더에도 올라왔을 때) */
 export function withNoticeFacts(s: PackSource, k: NoticeKeyword | undefined): PackSource {
   if (!k) return s

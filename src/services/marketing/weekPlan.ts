@@ -20,6 +20,7 @@ import { HOLE, PACK_AVOID, aiSections, customSource, makePack, type PackBlock, t
 import { WEEK_STORE_KEY } from './weekRunFlag'
 import { axShown, isMarketingCustomer, noAxText } from './persona'
 import { consultLint } from './consultRules'
+import { scoreFromCounts } from './postScore'
 import type { ChannelBrief } from './radarStore'
 import { formatsFor, lintShort, parseShortDrafts, shortsContext, type ShortDraft, type ShortPlatform } from './shorts'
 import { GOALS, lintThreadPost, topicTags, parseThreadDrafts, skeletonDraft, templateOf, threadsContext, type ThreadDraft, type ThreadGoal, type ThreadTemplateKey } from './threads'
@@ -451,9 +452,12 @@ export function buildWeek(setup: WeekSetup, brief: ChannelBrief, today: string, 
 }
 
 /** 점검 요약 — 이번 주 글(예비 빼고) 몇 개 중 통과 · 고칠 곳 */
-export function weekLintSummary(w: WeekView): { total: number; pass: number; bad: number; warn: number } {
+export function weekLintSummary(w: WeekView): { total: number; pass: number; bad: number; warn: number; avg: number; ready: number } {
   const items = [w.long.lint, ...w.shorts.filter((s) => s.slot.n > 0).map((s) => s.lint), ...w.threads.filter((x) => x.slot.day > 0).map((x) => x.lint)]
-  return { total: items.length, pass: items.filter((l) => l.bad === 0).length, bad: items.reduce((a, l) => a + l.bad, 0), warn: items.reduce((a, l) => a + l.warn, 0) }
+  // D-559 올리기 전 점수 — 글마다(꼭 고칠 것 −15 · 볼 것 −5) · 평균 · 90점 이상(꼭 고칠 것 0) 글 수
+  const scores = items.map((l) => scoreFromCounts(l.bad, l.warn))
+  const avg = scores.length ? Math.round(scores.reduce((a, x) => a + x.score, 0) / scores.length) : 0
+  return { total: items.length, pass: items.filter((l) => l.bad === 0).length, bad: items.reduce((a, l) => a + l.bad, 0), warn: items.reduce((a, l) => a + l.warn, 0), avg, ready: scores.filter((x) => x.pass).length }
 }
 
 /** 요일마다 올릴 것(달력 한 줄) */

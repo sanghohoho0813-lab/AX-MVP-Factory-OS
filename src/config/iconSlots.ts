@@ -66,7 +66,7 @@ export const ICON_SLOTS: IconSlot[] = [
   { key: 'more', name: '더보기', where: '휴대폰 아래 메뉴', sprite: 19 },
   { key: 'settings', name: '설정', where: '메뉴', sprite: 20 },
   // D-295 마케팅 · 브랜딩 목차(위: 콘텐츠 레이더 · 아래: 만들기)
-  { key: 'mk-plan', name: '이번 주 찍을 것', where: '마케팅 목차 — YouTube 로고', sheet: 'mk', sprite: 0 },
+  { key: 'mk-plan', name: '유튜브', where: '마케팅 목차 만들기 줄 — YouTube 로고', sheet: 'mk', sprite: 0 },
   { key: 'mk-top', name: '인기 · 급상승', where: '마케팅 목차', sheet: 'mk', sprite: 1 },
   { key: 'mk-channels', name: '채널', where: '마케팅 목차', sheet: 'mk', sprite: 2 },
   { key: 'mk-analysis', name: '분석', where: '마케팅 목차', sheet: 'mk', sprite: 3 },

@@ -462,5 +462,54 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D558-T7 서버 지시 — 스레드 1안은 그대로 올리는 글(완성 글이라는 말은 고객 지시문에 안 씀) · 릴스 1안은 바로 찍는 완성 대본 · [자료 · 요청] 먼저 · [자료 · 채널 설계 기준] · 태그는 내태그에서', tw.instruction.join(' ').includes('그대로 올리는 글') && !tw.instruction.join(' ').includes('완성 글') && tw.instruction.join(' ').includes('[자료 · 요청]') && tw.instruction.join(' ').includes('내태그') && sw.instruction.join(' ').includes('바로 찍는 완성 대본') && sw.instruction.join(' ').includes('[자료 · 채널 설계 기준]'))
 }
 
+// ---------------- D-559 올리기 전 점수(100점 만점 · 규칙 계산) + [고칠 곳만 AI로 고쳐 쓰기] 자료 ----------------
+{
+  const { scorePost, commonChecks, holesOf, fixLines, scoreFromCounts, scoreLabel, PASS_SCORE, SCORE_RULES } = await import('../marketing/postScore')
+  const { withWriteExtras } = await import('../aiAssist/marketingBuilders')
+  const { threadsContext: tctx, lintThreadPost: ltp } = await import('../marketing/threads')
+  const { DEFAULT_BRIEF: DEFAULT_BRIEF_FOR_TEST } = await import('../marketing/radarStore')
+  __setMarketingCustomerForTest(false)
+  const good = '대표님, 정책자금 3가지만 먼저 보세요\n\n첫째, 세금 밀린 게 없는지.\n둘째, 작년 매출이 줄지 않았는지.\n셋째, 대표 신용이 괜찮은지.\n\n이 셋이 되면 상담이 빨라요.\n\n지금 몇 년 차예요? 1년 / 3년 / 5년'
+  const gl = ltp({ body: good, template: 'B', tag: '정책자금' })
+  const gs = scorePost({ kind: 'thread', text: good, lines: gl.lines })
+  check('D559-S1 잘 쓴 스레드 글 — 90점 이상 · 바로 올려도 돼요 · 꼭 고칠 것 0', !!gs && gs.score >= PASS_SCORE && gs.pass && gs.bad === 0 && scoreLabel(gs).includes('바로 올려도'), gs)
+  const bad = '오늘은 정책자금에 대해 알아보겠습니다\n결론적으로 다양한 방법이 있습니다. [실제 사례] [금액]\n자세한 건 https://example.com 에서 상담 신청하세요'
+  const bl = ltp({ body: bad, template: 'B', tag: '정책자금' })
+  const bs = scorePost({ kind: 'thread', text: bad, lines: bl.lines })
+  check('D559-S2 링크 · 상담 안내 · AI 티 · 빈칸 · 첫 줄 숫자 없음 — 90점 아래 · 못 올림 · 꼭 고칠 것이 맨 앞', !!bs && bs.score < PASS_SCORE && !bs.pass && bs.bad >= 2 && bs.items[0].level === 'bad' && bs.items.some((x) => x.key === 'ai-tone') && bs.items.some((x) => x.key === 'holes') && bs.items.some((x) => x.key === 'first-num') && !bs.items.some((x) => x.key === 'brackets'), bs?.items.map((x) => `${x.key}:${x.minus}`))
+  const holes = commonChecks('[가] [나] [다] [라] [마] [바] 끝', 'short').find((x) => x.key === 'holes')
+  check('D559-S3 빈칸 — 한 곳 −5 · 최대 −20 · 대본 시간 표시 [0:00] 은 빈칸이 아님', holes?.minus === 20 && holesOf('[0:00] 첫마디\n[0:05] 둘째 [확인할 숫자]').length === 1)
+  const tone = commonChecks('알아보겠습니다 결론적으로 다양한 방법 여러분 도움이 되셨기를', 'long').find((x) => x.key === 'ai-tone')
+  check('D559-S4 기계가 쓴 것 같은 말 — 찾은 말 그대로 보여 줌 · 최대 −15', tone?.minus === 15 && /알아보겠습니다/.test(tone.text) && /결론적으로/.test(tone.text))
+  const longS = commonChecks(`${'가'.repeat(70)}.`, 'thread').find((x) => x.key === 'long-sentence')
+  check('D559-S5 긴 문장 — 스레드 60자 · 릴스 50자 · 긴 영상 90자 넘으면 한 번 −5 · 스레드 첫 줄 숫자만 스레드에서', longS?.minus === 5 && !commonChecks(`${'가'.repeat(70)}.`, 'long').some((x) => x.key === 'long-sentence') && !commonChecks('숫자 없는 첫 줄', 'short').some((x) => x.key === 'first-num') && !commonChecks('세 가지만 보세요', 'thread').some((x) => x.key === 'first-num'))
+  const sl = lintShort({ platform: 'reels', aim: 'reach', script: '[0:00] 세금 3가지\n[0:03] 첫째 밀린 세금 (화면: 큰 글자)\n[0:08] 둘째 매출', caption: '정책자금 신청 전 3가지', hashtags: '#정책자금' })
+  const ss = scorePost({ kind: 'short', text: '[0:00] 세금 3가지\n[0:03] 첫째 밀린 세금 (화면: 큰 글자)\n[0:08] 둘째 매출\n정책자금 신청 전 3가지', lines: sl.lines })
+  check('D559-S6 릴스 대본 — 시간 표시 · 화면 지시는 문장 · 빈칸으로 안 셈 · 점수 나옴', !!ss && !ss.items.some((x) => x.key === 'holes' || x.key === 'long-sentence') && ss.score > 0, ss?.items.map((x) => x.key))
+  const fl = fixLines(bs!)
+  check('D559-S7 AI 에 보낼 고칠 곳 — 번호 · 최대 8줄 · 줄마다 180자 안 · 빈 글은 점수 없음', fl.length >= 3 && fl.length <= 8 && fl[0].startsWith('1) ') && fl.every((l) => l.length <= 190) && scorePost({ kind: 'thread', text: '  ', lines: [] }) === null)
+  check('D559-S8 1주일치 줄 수 → 점수(꼭 고칠 것 −15 · 볼 것 −5) · 기준표 4줄', scoreFromCounts(0, 2).score === 90 && scoreFromCounts(0, 2).pass && !scoreFromCounts(1, 0).pass && scoreFromCounts(8, 0).score === 0 && SCORE_RULES.length === 4)
+  const base = tctx({ goal: '', template: 'B', topic: '정책자금', tag: '정책자금', facts: '', reference: '', recent: [], today: '2026-11-09', myTags: ['정책자금'] })
+  const rv = withWriteExtras(base, { brief: DEFAULT_BRIEF_FOR_TEST, request: '짧게', revise: { body: '첫 줄\n\n둘째 줄', fixes: fl } })
+  const nm = rv.sections.map((x) => x.name)
+  const rows = rv.sections.find((x) => x.name === '고칠 글')?.rows as Array<Record<string, string>>
+  check('D559-S9 고쳐 쓰기 자료 — 요청 다음에 고칠 글(한 줄 = 한 행 · 빈 줄 표시) · 고칠 곳 · 칸 12개 안 · 고칠 글이 없으면 두 칸 없음', nm.indexOf('고칠 글') === nm.indexOf('요청') + 1 && nm.indexOf('고칠 곳') === nm.indexOf('고칠 글') + 1 && rows.length === 3 && rows[1].줄 === '(빈 줄)' && nm.length <= 12 && !withWriteExtras(base, { request: '', revise: { body: ' ', fixes: fl } }).sections.some((x) => x.name === '고칠 글'), nm)
+  const tw = ASSISTS['threads.write'].instruction.join(' ')
+  const sw = ASSISTS['shorts.write'].instruction.join(' ')
+  check('D559-S10 서버 지시 — [자료 · 고칠 글] 이 있으면 1안은 고칠 곳만 고친 글 · 대본 · 빈칸은 자료에 있는 사실로만', tw.includes('[자료 · 고칠 글]') && tw.includes('[자료 · 고칠 곳] 만 고친 글') && sw.includes('[자료 · 고칠 곳] 만 고친 대본') && tw.includes('빈칸은 [자료] 에 있는 사실로만') && !tw.includes('완성 글'))
+}
+
+// ---------------- D-560 본인 댓글 칸에 AI 가 자기 글을 설명한 말 → 비움(대표 화면 사진) ----------------
+{
+  const { isMetaComment, parseThreadDrafts: ptd } = await import('../marketing/threads')
+  const metas = ['선택한 연재형으로 혜택과 주의점을 차례로 설명합니다. 감면은 확인만으로 자동 적용되는 것이 아니라 요건 충족이 필요하다는 점을 담았습니다.', '손해와 숫자를 앞세워 저장·공유할 계산 예시를 제시합니다. 금액은 대표가 제공한 단순 계산으로 한정하고, 실제 적용액처럼 보이지 않게 표현했습니다.', '따라 하기 쉬운 체크리스트 형식으로 정리했습니다. 창업 시점, 요건, 실제 세액 검토 순서로 확인하도록 안내합니다.']
+  const real = ['3분 진단은 프로필 링크에서', '체크리스트 필요하면 댓글에 "체크" 남겨 주세요', '조회 1,000 넘으면 점검표 DM 으로 드릴게요.']
+  check('D560-T1 본인 댓글 — 글 설명(…담았습니다 · …형식으로 정리했습니다 · …안내합니다)은 거름 · 진짜 댓글은 그대로', metas.every(isMetaComment) && !real.some(isMetaComment), { metas: metas.map(isMetaComment), real: real.map(isMetaComment) })
+  const ans = { headline: 'x', items: [{ title: '첫 줄', tag: 'R', body: '본문', when: '질문', detail: metas[0] }, { title: '첫 줄', tag: 'B', body: '본문2', when: '질문', detail: real[0] }], next: [] }
+  const ds = ptd(ans as never).drafts
+  check('D560-T2 AI 답 읽기 — 설명 말은 본인 댓글 칸을 비우고 · 진짜 댓글은 그대로', ds[0].selfComment === '' && ds[1].selfComment === real[0])
+  check('D560-T3 서버 지시 — 본인 댓글은 내가 그대로 다는 말 · 글을 어떻게 썼는지 설명하지 않음', ASSISTS['threads.write'].instruction.join(' ').includes('이 글을 어떻게 썼는지 설명하는 말은 쓰지 않는다'))
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

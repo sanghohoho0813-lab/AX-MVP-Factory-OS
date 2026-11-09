@@ -104,7 +104,7 @@ import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './ra
 import { MkAsk } from './radar/MkAsk'
 import type { MkRoute } from '../../services/marketing/mkAsk'
 import { useGrantFeed } from '../../services/grants/grantFeed'
-import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
+import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, fixedTopicVideos, withFixedVideos, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
 import { PackView } from './radar/PackView'
 import { WeekView } from './radar/WeekView'
 import { WeekProjects } from './radar/WeekProjects'
@@ -134,7 +134,7 @@ import { ChannelManager } from './radar/ChannelManager'
 import { MakeView } from './radar/MakeView'
 import { AllMade } from './radar/AllMade'
 import { BriefCard } from './radar/BriefCard'
-import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
+import { LookTabs, MarketingTabs, RADAR_VIEWS, isLookView, type RadarView } from '../../tools/marketing/MarketingTabs'
 import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 import { rememberWeekTopics } from '../../services/marketing/quickStart'
@@ -226,7 +226,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // 예전 주소 /marketing/youtube(콘텐츠 레이더)는 그대로 이번 주 찍을 것 — 첫 화면(대화창)은 /marketing 만
   const firstScreen = /^\/marketing\/?$/.test(location.pathname) && !params.get('view') && !params.get('pack') && params.get('week') !== '1'
   // D-235 경로 줄 끝에 지금 보는 탭(영업 › 마케팅 · 브랜딩 › 콘텐츠 레이더 › 이번 주 찍을 것) — 첫 화면은 꼬리 없음
-  usePageCrumbs(firstScreen ? [] : [{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
+  // D-560 남의 인기 영상(인기 영상 · 참고 채널 · 올리는 때 · 길이)은 두 칸 — '남의 인기 영상 › 참고 채널'
+  usePageCrumbs(firstScreen ? [] : isLookView(view) ? [{ label: '남의 인기 영상', to: '/marketing?view=top' }, { label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }] : [{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
   const kw = params.get('kw') ?? ''
   const [type, setType] = useState<YtType>('all')
@@ -314,21 +315,27 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   const fixedKeys = useMemo(() => fixedKeywords(grants.notices, today), [grants.notices, today])
   const packFixed = packKey.startsWith('notice:') ? (fixedKeys.find((k) => k.key === packKey) ?? null) : null
+  // D-560 고정 주제 관련 영상 — 레이더가 그 주제로 분류한 최근 30일 영상(평소보다 잘된 순 · 최대 8편)
+  const fixedVideos = useMemo(() => new Map(fixedKeys.map((k) => [k.key, fixedTopicVideos(plan?.clusters ?? [], k)])), [fixedKeys, plan])
+  const fixedSource = (k: (typeof fixedKeys)[number]) => {
+    const src = fixedPackSource(k, today)
+    return src ? withFixedVideos(src, fixedVideos.get(k.key) ?? []) : null
+  }
   const packSource = useMemo<PackSource | null>(() => {
     if (packKey.startsWith('custom:')) return customSource(packKey.slice(7))
-    if (packFixed) return fixedPackSource(packFixed, today)
+    if (packFixed) return fixedSource(packFixed)
     return packOpp ? packSourceOf(packOpp) : null
-  }, [packKey, packOpp, packFixed, today])
+  }, [packKey, packOpp, packFixed, today, fixedVideos]) // eslint-disable-line react-hooks/exhaustive-deps
   // D-346 1주일치 주제 — 이번 주 키워드 1~3위(모자라면 고정 키워드)
   // D-348 짝 셋 — 본업(고정 키워드 · 이번 주 새 공고 많은 순) × 미끼(이번 주 AI 흐름)
   const weekPlanSetup = useMemo(
     () =>
       weekSetup(
         (plan?.picks ?? []).map(packSourceOf),
-        fixedKeys.map((k) => ({ source: fixedPackSource(k, today), fresh: k.fresh.length })).filter((x): x is { source: PackSource; fresh: number } => !!x.source),
+        fixedKeys.map((k) => ({ source: fixedSource(k), fresh: k.fresh.length })).filter((x): x is { source: PackSource; fresh: number } => !!x.source),
         weekStart(today),
       ),
-    [plan, fixedKeys, today],
+    [plan, fixedKeys, today, fixedVideos], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const weekVer = useSyncExternalStore(subscribeWeek, weekVersion)
   const weekDone = useMemo(() => !!weekSaved(weekStart(today)), [weekVer, today]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -421,7 +428,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 
   // D-295 이번 주 키워드 = 벤치마킹 유튜브에서 실제로 뜨는 주제만(레이더 후보 10개 · 고정 키워드 주제는 빠짐)
   const homeData = useMemo<{ list: HomeKeyword[] } | null>(() => (plan ? { list: plan.picks.map((o) => ({ key: o.key, topic: o.topic, axis: o.axis, topicId: o.topicId })) } : null), [plan])
-  const fixedHome = useMemo<HomeKeyword[]>(() => fixedKeys.map((k) => ({ key: k.key, topic: k.label, sub: k.sub, axis: 'market', topicId: k.topicId, notice: true, note: k.note })), [fixedKeys])
+  const fixedHome = useMemo<HomeKeyword[]>(() => fixedKeys.map((k) => ({ key: k.key, topic: k.label, sub: k.sub, axis: 'market', topicId: k.topicId, notice: true, note: k.note, videos: fixedVideos.get(k.key)?.length ?? 0 })), [fixedKeys, fixedVideos])
   // D-267 지난주와 비교 — 주마다 첫 목록을 이 브라우저에 적어 두고 새로 들어온 키워드에 '새로'
   const homeKeyIds = useMemo(() => (homeData?.list ?? []).map((k) => k.key).join('|'), [homeData])
   const [lastWeek, setLastWeek] = useState<string[] | null>(null)
@@ -781,7 +788,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           title="마케팅 · 브랜딩"
           showOnPhone
           descriptionAsHint
-          description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 [이번 주 찍을 것] 아래 [자세히 보기] 에 있습니다.')}
+          description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 [유튜브] 아래 [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           // D-507 내 콘텐츠(만든 것 모음)에는 유튜브 새로 가져오기 · CSV 가 필요 없다 — 헷갈리지 않게 숨김
           // 휴대폰에서는 맨 위 [지금 새로 가져오기] · [CSV] 를 접는다(6시간마다 저절로 새로 · 첫 화면 [자세히 보기] 안에 그대로) — 첫 화면 한 줄을 아낀다
@@ -824,6 +831,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           <MarketingTabs active={view} onRadar={(k) => setParam({ view: k })} />
         </div>
       )}
+      {/* D-560 '남의 인기 영상' 한 칸 안 — 인기 영상 · 참고 채널 · 올리는 때 · 길이 */}
+      {!packKey && !weekOn && !firstScreen && isLookView(view) && <LookTabs view={view} onPick={(k) => setParam({ view: k })} />}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
       {!packKey && !weekOn && view !== 'plan' && <ScreenGuide id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
       {/* D-239 마케팅 AI 도우미(탭마다 다른 질문) — MK-SIMPLE(D-553) 띠 대신 위 머리 오른쪽 [AI 도우미] 단추(radarAssist). 이번 주 찍을 것의 질문 판은 [자세히 보기] 안 그대로 */}
@@ -900,6 +909,23 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                       </li>
                     ))}
                   </ul>
+                  {/* D-560 그 주제 관련 영상 — 레이더가 분류한 최근 30일 영상(평소보다 잘된 순) */}
+                  {(fixedVideos.get(packFixed.key)?.length ?? 0) > 0 ? (
+                    <>
+                      <p className="t-sub font-semibold text-slate-800">
+                        관련 영상 {fixedVideos.get(packFixed.key)?.length}편{(fixedVideos.get(packFixed.key)?.length ?? 0) > 8 ? ' 가운데 잘된 8편' : ''} — 참고 채널 최근 30일 · 평소보다 잘된 순 · 구조만 참고하고 제목 · 대사는 그대로 쓰지 않아요
+                      </p>
+                      <ul className="grid grid-cols-1 gap-x-3 lg:grid-cols-2" data-testid="mk-pack-videos">
+                        {(fixedVideos.get(packFixed.key) ?? []).slice(0, 8).map((v) => (
+                          <VideoRow key={v.id} v={v} onOpen={openVideo} noThumb={yt.sample} />
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="t-sub break-keep text-slate-600" data-testid="mk-pack-videos-none">
+                      관련 영상 — 참고 채널 최근 30일에 이 주제로 분류된 영상이 아직 없어요{prepared ? '' : '(유튜브 자료를 받는 중이에요)'}.
+                    </p>
+                  )}
                 </div>
               ) : null
             }

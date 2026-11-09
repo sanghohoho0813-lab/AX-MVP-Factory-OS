@@ -832,6 +832,15 @@ export interface ThreadDraft {
   checks: string[]
 }
 
+/**
+ * D-560 '본인 댓글' 칸에 AI 가 자기 글을 설명한 말이 들어오는 일(대표 화면 사진 — "선택한 연재형으로 … 담았습니다")을 거른다.
+ * 본인 댓글은 내 글 아래 내가 그대로 다는 한 줄이어야 한다 — 글을 어떻게 썼는지 · 무엇을 담았는지 말하는 문장이면 비운다(규칙).
+ */
+const META_COMMENT = /(?:담았|정리했|표현했|구성했|작성했|제시했|강조했|반영했|설명했|안내했)습니다|(?:형식|방식|틀|연재형|목록형)으로\s*(?:정리|설명|구성|작성|안내)|(?:설명|안내|제시|정리)합니다\.?$|이\s*글은|본문에서는|1안은|2안은|3안은/
+export function isMetaComment(c: string): boolean {
+  return META_COMMENT.test(c.trim())
+}
+
 /** threads.write 답 → 글 3개(본문이 빈 것은 버림) */
 export function parseThreadDrafts(a: AssistAnswer | null, tags: readonly string[] = TOPIC_TAGS): { drafts: ThreadDraft[]; tag: string } {
   if (!a) return { drafts: [], tag: '' }
@@ -844,7 +853,7 @@ export function parseThreadDrafts(a: AssistAnswer | null, tags: readonly string[
         template: (TEMPLATE_KEYS.has(t) ? t : '') as ThreadTemplateKey | '',
         body,
         ending: String(it.when ?? '').trim(),
-        selfComment: String(it.detail ?? '').trim(),
+        selfComment: isMetaComment(String(it.detail ?? '')) ? '' : String(it.detail ?? '').trim(),
         checks: (it.outline ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 8),
       }
     })

@@ -67,6 +67,8 @@ import { useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
 import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
 import { AiConfirm } from '../../components/ai/AiConfirm'
+import { EXTRA_SCORE_KEYS, fixLines, scorePost } from '../../services/marketing/postScore'
+import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -250,9 +252,12 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const formats = formatsFor(draft.platform, draft.aim)
   const fmt = draft.format ? formatOf(draft.format) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ShortDraft[] }>({ busy: false, error: '', drafts: [] })
+  // D-559 [AI로 고칠 곳만 고쳐 쓰기] — 고친 대본(fixed)이 칸에 그대로 있는 동안만 [고치기 전으로]
+  const [fix, setFix] = useState<{ busy: boolean; error: string; before: { script: string; caption: string; hashtags: string } | null; fixed: string; why?: 'fix' | 'new' }>({ busy: false, error: '', before: null, fixed: '' })
   // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
   const [request, setRequest] = useState('')
-  const writeContext = (use: { aim: ShortAim | ''; format: ShortFormatKey | '' }) => withWriteExtras(shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), { brief, request })
+  const writeContext = (use: { aim: ShortAim | ''; format: ShortFormatKey | '' }, revise?: { body: string; fixes: readonly string[] }) =>
+    withWriteExtras(shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), { brief, request, revise })
   const [saving, setSaving] = useState(false)
   /** D-364 📐 한 단계씩 — 대본이 아직 없으면 2단계는 한 줄 + [직접 쓰기](스레드 화면과 같다) */
   const [editorAll] = useFold('sht.editor', false)
@@ -264,6 +269,9 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const editorOpen = editorAll || handOpen || hasScript
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags, facts: factsText }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags, factsText])
+  // D-559 올리기 전 점수(규칙) — 대본 + 설명 글
+  const score = useMemo(() => scorePost({ kind: 'short', text: draft.script.trim() ? `${draft.script}\n${draft.caption}` : '', lines: lint.lines }), [draft.script, draft.caption, lint])
+  const lintShown = useMemo(() => [...lint.lines, ...(score?.items ?? []).filter((x) => EXTRA_SCORE_KEYS.has(x.key)).map((x) => ({ key: x.key, level: x.level, text: x.text }))], [lint, score])
   const mix = weekMix(store.posts, today)
 
   const bodyNow = useRef(draft.script)
@@ -331,9 +339,14 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
     showToast('첫 줄을 바꿨어요.')
     document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  /** auto — 대본 칸이 비어 있으면 1안을 바로 넣는다(쓰던 대본은 덮지 않는다) */
+  /**
+   * auto — 누른 단추가 [완성 대본 쓰기] 면 1안을 대본 칸에 바로 넣는다.
+   * D-560 예전에는 대본 칸에 글이 있으면 넣지 않아 아무 일도 안 일어난 것처럼 보였다 — 이제 새 1안 + [이전 대본으로 되돌리기].
+   * 기다리는 사이 직접 고친 대본만 덮지 않는다.
+   */
   const runAi = async (pick?: { aim: ShortAim | ''; format: ShortFormatKey | '' }, auto = false) => {
     if (ai.busy) return
+    const atClick = { script: bodyNow.current, caption: draft.caption, hashtags: draft.hashtags }
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { aim: draft.aim, format: draft.format }
     try {
@@ -344,16 +357,61 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
       setAi({ busy: false, error: '', drafts })
       set({ checks })
       if (auto) {
-        // 기다리는 사이 대본 칸에 쓴 것이 있으면 덮지 않는다
+        // 기다리는 사이 대본 칸을 직접 고쳤으면 덮지 않는다
         const first = drafts[0]
-        const fill = !bodyNow.current.trim()
-        if (fill) set({ script: first.script, caption: first.caption, hashtags: first.hashtags, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
-        showToast(fill ? '완성 대본(1안)을 대본 칸에 넣었어요 — 다른 안은 "AI로 완성 대본 쓰기" 아래에 있어요.' : '쓰던 대본은 그대로 두었어요 — AI 대본은 "AI로 완성 대본 쓰기" 아래에서 골라 넣어요.')
-        if (fill) window.setTimeout(() => document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+        const fill = bodyNow.current === atClick.script
+        if (fill) {
+          set({ script: first.script, caption: first.caption, hashtags: first.hashtags, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
+          const had = atClick.script.trim() && atClick.script.trim() !== first.script.trim()
+          setFix(had ? { busy: false, error: '', before: atClick, fixed: first.script, why: 'new' } : { busy: false, error: '', before: null, fixed: '' })
+          showToast(`${had ? '새 대본(1안)으로 바꿨어요 — 예전 대본은 [이전 대본으로 되돌리기] 로 돌릴 수 있어요.' : '완성 대본(1안)을 대본 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 대본 칸 바로 위 단추로 바꿔 봐요.' : ''}`)
+          // D-560 대본 칸으로 내려가 잠깐 빛나게 — 생긴 것이 바로 눈에 띄게
+          scrollAndFlash('sht-editor')
+        } else showToast('기다리는 사이 고치신 대본은 그대로 두었어요 — AI 대본은 위 "AI로 완성 대본 쓰기" 아래에서 골라 넣어요.')
       }
     } catch (e) {
       setAi({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', drafts: [] })
     }
+  }
+  const runFix = async () => {
+    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
+    const before = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
+    const from = score.score
+    setFix({ busy: true, error: '', before: null, fixed: '' })
+    try {
+      const body = before.caption.trim() ? `${before.script}\n\n설명 글: ${before.caption.trim()}` : before.script
+      const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context: writeContext({ aim: draft.aim, format: draft.format }, { body, fixes: fixLines(score) }) })
+      const { drafts, checks } = parseShortDrafts(run.structured)
+      const first = drafts[0]
+      if (!first?.script.trim()) throw new AssistError('provider_error', 'AI 답에서 고친 대본을 찾지 못했어요 — 다시 눌러 주세요.')
+      setAi({ busy: false, error: '', drafts })
+      // 기다리는 사이 대본 칸을 고쳤으면 덮지 않는다 — 고친 대본은 아래 1안에
+      if (bodyNow.current !== before.script) {
+        setFix({ busy: false, error: '', before: null, fixed: '' })
+        showToast('기다리는 사이 대본을 고치셔서 그대로 두었어요 — AI가 고친 대본은 "AI로 완성 대본 쓰기" 아래 1안에 있어요.')
+        return
+      }
+      set({ script: first.script, caption: first.caption || before.caption, hashtags: first.hashtags || before.hashtags, source: 'ai', checks })
+      setFix({ busy: false, error: '', before, fixed: first.script })
+      const cap = first.caption || before.caption
+      const after = scorePost({ kind: 'short', text: `${first.script}\n${cap}`, lines: lintShort({ platform: draft.platform, aim: draft.aim, script: first.script, caption: cap, hashtags: first.hashtags || before.hashtags, facts: factsText }).lines })
+      showToast(`고쳐 썼어요 — ${from}점 → ${after?.score ?? from}점`)
+    } catch (e) {
+      setFix({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', before: null, fixed: '' })
+    }
+  }
+  const undoFix = () => {
+    if (!fix.before) return
+    set({ ...fix.before })
+    setFix({ busy: false, error: '', before: null, fixed: '' })
+    showToast(fix.why === 'new' ? '이전 대본으로 돌렸어요.' : '고치기 전 대본으로 돌렸어요.')
+  }
+  /** D-560 대본 칸 위 '다른 안' — 바로 바꾸고 예전 대본은 [이전 대본으로 되돌리기] */
+  const swapDraft = (d: ShortDraft) => {
+    const prev = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
+    if (prev.script.trim() === d.script.trim()) return
+    set({ script: d.script, caption: d.caption || prev.caption, hashtags: d.hashtags || prev.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
+    setFix(prev.script.trim() ? { busy: false, error: '', before: prev, fixed: d.script, why: 'new' } : { busy: false, error: '', before: null, fixed: '' })
   }
   const runQuick = () => {
     if (!draft.topic.trim()) return
@@ -616,6 +674,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" data-testid="sht-editor">
           <div className="flex min-w-0 flex-col gap-3">
+            {ai.drafts.length > 1 && <AltDrafts drafts={ai.drafts} current={draft.script} draft={draft} facts={factsText} onPick={swapDraft} />}
             <label className="flex flex-col gap-1">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
                 <HintTip tip="영상에서 말할 말과 화면에 띄울 큰 글자를 시간 순서대로 적은 것이에요. [0:00] 은 몇 초에 나오는지예요." label="대본" tight>
@@ -678,6 +737,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
             {draft.format === 'comment' && <ShareKit testId="sht-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
+            <PostScoreBar score={draft.script.trim() ? score : null} testPrefix="sht" aiOk={aiOk} busy={fix.busy} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.script ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 대본으로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
             <div className="flex flex-wrap items-center gap-2">
               <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 설명 글 · #태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>
@@ -685,7 +745,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
               {lint.warn > 0 && <Badge tone="warning">볼 것 {lint.warn}</Badge>}
             </div>
-            <LintList lines={draft.script.trim() ? lint.lines : []} testId="sht-lint" />
+            <LintList lines={draft.script.trim() ? lintShown : []} testId="sht-lint" />
             {!draft.script.trim() && <p className="t-sub break-keep text-slate-500">대본을 쓰면 여기서 바로 확인해요.</p>}
           </div>
         </div>
@@ -695,8 +755,38 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   )
 }
 
+/** D-560 대본 칸 바로 위 — AI 가 함께 쓴 안(1 · 2안)을 점수와 함께 · 누르면 그 안으로(예전 대본은 되돌리기) */
+function AltDrafts({ drafts, current, draft, facts, onPick }: { drafts: readonly ShortDraft[]; current: string; draft: Draft; facts: string; onPick: (d: ShortDraft) => void }) {
+  return (
+    <span className="flex flex-wrap items-center gap-1.5" data-testid="sht-alt">
+      <span className="t-sub font-semibold text-slate-700">AI가 쓴 안</span>
+      {drafts.map((d, i) => {
+        const sc = scorePost({ kind: 'short', text: `${d.script}\n${d.caption}`, lines: lintShort({ platform: draft.platform, aim: draft.aim, script: d.script, caption: d.caption, hashtags: d.hashtags, facts }).lines })
+        const on = d.script.trim() === current.trim()
+        const f = d.format ? formatOf(d.format) : undefined
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(d)}
+            aria-pressed={on}
+            className={`tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50'}`}
+            data-testid="sht-alt-btn"
+            data-on={on ? '1' : '0'}
+          >
+            {i + 1}안{f ? ` · ${f.name}` : ''}
+            {sc && <span className={`t-meta font-bold ${sc.pass ? 'text-success-700' : 'text-warning-800'}`}>{sc.score}점</span>}
+            {on && <span className="t-meta font-normal">(지금)</span>}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
+
 function AiDraftCard({ n, d, draft, facts, onUse }: { n: number; d: ShortDraft; draft: Draft; facts: string; onUse: () => void }) {
   const lint = lintShort({ platform: draft.platform, aim: draft.aim, script: d.script, caption: d.caption, hashtags: d.hashtags, facts })
+  const sc = scorePost({ kind: 'short', text: `${d.script}\n${d.caption}`, lines: lint.lines })
   const f = d.format ? formatOf(d.format) : undefined
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-ai-draft">
@@ -706,6 +796,11 @@ function AiDraftCard({ n, d, draft, facts, onUse }: { n: number; d: ShortDraft; 
         <Badge tone={lint.bad ? 'danger' : 'success'}>
           약 {lint.seconds}초 · 고칠 것 {lint.bad}
         </Badge>
+        {sc && (
+          <span className="contents" data-testid="sht-ai-draft-score" data-score={sc.score}>
+            <Badge tone={sc.pass ? 'success' : sc.bad ? 'danger' : 'warning'}>{sc.score}점</Badge>
+          </span>
+        )}
       </div>
       <p className="t-sub max-h-56 overflow-y-auto break-keep whitespace-pre-line text-slate-800">{d.script}</p>
       {d.caption && <p className="t-sub break-keep text-slate-500">설명 글: {d.caption}</p>}
