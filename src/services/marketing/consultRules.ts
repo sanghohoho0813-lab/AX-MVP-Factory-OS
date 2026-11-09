@@ -17,9 +17,8 @@ export interface ConsultLine {
   text: string
 }
 
-/** 수치 후킹 — 99% · 90%가 · N배 · 'N명 중 M명' · 승인률 · 통과율(부정형 · 비율형 포함). 100% 는 기존 점검이 잡는다 */
-export const PCT_HOOK =
-  /(?<!\d)9\d\s*%|\d+\s*명\s*중\s*\d+\s*명|\d+(?:\.\d+)?\s*배(?=\s|[,.!?)」"'’]|$|로|나|씩|까지|가|는|의|차이|빠르|높|많|늘|더)|(?:승인|통과|선정|합격)\s*률|(?:승인|선정|합격)\s*확률/
+/* D-558 대표(2026-11-09): "제목에 숫자를 넣어야 돼 — 막는 거 없애자". 예전 '수치 후킹' 점검(99% · N배 · 10명 중 8명)은 뺐다.
+   승인 · 선정 보장(100% · 무조건)은 기존 점검(HYPE)이 그대로 잡는다. */
 
 /** 받은 숫자 늘려 말하기 — '250건 이상 · 넘게 · 수백 건 · 100억 넘게 · 9년 넘게' */
 export const INFLATE = /\d[\d,]*\s*(?:건|억|곳|명|개사)\s*(?:이상|넘게|넘는|넘어|여\s*(?:건|곳|명)?|가\s*넘|이\s*넘)|\d+\s*년\s*(?:넘게|이\s*넘)|수백\s*(?:건|곳|명|개사)/
@@ -63,8 +62,6 @@ export function consultLint(text: string, opts: { ax?: boolean } = {}): ConsultL
   if (!text.trim()) return out
   const hit = (re: RegExp) => re.exec(text)?.[0]?.trim() ?? ''
   const add = (key: string, level: ConsultLevel, msg: string) => out.push({ key, level, text: msg })
-  const pct = hit(PCT_HOOK)
-  if (pct) add('pct-hook', 'bad', `"${pct}" — 수치 후킹(99% · 10명 중 8명 · N배 · 승인률)은 쓰지 않아요. "모르고 신청하면 손해 봅니다" · "부결된 회사에서 자주 보이는 것" 처럼`)
   const inflate = hit(INFLATE)
   if (inflate) add('inflate', 'bad', `"${inflate}" — 받은 숫자는 그대로(이상 · 넘게 · 수백을 붙이지 않기)`)
   const narrowed = hit(NARROWED)
@@ -91,7 +88,6 @@ export function consultLint(text: string, opts: { ax?: boolean } = {}): ConsultL
 /** 사람이 마지막에 볼 칸(발행 전 확인) — 화면 · 복사 글에 그대로 */
 export const CONSULT_CHECKS: readonly string[] = [
   '□ 이미지 · 장면 · 썸네일 지시에 기관 로고 · 인증 마크 · 도장 · 공문 모양이 없다(사람 · 서류 · 화면으로)',
-  '□ 제목 · 첫마디에 "99% · 90%가 모르는 · 10명 중 8명 · N배 · 승인률" 같은 수치 후킹이 없다',
   '□ 경력 · 건수 · 금액이 받은 그대로다("이상 · 넘게 · 수백" 이나 뜻을 좁힌 말이 없다)',
   '□ "한 대표님은 …" · "A사" · "확정서" 같은 지어낸 사례 · 금액이 없다',
   '□ 가산점 · 성공보수 · "동행 · 대행 · 심사 대응" 같은 말이 없다',

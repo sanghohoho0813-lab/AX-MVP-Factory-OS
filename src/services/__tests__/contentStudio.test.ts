@@ -891,8 +891,8 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
     const cr = regulatedOf(cs)
     check('D554-1 경영컨설팅 업체 → 규제 업종(경영컨설팅) · 연구소를 가진 제조사는 아님 · 카드뉴스는 두 안 · 끝 문구 "결과는 기관 심사로 정해집니다"',
       cr?.kind === 'consulting' && regulatedOf(mfg) === null && cardFiveTypes(cs).join() === 'objection,curious' && cr.notice === '결과는 기관 심사로 정해집니다.' && noticeOf(cs).includes('기관 심사'), { kind: cr?.kind, mfg: regulatedOf(mfg)?.kind })
-    check('D554-2 금지 목록 — 수치 후킹 · 가산점 · 로고 · 도장 · 대행 · 성공보수 · 시간 압박 · 지어낸 사례 · 요건 · AX 수단화',
-      ['N명 중 M명', '가산점', '도장', '동행', '성공보수', '예산 소진', '확정서', '업력 1년 이상', 'AX'].every((w) => cr?.never.some((n) => n.includes(w))), cr?.never)
+    check('D554-2 금지 목록 — 가산점 · 로고 · 도장 · 대행 · 성공보수 · 시간 압박 · 지어낸 사례 · 요건 · AX 수단화 · D-558 수치 표현은 막지 않음',
+      !cr?.never.some((n) => n.includes('N명 중 M명')) && ['가산점', '도장', '동행', '성공보수', '예산 소진', '확정서', '업력 1년 이상', 'AX'].every((w) => cr?.never.some((n) => n.includes(w))), cr?.never)
     const rq = aiRequestText(cs, { kind: 'cards' })
     check('D554-3 요청문 — 본업이라 "정책자금 · 컨설팅 이야기 금지" 줄 없음 · 다른 사업 이야기는 그대로 막음 · AX 뜻 한 줄 · 카드 이미지 로고 대신 사람 · 서류 · 화면 · 세무 · 제도 숫자 · 받은 숫자 그대로',
       !rq.includes('사업 자금 · 정책자금 · 지원금 · 컨설팅 이야기') && rq.includes('다른 업체 · 전자책 · 강의 소개') && rq.includes(AX_MEANING) && rq.includes('사람 · 서류 · 실제 화면') && rq.includes('세무사님과 함께 검토') && rq.includes('기관 공고 확인') && rq.includes("'이상 · 넘게 · 수백'") && rq.includes('경영컨설팅 광고 규정'), rq)
@@ -900,9 +900,9 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
       aiRequestText(hf).includes('사업 자금 · 정책자금 · 지원금 · 컨설팅 이야기') && !aiRequestText(hf).includes('AX 뜻'))
     const bad = '이거 모르면 99% 부결됩니다. 10명 중 8명이 놓쳐요. 상담·진행 250건 넘게. 가산점 받아요. 심사 대응까지 해 드려요. 승인 후 수수료만. 중진공 로고와 반려 도장. 실제로 한 대표님은 2억. 신용 6등급이면 탈락. 연말까지 예산 소진. AX 하면 심사에서 유리'
     const keys = factChecks(bad, cs).map((x) => x.key)
-    const want = ['수치 후킹', '숫자 늘리기', '가산점 단정', '대행 말', '성공보수', '로고 · 도장', '지어낸 사례', '확인 안 된 요건', '시간 압박', 'AX 수단화'].map((w) => `reg-${w}`)
-    check('D554-5 받은 글 점검 — 컨설팅 위험 표현 10가지가 모두 걸림 · 깨끗한 글은 0',
-      want.every((k) => keys.includes(k)) && !factChecks('신청 전에 기본 조건부터 점검해요. 결과는 기관 심사로 정해집니다.', cs).some((x) => x.key.startsWith('reg-')), { missing: want.filter((k) => !keys.includes(k)) })
+    const want = ['숫자 늘리기', '가산점 단정', '대행 말', '성공보수', '로고 · 도장', '지어낸 사례', '확인 안 된 요건', '시간 압박', 'AX 수단화'].map((w) => `reg-${w}`)
+    check('D554-5 받은 글 점검 — 컨설팅 위험 표현 9가지가 모두 걸림 · D-558 수치(99% · 10명 중 8명)는 안 걸림 · 깨끗한 글은 0',
+      !keys.includes('reg-수치 후킹') && want.every((k) => keys.includes(k)) && !factChecks('신청 전에 기본 조건부터 점검해요. 결과는 기관 심사로 정해집니다.', cs).some((x) => x.key.startsWith('reg-')), { missing: want.filter((k) => !keys.includes(k)) })
   }
 
   const reqHf = aiRequestText(hf)

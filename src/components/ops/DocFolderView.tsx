@@ -97,7 +97,7 @@ export function DocFolderView({
   if (tree.total === 0) {
     return (
       <section className="rounded-(--radius-panel) border border-dashed border-slate-300 bg-white p-6 text-center" data-testid="folder-view">
-        <p className="t-body text-slate-600">아직 올린 파일이 없어요. [한꺼번에 올리기] 로 폴더째 올리면 폴더 그대로 보여요.</p>
+        <p className="t-body text-slate-600">아직 올린 파일이 없어요. [서류 올리기] → [폴더째 올리기] 로 올리면 폴더 그대로 보여요.</p>
       </section>
     )
   }

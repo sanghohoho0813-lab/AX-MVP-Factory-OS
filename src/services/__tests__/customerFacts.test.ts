@@ -510,6 +510,17 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const c3 = cellForPlacement(c2.record, { kind: 'new', label: '졸업증명서', sure: true, reason: '', issuedAt: null }, used)
   const c4 = cellForPlacement(c3.record, { kind: 'new', label: '졸업증명서', sure: true, reason: '', issuedAt: null }, used)
   check('새 칸도 겹치면 번호: 졸업증명서 · 졸업증명서 (2)', c3.label === '졸업증명서' && c4.label === '졸업증명서 (2)' && c3.key !== c4.key)
+  // D-558 받음을 꺼 둔(안 받음) 칸에 예전 파일이 남아 있으면 — 새 파일은 기본 칸(받음), 예전 파일은 '(2)' 칸으로(지우지 않음)
+  {
+    const off = withDocument(base, 'businessRegistration', { received: false, fileName: '예전_사업자등록증.pdf', storagePath: 'w/c/biz/old' })
+    const c = cellForPlacement(off, p2, new Set<string>())
+    const moved = allDocumentMetas(c.record).find((m) => m.label === '사업자등록증 (2)')
+    const oldCell = moved ? c.record.documents[moved.key] : undefined
+    check('D558-8 안 받음 칸 → 새 파일은 기본 칸 · 예전 파일은 (2) 칸(파일 그대로 · 안 받음 그대로)', c.key === 'businessRegistration' && !c.numbered && c.record.documents.businessRegistration?.fileName === '' && oldCell?.fileName === '예전_사업자등록증.pdf' && oldCell?.storagePath === 'w/c/biz/old' && oldCell?.received === false, JSON.stringify({ key: c.key, moved: moved?.label, oldCell }))
+    const on = withDocument(base, 'businessRegistration', { received: true, fileName: '받은_사업자등록증.pdf', storagePath: 'w/c/biz/on' })
+    const c2b = cellForPlacement(on, p2, new Set<string>())
+    check('D558-9 받음 칸은 예전처럼 덮지 않고 (2) 칸', c2b.key !== 'businessRegistration' && c2b.label === '사업자등록증 (2)' && c2b.record.documents.businessRegistration?.fileName === '받은_사업자등록증.pdf')
+  }
 
   // 다시 분류 — 중소기업 확인서 칸의 졸업증명서와 기타 칸의 중소기업 확인서를 서로 바꾼다(번호 칸 없이)
   let tangled = withCustomDocument(base, { label: `${OTHER_DOC_LABEL} · 스캔3` })
@@ -2739,6 +2750,18 @@ await (async () => {
   check('D-425 발급일 글 없는 등기부 → 발급일 모름(예전: 중임 2025-02-27 → "523일 지남")', findIssuedDate(REG.join('\n')) === null, String(findIssuedDate(REG.join('\n'))))
   check('D-425 "열람일시 : 2026년10월30일 11시12분" → 2026-10-30', findIssuedDate([...REG, '열람일시 : 2026년10월30일 11시12분'].join('\n')) === '2026-10-30', String(findIssuedDate([...REG, '열람일시 : 2026년10월30일 11시12분'].join('\n'))))
   check('D-425 법원 발급본 끝 줄("서기 2026년 10월 20일 법원행정처 등기정보중앙관리소") → 그 날짜(취임 · 중임 줄은 건너뜀)', findIssuedDate([...REG, '서기 2026년 10월 20일 법원행정처 등기정보중앙관리소 전산운영책임관'].join('\n')) === '2026-10-20')
+  // D-558 대표: "사업자등록증 발급일이 개업연월일로 들어감" — 발급일은 맨 아래(세무서장 앞) 날짜, 개업연월일은 발급일이 아니다
+  {
+    const BIZ = ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대 표 자 : 이미래', '개업연월일 : 2023 년 01 월 10 일', '사업장 소재지 : 경기도 파주시 문발로 1', '업태 : 제조업   종목 : 전통시장 납품']
+    const at = (lines: string[]) => findIssuedDate([...BIZ, ...lines].join('\n'))
+    check('D558-1 맨 아래 날짜를 못 읽으면 발급일 모름(예전: 개업연월일 2023-01-10 이 발급일)', at([]) === null, String(at([])))
+    check('D558-2 맨 아래 "2024 년 03 월 18 일 / 파주세무서장" → 2024-03-18', at(['2024 년 03 월 18 일', '파주세무서장']) === '2024-03-18')
+    check('D558-3 점 날짜 "2024.03.18 / 파주세무서장 (인)" → 2024-03-18(개업연월일이 년월일이어도)', at(['2024.03.18', '파주세무서장 (인)']) === '2024-03-18', String(at(['2024.03.18', '파주세무서장 (인)'])))
+    check('D558-4 한 줄 "2024년 3월 18일 파주세무서장" · 세무서장 다음 줄 날짜 → 2024-03-18', at(['2024년 3월 18일 파주세무서장']) === '2024-03-18' && at(['파주세무서장', '2024. 3. 18.']) === '2024-03-18')
+    check('D558-5 세무서장 뒤 전자우편 줄이 있어도 · 종목 "전통시장" 은 발급 기관이 아님', at(['2024 년 03 월 18 일', '파주세무서장', '전자세금계산서 전용 전자우편주소 : a@b.com']) === '2024-03-18')
+    check('D558-6 개업연월일 줄만 있는 홈택스 증명(발급일 이름표 있음) → 발급일 이름표 날짜', at(['발급일자 : 2026.11.05']) === '2026-11-05')
+    check('D558-7 확인서 유효기간 끝은 기관 줄 앞이어도 발급일 아님(범위 시작)', findIssuedDate(['중소기업 확인서', '유효기간 : 2026.04.01 ~ 2027.03.31', '중소벤처기업부장관'].join('\n')) === '2026-04-01', String(findIssuedDate(['중소기업 확인서', '유효기간 : 2026.04.01 ~ 2027.03.31', '중소벤처기업부장관'].join('\n'))))
+  }
   check('D-425 "발행일 2026/10/20" → 2026-10-20 · 다른 서류(납세증명서)의 마지막 날짜 규칙은 그대로', findIssuedDate([...REG, '발행일 2026/10/20'].join('\n')) === '2026-10-20' && findIssuedDate(['납세증명서', '위와 같이 증명합니다', '2026년 10월 20일'].join('\n')) === '2026-10-20')
 })()
 

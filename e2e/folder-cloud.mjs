@@ -241,7 +241,7 @@ try {
   mkdirSync(join(dir, '새봄상사', '인증서'), { recursive: true })
   writeFileSync(join(dir, '새봄상사', '인증서', '벤처기업확인서.png'), PNG)
   writeFileSync(join(dir, '새봄상사', '회사소개서.pdf'), PDF)
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).click()
+  await page.getByTestId('docs-upload').click()
   await page.locator('input[aria-label="서류 폴더 고르기"]').setInputFiles(join(dir, '새봄상사'))
   await page.waitForTimeout(4000)
   const upBtn = page.getByRole('button', { name: /올리기/ }).filter({ hasText: /(고른|전부|모두|\d+개)/ }).first()

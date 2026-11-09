@@ -46,6 +46,22 @@ export function cellForPlacement(record: ClientOpsRecord, p: DocPlacement, used:
     used.add(p.key)
     return { record: rec, key: p.key, label: p.label, numbered: false }
   }
+  // D-558 대표: "새로 올렸는데 기본 칸은 '안 받음' 그대로 · '사업자등록증 (2)' 가 생김" — 받음을 꺼 둔(안 받음) 칸에 예전 파일이 남아 있으면
+  //   예전 파일은 '(2)' 칸으로 옮겨 두고(지우지 않는다 · 안 받음 그대로) 새 파일을 기본 칸에 넣는다 → 기본 칸이 '받음'
+  if (p.kind === 'existing' && !used.has(p.key) && hasFile(rec, p.key) && rec.documents[p.key]?.received === false) {
+    const old = rec.documents[p.key] as DocumentState
+    const base = allDocumentMetas(rec).find((m) => m.key === p.key)
+    const label2 = nextNumberedLabel(rec, base?.label ?? p.label)
+    const before = rec.customDocuments.length
+    rec = withCustomDocument(rec, { label: label2, validMonths: base?.validMonths ?? knownDocValidMonths(p.label) })
+    if (rec.customDocuments.length === before + 1) {
+      const k2 = rec.customDocuments[rec.customDocuments.length - 1].key
+      const note = [old.note, `예전 파일 — 새 파일은 '${base?.label ?? p.label}' 칸에 넣었어요`].filter(Boolean).join(' · ').slice(0, 300)
+      rec = { ...rec, documents: { ...rec.documents, [k2]: { ...old, note }, [p.key]: { ...old, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', validUntil: undefined, note: '', folderPath: '', uploadedAt: undefined } } }
+      used.add(p.key)
+      return { record: rec, key: p.key, label: p.label, numbered: false }
+    }
+  }
   // D-148: 이름이 비면 기타 칸 — 빈 이름으로는 칸이 안 만들어져 엉뚱한 칸 키를 집었다
   const label = p.label.trim() || OTHER_DOC_LABEL
   const empty = emptyCellNamed(rec, label, used)

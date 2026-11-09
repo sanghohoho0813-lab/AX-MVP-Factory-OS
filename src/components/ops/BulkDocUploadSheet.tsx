@@ -473,7 +473,7 @@ export function BulkDocUploadSheet({
     <Modal
       open={!hidden}
       size="lg"
-      title={`${record.companyName} — 서류 한꺼번에 올리기`}
+      title={`${record.companyName} — 서류 올리기`}
       onClose={closeSheet}
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -560,11 +560,11 @@ export function BulkDocUploadSheet({
           <div className={`flex flex-wrap justify-center ${items.length > 0 ? 'gap-1.5' : 'gap-2'}`}>
             <Button variant="secondary" size={items.length > 0 ? 'sm' : undefined} disabled={busy} onClick={() => fileRef.current?.click()}>
               <FileUp aria-hidden="true" className="size-4" />
-              파일 고르기
+              파일 올리기
             </Button>
             <Button variant="secondary" size={items.length > 0 ? 'sm' : undefined} disabled={busy} onClick={() => folderRef.current?.click()}>
               <FolderUp aria-hidden="true" className="size-4" />
-              폴더째 고르기
+              폴더째 올리기
             </Button>
           </div>
           {items.length === 0 && (

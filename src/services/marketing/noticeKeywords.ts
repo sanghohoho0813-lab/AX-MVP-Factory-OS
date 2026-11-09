@@ -49,7 +49,7 @@ export function weekWindow(today: string): { from: string; to: string } {
 
 export interface NoticeKeyword {
   key: string
-  topicId: NoticeTopicId
+  topicId: string
   label: string
   /** 이번 주 새로 올라온 공고(올라온 날 · 없으면 접수 시작일이 이번 주) — 새 것 먼저 */
   fresh: GrantNotice[]
@@ -120,8 +120,10 @@ export function noticePackSource(k: NoticeKeyword, today: string): PackSource | 
  *  - 정부지원금 = 공고 분류의 '지원금'(소상공인 지원금 포함) 무리 — 이름 · 관점 · 제목은 회사 대표 기준으로 넓혔다.
  */
 export interface FixedTopic {
-  /** 공고 무리(noticeTopicOf) = 레이더 주제 번호 */
-  topicId: NoticeTopicId
+  /** 공고 무리(noticeTopicOf) · 레이더 주제 번호 — 키(notice:주제)도 이것 */
+  topicId: string
+  /** D-558 함께 묶는 주제(공고 무리 · 레이더 주제) — '정부지원금 · 고용지원금' 한 칸 */
+  also?: readonly string[]
   label: string
   /** 화면 둘째 줄(짧게) */
   sub: string
@@ -129,36 +131,41 @@ export interface FixedTopic {
   main?: { view: string; titles: string[]; thumbs: string[] }
 }
 
+/**
+ * D-558 대표(2026-11-09): "정부 지원금이랑 고용지원금은 묶어 주고, 그 빈칸에 절세 · 세금 신고를 고정으로".
+ * 키는 예전 그대로(notice:sme_subsidy = 정부지원금 칸) — 담아 둔 묶음 · AI 결과가 이어진다. 고용지원금 공고도 이 칸에서 센다.
+ */
 export const FIXED_TOPICS: readonly FixedTopic[] = [
   { topicId: 'policy_fund', label: '정책자금', sub: '융자 · 보증' },
-  { topicId: 'employ_subsidy', label: '고용지원금', sub: '채용 · 인건비' },
-  { topicId: 'certification', label: '기업인증', sub: '벤처 · 연구소' },
   {
     topicId: 'sme_subsidy',
-    label: '정부지원금',
-    sub: '갚지 않는 돈',
+    also: ['employ_subsidy'],
+    label: '정부지원금 · 고용지원금',
+    sub: '갚지 않는 돈 · 채용 · 인건비',
     main: {
-      view: '지원금 목록을 읽어 주는 대신, 우리 회사가 받을 수 있는 갚지 않는 지원금만 조건(업종 · 지역 · 규모)으로 추려 줍니다.',
-      titles: ['정부지원금, 우리 회사가 받을 수 있는 것만 골라봤습니다', '갚지 않아도 되는 정부지원금, 신청 순서대로 정리했습니다', '정부지원금 신청 전에 대표님이 꼭 확인할 3가지'],
-      thumbs: ['갚지 않는 돈', '우리 회사 해당?'],
+      view: '지원금 목록을 읽어 주는 대신, 우리 회사가 받을 수 있는 갚지 않는 지원금 · 채용 지원금만 조건(업종 · 지역 · 규모 · 채용 시기)으로 추려 줍니다.',
+      titles: ['정부지원금 · 고용지원금, 대표님이 신청 전에 꼭 확인할 3가지', '직원 1명 뽑기 전에 확인할 지원금 3가지, 순서가 중요합니다', '갚지 않는 돈 2가지 — 우리 회사가 받을 수 있는 것만 골라봤습니다'],
+      thumbs: ['갚지 않는 돈', '뽑기 전에 3가지'],
     },
   },
+  { topicId: 'certification', label: '기업인증', sub: '벤처 · 연구소' },
   { topicId: 'grant_program', label: '정부지원사업', sub: '공고 · 사업계획서' },
+  { topicId: 'tax_saving', label: '절세 · 세금 신고', sub: '법인세 · 종소세 · 부가세' },
 ]
 
-/** 고정 키워드 주제 번호 — 레이더 '경제 · 경영' 후보에서 뺀다(radarPlan fixedTopics) */
-export const FIXED_TOPIC_IDS: readonly string[] = FIXED_TOPICS.map((f) => f.topicId)
+/** 고정 키워드 주제 번호(묶은 주제까지) — 레이더 '경제 · 경영' 후보에서 뺀다(radarPlan fixedTopics) */
+export const FIXED_TOPIC_IDS: readonly string[] = FIXED_TOPICS.flatMap((f) => [f.topicId, ...(f.also ?? [])])
 
 export interface FixedKeyword extends NoticeKeyword {
   sub: string
   fixed: FixedTopic
 }
 
-/** 고정 키워드 다섯 — 공고가 없어도 늘 다섯(칩은 이번 주 새 공고가 있을 때만) */
+/** 고정 키워드 다섯 — 공고가 없어도 늘 다섯(칩은 이번 주 새 공고가 있을 때만 · 묶은 칸은 두 무리 공고를 함께 센다) */
 export function fixedKeywords(notices: readonly GrantNotice[], today: string): FixedKeyword[] {
   const { from } = weekWindow(today)
   const soon = ymd(at(today) + 6 * DAY)
-  const groups = new Map<NoticeTopicId, { fresh: GrantNotice[]; closing: GrantNotice[] }>()
+  const groups = new Map<string, { fresh: GrantNotice[]; closing: GrantNotice[] }>()
   for (const n of notices) {
     if (n.applyEnd && n.applyEnd < today) continue
     const id = noticeTopicOf(n)
@@ -169,9 +176,9 @@ export function fixedKeywords(notices: readonly GrantNotice[], today: string): F
     groups.set(id, g)
   }
   return FIXED_TOPICS.map((f) => {
-    const g = groups.get(f.topicId) ?? { fresh: [], closing: [] }
-    const fresh = [...g.fresh].sort((a, b) => (b.postedAt || b.applyStart).localeCompare(a.postedAt || a.applyStart) || a.title.localeCompare(b.title))
-    const closing = [...g.closing].sort((a, b) => a.applyEnd.localeCompare(b.applyEnd))
+    const ids = [f.topicId, ...(f.also ?? [])]
+    const fresh = ids.flatMap((id) => groups.get(id)?.fresh ?? []).sort((a, b) => (b.postedAt || b.applyStart).localeCompare(a.postedAt || a.applyStart) || a.title.localeCompare(b.title))
+    const closing = ids.flatMap((id) => groups.get(id)?.closing ?? []).sort((a, b) => a.applyEnd.localeCompare(b.applyEnd))
     return { key: `notice:${f.topicId}`, topicId: f.topicId, label: f.label, sub: f.sub, fixed: f, fresh, closing, note: fresh.length ? `새 공고 ${fresh.length}건` : '' }
   })
 }

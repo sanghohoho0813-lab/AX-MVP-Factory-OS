@@ -47,6 +47,15 @@ function rowsOf(records: ClientOpsRecord[]): Row[] {
 
 export function ClientSplit({ children }: { children: ReactNode }) {
   const [open, setOpenState] = useState(readOpen)
+  // D-558 대표: "업체 화면은 내가 고른 폭 그대로, 업체 목록은 폭과 상관없이 왼쪽에" — 목록(15rem) + 사이(1.25rem)만큼 본문 상자를 넓힌다
+  useEffect(() => {
+    if (!open) return
+    const root = document.documentElement
+    root.style.setProperty('--side-list-extra', '16.25rem')
+    return () => {
+      root.style.removeProperty('--side-list-extra')
+    }
+  }, [open])
   const setOpen = (v: boolean) => {
     setOpenState(v)
     try {

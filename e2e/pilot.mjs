@@ -465,6 +465,10 @@ try {
   check('Pilot 메뉴: 오늘 · 고객 관리 · 일정 · 매출 · 전문 모듈(기업성장 · 절세·재무) · 설정은 있음', ['오늘', '고객 관리', '매출', '기업성장', '절세·재무', '설정'].every((s) => nav.includes(s)), nav.replace(/\n/g, '|').slice(0, 400))
   check('메뉴(D-163): 정부지원사업 줄 없음 · 영업 묶음에 지원사업 알림 없음', !nav.includes('정부지원사업') && !/영업 관리\n지원사업 알림/.test(nav), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot(D-164): 대표 ↔ 팀장 전환 단추 없음', (await page.getByTestId('view-as-switch').count()) === 0)
+  await page.getByRole('button', { name: '사용자 메뉴' }).click().catch(() => {})
+  check('Pilot(D-558): 사용자 메뉴에도 보는 화면 전환 없음', (await page.getByTestId('usermenu-viewas').count()) === 0)
+  await page.keyboard.press('Escape')
+  await page.mouse.click(5, 400)
   check('P3 Pilot 메뉴(D-195): 마케팅 · 브랜딩 없음(대표 전용)', !nav.includes('마케팅'), nav.replace(/\n/g, '|').slice(0, 400))
   check('P3 Pilot 메뉴(D-206): 홍보 글 만들기 · 홈페이지 만들기 · 콘텐츠 레이더 없음(대표 전용)', !nav.includes('홍보 글') && !nav.includes('홈페이지 만들기') && !nav.includes('콘텐츠 레이더'))
   check('Pilot(D-164 · D-296): 머리줄 글자 크기 단추 없음 · 보기 방식은 접힌 단추 하나(눌러서 PC · Mobile · PC+Mobile)', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch-compact"]').count()) === 1 && (await page.locator('header [data-testid="device-switch"]').count()) === 0)
@@ -967,6 +971,12 @@ try {
   await go(page, '/settings')
   const vs = page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"]')
   check('대표(D-164 · D-296): 머리줄에는 전환 단추 없음 · 설정 › 보는 화면에 [대표 | 최은혜 팀장]', (await page.locator('header [data-testid="view-as-switch"], header [data-testid="view-as-compact"]').count()) === 0 && (await vs.count()) === 1 && /최은혜\s*팀장/.test(await vs.innerText()), await vs.innerText().catch(() => ''))
+  // D-558 대표: "팀장 비밀번호를 잊었다 — 이름을 누르면 그 아래에서 대표 ↔ 팀장 왔다 갔다" — 머리줄 사용자 메뉴 안(이름 바로 아래)에도 같은 전환
+  await page.getByRole('button', { name: '사용자 메뉴' }).click()
+  const mv = page.locator('[data-testid="usermenu-viewas"] [data-testid="view-as-switch"]')
+  check('대표(D-558): 머리줄 사용자 메뉴 — 이름 아래 보는 화면 [대표 | 최은혜 팀장](닫힌 머리줄에는 그대로 없음)', (await mv.count()) === 1 && /최은혜\s*팀장/.test(await mv.innerText().catch(() => '')), await mv.innerText().catch(() => ''))
+  await page.keyboard.press('Escape')
+  await page.mouse.click(5, 400)
   restLog = []
   await vs.locator('[data-view="pilot"]').click()
   await page.waitForLoadState('networkidle')

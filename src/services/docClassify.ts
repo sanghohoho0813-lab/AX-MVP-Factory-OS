@@ -463,9 +463,15 @@ export function findIssuedDate(raw: string): string | null {
     }
     return null
   }
+  // D-558 대표: "사업자등록증 발급일이 개업연월일로 들어가는 심각한 오류" — 발급일은 맨 아래 '2024년 03월 15일 ○○세무서장' 의 날짜다.
+  //   ① 세무서장 · 기관장 바로 앞(없으면 바로 뒤) 날짜를 먼저 — 점 · 줄표 날짜('2024.03.15')도 읽는다
+  //   ② '개업연월일 · 설립일 · 생년월일 · 취임일' 처럼 이름표가 붙은 날짜는 발급일이 아니다 — 아래 '마지막 날짜' 에서도 건너뛴다
+  //   (예전: 맨 아래 날짜를 못 읽으면 개업연월일이 마지막 날짜라 발급일이 됐다 — 이제는 모른다고 둔다)
+  const signed = issuerDate(text)
+  if (signed) return signed
   const w = validityWindow(text)
   const body = w ? `${text.slice(0, w.start)} ${text.slice(w.end)}` : text
-  const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
+  const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)].filter((m) => !labeledOther(body, m.index ?? 0))
   // D-311 '2024년 01월 01일 ~ 2026년 06월 30일' 같은 기간의 앞 · 끝 날짜는 발급일이 아니다(부가세 과세표준증명의 과세기간이 발급일로 읽혀 바로 '기한 지남' 이 됐다)
   const inRange = (m: RegExpMatchArray) => {
     const at = m.index ?? 0
@@ -484,6 +490,46 @@ export function findIssuedDate(raw: string): string | null {
     const first = dateMatches(w.body.slice(0, tilde))[0]
     const d = first ? parseKoreanDate(first[0]) : undefined
     if (d && plausible(d)) return d
+  }
+  return null
+}
+
+/** D-558 그 날짜 바로 앞(같은 줄)에 발급일이 아닌 이름표 — 개업연월일 · 설립일 · 생년월일 · 취임일 · 사업연도 · 과세기간 */
+const OTHER_DATE_LABEL = /(?:개\s*업|설\s*립|성\s*립|창\s*업|생\s*년|생\s*일|취\s*임|개\s*시|사\s*업\s*연\s*도|과\s*세\s*기\s*간|입\s*사|퇴\s*사)\s*(?:연\s*월\s*일|년\s*월\s*일|일\s*자|일)?\s*[:：)\]]?\s*$/
+function labeledOther(text: string, at: number): boolean {
+  const lineStart = text.lastIndexOf('\n', at - 1) + 1
+  return OTHER_DATE_LABEL.test(text.slice(Math.max(lineStart, at - 24), at))
+}
+
+/** D-558 '○○세무서장 · ○○청장 · ○○부장관 · ○○구청장' 처럼 발급 기관 이름으로 끝나는 줄(뒤에 '(인)' · '직인' 은 붙어도 됨 · '전통시장' 같은 말과 헷갈리는 '시장 · 군수' 는 뺐다) */
+const ISSUER_LINE = /(?:세\s*무\s*서\s*장|국\s*세\s*청\s*장|[가-힣]{1,10}\s*(?:청|처|부)\s*장(?:\s*관)?|구\s*청\s*장)\s*(?:\(\s*인\s*\)|직\s*인|인)?\s*$/
+const ANY_DATE = /(20\d{2})\s*(?:년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일|[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?!\d))/g
+/** D-558 발급 기관 줄 바로 앞(90자 안 · 없으면 그 줄 · 바로 뒤 40자) 날짜 — 사업자등록증 · 납세증명 · 확인서의 발급일. 기간(~ · 유효기간) · 개업연월일 같은 이름표 날짜는 건너뛴다 */
+function issuerDate(text: string): string | null {
+  const w = validityWindow(text)
+  const lines = text.split('\n')
+  let offset = text.length
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    offset -= lines[i].length + (i < lines.length - 1 ? 1 : 0)
+    if (!ISSUER_LINE.test(lines[i])) continue
+    const lineAt = Math.max(0, offset)
+    const issuerAt = lineAt + lines[i].search(ISSUER_LINE)
+    const from = Math.max(0, issuerAt - 90)
+    const ok = (m: RegExpMatchArray, base: number) => {
+      const at = base + (m.index ?? 0)
+      if (w && at >= w.start && at < w.end) return false
+      const after = text.slice(at + m[0].length, at + m[0].length + 4)
+      if (/^\s*[~∼〜～]/.test(after) || /[~∼〜～]\s*$/.test(text.slice(Math.max(0, at - 4), at))) return false
+      return !labeledOther(text, at)
+    }
+    const near = [...text.slice(from, issuerAt).matchAll(ANY_DATE)].filter((m) => ok(m, from))
+    const after = near.length ? [] : [...text.slice(issuerAt, issuerAt + 40).matchAll(ANY_DATE)].filter((m) => ok(m, issuerAt))
+    const m = near[near.length - 1] ?? after[0]
+    if (!m) continue
+    const d = `${m[1]}-${String(m[2] ?? m[4]).padStart(2, '0')}-${String(m[3] ?? m[5]).padStart(2, '0')}`
+    const mo = Number(d.slice(5, 7))
+    const da = Number(d.slice(8, 10))
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31 && plausible(d)) return d
   }
   return null
 }

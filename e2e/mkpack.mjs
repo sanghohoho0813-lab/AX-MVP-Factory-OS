@@ -440,9 +440,10 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   const fixedNames = (await p.getByTestId('mk-fixed-key').allInnerTexts()).map((t) => t.split('\n')[0].trim())
   const noteOf = async (key) => (await p.locator(`[data-testid="mk-fixed-key"][data-key="${key}"] [data-testid="mk-key-note"]`).innerText().catch(() => '')) ?? ''
   // D-295 대표: 정책자금 · 고용지원금 · 기업인증은 새 공고가 떴다고 이번 주 키워드에 올리지 말고 고정 키워드로(정부지원금 · 정부지원사업까지 5개)
-  check('K1 고정 키워드 5개 — 정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업(늘 그 자리)', JSON.stringify(fixedNames) === JSON.stringify(['정책자금', '고용지원금', '기업인증', '정부지원금', '정부지원사업']) && JSON.stringify(fixedIds) === JSON.stringify(['notice:policy_fund', 'notice:employ_subsidy', 'notice:certification', 'notice:sme_subsidy', 'notice:grant_program']), { fixedNames, fixedIds })
-  check('K2 고정 키워드 칩 = 이번 주 새 공고 수(지난달 공고는 안 셈 · 1건도 · 없으면 칩 대신 짧은 설명)', (await noteOf('notice:policy_fund')) === '새 공고 3건' && (await noteOf('notice:employ_subsidy')) === '새 공고 2건' && (await noteOf('notice:sme_subsidy')) === '새 공고 2건' && (await noteOf('notice:certification')) === '새 공고 1건' && (await noteOf('notice:grant_program')) === '', { pf: await noteOf('notice:policy_fund'), cert: await noteOf('notice:certification') })
-  const FIXED_TOPICS = ['policy_fund', 'employ_subsidy', 'certification', 'sme_subsidy', 'grant_program']
+  // D-558 대표: 정부지원금 · 고용지원금은 한 칸으로 묶고, 빈 칸에 절세 · 세금 신고를 고정
+  check('K1 고정 키워드 5개 — 정책자금 · 정부지원금 · 고용지원금(한 칸) · 기업인증 · 정부지원사업 · 절세 · 세금 신고(늘 그 자리)', JSON.stringify(fixedNames) === JSON.stringify(['정책자금', '정부지원금 · 고용지원금', '기업인증', '정부지원사업', '절세 · 세금 신고']) && JSON.stringify(fixedIds) === JSON.stringify(['notice:policy_fund', 'notice:sme_subsidy', 'notice:certification', 'notice:grant_program', 'notice:tax_saving']), { fixedNames, fixedIds })
+  check('K2 고정 키워드 칩 = 이번 주 새 공고 수(지난달 공고는 안 셈 · 1건도 · 묶은 칸은 지원금 + 고용지원금 공고를 함께 · 없으면 칩 대신 짧은 설명)', (await noteOf('notice:policy_fund')) === '새 공고 3건' && (await noteOf('notice:sme_subsidy')) === '새 공고 4건' && (await noteOf('notice:certification')) === '새 공고 1건' && (await noteOf('notice:grant_program')) === '' && (await noteOf('notice:tax_saving')) === '', { pf: await noteOf('notice:policy_fund'), sme: await noteOf('notice:sme_subsidy'), cert: await noteOf('notice:certification') })
+  const FIXED_TOPICS = ['policy_fund', 'employ_subsidy', 'certification', 'sme_subsidy', 'grant_program', 'tax_saving']
   check('K3 이번 주 키워드 10개는 유튜브에서 뜨는 주제만 — 고정 키워드 주제 · 공고 키워드 0(경영 × AI 다리 주제도)', keyIds.length === 10 && !keyIds.some((k) => k.startsWith('notice:') || FIXED_TOPICS.includes(k.split(':')[1])), keyIds)
   // D-507 기준 줄은 첫 화면을 가볍게 하려고 [사용 방법] 안으로 — 펼쳐서 읽는다(글은 그대로)
   await p.getByTestId('mk-howto-toggle').click()

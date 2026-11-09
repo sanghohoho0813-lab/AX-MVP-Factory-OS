@@ -14,6 +14,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
 import { useCurrentUser } from './useCurrentUser'
 import { AccountSwitchItems } from './AccountSwitch'
+import { ViewAsSwitch, useViewTargets } from './ViewAsSwitch'
 import { TutorialMenuItem } from '../tutorial/TutorialButton'
 
 const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
@@ -148,6 +149,9 @@ export function SupabaseUserMenu() {
             <p className="truncate text-sm font-semibold text-slate-800">{me.name} {me.title}</p>
             <p className="truncate text-[0.875rem] text-slate-400">{email}</p>
           </div>
+          {/* D-558 대표: "팀장 계정은 비밀번호를 잊어 못 들어가는데, 팀장이 보는 화면을 바로 보고 싶다 — 이름 아래에서 왔다 갔다" —
+              설정 안쪽에 있던 [대표 | 팀장] 전환(D-164 · 다시 로그인 없이 팀장 작업공간을 그대로)을 이름 바로 아래에. 대표 계정에만 보인다 */}
+          <ViewAsMenuRow />
           <Link to="/settings" onClick={() => setOpen(false)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             <Settings aria-hidden="true" className="size-4 text-slate-400" /> 설정
           </Link>
@@ -156,6 +160,18 @@ export function SupabaseUserMenu() {
           <AccountSwitchItems tone="light" onPick={() => setOpen(false)} />
         </div>
       )}
+    </div>
+  )
+}
+
+/** D-558 사용자 메뉴 안 '보는 화면' — 대표 계정(팀장 화면 볼 권한이 있을 때)에만 */
+function ViewAsMenuRow() {
+  const t = useViewTargets()
+  if (!t) return null
+  return (
+    <div className="flex flex-col gap-1.5 border-b border-slate-100 px-3 py-2.5" data-testid="usermenu-viewas">
+      <p className="t-meta break-keep text-slate-500">보는 화면 — 누르면 그 사람이 보는 화면으로(다시 로그인 없이)</p>
+      <ViewAsSwitch stacked />
     </div>
   )
 }

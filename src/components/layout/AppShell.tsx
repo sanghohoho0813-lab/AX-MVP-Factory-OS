@@ -141,7 +141,8 @@ export function AppShell() {
           {/* D-201: PC 본문 폭 — 머리줄 [폭] 단추로 좁게 · 보통(기본) · 넓게. 화면이 더 좁으면 바뀌는 것 없음 */}
           <main
             className="pb-safe-nav mx-auto w-full flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-9 2xl:px-14"
-            style={{ maxWidth: CONTENT_WIDTH_PX[contentWidth] }}
+            // D-558 고객 관리 PC 왼쪽 업체 목록은 고른 본문 폭 밖에 — 목록이 펴져 있으면 그 폭만큼(--side-list-extra) 더 넓힌다(업체 화면은 고른 폭 그대로)
+            style={{ maxWidth: `calc(${CONTENT_WIDTH_PX[contentWidth]}px + var(--side-list-extra, 0px))` }}
             data-content-width={contentWidth}
             // D-507 마케팅 · 브랜딩(60대 이상 — 글자 · 대비를 이 안에서만 키운다)
             data-area={isMarketingArea(location.pathname) ? 'marketing' : undefined}

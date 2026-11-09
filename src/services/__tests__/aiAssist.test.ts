@@ -559,7 +559,7 @@ function d241Tests() {
   // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지
   const radarSys = assistSystem(ASSISTS['radar.top5'])
   check('S1 마케팅 단추 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 후보 번호 · 미래AI랩 일 · 상투어 금지) — 다른 화면엔 없음',
-    RADAR_RULES.every((r: string) => radarSys.includes(r)) && !assistSystem(ASSISTS['today.top3']).includes('[마케팅 규칙]') && radarSys.includes('채널 설계 기준') && radarSys.includes('N분 컷'))
+    RADAR_RULES.every((r: string) => radarSys.includes(r)) && !assistSystem(ASSISTS['today.top3']).includes('[마케팅 규칙]') && radarSys.includes('채널 설계 기준') && radarSys.includes('꿀팁') && !radarSys.includes('N분 컷') && radarSys.includes('[완성도 규칙') && radarSys.includes('10개 중 8~9개에 숫자'))
   check('S2 [대본 끝까지 쓰기] — 서버 · 화면 단추 같은 이름 · 글쓰기 · 레이더 · 구간별 대사 · 공식 자료 확인 칸',
     ASSISTS['radar.script']?.page === 'radar' && ASSISTS['radar.script']?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'radar.script' && p.label === ASSISTS['radar.script'].label && p.kind === 'write') && ASSISTS['radar.script'].instruction.join(' ').includes('[공식 자료 확인'))
   check('S3 공통 규칙 — 모르는 칸은 비워 둠("자료에 없음" 으로 채우지 않음) · 없는 번호를 만들지 않음', ASSIST_RULES.some((r: string) => r.includes('빈 글로 둔다')) && ASSIST_RULES.some((r: string) => r.includes('없는 번호를 만들지 않고')) && !ASSIST_RULES.some((r: string) => r.includes('모르면 "자료에 없음"')))

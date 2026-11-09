@@ -111,7 +111,6 @@ const RULES: Record<RegulatedKind, Omit<RegulatedRule, 'kind' | 'notice'> & { no
   consulting: {
     label: '경영컨설팅',
     never: [
-      "100% · 99% · N배 · 'N명 중 M명' · 승인률 · 통과율 같은 수치 표현(부정형 '100% 부결' · '99%가 모르는', 비율형 '10명 중 8명이 놓치는'도)",
       '승인 · 선정 보장',
       '가산점 · 가점 · 우대 단정',
       '기관 로고 · 마크 · 도장 · 공문 모양(이미지 · 디자인 지시에도)',
@@ -127,7 +126,6 @@ const RULES: Record<RegulatedKind, Omit<RegulatedRule, 'kind' | 'notice'> & { no
     notice: () => '결과는 기관 심사로 정해집니다.',
     noticeRe: /기관\s*심사로\s*정해/,
     risky: [
-      { re: /(?:100|9\d)\s*%|\d+\s*명\s*중\s*\d+\s*명|(?:승인|통과|선정)\s*률/, word: '수치 후킹', why: "'100% · 99% · 10명 중 8명 · 승인률' 같은 수치 후킹은 쓰지 않아요" },
       { re: INFLATE, word: '숫자 늘리기', why: "받은 숫자에 '이상 · 넘게 · 수백' 을 붙이지 않아요" },
       { re: /가산점|가점|우대\s*(?:받|해\s*드|돼|됩)/, word: '가산점 단정', why: '가산점 · 가점 · 우대를 단정하지 않아요' },
       { re: PROXY_WORK, word: '대행 말', why: "기관 일을 대신해 주는 말 대신 '예상 질문 준비 · 신청 전 점검' 으로 써요" },

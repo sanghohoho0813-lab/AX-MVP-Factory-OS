@@ -70,7 +70,7 @@ export function customerBrief(): ChannelBrief {
     host: b?.name ? `${b.name}${b.company ? `(${b.company})` : ''} — ${b.industry || '컨설턴트'}` : '채널 주인(컨설턴트) — 이름 · 경력은 설정 › 내 브랜드에 적은 것만',
     audience: b?.audience || '중소기업 · 소상공인 대표와 실무자',
     covers: b?.specialties || b?.industry || '정책자금 · 지원금 · 절세 같은 중소기업 대표의 돈 문제',
-    avoid: [b?.avoid, '근거 없는 금액 약속 · "N배 빨라진다 · 꿀팁 · 충격" 같은 상투어 · 남의 영상 제목 · 대사 베끼기'].filter(Boolean).join(' · '),
+    avoid: [b?.avoid, '근거 없는 금액 약속 · "꿀팁 · 충격" 같은 상투어 · 남의 영상 제목 · 대사 베끼기'].filter(Boolean).join(' · '),
     tone: b?.tone || '쉬운 말, 과장 없이, 실제 상담에서 본 장면과 숫자로',
     format: '롱폼 10~15분(0~15초 증거 장면 → 결론 먼저 → 번호형 챕터) + 쇼츠 · 릴스 · 스레드로 나눠 쓰기',
     ending: b?.ending || '궁금한 점은 댓글로 남겨 주세요.',

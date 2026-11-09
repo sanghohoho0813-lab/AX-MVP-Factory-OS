@@ -647,6 +647,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     return set
   }, [record, today])
 
+  // D-558 대표: "받음 · 안 받음을 누르면 칸이 위로 올라가 헷갈려 — 그 자리에서 상태만" — '지금 필요' 칸을 위로 올리는 순서는
+  //   서류함을 열 때 · 칸이 늘거나 줄 때 · 탭을 다시 열 때만 다시 정한다(체크를 바꿔도 칸은 제자리)
+  const docKeysSig = record ? allDocumentMetas(record).map((m) => m.key).join('|') : ''
+  const orderUrgent = useMemo(() => urgentDocs, [docKeysSig, tab]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /** D-512 요청한 뒤 아직 안 온 서류 칸 — 칸 알약 '요청함 · N일째' */
   const reqKeys = useMemo(() => (record ? pendingDocKeys(record, today) : new Map<DocumentKey, { days: number; renew: boolean }>()), [record, today])
   // D-518 받은 서류에서 읽었지만 아직 확인하지 않은 정보 — 칸마다 몇 개
@@ -1453,9 +1458,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </h2>
           </HintTip>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
+            {/* D-558 대표: '한꺼번에 올리기' 대신 그냥 '서류 올리기' */}
+            <Button variant="secondary" size="sm" data-testid="docs-upload" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
               <FileUp aria-hidden="true" className="size-3.5" />
-              한꺼번에 올리기
+              서류 올리기
             </Button>
             {/* D-146: 예전 판별로 엉뚱한 칸에 들어간 파일을 제목으로 다시 가른다 */}
             {allDocumentMetas(record).some((m) => m.needsFile && record.documents[m.key]?.fileName) && (
@@ -1597,7 +1603,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           }}
         />
         <div className="grid gap-3 lg:grid-cols-2">
-          {docOrder(allDocumentMetas(record), urgentDocs)
+          {docOrder(allDocumentMetas(record), orderUrgent)
             // D-488 모음 판에 있는 기타 칸은 목차에서 빼 둔다([자세히] 로 펼치면 다시)
             .filter((meta) => !(isOtherCell(meta.label) && !!record.documents[meta.key]?.fileName && !openDocs.has(meta.key)))
             .map((meta) => {
@@ -2117,7 +2123,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 }}
               >
                 <FileUp aria-hidden="true" className="size-4" />
-                서류 한꺼번에 올리기(파일 · 폴더)
+                서류 올리기(파일 · 폴더째)
               </Button>
               {/* D-549 SAFE-5 서류 원본 한 번에 — 칸 이름 그대로 압축 하나(정책자금 신청 서류만도) */}
               {uploadable && originalItems(record).length > 0 && (

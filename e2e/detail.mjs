@@ -70,7 +70,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('예전 기록: 사업자등록번호 · 법인등록번호 값은 그대로', rec0.businessNumber === '123-45-67890' && rec0.corporateNumber === '134511-0022334')
 
   // 서류 → 회사 정보 (인정서)
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByTestId('docs-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles(LAB)
   const pick = page.getByLabel('연구소인정서.txt 칸 고르기')
   await pick.waitFor({ timeout: 15000 })
@@ -98,7 +98,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 다시 올려도 칸이 늘지 않고 묻지 않는다
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByTestId('docs-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles(LAB)
   const pick2 = page.getByLabel('연구소인정서.txt 칸 고르기')
   await pick2.waitFor({ timeout: 15000 })
@@ -154,10 +154,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 안의 단추는 제 일 — 서류 올리기는 시트, 조각은 상태 바꾸기(업체로 가지 않는다)
   await hc.getByRole('button', { name: '한솔테크(주) 서류 올리기' }).click()
   await page.waitForTimeout(500)
-  check('안의 단추: 서류 올리기 → 시트(업체로 넘어가지 않음)', page.url().endsWith('/ops/clients') && (await page.getByText('서류 한꺼번에 올리기').count()) >= 1, page.url())
+  check('안의 단추: 서류 올리기 → 시트(업체로 넘어가지 않음)', page.url().endsWith('/ops/clients') && (await page.getByText('— 서류 올리기').count()) >= 1, page.url())
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
-  if ((await page.getByText('서류 한꺼번에 올리기').count()) > 0) await page.getByRole('button', { name: '닫기' }).first().click()
+  if ((await page.getByText('— 서류 올리기').count()) > 0) await page.getByRole('button', { name: '닫기' }).first().click()
   await page.waitForTimeout(300)
   const money = hc.getByRole('button', { name: /^못 받은 내 돈/ })
   if ((await money.count()) === 1) {
@@ -383,7 +383,7 @@ for (const width of [360, 390, 430]) {
   // 서류 탭 '한꺼번에 올리기' — 암호 걸린 한글 문서는 까닭을 보여 주고 이름으로 칸을 정한다
   await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByTestId('docs-upload').click()
   // D-462 안내 글은 처음 열었을 때(파일 넣기 전) 보인다 — 파일을 넣으면 넣는 곳을 한 줄로 줄인다
   const hint = ((await page.getByRole('dialog').innerText().catch(() => '')) ?? '')
   const LOCKED = makeHwp({ lines: ['비밀'], flags: 3 })
@@ -679,7 +679,7 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(300)
 
   // 한꺼번에 올리기 — 확실한 서류를 '새 칸' 으로 바꾸고 이름을 비우면 '확실한 것만' 에 안 들어간다(예전: 다른 칸을 덮음)
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).click()
+  await page.getByTestId('docs-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles([{ name: '사업자등록증.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증\n등록번호 : 124-81-00998', 'utf8') }])
   await page.waitForTimeout(1200)
   await page.getByLabel('사업자등록증.txt 칸 고르기').selectOption('__new__')
@@ -785,7 +785,7 @@ for (const width of [1440, 390]) {
   await page.getByRole('button', { name: '더보기' }).first().click()
   await page.getByTestId('more-upload').click()
   await page.waitForTimeout(300)
-  check(`${width} 더보기 → 서류 한꺼번에 올리기 창`, (await page.getByRole('dialog').filter({ hasText: '서류 한꺼번에 올리기' }).count()) === 1)
+  check(`${width} 더보기 → 서류 한꺼번에 올리기 창`, (await page.getByRole('dialog').filter({ hasText: '— 서류 올리기' }).count()) === 1)
   await page.getByTestId('bulk-close').click()
   await page.waitForTimeout(200)
   check(`${width} 아무것도 안 넣고 닫으면 그냥 닫힘(표시 없음)`, (await page.getByTestId('bulk-minimized').count()) === 0 && (await page.getByRole('dialog').count()) === 0)
@@ -1123,7 +1123,7 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByTestId('docs-upload').click()
   const LONG = '스캔_2026_10_16_사업장_현장_사진_모음_최종본_수정본_진짜최종_ABCDEFGHIJKLMNOPQRSTUVWXYZ.txt'
   await page.getByLabel('서류 파일 고르기').first().setInputFiles([{ name: LONG, mimeType: 'text/plain', buffer: Buffer.from('메모 — 무슨 서류인지 모름', 'utf8') }])
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="bulk-item"][data-status="ready"]').length === 1, null, { timeout: 15000 })
@@ -1176,13 +1176,13 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   if (await page.getByTestId('folder-file-sheet').count()) await page.keyboard.press('Escape')
   await page.getByTestId('doc-view-list').click()
   // 업체를 옮기면 새 화면 — 열어 둔 창 · 고르던 칸이 다음 업체로 넘어가지 않는다
-  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByTestId('docs-upload').click()
   await page.getByRole('dialog').waitFor()
   const other = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id !== 'cli_hansol')?.id)
   await page.evaluate((id) => { history.pushState({}, '', `/ops/clients/${id}?tab=docs`); dispatchEvent(new PopStateEvent('popstate')) }, other)
   await page.waitForTimeout(900)
   const titles = await page.locator('[role="dialog"]').allInnerTexts()
-  check(`D-209 ${tag} 다른 업체로 옮기면 앞 업체의 올리기 창이 따라오지 않음`, !!other && !titles.some((t) => t.includes('한솔테크(주) — 서류 한꺼번에 올리기')), JSON.stringify({ other, titles: titles.map((t) => t.slice(0, 40)) }))
+  check(`D-209 ${tag} 다른 업체로 옮기면 앞 업체의 올리기 창이 따라오지 않음`, !!other && !titles.some((t) => t.includes('한솔테크(주) — 서류 올리기')), JSON.stringify({ other, titles: titles.map((t) => t.slice(0, 40)) }))
   check(`D-209 ${tag} 오류 0`, errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
@@ -2147,6 +2147,60 @@ for (const vp of [{ w: 390, h: 844, tag: '390' }, { w: 1440, h: 900, tag: '1440'
   check(`D-476 ${vp.tag} 빨간 한 줄 두 개 — 파일 이름 · 한빛상사 · 그 번호 · 이 업체 번호`, (batch.match(/다른 회사\(주식회사 한빛상사 · 214-86-12341\) 서류 같아/g) ?? []).length === 2 && batch.includes('이 업체 124-81-00998'), batch.slice(0, 600))
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   check(`D-476 ${vp.tag} 넘침 0 · 오류 0`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
+/* ---------------- D-558 서류함 받음 체크 → 칸 제자리 · 왼쪽 업체 목록은 본문 폭 밖 · 서류 올리기 이름 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => localStorage.removeItem('axmvp.ui.content_width'))
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const order = () => page.locator('[data-doc-card]').evaluateAll((els) => els.map((e) => e.getAttribute('data-doc-card')))
+  const before = await order()
+  // 받음인 칸 하나(맨 위가 아닌 것)를 안 받음으로 → 순서 그대로여야 한다(예전: 지금 필요 칸이 되어 맨 위로 올라감)
+  const boxes = page.locator('[data-doc-card] input[type="checkbox"][aria-label$=" 받음"]')
+  let idx = -1
+  for (let i = 1; i < (await boxes.count()); i += 1) if (await boxes.nth(i).isChecked()) { idx = i; break }
+  const key = idx >= 0 ? await boxes.nth(idx).evaluate((el) => el.closest('[data-doc-card]')?.getAttribute('data-doc-card')) : ''
+  if (idx >= 0) await boxes.nth(idx).uncheck()
+  await page.waitForTimeout(700)
+  const after = await order()
+  check('D-558 서류함 받음 끄기 → 칸이 제자리(순서 그대로 · 상태만 바뀜)', idx >= 0 && JSON.stringify(before) === JSON.stringify(after) && !(await page.locator(`[data-doc-card="${key}"] input[type="checkbox"]`).first().isChecked()), { idx, key, moved: before.indexOf(key) + ' → ' + after.indexOf(key) })
+  if (idx >= 0) await page.locator(`[data-doc-card="${key}"] input[type="checkbox"]`).first().check()
+  await page.waitForTimeout(500)
+  check('D-558 다시 받음 → 그래도 제자리', JSON.stringify(await order()) === JSON.stringify(before))
+  check('D-558 서류함 단추 이름 [서류 올리기](예전: 한꺼번에 올리기)', (await page.getByTestId('docs-upload').innerText()).trim() === '서류 올리기' && (await page.getByRole('button', { name: '한꺼번에 올리기' }).count()) === 0)
+  await page.getByTestId('docs-upload').click()
+  await page.waitForTimeout(400)
+  const sheetBtns = (await page.getByRole('dialog').innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('D-558 올리기 창 — [파일 올리기] · [폴더째 올리기](예전: 고르기)', sheetBtns.includes('파일 올리기') && sheetBtns.includes('폴더째 올리기') && !sheetBtns.includes('파일 고르기') && !sheetBtns.includes('폴더째 고르기') && sheetBtns.includes('— 서류 올리기'), sheetBtns.slice(0, 200))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  // 왼쪽 업체 목록 — 본문 폭(보통 1,280) 밖: 업체 화면 칸은 고른 폭 그대로 · 목록과 겹침 0
+  const side = page.getByTestId('client-sidelist')
+  if (!(await side.isVisible().catch(() => false))) await page.getByTestId('client-sidelist-open').click().catch(() => {})
+  await page.waitForTimeout(300)
+  const geo = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const sideEl = document.querySelector('[data-testid="client-sidelist"]')
+    const detail = sideEl?.nextElementSibling
+    const r = (el) => (el ? el.getBoundingClientRect() : null)
+    return { main: r(main)?.width ?? 0, side: r(sideEl), detail: r(detail) }
+  })
+  const pad = 56 * 2
+  check('D-558 업체 목록이 펴지면 본문 상자 = 고른 폭 + 목록 폭(업체 화면 칸 ≥ 1,280 − 안쪽 여백) · 목록 · 업체 화면 겹침 0', !!geo.side && !!geo.detail && geo.main >= 1280 + 250 && geo.detail.width >= 1280 - pad - 4 && geo.side.right <= geo.detail.left + 1, JSON.stringify(geo))
+  await page.getByTestId('client-sidelist-close').click()
+  await page.waitForTimeout(300)
+  const closedMain = await page.evaluate(() => document.querySelector('main')?.getBoundingClientRect().width ?? 0)
+  check('D-558 목록을 접으면 본문 상자는 고른 폭 그대로(1,280)', Math.abs(closedMain - 1280) <= 1, closedMain)
+  await page.getByTestId('client-sidelist-open').click().catch(() => {})
+  check('D-558 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
 

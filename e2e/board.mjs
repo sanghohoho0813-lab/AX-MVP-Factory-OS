@@ -507,7 +507,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.goto(BASE + '/ops/clients/cli_daum?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   const docTab = (await page.locator('main').innerText()) ?? ''
-  check('한꺼번에: 서류함에 한꺼번에 올리기 단추', (await page.getByRole('button', { name: '한꺼번에 올리기' }).count()) === 1)
+  check('한꺼번에: 서류함에 한꺼번에 올리기 단추', (await page.getByTestId('docs-upload').count()) === 1)
   check('한꺼번에: 서류함에 올린 파일 이름이 보인다', docTab.includes('scan001.txt') && docTab.includes('seal.txt'), docTab.slice(0, 500))
   check('한꺼번에: 만든 칸이 서류함에 있다', docTab.includes('법인인감증명서') && docTab.includes('직접 만든 칸'))
 }
