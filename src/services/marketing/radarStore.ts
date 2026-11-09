@@ -74,6 +74,62 @@ export interface ContentIdea {
   source: 'radar' | 'custom'
   /** D-241 AI 도우미 [대본 끝까지] 로 쓴 대본(이 줄에 저장 · 없으면 '') */
   script: string
+  /** D-558 어디서 왔나(이렇게 찍으세요 AI 추천 → 대본 → 보관함) — 언제 · 키워드 · 순위 · 몇 번째 어떤 제목 · 같이 나온 것 전부(없으면 예전 줄) */
+  origin?: IdeaOrigin
+}
+
+/** D-558 보관함 히스토리 — 토큰 써서 얻은 추천을 다시 쓸 수 있게 같이 나온 제목 · 첫 문장 · 썸네일 · 구성까지 */
+export interface IdeaOrigin {
+  from: 'kit'
+  /** 보관함으로 옮긴 때 */
+  savedAt: string
+  /** 그 주 시작일(YYYY-MM-DD) */
+  week: string
+  /** 이번 주 후보(키워드) */
+  keyword: string
+  /** 그 주 순위(0 = 모름) */
+  rank: number
+  /** 이어 준 본업 */
+  core: string
+  /** 같이 나온 제목 가운데 몇 번째(1부터) · 그 형식 */
+  titleIndex: number
+  titleType: string
+  titles: { text: string; type: string }[]
+  hook: string
+  thumbs: string[]
+  outline: string[]
+  view: string
+  /** 대본 길이(분) · AI 모델 · 추천 받은 때 · 대본 받은 때 */
+  minutes: number
+  model: string
+  kitAt: string
+  scriptAt: string
+}
+
+function normalizeOrigin(raw: unknown): IdeaOrigin | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const o = raw as Record<string, unknown>
+  if (o.from !== 'kit') return undefined
+  const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d)
+  return {
+    from: 'kit',
+    savedAt: str(o.savedAt, 40),
+    week: day(o.week),
+    keyword: str(o.keyword, 120),
+    rank: num(o.rank, 0, 99, 0),
+    core: str(o.core, 40),
+    titleIndex: num(o.titleIndex, 1, 20, 1),
+    titleType: str(o.titleType, 12),
+    titles: Array.isArray(o.titles) ? o.titles.filter((t): t is { text: string; type?: string } => !!t && typeof (t as { text?: unknown }).text === 'string').slice(0, 10).map((t) => ({ text: str(t.text, 120), type: str(t.type, 12) })) : [],
+    hook: str(o.hook, 300),
+    thumbs: strs(o.thumbs, 4, 40),
+    outline: strs(o.outline, 10, 200),
+    view: str(o.view, 600),
+    minutes: num(o.minutes, 1, 15, 5),
+    model: str(o.model, 80),
+    kitAt: str(o.kitAt, 40),
+    scriptAt: str(o.scriptAt, 40),
+  }
 }
 
 /** D-231 만들기 체크리스트 — 찍고 올리고 나눠 올리기까지 */
@@ -121,6 +177,7 @@ export function normalizeIdea(raw: Record<string, unknown>, id: string): Content
     link: typeof raw.link === 'string' && /^https:\/\/[^\s<>"']{4,}$/.test(raw.link) ? raw.link.slice(0, 300) : '',
     source: raw.source === 'custom' ? 'custom' : 'radar',
     script: str(raw.script, SCRIPT_MAX),
+    ...(normalizeOrigin(raw.origin) ? { origin: normalizeOrigin(raw.origin) } : {}),
   }
 }
 

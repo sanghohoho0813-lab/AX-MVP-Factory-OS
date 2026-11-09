@@ -16,7 +16,8 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard,
 import { Button } from '../../../components/ui/Button'
 import { Fold, HelpHeading, openFold } from '../../../components/ui/fold'
 import { todayLocalDate } from '../../../lib/appClock'
-import { IDEA_NEXT_HINT, IDEA_RESUME_STEP, IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
+import { localStamp } from '../../../services/marketing/kitScript'
+import { IDEA_NEXT_HINT, IDEA_RESUME_STEP, IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaOrigin, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
 import { learnFromMine, linkedVideo, perfOf, suggestMatches, youtubeIdOf, youtubeWatchUrl, type PerfTone } from '../../../services/marketing/myPerformance'
 import type { RadarVideo } from '../../../services/marketing/ytRadar'
 import { AxisBadge, IconChip } from './RadarParts'
@@ -412,7 +413,8 @@ function MakeRow({
               <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{i.hook}"
             </p>
           )}
-          {i.titleCandidates.length > 0 && (
+          {i.origin && <OriginBox g={i.origin} onCopy={onCopy} />}
+          {!i.origin && i.titleCandidates.length > 0 && (
             <ol className="t-sub flex list-decimal flex-col gap-0.5 pl-5 break-keep text-slate-800">
               {i.titleCandidates.map((t) => (
                 <li key={t}>{t}</li>
@@ -426,7 +428,7 @@ function MakeRow({
                 <span className="t-sub inline-flex items-center gap-1 font-bold text-slate-900">
                   <FileText aria-hidden="true" className="size-4 text-slate-500" /> 대본
                 </span>
-                <span className="t-meta text-slate-500">{i.script.length.toLocaleString('ko-KR')}자 · AI 도우미에서 저장</span>
+                <span className="t-meta text-slate-500">{i.script.length.toLocaleString('ko-KR')}자 · {i.origin ? `'이렇게 찍으세요' AI 추천 제목으로 ${i.origin.minutes}분` : 'AI 도우미에서 저장'}</span>
                 <Button size="sm" variant="secondary" className="ml-auto" onClick={() => onCopy(i.script, '대본')} data-testid="make-script-copy">
                   <ClipboardCopy aria-hidden="true" className="size-4" /> 대본 복사
                 </Button>
@@ -508,5 +510,63 @@ function MakeRow({
         )}
       </div>
     </li>
+  )
+}
+
+/**
+ * D-558 어디서 왔나요 — '이렇게 찍으세요' AI 추천 제목 → 대본 → 보관함으로 온 줄.
+ * 한 줄(언제 · 이번 주 몇 순위 키워드 · 제목 몇 개 중 몇 번째 · 형식 · 길이) + 펼치면 같이 나온 제목 전부(복사) · 첫 문장 · 표지 글 · 구성.
+ */
+function OriginBox({ g, onCopy }: { g: IdeaOrigin; onCopy: (text: string, what: string) => void }) {
+  const when = localStamp(g.savedAt)
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="make-origin">
+      <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="make-origin-line">
+        <span className="t-meta font-bold text-brand-700">어디서 왔나요 </span>
+        {when} 보관 · {g.week ? `${g.week.slice(5).replace('-', '.')} 주 ` : ''}
+        {g.rank ? `${g.rank}순위 ` : ''}'{g.keyword}'{g.core ? ` → ${g.core}` : ''} · AI 제목 {g.titles.length}개 중 <b className="font-bold text-slate-900">{g.titleIndex}번째</b>
+        {g.titleType ? `(${g.titleType})` : ''} · {g.minutes}분 대본
+      </p>
+      <details className="t-sub" data-testid="make-origin-more">
+        <summary className="sum-chev cursor-pointer font-semibold text-slate-700">같이 나온 제목 {g.titles.length}개 · 첫 문장 · 표지 글 다시 쓰기</summary>
+        <ol className="mt-1.5 flex flex-col gap-1">
+          {g.titles.map((t, n) => {
+            const on = n + 1 === g.titleIndex
+            return (
+              <li key={`${n}-${t.text}`} className="flex min-w-0 items-start gap-1.5" data-testid="make-origin-title" data-on={on ? '1' : '0'}>
+                <span className="t-meta mt-0.5 w-5 shrink-0 text-right font-bold text-slate-500 tabular-nums">{n + 1}</span>
+                {t.type && <span className="t-meta mt-0.5 shrink-0 rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{t.type}</span>}
+                <span className={`min-w-0 flex-1 break-keep [overflow-wrap:anywhere] ${on ? 'font-bold text-brand-700' : 'text-slate-800'}`}>
+                  {t.text}
+                  {on && <span className="t-meta ml-1 font-bold">· 고른 제목</span>}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => onCopy(t.text, '제목')} aria-label={`제목 복사 — ${t.text}`}>
+                  <ClipboardCopy aria-hidden="true" className="size-4" />
+                </Button>
+              </li>
+            )
+          })}
+        </ol>
+        {g.hook && (
+          <p className="mt-1.5 break-keep text-slate-800 [overflow-wrap:anywhere]">
+            <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{g.hook}"
+          </p>
+        )}
+        {g.thumbs.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {g.thumbs.map((t) => (
+              <span key={t} className="t-meta rounded-[6px] bg-slate-900 px-2 py-0.5 font-bold text-white">{t}</span>
+            ))}
+          </div>
+        )}
+        {g.outline.length > 0 && (
+          <ul className="mt-1.5 flex flex-col gap-0.5">
+            {g.outline.map((x) => (
+              <li key={x} className="break-keep text-slate-700 [overflow-wrap:anywhere]">· {x}</li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </div>
   )
 }

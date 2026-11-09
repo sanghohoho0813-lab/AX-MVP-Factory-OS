@@ -37,6 +37,8 @@ import { IDEA_STATUS_LABEL, type ContentIdea, type IdeaStatus } from '../../../s
 import { kitText, shootKit } from '../../../services/marketing/shootKit'
 import { coreChoices, type BrandCore } from '../../../services/marketing/brandAngle'
 import { kitCloudFailed, kitContext, kitError, kitKey, kitRunning, kitSaved, kitVersion, startKitAi, subscribeKit, type KitAi } from '../../../services/marketing/kitAi'
+import { scriptContext, scriptKey, type KitScript } from '../../../services/marketing/kitScript'
+import { KitScriptPanel } from './KitScriptPanel'
 import { otherDeviceNote } from '../../../services/marketing/keyedSync'
 import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { weekStart } from '../../../services/marketing/weekPlan'
@@ -95,7 +97,10 @@ export function PlanView({
   onGoChannels,
   onGoNotebook,
   brand,
+  onKeepScript,
 }: {
+  /** D-558 AI 추천 제목 → 대본 → 내 보관함 */
+  onKeepScript?: CardProps['onKeepScript']
   /** D-351 채널 설계 기준의 본업 · 칩으로 고르기 · AI 추천(대표 · AI 가 되는 계정만) */
   brand?: BrandCtx
   plan: RadarPlan
@@ -124,7 +129,7 @@ export function PlanView({
   const inWork = useMemo(() => ideas.filter((i) => i.status === 'selected' || i.status === 'script' || i.status === 'filmed').length, [ideas])
   const [hero, ...subs] = plan.picks.slice(0, 3)
   const rest = plan.picks.slice(3)
-  const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo, brand }
+  const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo, brand, onKeepScript }
   return (
     <div className="flex flex-col gap-6" data-testid="radar-plan">
       <section className="flex flex-col gap-3" aria-labelledby="radar-plan-h">
@@ -274,6 +279,8 @@ interface CardProps {
   onMute: (o: Opportunity) => void
   onCopy: (text: string, what?: string) => void
   onOpenVideo: (v: RadarVideo) => void
+  /** D-558 AI 추천 제목 → 대본 → 내 보관함(내 콘텐츠) — 그 줄 주소(실패 · 취소면 null) */
+  onKeepScript?: (o: Opportunity, kit: KitAi, s: KitScript, rank: number) => Promise<string | null>
 }
 
 /** [이번 주로 확정] — 수첩에 '제작 예정' 으로. 이미 제작 예정 이후 단계면 그 단계를 보여 준다 */
@@ -346,7 +353,7 @@ function HeroCard(props: CardProps) {
         <ConfirmButton {...props} />
         <DetailsToggle open={open} onToggle={() => setOpen((x) => !x)} />
       </div>
-      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size="lg" />
+      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size="lg" rank={1} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
     </article>
   )
 }
@@ -368,7 +375,7 @@ function SubCard(props: CardProps & { rank: number }) {
       </h3>
       <Facts o={o} size="sm" />
       <WhyRecommended o={o} />
-      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} />
+      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} rank={rank} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
       {open && <Details {...props} />}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <ConfirmButton {...props} quiet />
@@ -384,7 +391,7 @@ function SubCard(props: CardProps & { rank: number }) {
  *        그대로/바꿀 것 · 찍기 전 준비는 지우고 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일 · 제목 예 · 첫 문장만".
  * 늘 보이는 것: 이렇게 말해요(우리 각도) · 제목 예 · 첫 문장. 펼치면: 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일.
  */
-function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (text: string, what?: string) => void; brand?: BrandCtx; size?: 'lg' | 'sm' }) {
+function ShootBox({ o, onCopy, brand, size = 'sm', rank = 0, readOnly = false, onKeepScript }: { o: Opportunity; onCopy: (text: string, what?: string) => void; brand?: BrandCtx; size?: 'lg' | 'sm'; rank?: number; readOnly?: boolean; onKeepScript?: CardProps['onKeepScript'] }) {
   const kit = useMemo(() => shootKit(o), [o])
   // D-296 처음엔 접힌 채(제목 줄 · 준비 시간만) — 누르면 안의 글이 펼쳐진다
   const [open, setOpen] = useState(false)
@@ -472,7 +479,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm' }: { o: Opportunity; onCopy: (
             </div>
           )}
           {showAi && aiKit ? (
-            <AiKitBlock k={aiKit} lg={lg} onCopy={onCopy} topic={o.topic} />
+            <AiKitBlock k={aiKit} lg={lg} onCopy={onCopy} o={o} kitK={key} brief={brand?.brief} today={today} readOnly={readOnly} onKeep={onKeepScript ? (s) => onKeepScript(o, aiKit, s, rank) : undefined} />
           ) : (
           <>
           <p className={`min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere] ${lg ? 'text-[1.0625rem] leading-relaxed' : 't-sub'}`} data-testid="radar-angle">
@@ -554,8 +561,14 @@ function CoreChip({ id, label, on, onClick }: { id: string; label: string; on: b
   )
 }
 
-/** D-351 AI 추천 — 이렇게 말해요 · 제목(틀별) · 첫 문장 · 썸네일 · 구성 · 전체 복사 */
-function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: string; onCopy: (text: string, what?: string) => void }) {
+/**
+ * D-351 AI 추천 — 이렇게 말해요 · 제목(틀별) · 첫 문장 · 썸네일 · 구성 · 전체 복사.
+ * D-558 대표: "제목을 누르면 복사만 되는데 — 한 번 더 누르면 몇 분짜리인지 골라 대본까지, 그걸 보관함으로".
+ *   제목 줄을 누르면 그 제목이 골라지고(파랑) 바로 아래 '이 제목으로 대본 만들기' 판이 열린다. 복사 아이콘은 그대로.
+ */
+function AiKitBlock({ k, lg, o, kitK, brief, today, readOnly, onCopy, onKeep }: { k: KitAi; lg: boolean; o: Opportunity; kitK: string; brief?: ChannelBrief; today: string; readOnly: boolean; onCopy: (text: string, what?: string) => void; onKeep?: (s: KitScript) => Promise<string | null> }) {
+  const topic = o.topic
+  const [picked, setPicked] = useState<number | null>(null)
   const text = [
     `[이번 주 이렇게 찍으세요 · AI 추천] ${topic}${k.core ? ` → ${k.core}` : ''}`,
     k.view ? `이렇게 말해요: ${k.view}` : '',
@@ -569,6 +582,7 @@ function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: st
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+  const canScript = !!brief
   return (
     <div className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-control) bg-white px-3 py-2.5 ring-1 ring-violet-200" data-testid="radar-kit-ai-result">
       {k.view && (
@@ -582,16 +596,59 @@ function AiKitBlock({ k, lg, topic, onCopy }: { k: KitAi; lg: boolean; topic: st
       <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-ai-hook">
         <span className="t-meta font-bold text-brand-700">첫 문장 </span>"{k.hook}"
       </p>
+      {canScript && (
+        <p className="t-meta break-keep text-slate-600" data-testid="radar-kit-ai-pickhint">
+          제목을 누르면 → 몇 분짜리인지 고르고 → 대본까지 만들어 내 보관함에 담아요.
+        </p>
+      )}
       <ul className="flex flex-col gap-1" data-testid="radar-kit-ai-titles">
-        {k.titles.map((t) => (
-          <li key={t.text} className="flex min-w-0 items-start gap-1.5">
-            {t.type && <span className="t-meta mt-0.5 shrink-0 rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{t.type}</span>}
-            <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.text}</span>
-            <Button size="sm" variant="ghost" onClick={() => onCopy(t.text)} aria-label={`제목 복사 — ${t.text}`}>
-              <ClipboardCopy aria-hidden="true" className="size-4" />
-            </Button>
-          </li>
-        ))}
+        {k.titles.map((t, i) => {
+          const on = picked === i + 1
+          return (
+            <li key={t.text} className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex min-w-0 items-start gap-1.5">
+                {canScript ? (
+                  <button
+                    type="button"
+                    onClick={() => setPicked(on ? null : i + 1)}
+                    aria-expanded={on}
+                    className={`tap flex min-w-0 flex-1 items-start gap-1.5 rounded-(--radius-control) px-1.5 py-1 text-left hover:bg-slate-50 ${on ? 'ring-1 ring-brand-300' : ''}`}
+                    data-testid="radar-kit-ai-title"
+                    data-index={i + 1}
+                    data-on={on ? '1' : '0'}
+                  >
+                    {t.type && <span className="t-meta mt-0.5 shrink-0 rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{t.type}</span>}
+                    <span className={`t-sub min-w-0 flex-1 font-semibold break-keep [overflow-wrap:anywhere] ${on ? 'text-brand-700' : 'text-slate-900'}`}>{t.text}</span>
+                    <span className="t-meta mt-0.5 inline-flex shrink-0 items-center gap-0.5 font-bold text-brand-700">
+                      {on ? '접기' : '대본'}
+                      <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${on ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+                ) : (
+                  <>
+                    {t.type && <span className="t-meta mt-0.5 shrink-0 rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{t.type}</span>}
+                    <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.text}</span>
+                  </>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => onCopy(t.text)} aria-label={`제목 복사 — ${t.text}`}>
+                  <ClipboardCopy aria-hidden="true" className="size-4" />
+                </Button>
+              </div>
+              {on && brief && (
+                <KitScriptPanel
+                  sKey={scriptKey(kitK, i + 1)}
+                  title={t.text}
+                  titleType={t.type}
+                  titleIndex={i + 1}
+                  context={(minutes, request) => scriptContext({ o, kit: k, titleIndex: i + 1, minutes, brief, request, today })}
+                  onCopy={onCopy}
+                  onKeep={onKeep}
+                  readOnly={readOnly}
+                />
+              )}
+            </li>
+          )
+        })}
       </ul>
       {k.thumbs.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

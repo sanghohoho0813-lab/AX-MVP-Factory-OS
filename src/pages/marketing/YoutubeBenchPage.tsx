@@ -42,7 +42,8 @@ import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, SCRIPT_MAX, aiPlanInput, briefOf, confirmInput, customIdea, ideaFromOpportunity, type ChannelBrief, type ContentIdea, type IdeaInput, type IdeaStatus, type MakeCheckId, type RadarPrefs } from '../../services/marketing/radarStore'
 import { cleanTopic, customSource, packSourceOf, packText, type ContentPack, type PackSource } from '../../services/marketing/contentPack'
 import { openPackSync, packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
-import { openKitSync } from '../../services/marketing/kitAi'
+import { openKitSync, type KitAi } from '../../services/marketing/kitAi'
+import { originMemo, originOf, type KitScript } from '../../services/marketing/kitScript'
 import { openStudySync } from '../../services/marketing/videoStudyRun'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
@@ -681,6 +682,47 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       return null
     }
   }
+  /**
+   * D-558 '이렇게 찍으세요' AI 추천 제목 → 대본 → 내 보관함(내 콘텐츠). 제목마다 한 줄(같은 제목은 같은 줄 — 다시 담으면 그 줄을 고친다).
+   * 히스토리(origin): 언제 · 이번 주 몇 순위 키워드 · AI 제목 몇 개 중 몇 번째 어떤 형식 · 같이 나온 제목 · 첫 문장 · 썸네일 · 구성(토큰 써서 얻은 것 다시 쓰기).
+   */
+  const saveKitScript = async (o: Opportunity, kit: KitAi, sc: KitScript, rank: number): Promise<string | null> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), null)
+    if (notebook.failed) return (showToast('내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 제목이 두 번 담기지 않게).'), null)
+    const key = `${o.key}~t${sc.titleIndex}`.slice(0, 120)
+    const script = sc.text.slice(0, SCRIPT_MAX)
+    try {
+      const existing = notebook.ideas.find((i) => i.key === key)
+      if (existing?.script.trim() && existing.script !== script && !window.confirm(`'${existing.topic}' 줄에 이미 대본이 있어요.\n새 대본으로 바꿀까요? (지금 대본은 지워집니다 — 남기려면 [취소] 뒤 내 콘텐츠에서 먼저 복사해 두세요)`)) return null
+      const savedAt = new Date().toISOString()
+      const origin = originOf({ o, kit, script: sc, rank, week: weekStart(todayLocalDate()), savedAt })
+      const titles = [sc.title, ...kit.titles.map((t) => t.text).filter((t) => t !== sc.title)]
+      const status: IdeaStatus = existing && !(existing.status === 'idea' || existing.status === 'selected') ? existing.status : 'script'
+      const base: MakeCheckId[] = existing?.checks ?? []
+      const checks: MakeCheckId[] = [...new Set<MakeCheckId>([...base, 'title', 'script'])]
+      const saved = await notebook.save({
+        ...ideaFromOpportunity(o),
+        key,
+        topic: sc.title,
+        angle: kit.view || o.view,
+        titleCandidates: titles,
+        thumbnailCandidates: kit.thumbs.length ? [...kit.thumbs] : [...o.thumbs],
+        hook: kit.hook,
+        status,
+        checks,
+        script,
+        // 사람이 고친 메모는 그대로 — 자동 메모(지난번 히스토리 한 줄)만 새로
+        memo: existing?.memo.trim() && !(existing.origin && existing.memo === originMemo(existing.origin)) ? existing.memo : originMemo(origin),
+        origin,
+      })
+      if (!saved) return (showToast('담는 중입니다 — 잠시만 기다려 주세요.'), null)
+      showToast(`${q(saved.topic, '을/를')} 내 보관함(내 콘텐츠)에 담았습니다 — 대본 · 어디서 왔는지 · 같이 나온 제목까지 있습니다.`)
+      return ideaHref(saved.id)
+    } catch {
+      showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+      return null
+    }
+  }
   const saveBrief = async (next: ChannelBrief | null) => {
     const ok = await savePrefs({ ...prefs, brief: next })
     if (ok) showToast(next ? '채널 설계 기준을 저장했습니다 — 다음 AI 기획 · 대본부터 이 기준으로 씁니다.' : '채널 설계 기준을 기본값으로 되돌렸습니다.')
@@ -986,6 +1028,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   onGoChannels={() => setParam({ view: 'channels' })}
                   onGoNotebook={goNotebook}
                   brand={{ brief, cores, ai: mkAi && !readOnly, onCore: chooseCore }}
+                  onKeepScript={saveKitScript}
                 />
               </PeekProvider>
               {briefCard}

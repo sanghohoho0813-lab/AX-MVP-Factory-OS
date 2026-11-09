@@ -6,7 +6,7 @@ import { ASSISTS, RADAR_RULES, buildAssistPrompt } from '../../../api/_ai/assist
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { MK_ASK_CHIPS, mkRoute, mkTopicOf } from '../marketing/mkAsk'
 import { packBundle } from '../aiAssist/marketingBuilders'
-import { BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, saveIdea } from '../marketing/radarStore'
+import { BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, normalizeIdea, saveIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
@@ -16,6 +16,7 @@ import { LONG_DAY, SHORT_SLOTS, THREAD_SLOTS, buildWeek, normalizeWeekSaved, par
 import { collectWeek, decideRow, weekBadge, weekItemId, weekRows } from '../marketing/weekCollect'
 import { brandPicks, briefCores, coreChoices, coreOf } from '../marketing/brandAngle'
 import { kitContext, parseKitAnswer, parseKitStore, putKitStore } from '../marketing/kitAi'
+import { SCRIPT_MINUTES, charsFor, clampMinutes, originMemo, originOf, parseScript, parseScriptStore, putScriptStore, scriptContext, scriptKey } from '../marketing/kitScript'
 import { shootKit } from '../marketing/shootKit'
 import { listThreadPosts, saveThreadPost, sortThreadPosts, type ThreadDraft } from '../marketing/threads'
 import { listShortPosts, type ShortDraft } from '../marketing/shorts'
@@ -449,6 +450,47 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   const kp = parseKitAnswer(ans, '정책자금', '2026-10-30T00:00:00Z', 'gemini')
   const back = parseKitStore(JSON.stringify(putKitStore({}, 'w:k', kp!)))
   check('S8 AI 추천 답 → 칸(제목 · 틀 · 첫 문장 · 썸네일 · 구성) · 첫 문장이 없으면 실패 · 저장했다 읽어도 같음', !!kp && kp.titles.length === 2 && kp.titles[0].type === '숫자형' && kp.hook.includes('정책자금') && kp.thumbs[0] === '정책자금 × Claude' && kp.outline.length === 1 && parseKitAnswer({ headline: '', items: [{ title: 'x', tag: '제목' }] }, '', '', '') === null && JSON.stringify(back['w:k']) === JSON.stringify(kp), kp)
+
+  // D-558 AI 추천 제목 → 대본(길이 분) → 내 보관함(히스토리)
+  const sAns = { headline: '정책자금 준비 5분 대본', items: [{ title: '0:00 첫마디', body: '대표님, 정책자금 신청 전에 3가지만 보세요.', outline: ['자막: 3가지'] }, { title: '1:00 첫째', body: '작년 매출 서류부터 챙깁니다.' }, { title: '제목 후보', outline: ['정책자금 3가지', '신청 전 3가지'] }, { title: '설명란', body: '정책자금 준비 순서' }], next: ['매출 서류 화면 준비'] }
+  const sc = parseScript(sAns, { at: '2026-11-09T05:00:00Z', model: 'gemini', minutes: 5, titleIndex: 1, title: kp!.titles[0].text, titleType: kp!.titles[0].type })
+  const sBack = parseScriptStore(JSON.stringify(putScriptStore({}, scriptKey('w:k', 1), sc!)))
+  check(
+    'D558-S1 대본 답 → 구간(대사 · 화면) · 제목 후보/설명란은 따로 · 복사 글에 제목 · 길이 · 찍기 전 준비 · 대사 없으면 실패 · 저장했다 읽어도 같음',
+    !!sc && sc.parts.length === 2 && sc.parts[0].screen[0] === '자막: 3가지' && sc.extras.length === 2 && sc.text.startsWith(`[제목] ${kp!.titles[0].text}`) && sc.text.includes('[길이] 약 5분') && sc.text.includes('찍기 전 준비') &&
+      parseScript({ headline: 'x', items: [{ title: '제목 후보', outline: ['a'] }] }, { at: '', model: '', minutes: 1, titleIndex: 1, title: '', titleType: '' }) === null &&
+      JSON.stringify(sBack[scriptKey('w:k', 1)]) === JSON.stringify(sc) && scriptKey('w:k', 3) === 'w:k#t3',
+    sc,
+  )
+  check(
+    'D558-S2 길이(분) → 대사 글자 수(1분 350자 · 3분 1,050 · 10분 3,500 · 15분은 3,600 상한 · 0분은 350) · 직접 넣은 분은 1~15',
+    charsFor(1) === 350 && charsFor(3) === 1050 && charsFor(10) === 3500 && charsFor(15) === 3600 && charsFor(0) === 350 && clampMinutes(40) === 15 && clampMinutes(0) === 1 && clampMinutes(Number.NaN) === 5 && SCRIPT_MINUTES.join() === '1,3,5,10',
+  )
+  const ctx = scriptContext({ o: k0, kit: kp!, titleIndex: 2, minutes: 3, brief: DEFAULT_BRIEF, request: '50대 사장님께 말하듯', today: '2026-11-09' })
+  const row = ctx.sections.find((x) => x.name.startsWith('고른 기획'))?.rows[0] as Record<string, unknown> | undefined
+  check(
+    'D558-S3 보내는 자료 — 채널 설계 기준 · 고른 제목(2번째) · 형식 · 길이 3분 · 목표 1,050자 · 첫 문장 · 구성 · 요청 한 줄([자료 · 요청])',
+    !!row && row.제목 === kp!.titles[1].text && row.제목형식 === '질문형' && row.길이 === '3분' && String(row.목표글자수).includes('1,050') && row.첫문장 === kp!.hook && ctx.sections.some((x) => x.name === '요청' && (x.rows[0] as Record<string, unknown>).요청 === '50대 사장님께 말하듯') &&
+      !scriptContext({ o: k0, kit: kp!, titleIndex: 1, minutes: 5, brief: DEFAULT_BRIEF, today: '2026-11-09' }).sections.some((x) => x.name === '요청'),
+    ctx.sections.map((x) => x.name),
+  )
+  const g = originOf({ o: k0, kit: kp!, script: sc!, rank: 2, week: '2026-11-09', savedAt: '2026-11-09T06:30:00Z' })
+  const memo = originMemo(g)
+  check(
+    'D558-S4 히스토리 — 언제 · 주 · 키워드(순위) · 본업 · 제목 몇 개 중 몇 번째(형식) · 같이 나온 제목 전부 · 첫 문장 · 썸네일 · 길이 · 메모 한 줄',
+    g.from === 'kit' && g.rank === 2 && g.keyword === k0.topic && g.titleIndex === 1 && g.titleType === '숫자형' && g.titles.length === kp!.titles.length && g.hook === kp!.hook && g.thumbs[0] === kp!.thumbs[0] && g.minutes === 5 &&
+      memo.includes('2순위') && memo.includes(`AI 제목 ${kp!.titles.length}개 중 1번째(숫자형)`) && memo.includes('5분 대본'),
+    memo,
+  )
+  // D-558 보관함에 저장했다 읽어도 히스토리 그대로 · 이상한 값은 버림 · 예전 줄(히스토리 없음)은 그대로
+  const okIdea = normalizeIdea({ topic: '정책자금 3가지', key: 'm:x~t1', origin: { from: 'kit', savedAt: '2026-11-09T06:30:00Z', week: '2026-11-09', keyword: '정책자금', rank: 2, core: '정책자금', titleIndex: 1, titleType: '숫자형', titles: [{ text: '정책자금 3가지', type: '숫자형' }, { text: '질문?', type: '질문형' }], hook: 'h', thumbs: ['t'], outline: ['o'], view: 'v', minutes: 99, model: 'gemini', kitAt: '', scriptAt: '' } }, 'i1')
+  const badIdea = normalizeIdea({ topic: '예전 줄', origin: { from: 'other', titles: 'x' } }, 'i2')
+  const oldIdea = normalizeIdea({ topic: '예전 줄' }, 'i3')
+  check(
+    'D558-S5 보관함 줄 — 히스토리 그대로 읽힘(분은 1~15로) · 엉뚱한 히스토리는 버림 · 예전 줄은 히스토리 없이',
+    okIdea?.origin?.titles.length === 2 && okIdea.origin.rank === 2 && okIdea.origin.minutes === 15 && badIdea !== null && badIdea.origin === undefined && oldIdea !== null && !('origin' in oldIdea),
+    [okIdea?.origin, badIdea?.origin],
+  )
   const kc = kitContext(k0, DEFAULT_BRIEF, coreOf('policy') ?? null, briefCores(DEFAULT_BRIEF), '2026-10-30')
   const sent = buildAssistPrompt(ASSISTS['radar.kit'], kc, '').user
   check('S9 AI 추천 단추(radar.kit) — 서버에 있음 · 보내는 자료에 채널 설계 기준 전부 · 후보 · 고른 본업 · 레이더 숫자 근거 없음', !!ASSISTS['radar.kit'] && ASSIST_PRESETS.some((p) => p.id === 'radar.kit') && sent.includes('채널 설계 기준') && sent.includes(k0.topic) && sent.includes('이 본업으로') && sent.includes('우리가 실제로 하는 일') && !k0.facts.some((f) => sent.includes(f)), sent.slice(0, 300))

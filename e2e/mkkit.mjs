@@ -99,8 +99,21 @@ const KIT = (user) => {
     ],
   }
 }
+const SCRIPT = (user) => {
+  const title = (/제목: ([^|\n]+?)\s*\|/.exec(user) ?? [])[1] ?? ''
+  return {
+    headline: `대본 — ${title}`,
+    items: [
+      { title: '0:00 첫마디', tag: '유튜브 대본', body: `가짜 대본 첫마디 — ${title}`, outline: ['자막: 3가지'] },
+      { title: '0:40 첫째', tag: '유튜브 대본', body: '가짜 대본 본문 — 서류부터 챙깁니다.' },
+      { title: '제목 후보', tag: '제목', outline: ['가짜 제목 후보 1'] },
+    ],
+    next: ['서류 화면 준비'],
+  }
+}
 const answerFor = (sys, user) => {
   if (sys.includes('(radar.kit')) return KIT(user)
+  if (sys.includes('(radar.script')) return SCRIPT(user)
   if (sys.includes('(threads.write')) return threadsAnswer(user)
   if (sys.includes('(shorts.write')) return shortsAnswer(user)
   if (sys.includes('(radar.pack.video')) return LONG
@@ -251,6 +264,60 @@ await openPlan(page)
 card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 check('A5 새로 고쳐도 AI 추천 남음 · AI 다시 안 부름', (await kit.getByTestId('radar-kit-ai-result').count()) === 1 && kitCalls().length === n0 + 1)
+
+/* ---------------- D D-558 AI 추천 제목 → 대본(분) → 내 보관함(히스토리) ---------------- */
+const scriptCalls = () => llm.filter((x) => x.sys.includes('(radar.script'))
+await page.evaluate(() => localStorage.removeItem('axmvp.mkkitscript.v1'))
+const hint = await kit.getByTestId('radar-kit-ai-pickhint').count()
+const t2btn = kit.locator('[data-testid="radar-kit-ai-title"][data-index="2"]')
+const t2text = (await t2btn.innerText()).replace(/\s*(대본|접기)\s*$/, '').replace(/^질문형\s*/, '').trim()
+await t2btn.click()
+await page.waitForTimeout(200)
+const panel = kit.getByTestId('kit-script')
+check('D1 제목 줄을 누르면 그 아래에 대본 판(길이 1 · 3 · 5 · 10분 · 직접 · 바라는 점) · 제목은 파랑 · 안내 한 줄', hint === 1 && (await panel.count()) === 1 && (await t2btn.getAttribute('data-on')) === '1' && (await panel.getByTestId('kit-script-min').count()) === 4 && (await panel.getByTestId('kit-script-custom').count()) === 1 && (await panel.getByTestId('kit-script-request').count()) === 1, { t2text })
+await panel.locator('[data-testid="kit-script-min"][data-min="3"]').click()
+await panel.getByTestId('kit-script-request').fill('50대 사장님께 말하듯')
+const s0 = scriptCalls().length
+const srun = panel.getByTestId('kit-script-run')
+check('D2 단추 글 — AI로 3분 대본 만들기', (await srun.innerText()).includes('AI로 3분 대본 만들기'), await srun.innerText())
+await twice(srun)
+await panel.getByTestId('kit-script-result').waitFor({ timeout: 15000 }).catch(() => {})
+const ss = scriptCalls().slice(s0)
+const su = ss[0]?.user ?? ''
+check('D3 radar.script 한 번 · 보낸 자료에 고른 제목(2번째 · 질문형) · 길이 3분 · 목표 1,050자 · 첫 문장 · 바라는 점 · 지시문에 분량 규칙', ss.length === 1 && su.includes(t2text) && su.includes('제목형식: 질문형') && su.includes('길이: 3분') && su.includes('대사 약 1,050자') && su.includes('요청: 50대 사장님께 말하듯') && su.includes('AI 추천 첫 문장') && ss[0].sys.includes('1분에 약 350자'), su.slice(0, 600))
+const resTxt = await panel.getByTestId('kit-script-result').innerText().catch(() => '')
+check('D4 대본이 그 자리에 — 구간 제목 · 대사 · 화면 · 3분', resTxt.includes('가짜 대본 첫마디') && resTxt.includes('0:40 첫째') && resTxt.includes('자막: 3가지') && resTxt.includes('3분'), resTxt.slice(0, 300))
+await shot(page, 'D-kit-script')
+await panel.getByTestId('kit-script-keep').click()
+await panel.getByTestId('kit-script-kept').waitFor({ timeout: 8000 }).catch(() => {})
+check('D5 [내 보관함으로 옮기기] → [보관함에서 보기] 링크', (await panel.getByTestId('kit-script-kept').count()) === 1)
+// 다시 열어도 대본은 남음 · AI 다시 안 부름
+await openPlan(page)
+card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+kit = await openKit(card)
+await kit.locator('[data-testid="radar-kit-ai-title"][data-index="2"]').click()
+await page.waitForTimeout(200)
+check('D6 새로 고쳐도 그 제목의 대본 그대로 · AI 다시 안 부름 · 단추는 [다시 만들기]', (await kit.getByTestId('kit-script-result').innerText().catch(() => '')).includes('가짜 대본 첫마디') && scriptCalls().length === s0 + 1 && (await kit.getByTestId('kit-script-run').innerText()).includes('다시 만들기'))
+// 휴대폰 폭에서도 넘침 0
+await page.setViewportSize({ width: 390, height: 844 })
+await page.waitForTimeout(300)
+check('D7 390 — 대본 판 열린 채 넘침 0', (await overflowX(page)) <= 0, await overflowX(page))
+await page.setViewportSize({ width: 1440, height: 1000 })
+// 보관함(내 콘텐츠) — 히스토리
+await kit.getByTestId('kit-script-keep').click()
+await kit.getByTestId('kit-script-kept').waitFor({ timeout: 8000 }).catch(() => {})
+await kit.getByTestId('kit-script-kept').click()
+await page.waitForTimeout(900)
+const row = page.locator('[data-testid="radar-idea"][data-focus="1"]')
+await row.waitFor({ timeout: 8000 }).catch(() => {})
+const oline = await row.getByTestId('make-origin-line').innerText().catch(() => '')
+check('D8 내 콘텐츠 그 줄 — 제목 = 고른 제목 · 단계 대본 준비 · 어디서 왔나요(이번 주 키워드 · 순위 · 6개 중 2번째(질문형) · 3분)', (await row.innerText()).includes(t2text) && (await row.getAttribute('data-status')) === 'script' && oline.includes(topic) && /순위/.test(oline) && oline.includes('2번째') && oline.includes('(질문형)') && oline.includes('3분 대본'), oline)
+await row.getByTestId('make-origin-more').locator('summary').click()
+const otitles = await row.getByTestId('make-origin-title').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-on')}:${e.textContent}`))
+check('D9 펼치면 같이 나온 제목 전부(고른 것 표시) · 첫 문장 · 표지 글 · 대본 칸', otitles.length === 3 && otitles[1].startsWith('1:') && otitles.filter((t) => t.startsWith('1:')).length === 1 && (await row.getByTestId('make-origin-more').innerText()).includes('AI 추천 첫 문장') && (await row.getByTestId('make-script').innerText()).includes('가짜 대본 첫마디'), otitles)
+const dupRows = await page.locator('[data-testid="radar-idea"]', { hasText: t2text }).count()
+check('D10 같은 제목을 두 번 담아도 한 줄', dupRows === 1, dupRows)
+await shot(page, 'D-make-origin')
 check('A6 오류 0', errors.length === 0, errors)
 await ctx.close()
 
