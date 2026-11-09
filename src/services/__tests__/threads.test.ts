@@ -435,5 +435,32 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D555-12 대표 계정은 그대로 — AX 점검 · 8칸 · 태그 다섯 · AX 주제 · 이름표', axShown() && axKeys('AX 하면 심사에서 유리해요').includes('ax-inflate') && consultChecks().length === 8 && topicTags().includes('AX') && priorityTopics().some((p) => p.tag === 'AX') && topicTag('ChatGPT 로 보고서 쓰기') === 'AX' && rewritesFor().length === REWRITES.length && noAxText('MIRAE AX형') === 'MIRAE AX형' && exampleTagsOf(talk!) === '#AX #정책자금 #중소기업' && principleLint('정책자금 심사 전에 AX 화면 하나').some((l) => l.key === 'condition'))
 }
 
+// ---------------- D-558 스레드 · 릴스 — 내 태그(계정마다) · 요청 한 줄 · 채널 설계 기준 · 1안 = 완성 글 ----------------
+{
+  const { myTopicTags, cleanTag, parseThreadDrafts: parseTd, threadsContext: tctx } = await import('../marketing/threads')
+  const { withWriteExtras } = await import('../aiAssist/marketingBuilders')
+  const { DEFAULT_BRIEF } = await import('../marketing/radarStore')
+  const { shortsContext: sctx } = await import('../marketing/shorts')
+  __setMarketingCustomerForTest(false)
+  const own = myTopicTags({ used: ['정책자금', '#세무 사무소'], cores: ['AX', '시제품(MVP)', '가업승계 · 증여'] })
+  check('D558-T1 내 태그 — 쓴 태그 먼저 · 본업(괄호 · 가운뎃점 묶음은 첫 낱말) · 겹치지 않음 · 최대 8', JSON.stringify(own) === JSON.stringify(['정책자금', '세무사무소', 'AX', '시제품', '가업승계']) && myTopicTags({ used: Array.from({ length: 12 }, (_, i) => `태그${i}`) }).length === 8 && cleanTag(' #벤처 기업 확인!! ') === '벤처기업확인', own)
+  check('D558-T2 아무것도 없으면 기본 태그(셋 미만이면 채움) · 지금 고른 태그는 맨 앞', myTopicTags({}).join() === topicTags().join() && myTopicTags({ current: '세무', cores: ['절세'] })[0] === '세무' && myTopicTags({ current: '세무', cores: ['절세'] }).includes('정책자금'))
+  __setMarketingCustomerForTest(true)
+  const cust = myTopicTags({ used: ['AX'], cores: ['절세', '자본거래', '정부지원사업'] })
+  check('D558-T3 다른 계정 — 그 사람 본업(절세 · 자본거래 · 정부지원사업)이 태그 · AX 는 빠짐', cust.join() === '절세,자본거래,정부지원사업' , cust)
+  __setMarketingCustomerForTest(false)
+  const ans = { headline: 'x', items: [{ title: '첫 줄', tag: 'B', body: '본문입니다', when: '질문' }], next: ['주제 태그: 세무사무소 · 올릴 때 저녁'] }
+  check('D558-T4 AI 답의 태그 — 내 태그 안에서 고름(고정 다섯이 아니어도)', parseTd(ans as never, ['세무사무소', '절세']).tag === '세무사무소' && parseTd(ans as never).tag === '')
+  const base = tctx({ goal: '', template: 'B', topic: '정책자금', tag: '정책자금', facts: '', reference: '', recent: [], today: '2026-11-09', myTags: ['정책자금', '세무사무소'] })
+  const ext = withWriteExtras(base, { brief: DEFAULT_BRIEF, request: '  50대   사장님께\n말하듯 ' })
+  const names = ext.sections.map((x) => x.name)
+  check('D558-T5 자료 — 채널 설계 기준 맨 앞 · 쓸 글 · 요청(한 줄로 다듬음) 순서 · 내태그 칸 · 요청 비면 요청 칸 없음', names[0].startsWith('채널 설계 기준') && names[1] === '쓸 글' && names[2] === '요청' && (ext.sections[2].rows[0] as Record<string, string>).요청 === '50대 사장님께 말하듯' && (base.sections[0].rows[0] as Record<string, string>).내태그 === '정책자금 · 세무사무소' && !withWriteExtras(base, { brief: null, request: '  ' }).sections.some((x) => x.name === '요청') && withWriteExtras(base, { brief: null, request: '' }).sections[0].name === '쓸 글', names)
+  const sx = withWriteExtras(sctx({ platform: 'reels', aim: '', format: '', topic: '절세', facts: '', recent: [], today: '2026-11-09' }), { brief: DEFAULT_BRIEF, request: '30초 안으로' })
+  check('D558-T6 릴스 자료도 같은 순서(채널 설계 기준 · 만들 영상 · 요청)', sx.sections[0].name.startsWith('채널 설계 기준') && sx.sections[1].name === '만들 영상' && sx.sections[2].name === '요청', sx.sections.map((x) => x.name))
+  const tw = ASSISTS['threads.write']
+  const sw = ASSISTS['shorts.write']
+  check('D558-T7 서버 지시 — 스레드 1안 · 릴스 1안은 바로 올리는 완성 글/대본 · [자료 · 요청] 먼저 · [자료 · 채널 설계 기준] · 태그는 내태그에서', tw.instruction.join(' ').includes('바로 올리는 완성 글') && tw.instruction.join(' ').includes('[자료 · 요청]') && tw.instruction.join(' ').includes('내태그') && sw.instruction.join(' ').includes('바로 찍는 완성 대본') && sw.instruction.join(' ').includes('[자료 · 채널 설계 기준]'))
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

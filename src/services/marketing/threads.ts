@@ -424,6 +424,35 @@ export const TOPIC_TAGS = ['정책자금', '벤처기업확인', '정부지원�
 /** D-555 지금 계정의 주제 태그 — AX 는 대표만 하는 컨설팅이라 대표가 아닌 계정은 'AX' 없이 넷 */
 export const topicTags = (): string[] => (axShown() ? [...TOPIC_TAGS] : TOPIC_TAGS.filter((t) => t !== 'AX'))
 
+/** 태그 한 낱말로 — '#' · 괄호 · 띄어쓰기 · 가운뎃점 묶음을 뗀다('시제품(MVP)' → '시제품' · '가업승계 · 증여' → '가업승계') */
+export const cleanTag = (t: string) =>
+  t
+    .replace(/^#+/, '')
+    .replace(/\(.*?\)/g, '')
+    .split(/\s*[·,/]\s*/)[0]
+    .replace(/\s+/g, '')
+    .replace(/[^\p{L}\p{N}_]/gu, '')
+    .slice(0, 20)
+
+/**
+ * D-558 대표 "주제 태그가 고정이면 안 돼 — 계정마다 각자" — 내 태그 목록(최대 8):
+ * 지금 고른 태그 → 내가 올린 · 쓴 글의 태그(최근 것부터) → 채널 설계 기준의 본업 → (셋이 안 되면) 기본 태그.
+ * 다른 계정은 기본 태그에서 AX 를 뺀다(topicTags 그대로).
+ */
+export function myTopicTags(input: { current?: string; used?: readonly string[]; cores?: readonly string[]; max?: number }): string[] {
+  const out: string[] = []
+  const add = (t: string | undefined) => {
+    const c = cleanTag(t ?? '')
+    if (c && !out.includes(c)) out.push(c)
+  }
+  add(input.current)
+  for (const t of input.used ?? []) add(t)
+  for (const t of input.cores ?? []) add(t)
+  if (out.length < 3) for (const t of topicTags()) add(t)
+  const list = axShown() ? out : out.filter((t) => t.toUpperCase() !== 'AX')
+  return list.slice(0, input.max ?? 8)
+}
+
 /** 소재가 멀면 이 순서로(우리 분야 우선 주제) */
 /** short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다 */
 export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_TAGS)[number]; short: string }> = [
@@ -804,7 +833,7 @@ export interface ThreadDraft {
 }
 
 /** threads.write 답 → 글 3개(본문이 빈 것은 버림) */
-export function parseThreadDrafts(a: AssistAnswer | null): { drafts: ThreadDraft[]; tag: string } {
+export function parseThreadDrafts(a: AssistAnswer | null, tags: readonly string[] = TOPIC_TAGS): { drafts: ThreadDraft[]; tag: string } {
   if (!a) return { drafts: [], tag: '' }
   const drafts = a.items
     .map((it) => {
@@ -821,12 +850,13 @@ export function parseThreadDrafts(a: AssistAnswer | null): { drafts: ThreadDraft
     })
     .filter((d) => d.body)
     .slice(0, 3)
-  const tag = (a.next ?? []).map((n) => TOPIC_TAGS.find((t) => String(n).includes(t)) ?? '').find(Boolean) ?? ''
+  const pool = tags.length ? tags : TOPIC_TAGS
+  const tag = (a.next ?? []).map((n) => pool.find((t) => String(n).includes(t)) ?? '').find(Boolean) ?? ''
   return { drafts, tag }
 }
 
 /** threads.write 에 보낼 자료 — 고른 목표 · 틀 · 소재 · 더 쓸 사실 · 참고 글(뼈대만 · 저장 안 함) · 최근 올린 글의 틀 */
-export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; topic: string; tag: string; facts: string; reference: string; recent: readonly ThreadPost[]; today?: string; weekRef?: WeekRef | null }): AssistContext {
+export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; topic: string; tag: string; facts: string; reference: string; recent: readonly ThreadPost[]; today?: string; weekRef?: WeekRef | null; myTags?: readonly string[] }): AssistContext {
   const today = input.today ?? todayLocalDate()
   const t = input.template ? templateOf(input.template) : undefined
   const goal = GOALS.find((g) => g.key === input.goal)
@@ -841,6 +871,7 @@ export function threadsContext(input: { goal: ThreadGoal | ''; template: ThreadT
           목표에맞는틀: goal ? goal.picks.join(' · ') : '',
           소재: input.topic.trim() || '(비어 있음 — 우리 분야 우선 주제에서)',
           주제태그: input.tag || '',
+          내태그: (input.myTags ?? []).slice(0, 8).join(' · '),
           오늘요일계획: plan ? `${plan.day}요일 ${plan.label} — ${plan.picks.join(' · ')}` : '주말',
         },
       ],

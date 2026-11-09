@@ -45,6 +45,22 @@ export function briefRows(brief: ChannelBrief): { 항목: string; 기준: string
 }
 export const briefSection = (brief: ChannelBrief) => ({ name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: briefRows(brief) })
 
+/**
+ * D-558 스레드 · 릴스 [AI로 완성 글 쓰기] — 화면이 만든 자료에 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙)을 맨 앞에,
+ * 요청 한 줄을 두 번째에 붙인다([자료 · 요청] — 서버 지시문이 먼저 따른다). 요청이 비면 붙이지 않는다.
+ */
+export function withWriteExtras<T extends { sections: { name: string; rows: unknown[] }[] }>(ctx: T, extra: { brief?: ChannelBrief | null; request?: string }): T {
+  const req = (extra.request ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)
+  const [first, ...rest] = ctx.sections
+  const sections = [
+    ...(extra.brief ? [briefSection(extra.brief)] : []),
+    ...(first ? [first] : []),
+    ...(req ? [{ name: '요청', rows: [{ 요청: req }] }] : []),
+    ...rest,
+  ]
+  return { ...ctx, sections }
+}
+
 export const MIRAE_PROFILE = [
   '미래AI랩: 중소기업 대표를 돕는 컨설팅 회사 — 정책자금 · 고용지원금 · 기업부설연구소 · 창업감면 · 절세 · 지원사업 · AX(업무에 AI 넣기) · 기업인증.',
   '유튜브 · 블로그 시청자 = 중소기업 대표와 실무자. 말투는 쉬운 말, 과장 없이, 실제 사례와 숫자로.',

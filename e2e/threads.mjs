@@ -186,6 +186,16 @@ await page.getByTestId('thr-use-example').click()
 await page.waitForTimeout(200)
 const body1 = await page.getByTestId('thr-body').inputValue()
 check('W3 [예시 글로 시작] → 글 칸에 우리 버전 예시 · 글자 수 표시 · 태그 자동(벤처기업확인)', /점검표/.test(body1) && /\d+ \/ 500자/.test(await page.getByTestId('thr-count').innerText()) && (await page.getByTestId('thr-tag-벤처기업확인').getAttribute('aria-checked')) === 'true')
+// D-558 주제 태그는 계정마다 — 내 본업(채널 설계 기준) · 내가 쓴 태그 · 직접 적기 / 고른 틀에서 [이 틀로 완성 글 쓰기]
+{
+  const tags = await page.getByTestId('thr-tags').locator('[data-tag]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tag')))
+  await page.getByTestId('thr-tag-input').fill('#세무 사무소')
+  await page.getByTestId('thr-tag-add').click()
+  await page.waitForTimeout(150)
+  check('Q558-3 내 주제 태그 — 본업(정책자금 · 벤처기업확인)이 들어 있음 · 직접 적은 태그(#세무 사무소 → 세무사무소)가 골라짐 · 고른 틀에 [이 틀로 완성 글 쓰기]', tags.includes('정책자금') && tags.includes('벤처기업확인') && (await page.getByTestId('thr-tag-세무사무소').getAttribute('aria-checked')) === 'true' && (await page.getByTestId('thr-tpl-ai').count()) === 1, tags)
+  await page.getByTestId('thr-tag-세무사무소').click()
+  await page.getByTestId('thr-tag-벤처기업확인').click()
+}
 check('W4 예시 글 규칙 검사 — 고칠 것 0 · 끝: 자료 나눔 조건', (await lintKeys(page, 'bad')).length === 0 && /끝: 자료 나눔 조건/.test(await page.getByTestId('thr-lint').innerText()))
 // D-274 나눠 줄 자료 — P 틀이면 체크리스트 카드 6장(그림이 실제로 받아짐)
 const cardRes = await page.request.get(BASE + '/sns/venture-check-01.png')
@@ -213,6 +223,9 @@ check('W7 [빈 틀로 시작] → 뼈대 [대괄호] 칸 · 대괄호 알림', /
 
 /* ---------------- A AI 글 3개 ---------------- */
 await page.getByTestId('thr-qs-topic').fill('창업 3년 안 벤처기업확인 세금')
+// D-558 '잘 된 남의 글' 은 1단계 상자 안(형식 고르기 맨 아래 4번에 숨어 있지 않음) · 요청 한 줄
+check('Q558-1 1단계 상자 안에 [더 바라는 점] 한 줄 · [잘 된 남의 글 붙여넣기] · 주 단추 [AI로 완성 글 쓰기]', (await page.getByTestId('thr-qs-box').getByTestId('thr-qs-request').count()) === 1 && (await page.getByTestId('thr-qs-box').getByTestId('thr-ref-box').count()) === 1 && (await page.getByTestId('thr-qs-ai').innerText()).includes('AI로 완성 글 쓰기'))
+await page.getByTestId('thr-qs-request').fill('50대 사장님께 말하듯 사례 하나')
 await page.getByTestId('thr-ref-box').locator('summary').click()
 await page.getByTestId('thr-ref').fill('남의 글 첫 줄입니다\n남의 글 둘째 줄')
 { const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
@@ -221,6 +234,7 @@ const call = llm.find((x) => x.sys.includes('(threads.write'))
 check('A1 AI 글 3개 · 틀 표시 · 글자 수 · 고칠 것 수', (await page.getByTestId('thr-ai-draft').count()) === 3 && /B 손해 \+ 숫자/.test(await page.getByTestId('thr-ai-draft').first().innerText()))
 check('A2 서버 지시 — 대표 운영 원칙(먼저) · 스레드 규칙 · 스레드 공식(틀 라이브러리) · 사실 목록 · 마케팅(유튜브) 규칙 없음', !!call && call.sys.includes('[대표 운영 원칙') && call.sys.indexOf('[대표 운영 원칙') < call.sys.indexOf('[스레드 규칙]') && /눈에 띄게 해 주는 좋은 자료/.test(call.sys) && call.sys.includes('[스레드 규칙]') && call.sys.includes('[기준 문서]') && /자료 나눔 조건/.test(call.sys) && /김팀장 사실 목록/.test(call.sys) && !call.sys.includes('[마케팅 규칙]'))
 check('A3 보낸 자료 — 고른 틀 P · 소재 · 참고 글 줄 · 최근 올린 글 칸', !!call && /고른틀: P 자료 나눔 조건/.test(call.user) && /소재: 창업 3년 안 벤처기업확인 세금/.test(call.user) && /참고 글/.test(call.user) && /남의 글 첫 줄입니다/.test(call.user) && /최근 올린 글/.test(call.user), call?.user.slice(0, 500))
+check('Q558-2 보낸 자료 — [자료 · 채널 설계 기준] 맨 앞 · [자료 · 요청] 그 한 줄 · 내태그 · 지시문에 "1안은 바로 올리는 완성 글" · [완성도 규칙]', !!call && call.user.includes('[자료 · 채널 설계 기준') && call.user.indexOf('[자료 · 채널 설계 기준') < call.user.indexOf('[자료 · 쓸 글') && /\[자료 · 요청[^\]]*\][\s\S]*50대 사장님께 말하듯 사례 하나/.test(call.user) && /내태그: /.test(call.user) && call.sys.includes('바로 올리는 완성 글') && call.sys.includes('[완성도 규칙'), { heads: [...(call?.user ?? '').matchAll(/\[자료 · [^\]]+\]/g)].map((m) => m[0]), tag: /내태그: [^|\n]*/.exec(call?.user ?? '')?.[0], req: /50대 사장님께/.test(call?.user ?? ''), done: call?.sys.includes('바로 올리는 완성 글'), q: call?.sys.includes('[완성도 규칙') })
 check('A4 열쇠 · 비밀 글자가 화면에 없음', !/SECRET/.test(await page.locator('body').innerText()))
 await shot(page, 'pc-ai-drafts')
 await page.getByTestId('thr-ai-use').first().click()

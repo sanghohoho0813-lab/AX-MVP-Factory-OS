@@ -46,7 +46,9 @@ import {
   STAT_KEYS,
   THREAD_MAX,
   THREAD_TEMPLATES,
+  myTopicTags,
   topicTags,
+  cleanTag,
   WEEK_PLAN,
   EMPTY_STATS,
   firstLineOf,
@@ -73,6 +75,11 @@ import {
 } from '../../services/marketing/threads'
 import { josa } from '../../lib/josa'
 import { weekBadge } from '../../services/marketing/weekCollect'
+import { useRadarPrefs } from '../../services/marketing/useRadarStore'
+import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
+import { briefCores } from '../../services/marketing/brandAngle'
+import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -211,6 +218,9 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
   const aiOk = useMarketingAiOn() && !readOnly
   const store = useThreadPosts(workspaceId, readOnly)
   const week = useWeekRef(workspaceId, readOnly)
+  // D-558 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙) — AI 완성 글 자료 · 내 태그(본업)에
+  const { prefs } = useRadarPrefs(workspaceId, readOnly)
+  const brief = useMemo(() => briefOf(prefs), [prefs])
   const [params, setParams] = useSearchParams()
   const tab = tabOf(params.get('tab'))
   const go = (t: Tab) => {
@@ -287,7 +297,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="thr" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} weekRef={week.ref} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
+      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} weekRef={week.ref} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'library' && <LibraryPanel onUse={pickTemplate} />}
       {tab === 'routine' && <RoutinePanel week={week} readOnly={readOnly} onWrite={() => go('write')} onRecords={() => go('records')} />}
@@ -301,7 +311,7 @@ type Store = ReturnType<typeof useThreadPosts>
 /* ① 오늘 쓸 글                                                         */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; weekRef: WeekRef | null; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
+function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; weekRef: WeekRef | null; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -312,6 +322,14 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
   const hotKeys = new Set((weekRef?.items ?? []).map((x) => x.template))
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
   const [saving, setSaving] = useState(false)
+  // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
+  const [request, setRequest] = useState('')
+  // D-558 내 태그 — 내가 쓴 글의 태그 · 내 본업(채널 설계 기준) · 모자라면 기본(계정마다 다름 · 고른 태그는 목록에 없으면 앞에)
+  const baseTags = useMemo(() => myTopicTags({ used: [...store.posts].sort((a, b) => b.savedAt.localeCompare(a.savedAt)).map((p) => p.tag), cores: briefCores(brief).map((c) => c.label) }), [store.posts, brief])
+  const myTags = draft.tag && !baseTags.includes(cleanTag(draft.tag)) ? [cleanTag(draft.tag), ...baseTags].slice(0, 9) : baseTags
+  const [tagInput, setTagInput] = useState('')
+  const writeContext = (use: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }) =>
+    withWriteExtras(threadsContext({ goal: use.goal, template: use.template, topic: draft.topic, tag: use.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef, myTags }), { brief, request })
   /**
    * D-364 📐 한 단계씩 — 글이 아직 없으면 2단계(글 칸 · 규칙 검사)는 한 줄 + [직접 쓰기].
    * AI · 예시 · 빈 틀 · 기록표에서 연 글이 들어오면 펼치고, 쓰는 동안(글을 다 지워도) 접지 않는다. [모두 펼치기] 면 처음부터 펼침.
@@ -362,9 +380,9 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { goal: draft.goal, template: draft.template, tag: draft.tag }
     try {
-      const context = threadsContext({ goal: use.goal, template: use.template, topic: draft.topic, tag: use.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef })
+      const context = writeContext(use)
       const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context })
-      const { drafts, tag } = parseThreadDrafts(run.structured)
+      const { drafts, tag } = parseThreadDrafts(run.structured, myTags)
       if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 글을 찾지 못했어요 — 다시 눌러 주세요.')
       setAi({ busy: false, error: '', drafts })
       if (tag) setDraft((d) => (d.tag ? d : { ...d, tag }))
@@ -373,7 +391,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         const first = drafts[0]
         const fill = !bodyNow.current.trim()
         if (fill) set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template, goal: goalFor(first.template, use.goal) } : {}) })
-        showToast(fill ? '1안을 글 칸에 넣었어요 — 다른 안은 "AI로 바로 쓰기" 아래에 있어요.' : '쓰던 글은 그대로 두었어요 — AI 글은 "AI로 바로 쓰기" 아래에서 골라 넣어요.')
+        showToast(fill ? '완성 글(1안)을 글 칸에 넣었어요 — 다른 안은 "AI로 완성 글 쓰기" 아래에 있어요.' : '쓰던 글은 그대로 두었어요 — AI 글은 "AI로 완성 글 쓰기" 아래에서 골라 넣어요.')
         if (fill) window.setTimeout(() => document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
       }
     } catch (e) {
@@ -488,9 +506,19 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         picked={!!draft.template && draft.formatBy !== 'rec'}
         onChangeFormat={openFormats}
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
-        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
+        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 글 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
         hooks={<FirstLineMaker testPrefix="thr" channel="threads" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
+        request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 사례 하나 넣어서 · 댓글 받는 질문으로 끝내기' } : undefined}
+        reference={
+          <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="thr-ref-box">
+            <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-800">
+              <FilePlus2 aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-slate-500" />
+              잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 글 모양(첫 줄 · 줄 수 · 끝)대로 써요 · 선택 · 저장 안 함</span>
+            </summary>
+            <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="반응 좋았던 남의 스레드 글을 붙여 넣으세요 — 첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
+          </details>
+        }
       >
         {ai.drafts.length > 0 && (
           <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">
@@ -509,7 +537,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           title="스레드"
           presets={['threads.write']}
           quick={0}
-          build={() => ({ context: threadsContext({ goal: draft.goal, template: draft.template, topic: draft.topic, tag: draft.tag, facts: draft.facts, reference: draft.reference, recent: store.posts, today, weekRef }), links: {} })}
+          build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
           itemActions={(id) =>
             id === 'threads.write'
               ? [
@@ -518,7 +546,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                     label: '글 칸에 넣기',
                     primary: true,
                     run: (item) => {
-                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
+                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer, myTags).drafts[0]
                       if (!d) return false
                       takeDraft(d)
                       return true
@@ -530,32 +558,32 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
         />
       )}
 
-      {/* D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
-      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-week-hint">
-        <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700 max-sm:basis-full">
-          {hotKeys.size ? (
-            <>
-              <b className="text-slate-900">이번 주 반응 좋았던 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
-            </>
-          ) : (
-            '이번 주 반응이 좋았던 글의 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 모양만 적으면 돼요(매일 모을 필요 없어요)'
-          )}
-        </p>
-        <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
-          {hotKeys.size ? '고치기' : '적으러 가기'}
-        </Button>
-      </div>
       {/* D-298 대표 "[형식 바꾸기] 누르면 아래에 쭉 뜨는 건 좋은데 막상 내려 보면 눈에 안 들어온다 · 색이 없다" —
           보라 테두리 칸 · 펼치며 잠깐 빛남 · 안은 색 구역 넷(① 반응 하늘 · ② 틀 보라 · ③ 태그 초록 · ④ 남의 글 회색) */}
       <Fold
         id="thr.formats"
-        title="형식 직접 고르기"
-        hint="추천 형식 말고 내가 글 모양(틀)을 직접 고르는 곳이에요. 원하는 반응 → 틀 → 주제 태그 순서로 골라요."
+        title="내 맞춤 — 형식 · 반응 · 태그 직접 고르기"
+        hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 글 모양(틀)을 직접 고르고, 원하는 반응 · 내 주제 태그를 정해요. 고른 틀에서 [이 틀로 완성 글 쓰기] 를 누르면 그 틀로 바로 써요."
         icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
-        summary={`원하는 반응 · 틀 23가지 · 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 남의 글 뼈대`}
+        summary={`원하는 반응 · 틀 23가지 · 내 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 이번 주 잘 된 형식`}
         className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
         testId="thr-choose"
       >
+        {/* D-558 '내 맞춤' 안으로 옮김 — D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
+        <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="thr-week-hint">
+          <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700 max-sm:basis-full">
+            {hotKeys.size ? (
+              <>
+                <b className="text-slate-900">이번 주 반응 좋았던 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
+              </>
+            ) : (
+              '이번 주 반응이 좋았던 글의 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 모양만 적으면 돼요(매일 모을 필요 없어요)'
+            )}
+          </p>
+          <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
+            {hotKeys.size ? '고치기' : '적으러 가기'}
+          </Button>
+        </div>
         {plan && (
           <div className="flex flex-wrap items-center gap-2" data-testid="thr-plan">
             <p className="t-sub min-w-[12rem] flex-1 break-keep leading-relaxed text-slate-700">
@@ -671,25 +699,47 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
                   빈 틀로 시작
                 </Button>
               </div>
+              {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성 글" — 이 틀로 AI 한 번(위 '더 바라는 점' 도 같이) */}
+              {aiOk && (
+                <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="thr-tpl-ai-box">
+                  <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 50대 사장님께 말하듯" aria-label="이 틀로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tpl-request" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AiConfirm>
+                      <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ goal: goalFor(tpl.key, draft.goal), template: tpl.key, tag: draft.tag || rec.tag }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="thr-tpl-ai">
+                        {ai.busy ? 'AI가 쓰는 중…' : `${tpl.key} 틀로 완성 글 쓰기`}
+                      </Button>
+                    </AiConfirm>
+                    {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </ToneSection>
-        <ToneSection n="3" tone="emerald" title="주제 태그 1개" help="스레드에서 글 주제를 묶어 주는 낱말이에요. 하나만 붙이면 그 주제를 찾는 사람에게 더 잘 보여요." testId="thr-sec-tag">
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그">
-            {topicTags().map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={toneChip('emerald', draft.tag === t)} data-testid={`thr-tag-${t}`}>
+        <ToneSection n="3" tone="emerald" title="내 주제 태그 1개" help="스레드에서 글 주제를 묶어 주는 낱말이에요. 계정마다 달라요 — 내가 쓴 글의 태그 · 내 채널 설계 기준의 본업에서 골라 두었고, 없으면 직접 적어요." testId="thr-sec-tag">
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그" data-testid="thr-tags">
+            {myTags.map((t) => (
+              <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={toneChip('emerald', draft.tag === t)} data-testid={`thr-tag-${t}`} data-tag={t}>
                 #{t}
               </button>
             ))}
           </div>
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const t = cleanTag(tagInput)
+              if (!t) return
+              set({ tag: t })
+              setTagInput('')
+            }}
+          >
+            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} maxLength={20} placeholder="태그 직접 적기 — 예: 세무사무소" aria-label="주제 태그 직접 적기" className="t-sub min-h-11 w-56 max-w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tag-input" />
+            <Button size="sm" variant="secondary" type="submit" disabled={!cleanTag(tagInput)} data-testid="thr-tag-add">
+              이 태그로
+            </Button>
+          </form>
         </ToneSection>
-        <details className="border-t border-slate-200 pt-3" data-testid="thr-ref-box">
-          <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">
-            <span aria-hidden="true" className="mr-1.5 inline-flex size-6 items-center justify-center rounded-full bg-slate-700 text-[0.75rem] font-bold text-white">4</span>
-            잘 된 남의 글 붙여넣기 (선택 — 뼈대만 빌림 · 저장 안 함)
-          </summary>
-          <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
-        </details>
       </Fold>
 
       {!editorOpen ? (
@@ -697,7 +747,7 @@ function WritePanel({ draft, setDraft, store, weekRef, aiOk, readOnly, onRecords
           <div id="thr-editor" className="scroll-mt-24" data-testid="thr-editor-closed">
             <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
           </div>
-          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요.</p>
+          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 완성 글 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요.</p>
           <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus(), 0))} data-testid="thr-hand">
             <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
           </Button>

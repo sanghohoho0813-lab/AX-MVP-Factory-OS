@@ -63,6 +63,10 @@ import { readWeekTopics, recommendShort, topicChips } from '../../services/marke
 import { mkText } from '../../services/marketing/persona'
 import { exampleText } from '../../services/marketing/shorts'
 import { weekBadge } from '../../services/marketing/weekCollect'
+import { useRadarPrefs } from '../../services/marketing/useRadarStore'
+import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
+import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
+import { AiConfirm } from '../../components/ai/AiConfirm'
 
 type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -143,6 +147,9 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
   // SAAS-2 고객도 서버가 마케팅을 열었으면(사용량 장부로 셈) AI 를 쓴다 — 대표 판정은 그대로
   const aiOk = useMarketingAiOn() && !readOnly
   const store = useShortPosts(workspaceId, readOnly)
+  // D-558 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙) — AI 완성 대본 자료에
+  const { prefs } = useRadarPrefs(workspaceId, readOnly)
+  const brief = useMemo(() => briefOf(prefs), [prefs])
   const [params, setParams] = useSearchParams()
   const tab = tabOf(params.get('tab'))
   const go = (t: Tab) => {
@@ -222,7 +229,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="sht" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
+      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'guide' && <GuidePanel onUse={pickFormat} />}
     </div>
@@ -235,7 +242,7 @@ type Store = ReturnType<typeof useShortPosts>
 /* 오늘 만들 영상                                                        */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
+function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -243,6 +250,9 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
   const formats = formatsFor(draft.platform, draft.aim)
   const fmt = draft.format ? formatOf(draft.format) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ShortDraft[] }>({ busy: false, error: '', drafts: [] })
+  // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
+  const [request, setRequest] = useState('')
+  const writeContext = (use: { aim: ShortAim | ''; format: ShortFormatKey | '' }) => withWriteExtras(shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), { brief, request })
   const [saving, setSaving] = useState(false)
   /** D-364 📐 한 단계씩 — 대본이 아직 없으면 2단계는 한 줄 + [직접 쓰기](스레드 화면과 같다) */
   const [editorAll] = useFold('sht.editor', false)
@@ -327,7 +337,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { aim: draft.aim, format: draft.format }
     try {
-      const context = shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today })
+      const context = writeContext(use)
       const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context })
       const { drafts, checks } = parseShortDrafts(run.structured)
       if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 대본을 찾지 못했어요 — 다시 눌러 주세요.')
@@ -338,7 +348,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
         const first = drafts[0]
         const fill = !bodyNow.current.trim()
         if (fill) set({ script: first.script, caption: first.caption, hashtags: first.hashtags, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
-        showToast(fill ? '1안을 대본 칸에 넣었어요 — 다른 안은 "AI로 바로 쓰기" 아래에 있어요.' : '쓰던 대본은 그대로 두었어요 — AI 대본은 "AI로 바로 쓰기" 아래에서 골라 넣어요.')
+        showToast(fill ? '완성 대본(1안)을 대본 칸에 넣었어요 — 다른 안은 "AI로 완성 대본 쓰기" 아래에 있어요.' : '쓰던 대본은 그대로 두었어요 — AI 대본은 "AI로 완성 대본 쓰기" 아래에서 골라 넣어요.')
         if (fill) window.setTimeout(() => document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
       }
     } catch (e) {
@@ -436,8 +446,9 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           </div>
         }
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
-        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 바로 쓰기', onRun: () => void runQuick() }}
+        ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 대본 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: '형식 예시로 시작', onClick: startExample }}
+        request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 30초 안으로 · 댓글로 키워드 받기' } : undefined}
         hooks={<FirstLineMaker testPrefix="sht" channel="shorts" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
       >
         {ai.drafts.length > 0 && (
@@ -456,7 +467,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           title="릴스 · 틱톡"
           presets={['shorts.write']}
           quick={0}
-          build={() => ({ context: shortsContext({ platform: draft.platform, aim: draft.aim, format: draft.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), links: {} })}
+          build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}
           itemActions={(id) =>
             id === 'shorts.write'
               ? [
@@ -507,8 +518,8 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
       {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
       <Fold
         id="sht.formats"
-        title="형식 직접 고르기"
-        hint="추천 형식 말고 내가 직접 고르는 곳이에요. 어디에 올릴지 → 무엇을 원하는지 → 영상 형식 순서로 골라요."
+        title="내 맞춤 — 어디에 · 목적 · 형식 직접 고르기"
+        hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 어디에 올릴지 → 무엇을 원하는지 → 영상 형식을 직접 골라요. 고른 형식에서 [이 형식으로 완성 대본 쓰기] 를 누르면 그 형식으로 바로 써요."
         icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
         summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
         className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
@@ -569,6 +580,20 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
                   <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
                 </Button>
               </div>
+              {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성" — 이 형식으로 AI 한 번(위 '더 바라는 점' 도 같이) */}
+              {aiOk && (
+                <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="sht-fmt-ai-box">
+                  <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 30초 안으로" aria-label="이 형식으로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-fmt-request" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AiConfirm>
+                      <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ aim: draft.aim || eff.aim, format: fmt.key }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="sht-fmt-ai">
+                        {ai.busy ? 'AI가 쓰는 중…' : `${fmt.name}으로 완성 대본 쓰기`}
+                      </Button>
+                    </AiConfirm>
+                    {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </ToneSection>
@@ -579,7 +604,7 @@ function WritePanel({ draft, setDraft, store, aiOk, readOnly, onRecords }: { dra
           <div id="sht-editor" className="scroll-mt-24" data-testid="sht-editor-closed">
             <StepTitle n="2">고치고 확인하기</StepTitle>
           </div>
-          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 바로 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요.</p>
+          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 완성 대본 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요.</p>
           <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
             <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
           </Button>

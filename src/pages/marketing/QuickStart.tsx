@@ -4,7 +4,9 @@
  *
  *  ① 무엇에 대해? — 이번 주 키워드(콘텐츠 레이더) · 우리 분야 주제 칩, 또는 한 줄 쓰기
  *  ② 추천 형식 한 줄(규칙 계산) — [형식 바꾸기] 는 아래 '형식 직접 고르기' 를 연다
- *  ③ 주 단추 하나 [AI로 바로 쓰기] — 1안은 글 칸에 바로, 다른 안은 이 아래(AI 는 누를 때만 · 한 번에 한 번)
+ *  ③ 주 단추 하나 [AI로 완성 글 쓰기] — 1안은 글 칸에 바로, 다른 안은 이 아래(AI 는 누를 때만 · 한 번에 한 번)
+ * D-558 대표 "고르고 요청 한 줄 달고 한 번 누르면 바로 올려도 되는 글이 나와야" — 형식 줄 아래 '더 바라는 점' 한 줄 ·
+ *   '잘 된 남의 글' 을 이 상자 안으로(예전엔 형식 고르기 맨 아래 4번에 숨어 있었다).
  */
 import type { ReactNode } from 'react'
 import { Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
@@ -33,7 +35,13 @@ export function QuickStart({
   fallback,
   children,
   hooks,
+  request,
+  reference,
 }: {
+  /** D-558 요청 한 줄(선택) — AI 에 [자료 · 요청] 으로 */
+  request?: { value: string; onChange: (v: string) => void; placeholder: string }
+  /** D-558 잘 된 남의 글(선택 · 저장 안 함) — 상자 안에 보이게 */
+  reference?: ReactNode
   testPrefix: string
   topic: string
   /** 손으로 고친 주제(형식은 그대로) */
@@ -126,6 +134,22 @@ export function QuickStart({
             <SlidersHorizontal aria-hidden="true" className="size-4" /> 형식 바꾸기
           </button>
         </div>
+        {request && (
+          <label className="flex flex-col gap-1" data-testid={`${testPrefix}-qs-request-box`}>
+            <span className="t-sub font-semibold text-slate-800">
+              더 바라는 점 <span className="font-normal text-slate-600">(선택 — 한 줄이면 돼요)</span>
+            </span>
+            <input
+              value={request.value}
+              onChange={(e) => request.onChange(e.target.value)}
+              maxLength={200}
+              placeholder={request.placeholder}
+              className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3"
+              data-testid={`${testPrefix}-qs-request`}
+            />
+          </label>
+        )}
+        {reference}
         {facts}
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -143,7 +167,7 @@ export function QuickStart({
             {ai.ok && <ModelPicker popover className="sm:ml-auto" testId={`${testPrefix}-qs-model`} />}
           </div>
           <p className="t-sub break-keep text-slate-600" data-testid={`${testPrefix}-qs-note`}>
-            {has ? (ai.ok ? '1안은 아래 글 칸에 바로 넣어요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 꼭 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : '주제를 고르면 바로 쓸 수 있어요.'}
+            {has ? (ai.ok ? '한 번 누르면 바로 올려도 되는 완성 글(1안)이 아래 글 칸에 들어가요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 한 번 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : '주제를 고르면 바로 쓸 수 있어요.'}
           </p>
           {ai.error && (
             <p role="alert" className="t-sub break-keep text-danger-700" data-testid={`${testPrefix}-qs-error`}>
