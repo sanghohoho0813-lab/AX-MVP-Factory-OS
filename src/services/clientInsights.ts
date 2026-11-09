@@ -17,7 +17,8 @@ import { yearOverYear } from './withholdingReport'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
-import { profileOfRecord, missingForMatch } from './grants/grantProfile'
+import { credentialsOf, profileOfRecord, missingForMatch } from './grants/grantProfile'
+import { grantWhatIfs, whatIfLine } from './grants/grantWhatIf'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyEvidence } from './policyEvidence'
@@ -119,8 +120,11 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
     }
   }
   if (core.length) return { key: 'grants', label: '지원사업', tone: 'need', headline: `${josa(core.join(' · '), '을/를')} 알면 맞는 공고를 골라요`, detail: `지금 확인 필요 ${check.length}건`, missing: core, openPath: open, openLabel: '지원사업 알림', action: null }
-  if (check.length) return { key: 'grants', label: '지원사업', tone: 'maybe', headline: `확인하면 맞을 수 있는 공고 ${check.length}건`, detail: check[0].reasons.filter((r) => r.state === 'unknown').map((r) => r.label).join(' · ') + ' 확인', missing: [], openPath: open, openLabel: '확인할 공고 보기', action: null }
-  return { key: 'grants', label: '지원사업', tone: 'no', headline: '지역 · 업력 · 업종까지 맞는 공고가 지금은 없어요', detail: '새 공고가 들어오면(매일 아침 9시) 여기에 바로 보여요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
+  // D-556 한 가지만 갖추면 더 맞는 공고(인증 하나 · 직원 수) — 맞는 공고가 없을 때 무엇을 갖추면 열리는지
+  const wi = grantWhatIfs(notices, profile, today, { expired: credentialsOf(record, today).expired, clientId: record.id })
+  const wiText = wi.length ? `한 가지만 갖추면 공고가 더 맞아요 — ${whatIfLine(wi)}` : ''
+  if (check.length) return { key: 'grants', label: '지원사업', tone: 'maybe', headline: `확인하면 맞을 수 있는 공고 ${check.length}건`, detail: [check[0].reasons.filter((r) => r.state === 'unknown').map((r) => r.label).join(' · ') + ' 확인', wiText].filter(Boolean).join(' · '), missing: [], openPath: open, openLabel: '확인할 공고 보기', action: null }
+  return { key: 'grants', label: '지원사업', tone: 'no', headline: '지역 · 업력 · 업종까지 맞는 공고가 지금은 없어요', detail: wiText || '새 공고가 들어오면(매일 아침 9시) 여기에 바로 보여요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
 }
 
 /** D-311 '준비 서류 9/14 — 아직 사업계획서, 매출 증빙, 임대차계약서 외 2' (괄호 설명은 빼고 짧게) */

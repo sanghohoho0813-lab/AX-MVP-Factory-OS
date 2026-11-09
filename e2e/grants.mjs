@@ -17,6 +17,8 @@ import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
+// D-556 사진 폴더(선택) — 세 번째 인자
+const SHOTS = process.argv[3] ?? ''
 let pass = 0
 let fail = 0
 function check(name, ok, detail) {
@@ -720,6 +722,66 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForURL(/\/grants\?view=clients/)
   check(`공고 자세히${tag}: '이 업체 공고 더 보기' → 지원사업 알림(그 업체)`, /client=cli_hansol/.test(page.url()))
   check(`공고 자세히${tag}: JS 오류 없음`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+
+/* ---------------- D-556 한 가지만 갖추면 더 맞는 공고(벤처 확인 · 직원 수) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  // 한솔테크 — 인증을 안다(이노비즈만) · 직원 12명
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    for (const c of list) if (c.id === 'cli_hansol') c.factValues = { ...(c.factValues ?? {}), certifications: '이노비즈' }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  const paste = async (text) => {
+    await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+    await page.getByTestId('grant-add-open').click()
+    await page.locator('#grant-paste').fill(text)
+    await page.getByTestId('grant-read').click()
+    await page.getByTestId('grant-read-done').waitFor()
+    const rules = await page.getByTestId('grant-rules-toggle').innerText()
+    await page.getByTestId('grant-save').click()
+    await page.waitForTimeout(500)
+    return rules
+  }
+  const r1 = await paste(`[경기] 2026년 벤처기업 성장 바우처 공고
+소관부처·지자체 경기도
+신청기간 ${dot(kst(-3))} ~ ${dot(kst(20))}
+사업개요 기업당 최대 3,000만원 이내
+지원대상 경기도 소재 벤처기업 확인을 받은 제조업 중소기업`)
+  const r2 = await paste(`[경기] 2026년 파주시 제조기업 고용 우수기업 지원
+소관부처·지자체 경기도 파주시
+신청기간 ${dot(kst(-3))} ~ ${dot(kst(25))}
+사업개요 기업당 최대 2,000만원 이내
+지원대상 파주시 소재 제조업 중소기업 (상시 근로자 20명 이상)`)
+  check('D-556 준비: 공고 둘을 읽음(벤처기업 대상 · 직원 20명 이상)', /벤처/.test(r1) && /직원 20명 이상/.test(r2), `${r1} | ${r2}`)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1500)
+  const fold = page.getByTestId('grants-whatif')
+  await fold.waitFor({ timeout: 8000 }).catch(() => {})
+  const sum = (await fold.count()) ? await fold.locator('summary').innerText() : ''
+  check('D-556 업체 상세: 맞는 지원사업 아래 "한 가지만 갖추면 더 맞는 공고 2건 — 벤처 확인 +1 · 직원 20명 +1"(평소 접힘)', /한 가지만 갖추면 더 맞는 공고 2건/.test(sum) && /벤처 확인 \+1/.test(sum) && /직원 20명 \+1/.test(sum) && (await fold.evaluate((d) => d.open)) === false, sum)
+  await fold.locator('summary').click()
+  const keys = await page.getByTestId('grants-whatif-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  const items = await page.getByTestId('grants-whatif-list').innerText()
+  check('D-556 펼치면: 벤처 확인을 받으면 → 벤처 공고 · 직원이 20명이 되면(지금보다 8명 더) → 고용 공고', keys.includes('cert:venture') && keys.includes('employees:20') && /벤처기업 확인을 받으면/.test(items) && /벤처기업 성장 바우처/.test(items) && /직원이 20명이 되면\(지금보다 8명 더\)/.test(items) && /고용 우수기업/.test(items), items)
+  const hrefs = await page.getByTestId('grants-whatif-next').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+  check('D-556 이어서 준비: 기업인증 › 벤처기업 · 고용지원금 청년 채용 상황(이 업체로)', hrefs.includes('/tools/cert-os/venture?client=cli_hansol') && hrefs.some((h) => /\/tools\/employment\/diagnosis\?client=cli_hansol&preset=emp-youth/.test(h ?? '')), hrefs)
+  const main = await page.locator('main').innerText()
+  check('D-556 맞춤 추천 지원사업 칸: 맞는 공고가 없을 때 "한 가지만 갖추면 공고가 더 맞아요"', /한 가지만 갖추면 공고가 더 맞아요 — 벤처 확인 \+1 · 직원 20명 \+1/.test(main), (main.match(/지원사업[^\n]*\n[^\n]*/g) ?? []).slice(0, 3))
+  if (SHOTS) await page.getByTestId('detail-grants').screenshot({ path: `${SHOTS}/d556-whatif.png` }).catch(() => {})
+  await page.getByTestId('grants-whatif-next').first().click()
+  await page.waitForTimeout(800)
+  check('D-556 [기업인증 › 벤처기업에서 준비] → 그 업체 벤처 화면', /\/tools\/cert-os\/venture\?client=cli_hansol/.test(page.url()), page.url())
+  check('D-556 화면 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
 

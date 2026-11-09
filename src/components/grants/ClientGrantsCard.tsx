@@ -14,6 +14,9 @@ import { applicationFor, withGrantChallenge, withoutGrantChallenge } from '../..
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { ClientGrantPanel } from './GrantSheets'
 import { useGrantActions, useGrantData } from './useGrants'
+import { grantWhatIfs } from '../../services/grants/grantWhatIf'
+import { credentialsOf } from '../../services/grants/grantProfile'
+import { GrantWhatIfFold } from './GrantWhatIfFold'
 
 export function ClientGrantsCard({
   workspaceId,
@@ -41,6 +44,8 @@ export function ClientGrantsCard({
   const matches = useMemo(() => (client ? matchesFor(notices, client.profile, today) : []), [client, notices, today])
   // 알릴 것은 이 업체를 겨냥한 공고(맞음 · 확인 필요)만 — 전국 공통은 패널에서 접어 보여 준다
   const targeted = useMemo(() => matches.filter((m) => m.verdict !== 'general'), [matches])
+  // D-556 한 가지만 갖추면 더 맞는 공고(인증 하나 · 직원 수)
+  const whatIfs = useMemo(() => (client ? grantWhatIfs(notices, client.profile, today, { expired: credentialsOf(record, today).expired, clientId: record.id }) : []), [client, notices, record, today])
   const byId = useMemo(() => new Map(notices.map((n) => [n.id, n])), [notices])
   const challenge = onCommit
     ? {
@@ -93,6 +98,7 @@ export function ClientGrantsCard({
             challenge={challenge}
           />
         )}
+        <GrantWhatIfFold list={whatIfs} />
       </div>
     </Section>
   )

@@ -428,6 +428,7 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   const custShort = lintShort({ platform: 'reels', aim: 'reach', script: '[0:00] AX 하면 정책자금 받을 수 있어요', caption: '한 줄', hashtags: '' })
   check('D555-8 고객 릴스 점검 — AX 줄 없음', custShort.lines.every((l) => !AXW.test(l.text)), custShort.lines.map((l) => l.text))
   check('D555-9 고객 주제 태그 — AX 없이 넷 · 우리 분야 주제에 AX 주제 없음 · AI 주제는 경영컨설팅', !axShown() && topicTags().length === 4 && !topicTags().includes('AX') && priorityTopics().every((p) => p.tag !== 'AX') && topicTag('ChatGPT 로 보고서 쓰기') === '경영컨설팅')
+  check('D556-T 고객 우리 분야 주제 — AX 주제 셋 대신 공통 주제 셋(정책자금 · 지원사업 · 고용지원금) · 넷', priorityTopics().length === 4 && ['정책자금 신청 전 확인', '맞는 지원사업 고르기', '채용 때 고용지원금'].every((w) => priorityTopics().some((p) => p.short === w)) && priorityTopics().every((p) => !/(?<![A-Za-z])AX(?![A-Za-z])|\d/.test(p.topic)))
   const talk = formatOf('talk')
   check('D555-10 고객 예시 — #AX 태그 없음 · 예시 대본 · 설명 글에 AX 없음', !!talk && exampleTagsOf(talk) === '#정책자금 #중소기업' && !AXW.test(exampleOf(talk, 'tiktok').script + exampleOf(talk, 'tiktok').caption))
   check('D555-11 고객 화면 글 — 레이더 이름표 · 벤처 재료 이름에 AX 0', ['MIRAE AX형', 'AI · AX 채널 최근 2주', 'AX · 업무자동화', '시장 수요가 확인된 주제에 우리 AX 이야기를 붙입니다', '2. AX · MVP — 실제로 만든 것과 계획', '특허 명세서 · AX 와 한 이야기로', 'AX(MVP) 내용'].every((t) => !AXW.test(mkText(t)) && !AXW.test(noAxText(t))) && noAxText('특허 명세서 · AX 와 한 이야기로') === '특허 명세서 · MVP 와 한 이야기로' && mkText('AI · AX 채널 최근 2주') === 'AI 채널 최근 2주')

@@ -432,8 +432,14 @@ export const PRIORITY_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_
   { topic: 'AI에 뒤처질까 걱정, 어디부터 할지 모름', tag: 'AX', short: 'AI 어디부터?' },
   { topic: '반복 입력 · 대표가 다 확인해야 돌아가는 회사', tag: 'AX', short: '대표가 다 확인하는 회사' },
 ]
-/** D-555 지금 계정의 우리 분야 주제 — 대표가 아닌 계정은 AX 주제 없이 */
-export const priorityTopics = () => withoutAx(PRIORITY_TOPICS, (p) => p.tag)
+/** D-556 대표가 아닌 계정의 우리 분야 주제 — AX 주제 셋 대신 컨설턴트 공통 주제(숫자 · 사례 없이) */
+const CUSTOMER_TOPICS: ReadonlyArray<{ topic: string; tag: (typeof TOPIC_TAGS)[number]; short: string }> = [
+  { topic: '정책자금 신청 전에 먼저 확인할 것(대표자 신용 · 재무 · 체납)', tag: '정책자금', short: '정책자금 신청 전 확인' },
+  { topic: '우리 회사에 맞는 정부지원사업 공고 고르는 법', tag: '정부지원사업', short: '맞는 지원사업 고르기' },
+  { topic: '직원 뽑을 때 놓치기 쉬운 고용지원금', tag: '정부지원사업', short: '채용 때 고용지원금' },
+]
+/** D-555 지금 계정의 우리 분야 주제 — 대표가 아닌 계정은 AX 주제 없이(D-556 공통 주제 셋을 더해 넷) */
+export const priorityTopics = () => (axShown() ? [...PRIORITY_TOPICS] : [...withoutAx(PRIORITY_TOPICS, (p) => p.tag), ...CUSTOMER_TOPICS])
 
 /** 남의 글에 다는 전문가 답글(하루 3개) */
 export const EXPERT_REPLY = '현장에서 보면 [사실 하나]도 같이 봐요.\n[그게 왜 중요한지 한 줄].'

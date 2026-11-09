@@ -12,7 +12,8 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { GrantNotice } from './grants/grantMatch'
 import { matchesFor } from './grants/grantMatch'
-import { profileOfRecord } from './grants/grantProfile'
+import { credentialsOf, profileOfRecord } from './grants/grantProfile'
+import { grantWhatIfs } from './grants/grantWhatIf'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { policyEvidence } from './policyEvidence'
@@ -270,6 +271,12 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     a.verdict = fit.length ? { tone: 'good', text: `지역 · 업력 · 업종까지 맞는 공고 ${fit.length}건` } : check.length ? { tone: 'maybe', text: `확인하면 맞을 수 있는 공고 ${check.length}건` } : { tone: 'no', text: '맞는 공고가 지금은 없어요' }
     a.steps = (fit.length ? fit : check).slice(0, 6).map((m) => `${m.notice.title} — ${m.deadline.label}${m.notice.amountText ? ` · ${m.notice.amountText}` : ''}`)
     a.missing = [!p.sido ? '회사 주소' : '', !p.years ? '설립일' : '', !p.industry ? '업종' : '', !p.employees ? '직원 수' : ''].filter(Boolean)
+    // D-556 한 가지만 갖추면 더 맞는 공고(인증 하나 · 직원 수) — 공고에 적힌 조건으로만 다시 판정
+    const wi = grantWhatIfs(ctx.notices, p, ctx.today, { expired: credentialsOf(ctx.record, ctx.today).expired, clientId: ctx.record.id })
+    if (wi.length) {
+      a.facts.push(`한 가지만 갖추면 더 맞는 공고: ${wi.slice(0, 3).map((w) => `${w.label} ${w.gained.length}건`).join(' · ')}`)
+      if (wi[0].next) a.links.push(wi[0].next)
+    }
     a.copyText = [`${ceo(ctx.record)}, 회사 조건(지역 · 업력 · 업종)에 맞는 지원사업을 골라 봤습니다.`, ...a.steps.map((s) => `· ${s}`), '신청을 원하시면 서류 준비부터 도와드리겠습니다.'].join('\n')
     return a
   },
@@ -385,6 +392,9 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     ]
     a.docs = ['사업자등록증', '재무제표', '연구소 인정서(있으면)', '특허 · 지식재산(있으면)']
     a.links = [{ label: '회사 정보에 인증 적기', href: `/ops/clients/${encodeURIComponent(ctx.record.id)}` }]
+    // D-556 받아 둔 공고로 — 이 인증을 받으면 지금 열린 지원사업이 몇 건 더 맞는지(공고 조건 그대로)
+    const certWi = grantWhatIfs(ctx.notices, profileOfRecord(ctx.record, ctx.today), ctx.today, { expired: credentialsOf(ctx.record, ctx.today).expired, clientId: ctx.record.id }).filter((w) => w.key.startsWith('cert:'))
+    for (const w of certWi.slice(0, 3)) a.facts.push(`${w.label} 지금 열린 지원사업 ${w.gained.length}건이 더 맞아요 — ${w.gained.slice(0, 2).map((m) => m.notice.title).join(' · ')}${w.gained.length > 2 ? ' 외' : ''}`)
     a.copyText = [`[인증 검토] ${name(ctx.record)}`, ...a.steps.map((s) => `· ${s}`)].join('\n')
     return a
   },

@@ -41,6 +41,7 @@ import {
   shareMessage,
 } from '../grants/grantText'
 import { exampleNotices } from '../grants/grantExamples'
+import { grantWhatIfs, whatIfLine } from '../grants/grantWhatIf'
 import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertRequest } from '../grants/grantStore'
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { industryClasses } from '../grants/grantMatch'
@@ -1029,6 +1030,42 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const p = profileOfRecord(rec({ 'cf:여성기업': '확인일 2025-03-01 · 2028-02-28까지' }), T)
   check('D-308 업체 → 매칭 조건: 올린 여성기업확인서 → women', p.certs.includes('women') && p.certsKnown, JSON.stringify(p.certs))
   check('D-308 벤처 대상 공고: 올린 확인서로 맞음 · 만료면 안 맞음', verdictOf({ certs: ['venture'] }, { certs: up.certs, certsKnown: up.known }) === 'fit' && verdictOf({ certs: ['venture'] }, { certs: old.certs, certsKnown: old.known }) === 'no')
+}
+
+
+/* ---------------- D-556 한 가지만 갖추면 더 맞는 공고 ---------------- */
+{
+  const N = (id: string, rules: Partial<GrantRules>, over: Partial<GrantNotice> = {}) => notice(rules, { id, title: `공고 ${id}`, ...over })
+  const known = prof({ ...BASE, employees: exact(3), certs: [], certsKnown: true })
+  const list = [
+    N('v1', { certs: ['venture'] }),
+    N('v2', { certs: ['venture', 'innobiz'] }),
+    N('lab', { certs: ['lab'] }),
+    N('emp', { minEmployees: 5 }),
+    N('two', { certs: ['venture'], minEmployees: 5 }), // 인증 + 직원 — 두 가지라 세지 않음
+    N('reg', { regions: ['부산'], certs: ['venture'] }), // 지역이 안 맞음 — 세지 않음
+    N('closed', { certs: ['venture'] }, { applyEnd: '2026-09-01' }), // 마감 — 세지 않음
+    N('w', { certs: ['women'] }),
+    N('ok', {}), // 이미 맞음(전국 공통) — 세지 않음
+  ]
+  const wi = grantWhatIfs(list, known, TODAY, { clientId: 'c1' })
+  const by = new Map(wi.map((w) => [w.key, w]))
+  const ids = (k: string) => (by.get(k)?.gained ?? []).map((m) => m.notice.id).sort().join(',')
+  check('D556-1 벤처 확인을 받으면 — 벤처를 요구하는 공고 둘(v1 · v2), 두 가지가 모자란 공고 · 지역이 안 맞는 공고 · 마감 공고는 빼고', ids('cert:venture') === 'v1,v2', ids('cert:venture'))
+  check('D556-2 이노비즈 · 연구소 · 직원 수 각각 · 여성기업(성별 모름이면 보임)', ids('cert:innobiz') === 'v2' && ids('cert:lab') === 'lab' && ids('employees:5') === 'emp' && ids('cert:women') === 'w', wi.map((w) => w.key))
+  check('D556-3 많이 생기는 것 먼저 · 이미 맞는 공고는 세지 않음', wi[0].key === 'cert:venture' && !wi.some((w) => w.gained.some((m) => m.notice.id === 'ok')))
+  check('D556-4 이어서 준비할 곳 — 벤처는 기업인증 › 벤처기업 · 직원은 고용지원금 청년 채용 상황', by.get('cert:venture')?.next?.href === '/tools/cert-os/venture?client=c1' && (by.get('employees:5')?.next?.href ?? '').includes('preset=emp-youth') && by.get('cert:women')?.next === null)
+  check('D556-5 직원 이름표 — 지금보다 몇 명 더', by.get('employees:5')?.label === '직원이 5명이 되면(지금보다 2명 더)', by.get('employees:5')?.label)
+  const male = grantWhatIfs(list, { ...known, female: false }, TODAY)
+  check('D556-6 남성 대표로 확인된 업체에는 여성기업 칸 없음', !male.some((w) => w.key === 'cert:women'))
+  const unknownCerts = grantWhatIfs(list, { ...known, certsKnown: false }, TODAY)
+  check('D556-7 인증을 모르는 업체는 인증 공고가 이미 "확인 필요" — 갖출 것으로 세지 않음', !unknownCerts.some((w) => w.key.startsWith('cert:')) && unknownCerts.some((w) => w.key === 'employees:5'))
+  const has = grantWhatIfs(list, { ...known, certs: ['venture'] }, TODAY)
+  check('D556-8 이미 벤처 확인이 있으면 벤처 칸 없음 · 이노비즈 칸도 없음(v2 는 벤처로 이미 맞음)', !has.some((w) => w.key === 'cert:venture') && !has.some((w) => w.key === 'cert:innobiz'))
+  const renew = grantWhatIfs(list, known, TODAY, { expired: ['venture'] })
+  check('D556-9 만료된 인증이면 "다시 받으면"', renew.find((w) => w.key === 'cert:venture')?.label === '벤처기업 확인을 다시 받으면' && renew.find((w) => w.key === 'cert:venture')?.renew === true)
+  check('D556-10 한 줄 요약', whatIfLine(wi, 2) === '벤처 확인 +2 · 여성기업 +1' || /^벤처 확인 \+2 · /.test(whatIfLine(wi, 2)), whatIfLine(wi, 2))
+  check('D556-11 받아 둔 공고가 없으면 빈 목록', grantWhatIfs([], known, TODAY).length === 0)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
