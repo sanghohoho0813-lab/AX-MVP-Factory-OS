@@ -80,7 +80,7 @@ import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
 import { briefCores } from '../../services/marketing/brandAngle'
 import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
 import { AiConfirm } from '../../components/ai/AiConfirm'
-import { EXTRA_SCORE_KEYS, fixLines, scorePost } from '../../services/marketing/postScore'
+import { bestFirst, EXTRA_SCORE_KEYS, fixLines, needsPolish, polishedWins, scorePost, type PostScore } from '../../services/marketing/postScore'
 import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
@@ -325,7 +325,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ThreadDraft[] }>({ busy: false, error: '', drafts: [] })
   // D-559 [AI로 고칠 곳만 고쳐 쓰기] — 고친 글(fixed)이 글 칸에 그대로 있는 동안만 [고치기 전으로](before)
   // D-560 직접 [완성 글 쓰기] 를 누르면 새 1안이 글 칸에 — 예전 글은 같은 [되돌리기] 로(why = 'new')
-  const [fix, setFix] = useState<{ busy: boolean; error: string; before: string; fixed: string; why?: 'fix' | 'new' }>({ busy: false, error: '', before: '', fixed: '' })
+  // D-561 auto = [완성 글 쓰기] 뒤 90점이 안 돼 자동으로 한 번 더 다듬는 중
+  const [fix, setFix] = useState<{ busy: boolean; error: string; before: string; fixed: string; why?: 'fix' | 'new'; auto?: boolean }>({ busy: false, error: '', before: '', fixed: '' })
   const [saving, setSaving] = useState(false)
   // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
   const [request, setRequest] = useState('')
@@ -388,15 +389,19 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
    * 이제 누른 순간의 글 칸 → 새 1안(예전 글은 [이전 글로 되돌리기]). 기다리는 사이 직접 고친 글만 덮지 않는다.
    */
   const runAi = async (pick?: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }, auto = false) => {
-    if (ai.busy) return
+    if (ai.busy || fix.busy) return
     const atClick = bodyNow.current
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { goal: draft.goal, template: draft.template, tag: draft.tag }
     try {
       const context = writeContext(use)
       const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context })
-      const { drafts, tag } = parseThreadDrafts(run.structured, myTags)
-      if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 글을 찾지 못했어요 — 다시 눌러 주세요.')
+      const { drafts: raw, tag } = parseThreadDrafts(run.structured, myTags)
+      if (!raw.length) throw new AssistError('provider_error', 'AI 답에서 글을 찾지 못했어요 — 다시 눌러 주세요.')
+      // D-561 한 번 누르면 90점까지 — 점수 높은 안이 1안(글 칸에 들어갈 안)
+      const tagNow = use.tag || tag || draft.tag
+      const scoreOf = (d: ThreadDraft) => scoreThreadDraft(d, use.template, tagNow)
+      const drafts = bestFirst(raw, (d) => scoreOf(d)?.score ?? 0)
       setAi({ busy: false, error: '', drafts })
       if (tag) setDraft((d) => (d.tag ? d : { ...d, tag }))
       if (auto) {
@@ -406,10 +411,21 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         if (fill) {
           set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template, goal: goalFor(first.template, use.goal) } : {}) })
           const had = atClick.trim() && atClick.trim() !== first.body.trim()
+          const sc = scoreOf(first)
+          const polishNow = needsPolish(sc) && aiOk && !readOnly
           setFix(had ? { busy: false, error: '', before: atClick, fixed: first.body, why: 'new' } : { busy: false, error: '', before: '', fixed: '' })
-          showToast(`${had ? '새 글(1안)로 바꿨어요 — 예전 글은 [이전 글로 되돌리기] 로 돌릴 수 있어요.' : '완성 글(1안)을 글 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 글 칸 바로 위 단추로 바꿔 봐요.' : ''}`)
+          showToast(
+            polishNow && sc
+              ? `AI가 쓴 안 가운데 가장 높은 안(${sc.score}점)을 넣었어요 — 90점이 안 돼 AI가 고칠 곳만 한 번 더 다듬는 중이에요.`
+              : `${had ? '새 글(1안)로 바꿨어요 — 예전 글은 [이전 글로 되돌리기] 로 돌릴 수 있어요.' : '완성 글(1안)을 글 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 글 칸 바로 위 단추로 바꿔 봐요.' : ''}`,
+          )
           // D-560 대표 "생기면 아래에 딱 떠야 눈에 바로 띈다" — 글 칸으로 내려가 잠깐 빛나게
           scrollAndFlash('thr-editor')
+          // D-561 90점이 안 되면 자동으로 한 번 더(점수가 내려가면 AI가 처음 쓴 글 그대로)
+          if (polishNow && sc) {
+            const tplNow = (first.template || use.template) as ThreadTemplateKey | ''
+            await polish(first.body, sc, { goal: use.goal, template: tplNow, tag: tagNow }, had ? { to: atClick, why: 'new' } : { to: first.body, why: 'fix' }, true)
+          }
         } else showToast('기다리는 사이 고치신 글은 그대로 두었어요 — AI 글은 위 "AI로 완성 글 쓰기" 아래에서 골라 넣어요.')
       }
     } catch (e) {
@@ -446,31 +462,50 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     showToast('첫 줄을 바꿨어요.')
     document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  const runFix = async () => {
-    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
-    const before = draft.body
-    const from = score.score
-    setFix({ busy: true, error: '', before: '', fixed: '' })
+  /** 글 하나의 올리기 전 점수(규칙) — 다른 안 · 자동 다듬기 비교에 */
+  const scoreThreadDraft = (d: Pick<ThreadDraft, 'body' | 'template' | 'selfComment'>, tpl: ThreadTemplateKey | '', tag: string): PostScore | null =>
+    scorePost({ kind: 'thread', text: d.body, lines: lintThreadPost({ body: d.body, template: d.template || tpl, tag, selfComment: d.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }).lines })
+  /**
+   * D-559 고칠 곳만 AI 로 — before 글을 점수에서 뺀 곳과 함께 보내 고친 글을 받아 글 칸에.
+   * D-561 auto = [완성 글 쓰기] 뒤 90점이 안 돼 자동으로 한 번 — 점수가 내려가면 처음 글 그대로 · 다른 안(2안 · 3안)은 남긴다.
+   * undo = 되돌리기 단추가 돌아갈 글(그 전에 쓰던 글이 있으면 그 글 · 없으면 고치기 전 글).
+   */
+  const polish = async (before: string, sc: PostScore, use: { goal: ThreadGoal | ''; template: ThreadTemplateKey | ''; tag: string }, undo: { to: string; why: 'fix' | 'new' }, auto: boolean) => {
+    const idle = { busy: false, error: '', before: '', fixed: '' }
+    const keepUndo = undo.to.trim() && undo.to !== before ? { busy: false, error: '', before: undo.to, fixed: before, why: undo.why } : idle
+    setFix({ ...idle, busy: true, auto })
     try {
-      const use = { goal: draft.goal, template: draft.template, tag: draft.tag }
-      const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context: writeContext(use, { body: before, fixes: fixLines(score) }) })
+      const run = await callAssist({ requestId: newRequestId(), assistId: 'threads.write', page: 'threads', choice: readChoice(), context: writeContext(use, { body: before, fixes: fixLines(sc) }) })
       const { drafts } = parseThreadDrafts(run.structured, myTags)
       const first = drafts[0]
       if (!first?.body.trim()) throw new AssistError('provider_error', 'AI 답에서 고친 글을 찾지 못했어요 — 다시 눌러 주세요.')
-      setAi({ busy: false, error: '', drafts })
-      // 기다리는 사이 글 칸을 고쳤으면 덮지 않는다 — 고친 글은 아래 1안에
+      // 기다리는 사이 글 칸을 고쳤으면 덮지 않는다
       if (bodyNow.current !== before) {
-        setFix({ busy: false, error: '', before: '', fixed: '' })
-        showToast('기다리는 사이 글을 고치셔서 그대로 두었어요 — AI가 고친 글은 "AI로 완성 글 쓰기" 아래 1안에 있어요.')
+        if (!auto) setAi({ busy: false, error: '', drafts })
+        setFix(idle)
+        showToast(auto ? '기다리는 사이 글을 고치셔서 그대로 두었어요.' : '기다리는 사이 글을 고치셔서 그대로 두었어요 — AI가 고친 글은 "AI로 완성 글 쓰기" 아래 1안에 있어요.')
         return
       }
+      const after = scoreThreadDraft(first, use.template, use.tag)
+      if (auto && !polishedWins(sc.score, after?.score)) {
+        setFix(keepUndo)
+        showToast(`한 번 더 다듬어 봤지만 점수가 오르지 않아 AI가 처음 쓴 글(${sc.score}점)을 그대로 두었어요 — 빨간 · 노란 줄만 직접 고쳐 주세요.`)
+        return
+      }
+      // 직접 누른 고치기는 고친 답 전체를 '다른 안' 으로 · 자동 다듬기는 1안만 바꾸고 2안 · 3안은 남긴다
+      if (auto) setAi((a) => ({ ...a, drafts: a.drafts.map((d, k) => (k === 0 ? { ...d, body: first.body, checks: first.checks, selfComment: first.selfComment || d.selfComment } : d)) }))
+      else setAi({ busy: false, error: '', drafts })
       set({ body: first.body, source: 'ai', checks: first.checks, ...(first.selfComment ? { selfComment: first.selfComment } : {}) })
-      setFix({ busy: false, error: '', before, fixed: first.body })
-      const after = scorePost({ kind: 'thread', text: first.body, lines: lintThreadPost({ body: first.body, template: draft.template, tag: draft.tag, recent: store.posts, id: draft.id, today, facts: factsText }).lines })
-      showToast(`고쳐 썼어요 — ${from}점 → ${after?.score ?? from}점`)
+      setFix({ busy: false, error: '', before: undo.to, fixed: first.body, why: undo.why })
+      showToast(auto ? `한 번 더 다듬었어요 — ${sc.score}점 → ${after?.score ?? sc.score}점` : `고쳐 썼어요 — ${sc.score}점 → ${after?.score ?? sc.score}점`)
     } catch (e) {
-      setFix({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', before: '', fixed: '' })
+      const msg = e instanceof Error && e.message ? e.message : '다시 눌러 주세요.'
+      setFix(auto ? { ...keepUndo, error: `한 번 더 다듬기는 못 했어요(${msg}) — 글은 AI가 처음 쓴 그대로예요.` } : { ...idle, error: msg })
     }
+  }
+  const runFix = async () => {
+    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
+    await polish(draft.body, score, { goal: draft.goal, template: draft.template, tag: draft.tag }, { to: draft.body, why: 'fix' }, false)
   }
   const undoFix = () => {
     if (!fix.before) return
@@ -873,7 +908,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
             {(draft.template === 'P' || lint.ending === 'material') && <ShareKit testId="thr-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <PostScoreBar score={draft.body.trim() ? score : null} testPrefix="thr" aiOk={aiOk} busy={fix.busy} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.body ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 글로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
+            <PostScoreBar score={draft.body.trim() ? score : null} testPrefix="thr" aiOk={aiOk} busy={fix.busy} busyLabel={fix.auto ? 'AI가 90점까지 한 번 더 다듬는 중…' : undefined} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.body ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 글로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
             <div className="flex flex-wrap items-center gap-2">
               <HintTip tip="글이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산). 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>

@@ -20,9 +20,8 @@ import type { ChannelBrief } from '../../../services/marketing/radarStore'
 import { makePack, withAi, type ContentPack } from '../../../services/marketing/contentPack'
 import { templateOf } from '../../../services/marketing/threads'
 import { PLATFORMS } from '../../../services/marketing/shorts'
-import { scoreFromCounts } from '../../../services/marketing/postScore'
-import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
-import { markWeekSeen, startWeekAi, stopWeekAi, subscribeWeek, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
+import { LONG_DAY, WEEK_PARTS, buildWeek, dayLabel, weekCalendar, weekFixRequests, weekLintSummary, weekRequests, weekStart, weekText, type LintSum, type WeekSetup, type WeekShort, type WeekThread } from '../../../services/marketing/weekPlan'
+import { markWeekSeen, startWeekAi, startWeekFix, stopWeekAi, subscribeWeek, weekFix, weekRun, weekSaved, weekSync, weekVersion, type WeekPartState } from '../../../services/marketing/weekRun'
 import { weekItemId } from '../../../services/marketing/weekCollect'
 import { listThreadPosts } from '../../../services/marketing/threads'
 import { listShortPosts } from '../../../services/marketing/shorts'
@@ -99,6 +98,10 @@ export function WeekView({
   const stopped = Object.values(run.parts).includes('stopped')
   const canAi = ownerAi && !readOnly && setup.pairs.length > 0 && !past
   const changed = !past && !!saved && saved.topics.join('|') !== labels.join('|')
+  // D-561 90점 아래 AI 글만 고쳐 쓰기 — 한 번 눌러 이번 주 글을 90점까지(글마다 한 번 · 점수가 내려가면 원래 글)
+  const fix = useMemo(() => weekFix(start), [start, version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const fixReqs = useMemo(() => (canAi ? weekFixRequests(week, brief, today) : []), [canAi, week, brief, today])
+  const canFix = canAi && !running && fix.state !== 'running' && fixReqs.length > 0
   // 이 화면을 보고 있으면 '다 썼어요' 알림은 본 것으로
   useEffect(() => {
     if (run.finishedAt && !run.seen) markWeekSeen(start)
@@ -121,6 +124,9 @@ export function WeekView({
 
   const runAi = () => {
     if (canAi) startWeekAi(start, labels, weekRequests(setup, brief, today), { ws })
+  }
+  const runFix = () => {
+    if (canFix) startWeekFix(start, fixReqs, { ws })
   }
   const saveLong = async () => {
     const first = setup.pairs[0]?.source
@@ -494,14 +500,44 @@ export function WeekView({
               <BookmarkPlus aria-hidden="true" className="size-4" /> 긴 영상을 내 콘텐츠에 담기
             </Button>
           ))}
-        <p className={`t-sub min-w-0 flex-1 basis-60 break-keep font-semibold ${lint.bad ? 'text-danger-700' : 'text-success-700'}`} data-testid="mk-week-lint" data-bad={lint.bad}>
-          점검: 이번 주 글 {lint.total}개 중 통과 {lint.pass}
-          {lint.bad ? ` · 고칠 곳 ${lint.bad}` : ''}
-          {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
-          <span className="block font-normal text-slate-700 sm:inline" data-testid="mk-week-score" data-avg={lint.avg} data-ready={lint.ready}>
-            <span className="hidden sm:inline"> · </span>올리기 전 점수 평균 {lint.avg}점 · 바로 올릴 글 {lint.ready}/{lint.total}
-          </span>
-        </p>
+        <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
+          {/* D-561 점수 한 줄 먼저(예전 '통과 n' 과 '바로 올릴 글 n' 이 같은 말을 두 번 했다) — 자세한 수는 옆에 작게 */}
+          <p className={`t-sub break-keep font-semibold ${lint.ready === lint.total ? 'text-success-700' : lint.bad ? 'text-danger-700' : 'text-warning-800'}`} data-testid="mk-week-lint" data-bad={lint.bad}>
+            <span data-testid="mk-week-score" data-avg={lint.avg} data-ready={lint.ready}>
+              올리기 전 점수 평균 {lint.avg}점 · 바로 올릴 글 {lint.ready}/{lint.total}
+            </span>
+            <span className="block font-normal text-slate-700 sm:inline">
+              <span className="hidden sm:inline"> · </span>이번 주 글 {lint.total}개{lint.bad ? ` · 고칠 곳 ${lint.bad}` : ''}
+              {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
+            </span>
+          </p>
+          {fix.state === 'running' ? (
+            <p className="t-sub flex items-center gap-1.5 font-semibold break-keep text-violet-800" role="status" data-testid="mk-week-fix-running">
+              <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" /> AI가 90점 아래 글을 고치는 중 {fix.done}/{fix.total} — 다른 화면으로 가도 계속해요
+            </p>
+          ) : (
+            canFix && (
+              <AiConfirm>
+                <Button size="sm" variant="primary" className="self-start bg-violet-600 hover:bg-violet-700" onClick={runFix} data-testid="mk-week-fix" data-n={fixReqs.length}>
+                  <Sparkles aria-hidden="true" className="size-4" /> AI로 90점 아래 {fixReqs.length}개만 고쳐 쓰기
+                </Button>
+              </AiConfirm>
+            )
+          )}
+          {fix.state === 'done' && (
+            <details className="t-sub break-keep text-slate-700" data-testid="mk-week-fix-done" data-improved={fix.improved} data-kept={fix.kept} data-failed={fix.failed}>
+              <summary className="sum-chev tap cursor-pointer font-semibold text-success-700">
+                고쳐 썼어요 — {fix.improved}개 점수 올라감{fix.kept ? ` · ${fix.kept}개는 그대로(점수가 오르지 않음)` : ''}
+                {fix.failed ? ` · ${fix.failed}개 못 고침` : ''}
+              </summary>
+              <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4">
+                {fix.lines.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
       </div>
 
       <p className="t-meta break-keep text-slate-500">
@@ -552,8 +588,8 @@ function Card({ icon, title, sub, ai, lint, onCopy, children }: { icon: ReactNod
 }
 
 function LintBadge({ lint }: { lint: LintSum }) {
-  // D-559 올리기 전 점수(규칙) — 꼭 고칠 것 −15 · 볼 것 −5
-  const sc = scoreFromCounts(lint.bad, lint.warn)
+  // D-559 올리기 전 점수(규칙) — D-561 스레드 · 릴스 화면과 같은 점수(공통 점검 넷 포함)
+  const sc = { score: lint.score, pass: lint.pass }
   if (lint.bad === 0 && lint.warn === 0)
     return (
       <p className="t-meta self-start rounded-full bg-success-50 px-2 py-0.5 font-semibold text-success-700" data-testid="mk-week-lint-item" data-bad="0" data-score={sc.score}>
@@ -562,8 +598,9 @@ function LintBadge({ lint }: { lint: LintSum }) {
     )
   return (
     <details className="t-meta rounded-lg bg-slate-50 px-2.5 py-1.5" data-testid="mk-week-lint-item" data-bad={lint.bad} data-score={sc.score}>
-      <summary className={`sum-chev tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : 'text-amber-800'}`}>
-        {sc.score}점 · {lint.bad ? `고칠 곳 ${lint.bad}` : '✓ 점검 통과'}
+      <summary className={`sum-chev tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : sc.pass ? 'text-success-700' : 'text-amber-800'}`}>
+        {sc.score}점{sc.pass ? ' · ✓ 바로 올려도 돼요' : ''}
+        {lint.bad ? ` · 고칠 곳 ${lint.bad}` : ''}
         {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
       </summary>
       <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 break-keep text-slate-700">

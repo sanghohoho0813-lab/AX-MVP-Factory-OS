@@ -499,6 +499,17 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D559-S10 서버 지시 — [자료 · 고칠 글] 이 있으면 1안은 고칠 곳만 고친 글 · 대본 · 빈칸은 자료에 있는 사실로만', tw.includes('[자료 · 고칠 글]') && tw.includes('[자료 · 고칠 곳] 만 고친 글') && sw.includes('[자료 · 고칠 곳] 만 고친 대본') && tw.includes('빈칸은 [자료] 에 있는 사실로만') && !tw.includes('완성 글'))
 }
 
+// ---------------- D-561 한 번 누르면 90점까지 — 점수 높은 안 먼저 · 90 아래면 자동 한 번 · 내려가면 원래 글 ----------------
+{
+  const { bestFirst, needsPolish, polishedWins } = await import('../marketing/postScore')
+  const xs = [{ id: 'a', s: 80 }, { id: 'b', s: 95 }, { id: 'c', s: 95 }, { id: 'd', s: 60 }]
+  const order = bestFirst(xs, (x) => x.s).map((x) => x.id).join('')
+  check('D561-P1 AI 안 여러 개 → 점수 높은 순(같으면 원래 차례) · 원래 배열은 그대로', order === 'bcad' && xs.map((x) => x.id).join('') === 'abcd', order)
+  check('D561-P2 한 개 · 빈 목록도 그대로', bestFirst([{ s: 1 }], (x) => x.s).length === 1 && bestFirst([] as { s: number }[], (x) => x.s).length === 0)
+  check('D561-P3 자동 다듬기 — 90점 아래 · 꼭 고칠 것 있음(pass=false) 이면 한 번 · 통과면 안 함 · 글 없으면 안 함', needsPolish({ pass: false }) && !needsPolish({ pass: true }) && !needsPolish(null) && !needsPolish(undefined))
+  check('D561-P4 다듬은 글 쓰기 — 점수가 같거나 오르면 다듬은 글 · 내려가거나 못 매기면 원래 글', polishedWins(75, 90) && polishedWins(80, 80) && !polishedWins(85, 70) && !polishedWins(85, null))
+}
+
 // ---------------- D-560 본인 댓글 칸에 AI 가 자기 글을 설명한 말 → 비움(대표 화면 사진) ----------------
 {
   const { isMetaComment, parseThreadDrafts: ptd } = await import('../marketing/threads')

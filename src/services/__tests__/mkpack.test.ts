@@ -593,5 +593,34 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('D559-W1 1주일치 — 올리기 전 점수 평균(0~100) · 바로 올릴 글 수(0~전체)', sum2.avg >= 0 && sum2.avg <= 100 && sum2.ready >= 0 && sum2.ready <= sum2.total, sum2)
 }
 
+// ---------------- D-561 1주일치 — 스레드 · 릴스 화면과 같은 점수 · 90점 아래 AI 글만 고쳐 쓰기 ----------------
+{
+  const { buildWeek: bw, weekFixRequests, fixedDraft, lintWeekThread, weekSetup: ws2 } = await import('../marketing/weekPlan')
+  const { scorePost } = await import('../marketing/postScore')
+  const { lintThreadPost } = await import('../marketing/threads')
+  const { fixedKeywords: fk, fixedPackSource: fps } = await import('../marketing/noticeKeywords')
+  const keys = fk([], '2026-11-09')
+  const tp = ws2([], keys.map((k) => ({ source: fps(k, '2026-11-09')!, fresh: 0 })), '2026-11-09')
+  const good = '창업 3년 안 대표님, 세금 5년간 50% 줄일 수 있어요.\n\n벤처기업확인을 받으면 요건 충족 시 감면돼요.\n\n이 셋 중 몇 번? 1 / 2 / 3'
+  const poor = '오늘은 벤처기업확인에 대해 알아보겠습니다.\n결론적으로 다양한 방법이 있습니다.\n[실제 사례]\n[숫자]'
+  const td = (tpl: string, body: string) => ({ firstLine: body.split('\n')[0], template: tpl as never, body, ending: '', selfComment: '', checks: [] })
+  const saved = { at: '2026-11-09T01:00:00Z', model: 'gemini', start: '2026-11-09', topics: tp.pairs.map((p) => p.label), th0: [td('E', good), td('T', poor), td('X', good)] } as never
+  const w = bw(tp, DEFAULT_BRIEF, '2026-11-09', saved)
+  const tue = w.threads.find((x) => x.slot.day === 2)!
+  const page = scorePost({ kind: 'thread', text: poor, lines: lintThreadPost({ body: poor, template: 'T', selfComment: '' }).lines.filter((l) => l.key !== 'tag') })
+  check('D561-W1 1주일치 카드 점수 = 스레드 화면 점수(같은 글 · 같은 틀이면 같은 숫자 · 공통 점검 넷 포함)', !!page && tue.lint.score === page.score && tue.lint.score < 90 && !tue.lint.pass && tue.lint.fixes.length > 0, { week: tue.lint.score, page: page?.score })
+  const reqs = weekFixRequests(w, DEFAULT_BRIEF, '2026-11-09')
+  check('D561-W2 고쳐 쓸 글 = AI 가 쓴 글 · 90점 아래 · 예비 빼고(규칙 초안 · 통과한 글은 안 보냄) — 화요일 하나', reqs.length === 1 && reqs[0].key === 'th0:1' && reqs[0].assistId === 'threads.write' && reqs[0].label === '스레드 화' && reqs[0].before === tue.lint.score, reqs.map((r) => r.key))
+  const sent = buildAssistPrompt(ASSISTS['threads.write'], reqs[0].context, '').user
+  check('D561-W3 보낸 자료 — [자료 · 고칠 글] 그 글 한 줄씩 · [자료 · 고칠 곳] 감점 항목 · 채널 설계 기준 · 그 자리 틀(T)', /\[자료 · 고칠 글[^\]]*\][\s\S]*줄: 오늘은 벤처기업확인에 대해 알아보겠습니다\./.test(sent) && /고칠곳: 1\)/.test(sent) && sent.includes('[자료 · 채널 설계 기준') && /고른틀: T /.test(sent))
+  const ansGood = { headline: 'x', items: [{ title: good.split('\n')[0], tag: 'E', body: good, when: '질문' }] }
+  const ansWorse = { headline: 'x', items: [{ title: 'x', tag: 'T', body: poor + '\n여러분 [확인 기관]', when: '' }] }
+  const up = fixedDraft(reqs[0], ansGood as never, tue.draft)
+  const down = fixedDraft(reqs[0], ansWorse as never, tue.draft)
+  check('D561-W4 고친 답 — 점수가 오르면 그 자리에 넣을 글(틀은 원래 자리 T 그대로) · 내려가면 null(원래 글)', !!up && up.after >= 90 && (up.draft as { template: string }).template === 'T' && down === null, { up: up?.after })
+  const again = bw(tp, DEFAULT_BRIEF, '2026-11-09', { ...(saved as object), th0: [td('E', good), up!.draft, td('X', good)] } as never)
+  check('D561-W5 고친 뒤 다시 보면 고칠 글 0 · 화요일 점수 = 고친 글 점수', weekFixRequests(again, DEFAULT_BRIEF, '2026-11-09').length === 0 && again.threads.find((x) => x.slot.day === 2)!.lint.score === up!.after && lintWeekThread(up!.draft as never, 'T').score === up!.after)
+}
+
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

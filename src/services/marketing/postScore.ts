@@ -145,6 +145,23 @@ export function scoreFromCounts(bad: number, warn: number): { score: number; pas
 export const scoreLabel = (s: Pick<PostScore, 'score' | 'pass'> & { items?: readonly ScoreItem[] }) =>
   s.pass ? `${s.score}점 · 바로 올려도 돼요` : `${s.score}점 · 고칠 곳 ${s.items?.length ?? 0}`
 
+/**
+ * D-561 '한 번 누르면 90점까지' — AI 안 여러 개를 점수 높은 순으로(같으면 원래 차례).
+ * 글 칸에는 가장 높은 안이 1안으로 들어간다.
+ */
+export function bestFirst<T>(items: readonly T[], scoreOf: (t: T) => number): T[] {
+  return items
+    .map((t, i) => ({ t, i, s: scoreOf(t) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.t)
+}
+
+/** D-561 자동으로 한 번 더 다듬을지 — 90점 아래거나 꼭 고칠 것이 있으면(한 번만) */
+export const needsPolish = (s: Pick<PostScore, 'pass'> | null | undefined): boolean => !!s && !s.pass
+
+/** D-561 다듬은 글을 쓸지 — 점수가 같거나 오르면 다듬은 글, 내려가면 원래 글 */
+export const polishedWins = (before: number, after: number | null | undefined): boolean => after != null && after >= before
+
 /** AI 에 보낼 '고칠 곳' 줄(감점이 큰 것부터 · 최대 8줄 · 줄마다 짧게) */
 export function fixLines(s: PostScore): string[] {
   return s.items.slice(0, 8).map((x, i) => `${i + 1}) ${cut(x.text.replace(/\s+/g, ' '), 180)}`)

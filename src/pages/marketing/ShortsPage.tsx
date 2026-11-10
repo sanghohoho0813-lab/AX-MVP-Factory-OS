@@ -67,7 +67,7 @@ import { useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
 import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
 import { AiConfirm } from '../../components/ai/AiConfirm'
-import { EXTRA_SCORE_KEYS, fixLines, scorePost } from '../../services/marketing/postScore'
+import { bestFirst, EXTRA_SCORE_KEYS, fixLines, needsPolish, polishedWins, scorePost, type PostScore } from '../../services/marketing/postScore'
 import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'guide'
@@ -253,7 +253,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const fmt = draft.format ? formatOf(draft.format) : undefined
   const [ai, setAi] = useState<{ busy: boolean; error: string; drafts: ShortDraft[] }>({ busy: false, error: '', drafts: [] })
   // D-559 [AI로 고칠 곳만 고쳐 쓰기] — 고친 대본(fixed)이 칸에 그대로 있는 동안만 [고치기 전으로]
-  const [fix, setFix] = useState<{ busy: boolean; error: string; before: { script: string; caption: string; hashtags: string } | null; fixed: string; why?: 'fix' | 'new' }>({ busy: false, error: '', before: null, fixed: '' })
+  // D-561 auto = [완성 대본 쓰기] 뒤 90점이 안 돼 자동으로 한 번 더 다듬는 중
+  const [fix, setFix] = useState<{ busy: boolean; error: string; before: { script: string; caption: string; hashtags: string } | null; fixed: string; why?: 'fix' | 'new'; auto?: boolean }>({ busy: false, error: '', before: null, fixed: '' })
   // D-558 더 바라는 점 한 줄(이 화면에만 · AI 에 [자료 · 요청] 으로)
   const [request, setRequest] = useState('')
   const writeContext = (use: { aim: ShortAim | ''; format: ShortFormatKey | '' }, revise?: { body: string; fixes: readonly string[] }) =>
@@ -345,15 +346,18 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
    * 기다리는 사이 직접 고친 대본만 덮지 않는다.
    */
   const runAi = async (pick?: { aim: ShortAim | ''; format: ShortFormatKey | '' }, auto = false) => {
-    if (ai.busy) return
+    if (ai.busy || fix.busy) return
     const atClick = { script: bodyNow.current, caption: draft.caption, hashtags: draft.hashtags }
     setAi({ busy: true, error: '', drafts: [] })
     const use = pick ?? { aim: draft.aim, format: draft.format }
     try {
       const context = writeContext(use)
       const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context })
-      const { drafts, checks } = parseShortDrafts(run.structured)
-      if (!drafts.length) throw new AssistError('provider_error', 'AI 답에서 대본을 찾지 못했어요 — 다시 눌러 주세요.')
+      const { drafts: raw, checks } = parseShortDrafts(run.structured)
+      if (!raw.length) throw new AssistError('provider_error', 'AI 답에서 대본을 찾지 못했어요 — 다시 눌러 주세요.')
+      // D-561 한 번 누르면 90점까지 — 점수 높은 안이 1안(대본 칸에 들어갈 안)
+      const aimNow = (use.aim || draft.aim) as ShortAim
+      const drafts = bestFirst(raw, (d) => scoreShortDraft(d, aimNow)?.score ?? 0)
       setAi({ busy: false, error: '', drafts })
       set({ checks })
       if (auto) {
@@ -361,44 +365,73 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         const first = drafts[0]
         const fill = bodyNow.current === atClick.script
         if (fill) {
-          set({ script: first.script, caption: first.caption, hashtags: first.hashtags, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
+          const filled = { script: first.script, caption: first.caption, hashtags: first.hashtags }
+          set({ ...filled, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
           const had = atClick.script.trim() && atClick.script.trim() !== first.script.trim()
+          const sc = scoreShortDraft(first, aimNow)
+          const polishNow = needsPolish(sc) && aiOk && !readOnly
           setFix(had ? { busy: false, error: '', before: atClick, fixed: first.script, why: 'new' } : { busy: false, error: '', before: null, fixed: '' })
-          showToast(`${had ? '새 대본(1안)으로 바꿨어요 — 예전 대본은 [이전 대본으로 되돌리기] 로 돌릴 수 있어요.' : '완성 대본(1안)을 대본 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 대본 칸 바로 위 단추로 바꿔 봐요.' : ''}`)
+          showToast(
+            polishNow && sc
+              ? `AI가 쓴 안 가운데 가장 높은 안(${sc.score}점)을 넣었어요 — 90점이 안 돼 AI가 고칠 곳만 한 번 더 다듬는 중이에요.`
+              : `${had ? '새 대본(1안)으로 바꿨어요 — 예전 대본은 [이전 대본으로 되돌리기] 로 돌릴 수 있어요.' : '완성 대본(1안)을 대본 칸에 넣었어요.'}${drafts.length > 1 ? ' 다른 안은 대본 칸 바로 위 단추로 바꿔 봐요.' : ''}`,
+          )
           // D-560 대본 칸으로 내려가 잠깐 빛나게 — 생긴 것이 바로 눈에 띄게
           scrollAndFlash('sht-editor')
+          // D-561 90점이 안 되면 자동으로 한 번 더(점수가 내려가면 AI가 처음 쓴 대본 그대로)
+          if (polishNow && sc) await polish(filled, sc, { aim: aimNow, format: (first.format || use.format) as ShortFormatKey | '' }, had ? { to: atClick, why: 'new' } : { to: filled, why: 'fix' }, true)
         } else showToast('기다리는 사이 고치신 대본은 그대로 두었어요 — AI 대본은 위 "AI로 완성 대본 쓰기" 아래에서 골라 넣어요.')
       }
     } catch (e) {
       setAi({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', drafts: [] })
     }
   }
-  const runFix = async () => {
-    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
-    const before = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
-    const from = score.score
-    setFix({ busy: true, error: '', before: null, fixed: '' })
+  type Body = { script: string; caption: string; hashtags: string }
+  /** 대본 하나의 올리기 전 점수(규칙) — 다른 안 · 자동 다듬기 비교에 */
+  const scoreShortDraft = (d: Body, aim: ShortAim): PostScore | null =>
+    scorePost({ kind: 'short', text: d.script.trim() ? `${d.script}\n${d.caption}` : '', lines: lintShort({ platform: draft.platform, aim, script: d.script, caption: d.caption, hashtags: d.hashtags, facts: factsText }).lines })
+  /**
+   * D-559 고칠 곳만 AI 로 — before 대본(+ 설명 글)을 점수에서 뺀 곳과 함께 보내 고친 대본을 받아 칸에.
+   * D-561 auto = [완성 대본 쓰기] 뒤 90점이 안 돼 자동으로 한 번 — 점수가 내려가면 처음 대본 그대로 · 2안은 남긴다.
+   */
+  const polish = async (before: Body, sc: PostScore, use: { aim: ShortAim; format: ShortFormatKey | '' }, undo: { to: Body; why: 'fix' | 'new' }, auto: boolean) => {
+    const idle = { busy: false, error: '', before: null, fixed: '' }
+    const keepUndo = undo.to.script.trim() && undo.to.script !== before.script ? { busy: false, error: '', before: undo.to, fixed: before.script, why: undo.why } : idle
+    setFix({ ...idle, busy: true, auto })
     try {
       const body = before.caption.trim() ? `${before.script}\n\n설명 글: ${before.caption.trim()}` : before.script
-      const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context: writeContext({ aim: draft.aim, format: draft.format }, { body, fixes: fixLines(score) }) })
+      const run = await callAssist({ requestId: newRequestId(), assistId: 'shorts.write', page: 'shorts', choice: readChoice(), context: writeContext(use, { body, fixes: fixLines(sc) }) })
       const { drafts, checks } = parseShortDrafts(run.structured)
       const first = drafts[0]
       if (!first?.script.trim()) throw new AssistError('provider_error', 'AI 답에서 고친 대본을 찾지 못했어요 — 다시 눌러 주세요.')
-      setAi({ busy: false, error: '', drafts })
-      // 기다리는 사이 대본 칸을 고쳤으면 덮지 않는다 — 고친 대본은 아래 1안에
+      // 기다리는 사이 대본 칸을 고쳤으면 덮지 않는다
       if (bodyNow.current !== before.script) {
-        setFix({ busy: false, error: '', before: null, fixed: '' })
-        showToast('기다리는 사이 대본을 고치셔서 그대로 두었어요 — AI가 고친 대본은 "AI로 완성 대본 쓰기" 아래 1안에 있어요.')
+        if (!auto) setAi({ busy: false, error: '', drafts })
+        setFix(idle)
+        showToast(auto ? '기다리는 사이 대본을 고치셔서 그대로 두었어요.' : '기다리는 사이 대본을 고치셔서 그대로 두었어요 — AI가 고친 대본은 "AI로 완성 대본 쓰기" 아래 1안에 있어요.')
         return
       }
-      set({ script: first.script, caption: first.caption || before.caption, hashtags: first.hashtags || before.hashtags, source: 'ai', checks })
-      setFix({ busy: false, error: '', before, fixed: first.script })
-      const cap = first.caption || before.caption
-      const after = scorePost({ kind: 'short', text: `${first.script}\n${cap}`, lines: lintShort({ platform: draft.platform, aim: draft.aim, script: first.script, caption: cap, hashtags: first.hashtags || before.hashtags, facts: factsText }).lines })
-      showToast(`고쳐 썼어요 — ${from}점 → ${after?.score ?? from}점`)
+      const next: Body = { script: first.script, caption: first.caption || before.caption, hashtags: first.hashtags || before.hashtags }
+      const after = scoreShortDraft(next, use.aim)
+      if (auto && !polishedWins(sc.score, after?.score)) {
+        setFix(keepUndo)
+        showToast(`한 번 더 다듬어 봤지만 점수가 오르지 않아 AI가 처음 쓴 대본(${sc.score}점)을 그대로 두었어요 — 빨간 · 노란 줄만 직접 고쳐 주세요.`)
+        return
+      }
+      if (auto) setAi((a) => ({ ...a, drafts: a.drafts.map((d, k) => (k === 0 ? { ...d, ...next } : d)) }))
+      else setAi({ busy: false, error: '', drafts })
+      set({ ...next, source: 'ai', checks })
+      setFix({ busy: false, error: '', before: undo.to, fixed: next.script, why: undo.why })
+      showToast(auto ? `한 번 더 다듬었어요 — ${sc.score}점 → ${after?.score ?? sc.score}점` : `고쳐 썼어요 — ${sc.score}점 → ${after?.score ?? sc.score}점`)
     } catch (e) {
-      setFix({ busy: false, error: e instanceof Error && e.message ? e.message : '다시 눌러 주세요.', before: null, fixed: '' })
+      const msg = e instanceof Error && e.message ? e.message : '다시 눌러 주세요.'
+      setFix(auto ? { ...keepUndo, error: `한 번 더 다듬기는 못 했어요(${msg}) — 대본은 AI가 처음 쓴 그대로예요.` } : { ...idle, error: msg })
     }
+  }
+  const runFix = async () => {
+    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
+    const before = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
+    await polish(before, score, { aim: draft.aim as ShortAim, format: draft.format }, { to: before, why: 'fix' }, false)
   }
   const undoFix = () => {
     if (!fix.before) return
@@ -737,7 +770,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
             {draft.format === 'comment' && <ShareKit testId="sht-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <PostScoreBar score={draft.script.trim() ? score : null} testPrefix="sht" aiOk={aiOk} busy={fix.busy} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.script ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 대본으로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
+            <PostScoreBar score={draft.script.trim() ? score : null} testPrefix="sht" aiOk={aiOk} busy={fix.busy} busyLabel={fix.auto ? 'AI가 90점까지 한 번 더 다듬는 중…' : undefined} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.script ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 대본으로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
             <div className="flex flex-wrap items-center gap-2">
               <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 설명 글 · #태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>

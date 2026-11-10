@@ -96,7 +96,18 @@ const LONG = {
   ],
   next: ['노트북 화면 녹화'],
 }
+/** D-561 [AI로 90점 아래 n개만 고쳐 쓰기] — 고칠 글이 오면 그 자리 틀로 깔끔한 글 하나(링크 · 빈칸 없음 · 첫 줄 숫자) */
+const reviseAnswer = (sys, user) => {
+  if (sys.includes('(threads.write')) {
+    const t = (/고른틀: ([A-X]) /.exec(user) ?? [])[1] ?? 'E'
+    return { headline: '고친 글', items: [{ title: `AI 스레드 첫 줄 ${t} — 고친 글 3가지`, tag: t, body: `AI 스레드 첫 줄 ${t} — 고친 글 3가지\n\n둘째 줄 — 대표님이 자주 묻는 것\n\n이 셋 중 몇 번이 제일 급해? 1 / 2 / 3`, when: '고르기 쉬운 질문', detail: `본인 댓글 ${t}`, outline: [] }], next: [] }
+  }
+  const reels = /인스타 릴스/.test(user)
+  const k = reels ? '릴스' : '쇼츠'
+  return { headline: `AI ${k}`, items: [{ title: `AI ${k} 고친 대본`, tag: '리스트형', when: reels ? '약 22초' : '약 40초', body: `[0:00] AI ${k} 고친 대본 첫마디 3가지\n[0:03] 둘째, 숫자 하나\n[0:20] 끝`, detail: `AI ${k} 캡션 고친 것`, outline: ['#중소기업'] }], next: [] }
+}
 const answerFor = (sys, user) => {
+  if (user.includes('[자료 · 고칠 글')) return reviseAnswer(sys, user)
   if (sys.includes('(threads.write')) return threadsAnswer(user)
   if (sys.includes('(shorts.write')) return shortsAnswer(user)
   if (sys.includes('(radar.pack.video')) return LONG
@@ -258,6 +269,39 @@ const cal = await page.getByTestId('mk-week-day').evaluateAll((els) => els.map((
 check('V4 달력 7일 — 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 매일 스레드', cal.length === 7 && cal[2].includes('유튜브 긴 영상') && cal[1].includes('쇼츠 ①') && cal[3].includes('쇼츠 ②') && cal[5].includes('릴스 ③') && cal.every((d) => d.includes('스레드')), cal)
 const lintLine = await page.getByTestId('mk-week-lint').innerText()
 check("V5 점검 — 이번 주 글 11개 중 통과 · 링크가 든 금요일 스레드는 '고칠 곳'", lintLine.includes('이번 주 글 11개') && badFri !== '0' && badMon === '0' && /고칠 곳 [1-9]/.test(lintLine), lintLine)
+/* ---------------- F D-561 90점 아래 AI 글만 고쳐 쓰기(한 번 눌러 이번 주 글을 90점까지) ---------------- */
+{
+  await tabTo(page, 'threads')
+  const fixBtn = page.getByTestId('mk-week-fix')
+  const nFix = Number((await fixBtn.getAttribute('data-n').catch(() => '0')) ?? '0')
+  const avg0 = Number(await page.getByTestId('mk-week-score').getAttribute('data-avg'))
+  const fri0 = Number(await page.locator('[data-testid="mk-week-thread"][data-day="5"] [data-testid="mk-week-lint-item"]').getAttribute('data-score').catch(() => '0'))
+  check('F1 [AI로 90점 아래 n개만 고쳐 쓰기] 보라 단추 — 링크 든 금요일 스레드(90점 아래) 포함', nFix >= 1 && fri0 < 90 && /AI로 90점 아래 \d+개만 고쳐 쓰기/.test(await fixBtn.innerText().catch(() => '')), { nFix, fri0 })
+  await fixBtn.scrollIntoViewIfNeeded().catch(() => {})
+  await shot(page, 'F-before')
+  const f0 = llm.length
+  await fixBtn.click()
+  await page.waitForTimeout(450)
+  await fixBtn.click() // D-289 AI 단추 두 번
+  await page.getByTestId('mk-week-fix-done').waitFor({ timeout: 15000 }).catch(() => {})
+  const fcalls = llm.slice(f0)
+  check('F2 고칠 글 수만큼만 부름(글마다 한 번) · 모두 [자료 · 고칠 글] + [자료 · 고칠 곳]', fcalls.length === nFix && fcalls.every((c) => c.user.includes('[자료 · 고칠 글') && c.user.includes('[자료 · 고칠 곳')), { n: fcalls.length, nFix })
+  const done = page.getByTestId('mk-week-fix-done')
+  const fri = page.locator('[data-testid="mk-week-thread"][data-day="5"]')
+  const fri1 = Number(await fri.locator('[data-testid="mk-week-lint-item"]').getAttribute('data-score').catch(() => '0'))
+  const avg1 = Number(await page.getByTestId('mk-week-score').getAttribute('data-avg'))
+  check('F3 결과 한 줄 "고쳐 썼어요 — n개 점수 올라감" · 금요일 스레드 = 고친 글 · 점수 오름 · 평균 오름', Number(await done.getAttribute('data-improved')) >= 1 && /고쳐 썼어요/.test(await done.innerText()) && (await fri.innerText()).includes('고친 글 3가지') && fri1 > fri0 && avg1 > avg0, { fri0, fri1, avg0, avg1 })
+  console.log(`  (잰 숫자) 90점 아래 AI 글 ${nFix}개 · 금요일 스레드 ${fri0} → ${fri1}점 · 평균 ${avg0} → ${avg1}점 · 바로 올릴 글 ${await page.getByTestId('mk-week-score').getAttribute('data-ready')}`)
+  await done.scrollIntoViewIfNeeded().catch(() => {})
+  await done.locator('summary').click().catch(() => {})
+  await shot(page, 'F-after')
+  check('F4 다 고치면 단추가 사라짐(남은 90점 아래 AI 글 0)', (await fixBtn.count()) === 0)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
+  await tabTo(page, 'threads')
+  check('F5 새로 고쳐도 고친 글 그대로(이 브라우저에 저장)', (await page.locator('[data-testid="mk-week-thread"][data-day="5"]').innerText().catch(() => '')).includes('고친 글 3가지'))
+  await tabTo(page, 'plan')
+}
 await page.locator('[data-testid="mk-week-day"][data-day="3"] button').first().click()
 await page.waitForFunction(() => { const el = document.getElementById('mk-week-long'); if (!el) return false; const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }, null, { timeout: 5000 }).catch(() => {})
 check('V6 올릴 날 탭의 [유튜브 롱폼] 누르면 롱폼 탭 · 롱폼 칸으로', await page.evaluate(() => { const b = document.getElementById('mk-week-long')?.getBoundingClientRect(); return !!b && b.top < window.innerHeight && b.bottom > 0 }))

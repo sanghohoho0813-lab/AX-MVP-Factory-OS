@@ -53,6 +53,17 @@ const ANSWER = {
   ],
   next: ['[특허 출원 여부 확인]', '실제로 만든 화면인지'],
 }
+// D-561 차례대로 다른 답(비어 있으면 ANSWER) — 낮은 점수 답 → 자동 다듬기 답
+const QUEUE = []
+const LOW = {
+  headline: '벤처확인',
+  items: [
+    { title: '안녕하세요 여러분', tag: '리스트형', when: '약 30초', body: '[0:00] 안녕하세요 여러분 오늘은 알아보겠습니다\n[0:05] 결론적으로 다양한 방법이 있습니다 [실제 사례]\n[0:10] [숫자]', detail: '', outline: [] },
+    { title: '창업 3년 안이면,', tag: '리스트형', when: '약 30초', body: '[0:00] 창업 3년 안이면, 알아보겠습니다\n[0:05] 시점이 중요해요 [실제 사례]\n[0:10] [확인 기관]', detail: '결과는 확인기관이 정해요', outline: ['#벤처기업확인'] },
+  ],
+  next: [],
+}
+const nextAnswer = () => (QUEUE.length ? QUEUE.shift() : ANSWER)
 const realFetch = globalThis.fetch
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input)
@@ -64,13 +75,13 @@ globalThis.fetch = async (input, init = {}) => {
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
     const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
     llm.push({ sys, user, provider: 'gemini', model: /models\/([^:]+):/.exec(url)?.[1] ?? '' })
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(nextAnswer()) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com/v1/messages')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.system ?? '')
     llm.push({ sys, user: String(body.messages?.[0]?.content ?? ''), provider: 'anthropic', model: body.model })
-    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ANSWER) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(nextAnswer()) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
   }
   if (/\/models(\?|$)/.test(url)) return new Response(JSON.stringify({ models: [], data: [] }), { status: 200 })
   return realFetch(input, init)
@@ -217,6 +228,19 @@ check('A4 [이 대본으로 고치기] → 대본 · 캡션 · 해시태그 · �
   await page.getByTestId('sht-score-undo').click()
   await page.waitForTimeout(150)
   check('SC5 [고치기 전으로] → 예전 대본 · 설명 글 그대로', (await page.getByTestId('sht-script').inputValue()) === poor && (await page.getByTestId('sht-caption').inputValue()) === keep.caption)
+  // ---------- D-561 한 번 누르면 90점까지 — 점수 높은 안 먼저 · 90 아래면 자동으로 한 번 더 ----------
+  const toasts = async () => (await page.getByTestId('toast-stack').allInnerTexts().catch(() => [])).join(' | ')
+  QUEUE.push(LOW, ANSWER)
+  const p0 = llm.length
+  { const b = page.getByTestId('sht-qs-ai'); await b.scrollIntoViewIfNeeded(); await b.click(); await page.waitForTimeout(450); await b.click() }
+  await page.waitForFunction(() => /둘 다 걸리면/.test(document.querySelector('[data-testid="sht-script"]')?.value ?? ''), null, { timeout: 15000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  const pcalls = llm.slice(p0).filter((x) => x.sys.includes('(shorts.write'))
+  check('SC6 D-561 [완성 대본 쓰기] 한 번 → AI 두 번(쓰기 + 90점 아래라 자동 다듬기) · 다듬기 자료 = 점수 높은 안의 대본', pcalls.length === 2 && /\[자료 · 고칠 글[^\]]*\][\s\S]*줄: \[0:00\] 창업 3년 안이면, 알아보겠습니다/.test(pcalls[1]?.user ?? '') && !/줄: \[0:00\] 안녕하세요 여러분 오늘은/.test(pcalls[1]?.user ?? ''), { n: pcalls.length })
+  const s6 = Number(await sc.getAttribute('data-score'))
+  check('SC7 다듬은 대본이 칸에 · 점수 올라감 알림 · 다른 안(2안) 남음 · [이전 대본으로 되돌리기]', /둘 다 걸리면/.test(await page.getByTestId('sht-script').inputValue()) && /한 번 더 다듬었어요 — \d+점 → \d+점/.test(await toasts()) && (await page.getByTestId('sht-alt-btn').count()) === 2 && /이전 대본으로 되돌리기/.test(await page.getByTestId('sht-score-undo').innerText().catch(() => '')), { s6, t: await toasts() })
+  await page.waitForTimeout(1200)
+  check('SC8 한 번만 다듬음(다시 부르지 않음)', llm.length - p0 === pcalls.length)
   // 다음 시험(저장)을 위해 AI 1안 대본으로
   await page.getByTestId('sht-script').fill(keep.script)
   await page.waitForTimeout(150)

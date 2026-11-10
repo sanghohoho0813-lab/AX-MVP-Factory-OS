@@ -181,9 +181,13 @@ const sb = llm.length
 { const l289 = page.getByTestId('sht-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 clicks++
 await page.getByTestId('sht-ai-drafts').waitFor({ timeout: 20000 })
-await page.waitForTimeout(200)
+await page.waitForTimeout(300)
+// D-561 1안이 90점 아래면 AI 가 자동으로 한 번 더 다듬는다 — 끝날 때까지 기다린다
+await page.waitForFunction(() => !document.body.innerText.includes('90점까지 한 번 더 다듬는 중'), null, { timeout: 10000 }).catch(() => {})
+await page.waitForTimeout(300)
 const scall = llm.slice(sb).find((x) => x.sys.includes('(shorts.write'))
-check('S3 [AI로 바로 쓰기] → 1안 대본 · 캡션 · 해시태그가 칸에 · 다른 안 2개 · 호출 1번 · 보낸 자료에 추천 형식', /이거 모르면 손해예요/.test(await page.getByTestId('sht-script').inputValue()) && (await page.getByTestId('sht-tags').inputValue()) === '#고용지원금 #채용 #중소기업' && (await page.getByTestId('sht-ai-draft').count()) === 2 && llm.length - sb === 1 && !!scall && /고른형식: 리스트형/.test(scall.user) && /목적: 많이 보이게/.test(scall.user), scall?.user.slice(0, 300))
+const sn = llm.length - sb
+check('S3 [AI로 바로 쓰기] → 1안(점수 높은 안) 대본 · 캡션 · 해시태그가 칸에 · 다른 안 2개 · 호출 1번(90점 이상) 또는 2번(D-561 90점 아래면 자동 다듬기 — 두 번째는 [자료 · 고칠 글]) · 보낸 자료에 추천 형식', /이거 모르면 손해예요/.test(await page.getByTestId('sht-script').inputValue()) && (await page.getByTestId('sht-tags').inputValue()) === '#고용지원금 #채용 #중소기업' && (await page.getByTestId('sht-ai-draft').count()) === 2 && (sn === 1 || (sn === 2 && llm[sb + 1].user.includes('[자료 · 고칠 글'))) && !!scall && /고른형식: 리스트형/.test(scall.user) && /목적: 많이 보이게/.test(scall.user), scall?.user.slice(0, 300))
 console.log(`MEASURE shorts-after pc clicks=${clicks + 1} typed=0 (마케팅 목차 [릴스 · 틱톡] 1 + 칩 1 + AI 1)`)
 await page.getByTestId('sht-new').click()
 await page.waitForTimeout(150)

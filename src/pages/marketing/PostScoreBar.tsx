@@ -3,6 +3,7 @@
  *  '92점 · 바로 올려도 돼요' / '75점 · 고칠 곳 4' (규칙 계산 — AI 아님) + ? 에 점수 매기는 법.
  *  90점 아래면 보라 단추 [AI로 고칠 곳만 고쳐 쓰기] — 감점 항목을 그대로 AI 에 보내 1안을 고쳐 받는다(AI 를 부르는 것은 이 단추뿐).
  *  고쳐 쓴 뒤에는 [고치기 전으로] 가 남는다.
+ *  D-561 [완성 글 쓰기] 뒤 90점이 안 되면 AI 가 자동으로 한 번 더 다듬는다 — 그동안 이 단추 자리에 '90점까지 한 번 더 다듬는 중'.
  */
 import { RotateCcw, Sparkles } from 'lucide-react'
 import { AiConfirm } from '../../components/ai/AiConfirm'
@@ -15,6 +16,7 @@ export function PostScoreBar({
   testPrefix,
   aiOk,
   busy,
+  busyLabel,
   error,
   onFix,
   onUndo,
@@ -25,6 +27,8 @@ export function PostScoreBar({
   testPrefix: string
   aiOk: boolean
   busy: boolean
+  /** D-561 자동으로 한 번 더 다듬는 중이면 그 말 */
+  busyLabel?: string
   error?: string
   onFix: () => void
   /** 고쳐 쓴 직후에만 — 고치기 전 글로 */
@@ -53,7 +57,7 @@ export function PostScoreBar({
         <div className="flex flex-wrap items-center gap-2">
           <AiConfirm>
             <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={onFix} disabled={busy} data-testid={`${testPrefix}-score-fix`}>
-              <Sparkles aria-hidden="true" className="size-4" /> {busy ? 'AI가 고쳐 쓰는 중…' : `AI로 고칠 곳만 고쳐 쓰기 (${Math.min(8, score.items.length)}곳)`}
+              <Sparkles aria-hidden="true" className="size-4" /> {busy ? (busyLabel ?? 'AI가 고쳐 쓰는 중…') : `AI로 고칠 곳만 고쳐 쓰기 (${Math.min(8, score.items.length)}곳)`}
             </Button>
           </AiConfirm>
         </div>

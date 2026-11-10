@@ -56,6 +56,18 @@ const ANSWER = {
   ],
   next: ['주제 태그: 벤처기업확인', '오전에 올리기'],
 }
+// D-561 차례대로 다른 답(비어 있으면 ANSWER) — 낮은 점수 답 → 자동 다듬기 답
+const QUEUE = []
+const LOW = {
+  headline: '벤처확인',
+  items: [
+    { title: '오늘은 벤처기업확인에 대해 알아보겠습니다.', tag: 'U', body: '오늘은 벤처기업확인에 대해 알아보겠습니다.\n결론적으로 다양한 방법이 있습니다.\n여러분 [실제 사례]\n[숫자]\n[확인 기관]', when: '그냥 끝', detail: '', outline: [] },
+    { title: '창업 3년 안 대표님, 알아보겠습니다.', tag: 'B', body: '창업 3년 안 대표님, 알아보겠습니다.\n\n벤처기업확인을 받으면\n요건 충족 시 5년간 50% 감면.\n\n[실제 사례]\n[확인 기관]', when: '질문', detail: '3분 진단은 프로필 링크에서', outline: [] },
+  ],
+  next: ['주제 태그: 벤처기업확인'],
+}
+const WORSE = { ...LOW, items: [LOW.items[0]] }
+const nextAnswer = () => (QUEUE.length ? QUEUE.shift() : ANSWER)
 const realFetch = globalThis.fetch
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input)
@@ -67,13 +79,13 @@ globalThis.fetch = async (input, init = {}) => {
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
     const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
     llm.push({ sys, user, provider: 'gemini', model: /models\/([^:]+):/.exec(url)?.[1] ?? '' })
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(nextAnswer()) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com/v1/messages')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.system ?? '')
     llm.push({ sys, user: String(body.messages?.[0]?.content ?? ''), provider: 'anthropic', model: body.model })
-    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ANSWER) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(nextAnswer()) }], usage: { input_tokens: 1500, output_tokens: 200 }, stop_reason: 'end_turn', model: body.model }), { status: 200 })
   }
   if (/\/models(\?|$)/.test(url)) return new Response(JSON.stringify({ models: [], data: [] }), { status: 200 })
   return realFetch(input, init)
@@ -273,6 +285,44 @@ check('A6 AI 글 규칙 검사 — 고칠 것 0 · 끝 고르기 쉬운 질문',
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'score-390.png') })
   check('SC8 390 — 점수 줄 · 단추 넘침 0', (await overflowX(page)) <= 0)
   await page.setViewportSize({ width: 1440, height: 1000 })
+  // ---------- D-561 한 번 누르면 90점까지 — 점수 높은 안 먼저 · 90 아래면 자동으로 한 번 더 · 내려가면 원래 글 ----------
+  const toasts = async () => (await page.getByTestId('toast-stack').allInnerTexts().catch(() => [])).join(' | ')
+  const clickAi = async () => {
+    const b = page.getByTestId('thr-qs-ai')
+    await b.scrollIntoViewIfNeeded()
+    await b.click()
+    await page.waitForTimeout(450)
+    await b.click() // D-289 AI 단추 두 번
+  }
+  QUEUE.push(LOW, ANSWER)
+  const p0 = llm.length
+  await clickAi()
+  await page.waitForFunction(() => /세금 더 내고/.test(document.querySelector('[data-testid="thr-body"]')?.value ?? ''), null, { timeout: 15000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  const pcalls = llm.slice(p0).filter((x) => x.sys.includes('(threads.write'))
+  const polishCall = pcalls[1]
+  check('SC9 D-561 [완성 글 쓰기] 한 번 → AI 두 번(쓰기 + 90점 아래라 자동 다듬기) · 다듬기 자료 = 점수 높은 안(B)의 글 한 줄씩 + 고칠 곳', pcalls.length === 2 && !!polishCall && /\[자료 · 고칠 글[^\]]*\][\s\S]*줄: 창업 3년 안 대표님, 알아보겠습니다\./.test(polishCall.user) && !/줄: 오늘은 벤처기업확인에 대해/.test(polishCall.user) && /고칠곳:/.test(polishCall.user), { n: pcalls.length })
+  const s9 = Number(await sc.getAttribute('data-score'))
+  check('SC10 다듬은 글이 글 칸에 · 90점 이상 · 알림 "한 번 더 다듬었어요 — a점 → b점"', /세금 더 내고/.test(await page.getByTestId('thr-body').inputValue()) && s9 >= 90 && /한 번 더 다듬었어요 — \d+점 → \d+점/.test(await toasts()), { s9, t: await toasts() })
+  await page.getByTestId('thr-score').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(page, 'pc-auto-polish', false)
+  const alt = await page.getByTestId('thr-alt-btn').allInnerTexts()
+  check('SC11 글 칸 위 다른 안 — 1안이 다듬은 글(지금) · 2안은 남음 · [이전 글로 되돌리기] → 누르기 전 글', alt.length === 2 && /\(지금\)/.test(alt[0]) && /이전 글로 되돌리기/.test(await page.getByTestId('thr-score-undo').innerText().catch(() => '')), alt)
+  await page.getByTestId('thr-score-undo').click()
+  await page.waitForTimeout(150)
+  check('SC12 되돌리면 누르기 전 글(SC7 글)', (await page.getByTestId('thr-body').inputValue()) === poor)
+  // 다듬었는데 점수가 내려가면 — 처음 쓴(가장 높은) 안 그대로 · 그 말 알림
+  QUEUE.push(LOW, WORSE)
+  const p1 = llm.length
+  await clickAi()
+  await page.waitForFunction(() => /점수가 오르지 않아/.test(document.querySelector('[data-testid="toast-stack"]')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {})
+  const qcalls = llm.slice(p1).filter((x) => x.sys.includes('(threads.write')).length
+  check('SC13 다듬은 글 점수가 더 낮으면 처음 안(B · 점수 높은 안) 그대로 · "점수가 오르지 않아" · AI 두 번에서 멈춤', qcalls === 2 && /^창업 3년 안 대표님, 알아보겠습니다\./.test(await page.getByTestId('thr-body').inputValue()) && /점수가 오르지 않아/.test(await toasts()), { qcalls, t: await toasts() })
+  await page.waitForTimeout(1500)
+  check('SC14 다시 부르지 않음(한 번만 다듬음)', llm.length - p1 === qcalls)
+  // 다음 시험(저장)을 위해 보통 답(ANSWER · 100점 → 다듬지 않음)으로 다시 쓴다
+  await clickAi()
+  await page.waitForFunction(() => /세금 더 내고/.test(document.querySelector('[data-testid="thr-body"]')?.value ?? ''), null, { timeout: 15000 }).catch(() => {})
   // 다음 시험(저장)을 위해 AI 1안으로 되돌린다
   await page.getByTestId('thr-ai-use').first().click()
   await page.waitForTimeout(200)

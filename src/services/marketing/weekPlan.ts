@@ -15,12 +15,12 @@
  */
 import type { AssistAnswer } from '../aiAssist/client'
 import type { AssistContext } from '../aiAssist/context'
-import { briefSection, packBundle } from '../aiAssist/marketingBuilders'
+import { briefSection, packBundle, withWriteExtras } from '../aiAssist/marketingBuilders'
 import { HOLE, PACK_AVOID, aiSections, customSource, makePack, type PackBlock, type PackSectionId, type PackSource } from './contentPack'
 import { WEEK_STORE_KEY } from './weekRunFlag'
 import { axShown, isMarketingCustomer, noAxText } from './persona'
 import { consultLint } from './consultRules'
-import { scoreFromCounts } from './postScore'
+import { fixLines, scoreFromCounts, scorePost } from './postScore'
 import type { ChannelBrief } from './radarStore'
 import { formatsFor, lintShort, parseShortDrafts, shortsContext, type ShortDraft, type ShortPlatform } from './shorts'
 import { GOALS, lintThreadPost, topicTags, parseThreadDrafts, skeletonDraft, templateOf, threadsContext, type ThreadDraft, type ThreadGoal, type ThreadTemplateKey } from './threads'
@@ -356,6 +356,11 @@ export interface LintSum {
   bad: number
   warn: number
   lines: string[]
+  /** D-561 올리기 전 점수 — 스레드 · 릴스 화면과 같은 계산(규칙 검사 줄 + 공통 점검 넷) · 롱폼은 줄 수로 */
+  score: number
+  pass: boolean
+  /** AI 에 보낼 '고칠 곳'(감점 큰 것부터 최대 8줄) */
+  fixes: string[]
 }
 
 export interface WeekLong {
@@ -372,6 +377,8 @@ export interface WeekShort {
   draft: ShortDraft
   ai: boolean
   lint: LintSum
+  /** D-561 저장된 AI 답 배열에서 몇 번째(고쳐 쓴 글을 그 자리에) — AI 글이 아니면 -1 */
+  at: number
 }
 export interface WeekThread {
   slot: ThreadSlot
@@ -379,6 +386,7 @@ export interface WeekThread {
   draft: ThreadDraft
   ai: boolean
   lint: LintSum
+  at: number
 }
 export interface WeekView {
   start: string
@@ -394,14 +402,27 @@ function longLint(text: string): LintSum {
   const avoid = PACK_AVOID.exec(text)
   const consult = consultLint(text)
   const lines = [...(avoid ? [`"${avoid[0]}" — 쓰지 않는 말`] : []), ...consult.map((l) => l.text), ...(holes.length ? [`[공식 자료 확인] 빈칸 ${holes.length}칸 — 공고 · 보도자료로 채우기`] : [])]
-  return { bad: (avoid ? 1 : 0) + consult.filter((l) => l.level === 'bad').length, warn: (holes.length ? 1 : 0) + consult.filter((l) => l.level === 'warn').length, lines }
+  const bad = (avoid ? 1 : 0) + consult.filter((l) => l.level === 'bad').length
+  const warn = (holes.length ? 1 : 0) + consult.filter((l) => l.level === 'warn').length
+  return { bad, warn, lines, ...scoreFromCounts(bad, warn), fixes: lines.slice(0, 8) }
 }
 
-/** 공식 점검 줄 — 주제 태그(올릴 때 고른다)는 세지 않는다 */
-const sumOf = (r: { lines: { key: string; level: string; text: string }[] }): LintSum => {
-  const xs = r.lines.filter((l) => l.level !== 'ok' && l.key !== 'tag')
-  return { bad: xs.filter((l) => l.level === 'bad').length, warn: xs.filter((l) => l.level === 'warn').length, lines: xs.map((l) => l.text) }
+/**
+ * 공식 점검 줄 + 공통 점검(빈칸 · 기계 같은 말 · 긴 문장 · 스레드 첫 줄 숫자) → 점수.
+ * D-561 스레드 · 릴스 화면과 같은 점수(예전에는 공식 점검 줄 수만 세어 같은 글이 두 화면에서 다르게 나왔다).
+ * 주제 태그(올릴 때 고른다)는 세지 않는다.
+ */
+const sumOf = (kind: 'thread' | 'short', text: string, r: { lines: { key: string; level: string; text: string }[] }): LintSum => {
+  const xs = r.lines.filter((l) => l.level !== 'ok' && l.key !== 'tag').map((l) => ({ key: l.key, level: l.level as 'warn' | 'bad', text: l.text }))
+  const sc = scorePost({ kind, text, lines: xs })
+  if (!sc) return { bad: 0, warn: 0, lines: [], score: 100, pass: true, fixes: [] }
+  return { bad: sc.items.filter((x) => x.level === 'bad').length, warn: sc.items.filter((x) => x.level === 'warn').length, lines: sc.items.map((x) => x.text), score: sc.score, pass: sc.pass, fixes: fixLines(sc) }
 }
+/** D-561 1주일치 대본 · 스레드 글 한 개 점수(카드 · 고쳐 쓴 글 비교에 같은 식) */
+export const lintWeekShort = (d: Pick<ShortDraft, 'script' | 'caption' | 'hashtags'>, platform: ShortPlatform): LintSum =>
+  sumOf('short', d.script.trim() ? `${d.script}\n${d.caption}` : '', lintShort({ platform, aim: 'reach', script: d.script, caption: d.caption, hashtags: d.hashtags }))
+export const lintWeekThread = (d: Pick<ThreadDraft, 'body' | 'template' | 'selfComment'>, template: ThreadTemplateKey): LintSum =>
+  sumOf('thread', d.body, lintThreadPost({ body: d.body, template: d.template || template, selfComment: d.selfComment }))
 
 const ruleShort = (blocks: readonly PackBlock[], i: number, platform: ShortPlatform): ShortDraft => {
   const b = blocks[i] ?? blocks[0]
@@ -432,8 +453,8 @@ export function buildWeek(setup: WeekSetup, brief: ChannelBrief, today: string, 
   const shorts: WeekShort[] = SHORT_SLOTS.map((slot) => {
     const got = saved?.[slot.part]?.[slot.idx]
     const draft = got ?? ruleShort(sec(slot.topic, 'shorts'), slot.platform === 'reels' ? 1 : slot.idx, slot.platform)
-    const lint = sumOf(lintShort({ platform: slot.platform, aim: 'reach', script: draft.script, caption: draft.caption, hashtags: draft.hashtags }))
-    return { slot, topic: name(slot.topic), draft, ai: !!got, lint }
+    const lint = lintWeekShort(draft, slot.platform)
+    return { slot, topic: name(slot.topic), draft, ai: !!got, lint, at: got ? slot.idx : -1 }
   })
 
   const threads: WeekThread[] = []
@@ -444,8 +465,8 @@ export function buildWeek(setup: WeekSetup, brief: ChannelBrief, today: string, 
       const got = placed[i]
       const tp = templateOf(slot.template)
       const draft: ThreadDraft = got ?? { firstLine: '', template: slot.template, body: tp ? skeletonDraft(tp, name(slot.topic)) : '', ending: '', selfComment: '', checks: [] }
-      const lint = sumOf(lintThreadPost({ body: draft.body, template: draft.template || slot.template, selfComment: draft.selfComment }))
-      threads.push({ slot, topic: name(slot.topic), draft, ai: !!got, lint })
+      const lint = lintWeekThread(draft, slot.template)
+      threads.push({ slot, topic: name(slot.topic), draft, ai: !!got, lint, at: got ? (saved?.[part] ?? []).indexOf(got) : -1 })
     })
   }
   return { start, topics: names, long, shorts, threads }
@@ -454,10 +475,70 @@ export function buildWeek(setup: WeekSetup, brief: ChannelBrief, today: string, 
 /** 점검 요약 — 이번 주 글(예비 빼고) 몇 개 중 통과 · 고칠 곳 */
 export function weekLintSummary(w: WeekView): { total: number; pass: number; bad: number; warn: number; avg: number; ready: number } {
   const items = [w.long.lint, ...w.shorts.filter((s) => s.slot.n > 0).map((s) => s.lint), ...w.threads.filter((x) => x.slot.day > 0).map((x) => x.lint)]
-  // D-559 올리기 전 점수 — 글마다(꼭 고칠 것 −15 · 볼 것 −5) · 평균 · 90점 이상(꼭 고칠 것 0) 글 수
-  const scores = items.map((l) => scoreFromCounts(l.bad, l.warn))
-  const avg = scores.length ? Math.round(scores.reduce((a, x) => a + x.score, 0) / scores.length) : 0
-  return { total: items.length, pass: items.filter((l) => l.bad === 0).length, bad: items.reduce((a, l) => a + l.bad, 0), warn: items.reduce((a, l) => a + l.warn, 0), avg, ready: scores.filter((x) => x.pass).length }
+  // D-559 올리기 전 점수 — 글마다 · 평균 · 90점 이상(꼭 고칠 것 0) 글 수 · D-561 스레드 · 릴스 화면과 같은 점수
+  const avg = items.length ? Math.round(items.reduce((a, x) => a + x.score, 0) / items.length) : 0
+  return { total: items.length, pass: items.filter((l) => l.bad === 0).length, bad: items.reduce((a, l) => a + l.bad, 0), warn: items.reduce((a, l) => a + l.warn, 0), avg, ready: items.filter((x) => x.pass).length }
+}
+
+/* ------------------------------------------------------------------ */
+/* D-561 90점 아래 AI 글만 고쳐 쓰기                                       */
+/* ------------------------------------------------------------------ */
+
+export interface WeekFixRequest {
+  /** `${part}:${at}` — 같은 글을 두 번 고치지 않게 */
+  key: string
+  part: 'shortA' | 'shortB' | 'th0' | 'th1' | 'th2'
+  at: number
+  kind: 'short' | 'thread'
+  assistId: 'shorts.write' | 'threads.write'
+  page: 'shorts' | 'threads'
+  context: AssistContext
+  /** 고치기 전 점수 */
+  before: number
+  /** 화면 · 알림에 쓸 이름(예: '스레드 화' · '쇼츠 ①') */
+  label: string
+  /** 그 자리 규칙(고친 글 점수를 같은 식으로) */
+  platform?: ShortPlatform
+  template?: ThreadTemplateKey
+}
+
+/**
+ * 이번 주 글(예비 빼고) 가운데 AI 가 쓴 글이면서 90점이 안 되는 것 — 그 글 + 고칠 곳을 같은 단추(threads.write · shorts.write)에 보낸다.
+ * 규칙 초안(AI 가 아직 안 쓴 칸)은 고치지 않는다 — 먼저 [AI로 1주일치 쓰기].
+ */
+export function weekFixRequests(w: WeekView, brief: ChannelBrief, today: string): WeekFixRequest[] {
+  const out: WeekFixRequest[] = []
+  for (const s of w.shorts) {
+    if (s.slot.n === 0 || !s.ai || s.at < 0 || s.lint.pass) continue
+    const body = s.draft.caption.trim() ? `${s.draft.script}\n\n설명 글: ${s.draft.caption.trim()}` : s.draft.script
+    const ctx = shortsContext({ platform: s.slot.platform, aim: 'reach', format: formatsFor(s.slot.platform, 'reach')[0]?.key ?? '', topic: s.topic, facts: '', recent: [], today })
+    out.push({ key: `${s.slot.part}:${s.at}`, part: s.slot.part, at: s.at, kind: 'short', assistId: 'shorts.write', page: 'shorts', context: withWriteExtras(ctx, { brief, revise: { body, fixes: s.lint.fixes } }), before: s.lint.score, label: `${s.slot.platform === 'reels' ? '릴스' : '쇼츠'} ${'①②③'[s.slot.n - 1] ?? ''}`.trim(), platform: s.slot.platform })
+  }
+  for (const x of w.threads) {
+    if (x.slot.day === 0 || !x.ai || x.at < 0 || x.lint.pass) continue
+    const tpl = (x.draft.template || x.slot.template) as ThreadTemplateKey
+    const ctx = threadsContext({ goal: x.slot.goal, template: tpl, topic: x.topic, tag: tagOf(x.topic), facts: '', reference: '', recent: [], today })
+    out.push({ key: `${x.slot.part}:${x.at}`, part: x.slot.part, at: x.at, kind: 'thread', assistId: 'threads.write', page: 'threads', context: withWriteExtras(ctx, { brief, revise: { body: x.draft.body, fixes: x.lint.fixes } }), before: x.lint.score, label: `스레드 ${'월화수목금토일'[x.slot.day - 1] ?? ''}`.trim(), template: tpl })
+  }
+  return out
+}
+
+/** 고친 답 → 그 자리에 넣을 글(점수가 내려가면 null — 원래 글 그대로). 스레드 틀 · 대본 형식은 원래 자리 것을 지킨다. */
+export function fixedDraft(req: WeekFixRequest, a: AssistAnswer, old: ShortDraft | ThreadDraft): { draft: ShortDraft | ThreadDraft; after: number } | null {
+  if (req.kind === 'short') {
+    const d = parseShortDrafts(a).drafts[0]
+    if (!d?.script.trim()) return null
+    const o = old as ShortDraft
+    const next: ShortDraft = { ...o, ...d, caption: d.caption || o.caption, hashtags: d.hashtags || o.hashtags, format: o.format || d.format }
+    const after = lintWeekShort(next, req.platform ?? 'tiktok').score
+    return after >= req.before ? { draft: next, after } : null
+  }
+  const d = parseThreadDrafts(a).drafts[0]
+  if (!d?.body.trim()) return null
+  const o = old as ThreadDraft
+  const next: ThreadDraft = { ...o, ...d, template: o.template || d.template, selfComment: d.selfComment || o.selfComment }
+  const after = lintWeekThread(next, req.template ?? (o.template as ThreadTemplateKey)).score
+  return after >= req.before ? { draft: next, after } : null
 }
 
 /** 요일마다 올릴 것(달력 한 줄) */

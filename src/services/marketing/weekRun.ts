@@ -8,7 +8,7 @@
 import { AssistError, callAssist } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import { collectWeek, loadWeeksCloud, saveWeekCloud } from './weekCollect'
-import { WEEK_PARTS, WEEK_STORE_KEY, parseWeekStore, partResult, putWeekStore, type WeekPart, type WeekRequest, type WeekSaved } from './weekPlan'
+import { WEEK_PARTS, WEEK_STORE_KEY, fixedDraft, parseWeekStore, partResult, putWeekStore, type WeekFixRequest, type WeekPart, type WeekRequest, type WeekSaved } from './weekPlan'
 import { markWeekRunLoaded } from './weekRunFlag'
 
 // D-479 이 모듈이 읽혔다 — 앱 틀이 '1주일치 쓰는 중' 표시를 받아 와도 된다
@@ -251,4 +251,73 @@ export function startWeekAi(start: string, topics: readonly string[], requests: 
         finishIfDone(start)
       })
   for (const r of requests) call(r, 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-561 90점 아래 AI 글만 고쳐 쓰기 — 한 번 눌러 이번 주 글을 90점까지          */
+/* ------------------------------------------------------------------ */
+
+export interface WeekFix {
+  state: 'idle' | 'running' | 'done'
+  total: number
+  /** 답이 온 글(성공 · 그대로 · 실패 모두) */
+  done: number
+  /** 점수가 오르거나 같아 고친 글로 바꾼 것 */
+  improved: number
+  /** 다듬었는데 점수가 내려가 원래 글을 둔 것 */
+  kept: number
+  failed: number
+  /** 고친 글 이름 · 점수(알림 · 화면 한 줄) */
+  lines: string[]
+}
+export const IDLE_FIX: WeekFix = { state: 'idle', total: 0, done: 0, improved: 0, kept: 0, failed: 0, lines: [] }
+const fixes = new Map<string, WeekFix>()
+export const weekFix = (start: string): WeekFix => fixes.get(start) ?? IDLE_FIX
+const setFix = (start: string, fn: (f: WeekFix) => WeekFix) => {
+  fixes.set(start, fn(weekFix(start)))
+  emit()
+}
+
+/**
+ * 90점 아래 AI 글을 같은 단추(threads.write · shorts.write)로 '고칠 곳만' 고쳐 받아 그 자리에 넣는다.
+ * 한 번에 셋씩 · 글마다 한 번만 · 점수가 내려가면 원래 글 그대로 · 고친 글은 이 브라우저 · 클라우드 · 목록(스레드 · 릴스 기록표)에 같이.
+ * 쓰는 중(여섯 갈래)이거나 이미 고치는 중이면 하지 않는다. 다른 화면으로 가도 계속(이 모듈).
+ */
+export function startWeekFix(start: string, reqs: readonly WeekFixRequest[], opts: { ws?: string | null } = {}): void {
+  if (weekRunning(start) || weekFix(start).state === 'running' || reqs.length === 0) return
+  const choice = readChoice()
+  setFix(start, () => ({ ...IDLE_FIX, state: 'running', total: reqs.length }))
+  const todo = [...reqs]
+  const finish = () =>
+    setFix(start, (f) => (f.done >= f.total ? { ...f, state: 'done' } : f))
+  const one = async (r: WeekFixRequest): Promise<void> => {
+    try {
+      const run = await callAssist({ requestId: newRequestId(), assistId: r.assistId, page: r.page, choice, context: r.context })
+      const prev = weekSaved(start)
+      const arr = (prev?.[r.part] ?? []) as unknown[]
+      const old = arr[r.at] as Parameters<typeof fixedDraft>[2] | undefined
+      const got = run.structured && old ? fixedDraft(r, run.structured, old) : null
+      if (!prev || !old || !got) {
+        setFix(start, (f) => ({ ...f, done: f.done + 1, kept: f.kept + (old && run.structured ? 1 : 0), failed: f.failed + (old && run.structured ? 0 : 1), lines: [...f.lines, `${r.label} ${r.before}점 — 그대로(점수가 오르지 않음)`] }))
+        return
+      }
+      const nextArr = arr.map((d, i) => (i === r.at ? got.draft : d))
+      const next: WeekSaved = { ...prev, at: new Date().toISOString(), [r.part]: nextArr }
+      memory.set(start, next)
+      writeWeekStore(next)
+      setFix(start, (f) => ({ ...f, done: f.done + 1, improved: f.improved + 1, lines: [...f.lines, `${r.label} ${r.before}점 → ${got.after}점`] }))
+      // 목록(스레드 · 릴스 기록표)에도 — 대표가 그 화면에서 고친 글은 덮지 않는다(prev 와 비교)
+      if (opts.ws !== undefined) void queue(start, () => saveAndCollect(opts.ws ?? null, next, prev, [r.part]))
+    } catch (e) {
+      const msg = e instanceof Error && e.message ? e.message : '다시 눌러 주세요.'
+      setFix(start, (f) => ({ ...f, done: f.done + 1, failed: f.failed + 1, lines: [...f.lines, `${r.label} — 못 고침(${msg})`] }))
+    }
+  }
+  const worker = async () => {
+    for (let r = todo.shift(); r; r = todo.shift()) {
+      await one(r)
+      finish()
+    }
+  }
+  for (let i = 0; i < Math.min(3, reqs.length); i++) void worker()
 }
