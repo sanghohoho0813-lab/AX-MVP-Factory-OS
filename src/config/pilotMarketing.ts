@@ -73,8 +73,8 @@ export function usePilotMarketingScreens(): boolean {
   )
 }
 
-/** 고객에게 여는 마케팅 주소 — 레이더(/marketing · /marketing/youtube) · 스레드 · 릴스/틱톡 */
-const OPEN_BASES = ['/marketing/youtube', '/marketing/threads', '/marketing/shorts']
+/** 고객에게 여는 마케팅 주소 — 레이더(/marketing · /marketing/youtube) · 스레드 · 릴스/틱톡 · 기초 7가지(D-571) */
+const OPEN_BASES = ['/marketing/youtube', '/marketing/threads', '/marketing/shorts', '/marketing/basics']
 
 export function isCustomerMarketingPath(pathname: string): boolean {
   if (pathname === '/marketing' || pathname === '/marketing/') return true

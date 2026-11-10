@@ -296,6 +296,12 @@ const GUIDES: Record<string, Entry> = {
   },
 
   /* 마케팅 · 브랜딩 안의 화면 */
+  'mk-basics': {
+    what: '글로 고객을 모으는 기본 일곱 가지를 한 가지에 1분씩 알려 줘요.',
+    why: '어디서부터 해야 할지 모르는 분이 가장 많아서, 시작하기 전에 읽을 것을 한곳에 모았어요.',
+    effect: '왜 그렇게 쓰는지 알고 쓰게 돼요. 읽고 나서 [바로 해 보기] 로 그 화면에 가요.',
+    next: '내가 올린 글을 보고 어느 것을 더 연습하면 좋을지 알려 주게 해요.',
+  },
   'mk-plan': {
     what: '이번 주에 올릴 주제를 골라 주고, 누르면 긴 영상 대본 · 짧은 글까지 묶음으로 만들어 줘요.',
     why: '"이번 주에 뭘 찍지?" 에서 멈추는 시간이 가장 길어서요.',
@@ -401,6 +407,7 @@ export const MARKETING_GUIDE_KEYS: Record<string, string> = {
 
 /** 사용법 안내 화면에서 마케팅 아래에 펼쳐 보일 화면들(이름 · 열쇠 · 주소) */
 export const MARKETING_GUIDE_LIST: ReadonlyArray<{ key: string; label: string; path: string; basicHidden?: boolean }> = [
+  { key: 'mk-basics', label: '고객 모으기 기초 7가지', path: '/marketing/basics' },
   { key: 'mk-plan', label: '유튜브(이번 주 주제)', path: '/marketing/youtube?view=plan' },
   { key: 'mk-week', label: '1주일치 한 번에', path: '/marketing' },
   { key: 'mk-threads', label: '스레드', path: '/marketing/threads' },

@@ -663,5 +663,18 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('D566-P6 쉬운 말만(D-507) — 롱폼 · 썸네일 · 벤치마킹 · 캡션 · 해시태그 · 포맷 · 훅 · 스레드 · 릴스 낱말 0 · AX 0', !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|스레드|릴스|쇼츠|(?<![A-Za-z])AX(?![A-Za-z])/.test(words), words.match(/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|스레드|릴스|쇼츠/g)?.join())
 }
 
+// ---------- D-571 고객 모으기 기초 7가지 — 쉬운 말 · 결과를 약속하지 않음 · [바로 해 보기] 는 고객에게 열린 화면만 ----------
+{
+  const { MARKETING_BASICS, nextBasic } = await import('../../content/marketingBasics')
+  const { isCustomerMarketingPath } = await import('../../config/pilotMarketing')
+  const all = MARKETING_BASICS.map((b) => [b.title, b.point, b.why, b.bad, b.good, b.tryLabel].join(' ')).join(' ')
+  check('D571-B1 일곱 가지 · 칸이 비지 않음(요점 · 왜 · 이렇게 말고 · 이렇게 · 단추) · 열쇠 겹침 0', MARKETING_BASICS.length === 7 && new Set(MARKETING_BASICS.map((b) => b.key)).size === 7 && MARKETING_BASICS.every((b) => b.title.length >= 4 && b.point.length >= 12 && b.why.length >= 20 && b.bad.length >= 6 && b.good.length >= 12 && b.tryLabel.length >= 4))
+  check('D571-B2 쉬운 말만(D-507) — 롱폼 · 썸네일 · 벤치마킹 · 캡션 · 해시태그 · 포맷 · 훅 · CTA · 알고리즘 · 트렌드 0 · AX 0', !/롱폼|숏폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|CTA|알고리즘|트렌드|인사이트|AX/.test(all), all.match(/롱폼|숏폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|CTA|알고리즘|트렌드|인사이트|AX/g))
+  const promise = /무조건|100%|보장|확실히 받|누구나 받/
+  check('D571-B3 "이렇게" 보기 · 요점 · 왜 에는 결과를 약속하는 말 0(나쁜 보기에만 나온다)', MARKETING_BASICS.every((b) => !promise.test(b.good) && !promise.test(b.why)) && MARKETING_BASICS.some((b) => promise.test(b.bad)), MARKETING_BASICS.filter((b) => promise.test(b.good) || promise.test(b.why)).map((b) => b.key))
+  check('D571-B4 [바로 해 보기] 는 고객 계정에 열린 화면만(마케팅 · 설정) · 이 화면 주소도 고객에게 열림', MARKETING_BASICS.every((b) => { const path = b.tryHref.split('?')[0]; return path === '/settings' || isCustomerMarketingPath(path) }) && isCustomerMarketingPath('/marketing/basics'), MARKETING_BASICS.map((b) => b.tryHref))
+  check('D571-B5 다음에 읽을 것 — 처음엔 첫째 · 읽은 것은 건너뜀 · 다 읽으면 없음 · 모르는 값은 무시', nextBasic([])?.key === 'who' && nextBasic(['who', 'first'])?.key === 'steady' && nextBasic(MARKETING_BASICS.map((b) => b.key)) === null && nextBasic(['x'])?.key === 'who')
+}
+
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

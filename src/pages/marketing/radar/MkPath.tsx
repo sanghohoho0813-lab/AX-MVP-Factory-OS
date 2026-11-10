@@ -16,6 +16,7 @@ import { listThreadPosts } from '../../../services/marketing/threads'
 import { listShortPosts } from '../../../services/marketing/shorts'
 import { dailyMission, mkPathNext, mkPathSteps, postedThisWeek, weekdayOf } from '../../../services/marketing/mkPath'
 import { todayLocalDate } from '../../../lib/appClock'
+import { MARKETING_BASICS, readBasics } from '../../../content/marketingBasics'
 
 interface Post {
   status: string
@@ -57,6 +58,16 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
   const next = mkPathNext(steps)
   const done = steps.filter((s) => s.done).length
   const box = 'flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 sm:px-5'
+  // D-571 왜 이렇게 하는지 더 알고 싶은 사람에게 — 기초 7가지(읽은 수는 이 브라우저에 기억)
+  const readCount = readBasics().length
+  const basics = (
+    <p className="t-sub break-keep text-slate-700" data-testid="mk-path-basics">
+      {readCount >= MARKETING_BASICS.length ? '기초 7가지를 다 읽으셨어요 — ' : '처음이라면 — '}
+      <Link to="/marketing/basics" className="font-bold text-brand-700 hover:underline">
+        고객 모으기 기초 7가지(5분){readCount > 0 && readCount < MARKETING_BASICS.length ? ` · ${readCount}/${MARKETING_BASICS.length} 읽음` : readCount >= MARKETING_BASICS.length ? ' 다시 보기' : ''}
+      </Link>
+    </p>
+  )
 
   if (!next) {
     const m = dailyMission(weekdayOf(today))
@@ -81,6 +92,7 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
           이번 주 올린 것 <strong className="font-bold text-slate-900">{n}편</strong>
           {n === 0 ? ' — 오늘 한 편부터 시작해요.' : n >= 3 ? ' — 잘하고 계세요. 꾸준함이 고객을 데려와요.' : ' — 한 주에 세 편이면 충분해요.'}
         </p>
+        {basics}
       </section>
     )
   }
@@ -111,6 +123,7 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
           </li>
         ))}
       </ol>
+      {basics}
     </section>
   )
 }

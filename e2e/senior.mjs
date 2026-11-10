@@ -39,6 +39,7 @@ const SCREENS = [
   ['릴스 · 틱톡', '/marketing/shorts'],
   ['홍보 글', '/tools/content'],
   ['홈페이지', '/tools/homepage'],
+  ['기초 7가지', '/marketing/basics'],
   // 고른 뒤 화면 — 주제 묶음(첫 주제를 눌러서) · 업체로 연 홍보 글 · 홈페이지
   ['주제 묶음', '/marketing?view=plan', 'pack'],
   ['홍보 글 만들기', '/tools/content/build?client=cli_hansol'],
