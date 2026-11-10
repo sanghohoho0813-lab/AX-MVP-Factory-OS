@@ -29,10 +29,13 @@ const localRouter = createBrowserRouter([
   ...legalRoutes,
 ])
 
+/** D-589 앱 조각을 받는 동안 — index.html 의 첫 화면과 같은 모양(.boot · index.html 의 style)이라 깜박이지 않는다 */
 function BootSplash() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-slate-50">
-      <span className="text-sm text-slate-400">불러오는 중…</span>
+    <div className="boot" role="status" data-testid="boot-splash">
+      <img className="boot-mark" src="/favicon.svg" width={56} height={56} alt="" />
+      <p className="boot-name">MIRAE AI LAB OS</p>
+      <p className="boot-msg">불러오는 중…</p>
     </div>
   )
 }

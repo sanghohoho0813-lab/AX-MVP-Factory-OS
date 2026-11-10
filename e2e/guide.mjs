@@ -477,6 +477,29 @@ check(
 )
 if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage: true }).catch(() => {})
 
+/* G17 바로 보이는 첫 화면(D-589) — 스크립트를 받기 전에도 로고 · 불러오는 중 · 앱이 뜨면 사라짐 */
+{
+  const nojs = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', javaScriptEnabled: false })
+  const np = await nojs.newPage()
+  await np.goto(BASE + '/', { waitUntil: 'load' })
+  const splash = np.getByTestId('boot-splash')
+  const splashText = ((await splash.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+  const splashBox = await splash.boundingBox()
+  const markBox = await np.locator('.boot-mark').boundingBox()
+  const msgFont = await np.locator('.boot-msg').evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  const slowHidden = await np.locator('#boot-slow').evaluate((el) => el.hidden)
+  check(
+    'G17 스크립트 없이 연 첫 화면(390): 가운데 로고 · 제품 이름 · "불러오는 중…"(16px) · 화면을 꽉 채움 · 느릴 때 안내 줄은 처음엔 숨김',
+    splashText.includes('MIRAE AI LAB OS') && splashText.includes('불러오는 중') && !!splashBox && splashBox.height >= 800 && !!markBox && Math.abs(markBox.x + markBox.width / 2 - (splashBox.x + splashBox.width / 2)) <= 2 && msgFont >= 16 && slowHidden === true,
+    { splashText, h: splashBox?.height, mark: markBox, msgFont, slowHidden },
+  )
+  if (SHOTS) await np.screenshot({ path: `${SHOTS}/guide-14-boot-splash-390.png` }).catch(() => {})
+  await nojs.close()
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(500)
+  check('G17 앱이 뜨면 첫 화면은 사라짐(남아 있지 않음) · 느릴 때 안내 줄도 없음', (await mp.getByTestId('boot-splash').count()) === 0 && (await mp.locator('#boot-slow').count()) === 0 && (await mp.locator('header').count()) >= 1)
+}
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })

@@ -888,6 +888,18 @@ async function run() {
     )
   }
 
+  /* K27 — D-589 바로 보이는 첫 화면(index.html) */
+  {
+    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8')
+    const root = /<div id="root">([\s\S]*?)<\/div>\s*<script>/.exec(html)?.[1] ?? ''
+    check(
+      'K27 첫 화면 — #root 안에 로고 · 제품 이름 · 불러오는 중 · 느릴 때 안내(처음엔 숨김) · 모양(.boot)은 index.html 안에(스크립트 · 스타일 파일 없이 그려짐) · 앱의 불러오는 중 화면도 같은 모양 · 밖에서 불러오는 것 0',
+      root.includes('data-testid="boot-splash"') && root.includes('불러오는 중…') && root.includes('/favicon.svg') && /id="boot-slow" hidden/.test(root) && html.includes('.boot {') && html.includes("getElementById('boot-slow')") && app.includes('className="boot"') && app.includes('className="boot-msg"') && !/https?:\/\//.test(root),
+      root.slice(0, 200),
+    )
+  }
+
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)
 }

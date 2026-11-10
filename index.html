@@ -43,9 +43,31 @@
         el.setAttribute('data-motion', motion)
       })()
     </script>
+    <!-- D-589 스크립트를 받는 동안(첫 접속 · 느린 통신) 빈 화면 대신 바로 보이는 화면 — 앱이 뜨면 통째로 바뀐다. 앱의 '불러오는 중' 화면(App.tsx BootSplash)도 같은 모양 -->
+    <style>
+      .boot { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #fff; color: #0f172a; font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; text-align: center; padding: 24px; }
+      .boot-mark { width: 56px; height: 56px; }
+      .boot-name { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+      .boot-msg { margin: 0; font-size: 16px; color: #475569; }
+      .boot-slow { margin: 4px 0 0; font-size: 16px; color: #334155; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status" data-testid="boot-splash">
+        <img class="boot-mark" src="/favicon.svg" width="56" height="56" alt="" />
+        <p class="boot-name">MIRAE AI LAB OS</p>
+        <p class="boot-msg">불러오는 중…</p>
+        <p class="boot-slow" id="boot-slow" hidden>화면이 계속 안 뜨면 새로 고침해 주세요.</p>
+      </div>
+    </div>
+    <script>
+      /* 10초가 지나도 이 화면이면(통신이 끊겼거나 스크립트를 못 받음) 새로 고침을 안내한다 — 앱이 뜨면 이 칸은 이미 없다 */
+      setTimeout(function () {
+        var el = document.getElementById('boot-slow')
+        if (el) el.hidden = false
+      }, 10000)
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
