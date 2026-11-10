@@ -314,7 +314,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   await page.keyboard.press('Control+k')
   await page.waitForTimeout(500)
-  check('Ctrl+K: OS 검색만 뜬다', (await page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').count()) === 1 && (await page.getByPlaceholder('업체명, 직원명, 지원금명으로 검색…').count()) === 0)
+  check('Ctrl+K: OS 검색만 뜬다', (await page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름').count()) === 1 && (await page.getByPlaceholder('업체명, 직원명, 지원금명으로 검색…').count()) === 0)
   await page.keyboard.press('Escape')
 
   /* ---- D-92: 연구소 — 원본 화면 그대로 · 고객사는 고객 운영 업체에서 고른다 ---- */
@@ -616,7 +616,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   await page.keyboard.press('Control+k')
   await page.waitForTimeout(300)
-  await page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').fill('부채비율')
+  await page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름').fill('부채비율')
   await page.waitForTimeout(400)
   check('검색: 부채비율 → 크레탑 분석기', (await page.locator('body').innerText()).includes('크레탑 분석기'))
   await page.keyboard.press('Escape')

@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { HOME_HOWTO, HOME_HOWTO_NOTE, type HomeHowToKey } from '../../content/homeScreenHowTo'
+import { InAppBrowserNotice } from './InAppBrowserNotice'
 
 /** 지금 기기에 맞는 탭 — 모르면 아이폰부터 */
 function guessDevice(): HomeHowToKey {
@@ -27,6 +28,8 @@ export function AddToHomeHowTo({ testId = 'home-howto' }: { testId?: string }) {
         매일 쓰려면 — <span className="font-semibold text-brand-700">휴대폰 홈 화면에 넣는 법</span>
       </summary>
       <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4">
+        {/* D-594 카카오톡 안에서는 홈 화면에 넣을 수 없다 — 먼저 바깥 브라우저로 */}
+        <InAppBrowserNotice compact testId={`${testId}-inapp`} />
         <p className="t-sub break-keep text-slate-700">홈 화면에 넣어 두면 아이콘 한 번으로 열려요. 로그인도 그대로 남아요.</p>
         <div role="tablist" aria-label="어느 기기인가요" className="flex flex-wrap gap-1.5" data-testid={`${testId}-tabs`}>
           {HOME_HOWTO.map((h) => {

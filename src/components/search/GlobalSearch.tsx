@@ -208,7 +208,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="찾기 — 업체 · 대표 · 전화번호 · 도구"
+          aria-label="찾기 — 업체 · 대표 · 전화번호 · 화면 이름"
           data-testid="search-compact"
           className="flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-800 sm:w-auto sm:gap-1.5 sm:px-3"
         >
@@ -224,7 +224,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />
         {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
-        <span className="min-w-0 truncate">업체·대표·전화·도구 찾기</span>
+        <span className="min-w-0 truncate">업체·대표·전화·화면 찾기</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
       </button>
       )}
@@ -241,7 +241,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="업체 이름 · 대표 · 전화번호 뒷자리 · 도구"
+                placeholder="업체 · 대표 · 전화번호 뒷자리 · 화면 이름"
                 className="h-14 w-full bg-transparent text-[1rem] text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>

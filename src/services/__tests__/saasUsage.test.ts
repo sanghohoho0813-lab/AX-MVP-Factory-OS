@@ -42,6 +42,7 @@ import { normalizeClientOps } from '../clientOpsService'
 import { guideGroupsFor } from '../../content/guideGroups'
 import { searchScreens, squashForSearch } from '../../content/screenSearch'
 import { WHATS_NEW, WHATS_NEW_MAX, whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
+import { IN_APP_LABEL, externalOpenUrl, inAppBrowserOf } from '../../lib/inAppBrowser'
 
 let passed = 0
 let failed = 0
@@ -1014,6 +1015,39 @@ async function run() {
         whatsNewFor({ marketingOpen: false }).every((x) => !x.marketing) && whatsNewFor({ marketingOpen: true }).length === WHATS_NEW.length && whatsNewFor({ marketingOpen: false }).length < WHATS_NEW.length &&
         whatsNewDateLabel('2026-11-11') === '11월 11일' && whatsNewDateLabel('2026-01-05') === '1월 5일' && whatsNewDateLabel('언젠가') === '언젠가' && hasMenuGuide('fn-whats-new'),
       JSON.stringify({ n: WHATS_NEW.length, bad: bad.map((x) => x.id), closed: closedForCustomer.map((x) => x.id), closed2: closedNoMarketing.map((x) => x.id), order: ids.join() === sorted.join() }),
+    )
+  }
+
+  /* K32 — D-594 앱 안 브라우저(카카오톡 · 네이버 · 인스타그램 …) 알아보기 · 바깥 브라우저로 여는 길 */
+  {
+    const UA = {
+      kakaoIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KAKAOTALK 10.8.5',
+      kakaoAnd: 'Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36;KAKAOTALK 2410850',
+      naver: 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 NAVER(inapp; search; 2000; 12.6.5)',
+      insta: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21F90 Instagram 337.0.3.23.54 (iPhone15,2; iOS 17_5; ko_KR; ko; scale=3.00; 1179x2556; 612345678)',
+      threads: 'Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 Barcelona 337.0.0.30.109 Android',
+      fb: 'Mozilla/5.0 (Linux; Android 14; SM-S918N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/470.0.0.31.107;]',
+      line: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari Line/14.9.0',
+      safari: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+      chrome: 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+      samsung: 'Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36',
+      pc: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      ipadLine: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15 Outline/1.0',
+    }
+    const kinds = Object.fromEntries(Object.entries(UA).map(([k, ua]) => [k, inAppBrowserOf(ua)]))
+    const href = 'https://os.example.com/login?next=%2Fops%2Fclients'
+    const kUrl = externalOpenUrl('kakaotalk', href, UA.kakaoIos)
+    const aUrl = externalOpenUrl('naver', href, UA.naver)
+    check(
+      'K32 앱 안 브라우저(D-594) — 카카오톡(아이폰 · 갤럭시) · 네이버 · 인스타그램 · 스레드 · 페이스북 · 라인은 알아봄 · 사파리 · 크롬 · 삼성 인터넷 · PC · 빈 글은 아님("Outline" 은 라인이 아님) · 이름표 6개 · 카카오톡은 앱이 주는 길(주소 그대로 감쌈) · 갤럭시의 다른 앱은 크롬으로 여는 길 · 아이폰의 다른 앱은 길 없음(null) · http(s) 아닌 주소는 null',
+      kinds.kakaoIos === 'kakaotalk' && kinds.kakaoAnd === 'kakaotalk' && kinds.naver === 'naver' && kinds.insta === 'instagram' && kinds.threads === 'threads' && kinds.fb === 'facebook' && kinds.line === 'line' &&
+        kinds.safari === null && kinds.chrome === null && kinds.samsung === null && kinds.pc === null && kinds.ipadLine === null && inAppBrowserOf('') === null &&
+        Object.keys(IN_APP_LABEL).length === 6 && Object.values(IN_APP_LABEL).every((x) => x.length >= 2) &&
+        kUrl === `kakaotalk://web/openExternal?url=${encodeURIComponent(href)}` && decodeURIComponent(kUrl.split('url=')[1]) === href &&
+        aUrl === 'intent://os.example.com/login?next=%2Fops%2Fclients#Intent;scheme=https;package=com.android.chrome;end' &&
+        externalOpenUrl('instagram', href, UA.insta) === null && externalOpenUrl('line', href, UA.line) === null &&
+        externalOpenUrl('kakaotalk', 'javascript:alert(1)', UA.kakaoIos) === null && externalOpenUrl('naver', 'file:///etc/passwd', UA.naver) === null,
+      JSON.stringify({ kinds, kUrl, aUrl }),
     )
   }
 

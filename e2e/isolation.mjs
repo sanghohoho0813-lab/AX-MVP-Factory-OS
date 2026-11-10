@@ -228,7 +228,7 @@ try {
     const btn = page.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first()
     if (!(await btn.count())) return true
     await btn.click().catch(() => {})
-    const box = page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+    const box = page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
     await box.waitFor({ timeout: 4000 }).catch(() => {})
     await box.fill('대표비밀').catch(() => {})
     await page.waitForTimeout(600)

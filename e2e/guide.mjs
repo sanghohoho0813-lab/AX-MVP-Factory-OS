@@ -507,7 +507,7 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   await sp.goto(BASE + '/', { waitUntil: 'networkidle' })
   await sp.waitForTimeout(600)
   await sp.keyboard.press('Control+k')
-  const box = sp.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  const box = sp.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
   await box.waitFor({ timeout: 5000 })
   const dlg = sp.getByRole('dialog', { name: '빠른 이동 검색' })
   const ask = async (q) => {
@@ -540,7 +540,7 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
   await mp.waitForTimeout(500)
   await mp.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
-  const mbox = mp.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  const mbox = mp.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
   await mbox.waitFor({ timeout: 5000 })
   await mbox.fill('일정')
   await mp.waitForTimeout(450)
@@ -593,6 +593,42 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   const wcard = wp.getByTestId('menu-guide-card')
   check('G19 PC: [새로 생긴 것] 줄에 마우스 → 기능 안내 카드(fn-whats-new) · [홈 화면에 넣는 법] 줄도(fn-home-howto)', (await wcard.getAttribute('data-key').catch(() => '')) === 'fn-whats-new' && (await wp.getByTestId('home-howto-toggle').getAttribute('data-guide')) === 'fn-home-howto', await wcard.getAttribute('data-key').catch(() => ''))
   await wp.close()
+}
+
+/* G20 카카오톡 안에서 열렸을 때(D-594) — '홈 화면에 넣는 법' 안에 '먼저 다른 브라우저로' · 평소 브라우저에서는 없음 */
+{
+  const KAKAO_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KAKAOTALK 10.8.5'
+  const kc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', hasTouch: true, isMobile: true, userAgent: KAKAO_UA })
+  const kp = await kc.newPage()
+  kp.on('pageerror', (e) => errors.push(String(e)))
+  await kp.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+  await kp.waitForTimeout(600)
+  await kp.getByTestId('home-howto-toggle').click()
+  await kp.waitForTimeout(300)
+  const note = kp.getByTestId('home-howto-inapp')
+  const nt = ((await note.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  const openHref = (await kp.getByTestId('home-howto-inapp-open').getAttribute('href').catch(() => '')) ?? ''
+  const km = await kp.evaluate(() => {
+    const box = document.querySelector('[data-testid="home-howto-inapp"]')
+    return {
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      small: [...box.querySelectorAll('a, button')].filter((e) => e.getBoundingClientRect().height < 40).length,
+      minFont: Math.min(...[...box.querySelectorAll('p, a, button, span')].map((e) => parseFloat(getComputedStyle(e).fontSize))),
+    }
+  })
+  check(
+    'G20 카카오톡 안(390) › 홈 화면에 넣는 법: "지금 카카오톡 안에서 열렸어요" · 여기서는 넣을 수 없다는 한 줄 · [다른 브라우저로 열기] = 카카오톡이 주는 길(지금 주소 그대로) · [주소 복사] · 옆 넘침 0 · 40px 보다 작은 칸 0 · 글자 15px 이상',
+    (await note.getAttribute('data-kind').catch(() => '')) === 'kakaotalk' && nt.includes('카카오톡 안') && nt.includes('홈 화면에 넣을 수 없어요') && openHref === `kakaotalk://web/openExternal?url=${encodeURIComponent(BASE + '/guide')}` && (await kp.getByTestId('home-howto-inapp-copy').count()) === 1 && km.over <= 1 && km.small === 0 && km.minFont >= 15,
+    JSON.stringify({ nt: nt.slice(0, 120), openHref, ...km }),
+  )
+  if (SHOTS) await kp.screenshot({ path: `${SHOTS}/guide-20-inapp-390.png` }).catch(() => {})
+  await kc.close()
+  // 평소 브라우저(이 시험의 휴대폰 화면) — 안내가 없다
+  await mp.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(500)
+  await mp.getByTestId('home-howto-toggle').click()
+  await mp.waitForTimeout(300)
+  check('G20 평소 브라우저에서는 앱 안 안내가 없음(넣는 법만)', (await mp.getByTestId('home-howto-inapp').count()) === 0 && (await mp.getByTestId('home-howto-tabs').count()) === 1)
 }
 
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */

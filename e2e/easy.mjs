@@ -122,7 +122,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 찾기 — 고객 관리 업체를 대표 이름 · 전화 뒷자리로
   await page.keyboard.press('Control+k')
-  const input = page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  const input = page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
   await input.fill('김대표')
   await page.waitForTimeout(400)
   const res = (await page.locator('[role="dialog"]').innerText()) ?? ''

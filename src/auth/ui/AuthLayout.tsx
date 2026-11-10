@@ -7,6 +7,7 @@ import { CalendarCheck, FolderOpen, Megaphone } from 'lucide-react'
 import { BrandLogo, ProductWordmark } from '../../components/brand/BrandLogo'
 import { Link } from 'react-router-dom'
 import { LEGAL } from '../../content/legal'
+import { InAppBrowserNotice } from '../../components/guide/InAppBrowserNotice'
 
 /**
  * D-578 처음 온 사람이 '무슨 프로그램인지' 알게 — 로그인 · 가입 화면 옆(PC 넓은 화면만)에 세 줄.
@@ -61,6 +62,8 @@ export function AuthLayout({
           <BrandLogo imgClassName="h-10 max-w-[220px]" />
           <ProductWordmark />
         </div>
+        {/* D-594 카카오톡 · 네이버 앱 안에서 열렸을 때만 — 바깥 브라우저로 여는 길 */}
+        <InAppBrowserNotice className="mb-4" />
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-xl font-bold break-keep text-slate-900">{title}</h1>
           {subtitle && <p className="mt-1.5 text-[0.9375rem] break-keep text-slate-600">{subtitle}</p>}

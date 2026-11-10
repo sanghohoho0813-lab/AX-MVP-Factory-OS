@@ -262,7 +262,7 @@ async function shot(page, name) {
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 async function searchFor(page, q) {
   await page.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
-  const box = page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  const box = page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
   await box.waitFor({ timeout: 5000 }).catch(() => {})
   await box.fill(q)
   await page.waitForTimeout(800)
@@ -297,7 +297,50 @@ try {
     await lp.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await lp.waitForTimeout(800)
     check('로그인해 둔 브라우저(D-590): 앱 뼈대를 미리 받음(AppShell 조각)', got.some((f) => /^AppShell-/.test(f)), { n: got.length })
+    check('로그인 화면(D-594): 평소 브라우저에서는 앱 안 안내가 없음', (await lp.getByTestId('inapp-notice').count()) === 0)
     await lc.close()
+    // D-594 카카오톡으로 받은 주소를 누르면 카카오톡 안 브라우저에서 열린다 — 로그인 화면이 알려 주고 바깥 브라우저로 여는 길을 준다
+    const KAKAO_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KAKAOTALK 10.8.5'
+    const INSTA_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21F90 Instagram 337.0.3.23.54'
+    const seen = {}
+    for (const [name, ua] of [['kakao', KAKAO_UA], ['insta', INSTA_UA]]) {
+      const kc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true, userAgent: ua })
+      await kc.route(`https://${REF}.supabase.co/**`, route)
+      const kp = await kc.newPage()
+      kp.on('pageerror', (e) => errors.push(String(e)))
+      await kp.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+      await kp.waitForTimeout(800)
+      const note = kp.getByTestId('inapp-notice')
+      seen[name] = {
+        kind: await note.getAttribute('data-kind').catch(() => ''),
+        text: ((await note.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '),
+        open: await kp.getByTestId('inapp-notice-open').getAttribute('href').catch(() => null),
+        copy: await kp.getByTestId('inapp-notice-copy').count(),
+        ...(await kp.evaluate(() => {
+          const box = document.querySelector('[data-testid="inapp-notice"]')
+          const btn = [...document.querySelectorAll('button[type="submit"]')].pop()
+          return {
+            over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            small: box ? [...box.querySelectorAll('a, button')].filter((e) => e.getBoundingClientRect().height < 40).length : -1,
+            minFont: box ? Math.min(...[...box.querySelectorAll('p, a, button, span')].map((e) => parseFloat(getComputedStyle(e).fontSize))) : 0,
+            loginBottom: btn ? Math.round(btn.getBoundingClientRect().bottom) : -1,
+            email: document.querySelectorAll('input[type="email"]').length,
+          }
+        })),
+      }
+      if (name === 'kakao') await shot(kp, 'login-inapp-kakao-390')
+      await kc.close()
+    }
+    check(
+      '로그인 화면(D-594 · 카카오톡 안 · 390): "지금 카카오톡 안에서 열렸어요" · 왜 바꾸면 좋은지 한 줄 · [다른 브라우저로 열기] = 카카오톡이 주는 길(지금 주소 그대로) · [주소 복사] · 로그인 칸 · 단추가 첫 화면 안 · 옆 넘침 0 · 40px 보다 작은 칸 0 · 글자 15px 이상',
+      seen.kakao.kind === 'kakaotalk' && seen.kakao.text.includes('카카오톡 안') && seen.kakao.text.includes('로그인이 자주 풀리고') && seen.kakao.open === `kakaotalk://web/openExternal?url=${encodeURIComponent(`${BASE}/login`)}` && seen.kakao.copy === 1 && seen.kakao.email === 1 && seen.kakao.loginBottom > 0 && seen.kakao.loginBottom <= 844 && seen.kakao.over <= 1 && seen.kakao.small === 0 && seen.kakao.minFont >= 15,
+      seen.kakao,
+    )
+    check(
+      '로그인 화면(D-594 · 인스타그램 안 · 아이폰): 여는 길이 없는 앱은 단추 없이 글 안내 + [주소 복사] 만(눌러도 아무 일 없는 단추를 두지 않음)',
+      seen.insta.kind === 'instagram' && seen.insta.open === null && seen.insta.copy === 1 && seen.insta.text.includes('⋮') && !seen.insta.text.includes('안 열리면') && seen.insta.over <= 1,
+      seen.insta,
+    )
   }
 
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
@@ -556,7 +599,7 @@ try {
   // 찾기 · 알림 종
   await go(page, '/')
   await page.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
-  const search = page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  const search = page.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름')
   await search.waitFor({ timeout: 5000 }).catch(() => {})
   for (const q of ['대표비밀', '김비밀', '1111']) {
     await search.fill(q)
@@ -1524,7 +1567,7 @@ try {
       )
       // 아무것도 안 적었을 때 — '일치하는 항목이 없습니다' 대신 무엇을 적으면 되는지
       await pk.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
-      await pk.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').waitFor({ timeout: 5000 }).catch(() => {})
+      await pk.getByPlaceholder('업체 · 대표 · 전화번호 뒷자리 · 화면 이름').waitFor({ timeout: 5000 }).catch(() => {})
       await pk.waitForTimeout(500)
       const emptyK = (await pk.getByTestId('search-empty').innerText().catch(() => '')) ?? ''
       check('고객 찾기(D-592): 열자마자(아직 안 적음) — "일치하는 항목이 없습니다" 가 아니라 적을 것 안내(업체 이름이나 화면 이름 · 예)', emptyK.includes('업체 이름이나 화면 이름') && !emptyK.includes('일치하는'), emptyK)
