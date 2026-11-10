@@ -14,7 +14,7 @@
  * 대표: "모든 소목차 · 소제목 옆에 조그맣게 ? 물음표 — 마우스를 올리면(휴대폰은 누르면) 그 의미 · 무엇을 위한 것인지."
  * 그래서 ⓘ 대신 누구나 '물어보는 곳' 으로 아는 ? 모양을 쓴다.
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp } from 'lucide-react'
 import { hintFor } from '../../content/sectionHints'
 import { foldOldIds } from '../../lib/uiNameAliases'
@@ -250,6 +250,30 @@ export function HelpHeading({
  * 접는 목차 한 덩어리 — 제목 줄(▸ · 제목 · 숫자 · ? · 오른쪽 행동) + 펼치면 내용.
  * id 는 화면 안에서 겹치지 않게(기억 열쇠). 설명(hint)을 안 주면 목차 이름으로 사전에서 찾는다.
  */
+/**
+ * D-573 머리줄이 넓은가(36rem 이상) — 요약 글을 제목 옆에 둘지 아래로 내릴지를 '이 칸의 폭' 으로 가른다.
+ * 화면 폭(sm)으로 가르면 PC 에서 두 칸으로 나란히 놓인 좁은 칸의 [모두 보기] 가 아랫줄로 떨어졌다.
+ * CSS 컨테이너 질의는 쓰지 않는다 — 예전 사파리 · 크롬에서는 그 칸이 겹침 순서의 새 층이 되어 물음표 설명이 아래 칸에 가린다.
+ * 글자 크기 설정(크게 · 매우 크게)을 따라가게 rem 으로 잰다. 그리기 전에 한 번 재서 깜빡임이 없다.
+ */
+function useWideHead(ref: RefObject<HTMLElement | null>, enabled: boolean): boolean {
+  const [wide, setWide] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!enabled || !el) return
+    const check = () => {
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      setWide(el.getBoundingClientRect().width >= 36 * rem)
+    }
+    check()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref, enabled])
+  return enabled && wide
+}
+
 export function Fold({
   id,
   title,
@@ -294,6 +318,9 @@ export function Fold({
 }) {
   const [open, setOpen] = useFold(id, defaultOpen, forceOpen, keepClosed)
   const bodyId = useId()
+  const headRef = useRef<HTMLDivElement>(null)
+  // 요약이 보일 때만 잰다(펼친 판 · 요약 없는 판은 재지 않는다)
+  const wide = useWideHead(headRef, !!summary && !open)
   const tip = hint ?? hintFor(title)
   const tone =
     countTone === 'danger' ? 'bg-danger-50 text-danger-700' : countTone === 'warning' ? 'bg-warning-50 text-warning-800' : countTone === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-600'
@@ -306,8 +333,8 @@ export function Fold({
       aria-labelledby={headingId}
       className={`flex min-w-0 flex-col ${open ? 'gap-3' : ''} ${panel ? `rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 sm:px-4 ${open ? 'pb-4 sm:pb-5' : ''}` : ''} ${className}`}
     >
-      {/* D-573 머리줄은 '이 칸의 폭' 을 본다(@container) — 두 칸으로 나란히 놓인 좁은 칸에서도 요약이 [모두 보기] 를 아랫줄로 밀지 않게 */}
-      <div className="@container flex flex-wrap items-center gap-x-2">
+      {/* D-573 머리줄은 '이 칸의 폭' 을 본다(useWideHead) — 두 칸으로 나란히 놓인 좁은 칸에서도 요약이 [모두 보기] 를 아랫줄로 밀지 않게 */}
+      <div ref={headRef} data-wide={wide ? '1' : '0'} className="flex flex-wrap items-center gap-x-2">
         {/* 제목(h2) 안에 펼침 단추 — 화면 읽기 프로그램도 '제목 · 펼침' 으로 읽는다 */}
         <HintTip tip={tip} label={title} className="max-w-full">
           <h2 id={headingId} className="t-section min-w-0 text-slate-900">
@@ -330,7 +357,7 @@ export function Fold({
         {summary && !open && (
           // D-357 좁은 칸(휴대폰 · PC 의 반쪽 칸)은 요약을 제목 줄 아래로(order-last) — '모두 보기' 같은 단추는 제목 줄에 그대로
           // D-573 화면 폭(sm) 대신 이 머리줄의 폭(36rem)으로 가른다 — 넓은 칸에서는 제목 옆에(남는 폭 안에서 줄바꿈 · 단추는 제목 줄에 그대로)
-          <span data-testid="fold-summary" className="t-sub order-last min-w-0 basis-full pb-2 pl-7 break-keep text-slate-500 [overflow-wrap:anywhere] @xl:order-none @xl:min-w-[10rem] @xl:flex-[1_1_0%] @xl:basis-0 @xl:pb-0 @xl:pl-0">
+          <span data-testid="fold-summary" className={`t-sub break-keep text-slate-500 [overflow-wrap:anywhere] ${wide ? 'min-w-[10rem] flex-[1_1_0%] basis-0' : 'order-last min-w-0 basis-full pb-2 pl-7'}`}>
             {summary}
           </span>
         )}

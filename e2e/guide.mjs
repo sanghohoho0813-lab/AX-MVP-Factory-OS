@@ -246,6 +246,12 @@ await page.goto(BASE + '/guide?m=mk-threads', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
 const mkFn = await page.getByTestId('guide-function').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
 check('G9 사용법 안내 — 스레드 줄 아래에 글 쓰기 기능 2개', mkFn.includes('fn-mk-write') && mkFn.includes('fn-mk-firstline'), mkFn)
+/* G10 — D-576 영업 관리 탭 · AI 도우미 · 오늘 [오늘 정리하기] 에도 기능 안내 */
+const kTab = await hoverCard('/sales/board', '[data-guide="fn-sales-tab-meeting"]')
+const tabKeys2 = await page.locator('[data-testid="sales-tabs"] a').evaluateAll((els) => els.map((e) => e.getAttribute('data-guide') || ''))
+check('G10 영업 관리 탭 4개 전부 안내 열쇠 · [미팅 준비] 에 마우스 → 기능 안내', kTab === 'fn-sales-tab-meeting' && tabKeys2.length === 4 && tabKeys2.every((k) => k.startsWith('fn-sales-tab-')), { kTab, tabKeys2 })
+const kWrap = await hoverCard('/', '[data-guide="fn-today-wrap"]')
+check('G10 오늘 [오늘 정리하기] 에 마우스 → 기능 안내', kWrap === 'fn-today-wrap', kWrap)
 
 /* G6 */
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', hasTouch: true, isMobile: true })

@@ -251,6 +251,7 @@ function OpenButton({ label, onClick, className = '' }: { label: string; onClick
       type="button"
       data-testid="ai-assist-open"
       data-ai-assist="open"
+      data-guide="fn-ai-assist"
       onClick={onClick}
       className={`tap t-body inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-violet-500 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-1.5 font-semibold whitespace-nowrap text-white shadow-sm hover:from-violet-700 hover:to-fuchsia-700 sm:min-h-10 ${className}`}
     >

@@ -39,6 +39,7 @@ export function SalesTabs({ part = 'all' }: { part?: 'all' | 'tabs' } = {}) {
             <NavLink
               to={client && CLIENT_TABS.has(t.to) ? `${t.to}?client=${encodeURIComponent(client)}` : t.to}
               end
+              data-guide={`fn-sales-tab-${t.to.split('/').pop()}`}
               className={({ isActive }) =>
                 `tap flex h-full flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 py-1.5 text-center font-semibold break-keep sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 ${
                   isActive ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
