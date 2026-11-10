@@ -640,5 +640,28 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('D561-W5 고친 뒤 다시 보면 고칠 글 0 · 화요일 점수 = 고친 글 점수', weekFixRequests(again, DEFAULT_BRIEF, '2026-11-09').length === 0 && again.threads.find((x) => x.slot.day === 2)!.lint.score === up!.after && lintWeekThread(up!.draft as never, 'T').score === up!.after)
 }
 
+/* D-566 마케팅 처음 시작 길 — 다섯 걸음(실제 기록) → 다 하면 오늘의 한 가지(요일) · 쉬운 말만 */
+{
+  const { mkPathSteps, mkPathNext, dailyMission, postedThisWeek, weekStart: pathWeekStart, weekdayOf } = await import('../marketing/mkPath')
+  const none = mkPathSteps({ channel: false, ideas: 0, written: 0, posted: 0, ending: false })
+  const mid = mkPathSteps({ channel: true, ideas: 0, written: 2, posted: 0, ending: false })
+  const all = mkPathSteps({ channel: true, ideas: 3, written: 2, posted: 1, ending: true })
+  check('D566-P1 다섯 걸음 — 아무것도 없으면 첫 걸음은 "내 채널 알려 주기" · 걸음마다 왜 한 줄 · 큰 단추 · 갈 곳', none.length === 5 && mkPathNext(none)?.key === 'channel' && none.every((x) => x.why.length >= 20 && x.action.length >= 4 && x.href.startsWith('/')), none.map((x) => x.key).join())
+  check('D566-P2 글을 먼저 썼으면 "주제 고르기" 도 한 것으로(순서를 강요하지 않음) · 다음은 "올리고 [올렸어요]"', mid[1].done && mid[2].done && mkPathNext(mid)?.key === 'post', mid.map((x) => `${x.key}:${x.done}`).join())
+  check('D566-P3 다 하면 다음 걸음 없음(→ 오늘의 한 가지)', mkPathNext(all) === null)
+  const days = [0, 1, 2, 3, 4, 5, 6].map((d) => dailyMission(d).key)
+  check('D566-P4 오늘의 한 가지 — 일 돌아보기 · 월 주제 · 화목토 짧은 글 · 수금 짧은 영상 · 이상한 값도 안전', days.join() === 'review,topic,thread,short,thread,short,thread' && dailyMission(-1).key === 'thread' && dailyMission(8).key === 'topic', days.join())
+  const posts = [
+    { status: 'posted', postedOn: '2026-11-09' },
+    { status: 'posted', postedOn: '2026-11-10' },
+    { status: 'posted', postedOn: '2026-11-08' },
+    { status: 'draft', postedOn: '' },
+    { status: 'posted', postedOn: '2026-11-12' },
+  ]
+  check('D566-P5 이번 주 올린 편 수 — 월요일부터 오늘까지 · 지난주 · 초안 · 앞날은 세지 않음 · 요일', pathWeekStart('2026-11-10') === '2026-11-09' && pathWeekStart('2026-11-15') === '2026-11-09' && postedThisWeek(posts, '2026-11-10') === 2 && weekdayOf('2026-11-10') === 2 && weekdayOf('2026-11-15') === 0, `${pathWeekStart('2026-11-10')} ${postedThisWeek(posts, '2026-11-10')}`)
+  const words = [...none, ...[0, 1, 2, 3].map((d) => dailyMission(d))].map((x) => `${x.title} ${x.why} ${x.action}`).join(' ')
+  check('D566-P6 쉬운 말만(D-507) — 롱폼 · 썸네일 · 벤치마킹 · 캡션 · 해시태그 · 포맷 · 훅 · 스레드 · 릴스 낱말 0 · AX 0', !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|스레드|릴스|쇼츠|(?<![A-Za-z])AX(?![A-Za-z])/.test(words), words.match(/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|스레드|릴스|쇼츠/g)?.join())
+}
+
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

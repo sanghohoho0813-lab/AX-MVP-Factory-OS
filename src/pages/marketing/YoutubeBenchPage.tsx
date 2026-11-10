@@ -103,6 +103,7 @@ import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { MkAsk } from './radar/MkAsk'
 import { MkStart } from './radar/MkStart'
+import { MkPath } from './radar/MkPath'
 import type { MkRoute } from '../../services/marketing/mkAsk'
 import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, fixedTopicVideos, withFixedVideos, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
@@ -987,6 +988,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           {/* D-511 첫 화면 — 대화창 하나 · 지난번 하던 것 한 줄 · 살펴보기 · 만들기 목록. 키워드 판 · 자세히 보기 · 시장 신호는 [이번 주 찍을 것] 안 */}
           {/* D-564 대표가 아닌 계정이 처음 왔을 때 — 내 채널(이름 · 회사 · 분야 · 올릴 주제)부터. 적으면 다시 안 보인다 */}
           {!readOnly && customer && <MkStart workspaceId={workspaceId} picked={prefs.interests ?? []} prefsReady={prefsReady} onSaveInterests={(ids) => savePrefs({ ...prefs, interests: ids })} />}
+          {/* D-566 처음 시작 길 — 지금 할 한 가지(다섯 걸음) → 다 하면 오늘의 한 가지(요일마다). 대표가 아닌 계정에만 */}
+          {!readOnly && customer && <MkPath workspaceId={workspaceId} ideas={notebook.ideas.length} interests={(prefs.interests ?? []).length} prefsReady={prefsReady} />}
           {readOnly ? null : <MkAsk onRoute={onAsk} />}
           {!readOnly && resume && <ResumeCard {...resume} />}
           <div role="tablist" data-testid="yt-views">

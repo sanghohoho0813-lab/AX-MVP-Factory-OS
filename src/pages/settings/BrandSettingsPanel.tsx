@@ -35,7 +35,9 @@ function BrandForm() {
   const [draft, setDraft] = useState<BrandProfile>(emptyBrand())
   const [ready, setReady] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [more, setMore] = useState(false)
+  // D-566 마케팅 시작 길의 '끝인사 적기' 가 ?brand=more 로 데려온다 — 그 칸이 든 '더 적기' 를 펼친 채
+  const wantMore = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('brand') === 'more'
+  const [more, setMore] = useState(wantMore)
 
   useEffect(() => {
     let alive = true
@@ -43,7 +45,7 @@ function BrandForm() {
       .then((p) => {
         if (!alive) return
         setDraft(p)
-        setMore(Boolean(p.intro || p.facts || p.avoid || p.ending || p.benchmarks))
+        setMore(wantMore || Boolean(p.intro || p.facts || p.avoid || p.ending || p.benchmarks))
         setReady(true)
       })
       .catch(() => alive && setReady(true))
