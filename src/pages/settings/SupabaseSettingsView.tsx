@@ -33,6 +33,9 @@ import { BrandSettingsPanel } from './BrandSettingsPanel'
 import { AiUsagePanel } from './AiUsagePanel'
 import { AccountSwitchItems } from '../../components/layout/AccountSwitch'
 import { FeedbackNavButton } from '../../components/feedback/FeedbackNavButton'
+import { useCustomerAudience } from '../../config/customerAudience'
+import { useSupportState } from '../../components/support/useSupport'
+import { setModelPickShown, useModelPickShown } from '../../lib/modelPickPref'
 
 /** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
 function NameEditor() {
@@ -202,6 +205,10 @@ function DataPanelSupabase({ focus = '' }: { focus?: string }) {
 function CloudAccountView() {
   const { access } = useAuth()
   const pilot = useIsPilot()
+  // D-568 구독 고객에게는 팀장용 설문 대신 [문의하기](문의 창구가 열려 있을 때만 줄을 그린다)
+  const customer = useCustomerAudience()
+  const support = useSupportState(customer)
+  const modelPick = useModelPickShown()
   return (
     <AccountViewPanel portal={!pilot}>
       {access === 'full' && (
@@ -209,9 +216,43 @@ function CloudAccountView() {
           <AccountSwitchItems tone="light" signout={false} empty={<p className="t-sub break-keep text-slate-500">이 기기에서 로그인했던 다른 계정이 없어요. 다른 계정으로 한 번 로그인하면 여기에 생깁니다.</p>} />
         </AccountViewRow>
       )}
-      <AccountViewRow label={pilot ? '개발자에게 피드백' : '받은 피드백함'} hint={pilot ? '불편한 점 · 바라는 점을 설문으로 보냅니다.' : '팀장이 보낸 설문 · 의견을 봅니다.'} testId="settings-feedback">
-        <FeedbackNavButton tone="light" />
-      </AccountViewRow>
+      {customer ? (
+        <>
+          {support === 'ready' && (
+            <AccountViewRow label="문의하기" hint="궁금한 점 · 불편한 점을 적어 보내면 운영자가 읽고 답해 드려요." testId="settings-feedback">
+              <FeedbackNavButton tone="light" />
+            </AccountViewRow>
+          )}
+          {/* D-570 고객 화면은 처음에 단순하게 — 모델 고르기는 원하는 사람만 꺼내 쓴다 */}
+          <AccountViewRow label="AI 모델 고르기 단추" hint="AI 단추 옆에 모델을 고르는 단추를 보일지 정해요. 숨겨도 AI 는 그대로 쓸 수 있어요." testId="settings-model-pick">
+            <div role="radiogroup" aria-label="AI 모델 고르기 단추" className="grid grid-cols-2 gap-1 rounded-(--radius-control) bg-slate-100 p-0.5">
+              {(
+                [
+                  [false, '숨기기'],
+                  [true, '보이기'],
+                ] as const
+              ).map(([v, l]) => (
+                <button
+                  key={l}
+                  type="button"
+                  role="radio"
+                  aria-checked={modelPick === v}
+                  onClick={() => setModelPickShown(v)}
+                  data-testid="settings-model-pick-option"
+                  data-value={v ? 'show' : 'hide'}
+                  className={`tap min-h-11 rounded-[8px] px-3 text-[0.9375rem] font-semibold ${modelPick === v ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </AccountViewRow>
+        </>
+      ) : (
+        <AccountViewRow label={pilot ? '개발자에게 피드백' : '받은 피드백함'} hint={pilot ? '불편한 점 · 바라는 점을 설문으로 보냅니다.' : '팀장이 보낸 설문 · 의견을 봅니다.'} testId="settings-feedback">
+          <FeedbackNavButton tone="light" />
+        </AccountViewRow>
+      )}
     </AccountViewPanel>
   )
 }

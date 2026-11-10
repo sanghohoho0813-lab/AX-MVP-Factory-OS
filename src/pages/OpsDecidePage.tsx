@@ -72,7 +72,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
         description="올린 서류 · 업체 기록 · 받아 둔 공고를 읽고 프로그램이 먼저 준비했습니다. 맞으면 [맞아요], 아니면 [아니에요] 만 누르세요."
       />
       <p className="t-body text-slate-700" data-testid="decide-summary">
-        {loaded && !gathering ? (all.length ? <><b className="font-bold text-slate-900">{clients}곳</b>에서 <b className="font-bold text-brand-700">{all.length}건</b> 확인할 것이 있습니다.</> : '지금 확인할 것이 없습니다.') : loaded ? `업체 ${records.length}곳에서 확인할 것을 모으는 중…` : '불러오는 중…'}
+        {loaded && !gathering ? (all.length ? <><b className="font-bold text-slate-900">{clients}곳</b>에서 <b className="font-bold text-brand-700">{all.length}건</b> 확인할 것이 있습니다.</> : '서류에서 읽은 내용 가운데, 사람이 한 번 봐야 하는 것만 여기에 모여요.') : loaded ? `업체 ${records.length}곳에서 확인할 것을 모으는 중…` : '불러오는 중…'}
       </p>
       {all.length > 0 && (
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="종류">

@@ -7,6 +7,8 @@ import { ChevronDown, Cpu } from 'lucide-react'
 import { fetchAssistStatus, type AssistStatus } from '../../services/aiAssist/client'
 import { CHOICE_EVENT, readChoice, saveChoice, type AiChoice } from '../../services/aiAssist/store'
 import { ModelRow, labelOf } from './AiAssist'
+import { useCustomerAudience } from '../../config/customerAudience'
+import { useModelPickShown } from '../../lib/modelPickPref'
 
 const FALLBACK: AiChoice = { provider: 'gemini', model: 'gemini-3.1-flash-lite' }
 
@@ -67,6 +69,10 @@ export function ModelPicker({ className = '', tone = 'light', popover = false, t
   }, [open, status])
   const effective = choice ?? status?.defaultChoice ?? FALLBACK
   const label = labelOf(status, effective)
+  // D-570 구독 고객 화면은 기본으로 숨긴다(AI 는 기본 모델로 그대로) — 설정 › 계정 · 보기에서 [보이기] 를 고르면 나온다
+  const customer = useCustomerAudience()
+  const shown = useModelPickShown()
+  if (customer && !shown) return null
   return (
     <div ref={box} className={`${popover ? 'relative' : 'flex flex-col gap-2'} min-w-0 ${className}`} data-testid="model-picker">
       <button
