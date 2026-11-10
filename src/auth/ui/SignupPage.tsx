@@ -51,7 +51,7 @@ export function SignupPage() {
     <AuthLayout
       intro
       title="회원가입"
-      subtitle="새 계정을 만들어 클라우드 작업공간을 시작하세요."
+      subtitle="이름 · 이메일 · 비밀번호만 넣으면 돼요."
       footer={
         <>
           이미 계정이 있으신가요?{' '}
