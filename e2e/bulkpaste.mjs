@@ -45,7 +45,8 @@ const EMPTY_SEED = `
 const PASTE_1 = ['대표자\t상호\t사업자등록번호\t전화번호', '김한솔\t한솔정밀(주)\t123-45-67890\t010-1111-2222', '이다움\t다움에너지\t2208162517\t02-123-4567', '박셋\t셋째산업\t\t', '최넷\t넷째기업 주식회사\t333-22-11111\t010-3333-4444', '김한솔\t주식회사 한솔정밀\t123-45-67890\t010-1111-2222', '무명\t\t\t010-9999-9999'].join('\n')
 const PASTE_2 = ['한솔정밀(주)\t김한솔\t123-45-67890', '다움에너지\t이다움\t', '다섯째상사\t오다섯\t555-55-55555'].join('\n')
 
-const browser = await chromium.launch()
+// 시험 기계의 글자 설정이 비어 있으면 한글 파일 이름이 'download' 로 나온다 — 브라우저만 UTF-8 로(다른 내려받기 시험과 같게)
+const browser = await chromium.launch({ env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } })
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', acceptDownloads: true })
 const page = await ctx.newPage()
 const errors = []

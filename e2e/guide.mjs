@@ -344,6 +344,12 @@ await mp.waitForTimeout(250)
 const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 const small = await mp.locator('[data-testid="guide-page"] button, [data-testid="guide-page"] a').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? '').trim().slice(0, 16)))
 check('G6 휴대폰 390: 사용법 안내 넘침 0 · 40px 보다 작은 단추 0 · 펼친 줄에 영상 자리', over <= 0 && small.length === 0 && (await mp.getByTestId('guide-video').count()) === 1, { over, small })
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-04-390.png`, fullPage: true }).catch(() => {})
+await mp.getByTestId('guide-group').nth(1).tap()
+await mp.waitForTimeout(700)
+check('G6 휴대폰에는 마우스 카드가 없음(누를 때 뜨지 않음)', (await mp.getByTestId('menu-guide-card').count()) === 0)
+
+/* G13 휴대폰 — 올리는 법 펼침 */
 await mp.goto(BASE + '/marketing/shorts', { waitUntil: 'networkidle' })
 await mp.waitForTimeout(700)
 await mp.getByTestId('sht-howto-toggle').scrollIntoViewIfNeeded()
@@ -353,10 +359,7 @@ const howOver = await mp.evaluate(() => document.documentElement.scrollWidth - d
 const howSmall = await mp.locator('[data-testid="sht-howto"] summary, [data-testid="sht-howto"] button').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? '').trim().slice(0, 12)))
 const howFont = await mp.locator('[data-testid="sht-howto"] *').evaluateAll((els) => Math.min(...els.filter((e) => [...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())).map((e) => parseFloat(getComputedStyle(e).fontSize))))
 check('G13 휴대폰 390: 올리는 법 펼침 — 옆 넘침 0 · 40px 보다 작은 단추 0 · 글자 15px 이상', howOver <= 0 && howSmall.length === 0 && howFont >= 15, { howOver, howSmall, howFont })
-if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-04-390.png`, fullPage: true }).catch(() => {})
-await mp.getByTestId('guide-group').nth(1).tap()
-await mp.waitForTimeout(700)
-check('G6 휴대폰에는 마우스 카드가 없음(누를 때 뜨지 않음)', (await mp.getByTestId('menu-guide-card').count()) === 0)
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-10-howto-390.png`, fullPage: true }).catch(() => {})
 
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
