@@ -187,7 +187,7 @@ const csvText = csvBuf.toString('utf8')
 const csvLines = csvText.replace(/^﻿/, '').trim().split('\r\n')
 check(
   'B8 [업체 목록 엑셀 파일로] — 파일 이름 업체목록-날짜.csv · 맨 앞 BOM · 제목 줄 · 업체 5줄 · 잠재고객 구분',
-  /^업체목록-\d{4}-\d{2}-\d{2}\.csv$/.test(dl.suggestedFilename()) && csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf && csvLines[0] === '회사명,대표자,전화,사업자등록번호,업종,구분,다음 할 일,기한,등록일' && csvLines.length === 6 && csvText.includes('다섯째상사,오다섯,,555-55-55555,,잠재고객') && csvText.includes('한솔정밀(주),김한솔,010-1111-2222,123-45-67890,,계약 고객'),
+  /^업체목록-\d{4}-\d{2}-\d{2}\.csv$/.test(dl.suggestedFilename()) && csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf && csvLines[0] === '회사명,대표자,전화,사업자등록번호,업종,구분,다음 할 일,기한,등록일,이메일,주소' && csvLines.length === 6 && csvText.includes('다섯째상사,오다섯,,555-55-55555,,잠재고객') && csvText.includes('한솔정밀(주),김한솔,010-1111-2222,123-45-67890,,계약 고객'),
   { name: dl.suggestedFilename(), lines: csvLines.slice(0, 3) },
 )
 
@@ -206,9 +206,9 @@ check('B9 [엑셀 파일 고르기] 단추 · 못 읽는 파일(.png)은 까닭 
 // 엑셀 파일 — 표 위 제목 줄 · 제목 줄 · 새 곳 1 + 이미 있는 곳 1
 const XLSX_FILE = storedXlsx([
   ['거래처 목록', '', '', ''],
-  ['상호', '대표자', '연락처', '사업자번호'],
-  ['여섯째기술(주)', '육기술', '010-6666-7777', '666-66-66666'],
-  ['한솔정밀(주)', '김한솔', '010-1111-2222', '123-45-67890'],
+  ['상호', '대표자', '연락처', '사업자번호', '이메일', '주소'],
+  ['여섯째기술(주)', '육기술', '010-6666-7777', '666-66-66666', 'six@example.com', '경기도 수원시 영통구 광교로 6'],
+  ['한솔정밀(주)', '김한솔', '010-1111-2222', '123-45-67890', '', ''],
 ])
 await page.getByTestId('bulk-paste-file-input').setInputFiles({ name: '거래처.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX_FILE })
 await page.waitForFunction(() => document.querySelector('[data-testid="bulk-paste-file-note"]'), null, { timeout: 8000 }).catch(() => {})
@@ -216,8 +216,8 @@ const fileNote = ((await page.getByTestId('bulk-paste-file-note').innerText().ca
 const sum9 = page.getByTestId('bulk-paste-summary')
 const cols9 = await page.getByTestId('bulk-paste-col').evaluateAll((els) => els.map((e) => e.value))
 check(
-  'B9 엑셀 파일(.xlsx)을 고르면 — 한 줄 안내(파일 이름 · 3줄 · 제목 1줄 뺌) · 못 읽은 까닭 줄 사라짐 · 제목 줄 체크 · 칸 4개 알아서 · 등록할 곳 1 · 이미 있는 곳 1',
-  fileNote.includes('거래처.xlsx') && fileNote.includes('3줄') && fileNote.includes('1줄(제목)은 뺐어요') && (await page.getByTestId('bulk-paste-file-error').count()) === 0 && (await page.getByTestId('bulk-paste-header').isChecked()) && cols9.join() === 'companyName,contactName,contactPhone,businessNumber' && (await sum9.getAttribute('data-add')) === '1' && (await sum9.getAttribute('data-dupes')) === '1',
+  'B9 엑셀 파일(.xlsx)을 고르면 — 한 줄 안내(파일 이름 · 3줄 · 제목 1줄 뺌) · 못 읽은 까닭 줄 사라짐 · 제목 줄 체크 · 칸 6개 알아서(이메일 · 주소 포함 — D-591) · 등록할 곳 1 · 이미 있는 곳 1',
+  fileNote.includes('거래처.xlsx') && fileNote.includes('3줄') && fileNote.includes('1줄(제목)은 뺐어요') && (await page.getByTestId('bulk-paste-file-error').count()) === 0 && (await page.getByTestId('bulk-paste-header').isChecked()) && cols9.join() === 'companyName,contactName,contactPhone,businessNumber,contactEmail,businessAddress' && ((await page.getByTestId('bulk-paste-extras').innerText().catch(() => '')) ?? '').includes('이메일 1곳 · 주소 1곳') && (await sum9.getAttribute('data-add')) === '1' && (await sum9.getAttribute('data-dupes')) === '1',
   { fileNote, cols9, add: await sum9.getAttribute('data-add'), dupes: await sum9.getAttribute('data-dupes') },
 )
 await shot(page, 'bulk-07-file')
@@ -226,7 +226,7 @@ await page.getByTestId('bulk-paste-submit').click()
 await page.waitForTimeout(1200)
 const after9 = await stored()
 const six = after9.find((r) => r.companyName === '여섯째기술(주)')
-check('B9 [1곳 등록] → 저장 6곳 · 파일에서 읽은 대표 · 전화 · 번호 그대로', after9.length === 6 && six?.contactName === '육기술' && six?.contactPhone === '010-6666-7777' && six?.businessNumber === '666-66-66666', six && { c: six.contactName, p: six.contactPhone, b: six.businessNumber })
+check('B9 [1곳 등록] → 저장 6곳 · 파일에서 읽은 대표 · 전화 · 번호 · 이메일 · 주소 그대로', after9.length === 6 && six?.contactName === '육기술' && six?.contactPhone === '010-6666-7777' && six?.businessNumber === '666-66-66666' && six?.contactEmail === 'six@example.com' && six?.businessAddress === '경기도 수원시 영통구 광교로 6', six && { c: six.contactName, p: six.contactPhone, b: six.businessNumber })
 
 await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)

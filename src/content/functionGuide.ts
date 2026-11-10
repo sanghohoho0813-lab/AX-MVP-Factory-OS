@@ -104,7 +104,7 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     menu: 'client-ops',
     what: '엑셀에서 고객 목록을 복사해 붙여넣거나 엑셀 파일을 그대로 고르면 여러 업체가 한 번에 등록돼요.',
     why: '고객이 이미 수십 곳인 분이 한 곳씩 등록 창을 열지 않게 하려고 있어요.',
-    effect: '회사 이름 · 대표 · 전화 · 사업자등록번호 칸을 알아서 찾고, 이미 있는 업체는 건너뛰어요.',
+    effect: '회사 이름 · 대표 · 전화 · 사업자등록번호 · 이메일 · 주소 칸을 알아서 찾고, 이미 있는 업체는 건너뛰어요.',
     next: '200곳이 넘는 목록도 나눠서 이어 등록하게 해요.',
   },
   'fn-calendar-add': {

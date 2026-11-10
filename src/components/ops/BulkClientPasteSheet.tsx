@@ -15,7 +15,7 @@ import { Button } from '../ui/Button'
 import { createClient } from '../../services/clientOpsService'
 import { emptySales, type ClientOpsRecord } from '../../types/clientOps'
 import { BULK_FILE_ACCEPT, readBulkFile } from '../../services/clientBulkFile'
-import { PASTE_FIELDS, PASTE_FIELD_LABEL, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste, type PasteField } from '../../services/clientBulkPaste'
+import { PASTE_FIELDS, PASTE_FIELD_LABEL, bulkExtrasLine, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste, type PasteField } from '../../services/clientBulkPaste'
 
 type Kind = 'contract' | 'prospect'
 
@@ -111,6 +111,8 @@ export function BulkClientPasteSheet({
           contactPhone: row.contactPhone,
           businessNumber: row.businessNumber,
           industry: row.industry,
+          contactEmail: row.contactEmail,
+          businessAddress: row.businessAddress,
           ...(kind === 'prospect' ? { status: 'waiting' as const, sales: emptySales('lead') } : {}),
         })
         done++
@@ -151,7 +153,7 @@ export function BulkClientPasteSheet({
     >
       <div className="flex flex-col gap-4" data-testid="bulk-paste">
         <p className="t-body break-keep text-slate-800">
-          <strong className="font-bold text-slate-900">엑셀에서 고객 목록을 복사해 아래 칸에 붙여넣거나, 엑셀 파일을 그대로 고르세요.</strong> 한 줄에 한 곳 — 칸 순서는 상관없어요. 회사 이름 · 대표 · 전화 · 사업자등록번호를 알아서 찾습니다.
+          <strong className="font-bold text-slate-900">엑셀에서 고객 목록을 복사해 아래 칸에 붙여넣거나, 엑셀 파일을 그대로 고르세요.</strong> 한 줄에 한 곳 — 칸 순서는 상관없어요. 회사 이름 · 대표 · 전화 · 사업자등록번호 · 이메일 · 주소를 알아서 찾습니다.
         </p>
         <label className="flex flex-col gap-1.5">
           <span className="t-sub flex items-center gap-1.5 font-semibold text-slate-800">
@@ -238,6 +240,11 @@ export function BulkClientPasteSheet({
                 <p className="t-sub font-semibold break-keep text-slate-900" role="status" data-testid="bulk-paste-summary" data-add={plan.add.length} data-dupes={plan.dupes.length} data-repeats={plan.repeats.length}>
                   {bulkSummaryLine(plan, read)}
                 </p>
+                {bulkExtrasLine(plan.add) && (
+                  <p className="t-sub break-keep text-slate-700" data-testid="bulk-paste-extras">
+                    {bulkExtrasLine(plan.add)}
+                  </p>
+                )}
                 {shown.length > 0 && (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[30rem] border-collapse text-left text-[0.9375rem]" data-testid="bulk-paste-preview">

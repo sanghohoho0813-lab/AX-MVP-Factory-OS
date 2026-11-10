@@ -781,6 +781,8 @@ export async function createClient(
     contactPhone: input.contactPhone?.trim() ?? '',
     businessNumber: input.businessNumber?.trim() ?? '',
     industry: input.industry?.trim() ?? '',
+    ...(input.contactEmail?.trim() ? { contactEmail: input.contactEmail.trim() } : {}),
+    ...(input.businessAddress?.trim() ? { businessAddress: input.businessAddress.trim() } : {}),
     status: input.status ?? 'active',
     sales: input.sales ?? null,
     ...(input.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),

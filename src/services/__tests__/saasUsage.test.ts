@@ -30,7 +30,7 @@ import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, se
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
 import { HOWTO_NOTE, POSTING_HOWTO } from '../../content/postingHowTo'
-import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, dropTitleRows, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
+import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkExtrasLine, bulkSummaryLine, clientsCsv, dropTitleRows, guessColumns, planBulk, rowsFromTable, splitPaste, tidyEmail } from '../clientBulkPaste'
 import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, firstSheetOfText, readBulkFile } from '../clientBulkFile'
 import { makeSimpleXlsx } from './xlsxFixture'
 import { guideKeyForPath } from '../../content/screenGuideKey'
@@ -736,8 +736,8 @@ async function run() {
       const doubledQuote = csv.includes('"서류 ""받기"""')
       const guarded = csv.includes("'=1+1상사") && csv.includes("'+82-10-3333-4444")
       check(
-        "K21 내려받기(CSV) — 제목 줄 9칸 · 보관한 업체 빼고 3곳 · 쉼표 든 이름은 따옴표 · 따옴표는 두 번 · = + 로 시작하면 앞에 ' · 잠재고객 구분 · 그대로 붙여넣으면 3곳 다시 읽힘(회사 · 대표 · 전화 · 번호 · 업종)",
-        lines[0] === CLIENTS_CSV_HEADER.join(',') && CLIENTS_CSV_HEADER.length === 9 && count === 3 && lines.length === 4 && !csv.includes('보관한상사') && quotedName && doubledQuote && guarded && csv.includes(',잠재고객,') && gBack.header && gBack.columns.slice(0, 5).join() === 'companyName,contactName,contactPhone,businessNumber,industry' && rBack.rows.length === 3 && rBack.rows.some((r) => r.companyName === '한솔, 테크(주)' && r.contactName === '김한솔' && r.businessNumber === '123-45-67890' && r.industry === '제조업'),
+        "K21 내려받기(CSV) — 제목 줄 11칸 · 보관한 업체 빼고 3곳 · 쉼표 든 이름은 따옴표 · 따옴표는 두 번 · = + 로 시작하면 앞에 ' · 잠재고객 구분 · 그대로 붙여넣으면 3곳 다시 읽힘(회사 · 대표 · 전화 · 번호 · 업종)",
+        lines[0] === CLIENTS_CSV_HEADER.join(',') && CLIENTS_CSV_HEADER.length === 11 && count === 3 && lines.length === 4 && !csv.includes('보관한상사') && quotedName && doubledQuote && guarded && csv.includes(',잠재고객,') && gBack.header && gBack.columns.slice(0, 5).join() === 'companyName,contactName,contactPhone,businessNumber,industry' && rBack.rows.length === 3 && rBack.rows.some((r) => r.companyName === '한솔, 테크(주)' && r.contactName === '김한솔' && r.businessNumber === '123-45-67890' && r.industry === '제조업'),
         JSON.stringify({ lines, g: gBack, n: rBack.rows.length, quotedName, doubledQuote, guarded }),
       )
     }
@@ -929,6 +929,34 @@ async function run() {
     const blocked = hasSavedSignIn()
     g.localStorage = before
     check('K28 미리 받기 — 로그인 표가 없으면 안 받음 · 다른 저장 값만 있어도 안 받음 · sb-…-auth-token 이 있으면 받음 · 저장 공간이 막혀도 죽지 않음(안 받음)', none === false && other === false && signed === true && blocked === false, JSON.stringify({ none, other, signed, blocked }))
+  }
+
+  /* K29 — D-591 여러 업체 등록: 이메일 · 주소 칸 */
+  {
+    // ① 제목 줄로 — 이메일 · 주소(소재지) 칸을 찾아 업체 줄에 넣는다 · 이메일 모양이 아니면 비운다
+    const t1 = splitPaste('상호\t대표자\tE-mail\t소재지\n한솔테크(주)\t김한솔\thansol@example.com\t경기도 성남시 분당구 판교로 1\n다움에너지\t이다움\t메일없음\t\n')
+    const g1 = guessColumns(t1)
+    const r1 = rowsFromTable(t1, g1)
+    // ② 제목 줄 없이 모양으로 — 주소 칸이 회사 이름으로 잡히지 않고, '서울정밀(주)' 같은 이름은 주소로 잡히지 않는다
+    const t2 = splitPaste('서울정밀(주)\t서울특별시 강남구 테헤란로 12\tkim@seoul.co.kr\t02-123-4567\n경기산업\t경기 화성시 동탄대로 5\tlee@gg.kr\t031-111-2222\n부산상사\t부산광역시 해운대구 센텀로 9\tpark@bs.kr\t051-333-4444')
+    const g2 = guessColumns(t2)
+    const r2 = rowsFromTable(t2, g2)
+    check(
+      'K29 이메일 · 주소 — 제목 줄(E-mail · 소재지)로 찾음 · 이메일 모양이 아니면 비움 / 제목 줄 없이 모양으로(주소 칸 ≠ 회사 이름 · "서울정밀(주)" ≠ 주소) · 3곳 다 이메일 · 주소 · 전화',
+      g1.header && g1.columns.join() === 'companyName,contactName,contactEmail,businessAddress' && r1.rows[0].contactEmail === 'hansol@example.com' && r1.rows[0].businessAddress === '경기도 성남시 분당구 판교로 1' && r1.rows[1].contactEmail === '' && r1.rows[1].businessAddress === '' && !g2.header && g2.columns.join() === 'companyName,businessAddress,contactEmail,contactPhone' && r2.rows.length === 3 && r2.rows[0].companyName === '서울정밀(주)' && r2.rows[2].businessAddress === '부산광역시 해운대구 센텀로 9' && r2.rows[1].contactEmail === 'lee@gg.kr',
+      JSON.stringify({ g1, r1: r1.rows, g2, r2: r2.rows.map((r) => [r.companyName, r.businessAddress, r.contactEmail]) }),
+    )
+    // ③ 요약 아래 한 줄 · 이메일 다듬기 · 내려받은 CSV 를 다시 읽어도 이메일 · 주소가 돌아온다
+    const recs = [normalizeClientOps({ id: 'm', workspaceId: 'w', companyName: '메일상사', contactEmail: 'ceo@mail.kr', businessAddress: '대전 유성구 대학로 99, 3층', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' })]
+    const { csv } = clientsCsv(recs)
+    const back = splitPaste(csv)
+    const gb = guessColumns(back)
+    const rb = rowsFromTable(back, gb)
+    check(
+      'K29 이메일 · 주소 — 요약 아래 한 줄(이메일 n곳 · 주소 n곳) · 없으면 빈 글 · 이메일 다듬기 · 내려받은 CSV(제목 줄 11칸 · 쉼표 든 주소는 따옴표)를 다시 읽으면 이메일 · 주소 그대로',
+      bulkExtrasLine(r2.rows) === '이메일 3곳 · 주소 3곳도 같이 넣어요' && bulkExtrasLine(r1.rows) === '이메일 1곳 · 주소 1곳도 같이 넣어요' && bulkExtrasLine(rowsFromTable(splitPaste('가나상사\n다라마트'), guessColumns(splitPaste('가나상사\n다라마트'))).rows) === '' && tidyEmail(' a@b.co ') === 'a@b.co' && tidyEmail('a@b') === '' && tidyEmail('없음') === '' && CLIENTS_CSV_HEADER.length === 11 && csv.includes('"대전 유성구 대학로 99, 3층"') && rb.rows.length === 1 && rb.rows[0].contactEmail === 'ceo@mail.kr' && rb.rows[0].businessAddress === '대전 유성구 대학로 99, 3층',
+      JSON.stringify({ csv, gb, rb: rb.rows }),
+    )
   }
 
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)

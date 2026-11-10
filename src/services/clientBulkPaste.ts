@@ -7,20 +7,23 @@
  *  - 칸 순서는 상관없다. 첫 줄이 제목 줄(회사명 · 대표 · 전화 …)이면 제목으로, 아니면 칸 안의 모양(사업자등록번호 · 전화번호 · 사람 이름)으로 찾는다.
  *  - 찾은 칸은 화면에서 사람이 바꿀 수 있다(여기서는 '추측' 만 한다).
  *  - 이미 있는 업체(사업자등록번호 · 이름)는 건너뛴다 — 크레탑 등록 · 새 업체 등록 창과 같은 규칙(findClientForCretop).
+ *  - D-591 이메일 · 주소 칸도 읽는다(제목 줄 · 모양) — 고객 목록에 흔한 칸이라 버리지 않는다.
  * 규칙 계산이다 — AI 가 아니다. 저장은 하지 않는다(등록은 화면이 있는 저장 길 createClient 로 한다).
  */
 import { contractStageOf, type ClientOpsRecord } from '../types/clientOps'
 import { companyKey, findClientForCretop } from './salesCretop'
 
-export type PasteField = 'companyName' | 'contactName' | 'contactPhone' | 'businessNumber' | 'industry' | 'skip'
+export type PasteField = 'companyName' | 'contactName' | 'contactPhone' | 'contactEmail' | 'businessNumber' | 'businessAddress' | 'industry' | 'skip'
 
-export const PASTE_FIELDS: readonly PasteField[] = ['companyName', 'contactName', 'contactPhone', 'businessNumber', 'industry', 'skip']
+export const PASTE_FIELDS: readonly PasteField[] = ['companyName', 'contactName', 'contactPhone', 'contactEmail', 'businessNumber', 'businessAddress', 'industry', 'skip']
 
 export const PASTE_FIELD_LABEL: Record<PasteField, string> = {
   companyName: '회사 이름',
   contactName: '대표 · 담당자',
   contactPhone: '전화',
+  contactEmail: '이메일',
   businessNumber: '사업자등록번호',
+  businessAddress: '주소',
   industry: '업종',
   skip: '쓰지 않음',
 }
@@ -36,6 +39,9 @@ export interface PasteRow {
   contactPhone: string
   businessNumber: string
   industry: string
+  /** D-591 이메일 · 주소 — 없으면 빈 글 */
+  contactEmail: string
+  businessAddress: string
 }
 
 const digits = (v: string) => v.replace(/\D/g, '')
@@ -97,6 +103,9 @@ export function splitPaste(text: string): string[][] {
 const BIZ_RE = /^\d{3}[-\s]?\d{2}[-\s]?\d{5}$/
 const PHONE_RE = /^\(?0\d{1,2}\)?[-\s.]?\d{3,4}[-\s.]?\d{4}$/
 const PERSON_RE = /^[가-힣]{2,4}$/
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[A-Za-z]{2,}$/
+// 주소 — 시 · 도 이름으로 시작하고 띄어 쓴 뒤 시 · 군 · 구 · 읍 · 면 · 동 · 로 · 길이 이어진다('서울정밀' 같은 회사 이름과 가르려고 띄어쓰기를 본다)
+const ADDRESS_RE = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청[남북]|전라[남북]|경상[남북])\S*\s+\S*(시|군|구|읍|면|동|로|길)/
 const CORP_RE = /\(\s*주\s*\)|㈜|주식회사|유한회사|\(\s*유\s*\)|법인|상사|산업|테크|기업|전자|건설|물산|컴퍼니|컨설팅|조합|농원|식품|상회|엔지니어링|시스템|솔루션/
 
 /**
@@ -111,6 +120,8 @@ function headerField(cell: string): PasteField | null {
   if (/^(회사(명|이름)?|업체(명|이름)?|상호(명)?|상호\(법인명\)|법인명|기업명|거래처(명)?|고객사(명)?|사업장명)$/.test(c)) return 'companyName'
   if (/^(대표(자|이사)?(명|성명|이름)?|담당자?(명|성명|이름)?|성명|이름)$/.test(c)) return 'contactName'
   if (/^(업종|업태|종목|업태\/종목|업태종목)$/.test(c)) return 'industry'
+  if (/^(이메일|메일|이메일주소|메일주소|전자우편|E-?mail)$/i.test(c)) return 'contactEmail'
+  if (/^(주소|사업장주소|사업장소재지|소재지|회사주소|본점소재지|도로명주소)$/.test(c)) return 'businessAddress'
   return null
 }
 
@@ -174,6 +185,9 @@ export function guessColumns(cells: string[][]): ColumnGuess {
   }
   if (!used.has('businessNumber')) take(best((c) => share(c, (x) => BIZ_RE.test(x)), 0.6), 'businessNumber')
   if (!used.has('contactPhone')) take(best((c) => share(c, (x) => PHONE_RE.test(x)), 0.6), 'contactPhone')
+  // D-591 이메일 · 주소는 회사 이름을 찾기 전에 먼저 — 주소 칸(한글 글자)이 회사 이름으로 잘못 잡히지 않게
+  if (!used.has('contactEmail')) take(best((c) => share(c, (x) => EMAIL_RE.test(x)), 0.6), 'contactEmail')
+  if (!used.has('businessAddress')) take(best((c) => share(c, (x) => ADDRESS_RE.test(x)), 0.6), 'businessAddress')
   if (!used.has('companyName')) {
     let at = best((c) => share(c, (x) => CORP_RE.test(x)), 0.3)
     // 회사 말이 없는 목록(상호만 적은 가게 이름 등) — 숫자가 아니고 사람 이름 칸도 아닌 첫 글자 칸
@@ -207,6 +221,12 @@ export function tidyPhone(v: string): string {
   return d.length >= 8 && d.length <= 11 ? v.trim() : ''
 }
 
+/** 이메일 — 이메일 모양일 때만. 아니면 비운다(틀린 주소를 넣지 않는다) */
+export function tidyEmail(v: string): string {
+  const t = v.trim()
+  return EMAIL_RE.test(t) && t.length <= 120 ? t : ''
+}
+
 export interface PasteRead {
   rows: PasteRow[]
   /** 회사 이름이 비어 뺀 줄 수 */
@@ -223,6 +243,8 @@ export function rowsFromTable(cells: string[][], guess: ColumnGuess): PasteRead 
   const iPhone = at('contactPhone')
   const iBiz = at('businessNumber')
   const iInd = at('industry')
+  const iMail = at('contactEmail')
+  const iAddr = at('businessAddress')
   const start = guess.header ? 1 : 0
   const rows: PasteRow[] = []
   let noName = 0
@@ -245,6 +267,8 @@ export function rowsFromTable(cells: string[][], guess: ColumnGuess): PasteRead 
       contactPhone: iPhone >= 0 ? tidyPhone(r[iPhone] ?? '') : '',
       businessNumber: iBiz >= 0 ? tidyBizNo(r[iBiz] ?? '') : '',
       industry: iInd >= 0 ? (r[iInd] ?? '').slice(0, 40) : '',
+      contactEmail: iMail >= 0 ? tidyEmail(r[iMail] ?? '') : '',
+      businessAddress: iAddr >= 0 ? (r[iAddr] ?? '').slice(0, 200) : '',
     })
   }
   return { rows, noName, over }
@@ -294,12 +318,20 @@ export function bulkSummaryLine(plan: BulkPlan, read: Pick<PasteRead, 'noName' |
   return parts.join(' · ')
 }
 
+/** 요약 아래 한 줄 — 이메일 · 주소도 같이 넣는 곳 수(없으면 빈 글) */
+export function bulkExtrasLine(rows: readonly PasteRow[]): string {
+  const mail = rows.filter((r) => r.contactEmail).length
+  const addr = rows.filter((r) => r.businessAddress).length
+  const parts = [mail ? `이메일 ${mail}곳` : '', addr ? `주소 ${addr}곳` : ''].filter(Boolean)
+  return parts.length ? `${parts.join(' · ')}도 같이 넣어요` : ''
+}
+
 /* ------------------------------------------------------------------ */
 /* D-584 업체 목록 엑셀 파일로 내려받기(CSV) — 붙여넣기의 짝                 */
 /* ------------------------------------------------------------------ */
 
 /** 내려받는 표의 제목 줄 — 붙여넣기(guessColumns)가 그대로 다시 읽는 말로 */
-export const CLIENTS_CSV_HEADER = ['회사명', '대표자', '전화', '사업자등록번호', '업종', '구분', '다음 할 일', '기한', '등록일'] as const
+export const CLIENTS_CSV_HEADER = ['회사명', '대표자', '전화', '사업자등록번호', '업종', '구분', '다음 할 일', '기한', '등록일', '이메일', '주소'] as const
 
 /** 한 칸 — 쉼표 · 따옴표 · 줄바꿈이 있으면 따옴표로 감싼다. = + - @ 로 시작하면 엑셀이 식으로 읽지 않게 앞에 ' 를 붙인다. */
 function csvCell(value: string): string {
@@ -315,7 +347,7 @@ export function clientsCsv(records: readonly ClientOpsRecord[]): { csv: string; 
   for (const r of live) {
     const stage = contractStageOf(r.status)
     lines.push(
-      [r.companyName, r.contactName, r.contactPhone, r.businessNumber, r.industry, stage === 'pre' ? '잠재고객' : stage === 'closed' ? '계약 끝남' : '계약 고객', r.nextAction, r.nextActionDueDate, r.createdAt.slice(0, 10)]
+      [r.companyName, r.contactName, r.contactPhone, r.businessNumber, r.industry, stage === 'pre' ? '잠재고객' : stage === 'closed' ? '계약 끝남' : '계약 고객', r.nextAction, r.nextActionDueDate, r.createdAt.slice(0, 10), r.contactEmail, r.businessAddress]
         .map((c) => csvCell(String(c ?? '')))
         .join(','),
     )

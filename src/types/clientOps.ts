@@ -971,6 +971,9 @@ export interface CreateClientOpsInput {
   contactPhone?: string
   businessNumber?: string
   industry?: string
+  /** D-591 여러 업체 등록(엑셀 목록)에서 같이 넣는 이메일 · 주소 */
+  contactEmail?: string
+  businessAddress?: string
   /** 기본 'active'(계약함). 잠재고객은 'waiting'(계약 전) — D-114 */
   status?: ClientOpsStatus
   /** 영업 칸 — 잠재고객으로 만들 때 (D-114) */
