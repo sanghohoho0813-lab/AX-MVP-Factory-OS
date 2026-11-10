@@ -395,6 +395,39 @@ await mp.locator('[role="dialog"] button[aria-label="닫기"]').tap()
 await mp.waitForTimeout(300)
 check('G14 스레드 화면에서는 스레드 안내(어려운 말 0) · 닫으면 화면 그대로', thrKey === 'mk-threads' && thrLabel === '스레드' && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷/.test(thrGuide) && (await mp.getByTestId('screen-guide').count()) === 0 && mp.url().endsWith('/marketing/threads'), { thrKey, thrLabel })
 
+/* G15 홈 화면에 넣는 법(D-587) — 사용법 안내 화면 접힌 한 줄 · 기기 탭 · 매니페스트 · 아이콘 */
+await mp.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+const hh = mp.getByTestId('home-howto')
+const hhClosed = (await hh.count()) === 1 && !(await hh.evaluate((el) => el.open))
+await mp.getByTestId('home-howto-toggle').scrollIntoViewIfNeeded()
+await mp.getByTestId('home-howto-toggle').tap()
+await mp.waitForTimeout(250)
+const hhTabs = await mp.getByTestId('home-howto-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+await mp.locator('[data-testid="home-howto-tab"][data-key="iphone"]').tap()
+await mp.waitForTimeout(150)
+const hhIphone = await mp.getByTestId('home-howto-step').allInnerTexts()
+await mp.locator('[data-testid="home-howto-tab"][data-key="android"]').tap()
+await mp.waitForTimeout(150)
+const hhAndroid = await mp.getByTestId('home-howto-step').allInnerTexts()
+const hhOver = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+const hhSmall = await mp.locator('[data-testid="home-howto"] summary, [data-testid="home-howto"] button').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 }).length)
+check(
+  'G15 사용법 안내 › 홈 화면에 넣는 법: 처음엔 접힘 → 탭 3(아이폰 · 갤럭시 · PC) · 아이폰 4걸음([공유] · [홈 화면에 추가]) · 갤럭시 4걸음 · 390 넘침 0 · 40px 보다 작은 단추 0',
+  hhClosed && hhTabs.join() === 'iphone,android,pc' && hhIphone.length === 4 && hhIphone.join(' ').includes('[공유]') && hhIphone.join(' ').includes('[홈 화면에 추가]') && hhAndroid.length === 4 && hhAndroid.join(' ').includes('[홈 화면에 추가]') && hhOver <= 0 && hhSmall === 0,
+  { hhClosed, hhTabs, i: hhIphone.length, a: hhAndroid.length, hhOver, hhSmall },
+)
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-12-home-howto-390.png`, fullPage: true }).catch(() => {})
+const pwa = await mp.evaluate(async () => {
+  const link = document.querySelector('link[rel="manifest"]')?.getAttribute('href') ?? ''
+  const apple = document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') ?? ''
+  const m = link ? await fetch(link).then((r) => r.json()).catch(() => null) : null
+  const types = []
+  for (const src of [apple, ...(m?.icons ?? []).map((i) => i.src)]) types.push(await fetch(src).then((r) => (r.ok ? (r.headers.get('content-type') ?? '') : `HTTP ${r.status}`)).catch(() => 'ERR'))
+  return { link, apple, display: m?.display, start: m?.start_url, icons: (m?.icons ?? []).length, types }
+})
+check('G15 매니페스트 · 아이콘이 실제로 내려옴 — display browser · 시작 주소 / · 아이콘 3 · 전부 image/png', pwa.link === '/manifest.webmanifest' && pwa.apple === '/apple-touch-icon.png' && pwa.display === 'browser' && pwa.start === '/' && pwa.icons === 3 && pwa.types.length === 4 && pwa.types.every((t) => t.startsWith('image/png')), pwa)
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })

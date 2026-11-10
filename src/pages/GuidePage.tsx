@@ -25,6 +25,7 @@ import { menuVideo } from '../config/menuVideos'
 import { minutesLabel } from '../config/tutorialVideos'
 import { useTutorial } from '../components/tutorial/tutorialContext'
 import { useSupportState } from '../components/support/useSupport'
+import { AddToHomeHowTo } from '../components/guide/AddToHomeHowTo'
 
 interface Row {
   key: string
@@ -165,6 +166,9 @@ export function GuidePage() {
           )
         })}
       </ul>
+
+      {/* D-587 매일 쓰게 — 휴대폰 홈 화면에 넣는 법(접힌 한 줄) */}
+      <AddToHomeHowTo />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="guide-foot">
         <p className="t-sub min-w-0 flex-1 basis-64 break-keep text-slate-700">

@@ -34,6 +34,7 @@ import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, dropTi
 import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, firstSheetOfText, readBulkFile } from '../clientBulkFile'
 import { makeSimpleXlsx } from './xlsxFixture'
 import { guideKeyForPath } from '../../content/screenGuideKey'
+import { HOME_HOWTO, HOME_HOWTO_NOTE } from '../../content/homeScreenHowTo'
 import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
@@ -831,6 +832,25 @@ async function run() {
       'K24 화면 안내 열쇠 — 메뉴에 보이는 화면 전부 열쇠 · 네 칸 글(빈 칸 0) · 업체 화면(깊은 주소) = 고객 관리 안내 + 이 화면 안 기능 8개 이상(고객 계정에도 6개 이상)',
       menus.length >= 20 && holes.length === 0 && clientKey === 'client-ops' && functionGuidesOf('client-ops', { pilot: false, basic: false }).length >= 8 && functionGuidesOf('client-ops', { pilot: true, basic: true }).length >= 6,
       JSON.stringify({ n: menus.length, holes: holes.map((m) => m.path).slice(0, 8), clientKey, fns: functionGuidesOf('client-ops', { pilot: true, basic: true }).length }),
+    )
+  }
+
+  /* K25 — D-587 홈 화면에 넣는 법(기기별 걸음) · 매니페스트 */
+  {
+    const all = HOME_HOWTO.flatMap((h) => [h.need, h.tip, ...h.steps]).join(' ')
+    const manifest = JSON.parse(readFileSync(join(process.cwd(), 'public/manifest.webmanifest'), 'utf8')) as { display: string; start_url: string; short_name: string; icons: Array<{ src: string; sizes: string; purpose?: string }> }
+    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    const iconFiles = ['public/apple-touch-icon.png', ...manifest.icons.map((i) => `public${i.src}`)].map((f) => readFileSync(join(process.cwd(), f)))
+    const isPng = (b: Buffer) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+    check(
+      'K25 홈 화면에 넣는 법 — 세 기기(아이폰 · 갤럭시 · PC) · 걸음 3 ~ 4개 · 한 걸음 60자 안 · 휴대폰 둘은 [홈 화면에 추가] · 카카오톡에서 연 화면 안내 · 알림 한 줄',
+      HOME_HOWTO.map((h) => h.key).join() === 'iphone,android,pc' && HOME_HOWTO.every((h) => h.steps.length >= 3 && h.steps.length <= 4 && h.steps.every((s) => s.length <= 60) && h.need.length > 0 && h.tip.length > 0) && HOME_HOWTO.filter((h) => h.key !== 'pc').every((h) => h.steps.join(' ').includes('[홈 화면에 추가]') && h.tip.includes('카카오톡')) && HOME_HOWTO_NOTE.includes('비슷한 말') && !/PWA|매니페스트|설치/.test(all),
+      JSON.stringify(HOME_HOWTO.map((h) => [h.key, h.steps.length, Math.max(...h.steps.map((s) => s.length))])),
+    )
+    check(
+      'K25 매니페스트 — 브라우저에서 그대로 열림(display browser — 로그인 유지) · 시작 주소 / · 짧은 이름 12자 안 · 아이콘 192 · 512(PNG 파일 있음) · index.html 에 manifest · 애플 아이콘 · 이름',
+      manifest.display === 'browser' && manifest.start_url === '/' && manifest.short_name.length <= 12 && manifest.icons.some((i) => i.sizes === '192x192') && manifest.icons.some((i) => i.sizes === '512x512') && manifest.icons.some((i) => i.purpose === 'maskable') && iconFiles.every(isPng) && html.includes('<link rel="manifest" href="/manifest.webmanifest" />') && html.includes('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />') && html.includes('apple-mobile-web-app-title') && !html.includes('apple-mobile-web-app-capable'),
+      JSON.stringify({ d: manifest.display, n: manifest.short_name, icons: manifest.icons.map((i) => i.sizes) }),
     )
   }
 

@@ -243,9 +243,10 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
             </span>
           </span>
         )}
-        <span className="flex min-w-0 items-center gap-1">
-          <span className="t-card truncate text-slate-900">{screenTitle}</span>
-          {guideKey && <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+        {/* 이름 칸은 예전처럼 남은 폭을 다 쓴다(짧은 이름도 자리 넉넉) — ⓘ 는 글자 바로 뒤에 흐르게 */}
+        <span className="t-card truncate text-slate-900">
+          {screenTitle}
+          {guideKey && <CircleHelp aria-hidden="true" className="ml-1 inline-block size-4 align-[-0.125em] text-slate-400" />}
         </span>
       </MobileTitle>
       {/* 휴대폰에서도 지금 몇 시인지는 보인다 (D-87) */}
