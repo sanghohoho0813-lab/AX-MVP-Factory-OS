@@ -272,6 +272,34 @@ async function searchFor(page, q) {
 }
 
 try {
+  /* D-590 로그인 화면은 가볍게 — 앱 뼈대(메뉴 · 머리줄 · 판정 규칙)를 같이 받지 않는다. 로그인해 둔 브라우저는 미리 받는다 */
+  {
+    const lc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await lc.route(`https://${REF}.supabase.co/**`, route)
+    const lp = await lc.newPage()
+    const got = []
+    lp.on('requestfinished', (r) => {
+      const u = new URL(r.url())
+      if (u.pathname.startsWith('/assets/') && u.pathname.endsWith('.js')) got.push(u.pathname.split('/').pop())
+    })
+    await lp.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+    await lp.waitForTimeout(800)
+    const heavyRe = /^(AppShell|Sidebar|clientInsights|TodayCommandCenterPage|taxCalc|salesEngine)-/
+    const guest = { n: got.length, heavy: got.filter((f) => heavyRe.test(f)) }
+    check(
+      '로그인 화면(D-590): 받는 스크립트 40개 이하 · 앱 뼈대 · 판정 규칙 조각은 받지 않음 · 로그인 칸이 보임',
+      guest.n > 0 && guest.n <= 40 && guest.heavy.length === 0 && (await lp.getByLabel('이메일').count()) === 1,
+      guest,
+    )
+    // 로그인해 둔 브라우저(저장된 로그인 표 있음)는 첫 조각을 읽자마자 앱 뼈대를 받기 시작한다 — 표가 가짜여도 받기는 시작한다(화면은 로그인 화면 그대로)
+    got.length = 0
+    await lp.evaluate((ref) => localStorage.setItem(`sb-${ref}-auth-token`, '{}'), REF)
+    await lp.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+    await lp.waitForTimeout(800)
+    check('로그인해 둔 브라우저(D-590): 앱 뼈대를 미리 받음(AppShell 조각)', got.some((f) => /^AppShell-/.test(f)), { n: got.length })
+    await lc.close()
+  }
+
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   await ctx.route(`https://${REF}.supabase.co/**`, route)
   await ctx.route('**/api/ai-assist**', assistRoute)

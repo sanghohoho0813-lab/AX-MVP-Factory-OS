@@ -3,15 +3,21 @@
  * (App.tsx 에서 추출; 도메인 페이지는 route-level lazy loading 유지)
  */
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
-import { ChatFirst } from '../components/chat/ChatFirst'
-import { AxOpenPage } from '../pages/AxOpenPage'
 import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
-import { ToolClientFrame } from '../tools/shared/toolClientContext'
-import { ModuleRoute } from '../tools/shared/ModuleRoute'
-import { EmptyModulePage } from '../pages/EmptyModulePage'
-import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
+
+/*
+ * D-590 화면 목록은 가볍게 — 로그인 화면(supabase 모드)도 이 파일을 받는다(주소 표가 라우터에 들어가야 해서).
+ * 그래서 화면을 감싸는 틀(업체로 열기 · 모듈 목차 · 대화창 먼저)과 작은 화면들도 화면들처럼 필요할 때 받는다.
+ * 이 틀들은 앱 뼈대와 함께 미리 받아 둔다(app/shellChunks) — 화면을 열 때 한 번 더 기다리지 않게.
+ */
+const ChatFirst = lazy(() => import('../components/chat/ChatFirst').then((m) => ({ default: m.ChatFirst })))
+const AxOpenPage = lazy(() => import('../pages/AxOpenPage').then((m) => ({ default: m.AxOpenPage })))
+const ToolClientFrame = lazy(() => import('../tools/shared/toolClientContext').then((m) => ({ default: m.ToolClientFrame })))
+const ModuleRoute = lazy(() => import('../tools/shared/ModuleRoute').then((m) => ({ default: m.ModuleRoute })))
+const EmptyModulePage = lazy(() => import('../pages/EmptyModulePage').then((m) => ({ default: m.EmptyModulePage })))
+const ReportsRedirectPage = lazy(() => import('../pages/ReportsRedirectPage').then((m) => ({ default: m.ReportsRedirectPage })))
 
 // D-188: 개발자에게 피드백(팀장) · 받은 피드백함(대표)
 const FeedbackPage = lazy(() => import('../pages/FeedbackPage').then((m) => ({ default: m.FeedbackPage })))

@@ -35,6 +35,7 @@ import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, 
 import { makeSimpleXlsx } from './xlsxFixture'
 import { guideKeyForPath } from '../../content/screenGuideKey'
 import { HOME_HOWTO, HOME_HOWTO_NOTE } from '../../content/homeScreenHowTo'
+import { hasSavedSignIn } from '../../app/shellChunks'
 import { BIO_CHANNELS, bioBlanks, bioDrafts, bioInputFromBrand, josa, type BioInput } from '../marketing/profileBio'
 import { consultLint } from '../marketing/consultRules'
 import { normalizeClientOps } from '../clientOpsService'
@@ -898,6 +899,36 @@ async function run() {
       root.includes('data-testid="boot-splash"') && root.includes('불러오는 중…') && root.includes('/favicon.svg') && /id="boot-slow" hidden/.test(root) && html.includes('.boot {') && html.includes("getElementById('boot-slow')") && app.includes('className="boot"') && app.includes('className="boot-msg"') && !/https?:\/\//.test(root),
       root.slice(0, 200),
     )
+  }
+
+  /* K28 — D-590 로그인 화면 가볍게(앱 뼈대 · 화면 틀을 첫 조각에서 떼기) */
+  {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')
+    const staticImports = (code: string) => [...code.matchAll(/^import\s+(?!type\b)[^'"]*['"]([^'"]+)['"]/gm)].map((m) => m[1])
+    const app = staticImports(src('src/App.tsx'))
+    const supa = staticImports(src('src/app/SupabaseApp.tsx'))
+    const routes = staticImports(src('src/app/appRouteChildren.tsx'))
+    const chunks = src('src/app/shellChunks.ts')
+    const heavy = (list: string[]) => list.filter((p) => /layout\/AppShell|appRouteChildren|toolClientContext|ModuleRoute|chat\/ChatFirst|pages\/AxOpenPage|pages\/EmptyModulePage/.test(p))
+    check(
+      'K28 첫 조각(App.tsx)은 앱 뼈대 · 화면 목록을 바로 받지 않음 · 로그인 앱(SupabaseApp)은 뼈대를 바로 받지 않음 · 화면 목록은 화면 틀을 바로 받지 않음(전부 필요할 때) · 뼈대와 함께 받는 조각 4개',
+      heavy(app).length === 0 && !supa.some((p) => /layout\/AppShell/.test(p)) && heavy(routes).length === 0 && (chunks.match(/import\('/g) ?? []).length === 4 && /layout\/AppShell/.test(chunks) && /toolClientContext/.test(chunks) && /ModuleRoute/.test(chunks) && /ChatFirst/.test(chunks),
+      JSON.stringify({ app: heavy(app), supa: supa.filter((p) => /AppShell/.test(p)), routes: heavy(routes) }),
+    )
+    // 로그인해 둔 브라우저만 미리 받는다 — 저장된 로그인 표(sb-…-auth-token)의 이름만 본다(값은 읽지 않는다)
+    const store = new Map<string, string>()
+    const g = globalThis as unknown as { localStorage?: unknown }
+    const before = g.localStorage
+    g.localStorage = { get length() { return store.size }, key: (i: number) => [...store.keys()][i] ?? null, getItem: (k: string) => store.get(k) ?? null }
+    const none = hasSavedSignIn()
+    store.set('axmvp.ui.preferences', '{}')
+    const other = hasSavedSignIn()
+    store.set('sb-abcdefghijklmnop-auth-token', '{"x":1}')
+    const signed = hasSavedSignIn()
+    g.localStorage = { get length(): number { throw new Error('막힘') }, key: () => null }
+    const blocked = hasSavedSignIn()
+    g.localStorage = before
+    check('K28 미리 받기 — 로그인 표가 없으면 안 받음 · 다른 저장 값만 있어도 안 받음 · sb-…-auth-token 이 있으면 받음 · 저장 공간이 막혀도 죽지 않음(안 받음)', none === false && other === false && signed === true && blocked === false, JSON.stringify({ none, other, signed, blocked }))
   }
 
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)

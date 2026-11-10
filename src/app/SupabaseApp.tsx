@@ -5,9 +5,8 @@
  * 조용히 local 모드로 fallback 하지 않는다.
  */
 
-import type { ReactNode } from 'react'
+import { Suspense, lazy, type ReactNode } from 'react'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { AppShell } from '../components/layout/AppShell'
 import { getSupabaseClient } from '../lib/supabase/client'
 import { RepositoryProvider } from '../repositories/async/RepositoryProvider'
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
@@ -27,6 +26,13 @@ import { JoinPage } from '../auth/ui/JoinPage'
 import { afterSignInPath } from '../auth/workspaceStorage'
 import { appRouteChildren, legalRoutes, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
+import { loadShellChunks } from './shellChunks'
+
+/**
+ * D-590 앱 뼈대(메뉴 · 머리줄 · 찾기 · 알림과 거기 딸린 판정 규칙들)는 로그인한 뒤에만 쓴다 — 로그인 화면이 같이 받지 않게 조각으로 뗐다.
+ * 이미 로그인해 둔 브라우저는 App.tsx 가 첫 조각을 읽자마자 미리 받기 시작한다(app/shellChunks).
+ */
+const AppShell = lazy(loadShellChunks)
 
 /** 로그인·회원가입 등 게스트 전용 라우트 가드 (로그인 상태면 홈으로) */
 function GuestOnly({ children }: { children: ReactNode }) {
@@ -59,7 +65,9 @@ function ProtectedShell() {
       supabaseClient={getSupabaseClient()}
       workspaceId={currentWorkspaceId ?? undefined}
     >
-      <AppShell />
+      <Suspense fallback={<InitializingScreen />}>
+        <AppShell />
+      </Suspense>
     </RepositoryProvider>
   )
 }

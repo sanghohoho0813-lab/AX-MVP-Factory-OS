@@ -1,33 +1,27 @@
 import { Suspense, lazy, useEffect, useRef } from 'react'
-import { RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { AppShell } from './components/layout/AppShell'
 import { ToastProvider } from './components/ui/toast'
 import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
-import { appRouteChildren, legalRoutes, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
 import { DatePickerHost } from './components/ui/DatePickerHost'
-import { RouteErrorScreen } from './components/layout/RouteErrorScreen'
 import { DeviceStage } from './components/layout/DeviceView'
 import { isStageExcluded, useDeviceView } from './lib/deviceView'
+import { preloadShellIfSignedIn } from './app/shellChunks'
 
 // supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
 const SupabaseApp = lazy(() =>
   import('./app/SupabaseApp').then((m) => ({ default: m.SupabaseApp })),
 )
 
-// local 모드 라우터 — 기존 Stage 1~11 구조를 그대로 유지한다(로그인 없이 진입).
-const localRouter = createBrowserRouter([
-  {
-    element: <AppShell />,
-    errorElement: <RouteErrorScreen />,
-    children: appRouteChildren,
-  },
-  { path: '/grants/find', errorElement: <RouteErrorScreen />, element: <PublicGrantFinder /> },
-  publicSurveyRoute,
-  publicTestRoute,
-  ...legalRoutes,
-])
+// D-590 로그인해 둔 브라우저는 앱 뼈대를 기다리지 않게 — 첫 조각을 읽자마자 받기 시작한다(로그인 화면만 볼 사람은 받지 않는다)
+try {
+  if (getDataModeConfig().mode === 'supabase') preloadShellIfSignedIn()
+} catch {
+  /* 설정을 못 읽으면 미리 받지 않는다 — 화면이 필요할 때 받는다 */
+}
+
+// D-590 local 모드 앱(로그인 없이 진입)도 조각으로 — 앱 뼈대 · 화면 목록이 맨 처음 받는 조각에 섞이지 않게(로그인 화면을 가볍게)
+const LocalApp = lazy(() => import('./app/LocalApp').then((m) => ({ default: m.LocalApp })))
 
 /** D-589 앱 조각을 받는 동안 — index.html 의 첫 화면과 같은 모양(.boot · index.html 의 style)이라 깜박이지 않는다 */
 function BootSplash() {
@@ -72,7 +66,9 @@ function App() {
               <SupabaseApp />
             </Suspense>
           ) : (
-            <RouterProvider router={localRouter} />
+            <Suspense fallback={<BootSplash />}>
+              <LocalApp />
+            </Suspense>
           )}
         </ToastProvider>
       </AppearanceProvider>
