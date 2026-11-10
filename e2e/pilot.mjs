@@ -375,6 +375,16 @@ try {
   const outText = await bodyText(page)
   check('가입자: "이 계정은 쓸 수 없습니다" 화면', (await page.getByTestId('no-access').count()) === 1, outText.slice(0, 200))
   check('가입자: 대표 자료 0', leaked(outText).length === 0, leaked(outText).join())
+  // D-579 방금 가입한 사람이 맨 먼저 보는 화면 — 무엇을 하면 되는지(이메일을 담당자에게 → 승인되면 다시 확인) · 내 이메일 · [복사] · 권한은 그대로
+  const noAccessLook = {
+    email: ((await page.getByTestId('no-access-email').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '),
+    retry: await page.getByTestId('no-access-retry').count(),
+    out: await page.getByTestId('no-access-signout').count(),
+    title: ((await page.getByTestId('no-access').innerText().catch(() => '')) ?? '').trim(),
+    px: await page.evaluate(() => Math.min(...[...document.querySelectorAll('h1, p')].map((el) => parseFloat(getComputedStyle(el).fontSize)))),
+  }
+  check('가입자(D-579): "아직 사용 승인 전" · 할 일 안내(이메일을 담당자에게) · 내 이메일 + [복사] · [승인됐는지 다시 확인] · [로그아웃] · 글자 16px 이상', /승인 전/.test(noAccessLook.title) && /담당자에게/.test(outText) && noAccessLook.email.includes(OUTSIDER.email) && noAccessLook.retry === 1 && noAccessLook.out === 1 && noAccessLook.px >= 16, JSON.stringify(noAccessLook))
+  await shot(page, 'outsider-01-no-access')
   await go(page, `/ops/clients/${OWNER_CLIENT}`)
   check('가입자: 대표 업체 주소로 가도 접근 없음 화면', (await page.getByTestId('no-access').count()) === 1 && leaked(await bodyText(page)).length === 0)
   const outRest = await page.evaluate(async ([ref]) => {

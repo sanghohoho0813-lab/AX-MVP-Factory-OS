@@ -71,7 +71,7 @@ export function ConfigurationErrorScreen({
         <Settings2 aria-hidden="true" className="size-6" />
       </span>
       <h1 className="mt-4 text-lg font-bold text-slate-900">클라우드 설정이 필요합니다</h1>
-      <p className="mt-2 text-sm break-keep text-slate-600">
+      <p className="mt-2 text-[1rem] break-keep text-slate-700">
         {detail ?? '클라우드 저장 모드에 필요한 환경변수가 올바르지 않습니다.'}
       </p>
       {missingKeys && missingKeys.length > 0 && (
@@ -115,7 +115,7 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
         <WifiOff aria-hidden="true" className="size-6" />
       </span>
       <h1 className="mt-4 text-lg font-bold text-slate-900">연결에 실패했습니다</h1>
-      <p className="mt-2 text-sm break-keep text-slate-600">
+      <p className="mt-2 text-[1rem] break-keep text-slate-700">
         {detail ?? '클라우드 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.'}
       </p>
       <Button variant="primary" className="mt-5 w-full" onClick={onRetry}>
@@ -125,16 +125,55 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
   )
 }
 
-/** D-162: 로그인은 됐지만 내부 OS 접근 목록에 없는 계정(공개 사이트 가입자 등) — 아무 화면도 열지 않는다 */
-export function NoAccessScreen({ onSignOut }: { onSignOut: () => void }) {
+/**
+ * D-162: 로그인은 됐지만 접근 목록에 없는 계정(방금 가입한 사람 · 공개 사이트 가입자 등) — 아무 화면도 열지 않는다.
+ * D-579: 방금 가입한 사람이 맨 먼저 보는 화면이다 — '쓸 수 없습니다 · 관리자에게 문의' 한 줄로 끝내지 않고,
+ *        무엇을 하면 되는지(가입한 이메일을 담당자에게 알려 주기 → 승인되면 다시 확인)와 그 이메일 · [복사] 를 보여 준다.
+ *        권한은 그대로다(승인 전에는 어떤 화면 · 자료도 열리지 않는다).
+ */
+export function NoAccessScreen({ onSignOut, email = '' }: { onSignOut: () => void; email?: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(email)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // 복사가 막힌 브라우저 — 이메일은 화면에 그대로 보인다
+    }
+  }
   return (
     <CenteredCard>
       <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-600">
         <ShieldAlert aria-hidden="true" className="size-6" />
       </span>
-      <h1 className="mt-4 text-lg font-bold text-slate-900" data-testid="no-access">이 계정은 MIRAE AI LAB OS 를 쓸 수 없습니다</h1>
-      <p className="mt-2 text-sm break-keep text-slate-600">사용 권한이 필요하면 관리자에게 문의해 주세요.</p>
-      <Button variant="primary" className="mt-5 w-full" onClick={onSignOut}>
+      <h1 className="mt-4 text-[1.2rem] font-bold break-keep text-slate-900" data-testid="no-access">
+        이 계정은 아직 사용 승인 전이에요
+      </h1>
+      <p className="mt-2 text-[1rem] break-keep text-slate-700">
+        승인된 계정만 쓸 수 있는 프로그램이에요. 사용을 신청하셨다면 안내받은 담당자에게 아래 이메일을 알려 주세요 — 승인되면 이 계정으로 바로 열려요.
+      </p>
+      {email && (
+        <div className="mt-4 flex items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left" data-testid="no-access-email">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.875rem] text-slate-600">로그인한 이메일</span>
+            <span className="block truncate text-[1rem] font-semibold text-slate-900">{email}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void copy()}
+            data-testid="no-access-copy"
+            className="tap inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+            {copied ? '복사했어요' : '복사'}
+          </button>
+        </div>
+      )}
+      <Button variant="primary" className="mt-5 h-12 w-full text-[1rem] font-semibold sm:h-12" onClick={() => window.location.reload()} data-testid="no-access-retry">
+        <RefreshCw aria-hidden="true" className="size-4" /> 승인됐는지 다시 확인
+      </Button>
+      <Button variant="ghost" className="mt-2 h-11 w-full" onClick={onSignOut} data-testid="no-access-signout">
         <LogOut aria-hidden="true" className="size-4" /> 로그아웃
       </Button>
     </CenteredCard>
@@ -149,7 +188,7 @@ export function StorageBlockedScreen({ onSignOut }: { onSignOut: () => void }) {
         <ShieldAlert aria-hidden="true" className="size-6" />
       </span>
       <h1 className="mt-4 text-lg font-bold text-slate-900" data-testid="storage-blocked">이 브라우저에서는 열 수 없습니다</h1>
-      <p className="mt-2 text-sm break-keep text-slate-600">
+      <p className="mt-2 text-[1rem] break-keep text-slate-700">
         이 브라우저의 저장 공간이 가득 차서 다른 계정이 쓰던 자료를 따로 넣어 두지 못했습니다. 섞이지 않도록 열지 않았습니다(아무것도 지우지 않았습니다). 다른 브라우저나 기기에서 로그인해 주세요.
       </p>
       <Button variant="primary" className="mt-5 w-full" onClick={onSignOut}>

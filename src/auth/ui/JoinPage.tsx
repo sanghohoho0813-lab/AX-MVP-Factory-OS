@@ -67,7 +67,7 @@ export function JoinPage() {
           </>
         }
       >
-        <p className="text-sm break-keep text-slate-600">
+        <p className="text-[0.9375rem] break-keep text-slate-700">
           로그인 후 이 초대 링크로 다시 접속하면 자동으로 합류 안내가 표시됩니다.
         </p>
       </AuthLayout>
