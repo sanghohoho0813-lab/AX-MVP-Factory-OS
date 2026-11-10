@@ -1504,6 +1504,34 @@ try {
     }, [REF, OWNER_WS])
     check('고객 REST(D-562 · 진짜 RLS): 대표 작업공간 업체 0건', restK === 0, restK)
 
+    // ---------- D-592 고객 찾기 — 화면 · 기능 이름으로 찾아짐 · 닫힌 화면(전문 모듈 · 영업자 정산 · 체크리스트)은 이름으로도 안 나옴 ----------
+    {
+      await go(pk, '/')
+      await pk.waitForTimeout(500)
+      const found = {}
+      for (const q of ['스레드', '일정', '엑셀', '프로필 소개', '정책자금', '정산', '체크리스트', '절세', '고용지원금', '크레탑', '홈페이지 만들기']) found[q] = await searchFor(pk, q)
+      const hit = (q, re) => found[q].includes('화면 · 기능') && re.test(found[q])
+      check(
+        '고객 찾기(D-592): "스레드" · "일정" · "엑셀" · "프로필 소개" → [화면 · 기능] 에서 찾아짐(전문 모듈이 닫혀도 찾기가 빈손이 아님)',
+        hit('스레드', /스레드\(짧은 글/) && hit('일정', /일정/) && hit('엑셀', /엑셀 목록 붙여넣기/) && hit('프로필 소개', /프로필 소개 글 만들기/),
+        ['스레드', '일정', '엑셀', '프로필 소개'].map((q) => `${q}: ${found[q].replace(/\n+/g, '|').slice(0, 90)}`).join(' ## '),
+      )
+      const closedQ = ['정책자금', '정산', '체크리스트', '절세', '고용지원금', '크레탑', '홈페이지 만들기']
+      check(
+        '고객 찾기(D-592): 닫힌 화면 이름(정책자금 · 정산 · 체크리스트 · 절세 · 고용지원금 · 크레탑 · 홈페이지 만들기)은 0 — "일치하는 항목이 없습니다" · 대표 자료 0',
+        closedQ.every((q) => found[q].includes('일치하는 항목이 없습니다') && !found[q].includes('화면 · 기능') && !found[q].includes('전문 모듈')) && Object.values(found).every((t) => leaked(t).length === 0),
+        closedQ.map((q) => `${q}: ${found[q].replace(/\n+/g, '|').slice(0, 70)}`).join(' ## '),
+      )
+      // 아무것도 안 적었을 때 — '일치하는 항목이 없습니다' 대신 무엇을 적으면 되는지
+      await pk.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
+      await pk.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').waitFor({ timeout: 5000 }).catch(() => {})
+      await pk.waitForTimeout(500)
+      const emptyK = (await pk.getByTestId('search-empty').innerText().catch(() => '')) ?? ''
+      check('고객 찾기(D-592): 열자마자(아직 안 적음) — "일치하는 항목이 없습니다" 가 아니라 적을 것 안내(업체 이름이나 화면 이름 · 예)', emptyK.includes('업체 이름이나 화면 이름') && !emptyK.includes('일치하는'), emptyK)
+      await shot(pk, 'customer-02b-search')
+      await pk.keyboard.press('Escape')
+    }
+
     // ---------- D-563 고객 계정 = 기본 OS 만 — 업체를 등록하고 서류를 올려도 화면 안에 전문 모듈로 가는 길이 없다 ----------
     const HID = ['/modules', '/tools/policy-funding', '/tools/employment', '/tools/labcare', '/grants', '/tools/cert-os', '/tools/tax', '/tools/startup-tax', '/tools/cretop', '/upcoming']
     /** 지금 화면 본문 — 닫힌 주소로 가는 링크 · 전문 모듈을 약속하는 말 */

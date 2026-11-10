@@ -23,9 +23,11 @@ import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isProspect } from '../../services/salesPipeline'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { useBackToClose } from '../../lib/backToClose'
+import { useGuideGroups } from '../guide/useGuideGroups'
+import { searchScreens } from '../../content/screenSearch'
 
 interface Hit {
-  group: '고객 관리' | '고객사' | '프로젝트' | '특허·MVP' | '지금 해야 할 일' | '전문 모듈' | '결과·자료'
+  group: '고객 관리' | '고객사' | '프로젝트' | '특허·MVP' | '지금 해야 할 일' | '전문 모듈' | '화면 · 기능' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -54,6 +56,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const pilot = useIsPilot()
   const workspaceId = auth?.currentWorkspaceId ?? null
   const [opsClients, setOpsClients] = useState<ClientOpsRecord[]>([])
+  // D-592 화면 · 기능 이름으로도 찾기 — 사용법 안내와 같은 표(이 계정에 보이는 것만)
+  const guide = useGuideGroups()
   useEffect(() => {
     if (!open) return
     let alive = true
@@ -161,10 +165,17 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       }
     }
     // 도구함 — "부채비율" 처럼 도구 이름이 아닌 말로도 찾게 한다 (D-89)
+    const toolPaths = new Set<string>()
     for (const t of searchTools(query)) {
       if (!t.path || (pilot && isPilotHiddenPath(t.path))) continue
       const path = t.path
       out.push({ group: '전문 모듈', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
+      toolPaths.add(path)
+    }
+    // D-592 화면 · 기능 — 메뉴 이름 · 화면 안 기능 이름(안내 글)으로. 위 전문 모듈에 이미 나온 화면은 겹쳐 적지 않는다
+    for (const h of searchScreens(query, guide.groups, { pilot: guide.pilot, basic: guide.basic })) {
+      if (toolPaths.has(h.path)) continue
+      out.push({ group: '화면 · 기능', label: h.label, sublabel: h.sublabel, onSelect: () => { navigate(h.path); close() } })
     }
     for (const s of pilot ? [] : RESULT_SHORTCUTS) {
       if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {
@@ -173,7 +184,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
     }
     return out.slice(0, 24)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, query, opsClients, pilot])
+  }, [open, query, opsClients, pilot, guide.groups, guide.basic])
 
   useEffect(() => { setActive(0) }, [query])
 
@@ -236,11 +247,13 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {hits.length === 0 ? (
-                <p className="px-3 py-6 text-center text-[0.9375rem] text-slate-400">일치하는 항목이 없습니다.</p>
+                <p className="px-3 py-6 text-center text-[0.9375rem] break-keep text-slate-500" data-testid="search-empty">
+                  {query.trim() ? '일치하는 항목이 없습니다.' : '업체 이름이나 화면 이름을 적어 보세요 — 예: 일정 · 서류 · 스레드'}
+                </p>
               ) : (
                 grouped.map((g) => (
                   <div key={g.group} className="mb-1">
-                    <p className="px-3 py-1.5 text-[0.875rem] font-semibold text-slate-400">{g.group}</p>
+                    <p className="px-3 py-1.5 text-[0.875rem] font-semibold text-slate-400" data-testid="search-group">{g.group}</p>
                     <ul>
                       {g.items.map(({ hit, index }) => (
                         <li key={index}>

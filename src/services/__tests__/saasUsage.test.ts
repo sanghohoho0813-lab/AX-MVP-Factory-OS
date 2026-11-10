@@ -39,6 +39,9 @@ import { hasSavedSignIn } from '../../app/shellChunks'
 import { BIO_CHANNELS, bioBlanks, bioDrafts, bioInputFromBrand, josa, type BioInput } from '../marketing/profileBio'
 import { consultLint } from '../marketing/consultRules'
 import { normalizeClientOps } from '../clientOpsService'
+import { guideGroupsFor } from '../../content/guideGroups'
+import { searchScreens, squashForSearch } from '../../content/screenSearch'
+import { WHATS_NEW, WHATS_NEW_MAX, whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
 
 let passed = 0
 let failed = 0
@@ -956,6 +959,61 @@ async function run() {
       'K29 이메일 · 주소 — 요약 아래 한 줄(이메일 n곳 · 주소 n곳) · 없으면 빈 글 · 이메일 다듬기 · 내려받은 CSV(제목 줄 11칸 · 쉼표 든 주소는 따옴표)를 다시 읽으면 이메일 · 주소 그대로',
       bulkExtrasLine(r2.rows) === '이메일 3곳 · 주소 3곳도 같이 넣어요' && bulkExtrasLine(r1.rows) === '이메일 1곳 · 주소 1곳도 같이 넣어요' && bulkExtrasLine(rowsFromTable(splitPaste('가나상사\n다라마트'), guessColumns(splitPaste('가나상사\n다라마트'))).rows) === '' && tidyEmail(' a@b.co ') === 'a@b.co' && tidyEmail('a@b') === '' && tidyEmail('없음') === '' && CLIENTS_CSV_HEADER.length === 11 && csv.includes('"대전 유성구 대학로 99, 3층"') && rb.rows.length === 1 && rb.rows[0].contactEmail === 'ceo@mail.kr' && rb.rows[0].businessAddress === '대전 유성구 대학로 99, 3층',
       JSON.stringify({ csv, gb, rb: rb.rows }),
+    )
+  }
+
+  /* K30 — D-592 찾기에서 화면 · 기능 이름으로도 */
+  {
+    const { setCustomerAudience } = await import('../../config/customerAudience')
+    const owner = guideGroupsFor({ advanced: true, pilot: false, caps: new Set(), basic: false, pilotMarketing: false })
+    const find = (groups: ReturnType<typeof guideGroupsFor>, opts: { pilot?: boolean; basic?: boolean }, q: string) => searchScreens(q, groups, opts)
+    const o = (q: string) => find(owner, {}, q)
+    check(
+      'K30 찾기 화면 · 기능(대표) — "스레드" 첫 줄 = 스레드 화면 · "프로필소개"(붙여 써도) → 프로필 소개 글 만들기(기초 7가지 화면) · "엑셀" → 여러 업체 등록(고객 관리) · "정산" → 영업자 정산 · "홈 화면" → 넣는 법(사용법 안내) · "찾기" → 안내 글 · 한 글자 · 빈 말 · 없는 말은 0 · 여섯 줄까지',
+      o('스레드')[0]?.path === '/marketing/threads' && o('스레드')[0]?.kind === 'screen' &&
+        o('프로필소개')[0]?.label === '프로필 소개 글 만들기' && o('프로필소개')[0]?.path === '/marketing/basics' && o('프로필 소개')[0]?.sublabel.includes('고객 모으기 기초 7가지') &&
+        o('엑셀')[0]?.path === '/ops/clients' && o('엑셀')[0]?.kind === 'function' &&
+        o('정산')[0]?.path === '/ops/agents' &&
+        o('홈 화면')[0]?.path === '/guide' && o('홈 화면')[0]?.label === '휴대폰 홈 화면에 넣는 법' &&
+        o('찾기')[0]?.path === '/guide?m=fn-search' &&
+        o('글').length === 0 && o('  ').length === 0 && o('없는말없는말').length === 0 && o('서류').length <= 6 && o('서류').length >= 3 &&
+        squashForSearch('프로필 소개 · 글(만들기)') === '프로필소개글만들기',
+      JSON.stringify({ a: o('스레드').map((h) => h.path), b: o('프로필소개'), c: o('엑셀'), d: o('정산'), e: o('홈 화면'), f: o('찾기'), n: o('서류').length }),
+    )
+    setCustomerAudience(true)
+    setPilotMarketingScreens(true)
+    const cust = guideGroupsFor({ advanced: false, pilot: true, caps: new Set(), basic: true, pilotMarketing: true })
+    const c = (q: string) => find(cust, { pilot: true, basic: true }, q)
+    const all = ['스레드', '일정', '서류', '엑셀', '프로필', '내려받기', '오늘', '고객', '영업', '매출', '설정', '문의', '마케팅', '유튜브', '릴스'].flatMap((q) => c(q))
+    check(
+      'K30 찾기 화면 · 기능(고객 계정) — 닫힌 것(정책자금 · 정산 · 체크리스트 · 절세 · 연구소 · 홈페이지 만들기)은 0 · 열린 것(스레드 · 일정 · 엑셀 · 프로필)은 찾아짐 · 가는 주소가 전부 열린 주소 · 설명 글에 모듈 · 판정 · 예상 금액 0',
+      ['정책자금', '정산', '체크리스트', '절세', '연구소', '고용지원금', '홈페이지 만들기', '크레탑'].every((q) => c(q).length === 0) &&
+        c('스레드')[0]?.path === '/marketing/threads' && c('일정')[0]?.path === '/ops/calendar' && c('엑셀')[0]?.path === '/ops/clients' && c('프로필')[0]?.path === '/marketing/basics' &&
+        all.length >= 15 && all.every((h) => !isPilotHiddenPath(h.path.split('?')[0])) && all.every((h) => !/모듈|판정|예상 금액/.test(`${h.label} ${h.sublabel}`)),
+      JSON.stringify({ closed: ['정책자금', '정산', '체크리스트', '절세', '연구소', '고용지원금', '홈페이지 만들기', '크레탑'].map((q) => [q, c(q).map((h) => h.label)]), bad: all.filter((h) => isPilotHiddenPath(h.path.split('?')[0]) || /모듈|판정|예상 금액/.test(`${h.label} ${h.sublabel}`)) }),
+    )
+    setCustomerAudience(false)
+    setPilotMarketingScreens(false)
+  }
+
+  /* K31 — D-593 새로 생긴 것 */
+  {
+    const { setCustomerAudience } = await import('../../config/customerAudience')
+    setCustomerAudience(true)
+    setPilotMarketingScreens(true)
+    const closedForCustomer = WHATS_NEW.filter((x) => x.path && isPilotHiddenPath(x.path.split('?')[0]))
+    setPilotMarketingScreens(false)
+    const closedNoMarketing = whatsNewFor({ marketingOpen: false }).filter((x) => x.path && isPilotHiddenPath(x.path.split('?')[0]))
+    setCustomerAudience(false)
+    const ids = WHATS_NEW.map((x) => x.id)
+    const sorted = [...WHATS_NEW].sort((a, b) => b.date.localeCompare(a.date)).map((x) => x.id)
+    const bad = WHATS_NEW.filter((x) => /모듈|판정|예상 금액|롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅/.test(`${x.title} ${x.how} ${x.cta ?? ''}`) || x.title.length < 8 || x.how.length < 12 || !/^\d{4}-\d{2}-\d{2}$/.test(x.date) || (x.path !== undefined && !x.path.startsWith('/')))
+    check(
+      'K31 새로 생긴 것(D-593) — 열 개까지 · 최근 것이 위 · 열쇠 겹침 0 · 고객 글(모듈 · 판정 · 예상 금액 · 업계 말 0) · 갈 화면은 전부 고객에게 열린 주소 · 마케팅이 닫힌 계정에는 마케팅 줄 빠짐(닫힌 주소 0) · 날짜 "11월 11일"',
+      WHATS_NEW.length >= 5 && WHATS_NEW.length <= WHATS_NEW_MAX && new Set(ids).size === ids.length && ids.join() === sorted.join() && bad.length === 0 && closedForCustomer.length === 0 && closedNoMarketing.length === 0 &&
+        whatsNewFor({ marketingOpen: false }).every((x) => !x.marketing) && whatsNewFor({ marketingOpen: true }).length === WHATS_NEW.length && whatsNewFor({ marketingOpen: false }).length < WHATS_NEW.length &&
+        whatsNewDateLabel('2026-11-11') === '11월 11일' && whatsNewDateLabel('2026-01-05') === '1월 5일' && whatsNewDateLabel('언젠가') === '언젠가' && hasMenuGuide('fn-whats-new'),
+      JSON.stringify({ n: WHATS_NEW.length, bad: bad.map((x) => x.id), closed: closedForCustomer.map((x) => x.id), closed2: closedNoMarketing.map((x) => x.id), order: ids.join() === sorted.join() }),
     )
   }
 

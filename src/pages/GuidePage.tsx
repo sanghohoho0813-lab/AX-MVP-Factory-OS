@@ -8,66 +8,27 @@
  *  - `?m=<메뉴 key>` 로 오면 그 메뉴가 펼쳐진 채(마우스 안내 카드 · 다른 화면의 링크가 데려온다).
  * 규칙 글이다 — AI 를 부르지 않는다.
  */
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, ChevronDown, MessageCircleQuestion, PlayCircle } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
-import { useIsPilot } from '../auth/osAccess'
-import { useCapabilitySet } from '../auth/ownerAiAccess'
-import { useCustomerAudience } from '../config/customerAudience'
-import { usePilotMarketingScreens } from '../config/pilotMarketing'
-import { enabledModulesByGroup, type ModuleDefinition } from '../config/moduleRegistry'
-import { isAdvancedVisible } from '../lib/featureVisibility'
-import { useStoreVersion } from '../lib/useStoreVersion'
-import { GUIDE_LABELS, MARKETING_GUIDE_LIST, menuGuide } from '../content/menuGuide'
+import { GUIDE_LABELS, menuGuide } from '../content/menuGuide'
 import { functionGuidesOf } from '../content/functionGuide'
 import { menuVideo } from '../config/menuVideos'
 import { minutesLabel } from '../config/tutorialVideos'
 import { useTutorial } from '../components/tutorial/tutorialContext'
 import { useSupportState } from '../components/support/useSupport'
 import { AddToHomeHowTo } from '../components/guide/AddToHomeHowTo'
-
-interface Row {
-  key: string
-  label: string
-  path: string
-  hint?: string
-  /** 묶음 안쪽 줄(분야 아래 도구 · 마케팅 안 화면) */
-  nested?: boolean
-  /** 아직 없는 기능(출시 예정 · 준비 중) — [화면 열기] 대신 '준비 중' */
-  soon?: boolean
-  /** 화면이 아니라 단추(D-569 어느 화면에나 있는 위쪽 단추) — [이 화면 열기] 없음 */
-  noLink?: boolean
-}
-
-function rowsOf(items: ModuleDefinition[], marketingOpen: boolean, basic: boolean): Row[] {
-  const out: Row[] = []
-  const tops = items.filter((m) => !m.parent)
-  for (const m of tops) {
-    out.push({ key: m.key, label: m.label, path: m.path, hint: m.hint, soon: m.status === 'soon' || m.status === 'next' })
-    for (const c of items.filter((x) => x.parent === m.key)) out.push({ key: c.key, label: c.label, path: c.path, hint: c.hint, nested: true, soon: c.key.startsWith('up-') })
-    if (m.key === 'marketing' && marketingOpen) for (const s of MARKETING_GUIDE_LIST) if (!(basic && s.basicHidden)) out.push({ key: s.key, label: s.label, path: s.path, nested: true })
-  }
-  return out
-}
+import { useGuideGroups } from '../components/guide/useGuideGroups'
+import { WhatsNew } from '../components/guide/WhatsNew'
 
 export function GuidePage() {
-  const pilot = useIsPilot()
-  const caps = useCapabilitySet()
-  const basic = useCustomerAudience()
-  const pilotMarketing = usePilotMarketingScreens()
-  useStoreVersion()
+  const { groups, pilot, basic } = useGuideGroups()
   const tutorial = useTutorial()
   const support = useSupportState(pilot)
   const [params, setParams] = useSearchParams()
   const want = params.get('m') ?? ''
 
-  const groups = useMemo(() => {
-    const menus = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot, caps }).map((g) => ({ key: g.group.key as string, title: g.group.title, rows: rowsOf(g.items, !pilot || pilotMarketing, basic) }))
-    // D-569 어느 화면에나 있는 위쪽 단추(찾기 · 종 · 화면 꾸미기 …) — 메뉴 묶음 뒤에 한 묶음
-    const top: Row[] = functionGuidesOf('top', { pilot, basic }).map(({ key, guide }) => ({ key, label: guide.label, path: '', noLink: true }))
-    return top.length > 0 ? [...menus, { key: 'top', title: '어느 화면에나', rows: top }] : menus
-  }, [pilot, caps, pilotMarketing, basic])
   const wantGroup = groups.find((g) => g.rows.some((r) => r.key === want))?.key
   const [tab, setTab] = useState<string | null>(null)
   const active = groups.find((g) => g.key === (tab ?? wantGroup)) ?? groups[0]
@@ -166,6 +127,9 @@ export function GuidePage() {
           )
         })}
       </ul>
+
+      {/* D-593 새로 생긴 것(접힌 한 줄) — 뭐가 바뀌었는지 화면 안에서 보고 한 번 눌러 써 본다 */}
+      <WhatsNew />
 
       {/* D-587 매일 쓰게 — 휴대폰 홈 화면에 넣는 법(접힌 한 줄) */}
       <AddToHomeHowTo />

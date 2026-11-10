@@ -500,6 +500,101 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   check('G17 앱이 뜨면 첫 화면은 사라짐(남아 있지 않음) · 느릴 때 안내 줄도 없음', (await mp.getByTestId('boot-splash').count()) === 0 && (await mp.locator('#boot-slow').count()) === 0 && (await mp.locator('header').count()) >= 1)
 }
 
+/* G18 찾기에서 화면 · 기능 이름으로도(D-592) — 메뉴 이름 · 화면 안 기능 이름 → 그 화면으로 · 붙여 써도 · 휴대폰에서도 */
+{
+  const sp = await ctx.newPage()
+  sp.on('pageerror', (e) => errors.push(String(e)))
+  await sp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await sp.waitForTimeout(600)
+  await sp.keyboard.press('Control+k')
+  const box = sp.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  await box.waitFor({ timeout: 5000 })
+  const dlg = sp.getByRole('dialog', { name: '빠른 이동 검색' })
+  const ask = async (q) => {
+    await box.fill(q)
+    await sp.waitForTimeout(450)
+    return { groups: await sp.getByTestId('search-group').allInnerTexts(), text: (await dlg.innerText().catch(() => '')) ?? '' }
+  }
+  const a1 = await ask('스레드')
+  check('G18 찾기 "스레드" → [화면 · 기능] 묶음 · 첫 줄 스레드 화면(무엇을 하는 곳인지 한 줄) · 화면 안 기능(올리는 법)도', a1.groups.includes('화면 · 기능') && /화면 · 기능\s+스레드\s+스레드\(짧은 글/.test(a1.text) && a1.text.includes("'스레드' 화면 안"), a1.text.slice(0, 260))
+  if (SHOTS) await sp.screenshot({ path: `${SHOTS}/guide-18-search.png` }).catch(() => {})
+  const a2 = await ask('프로필소개')
+  const a3 = await ask('엑셀')
+  const a4 = await ask('홈 화면')
+  check(
+    'G18 찾기 — 붙여 쓴 "프로필소개" → 프로필 소개 글 만들기(기초 7가지 화면 안) · "엑셀" → 여러 업체 등록(고객 관리 화면 안) · "홈 화면" → 넣는 법(사용법 안내 화면 안)',
+    a2.text.includes('프로필 소개 글 만들기') && a2.text.includes("'고객 모으기 기초 7가지' 화면 안") && a3.text.includes('엑셀 목록 붙여넣기') && a3.text.includes("'고객 관리' 화면 안") && a4.text.includes('휴대폰 홈 화면에 넣는 법') && a4.text.includes("'사용법 안내' 화면 안"),
+    [a2.text, a3.text, a4.text].map((t) => t.slice(0, 120)).join(' ## '),
+  )
+  const a5 = await ask('부채비율')
+  const a6 = await ask('없는말없는말')
+  const a7 = await ask('글')
+  check('G18 찾기 — 예전 길 그대로("부채비율" → 전문 모듈 크레탑 분석기) · 없는 말은 "일치하는 항목이 없습니다" · 한 글자는 화면 · 기능을 찾지 않음', a5.text.includes('크레탑 분석기') && a6.text.includes('일치하는 항목이 없습니다') && !a7.groups.includes('화면 · 기능'), [a5.text, a6.text, a7.groups.join()].map((t) => t.slice(0, 100)).join(' ## '))
+  await box.fill('프로필 소개')
+  await sp.waitForTimeout(450)
+  await sp.keyboard.press('Enter')
+  await sp.waitForTimeout(900)
+  check('G18 찾기 — Enter 한 번에 그 화면으로(/marketing/basics) · 창 닫힘 · 프로필 소개 글 만들기 줄이 있음', new URL(sp.url()).pathname === '/marketing/basics' && (await dlg.count()) === 0 && (await sp.getByTestId('mk-bio').count()) === 1, sp.url())
+  await sp.close()
+  // 휴대폰(390) — 머리줄 [찾기] → 같은 묶음 · 누르면 그 화면 · 옆 넘침 0
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(500)
+  await mp.getByRole('button', { name: /^찾기|찾기$/ }).filter({ visible: true }).first().click()
+  const mbox = mp.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구')
+  await mbox.waitFor({ timeout: 5000 })
+  await mbox.fill('일정')
+  await mp.waitForTimeout(450)
+  const mg = await mp.getByTestId('search-group').allInnerTexts()
+  const mo = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  await mp.getByRole('dialog', { name: '빠른 이동 검색' }).getByRole('button', { name: /^일정/ }).first().click()
+  await mp.waitForTimeout(800)
+  check('G18 휴대폰(390) 찾기 "일정" → [화면 · 기능] · 누르면 일정 화면(/ops/calendar) · 옆 넘침 0', mg.includes('화면 · 기능') && new URL(mp.url()).pathname === '/ops/calendar' && mo <= 1, `${mg.join()} ${mp.url()} over=${mo}`)
+}
+
+/* G19 새로 생긴 것(D-593) — 사용법 안내 화면의 접힌 한 줄 → 최근 것부터 한 줄씩 · 누르면 그 화면 · 390 */
+{
+  await mp.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(600)
+  const wn = mp.getByTestId('whats-new')
+  const folded = (await wn.count()) === 1 && !(await wn.evaluate((d) => d.open))
+  const sum = ((await mp.getByTestId('whats-new-toggle').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  await mp.getByTestId('whats-new-toggle').click()
+  await mp.waitForTimeout(300)
+  const items = await mp.getByTestId('whats-new-item').count()
+  const first = ((await mp.getByTestId('whats-new-item').first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  const m = await mp.evaluate(() => {
+    const box = document.querySelector('[data-testid="whats-new"]')
+    const els = [...box.querySelectorAll('p, a, span, summary')]
+    return {
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      small: [...box.querySelectorAll('a, summary')].filter((e) => e.getBoundingClientRect().height < 40).length,
+      minFont: Math.min(...els.map((e) => parseFloat(getComputedStyle(e).fontSize))),
+      text: box.innerText,
+    }
+  })
+  check(
+    'G19 사용법 안내 › 새로 생긴 것(390): 처음엔 접힌 한 줄("최근 n가지") → 펼치면 5~10줄 · 줄마다 날짜(n월 n일) · 이렇게 써 보세요 · 옆 넘침 0 · 40px 보다 작은 칸 0 · 글자 14px 이상 · 모듈 · 판정 · 예상 금액 0',
+    folded && /새로 생긴 것 — 최근 \d+가지/.test(sum) && items >= 5 && items <= 10 && /\d+월 \d+일/.test(first) && m.over <= 1 && m.small === 0 && m.minFont >= 14 && !/모듈|판정|예상 금액/.test(m.text),
+    JSON.stringify({ folded, sum, items, first: first.slice(0, 80), over: m.over, small: m.small, minFont: m.minFont }),
+  )
+  if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-19-whatsnew-390.png` }).catch(() => {})
+  const goText = ((await mp.getByTestId('whats-new-go').first().innerText().catch(() => '')) ?? '').trim()
+  await mp.getByTestId('whats-new-go').first().click()
+  await mp.waitForTimeout(1200)
+  check('G19 새로 생긴 것 › [엑셀 목록 넣어 보기] → 고객 관리의 붙여넣는 창이 바로 열림(?bulk=1)', goText.includes('엑셀 목록 넣어 보기') && new URL(mp.url()).pathname === '/ops/clients' && (await mp.getByTestId('bulk-paste-text').count()) === 1, `${goText} ${mp.url()}`)
+  await mp.keyboard.press('Escape').catch(() => {})
+  // PC — 접힌 줄에 마우스 → 기능 안내 카드
+  const wp = await ctx.newPage()
+  wp.on('pageerror', (e) => errors.push(String(e)))
+  await wp.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+  await wp.waitForTimeout(600)
+  await wp.getByTestId('whats-new-toggle').hover()
+  await wp.waitForTimeout(900)
+  const wcard = wp.getByTestId('menu-guide-card')
+  check('G19 PC: [새로 생긴 것] 줄에 마우스 → 기능 안내 카드(fn-whats-new) · [홈 화면에 넣는 법] 줄도(fn-home-howto)', (await wcard.getAttribute('data-key').catch(() => '')) === 'fn-whats-new' && (await wp.getByTestId('home-howto-toggle').getAttribute('data-guide')) === 'fn-home-howto', await wcard.getAttribute('data-key').catch(() => ''))
+  await wp.close()
+}
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })
