@@ -318,9 +318,15 @@ try {
   await page.getByTestId('cert-complete-date').fill('2026-03-15')
   await page.getByTestId('cert-complete-fill').click()
   await page.getByTestId('cert-complete-save').click()
-  await page.waitForTimeout(1500)
-  const certPay = JSON.parse(sql(`select payload::text from public.operations_clients where id = '${OWNER_CLIENT}'`) || '{}')
-  const innoCred = (certPay.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+  // 저장이 DB 에 닿을 때까지 기다린다 — 예전에는 1.5초만 기다려서 시험 기계가 바쁠 때(다른 빌드 · 시험과 겹칠 때) 빈 값을 읽고 실패했다(2026-11-10)
+  let certPay = {}
+  let innoCred = []
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(500)
+    certPay = JSON.parse(sql(`select payload::text from public.operations_clients where id = '${OWNER_CLIENT}'`) || '{}')
+    innoCred = (certPay.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+    if (innoCred.length > 0 && i >= 2) break
+  }
   check('클라우드(P1): 인증 완료 → 업체 기록(DB) 인증서 칸 1개 · 갱신 일정 3줄', innoCred.length === 1 && innoCred[0].value.includes('2029-03-14까지') && ((certPay.toolResults ?? []).find((t) => t.toolKey === 'cert-os')?.deadlines?.length ?? 0) === 3, JSON.stringify(innoCred))
 
   // D-180: 클라우드(진짜 RLS) — 앱이 특허를 저장해도 DB 에 있는 예전 벤처 기록은 그대로(서비스가 저장 전에 DB 를 한 번 읽고 잠긴 칸만 되돌린다)
