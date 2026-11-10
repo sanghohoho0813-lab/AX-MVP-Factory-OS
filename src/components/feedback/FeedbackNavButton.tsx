@@ -5,13 +5,17 @@
  *  - 팀장(Pilot · 대표가 팀장 화면 보기): 옅은 금색 테두리 [개발자에게 피드백](D-189 — 꽉 찬 금색은 과해서). 이번 회차 설문을 아직 안 보냈으면 '새 설문' 점.
  *  - 대표: [받은 피드백함] + 안 읽은 피드백 수(빨간 숫자).
  * 로그인(클라우드) 모드에서만 — 로컬 모드에는 팀장이 없다.
+ * D-568 외부 구독 고객에게는 팀장용 설문 대신 [문의하기](문의 창구가 열려 있을 때) — 답장이 오면 '답장' 표시.
+ *       대표의 숫자에는 받은 문의 · 화면 오류 가운데 안 읽은 것도 더한다.
  */
 
 import { useContext } from 'react'
 import { Link } from 'react-router-dom'
-import { Inbox, MessageSquareHeart } from 'lucide-react'
+import { Inbox, MessageCircleQuestion, MessageSquareHeart } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useIsPilot } from '../../auth/osAccess'
+import { useCustomerAudience } from '../../config/customerAudience'
+import { useSupportInbox, useSupportReplies, useSupportState } from '../support/useSupport'
 import { getDataModeConfig } from '../../data/dataMode'
 import { todayLocalDate } from '../../lib/appClock'
 import { feedbackRound } from '../../services/feedbackSurvey'
@@ -58,12 +62,37 @@ function PilotFeedbackButton({ collapsed, onNavigate, tone }: { collapsed: boole
   )
 }
 
+/** D-568 구독 고객: [문의하기] — 문의 창구(0025)가 없으면 그리지 않는다 */
+function CustomerSupportButton({ collapsed, onNavigate, tone }: { collapsed: boolean; onNavigate?: () => void; tone: Tone }) {
+  const state = useSupportState()
+  const replies = useSupportReplies()
+  const light = tone === 'light'
+  if (state !== 'ready') return null
+  return (
+    <Link
+      to="/support"
+      onClick={onNavigate}
+      data-testid="support-open"
+      data-replies={replies}
+      aria-label={collapsed ? `문의하기${replies > 0 ? ' — 새 답장' : ''}` : undefined}
+      title={collapsed ? '문의하기' : undefined}
+      className={`${light ? LOOK_LIGHT : LOOK} ${collapsed ? 'justify-center px-0' : ''}`}
+    >
+      <MessageCircleQuestion aria-hidden="true" className={`size-5 shrink-0 ${light ? 'text-brand-600' : 'text-amber-300'}`} />
+      {!collapsed && <span className="min-w-0 flex-1 truncate">문의하기</span>}
+      {replies > 0 && !collapsed && <span className={light ? 'shrink-0 rounded-full border border-brand-200 px-2 py-0.5 text-[0.78rem] font-semibold text-brand-700' : 'shrink-0 rounded-full bg-amber-300/15 px-2 py-0.5 text-[0.78rem] font-semibold text-amber-200'}>새 답장</span>}
+    </Link>
+  )
+}
+
 function OwnerInboxButton({ collapsed, onNavigate, tone }: { collapsed: boolean; onNavigate?: () => void; tone: Tone }) {
-  const { unread } = useFeedbackInbox()
+  const feedback = useFeedbackInbox()
+  const support = useSupportInbox()
+  const unread = feedback.unread + support.unread
   const light = tone === 'light'
   return (
     <Link
-      to="/feedback/inbox"
+      to={feedback.unread === 0 && support.unread > 0 ? '/feedback/inbox?tab=support' : '/feedback/inbox'}
       onClick={onNavigate}
       data-testid="feedback-inbox-open"
       data-unread={unread}
@@ -89,7 +118,29 @@ export function FeedbackNavButton({ collapsed = false, onNavigate, tone = 'dark'
   const auth = useContext(AuthContext)
   const pilot = useIsPilot()
   if (getDataModeConfig().mode !== 'supabase' || !auth?.session) return null
-  return pilot ? <PilotFeedbackButton collapsed={collapsed} onNavigate={onNavigate} tone={tone} /> : <OwnerInboxButton collapsed={collapsed} onNavigate={onNavigate} tone={tone} />
+  return pilot ? <PilotSideButton collapsed={collapsed} onNavigate={onNavigate} tone={tone} /> : <OwnerInboxButton collapsed={collapsed} onNavigate={onNavigate} tone={tone} />
+}
+
+/** 팀장 등급 — 내부 팀장은 설문, 외부 구독 고객은 문의하기(설문은 대표가 팀장 작업공간을 읽어야 닿는다 — 고객에게는 안 통한다) */
+function PilotSideButton(props: { collapsed: boolean; onNavigate?: () => void; tone: Tone }) {
+  const customer = useCustomerAudience()
+  return customer ? <CustomerSupportButton {...props} /> : <PilotFeedbackButton {...props} />
+}
+
+function CustomerReplyDot({ collapsed }: { collapsed: boolean }) {
+  const replies = useSupportReplies()
+  if (replies <= 0) return null
+  if (collapsed) return <span data-testid="settings-support-reply" aria-label="새 답장" className="absolute top-1.5 right-3 size-2.5 rounded-full bg-amber-300" />
+  return (
+    <span data-testid="settings-support-reply" className="t-meta ml-auto shrink-0 rounded-full bg-amber-300/15 px-2 py-0.5 font-semibold text-amber-200">
+      답장
+    </span>
+  )
+}
+
+function PilotDot({ collapsed }: { collapsed: boolean }) {
+  const customer = useCustomerAudience()
+  return customer ? <CustomerReplyDot collapsed={collapsed} /> : <PilotFreshDot collapsed={collapsed} />
 }
 
 function PilotFreshDot({ collapsed }: { collapsed: boolean }) {
@@ -103,7 +154,9 @@ function PilotFreshDot({ collapsed }: { collapsed: boolean }) {
 }
 
 function OwnerUnreadDot({ collapsed }: { collapsed: boolean }) {
-  const { unread } = useFeedbackInbox()
+  const feedback = useFeedbackInbox()
+  const support = useSupportInbox()
+  const unread = feedback.unread + support.unread
   if (unread <= 0) return null
   const text = unread > 99 ? '99+' : String(unread)
   return (
@@ -122,5 +175,5 @@ export function FeedbackNavDot({ collapsed }: { collapsed: boolean }) {
   const auth = useContext(AuthContext)
   const pilot = useIsPilot()
   if (getDataModeConfig().mode !== 'supabase' || !auth?.session) return null
-  return pilot ? <PilotFreshDot collapsed={collapsed} /> : <OwnerUnreadDot collapsed={collapsed} />
+  return pilot ? <PilotDot collapsed={collapsed} /> : <OwnerUnreadDot collapsed={collapsed} />
 }

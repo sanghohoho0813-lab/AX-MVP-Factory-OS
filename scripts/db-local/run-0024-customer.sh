@@ -50,7 +50,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000d1', 'cust24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -93,7 +93,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000b1', 'pilot24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }

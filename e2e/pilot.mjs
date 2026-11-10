@@ -1565,6 +1565,9 @@ try {
 
     // ---------- D-564 고객 계정 마케팅 · 브랜딩 — 화면은 열리고, 대표 채널 · AX · AI 기본 주제 없이 '내 채널부터' ----------
     check('고객 메뉴(D-564): 마케팅 · 브랜딩 있음(대표 전용에서 풀림)', navK.includes('마케팅 · 브랜딩'), navK.replace(/\n/g, '|').slice(0, 400))
+    // 위에서 사용법 안내 · 설정을 다녀왔다 — 처음 시작 카드는 오늘 화면에 있다
+    await go(pk, '/')
+    await pk.getByTestId('today-firstuse').waitFor({ timeout: 8000 }).catch(() => {})
     const headK0 = ((await pk.locator('header').first().innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
     const stepsFirst = ((await pk.getByTestId('today-firstuse').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
     check('고객(D-564) 오늘: 이름을 아직 안 적었으면 처음 시작 카드가 "다음: 내 이름 · 회사 적기"', (await pk.getByTestId('today-firstuse').getAttribute('data-next').catch(() => '')) === 'me' && stepsFirst.includes('내 이름 · 회사 적기'), `${stepsFirst.slice(0, 200)} / 머리줄: ${headK0.slice(0, 120)}`)
@@ -1656,6 +1659,139 @@ try {
     const smartO = (await po.locator('main').innerText().catch(() => '')) ?? ''
     check('대표 맞춤 추천(D-563): 모듈별 판정 · 맞춤 상담 · 맞는 지원사업 칸 그대로', (await po.locator('#module-verdicts').count()) === 1 && ['모듈별 판정', '맞춤 상담', '맞는 지원사업'].every((x) => smartO.includes(x)), smartO.replace(/\n/g, '|').slice(0, 300))
     await cO.close()
+  }
+
+  // ---------- D-568 출시 목록 L-4: 고객 문의 · 화면 오류 → 대표 받은함 → 답장 → 고객 화면(진짜 RLS · 0025) ----------
+  {
+    const open = async (u) => {
+      const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+      const pg = await c.newPage()
+      // 아래에서 일부러 내는 오류는 세지 않는다
+      pg.on('pageerror', (e) => {
+        if (!String(e).includes('e2e 일부러 낸 오류')) errors.push(String(e))
+      })
+      await c.route(`https://${REF}.supabase.co/**`, route)
+      await login(pg, u)
+      return [c, pg]
+    }
+    const attack = (pg) =>
+      pg.evaluate(async ([ref]) => {
+        const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+        const h = { apikey: 'qa-anon', Authorization: `Bearer ${tok}`, 'content-type': 'application/json' }
+        const base = `https://${ref}.supabase.co/rest/v1`
+        const inbox = await fetch(`${base}/rpc/support_inbox`, { method: 'POST', headers: h, body: '{}' }).then(async (r) => (r.ok ? (await r.json()).length : -1))
+        const rows = await fetch(`${base}/support_messages?select=user_id`, { headers: h }).then(async (r) => (r.ok ? await r.json() : []))
+        const reply = await fetch(`${base}/rpc/support_reply`, { method: 'POST', headers: h, body: JSON.stringify({ p_id: '00000000-0000-0000-0000-000000000000', p_reply: 'x' }) }).then((r) => r.status)
+        const read = await fetch(`${base}/rpc/support_mark_read`, { method: 'POST', headers: h, body: JSON.stringify({ p_ids: [] }) }).then((r) => r.status)
+        const ins = await fetch(`${base}/support_messages`, { method: 'POST', headers: h, body: JSON.stringify({ kind: 'question', body: '직접 넣기' }) }).then((r) => r.status)
+        const upd = await fetch(`${base}/support_messages?kind=eq.question`, { method: 'PATCH', headers: h, body: JSON.stringify({ reply: '내가 쓴 답' }) }).then((r) => r.status)
+        const del = await fetch(`${base}/support_messages?kind=eq.question`, { method: 'DELETE', headers: h }).then((r) => r.status)
+        return { inbox, users: [...new Set(rows.map((x) => x.user_id))], reply, read, ins, upd, del }
+      }, [REF])
+    const blocked = (a) => a.inbox === 0 && [a.reply, a.read, a.ins, a.upd, a.del].every((st) => st >= 400)
+    check('문의(D-568) 준비: 0025 적용 · 처음에는 0줄', sql(`select count(*) from public.support_messages`) === '0')
+
+    // (1) 고객: 팀장용 설문 대신 [문의하기] → 보내기 → 화면 오류 자동
+    let [cS, ps] = await open(CUSTOMER)
+    await go(ps, '/settings')
+    await ps.waitForTimeout(900)
+    check('고객(D-568) 설정: 팀장용 [개발자에게 피드백] 없음 · [문의하기] 있음', (await ps.getByTestId('feedback-open').count()) === 0 && (await ps.getByTestId('support-open').count()) >= 1)
+    await go(ps, '/feedback')
+    await ps.waitForTimeout(900)
+    check('고객(D-568): /feedback(팀장용 설문) 주소 → 문의하기로', new URL(ps.url()).pathname === '/support' && (await ps.getByTestId('support-page').count()) === 1, ps.url())
+    await go(ps, '/guide')
+    await ps.getByTestId('guide-support').waitFor({ timeout: 8000 }).catch(() => {})
+    await ps.getByTestId('guide-support').click()
+    await ps.getByTestId('support-text').waitFor({ timeout: 8000 })
+    await ps.waitForTimeout(500)
+    check('고객(D-568) 문의하기: 첫 화면은 적는 칸 하나 + [보내기](빈 칸이면 못 누름) · 아직 보낸 것 없음', (await ps.getByTestId('support-send').isDisabled()) && (await ps.getByTestId('support-empty').count()) === 1 && leaked((await mainText(ps)) ?? '').length === 0)
+    await shot(ps, 'customer-10-support')
+    const ASK = '서류를 올렸는데 칸에 안 들어가요. 어떻게 하나요?'
+    await ps.getByTestId('support-text').fill(ASK)
+    await ps.getByTestId('support-send').click()
+    await ps.getByTestId('support-sent').waitFor({ timeout: 8000 }).catch(() => {})
+    await ps.getByTestId('support-row').first().waitFor({ timeout: 8000 }).catch(() => {})
+    const rowS = sql(`select kind || '|' || body || '|' || (read_at is null)::text from public.support_messages where user_id = '${CUSTOMER.id}' and kind = 'question'`)
+    check('고객(D-568): [보내기] → "보냈어요" · 목록 1건(보냈어요) · DB 에 고객 계정으로 한 줄(안 읽음)', (await ps.getByTestId('support-sent').count()) === 1 && (await ps.getByTestId('support-row').count()) === 1 && (await ps.getByTestId('support-row').first().getAttribute('data-status')) === 'sent' && rowS === `question|${ASK}|true`, rowS)
+    await shot(ps, 'customer-11-support-sent')
+    await go(ps, '/ops/clients')
+    await ps.waitForTimeout(700)
+    await ps.evaluate(() => {
+      setTimeout(() => {
+        throw new Error('e2e 일부러 낸 오류 010-9999-8888')
+      }, 0)
+    })
+    await ps.waitForTimeout(2200)
+    const errS = sql(`select body || '|' || (context->>'path') || '|' || (context->>'source') from public.support_messages where user_id = '${CUSTOMER.id}' and kind = 'error'`)
+    check('고객(D-568) 화면 오류: 운영자에게 자동으로 한 줄 — 전화번호는 가려서 · 화면 주소 · 잡힌 곳(업체 자료 0)', errS.includes('e2e 일부러 낸 오류 (숫자)') && !errS.includes('9999') && errS.endsWith('|/ops/clients|window'), errS)
+    const atkC = await attack(ps)
+    check('고객 공격(D-568 · 진짜 RLS): 받은함 0줄 · 답장 · 읽음 · 직접 넣기 · 고치기 · 지우기 막힘 · 자기 글만 읽힘', blocked(atkC) && atkC.users.join() === CUSTOMER.id, JSON.stringify(atkC))
+    await cS.close()
+
+    // (2) 내부 팀장: 고객 글은 안 보이고, 받은함 · 답장도 막힌다. 팀장용 설문은 그대로
+    let [cT, pt] = await open(PILOT)
+    await go(pt, '/settings')
+    await pt.waitForTimeout(900)
+    check('내부 팀장(D-568) 설정: [개발자에게 피드백] 그대로', (await pt.getByTestId('feedback-open').count()) >= 1)
+    const atkP = await attack(pt)
+    check('내부 팀장 공격(D-568 · 진짜 RLS): 고객 문의 0줄 · 받은함 0줄 · 답장 · 읽음 · 직접 쓰기 막힘', blocked(atkP) && !atkP.users.includes(CUSTOMER.id), JSON.stringify(atkP))
+    await cT.close()
+
+    // (3) 대표: 종 · 메뉴 숫자 → 받은 피드백함 [문의 · 오류] 탭 → 열면 읽음 → 답장
+    let [cW, pw] = await open(OWNER)
+    await go(pw, '/')
+    await pw.waitForTimeout(1500)
+    const dotW = pw.locator('aside [data-testid="settings-feedback-unread"]').first()
+    check('대표(D-568): 메뉴 설정 줄 숫자에 새 문의 · 오류 2', (await dotW.count()) === 1 && ((await dotW.innerText()) ?? '').trim() === '2', await dotW.innerText().catch(() => ''))
+    await pw.locator('header button[aria-label^="챙길 것"]').first().click()
+    await pw.waitForTimeout(300)
+    const bellS = pw.getByTestId('bell-support')
+    check('대표(D-568): 종에 "새로 온 문의 1건 · 화면 오류 1건"', (await bellS.count()) === 1 && /문의 1건 · 화면 오류 1건/.test(await bellS.innerText()), await bellS.innerText().catch(() => ''))
+    await bellS.click()
+    await pw.waitForURL(/\/feedback\/inbox\?tab=support$/, { timeout: 10000 }).catch(() => {})
+    await pw.getByTestId('support-inbox-entry').first().waitFor({ timeout: 10000 }).catch(() => {})
+    await pw.waitForTimeout(1200)
+    const inboxText = ((await pw.getByTestId('support-inbox').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('대표(D-568) 받은함: 탭 둘(팀장 의견 · 문의 · 오류) · 고객 문의 + 화면 오류 2건 · 보낸 사람 이메일 · "구독 고객" · 새로 표시', (await pw.getByTestId('inbox-tabs').count()) === 1 && (await pw.getByTestId('support-inbox-entry').count()) === 2 && inboxText.includes(ASK) && inboxText.includes('e2e 일부러 낸 오류 (숫자)') && inboxText.includes(CUSTOMER.email) && inboxText.includes('구독 고객') && inboxText.includes('새로'), inboxText.slice(0, 400))
+    const readN = sql(`select count(*) from public.support_messages where read_at is not null`)
+    check('대표(D-568): 열면 읽음으로 적힘(DB 2줄) · 메뉴 숫자 사라짐', readN === '2' && (await pw.locator('aside [data-testid="settings-feedback-unread"]').count()) === 0, readN)
+    await shot(pw, 'owner-support-inbox')
+    const qCard = pw.locator('[data-testid="support-inbox-entry"][data-kind="question"]').first()
+    await qCard.getByTestId('support-inbox-reply-open').click()
+    const ANSWER = '서류함에서 그 파일의 [무슨 서류?] 를 눌러 칸을 골라 주세요.'
+    await qCard.getByTestId('support-inbox-reply-text').fill(ANSWER)
+    await qCard.getByTestId('support-inbox-reply-send').click()
+    await pw.waitForTimeout(1500)
+    const replyDb = sql(`select coalesce(reply, '') || '|' || body || '|' || (seen_at is null)::text from public.support_messages where kind = 'question'`)
+    check('대표(D-568): 답장 → DB 에 답장만 적힘(보낸 글은 그대로) · 화면에 보낸 답장', replyDb === `${ANSWER}|${ASK}|true` && (await pw.getByTestId('support-inbox-reply').count()) >= 1, replyDb)
+    await pw.getByTestId('inbox-tab-feedback').click()
+    await pw.waitForTimeout(600)
+    check('대표(D-568): [팀장 의견] 탭 — 예전 받은 피드백함 그대로(팀장이 보낸 의견)', (await pw.getByTestId('feedback-entry').count()) >= 1 && (await pw.getByTestId('support-inbox').count()) === 0)
+    await pw.setViewportSize({ width: 390, height: 844 })
+    await go(pw, '/feedback/inbox?tab=support')
+    await pw.waitForTimeout(900)
+    check('대표 390(D-568): 받은 문의 · 오류 가로 넘침 0', (await overflowX(pw)) <= 0 && (await pw.getByTestId('support-inbox-entry').count()) === 2, String(await overflowX(pw)))
+    await shot(pw, 'owner-support-inbox-390')
+    await cW.close()
+
+    // (4) 고객: 메뉴에 '답장' → 문의하기에 운영자 답장 → 본 것으로
+    ;[cS, ps] = await open(CUSTOMER)
+    await go(ps, '/')
+    await ps.waitForTimeout(1500)
+    check('고객(D-568): 메뉴 설정 줄에 "답장" 표시', (await ps.locator('aside [data-testid="settings-support-reply"]').count()) === 1)
+    await go(ps, '/support')
+    await ps.getByTestId('support-reply').first().waitFor({ timeout: 8000 }).catch(() => {})
+    await ps.waitForTimeout(1200)
+    const replyText = ((await ps.getByTestId('support-list').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    const seenDb = sql(`select (seen_at is not null)::text from public.support_messages where kind = 'question'`)
+    check('고객(D-568) 문의하기: 운영자 답장이 보임 · "새 답장" · 본 것으로 적힘(DB) · 자동으로 전해진 오류 1건(접힘)', replyText.includes(ANSWER) && replyText.includes('새 답장') && seenDb === 'true' && ((await ps.getByTestId('support-errors').innerText().catch(() => '')) ?? '').includes('1건'), `${replyText.slice(0, 200)} seen=${seenDb}`)
+    await shot(ps, 'customer-12-support-reply')
+    await ps.setViewportSize({ width: 390, height: 844 })
+    await go(ps, '/support')
+    await ps.waitForTimeout(900)
+    check('고객 390(D-568): 문의하기 가로 넘침 0 · 본 뒤에는 "답장" 표시 사라짐', (await overflowX(ps)) <= 0 && (await ps.locator('[data-testid="settings-support-reply"]').count()) === 0, String(await overflowX(ps)))
+    await shot(ps, 'customer-13-support-390')
+    await cS.close()
   }
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))

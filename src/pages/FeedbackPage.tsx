@@ -11,6 +11,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { Check, CheckCircle2, MessageSquareHeart, Send } from 'lucide-react'
 import { AuthContext } from '../auth/authContext'
 import { useIsPilot, useViewingPilot } from '../auth/osAccess'
+import { useCustomerAudience } from '../config/customerAudience'
 import { useCurrentUser } from '../components/layout/useCurrentUser'
 import { useMyFeedback } from '../components/feedback/useFeedback'
 import { Button } from '../components/ui/Button'
@@ -27,6 +28,7 @@ function whenText(iso: string): string {
 
 export function FeedbackPage() {
   const pilot = useIsPilot()
+  const customer = useCustomerAudience()
   const viewing = useViewingPilot()
   const auth = useContext(AuthContext)
   const me = useCurrentUser()
@@ -49,6 +51,8 @@ export function FeedbackPage() {
 
   // 대표 화면에서는 받은 피드백함으로
   if (!pilot) return <Navigate to="/feedback/inbox" replace />
+  // D-568 이 설문은 내부 팀장용(대표가 팀장 작업공간을 읽어야 닿는다) — 외부 구독 고객은 문의하기로
+  if (customer) return <Navigate to="/support" replace />
 
   const set = (id: string, v: FeedbackAnswers[string] | undefined) =>
     setAnswers((cur) => {

@@ -8,6 +8,7 @@ import { todayLocalDate } from '../../lib/appClock'
 import type { OpsAlert } from '../../types/clientOps'
 import { useIsPilot } from '../../auth/osAccess'
 import { useFeedbackInbox } from '../feedback/useFeedback'
+import { useSupportInbox } from '../support/useSupport'
 
 /**
  * 헤더 알림 종 — 데모 상수가 아니라 실제 경고(마감·서류·수금)와 열린 고객 이벤트 수를 보여준다.
@@ -71,7 +72,11 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   // D-188: 팀장이 보낸 새 피드백 — 대표 종에도
   const { entries: feedback, unread: feedbackUnread } = useFeedbackInbox()
   const feedbackFrom = [...new Set((feedback ?? []).filter((e) => !e.readAt).map((e) => e.person))].join(' · ')
-  const count = critical.length + events.length + feedbackUnread
+  // D-568: 고객 · 팀장이 보낸 문의와 그 화면에서 난 오류 — 대표 종에도
+  const { entries: support, unread: supportUnread } = useSupportInbox()
+  const supportNew = (support ?? []).filter((m) => !m.readAt)
+  const supportText = [supportNew.some((m) => m.kind === 'question') ? `문의 ${supportNew.filter((m) => m.kind === 'question').length}건` : '', supportNew.some((m) => m.kind === 'error') ? `화면 오류 ${supportNew.filter((m) => m.kind === 'error').length}건` : ''].filter(Boolean).join(' · ')
+  const count = critical.length + events.length + feedbackUnread + supportUnread
 
   return (
     <div ref={containerRef} className="relative">
@@ -103,6 +108,14 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
                     <span className="block truncate text-[0.875rem] text-slate-700">
                       {feedbackFrom || '팀장님'} — 새 피드백 {feedbackUnread}건
                     </span>
+                  </Link>
+                </li>
+              )}
+              {supportUnread > 0 && (
+                <li className="border-b border-slate-50">
+                  <Link to="/feedback/inbox?tab=support" onClick={() => setOpen(false)} data-testid="bell-support" className="block px-4 py-2.5 hover:bg-slate-50">
+                    <span className="block text-[0.875rem] font-semibold text-brand-700">받은 문의 · 오류</span>
+                    <span className="block truncate text-[0.875rem] text-slate-700">새로 온 {supportText}</span>
                   </Link>
                 </li>
               )}

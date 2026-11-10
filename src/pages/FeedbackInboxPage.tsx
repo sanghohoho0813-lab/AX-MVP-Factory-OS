@@ -5,10 +5,14 @@
  *  - 위: 회차(또는 전체) 모아 보기 — 점수 평균(1~5) · 많이 고른 것 순 · 하나 고르기 · 직접 쓴 말.
  *  - 아래: 보낸 것 하나하나(새 것에 '새로' 표시) — 점수는 점 다섯 개, 고른 것은 칩, 직접 쓴 말은 따옴표 상자.
  * 열면 읽음으로 적는다(사이드바 · 종 숫자가 사라지고, 팀장 화면에 '대표님 읽음'). 이번에 본 '새로' 표시는 화면을 떠날 때까지 둔다.
+ * D-568 문의 창구(0025)가 열려 있으면 탭 둘 — [팀장 의견] · [문의 · 오류](고객 · 팀장이 보낸 문의와 화면 오류). 없으면 예전 그대로.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Inbox, MessageSquareQuote } from 'lucide-react'
+import { SupportInbox } from '../components/support/SupportInbox'
+import { useSupportInbox } from '../components/support/useSupport'
 import { ScreenTitle } from '../components/ui/primitives'
 import { useFeedbackInbox, type InboxEntry } from '../components/feedback/useFeedback'
 import { nowIso } from '../lib/appClock'
@@ -83,6 +87,9 @@ function EntryCard({ e, fresh }: { e: InboxEntry; fresh: boolean }) {
 
 export function FeedbackInboxPage() {
   const { entries, unread, error } = useFeedbackInbox()
+  const support = useSupportInbox()
+  const [params, setParams] = useSearchParams()
+  const tab: 'feedback' | 'support' = support.ready && params.get('tab') === 'support' ? 'support' : 'feedback'
   const [round, setRound] = useState<string>('all')
   /** 이번에 열었을 때 새것이던 줄 — 읽음으로 적은 뒤에도 이 화면에서는 '새로' 를 둔다 */
   const freshIds = useRef<Set<string> | null>(null)
@@ -92,7 +99,8 @@ export function FeedbackInboxPage() {
 
   // D-222 열어 둔 동안 새로 온 피드백도 '새로' 를 달고 읽음으로 적는다 — 예전에는 처음 열 때 한 번만 적어, 그 뒤에 온 것은 종 · 메뉴 숫자에 계속 남았다
   useEffect(() => {
-    if (!entries) return
+    // 문의 · 오류 탭으로 바로 들어왔으면 팀장 의견은 아직 본 것이 아니다 — 그 탭을 열 때 읽음으로
+    if (!entries || tab !== 'feedback') return
     const first = freshIds.current === null
     if (first) freshIds.current = new Set()
     const toRead = entries.filter((e) => !e.readAt && !marked.current.has(e.id))
@@ -102,7 +110,7 @@ export function FeedbackInboxPage() {
     }
     if (first || toRead.length > 0) setTick((n) => n + 1)
     if (toRead.length > 0) void markFeedbackRead(toRead, nowIso()).catch(() => {})
-  }, [entries])
+  }, [entries, tab])
 
   const rounds = useMemo(() => {
     const m = new Map<string, { label: string; n: number }>()
@@ -116,15 +124,42 @@ export function FeedbackInboxPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      <ScreenTitle title="받은 피드백함" sub={entries === null ? '불러오는 중…' : `팀장님이 보낸 의견 ${total}건${fresh.size > 0 ? ` · 새 의견 ${fresh.size}건` : unread > 0 ? ` · 새 의견 ${unread}건` : ''}`} />
+      <ScreenTitle title="받은 피드백함" sub={tab === 'support' ? `고객 · 팀장이 보낸 문의와 화면 오류 ${support.entries?.length ?? 0}건 — 고객사 자료는 같이 오지 않습니다` : entries === null ? '불러오는 중…' : `팀장님이 보낸 의견 ${total}건${fresh.size > 0 ? ` · 새 의견 ${fresh.size}건` : unread > 0 ? ` · 새 의견 ${unread}건` : ''}`} />
 
-      {error && (
+      {support.ready && (
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="받은 것 종류" data-testid="inbox-tabs">
+          {(
+            [
+              ['feedback', `팀장 의견 ${total}`, 0],
+              ['support', `문의 · 오류 ${support.entries?.length ?? 0}`, support.unread],
+            ] as const
+          ).map(([id, label, badge]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setParams(id === 'support' ? { tab: 'support' } : {}, { replace: true })}
+              data-testid={`inbox-tab-${id}`}
+              data-unread={badge}
+              className={`tap inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-[0.9375rem] font-semibold ${tab === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              {label}
+              {badge > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger-500 px-1.5 text-[0.8rem] font-bold text-white">{badge > 99 ? '99+' : badge}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'support' && <SupportInbox entries={support.entries} error={support.error} />}
+
+      {tab === 'feedback' && error && (
         <p role="alert" className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-danger-700">
           {error}
         </p>
       )}
 
-      {entries !== null && total === 0 && (
+      {tab === 'feedback' && entries !== null && total === 0 && (
         <div data-testid="feedback-inbox-empty" className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
           <Inbox aria-hidden="true" className="size-9 text-slate-400" />
           <p className="text-[1rem] font-semibold text-slate-800">아직 받은 피드백이 없습니다</p>
@@ -132,7 +167,7 @@ export function FeedbackInboxPage() {
         </div>
       )}
 
-      {total > 0 && (
+      {tab === 'feedback' && total > 0 && (
         <>
           {rounds.length > 1 && (
             <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="회차">

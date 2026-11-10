@@ -265,9 +265,10 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
   return (
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs" data-slim="1" className="flex flex-col gap-2">
       {/* 휴대폰 — 처음 · 지금 화면 · 다른 화면 */}
-      <div className="flex items-center gap-2 sm:hidden" data-testid="mk-tabs-phone">
+      {/* 글자를 크게 쓰는 좁은 휴대폰(360 · 매우 크게)에서는 [다른 화면] 이 아랫줄로 — 지금 화면 이름이 한 글자씩 꺾이지 않게 */}
+      <div className="flex flex-wrap items-center gap-2 sm:hidden" data-testid="mk-tabs-phone">
         {homeLink(true)}
-        <span className="t-sub flex min-w-0 flex-1 items-center gap-1.5 font-bold text-slate-900" data-testid="mk-tabs-now">
+        <span className="t-sub flex min-w-0 flex-1 basis-[7.5rem] items-center gap-1.5 font-bold text-slate-900" data-testid="mk-tabs-now">
           {now && <SlimIcon it={now} />}
           <span className="min-w-0 leading-tight break-keep">{now ? (TOOLS.some((t) => t.key === now.key) ? now.short : now.label) : '마케팅'}</span>
         </span>

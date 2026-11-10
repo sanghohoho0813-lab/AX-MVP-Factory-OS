@@ -1,5 +1,5 @@
 -- =====================================================================
--- D-534 운영 DB 점검 — 0016 ~ 0024 가 들어가 있는지 **읽기만** 해서 알려 준다. (마이그레이션 아님)
+-- D-534 운영 DB 점검 — 0016 ~ 0025 가 들어가 있는지 **읽기만** 해서 알려 준다. (마이그레이션 아님 · 파일 이름은 예전 그대로)
 --
 -- 사용: Supabase SQL Editor 에 이 파일을 **통째로** 붙여 넣고 실행.
 -- 읽기 전용 보장(두 겹):
@@ -40,7 +40,9 @@ with fn(name) as (
      (select count(*) from trg where name = 'zz_workspace_id_lock' and rel in ('operations_clients', 'module_data', 'ops_journal_entries')) = 3),
   (24, '0024 고객 ↔ 내부 팀장 분리(D-533)', 'os_access.audience 칸 · 고객 작업공간 대표 금지 장치 · 팀장 화면 목록이 internal 만',
      exists (select 1 from col where tbl = 'os_access' and name = 'audience') and exists (select 1 from trg where name = 'zz_os_access_customer_member')
-     and coalesce((select position('audience' in pg_get_functiondef(p.oid)) > 0 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'my_pilot_views' limit 1), false))
+     and coalesce((select position('audience' in pg_get_functiondef(p.oid)) > 0 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'my_pilot_views' limit 1), false)),
+  (25, '0025 문의 · 화면 오류(D-568)', 'support_messages 표 · 보내기 · 받은함 함수(없으면 앱은 문의 단추를 숨긴다)',
+     to_regclass('public.support_messages') is not null and exists (select 1 from fn where name = 'support_send') and exists (select 1 from fn where name = 'support_inbox'))
 ), rows_out(sec, no, item, what, result) as (
   select '0 확인', 0, '읽기 전용 거래', '맨 위 set transaction read only 가 걸렸나(on 이어야 함)', current_setting('transaction_read_only')
   union all

@@ -10,7 +10,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronDown, PlayCircle } from 'lucide-react'
+import { ArrowRight, ChevronDown, MessageCircleQuestion, PlayCircle } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useIsPilot } from '../auth/osAccess'
 import { useCapabilitySet } from '../auth/ownerAiAccess'
@@ -23,6 +23,7 @@ import { GUIDE_LABELS, MARKETING_GUIDE_LIST, menuGuide } from '../content/menuGu
 import { menuVideo } from '../config/menuVideos'
 import { minutesLabel } from '../config/tutorialVideos'
 import { useTutorial } from '../components/tutorial/tutorialContext'
+import { useSupportState } from '../components/support/useSupport'
 
 interface Row {
   key: string
@@ -53,6 +54,7 @@ export function GuidePage() {
   const pilotMarketing = usePilotMarketingScreens()
   useStoreVersion()
   const tutorial = useTutorial()
+  const support = useSupportState(pilot)
   const [params, setParams] = useSearchParams()
   const want = params.get('m') ?? ''
 
@@ -152,7 +154,13 @@ export function GuidePage() {
             <PlayCircle aria-hidden="true" className="size-4 text-brand-600" /> 전체 안내 영상 보기
           </button>
         )}
-        {/* 설문(/feedback)은 내부 팀장용 — 외부 구독 고객의 의견 길은 따로(출시 목록 L-4) */}
+        {/* D-568 문의하기 — 팀장 · 구독 고객(문의 창구 0025 가 열려 있을 때만). 대표는 받은함에서 읽는다 */}
+        {pilot && support === 'ready' && (
+          <Link to="/support" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="guide-support">
+            <MessageCircleQuestion aria-hidden="true" className="size-4 text-brand-600" /> 문의하기
+          </Link>
+        )}
+        {/* 설문(/feedback)은 내부 팀장용 — 외부 구독 고객은 위 문의하기로 */}
         {pilot && !basic && (
           <Link to="/feedback" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="guide-feedback">
             의견 보내기 <ArrowRight aria-hidden="true" className="size-4" />

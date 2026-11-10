@@ -3,6 +3,7 @@ import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
 import { GuideLayer } from '../guide/GuideLayer'
+import { installErrorReporter } from '../../services/support'
 import { primePilotMarketingScreens, setPilotMarketing, setPilotMarketingScreens, usePilotMarketing, usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { fetchAssistStatus } from '../../services/aiAssist/client'
@@ -77,6 +78,11 @@ export function AppShell() {
   // D-257 팀장(대표가 팀장 화면으로 볼 때도)은 AI 회사 Gemini 만 — 모델 고르기 · 고른 것 읽기가 같이 따른다
   setAllowedProviders(useAiAssistAccess() === 'pilot' ? ['gemini'] : null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // D-568 팀장 · 구독 고객 계정의 잡히지 않은 오류(눌러도 아무 일도 안 일어나는 종류)를 운영자에게 — 오류 글 · 화면 주소만.
+  //       대표 자신의 화면은 달지 않는다. 문의 창구(0025)가 없으면 첫 오류 때 한 번 물어보고 그만둔다.
+  const shellAuth = useContext(AuthContext)
+  const reportErrors = !!shellAuth?.session && shellAuth.access === 'pilot'
+  useEffect(() => (reportErrors ? installErrorReporter() : undefined), [reportErrors])
   const weekLoaded = useSyncExternalStore(subscribeWeekRunLoaded, weekRunLoaded)
   // D-295 휴대폰 아래 메뉴 '더보기' = 아래에서 올라오는 판(왼쪽 위 ☰ 는 예전 서랍 그대로)
   const [moreOpen, setMoreOpen] = useState(false)

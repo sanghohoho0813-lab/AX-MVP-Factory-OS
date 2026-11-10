@@ -599,6 +599,31 @@ async function run() {
     LEGAL.ready === false && !/[0-9][0-9,]*\s*원/.test(flat(TERMS) + pv) && ['수집하는 개인정보', '보유 기간', '처리 위탁', '국외 이전', '이용자의 권리', '보호책임자', '주민등록번호'].every((w) => pv.includes(w)) && TERMS.sections.length >= 10 && PRIVACY.sections.length >= 8,
     `${TERMS.sections.length}/${PRIVACY.sections.length}`,
   )
+  // 출시 목록 L-4(D-568) 문의 · 화면 오류 — 보내는 글에 긴 숫자 · 이메일 0 · 주소는 길만 · 새 버전 조각 오류와 잡음은 안 보냄
+  const sp = await import('../support')
+  const err = new TypeError("Cannot read properties of undefined (reading 'name') — 010-1234-5678 kim@example.com 사업자 123-45-67890")
+  const rep = sp.errorReport(err, { path: '/ops/clients/abc?q=김비밀#x', source: 'screen', build: 'index-AbCd.js', viewport: '390x844', agent: 'UA' })
+  check(
+    'K18 화면 오류 알리기(D-568) — 전화 · 사업자번호 · 이메일 가림 · 화면 주소는 물음표 앞까지만 · 오류 이름 남음 · 새 버전 조각 오류 · 끊김 잡음은 안 보냄',
+    !!rep && !/\d{3}-\d{4}-\d{4}|\d{3}-\d{2}-\d{5}|@example/.test(rep.body + JSON.stringify(rep.context)) && rep.body.includes('(숫자)') && rep.body.includes('(이메일)') && rep.body.startsWith('TypeError') && rep.context.path === '/ops/clients/abc' && rep.context.source === 'screen' &&
+      sp.errorReport(new Error('Failed to fetch dynamically imported module: /assets/x.js'), { path: '/', source: 'screen' }) === null &&
+      sp.errorReport(new TypeError('Failed to fetch'), { path: '/', source: 'promise' }) === null &&
+      sp.errorReport(new Error('ResizeObserver loop limit exceeded'), { path: '/', source: 'window' }) === null &&
+      sp.errorReport(null, { path: '/', source: 'window' }) === null,
+    rep ? `${rep.body.slice(0, 60)} | ${rep.context.path}` : 'null',
+  )
+  const msg = (over: Record<string, unknown>) => sp.toMessage({ id: 'm1', kind: 'question', body: '글', context: { path: '/a', n: 3 }, created_at: '2026-11-10T01:00:00Z', read_at: null, reply: null, replied_at: null, seen_at: null, ...over })
+  check(
+    'K19 문의 상태(D-568) — 보냄 → 읽음 → 답장 · 안 본 답장만 셈 · 운영자 안 읽은 수 · 표 없음(0025 전) 구분 · 하루 한도 말 · 모르는 종류는 문의로',
+    sp.messageStatus(msg({})).key === 'sent' && sp.messageStatus(msg({ read_at: 'x' })).key === 'read' && sp.messageStatus(msg({ read_at: 'x', reply: '답' })).key === 'replied' &&
+      sp.unseenReplies([msg({ reply: '답' }), msg({ reply: '답', seen_at: 'x' }), msg({})]).length === 1 &&
+      sp.inboxUnread([sp.toInboxMessage({ id: 'a', read_at: null }), sp.toInboxMessage({ id: 'b', read_at: 'x' })]) === 1 &&
+      sp.toInboxMessage({ author_audience: 'customer' }).audience === 'customer' && sp.toInboxMessage({ author_audience: 'x' }).audience === 'internal' &&
+      msg({ kind: 'weird' }).kind === 'question' && msg({}).context.n === '3' &&
+      sp.isMissingError({ code: 'PGRST205', message: '' }) && sp.isMissingError({ code: '', message: 'Could not find the function public.support_send' }) && !sp.isMissingError({ code: '42501', message: 'permission denied' }) &&
+      sp.sendFailReason({ message: 'support_rate_limited' }) === 'limit' && sp.sendFailReason({ code: '42501', message: 'support_not_allowed' }) === 'denied' && sp.sendFailReason({ code: 'PGRST202', message: '' }) === 'missing' && sp.sendFailReason({ message: 'boom' }) === 'failed' &&
+      sp.sendFailText('limit').includes('내일') && sp.cleanPath('/a/b?x=1#y') === '/a/b' && sp.scrubText('가 1234567 나') === '가 (숫자) 나' && sp.scrubText('12345 글 2026-11-10') === '12345 글 (숫자)',
+  )
   const bf = basicFlow(CLIENT_FLOW)
   check(
     'K12 업체 일 순서 안내 — 고객 계정 문장에 모듈 0 · 단계 수 · 순서는 같음 · 원래 문장은 그대로',
