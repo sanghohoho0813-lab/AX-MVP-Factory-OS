@@ -361,6 +361,40 @@ const howFont = await mp.locator('[data-testid="sht-howto"] *').evaluateAll((els
 check('G13 휴대폰 390: 올리는 법 펼침 — 옆 넘침 0 · 40px 보다 작은 단추 0 · 글자 15px 이상', howOver <= 0 && howSmall.length === 0 && howFont >= 15, { howOver, howSmall, howFont })
 if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-10-howto-390.png`, fullPage: true }).catch(() => {})
 
+/* G14 휴대폰 '이 화면 안내'(D-586) — 머리줄 화면 이름을 누르면 그 화면 안내 창 */
+await mp.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+const titleBtn = mp.getByTestId('screen-title-guide')
+const titleBox = await titleBtn.boundingBox()
+const hdrOver = await mp.locator('header').first().evaluate((el) => el.scrollWidth - el.clientWidth)
+await titleBtn.tap()
+await mp.waitForFunction(() => document.querySelector('[data-testid="screen-guide"]'), null, { timeout: 8000 }).catch(() => {})
+const scrG = mp.getByTestId('screen-guide')
+const scrText = ((await scrG.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+const scrFns = await mp.getByTestId('screen-guide-function').count()
+const scrOver = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+const scrSmall = await mp.locator('[role="dialog"] button, [role="dialog"] a').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? e.getAttribute('aria-label') ?? '').trim().slice(0, 16)))
+check(
+  'G14 휴대폰: 머리줄 화면 이름(44px 이상 · 머리줄 넘침 0)을 누르면 "이 화면 안내" — 고객 관리 · 네 칸 · 이 화면 안 기능 6개 이상 · 옆 넘침 0 · 40px 보다 작은 단추 0',
+  !!titleBox && titleBox.height >= 44 && hdrOver <= 1 && (await scrG.getAttribute('data-key')) === 'client-ops' && scrText.includes('고객 관리') && ['무엇을 하나요', '왜 있나요', '쓰면 이렇게 돼요', '앞으로'].every((w) => scrText.includes(w)) && scrFns >= 6 && scrOver <= 0 && scrSmall.length === 0,
+  { h: titleBox?.height, hdrOver, key: await scrG.getAttribute('data-key').catch(() => null), scrFns, scrOver, scrSmall, t: scrText.slice(0, 120) },
+)
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-11-screen-guide-390.png` }).catch(() => {})
+await mp.getByTestId('screen-guide-more').tap()
+await mp.waitForTimeout(700)
+check('G14 [사용법 안내에서 더 보기] → 사용법 안내 화면 · 고객 관리 줄이 펼쳐진 채 · 창은 닫힘', mp.url().includes('/guide?m=client-ops') && (await mp.locator('[data-testid="guide-row"][data-key="client-ops"]').getAttribute('data-open')) === '1' && (await mp.getByTestId('screen-guide').count()) === 0, mp.url())
+// 마케팅 안 화면은 그 화면 안내(스레드) · 닫기 → 화면 그대로
+await mp.goto(BASE + '/marketing/threads', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+await mp.getByTestId('screen-title-guide').tap()
+await mp.waitForFunction(() => document.querySelector('[data-testid="screen-guide"]'), null, { timeout: 8000 }).catch(() => {})
+const thrKey = await mp.getByTestId('screen-guide').getAttribute('data-key').catch(() => null)
+const thrLabel = ((await mp.getByTestId('screen-guide-label').innerText().catch(() => '')) ?? '').trim()
+const thrGuide = ((await mp.getByTestId('screen-guide').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+await mp.locator('[role="dialog"] button[aria-label="닫기"]').tap()
+await mp.waitForTimeout(300)
+check('G14 스레드 화면에서는 스레드 안내(어려운 말 0) · 닫으면 화면 그대로', thrKey === 'mk-threads' && thrLabel === '스레드' && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷/.test(thrGuide) && (await mp.getByTestId('screen-guide').count()) === 0 && mp.url().endsWith('/marketing/threads'), { thrKey, thrLabel })
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })

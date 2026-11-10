@@ -1,15 +1,16 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { DeviceSwitchCompact } from './DeviceView'
 import {
   Building,
   Check,
   ChevronDown,
+  CircleHelp,
   Menu,
   Settings,
   UserRound,
 } from 'lucide-react'
-import { Suspense, lazy, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { Suspense, lazy, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { CURRENT_USER, WORKSPACES } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
@@ -19,6 +20,7 @@ import { TutorialMenuItem } from '../tutorial/TutorialButton'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
 import { screenGroupForPath, screenTitleForPath, type NavAccent } from '../../config/moduleRegistry'
+import { guideKeyForPath } from '../../content/screenGuideKey'
 
 /* D-110: 머리줄 묶음 이름 앞 색 띠 — 서랍 메뉴 묶음 띠와 같은 색. 글자와 한 줄로 흐르게 ::before 로 그린다 (통째로 적어야 Tailwind 가 만든다) */
 const GROUP_BAR: Record<NavAccent, string> = {
@@ -36,6 +38,8 @@ const GROUP_BAR: Record<NavAccent, string> = {
 const SupabaseWorkspaceSelector = lazy(() =>
   import('./SupabaseHeaderParts').then((m) => ({ default: m.SupabaseWorkspaceSelector })),
 )
+// D-586 휴대폰 '이 화면 안내' 창 — 누를 때만 불러온다
+const ScreenGuideSheet = lazy(() => import('../guide/ScreenGuideSheet').then((m) => ({ default: m.ScreenGuideSheet })))
 const SupabaseUserMenu = lazy(() =>
   import('./SupabaseHeaderParts').then((m) => ({ default: m.SupabaseUserMenu })),
 )
@@ -201,7 +205,13 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const pathname = useNavPath()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
   const screenGroup = screenGroupForPath(pathname)
+  // D-586 휴대폰 '이 화면 안내' — 어느 화면에서 열었는지 기억해 두고, 화면이 바뀌면 닫힌다
+  const { search } = useLocation()
+  const guideKey = guideKeyForPath(pathname, search)
+  const [guideFor, setGuideFor] = useState<string | null>(null)
+  const guideOpen = guideFor !== null && guideFor === guideKey
   return (
+    <>
     <header ref={headerRef} className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
         type="button"
@@ -218,7 +228,8 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         정작 화면 제목이 안 보인다.
       */}
       {/* D-110: 제목 위에 서랍 메뉴의 묶음 이름을 작게 (영업 › 영업자 정산) — 색 띠는 서랍의 묶음 띠와 같은 색 */}
-      <span className="flex min-w-0 flex-1 flex-col lg:hidden">
+      {/* D-586 휴대폰은 마우스를 올릴 수 없다 — 화면 이름을 누르면 '이 화면 안내'(무엇 · 왜 · 효과 · 앞으로 + 이 화면 안 기능). 아이콘을 늘리지 않고 이름 옆 작은 ⓘ 만 */}
+      <MobileTitle guideKey={guideKey} onOpen={() => setGuideFor(guideKey)}>
         {screenGroup && (
           <span
             data-testid="screen-group"
@@ -232,8 +243,11 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
             </span>
           </span>
         )}
-        <span className="t-card truncate text-slate-900">{screenTitle}</span>
-      </span>
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="t-card truncate text-slate-900">{screenTitle}</span>
+          {guideKey && <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+        </span>
+      </MobileTitle>
       {/* 휴대폰에서도 지금 몇 시인지는 보인다 (D-87) */}
       <span className="hdr-mclock lg:hidden">
         <HeaderClock />
@@ -302,5 +316,29 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         </span>
       </div>
     </header>
+      {/* 머리줄 밖에 그린다 — 머리줄(sticky) 안에 두면 아래 메뉴보다 뒤에 깔린다 */}
+      {guideOpen && guideKey && (
+        <Suspense fallback={null}>
+          <ScreenGuideSheet guideKey={guideKey} fallbackLabel={screenTitle} onClose={() => setGuideFor(null)} />
+        </Suspense>
+      )}
+    </>
+  )
+}
+
+/** 휴대폰 머리줄의 화면 이름 — 안내가 있는 화면이면 누를 수 있는 단추(D-586), 없으면 글 그대로 */
+function MobileTitle({ guideKey, onOpen, children }: { guideKey: string | null; onOpen: () => void; children: ReactNode }) {
+  if (!guideKey) return <span className="flex min-w-0 flex-1 flex-col lg:hidden">{children}</span>
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="이 화면 안내 보기"
+      aria-haspopup="dialog"
+      className="tap flex min-h-11 min-w-0 flex-1 cursor-pointer flex-col justify-center rounded-(--radius-control) text-left lg:hidden"
+      data-testid="screen-title-guide"
+    >
+      {children}
+    </button>
   )
 }

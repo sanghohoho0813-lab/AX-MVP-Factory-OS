@@ -33,6 +33,7 @@ import { HOWTO_NOTE, POSTING_HOWTO } from '../../content/postingHowTo'
 import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, dropTitleRows, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
 import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, firstSheetOfText, readBulkFile } from '../clientBulkFile'
 import { makeSimpleXlsx } from './xlsxFixture'
+import { guideKeyForPath } from '../../content/screenGuideKey'
 import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
@@ -806,6 +807,30 @@ async function run() {
       'K23 파일 — 번호가 먼저 나오면 제목 줄 없는 표(버린 줄 0) · 첫 줄이 제목 줄이면 그대로 · 시트 이름 붙은 글은 첫 시트만(2장 · 이름)',
       dropTitleRows(noHead).dropped === 0 && dropTitleRows(headFirst).dropped === 0 && dropTitleRows(splitPaste('목록\t\n회사명\t전화\n한솔\t02-123-4567')).dropped === 1 && sheet.sheets === 2 && sheet.name === '거래처' && sheet.body === '회사명\t전화\n한솔\t02-1' && firstSheetOfText('회사명\t전화').sheets === 1,
       JSON.stringify({ a: dropTitleRows(noHead).dropped, b: dropTitleRows(headFirst).dropped, sheet }),
+    )
+  }
+
+  /* K24 — D-586 휴대폰 '이 화면 안내'(머리줄 화면 이름 → 그 화면 안내 열쇠) */
+  {
+    const k = (p: string, q = '') => guideKeyForPath(p, q)
+    check(
+      'K24 화면 안내 열쇠 — 마케팅 안 화면은 주소 · ?view= 로(스레드 · 릴스 · 기초 · 유튜브 주제/남의 영상/내 콘텐츠 · 홍보 글 · 홈페이지) · 마케팅 첫 화면은 마케팅',
+      k('/marketing/threads') === 'mk-threads' && k('/marketing/shorts') === 'mk-shorts' && k('/marketing/basics') === 'mk-basics' && k('/marketing/youtube') === 'mk-plan' && k('/marketing/youtube', '?view=plan') === 'mk-plan' && k('/marketing/youtube', '?view=top') === 'mk-top' && k('/marketing/youtube', '?view=channels') === 'mk-top' && k('/marketing/youtube', '?view=make&x=1') === 'mk-make' && k('/tools/content') === 'mk-content' && k('/tools/homepage/abc') === 'mk-homepage' && k('/marketing') === 'marketing',
+      JSON.stringify([k('/marketing/threads'), k('/marketing/youtube'), k('/marketing/youtube', '?view=top'), k('/marketing'), k('/tools/content')]),
+    )
+    // 왼쪽 메뉴에 보이는 화면은 전부 열쇠가 있고, 그 열쇠로 네 칸 글이 나온다(빈 칸 0) — 업체 화면(깊은 주소)도 고객 관리 안내
+    const menus = enabledModulesByGroup({ advanced: true, pilot: false }).flatMap((g) => g.items).filter((m) => m.path && m.path.startsWith('/'))
+    const holes = menus.filter((m) => {
+      const key = k(m.path.split('?')[0], m.path.includes('?') ? `?${m.path.split('?')[1]}` : '')
+      if (!key) return true
+      const g = menuGuide(key, { label: m.label, hint: m.hint })
+      return !g.what || !g.why || !g.effect || !g.next
+    })
+    const clientKey = k('/ops/clients/abc123')
+    check(
+      'K24 화면 안내 열쇠 — 메뉴에 보이는 화면 전부 열쇠 · 네 칸 글(빈 칸 0) · 업체 화면(깊은 주소) = 고객 관리 안내 + 이 화면 안 기능 8개 이상(고객 계정에도 6개 이상)',
+      menus.length >= 20 && holes.length === 0 && clientKey === 'client-ops' && functionGuidesOf('client-ops', { pilot: false, basic: false }).length >= 8 && functionGuidesOf('client-ops', { pilot: true, basic: true }).length >= 6,
+      JSON.stringify({ n: menus.length, holes: holes.map((m) => m.path).slice(0, 8), clientKey, fns: functionGuidesOf('client-ops', { pilot: true, basic: true }).length }),
     )
   }
 

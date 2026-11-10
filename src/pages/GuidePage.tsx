@@ -168,7 +168,7 @@ export function GuidePage() {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="guide-foot">
         <p className="t-sub min-w-0 flex-1 basis-64 break-keep text-slate-700">
-          <span className="max-lg:hidden">왼쪽 메뉴에 마우스를 올려도 같은 설명이 떠요(번거로우면 설정 › 계정 · 보기에서 끌 수 있어요). </span>궁금한 점 · 불편한 점은 알려 주세요 — 먼저 고쳐요.
+          <span className="max-lg:hidden">왼쪽 메뉴에 마우스를 올려도 같은 설명이 떠요(번거로우면 설정 › 계정 · 보기에서 끌 수 있어요). </span><span className="lg:hidden">다른 화면에서는 맨 위 화면 이름을 누르면 그 화면 안내가 떠요. </span>궁금한 점 · 불편한 점은 알려 주세요 — 먼저 고쳐요.
         </p>
         {tutorial && (
           <button type="button" onClick={() => tutorial.open()} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="guide-tutorial">
