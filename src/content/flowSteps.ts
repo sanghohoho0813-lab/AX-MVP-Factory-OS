@@ -14,6 +14,8 @@ export interface FlowStep {
   label: string
   /** 이 단계는 무엇을 위한 것인지 — 한 문장 */
   why: string
+  /** D-563 전문 모듈이 없는 계정(외부 구독 고객)에게 보일 문장 — 없으면 why 그대로 */
+  whyBasic?: string
 }
 
 export interface FlowDef {
@@ -42,11 +44,13 @@ export const CLIENT_FLOW: FlowDef = {
       key: 'smart',
       label: '맞춤 추천',
       why: '이 업체에 맞는 모듈(정책자금 · 고용지원금 · 연구소 · 절세 …)과 먼저 제안할 것을 골라 드려요.',
+      whyBasic: '서류에서 읽은 정보 · 밀린 일 · 받을 돈처럼 지금 확인하고 챙길 것을 모아 드려요.',
     },
     {
       key: 'work',
       label: '업무 진행',
       why: '고른 모듈을 열어 진단 · 계산하고, 결과를 기록에 붙여 할 일과 기한을 걸어요.',
+      whyBasic: '맡은 업무마다 할 일과 기한을 걸고, 진행 상황을 적어 둬요.',
     },
     {
       key: 'portal',
@@ -369,6 +373,11 @@ export interface FlowPosition {
   next: FlowStep | null
   /** 지금 화면 이름 · 무엇을 위한 것인지 */
   here: { label: string; why: string } | null
+}
+
+/** D-563 전문 모듈이 없는 계정에 보일 순서 — 문장만 바꾼다(단계 · 순서는 그대로) */
+export function basicFlow(flow: FlowDef): FlowDef {
+  return { ...flow, steps: flow.steps.map((s) => (s.whyBasic ? { ...s, why: s.whyBasic } : s)) }
 }
 
 /** 지금 화면이 순서의 몇 번째인지 · 앞뒤 단계. visible 로 이 사람에게 없는 단계(팀장 화면의 고객 플랫폼 등)를 뺀다 */

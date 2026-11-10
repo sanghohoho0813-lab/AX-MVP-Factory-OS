@@ -21,6 +21,7 @@ import { ModelPicker } from '../ai/ModelPicker'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
 import { useIsPhone } from '../../lib/useIsPhone'
+import { useCustomerAudience } from '../../config/customerAudience'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
@@ -60,6 +61,8 @@ function speechCtor(): (new () => SpeechLike) | null {
 }
 
 export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRecordTalk }: HomeAskProps) {
+  // D-563 외부 구독 고객 계정 — 모듈 판정을 약속하는 말을 쓰지 않는다
+  const customer = useCustomerAudience()
   const { turns, busy } = useHomeAsk()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -244,7 +247,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
             무엇을 도와드릴까요?
           </p>
           <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
-            업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요
+            {customer ? '업체 이름과 함께 물어보거나 서류를 올리면 그 업체 자료로 답해요' : '업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요'}
           </p>
         </>
       )}
@@ -368,6 +371,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
 }
 
 function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names: { id: string; name: string }[]; onRecorded?: () => void; onRecordTalk?: HomeAskProps['onRecordTalk'] }) {
+  // D-563 외부 구독 고객 계정 — 맞춤 진단서 · 말하기 대본(모듈 판정으로 만드는 것)은 띄우지 않는다
+  const customer = useCustomerAudience()
   const [talkBusy, setTalkBusy] = useState(false)
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -441,13 +446,13 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
             </Link>
           ))}
           {/* D-499 대표님께 드릴 한 장 — 누르면 그 업체 맞춤 진단서가 바로 열린다 */}
-          {names[0] && (
+          {names[0] && !customer && (
             <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&diag=1`} onClick={() => requestDiagnosis(names[0].id)} className="tap ml-1 inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-diag">
               맞춤 진단서
             </Link>
           )}
           {/* D-508 상담 자리에서 읽을 말 — 그 업체 판정 그대로 미팅 순서 · 고객에게 이렇게 말하세요 */}
-          {names[0] && (
+          {names[0] && !customer && (
             <Link to={`/ops/clients/${encodeURIComponent(names[0].id)}?tab=smart&talk=1`} className="tap ml-1 inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="home-ask-talkscript">
               말하기 대본
             </Link>

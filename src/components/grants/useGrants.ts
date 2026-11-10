@@ -14,6 +14,10 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import type { PortalClientLink } from '../../types/bridge'
 import { useIsPilot } from '../../auth/osAccess'
+import { useCustomerAudience } from '../../config/customerAudience'
+
+/** D-563 외부 구독 고객 계정 — 지원사업 알림(전문 모듈 묶음)이 닫혀 있다. 공고를 주지 않으면 맞는 공고 수 · 칩 · 알림이 함께 사라진다 */
+const NO_NOTICES: GrantNotice[] = []
 
 export function useGrantData(workspaceId: string | null) {
   const [notices, setNotices] = useState<GrantNotice[]>([])
@@ -45,7 +49,8 @@ export function useGrantData(workspaceId: string | null) {
   const linkOf = useCallback((clientId: string) => links.find((l) => l.operationsClientId === clientId && l.status === 'active') ?? null, [links])
   // D-143: 기업마당에서 받은 공고(모든 화면이 같은 것을 같이 쓴다)를 직접 넣은 공고와 합친다
   const feed = useGrantFeed()
-  const all = useMemo(() => mergeNotices(notices, feed.notices), [notices, feed.notices])
+  const customer = useCustomerAudience()
+  const all = useMemo(() => (customer ? NO_NOTICES : mergeNotices(notices, feed.notices)), [customer, notices, feed.notices])
   return { notices: all, manualNotices: notices, setNotices, sent, setSent, links, linkOf, loaded, error, reload, feed }
 }
 
@@ -74,7 +79,8 @@ export function useGrantNotices(workspaceId: string | null): GrantNotice[] {
     }
   }, [workspaceId])
   const feed = useGrantFeed()
-  return useMemo(() => mergeNotices(manual, feed.notices), [manual, feed.notices])
+  const customer = useCustomerAudience()
+  return useMemo(() => (customer ? NO_NOTICES : mergeNotices(manual, feed.notices)), [customer, manual, feed.notices])
 }
 
 export function useClientGrantSummaries(workspaceId: string | null, records: readonly ClientOpsRecord[], today: string): Map<string, ClientGrantSummary> {

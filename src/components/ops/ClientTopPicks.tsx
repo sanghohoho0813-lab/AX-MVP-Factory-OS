@@ -16,7 +16,7 @@ import { activityTimeText } from '../../services/clientOpsActivity'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, type Tone } from '../ui/primitives'
 import { Button } from '../ui/Button'
-import { useEntitlements } from '../../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
 import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, waitingLabels, waitingNames, type Insight, type InsightTone } from '../../services/clientInsights'
 import { pendingFacts } from '../../services/customerFacts'
@@ -217,7 +217,7 @@ export default function ClientTopPicks({
 }) {
   const { ent } = useEntitlements()
   const notices = useGrantNotices(workspaceId)
-  const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
+  const insights = useMemo(() => buildInsights(record, today, notices, (key) => featureUsable(ent, key)), [record, today, notices, ent])
   // D-352 대표님께 드릴 맞춤 진단서 — 개요 맨 위에서도 바로
   const [diag, setDiag] = useState(false)
   // D-508 말하기 대본(미팅 순서 · 제안마다 말하기)

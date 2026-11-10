@@ -13,7 +13,7 @@ import { useToast } from '../components/ui/toastContext'
 import { DecisionList, useDecisionAnswer } from '../components/ops/DecisionList'
 import { NO_DECISIONS, useAllDecisionsState } from '../components/ops/useAllDecisions'
 import { useGrantData } from '../components/grants/useGrants'
-import { useEntitlements } from '../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../lib/entitlementsStore'
 import { listClients, saveClient } from '../services/clientOpsService'
 import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, type DecisionKind } from '../services/decisionLabels'
 import { todayLocalDate } from '../lib/appClock'
@@ -32,7 +32,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
   const [kind, setKind] = useState<DecisionKind | 'all'>('all')
   const { notices, linkOf } = useGrantData(workspaceId)
   const { ent } = useEntitlements()
-  const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
+  const usable = useCallback((key: string) => featureUsable(ent, key), [ent])
 
   useEffect(() => {
     listClients(workspaceId)

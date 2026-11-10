@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { WorkChat } from './WorkChat'
 import { useToolClient } from '../../tools/shared/toolClientContext'
-import { useEntitlements } from '../../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 import { useAiAssistAccess, useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
 import { buildInsights } from '../../services/clientInsights'
@@ -205,7 +205,7 @@ function ModuleChatInner({ k, notices }: { k: ChatFirstKey; notices: readonly Gr
   }
 
   const client = useMemo(() => (clients ?? []).find((c) => c.id === clientId) ?? null, [clients, clientId])
-  const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
+  const usable = useCallback((key: string) => featureUsable(ent, key), [ent])
   const insightOf = useCallback(
     (r: ClientOpsRecord, light = false) => (cfg.insightKey ? (buildInsights(r, today, notices, (key) => key === cfg.insightKey && usable(key), light)[0] ?? null) : null),
     [cfg.insightKey, today, notices, usable],

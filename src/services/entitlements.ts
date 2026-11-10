@@ -237,6 +237,19 @@ export function openEntitlements(today: string): Entitlements {
   return resolveEntitlements(defaultSubscription(), new Map(), today)
 }
 
+/** D-563 외부 구독 고객 계정에 주는 요금제 — 기본 OS 만 */
+export const CUSTOMER_PLAN_KEY = 'BASIC'
+
+/**
+ * D-563 외부 구독 고객 계정(os_access.audience = customer) — 기본 OS 만 쓴다.
+ * 대표(2026-11-10): "전문 모듈들은 당분간 빼자 — 내 화면 말고 고객 화면에서."
+ * 저장된 요금제 · 체험 · 열어 둔 기록을 보지 않는다 — 고객이 자기 작업공간 기록으로 전문 모듈을 열 수 없다(여는 것은 대표가 정한다).
+ * 이 값 하나로 맞춤 추천 · 확인할 것 · 상황 예시 · 영업 흐름 · 대화창이 전문 모듈로 가는 길을 같이 닫는다(화면마다 따로 막지 않는다).
+ */
+export function customerEntitlements(today: string, catalog: Catalog = DEFAULT_CATALOG): Entitlements {
+  return resolveEntitlements({ planKey: CUSTOMER_PLAN_KEY, selectedModules: [], updatedAt: '' }, new Map(), today, catalog)
+}
+
 /* ------------------------------------------------------------------ */
 /* 가격 — 결제는 없다. 정한 가격이 있을 때 얼마인지 셈만 한다              */
 /* ------------------------------------------------------------------ */

@@ -26,7 +26,8 @@ import { TodayKpis } from '../components/ops/TodayKpis'
 import { AppLauncher, useLauncherItems } from '../components/layout/AppLauncher'
 import { hasWeekData, subscribeWeekRunLoaded } from '../services/marketing/weekRunFlag'
 import { useAllDecisions } from '../components/ops/useAllDecisions'
-import { useEntitlements } from '../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../lib/entitlementsStore'
+import { isCustomerAudience, useCustomerAudience } from '../config/customerAudience'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -284,7 +285,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   // D-158: 확인할 것 — 공고 · 요금제 권한
   const { notices: grantNotices, linkOf } = useGrantData(workspaceId)
   const { ent } = useEntitlements()
-  const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
+  const usable = useCallback((key: string) => featureUsable(ent, key), [ent])
+  // D-563 외부 구독 고객 계정 — 모듈 판정으로 만드는 말하기 대본 단추 · 판정을 약속하는 답 문구는 쓰지 않는다
+  const customer = useCustomerAudience()
 
   const load = useCallback(async () => {
     try {
@@ -396,7 +399,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const contentDue = useMemo(() => contentAgenda(ideas, today), [ideas, today])
   // D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠를 다 해 볼 때까지 오늘 맨 위 한 줄
   const pilotMarketing = usePilotMarketing()
-  const firstSteps = useMemo(() => firstUseSteps({ clients, journal, ideas: ideas.length, marketing: !pilot || pilotMarketing === 'open' }), [clients, journal, ideas, pilot, pilotMarketing])
+  const firstSteps = useMemo(() => firstUseSteps({ clients, journal, ideas: ideas.length, marketing: !pilot || pilotMarketing === 'open', basic: customer }), [clients, journal, ideas, pilot, pilotMarketing, customer])
   const [firstUseClosed, setFirstUseClosed] = useState(() => {
     try {
       return localStorage.getItem(FIRST_USE_CLOSED_KEY) === '1'
@@ -471,8 +474,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       .map((c) => ({ clientId: c.id, clientName: c.companyName, labels: (reco.chips.get(c.id) ?? []).map((ch) => ch.label), score: reco.scores.get(c.id) ?? 0 }))
       .filter((r) => r.labels.length > 0)
       .sort((a, b) => b.score - a.score || b.labels.length - a.labels.length)
-    return homeSuggestions({ appointments: appointments.map((e) => ({ clientId: e.clientId ?? null, clientName: e.clientName, daysLeft: e.daysLeft })), freshDocs, recos, overdueMoney: money.overdue.count, hasTodos: todoCount > 0 })
-  }, [active, today, reco, appointments, money, todoCount])
+    return homeSuggestions({ appointments: appointments.map((e) => ({ clientId: e.clientId ?? null, clientName: e.clientName, daysLeft: e.daysLeft })), freshDocs, recos, overdueMoney: money.overdue.count, hasTodos: todoCount > 0, basic: customer })
+  }, [active, today, reco, appointments, money, todoCount, customer])
   const homePrepare = useCallback(
     async (question: string, ids: string[], intents: HomeIntent[], docs: readonly ChatDoc[] = []) => {
       const base = await assistBuild()
@@ -591,6 +594,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           appointments: appointments.filter((e) => (e.daysLeft ?? 9) >= 0).slice(0, 3).map((e) => `${e.clientName} — ${e.title}${e.daysLeft === 0 ? ' (오늘)' : e.daysLeft === 1 ? ' (내일)' : ''}`),
         },
         nearNames: focus.length === 0 && companyish ? nearNames(question, active) : [],
+        basic: isCustomerAudience(),
       })
       if (docs.length) {
         for (const [ref, href] of Object.entries(rule.links)) if (href.includes(CHAT_NEW_ID)) delete rule.links[ref]
@@ -905,7 +909,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                           <span className="t-body min-w-0 flex-[1_1_8rem] break-keep text-slate-700">{e.title}</span>
                           <span className="ml-auto flex shrink-0 items-center gap-2">
                             {/* D-508 오늘 · 내일 미팅 · 상담이면 — 그 업체 판정 그대로 말하기 대본(미팅 순서 · 고객에게 이렇게 말하세요) */}
-                            {(e.daysLeft === 0 || e.daysLeft === 1) && MEETING_WORDS.test(e.title) && (
+                            {!customer && (e.daysLeft === 0 || e.daysLeft === 1) && MEETING_WORDS.test(e.title) && (
                               <Link to={`/ops/clients/${e.clientId}?tab=smart&talk=1`} className="tap t-sub inline-flex items-center font-semibold text-slate-700 hover:text-brand-700 hover:underline" data-testid="today-appt-talk">
                                 말하기 대본
                               </Link>

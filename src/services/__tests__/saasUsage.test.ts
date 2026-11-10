@@ -478,6 +478,60 @@ async function run() {
   setCustomerAudience(false)
   check('K7 값을 끄면 원래대로(내부 팀장 메뉴 · 주소)', groupsOf(true).includes('modules') && !isPilotHiddenPath('/tools'))
 
+  // ---------- D-563 고객 계정 = 기본 OS 만 — 화면 안에서 전문 모듈로 가는 길도 같이 닫힌다 ----------
+  const { customerEntitlements, openEntitlements, CUSTOMER_PLAN_KEY } = await import('../entitlements')
+  const { featureUsable } = await import('../../lib/entitlementsStore')
+  const { MODULE_CATALOG, FEATURE_CATALOG, BASE_MODULE_KEY } = await import('../../config/productCatalog')
+  const { ruleAnswer } = await import('../homeAsk/homeAsk')
+  const { basicFlow, CLIENT_FLOW } = await import('../../content/flowSteps')
+  const cent = customerEntitlements('2026-11-10')
+  const expert = MODULE_CATALOG.filter((m) => m.key !== BASE_MODULE_KEY && !m.includedInBase)
+  const TOOL_KEYS = ['policy-funding', 'employment', 'labcare', 'cert-os', 'tax', 'startup-tax', 'cretop', 'homepage', 'content']
+  check(
+    'K8 고객 요금제(D-563) — 기본 OS 만: 전문 모듈 전부 못 씀 · 기본 OS 와 카탈로그 밖 화면은 그대로',
+    CUSTOMER_PLAN_KEY === 'BASIC' && expert.length >= 6 && expert.every((m) => !cent.module(m.key).usable) && cent.module(BASE_MODULE_KEY).usable && cent.feature('없는-기능').usable,
+    expert.filter((m) => cent.module(m.key).usable).map((m) => m.key).join(),
+  )
+  check(
+    'K9 고객 요금제 — 도구 9개(정책자금 · 고용 · 연구소 · 인증 · 절세 · 창업감면 · 크레탑 · 홈페이지 · 홍보 글) 모두 못 씀 · 대표(기본값)는 모두 씀',
+    TOOL_KEYS.every((k) => FEATURE_CATALOG.some((f) => f.key === k) && !cent.feature(k).usable) && TOOL_KEYS.every((k) => openEntitlements('2026-11-10').feature(k).usable),
+    TOOL_KEYS.filter((k) => cent.feature(k).usable).join(),
+  )
+  const open = openEntitlements('2026-11-10')
+  const grantsBefore = featureUsable(open, 'grants')
+  setCustomerAudience(true)
+  const grantsCustomer = featureUsable(cent, 'grants')
+  const policyCustomer = featureUsable(cent, 'policy-funding')
+  setCustomerAudience(false)
+  check('K10 지원사업 알림 — 평소엔 요금제와 상관없이 열림 · 고객 계정에서만 닫힘 · 값을 끄면 다시 열림', grantsBefore && !grantsCustomer && !policyCustomer && featureUsable(open, 'grants'), `${grantsBefore}/${grantsCustomer}/${policyCustomer}`)
+  const baseIn = { question: '한솔 뭐부터?', intents: [] as never[], focus: [{ id: 'c1', name: '한솔테크(주)', picks: [], missingDocs: [] }], today: { overdue: 0, todos: [], hardDue: [], appointments: [] }, nearNames: [] }
+  const ansBasic = ruleAnswer({ ...baseIn, basic: true })
+  const ansFull = ruleAnswer(baseIn)
+  const textOf = (a: { headline?: string; items?: { title?: string; detail?: string }[]; next?: string[] }) => [a.headline ?? '', ...(a.items ?? []).flatMap((x) => [x.title ?? '', x.detail ?? '']), ...(a.next ?? [])].join(' | ')
+  check(
+    'K11 오늘 대화창 규칙 답 — 고객 계정은 모듈 판정 · 진단서를 약속하지 않음(업체 화면 열기는 그대로) · 대표 답은 예전 그대로',
+    !/모듈|판정|진단서/.test(textOf(ansBasic)) && ansBasic.links.c1 === '/ops/clients/c1?tab=smart' && (ansBasic.items ?? []).length === 1 && /모듈/.test(textOf(ansFull)) && /진단서/.test(textOf(ansFull)),
+    textOf(ansBasic),
+  )
+  const { firstUseSteps } = await import('../firstUse')
+  const { homeSuggestions } = await import('../homeAsk/homeAsk')
+  const fuBasic = firstUseSteps({ clients: [], journal: [], ideas: 0, marketing: false, basic: true })
+  const fuFull = firstUseSteps({ clients: [], journal: [], ideas: 0, marketing: false })
+  const sugIn = { appointments: [{ clientId: 'c1', clientName: '한솔', daysLeft: 0 }], freshDocs: [{ clientId: 'c2', clientName: '다음' }], recos: [], overdueMoney: 0, hasTodos: false }
+  const sugBasic = homeSuggestions({ ...sugIn, basic: true }).map((x) => x.text).join(' | ')
+  const sugFull = homeSuggestions(sugIn).map((x) => x.text).join(' | ')
+  check(
+    'K13 처음 시작 카드 · 대화창 권하는 질문 — 고객 계정은 모듈 · 제안 · 받을 수 있는 것을 약속하지 않음(단계 수는 같음) · 대표는 예전 그대로',
+    fuBasic.length === fuFull.length && fuBasic.every((x) => !`${x.title}${x.note}`.includes('모듈')) && fuFull.some((x) => x.note.includes('모듈')) && !/제안|받을 수 있는 것/.test(sugBasic) && sugBasic.includes('다음에 할 일 정리해 줘') && sugFull.includes('받을 수 있는 것 정리해 줘') && sugFull.includes('제안할까요'),
+    `${fuBasic.map((x) => x.note).join('/')} || ${sugBasic}`,
+  )
+  const bf = basicFlow(CLIENT_FLOW)
+  check(
+    'K12 업체 일 순서 안내 — 고객 계정 문장에 모듈 0 · 단계 수 · 순서는 같음 · 원래 문장은 그대로',
+    bf.steps.length === CLIENT_FLOW.steps.length && bf.steps.every((st, i2) => st.key === CLIENT_FLOW.steps[i2].key) && bf.steps.every((st) => !st.why.includes('모듈')) && CLIENT_FLOW.steps.some((st) => st.why.includes('모듈')),
+    bf.steps.filter((st) => st.why.includes('모듈')).map((st) => st.key).join(),
+  )
+
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)
 }

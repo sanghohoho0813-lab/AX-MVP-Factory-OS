@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { RecoChip } from '../../services/clientInsights'
-import { useEntitlements } from '../../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 
 type Engine = typeof import('../../services/clientInsights')
 let loaded: Engine | null = null
@@ -113,7 +113,7 @@ export function useClientReco(records: readonly ClientOpsRecord[], today: string
     const chips = new Map<string, RecoChip[]>()
     const scores = new Map<string, number>()
     const ctx = `${today}|${entIdOf(ent)}`
-    const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+    const usable = (key: string) => featureUsable(ent, key)
     // 업체가 적으면(60곳 이하) 예전처럼 바로 계산 — 많을 때만 아래에서 나눠 계산한다
     if (engine) {
       const todo = records.filter((r) => remembered(r, ctx) === undefined)
@@ -143,7 +143,7 @@ export function useClientReco(records: readonly ClientOpsRecord[], today: string
     let alive = true
     let handle = 0
     const ctx = `${today}|${entIdOf(ent)}`
-    const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+    const usable = (key: string) => featureUsable(ent, key)
     const todo = records.slice()
     let i = 0
     const step = () => {

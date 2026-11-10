@@ -1435,6 +1435,84 @@ try {
       return r.ok ? (await r.json()).length : -1
     }, [REF, OWNER_WS])
     check('고객 REST(D-562 · 진짜 RLS): 대표 작업공간 업체 0건', restK === 0, restK)
+
+    // ---------- D-563 고객 계정 = 기본 OS 만 — 업체를 등록하고 서류를 올려도 화면 안에 전문 모듈로 가는 길이 없다 ----------
+    const HID = ['/modules', '/tools/policy-funding', '/tools/employment', '/tools/labcare', '/grants', '/tools/cert-os', '/tools/tax', '/tools/startup-tax', '/tools/cretop', '/upcoming']
+    /** 지금 화면 본문 — 닫힌 주소로 가는 링크 · 전문 모듈을 약속하는 말 */
+    const deadEnds = (pg) =>
+      pg.evaluate((hid) => {
+        const hidden = (x) => x === '/tools' || hid.some((b) => x === b || x.startsWith(b + '/'))
+        const main = document.querySelector('main')
+        const links = [...(main?.querySelectorAll('a[href]') ?? [])].map((el) => new URL(el.href).pathname).filter(hidden)
+        const words = ((main?.innerText ?? '').match(/모듈|판정|진단서|말하기 대본|지원사업 알림|상황 예시|설계서|체험/g) ?? [])
+        return { links, words }
+      }, HID)
+    await go(pk, '/')
+    await pk.waitForTimeout(600)
+    const stepsK = (await pk.getByTestId('first-client-steps').innerText().catch(() => '')) ?? ''
+    check('고객(D-563): 빈 화면 안내 3단계가 모듈 · 예상 금액을 약속하지 않음', stepsK.includes('첫 업체 등록') && stepsK.includes('확인 · 할 일') && !stepsK.includes('모듈') && !stepsK.includes('예상 금액'), stepsK.replace(/\n/g, '|'))
+    await pk.getByTestId('today-first-client-add').click()
+    await pk.waitForTimeout(600)
+    await pk.getByLabel('업체명').fill('고객시범상사(주)')
+    await pk.getByLabel('대표자·담당자').fill('한고객')
+    await pk.getByRole('button', { name: '등록하고 열기' }).click()
+    await pk.waitForURL(/\/ops\/clients\/[^/?]+/, { timeout: 15000 }).catch(() => {})
+    await pk.waitForTimeout(900)
+    const kc = sql(`select id from public.operations_clients where workspace_id = '${cws}' and company_name = '고객시범상사(주)'`)
+    check('고객(D-563): 첫 업체가 고객 작업공간에 저장(DB) · 그 업체 화면', kc.length > 0 && pk.url().includes(`/ops/clients/${kc}`), `${kc} ${pk.url()}`)
+    await pk.getByTestId('client-upload').click()
+    await pk.getByLabel('서류 파일 고르기').setInputFiles([{ name: '사업자등록증.txt', mimeType: 'text/plain', buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 220-81-62517', '법인명(단체명) : 고객시범상사(주)', '대표자 : 한고객', '개업연월일 : 2022 년 03 월 02 일', '사업장 소재지 : 서울특별시 금천구 가산디지털1로 1', '업태 : 제조업', '종목 : 정밀기계'].join('\n'), 'utf8') }])
+    await pk.getByTestId('smart-placed').waitFor({ timeout: 20000 }).catch(() => {})
+    await pk.waitForTimeout(1200)
+    const payK = JSON.parse(sql(`select payload::text from public.operations_clients where id = '${kc}'`) || '{}')
+    check('고객(D-563): 서류 올리기는 그대로 — 사업자번호 · 설립일 바로 입력 · 서류함 보관 경로가 고객 작업공간', String(payK.businessNumber ?? '').replace(/\D/g, '') === '2208162517' && payK.establishedAt === '2022-03-02' && String(payK.documents?.businessRegistration?.storagePath ?? '').startsWith(`${cws}/`), JSON.stringify({ b: payK.businessNumber, e: payK.establishedAt, p: payK.documents?.businessRegistration?.storagePath }))
+    await pk.keyboard.press('Escape')
+    await pk.waitForTimeout(400)
+    await go(pk, `/ops/clients/${kc}?tab=smart`)
+    await pk.waitForTimeout(1200)
+    const recoK = await deadEnds(pk)
+    check(
+      '고객(D-563) 맞춤 추천 탭: 먼저 제안할 것 · 모듈별 판정 · 맞춤 상담 · 맞는 지원사업 칸 없음 · 닫힌 주소 링크 0 · 모듈을 약속하는 말 0',
+      (await pk.getByTestId('top-picks').count()) === 0 && (await pk.getByTestId('smart-insights').count()) === 0 && (await pk.locator('#module-verdicts').count()) === 0 && recoK.links.length === 0 && recoK.words.length === 0 && (await pk.getByTestId('smart-tab').count()) === 1,
+      JSON.stringify(recoK),
+    )
+    check('고객(D-563) 맞춤 추천 탭: 서류 올리기 · 올린 서류 읽은 결과는 그대로 보임', (await pk.getByTestId('smart-upload').count()) === 1 && (await pk.getByTestId('smart-batch').count()) === 1)
+    await shot(pk, 'customer-03-detail-reco')
+    await go(pk, `/ops/clients/${kc}?tab=smart&talk=1`)
+    await pk.waitForTimeout(900)
+    const talkK = await deadEnds(pk)
+    check('고객(D-563): 말하기 대본 주소(?talk=1)로 와도 대본 창이 뜨지 않음 · 화면은 그대로', talkK.words.length === 0 && (await pk.getByTestId('smart-tab').count()) === 1 && (await pk.locator('[data-testid^="talk-"]').count()) === 0, JSON.stringify(talkK))
+    await go(pk, `/ops/clients/${kc}?tab=overview`)
+    await pk.waitForTimeout(1200)
+    const overK = await deadEnds(pk)
+    const overText = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+    check('고객(D-563) 개요 탭: "전문 모듈 열기" 카드 · 먼저 제안할 것 없음 · 닫힌 주소 링크 0 · 회사 기본 정보는 그대로', !overText.includes('전문 모듈 열기') && (await pk.getByTestId('top-picks').count()) === 0 && overK.links.length === 0 && overK.words.length === 0 && overText.includes('회사 기본 정보') && overText.includes('220'), JSON.stringify(overK))
+    await shot(pk, 'customer-04-detail-overview')
+    await go(pk, `/ops/clients/${kc}?tab=docs`)
+    await pk.waitForTimeout(1000)
+    const docsK = await deadEnds(pk)
+    check('고객(D-563) 서류 탭: "이 서류를 쓰는 도구" 줄 없음 · 닫힌 주소 링크 0 · 서류 칸은 그대로', (await pk.locator('[data-testid^="doc-tools-"]').count()) === 0 && docsK.links.length === 0 && ((await pk.locator('main').innerText().catch(() => '')) ?? '').includes('사업자등록증'), JSON.stringify(docsK))
+    const leftK = []
+    for (const u of ['/', '/ops/decide', '/ops/clients', '/ops/calendar', '/sales/board', '/money', '/settings', `/ops/clients/${kc}?tab=work`, `/ops/clients/${kc}?tab=journal`]) {
+      await go(pk, u)
+      await pk.waitForTimeout(700)
+      const d = await deadEnds(pk)
+      if (d.links.length) leftK.push(`${u} → ${d.links.join(',')}`)
+    }
+    check('고객(D-563): 열린 화면 9곳(오늘 · 확인할 것 · 고객 관리 · 일정 · 영업 · 매출 · 설정 · 업무 · 업무 일기) 본문에 닫힌 주소 링크 0', leftK.length === 0, leftK.join(' | '))
+    await go(pk, '/settings')
+    await pk.waitForTimeout(600)
+    check('고객(D-563) 설정: "모듈 첫 화면" 칸 없음', (await pk.getByTestId('settings-chatfirst').count()) === 0)
+    await go(pk, '/')
+    await pk.waitForTimeout(900)
+    await pk.getByTestId('home-ask').first().click().catch(() => {})
+    await pk.waitForTimeout(500)
+    const guideK = (await pk.getByTestId('home-ask-guide').innerText().catch(() => '')) ?? ''
+    const todayK2 = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+    check('고객(D-563) 오늘: 대화창 안내가 "그 업체 자료로 답해요"(모듈 판정을 약속하지 않음) · 빈 화면 안내는 사라짐 · 대표 자료 0', guideK.includes('그 업체 자료로 답해요') && !guideK.includes('모듈') && !todayK2.includes('등록된 업체가 없습니다') && leaked(todayK2).length === 0, `${guideK} / ${leaked(todayK2).join()}`)
+    const wordsToday = todayK2.match(/모듈|판정|진단서|말하기 대본|받을 수 있는 것|지원사업 알림/g) ?? []
+    check('고객(D-563) 오늘: 처음 시작 카드 · 권하는 질문 · 본문에 모듈 · 판정 · 진단서 · "받을 수 있는 것" 0', wordsToday.length === 0 && todayK2.includes('처음 시작'), wordsToday.join())
+    await shot(pk, 'customer-05-today-after')
     await cK.close()
     // 대표 화면은 그대로 — 전문 모듈 묶음이 보인다(고객 로그인 뒤 같은 브라우저 묶음에서도)
     const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
@@ -1446,6 +1524,14 @@ try {
     await po.waitForTimeout(1200)
     const navO = (await po.locator('aside').first().innerText().catch(() => '')) ?? ''
     check('대표 메뉴(D-562): 전문 모듈 · 영업자 정산 · 1차 미팅 체크리스트 그대로', ['전문 모듈', '영업자 정산', '1차 미팅'].every((x) => navO.includes(x)), navO.replace(/\n/g, '|').slice(0, 400))
+    await go(po, `/ops/clients/${OWNER_CLIENT}?tab=overview`)
+    await po.getByTestId('top-picks').waitFor({ timeout: 8000 }).catch(() => {})
+    const overO = (await po.locator('main').innerText().catch(() => '')) ?? ''
+    check('대표 업체 화면(D-563): 먼저 제안할 것 · "전문 모듈 열기" 카드 그대로', (await po.getByTestId('top-picks').count()) === 1 && overO.includes('전문 모듈 열기'), overO.replace(/\n/g, '|').slice(0, 300))
+    await go(po, `/ops/clients/${OWNER_CLIENT}?tab=smart`)
+    await po.waitForTimeout(1200)
+    const smartO = (await po.locator('main').innerText().catch(() => '')) ?? ''
+    check('대표 맞춤 추천(D-563): 모듈별 판정 · 맞춤 상담 · 맞는 지원사업 칸 그대로', (await po.locator('#module-verdicts').count()) === 1 && ['모듈별 판정', '맞춤 상담', '맞는 지원사업'].every((x) => smartO.includes(x)), smartO.replace(/\n/g, '|').slice(0, 300))
     await cO.close()
   }
 

@@ -39,6 +39,7 @@ MIRAE AI LAB OS × Customer Platform.
 - 목표는 **첫 유료 시범 고객(외부 컨설턴트 1~3명)**. 그때까지 대표 화면의 새 기능은 멈춘다.
 - 고객 계정(`os_access.audience = customer`)에 보이는 것은 네 영역(마케팅 · 고객사 · 서류 · 일정 · 업무)만.
   전문 모듈 묶음 · 영업자 정산 · 1차 미팅 체크리스트는 고객에게 닫는다(D-562 `src/config/customerAudience.ts`). **대표 · 내부 팀장 화면은 그대로 둔다.**
+  화면 안의 길도 같이 닫는다(D-563) — 고객 계정은 '기본 OS 만' 요금제(`customerEntitlements`)로 본다. 고객에게만 숨길 칸은 `useCustomerAudience()` 로, 새 기능이 전문 모듈로 이어지면 요금제 값(`featureUsable`)을 본다.
 - 카드 결제 연동은 첫 3명 뒤 — 처음에는 계좌이체 · 세금계산서(계정은 대표가 `supabase/manual/customer_provision.sql` 로 연다).
 - 대표만 할 수 있는 일(운영 DB 실행 · 승인 · 시범 고객 · 가격)은 보고 맨 위에 🚨 로 남기고, 답을 기다리는 동안 출시 목록의 다른 항목을 한다.
 - **대표가 "출시 모드 끝" 이라고 하면** 이 칸을 지우고 아래 '고도화 최종 목표' 로 돌아간다.

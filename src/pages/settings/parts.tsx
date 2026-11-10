@@ -2,6 +2,7 @@
  * 설정 화면 공유 조각 (local·supabase 모두 사용). Supabase 의존성이 없다.
  */
 
+import { useCustomerAudience } from '../../config/customerAudience'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CONTENT_WIDTH_LABEL, CONTENT_WIDTH_PX, setContentWidth, useContentWidth } from '../../lib/contentWidth'
 import { Database, Info, SlidersHorizontal, Users } from 'lucide-react'
@@ -91,7 +92,13 @@ export function TextScalePanel() {
  * D-552 모듈 첫 화면 — 메뉴로 들어가면 대화창부터 / 예전 화면(바로 화면) 바로.
  * 전체를 고르면 모듈마다 고른 것은 비워 전체를 따른다(모듈 대화창 아래 '처음에 무엇을 보여 줄까요?' 와 같은 값).
  */
+/** D-563 외부 구독 고객 계정에는 전문 모듈이 없다 — 이 칸을 그리지 않는다(대표 · 내부 팀장은 그대로) */
 export function ModuleStartPanel() {
+  const customer = useCustomerAudience()
+  return customer ? null : <ModuleStartPanelBody />
+}
+
+function ModuleStartPanelBody() {
   const [prefs, setPrefs] = useState(readChatFirst)
   useEffect(() => {
     const on = () => setPrefs(readChatFirst())

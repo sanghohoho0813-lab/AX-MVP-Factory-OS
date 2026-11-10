@@ -34,13 +34,13 @@ const hasDoc = (c: ClientOpsRecord) => Object.values(c.documents ?? {}).some((d)
 /** 업체에 걸린 할 일(기한이 있거나 후속조치) */
 const isClientTodo = (e: JournalEntry) => !!e.clientId && (e.entryType === 'follow_up' || !!e.dueDate)
 
-export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; journal: readonly JournalEntry[]; ideas: number; marketing: boolean }): FirstStep[] {
+export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; journal: readonly JournalEntry[]; ideas: number; marketing: boolean; /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈을 약속하지 않는다 */ basic?: boolean }): FirstStep[] {
   const target = firstUseClient(input.clients)
   const at = (tab: string) => (target ? `/ops/clients/${encodeURIComponent(target.id)}?tab=${tab}` : '/ops/clients?new=1')
   const steps: FirstStep[] = [
     { key: 'client', title: '첫 업체 등록', note: '사업자등록증을 올리면 이름 · 번호 · 대표가 채워져요', done: !!target, href: '/ops/clients?new=1', action: '첫 업체 등록' },
     { key: 'doc', title: '서류 한 장 올리기', note: '대충 올려도 칸 · 회사 정보를 채워요', done: input.clients.some(hasDoc), href: at('docs'), action: '서류 올리기' },
-    { key: 'todo', title: '맞춤 추천 보고 할 일 하나', note: '맞는 모듈 · 받을 서류를 보고 [할 일로] 한 번', done: input.journal.some(isClientTodo), href: at('smart'), action: '맞춤 추천 보기' },
+    { key: 'todo', title: '맞춤 추천 보고 할 일 하나', note: input.basic ? '확인할 것 · 받을 서류를 보고 [할 일로] 한 번' : '맞는 모듈 · 받을 서류를 보고 [할 일로] 한 번', done: input.journal.some(isClientTodo), href: at('smart'), action: '맞춤 추천 보기' },
   ]
   if (input.marketing) steps.push({ key: 'content', title: '첫 콘텐츠', note: '이번 주 주제 하나로 글 · 대본을 한 번에', done: input.ideas > 0, href: '/marketing', action: '마케팅 열기' })
   return steps

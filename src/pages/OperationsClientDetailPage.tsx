@@ -215,7 +215,8 @@ import { activeApplications, withApplyDocDone } from '../services/grants/grantAp
 import { usePortalDocRequests } from '../components/grants/usePortalDocRequests'
 import { ClientReportSheet } from '../components/ops/ClientReportSheet'
 import type { ReportPeriod } from '../services/clientReport'
-import { CLIENT_FLOW, flowPosition } from '../content/flowSteps'
+import { basicFlow, CLIENT_FLOW, flowPosition } from '../content/flowSteps'
+import { useCustomerAudience } from '../config/customerAudience'
 import { StepGuide, StepNext } from '../components/ui/StepGuide'
 import { EDGE_BOX } from '../components/ui/edge'
 
@@ -243,6 +244,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   // D-129: 예전 '파일' 탭 주소는 서류로 — 고객과 주고받은 파일도 서류 탭 아래에 있다
   // D-162: Pilot 에게는 고객 플랫폼(대표 공개 사이트와 이어짐) · 컨설팅(특허·MVP) 탭이 없다 — 주소로 와도 개요로
   const pilot = useIsPilot()
+  // D-563 외부 구독 고객 계정 — 전문 모듈로 가는 칸(먼저 제안할 것 · 전문 모듈 열기)은 그리지 않는다. 대표 · 내부 팀장은 그대로
+  const customer = useCustomerAudience()
   const requested: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
   const ownerAi = useOwnerAiAccess()
   const tab: DetailTab = (pilot && PILOT_HIDDEN_TABS.has(requested)) || (requested === 'ai' && ownerAi === 'no') ? 'overview' : requested
@@ -264,7 +267,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   }
   const focusedService = searchParams.get('svc')
   // D-235: 업체 일 순서 — 팀장 화면에 없는 탭(고객 플랫폼)은 순서에서도 뺀다
-  const flowPos = flowPosition(CLIENT_FLOW, tab, (k) => !(pilot && PILOT_HIDDEN_TABS.has(k as DetailTab)))
+  const flowPos = flowPosition(customer ? basicFlow(CLIENT_FLOW) : CLIENT_FLOW, tab, (k) => !(pilot && PILOT_HIDDEN_TABS.has(k as DetailTab)))
   const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
@@ -952,6 +955,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         좋은 판정 3개만 크게, 누르면 그 모듈. 모든 판정은 맞춤 추천 탭에.
       */}
       {/* D-482 판정 엔진을 받는 동안 같은 모양의 빈 자리 — 뒤늦게 끼어들며 아래 회사 정보를 밀어내던 것 */}
+      {!customer && (
       <Suspense fallback={<TopPicksPlaceholder />}>
         <ClientTopPicks
           record={record}
@@ -973,6 +977,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           }}
         />
       </Suspense>
+      )}
       {/*
         D-144: 그다음 회사 정보 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
         지금 챙길 것 · 맞는 지원사업 · 확인할 정보는 '맞춤 추천' 탭으로 옮겼다(여기는 한 줄로 알려만 준다).
@@ -1160,7 +1165,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <ToolResultsCard record={record} fold={{ id: 'overview.results', panel: true }} onChange={(next) => void commit(next)} />
 
       {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
-      <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />
+      {!customer && <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />}
 
       {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
       <AxProjectsCard record={record} fold={{ id: 'overview.ax', panel: true }} />
@@ -1854,7 +1859,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   )}
 
                   {/* 이 서류를 쓰는 도구 (D-90) — 올려 두면 그 도구가 바로 돈다 */}
-                  {toolsNeeding(meta.key).length > 0 && (
+                  {!customer && toolsNeeding(meta.key).length > 0 && (
                     <p className="text-[0.875rem] break-keep text-brand-700" data-testid={`doc-tools-${meta.key}`}>
                       <Wrench aria-hidden="true" className="mr-1 inline size-3.5 align-[-2px]" />
                       이 서류를 쓰는 도구: {toolsNeeding(meta.key).map((t) => t.label).join(' · ')}

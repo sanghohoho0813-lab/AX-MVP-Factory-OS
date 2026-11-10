@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getDataModeConfig } from '../data/dataMode'
 import { useAuth } from '../auth/AuthProvider'
 import { todayLocalDate } from './appClock'
-import { openEntitlements, resolveEntitlements, type Subscription } from '../services/entitlements'
+import { customerEntitlements, openEntitlements, resolveEntitlements, type Subscription } from '../services/entitlements'
+import { useCustomerAudience } from '../config/customerAudience'
 import { listAccess, type ModuleAccess } from '../services/moduleAccess'
 import { loadSubscription } from '../services/subscription'
 import { ENTITLEMENTS_EVENT, EntitlementsCtx, type EntitlementsValue } from './entitlementsStore'
@@ -26,6 +27,8 @@ function CloudProvider({ children }: { children: ReactNode }) {
 
 function Inner({ workspaceId, children }: { workspaceId: string | null; children: ReactNode }) {
   const today = todayLocalDate()
+  // D-563 외부 구독 고객 계정 — 기본 OS 만(저장된 요금제 · 체험 기록과 상관없이). 대표 · 내부 팀장은 아래 그대로
+  const customer = useCustomerAudience()
   const [loaded, setLoaded] = useState<{ sub: Subscription; access: Map<string, ModuleAccess> } | null>(null)
   const [version, setVersion] = useState(0)
 
@@ -51,11 +54,11 @@ function Inner({ workspaceId, children }: { workspaceId: string | null; children
 
   const value = useMemo<EntitlementsValue>(
     () => ({
-      ent: loaded ? resolveEntitlements(loaded.sub, loaded.access, today) : openEntitlements(today),
-      ready: loaded !== null,
+      ent: customer ? customerEntitlements(today) : loaded ? resolveEntitlements(loaded.sub, loaded.access, today) : openEntitlements(today),
+      ready: customer || loaded !== null,
       workspaceId,
     }),
-    [loaded, today, workspaceId],
+    [loaded, today, workspaceId, customer],
   )
   return <EntitlementsCtx.Provider value={value}>{children}</EntitlementsCtx.Provider>
 }

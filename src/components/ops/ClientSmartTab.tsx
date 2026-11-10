@@ -24,6 +24,7 @@ import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History, MessageC
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { latestToolResult } from '../../services/toolResultGroups'
 import { useIsPilot } from '../../auth/osAccess'
+import { useCustomerAudience } from '../../config/customerAudience'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, Surface, type Tone } from '../ui/primitives'
@@ -46,7 +47,7 @@ import { Fold, FoldAllButton, HintTip, openFold } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { recoRequestMessage } from '../../services/recoRequest'
 import { useGrantData } from '../grants/useGrants'
-import { useEntitlements } from '../../lib/entitlementsStore'
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
 import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts, withFactDecisions } from '../../services/customerFacts'
@@ -89,11 +90,13 @@ export default function ClientSmartTab({
   onFill: () => void
 }) {
   const { ent } = useEntitlements()
+  // D-563 외부 구독 고객 계정 — 전문 모듈에서 나오는 칸(먼저 제안할 것 · 맞춤 상담 · 모듈별 판정 · 맞는 지원사업)은 그리지 않는다
+  const customer = useCustomerAudience()
   // D-161: 되돌리기는 알림이 뜬 뒤에 누른다 — 그때의 기록 위에 되돌린다
   const recordRef = useRef(record)
   recordRef.current = record
   const { notices, linkOf } = useGrantData(workspaceId)
-  const usable = (key: string) => key === 'grants' || ent.feature(key).usable
+  const usable = (key: string) => featureUsable(ent, key)
   const insights = useMemo(() => buildInsights(record, today, notices, usable), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   // D-345 방금 올린 서류 — 올리기 전 기록의 판정과 견줘 새로 판정이 난 모듈(한 번만 계산)
   const opened = useMemo(() => (lastBatch?.before ? insightChanges(buildInsights(lastBatch.before, today, notices, usable), insights) : []), [lastBatch, today, notices, insights]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -194,17 +197,19 @@ export default function ClientSmartTab({
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
-      {diagOpen && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
-      {talk !== undefined && (
+      {diagOpen && !customer && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
+      {talk !== undefined && !customer && (
         <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} memo={onCommitQuiet ? { workspaceId, userId: userId ?? null, onCommit: onCommitQuiet } : undefined} />
       )}
       {/* D-492 서류에서 읽어 넣은 중요 번호 — 맨 위에서 처음 한 번만 원본과 맞춰 보기(다 확인하면 사라진다) */}
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onTalk={() => setTalk(null)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
-          openFold('smart.verdicts')
-          window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-        }} />
+      {!customer && (
+        <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onTalk={() => setTalk(null)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
+            openFold('smart.verdicts')
+            window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+          }} />
+      )}
 
       {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
       <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} />
@@ -249,7 +254,7 @@ export default function ClientSmartTab({
       {/* D-357 화면 원칙 — 맞춤 추천 첫 화면은 '먼저 제안할 것' 하나만 펼치고 나머지는 접힌 채 한 줄(펼친 것은 기억) */}
       <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', summary: steps.length ? '누르면 이 업체에 지금 할 일 순서' : '지금 추천할 행동 없음' }}>
         {steps.length === 0 ? (
-          <p className="t-sub break-keep text-slate-500">지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.</p>
+          <p className="t-sub break-keep text-slate-500">{customer ? '지금 추천할 행동이 없어요.' : '지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.'}</p>
         ) : (
           <ol className="flex flex-col gap-2" data-testid="smart-steps">
             {steps.map((st, i) => (
@@ -316,11 +321,14 @@ export default function ClientSmartTab({
       />
 
       {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
-      <Fold id="smart.advisor" title="맞춤 상담">
-        <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} bare />
-      </Fold>
+      {!customer && (
+        <Fold id="smart.advisor" title="맞춤 상담">
+          <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} bare />
+        </Fold>
+      )}
 
       {/* 5. 모듈별 판정 */}
+      {!customer && (
       <div id="module-verdicts" className="scroll-mt-32">
       {/* D-192: 위 '먼저 제안할 것' 이 좋은 것 3개를 보여 준다 — 전부는 접어 둔다(설명은 ⓘ) */}
       <Section title="모듈별 판정" count={insights.length} fold={{ id: 'smart.verdicts' }}>
@@ -383,6 +391,7 @@ export default function ClientSmartTab({
         </ul>
       </Section>
       </div>
+      )}
 
       {/* 5-1. D-238: 홍보도 같이 — 홈페이지 · 홍보 글(대표 화면 · 요금제에 있을 때만) */}
       <ClientPromoRow record={record} />
@@ -399,7 +408,7 @@ export default function ClientSmartTab({
       )}
 
       {/* 7. 맞는 지원사업 */}
-      <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />
+      {!customer && <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />}
     </div>
   )
 }

@@ -6,6 +6,7 @@
 import { createContext, useContext } from 'react'
 import { todayLocalDate } from './appClock'
 import { openEntitlements, type Entitlements } from '../services/entitlements'
+import { isCustomerAudience } from '../config/customerAudience'
 
 export const ENTITLEMENTS_EVENT = 'axmvp:entitlements'
 
@@ -31,4 +32,12 @@ const FALLBACK: EntitlementsValue = { ent: openEntitlements(todayLocalDate()), r
 /** 틀 밖(단독 화면)에서는 아무것도 잠그지 않는다 */
 export function useEntitlements(): EntitlementsValue {
   return useContext(EntitlementsCtx) ?? FALLBACK
+}
+
+/**
+ * 화면이 묻는 '이 기능을 쓸 수 있나' — 지원사업 알림(grants)은 요금제와 상관없이 열려 있다(예전 그대로).
+ * D-563 외부 구독 고객 계정에게만 닫힌다(전문 모듈 묶음 주소가 닫혀 있어, 열어 두면 갈 곳 없는 단추가 된다).
+ */
+export function featureUsable(ent: Entitlements, key: string): boolean {
+  return key === 'grants' ? !isCustomerAudience() : ent.feature(key).usable
 }

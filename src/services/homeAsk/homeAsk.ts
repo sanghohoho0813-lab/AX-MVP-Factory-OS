@@ -152,6 +152,8 @@ export interface SuggestInput {
   recos: readonly { clientId: string; clientName: string; labels: readonly string[] }[]
   overdueMoney: number
   hasTodos: boolean
+  /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 판정 · 제안을 약속하는 질문을 권하지 않는다 */
+  basic?: boolean
 }
 
 /** 지금 자료에 맞춘 질문 세 줄 — 약속 → 새 서류 → 추천 많은 업체, 모자라면 오늘 · 돈 · 연락 */
@@ -160,12 +162,12 @@ export function homeSuggestions(i: SuggestInput): HomeSuggestion[] {
   const used = new Set<string>()
   const meet = i.appointments.find((a) => a.clientId && (a.daysLeft ?? 9) >= 0 && (a.daysLeft ?? 9) <= 1)
   if (meet?.clientId) {
-    out.push({ icon: 'meeting', text: `${meet.daysLeft === 0 ? '오늘' : '내일'} ${meet.clientName} 미팅 — 무엇을 먼저 제안할까요?`, clientId: meet.clientId })
+    out.push({ icon: 'meeting', text: `${meet.daysLeft === 0 ? '오늘' : '내일'} ${meet.clientName} 미팅 — ${i.basic ? '무엇을 먼저 확인할까요?' : '무엇을 먼저 제안할까요?'}`, clientId: meet.clientId })
     used.add(meet.clientId)
   }
   const doc = i.freshDocs.find((d) => !used.has(d.clientId))
   if (doc) {
-    out.push({ icon: 'docs', text: `${doc.clientName} 서류가 들어왔어요 — 받을 수 있는 것 정리해 줘`, clientId: doc.clientId })
+    out.push({ icon: 'docs', text: `${doc.clientName} 서류가 들어왔어요 — ${i.basic ? '다음에 할 일 정리해 줘' : '받을 수 있는 것 정리해 줘'}`, clientId: doc.clientId })
     used.add(doc.clientId)
   }
   const reco = i.recos.find((r) => !used.has(r.clientId) && r.labels.length > 0)
@@ -316,6 +318,8 @@ export interface RuleInput {
   today: { overdue: number; todos: readonly string[]; hardDue: readonly string[]; appointments: readonly string[] }
   /** 질문에 업체 같은 말이 있었는데 못 찾았으면 비슷한 이름(최대 3) */
   nearNames: readonly string[]
+  /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈 판정 · 진단서를 약속하는 말을 쓰지 않는다 */
+  basic?: boolean
 }
 
 export interface RuleAnswer extends AssistAnswer {
@@ -342,14 +346,15 @@ export function ruleAnswer(i: RuleInput): RuleAnswer {
       const ask = [...new Set(picks.flatMap((p) => p.missing))].filter((m) => !docs.has(m)).slice(0, 6)
       if (ask.length && i.intents.includes('meeting')) items.push({ title: `${i.focus.length > 1 ? `${f.name} · ` : ''}미팅에서 확인할 것`, outline: ask, ref })
       if (f.missingDocs.length) items.push({ title: `${i.focus.length > 1 ? `${f.name} · ` : ''}받아 올 서류`, outline: f.missingDocs.slice(0, 6), ref })
-      if (picks.length === 0) items.push({ title: `${f.name} — 아직 판정할 자료가 적어요`, detail: '사업자등록증 · 재무제표 · 4대보험 명부를 받으면 맞는 모듈을 바로 판정해요.', ref })
+      if (picks.length === 0 && i.basic) items.push({ title: `${f.name} — 업체 화면에서 이어 보기`, detail: '서류함 · 확인할 것 · 업무 · 다음 약속을 한 화면에서 봐요.', ref })
+      else if (picks.length === 0) items.push({ title: `${f.name} — 아직 판정할 자료가 적어요`, detail: '사업자등록증 · 재무제표 · 4대보험 명부를 받으면 맞는 모듈을 바로 판정해요.', ref })
     }
     const names = i.focus.map((f) => f.name).join(' · ')
     const top = i.focus[0].picks[0]
     return {
-      headline: top ? `${names} — 먼저 제안할 것은 ${top.label}(${top.toneLabel})부터예요.` : `${names} — 자료를 더 받으면 맞는 모듈을 판정해요.`,
+      headline: top ? `${names} — 먼저 제안할 것은 ${top.label}(${top.toneLabel})부터예요.` : i.basic ? `${names} — 서류 · 할 일 · 다음 약속부터 챙겨요.` : `${names} — 자료를 더 받으면 맞는 모듈을 판정해요.`,
       items,
-      next: ['맞춤 추천에서 맞춤 진단서 한 장 드리기', '받아 올 서류 요청 문구 보내기'],
+      next: i.basic ? ['받아 올 서류 요청 문구 보내기', '다음 약속 · 할 일 적어 두기'] : ['맞춤 추천에서 맞춤 진단서 한 장 드리기', '받아 올 서류 요청 문구 보내기'],
       links,
     }
   }
