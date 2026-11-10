@@ -11,7 +11,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PlayCircle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
-import { GUIDE_LABELS, menuGuide } from '../../content/menuGuide'
+import { GUIDE_LABELS, hasMenuGuide, menuGuide } from '../../content/menuGuide'
+import { MODULES } from '../../config/moduleRegistry'
 import { menuVideo } from '../../config/menuVideos'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { guideTitle } from './guideTitle'
@@ -60,7 +61,12 @@ export function GuideLayer() {
         setShown({ key, label: el.getAttribute('data-guide-label') || guideTitle(key), rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom }, side: !!el.closest('aside') })
       }, DELAY_MS)
     }
-    const guideOf = (t: EventTarget | null) => (t instanceof Element ? t.closest('[data-guide]') : null)
+    // 글이 있는 열쇠만 — 메뉴 표의 key · 출시 예정(up-…) · 따로 쓴 안내(메뉴 · 기능). 모르는 값에는 카드를 띄우지 않는다
+    const known = (key: string) => hasMenuGuide(key) || key.startsWith('up-') || MODULES.some((m) => m.key === key)
+    const guideOf = (t: EventTarget | null) => {
+      const el = t instanceof Element ? t.closest('[data-guide]') : null
+      return el && known(el.getAttribute('data-guide') ?? '') ? el : null
+    }
     const over = (e: MouseEvent) => {
       const el = guideOf(e.target)
       if (!el) {

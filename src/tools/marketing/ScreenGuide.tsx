@@ -34,7 +34,7 @@ export function ScreenGuide({ id, what, steps = [], testId = 'mk-guide' }: { id:
     setClosed(!closed)
   }
   return (
-    <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid={testId} data-guide={id} data-open={closed ? '0' : '1'} aria-label="이 화면은">
+    <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid={testId} data-screen-guide={id} data-open={closed ? '0' : '1'} aria-label="이 화면은">
       <div className="flex items-start gap-2">
         <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-700" />
         <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
