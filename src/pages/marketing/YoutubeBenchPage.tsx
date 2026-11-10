@@ -44,7 +44,7 @@ import { cleanTopic, customSource, packSourceOf, packText, type ContentPack, typ
 import { openPackSync, packAiVersion, packDoneKeys, subscribePackAi } from '../../services/marketing/packAi'
 import { openKitSync, type KitAi } from '../../services/marketing/kitAi'
 import { originMemo, originOf, type KitScript } from '../../services/marketing/kitScript'
-import { interestTopics } from '../../services/marketing/interests'
+import { interestTopics, wantsAi } from '../../services/marketing/interests'
 import { openStudySync } from '../../services/marketing/videoStudyRun'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import {
@@ -102,6 +102,7 @@ import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { MkAsk } from './radar/MkAsk'
+import { MkStart } from './radar/MkStart'
 import type { MkRoute } from '../../services/marketing/mkAsk'
 import { useGrantFeed } from '../../services/grants/grantFeed'
 import { FIXED_TOPIC_IDS, fixedKeywords, fixedPackSource, fixedTopicVideos, withFixedVideos, readWeekLog, rememberWeek, weekChange, weekWindow, writeWeekLog } from '../../services/marketing/noticeKeywords'
@@ -271,7 +272,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   // D-295 고정 키워드 주제(정책자금 · 고용지원금 · 인증 · 지원금 · 지원사업)는 이번 주 키워드 후보에서 뺀다 — 늘 따로 보인다
   // D-558 계정마다 고른 관심 분야 → 그 분야 주제가 '이번 주 뜨는 주제' 맨 앞
   const interestIds = useMemo(() => interestTopics(prefs.interests ?? []), [prefs.interests])
-  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted, fixedTopics: FIXED_TOPIC_IDS, interests: interestIds }), [prefs.overrides, prefs.mix, prefs.muted, interestIds])
+  // D-564 대표가 아닌 계정 — AI 쪽 관심 분야를 스스로 고르지 않았으면 이번 주 주제는 '경제 · 경영' 축에서만(대표 기본값인 AI · AX 주제를 넣지 않는다)
+  const marketOnly = customer && !wantsAi(prefs.interests ?? [])
+  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted, fixedTopics: FIXED_TOPIC_IDS, interests: interestIds, marketOnly }), [marketOnly, prefs.overrides, prefs.mix, prefs.muted, interestIds])
   const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
   // D-232 내 콘텐츠 성과 — 레이더가 이미 받은 내 채널 영상만(유튜브를 더 부르지 않음)
@@ -982,6 +985,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       ) : firstScreen ? (
         <>
           {/* D-511 첫 화면 — 대화창 하나 · 지난번 하던 것 한 줄 · 살펴보기 · 만들기 목록. 키워드 판 · 자세히 보기 · 시장 신호는 [이번 주 찍을 것] 안 */}
+          {/* D-564 대표가 아닌 계정이 처음 왔을 때 — 내 채널(이름 · 회사 · 분야 · 올릴 주제)부터. 적으면 다시 안 보인다 */}
+          {!readOnly && customer && <MkStart workspaceId={workspaceId} picked={prefs.interests ?? []} prefsReady={prefsReady} onSaveInterests={(ids) => savePrefs({ ...prefs, interests: ids })} />}
           {readOnly ? null : <MkAsk onRoute={onAsk} />}
           {!readOnly && resume && <ResumeCard {...resume} />}
           <div role="tablist" data-testid="yt-views">
@@ -1043,8 +1048,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
                   rising={rising.filter((r) => r.fit)}
                   breakouts={breakouts}
-                  focus={focus}
-                  basis={`최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
+                  // D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았으면 — 시장 신호에서 AI 영역 · AI 판을 뺀다
+                  focus={marketOnly ? { ...focus, domains: focus.domains.filter((d) => d.domain !== 'ai'), aiKeywords: [], workflow: [], fresh: [] } : focus}
+                  noAi={marketOnly}
+                  basis={marketOnly ? `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳 — 점수가 아니라 근거로 고릅니다` : `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
                   ideas={notebook.ideas}
                   readOnly={readOnly}
                   noThumb={yt.sample}

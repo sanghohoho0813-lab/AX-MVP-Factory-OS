@@ -83,6 +83,7 @@ export function PlanView({
   rising,
   breakouts,
   focus,
+  noAi = false,
   basis,
   ideas,
   readOnly,
@@ -108,6 +109,8 @@ export function PlanView({
   breakouts: RadarVideo[]
   /** D-197 — 지금 강한 흐름 · AI 핵심 키워드 · 업무 흐름 · 새 AI 키워드 후보 · 사이드 급상승 */
   focus: FocusData
+  /** D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았을 때 — 시장 신호에서 AI 판을 뺀다 */
+  noAi?: boolean
   basis: string
   ideas: readonly ContentIdea[]
   readOnly: boolean
@@ -242,7 +245,7 @@ export function PlanView({
         )}
       </section>
 
-      <MarketSignals rising={rising} breakouts={breakouts} focus={focus} noThumb={noThumb} onOpenVideo={onOpenVideo} />
+      <MarketSignals rising={rising} breakouts={breakouts} focus={focus} noThumb={noThumb} onOpenVideo={onOpenVideo} noAi={noAi} />
     </div>
   )
 }
@@ -939,11 +942,13 @@ function readBoard(): Board {
   return 'flow'
 }
 
-function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { rising: RisingTopic[]; breakouts: RadarVideo[]; focus: FocusData; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
+function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo, noAi = false }: { rising: RisingTopic[]; breakouts: RadarVideo[]; focus: FocusData; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void; /** D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았으면 AI 판 · AI 말을 그리지 않는다 */ noAi?: boolean }) {
   const [allRising, setAllRising] = useState(false)
   const [allBreakouts, setAllBreakouts] = useState(false)
   // D-227 한 번에 한 판 — 고르지 않은 판은 그리지 않는다(지운 것은 없다 · [전부 보기] 는 예전처럼 다 펼친다)
-  const [board, setBoardState] = useState<Board>(readBoard)
+  const [boardRaw, setBoardState] = useState<Board>(readBoard)
+  // D-564 AI 판을 안 그리는 계정이 예전에 AI 판을 골라 뒀으면 '지금 강한 흐름' 으로
+  const board: Board = noAi && boardRaw === 'ai' ? 'flow' : boardRaw
   const setBoard = (b: Board) => {
     setBoardState(b)
     try {
@@ -962,14 +967,14 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
     <Fold
       id="radar.signals"
       title="다음 후보 찾기 · 시장 신호"
-      hint="지금 강한 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드 급상승 — 다음 후보를 찾을 때 펼쳐 보세요. 한 번에 한 판씩 보여요."
+      hint={noAi ? '지금 강한 흐름 · 급상승 · 터진 영상 · 사이드 급상승 — 다음 후보를 찾을 때 펼쳐 보세요. 한 번에 한 판씩 보여요.' : '지금 강한 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드 급상승 — 다음 후보를 찾을 때 펼쳐 보세요. 한 번에 한 판씩 보여요.'}
       icon={<IconChip icon={BarChart3} tone="indigo" />}
       testId="radar-signals-fold"
       summary={
         <span className="flex flex-wrap items-center gap-1.5" data-testid="radar-signals-summary">
           {top && <span className="t-meta rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-800">가장 센 흐름 · {top.label}</span>}
           <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">흐름 {flowN}</span>
-          <span className="t-meta rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">AI 키워드 {aiN}</span>
+          {!noAi && <span className="t-meta rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">AI 키워드 {aiN}</span>}
           <span className="t-meta rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">급상승 {rising.length}</span>
           <span className="t-meta rounded-full bg-red-50 px-2 py-0.5 text-red-700">터진 영상 {breakouts.length}</span>
           {focus.side.length > 0 && <span className="t-meta rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">사이드 {focus.side.length}</span>}
@@ -978,9 +983,9 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
     >
     <section className="flex flex-col gap-2.5" aria-labelledby="radar-signals-h" data-testid="radar-signals">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <HintTip tip={hintFor('시장 신호')} label="경제 · 경영 · AI 시장 신호">
+        <HintTip tip={hintFor('시장 신호')} label={noAi ? '경제 · 경영 시장 신호' : '경제 · 경영 · AI 시장 신호'}>
           <h2 id="radar-signals-h" className="t-section flex items-center gap-2 font-extrabold break-keep text-slate-900">
-            경제 · 경영 · AI 시장 신호
+            {noAi ? '경제 · 경영 시장 신호' : '경제 · 경영 · AI 시장 신호'}
           </h2>
         </HintTip>
         <span className="t-meta break-keep text-slate-500" data-testid="radar-peek-hint">
@@ -993,16 +998,16 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
         value={board}
         onChange={(k) => setBoard(k as Board)}
         options={[
-          { key: 'flow', label: '지금 강한 흐름', hint: '경제 · 경영 · AI', icon: BarChart3, tone: 'indigo', badge: flowN },
-          { key: 'ai', label: 'AI 핵심 키워드', hint: '회사별 · 업무 흐름', icon: Sparkles, tone: 'violet', badge: aiN },
+          { key: 'flow', label: '지금 강한 흐름', hint: noAi ? '경제 · 경영' : '경제 · 경영 · AI', icon: BarChart3, tone: 'indigo', badge: flowN },
+          ...(noAi ? [] : [{ key: 'ai', label: 'AI 핵심 키워드', hint: '회사별 · 업무 흐름', icon: Sparkles, tone: 'violet' as const, badge: aiN }]),
           { key: 'hot', label: '급상승 · 터진 영상', hint: '2주 · 평소보다', icon: Flame, tone: 'red', badge: rising.length + breakouts.length },
           { key: 'side', label: '사이드 급상승', hint: '분야 밖 · 형식 참고', icon: Zap, tone: 'amber', badge: focus.side.length },
           { key: 'all', label: '전부 보기', hint: '네 판을 한 화면에', icon: LayoutList, tone: 'slate' },
         ]}
-        cols={5}
+        cols={noAi ? 4 : 5}
       />
       {on('flow') && <DomainBoard signals={focus.domains} />}
-      {on('ai') && <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />}
+      {!noAi && on('ai') && <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />}
       {on('hot') && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-rising">

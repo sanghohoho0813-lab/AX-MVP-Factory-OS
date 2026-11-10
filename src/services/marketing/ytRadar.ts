@@ -228,6 +228,8 @@ export interface RadarOptions {
   fixedTopics?: readonly string[]
   /** D-558 계정마다 고른 관심 분야의 주제 번호 — 그 주제 후보가 10개 맨 앞에(남은 자리는 다른 뜨는 주제) · 비면 예전 그대로 */
   interests?: readonly string[]
+  /** D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았을 때 — 10개를 '경제 · 경영' 축에서만 고른다('AI · 업무' · '경영 × AI' 축은 넣지 않는다) */
+  marketOnly?: boolean
 }
 
 /** 영상마다 평소 · 배수 · 등급 · 주제 · 제목 구조 */
@@ -849,27 +851,35 @@ export function radarPlan(p: Prepared, opts: RadarOptions = {}, precomputed?: re
   const fixed = new Set(opts.fixedTopics ?? [])
   // '경영 × AI' 다리 주제도 같은 주제면 뺀다(정책자금 × 공고 자동 수집 …) — 이번 주 10개에 고정 키워드 이름이 다시 보이지 않게
   if (fixed.size) for (const a of ['market', 'bridge'] as const) pools[a] = pools[a].filter((o) => !fixed.has(o.topicId))
-  return { picks: withInterests(withHoldsLast(pools, mix), pools, opts.interests), aiDataShort, aiChannels, clusters: cs, hot, mix, muted: [...muted] }
+  return { picks: withInterests(withHoldsLast(pools, mix), pools, opts.interests, opts.marketOnly), aiDataShort, aiChannels, clusters: cs, hot, mix, muted: [...muted] }
 }
 
 /**
  * D-558 관심 분야 — 고른 분야의 주제 후보를 맨 앞으로(먼저 고른 10개 안의 것 · 그다음 10개 밖에 있던 것, 신호 센 순) ·
  * 남은 자리는 원래 10개 순서 그대로. 같은 후보(축:주제)는 한 번만 · 관심 분야 안에서 '지켜보기' 후보는 그 묶음 맨 뒤.
  */
-export function withInterests(picks: readonly Opportunity[], pools: Readonly<Record<ContentAxis, readonly Opportunity[]>>, interests?: readonly string[]): Opportunity[] {
+export function withInterests(picks: readonly Opportunity[], pools: Readonly<Record<ContentAxis, readonly Opportunity[]>>, interests?: readonly string[], marketOnly = false): Opportunity[] {
   const want = new Set(interests ?? [])
-  if (!want.size) return [...picks]
+  // D-564 marketOnly — 'AI · 업무' · '경영 × AI' 축 후보는 넣지 않고, 빈 자리는 '경제 · 경영' 축의 다음 후보로 채운다
+  const allow = (o: Opportunity) => !marketOnly || o.axis === 'market'
+  const seen = new Set<string>()
+  const once = (o: Opportunity) => !seen.has(o.key) && (seen.add(o.key), true)
+  if (!want.size) {
+    if (!marketOnly) return [...picks]
+    const fill = [...pools.market].sort((x, y) => clusterOrder(x.cluster, y.cluster))
+    return [...picks.filter(allow), ...fill].filter(once).slice(0, MAX_PICKS)
+  }
   const hit = (o: Opportunity) => want.has(o.topicId)
-  const more = (['market', 'axai', 'bridge'] as const)
+  const axes: readonly ContentAxis[] = marketOnly ? ['market'] : ['market', 'axai', 'bridge']
+  const more = axes
     .flatMap((a) => pools[a])
     .filter(hit)
     .sort((x, y) => clusterOrder(x.cluster, y.cluster))
-  const seen = new Set<string>()
-  const once = (o: Opportunity) => !seen.has(o.key) && (seen.add(o.key), true)
   // 관심 분야 안에서도 '지켜보기'(아직 신호가 약한 것)는 뒤로 — 앞자리는 지금 뜨는 것부터
-  const hits = [...picks.filter(hit), ...more].filter(once)
+  const hits = [...picks.filter(allow).filter(hit), ...more].filter(once)
   const front = [...hits.filter((o) => o.approach !== 'hold'), ...hits.filter((o) => o.approach === 'hold')]
-  const back = picks.filter(once)
+  const rest = marketOnly ? [...picks.filter(allow), ...[...pools.market].sort((x, y) => clusterOrder(x.cluster, y.cluster))] : picks
+  const back = rest.filter(once)
   return [...front, ...back].slice(0, MAX_PICKS)
 }
 

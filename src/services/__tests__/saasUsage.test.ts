@@ -24,7 +24,7 @@ import { KIM_FACTS, ourFactsList, unknownNumbers } from '../marketing/snsRules'
 import { DEFAULT_BRIEF, defaultBrief } from '../marketing/radarStore'
 import { withoutOwnerChannel, type YtFeed } from '../marketing/ytBench'
 import { presetOf } from '../aiAssist/presets'
-import { isCustomerMarketingPath, setPilotMarketing } from '../../config/pilotMarketing'
+import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, setPilotMarketing, setPilotMarketingScreens } from '../../config/pilotMarketing'
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
 
@@ -55,6 +55,9 @@ let acct: Acct | null = { kind: 'customer', plan: 'growth', marketing: true, act
 let ledgerMode: 'ok' | 'not_configured' | 'down' = 'ok'
 /** my_ai_access — ok · missing(0022 적용 전) · error(닿지 못함) */
 let accessMode: 'ok' | 'missing' | 'error' = 'ok'
+/** D-564 os_access.audience(0024) — none(칸 없음 · 0024 전) · internal · customer · down(닿지 못함) */
+let audienceMode: 'none' | 'internal' | 'customer' | 'down' = 'none'
+let audienceAsked = 0
 let configured = true
 let settleFails = 0
 let ledgerCalls: { fn: string; args: Record<string, unknown> }[] = []
@@ -102,6 +105,12 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   }
   if (url.includes('/rest/v1/rpc/has_capability')) return json(headers.Authorization === OWNER)
   if (url.includes('/rest/v1/rpc/my_os_access')) return json(headers.Authorization === OWNER ? 'full' : headers.Authorization === PILOT ? 'pilot' : 'none')
+  if (url.includes('/rest/v1/os_access?select=audience')) {
+    audienceAsked += 1
+    if (audienceMode === 'down') throw new Error('network down')
+    if (audienceMode === 'none') return json({ code: '42703', message: 'column os_access.audience does not exist' }, 400)
+    return json([{ audience: audienceMode }])
+  }
   if (url.includes('/rest/v1/rpc/my_ai_access')) {
     ledgerCalls.push({ fn: 'my_ai_access', args: body })
     if (accessMode === 'missing') return json({ code: 'PGRST202', message: 'Could not find the function public.my_ai_access' }, 404)
@@ -337,7 +346,34 @@ async function run() {
   const lg = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
   const lgMk = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
   const lgSt = await status(PILOT)
-  check('F4 0022 적용 전(지금 운영 · 권한 함수 없음) — 팀장 일반 AI 는 예전처럼 · 예약 안 부름 · 마케팅 403 · 상태 마케팅 닫힘', lg.statusCode === 200 && fnCalls('ai_usage_reserve').length === 0 && lgMk.statusCode === 403 && lgMk.body.code === 'usage_setup_needed' && lgSt.body.marketing === false && lgSt.body.usage === null, { s: lg.statusCode, mk: lgMk.body.code, st: lgSt.body.marketing })
+  check('F4 0022 적용 전(지금 운영 · 권한 함수 없음 · 0024 도 없음) — 내부 팀장 일반 AI 는 예전처럼 · D-564 마케팅 AI 도 200(세지 않음 · 예약 안 부름) · 상태 마케팅 열림', lg.statusCode === 200 && lgMk.statusCode === 200 && fnCalls('ai_usage_reserve').length === 0 && lgSt.body.marketing === true && (lgSt.body.assists as { page: string }[]).some((a) => MARKETING_PAGES.has(a.page)), { g: lg.statusCode, m: lgMk.statusCode, c: lgMk.body.code, st: lgSt.body.marketing })
+  // D-564 0024(고객 구분)만 먼저 들어온 운영 — 외부 고객은 장부 없이 어떤 AI 도 못 쓴다
+  setEnv()
+  accessMode = 'missing'
+  audienceMode = 'customer'
+  calls = []
+  const lcG = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const lcM = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const lcSt = await status(PILOT)
+  check('F4b 장부 없음 + 외부 고객(0024 만) — 일반 · 마케팅 둘 다 503 usage_setup_needed · AI 0 · 상태 마케팅 닫힘', lcG.statusCode === 503 && lcG.body.code === 'usage_setup_needed' && lcM.statusCode === 503 && lcM.body.code === 'usage_setup_needed' && provider().length === 0 && lcSt.body.marketing === false, { g: lcG.statusCode, m: lcM.statusCode, st: lcSt.body.marketing })
+  setEnv()
+  accessMode = 'missing'
+  audienceMode = 'down'
+  calls = []
+  const ldG = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: TODAY }, PILOT)
+  const ldM = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const ldSt = await status(PILOT)
+  check('F4c 장부 없음 + 누구인지 못 물음 — 팀장 일반 AI 는 예전처럼 200 · 마케팅은 503(모르면 열지 않음) · 상태 마케팅 닫힘', ldG.statusCode === 200 && ldM.statusCode === 503 && ldM.body.code === 'usage_unreachable' && provider().length === 1 && ldSt.body.marketing === false, { g: ldG.statusCode, m: ldM.statusCode, c: ldM.body.code, st: ldSt.body.marketing })
+  setEnv()
+  accessMode = 'missing'
+  audienceMode = 'internal'
+  audienceAsked = 0
+  calls = []
+  const liM = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const liM2 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+  const liSys = String((provider()[0]?.body as { systemInstruction?: { parts?: { text?: string }[] } } | undefined)?.systemInstruction?.parts?.[0]?.text ?? JSON.stringify(provider()[0]?.body ?? ''))
+  check('F4d 장부 없음 + 내부 팀장(0024 있음 · internal) — 마케팅 200 · Gemini 로만 · 대표 이름 · 채널 0 · 누구인지는 60초에 한 번만 물음', liM.statusCode === 200 && liM2.statusCode === 200 && provider().length === 2 && provider().every((c) => c.url.includes('generativelanguage')) && !/김상호|김팀장의 경영노트/.test(liSys) && audienceAsked === 1, { m: liM.statusCode, n: provider().length, asked: audienceAsked })
+  audienceMode = 'none'
 
   setEnv()
   acct = INTERNAL
@@ -446,18 +482,20 @@ async function run() {
   check('C9 대표 계정 화면 자료 · 기본값은 그대로(미래AI랩 소개 · 김팀장의 경영노트 · 사실 목록 · 단추 이름)', ownerRb.includes('미래AI랩') && defaultBrief() === DEFAULT_BRIEF && ourFactsList() === KIM_FACTS && presetOf('radar.top5')?.label === '미래AI랩 맞춤 이번 주 TOP5 기획' && mkText('MIRAE 관점') === 'MIRAE 관점')
   __setBrandForTest(null, null)
 
-  /* ---- 4. 메뉴 스위치 ---- */
-  setPilotMarketing('unknown')
-  const closedBefore = ['/marketing', '/marketing/youtube', '/marketing/threads', '/marketing/shorts'].every((p) => isPilotHiddenPath(p))
+  /* ---- 4. 메뉴 스위치(D-564 — 화면은 팀장 등급이면 열림 · AI 단추는 서버 답) ---- */
+  setPilotMarketingScreens(false)
   setPilotMarketing('open')
+  const closedBefore = ['/marketing', '/marketing/youtube', '/marketing/threads', '/marketing/shorts'].every((p) => isPilotHiddenPath(p))
+  setPilotMarketing('closed')
+  setPilotMarketingScreens(true)
   const opened = ['/marketing', '/marketing/youtube', '/marketing/threads', '/marketing/shorts'].every((p) => !isPilotHiddenPath(p))
   const stillClosed = ['/tools/content', '/tools/homepage', '/marketing/more', '/patent-venture', '/ai', '/ops/agents', '/studio'].every((p) => isPilotHiddenPath(p)) && !isCustomerMarketingPath('/marketingx') && !isCustomerMarketingPath('/marketing/more')
   const menu = enabledModulesByGroup({ pilot: true }).flatMap((g) => g.items.map((m) => m.key))
-  check('N1 서버가 열기 전에는 고객에게 마케팅 주소 모두 닫힘', closedBefore)
-  check('N2 서버가 연 계정 — 레이더 · 스레드 · 릴스/틱톡 주소 열림 · 메뉴에 마케팅 · 브랜딩 줄', opened && menu.includes('marketing'), menu)
+  check('N1 대표가 팀장 화면으로 볼 때(화면 스위치 꺼짐) — 서버가 AI 를 열어도 마케팅 주소 모두 닫힘', closedBefore)
+  check('N2 팀장 등급 계정(화면 스위치 켜짐) — 서버 AI 답이 닫힘이어도 레이더 · 스레드 · 릴스/틱톡 주소 열림 · 메뉴에 마케팅 · 브랜딩 줄', opened && menu.includes('marketing') && pilotMarketingScreens() && pilotMarketingState() === 'closed', menu)
   check('N3 열려도 홍보 글 · 홈페이지 · 예전 안내 · 다른 대표 화면은 닫힌 채', stillClosed && !menu.includes('agents') && !menu.includes('patent-venture'))
-  setPilotMarketing('closed')
-  check('N4 닫히면 다시 닫힘(메뉴 · 주소)', isPilotHiddenPath('/marketing/threads') && !enabledModulesByGroup({ pilot: true }).some((g) => g.items.some((m) => m.key === 'marketing')))
+  setPilotMarketingScreens(false)
+  check('N4 화면 스위치를 끄면 다시 닫힘(메뉴 · 주소)', isPilotHiddenPath('/marketing/threads') && !enabledModulesByGroup({ pilot: true }).some((g) => g.items.some((m) => m.key === 'marketing')))
   setPilotMarketing('unknown')
 
   /* ---- 5. D-562 외부 구독 고객 — 전문 모듈 묶음은 메뉴 · 주소에서 닫힌다(대표 · 내부 팀장은 그대로) ---- */
@@ -472,9 +510,9 @@ async function run() {
   check('K3 고객 계정 — 전문 모듈 · 도구 주소 8곳 모두 닫힘 · 고객 관리 · 일정 · 영업 관리 · 매출 · 설정 주소는 열림', TOOL_PATHS.every((p) => isPilotHiddenPath(p) && isCustomerHiddenPath(p)) && KEEP_PATHS.every((p) => !isPilotHiddenPath(p)), TOOL_PATHS.filter((p) => !isPilotHiddenPath(p)).concat(KEEP_PATHS.filter((p) => isPilotHiddenPath(p))))
   check('K4 고객 계정 — 영업자 정산 · 1차 미팅 체크리스트도 닫힘(대표 전용 줄)', isPilotHiddenPath('/ops/agents') && isPilotHiddenPath('/sales/first-meeting') && !enabledModulesByGroup({ pilot: true }).some((g) => g.items.some((m) => m.key === 'agents' || m.key === 'first-meeting')))
   check('K5 대표 화면(pilot 아님)은 값이 켜져 있어도 전문 모듈 · 영업자 정산 · 1차 미팅 체크리스트 그대로', groupsOf(false).includes('modules') && enabledModulesByGroup({ pilot: false }).some((g) => g.items.some((m) => m.key === 'agents')) && enabledModulesByGroup({ pilot: false }).some((g) => g.items.some((m) => m.key === 'first-meeting')))
-  setPilotMarketing('open')
-  check('K6 고객 계정 + 마케팅 열림 — 레이더 · 스레드 · 릴스 주소는 열리고 전문 모듈은 닫힌 채', ['/marketing', '/marketing/threads', '/marketing/shorts'].every((p) => !isPilotHiddenPath(p)) && isPilotHiddenPath('/tools'))
-  setPilotMarketing('unknown')
+  setPilotMarketingScreens(true)
+  check('K6 고객 계정 + 마케팅 화면 열림(D-564 — 팀장 등급이면 열린다) — 레이더 · 스레드 · 릴스 주소는 열리고 전문 모듈은 닫힌 채', ['/marketing', '/marketing/threads', '/marketing/shorts'].every((p) => !isPilotHiddenPath(p)) && isPilotHiddenPath('/tools'))
+  setPilotMarketingScreens(false)
   setCustomerAudience(false)
   check('K7 값을 끄면 원래대로(내부 팀장 메뉴 · 주소)', groupsOf(true).includes('modules') && !isPilotHiddenPath('/tools'))
 
@@ -524,6 +562,14 @@ async function run() {
     'K13 처음 시작 카드 · 대화창 권하는 질문 — 고객 계정은 모듈 · 제안 · 받을 수 있는 것을 약속하지 않음(단계 수는 같음) · 대표는 예전 그대로',
     fuBasic.length === fuFull.length && fuBasic.every((x) => !`${x.title}${x.note}`.includes('모듈')) && fuFull.some((x) => x.note.includes('모듈')) && !/제안|받을 수 있는 것/.test(sugBasic) && sugBasic.includes('다음에 할 일 정리해 줘') && sugFull.includes('받을 수 있는 것 정리해 줘') && sugFull.includes('제안할까요'),
     `${fuBasic.map((x) => x.note).join('/')} || ${sugBasic}`,
+  )
+  // D-564 고객 계정 — 이름 · 회사를 아직 안 적었으면 처음 시작 카드 맨 앞에 '내 이름 · 회사 적기'(고객에게 가는 글 서명)
+  const fuUnnamed = firstUseSteps({ clients: [], journal: [], ideas: 0, marketing: true, basic: true, named: false })
+  const fuNamed = firstUseSteps({ clients: [], journal: [], ideas: 0, marketing: true, basic: true, named: true })
+  check(
+    'K14 처음 시작(D-564) — named 를 주면 맨 앞에 "내 이름 · 회사 적기"(설정으로) · 안 주면(대표 · 내부 팀장) 예전 단계 그대로 · 마케팅을 연 계정은 끝에 "첫 콘텐츠"',
+    fuUnnamed[0].key === 'me' && fuUnnamed[0].done === false && fuUnnamed[0].href === '/settings' && fuNamed[0].key === 'me' && fuNamed[0].done === true && fuUnnamed.length === fuFull.length + 2 && fuUnnamed[fuUnnamed.length - 1].key === 'content' && fuFull.every((x) => x.key !== 'me'),
+    fuUnnamed.map((x) => `${x.key}:${x.done}`).join(','),
   )
   const bf = basicFlow(CLIENT_FLOW)
   check(

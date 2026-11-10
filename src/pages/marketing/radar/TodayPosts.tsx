@@ -9,14 +9,14 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Megaphone } from 'lucide-react'
 import { todayLocalDate } from '../../../lib/appClock'
 import { useIsPilot } from '../../../auth/osAccess'
-import { usePilotMarketing } from '../../../config/pilotMarketing'
+import { usePilotMarketingScreens } from '../../../config/pilotMarketing'
 import { dayLabel } from '../../../services/marketing/weekPlan'
 import { postingDay, postsOfDay } from '../../../services/marketing/todayPosts'
 import { allWeeks, subscribeWeek, weekSaved, weekVersion } from '../../../services/marketing/weekRun'
 
 export default function TodayPosts() {
   const pilot = useIsPilot()
-  const open = usePilotMarketing() === 'open'
+  const open = usePilotMarketingScreens()
   const version = useSyncExternalStore(subscribeWeek, weekVersion)
   const today = todayLocalDate()
   const { monday, day } = postingDay(today)

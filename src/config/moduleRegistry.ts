@@ -37,7 +37,7 @@ import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTool
 import { FEATURE_CATALOG, visibleModules } from './productCatalog'
 import { UPCOMING_PATH, UPCOMING_PRODUCTS } from './upcomingProducts'
 import { withSlotIcons } from './iconSlots'
-import { isCustomerMarketingPath, pilotMarketingState } from './pilotMarketing'
+import { isCustomerMarketingPath, pilotMarketingScreens } from './pilotMarketing'
 import { isCustomerAudience } from './customerAudience'
 
 /**
@@ -302,7 +302,7 @@ export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolea
     // D-162: Pilot 에게는 대표 전용 줄 · 고급 운영 기능(검증 · 기관 전략 · 사례)을 빼고 보인다
     // 기능 권한이 필요한 줄(AI 전략실)은 권한이 있을 때만
     // SAAS-2 마케팅 · 브랜딩 줄은 서버가 연 계정에만(pilotMarketing) — 다른 대표 전용 줄은 그대로
-    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && ((m.ownerOnly && !(m.key === 'marketing' && pilotMarketingState() === 'open')) || m.advanced || isPilotHiddenPath(m.path))) && (!m.capability || caps.has(m.capability))),
+    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && ((m.ownerOnly && !(m.key === 'marketing' && pilotMarketingScreens())) || m.advanced || isPilotHiddenPath(m.path))) && (!m.capability || caps.has(m.capability))),
   })).filter((g) => g.items.length > 0)
 }
 
@@ -339,8 +339,8 @@ export function isCustomerHiddenPath(pathname: string): boolean {
 }
 
 export function isPilotHiddenPath(pathname: string): boolean {
-  // SAAS-2 서버가 사용량 장부를 확인해 마케팅을 연 계정 — 레이더 · 스레드 · 릴스/틱톡 주소만 연다(config/pilotMarketing)
-  if (pilotMarketingState() === 'open' && isCustomerMarketingPath(pathname)) return false
+  // D-564 팀장 등급 계정(내부 팀장 · 구독 고객)에게는 마케팅 화면 — 레이더 · 스레드 · 릴스/틱톡 주소만 연다(config/pilotMarketing · AI 단추는 서버 권한대로)
+  if (pilotMarketingScreens() && isCustomerMarketingPath(pathname)) return false
   // D-562 외부 구독 고객 — 전문 모듈 묶음 주소도 닫는다
   if (isCustomerAudience() && isCustomerHiddenPath(pathname)) return true
   if (PILOT_HIDDEN_EXTRA.some((b) => underBase(pathname, b))) return true

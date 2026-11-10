@@ -424,7 +424,7 @@ try {
   await go(page, '/')
   // U2(2026-11-05) 바로가기는 처음엔 접힘 — 접힌 줄 이름 링크도 같은 목록(같은 권한)
   const uxTiles = await page.getByTestId('app-mini').evaluateAll((els) => els.map((e) => e.dataset.key))
-  check('Pilot(D-282): 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처 · 마케팅) 없음 · 고객 관리 · 전체 도구는 있음', uxTiles.includes('client-ops') && uxTiles.includes('tools') && !uxTiles.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)), uxTiles)
+  check('Pilot(D-282 · D-564): 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처) 없음 · 고객 관리 · 전체 도구 · 마케팅은 있음', uxTiles.includes('client-ops') && uxTiles.includes('tools') && uxTiles.includes('marketing') && !uxTiles.some((k) => ['ai-workspace', 'patent-venture'].includes(k)), uxTiles)
   check('Pilot(D-282): KPI — 최근 AI 작업 칸 없음 · 상담 대신 후속 약속 · 대표 자료 0', (await page.getByTestId('kpi-ai').count()) === 0 && (await page.getByTestId('kpi-follow').innerText()).includes('후속 약속') && leaked(await page.getByTestId('today-kpis').innerText()).length === 0)
   // 팀장 머리줄 — 5폭 × 글자 3단계에서 넘치지 않는다(D-296 안내 영상 단추는 머리줄에 없다)
   {
@@ -471,8 +471,8 @@ try {
   check('Pilot(D-558): 사용자 메뉴에도 보는 화면 전환 없음', (await page.getByTestId('usermenu-viewas').count()) === 0)
   await page.keyboard.press('Escape')
   await page.mouse.click(5, 400)
-  check('P3 Pilot 메뉴(D-195): 마케팅 · 브랜딩 없음(대표 전용)', !nav.includes('마케팅'), nav.replace(/\n/g, '|').slice(0, 400))
-  check('P3 Pilot 메뉴(D-206): 홍보 글 만들기 · 홈페이지 만들기 · 콘텐츠 레이더 없음(대표 전용)', !nav.includes('홍보 글') && !nav.includes('홈페이지 만들기') && !nav.includes('콘텐츠 레이더'))
+  check('P3 Pilot 메뉴(D-564): 마케팅 · 브랜딩 있음(팀장 등급 계정에 화면을 연다 · 대표 자료는 아래 P9 · 화면 시험이 지킴)', nav.includes('마케팅 · 브랜딩'), nav.replace(/\n/g, '|').slice(0, 400))
+  check('P3 Pilot 메뉴(D-206): 홍보 글 만들기 · 홈페이지 만들기 없음(대표 전용)', !nav.includes('홍보 글') && !nav.includes('홈페이지 만들기'))
   check('Pilot(D-164 · D-296): 머리줄 글자 크기 단추 없음 · 보기 방식은 접힌 단추 하나(눌러서 PC · Mobile · PC+Mobile)', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch-compact"]').count()) === 1 && (await page.locator('header [data-testid="device-switch"]').count()) === 0)
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
@@ -484,7 +484,7 @@ try {
   }
   await go(page, `/ops/clients/${OWNER_CLIENT}`)
   check('Pilot 교차: 대표 업체 주소 → "찾지 못했습니다"', /찾지 못|없는 업체|없습니다/.test(await bodyText(page)))
-  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/studio/spec-check', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month', '/ai', '/ai/new', '/ai/usage', '/ai/cases/case_qa_owner_01', '/ai/cases/case_qa_owner_01/proposal/x', '/patent-venture', '/patent-venture/plan?client=' + OWNER_CLIENT, '/patent-venture/spec-check', '/patent-venture/write']) {
+  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/studio/spec-check', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/ai', '/ai/new', '/ai/usage', '/ai/cases/case_qa_owner_01', '/ai/cases/case_qa_owner_01/proposal/x', '/patent-venture', '/patent-venture/plan?client=' + OWNER_CLIENT, '/patent-venture/spec-check', '/patent-venture/write']) {
     await go(page, p)
     check(`Pilot 주소 막힘: ${p}`, (await bodyText(page)).includes('화면을 찾지 못했습니다'), (await bodyText(page)).slice(0, 120))
   }
@@ -509,12 +509,12 @@ try {
     await page.waitForTimeout(700)
     check(`Pilot 찾기: "${q}" → 대표 자료 0`, (await search.isVisible()) && leaked(await bodyText(page)).length === 0, leaked(await bodyText(page)).join())
   }
-  // D-195 P4: 찾기(Ctrl+K)로도 마케팅 · 콘텐츠 레이더가 안 나온다
+  // D-564 P4: 찾기(Ctrl+K) — 마케팅 · 브랜딩은 이제 나온다(팀장 화면) · 대표 자료는 나오지 않는다
   for (const q of ['마케팅', '유튜브', '콘텐츠 레이더']) {
     await search.fill(q)
     await page.waitForTimeout(700)
     const t = await bodyText(page)
-    check(`P4 Pilot 찾기: "${q}" → 마케팅 · 콘텐츠 레이더 결과 0`, (await search.isVisible()) && !t.includes('마케팅 · 브랜딩') && !t.includes('콘텐츠 레이더') && (await page.locator('a[href^="/marketing"]').count()) === 0, t.slice(0, 200))
+    check(`P4 Pilot 찾기(D-564): "${q}" → 대표 자료 0${q === '마케팅' ? ' · 마케팅 · 브랜딩 화면은 찾아짐' : ''}`, (await search.isVisible()) && leaked(t).length === 0 && (q !== '마케팅' || t.includes('마케팅 · 브랜딩')), t.slice(0, 200))
   }
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: /챙길 것/ }).first().click().catch(() => {})
@@ -729,7 +729,7 @@ try {
   const d1 = await assistDirect(PILOT, { requestId: 'pilot-direct-000001', assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic' }, context: { title: '오늘', today: '2026-10-21', sections: [] } })
   const d2 = await assistDirect(PILOT, { requestId: 'pilot-direct-000002', assistId: 'radar.top5', page: 'radar', context: { title: '마케팅', today: '2026-10-21', sections: [] } })
   const d3 = await assistDirect(OUTSIDER, { requestId: 'pilot-direct-000003', assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-21', sections: [] } })
-  check('팀장(D-257) 서버 직접: Claude 고르면 403 provider_not_allowed · 대표 전용 마케팅 단추 403 · 등급 없는 가입자 403 · AI 회사 안 부름', d1.statusCode === 403 && d1.body.code === 'provider_not_allowed' && d2.statusCode === 403 && d3.statusCode === 403 && aiCalls.length === 1, { d1: d1.body.code, d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
+  check('팀장(D-257 · D-564) 서버 직접: Claude 고르면 403 provider_not_allowed · 장부 비밀값이 없는 동안 마케팅 단추 403 usage_setup_needed(셀 수 없으면 열지 않음) · 등급 없는 가입자 403 · AI 회사 안 부름', d1.statusCode === 403 && d1.body.code === 'provider_not_allowed' && d2.statusCode === 403 && d2.body.code === 'usage_setup_needed' && d3.statusCode === 403 && aiCalls.length === 1, { d1: d1.body.code, d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
 
   // D-258: 팀장 — OS 안 오른쪽 판 AI 대화 → 진짜 서버 함수(side.chat) → Gemini 로만 · 보낸 것에 대표 자료 0
   await page.getByTestId('side-ai-button').click()
@@ -1165,13 +1165,13 @@ try {
   check('390 Pilot: 하단 메뉴에 상담 없음', !bottom.includes('상담'), bottom.replace(/\n/g, '|'))
   check('390 Pilot: 오늘 화면 가로 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
   const mTiles = await mp.getByTestId('app-mini').evaluateAll((els) => els.map((e) => e.dataset.key))
-  check('390 Pilot(D-282): 휴대폰 큰 아이콘 바로가기 — 대표 전용 없음', mTiles.length >= 4 && !mTiles.some((k) => ['ai-workspace', 'patent-venture', 'marketing'].includes(k)), mTiles)
+  check('390 Pilot(D-282 · D-564): 휴대폰 큰 아이콘 바로가기 — 대표 전용(AI 전략실 · 특허 · 벤처) 없음 · 마케팅은 있음', mTiles.length >= 4 && mTiles.includes('marketing') && !mTiles.some((k) => ['ai-workspace', 'patent-venture'].includes(k)), mTiles)
   await shot(mp, 'pilot-m01-today')
   await mp.getByRole('button', { name: /더보기|메뉴/ }).last().click().catch(() => {})
   await mp.waitForTimeout(500)
   const drawer = await bodyText(mp)
   check('390 Pilot: 메뉴 열어도 숨긴 묶음 없음', !drawer.includes('잘 안 쓰는 기능') && !drawer.includes('이 시스템') && !drawer.includes('영업자 정산'))
-  check('P3 390 Pilot(D-195): 휴대폰 메뉴 · 하단 메뉴에 마케팅 없음', !drawer.includes('마케팅') && !bottom.includes('마케팅'))
+  check('P3 390 Pilot(D-564): 휴대폰 메뉴에 마케팅 · 브랜딩 있음', drawer.includes('마케팅'), drawer.replace(/\n/g, '|').slice(0, 300))
   await shot(mp, 'pilot-m02-menu')
   // D-184: 휴대폰 서랍에 로그아웃(예전에는 휴대폰에서 로그아웃할 곳이 없었다) — 이 기기에는 팀장 계정 하나뿐이라 '바꾸기' 줄은 없다
   check('390 Pilot(D-184): 서랍에 로그아웃 단추 · 다른 계정 줄 없음(이 기기엔 팀장만)', (await mp.getByTestId('account-signout').count()) === 1 && (await mp.getByTestId('account-switch-to').count()) === 0)
@@ -1224,8 +1224,8 @@ try {
   // SAAS-2.1 지금 팀장은 '내부 계정'(pilot_provision 이 권한 줄을 넣음) — 장부를 켜도 마케팅은 닫힌 채, 일반 AI 는 한도 없이 기록만.
   //   구독 고객으로 바꾸면(대표가 SQL 한 줄) 그때 마케팅 · 한도가 열린다.
   const USAGE_SECRET = 'pilot-e2e-usage-secret-0123456789abcdef'
-  check('SAAS-2 준비 전: 장부 설정 없음(위 P1~P4 — 팀장 마케팅 닫힘 · 일반 AI 예전처럼이 이 상태)', sql(`select count(*) from public.ai_usage_config`) === '0')
-  check('SAAS-2.1 pilot_provision: 팀장 권한 줄 = 내부 계정(internal · 마케팅 없음)', sql(`select kind || ':' || plan || ':' || marketing from public.ai_entitlements where user_id = '${PILOT.id}'`) === 'internal:internal:false')
+  check('SAAS-2 준비 전: 장부 설정 없음(위 P1~P4 — 팀장 마케팅 화면은 열림 · 마케팅 AI 는 닫힘 · 일반 AI 예전처럼이 이 상태)', sql(`select count(*) from public.ai_usage_config`) === '0')
+  check('SAAS-2.1 pilot_provision(D-564): 팀장 권한 줄 = 내부 계정(internal · 마케팅 AI 포함)', sql(`select kind || ':' || plan || ':' || marketing from public.ai_entitlements where user_id = '${PILOT.id}'`) === 'internal:internal:true')
   check('SAAS-2.1 위 P1~P4 팀장 일반 AI(장부 설정 전) — 장부 줄 0 · 예전처럼 답함', sql(`select count(*) from public.ai_usage_ledger`) === '0')
   sql(`insert into public.ai_usage_config (id, secret_hash, default_monthly_units) values (1, sha256(convert_to('${USAGE_SECRET}', 'UTF8')), 12) on conflict (id) do update set secret_hash = excluded.secret_hash, default_monthly_units = excluded.default_monthly_units`)
   process.env.AI_USAGE_SECRET = USAGE_SECRET
@@ -1243,11 +1243,11 @@ try {
   const AXW = /.{0,24}(?<![A-Za-z])AX(?![A-Za-z]).{0,24}/g
   const axIn = async (pg) => ((await pg.locator('main').evaluate((el) => el.textContent ?? '').catch(() => '')).match(AXW) ?? [])
   const todayCtx = { title: '오늘', today: '2026-10-25', sections: [] }
-  check('SAAS-2.1 내부 팀장: 장부를 켜도 마케팅 메뉴 닫힘(권한에 마케팅 없음)', (await p4.locator('aside a[href="/marketing"]').count()) === 0, await p4.locator('aside').innerText().catch(() => ''))
+  check('SAAS-2.1 내부 팀장(D-564): 왼쪽 메뉴에 마케팅 · 브랜딩', (await p4.locator('aside a[href="/marketing"]').count()) >= 1, await p4.locator('aside').innerText().catch(() => ''))
   const inRun = await assistDirect(PILOT, { requestId: 'req-saas21-int-000001', assistId: 'today.top3', page: 'today', context: todayCtx })
   check('SAAS-2.1 내부 팀장 일반 AI → 200 · DB 장부에 기록(internal · general · 정산)', inRun.statusCode === 200 && sql(`select kind || ':' || feature || ':' || status from public.ai_usage_ledger where request_id = 'req-saas21-int-000001'`) === 'internal:general:settled', `${inRun.statusCode} ${inRun.raw.slice(0, 160)}`)
   const inMk = await assistDirect(PILOT, { requestId: 'req-saas21-int-000002', assistId: 'radar.top5', page: 'radar', context: { title: '콘텐츠 레이더', today: '2026-10-25', sections: [] } })
-  check('SAAS-2.1 내부 팀장 마케팅 직접 호출 → 403 marketing_not_included · 장부 줄 안 생김', inMk.statusCode === 403 && inMk.body.code === 'marketing_not_included' && sql(`select count(*) from public.ai_usage_ledger where request_id = 'req-saas21-int-000002'`) === '0', `${inMk.statusCode} ${inMk.raw.slice(0, 160)}`)
+  check('SAAS-2.1 내부 팀장 마케팅 AI(D-564) → 200 · DB 장부에 기록(internal · marketing · 정산) — 장부가 있으면 반드시 센다', inMk.statusCode === 200 && sql(`select kind || ':' || feature || ':' || status from public.ai_usage_ledger where request_id = 'req-saas21-int-000002'`) === 'internal:marketing:settled', `${inMk.statusCode} ${inMk.raw.slice(0, 160)}`)
   await go(p4, '/settings')
   await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})
   check('SAAS-2.1 내부 팀장: 설정에 "내부 계정(한도 없이 기록만)"', (await p4.getByTestId('ai-usage').getAttribute('data-kind').catch(() => '')) === 'internal' && ((await p4.getByTestId('ai-usage-numbers').innerText().catch(() => '')) ?? '').includes('내부 계정(한도 없이 기록만)'), await p4.getByTestId('ai-usage').innerText().catch(() => ''))
@@ -1334,7 +1334,7 @@ try {
   check('SAAS-2.1 기한 끝난 구독자: 일반 · 마케팅 둘 다 403 subscription_inactive · AI 0 · 장부 줄 0', exp1.statusCode === 403 && exp1.body.code === 'subscription_inactive' && exp2.statusCode === 403 && exp2.body.code === 'subscription_inactive' && aiCalls.length === 0 && sql(`select count(*) from public.ai_usage_ledger where user_id = '${PILOT.id}'`) === '0', `${exp1.raw.slice(0, 120)} ${exp2.raw.slice(0, 120)}`)
   await go(p4, '/settings')
   await p4.getByTestId('ai-usage-inactive').waitFor({ timeout: 8000 }).catch(() => {})
-  check('SAAS-2.1 기한 끝난 구독자: 설정에 "구독을 확인해 주세요" · 왼쪽 메뉴에 마케팅 없음', (await p4.getByTestId('ai-usage-inactive').count()) === 1 && (await p4.locator('aside a[href="/marketing"]').count()) === 0, await p4.getByTestId('ai-usage').innerText().catch(() => ''))
+  check('SAAS-2.1 기한 끝난 구독자(D-564): 설정에 "구독을 확인해 주세요" · 마케팅 화면은 메뉴에 남음(AI 단추는 서버가 403 — 위)', (await p4.getByTestId('ai-usage-inactive').count()) === 1 && (await p4.locator('aside a[href="/marketing"]').count()) >= 1, await p4.getByTestId('ai-usage').innerText().catch(() => ''))
   await shot(p4, 'saas21-inactive-settings')
   // SAAS-2.1 마케팅이 빠진 요금제 — 일반 AI 는 세고 200 · 마케팅은 403
   sql(`update public.ai_entitlements set active_until = now() + interval '30 days', marketing = false where user_id = '${PILOT.id}'`)
@@ -1513,6 +1513,56 @@ try {
     const wordsToday = todayK2.match(/모듈|판정|진단서|말하기 대본|받을 수 있는 것|지원사업 알림/g) ?? []
     check('고객(D-563) 오늘: 처음 시작 카드 · 권하는 질문 · 본문에 모듈 · 판정 · 진단서 · "받을 수 있는 것" 0', wordsToday.length === 0 && todayK2.includes('처음 시작'), wordsToday.join())
     await shot(pk, 'customer-05-today-after')
+
+    // ---------- D-564 고객 계정 마케팅 · 브랜딩 — 화면은 열리고, 대표 채널 · AX · AI 기본 주제 없이 '내 채널부터' ----------
+    check('고객 메뉴(D-564): 마케팅 · 브랜딩 있음(대표 전용에서 풀림)', navK.includes('마케팅 · 브랜딩'), navK.replace(/\n/g, '|').slice(0, 400))
+    const headK0 = ((await pk.locator('header').first().innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    const stepsFirst = ((await pk.getByTestId('today-firstuse').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('고객(D-564) 오늘: 이름을 아직 안 적었으면 처음 시작 카드가 "다음: 내 이름 · 회사 적기"', (await pk.getByTestId('today-firstuse').getAttribute('data-next').catch(() => '')) === 'me' && stepsFirst.includes('내 이름 · 회사 적기'), `${stepsFirst.slice(0, 200)} / 머리줄: ${headK0.slice(0, 120)}`)
+    await go(pk, '/marketing')
+    await pk.getByTestId('mk-start').waitFor({ timeout: 8000 }).catch(() => {})
+    const mkK = await mainText(pk)
+    const mkAxK = await axIn(pk)
+    check('고객 마케팅(D-564): /marketing 열림 · "먼저 내 채널을 알려 주세요" 칸 · 대표 이름 · 채널 0 · 대표 자료 0', !mkK.includes('화면을 찾지 못했습니다') && (await pk.getByTestId('mk-start').count()) === 1 && !OWNER_WORDS.test(mkK) && leaked(mkK).length === 0, (mkK.match(OWNER_WORDS) ?? []).join())
+    check('고객 마케팅(D-564): 첫 화면(접힌 칸 포함)에 AX 0', mkAxK.length === 0, mkAxK.slice(0, 6))
+    await shot(pk, 'customer-06-marketing-start')
+    await go(pk, '/marketing/youtube?view=plan')
+    await pk.waitForTimeout(900)
+    const planK = await mainText(pk)
+    check('고객 마케팅(D-564): 이번 주 찍을 것 — AI 키워드 판 · AI 주제 줄 없음(스스로 AI 분야를 고르기 전) · 대표 이름 0 · AX 0', (await pk.getByTestId('radar-ai-keywords').count()) === 0 && (await pk.locator('[data-testid="radar-opp"][data-axis="axai"], [data-testid="radar-opp"][data-axis="bridge"]').count()) === 0 && !OWNER_WORDS.test(planK) && (await axIn(pk)).length === 0, `${(planK.match(OWNER_WORDS) ?? []).join()} ai-board=${await pk.getByTestId('radar-ai-keywords').count()}`)
+    await shot(pk, 'customer-07-marketing-plan')
+    // 첫 칸에 이름 · 회사 · 분야 + 관심 분야 하나 → 저장 → 칸이 사라지고 머리줄 이름이 내 이름으로
+    await go(pk, '/marketing')
+    await pk.getByTestId('mk-start').waitFor({ timeout: 8000 }).catch(() => {})
+    await pk.getByTestId('mk-start-save').click()
+    check('고객 마케팅(D-564): 아무것도 안 적고 저장 → 안내 한 줄(저장 안 함)', ((await pk.getByTestId('mk-start-hint').innerText().catch(() => '')) ?? '').includes('하나만 적어도'), await pk.getByTestId('mk-start-hint').innerText().catch(() => ''))
+    await pk.getByTestId('mk-start-name').fill('박고객')
+    await pk.getByTestId('mk-start-company').fill('고객경영연구소')
+    await pk.getByTestId('mk-start-industry').fill('정책자금 컨설팅')
+    const chipK = pk.locator('[data-testid="mk-start-chip"]:not([data-id="ai_tools"]):not([data-id="automation"])').first()
+    const chipId = await chipK.getAttribute('data-id')
+    await chipK.click()
+    await pk.getByTestId('mk-start-save').click()
+    await pk.waitForTimeout(1800)
+    const brandK = sql(`select data->>'name' || '|' || (data->>'company') || '|' || (data->>'industry') from public.module_data where workspace_id = '${cws}' and module_key = 'brand' limit 1`)
+    const prefsK = sql(`select coalesce(string_agg(data::text, ' '), '') from public.module_data where workspace_id = '${cws}' and module_key = 'marketing'`)
+    check('고객 마케팅(D-564): [저장하고 시작] → 내 브랜드(이름 · 회사 · 분야)와 관심 분야가 고객 작업공간에 저장(DB) · 칸은 사라짐', brandK === '박고객|고객경영연구소|정책자금 컨설팅' && prefsK.includes(String(chipId)) && (await pk.getByTestId('mk-start').count()) === 0, `${brandK} / ${chipId} / ${prefsK.slice(0, 160)}`)
+    const headK = ((await pk.locator('header').first().innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('고객(D-564): 머리줄 이름이 "사용자" 가 아니라 방금 적은 이름', headK.includes('박고객') && !headK.includes('사용자'), headK.slice(0, 160))
+    check('고객(D-564): 대표 작업공간의 내 브랜드 · 마케팅 기록은 그대로(다른 작업공간에 쓰지 않음)', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'brand' and data->>'name' = '박고객'`) === '0')
+    await shot(pk, 'customer-08-marketing-after')
+    await go(pk, '/')
+    await pk.waitForTimeout(900)
+    const stepsAfter = ((await pk.getByTestId('today-firstuse').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    const meDone = await pk.locator('[data-testid="today-firstuse-step"][data-step="me"]').getAttribute('data-done').catch(() => '')
+    const nextAfter = await pk.getByTestId('today-firstuse').getAttribute('data-next').catch(() => '')
+    check('고객(D-564) 오늘: 이름 · 회사를 적은 뒤에는 "내 이름 · 회사 적기" 가 끝남(✓ · 다음 단계로 — 카드가 다 끝나 사라졌어도 통과)', meDone === '1' || (nextAfter !== 'me' && !stepsAfter.includes('다음: 내 이름')), `${meDone} ${nextAfter} ${stepsAfter.slice(0, 200)}`)
+    await pk.setViewportSize({ width: 390, height: 844 })
+    await go(pk, '/marketing')
+    await pk.waitForTimeout(700)
+    check('고객 390(D-564): 마케팅 첫 화면 가로 넘침 0', (await overflowX(pk)) <= 0, String(await overflowX(pk)))
+    await shot(pk, 'customer-09-marketing-390')
+    await pk.setViewportSize({ width: 1440, height: 900 })
     await cK.close()
     // 대표 화면은 그대로 — 전문 모듈 묶음이 보인다(고객 로그인 뒤 같은 브라우저 묶음에서도)
     const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })

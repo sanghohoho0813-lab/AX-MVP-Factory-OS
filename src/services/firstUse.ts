@@ -9,7 +9,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry } from '../types/bridge'
 
-export type FirstStepKey = 'client' | 'doc' | 'todo' | 'content'
+export type FirstStepKey = 'me' | 'client' | 'doc' | 'todo' | 'content'
 
 export interface FirstStep {
   key: FirstStepKey
@@ -34,7 +34,7 @@ const hasDoc = (c: ClientOpsRecord) => Object.values(c.documents ?? {}).some((d)
 /** 업체에 걸린 할 일(기한이 있거나 후속조치) */
 const isClientTodo = (e: JournalEntry) => !!e.clientId && (e.entryType === 'follow_up' || !!e.dueDate)
 
-export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; journal: readonly JournalEntry[]; ideas: number; marketing: boolean; /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈을 약속하지 않는다 */ basic?: boolean }): FirstStep[] {
+export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; journal: readonly JournalEntry[]; ideas: number; marketing: boolean; /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈을 약속하지 않는다 */ basic?: boolean; /** D-564 고객 계정이 이름 · 회사를 적었는가 — 값을 주면 맨 앞에 '내 이름 · 회사 적기' 단계가 붙는다(고객에게 가는 글 서명) */ named?: boolean }): FirstStep[] {
   const target = firstUseClient(input.clients)
   const at = (tab: string) => (target ? `/ops/clients/${encodeURIComponent(target.id)}?tab=${tab}` : '/ops/clients?new=1')
   const steps: FirstStep[] = [
@@ -42,6 +42,7 @@ export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; jour
     { key: 'doc', title: '서류 한 장 올리기', note: '대충 올려도 칸 · 회사 정보를 채워요', done: input.clients.some(hasDoc), href: at('docs'), action: '서류 올리기' },
     { key: 'todo', title: '맞춤 추천 보고 할 일 하나', note: input.basic ? '확인할 것 · 받을 서류를 보고 [할 일로] 한 번' : '맞는 모듈 · 받을 서류를 보고 [할 일로] 한 번', done: input.journal.some(isClientTodo), href: at('smart'), action: '맞춤 추천 보기' },
   ]
+  if (input.named !== undefined) steps.unshift({ key: 'me', title: '내 이름 · 회사 적기', note: '고객에게 보내는 글 끝 서명과 AI 글에 쓰여요', done: input.named, href: '/settings', action: '이름 · 회사 적기' })
   if (input.marketing) steps.push({ key: 'content', title: '첫 콘텐츠', note: '이번 주 주제 하나로 글 · 대본을 한 번에', done: input.ideas > 0, href: '/marketing', action: '마케팅 열기' })
   return steps
 }

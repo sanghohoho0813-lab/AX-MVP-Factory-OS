@@ -2,7 +2,7 @@ import { Suspense, lazy, useContext, useEffect, useState, useSyncExternalStore }
 import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
-import { isCustomerMarketingPath, setPilotMarketing, usePilotMarketing } from '../../config/pilotMarketing'
+import { primePilotMarketingScreens, setPilotMarketing, setPilotMarketingScreens, usePilotMarketing, usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { fetchAssistStatus } from '../../services/aiAssist/client'
 import { Outlet, useLocation } from 'react-router-dom'
@@ -52,11 +52,10 @@ function PilotRouteGuard({ pathname, children }: { pathname: string; children: R
   setBuiltinServicesHidden(pilot)
   // 대표 AI 전략실처럼 기능 권한이 필요한 화면 — 권한이 없으면(팀장 · 권한 없는 구성원) 직접 주소로도 없는 화면
   const caps = useCapabilitySet()
-  // SAAS-2 마케팅을 열지 서버에 묻는 동안은 '없는 화면' 대신 불러오는 중(답이 오면 열리거나 닫힌다)
-  const marketing = usePilotMarketing()
+  // D-564 마케팅 화면은 팀장 등급이면 열린다(값이 바뀌면 다시 판단 — isPilotHiddenPath 가 본다). AI 단추만 서버 답을 기다린다
+  usePilotMarketingScreens()
   // D-562 외부 구독 고객이면 전문 모듈 주소도 닫힌다 — 값이 바뀌면 다시 판단한다(isPilotHiddenPath 가 본다)
   useCustomerAudience()
-  if (pilot && marketing === 'unknown' && isCustomerMarketingPath(pathname)) return <ShellFallback />
   if ((pilot && isPilotHiddenPath(pathname)) || isCapabilityHiddenPath(pathname, caps)) {
     return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
   }
@@ -100,11 +99,15 @@ export function AppShell() {
   // SAAS-2 마케팅 화면이 누구 이름으로 쓰는지(팀장 · 구독 고객 = 그 사람 브랜드) — 화면을 그리기 전에 정한다
   const access = auth?.access ?? null
   setMarketingCustomer(access === 'pilot')
+  // D-564 마케팅 화면(메뉴 · 주소)은 팀장 등급 계정이면 연다 — 그리기 전에 값을 맞춘다(대표가 팀장 화면으로 볼 때는 access 가 full 이라 닫힌 채)
+  primePilotMarketingScreens(access === 'pilot')
+  usePilotMarketingScreens()
   // SAAS-2 마케팅을 고객에게 열지는 서버가 정한다(사용량 장부가 준비된 계정만) — 메뉴가 이 값을 따라 다시 그려진다
   usePilotMarketing()
   // D-562 외부 구독 고객 여부 — 메뉴(전문 모듈 묶음)가 이 값을 따라 다시 그려진다
   useCustomerAudience()
   useEffect(() => {
+    setPilotMarketingScreens(access === 'pilot')
     if (access !== 'pilot') {
       setPilotMarketing('closed')
       return

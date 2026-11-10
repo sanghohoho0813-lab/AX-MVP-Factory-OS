@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, BarChart3, ChevronDown, ChevronUp, Clapperboard, Film, Flame, Globe, Home, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
-import { usePilotMarketing } from '../../config/pilotMarketing'
+import { usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { slotIcon } from '../../config/iconSlots'
 
 export type RadarView = 'plan' | 'top' | 'channels' | 'analysis' | 'make'
@@ -134,7 +134,7 @@ export function MarketingTabs({ active, onRadar, home = false }: { active: Marke
 function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
   const pilot = useIsPilot()
   // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
-  const open = usePilotMarketing() === 'open'
+  const open = usePilotMarketingScreens()
   const strip = useRef<HTMLDivElement>(null)
   // D-478 휴대폰 띠 — 처음 열 때 지금 칸이 화면 안에 오게(띠만 옮긴다 · 화면은 그대로)
   useEffect(() => {
@@ -227,7 +227,7 @@ function SlimIcon({ it }: { it: Item }) {
 
 function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void }) {
   const pilot = useIsPilot()
-  const open = usePilotMarketing() === 'open'
+  const open = usePilotMarketingScreens()
   const [more, setMore] = useState(false)
   // 다른 화면으로 옮기면 휴대폰 판은 닫는다
   useEffect(() => setMore(false), [active])

@@ -7,6 +7,8 @@
  *  - 고객 · 마케팅 요청은 장부 예약이 성공해야만 AI 를 부른다(비밀값 없음 · DB 설정 오류 · 장부 끊김 · 권한 조회 실패 → 막음).
  *  - 내부 팀장의 일반 AI 만 장부가 고장 나도 예전처럼 쓴다(기록이 빠진 것은 서버 기록에 남김) — 지금 쓰는 팀장 업무가 멈추지 않게.
  *  - 대표 계정은 부르지 않는다(대표 AI 는 예전 그대로).
+ *  - D-564 내부 팀장은 마케팅 AI 도 쓴다(대표 2026-11-10 "팀장에게도 마케팅 · 브랜딩을") — 장부가 있으면 반드시 세고, 장부가 아직 없는 운영(0022 전)에서는
+ *    일반 AI 처럼 세지 않고 연다(Gemini 만 · 분/시간 제한 그대로). 외부 구독 고객은 장부 없이는 어떤 AI 도 열지 않는다.
  * service_role 키는 쓰지 않는다(브라우저 · git 금지 원칙 — 서버도 anon 키 + 그 사람 로그인만).
  */
 
@@ -93,6 +95,53 @@ export async function myAccess(token) {
     configured: b.configured === true,
     month: String(b.month || ''),
   }
+}
+
+/* ---------------- D-564 장부(0022)가 아직 없는 운영에서 — 내부 팀장인가 외부 고객인가 ---------------- */
+
+const audienceCache = new Map()
+
+/**
+ * 0022(my_ai_access)가 없을 때만 묻는다 — 자기 os_access 줄의 audience(0024 · 자기 줄만 읽힌다).
+ *   'internal' — 칸이 없다(0024 전: 외부 고객 계정이 있을 수 없다) 또는 internal
+ *   'customer' — 외부 구독 고객(0024 만 들어온 운영): 장부 없이 AI 를 열지 않는다
+ *   'unknown'  — 닿지 못함 · 모르는 답: 마케팅은 막고, 내부 팀장의 일반 AI 는 예전처럼(지금 쓰는 업무가 멈추지 않게)
+ * 60초 기억한다(같은 사람이 연달아 누를 때 한 번만 묻는다).
+ */
+export async function legacyAudience(token) {
+  const hit = audienceCache.get(token)
+  if (hit && hit.until > Date.now()) return hit.value
+  const base = envAny(SUPA_URL_NAMES).replace(/\/+$/, '')
+  const anon = envAny(SUPA_ANON_NAMES)
+  if (!base || !anon) return 'unknown'
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
+  let value = 'unknown'
+  try {
+    const r = await fetch(`${base}/rest/v1/os_access?select=audience&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: ctrl.signal })
+    let body = null
+    try {
+      body = await r.json()
+    } catch {
+      body = null
+    }
+    if (r.status === 200 && Array.isArray(body)) value = body[0] && body[0].audience === 'customer' ? 'customer' : 'internal'
+    else if (/42703|42P01|PGRST204|PGRST205|does not exist|Could not find/i.test(JSON.stringify(body ?? ''))) value = 'internal'
+  } catch {
+    value = 'unknown'
+  } finally {
+    clearTimeout(timer)
+  }
+  if (value !== 'unknown') {
+    audienceCache.set(token, { until: Date.now() + 60_000, value })
+    if (audienceCache.size > 200) audienceCache.delete(audienceCache.keys().next().value)
+  }
+  return value
+}
+
+/** 시험용 — 기억한 것 비우기 */
+export function __resetUsageState() {
+  audienceCache.clear()
 }
 
 /**

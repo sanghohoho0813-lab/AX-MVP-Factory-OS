@@ -30,6 +30,15 @@ export const INTEREST_GROUPS: readonly InterestGroup[] = [
 
 const IDS = new Set(INTEREST_GROUPS.map((g) => g.id))
 
+/**
+ * D-564 AI 쪽 묶음 — 대표가 아닌 계정은 이 둘을 스스로 고르지 않으면 '이번 주 뜨는 주제' 에 AI · 업무 자동화 주제가 나오지 않는다.
+ * 대표(2026-11-10): "내가 기본으로 세팅한 AX · AI 관련 주제는 다른 계정에 없었으면 — 본인이 원하는 것으로 고르게".
+ */
+export const AI_INTEREST_IDS: readonly string[] = ['ai_tools', 'automation']
+
+/** 고른 관심 분야에 AI 쪽 묶음이 있는가 */
+export const wantsAi = (groups: readonly string[]): boolean => groups.some((g) => AI_INTEREST_IDS.includes(g))
+
 /** 저장된 값 → 아는 묶음 번호만 · 겹치지 않게 · 최대 10 */
 export function normalizeInterests(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []

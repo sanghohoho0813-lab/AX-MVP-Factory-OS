@@ -19,7 +19,7 @@ import { SKILL_MAX } from './_ai/judge.js'
 import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { cleanBrand } from './_ai/brand.js'
 import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
-import { myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
+import { __resetUsageState, legacyAudience, myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, probeProvider, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
@@ -77,6 +77,7 @@ const clock = (sec) => {
 /** 시험용 — 기억한 것 비우기 */
 export function __resetAiAssistState() {
   __resetGateState()
+  __resetUsageState()
   __resetProviderCache()
   inflight.clear()
   probeAt.clear()
@@ -208,10 +209,12 @@ export default async function handler(req, res) {
       const ids = catalog.providers.map((p) => p.id).filter((id) => who.role !== 'pilot' || id === 'gemini')
       probe = await Promise.all(ids.map((id) => probeProvider(id)))
     }
-    // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅은 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
+    // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅 AI 는 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
+    // D-564 장부(0022)가 아직 없는 운영 — 내부 팀장은 마케팅 AI 도 일반 AI 처럼 연다(외부 고객 · 누구인지 모를 때는 닫힌 채)
     const acc = who.role === 'pilot' ? await myAccess(bearerOf(req)) : null
     const meterable = !!acc && acc.state === 'ok' && acc.configured && usageReady()
-    const marketing = who.role !== 'pilot' || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
+    const legacyInternal = !!acc && acc.state === 'missing' && (await legacyAudience(bearerOf(req))) === 'internal'
+    const marketing = who.role !== 'pilot' || legacyInternal || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
     const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
     const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
     return send(res, 200, { ok: true, role: who.role, ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
@@ -229,8 +232,6 @@ export default async function handler(req, res) {
   if (!assist || body.page !== assist.page || typeof body.requestId !== 'string' || !ID_RE.test(body.requestId)) return fail(res, 400, 'bad_request')
 
   if (pilot && CUSTOMER_ALWAYS_BLOCKED.has(assist.page)) return fail(res, 403, 'forbidden')
-  // SAAS-2 비밀값이 없으면 마케팅은 누구에게도(대표 빼고) 열지 않는다 — 장부로 셀 수 없다
-  if (pilot && MARKETING_PAGES.has(assist.page) && !usageReady()) return fail(res, 403, 'usage_setup_needed')
   // D-260 영상 단추는 영상 번호 · 구간이 맞아야
   const video = assist.video ? cleanVideo(body.video) : null
   if (assist.video && !video) return fail(res, 400, 'bad_request')
@@ -275,7 +276,9 @@ export default async function handler(req, res) {
   // 권한 조회 · 예약까지 한 약속(promise)으로 묶어 먼저 기억해 둔다 — 같은 서버에서 같은 요청이 동시에 오면 예약 · AI 를 한 번만.
   //   고객(customer) · 마케팅: 예약이 성공해야만 AI(비밀값 없음 · DB 설정 오류 · 장부 끊김 · 권한 조회 실패 → 막음)
   //   내부 팀장(internal)의 일반 AI: 장부가 고장 나도 예전처럼(기록이 빠진 것은 서버 기록에 남김)
-  //   0022 적용 전(권한 함수 없음 · 지금 운영): 고객 계정이 있을 수 없으므로 pilot 은 예전처럼 · 마케팅은 닫힘
+  //   0022 적용 전(권한 함수 없음 · 지금 운영): 내부 팀장은 예전처럼 — D-564 마케팅 AI 도 세지 않고 연다(Gemini 만 · 분/시간 제한).
+  //     0024(고객 구분)만 먼저 들어온 운영의 외부 고객은 장부 없이 어떤 AI 도 못 쓴다 · 누구인지 모르면 마케팅은 막는다
+  //   0022 가 있으면: 마케팅은 누구든(내부 팀장 포함) 권한(marketing) + 장부 예약이 되어야만
   const token = pilot ? bearerOf(req) : ''
   const tier = tierOf(choice.provider, choice.model)
   const mk = MARKETING_PAGES.has(assist.page)
@@ -285,10 +288,17 @@ export default async function handler(req, res) {
       const acc = await myAccess(token)
       if (acc.state === 'error') throw new UsageError(503, 'usage_unreachable')
       const legacy = acc.state === 'missing'
+      if (legacy) {
+        const aud = await legacyAudience(token)
+        if (aud === 'customer') throw new UsageError(503, 'usage_setup_needed')
+        if (mk && aud !== 'internal') throw new UsageError(503, 'usage_unreachable')
+      }
       const customer = !legacy && acc.kind === 'customer'
-      if (mk && (legacy || !acc.marketing)) throw new UsageError(403, legacy ? 'usage_setup_needed' : 'marketing_not_included')
+      // 비밀값이 없으면(장부로 셀 수 없음) 장부가 있는 운영의 마케팅은 누구에게도 열지 않는다
+      if (mk && !legacy && !usageReady()) throw new UsageError(403, 'usage_setup_needed')
+      if (mk && !legacy && !acc.marketing) throw new UsageError(403, 'marketing_not_included')
       if (customer && !acc.active) throw new UsageError(403, 'subscription_inactive')
-      const mustMeter = customer || mk
+      const mustMeter = customer || (mk && !legacy)
       const canMeter = !legacy && acc.configured && usageReady()
       if (mustMeter && !canMeter) throw new UsageError(503, 'usage_setup_needed')
       if (!canMeter && !legacy) console.warn(`[ai-assist] 장부 기록 못 함(내부 팀장 · 일반) 문의번호=${String(body.requestId).slice(-6)} 이유=usage_setup_needed`)

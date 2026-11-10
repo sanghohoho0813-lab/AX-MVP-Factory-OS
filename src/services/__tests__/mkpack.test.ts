@@ -540,6 +540,24 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   const p1 = normalizePrefs({ interests: ['tax', 'nope'] })
   const p0 = normalizePrefs({})
   check('D558-I4 설정에 저장 — 아는 묶음만 남김 · 안 고른 계정은 칸 자체가 없음(예전 설정 그대로)', JSON.stringify(p1.interests) === '["tax"]' && !('interests' in p0))
+  // D-564 대표가 아닌 계정 — AI 쪽 관심 분야를 스스로 고르지 않으면 이번 주 10개에 AI · 업무 · 경영 × AI 축이 나오지 않는다
+  const { wantsAi, AI_INTEREST_IDS } = await import('../marketing/interests')
+  const mo = radarPlan(prepareFeed(sampleFeed(NOW), NOW), { now: NOW, marketOnly: true })
+  const moTax = radarPlan(prepareFeed(sampleFeed(NOW), NOW), { now: NOW, interests: interestTopics(['tax']), marketOnly: true })
+  const baseAi = base.picks.filter((o) => o.axis !== 'market').length
+  const taxWant = new Set(interestTopics(['tax']))
+  const taxFirstMiss = moTax.picks.findIndex((o) => !taxWant.has(o.topicId))
+  check(
+    'D564-M1 marketOnly — 평소 10개에는 AI 축 후보가 있지만(견본) · 켜면 전부 경제 · 경영 축 · 같은 후보 한 번 · 빈 자리는 다음 경제 · 경영 후보로 채움',
+    baseAi > 0 && mo.picks.length > 0 && mo.picks.every((o) => o.axis === 'market') && new Set(mo.picks.map((o) => o.key)).size === mo.picks.length && mo.picks.length >= base.picks.filter((o) => o.axis === 'market').length,
+    { baseAi, n: mo.picks.length, axes: mo.picks.map((o) => o.axis).join() },
+  )
+  check(
+    'D564-M2 marketOnly + 관심 분야(세금 · 절세) — 그 분야 주제가 맨 앞 · 여전히 AI 축 0',
+    moTax.picks.every((o) => o.axis === 'market') && (taxFirstMiss === -1 || moTax.picks.slice(taxFirstMiss).every((o) => !taxWant.has(o.topicId))),
+    moTax.picks.map((o) => `${o.axis}:${o.topicId}`).join(),
+  )
+  check('D564-M3 AI 쪽 묶음 = AI 도구 · 업무 자동화 — 골랐을 때만 wantsAi', JSON.stringify(AI_INTEREST_IDS) === '["ai_tools","automation"]' && !wantsAi([]) && !wantsAi(['tax', 'gov_money']) && wantsAi(['tax', 'ai_tools']) && wantsAi(['automation']) && AI_INTEREST_IDS.every((id) => INTEREST_GROUPS.some((g) => g.id === id)))
 }
 
 // ---------------- D-511 마케팅 첫 화면 대화창 — 한 줄 → 갈 곳(규칙) ----------------

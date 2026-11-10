@@ -22,7 +22,7 @@ declare
   v_plan      text := 'growth';      -- 요금제 이름(영문 소문자 · 숫자 · _ -)
   v_units     int  := 600;           -- 월 AI 한도(장부 단위)
   v_months    int  := 1;             -- 이용 기한(개월)
-  v_marketing boolean := false;      -- 마케팅 AI 단추 포함 여부
+  v_marketing boolean := true;       -- 마케팅 AI 단추 포함 여부(D-564 기본 포함 — 마케팅 화면은 요금제와 상관없이 보이고, 이 값은 그 안의 AI 단추)
   v_uid uuid;
   v_ws  uuid;
 begin

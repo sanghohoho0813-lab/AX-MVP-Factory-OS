@@ -1,5 +1,6 @@
 /**
- * SAAS-2 마케팅 · 브랜딩을 대표가 아닌 계정(구독 고객 · 팀장)에게 여는 스위치 — 서버가 정한다.
+ * SAAS-2 마케팅 · 브랜딩의 **AI 단추**를 대표가 아닌 계정(구독 고객 · 팀장)에게 여는 스위치 — 서버가 정한다.
+ * (D-564 화면 자체는 아래 screens 값 — 팀장 등급이면 열린다. 이 state 는 AI 단추만 정한다.)
  *
  *  - 서버(api/ai-assist ?status=1)가 '이 계정의 AI 사용량을 장부(0022)로 셀 수 있다' 고 답할 때만 연다(marketing: true).
  *    장부가 없으면(대표가 SQL 을 아직 적용하지 않음) 예전처럼 닫힌 채 — 사용량을 세지 못하는 무거운 AI 를 열지 않는다.
@@ -33,6 +34,42 @@ export function usePilotMarketing(): PilotMarketingState {
     },
     () => state,
     () => state,
+  )
+}
+
+/**
+ * D-564 화면(메뉴 · 주소 · 찾기)은 팀장 등급 계정 전부에게 연다 — 사용량 장부와 상관없이.
+ * 대표(2026-11-10): "최은혜 팀장이랑 새롭게 가입하는 사람들한테도 마케팅 · 브랜딩은 보이게. 대신 김팀장의 경영노트 채널이나 AX 같은 내 기본값은 없이."
+ *  - 화면: 로그인 등급이 pilot(내부 팀장 · 구독 고객)이면 열림. 대표가 팀장 화면으로 볼 때는 닫힌 채(대표 마케팅은 대표 작업공간에서).
+ *  - AI 단추: 위 state(서버가 정함) 그대로 — 화면이 열려도 서버가 허락하지 않으면 AI 단추는 없다(규칙 초안 · 틀 · 점검은 쓴다).
+ * AppShell 이 그리기 전에 primePilotMarketingScreens 로 값을 맞추고(첫 화면에 '없는 화면' 이 깜빡이지 않게), 그린 뒤 setPilotMarketingScreens 로 알린다.
+ */
+let screens = false
+let screensTold = false
+
+export function primePilotMarketingScreens(on: boolean) {
+  screens = on
+}
+
+export function setPilotMarketingScreens(on: boolean) {
+  screens = on
+  if (screensTold === on) return
+  screensTold = on
+  listeners.forEach((l) => l())
+}
+
+export function pilotMarketingScreens(): boolean {
+  return screens
+}
+
+export function usePilotMarketingScreens(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => screens,
+    () => screens,
   )
 }
 

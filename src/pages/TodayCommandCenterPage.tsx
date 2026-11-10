@@ -91,7 +91,9 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 import { FirstClientSteps, FirstUseCard } from '../components/ops/FirstClientSteps'
 import { FIRST_USE_CLOSED_KEY, firstUseSteps, firstUseVisible } from '../services/firstUse'
-import { usePilotMarketing } from '../config/pilotMarketing'
+import { useCurrentUser } from '../components/layout/useCurrentUser'
+import { useBrandProfile } from '../services/brandProfile'
+import { usePilotMarketingScreens } from '../config/pilotMarketing'
 import { PERSONAL_KEY } from '../services/journalKind'
 import { recordMove, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
@@ -398,8 +400,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    */
   const contentDue = useMemo(() => contentAgenda(ideas, today), [ideas, today])
   // D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠를 다 해 볼 때까지 오늘 맨 위 한 줄
-  const pilotMarketing = usePilotMarketing()
-  const firstSteps = useMemo(() => firstUseSteps({ clients, journal, ideas: ideas.length, marketing: !pilot || pilotMarketing === 'open', basic: customer }), [clients, journal, ideas, pilot, pilotMarketing, customer])
+  const pilotMarketing = usePilotMarketingScreens()
+  // D-564 고객 계정 — 이름(설정 › 내 정보 · 내 브랜드)이나 회사를 적었는가
+  const meNow = useCurrentUser()
+  const myBrand = useBrandProfile()
+  const meNamed = meNow.name !== '사용자' || !!myBrand.profile.company
+  const firstSteps = useMemo(() => firstUseSteps({ clients, journal, ideas: ideas.length, marketing: !pilot || pilotMarketing, basic: customer, ...(customer ? { named: meNamed } : {}) }), [clients, journal, ideas, pilot, pilotMarketing, customer, meNamed])
   const [firstUseClosed, setFirstUseClosed] = useState(() => {
     try {
       return localStorage.getItem(FIRST_USE_CLOSED_KEY) === '1'
