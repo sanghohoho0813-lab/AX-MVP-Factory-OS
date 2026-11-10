@@ -1614,6 +1614,21 @@ try {
     await shot(pk, 'customer-09-marketing-390')
     await pk.setViewportSize({ width: 1440, height: 900 })
     await cK.close()
+    // 출시 목록 L-5: 이용약관 · 개인정보처리방침 초안 — 로그인 없이 열리고(초안 띠), 검토 전에는 로그인 화면에 링크가 없다
+    {
+      const cL = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'ko-KR' })
+      const pl = await cL.newPage()
+      pl.on('pageerror', (e) => errors.push(String(e)))
+      await cL.route(`https://${REF}.supabase.co/**`, route)
+      await pl.goto(`${BASE}/privacy`, { waitUntil: 'networkidle' })
+      await pl.waitForTimeout(600)
+      const lt = (await pl.getByTestId('legal-page').innerText().catch(() => '')) ?? ''
+      check('약관 초안(L-5 · 클라우드): 로그인하지 않아도 /privacy 열림 · 초안 띠 · 대표 자료 0', (await pl.getByTestId('legal-page').count()) === 1 && (await pl.getByTestId('legal-draft').count()) === 1 && lt.includes('개인정보처리방침') && leaked(lt).length === 0, lt.slice(0, 120))
+      await pl.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+      await pl.waitForTimeout(600)
+      check('약관 초안(L-5): 법률 검토 전에는 로그인 화면에 약관 링크를 걸지 않음', (await pl.getByLabel('이메일').count()) === 1 && (await pl.getByTestId('auth-legal').count()) === 0)
+      await cL.close()
+    }
     // 대표 화면은 그대로 — 전문 모듈 묶음이 보인다(고객 로그인 뒤 같은 브라우저 묶음에서도)
     const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
     const po = await cO.newPage()

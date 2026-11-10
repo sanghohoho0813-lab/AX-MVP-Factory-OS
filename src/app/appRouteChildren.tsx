@@ -632,6 +632,18 @@ export function PublicGrantFinder() {
   )
 }
 
+// 출시 목록 L-5: 이용약관 · 개인정보처리방침(로그인 없이 · 정해진 글만)
+const LegalPage = lazy(() => import('../pages/public/LegalPage'))
+export const legalRoutes = (['terms', 'privacy'] as const).map((doc) => ({
+  path: `/${doc}`,
+  errorElement: <RouteErrorScreen />,
+  element: (
+    <Suspense fallback={<RouteFallback />}>
+      <LegalPage doc={doc} />
+    </Suspense>
+  ),
+}))
+
 export const publicTestRoute = {
   path: '/test/:accessToken',
   errorElement: <RouteErrorScreen />,

@@ -7,6 +7,7 @@
  *  G4 사용법 안내 화면 — 묶음 탭 · 한 번에 한 줄만 펼침 · 영상 자리 · [이 화면 열기] · ?m= 로 그 줄 펼침
  *  G5 마케팅 목차 · 오늘 바로가기에서도 카드(옆 칸을 가리지 않게 아래로)
  *  G6 휴대폰 390 — 사용법 안내 화면 넘침 0 · 마우스 카드 없음 · 작은 단추 0
+ *  G7 이용약관 · 개인정보처리방침 초안 화면(/terms · /privacy) — 로그인 없이 · 초안 띠 · 금액 0
  *
  *   node e2e/guide.mjs http://localhost:4390 [사진 폴더]
  */
@@ -165,6 +166,19 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-04-390.png`, fullPage: tr
 await mp.getByTestId('guide-group').nth(1).tap()
 await mp.waitForTimeout(700)
 check('G6 휴대폰에는 마우스 카드가 없음(누를 때 뜨지 않음)', (await mp.getByTestId('menu-guide-card').count()) === 0)
+
+/* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
+for (const doc of ['terms', 'privacy']) {
+  await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(500)
+  const lt = (await mp.getByTestId('legal-page').innerText().catch(() => '')) ?? ''
+  const lo = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`G7 /${doc} 열림(390) — 제목 · 초안 띠 · 조항 8개 이상 · 넘침 0 · 금액(원) 0`, (await mp.getByTestId('legal-page').getAttribute('data-doc')) === doc && (await mp.getByTestId('legal-draft').count()) === 1 && (await mp.getByTestId('legal-section').count()) >= 8 && lo <= 0 && !/[0-9][0-9,]*\s*원/.test(lt), { n: await mp.getByTestId('legal-section').count(), lo })
+}
+await mp.getByTestId('legal-other').click()
+await mp.waitForTimeout(500)
+check('G7 개인정보처리방침 → [이용약관 보기] 로 오감', mp.url().endsWith('/terms') && (await mp.getByTestId('legal-page').getAttribute('data-doc')) === 'terms', mp.url())
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-05-terms-390.png` }).catch(() => {})
 
 check('화면 오류 0', errors.length === 0, errors.slice(0, 3))
 await browser.close()

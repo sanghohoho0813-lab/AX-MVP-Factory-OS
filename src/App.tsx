@@ -5,7 +5,7 @@ import { ToastProvider } from './components/ui/toast'
 import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
-import { appRouteChildren, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
+import { appRouteChildren, legalRoutes, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
 import { DatePickerHost } from './components/ui/DatePickerHost'
 import { RouteErrorScreen } from './components/layout/RouteErrorScreen'
 import { DeviceStage } from './components/layout/DeviceView'
@@ -26,6 +26,7 @@ const localRouter = createBrowserRouter([
   { path: '/grants/find', errorElement: <RouteErrorScreen />, element: <PublicGrantFinder /> },
   publicSurveyRoute,
   publicTestRoute,
+  ...legalRoutes,
 ])
 
 function BootSplash() {

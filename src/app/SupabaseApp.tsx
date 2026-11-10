@@ -25,7 +25,7 @@ import { ForgotPasswordPage } from '../auth/ui/ForgotPasswordPage'
 import { ResetPasswordPage } from '../auth/ui/ResetPasswordPage'
 import { JoinPage } from '../auth/ui/JoinPage'
 import { afterSignInPath } from '../auth/workspaceStorage'
-import { appRouteChildren, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
+import { appRouteChildren, legalRoutes, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 
 /** 로그인·회원가입 등 게스트 전용 라우트 가드 (로그인 상태면 홈으로) */
@@ -68,6 +68,7 @@ const supabaseRouter = createBrowserRouter([
   { path: '/grants/find', errorElement: <RouteErrorScreen />, element: <PublicGrantFinder /> },
   publicSurveyRoute,
   publicTestRoute,
+  ...legalRoutes,
   { path: '/login', element: <GuestOnly><LoginPage /></GuestOnly> },
   { path: '/signup', element: <GuestOnly><SignupPage /></GuestOnly> },
   { path: '/forgot-password', element: <GuestOnly><ForgotPasswordPage /></GuestOnly> },

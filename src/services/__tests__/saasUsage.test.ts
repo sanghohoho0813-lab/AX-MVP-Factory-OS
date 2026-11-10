@@ -590,6 +590,15 @@ async function run() {
     'K16 안내 영상(D-565) — 외부 구독 고객에게는 내부 팀장용 영상을 저절로 띄우지 않음 · 내부 팀장은 예전처럼 · 메뉴 영상은 화면 안 파일만(바깥 주소 0 · 지금은 비어 있음)',
     shouldAutoOpenTutorial({ ...autoIn, customer: true }) === false && shouldAutoOpenTutorial({ ...autoIn }) === true && shouldAutoOpenTutorial({ ...autoIn, customer: false }) === true && menuVideo('client-ops') === null,
   )
+  // 출시 목록 L-5 이용약관 · 개인정보처리방침 초안 — 검토 전에는 링크를 걸지 않고(ready false) · 금액을 지어내지 않고 · 개인정보처리방침에 꼭 있어야 할 칸
+  const { LEGAL, TERMS, PRIVACY } = await import('../../content/legal')
+  const flat = (d: typeof TERMS) => [d.intro, ...d.sections.flatMap((x) => [x.title, ...x.body])].join('\n')
+  const pv = flat(PRIVACY)
+  check(
+    'K17 약관 초안(L-5) — 검토 전(ready false) · 금액(원) 0 · 개인정보처리방침에 수집 항목 · 보유 기간 · 처리 위탁 · 국외 이전 · 이용자 권리 · 보호책임자 · 주민등록번호를 저장하지 않는다는 말',
+    LEGAL.ready === false && !/[0-9][0-9,]*\s*원/.test(flat(TERMS) + pv) && ['수집하는 개인정보', '보유 기간', '처리 위탁', '국외 이전', '이용자의 권리', '보호책임자', '주민등록번호'].every((w) => pv.includes(w)) && TERMS.sections.length >= 10 && PRIVACY.sections.length >= 8,
+    `${TERMS.sections.length}/${PRIVACY.sections.length}`,
+  )
   const bf = basicFlow(CLIENT_FLOW)
   check(
     'K12 업체 일 순서 안내 — 고객 계정 문장에 모듈 0 · 단계 수 · 순서는 같음 · 원래 문장은 그대로',

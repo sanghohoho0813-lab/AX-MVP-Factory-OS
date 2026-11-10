@@ -4,6 +4,8 @@
 
 import type { ReactNode } from 'react'
 import { BrandLogo, ProductWordmark } from '../../components/brand/BrandLogo'
+import { Link } from 'react-router-dom'
+import { LEGAL } from '../../content/legal'
 
 export function AuthLayout({
   title,
@@ -29,6 +31,18 @@ export function AuthLayout({
           <div className="mt-6">{children}</div>
         </div>
         {footer && <div className="mt-4 text-center text-sm text-slate-500">{footer}</div>}
+        {/* 출시 목록 L-5: 이용약관 · 개인정보처리방침 — 법률 검토가 끝나(LEGAL.ready) 고객에게 보여도 될 때만 */}
+        {LEGAL.ready && (
+          <p className="mt-4 flex justify-center gap-3 text-[0.875rem] text-slate-500" data-testid="auth-legal">
+            <Link to="/terms" className="hover:text-brand-700 hover:underline">
+              이용약관
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/privacy" className="hover:text-brand-700 hover:underline">
+              개인정보처리방침
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   )
