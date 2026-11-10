@@ -93,6 +93,7 @@ import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/
 import { FirstClientSteps, FirstUseCard } from '../components/ops/FirstClientSteps'
 import { FIRST_USE_CLOSED_KEY, firstUseSteps, firstUseVisible } from '../services/firstUse'
 import { dailyMission, weekdayOf } from '../services/marketing/mkPath'
+import { CustomerWelcome } from '../components/home/CustomerWelcome'
 import { useCurrentUser } from '../components/layout/useCurrentUser'
 import { useBrandProfile } from '../services/brandProfile'
 import { usePilotMarketingScreens } from '../config/pilotMarketing'
@@ -806,7 +807,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       {!loading && pilot && pilotMarketing && !(!firstUseClosed && firstUseVisible(firstSteps, clients, today)) && clients.length > 0 && <MkTodayLine today={today} onGo={(href) => navigate(href)} />}
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}
-      {!loading && clients.length === 0 && (
+      {/* D-567 외부 구독 고객(마케팅이 열린 계정) — '어디서 시작할까요?' 두 갈래(고객 모으기 · 내 고객 정리). 대표 · 내부 팀장은 예전 그대로 */}
+      {!loading && clients.length === 0 && customer && pilotMarketing && <CustomerWelcome name={meNow.name} named={meNamed} onGo={(href) => navigate(href)} />}
+      {!loading && clients.length === 0 && !(customer && pilotMarketing) && (
         <section data-testid="today-first-client" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-center">
           <Building2 aria-hidden="true" className="size-8 text-brand-400" />
           <p className="text-[1.2rem] font-bold text-slate-900">등록된 업체가 없습니다</p>

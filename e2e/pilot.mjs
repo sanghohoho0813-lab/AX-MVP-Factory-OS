@@ -1461,8 +1461,16 @@ try {
       }, HID)
     await go(pk, '/')
     await pk.waitForTimeout(600)
-    const stepsK = (await pk.getByTestId('first-client-steps').innerText().catch(() => '')) ?? ''
-    check('고객(D-563): 빈 화면 안내 3단계가 모듈 · 예상 금액을 약속하지 않음', stepsK.includes('첫 업체 등록') && stepsK.includes('확인 · 할 일') && !stepsK.includes('모듈') && !stepsK.includes('예상 금액'), stepsK.replace(/\n/g, '|'))
+    // D-567 고객 첫 화면(업체 0곳) — '어디서 시작할까요?' 두 갈래(고객 모으기 · 내 고객 정리) · 없는 것(모듈 · 예상 금액)을 약속하지 않음
+    const welK = ((await pk.getByTestId('today-first-client').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('고객(D-567) 첫 화면: "어디서 시작할까요?" · 고객 모으기부터 [마케팅 시작하기] · 내 고객 정리부터 [첫 업체 등록] · 먼저 내 이름 · 회사 적기 · 사용법 안내', (await pk.getByTestId('today-first-client').getAttribute('data-variant')) === 'welcome' && ['어디서 시작할까요', '고객 모으기부터', '마케팅 시작하기', '내 고객 정리부터', '첫 업체 등록', '내 이름 · 회사 적기', '사용법 안내'].every((w) => welK.includes(w)), welK.slice(0, 300))
+    check('고객(D-563 · D-567): 첫 화면 안내가 모듈 · 예상 금액 · 판정을 약속하지 않음 · 대표 자료 0', !/모듈|예상 금액|판정/.test(welK) && leaked(welK).length === 0, welK.slice(0, 200))
+    await shot(pk, 'customer-01b-welcome')
+    await pk.getByTestId('today-welcome-marketing-go').click()
+    await pk.waitForTimeout(900)
+    check('고객(D-567): [마케팅 시작하기] → 마케팅 첫 화면(내 채널 알려 주기 칸)', pk.url().endsWith('/marketing') && (await pk.getByTestId('mk-start').count()) === 1, pk.url())
+    await go(pk, '/')
+    await pk.waitForTimeout(600)
     await pk.getByTestId('today-first-client-add').click()
     await pk.waitForTimeout(600)
     await pk.getByLabel('업체명').fill('고객시범상사(주)')

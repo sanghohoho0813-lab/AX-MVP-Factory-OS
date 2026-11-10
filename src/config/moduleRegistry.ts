@@ -286,7 +286,8 @@ export const MODULES: ModuleDefinition[] = withSlotIcons<ModuleDefinition>([
   { key: 'tools', label: '모듈 전체', path: '/tools', icon: LayoutGrid, group: 'modules', accent: 'system', enabled: true, hint: '전문 모듈 여섯과 그 안의 기능 · 요금제', alsoPaths: ['/modules'], exact: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
   // D-565 사용법 안내 — 메뉴마다 무엇 · 왜 · 효과 · 앞으로 + 사용법 영상 자리(모든 계정)
-  { key: 'guide', label: '사용법 안내', path: '/guide', icon: CircleHelp, group: 'settings', accent: 'system', enabled: true, hint: '메뉴마다 무엇을 하는 곳인지 · 사용법 영상' },
+  // 열쇠는 'help' — 예전에 없앤 '처음 사용 가이드'(D-185 · key guide)와 다른 화면이다(그때 저장된 것과 섞이지 않게)
+  { key: 'help', label: '사용법 안내', path: '/guide', icon: CircleHelp, group: 'settings', accent: 'system', enabled: true, hint: '메뉴마다 무엇을 하는 곳인지 · 사용법 영상' },
 ])
 
 /** 켜져 있는 모듈만, 그룹 순서대로 묶어 돌려준다 */

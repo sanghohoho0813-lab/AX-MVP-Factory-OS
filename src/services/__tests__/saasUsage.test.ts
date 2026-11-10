@@ -576,7 +576,7 @@ async function run() {
   const { MODULES } = await import('../../config/moduleRegistry')
   const { menuVideo } = await import('../../config/menuVideos')
   const { shouldAutoOpenTutorial } = await import('../tutorialPrefs')
-  const customerMenus = ['today', 'decide', 'calendar', 'client-ops', 'sales', 'money', 'marketing', 'settings', 'guide', ...MARKETING_GUIDE_LIST.filter((x) => !x.basicHidden).map((x) => x.key)]
+  const customerMenus = ['today', 'decide', 'calendar', 'client-ops', 'sales', 'money', 'marketing', 'settings', 'help', ...MARKETING_GUIDE_LIST.filter((x) => !x.basicHidden).map((x) => x.key)]
   const badBasic = customerMenus.filter((k) => /모듈|판정|예상 금액|제도를 먼저/.test(Object.values(menuGuide(k, { basic: true })).join(' ')))
   const thin = MODULES.filter((m) => m.enabled).filter((m) => Object.values(menuGuide(m.key, { label: m.label, hint: m.hint })).some((x) => x.trim().length < 8))
   const unwritten = MODULES.filter((m) => m.enabled && !m.key.startsWith('up-') && !hasMenuGuide(m.key)).map((m) => m.key)

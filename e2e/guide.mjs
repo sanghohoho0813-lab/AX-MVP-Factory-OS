@@ -85,7 +85,7 @@ check(`G3 보이는 메뉴 줄 ${keys.length}개 전부에 안내 열쇠`, keys.
 
 /* G4 */
 await page.mouse.move(800, 500)
-await row('guide').click()
+await row('help').click()
 await page.waitForTimeout(900)
 check('G4 메뉴 [사용법 안내] → /guide · 한 줄 설명', page.url().endsWith('/guide') && (await page.getByTestId('guide-page').count()) === 1 && ((await page.locator('main').innerText()) ?? '').includes('메뉴를 누르면'))
 const groups = await page.getByTestId('guide-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
