@@ -16,6 +16,7 @@ import { DeviceSwitch } from '../../components/layout/DeviceView'
 import { useDeviceView } from '../../lib/deviceView'
 import { brand } from '../../brand/brand.config'
 import { useTutorial } from '../../components/tutorial/tutorialContext'
+import { setGuideHoverOn, useGuideHoverOn } from '../../lib/guideHoverPref'
 
 /** 한 줄 — 왼쪽 이름 · 설명, 오른쪽 단추(좁으면 위아래로) */
 export function AccountViewRow({ label, hint, children, testId }: { label: string; hint?: string; children: ReactNode; testId?: string }) {
@@ -34,6 +35,7 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
   const views = useViewTargets()
   const device = useDeviceView()
   const tutorial = useTutorial()
+  const guideHover = useGuideHoverOn()
   return (
     <Panel title="계정 · 보기">
       <div data-testid="settings-account-view" className="flex flex-col">
@@ -61,6 +63,30 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
             </button>
           </AccountViewRow>
         )}
+        {/* D-580 마우스 안내 카드 — 기본은 켬. 익숙해진 사람은 끌 수 있다(사용법 안내 화면에는 그대로) */}
+        <AccountViewRow label="마우스 안내 카드" hint="메뉴 · 단추에 마우스를 올리면 뜨는 설명이에요. 꺼도 사용법 안내 화면에서 볼 수 있어요." testId="settings-guide-hover">
+          <div role="radiogroup" aria-label="마우스 안내 카드" className="grid grid-cols-2 gap-1 rounded-(--radius-control) bg-slate-100 p-0.5">
+            {(
+              [
+                [true, '켜기'],
+                [false, '끄기'],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={l}
+                type="button"
+                role="radio"
+                aria-checked={guideHover === v}
+                onClick={() => setGuideHoverOn(v)}
+                data-testid="settings-guide-hover-option"
+                data-value={v ? 'on' : 'off'}
+                className={`tap min-h-11 rounded-[8px] px-3 text-[0.9375rem] font-semibold ${guideHover === v ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </AccountViewRow>
         {children}
         {/* D-162 팀장에게는 고객 플랫폼 문이 없다(대표 고객 플랫폼) */}
         {portal && <AccountViewRow label={brand.customerPlatformLabel} hint="고객이 보는 화면을 새 창으로 엽니다." testId="settings-portal">

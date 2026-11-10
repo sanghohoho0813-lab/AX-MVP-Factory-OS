@@ -16,6 +16,7 @@ import { MODULES } from '../../config/moduleRegistry'
 import { menuVideo } from '../../config/menuVideos'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { guideTitle } from './guideTitle'
+import { guideHoverOn, useGuideHoverOn } from '../../lib/guideHoverPref'
 
 interface Shown {
   key: string
@@ -34,6 +35,11 @@ export function GuideLayer() {
   const card = useRef<HTMLDivElement>(null)
   const basic = useCustomerAudience()
   const location = useLocation()
+  // D-580 설정에서 끈 사람에게는 띄우지 않는다(기본은 켬 · 사용법 안내 화면에는 그대로)
+  const hoverOn = useGuideHoverOn()
+  useEffect(() => {
+    if (!hoverOn) setShown(null)
+  }, [hoverOn])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
@@ -48,6 +54,7 @@ export function GuideLayer() {
       setShown(null)
     }
     const arm = (el: Element) => {
+      if (!guideHoverOn()) return
       if (el === current || el === muted) return
       window.clearTimeout(timer)
       current = el
