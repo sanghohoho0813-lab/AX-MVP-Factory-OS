@@ -1569,6 +1569,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               aria-pressed={docView === v}
               onClick={() => changeDocView(v)}
               data-testid={`doc-view-${v}`}
+              data-guide="fn-docs-view"
               className={`tap t-body flex min-h-11 items-center gap-2 rounded-full border px-4 font-semibold ${docView === v ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
             >
               <Icon aria-hidden="true" className="size-4" />

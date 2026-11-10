@@ -895,6 +895,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                           type="button"
                           aria-pressed={on}
                           onClick={() => setSegment(sg.key)}
+                          data-guide="fn-clients-segment"
                           className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                           <span className="text-[0.875rem]">{sg.label}</span>

@@ -86,6 +86,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 data-testid={`decide-kind-${k}`}
+                data-guide="fn-decide-kinds"
                 className={`tap t-sub shrink-0 rounded-full border px-3 py-1.5 font-semibold whitespace-nowrap ${kind === k ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}
               >
                 {k === 'all' ? '전체' : DECISION_KIND_LABEL[k]} {n}

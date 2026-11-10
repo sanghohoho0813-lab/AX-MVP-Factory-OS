@@ -97,7 +97,7 @@ function BrandForm() {
           <p className="t-sub mt-0.5 break-keep text-slate-800">{brandSummary(draft)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" onClick={() => void save()} disabled={saving || !ready || !changed} data-testid="brand-save">
+          <Button variant="primary" onClick={() => void save()} disabled={saving || !ready || !changed} data-testid="brand-save" data-guide="fn-brand">
             {saving ? '저장 중…' : changed ? '저장' : '저장됨'}
           </Button>
           {!workspaceId && <span className="t-meta text-slate-500">이 브라우저에만 저장됩니다(로그인하면 작업공간에 저장)</span>}

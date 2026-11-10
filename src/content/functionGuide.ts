@@ -333,6 +333,22 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '서류마다 떼는 곳 안내를 더 자세히 넣어요.',
   },
 
+  'fn-clients-segment': {
+    label: '계약 고객 · 잠재고객 · 전체',
+    menu: 'client-ops',
+    what: '계약한 곳과 아직 상담 중인 곳을 나눠서 봐요. 숫자는 그 안의 업체 수예요.',
+    why: '챙기는 방법이 달라서 — 계약한 곳은 기한 · 받을 돈, 상담 중인 곳은 다음 연락이 먼저예요.',
+    effect: '지금 볼 업체만 남아서 목록이 짧아져요. 고른 것은 다음에도 그대로예요.',
+    next: '내가 만든 묶음(지역 · 업종)으로도 나눠 보게 해요.',
+  },
+  'fn-docs-view': {
+    label: '목차로 보기 · 폴더로 보기',
+    menu: 'client-ops',
+    what: '같은 서류를 두 가지 모양으로 봐요 — 서류 칸 목록, 또는 올린 폴더 모양 그대로.',
+    why: '칸으로 보면 빠진 서류가 보이고, 폴더로 보면 받은 그대로 찾기 쉬워서 둘 다 뒀어요.',
+    effect: '보기만 바뀌고 파일은 그대로예요. 고른 보기는 다음에도 기억해요.',
+    next: '폴더째로 내려받기를 폴더 보기 안에 넣어요.',
+  },
   'fn-clients-workitem': {
     label: '업무 항목 추가',
     menu: 'client-ops',
@@ -351,6 +367,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   },
 
   // ---------------------------------------------------------------- 확인할 것
+  'fn-decide-kinds': {
+    label: '종류별로 보기',
+    menu: 'decide',
+    what: '확인할 것을 종류(바로 넣은 값 · 다음 약속 등)별로 걸러 봐요. 숫자는 남은 건수예요.',
+    why: '같은 종류끼리 모아 보면 한 번에 빨리 답할 수 있어서 있어요.',
+    effect: '예를 들어 다음 약속만 모아 놓고 [잡기] 를 차례로 누르면 끝나요.',
+    next: '급한 종류를 먼저 보이게 순서를 바꿔 줘요.',
+  },
   'fn-decide-bulk': {
     label: '모두 맞아요',
     menu: 'decide',
@@ -405,6 +429,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   },
 
   // ---------------------------------------------------------------- 설정
+  'fn-brand': {
+    label: '내 브랜드 저장',
+    menu: 'settings',
+    what: '내 이름 · 회사 · 분야 · 말투를 적어 두는 곳이에요.',
+    why: '누가 쓰는 글인지 알아야 내 글처럼 나와서, 한 번만 적어 두게 했어요.',
+    effect: '올릴 글 · 고객에게 가는 글의 서명과 말투가 내 것으로 나와요.',
+    next: '분야에 맞는 글 주제를 더 정확하게 골라 줘요.',
+  },
   'fn-textscale': {
     label: '글자 크기',
     menu: 'settings',
