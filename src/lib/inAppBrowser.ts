@@ -44,7 +44,17 @@ export function externalOpenUrl(kind: InAppKind, href: string, ua: string): stri
   return null
 }
 
+/**
+ * 한 번만 쓰는 표(비밀번호 재설정 · 이메일 확인 링크)가 주소에 붙어 온 화면인가.
+ * 그런 화면에서는 안내하지 않는다 — 그 자리에서 끝내는 것이 맞고, 표가 든 주소를 다른 곳으로 넘기거나 복사하게 하지 않는다.
+ */
+export function hasOneTimeToken(href: string): boolean {
+  return /[#&?](access_token|refresh_token|code|token_hash)=|[#&?]type=(recovery|signup|magiclink|invite|email_change)\b/i.test(href)
+}
+
 /** 지금 브라우저(없으면 null) */
 export function currentInApp(): InAppKind | null {
-  return typeof navigator === 'undefined' ? null : inAppBrowserOf(navigator.userAgent)
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return null
+  if (hasOneTimeToken(window.location.href)) return null
+  return inAppBrowserOf(navigator.userAgent)
 }

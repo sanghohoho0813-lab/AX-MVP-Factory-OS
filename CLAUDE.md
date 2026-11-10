@@ -147,6 +147,7 @@ npm run qa:vstudy -- http://localhost:4390        # 벤치마킹 영상 창(대�
 npm run qa:certai -- http://localhost:4390        # 기업인증 · 벤처 타자 없이(대표님 답장 한 번에 나눠 넣기 · 실사 말할 답 AI · 사업계획서 AI 판 처음부터 · 칸마다 AI)
 npm run qa:keepui -- http://localhost:4390       # 꾸미기 지키기(화면 꾸미기 순서 · 숨김 · 없는 칸 자리 · [모두 접기] · 글자 크기 · 테마 · 모르는 값 · 휴대폰 아래 메뉴 — 새로 고쳐도 그대로) — 이름표 지킴은 test:all 의 test:keep-ui
 npm run qa:wording                                # 화면 번들 · AI 지시문에 내부 별칭 0 · '검증된 방법' (npm run build 다음에)
+npm run qa:weight -- dist                         # 받는 양 재기(D-590 — 로그인 화면 · 앱 뼈대 · 화면별 '첫 화면을 막는 조각' 수 · 압축 크기 · 파일만 읽음 · 통과/실패 없음 — 줄이는 일을 할 때 전후를 잰다)
 npm run qa:wayfinding -- http://localhost:4390    # 길잡이(경로 줄 · 단계 안내 이전/다음 · 순서 밖 화면 · 설명 접기 · 모듈 '이렇게 쓰세요' · ? 설명 화면 안 · 360/390)
 npm run qa:ventureplan -- http://localhost:4390   # 벤처 사업계획서 쓰기(기업인증 › 벤처 · 사이트 순서 · 명세서 재료 · 회사 기록으로 채우기 · 글자 수 · 점검 · MD · AI 초안 고친 칸 보호 · 360~430)
 npm run qa:pvmenu -- http://localhost:4390         # 메뉴 '특허 · 벤처'(기업인증 밖 · 회사 고르고 사업계획서 쓰기 = 기업인증 안과 같은 기록 · 명세서 점검 · 팀장 화면엔 없음 · 360~430)

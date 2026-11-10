@@ -42,7 +42,7 @@ import { normalizeClientOps } from '../clientOpsService'
 import { guideGroupsFor } from '../../content/guideGroups'
 import { searchScreens, squashForSearch } from '../../content/screenSearch'
 import { WHATS_NEW, WHATS_NEW_MAX, whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
-import { IN_APP_LABEL, externalOpenUrl, inAppBrowserOf } from '../../lib/inAppBrowser'
+import { IN_APP_LABEL, externalOpenUrl, hasOneTimeToken, inAppBrowserOf } from '../../lib/inAppBrowser'
 
 let passed = 0
 let failed = 0
@@ -1048,6 +1048,11 @@ async function run() {
         externalOpenUrl('instagram', href, UA.insta) === null && externalOpenUrl('line', href, UA.line) === null &&
         externalOpenUrl('kakaotalk', 'javascript:alert(1)', UA.kakaoIos) === null && externalOpenUrl('naver', 'file:///etc/passwd', UA.naver) === null,
       JSON.stringify({ kinds, kUrl, aUrl }),
+    )
+    check(
+      'K32 한 번만 쓰는 표가 붙은 주소(비밀번호 재설정 · 이메일 확인 · code)에서는 안내하지 않음 — 표가 든 주소를 넘기거나 복사하게 하지 않는다 · 보통 주소(로그인 · 초대 · ?next=)는 그대로 안내',
+      hasOneTimeToken('https://os.example.com/reset-password#access_token=abc&refresh_token=def&type=recovery') && hasOneTimeToken('https://os.example.com/auth/callback?code=xyz') && hasOneTimeToken('https://os.example.com/#type=recovery') && hasOneTimeToken('https://os.example.com/x?token_hash=1&type=signup') &&
+        !hasOneTimeToken('https://os.example.com/login') && !hasOneTimeToken('https://os.example.com/login?next=%2Fops%2Fclients') && !hasOneTimeToken('https://os.example.com/join/abcd1234') && !hasOneTimeToken('https://os.example.com/guide?m=fn-search') && !hasOneTimeToken('https://os.example.com/marketing/youtube?view=plan&type=recoveryx'),
     )
   }
 

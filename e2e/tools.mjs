@@ -662,6 +662,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 /* D-109: 크레탑 주식가치 → 세금 계산기 09 로 같은 값 넘기기 · 휴대폰 계산기 펼쳐 고르기 */
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  // D-552 뒤로 모듈 맨 첫 주소는 대화창부터 — 이 시험은 예전 화면(바로 화면)을 본다(다른 시험 시드와 같은 값)
+  await ctx.addInitScript(() => localStorage.setItem('axmvp.chatfirst.v1', JSON.stringify({ all: 'direct' })))
   const page = await ctx.newPage()
   await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
@@ -757,6 +759,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ctx.close()
 
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  await m.addInitScript(() => localStorage.setItem('axmvp.chatfirst.v1', JSON.stringify({ all: 'direct' })))
   const mp = await m.newPage()
   await mp.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
   await mp.getByTestId('tax-picker').click()
@@ -780,6 +783,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const mob = vp.width < 500
     const tag = mob ? '390' : '1440'
     const ctx = await browser.newContext({ viewport: vp, isMobile: mob, hasTouch: mob, locale: 'ko-KR' })
+    await ctx.addInitScript(() => localStorage.setItem('axmvp.chatfirst.v1', JSON.stringify({ all: 'direct' })))
     const page = await ctx.newPage()
     await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()

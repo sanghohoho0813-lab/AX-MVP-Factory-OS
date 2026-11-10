@@ -60,6 +60,7 @@
     "e2e:internal": "node e2e/internal.mjs",
     "e2e:roundtrip": "node e2e/roundtrip.mjs",
     "qa:wording": "node scripts/qa-wording.mjs",
+    "qa:weight": "node scripts/chunk-weight.mjs",
     "qa:sideai": "node e2e/sideai.mjs",
     "qa:certai": "node e2e/certai.mjs",
     "qa:specboard": "node e2e/specboard.mjs",
