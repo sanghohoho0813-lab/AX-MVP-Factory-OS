@@ -40,6 +40,7 @@ import {
   KanbanSquare,
   Moon,
   NotebookPen,
+  X,
 } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { Blank, Disclosure, MetricTile } from '../components/ui/primitives'
@@ -91,6 +92,7 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 import { FirstClientSteps, FirstUseCard } from '../components/ops/FirstClientSteps'
 import { FIRST_USE_CLOSED_KEY, firstUseSteps, firstUseVisible } from '../services/firstUse'
+import { dailyMission, weekdayOf } from '../services/marketing/mkPath'
 import { useCurrentUser } from '../components/layout/useCurrentUser'
 import { useBrandProfile } from '../services/brandProfile'
 import { usePilotMarketingScreens } from '../config/pilotMarketing'
@@ -204,6 +206,48 @@ function AllLink({ to }: { to: string }) {
  * D-282 바로가기 — 앱 런처(PC 흰 카드 · 휴대폰 큰 아이콘).
  * U2(2026-11-05) 처음엔 접어 둔다 — 접힌 줄에도 이름 링크가 있어 한 번 눌러 바로 간다. 펼친 것은 기억(today.launcher).
  */
+/** D-566 오늘의 마케팅 한 가지 — 한 줄(무엇 · 왜 · 단추) · [오늘은 닫기] 는 이 기기에서 오늘만 */
+const MK_TODAY_HIDE_KEY = 'axmvp.ui.mktoday.hide'
+function MkTodayLine({ today, onGo }: { today: string; onGo: (href: string) => void }) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(MK_TODAY_HIDE_KEY) === today
+    } catch {
+      return false
+    }
+  })
+  if (hidden) return null
+  const m = dailyMission(weekdayOf(today))
+  return (
+    <section className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" aria-label="오늘의 마케팅 한 가지" data-testid="today-mk-line" data-mission={m.key}>
+      <span className="flex min-w-0 flex-1 basis-56 flex-col">
+        <span className="t-meta font-bold text-brand-700">오늘의 마케팅 한 가지</span>
+        <span className="t-body font-bold break-keep text-slate-900">{m.title}</span>
+        <span className="t-sub break-keep text-slate-600">{m.why}</span>
+      </span>
+      <Button variant="secondary" onClick={() => onGo(m.href)} data-testid="today-mk-go">
+        {m.action} <ArrowRight aria-hidden="true" className="size-4" />
+      </Button>
+      <button
+        type="button"
+        aria-label="오늘의 마케팅 한 가지 오늘은 닫기"
+        onClick={() => {
+          setHidden(true)
+          try {
+            localStorage.setItem(MK_TODAY_HIDE_KEY, today)
+          } catch {
+            /* 이번 접속 동안만 닫힘 */
+          }
+        }}
+        data-testid="today-mk-close"
+        className="tap inline-flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-50"
+      >
+        <X aria-hidden="true" className="size-4" />
+      </button>
+    </section>
+  )
+}
+
 function TodayLauncher({ phone }: { phone: boolean }) {
   const items = useLauncherItems()
   return (
@@ -757,6 +801,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           }}
         />
       )}
+
+      {/* D-566 오늘의 마케팅 한 가지 — 대표가 아닌 계정(마케팅이 열린)에게 요일마다 하나 · 처음 시작 카드가 떠 있는 동안에는 겹치지 않게 */}
+      {!loading && pilot && pilotMarketing && !(!firstUseClosed && firstUseVisible(firstSteps, clients, today)) && clients.length > 0 && <MkTodayLine today={today} onGo={(href) => navigate(href)} />}
 
       {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}
       {!loading && clients.length === 0 && (
