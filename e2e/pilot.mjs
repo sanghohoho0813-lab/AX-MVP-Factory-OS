@@ -1552,7 +1552,7 @@ try {
     }
     const gBadK = gAllK.filter((x) => /모듈|판정|예상 금액|진단서/.test(x) || leaked(x).length > 0)
     check('고객(D-565) 사용법 안내: 묶음은 오늘 · 고객 · 영업 · 설정뿐(전문 모듈 없음) · 모든 줄 글에 모듈 · 판정 · 예상 금액 0 · 대표 자료 0', gGroupsK.join() === 'today,clients,sales,settings' && gAllK.length >= 10 && gBadK.length === 0, `${gGroupsK.join()} / ${gAllK.length}줄 / ${gBadK.join(' || ').slice(0, 300)}`)
-    check('고객(D-565) 사용법 안내: 닫힌 화면(홍보 글 · 홈페이지 · 모듈) 줄 없음 · 팀장용 [전체 안내 영상] 단추 없음 · [의견 보내기] 있음', !gAllK.some((x) => /^(mk-content|mk-homepage|tools|cat-)/.test(x)) && (await pk.getByTestId('guide-tutorial').count()) === 0 && (await pk.getByTestId('guide-feedback').count()) === 1, gAllK.map((x) => x.split(':')[0]).join())
+    check('고객(D-565) 사용법 안내: 닫힌 화면(홍보 글 · 홈페이지 · 모듈) 줄 없음 · 팀장용 [전체 안내 영상] · 팀장용 설문 링크 없음', !gAllK.some((x) => /^(mk-content|mk-homepage|tools|cat-)/.test(x)) && (await pk.getByTestId('guide-tutorial').count()) === 0 && (await pk.getByTestId('guide-feedback').count()) === 0, gAllK.map((x) => x.split(':')[0]).join())
     await shot(pk, 'customer-05b-guide')
     await go(pk, '/settings')
     await pk.waitForTimeout(500)

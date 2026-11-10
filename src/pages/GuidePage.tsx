@@ -152,7 +152,8 @@ export function GuidePage() {
             <PlayCircle aria-hidden="true" className="size-4 text-brand-600" /> 전체 안내 영상 보기
           </button>
         )}
-        {pilot && (
+        {/* 설문(/feedback)은 내부 팀장용 — 외부 구독 고객의 의견 길은 따로(출시 목록 L-4) */}
+        {pilot && !basic && (
           <Link to="/feedback" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="guide-feedback">
             의견 보내기 <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
