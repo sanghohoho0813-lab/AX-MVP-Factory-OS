@@ -60,17 +60,17 @@ export function TextScaleControl({ showPreview = false, compact = false }: { sho
       {showPreview && (
         <div className="rounded-(--radius-card) border border-slate-200 bg-white p-4">
           <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">미리보기</p>
-          <h3 className="mt-2 text-xl font-bold text-slate-900">진단부터 검증까지 한눈에</h3>
+          <h3 className="mt-2 text-xl font-bold text-slate-900">오늘 챙길 일을 한눈에</h3>
           <p className="mt-1.5 text-sm text-slate-700">
-            기업의 현재 업무를 진단하고 다음에 만들 기능을 확인합니다.
+            약속 · 기한 · 받을 돈을 한 화면에서 확인합니다.
           </p>
           <p className="mt-1 text-[0.875rem] text-slate-400">보조 설명 · 이 문장은 작은 글씨의 예시입니다.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="inline-flex h-10 items-center rounded-(--radius-control) bg-brand-600 px-4 text-sm font-medium text-white">
-              핵심 행동 버튼
+              서류 올리기
             </span>
-            <StatusBadge tone="success" withDot>통과</StatusBadge>
-            <StatusBadge tone="warning" withDot>조건부 통과</StatusBadge>
+            <StatusBadge tone="success" withDot>받음</StatusBadge>
+            <StatusBadge tone="warning" withDot>요청함</StatusBadge>
           </div>
         </div>
       )}

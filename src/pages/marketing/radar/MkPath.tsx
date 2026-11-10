@@ -6,6 +6,7 @@
  *  - 다 한 뒤: '오늘의 한 가지'(요일마다 하나) + 이번 주 올린 편 수 — 매일 한 번 눌러 하게.
  *  - 실제 기록으로 본다(내 브랜드 · 담은 주제 · 써 둔 글 · 올린 표시) — 따로 저장하는 진행 기록 없음. 읽기만 한다.
  *  - 첫 설정 칸(MkStart)이 보이는 동안에는 그리지 않는다(같은 말을 두 번 하지 않게).
+ *  - D-574 한 편이라도 올린 뒤부터: '이번 달 새로 적은 고객 n곳 · 글을 보고 온 곳 m곳' + [잠재고객으로 적어 두기](영업 관리 등록 창).
  * 규칙 화면이다 — AI 를 부르지 않는다.
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -14,8 +15,9 @@ import { Link } from 'react-router-dom'
 import { isBrandEmpty, useBrandProfile } from '../../../services/brandProfile'
 import { listThreadPosts } from '../../../services/marketing/threads'
 import { listShortPosts } from '../../../services/marketing/shorts'
-import { dailyMission, mkPathNext, mkPathSteps, postedThisWeek, weekdayOf } from '../../../services/marketing/mkPath'
-import { todayLocalDate } from '../../../lib/appClock'
+import { LEAD_FROM_CONTENT_HREF, dailyMission, leadsThisMonth, mkPathNext, mkPathSteps, postedThisWeek, weekdayOf } from '../../../services/marketing/mkPath'
+import { listClients } from '../../../services/clientOpsService'
+import { localDateOf, todayLocalDate } from '../../../lib/appClock'
 import { MARKETING_BASICS, readBasics } from '../../../content/marketingBasics'
 
 interface Post {
@@ -26,6 +28,20 @@ interface Post {
 export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspaceId: string | null; ideas: number; interests: number; prefsReady: boolean }) {
   const brand = useBrandProfile()
   const [posts, setPosts] = useState<Post[] | null>(null)
+  /** D-574 이번 달에 적은 업체(유입 경로와 함께) — 못 읽으면 숫자 없이 길만 보인다(읽기만) */
+  const [leads, setLeads] = useState<Array<{ day: string; source: string }> | null>(null)
+  useEffect(() => {
+    let alive = true
+    setLeads(null)
+    void listClients(workspaceId)
+      .then((list) => {
+        if (alive) setLeads(list.filter((c) => !c.archivedAt).map((c) => ({ day: localDateOf(c.createdAt), source: c.sales?.source ?? '' })))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [workspaceId])
   useEffect(() => {
     let alive = true
     setPosts(null)
@@ -69,6 +85,30 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
     </p>
   )
 
+  // D-574 글의 끝은 고객 — 한 편이라도 올린 뒤부터: 이번 달 새로 적은 고객 · 글을 보고 온 곳 + [잠재고객으로 적어 두기]
+  const postedAny = (posts ?? []).some((p) => p.status === 'posted')
+  const lead = leads ? leadsThisMonth(leads, today) : null
+  const leadLine = postedAny && (
+    <p className="t-sub break-keep text-slate-700" data-testid="mk-path-leads" data-all={lead?.all ?? ''} data-content={lead?.fromContent ?? ''}>
+      {lead && (
+        <>
+          이번 달 새로 적은 고객 <strong className="font-bold text-slate-900">{lead.all}곳</strong>
+          {lead.all > 0 && (
+            <>
+              {' '}
+              · 글을 보고 온 곳 <strong className="font-bold text-slate-900">{lead.fromContent}곳</strong>
+            </>
+          )}
+          {' — '}
+        </>
+      )}
+      글을 보고 연락이 왔나요?{' '}
+      <Link to={LEAD_FROM_CONTENT_HREF} className="font-bold text-brand-700 hover:underline" data-testid="mk-path-lead-add" data-guide="fn-mk-lead">
+        잠재고객으로 적어 두기
+      </Link>
+    </p>
+  )
+
   if (!next) {
     const m = dailyMission(weekdayOf(today))
     const n = postedThisWeek(posts ?? [], today)
@@ -92,6 +132,7 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
           이번 주 올린 것 <strong className="font-bold text-slate-900">{n}편</strong>
           {n === 0 ? ' — 오늘 한 편부터 시작해요.' : n >= 3 ? ' — 잘하고 계세요. 꾸준함이 고객을 데려와요.' : ' — 한 주에 세 편이면 충분해요.'}
         </p>
+        {leadLine}
         {basics}
       </section>
     )
@@ -123,6 +164,7 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
           </li>
         ))}
       </ol>
+      {leadLine}
       {basics}
     </section>
   )

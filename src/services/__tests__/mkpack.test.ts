@@ -676,5 +676,24 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('D571-B5 다음에 읽을 것 — 처음엔 첫째 · 읽은 것은 건너뜀 · 다 읽으면 없음 · 모르는 값은 무시', nextBasic([])?.key === 'who' && nextBasic(['who', 'first'])?.key === 'steady' && nextBasic(MARKETING_BASICS.map((b) => b.key)) === null && nextBasic(['x'])?.key === 'who')
 }
 
+{
+  /* D-574 마케팅 → 고객 DB 고리 — 이번 달 새로 적은 고객 · 글을 보고 온 곳(규칙 계산 · 읽기만) */
+  const { CONTENT_SOURCES, leadsThisMonth, LEAD_FROM_CONTENT_HREF } = await import('../marketing/mkPath')
+  const { SALES_SOURCES } = await import('../../content/salesCatalog')
+  check('D574-L1 글 · 영상 경로 넷은 전부 영업 관리 "유입 경로" 목록에 있는 값(블로그 · 유튜브 · 인스타 · 스레드)', CONTENT_SOURCES.length === 4 && CONTENT_SOURCES.every((x) => (SALES_SOURCES as readonly string[]).includes(x)) && (SALES_SOURCES as readonly string[]).includes('스레드') && SALES_SOURCES[SALES_SOURCES.length - 1] === '기타', CONTENT_SOURCES.join())
+  const leads = [
+    { day: '2026-11-03', source: '스레드' },
+    { day: '2026-11-09', source: '소개' },
+    { day: '2026-11-10', source: '유튜브' },
+    { day: '2026-11-10', source: '' },
+    { day: '2026-10-31', source: '블로그' },
+    { day: '2026-11-11', source: '인스타' },
+  ]
+  const c = leadsThisMonth(leads, '2026-11-10')
+  check('D574-L2 이번 달 것만(지난달 · 내일 날짜 빼고) · 글을 보고 온 곳은 네 경로만', c.all === 4 && c.fromContent === 2, JSON.stringify(c))
+  check('D574-L3 아무도 없으면 0 / 0 · 달이 바뀌면 다시 0부터', leadsThisMonth([], '2026-11-10').all === 0 && leadsThisMonth(leads, '2026-12-01').all === 0 && leadsThisMonth(leads, '2026-10-31').fromContent === 1)
+  check('D574-L4 등록 창 주소 = 영업 관리 새 잠재고객 + 글에서 왔다는 표시', LEAD_FROM_CONTENT_HREF === '/sales/board?new=1&from=content')
+}
+
 console.log(`\nmkpack: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

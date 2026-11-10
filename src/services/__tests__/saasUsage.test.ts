@@ -649,10 +649,10 @@ async function run() {
   const fnBadBasic = fnKeys.filter((k) => !FUNCTION_GUIDES[k].hiddenForPilot && !FUNCTION_GUIDES[k].onlyOwner && !FUNCTION_GUIDES[k].basicHidden).filter((k) => /모듈|판정|예상 금액|제도/.test(Object.values(menuGuide(k, { basic: true })).join(' ')))
   check(
     'K20 기능 안내(D-569) — 화면에 단 열쇠(fn-…)는 전부 글이 있음 · 네 칸 12자 이상 · 메뉴에 이어짐 · 고객 글에 모듈 · 판정 · 제도 0 · 팀장에게 없는 탭(고객 플랫폼 · 컨설팅 · AI 전략실)은 팀장 안내에서 빠짐 · 대표 글은 그대로',
-    fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 23 &&
+    fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 27 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 3 && functionGuidesOf('mk-threads').length === 2 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 4 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 2 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)

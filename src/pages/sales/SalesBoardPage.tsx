@@ -54,6 +54,7 @@ import {
   salesMoveBlocked,
 } from '../../services/salesPipeline'
 import { SALES_SOURCES, SALES_STALE_DAYS } from '../../content/salesCatalog'
+import { CONTENT_SOURCES } from '../../services/marketing/mkPath'
 import { formatKrwCompact, krwTile } from '../../lib/format'
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import {
@@ -171,7 +172,7 @@ const EMPTY_FORM: ProspectForm = { companyName: '', contactName: '', contactPhon
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
-function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: boolean; busy: boolean; records: ClientOpsRecord[]; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
+function NewProspectModal({ open, busy, records, fromContent = false, onClose, onSubmit }: { open: boolean; busy: boolean; records: ClientOpsRecord[]; fromContent?: boolean; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
   const [f, setF] = useState<ProspectForm>(EMPTY_FORM)
   const pilot = useIsPilot()
   // NX-2 같은 업체가 이미 있으면 먼저 알린다(고객 관리 등록 · 크레탑과 같은 규칙) — 예전엔 같은 업체가 두 번 생겼다. 다른 업체면 그대로 등록
@@ -200,6 +201,11 @@ function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: bo
           <ClientTypePicker value={f.clientType} onChange={(t) => set('clientType', t)} testId="prospect-client-type" />
         </div>
       )}
+      {fromContent && (
+        <p className="t-sub mb-2 break-keep font-semibold text-slate-800" data-testid="prospect-from-content">
+          글을 보고 연락 온 분을 적어 두세요 — '유입 경로' 에 어디서 보셨는지 고르면, 어떤 글이 고객을 데려오는지 마케팅 화면에서 세어 드려요.
+        </p>
+      )}
       <p className="t-sub break-keep text-slate-500">
         계약 전 업체로 등록됩니다. 고객 관리{!pilot ? ` '${CLIENT_TYPE_LABEL[f.clientType]}' 쪽` : ''} '잠재고객' 에도 같이 보이고, 계약하면 계약 고객으로 넘어갑니다.
       </p>
@@ -220,7 +226,8 @@ function NewProspectModal({ open, busy, records, onClose, onSubmit }: { open: bo
           유입 경로
           <select value={f.source} onChange={(e) => set('source', e.target.value)} className={inputClass}>
             <option value="">선택</option>
-            {SALES_SOURCES.map((x) => <option key={x} value={x}>{x}</option>)}
+            {/* D-574 마케팅 화면에서 왔으면 글 · 영상 경로를 앞에(고르기 쉽게) — 목록 값은 같다 */}
+            {(fromContent ? [...SALES_SOURCES.filter((x) => CONTENT_SOURCES.includes(x)), ...SALES_SOURCES.filter((x) => !CONTENT_SOURCES.includes(x))] : SALES_SOURCES).map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
         </label>
         {/* D-126: 소개로 왔을 때만 묻는다 */}
@@ -271,10 +278,12 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   useQueryInUrl(query, searchParams, setSearchParams)
   const [formOpen, setFormOpen] = useState(() => searchParams.get('new') === '1')
+  // D-574 마케팅 '글을 보고 연락이 왔나요?' 에서 왔다(?from=content) — 등록 창이 닫힐 때까지 기억
+  const [fromContent, setFromContent] = useState(() => searchParams.get('new') === '1' && searchParams.get('from') === 'content')
   // D-124: ?new=1 은 한 번만 — 주소에 남으면 뒤로가기로 돌아올 때마다 빈 등록 창이 다시 떴다
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('new'); return n }, { replace: true })
+      setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('new'); n.delete('from'); return n }, { replace: true })
     }
   }, [searchParams, setSearchParams])
   const [busy, setBusy] = useState(false)
@@ -410,6 +419,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     createdRef.current = null
     if (made) setRecords((list) => (list.some((r) => r.id === made.id) ? list : [made, ...list]))
     setFormOpen(false)
+    setFromContent(false)
   }
 
   const create = async (f: ProspectForm) => {
@@ -756,7 +766,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </ArrangeItem>
       </ArrangeArea>
 
-      <NewProspectModal open={formOpen} busy={busy} records={records} onClose={closeForm} onSubmit={(f) => void create(f)} />
+      <NewProspectModal open={formOpen} busy={busy} records={records} fromContent={fromContent} onClose={closeForm} onSubmit={(f) => void create(f)} />
       {closing && (
         <ContractCloseSheet
           record={closing.record}

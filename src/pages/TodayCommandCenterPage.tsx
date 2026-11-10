@@ -771,7 +771,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </p>
           <span className="ml-auto hidden shrink-0 sm:inline-flex">
             {/* NX-1 하루를 마칠 때 누르는 단추 — 아침 첫 화면의 강조는 '오늘 먼저 제안할 것' 에 양보(단추 · 하는 일은 그대로) */}
-            <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
+            <Button variant="secondary" onClick={() => setSummaryOpen(true)} data-guide="fn-today-wrap">
               <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
             </Button>
           </span>

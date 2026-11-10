@@ -708,7 +708,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               <span className="sm:hidden">등록</span>
             </Button>
             {/* D-122: 점 세 개만 두지 않는다 — 백업 · 일정 · 정산이 여기 숨어 있었다 */}
-            <Button variant="ghost" onClick={() => setMoreOpen(true)}>
+            <Button variant="ghost" onClick={() => setMoreOpen(true)} data-guide="fn-clients-tools">
               <MoreHorizontal aria-hidden="true" className="size-5" />
               더보기
             </Button>

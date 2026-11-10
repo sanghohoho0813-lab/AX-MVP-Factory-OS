@@ -4,13 +4,14 @@
  * 예전에는 고객 계정도 '등록된 업체가 없습니다 · 첫 업체 등록' 하나만 보였다(마케팅부터 하고 싶은 사람이 갈 곳을 못 찾음).
  *
  *  - 📐 한 화면에 한 가지: 큰 칸 둘(고객 모으기 · 내 고객 정리) — 각 칸에 무엇이 되는지 한 줄 + 큰 단추 하나.
- *  - 이름을 아직 안 적었으면 아래 작은 줄 '먼저 내 이름 · 회사 적기' · 늘 '사용법 안내'.
+ *  - 이름을 아직 안 적었으면 아래 작은 줄 '먼저 내 이름 · 회사 적기' · 늘 '사용법 안내' · 글자 크기 단추(D-575).
  *  - 대표 · 내부 팀장 화면은 예전 그대로(이 칸은 외부 구독 고객 + 마케팅 화면이 열린 계정에만).
  * 규칙 화면이다 — AI 를 부르지 않는다.
  */
 import { ArrowRight, Building2, CirclePlus, Megaphone } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
+import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 
 export function CustomerWelcome({ name, named, onGo }: { name: string; named: boolean; onGo: (href: string) => void }) {
   const card = 'flex min-w-0 flex-1 basis-72 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-4 text-left sm:p-5'
@@ -53,6 +54,10 @@ export function CustomerWelcome({ name, named, onGo }: { name: string; named: bo
         <Link to="/guide" className="tap inline-flex min-h-11 items-center font-semibold text-brand-700 hover:underline" data-testid="today-welcome-guide">
           사용법 안내 보기
         </Link>
+        {/* D-575 처음 보는 화면에서 바로 글자를 키울 수 있게(설정까지 가지 않아도) — 누를 때마다 기본 → 크게 → 매우 크게 */}
+        <span className="inline-flex items-center gap-2" data-testid="today-welcome-scale">
+          글자가 작으면 <TextScaleQuickButton showLabel />
+        </span>
       </p>
     </section>
   )

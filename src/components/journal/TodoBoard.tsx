@@ -83,6 +83,7 @@ export function TodoComposer({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-guide="fn-today-capture"
         className="tap flex w-full items-center gap-2 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 py-3 text-left text-slate-500 hover:border-brand-400 hover:text-brand-700"
       >
         <Plus aria-hidden="true" className="size-4 shrink-0" />

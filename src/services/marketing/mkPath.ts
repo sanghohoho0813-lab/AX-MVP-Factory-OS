@@ -90,6 +90,29 @@ export function postedThisWeek(posts: ReadonlyArray<{ status: string; postedOn: 
   return posts.filter((p) => p.status === 'posted' && p.postedOn >= from && p.postedOn <= today).length
 }
 
+/**
+ * D-574 글 · 영상을 보고 온 문의로 세는 유입 경로(영업 관리 '유입 경로' 값 그대로 — content/salesCatalog).
+ * 마케팅의 끝은 '올린 편 수' 가 아니라 '적어 둔 고객' 이다 — 올린 글이 고객을 데려왔는지 같은 카드에서 보게.
+ */
+export const CONTENT_SOURCES: readonly string[] = ['블로그', '유튜브', '인스타', '스레드']
+
+export interface LeadCount {
+  /** 이번 달에 새로 적은 업체(잠재고객 포함) */
+  all: number
+  /** 그중 글 · 영상을 보고 온 곳 */
+  fromContent: number
+}
+
+/** 이번 달(오늘이 든 달)에 새로 적은 업체 수 · 그중 글을 보고 온 수. day = 적은 날 YYYY-MM-DD(이 기기 날짜) */
+export function leadsThisMonth(leads: ReadonlyArray<{ day: string; source: string }>, today: string): LeadCount {
+  const month = today.slice(0, 7)
+  const mine = leads.filter((l) => l.day.slice(0, 7) === month && l.day <= today)
+  return { all: mine.length, fromContent: mine.filter((l) => CONTENT_SOURCES.includes(l.source)).length }
+}
+
+/** 잠재고객 등록 창을 '글을 보고 온 문의' 로 여는 주소(영업 관리가 유입 경로를 앞에 보여 준다) */
+export const LEAD_FROM_CONTENT_HREF = '/sales/board?new=1&from=content'
+
 /** 요일 숫자(0 일 ~ 6 토) — YYYY-MM-DD 에서 */
 export function weekdayOf(today: string): number {
   const [y, m, d] = today.split('-').map(Number)
