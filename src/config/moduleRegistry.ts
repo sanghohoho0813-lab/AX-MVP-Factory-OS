@@ -38,6 +38,7 @@ import { FEATURE_CATALOG, visibleModules } from './productCatalog'
 import { UPCOMING_PATH, UPCOMING_PRODUCTS } from './upcomingProducts'
 import { withSlotIcons } from './iconSlots'
 import { isCustomerMarketingPath, pilotMarketingState } from './pilotMarketing'
+import { isCustomerAudience } from './customerAudience'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -294,7 +295,9 @@ export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolea
   const showAdvanced = opts.advanced ?? true
   const pilot = opts.pilot ?? false
   const caps = opts.caps ?? new Set<string>()
-  return MODULE_GROUPS.filter((group) => !(pilot && group.ownerOnly)).map((group) => ({
+  // D-562 외부 구독 고객에게는 전문 모듈 묶음째 보이지 않는다(대표 · 내부 팀장은 그대로)
+  const customer = pilot && isCustomerAudience()
+  return MODULE_GROUPS.filter((group) => !(pilot && group.ownerOnly) && !(customer && CUSTOMER_HIDDEN_GROUPS.has(group.key))).map((group) => ({
     group,
     // D-162: Pilot 에게는 대표 전용 줄 · 고급 운영 기능(검증 · 기관 전략 · 사례)을 빼고 보인다
     // 기능 권한이 필요한 줄(AI 전략실)은 권한이 있을 때만
@@ -323,9 +326,23 @@ const PILOT_HIDDEN_EXTRA = [
 ]
 const underBase = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)
 
+/**
+ * D-562 외부 구독 고객(audience = customer)에게 열지 않는 묶음 — 전문 모듈(분야 줄 · 도구 · 모듈 전체 · 출시 예정).
+ * 대표(2026-11-10): "영업자 정산 · 1차 미팅 체크리스트 · 전문 모듈은 당분간 빼자 — 내 화면 말고 고객 화면에서."
+ * 영업자 정산 · 1차 미팅 체크리스트는 대표 전용 줄(ownerOnly)이라 Pilot 등급에게 이미 닫혀 있다.
+ */
+const CUSTOMER_HIDDEN_GROUPS: ReadonlySet<ModuleGroupKey> = new Set<ModuleGroupKey>(['modules'])
+
+/** 고객 계정에게 닫는 주소 — 전문 모듈 묶음의 줄(도구 포함)이 맡는 주소 전부(메뉴와 같은 표에서 계산) */
+export function isCustomerHiddenPath(pathname: string): boolean {
+  return MODULES.some((m) => m.enabled && CUSTOMER_HIDDEN_GROUPS.has(m.group) && moduleMatchLength(m, pathname) > 0)
+}
+
 export function isPilotHiddenPath(pathname: string): boolean {
   // SAAS-2 서버가 사용량 장부를 확인해 마케팅을 연 계정 — 레이더 · 스레드 · 릴스/틱톡 주소만 연다(config/pilotMarketing)
   if (pilotMarketingState() === 'open' && isCustomerMarketingPath(pathname)) return false
+  // D-562 외부 구독 고객 — 전문 모듈 묶음 주소도 닫는다
+  if (isCustomerAudience() && isCustomerHiddenPath(pathname)) return true
   if (PILOT_HIDDEN_EXTRA.some((b) => underBase(pathname, b))) return true
   const ownerGroups = new Set(MODULE_GROUPS.filter((g) => g.ownerOnly).map((g) => g.key))
   return MODULES.some((m) => m.enabled && (m.ownerOnly || m.advanced || ownerGroups.has(m.group)) && moduleMatchLength(m, pathname) > 0)

@@ -14,7 +14,7 @@
 import { chromium } from 'playwright'
 import { spawn, execSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -38,7 +38,9 @@ function check(name, ok, detail) {
 const OWNER = { id: '0e000000-0000-4000-8000-0000000000a1', email: 'owner@e2e.kr', password: 'owner-pass' }
 const PILOT = { id: '0e000000-0000-4000-8000-0000000000b1', email: 'pilot@e2e.kr', password: 'pilot-pass' }
 const OUTSIDER = { id: '0e000000-0000-4000-8000-0000000000c1', email: 'outsider@e2e.kr', password: 'outsider-pass' }
-const USERS = [OWNER, PILOT, OUTSIDER]
+// D-562 외부 구독 고객 — supabase/manual/customer_provision.sql 그대로(이메일만 바꿔) 준비한다(아래 '고객 계정' 묶음)
+const CUSTOMER = { id: '0e000000-0000-4000-8000-0000000000d1', email: 'customer@e2e.kr', password: 'customer-pass' }
+const USERS = [OWNER, PILOT, OUTSIDER, CUSTOMER]
 const OWNER_WS = '0e0000aa-0000-4000-8000-00000000000a'
 const OWNER_CLIENT = 'owner-secret-1'
 // D-171: 대표가 직접 만든 업무 항목(세무기장 · 모두의 창업 2차)도 팀장 화면 · 응답에 나오면 안 된다
@@ -1387,6 +1389,64 @@ try {
     const pilotSeesOwner = sql(`set role authenticated; set request.jwt.claims = '{"sub":"${PILOT.id}","role":"authenticated"}'; select count(*) from public.ui_preferences where user_id = '${OWNER.id}';`).split('\n').pop()
     check('D-485 팀장 로그인 → 대표 꾸미기를 받지 않음 · 팀장은 대표 줄을 못 읽음(RLS)', !offPilot.includes('assist') && pilotSeesOwner === '0', `${JSON.stringify(offPilot)} rows=${pilotSeesOwner}`)
     await cC.close()
+  }
+
+  // ---------- D-562 외부 구독 고객 계정 — 전문 모듈 묶음은 메뉴 · 주소 · 찾기에서 닫힌다(대표 · 내부 팀장은 그대로) ----------
+  {
+    sql(`insert into auth.users (id, email) values ('${CUSTOMER.id}', '${CUSTOMER.email}') on conflict do nothing`)
+    sql(readFileSync('supabase/manual/customer_provision.sql', 'utf8').replace('여기에_고객_이메일@example.com', CUSTOMER.email).replace("'고객 작업공간'", "'시범 고객'"))
+    const cws = sql(`select id from public.workspaces where owner_id = '${CUSTOMER.id}'`)
+    check('고객(D-562) 준비: customer_provision.sql → pilot 등급 · audience = customer · 그 사람만 구성원인 작업공간 하나 · 업체 0', sql(`select tier || ':' || audience from public.os_access where user_id = '${CUSTOMER.id}'`) === 'pilot:customer' && cws.length === 36 && sql(`select count(*) from public.workspace_members where workspace_id = '${cws}'`) === '1' && sql(`select count(*) from public.operations_clients where workspace_id = '${cws}'`) === '0', cws)
+    check('고객(D-562): 내부 팀장 줄은 그대로 internal(팀장 화면 · 메뉴는 위 시험 그대로)', sql(`select audience from public.os_access where user_id = '${PILOT.id}'`) === 'internal')
+    const cK = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    const pk = await cK.newPage()
+    pk.on('pageerror', (e) => errors.push(String(e)))
+    await cK.route(`https://${REF}.supabase.co/**`, route)
+    await login(pk, CUSTOMER)
+    await go(pk, '/')
+    await pk.waitForTimeout(1200)
+    const navK = (await pk.locator('aside').first().innerText().catch(() => '')) ?? ''
+    check('고객 메뉴(D-562): 전문 모듈 묶음(기업성장 · 절세·재무 · 모듈 전체) 없음 · 영업자 정산 · 1차 미팅 체크리스트 없음', !navK.includes('전문 모듈') && !navK.includes('기업성장') && !navK.includes('절세·재무') && !navK.includes('모듈 전체') && !navK.includes('영업자 정산') && !navK.includes('1차 미팅'), navK.replace(/\n/g, '|').slice(0, 400))
+    check('고객 메뉴(D-562): 오늘 · 확인할 것 · 일정 · 고객 관리 · 영업 관리 · 매출 · 설정은 있음', ['오늘', '확인할 것', '일정', '고객 관리', '영업 관리', '매출', '설정'].every((x) => navK.includes(x)), navK.replace(/\n/g, '|').slice(0, 400))
+    const todayK = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+    check('고객(D-562): 오늘 화면에 대표 자료 0', leaked(todayK).length === 0, leaked(todayK).join())
+    await shot(pk, 'customer-01-today')
+    const closed = []
+    for (const u of ['/tools', '/modules', '/tools/policy-funding', '/tools/tax', '/tools/employment', '/tools/startup-tax', '/tools/labcare', '/tools/cretop', '/ops/agents', '/sales/first-meeting']) {
+      await go(pk, u)
+      await pk.waitForTimeout(350)
+      const t = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+      if (!t.includes('화면을 찾지 못했습니다')) closed.push(u)
+    }
+    check('고객 주소(D-562): 전문 모듈 · 도구 · 영업자 정산 · 1차 미팅 체크리스트 주소는 "화면을 찾지 못했습니다"(10곳)', closed.length === 0, closed.join())
+    const openK = []
+    for (const u of ['/ops/clients', '/ops/calendar', '/ops/decide', '/sales/board', '/money', '/settings']) {
+      await go(pk, u)
+      await pk.waitForTimeout(350)
+      const t = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+      if (t.includes('화면을 찾지 못했습니다') || leaked(t).length) openK.push(u)
+    }
+    check('고객 주소(D-562): 고객 관리 · 일정 · 확인할 것 · 영업 관리 · 매출 · 설정은 열림 · 대표 자료 0', openK.length === 0, openK.join())
+    await go(pk, '/ops/clients')
+    await shot(pk, 'customer-02-clients')
+    const restK = await pk.evaluate(async ([ref, ownerWs]) => {
+      const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+      const r = await fetch(`https://${ref}.supabase.co/rest/v1/operations_clients?select=id&workspace_id=eq.${ownerWs}`, { headers: { apikey: 'qa-anon', Authorization: `Bearer ${tok}` } })
+      return r.ok ? (await r.json()).length : -1
+    }, [REF, OWNER_WS])
+    check('고객 REST(D-562 · 진짜 RLS): 대표 작업공간 업체 0건', restK === 0, restK)
+    await cK.close()
+    // 대표 화면은 그대로 — 전문 모듈 묶음이 보인다(고객 로그인 뒤 같은 브라우저 묶음에서도)
+    const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    const po = await cO.newPage()
+    po.on('pageerror', (e) => errors.push(String(e)))
+    await cO.route(`https://${REF}.supabase.co/**`, route)
+    await login(po, OWNER)
+    await go(po, '/')
+    await po.waitForTimeout(1200)
+    const navO = (await po.locator('aside').first().innerText().catch(() => '')) ?? ''
+    check('대표 메뉴(D-562): 전문 모듈 · 영업자 정산 · 1차 미팅 체크리스트 그대로', ['전문 모듈', '영업자 정산', '1차 미팅'].every((x) => navO.includes(x)), navO.replace(/\n/g, '|').slice(0, 400))
+    await cO.close()
   }
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))

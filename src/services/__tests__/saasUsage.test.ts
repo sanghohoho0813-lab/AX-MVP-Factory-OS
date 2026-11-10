@@ -460,6 +460,24 @@ async function run() {
   check('N4 닫히면 다시 닫힘(메뉴 · 주소)', isPilotHiddenPath('/marketing/threads') && !enabledModulesByGroup({ pilot: true }).some((g) => g.items.some((m) => m.key === 'marketing')))
   setPilotMarketing('unknown')
 
+  /* ---- 5. D-562 외부 구독 고객 — 전문 모듈 묶음은 메뉴 · 주소에서 닫힌다(대표 · 내부 팀장은 그대로) ---- */
+  const { setCustomerAudience, isCustomerAudience } = await import('../../config/customerAudience')
+  const { isCustomerHiddenPath } = await import('../../config/moduleRegistry')
+  const groupsOf = (pilot: boolean) => enabledModulesByGroup({ pilot }).map((g) => g.group.key)
+  const TOOL_PATHS = ['/tools', '/modules', '/tools/policy-funding', '/tools/tax', '/tools/employment', '/tools/startup-tax', '/tools/labcare', '/tools/cretop']
+  const KEEP_PATHS = ['/', '/ops/clients', '/ops/clients/abc', '/ops/calendar', '/ops/decide', '/sales/board', '/money', '/settings']
+  check('K1 평소(내부 팀장) — 전문 모듈 묶음이 메뉴에 있고 도구 주소가 열림', !isCustomerAudience() && groupsOf(true).includes('modules') && TOOL_PATHS.every((p) => !isPilotHiddenPath(p)), groupsOf(true))
+  setCustomerAudience(true)
+  check('K2 고객 계정 — 전문 모듈 묶음째 메뉴에서 빠짐 · 오늘 · 고객 · 영업 · 설정 묶음은 그대로', !groupsOf(true).includes('modules') && ['today', 'clients', 'sales', 'settings'].every((k) => groupsOf(true).includes(k as never)), groupsOf(true))
+  check('K3 고객 계정 — 전문 모듈 · 도구 주소 8곳 모두 닫힘 · 고객 관리 · 일정 · 영업 관리 · 매출 · 설정 주소는 열림', TOOL_PATHS.every((p) => isPilotHiddenPath(p) && isCustomerHiddenPath(p)) && KEEP_PATHS.every((p) => !isPilotHiddenPath(p)), TOOL_PATHS.filter((p) => !isPilotHiddenPath(p)).concat(KEEP_PATHS.filter((p) => isPilotHiddenPath(p))))
+  check('K4 고객 계정 — 영업자 정산 · 1차 미팅 체크리스트도 닫힘(대표 전용 줄)', isPilotHiddenPath('/ops/agents') && isPilotHiddenPath('/sales/first-meeting') && !enabledModulesByGroup({ pilot: true }).some((g) => g.items.some((m) => m.key === 'agents' || m.key === 'first-meeting')))
+  check('K5 대표 화면(pilot 아님)은 값이 켜져 있어도 전문 모듈 · 영업자 정산 · 1차 미팅 체크리스트 그대로', groupsOf(false).includes('modules') && enabledModulesByGroup({ pilot: false }).some((g) => g.items.some((m) => m.key === 'agents')) && enabledModulesByGroup({ pilot: false }).some((g) => g.items.some((m) => m.key === 'first-meeting')))
+  setPilotMarketing('open')
+  check('K6 고객 계정 + 마케팅 열림 — 레이더 · 스레드 · 릴스 주소는 열리고 전문 모듈은 닫힌 채', ['/marketing', '/marketing/threads', '/marketing/shorts'].every((p) => !isPilotHiddenPath(p)) && isPilotHiddenPath('/tools'))
+  setPilotMarketing('unknown')
+  setCustomerAudience(false)
+  check('K7 값을 끄면 원래대로(내부 팀장 메뉴 · 주소)', groupsOf(true).includes('modules') && !isPilotHiddenPath('/tools'))
+
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)
 }

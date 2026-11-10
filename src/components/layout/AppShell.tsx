@@ -3,6 +3,7 @@ import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
 import { isCustomerMarketingPath, setPilotMarketing, usePilotMarketing } from '../../config/pilotMarketing'
+import { useCustomerAudience } from '../../config/customerAudience'
 import { fetchAssistStatus } from '../../services/aiAssist/client'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
@@ -53,6 +54,8 @@ function PilotRouteGuard({ pathname, children }: { pathname: string; children: R
   const caps = useCapabilitySet()
   // SAAS-2 마케팅을 열지 서버에 묻는 동안은 '없는 화면' 대신 불러오는 중(답이 오면 열리거나 닫힌다)
   const marketing = usePilotMarketing()
+  // D-562 외부 구독 고객이면 전문 모듈 주소도 닫힌다 — 값이 바뀌면 다시 판단한다(isPilotHiddenPath 가 본다)
+  useCustomerAudience()
   if (pilot && marketing === 'unknown' && isCustomerMarketingPath(pathname)) return <ShellFallback />
   if ((pilot && isPilotHiddenPath(pathname)) || isCapabilityHiddenPath(pathname, caps)) {
     return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
@@ -99,6 +102,8 @@ export function AppShell() {
   setMarketingCustomer(access === 'pilot')
   // SAAS-2 마케팅을 고객에게 열지는 서버가 정한다(사용량 장부가 준비된 계정만) — 메뉴가 이 값을 따라 다시 그려진다
   usePilotMarketing()
+  // D-562 외부 구독 고객 여부 — 메뉴(전문 모듈 묶음)가 이 값을 따라 다시 그려진다
+  useCustomerAudience()
   useEffect(() => {
     if (access !== 'pilot') {
       setPilotMarketing('closed')

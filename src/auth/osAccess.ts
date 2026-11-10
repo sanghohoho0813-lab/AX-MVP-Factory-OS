@@ -24,6 +24,26 @@ export async function fetchMyAccess(): Promise<OsAccess> {
 }
 
 /**
+ * D-562 이 계정이 '외부 구독 고객' 인가 — 자기 os_access 줄의 audience(0024). 자기 줄만 읽힌다(os_access_select_self).
+ * 칸이 아직 없거나(0024 전) 못 읽으면 internal — 고객 계정은 0024 뒤에만 만들어지므로 그 전에는 늘 internal 이 맞다.
+ * 화면 정리에만 쓴다(전문 모듈 묶음 숨김) — 권한 판단은 서버가 한다.
+ */
+export async function fetchMyAudience(): Promise<'internal' | 'customer'> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { data, error } = await getSupabaseClient().from('os_access').select('audience').limit(1)
+      if (!error) return Array.isArray(data) && (data[0] as { audience?: unknown } | undefined)?.audience === 'customer' ? 'customer' : 'internal'
+      const code = (error as { code?: string }).code ?? ''
+      // 칸 · 표가 없다(0024 · 0019 전) — 다시 물어도 같다
+      if (code === '42703' || code === '42P01' || code === 'PGRST204' || code === 'PGRST205' || /does not exist|could not find/i.test(error.message ?? '')) return 'internal'
+    } catch {
+      /* 다시 묻는다 */
+    }
+  }
+  return 'internal'
+}
+
+/**
  * 기능 권한(capability) — 서버 0021 my_capabilities(). 등급 full 이 아니면 서버가 빈 목록을 준다.
  * 함수가 아직 없으면(0021 전) null — 화면은 'DB 설정 필요' 로 안내한다(열지 않는다).
  */

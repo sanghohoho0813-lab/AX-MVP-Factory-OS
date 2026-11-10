@@ -31,7 +31,8 @@ import {
   unauthenticatedState,
   type BootstrapState,
 } from './bootstrap'
-import { fetchMyAccess, fetchMyCapabilities, fetchPilotViews, type OsAccess, type PilotView } from './osAccess'
+import { fetchMyAccess, fetchMyAudience, fetchMyCapabilities, fetchPilotViews, type OsAccess, type PilotView } from './osAccess'
+import { setCustomerAudience } from '../config/customerAudience'
 import { vaultSignOut, vaultSwitchTo } from './storageVault'
 import { identityFromSession } from './currentUser'
 import { clearSwitchTarget, rememberAccount } from './recentAccounts'
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resolveForSession = useCallback(
     async (nextSession: Session | null) => {
       if (!nextSession) {
+        setCustomerAudience(false)
         if (mounted.current) {
           setAccess(null)
           setBootstrap(unauthenticatedState('supabase'))
@@ -97,7 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const views = tier === 'full' ? await fetchPilotViews() : []
         // 대표 AI 전략실 등 기능 권한(0021) — full 만 묻는다(Pilot 은 서버도 빈 목록)
         const caps = tier === 'full' ? await fetchMyCapabilities() : []
+        // D-562 외부 구독 고객이면 전문 모듈 묶음을 메뉴 · 주소에서 닫는다(Pilot 등급만 묻는다 — 대표 · 내부 팀장은 그대로)
+        const audience = tier === 'pilot' ? await fetchMyAudience() : 'internal'
         if (!mounted.current) return
+        setCustomerAudience(audience === 'customer')
         setWorkspaces(memberships)
         setPilotViews(views)
         setCapabilities(caps)
