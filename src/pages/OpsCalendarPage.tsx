@@ -287,7 +287,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               오늘로
             </Button>
             {/* D-139: 어디서든 바로 적기 — 고른 날(없으면 오늘) */}
-            <Button variant="primary" onClick={() => setQuick({ date: picked ?? today, tab: 'todo' })} data-testid="calendar-quick-open">
+            <Button variant="primary" onClick={() => setQuick({ date: picked ?? today, tab: 'todo' })} data-testid="calendar-quick-open" data-guide="fn-calendar-add">
               <Plus aria-hidden="true" className="size-4" />
               적기
             </Button>
@@ -336,7 +336,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               </span>
               {/* D-139: 법정 공휴일은 자동으로 깔지 않는다 — 대표가 보고 넣는다 */}
               {missingHolidays.length > 0 && (
-                <button type="button" onClick={() => setHolidayImport(true)} data-testid="holiday-import-open" className="tap t-sub rounded-full border border-danger-200 bg-danger-50 px-3 py-1 font-semibold text-danger-700 hover:bg-white">
+                <button type="button" onClick={() => setHolidayImport(true)} data-testid="holiday-import-open" data-guide="fn-calendar-holiday" className="tap t-sub rounded-full border border-danger-200 bg-danger-50 px-3 py-1 font-semibold text-danger-700 hover:bg-white">
                   {ym[0]}년 공휴일 넣기 ({missingHolidays.length}일)
                 </button>
               )}

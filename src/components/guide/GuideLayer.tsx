@@ -160,10 +160,13 @@ export function GuideLayer() {
           </div>
         ))}
       </dl>
-      <p className="t-meta flex items-center gap-1.5 border-t border-slate-100 pt-2 text-slate-600">
-        <PlayCircle aria-hidden="true" className="size-4 shrink-0" />
-        {video ? '사용법 영상이 있어요 — 메뉴의 [사용법 안내]에서 보기' : '사용법 영상 준비 중 — 메뉴의 [사용법 안내]에 모여요'}
-      </p>
+      {/* 영상 자리는 메뉴마다 — 화면 안 기능(fn-…) 카드는 글만(D-569) */}
+      {!shown.key.startsWith('fn-') && (
+        <p className="t-meta flex items-center gap-1.5 border-t border-slate-100 pt-2 text-slate-600">
+          <PlayCircle aria-hidden="true" className="size-4 shrink-0" />
+          {video ? '사용법 영상이 있어요 — 메뉴의 [사용법 안내]에서 보기' : '사용법 영상 준비 중 — 메뉴의 [사용법 안내]에 모여요'}
+        </p>
+      )}
     </div>,
     document.body,
   )

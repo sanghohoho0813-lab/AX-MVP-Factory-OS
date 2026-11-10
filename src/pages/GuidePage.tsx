@@ -20,6 +20,7 @@ import { enabledModulesByGroup, type ModuleDefinition } from '../config/moduleRe
 import { isAdvancedVisible } from '../lib/featureVisibility'
 import { useStoreVersion } from '../lib/useStoreVersion'
 import { GUIDE_LABELS, MARKETING_GUIDE_LIST, menuGuide } from '../content/menuGuide'
+import { functionGuidesOf } from '../content/functionGuide'
 import { menuVideo } from '../config/menuVideos'
 import { minutesLabel } from '../config/tutorialVideos'
 import { useTutorial } from '../components/tutorial/tutorialContext'
@@ -34,6 +35,8 @@ interface Row {
   nested?: boolean
   /** 아직 없는 기능(출시 예정 · 준비 중) — [화면 열기] 대신 '준비 중' */
   soon?: boolean
+  /** 화면이 아니라 단추(D-569 어느 화면에나 있는 위쪽 단추) — [이 화면 열기] 없음 */
+  noLink?: boolean
 }
 
 function rowsOf(items: ModuleDefinition[], marketingOpen: boolean, basic: boolean): Row[] {
@@ -58,10 +61,12 @@ export function GuidePage() {
   const [params, setParams] = useSearchParams()
   const want = params.get('m') ?? ''
 
-  const groups = useMemo(
-    () => enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot, caps }).map((g) => ({ key: g.group.key, title: g.group.title, rows: rowsOf(g.items, !pilot || pilotMarketing, basic) })),
-    [pilot, caps, pilotMarketing, basic],
-  )
+  const groups = useMemo(() => {
+    const menus = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot, caps }).map((g) => ({ key: g.group.key as string, title: g.group.title, rows: rowsOf(g.items, !pilot || pilotMarketing, basic) }))
+    // D-569 어느 화면에나 있는 위쪽 단추(찾기 · 종 · 화면 꾸미기 …) — 메뉴 묶음 뒤에 한 묶음
+    const top: Row[] = functionGuidesOf('top', { pilot, basic }).map(({ key, guide }) => ({ key, label: guide.label, path: '', noLink: true }))
+    return top.length > 0 ? [...menus, { key: 'top', title: '어느 화면에나', rows: top }] : menus
+  }, [pilot, caps, pilotMarketing, basic])
   const wantGroup = groups.find((g) => g.rows.some((r) => r.key === want))?.key
   const [tab, setTab] = useState<string | null>(null)
   const active = groups.find((g) => g.key === (tab ?? wantGroup)) ?? groups[0]
@@ -110,6 +115,8 @@ export function GuidePage() {
           const on = openKey === r.key
           const g = menuGuide(r.key, { label: r.label, hint: r.hint, basic })
           const panelId = `guide-panel-${r.key}`
+          // D-569 이 화면 안의 주요 기능(업체 화면의 탭 같은 것) — 화면에서 마우스를 올려도 같은 글이 뜬다
+          const fns = on && !r.noLink ? functionGuidesOf(r.key, { pilot, basic }) : []
           return (
             <li key={r.key} className={`rounded-(--radius-panel) border border-slate-200 bg-white ${r.nested ? 'sm:ml-6' : ''}`} data-testid="guide-row" data-key={r.key} data-open={on ? '1' : '0'}>
               <button type="button" aria-expanded={on} aria-controls={panelId} onClick={() => pick(r.key)} data-no-veil className="tap flex min-h-14 w-full items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 text-left hover:bg-slate-50" data-testid="guide-row-toggle">
@@ -131,13 +138,27 @@ export function GuidePage() {
                         <dd className="t-body break-keep text-slate-800">{g[k]}</dd>
                       </div>
                     ))}
-                    {!r.soon && (
+                    {fns.length > 0 && (
+                      <div className="flex flex-col gap-1.5" data-testid="guide-functions">
+                        <dt className="t-sub font-bold text-brand-700">이 화면 안에서 할 수 있는 것</dt>
+                        <dd>
+                          <ul className="flex flex-col gap-1">
+                            {fns.map(({ key, guide }) => (
+                              <li key={key} className="t-sub break-keep text-slate-800" data-testid="guide-function" data-key={key}>
+                                <span className="font-bold text-slate-900">{guide.label}</span> — {menuGuide(key, { basic }).what}
+                              </li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                    )}
+                    {!r.soon && !r.noLink && (
                       <Link to={r.path} className="tap t-sub mt-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="guide-go">
                         이 화면 열기 <ArrowRight aria-hidden="true" className="size-4" />
                       </Link>
                     )}
                   </dl>
-                  <GuideVideo k={r.key} label={r.label} />
+                  {!r.noLink && <GuideVideo k={r.key} label={r.label} />}
                 </div>
               )}
             </li>

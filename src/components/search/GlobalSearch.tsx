@@ -208,6 +208,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-guide="fn-search"
         className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.9375rem] text-slate-400 hover:border-slate-300"
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />

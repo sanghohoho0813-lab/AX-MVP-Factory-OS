@@ -10,6 +10,8 @@
  *  - '앞으로' 는 계획이다(약속한 날짜가 아니다). 대표가 정한 방향(서류는 대충 올려도 알아서 · 모듈 추천 먼저 · 상황 예시 · 팀 기능 · 메뉴별 영상)만 적는다.
  * 규칙 글이다 — AI 가 쓰지 않는다.
  */
+import { FUNCTION_GUIDES } from './functionGuide'
+
 export interface MenuGuide {
   /** 무엇을 하는 곳인가 */
   what: string
@@ -366,6 +368,12 @@ const SAME: Record<string, string> = { 'tool-homepage': 'mk-homepage', 'tool-con
 
 /** 이 메뉴의 안내 — basic 이면 전문 모듈이 없는 계정용 글 */
 export function menuGuide(key: string, opts: { label?: string; hint?: string; basic?: boolean } = {}): MenuGuide {
+  // D-569 화면 안 기능(fn-…)은 기능 안내에서
+  const fn = FUNCTION_GUIDES[key]
+  if (fn) {
+    const base: MenuGuide = { what: fn.what, why: fn.why, effect: fn.effect, next: fn.next }
+    return opts.basic && fn.basic ? { ...base, ...fn.basic } : base
+  }
   const g = GUIDES[SAME[key] ?? key]
   if (!g) return fallback(opts.label ?? key, opts.hint, key.startsWith('up-'))
   const { basic, ...base } = g
@@ -374,6 +382,7 @@ export function menuGuide(key: string, opts: { label?: string; hint?: string; ba
 
 /** 따로 적어 둔 안내가 있는 메뉴인가(시험 · 목록용) */
 export function hasMenuGuide(key: string): boolean {
+  if (FUNCTION_GUIDES[key]) return true
   return (SAME[key] ?? key) in GUIDES
 }
 

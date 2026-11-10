@@ -891,6 +891,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               type="button"
               role="tab"
               aria-selected={tab === t.key}
+              data-guide={`fn-client-${t.key}`}
               onClick={() => setTab(t.key)}
               className={`t-body -mb-px flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 px-3 font-semibold whitespace-nowrap ${
                 tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'

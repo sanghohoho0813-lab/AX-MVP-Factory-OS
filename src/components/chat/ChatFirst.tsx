@@ -55,6 +55,7 @@ export function ChatModeButton() {
       to={`${CHAT_FIRST_PATHS[k]}?chat=1`}
       className="tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
       data-testid="chatfirst-open"
+      data-guide="fn-chat-mode"
     >
       <MessageCircle aria-hidden="true" className="size-4 text-slate-500" />
       <span>대화로 묻기</span>

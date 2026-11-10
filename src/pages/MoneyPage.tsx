@@ -220,7 +220,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
                 ['subs', `정기 결제 ${activeSubs.length}`],
               ] as [Tab, string][]
             ).map(([k, l]) => (
-              <button key={k} type="button" role="tab" aria-selected={tab === k} data-testid={`money-tab-${k}`} onClick={() => setParam('tab', k === 'revenue' ? '' : k)} className={`tap t-body flex-1 rounded-[8px] px-3 py-2 font-semibold ${tab === k ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}>
+              <button key={k} type="button" role="tab" aria-selected={tab === k} data-testid={`money-tab-${k}`} data-guide={`fn-money-${k}`} onClick={() => setParam('tab', k === 'revenue' ? '' : k)} className={`tap t-body flex-1 rounded-[8px] px-3 py-2 font-semibold ${tab === k ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}>
                 {l}
               </button>
             ))}

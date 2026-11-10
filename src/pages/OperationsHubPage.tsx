@@ -702,7 +702,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 build={assistBuild}
               />
             )}
-            <Button variant="primary" onClick={openForm} data-testid="clients-add">
+            <Button variant="primary" onClick={openForm} data-testid="clients-add" data-guide="fn-clients-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               <span className="hidden sm:inline">{!pilot && ctype === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</span>
               <span className="sm:hidden">등록</span>

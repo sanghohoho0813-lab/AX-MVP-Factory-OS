@@ -7,6 +7,8 @@
  *  2) 마케팅 고객판 — 서버 지시문(단추 · 규칙 · 실측 공식) · 화면 자료(레이더 · 묶음 · 스레드 · 숏폼 · 남의 영상 기획)에 대표 개인 정보 0.
  *  3) 메뉴 스위치 — 서버가 연 계정만 레이더 · 스레드 · 릴스/틱톡 주소가 열리고, 홍보 글 · 홈페이지 · 다른 대표 화면은 그대로 닫힘.
  */
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import handler, { MARKETING_PAGES, __resetAiAssistState } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
 import { OWNER_IDENTITY_WORDS, cleanBrand, customerize } from '../../../api/_ai/brand.js'
@@ -623,6 +625,30 @@ async function run() {
       sp.isMissingError({ code: 'PGRST205', message: '' }) && sp.isMissingError({ code: '', message: 'Could not find the function public.support_send' }) && !sp.isMissingError({ code: '42501', message: 'permission denied' }) &&
       sp.sendFailReason({ message: 'support_rate_limited' }) === 'limit' && sp.sendFailReason({ code: '42501', message: 'support_not_allowed' }) === 'denied' && sp.sendFailReason({ code: 'PGRST202', message: '' }) === 'missing' && sp.sendFailReason({ message: 'boom' }) === 'failed' &&
       sp.sendFailText('limit').includes('내일') && sp.cleanPath('/a/b?x=1#y') === '/a/b' && sp.scrubText('가 1234567 나') === '가 (숫자) 나' && sp.scrubText('12345 글 2026-11-10') === '12345 글 (숫자)',
+  )
+  // D-569 기능 안내 — 화면 안 주요 기능(fn-…)에도 네 칸 글 · 화면에 단 열쇠는 전부 글이 있음 · 고객 글에 없는 것을 약속하지 않음
+  const { FUNCTION_GUIDES, functionGuidesOf } = await import('../../content/functionGuide')
+  const { CLIENT_DETAIL_TABS } = await import('../../config/clientDetailTabs')
+  const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === '__tests__' ? [] : walk(join(dir, e.name))) : /\.tsx$/.test(e.name) ? [join(dir, e.name)] : []))
+  const usedFn = new Set<string>()
+  for (const f of walk('src')) for (const m of readFileSync(f, 'utf8').matchAll(/data-guide=(?:"|\{[^}]*')(fn-[a-z-]+)/g)) usedFn.add(m[1])
+  for (const t of CLIENT_DETAIL_TABS) usedFn.add(`fn-client-${t.key}`)
+  for (const k of ['revenue', 'cost', 'subs']) usedFn.add(`fn-money-${k}`)
+  usedFn.delete('fn-client-')
+  usedFn.delete('fn-money-')
+  const fnKeys = Object.keys(FUNCTION_GUIDES)
+  const fnMissing = [...usedFn].filter((k) => !FUNCTION_GUIDES[k])
+  const fnThin = fnKeys.filter((k) => (['what', 'why', 'effect', 'next'] as const).some((x) => FUNCTION_GUIDES[k][x].length < 12) || !FUNCTION_GUIDES[k].label)
+  const menuKeys = new Set(['top', ...enabledModulesByGroup({ advanced: true, pilot: false }).flatMap((g) => g.items.map((m) => m.key))])
+  const fnNoMenu = fnKeys.filter((k) => !menuKeys.has(FUNCTION_GUIDES[k].menu))
+  const fnBadBasic = fnKeys.filter((k) => !FUNCTION_GUIDES[k].hiddenForPilot && !FUNCTION_GUIDES[k].onlyOwner && !FUNCTION_GUIDES[k].basicHidden).filter((k) => /모듈|판정|예상 금액|제도/.test(Object.values(menuGuide(k, { basic: true })).join(' ')))
+  check(
+    'K20 기능 안내(D-569) — 화면에 단 열쇠(fn-…)는 전부 글이 있음 · 네 칸 12자 이상 · 메뉴에 이어짐 · 고객 글에 모듈 · 판정 · 제도 0 · 팀장에게 없는 탭(고객 플랫폼 · 컨설팅 · AI 전략실)은 팀장 안내에서 빠짐 · 대표 글은 그대로',
+    fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 15 &&
+      !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
+      !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 1 && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+    `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
   check(

@@ -41,7 +41,7 @@ MIRAE AI LAB OS × Customer Platform.
   전문 모듈 묶음 · 영업자 정산 · 1차 미팅 체크리스트는 고객에게 닫는다(D-562 `src/config/customerAudience.ts`). **대표 · 내부 팀장 화면은 그대로 둔다.**
   마케팅 · 브랜딩 화면은 팀장 · 고객 계정에도 연다(D-564) — 대표 채널 · AX · AI 기본 주제 없이 '먼저 내 채널을 알려 주세요'(`radar/MkStart`)부터. 화면을 여닫는 값은 `usePilotMarketingScreens()`, AI 단추는 서버 답(`usePilotMarketing()`).
   화면 안의 길도 같이 닫는다(D-563) — 고객 계정은 '기본 OS 만' 요금제(`customerEntitlements`)로 본다. 고객에게만 숨길 칸은 `useCustomerAudience()` 로, 새 기능이 전문 모듈로 이어지면 요금제 값(`featureUsable`)을 본다.
-- 새 메뉴 · 화면을 만들면 안내 글도 같이(D-565) — `src/content/menuGuide.ts` 에 네 칸(무엇 · 왜 · 효과 · 앞으로)을 쓰고, 누르는 칸에 `data-guide="<메뉴 key>"` 를 단다. 고객 계정 글(basic)에는 모듈 · 판정 · 예상 금액을 쓰지 않는다. 영상은 `src/config/menuVideos.ts` 한 줄.
+- 새 메뉴 · 화면을 만들면 안내 글도 같이(D-565) — `src/content/menuGuide.ts` 에 네 칸(무엇 · 왜 · 효과 · 앞으로)을 쓰고, 누르는 칸에 `data-guide="<메뉴 key>"` 를 단다. 화면 안의 주요 단추 · 탭은 `data-guide="fn-<이름>"` + `src/content/functionGuide.ts`(D-569). 고객 계정 글(basic)에는 모듈 · 판정 · 예상 금액을 쓰지 않는다. 영상은 `src/config/menuVideos.ts` 한 줄.
 - 카드 결제 연동은 첫 3명 뒤 — 처음에는 계좌이체 · 세금계산서(계정은 대표가 `supabase/manual/customer_provision.sql` 로 연다).
 - 대표만 할 수 있는 일(운영 DB 실행 · 승인 · 시범 고객 · 가격)은 보고 맨 위에 🚨 로 남기고, 답을 기다리는 동안 출시 목록의 다른 항목을 한다.
 - **대표가 "출시 모드 끝" 이라고 하면** 이 칸을 지우고 아래 '고도화 최종 목표' 로 돌아간다.

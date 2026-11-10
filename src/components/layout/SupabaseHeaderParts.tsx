@@ -59,6 +59,7 @@ export function SupabaseWorkspaceSelector() {
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        data-guide="fn-workspace"
         onClick={() => setOpen((v) => !v)}
         className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900"
       >

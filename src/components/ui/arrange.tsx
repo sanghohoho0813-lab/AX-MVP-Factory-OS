@@ -158,6 +158,7 @@ export function ArrangeButton() {
         onClick={() => setOpen(true)}
         className="tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
         data-testid="arrange-open"
+        data-guide="fn-arrange"
         aria-haspopup="dialog"
       >
         <SlidersHorizontal aria-hidden="true" className="size-4 text-slate-500" />

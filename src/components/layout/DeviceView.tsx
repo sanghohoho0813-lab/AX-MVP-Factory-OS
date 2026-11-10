@@ -74,7 +74,7 @@ export function DeviceSwitchCompact() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`보기 방식: ${cur.label}`}
-        title={`보기 방식: ${cur.label}`}
+        data-guide={open ? undefined : 'fn-device'}
         onClick={() => setOpen((v) => !v)}
         className={`inline-flex h-10 items-center gap-0.5 rounded-(--radius-control) border px-2 ${mode === 'pc' ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' : 'border-brand-300 bg-brand-50 text-brand-700'}`}
       >

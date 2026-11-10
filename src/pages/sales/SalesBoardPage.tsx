@@ -512,7 +512,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
               <ScanSearch aria-hidden="true" className="size-4" />
               크레탑으로 등록
             </Link>
-            <Button variant="secondary" onClick={() => setFormOpen(true)}>
+            <Button variant="secondary" onClick={() => setFormOpen(true)} data-guide="fn-sales-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               새 잠재고객
             </Button>

@@ -17,7 +17,7 @@ export function CustomerWelcome({ name, named, onGo }: { name: string; named: bo
   return (
     <section data-testid="today-first-client" data-variant="welcome" className="flex flex-col gap-4 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-5 sm:px-6 sm:py-7" aria-labelledby="today-welcome-title">
       <div className="flex flex-col gap-1 text-center">
-        <h2 id="today-welcome-title" className="text-[1.3rem] font-bold break-keep text-slate-900">
+        <h2 id="today-welcome-title" className="text-[1.2rem] font-bold break-keep text-slate-900">
           {named && name ? `${name}님, 어디서 시작할까요?` : '환영합니다 — 어디서 시작할까요?'}
         </h2>
         <p className="t-body break-keep text-slate-600">둘 중 편한 것부터 누르세요. 나중에 다른 쪽도 언제든 할 수 있어요.</p>

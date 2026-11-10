@@ -157,7 +157,7 @@ export function SideAiButton() {
         onClick={toggle}
         aria-expanded={open}
         aria-label={`${name} 옆에 띄우기`}
-        title={`${name} 옆에 띄우기 — OS 를 보면서 오른쪽에 AI 창`}
+        data-guide={open ? undefined : 'fn-side-ai'}
         data-testid="side-ai-button"
         data-open={s.open ? '1' : '0'}
         className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3 py-2 text-[0.875rem] font-semibold whitespace-nowrap shadow-(--shadow-card) ${s.open ? 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-white text-violet-800 hover:bg-violet-50'}`}

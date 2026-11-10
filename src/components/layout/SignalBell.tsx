@@ -84,6 +84,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
         type="button"
         aria-label={count > 0 ? `챙길 것 ${count}건` : '챙길 것 없음'}
         aria-expanded={open}
+        data-guide={open ? undefined : 'fn-bell'}
         onClick={() => setOpen((v) => !v)}
         className="relative flex size-10 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700"
       >
