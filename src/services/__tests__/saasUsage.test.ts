@@ -35,6 +35,8 @@ import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, 
 import { makeSimpleXlsx } from './xlsxFixture'
 import { guideKeyForPath } from '../../content/screenGuideKey'
 import { HOME_HOWTO, HOME_HOWTO_NOTE } from '../../content/homeScreenHowTo'
+import { BIO_CHANNELS, bioBlanks, bioDrafts, bioInputFromBrand, josa, type BioInput } from '../marketing/profileBio'
+import { consultLint } from '../marketing/consultRules'
 import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
@@ -661,7 +663,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 2 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -851,6 +853,38 @@ async function run() {
       'K25 매니페스트 — 브라우저에서 그대로 열림(display browser — 로그인 유지) · 시작 주소 / · 짧은 이름 12자 안 · 아이콘 192 · 512(PNG 파일 있음) · index.html 에 manifest · 애플 아이콘 · 이름',
       manifest.display === 'browser' && manifest.start_url === '/' && manifest.short_name.length <= 12 && manifest.icons.some((i) => i.sizes === '192x192') && manifest.icons.some((i) => i.sizes === '512x512') && manifest.icons.some((i) => i.purpose === 'maskable') && iconFiles.every(isPng) && html.includes('<link rel="manifest" href="/manifest.webmanifest" />') && html.includes('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />') && html.includes('apple-mobile-web-app-title') && !html.includes('apple-mobile-web-app-capable'),
       JSON.stringify({ d: manifest.display, n: manifest.short_name, icons: manifest.icons.map((i) => i.sizes) }),
+    )
+  }
+
+  /* K26 — D-588 프로필 소개 글(채널별 초안 세 가지 · 규칙) */
+  {
+    const full: BioInput = { name: '박 컨설턴트', field: '정책자금 컨설팅', helps: '정책자금 · 고용지원금 · 기업부설연구소', audience: '제조업 중소기업 대표', contact: '문의는 프로필 링크로', fact: '2015년부터 중소기업 상담' }
+    const sns = bioDrafts(full, 'sns')
+    const tik = bioDrafts(full, 'tiktok')
+    const yt = bioDrafts(full, 'youtube')
+    const allText = [...sns, ...tik, ...yt].map((d) => d.text).join('\n')
+    check(
+      'K26 프로필 소개 글 — 채널 셋(150 · 80 · 1,000자) · 초안 세 가지씩 서로 다름 · 전부 한도 안 · 이름 · 분야 · 고객 · 연락 받는 길이 들어감 · [대괄호] 0 · 부풀리는 말 0',
+      BIO_CHANNELS.map((c) => `${c.key}:${c.limit}`).join() === 'sns:150,tiktok:80,youtube:1000' && [sns, tik, yt].every((ds) => ds.length === 3 && new Set(ds.map((d) => d.text)).size === 3 && ds.every((d) => !d.over && d.length === [...d.text].length)) && sns.every((d) => d.length <= 150 && d.text.includes('박 컨설턴트') && d.text.includes('문의는 프로필 링크로')) && tik.every((d) => d.length <= 80) && yt[0].text.includes('제조업 중소기업 대표를 위한 정책자금 컨설팅 채널입니다.') && yt[0].text.includes('2015년부터 중소기업 상담') && !allText.includes('[') && consultLint(allText).length === 0,
+      JSON.stringify({ sns: sns.map((d) => [d.key, d.length, d.over]), tik: tik.map((d) => [d.length, d.text]), yt: yt.map((d) => d.length) }),
+    )
+    // 빈 칸은 [대괄호] 로 — 지어내지 않는다 · 어느 칸이 비었는지 알려 준다(사실 한 줄은 비워도 됨)
+    const empty: BioInput = { name: '', field: '', helps: '', audience: '', contact: '', fact: '' }
+    const e1 = bioDrafts(empty, 'sns')
+    const partial = bioDrafts({ ...empty, name: '이 대표', helps: '절세' }, 'sns')
+    check(
+      'K26 프로필 소개 글 — 빈 칸은 [이름] · [분야] · [도와주는 일] · [주요 고객] · [연락 받는 길] 로(숫자 · 경력을 지어내지 않음) · 빈 칸 이름 5개 · 사실 한 줄은 빠져도 됨',
+      e1.every((d) => d.text.includes('[이름]') && d.text.includes('[연락 받는 길]')) && e1[0].text.includes('[주요 고객]') && e1[1].text.includes('[도와주는 일]') && e1[1].text.includes('[분야]') && !/\d/.test(e1.map((d) => d.text).join('')) && bioBlanks(empty).length === 5 && bioBlanks(full).length === 0 && bioBlanks({ ...full, fact: '' }).length === 0 && partial[2].text.includes('이 대표가 하나씩') && partial[1].text.includes('· 절세'),
+      JSON.stringify({ e: e1.map((d) => d.text), blanks: bioBlanks(empty), p: partial[2].text }),
+    )
+    // 길면 덜 중요한 것부터 뺀다(사실 한 줄 → 도와주는 일 수) · 그래도 넘으면 넘는다고 표시 · 조사(받침) · 내 브랜드에서 재료
+    const longFact = bioDrafts({ ...full, fact: `${'2015년부터 중소기업 대표님들과 정책자금 · 고용지원금 · 연구소 설립을 함께 준비해 온 사람입니다. '.repeat(2)}정말 긴 소개` }, 'sns')
+    const tooLong = bioDrafts({ ...full, contact: '문의는 '.padEnd(170, '가') }, 'sns')
+    const fromBrand = bioInputFromBrand({ name: '', company: '○○경영컨설팅', industry: '노무 컨설팅', specialties: '고용지원금, 취업규칙', audience: '소상공인 사장님', tone: '', intro: '', facts: '공인노무사 · 2012년 개업', avoid: '', ending: '궁금한 점은 댓글로 남겨 주세요.', benchmarks: '' })
+    check(
+      'K26 프로필 소개 글 — 긴 사실 한 줄은 빼고 한도 안 · 연락 받는 길이 너무 길면 "넘어요" 표시 · 조사(을/를 · 이/가 · 받침 없으면 라면) · 내 브랜드에서 재료(댓글 인사는 연락 받는 길로 안 씀 · 사실 첫 줄)',
+      longFact.every((d) => !d.over && d.length <= 150 && !d.text.includes('정말 긴 소개')) && tooLong.every((d) => d.over) && josa('대표', '을', '를') === '대표를' && josa('사장님', '을', '를') === '사장님을' && josa('[이름]', '이', '가') === '[이름]이(가)' && bioDrafts({ ...full, audience: '소상공인 사장님' }, 'sns')[2].text.startsWith('소상공인 사장님이라면,') && sns[2].text.startsWith('제조업 중소기업 대표라면,') && fromBrand.name === '○○경영컨설팅' && fromBrand.contact === '' && fromBrand.fact === '공인노무사' && fromBrand.helps === '고용지원금, 취업규칙' && bioDrafts(fromBrand, 'sns')[1].text.includes('· 취업규칙'),
+      JSON.stringify({ lf: longFact.map((d) => [d.length, d.over, d.text.includes('정말 긴 소개')]), tl: tooLong.map((d) => d.over), j: [josa('대표', '을', '를'), josa('사장님', '을', '를'), josa('[이름]', '이', '가')], a: bioDrafts({ ...full, audience: '소상공인 사장님' }, 'sns')[2].text.slice(0, 20), b: sns[2].text.slice(0, 20), c: bioDrafts(fromBrand, 'sns')[1].text, fromBrand }),
     )
   }
 

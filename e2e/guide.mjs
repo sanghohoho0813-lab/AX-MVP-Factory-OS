@@ -428,6 +428,55 @@ const pwa = await mp.evaluate(async () => {
 })
 check('G15 매니페스트 · 아이콘이 실제로 내려옴 — display browser · 시작 주소 / · 아이콘 3 · 전부 image/png', pwa.link === '/manifest.webmanifest' && pwa.apple === '/apple-touch-icon.png' && pwa.display === 'browser' && pwa.start === '/' && pwa.icons === 3 && pwa.types.length === 4 && pwa.types.every((t) => t.startsWith('image/png')), pwa)
 
+/* G16 프로필 소개 글 만들기(D-588) — 기초 7가지 화면 접힌 한 줄 · 칸 채우기 · 채널 탭 · 글자 수 · 복사 */
+await mp.goto(BASE + '/marketing/basics', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+const bio = mp.getByTestId('mk-bio')
+const bioClosed = (await bio.count()) === 1 && !(await bio.evaluate((el) => el.open))
+await mp.getByTestId('mk-bio-toggle').scrollIntoViewIfNeeded()
+await mp.getByTestId('mk-bio-toggle').tap()
+await mp.waitForTimeout(250)
+const bioBlank0 = ((await mp.getByTestId('mk-bio-blanks').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+const bioEmptyText = (await mp.getByTestId('mk-bio-text').allInnerTexts()).join('\n')
+const fillBio = async (key, v) => {
+  await mp.locator(`[data-testid="mk-bio-input"][data-key="${key}"]`).fill(v)
+}
+await fillBio('name', '박 컨설턴트')
+await fillBio('field', '정책자금 컨설팅')
+await fillBio('helps', '정책자금 · 고용지원금 · 기업부설연구소')
+await fillBio('audience', '제조업 중소기업 대표')
+await fillBio('contact', '문의는 프로필 링크로')
+await mp.waitForTimeout(200)
+const bioTexts = await mp.getByTestId('mk-bio-text').allInnerTexts()
+const bioCounts = await mp.getByTestId('mk-bio-count').allInnerTexts()
+check(
+  'G16 기초 7가지 › 프로필 소개 글: 처음엔 접힘 → 빈 칸은 [대괄호] · 어느 칸을 채울지 한 줄 → 다섯 칸 채우면 초안 3개(이름 · 연락 받는 길 · [대괄호] 0) · 글자 수 n / 150자 · 빈 칸 안내 사라짐',
+  bioClosed && bioBlank0.includes('이름 · 회사') && bioEmptyText.includes('[이름]') && bioTexts.length === 3 && bioTexts.every((t) => t.includes('박 컨설턴트') && t.includes('문의는 프로필 링크로') && !t.includes('[')) && bioCounts.length === 3 && bioCounts.every((c) => /^\d+ \/ 150자$/.test(c.trim())) && (await mp.getByTestId('mk-bio-blanks').count()) === 0,
+  { bioClosed, bioBlank0: bioBlank0.slice(0, 80), bioTexts: bioTexts.map((t) => t.slice(0, 40)), bioCounts },
+)
+await mp.locator('[data-testid="mk-bio-tab"][data-key="tiktok"]').tap()
+await mp.waitForTimeout(150)
+const tikCounts = (await mp.getByTestId('mk-bio-count').allInnerTexts()).map((c) => Number(c.trim().split(' ')[0]))
+await mp.locator('[data-testid="mk-bio-tab"][data-key="youtube"]').tap()
+await mp.waitForTimeout(150)
+const ytFirst = ((await mp.getByTestId('mk-bio-text').first().innerText()) ?? '').trim()
+await mp.getByTestId('mk-bio-copy').first().tap()
+await mp.waitForTimeout(300)
+const copyLabel = ((await mp.getByTestId('mk-bio-copy').first().innerText()) ?? '').trim()
+// 부풀리는 말을 적으면 빨갛게 알려 준다
+await fillBio('fact', '상담 250건 이상')
+await mp.waitForTimeout(200)
+const bioWarn = ((await mp.getByTestId('mk-bio-warns').innerText().catch(() => '')) ?? '').trim()
+const bioOver = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+const bioSmall = await mp.locator('[data-testid="mk-bio"] summary, [data-testid="mk-bio"] button, [data-testid="mk-bio"] input').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 }).length)
+const bioFont = await mp.locator('[data-testid="mk-bio"] *').evaluateAll((els) => Math.min(...els.filter((e) => [...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())).map((e) => parseFloat(getComputedStyle(e).fontSize))))
+check(
+  'G16 틱톡 탭은 80자 안 · 유튜브 탭 첫 줄 "…를 위한 … 채널입니다." · [복사] 누르면 "복사했어요" · 부풀리는 말(250건 이상)은 빨갛게 · 390 넘침 0 · 40px 보다 작은 칸 0 · 글자 15px 이상',
+  tikCounts.length === 3 && tikCounts.every((n) => n > 0 && n <= 80) && ytFirst.startsWith('제조업 중소기업 대표를 위한 정책자금 컨설팅 채널입니다.') && copyLabel.includes('복사했어요') && bioWarn.length > 0 && bioOver <= 0 && bioSmall === 0 && bioFont >= 15,
+  { tikCounts, ytFirst: ytFirst.slice(0, 50), copyLabel, bioWarn: bioWarn.slice(0, 60), bioOver, bioSmall, bioFont },
+)
+if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage: true }).catch(() => {})
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })

@@ -13,6 +13,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
 import { PostingHowTo } from './PostingHowTo'
+import { ProfileBioMaker } from './ProfileBioMaker'
 import { MARKETING_BASICS, markBasicRead, nextBasic, readBasics } from '../../content/marketingBasics'
 
 export function MarketingBasicsPage() {
@@ -91,6 +92,8 @@ export function MarketingBasicsPage() {
         })}
       </ol>
       {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
+      {/* D-588 글에서는 팔지 않고 프로필로 보낸다 — 그 프로필에 쓸 소개 글(접힌 한 줄 · 규칙 초안) */}
+      <ProfileBioMaker />
       <PostingHowTo channels={['threads', 'reels', 'tiktok', 'shorts', 'youtube']} testId="mk-basics-howto" />
     </div>
   )

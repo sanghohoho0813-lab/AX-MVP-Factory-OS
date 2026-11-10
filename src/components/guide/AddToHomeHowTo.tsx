@@ -23,7 +23,7 @@ export function AddToHomeHowTo({ testId = 'home-howto' }: { testId?: string }) {
   const cur = HOME_HOWTO.find((h) => h.key === picked) ?? HOME_HOWTO[0]
   return (
     <details className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
-      <summary className="t-body flex min-h-12 cursor-pointer items-center gap-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`}>
+      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`}>
         매일 쓰려면 — <span className="font-semibold text-brand-700">휴대폰 홈 화면에 넣는 법</span>
       </summary>
       <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4">
