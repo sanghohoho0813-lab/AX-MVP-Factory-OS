@@ -216,7 +216,7 @@ function TodayLauncher({ phone }: { phone: boolean }) {
       summary={
         <span className="flex gap-x-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:whitespace-normal [&::-webkit-scrollbar]:hidden" data-testid="app-mini-row">
           {items.map((it) => (
-            <Link key={it.key} to={it.path} className="tap inline-flex shrink-0 items-center rounded-full px-2.5 font-medium text-brand-700 hover:bg-slate-50 hover:underline" data-testid="app-mini" data-key={it.key}>
+            <Link key={it.key} to={it.path} className="tap inline-flex shrink-0 items-center rounded-full px-2.5 font-medium text-brand-700 hover:bg-slate-50 hover:underline" data-testid="app-mini" data-key={it.key} data-guide={it.key}>
               {it.short}
             </Link>
           ))}

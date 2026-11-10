@@ -20,6 +20,7 @@ import { todayLocalDate } from '../../lib/appClock'
 import { useBackToClose } from '../../lib/backToClose'
 import { useToast } from '../ui/toastContext'
 import { TutorialContext } from './tutorialContext'
+import { useCustomerAudience } from '../../config/customerAudience'
 
 type Part = TutorialVideo['key']
 
@@ -42,10 +43,13 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   const access = auth?.access ?? null
   const ready = auth ? auth.bootstrap.status === 'ready' : false
   const hiddenInAccount = auth?.session?.user.user_metadata?.tutorial_hidden === true
+  // D-565 외부 구독 고객에게는 이 영상(내부 팀장용 · 전문 모듈 소개)을 띄우지도, 다시 보기 단추를 보이지도 않는다 — 메뉴별 사용법 안내(/guide)가 대신한다
+  const customer = useCustomerAudience()
   useEffect(() => {
     if (!ready) return
     const go = shouldAutoOpenTutorial({
       access,
+      customer,
       prefs: readTutorialPrefs(),
       today: todayLocalDate(),
       hiddenInAccount,
@@ -54,16 +58,16 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     if (!go) return
     markShownThisSession()
     setState({ open: true, auto: true, part: 'part1' })
-  }, [ready, access, hiddenInAccount])
+  }, [ready, access, hiddenInAccount, customer])
 
   const open = useCallback((part: Part = 'part1') => setState({ open: true, auto: false, part }), [])
   const close = useCallback(() => setState((s) => ({ ...s, open: false })), [])
-  const value = useMemo(() => ({ open }), [open])
+  const value = useMemo(() => (customer ? null : { open }), [open, customer])
 
   return (
     <TutorialContext.Provider value={value}>
       {children}
-      {state.open && (
+      {state.open && !customer && (
         <TutorialDialog
           part={state.part}
           auto={state.auto}

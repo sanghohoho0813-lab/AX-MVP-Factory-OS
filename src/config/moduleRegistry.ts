@@ -31,6 +31,7 @@ import {
   CircleDashed,
   Sparkles,
   Stamp,
+  CircleHelp,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -284,6 +285,8 @@ export const MODULES: ModuleDefinition[] = withSlotIcons<ModuleDefinition>([
     : []),
   { key: 'tools', label: '모듈 전체', path: '/tools', icon: LayoutGrid, group: 'modules', accent: 'system', enabled: true, hint: '전문 모듈 여섯과 그 안의 기능 · 요금제', alsoPaths: ['/modules'], exact: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
+  // D-565 사용법 안내 — 메뉴마다 무엇 · 왜 · 효과 · 앞으로 + 사용법 영상 자리(모든 계정)
+  { key: 'guide', label: '사용법 안내', path: '/guide', icon: CircleHelp, group: 'settings', accent: 'system', enabled: true, hint: '메뉴마다 무엇을 하는 곳인지 · 사용법 영상' },
 ])
 
 /** 켜져 있는 모듈만, 그룹 순서대로 묶어 돌려준다 */

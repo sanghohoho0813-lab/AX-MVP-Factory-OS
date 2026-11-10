@@ -69,7 +69,7 @@ export function AppLauncher({ variant, onNavigate, testId = 'app-launcher' }: { 
       aria-label="바로가기"
     >
       {items.map((it) => (
-        <li key={it.key} className="min-w-0">
+        <li key={it.key} className="min-w-0" data-guide={it.key}>
           <AppTile
             to={it.path}
             icon={it.icon}

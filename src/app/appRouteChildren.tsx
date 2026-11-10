@@ -83,6 +83,7 @@ const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPag
 const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
 const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.KpiPage })))
 const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ default: m.RoadmapPage })))
+const GuidePage = lazy(() => import('../pages/GuidePage').then((m) => ({ default: m.GuidePage })))
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
 const PatentSpecCheckPage = lazy(() => import('../pages/PatentSpecCheckPage').then((m) => ({ default: m.PatentSpecCheckPage })))
@@ -497,7 +498,8 @@ export const appRouteChildren = [
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },
-      { path: 'guide', element: <Navigate to="/" replace /> },
+      // D-565 사용법 안내(메뉴마다 설명 · 영상 자리) — 예전에는 오늘로 넘기던 주소
+      { path: 'guide', element: <GuidePage /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },
       { path: 'diagnosis/questions', element: <QuestionBankPage /> },

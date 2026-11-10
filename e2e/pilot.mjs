@@ -420,6 +420,16 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   check('Pilot(D-185): Esc 로 닫힘', (await tut.count()) === 0)
+  // D-565 내부 팀장의 사용법 안내 — 전문 모듈 묶음까지 · [전체 안내 영상 보기] 로 같은 영상
+  await go(page, '/guide')
+  await page.waitForTimeout(600)
+  const gGroupsP = await page.getByTestId('guide-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
+  check('Pilot(D-565) 사용법 안내: 묶음에 전문 모듈 있음 · 대표 전용 묶음(잘 안 쓰는 기능 · 이 시스템) 없음 · [전체 안내 영상 보기] 있음 · 대표 자료 0', gGroupsP.includes('modules') && !gGroupsP.includes('rare') && !gGroupsP.includes('about') && (await page.getByTestId('guide-tutorial').count()) === 1 && leaked(await bodyText(page)).length === 0, gGroupsP.join())
+  await page.getByTestId('guide-tutorial').click()
+  await page.waitForTimeout(400)
+  check('Pilot(D-565): [전체 안내 영상 보기] → 안내 영상 창', (await tut.count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
   // D-282 팀장 오늘 화면 — 바로가기는 메뉴와 같은 권한(대표 전용 AI 전략실 · 특허 · 벤처 · 마케팅 없음) · KPI 에 '최근 AI 작업' 칸 없음
   await go(page, '/')
   // U2(2026-11-05) 바로가기는 처음엔 접힘 — 접힌 줄 이름 링크도 같은 목록(같은 권한)
@@ -1403,6 +1413,8 @@ try {
     pk.on('pageerror', (e) => errors.push(String(e)))
     await cK.route(`https://${REF}.supabase.co/**`, route)
     await login(pk, CUSTOMER)
+    // D-565 내부 팀장용 안내 영상(전문 모듈 소개)은 외부 고객에게 저절로 뜨지 않는다
+    check('고객(D-565): 첫 로그인에 팀장용 안내 영상 창이 뜨지 않음', (await pk.getByTestId('tutorial-dialog').count()) === 0)
     await go(pk, '/')
     await pk.waitForTimeout(1200)
     const navK = (await pk.locator('aside').first().innerText().catch(() => '')) ?? ''
@@ -1513,6 +1525,35 @@ try {
     const wordsToday = todayK2.match(/모듈|판정|진단서|말하기 대본|받을 수 있는 것|지원사업 알림/g) ?? []
     check('고객(D-563) 오늘: 처음 시작 카드 · 권하는 질문 · 본문에 모듈 · 판정 · 진단서 · "받을 수 있는 것" 0', wordsToday.length === 0 && todayK2.includes('처음 시작'), wordsToday.join())
     await shot(pk, 'customer-05-today-after')
+
+    // ---------- D-565 사용법 안내 — 고객에게는 고객 메뉴만 · 없는 기능을 약속하지 않는 글 · 팀장용 영상 단추 없음 ----------
+    check('고객 메뉴(D-565): 사용법 안내 있음', navK.includes('사용법 안내'), navK.replace(/\n/g, '|').slice(0, 400))
+    await go(pk, '/guide')
+    await pk.waitForTimeout(700)
+    const gGroupsK = await pk.getByTestId('guide-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
+    const gAllK = []
+    for (let g = 0; g < gGroupsK.length; g += 1) {
+      await pk.getByTestId('guide-group').nth(g).click()
+      await pk.waitForTimeout(120)
+      const n = await pk.getByTestId('guide-row').count()
+      for (let i = 0; i < n; i += 1) {
+        const r = pk.getByTestId('guide-row').nth(i)
+        await r.getByTestId('guide-row-toggle').click()
+        gAllK.push(`${await r.getAttribute('data-key')}: ${((await r.innerText()) ?? '').replace(/\n/g, ' ')}`)
+      }
+    }
+    const gBadK = gAllK.filter((x) => /모듈|판정|예상 금액|진단서/.test(x) || leaked(x).length > 0)
+    check('고객(D-565) 사용법 안내: 묶음은 오늘 · 고객 · 영업 · 설정뿐(전문 모듈 없음) · 모든 줄 글에 모듈 · 판정 · 예상 금액 0 · 대표 자료 0', gGroupsK.join() === 'today,clients,sales,settings' && gAllK.length >= 10 && gBadK.length === 0, `${gGroupsK.join()} / ${gAllK.length}줄 / ${gBadK.join(' || ').slice(0, 300)}`)
+    check('고객(D-565) 사용법 안내: 닫힌 화면(홍보 글 · 홈페이지 · 모듈) 줄 없음 · 팀장용 [전체 안내 영상] 단추 없음 · [의견 보내기] 있음', !gAllK.some((x) => /^(mk-content|mk-homepage|tools|cat-)/.test(x)) && (await pk.getByTestId('guide-tutorial').count()) === 0 && (await pk.getByTestId('guide-feedback').count()) === 1, gAllK.map((x) => x.split(':')[0]).join())
+    await shot(pk, 'customer-05b-guide')
+    await go(pk, '/settings')
+    await pk.waitForTimeout(500)
+    check('고객(D-565) 설정: 팀장용 "안내 영상" 줄 없음', (await pk.getByTestId('settings-tutorial').count()) === 0)
+    await pk.locator('aside [data-guide="client-ops"]').first().hover()
+    await pk.waitForTimeout(900)
+    const cardK = ((await pk.getByTestId('menu-guide-card').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('고객(D-565): 메뉴에 마우스 → 안내 카드 · 고객용 글(제도 · 모듈 약속 없음)', cardK.includes('무엇을 하나요') && !/모듈|제도|판정/.test(cardK), cardK.slice(0, 240))
+    await pk.mouse.move(900, 500)
 
     // ---------- D-564 고객 계정 마케팅 · 브랜딩 — 화면은 열리고, 대표 채널 · AX · AI 기본 주제 없이 '내 채널부터' ----------
     check('고객 메뉴(D-564): 마케팅 · 브랜딩 있음(대표 전용에서 풀림)', navK.includes('마케팅 · 브랜딩'), navK.replace(/\n/g, '|').slice(0, 400))

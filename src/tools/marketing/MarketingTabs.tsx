@@ -15,6 +15,7 @@ import { AtSign, BarChart3, ChevronDown, ChevronUp, Clapperboard, Film, Flame, G
 import { useIsPilot } from '../../auth/osAccess'
 import { usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { slotIcon } from '../../config/iconSlots'
+import { MARKETING_GUIDE_KEYS } from '../../content/menuGuide'
 
 export type RadarView = 'plan' | 'top' | 'channels' | 'analysis' | 'make'
 export type MarketingTab = RadarView | 'threads' | 'shorts' | 'content' | 'homepage'
@@ -164,11 +165,11 @@ function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | nul
           <div className="max-sm:contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:gap-1 sm:rounded-(--radius-control) sm:border sm:border-slate-200 sm:bg-white sm:p-1">
             {lookItems.map((it) =>
               onRadar ? (
-                <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={`${cls(isOn(it.key, active))} ${home ? HOME_CELL : ''}`}>
+                <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]} onClick={() => onRadar(it.key as RadarView)} className={`${cls(isOn(it.key, active))} ${home ? HOME_CELL : ''}`}>
                   <Label it={it} />
                 </button>
               ) : (
-                <Link key={it.key} to={`/marketing?view=${it.key}`} className={`${cls(false)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`}>
+                <Link key={it.key} to={`/marketing?view=${it.key}`} className={`${cls(false)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
                   <Label it={it} />
                 </Link>
               ),
@@ -184,16 +185,16 @@ function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | nul
               <div className={`max-sm:contents sm:grid sm:min-w-0 sm:gap-1.5 ${tools.length < TOOLS.length ? 'sm:grid-cols-3' : 'sm:grid-cols-3 sm:@[70rem]:grid-cols-5'}`}>
                 {/* D-560 유튜브(이번 주 주제 → 긴 영상 대본) — 스레드 옆, 레이더 화면에서는 그 자리에서 바뀐다(yt-view-plan) */}
                 {onRadar ? (
-                  <button type="button" role="tab" aria-selected={active === 'plan'} onClick={() => onRadar('plan')} className={`${makeCls(active === 'plan')} ${home ? HOME_CELL : ''}`} data-testid="yt-view-plan">
+                  <button type="button" role="tab" aria-selected={active === 'plan'} onClick={() => onRadar('plan')} className={`${makeCls(active === 'plan')} ${home ? HOME_CELL : ''}`} data-testid="yt-view-plan" data-guide="mk-plan">
                     <MakeLabel it={PLAN_ITEM} />
                   </button>
                 ) : (
-                  <Link to="/marketing?view=plan" className={`${makeCls(false)} ${home ? HOME_CELL : ''}`} data-testid="mk-tab-plan">
+                  <Link to="/marketing?view=plan" className={`${makeCls(false)} ${home ? HOME_CELL : ''}`} data-testid="mk-tab-plan" data-guide="mk-plan">
                     <MakeLabel it={PLAN_ITEM} />
                   </Link>
                 )}
                 {tools.map((it) => (
-                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={`${makeCls(active === it.key)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`}>
+                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={`${makeCls(active === it.key)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
                     <MakeLabel it={it} />
                   </Link>
                 ))}
@@ -236,12 +237,12 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
   const showTools = !pilot || open
   const now = [...RADAR_VIEWS, ...TOOLS].find((t) => t.key === active) ?? null
   const planBtn = onRadar ? (
-    <button type="button" role="tab" aria-selected={active === 'plan'} data-testid="yt-view-plan" onClick={() => onRadar('plan')} className={slimCls(active === 'plan')}>
+    <button type="button" role="tab" aria-selected={active === 'plan'} data-testid="yt-view-plan" data-guide="mk-plan" onClick={() => onRadar('plan')} className={slimCls(active === 'plan')}>
       <SlimIcon it={PLAN_ITEM} />
       {PLAN_ITEM.label}
     </button>
   ) : (
-    <Link to="/marketing?view=plan" className={slimCls(false)} data-testid="mk-tab-plan">
+    <Link to="/marketing?view=plan" className={slimCls(false)} data-testid="mk-tab-plan" data-guide="mk-plan">
       <SlimIcon it={PLAN_ITEM} />
       {PLAN_ITEM.label}
     </Link>
@@ -292,12 +293,12 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
           {!showTools && planBtn}
           {LOOK_ITEMS.map((it) =>
             onRadar ? (
-              <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} onClick={() => onRadar(it.key as RadarView)} className={slimCls(isOn(it.key, active))}>
+              <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]} onClick={() => onRadar(it.key as RadarView)} className={slimCls(isOn(it.key, active))}>
                 <SlimIcon it={it} />
                 {it.label}
               </button>
             ) : (
-              <Link key={it.key} to={`/marketing?view=${it.key}`} className={slimCls(false)} data-testid={`mk-tab-${it.key}`}>
+              <Link key={it.key} to={`/marketing?view=${it.key}`} className={slimCls(false)} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
                 <SlimIcon it={it} />
                 {it.label}
               </Link>
@@ -311,7 +312,7 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
               <span className="t-sub w-[4.5rem] shrink-0 font-semibold text-slate-600 max-sm:hidden">만들기</span>
               {planBtn}
               {tools.map((it) => (
-                <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={slimCls(active === it.key)} data-testid={`mk-tab-${it.key}`}>
+                <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={slimCls(active === it.key)} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
                   <SlimIcon it={it} />
                   {it.short}
                 </Link>

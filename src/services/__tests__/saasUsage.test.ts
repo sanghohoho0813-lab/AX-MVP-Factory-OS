@@ -571,6 +571,25 @@ async function run() {
     fuUnnamed[0].key === 'me' && fuUnnamed[0].done === false && fuUnnamed[0].href === '/settings' && fuNamed[0].key === 'me' && fuNamed[0].done === true && fuUnnamed.length === fuFull.length + 2 && fuUnnamed[fuUnnamed.length - 1].key === 'content' && fuFull.every((x) => x.key !== 'me'),
     fuUnnamed.map((x) => `${x.key}:${x.done}`).join(','),
   )
+  // D-565 메뉴 안내 — 고객 계정에 보이는 메뉴의 글은 없는 것(전문 모듈 · 판정 · 예상 금액)을 약속하지 않는다 · 모든 메뉴에 네 칸 글
+  const { menuGuide, hasMenuGuide, MARKETING_GUIDE_LIST } = await import('../../content/menuGuide')
+  const { MODULES } = await import('../../config/moduleRegistry')
+  const { menuVideo } = await import('../../config/menuVideos')
+  const { shouldAutoOpenTutorial } = await import('../tutorialPrefs')
+  const customerMenus = ['today', 'decide', 'calendar', 'client-ops', 'sales', 'money', 'marketing', 'settings', 'guide', ...MARKETING_GUIDE_LIST.filter((x) => !x.basicHidden).map((x) => x.key)]
+  const badBasic = customerMenus.filter((k) => /모듈|판정|예상 금액|제도를 먼저/.test(Object.values(menuGuide(k, { basic: true })).join(' ')))
+  const thin = MODULES.filter((m) => m.enabled).filter((m) => Object.values(menuGuide(m.key, { label: m.label, hint: m.hint })).some((x) => x.trim().length < 8))
+  const unwritten = MODULES.filter((m) => m.enabled && !m.key.startsWith('up-') && !hasMenuGuide(m.key)).map((m) => m.key)
+  check(
+    'K15 메뉴 안내(D-565) — 고객 계정 글에 모듈 · 판정 · 예상 금액 0 · 켜진 메뉴 전부 네 칸 글(8자 이상) · 출시 예정 항목 말고는 따로 쓴 글 · 대표 글은 그대로(고객 관리 "맞는 제도")',
+    badBasic.length === 0 && thin.length === 0 && unwritten.length === 0 && menuGuide('client-ops').next.includes('맞는 제도') && !menuGuide('client-ops', { basic: true }).next.includes('제도'),
+    `basic=${badBasic.join()} thin=${thin.map((m) => m.key).join()} unwritten=${unwritten.join()}`,
+  )
+  const autoIn = { access: 'pilot', prefs: {}, today: '2026-11-10', hiddenInAccount: false, shownThisSession: false } as const
+  check(
+    'K16 안내 영상(D-565) — 외부 구독 고객에게는 내부 팀장용 영상을 저절로 띄우지 않음 · 내부 팀장은 예전처럼 · 메뉴 영상은 화면 안 파일만(바깥 주소 0 · 지금은 비어 있음)',
+    shouldAutoOpenTutorial({ ...autoIn, customer: true }) === false && shouldAutoOpenTutorial({ ...autoIn }) === true && shouldAutoOpenTutorial({ ...autoIn, customer: false }) === true && menuVideo('client-ops') === null,
+  )
   const bf = basicFlow(CLIENT_FLOW)
   check(
     'K12 업체 일 순서 안내 — 고객 계정 문장에 모듈 0 · 단계 수 · 순서는 같음 · 원래 문장은 그대로',

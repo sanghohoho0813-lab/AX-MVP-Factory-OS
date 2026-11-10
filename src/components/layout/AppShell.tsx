@@ -2,6 +2,7 @@ import { Suspense, lazy, useContext, useEffect, useState, useSyncExternalStore }
 import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
+import { GuideLayer } from '../guide/GuideLayer'
 import { primePilotMarketingScreens, setPilotMarketing, setPilotMarketingScreens, usePilotMarketing, usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { fetchAssistStatus } from '../../services/aiAssist/client'
@@ -134,6 +135,8 @@ export function AppShell() {
       <FrameBridge />
       {/* D-485 화면 꾸미기 — 이 사람의 모든 기기에서 같게(클라우드) */}
       <LayoutCloudSync />
+      {/* D-565 메뉴 · 목차에 마우스를 올리면 안내 카드(무엇 · 왜 · 효과 · 앞으로) */}
+      <GuideLayer />
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 다시 보기는 설정 › 계정 · 보기(D-296) */}
       <TutorialProvider>

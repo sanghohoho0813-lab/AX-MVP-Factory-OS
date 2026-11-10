@@ -149,6 +149,7 @@
     "test:saasusage": "vite build --config vite.saasusage.config.mjs && node .saasusage-out/saasusage.mjs",
     "test:keep-ui": "node scripts/qa-keep-ui.mjs",
     "qa:keepui": "node e2e/keepui.mjs",
+    "qa:guide": "node e2e/guide.mjs",
     "test:edge": "node scripts/qa-edge.mjs",
     "test:type-scale": "node scripts/qa-type-scale.mjs",
     "test:doctrust": "vite build --config vite.doctrust.config.mjs && node .doctrust-out/doctrust.mjs",

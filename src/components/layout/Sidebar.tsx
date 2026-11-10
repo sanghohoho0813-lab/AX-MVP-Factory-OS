@@ -453,7 +453,8 @@ function NavLinkRow({
     <Link
       to={item.path}
       onClick={onNavigate}
-      title={collapsed ? undefined : item.hint}
+      // D-565 마우스를 올리면 안내 카드(무엇 · 왜 · 효과 · 앞으로) — 브라우저 기본 설명 글(title) 대신
+      data-guide={collapsed ? undefined : item.key}
       aria-label={collapsed ? item.label : undefined}
       data-nav-tip={collapsed ? item.label : undefined}
       // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
@@ -537,7 +538,7 @@ function CategoryRow({
         aria-controls={listId}
         data-nav-category={item.moduleKey}
         onClick={() => onToggle(item.key, open)}
-        title={item.hint}
+        data-guide={item.key}
         className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.9375rem] font-medium transition-colors ${
           selfActive ? 'bg-navy-800 text-white' : childActive ? 'text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
         }`}
@@ -613,7 +614,7 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((v) => !v)}
-        title={collapsed ? undefined : item.hint}
+        data-guide={collapsed ? undefined : item.key}
         aria-label={collapsed ? item.label : undefined}
         data-nav-tip={collapsed ? item.label : undefined}
         className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-2 py-1.5 text-left text-[0.9375rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}

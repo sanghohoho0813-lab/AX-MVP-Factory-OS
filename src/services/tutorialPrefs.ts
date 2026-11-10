@@ -81,10 +81,13 @@ export interface AutoOpenInput {
   hiddenInAccount: boolean
   /** 이 창에서 이미 한 번 띄웠다 */
   shownThisSession: boolean
+  /** D-565 외부 구독 고객 — 이 영상은 내부 팀장용(전문 모듈 소개)이라 고객에게는 띄우지 않는다. 고객은 메뉴별 사용법 안내(/guide)로 */
+  customer?: boolean
 }
 
 export function shouldAutoOpenTutorial(i: AutoOpenInput): boolean {
   if (i.access !== 'pilot') return false
+  if (i.customer) return false
   if (i.hiddenInAccount || i.prefs.never) return false
   if (i.prefs.hiddenOn === i.today) return false
   return !i.shownThisSession
