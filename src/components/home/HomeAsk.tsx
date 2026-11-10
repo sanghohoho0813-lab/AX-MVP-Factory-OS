@@ -254,7 +254,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
 
       <form onSubmit={onSubmit} className={`relative mx-auto ${expanded ? 'mt-4' : ''} flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400`} data-testid="home-ask-form">
         <div ref={menuRef} className="relative shrink-0">
-          <button type="button" aria-label="업체 고르기 · 서류로 새 업체" aria-expanded={menu} onClick={() => setMenu((v) => !v)} className="tap flex size-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" data-testid="home-ask-plus">
+          <button type="button" aria-label="업체 고르기 · 서류로 새 업체" aria-expanded={menu} onClick={() => setMenu((v) => !v)} className="tap flex size-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" data-testid="home-ask-plus" data-guide={menu ? undefined : 'fn-ask-plus'}>
             <Plus aria-hidden="true" className="size-5" />
           </button>
           {menu && (
@@ -326,7 +326,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         </div>
         <ModelPicker popover className="max-w-[11.5rem] shrink-0 max-sm:hidden" testId="home-ask-model" />
         {Speech && (
-          <button type="button" aria-label={listening ? '받아 적기 멈추기' : '말로 적기'} aria-pressed={listening} onClick={toggleMic} className={`tap flex size-10 shrink-0 items-center justify-center rounded-full ${listening ? 'bg-danger-50 text-danger-700' : 'text-slate-600 hover:bg-slate-100'}`} data-testid="home-ask-mic">
+          <button type="button" aria-label={listening ? '받아 적기 멈추기' : '말로 적기'} aria-pressed={listening} onClick={toggleMic} data-guide="fn-ask-voice" className={`tap flex size-10 shrink-0 items-center justify-center rounded-full ${listening ? 'bg-danger-50 text-danger-700' : 'text-slate-600 hover:bg-slate-100'}`} data-testid="home-ask-mic">
             {listening ? <MicOff aria-hidden="true" className="size-5" /> : <Mic aria-hidden="true" className="size-5" />}
           </button>
         )}

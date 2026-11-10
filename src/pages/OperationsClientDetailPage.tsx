@@ -842,7 +842,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </Link>
           )}
           {/* D-144: 서류 올리기 — 파일 · 폴더째. 읽자마자 확실한 것은 바로 넣고, 모듈 판정은 맞춤 추천에 */}
-          <Button variant={prospect ? 'secondary' : 'primary'} onClick={openUpload} data-testid="client-upload" className="max-sm:px-3">
+          <Button variant={prospect ? 'secondary' : 'primary'} onClick={openUpload} data-testid="client-upload" data-guide="fn-docs-upload" className="max-sm:px-3">
             <FileUp aria-hidden="true" className="size-4" />
             서류 올리기
           </Button>
@@ -2077,6 +2077,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 variant="secondary"
                 className="w-full justify-start"
                 data-testid="more-doc-request"
+                data-guide="fn-docs-request"
                 onClick={() => {
                   setMoreOpen(false)
                   setMessage({

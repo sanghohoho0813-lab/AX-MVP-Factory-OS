@@ -631,7 +631,12 @@ async function run() {
   const { CLIENT_DETAIL_TABS } = await import('../../config/clientDetailTabs')
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === '__tests__' ? [] : walk(join(dir, e.name))) : /\.tsx$/.test(e.name) ? [join(dir, e.name)] : []))
   const usedFn = new Set<string>()
-  for (const f of walk('src')) for (const m of readFileSync(f, 'utf8').matchAll(/data-guide=(?:"|\{[^}]*')(fn-[a-z-]+)/g)) usedFn.add(m[1])
+  for (const f of walk('src')) {
+    const text = readFileSync(f, 'utf8')
+    for (const m of text.matchAll(/data-guide="(fn-[a-z-]+)/g)) usedFn.add(m[1])
+    // 중괄호 안(조건에 따라 다른 열쇠)은 그 안의 열쇠를 전부
+    for (const b of text.matchAll(/data-guide=\{([^}]*)\}/g)) for (const m of b[1].matchAll(/['`](fn-[a-z-]+)/g)) usedFn.add(m[1])
+  }
   for (const t of CLIENT_DETAIL_TABS) usedFn.add(`fn-client-${t.key}`)
   for (const k of ['revenue', 'cost', 'subs']) usedFn.add(`fn-money-${k}`)
   usedFn.delete('fn-client-')
@@ -639,15 +644,15 @@ async function run() {
   const fnKeys = Object.keys(FUNCTION_GUIDES)
   const fnMissing = [...usedFn].filter((k) => !FUNCTION_GUIDES[k])
   const fnThin = fnKeys.filter((k) => (['what', 'why', 'effect', 'next'] as const).some((x) => FUNCTION_GUIDES[k][x].length < 12) || !FUNCTION_GUIDES[k].label)
-  const menuKeys = new Set(['top', ...enabledModulesByGroup({ advanced: true, pilot: false }).flatMap((g) => g.items.map((m) => m.key))])
+  const menuKeys = new Set(['top', ...enabledModulesByGroup({ advanced: true, pilot: false }).flatMap((g) => g.items.map((m) => m.key)), ...MARKETING_GUIDE_LIST.map((x) => x.key)])
   const fnNoMenu = fnKeys.filter((k) => !menuKeys.has(FUNCTION_GUIDES[k].menu))
   const fnBadBasic = fnKeys.filter((k) => !FUNCTION_GUIDES[k].hiddenForPilot && !FUNCTION_GUIDES[k].onlyOwner && !FUNCTION_GUIDES[k].basicHidden).filter((k) => /모듈|판정|예상 금액|제도/.test(Object.values(menuGuide(k, { basic: true })).join(' ')))
   check(
     'K20 기능 안내(D-569) — 화면에 단 열쇠(fn-…)는 전부 글이 있음 · 네 칸 12자 이상 · 메뉴에 이어짐 · 고객 글에 모듈 · 판정 · 제도 0 · 팀장에게 없는 탭(고객 플랫폼 · 컨설팅 · AI 전략실)은 팀장 안내에서 빠짐 · 대표 글은 그대로',
-    fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 15 &&
+    fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 23 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 1 && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 3 && functionGuidesOf('mk-threads').length === 2 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)

@@ -75,6 +75,7 @@ export function FirstLineMaker({ testPrefix, channel, topic, facts = '', aiOk, o
           onClick={() => setOpen(true)}
           className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3.5 font-semibold text-slate-800 hover:bg-slate-50"
           data-testid={`${testPrefix}-hooks-open`}
+          data-guide="fn-mk-firstline"
         >
           <MessageSquareQuote aria-hidden="true" className="size-4 text-slate-500" />
           첫마디 10개 먼저 보기

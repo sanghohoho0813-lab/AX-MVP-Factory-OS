@@ -80,7 +80,11 @@ function NameEditor() {
   )
 }
 
-function DataPanelSupabase({ focus = '' }: { focus?: string }) {
+/**
+ * 작업공간 자료 내려받기 — 대표 설정 › 데이터 와 팀장 · 구독 고객 설정이 같은 칸을 쓴다(D-572).
+ * 읽기만 한다. mine = 팀장 · 고객 설정(제목 · 설명만 쉬운 말로 — 단추 · 파일은 같다).
+ */
+function ExportPanel({ mine = false }: { mine?: boolean }) {
   const { showToast } = useToast()
   const { currentWorkspaceId, workspaces } = useAuth()
   /**
@@ -111,8 +115,6 @@ function DataPanelSupabase({ focus = '' }: { focus?: string }) {
       setOriginals(null)
     }
   }
-  const [confirmClear, setConfirmClear] = useState(false)
-  const [busy, setBusy] = useState(false)
   /** D-528 작업공간 전체 내보내기 — 고객 관리 › 더보기 › [백업 내려받기] 와 같은 함수 · 같은 파일 */
   const [exporting, setExporting] = useState(false)
   async function handleExport() {
@@ -127,6 +129,39 @@ function DataPanelSupabase({ focus = '' }: { focus?: string }) {
     }
   }
 
+  return (
+    <Panel title={mine ? '내 자료 내려받기' : '작업공간 전체 내보내기'}>
+      <p className="t-sub break-keep text-slate-600">
+        {mine
+          ? '내 업체 · 서류 목록 · 업무 일기 · 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸거나 지우지 않아요. 서류 원본(PDF · 사진)은 [서류 원본 파일 전부] 로 따로 받아요.'
+          : '업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸지 않아요. 고객 관리 › 더보기 › [백업 내려받기] 와 같은 파일이에요. 서류 원본 파일(PDF · 사진)은 [서류 원본 파일 전부] 로 따로 받아요.'}
+      </p>
+      <Button variant="secondary" className="mt-3" onClick={() => void handleExport()} disabled={exporting || !currentWorkspaceId} data-testid="settings-export" data-guide="fn-export">
+        <Download aria-hidden="true" className="size-4" />
+        {exporting ? '모으는 중…' : '전체 내려받기'}
+      </Button>
+      {/* D-549 SAFE-5 원본 파일(PDF · 사진 …)은 위 파일에 목록만 — 원본은 여기서 압축 하나로 */}
+      <Button variant="secondary" className="mt-3 ml-0 sm:ml-2" onClick={() => void handleOriginals()} disabled={!!originals || !currentWorkspaceId} data-testid="settings-originals">
+        <FileArchive aria-hidden="true" className="size-4" />
+        {originals ? (originals.total ? `원본 받는 중 ${originals.done} / ${originals.total}` : '업체 목록 읽는 중…') : '서류 원본 파일 전부(ZIP)'}
+      </Button>
+      {originalsLine && (
+        <p role="status" className="t-sub mt-2 break-keep text-slate-800" data-testid="settings-originals-done">
+          {originalsLine}
+        </p>
+      )}
+      {/* D-536 이 파일로 되살아나는 것 · 보관용 · 담기지 않는 것(접어 둠) */}
+      <div className="mt-3">
+        <BackupScopeNote />
+      </div>
+    </Panel>
+  )
+}
+
+function DataPanelSupabase({ focus = '' }: { focus?: string }) {
+  const { showToast } = useToast()
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [busy, setBusy] = useState(false)
   function handleClear() {
     setBusy(true)
     try {
@@ -143,29 +178,7 @@ function DataPanelSupabase({ focus = '' }: { focus?: string }) {
 
   return (
     <>
-      <Panel title="작업공간 전체 내보내기">
-        <p className="t-sub break-keep text-slate-600">
-          업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록을 파일 하나로 내려받아요. 읽기만 해요 — 아무것도 바꾸지 않아요. 고객 관리 › 더보기 › [백업 내려받기] 와 같은 파일이에요. 서류 원본 파일(PDF · 사진)은 [서류 원본 파일 전부] 로 따로 받아요.
-        </p>
-        <Button variant="secondary" className="mt-3" onClick={() => void handleExport()} disabled={exporting || !currentWorkspaceId} data-testid="settings-export">
-          <Download aria-hidden="true" className="size-4" />
-          {exporting ? '모으는 중…' : '전체 내려받기'}
-        </Button>
-        {/* D-549 SAFE-5 원본 파일(PDF · 사진 …)은 위 파일에 목록만 — 원본은 여기서 압축 하나로 */}
-        <Button variant="secondary" className="mt-3 ml-0 sm:ml-2" onClick={() => void handleOriginals()} disabled={!!originals || !currentWorkspaceId} data-testid="settings-originals">
-          <FileArchive aria-hidden="true" className="size-4" />
-          {originals ? (originals.total ? `원본 받는 중 ${originals.done} / ${originals.total}` : '업체 목록 읽는 중…') : '서류 원본 파일 전부(ZIP)'}
-        </Button>
-        {originalsLine && (
-          <p role="status" className="t-sub mt-2 break-keep text-slate-800" data-testid="settings-originals-done">
-            {originalsLine}
-          </p>
-        )}
-        {/* D-536 이 파일로 되살아나는 것 · 보관용 · 담기지 않는 것(접어 둠) */}
-        <div className="mt-3">
-          <BackupScopeNote />
-        </div>
-      </Panel>
+      <ExportPanel />
 
       {/* D-550 SYNC-5 다른 기기 때문에 덮인 내용 — 보관된 것이 있을 때만(알림 줄이 데려오면 '없어요' 한 줄) */}
       <OverwrittenPanel focus={focus === 'overwritten'} />
@@ -286,6 +299,8 @@ export function SupabaseSettingsView() {
         <TextScalePanel />
         <ModuleStartPanel />
         <AppearancePanel />
+        {/* D-572 내 자료 내려받기 — 약관 · 안내 글이 약속한 것(언제든 통째로). 읽기만 한다 · 대표 설정 › 데이터와 같은 단추 */}
+        <ExportPanel mine />
       </div>
     )
   }

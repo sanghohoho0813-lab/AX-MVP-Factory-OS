@@ -426,8 +426,8 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
       className="tap group flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-gradient-to-r from-violet-700 to-fuchsia-700 px-3 py-3 text-left text-white shadow-(--shadow-card) hover:from-violet-800 hover:to-fuchsia-800 sm:px-4"
       data-testid="mk-week-open"
       data-done={done ? '1' : '0'}
-      // D-511 설명 줄은 마우스를 올리면(글자를 줄였다 — 무엇이 나오는지는 옆 칩 셋)
-      title="이번 주 뜨는 주제에 우리 본업을 엮어, 일주일 동안 올릴 것을 AI 가 한 번에 써요"
+      // D-511 설명 줄은 마우스를 올리면(글자를 줄였다 — 무엇이 나오는지는 옆 칩 셋) · D-573 안내 카드(무엇 · 왜 · 효과 · 앞으로)로
+      data-guide="mk-week"
     >
       <CalendarDays aria-hidden="true" className="size-6 shrink-0" />
       <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">

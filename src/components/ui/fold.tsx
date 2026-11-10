@@ -306,7 +306,8 @@ export function Fold({
       aria-labelledby={headingId}
       className={`flex min-w-0 flex-col ${open ? 'gap-3' : ''} ${panel ? `rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 sm:px-4 ${open ? 'pb-4 sm:pb-5' : ''}` : ''} ${className}`}
     >
-      <div className="flex flex-wrap items-center gap-x-2">
+      {/* D-573 머리줄은 '이 칸의 폭' 을 본다(@container) — 두 칸으로 나란히 놓인 좁은 칸에서도 요약이 [모두 보기] 를 아랫줄로 밀지 않게 */}
+      <div className="@container flex flex-wrap items-center gap-x-2">
         {/* 제목(h2) 안에 펼침 단추 — 화면 읽기 프로그램도 '제목 · 펼침' 으로 읽는다 */}
         <HintTip tip={tip} label={title} className="max-w-full">
           <h2 id={headingId} className="t-section min-w-0 text-slate-900">
@@ -327,8 +328,9 @@ export function Fold({
           </h2>
         </HintTip>
         {summary && !open && (
-          // D-357 휴대폰은 요약을 제목 줄 아래로(order-last) — '모두 보기' 같은 단추는 제목 줄에 그대로
-          <span data-testid="fold-summary" className="t-sub order-last min-w-0 basis-full pb-2 pl-7 break-keep text-slate-500 [overflow-wrap:anywhere] sm:order-none sm:flex-[1_1_10rem] sm:basis-auto sm:pb-0 sm:pl-0">
+          // D-357 좁은 칸(휴대폰 · PC 의 반쪽 칸)은 요약을 제목 줄 아래로(order-last) — '모두 보기' 같은 단추는 제목 줄에 그대로
+          // D-573 화면 폭(sm) 대신 이 머리줄의 폭(36rem)으로 가른다 — 넓은 칸에서는 제목 옆에(남는 폭 안에서 줄바꿈 · 단추는 제목 줄에 그대로)
+          <span data-testid="fold-summary" className="t-sub order-last min-w-0 basis-full pb-2 pl-7 break-keep text-slate-500 [overflow-wrap:anywhere] @xl:order-none @xl:min-w-[10rem] @xl:flex-[1_1_0%] @xl:basis-0 @xl:pb-0 @xl:pl-0">
             {summary}
           </span>
         )}

@@ -212,6 +212,41 @@ const fnList = await page.getByTestId('guide-function').evaluateAll((els) => els
 check('G8 사용법 안내 — 고객 관리 줄 아래 "이 화면 안에서 할 수 있는 것"(업체 화면 탭 6개 이상)', fnList.length >= 6 && fnList.includes('fn-client-docs') && fnList.includes('fn-client-fees'), fnList)
 await shot(page, 'guide-07-functions')
 
+/* G9 — D-573 기능 안내 넓히기: 글 쓰기 단추 · 첫마디 · 대화창 [+] · 서류 올리기에도 같은 카드 · 사용법 안내에 모임 */
+check('G9 사용법 안내 — 고객 관리 줄에 [서류 올리기] · [서류 요청 문구] 도', fnList.includes('fn-docs-upload') && fnList.includes('fn-docs-request'), fnList)
+async function hoverCard(path, sel, prep) {
+  await page.goto(BASE + path, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  if (prep) await prep()
+  const el = page.locator(sel).first()
+  if ((await page.locator(sel).count()) === 0) return 'none'
+  await el.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(400)
+  await page.mouse.move(3, 3)
+  await el.hover()
+  await card.waitFor({ timeout: 3000 }).catch(() => {})
+  return (await card.getAttribute('data-key').catch(() => '')) ?? ''
+}
+const kWrite = await hoverCard('/marketing/threads', '[data-guide="fn-mk-write"]')
+const writeText = ((await card.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+await shot(page, 'guide-08-fn-write')
+const kFirst = await hoverCard('/marketing/threads', '[data-guide="fn-mk-firstline"]')
+const kScript = await hoverCard('/marketing/shorts', '[data-guide="fn-mk-script"]')
+check('G9 스레드 [AI로 완성 글 쓰기] · [첫마디 10개 먼저 보기] · 릴스 [AI로 완성 대본 쓰기] 에 마우스 → 기능 안내(어려운 말 0)', kWrite === 'fn-mk-write' && kFirst === 'fn-mk-firstline' && kScript === 'fn-mk-script' && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅/.test(writeText), { kWrite, kFirst, kScript })
+const kPlus = await hoverCard('/', '[data-guide="fn-ask-plus"]', async () => {
+  await page.getByTestId('home-ask').click().catch(() => {})
+  await page.waitForTimeout(300)
+})
+check('G9 오늘 대화창 [+] 에 마우스 → 기능 안내', kPlus === 'fn-ask-plus', kPlus)
+await page.locator('[data-guide="fn-ask-plus"]').first().click()
+await page.waitForTimeout(300)
+check('G9 [+] 를 누르면 고르기 판이 열림 · 카드 닫힘(누름을 가로채지 않음)', (await page.getByTestId('home-ask-menu').count()) === 1 && (await card.count()) === 0)
+await page.keyboard.press('Escape')
+await page.goto(BASE + '/guide?m=mk-threads', { waitUntil: 'networkidle' })
+await page.waitForTimeout(600)
+const mkFn = await page.getByTestId('guide-function').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+check('G9 사용법 안내 — 스레드 줄 아래에 글 쓰기 기능 2개', mkFn.includes('fn-mk-write') && mkFn.includes('fn-mk-firstline'), mkFn)
+
 /* G6 */
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', hasTouch: true, isMobile: true })
 const mp = await m.newPage()

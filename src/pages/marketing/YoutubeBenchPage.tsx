@@ -813,7 +813,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             {/* D-507 이곳이 무엇을 해 주는지 한 줄(쉬운 말) — 예전 이름(콘텐츠 레이더)은 괄호로 남긴다 */}
             {(firstScreen || view === 'plan') && (
               <span className="font-semibold text-slate-700" data-testid="radar-subtitle">
-                우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳 <span className="font-normal text-slate-600 max-sm:hidden">(콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>
+                {/* D-573 대표가 아닌 계정에는 예전 이름(괄호)을 보이지 않는다 — 처음 보는 사람에게는 뜻 없는 말 · '우리 회사' 대신 '내 채널' */}
+                {customer ? '내 유튜브 · SNS 에 올릴 글과 대본을 만드는 곳' : '우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳'}
+                {!customer && <span className="font-normal text-slate-600 max-sm:hidden"> (콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>}
               </span>
             )}
             {prepared && !firstScreen && view !== 'make' && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}

@@ -154,7 +154,7 @@ export function QuickStart({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {ai.ok && (
-              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`}>
+              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
                 <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
               </Button></AiConfirm>
             )}

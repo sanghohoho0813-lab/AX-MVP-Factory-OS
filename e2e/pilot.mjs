@@ -1735,6 +1735,25 @@ try {
     await go(ps, '/')
     await ps.waitForTimeout(1200)
     check('고객(D-570): 오늘 화면에 [모델 · ○○] 단추가 기본으로 없음 → 설정 [보이기] → 나옴 → [숨기기] → 다시 없음', pickOff === 0 && pickOn >= 1 && (await ps.getByTestId('model-picker').count()) === 0, { pickOff, pickOn })
+    // D-572 약관 · 안내 글이 약속한 '언제든 내 자료를 통째로' — 고객 설정에 [전체 내려받기] · 받은 파일에는 내 작업공간 것만
+    await go(ps, '/settings')
+    const expBtn = ps.getByTestId('settings-export')
+    await expBtn.waitFor({ timeout: 8000 }).catch(() => {})
+    await expBtn.scrollIntoViewIfNeeded().catch(() => {})
+    await shot(ps, 'customer-09-settings-export')
+    let expFile = null
+    try {
+      const [dl] = await Promise.all([ps.waitForEvent('download', { timeout: 20000 }), expBtn.click()])
+      expFile = JSON.parse(readFileSync(await dl.path(), 'utf8'))
+    } catch (e) {
+      expFile = { error: String(e).slice(0, 120) }
+    }
+    const expText = JSON.stringify(expFile)
+    check(
+      '고객(D-572) 설정: [내 자료 내려받기] 칸 · [전체 내려받기] → 파일 하나(3판) · 대표 작업공간 것(업체 · 대표비밀 주제) 0',
+      (await ps.getByTestId('settings-originals').count()) === 1 && expFile?.version === 3 && Array.isArray(expFile?.clients) && !expText.includes(OWNER_WS) && !expText.includes('대표비밀'),
+      { version: expFile?.version, clients: expFile?.clients?.length, error: expFile?.error },
+    )
     await go(ps, '/settings')
     await ps.waitForTimeout(700)
     await go(ps, '/feedback')

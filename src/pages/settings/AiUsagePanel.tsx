@@ -2,7 +2,8 @@
  * SAAS-2 설정 › 이번 달 AI 사용량 — 대표가 아닌 계정(구독 고객 · 내부 팀장)이 남은 양 · 이용 권한을 본다.
  *
  *  - 서버 장부(0022 my_ai_access)가 센 값 그대로 — 화면이 세지 않는다. 매달 1일(한국 시간) 다시 채워진다.
- *  - 내부 팀장: 한도 없이 기록만(이번 달 n단위) · 구독 고객: 요금제 · n / m · 이용 기한이 없으면 '구독 확인'.
+ *  - 내부 팀장: 한도 없이 기록만(이번 달 n단위) · 구독 고객: n / m · 남은 양 · 이용 기한이 없으면 '구독 확인'
+ *    (요금제의 내부 이름은 화면에 쓰지 않는다 — 가격 · 이름은 대표가 정한 뒤에. D-573).
  *  - 장부가 아직 없으면(대표가 SQL 을 적용하기 전) '준비 중' — 이때 마케팅 AI 는 닫혀 있고, 내부 팀장의 다른 AI 는 예전처럼 쓴다.
  *  - 대표 계정 · 대표가 팀장 화면으로 볼 때는 그리지 않는다(대표 AI 는 세지 않는다).
  */
@@ -58,7 +59,7 @@ export function AiUsagePanel() {
         {u.state === 'ok' && u.kind === 'customer' && u.active && u.limit !== null && (
           <>
             <p className="t-body font-semibold text-slate-900" data-testid="ai-usage-numbers">
-              {u.used.toLocaleString('ko-KR')} / {u.limit.toLocaleString('ko-KR')} <span className="t-sub font-normal text-slate-500">단위 · {u.month.slice(0, 7)}{u.plan && u.plan !== 'none' ? ` · ${u.plan}` : ''}{u.marketing ? ' · 마케팅 포함' : ''}</span>
+              {u.used.toLocaleString('ko-KR')} / {u.limit.toLocaleString('ko-KR')} <span className="t-sub font-normal text-slate-500">단위 · {u.month.slice(0, 7)}{` · 남은 양 ${Math.max(0, u.limit - u.used).toLocaleString('ko-KR')}`}{u.marketing ? ' · 마케팅 포함' : ''}</span>
             </p>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="이번 달 AI 사용량">
               <div className={`h-full rounded-full ${pct >= 90 ? 'bg-danger-500' : pct >= 70 ? 'bg-warning-500' : 'bg-brand-500'}`} style={{ width: `${pct}%` }} />
