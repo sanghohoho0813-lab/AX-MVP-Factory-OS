@@ -9,7 +9,7 @@
  *  - 이미 있는 업체(사업자등록번호 · 이름)는 건너뛴다 — 크레탑 등록 · 새 업체 등록 창과 같은 규칙(findClientForCretop).
  * 규칙 계산이다 — AI 가 아니다. 저장은 하지 않는다(등록은 화면이 있는 저장 길 createClient 로 한다).
  */
-import type { ClientOpsRecord } from '../types/clientOps'
+import { contractStageOf, type ClientOpsRecord } from '../types/clientOps'
 import { companyKey, findClientForCretop } from './salesCretop'
 
 export type PasteField = 'companyName' | 'contactName' | 'contactPhone' | 'businessNumber' | 'industry' | 'skip'
@@ -278,3 +278,33 @@ export function bulkSummaryLine(plan: BulkPlan, read: Pick<PasteRead, 'noName' |
   if (read.over) parts.push(`한 번에 ${PASTE_MAX_ROWS}곳까지 — 남은 ${read.over}줄은 다음에`)
   return parts.join(' · ')
 }
+
+/* ------------------------------------------------------------------ */
+/* D-584 업체 목록 엑셀 파일로 내려받기(CSV) — 붙여넣기의 짝                 */
+/* ------------------------------------------------------------------ */
+
+/** 내려받는 표의 제목 줄 — 붙여넣기(guessColumns)가 그대로 다시 읽는 말로 */
+export const CLIENTS_CSV_HEADER = ['회사명', '대표자', '전화', '사업자등록번호', '업종', '구분', '다음 할 일', '기한', '등록일'] as const
+
+/** 한 칸 — 쉼표 · 따옴표 · 줄바꿈이 있으면 따옴표로 감싼다. = + - @ 로 시작하면 엑셀이 식으로 읽지 않게 앞에 ' 를 붙인다. */
+function csvCell(value: string): string {
+  let v = value.replace(/\r\n?/g, '\n')
+  if (/^[=+\-@\t]/.test(v)) v = `'${v}`
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+}
+
+/** 업체 목록 → CSV(보관한 업체는 뺀다 · 이름 순). 읽기만 — 아무것도 바꾸지 않는다. */
+export function clientsCsv(records: readonly ClientOpsRecord[]): { csv: string; count: number } {
+  const live = records.filter((r) => r.archivedAt === null).sort((a, b) => a.companyName.localeCompare(b.companyName, 'ko'))
+  const lines = [CLIENTS_CSV_HEADER.join(',')]
+  for (const r of live) {
+    const stage = contractStageOf(r.status)
+    lines.push(
+      [r.companyName, r.contactName, r.contactPhone, r.businessNumber, r.industry, stage === 'pre' ? '잠재고객' : stage === 'closed' ? '계약 끝남' : '계약 고객', r.nextAction, r.nextActionDueDate, r.createdAt.slice(0, 10)]
+        .map((c) => csvCell(String(c ?? '')))
+        .join(','),
+    )
+  }
+  return { csv: lines.join('\r\n') + '\r\n', count: live.length }
+}
+

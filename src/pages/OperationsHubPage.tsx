@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   ClipboardPaste,
   Download,
+  FileSpreadsheet,
   RefreshCw,
   Search,
   Upload,
@@ -63,6 +64,7 @@ import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload, Handshake } from 'lucide-react'
 import {
   createClient,
+  saveBytesAs,
   dismissLocalMigration,
   findForeignClientIds,
   listClients,
@@ -99,6 +101,7 @@ import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, is
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
 import { BulkClientPasteSheet } from '../components/ops/BulkClientPasteSheet'
+import { clientsCsv } from '../services/clientBulkPaste'
 import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
 import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/docHandoff'
 import { HintTip } from '../components/ui/fold'
@@ -752,6 +755,26 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               <span className="flex min-w-0 flex-col items-start text-left">
                 <span>{exporting ? '모으는 중…' : '백업 내려받기'}</span>
                 <span className="text-xs font-normal break-keep text-slate-500">업체 · 서류 파일 목록 · 업무 일기 · 모듈 기록까지 한 파일</span>
+              </span>
+            </Button>
+            {/* D-584 업체 목록을 엑셀에서 열 수 있는 파일로(붙여넣기의 짝 — 읽기만) */}
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              disabled={records.every((r) => r.archivedAt !== null)}
+              onClick={() => {
+                const { csv, count } = clientsCsv(records)
+                // 맨 앞 BOM — 엑셀에서 한글이 깨지지 않게
+                saveBytesAs(new TextEncoder().encode(`\ufeff${csv}`), `업체목록-${today}.csv`, 'text/csv;charset=utf-8')
+                showToast(`업체 ${count}곳을 엑셀에서 열 수 있는 파일로 내려받았어요.`)
+                setMoreOpen(false)
+              }}
+              data-testid="clients-csv"
+            >
+              <FileSpreadsheet aria-hidden="true" className="size-4 shrink-0" />
+              <span className="flex min-w-0 flex-col items-start text-left">
+                <span>업체 목록 엑셀 파일로</span>
+                <span className="text-xs font-normal break-keep text-slate-500">회사명 · 대표자 · 전화 · 사업자등록번호 · 다음 할 일</span>
               </span>
             </Button>
             <Button variant="secondary" className="w-full justify-start" onClick={() => restoreRef.current?.click()} disabled={restoring}>

@@ -30,7 +30,7 @@ import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, se
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
 import { HOWTO_NOTE, POSTING_HOWTO } from '../../content/postingHowTo'
-import { PASTE_MAX_ROWS, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
+import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
 import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
@@ -711,6 +711,29 @@ async function run() {
     const many = splitPaste(Array.from({ length: PASTE_MAX_ROWS + 5 }, (_, i) => `업체${i + 1}상사`).join('\n'))
     const r7 = rowsFromTable(many, guessColumns(many))
     check('K21 붙여넣기 — 열 자리가 아닌 번호 · 전화 모양이 아닌 글은 비움 · 이름 없는 줄 뺌 · 한 번에 200곳(넘는 줄 수 알림)', r6.rows.length === 1 && r6.rows[0].businessNumber === '' && r6.rows[0].contactPhone === '' && r6.noName === 1 && r7.rows.length === PASTE_MAX_ROWS && r7.over === 5, JSON.stringify({ r6, over: r7.over }))
+    // ⑦ D-584 업체 목록 내려받기(CSV) — 제목 줄 · 쉼표/따옴표 감싸기 · 식으로 읽히는 첫 글자 막기 · 보관한 업체 빼기 · 그대로 붙여넣으면 다시 읽힘
+    {
+      const mk7 = (id: string, companyName: string, extra: Record<string, unknown> = {}) => normalizeClientOps({ id, workspaceId: 'w', companyName, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', ...extra })
+      const recs = [
+        mk7('a', '한솔, 테크(주)', { contactName: '김한솔', contactPhone: '010-1111-2222', businessNumber: '123-45-67890', industry: '제조업', nextAction: '서류 "받기"', nextActionDueDate: '2026-11-20' }),
+        mk7('b', '다움에너지', { status: 'waiting', contactPhone: '+82-10-3333-4444' }),
+        mk7('c', '보관한상사', { archivedAt: '2026-11-02T00:00:00Z' }),
+        mk7('d', '=1+1상사'),
+      ]
+      const { csv, count } = clientsCsv(recs)
+      const lines = csv.trim().split('\r\n')
+      const back = splitPaste(csv)
+      const gBack = guessColumns(back)
+      const rBack = rowsFromTable(back, gBack)
+      const quotedName = csv.includes('"한솔, 테크(주)"')
+      const doubledQuote = csv.includes('"서류 ""받기"""')
+      const guarded = csv.includes("'=1+1상사") && csv.includes("'+82-10-3333-4444")
+      check(
+        "K21 내려받기(CSV) — 제목 줄 9칸 · 보관한 업체 빼고 3곳 · 쉼표 든 이름은 따옴표 · 따옴표는 두 번 · = + 로 시작하면 앞에 ' · 잠재고객 구분 · 그대로 붙여넣으면 3곳 다시 읽힘(회사 · 대표 · 전화 · 번호 · 업종)",
+        lines[0] === CLIENTS_CSV_HEADER.join(',') && CLIENTS_CSV_HEADER.length === 9 && count === 3 && lines.length === 4 && !csv.includes('보관한상사') && quotedName && doubledQuote && guarded && csv.includes(',잠재고객,') && gBack.header && gBack.columns.slice(0, 5).join() === 'companyName,contactName,contactPhone,businessNumber,industry' && rBack.rows.length === 3 && rBack.rows.some((r) => r.companyName === '한솔, 테크(주)' && r.contactName === '김한솔' && r.businessNumber === '123-45-67890' && r.industry === '제조업'),
+        JSON.stringify({ lines, g: gBack, n: rBack.rows.length, quotedName, doubledQuote, guarded }),
+      )
+    }
     // ⑥ 이미 있는 업체 · 목록 안에서 겹치는 줄은 건너뛴다(번호가 서로 다르면 다른 회사)
     const mkRec = (id: string, companyName: string, businessNumber: string) => normalizeClientOps({ id, workspaceId: 'w', companyName, businessNumber, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' })
     const existing = [mkRec('a', '한솔테크', '123-45-67890'), mkRec('b', '(주)다움에너지', '')]

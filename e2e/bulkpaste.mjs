@@ -8,12 +8,13 @@
  *   B5 [더보기] › [여러 업체 한 번에 등록] — 같은 목록을 또 붙여넣으면 이미 있는 곳은 건너뛰고 새 곳만 · [잠재고객] → 영업 보드 잠재 칸
  *   B6 휴대폰 390 — 옆 넘침 0 · 40px 보다 작은 단추 0
  *   B7 /ops/clients?bulk=1 로 바로 열림(고객 첫 화면 '엑셀 목록 붙여넣기')
+ *   B8 [더보기] › [업체 목록 엑셀 파일로] — CSV 파일 하나(제목 줄 · 한글 안 깨지게 BOM · 업체 수만큼)
  *   N1 영업 보드 칸 이름 '1차 미팅 예정' · '1차 미팅 완료' 가 잘리지 않음
  *
  *   node e2e/bulkpaste.mjs <baseUrl> [사진 폴더]
  */
 import { chromium } from 'playwright'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
@@ -45,7 +46,7 @@ const PASTE_1 = ['대표자\t상호\t사업자등록번호\t전화번호', '김�
 const PASTE_2 = ['한솔정밀(주)\t김한솔\t123-45-67890', '다움에너지\t이다움\t', '다섯째상사\t오다섯\t555-55-55555'].join('\n')
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', acceptDownloads: true })
 const page = await ctx.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
@@ -125,6 +126,19 @@ await page.waitForTimeout(1200)
 const after2 = await stored()
 const five = after2.find((r) => r.companyName === '다섯째상사')
 check('B5 [잠재고객] 으로 1곳 — 저장 5곳 · 계약 전(영업 칸 있음 · 잠재 단계)', after2.length === 5 && five?.status === 'waiting' && five?.sales?.stage === 'lead', five && { s: five.status, st: five.sales?.stage })
+/* ---------------- B8 업체 목록 엑셀 파일로(D-584) ---------------- */
+await page.locator('[data-guide="fn-clients-tools"]').first().click()
+await page.waitForTimeout(300)
+const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.getByTestId('clients-csv').click()])
+const csvBuf = readFileSync(await dl.path())
+const csvText = csvBuf.toString('utf8')
+const csvLines = csvText.replace(/^﻿/, '').trim().split('\r\n')
+check(
+  'B8 [업체 목록 엑셀 파일로] — 파일 이름 업체목록-날짜.csv · 맨 앞 BOM · 제목 줄 · 업체 5줄 · 잠재고객 구분',
+  /^업체목록-\d{4}-\d{2}-\d{2}\.csv$/.test(dl.suggestedFilename()) && csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf && csvLines[0] === '회사명,대표자,전화,사업자등록번호,업종,구분,다음 할 일,기한,등록일' && csvLines.length === 6 && csvText.includes('다섯째상사,오다섯,,555-55-55555,,잠재고객') && csvText.includes('한솔정밀(주),김한솔,010-1111-2222,123-45-67890,,계약 고객'),
+  { name: dl.suggestedFilename(), lines: csvLines.slice(0, 3) },
+)
+
 await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
 const leadCol = ((await page.locator('[data-testid="sales-board"] [data-sales-col="lead"]').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
