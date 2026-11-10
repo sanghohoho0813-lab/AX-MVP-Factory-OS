@@ -174,6 +174,7 @@ export function PackView({
               disabled={saving}
               className="tap t-sub inline-flex min-h-11 items-center justify-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60 sm:gap-1.5 sm:px-3"
               data-testid="mk-pack-save"
+              data-guide="fn-mk-keep"
             >
               <BookmarkPlus aria-hidden="true" className="size-4" />
               {/* D-478 휴대폰 반 칸(360 에서 약 140px)에 한 줄로 */}
@@ -281,7 +282,7 @@ export function PackView({
             </Link>
           ) : (
             !readOnly && (
-              <Button onClick={() => void save()} disabled={saving} data-testid="mk-pack-next-save">
+              <Button onClick={() => void save()} disabled={saving} data-testid="mk-pack-next-save" data-guide="fn-mk-keep">
                 <BookmarkPlus aria-hidden="true" className="size-4" /> 내 콘텐츠에 담기
               </Button>
             )

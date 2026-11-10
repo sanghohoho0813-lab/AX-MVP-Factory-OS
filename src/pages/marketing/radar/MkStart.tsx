@@ -140,7 +140,7 @@ export function MkStart({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" className="min-h-12 justify-center" onClick={() => void save()} disabled={saving} data-testid="mk-start-save">
+        <Button variant="primary" className="min-h-12 justify-center" onClick={() => void save()} disabled={saving} data-testid="mk-start-save" data-guide="fn-mk-start">
           {saving ? '저장하는 중…' : '저장하고 시작'}
         </Button>
         <Button variant="ghost" className="min-h-12 justify-center" onClick={later} data-testid="mk-start-later">

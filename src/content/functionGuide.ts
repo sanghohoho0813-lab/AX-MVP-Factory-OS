@@ -410,6 +410,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '장면마다 무엇을 비출지 안내도 같이 넣어요.',
   },
 
+  'fn-mk-fix': {
+    label: 'AI로 고칠 곳만 고쳐 쓰기',
+    menu: 'mk-threads',
+    what: '점수가 깎인 곳만 AI 가 골라서 고쳐 써요. 나머지 글은 그대로 둬요.',
+    why: '처음부터 다시 쓰면 마음에 들던 문장까지 바뀌어서, 고칠 곳만 손보게 했어요.',
+    effect: '점수가 오른 글만 남고, 마음에 안 들면 [고치기 전으로] 한 번에 돌아가요.',
+    next: '무엇을 왜 고쳤는지 한 줄씩 보여 줘요.',
+  },
   'fn-mk-posted': {
     label: '올렸어요 · 기록표로',
     menu: 'mk-threads',
@@ -419,6 +427,22 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '올린 지 이틀 뒤에 반응 숫자를 적으라고 알려 줘요.',
   },
 
+  'fn-mk-keep': {
+    label: '내 콘텐츠에 담기',
+    menu: 'mk-plan',
+    what: '이 주제로 만든 대본 · 글 묶음을 내 콘텐츠에 저장해요.',
+    why: '찍기로 정한 것만 따로 모아야 찍는 날 · 올리는 날을 챙길 수 있어서 있어요.',
+    effect: '내 콘텐츠에서 대본을 이어서 고치고, 찍었는지 · 올렸는지 표시해요.',
+    next: '담은 주제로 이번 주 할 일을 달력에 같이 걸어 줘요.',
+  },
+  'fn-mk-start': {
+    label: '저장하고 시작',
+    menu: 'marketing',
+    what: '내 이름 · 분야 · 올릴 주제를 한 번 적고 시작해요.',
+    why: '누가 어떤 분야로 올리는지 알아야 주제와 글이 내 것으로 나와서 맨 처음에 물어봐요.',
+    effect: '이번 주 주제 · 글 초안이 내 분야에 맞춰 나와요. 나중에 설정에서 고칠 수 있어요.',
+    next: '분야를 고르면 잘 맞는 예시 글을 같이 보여 줘요.',
+  },
   'fn-mk-lead': {
     label: '글 보고 온 분 적어 두기',
     menu: 'marketing',

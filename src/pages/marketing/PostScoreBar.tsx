@@ -56,7 +56,7 @@ export function PostScoreBar({
       {score && !score.pass && aiOk && !readOnly && (
         <div className="flex flex-wrap items-center gap-2">
           <AiConfirm>
-            <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={onFix} disabled={busy} data-testid={`${testPrefix}-score-fix`}>
+            <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={onFix} disabled={busy} data-testid={`${testPrefix}-score-fix`} data-guide="fn-mk-fix">
               <Sparkles aria-hidden="true" className="size-4" /> {busy ? (busyLabel ?? 'AI가 고쳐 쓰는 중…') : `AI로 고칠 곳만 고쳐 쓰기 (${Math.min(8, score.items.length)}곳)`}
             </Button>
           </AiConfirm>
