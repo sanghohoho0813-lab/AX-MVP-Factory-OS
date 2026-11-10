@@ -69,6 +69,7 @@ const okFor = (url: string) => {
   return { model: 'x', choices: [{ message: { content: JSON.stringify(ANSWER) }, finish_reason: 'stop' }], usage: { prompt_tokens: 800, completion_tokens: 100 } }
 }
 
+let audienceDown = false
 globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
   const url = String(input)
   const headers = init?.headers ?? {}
@@ -82,6 +83,11 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_os_access')) return new Response(JSON.stringify(headers.Authorization === OWNER ? 'full' : headers.Authorization === PILOT ? 'pilot' : 'none'), { status: 200 })
   // SAAS-2 0022 적용 전(지금 운영) — 이용 권한 함수가 없다: 팀장은 예전처럼(내부 팀장)
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_ai_access')) return new Response(JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.my_ai_access' }), { status: 404 })
+  // D-564 0022 가 없을 때 서버가 묻는 것 — 내 os_access 줄의 audience(0024). 지금 운영처럼 칸이 없으면 내부 팀장으로 본다
+  if (url.startsWith('https://qa.supabase.test/rest/v1/os_access?select=audience')) {
+    if (audienceDown) return new Response('{}', { status: 500 })
+    return new Response(JSON.stringify({ code: '42703', message: 'column os_access.audience does not exist' }), { status: 400 })
+  }
   const c: Call = { url, headers, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {} }
   if (/models(\?|$)/.test(url) && (init?.method ?? 'GET') === 'GET') {
     calls.push(c)
@@ -250,7 +256,7 @@ async function serverTests() {
     const st = await get('/api/ai-assist?status=1', PILOT)
     const ids = (st.body.providers as { id: string }[] | undefined)?.map((p) => p.id) ?? []
     const assistPages = new Set(((st.body.assists as { page: string }[] | undefined) ?? []).map((a) => a.page))
-    check('P1 팀장 상태 — 회사 목록은 Gemini 하나 · 기본도 Gemini · role pilot · 마케팅 단추 없음', st.statusCode === 200 && ids.join() === 'gemini' && (st.body.defaultChoice as { provider: string }).provider === 'gemini' && st.body.role === 'pilot' && !assistPages.has('radar') && !assistPages.has('content') && assistPages.has('today'), { ids, role: st.body.role })
+    check('P1 팀장 상태(D-564) — 회사 목록은 Gemini 하나 · 기본도 Gemini · role pilot · 마케팅 단추 있음(내부 팀장) · 대표 전용 화면(특허 명세서 · 홈페이지) 단추는 없음', st.statusCode === 200 && ids.join() === 'gemini' && (st.body.defaultChoice as { provider: string }).provider === 'gemini' && st.body.role === 'pilot' && st.body.marketing === true && assistPages.has('radar') && assistPages.has('content') && !assistPages.has('patent') && !assistPages.has('site') && assistPages.has('today'), { ids, role: st.body.role, marketing: st.body.marketing })
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
     const call = calls.find((c) => c.url.includes(':generateContent'))
     const sys = JSON.stringify(call?.body.systemInstruction ?? '')
@@ -262,8 +268,17 @@ async function serverTests() {
     const c2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX }, PILOT)
     check('P4 팀장이 Claude · GPT 를 보내면 403 provider_not_allowed · 공급자 안 부름', c1.statusCode === 403 && c1.body.code === 'provider_not_allowed' && c2.statusCode === 403 && c2.body.code === 'provider_not_allowed' && calls.length === 0, { c1: c1.body, n: calls.length })
     const m1 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: CTX }, PILOT)
-    // SAAS-2 사용량 장부(AI_USAGE_SECRET)가 없으면 고객 마케팅은 닫힌 채 — 이유는 '사용량 관리 준비 중'
-    check('P5 팀장이 마케팅 단추를 직접 불러도(사용량 장부 없음) 403 usage_setup_needed · 공급자 안 부름', m1.statusCode === 403 && m1.body.code === 'usage_setup_needed' && calls.length === 0, m1.body)
+    // D-564 0022 적용 전(지금 운영)의 내부 팀장 — 마케팅 AI 도 일반 AI 처럼 연다(Gemini 만 · 세지 않음). 누구인지 못 물으면 막는다
+    const mkCalls = calls.filter((c) => c.url.includes(':generateContent'))
+    check('P5 팀장(내부 · 장부 전)이 마케팅 단추를 누르면 200 · Gemini 한 번(다른 회사 0)', m1.statusCode === 200 && (m1.body.run as { provider: string }).provider === 'gemini' && mkCalls.length === 1 && calls.every((c) => !/anthropic|openai/.test(c.url)), { s: m1.statusCode, body: m1.raw.slice(0, 160), n: mkCalls.length })
+    __resetAiAssistState()
+    audienceDown = true
+    calls = []
+    const m2 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: CTX }, PILOT)
+    const g3 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
+    check('P5b 누구인지(내부 · 외부 고객) 못 물으면 마케팅은 503 usage_unreachable · 일반 AI 는 예전처럼 200', m2.statusCode === 503 && m2.body.code === 'usage_unreachable' && g3.statusCode === 200 && calls.filter((c) => c.url.includes(':generateContent')).length === 1, { m2: m2.body, g3: g3.statusCode })
+    audienceDown = false
+    __resetAiAssistState()
     const own = await get('/api/ai-assist?status=1')
     check('P6 대표는 그대로 — 세 회사 · role owner', (own.body.providers as { id: string }[]).length === 3 && own.body.role === 'owner')
   }
@@ -309,9 +324,11 @@ async function serverTests() {
     check('V5 Gemini 키가 없으면 Claude 키가 있어도 503 · 넣을 이름 GEMINI_API_KEY · 공급자 안 부름', nk.statusCode === 503 && nk.body.code === 'setup_needed' && JSON.stringify(nk.body.missing) === '["GEMINI_API_KEY"]' && calls.length === 0, nk.body)
     setEnv()
     const pl = await post({ requestId: rid(), assistId: 'radar.transcript', page: 'radar', context: VCTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } }, PILOT)
+    const plParts = ((calls.filter((c) => c.url.includes(':generateContent')).pop()?.body.contents as { parts: unknown[] }[] | undefined)?.[0]?.parts ?? []).length
+    calls = []
     const other = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX, video: { id: 'dQw4w9WgXcQ', start: 0, end: 600 } })
     const otherParts = ((calls.find((c) => c.url.includes(':generateContent'))?.body.contents as { parts: unknown[] }[] | undefined)?.[0]?.parts ?? []).length
-    check('V6 팀장은 403(대표 전용 마케팅) · 다른 단추에 영상을 붙여 보내도 무시(글만 감)', pl.statusCode === 403 && other.statusCode === 200 && otherParts === 1, { pl: pl.statusCode, otherParts })
+    check('V6 팀장(내부 · D-564)도 영상 받아 적기 200(영상 + 글 두 조각) · 다른 단추에 영상을 붙여 보내도 무시(글만 감)', pl.statusCode === 200 && plParts === 2 && other.statusCode === 200 && otherParts === 1, { pl: pl.statusCode, plParts, otherParts })
     calls = []
     const ad = await post({ requestId: rid(), assistId: 'radar.adapt', page: 'radar', choice: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, context: VCTX })
     check('V7 우리 회사 버전 만들기 — 고른 회사(Claude) 그대로 · 영상은 붙이지 않음(글 · 대본 자료로)', ad.statusCode === 200 && (ad.body.run as { provider: string }).provider === 'anthropic' && calls.some((c) => c.url.includes('/messages')) && !calls.some((c) => c.url.includes(':generateContent')), ad.statusCode)
