@@ -1497,6 +1497,7 @@ try {
     // 휴대폰에서도 두 갈래가 한 칸씩 · 넘침 0 · 큰 단추(44px 이상)
     await pk.setViewportSize({ width: 390, height: 844 })
     await pk.waitForTimeout(500)
+    check('고객(D-582) 첫 화면: 내 고객 정리 칸에 [엑셀 목록 붙여넣기] 길', (await pk.getByTestId('today-welcome-bulk').count()) === 1)
     const welBtn = await pk.getByTestId('today-welcome-marketing-go').boundingBox()
     check('고객 390(D-567): 첫 화면 두 갈래 — 가로 넘침 0 · [마케팅 시작하기] 높이 44px 이상', (await overflowX(pk)) <= 0 && !!welBtn && welBtn.height >= 44, { over: await overflowX(pk), h: welBtn?.height })
     await shot(pk, 'customer-01c-welcome-390')

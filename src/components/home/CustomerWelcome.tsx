@@ -43,6 +43,10 @@ export function CustomerWelcome({ name, named, onGo }: { name: string; named: bo
           <Button variant="secondary" className="mt-auto min-h-12 justify-center" onClick={() => onGo('/ops/clients?new=1')} data-testid="today-first-client-add">
             <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
           </Button>
+          {/* D-582 고객이 이미 여러 곳인 사람 — 한 곳씩 넣지 않고 엑셀 목록을 붙여넣는 길 */}
+          <button type="button" onClick={() => onGo('/ops/clients?bulk=1')} className="tap t-sub inline-flex min-h-11 items-center justify-center font-semibold break-keep text-brand-700 hover:underline" data-testid="today-welcome-bulk">
+            고객이 여러 곳이면 — 엑셀 목록 붙여넣기
+          </button>
         </div>
       </div>
       <p className="t-sub flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-slate-600" data-testid="today-welcome-foot">

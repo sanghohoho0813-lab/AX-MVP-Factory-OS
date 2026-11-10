@@ -12,6 +12,7 @@ import { ArrowRight, Check, ChevronDown } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
+import { PostingHowTo } from './PostingHowTo'
 import { MARKETING_BASICS, markBasicRead, nextBasic, readBasics } from '../../content/marketingBasics'
 
 export function MarketingBasicsPage() {
@@ -89,6 +90,8 @@ export function MarketingBasicsPage() {
           )
         })}
       </ol>
+      {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
+      <PostingHowTo channels={['threads', 'reels', 'tiktok', 'shorts', 'youtube']} testId="mk-basics-howto" />
     </div>
   )
 }

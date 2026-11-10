@@ -7,6 +7,7 @@
  *   B4 어떤 업체인지 고르기 전에는 등록 단추가 꺼져 있음 → [계약 고객] → [n곳 등록] → 목록에 카드 n장 · 저장된 값
  *   B5 [더보기] › [여러 업체 한 번에 등록] — 같은 목록을 또 붙여넣으면 이미 있는 곳은 건너뛰고 새 곳만 · [잠재고객] → 영업 보드 잠재 칸
  *   B6 휴대폰 390 — 옆 넘침 0 · 40px 보다 작은 단추 0
+ *   B7 /ops/clients?bulk=1 로 바로 열림(고객 첫 화면 '엑셀 목록 붙여넣기')
  *   N1 영업 보드 칸 이름 '1차 미팅 예정' · '1차 미팅 완료' 가 잘리지 않음
  *
  *   node e2e/bulkpaste.mjs <baseUrl> [사진 폴더]
@@ -150,6 +151,11 @@ const over = await mp.evaluate(() => document.documentElement.scrollWidth - docu
 const small = await mp.locator('[role="dialog"] button, [role="dialog"] select, [role="dialog"] summary').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? '').trim().slice(0, 14)))
 check('B6 휴대폰 390 — 붙여넣은 뒤 옆 넘침 0 · 40px 보다 작은 단추 · 고르개 0 · 등록할 곳 4', over <= 0 && small.length === 0 && (await mp.getByTestId('bulk-paste-summary').getAttribute('data-add')) === '4', { over, small })
 if (SHOTS) await mp.screenshot({ path: `${SHOTS}/bulk-06-390.png` })
+
+/* ---------------- B7 주소로 바로 열기(첫 화면 '엑셀 목록 붙여넣기' 가 이 주소로 온다) ---------------- */
+await mp.goto(BASE + '/ops/clients?bulk=1', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+check('B7 /ops/clients?bulk=1 → 붙여넣는 창이 바로 열림', (await mp.getByTestId('bulk-paste').count()) === 1 && (await mp.getByTestId('bulk-paste-text').count()) === 1)
 
 check('JS 오류 없음', errors.length === 0, errors.slice(0, 3))
 console.log(`\nqa:bulkpaste: ${pass} passed, ${fail} failed`)

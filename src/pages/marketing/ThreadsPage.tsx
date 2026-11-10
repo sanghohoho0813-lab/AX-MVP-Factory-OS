@@ -24,6 +24,7 @@ import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, Rewri
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
 import { FirstLineMaker } from './FirstLineMaker'
+import { PostingHowTo } from './PostingHowTo'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
@@ -899,6 +900,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
                 새 글
               </Button>
             </div>
+            {/* D-583 올려 본 적이 없는 사람 — 접힌 한 줄(누르면 스레드에 올리는 다섯 걸음) */}
+            <PostingHowTo channels={['threads']} testId="thr-howto" />
             {/* D-274 보충본 1-3 "한 주제를 여러 채널로" — 같은 소재 · 태그를 들고 릴스 · 틱톡으로 */}
             {draft.topic.trim() && (
               <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/shorts?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="thr-to-shorts">

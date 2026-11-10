@@ -300,6 +300,37 @@ await page.waitForTimeout(600)
 const mkFn2 = await page.getByTestId('guide-function').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
 check('G12 기초 7가지 [읽었어요] · 내 콘텐츠 단계 숫자판 · 남의 인기 영상 탭에 마우스 → 기능 안내(어려운 말 0) · 사용법 안내 내 콘텐츠 줄 아래 2개', kRead === 'fn-mk-basic-read' && kStages === 'fn-mk-stages' && kLook === 'fn-mk-look' && mkFn2.includes('fn-mk-stages') && mkFn2.includes('fn-mk-add') && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅/.test(readText + stagesText), { kRead, kStages, kLook, mkFn2 })
 
+/* G13 — D-583 올리는 법(스레드 · 릴스/틱톡/쇼츠 · 기초 7가지 아래) — 접힌 한 줄 → 채널별 걸음 */
+const howto = async (path, id) => {
+  await page.goto(BASE + path, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const box = page.getByTestId(id)
+  const closed = (await box.count()) === 1 && !(await box.evaluate((e) => e.open))
+  await page.getByTestId(`${id}-toggle`).scrollIntoViewIfNeeded()
+  await page.getByTestId(`${id}-toggle`).click()
+  await page.waitForTimeout(200)
+  return { box, closed }
+}
+const hThr = await howto('/marketing/threads', 'thr-howto')
+const thrSteps = await page.getByTestId('thr-howto-step').allInnerTexts()
+const hSht = await howto('/marketing/shorts', 'sht-howto')
+const shtTabs = await page.getByTestId('sht-howto-tab').allInnerTexts()
+await page.locator('[data-testid="sht-howto-tab"][data-key="tiktok"]').click()
+await page.waitForTimeout(150)
+const tikSteps = await page.getByTestId('sht-howto-step').allInnerTexts()
+const hBas = await howto('/marketing/basics', 'mk-basics-howto')
+const basTabs = await page.getByTestId('mk-basics-howto-tab').allInnerTexts()
+await page.locator('[data-testid="mk-basics-howto-tab"][data-key="youtube"]').click()
+await page.waitForTimeout(150)
+const ytSteps = await page.getByTestId('mk-basics-howto-step').allInnerTexts()
+const howText = [...thrSteps, ...tikSteps, ...ytSteps, await hBas.box.innerText()].join(' ')
+check(
+  'G13 올리는 법: 세 화면 모두 처음엔 접힘 → 스레드 5걸음([게시] · [올렸어요]) · 릴스/틱톡/쇼츠 탭 3 → 틱톡 4걸음([업로드]) · 기초 화면 탭 5 → 유튜브 긴 영상([게시 완료]) · 어려운 말 0',
+  hThr.closed && hSht.closed && hBas.closed && thrSteps.length === 5 && thrSteps.join(' ').includes('[게시]') && thrSteps[4].includes('[올렸어요]') && shtTabs.length === 3 && tikSteps.length === 4 && tikSteps.join(' ').includes('[업로드]') && basTabs.length === 5 && ytSteps.join(' ').includes('[게시 완료]') && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅/.test(howText),
+  { closed: [hThr.closed, hSht.closed, hBas.closed], thr: thrSteps.length, shtTabs, tik: tikSteps.length, basTabs },
+)
+await shot(page, 'guide-09-howto')
+
 /* G6 */
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', hasTouch: true, isMobile: true })
 const mp = await m.newPage()
@@ -313,6 +344,15 @@ await mp.waitForTimeout(250)
 const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 const small = await mp.locator('[data-testid="guide-page"] button, [data-testid="guide-page"] a').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? '').trim().slice(0, 16)))
 check('G6 휴대폰 390: 사용법 안내 넘침 0 · 40px 보다 작은 단추 0 · 펼친 줄에 영상 자리', over <= 0 && small.length === 0 && (await mp.getByTestId('guide-video').count()) === 1, { over, small })
+await mp.goto(BASE + '/marketing/shorts', { waitUntil: 'networkidle' })
+await mp.waitForTimeout(700)
+await mp.getByTestId('sht-howto-toggle').scrollIntoViewIfNeeded()
+await mp.getByTestId('sht-howto-toggle').click()
+await mp.waitForTimeout(250)
+const howOver = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+const howSmall = await mp.locator('[data-testid="sht-howto"] summary, [data-testid="sht-howto"] button').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 }).map((e) => (e.textContent ?? '').trim().slice(0, 12)))
+const howFont = await mp.locator('[data-testid="sht-howto"] *').evaluateAll((els) => Math.min(...els.filter((e) => [...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())).map((e) => parseFloat(getComputedStyle(e).fontSize))))
+check('G13 휴대폰 390: 올리는 법 펼침 — 옆 넘침 0 · 40px 보다 작은 단추 0 · 글자 15px 이상', howOver <= 0 && howSmall.length === 0 && howFont >= 15, { howOver, howSmall, howFont })
 if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-04-390.png`, fullPage: true }).catch(() => {})
 await mp.getByTestId('guide-group').nth(1).tap()
 await mp.waitForTimeout(700)

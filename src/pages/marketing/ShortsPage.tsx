@@ -58,6 +58,7 @@ import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, Rewri
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
 import { FirstLineMaker } from './FirstLineMaker'
+import { PostingHowTo } from './PostingHowTo'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
@@ -762,6 +763,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
                 새로
               </Button>
             </div>
+            {/* D-583 찍은 영상을 어디에 어떻게 올리나 — 접힌 한 줄(안에서 릴스 · 틱톡 · 쇼츠 탭) */}
+            <PostingHowTo channels={['reels', 'tiktok', 'shorts']} testId="sht-howto" />
             {draft.topic.trim() && (
               <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/threads?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="sht-to-threads">
                 같은 소재로 스레드 글 쓰기 →

@@ -29,6 +29,7 @@ import { presetOf } from '../aiAssist/presets'
 import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, setPilotMarketing, setPilotMarketingScreens } from '../../config/pilotMarketing'
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
+import { HOWTO_NOTE, POSTING_HOWTO } from '../../content/postingHowTo'
 import { PASTE_MAX_ROWS, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
 import { normalizeClientOps } from '../clientOpsService'
 
@@ -656,7 +657,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 4 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -665,6 +666,18 @@ async function run() {
     bf.steps.length === CLIENT_FLOW.steps.length && bf.steps.every((st, i2) => st.key === CLIENT_FLOW.steps[i2].key) && bf.steps.every((st) => !st.why.includes('모듈')) && CLIENT_FLOW.steps.some((st) => st.why.includes('모듈')),
     bf.steps.filter((st) => st.why.includes('모듈')).map((st) => st.key).join(),
   )
+
+  /* K22 — D-583 올리는 법(채널별 걸음) — 쉬운 말 · 짧은 걸음 */
+  {
+    const all = Object.values(POSTING_HOWTO)
+    const text = all.map((h) => [h.label, h.need, h.tip, ...h.steps].join(' ')).join(' ') + HOWTO_NOTE
+    const longStep = all.flatMap((h) => h.steps.map((s2) => ({ k: h.key, s: s2 }))).filter((x) => x.s.length > 48)
+    check(
+      'K22 올리는 법 — 다섯 채널(스레드 · 릴스 · 틱톡 · 쇼츠 · 유튜브) · 걸음 4 ~ 5개 · 한 걸음 48자 안 · 어려운 말(롱폼 · 썸네일 · 캡션 · 해시태그 · 포맷 · 훅 · 벤치마킹) 0 · 마지막 걸음은 올렸다고 표시',
+      all.length === 5 && all.every((h) => h.steps.length >= 4 && h.steps.length <= 5 && h.need.length > 5 && h.tip.length > 10) && longStep.length === 0 && !/롱폼|썸네일|캡션|해시태그|포맷|훅|벤치마킹/.test(text) && all.filter((h) => h.key !== 'youtube').every((h) => h.steps[h.steps.length - 1].includes('올렸어요')) && POSTING_HOWTO.youtube.steps[4].includes('게시 완료'),
+      JSON.stringify({ n: all.length, longStep }),
+    )
+  }
 
   /* K21 — D-582 여러 업체 한 번에 등록(엑셀에서 붙여넣기) */
   {

@@ -283,7 +283,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
   const [asProspect, setAsProspect] = useState(true)
   // D-582 여러 업체 한 번에 등록(엑셀에서 붙여넣기)
-  const [bulkOpen, setBulkOpen] = useState(false)
+  // 첫 화면의 '엑셀 목록 붙여넣기' 는 ?bulk=1 로 온다(새 업체 등록 창의 ?new=1 과 같은 방식)
+  const [bulkOpen, setBulkOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bulk') === '1')
   /** D-181: 새로 넣는 고객의 종류 — 보고 있던 쪽(대표만 고른다) */
   const [newType, setNewType] = useState<ClientType>(initialClientType)
   // D-124: 찾던 말은 주소(?q=)에 — 업체를 열었다가 뒤로 와도 그대로

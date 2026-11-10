@@ -435,6 +435,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '올린 지 이틀 뒤에 반응 숫자를 적으라고 알려 줘요.',
   },
 
+  'fn-mk-howto': {
+    label: '올리는 법 보기',
+    menu: 'mk-threads',
+    what: '쓴 글 · 대본을 스레드 · 인스타그램 · 틱톡 · 유튜브에 올리는 순서를 네댓 걸음으로 알려 줘요.',
+    why: '글은 프로그램이 써 주지만, 올려 본 적이 없으면 거기서 멈추게 돼서 있어요.',
+    effect: '걸음대로 따라 하면 처음이어도 5분 안에 올릴 수 있어요.',
+    next: '걸음마다 화면 사진을 같이 보여 줘요.',
+  },
   'fn-mk-keep': {
     label: '내 콘텐츠에 담기',
     menu: 'mk-plan',
