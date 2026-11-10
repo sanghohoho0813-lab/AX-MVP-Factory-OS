@@ -100,7 +100,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
           <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
             {DECISION_KIND_LABEL[kind]} {bulkable.length}건을 다 읽어 보셨으면 한 번에 처리할 수 있어요.
           </p>
-          <Button size="sm" variant="primary" className="self-start sm:self-auto" disabled={busy !== null} onClick={() => void answerMany(bulkable)} data-testid="decide-bulk-yes">
+          <Button size="sm" variant="primary" className="self-start sm:self-auto" disabled={busy !== null} onClick={() => void answerMany(bulkable)} data-testid="decide-bulk-yes" data-guide="fn-decide-bulk">
             <CheckCheck aria-hidden="true" className="size-4" /> 이 {bulkable.length}건 모두 맞아요
           </Button>
         </div>

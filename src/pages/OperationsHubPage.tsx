@@ -1083,6 +1083,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   <button
                     type="button"
                     onClick={() => setCatalogOpen(true)}
+                    data-guide="fn-clients-workitem"
                     className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
                   >
                     업무 항목 추가

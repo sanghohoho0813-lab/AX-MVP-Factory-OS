@@ -115,6 +115,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '쉬는 날에 잡힌 마감을 미리 알려 줘요.',
     next: '해가 바뀌면 저절로 넣어 주게 해요.',
   },
+  'fn-calendar-dayoff': {
+    label: '쉬는 날로 표시',
+    menu: 'calendar',
+    what: '고른 날을 쉬는 날(휴가 · 회사 쉬는 날)로 적어 둬요.',
+    why: '쉬는 날에 마감이 걸리면 그 전 영업일까지 챙겨야 해서, 달력이 미리 알게 하려고 있어요.',
+    effect: '쉬는 날에 기한이 있으면 전 영업일까지 챙기라고 한 줄로 알려 줘요.',
+    next: '여러 사람의 쉬는 날을 같이 보게 해요.',
+  },
   'fn-sales-add': {
     label: '잠재고객 등록',
     menu: 'sales',
@@ -325,6 +333,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '서류마다 떼는 곳 안내를 더 자세히 넣어요.',
   },
 
+  'fn-clients-workitem': {
+    label: '업무 항목 추가',
+    menu: 'client-ops',
+    what: '내가 하는 업무 이름을 만들어 업체마다 붙여요.',
+    why: '사람마다 하는 일이 달라서, 정해진 목록 대신 내 업무로 표를 만들 수 있게 했어요.',
+    effect: '업체마다 그 업무가 어디까지 됐는지 조각으로 보여요.',
+    next: '업무마다 자주 쓰는 할 일 묶음을 같이 걸어 둬요.',
+  },
   'fn-clients-tools': {
     label: '고객 관리 [더보기]',
     menu: 'client-ops',
@@ -332,6 +348,16 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     why: '가끔 쓰는 도구를 첫 화면에서 빼서 목록이 한눈에 보이게 하려고 있어요.',
     effect: '업체 목록을 파일로 받아 두거나, 내가 하는 업무 이름을 직접 만들 수 있어요.',
     next: '자주 쓰는 도구는 밖으로 꺼내 놓을 수 있게 해요.',
+  },
+
+  // ---------------------------------------------------------------- 확인할 것
+  'fn-decide-bulk': {
+    label: '모두 맞아요',
+    menu: 'decide',
+    what: '서류에서 읽어 넣은 값을 한 번에 맞다고 확인해요.',
+    why: '하나씩 누르는 시간을 줄이고, 사람은 마지막 확인만 하게 하려고 있어요.',
+    effect: '확인한 값은 회사 정보로 굳어져요. 틀린 것은 [하나씩 다시 볼게요] 로 골라 고쳐요.',
+    next: '자주 틀리는 값은 먼저 따로 물어봐요.',
   },
 
   // ---------------------------------------------------------------- 마케팅 · 브랜딩 › 글 · 대본 쓰기

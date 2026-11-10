@@ -571,7 +571,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         <Button variant="primary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo">
                           <Plus aria-hidden="true" className="size-4" />이 날에 적기 · 반복
                         </Button>
-                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off">
+                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off" data-guide="fn-calendar-dayoff">
                           {pickedOff.length > 0 ? '쉬는 날 고치기' : '쉬는 날로 표시'}
                         </Button>
                       </div>
