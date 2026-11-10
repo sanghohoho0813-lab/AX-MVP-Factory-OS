@@ -133,7 +133,8 @@ const fetched = []
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } })
 async function newCtx(viewport) {
-  const ctx = await browser.newContext({ viewport, locale: 'ko-KR', acceptDownloads: true, ...(viewport.width < 768 ? { isMobile: true, hasTouch: true } : {}) })
+  // 화면은 브라우저의 오늘 날짜로 파일 이름을 짓는다 — 시험의 today(한국 시각)와 같은 시간대로 맞춘다(한국 자정 ~ 오전 9시에 날짜가 하루 어긋나던 것)
+  const ctx = await browser.newContext({ viewport, locale: 'ko-KR', timezoneId: 'Asia/Seoul', acceptDownloads: true, ...(viewport.width < 768 ? { isMobile: true, hasTouch: true } : {}) })
   await ctx.addInitScript(([ref, s, ws]) => {
     localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
     localStorage.setItem('axmvp.active_workspace', ws)
