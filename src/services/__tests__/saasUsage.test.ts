@@ -43,6 +43,7 @@ import { guideGroupsFor } from '../../content/guideGroups'
 import { searchScreens, squashForSearch } from '../../content/screenSearch'
 import { WHATS_NEW, WHATS_NEW_MAX, whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
 import { IN_APP_LABEL, externalOpenUrl, hasOneTimeToken, inAppBrowserOf } from '../../lib/inAppBrowser'
+import { CONTACT_PATHS, CONTACT_PATH_AFTER, CONTACT_PATH_NOTE } from '../../content/contactPathHowTo'
 
 let passed = 0
 let failed = 0
@@ -668,7 +669,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 2 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 3 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -1069,6 +1070,21 @@ async function run() {
       meta('og:image') === 'https://os.miraeailab.com/og-image.png' && meta('og:image:width') === '1200' && meta('og:image:height') === '630' && isPng && w === 1200 && h === 630 && png.length > 10_000 && png.length < 300_000 &&
         meta('og:title').length > 3 && meta('og:description').length > 10 && meta('twitter:card') === 'summary_large_image' && meta('og:image:alt').length > 5,
       JSON.stringify({ image: meta('og:image'), w, h, bytes: png.length, isPng }),
+    )
+  }
+
+  /* K34 — D-596 연락 받는 길 만드는 법 */
+  {
+    const all = CONTACT_PATHS.flatMap((c) => [c.label, c.fit, c.need, ...c.steps, c.bioLine, c.tip]).join('\n')
+    const bad = CONTACT_PATHS.filter((c) => c.steps.length < 3 || c.steps.length > 5 || c.steps.some((s) => s.length < 12 || s.length > 70) || c.fit.length < 10 || c.need.length < 5 || c.tip.length < 10 || !c.bioLine.startsWith('문의'))
+    // 프로필 소개 글에 넣었을 때: '문의: 문의…' 처럼 겹치지 않고, 채울 곳은 [대괄호] 로 남는다
+    const bioWith = (line: string) => bioDrafts({ name: '박 컨설턴트', field: '정책자금 컨설팅', helps: '정책자금', audience: '제조업 대표', contact: line, fact: '' }, 'youtube')[0].text
+    check(
+      'K34 연락 받는 길 만드는 법(D-596) — 세 가지(오픈채팅 · 채널 · 전화) · 길마다 3~5걸음(한 줄에 한 동작) · 이런 분께 · 준비물 · 알아 두면 · 업계 말 0 · 가짜 번호를 그대로 넣지 않음(채울 곳은 [대괄호]) · 소개 글에 넣어도 "문의" 가 겹치지 않음 · 앱이 바뀔 때 한 줄 · 다음 길(잠재고객) 한 줄',
+      CONTACT_PATHS.length === 3 && CONTACT_PATHS.map((c) => c.key).join() === 'openchat,channel,phone' && bad.length === 0 && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅|DM|CTA/.test(all) &&
+        !/010-\d{4}-\d{4}/.test(CONTACT_PATHS.map((c) => c.bioLine).join()) && CONTACT_PATHS.find((c) => c.key === 'phone')!.bioLine.includes('[전화번호]') && CONTACT_PATHS.find((c) => c.key === 'channel')!.bioLine.includes('[채널 이름]') &&
+        CONTACT_PATHS.every((c) => !/문의[:：]\s*문의/.test(bioWith(c.bioLine)) && bioWith(c.bioLine).includes(c.bioLine)) && CONTACT_PATH_NOTE.includes('비슷한 말') && CONTACT_PATH_AFTER.includes('잠재고객') && hasMenuGuide('fn-mk-contact'),
+      JSON.stringify({ bad: bad.map((c) => c.key), sample: bioWith(CONTACT_PATHS[0].bioLine).slice(-60) }),
     )
   }
 

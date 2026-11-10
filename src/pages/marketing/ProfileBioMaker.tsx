@@ -7,7 +7,7 @@
  *  - 부풀리는 말(건수 늘리기 · 보장 · 시간 압박)은 있는 글 규칙(consultLint)으로 빨갛게 알려 준다.
  * 마케팅 영역 — 글자 15px 이상 · 쉬운 말(D-507) · 누르는 칸 44px.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Copy } from 'lucide-react'
 import { useBrandProfile } from '../../services/brandProfile'
@@ -34,11 +34,23 @@ async function copy(text: string): Promise<boolean> {
   }
 }
 
-export function ProfileBioMaker({ testId = 'mk-bio' }: { testId?: string }) {
+/** contactSeed — 아래 '연락 받는 길 만드는 법'(D-596)에서 [소개 글에 이 줄 넣기] 를 누르면 그 줄이 '연락 받는 길' 칸에 들어온다(n 은 누를 때마다 늘어난다) */
+export function ProfileBioMaker({ testId = 'mk-bio', contactSeed }: { testId?: string; contactSeed?: { line: string; n: number } }) {
+  const boxRef = useRef<HTMLDetailsElement>(null)
   const { profile, loaded } = useBrandProfile()
   const base = useMemo(() => bioInputFromBrand(loaded ? profile : null), [profile, loaded])
   // 여기서 고친 칸만 따로 — 내 브랜드가 나중에 읽혀도 고친 칸은 그대로 둔다
   const [edits, setEdits] = useState<Partial<BioInput>>({})
+  const seedN = contactSeed?.n ?? 0
+  const seedLine = contactSeed?.line ?? ''
+  useEffect(() => {
+    if (!seedN || !seedLine) return
+    setEdits((prev) => ({ ...prev, contact: seedLine }))
+    const box = boxRef.current
+    if (!box) return
+    box.open = true
+    box.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [seedN, seedLine])
   const input: BioInput = { ...base, ...edits }
   const [channel, setChannel] = useState<BioChannel>('sns')
   const [copied, setCopied] = useState<string>('')
@@ -48,7 +60,7 @@ export function ProfileBioMaker({ testId = 'mk-bio' }: { testId?: string }) {
   const warns = consultLint(Object.values(input).join('\n'), { ax: axShown() })
 
   return (
-    <details className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
+    <details ref={boxRef} className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
       <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-bio">
         프로필에는 뭐라고 쓰죠? <span className="font-semibold text-brand-700">프로필 소개 글 만들기</span>
       </summary>

@@ -578,8 +578,9 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
     JSON.stringify({ folded, sum, items, first: first.slice(0, 80), over: m.over, small: m.small, minFont: m.minFont }),
   )
   if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-19-whatsnew-390.png` }).catch(() => {})
-  const goText = ((await mp.getByTestId('whats-new-go').first().innerText().catch(() => '')) ?? '').trim()
-  await mp.getByTestId('whats-new-go').first().click()
+  const bulkGo = mp.locator('[data-testid="whats-new-item"][data-key="bulk-email-address"]').getByTestId('whats-new-go')
+  const goText = ((await bulkGo.innerText().catch(() => '')) ?? '').trim()
+  await bulkGo.click()
   await mp.waitForTimeout(1200)
   check('G19 새로 생긴 것 › [엑셀 목록 넣어 보기] → 고객 관리의 붙여넣는 창이 바로 열림(?bulk=1)', goText.includes('엑셀 목록 넣어 보기') && new URL(mp.url()).pathname === '/ops/clients' && (await mp.getByTestId('bulk-paste-text').count()) === 1, `${goText} ${mp.url()}`)
   await mp.keyboard.press('Escape').catch(() => {})
@@ -645,6 +646,47 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
     og.status === 200 && og.type.includes('image/png') && og.w === 1200 && og.h === 630 && og.bytes < 300_000 && /^https:\/\/.+\/og-image\.png$/.test(og.image) && og.title.length > 3 && og.desc.length > 10,
     JSON.stringify(og),
   )
+}
+
+/* G22 연락 받는 길 만드는 법(D-596) — 기초 7가지 화면 아래 접힌 한 줄 → 길 고르기 → 걸음 → [소개 글에 이 줄 넣기] → 프로필 소개 글 칸에 들어감 */
+{
+  await mp.goto(BASE + '/marketing/basics', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(600)
+  const box = mp.getByTestId('mk-contact')
+  const folded = (await box.count()) === 1 && !(await box.evaluate((d) => d.open))
+  await mp.getByTestId('mk-contact-toggle').click()
+  await mp.waitForTimeout(300)
+  const tabs = await mp.getByTestId('mk-contact-tab').allInnerTexts()
+  const steps1 = await mp.getByTestId('mk-contact-step').count()
+  const line1 = ((await mp.getByTestId('mk-contact-bio-line').innerText().catch(() => '')) ?? '').trim()
+  await mp.locator('[data-testid="mk-contact-tab"][data-key="phone"]').click()
+  await mp.waitForTimeout(200)
+  const steps3 = await mp.getByTestId('mk-contact-step').count()
+  const line3 = ((await mp.getByTestId('mk-contact-bio-line').innerText().catch(() => '')) ?? '').trim()
+  const cm = await mp.evaluate(() => {
+    const el = document.querySelector('[data-testid="mk-contact"]')
+    return {
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      small: [...el.querySelectorAll('a, button, summary')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 && e.tagName !== 'A' }).length,
+      minFont: Math.min(...[...el.querySelectorAll('p, span, button, a, summary')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => parseFloat(getComputedStyle(e).fontSize))),
+      lead: el.querySelector('[data-testid="mk-contact-lead"]')?.getAttribute('href') ?? '',
+    }
+  })
+  check(
+    'G22 기초 7가지 › 연락 받는 길 만드는 법(390): 처음엔 접힘 → 길 셋(카카오톡 오픈채팅 · 카카오톡 채널 · 전화 · 문자) · 오픈채팅 5걸음 · 프로필에 적을 한 줄 · 전화 탭은 3걸음 · 채울 곳은 [대괄호] · 잠재고객으로 적는 길 · 옆 넘침 0 · 작은 단추 0 · 글자 15px 이상',
+    folded && tabs.join('|') === '카카오톡 오픈채팅|카카오톡 채널|전화 · 문자' && steps1 === 5 && line1.startsWith('문의는 프로필 링크') && steps3 === 3 && line3.includes('[전화번호]') && cm.lead === '/sales/board?new=1&from=content' && cm.over <= 1 && cm.small === 0 && cm.minFont >= 15,
+    JSON.stringify({ folded, tabs, steps1, line1, steps3, line3, ...cm }),
+  )
+  if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-22-contact-390.png` }).catch(() => {})
+  // [소개 글에 이 줄 넣기] → 위의 프로필 소개 글 만들기가 펼쳐지고 '연락 받는 길' 칸에 그 줄 · 초안에도 들어감
+  await mp.locator('[data-testid="mk-contact-tab"][data-key="openchat"]').click()
+  await mp.waitForTimeout(200)
+  await mp.getByTestId('mk-contact-use').click()
+  await mp.waitForTimeout(700)
+  const bioOpen = await mp.getByTestId('mk-bio').evaluate((d) => d.open)
+  const contactVal = await mp.locator('[data-testid="mk-bio-input"][data-key="contact"]').inputValue().catch(() => '')
+  const draft1 = ((await mp.getByTestId('mk-bio-text').first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('G22 [소개 글에 이 줄 넣기] → 프로필 소개 글 만들기가 펼쳐짐 · "연락 받는 길" 칸에 그 줄 · 초안 첫 번째에도 그 줄 · 다른 칸은 그대로', bioOpen && contactVal === '문의는 프로필 링크(카카오톡 1:1)로' && draft1.includes('문의는 프로필 링크(카카오톡 1:1)로'), JSON.stringify({ bioOpen, contactVal, draft1: draft1.slice(0, 120) }))
 }
 
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */

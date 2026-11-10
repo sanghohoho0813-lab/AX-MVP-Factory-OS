@@ -25,6 +25,15 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'contact-path',
+    date: '2026-11-11',
+    title: '연락 받는 길 만드는 법을 알려 줘요',
+    how: "카카오톡 오픈채팅을 다섯 걸음으로 만들고, 그 한 줄을 프로필 소개 글에 바로 넣어요. 기초 7가지 화면 아래에 있어요.",
+    path: '/marketing/basics',
+    cta: '기초 7가지 열기',
+    marketing: true,
+  },
+  {
     id: 'search-screens',
     date: '2026-11-11',
     title: '찾기에 하고 싶은 일을 적어도 찾아 줘요',

@@ -517,6 +517,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '위쪽 숫자가 하나 늘고, 아직 안 읽은 다음 것이 바로 펼쳐져요.',
     next: '읽은 것을 바로 연습해 보는 짧은 문제를 넣어요.',
   },
+  'fn-mk-contact': {
+    label: '연락 받는 길 만드는 법',
+    menu: 'mk-basics',
+    what: '글을 본 사람이 말을 걸 수 있는 길(카카오톡 오픈채팅 · 채널 · 전화)을 만드는 순서를 서너 걸음으로 알려 줘요.',
+    why: '프로필에 연락 받는 길이 없으면 글을 아무리 올려도 문의가 들어올 곳이 없어서 있어요.',
+    effect: '걸음대로 따라 만든 뒤 [소개 글에 이 줄 넣기] 를 누르면 프로필 소개 글에 바로 들어가요.',
+    next: '걸음마다 화면 사진을 같이 보여 줘요.',
+  },
   'fn-mk-bio': {
     label: '프로필 소개 글 만들기',
     menu: 'mk-basics',

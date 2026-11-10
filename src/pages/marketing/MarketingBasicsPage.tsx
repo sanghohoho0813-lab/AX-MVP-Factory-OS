@@ -14,6 +14,7 @@ import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
 import { PostingHowTo } from './PostingHowTo'
 import { ProfileBioMaker } from './ProfileBioMaker'
+import { ContactPathHowTo } from './ContactPathHowTo'
 import { MARKETING_BASICS, markBasicRead, nextBasic, readBasics } from '../../content/marketingBasics'
 
 export function MarketingBasicsPage() {
@@ -21,6 +22,8 @@ export function MarketingBasicsPage() {
   const [open, setOpen] = useState<string | null>(() => nextBasic(readBasics())?.key ?? null)
   const done = read.length
   const total = MARKETING_BASICS.length
+  // D-596 '연락 받는 길 만드는 법' 에서 고른 줄 → 프로필 소개 글의 '연락 받는 길' 칸으로(누를 때마다 n 이 늘어 같은 줄도 다시 들어간다)
+  const [contactSeed, setContactSeed] = useState({ line: '', n: 0 })
 
   const markRead = (key: string) => {
     const next = markBasicRead(key)
@@ -93,7 +96,9 @@ export function MarketingBasicsPage() {
       </ol>
       {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
       {/* D-588 글에서는 팔지 않고 프로필로 보낸다 — 그 프로필에 쓸 소개 글(접힌 한 줄 · 규칙 초안) */}
-      <ProfileBioMaker />
+      <ProfileBioMaker contactSeed={contactSeed} />
+      {/* D-596 프로필에 적을 '연락 받는 길' 이 아직 없는 사람 — 만드는 법(접힌 한 줄) · 고른 줄은 위 소개 글 칸으로 */}
+      <ContactPathHowTo onUse={(line) => setContactSeed((prev) => ({ line, n: prev.n + 1 }))} />
       <PostingHowTo channels={['threads', 'reels', 'tiktok', 'shorts', 'youtube']} testId="mk-basics-howto" />
     </div>
   )
