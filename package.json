@@ -95,6 +95,7 @@
     "qa:uxpick": "node e2e/uxpick.mjs",
     "qa:firstscreen": "node e2e/firstscreen.mjs",
     "qa:taps": "node e2e/taps.mjs",
+    "qa:bulkpaste": "node e2e/bulkpaste.mjs",
     "qa:hover": "node e2e/hover.mjs",
     "qa:senior": "node e2e/senior.mjs",
     "qa:mkkit": "node e2e/mkkit.mjs",

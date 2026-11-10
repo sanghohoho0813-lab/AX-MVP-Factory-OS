@@ -1853,6 +1853,37 @@ try {
     ps.off('pageerror', onErr)
     await ps.setViewportSize({ width: 1440, height: 900 })
     check('고객(D-575) 화면 한 바퀴(일정 · 영업 · 매출 · 확인할 것 · 고객 관리 · 스레드 · 릴스): 전부 열림 · 대표 이름 · 채널 0 · 390 옆 넘침 0 · 화면 오류 0', sweep.every((x) => x.ok && x.over <= 1) && sweepErrors.length === 0, { bad: sweep.filter((x) => !x.ok || x.over > 1), sweepErrors })
+    // D-582 고객 계정: 여러 업체 한 번에 등록 — 진짜 권한 규칙으로 저장 · 고객 작업공간에만 · 대표 작업공간은 그대로
+    {
+      const custWs = sql(`select id from public.workspaces where owner_id = '${CUSTOMER.id}' order by created_at limit 1`)
+      const countIn = (ws) => Number(sql(`select count(*) from public.operations_clients where workspace_id = '${ws}'`))
+      const ownerBefore = countIn(OWNER_WS)
+      const custBefore = countIn(custWs)
+      await go(ps, '/ops/clients')
+      await ps.waitForTimeout(700)
+      await ps.locator('[data-guide="fn-clients-tools"]').first().click()
+      await ps.getByTestId('clients-bulk').click()
+      await ps.getByTestId('bulk-paste-text').fill('상호\t대표자\t전화\n붙여넣기일번상사\t김일번\t010-1010-2020\n붙여넣기이번테크\t이이번\t\n고객시범상사(주)\t한고객\t')
+      await ps.waitForTimeout(400)
+      const bAdd = await ps.getByTestId('bulk-paste-summary').getAttribute('data-add').catch(() => '')
+      const bDup = await ps.getByTestId('bulk-paste-summary').getAttribute('data-dupes').catch(() => '')
+      await shot(ps, 'customer-14-bulk-read')
+      await ps.locator('[data-testid="bulk-paste-kind"][data-value="contract"]').click()
+      await ps.getByTestId('bulk-paste-submit').click()
+      // DB 에 닿을 때까지(최대 10초) — 기계가 바쁠 때 빈 값을 읽지 않게
+      let custAfter = custBefore
+      for (let i = 0; i < 20; i++) {
+        await ps.waitForTimeout(500)
+        custAfter = countIn(custWs)
+        if (custAfter >= custBefore + 2) break
+      }
+      const pasted = sql(`select company_name || ':' || workspace_id from public.operations_clients where company_name like '붙여넣기%' order by company_name`).split('\n').filter(Boolean)
+      check(
+        '고객(D-582) 여러 업체 한 번에 등록: 이미 있는 1곳은 건너뛰고 2곳 → 고객 작업공간에만 2줄 · 대표 작업공간 업체 수 그대로',
+        bAdd === '2' && bDup === '1' && custAfter === custBefore + 2 && pasted.length === 2 && pasted.every((l) => l.endsWith(custWs)) && countIn(OWNER_WS) === ownerBefore,
+        { bAdd, bDup, custBefore, custAfter, pasted },
+      )
+    }
     await go(ps, '/settings')
     await ps.waitForTimeout(700)
     await go(ps, '/feedback')

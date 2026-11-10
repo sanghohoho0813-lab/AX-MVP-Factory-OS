@@ -477,10 +477,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       {/* D-118 단계 구분색(테마를 따라간다). D-483 대표 지시 — 칸 위쪽 띠 · 옅은 머리 바탕 대신 칸 머리 작은 박스의 네 변에만 색 */}
       {/* UXS-1 영업 보드 판 안이라 칸에는 테두리를 두르지 않는다(옅은 바탕으로만 — 상자 안 상자 안 상자를 만들지 않게) */}
       <div data-stage-head data-stage-bar className={`flex flex-col gap-0.5 rounded-(--radius-control) border-2 bg-white px-2.5 py-2 ${c.edge}`} style={c.style}>
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
           {/* D-192: 좁은 칸 머리 — ⓘ 없이 마우스를 올리면 단계 설명(아래 한 줄은 휴대폰에서만) */}
+          {/* N1 칸이 좁으면 '1차 미팅 예정' · '1차 미팅 완료' 가 둘 다 '1차 미팅 …' 로 잘려 구분이 안 됐다 — 자르지 않고 두 줄로 */}
           <HintTip tip={SALES_STAGE_HINT[stage]} label={SALES_STAGE_LABEL[stage]} dot={false}>
-            <h2 className={`t-sub min-w-0 truncate font-bold ${c.text}`} style={c.style}>{SALES_STAGE_LABEL[stage]}</h2>
+            <h2 className={`t-sub min-w-0 leading-tight font-bold break-keep ${c.text}`} style={c.style}>{SALES_STAGE_LABEL[stage]}</h2>
           </HintTip>
           <span className={`t-meta shrink-0 rounded-full bg-white px-2 font-semibold tabular-nums ${list.length > 0 ? c.text : 'text-slate-400'}`} style={list.length > 0 ? c.style : undefined}>{list.length}</span>
         </div>

@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   CirclePlus,
   ClipboardCheck,
+  ClipboardPaste,
   Download,
   RefreshCw,
   Search,
@@ -97,6 +98,7 @@ import { useGrowingCount } from '../lib/useGrowingCount'
 import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
+import { BulkClientPasteSheet } from '../components/ops/BulkClientPasteSheet'
 import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
 import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/docHandoff'
 import { HintTip } from '../components/ui/fold'
@@ -280,6 +282,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   }
   /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
   const [asProspect, setAsProspect] = useState(true)
+  // D-582 여러 업체 한 번에 등록(엑셀에서 붙여넣기)
+  const [bulkOpen, setBulkOpen] = useState(false)
   /** D-181: 새로 넣는 고객의 종류 — 보고 있던 쪽(대표만 고른다) */
   const [newType, setNewType] = useState<ClientType>(initialClientType)
   // D-124: 찾던 말은 주소(?q=)에 — 업체를 열었다가 뒤로 와도 그대로
@@ -718,6 +722,14 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       {moreOpen && (
         <BottomSheet title="고객 관리 도구" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-2">
+            {/* D-582 엑셀 목록을 붙여넣어 여러 곳을 한 번에 */}
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); setBulkOpen(true) }} data-testid="clients-bulk">
+              <ClipboardPaste aria-hidden="true" className="size-4 shrink-0" />
+              <span className="flex min-w-0 flex-col items-start text-left">
+                <span>여러 업체 한 번에 등록</span>
+                <span className="text-xs font-normal break-keep text-slate-500">엑셀에서 복사해 붙여넣기</span>
+              </span>
+            </Button>
             <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/calendar') }}>
               <CalendarDays aria-hidden="true" className="size-4" />
               일정 보기
@@ -758,6 +770,20 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
           </div>
         </BottomSheet>
       )}
+
+      <BulkClientPasteSheet
+        open={bulkOpen}
+        records={records}
+        workspaceId={workspaceId}
+        onClose={() => setBulkOpen(false)}
+        onPartial={() => void load()}
+        onDone={(n, kind) => {
+          setBulkOpen(false)
+          setSegment('all')
+          void load()
+          showToast(`${n}곳을 ${kind === 'prospect' ? '잠재고객' : '계약 고객'}으로 등록했어요 — 업체를 눌러 서류를 올리면 나머지 칸이 채워져요.`)
+        }}
+      />
 
       {error && (
         <div
@@ -1109,9 +1135,15 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
                   <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
                   <p className="mt-3 text-[1.2rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
-                  <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-add">
-                    <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
-                  </Button>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <Button variant="primary" onClick={openForm} data-testid="clients-empty-add">
+                      <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
+                    </Button>
+                    {/* D-582 고객 목록이 엑셀에 있는 사람 — 한 곳씩 넣지 않게 */}
+                    <Button variant="secondary" onClick={() => setBulkOpen(true)} data-testid="clients-empty-bulk" data-guide="fn-clients-bulk">
+                      <ClipboardPaste aria-hidden="true" className="size-4" />엑셀 목록 붙여넣기
+                    </Button>
+                  </div>
                   <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
                     업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.
                   </p>
@@ -1189,7 +1221,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 조각에 이미 '7일 지남' 이라고 글자로 쓰여 있으므로 빨강이 무슨 뜻인지 물어볼 일이 없다.
                 범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
               */}
-              <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>
+              {/* N1 업체가 하나도 없을 때는 누를 조각이 없다 — 빈 화면의 안내(첫 업체 등록)만 남긴다 */}
+              {typed.length > 0 && <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>}
             </section>
 
           </div>

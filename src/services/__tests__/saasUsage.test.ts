@@ -29,6 +29,8 @@ import { presetOf } from '../aiAssist/presets'
 import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, setPilotMarketing, setPilotMarketingScreens } from '../../config/pilotMarketing'
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
+import { PASTE_MAX_ROWS, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
+import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
 let failed = 0
@@ -654,7 +656,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 7 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 4 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 8 && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 4 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 1 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -663,6 +665,51 @@ async function run() {
     bf.steps.length === CLIENT_FLOW.steps.length && bf.steps.every((st, i2) => st.key === CLIENT_FLOW.steps[i2].key) && bf.steps.every((st) => !st.why.includes('모듈')) && CLIENT_FLOW.steps.some((st) => st.why.includes('모듈')),
     bf.steps.filter((st) => st.why.includes('모듈')).map((st) => st.key).join(),
   )
+
+  /* K21 — D-582 여러 업체 한 번에 등록(엑셀에서 붙여넣기) */
+  {
+    // ① 제목 줄 있는 엑셀 복사(탭) — 칸 순서가 뒤섞여도 제목으로 찾는다
+    const t1 = splitPaste('전화번호\t상호\t대표자\t사업자등록번호\t업종\r\n010-1234-5678\t한솔테크(주)\t김한솔\t123-45-67890\t제조업\r\n02-123-4567\t다움에너지\t이다움\t2208162517\t\r\n\r\n')
+    const g1 = guessColumns(t1)
+    const r1 = rowsFromTable(t1, g1)
+    check(
+      'K21 붙여넣기 — 제목 줄(탭): 칸 순서와 상관없이 회사 · 대표 · 전화 · 사업자등록번호 · 업종 · 번호는 000-00-00000 으로 · 빈 줄 버림',
+      g1.header && g1.columns.join() === 'contactPhone,companyName,contactName,businessNumber,industry' && r1.rows.length === 2 && r1.rows[0].companyName === '한솔테크(주)' && r1.rows[0].contactName === '김한솔' && r1.rows[0].contactPhone === '010-1234-5678' && r1.rows[0].businessNumber === '123-45-67890' && r1.rows[0].industry === '제조업' && r1.rows[1].businessNumber === '220-81-62517',
+      JSON.stringify({ g1, rows: r1.rows }),
+    )
+    // ② 제목 줄 없음 — 칸 안의 모양으로(사업자등록번호 · 전화 · 사람 이름 · 회사 말)
+    const t2 = splitPaste('김한솔\t한솔테크(주)\t123-45-67890\t010-1234-5678\n이다움\t다움에너지 주식회사\t\t02-123-4567\n박셋\t셋째산업\t111-22-33333\t')
+    const g2 = guessColumns(t2)
+    const r2 = rowsFromTable(t2, g2)
+    check('K21 붙여넣기 — 제목 줄 없음: 모양으로 칸을 찾음(첫 줄을 제목으로 먹지 않음 · 3곳)', !g2.header && g2.columns.join() === 'contactName,companyName,businessNumber,contactPhone' && r2.rows.length === 3 && r2.rows[2].companyName === '셋째산업', JSON.stringify(g2))
+    // ③ 회사 이름이 '대표' 로 시작해도 제목 줄로 보지 않는다(첫 업체가 통째로 빠지면 안 된다)
+    const t3 = splitPaste('대표상사\t김대표\n이름테크\t박이름')
+    const g3 = guessColumns(t3)
+    check('K21 붙여넣기 — "대표상사" · "이름테크" 는 제목 줄이 아님(2곳 그대로)', !g3.header && rowsFromTable(t3, g3).rows.length === 2 && rowsFromTable(t3, g3).rows[0].companyName === '대표상사', JSON.stringify(g3))
+    // ④ 한 줄에 한 곳(이름만) · 쉼표(CSV · 따옴표 안 쉼표)
+    const t4 = splitPaste('가나상사\n다라마트\n바사식당')
+    const r4 = rowsFromTable(t4, guessColumns(t4))
+    const t5 = splitPaste('회사명,대표,전화\n"한솔, 테크",김한솔,010-1234-5678\n다움에너지,이다움,')
+    const r5 = rowsFromTable(t5, guessColumns(t5))
+    check('K21 붙여넣기 — 이름만 한 줄씩 3곳 · CSV 는 따옴표 안 쉼표를 한 칸으로', r4.rows.length === 3 && r4.rows[1].companyName === '다라마트' && r5.rows.length === 2 && r5.rows[0].companyName === '한솔, 테크' && r5.rows[0].contactPhone === '010-1234-5678', JSON.stringify({ r4: r4.rows, r5: r5.rows }))
+    // ⑤ 틀린 번호는 넣지 않는다 · 회사 이름이 빈 줄은 뺀다 · 한도
+    const t6 = splitPaste('상호\t사업자번호\t연락처\n가나상사\t12345\t전화없음\n\t111-22-33333\t010-0000-0000')
+    const r6 = rowsFromTable(t6, guessColumns(t6))
+    const many = splitPaste(Array.from({ length: PASTE_MAX_ROWS + 5 }, (_, i) => `업체${i + 1}상사`).join('\n'))
+    const r7 = rowsFromTable(many, guessColumns(many))
+    check('K21 붙여넣기 — 열 자리가 아닌 번호 · 전화 모양이 아닌 글은 비움 · 이름 없는 줄 뺌 · 한 번에 200곳(넘는 줄 수 알림)', r6.rows.length === 1 && r6.rows[0].businessNumber === '' && r6.rows[0].contactPhone === '' && r6.noName === 1 && r7.rows.length === PASTE_MAX_ROWS && r7.over === 5, JSON.stringify({ r6, over: r7.over }))
+    // ⑥ 이미 있는 업체 · 목록 안에서 겹치는 줄은 건너뛴다(번호가 서로 다르면 다른 회사)
+    const mkRec = (id: string, companyName: string, businessNumber: string) => normalizeClientOps({ id, workspaceId: 'w', companyName, businessNumber, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' })
+    const existing = [mkRec('a', '한솔테크', '123-45-67890'), mkRec('b', '(주)다움에너지', '')]
+    const t8 = splitPaste('한솔테크(주)\t123-45-67890\n다움에너지\t\n새로운상사\t999-88-77777\n주식회사 새로운상사\t999-88-77777\n새로운상사\t555-44-33333\n넷째기업\t')
+    const p8 = planBulk(rowsFromTable(t8, guessColumns(t8)).rows, existing)
+    const line8 = bulkSummaryLine(p8, { noName: 0, over: 0 })
+    check(
+      'K21 붙여넣기 — 이미 있는 업체 2곳 건너뜀(번호 · 이름) · 목록 안 같은 번호 1곳 건너뜀 · 이름은 같아도 번호가 다르면 따로 등록 · 한 줄 요약',
+      p8.dupes.length === 2 && p8.repeats.length === 1 && p8.add.map((r) => r.companyName).join() === '새로운상사,새로운상사,넷째기업' && line8.includes('등록할 곳 3') && line8.includes('이미 있어 건너뛸 곳 2') && line8.includes('목록 안에서 겹치는 곳 1'),
+      JSON.stringify({ add: p8.add.map((r) => [r.companyName, r.businessNumber]), dupes: p8.dupes.length, repeats: p8.repeats.length, line8 }),
+    )
+  }
 
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)
