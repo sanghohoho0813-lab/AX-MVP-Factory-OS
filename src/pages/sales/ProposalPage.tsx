@@ -22,8 +22,7 @@ import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { CopyButton, PillList, StageBadge } from '../../components/sales/salesParts'
 import { rampAt } from '../../components/sales/salesColor'
-import { useCurrentUser } from '../../components/layout/useCurrentUser'
-import { brand } from '../../brand/brand.config'
+import { useCurrentUser, useOrgName } from '../../components/layout/useCurrentUser'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
 import { salesStageOf, stageReached } from '../../services/salesPipeline'
@@ -234,7 +233,9 @@ function ProposalWork({
   /** D-122: 계약 완료 확인 시트(받을 날 · 영업자 · 계약 방식 · 보험 · 업무까지 한 번에) */
   const [closing, setClosing] = useState<ContractCloseDraft | null>(null)
   const me = useCurrentUser()
-  const profile = { consultant: me.name, title: me.title, org: brand.companyName }
+  // D-577 '담당' 줄의 소속 — 외부 구독 고객은 내 브랜드의 회사(대표 회사 이름이 고객 문서에 나가지 않게)
+  const org = useOrgName()
+  const profile = { consultant: me.name, title: me.title, org }
   const item = useMemo(() => toProposalItem(record), [record])
   const saved = record.sales?.proposal
   const recommended = useMemo(() => matchPackages(item, catalog), [item, catalog])

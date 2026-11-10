@@ -1856,6 +1856,10 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
 
   const vr = buildVisitReport({ name: '대성정밀', industry: '제조업', revenue: 3500, empCount: 26, estYears: 18, ceoAge: 58, interests: ['가업승계'], stage: 'meeting1_scheduled' }, 'client', { consultant: '김상호', title: '대표', org: '미래' })
   check('방문 리포트: 사전 점검 · TOP3 · 담당자 줄', vr.includes('[법인컨설팅 사전 점검 리포트]') && vr.includes('우선 검토 후보 TOP 3') && vr.includes('담당: 김상호 대표 · 미래'))
+  // D-577 구독 고객이 회사 이름을 아직 안 적었으면 '담당' 줄에 소속을 붙이지 않는다(대표 회사 이름 · 끝에 남는 ' · ' 0)
+  const vrNoOrg = buildVisitReport({ name: '대성정밀', industry: '제조업', revenue: 3500, empCount: 26, estYears: 18, ceoAge: 58, interests: ['가업승계'], stage: 'meeting1_scheduled' }, 'client', { consultant: '박고객', title: '', org: '' })
+  const staffLines = vrNoOrg.split('\n').filter((l) => l.startsWith('담당:'))
+  check('D-577 방문 리포트: 소속이 비면 "담당: 박고객" 만(끝에 · 없음 · 대표 회사 이름 0)', staffLines.length >= 1 && staffLines.every((l) => l.trim() === '담당: 박고객') && !/미래에이아이랩|미래경영지원센터/.test(vrNoOrg), staffLines.join(' | '))
 
   // 성과 지표 — 영업 묶음
   const k1 = mk('k1', { sales: { ...sales('contracted'), history: [{ at: ago(30), from: null, to: 'lead' }, { at: ago(10), from: 'lead', to: 'contracted' }] } })

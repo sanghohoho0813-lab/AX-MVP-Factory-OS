@@ -14,10 +14,10 @@ export function TextScaleQuickButton({ showLabel = false }: { showLabel?: boolea
     <button
       type="button"
       data-testid="text-scale-quick"
+      data-guide="fn-textscale"
       data-scale={scale}
       onClick={() => setScale(next)}
       aria-label={`글자 크기 ${label} — 누르면 ${TEXT_SCALE_META[next].label}`}
-      title={`글자 크기: ${label} (누르면 ${TEXT_SCALE_META[next].label})`}
       className="flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 text-slate-700 hover:border-brand-300 hover:text-brand-700"
     >
       <span aria-hidden="true" className="font-bold leading-none">

@@ -71,7 +71,7 @@ export function WorkspaceOnboarding() {
             <LogOut aria-hidden="true" className="size-4" /> 로그아웃
           </Button>
         </div>
-        <p className="mb-5 text-sm break-keep text-slate-500">
+        <p className="mb-5 text-[0.9375rem] break-keep text-slate-600">
           새 작업공간을 만들거나, 받은 초대 코드로 기존 작업공간에 참여하세요.
         </p>
 
@@ -80,21 +80,21 @@ export function WorkspaceOnboarding() {
         <AuthNotice message={notice} />
 
         <form onSubmit={handleCreate} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <div className="mb-3 flex items-center gap-2 text-[1rem] font-semibold text-slate-800">
             <Building2 aria-hidden="true" className="size-4 text-brand-600" /> 새 작업공간 만들기
           </div>
           <AuthField id="ws-name" label="작업공간 이름" value={name} onChange={setName} placeholder="예: 우리 컨설팅" disabled={busy} />
-          <Button type="submit" variant="primary" disabled={busy} className="mt-4 h-11 w-full">
+          <Button type="submit" variant="primary" disabled={busy} className="mt-4 h-12 w-full text-[1rem] font-semibold sm:h-12">
             <Plus aria-hidden="true" className="size-4" /> {busy ? '처리 중…' : '만들기'}
           </Button>
         </form>
 
         <form onSubmit={handleJoin} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <div className="mb-3 flex items-center gap-2 text-[1rem] font-semibold text-slate-800">
             <Ticket aria-hidden="true" className="size-4 text-brand-600" /> 초대 코드로 참여
           </div>
           <AuthField id="invite" label="초대 코드" value={inviteToken} onChange={setInviteToken} placeholder="초대 코드를 붙여넣기" required={false} disabled={busy} />
-          <Button type="submit" variant="secondary" disabled={busy} className="mt-4 h-11 w-full">
+          <Button type="submit" variant="secondary" disabled={busy} className="mt-4 h-12 w-full text-[1rem] font-semibold sm:h-12">
             {busy ? '처리 중…' : '참여하기'}
           </Button>
         </form>

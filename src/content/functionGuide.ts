@@ -360,6 +360,15 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '장면마다 무엇을 비출지 안내도 같이 넣어요.',
   },
 
+  'fn-mk-posted': {
+    label: '올렸어요 · 기록표로',
+    menu: 'mk-threads',
+    what: '이 글을 올렸다고 적어 두는 단추예요. 글은 기록표로 옮겨져요.',
+    why: '올린 글과 쓰다 만 글을 나누고, 올린 날부터 반응을 적어 가려고 있어요.',
+    effect: '하나라도 올렸다고 적으면 마케팅 첫 화면에서 글을 보고 온 고객 수를 세기 시작해요.',
+    next: '올린 지 이틀 뒤에 반응 숫자를 적으라고 알려 줘요.',
+  },
+
   'fn-mk-lead': {
     label: '글 보고 온 분 적어 두기',
     menu: 'marketing',
@@ -370,6 +379,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   },
 
   // ---------------------------------------------------------------- 설정
+  'fn-textscale': {
+    label: '글자 크기',
+    menu: 'settings',
+    what: '누를 때마다 글자가 기본 → 크게 → 매우 크게로 바뀌어요.',
+    why: '작은 글씨가 불편한 분도 안경 없이 편하게 보게 하려고 있어요.',
+    effect: '한 번 고르면 모든 화면이 그 크기로 보여요. 다음에 열어도 그대로예요.',
+    next: '줄 간격과 단추 크기도 같이 고르게 해요.',
+  },
   'fn-export': {
     label: '내 자료 내려받기',
     menu: 'settings',

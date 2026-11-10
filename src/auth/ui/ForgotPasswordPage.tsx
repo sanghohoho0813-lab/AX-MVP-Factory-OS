@@ -41,7 +41,7 @@ export function ForgotPasswordPage() {
         <AuthError message={error} />
         <AuthNotice message={notice} />
         <AuthField id="email" label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" placeholder="you@example.com" disabled={submitting} />
-        <Button type="submit" variant="primary" disabled={submitting} className="h-11 w-full">
+        <Button type="submit" variant="primary" disabled={submitting} className="h-12 w-full text-[1rem] font-semibold sm:h-12">
           {submitting ? '전송 중…' : '재설정 링크 보내기'}
         </Button>
       </form>

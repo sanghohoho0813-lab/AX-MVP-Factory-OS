@@ -67,6 +67,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout
+      intro
       title="로그인"
       subtitle={switching ? `${accountLabel(switching)} 계정으로 로그인합니다. 비밀번호만 넣어 주세요.` : '이메일과 비밀번호로 로그인하세요.'}
       footer={
@@ -105,7 +106,7 @@ export function LoginPage() {
                       {(a.name || a.email).slice(0, 1).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{label}</span>
+                      <span className="block truncate text-[1rem] font-semibold text-slate-900">{label}</span>
                       {label !== a.email && <span className="block truncate text-[0.875rem] text-slate-500">{a.email}</span>}
                     </span>
                     {on && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
@@ -152,11 +153,11 @@ export function LoginPage() {
           disabled={submitting}
         />
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-[13px] text-slate-500 hover:text-brand-700 hover:underline">
+          <Link to="/forgot-password" className="inline-flex min-h-10 items-center text-[0.9375rem] text-slate-600 hover:text-brand-700 hover:underline">
             비밀번호를 잊으셨나요?
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={submitting} className="h-11 w-full">
+        <Button type="submit" variant="primary" disabled={submitting} className="h-12 w-full text-[1rem] font-semibold sm:h-12">
           {submitting ? '로그인 중…' : '로그인'}
         </Button>
       </form>

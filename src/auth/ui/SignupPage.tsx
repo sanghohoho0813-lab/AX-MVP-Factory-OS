@@ -49,6 +49,7 @@ export function SignupPage() {
 
   return (
     <AuthLayout
+      intro
       title="회원가입"
       subtitle="새 계정을 만들어 클라우드 작업공간을 시작하세요."
       footer={
@@ -83,7 +84,7 @@ export function SignupPage() {
         <AuthField id="email" label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" placeholder="you@example.com" disabled={submitting} />
         <AuthField id="password" label="비밀번호" type="password" value={password} onChange={setPassword} autoComplete="new-password" placeholder="6자 이상" disabled={submitting} />
         <AuthField id="confirm" label="비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" disabled={submitting} />
-        <Button type="submit" variant="primary" disabled={submitting} className="h-11 w-full">
+        <Button type="submit" variant="primary" disabled={submitting} className="h-12 w-full text-[1rem] font-semibold sm:h-12">
           {submitting ? '가입 중…' : '회원가입'}
         </Button>
       </form>

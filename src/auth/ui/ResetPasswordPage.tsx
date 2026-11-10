@@ -48,7 +48,7 @@ export function ResetPasswordPage() {
         <AuthNotice message={notice} />
         <AuthField id="password" label="새 비밀번호" type="password" value={password} onChange={setPassword} autoComplete="new-password" placeholder="6자 이상" disabled={submitting} />
         <AuthField id="confirm" label="새 비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" disabled={submitting} />
-        <Button type="submit" variant="primary" disabled={submitting} className="h-11 w-full">
+        <Button type="submit" variant="primary" disabled={submitting} className="h-12 w-full text-[1rem] font-semibold sm:h-12">
           {submitting ? '변경 중…' : '비밀번호 변경'}
         </Button>
       </form>

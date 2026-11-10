@@ -900,6 +900,13 @@ try {
     check('계정(D-184): 바꾸기 → 로그인 화면 · 팀장 이메일이 미리 들어감 · 비밀번호 칸에 커서', page.url().includes('/login') && toPilot.pre.email === PILOT.email && toPilot.pre.focus === 'password', JSON.stringify({ u: page.url(), e: toPilot.pre.email, f: toPilot.pre.focus }))
     check('계정(D-184): 로그인 화면 안내 "최은혜 팀장 계정으로 로그인합니다" · 계정 둘', toPilot.pre.text.includes('최은혜 팀장 계정으로 로그인합니다') && (await page.getByTestId('recent-account').count()) === 2)
     check('계정(D-184): 로그인 화면에 대표 자료 0(이메일 · 이름만)', leaked(toPilot.pre.text).length === 0, leaked(toPilot.pre.text).join())
+    // D-578 로그인 화면 — PC 넓은 화면은 옆에 '무엇을 해 주는 프로그램인지' 세 줄 · 입력 글자 16px(아이폰 확대 없음) · 이름표 15px
+    const loginLook = await page.evaluate(() => {
+      const intro = document.querySelector('[data-testid="auth-intro"]')
+      const px = (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize)
+      return { shown: !!intro && getComputedStyle(intro).display !== 'none', rows: intro?.querySelectorAll('li').length ?? 0, text: intro?.textContent ?? '', input: px('input#email'), label: px('label[for="email"]') }
+    })
+    check('로그인(D-578): PC 옆 소개 세 줄(고객 · 서류 / 일정 · 업무 / 마케팅) · 가격 · 원 0 · 입력 글자 16px 이상 · 이름표 15px 이상', loginLook.shown && loginLook.rows === 3 && /고객 · 서류/.test(loginLook.text) && /마케팅/.test(loginLook.text) && !/원|요금|무료/.test(loginLook.text) && loginLook.input >= 16 && loginLook.label >= 15, JSON.stringify({ ...loginLook, text: loginLook.text.slice(0, 40) }))
     await shot(page, 'acct-02-login-switch')
     currentWho = PILOT
     await page.getByLabel('비밀번호').fill(PILOT.password)
@@ -1205,6 +1212,11 @@ try {
   await mp.waitForTimeout(300)
   check('390(D-184): 서랍 로그아웃 → 로그인 화면 · 이 기기 계정 1개(팀장)', mp.url().includes('/login') && (await mp.getByTestId('recent-account').count()) === 1 && (await mp.getByTestId('recent-account').getAttribute('data-email')) === PILOT.email)
   check('390(D-184): 로그인 화면 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
+  const loginLook390 = await mp.evaluate(() => {
+    const intro = document.querySelector('[data-testid="auth-intro"]')
+    return { hidden: !intro || getComputedStyle(intro).display === 'none', input: parseFloat(getComputedStyle(document.querySelector('input#email')).fontSize) }
+  })
+  check('390(D-578): 로그인 화면 — 소개 줄 없이 로그인 칸 먼저 · 입력 글자 16px 이상(누를 때 화면이 확대되지 않게)', loginLook390.hidden && loginLook390.input >= 16, JSON.stringify(loginLook390))
   await mp.getByTestId('recent-account').click()
   await mp.waitForTimeout(300)
   check('390(D-184): 계정 누르면 이메일이 들어가고 비밀번호 칸에 커서', (await mp.locator('#email').inputValue()) === PILOT.email && (await mp.evaluate(() => document.activeElement?.id)) === 'password')
@@ -1806,7 +1818,7 @@ try {
       await ps.waitForTimeout(500)
       const over = await overflowX(ps)
       await shot(ps, `customer-10-${name}-390`)
-      sweep.push({ name, ok: t.length > 20 && !t.includes('화면을 찾지 못했습니다') && !OWNER_WORDS.test(t), over })
+      sweep.push({ name, ok: t.length > 20 && !t.includes('화면을 찾지 못했습니다') && !OWNER_WORDS.test(t) && !/미래경영지원센터|미래에이아이랩/.test(t), over })
     }
     // 영업 관리의 나머지 탭(미팅 준비 · 상품·제안 · 전략)은 사진과 알림 줄만 — 고객에게 그대로 열어 둘지는 대표가 정한다(보고 🚨)
     for (const [name, path] of [['sales-meeting', '/sales/meeting'], ['sales-proposal', '/sales/proposal'], ['sales-strategy', '/sales/strategy']]) {
@@ -1816,6 +1828,11 @@ try {
       const t = ((await ps.locator('main').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
       await shot(ps, `customer-11-${name}`)
       console.log(`INFO  고객 화면 ${path}: 글자 ${t.length} · 대표 낱말 ${OWNER_WORDS.test(t) ? (t.match(OWNER_WORDS)?.[0] ?? '') : '0'} · 찾지 못함 ${t.includes('화면을 찾지 못했습니다') ? '예' : '아니요'}`)
+      // D-577 고객에게 드리는 문서(방문 리포트)의 '담당' 줄 — 대표 회사 이름이 아니라 내 브랜드의 회사
+      if (name === 'sales-proposal') {
+        const staff = t.match(/담당: [^■━]{0,60}/)?.[0] ?? ''
+        check('고객(D-577) 상품·제안 방문 리포트: "담당" 줄에 대표 회사 이름(미래경영지원센터 · 미래에이아이랩) 0 · 내 브랜드의 회사가 붙음', !/미래경영지원센터|미래에이아이랩/.test(t) && staff.includes('고객경영연구소'), staff)
+      }
     }
     ps.off('pageerror', onErr)
     await ps.setViewportSize({ width: 1440, height: 900 })

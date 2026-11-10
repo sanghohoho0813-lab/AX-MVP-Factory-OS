@@ -99,7 +99,7 @@ function buildProposal(item, pkgs, mode, profile) {
   const dateK = todayISO().replace(/-/g, ".");
   const docs = Array.from(new Set(pkgs.flatMap((x) => x.docs || []))).slice(0, 12);
   const L = [];
-  L.push(div, `[${name} 법인컨설팅 제안 초안]`, `작성일: ${dateK}`, `담당: ${p.consultant} ${p.title} · ${p.org}`, `구분: ${mode === "internal" ? "내부 검토용" : "대표님 공유용"}`, div, "");
+  L.push(div, `[${name} 법인컨설팅 제안 초안]`, `작성일: ${dateK}`, `담당: ${staffLine(p)}`, `구분: ${mode === "internal" ? "내부 검토용" : "대표님 공유용"}`, div, "");
   L.push("■ 고객 현황 요약", `${safe(item.industry, "-")} · 매출 ${wonFromMillion(item.revenue)} · 직원 ${safe(item.empCount, "-")}명 · 업력 ${safe(item.estYears, "-")}년 · 단계 ${stageOf(item.stage).label}`);
   if (item.concern) L.push(`주요 고민: ${item.concern}`);
   L.push("", "■ 현재 확인이 필요한 이슈", visitReasonText(item, mode), "");
@@ -112,7 +112,7 @@ function buildProposal(item, pkgs, mode, profile) {
   if (mode === "internal") { L.push("", "■ [내부] 영업·클로징 포인트", `· 영업 포인트: ${pkgs[0] ? pkgs[0].point : ""}`, "· 클로징: 우선 1개 패키지부터 단계적으로 진행 제안", "· 예상 반론: \"세무사 있어요 / 비용?\" → 검토 포인트 정리·단계적 범위 제안으로 대응", `· 다음 액션: ${item.nextAction || "자료 요청"}`); }
   else { L.push("", "■ 제안 금액 안내", "제안 금액은 월납 플랜 기준으로 협의 후 정리되며, 고객 재무상황을 확인한 뒤 조정될 수 있습니다."); }
   L.push("", "■ 다음 미팅 제안", "자료 확인 후 실제 적용 가능성이 있는 부분만 추려서 다시 정리드리겠습니다. 부담 없이 우선순위만 함께 확인하는 자리로 봐주시면 됩니다.", "");
-  L.push("■ 주의", "적용 여부는 회사 자료 확인과 세무사·전문가 검토가 필요합니다. 본 문서는 제안 초안입니다.", div, `담당: ${p.consultant} ${p.title} · ${p.org}${p.phone ? ` · ${p.phone}` : ""}${p.email ? ` · ${p.email}` : ""}`, div);
+  L.push("■ 주의", "적용 여부는 회사 자료 확인과 세무사·전문가 검토가 필요합니다. 본 문서는 제안 초안입니다.", div, `담당: ${staffLine(p)}${p.phone ? ` · ${p.phone}` : ""}${p.email ? ` · ${p.email}` : ""}`, div);
   return L.join("\n");
 }
 const SCOPE_TEMPLATES = {
@@ -200,6 +200,12 @@ function buildDocRequestText(item) {
   const name = getCompanyName(item) || item.name;
   return `대표님, ${name} 관련 ${main.name} 검토를 위해 ${main.docs.join(", ")} 정도를 확인하면 좋겠습니다. 자료 확인 후 적용 가능성과 우선 점검이 필요한 항목을 정리드리겠습니다. (적용 여부는 세부 요건 확인이 필요합니다.)`;
 }
+/* [D-577] '담당' 줄 — 이름 · 직함 · 소속. 소속(org)이 비어 있으면 ' · ' 를 달지 않는다
+   (구독 고객이 내 브랜드의 회사 이름을 아직 안 적었을 때 — 대표 회사 이름을 대신 붙이지 않는다) */
+function staffLine(p) {
+  const who = [p.consultant, p.title].filter((x) => x && String(x).trim()).join(" ");
+  return [who, p.org && String(p.org).trim()].filter(Boolean).join(" · ");
+}
 const REPORT_PROFILE_DEFAULT = { consultant: "김팀장", org: "미래에이아이랩", /* [D-94] 고객에게 나가는 리포트 머리 — 원본 앱 이름 대신 회사 이름 */ title: "컨설턴트", phone: "", email: "", footer: "본 리포트는 상담 전 사전 점검용 자료이며, 실제 적용 여부는 회사의 세부 자료 확인과 세무사·노무사·전문가 검토가 필요합니다." };
 const VISIT_BASE_DOCS = ["재무제표(최근 3개년)", "법인등기부등본", "사업자등록증", "정관", "주주명부", "4대보험 사업장 가입자명부", "대출/보증 내역"];
 const EXTRA_CHECK_MAP = { "정관정비": "정관·임원보수 규정", "임원퇴직금": "임원퇴직금 규정", "가지급금": "가지급금/가수금 정리", "연구소": "기업부설연구소/벤처", "벤처인증": "벤처·이노비즈 인증", "고용지원금": "고용지원금/통합고용세액공제", "법인세": "연구·인력개발비 세액공제", "정책자금": "정책자금", "사내근로복지기금": "사내근로복지기금", "가업승계": "가업승계/주식가치평가", "미처분이익잉여금": "미처분이익잉여금/이익소각", "주식이동": "주식가치평가" };
@@ -286,7 +292,7 @@ function buildVisitReport(item, mode, profile) {
   const div = "━━━━━━━━━━━━━━━━";
   const dateK = todayISO().replace(/-/g, ".");
   const L = [];
-  L.push(div, "[법인컨설팅 사전 점검 리포트]", `고객사: ${name}`, `작성일: ${dateK}`, `담당: ${p.consultant} ${p.title} · ${p.org}`, `구분: ${mode === "internal" ? "내부 검토용" : "대표님 공유용"}`, div, "");
+  L.push(div, "[법인컨설팅 사전 점검 리포트]", `고객사: ${name}`, `작성일: ${dateK}`, `담당: ${staffLine(p)}`, `구분: ${mode === "internal" ? "내부 검토용" : "대표님 공유용"}`, div, "");
   L.push("■ 회사 현황 요약", `${safe(item.industry, "-")} · 매출 ${wonFromMillion(item.revenue)} · 직원 ${safe(item.empCount, "-")}명 · 업력 ${safe(item.estYears, "-")}년 · 상담 단계 ${stageOf(item.stage).label}`);
   if (item.concern) L.push(`주요 고민: ${item.concern}`);
   if (item.financialSummary) {
@@ -310,7 +316,7 @@ function buildVisitReport(item, mode, profile) {
   L.push("■ 요청 자료 체크리스트");
   visitRequestDocs(item).forEach((d) => L.push(`☐ ${d}`));
   L.push("", "■ 다음 미팅 제안", "자료 확인 후 실제 적용 가능성이 있는 부분만 추려서 다시 정리드리겠습니다. 부담 없이 현재 상황과 우선순위만 함께 확인하는 자리로 봐주시면 됩니다.", "");
-  L.push(div, `담당: ${p.consultant} ${p.title} · ${p.org}`);
+  L.push(div, `담당: ${staffLine(p)}`);
   if (p.phone) L.push(`연락처: ${p.phone}`);
   if (p.email) L.push(`이메일: ${p.email}`);
   L.push("", `※ ${p.footer}`, div);

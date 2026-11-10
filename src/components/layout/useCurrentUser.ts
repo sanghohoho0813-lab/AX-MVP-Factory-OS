@@ -34,6 +34,18 @@ export function useCurrentUser(): UserIdentity {
 }
 
 /**
+ * D-577 고객에게 드리는 문서(방문 리포트 · 제안서)의 '담당' 줄에 붙는 소속 이름.
+ * 대표 · 내부 팀장은 예전처럼 대표 회사, 외부 구독 고객은 내 브랜드의 '회사 · 브랜드'(안 적었으면 빈칸 — 대표 회사 이름이 고객 문서에 나가지 않는다).
+ */
+export function useOrgName(): string {
+  const auth = useContext(AuthContext)
+  const customer = useCustomerAudience()
+  const mine = useBrandProfile()
+  if (auth?.access === 'pilot' && customer) return mine.loaded && mine.workspaceId === auth.currentWorkspaceId ? mine.profile.company.trim() : ''
+  return brand.companyName
+}
+
+/**
  * 고객에게 가는 글(안부 카톡 · 성과 보고서) 맨 끝 서명 (D-162).
  * 대표 · 직원은 지금처럼 '미래AI랩 김상호 대표', Pilot 은 자기 이름 — 대표 이름으로 고객에게 나가지 않는다.
  */

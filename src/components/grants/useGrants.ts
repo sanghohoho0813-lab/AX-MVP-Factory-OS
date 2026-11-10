@@ -15,6 +15,7 @@ import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import type { PortalClientLink } from '../../types/bridge'
 import { useIsPilot } from '../../auth/osAccess'
 import { useCustomerAudience } from '../../config/customerAudience'
+import { useSenderLine } from '../layout/useCurrentUser'
 
 /** D-563 외부 구독 고객 계정 — 지원사업 알림(전문 모듈 묶음)이 닫혀 있다. 공고를 주지 않으면 맞는 공고 수 · 칩 · 알림이 함께 사라진다 */
 const NO_NOTICES: GrantNotice[] = []
@@ -109,6 +110,10 @@ export function useGrantActions(o: {
   const { workspaceId, setSent, linkOf, toast } = o
   // D-162: 공개 찾기 화면의 알림 신청은 대표 상담신청함으로 들어간다 — Pilot 은 그 링크를 나누지 않는다
   const pilot = useIsPilot()
+  // D-577 외부 구독 고객의 글에는 대표 회사 이름을 붙이지 않는다 — 내 브랜드 서명으로(대표 · 내부 팀장은 예전 그대로)
+  const customer = useCustomerAudience()
+  const mine = useSenderLine()
+  const sender = pilot && customer ? mine : brand.brandNameKo
   const remember = useCallback(
     async (clientId: string, ids: string[], channel: SentChannel) => {
       try {
@@ -123,22 +128,22 @@ export function useGrantActions(o: {
 
   const copyNotice = useCallback(
     async (client: GrantClient, match: GrantMatch) => {
-      const ok = await copyText(noticeMessage({ companyName: client.record.companyName, match, sender: brand.brandNameKo }))
+      const ok = await copyText(noticeMessage({ companyName: client.record.companyName, match, sender }))
       toast(ok ? `${client.record.companyName} — 카톡 문구를 복사했습니다` : '복사하지 못했습니다')
       if (ok) await remember(client.record.id, [match.notice.id], 'kakao')
     },
-    [remember, toast],
+    [remember, toast, sender],
   )
 
   const copyAll = useCallback(
     async (client: GrantClient, matches: GrantMatch[]) => {
       const link = pilot ? '' : finderLink(window.location.origin, client.profile)
-      const text = shareMessage({ companyName: client.record.companyName, profileLine: profileLine(client.profile), matches, link, sender: brand.brandNameKo })
+      const text = shareMessage({ companyName: client.record.companyName, profileLine: profileLine(client.profile), matches, link, sender })
       const ok = await copyText(text)
       toast(ok ? `${client.record.companyName} — 맞는 공고 ${matches.length}건 문구를 복사했습니다` : '복사하지 못했습니다')
       if (ok) await remember(client.record.id, matches.slice(0, 5).map((m) => m.notice.id), 'kakao')
     },
-    [remember, toast, pilot],
+    [remember, toast, pilot, sender],
   )
 
   const copyLink = useCallback(

@@ -890,7 +890,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
                   <Button variant="secondary" onClick={() => void save(false)} disabled={!draft.body.trim() || saving} data-testid="thr-save">
                     <Save aria-hidden="true" className="size-4" /> 저장
                   </Button>
-                  <Button variant="primary" onClick={() => void save(true)} disabled={!draft.body.trim() || saving} data-testid="thr-posted">
+                  <Button variant="primary" onClick={() => void save(true)} disabled={!draft.body.trim() || saving} data-testid="thr-posted" data-guide="fn-mk-posted">
                     <Send aria-hidden="true" className="size-4" /> 올렸어요 · 기록표로
                   </Button>
                 </>
