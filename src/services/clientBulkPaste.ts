@@ -119,6 +119,21 @@ const share = (cells: string[], test: (c: string) => boolean) => {
   return filled.length === 0 ? 0 : filled.filter(test).length / filled.length
 }
 
+/**
+ * D-585 표 위에 얹힌 제목 · 날짜 줄 버리기 — 파일로 받은 표는 맨 위에 '거래처 목록' 같은 줄이 흔하다.
+ * 앞 10줄 안에서 제목 말(회사명 · 대표 · 전화 …)이 서로 다른 두 칸 이상인 첫 줄을 제목 줄로 본다.
+ * 번호 · 전화가 먼저 나오면 제목 줄이 없는 표 — 그대로 둔다(자료 줄을 버리지 않는다).
+ */
+export function dropTitleRows(cells: string[][]): { cells: string[][]; dropped: number } {
+  const limit = Math.min(cells.length - 1, 10)
+  for (let i = 0; i <= limit; i++) {
+    const heads = new Set(cells[i].map(headerField).filter((h): h is PasteField => h !== null))
+    if (heads.size >= 2) return i === 0 ? { cells, dropped: 0 } : { cells: cells.slice(i), dropped: i }
+    if (cells[i].some((c) => BIZ_RE.test(c) || PHONE_RE.test(c))) break
+  }
+  return { cells, dropped: 0 }
+}
+
 export interface ColumnGuess {
   /** 첫 줄을 제목 줄로 봤는지 */
   header: boolean

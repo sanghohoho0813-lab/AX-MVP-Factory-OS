@@ -5,14 +5,16 @@
  *  - 칸은 알아서 찾고(clientBulkPaste), 틀리면 칸마다 고르개로 바꾼다.
  *  - 이미 있는 업체 · 목록 안에서 겹치는 줄은 건너뛴다(무엇을 건너뛰는지 펼쳐 볼 수 있다).
  *  - 등록은 있는 저장 길(createClient) 그대로 한 곳씩 — 중간에 끊기면 등록된 곳까지 남고, 다시 누르면 남은 곳만.
+ *  - D-585 복사가 어려우면 [엑셀 파일 고르기] — 파일을 브라우저 안에서 읽어 같은 칸에 넣는다(올리지 않는다).
  * 규칙으로 읽는다 — AI 가 아니다.
  */
-import { useMemo, useState } from 'react'
-import { ClipboardPaste } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ClipboardPaste, FileSpreadsheet } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { createClient } from '../../services/clientOpsService'
 import { emptySales, type ClientOpsRecord } from '../../types/clientOps'
+import { BULK_FILE_ACCEPT, readBulkFile } from '../../services/clientBulkFile'
 import { PASTE_FIELDS, PASTE_FIELD_LABEL, bulkSummaryLine, guessColumns, planBulk, rowsFromTable, splitPaste, type PasteField } from '../../services/clientBulkPaste'
 
 type Kind = 'contract' | 'prospect'
@@ -48,6 +50,11 @@ export function BulkClientPasteSheet({
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
+  // D-585 고른 파일 — 읽은 결과 한 줄 · 못 읽은 까닭
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [fileBusy, setFileBusy] = useState(false)
+  const [fileNote, setFileNote] = useState('')
+  const [fileError, setFileError] = useState('')
 
   const cells = useMemo(() => splitPaste(text), [text])
   const auto = useMemo(() => guessColumns(cells), [cells])
@@ -70,6 +77,24 @@ export function BulkClientPasteSheet({
   const close = () => {
     if (busy) return
     onClose()
+  }
+
+  const pickFile = async (file: File | undefined) => {
+    if (!file || busy || fileBusy) return
+    setFileBusy(true)
+    setFileNote('')
+    setFileError('')
+    const res = await readBulkFile(file)
+    setFileBusy(false)
+    if (!res.ok) {
+      setFileError(res.reason)
+      return
+    }
+    setText(res.text)
+    setOverride(null)
+    setHeaderPick(null)
+    setError('')
+    setFileNote(res.note)
   }
 
   const run = async () => {
@@ -95,6 +120,8 @@ export function BulkClientPasteSheet({
       setOverride(null)
       setHeaderPick(null)
       setKind(null)
+      setFileNote('')
+      setFileError('')
       onDone(done, kind)
     } catch (cause) {
       const why = cause instanceof Error ? cause.message : '저장하지 못했습니다'
@@ -124,7 +151,7 @@ export function BulkClientPasteSheet({
     >
       <div className="flex flex-col gap-4" data-testid="bulk-paste">
         <p className="t-body break-keep text-slate-800">
-          <strong className="font-bold text-slate-900">엑셀에서 고객 목록을 복사해 아래 칸에 붙여넣으세요.</strong> 한 줄에 한 곳 — 칸 순서는 상관없어요. 회사 이름 · 대표 · 전화 · 사업자등록번호를 알아서 찾습니다.
+          <strong className="font-bold text-slate-900">엑셀에서 고객 목록을 복사해 아래 칸에 붙여넣거나, 엑셀 파일을 그대로 고르세요.</strong> 한 줄에 한 곳 — 칸 순서는 상관없어요. 회사 이름 · 대표 · 전화 · 사업자등록번호를 알아서 찾습니다.
         </p>
         <label className="flex flex-col gap-1.5">
           <span className="t-sub flex items-center gap-1.5 font-semibold text-slate-800">
@@ -135,6 +162,7 @@ export function BulkClientPasteSheet({
             onChange={(e) => {
               setText(e.target.value)
               setError('')
+              setFileNote('')
             }}
             rows={cells.length > 0 ? 4 : 7}
             disabled={busy}
@@ -144,6 +172,36 @@ export function BulkClientPasteSheet({
             data-testid="bulk-paste-text"
           />
         </label>
+        {/* D-585 복사 · 붙여넣기가 어려우면 파일을 그대로 — 브라우저 안에서만 읽는다 */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <input
+            ref={fileRef}
+            type="file"
+            accept={BULK_FILE_ACCEPT}
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              void pickFile(f)
+            }}
+            data-testid="bulk-paste-file-input"
+          />
+          <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={busy || fileBusy} data-testid="bulk-paste-file">
+            <FileSpreadsheet aria-hidden="true" className="size-4" />
+            {fileBusy ? '읽는 중…' : '엑셀 파일 고르기'}
+          </Button>
+          <span className="t-sub break-keep text-slate-600">복사가 어려우면 파일을 그대로 고르세요(.xlsx · .xls · .csv) — 파일은 올리지 않고 이 화면에서만 읽어요.</span>
+        </div>
+        {fileNote && (
+          <p role="status" className="t-sub font-semibold break-keep text-slate-800" data-testid="bulk-paste-file-note">
+            {fileNote}
+          </p>
+        )}
+        {fileError && (
+          <p role="alert" className="t-sub font-semibold break-keep text-danger-700" data-testid="bulk-paste-file-error">
+            {fileError}
+          </p>
+        )}
 
         {cells.length > 0 && (
           <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3" aria-label="이렇게 읽었어요">

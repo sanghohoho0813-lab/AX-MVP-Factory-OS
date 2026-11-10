@@ -30,7 +30,9 @@ import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, se
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
 import { HOWTO_NOTE, POSTING_HOWTO } from '../../content/postingHowTo'
-import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
+import { CLIENTS_CSV_HEADER, PASTE_MAX_ROWS, bulkSummaryLine, clientsCsv, dropTitleRows, guessColumns, planBulk, rowsFromTable, splitPaste } from '../clientBulkPaste'
+import { BULK_FILE_ACCEPT, BULK_FILE_MAX_BYTES, bulkFileKind, decodeTableBytes, firstSheetOfText, readBulkFile } from '../clientBulkFile'
+import { makeSimpleXlsx } from './xlsxFixture'
 import { normalizeClientOps } from '../clientOpsService'
 
 let passed = 0
@@ -744,6 +746,66 @@ async function run() {
       'K21 붙여넣기 — 이미 있는 업체 2곳 건너뜀(번호 · 이름) · 목록 안 같은 번호 1곳 건너뜀 · 이름은 같아도 번호가 다르면 따로 등록 · 한 줄 요약',
       p8.dupes.length === 2 && p8.repeats.length === 1 && p8.add.map((r) => r.companyName).join() === '새로운상사,새로운상사,넷째기업' && line8.includes('등록할 곳 3') && line8.includes('이미 있어 건너뛸 곳 2') && line8.includes('목록 안에서 겹치는 곳 1'),
       JSON.stringify({ add: p8.add.map((r) => [r.companyName, r.businessNumber]), dupes: p8.dupes.length, repeats: p8.repeats.length, line8 }),
+    )
+  }
+
+  /* K23 — D-585 엑셀 파일 그대로(여러 업체 등록 창 [엑셀 파일 고르기]) */
+  {
+    const asFile = (name: string, buf: ArrayBuffer | Uint8Array, type = '') => {
+      const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+      return { name, type, size: bytes.byteLength, arrayBuffer: async () => bytes.slice().buffer as ArrayBuffer }
+    }
+    // ① 엑셀 — 표 위에 제목 · 날짜 줄이 있어도 제목 줄부터 읽는다
+    const xlsx = await makeSimpleXlsx([
+      ['거래처 목록', '', '', ''],
+      ['2026년 11월', '', '', ''],
+      ['회사명', '대표자', '전화', '사업자등록번호'],
+      ['한솔테크(주)', '김한솔', '010-1234-5678', '123-45-67890'],
+      ['다움에너지', '이다움', '02-123-4567', ''],
+      ['셋째상사', '', '', '555-44-33333'],
+    ])
+    const f1 = await readBulkFile(asFile('거래처.xlsx', xlsx))
+    const t1 = f1.ok ? splitPaste(f1.text) : []
+    const g1 = guessColumns(t1)
+    const r1 = rowsFromTable(t1, g1)
+    check(
+      'K23 파일 — 엑셀(.xlsx): 표 위 제목 2줄을 빼고 제목 줄부터 · 3곳 · 칸을 알아서 · 한 줄 안내(파일 이름 · 줄 수 · 뺀 줄)',
+      f1.ok && f1.rows === 4 && g1.header && g1.columns.join() === 'companyName,contactName,contactPhone,businessNumber' && r1.rows.length === 3 && r1.rows[0].businessNumber === '123-45-67890' && f1.note.includes('거래처.xlsx') && f1.note.includes('4줄') && f1.note.includes('2줄(제목)은 뺐어요'),
+      JSON.stringify({ f1, g1 }),
+    )
+    // ② 옛 한글 방식(EUC-KR) CSV — 엑셀에서 'CSV(쉼표로 분리)' 로 저장한 파일
+    const euc = Uint8Array.of(0xc8, 0xb8, 0xbb, 0xe7, 0xb8, 0xed, 0x2c, 0xc0, 0xfc, 0xc8, 0xad, 0x0a, 0xc7, 0xd1, 0xbc, 0xd6, 0x2c, 0x30, 0x32, 0x2d, 0x31, 0x32, 0x33, 0x2d, 0x34, 0x35, 0x36, 0x37)
+    const f2 = await readBulkFile(asFile('목록.csv', euc, 'text/csv'))
+    const t2 = f2.ok ? splitPaste(f2.text) : []
+    const r2 = rowsFromTable(t2, guessColumns(t2))
+    // ③ 이 프로그램이 내려받은 CSV(맨 앞 BOM)를 그대로 다시 고르기
+    const { csv } = clientsCsv([normalizeClientOps({ id: 'x', workspaceId: 'w', companyName: '한솔, 테크(주)', contactName: '김한솔', contactPhone: '010-1111-2222', businessNumber: '123-45-67890', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' })])
+    const f3 = await readBulkFile(asFile('업체목록-2026-11-11.csv', new TextEncoder().encode(`﻿${csv}`)))
+    const t3 = f3.ok ? splitPaste(f3.text) : []
+    const r3 = rowsFromTable(t3, guessColumns(t3))
+    check(
+      'K23 파일 — 옛 한글 방식 CSV 도 깨지지 않게(회사명 · 전화) · 내려받은 CSV(BOM · 따옴표 안 쉼표)를 다시 고르면 그대로 1곳',
+      f2.ok && r2.rows.length === 1 && r2.rows[0].companyName === '한솔' && r2.rows[0].contactPhone === '02-123-4567' && f3.ok && r3.rows.length === 1 && r3.rows[0].companyName === '한솔, 테크(주)' && r3.rows[0].businessNumber === '123-45-67890' && decodeTableBytes(Uint8Array.of(0xff, 0xfe, 0x41, 0x00)) === 'A',
+      JSON.stringify({ f2, r2: r2.rows, f3, r3: r3.rows }),
+    )
+    // ④ 못 읽는 파일은 까닭을 말한다(막지 않고 붙여넣기로 안내) — 형식 · 크기 · 깨진 엑셀 · 빈 파일
+    const bad1 = await readBulkFile(asFile('사진.png', Uint8Array.of(1, 2, 3)))
+    const bad2 = await readBulkFile({ name: '큰목록.csv', type: 'text/csv', size: BULK_FILE_MAX_BYTES + 1, arrayBuffer: async () => new ArrayBuffer(0) })
+    const bad3 = await readBulkFile(asFile('깨진.xlsx', Uint8Array.of(0x50, 0x4b, 0x03, 0x04, 0, 0, 0)))
+    const bad4 = await readBulkFile(asFile('빈.csv', new TextEncoder().encode('\n\n')))
+    check(
+      'K23 파일 — 못 읽는 파일: 형식(.png) · 5MB 넘음 · 깨진 엑셀 · 빈 파일 모두 까닭 한 줄(파일 이름 포함) · 받는 확장자 5가지',
+      !bad1.ok && bad1.reason.includes('사진.png') && !bad2.ok && bad2.reason.includes('너무 커요') && !bad3.ok && bad3.reason.includes('붙여넣어') && !bad4.ok && bad4.reason.includes('빈.csv') && BULK_FILE_ACCEPT.split(',').length === 5 && bulkFileKind('a.XLSX') === 'xlsx' && bulkFileKind('a.xls') === 'xls' && bulkFileKind('a.tsv') === 'text' && bulkFileKind('a.hwp') === null,
+      JSON.stringify({ bad1, bad2, bad3, bad4 }),
+    )
+    // ⑤ 제목 줄이 없는 표 · 첫 줄이 이미 제목 줄인 표는 한 줄도 버리지 않는다 · 시트 이름이 붙은 글은 첫 시트만
+    const noHead = splitPaste('한솔테크(주)\t123-45-67890\n회사명\t전화\n다움\t02-123-4567')
+    const headFirst = splitPaste('회사명\t전화\n한솔\t02-123-4567')
+    const sheet = firstSheetOfText('[거래처]\n회사명\t전화\n한솔\t02-1\n\n[메모]\n아무 글')
+    check(
+      'K23 파일 — 번호가 먼저 나오면 제목 줄 없는 표(버린 줄 0) · 첫 줄이 제목 줄이면 그대로 · 시트 이름 붙은 글은 첫 시트만(2장 · 이름)',
+      dropTitleRows(noHead).dropped === 0 && dropTitleRows(headFirst).dropped === 0 && dropTitleRows(splitPaste('목록\t\n회사명\t전화\n한솔\t02-123-4567')).dropped === 1 && sheet.sheets === 2 && sheet.name === '거래처' && sheet.body === '회사명\t전화\n한솔\t02-1' && firstSheetOfText('회사명\t전화').sheets === 1,
+      JSON.stringify({ a: dropTitleRows(noHead).dropped, b: dropTitleRows(headFirst).dropped, sheet }),
     )
   }
 

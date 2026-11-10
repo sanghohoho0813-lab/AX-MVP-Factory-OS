@@ -9,12 +9,14 @@
  *   B6 휴대폰 390 — 옆 넘침 0 · 40px 보다 작은 단추 0
  *   B7 /ops/clients?bulk=1 로 바로 열림(고객 첫 화면 '엑셀 목록 붙여넣기')
  *   B8 [더보기] › [업체 목록 엑셀 파일로] — CSV 파일 하나(제목 줄 · 한글 안 깨지게 BOM · 업체 수만큼)
+ *   B9 붙여넣는 창 [엑셀 파일 고르기] — .xlsx 를 고르면 같은 미리 보기(표 위 제목 줄 빼기) · 못 읽는 파일은 까닭 한 줄
  *   N1 영업 보드 칸 이름 '1차 미팅 예정' · '1차 미팅 완료' 가 잘리지 않음
  *
  *   node e2e/bulkpaste.mjs <baseUrl> [사진 폴더]
  */
 import { chromium } from 'playwright'
 import { mkdirSync, readFileSync } from 'node:fs'
+import { crc32 } from 'node:zlib'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
@@ -32,6 +34,55 @@ const check = (n, c, d) => {
 }
 const shot = async (page, name) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` })
+}
+
+/** 압축하지 않은(stored) zip 으로 만든 한 장짜리 엑셀 — 시험용(글자만) */
+function storedXlsx(rows) {
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const body = rows.map((cells, r) => `<row r="${r + 1}">${cells.map((v, c) => (v === '' ? '' : `<c r="${String.fromCharCode(65 + c)}${r + 1}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`)).join('')}</row>`).join('')
+  const files = [
+    ['xl/workbook.xml', '<?xml version="1.0"?><workbook><sheets><sheet name="거래처" sheetId="1"/></sheets></workbook>'],
+    ['xl/worksheets/sheet1.xml', `<?xml version="1.0"?><worksheet><sheetData>${body}</sheetData></worksheet>`],
+  ]
+  const locals = []
+  const centrals = []
+  let offset = 0
+  for (const [name, text] of files) {
+    const nameBuf = Buffer.from(name, 'utf8')
+    const data = Buffer.from(text, 'utf8')
+    const crc = crc32(data) >>> 0
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt16LE(0x0800, 6)
+    local.writeUInt16LE(0, 8)
+    local.writeUInt32LE(crc, 14)
+    local.writeUInt32LE(data.length, 18)
+    local.writeUInt32LE(data.length, 22)
+    local.writeUInt16LE(nameBuf.length, 26)
+    const central = Buffer.alloc(46)
+    central.writeUInt32LE(0x02014b50, 0)
+    central.writeUInt16LE(20, 4)
+    central.writeUInt16LE(20, 6)
+    central.writeUInt16LE(0x0800, 8)
+    central.writeUInt16LE(0, 10)
+    central.writeUInt32LE(crc, 16)
+    central.writeUInt32LE(data.length, 20)
+    central.writeUInt32LE(data.length, 24)
+    central.writeUInt16LE(nameBuf.length, 28)
+    central.writeUInt32LE(offset, 42)
+    locals.push(local, nameBuf, data)
+    centrals.push(central, nameBuf)
+    offset += 30 + nameBuf.length + data.length
+  }
+  const cd = Buffer.concat(centrals)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(files.length, 8)
+  end.writeUInt16LE(files.length, 10)
+  end.writeUInt32LE(cd.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return Buffer.concat([...locals, cd, end])
 }
 
 const EMPTY_SEED = `
@@ -139,6 +190,43 @@ check(
   /^업체목록-\d{4}-\d{2}-\d{2}\.csv$/.test(dl.suggestedFilename()) && csvBuf[0] === 0xef && csvBuf[1] === 0xbb && csvBuf[2] === 0xbf && csvLines[0] === '회사명,대표자,전화,사업자등록번호,업종,구분,다음 할 일,기한,등록일' && csvLines.length === 6 && csvText.includes('다섯째상사,오다섯,,555-55-55555,,잠재고객') && csvText.includes('한솔정밀(주),김한솔,010-1111-2222,123-45-67890,,계약 고객'),
   { name: dl.suggestedFilename(), lines: csvLines.slice(0, 3) },
 )
+
+/* ---------------- B9 엑셀 파일 그대로 고르기(D-585) ---------------- */
+await page.locator('[data-guide="fn-clients-tools"]').first().click()
+await page.waitForTimeout(300)
+await page.getByTestId('clients-bulk').click()
+await page.waitForTimeout(300)
+const fileBtn = page.getByTestId('bulk-paste-file')
+const fileBtnText = ((await fileBtn.innerText().catch(() => '')) ?? '').trim()
+// 못 읽는 파일 → 까닭 한 줄 · 붙여넣는 칸은 그대로
+await page.getByTestId('bulk-paste-file-input').setInputFiles({ name: '명함사진.png', mimeType: 'image/png', buffer: Buffer.from([1, 2, 3]) })
+await page.waitForTimeout(300)
+const fileErr = ((await page.getByTestId('bulk-paste-file-error').innerText().catch(() => '')) ?? '').trim()
+check('B9 [엑셀 파일 고르기] 단추 · 못 읽는 파일(.png)은 까닭 한 줄(파일 이름) · 붙여넣는 칸은 빈 채', fileBtnText.includes('엑셀 파일 고르기') && fileErr.includes('명함사진.png') && (await page.getByTestId('bulk-paste-text').inputValue()) === '', { fileBtnText, fileErr })
+// 엑셀 파일 — 표 위 제목 줄 · 제목 줄 · 새 곳 1 + 이미 있는 곳 1
+const XLSX_FILE = storedXlsx([
+  ['거래처 목록', '', '', ''],
+  ['상호', '대표자', '연락처', '사업자번호'],
+  ['여섯째기술(주)', '육기술', '010-6666-7777', '666-66-66666'],
+  ['한솔정밀(주)', '김한솔', '010-1111-2222', '123-45-67890'],
+])
+await page.getByTestId('bulk-paste-file-input').setInputFiles({ name: '거래처.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX_FILE })
+await page.waitForFunction(() => document.querySelector('[data-testid="bulk-paste-file-note"]'), null, { timeout: 8000 }).catch(() => {})
+const fileNote = ((await page.getByTestId('bulk-paste-file-note').innerText().catch(() => '')) ?? '').trim()
+const sum9 = page.getByTestId('bulk-paste-summary')
+const cols9 = await page.getByTestId('bulk-paste-col').evaluateAll((els) => els.map((e) => e.value))
+check(
+  'B9 엑셀 파일(.xlsx)을 고르면 — 한 줄 안내(파일 이름 · 3줄 · 제목 1줄 뺌) · 못 읽은 까닭 줄 사라짐 · 제목 줄 체크 · 칸 4개 알아서 · 등록할 곳 1 · 이미 있는 곳 1',
+  fileNote.includes('거래처.xlsx') && fileNote.includes('3줄') && fileNote.includes('1줄(제목)은 뺐어요') && (await page.getByTestId('bulk-paste-file-error').count()) === 0 && (await page.getByTestId('bulk-paste-header').isChecked()) && cols9.join() === 'companyName,contactName,contactPhone,businessNumber' && (await sum9.getAttribute('data-add')) === '1' && (await sum9.getAttribute('data-dupes')) === '1',
+  { fileNote, cols9, add: await sum9.getAttribute('data-add'), dupes: await sum9.getAttribute('data-dupes') },
+)
+await shot(page, 'bulk-07-file')
+await page.locator('[data-testid="bulk-paste-kind"][data-value="contract"]').click()
+await page.getByTestId('bulk-paste-submit').click()
+await page.waitForTimeout(1200)
+const after9 = await stored()
+const six = after9.find((r) => r.companyName === '여섯째기술(주)')
+check('B9 [1곳 등록] → 저장 6곳 · 파일에서 읽은 대표 · 전화 · 번호 그대로', after9.length === 6 && six?.contactName === '육기술' && six?.contactPhone === '010-6666-7777' && six?.businessNumber === '666-66-66666', six && { c: six.contactName, p: six.contactPhone, b: six.businessNumber })
 
 await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
