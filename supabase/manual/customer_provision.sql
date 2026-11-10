@@ -6,8 +6,11 @@
 --
 -- 순서
 --   0. 0019 → 0020 → 0022 → 0023 → 0024 를 먼저 실행해 둔다(0024 가 없으면 아래가 멈춘다).
---   1. Authentication → Users → Add user 로 고객 계정(이메일 · 비밀번호)을 만든다. ('Auto Confirm User' 체크)
---   2. 아래 다섯 줄(v_email · v_ws_name · v_plan · v_units · v_months · v_marketing)만 바꿔 실행한다.
+--   1. 고객 계정 준비 — 둘 중 하나
+--      a) 고객이 로그인 화면에서 직접 가입했다면 건너뛴다(D-579). 고객 화면 '이 계정은 아직 사용 승인 전이에요' 에 뜬 이메일을 받아 v_email 에 넣는다.
+--      b) 대표가 만들어 줄 때는 Authentication → Users → Add user 로 계정(이메일 · 비밀번호)을 만든다. ('Auto Confirm User' 체크)
+--   2. 아래 여섯 줄(v_email · v_ws_name · v_plan · v_units · v_months · v_marketing)만 바꿔 실행한다.
+--   3. 고객은 그 화면에서 [승인됐는지 다시 확인] 만 누르면 열린다(다시 가입 · 다시 로그인할 필요 없음).
 --
 -- 하는 일: 그 계정을 pilot 등급(자기 작업공간 하나 · 대표 자료 0) + audience = customer 로 등록하고,
 --          그 사람만 구성원인 빈 작업공간을 만들고, AI 권한을 customer 요금제(한도 · 기한)로 넣는다.
