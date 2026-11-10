@@ -1056,6 +1056,22 @@ async function run() {
     )
   }
 
+  /* K33 — D-595 링크 미리보기 그림 */
+  {
+    const html = readFileSync('index.html', 'utf8')
+    const meta = (prop: string) => new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? ''
+    const png = readFileSync('public/og-image.png')
+    const isPng = png.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'
+    const w = png.readUInt32BE(16)
+    const h = png.readUInt32BE(20)
+    check(
+      'K33 링크 미리보기(D-595) — 그림 주소가 통째로(https · 운영 주소 · /og-image.png) · 가로 1200 세로 630(머리 글과 파일이 같음) · PNG · 300KB 아래 · 제목 · 설명 · 큰 그림 카드 · 그림 설명 글',
+      meta('og:image') === 'https://os.miraeailab.com/og-image.png' && meta('og:image:width') === '1200' && meta('og:image:height') === '630' && isPng && w === 1200 && h === 630 && png.length > 10_000 && png.length < 300_000 &&
+        meta('og:title').length > 3 && meta('og:description').length > 10 && meta('twitter:card') === 'summary_large_image' && meta('og:image:alt').length > 5,
+      JSON.stringify({ image: meta('og:image'), w, h, bytes: png.length, isPng }),
+    )
+  }
+
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)
 }

@@ -631,6 +631,22 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   check('G20 평소 브라우저에서는 앱 안 안내가 없음(넣는 법만)', (await mp.getByTestId('home-howto-inapp').count()) === 0 && (await mp.getByTestId('home-howto-tabs').count()) === 1)
 }
 
+/* G21 링크 미리보기 그림(D-595) — 주소를 카카오톡 · 문자로 보냈을 때 카드에 뜨는 그림이 실제로 내려온다 */
+{
+  const og = await mp.evaluate(async () => {
+    const meta = (p) => document.querySelector(`meta[property="${p}"]`)?.getAttribute('content') ?? ''
+    const r = await fetch('/og-image.png')
+    const buf = new Uint8Array(await r.arrayBuffer())
+    const dv = new DataView(buf.buffer)
+    return { status: r.status, type: r.headers.get('content-type') ?? '', bytes: buf.length, w: buf.length > 24 ? dv.getUint32(16) : 0, h: buf.length > 24 ? dv.getUint32(20) : 0, image: meta('og:image'), title: meta('og:title'), desc: meta('og:description') }
+  })
+  check(
+    'G21 링크 미리보기: 머리 글에 그림 주소(https · /og-image.png) · 제목 · 설명 · /og-image.png 가 그림으로 내려옴(200 · image/png · 1200×630 · 300KB 아래)',
+    og.status === 200 && og.type.includes('image/png') && og.w === 1200 && og.h === 630 && og.bytes < 300_000 && /^https:\/\/.+\/og-image\.png$/.test(og.image) && og.title.length > 3 && og.desc.length > 10,
+    JSON.stringify(og),
+  )
+}
+
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */
 for (const doc of ['terms', 'privacy']) {
   await mp.goto(`${BASE}/${doc}`, { waitUntil: 'networkidle' })
