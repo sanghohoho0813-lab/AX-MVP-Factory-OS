@@ -115,7 +115,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
         testId="mk-make-long"
       >
         {/* 단계판 */}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages" data-guide="fn-mk-stages">
           {(['all', ...IDEA_STATUSES] as const).map((s) => {
             const n = s === 'all' ? ideas.length : counts[s]
             const on = stage === s
@@ -178,7 +178,7 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
                 aria-label="담을 주제"
                 data-testid="make-add-input"
               />
-              <Button variant="primary" onClick={() => void add()} disabled={readOnly || !topic.trim()} data-testid="make-add">
+              <Button variant="primary" onClick={() => void add()} disabled={readOnly || !topic.trim()} data-testid="make-add" data-guide="fn-mk-add">
                 <Plus aria-hidden="true" className="size-4" /> 담기
               </Button>
             </div>

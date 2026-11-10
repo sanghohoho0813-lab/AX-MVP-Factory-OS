@@ -285,6 +285,21 @@ await page.waitForTimeout(200)
 const kBack = await hoverCard('/', '[data-guide="fn-today-wrap"]')
 check('G11 설정 › 마우스 안내 카드: 기본 켜기 → [끄기] → 메뉴 · 단추에 올려도 카드 0 · 사용법 안내 화면 글은 그대로 · 새로 고쳐도 끈 채 → [켜기] → 다시 뜸', ghDefault === 'true' && ghOffChecked === 'true' && ghOffMenu === 0 && ghOffFn === 0 && ghGuideRows >= 3 && ghKept === 'true' && kBack === 'fn-today-wrap', { ghDefault, ghOffChecked, ghOffMenu, ghOffFn, ghGuideRows, ghKept, kBack })
 
+/* G12 — 마케팅 남은 화면(기초 7가지 · 내 콘텐츠 · 남의 인기 영상)에도 기능 안내 · 사용법 안내 화면에 모임 */
+const kRead = await hoverCard('/marketing/basics', '[data-guide="fn-mk-basic-read"]')
+const readText = ((await card.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+const kStages = await hoverCard('/marketing/youtube?view=make', '[data-guide="fn-mk-stages"]', async () => {
+  const fold = page.getByTestId('mk-make-long')
+  if ((await fold.getAttribute('data-open').catch(() => '')) === '0') await fold.getByTestId('fold-toggle').first().click()
+  await page.waitForTimeout(300)
+})
+const stagesText = ((await card.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+const kLook = await hoverCard('/marketing/youtube?view=top', '[data-guide="fn-mk-look"]')
+await page.goto(BASE + '/guide?m=mk-make', { waitUntil: 'networkidle' })
+await page.waitForTimeout(600)
+const mkFn2 = await page.getByTestId('guide-function').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+check('G12 기초 7가지 [읽었어요] · 내 콘텐츠 단계 숫자판 · 남의 인기 영상 탭에 마우스 → 기능 안내(어려운 말 0) · 사용법 안내 내 콘텐츠 줄 아래 2개', kRead === 'fn-mk-basic-read' && kStages === 'fn-mk-stages' && kLook === 'fn-mk-look' && mkFn2.includes('fn-mk-stages') && mkFn2.includes('fn-mk-add') && !/롱폼|썸네일|벤치마킹|캡션|해시태그|포맷|훅/.test(readText + stagesText), { kRead, kStages, kLook, mkFn2 })
+
 /* G6 */
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', hasTouch: true, isMobile: true })
 const mp = await m.newPage()

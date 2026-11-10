@@ -269,7 +269,7 @@ export function WeekView({
                     <>
                       <ModelPicker />
                       <AiConfirm>
-                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run">
+                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run" data-guide="fn-mk-week-run">
                           {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
                           {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
                         </Button>
@@ -483,10 +483,10 @@ export function WeekView({
 
       {/* 도구 · 점검 요약 — 탭 아래 한 줄 */}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
-        <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all">
+        <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all" data-guide="fn-mk-week-copy">
           <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => download(`week-content-${start}.txt`, text())} data-testid="mk-week-download">
+        <Button size="sm" variant="secondary" onClick={() => download(`week-content-${start}.txt`, text())} data-testid="mk-week-download" data-guide="fn-mk-week-copy">
           <Download aria-hidden="true" className="size-4" /> 텍스트 파일로
         </Button>
         {!readOnly &&

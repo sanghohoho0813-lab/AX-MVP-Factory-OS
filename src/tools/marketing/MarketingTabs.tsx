@@ -346,6 +346,7 @@ export function LookTabs({ view, onPick }: { view: RadarView; onPick: (v: RadarV
             onClick={() => onPick(it.key as RadarView)}
             className={`tap t-sub inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[8px] px-1 text-center leading-tight font-semibold break-keep ${on ? 'bg-white text-brand-700 shadow-(--shadow-card) ring-2 ring-brand-200' : 'text-slate-600 hover:bg-white/70'}`}
             data-testid={it.key === 'top' ? 'yt-sub-top' : `yt-view-${it.key}`}
+            data-guide="fn-mk-look"
           >
             <span className="max-sm:hidden">
               <SlimIcon it={it} />

@@ -78,7 +78,7 @@ export function MarketingBasicsPage() {
                       {b.tryLabel} <ArrowRight aria-hidden="true" className="size-4" />
                     </Link>
                     {!isRead && (
-                      <button type="button" onClick={() => markRead(b.key)} className="tap t-body inline-flex min-h-12 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-basic-read">
+                      <button type="button" onClick={() => markRead(b.key)} className="tap t-body inline-flex min-h-12 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-basic-read" data-guide="fn-mk-basic-read">
                         <Check aria-hidden="true" className="size-4" /> 읽었어요
                       </button>
                     )}
