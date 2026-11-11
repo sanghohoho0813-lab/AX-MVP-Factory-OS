@@ -126,4 +126,21 @@ check "연습 ⑥ 되돌린 뒤에도 대표 팀장 화면 1 · audience 칸은 
 out=$(blk supabase/migrations/20261104000023_workspace_id_lock.sql)$(blk supabase/migrations/20261104000024_customer_audience.sql)
 check "연습 ⑦ 다시 적용 — 오류 없음 · 확인 12줄 모두 '좋음'" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0023_0024.sql | grep -c '|좋음$')" "0 12"
 check "연습 ⑧ 확인 SQL 셋 다 쓰기 0(점검 · 적용 전 · 적용 뒤)" "$(before=$(v "select sum(n_tup_ins + n_tup_upd + n_tup_del) from pg_stat_user_tables"); blk supabase/manual/check_applied_0016_0024.sql > /dev/null; blk supabase/manual/precheck_0023_0024.sql > /dev/null; blk supabase/manual/verify_after_0023_0024.sql > /dev/null; sleep 1; after=$(v "select sum(n_tup_ins + n_tup_upd + n_tup_del) from pg_stat_user_tables"); [ "$before" = "$after" ] && echo same || echo "$before→$after")" "same"
+# ⑨ D-597 SQL Editor 는 붙여 넣을 때 줄 앞에 빈칸을 더한다(2026-11-11 운영 적용 전 점검에서 실제로 계단처럼 밀린 본문 — 7 · 8번 '다름')
+#    → 띄어쓰기 · 줄바꿈만 다른 본문은 점검 · 확인이 같은 본문으로 본다. 글자가 하나라도 다르면 여전히 멈춤.
+ind() { awk '{n=(NR<60?NR:60); s=""; for(i=0;i<n;i++) s=s" "; print s $0}' "$1"; }
+blkind() { local body; body="${2:-}$(ind "$1")"; su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat)\"" <<<"$body" 2>&1; }
+blk supabase/manual/rollback_0023_0024.sql > /dev/null
+out=$(blkind supabase/migrations/20261008000020_owner_views_pilot.sql)
+check "연습 ⑨ 0020 을 계단 들여쓰기로 붙여 넣음 — 오류 없음 · 두 본문 글자는 원본과 다름" "$(echo "$out" | grep -c 'ERROR') $(v "select count(*) from pg_proc where proname in ('os_access_link_owner_to_pilots', 'my_pilot_views') and md5(prosrc) not in ('5923bce05aa4d3eebf827e7fd39e3db5', 'b9e5de279b3f39efc381ecf3c0b497b0')")" "0 2"
+out=$(blk supabase/manual/precheck_0023_0024.sql)
+check "연습 ⑨ 적용 전 점검: 띄어쓰기만 다른 본문 = '0020 그대로 · 좋음' · 멈춤 0" "$(echo "$out" | grep -c '멈춤') $(echo "$out" | grep -c '|0020 그대로|좋음$')" "0 2"
+out=$(blkind supabase/migrations/20261104000023_workspace_id_lock.sql "set lock_timeout = '5s'; ")$(blkind supabase/migrations/20261104000024_customer_audience.sql "set lock_timeout = '5s'; ")
+check "연습 ⑨ 0023 · 0024 도 계단 들여쓰기로 — 오류 없음 · 확인 12줄 모두 '좋음' · 대표 팀장 화면 1/1" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0023_0024.sql | grep -c '|좋음$') $(blk supabase/manual/verify_after_0023_0024.sql | grep -E '^7\|' | cut -d'|' -f4)" "0 12 1 / 1"
+check "연습 ⑨ 직접 시도: 통과 4 · 실패 0" "$(blk supabase/manual/try_0023_0024.sql | grep -c '통과 4 · 실패 0')" "1"
+blk supabase/manual/rollback_0023_0024.sql > /dev/null
+sed "s/'Pilot')/'Pilot2')/" supabase/migrations/20261008000020_owner_views_pilot.sql | q > /dev/null 2>&1
+row8=$(blk supabase/manual/precheck_0023_0024.sql | grep -E '^8\|')
+check "연습 ⑨ 글자가 바뀐 본문(누가 고친 것)은 여전히 '다름 · 멈춤'" "$(echo "$row8" | cut -d'|' -f4) $(echo "$row8" | cut -d'|' -f5 | grep -c '^멈춤')" "다름 1"
+q < supabase/migrations/20261008000020_owner_views_pilot.sql > /dev/null 2>&1
 [ "$BAD" -eq 0 ]

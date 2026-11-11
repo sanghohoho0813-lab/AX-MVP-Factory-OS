@@ -13,7 +13,16 @@ with fn(name) as (
 ), trg(name, rel) as (
   select g.tgname, c.relname from pg_trigger g join pg_class c on c.oid = g.tgrelid where not g.tgisinternal
 ), fp(name, md5) as (
-  select p.proname, md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  -- D-597 SQL Editor 는 붙여 넣을 때 줄 앞에 빈칸을 더한다(운영에서 실제로 계단처럼 밀림) — 띄어쓰기 · 줄바꿈을 한 칸으로 줄여 같은 본문이면
+  --       원래 지문으로 본다(0020 · 0024 두 본문 각각). 글자 · 낱말이 하나라도 다르면 여전히 '다름'.
+  select p.proname,
+         case md5(regexp_replace(p.prosrc, '[[:space:]]+', ' ', 'g'))
+           when '0c7aa6513f8d3c4e3c9b3d4c6075a4f6' then '5923bce05aa4d3eebf827e7fd39e3db5'
+           when '94c548e08c03555bac62c6a6608cac12' then 'b9e5de279b3f39efc381ecf3c0b497b0'
+           when 'c5da8186947acc049dbff376c8960452' then 'a4b15692163e9302adf96e7be8b1d021'
+           when '48308280689708c6808ebbd2017baeef' then '9e29a68be87ac2fa4ece076aa66b6969'
+           else md5(p.prosrc) end
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname in ('os_access_link_owner_to_pilots', 'my_pilot_views')
 ), has_os as (
   select to_regclass('public.os_access') is not null as ok
