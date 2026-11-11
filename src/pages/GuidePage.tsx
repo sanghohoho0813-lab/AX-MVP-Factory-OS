@@ -12,7 +12,8 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, ChevronDown, MessageCircleQuestion, PlayCircle } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
-import { GUIDE_LABELS, menuGuide } from '../content/menuGuide'
+import { GUIDE_LABELS, GUIDE_SECTION_ORDER, menuGuide } from '../content/menuGuide'
+import { GuideSectionIcon } from '../components/guide/GuideSectionIcon'
 import { functionGuidesOf } from '../content/functionGuide'
 import { menuVideo } from '../config/menuVideos'
 import { minutesLabel } from '../config/tutorialVideos'
@@ -93,10 +94,13 @@ export function GuidePage() {
               </button>
               {on && (
                 <div id={panelId} className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5 lg:flex-row lg:gap-5" data-testid="guide-panel">
-                  <dl className="flex min-w-0 flex-1 flex-col gap-2.5">
-                    {(['what', 'why', 'effect', 'next'] as const).map((k) => (
-                      <div key={k} className="flex flex-col gap-0.5" data-testid={`guide-${k}`}>
-                        <dt className="t-sub font-bold text-brand-700">{GUIDE_LABELS[k]}</dt>
+                  <dl className="flex min-w-0 flex-1 flex-col gap-4">
+                    {GUIDE_SECTION_ORDER.map((k) => (
+                      <div key={k} className="flex flex-col gap-1" data-testid={`guide-${k}`}>
+                        <dt className="t-sub flex items-center gap-2 font-bold text-slate-800">
+                          <GuideSectionIcon k={k} size="md" />
+                          {GUIDE_LABELS[k]}
+                        </dt>
                         <dd className="t-body break-keep text-slate-800">{g[k]}</dd>
                       </div>
                     ))}

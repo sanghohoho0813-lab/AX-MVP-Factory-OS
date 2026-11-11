@@ -11,7 +11,8 @@ import { ArrowRight } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { useIsPilot } from '../../auth/osAccess'
 import { useCustomerAudience } from '../../config/customerAudience'
-import { GUIDE_LABELS, menuGuide } from '../../content/menuGuide'
+import { GUIDE_LABELS, GUIDE_SECTION_ORDER, menuGuide } from '../../content/menuGuide'
+import { GuideSectionIcon } from './GuideSectionIcon'
 import { functionGuidesOf } from '../../content/functionGuide'
 import { guideTitle } from './guideTitle'
 
@@ -37,10 +38,13 @@ export function ScreenGuideSheet({ guideKey, fallbackLabel, onClose }: { guideKe
         <p className="t-card font-bold break-keep text-slate-900" data-testid="screen-guide-label">
           {label}
         </p>
-        <dl className="flex flex-col gap-2.5">
-          {(['what', 'why', 'effect', 'next'] as const).map((k) => (
-            <div key={k} className="flex flex-col gap-0.5" data-testid={`screen-guide-${k}`}>
-              <dt className="t-sub font-bold text-brand-700">{GUIDE_LABELS[k]}</dt>
+        <dl className="flex flex-col gap-4">
+          {GUIDE_SECTION_ORDER.map((k) => (
+            <div key={k} className="flex flex-col gap-1" data-testid={`screen-guide-${k}`}>
+              <dt className="t-sub flex items-center gap-2 font-bold text-slate-800">
+                <GuideSectionIcon k={k} size="md" />
+                {GUIDE_LABELS[k]}
+              </dt>
               <dd className="t-body break-keep text-slate-800">{g[k]}</dd>
             </div>
           ))}

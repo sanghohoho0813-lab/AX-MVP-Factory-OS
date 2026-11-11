@@ -419,3 +419,7 @@ export const MARKETING_GUIDE_LIST: ReadonlyArray<{ key: string; label: string; p
 ]
 
 export const GUIDE_LABELS = { what: '무엇을 하나요', why: '왜 있나요', effect: '쓰면 이렇게 돼요', next: '앞으로' } as const
+
+/** D-598 네 칸 순서 — 카드 · 휴대폰 안내 · 사용법 안내 화면이 같은 순서 · 같은 아이콘(components/guide/GuideSectionIcon) */
+export type GuideSectionKey = keyof typeof GUIDE_LABELS
+export const GUIDE_SECTION_ORDER: ReadonlyArray<GuideSectionKey> = ['what', 'why', 'effect', 'next']

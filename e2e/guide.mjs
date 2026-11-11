@@ -8,6 +8,7 @@
  *  G5 마케팅 목차 · 오늘 바로가기에서도 카드(옆 칸을 가리지 않게 아래로)
  *  G6 휴대폰 390 — 사용법 안내 화면 넘침 0 · 마우스 카드 없음 · 작은 단추 0
  *  G7 이용약관 · 개인정보처리방침 초안 화면(/terms · /privacy) — 로그인 없이 · 초안 띠 · 금액 0
+ *  G23 (D-598) 안내 카드 더 빨리(처음 0.25초 · 바로 옆 칸 0.08초) · 네 칸 앞 작은 아이콘 · 칸 사이 간격 — 카드 · 사용법 안내 · 휴대폰 안내 세 곳
  *
  *   node e2e/guide.mjs http://localhost:4390 [사진 폴더]
  */
@@ -43,6 +44,15 @@ await page.waitForTimeout(800)
 
 const card = page.getByTestId('menu-guide-card')
 const row = (key) => page.locator(`aside [data-guide="${key}"]`).first()
+// D-598 카드를 본 직후 다른 안내 칸으로 옮기면 0.08초 만에 그 카드가 뜬다 — '떠나면 닫힘' 은 안내 칸이 없는 빈 자리로 옮겨 본다
+const emptySpot = () => page.evaluate(() => {
+  for (const [x, y] of [[800, 500], [1000, 860], [640, 880], [1380, 520], [900, 120], [1200, 300]]) {
+    const el = document.elementFromPoint(x, y)
+    if (!el || !el.closest('[data-guide]')) return [x, y]
+  }
+  return [6, 894]
+})
+const moveAway = async () => { const [x, y] = await emptySpot(); await page.mouse.move(x, y) }
 
 /* G1 */
 await row('client-ops').hover()
@@ -57,7 +67,7 @@ check('G1 카드는 메뉴 줄 오른쪽 · 화면 안', !!box && !!rb && box.x 
 const navText = (await page.locator('aside').first().innerText()) ?? ''
 check('G2 카드 글은 메뉴(aside) 글에 섞이지 않음', !navText.includes('무엇을 하나요'))
 await shot(page, 'guide-01-hover')
-await page.mouse.move(800, 500)
+await moveAway()
 await page.waitForTimeout(200)
 check('G1 떠나면 닫힘', (await card.count()) === 0)
 
@@ -687,6 +697,51 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
   const contactVal = await mp.locator('[data-testid="mk-bio-input"][data-key="contact"]').inputValue().catch(() => '')
   const draft1 = ((await mp.getByTestId('mk-bio-text').first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
   check('G22 [소개 글에 이 줄 넣기] → 프로필 소개 글 만들기가 펼쳐짐 · "연락 받는 길" 칸에 그 줄 · 초안 첫 번째에도 그 줄 · 다른 칸은 그대로', bioOpen && contactVal === '문의는 프로필 링크(카카오톡 1:1)로' && draft1.includes('문의는 프로필 링크(카카오톡 1:1)로'), JSON.stringify({ bioOpen, contactVal, draft1: draft1.slice(0, 120) }))
+}
+
+/* G23 안내 카드 더 빨리 · 네 칸 아이콘(D-598) — 처음 0.25초(지나가는 마우스는 여전히 거름) · 카드를 본 직후 옆 칸은 0.08초 ·
+ *     무엇 · 왜 · 효과 · 앞으로 앞에 작은 아이콘 · 칸 사이 간격 — 마우스 카드 · 사용법 안내 화면 · 휴대폰 '이 화면 안내' 세 곳 같게 */
+{
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await moveAway()
+  await page.waitForTimeout(1300) // 카드를 본 지 1초가 지난 '처음' 상태
+  const appear = async (key) => {
+    const t0 = Date.now()
+    await row(key).hover()
+    for (let i = 0; i < 60; i++) {
+      if ((await card.getAttribute('data-key').catch(() => null)) === key) return Date.now() - t0
+      await page.waitForTimeout(15)
+    }
+    return -1
+  }
+  const cold = await appear('calendar')
+  const warm = await appear('client-ops')
+  const icons = await card.locator('[data-testid="guide-sec-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-k')))
+  const gaps = await card.locator('[data-testid="guide-sec"]').evaluateAll((els) => els.slice(1).map((e, i) => Math.round(e.getBoundingClientRect().top - els[i].getBoundingClientRect().bottom)))
+  const tones = await card.locator('[data-testid="guide-sec-icon"]').evaluateAll((els) => new Set(els.map((e) => getComputedStyle(e).color)).size)
+  await shot(page, 'guide-23-card-icons')
+  await moveAway()
+  check(
+    'G23 안내 카드 더 빨리(D-598) — 처음 0.2~0.45초(예전 0.45초 넘게) · 바로 옆 칸 0.25초 안 · 네 칸 아이콘(무엇 · 왜 · 효과 · 앞으로 순 · 모양은 다르고 색은 한 가지) · 칸 사이 10px 이상',
+    cold >= 200 && cold <= 450 && warm >= 0 && warm <= 250 && icons.join() === 'what,why,effect,next' && gaps.length === 3 && gaps.every((g) => g >= 10) && tones === 1,
+    { cold, warm, icons, gaps, tones },
+  )
+  await page.goto(BASE + '/guide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('guide-row').first().getByTestId('guide-row-toggle').click()
+  await page.waitForTimeout(250)
+  const pageIcons = await page.getByTestId('guide-panel').first().locator('[data-testid="guide-sec-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-k')).join())
+  await shot(page, 'guide-23-page-icons')
+  await mp.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await mp.waitForTimeout(600)
+  await mp.getByTestId('screen-title-guide').tap()
+  await mp.waitForFunction(() => document.querySelector('[data-testid="screen-guide"]'), null, { timeout: 8000 }).catch(() => {})
+  const sheetIcons = await mp.getByTestId('screen-guide').locator('[data-testid="guide-sec-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-k')).join())
+  const sheetOver = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  await shot(mp, 'guide-23-sheet-icons-390')
+  await mp.keyboard.press('Escape').catch(() => {})
+  check('G23 사용법 안내 화면 · 휴대폰 "이 화면 안내" 도 같은 네 아이콘 · 휴대폰 옆 넘침 0', pageIcons === 'what,why,effect,next' && sheetIcons === 'what,why,effect,next' && sheetOver <= 0, { pageIcons, sheetIcons, sheetOver })
 }
 
 /* G7 출시 목록 L-5 — 이용약관 · 개인정보처리방침 초안 화면(로그인 없이 · 초안 띠 · 가격을 지어내지 않음) */

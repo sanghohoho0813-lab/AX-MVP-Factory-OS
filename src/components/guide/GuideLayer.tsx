@@ -4,14 +4,17 @@
  *
  *  - 한 번만 붙이는 층(AppShell) — 메뉴 · 목차 · 바로가기는 `data-guide` 만 달면 된다.
  *  - 마우스가 있는 기기에서만(휴대폰은 올릴 수 없다 — 사용법 안내 화면에서 본다).
- *  - 0.45초 머물러야 뜬다(지나가는 마우스에 깜빡이지 않게) · 누르면 닫히고 그 칸을 떠날 때까지 다시 뜨지 않는다 · Esc · 스크롤 · 화면 이동에 닫힌다.
+ *  - 0.25초 머물러야 뜬다(D-598 대표 '조금 더 빨리' — 예전 0.45초 · 지나가는 마우스에는 여전히 안 뜬다).
+ *    카드를 한 번 본 뒤 1초 안에 다른 칸으로 옮기면 0.08초 만에 다음 카드(메뉴를 차례로 훑을 때 기다리지 않게).
+ *    누르면 닫히고 그 칸을 떠날 때까지 다시 뜨지 않는다 · Esc · 스크롤 · 화면 이동에 닫힌다.
  *  - 카드는 누를 수 없다(pointer-events: none) — 아래 화면을 가리거나 누름을 가로채지 않는다. 본문 밖(body)에 그려 메뉴 글에 섞이지 않는다.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PlayCircle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
-import { GUIDE_LABELS, hasMenuGuide, menuGuide } from '../../content/menuGuide'
+import { GUIDE_LABELS, GUIDE_SECTION_ORDER, hasMenuGuide, menuGuide } from '../../content/menuGuide'
+import { GuideSectionIcon } from './GuideSectionIcon'
 import { MODULES } from '../../config/moduleRegistry'
 import { menuVideo } from '../../config/menuVideos'
 import { useCustomerAudience } from '../../config/customerAudience'
@@ -26,7 +29,10 @@ interface Shown {
   side: boolean
 }
 
-const DELAY_MS = 450
+/** D-598 처음 뜨기까지(지나가는 마우스는 거른다) · 카드를 본 직후 옆 칸으로 옮길 때 · 그 '바로 다음' 으로 보는 시간 */
+const GUIDE_DELAY_MS = 250
+const GUIDE_WARM_DELAY_MS = 80
+const WARM_FOR_MS = 1000
 const CARD_W = 320
 
 export function GuideLayer() {
@@ -48,8 +54,13 @@ export function GuideLayer() {
     let current: Element | null = null
     // 누른 칸은 떠날 때까지 다시 띄우지 않는다(누른 뒤 화면이 바뀌어도 마우스는 그 자리에 있다)
     let muted: Element | null = null
+    // 카드가 떠 있었던 마지막 때 — 그 뒤 1초 안이면 다음 칸은 기다리지 않고 바로(D-598)
+    let visible = false
+    let warmUntil = 0
     const hide = () => {
       window.clearTimeout(timer)
+      if (visible) warmUntil = Date.now() + WARM_FOR_MS
+      visible = false
       current = null
       setShown(null)
     }
@@ -57,6 +68,9 @@ export function GuideLayer() {
       if (!guideHoverOn()) return
       if (el === current || el === muted) return
       window.clearTimeout(timer)
+      const warm = visible || Date.now() < warmUntil
+      if (visible) warmUntil = Date.now() + WARM_FOR_MS
+      visible = false
       current = el
       setShown(null)
       timer = window.setTimeout(() => {
@@ -65,8 +79,9 @@ export function GuideLayer() {
         if (!key) return
         const r = el.getBoundingClientRect()
         if (r.width === 0 && r.height === 0) return
+        visible = true
         setShown({ key, label: el.getAttribute('data-guide-label') || guideTitle(key), rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom }, side: !!el.closest('aside') })
-      }, DELAY_MS)
+      }, warm ? GUIDE_WARM_DELAY_MS : GUIDE_DELAY_MS)
     }
     // 글이 있는 열쇠만 — 메뉴 표의 key · 출시 예정(up-…) · 따로 쓴 안내(메뉴 · 기능). 모르는 값에는 카드를 띄우지 않는다
     const known = (key: string) => hasMenuGuide(key) || key.startsWith('up-') || MODULES.some((m) => m.key === key)
@@ -92,9 +107,13 @@ export function GuideLayer() {
     const down = (e: MouseEvent) => {
       muted = guideOf(e.target)
       hide()
+      warmUntil = 0
     }
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') hide()
+      if (e.key === 'Escape') {
+        hide()
+        warmUntil = 0
+      }
     }
     const leave = () => {
       muted = null
@@ -165,10 +184,14 @@ export function GuideLayer() {
       style={{ width: CARD_W, top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
     >
       <p className="t-card font-bold break-keep text-slate-900">{shown.label}</p>
-      <dl className="flex flex-col gap-1.5">
-        {(['what', 'why', 'effect', 'next'] as const).map((k) => (
-          <div key={k} className="flex flex-col">
-            <dt className="t-meta font-bold text-brand-700">{GUIDE_LABELS[k]}</dt>
+      {/* D-598 칸마다 작은 아이콘 · 칸 사이를 조금 더 띄워 한눈에 갈리게 */}
+      <dl className="flex flex-col gap-3">
+        {GUIDE_SECTION_ORDER.map((k) => (
+          <div key={k} className="flex flex-col gap-1" data-testid="guide-sec" data-k={k}>
+            <dt className="t-meta flex items-center gap-1.5 font-bold text-slate-800">
+              <GuideSectionIcon k={k} />
+              {GUIDE_LABELS[k]}
+            </dt>
             <dd className="t-sub break-keep text-slate-800">{g[k]}</dd>
           </div>
         ))}
