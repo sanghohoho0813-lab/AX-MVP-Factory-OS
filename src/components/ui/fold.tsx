@@ -335,7 +335,10 @@ export function Fold({
     >
       {/* D-573 머리줄은 '이 칸의 폭' 을 본다(useWideHead) — 두 칸으로 나란히 놓인 좁은 칸에서도 요약이 [모두 보기] 를 아랫줄로 밀지 않게 */}
       <div ref={headRef} data-wide={wide ? '1' : '0'} className="flex flex-wrap items-center gap-x-2">
-        {/* 제목(h2) 안에 펼침 단추 — 화면 읽기 프로그램도 '제목 · 펼침' 으로 읽는다 */}
+        {/* 제목(h2) 안에 펼침 단추 — 화면 읽기 프로그램도 '제목 · 펼침' 으로 읽는다
+            D-598 좁은 머리줄(휴대폰 360 등)에서는 제목 칸이 남는 폭만 차지하고 줄어든다 — 숫자 알약이 붙어 길어져도 '모두 보기' 가 아랫줄로 밀리지 않게
+            (제목 글자가 두 줄이 되는 쪽을 택한다). 넓은 머리줄은 예전 그대로(제목은 제 폭 · 요약이 옆을 채움). */}
+        <div className={wide ? 'max-w-full' : 'min-w-0 flex-[1_1_0%]'}>
         <HintTip tip={tip} label={title} className="max-w-full">
           <h2 id={headingId} className="t-section min-w-0 text-slate-900">
             <button
@@ -354,6 +357,7 @@ export function Fold({
             </button>
           </h2>
         </HintTip>
+        </div>
         {summary && !open && (
           // D-357 좁은 칸(휴대폰 · PC 의 반쪽 칸)은 요약을 제목 줄 아래로(order-last) — '모두 보기' 같은 단추는 제목 줄에 그대로
           // D-573 화면 폭(sm) 대신 이 머리줄의 폭(36rem)으로 가른다 — 넓은 칸에서는 제목 옆에(남는 폭 안에서 줄바꿈 · 단추는 제목 줄에 그대로)
@@ -361,7 +365,7 @@ export function Fold({
             {summary}
           </span>
         )}
-        {action && <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">{action}</div>}
+        {action && <div className={`ml-auto flex min-w-0 flex-wrap items-center gap-2 ${wide ? '' : 'shrink-0'}`}>{action}</div>}
       </div>
       {open && (
         <div id={bodyId} className="flex min-w-0 flex-col gap-3">
