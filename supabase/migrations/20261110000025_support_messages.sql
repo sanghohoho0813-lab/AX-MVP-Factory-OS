@@ -160,8 +160,10 @@ security definer
 set search_path = public
 as $$
   select m.id, m.user_id, m.kind, m.body, m.context, m.created_at, m.read_at, m.reply, m.replied_at, m.seen_at,
-         coalesce(nullif(btrim(p.display_name), ''), '') as author_name,
-         coalesce(p.email, '') as author_email,
+         -- D-599 운영 DB 의 profiles 는 공개 사이트 모양(name 은 있고 display_name 은 없다 — 0009 와 같은 사정)이라
+         -- 칸 이름을 직접 쓰면 이 파일 전체가 멈춘다(2026-11-11 운영에서 실제로 멈춤 · 한 거래라 바뀐 것 0). 어느 모양이든 돌게 행을 jsonb 로 읽는다.
+         coalesce(nullif(btrim(coalesce(to_jsonb(p) ->> 'display_name', to_jsonb(p) ->> 'name', '')), ''), '') as author_name,
+         coalesce(to_jsonb(p) ->> 'email', '') as author_email,
          -- audience 칸(0024)이 아직 없어도 돈다
          coalesce(to_jsonb(a) ->> 'audience', 'internal') as author_audience
   from public.support_messages m

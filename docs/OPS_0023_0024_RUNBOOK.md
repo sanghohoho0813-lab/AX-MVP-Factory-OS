@@ -108,6 +108,7 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 
 - 무엇: 표 하나(`support_messages`) · 정책 하나 · 함수 여섯. **기존 표 · 열 · 정책 · 자료는 건드리지 않는다.** 선행은 0019(0024 가 없어도 돈다).
 - 왜 지금: 외부 고객 계정을 열면(0024 뒤) 고객 화면의 오류 · 문의가 대표에게 닿을 길이 이것뿐이다. 없으면 앱은 문의 단추를 숨기고 예전처럼 돈다.
+- (D-599) 운영 profiles 모양(display_name 없음)에서 멈추던 것을 고쳤다 — 2026-11-11 이전에 받은 0025 파일로 실패했다면 지금 파일로 다시 실행한다(그때 바뀐 것은 없다).
 - 실행: `supabase/migrations/20261110000025_support_messages.sql` 을 **통째로** 붙여 실행 → 마지막 결과 한 줄이
   `table_count 1 · policy_count 1 · function_count 6 · authenticated_grants SELECT` 이면 끝. 여러 번 실행해도 같다.
 - 확인: `supabase/manual/check_applied_0016_0024.sql` 의 25번 줄이 '들어감'. 대표 계정으로 로그인 → 설정 › 받은 피드백함에 탭 [문의 · 오류] 가 보인다.

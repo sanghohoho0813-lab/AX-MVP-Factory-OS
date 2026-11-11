@@ -143,4 +143,17 @@ sed "s/'Pilot')/'Pilot2')/" supabase/migrations/20261008000020_owner_views_pilot
 row8=$(blk supabase/manual/precheck_0023_0024.sql | grep -E '^8\|')
 check "연습 ⑨ 글자가 바뀐 본문(누가 고친 것)은 여전히 '다름 · 멈춤'" "$(echo "$row8" | cut -d'|' -f4) $(echo "$row8" | cut -d'|' -f5 | grep -c '^멈춤')" "다름 1"
 q < supabase/migrations/20261008000020_owner_views_pilot.sql > /dev/null 2>&1
+# ⑩ D-599 운영 DB 의 profiles 는 공개 사이트 모양(name 있음 · display_name 없음) — 0025 가 그 모양에서도 한 덩어리로 들어가는지
+#    (2026-11-11 운영에서 0025 가 'column p.display_name does not exist' 로 멈춤 · 한 거래라 바뀐 것 0 → 고침)
+su postgres -c "psql -q -d $DB" > /dev/null 2>&1 <<'SQL'
+alter table public.profiles drop column if exists display_name cascade;
+alter table public.profiles add column if not exists name text;
+insert into public.profiles (id, email, name) values ('24000000-0000-4000-8000-0000000000a1', 'owner24@x.kr', '운영모양이름')
+  on conflict (id) do update set name = excluded.name;
+SQL
+out=$(blk supabase/migrations/20261110000025_support_messages.sql)
+check "연습 ⑩ 운영 모양 profiles(display_name 없음)에서 0025 한 덩어리 — 오류 0 · 표 1 · 정책 1 · 함수 6" "$(echo "$out" | grep -c 'ERROR') $(v "select count(*) from pg_tables where schemaname = 'public' and tablename = 'support_messages'") $(v "select count(*) from pg_policies where schemaname = 'public' and tablename = 'support_messages'") $(v "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'support\\_%'")" "0 1 1 6"
+check "연습 ⑩ 받은함의 보낸 사람 이름은 운영 모양의 name 칸에서" "$(v "select coalesce(nullif(btrim(coalesce(to_jsonb(p) ->> 'display_name', to_jsonb(p) ->> 'name', '')), ''), '') from public.profiles p where p.id = '24000000-0000-4000-8000-0000000000a1'")" "운영모양이름"
+out=$(blk supabase/migrations/20261110000025_support_messages.sql)
+check "연습 ⑩ 0025 다시 실행해도 같음(오류 0)" "$(echo "$out" | grep -c 'ERROR')" "0"
 [ "$BAD" -eq 0 ]
