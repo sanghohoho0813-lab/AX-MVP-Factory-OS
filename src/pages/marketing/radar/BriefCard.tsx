@@ -12,7 +12,7 @@ import { Fold } from '../../../components/ui/fold'
 import { BRIEF_FIELDS, BRIEF_MAX, defaultBrief, normalizeBrief, type ChannelBrief } from '../../../services/marketing/radarStore'
 import { isMarketingCustomer } from '../../../services/marketing/persona'
 
-export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelBrief; custom: boolean; readOnly: boolean; onSave: (next: ChannelBrief | null) => Promise<boolean> }) {
+export function BriefCard({ brief, custom, readOnly, onSave, plain = false }: { brief: ChannelBrief; custom: boolean; readOnly: boolean; onSave: (next: ChannelBrief | null) => Promise<boolean>; /** D-603 다른 판 안에 놓일 때 — 테두리 칸 없이 가는 선 위 한 줄(박스 안 박스 줄이기) */ plain?: boolean }) {
   const [draft, setDraft] = useState<ChannelBrief>(brief)
   const [busy, setBusy] = useState(false)
   // D-244 기준 값이 정말 바뀔 때만 따라간다 — 다른 레이더 설정을 저장해도 brief 묶음이 새로 와서 고치던 글이 지워졌다.
@@ -35,7 +35,8 @@ export function BriefCard({ brief, custom, readOnly, onSave }: { brief: ChannelB
   }
   return (
     <Fold
-      panel
+      panel={!plain}
+      className={plain ? 'border-t border-slate-100 pt-1' : ''}
       id="radar.brief"
       icon={<Compass aria-hidden="true" className="size-4 text-violet-700" />}
       title="채널 설계 기준"

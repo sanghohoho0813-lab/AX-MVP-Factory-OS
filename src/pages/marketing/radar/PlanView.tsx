@@ -164,8 +164,9 @@ export function PlanView({
 
         {criteria && <Criteria plan={plan} basis={basis} readOnly={readOnly} onMix={onMix} onUnmute={onUnmute} onClose={() => setCriteria(false)} />}
 
-        {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에) */}
-        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="radar-guide">
+        {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에)
+            D-603 [자세히 보기] 판 안의 또 한 칸(테두리) → 테두리 없이(박스 안 박스 줄이기) */}
+        <div className="flex flex-col gap-3" data-testid="radar-guide">
           <div className="mx-auto w-full max-w-xl">
             <MkSteps
               steps={[
@@ -180,7 +181,7 @@ export function PlanView({
             />
           </div>
           {selected.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="radar-selected">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2" data-testid="radar-selected">
               <span className="t-sub inline-flex items-center gap-1 font-bold text-success-800">
                 <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
               </span>
@@ -416,7 +417,8 @@ function ShootBox({ o, onCopy, brand, size = 'sm', rank = 0, readOnly = false, o
     setTab('ai')
   }
   return (
-    <section className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white ${lg ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
+    // D-603 후보 카드 안의 또 한 칸(테두리) → 카드 안 가는 선 아래 한 줄(박스 안 박스 줄이기)
+    <section className="flex min-w-0 flex-col gap-2.5 border-t border-slate-100 pt-3" data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left" data-testid="radar-kit-toggle">
         <IconChip icon={Clapperboard} tone="rose" />
         <span className={`font-extrabold text-slate-900 ${lg ? 't-card' : 't-sub'}`}>이번 주 이렇게 찍으세요</span>

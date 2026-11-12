@@ -25,6 +25,15 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'youtube-calm',
+    date: '2026-11-12',
+    title: '유튜브 주제 고르는 화면도 한 판으로 깔끔해졌어요',
+    how: "이번 주 뜨는 주제가 번호 붙은 목록으로 바뀌었어요. 하나를 누르면 제목 · 대본이 한 판 안에 나와요. 왜 이 주제인지는 판 맨 아래 [자세히 보기] 에 있어요.",
+    path: '/marketing?view=plan',
+    cta: '유튜브 열기',
+    marketing: true,
+  },
+  {
     id: 'sns-calm',
     date: '2026-11-12',
     title: '스레드 · 릴스 쓰는 화면이 한 판으로 깔끔해졌어요',
@@ -92,15 +101,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     how: '고객 관리 화면의 [더보기] 안에 [업체 목록 엑셀 파일로] 가 있어요.',
     path: '/ops/clients',
     cta: '고객 관리 열기',
-  },
-  {
-    id: 'posting-howto',
-    date: '2026-11-10',
-    title: '쓴 글을 올리는 법을 알려 줘요',
-    how: "글 쓰는 화면 아래 '올리는 법 보기' 를 누르면 스레드 · 인스타그램 · 틱톡 · 유튜브에 올리는 순서가 나와요.",
-    path: '/marketing/threads',
-    cta: '스레드 화면 열기',
-    marketing: true,
   },
 ]
 

@@ -129,8 +129,11 @@ export function PackView({
       </div>
       {guide}
 
-      {/* D-478 빨간 그라데이션 머리 → 흰 칸 + 회색 테두리(박스 색은 하나 · 빨강 = 주의만). 단추: 주 단추 하나(전체 복사) + 나머지 테두리 단추 */}
-      <header className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card) sm:p-5">
+      {/* D-603 대표 "유튜브 화면도 박스 너무 많아 — 스레드 · 릴스처럼" — 머리 · AI · 칸 고르기 · 다른 채널 · 고른 칸 · 채널 설계 기준 · 다음엔 이것이
+          따로따로 떨어진 판 일곱 개 → 큰 판 하나 안에 가는 가로선으로 나눈다(같은 내용 · 같은 시험 이름) */}
+      <div className="flex min-w-0 flex-col rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-pack-box">
+      {/* D-478 빨간 그라데이션 머리 → 흰 칸(박스 색은 하나 · 빨강 = 주의만). 단추: 주 단추 하나(전체 복사) + 나머지 테두리 단추 */}
+      <header className="p-4 sm:p-5">
         <div className="flex flex-col gap-1">
           <p className="t-meta inline-flex items-center gap-1.5 font-semibold text-slate-500">
             <span aria-hidden="true" className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-bold ${rank > 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>{rank > 0 ? rank : rank < 0 ? '고정' : '직접'}</span>
@@ -192,8 +195,20 @@ export function PackView({
 
       <AiBar canAi={canAi} ownerAi={ownerAi} readOnly={readOnly} parts={parts} errors={run.errors} saved={saved} storeFull={run.storeFull} cloudFailed={!readOnly && packCloudFailed()} onRun={runAi} />
 
+      {/* MUX-2 같은 주제를 스레드 · 릴스 · 틱톡 전용 공식으로 — 주제를 들고 가면 그 화면이 형식을 추천해 [AI로 바로 쓰기] 하나만 누르면 된다
+          D-603 따로 떨어진 칸 → 판 안 한 줄(가는 선 위) */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5 sm:px-5" data-testid="mk-pack-channels">
+        <span className="t-sub min-w-[10rem] flex-1 break-keep font-semibold text-slate-800">같은 주제로 다른 채널 — 채널마다 공식이 달라 따로 써요</span>
+        <Link to={`/marketing/threads?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-threads">
+          <AtSign aria-hidden="true" className="size-4" /> 스레드 글 쓰기
+        </Link>
+        <Link to={`/marketing/shorts?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-shorts">
+          <Film aria-hidden="true" className="size-4" /> 릴스 · 틱톡 대본 쓰기
+        </Link>
+      </div>
+
       {/* D-478 칸 이동 칩은 스크롤해도 머리줄 바로 아래에 붙어 있다(휴대폰 묶음은 1만 px 넘게 길다 — 길을 잃지 않게) */}
-      <nav aria-label="묶음 칸 고르기" className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-slate-50/95 px-1 py-1.5 backdrop-blur [scrollbar-width:none]" data-testid="mk-pack-nav">
+      <nav aria-label="묶음 칸 고르기" className="sticky top-16 z-20 flex gap-1.5 overflow-x-auto border-t border-slate-100 bg-white/95 px-3 py-2 backdrop-blur [scrollbar-width:none] sm:px-4" data-testid="mk-pack-nav">
         {pack.sections.map((x) => {
           const L = SECTION_LOOK[x.id]
           return (
@@ -206,24 +221,13 @@ export function PackView({
         })}
       </nav>
 
-      {/* MUX-2 같은 주제를 스레드 · 릴스 · 틱톡 전용 공식으로 — 주제를 들고 가면 그 화면이 형식을 추천해 [AI로 바로 쓰기] 하나만 누르면 된다 */}
-      <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="mk-pack-channels">
-        <span className="t-sub min-w-[10rem] flex-1 break-keep font-semibold text-slate-800">같은 주제로 다른 채널 — 채널마다 공식이 달라 따로 써요</span>
-        <Link to={`/marketing/threads?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-threads">
-          <AtSign aria-hidden="true" className="size-4" /> 스레드 글 쓰기
-        </Link>
-        <Link to={`/marketing/shorts?topic=${encodeURIComponent(source.topic)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="mk-pack-to-shorts">
-          <Film aria-hidden="true" className="size-4" /> 릴스 · 틱톡 대본 쓰기
-        </Link>
-      </div>
-
       {pack.sections.map((x, idx) => {
         const L = SECTION_LOOK[x.id]
         const ai = aiIds.has(x.id)
         const busy = running && PACK_AI_PARTS.some((p) => parts[p.part] === 'running' && p.sections.includes(x.id))
         const next = pack.sections[idx + 1]
         return (
-          <section key={x.id} id={`pack-${x.id}`} hidden={current !== x.id} className="flex scroll-mt-36 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
+          <section key={x.id} id={`pack-${x.id}`} hidden={current !== x.id} className="flex scroll-mt-36 flex-col gap-3 px-4 pt-2 pb-4 sm:px-5" data-testid="mk-pack-section" data-sec={x.id} data-ai={ai ? '1' : '0'}>
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${L.chip}`}>
                 <L.icon className="size-5" />
@@ -242,12 +246,13 @@ export function PackView({
                 <ClipboardCopy aria-hidden="true" className="size-4" /> 이 칸 복사
               </Button>
             </div>
-            <div className="flex flex-col gap-2">
+            {/* D-603 회색 칠한 칸 → 가는 선으로만 나눈 줄(칸마다 [복사] 그대로) */}
+            <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-100">
               {x.blocks.map((b, i) => (
-                <div key={`${b.label}-${i}`} className="flex flex-col gap-1 rounded-xl bg-slate-50 px-3 py-2.5" data-testid="mk-pack-block">
+                <div key={`${b.label}-${i}`} className="flex flex-col gap-1 py-3" data-testid="mk-pack-block">
                   <div className="flex items-start gap-2">
                     <p className="t-sub min-w-0 flex-1 font-bold break-keep text-slate-800 [overflow-wrap:anywhere]">{plainLabel(b.label)}</p>
-                    <button type="button" onClick={() => onCopy(b.text, b.label)} className="tap t-meta -my-1 inline-flex min-h-9 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-600 hover:bg-white hover:text-slate-900">
+                    <button type="button" onClick={() => onCopy(b.text, b.label)} className="tap t-meta -my-1 inline-flex min-h-9 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
                       <ClipboardCopy aria-hidden="true" className="size-3.5" /> 복사
                     </button>
                   </div>
@@ -265,12 +270,14 @@ export function PackView({
       })}
 
       {briefSlot && (
-        <Fold id="mk-pack-brief" title="채널 설계 기준 — 인사 · 말투 · 끝맺음" hint="대본의 인사 · 끝맺음과 AI 가 쓰는 말투가 이 기준을 따릅니다. 바꾸면 다음 묶음부터 바뀌어요." panel testId="mk-pack-brief" keepClosed>
-          {briefSlot}
-        </Fold>
+        <div className="border-t border-slate-100 px-3 py-1 sm:px-4">
+          <Fold id="mk-pack-brief" title="채널 설계 기준 — 인사 · 말투 · 끝맺음" hint="대본의 인사 · 끝맺음과 AI 가 쓰는 말투가 이 기준을 따릅니다. 바꾸면 다음 묶음부터 바뀌어요." testId="mk-pack-brief" keepClosed className="data-[open=1]:pb-3">
+            {briefSlot}
+          </Fold>
+        </div>
       )}
       {/* D-507 끝까지 내려온 사람에게 '다음엔 이것' — 담아 두면 다음에 첫 화면 [이어서 하기] 에서 바로 이어진다(계속 쓰기 쉽게) */}
-      <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="mk-pack-next" aria-label="다음엔 이것">
+      <section className="flex flex-col gap-2 border-t border-slate-100 px-4 py-4 sm:px-5" data-testid="mk-pack-next" aria-label="다음엔 이것">
         <p className="t-card font-bold text-slate-900">다 쓰셨나요? 다음엔 이것</p>
         <p className="t-sub break-keep text-slate-700">
           {savedHref ? '내 콘텐츠에 담아 두었어요 — 찍는 날 · 올리는 날을 적어 두면 첫 화면 [이어서 하기] 에서 바로 이어져요.' : '찍을 거면 내 콘텐츠에 담아 두세요 — 다음에 마케팅을 열면 첫 화면 [이어서 하기] 에서 바로 이어져요.'}
@@ -292,6 +299,7 @@ export function PackView({
           </Button>
         </div>
       </section>
+      </div>
       <p className="t-meta break-keep text-slate-500">{PACK_LABEL.checks} 칸의 □ 를 모두 확인한 뒤 올리세요. 규칙 초안은 규칙으로 만든 글이고(AI 아님), ✨ 표시가 있는 칸만 AI 가 쓴 글이에요.</p>
     </div>
   )
@@ -327,7 +335,7 @@ function AiBar({
 }) {
   if (!canAi) {
     return (
-      <p className="t-sub break-keep rounded-xl bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-pack-ai-off">
+      <p className="t-sub break-keep border-t border-slate-100 px-4 py-2.5 text-slate-600 empty:hidden sm:px-5" data-testid="mk-pack-ai-off">
         {readOnly ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않고 저장하지 않아요).' : ownerAi ? '' : 'AI 로 다시 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
       </p>
     )
@@ -335,7 +343,8 @@ function AiBar({
   const running = Object.values(parts).includes('running')
   const icon = (s: PartState) => (s === 'running' ? <Loader2 aria-hidden="true" className="size-3.5 animate-spin" /> : s === 'done' ? '✓' : s === 'error' ? '!' : '·')
   return (
-    <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 ${errors.length ? 'border-amber-300 bg-amber-50' : 'border-violet-200 bg-violet-50'}`} data-testid="mk-pack-ai" data-state={running ? 'running' : errors.length ? 'error' : saved ? 'done' : 'idle'}>
+    // D-603 보라 칠한 띠 → 판 안 한 줄(가는 선 위) — AI 글자 · 단추만 보라
+    <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 sm:px-5" data-testid="mk-pack-ai" data-state={running ? 'running' : errors.length ? 'error' : saved ? 'done' : 'idle'}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
         <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">

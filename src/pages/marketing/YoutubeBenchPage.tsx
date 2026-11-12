@@ -759,6 +759,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   // D-295 채널 설계 기준은 대표 계정만(접힌 채로) — 팀장 · 구독 고객은 설정 › 내 브랜드로 각자
   const briefCard = !readOnly && !isMarketingCustomer() ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
+  /** D-603 다른 판 안([자세히 보기] · 묶음 화면 판)에 들어갈 때 — 테두리 칸 없이 */
+  const briefInline = !readOnly && !isMarketingCustomer() ? <BriefCard plain brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey && !weekOn && !firstScreen
   /** D-511 첫 화면 대화창 — 쓴 말(규칙)이 정한 곳으로. 1주일치는 열기만(AI 는 그 화면에서 두 번 눌러 확인) */
   const onAsk = (r: MkRoute) => {
@@ -846,7 +848,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {packKey ? (
         packSource ? (
           <PackView
-            guide={<ScreenGuide id="radar.pack" what={isMarketingCustomer() ? '고른 주제로 제목 · 대본 · 블로그 글이 한 번에 나온 곳이에요.' : '고른 주제로 제목 · 대본 · 블로그 글 · 카드뉴스가 한 번에 나온 곳이에요.'} steps={['위 칩으로 칸 고르기', '[이 칸 복사]', '올릴 곳에 붙여넣기']} />}
+            guide={<ScreenGuide plain id="radar.pack" what={isMarketingCustomer() ? '고른 주제로 제목 · 대본 · 블로그 글이 한 번에 나온 곳이에요.' : '고른 주제로 제목 · 대본 · 블로그 글 · 카드뉴스가 한 번에 나온 곳이에요.'} steps={['위 칩으로 칸 고르기', '[이 칸 복사]', '올릴 곳에 붙여넣기']} />}
             source={packSource}
             brief={brief}
             rank={homeRank(packKey)}
@@ -856,7 +858,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             onBack={closePack}
             onCopy={(t, what) => copy(t, what)}
             onSave={savePack}
-            briefSlot={briefCard}
+            briefSlot={briefInline}
             whySlot={
               packOpp ? (
                 <PeekProvider value={peekEnv}>
@@ -1021,61 +1023,63 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             week={{ ai: mkAi && !readOnly && weekPlanSetup.pairs.length > 0, done: weekDone, onOpen: openWeek }}
             resume={null}
             interests={{ picked: prefs.interests ?? [], topics: interestIds, readOnly, onSave: (ids) => savePrefs({ ...prefs, interests: ids }) }}
+            // D-251 대표 "키워드 1등이 뭐고 왜 그런 거고 관련 영상은 뭐고 이런 건 다 아래에 몰아서" — 예전 첫 화면 전부를 [자세히 보기] 한 곳에
+            // D-603 따로 떨어진 판(panel) 대신 위 판 맨 아래 한 줄 — 접힘 · 펼침 기억은 그대로(mk-more)
+            more={
+              prepared && plan && focus ? (
+                <Fold
+                  id="mk-more"
+                  title="자세히 보기 — 왜 이 키워드인지 · 관련 영상 · 시장 신호"
+                  hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준."
+                  summary="1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 채널 설계 기준"
+                  testId="mk-more"
+                >
+                  <div className="flex flex-wrap gap-2">{feedButtons}</div>
+                  {!readOnly && (
+                    <AiAssist
+                      page="radar"
+                      scope="radar:plan"
+                      title="마케팅 · 이번 주 찍을 것"
+                      presets={RADAR_ASSIST.plan}
+                      build={assistBuild}
+                      itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
+                      resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
+                    />
+                  )}
+                  <PeekProvider value={peekEnv}>
+                    <PlanView
+                      plan={plan}
+                      // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
+                      rising={rising.filter((r) => r.fit)}
+                      breakouts={breakouts}
+                      // D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았으면 — 시장 신호에서 AI 영역 · AI 판을 뺀다
+                      focus={marketOnly ? { ...focus, domains: focus.domains.filter((d) => d.domain !== 'ai'), aiKeywords: [], workflow: [], fresh: [] } : focus}
+                      noAi={marketOnly}
+                      basis={marketOnly ? `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳 — 점수가 아니라 근거로 고릅니다` : `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
+                      ideas={notebook.ideas}
+                      readOnly={readOnly}
+                      noThumb={yt.sample}
+                      onConfirm={(o) => void confirmOpp(o)}
+                      onSave={(o) => void saveOpp(o)}
+                      onMute={(o) => void muteOpp(o)}
+                      onUnmute={(k) => void unmute(k)}
+                      onCopy={(t, what) => copy(t, what)}
+                      onOpenVideo={openVideo}
+                      onMix={(mix) => void savePrefs({ ...prefs, mix })}
+                      onGoChannels={() => setParam({ view: 'channels' })}
+                      onGoNotebook={goNotebook}
+                      brand={{ brief, cores, ai: mkAi && !readOnly, onCore: chooseCore }}
+                      onKeepScript={saveKitScript}
+                    />
+                  </PeekProvider>
+                  {briefInline}
+                </Fold>
+              ) : undefined
+            }
           />
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
           {!prepared && briefCard}
-          {/* D-251 대표 "키워드 1등이 뭐고 왜 그런 거고 관련 영상은 뭐고 이런 건 다 아래에 몰아서" — 예전 첫 화면 전부를 여기 한 곳에 */}
-          {prepared && plan && focus && (
-            <Fold
-              id="mk-more"
-              title="자세히 보기 — 왜 이 키워드인지 · 관련 영상 · 시장 신호"
-              hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준."
-              summary="1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 채널 설계 기준"
-              panel
-              testId="mk-more"
-            >
-              <div className="flex flex-wrap gap-2">{feedButtons}</div>
-              {!readOnly && (
-                <AiAssist
-                  page="radar"
-                  scope="radar:plan"
-                  title="마케팅 · 이번 주 찍을 것"
-                  presets={RADAR_ASSIST.plan}
-                  build={assistBuild}
-                  itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
-                  resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
-                />
-              )}
-              <PeekProvider value={peekEnv}>
-                <PlanView
-                  plan={plan}
-                  // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
-                  rising={rising.filter((r) => r.fit)}
-                  breakouts={breakouts}
-                  // D-564 대표가 아닌 계정이 AI 쪽 관심 분야를 고르지 않았으면 — 시장 신호에서 AI 영역 · AI 판을 뺀다
-                  focus={marketOnly ? { ...focus, domains: focus.domains.filter((d) => d.domain !== 'ai'), aiKeywords: [], workflow: [], fresh: [] } : focus}
-                  noAi={marketOnly}
-                  basis={marketOnly ? `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳 — 점수가 아니라 근거로 고릅니다` : `최근 30일 영상 ${fmt(recent30)}편 · 참고 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
-                  ideas={notebook.ideas}
-                  readOnly={readOnly}
-                  noThumb={yt.sample}
-                  onConfirm={(o) => void confirmOpp(o)}
-                  onSave={(o) => void saveOpp(o)}
-                  onMute={(o) => void muteOpp(o)}
-                  onUnmute={(k) => void unmute(k)}
-                  onCopy={(t, what) => copy(t, what)}
-                  onOpenVideo={openVideo}
-                  onMix={(mix) => void savePrefs({ ...prefs, mix })}
-                  onGoChannels={() => setParam({ view: 'channels' })}
-                  onGoNotebook={goNotebook}
-                  brand={{ brief, cores, ai: mkAi && !readOnly, onCore: chooseCore }}
-                  onKeepScript={saveKitScript}
-                />
-              </PeekProvider>
-              {briefCard}
-            </Fold>
-          )}
         </>
       ) : !prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />

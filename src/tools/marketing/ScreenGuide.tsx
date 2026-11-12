@@ -26,7 +26,7 @@ function writeClosed(list: string[]) {
   }
 }
 
-export function ScreenGuide({ id, what, steps = [], testId = 'mk-guide' }: { id: string; what: string; steps?: readonly string[]; testId?: string }) {
+export function ScreenGuide({ id, what, steps = [], testId = 'mk-guide', plain = false }: { id: string; what: string; steps?: readonly string[]; testId?: string; /** D-603 테두리 칸 없이 글 한 줄(아래 큰 판과 겹쳐 박스가 늘지 않게) */ plain?: boolean }) {
   const [closed, setClosed] = useState(() => readClosed().includes(id))
   const toggle = () => {
     const list = readClosed().filter((x) => x !== id)
@@ -34,7 +34,7 @@ export function ScreenGuide({ id, what, steps = [], testId = 'mk-guide' }: { id:
     setClosed(!closed)
   }
   return (
-    <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5" data-testid={testId} data-screen-guide={id} data-open={closed ? '0' : '1'} aria-label="이 화면은">
+    <section className={`flex flex-col gap-2 ${plain ? 'px-1' : 'rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5'}`} data-testid={testId} data-screen-guide={id} data-open={closed ? '0' : '1'} aria-label="이 화면은">
       <div className="flex items-start gap-2">
         <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-700" />
         <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
