@@ -116,15 +116,21 @@ await seedWeek(page)
 await page.goto(BASE + '/marketing/threads', { waitUntil: 'networkidle' })
 await page.getByTestId('thr-qs').waitFor({ timeout: 15000 })
 const weekChips = await page.locator('[data-testid="thr-qs-week"] [data-testid="thr-qs-chip"]').allInnerTexts()
-check('Q1 첫 화면 — 맨 위 "무엇에 대해 쓸까요?" · 이번 주 키워드 칩 3개(레이더) · 우리 분야 칩 · 주제 없으면 [AI로 바로 쓰기] 잠김', /무엇에 대해 쓸까요/.test(await page.getByTestId('thr-qs').innerText()) && weekChips.join('|') === WEEK.join('|') && (await page.locator('[data-testid="thr-qs-ours"] [data-testid="thr-qs-chip"]').count()) >= 3 && (await page.getByTestId('thr-qs-ai').isDisabled()), weekChips)
+check('Q1 첫 화면 — 맨 위 "무엇에 대해 쓸까요?" · 이번 주 키워드 칩 3개(레이더 · D-602 처음엔 접힌 한 줄) · 우리 분야 칩 · 주제 없으면 [AI로 바로 쓰기] 잠김', /무엇에 대해 쓸까요/.test(await page.getByTestId('thr-qs').innerText()) && (await page.getByTestId('thr-qs-week').getAttribute('open')) === null && weekChips.join('|') === WEEK.join('|') && (await page.locator('[data-testid="thr-qs-ours"] [data-testid="thr-qs-chip"]').count()) >= 3 && (await page.getByTestId('thr-qs-ai').isDisabled()), weekChips)
 const primAbove = (p, pre) =>
   p.evaluate((pr) => {
     const ed = document.getElementById(`${pr}-editor`)?.getBoundingClientRect().top ?? Infinity
     return [...document.querySelectorAll('main button.bg-brand-600')].filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().top < ed).map((b) => b.getAttribute('data-testid'))
   }, pre)
+// D-602 이번 주 키워드는 칸 안 접힌 한 줄 — 칩을 누르기 전에 펼친다(이미 펼쳐져 있으면 그대로)
+const openWeek = async (p, pre) => {
+  const d = p.getByTestId(`${pre}-qs-week`)
+  if ((await d.getAttribute('open')) === null) await p.getByTestId(`${pre}-qs-week-open`).click()
+}
 const thrPrim = await primAbove(page, 'thr')
 check('Q2 고르기(반응 · 틀 23가지 · 태그)는 지우지 않고 "형식 직접 고르기" 안에 접힘 · 글 칸 위의 주 단추(진한 단추)는 [AI로 바로 쓰기] 하나', (await page.getByTestId('thr-choose').getAttribute('data-open')) === '0' && (await page.getByTestId('thr-goal-reply').count()) === 0 && thrPrim.join() === 'thr-qs-ai', thrPrim)
 let clicks = 0
+await openWeek(page, 'thr')
 await page.locator('[data-testid="thr-qs-week"] [data-testid="thr-qs-chip"]').first().click()
 clicks++
 const recLabel = await page.getByTestId('thr-qs-rec-label').innerText()
@@ -174,6 +180,7 @@ await page.getByTestId('sht-qs').waitFor({ timeout: 15000 })
 const shtPrim = await primAbove(page, 'sht')
 check('S1 첫 화면 — 어디에(칩 2) · 주제 · 이번 주 키워드 칩 · 고르기는 접힘(지운 것 없음) · 대본 칸 위 주 단추는 [AI로 바로 쓰기] 하나', shtPrim.join() === 'sht-qs-ai' && (await page.locator('[data-testid="sht-qs-platform"] [role="radio"]').count()) === 2 && (await page.locator('[data-testid="sht-qs-week"] [data-testid="sht-qs-chip"]').count()) === 3 && (await page.getByTestId('sht-choose').getAttribute('data-open')) === '0' && (await page.getByTestId('sht-qs-ai').isDisabled()))
 clicks = 0
+await openWeek(page, 'sht')
 await page.locator('[data-testid="sht-qs-week"] [data-testid="sht-qs-chip"]').first().click()
 clicks++
 check('S2 틱톡 · 고용지원금 → 추천 "많이 보이게 · 리스트형"', /많이 보이게 · 리스트형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
@@ -191,6 +198,7 @@ check('S3 [AI로 바로 쓰기] → 1안(점수 높은 안) 대본 · 캡션 · 
 console.log(`MEASURE shorts-after pc clicks=${clicks + 1} typed=0 (마케팅 목차 [릴스 · 틱톡] 1 + 칩 1 + AI 1)`)
 await page.getByTestId('sht-new').click()
 await page.waitForTimeout(150)
+await openWeek(page, 'sht')
 await page.locator('[data-testid="sht-qs-week"] [data-testid="sht-qs-chip"]').first().click()
 await page.getByTestId('sht-qs-platform-reels').click()
 await page.waitForTimeout(150)
@@ -255,13 +263,14 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
   for (const [kind, pre] of [['threads', 'thr'], ['shorts', 'sht']]) {
     await mp.goto(`${BASE}/marketing/${kind}`, { waitUntil: 'networkidle' })
     await mp.getByTestId(`${pre}-qs`).waitFor({ timeout: 15000 })
+    await openWeek(mp, pre)
     await mp.locator(`[data-testid="${pre}-qs-week"] [data-testid="${pre}-qs-chip"]`).first().click()
     const aiY = await yOf(mp, `${pre}-qs-ai`)
     const pageH = await mp.evaluate(() => document.documentElement.scrollHeight)
     { const l289 = mp.getByTestId(`${pre}-qs-ai`); await l289.click(); await mp.waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
     await mp.getByTestId(`${pre}-ai-drafts`).waitFor({ timeout: 20000 })
     await mp.waitForTimeout(250)
-    const btnH = await mp.locator(`[data-testid="${pre}-qs-ai"], [data-testid="${pre}-qs-chip"]`).evaluateAll((xs) => xs.map((x) => Math.round(x.getBoundingClientRect().height)))
+    const btnH = await mp.locator(`[data-testid="${pre}-qs-ai"], [data-testid="${pre}-qs-chip"]`).evaluateAll((xs) => xs.map((x) => Math.round(x.getBoundingClientRect().height)).filter((h) => h > 0))
     const was = BEFORE_Y[`${kind} ${tag}`]
     console.log(`MEASURE ${kind}-after ${tag} aiButtonY=${aiY} pageH=${pageH} (before ${was})`)
     check(`M ${tag} ${kind}: 넘침 0 · AI 단추 · 칩 44px 이상 · 1안이 칸에 · AI 단추가 예전보다 35% 넘게 위(${was} → ${aiY}px)`, (await overflowX(mp)) <= 0 && btnH.every((h) => h >= 44) && (await mp.getByTestId(pre === 'thr' ? 'thr-body' : 'sht-script').inputValue()).length > 0 && aiY < was * 0.65, { over: await overflowX(mp), btnH, aiY, was })

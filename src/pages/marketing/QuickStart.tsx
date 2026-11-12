@@ -7,9 +7,12 @@
  *  ③ 주 단추 하나 [AI로 완성 글 쓰기] — 1안은 글 칸에 바로, 다른 안은 이 아래(AI 는 누를 때만 · 한 번에 한 번)
  * D-558 대표 "고르고 요청 한 줄 달고 한 번 누르면 바로 올려도 되는 글이 나와야" — 형식 줄 아래 '더 바라는 점' 한 줄 ·
  *   '잘 된 남의 글' 을 이 상자 안으로(예전엔 형식 고르기 맨 아래 4번에 숨어 있었다).
+ * D-602 대표(2026-11-12) "박스가 너무 많아 눈에 안 들어온다 — 큰 박스 안에 가로선으로 나누든지 줄글 느낌으로 ·
+ *   우리 분야 주제는 영업 관리 › 전략 키워드로 · 이번 주 키워드는 좋지만 접어 두기" —
+ *   상자 하나 안에서 칸마다 가로선(안쪽 테두리 상자 0) · 우리 분야(전략 키워드) 8개 먼저 + [n개 더] · 이번 주 키워드는 접힌 한 줄.
  */
-import type { ReactNode } from 'react'
-import { Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronDown, Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { HintTip } from '../../components/ui/fold'
 import type { TopicChip } from '../../services/marketing/quickStart'
@@ -17,6 +20,10 @@ import { StepTitle } from './snsParts'
 import { toneChip } from './snsTone'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 import { ModelPicker } from '../../components/ai/ModelPicker'
+
+/** D-602 우리 분야 주제 칩 — 처음에 보이는 수(PC 8 · 휴대폰 4 · 나머지는 [전부 n개 보기]) */
+const OURS_SHOWN = 8
+const OURS_SHOWN_PHONE = 4
 
 export function QuickStart({
   testPrefix,
@@ -37,6 +44,7 @@ export function QuickStart({
   hooks,
   request,
   reference,
+  more,
 }: {
   /** D-558 요청 한 줄(선택) — AI 에 [자료 · 요청] 으로 */
   request?: { value: string; onChange: (v: string) => void; placeholder: string }
@@ -68,39 +76,27 @@ export function QuickStart({
   children?: ReactNode
   /** D-546 첫마디 10개(평소 단추 한 줄 · 누르면 펼침) — 상자 맨 끝 */
   hooks?: ReactNode
+  /** D-602 더 정하기(이것만 지키면 돼요 · 내 맞춤) — 같은 상자 맨 아래 접힌 줄(따로 상자 0) */
+  more?: ReactNode
 }) {
   const week = chips.filter((c) => c.from === 'week')
   const ours = chips.filter((c) => c.from === 'ours')
   const has = !!topic.trim()
-  // D-298 대표 "우리 분야 주제도 늘 고정인지 바뀌는 건지 모르겠다" — 이름 옆에 '매주 바뀌어요' / '늘 그대로예요' + 색(이번 주 = 빨강 계열 · 우리 분야 = 남색)
-  const chipRow = (list: readonly TopicChip[], id: 'week' | 'ours') => {
-    if (!list.length) return null
-    const week = id === 'week'
-    const Icon = week ? Flame : Pin
-    const tone = week ? 'rose' : 'indigo'
-    return (
-      <div className="flex flex-col gap-1.5" data-testid={`${testPrefix}-qs-${id}`}>
-        <HintTip
-          tip={week ? '콘텐츠 레이더가 유튜브에서 이번 주에 뜨는 주제를 골라 둔 거예요. 월요일마다 새로 바뀌어요.' : '우리 회사가 꾸준히 이야기할 주제예요. 매주 바뀌지 않고 늘 같은 자리에 있어요.'}
-          label={week ? '이번 주 키워드' : '우리 분야 주제'}
-          tight
-        >
-          <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-${id}-label`}>
-            <Icon aria-hidden="true" className={`size-4 shrink-0 ${week ? 'text-rose-600' : 'text-indigo-600'}`} />
-            {week ? '이번 주 키워드' : '우리 분야 주제'}
-            <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${week ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{week ? '매주 바뀌어요' : '늘 그대로예요'}</span>
-          </span>
-        </HintTip>
-        <div className="flex flex-wrap gap-1.5">
-          {list.map((c) => (
-            <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={toneChip(tone, topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
-              {c.label ?? c.topic}
-            </button>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  // D-602 우리 분야(영업 관리 › 전략 키워드)는 앞 8개만 — 고른 주제가 뒤쪽이면 처음부터 다 보인다
+  const pickedAt = ours.findIndex((c) => c.topic === topic)
+  const pickedLate = pickedAt >= OURS_SHOWN
+  const [allOurs, setAllOurs] = useState(false)
+  const oursShown = allOurs || pickedLate ? ours : ours.slice(0, OURS_SHOWN)
+  // D-602 이번 주 키워드는 접힌 한 줄 — 고른 주제가 이번 주 키워드면 펼친 채로
+  const [weekOpen, setWeekOpen] = useState(false)
+  const weekPicked = week.some((c) => c.topic === topic)
+  const chip = (c: TopicChip, tone: 'rose' | 'indigo', phoneHide = false) => (
+    <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={`${toneChip(tone, topic === c.topic)} ${phoneHide ? 'max-sm:hidden' : ''}`} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
+      {c.label ?? c.topic}
+    </button>
+  )
+  // 칸 사이 가로선(안쪽 상자 대신) — 대표 "줄글 느낌 · 큰 박스 안에 가로선"
+  const row = 'border-t border-slate-100 pt-3'
   return (
     <div data-testid={`${testPrefix}-qs`}>
       {/* D-299 카드(Surface)는 넘치는 것을 자른다 — [모델 · ○○] 고르는 판 · ? 설명이 잘려서 자르지 않는 상자로 */}
@@ -115,10 +111,41 @@ export function QuickStart({
           className="t-body min-h-12 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3"
           data-testid={`${testPrefix}-qs-topic`}
         />
-        {chipRow(week, 'week')}
-        {chipRow(ours, 'ours')}
-        {/* D-298 추천 형식 줄 — 보라 테두리 · '추천 형식' 딱지 · 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시 */}
-        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-qs-rec`}>
+        {ours.length > 0 && (
+          <div className="flex flex-col gap-1.5" data-testid={`${testPrefix}-qs-ours`}>
+            <HintTip tip="영업 관리 › 전략에 모아 둔 상담 주제예요(정관 · 가지급금 · 정책자금 …). 고객이 실제로 묻는 것이라 글감으로 좋아요. 매주 바뀌지 않아요." label="우리 분야 주제" tight>
+              <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-ours-label`}>
+                <Pin aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />
+                우리 분야 주제
+                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">늘 그대로예요</span>
+              </span>
+            </HintTip>
+            <div className="flex flex-wrap gap-1.5">
+              {/* 휴대폰은 이름이 길어 한 줄에 하나씩 — 앞 4개만(고른 주제는 늘 보임) */}
+              {oursShown.map((c, i) => chip(c, 'indigo', !allOurs && i >= OURS_SHOWN_PHONE && i !== pickedAt))}
+              {ours.length > OURS_SHOWN_PHONE && !pickedLate && (
+                <button type="button" onClick={() => setAllOurs((v) => !v)} aria-expanded={allOurs} className={`tap t-sub inline-flex min-h-9 items-center gap-1 rounded-full px-3 font-semibold text-brand-700 hover:bg-slate-50 ${ours.length > OURS_SHOWN ? '' : 'sm:hidden'}`} data-testid={`${testPrefix}-qs-ours-more`}>
+                  {allOurs ? '접기' : `전부 ${ours.length}개 보기`}
+                  <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${allOurs ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {week.length > 0 && (
+          // D-602 이번 주 키워드 — 좋지만 늘 펼쳐 둘 것은 아니다(대표) → 접힌 한 줄 · 누르면 칩
+          <details open={weekOpen || weekPicked} onToggle={(e) => setWeekOpen((e.currentTarget as HTMLDetailsElement).open)} data-testid={`${testPrefix}-qs-week`}>
+            <summary className="sum-chev tap t-sub flex min-h-9 cursor-pointer flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-week-open`}>
+              <Flame aria-hidden="true" className="size-4 shrink-0 text-rose-600" />
+              <span data-testid={`${testPrefix}-qs-week-label`}>이번 주 키워드 {week.length}개</span>
+              <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">매주 바뀌어요</span>
+              <span className="t-meta font-normal text-slate-600">— 유튜브에서 이번 주에 뜨는 주제</span>
+            </summary>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">{week.map((c) => chip(c, 'rose'))}</div>
+          </details>
+        )}
+        {/* D-298 추천 형식 줄 — 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시. D-602 상자 대신 가로선 */}
+        <div className={`flex flex-wrap items-center gap-2 ${row}`} data-testid={`${testPrefix}-qs-rec`}>
           <div className="t-sub min-w-[12rem] flex-1 break-keep text-slate-800">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <b className="t-meta shrink-0 font-bold text-brand-700">{picked ? '고른 형식' : '추천 형식'}</b>
@@ -149,9 +176,14 @@ export function QuickStart({
             />
           </label>
         )}
-        {reference}
-        {facts}
-        <div className="flex flex-col gap-2">
+        {(reference || facts) && (
+          // D-602 잘 된 남의 글 · 사실 목록 — 접힌 줄 둘(상자 없이 가로선만)
+          <div className={`flex flex-col gap-1 ${row}`}>
+            {reference}
+            {facts}
+          </div>
+        )}
+        <div className={`flex flex-col gap-2 ${row}`}>
           <div className="flex flex-wrap items-center gap-2">
             {ai.ok && (
               <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
@@ -177,6 +209,7 @@ export function QuickStart({
           {children}
         </div>
         {hooks}
+        {more && <div className={`flex flex-col gap-1 ${row}`}>{more}</div>}
       </div>
     </div>
   )

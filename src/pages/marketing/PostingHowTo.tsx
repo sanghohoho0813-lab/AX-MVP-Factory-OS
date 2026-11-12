@@ -8,17 +8,17 @@
 import { useState } from 'react'
 import { HOWTO_NOTE, howTos, type HowToKey } from '../../content/postingHowTo'
 
-export function PostingHowTo({ channels, open = false, testId = 'mk-howto' }: { channels: readonly HowToKey[]; open?: boolean; testId?: string }) {
+export function PostingHowTo({ channels, open = false, testId = 'mk-howto', plain = false }: { channels: readonly HowToKey[]; open?: boolean; testId?: string; /** D-602 상자 없이 가로선 한 줄(스레드 · 릴스 쓰기 칸 안) */ plain?: boolean }) {
   const list = howTos(channels)
   const [picked, setPicked] = useState<HowToKey>(channels[0])
   const cur = list.find((h) => h.key === picked) ?? list[0]
   if (!cur) return null
   return (
-    <details className="rounded-(--radius-panel) border border-slate-200 bg-white" open={open} data-testid={testId}>
-      <summary className="t-body flex min-h-12 cursor-pointer items-center gap-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-howto">
+    <details className={plain ? 'border-t border-slate-100' : 'rounded-(--radius-panel) border border-slate-200 bg-white'} open={open} data-testid={testId}>
+      <summary className={`t-body flex min-h-12 cursor-pointer items-center gap-2 font-bold break-keep text-slate-900 hover:bg-slate-50 ${plain ? 'px-1 py-2' : 'rounded-(--radius-panel) px-4 py-2.5'}`} data-testid={`${testId}-toggle`} data-guide="fn-mk-howto">
         처음 올려 보시나요? <span className="font-semibold text-brand-700">올리는 법 보기</span>
       </summary>
-      <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4">
+      <div className={`flex flex-col gap-3 border-t border-slate-100 ${plain ? 'px-1 py-3' : 'px-4 py-4'}`}>
         {list.length > 1 && (
           <div role="tablist" aria-label="어디에 올리나요" className="flex flex-wrap gap-1.5" data-testid={`${testId}-tabs`}>
             {list.map((h) => {

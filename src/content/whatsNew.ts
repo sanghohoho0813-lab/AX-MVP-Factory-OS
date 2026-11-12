@@ -25,6 +25,15 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'sns-calm',
+    date: '2026-11-12',
+    title: '스레드 · 릴스 쓰는 화면이 한 판으로 깔끔해졌어요',
+    how: "1번 칸에서 '우리 분야 주제'(정관 · 가지급금 · 정책자금 같은 상담 주제)를 하나 누르고 [AI로 완성 글 쓰기] 를 누르면 돼요. 이번 주 키워드 · 직접 고르기는 접어 뒀어요.",
+    path: '/marketing/threads',
+    cta: '스레드 열기',
+    marketing: true,
+  },
+  {
     id: 'contact-path',
     date: '2026-11-11',
     title: '연락 받는 길 만드는 법을 알려 줘요',

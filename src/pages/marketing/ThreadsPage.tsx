@@ -23,6 +23,7 @@ import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection, chip } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
+import { strategyTopicNames } from '../../services/salesStrategyTopics'
 import { FirstLineMaker } from './FirstLineMaker'
 import { PostingHowTo } from './PostingHowTo'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
@@ -42,7 +43,6 @@ import {
   GOAL_EASY,
   TEMPLATE_EASY,
   NOT_THIS,
-  priorityTopics,
   ROUTINE,
   STAT_KEYS,
   THREAD_MAX,
@@ -360,7 +360,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   // MUX-2 추천 형식(규칙) — 사람이 직접 고른 틀이 있으면 그것, 없으면 주제 · 오늘 계획 · 이번 주 잘 된 틀로
   const rec = useMemo(() => recommendThread({ topic: draft.topic, today, weekRef }), [draft.topic, today, weekRef])
   const eff = draft.template ? { goal: (draft.goal || templateOf(draft.template)?.goals[0] || rec.goal) as ThreadGoal, template: draft.template } : { goal: rec.goal, template: rec.template }
-  const chips = useMemo(() => topicChips(readWeekTopics(today), priorityTopics()), [today])
+  // D-602 우리 분야 주제 = 영업 관리 › 전략 키워드(대표 2026-11-12) · 이번 주 키워드는 칸 안에 접힌 한 줄로
+  const chips = useMemo(() => topicChips(readWeekTopics(today), strategyTopicNames()), [today])
   const pickTopic = (t: string) => {
     // 칩으로 새 주제를 고르면 형식도 그 주제에 맞춰 다시 추천 — 사람이 직접 고른 틀은 덮지 않는다
     if (draft.formatBy === 'hand' && draft.template) return set({ topic: t, tag: draft.tag || topicTag(t) })
@@ -602,13 +603,204 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 글 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
+        more={
+          <>
+            {/* D-298 대표 "[형식 바꾸기] 누르면 아래에 쭉 뜨는 건 좋은데 막상 내려 보면 눈에 안 들어온다 · 색이 없다" —
+                보라 테두리 칸 · 펼치며 잠깐 빛남 · 안은 색 구역 넷(① 반응 하늘 · ② 틀 보라 · ③ 태그 초록 · ④ 남의 글 회색) */}
+            <Fold
+              id="thr.formats"
+              title="내 맞춤 — 형식 · 반응 · 태그 직접 고르기"
+              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 글 모양(틀)을 직접 고르고, 원하는 반응 · 내 주제 태그를 정해요. 고른 틀에서 [이 틀로 완성 글 쓰기] 를 누르면 그 틀로 바로 써요."
+              icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
+              summary={`원하는 반응 · 틀 23가지 · 내 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 이번 주 잘 된 형식`}
+              className="scroll-mt-24 data-[open=1]:pb-2"
+              keepClosed
+              testId="thr-choose"
+            >
+              {/* D-558 '내 맞춤' 안으로 옮김 — D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
+              <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="thr-week-hint">
+                <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700 max-sm:basis-full">
+                  {hotKeys.size ? (
+                    <>
+                      <b className="text-slate-900">이번 주 반응 좋았던 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
+                    </>
+                  ) : (
+                    '이번 주 반응이 좋았던 글의 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 모양만 적으면 돼요(매일 모을 필요 없어요)'
+                  )}
+                </p>
+                <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
+                  {hotKeys.size ? '고치기' : '적으러 가기'}
+                </Button>
+              </div>
+              {plan && (
+                <div className="flex flex-wrap items-center gap-2" data-testid="thr-plan">
+                  <p className="t-sub min-w-[12rem] flex-1 break-keep leading-relaxed text-slate-700">
+                    <CalendarCheck aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-amber-600" />
+                    <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · <TplNames keys={plan.picks} />
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={() => set({ goal: plan.goal, template: plan.picks[0], formatBy: 'hand' })} data-testid="thr-plan-use">
+                    이 계획으로
+                  </Button>
+                </div>
+              )}
+              <ToneSection n="1" tone="sky" title="원하는 반응" help="이 글을 읽은 사람이 무엇을 해 주면 좋겠는지 골라요. 고르면 그 반응에 잘 맞는 틀만 남아요." testId="thr-sec-goal">
+                <BigChoices items={GOAL_CHOICES} value={draft.goal} onPick={pickGoal} label="원하는 반응" testPrefix="thr-goal" />
+              </ToneSection>
+              <ToneSection n="2" tone="violet" title="틀 고르기" help="틀 = 글을 쓰는 순서예요. 잘 된 글 수백 개를 보고 모양이 같은 것끼리 묶었어요. 틀 이름에 마우스를 올리면 뜻 · 예시가 나와요." testId="thr-sec-tpl">
+                {/* D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천해 주고, 23개가 조그맣게라도 다 나열돼서 마우스를 올리면 정의 · 예시" —
+                    ① 추천 틀(반응 · 오늘 계획) 큰 단추 ② 그 아래 틀 전부 작은 색 단추(반응 색 · ★ 추천 · 이번 주 잘 됨) — 어느 것이든 바로 고른다 */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700" data-testid="thr-picks-why">
+                    <b className="text-brand-700">★ 추천</b> ·{' '}
+                    {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실제 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 작은 이름표는 그 틀로 잘 받는 반응이에요. 아래에서 다른 틀도 바로 골라요.
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
+                    <BookOpen aria-hidden="true" className="size-4" /> 틀 설명서
+                  </Button>
+                </div>
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
+                  {picks.map((t) => (
+                    <li key={t.key} className="min-w-0">
+                      <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} ctx={draft.goal || plan?.goal || ''} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0], formatBy: 'hand' })} />
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-col gap-2 pt-1" data-testid="thr-all-tpls">
+                  <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-700">
+                    <b className="text-slate-900">틀 전부 — 눌러서 바로 골라요</b>
+                    <span className="text-slate-500">마우스를 올리면 뜻 · 예시{' · '}휴대폰은 누르면 아래 상자에</span>
+                  </p>
+                  {/* D-299 색 읽는 법 — 색 = 그 틀이 잘 되는 반응 · 점 두 개 = 두 반응에 다 좋음 · 고른 반응에 맞는 틀은 진하게 */}
+                  <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600" data-testid="thr-color-legend">
+                    <span>
+                      <b className="text-slate-800">색 = 잘 되는 반응</b> · 점이 두 개면 두 반응에 다 좋아요
+                      {goal ? (
+                        <>
+                          {' · '}
+                          <b className={TONES[GOAL_TONE[goal.key]].ink}>'{goal.label}'</b> 에 맞는 틀은 진하게
+                        </>
+                      ) : null}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="색 뜻">
+                      {GOAL_CHOICES.map((g) => (
+                        <span key={g.key} className="t-meta inline-flex items-center gap-1 text-slate-600">
+                          <span aria-hidden="true" className={`inline-block size-2.5 rounded-full ${TONES[g.tone].bar}`} />
+                          {g.label}
+                        </span>
+                      ))}
+                    </span>
+                  </p>
+                  {/* 휴대폰도 두 줄(8.5rem) — 큰 글자면 저절로 한 줄 */}
+                  <ul className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr))' }}>
+                    {THREAD_TEMPLATES.map((t) => (
+                      <li key={t.key} className="min-w-0">
+                        <MiniTemplate t={t} on={draft.template === t.key} rec={picks.some((x) => x.key === t.key)} hot={hotKeys.has(t.key)} ctx={draft.goal} onClick={() => set({ template: t.key, goal: goalFor(t.key, draft.goal), formatBy: 'hand' })} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {tpl && (
+                  <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-tpl-detail">
+                    <p className="t-body font-bold break-keep text-slate-900">
+                      {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
+                    </p>
+                    {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
+                    <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="thr-tpl-plain">
+                      <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
+                      <span className="min-w-0">
+                        <b>쉽게 말하면</b> {TEMPLATE_EASY[tpl.key].plain}
+                      </span>
+                    </p>
+                    <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
+                      <b className="text-slate-900">예시</b>
+                      {'\n'}
+                      {TEMPLATE_EASY[tpl.key].sample}
+                    </p>
+                    <ol className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-1 break-keep text-slate-700" aria-label="뼈대">
+                      {tpl.skeleton.map((s, i) => (
+                        <li key={s} className="inline-flex items-center gap-1.5">
+                          {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-900">{s}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="t-sub break-keep text-slate-700">
+                      <b>왜 되나</b> {tpl.why}
+                    </p>
+                    {!isMarketingCustomer() && (
+                      <p className="t-sub break-keep text-slate-700">
+                        <b>우리가 쓰면</b> {tpl.ours}
+                      </p>
+                    )}
+                    {tpl.caution && (
+                      <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
+                        <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {tpl.caution}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {tpl.example && !isMarketingCustomer() && (
+                        <Button size="sm" variant="secondary" onClick={() => startBody(tpl.example ?? '', 'example', tpl.exampleTag)} data-testid="thr-use-example">
+                          <FilePlus2 aria-hidden="true" className="size-4" /> 예시 글로 시작
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => startBody(skeletonDraft(tpl, draft.topic), 'hand')} data-testid="thr-use-skeleton">
+                        빈 틀로 시작
+                      </Button>
+                    </div>
+                    {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성 글" — 이 틀로 AI 한 번(위 '더 바라는 점' 도 같이) */}
+                    {aiOk && (
+                      <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="thr-tpl-ai-box">
+                        <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 50대 사장님께 말하듯" aria-label="이 틀로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tpl-request" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <AiConfirm>
+                            <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ goal: goalFor(tpl.key, draft.goal), template: tpl.key, tag: draft.tag || rec.tag }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="thr-tpl-ai">
+                              {ai.busy ? 'AI가 쓰는 중…' : `${tpl.key} 틀로 완성 글 쓰기`}
+                            </Button>
+                          </AiConfirm>
+                          {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ToneSection>
+              <ToneSection n="3" tone="emerald" title="내 주제 태그 1개" help="스레드에서 글 주제를 묶어 주는 낱말이에요. 계정마다 달라요 — 내가 쓴 글의 태그 · 내 채널 설계 기준의 본업에서 골라 두었고, 없으면 직접 적어요." testId="thr-sec-tag">
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그" data-testid="thr-tags">
+                  {myTags.map((t) => (
+                    <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={toneChip('emerald', draft.tag === t)} data-testid={`thr-tag-${t}`} data-tag={t}>
+                      #{t}
+                    </button>
+                  ))}
+                </div>
+                <form
+                  className="flex flex-wrap items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const t = cleanTag(tagInput)
+                    if (!t) return
+                    set({ tag: t })
+                    setTagInput('')
+                  }}
+                >
+                  <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} maxLength={20} placeholder="태그 직접 적기 — 예: 세무사무소" aria-label="주제 태그 직접 적기" className="t-sub min-h-11 w-56 max-w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tag-input" />
+                  <Button size="sm" variant="secondary" type="submit" disabled={!cleanTag(tagInput)} data-testid="thr-tag-add">
+                    이 태그로
+                  </Button>
+                </form>
+              </ToneSection>
+            </Fold>
+          </>
+        }
         hooks={<FirstLineMaker testPrefix="thr" channel="threads" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
         request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 사례 하나 넣어서 · 댓글 받는 질문으로 끝내기' } : undefined}
         reference={
-          <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="thr-ref-box">
-            <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-800">
-              <FilePlus2 aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-slate-500" />
-              잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 글 모양(첫 줄 · 줄 수 · 끝)대로 써요 · 선택 · 저장 안 함</span>
+          <details className="py-0.5" data-testid="thr-ref-box">
+            <summary className="sum-chev tap t-sub min-h-9 cursor-pointer font-semibold text-slate-800">
+              {/* D-602 꺾쇠(flex) 옆에 글 한 덩어리 — 휴대폰에서 글이 칸처럼 쪼개지지 않게 */}
+              <span className="min-w-0 break-keep">
+                <FilePlus2 aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-slate-500" />
+                잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 글 모양(첫 줄 · 줄 수 · 끝)대로 써요 · 선택 · 저장 안 함</span>
+              </span>
             </summary>
             <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="반응 좋았던 남의 스레드 글을 붙여 넣으세요 — 첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
           </details>
@@ -623,218 +815,6 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         )}
       </QuickStart>
 
-      {/* D-299 대표 "마케팅 · 브랜딩 어디서든 LLM 모델을 골라 요청" — 이 화면에도 AI 도우미 판: 모델 고르기 · 직접 묻기(스레드 공식으로 답) ·
-          [스레드 글 3개 쓰기] 를 고른 모델로 → 답의 [글 칸에 넣기]. 띠에는 단추를 늘어놓지 않는다(위 [AI로 바로 쓰기] 와 겹치지 않게) */}
-      {aiOk && (
-        <AiAssist
-          page="threads"
-          title="스레드"
-          presets={['threads.write']}
-          quick={0}
-          build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
-          itemActions={(id) =>
-            id === 'threads.write'
-              ? [
-                  {
-                    id: 'thr-use',
-                    label: '글 칸에 넣기',
-                    primary: true,
-                    run: (item) => {
-                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer, myTags).drafts[0]
-                      if (!d) return false
-                      takeDraft(d)
-                      return true
-                    },
-                  },
-                ]
-              : null
-          }
-        />
-      )}
-
-      {/* D-298 대표 "[형식 바꾸기] 누르면 아래에 쭉 뜨는 건 좋은데 막상 내려 보면 눈에 안 들어온다 · 색이 없다" —
-          보라 테두리 칸 · 펼치며 잠깐 빛남 · 안은 색 구역 넷(① 반응 하늘 · ② 틀 보라 · ③ 태그 초록 · ④ 남의 글 회색) */}
-      <Fold
-        id="thr.formats"
-        title="내 맞춤 — 형식 · 반응 · 태그 직접 고르기"
-        hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 글 모양(틀)을 직접 고르고, 원하는 반응 · 내 주제 태그를 정해요. 고른 틀에서 [이 틀로 완성 글 쓰기] 를 누르면 그 틀로 바로 써요."
-        icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
-        summary={`원하는 반응 · 틀 23가지 · 내 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 이번 주 잘 된 형식`}
-        className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
-        testId="thr-choose"
-      >
-        {/* D-558 '내 맞춤' 안으로 옮김 — D-275 이번 주 잘 터진 형식 — 참고만(기본은 우리 공식) · 없으면 월요일에 적으라고 한 줄. MUX-2 주제 고르기 아래로(첫 행동이 먼저 보이게) */}
-        <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="thr-week-hint">
-          <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700 max-sm:basis-full">
-            {hotKeys.size ? (
-              <>
-                <b className="text-slate-900">이번 주 반응 좋았던 형식(참고)</b> · <TplNames keys={[...hotKeys]} /> — 기본은 우리 공식, AI 는 글 하나에만 참고해요
-              </>
-            ) : (
-              '이번 주 반응이 좋았던 글의 형식을 아직 안 적었어요 — 월요일에 한 번, 인기 글 3~5개의 모양만 적으면 돼요(매일 모을 필요 없어요)'
-            )}
-          </p>
-          <Button size="sm" variant="ghost" onClick={onRoutine} data-testid="thr-week-go">
-            {hotKeys.size ? '고치기' : '적으러 가기'}
-          </Button>
-        </div>
-        {plan && (
-          <div className="flex flex-wrap items-center gap-2" data-testid="thr-plan">
-            <p className="t-sub min-w-[12rem] flex-1 break-keep leading-relaxed text-slate-700">
-              <CalendarCheck aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-amber-600" />
-              <b className="text-slate-900">오늘({plan.day}) 계획 — {plan.label}</b> · <TplNames keys={plan.picks} />
-            </p>
-            <Button size="sm" variant="secondary" onClick={() => set({ goal: plan.goal, template: plan.picks[0], formatBy: 'hand' })} data-testid="thr-plan-use">
-              이 계획으로
-            </Button>
-          </div>
-        )}
-        <ToneSection n="1" tone="sky" title="원하는 반응" help="이 글을 읽은 사람이 무엇을 해 주면 좋겠는지 골라요. 고르면 그 반응에 잘 맞는 틀만 남아요." testId="thr-sec-goal">
-          <BigChoices items={GOAL_CHOICES} value={draft.goal} onPick={pickGoal} label="원하는 반응" testPrefix="thr-goal" />
-        </ToneSection>
-        <ToneSection n="2" tone="violet" title="틀 고르기" help="틀 = 글을 쓰는 순서예요. 잘 된 글 수백 개를 보고 모양이 같은 것끼리 묶었어요. 틀 이름에 마우스를 올리면 뜻 · 예시가 나와요." testId="thr-sec-tpl">
-          {/* D-299 대표 "틀 3개가 고정이라 별로 — 먼저 추천해 주고, 23개가 조그맣게라도 다 나열돼서 마우스를 올리면 정의 · 예시" —
-              ① 추천 틀(반응 · 오늘 계획) 큰 단추 ② 그 아래 틀 전부 작은 색 단추(반응 색 · ★ 추천 · 이번 주 잘 됨) — 어느 것이든 바로 고른다 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="t-sub min-w-[12rem] flex-1 break-keep text-slate-700" data-testid="thr-picks-why">
-              <b className="text-brand-700">★ 추천</b> ·{' '}
-              {goal ? `'${goal.label}' 에 잘 된 틀 — 앞쪽일수록 실제 숫자가 좋았어요.` : plan ? `오늘(${plan.day}) 계획 '${plan.label}' 에 맞는 틀이에요.` : '자주 쓰는 틀이에요.'} 작은 이름표는 그 틀로 잘 받는 반응이에요. 아래에서 다른 틀도 바로 골라요.
-            </p>
-            <Button size="sm" variant="ghost" onClick={onLibrary} data-testid="thr-all-templates">
-              <BookOpen aria-hidden="true" className="size-4" /> 틀 설명서
-            </Button>
-          </div>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="thr-picks">
-            {picks.map((t) => (
-              <li key={t.key} className="min-w-0">
-                <TemplateButton t={t} on={draft.template === t.key} hot={hotKeys.has(t.key)} ctx={draft.goal || plan?.goal || ''} onClick={() => set({ template: t.key, goal: draft.goal || t.goals[0], formatBy: 'hand' })} />
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-col gap-2 pt-1" data-testid="thr-all-tpls">
-            <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-700">
-              <b className="text-slate-900">틀 전부 — 눌러서 바로 골라요</b>
-              <span className="text-slate-500">마우스를 올리면 뜻 · 예시{' · '}휴대폰은 누르면 아래 상자에</span>
-            </p>
-            {/* D-299 색 읽는 법 — 색 = 그 틀이 잘 되는 반응 · 점 두 개 = 두 반응에 다 좋음 · 고른 반응에 맞는 틀은 진하게 */}
-            <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600" data-testid="thr-color-legend">
-              <span>
-                <b className="text-slate-800">색 = 잘 되는 반응</b> · 점이 두 개면 두 반응에 다 좋아요
-                {goal ? (
-                  <>
-                    {' · '}
-                    <b className={TONES[GOAL_TONE[goal.key]].ink}>'{goal.label}'</b> 에 맞는 틀은 진하게
-                  </>
-                ) : null}
-              </span>
-              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="색 뜻">
-                {GOAL_CHOICES.map((g) => (
-                  <span key={g.key} className="t-meta inline-flex items-center gap-1 text-slate-600">
-                    <span aria-hidden="true" className={`inline-block size-2.5 rounded-full ${TONES[g.tone].bar}`} />
-                    {g.label}
-                  </span>
-                ))}
-              </span>
-            </p>
-            {/* 휴대폰도 두 줄(8.5rem) — 큰 글자면 저절로 한 줄 */}
-            <ul className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr))' }}>
-              {THREAD_TEMPLATES.map((t) => (
-                <li key={t.key} className="min-w-0">
-                  <MiniTemplate t={t} on={draft.template === t.key} rec={picks.some((x) => x.key === t.key)} hot={hotKeys.has(t.key)} ctx={draft.goal} onClick={() => set({ template: t.key, goal: goalFor(t.key, draft.goal), formatBy: 'hand' })} />
-                </li>
-              ))}
-            </ul>
-          </div>
-          {tpl && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="thr-tpl-detail">
-              <p className="t-body font-bold break-keep text-slate-900">
-                {tpl.key} {tpl.name} <span className="t-meta font-normal text-slate-600">· {tpl.reaction}</span>
-              </p>
-              {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="thr-tpl-plain">
-                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
-                <span className="min-w-0">
-                  <b>쉽게 말하면</b> {TEMPLATE_EASY[tpl.key].plain}
-                </span>
-              </p>
-              <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-tpl-sample">
-                <b className="text-slate-900">예시</b>
-                {'\n'}
-                {TEMPLATE_EASY[tpl.key].sample}
-              </p>
-              <ol className="t-sub flex flex-wrap items-center gap-x-1.5 gap-y-1 break-keep text-slate-700" aria-label="뼈대">
-                {tpl.skeleton.map((s, i) => (
-                  <li key={s} className="inline-flex items-center gap-1.5">
-                    {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
-                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-900">{s}</span>
-                  </li>
-                ))}
-              </ol>
-              <p className="t-sub break-keep text-slate-700">
-                <b>왜 되나</b> {tpl.why}
-              </p>
-              {!isMarketingCustomer() && (
-                <p className="t-sub break-keep text-slate-700">
-                  <b>우리가 쓰면</b> {tpl.ours}
-                </p>
-              )}
-              {tpl.caution && (
-                <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
-                  <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {tpl.caution}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {tpl.example && !isMarketingCustomer() && (
-                  <Button size="sm" variant="secondary" onClick={() => startBody(tpl.example ?? '', 'example', tpl.exampleTag)} data-testid="thr-use-example">
-                    <FilePlus2 aria-hidden="true" className="size-4" /> 예시 글로 시작
-                  </Button>
-                )}
-                <Button size="sm" variant="ghost" onClick={() => startBody(skeletonDraft(tpl, draft.topic), 'hand')} data-testid="thr-use-skeleton">
-                  빈 틀로 시작
-                </Button>
-              </div>
-              {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성 글" — 이 틀로 AI 한 번(위 '더 바라는 점' 도 같이) */}
-              {aiOk && (
-                <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="thr-tpl-ai-box">
-                  <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 50대 사장님께 말하듯" aria-label="이 틀로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tpl-request" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AiConfirm>
-                      <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ goal: goalFor(tpl.key, draft.goal), template: tpl.key, tag: draft.tag || rec.tag }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="thr-tpl-ai">
-                        {ai.busy ? 'AI가 쓰는 중…' : `${tpl.key} 틀로 완성 글 쓰기`}
-                      </Button>
-                    </AiConfirm>
-                    {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </ToneSection>
-        <ToneSection n="3" tone="emerald" title="내 주제 태그 1개" help="스레드에서 글 주제를 묶어 주는 낱말이에요. 계정마다 달라요 — 내가 쓴 글의 태그 · 내 채널 설계 기준의 본업에서 골라 두었고, 없으면 직접 적어요." testId="thr-sec-tag">
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제 태그" data-testid="thr-tags">
-            {myTags.map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={draft.tag === t} onClick={() => set({ tag: draft.tag === t ? '' : t })} className={toneChip('emerald', draft.tag === t)} data-testid={`thr-tag-${t}`} data-tag={t}>
-                #{t}
-              </button>
-            ))}
-          </div>
-          <form
-            className="flex flex-wrap items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const t = cleanTag(tagInput)
-              if (!t) return
-              set({ tag: t })
-              setTagInput('')
-            }}
-          >
-            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} maxLength={20} placeholder="태그 직접 적기 — 예: 세무사무소" aria-label="주제 태그 직접 적기" className="t-sub min-h-11 w-56 max-w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-tag-input" />
-            <Button size="sm" variant="secondary" type="submit" disabled={!cleanTag(tagInput)} data-testid="thr-tag-add">
-              이 태그로
-            </Button>
-          </form>
-        </ToneSection>
-      </Fold>
 
       {!editorOpen ? (
         <Surface className="flex flex-col gap-2">
@@ -901,7 +881,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
               </Button>
             </div>
             {/* D-583 올려 본 적이 없는 사람 — 접힌 한 줄(누르면 스레드에 올리는 다섯 걸음) */}
-            <PostingHowTo channels={['threads']} testId="thr-howto" />
+            <PostingHowTo channels={['threads']} testId="thr-howto" plain />
             {/* D-274 보충본 1-3 "한 주제를 여러 채널로" — 같은 소재 · 태그를 들고 릴스 · 틱톡으로 */}
             {draft.topic.trim() && (
               <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/shorts?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="thr-to-shorts">
@@ -921,7 +901,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
             </div>
             <LintList lines={draft.body.trim() ? lintShown : []} testId="thr-lint" />
             {!draft.body.trim() && <p className="t-sub break-keep text-slate-500">글을 쓰면 여기서 바로 확인해요.</p>}
-            <details className="rounded-(--radius-control) border border-slate-200 px-3 py-2">
+            <details className="border-t border-slate-100 pt-2">
               <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-700">올리기 전 사람이 볼 것 {BEFORE_POST.length}가지</summary>
               <ul className="t-sub mt-1 list-disc pl-5 break-keep text-slate-700">
                 {BEFORE_POST.map((b) => (
@@ -932,6 +912,36 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
           </div>
         </div>
       </Surface>
+      )}
+
+      {/* D-602 AI 도우미 판은 맨 아래로 — 1단계(주제 → 완성 글) · 2단계(고치기) 사이를 끊지 않게 */}
+      {/* D-299 대표 "마케팅 · 브랜딩 어디서든 LLM 모델을 골라 요청" — 이 화면에도 AI 도우미 판: 모델 고르기 · 직접 묻기(스레드 공식으로 답) ·
+          [스레드 글 3개 쓰기] 를 고른 모델로 → 답의 [글 칸에 넣기]. 띠에는 단추를 늘어놓지 않는다(위 [AI로 바로 쓰기] 와 겹치지 않게) */}
+      {aiOk && (
+        <AiAssist
+          page="threads"
+          title="스레드"
+          presets={['threads.write']}
+          quick={0}
+          build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
+          itemActions={(id) =>
+            id === 'threads.write'
+              ? [
+                  {
+                    id: 'thr-use',
+                    label: '글 칸에 넣기',
+                    primary: true,
+                    run: (item) => {
+                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer, myTags).drafts[0]
+                      if (!d) return false
+                      takeDraft(d)
+                      return true
+                    },
+                  },
+                ]
+              : null
+          }
+        />
       )}
     </div>
   )

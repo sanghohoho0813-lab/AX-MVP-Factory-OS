@@ -19,43 +19,14 @@ import { salesStageLabelOf } from '../../services/salesPipeline'
 import { STRATEGY_LIBRARY } from '../../services/salesEngine'
 import { CRETOP_WEAPONS, PROPOSAL_TOPICS, TAX_STRATEGIES } from '../../services/salesLibrary'
 import { customersForTopic } from '../../services/salesSignals'
+import { strategyTopicKey } from '../../services/salesStrategyTopics'
 import { rampAt } from '../../components/sales/salesColor'
 import { todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
 
 type SourceKey = 'strategy' | 'cretop' | 'tax'
 
-/**
- * D-167: 세 목록(영업 전략 17 · 크레탑 무기 34 · 절세 전략 25 = 76)을 주제 하나로 합친다.
- * 대표: "똑같으면 굳이 76개로 나눠 놓을 이유가 없다" — 가지급금 · 정관 · 연구소 같은 주제가 세 곳에 따로 있었다.
- * 같은 주제는 한 줄로 모으고, 펼치면 세 목록의 내용(언제 꺼내나 · 물어볼 것 · 받을 자료 · 조심할 것)을 합쳐 보여 준다.
- * 멘트(이렇게 꺼낸다 · 마무리 말 · 연락 멘트)는 뺀다 — 포인트만(대표: 멘트 · 카톡 문구는 숨기자). 원본 목록은 그대로 둔다.
- */
-const TOPIC_RULES: [string, RegExp][] = [
-  ['articles', /정관/],
-  ['retained', /미처분|이익잉여금/],
-  ['succession', /가업승계|증여특례/],
-  ['loan', /가지급금/],
-  ['deposit', /가수금/],
-  ['rnd-credit', /연구인력개발비/],
-  ['lab', /연구소|전담부서/],
-  ['welfare', /사내근로복지기금/],
-  ['venture', /벤처/],
-  ['innobiz', /이노비즈|메인비즈/],
-  ['policy', /정책자금/],
-  ['employ-sub', /고용지원금/],
-  ['employ-credit', /통합고용세액공제/],
-  ['exec-pay', /임원퇴직금|임원보수/],
-  ['share-value', /주식가치/],
-  ['burn', /이익소각|자기주식/],
-  ['dividend', /배당/],
-  ['insurance', /법인보험|퇴직연금|목적자금/],
-  ['conversion', /법인전환/],
-  ['related', /특수관계자|관계사/],
-]
-function topicKey(name: string): string {
-  return TOPIC_RULES.find(([, re]) => re.test(name))?.[0] ?? name
-}
+// D-167 같은 주제 묶기 규칙은 services/salesStrategyTopics 로 옮김(D-602 — 스레드 · 릴스 주제 칩도 같은 목록을 쓴다)
 
 interface Entry {
   id: string
@@ -119,7 +90,7 @@ function parts(): Part[] {
 function buildEntries(): Entry[] {
   const groups = new Map<string, Part[]>()
   for (const p of parts()) {
-    const k = topicKey(p.name)
+    const k = strategyTopicKey(p.name)
     groups.set(k, [...(groups.get(k) ?? []), p])
   }
   return [...groups.entries()].map(([k, ps]) => {

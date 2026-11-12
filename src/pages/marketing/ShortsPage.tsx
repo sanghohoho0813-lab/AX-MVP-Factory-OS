@@ -57,6 +57,7 @@ import {
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
+import { strategyTopicNames } from '../../services/salesStrategyTopics'
 import { FirstLineMaker } from './FirstLineMaker'
 import { PostingHowTo } from './PostingHowTo'
 import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/ui/fold'
@@ -94,12 +95,6 @@ function formatTip(f: ShortFormat): string {
 }
 const tabOf = (raw: string | null): Tab => (TABS.some((t) => t.key === raw) ? (raw as Tab) : 'write')
 
-// short — 주제 칩에 보이는 짧은 이름(MUX-2 큰 글자에서도 한 줄 안팎). AI 에는 topic 전체가 간다
-const QUICK_TOPICS = [
-  { topic: '창업 3년 안 벤처확인 세금', short: '창업 3년 안 벤처확인 세금' },
-  { topic: '매일 반복되는 일 하나 화면으로 바꾸기', short: '반복 업무를 화면으로' },
-  { topic: '정책자금 전에 볼 기본 컨디션(신용 · 재무 · 체납)', short: '자금 전 기본 컨디션' },
-]
 
 interface Draft {
   id?: string
@@ -282,7 +277,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const rec = useMemo(() => recommendShort({ topic: draft.topic, platform: draft.platform, posts: store.posts, today }), [draft.topic, draft.platform, store.posts, today])
   const effFmt = draft.format ? formatOf(draft.format) : undefined
   const eff = effFmt ? { aim: (draft.aim || aimsOf(effFmt, draft.platform)[0]) as ShortAim, format: effFmt.key } : { aim: rec.aim, format: rec.format }
-  const chips = useMemo(() => topicChips(readWeekTopics(today), QUICK_TOPICS), [today])
+  // D-602 우리 분야 주제 = 영업 관리 › 전략 키워드(스레드와 같은 목록) · 이번 주 키워드는 접힌 한 줄
+  const chips = useMemo(() => topicChips(readWeekTopics(today), strategyTopicNames()), [today])
   const pickTopic = (t: string) => {
     // 칩으로 새 주제를 고르면 목적 · 형식도 그 주제에 맞춰 다시 추천 — 사람이 직접 고른 형식은 덮지 않는다
     if (draft.formatBy === 'hand' && draft.format) return set({ topic: t })
@@ -541,6 +537,121 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 대본 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: '형식 예시로 시작', onClick: startExample }}
         request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 30초 안으로 · 댓글로 키워드 받기' } : undefined}
+        more={
+          <>
+            {/* D-298 '이것만 지키면 돼요' — 글자 덩어리 대신 색 번호 · 굵은 한마디 · 짧은 설명, 예시는 마우스를 올리거나 ? 를 누르면 */}
+            {/* D-357 화면 원칙 — 접힌 채로도 네 가지 한마디는 한 줄에(누르면 설명 · 예시) */}
+            <Fold
+              id="sht.basics"
+              title="이것만 지키면 돼요"
+              icon={<Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
+              summary={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
+              className="data-[open=1]:pb-2"
+              testId="sht-basics"
+            >
+              <ol className="flex flex-col gap-2 pl-1">
+                {SHORT_BASICS_EASY.map((b, i) => (
+                  <li key={b.title} className="min-w-0" data-testid="sht-basic">
+                    <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
+                      <span className="t-body flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
+                        <span aria-hidden="true" className="t-meta inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+                          {i + 1}
+                        </span>
+                        <span className="min-w-0">{b.title}</span>
+                      </span>
+                    </HintTip>
+                    <span className="t-sub block pl-8 break-keep text-slate-600">{b.detail}</span>
+                  </li>
+                ))}
+              </ol>
+            </Fold>
+
+            {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
+            <Fold
+              id="sht.formats"
+              title="내 맞춤 — 어디에 · 목적 · 형식 직접 고르기"
+              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 어디에 올릴지 → 무엇을 원하는지 → 영상 형식을 직접 골라요. 고른 형식에서 [이 형식으로 완성 대본 쓰기] 를 누르면 그 형식으로 바로 써요."
+              icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
+              summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
+              className="scroll-mt-24 data-[open=1]:pb-2"
+              keepClosed
+              testId="sht-choose"
+            >
+              <ToneSection n="1" tone="teal" title="어디에 올려요?" help="영상을 올릴 곳이에요. 틱톡 · 쇼츠는 말로 설명하는 조금 긴 영상, 릴스는 20초 안팎 짧은 영상이 잘 돼요." testId="sht-sec-platform">
+                <BigChoices items={PLATFORM_CHOICES} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
+              </ToneSection>
+              <ToneSection n="2" tone="sky" title="무엇을 원해요?" help="이 영상으로 얻고 싶은 것이에요. 많이 보이게 하는 영상과 문의 · 댓글을 받는 영상은 끝맺음이 달라요." testId="sht-sec-aim">
+                <BigChoices items={aimChoices(draft.platform)} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
+                <p className="t-sub break-keep text-slate-600" data-testid="sht-mix">
+                  {draft.platform === 'tiktok' ? `권장: 많이 보이게 3번에 문의로 1번 · 이번 주 ${mix.tiktok.reach} : ${mix.tiktok.convert}` : `권장: 많이 보이게 2번 · 댓글 받기 2번(자금 · 세금 소재는 댓글 위주) · 이번 주 ${mix.reels.reach} : ${mix.reels.convert}`}
+                </p>
+              </ToneSection>
+              <ToneSection n="3" tone="violet" title="어떤 형식으로?" help="영상의 모양이에요. 형식 이름에 마우스를 올리면 어떤 영상인지 · 예시가 나와요." testId="sht-sec-format">
+                <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }} data-testid="sht-formats">
+                  {formats.map((f) => {
+                    const on = draft.format === f.key
+                    const tone = TONES[FORMAT_TONE[f.key]]
+                    return (
+                      <li key={f.key} className="min-w-0">
+                        <HoverTip block className="h-full" tip={<TipBody title={`${f.name} (${f.seconds})`} body={FORMAT_EASY[f.key].plain} example={FORMAT_EASY[f.key].sample} />} testId="sht-formattip">
+                          <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-white ring-2 ring-brand-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`sht-format-${f.key}`}>
+                            <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span aria-hidden="true" className={`inline-block size-2.5 shrink-0 rounded-full ${tone.bar}`} />
+                              <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
+                              <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${tone.soft} ${tone.ink}`}>{f.seconds}</span>
+                            </span>
+                            <span className="t-sub break-keep text-slate-600">{mkText(f.how)}</span>
+                          </button>
+                        </HoverTip>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {fmt && (
+                  <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-format-detail">
+                    {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
+                    <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="sht-format-plain">
+                      <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
+                      <span className="min-w-0">
+                        <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
+                      </span>
+                    </p>
+                    <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-slate-800">
+                      <b className="text-slate-900">예시</b> {FORMAT_EASY[fmt.key].sample}
+                    </p>
+                    <p className="t-sub break-keep text-slate-700">
+                      <b>왜 되나</b> {fmt.why}
+                    </p>
+                    {fmt.caution && (
+                      <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
+                        <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {fmt.caution}
+                      </p>
+                    )}
+                    <div>
+                      <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: exampleTagsOf(fmt), source: 'example' })} data-testid="sht-use-example">
+                        <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
+                      </Button>
+                    </div>
+                    {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성" — 이 형식으로 AI 한 번(위 '더 바라는 점' 도 같이) */}
+                    {aiOk && (
+                      <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="sht-fmt-ai-box">
+                        <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 30초 안으로" aria-label="이 형식으로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-fmt-request" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <AiConfirm>
+                            <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ aim: draft.aim || eff.aim, format: fmt.key }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="sht-fmt-ai">
+                              {ai.busy ? 'AI가 쓰는 중…' : `${fmt.name}으로 완성 대본 쓰기`}
+                            </Button>
+                          </AiConfirm>
+                          {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ToneSection>
+            </Fold>
+          </>
+        }
         hooks={<FirstLineMaker testPrefix="sht" channel="shorts" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
       >
         {ai.drafts.length > 0 && (
@@ -552,144 +663,6 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         )}
       </QuickStart>
 
-      {/* D-299 AI 도우미 판 — 모델 고르기 · 직접 묻기(숏폼 공식으로 답) · [대본 2개 쓰기] 를 고른 모델로 → 답의 [대본 칸에 넣기] */}
-      {aiOk && (
-        <AiAssist
-          page="shorts"
-          title="릴스 · 틱톡"
-          presets={['shorts.write']}
-          quick={0}
-          build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}
-          itemActions={(id) =>
-            id === 'shorts.write'
-              ? [
-                  {
-                    id: 'sht-use',
-                    label: '대본 칸에 넣기',
-                    primary: true,
-                    run: (item) => {
-                      const d = parseShortDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
-                      if (!d) return false
-                      start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
-                      return true
-                    },
-                  },
-                ]
-              : null
-          }
-        />
-      )}
-
-      {/* D-298 '이것만 지키면 돼요' — 글자 덩어리 대신 색 번호 · 굵은 한마디 · 짧은 설명, 예시는 마우스를 올리거나 ? 를 누르면 */}
-      {/* D-357 화면 원칙 — 접힌 채로도 네 가지 한마디는 한 줄에(누르면 설명 · 예시) */}
-      <Fold
-        id="sht.basics"
-        title="이것만 지키면 돼요"
-        icon={<Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
-        summary={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
-        className="rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-3 sm:px-4"
-        testId="sht-basics"
-      >
-        <ol className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }}>
-          {SHORT_BASICS_EASY.map((b, i) => (
-            <li key={b.title} className="min-w-0 rounded-lg border border-amber-200 bg-white px-2.5 py-2" data-testid="sht-basic">
-              <HintTip tip={`예시\n${b.example}`} label={b.title} tight>
-                <span className="t-body flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
-                  <span aria-hidden="true" className="t-meta inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0">{b.title}</span>
-                </span>
-              </HintTip>
-              <span className="t-sub block pl-8 break-keep text-slate-600">{b.detail}</span>
-            </li>
-          ))}
-        </ol>
-      </Fold>
-
-      {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
-      <Fold
-        id="sht.formats"
-        title="내 맞춤 — 어디에 · 목적 · 형식 직접 고르기"
-        hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 어디에 올릴지 → 무엇을 원하는지 → 영상 형식을 직접 골라요. 고른 형식에서 [이 형식으로 완성 대본 쓰기] 를 누르면 그 형식으로 바로 써요."
-        icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
-        summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
-        className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 data-[open=1]:pb-4 sm:px-4"
-        testId="sht-choose"
-      >
-        <ToneSection n="1" tone="teal" title="어디에 올려요?" help="영상을 올릴 곳이에요. 틱톡 · 쇼츠는 말로 설명하는 조금 긴 영상, 릴스는 20초 안팎 짧은 영상이 잘 돼요." testId="sht-sec-platform">
-          <BigChoices items={PLATFORM_CHOICES} value={draft.platform} onPick={pickPlatform} label="어디에 올려요" testPrefix="sht-platform" min="13rem" />
-        </ToneSection>
-        <ToneSection n="2" tone="sky" title="무엇을 원해요?" help="이 영상으로 얻고 싶은 것이에요. 많이 보이게 하는 영상과 문의 · 댓글을 받는 영상은 끝맺음이 달라요." testId="sht-sec-aim">
-          <BigChoices items={aimChoices(draft.platform)} value={draft.aim} onPick={pickAim} label="무엇을 원해요" testPrefix="sht-aim" min="13rem" />
-          <p className="t-sub break-keep text-slate-600" data-testid="sht-mix">
-            {draft.platform === 'tiktok' ? `권장: 많이 보이게 3번에 문의로 1번 · 이번 주 ${mix.tiktok.reach} : ${mix.tiktok.convert}` : `권장: 많이 보이게 2번 · 댓글 받기 2번(자금 · 세금 소재는 댓글 위주) · 이번 주 ${mix.reels.reach} : ${mix.reels.convert}`}
-          </p>
-        </ToneSection>
-        <ToneSection n="3" tone="violet" title="어떤 형식으로?" help="영상의 모양이에요. 형식 이름에 마우스를 올리면 어떤 영상인지 · 예시가 나와요." testId="sht-sec-format">
-          <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))' }} data-testid="sht-formats">
-            {formats.map((f) => {
-              const on = draft.format === f.key
-              const tone = TONES[FORMAT_TONE[f.key]]
-              return (
-                <li key={f.key} className="min-w-0">
-                  <HoverTip block className="h-full" tip={<TipBody title={`${f.name} (${f.seconds})`} body={FORMAT_EASY[f.key].plain} example={FORMAT_EASY[f.key].sample} />} testId="sht-formattip">
-                    <button type="button" aria-pressed={on} onClick={() => set({ format: f.key, formatBy: 'hand' })} className={`tap flex h-full min-h-16 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3.5 py-2.5 text-left ${on ? 'border-brand-500 bg-white ring-2 ring-brand-200' : `${tone.line} bg-white ${tone.hover}`}`} data-testid={`sht-format-${f.key}`}>
-                      <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span aria-hidden="true" className={`inline-block size-2.5 shrink-0 rounded-full ${tone.bar}`} />
-                        <span className="t-body font-bold break-keep text-slate-900">{f.name}</span>
-                        <span className={`t-meta rounded-full px-2 py-0.5 font-semibold ${tone.soft} ${tone.ink}`}>{f.seconds}</span>
-                      </span>
-                      <span className="t-sub break-keep text-slate-600">{mkText(f.how)}</span>
-                    </button>
-                  </HoverTip>
-                </li>
-              )
-            })}
-          </ul>
-          {fmt && (
-            <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-3" data-testid="sht-format-detail">
-              {/* D-298 쉽게 말하면 · 예시 — 휴대폰(마우스 없음)도 고르면 여기서 본다 */}
-              <p className="t-sub flex items-start gap-1.5 break-keep text-slate-800" data-testid="sht-format-plain">
-                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
-                <span className="min-w-0">
-                  <b>쉽게 말하면</b> {FORMAT_EASY[fmt.key].plain}
-                </span>
-              </p>
-              <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-slate-800">
-                <b className="text-slate-900">예시</b> {FORMAT_EASY[fmt.key].sample}
-              </p>
-              <p className="t-sub break-keep text-slate-700">
-                <b>왜 되나</b> {fmt.why}
-              </p>
-              {fmt.caution && (
-                <p className="t-sub flex items-start gap-1.5 break-keep text-warning-800">
-                  <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> {fmt.caution}
-                </p>
-              )}
-              <div>
-                <Button variant="secondary" onClick={() => start({ ...exampleOf(fmt, draft.platform), hashtags: exampleTagsOf(fmt), source: 'example' })} data-testid="sht-use-example">
-                  <FilePlus2 aria-hidden="true" className="size-4" /> 예시 대본으로 시작
-                </Button>
-              </div>
-              {/* D-558 대표 "형식 · 예시를 보고 고른 다음 요청 한 줄 달고 한 번 누르면 완성" — 이 형식으로 AI 한 번(위 '더 바라는 점' 도 같이) */}
-              {aiOk && (
-                <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2.5" data-testid="sht-fmt-ai-box">
-                  <input value={request} onChange={(e) => setRequest(e.target.value)} maxLength={200} placeholder="더 바라는 점(선택) — 예: 30초 안으로" aria-label="이 형식으로 쓸 때 더 바라는 점" className="t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="sht-fmt-request" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AiConfirm>
-                      <Button size="sm" variant="primary" className="bg-violet-600 hover:bg-violet-700" onClick={() => void runAi({ aim: draft.aim || eff.aim, format: fmt.key }, true)} disabled={ai.busy || !draft.topic.trim()} data-testid="sht-fmt-ai">
-                        {ai.busy ? 'AI가 쓰는 중…' : `${fmt.name}으로 완성 대본 쓰기`}
-                      </Button>
-                    </AiConfirm>
-                    {!draft.topic.trim() && <span className="t-meta text-slate-600">위 1번에서 주제를 먼저 고르세요.</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </ToneSection>
-      </Fold>
 
       {!editorOpen ? (
         <Surface className="flex flex-col gap-2">
@@ -764,7 +737,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
               </Button>
             </div>
             {/* D-583 찍은 영상을 어디에 어떻게 올리나 — 접힌 한 줄(안에서 릴스 · 틱톡 · 쇼츠 탭) */}
-            <PostingHowTo channels={['reels', 'tiktok', 'shorts']} testId="sht-howto" />
+            <PostingHowTo channels={['reels', 'tiktok', 'shorts']} testId="sht-howto" plain />
             {draft.topic.trim() && (
               <Button variant="ghost" className="self-start" onClick={() => navigate(`/marketing/threads?topic=${encodeURIComponent(draft.topic.trim())}`)} data-testid="sht-to-threads">
                 같은 소재로 스레드 글 쓰기 →
@@ -786,6 +759,35 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
           </div>
         </div>
       </Surface>
+      )}
+
+      {/* D-602 AI 도우미 판은 맨 아래로 — 1단계 · 2단계 사이를 끊지 않게 */}
+      {/* D-299 AI 도우미 판 — 모델 고르기 · 직접 묻기(숏폼 공식으로 답) · [대본 2개 쓰기] 를 고른 모델로 → 답의 [대본 칸에 넣기] */}
+      {aiOk && (
+        <AiAssist
+          page="shorts"
+          title="릴스 · 틱톡"
+          presets={['shorts.write']}
+          quick={0}
+          build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}
+          itemActions={(id) =>
+            id === 'shorts.write'
+              ? [
+                  {
+                    id: 'sht-use',
+                    label: '대본 칸에 넣기',
+                    primary: true,
+                    run: (item) => {
+                      const d = parseShortDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
+                      if (!d) return false
+                      start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
+                      return true
+                    },
+                  },
+                ]
+              : null
+          }
+        />
       )}
     </div>
   )
