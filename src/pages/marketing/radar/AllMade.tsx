@@ -47,7 +47,8 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
   const loading = shorts === null || threads === null
 
   return (
-    <section className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="mk-allmade-h" data-testid="mk-allmade">
+    // D-604 내 콘텐츠 큰 판 안 한 칸(따로 떨어진 판 → 가는 선으로 나눈 칸)
+    <section className="flex min-w-0 flex-col gap-2.5" aria-labelledby="mk-allmade-h" data-testid="mk-allmade">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="mk-allmade-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <Layers aria-hidden="true" className="size-5 text-rose-600" /> 만든 것 한눈에
@@ -79,7 +80,7 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
       </div>
       {failed.length > 0 && <p className="t-meta text-warning-700">{failed.join(' · ')} 기록을 읽지 못했어요 — 나머지만 보여요.</p>}
       {shown.length === 0 ? (
-        <p className="t-sub rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-3 break-keep text-slate-500" data-testid="mk-allmade-empty">
+        <p className="t-sub py-1 break-keep text-slate-500" data-testid="mk-allmade-empty">
           {loading ? '읽는 중…' : kind === 'all' ? '아직 만든 글이 없어요 — 이번 주 키워드에서 하나 고르거나 1주일치를 한 번에 만들어 보세요.' : `아직 ${KIND[kind].label} 글이 없어요.`}
         </p>
       ) : (
@@ -88,7 +89,7 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
             const K = KIND[x.kind]
             return (
               <li key={`${x.kind}-${x.id}`}>
-                <Link to={x.href} className="tap flex min-w-0 items-center gap-2.5 py-2 hover:bg-slate-50" data-testid="mk-allmade-item" data-kind={x.kind}>
+                <Link to={x.href} className="tap flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-slate-50" data-testid="mk-allmade-item" data-kind={x.kind}>
                   <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 ${K.tone}`}>
                     <K.icon className="size-4" />
                   </span>

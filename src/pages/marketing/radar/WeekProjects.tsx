@@ -31,7 +31,8 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
   // D-507 60대+ — 아직 1주일치가 없으면 한 줄만(제목 · 없음 · [만들러 가기]) — 만든 것 목록이 첫 화면에서 밀려나지 않게
   if (weeks.length === 0)
     return (
-      <section className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2.5 sm:px-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
+      // D-604 내 콘텐츠 큰 판 안 한 줄(따로 떨어진 판 → 가는 선으로 나눈 줄)
+      <section className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-labelledby="mk-projects-h" data-testid="mk-projects">
         <h3 id="mk-projects-h" className="t-sub flex shrink-0 items-center gap-2 font-bold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
@@ -44,14 +45,15 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
       </section>
     )
   return (
-    <section className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="mk-projects-h" data-testid="mk-projects">
+    <section className="flex flex-col gap-2" aria-labelledby="mk-projects-h" data-testid="mk-projects">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
         <p className="t-meta break-keep text-slate-500">누르면 그 주 프로젝트 안에서 긴 영상 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
       </div>
-      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      {/* D-604 보라 테두리 카드 → 가는 선으로 나눈 줄(누르면 그 주 프로젝트 — 예전 그대로) */}
+      <ul className="flex flex-col divide-y divide-slate-100">
         {weeks.map(({ start, saved }) => {
           const run = weekRun(start)
           const running = Object.values(run.parts).includes('running')
@@ -62,7 +64,7 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
               <button
                 type="button"
                 onClick={() => onOpen(start)}
-                className="tap flex h-full w-full min-w-0 flex-col gap-2 rounded-(--radius-card) border border-violet-200 bg-white p-3 text-left shadow-(--shadow-card) hover:border-violet-400"
+                className="tap flex w-full min-w-0 flex-col gap-1.5 rounded-lg px-1.5 py-2.5 text-left hover:bg-slate-50"
                 data-testid="mk-project"
                 data-start={start}
               >

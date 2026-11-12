@@ -27,8 +27,8 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
     id: 'youtube-calm',
     date: '2026-11-12',
-    title: '유튜브 주제 고르는 화면도 한 판으로 깔끔해졌어요',
-    how: "이번 주 뜨는 주제가 번호 붙은 목록으로 바뀌었어요. 하나를 누르면 제목 · 대본이 한 판 안에 나와요. 왜 이 주제인지는 판 맨 아래 [자세히 보기] 에 있어요.",
+    title: '유튜브 · 내 콘텐츠 화면도 한 판으로 깔끔해졌어요',
+    how: "유튜브는 이번 주 뜨는 주제가 번호 붙은 목록으로 바뀌었고, 하나를 누르면 제목 · 대본이 한 판 안에 나와요. 내 콘텐츠도 만든 것 · 긴 영상 진행판 · 채널 기준이 한 판 안에 줄로 나뉘어요.",
     path: '/marketing?view=plan',
     cta: '유튜브 열기',
     marketing: true,

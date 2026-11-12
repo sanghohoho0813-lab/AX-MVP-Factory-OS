@@ -842,7 +842,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {/* D-560 '남의 인기 영상' 한 칸 안 — 인기 영상 · 참고 채널 · 올리는 때 · 길이 */}
       {!packKey && !weekOn && !firstScreen && isLookView(view) && <LookTabs view={view} onPick={(k) => setParam({ view: k })} />}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
-      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
+      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide plain={view === 'make'} id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
       {/* D-239 마케팅 AI 도우미(탭마다 다른 질문) — MK-SIMPLE(D-553) 띠 대신 위 머리 오른쪽 [AI 도우미] 단추(radarAssist). 이번 주 찍을 것의 질문 판은 [자세히 보기] 안 그대로 */}
 
       {packKey ? (
@@ -979,6 +979,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           onRemove={(i) => void removeIdea(i)}
           onCopy={(t, what) => copy(t, what)}
           onAdd={addCustom}
+          brief={briefInline}
           projects={
             <>
               <WeekProjects onOpen={openProject} onMake={() => setParam({ view: '' })} />
@@ -1110,8 +1111,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         </PeekProvider>
       )}
 
-      {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 내 콘텐츠 맨 아래(이번 주 찍을 것에서는 [자세히 보기] · 묶음 화면 안) */}
-      {view === 'make' && briefCard}
+      {/* D-241 AI 도우미가 기획 · 대본을 쓸 때 따르는 채널 설계 기준 — 내 콘텐츠 맨 아래(이번 주 찍을 것에서는 [자세히 보기] · 묶음 화면 안)
+          D-604 내 콘텐츠에서는 큰 판 맨 아래 한 줄(MakeView brief) */}
       <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} study={{ brief, readOnly, sample: yt.sample, onSave: saveAdapt }} />
     </div>
   )
