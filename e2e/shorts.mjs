@@ -105,6 +105,12 @@ const open = async (p, q = '') => {
   if ((await fold.count()) && (await fold.getAttribute('data-open')) === '0') await fold.getByTestId('fold-toggle').click()
 }
 
+// D-602 '내 맞춤' 은 화면을 열 때마다 접힌 채(기억 안 함) — 탭을 바꾸거나 새로 고친 뒤 그 안을 보면 다시 펼친다
+const openChoose = async (p) => {
+  const f = p.getByTestId('sht-choose')
+  await f.waitFor({ timeout: 8000 }).catch(() => {})
+  if ((await f.count()) && (await f.getAttribute('data-open')) === '0') await f.getByTestId('fold-toggle').click()
+}
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
 await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
@@ -191,13 +197,14 @@ check('W9 릴스 화면 시연은 25초판(끝에 권유 없이) · 고칠 것 0
 await page.getByTestId('sht-platform-tiktok').click()
 await page.getByTestId('sht-aim-reach').click()
 await page.getByTestId('sht-format-list').click()
+const a3Chip = (await page.getByTestId('sht-qs-chip').first().innerText()).trim()
 await page.getByTestId('sht-qs-chip').first().click()
 { const l289 = page.getByTestId('sht-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.getByTestId('sht-ai-drafts').waitFor({ timeout: 20000 })
 const call = llm.find((x) => x.sys.includes('(shorts.write'))
 check('A1 AI 대본 2개 · 형식 · 길이 · 고칠 것 수', (await page.getByTestId('sht-ai-draft').count()) === 2 && /리스트형/.test(await page.getByTestId('sht-ai-draft').first().innerText()) && /약 \d+초 · 고칠 것 \d/.test(await page.getByTestId('sht-ai-draft').first().innerText()))
 check('A2 서버 지시 — 대표 운영 원칙(먼저) · 숏폼 규칙 · 기준 문서(숏폼 공식 · 사실 목록) · 스레드 · 마케팅 규칙 없음', !!call && call.sys.includes('[대표 운영 원칙') && call.sys.indexOf('[대표 운영 원칙') < call.sys.indexOf('[숏폼 규칙]') && call.sys.includes('[숏폼 규칙]') && call.sys.includes('[기준 문서]') && /김팀장 사실 목록/.test(call.sys) && !call.sys.includes('[스레드 규칙]') && !call.sys.includes('[마케팅 규칙]'))
-check('A3 보낸 자료 — 틱톡 · 많이 보이게 · 리스트형 · 소재', !!call && /플랫폼: 틱톡 · 유튜브 쇼츠/.test(call.user) && /목적: 많이 보이게/.test(call.user) && /고른형식: 리스트형/.test(call.user) && /소재: 창업 3년 안 벤처확인 세금/.test(call.user), call?.user.slice(0, 400))
+check('A3 보낸 자료 — 틱톡 · 많이 보이게 · 리스트형 · 소재', !!call && /플랫폼: 틱톡 · 유튜브 쇼츠/.test(call.user) && /목적: 많이 보이게/.test(call.user) && /고른형식: 리스트형/.test(call.user) && call.user.includes(`소재: ${a3Chip}`), call?.user.slice(0, 400))
 await shot(page, 'pc-ai-drafts')
 await page.getByTestId('sht-ai-use').first().click()
 await page.waitForTimeout(200)
@@ -285,12 +292,14 @@ check('G1 형식 5 · 플랫폼 두 칸 · 댓글 받기 조건 4줄', (await pa
 await shot(page, 'pc-guide', false)
 await page.locator('[data-testid="sht-guide-card"][data-key="comment"]').locator('xpath=ancestor::article').getByTestId('sht-guide-use').click()
 await page.getByTestId('sht-write').waitFor()
+await openChoose(page)
 check('G2 [이 형식으로 만들기] → 릴스 · 댓글 받기 · 댓글형 골라짐', (await page.getByTestId('sht-platform-reels').getAttribute('aria-checked')) === 'true' && (await page.getByTestId('sht-aim-convert').getAttribute('aria-checked')) === 'true' && (await page.getByTestId('sht-format-comment').getAttribute('aria-pressed')) === 'true')
 await page.getByTestId('sht-tab-guide').click()
 await page.getByTestId('sht-guide').waitFor()
 check('G4 형식 · 공식 — 이렇게 말고 → 이렇게 표 · 나눠 줄 자료', (await page.locator('[data-testid="sht-rewrites"] li').count()) >= 10 && (await page.getByTestId('sht-guide-share-card').count()) === 6)
 /* ---------------- L D-299 모델 고르기 · AI 도우미 판 ---------------- */
 await page.getByTestId('sht-tab-write').click()
+await openChoose(page)
 await page.getByTestId('sht-qs-topic').fill('정책자금 전에 볼 기본 컨디션')
 {
   const bar = page.getByTestId('ai-assist-bar')
@@ -312,6 +321,7 @@ await page.getByTestId('sht-qs-topic').fill('정책자금 전에 볼 기본 컨�
   await page.evaluate(() => localStorage.removeItem('axmvp.ai.choice.v1'))
 }
 await page.getByTestId('sht-tab-write').click()
+await openChoose(page)
 await page.getByTestId('sht-qs-topic').fill('매일 반복되는 일 하나 화면으로 바꾸기')
 await page.getByTestId('sht-to-threads').click()
 await page.getByTestId('thr-page').waitFor()

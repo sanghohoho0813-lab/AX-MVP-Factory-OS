@@ -109,6 +109,12 @@ const open = async (p, q = '') => {
   if ((await fold.count()) && (await fold.getAttribute('data-open')) === '0') await fold.getByTestId('fold-toggle').click()
 }
 
+// D-602 '내 맞춤' 은 화면을 열 때마다 접힌 채(기억 안 함) — 탭을 바꾸거나 새로 고친 뒤 그 안을 보면 다시 펼친다
+const openChoose = async (p) => {
+  const f = p.getByTestId('thr-choose')
+  await f.waitFor({ timeout: 8000 }).catch(() => {})
+  if ((await f.count()) && (await f.getAttribute('data-open')) === '0') await f.getByTestId('fold-toggle').click()
+}
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
 await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
@@ -354,6 +360,7 @@ await page.reload({ waitUntil: 'networkidle' })
 await page.getByTestId('thr-records').waitFor()
 check('S5 새로고침해도 기록 · 숫자 남음', (await page.locator('[data-testid="thr-stat-likes"]').first().inputValue()) === '9' && /점수 44/.test(await page.getByTestId('thr-rec-score').first().innerText()))
 await page.getByTestId('thr-tab-write').click()
+await openChoose(page)
 check('S6 올린 뒤 쓰기 칸은 비어 있음', (await page.getByTestId('thr-body').inputValue()) === '')
 // V 같은 달 두 번
 await page.getByTestId('thr-goal-reply').click()
@@ -364,6 +371,7 @@ check('S7 V(대놓고 영업) 예시 — 판매 검사 빼고 고칠 것 0', (aw
 await page.getByTestId('thr-posted').click()
 await page.getByTestId('thr-records').waitFor()
 await page.getByTestId('thr-tab-write').click()
+await openChoose(page)
 await page.getByTestId('thr-goal-reply').click()
 await page.getByTestId('thr-tpl-V').click()
 await page.getByTestId('thr-use-example').click()
@@ -384,6 +392,7 @@ check('S10 [지우기] 확인 → 한 줄 줄어듦', (await page.locator('[data
 
 /* ---------------- K 쓰던 글 남기기 ---------------- */
 await page.getByTestId('thr-tab-write').click()
+await openChoose(page)
 await page.getByTestId('thr-body').fill('솔직히 말하면, 나도 처음엔 몰랐어.\n쓰다 만 글')
 await page.getByTestId('thr-ref-box').locator('summary').click()
 await page.getByTestId('thr-ref').fill('남의 글')
@@ -404,11 +413,15 @@ const shareKeys = await page.getByTestId('thr-lib-card').evaluateAll((xs) => xs.
 check('L2 공유 · 저장으로 거르기 → B · E · H · M · O · Q · U', shareKeys === 'BEHMOQU', shareKeys)
 await page.locator('[data-testid="thr-lib-card"][data-key="U"]').locator('xpath=ancestor::article').getByTestId('thr-lib-use').click()
 await page.getByTestId('thr-write').waitFor()
-check('L3 [이 틀로 쓰기] → 쓰기 칸 · U 밥줄 공개 골라짐', (await page.getByTestId('thr-tpl-detail').innerText()).includes('U 밥줄 공개'))
+// D-602 '내 맞춤' 은 접힌 채 — 고른 틀은 ① 판 '고른 형식' 줄에 바로 보이고, 펼치면 틀 설명에도
+const l3rec = await page.getByTestId('thr-qs-rec').innerText()
+await openChoose(page)
+check('L3 [이 틀로 쓰기] → 쓰기 칸 · ① 판에 "고른 형식 … U 밥줄 공개" · 펼치면 틀 설명도 U', /고른 형식/.test(l3rec) && l3rec.includes('U 밥줄 공개') && (await page.getByTestId('thr-tpl-detail').innerText()).includes('U 밥줄 공개'), l3rec)
 await page.getByTestId('thr-tab-library').click()
 await page.getByTestId('thr-library').waitFor()
 check('L4 이렇게 말고 → 이렇게 표(가점 · 성공 약속 · 숙제 …)', (await page.locator('[data-testid="thr-rewrites"] li').count()) >= 10 && /눈에 띄게 해 주는 좋은 자료/.test(await page.getByTestId('thr-rewrites').innerText()))
 await page.getByTestId('thr-tab-write').click()
+await openChoose(page)
 await page.getByTestId('thr-qs-topic').fill('창업 3년 안 벤처확인 세금')
 await page.getByTestId('thr-to-shorts').click()
 await page.getByTestId('sht-page').waitFor()
@@ -440,6 +453,7 @@ await page.getByTestId('thr-routine').waitFor()
 await page.locator('[data-testid="thr-weekref-item"]').first().waitFor({ timeout: 5000 }).catch(() => {})
 check('R1c 이번 주 형식 저장 → 새로고침해도 남음(틀 P · 대상 부르기 · 자료 나눔 · 메모)', (await page.getByTestId('thr-weekref-item').count()) === 1 && (await page.getByTestId('thr-weekref-template').first().inputValue()) === 'P' && (await page.getByTestId('thr-weekref-ending').first().inputValue()) === 'material' && (await page.getByTestId('thr-weekref-note').first().inputValue()) === '자금 태그 · 답글이 많음')
 await page.getByTestId('thr-tab-write').click()
+await openChoose(page)
 await page.getByTestId('thr-write').waitFor()
 await page.getByTestId('thr-goal-reply').click()
 check('R1d 쓰기 칸 — 이번 주 잘 터진 형식(참고) 한 줄 · P 틀에 "이번 주 잘 됨"', /P 자료 나눔 조건/.test(await page.getByTestId('thr-week-hint').innerText()) && /이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-P').innerText()) && !/이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-A').innerText()))
