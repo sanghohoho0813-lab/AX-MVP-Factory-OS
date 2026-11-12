@@ -1119,6 +1119,10 @@ try {
   check('대표 → 팀장 화면: 메뉴가 팀장과 같다(영업자 정산 · 상담신청 · 이 시스템 없음)', !pnav.includes('영업자 정산') && !pnav.includes('상담신청') && !pnav.includes('이 시스템'), pnav.replace(/\n/g, '|').slice(0, 300))
   check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
   check('P7 대표 → 팀장 화면(D-195): 마케팅 · 브랜딩 메뉴 없음', !pnav.includes('마케팅'), pnav.replace(/\n/g, '|').slice(0, 300))
+  {
+    const note = (await page.getByTestId('viewing-pilot-note').innerText().catch(() => '')) ?? ''
+    check('D-601 대표 → 팀장 화면 띠: 마케팅 · 브랜딩이 여기서는 안 보이는 까닭 · 팀장이 직접 로그인하면 보임 한 줄', note.includes('마케팅 · 브랜딩') && note.includes('직접 로그인'), note)
+  }
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
   check('AI 대표 → 팀장 화면: AI 전략실 메뉴 없음', !pnav.includes('AI 전략실'), pnav.replace(/\n/g, '|').slice(0, 300))

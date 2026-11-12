@@ -127,7 +127,11 @@ export function ViewingPilotBanner() {
       <UsersRound aria-hidden="true" className="size-4 shrink-0" />
       <p className="t-sub min-w-0 flex-1 break-keep">
         <b>{who}</b> 화면 보는 중
-        <span className="hidden sm:inline"> — 팀장님 작업공간의 자료입니다(업무 일기는 사람마다 따로라 보이지 않습니다).</span>
+        {/* D-601 마케팅 · 브랜딩도 여기서는 안 보인다(D-564 — 이 보기는 대표 로그인이라 대표 마케팅 자료가 섞이지 않게) → 띠에서 미리 알린다 */}
+        <span className="hidden sm:inline" data-testid="viewing-pilot-note">
+          {' '}
+          — 팀장님 작업공간의 자료입니다. 업무 일기와 마케팅 · 브랜딩은 사람마다 따로라 여기서는 보이지 않습니다(팀장님이 직접 로그인하면 보여요).
+        </span>
       </p>
       <button type="button" onClick={() => t.go(t.own?.workspaceId)} data-testid="viewing-pilot-back" className="tap t-sub shrink-0 rounded-(--radius-control) bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-navy-900 hover:bg-slate-100">
         {brand.ownerTitle}로
