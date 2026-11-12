@@ -30,7 +30,7 @@ import { BackToCloseGuard } from '../../lib/backToClose'
 import { useScrollMemory } from '../../lib/scrollMemory'
 import { EntitlementsProvider } from '../../lib/entitlementsContext'
 import { ModuleBoundary } from '../modules/ModuleBoundary'
-import { useIsPilot } from '../../auth/osAccess'
+import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
 import { isCapabilityHiddenPath, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { useCapabilitySet } from '../../auth/ownerAiAccess'
 import { NotFoundState } from '../ui/NotFoundState'
@@ -105,16 +105,23 @@ export function AppShell() {
   const brandWorkspace = auth?.currentWorkspaceId ?? null
   // SAAS-2 마케팅 화면이 누구 이름으로 쓰는지(팀장 · 구독 고객 = 그 사람 브랜드) — 화면을 그리기 전에 정한다
   const access = auth?.access ?? null
-  setMarketingCustomer(access === 'pilot')
-  // D-564 마케팅 화면(메뉴 · 주소)은 팀장 등급 계정이면 연다 — 그리기 전에 값을 맞춘다(대표가 팀장 화면으로 볼 때는 access 가 full 이라 닫힌 채)
-  primePilotMarketingScreens(access === 'pilot')
+  // D-601 대표가 팀장 화면으로 볼 때도 마케팅 · 브랜딩을 연다(대표 2026-11-12 "내 아이디에서 왔다갔다 해도 보이게").
+  //   - 보이는 것은 팀장 작업공간의 마케팅(클라우드 자료가 작업공간별) · 팀장 브랜드 이름(고객 쪽 말투) — 대표 채널 · AX 기본값은 안 섞인다.
+  //   - 화면들은 이 보기에서 읽기만(readOnly = useViewingPilot) · AI 단추 없음(아래 setPilotMarketing('closed') · useMarketingAiOn) — 대표 자료가 팀장 작업공간으로 올라가지 않는다.
+  const viewingPilot = useViewingPilot() !== null
+  const marketingAsPilot = access === 'pilot' || viewingPilot
+  setMarketingCustomer(marketingAsPilot)
+  // D-564 마케팅 화면(메뉴 · 주소)은 팀장 등급 계정이면 연다 — 그리기 전에 값을 맞춘다(D-601 대표가 팀장 화면으로 볼 때도)
+  primePilotMarketingScreens(marketingAsPilot)
   usePilotMarketingScreens()
   // SAAS-2 마케팅을 고객에게 열지는 서버가 정한다(사용량 장부가 준비된 계정만) — 메뉴가 이 값을 따라 다시 그려진다
   usePilotMarketing()
   // D-562 외부 구독 고객 여부 — 메뉴(전문 모듈 묶음)가 이 값을 따라 다시 그려진다
   useCustomerAudience()
   useEffect(() => {
-    setPilotMarketingScreens(access === 'pilot')
+    setPilotMarketingScreens(marketingAsPilot)
+  }, [marketingAsPilot])
+  useEffect(() => {
     if (access !== 'pilot') {
       setPilotMarketing('closed')
       return

@@ -1118,10 +1118,11 @@ try {
   const pnav = (await page.locator('aside').first().innerText()) ?? ''
   check('대표 → 팀장 화면: 메뉴가 팀장과 같다(영업자 정산 · 상담신청 · 이 시스템 없음)', !pnav.includes('영업자 정산') && !pnav.includes('상담신청') && !pnav.includes('이 시스템'), pnav.replace(/\n/g, '|').slice(0, 300))
   check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
-  check('P7 대표 → 팀장 화면(D-195): 마케팅 · 브랜딩 메뉴 없음', !pnav.includes('마케팅'), pnav.replace(/\n/g, '|').slice(0, 300))
+  // D-601 대표(2026-11-12): "내 아이디에서 왔다갔다 해도 보이게" — 팀장 화면 보기에서도 마케팅 · 브랜딩 메뉴(예전 D-195 P7 은 '없음')
+  check('P7 대표 → 팀장 화면(D-601): 마케팅 · 브랜딩 메뉴 있음', (await page.locator('aside a[href="/marketing"]').count()) >= 1, pnav.replace(/\n/g, '|').slice(0, 300))
   {
     const note = (await page.getByTestId('viewing-pilot-note').innerText().catch(() => '')) ?? ''
-    check('D-601 대표 → 팀장 화면 띠: 마케팅 · 브랜딩이 여기서는 안 보이는 까닭 · 팀장이 직접 로그인하면 보임 한 줄', note.includes('마케팅 · 브랜딩') && note.includes('직접 로그인'), note)
+    check('D-601 대표 → 팀장 화면 띠: 마케팅은 보기만 된다는 한 줄', note.includes('마케팅') && note.includes('보기만'), note)
   }
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
@@ -1142,10 +1143,24 @@ try {
   check('D-247 대표 → 팀장 화면: 특허 · 벤처 메뉴 없음', !pnav.includes('특허 · 벤처'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ai')
   check('AI 대표 → 팀장 화면: /ai 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다') && (await page.getByTestId('case-workspace').count()) === 0)
-  for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']) {
-    await go(page, p)
-    const t = await bodyText(page)
-    check(`P8 대표 → 팀장 화면(D-195): ${p} 막힘 · 대표 콘텐츠 기록 0`, t.includes('화면을 찾지 못했습니다') && (await page.getByTestId('yt-page').count()) === 0 && leaked(t).length === 0, t.slice(0, 120))
+  {
+    // D-601 팀장 화면 보기에서 마케팅 화면 — 열림 · 팀장 작업공간 것만(대표 콘텐츠 기록 · 대표 이름 · 채널 0) · 읽기만(팀장 작업공간에 새로 쓰는 줄 0)
+    const OWNER_WORDS = /김상호|김팀장|미래AI랩|경영노트|AX Fit|3분 진단/
+    const pilotMk = () => sql(`select count(*) || ':' || coalesce(max(updated_at)::text, '-') from public.module_data where workspace_id = '${PILOT_WS}' and module_key in ('marketing', 'brand')`)
+    const before = pilotMk()
+    for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/threads', '/marketing/shorts', '/marketing/basics']) {
+      await go(page, p)
+      await page.waitForTimeout(600)
+      const t = await bodyText(page)
+      const main = (await page.locator('main').innerText().catch(() => '')) ?? ''
+      const ow = main.match(OWNER_WORDS)?.[0] ?? ''
+      check(`P8 대표 → 팀장 화면(D-601): ${p} 열림 · 대표 콘텐츠 기록 · 대표 이름/채널 0`, !t.includes('화면을 찾지 못했습니다') && leaked(t).length === 0 && !ow, `${ow} ${leaked(t).join()} ${t.slice(0, 120)}`)
+      if (p === '/marketing/threads' || p === '/marketing/shorts') check(`P8 대표 → 팀장 화면(D-601): ${p} 저장 안 함 안내`, main.includes('팀장 화면을 보는 중에는 저장하지 않습니다'), main.slice(0, 160))
+    }
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/owner-as-pilot-marketing.png` })
+    await go(page, '/marketing/threads')
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/owner-as-pilot-threads.png` })
+    check('P8 대표 → 팀장 화면(D-601): 마케팅 화면을 다 돌아도 팀장 작업공간 마케팅 기록 그대로(쓰기 0)', pilotMk() === before, `${before} → ${pilotMk()}`)
   }
   await go(page, '/settings')
   check('대표 → 팀장 화면: 설정 이름 칸 대신 안내(여기서 저장하면 대표 이름이 바뀌므로)', (await page.getByTestId('name-editor-viewing').count()) === 1 && (await page.getByTestId('name-input').count()) === 0)
