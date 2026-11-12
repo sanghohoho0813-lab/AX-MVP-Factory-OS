@@ -81,6 +81,8 @@ function collect(max) {
     if (out.length >= max) break
     if (el.closest('[data-hover-skip], .print-only, [aria-hidden="true"]')) continue
     if (el.matches('input[type="checkbox"], input[type="radio"]') && el.closest('label')) continue // 감싼 label 로 잰다
+    // D-602 접힌 <details> 안(summary 밖)은 화면에 없다 — 크롬은 그래도 크기를 돌려준다(내용 숨김) · 누를 수 없으니 재지 않는다
+    { const d = el.closest('details'); if (d && !d.open && !el.closest('summary')) continue }
     const r = el.getBoundingClientRect()
     if (r.width < 6 || r.height < 6) continue
     if (r.width * r.height > vw * vh * 0.6) continue // 뒤판(바깥 누르면 닫힘) 같은 것
