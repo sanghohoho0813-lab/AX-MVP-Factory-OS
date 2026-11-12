@@ -109,11 +109,23 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 - 무엇: 표 하나(`support_messages`) · 정책 하나 · 함수 여섯. **기존 표 · 열 · 정책 · 자료는 건드리지 않는다.** 선행은 0019(0024 가 없어도 돈다).
 - 왜 지금: 외부 고객 계정을 열면(0024 뒤) 고객 화면의 오류 · 문의가 대표에게 닿을 길이 이것뿐이다. 없으면 앱은 문의 단추를 숨기고 예전처럼 돈다.
 - (D-599) 운영 profiles 모양(display_name 없음)에서 멈추던 것을 고쳤다 — 2026-11-11 이전에 받은 0025 파일로 실패했다면 지금 파일로 다시 실행한다(그때 바뀐 것은 없다).
+- (D-600) **운영 적용 완료 2026-11-12** — 고친 파일로 다시 실행 → 확인 결과 '들어감'.
 - 실행: `supabase/migrations/20261110000025_support_messages.sql` 을 **통째로** 붙여 실행 → 마지막 결과 한 줄이
   `table_count 1 · policy_count 1 · function_count 6 · authenticated_grants SELECT` 이면 끝. 여러 번 실행해도 같다.
 - 확인: `supabase/manual/check_applied_0016_0024.sql` 의 25번 줄이 '들어감'. 대표 계정으로 로그인 → 설정 › 받은 피드백함에 탭 [문의 · 오류] 가 보인다.
 - 되돌리기(필요할 때만): 함수 여섯 개의 실행 권한을 거두면 앱은 단추를 숨긴다 — 표는 남겨도 무해(지우지 않는다).
 - 로컬 시험: `npm run qa:db`(test-0025-support.sql 51줄) · `npm run qa:pilot`(고객 → 대표 받은함 → 답장 → 고객 화면 · 고객/팀장 토큰 공격).
+
+## 9. AI 사용량 비밀값 넣은 뒤 — 팀장 마케팅 AI 권한(D-600)
+
+- 0022 를 처음 넣을 때 그때 있던 팀장(pilot) 계정에 `ai_entitlements` 줄이 **마케팅 꺼짐**(`marketing = false`)으로 만들어진다.
+  비밀값(`ai_usage_config`)이 없는 동안에는 이 값을 보지 않지만, 비밀값을 넣으면 서버가 이 값을 보고 **팀장 마케팅 AI 단추를 닫는다.**
+- 그래서 비밀값을 넣은 뒤 한 번 확인한다(읽기만): `select kind, marketing from public.ai_entitlements;` → internal 이 false 이면
+  `update public.ai_entitlements set marketing = true, updated_at = now() where kind = 'internal' returning kind, marketing;`(D-564 — 팀장에게도 마케팅 AI).
+  `supabase/manual/pilot_provision.sql` 로 새로 연 팀장 계정은 처음부터 켜짐이다.
+- 운영(2026-11-12): 비밀값 들어감(09:58) · internal 이 꺼짐이었음 → 대표가 위 update 실행 → true.
+- Vercel `AI_USAGE_SECRET` 이 DB 의 해시와 맞는지는 SQL 로 볼 수 없다 — 팀장 계정으로 마케팅 AI 단추를 한 번 눌러 글이 나오면 맞다.
+  '이 AI 기능은 사용량 관리가 준비되면 열립니다' 가 뜨면 값이 다르다(Production 체크 · 앞뒤 빈칸 · 값을 넣은 뒤 Redeploy).
 
 ## 7. 파일
 
