@@ -115,7 +115,8 @@ await seedWeek(page)
 /* ---------------- Q 스레드 ---------------- */
 await page.goto(BASE + '/marketing/threads', { waitUntil: 'networkidle' })
 await page.getByTestId('thr-qs').waitFor({ timeout: 15000 })
-const weekChips = await page.locator('[data-testid="thr-qs-week"] [data-testid="thr-qs-chip"]').allInnerTexts()
+// D-602 이번 주 키워드는 접힌 줄 안 — 보이지 않아도 글자는 읽는다(textContent)
+const weekChips = (await page.locator('[data-testid="thr-qs-week"] [data-testid="thr-qs-chip"]').allTextContents()).map((t) => t.trim())
 check('Q1 첫 화면 — 맨 위 "무엇에 대해 쓸까요?" · 이번 주 키워드 칩 3개(레이더 · D-602 처음엔 접힌 한 줄) · 우리 분야 칩 · 주제 없으면 [AI로 바로 쓰기] 잠김', /무엇에 대해 쓸까요/.test(await page.getByTestId('thr-qs').innerText()) && (await page.getByTestId('thr-qs-week').getAttribute('open')) === null && weekChips.join('|') === WEEK.join('|') && (await page.locator('[data-testid="thr-qs-ours"] [data-testid="thr-qs-chip"]').count()) >= 3 && (await page.getByTestId('thr-qs-ai').isDisabled()), weekChips)
 const primAbove = (p, pre) =>
   p.evaluate((pr) => {
@@ -204,7 +205,8 @@ await page.getByTestId('sht-qs-platform-reels').click()
 await page.waitForTimeout(150)
 check('S4 릴스로 바꾸면 추천도 릴스 형식으로(금지형 · 자료 없는 주제라 댓글형 아님)', /금지형/.test(await page.getByTestId('sht-qs-rec-label').innerText()) && !/댓글형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
 await page.getByTestId('sht-qs-topic').fill('벤처기업확인 셀프 체크리스트')
-await page.locator('[data-testid="sht-qs-ours"] [data-testid="sht-qs-chip"]').first().click()
+// D-602 우리 분야 주제 = 영업 관리 › 전략 키워드 — 그 가운데 '벤처' 칩(나눠 줄 점검표가 있는 주제)
+await page.locator('[data-testid="sht-qs-ours"] [data-testid="sht-qs-chip"]', { hasText: '벤처' }).first().click()
 await page.waitForTimeout(150)
 check('S5 나눠 줄 점검표가 있는 주제(벤처) + 릴스 → 댓글 받기 · 댓글형 글자 영상', /댓글 받기 · 댓글형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
 
