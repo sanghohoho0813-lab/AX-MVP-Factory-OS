@@ -189,7 +189,7 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
       </MkHero>
       <div className="flex flex-col gap-4 p-4 sm:p-5">
         {/* D-507 60대+ — 할 일(업종 고르고 [초안 만들기])이 맨 위 · 들어갈 내용 9가지는 그 아래(예전에는 9칸 아래 맨 끝이라 휴대폰에서 두 화면 내려야 보였다) */}
-        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
             <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
             <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
@@ -206,9 +206,9 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
           </button>
         </div>
         <p className="t-body break-keep text-slate-600" data-testid="site-start-note"><b className="font-semibold text-slate-900">이 내용이 들어가요</b> — 있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).</p>
-        <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="site-start-facts">
+        <dl className="grid grid-cols-1 gap-x-6 border-t border-slate-100 sm:grid-cols-2" data-testid="site-start-facts">
           {rows.map(([k, v]) => (
-            <div key={k} className={`flex min-h-12 min-w-0 items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${v ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-white'}`}>
+            <div key={k} className="flex min-h-12 min-w-0 items-start gap-2.5 border-b border-slate-100 py-2">
               {v ? (
                 <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-success-600 text-white" aria-label="있음">
                   <Check className="size-4" aria-hidden="true" />
@@ -225,9 +225,9 @@ function StartCard({ record, promo, onStart }: { record: ClientOpsRecord; promo?
             </div>
           ))}
         </dl>
-        {!f.phone && !promo?.phone && f.contactPhone && <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-danger-700">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
+        {!f.phone && !promo?.phone && f.contactPhone && <p className="t-sub break-keep text-danger-700">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
         {fromPromo.length > 0 && (
-          <p className="t-sub break-keep rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-slate-700" data-testid="site-start-promo">
+          <p className="t-sub break-keep text-slate-700" data-testid="site-start-promo">
             블로그 · 플레이스 홍보 글 만들기에 적어 둔 {fromPromo.join(' · ')}도 비어 있는 칸에 넣어요.
           </p>
         )}
@@ -490,7 +490,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <b className="font-semibold text-slate-900">블록</b>은 홈페이지의 한 칸이에요(맨 위 소개 · 하는 일 · 연락처 …). 칸 이름을 누르면 글을 고칠 수 있어요.
       </p>
       {suggestions.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="site-suggest">
+        <div className="flex flex-col gap-2 border-y border-slate-100 py-2" data-testid="site-suggest">
           <button type="button" onClick={() => setSuggestOpen(!suggestOpen)} aria-expanded={suggestOpen} className="tap -m-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) p-1 text-left" data-testid="site-suggest-toggle">
             <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform duration-150 ${suggestOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
             <Sparkles className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
@@ -513,13 +513,15 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
           ))}
         </div>
       )}
+      {/* D-607 블록마다 테두리 칸 → 가로선으로 나눈 줄(연 블록은 파란 고리) */}
+      <div className="flex flex-col divide-y divide-slate-100 border-y border-slate-100" data-testid="site-block-list">
       {doc.blocks.map((b, i) => {
         const def = blockDef(b.type)
         const open = selected === b.id
         const pinned = b.type === 'header' || b.type === 'footer'
         return (
-          <div key={b.id} data-block-row={b.id} data-type={b.type} className={`rounded-(--radius-control) border bg-white ${open ? 'border-brand-500 shadow-md ring-1 ring-brand-200' : `border-slate-200 ${TONE[BLOCK_STYLE[b.type].tone].hover}`}`}>
-            <button type="button" className="tap flex w-full min-h-14 items-center gap-3 px-3 py-2 text-left" onClick={() => setSelected(open ? null : b.id)} aria-expanded={open} data-testid="block-row">
+          <div key={b.id} data-block-row={b.id} data-type={b.type} className={open ? 'my-1.5 rounded-(--radius-control) ring-2 ring-brand-300' : ''}>
+            <button type="button" className="tap flex w-full min-h-14 items-center gap-3 rounded-(--radius-control) px-2 py-2 text-left hover:bg-slate-50" onClick={() => setSelected(open ? null : b.id)} aria-expanded={open} data-testid="block-row">
               <span className="relative shrink-0">
                 <MkIcon icon={BLOCK_STYLE[b.type].icon} tone={BLOCK_STYLE[b.type].tone} />
                 <span className="absolute -top-1.5 -left-1.5 flex size-5 items-center justify-center rounded-full bg-white text-[0.6875rem] font-bold text-slate-600 tabular-nums shadow ring-1 ring-slate-200" aria-hidden="true">
@@ -540,7 +542,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             {open && def && (
               <div className="flex flex-col gap-4 border-t border-slate-100 p-3" data-testid="block-editor">
                 {b.sample?.length ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="t-sub min-w-0 flex-1 break-keep text-danger-700">견본 문구가 들어 있어요. 업체와 맞는지 확인하고 고쳐 주세요.</p>
                     <Button size="sm" onClick={() => change(confirmSample(doc, b.id, nowIso()))} data-testid="sample-confirm">
                       업체와 확인했어요
@@ -584,6 +586,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
           </div>
         )
       })}
+      </div>
       <button
         type="button"
         onClick={() => setAdding(true)}
@@ -718,10 +721,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   /* ---- 점검 ---- */
   const checksTab = (
-    <div className="flex flex-col gap-2" data-testid="site-checks">
-      {checks.length === 0 && <p className="t-body text-success-700">점검할 것이 없어요. 내려받아도 됩니다.</p>}
+    <div className="flex flex-col divide-y divide-slate-100 border-y border-slate-100" data-testid="site-checks">
+      {checks.length === 0 && <p className="t-body py-3 text-success-700">점검할 것이 없어요. 내려받아도 됩니다.</p>}
       {checks.map((c) => (
-        <div key={c.key} className="flex flex-wrap items-start gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3" data-testid="site-check" data-level={c.level} data-key={c.key}>
+        <div key={c.key} className="flex flex-wrap items-start gap-2 py-3" data-testid="site-check" data-level={c.level} data-key={c.key}>
           <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${c.level === 'must' ? 'bg-danger-600 text-white' : c.level === 'should' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'}`}>
             {c.level === 'must' ? '꼭' : c.level === 'should' ? '확인' : '참고'}
           </span>
@@ -762,7 +765,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <ArrowRight className="size-4" aria-hidden="true" />
       </button>
     ) : (
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-3 shadow-(--shadow-card)" data-testid="site-finish">
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3" data-testid="site-finish">
         <p className={`t-sub break-keep ${must ? 'text-danger-700' : 'text-slate-800'}`}>
           <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 파일(HTML) 하나가 홈페이지 전체예요.
         </p>
@@ -791,11 +794,11 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   const editor = (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-stretch gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1" role="tablist" aria-label="홈페이지 만들기 단계" data-testid="site-steps" data-current={tab}>
+      <div className="flex items-stretch gap-1 rounded-(--radius-control) bg-slate-100 p-1" role="tablist" aria-label="홈페이지 만들기 단계" data-testid="site-steps" data-current={tab}>
         {tabs.map((t, i) => {
           const on = tab === t.key
           return (
-            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => goTab(t.key)} className={`tap flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) px-1 py-1.5 text-center ${on ? 'bg-brand-50 text-brand-800 ring-1 ring-brand-200' : 'text-slate-700 hover:bg-slate-50'}`} data-testid={`site-tab-${t.key}`} data-step={i + 1}>
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => goTab(t.key)} className={`tap flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) px-1 py-1.5 text-center ${on ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-700 hover:bg-white/60'}`} data-testid={`site-tab-${t.key}`} data-step={i + 1}>
               {/* 휴대폰은 칸이 좁아 번호를 아랫줄로 — '내용 고치기' 가 두 줄로 꺾이지 않게 */}
               <span className="t-sub flex items-center gap-1 font-bold break-keep">
                 <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs tabular-nums max-sm:hidden ${on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{i + 1}</span>
@@ -845,8 +848,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   return (
     <div className="flex flex-col gap-4" data-testid="site-builder">
+      {/* D-607 따로 떨어진 상자(머리 띠 · 점수 · 업종 경고 · 단계 판) → 큰 판 하나(site-box) + 얇은 가로선. AI 도우미 띠는 판 아래(보라 = AI 만) */}
+      <div className="flex min-w-0 flex-col rounded-(--radius-panel) border border-slate-200 bg-white [&>*+*]:border-t [&>*+*]:border-slate-100" data-testid="site-box">
       {/* D-226 머리 띠 — 누구 홈페이지 · 어떤 견본 · 블록 · 점수가 한눈에, 아래에 도구줄 */}
-      <section className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-t-(--radius-panel)">
         <MkHero
           tone="emerald"
           icon={Globe}
@@ -861,16 +866,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         />
         <div className="p-3 sm:p-4">{toolbar}</div>
       </section>
-      <AiAssist
-        page="site"
-        scope={`site:${record.id}`}
-        title={`홈페이지 · ${record.companyName}`}
-        presets={['site.copy', 'site.faq', 'site.seo']}
-        build={() => siteAssistBundle({ record, doc: docRef.current ?? doc, today, promo })}
-        itemActions={assistActions}
-      />
       {mismatch && (
-        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
+        <div className="flex flex-wrap items-center gap-3 p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
           <AlertTriangle className="size-5 shrink-0 text-danger-600" aria-hidden="true" />
           <p className="t-body min-w-0 flex-1 break-keep text-danger-700">
             업체 기록으로 보면 <b>{industryDef(detected).label}</b> 업종이에요. 지금은 {industryDef(doc.industry).label} 견본이라 첫 화면 문구가 안 맞을 수 있어요.
@@ -881,7 +878,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         </div>
       )}
       {score && (
-        <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-3 shadow-(--shadow-card) sm:flex-row sm:items-center sm:gap-4 sm:p-4" data-testid="site-score" data-score={score.score}>
+        <section className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4" data-testid="site-score" data-score={score.score}>
           <div className="flex shrink-0 items-center gap-3">
             {/* D-226 점수만큼 차오르는 고리 */}
             <span
@@ -926,7 +923,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         </section>
       )}
       {phone ? (
-        <>
+        <div className="flex min-w-0 flex-col gap-3 p-3">
           <div className="flex gap-1 rounded-(--radius-control) bg-slate-100 p-1">
             {(['edit', 'preview'] as const).map((p) => (
               <button key={p} type="button" aria-pressed={pane === p} onClick={() => setPane(p)} className={`tap t-sub min-h-11 flex-1 rounded-(--radius-control) font-semibold ${pane === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} data-testid={`pane-${p}`}>
@@ -935,13 +932,22 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             ))}
           </div>
           {pane === 'edit' ? editor : preview}
-        </>
+        </div>
       ) : (
-        <div className={`grid items-start gap-4 ${big ? '' : 'lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]'}`} data-big={big}>
+        <div className={`grid items-start gap-4 p-3 sm:p-4 ${big ? '' : 'lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]'}`} data-big={big}>
           {!big && editor}
           {preview}
         </div>
       )}
+      </div>
+      <AiAssist
+        page="site"
+        scope={`site:${record.id}`}
+        title={`홈페이지 · ${record.companyName}`}
+        presets={['site.copy', 'site.faq', 'site.seo']}
+        build={() => siteAssistBundle({ record, doc: docRef.current ?? doc, today, promo })}
+        itemActions={assistActions}
+      />
 
       {adding && (
         <BottomSheet title="블록 더하기" onClose={() => setAdding(false)}>

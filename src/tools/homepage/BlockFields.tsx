@@ -259,7 +259,7 @@ function ListField({
         </span>
       </div>
       {items.map((it, i) => (
-        <div key={i} className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="list-item">
+        <div key={i} className="flex flex-col gap-2 border-t border-slate-100 pt-3" data-testid="list-item">
           {(field.itemFields ?? []).map((sub) => {
             // 목록 안 사진(사진 모음 · 로고) — D-207
             if (sub.kind === 'image')

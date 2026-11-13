@@ -143,6 +143,19 @@ const errors = []
   check('3b 첫 화면 = 글 + 업종 그림 나란히 · 마지막 줄 강조 · 칩(설립 · 소재지 · 직원)', look.split === 1 && look.art === 1 && look.hl.length > 0 && look.chips.length === 3 && look.chips[0].startsWith('설립'), look)
   check('3b 사업 = 아이콘 카드(카드마다 아이콘) · 숫자 = 색 띠 · 구역 머리글 · 로고 글자', look.cards >= 2 && look.icw === look.cards && look.numband === 1 && look.kicker.includes('ABOUT') && look.kicker.includes('BUSINESS') && look.mark === '한', look)
   check('3 저장됨', await waitSaved(page))
+  // D-607 큰 판 하나 + 가로선 — 판 안에 네 변 테두리 상자(단추 · 입력 칸 · 미리보기 틀 빼고)가 다시 생기지 않게 · AI 도우미 띠는 판 밖
+  const innerBoxes = await page.getByTestId('site-box').evaluate((box) =>
+    [...box.querySelectorAll('*')]
+      .filter((e) => {
+        if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A', 'LABEL', 'IFRAME'].includes(e.tagName) || e.closest('button, a, [data-testid="site-preview"]')) return false
+        const r = e.getBoundingClientRect()
+        if (r.height <= 20 || r.width <= 120) return false
+        const s = getComputedStyle(e)
+        return s.borderStyle !== 'none' && ['Top', 'Right', 'Bottom', 'Left'].every((k) => parseFloat(s[`border${k}Width`]) > 0)
+      })
+      .map((e) => e.getAttribute('data-testid') || e.className.toString().slice(0, 40)),
+  )
+  check('D607-1 큰 판 하나(site-box) 안에 테두리 상자 0 · AI 도우미 띠는 판 밖', innerBoxes.length === 0 && (await page.locator('[data-testid="site-box"] [data-testid="ai-assist-bar"]').count()) === 0, innerBoxes)
   const firstSaved = await savedDoc(page)
   check('3 이 브라우저 모듈 기록(homepage · site)에 업체별 한 줄', firstSaved?.blocks?.length === types.length)
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/site-builder-pc.png`, fullPage: false })
