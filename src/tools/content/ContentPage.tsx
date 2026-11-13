@@ -54,7 +54,7 @@ function ClientPicker() {
   return (
     <>
       {/* D-507 이 화면은 — 무엇을 해 주는 곳인지 한 줄 + 1 → 2 → 3(업체를 고르기 전 첫 화면 · 이 도구는 칸이 '만들기' 하나라 업체 고르기 화면에서 그린다) */}
-      <ScreenGuide id="content" what="네이버 블로그 · 플레이스에 올릴 홍보 글을 업체 기록으로 바로 만들어 줘요." steps={['업체 고르기', '글 종류 고르기', '[복사] 해서 올리기']} />
+      <ScreenGuide plain id="content" what="네이버 블로그 · 플레이스에 올릴 홍보 글을 업체 기록으로 바로 만들어 줘요." steps={['업체 고르기', '글 종류 고르기', '[복사] 해서 올리기']} />
       <SubjectPicker
         buildPath={BUILD}
         made={made}

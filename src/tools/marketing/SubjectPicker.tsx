@@ -167,7 +167,7 @@ export function SubjectPicker({
 
       {/* D-238: 콘텐츠 레이더에서 들고 온 주제가 있으면 먼저 보여 준다 — 업체를 고르면 그 화면까지 같이 간다 */}
       {kw && (
-        <p className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) border px-3 py-2 break-keep [overflow-wrap:anywhere] ${t.line} ${t.soft} ${t.deep}`} data-testid="subject-carry-kw">
+        <p className={`t-sub flex items-start gap-1.5 break-keep [overflow-wrap:anywhere] ${t.deep}`} data-testid="subject-carry-kw">
           <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
           <span className="min-w-0">
             콘텐츠 레이더에서 가져온 주제 <b className="font-bold">‘{kw}’</b> — 아래에서 업체를 고르면 이 주제로 바로 써요.
@@ -176,7 +176,7 @@ export function SubjectPicker({
       )}
 
       {last && !kw && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="subject-resume">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-slate-100 py-2.5" data-testid="subject-resume">
           <History aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
           <span className="min-w-0 flex-1 basis-40">
             <span className="t-meta block font-semibold text-slate-600">지난번 하던 곳</span>
@@ -191,8 +191,8 @@ export function SubjectPicker({
         </div>
       )}
 
-      {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 */}
-      <div className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${t.line} ${t.soft}`} data-testid="trial-start">
+      {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 · D-606 칠한 상자 대신 가로선 아래 한 줄 */}
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3" data-testid="trial-start">
         <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>
           <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
           고객 관리에 없어도 돼요 — 미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.

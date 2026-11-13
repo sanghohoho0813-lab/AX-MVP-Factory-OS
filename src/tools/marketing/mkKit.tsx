@@ -179,8 +179,36 @@ export interface MkPickOption {
 }
 
 /** 여러 길 중 하나 고르기 — 큰 칸(아이콘 · 이름 · 한 줄). 고른 칸만 진한 색 */
-export function MkPick({ options, value, onChange, label, testId, cols = 4 }: { options: MkPickOption[]; value: string; onChange: (key: string) => void; label: string; testId?: string; cols?: 2 | 3 | 4 | 5 }) {
+export function MkPick({ options, value, onChange, label, testId, cols = 4, variant = 'tiles' }: { options: MkPickOption[]; value: string; onChange: (key: string) => void; label: string; testId?: string; cols?: 2 | 3 | 4 | 5; /** D-606 'chips' = 테두리 칸 대신 둥근 알약 한 줄(설명은 마우스를 올리면) — 큰 판 안에서 상자가 늘지 않게 */ variant?: 'tiles' | 'chips' }) {
   const grid = cols === 5 ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : cols === 4 ? 'grid-cols-2 lg:grid-cols-4' : cols === 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'
+  if (variant === 'chips')
+    return (
+      <div role="tablist" aria-label={label} className="flex flex-wrap gap-2" data-testid={testId}>
+        {options.map((o) => {
+          const on = o.key === value
+          const t = TONE[o.tone]
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              title={o.hint}
+              onClick={() => onChange(o.key)}
+              className={`tap inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full border py-1 pr-4 pl-1.5 text-left ${on ? `border-transparent shadow-sm ${t.solid}` : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'}`}
+              data-testid="mk-pick"
+              data-key={o.key}
+            >
+              <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-full ${on ? 'bg-white/20' : t.icon}`}>
+                <o.icon className="size-4" />
+              </span>
+              <span className="t-body font-bold whitespace-nowrap">{o.label}</span>
+              {o.badge !== undefined && o.badge !== null && o.badge !== '' && <span className={`t-meta shrink-0 rounded-full px-1.5 font-bold tabular-nums ${on ? 'bg-white/25' : t.icon}`}>{o.badge}</span>}
+            </button>
+          )
+        })}
+      </div>
+    )
   return (
     <div role="tablist" aria-label={label} className={`grid gap-2 ${grid}`} data-testid={testId}>
       {options.map((o) => {

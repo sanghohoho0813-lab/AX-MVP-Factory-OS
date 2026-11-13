@@ -925,8 +925,22 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await p.getByTestId('content-archive-toggle').click()
   check(`D227-C6 ${T} 띄운 글이 보관함 글이어도 [보관함] 을 누르면 접힘`, (await p.getByTestId('content-archive').getAttribute('data-open')) === '0')
   const pickH = await p.getByTestId('content-mode').getByTestId('mk-pick').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-  const labelW = await p.locator('[data-testid="content-mode"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
-  check(`D227-C7 ${T} 길 칸 44px 이상 · 이름 칸 짜부라짐 0(폭 ≥ 100) · 가로 넘침 0 · 오류 0`, pickH.every((h) => h >= 44) && labelW.every((w) => w >= 100) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { pickH, labelW, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
+  // D-606 큰 칸 4개 → 알약 4개 — 이름이 한 줄(줄바꿈 · 짜부라짐 0)인지로 본다(예전 '폭 ≥ 100' 은 칸 모양 기준)
+  const labelLines = await p.locator('[data-testid="content-mode"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight))))
+  // D-606 큰 판 하나 + 가로선 — 판 안에 네 변 테두리 상자(단추 · 입력 칸 빼고)가 다시 생기지 않게
+  const innerBoxes = await p.getByTestId('content-box').evaluate((box) =>
+    [...box.querySelectorAll('*')]
+      .filter((e) => {
+        if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A', 'LABEL'].includes(e.tagName) || e.closest('button, a')) return false
+        const r = e.getBoundingClientRect()
+        if (r.height <= 20 || r.width <= 120) return false
+        const s = getComputedStyle(e)
+        return s.borderStyle !== 'none' && ['Top', 'Right', 'Bottom', 'Left'].every((k) => parseFloat(s[`border${k}Width`]) > 0)
+      })
+      .map((e) => e.getAttribute('data-testid') || e.className.toString().slice(0, 40)),
+  )
+  check(`D606-1 ${T} 큰 판 하나(content-box) 안에 테두리 상자 0 · AI 도우미 띠는 판 밖`, innerBoxes.length === 0 && (await p.locator('[data-testid="content-box"] [data-testid="ai-assist-bar"]').count()) === 0, innerBoxes)
+  check(`D227-C7 ${T} 길 알약 44px 이상 · 이름 한 줄(짜부라짐 0) · 가로 넘침 0 · 오류 0`, pickH.length === 4 && pickH.every((h) => h >= 44) && labelLines.every((n) => n === 1) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { pickH, labelLines, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
   await ctx.close()
 }
 
