@@ -28,7 +28,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
-import { Badge, MetricTile } from '../../components/ui/primitives'
+import { Badge } from '../../components/ui/primitives'
 import { Fold, HintTip, openFold } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../../components/ui/toastContext'
@@ -842,7 +842,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {/* D-560 '남의 인기 영상' 한 칸 안 — 인기 영상 · 참고 채널 · 올리는 때 · 길이 */}
       {!packKey && !weekOn && !firstScreen && isLookView(view) && <LookTabs view={view} onPick={(k) => setParam({ view: k })} />}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
-      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide plain={view === 'make'} id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
+      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide plain id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
       {/* D-239 마케팅 AI 도우미(탭마다 다른 질문) — MK-SIMPLE(D-553) 띠 대신 위 머리 오른쪽 [AI 도우미] 단추(radarAssist). 이번 주 찍을 것의 질문 판은 [자세히 보기] 안 그대로 */}
 
       {packKey ? (
@@ -1088,9 +1088,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <PeekProvider value={peekEnv}>
           <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
 
+          {/* D-605 대표 "남의 인기 영상 화면도 박스 많아 — 똑같이 정리" — 인기 영상 · 참고 채널 · 올리는 때 · 길이 모두 큰 판 하나 안에(칸 사이는 가는 가로선) */}
+          <div className="flex min-w-0 flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:px-4 sm:py-4" data-testid="look-box" data-view={view}>
           {view === 'top' && (
-            <>
+            <div className="flex min-w-0 flex-col gap-4">
               <HotBanner prepared={prepared} onPick={(k) => setParam({ p: '', kw: k })} />
+              <div className="flex min-w-0 flex-col gap-3 border-t border-slate-100 pt-4">
               <Filters prepared={prepared} period={period} type={type} channel={liveChannel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />
               <TopView
                 prepared={prepared}
@@ -1104,10 +1107,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 onKeyword={(k) => setParam({ kw: k })}
                 onOpen={openVideo}
               />
-            </>
+              </div>
+            </div>
           )}
           {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={savePrefs} notify={showToast} />}
           {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} rv={rvById} onCopy={(t) => copy(t)} />}
+          </div>
         </PeekProvider>
       )}
 
@@ -1206,7 +1211,8 @@ function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword:
       <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {topics.map((t, i) => (
           <li key={t.keyword} className="min-w-0">
-            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400">
+            {/* D-605 테두리 칸 → 테두리 없는 줄(누르면 그 주제 영상만 — 예전 그대로) */}
+            <button type="button" onClick={() => onPick(t.keyword)} data-testid="yt-hot-item" className="tap flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-2 text-left hover:bg-slate-50">
               <span className="t-meta flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">{i + 1}</span>
               <span className="flex min-w-0 flex-col">
                 <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.keyword}</span>
@@ -1417,20 +1423,21 @@ function TopView({
       )}
 
       {board.rows.length === 0 ? (
-        <p className="t-body rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 text-slate-500" data-testid="yt-empty">
+        <p className="t-body py-2 text-slate-500" data-testid="yt-empty">
           {kw ? `${q(kw, '이/가')} 든 영상이 없습니다.` : '이 기간에 올린 영상이 없습니다.'}
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-testid="yt-summary">
-            <MetricTile label="조회수 1위" value={`${shortNum(top.views)}회`} hint={top.channelName} hintOnMobile />
-            <MetricTile label="평균 조회수" value={`${shortNum(board.shownAvg)}회`} hint={`영상 ${board.rows.length}편`} hintOnMobile />
+          {/* D-605 숫자 칸 셋(테두리 칸) → 가는 선 사이 한 줄 숫자(같은 숫자 · 같은 말) */}
+          <dl className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-slate-100 py-2.5" data-testid="yt-summary">
+            <SumStat label="조회수 1위" value={`${shortNum(top.views)}회`} hint={top.channelName} />
+            <SumStat label="평균 조회수" value={`${shortNum(board.shownAvg)}회`} hint={`영상 ${board.rows.length}편`} />
             {board.myBestRank > 0 ? (
-              <MetricTile label="내 채널 최고 순위" value={`${board.myBestRank}위`} tone="warning" hint={`${shortNum(board.rows[board.myBestRank - 1].views)}회`} hintOnMobile />
+              <SumStat label="내 채널 최고 순위" value={`${board.myBestRank}위`} warn hint={`${shortNum(board.rows[board.myBestRank - 1].views)}회`} />
             ) : (
-              <MetricTile label="조회수 2위" value={second ? `${shortNum(second.views)}회` : '—'} hint={second?.channelName} hintOnMobile />
+              <SumStat label="조회수 2위" value={second ? `${shortNum(second.views)}회` : '—'} hint={second?.channelName} />
             )}
-          </div>
+          </dl>
           <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
             {rows.map((v, i) => (
               <VideoCard key={v.id} v={v} r={rv.get(v.id)} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} onOpen={onOpen} />
@@ -1447,13 +1454,25 @@ function TopView({
   )
 }
 
+/** D-605 인기 영상 위 숫자 한 줄의 한 칸 — 이름 · 숫자 · (보조) */
+function SumStat({ label, value, hint, warn = false }: { label: string; value: string; hint?: string; warn?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+      <dt className="t-sub text-slate-600">{label}</dt>
+      <dd className={`t-body font-extrabold tabular-nums ${warn ? 'text-warning-700' : 'text-slate-900'}`}>{value}</dd>
+      {hint && <dd className="t-meta min-w-0 break-keep text-slate-500">{hint}</dd>}
+    </div>
+  )
+}
+
 function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: RadarVideo | undefined; rank: number; rising: boolean; noThumb: boolean; onOpen: (v: YtVideo) => void }) {
   const [broken, setBroken] = useState(false)
   const medal = rank === 1 ? 'bg-amber-400 text-amber-950' : rank === 2 ? 'bg-slate-300 text-slate-900' : rank === 3 ? 'bg-orange-300 text-orange-950' : 'bg-slate-900/80 text-white'
   return (
-    <li className={`flex min-w-0 flex-row overflow-hidden rounded-(--radius-card) border bg-white sm:flex-col ${v.mine ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'}`} data-testid="yt-card" data-mine={v.mine ? '1' : '0'} data-rising={rising ? '1' : '0'} data-tier={r?.tier ?? 'unknown'}>
+    // D-605 카드 테두리 → 테두리 없이(그림 + 글 · 휴대폰은 가는 선으로 나눈 줄) — '내 채널' 은 그림 위 노란 칩 그대로
+    <li className="flex min-w-0 flex-row gap-2.5 max-sm:border-b max-sm:border-slate-100 max-sm:pb-2.5 sm:flex-col sm:gap-1" data-testid="yt-card" data-mine={v.mine ? '1' : '0'} data-rising={rising ? '1' : '0'} data-tier={r?.tier ?? 'unknown'}>
       {/* 휴대폰은 한 줄 목록(썸네일 왼쪽) — PC 카드 여러 칸을 작게 줄이지 않는다(D-194) */}
-      <button type="button" onClick={() => onOpen(v)} className="relative block aspect-video w-36 shrink-0 self-start bg-slate-100 sm:w-full" aria-label={`${v.title} — 자세히 보기`} data-testid="yt-card-thumb">
+      <button type="button" onClick={() => onOpen(v)} className="relative block aspect-video w-36 shrink-0 self-start overflow-hidden rounded-lg bg-slate-100 sm:w-full" aria-label={`${v.title} — 자세히 보기`} data-testid="yt-card-thumb">
         {noThumb || broken ? (
           <span className="flex size-full items-center justify-center text-slate-300">
             <PlayCircle aria-hidden="true" className="size-10" />
@@ -1476,7 +1495,7 @@ function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: Rad
         </span>
         <span className="t-meta absolute right-1.5 bottom-1.5 rounded bg-slate-900/80 px-1.5 font-semibold text-white">{v.isShort ? '쇼츠' : '긴 영상'}</span>
       </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 sm:px-0.5 sm:pb-2">
         <p className="t-meta truncate text-slate-500">{v.channelName}</p>
         {/* D-507 휴대폰에서 제목도 손가락 하나(44px) — 25px 줄을 정확히 누르기 어려웠다 */}
         <button type="button" onClick={() => onOpen(v)} className="tap t-sub line-clamp-2 text-left font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
@@ -1524,9 +1543,10 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
   // D-507 표보다 결론 먼저 — 60대도 한 줄만 읽고 '언제 · 얼마나 길게' 를 정하게
   const answer = analysisAnswer(wd, hr, ln)
   return (
-    <div className="flex flex-col gap-3" data-testid="yt-analysis">
+    // D-605 판 아홉 개 → 한 판 안 줄(한 줄 결론 → 접힌 칸들, 사이는 가는 가로선)
+    <div className="flex flex-col [&>*+*]:border-t [&>*+*]:border-slate-100 [&>*]:py-1.5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0" data-testid="yt-analysis">
       {answer && (
-        <section className="flex flex-col gap-1 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="yt-analysis-answer" aria-label="한 줄로">
+        <section className="flex flex-col gap-1 pb-3" data-testid="yt-analysis-answer" aria-label="한 줄로">
           <p className="t-meta font-semibold text-slate-600">한 줄로 — 참고 채널에서 요즘 잘된 때 · 길이</p>
           <p className="t-body font-bold break-keep text-slate-900">{answer}</p>
           <p className="t-sub break-keep text-slate-700">우리 영상도 이때 · 이 길이로 올려 보세요. 자세한 숫자는 아래 칸을 누르면 보여요.</p>
@@ -1534,7 +1554,7 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
       )}
       <MyChannelCard s={mine} />
       {cmp.length > 0 && (
-        <Fold panel id="yt.compare" title="내 채널 vs 참고 채널 평균" defaultOpen testId="yt-compare">
+        <Fold id="yt.compare" title="내 채널 vs 참고 채널 평균" defaultOpen testId="yt-compare">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
             <span className="t-meta text-slate-400" />
             <span className="t-meta text-right font-semibold text-amber-700">내 채널</span>
@@ -1546,16 +1566,16 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
         </Fold>
       )}
       <HotPatternsCard stats={pats} />
-      <Fold panel id="yt.weekday" title="잘 되는 요일" summary={best(bestOf(wd))} testId="yt-weekday">
+      <Fold id="yt.weekday" title="잘 되는 요일" summary={best(bestOf(wd))} testId="yt-weekday">
         <StatList stats={wd} />
       </Fold>
-      <Fold panel id="yt.hour" title="잘 되는 시간대" summary={best(bestOf(hr))} testId="yt-hour">
+      <Fold id="yt.hour" title="잘 되는 시간대" summary={best(bestOf(hr))} testId="yt-hour">
         {hr.length ? <StatList stats={hr} /> : <p className="t-sub text-slate-500">같은 시간대에 올린 영상이 2편 넘는 곳이 아직 없습니다.</p>}
       </Fold>
-      <Fold panel id="yt.length" title="영상 길이별" summary={best(bestOf(ln))} testId="yt-length">
+      <Fold id="yt.length" title="영상 길이별" summary={best(bestOf(ln))} testId="yt-length">
         <StatList stats={ln} />
       </Fold>
-      <Fold panel id="yt.format" title="긴 영상 vs 쇼츠" testId="yt-format">
+      <Fold id="yt.format" title="긴 영상 vs 쇼츠" testId="yt-format">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
           <span className="t-meta text-slate-400">채널</span>
           <span className="t-meta text-right font-semibold text-slate-500">긴 영상 평균(편)</span>
@@ -1565,7 +1585,7 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
           ))}
         </div>
       </Fold>
-      <Fold panel id="yt.cadence" title="채널별 업로드 주기" testId="yt-cadence">
+      <Fold id="yt.cadence" title="채널별 업로드 주기" testId="yt-cadence">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
           <span className="t-meta text-slate-400">채널</span>
           <span className="t-meta text-right font-semibold text-slate-500">평균 간격</span>
@@ -1575,7 +1595,7 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
           ))}
         </div>
       </Fold>
-      <Fold panel id="yt.ideas" title="단어로 본 주목 주제" summary={week[0] ? `이번 주 1위 ${week[0].keyword}` : undefined} count={week.length + month.length} testId="yt-ideas">
+      <Fold id="yt.ideas" title="단어로 본 주목 주제" summary={week[0] ? `이번 주 1위 ${week[0].keyword}` : undefined} count={week.length + month.length} testId="yt-ideas">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <p className="t-sub font-bold text-slate-900">이번 주</p>
@@ -1592,11 +1612,12 @@ function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; r
 }
 
 function TopicGrid({ topics, rv, basis, onCopy }: { topics: Topic[]; rv: ReadonlyMap<string, RadarVideo>; basis: string; onCopy: (t: string) => void }) {
-  if (topics.length === 0) return <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500">이 기간에 2개 이상 채널이 같이 다룬 주제가 없습니다.</p>
+  if (topics.length === 0) return <p className="t-sub py-1 text-slate-500">이 기간에 2개 이상 채널이 같이 다룬 주제가 없습니다.</p>
   return (
-    <ol className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+    // D-605 테두리 카드 → 가는 선으로 나눈 줄
+    <ol className="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-6">
       {topics.map((t, i) => (
-        <li key={t.keyword} className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3.5 sm:p-4" data-testid="yt-topic">
+        <li key={t.keyword} className="flex min-w-0 flex-col gap-2 border-t border-slate-100 py-3" data-testid="yt-topic">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="danger">{i + 1}위 주목 주제</Badge>
             <span className="t-card font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.keyword}</span>

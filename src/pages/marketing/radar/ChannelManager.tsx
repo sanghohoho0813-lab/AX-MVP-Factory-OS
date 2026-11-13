@@ -68,6 +68,7 @@ export function ChannelManager({
   }
 
   return (
+    // D-605 채널 추가 · 묶음 넷 · 내가 추가한 채널 — 따로 떨어진 판 → 한 판 안(위 큰 판) 가는 가로선으로
     <div className="flex flex-col gap-3" data-testid="yt-channels">
       <AddChannel readOnly={readOnly} full={prefs.added.length >= MAX_ADDED} known={new Set(rows.map((r) => r.id))} onAdd={(c, group) => {
         // D-222 저장된 뒤에만 '더했습니다'(설정을 못 읽었거나 저장 실패면 그 안내만) · 더한 날은 한국 날짜로 보이게 시각 그대로
@@ -76,7 +77,7 @@ export function ChannelManager({
         })
       }} />
       {failed.length > 0 && <p className="t-meta break-keep text-warning-700">이번에 못 받은 채널: {failed.join(' · ')}</p>}
-      <div className="flex flex-col gap-5" data-testid="yt-channel-table">
+      <div className="flex flex-col gap-5 border-t border-slate-100 pt-4" data-testid="yt-channel-table">
         <section className="flex flex-col gap-3" aria-labelledby="radar-default-h" data-testid="radar-default-channels" data-count={defaultCount}>
           <div className="flex flex-col gap-0.5">
             <HelpHeading as="h3" tight id="radar-default-h" label="기본 참고 채널" className="t-card font-bold text-slate-900">
@@ -88,7 +89,7 @@ export function ChannelManager({
             const list = byGroup.get(g) ?? []
             const on = list.filter((c) => prefs.overrides[c.id]?.enabled !== false).length
             return (
-              <Fold key={g} panel id={`radar.ch.${g}`} title={mkText(GROUP_LABEL[g])} count={list.length} defaultOpen={list.length > 0} summary={list.length ? `사용 중 ${on}곳` : '아직 채널이 없습니다'} testId={`radar-group-${g}`}>
+              <Fold key={g} className="border-t border-slate-100 pt-1 data-[open=1]:pb-2" id={`radar.ch.${g}`} title={mkText(GROUP_LABEL[g])} count={list.length} defaultOpen={list.length > 0} summary={list.length ? `사용 중 ${on}곳` : '아직 채널이 없습니다'} testId={`radar-group-${g}`}>
                 <p className="t-meta mb-1 break-keep text-slate-500">{mkText(GROUP_PURPOSE[g])}</p>
                 {list.length === 0 ? (
                   <p className="t-sub break-keep text-slate-500">이 묶음에 기본 채널이 없습니다{g === 'ai' || g === 'ax' ? ' — 위 [채널 추가] 로 더할 수 있습니다' : ''}.</p>
@@ -111,7 +112,7 @@ export function ChannelManager({
           })}
         </section>
 
-        <section className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4" aria-labelledby="radar-added-h" data-testid="radar-added-channels" data-count={addedRows.length}>
+        <section className="flex flex-col gap-2 border-t border-slate-100 pt-4" aria-labelledby="radar-added-h" data-testid="radar-added-channels" data-count={addedRows.length}>
           <div className="flex flex-col gap-0.5">
             <HelpHeading as="h3" tight id="radar-added-h" label="내가 추가한 채널" className="t-card font-bold text-slate-900">
               내가 추가한 채널 <span className="t-sub font-semibold text-slate-500">{addedRows.length}곳</span>
@@ -229,7 +230,7 @@ function AddChannel({ readOnly, full, known, onAdd }: { readOnly: boolean; full:
     setFound(r.channel)
   }
   return (
-    <Fold panel id="radar.ch.add" title="채널 추가" defaultOpen={false} summary={full ? `더한 채널 ${MAX_ADDED}곳 — 가득 참` : 'youtube.com/@주소 를 붙여 넣기'} testId="radar-add-channel" icon={<Plus aria-hidden="true" className="size-4" />}>
+    <Fold id="radar.ch.add" title="채널 추가" defaultOpen={false} summary={full ? `더한 채널 ${MAX_ADDED}곳 — 가득 참` : 'youtube.com/@주소 를 붙여 넣기'} testId="radar-add-channel" icon={<Plus aria-hidden="true" className="size-4" />}>
       <div className="flex flex-col gap-2">
         <p className="t-meta break-keep text-slate-500">유튜브 채널 화면 주소를 넣으면 채널 정보만 한 번 확인합니다(검색하지 않습니다 · 로그인한 OS 에서만). 더한 채널은 {MAX_ADDED}곳까지.</p>
         <div className="flex flex-wrap items-center gap-2">
@@ -253,7 +254,7 @@ function AddChannel({ readOnly, full, known, onAdd }: { readOnly: boolean; full:
           </p>
         )}
         {found && (
-          <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="radar-add-found">
+          <div className="flex flex-col gap-2 border-t border-slate-100 pt-3" data-testid="radar-add-found">
             <p className="t-body font-semibold break-keep text-slate-900">
               {found.title} <span className="t-meta font-normal text-slate-500">{found.handle}</span>
             </p>

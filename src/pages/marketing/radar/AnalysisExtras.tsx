@@ -18,7 +18,8 @@ function Row({ a, b, c }: { a: string; b: string; c?: string }) {
 
 export function MyChannelCard({ s }: { s: MyChannelStats | null }) {
   return (
-    <Fold panel id="radar.mine" title="내 채널(최근 20편)" defaultOpen summary={s ? `긴 영상 평소 ${s.longMedian === null ? '—' : `${shortNum(s.longMedian)}회`} · 쇼츠 평소 ${s.shortMedian === null ? '—' : `${shortNum(s.shortMedian)}회`}` : '내 채널 영상이 없습니다'} testId="radar-mine">
+    // D-605 따로 떨어진 판 → 분석 판 안 한 줄(가는 선 위) — 접기 열쇠 그대로
+    <Fold id="radar.mine" title="내 채널(최근 20편)" defaultOpen summary={s ? `긴 영상 평소 ${s.longMedian === null ? '—' : `${shortNum(s.longMedian)}회`} · 쇼츠 평소 ${s.shortMedian === null ? '—' : `${shortNum(s.shortMedian)}회`}` : '내 채널 영상이 없습니다'} testId="radar-mine">
       {!s ? (
         <p className="t-sub text-slate-500">받아 온 데이터에 내 채널 영상이 없습니다.</p>
       ) : (
@@ -32,7 +33,7 @@ export function MyChannelCard({ s }: { s: MyChannelStats | null }) {
             <Row a="잘된 길이" b={s.bestLength ? s.bestLength.label : '아직 모름'} c={s.bestLength ? `${s.bestLength.count}편 · 보통 ${shortNum(s.bestLength.median)}회` : ''} />
             <Row a="업로드 주기" b={s.cadenceDays === null ? '데이터 부족' : `${s.cadenceDays.toFixed(1)}일에 한 편`} c={`최근 ${s.count}편 기준`} />
           </div>
-          <p className="t-meta rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep text-slate-600" data-testid="radar-analytics-note">
+          <p className="t-meta break-keep text-slate-600" data-testid="radar-analytics-note">
             시청 지속시간 · 노출 클릭률 분석은 추후 YouTube Analytics 연결 예정입니다(지금 받는 공개 데이터로는 알 수 없어 어림하지 않습니다).
           </p>
         </div>
@@ -44,7 +45,7 @@ export function MyChannelCard({ s }: { s: MyChannelStats | null }) {
 export function HotPatternsCard({ stats }: { stats: PatternStat[] }) {
   const top = stats[0]
   return (
-    <Fold panel id="radar.patterns" title="이번 달 잘된 제목 구조" defaultOpen={false} summary={top ? `1위 ${top.label} · 잘된 영상 ${top.hotOf}편 중 ${top.hot}편` : '평소보다 잘된 영상이 아직 없습니다'} testId="radar-patterns">
+    <Fold id="radar.patterns" title="이번 달 잘된 제목 구조" defaultOpen={false} summary={top ? `1위 ${top.label} · 잘된 영상 ${top.hotOf}편 중 ${top.hot}편` : '평소보다 잘된 영상이 아직 없습니다'} testId="radar-patterns">
       {stats.length === 0 ? (
         <p className="t-sub text-slate-500">최근 30일에 평소보다 2배 넘게 잘된 영상이 없습니다.</p>
       ) : (
