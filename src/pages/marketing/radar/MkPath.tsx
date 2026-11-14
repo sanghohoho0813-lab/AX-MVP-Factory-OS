@@ -7,6 +7,7 @@
  *  - 실제 기록으로 본다(내 브랜드 · 담은 주제 · 써 둔 글 · 올린 표시) — 따로 저장하는 진행 기록 없음. 읽기만 한다.
  *  - 첫 설정 칸(MkStart)이 보이는 동안에는 그리지 않는다(같은 말을 두 번 하지 않게).
  *  - D-574 한 편이라도 올린 뒤부터: '이번 달 새로 적은 고객 n곳 · 글을 보고 온 곳 m곳' + [잠재고객으로 적어 두기](영업 관리 등록 창).
+ *  - D-609 그 줄 끝에 '적으면 바로 들어오는 [내 상담 신청 링크]'(서버 0027 이 있고 작업공간 주인일 때만) → 기초 7가지의 링크 칸(펼쳐서).
  * 규칙 화면이다 — AI 를 부르지 않는다.
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -19,6 +20,7 @@ import { LEAD_FROM_CONTENT_HREF, dailyMission, leadsThisMonth, mkPathNext, mkPat
 import { listClients } from '../../../services/clientOpsService'
 import { localDateOf, todayLocalDate } from '../../../lib/appClock'
 import { MARKETING_BASICS, readBasics } from '../../../content/marketingBasics'
+import { useIntakeLink } from '../IntakeLinkCard'
 
 interface Post {
   status: string
@@ -27,6 +29,7 @@ interface Post {
 
 export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspaceId: string | null; ideas: number; interests: number; prefsReady: boolean }) {
   const brand = useBrandProfile()
+  const { state: intake } = useIntakeLink(workspaceId)
   const [posts, setPosts] = useState<Post[] | null>(null)
   /** D-574 이번 달에 적은 업체(유입 경로와 함께) — 못 읽으면 숫자 없이 길만 보인다(읽기만) */
   const [leads, setLeads] = useState<Array<{ day: string; source: string }> | null>(null)
@@ -106,6 +109,15 @@ export function MkPath({ workspaceId, ideas, interests, prefsReady }: { workspac
       <Link to={LEAD_FROM_CONTENT_HREF} className="font-bold text-brand-700 hover:underline" data-testid="mk-path-lead-add" data-guide="fn-mk-lead">
         잠재고객으로 적어 두기
       </Link>
+      {intake?.role === 'owner' && (
+        <>
+          {' '}
+          · 적으면 바로 들어오는{' '}
+          <Link to="/marketing/basics?open=intake" className="font-bold text-brand-700 hover:underline" data-testid="mk-path-intake">
+            내 상담 신청 링크
+          </Link>
+        </>
+      )}
     </p>
   )
 

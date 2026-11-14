@@ -7,6 +7,9 @@
 
 import { isUserScopedKey, vaultSignOut, vaultSwitchTo } from '../storageVault'
 import { historyLine, isConsentMissing, koWhen, leftText, parseConsentState } from '../../services/viewConsent'
+import { EMPTY_INTAKE_FORM, defaultIntakeTitle, intakeErrorText, intakeLine, intakeUrl, isIntakeMissing, koDay, parseIntakeState, slugFromPath, sourceFromQuery, validateIntake } from '../../services/intakeLink'
+import { LINK_SOURCE, leadsThisMonth } from '../../services/marketing/mkPath'
+import { SALES_SOURCES } from '../../content/salesCatalog'
 import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../currentUser'
 import { brand } from '../../brand/brand.config'
@@ -445,6 +448,25 @@ check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft
   check('한국 시각 · 요일 · 오전/오후 · 정각은 분 없음', koWhen('2026-11-21T01:00:00Z') === '11월 21일(토) 오전 10시' && koWhen('2026-11-14T15:05:00Z') === '11월 15일(일) 오전 12시 5분' && koWhen('엉뚱') === '', koWhen('2026-11-21T01:00:00Z'))
   check('남은 시간: 일 · 시간 · 곧 · 끝남', leftText('2026-11-21T01:00:00Z', now) === '6일 남음' && leftText('2026-11-14T08:00:00Z', now) === '5시간 남음' && leftText('2026-11-14T03:30:00Z', now) === '곧 끝남' && leftText('2026-11-14T02:00:00Z', now) === '끝남')
   check('함수 없음 · 권한 거둠(되돌림) → 화면 숨김 / 그 밖의 오류는 아님', isConsentMissing({ code: 'PGRST202' }) && isConsentMissing({ code: '42883' }) && isConsentMissing({ code: '42501', message: 'permission denied for function view_consent_state' }) && !isConsentMissing({ code: '08006', message: 'connection failure' }) && !isConsentMissing(null))
+}
+
+// ---------------------------------------------------------------- L-9 · D-609 상담 신청 링크
+{
+  const st = parseIntakeState({ role: 'owner', link: { slug: '0a1b2c3d4e5f', title: '김팀장 상담 신청', intro: '', createdAt: '2026-11-14T01:00:00Z', received: 3, lastAt: '2026-11-14T05:00:00Z' }, closed: 2 })
+  check('L9-1 링크 상태: 주인 · 주소 · 받은 수 · 닫힌 수', st.role === 'owner' && st.link?.slug === '0a1b2c3d4e5f' && st.link.received === 3 && st.closed === 2)
+  check('L9-2 이상한 상태 → 안 그림(none) · 주소 모양이 아니면 링크 없음', parseIntakeState(null).role === 'none' && parseIntakeState({ role: 'viewer' }).role === 'none' && (() => { const x = parseIntakeState({ role: 'owner', link: { slug: '../evil' } }); return x.role === 'owner' && x.link === null })())
+  check('L9-3 공개 주소 · 글 끝 한 줄', intakeUrl('0a1b2c3d4e5f', 'https://os.example.com/') === 'https://os.example.com/ask/0a1b2c3d4e5f' && intakeLine('0a1b2c3d4e5f', 'https://os.example.com') === '상담 신청은 여기로 → https://os.example.com/ask/0a1b2c3d4e5f')
+  check('L9-4 주소에서 조각 꺼내기 — 12자리만 · 대문자는 소문자로 · 그 밖은 빈칸', slugFromPath('/ask/0A1B2C3D4E5F') === '0a1b2c3d4e5f' && slugFromPath('/ask/0a1b2c3d4e5f/') === '0a1b2c3d4e5f' && slugFromPath('/ask/short') === '' && slugFromPath('/ask/0a1b2c3d4e5f/x') === '' && slugFromPath('/today') === '')
+  check('L9-5 ?from= → 경로(영어 이름도) · 모르면 빈칸', sourceFromQuery('?from=threads') === '스레드' && sourceFromQuery('?from=IG') === '인스타' && sourceFromQuery('?from=%EB%B8%94%EB%A1%9C%EA%B7%B8') === '블로그' && sourceFromQuery('?from=tv') === '' && sourceFromQuery('') === '')
+  check('L9-6 처음 제목 — 이름 · 기본 이름이면 회사 · 둘 다 없으면 상담 신청', defaultIntakeTitle('김은혜') === '김은혜 상담 신청' && defaultIntakeTitle('사용자', '은혜컨설팅') === '은혜컨설팅 상담 신청' && defaultIntakeTitle('팀장님') === '상담 신청' && defaultIntakeTitle('가'.repeat(60)).length === 40)
+  const ok = { ...EMPTY_INTAKE_FORM, name: '홍길동', phone: '010-1234-5678', consent: true }
+  check('L9-7 보내기 전 확인 — 바른 것 통과 · 이름/연락처/번호/이메일/동의 각각 한 줄', validateIntake(ok) === '' && validateIntake({ ...ok, name: '' }).includes('이름') && validateIntake({ ...ok, phone: '' }).includes('휴대폰') && validateIntake({ ...ok, phone: '공일공' }).includes('숫자') && validateIntake({ ...ok, email: 'x@' }).includes('이메일') && validateIntake({ ...ok, consent: false }).includes('동의') && validateIntake({ ...ok, name: '', companyName: '(주)길동' }) === '' && validateIntake({ ...ok, phone: '', email: 'a@b.kr' }) === '')
+  check('L9-8 서버 오류 → 사람 말 · 모르는 오류는 연결 안내', intakeErrorText({ message: 'too many requests' }).includes('10분') && intakeErrorText({ message: 'invalid phone' }).includes('숫자') && intakeErrorText({ message: 'boom' }).includes('연결'))
+  check('L9-9 0027 전 · 되돌림 → 숨김 / 그 밖 오류는 아님', isIntakeMissing({ code: 'PGRST202' }) && isIntakeMissing({ code: '42501', message: 'permission denied for function intake_link_state' }) && !isIntakeMissing({ code: '08006' }) && !isIntakeMissing(null))
+  check('L9-10 한국 날짜', koDay('2026-11-14T15:30:00Z') === '11월 15일' && koDay('x') === '')
+  check('L9-11 링크로 온 곳(경로 안 고름)도 글을 보고 온 곳으로 셈', (() => { const c = leadsThisMonth([{ day: '2026-11-14', source: LINK_SOURCE }, { day: '2026-11-14', source: '스레드' }, { day: '2026-11-14', source: '소개' }], '2026-11-14'); return c.all === 3 && c.fromContent === 2 })())
+  check('L9-12 영업 관리 유입 경로 목록에 상담 링크(기타 앞 · 더하기만)', (SALES_SOURCES as readonly string[]).includes(LINK_SOURCE) && SALES_SOURCES[SALES_SOURCES.length - 1] === '기타' && SALES_SOURCES[SALES_SOURCES.length - 2] === LINK_SOURCE)
+  check('L9-13 공개 화면은 보기 무대(iframe)에 넣지 않음', isStageExcluded('/ask/0a1b2c3d4e5f'))
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

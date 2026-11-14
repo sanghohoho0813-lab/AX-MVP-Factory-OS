@@ -9,6 +9,10 @@
   },
   "rewrites": [
     {
+      "source": "/ask/:slug",
+      "destination": "/ask.html"
+    },
+    {
       "source": "/((?!assets/|favicon\\.svg|api/).*)",
       "destination": "/index.html"
     }

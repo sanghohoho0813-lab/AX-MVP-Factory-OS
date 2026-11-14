@@ -50,7 +50,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000d1', 'cust24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -93,7 +93,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000b1', 'pilot24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -177,4 +177,23 @@ out=$(blk supabase/manual/rollback_0026.sql)
 check "연습 ⑪ 되돌리기: 문 0 | 0 · 대표가 다시 팀장 업체를 봄 · 기록 표는 남음" "$(echo "$out" | tail -1) $(ownsee) $(v "select count(*) from pg_tables where tablename in ('workspace_view_grants', 'workspace_view_requests')")" "0|0 1 2"
 out=$(blk supabase/migrations/20261114000026_view_consent.sql)
 check "연습 ⑪ 되돌린 뒤 0026 다시 — 문 다시 · 대표 0 · 확인 6줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(ownsee) $(blk supabase/manual/verify_after_0026.sql | grep -cE '^[1-6]\|.*\|좋음$')" "0 0 6"
+# ⑫ L-9 · D-609 0027(고객마다 상담 신청 링크) — 운영 모양(0026 까지 · profiles name) 위에 한 덩어리로
+asr() { su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '$1', false); set role $2; $3" 2>&1 | tail -1; }
+out=$(blk supabase/migrations/20261114000027_intake_links.sql "set lock_timeout = '5s'; ")
+check "연습 ⑫ 0027 한 덩어리(lock_timeout 5초) — 오류 0" "$(echo "$out" | grep -c 'ERROR')" "0"
+out=$(blk supabase/manual/verify_after_0027.sql)
+check "연습 ⑫ 적용 뒤 확인: 1~5 모두 '좋음' · 열린 링크 0" "$(echo "$out" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$out" | grep -E '^6\|' | cut -d'|' -f3)" "5 0"
+check "연습 ⑫ 확인 SQL: 맨 위 set transaction read only · 만들기/고치기 문장 0" "$(grep -v '^--' supabase/manual/verify_after_0027.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/verify_after_0027.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|truncate|grant|revoke|comment on)\b')" "set transaction read only; 0"
+SLUG=$(asr 24000000-0000-4000-8000-0000000000b1 authenticated "select public.intake_link_save('$PW', '팀장 상담', '')->'link'->>'slug';")
+check "연습 ⑫ 팀장이 링크 만들기 → 12자리 주소" "$(echo "$SLUG" | grep -cE '^[0-9a-f]{12}$')" "1"
+check "연습 ⑫ 로그인 안 한 사람 신청 → ok" "$(asr '' anon "select public.public_intake_submit('$SLUG', '{\"name\":\"연습 신청\",\"phone\":\"010-2400-0001\",\"consent\":true}');")" "ok"
+check "연습 ⑫ 팀장 잠재고객 1 · 대표는 허락 전이라 0(0026)" "$(asr 24000000-0000-4000-8000-0000000000b1 authenticated "select count(*) from public.operations_clients where workspace_id = '$PW' and company_name = '연습 신청';") $(asr 24000000-0000-4000-8000-0000000000a1 authenticated "select count(*) from public.operations_clients where company_name = '연습 신청';")" "1 0"
+out=$(blk supabase/migrations/20261114000027_intake_links.sql)
+check "연습 ⑫ 0027 다시 실행해도 같음(오류 0 · 확인 5줄 좋음 · 주소 그대로)" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0027.sql | grep -cE '^[1-5]\|.*\|좋음$') $(asr '' anon "select public.public_intake_form('$SLUG')->>'title';")" "0 5 팀장 상담"
+out=$(blkind supabase/migrations/20261114000027_intake_links.sql "set lock_timeout = '5s'; ")
+check "연습 ⑫ 계단 들여쓰기로 붙여 넣어도(D-597) 오류 0" "$(echo "$out" | grep -c 'ERROR')" "0"
+out=$(blk supabase/manual/rollback_0027.sql)
+check "연습 ⑫ 되돌리기: false | false · 공개 화면 막힘 · 링크 표 · 잠재고객 남음" "$(echo "$out" | tail -1) $(asr '' anon "select public.public_intake_form('$SLUG');" | grep -c 'permission denied') $(v "select count(*) from public.public_intake_links") $(v "select count(*) from public.operations_clients where company_name = '연습 신청'")" "f|f 1 1 1"
+out=$(blk supabase/migrations/20261114000027_intake_links.sql)
+check "연습 ⑫ 되돌린 뒤 0027 다시 — 같은 주소로 다시 받음 · 확인 5줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(asr '' anon "select public.public_intake_form('$SLUG')->>'title';") $(blk supabase/manual/verify_after_0027.sql | grep -cE '^[1-5]\|.*\|좋음$')" "0 팀장 상담 5"
 [ "$BAD" -eq 0 ]

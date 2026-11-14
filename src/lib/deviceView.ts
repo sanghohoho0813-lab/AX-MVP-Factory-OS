@@ -136,7 +136,7 @@ export function stripFrame(pathWithSearch: string): string {
 
 /** 무대를 띄우지 않는 주소 — 공개 화면(설문 · 시험 · 지원사업 찾기) */
 export function isStageExcluded(pathname: string): boolean {
-  return /^\/(survey|test)\//.test(pathname) || pathname.startsWith('/grants/find')
+  return /^\/(survey|test|ask)\//.test(pathname) || pathname.startsWith('/grants/find')
 }
 
 /* 메시지 이름 — 같은 출처 · 부모 ↔ iframe 만 */

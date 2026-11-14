@@ -103,11 +103,17 @@ export interface LeadCount {
   fromContent: number
 }
 
+/**
+ * D-609 상담 신청 링크(글 끝 · 프로필에 붙이는 주소)로 들어왔는데 경로를 안 고른 곳 — 서버가 적는 유입 경로(services/intakeLink 와 같은 글).
+ * 링크는 글에 붙이는 것이라 '글을 보고 온 곳' 으로 센다. 손으로 등록하는 창의 '글 · 영상 경로' 목록에는 넣지 않는다.
+ */
+export const LINK_SOURCE = '상담 링크'
+
 /** 이번 달(오늘이 든 달)에 새로 적은 업체 수 · 그중 글을 보고 온 수. day = 적은 날 YYYY-MM-DD(이 기기 날짜) */
 export function leadsThisMonth(leads: ReadonlyArray<{ day: string; source: string }>, today: string): LeadCount {
   const month = today.slice(0, 7)
   const mine = leads.filter((l) => l.day.slice(0, 7) === month && l.day <= today)
-  return { all: mine.length, fromContent: mine.filter((l) => CONTENT_SOURCES.includes(l.source)).length }
+  return { all: mine.length, fromContent: mine.filter((l) => CONTENT_SOURCES.includes(l.source) || l.source === LINK_SOURCE).length }
 }
 
 /** 잠재고객 등록 창을 '글을 보고 온 문의' 로 여는 주소(영업 관리가 유입 경로를 앞에 보여 준다) */

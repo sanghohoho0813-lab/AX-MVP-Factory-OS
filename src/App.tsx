@@ -7,15 +7,23 @@ import { DatePickerHost } from './components/ui/DatePickerHost'
 import { DeviceStage } from './components/layout/DeviceView'
 import { isStageExcluded, useDeviceView } from './lib/deviceView'
 import { preloadShellIfSignedIn } from './app/shellChunks'
+import { slugFromPath } from './lib/askPath'
 
 // supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
 const SupabaseApp = lazy(() =>
   import('./app/SupabaseApp').then((m) => ({ default: m.SupabaseApp })),
 )
 
+/**
+ * L-9 · D-609 상담 신청 공개 화면(/ask/<12자리>) — 컨설턴트의 고객이 여는 화면이라 로그인 준비 · 라우터 · OS 이름 없이 바로 그린다.
+ * (작은 조각 하나만 받는다 · 앱 뼈대 미리 받기도 하지 않는다)
+ */
+const IntakeFormPage = lazy(() => import('./pages/public/IntakeFormPage'))
+const askSlug = typeof window !== 'undefined' ? slugFromPath(window.location.pathname) : ''
+
 // D-590 로그인해 둔 브라우저는 앱 뼈대를 기다리지 않게 — 첫 조각을 읽자마자 받기 시작한다(로그인 화면만 볼 사람은 받지 않는다)
 try {
-  if (getDataModeConfig().mode === 'supabase') preloadShellIfSignedIn()
+  if (getDataModeConfig().mode === 'supabase' && !askSlug) preloadShellIfSignedIn()
 } catch {
   /* 설정을 못 읽으면 미리 받지 않는다 — 화면이 필요할 때 받는다 */
 }
@@ -35,6 +43,26 @@ function BootSplash() {
 }
 
 function App() {
+  if (askSlug) {
+    return (
+      <Suspense fallback={<IntakeSplash />}>
+        <IntakeFormPage slug={askSlug} />
+      </Suspense>
+    )
+  }
+  return <MainApp />
+}
+
+/** 상담 신청 화면을 받는 동안 — OS 이름 · 로고 없이 */
+function IntakeSplash() {
+  return (
+    <div className="boot" role="status" data-testid="boot-splash">
+      <p className="boot-msg">상담 신청 화면을 여는 중…</p>
+    </div>
+  )
+}
+
+function MainApp() {
   const cfg = getDataModeConfig()
   // D-164: PC 에서 Mobile · PC+Mobile 을 고르면 앱 대신 보기 무대(같은 앱을 iframe 으로) · D-286 휴대폰에서 PC · PC+Mobile 도
   const device = useDeviceView()

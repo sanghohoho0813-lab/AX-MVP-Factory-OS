@@ -1908,6 +1908,102 @@ try {
     check('고객 390(D-564): 마케팅 첫 화면 가로 넘침 0', (await overflowX(pk)) <= 0, String(await overflowX(pk)))
     await shot(pk, 'customer-09-marketing-390')
     await pk.setViewportSize({ width: 1440, height: 900 })
+
+    /* ---------- L-9 · D-609(0027): 고객마다 상담 신청 링크 — 만들기 → 모르는 사람이 휴대폰으로 신청 → 내 잠재고객 · 대표는 0 ---------- */
+    {
+      await go(pk, '/marketing')
+      await pk.getByTestId('mk-path-intake').waitFor({ timeout: 8000 }).catch(() => {})
+      check('L9-0 마케팅 첫 화면 고객 줄 끝: "적으면 바로 들어오는 [내 상담 신청 링크]"', (await pk.getByTestId('mk-path-intake').count()) === 1, ((await pk.getByTestId('mk-path-leads').innerText().catch(() => '')) ?? '').slice(0, 160))
+      await pk.getByTestId('mk-path-intake').click()
+      const card = pk.getByTestId('mk-intake')
+      await card.waitFor({ timeout: 8000 }).catch(() => {})
+      const titleVal = await pk.getByTestId('mk-intake-title').inputValue().catch(() => '')
+      check('L9-1 → 기초 7가지의 링크 칸이 펼쳐진 채 · 아직 링크 없음 · 1 → 2 → 3 · 제목 칸이 미리 채워짐', new URL(pk.url()).pathname === '/marketing/basics' && (await card.getAttribute('open')) !== null && (await card.getAttribute('data-link')) === '0' && (await pk.getByTestId('mk-intake-steps').count()) === 1 && titleVal.endsWith('상담 신청'), titleVal)
+      await shot(pk, 'l9-0-card-empty')
+      await pk.getByTestId('mk-intake-title').fill('은혜컨설팅 상담 신청')
+      await pk.getByTestId('mk-intake-create').click()
+      await pk.locator('[data-testid="mk-intake"][data-link="1"]').waitFor({ timeout: 8000 }).catch(() => {})
+      const url1 = ((await pk.getByTestId('mk-intake-url').innerText().catch(() => '')) ?? '').trim()
+      const slug1 = url1.split('/ask/')[1] ?? ''
+      check('L9-2 [내 상담 신청 링크 만들기] → 주소 /ask/<12자리> · [주소 복사] · DB 열린 링크 1(내 작업공간 · 제목 그대로)', url1.startsWith(`${BASE}/ask/`) && /^[0-9a-f]{12}$/.test(slug1) && (await pk.getByTestId('mk-intake-copy').count()) === 1 && sql(`select count(*) || '|' || max(title) from public.public_intake_links where workspace_id = '${cwsLead}' and revoked_at is null`) === '1|은혜컨설팅 상담 신청', url1)
+      await shot(pk, 'l9-1-card-link')
+      // 모르는 사람 — 로그인 없음 · 휴대폰
+      const ca = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+      const pa = await ca.newPage()
+      pa.on('pageerror', (e) => errors.push(String(e)))
+      await ca.route(`https://${REF}.supabase.co/**`, route)
+      await pa.goto(`${BASE}/ask/${slug1}?from=threads`)
+      await pa.getByTestId('intake-title').waitFor({ timeout: 10000 }).catch(() => {})
+      const pub = (await pa.locator('body').innerText().catch(() => '')) ?? ''
+      check('L9-3 공개 화면(로그인 없음 · 390): 제목 = 컨설턴트가 정한 것 · 탭 제목도 · OS 이름 · 메뉴 0 · ?from=threads → 스레드 골라짐 · 넘침 0',
+        ((await pa.getByTestId('intake-title').innerText().catch(() => '')) ?? '').trim() === '은혜컨설팅 상담 신청' && (await pa.title()) === '은혜컨설팅 상담 신청' && !/MIRAE|미래AI랩|미래에이아이랩|대표비밀/.test(pub) && (await pa.locator('aside, nav').count()) === 0 &&
+        (await pa.locator('[data-testid="intake-source"][data-source="스레드"]').getAttribute('aria-pressed')) === 'true' && (await overflowX(pa)) <= 0,
+        pub.replace(/\n/g, '|').slice(0, 200))
+      await shot(pa, 'l9-2-public-form-390')
+      await pa.getByTestId('intake-submit').click()
+      const p1 = ((await pa.getByTestId('intake-problem').innerText().catch(() => '')) ?? '')
+      await pa.getByTestId('intake-name').fill('박신청')
+      await pa.getByTestId('intake-company').fill('(주)링크로온상사')
+      await pa.getByTestId('intake-phone').fill('010-5555-1234')
+      await pa.getByTestId('intake-message').fill('정책자금 상담 받고 싶어요')
+      await pa.getByTestId('intake-submit').click()
+      const p2 = ((await pa.getByTestId('intake-problem').innerText().catch(() => '')) ?? '')
+      check('L9-4 빈 채로 보내면 "이름" 한 줄 · 동의 안 하면 "동의" 한 줄(서버에 안 감 · DB 0)', p1.includes('이름') && p2.includes('동의') && sql(`select count(*) from public.operations_clients where workspace_id = '${cwsLead}' and company_name = '(주)링크로온상사'`) === '0', `${p1} / ${p2}`)
+      await pa.getByTestId('intake-consent').check()
+      await pa.getByTestId('intake-submit').click()
+      await pa.getByTestId('intake-done').waitFor({ timeout: 10000 }).catch(() => {})
+      const row = sql(`select status || '|' || (payload->'sales'->>'stage') || '|' || (payload->'sales'->>'source') || '|' || (payload->'sales'->>'concern') || '|' || (payload->>'contactName') || '|' || next_action from public.operations_clients where workspace_id = '${cwsLead}' and company_name = '(주)링크로온상사'`)
+      check('L9-5 동의하고 보내기 → "보냈어요" · DB 그 고객 작업공간 잠재고객 1줄(대기 · lead · 스레드 · 하고 싶은 말 · 이름 · 연락드리기)', (await pa.getByTestId('intake-done').count()) === 1 && row === 'waiting|lead|스레드|정책자금 상담 받고 싶어요|박신청|상담 신청 — 연락드리기', row)
+      await shot(pa, 'l9-3-public-done-390')
+      await pa.goto(`${BASE}/ask/${slug1}`)
+      await pa.getByTestId('intake-name').waitFor({ timeout: 10000 }).catch(() => {})
+      await pa.getByTestId('intake-name').fill('박신청')
+      await pa.getByTestId('intake-phone').fill('01055551234')
+      await pa.getByTestId('intake-consent').check()
+      await pa.getByTestId('intake-submit').click()
+      await pa.getByTestId('intake-done').waitFor({ timeout: 10000 }).catch(() => {})
+      check('L9-6 같은 연락처로 한 번 더 → "보냈어요" 지만 두 줄 안 생김', (await pa.getByTestId('intake-done').count()) === 1 && sql(`select count(*) from public.operations_clients where workspace_id = '${cwsLead}' and payload->>'contactName' = '박신청'`) === '1')
+      await pa.goto(`${BASE}/ask/000000000000`)
+      await pa.getByTestId('intake-closed').waitFor({ timeout: 10000 }).catch(() => {})
+      check('L9-7 없는 주소 → "이 주소는 지금 상담 신청을 받지 않아요"', (await pa.getByTestId('intake-closed').count()) === 1)
+      const restOwner = async (table, q) => {
+        const r = await fetch(`http://127.0.0.1:${PGRST_PORT}/${table}?${q}&select=id`, { headers: { authorization: `Bearer ${jwt(OWNER)}` } })
+        return r.ok ? (await r.json()).length : `http ${r.status}`
+      }
+      const oLead = await restOwner('operations_clients', `workspace_id=eq.${cwsLead}`)
+      const oLink = await restOwner('public_intake_links', `workspace_id=eq.${cwsLead}`)
+      check('L9-8 대표 토큰: 그 고객의 잠재고객 0 · 링크 0(고객 작업공간 — 0024)', oLead === 0 && oLink === 0, `leads=${oLead} links=${oLink}`)
+      await go(pk, '/sales/board')
+      await pk.waitForTimeout(800)
+      const boardK = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+      await go(pk, '/marketing')
+      await pk.getByTestId('mk-path-leads').waitFor({ timeout: 8000 }).catch(() => {})
+      const lead2 = { all: await pk.getByTestId('mk-path-leads').getAttribute('data-all').catch(() => ''), content: await pk.getByTestId('mk-path-leads').getAttribute('data-content').catch(() => '') }
+      check('L9-9 고객: 영업 관리에 그 잠재고객 · 마케팅 "새로 적은 고객 3곳 · 글을 보고 온 곳 2곳"', boardK.includes('(주)링크로온상사') && lead2.all === '3' && lead2.content === '2', `${JSON.stringify(lead2)} ${boardK.includes('(주)링크로온상사')}`)
+      await go(pk, '/marketing/basics?open=intake')
+      await pk.getByTestId('mk-intake-count').waitFor({ timeout: 8000 }).catch(() => {})
+      check('L9-10 링크 칸 한 줄에 "받은 신청 1건" · [잠재고객 보기]', /받은 신청 1건/.test((await pk.getByTestId('mk-intake-count').innerText().catch(() => '')) ?? '') && (await pk.getByTestId('mk-intake-leads').count()) === 1)
+      await pk.getByTestId('mk-intake-more').locator('summary').click()
+      await pk.getByTestId('mk-intake-rotate').click()
+      const confirmText = ((await pk.getByTestId('mk-intake-confirm').innerText().catch(() => '')) ?? '')
+      await pk.getByTestId('mk-intake-confirm-yes').click()
+      await pk.waitForTimeout(1200)
+      const url2 = ((await pk.getByTestId('mk-intake-url').innerText().catch(() => '')) ?? '').trim()
+      const slug2 = url2.split('/ask/')[1] ?? ''
+      await pa.goto(`${BASE}/ask/${slug1}`)
+      await pa.getByTestId('intake-closed').waitFor({ timeout: 10000 }).catch(() => {})
+      const oldClosed = (await pa.getByTestId('intake-closed').count()) === 1
+      await pa.goto(`${BASE}/ask/${slug2}`)
+      await pa.getByTestId('intake-title').waitFor({ timeout: 10000 }).catch(() => {})
+      check('L9-11 [주소 새로 만들기] → 한 번 더 묻기 · 새 주소 · 예전 주소는 "받지 않아요" · 새 주소는 같은 제목', /바로 안 받게/.test(confirmText) && /^[0-9a-f]{12}$/.test(slug2) && slug2 !== slug1 && oldClosed && ((await pa.getByTestId('intake-title').innerText().catch(() => '')) ?? '').trim() === '은혜컨설팅 상담 신청', `${slug1} → ${slug2}`)
+      await ca.close()
+      await pk.setViewportSize({ width: 390, height: 844 })
+      await go(pk, '/marketing/basics?open=intake')
+      await pk.getByTestId('mk-intake-url').waitFor({ timeout: 8000 }).catch(() => {})
+      check('L9-12 고객 390: 링크 칸 펼친 채 가로 넘침 0', (await overflowX(pk)) <= 0, String(await overflowX(pk)))
+      await shot(pk, 'l9-4-card-390')
+      await pk.setViewportSize({ width: 1440, height: 900 })
+    }
     await cK.close()
     // 출시 목록 L-5: 이용약관 · 개인정보처리방침 초안 — 로그인 없이 열리고(초안 띠), 검토 전에는 로그인 화면에 링크가 없다
     {
