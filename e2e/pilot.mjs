@@ -1088,6 +1088,50 @@ try {
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1500)
   await go(page, '/ops/clients')
+  /* ---------- L-27 · D-608(0026): 고객 자료는 팀장이 허락한 동안만 — 요청 → 팀장 알림 → 설정에서 7일 허락 → 보임 ---------- */
+  let consentPilot = null
+  {
+    const vc = page.getByTestId('viewing-consent')
+    await vc.waitFor({ timeout: 8000 }).catch(() => {})
+    const pv0 = await bodyText(page)
+    check('L27-1 대표 → 팀장 화면(허락 전): 팀장 업체 안 보임 · 띠 아래 "고객 자료는 팀장님이 허락해야 보여요" · [허락 요청 보내기]', !pv0.includes('은혜테스트정밀') && (await vc.getAttribute('data-consent').catch(() => '')) === 'closed' && /팀장님이 허락해야/.test(await vc.innerText().catch(() => '')) && (await page.getByTestId('viewing-consent-ask').count()) === 1, (await vc.innerText().catch(() => 'none')).slice(0, 160))
+    await shot(page, 'l27-1-owner-before')
+    await page.getByTestId('viewing-consent-ask').click()
+    await page.locator('[data-testid="viewing-consent"][data-consent="requested"]').waitFor({ timeout: 8000 }).catch(() => {})
+    check('L27-2 [허락 요청 보내기] → "허락 요청을 보냈어요" · DB 열린 요청 1줄', (await vc.getAttribute('data-consent').catch(() => '')) === 'requested' && /허락 요청을 보냈어요/.test(await vc.innerText().catch(() => '')) && sql(`select count(*) from public.workspace_view_requests where workspace_id = '${PILOT_WS}' and closed_at is null`) === '1', await vc.innerText().catch(() => ''))
+    const cp = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cp.route(`https://${REF}.supabase.co/**`, route)
+    await cp.route('**/api/ai-assist**', assistRoute)
+    const pp = await cp.newPage()
+    pp.on('pageerror', (e) => errors.push(String(e)))
+    await login(pp, PILOT)
+    await go(pp, '/ops/clients')
+    if (await pp.getByTestId('tutorial-dialog').count()) await pp.keyboard.press('Escape')
+    const nt = pp.getByTestId('consent-request-notice')
+    await nt.waitFor({ timeout: 8000 }).catch(() => {})
+    check('L27-3 팀장 화면 맨 위: "…님이 내 고객 자료 보기를 요청했어요" · [설정에서 허락 · 거절하기]', (await nt.count()) === 1 && /고객 자료 보기를 요청했어요/.test(await nt.innerText().catch(() => '')) && (await pp.getByTestId('consent-request-open').count()) === 1, await nt.innerText().catch(() => 'none'))
+    await shot(pp, 'l27-3-pilot-notice')
+    await pp.getByTestId('consent-request-open').click()
+    await pp.waitForURL(/\/settings/, { timeout: 8000 }).catch(() => {})
+    const cs = pp.getByTestId('consent-settings')
+    await cs.waitFor({ timeout: 8000 }).catch(() => {})
+    check('L27-4 팀장 설정: 그 칸 · "지금 닫혀 있어요" · 요청 줄 · 기간 셋(7일 기본)', (await cs.getAttribute('data-consent').catch(() => '')) === 'closed' && (await pp.getByTestId('consent-request-line').count()) === 1 && (await pp.getByTestId('consent-days').count()) === 3 && (await pp.locator('[data-testid="consent-days"][aria-checked="true"]').getAttribute('data-days').catch(() => '')) === '7', ((await cs.innerText().catch(() => 'none')) ?? '').slice(0, 200))
+    await shot(pp, 'l27-4-pilot-settings')
+    await pp.getByTestId('consent-grant').click()
+    await pp.locator('[data-testid="consent-settings"][data-consent="active"]').waitFor({ timeout: 8000 }).catch(() => {})
+    check('L27-5 [7일 동안 허락하기] → "지금 허락 중" · DB 허락 1(대표에게 · 약 7일) · 요청은 허락함으로 닫힘 · 지난 기록 펼침',
+      (await cs.getAttribute('data-consent').catch(() => '')) === 'active' && (await pp.getByTestId('consent-revoke').count()) === 1 &&
+      sql(`select count(*) || ' ' || bool_and(grantee_id = '${OWNER.id}') || ' ' || bool_and(expires_at between now() + interval '6 days 23 hours' and now() + interval '7 days 1 hour') from public.workspace_view_grants where workspace_id = '${PILOT_WS}' and revoked_at is null and expires_at > now()`) === '1 true true' &&
+      sql(`select string_agg(coalesce(closed_reason, 'open'), ',') from public.workspace_view_requests where workspace_id = '${PILOT_WS}'`) === 'granted' && (await pp.getByTestId('consent-history').count()) === 1)
+    await shot(pp, 'l27-5-pilot-granted')
+    check('L27-6 팀장 화면: 허락한 뒤 맨 위 요청 알림 사라짐', await go(pp, '/ops/clients').then(() => pp.getByTestId('consent-request-notice').count()) === 0)
+    consentPilot = { cp, pp }
+    currentWho = OWNER
+    await go(page, '/ops/clients')
+    await page.locator('[data-testid="viewing-consent"][data-consent="active"]').waitFor({ timeout: 8000 }).catch(() => {})
+    check('L27-7 대표 → 팀장 화면(허락 뒤): 띠 아래 "고객 자료 보기 허락됨 · …까지(6일 남음)"', (await vc.getAttribute('data-consent').catch(() => '')) === 'active' && /허락됨/.test(await vc.innerText().catch(() => '')) && /남음/.test(await vc.innerText().catch(() => '')), await vc.innerText().catch(() => ''))
+    await shot(page, 'l27-7-owner-after')
+  }
   const pv = await bodyText(page)
   check('대표 → 팀장 화면: 팀장 업체(은혜테스트정밀)가 보인다', pv.includes('은혜테스트정밀'), pv.slice(0, 300))
   check('대표 → 팀장 화면: 대표 업체는 안 보인다(팀장 작업공간 자료만)', leaked(pv).length === 0, leaked(pv).join())
@@ -1224,6 +1268,40 @@ try {
     check('대표 1280(D-164): 다시 대표 화면', (await page.getByTestId('viewing-pilot').count()) === 0 && (await bodyText(page)).includes('대표비밀정밀'))
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.waitForTimeout(300)
+  }
+
+  /* ---------- L-27 · D-608: 팀장 [지금 닫기] → 그 순간부터 대표에게 다시 0(진짜 토큰 · 화면 둘 다) ---------- */
+  if (consentPilot) {
+    const { cp, pp } = consentPilot
+    await go(pp, '/settings?focus=consent')
+    await pp.getByTestId('consent-revoke').click()
+    await pp.locator('[data-testid="consent-settings"][data-consent="closed"]').waitFor({ timeout: 8000 }).catch(() => {})
+    const restCount = async (table, q) => {
+      const r = await fetch(`http://127.0.0.1:${PGRST_PORT}/${table}?${q}&select=id`, { headers: { authorization: `Bearer ${jwt(OWNER)}` } })
+      return r.ok ? (await r.json()).length : `http ${r.status}`
+    }
+    const nClients = await restCount('operations_clients', `workspace_id=eq.${PILOT_WS}`)
+    const nMods = await restCount('module_data', `workspace_id=eq.${PILOT_WS}&client_id=not.is.null`)
+    check('L27-8 팀장 [지금 닫기] → 설정 "지금 닫혀 있어요" · 지난 기록에 닫은 때 · 대표 토큰으로 팀장 업체 0 · 업체 걸린 모듈 기록 0',
+      (await pp.getByTestId('consent-settings').getAttribute('data-consent').catch(() => '')) === 'closed' && /닫음/.test((await pp.getByTestId('consent-history').textContent().catch(() => '')) ?? '') && nClients === 0 && nMods === 0 &&
+      sql(`select count(*) from public.workspace_view_grants where workspace_id = '${PILOT_WS}' and revoked_at is null and expires_at > now()`) === '0',
+      `clients=${nClients} mods=${nMods}`)
+    await shot(pp, 'l27-8-pilot-revoked')
+    await cp.close()
+    currentWho = OWNER
+    await go(page, '/settings')
+    await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"] [data-view="pilot"]').click()
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1500)
+    await go(page, '/ops/clients')
+    await page.getByTestId('viewing-consent').waitFor({ timeout: 8000 }).catch(() => {})
+    const pv3 = await bodyText(page)
+    check('L27-9 대표 → 팀장 화면(닫은 뒤): 팀장 업체 다시 안 보임 · 띠 아래 "허락해야 보여요" · 마케팅 메뉴는 그대로', !pv3.includes('은혜테스트정밀') && (await page.getByTestId('viewing-consent').getAttribute('data-consent').catch(() => '')) === 'closed' && (await page.locator('aside a[href="/marketing"]').count()) >= 1, pv3.slice(0, 200))
+    await page.getByTestId('viewing-pilot-back').click()
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1500)
+    await go(page, '/ops/clients')
+    check('L27-10 대표 화면으로 돌아오면 대표 업체 그대로 · 허락 한 줄 없음', (await bodyText(page)).includes('대표비밀정밀') && (await page.getByTestId('viewing-consent').count()) === 0)
   }
 
   /* ---------- D-164: 보기 방식 — PC+Mobile(같은 로그인 · 같은 자료) ---------- */

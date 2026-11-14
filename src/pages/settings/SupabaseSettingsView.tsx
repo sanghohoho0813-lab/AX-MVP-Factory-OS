@@ -36,6 +36,7 @@ import { FeedbackNavButton } from '../../components/feedback/FeedbackNavButton'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { useSupportState } from '../../components/support/useSupport'
 import { setModelPickShown, useModelPickShown } from '../../lib/modelPickPref'
+import { ViewConsentPanel } from '../../components/layout/ViewConsent'
 
 /** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
 function NameEditor() {
@@ -294,6 +295,8 @@ export function SupabaseSettingsView() {
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
           <SettingRow label="작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
         </Panel>
+        {/* L-27 · D-608 대표님의 내 고객 자료 보기 — 허락 · 닫기 · 거절 · 지난 기록(대표 계정이 구성원일 때만 · 서버 0026 뒤) */}
+        <ViewConsentPanel focus={focus === 'consent'} />
         {/* D-550 팀장 작업공간의 덮인 내용(있을 때만) */}
         <OverwrittenPanel focus={focus === 'overwritten'} />
         <TextScalePanel />

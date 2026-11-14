@@ -6,6 +6,7 @@
  */
 
 import { isUserScopedKey, vaultSignOut, vaultSwitchTo } from '../storageVault'
+import { historyLine, isConsentMissing, koWhen, leftText, parseConsentState } from '../../services/viewConsent'
 import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../currentUser'
 import { brand } from '../../brand/brand.config'
@@ -424,6 +425,26 @@ check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft
   // D-222 같은 팀장이 두 번 보내도 '2명' 이 아니라 응답 2건 · 1명
   const sum2 = summarizeFeedback([mk('1', { easy: 4 }), mk('2', { easy: 5 }), { ...mk('3', { easy: 3 }), author: { id: 'u2', name: '박팀장', title: '팀장', email: '' } }])
   check('피드백 모아 보기: 응답 3건 · 보낸 사람 2명(같은 사람 여러 번은 1명)', sum2.responses === 3 && sum2.people === 2 && sum.people === 1, { r: sum2.responses, p: sum2.people })
+}
+
+// L-27 · D-608 대표가 팀장 고객 자료를 볼 때 — 팀장 허락 상태(서버 0026 이 준 모양 → 화면 모양)
+{
+  const now = Date.parse('2026-11-14T03:00:00Z')
+  check('허락 상태: 모르는 모양 · null · 함수 없음 → none', parseConsentState(null).role === 'none' && parseConsentState({ role: 'x' }).role === 'none' && parseConsentState('owner').role === 'none')
+  const o = parseConsentState({ role: 'owner', viewers: 1, active: null, request: { createdAt: '2026-11-14T02:00:00Z', by: '김상호' }, history: [
+    { kind: 'grant', createdAt: '2026-11-10T01:00:00Z', expiresAt: '2026-11-11T01:00:00Z', revokedAt: null, to: '김상호' },
+    { kind: 'request', createdAt: '2026-11-09T01:00:00Z', closedAt: '2026-11-10T01:00:00Z', closedReason: 'granted', by: '김상호' },
+    { kind: 'grant', createdAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-19T01:00:00Z', revokedAt: '2026-11-13T05:30:00Z', to: '김상호' },
+    null, 'x'] })
+  check('허락 상태(팀장): 대표 계정 1 · 요청(보낸 사람) · 지난 기록 3줄(이상한 줄은 버림)', o.role === 'owner' && o.viewers === 1 && o.active === null && o.request?.by === '김상호' && o.history.length === 3)
+  if (o.role === 'owner') {
+    check('지난 기록 한 줄: 기한 지남 · 허락함 · 닫은 때', historyLine(o.history[0], now).endsWith('기한이 지나 닫힘') && historyLine(o.history[1], now).endsWith('허락함') && historyLine(o.history[2], now).includes('닫음') && historyLine(o.history[2], now).includes('11월 13일(금) 오후 2시 30분'), o.history.map((h) => historyLine(h, now)).join(' / '))
+  }
+  const v = parseConsentState({ role: 'viewer', active: { createdAt: '2026-11-14T01:00:00Z', expiresAt: '2026-11-21T01:00:00Z' }, request: null, lastClosed: { closedAt: '2026-11-14T01:00:00Z', closedReason: 'granted' } })
+  check('허락 상태(대표): 지금 허락 · 끝나는 때 · 마지막으로 닫힌 요청', v.role === 'viewer' && v.active?.expiresAt === '2026-11-21T01:00:00Z' && v.request === null && v.lastClosed?.closedReason === 'granted')
+  check('한국 시각 · 요일 · 오전/오후 · 정각은 분 없음', koWhen('2026-11-21T01:00:00Z') === '11월 21일(토) 오전 10시' && koWhen('2026-11-14T15:05:00Z') === '11월 15일(일) 오전 12시 5분' && koWhen('엉뚱') === '', koWhen('2026-11-21T01:00:00Z'))
+  check('남은 시간: 일 · 시간 · 곧 · 끝남', leftText('2026-11-21T01:00:00Z', now) === '6일 남음' && leftText('2026-11-14T08:00:00Z', now) === '5시간 남음' && leftText('2026-11-14T03:30:00Z', now) === '곧 끝남' && leftText('2026-11-14T02:00:00Z', now) === '끝남')
+  check('함수 없음 · 권한 거둠(되돌림) → 화면 숨김 / 그 밖의 오류는 아님', isConsentMissing({ code: 'PGRST202' }) && isConsentMissing({ code: '42883' }) && isConsentMissing({ code: '42501', message: 'permission denied for function view_consent_state' }) && !isConsentMissing({ code: '08006', message: 'connection failure' }) && !isConsentMissing(null))
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

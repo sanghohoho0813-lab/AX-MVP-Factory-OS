@@ -116,6 +116,21 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 - 되돌리기(필요할 때만): 함수 여섯 개의 실행 권한을 거두면 앱은 단추를 숨긴다 — 표는 남겨도 무해(지우지 않는다).
 - 로컬 시험: `npm run qa:db`(test-0025-support.sql 51줄) · `npm run qa:pilot`(고객 → 대표 받은함 → 답장 → 고객 화면 · 고객/팀장 토큰 공격).
 
+## 10. 0026 — 대표가 팀장 화면을 볼 때 고객 자료는 팀장 허락 동안만(L-27 · D-608) · 0020 · 0024 다음에
+
+- 무엇: 표 둘(`workspace_view_grants` 허락 기록 · `workspace_view_requests` 요청 기록 — 앱 계정은 읽기만) · 함수 여덟(`view_consent_*`) ·
+  고객 자료 표마다 RESTRICTIVE 정책 하나(`zz View consent gate`) · `module_data` 하나 · `storage.objects`(client-documents) 하나 · `portal_preview_project` 에 같은 문 한 줄.
+  **기존 표 · 열 · 허용 정책 · 자료는 건드리지 않는다**(정책은 더하기만 — AND 로 걸리는 문).
+- 넣으면 바로 달라지는 것: **최은혜 팀장님이 허락하기 전까지 대표님이 [대표 | 팀장] 으로 팀장 화면을 볼 때 업체 · 서류 · 계약이 비어 보인다.**
+  마케팅 · 브랜딩 · 받은 피드백함 · 화면 설정은 그대로. 팀장님 화면 · 대표님 자기 화면은 아무것도 안 바뀐다.
+  허락 길: 대표 화면 띠 아래 [허락 요청 보내기] → 팀장님 화면 맨 위 알림 → 설정에서 [7일 동안 허락하기](하루 · 30일도) → 대표 화면에 다시 보임.
+- 실행: SQL Editor 에 `set lock_timeout = '5s';` 한 줄 + `supabase/migrations/20261114000026_view_consent.sql` **통째로** → 마지막 결과 `storage_gate 1`. 여러 번 실행해도 같다.
+  잠금이 5초 넘게 걸리면 멈추고 아무것도 바뀌지 않는다(한 거래) — 조금 뒤 다시.
+- 확인(읽기만): `supabase/manual/verify_after_0026.sql` → 1~6 '좋음' · 7 '대표가 팀장 작업공간 구성원' 1 · 8 '지금 열린 허락' 0.
+- 되돌리기(대표가 다시 허락 없이 보게): `supabase/manual/rollback_0026.sql` — 문만 떼고 함수 실행 권한을 거둔다(앱은 허락 화면을 숨긴다) · 기록 표와 기록은 남긴다. 다시 켜려면 0026 을 다시 실행.
+- 로컬 시험: `npm run qa:db`(test-0026 · run-0024-customer ⑪ 운영 모양 위 적용 · 다시 실행 · 계단 들여쓰기 · 되돌리기) · `npm run qa:pilot`(L27-1~10 화면 · 진짜 토큰).
+- 외부 구독 고객: 0024 그대로 대표가 구성원이 아니라 이 기능과 상관없다(고객 지원용 '동의 뒤 보기' 는 0024 를 풀어야 해서 따로 결정).
+
 ## 9. AI 사용량 비밀값 넣은 뒤 — 팀장 마케팅 AI 권한(D-600)
 
 - 0022 를 처음 넣을 때 그때 있던 팀장(pilot) 계정에 `ai_entitlements` 줄이 **마케팅 꺼짐**(`marketing = false`)으로 만들어진다.
@@ -139,6 +154,9 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 | `supabase/manual/try_0023_0024.sql` | 시도 뒤 **전부 되돌림** | 적용 뒤 |
 | `supabase/manual/rollback_0023_0024.sql` | 장치 떼기 · 함수 0020 본문 | 되돌리라고 할 때만 |
 | `supabase/manual/customer_provision.sql` | 고객 계정 열기 | 0024 뒤(순서는 §9) |
+| `supabase/migrations/20261114000026_view_consent.sql` | 표 2 · 함수 8 · 문(정책) 추가 | 승인 뒤(§10) |
+| `supabase/manual/verify_after_0026.sql` | 읽기만 | 0026 뒤 |
+| `supabase/manual/rollback_0026.sql` | 문 떼기 · 함수 권한 거둠(기록은 남김) | 되돌리라고 할 때만 |
 
 읽기만 파일 셋은 맨 위 `set transaction read only` 로 한 거래를 읽기 전용으로 묶는다(같은 덩어리 안 쓰기 문장은 오류로 막힘 — 로컬 확인).
 한 줄씩 실행하는 도구에서는 그 줄이 경고만 내고 넘어가지만, 아래가 SELECT 한 문장뿐이라 여전히 읽기만 한다(첫 줄 '읽기 전용 거래' 가 off 로 보인다).

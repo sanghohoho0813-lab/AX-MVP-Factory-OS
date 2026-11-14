@@ -36,6 +36,7 @@ import { useCapabilitySet } from '../../auth/ownerAiAccess'
 import { NotFoundState } from '../ui/NotFoundState'
 import { FrameBridge } from './DeviceView'
 import { ViewingPilotBanner } from './ViewAsSwitch'
+import { ConsentRequestNotice, ViewingConsentLine } from './ViewConsent'
 import { Breadcrumbs } from './Breadcrumbs'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
@@ -183,6 +184,9 @@ export function AppShell() {
             <ClientConflictNotice />
             {/* D-164: 대표가 팀장 화면을 보는 동안 */}
             <ViewingPilotBanner />
+            {/* L-27 · D-608 고객 자료는 팀장 허락 동안만 — 대표: 허락 상태 · 요청 / 팀장: 받은 요청(서버 0026 이 없으면 둘 다 안 그림) */}
+            <ViewingConsentLine />
+            <ConsentRequestNotice />
             {/* D-235: 경로 줄 — 어디를 눌러 들어와도 지금 어디 안에 있는지(앞 칸을 누르면 그 단계로) */}
             {/* D-265 [ChatGPT 옆에 띄우기] — 본문 오른쪽 여백에 들어가면 그 여백(화면 고정), 아니면 이 줄 오른쪽(PC 만) */}
             {/* D-287 [화면 꾸미기] — 칸 순서 · 숨기기를 고를 수 있는 화면에서만(경로 줄 오른쪽 · 휴대폰도) */}

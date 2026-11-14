@@ -11,7 +11,8 @@ select set_config('request.jwt.claim.sub', '19000000-0000-0000-0000-0000000000a1
 set role authenticated;
 select qa.eq('O: 볼 수 있는 팀장 화면 = Pilot 작업공간 하나', (select count(*)::text from public.my_pilot_views()), '1');
 select qa.eq('O: 그 작업공간 = Pilot 작업공간', (select (workspace_id = (select v from qa.ids where k = 'P'))::text from public.my_pilot_views()), 'true');
-select qa.eq('O: 팀장 업체가 보인다(편집자)', (select count(*)::text from public.operations_clients where id = 'p19-client'), '1');
+-- L-27(0026): 편집자 구성원은 그대로 — 업체 자료는 팀장이 허락한 동안만 보인다(허락 길은 test-0026)
+select qa.eq('O: 팀장 작업공간 구성원(편집자) · 팀장 업체는 허락 전 안 보임(0026)', (select public.is_workspace_member(v)::text from qa.ids where k = 'P') || ' ' || (select count(*)::text from public.operations_clients where id = 'p19-client'), 'true 0');
 select qa.no('O: 연결 함수를 앱에서 부를 수 없음', $q$select public.os_access_link_owner_to_pilots()$q$);
 reset role;
 

@@ -50,7 +50,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000d1', 'cust24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -93,7 +93,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000b1', 'pilot24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -156,4 +156,25 @@ check "연습 ⑩ 운영 모양 profiles(display_name 없음)에서 0025 한 덩
 check "연습 ⑩ 받은함의 보낸 사람 이름은 운영 모양의 name 칸에서" "$(v "select coalesce(nullif(btrim(coalesce(to_jsonb(p) ->> 'display_name', to_jsonb(p) ->> 'name', '')), ''), '') from public.profiles p where p.id = '24000000-0000-4000-8000-0000000000a1'")" "운영모양이름"
 out=$(blk supabase/migrations/20261110000025_support_messages.sql)
 check "연습 ⑩ 0025 다시 실행해도 같음(오류 0)" "$(echo "$out" | grep -c 'ERROR')" "0"
+# ⑪ L-27 · D-608 0026(대표가 팀장 고객 자료를 볼 때 — 팀장 허락 동안만) — 운영 모양(0025 까지 · profiles name) 위에 한 덩어리로
+PW=$(v "select id from public.workspaces where owner_id = '24000000-0000-4000-8000-0000000000b1'")
+q > /dev/null <<SQL || { echo "팀장 업체 준비 실패"; exit 1; }
+insert into public.operations_clients (id, workspace_id, company_name, payload) values ('p24-client', '$PW', '팀장고객24', '{}') on conflict (id) do nothing;
+SQL
+ownsee() { su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '24000000-0000-4000-8000-0000000000a1', false); set role authenticated; select count(*) from public.operations_clients where id = 'p24-client';" | tail -1; }
+check "연습 ⑪ 0026 전: 대표가 팀장 업체를 본다(0020 그대로)" "$(ownsee)" "1"
+out=$(blk supabase/migrations/20261114000026_view_consent.sql "set lock_timeout = '5s'; ")
+check "연습 ⑪ 0026 한 덩어리(lock_timeout 5초) — 오류 0 · 마지막 결과 = 파일 문 1" "$(echo "$out" | grep -c 'ERROR') $(echo "$out" | tail -1)" "0 1"
+out=$(blk supabase/manual/verify_after_0026.sql)
+check "연습 ⑪ 적용 뒤 확인: 1~6 모두 '좋음' · 대표 구성원 1 · 열린 허락 0" "$(echo "$out" | grep -cE '^[1-6]\|.*\|좋음$') $(echo "$out" | grep -E '^7\|' | cut -d'|' -f3) $(echo "$out" | grep -E '^8\|' | cut -d'|' -f3)" "6 1 0"
+check "연습 ⑪ 확인 SQL: 맨 위 set transaction read only · 만들기/고치기 문장 0" "$(grep -v '^--' supabase/manual/verify_after_0026.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/verify_after_0026.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|truncate|grant|revoke|comment on)\b')" "set transaction read only; 0"
+check "연습 ⑪ 0026 뒤: 대표는 허락 전 팀장 업체 0 · 대표 자기 업체는 그대로" "$(ownsee) $(su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '24000000-0000-4000-8000-0000000000a1', false); set role authenticated; select count(*) from public.operations_clients where id = 'o24-secret';" | tail -1)" "0 1"
+out=$(blk supabase/migrations/20261114000026_view_consent.sql)
+check "연습 ⑪ 0026 다시 실행해도 같음(오류 0 · 확인 6줄 좋음)" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0026.sql | grep -cE '^[1-6]\|.*\|좋음$')" "0 6"
+out=$(blkind supabase/migrations/20261114000026_view_consent.sql "set lock_timeout = '5s'; ")
+check "연습 ⑪ 계단 들여쓰기로 붙여 넣어도(D-597) 오류 0" "$(echo "$out" | grep -c 'ERROR')" "0"
+out=$(blk supabase/manual/rollback_0026.sql)
+check "연습 ⑪ 되돌리기: 문 0 | 0 · 대표가 다시 팀장 업체를 봄 · 기록 표는 남음" "$(echo "$out" | tail -1) $(ownsee) $(v "select count(*) from pg_tables where tablename in ('workspace_view_grants', 'workspace_view_requests')")" "0|0 1 2"
+out=$(blk supabase/migrations/20261114000026_view_consent.sql)
+check "연습 ⑪ 되돌린 뒤 0026 다시 — 문 다시 · 대표 0 · 확인 6줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(ownsee) $(blk supabase/manual/verify_after_0026.sql | grep -cE '^[1-6]\|.*\|좋음$')" "0 0 6"
 [ "$BAD" -eq 0 ]

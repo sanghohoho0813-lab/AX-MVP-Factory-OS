@@ -35,7 +35,7 @@ set role authenticated;
 select qa.eq('O: 팀장 화면 목록 = 내부 팀장 하나(고객 없음)', (select count(*)::text from public.my_pilot_views()), '1');
 select qa.eq('O: 그 하나 = 내부 팀장 작업공간', (select (workspace_id = (select v from qa.ids where k = 'P'))::text from public.my_pilot_views()), 'true');
 select qa.eq('O: 고객 업체 안 보임', (select count(*)::text from public.operations_clients where id = 'c24-client'), '0');
-select qa.eq('O: 내부 팀장 업체는 보임(편집자 그대로)', (select count(*)::text from public.operations_clients where id = 'p19-client'), '1');
+select qa.eq('O: 내부 팀장 작업공간 편집자 그대로 · 업체는 팀장 허락 전 안 보임(0026 · 허락 길은 test-0026)', (select public.is_workspace_member(v)::text from qa.ids where k = 'P') || ' ' || (select count(*)::text from public.operations_clients where id = 'p19-client'), 'true 0');
 -- 고객 업체 고치기 — RLS 가 줄을 숨겨 0줄 고침(오류 없이). 아래 '결과' 줄로 그대로인지 본다
 update public.operations_clients set company_name = '대표가 고침' where id = 'c24-client';
 reset role;
