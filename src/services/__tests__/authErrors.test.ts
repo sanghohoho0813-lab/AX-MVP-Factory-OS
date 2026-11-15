@@ -26,21 +26,21 @@ const check = (n: string, c: boolean, d?: string) => {
 {
   const r = toFriendlyAuthError({ message: 'Signups not allowed for this instance' })
   check('가입차단: 분류', r.kind === 'signup_disabled', r.kind)
-  check('가입차단: 켜는 위치 안내', r.message.includes('Allow new users to sign up'))
+  check('가입차단: 고객에게는 담당자 안내 · 관리 화면 말 0(첫날 걸어 보기)', r.message.includes('담당자') && !/Supabase|Authentication/.test(r.message), r.message)
 }
 
 /* 잘못된 이메일 */
 {
   const r = toFriendlyAuthError({ message: 'Email address "a@b" is invalid' })
   check('이메일오류: 분류', r.kind === 'invalid_email', r.kind)
-  check('이메일오류: 대안 안내', r.message.includes('Users'))
+  check('이메일오류: 대안 안내 · 관리 화면 말 0', r.message.includes('다른 이메일') && !/Supabase|Authentication/.test(r.message), r.message)
 }
 
 /* 미인증 */
 {
   const r = toFriendlyAuthError({ message: 'Email not confirmed' })
   check('미인증: 분류', r.kind === 'email_not_confirmed', r.kind)
-  check('미인증: 해결 방법', r.message.includes('메일'))
+  check('미인증: 해결 방법 · 스팸함 · 관리 화면 말 0', r.message.includes('메일의 링크') && r.message.includes('스팸함') && !/Supabase|Authentication/.test(r.message), r.message)
 }
 
 /* 기존 동작 유지 */

@@ -232,6 +232,15 @@ check('R3c 업체 기록에 붙음 · 끝내지 않은 요청 1', openRequests(r
   check('F6 다 함 — 다음 없음 · 안 띄움', firstUseNext(s4) === null && !firstUseVisible(s4, [withDoc], today))
   const s5 = firstUseSteps({ clients: [withDoc], journal: [todo({ entryType: 'follow_up', clientId: 'n1' })], ideas: 0, marketing: false })
   check('F7 마케팅이 닫힌 계정(팀장) — 세 단계 · 다 했으면 안 띄움', s5.length === 3 && firstUseNext(s5) === null && !firstUseVisible(s5, [withDoc], today))
+  // 첫날 걸어 보기(2026-11-15): 날짜를 정한 다음 약속도 할 일 · 고객 계정은 맞춤 추천([할 일로] 없음) 대신 개요의 '다음 약속 정하기'로
+  const dated = { ...withDoc, nextAction: '1차 미팅', nextActionDueDate: '2026-11-23' }
+  const s6 = firstUseSteps({ clients: [dated], journal: [], ideas: 0, marketing: true })
+  check('F8 다음 약속(무엇 · 날짜)을 정했으면 할 일 단계 끝 — 다음 = 첫 콘텐츠', s6.find((x) => x.key === 'todo')?.done === true && firstUseNext(s6)?.key === 'content', s6.map((x) => `${x.key}:${x.done}`).join(','))
+  const s7 = firstUseSteps({ clients: [{ ...withDoc, nextAction: '1차 미팅', nextActionDueDate: '' }], journal: [], ideas: 0, marketing: true })
+  check('F9 날짜 없는 다음 약속은 아직 할 일 아님(일정에 안 뜬다)', s7.find((x) => x.key === 'todo')?.done === false)
+  const s8 = firstUseSteps({ clients: [withDoc], journal: [], ideas: 0, marketing: true, basic: true, named: true })
+  const t8 = s8.find((x) => x.key === 'todo')
+  check('F10 고객 계정 — 할 일 단계는 업체 개요의 "다음 약속 정하기"(누르면 개요 탭) · [할 일로] · 모듈을 약속하지 않음', !!t8 && t8.title === '다음 약속 하나 정하기' && t8.href === '/ops/clients/n1?tab=overview' && t8.action === '다음 약속 정하기' && !/할 일로|모듈/.test(`${t8.title}${t8.note}`), t8)
 }
 
 /* L D-520 업무 한 줄 */

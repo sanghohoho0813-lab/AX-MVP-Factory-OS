@@ -305,7 +305,7 @@ export function WeekView({
                 ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않아요).'
                 : past
                   ? `${dayLabel(start, 1)} 주에 만든 1주일치예요${saved?.model ? ` · ${saved.model}` : ''}${saved && when(saved.at) ? ` · ${when(saved.at)}` : ''} — 다시 쓰기는 이번에 만들 주만 돼요.`
-                  : 'AI 로 다 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
+                  : 'AI 로 다 쓰기는 지금 이 계정에서 쓸 수 없어요 — 아래는 규칙으로 만든 초안이에요.'}
             </p>
           )}
 

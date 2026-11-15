@@ -69,7 +69,7 @@ function NameEditor() {
     <div className="flex flex-wrap items-end gap-3 border-b border-slate-50 py-3" data-testid="name-editor">
       <label className="min-w-[10rem] flex-1 text-[0.875rem] text-slate-500">
         이름
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 최은혜" className={input} data-testid="name-input" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 홍길동" className={input} data-testid="name-input" />
       </label>
       <label className="w-32 text-[0.875rem] text-slate-500">
         직함

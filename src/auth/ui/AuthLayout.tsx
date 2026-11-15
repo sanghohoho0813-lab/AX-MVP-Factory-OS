@@ -69,7 +69,8 @@ export function AuthLayout({
           {subtitle && <p className="mt-1.5 text-[0.9375rem] break-keep text-slate-600">{subtitle}</p>}
           <div className="mt-6">{children}</div>
         </div>
-        {footer && <div className="mt-4 text-center text-[0.9375rem] text-slate-600">{footer}</div>}
+        {/* 첫날 걸어 보기: '회원가입' · '로그인' 글자 링크가 휴대폰에서 누르는 칸 20px 남짓 — 처음 오는 사람의 첫 단추라 44px 칸으로 */}
+        {footer && <div className="mt-2 text-center text-[0.9375rem] text-slate-600 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_a]:px-1">{footer}</div>}
         {/* 출시 목록 L-5: 이용약관 · 개인정보처리방침 — 법률 검토가 끝나(LEGAL.ready) 고객에게 보여도 될 때만 */}
         {LEGAL.ready && (
           <p className="mt-4 flex justify-center gap-3 text-[0.875rem] text-slate-500" data-testid="auth-legal">

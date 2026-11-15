@@ -284,6 +284,9 @@ check('D12 JS 오류 0', errs.length === 0, errs.slice(0, 3))
     r.createdAt = new Date().toISOString()
     r.documents = {}
     r.customDocuments = []
+    // 첫날 걸어 보기(2026-11-15): 날짜를 정한 다음 약속도 '할 일' 로 센다 — 막 등록한 업체 모양(다음 약속 없음)
+    r.nextAction = ''
+    r.nextActionDueDate = ''
     localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify([r]))
     localStorage.setItem('axmvp.v1.ops_journal_entries', '[]')
   })

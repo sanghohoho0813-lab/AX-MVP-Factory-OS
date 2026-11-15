@@ -33,6 +33,8 @@ export function firstUseClient(clients: readonly ClientOpsRecord[]): ClientOpsRe
 const hasDoc = (c: ClientOpsRecord) => Object.values(c.documents ?? {}).some((d) => !!d && (d.received || !!d.fileName || !!d.storagePath))
 /** 업체에 걸린 할 일(기한이 있거나 후속조치) */
 const isClientTodo = (e: JournalEntry) => !!e.clientId && (e.entryType === 'follow_up' || !!e.dueDate)
+/** 첫날 걸어 보기(2026-11-15): 날짜까지 정한 '다음 약속'도 그 업체에 걸린 할 일이다(일정 · 다가오는 마감 · 약속에 뜬다) */
+const hasDatedNext = (c: ClientOpsRecord) => c.archivedAt === null && !!c.nextAction?.trim() && !!c.nextActionDueDate
 
 export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; journal: readonly JournalEntry[]; ideas: number; marketing: boolean; /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈을 약속하지 않는다 */ basic?: boolean; /** D-564 고객 계정이 이름 · 회사를 적었는가 — 값을 주면 맨 앞에 '내 이름 · 회사 적기' 단계가 붙는다(고객에게 가는 글 서명) */ named?: boolean }): FirstStep[] {
   const target = firstUseClient(input.clients)
@@ -40,7 +42,11 @@ export function firstUseSteps(input: { clients: readonly ClientOpsRecord[]; jour
   const steps: FirstStep[] = [
     { key: 'client', title: '첫 업체 등록', note: '사업자등록증을 올리면 이름 · 번호 · 대표가 채워져요', done: !!target, href: '/ops/clients?new=1', action: '첫 업체 등록' },
     { key: 'doc', title: '서류 한 장 올리기', note: '대충 올려도 칸 · 회사 정보를 채워요', done: input.clients.some(hasDoc), href: at('docs'), action: '서류 올리기' },
-    { key: 'todo', title: '맞춤 추천 보고 할 일 하나', note: input.basic ? '확인할 것 · 받을 서류를 보고 [할 일로] 한 번' : '맞는 모듈 · 받을 서류를 보고 [할 일로] 한 번', done: input.journal.some(isClientTodo), href: at('smart'), action: '맞춤 추천 보기' },
+    // 첫날 걸어 보기: 고객 계정(basic)의 맞춤 추천에는 [할 일로] 단추가 없다(모듈 카드가 닫혀 있다) — 안내를 따라가도 이 단계가 끝나지 않았다.
+    // 고객은 업체 개요의 '다음 약속 [정하기]'(접히지 않은 칸)로 보내고, 날짜를 정한 다음 약속도 할 일로 센다(대표 · 팀장도 같이).
+    input.basic
+      ? { key: 'todo', title: '다음 약속 하나 정하기', note: '무엇을 언제 할지 적으면 오늘 · 일정에 떠요', done: input.journal.some(isClientTodo) || input.clients.some(hasDatedNext), href: at('overview'), action: '다음 약속 정하기' }
+      : { key: 'todo', title: '맞춤 추천 보고 할 일 하나', note: '맞는 모듈 · 받을 서류를 보고 [할 일로] 한 번', done: input.journal.some(isClientTodo) || input.clients.some(hasDatedNext), href: at('smart'), action: '맞춤 추천 보기' },
   ]
   if (input.named !== undefined) steps.unshift({ key: 'me', title: '내 이름 · 회사 적기', note: '고객에게 보내는 글 끝 서명과 AI 글에 쓰여요', done: input.named, href: '/settings', action: '이름 · 회사 적기' })
   if (input.marketing) steps.push({ key: 'content', title: '첫 콘텐츠', note: '이번 주 주제 하나로 글 · 대본을 한 번에', done: input.ideas > 0, href: '/marketing', action: '마케팅 열기' })

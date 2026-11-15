@@ -336,7 +336,7 @@ function AiBar({
   if (!canAi) {
     return (
       <p className="t-sub break-keep border-t border-slate-100 px-4 py-2.5 text-slate-600 empty:hidden sm:px-5" data-testid="mk-pack-ai-off">
-        {readOnly ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않고 저장하지 않아요).' : ownerAi ? '' : 'AI 로 다시 쓰기는 대표 계정에서만 돼요 — 아래는 규칙으로 만든 초안이에요.'}
+        {readOnly ? '팀장 화면을 보는 중이라 규칙 초안만 보여 드려요(AI 를 부르지 않고 저장하지 않아요).' : ownerAi ? '' : 'AI 로 다시 쓰기는 지금 이 계정에서 쓸 수 없어요 — 아래는 규칙으로 만든 초안이에요.'}
       </p>
     )
   }

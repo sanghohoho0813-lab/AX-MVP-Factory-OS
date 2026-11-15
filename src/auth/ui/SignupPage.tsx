@@ -52,7 +52,8 @@ export function SignupPage() {
     }
     if (!result.session) {
       // 이메일 확인이 필요한 설정
-      setNotice('가입 확인 메일을 보냈습니다. 메일의 링크로 인증한 뒤 로그인해 주세요.')
+      // 첫날 걸어 보기 — 어느 주소로 갔는지 · 안 보이면 스팸함(확인 메일을 못 찾는 것이 가입에서 가장 흔한 막힘)
+      setNotice(`${email.trim()} 로 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요. 메일이 안 보이면 스팸함도 확인해 주세요.`)
       setSubmitting(false)
       return
     }

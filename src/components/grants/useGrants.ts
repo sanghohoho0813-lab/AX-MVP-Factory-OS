@@ -49,8 +49,8 @@ export function useGrantData(workspaceId: string | null) {
   }, [reload])
   const linkOf = useCallback((clientId: string) => links.find((l) => l.operationsClientId === clientId && l.status === 'active') ?? null, [links])
   // D-143: 기업마당에서 받은 공고(모든 화면이 같은 것을 같이 쓴다)를 직접 넣은 공고와 합친다
-  const feed = useGrantFeed()
   const customer = useCustomerAudience()
+  const feed = useGrantFeed(!customer)
   const all = useMemo(() => (customer ? NO_NOTICES : mergeNotices(notices, feed.notices)), [customer, notices, feed.notices])
   return { notices: all, manualNotices: notices, setNotices, sent, setSent, links, linkOf, loaded, error, reload, feed }
 }
@@ -79,8 +79,8 @@ export function useGrantNotices(workspaceId: string | null): GrantNotice[] {
       alive = false
     }
   }, [workspaceId])
-  const feed = useGrantFeed()
   const customer = useCustomerAudience()
+  const feed = useGrantFeed(!customer)
   return useMemo(() => (customer ? NO_NOTICES : mergeNotices(manual, feed.notices)), [customer, manual, feed.notices])
 }
 

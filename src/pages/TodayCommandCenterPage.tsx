@@ -359,10 +359,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     void load()
   }, [load])
 
-  // D-237 내 콘텐츠(콘텐츠 레이더)의 촬영 · 게시 예정 — 대표 화면에만(팀장은 마케팅이 없다). 못 읽으면 없이 그린다
+  // D-237 내 콘텐츠(콘텐츠 레이더)의 촬영 · 게시 예정. 못 읽으면 없이 그린다
+  // 첫날 걸어 보기(2026-11-15): D-564 부터 팀장 · 구독 고객도 마케팅 화면이 열린다 — 예전처럼 대표만 읽으면 '처음 시작' 의
+  // '첫 콘텐츠' 가 담고 올려도 끝나지 않았다. 마케팅 화면이 열린 계정이면 자기 작업공간 것을 읽는다.
+  const pilotMarketing = usePilotMarketingScreens()
   const [ideas, setIdeas] = useState<ContentIdea[]>([])
   useEffect(() => {
-    if (pilot) {
+    if (pilot && !pilotMarketing) {
       setIdeas([])
       return
     }
@@ -373,7 +376,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     return () => {
       alive = false
     }
-  }, [workspaceId, pilot])
+  }, [workspaceId, pilot, pilotMarketing])
 
   // 계약 완료(끝남)·보관을 뺀 곳이 '지금 챙기는 업체'
   // D-168: 할 일에 붙일 업체 — 보관하지 않은 업체 전부. 예전에는 예전 '끝남'(completed) 업체를 뺐는데,
@@ -445,7 +448,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    */
   const contentDue = useMemo(() => contentAgenda(ideas, today), [ideas, today])
   // D-519 처음 시작 — 업체 · 서류 · 할 일 · (마케팅) 첫 콘텐츠를 다 해 볼 때까지 오늘 맨 위 한 줄
-  const pilotMarketing = usePilotMarketingScreens()
   // D-564 고객 계정 — 이름(설정 › 내 정보 · 내 브랜드)이나 회사를 적었는가
   const meNow = useCurrentUser()
   const myBrand = useBrandProfile()

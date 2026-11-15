@@ -166,12 +166,15 @@ function subscribe(fn: () => void) {
   return () => listeners.delete(fn)
 }
 
-/** 화면에서 — 처음 쓸 때 한 번 불러 온다 */
-export function useGrantFeed(): FeedState & { refresh: () => Promise<void> } {
+/**
+ * 화면에서 — 처음 쓸 때 한 번 불러 온다.
+ * enabled = false(구독 고객 — 지원사업은 닫힌 화면 · D-562)면 받지 않는다(첫날 걸어 보기: 고객 휴대폰이 화면마다 공고 최대 1,000건을 받고 브라우저에 쌓던 것).
+ */
+export function useGrantFeed(enabled = true): FeedState & { refresh: () => Promise<void> } {
   const s = useSyncExternalStore(subscribe, feedSnapshot, feedSnapshot)
   useEffect(() => {
-    void ensureFeed()
-  }, [])
+    if (enabled) void ensureFeed()
+  }, [enabled])
   return { ...s, refresh: refreshFeed }
 }
 
