@@ -37,6 +37,7 @@ import { useCustomerAudience } from '../../config/customerAudience'
 import { useSupportState } from '../../components/support/useSupport'
 import { setModelPickShown, useModelPickShown } from '../../lib/modelPickPref'
 import { ViewConsentPanel } from '../../components/layout/ViewConsent'
+import { SelfSignupPanel } from './SelfSignupPanel'
 
 /** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
 function NameEditor() {
@@ -328,9 +329,13 @@ export function SupabaseSettingsView() {
         </>
       )}
       {tab === 'workspace' && (
-        <Panel title={`작업공간 · ${current?.workspace?.name ?? ''}`}>
-          <WorkspaceMembersPanel />
-        </Panel>
+        <>
+          <Panel title={`작업공간 · ${current?.workspace?.name ?? ''}`}>
+            <WorkspaceMembersPanel />
+          </Panel>
+          {/* L-7 · D-610 가입하면 바로 쓰기 — 대표(운영자)에게만 · 서버 0028 뒤에만 보인다 */}
+          <SelfSignupPanel />
+        </>
       )}
       {tab === 'data' && <DataPanelSupabase focus={focus} />}
       {tab === 'system' && <SupabaseHealthPanel />}

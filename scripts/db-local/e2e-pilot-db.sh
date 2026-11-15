@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -70,6 +70,9 @@ psqlq < supabase/migrations/20261114000026_view_consent.sql > /dev/null
 
 # 0027 — L-9 · D-609 고객(컨설턴트)마다 상담 신청 링크(0019 뒤 — 사용 승인 있는 주인만)
 psqlq < supabase/migrations/20261114000027_intake_links.sql > /dev/null
+
+# 0028 — L-7 · D-610 가입하면 바로 쓰기(꺼 둔 채 — 0019 · 0022 · 0024 · 0025 뒤)
+psqlq < supabase/migrations/20261115000028_self_signup.sql > /dev/null
 
 # PostgREST 가 붙을 역할(로컬 시험용 비밀번호)
 psqlq > /dev/null <<'SQL'

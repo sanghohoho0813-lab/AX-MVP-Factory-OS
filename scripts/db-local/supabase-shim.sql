@@ -9,6 +9,8 @@ do $$ begin
 end $$;
 create schema if not exists auth;
 create table if not exists auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, created_at timestamptz default now());
+-- 진짜 Supabase 처럼 이메일 확인한 때(0028 가입하면 바로 쓰기가 본다) — 예전 시험 계정은 비어 있다(= 확인 전)
+alter table auth.users add column if not exists email_confirmed_at timestamptz;
 -- Supabase 와 같게: 예전 방식(request.jwt.claim.sub)과 PostgREST 방식(request.jwt.claims JSON) 둘 다 읽는다 — e2e(PostgREST) 와 SQL 시험이 같은 함수를 쓴다
 create or replace function auth.uid() returns uuid language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid $$;
 create or replace function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', 'anon') $$;

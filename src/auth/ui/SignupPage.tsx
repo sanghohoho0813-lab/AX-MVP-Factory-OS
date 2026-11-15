@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { loadSignupOpen } from '../../services/selfSignup'
 import { Button } from '../../components/ui/Button'
 import { signUpWithPassword } from '../authService'
 import { AuthLayout, AuthField, AuthError, AuthNotice } from './AuthLayout'
@@ -15,6 +16,17 @@ export function SignupPage() {
   const [errorKind, setErrorKind] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // L-7 · D-610 대표가 '가입하면 바로 쓰기' 를 켜 두었나(서버 0028 · 열림 여부만) — 모르면 지금 문구 그대로
+  const [openNow, setOpenNow] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void loadSignupOpen().then((v) => {
+      if (alive) setOpenNow(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -84,9 +96,9 @@ export function SignupPage() {
         <AuthField id="email" label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" placeholder="you@example.com" disabled={submitting} />
         <AuthField id="password" label="비밀번호" type="password" value={password} onChange={setPassword} autoComplete="new-password" placeholder="6자 이상" disabled={submitting} />
         <AuthField id="confirm" label="비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" disabled={submitting} />
-        {/* D-579 가입만으로는 열리지 않는다(승인된 계정만) — 가입하기 전에 미리 알려 준다 */}
-        <p className="text-[0.9375rem] break-keep text-slate-600" data-testid="signup-approval-note">
-          가입한 뒤 담당자가 사용을 승인하면 이 계정으로 바로 쓸 수 있어요.
+        {/* D-579 가입만으로는 열리지 않는다(승인된 계정만) — 가입하기 전에 미리 알려 준다 · D-610 바로 쓰기가 켜져 있으면 그렇게 */}
+        <p className="text-[0.9375rem] break-keep text-slate-600" data-testid="signup-approval-note" data-open={openNow ? '1' : '0'}>
+          {openNow ? '가입하고 메일 확인까지 마치면 바로 시작할 수 있어요.' : '가입한 뒤 담당자가 사용을 승인하면 이 계정으로 바로 쓸 수 있어요.'}
         </p>
         <Button type="submit" variant="primary" disabled={submitting} className="h-12 w-full text-[1rem] font-semibold sm:h-12">
           {submitting ? '가입 중…' : '회원가입'}

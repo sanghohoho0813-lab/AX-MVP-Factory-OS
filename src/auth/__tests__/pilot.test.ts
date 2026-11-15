@@ -9,6 +9,8 @@ import { isUserScopedKey, vaultSignOut, vaultSwitchTo } from '../storageVault'
 import { historyLine, isConsentMissing, koWhen, leftText, parseConsentState } from '../../services/viewConsent'
 import { EMPTY_INTAKE_FORM, defaultIntakeTitle, intakeErrorText, intakeLine, intakeUrl, isIntakeMissing, koDay, parseIntakeState, slugFromPath, sourceFromQuery, validateIntake } from '../../services/intakeLink'
 import { LINK_SOURCE, leadsThisMonth } from '../../services/marketing/mkPath'
+import { clampPolicyNumber, defaultWorkspaceName, isSelfSignupMissing, parseSelfSignupAccounts, parseSelfSignupAdmin, parseSelfSignupStart, parseSelfSignupState, selfSignupStartText, selfSignupSummary } from '../../services/selfSignup'
+import { functionGuidesOf } from '../../content/functionGuide'
 import { SALES_SOURCES } from '../../content/salesCatalog'
 import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../currentUser'
@@ -467,6 +469,24 @@ check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft
   check('L9-11 링크로 온 곳(경로 안 고름)도 글을 보고 온 곳으로 셈', (() => { const c = leadsThisMonth([{ day: '2026-11-14', source: LINK_SOURCE }, { day: '2026-11-14', source: '스레드' }, { day: '2026-11-14', source: '소개' }], '2026-11-14'); return c.all === 3 && c.fromContent === 2 })())
   check('L9-12 영업 관리 유입 경로 목록에 상담 링크(기타 앞 · 더하기만)', (SALES_SOURCES as readonly string[]).includes(LINK_SOURCE) && SALES_SOURCES[SALES_SOURCES.length - 1] === '기타' && SALES_SOURCES[SALES_SOURCES.length - 2] === LINK_SOURCE)
   check('L9-13 공개 화면은 보기 무대(iframe)에 넣지 않음', isStageExcluded('/ask/0a1b2c3d4e5f'))
+}
+
+// ---------- L-7 · D-610 가입하면 바로 쓰기(0028) — 화면 쪽 규칙 ----------
+{
+  check('L7-1 상태 — 서버가 준 값만 · 모르는 값은 closed(지금 화면)', parseSelfSignupState('open') === 'open' && parseSelfSignupState('unconfirmed') === 'unconfirmed' && parseSelfSignupState('hack') === 'closed' && parseSelfSignupState(null) === 'closed')
+  check('L7-2 시작 결과 — status 만 읽음 · 모르면 closed', parseSelfSignupStart({ status: 'ok', workspace: 'x' }) === 'ok' && parseSelfSignupStart({ status: 'busy' }) === 'busy' && parseSelfSignupStart({ status: 'weird' }) === 'closed' && parseSelfSignupStart('ok') === 'closed')
+  const ad = parseSelfSignupAdmin({ role: 'owner', policy: { open: true, seatLimit: 3, trialDays: 14, monthlyUnits: 100, marketing: false, updatedAt: '2026-11-15T00:00:00Z' }, used: 1, seatsLeft: 2 })
+  check('L7-3 대표 설정 읽기 — owner 만 ready · 그 밖은 none', ad.status === 'ready' && ad.admin.policy.open && ad.admin.policy.marketing === false && ad.admin.seatsLeft === 2 && parseSelfSignupAdmin({ role: 'none' }).status === 'none' && parseSelfSignupAdmin(null).status === 'none')
+  if (ad.status === 'ready') {
+    check('L7-4 대표 한 줄 — 켜짐 · 남은 자리', selfSignupSummary(ad.admin).includes('켜짐') && selfSignupSummary(ad.admin).includes('2명'))
+    check('L7-5 대표 한 줄 — 자리 다 참 · 꺼짐', selfSignupSummary({ ...ad.admin, seatsLeft: 0 }).includes('자리 다 참') && selfSignupSummary({ ...ad.admin, policy: { ...ad.admin.policy, open: false } }).startsWith('꺼짐'))
+  }
+  check('L7-6 계정 목록 — 이메일 · 이름 · 작업공간 · 열림', (() => { const r = parseSelfSignupAccounts([{ email: 'a@x.kr', person_name: '김', workspace_name: '김 작업공간', joined_at: '2026-11-15T00:00:00Z', ai_until: null, active: false }, null]); return r.length === 1 && r[0].email === 'a@x.kr' && r[0].aiUntil === '' && r[0].active === false })())
+  check('L7-7 작업공간 처음 이름 — "<이름> 작업공간" · 빈칸 정리 · 없으면 내 작업공간', defaultWorkspaceName('  박  고객 ') === '박 고객 작업공간' && defaultWorkspaceName('') === '내 작업공간' && defaultWorkspaceName('가'.repeat(50)).length === 34 + ' 작업공간'.length)
+  check('L7-8 대표가 고른 값은 서버 범위 안 정수로', clampPolicyNumber('seatLimit', 2000) === 1000 && clampPolicyNumber('trialDays', 0) === 1 && clampPolicyNumber('monthlyUnits', '50.6') === 51 && clampPolicyNumber('seatLimit', 'x') === 0)
+  check('L7-9 0028 전 · 되돌림 → 지금 화면 / 그 밖 오류는 아님', isSelfSignupMissing({ code: 'PGRST202' }) && isSelfSignupMissing({ code: '42501', message: 'permission denied for function self_signup_state' }) && !isSelfSignupMissing({ code: '08006' }) && !isSelfSignupMissing(null))
+  check('L7-10 시작 결과 → 사람 말(ok 는 빈칸 · 자리 참 · 메일 확인 · 잠시 뒤)', selfSignupStartText('ok') === '' && selfSignupStartText('closed').includes('자리') && selfSignupStartText('unconfirmed').includes('메일') && selfSignupStartText('busy').includes('잠시') && selfSignupStartText('not_eligible').includes('담당자'))
+  check('L7-11 기능 안내 — 대표 설정에만(팀장 · 고객 사용법 안내에는 없음)', functionGuidesOf('settings').some((x) => x.key === 'fn-self-signup') && !functionGuidesOf('settings', { pilot: true }).some((x) => x.key === 'fn-self-signup') && !functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-self-signup'))
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

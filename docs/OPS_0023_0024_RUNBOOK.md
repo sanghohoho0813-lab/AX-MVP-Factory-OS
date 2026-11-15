@@ -146,6 +146,26 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 - 로컬 시험: `npm run qa:db`(test-0027 · run-0024-customer ⑫ 운영 모양 위 적용 · 다시 실행 · 계단 들여쓰기 · 되돌리기 → 같은 주소로 다시) · `npm run qa:pilot`(L9-0~12 — 고객이 만들고 모르는 사람이 휴대폰으로 신청 · 대표 토큰 0).
 - 배포: `vercel.json` 이 `/ask/<주소>` 를 `ask.html`(빌드가 index.html 을 복사해 제목 · 미리보기 카드만 '상담 신청' 으로 바꾼 것)로 보낸다 — 0027 과 상관없이 먼저 나가도 된다.
 
+## 12. 0028 — 가입하면 바로 쓰기(L-7 · D-610 · **꺼 둔 채로** 들어간다) · 0019 · 0022 · 0024 · 0025 다음에
+
+- 무엇: 표 둘(`self_signup_policy` — 설정 한 줄 · 기본 꺼짐 / `self_signup_accounts` — 이 길로 열린 계정 기록 · 지우지 않음) · 함수 여덟
+  (`signup_open` — 로그인 없이 열림 여부만 · `self_signup_state/start` — 로그인한 새 가입자 · `self_signup_admin/admin_save/admin_list` — 대표(0025 운영자)만 ·
+  `self_signup_seats_left/check` — 함수 안에서만). 앱 계정은 두 표에 쓰지 못하고 읽어도 0줄. **기존 표 · 열 · 정책 · 함수는 건드리지 않는다.**
+- 넣어도 바로 달라지는 것은 없다(기본 꺼짐) — 대표 설정 › 작업공간 아래에 '가입하면 바로 쓰기' 칸이 생기고 '꺼짐' 으로 보인다.
+  새 가입자는 지금처럼 '아직 사용 승인 전' 화면이고, 대표가 `customer_provision.sql` 로 여는 길도 그대로다.
+- 대표가 켜면: 이메일 확인을 마친 새 가입자가 그 화면에서 [바로 시작하기] → `customer_provision.sql` 과 같은 계정(pilot · customer · 자기 작업공간 하나 · 대표 연결 없음 ·
+  AI customer `trial` — 시험 기간 · 월 한도는 대표가 고른 값). 받을 사람 수(기본 3명)가 다 차면 저절로 닫힌다. [끄기] 는 이미 연 계정을 닫지 않는다.
+- 막는 것: 이메일 확인 전 · 이미 등급(os_access)이 있는 계정 · 다른 작업공간 구성원 · 이미 작업공간이 있는 계정 · AI 권한 줄이 이미 있는 계정 ·
+  예전에 이 길로 열렸던 계정(대표가 닫았어도 다시 못 엶) · 한 시간 10명 넘게 · 동시에 눌러 자리 수 넘기기(한 줄로 세움).
+- 계정 닫기 · 기간 늘리기는 화면에 없다 — 닫기: `delete from public.os_access where user_id = (select id from auth.users where email = '…');`(자료는 그대로 · 다시 열려면 customer_provision.sql) ·
+  AI 기간 늘리기: `customer_provision.sql` 의 v_plan · v_units · v_months 를 고쳐 다시 실행.
+- 실행: SQL Editor 에 `set lock_timeout = '5s';` 한 줄 + `supabase/migrations/20261115000028_self_signup.sql` **통째로**. 여러 번 실행해도 같다(켠 설정 · 기록은 그대로).
+- 확인(읽기만): `supabase/manual/verify_after_0028.sql` → 1~5 '좋음' · 6 '꺼짐 · 3명' · 7 '이 길로 열린 계정' 0.
+- 되돌리기: `supabase/manual/rollback_0028.sql` — 함수 실행 권한만 거둔다(새 가입자는 다시 '승인 전' 화면 · 대표 칸 숨김) · 설정 · 기록 · 이미 연 고객 계정은 남긴다. 다시 켜려면 0028 을 다시 실행.
+- 로컬 시험: `npm run qa:db`(test-0028 · run-0024-customer ⑬ 운영 모양 위 적용 · 팀장 켜기 막힘 · 대표 켬 · 새 가입자 시작 · 다시 실행 · 계단 들여쓰기 · 되돌리기 → 다시) ·
+  `npm run qa:pilot`(L7-0~17 — 꺼짐 → 승인 전 화면 · 대표가 자리 1명으로 켬 · 새 가입자 390 [바로 시작하기] → 고객 화면 · 대표 자료 0 · 자리 다 참 → 다음 가입자 승인 전 · 끄기).
+- 운영 Supabase 의 '이메일 확인(Confirm email)' 설정이 꺼져 있으면 가입 즉시 확인된 것으로 친다 — 그럴 때는 받을 사람 수를 작게 두고 켠다.
+
 ## 9. AI 사용량 비밀값 넣은 뒤 — 팀장 마케팅 AI 권한(D-600)
 
 - 0022 를 처음 넣을 때 그때 있던 팀장(pilot) 계정에 `ai_entitlements` 줄이 **마케팅 꺼짐**(`marketing = false`)으로 만들어진다.
@@ -175,6 +195,9 @@ SQL Editor 는 붙여 넣은 글을 한 덩어리(한 거래)로 보내고 **마
 | `supabase/migrations/20261114000027_intake_links.sql` | 표 1 · 함수 7 추가 | 승인 뒤(§11) |
 | `supabase/manual/verify_after_0027.sql` | 읽기만 | 0027 뒤 |
 | `supabase/manual/rollback_0027.sql` | 함수 권한 거둠(링크 · 잠재고객은 남김) | 되돌리라고 할 때만 |
+| `supabase/migrations/20261115000028_self_signup.sql` | 표 2 · 함수 8 추가(기본 꺼짐) | 승인 뒤(§12) |
+| `supabase/manual/verify_after_0028.sql` | 읽기만 | 0028 뒤 |
+| `supabase/manual/rollback_0028.sql` | 함수 권한 거둠(설정 · 기록 · 열린 계정은 남김) | 되돌리라고 할 때만 |
 
 읽기만 파일 셋은 맨 위 `set transaction read only` 로 한 거래를 읽기 전용으로 묶는다(같은 덩어리 안 쓰기 문장은 오류로 막힘 — 로컬 확인).
 한 줄씩 실행하는 도구에서는 그 줄이 경고만 내고 넘어가지만, 아래가 SELECT 한 문장뿐이라 여전히 읽기만 한다(첫 줄 '읽기 전용 거래' 가 off 로 보인다).

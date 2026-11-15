@@ -51,7 +51,7 @@ function ProtectedShell() {
     return <Navigate to="/login" replace />
   }
   // D-162: 접근 목록에 없는 계정 · 다른 계정 자료가 남은 브라우저 — 앱을 열지 않는다
-  if (bootstrap.status === 'no_access') return <NoAccessScreen onSignOut={() => void signOut()} email={session?.user.email ?? ''} />
+  if (bootstrap.status === 'no_access') return <NoAccessScreen onSignOut={() => void signOut()} email={session?.user.email ?? ''} name={typeof session?.user.user_metadata?.display_name === 'string' ? session.user.user_metadata.display_name : ''} />
   if (bootstrap.status === 'storage_blocked') return <StorageBlockedScreen onSignOut={() => void signOut()} />
   if (bootstrap.status === 'authenticated_no_workspace') {
     return <WorkspaceOnboarding />

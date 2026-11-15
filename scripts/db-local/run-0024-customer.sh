@@ -50,7 +50,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000d1', 'cust24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -93,7 +93,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000b1', 'pilot24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -196,4 +196,26 @@ out=$(blk supabase/manual/rollback_0027.sql)
 check "연습 ⑫ 되돌리기: false | false · 공개 화면 막힘 · 링크 표 · 잠재고객 남음" "$(echo "$out" | tail -1) $(asr '' anon "select public.public_intake_form('$SLUG');" | grep -c 'permission denied') $(v "select count(*) from public.public_intake_links") $(v "select count(*) from public.operations_clients where company_name = '연습 신청'")" "f|f 1 1 1"
 out=$(blk supabase/migrations/20261114000027_intake_links.sql)
 check "연습 ⑫ 되돌린 뒤 0027 다시 — 같은 주소로 다시 받음 · 확인 5줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(asr '' anon "select public.public_intake_form('$SLUG')->>'title';") $(blk supabase/manual/verify_after_0027.sql | grep -cE '^[1-5]\|.*\|좋음$')" "0 팀장 상담 5"
+# ⑬ L-7 · D-610 0028(가입하면 바로 쓰기 · 꺼 둔 채) — 운영 모양(0027 까지 · profiles name) 위에 한 덩어리로
+q > /dev/null <<'SQL' || { echo "새 가입자 준비 실패"; exit 1; }
+insert into auth.users (id, email, email_confirmed_at) values ('24000000-0000-4000-8000-0000000000e1', 'self24@x.kr', now()) on conflict do nothing;
+SQL
+NEWU=24000000-0000-4000-8000-0000000000e1
+out=$(blk supabase/migrations/20261115000028_self_signup.sql "set lock_timeout = '5s'; ")
+check "연습 ⑬ 0028 한 덩어리(lock_timeout 5초) — 오류 0 · 마지막 결과 = 꺼짐" "$(echo "$out" | grep -c 'ERROR') $(echo "$out" | tail -1 | cut -d'|' -f1)" "0 f"
+out=$(blk supabase/manual/verify_after_0028.sql)
+check "연습 ⑬ 적용 뒤 확인: 1~5 모두 '좋음' · 지금 꺼짐 · 3명 · 열린 계정 0" "$(echo "$out" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$out" | grep -E '^6\|' | cut -d'|' -f3) $(echo "$out" | grep -E '^7\|' | cut -d'|' -f3)" "5 꺼짐 · 3명 0"
+check "연습 ⑬ 확인 SQL: 맨 위 set transaction read only · 만들기/고치기 문장 0" "$(grep -v '^--' supabase/manual/verify_after_0028.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/verify_after_0028.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|truncate|grant|revoke|comment on)\b')" "set transaction read only; 0"
+check "연습 ⑬ 적용 직후: 새 가입자 closed · 가입 화면 '바로 못 씀' · 눌러도 등급 없음" "$(asr $NEWU authenticated "select public.self_signup_state();") $(asr '' anon "select public.signup_open();") $(asr $NEWU authenticated "select public.self_signup_start('')->>'status';") $(v "select count(*) from public.os_access where user_id = '$NEWU'")" "closed f closed 0"
+check "연습 ⑬ 팀장은 켤 수 없음 · 대표는 켬" "$(su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '24000000-0000-4000-8000-0000000000b1', false); set role authenticated; select public.self_signup_admin_save(true, 3, 14, 100, true);" 2>&1 | grep -c 'not allowed') $(asr 24000000-0000-4000-8000-0000000000a1 authenticated "select public.self_signup_admin_save(true, 3, 14, 100, true)->'policy'->>'open';")" "1 true"
+check "연습 ⑬ 새 가입자 [바로 시작하기] → ok · pilot customer · 작업공간 하나 · 구성원 본인뿐 · AI customer trial" "$(asr $NEWU authenticated "select public.self_signup_start('연습 컨설팅')->>'status';") $(v "select tier || ' ' || audience from public.os_access where user_id = '$NEWU'") $(v "select count(*) from public.workspaces where owner_id = '$NEWU'") $(v "select count(*) from public.workspace_members m join public.workspaces w on w.id = m.workspace_id where w.owner_id = '$NEWU'") $(v "select kind || ' ' || plan from public.ai_entitlements where user_id = '$NEWU'")" "ok pilot customer 1 1 customer trial"
+check "연습 ⑬ 새 고객은 대표 업체 0 · 대표는 새 고객 작업공간 0" "$(asr $NEWU authenticated "select count(*) from public.operations_clients;") $(asr 24000000-0000-4000-8000-0000000000a1 authenticated "select count(*) from public.workspaces where owner_id = '$NEWU';")" "0 0"
+out=$(blk supabase/migrations/20261115000028_self_signup.sql)
+check "연습 ⑬ 0028 다시 실행해도 같음(오류 0 · 확인 5줄 좋음 · 켠 설정 그대로 · 열린 계정 1)" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0028.sql | grep -cE '^[1-5]\|.*\|좋음$') $(asr '' anon "select public.signup_open();") $(v "select count(*) from public.self_signup_accounts")" "0 5 t 1"
+out=$(blkind supabase/migrations/20261115000028_self_signup.sql "set lock_timeout = '5s'; ")
+check "연습 ⑬ 계단 들여쓰기로 붙여 넣어도(D-597) 오류 0" "$(echo "$out" | grep -c 'ERROR')" "0"
+out=$(blk supabase/manual/rollback_0028.sql)
+check "연습 ⑬ 되돌리기: false | false · 가입 화면 함수 막힘 · 열린 고객 그대로 · 기록 남음" "$(echo "$out" | tail -1) $(asr '' anon "select public.signup_open();" | grep -c 'permission denied') $(v "select tier || ' ' || audience from public.os_access where user_id = '$NEWU'") $(v "select count(*) from public.self_signup_accounts")" "f|f 1 pilot customer 1"
+out=$(blk supabase/migrations/20261115000028_self_signup.sql)
+check "연습 ⑬ 되돌린 뒤 0028 다시 — 켠 설정 그대로 · 확인 5줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(asr '' anon "select public.signup_open();") $(blk supabase/manual/verify_after_0028.sql | grep -cE '^[1-5]\|.*\|좋음$')" "0 t 5"
 [ "$BAD" -eq 0 ]

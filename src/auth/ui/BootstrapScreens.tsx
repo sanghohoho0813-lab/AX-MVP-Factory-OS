@@ -3,9 +3,16 @@
  * 조용히 local 모드로 fallback 하지 않는다.
  */
 
-import { useState } from 'react'
-import { Check, Copy, Loader2, LogOut, RefreshCw, Settings2, ShieldAlert, WifiOff } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, CheckCircle2, Copy, Loader2, LogOut, RefreshCw, Settings2, ShieldAlert, WifiOff } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
+import {
+  defaultWorkspaceName,
+  loadSelfSignupState,
+  selfSignupStartText,
+  startSelfSignup,
+  type SelfSignupState,
+} from '../../services/selfSignup'
 
 function CenteredCard({ children }: { children: React.ReactNode }) {
   return (
@@ -130,8 +137,124 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
  * D-579: 방금 가입한 사람이 맨 먼저 보는 화면이다 — '쓸 수 없습니다 · 관리자에게 문의' 한 줄로 끝내지 않고,
  *        무엇을 하면 되는지(가입한 이메일을 담당자에게 알려 주기 → 승인되면 다시 확인)와 그 이메일 · [복사] 를 보여 준다.
  *        권한은 그대로다(승인 전에는 어떤 화면 · 자료도 열리지 않는다).
+ * L-7 · D-610: 대표가 '가입하면 바로 쓰기' 를 켜 두었으면(서버 0028) 기다리는 대신 [바로 시작하기] 한 번 — 서버가 계정을 연다.
+ *        꺼져 있거나 · 자리가 다 찼거나 · 0028 전이면 지금 화면 그대로.
  */
-export function NoAccessScreen({ onSignOut, email = '' }: { onSignOut: () => void; email?: string }) {
+export function NoAccessScreen({ onSignOut, email = '', name = '' }: { onSignOut: () => void; email?: string; name?: string }) {
+  const [state, setState] = useState<SelfSignupState | null>(null)
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    let alive = true
+    void loadSelfSignupState().then((s) => {
+      if (!alive) return
+      // 그 사이 계정이 열렸다(대표가 열었거나 다른 창에서 시작) — 새로 열면 앱으로 간다
+      if (s === 'has_access') window.location.reload()
+      setState(s)
+      if (s === 'unconfirmed') setNote(selfSignupStartText('unconfirmed'))
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  if (state === null) {
+    return (
+      <CenteredCard>
+        <p role="status" className="flex items-center justify-center gap-2 text-[1rem] text-slate-700" data-testid="no-access-checking">
+          <Loader2 aria-hidden="true" className="size-5 animate-spin text-brand-500" /> 계정을 확인하는 중…
+        </p>
+      </CenteredCard>
+    )
+  }
+  if (state === 'open') {
+    return (
+      <SelfStartCard
+        email={email}
+        name={name}
+        onSignOut={onSignOut}
+        onClosed={(text) => {
+          setNote(text)
+          setState('closed')
+        }}
+      />
+    )
+  }
+  return <WaitingCard onSignOut={onSignOut} email={email} note={note} />
+}
+
+/** L-7 · D-610 '가입하면 바로 쓰기' 가 켜져 있을 때 — 작업공간 이름 하나 · 큰 단추 하나 */
+function SelfStartCard({ email, name, onSignOut, onClosed }: { email: string; name: string; onSignOut: () => void; onClosed: (text: string) => void }) {
+  const [wsName, setWsName] = useState(() => defaultWorkspaceName(name))
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  const go = async () => {
+    if (busy) return
+    setBusy(true)
+    setProblem('')
+    try {
+      const r = await startSelfSignup(wsName)
+      if (r === 'ok' || r === 'has_access') {
+        window.location.reload()
+        return
+      }
+      if (r === 'busy' || r === 'unconfirmed') setProblem(selfSignupStartText(r))
+      else onClosed(selfSignupStartText(r === 'missing' ? 'closed' : r))
+    } catch {
+      setProblem('잠깐 연결이 안 됐어요. 잠시 뒤 다시 눌러 주세요.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <CenteredCard>
+      <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 text-success-700">
+        <CheckCircle2 aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-4 text-[1.2rem] font-bold break-keep text-slate-900" data-testid="self-start-title">
+        바로 시작할 수 있어요
+      </h1>
+      <p className="mt-2 text-[1rem] break-keep text-slate-700">
+        가입을 마쳤어요. 내 작업공간 이름을 정하고 [바로 시작하기] 를 누르면 바로 열려요.
+      </p>
+      <form
+        className="mt-4 flex flex-col gap-3 text-left"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void go()
+        }}
+        data-testid="self-start"
+      >
+        <label className="flex flex-col gap-1">
+          <span className="text-[0.9375rem] font-semibold text-slate-800">작업공간 이름</span>
+          <input
+            value={wsName}
+            onChange={(e) => setWsName(e.target.value)}
+            maxLength={40}
+            className="min-h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[1rem] text-slate-900 focus:border-brand-500 focus:outline-none"
+            data-testid="self-start-name"
+          />
+        </label>
+        {problem && (
+          <p role="alert" className="text-[0.9375rem] break-keep text-danger-700" data-testid="self-start-problem">
+            {problem}
+          </p>
+        )}
+        <Button type="submit" variant="primary" disabled={busy} className="h-12 w-full text-[1rem] font-semibold sm:h-12" data-testid="self-start-go">
+          {busy ? '여는 중…' : '바로 시작하기'}
+        </Button>
+      </form>
+      <p className="mt-3 text-[0.9375rem] break-keep text-slate-600">
+        내 업체 · 서류 · 기록은 나만 봐요. 운영자도 볼 수 없어요.
+      </p>
+      {email && <p className="mt-1 truncate text-[0.9375rem] text-slate-600">{email}</p>}
+      <Button variant="ghost" className="mt-2 h-11 w-full" onClick={onSignOut} data-testid="no-access-signout">
+        <LogOut aria-hidden="true" className="size-4" /> 로그아웃
+      </Button>
+    </CenteredCard>
+  )
+}
+
+/** D-579 아직 사용 승인 전 — 이메일 · [복사] · [승인됐는지 다시 확인] · [로그아웃] */
+function WaitingCard({ onSignOut, email, note }: { onSignOut: () => void; email: string; note: string }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
@@ -153,6 +276,11 @@ export function NoAccessScreen({ onSignOut, email = '' }: { onSignOut: () => voi
       <p className="mt-2 text-[1rem] break-keep text-slate-700">
         승인된 계정만 쓸 수 있는 프로그램이에요. 사용을 신청하셨다면 안내받은 담당자에게 아래 이메일을 알려 주세요 — 승인되면 이 계정으로 바로 열려요.
       </p>
+      {note && (
+        <p role="status" className="mt-2 text-[1rem] break-keep text-slate-800" data-testid="no-access-note">
+          {note}
+        </p>
+      )}
       {email && (
         <div className="mt-4 flex items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left" data-testid="no-access-email">
           <span className="min-w-0 flex-1">

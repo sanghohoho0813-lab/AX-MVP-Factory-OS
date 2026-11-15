@@ -40,7 +40,10 @@ const PILOT = { id: '0e000000-0000-4000-8000-0000000000b1', email: 'pilot@e2e.kr
 const OUTSIDER = { id: '0e000000-0000-4000-8000-0000000000c1', email: 'outsider@e2e.kr', password: 'outsider-pass' }
 // D-562 외부 구독 고객 — supabase/manual/customer_provision.sql 그대로(이메일만 바꿔) 준비한다(아래 '고객 계정' 묶음)
 const CUSTOMER = { id: '0e000000-0000-4000-8000-0000000000d1', email: 'customer@e2e.kr', password: 'customer-pass' }
-const USERS = [OWNER, PILOT, OUTSIDER, CUSTOMER]
+// L-7 · D-610 가입하면 바로 쓰기 — 로그인 화면에서 스스로 가입하고 메일 확인까지 마친 두 사람(대표가 켜기 전 · 켠 뒤 · 자리 다 찬 뒤)
+const SELF1 = { id: '0e000000-0000-4000-8000-0000000000e1', email: 'self1@e2e.kr', password: 'self1-pass' }
+const SELF2 = { id: '0e000000-0000-4000-8000-0000000000e2', email: 'self2@e2e.kr', password: 'self2-pass' }
+const USERS = [OWNER, PILOT, OUTSIDER, CUSTOMER, SELF1, SELF2]
 const OWNER_WS = '0e0000aa-0000-4000-8000-00000000000a'
 const OWNER_CLIENT = 'owner-secret-1'
 // D-171: 대표가 직접 만든 업무 항목(세무기장 · 모두의 창업 2차)도 팀장 화면 · 응답에 나오면 안 된다
@@ -2278,6 +2281,150 @@ try {
     check('고객 390(D-568): 문의하기 가로 넘침 0 · 본 뒤에는 "답장" 표시 사라짐', (await overflowX(ps)) <= 0 && (await ps.locator('[data-testid="settings-support-reply"]').count()) === 0, String(await overflowX(ps)))
     await shot(ps, 'customer-13-support-390')
     await cS.close()
+  }
+
+  /* ================= L-7 · D-610 가입하면 바로 쓰기(0028 · 꺼 둔 채) — 진짜 RLS ================= */
+  {
+    sql(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ('${SELF1.id}', '${SELF1.email}', now(), '{"display_name":"한시범"}'), ('${SELF2.id}', '${SELF2.email}', now(), '{}') on conflict do nothing`)
+    meta.set(SELF1.id, { display_name: '한시범' })
+    check('L7-0 준비: 0028 들어감 · 기본 꺼짐 · 열린 계정 0', sql(`select open::text || ' ' || seat_limit from public.self_signup_policy`) === 'false 3' && sql(`select count(*) from public.self_signup_accounts`) === '0')
+    const noteOf = async (pg) => ({ open: await pg.getByTestId('signup-approval-note').getAttribute('data-open').catch(() => ''), text: ((await pg.getByTestId('signup-approval-note').innerText().catch(() => '')) ?? '').trim() })
+    // (1) 꺼져 있을 때: 가입 화면 문구 그대로 · 새 가입자는 승인 전 화면
+    const cA = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await cA.route(`https://${REF}.supabase.co/**`, route)
+    const pa7 = await cA.newPage()
+    pa7.on('pageerror', (e) => errors.push(String(e)))
+    await pa7.goto(`${BASE}/signup`, { waitUntil: 'networkidle' })
+    await pa7.waitForTimeout(600)
+    const n0 = await noteOf(pa7)
+    check('L7-1 꺼져 있을 때 가입 화면: "담당자가 사용을 승인하면" 그대로', n0.open === '0' && n0.text.includes('승인하면'), n0)
+    await cA.close()
+    const c1 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await c1.route(`https://${REF}.supabase.co/**`, route)
+    const p1 = await c1.newPage()
+    p1.on('pageerror', (e) => errors.push(String(e)))
+    await login(p1, SELF1)
+    check('L7-2 꺼져 있을 때 새 가입자: "아직 사용 승인 전" 화면 · [바로 시작하기] 없음 · 대표 자료 0', (await p1.getByTestId('no-access').count()) === 1 && (await p1.getByTestId('self-start-title').count()) === 0 && leaked(await bodyText(p1)).length === 0)
+    await c1.close()
+
+    // (2) 대표: 설정 › 작업공간 '가입하면 바로 쓰기' — 자리 1명으로 줄이고 켬(한 번 더 묻기)
+    const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cO.route(`https://${REF}.supabase.co/**`, route)
+    const po = await cO.newPage()
+    po.on('pageerror', (e) => errors.push(String(e)))
+    await login(po, OWNER)
+    await go(po, '/settings')
+    await po.getByRole('navigation', { name: '설정 메뉴' }).getByRole('button', { name: '작업공간' }).click()
+    await po.getByTestId('self-signup-panel').waitFor({ timeout: 8000 }).catch(() => {})
+    const sum0 = ((await po.getByTestId('self-signup-summary').innerText().catch(() => '')) ?? '').trim()
+    check('L7-3 대표 설정 › 작업공간: "가입하면 바로 쓰기" 칸 · 지금 꺼짐 · [켜기] · 기능 안내 열쇠', (await po.getByTestId('self-signup-panel').getAttribute('data-open')) === '0' && sum0.startsWith('꺼짐') && (await po.getByTestId('self-signup-toggle').getAttribute('data-action')) === 'on' && (await po.locator('[data-guide="fn-self-signup"]').count()) === 1, sum0)
+    await shot(po, 'self-signup-01-owner-off')
+    await po.getByTestId('self-signup-settings').locator('summary').click()
+    await po.getByTestId('self-signup-seats').fill('1')
+    await po.getByTestId('self-signup-save').click()
+    await po.waitForTimeout(900)
+    check('L7-4 대표: 받을 사람 1명으로 저장(DB) · 아직 꺼짐', sql(`select seat_limit || ' ' || open::text from public.self_signup_policy`) === '1 false')
+    await po.getByTestId('self-signup-toggle').click()
+    const dlg = po.getByRole('dialog')
+    await dlg.waitFor({ timeout: 5000 }).catch(() => {})
+    const dlgText = ((await dlg.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('L7-5 대표 [켜기] → 한 번 더 묻기: 남은 자리 1명 · 고객 업체 · 서류는 대표도 못 봄', dlgText.includes('남은 자리 1명') && dlgText.includes('대표님도 볼 수 없어요'), dlgText.slice(0, 200))
+    await dlg.getByRole('button', { name: '켜기' }).click()
+    await po.waitForTimeout(1200)
+    check('L7-6 켬 → DB open = true · 칸 한 줄 "켜짐 · 남은 자리 1명"', sql(`select open::text from public.self_signup_policy`) === 'true' && ((await po.getByTestId('self-signup-summary').innerText().catch(() => '')) ?? '').includes('남은 자리 1명'))
+    await shot(po, 'self-signup-02-owner-on')
+    // 내부 팀장 · 고객 설정에는 이 칸이 없다
+    const cP7 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cP7.route(`https://${REF}.supabase.co/**`, route)
+    const pp7 = await cP7.newPage()
+    await login(pp7, PILOT)
+    await go(pp7, '/settings')
+    await pp7.waitForTimeout(800)
+    check('L7-7 내부 팀장 설정: "가입하면 바로 쓰기" 칸 없음 · 서버도 none', (await pp7.getByTestId('self-signup-panel').count()) === 0 && (await pp7.evaluate(async ([ref]) => {
+      const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+      const h = { apikey: 'qa-anon', Authorization: `Bearer ${tok}`, 'content-type': 'application/json' }
+      const a = await fetch(`https://${ref}.supabase.co/rest/v1/rpc/self_signup_admin`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.json())
+      const save = await fetch(`https://${ref}.supabase.co/rest/v1/rpc/self_signup_admin_save`, { method: 'POST', headers: h, body: JSON.stringify({ p_open: false, p_seat_limit: 100, p_trial_days: 30, p_monthly_units: 1000, p_marketing: true }) }).then((r) => r.status)
+      return a.role === 'none' && save >= 400
+    }, [REF])))
+    await cP7.close()
+
+    // (3) 켠 뒤: 가입 화면 문구 · 새 가입자 [바로 시작하기] → 고객 계정 · 빈 작업공간
+    const cB = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await cB.route(`https://${REF}.supabase.co/**`, route)
+    const pb7 = await cB.newPage()
+    await pb7.goto(`${BASE}/signup`, { waitUntil: 'networkidle' })
+    await pb7.waitForTimeout(600)
+    const n1 = await noteOf(pb7)
+    check('L7-8 켠 뒤 가입 화면: "메일 확인까지 마치면 바로 시작" 한 줄', n1.open === '1' && n1.text.includes('바로 시작'), n1)
+    await cB.close()
+    const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await c2.route(`https://${REF}.supabase.co/**`, route)
+    const p2 = await c2.newPage()
+    p2.on('pageerror', (e) => errors.push(String(e)))
+    await login(p2, SELF1)
+    await p2.getByTestId('self-start-title').waitFor({ timeout: 8000 }).catch(() => {})
+    const look7 = await p2.evaluate(() => {
+      const go = document.querySelector('[data-testid="self-start-go"]')
+      const nm = document.querySelector('[data-testid="self-start-name"]')
+      return {
+        name: nm instanceof HTMLInputElement ? nm.value : '',
+        goH: go ? Math.round(go.getBoundingClientRect().height) : 0,
+        goBottom: go ? Math.round(go.getBoundingClientRect().bottom) : 0,
+        minFont: Math.min(...[...document.querySelectorAll('h1, p, label span, button, input')].map((e) => parseFloat(getComputedStyle(e).fontSize))),
+        over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    check('L7-9 켠 뒤 새 가입자(390): "바로 시작할 수 있어요" · 작업공간 이름 "한시범 작업공간" · 큰 단추 하나가 첫 화면 안 · 글자 15px 이상 · 넘침 0 · 승인 전 화면 아님', (await p2.getByTestId('self-start-title').count()) === 1 && (await p2.getByTestId('no-access').count()) === 0 && look7.name === '한시범 작업공간' && look7.goH >= 44 && look7.goBottom > 0 && look7.goBottom <= 844 && look7.minFont >= 15 && look7.over <= 0, look7)
+    await shot(p2, 'self-signup-03-start-390')
+    await p2.getByTestId('self-start-name').fill('한시범 컨설팅')
+    await p2.getByTestId('self-start-go').click()
+    await p2.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+    await p2.waitForLoadState('networkidle')
+    await p2.waitForTimeout(1500)
+    const selfWs = sql(`select id from public.workspaces where owner_id = '${SELF1.id}'`)
+    check('L7-10 [바로 시작하기] → DB: pilot · customer · 작업공간 "한시범 컨설팅" 하나 · 구성원 본인뿐 · AI customer trial(시험 기간)', sql(`select tier || ':' || audience from public.os_access where user_id = '${SELF1.id}'`) === 'pilot:customer' && selfWs.length === 36 && sql(`select name from public.workspaces where id = '${selfWs}'`) === '한시범 컨설팅' && sql(`select string_agg(user_id::text, ',') from public.workspace_members where workspace_id = '${selfWs}'`) === SELF1.id && sql(`select kind || ':' || plan from public.ai_entitlements where user_id = '${SELF1.id}'`) === 'customer:trial', selfWs)
+    const appText = await bodyText(p2)
+    check('L7-11 바로 앱이 열림(승인 전 · 시작 화면 아님) · 대표 자료 0 · 고객 메뉴(영업자 정산 없음)', (await p2.getByTestId('no-access').count()) === 0 && (await p2.getByTestId('self-start').count()) === 0 && leaked(appText).length === 0 && !appText.includes('영업자 정산'), appText.slice(0, 200))
+    const rest7 = await p2.evaluate(async ([ref]) => {
+      const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+      const h = { apikey: 'qa-anon', Authorization: `Bearer ${tok}`, 'content-type': 'application/json' }
+      const base = `https://${ref}.supabase.co/rest/v1`
+      const clients = await fetch(`${base}/operations_clients?select=company_name`, { headers: h }).then((r) => r.text())
+      const again = await fetch(`${base}/rpc/self_signup_start`, { method: 'POST', headers: h, body: JSON.stringify({ p_name: '또' }) }).then((r) => r.json())
+      const list = await fetch(`${base}/rpc/self_signup_admin_list`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.json())
+      return { clients, again: again.status, list: Array.isArray(list) ? list.length : -1 }
+    }, [REF])
+    check('L7-12 새 고객 REST: 업체 0줄(대표 것 안 보임) · 다시 눌러도 has_access · 대표 목록 0줄', rest7.clients === '[]' && rest7.again === 'has_access' && rest7.list === 0 && sql(`select count(*) from public.workspaces where owner_id = '${SELF1.id}'`) === '1', rest7)
+    await shot(p2, 'self-signup-04-opened-390')
+    await c2.close()
+
+    // (4) 대표 목록 · 자리 다 참 → 다음 가입자는 승인 전 화면
+    await go(po, '/settings')
+    await po.getByRole('navigation', { name: '설정 메뉴' }).getByRole('button', { name: '작업공간' }).click()
+    await po.getByTestId('self-signup-panel').waitFor({ timeout: 8000 }).catch(() => {})
+    await po.getByTestId('self-signup-accounts').locator('summary').click()
+    const accText = ((await po.getByTestId('self-signup-accounts').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('L7-13 대표 목록: 1명 · self1 이메일 · 한시범 · 한시범 컨설팅 · "자리 다 참"', (await po.getByTestId('self-signup-account').count()) === 1 && accText.includes(SELF1.email) && accText.includes('한시범 컨설팅') && ((await po.getByTestId('self-signup-summary').innerText().catch(() => '')) ?? '').includes('자리 다 참'), accText.slice(0, 200))
+    check('L7-14 대표는 그 고객 작업공간 구성원 아님(DB)', sql(`select count(*) from public.workspace_members where workspace_id = '${selfWs}' and user_id = '${OWNER.id}'`) === '0')
+    await shot(po, 'self-signup-05-owner-list')
+    const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await c3.route(`https://${REF}.supabase.co/**`, route)
+    const p3 = await c3.newPage()
+    p3.on('pageerror', (e) => errors.push(String(e)))
+    await login(p3, SELF2)
+    check('L7-15 자리 다 찬 뒤 다음 가입자: 승인 전 화면(시작 단추 없음) · 계정 안 생김', (await p3.getByTestId('no-access').count()) === 1 && (await p3.getByTestId('self-start-title').count()) === 0 && sql(`select count(*) from public.os_access where user_id = '${SELF2.id}'`) === '0')
+    await c3.close()
+
+    // (5) 대표 [끄기] → 가입 화면 예전 문구 · 열린 고객은 그대로
+    await po.getByTestId('self-signup-toggle').click()
+    await po.waitForTimeout(1200)
+    check('L7-16 대표 [끄기](묻지 않음) → DB open = false · 이미 연 고객은 그대로 pilot:customer', sql(`select open::text from public.self_signup_policy`) === 'false' && sql(`select tier || ':' || audience from public.os_access where user_id = '${SELF1.id}'`) === 'pilot:customer')
+    await po.setViewportSize({ width: 390, height: 844 })
+    await po.waitForTimeout(500)
+    check('L7-17 대표 390: 가입하면 바로 쓰기 칸 가로 넘침 0', (await overflowX(po)) <= 0, String(await overflowX(po)))
+    await shot(po, 'self-signup-06-owner-390')
+    await cO.close()
   }
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))
