@@ -100,6 +100,7 @@ import { usePilotMarketingScreens } from '../config/pilotMarketing'
 import { PERSONAL_KEY } from '../services/journalKind'
 import { recordMove, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
+import { useClientSaveNews } from '../services/clientSaveNews'
 
 /** D-508 업체 약속 글이 미팅 · 상담이면 말하기 대본을 바로 */
 const MEETING_WORDS = /미팅|상담|방문|제안|만남|브리핑|설명회|회의/
@@ -308,6 +309,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   }, [workspaceId, viewingPilot])
 
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
+  // SYNC-6 업체 저장이 끝나면(합쳐 저장 · 같은 칸을 고른 뒤 포함) — 오늘 화면의 업체 줄도 그 판으로
+  useClientSaveNews(setClients)
   // D-238: 먼저 제안할 것(가능성 높은 모듈)이 있는 업체 수 — 고객 관리 카드 띠와 같은 판정(지원사업 공고 수는 빼고 모듈 판정만)
   const reco = useClientReco(clients, today, noGrantFit)
   const pickCount = useMemo(

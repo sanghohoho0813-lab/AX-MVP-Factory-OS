@@ -11,8 +11,12 @@
  *   S6 같은 기기에서 기다리지 않고 세 번 저장 → 막힘 0 · 마지막 것
  *   S7 다른 작업공간 사람(팀장 토큰) → 합치기로도 대표 업체를 못 고침(RLS 그대로)
  *   S8 글자마다 저장(업체 상세) — 합쳐 저장한 뒤 이어 친 글자: 그대로 보내면 내 앞 글자가 '겹친 칸' 으로 잘못 잡힘(재현) → 화면처럼 얹어 보내면 겹침 0
+ *   S9 SYNC-6 저장 끝 소식(saved) — 줄 선 저장이 끝난 뒤 한 번만 · 마지막 판 · 합쳐 저장도 마지막에 합친 판 · 막히면 없음 → 고른 뒤 고른 판 · 실패(RLS)면 없음
  *   U  화면(진짜 앱 · 대표 로그인 · 업체 상세 › 업체 정보 수정): 다른 기기가 담당자를 고친 사이 휴대폰 번호 입력 → '합쳐서 저장' 한 줄 · DB 둘 다 · 화면 담당자도 새 값
  *      → 같은 칸(담당자)을 다르게 → 화면 아래 고르기 판(겹친 칸 · 두 값) · DB 그대로 → [내가 고친 것으로 저장] → DB · 화면 내 값 · 판 닫힘 · 390 넘침 0
+ *   U7 SYNC-6 업체 상세 오른쪽에서 업체명을 고치면 왼쪽 업체 목록도 바로 새 이름(예전: 다른 업체로 옮길 때까지 옛 이름)
+ *   L  SYNC-6 영업 보드 — 다른 기기가 단계를 옮긴 사이 보드에서 다른 단계로 → 고르기 판 · 보드는 먼저 저장된 칸(덮지 않음)
+ *      → [내가 고친 것으로 저장] → 새로 고치지 않아도 카드가 고른 칸으로 · DB 같은 값 · JS 오류 0
  *
  *   sudo node e2e/client-conflict.mjs   (pg_ctlcluster 16 main start 먼저)
  */
@@ -75,8 +79,15 @@ const bundle = pathToFileURL(path.resolve('.clientconflict-out/clientconflict.mj
 const A = await import(`${bundle}?device=A`)
 const B = await import(`${bundle}?device=B`)
 const news = { A: [], B: [] }
-A.onClientSaveNews((n) => news.A.push(n.kind))
-B.onClientSaveNews((n) => news.B.push(n.kind))
+const savedNews = { A: [], B: [] } // SYNC-6 저장 끝 소식이 실어 온 판
+A.onClientSaveNews((n) => {
+  news.A.push(n.kind)
+  if (n.kind === 'saved') savedNews.A.push(n.record)
+})
+B.onClientSaveNews((n) => {
+  news.B.push(n.kind)
+  if (n.kind === 'saved') savedNews.B.push(n.record)
+})
 
 const dbOf = (id) => JSON.parse(sql(`select json_build_object('name', company_name, 'contact', payload->>'contactName', 'phone', payload->>'contactPhone', 'industry', payload->>'industry', 'notes', payload->>'notes', 'noteIds', (select coalesce(json_agg(n->>'id'), '[]'::json) from jsonb_array_elements(coalesce(payload->'notes_list', '[]'::jsonb)) n), 'noteTexts', (select coalesce(json_agg(n->>'text'), '[]'::json) from jsonb_array_elements(coalesce(payload->'notes_list', '[]'::jsonb)) n)) from public.operations_clients where id = '${id}'`))
 const fresh = async (dev, id) => (await dev.listClients(WS)).find((r) => r.id === id)
@@ -187,6 +198,43 @@ async function browserPart(ID) {
     await page.getByTestId('client-conflict-theirs').click()
     await page.waitForTimeout(800)
     check('U5 [먼저 저장된 것으로 두기] → DB 담당자 = 다른 기기 값 · 판 닫힘', dbOf(ID).contact === '휴대폰 시험(다른 기기)' && (await page.getByTestId('client-conflict').count()) === 0)
+
+    // U7 SYNC-6 오른쪽 상세에서 업체명 → 왼쪽 업체 목록도 바로
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.waitForTimeout(400)
+    const sideRow = page.getByTestId('client-sidelist').locator(`[data-client="${ID}"]`)
+    await sideRow.waitFor({ timeout: 8000 }).catch(() => {})
+    const nameBefore = (await sideRow.innerText().catch(() => '')).trim()
+    await page.getByLabel('업체명', { exact: true }).fill('충돌시험 정밀(새 이름)')
+    await page.waitForFunction((id) => (document.querySelector(`[data-testid="client-sidelist"] [data-client="${id}"]`)?.textContent ?? '').includes('새 이름'), ID, { timeout: 8000 }).catch(() => {})
+    const nameAfter = (await sideRow.innerText().catch(() => '')).trim()
+    check('U7 오른쪽 상세에서 업체명을 고치면 왼쪽 업체 목록도 새로 고치지 않고 새 이름(예전: 옛 이름 그대로)', /충돌시험 정밀/.test(nameBefore) && !nameBefore.includes('새 이름') && nameAfter.includes('충돌시험 정밀(새 이름)') && dbOf(ID).name === '충돌시험 정밀(새 이름)', { nameBefore, nameAfter, db: dbOf(ID).name })
+    await page.getByTestId('client-sidelist').screenshot({ path: '/tmp/claude-0/clientconflict-sidelist.png' }).catch(() => {})
+
+    // L SYNC-6 영업 보드 — 같은 칸(영업 단계) 고르기 → 카드가 고른 칸으로 바로(만든 업체는 계약 고객이라 잠재고객으로 돌려 둔다)
+    const a3b = await fresh(A, ID)
+    await A.saveClient({ ...a3b, status: 'waiting' })
+    await page.goto(`${BASE}/sales/board`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(800)
+    const board = page.getByTestId('sales-board')
+    const colOf = async () => board.locator('section[data-sales-col]').filter({ has: page.locator(`select[aria-label="충돌시험 정밀(새 이름) 영업 단계"]`) }).getAttribute('data-sales-col').catch(() => null)
+    const colStart = await colOf()
+    const a4 = await fresh(A, ID)
+    await A.saveClient(A.withSalesStage(a4, 'm1sched'))
+    await board.getByLabel('충돌시험 정밀(새 이름) 영업 단계').selectOption('m1done')
+    await page.getByTestId('client-conflict').waitFor({ timeout: 8000 }).catch(() => {})
+    await page.waitForTimeout(800)
+    const colMid = await colOf()
+    const dbMid = sql(`select payload->'sales'->>'stage' from public.operations_clients where id = '${ID}'`)
+    check('L1 다른 기기가 단계를 옮긴 사이 보드에서 다른 단계로 → 고르기 판 · 보드 카드는 먼저 저장된 칸 · DB 덮지 않음', colStart === 'lead' && (await page.getByTestId('client-conflict').isVisible().catch(() => false)) && colMid === 'm1sched' && dbMid === 'm1sched', { colStart, colMid, dbMid })
+    await page.screenshot({ path: '/tmp/claude-0/clientconflict-board-pick.png' }).catch(() => {})
+    await page.getByTestId('client-conflict-mine').click()
+    await page.getByTestId('client-conflict').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})
+    await page.waitForFunction(() => !!document.querySelector('[data-testid="sales-board"] section[data-sales-col="m1done"] select'), null, { timeout: 8000 }).catch(() => {})
+    const colEnd = await colOf()
+    const dbEnd = sql(`select payload->'sales'->>'stage' from public.operations_clients where id = '${ID}'`)
+    check('L2 [내가 고친 것으로 저장] → 새로 고치지 않아도 보드 카드가 고른 칸(1차 미팅 완료) · DB 같은 값(예전: 먼저 저장된 칸에 남아 보임)', colEnd === 'm1done' && dbEnd === 'm1done', { colEnd, dbEnd })
+    await page.screenshot({ path: '/tmp/claude-0/clientconflict-board-after.png' }).catch(() => {})
     check('U6 화면 JS 오류 0', errors.length === 0, errors)
   } finally {
     await browser.close()
@@ -308,6 +356,44 @@ try {
     const r = await tryErr(B.saveClient(rebased))
     const now = dbOf(ID)
     check('S8b 화면처럼 그 사이 친 글자만 저장된 판에 얹어 보냄 → 겹침 0 · 휴대폰 010-123 · A 의 직급 그대로', r.ok && m.conflicts.length === 0 && now.phone === '010-123' && sql(`select payload->>'contactTitle' from public.operations_clients where id = '${ID}'`) === '부장(A)' && !!s1, { now, conflicts: m.conflicts, err: r.e?.message })
+  }
+
+  // S9 SYNC-6 저장 끝 소식(saved) — 목록 화면이 바꿔 끼우는 판
+  {
+    const a = await fresh(A, ID)
+    news.A.length = 0
+    savedNews.A.length = 0
+    const rs = await Promise.all([1, 2, 3].map((n) => tryErr(A.saveClient({ ...a, notes: `줄 선 저장 ${n}` }))))
+    check('S9a 같은 기기에서 줄 선 세 번 → 저장 끝 소식은 마지막에 한 번 · 마지막 판(3) · DB 와 같음', rs.every((x) => x.ok) && savedNews.A.length === 1 && savedNews.A[0].notes === '줄 선 저장 3' && dbOf(ID).notes === '줄 선 저장 3', { n: savedNews.A.length, notes: savedNews.A.map((r) => r.notes), kinds: news.A })
+  }
+  {
+    const a = await fresh(A, ID)
+    const b = await fresh(B, ID)
+    await A.saveClient({ ...a, contactPhone: '010-9090-1111' })
+    news.B.length = 0
+    savedNews.B.length = 0
+    const r = await tryErr(B.saveClient({ ...b, industry: '제조(S9b)' }))
+    const last = savedNews.B.at(-1)
+    check('S9b 합쳐 저장 → "합쳐서 저장" 다음에 저장 끝 소식 · 실어 온 판에 둘 다(A 연락처 · B 업종)', r.ok && news.B.indexOf('merged') >= 0 && news.B.lastIndexOf('saved') > news.B.indexOf('merged') && last?.contactPhone === '010-9090-1111' && last?.industry === '제조(S9b)', { kinds: news.B, last: last && { phone: last.contactPhone, industry: last.industry } })
+  }
+  {
+    const a = await fresh(A, ID)
+    const b = await fresh(B, ID)
+    await A.saveClient({ ...a, contactName: '정과장(A)' })
+    news.B.length = 0
+    savedNews.B.length = 0
+    const r = await tryErr(B.saveClient({ ...b, contactName: '오대리(B)' }))
+    const beforePick = savedNews.B.length
+    await B.resolveClientConflict(r.e, 'mine')
+    check('S9c 같은 칸 → 막힌 동안 저장 끝 소식 0(목록은 먼저 저장된 판 그대로) → [내가 고친 것으로] 뒤 한 번 · 고른 값', !r.ok && beforePick === 0 && savedNews.B.length === 1 && savedNews.B[0].contactName === '오대리(B)' && dbOf(ID).contact === '오대리(B)', { beforePick, after: savedNews.B.map((x) => x.contactName), kinds: news.B })
+  }
+  {
+    const a = await fresh(A, ID)
+    savedNews.A.length = 0
+    globalThis.__PGRST_JWT = jwt(PILOT)
+    const r = await tryErr(A.saveClient({ ...a, contactName: '팀장이 또 바꾸려 함' }))
+    globalThis.__PGRST_JWT = jwt(OWNER)
+    check('S9d 저장 실패(다른 작업공간 · RLS) → 저장 끝 소식 0(목록이 못 저장한 판을 보이지 않음)', !r.ok && savedNews.A.length === 0, { n: savedNews.A.length })
   }
 
   await browserPart(ID)

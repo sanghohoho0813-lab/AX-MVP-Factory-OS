@@ -18,6 +18,7 @@ import { listClients, saveClient } from '../services/clientOpsService'
 import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, type DecisionKind } from '../services/decisionLabels'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
+import { useClientSaveNews } from '../services/clientSaveNews'
 
 const KINDS: DecisionKind[] = ['fact', 'autofill', 'money', 'doc', 'shelf', 'stale', 'module', 'next', 'grant', 'followup']
 
@@ -25,6 +26,8 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  // SYNC-6 업체 저장이 끝나면(합쳐 저장 · 같은 칸을 고른 뒤 포함) — 확인할 것도 그 판으로
+  useClientSaveNews(setRecords)
   // D-160: 한 번에 여러 건 답할 때도 저장 직전의 최신 기록 위에 적는다
   const recordsRef = useRef(records)
   recordsRef.current = records

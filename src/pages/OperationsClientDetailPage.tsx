@@ -533,7 +533,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   useEffect(
     () =>
       onClientSaveNews((n) => {
-        if (n.kind === 'conflict' || n.record.id !== clientId || loopRef.current) return
+        // SYNC-6 'saved'(목록 화면용 — 저장마다 온다)는 듣지 않는다: 이 화면은 예전 그대로 합쳐 저장 · 고른 뒤만 맞춘다(제 저장은 제가 받는다)
+        if ((n.kind !== 'merged' && n.kind !== 'resolved') || n.record.id !== clientId || loopRef.current) return
         latestRef.current = n.record
         setRecord(n.record)
         setSavedAt(Date.now())

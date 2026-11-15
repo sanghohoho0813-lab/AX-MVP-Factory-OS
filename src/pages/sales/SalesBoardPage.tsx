@@ -71,6 +71,7 @@ import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, type ClientTyp
 import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 import { HintTip } from '../../components/ui/fold'
 import { EDGE_BOX } from '../../components/ui/edge'
+import { useClientSaveNews } from '../../services/clientSaveNews'
 
 const PICK_KEY = 'axmvp.sales.board.stage'
 
@@ -269,6 +270,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  // SYNC-6 업체 저장이 끝나면(합쳐 저장 · 같은 칸을 고른 뒤 포함) — 보드 카드도 그 판으로 바로
+  useClientSaveNews(setRecords)
   const grantSums = useClientGrantSummaries(workspaceId, records, today)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

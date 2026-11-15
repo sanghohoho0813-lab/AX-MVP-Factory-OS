@@ -78,6 +78,7 @@ import { SALES_SIMPLE } from '../../config/salesSimple'
 import { DirectPickPanel } from '../../components/sales/DirectPickPanel'
 import { HintTip } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
+import { useClientSaveNews } from '../../services/clientSaveNews'
 
 /** D-167: 1차 미팅 준비 방법 — 고른 쪽을 이 브라우저에 남긴다(크레탑을 안 쓰는 사람은 매번 고르지 않게) */
 const PREP_MODE_KEY = 'axmvp.ui.meeting_prep_mode'
@@ -597,6 +598,8 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   const [params, setParams] = useSearchParams()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  // SYNC-6 업체 저장이 끝나면(합쳐 저장 · 같은 칸을 고른 뒤 포함) — 미팅 준비도 그 판으로(막혀 다시 읽은 화면이 고른 값을 바로 보이게)
+  useClientSaveNews(setRecords)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 

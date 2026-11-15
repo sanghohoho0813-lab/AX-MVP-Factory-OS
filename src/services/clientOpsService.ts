@@ -724,11 +724,16 @@ export function __forgetClientSnapshots(): void {
   ownVersions.clear()
 }
 
-/** SYNC-2 저장 소식 — 다른 곳 고침과 합쳐 저장했을 때 · 같은 칸이 겹쳐 고르기가 필요할 때 · 고른 뒤 저장했을 때 */
+/**
+ * SYNC-2 저장 소식 — 다른 곳 고침과 합쳐 저장했을 때 · 같은 칸이 겹쳐 고르기가 필요할 때 · 고른 뒤 저장했을 때.
+ * SYNC-6 saved — 이 업체 저장이 끝났고 뒤에 줄 선 저장이 더 없다(합쳐 저장 · 고른 뒤 저장도 마지막에 이것이 온다).
+ *   업체 상세 밖 목록 화면이 이 판으로 바꿔 끼운다. 줄 서 있는 동안은 보내지 않는다 — 그 사이 화면에서 더 고친 것을 덮지 않게(D-125).
+ */
 export type ClientSaveNews =
   | { kind: 'merged'; record: ClientOpsRecord }
   | { kind: 'conflict'; error: ClientSaveConflictError }
   | { kind: 'resolved'; record: ClientOpsRecord }
+  | { kind: 'saved'; record: ClientOpsRecord }
 const saveNewsListeners = new Set<(n: ClientSaveNews) => void>()
 export function onClientSaveNews(fn: (n: ClientSaveNews) => void): () => void {
   saveNewsListeners.add(fn)
@@ -819,10 +824,30 @@ export async function createClient(
  * 나중에 부른 저장보다 먼저 부른 저장이 늦게 도착해 예전 값이 남을 수 있었다. 앞 저장이 실패해도 다음 저장은 간다.
  */
 const saveChains = new Map<string, Promise<unknown>>()
+/** SYNC-6 업체마다 줄 서 있는 저장 수(돌고 있는 것 포함) */
+const pendingSaves = new Map<string, number>()
+const pendingOf = (id: string) => pendingSaves.get(id) ?? 0
 
 export function saveClient(record: ClientOpsRecord): Promise<ClientOpsRecord> {
   const prev = saveChains.get(record.id) ?? Promise.resolve()
-  const run = prev.catch(() => undefined).then(() => saveClientNow(record))
+  pendingSaves.set(record.id, pendingOf(record.id) + 1)
+  const run = prev
+    .catch(() => undefined)
+    .then(async () => {
+      let saved: ClientOpsRecord | null = null
+      try {
+        saved = await saveClientNow(record)
+        return saved
+      } finally {
+        // 이 저장이 끝나는 순간(부른 쪽이 결과를 받기 전) 줄에서 뺀다 — 더 줄 선 저장이 없으면 목록 화면들에 이 판을 알린다
+        const left = pendingOf(record.id) - 1
+        if (left > 0) pendingSaves.set(record.id, left)
+        else {
+          pendingSaves.delete(record.id)
+          if (saved) announce({ kind: 'saved', record: saved })
+        }
+      }
+    })
   const tail = run.catch(() => undefined)
   saveChains.set(record.id, tail)
   void tail.then(() => {

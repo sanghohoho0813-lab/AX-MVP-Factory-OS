@@ -245,3 +245,21 @@ export function conflictValueText(v: unknown): string {
   }
   return '(목록)'
 }
+
+/**
+ * SYNC-6 목록에서 같은 id 를 방금 저장된 판으로 — 없거나 이미 같은 판이면 같은 배열 그대로(다시 그리지 않음).
+ * 목록 쪽이 더 새 판이면(그 뒤 다시 읽어 온 다른 곳 고침) 되돌리지 않는다.
+ */
+export function replaceClientInList(list: readonly ClientOpsRecord[], record: ClientOpsRecord): ClientOpsRecord[] {
+  const savedAt = Date.parse(record.updatedAt)
+  let changed = false
+  const next = list.map((r) => {
+    if (r.id !== record.id || r === record) return r
+    if (r.updatedAt !== '' && r.updatedAt === record.updatedAt) return r
+    const at = Date.parse(r.updatedAt)
+    if (Number.isFinite(at) && Number.isFinite(savedAt) && at > savedAt) return r
+    changed = true
+    return record
+  })
+  return changed ? next : (list as ClientOpsRecord[])
+}

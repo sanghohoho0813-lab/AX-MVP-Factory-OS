@@ -11,6 +11,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { listClients } from '../../services/clientOpsService'
+import { useClientSaveNews } from '../../services/clientSaveNews'
 import { isContractClient, isProspect } from '../../services/salesPipeline'
 import type { ClientOpsRecord } from '../../types/clientOps'
 
@@ -94,6 +95,8 @@ function ClientSideList({ onClose }: { onClose: () => void }) {
   const { clientId = '' } = useParams()
   const { search } = useLocation()
   const [records, setRecords] = useState<ClientOpsRecord[] | null>(null)
+  // SYNC-6 오른쪽 상세에서 회사 이름 · 계약 단계를 고치면 왼쪽 목록도 바로(예전: 다른 업체로 옮길 때까지 옛 이름)
+  useClientSaveNews((fn) => setRecords((list) => (list ? fn(list) : list)))
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLUListElement | null>(null)
 

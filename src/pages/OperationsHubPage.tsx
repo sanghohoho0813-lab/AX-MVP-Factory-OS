@@ -107,6 +107,7 @@ import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/d
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
+import { useClientSaveNews } from '../services/clientSaveNews'
 
 // D-481 서류 한꺼번에 올리기 창(글자 읽기 · 서류 분석 엔진)은 카드에서 누를 때 받는다 — 목록 첫 화면이 이것 때문에 무거웠다
 const BulkDocUploadSheet = lazy(() => import('../components/ops/BulkDocUploadSheet').then((m) => ({ default: m.BulkDocUploadSheet })))
@@ -157,6 +158,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   const navigate = useNavigate()
   const pilot = useIsPilot()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  // SYNC-6 업체 저장이 끝나면(합쳐 저장 · 같은 칸을 고른 뒤 포함) — 이 목록도 그 판으로 바로
+  useClientSaveNews(setRecords)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
