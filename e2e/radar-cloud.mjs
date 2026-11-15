@@ -15,6 +15,14 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+const openRow = async (row) => {
+  if ((await row.getAttribute('data-open')) !== 'pin') {
+    await row.getByTestId('radar-opp-row').click()
+    await row.page().waitForTimeout(150)
+  }
+  return row
+}
 const REF = 'qaproject'
 const PORT = 4536
 const BASE = `http://localhost:${PORT}`
@@ -182,6 +190,7 @@ try {
     await page.screenshot({ path: join(SHOTS, `d222-prefs-failed-${vp.width}.png`), fullPage: false })
 
     const sub = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
+    await openRow(sub)
     await sub.getByTestId('radar-opp-more').click()
     await page.waitForTimeout(200)
     await sub.getByTestId('radar-mute').click()
@@ -197,6 +206,7 @@ try {
     const sub2 = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
     const topic = ((await sub2.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
     // 첫 번째 [관심 없음] 이 막혔으니 같은 카드가 펼쳐진 채로 있다
+    await openRow(sub2)
     if (!(await sub2.getByTestId('radar-mute').isVisible().catch(() => false))) await sub2.getByTestId('radar-opp-more').click()
     await page.waitForTimeout(200)
     await sub2.getByTestId('radar-mute').click()
@@ -211,6 +221,7 @@ try {
   /* ---------- 3 수첩 목록을 못 읽음 → 담기 막음 ---------- */
   {
     const { ctx, page, errors, writes } = await open({ width: 1440, height: 900 }, { ideasDown: true })
+    await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
     await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm').click()
     await page.waitForTimeout(600)
     const t = await toastText(page)
@@ -222,6 +233,7 @@ try {
   /* ---------- 4 [이번 주로 확정] 빠르게 두 번 → 수첩 한 줄 ---------- */
   {
     const { ctx, page, errors, writes } = await open({ width: 1440, height: 900 }, { ideaDelay: 900 })
+    await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
     const btn = page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm')
     await btn.click()
     await btn.click({ timeout: 2000 }).catch(() => {})

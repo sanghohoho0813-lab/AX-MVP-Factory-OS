@@ -32,7 +32,7 @@ import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
-import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders } from '../../services/aiAssist/store'
+import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders, isCheapOnly } from '../../services/aiAssist/store'
 import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
@@ -736,7 +736,8 @@ export function ModelRow({
           )}
           {provider && (
             <ul className="flex flex-col gap-1.5">
-              {provider.models.map((m) => {
+              {/* D-614 내부 팀장은 회사마다 가장 싼 모델 하나만(대표가 팀장 화면으로 볼 때도 같은 모양) */}
+              {provider.models.filter((m) => !isCheapOnly() || m.tier === 'cheap').map((m) => {
                 const on = effective.provider === provider.id && effective.model === m.id
                 return (
                   <li key={m.id}>
@@ -807,8 +808,9 @@ export function ModelRow({
           )}
           <p className="t-meta break-keep text-slate-500">
             {/* D-257 팀장 화면에는 없는 마케팅 · AI 전략실은 말하지 않는다 */}
-            고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 ? ' · 마케팅 · AI 전략실' : ' · 오른쪽 판 AI 대화'})가 같이 써요.
-            {allowedProviders().length === 1 && ' 팀장 계정은 지금 Gemini 모델만 쓸 수 있어요.'}
+            고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 && !isCheapOnly() ? ' · 마케팅 · AI 전략실' : ' · 마케팅 · 오른쪽 판 AI 대화'})가 같이 써요.
+            {allowedProviders().length === 1 && ' 이 계정은 지금 Gemini 모델만 쓸 수 있어요.'}
+            {isCheapOnly() && ' 팀장 계정은 회사마다 가장 싼 모델 하나씩 쓸 수 있어요.'}
           </p>
         </div>
       )}

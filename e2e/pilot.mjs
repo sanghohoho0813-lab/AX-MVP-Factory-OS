@@ -143,7 +143,15 @@ globalThis.fetch = async (input, init = {}) => {
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(AI_ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 120 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com') || url.includes('api.openai.com')) {
-    aiCalls.push({ provider: url.includes('anthropic') ? 'anthropic' : 'openai', url, sys: '', user: '' })
+    // D-614 모델 목록 받기(키로 쓸 수 있는 모델 확인 · 오른쪽 판 회사 바꾸기)는 글을 쓰는 호출이 아니다 — 세지 않는다
+    if (/\/models(\?|$)/.test(url)) return new Response('{}', { status: 500 })
+    let model = ''
+    try {
+      model = String(JSON.parse(String(init.body ?? '{}')).model ?? '')
+    } catch {
+      model = ''
+    }
+    aiCalls.push({ provider: url.includes('anthropic') ? 'anthropic' : 'openai', url, sys: '', user: '', model })
     return new Response('{}', { status: 500 })
   }
   return realFetch(input, init)
@@ -823,13 +831,21 @@ try {
   await page.getByTestId('ai-assist-model-toggle').first().click()
   await page.waitForTimeout(500)
   const tabs = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
-  check('팀장(D-257): 모델 바꾸기 — 회사 탭은 Gemini 하나(GPT · Claude 없음)', tabs.join() === 'gemini', tabs.join())
+  check('팀장(D-614): 모델 바꾸기 — 회사 탭은 Gemini · GPT · Claude 셋(내부 팀장)', tabs.join() === 'gemini,openai,anthropic', tabs.join())
+  {
+    // D-614 회사마다 가장 싼 모델 하나만 — Claude 탭을 눌러도 Haiku 하나
+    await page.locator('[data-testid="ai-assist-settings"] [role="tab"][data-provider="anthropic"]').first().click().catch(() => {})
+    await page.waitForTimeout(300)
+    const opts = await page.locator('[data-testid="ai-assist-settings"] [data-testid="ai-assist-model-option"]').allInnerTexts().catch(() => [])
+    check('팀장(D-614): Claude 탭 모델은 가장 싼 Claude Haiku 하나', opts.length === 1 && opts[0].includes('Haiku'), opts.join(' | '))
+  }
   await shot(page, 'pilot-07-ai-gemini')
   await page.keyboard.press('Escape')
   const d1 = await assistDirect(PILOT, { requestId: 'pilot-direct-000001', assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic' }, context: { title: '오늘', today: '2026-10-21', sections: [] } })
   const d2 = await assistDirect(PILOT, { requestId: 'pilot-direct-000002', assistId: 'radar.top5', page: 'radar', context: { title: '마케팅', today: '2026-10-21', sections: [] } })
   const d3 = await assistDirect(OUTSIDER, { requestId: 'pilot-direct-000003', assistId: 'today.top3', page: 'today', context: { title: '오늘', today: '2026-10-21', sections: [] } })
-  check('팀장(D-257 · D-564) 서버 직접: Claude 고르면 403 provider_not_allowed · 장부 비밀값이 없는 동안 마케팅 단추 403 usage_setup_needed(셀 수 없으면 열지 않음) · 등급 없는 가입자 403 · AI 회사 안 부름', d1.statusCode === 403 && d1.body.code === 'provider_not_allowed' && d2.statusCode === 403 && d2.body.code === 'usage_setup_needed' && d3.statusCode === 403 && aiCalls.length === 1, { d1: d1.body.code, d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
+  const claudeCalls = aiCalls.filter((c) => c.provider === 'anthropic')
+  check('팀장(D-614 · D-564) 서버 직접: Claude 고르면(내부 팀장) 막지 않고 가장 싼 Claude Haiku 로 부름 · 장부 비밀값이 없는 동안 마케팅 단추 403 usage_setup_needed(셀 수 없으면 열지 않음) · 등급 없는 가입자 403 · Gemini 는 더 안 부름', d1.body.code !== 'provider_not_allowed' && claudeCalls.length === 1 && claudeCalls[0].model === 'claude-haiku-5-5' && d2.statusCode === 403 && d2.body.code === 'usage_setup_needed' && d3.statusCode === 403 && aiCalls.filter((c) => c.provider === 'gemini').length === 1, { d1: d1.body.code, claude: claudeCalls.map((c) => c.model), d2: d2.body.code, d3: d3.body.code, n: aiCalls.length })
 
   // D-258: 팀장 — OS 안 오른쪽 판 AI 대화 → 진짜 서버 함수(side.chat) → Gemini 로만 · 보낸 것에 대표 자료 0
   await page.getByTestId('side-ai-button').click()
@@ -840,7 +856,7 @@ try {
   await page.getByTestId('dock-answer').first().waitFor({ timeout: 15000 }).catch(() => {})
   const dockAns = await page.getByTestId('dock-answer').first().innerText().catch(() => '')
   const gem2 = aiCalls.filter((c) => c.provider === 'gemini')
-  check('팀장(D-258 · SAAS-1): 오른쪽 판 AI 대화 → 판 안에 답 · Gemini 로만 · 팀장 설정 첫 줄 · 대표 이름 0 · 보낸 것에 대표 자료 0', dockAns.includes('서류 마감부터') && gem2.length === 2 && aiCalls.length === 2 && gem2[1].sys.includes('은혜컨설턴트(은혜경영)의 업무 비서') && !/김상호|김팀장|미래AI랩/.test(gem2[1].sys) && gem2[1].user.includes('정책자금 신청 순서') && leaked(gem2[1].user).length === 0, { n: aiCalls.length, dockAns: dockAns.slice(0, 80) })
+  check('팀장(D-258 · SAAS-1): 오른쪽 판 AI 대화 → 판 안에 답 · Gemini 로만 · 팀장 설정 첫 줄 · 대표 이름 0 · 보낸 것에 대표 자료 0', dockAns.includes('서류 마감부터') && gem2.length === 2 && aiCalls.length === 2 + claudeCalls.length && gem2[1].sys.includes('은혜컨설턴트(은혜경영)의 업무 비서') && !/김상호|김팀장|미래AI랩/.test(gem2[1].sys) && gem2[1].user.includes('정책자금 신청 순서') && leaked(gem2[1].user).length === 0, { n: aiCalls.length, dockAns: dockAns.slice(0, 80) })
   await shot(page, 'pilot-08-dock-chat')
   await page.getByTestId('dock-close').click()
 
@@ -1175,7 +1191,7 @@ try {
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
   check('AI 대표 → 팀장 화면: AI 전략실 메뉴 없음', !pnav.includes('AI 전략실'), pnav.replace(/\n/g, '|').slice(0, 300))
   {
-    // D-257 대표가 팀장 화면으로 볼 때도 팀장과 같게 — AI 띠는 있고 회사는 Gemini 만
+    // D-257 · D-614 대표가 팀장 화면으로 볼 때도 팀장과 같게 — AI 띠는 있고 회사는 Gemini · GPT · Claude(가장 싼 모델)
     await go(page, '/')
     const hasBar = (await page.getByTestId('ai-assist-bar').count()) >= 1
     await page.getByTestId('ai-assist-chip').first().click()
@@ -1184,7 +1200,7 @@ try {
     await page.getByTestId('ai-assist-model-toggle').first().click().catch(() => {})
     await page.waitForTimeout(500)
     const vt = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
-    check('AI 대표 → 팀장 화면(D-257): AI 도우미 띠 있음 · 회사 탭 Gemini 하나', hasBar && vt.join() === 'gemini', vt.join())
+    check('AI 대표 → 팀장 화면(D-614): AI 도우미 띠 있음 · 회사 탭 Gemini · GPT · Claude', hasBar && vt.join() === 'gemini,openai,anthropic', vt.join())
     await page.keyboard.press('Escape')
   }
   check('D-247 대표 → 팀장 화면: 특허 · 벤처 메뉴 없음', !pnav.includes('특허 · 벤처'), pnav.replace(/\n/g, '|').slice(0, 300))

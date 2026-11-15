@@ -267,6 +267,14 @@ const RADAR = {
   failed: [],
 }
 const RJSON = JSON.stringify(RADAR)
+/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+const openRow = async (row) => {
+  if ((await row.getAttribute('data-open')) !== 'pin') {
+    await row.getByTestId('radar-opp-row').click()
+    await row.page().waitForTimeout(150)
+  }
+  return row
+}
 const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '이 영상은 뜹니다', '% 성공']
 
 {
@@ -295,24 +303,34 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(900)
 
   const tops = page.getByTestId('radar-top').getByTestId('radar-opp')
-  // D-296 대표 "10순위까지 한 번에" — 위 3장(1순위 크게 · 2 · 3) + 아래 4위부터 같은 카드 · [후보 더 보기] 없음
+  // D-613 대표 "1~10위 박스가 너무 크고 정보가 많다 — 이번 주 뜨는 주제처럼 정돈 · 올리거나 누르면 펼쳐지게" — 번호 한 줄 목록 · 처음엔 모두 접힘
   const allCards = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]')
   const axes = (await allCards.evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))).slice(0, 5)
-  check('레이더: 첫 화면에 후보 카드 3장 + 4위부터 아래 카드(한 번에)', (await tops.count()) === 3 && (await allCards.count()) >= 5 && (await page.getByTestId('radar-rest').locator('[data-testid="radar-opp"]').count()) === (await allCards.count()) - 3 && axes.length === 5, axes)
+  const rowHeights = await tops.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check('D-613 레이더: 1~10위가 번호 한 줄 목록(한 번에 · [후보 더 보기] 없음) · 처음엔 모두 접힘(펼친 내용 0) · 줄 높이 72px 이하', (await tops.count()) >= 5 && (await tops.count()) === (await allCards.count()) && (await page.getByTestId('radar-opp-body').count()) === 0 && rowHeights.every((h) => h <= 72) && axes.length === 5, { rowHeights, axes })
   check('레이더: 이번 주 5개에 시장수요 · AX·AI · BRIDGE 가 섞인다(비중 가이드 45 · 35 · 20)', ['market', 'axai', 'bridge'].every((a) => axes.includes(a)), axes)
   const first = tops.first()
   const strengthText = (await first.getByTestId('radar-strength').innerText()) ?? ''
-  // D-195 UX 3.0 — 1순위 하나만 크게 · 2 · 3 작게 · 기본 상태는 결정 → 이유(한 문장 · 근거 2개) → MIRAE 관점
-  const heroBox = await page.locator('[data-testid="radar-opp"][data-size="hero"]').boundingBox()
-  const subBoxes = await page.getByTestId('radar-top').locator('[data-testid="radar-opp"][data-size="sub"]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height))
-  check('U1 1순위 HERO 하나 · "이번 주 1순위" · 맨 앞 카드', (await page.locator('[data-size="hero"]').count()) === 1 && (await first.getAttribute('data-size')) === 'hero' && (await first.getByTestId('radar-rank1').innerText()).includes('이번 주 1순위'))
-  check('U2 2 · 3순위는 작게(카드 넓이가 1순위보다 작음)', subBoxes.length === 2 && !!heroBox && subBoxes.every((a) => a < heroBox.width * heroBox.height), { hero: heroBox && heroBox.width * heroBox.height, subBoxes })
-  check('U3 기본 상태에서는 벤치마킹 썸네일을 보이지 않는다(위 3장)', (await page.getByTestId('radar-top').getByTestId('radar-bench-thumb').count()) === 0)
+  // D-613 PC 마우스: 줄에 올리면 미리 보기(목록 위에 겹침 — 목록이 밀리지 않음) · 밖으로 나가면 닫힘
+  {
+    const second = tops.nth(1)
+    const listH0 = (await page.getByTestId('radar-top').boundingBox())?.height ?? 0
+    await second.getByTestId('radar-opp-row').hover()
+    await page.waitForTimeout(500)
+    const peekState = await second.getAttribute('data-open')
+    const listH1 = (await page.getByTestId('radar-top').boundingBox())?.height ?? 0
+    await page.mouse.move(2, 2)
+    await page.waitForTimeout(500)
+    check('D-613 마우스를 올리면 그 줄 미리 보기가 펼쳐짐(목록은 그대로 · 밀림 0) · 마우스를 치우면 닫힘', peekState === 'peek' && Math.abs(listH1 - listH0) < 1 && (await second.getAttribute('data-open')) === '0' && (await page.getByTestId('radar-opp-body').count()) === 0, { peekState, listH0, listH1 })
+  }
+  await openRow(first)
+  check('U1 1번 줄 = 1순위(맨 앞 · 하나) · 누르면 펼친 채 "이번 주 1순위"', (await page.locator('[data-size="hero"]').count()) === 1 && (await first.getAttribute('data-size')) === 'hero' && (await first.getAttribute('data-open')) === 'pin' && (await first.getByTestId('radar-rank1').innerText()).includes('이번 주 1순위'))
+  check('U3 기본 상태에서는 벤치마킹 썸네일을 보이지 않는다', (await page.getByTestId('radar-top').getByTestId('radar-bench-thumb').count()) === 0)
   const why = ((await first.getByTestId('radar-why').innerText()) ?? '').trim()
   check('U5 왜 지금은 사람이 읽는 한 문장 · 핵심 근거는 2개까지', /채널/.test(why) && why.endsWith('.') && !why.includes('\n') && (why.match(/\./g) ?? []).length <= 2 && (await first.getByTestId('radar-fact').count()) >= 1 && (await first.getByTestId('radar-fact').count()) <= 2, why)
-  // D-296 대표 "처음부터 읽을 게 너무 많다" — 찍기 키트는 1순위까지 모두 접힌 채(제목 줄 · 준비 시간만)
+  // D-296 대표 "처음부터 읽을 게 너무 많다" — 펼친 줄도 찍기 키트는 접힌 채(제목 줄 · 준비 시간만) · 펼치지 않은 줄은 키트 0
   const kitOpenStates = await page.getByTestId('radar-plan').getByTestId('radar-kit').evaluateAll((els) => els.map((e) => e.getAttribute('data-open')))
-  check('U6 · U7(D-296) 4~10위도 한 번에(한 줄 · [후보 더 보기] 없음) · 찍기 키트 모두 접힌 채 · 안의 글(이렇게 말해요 · 제목 예) 0', (await page.getByTestId('radar-opp-compact').count()) === 0 && (await page.getByTestId('radar-more').count()) === 0 && kitOpenStates.length >= 5 && kitOpenStates.every((x) => x === '0') && (await page.getByTestId('radar-plan').getByTestId('radar-angle').count()) === 0 && (await page.getByTestId('radar-plan').getByTestId('radar-kit-title').count()) === 0, kitOpenStates)
+  check('U6 · U7(D-296 · D-613) 펼친 줄 하나만 찍기 키트(접힌 채) · 안의 글(이렇게 말해요 · 제목 예) 0', (await page.getByTestId('radar-opp-compact').count()) === 0 && (await page.getByTestId('radar-more').count()) === 0 && kitOpenStates.length === 1 && kitOpenStates.every((x) => x === '0') && (await page.getByTestId('radar-plan').getByTestId('radar-angle').count()) === 0 && (await page.getByTestId('radar-plan').getByTestId('radar-kit-title').count()) === 0, kitOpenStates)
   await first.getByTestId('radar-kit-toggle').click()
   await page.waitForTimeout(150)
   check('레이더 카드: 신호 세기(강함 · 보통 · 초기 — 점수 없음) · 찍기 키트를 펼치면 이렇게 말해요 · 제목 예', /신호 (강함|보통)|초기 신호/.test(strengthText) && !/\d+점/.test(strengthText) && ((await first.getByTestId('radar-view').innerText()) ?? '').length > 15 && ((await first.innerText()) ?? '').includes('제목 예'))
@@ -377,6 +395,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
 
   // U8 · U9 — [이번 주로 확정] → 기존 수첩에 '제작 예정' · 다시 눌러도 줄이 늘지 않음
   const heroCard = page.locator('[data-testid="radar-opp"][data-size="hero"]')
+  await openRow(heroCard)
   const heroTopic = ((await heroCard.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
   // D-238: [이번 주로 확정] 은 찍기 키트(펼쳐 둔 채) 위 — 예전엔 키트 아래로 한참 밀려 있었다
   {
@@ -398,6 +417,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.getByTestId('radar-idea-status').first().selectOption('idea')
   await page.waitForTimeout(400)
   await toPlan()
+  await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
   await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm').click()
   await page.waitForTimeout(500)
   await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-opp-more').click()
@@ -413,6 +433,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   // U10 · U11 — [관심 없음] → 그 후보만 빠짐 · 추천 기준 › 숨긴 주제에서 되살림
   const sub2 = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
   const mutedTopic = ((await sub2.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
+  await openRow(sub2)
   await sub2.getByTestId('radar-opp-more').click()
   await page.waitForTimeout(200)
   await sub2.getByTestId('radar-mute').click()
@@ -446,7 +467,9 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(400)
   const mAxes = await page.getByTestId('radar-top').getByTestId('radar-opp').evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))
   // D-558 고정 본업 주제(고용지원금 · 절세 · 세금 신고 …)는 '이번 주 뜨는 주제' 에 다시 나오지 않는다 — 이 시험 자료(채널 4곳 · 영상 16편)의 시장 후보는 둘만 남는다
-  check('비중 가이드: 시장 100 · 나머지 0 → 시장 후보가 먼저(남은 시장 후보 둘이 앞 2장 · AI 후보 0 · 가이드는 바꿀 수 있다)', mAxes.length === 3 && mAxes[0] === 'market' && mAxes[1] === 'market' && !mAxes.includes('axai'), mAxes)
+  // D-613 radar-top = 1~10위 목록 전체 — 앞 3줄을 본다
+  const mTop = mAxes.slice(0, 3)
+  check('비중 가이드: 시장 100 · 나머지 0 → 시장 후보가 먼저(남은 시장 후보 둘이 앞 2장 · AI 후보 0 · 가이드는 바꿀 수 있다)', mTop.length === 3 && mTop[0] === 'market' && mTop[1] === 'market' && !mTop.includes('axai'), mAxes)
   await page.getByTestId('radar-mix').click()
   await page.getByTestId('radar-mix-panel').getByRole('button', { name: /기본값/ }).click()
   await page.getByTestId('radar-mix-panel').getByRole('button', { name: '적용' }).click()
@@ -564,11 +587,13 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const size = await page.evaluate(() => {
     const f = (s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)
     const h = (s) => document.querySelector(s)?.getBoundingClientRect().height ?? 0
-    return { plan: f('#radar-plan-h'), signals: f('#radar-signals-h'), side: f('#radar-side-h'), hero: h('[data-testid="radar-opp"][data-size="hero"]'), sideBox: h('[data-testid="radar-side"]') }
+    return { plan: f('#radar-plan-h'), signals: f('#radar-signals-h'), side: f('#radar-side-h'), list: h('section[aria-labelledby="radar-plan-h"]'), sideBox: h('[data-testid="radar-side"]') }
   })
-  check(`${T} SIDE 가 TOP 보다 커 보이지 않는다: 제목 글자 TOP > 시장 신호 > 사이드 · 사이드 칸 높이 < 1순위 카드`, size.plan > size.signals && size.signals > size.side && size.sideBox < size.hero, size)
+  // D-613 1순위 큰 카드 → 번호 줄 목록 — 사이드 칸을 1~10위 목록 전체 높이와 견준다
+  check(`${T} SIDE 가 TOP 보다 커 보이지 않는다: 제목 글자 TOP > 시장 신호 > 사이드 · 사이드 칸 높이 < 이번 주 찍을 것 판`, size.plan > size.signals && size.signals > size.side && size.sideBox < size.list, size)
   // 왜 추천됐나요
   const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
+  await openRow(hero)
   await hero.getByTestId('radar-why-rec').click()
   await page.waitForTimeout(200)
   const whyItems = await hero.getByTestId('radar-why-item').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-id')}:${e.getAttribute('data-met')}`))
@@ -626,6 +651,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
     const T = vp.tag
     const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     // 숫자가 쓰인 곳마다 목록이 붙었나 — 글 속 숫자(…편 · 터진 영상 n) = 목록 길이
+    // D-613 후보 근거(fact)는 펼친 줄 안에 — 1순위 줄을 펼쳐 둔다
+    await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
     const peeks = await page.getByTestId('radar-plan').getByTestId('radar-peek').evaluateAll((els) => els.map((e) => ({ kind: e.getAttribute('data-kind'), n: Number(e.getAttribute('data-count')), text: e.textContent ?? '', h: e.getBoundingClientRect().height })))
     const kinds = new Set(peeks.map((x) => x.kind))
     const mismatch = peeks.filter((x) => lastNum(x.text) !== null && lastNum(x.text) !== x.n)
@@ -663,6 +690,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
       await page.mouse.move(5, 450)
       await page.waitForTimeout(400)
       // 누르면 고정 — 마우스를 빼도 남고, Esc · 바깥 · 닫기로 닫힘
+      await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
       const fact = page.locator('[data-testid="radar-opp"][data-size="hero"] [data-testid="radar-peek"][data-kind="fact"]').first()
       await fact.click()
       await page.mouse.move(5, 450)
@@ -761,6 +789,9 @@ for (const width of [360, 390, 430]) {
     return a < b
   })
   check(`${width} 이번 주 찍을 것: 후보 카드가 먼저(이유 → 관련 영상) · 넘침 0`, order && (await over()) <= 0, await over())
+  // D-613 휴대폰은 줄을 눌러 펼친다
+  await page.getByTestId('radar-opp-row').first().tap()
+  await page.waitForTimeout(200)
   await page.getByTestId('radar-opp-more').first().tap()
   await page.waitForTimeout(200)
   const small = await page.evaluate(() =>
@@ -921,9 +952,10 @@ for (const width of [360, 390, 430]) {
     return page.evaluate(() => {
       const t = (sel) => [...document.querySelectorAll(sel)].map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim())
       return {
-        top: t('[data-testid="radar-top"] [data-testid="radar-opp-topic"]'),
+        // D-613 radar-top = 1~10위 목록 전체 — 앞 3줄 · 4위부터로 나눠 본다
+        top: t('[data-testid="radar-top"] [data-testid="radar-opp-topic"]').slice(0, 3),
         axes: [...document.querySelectorAll('[data-testid="radar-opp"], [data-testid="radar-opp-compact"]')].map((e) => e.getAttribute('data-axis')),
-        rest: t('[data-testid="radar-rest"] [data-testid="radar-opp-topic"]'),
+        rest: t('[data-testid="radar-top"] [data-testid="radar-opp-topic"]').slice(3),
         rising: t('[data-testid="radar-rising-row"]'),
         breakouts: t('[data-testid="radar-breakouts"] [data-testid="radar-breakout-chip"]'),
       }
@@ -1018,6 +1050,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   // D-560 대표 "이번 주 찍을 것 이름을 유튜브로 바꾸고 스레드 옆에 · 인기 영상 ~ 나머지도 합칠 수 있으면 합쳐" — 살펴보기 2칸 · 만들기 5칸(유튜브가 스레드 옆 맨 앞)
   check(`D231-1 ${T} 마케팅 · 브랜딩(/marketing) = 바로 레이더 · 목차 7칸(살펴보기: 남의 인기 영상 · 내 콘텐츠 / 만들기: 유튜브 · 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지)`, (await page.getByTestId('radar-plan').count()) === 1 && tabIds.join() === 'yt-view-top,yt-view-make,yt-view-plan,mk-tab-threads,mk-tab-shorts,mk-tab-content,mk-tab-homepage', tabIds)
   const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
+  await openRow(hero)
   // D-253: '미래AI랩 관점' 상자 + 찍기 키트 두 상자 → '이번 주 이렇게 찍으세요' 한 상자(이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 · 제목 후보 · 썸네일)
   const kit = hero.getByTestId('radar-kit')
   // D-296 1순위도 처음엔 접힌 채 — 제목 줄 · 준비 시간만, 누르면 안의 글
@@ -1046,15 +1079,18 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const kitClip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
   check(`D231-4 ${T} [전체 복사] — 이렇게 말해요 · 첫 문장 · 제목 후보 · 잘 된 틀 · 그대로 쓰지 않는다는 말(구성 · 쇼츠 줄 없음)`, kitClip.includes('[이번 주 이렇게 찍으세요]') && kitClip.includes('이렇게 말해요:') && kitClip.includes('첫 문장:') && kitClip.includes('제목 후보') && kitClip.includes('그대로 쓰지 않는다') && !kitClip.includes('긴 영상 구성') && !kitClip.includes('미래AI랩 관점'), kitClip.slice(0, 120))
   const sub = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
+  await openRow(sub)
   const subKit = sub.getByTestId('radar-kit')
   const subClosed = (await subKit.getAttribute('data-open')) === '0' && (await subKit.getByTestId('radar-kit-title').count()) === 0 && (await subKit.getByTestId('radar-kit-hook').count()) === 0 && (await subKit.getByTestId('radar-angle').count()) === 0 && (await subKit.getByTestId('radar-kit-body').count()) === 0
   await subKit.getByTestId('radar-kit-toggle').click()
   await page.waitForTimeout(150)
   check(`D231-5 · D296 ${T} 2 · 3순위 — 찍기 키트 접힌 채 → 누르면 이렇게 말해요 · 제목 예 · 첫 문장 · 잘 된 틀 · 제목 후보`, subClosed && (await subKit.getAttribute('data-open')) === '1' && (await subKit.getByTestId('radar-kit-titles').count()) === 1 && (await subKit.getByTestId('radar-angle').count()) === 1 && (await subKit.getByTestId('radar-kit-hook').count()) === 1)
-  const restCards = page.getByTestId('radar-rest').locator('[data-testid="radar-opp"]')
-  const restN = await restCards.count()
-  const restKits = await page.getByTestId('radar-rest').getByTestId('radar-kit-toggle').count()
-  check(`D231-6 · D296 ${T} 4~10위도 같은 카드로 한 번에(${restN}장) · 카드마다 찍기 키트(접힌 채)`, restN >= 2 && restKits === restN)
+  // D-613 4~10위도 같은 목록 줄로 한 번에 — 펼치면 그 줄에도 찍기 키트(접힌 채)
+  const restRows = page.getByTestId('radar-top').locator('[data-testid="radar-opp"]:nth-child(n+4)')
+  const restN = await restRows.count()
+  await openRow(restRows.first())
+  const restKit = restRows.first().getByTestId('radar-kit')
+  check(`D231-6 · D296 · D-613 ${T} 4~10위도 같은 목록 줄로 한 번에(${restN}줄) · 펼치면 찍기 키트(접힌 채)`, restN >= 2 && (await restKit.count()) === 1 && (await restKit.getAttribute('data-open')) === '0')
   const ov1 = await over()
   // [이번 주로 확정] → 내 콘텐츠
   await hero.getByTestId('radar-confirm').click()

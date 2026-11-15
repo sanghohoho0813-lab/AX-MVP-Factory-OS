@@ -47,7 +47,7 @@ import { ArrangeButton } from '../ui/arrange'
 import { ChatModeButton } from '../chat/ChatFirst'
 import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
-import { setAllowedProviders } from '../../services/aiAssist/store'
+import { setAllowedProviders, setCheapOnly } from '../../services/aiAssist/store'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -77,7 +77,18 @@ export function AppShell() {
   // D-188: 머리줄 · 메뉴 숫자까지 같은 목록을 보게 — 화면을 그리는 맨 위에서 먼저 정한다
   setBuiltinServicesHidden(useIsPilot())
   // D-257 팀장(대표가 팀장 화면으로 볼 때도)은 AI 회사 Gemini 만 — 모델 고르기 · 고른 것 읽기가 같이 따른다
-  setAllowedProviders(useAiAssistAccess() === 'pilot' ? ['gemini'] : null)
+  // D-614 대표 지시: 내부 팀장은 Gemini · GPT · Claude 셋 — 회사마다 가장 싼 모델 하나만. 외부 구독 고객은 그대로 Gemini 만
+  //       (개인정보처리방침 초안의 국외 이전 회사가 Google 하나 — 고객에게 늘리려면 방침부터)
+  const assistAccess = useAiAssistAccess()
+  const customerScreen = useCustomerAudience()
+  setAllowedProviders(assistAccess === 'pilot' ? (customerScreen ? ['gemini'] : ['gemini', 'openai', 'anthropic']) : null)
+  const cheapOnly = assistAccess === 'pilot' && !customerScreen
+  setCheapOnly(cheapOnly)
+  // 대표가 팀장 화면으로 볼 때 — 가장 싼 모델 이름을 먼저 받아 둔다(대표가 고른 비싼 모델이 이 보기에서 쓰이지 않게). 팀장 본인은 아래 마케팅 확인이 같이 받는다
+  const viewingAsPilot = useViewingPilot() !== null
+  useEffect(() => {
+    if (cheapOnly && viewingAsPilot) void fetchAssistStatus().catch(() => undefined)
+  }, [cheapOnly, viewingAsPilot])
   const [mobileOpen, setMobileOpen] = useState(false)
   // D-568 팀장 · 구독 고객 계정의 잡히지 않은 오류(눌러도 아무 일도 안 일어나는 종류)를 운영자에게 — 오류 글 · 화면 주소만.
   //       대표 자신의 화면은 달지 않는다. 문의 창구(0025)가 없으면 첫 오류 때 한 번 물어보고 그만둔다.
@@ -108,7 +119,8 @@ export function AppShell() {
   const access = auth?.access ?? null
   // D-601 대표가 팀장 화면으로 볼 때도 마케팅 · 브랜딩을 연다(대표 2026-11-12 "내 아이디에서 왔다갔다 해도 보이게").
   //   - 보이는 것은 팀장 작업공간의 마케팅(클라우드 자료가 작업공간별) · 팀장 브랜드 이름(고객 쪽 말투) — 대표 채널 · AX 기본값은 안 섞인다.
-  //   - 화면들은 이 보기에서 읽기만(readOnly = useViewingPilot) · AI 단추 없음(아래 setPilotMarketing('closed') · useMarketingAiOn) — 대표 자료가 팀장 작업공간으로 올라가지 않는다.
+  //   - 화면들은 이 보기에서 읽기만(readOnly = useViewingPilot) — 대표 자료가 팀장 작업공간으로 올라가지 않는다.
+  //   - D-614 AI 단추는 팀장 화면 그대로 보인다(useMarketingAiOn) — 답은 글 칸에만 들어가고 저장은 readOnly 가 막는다 · 모델은 회사마다 가장 싼 것만.
   const viewingPilot = useViewingPilot() !== null
   const marketingAsPilot = access === 'pilot' || viewingPilot
   setMarketingCustomer(marketingAsPilot)

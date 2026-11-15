@@ -9,7 +9,7 @@
  */
 import { useContext } from 'react'
 import { AuthContext } from './authContext'
-import { useIsPilot } from './osAccess'
+import { useIsPilot, useViewingPilot } from './osAccess'
 import { usePilotMarketing } from '../config/pilotMarketing'
 
 export const OWNER_AI_CAP = 'can_use_owner_ai_workspace'
@@ -55,13 +55,16 @@ export function useAiAssistAccess(): AssistAccess {
 
 /**
  * SAAS-2 마케팅 화면(레이더 묶음 · 스레드 · 릴스/틱톡)의 AI — 대표는 예전 판정 그대로,
- * 고객(팀장 등급)은 서버가 마케팅을 열었을 때만(그 계정의 사용량을 장부로 셀 수 있을 때). 대표가 팀장 화면으로 볼 때는 꺼짐.
+ * 고객(팀장 등급)은 서버가 마케팅을 열었을 때만(그 계정의 사용량을 장부로 셀 수 있을 때).
+ * D-614 대표가 팀장 화면으로 볼 때도 켠다(대표 2026-11-15 "팀장 화면에 LLM 단추가 하나도 안 보여 — 있어야 해") —
+ * 팀장이 보는 단추 그대로 보이고 눌러 볼 수 있다. 화면들은 그 보기에서 읽기만이라 AI 답은 글 칸에만 들어가고 팀장 작업공간에 저장되지 않는다.
  */
 export function useMarketingAiOn(): boolean {
   const owner = useOwnerAiAccess()
   const auth = useContext(AuthContext)
+  const viewing = useViewingPilot() !== null
   const open = usePilotMarketing() === 'open'
-  return owner !== 'no' || (auth?.access === 'pilot' && open)
+  return owner !== 'no' || viewing || (auth?.access === 'pilot' && open)
 }
 
 /** AI 단추를 눌러 부를 수 있는가(대표 · 팀장) */

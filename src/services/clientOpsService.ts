@@ -62,7 +62,7 @@ import { CONTRACT_KIND_LABEL, FEE_CONDITION_ORDER, emptyContract, isCustomDocume
 import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
 import { normalizeSales } from './salesPipeline'
 import { normalizeDocRequests } from './docRequests'
-import { applyMine, conflictLabels, mergeClientEdits, type MergeConflict } from './clientMerge'
+import { applyMine, conflictRows, mergeClientEdits, type MergeConflict } from './clientMerge'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -872,7 +872,7 @@ export class ClientSaveConflictError extends Error {
   constructor(latest: ClientOpsRecord, detail?: { mine: ClientOpsRecord; merged: ClientOpsRecord; conflicts: MergeConflict[] }) {
     super(
       detail && detail.conflicts.length > 0
-        ? `다른 곳에서 같은 칸(${conflictLabels(detail.conflicts).slice(0, 3).join(' · ')})을 먼저 고쳤어요 — 화면 위 알림에서 어느 쪽으로 할지 골라 주세요`
+        ? `다른 곳에서 같은 칸(${[...new Set(conflictRows(detail.conflicts).map((r) => r.label))].slice(0, 3).join(' · ')})을 먼저 고쳤어요 — 화면 위 알림에서 어느 쪽으로 할지 골라 주세요`
         : '다른 화면이나 다른 사람이 이 업체를 먼저 고쳐서 덮어쓰지 않았어요 — 최신 내용을 보고 다시 해 주세요',
     )
     this.name = 'ClientSaveConflictError'

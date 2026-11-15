@@ -24,7 +24,7 @@
  *  - 키트 맨 위 '내 본업으로 잇기' 칩(채널 설계 기준에서 읽은 본업) — AI 주제는 늘 본업으로 이어진 제목(틀별) · 첫 문장 · 이렇게 말해요(규칙).
  *  - [AI로 내 채널에 맞게 추천](두 번 눌러 확인) — 기준 전부 · 이 후보 · 고른 본업으로 AI 가 다시 쓴다. 규칙 추천 / AI 추천을 바꿔 본다.
  */
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Fold } from '../../../components/ui/fold'
 import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
 import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, CloudOff, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
@@ -130,8 +130,7 @@ export function PlanView({
   const selected = useMemo(() => ideas.filter((i) => i.status === 'selected').slice(0, 3), [ideas])
   // 제작 예정 · 대본 · 촬영 중인 것이 있으면 길잡이는 ③ 찍고 올리기
   const inWork = useMemo(() => ideas.filter((i) => i.status === 'selected' || i.status === 'script' || i.status === 'filmed').length, [ideas])
-  const [hero, ...subs] = plan.picks.slice(0, 3)
-  const rest = plan.picks.slice(3)
+  const hero = plan.picks[0]
   const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo, brand, onKeepScript }
   return (
     <div className="flex flex-col gap-6" data-testid="radar-plan">
@@ -199,7 +198,7 @@ export function PlanView({
               <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
               <span className="min-w-0">
                 <b className="font-bold text-slate-900">지금 할 일 — </b>
-                {hero ? "1~10순위가 아래에 다 있어요 — 마음에 드는 주제의 '이번 주 이렇게 찍으세요' 를 눌러 제목 예 · 첫 문장을 보고, 찍을 만하면 [이번 주로 확정] 을 눌러 주세요." : '후보가 생기면 여기서 바로 고를 수 있어요.'}
+                {hero ? '주제에 마우스를 올리면 이유 · 찍는 법이 펼쳐져요(휴대폰은 누르기) — 누르면 펼친 채로 남고, 찍을 만하면 [이번 주로 확정] 을 눌러 주세요.' : '후보가 생기면 여기서 바로 고를 수 있어요.'}
               </span>
             </p>
           )}
@@ -222,27 +221,10 @@ export function PlanView({
             최근 30일에 2편 넘게 함께 나온 주제가 아직 없습니다 — 억지로 후보를 만들지 않았습니다. 며칠 뒤 다시 보거나 채널을 더해 주세요.
           </p>
         ) : (
-          <>
-            {/* PC(1280+): 1순위 왼쪽 크게 · 2 · 3순위 오른쪽 세로 / 그 아래 폭: 1순위 한 줄 전체 · 2 · 3 두 칸 / 휴대폰: 1 → 2 → 3 */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-testid="radar-top">
-              <HeroCard o={hero} {...card} />
-              {subs.length > 0 && (
-                <div className="flex min-w-0 flex-col gap-3 md:col-span-2 md:grid md:grid-cols-2 xl:col-span-1 xl:flex">
-                  {subs.map((o, i) => (
-                    <SubCard key={o.key} o={o} rank={i + 2} {...card} />
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* D-296 4~10위도 한 번에 — 2 · 3순위와 같은 카드(찍기 키트는 접힌 채라 길지 않다) */}
-            {rest.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="radar-rest">
-                {rest.map((o, i) => (
-                  <SubCard key={o.key} o={o} rank={i + 4} {...card} />
-                ))}
-              </div>
-            )}
-          </>
+          // D-613 대표 "1~10위 박스가 너무 크고 정보가 많아 눈에 안 들어온다 — 바로 위 '이번 주 뜨는 주제' 처럼 정돈 · 마우스를 올리거나 누르면 쫙 펼쳐지게".
+          // 예전: 1순위 큰 카드 + 2~10위 카드(근거 칩 · 이유 · 찍는 법 · 단추가 늘 다 보임) — PC 1,577px · 휴대폰 3,457px.
+          // 지금: 번호 붙은 한 줄 목록(줄 사이 가는 선 · 1번만 진한 동그라미). 안의 내용 · 단추는 그대로 — 펼쳤을 때만 보인다.
+          <PlanList picks={plan.picks} card={card} />
         )}
       </section>
 
@@ -326,66 +308,153 @@ function DetailsToggle({ open, onToggle, short }: { open: boolean; onToggle: () 
   )
 }
 
-/** 1순위 — 하나만 크게. 결정(주제) → 이유(한 문장 · 근거 2개) → MIRAE 관점 · 제목 예 → [확정] */
-function HeroCard(props: CardProps) {
-  const { o } = props
-  const [open, setOpen] = useState(false)
+/**
+ * D-613 이번 주 찍을 것 1~10위 — '이번 주 뜨는 주제' 와 같은 번호 줄 목록.
+ *  - 줄: 번호(1번만 진한 동그라미) · 주제 · 신호 세기 · (제작 예정이면 표시) · 펼침 화살표.
+ *  - PC 마우스: 줄에 올려 두면 그 줄 바로 아래로 미리 보기가 펼쳐진다(목록은 움직이지 않게 위에 겹쳐서) — 마우스가 미리 보기 안에 있는 동안 그대로.
+ *    줄을 누르거나 미리 보기 안을 누르면 펼친 채로 고정(목록 사이에 끼어 들어감) · 다시 누르면 접힘.
+ *  - 휴대폰 · 터치: 누르면 펼침 / 다시 누르면 접힘.
+ *  - 펼친 내용은 예전 카드 그대로(왜 지금 · 근거 · 왜 추천됐나요 · [이번 주로 확정] · 근거 보기 · 이번 주 이렇게 찍으세요).
+ */
+const HOVER_OPEN_MS = 260
+const HOVER_CLOSE_MS = 220
+
+function canHover(): boolean {
+  try {
+    return typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
+  } catch {
+    return false
+  }
+}
+
+type CardBase = Omit<CardProps, 'o'>
+
+function PlanList({ picks, card }: { picks: readonly Opportunity[]; card: CardBase }) {
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set())
+  const [peek, setPeek] = useState<string | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const hover = (key: string, on: boolean) => {
+    if (!canHover()) return
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setPeek((cur) => (on ? key : cur === key ? null : cur)), on ? HOVER_OPEN_MS : HOVER_CLOSE_MS)
+  }
+  const pin = (key: string, on: boolean) => {
+    window.clearTimeout(timer.current)
+    setPinned((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(key)
+      else next.delete(key)
+      return next
+    })
+    setPeek((cur) => (cur === key ? null : cur))
+  }
   return (
-    <article className="flex min-w-0 flex-col gap-4 self-start rounded-(--radius-panel) border border-slate-300 bg-white p-4 shadow-(--shadow-card) sm:p-6 md:col-span-2 xl:col-span-1" data-testid="radar-opp" data-size="hero" data-rank="1" data-axis={o.axis} data-domain={o.domain} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="t-meta rounded-full bg-slate-900 px-2.5 py-0.5 font-bold text-white" data-testid="radar-rank1">
-          이번 주 1순위
-        </span>
-        <AxisBadge axis={o.axis} />
-        <DomainBadge axis={o.axis} domain={o.domain} />
-        <StrengthMeter strength={o.strength} />
-      </div>
-      <h3 id={`radar-h-${o.key}`} className="text-2xl leading-tight font-bold break-keep text-slate-900 [overflow-wrap:anywhere] sm:text-[28px]" data-testid="radar-opp-topic">
-        {o.topic}
-      </h3>
-      <div className="flex flex-col gap-2">
-        <p className="t-body break-keep text-slate-700" data-testid="radar-why">
-          <span className="font-bold text-slate-900">왜 지금 · </span>
-          {o.summary}
-        </p>
-        <Facts o={o} />
-        <WhyRecommended o={o} />
-      </div>
-      {open && <Details {...props} />}
-      {/* D-238: [이번 주로 확정] 을 찍기 키트 위로 — 키트를 펼쳐 둔 채라 단추가 화면 한참 아래로 밀려 있었다 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <ConfirmButton {...props} />
-        <DetailsToggle open={open} onToggle={() => setOpen((x) => !x)} />
-      </div>
-      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size="lg" rank={1} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
-    </article>
+    <ul className="grid grid-cols-1 items-start sm:grid-cols-2 sm:gap-x-6" data-testid="radar-top">
+      {picks.map((o, i) => (
+        <PlanRow
+          key={o.key}
+          o={o}
+          rank={i + 1}
+          {...card}
+          pinned={pinned.has(o.key)}
+          peek={peek === o.key && !pinned.has(o.key)}
+          onToggle={() => pin(o.key, !pinned.has(o.key))}
+          onPin={() => {
+            if (!pinned.has(o.key)) pin(o.key, true)
+          }}
+          onHover={(on) => hover(o.key, on)}
+        />
+      ))}
+    </ul>
   )
 }
 
-/** 2~10순위 — 작게(핵심 근거 · 찍기 키트는 접힌 채) */
-function SubCard(props: CardProps & { rank: number }) {
-  const { o, rank } = props
-  const [open, setOpen] = useState(false)
+function PlanRow(props: CardProps & { rank: number; pinned: boolean; peek: boolean; onToggle: () => void; onPin: () => void; onHover: (on: boolean) => void }) {
+  const { o, rank, pinned, peek } = props
+  const open = pinned || peek
+  const [more, setMore] = useState(false)
+  const s = props.status.get(o.key)
+  const planned = !!s && s !== 'idea'
+  const bodyId = `radar-b-${o.key}`
   return (
-    <article className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-4" data-testid="radar-opp" data-size="sub" data-rank={rank} data-axis={o.axis} data-domain={o.domain} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-700">{rank}</span>
-        <AxisBadge axis={o.axis} />
-        <DomainBadge axis={o.axis} domain={o.domain} />
-        <StrengthMeter strength={o.strength} />
-      </div>
-      <h3 id={`radar-h-${o.key}`} className="t-card font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-opp-topic">
-        {o.topic}
-      </h3>
-      <Facts o={o} size="sm" />
-      <WhyRecommended o={o} />
-      <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} rank={rank} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
-      {open && <Details {...props} />}
-      <div className="mt-auto flex flex-wrap items-center gap-2">
-        <ConfirmButton {...props} quiet />
-        <DetailsToggle open={open} onToggle={() => setOpen((x) => !x)} short />
-      </div>
-    </article>
+    <li
+      className="relative min-w-0 border-b border-slate-100"
+      data-testid="radar-opp"
+      data-size={rank === 1 ? 'hero' : 'sub'}
+      data-rank={rank}
+      data-axis={o.axis}
+      data-domain={o.domain}
+      data-strength={o.strength}
+      data-open={open ? (pinned ? 'pin' : 'peek') : '0'}
+      aria-labelledby={`radar-h-${o.key}`}
+      onMouseEnter={() => props.onHover(true)}
+      onMouseLeave={() => props.onHover(false)}
+    >
+      <button
+        type="button"
+        onClick={props.onToggle}
+        aria-expanded={pinned}
+        aria-controls={bodyId}
+        className={`tap group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-2 text-left transition-colors hover:bg-slate-50 sm:gap-3 ${open ? 'bg-slate-50' : ''}`}
+        data-testid="radar-opp-row"
+        title="마우스를 올리면 이유 · 찍는 법이 펼쳐져요 — 누르면 펼친 채로 남아요"
+      >
+        <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold ${rank === 1 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
+          {rank}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span id={`radar-h-${o.key}`} className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-opp-topic">
+            {o.topic}
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <StrengthMeter strength={o.strength} />
+            {planned && (
+              <span className="t-meta inline-flex items-center gap-1 font-bold text-success-700" data-testid="radar-row-planned">
+                <CalendarCheck aria-hidden="true" className="size-3.5" /> {s === 'selected' ? '제작 예정' : IDEA_STATUS_LABEL[s]}
+              </span>
+            )}
+          </span>
+        </span>
+        <ChevronDown aria-hidden="true" className={`size-5 shrink-0 transition-transform group-hover:text-brand-600 ${pinned ? 'rotate-180 text-brand-600' : 'text-slate-400'}`} />
+      </button>
+      {open && (
+        <div
+          id={bodyId}
+          // 미리 보기(마우스만 올림)는 목록 위에 겹쳐서 — 목록이 밀려 움직이지 않게. 고정하면 목록 사이에 끼어 들어간다.
+          className={
+            pinned
+              ? 'flex flex-col gap-3 px-1.5 pt-2 pb-4 sm:pl-11'
+              : 'absolute inset-x-0 top-full z-30 flex max-h-[min(70vh,34rem)] flex-col gap-3 overflow-y-auto rounded-(--radius-card) border border-slate-200 bg-white p-3 shadow-(--shadow-overlay)'
+          }
+          data-testid="radar-opp-body"
+          onPointerDownCapture={props.onPin}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {rank === 1 && (
+              <span className="t-meta rounded-full bg-slate-900 px-2.5 py-0.5 font-bold text-white" data-testid="radar-rank1">
+                이번 주 1순위
+              </span>
+            )}
+            <AxisBadge axis={o.axis} />
+            <DomainBadge axis={o.axis} domain={o.domain} />
+          </div>
+          {o.summary && (
+            <p className="t-sub break-keep text-slate-700" data-testid="radar-why">
+              <span className="font-bold text-slate-900">왜 지금 · </span>
+              {o.summary}
+            </p>
+          )}
+          <Facts o={o} size="sm" />
+          <WhyRecommended o={o} />
+          {more && <Details {...props} />}
+          <div className="flex flex-wrap items-center gap-2">
+            <ConfirmButton {...props} quiet={rank !== 1} />
+            <DetailsToggle open={more} onToggle={() => setMore((x) => !x)} short={rank !== 1} />
+          </div>
+          <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size={rank === 1 ? 'lg' : 'sm'} rank={rank} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
+        </div>
+      )}
+    </li>
   )
 }
 

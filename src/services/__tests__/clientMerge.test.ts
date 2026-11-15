@@ -2,7 +2,7 @@
  * SYNC-2(D-547) 업체 기록 합치기 — 읽은 판 · 내가 고친 것 · 먼저 저장된 것.
  * 서로 다른 칸 → 둘 다 · 같은 칸 다르게 → 겹친 칸(먼저 저장된 값을 두고) · [내가 고친 것으로] → 내 값 · id 목록은 줄마다 · 글자 목록은 더한 것/뺀 것.
  */
-import { applyMine, conflictLabels, conflictValueText, mergeClientEdits, replaceClientInList, sameValue } from '../clientMerge'
+import { applyMine, conflictLabels, conflictRows, conflictValueText, mergeClientEdits, replaceClientInList, sameValue } from '../clientMerge'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientNote, ClientOpsRecord } from '../../types/clientOps'
 
@@ -123,7 +123,20 @@ const edit = (r: ClientOpsRecord, part: Partial<ClientOpsRecord>, v = r.updatedA
   const r = mergeClientEdits(base, edit(base, {}), theirs)
   check('M12 나는 안 고침 → 먼저 저장된 것 그대로(같은 값)', r.conflicts.length === 0 && sameValue({ ...r.merged, updatedAt: '' }, { ...theirs, updatedAt: '' }))
 }
-check('V1 겹친 값 보기 — 짧은 글 그대로 · 빈 글 (비움) · 지움 · 묶음 이름', conflictValueText('010-1') === '010-1' && conflictValueText('') === '(비움)' && conflictValueText(undefined) === '(지움)' && conflictValueText({ text: '첫 상담' }) === '첫 상담' && conflictValueText([1]) === '(목록)')
+check('V1 겹친 값 보기 — 짧은 글 그대로 · 빈 글 (비움) · 지움 · 묶음 이름 · 목록은 (여러 줄)', conflictValueText('010-1') === '010-1' && conflictValueText('') === '(비움)' && conflictValueText(undefined) === '(지움)' && conflictValueText({ text: '첫 상담' }) === '첫 상담' && conflictValueText([1]) === '(여러 줄)')
+{
+  // UX-STAB 영업 단계를 두 기기에서 따로 옮기면 — 예전: '영업 정보' 줄 셋(m1done · (목록) · 2026-11-15T06:55:37Z) → 지금: '영업 단계' 한 줄 · 쉬운 이름
+  const rows = conflictRows([
+    { path: 'sales.stage', mine: 'm1done', theirs: 'm1sched' },
+    { path: 'sales.history', mine: [{ at: '2026-11-15T06:55:37Z', from: 'lead', to: 'm1done' }], theirs: [{ at: '2026-11-15T06:50:00Z', from: 'lead', to: 'm1sched' }] },
+    { path: 'sales.movedAt', mine: '2026-11-15T06:55:37Z', theirs: '2026-11-15T06:50:00Z' },
+    { path: 'contactPhone', mine: '010-1', theirs: '010-2' },
+  ])
+  const shown = JSON.stringify(rows)
+  check('V2 영업 단계 겹침 → 한 줄 "영업 단계" · 1차 미팅 완료 / 1차 미팅 예정 · 딸린 줄(기록 · 옮긴 때) 없음 · 다른 칸은 그대로 · 내부 글자 0', rows.length === 2 && rows[0].label === '영업 단계' && rows[0].mine === '1차 미팅 완료' && rows[0].theirs === '1차 미팅 예정' && rows[1].label === '담당자 연락처' && !/m1done|m1sched|\(목록\)|T06:/.test(shown), rows)
+  const only = conflictRows([{ path: 'sales.movedAt', mine: '2026-11-15T06:55:37Z', theirs: '2026-11-15T06:50:00Z' }])
+  check('V3 단계 없이 옮긴 때만 겹침 → 그 줄은 남김 · 시각은 "11월 15일 hh:mm" 꼴(T · Z 0)', only.length === 1 && only[0].label === '영업 단계 옮긴 때' && /^11월 15일 \d{2}:\d{2}$/.test(only[0].mine) && !/T|Z/.test(only[0].mine), only)
+}
 
 // SYNC-6 저장 끝 소식 → 목록에서 그 업체만 새 판으로
 {

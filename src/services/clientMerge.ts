@@ -14,7 +14,7 @@
  *     · 그 밖(글자 칸 · 숫자 칸)은 겹친 칸 — 일단 먼저 저장된 값을 두고, 사람이 [내가 고친 것으로] 를 고르면 내 값.
  *  - updatedAt 은 견주지 않는다(판 표시) — 합친 판은 먼저 저장된 판 위에 얹는다.
  */
-import type { ClientOpsRecord } from '../types/clientOps'
+import { SALES_STAGE_LABEL, type ClientOpsRecord, type SalesStage } from '../types/clientOps'
 
 type Json = unknown
 type Obj = Record<string, unknown>
@@ -234,16 +234,72 @@ export function conflictLabels(conflicts: readonly MergeConflict[]): string[] {
   return seen
 }
 
-/** 겹친 값 한 줄 보기 — 짧은 글 · 숫자는 그대로, 묶음 · 목록 · 지움은 쉬운 말로 */
+/** '2026-11-15T06:55:37Z' 같은 저장 시각 → '11월 15일 15:55'(이 기기 시각) — 화면에 내부 글자를 그대로 보이지 않게 */
+function whenText(v: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return null
+  const d = new Date(v)
+  if (!Number.isFinite(d.getTime())) return null
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 겹친 값 한 줄 보기 — 짧은 글 · 숫자는 그대로, 시각은 'n월 n일 hh:mm', 묶음 · 목록 · 지움은 쉬운 말로 */
 export function conflictValueText(v: unknown): string {
   if (v === undefined || v === null) return '(지움)'
-  if (typeof v === 'string') return v.trim() ? (v.length > 40 ? `${v.slice(0, 40)}…` : v) : '(비움)'
+  if (typeof v === 'string') {
+    const when = whenText(v)
+    if (when) return when
+    return v.trim() ? (v.length > 40 ? `${v.slice(0, 40)}…` : v) : '(비움)'
+  }
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
   if (isObj(v)) {
     const t = ['text', 'title', 'label', 'memo', 'status'].map((k) => v[k]).find((x) => typeof x === 'string' && x.trim())
     return typeof t === 'string' ? (t.length > 40 ? `${t.slice(0, 40)}…` : t) : '(여러 칸)'
   }
-  return '(목록)'
+  return '(여러 줄)'
+}
+
+/**
+ * UX-STAB 고르기 판 한 줄 — 묶음 안의 한 칸이 겹치면 그 칸 이름으로(영업 정보 → 영업 단계), 값도 쉬운 말로(m1done → 1차 미팅 완료).
+ * 다른 칸을 따라 같이 바뀌는 칸(단계를 옮기면 같이 바뀌는 단계 기록 · 옮긴 때)은 주 칸이 겹쳐 있으면 따로 줄을 내지 않는다 —
+ * 예전에는 영업 단계 하나를 두 기기에서 옮기면 '영업 정보' 줄이 셋(m1done · (목록) · 2026-11-15T06:55:37Z) 떴다.
+ * 고르면 [내가 고친 것으로] 가 딸린 칸까지 같이 가져간다(applyMine 은 겹친 칸 전부 — 화면에 안 보여도 같이).
+ */
+const PATH_LABEL: Record<string, string> = {
+  'sales.stage': '영업 단계',
+  'sales.history': '영업 단계 기록',
+  'sales.movedAt': '영업 단계 옮긴 때',
+  'sales.memo': '영업 메모',
+  'sales.concern': '대표의 고민',
+  'sales.expectedFee': '예상 수임료',
+  'sales.source': '어떻게 알게 됐나',
+  'sales.referrer': '소개한 사람',
+}
+const FOLLOWERS: Record<string, readonly string[]> = { 'sales.stage': ['sales.history', 'sales.movedAt'] }
+
+export interface ConflictRow {
+  path: string
+  label: string
+  mine: string
+  theirs: string
+}
+
+const isPath = (path: string, base: string) => path === base || path.startsWith(`${base}.`) || path.startsWith(`${base}[`)
+
+function rowValue(path: string, v: unknown): string {
+  if (path === 'sales.stage' && typeof v === 'string' && v in SALES_STAGE_LABEL) return SALES_STAGE_LABEL[v as SalesStage]
+  return conflictValueText(v)
+}
+
+export function conflictRows(conflicts: readonly MergeConflict[]): ConflictRow[] {
+  const paths = conflicts.map((c) => c.path)
+  const hidden = Object.entries(FOLLOWERS).flatMap(([lead, followers]) => (paths.includes(lead) ? followers : []))
+  return conflicts
+    .filter((c) => !hidden.some((h) => isPath(c.path, h)))
+    .map((c) => {
+      const label = Object.entries(PATH_LABEL).find(([p]) => isPath(c.path, p))?.[1] ?? conflictLabels([c])[0]
+      return { path: c.path, label, mine: rowValue(c.path, c.mine), theirs: rowValue(c.path, c.theirs) }
+    })
 }
 
 /**

@@ -30,9 +30,40 @@ export function allowedProviders(): readonly ProviderId[] {
   return onlyProviders ?? ALL_PROVIDERS
 }
 
+let cheapOnly = false
+/**
+ * D-614 내부 팀장(대표가 팀장 화면으로 볼 때도) — 대표 지시 "제미나이 · 지피티(출력) · 클로드 각각 가장 싼 모델만".
+ * 모델 고르기에 회사마다 가장 싼 모델(서버 목록의 tier cheap) 하나만 보인다. 서버도 다른 모델을 가장 싼 것으로 바꿔 부른다.
+ */
+export function setCheapOnly(on: boolean): void {
+  cheapOnly = on
+}
+export function isCheapOnly(): boolean {
+  return cheapOnly
+}
+
+let cheapIds: ReadonlySet<string> | null = null
+/** 서버 목록을 받을 때마다 가장 싼 모델(tier cheap) 이름을 기억한다 — 가장 싼 것만 쓰는 계정에서 예전에 고른 비싼 모델을 걸러 낸다 */
+export function noteCheapModels(providers: readonly { models: readonly { id: string; tier?: string | null }[] }[]): void {
+  const ids = providers.flatMap((p) => p.models.filter((m) => m.tier === 'cheap').map((m) => m.id))
+  if (!ids.length) return
+  const changed = !cheapIds || ids.length !== cheapIds.size || ids.some((id) => !cheapIds!.has(id))
+  cheapIds = new Set(ids)
+  // 이미 열린 화면(모델 단추 · 도우미)도 걸러 낸 선택으로 다시 그리게
+  if (changed && cheapOnly) {
+    try {
+      window.dispatchEvent(new CustomEvent(CHOICE_EVENT, { detail: readChoice() }))
+    } catch {
+      // 알림을 못 보내도 부를 때는 readChoice 가 거른다
+    }
+  }
+}
+
 export function readChoice(): AiChoice | null {
   try {
     const v = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as AiChoice | null
+    // D-614 가장 싼 모델만 쓰는 계정 — 이 브라우저에 예전에 고른 비싼 모델이 남아 있으면 기본(가장 싼 Gemini)으로 읽는다(고른 기록은 지우지 않음)
+    if (v && cheapOnly && cheapIds && !cheapIds.has(v.model)) return null
     if (v && allowedProviders().includes(v.provider) && typeof v.model === 'string' && v.model) return v
   } catch {
     // 못 읽으면 기본값

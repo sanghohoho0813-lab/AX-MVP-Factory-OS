@@ -21,7 +21,7 @@ import { inFrame } from '../../lib/deviceView'
 import { closeDock, openDock, useDock } from '../../lib/sideDock'
 import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
-import { allowedProviders, readChoice, saveChoice } from '../../services/aiAssist/store'
+import { allowedProviders, isCheapOnly, readChoice, saveChoice } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 
 /** 옆 창 서비스 → OS 안 대화에 쓸 AI 회사 */
@@ -70,7 +70,8 @@ export function SideAiButton() {
         setStarting(true)
         try {
           const p = (await fetchAssistStatus(true)).providers.find((x) => x.id === want)
-          const m = p?.configured ? (p.models.find((x) => x.tier === 'standard') ?? p.models[0]) : undefined
+          // D-614 가장 싼 모델만 쓰는 계정(내부 팀장 · 대표가 팀장 화면으로 볼 때)은 그 회사의 가장 싼 모델로
+          const m = p?.configured ? (isCheapOnly() ? p.models.find((x) => x.tier === 'cheap') : p.models.find((x) => x.tier === 'standard') ?? p.models[0]) : undefined
           if (m) saveChoice({ provider: want, model: m.id })
           else showToast(`${MODEL_NAME[s.service]} 키가 아직 없어요 — 지금 고른 모델로 엽니다(판 위 [모델] 에서 바꿀 수 있어요)`)
         } catch {

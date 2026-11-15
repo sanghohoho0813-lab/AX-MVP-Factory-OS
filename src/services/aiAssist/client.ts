@@ -7,6 +7,7 @@ import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AssistContext } from './context'
 import type { AssistPage } from './presets'
 import { brandForRequest } from '../brandProfile'
+import { noteCheapModels } from './store'
 
 export const ASSIST_ENDPOINT = '/api/ai-assist'
 
@@ -230,6 +231,8 @@ export async function fetchAssistStatus(withModels = false, probe = false): Prom
   if (!res.ok) throw await readError(res)
   if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as AssistStatus & { ok: boolean }
+  // D-614 가장 싼 모델 이름을 기억해 둔다(가장 싼 것만 쓰는 계정이 예전에 고른 비싼 모델을 걸러 낸다)
+  if (Array.isArray(b.providers)) noteCheapModels(b.providers.filter((p) => p && Array.isArray(p.models)))
   return {
     ...(Array.isArray(b.probe) ? { probe: b.probe.filter((x) => x && isProvider(x.id)).map((x) => ({ id: x.id, code: String(x.code ?? ''), keyName: x.keyName ? String(x.keyName) : undefined, model: x.model ? String(x.model) : undefined, detail: String(x.detail ?? '').slice(0, 160) })) } : {}),
     providers: Array.isArray(b.providers) ? b.providers : [],

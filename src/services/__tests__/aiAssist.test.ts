@@ -28,7 +28,7 @@ import { sampleFeed } from '../marketing/ytSample'
 import { agentsBundle, calendarBundle, clientsBundle, inboxBundle, maskStaff, salesBundle } from '../aiAssist/builders'
 import { moduleBundle } from '../aiAssist/moduleBuilders'
 import { radarBundle } from '../aiAssist/marketingBuilders'
-import { allowedProviders, contextHash, historyOf, markDone, pushHistory, readChoice, setAllowedProviders } from '../aiAssist/store'
+import { allowedProviders, contextHash, historyOf, isCheapOnly, markDone, noteCheapModels, pushHistory, readChoice, setAllowedProviders, setCheapOnly } from '../aiAssist/store'
 import { aiAssistAccessOf, ownerAiAccessOf } from '../../auth/ownerAiAccess'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -70,6 +70,8 @@ const okFor = (url: string) => {
 }
 
 let audienceDown = false
+// D-614 외부 구독 고객(0024 audience = customer)으로 답할 때 — 고객은 그대로 Gemini 만
+let audienceCustomer = false
 globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
   const url = String(input)
   const headers = init?.headers ?? {}
@@ -86,6 +88,7 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
   // D-564 0022 가 없을 때 서버가 묻는 것 — 내 os_access 줄의 audience(0024). 지금 운영처럼 칸이 없으면 내부 팀장으로 본다
   if (url.startsWith('https://qa.supabase.test/rest/v1/os_access?select=audience')) {
     if (audienceDown) return new Response('{}', { status: 500 })
+    if (audienceCustomer) return new Response(JSON.stringify([{ audience: 'customer' }]), { status: 200 })
     return new Response(JSON.stringify({ code: '42703', message: 'column os_access.audience does not exist' }), { status: 400 })
   }
   const c: Call = { url, headers, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {} }
@@ -225,7 +228,7 @@ async function serverTests() {
     const again = await get('/api/ai-assist?status=1&probe=1')
     check('S8f 연달아 점검은 20초 막힘(429)', again.statusCode === 429, again.statusCode)
     const pp = await get('/api/ai-assist?status=1&probe=1', PILOT)
-    check('S8g 팀장 점검은 Gemini 만', pp.statusCode === 200 && ((pp.body.probe ?? []) as { id: string }[]).map((x) => x.id).join() === 'gemini', pp.raw.slice(0, 300))
+    check('S8g 팀장(내부) 점검은 쓸 수 있는 세 회사(D-614)', pp.statusCode === 200 && ((pp.body.probe ?? []) as { id: string }[]).map((x) => x.id).join() === 'gemini,openai,anthropic', pp.raw.slice(0, 300))
     check('S8h 오류 나누기 — 잔액 · 키 · 모델 · 붐빔 · 그 밖 400 · 키처럼 보이는 글 가림', classifyProviderError(429, '{"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}').code === 'provider_billing' && classifyProviderError(404, '{"error":{"type":"not_found_error","message":"model: claude-x"}}').code === 'provider_model' && classifyProviderError(529, '{"error":{"type":"overloaded_error"}}').code === 'provider_busy' && classifyProviderError(400, '{"error":{"message":"max_tokens too large"}}').code === 'provider_rejected' && !classifyProviderError(401, '{"error":{"message":"bad key sk-ant-abcdef123456"}}').detail.includes('sk-ant'))
     setEnv()
   }
@@ -250,27 +253,42 @@ async function serverTests() {
     const r5 = await post({ requestId: rid(), assistId: 'no.such', page: 'today', context: CTX })
     check('S12 단추와 화면이 다름 · 이상한 요청 번호 · 없는 단추 → 400', r3.statusCode === 400 && r4.statusCode === 400 && r5.statusCode === 400)
   }
-  /* D-257 팀장(Pilot) — AI 도우미는 Gemini 만 */
+  /* D-257 팀장(Pilot) — AI 도우미 · D-614 내부 팀장은 Gemini · GPT · Claude 셋 — 회사마다 가장 싼 모델 하나 · 외부 고객은 Gemini 만 */
   {
     calls = []
     const st = await get('/api/ai-assist?status=1', PILOT)
     const ids = (st.body.providers as { id: string }[] | undefined)?.map((p) => p.id) ?? []
     const assistPages = new Set(((st.body.assists as { page: string }[] | undefined) ?? []).map((a) => a.page))
-    check('P1 팀장 상태(D-564) — 회사 목록은 Gemini 하나 · 기본도 Gemini · role pilot · 마케팅 단추 있음(내부 팀장) · 대표 전용 화면(특허 명세서 · 홈페이지) 단추는 없음', st.statusCode === 200 && ids.join() === 'gemini' && (st.body.defaultChoice as { provider: string }).provider === 'gemini' && st.body.role === 'pilot' && st.body.marketing === true && assistPages.has('radar') && assistPages.has('content') && !assistPages.has('patent') && !assistPages.has('site') && assistPages.has('today'), { ids, role: st.body.role, marketing: st.body.marketing })
+    const models = ((st.body.providers as { id: string; models: { id: string }[] }[] | undefined) ?? []).map((p) => `${p.id}:${p.models.map((m) => m.id).join('+')}`)
+    check('P1 팀장 상태(D-564 · D-614) — 내부 팀장은 Gemini · GPT · Claude 셋 · 회사마다 가장 싼 모델 하나(Gemini 3.1 Flash-Lite · GPT-5 nano · Claude Haiku) · cheapOnly · 기본은 Gemini · 마케팅 단추 있음 · 대표 전용 화면 단추는 없음', st.statusCode === 200 && ids.join() === 'gemini,openai,anthropic' && models.join() === 'gemini:gemini-3.1-flash-lite,openai:gpt-5-nano,anthropic:claude-haiku-5-5' && st.body.cheapOnly === true && (st.body.defaultChoice as { provider: string; model: string }).model === 'gemini-3.1-flash-lite' && st.body.role === 'pilot' && st.body.marketing === true && assistPages.has('radar') && assistPages.has('content') && !assistPages.has('patent') && !assistPages.has('site') && assistPages.has('today'), { ids, models, role: st.body.role, marketing: st.body.marketing })
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
     const call = calls.find((c) => c.url.includes(':generateContent'))
     const sys = JSON.stringify(call?.body.systemInstruction ?? '')
     check('P2 팀장 기본(선택 없음) → Gemini 가장 싼 모델로 · 답 받음 · 지시문에 "사용자 본인이 보냈다" 한 줄(SAAS-1 — 대표 이름 대신)', r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && (call?.url ?? '').includes('gemini-3.1-flash-lite') && sys.includes('컨설턴트(사용자) 본인이 보냈다') && !sys.includes('김상호'), r.raw.slice(0, 300))
     const g2 = await post({ requestId: rid(), assistId: 'money.top', page: 'money', choice: { provider: 'gemini', model: 'gemini-3.1-flash' }, context: CTX }, PILOT)
-    check('P3 팀장이 다른 Gemini 모델을 골라도 됨', g2.statusCode === 200 && (g2.body.run as { model: string }).model === 'gemini-3.1-flash', g2.raw.slice(0, 200))
+    check('P3 팀장이 더 비싼 Gemini 모델을 보내도 가장 싼 모델로 부름(D-614)', g2.statusCode === 200 && (g2.body.run as { model: string }).model === 'gemini-3.1-flash-lite' && calls.some((c) => c.url.includes('gemini-3.1-flash-lite:generateContent')), g2.raw.slice(0, 200))
     calls = []
-    const c1 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic' }, context: CTX }, PILOT)
-    const c2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX }, PILOT)
-    check('P4 팀장이 Claude · GPT 를 보내면 403 provider_not_allowed · 공급자 안 부름', c1.statusCode === 403 && c1.body.code === 'provider_not_allowed' && c2.statusCode === 403 && c2.body.code === 'provider_not_allowed' && calls.length === 0, { c1: c1.body, n: calls.length })
+    const c1 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic', model: 'claude-opus-5-5' }, context: CTX }, PILOT)
+    const c1call = calls.find((c) => c.url.includes('/v1/messages'))
+    check('P4 내부 팀장이 Claude 를 고르면(D-614) — 비싼 모델을 보내도 Claude Haiku(가장 쌈)로 부름', c1.statusCode === 200 && (c1.body.run as { provider: string; model: string }).provider === 'anthropic' && (c1.body.run as { model: string }).model === 'claude-haiku-5-5' && c1call?.body.model === 'claude-haiku-5-5', { c1: c1.raw.slice(0, 200), sent: c1call?.body.model })
+    calls = []
+    const c2 = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-6-astra' }, context: CTX }, PILOT)
+    check('P4b 내부 팀장이 GPT 를 고르면 GPT-5 nano 로만(키가 없으면 503 설정 필요 · 공급자 안 부름)', (c2.statusCode === 503 && c2.body.code === 'setup_needed' && calls.length === 0) || (c2.statusCode === 200 && (c2.body.run as { model: string }).model === 'gpt-5-nano'), { s: c2.statusCode, b: c2.raw.slice(0, 160) })
+    // D-614 외부 구독 고객은 그대로 Gemini 만(개인정보처리방침 초안의 국외 이전 회사가 Google 하나)
+    __resetAiAssistState()
+    audienceCustomer = true
+    calls = []
+    const cs = await get('/api/ai-assist?status=1', PILOT)
+    const cc = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'anthropic', model: 'claude-haiku-5-5' }, context: CTX }, PILOT)
+    const co = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: { provider: 'openai', model: 'gpt-5-nano' }, context: CTX }, PILOT)
+    check('P4c 외부 고객 — 회사 목록 Gemini 하나 · cheapOnly 아님 · Claude · GPT 를 보내면 403 provider_not_allowed · 공급자 안 부름', cs.statusCode === 200 && ((cs.body.providers as { id: string }[]) ?? []).map((p) => p.id).join() === 'gemini' && cs.body.cheapOnly === false && cc.statusCode === 403 && cc.body.code === 'provider_not_allowed' && co.statusCode === 403 && co.body.code === 'provider_not_allowed' && calls.length === 0, { ids: ((cs.body.providers as { id: string }[]) ?? []).map((p) => p.id), cc: cc.body.code, co: co.body.code, n: calls.length })
+    audienceCustomer = false
+    __resetAiAssistState()
+    calls = []
     const m1 = await post({ requestId: rid(), assistId: 'radar.top5', page: 'radar', context: CTX }, PILOT)
     // D-564 0022 적용 전(지금 운영)의 내부 팀장 — 마케팅 AI 도 일반 AI 처럼 연다(Gemini 만 · 세지 않음). 누구인지 못 물으면 막는다
     const mkCalls = calls.filter((c) => c.url.includes(':generateContent'))
-    check('P5 팀장(내부 · 장부 전)이 마케팅 단추를 누르면 200 · Gemini 한 번(다른 회사 0)', m1.statusCode === 200 && (m1.body.run as { provider: string }).provider === 'gemini' && mkCalls.length === 1 && calls.every((c) => !/anthropic|openai/.test(c.url)), { s: m1.statusCode, body: m1.raw.slice(0, 160), n: mkCalls.length })
+    check('P5 팀장(내부 · 장부 전)이 마케팅 단추를 누르면(고른 것 없음) 200 · Gemini 가장 싼 모델 한 번(다른 회사 0)', m1.statusCode === 200 && (m1.body.run as { provider: string }).provider === 'gemini' && mkCalls.length === 1 && calls.every((c) => !/anthropic|openai/.test(c.url)), { s: m1.statusCode, body: m1.raw.slice(0, 160), n: mkCalls.length })
     __resetAiAssistState()
     audienceDown = true
     calls = []
@@ -286,7 +304,7 @@ async function serverTests() {
   {
     const st = await get('/api/ai-assist?status=1', PILOT)
     const r = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: CTX }, PILOT)
-    check('P7 기본 회사를 Claude 로 바꿔 둬도 팀장 기본은 Gemini', (st.body.defaultChoice as { provider: string }).provider === 'gemini' && r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini', { def: st.body.defaultChoice, run: (r.body.run as { provider?: string } | undefined)?.provider })
+    check('P7 기본 회사를 Claude 로 바꿔 둬도 팀장 기본은 Gemini(가장 쌈)', (st.body.defaultChoice as { provider: string }).provider === 'gemini' && r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini', { def: st.body.defaultChoice, run: (r.body.run as { provider?: string } | undefined)?.provider })
   }
   // D-260 영상 대본 받아 적기 — 서버가 만든 YouTube 주소 · 구간 · 낮은 해상도 · Gemini 만
   setEnv()
@@ -561,7 +579,7 @@ function d241Tests() {
     markDone(run.requestId, 'next:1')
     const again = historyOf('today')[0]
     check('H1 [할 일로 넣기] 한 항목은 지난 답에 적힘 — 판을 다시 열어 다시 읽어도 그대로 · 같은 것 한 번 · 없는 답이면 null', JSON.stringify(again?.done) === '["item:0","next:1"]' && markDone('as_no_such_0001', 'item:0') === null, again?.done)
-    // D-257 팀장 — 화면에서 고를 수 있는 회사는 Gemini 만 · 예전에 고른 Claude 는 '고른 것 없음'(서버 기본 Gemini)으로 읽음
+    // D-257 외부 고객 화면 — 고를 수 있는 회사는 Gemini 만 · 예전에 고른 Claude 는 '고른 것 없음'(서버 기본 Gemini)으로 읽음
     localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'anthropic', model: 'claude-haiku-5-5' }))
     const ownerSees = readChoice()?.provider
     setAllowedProviders(['gemini'])
@@ -570,7 +588,20 @@ function d241Tests() {
     localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'gemini', model: 'gemini-3.8-flash' }))
     const pilotGem = readChoice()?.model
     setAllowedProviders(null)
-    check('PV1 팀장 화면 — 고를 수 있는 회사 Gemini 하나 · 고른 Claude 는 무시(기본 Gemini) · Gemini 모델은 그대로 · 대표로 돌아오면 셋', ownerSees === 'anthropic' && pilotSees === null && pilotList === 'gemini' && pilotGem === 'gemini-3.8-flash' && allowedProviders().join() === 'gemini,openai,anthropic', { ownerSees, pilotSees, pilotList, pilotGem })
+    check('PV1 고객 화면 — 고를 수 있는 회사 Gemini 하나 · 고른 Claude 는 무시(기본 Gemini) · Gemini 모델은 그대로 · 대표로 돌아오면 셋', ownerSees === 'anthropic' && pilotSees === null && pilotList === 'gemini' && pilotGem === 'gemini-3.8-flash' && allowedProviders().join() === 'gemini,openai,anthropic', { ownerSees, pilotSees, pilotList, pilotGem })
+    // D-614 내부 팀장 화면(대표가 팀장 화면으로 볼 때도) — 세 회사 · 가장 싼 모델만: 예전에 고른 비싼 모델은 '고른 것 없음' · 가장 싼 Claude 는 그대로
+    setAllowedProviders(['gemini', 'openai', 'anthropic'])
+    setCheapOnly(true)
+    noteCheapModels([{ models: [{ id: 'gemini-3.1-flash-lite', tier: 'cheap' }, { id: 'gemini-3.8-flash', tier: 'standard' }] }, { models: [{ id: 'gpt-5-nano', tier: 'cheap' }] }, { models: [{ id: 'claude-haiku-5-5', tier: 'cheap' }, { id: 'claude-opus-5-5', tier: 'deep' }] }])
+    localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'anthropic', model: 'claude-opus-5-5' }))
+    const cheapOpus = readChoice()
+    localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'anthropic', model: 'claude-haiku-5-5' }))
+    const cheapHaiku = readChoice()?.model
+    setCheapOnly(false)
+    localStorage.setItem('axmvp.ai.choice.v1', JSON.stringify({ provider: 'anthropic', model: 'claude-opus-5-5' }))
+    const backOwner = readChoice()?.model
+    setAllowedProviders(null)
+    check('PV2 내부 팀장 화면(D-614) — 세 회사 · 예전에 고른 Claude Opus 는 고른 것 없음(기본 Gemini 가장 쌈) · Claude Haiku 는 그대로 · 대표로 돌아오면 Opus 그대로(기록은 안 지움)', isCheapOnly() === false && cheapOpus === null && cheapHaiku === 'claude-haiku-5-5' && backOwner === 'claude-opus-5-5', { cheapOpus, cheapHaiku, backOwner })
   }
 
   // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지

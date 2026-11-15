@@ -227,6 +227,12 @@ async function browserPart(ID) {
     const colMid = await colOf()
     const dbMid = sql(`select payload->'sales'->>'stage' from public.operations_clients where id = '${ID}'`)
     check('L1 다른 기기가 단계를 옮긴 사이 보드에서 다른 단계로 → 고르기 판 · 보드 카드는 먼저 저장된 칸 · DB 덮지 않음', colStart === 'lead' && (await page.getByTestId('client-conflict').isVisible().catch(() => false)) && colMid === 'm1sched' && dbMid === 'm1sched', { colStart, colMid, dbMid })
+    {
+      // D-615 고르기 판 글자 — '영업 단계' 한 줄 · 쉬운 이름(1차 미팅 완료 / 1차 미팅 예정) · 내부 글자(m1done · (목록) · 저장 시각 T) 0 · 딸린 줄 없음
+      const lrows = await page.getByTestId('client-conflict-row').allInnerTexts().catch(() => [])
+      const stageRows = lrows.filter((t) => t.startsWith('영업 단계'))
+      check('L1b 고르기 판 — 영업 단계 한 줄 · 1차 미팅 완료 / 1차 미팅 예정 · 내부 글자 0 · 단계 기록 · 옮긴 때 줄 없음', stageRows.length === 1 && /1차 미팅 완료/.test(stageRows[0]) && /1차 미팅 예정/.test(stageRows[0]) && !lrows.some((t) => /m1done|m1sched|\(목록\)|\d{4}-\d{2}-\d{2}T|영업 단계 기록|영업 단계 옮긴 때|영업 정보/.test(t)), lrows)
+    }
     await page.screenshot({ path: '/tmp/claude-0/clientconflict-board-pick.png' }).catch(() => {})
     await page.getByTestId('client-conflict-mine').click()
     await page.getByTestId('client-conflict').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})

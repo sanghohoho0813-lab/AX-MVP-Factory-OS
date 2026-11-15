@@ -143,7 +143,8 @@ export default function ShortsPage() {
 function Shorts({ workspaceId }: { workspaceId: string | null }) {
   const readOnly = useViewingPilot() !== null
   // SAAS-2 고객도 서버가 마케팅을 열었으면(사용량 장부로 셈) AI 를 쓴다 — 대표 판정은 그대로
-  const aiOk = useMarketingAiOn() && !readOnly
+  // D-614 대표가 팀장 화면으로 볼 때도 AI 단추는 팀장 화면 그대로(답은 글 칸에만 · 저장은 위 readOnly 가 막음)
+  const aiOk = useMarketingAiOn()
   const store = useShortPosts(workspaceId, readOnly)
   // D-558 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙) — AI 완성 대본 자료에
   const { prefs } = useRadarPrefs(workspaceId, readOnly)
@@ -225,7 +226,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
           </Button>
         </div>
       )}
-      {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600">팀장 화면을 보는 중에는 저장하지 않습니다.</p>}
+      {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-viewas-note">팀장 화면을 보는 중에는 저장하지 않습니다 — AI 단추는 팀장님 화면 그대로 눌러 볼 수 있어요(회사마다 가장 싼 모델 · 답은 글 칸에만).</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="sht" />}
       {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
@@ -366,7 +367,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
           set({ ...filled, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
           const had = atClick.script.trim() && atClick.script.trim() !== first.script.trim()
           const sc = scoreShortDraft(first, aimNow)
-          const polishNow = needsPolish(sc) && aiOk && !readOnly
+          const polishNow = needsPolish(sc) && aiOk
           setFix(had ? { busy: false, error: '', before: atClick, fixed: first.script, why: 'new' } : { busy: false, error: '', before: null, fixed: '' })
           showToast(
             polishNow && sc
@@ -426,7 +427,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
     }
   }
   const runFix = async () => {
-    if (fix.busy || ai.busy || !score || score.pass || readOnly) return
+    if (fix.busy || ai.busy || !score || score.pass) return
     const before = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
     await polish(before, score, { aim: draft.aim as ShortAim, format: draft.format }, { to: before, why: 'fix' }, false)
   }
@@ -746,7 +747,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
             {draft.format === 'comment' && <ShareKit testId="sht-share" />}
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <PostScoreBar score={draft.script.trim() ? score : null} testPrefix="sht" aiOk={aiOk} busy={fix.busy} busyLabel={fix.auto ? 'AI가 90점까지 한 번 더 다듬는 중…' : undefined} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.script ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 대본으로 되돌리기' : '고치기 전으로'} readOnly={readOnly} />
+            <PostScoreBar score={draft.script.trim() ? score : null} testPrefix="sht" aiOk={aiOk} busy={fix.busy} busyLabel={fix.auto ? 'AI가 90점까지 한 번 더 다듬는 중…' : undefined} error={fix.error} onFix={() => void runFix()} onUndo={fix.before && fix.fixed === draft.script ? undoFix : null} undoLabel={fix.why === 'new' ? '이전 대본으로 되돌리기' : '고치기 전으로'} />
             <div className="flex flex-wrap items-center gap-2">
               <HintTip tip="대본이 규칙대로 잘 써졌는지 바로 확인해 줘요(규칙 계산) — 첫마디 · 길이 · 끝맺음 · 설명 글 · #태그. 빨강 = 꼭 고칠 것 · 노랑 = 한 번 볼 것 · 초록 = 괜찮아요." label="규칙 검사" tight>
                 <span className="t-sub font-semibold text-slate-700">규칙 검사</span>

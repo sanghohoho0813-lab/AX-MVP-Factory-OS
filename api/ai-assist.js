@@ -9,6 +9,9 @@
  * 오류 응답에는 공급자 원문 · 키 · 주소를 넣지 않는다.
  * D-257 팀장(Pilot)도 연다 — 대표 지시 "일단은 Gemini 만": 모델 목록에 Gemini 만 · 다른 회사를 보내면 403(provider_not_allowed) ·
  *   대표 전용 화면(마케팅 radar · content) 단추는 403 · 지시문의 '대표' 는 이 화면을 쓰는 팀장으로 읽게 한 줄 더.
+ * D-614(2026-11-15 대표 지시 "팀장 화면에 LLM 단추가 있어야 해 · 기본으로 제미나이 · 지피티(출력) · 클로드 각각 가장 싼 모델만") —
+ *   내부 팀장(audience internal)은 세 회사 · 회사마다 가장 싼 모델 하나(tier cheap)만. 다른 모델을 보내도 서버가 가장 싼 모델로 바꿔 부른다.
+ *   외부 구독 고객 · 누구인지 모를 때는 예전 그대로 Gemini 만(개인정보처리방침 초안의 국외 이전 회사가 Google 하나 — 늘리려면 방침부터).
  * D-260 영상 단추(radar.transcript) — { video: { id, start, end } } 만 받아 서버가 YouTube 주소를 만들고 Gemini 에 영상 그대로 붙인다(구간 15분까지).
  */
 import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, PACKS, RADAR_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
@@ -23,8 +26,20 @@ import { __resetUsageState, legacyAudience, myAccess, releaseUsage, reserveUsage
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, probeProvider, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
-/** 팀장이 쓸 수 있는 AI 회사 · 못 여는 화면(대표 전용 마케팅) */
+/** 팀장 등급 중 외부 구독 고객(· 누구인지 모를 때)이 쓸 수 있는 AI 회사 */
 export const PILOT_PROVIDERS = new Set(['gemini'])
+/** D-614 내부 팀장이 쓸 수 있는 AI 회사 — 회사마다 가장 싼 모델 하나만(pilotModel) */
+export const INTERNAL_PILOT_PROVIDERS = new Set(['gemini', 'openai', 'anthropic'])
+/** 팀장 등급 계정이 쓸 수 있는 회사 — internal 이면 셋, 아니면 Gemini 하나 */
+export const pilotProviders = (internal) => (internal ? INTERNAL_PILOT_PROVIDERS : PILOT_PROVIDERS)
+/** D-614 내부 팀장은 회사마다 가장 싼 모델로 고정 — 다른 모델을 보내도 이것으로 */
+export const pilotModel = (provider) => tierModel(provider, 'cheap')
+/** 팀장 등급 계정이 내부 팀장인가 — 장부(0022)가 있으면 그 답 · 없으면 자기 os_access 의 audience(0024 전이면 내부). 모르면 아님 */
+async function isInternal(acc, token) {
+  if (acc && acc.state === 'ok') return acc.kind === 'internal'
+  if (acc && acc.state === 'missing') return (await legacyAudience(token)) === 'internal'
+  return false
+}
 // SAAS-1 특허 명세서(대표 전용 화면 · 대표 회사 기준)는 늘 막는다 — 벤처 사업계획서(기업인증 안)는 팀장도 쓴다(D-257)
 // D-300 홈페이지 만들기(site)도 대표 전용 화면이라 팀장 · 고객은 늘 막는다
 export const CUSTOMER_ALWAYS_BLOCKED = new Set(['patent', 'site'])
@@ -40,10 +55,17 @@ const bearerOf = (req) => {
   return m ? m[1] : ''
 }
 
-/** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서 */
-function pilotCatalog(catalog) {
-  const providers = catalog.providers.filter((p) => PILOT_PROVIDERS.has(p.id))
-  const def = PILOT_PROVIDERS.has(catalog.defaultChoice.provider) ? catalog.defaultChoice : { provider: 'gemini', model: tierModel('gemini', 'cheap') }
+/** 팀장에게 보여 줄 모델 목록 — 허용된 회사만 · 기본도 그 안에서. D-614 내부 팀장은 회사마다 가장 싼 모델 하나만 보인다 */
+function pilotCatalog(catalog, internal = false) {
+  const allowed = pilotProviders(internal)
+  const providers = catalog.providers
+    .filter((p) => allowed.has(p.id))
+    .map((p) => (internal ? { ...p, models: p.models.filter((m) => m.id === pilotModel(p.id)) } : p))
+  const def = internal
+    ? { provider: 'gemini', model: pilotModel('gemini') }
+    : allowed.has(catalog.defaultChoice.provider)
+      ? catalog.defaultChoice
+      : { provider: 'gemini', model: tierModel('gemini', 'cheap') }
   return { providers, defaultChoice: def }
 }
 /** D-353 [연결 점검] 누른 때(사람마다 20초에 한 번) */
@@ -199,25 +221,26 @@ export default async function handler(req, res) {
     const who = await whoCan(req, { allowPilot: true })
     if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
     const full = await publicCatalog({ withLive: url.searchParams.get('models') === '1' })
-    const catalog = who.role === 'pilot' ? pilotCatalog(full) : full
-    // D-353 [연결 점검] — 공급자마다 아주 짧게 한 번 불러 본다(팀장은 Gemini 만 · 20초에 한 번)
+    // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅 AI 는 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
+    // D-564 장부(0022)가 아직 없는 운영 — 내부 팀장은 마케팅 AI 도 일반 AI 처럼 연다(외부 고객 · 누구인지 모를 때는 닫힌 채)
+    const acc = who.role === 'pilot' ? await myAccess(bearerOf(req)) : null
+    const internal = who.role === 'pilot' && (await isInternal(acc, bearerOf(req)))
+    const catalog = who.role === 'pilot' ? pilotCatalog(full, internal) : full
+    // D-353 [연결 점검] — 공급자마다 아주 짧게 한 번 불러 본다(팀장은 쓸 수 있는 회사만 · 20초에 한 번)
     let probe
     if (url.searchParams.get('probe') === '1') {
       const last = probeAt.get(who.userId) ?? 0
       if (Date.now() - last < 20_000) return fail(res, 429, 'rate_limited', { retryAfter: 20 })
       probeAt.set(who.userId, Date.now())
-      const ids = catalog.providers.map((p) => p.id).filter((id) => who.role !== 'pilot' || id === 'gemini')
+      const ids = catalog.providers.map((p) => p.id).filter((id) => who.role !== 'pilot' || pilotProviders(internal).has(id))
       probe = await Promise.all(ids.map((id) => probeProvider(id)))
     }
-    // SAAS-2 고객 — 이용 권한 · 이번 달 사용량. 마케팅 AI 는 권한(marketing)이 있고 장부로 셀 수 있을 때만(고객은 이용 기한도)
-    // D-564 장부(0022)가 아직 없는 운영 — 내부 팀장은 마케팅 AI 도 일반 AI 처럼 연다(외부 고객 · 누구인지 모를 때는 닫힌 채)
-    const acc = who.role === 'pilot' ? await myAccess(bearerOf(req)) : null
     const meterable = !!acc && acc.state === 'ok' && acc.configured && usageReady()
     const legacyInternal = !!acc && acc.state === 'missing' && (await legacyAudience(bearerOf(req))) === 'internal'
     const marketing = who.role !== 'pilot' || legacyInternal || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
     const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
     const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
-    return send(res, 200, { ok: true, role: who.role, ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
+    return send(res, 200, { ok: true, role: who.role, ...(who.role === 'pilot' ? { cheapOnly: internal } : {}), ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
@@ -237,14 +260,21 @@ export default async function handler(req, res) {
   if (assist.video && !video) return fail(res, 400, 'bad_request')
 
   // 고른 것이 없으면 기본(Gemini 가장 싼 모델) · 공급자만 골랐으면 그 공급자의 가장 싼 모델
+  // D-614 팀장 등급 — 내부 팀장인지 먼저 본다(쓸 수 있는 회사 · 모델이 다르다). 이 답은 아래 장부 예약에도 그대로 쓴다
+  const token = pilot ? bearerOf(req) : ''
+  const pilotAcc = pilot ? await myAccess(token) : null
+  const internal = pilot && (await isInternal(pilotAcc, token))
   const sent = cleanChoice(body.choice)
-  if (pilot && sent && !PILOT_PROVIDERS.has(sent.provider)) return fail(res, 403, 'provider_not_allowed')
-  const def = pilot && !PILOT_PROVIDERS.has(defaultChoice().provider) ? { provider: 'gemini', model: tierModel('gemini', 'cheap') } : defaultChoice()
+  if (pilot && sent && !pilotProviders(internal).has(sent.provider)) return fail(res, 403, 'provider_not_allowed')
+  // 내부 팀장의 기본은 늘 Gemini 가장 싼 모델(서버 기본 회사를 Claude 로 바꿔 둬도) — 상태 화면의 기본(pilotCatalog)과 같게
+  const def = pilot && (internal || !pilotProviders(internal).has(defaultChoice().provider)) ? { provider: 'gemini', model: tierModel('gemini', 'cheap') } : defaultChoice()
   // D-260 영상을 직접 보는 것은 Gemini 만 된다 — 다른 회사를 골라 둬도 이 단추는 Gemini(고른 Gemini 모델이 있으면 그것)
   const provider = assist.video ? 'gemini' : sent ? sent.provider : def.provider
-  const model = assist.video
+  const picked = assist.video
     ? (sent && sent.provider === 'gemini' && sent.model) || (def.provider === 'gemini' ? def.model : tierModel('gemini', 'cheap'))
     : (sent && sent.model) || (provider === def.provider ? def.model : tierModel(provider, 'cheap'))
+  // D-614 내부 팀장은 회사마다 가장 싼 모델 하나 — 더 비싼 모델을 보내도 가장 싼 모델로 부른다
+  const model = pilot && internal ? pilotModel(provider) : picked
   const choice = { provider, model }
   if (!providerKey(choice.provider) || !providerBase(choice.provider)) {
     return fail(res, 503, 'setup_needed', { missing: [PROVIDERS[choice.provider].keyNames[0]], provider: choice.provider })
@@ -279,13 +309,12 @@ export default async function handler(req, res) {
   //   0022 적용 전(권한 함수 없음 · 지금 운영): 내부 팀장은 예전처럼 — D-564 마케팅 AI 도 세지 않고 연다(Gemini 만 · 분/시간 제한).
   //     0024(고객 구분)만 먼저 들어온 운영의 외부 고객은 장부 없이 어떤 AI 도 못 쓴다 · 누구인지 모르면 마케팅은 막는다
   //   0022 가 있으면: 마케팅은 누구든(내부 팀장 포함) 권한(marketing) + 장부 예약이 되어야만
-  const token = pilot ? bearerOf(req) : ''
   const tier = tierOf(choice.provider, choice.model)
   const mk = MARKETING_PAGES.has(assist.page)
   const promise = (async () => {
     let charged = false
     if (pilot) {
-      const acc = await myAccess(token)
+      const acc = pilotAcc
       if (acc.state === 'error') throw new UsageError(503, 'usage_unreachable')
       const legacy = acc.state === 'missing'
       if (legacy) {

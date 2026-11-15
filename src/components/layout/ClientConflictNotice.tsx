@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GitMerge, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { onClientSaveNews, resolveClientConflict, type ClientSaveConflictError } from '../../services/clientOpsService'
-import { conflictLabels, conflictValueText } from '../../services/clientMerge'
+import { conflictRows } from '../../services/clientMerge'
 
 const LABEL_ROWS = 4
 
@@ -54,8 +54,10 @@ export function ClientConflictNotice() {
 
   if (!merged && !conflict) return null
   const name = conflict ? conflict.latest.companyName || '이 업체' : merged
-  const rows = conflict ? conflict.conflicts.slice(0, LABEL_ROWS) : []
-  const more = conflict ? Math.max(0, conflict.conflicts.length - LABEL_ROWS) : 0
+  // UX-STAB 딸린 칸(단계 기록 · 옮긴 때)은 주 칸 한 줄로 · 이름 · 값은 쉬운 말로
+  const all = conflict ? conflictRows(conflict.conflicts) : []
+  const rows = all.slice(0, LABEL_ROWS)
+  const more = Math.max(0, all.length - LABEL_ROWS)
   return (
     // 화면 위(머리줄 바로 아래) — 아래쪽 알림(저장됨 · 오류) 자리와 겹치지 않게
     <div className="no-print fixed inset-x-3 top-[calc(4.5rem+env(safe-area-inset-top,0px))] z-50 flex justify-center sm:inset-x-auto sm:top-20 sm:right-6 sm:justify-end lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)]" data-testid="client-conflict-wrap">
@@ -71,12 +73,12 @@ export function ClientConflictNotice() {
           <ul className="mt-3 flex flex-col divide-y divide-slate-200 rounded-(--radius-control) border border-slate-200" data-testid="client-conflict-rows">
             {rows.map((c) => (
               <li key={c.path} className="px-3 py-2" data-testid="client-conflict-row" data-path={c.path}>
-                <p className="t-sub font-semibold text-slate-900">{conflictLabels([c])[0]}</p>
+                <p className="t-sub font-semibold text-slate-900">{c.label}</p>
                 <p className="t-sub mt-0.5 break-keep text-slate-700 [overflow-wrap:anywhere]">
-                  내가 고친 것: <b className="font-semibold text-slate-900">{conflictValueText(c.mine)}</b>
+                  내가 고친 것: <b className="font-semibold text-slate-900">{c.mine}</b>
                 </p>
                 <p className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]">
-                  먼저 저장된 것: <b className="font-semibold text-slate-900">{conflictValueText(c.theirs)}</b>
+                  먼저 저장된 것: <b className="font-semibold text-slate-900">{c.theirs}</b>
                 </p>
               </li>
             ))}

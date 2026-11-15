@@ -25,6 +25,15 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'youtube-plan-list',
+    date: '2026-11-15',
+    title: "유튜브 '이번 주 찍을 것' 1~10위가 한 줄 목록이 됐어요",
+    how: '주제에 마우스를 올리면 이유 · 찍는 법이 펼쳐지고, 누르면 펼친 채로 남아요(휴대폰은 누르기). 찍을 만하면 [이번 주로 확정] 을 눌러 주세요.',
+    path: '/marketing?view=plan',
+    cta: '유튜브 열기',
+    marketing: true,
+  },
+  {
     id: 'youtube-calm',
     date: '2026-11-12',
     title: '유튜브 · 내 콘텐츠 · 남의 인기 영상 화면도 한 판으로 깔끔해졌어요',
@@ -93,14 +102,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     how: '엑셀에서 목록을 복사해 붙여넣거나 엑셀 파일을 그대로 고르면 돼요. 이미 있는 업체는 건너뛰어요.',
     path: '/ops/clients?bulk=1',
     cta: '한 번에 등록해 보기',
-  },
-  {
-    id: 'clients-csv',
-    date: '2026-11-10',
-    title: '업체 목록을 엑셀 파일로 내려받아요',
-    how: '고객 관리 화면의 [더보기] 안에 [업체 목록 엑셀 파일로] 가 있어요.',
-    path: '/ops/clients',
-    cta: '고객 관리 열기',
   },
 ]
 

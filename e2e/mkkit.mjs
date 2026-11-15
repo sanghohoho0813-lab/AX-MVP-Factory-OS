@@ -176,7 +176,16 @@ const twice = async (loc) => {
 }
 /** AI 주제 카드(첫 번째) */
 const aiCard = (p) => p.getByTestId('radar-plan').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
+/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+const openRow = async (row) => {
+  if ((await row.getAttribute('data-open')) !== 'pin') {
+    await row.getByTestId('radar-opp-row').click()
+    await row.page().waitForTimeout(150)
+  }
+  return row
+}
 const openKit = async (card) => {
+  await openRow(card)
   const kit = card.getByTestId('radar-kit')
   if ((await kit.getAttribute('data-open')) !== '1') await kit.getByTestId('radar-kit-toggle').click()
   await card.page().waitForTimeout(250)
