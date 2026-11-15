@@ -9345,3 +9345,12 @@ D-589 에서 "받는 양 줄이기는 큰 수술이라 뒤로" 라고 적었는�
 - 앱: `services/selfSignup.ts`(0028 전 · 되돌린 뒤 → 'missing' → **지금 화면 그대로**) · `auth/ui/BootstrapScreens.tsx`(승인 전 화면 = 확인하는 동안 한 줄 → 바로 시작 / 기다림) ·
   `auth/ui/SignupPage.tsx` 한 줄 · `pages/settings/SelfSignupPanel.tsx` · 기능 안내 `fn-self-signup`(대표만). 새로 생긴 것(D-593)에는 넣지 않는다(고객이 쓰는 기능이 아니라 가입 길).
 - 시험 장치: 로컬 auth 흉내에 `email_confirmed_at`(진짜 Supabase 에 있는 칸)을 더했다 · run-0022-owner · run-0019-seed · e2e-pilot-db 는 0028 을 선행 뒤에 넣는다.
+- 받는 양: 로그인 화면까지 압축 228 → 230KB · 조각 22 → 24(selfSignup 2KB · 아이콘 하나) — 가입 화면 한 줄 · 승인 전 화면이 첫 조각과 같이 쓰므로.
+- 운영 적용(대표가 SQL Editor 에서): `set lock_timeout = '5s';` + `supabase/migrations/20261115000028_self_signup.sql` 통째로 → `supabase/manual/verify_after_0028.sql`(읽기만) 1~5 '좋음' · 6 '꺼짐 · 3명'.
+  넣어도 꺼져 있다 — 켜는 것은 대표 설정 › 작업공간. 되돌리기: `supabase/manual/rollback_0028.sql`(함수 실행 권한만 거둠). 순서: 0019 · 0022 · 0024 · 0025 뒤. 런북 §12.
+- 시험: qa:db test-0028(설치 직후 꺼짐 · anon 은 열림 여부만 · 꺼짐이면 closed · 표 직접 읽기 0줄/쓰기 막힘 · 팀장 · 가입자 대표 설정 막힘 · 대표 범위 밖 값 막힘 · 켜기 기록 ·
+  이메일 확인 전 · 다른 작업공간 구성원 · AI 줄 있음 · 이미 고객 → 각각 막힘 · 시작 → pilot customer · 작업공간 이름 정리 · 구성원 본인뿐 · AI trial 7일 · 대표 구성원 넣기 막힘 ·
+  다시 눌러도 하나 · 이름 없으면 '<이름> 작업공간' · 자리 다 참 → closed · 대표 목록 · 닫힌 계정 다시 못 엶 · 한 시간 10명 → busy · 끄기 · 끄기는 열린 고객을 닫지 않음) 586/0 ·
+  run-0024-customer ⑬ 11/11(운영 모양 위 한 덩어리 · 확인 5줄 · 팀장 켜기 막힘 · 대표 켬 · 새 가입자 시작 · 대표 0 · 다시 실행 · 계단 들여쓰기 · 되돌리기 → 다시) ·
+  qa:pilot L7-0~17(447/0) · qa:isolation 24/0 · qa:guide 71/0 · qa:session 14/0 · test:pilot L7-1~11(172/0) · test:all 녹색.
+- 🚨 확인하지 못한 것: 운영 Supabase 의 '이메일 확인' 설정(꺼져 있으면 가입 즉시 확인된 것으로 친다 — 그럴 때는 받을 사람 수를 작게) · 진짜 메일이 오는지(시험 기계에서 메일 0).
