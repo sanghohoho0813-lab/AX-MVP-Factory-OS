@@ -25,10 +25,10 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
-    id: 'youtube-plan-list',
+    id: 'youtube-topics-one',
     date: '2026-11-15',
-    title: "유튜브 '이번 주 찍을 것' 1~10위가 한 줄 목록이 됐어요",
-    how: '주제에 마우스를 올리면 이유 · 찍는 법이 펼쳐지고, 누르면 펼친 채로 남아요(휴대폰은 누르기). 찍을 만하면 [이번 주로 확정] 을 눌러 주세요.',
+    title: "유튜브 '이번 주 뜨는 주제' 하나로 합쳤어요 — 누르면 제목 · 표지 글까지",
+    how: '주제에 마우스를 올리면 근거 숫자(여러 채널이 다룬 수 · 평소보다 잘된 영상 수)가 뜨고, 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐져요(휴대폰은 누르기). [이 주제로 글 · 대본 만들기] 를 누르면 글이 나와요.',
     path: '/marketing?view=plan',
     cta: '유튜브 열기',
     marketing: true,

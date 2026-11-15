@@ -180,6 +180,7 @@ const firstKey = await keys.first().getAttribute('data-key')
 const firstTopic = (await keys.first().innerText()).split('\n').map((s) => s.trim()).filter(Boolean)[1]
 const before = packCalls().length
 await keys.first().click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor({ timeout: 8000 })
 const url1 = new URL(page.url())
 check('P1 키워드 누르면 → 묶음 화면(?pack=키) · 주제 · 추천 제목', url1.searchParams.get('pack') === firstKey && (await page.getByTestId('mk-pack-topic').innerText()).includes(firstTopic) && (await page.getByTestId('mk-pack-headline').innerText()).startsWith('추천 제목'), { url: page.url(), firstTopic })
@@ -257,6 +258,7 @@ await openHome(page)
 check("R1 첫 화면 그 키워드에 'AI로 써 둠'", (await page.locator(`[data-testid="mk-key"][data-key="${firstKey}"]`).getByTestId('mk-key-ai').count()) === 1)
 const n0 = packCalls().length
 await page.locator(`[data-testid="mk-key"][data-key="${firstKey}"]`).click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor()
 await page.waitForTimeout(1200)
 const dialogs = []
@@ -277,6 +279,7 @@ await page.getByTestId('mk-pack-back').click()
 await page.getByTestId('mk-home').waitFor({ timeout: 5000 })
 check('R4 [← 이번 주 키워드] → 첫 화면', (await page.getByTestId('mk-pack').count()) === 0)
 await page.locator(`[data-testid="mk-key"][data-key="${firstKey}"]`).click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor()
 const n1 = packCalls().length
 { const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
@@ -291,6 +294,7 @@ const third = page.getByTestId('mk-key').nth(2)
 const thirdKey = await third.getAttribute('data-key')
 const nL = packCalls().length
 await third.click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor()
 { const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.waitForTimeout(400)
@@ -298,6 +302,7 @@ await page.getByTestId('mk-pack-back').click()
 await page.getByTestId('mk-home').waitFor()
 await page.waitForTimeout(3200)
 await page.locator(`[data-testid="mk-key"][data-key="${thirdKey}"]`).click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor()
 await page.waitForFunction(() => document.querySelectorAll('[data-testid="mk-pack-section"][data-ai="1"]').length === 6, null, { timeout: 8000 }).catch(() => {})
 check('L1 AI 가 쓰는 중에 첫 화면으로 나갔다 다시 들어와도 — 그 사이 온 AI 글이 보이고 · 다시 부르지 않음', (await page.locator('[data-testid="mk-pack-section"][data-ai="1"]').count()) === 6 && packCalls().length === nL + 3 && (await page.getByTestId('mk-pack-ai').getAttribute('data-state')) === 'done', { calls: packCalls().length - nL })
@@ -309,6 +314,7 @@ await page.getByTestId('mk-home').waitFor()
 failing = 'radar.pack.blog'
 const second = page.getByTestId('mk-key').nth(1)
 await second.click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor()
 { const l289 = page.getByTestId('mk-pack-ai-run'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await aiDone(page)
@@ -386,6 +392,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   check(`M ${tag}: 첫 화면 넘침 0 · 키워드 단추 ${KEYS_N}개 모두 44px 이상`, (await overflowX(mp)) <= 0 && h.length === KEYS_N && h.every((x) => x >= 44), { over: await overflowX(mp), h })
   await shot(mp, `M-${w}${big ? '-big' : ''}-home`)
   await mp.getByTestId('mk-key').first().click()
+  await mp.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
   await mp.getByTestId('mk-pack').waitFor()
   await aiDone(mp)
   // 휴대폰에서도 펼쳐보기 — 머리 상자 안 관련 영상이 넘치지 않게

@@ -217,6 +217,7 @@ await page.getByRole('button', { name: /예시로 보기/ }).first().click()
 await page.getByTestId('mk-key').first().waitFor({ timeout: 15000 })
 const keyTopic = (await page.getByTestId('mk-key').first().innerText()).split('\n').map((x) => x.trim()).filter((x) => x && !/^\d+$/.test(x))[0] ?? ''
 await page.getByTestId('mk-key').first().click()
+await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
 await page.getByTestId('mk-pack').waitFor({ timeout: 15000 })
 const packTopic = (await page.getByTestId('mk-pack-topic').innerText()).trim()
 check('P1 묶음 화면에 "같은 주제로 다른 채널" — 스레드 · 릴스 · 틱톡 단추', (await page.getByTestId('mk-pack-to-threads').count()) === 1 && (await page.getByTestId('mk-pack-to-shorts').count()) === 1, keyTopic)

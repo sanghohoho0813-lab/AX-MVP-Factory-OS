@@ -98,7 +98,7 @@ import {
   type Opportunity,
   type RadarVideo,
 } from '../../services/marketing/ytRadar'
-import { PlanView, type FocusData } from './radar/PlanView'
+import { PlanView, type FocusData, type OppCard } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { MkAsk } from './radar/MkAsk'
@@ -313,6 +313,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   )
   // D-241 답의 후보 번호(o#) → 레이더 후보(같은 주제 줄에 합치고 · 찍기 키트를 대본 자료로)
   const oppByKey = useMemo(() => new Map((plan?.picks ?? []).map((o) => [o.key, o])), [plan])
+  // D-616 뜨는 주제 줄의 '제작 예정' 표시 · [이번 주로 확정] 단계(내 콘텐츠 줄 단계)
+  const oppStatus = useMemo(() => new Map(notebook.ideas.map((i) => [i.key, i.status])), [notebook.ideas])
   const packOpp = packKey && !packKey.startsWith('custom:') ? (oppByKey.get(packKey) ?? null) : null
   // D-295 고정 키워드 다섯(정책자금 · 고용지원금 · 기업인증 · 정부지원금 · 정부지원사업) — 늘 따로. 이번 주 새 공고 수(기업마당 · 매일 아침 9시)는 칩으로
   const grants = useGrantFeed()
@@ -762,6 +764,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   /** D-603 다른 판 안([자세히 보기] · 묶음 화면 판)에 들어갈 때 — 테두리 칸 없이 */
   const briefInline = !readOnly && !isMarketingCustomer() ? <BriefCard plain brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey && !weekOn && !firstScreen
+  // D-616 뜨는 주제 줄을 눌러 펼친 판 — 예전 '이번 주 찍을 것' 카드와 같은 단추 · 같은 저장(확정 · 담기 · 관심 없음 · AI 추천 대본)
+  const oppCard: OppCard = {
+    status: oppStatus,
+    readOnly,
+    noThumb: yt.sample,
+    onConfirm: (o) => void confirmOpp(o),
+    onSave: (o) => void saveOpp(o),
+    onMute: (o) => void muteOpp(o),
+    onCopy: (t, what) => copy(t, what),
+    onOpenVideo: openVideo,
+    brand: { brief, cores, ai: mkAi && !readOnly, onCore: chooseCore },
+    onKeepScript: saveKitScript,
+  }
   /** D-511 첫 화면 대화창 — 쓴 말(규칙)이 정한 곳으로. 1주일치는 열기만(AI 는 그 화면에서 두 번 눌러 확인) */
   const onAsk = (r: MkRoute) => {
     if (r.kind === 'week') openWeek(false)
@@ -1011,7 +1026,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       ) : home ? (
         <>
           {prepared && <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />}
+          <PeekProvider value={peekEnv}>
           <KeywordHome
+            // D-616 이번 주 뜨는 주제 = 예전 '이번 주 찍을 것' 1~10위(같은 후보) — 줄을 누르면 이유 · 근거 · 찍는 법 · 확정 · 만들기
+            opps={plan ? { byKey: oppByKey, card: oppCard } : undefined}
             fixed={fixedHome}
             keywords={homeKeys}
             status={homeStatus}
@@ -1030,9 +1048,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               prepared && plan && focus ? (
                 <Fold
                   id="mk-more"
-                  title="자세히 보기 — 왜 이 키워드인지 · 관련 영상 · 시장 신호"
-                  hint="예전 첫 화면 전부가 여기 있어요 — 1순위 이유 · 근거 영상 · 이번 주로 확정 · 시장 신호 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준."
-                  summary="1순위 이유 · 관련 영상 · 시장 신호 · AI 도우미 · 채널 설계 기준"
+                  // D-616 주제마다 이유 · 근거 · 찍는 법 · 확정은 위 목록(줄을 누르면) — 같은 1~10위를 여기서 한 번 더 보이지 않는다
+                  title="자세히 보기 — 시장 신호 · 추천 기준 · AI 도우미"
+                  hint="주제마다 왜 지금 · 근거 영상 · 제목 · 표지 글 · 이번 주로 확정은 위 '이번 주 뜨는 주제' 에서 그 주제를 누르면 펼쳐져요. 여기에는 시장 신호 · 추천 기준(숨긴 주제) · 이번 주 제작 예정 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준이 있어요."
+                  summary="시장 신호 · 추천 기준 · AI 도우미 · 채널 설계 기준"
                   testId="mk-more"
                 >
                   <div className="flex flex-wrap gap-2">{feedButtons}</div>
@@ -1060,17 +1079,11 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                       ideas={notebook.ideas}
                       readOnly={readOnly}
                       noThumb={yt.sample}
-                      onConfirm={(o) => void confirmOpp(o)}
-                      onSave={(o) => void saveOpp(o)}
-                      onMute={(o) => void muteOpp(o)}
                       onUnmute={(k) => void unmute(k)}
-                      onCopy={(t, what) => copy(t, what)}
                       onOpenVideo={openVideo}
                       onMix={(mix) => void savePrefs({ ...prefs, mix })}
                       onGoChannels={() => setParam({ view: 'channels' })}
                       onGoNotebook={goNotebook}
-                      brand={{ brief, cores, ai: mkAi && !readOnly, onCore: chooseCore }}
-                      onKeepScript={saveKitScript}
                     />
                   </PeekProvider>
                   {briefInline}
@@ -1078,6 +1091,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               ) : undefined
             }
           />
+          </PeekProvider>
           {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
           {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
           {!prepared && briefCard}

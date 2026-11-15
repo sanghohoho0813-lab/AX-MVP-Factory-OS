@@ -175,18 +175,21 @@ const twice = async (loc) => {
   await loc.click()
 }
 /** AI 주제 카드(첫 번째) */
-const aiCard = (p) => p.getByTestId('radar-plan').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
-/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+const aiCard = (p) => p.getByTestId('mk-keys').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
+/** D-613 · D-616 이번 주 뜨는 주제 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
 const openRow = async (row) => {
   if ((await row.getAttribute('data-open')) !== 'pin') {
-    await row.getByTestId('radar-opp-row').click()
+    await row.getByTestId('mk-key').click()
     await row.page().waitForTimeout(150)
   }
-  return row
+  // D-616 펼친 판은 줄 밖(PC 는 두 줄 아래 한 판 넓이) — 줄 + 그 판을 함께 찾는 자리를 돌려준다
+  const key = await row.getByTestId('mk-key').getAttribute('data-key')
+  return row.or(row.page().locator(`[data-testid="radar-opp-body"][data-for="${key}"]`))
 }
 const openKit = async (card) => {
-  await openRow(card)
-  const kit = card.getByTestId('radar-kit')
+  const c = await openRow(card)
+  const kit = c.getByTestId('radar-kit')
+  // D-616 펼친 판 안에서는 처음부터 펼친 채
   if ((await kit.getAttribute('data-open')) !== '1') await kit.getByTestId('radar-kit-toggle').click()
   await card.page().waitForTimeout(250)
   return kit
@@ -227,18 +230,18 @@ await shot(page, 'B-kit-rule')
 /* ---------------- C 칩으로 다른 본업 ---------------- */
 await kit.locator('[data-testid="radar-kit-core"][data-core="policy"]').click()
 await page.waitForTimeout(300)
-card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+card = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 const t2 = await kit.getByTestId('radar-kit-titles').innerText()
 const h2 = await kit.getByTestId('radar-kit-hook').innerText()
 check('C1 [정책자금] 칩 → 제목 · 첫 문장이 정책자금으로 · 칩 켜짐', t2.includes('정책자금') && h2.includes('정책자금') && (await kit.locator('[data-testid="radar-kit-core"][data-core="policy"]').getAttribute('data-on')) === '1', { t2: t2.slice(0, 200), h2 })
 await openPlan(page)
-card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+card = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 check('C2 새로 고쳐도 고른 본업(정책자금) 그대로', (await kit.locator('[data-testid="radar-kit-core"][data-core="policy"]').getAttribute('data-on')) === '1' && (await kit.getByTestId('radar-kit-hook').innerText()).includes('정책자금'))
 
 /* ---------------- M 시장 주제는 그대로 ---------------- */
-const marketCards = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"][data-axis="market"]')
+const marketCards = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"][data-axis="market"]')
 const mInfo = []
 for (let i = 0; i < Math.min(3, await marketCards.count()); i++) {
   const c = marketCards.nth(i)
@@ -248,7 +251,7 @@ for (let i = 0; i < Math.min(3, await marketCards.count()); i++) {
 check('M1 시장 주제(정책자금 · 고용지원금 …)는 그대로 — 본업인 주제는 칩 없음 · 아닌 주제(가업승계)는 [주제 그대로] 가 켜진 채', mInfo.length > 0 && mInfo.every((m) => !m.hook.includes('기능 말고')) && mInfo.filter((m) => /정책자금|고용지원금/.test(m.topic)).every((m) => m.chips === 0), mInfo)
 
 /* ---------------- A AI 추천 ---------------- */
-card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+card = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 const n0 = kitCalls().length
 const run = kit.getByTestId('radar-kit-ai-run')
@@ -270,7 +273,7 @@ await page.waitForTimeout(200)
 check('A4 [규칙 추천] 으로 바꿔 보기 → 규칙 제목 · 다시 [AI 추천]', (await kit.getByTestId('radar-kit-ai-result').count()) === 0 && (await kit.getByTestId('radar-kit-titles').count()) === 1)
 await kit.locator('[data-testid="radar-kit-tab"][data-tab="ai"]').click()
 await openPlan(page)
-card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+card = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 check('A5 새로 고쳐도 AI 추천 남음 · AI 다시 안 부름', (await kit.getByTestId('radar-kit-ai-result').count()) === 1 && kitCalls().length === n0 + 1)
 
@@ -302,7 +305,7 @@ await panel.getByTestId('kit-script-kept').waitFor({ timeout: 8000 }).catch(() =
 check('D5 [내 보관함으로 옮기기] → [보관함에서 보기] 링크', (await panel.getByTestId('kit-script-kept').count()) === 1)
 // 다시 열어도 대본은 남음 · AI 다시 안 부름
 await openPlan(page)
-card = page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+card = page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
 kit = await openKit(card)
 await kit.locator('[data-testid="radar-kit-ai-title"][data-index="2"]').click()
 await page.waitForTimeout(200)

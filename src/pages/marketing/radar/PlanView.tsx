@@ -23,10 +23,14 @@
  * D-351 대표 "이번 주 이렇게 찍으세요를 내 브랜딩에 유리하게 — AI 주제는 AX 로, 정책자금 신청할 때 … 채널 설계 기준에 맞춰서":
  *  - 키트 맨 위 '내 본업으로 잇기' 칩(채널 설계 기준에서 읽은 본업) — AI 주제는 늘 본업으로 이어진 제목(틀별) · 첫 문장 · 이렇게 말해요(규칙).
  *  - [AI로 내 채널에 맞게 추천](두 번 눌러 확인) — 기준 전부 · 이 후보 · 고른 본업으로 AI 가 다시 쓴다. 규칙 추천 / AI 추천을 바꿔 본다.
+ * D-616 대표 "이번 주 뜨는 주제 1~10위와 이번 주 찍을 것 1~10위가 똑같이 중복 — 뜨는 주제에 합치자":
+ *  - 1~10위 목록은 '이번 주 뜨는 주제'(KeywordHome) 하나만. 줄마다 신호 세기 · 마우스를 올리면 근거 숫자(OppPeek) ·
+ *    누르면 이 파일의 카드 내용 전부(OppBody — 이렇게 찍으세요는 펼친 채).
+ *  - 이 판(PlanView · [자세히 보기] 안)에는 고르는 기준 · 숨긴 주제 · 이번 주 제작 예정 · 시장 신호만 남는다.
  */
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Fold } from '../../../components/ui/fold'
-import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
+import { MkPick } from '../../../tools/marketing/mkKit'
 import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, CloudOff, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
@@ -72,7 +76,7 @@ import {
 } from '../../../services/marketing/ytRadar'
 import { Peek } from './EvidencePeek'
 import { AiKeywordBoard, DomainBoard, SideBreakouts } from './FocusSignals'
-import { AxisBadge, DomainBadge, IconChip, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
+import { AxisBadge, DomainBadge, IconChip, RatioChip, Thumb, VideoRow } from './RadarParts'
 import { mkText } from '../../../services/marketing/persona'
 
 /** 시장 신호 첫 화면 개수(나머지는 [더 보기]) */
@@ -88,22 +92,12 @@ export function PlanView({
   ideas,
   readOnly,
   noThumb,
-  onConfirm,
-  onSave,
-  onMute,
   onUnmute,
-  onCopy,
   onOpenVideo,
   onMix,
   onGoChannels,
   onGoNotebook,
-  brand,
-  onKeepScript,
 }: {
-  /** D-558 AI 추천 제목 → 대본 → 내 보관함 */
-  onKeepScript?: CardProps['onKeepScript']
-  /** D-351 채널 설계 기준의 본업 · 칩으로 고르기 · AI 추천(대표 · AI 가 되는 계정만) */
-  brand?: BrandCtx
   plan: RadarPlan
   rising: RisingTopic[]
   breakouts: RadarVideo[]
@@ -115,33 +109,24 @@ export function PlanView({
   ideas: readonly ContentIdea[]
   readOnly: boolean
   noThumb: boolean
-  onConfirm: (o: Opportunity) => void
-  onSave: (o: Opportunity) => void
-  onMute: (o: Opportunity) => void
   onUnmute: (key: string) => void
-  onCopy: (text: string, what?: string) => void
   onOpenVideo: (v: RadarVideo) => void
   onMix: (m: MixGuide) => void
   onGoChannels: () => void
   onGoNotebook: () => void
 }) {
   const [criteria, setCriteria] = useState(false)
-  const status = useMemo(() => new Map(ideas.map((i) => [i.key, i.status])), [ideas])
   const selected = useMemo(() => ideas.filter((i) => i.status === 'selected').slice(0, 3), [ideas])
-  // 제작 예정 · 대본 · 촬영 중인 것이 있으면 길잡이는 ③ 찍고 올리기
-  const inWork = useMemo(() => ideas.filter((i) => i.status === 'selected' || i.status === 'script' || i.status === 'filmed').length, [ideas])
-  const hero = plan.picks[0]
-  const card = { status, readOnly, noThumb, onConfirm, onSave, onMute, onCopy, onOpenVideo, brand, onKeepScript }
   return (
     <div className="flex flex-col gap-6" data-testid="radar-plan">
-      <section className="flex flex-col gap-3" aria-labelledby="radar-plan-h">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <HintTip tip={hintFor('이번 주 찍을 것')} label="이번 주 찍을 것">
-            <h2 id="radar-plan-h" className="flex items-center gap-2 text-[1.375rem] leading-tight font-extrabold text-slate-900 sm:text-2xl">
-              <IconChip icon={Clapperboard} tone="rose" size="lg" />
-              이번 주 찍을 것
-            </h2>
-          </HintTip>
+      {/* D-616 대표 "이번 주 뜨는 주제 1~10위가 이번 주 찍을 것과 똑같이 중복 — 뜨는 주제에 합치자".
+          예전: 여기에 '이번 주 찍을 것' 제목 · 길잡이(주제 고르기 → 확정 → 찍고 올리기) · 같은 1~10위 목록이 한 번 더.
+          지금: 1~10위(이유 · 근거 · 찍는 법 · 확정)는 위 '이번 주 뜨는 주제' 줄을 누르면 — 여기에는 고르는 기준 · 숨긴 주제 · 제작 예정만. */}
+      <section className="flex flex-col gap-2.5" aria-label="이번 주 뜨는 주제 — 고르는 기준" data-testid="radar-guide">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="t-sub min-w-0 flex-1 basis-64 break-keep text-slate-700" data-testid="radar-guide-next">
+            <b className="font-bold text-slate-900">이번 주 뜨는 주제는</b> 참고 채널 최근 30일 영상에서 여러 채널이 함께 다루고 평소보다 잘된 것으로 골라요 — 주제마다 이유 · 제목 · 표지 글 · 찍는 법은 위 목록에서 그 주제를 누르면 펼쳐져요.
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             {plan.muted.length > 0 && (
               <button type="button" onClick={() => setCriteria(true)} className="tap t-meta inline-flex items-center gap-1 rounded-full px-2 font-semibold text-slate-500 hover:text-slate-800" data-testid="radar-muted-chip">
@@ -163,46 +148,21 @@ export function PlanView({
 
         {criteria && <Criteria plan={plan} basis={basis} readOnly={readOnly} onMix={onMix} onUnmute={onUnmute} onClose={() => setCriteria(false)} />}
 
-        {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에)
-            D-603 [자세히 보기] 판 안의 또 한 칸(테두리) → 테두리 없이(박스 안 박스 줄이기) */}
-        <div className="flex flex-col gap-3" data-testid="radar-guide">
-          <div className="mx-auto w-full max-w-xl">
-            <MkSteps
-              steps={[
-                { key: 'pick', label: '주제 고르기' },
-                { key: 'confirm', label: '이번 주로 확정' },
-                { key: 'make', label: '찍고 올리기' },
-              ]}
-              current={inWork > 0 ? 2 : 0}
-              tone="rose"
-              onGo={(k) => (k === 'make' ? onGoNotebook() : document.querySelector('[data-testid="radar-top"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))}
-              testId="radar-steps"
-            />
+        {selected.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2" data-testid="radar-selected">
+            <span className="t-sub inline-flex items-center gap-1 font-bold text-success-800">
+              <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
+            </span>
+            {selected.map((i) => (
+              <span key={i.id} className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-selected-item">
+                {i.topic}
+              </span>
+            ))}
+            <button type="button" onClick={onGoNotebook} className="tap t-sub ml-auto inline-flex items-center gap-1 rounded-full bg-success-700 px-3 font-bold text-white hover:bg-success-800" data-testid="radar-guide-notebook">
+              <NotebookPen aria-hidden="true" className="size-4" /> 다음: 내 콘텐츠에서 일정 · 체크 <ArrowRight aria-hidden="true" className="size-4" />
+            </button>
           </div>
-          {selected.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2" data-testid="radar-selected">
-              <span className="t-sub inline-flex items-center gap-1 font-bold text-success-800">
-                <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
-              </span>
-              {selected.map((i) => (
-                <span key={i.id} className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-selected-item">
-                  {i.topic}
-                </span>
-              ))}
-              <button type="button" onClick={onGoNotebook} className="tap t-sub ml-auto inline-flex items-center gap-1 rounded-full bg-success-700 px-3 font-bold text-white hover:bg-success-800" data-testid="radar-guide-notebook">
-                <NotebookPen aria-hidden="true" className="size-4" /> 다음: 내 콘텐츠에서 일정 · 체크 <ArrowRight aria-hidden="true" className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <p className="t-sub flex items-start gap-1.5 break-keep text-slate-700" data-testid="radar-guide-next">
-              <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-500" />
-              <span className="min-w-0">
-                <b className="font-bold text-slate-900">지금 할 일 — </b>
-                {hero ? '주제에 마우스를 올리면 이유 · 찍는 법이 펼쳐져요(휴대폰은 누르기) — 누르면 펼친 채로 남고, 찍을 만하면 [이번 주로 확정] 을 눌러 주세요.' : '후보가 생기면 여기서 바로 고를 수 있어요.'}
-              </span>
-            </p>
-          )}
-        </div>
+        )}
 
         {plan.aiDataShort && (
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-slate-300 bg-slate-50 px-3 py-2 break-keep text-slate-700" data-testid="radar-ai-short">
@@ -214,17 +174,6 @@ export function PlanView({
               채널 보기
             </button>
           </p>
-        )}
-
-        {!hero ? (
-          <p className="t-body rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-500" data-testid="radar-empty">
-            최근 30일에 2편 넘게 함께 나온 주제가 아직 없습니다 — 억지로 후보를 만들지 않았습니다. 며칠 뒤 다시 보거나 채널을 더해 주세요.
-          </p>
-        ) : (
-          // D-613 대표 "1~10위 박스가 너무 크고 정보가 많아 눈에 안 들어온다 — 바로 위 '이번 주 뜨는 주제' 처럼 정돈 · 마우스를 올리거나 누르면 쫙 펼쳐지게".
-          // 예전: 1순위 큰 카드 + 2~10위 카드(근거 칩 · 이유 · 찍는 법 · 단추가 늘 다 보임) — PC 1,577px · 휴대폰 3,457px.
-          // 지금: 번호 붙은 한 줄 목록(줄 사이 가는 선 · 1번만 진한 동그라미). 안의 내용 · 단추는 그대로 — 펼쳤을 때만 보인다.
-          <PlanList picks={plan.picks} card={card} />
         )}
       </section>
 
@@ -309,152 +258,69 @@ function DetailsToggle({ open, onToggle, short }: { open: boolean; onToggle: () 
 }
 
 /**
- * D-613 이번 주 찍을 것 1~10위 — '이번 주 뜨는 주제' 와 같은 번호 줄 목록.
- *  - 줄: 번호(1번만 진한 동그라미) · 주제 · 신호 세기 · (제작 예정이면 표시) · 펼침 화살표.
- *  - PC 마우스: 줄에 올려 두면 그 줄 바로 아래로 미리 보기가 펼쳐진다(목록은 움직이지 않게 위에 겹쳐서) — 마우스가 미리 보기 안에 있는 동안 그대로.
- *    줄을 누르거나 미리 보기 안을 누르면 펼친 채로 고정(목록 사이에 끼어 들어감) · 다시 누르면 접힘.
- *  - 휴대폰 · 터치: 누르면 펼침 / 다시 누르면 접힘.
- *  - 펼친 내용은 예전 카드 그대로(왜 지금 · 근거 · 왜 추천됐나요 · [이번 주로 확정] · 근거 보기 · 이번 주 이렇게 찍으세요).
+ * D-616 '이번 주 뜨는 주제' 줄 하나가 품는 것(KeywordHome 이 그린다 — 예전 D-613 '이번 주 찍을 것' 목록과 합침).
+ *  - OppPeek: PC 마우스를 올리면 — 근거 숫자만(직접 경쟁 채널 몇 곳 · 평소보다 잘된 영상 몇 편) + 누르면 무엇이 펼쳐지는지 한 줄.
+ *  - OppBody: 누르면 — 왜 지금 · 근거 · [이 주제로 글 · 대본 만들기] · [이번 주로 확정] · 이번 주 이렇게 찍으세요(제목 · 첫 문장 ·
+ *    잘 된 틀 → 우리 제목 · 제목 후보 · 표지 글 — 처음부터 펼친 채) · 왜 추천됐나요 · 근거 보기(참고 영상 · 관심 없음).
+ * 안의 칸 · 단추 · 시험 이름은 D-613 카드 그대로(radar-why · radar-fact · radar-confirm · radar-kit …).
  */
-const HOVER_OPEN_MS = 260
-const HOVER_CLOSE_MS = 220
+export type OppCard = Omit<CardProps, 'o'>
 
-function canHover(): boolean {
-  try {
-    return typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
-  } catch {
-    return false
-  }
-}
-
-type CardBase = Omit<CardProps, 'o'>
-
-function PlanList({ picks, card }: { picks: readonly Opportunity[]; card: CardBase }) {
-  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set())
-  const [peek, setPeek] = useState<string | null>(null)
-  const timer = useRef<number | undefined>(undefined)
-  const hover = (key: string, on: boolean) => {
-    if (!canHover()) return
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setPeek((cur) => (on ? key : cur === key ? null : cur)), on ? HOVER_OPEN_MS : HOVER_CLOSE_MS)
-  }
-  const pin = (key: string, on: boolean) => {
-    window.clearTimeout(timer.current)
-    setPinned((prev) => {
-      const next = new Set(prev)
-      if (on) next.add(key)
-      else next.delete(key)
-      return next
-    })
-    setPeek((cur) => (cur === key ? null : cur))
-  }
+export function OppPeek({ o }: { o: Opportunity }) {
   return (
-    <ul className="grid grid-cols-1 items-start sm:grid-cols-2 sm:gap-x-6" data-testid="radar-top">
-      {picks.map((o, i) => (
-        <PlanRow
-          key={o.key}
-          o={o}
-          rank={i + 1}
-          {...card}
-          pinned={pinned.has(o.key)}
-          peek={peek === o.key && !pinned.has(o.key)}
-          onToggle={() => pin(o.key, !pinned.has(o.key))}
-          onPin={() => {
-            if (!pinned.has(o.key)) pin(o.key, true)
-          }}
-          onHover={(on) => hover(o.key, on)}
-        />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2" data-testid="mk-key-peek">
+      {o.facts.length > 0 ? (
+        <Facts o={o} size="sm" />
+      ) : (
+        o.summary && <p className="t-sub break-keep text-slate-700">{o.summary}</p>
+      )}
+      <p className="t-meta flex items-center gap-1 break-keep text-slate-600">
+        <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" /> 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법까지 펼쳐져요
+      </p>
+    </div>
   )
 }
 
-function PlanRow(props: CardProps & { rank: number; pinned: boolean; peek: boolean; onToggle: () => void; onPin: () => void; onHover: (on: boolean) => void }) {
-  const { o, rank, pinned, peek } = props
-  const open = pinned || peek
+export function OppBody({ o, rank, card, onMake }: { o: Opportunity; rank: number; card: OppCard; onMake: () => void }) {
   const [more, setMore] = useState(false)
-  const s = props.status.get(o.key)
-  const planned = !!s && s !== 'idea'
-  const bodyId = `radar-b-${o.key}`
+  const props: CardProps = { ...card, o }
   return (
-    <li
-      className="relative min-w-0 border-b border-slate-100"
-      data-testid="radar-opp"
-      data-size={rank === 1 ? 'hero' : 'sub'}
-      data-rank={rank}
-      data-axis={o.axis}
-      data-domain={o.domain}
-      data-strength={o.strength}
-      data-open={open ? (pinned ? 'pin' : 'peek') : '0'}
-      aria-labelledby={`radar-h-${o.key}`}
-      onMouseEnter={() => props.onHover(true)}
-      onMouseLeave={() => props.onHover(false)}
-    >
-      <button
-        type="button"
-        onClick={props.onToggle}
-        aria-expanded={pinned}
-        aria-controls={bodyId}
-        className={`tap group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-2 text-left transition-colors hover:bg-slate-50 sm:gap-3 ${open ? 'bg-slate-50' : ''}`}
-        data-testid="radar-opp-row"
-        title="마우스를 올리면 이유 · 찍는 법이 펼쳐져요 — 누르면 펼친 채로 남아요"
-      >
-        <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold ${rank === 1 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
-          {rank}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-          <span id={`radar-h-${o.key}`} className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-opp-topic">
-            {o.topic}
-          </span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            <StrengthMeter strength={o.strength} />
-            {planned && (
-              <span className="t-meta inline-flex items-center gap-1 font-bold text-success-700" data-testid="radar-row-planned">
-                <CalendarCheck aria-hidden="true" className="size-3.5" /> {s === 'selected' ? '제작 예정' : IDEA_STATUS_LABEL[s]}
-              </span>
-            )}
-          </span>
-        </span>
-        <ChevronDown aria-hidden="true" className={`size-5 shrink-0 transition-transform group-hover:text-brand-600 ${pinned ? 'rotate-180 text-brand-600' : 'text-slate-400'}`} />
-      </button>
-      {open && (
-        <div
-          id={bodyId}
-          // 미리 보기(마우스만 올림)는 목록 위에 겹쳐서 — 목록이 밀려 움직이지 않게. 고정하면 목록 사이에 끼어 들어간다.
-          className={
-            pinned
-              ? 'flex flex-col gap-3 px-1.5 pt-2 pb-4 sm:pl-11'
-              : 'absolute inset-x-0 top-full z-30 flex max-h-[min(70vh,34rem)] flex-col gap-3 overflow-y-auto rounded-(--radius-card) border border-slate-200 bg-white p-3 shadow-(--shadow-overlay)'
-          }
-          data-testid="radar-opp-body"
-          onPointerDownCapture={props.onPin}
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            {rank === 1 && (
-              <span className="t-meta rounded-full bg-slate-900 px-2.5 py-0.5 font-bold text-white" data-testid="radar-rank1">
-                이번 주 1순위
-              </span>
-            )}
-            <AxisBadge axis={o.axis} />
-            <DomainBadge axis={o.axis} domain={o.domain} />
-          </div>
-          {o.summary && (
-            <p className="t-sub break-keep text-slate-700" data-testid="radar-why">
-              <span className="font-bold text-slate-900">왜 지금 · </span>
-              {o.summary}
-            </p>
+    // 넓은 PC 는 두 칸 — 왼쪽: 왜 지금 · 근거 · 단추 · 왜 추천됐나요 · 근거 보기 / 오른쪽: 이번 주 이렇게 찍으세요(제목 · 표지 글). 휴대폰은 한 줄로 차례대로
+    <div className="grid min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-x-8">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {rank === 1 && (
+            <span className="t-meta rounded-full bg-slate-900 px-2.5 py-0.5 font-bold text-white" data-testid="radar-rank1">
+              이번 주 1순위
+            </span>
           )}
-          <Facts o={o} size="sm" />
-          <WhyRecommended o={o} />
-          {more && <Details {...props} />}
-          <div className="flex flex-wrap items-center gap-2">
-            <ConfirmButton {...props} quiet={rank !== 1} />
-            <DetailsToggle open={more} onToggle={() => setMore((x) => !x)} short={rank !== 1} />
-          </div>
-          <ShootBox o={o} onCopy={props.onCopy} brand={props.brand} size={rank === 1 ? 'lg' : 'sm'} rank={rank} readOnly={props.readOnly} onKeepScript={props.onKeepScript} />
+          <AxisBadge axis={o.axis} />
+          <DomainBadge axis={o.axis} domain={o.domain} />
         </div>
-      )}
-    </li>
+        {o.summary && (
+          <p className="t-sub break-keep text-slate-700" data-testid="radar-why">
+            <span className="font-bold text-slate-900">왜 지금 · </span>
+            {o.summary}
+          </p>
+        )}
+        <Facts o={o} size="sm" />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 예전 이 줄을 한 번 누르면 바로 열리던 콘텐츠 묶음(제목 · 유튜브 대본 · 릴스 · 블로그 · 카드뉴스 · 올릴 때 글) */}
+          <Button variant="primary" onClick={onMake} data-testid="mk-key-go">
+            이 주제로 글 · 대본 만들기 <ArrowRight aria-hidden="true" className="size-4" />
+          </Button>
+          <ConfirmButton {...props} quiet />
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+          <WhyRecommended o={o} />
+          <div>
+            <DetailsToggle open={more} onToggle={() => setMore((x) => !x)} />
+          </div>
+          {more && <Details {...props} />}
+        </div>
+      </div>
+      <ShootBox o={o} onCopy={card.onCopy} brand={card.brand} size={rank === 1 ? 'lg' : 'sm'} rank={rank} readOnly={card.readOnly} onKeepScript={card.onKeepScript} defaultOpen flush />
+    </div>
   )
 }
 
@@ -464,10 +330,11 @@ function PlanRow(props: CardProps & { rank: number; pinned: boolean; peek: boole
  *        그대로/바꿀 것 · 찍기 전 준비는 지우고 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일 · 제목 예 · 첫 문장만".
  * 늘 보이는 것: 이렇게 말해요(우리 각도) · 제목 예 · 첫 문장. 펼치면: 잘 된 틀 → 우리 제목 · 제목 후보 · 썸네일.
  */
-function ShootBox({ o, onCopy, brand, size = 'sm', rank = 0, readOnly = false, onKeepScript }: { o: Opportunity; onCopy: (text: string, what?: string) => void; brand?: BrandCtx; size?: 'lg' | 'sm'; rank?: number; readOnly?: boolean; onKeepScript?: CardProps['onKeepScript'] }) {
+function ShootBox({ o, onCopy, brand, size = 'sm', rank = 0, readOnly = false, onKeepScript, defaultOpen = false, flush = false }: { o: Opportunity; onCopy: (text: string, what?: string) => void; brand?: BrandCtx; size?: 'lg' | 'sm'; rank?: number; readOnly?: boolean; onKeepScript?: CardProps['onKeepScript']; defaultOpen?: boolean; flush?: boolean }) {
   const kit = useMemo(() => shootKit(o), [o])
   // D-296 처음엔 접힌 채(제목 줄 · 준비 시간만) — 누르면 안의 글이 펼쳐진다
-  const [open, setOpen] = useState(false)
+  // D-616 뜨는 주제 줄을 눌러 연 판 안에서는 펼친 채로(대표 "누르면 제목 · 표지 글은 어떻게 할지 종합적으로") — 접기는 그대로
+  const [open, setOpen] = useState(defaultOpen)
   const lg = size === 'lg'
   // D-351 AI 추천 — 이 후보 · 이번 주 · 화면 밖(모듈)에 남는다
   const kver = useSyncExternalStore(subscribeKit, kitVersion)
@@ -487,7 +354,7 @@ function ShootBox({ o, onCopy, brand, size = 'sm', rank = 0, readOnly = false, o
   }
   return (
     // D-603 후보 카드 안의 또 한 칸(테두리) → 카드 안 가는 선 아래 한 줄(박스 안 박스 줄이기)
-    <section className="flex min-w-0 flex-col gap-2.5 border-t border-slate-100 pt-3" data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
+    <section className={`flex min-w-0 flex-col gap-2.5 border-t border-slate-100 pt-3 ${flush ? 'lg:border-t-0 lg:pt-0' : ''}`} data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left" data-testid="radar-kit-toggle">
         <IconChip icon={Clapperboard} tone="rose" />
         <span className={`font-extrabold text-slate-900 ${lg ? 't-card' : 't-sub'}`}>이번 주 이렇게 찍으세요</span>

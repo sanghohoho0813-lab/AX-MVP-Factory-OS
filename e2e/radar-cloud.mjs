@@ -15,13 +15,15 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+/** D-613 · D-616 이번 주 뜨는 주제 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
 const openRow = async (row) => {
   if ((await row.getAttribute('data-open')) !== 'pin') {
-    await row.getByTestId('radar-opp-row').click()
+    await row.getByTestId('mk-key').click()
     await row.page().waitForTimeout(150)
   }
-  return row
+  // D-616 펼친 판은 줄 밖(PC 는 두 줄 아래 한 판 넓이) — 줄 + 그 판을 함께 찾는 자리를 돌려준다
+  const key = await row.getByTestId('mk-key').getAttribute('data-key')
+  return row.or(row.page().locator(`[data-testid="radar-opp-body"][data-for="${key}"]`))
 }
 const REF = 'qaproject'
 const PORT = 4536
@@ -190,10 +192,10 @@ try {
     await page.screenshot({ path: join(SHOTS, `d222-prefs-failed-${vp.width}.png`), fullPage: false })
 
     const sub = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
-    await openRow(sub)
-    await sub.getByTestId('radar-opp-more').click()
+    const subC = await openRow(sub)
+    await subC.getByTestId('radar-opp-more').click()
     await page.waitForTimeout(200)
-    await sub.getByTestId('radar-mute').click()
+    await subC.getByTestId('radar-mute').click()
     await page.waitForTimeout(500)
     const t = await toastText(page)
     check(`D-222 1 ${label}: 못 읽은 채 [관심 없음] → 저장 요청 0(예전: 빈 설정으로 덮어 비중 · 더한 채널 · 숨긴 주제가 사라짐) · 안내`, prefsWrites(writes).length === 0 && t.includes('읽지 못했습니다'), { writes: prefsWrites(writes).length, t })
@@ -206,10 +208,10 @@ try {
     const sub2 = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
     const topic = ((await sub2.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
     // 첫 번째 [관심 없음] 이 막혔으니 같은 카드가 펼쳐진 채로 있다
-    await openRow(sub2)
-    if (!(await sub2.getByTestId('radar-mute').isVisible().catch(() => false))) await sub2.getByTestId('radar-opp-more').click()
+    const sub2C = await openRow(sub2)
+    if (!(await sub2C.getByTestId('radar-mute').isVisible().catch(() => false))) await sub2C.getByTestId('radar-opp-more').click()
     await page.waitForTimeout(200)
-    await sub2.getByTestId('radar-mute').click()
+    await sub2C.getByTestId('radar-mute').click()
     await page.waitForTimeout(800)
     const pw = prefsWrites(writes)
     const last = pw[pw.length - 1]?.payload
@@ -221,8 +223,8 @@ try {
   /* ---------- 3 수첩 목록을 못 읽음 → 담기 막음 ---------- */
   {
     const { ctx, page, errors, writes } = await open({ width: 1440, height: 900 }, { ideasDown: true })
-    await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
-    await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm').click()
+    const heroC = await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
+    await heroC.getByTestId('radar-confirm').click()
     await page.waitForTimeout(600)
     const t = await toastText(page)
     check('D-222 3 수첩 목록을 못 읽음 → [이번 주로 확정] 저장 요청 0 · "내 콘텐츠를 읽지 못했습니다 — 새로고침"(예전: 빈 목록으로 보고 이미 있는 주제를 또 담음)', ideaWrites(writes).length === 0 && t.includes('내 콘텐츠를 읽지 못했습니다'), { n: ideaWrites(writes).length, t })
@@ -233,14 +235,14 @@ try {
   /* ---------- 4 [이번 주로 확정] 빠르게 두 번 → 수첩 한 줄 ---------- */
   {
     const { ctx, page, errors, writes } = await open({ width: 1440, height: 900 }, { ideaDelay: 900 })
-    await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
-    const btn = page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm')
+    const heroC = await openRow(page.locator('[data-testid="radar-opp"][data-size="hero"]'))
+    const btn = heroC.getByTestId('radar-confirm')
     await btn.click()
     await btn.click({ timeout: 2000 }).catch(() => {})
     await page.waitForTimeout(1800)
     const ids = new Set(ideaWrites(writes).map((w) => w.id))
     check('D-222 4 [이번 주로 확정] 을 저장 중에 또 누름 → 수첩 줄 1개(예전: 서로 다른 줄 2개)', ids.size === 1, ideaWrites(writes))
-    check('D-222 4 확정 표시 · JS 오류 없음', (await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirmed').count()) === 1 && errors.length === 0, errors)
+    check('D-222 4 확정 표시 · JS 오류 없음', (await heroC.getByTestId('radar-confirmed').count()) === 1 && errors.length === 0, errors)
     await ctx.close()
   }
 } finally {

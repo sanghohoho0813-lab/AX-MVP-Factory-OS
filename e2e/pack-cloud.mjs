@@ -283,20 +283,22 @@ const openPlan = async (page) => {
   }
   await page.getByTestId('radar-plan').waitFor({ timeout: 10000 })
 }
-/** D-613 이번 주 찍을 것 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
+/** D-613 · D-616 이번 주 뜨는 주제 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
 const openRow = async (row) => {
   if ((await row.getAttribute('data-open')) !== 'pin') {
-    await row.getByTestId('radar-opp-row').click()
+    await row.getByTestId('mk-key').click()
     await row.page().waitForTimeout(150)
   }
-  return row
+  // D-616 펼친 판은 줄 밖(PC 는 두 줄 아래 한 판 넓이) — 줄 + 그 판을 함께 찾는 자리를 돌려준다
+  const key = await row.getByTestId('mk-key').getAttribute('data-key')
+  return row.or(row.page().locator(`[data-testid="radar-opp-body"][data-for="${key}"]`))
 }
 const kitOf = async (page, topic) => {
   const card = topic
-    ? page.getByTestId('radar-plan').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
-    : page.getByTestId('radar-plan').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
-  await openRow(card)
-  const kit = card.getByTestId('radar-kit')
+    ? page.getByTestId('mk-keys').locator('[data-testid="radar-opp"]', { has: page.getByText(topic, { exact: true }) }).first()
+    : page.getByTestId('mk-keys').locator('[data-testid="radar-opp"][data-axis="axai"]').first()
+  const c = await openRow(card)
+  const kit = c.getByTestId('radar-kit')
   if ((await kit.getAttribute('data-open')) !== '1') await kit.getByTestId('radar-kit-toggle').click()
   await page.waitForTimeout(250)
   return { card, kit }

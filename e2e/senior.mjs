@@ -215,6 +215,7 @@ for (const vp of [
     }
     if (then === 'pack') {
       await page.getByTestId('mk-key').first().click().catch(() => {})
+      await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
       await page.getByTestId('mk-pack').waitFor({ timeout: 8000 }).catch(() => {})
       await page.waitForTimeout(500)
     }
@@ -249,6 +250,7 @@ for (const vp of [
     }
     const before = await page.getByTestId('mk-resume').count()
     await page.getByTestId('mk-key').first().click()
+    await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
     await page.getByTestId('mk-pack').waitFor({ timeout: 8000 })
     const topic = (await page.getByTestId('mk-pack-topic').innerText()).split('\n')[0].trim()
     const next = page.getByTestId('mk-pack-next')
@@ -338,6 +340,7 @@ for (const vp of [
       }
       if (then === 'pack') {
         await page.getByTestId('mk-key').first().click().catch(() => {})
+        await page.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
         await page.getByTestId('mk-pack').waitFor({ timeout: 8000 }).catch(() => {})
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'extra_large'))
