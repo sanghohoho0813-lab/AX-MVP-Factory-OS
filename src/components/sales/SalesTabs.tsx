@@ -6,9 +6,10 @@
  * 일정 안의 탭(ScheduleTabs, D-103)과 같은 모양이다.
  */
 import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
-import { SALES_TABS } from '../../config/salesTabs'
+import { SALES_TABS, isCustomerClosedSalesPath } from '../../config/salesTabs'
+import { useCustomerAudience } from '../../config/customerAudience'
 import { rampAt } from './salesColor'
-import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
+import { SALES_FLOW, basicFlow, flowPosition } from '../../content/flowSteps'
 import { StepGuide } from '../ui/StepGuide'
 
 /** 업체를 골라 보는 탭 — 옮겨 가도 보던 업체를 그대로 (D-124) */
@@ -22,19 +23,22 @@ export function SalesTabs({ part = 'all' }: { part?: 'all' | 'tabs' } = {}) {
   const [params] = useSearchParams()
   const client = params.get('client')
   const { pathname } = useLocation()
-  if (SALES_TABS.length < 2) return null
+  // D-617 외부 구독 고객 — 상품·제안 · 전략 탭과 순서 안내의 그 단계를 뺀다(대표 · 내부 팀장은 그대로)
+  const customer = useCustomerAudience()
+  const tabs = customer ? SALES_TABS.filter((t) => !isCustomerClosedSalesPath(t.to)) : SALES_TABS
+  if (tabs.length < 2) return null
   // D-235: 영업 순서 — 지금 몇 번째 · 무엇을 위한 화면인지 · 이전/다음(업체를 골라 보던 중이면 그 업체를 들고)
   const flowKey = SALES_FLOW.steps.find((st) => pathname.startsWith(st.key))?.key ?? Object.keys(SALES_FLOW.aside ?? {}).find((k) => pathname.startsWith(k)) ?? ''
-  const pos = flowPosition(SALES_FLOW, flowKey)
+  const pos = flowPosition(customer ? basicFlow(SALES_FLOW) : SALES_FLOW, flowKey, customer ? (k) => !isCustomerClosedSalesPath(k) : undefined)
   const hrefOf = (to: string) => (client && CLIENT_TABS.has(to) ? `${to}?client=${encodeURIComponent(client)}` : to)
   return (
     <>
     <nav aria-label="영업 관리 보기" data-testid="sales-tabs" className="no-print w-full sm:w-auto">
       <ul
         className="grid gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto"
-        style={{ gridTemplateColumns: `repeat(${SALES_TABS.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
-        {SALES_TABS.map((t, i) => (
+        {tabs.map((t, i) => (
           <li key={t.to} className="min-w-0">
             <NavLink
               to={client && CLIENT_TABS.has(t.to) ? `${t.to}?client=${encodeURIComponent(client)}` : t.to}
@@ -49,7 +53,7 @@ export function SalesTabs({ part = 'all' }: { part?: 'all' | 'tabs' } = {}) {
               {/* D-118: 안 고른 탭 아이콘은 탭마다 조금씩 다른 구분색(테마를 따라감) — 고른 탭은 흰색 */}
               {({ isActive }) => (
                 <>
-                  <t.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? '' : 'ramp-text'}`} style={isActive ? undefined : rampAt(i, SALES_TABS.length)} />
+                  <t.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? '' : 'ramp-text'}`} style={isActive ? undefined : rampAt(i, tabs.length)} />
                   <span className="text-[0.875rem] leading-tight sm:whitespace-nowrap">{t.label}</span>
                 </>
               )}

@@ -27,7 +27,7 @@ import { SummaryChip } from '../../components/ui/SummaryChip'
 import { usePageLayout, visibilityOf } from '../../lib/pageLayout'
 import { NextActionBar, PageHero, PageStack, WorkPanel } from '../../components/ui/pageFrame'
 import { ArrangeArea, ArrangeItem } from '../../components/ui/arrange'
-import { SALES_FLOW, flowPosition } from '../../content/flowSteps'
+import { SALES_FLOW, basicFlow, flowPosition } from '../../content/flowSteps'
 import { CopyButton } from '../../components/sales/salesParts'
 import { stageColor } from '../../components/sales/salesColor'
 import { salesActionPath, salesRecontacts, salesRisks } from '../../services/salesSignals'
@@ -67,6 +67,8 @@ import {
 } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
 import { useIsPilot } from '../../auth/osAccess'
+import { useCustomerAudience } from '../../config/customerAudience'
+import { isCustomerClosedSalesPath } from '../../config/salesTabs'
 import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, type ClientType } from '../../services/clientType'
 import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 import { HintTip } from '../../components/ui/fold'
@@ -264,6 +266,8 @@ function NewProspectModal({ open, busy, records, fromContent = false, onClose, o
 function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const phone = useIsPhone()
   const pilot = useIsPilot()
+  // D-617 외부 구독 고객 — 크레탑으로 등록 · 상품·제안 · 전략 길이 없다
+  const customer = useCustomerAudience()
   const [allRisks, setAllRisks] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -507,7 +511,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
 
   // UXS-1 지금 할 일 — 챙길 영업이 있으면 맨 위 하나, 없으면 영업 순서의 다음 단계(예전 순서 안내 상자가 하던 말)
   const topRisk = risks[0]
-  const flow = flowPosition(SALES_FLOW, '/sales/board')
+  const flow = flowPosition(customer ? basicFlow(SALES_FLOW) : SALES_FLOW, '/sales/board', customer ? (k) => !isCustomerClosedSalesPath(k) : undefined)
 
   return (
     <PageStack>
@@ -521,12 +525,14 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           <>
             {/* UIX-1(D-548) 예전 띠의 질문 단추(건마다 특징 · 밀어붙일 건 · 멈춘 건 · 계약 가능 금액 · 직접 묻기)는 누르면 열리는 판 안에 그대로 */}
             {assistShown && records.length > 0 && <AiAssist variant="button" page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
-            {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 */}
-            <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
-              <ScanSearch aria-hidden="true" className="size-4" />
-              크레탑으로 등록
-            </Link>
-            <Button variant="secondary" onClick={() => setFormOpen(true)} data-guide="fn-sales-add">
+            {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 — D-617 외부 구독 고객에게는 없음(크레탑은 고객에게 닫힌 전문 모듈) */}
+            {!customer && (
+              <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
+                <ScanSearch aria-hidden="true" className="size-4" />
+                크레탑으로 등록
+              </Link>
+            )}
+            <Button variant={customer ? 'primary' : 'secondary'} onClick={() => setFormOpen(true)} data-guide="fn-sales-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               새 잠재고객
             </Button>

@@ -1259,11 +1259,15 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   </Link>
                 </>
               )}
-              {' · '}
-              {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
-              <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">
-                + 크레탑으로 등록
-              </Link>
+              {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 — D-617 외부 구독 고객에게는 없음(크레탑은 고객에게 닫힌 전문 모듈) */}
+              {!customer && (
+                <>
+                  {' · '}
+                  <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">
+                    + 크레탑으로 등록
+                  </Link>
+                </>
+              )}
             </p>
             {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
               <Blank

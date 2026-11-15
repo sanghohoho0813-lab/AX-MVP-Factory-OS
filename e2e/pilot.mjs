@@ -912,6 +912,19 @@ try {
     await page.waitForTimeout(400)
   }
   check('팀장(D-182): 영업 보드 새 잠재고객 창에 "어디로 분류할까요?" 없음', (await npBtn.count()) > 0 && (await page.getByRole('dialog').count()) === 1 && (await page.getByTestId('prospect-client-type').count()) === 0 && (await page.getByTestId('sales-card-consultant').count()) === 0)
+  // D-617 외부 구독 고객에게만 닫은 영업 화면 — 내부 팀장 화면은 그대로(탭 4 · 크레탑으로 등록 · 옆 AI 단추)
+  await page.keyboard.press('Escape')
+  await go(page, '/sales/board')
+  await page.waitForTimeout(500)
+  {
+    const tabsP = await page.locator('[data-testid="sales-tabs"] a').count()
+    const cretopP = await page.getByTestId('board-cretop-intake').count()
+    const sideP = await page.getByTestId('side-ai-button').count()
+    await go(page, '/sales/strategy')
+    await page.waitForTimeout(400)
+    const stratP = (await bodyText(page)).includes('화면을 찾지 못했습니다')
+    check('팀장(D-617): 영업 관리 그대로 — 탭 4(보드 · 미팅 준비 · 상품·제안 · 전략) · [크레탑으로 등록] · 머리줄 [ChatGPT 옆에 띄우기] · 전략 화면 열림', tabsP === 4 && cretopP === 1 && sideP === 1 && !stratP, { tabsP, cretopP, sideP, stratP })
+  }
 
   await go(page, '/ops/calendar')
   const cal = await bodyText(page)
@@ -1654,6 +1667,36 @@ try {
       if (t.includes('화면을 찾지 못했습니다') || leaked(t).length) openK.push(u)
     }
     check('고객 주소(D-562): 고객 관리 · 일정 · 확인할 것 · 영업 관리 · 매출 · 설정은 열림 · 대표 자료 0', openK.length === 0, openK.join())
+    // D-617 출시 목록 A6 — 우리 회사 상품표 · 영업 전략 자료실 · 크레탑 등록 · 옆 AI 창은 고객에게 닫는다
+    {
+      const closedS = []
+      for (const u of ['/sales/proposal', '/sales/strategy', '/sales/new', '/sales/proposal?client=x']) {
+        await go(pk, u)
+        await pk.waitForTimeout(350)
+        const t = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+        if (!t.includes('화면을 찾지 못했습니다')) closedS.push(u)
+      }
+      check('고객 주소(D-617): 상품·제안 · 전략 · 크레탑으로 새 잠재고객 주소는 "화면을 찾지 못했습니다"(4곳)', closedS.length === 0, closedS.join())
+      await go(pk, '/sales/board')
+      await pk.waitForTimeout(700)
+      const tabsK = await pk.locator('[data-testid="sales-tabs"] a').allInnerTexts()
+      const boardK = (await pk.locator('main').innerText().catch(() => '')) ?? ''
+      const cretopK = await pk.getByTestId('board-cretop-intake').count()
+      const sideK = await pk.locator('[data-testid="side-ai-button"], [data-testid="side-ai-corner"]').count()
+      await shot(pk, 'customer-03b-sales-board')
+      check(
+        '고객 영업 관리(D-617): 탭은 영업 보드 · 미팅 준비 둘 · [크레탑으로 등록] 0 · 순서 안내에 상품·제안 0 · 머리줄 [ChatGPT 옆에 띄우기] 0 · [새 잠재고객] 은 그대로',
+        tabsK.length === 2 && tabsK.join().includes('영업 보드') && tabsK.join().includes('미팅 준비') && cretopK === 0 && !boardK.includes('상품 · 제안') && !boardK.includes('상품·제안') && sideK === 0 && (await pk.getByRole('button', { name: /새 잠재고객/ }).count()) >= 1,
+        { tabsK, cretopK, sideK },
+      )
+      await go(pk, '/')
+      await pk.waitForTimeout(800)
+      check('고객 오늘(D-617): [크레탑으로 등록] 길 0 · 옆 AI 단추 0', (await pk.getByTestId('today-cretop-intake').count()) === 0 && (await pk.locator('[data-testid="side-ai-button"], [data-testid="side-ai-corner"]').count()) === 0)
+      const qS = await searchFor(pk, '상품·제안')
+      const qA = await searchFor(pk, 'ChatGPT 옆에')
+      check('고객 찾기(D-617): "상품·제안" · "ChatGPT 옆에" → 닫힌 화면 · 단추 이름 0', !/상품\s?·\s?제안/.test(qS) && !qA.includes('AI 창 옆에 띄우기'), { qS: qS.replace(/\n+/g, '|').slice(0, 90), qA: qA.replace(/\n+/g, '|').slice(0, 90) })
+      await pk.keyboard.press('Escape')
+    }
     await go(pk, '/ops/clients')
     await shot(pk, 'customer-02-clients')
     const restK = await pk.evaluate(async ([ref, ownerWs]) => {
@@ -2148,19 +2191,15 @@ try {
       await shot(ps, `customer-10-${name}-390`)
       sweep.push({ name, ok: t.length > 20 && !t.includes('화면을 찾지 못했습니다') && !OWNER_WORDS.test(t) && !/미래경영지원센터|미래에이아이랩/.test(t), over })
     }
-    // 영업 관리의 나머지 탭(미팅 준비 · 상품·제안 · 전략)은 사진과 알림 줄만 — 고객에게 그대로 열어 둘지는 대표가 정한다(보고 🚨)
-    for (const [name, path] of [['sales-meeting', '/sales/meeting'], ['sales-proposal', '/sales/proposal'], ['sales-strategy', '/sales/strategy']]) {
+    // 영업 관리의 남은 탭(미팅 준비) — 열림 · 1차 준비는 '항목 고르기' 하나(크레탑 분석기 고르개 0) · 상품·제안 · 전략은 D-617 로 닫힘(위 주소 점검)
+    {
       await ps.setViewportSize({ width: 1440, height: 900 })
-      await go(ps, path)
+      await go(ps, '/sales/meeting')
       await ps.waitForTimeout(900)
       const t = ((await ps.locator('main').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
-      await shot(ps, `customer-11-${name}`)
-      console.log(`INFO  고객 화면 ${path}: 글자 ${t.length} · 대표 낱말 ${OWNER_WORDS.test(t) ? (t.match(OWNER_WORDS)?.[0] ?? '') : '0'} · 찾지 못함 ${t.includes('화면을 찾지 못했습니다') ? '예' : '아니요'}`)
-      // D-577 고객에게 드리는 문서(방문 리포트)의 '담당' 줄 — 대표 회사 이름이 아니라 내 브랜드의 회사
-      if (name === 'sales-proposal') {
-        const staff = t.match(/담당: [^■━]{0,60}/)?.[0] ?? ''
-        check('고객(D-577) 상품·제안 방문 리포트: "담당" 줄에 대표 회사 이름(미래경영지원센터 · 미래에이아이랩) 0 · 내 브랜드의 회사가 붙음', !/미래경영지원센터|미래에이아이랩/.test(t) && staff.includes('고객경영연구소'), staff)
-      }
+      await shot(ps, 'customer-11-sales-meeting')
+      sweep.push({ name: 'sales-meeting', ok: t.length > 20 && !t.includes('화면을 찾지 못했습니다') && !OWNER_WORDS.test(t) && !/미래경영지원센터|미래에이아이랩/.test(t), over: 0 })
+      check('고객 미팅 준비(D-617): 크레탑 분석기 고르개 · 분석기 0 · 머리 설명에 크레탑 0', (await ps.getByTestId('prep-mode').count()) === 0 && (await ps.getByTestId('meeting-cretop').count()) === 0 && !t.includes('크레탑 분석기 또는'), t.slice(0, 160))
     }
     ps.off('pageerror', onErr)
     await ps.setViewportSize({ width: 1440, height: 900 })

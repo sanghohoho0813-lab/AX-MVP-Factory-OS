@@ -18,6 +18,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
+import { useCustomerAudience } from '../../config/customerAudience'
 import { closeDock, openDock, useDock } from '../../lib/sideDock'
 import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
@@ -48,6 +49,8 @@ function measureCorner(btnW: number): { spot: 'margin' | 'inline'; left: number;
 }
 
 export function SideAiButton() {
+  // D-617 외부 구독 고객 — [ChatGPT 옆에 띄우기] 없음(출시 목록 A6 · 대표 · 내부 팀장은 그대로)
+  const customer = useCustomerAudience()
   const s = useSideAi()
   const dock = useDock()
   const [open, setOpen] = useState(false)
@@ -140,7 +143,7 @@ export function SideAiButton() {
       document.removeEventListener('keydown', esc)
     }
   }, [open])
-  if (inFrame()) return null
+  if (inFrame() || customer) return null
   const name = SIDE_SERVICES[s.service].label
   const shown = s.at || name
   const inMargin = corner.spot === 'margin'

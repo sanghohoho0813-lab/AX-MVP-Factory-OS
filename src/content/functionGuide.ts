@@ -60,6 +60,8 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   'fn-side-ai': {
     label: 'AI 창 옆에 띄우기',
     menu: 'top',
+    // D-617 외부 구독 고객 화면에는 없다
+    basicHidden: true,
     what: 'ChatGPT · Claude · Gemini 같은 AI 창을 화면 오른쪽에 나란히 띄워요.',
     why: '이 화면의 숫자를 보면서 AI 에게 물어보려고 창을 왔다 갔다 하지 않게 하려고 있어요.',
     effect: '복사 · 붙여넣기 하러 창을 바꾸는 일이 줄어요.',
@@ -159,6 +161,8 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   'fn-sales-tab-proposal': {
     label: '상품·제안',
     menu: 'sales',
+    // D-617 외부 구독 고객 화면에는 없다
+    basicHidden: true,
     what: '추천할 상품 · 방문 리포트 · 필요 서류 · 계약 준비를 한곳에서 챙겨요.',
     why: '제안 자료를 매번 처음부터 만들지 않게 하려고 있어요.',
     effect: '업체를 고르면 그 업체에 맞춘 제안 자료가 바로 나와요.',
@@ -167,6 +171,8 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   'fn-sales-tab-strategy': {
     label: '전략',
     menu: 'sales',
+    // D-617 외부 구독 고객 화면에는 없다
+    basicHidden: true,
     what: '컨설팅 주제마다 지금 연락하면 좋은 고객을 찾아 보여 줘요.',
     why: '무슨 이야기로 연락할지 막막할 때 꺼내 보려고 있어요.',
     effect: '주제를 누르면 그 주제에 맞는 고객 목록이 나와요.',

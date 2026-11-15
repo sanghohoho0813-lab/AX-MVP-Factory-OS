@@ -9,6 +9,7 @@
  * 순수 함수 · 규칙 계산.
  */
 
+import { isCustomerAudience } from '../config/customerAudience'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { salesStageOf } from './salesPipeline'
 import { toEngineItem } from './salesMeeting'
@@ -43,7 +44,8 @@ export interface SalesRisk {
  * 견적 · 제안 → 상품·제안, 다음 할 일 정하기 → 업체 상세(다음 약속), 연락 · 미팅 → 미팅 준비.
  */
 export function salesActionPath(action: string, clientId: string): string {
-  if (/견적|업무범위|제안서|검토 상황/.test(action)) return `/sales/proposal?client=${clientId}`
+  // D-617 외부 구독 고객에게는 상품·제안 화면이 없다 — 견적 · 제안 일도 그 업체 화면(다음 약속 · 메모)으로
+  if (/견적|업무범위|제안서|검토 상황/.test(action)) return isCustomerAudience() ? `/ops/clients/${clientId}` : `/sales/proposal?client=${clientId}`
   if (/다음 (할 일|약속) 정하기/.test(action)) return `/ops/clients/${clientId}`
   return `/sales/meeting?client=${clientId}`
 }

@@ -119,6 +119,8 @@ export const SALES_FLOW: FlowDef = {
       key: '/sales/meeting',
       label: '미팅 준비',
       why: '크레탑 분석과 1 · 2 · 3차 미팅 대본으로 만나기 전에 할 말 · 물어볼 것을 준비해요.',
+      // D-617 외부 구독 고객 — 크레탑(전문 모듈)이 닫혀 있다
+      whyBasic: '물어볼 항목과 1 · 2 · 3차 미팅 대본으로 만나기 전에 할 말 · 물어볼 것을 준비해요.',
     },
     {
       key: '/sales/proposal',

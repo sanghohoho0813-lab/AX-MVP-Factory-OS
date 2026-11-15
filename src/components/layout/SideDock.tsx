@@ -8,6 +8,7 @@
  * D-261 머리줄(시각 · 찾기 · 알림) 아래부터 — 머리줄은 그대로 다 보이고 본문 칸 안에만 뜬다.
  * 폭은 왼쪽 경계선을 끌어서(320~720) · 키보드 ←/→ · 두 번 누르면 처음 폭. 보기 무대(iframe) 안에서는 그리지 않는다.
  */
+import { useCustomerAudience } from '../../config/customerAudience'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
@@ -335,7 +336,9 @@ export function SideDock() {
   const sideReserve = useSideAi().reserve
   const navW = navPx(nav) ?? (vw >= 1280 ? 288 : 256)
   const lay = dockLayout(vw - sideReserve, navW, dock.width)
-  const shown = dock.open && lay.mode !== 'none' && !inFrame()
+  // D-617 외부 구독 고객 — 여는 단추([ChatGPT 옆에 띄우기])가 없다. 같은 브라우저에 열어 둔 판이 남아 있어도 그리지 않는다
+  const customer = useCustomerAudience()
+  const shown = dock.open && lay.mode !== 'none' && !inFrame() && !customer
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ x: number; w: number; raf: number; next: number } | null>(null)
   const [webSeen, setWebSeen] = useState(dock.tab === 'web')

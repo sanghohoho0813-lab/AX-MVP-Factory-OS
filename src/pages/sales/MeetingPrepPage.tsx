@@ -15,6 +15,7 @@
  * 모두 규칙 계산이다(LLM 호출 없음). 'AX 1차 미팅 체크리스트'(/sales/first-meeting) 자리와는 따로다.
  */
 
+import { useCustomerAudience } from '../../config/customerAudience'
 import { MeetingGrantTalk } from '../../components/grants/MeetingGrantTalk'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
@@ -315,6 +316,7 @@ function ShareTextButton({ text }: { text: string }) {
 }
 
 function MeetingRecorder({ record, round, today, onSave, onNextRound, onPinRound }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean>; onNextRound: () => void; onPinRound: () => void }) {
+  const customer = useCustomerAudience()
   const stage = salesStageOf(record)
   const target = stageAfterMeeting(round)
   // D-171: 클로징은 3차가 아닐 수도 — 고른 차수(3 · 4 · 5)로 부른다
@@ -422,7 +424,8 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound, onPinRound
             기록 하나 더
           </Button>
           {/* D-126: 2차 뒤에는 제안서 · 견적, 3차 뒤에는 계약 준비로 바로 — 예전엔 3차 기록 뒤 갈 곳이 없었다 */}
-          {round >= 2 && (
+          {/* D-617 외부 구독 고객에게는 상품·제안 화면이 없다 */}
+          {round >= 2 && !customer && (
             <Link to={`/sales/proposal?client=${record.id}`} data-testid="wrapup-proposal" className={LINK_BUTTON.primary}>
               {round === 2 ? '제안서 · 견적 만들기' : '계약 준비 · 계약 완료로'}
               <ChevronRight aria-hidden="true" className="size-4" />
@@ -641,7 +644,10 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const round: Round = (rp === '0' && SALES_SIMPLE.showFirstContact) || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : pinned ?? (stage === 'lead' && SALES_SIMPLE.showFirstContact ? 0 : liveRound)
   const closingN = record ? closingRoundOf(record) : 3
   const ahead = round > liveRound
-  const [prepMode, setPrepModeState] = useState<'cretop' | 'direct'>(readPrepMode)
+  const [savedPrepMode, setPrepModeState] = useState<'cretop' | 'direct'>(readPrepMode)
+  // D-617 외부 구독 고객은 크레탑(전문 모듈 · D-562)이 닫혀 있다 — 1차 준비는 '항목만 바로 고르기' 하나
+  const customer = useCustomerAudience()
+  const prepMode = customer ? 'direct' : savedPrepMode
   const setPrepMode = (m: 'cretop' | 'direct') => {
     setPrepModeState(m)
     try {
@@ -700,7 +706,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-4">
       <ScreenTitle
         title="영업 관리"
-        sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기 또는 항목 바로 고르기, 2차부터 앞 미팅 메모 · 이어서 물을 것`}
+        sub={`${today} · 미팅 준비 — 1차는 ${customer ? '물어볼 항목 고르기' : '크레탑 분석기 또는 항목 바로 고르기'}, 2차부터 앞 미팅 메모 · 이어서 물을 것`}
         actions={<AiSoonButton size="sm" label="AI로 미팅 질문 다듬기" what="업체 정보와 지난 미팅 메모로 이번 미팅 질문 · 대본을 다듬어 줍니다" />}
       />
       <SalesTabs />
@@ -839,13 +845,13 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
               {round === 1 && (
                 <>
                   {/* D-167: 1차 준비 방법 둘 — 크레탑 분석기로 · 크레탑 없이 항목만 바로 고르기(경험 많은 컨설턴트) */}
-                  <div role="radiogroup" aria-label="1차 미팅 준비 방법" data-testid="prep-mode" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
+                  {!customer && <div role="radiogroup" aria-label="1차 미팅 준비 방법" data-testid="prep-mode" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
                     {([['cretop', '크레탑 분석기로'], ['direct', '항목만 바로 고르기']] as const).map(([k, label]) => (
                       <button key={k} type="button" role="radio" aria-checked={prepMode === k} onClick={() => setPrepMode(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.875rem] font-semibold break-keep sm:px-4 ${prepMode === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
                         {label}
                       </button>
                     ))}
-                  </div>
+                  </div>}
                   {prepMode === 'direct' && <DirectPickPanel record={record} onSave={(n, m) => persist(n, m)} />}
                   {/* D-121: 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품) — 분석하면 이 업체에 바로 반영 */}
                   {prepMode === 'cretop' && <section aria-label="크레탑 분석기" data-testid="meeting-cretop" className="flex flex-col gap-2">
@@ -1031,6 +1037,8 @@ function FirstMeetingScript({ item }: { item: EngineItem }) {
  * 원본 대본의 나머지(진행 순서 · 거절과 답 · 수임료 · 전략)는 '더 보기' 로 접는다.
  */
 function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsRecord; item: EngineItem; round: 2 | 3; onGoFirst: () => void }) {
+  // D-617 외부 구독 고객 — 상품·제안(제안서 · 견적 · 계약 준비) 바로 가기 칸 없음
+  const customer = useCustomerAudience()
   const proposal = record.sales?.proposal ?? null
   const prep = record.sales?.contractPrep?.length ?? 0
   const followUp = (
@@ -1076,7 +1084,7 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
             <NumberedList items={p.topIssues.map((t) => t.replace(/^\d+\.\s*/, ''))} />
           </ScriptBlock>
           {SALES_SIMPLE.showScripts && <ScriptBlock title="마무리 말" text={p.close} copy />}
-          {nextLink}
+          {!customer && nextLink}
           <Disclosure title={SALES_SIMPLE.showScripts ? '더 보기 — 목표 · 진행 순서 · 거절과 답 · 받을 자료 · 수임료' : '더 보기 — 목표 · 받을 자료 · 수임료'}>
             <div className="flex flex-col gap-3">
               <ScriptBlock title="목표" text={p.goal} />
@@ -1105,7 +1113,7 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
         {SALES_SIMPLE.showScripts && <ScriptBlock title="1차 계약 제안" text={p.proposal} copy />}
         {SALES_SIMPLE.showScripts && <ScriptBlock title="가격 이야기" text={p.priceTalk} copy />}
         {SALES_SIMPLE.showScripts && <ScriptBlock title="'생각해 볼게요' 에 대한 답" text={p.holdTalk} copy />}
-        {nextLink}
+        {!customer && nextLink}
         <Disclosure title="더 보기 — 목표 · 전략">
           <div className="flex flex-col gap-3">
             <ScriptBlock title="목표" text={p.goal} />

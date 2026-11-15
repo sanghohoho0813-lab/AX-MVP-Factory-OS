@@ -33,7 +33,7 @@ import {
   Stamp,
   CircleHelp,
 } from 'lucide-react'
-import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
+import { SALES_EXTRA_PATHS, SALES_TAB_PATHS, isCustomerClosedSalesPath } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
 import { FEATURE_CATALOG, visibleModules } from './productCatalog'
 import { UPCOMING_PATH, UPCOMING_PRODUCTS } from './upcomingProducts'
@@ -337,8 +337,9 @@ const underBase = (pathname: string, base: string) => pathname === base || pathn
  */
 const CUSTOMER_HIDDEN_GROUPS: ReadonlySet<ModuleGroupKey> = new Set<ModuleGroupKey>(['modules'])
 
-/** 고객 계정에게 닫는 주소 — 전문 모듈 묶음의 줄(도구 포함)이 맡는 주소 전부(메뉴와 같은 표에서 계산) */
+/** 고객 계정에게 닫는 주소 — 전문 모듈 묶음의 줄(도구 포함)이 맡는 주소 전부(메뉴와 같은 표에서 계산) + D-617 영업 관리 안 우리 회사 상품 · 전략 화면 */
 export function isCustomerHiddenPath(pathname: string): boolean {
+  if (isCustomerClosedSalesPath(pathname)) return true
   return MODULES.some((m) => m.enabled && CUSTOMER_HIDDEN_GROUPS.has(m.group) && moduleMatchLength(m, pathname) > 0)
 }
 
