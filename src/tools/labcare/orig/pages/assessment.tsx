@@ -4,11 +4,12 @@ import Layout from "../components/Layout";
 import OsAttach from "../components/OsAttach";
 import PageGuide from "../components/PageGuide";
 import { downloadSvgAsJpeg, printSvg } from "../../lib/download";
-import { addTempCompany } from "../lib/storage";
+import { addSetupTargetId, addTempCompany, ensureLabClientFromOs } from "../lib/storage";
+import { setSession } from "../lib/uiState";
 import { assessFeasibility, requiredForLab } from "../../lib/feasibility";
+import { assessFormKey, assessInputOf, labVerdictLine, newCandidate, prefillAssessForm, readAssessForm, restoreAssessForm, type AssessForm } from "../../lib/assessForm";
 import { usePrefillFromClient } from "../../../shared/usePrefill";
 import { useToolClient } from "../../../shared/toolClientContext";
-import { sharedToolKey } from "../../../shared/toolStorage";
 import { monthsInBusiness } from "../../../shared/clientPrefill";
 import { isExcludedIndustryText } from "../../lib/assessmentOptions";
 import { businessAgeLabel, withinStartupYears } from "../../lib/startup";
@@ -146,90 +147,45 @@ const FACILITY_DEPT = [
   "타 업무 겸직 여부 확인",
 ];
 
-let cidSeq = 0;
-function newCandidate(): ResearcherCandidate {
-  cidSeq += 1;
-  return {
-    id: `cand-${Date.now()}-${cidSeq}`,
-    name: "",
-    isCeo: false,
-    isRegisteredExec: false,
-    fullTime: true,
-    insured: true,
-    researchDedicated: true,
-    hasOtherDuties: false,
-    daytimeGradSchool: false,
-    education: "학사",
-    major: "공학계열",
-    cert: "없음",
-    researchYears: 0,
-    dutyDescription: "",
-  };
-}
-
-/** D-165: 설립 가능성 체크에 적은 것 — 업체마다 이 브라우저에 남긴다(전에는 새로 고침 · 다시 열기에서 빈 칸으로 돌아갔다) */
-const ASSESS_FORM_KEY = "axmvp.tools.labcare.assessForm";
-const assessFormKey = (clientId: string | null) => (clientId ? `${ASSESS_FORM_KEY}.${clientId}` : sharedToolKey(ASSESS_FORM_KEY));
-function readAssessForm(clientId: string | null): Record<string, unknown> {
-  try {
-    const raw = localStorage.getItem(assessFormKey(clientId));
-    const v = raw ? (JSON.parse(raw) as unknown) : null;
-    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
 export default function AssessmentPage() {
   const { clientId } = useToolClient();
-  const savedForm = useRef<Record<string, unknown> | null>(null);
-  if (savedForm.current === null) savedForm.current = readAssessForm(clientId);
-  /** 남긴 값이 같은 모양일 때만 쓴다(옛 모양 · 깨진 값은 기본값) */
-  const restored = <T,>(name: string, fallback: T): T => {
-    const v = savedForm.current?.[name];
-    if (v === undefined || v === null) return fallback;
-    if (Array.isArray(fallback)) return (Array.isArray(v) ? v : fallback) as T;
-    return (typeof v === typeof fallback ? v : fallback) as T;
-  };
+  // D-618 처음 값 — 남겨 둔 답(없으면 기본값). 업체 맞춤 추천 카드와 같은 파일(lib/assessForm)로 읽는다
+  const initRef = useRef<AssessForm | null>(null);
+  if (initRef.current === null) initRef.current = restoreAssessForm(readAssessForm(clientId));
+  const init = initRef.current;
   /* ① 설립 유형 */
-  const [desiredType, setDesiredType] = useState<LabTypeChoice>(() => restored('desiredType', "아직 모름"));
+  const [desiredType, setDesiredType] = useState<LabTypeChoice>(() => init.desiredType);
 
   /* ② 기업 기본요건 */
-  const [companyName, setCompanyName] = useState(() => restored('companyName', ""));
-  const [industry, setIndustry] = useState(() => restored('industry', ""));
-  const [customIndustry, setCustomIndustry] = useState(() => restored('customIndustry', false));
-  const [industryField, setIndustryField] = useState<IndustryField>(() => restored('industryField', "과학기술 분야"));
-  const [isExcludedIndustry, setIsExcludedIndustry] = useState(() => restored('isExcludedIndustry', false));
+  const [companyName, setCompanyName] = useState(() => init.companyName);
+  const [industry, setIndustry] = useState(() => init.industry);
+  const [customIndustry, setCustomIndustry] = useState(() => init.customIndustry);
+  const [industryField, setIndustryField] = useState<IndustryField>(() => init.industryField);
+  const [isExcludedIndustry, setIsExcludedIndustry] = useState(() => init.isExcludedIndustry);
   // D-136: 규모는 업체 기록에 없다 — '소기업' 을 기본으로 깔지 않고 고르게 한다(고르기 전에는 ★ 규모 확인 필요)
-  const [companySize, setCompanySize] = useState<CompanySize>(() => restored('companySize', "소기업"));
-  const [sizeConfirmed, setSizeConfirmed] = useState(() => restored('sizeConfirmed', false));
-  const [isVenture, setIsVenture] = useState(() => restored('isVenture', false));
-  const [isResearcherFounded, setIsResearcherFounded] = useState(() => restored('isResearcherFounded', false));
+  const [companySize, setCompanySize] = useState<CompanySize>(() => init.companySize);
+  const [sizeConfirmed, setSizeConfirmed] = useState(() => init.sizeConfirmed);
+  const [isVenture, setIsVenture] = useState(() => init.isVenture);
+  const [isResearcherFounded, setIsResearcherFounded] = useState(() => init.isResearcherFounded);
   // D-136: 업력은 '년' 이 아니라 설립일(달력)로 — 3년 11개월이 '3년 = 36개월' 로 창업 3년 이내가 되던 문제
-  const [establishedAt, setEstablishedAt] = useState(() => restored('establishedAt', ""));
-  const [becameMediumWithinYear, setBecameMediumWithinYear] = useState(() => restored('becameMediumWithinYear', false));
+  const [establishedAt, setEstablishedAt] = useState(() => init.establishedAt);
+  const [becameMediumWithinYear, setBecameMediumWithinYear] = useState(() => init.becameMediumWithinYear);
   // 직원 수는 판정에 쓰지 않는다(참고용) — 비워 두고 시작한다
-  const [employeeCount, setEmployeeCount] = useState(() => restored('employeeCount', ""));
-  const [isOverseasLab, setIsOverseasLab] = useState(() => restored('isOverseasLab', false));
+  const [employeeCount, setEmployeeCount] = useState(() => init.employeeCount);
+  const [isOverseasLab, setIsOverseasLab] = useState(() => init.isOverseasLab);
   // D-126: 업체에서 열었으면 회사명 · 업종 · 설립일을 업체 기록에서 채운다(예전엔 직원 10명 · 업력 3년이라는 지어낸 값으로 시작했다)
   const { note: prefillNote } = usePrefillFromClient((facts) => {
-    const filled: string[] = [];
-    // D-134: 이미 적은 회사명 · 업종은 덮지 않는다(업체 기록이 늦게 오면 적던 글이 사라졌다)
-    if (facts.companyName && !companyName.trim()) { setCompanyName(facts.companyName); filled.push("회사명"); }
-    if (facts.industryText && !industry.trim()) {
-      setIndustry(facts.industryText);
-      setCustomIndustry(true);
-      // D-136: 채운 업종도 직접 적은 것과 같이 제외 업종인지 본다
-      setIsExcludedIndustry(isExcludedIndustryText(facts.industryText));
-      filled.push("업종");
-    }
-    // D-136: 이미 적은 설립일 · 직원 수는 덮지 않는다
-    if (facts.establishedAt && !establishedAt) { setEstablishedAt(facts.establishedAt); filled.push("설립일"); }
-    // 직원 수는 판정에 안 쓰니 채웠다고 알리지 않는다(참고 칸만 채움)
-    if (facts.employeeCount !== null && employeeCount === "") setEmployeeCount(String(facts.employeeCount));
-    // D-329 서류함의 중소기업 확인서 → 기업 규모 · 벤처기업확인서(유효) → 벤처(전담요원 2명 기준). 이미 고른 규모 · 벤처는 덮지 않는다
-    if (facts.smeSize && !sizeConfirmed) { setCompanySize(facts.smeSize); setSizeConfirmed(true); filled.push(`중소기업 확인서의 기업 규모(${facts.smeSize})`); }
-    if (facts.ventureValidNow && !isVenture) { setIsVenture(true); filled.push("벤처기업 확인"); }
+    // D-618 채우는 규칙은 lib/assessForm 한 곳(맞춤 추천 카드도 같은 규칙) — 이미 적은 값은 덮지 않는다
+    const { patch, filled } = prefillAssessForm({ ...init, companyName, industry, establishedAt, employeeCount, sizeConfirmed, isVenture }, facts);
+    if (patch.companyName !== undefined) setCompanyName(patch.companyName);
+    if (patch.industry !== undefined) setIndustry(patch.industry);
+    if (patch.customIndustry !== undefined) setCustomIndustry(patch.customIndustry);
+    if (patch.isExcludedIndustry !== undefined) setIsExcludedIndustry(patch.isExcludedIndustry);
+    if (patch.establishedAt !== undefined) setEstablishedAt(patch.establishedAt);
+    if (patch.employeeCount !== undefined) setEmployeeCount(patch.employeeCount);
+    if (patch.companySize !== undefined) setCompanySize(patch.companySize);
+    if (patch.sizeConfirmed !== undefined) setSizeConfirmed(patch.sizeConfirmed);
+    if (patch.isVenture !== undefined) setIsVenture(patch.isVenture);
     return filled;
   });
   const todayDate = new Date();
@@ -238,43 +194,46 @@ export default function AssessmentPage() {
   const ageLabel = businessAgeLabel(establishedAt, todayDate);
 
   /* 신고대상 */
-  const [isForProfit, setIsForProfit] = useState(() => restored('isForProfit', true));
-  const [hasBusinessOps, setHasBusinessOps] = useState(() => restored('hasBusinessOps', true));
-  const [rndOnlyCompany, setRndOnlyCompany] = useState(() => restored('rndOnlyCompany', false));
-  const [isSubUnit, setIsSubUnit] = useState(() => restored('isSubUnit', true));
+  const [isForProfit, setIsForProfit] = useState(() => init.isForProfit);
+  const [hasBusinessOps, setHasBusinessOps] = useState(() => init.hasBusinessOps);
+  const [rndOnlyCompany, setRndOnlyCompany] = useState(() => init.rndOnlyCompany);
+  const [isSubUnit, setIsSubUnit] = useState(() => init.isSubUnit);
 
   /* ③ 연구개발활동 */
-  const [projectName, setProjectName] = useState(() => restored('projectName', ""));
-  const [preCommercial, setPreCommercial] = useState(() => restored('preCommercial', true));
-  const [activityNature, setActivityNature] = useState<ActivityNature>(() => restored('activityNature', 
-    "새로운 제품·공정·서비스 개발",
-  ));
-  const [negativeActivities, setNegativeActivities] = useState<NegativeActivity[]>(() => restored('negativeActivities', []));
+  const [projectName, setProjectName] = useState(() => init.projectName);
+  const [preCommercial, setPreCommercial] = useState(() => init.preCommercial);
+  const [activityNature, setActivityNature] = useState<ActivityNature>(() => init.activityNature);
+  const [negativeActivities, setNegativeActivities] = useState<NegativeActivity[]>(() => init.negativeActivities);
 
   /* ④ 물적요건 */
   // D-136: 예전에는 숨긴 채 늘 '있음' · '50㎡ 이하' 로 두어 판정이 너그러웠다 — 둘 다 보이게, 50㎡ 는 '아니오' 에서 시작
-  const [hasSpace, setHasSpace] = useState(() => restored('hasSpace', true));
-  const [independentSpace, setIndependentSpace] = useState(() => restored('independentSpace', true));
-  const [fixedWallsAndDoor, setFixedWallsAndDoor] = useState(() => restored('fixedWallsAndDoor', true));
-  const [movableWallPossible, setMovableWallPossible] = useState(() => restored('movableWallPossible', false));
-  const [spaceUnder50, setSpaceUnder50] = useState(() => restored('spaceUnder50', false));
-  const [adequateArea, setAdequateArea] = useState(() => restored('adequateArea', true));
-  const [equipmentInSpace, setEquipmentInSpace] = useState(() => restored('equipmentInSpace', true));
-  const [isInfoServiceOrSW, setIsInfoServiceOrSW] = useState(() => restored('isInfoServiceOrSW', false));
+  const [hasSpace, setHasSpace] = useState(() => init.hasSpace);
+  const [independentSpace, setIndependentSpace] = useState(() => init.independentSpace);
+  const [fixedWallsAndDoor, setFixedWallsAndDoor] = useState(() => init.fixedWallsAndDoor);
+  const [movableWallPossible, setMovableWallPossible] = useState(() => init.movableWallPossible);
+  const [spaceUnder50, setSpaceUnder50] = useState(() => init.spaceUnder50);
+  const [adequateArea, setAdequateArea] = useState(() => init.adequateArea);
+  const [equipmentInSpace, setEquipmentInSpace] = useState(() => init.equipmentInSpace);
+  const [isInfoServiceOrSW, setIsInfoServiceOrSW] = useState(() => init.isInfoServiceOrSW);
 
   /* 연구전담요원 후보 수 (UI 추천용 — 1~5, 5는 5명 이상) */
-  const [pick, setPick] = useState(() => restored('pick', 1));
+  const [pick, setPick] = useState(() => init.pick);
 
   /* ⑤ 후보자 */
-  const [candidates, setCandidates] = useState<ResearcherCandidate[]>(() => restored('candidates', [newCandidate()]));
+  const [candidates, setCandidates] = useState<ResearcherCandidate[]>(() => init.candidates);
 
+  // D-618 화면 값 한 벌 — 남기기 · 판정 입력 · 맨 위 한 줄이 모두 이것을 쓴다
+  const formNow = useMemo<AssessForm>(
+    () => ({ desiredType, companyName, industry, customIndustry, industryField, isExcludedIndustry, companySize, sizeConfirmed, isVenture, isResearcherFounded, establishedAt, becameMediumWithinYear, employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany, isSubUnit, projectName, preCommercial, activityNature, negativeActivities, hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible, spaceUnder50, adequateArea, equipmentInSpace, isInfoServiceOrSW, pick, candidates }),
+    [desiredType, companyName, industry, customIndustry, industryField, isExcludedIndustry, companySize, sizeConfirmed, isVenture, isResearcherFounded, establishedAt, becameMediumWithinYear, employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany, isSubUnit, projectName, preCommercial, activityNature, negativeActivities, hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible, spaceUnder50, adequateArea, equipmentInSpace, isInfoServiceOrSW, pick, candidates],
+  );
   useEffect(() => {
     try {
-      localStorage.setItem(assessFormKey(clientId), JSON.stringify({ desiredType, companyName, industry, customIndustry, industryField, isExcludedIndustry, companySize, sizeConfirmed, isVenture, isResearcherFounded, establishedAt, becameMediumWithinYear, employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany, isSubUnit, projectName, preCommercial, activityNature, negativeActivities, hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible, spaceUnder50, adequateArea, equipmentInSpace, isInfoServiceOrSW, pick, candidates }));
+      localStorage.setItem(assessFormKey(clientId), JSON.stringify(formNow));
     } catch {
       /* 남기지 못해도 판정은 된다 */
     }
-  }, [clientId, desiredType, companyName, industry, customIndustry, industryField, isExcludedIndustry, companySize, sizeConfirmed, isVenture, isResearcherFounded, establishedAt, becameMediumWithinYear, employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany, isSubUnit, projectName, preCommercial, activityNature, negativeActivities, hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible, spaceUnder50, adequateArea, equipmentInSpace, isInfoServiceOrSW, pick, candidates]);
+  }, [clientId, formNow]);
 
   /* 연구과제 추천 프롬프트 모달 */
   const [promptOpen, setPromptOpen] = useState(false);
@@ -286,51 +245,9 @@ export default function AssessmentPage() {
   const [sentMsg, setSentMsg] = useState<string | null>(null);
   const router = useRouter();
 
-  const result = useMemo(
-    () =>
-      assessFeasibility({
-        desiredType,
-        companyName,
-        industry,
-        industryField,
-        isExcludedIndustry,
-        companySize,
-        sizeConfirmed,
-        isVenture,
-        isResearcherFounded,
-        // 설립일을 모르면 개월 수는 쓰지 않는다(withinStartup3y = null 이 특례를 막는다)
-        businessMonths: businessMonths ?? 999,
-        withinStartup3y: startupWithin,
-        becameMediumWithinYear: companySize === "중기업" ? becameMediumWithinYear : false,
-        employeeCount: Number(employeeCount) || 0,
-        isOverseasLab,
-        isForProfit,
-        hasBusinessOps,
-        rndOnlyCompany,
-        isSubUnit,
-        projectName,
-        preCommercial,
-        activityNature,
-        negativeActivities,
-        hasSpace,
-        independentSpace,
-        fixedWallsAndDoor,
-        movableWallPossible,
-        spaceUnder50,
-        adequateArea,
-        equipmentInSpace,
-        isInfoServiceOrSW,
-        candidates,
-      }),
-    [
-      desiredType, companyName, industry, industryField, isExcludedIndustry,
-      companySize, sizeConfirmed, isVenture, isResearcherFounded, businessMonths, startupWithin, becameMediumWithinYear,
-      employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany,
-      isSubUnit, projectName, preCommercial, activityNature, negativeActivities,
-      hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible,
-      spaceUnder50, adequateArea, equipmentInSpace, isInfoServiceOrSW, candidates,
-    ],
-  );
+  // 판정 — 입력은 lib/assessForm 의 assessInputOf 한 곳에서 만든다(맞춤 추천 카드와 같은 값)
+  const result = useMemo(() => assessFeasibility(assessInputOf(formNow, new Date())), [formNow]);
+  const verdictLine = useMemo(() => labVerdictLine(formNow, result, new Date()), [formNow, result]);
 
   function updateCandidate(id: string, patch: Partial<ResearcherCandidate>) {
     setCandidates((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -360,6 +277,16 @@ export default function AssessmentPage() {
       return false;
     }
     const labType = desiredType === "기업부설연구소" ? "기업부설연구소" : "연구개발전담부서";
+    // D-618 업체로 열었으면 이름만 있는 임시 업체가 아니라 그 업체를 연구소 업체로 올린다 — 등록 창 없이 · 설립서류 관리에 바로
+    if (clientId) {
+      const c = ensureLabClientFromOs(clientId, { labType, industry: industry || undefined, researcherCount: pick < 5 ? pick : undefined });
+      if (c) {
+        addSetupTargetId(c.id);
+        setSession("setupdoc:active", `setup-${c.id}`);
+        setSentMsg(`‘${c.name}’${particle(c.name, '을/를')} 연구소 업체로 올리고 설립서류 관리에 넣었습니다(업체 기록 그대로).`);
+        return true;
+      }
+    }
     addTempCompany({
       name: companyName.trim(),
       industry: industry || undefined,
@@ -447,6 +374,21 @@ export default function AssessmentPage() {
       subtitle="기업 정보와 연구인력 조건을 바탕으로 연구소/전담부서 설립 가능성을 빠르게 검토합니다"
     >
       {prefillNote && <p className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-brand-800" data-testid="lab-prefill-note">{prefillNote}</p>}
+      {/* D-618 지금 판정 한 줄 — 업체 맞춤 추천 카드와 같은 글(같은 규칙 · 같은 입력). 자세한 결과는 아래 */}
+      <div className="mb-3 rounded-xl border border-slate-200 bg-white px-4 py-3 print-hide" data-testid="lab-verdict-top" data-tone={verdictLine.tone}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-slate-500">지금 판정</span>
+          <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-bold ring-1 ring-inset ${VERDICT_STYLE[result.verdict]}`} data-testid="lab-verdict-top-badge">{result.verdict}</span>
+          <button type="button" onClick={() => document.getElementById("lab-result")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="ml-auto text-sm font-semibold text-navy-700 underline">자세한 결과 보기 ↓</button>
+        </div>
+        <p className="mt-1.5 text-base font-semibold break-keep text-slate-900" data-testid="lab-verdict-top-headline">{verdictLine.headline}</p>
+        {verdictLine.detail && <p className="mt-0.5 text-sm break-keep text-slate-600">{verdictLine.detail}</p>}
+        {verdictLine.needs.length > 0 && (
+          <p className="mt-1 text-sm break-keep text-amber-800" data-testid="lab-verdict-top-needs">
+            <b>더 필요한 것</b> · {verdictLine.needs.join(" · ")}
+          </p>
+        )}
+      </div>
       <PageGuide
         id="assessment"
         purpose="기업부설연구소·연구개발전담부서 설립 가능성을 1차 검토합니다."
@@ -899,7 +841,7 @@ export default function AssessmentPage() {
             </div>
 
             {/* 최종 판정 */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
+            <div id="lab-result" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
               <p className="text-sm font-medium text-slate-500">설립 가능성 검토 결과 (현재 입력 기준)</p>
               <div className="mt-2">
                 <span className={`inline-flex items-center rounded-lg px-4 py-2 text-base font-bold ring-1 ring-inset ${VERDICT_STYLE[result.verdict]}`}>

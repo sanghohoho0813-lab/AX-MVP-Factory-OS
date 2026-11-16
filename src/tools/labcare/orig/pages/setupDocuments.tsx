@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Link from "../next";
 import Layout from "../components/Layout";
+import { osClientOf } from "../store";
 import {
   buildSetupPackage,
   buildTempPackage,
@@ -9,6 +10,7 @@ import {
   getSetupPackages,
   groupProgress,
   missingDocs,
+  saveSetupDocStatus,
   SETUP_GROUPS,
   type DocClass,
   type DocStatus,
@@ -146,6 +148,8 @@ export default function SetupDocumentsPage() {
   const done = packages.filter((p) => docProgress(p) >= 100);
 
   function setDocStatus(docKey: string, status: DocStatus) {
+    // D-618 실제 업체는 바꾼 상태를 남긴다(예전에는 새로 고치면 사라졌다) — 임시 업체 · 견본은 예전 그대로
+    if (pkg && !pkg.temp && osClientOf(pkg.clientId)) saveSetupDocStatus(pkg.clientId, docKey, status);
     setPackages((pkgs) =>
       pkgs.map((p) =>
         p.id === pkg!.id
@@ -649,6 +653,11 @@ function DocRow({ doc, onChange }: { doc: SetupDoc; onChange: (s: DocStatus) => 
         >
           {doc.label}
         </p>
+        {doc.fromBox && (
+          <span className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600" data-testid="setupdoc-from-box" title="고객 관리 서류함에 받아 둔 서류예요">
+            서류함에 있음
+          </span>
+        )}
       </div>
       <select
         value={doc.status}

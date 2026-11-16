@@ -19,13 +19,14 @@ import { canUploadFiles, documentFileUrl, uploadModuleFile } from '../../../serv
 import { useToast } from '../../../components/ui/toastContext'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { useToolClient } from '../../shared/toolClientContext'
-import SubsidyApp, { DEFAULT_PROGRAMS, PROGRAM_ENABLED_DEFAULTS } from './SubsidyApp.jsx'
+import SubsidyApp, { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_ENABLED_DEFAULTS } from './SubsidyApp.jsx'
 import {
   MODULE,
   companyMetaOf,
   employeeRowData,
   matchOsClient,
   memosFromRow,
+  osCompanyDefaults,
   osPickList,
   programsFromD91,
   toOrigCompany,
@@ -95,6 +96,9 @@ async function loadAll(workspaceId: string | null, clients: ClientOpsRecord[]): 
     memoRowId: calRow?.id,
   }
 }
+
+/** D-618 업체마다 기록을 쌓는 화면 — 업체로 열었는데 아직 고용지원금 업체가 아니면 등록 창 없이 조용히 올린다 */
+const AUTO_REGISTER_VIEWS = new Set(['dashboard', 'company', 'kanban'])
 
 export function EmploymentOrig({
   view,
@@ -391,11 +395,21 @@ export function EmploymentOrig({
     if (companyId && companyId !== focusClient) return
     if (data.companies.some((c) => c.id === focusClient)) {
       if (view === 'dashboard' || view === 'company') onNav({ view: 'company', company: focusClient })
-    } else if (!presetOf && data.clients.some((c) => c.id === focusClient && !c.archivedAt)) {
-      // D-199: 상황 예시(채용 진단)로 열었으면 등록 창을 띄우지 않는다 — 진단은 등록 없이 되고, 창이 결과를 가렸다
-      setOpenAddFor(focusClient)
+    } else if (!presetOf && AUTO_REGISTER_VIEWS.has(view)) {
+      // D-618: 등록 창('업체 정보')을 띄우지 않는다 — 고객 관리 기록 그대로 그 자리에서 고용지원금 업체로 올린다.
+      // (예전에는 맞춤 추천에서 넘어오면 판정 위로 등록 창이 떠서, 이미 아는 것을 다시 확인하고 저장해야 했다)
+      // 업체마다 기록을 쌓는 화면(한눈에 보기 · 업체 목록 · 업체 화면 · 진행 보드 · 회차 일정)에서만 올린다.
+      // 채용 진단 · 명부 진단 · 계산기는 등록 없이 되므로 그 화면에서는 올리지 않는다(D-199 그대로).
+      const os = data.clients.find((c) => c.id === focusClient && !c.archivedAt)
+      if (!os) return
+      const companyDocs = COMPANY_DEFAULT_DOCS.flatMap((cat) => cat.docs.map((label) => ({ id: crypto.randomUUID(), label, done: false, files: [] })))
+      void saveCompany({ ...osCompanyDefaults(os), id: os.id, osId: os.id, createdAt: new Date().toISOString(), companyDocs })
+        // 처음 올린 때는 화면을 옮기지 않는다 — 한눈에 보기의 '이 업체' 한 장(판정 한 줄) · 상황 예시가 먼저 보여야 한다(D-354 · D-197).
+        // 다음에 열 때는 예전처럼 그 업체 화면으로 간다(D-94).
+        .then(() => showToast(`${os.companyName} — 고용지원금 업체로 올렸어요(고객 관리 기록 그대로). 직원을 넣으면 회차 · 서류가 이어져요.`))
+        .catch(fail)
     }
-  }, [data, focusClient, companyId, view, onNav, presetOf])
+  }, [data, focusClient, companyId, view, onNav, presetOf, saveCompany, showToast, fail])
 
   const call = useCallback(
     <A extends unknown[]>(fn: (...a: A) => Promise<void>) =>

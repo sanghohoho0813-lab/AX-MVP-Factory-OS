@@ -258,13 +258,14 @@ function ReportBody() {
         )}
 
         {/* 리포트 유형 탭 */}
-        <div className="no-print mb-4 flex gap-2 rounded-2xl bg-slate-100 p-1.5">
+        {/* D-618 좁은 화면에서는 줄을 바꾼다 — 예전에는 세 단추가 한 줄(533px)이라 휴대폰에서 옆으로 넘쳤다 */}
+        <div className="no-print mb-4 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1.5">
           {(["요약", "상세", "방문"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setReportType(t)}
-              className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2.5 text-base font-bold ${
+              className={`min-w-fit flex-1 whitespace-nowrap rounded-xl px-3 py-2.5 text-base font-bold ${
                 reportType === t ? "bg-white text-navy-700 shadow-sm" : "text-slate-500"
               }`}
             >

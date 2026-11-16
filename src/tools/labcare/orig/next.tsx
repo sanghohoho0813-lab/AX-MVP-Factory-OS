@@ -4,14 +4,16 @@
  */
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
-import { mapHref } from './nav'
+import { Link as RouterLink, useLocation } from 'react-router-dom'
+import { mapHref, withOsClient } from './nav'
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & { href: string; children?: ReactNode; prefetch?: boolean; scroll?: boolean }
 
 export default function Link({ href, children, prefetch, scroll, ...rest }: LinkProps) {
   void prefetch
   void scroll
+  // D-618 모듈 안 링크도 '어느 업체 일로 열었나' 를 들고 간다
+  const { search } = useLocation()
   if (/^https?:\/\//.test(href)) {
     return (
       <a href={href} {...rest}>
@@ -20,7 +22,7 @@ export default function Link({ href, children, prefetch, scroll, ...rest }: Link
     )
   }
   return (
-    <RouterLink to={mapHref(href)} {...rest}>
+    <RouterLink to={withOsClient(mapHref(href), search)} {...rest}>
       {children}
     </RouterLink>
   )

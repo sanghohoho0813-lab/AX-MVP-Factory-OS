@@ -29,13 +29,31 @@ export function mapHref(href: string): string {
   return `${BASE}/${section}${qs ? `?${qs}` : ''}`
 }
 
+/**
+ * D-618 모듈 안에서 화면을 옮겨도 '어느 업체 일로 열었나'(?client=)를 들고 간다.
+ * 예전에는 설립 가능성 체크 → [설립서류 관리로 보내기] 처럼 안쪽 단추로 옮기면 업체가 풀려 '어느 업체 일인가요?' 를 다시 물었다.
+ * 다른 연구소 업체 화면(?cid= 가 다른 업체)으로 갈 때는 들고 가지 않는다 — 보는 업체와 붙이는 업체가 달라지면 안 된다.
+ */
+export function withOsClient(mapped: string, currentSearch: string): string {
+  if (/^https?:\/\//.test(mapped)) return mapped
+  const client = new URLSearchParams(currentSearch).get('client')
+  if (!client) return mapped
+  const [path, query = ''] = mapped.split('?')
+  const q = new URLSearchParams(query)
+  if (q.has('client')) return mapped
+  const cid = q.get('cid')
+  if (cid && cid !== client) return mapped
+  q.set('client', client)
+  return `${path}?${q.toString()}`
+}
+
 export function useRouter() {
   const navigate = useNavigate()
   // D-168: 그릴 때마다 새 값을 주지 않는다(지켜보는 화면이 끝없이 다시 그리지 않게)
   return useMemo(
     () => ({
-      push: (href: string) => navigate(mapHref(href)),
-      replace: (href: string) => navigate(mapHref(href), { replace: true }),
+      push: (href: string) => navigate(withOsClient(mapHref(href), window.location.search)),
+      replace: (href: string) => navigate(withOsClient(mapHref(href), window.location.search), { replace: true }),
       back: () => navigate(-1),
       refresh: () => undefined,
     }),

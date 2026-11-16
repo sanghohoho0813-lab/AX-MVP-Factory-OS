@@ -6,6 +6,8 @@ import type { LabType } from "../../types";
 import { currentMonth, getChangeRecords, getClients, getNoteTargets, getReminders, isCheckDue, isReportSent, type ChangeRecStatus } from "./storage";
 import { ddayOf as ddayOfLib } from "../../lib/deadlines";
 import { fewerThanTen } from "../../lib/documents";
+import { osClientOf, storeRead, storeWrite } from "../store";
+import { documentMetaOf } from "../../../../services/clientOpsDocuments";
 
 /* ───────────────── 설립 진행(설립서류 관리) ───────────────── */
 
@@ -71,6 +73,8 @@ export interface SetupDoc {
   promptKey?: PromptKey;
   checklist?: string[];
   status: DocStatus;
+  /** D-618 고객 관리 서류함에 받아 둔 서류라 '완료' 로 시작한 칸 */
+  fromBox?: boolean;
 }
 
 export interface SetupPackage {
@@ -151,7 +155,63 @@ function idHash(id: string): number {
  *  · 목표 준비율(target)에 맞춰 완료 분포를 결정 (해시 기반 결정적)
  *  · 미완료 항목: 필수/작성보조는 준비중(일부 고객 요청중), 요청·해당시는 기본 준비중
  */
+/* ───────── D-618 실제 업체의 서류 상태 — 고객 관리 서류함 + 직접 바꾼 값 ─────────
+ * 예전에는 실제 업체도 견본용 규칙(업체 id 로 만든 임의 값)으로 '완료' 가 찍혔고, 바꾼 상태는 새로 고치면 사라졌다.
+ * 이제: 서류함에 받아 둔 서류는 '완료' 로 시작 · 나머지는 '준비중' · 직접 바꾼 값은 남긴다(바꾼 값이 먼저).
+ */
+const SETUP_STATUS_KEY = "pmsaas:setupDocStatus:v1";
+type StatusMap = Record<string, Record<string, DocStatus>>;
+
+/** 서류함 칸 이름 → 설립서류 칸. 이름으로 알아본다(직접 만든 칸 포함) */
+const BOX_MATCH: Array<[string, RegExp]> = [
+  ["biz", /사업자\s*등록증/],
+  ["sme", /중소기업\s*확인서/],
+  ["insurance", /4대\s*(사회)?\s*보험.*명부|가입자\s*명부/],
+  ["venture", /벤처기업\s*확인서/],
+  ["midsize", /중견기업\s*확인서/],
+  ["building", /임대차\s*계약서|건축물\s*대장/],
+  ["degree", /학위\s*증명|졸업\s*증명/],
+  ["career", /경력\s*증명/],
+];
+
+/** 이 업체 서류함에 받아 둔('받음' 표시) 설립서류 칸 */
+export function boxHeldSetupDocs(clientId: string): Set<string> {
+  const os = osClientOf(clientId);
+  const out = new Set<string>();
+  if (!os) return out;
+  for (const [key, state] of Object.entries(os.documents ?? {})) {
+    // 서류함에서 '받음' 으로 표시한 것이면 받은 것으로 본다(종이로 받아 파일이 없는 것도 있다)
+    if (!state?.received) continue;
+    const meta = documentMetaOf(os, key);
+    for (const [docKey, re] of BOX_MATCH) if (re.test(meta.label)) out.add(docKey);
+  }
+  return out;
+}
+
+export function setupDocOverrides(clientId: string): Record<string, DocStatus> {
+  return storeRead<StatusMap>(SETUP_STATUS_KEY, {})[clientId] ?? {};
+}
+/** 직접 바꾼 서류 상태를 남긴다 — 다시 열어도 · 다른 기기에서도 그대로 */
+export function saveSetupDocStatus(clientId: string, docKey: string, status: DocStatus): void {
+  const all = storeRead<StatusMap>(SETUP_STATUS_KEY, {});
+  storeWrite(SETUP_STATUS_KEY, { ...all, [clientId]: { ...(all[clientId] ?? {}), [docKey]: status } });
+}
+
 function deriveDocs(c: DocClient, target: number): SetupDoc[] {
+  // 고객 관리에 있는 실제 업체 — 서류함과 직접 바꾼 값으로(견본용 임의 값은 쓰지 않는다)
+  if (osClientOf(c.id)) {
+    const held = boxHeldSetupDocs(c.id);
+    const over = setupDocOverrides(c.id);
+    return DOC_MASTER.map((m) => {
+      const fromBox = held.has(m.key);
+      const status: DocStatus = over[m.key] ?? (m.na?.(c) ? "해당 없음" : fromBox ? "완료" : "준비중");
+      return {
+        key: m.key, label: m.label, group: m.group, cls: m.cls, tip: m.tip,
+        collapsed: m.collapsed, promptKey: m.promptKey, checklist: m.checklist, status,
+        fromBox: fromBox && status === "완료" ? true : undefined,
+      };
+    });
+  }
   return DOC_MASTER.map((m) => {
     let status: DocStatus;
     if (m.na?.(c)) {

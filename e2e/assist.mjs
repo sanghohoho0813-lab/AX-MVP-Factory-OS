@@ -336,6 +336,21 @@ await page.keyboard.press('Escape')
   await page.getByTestId('ai-assist-ask-send').click()
   await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'client.ask', null, { timeout: 10000 }).catch(() => {})
   check("G 업체 상세: 판의 질문 칸 → 'client.ask'(이 업체 자료로)", (llm.at(-1)?.user ?? '').includes('[대표가 더 묻는 것] 이 업체 지난달에 뭐 했어?') && (llm.at(-1)?.user ?? '').includes('[요청] 업체 — 직접 물어본 것에 답'), (llm.at(-1)?.user ?? '').slice(-160))
+  // D-618 모듈(연구소)을 물으면 — 답 위에 그 모듈 판정 줄(맞춤 추천 카드 · 모듈 화면과 같은 글) · AI 에도 같은 줄이 가고 '그대로 옮긴다' 지시가 붙는다
+  check('G 업체 상세: 모듈을 묻지 않은 질문 — 답 위 판정 줄 없음', (await page.getByTestId('ask-verdict-pin').count()) === 0, '')
+  {
+    const n0 = llm.length
+    await page.getByTestId('ai-assist-ask').fill('연구소 3년 내 법인인데 설립 가능한지')
+    await page.getByTestId('ai-assist-ask-send').click()
+    await page.getByTestId('ask-verdict-pin').waitFor({ timeout: 10000 }).catch(() => {})
+    for (let i = 0; i < 40 && llm.length === n0; i++) await page.waitForTimeout(250)
+    const pinHead = ((await page.getByTestId('ask-verdict-headline').first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
+    const pinKey = await page.getByTestId('ask-verdict-row').first().getAttribute('data-key').catch(() => '')
+    const sent = `${llm.at(-1)?.sys ?? ''}\n${llm.at(-1)?.user ?? ''}`
+    check('G 업체 상세: 연구소를 물으면 답 위에 "이 업체 판정"(연구소 · 모듈과 같은 글)', llm.length > n0 && pinKey === 'labcare' && pinHead.length > 5, { pinKey, pinHead })
+    check('G 업체 상세: AI 에 간 자료에도 같은 판정 줄 · 지시문에 "판정 줄 그대로 · 짧게"', sent.includes(pinHead.slice(0, 40)) && sent.includes('글자 그대로 옮긴다') && sent.includes('headline 은 2문장 안'), { has: sent.includes(pinHead.slice(0, 40)), rule: sent.includes('글자 그대로 옮긴다') })
+    await shot(page, 'G-client-ask-pin')
+  }
   await page.keyboard.press('Escape')
 }
 

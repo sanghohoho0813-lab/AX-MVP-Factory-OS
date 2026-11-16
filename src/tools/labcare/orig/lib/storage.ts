@@ -133,6 +133,33 @@ export function addClient(input: Omit<Client, "id" | "createdAt"> & { id?: strin
   return client;
 }
 
+/**
+ * D-618 고객 관리 업체를 연구소 업체로 — 등록 창 없이 그 자리에서(이미 있으면 그대로 돌려준다).
+ * 이름 · 대표 · 주소 · 설립일 · 직원 수는 고객 관리 기록 그대로(getClients 가 늘 비춰 본다). 고칠 것은 업체 화면에서.
+ */
+export function ensureLabClientFromOs(osId: string, extra: Partial<Pick<Client, "labType" | "industry" | "researcherCount">> = {}): Client | null {
+  const existing = getClients().find((c) => c.id === osId);
+  if (existing) return existing;
+  const os = osClientOf(osId);
+  if (!os) return null;
+  const emp = Number(String(os.employeeCount || "").replace(/[^0-9]/g, "")) || undefined;
+  return addClient({
+    id: os.id,
+    name: os.companyName,
+    industry: extra.industry || os.industry || "",
+    labType: extra.labType ?? "연구개발전담부서",
+    ceoName: os.representativeName || os.contactName || "",
+    address: os.businessAddress || "",
+    certifiedDate: "",
+    foundedDate: os.establishedAt || undefined,
+    employeeCount: emp,
+    researcherCount: extra.researcherCount ?? 1,
+    labName: "",
+    consultant: "",
+    businessType: os.corporateNumber ? "법인사업자" : undefined,
+  });
+}
+
 export function updateClient(id: string, patch: Partial<Client>): void {
   const clients = rawClients().map((c) => (c.id === id ? { ...c, ...patch, id: c.id } : c));
   write(CLIENTS_KEY, clients);

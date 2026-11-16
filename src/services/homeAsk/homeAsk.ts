@@ -130,6 +130,15 @@ export const INTENT_MODULES: Partial<Record<HomeIntent, readonly string[]>> = {
   grants: ['grants'],
 }
 
+/**
+ * D-618 물어본 모듈의 OS 판정 줄 — AI 답 위에 '모듈 화면과 같은 글' 로 고정해 보여 준다.
+ * 질문에 모듈 이름이 없으면 빈 목록(아무것도 붙이지 않는다). 판정을 새로 만들지 않는다 — 받은 줄을 고르기만 한다.
+ */
+export function verdictsForAsk<T extends { key: string }>(ask: string, insights: readonly T[], max = 2): T[] {
+  const want = new Set(intentsOf(ask).flatMap((k) => INTENT_MODULES[k] ?? []))
+  return want.size ? insights.filter((x) => want.has(x.key)).slice(0, max) : []
+}
+
 /* ------------------------------------------------------------------ */
 /* 3. 추천 질문 세 줄                                                       */
 /* ------------------------------------------------------------------ */

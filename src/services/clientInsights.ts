@@ -12,6 +12,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
+import { clientLabFeasibility } from '../tools/labcare/lib/assessForm'
 import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { yearOverYear } from './withholdingReport'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
@@ -496,6 +497,8 @@ function labCreditOf(record: ClientOpsRecord): number {
 
 const labInsight: Provider = ({ record, facts, today }) => {
   const open = `/tools/labcare${q(record)}`
+  // D-618 '연구소 설립 가능성' 은 설립 가능성 체크 화면으로 바로(예전에는 모듈 첫 화면 → 고객사 등록 창)
+  const assessOpen = `/tools/labcare/assessment${q(record)}`
   // D-340 회사 정보 글 · 올린 인정서 둘 다('없음' 글은 아님)
   const lab = researchLabOf(record)
   if (lab) {
@@ -541,22 +544,25 @@ const labInsight: Provider = ({ record, facts, today }) => {
       headline: `연구개발비를 쓰는데(${amt}${pct ? ` · ${pct}` : ''}) 연구소가 없어요 — 연구소(전담부서)를 만들면 연구 · 인력개발비 세액공제 대상`,
       detail: '연구 인력(학위 · 경력)과 독립된 연구 공간이 있으면 인정받을 수 있어요 · 세액공제는 인정 뒤 쓴 연구개발비부터(★ 세무사)',
       missing: ['연구 인력(학위 · 경력)', '연구 공간'],
-      openPath: open,
+      openPath: assessOpen,
       openLabel: '연구소 설립 가능성',
       action: '연구소 — 연구개발비가 있어 설립 검토',
     }
   }
-  const emp = facts.employeeCount
+  // D-618 연구소가 없고 붙여 둔 결과도 없으면 — 모듈의 설립 가능성 체크와 같은 규칙 · 같은 입력으로 판정한다.
+  // (예전에는 직원 수만 보는 따로 된 줄이라, 같은 업체가 카드 · AI 도우미 · 모듈에서 서로 다른 말을 들었다)
+  // 이 브라우저에서 모듈에 답해 둔 것이 있으면 그 답 그대로 — 그래서 모듈 화면 맨 위 '지금 판정' 과 글자까지 같다.
+  const { line } = clientLabFeasibility(record, new Date(`${today}T00:00:00`))
   return {
     key: 'labcare',
     label: '연구소',
-    tone: emp !== null && emp >= 2 ? 'maybe' : 'need',
-    headline: emp !== null && emp >= 2 ? `직원 ${emp}명 — 연구 인력 · 공간이 있으면 연구소(전담부서) 설립을 검토해 볼 만해요` : '직원 수 · 연구 인력을 알면 연구소 설립 가능성을 봐요',
-    detail: '연구 인력의 학위 · 경력과 독립된 연구 공간이 필요해요.',
-    missing: ['연구 인력(학위 · 경력)', '연구 공간'],
-    openPath: open,
+    tone: line.tone === 'need' && facts.employeeCount !== null && facts.employeeCount >= 2 ? 'maybe' : line.tone,
+    headline: line.headline,
+    detail: line.detail,
+    missing: line.needs,
+    openPath: assessOpen,
     openLabel: '연구소 설립 가능성',
-    action: null,
+    action: line.tone === 'good' ? `연구소 — ${line.verdict}` : null,
   }
 }
 

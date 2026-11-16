@@ -204,8 +204,13 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   const page = await ctx.newPage()
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  await page.goto(BASE + '/tools/employment/companies?client=cli_hansol', { waitUntil: 'networkidle' })
+  // D-618: 업체로 열면 등록 창이 뜨지 않는다(조용히 올라감) — 저장 실패 띠는 [+ 업체 추가] 로 직접 여는 창에서 본다
+  await page.goto(BASE + '/tools/employment/companies', { waitUntil: 'networkidle' })
   await page.waitForTimeout(1200)
+  await page.getByRole('button', { name: '+ 업체 추가', exact: true }).first().click()
+  await page.waitForTimeout(500)
+  await page.locator('select').filter({ hasText: '한솔테크' }).first().selectOption({ label: '한솔테크(주)' })
+  await page.waitForTimeout(400)
   // 저장소를 끝까지 채운다
   await page.evaluate(() => {
     for (const size of [262144, 16384, 1024, 64, 4, 1]) {

@@ -14,7 +14,8 @@ import { listRows } from '../../../services/moduleData'
 import { useToolClient } from '../../shared/toolClientContext'
 import { hydrateLabStore } from './store'
 import { ymdLocal } from '../lib/deadlines'
-import { getClients } from './lib/storage'
+import { addSetupTargetId, ensureLabClientFromOs, getClients } from './lib/storage'
+import { setSession } from './lib/uiState'
 import StatusBadge from './components/StatusBadge'
 import { getLatestCheck } from './lib/storage'
 import DashboardPage from './pages/dashboard'
@@ -33,6 +34,9 @@ import InspectionPage from './pages/inspection'
 import ReportsPage from './pages/reports'
 import ResourcesPage from './pages/resources'
 import SettingsPage from './pages/settings'
+
+/** D-618 업체마다 기록을 쌓는 화면 — 업체로 열었는데 아직 연구소 업체가 아니면 조용히 올린다(등록 창 없음) */
+const NEEDS_LAB_CLIENT = new Set(['clients', 'setup-docs', 'org-diagram', 'notes', 'changes', 'survey', 'check', 'inspection', 'reports'])
 
 /** D-91 모듈 기록 → 원본 저장소 모양 */
 async function legacyFromD91(workspaceId: string | null): Promise<Record<string, unknown>> {
@@ -120,14 +124,25 @@ export function OrigLabcare({ section }: { section: string }) {
   const navigate = useNavigate()
   const focused = useRef<string | null>(null)
 
-  // D-94: 업체 상세에서 연 연구소(?client=) — 연구소 고객사면 그 고객사 화면으로, 아니면 추가 창에 골라 둔 채로. 한 번만
+  // D-94 · D-618: 업체로 연 연구소(?client=) — 연구소 업체면 그 업체 화면으로. 한 번만
+  // 아직 연구소 업체가 아니면 '고객사 추가' 창을 띄우지 않는다(예전에는 맞춤 추천에서 넘어오면 등록 창부터 떴다):
+  //  - 한눈에 보기 · 설립 가능성 체크 · 세액공제는 등록 없이 그 업체 숫자로 그대로
+  //  - 업체마다 기록을 쌓는 화면(업체 목록 · 설립서류 · 연구노트 …)은 그 자리에서 조용히 연구소 업체로 올린다
   useEffect(() => {
     if (!ready || !osFocus || cid || focused.current === osFocus) return
     focused.current = osFocus
-    const registered = getClients().some((c) => c.id === osFocus)
+    let registered = getClients().some((c) => c.id === osFocus)
+    if (!registered && NEEDS_LAB_CLIENT.has(section)) {
+      registered = ensureLabClientFromOs(osFocus) !== null
+      // 설립서류 관리는 '관리 대상' 에도 올려 바로 그 업체 서류가 보이게
+      if (registered && section === 'setup-docs') {
+        addSetupTargetId(osFocus)
+        setSession('setupdoc:active', `setup-${osFocus}`)
+      }
+    }
     const qs = new URLSearchParams(params)
-    if (section === 'dashboard' || section === 'clients') {
-      qs.set(registered ? 'cid' : 'add', osFocus)
+    if (registered && (section === 'dashboard' || section === 'clients')) {
+      qs.set('cid', osFocus)
       void navigate(`/tools/labcare/clients?${qs.toString()}`, { replace: true })
     } else if (registered && (section === 'check' || section === 'reports')) {
       qs.set('cid', osFocus)

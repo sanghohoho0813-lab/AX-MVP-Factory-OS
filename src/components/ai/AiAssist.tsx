@@ -115,6 +115,11 @@ export interface AiAssistProps {
   onRecorded?: () => void
   /** D-244 한 업체 화면 — 답 항목에 업체 번호(c#)가 없어도 [할 일로 넣기] 를 이 업체에 */
   defaultClientId?: string
+  /**
+   * D-618 직접 물어본 질문 위에 고정해 보여 줄 칸 — 그 화면이 규칙으로 이미 아는 답(예: 물어본 모듈의 OS 판정 · 모듈 화면과 같은 글).
+   * AI 답을 기다리는 동안에도 바로 보이고, AI 답은 그 아래에 온다. 보여 줄 것이 없으면 null.
+   */
+  pin?: (ask: string) => ReactNode
 }
 
 export function AiAssist(props: AiAssistProps) {
@@ -127,7 +132,7 @@ export function AiAssist(props: AiAssistProps) {
 /** D-288 [직접 묻기] 로 열 때 — 단추를 누르지 않고 질문 칸에 바로 */
 const ASK_FIRST = '__ask'
 
-function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId }: AiAssistProps) {
+function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId, pin }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
@@ -228,6 +233,7 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
           resultActions={resultActions}
           record={record ?? RECORD_PAGES.has(page)}
           defaultClientId={defaultClientId}
+          pin={pin}
           onRecorded={() => {
             recorded.current = true
           }}
@@ -300,9 +306,11 @@ function AssistPanel({
   resultActions,
   record,
   defaultClientId,
+  pin,
   onRecorded,
   onClose,
 }: {
+  pin?: (ask: string) => ReactNode
   onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>
   itemActions?: (assistId: string) => AssistItemAction[] | null
   resultActions?: (assistId: string) => AssistResultAction[] | null
@@ -330,6 +338,8 @@ function AssistPanel({
   const [shown, setShown] = useState<Shown>(null)
   const [history, setHistory] = useState<HistoryEntry[]>(() => historyOf(scope))
   const [ask, setAsk] = useState('')
+  // D-618 지금 보고 있는 질문 — 그 화면이 규칙으로 아는 답(pin)을 AI 답보다 먼저 보여 준다(AI 가 실패해도 남는다)
+  const [liveAsk, setLiveAsk] = useState('')
   // D-288 적은 질문은 기본으로 '직접 질문'(이 화면 자료로 그 질문에만 답) — 예전에는 첫 단추(예: 이번 주 일정 한눈에)에 묶여 그 단추 답만 나왔다
   const askDirect = useMemo(() => askPresetOf(page), [page])
   const DIRECT = '__direct'
@@ -340,6 +350,7 @@ function AssistPanel({
   const [settings, setSettings] = useState(false)
   const [nowHash, setNowHash] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
+  const pinRef = useRef<HTMLDivElement | null>(null)
   const started = useRef(false)
 
   useEffect(() => {
@@ -374,6 +385,9 @@ function AssistPanel({
       if (running) return
       setRunning(preset.id)
       setError(null)
+      // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
+      const masked = askText ? safeText(askText, [], 500) : ''
+      setLiveAsk(masked)
       // NX-2 실패하면 이 번호 끝 6자리를 '문의 번호' 로 보여 준다(서버 함수 기록과 같은 번호)
       const requestId = newRequestId()
       try {
@@ -381,15 +395,14 @@ function AssistPanel({
         const hash = contextHash(JSON.stringify(bundle.context))
         setNowHash(hash)
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : bundle.context
-        // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
-        const masked = askText ? safeText(askText, [], 500) : ''
         const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
         const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
         const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
         setShown(entry)
-        window.setTimeout(() => resultRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 40)
+        // D-618 판정 줄이 붙어 있으면 그 줄부터 보이게(답만 보이고 판정 줄이 위로 밀려 안 보이지 않게)
+        window.setTimeout(() => (pinRef.current?.childElementCount ? pinRef.current : resultRef.current)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 40)
       } catch (e) {
         const ref = requestId.slice(-6)
         if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing, ref })
@@ -576,6 +589,11 @@ function AssistPanel({
               </div>
             )}
 
+            {/* D-618 물어본 것에 대해 화면이 이미 아는 답(모듈 판정 그대로) — 기다리는 동안에도 보이고, AI 답은 그 아래 */}
+            <div ref={pinRef} className="scroll-mt-2 empty:hidden">
+              {pin?.(liveAsk)}
+            </div>
+
             {shown && (
               <div ref={resultRef} className="scroll-mt-2">
                 <ResultView
@@ -612,7 +630,10 @@ function AssistPanel({
                     <li key={h.run.requestId}>
                       <button
                         type="button"
-                        onClick={() => setShown({ ...h, links: h.links ?? {} })}
+                        onClick={() => {
+                          setShown({ ...h, links: h.links ?? {} })
+                          setLiveAsk(h.ask ?? '')
+                        }}
                         className={`tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-left hover:bg-slate-50 ${shown?.run.requestId === h.run.requestId ? 'bg-violet-50' : ''}`}
                       >
                         <span className="t-sub min-w-0 grow font-semibold break-keep text-slate-800">{h.label}</span>

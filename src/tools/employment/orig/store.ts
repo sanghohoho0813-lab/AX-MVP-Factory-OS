@@ -18,6 +18,7 @@
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import type { ModuleRow } from '../../../services/moduleData'
 import { safeBizNo, scrubRrnDeep } from '../lib/privacy'
+import { documentMetaOf } from '../../../services/clientOpsDocuments'
 
 export type Rec = Record<string, unknown>
 
@@ -75,6 +76,48 @@ function withFiles(list: unknown): Rec[] {
     .map((d) => ({ ...d, id: str(d.id) || uid(), label: str(d.label) || str(d.name), files: Array.isArray(d.files) ? d.files : [] }))
 }
 
+/**
+ * D-618 고객 관리 서류함에 받아 둔 서류 → 고용지원금 업체 서류 체크.
+ * 대표: "서류를 고객 관리에 넣어 놨으면 모듈이 먼저 끌고 와야 한다." — 이름으로 알아본다(직접 만든 칸 포함).
+ * [고용지원금 서류 이름, 서류함 칸 이름]
+ */
+const BOX_DOC_MATCH: ReadonlyArray<readonly [RegExp, RegExp]> = [
+  [/사업자\s*등록증/, /사업자\s*등록증/],
+  [/법인\s*등기/, /^(?!.*(부동산|건물|토지)).*(법인\s*등기|등기부\s*등본|등기사항\s*(전부)?\s*증명)/],
+  [/신분증/, /신분증/],
+  [/통장\s*사본/, /통장\s*사본/],
+  [/4대\s*보험\s*가입자\s*명부/, /4대\s*(사회)?\s*보험.*명부|가입자\s*명부/],
+  [/법인세.*신고서|소득세.*신고서/, /법인세.*신고서|종합소득세\s*신고서|세무조정\s*계산서/],
+  [/재무제표/, /재무제표|재무상태표|손익계산서/],
+  [/국세\s*완납/, /^(?!.*지방세).*(납세\s*증명|국세\s*완납)/],
+  [/임금\s*대장|급여\s*대장/, /임금\s*대장|급여\s*대장/],
+  [/취업\s*규칙/, /취업\s*규칙/],
+]
+
+/** 이 업체 서류함에서 '받음' 인 칸 이름들 */
+export function boxReceivedLabels(os: ClientOpsRecord): string[] {
+  return Object.entries(os.documents ?? {})
+    .filter(([, state]) => !!state?.received)
+    .map(([key]) => documentMetaOf(os, key).label)
+}
+
+/**
+ * 업체 서류에 서류함을 비춘다 — 아직 안 받은 줄(미요청 · 요청완료)인데 서류함에 있으면 '제출완료 · 서류함에 있음'.
+ * 직접 정한 상태(보완필요 · 확인완료 · 제출완료)는 건드리지 않는다. 서류함에 없으면 예전 그대로.
+ */
+export function withBoxDocs(docs: Rec[], os: ClientOpsRecord): Rec[] {
+  const held = boxReceivedLabels(os)
+  if (!held.length) return docs.map((d) => (d.fromBox ? { ...d, fromBox: undefined } : d))
+  return docs.map((d) => {
+    const label = str(d.label)
+    const inBox = BOX_DOC_MATCH.some(([mine, box]) => mine.test(label) && held.some((h) => box.test(h)))
+    if (!inBox) return d.fromBox ? { ...d, fromBox: undefined } : d
+    const status = str(d.status) || (d.done ? 'confirmed' : 'none')
+    if (status === 'none' || status === 'requested') return { ...d, status: 'submitted', done: true, fromBox: true }
+    return { ...d, fromBox: status === 'submitted' || status === 'confirmed' ? true : undefined }
+  })
+}
+
 /** 모듈 기록(업체 한 줄) + 고객 운영 업체 → 원본 업체 */
 export function toOrigCompany(os: ClientOpsRecord, meta: Rec | undefined, createdAt?: string): Rec {
   const m = meta ?? {}
@@ -82,7 +125,7 @@ export function toOrigCompany(os: ClientOpsRecord, meta: Rec | undefined, create
   out.id = os.id
   out.osId = os.id
   out.name = os.companyName // 이름은 늘 고객 관리 기록 그대로
-  out.companyDocs = withFiles(m.companyDocs)
+  out.companyDocs = withBoxDocs(withFiles(m.companyDocs), os)
   out.notes = Array.isArray(m.notes) ? m.notes : []
   out.programInfos = Array.isArray(m.programInfos) ? m.programInfos : []
   if (m.needsReview && m.reviewNeeded === undefined) out.reviewNeeded = true

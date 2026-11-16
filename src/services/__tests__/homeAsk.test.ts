@@ -7,7 +7,7 @@ import { RefBook, type AssistBundle } from '../aiAssist/context'
 import { DOWN_REASONS, EMPTY_FEEDBACK, docRequestText, isDocListItem, findClients, homeSuggestions, intentsOf, learnAliases, mergeBundles, nearNames, normName, parseFeedback, planChips, planSection, preferenceRules, priorTurnsSection, ruleAnswer, withFeedback, type PlanRunLite } from '../homeAsk/homeAsk'
 import { runScenarios } from '../scenarios'
 import { dateOfTalk, newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, wonOfTalk } from '../homeAsk/homeTalk'
-import { openedBy } from '../homeAsk/homeAsk'
+import { openedBy, verdictsForAsk } from '../homeAsk/homeAsk'
 import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
 import { withFactValue } from '../customerFacts'
 import { applyTalk, hasTalk, talkFound } from '../homeAsk/talkApply'
@@ -256,6 +256,16 @@ check('home.chat 지시문 — OS 판정 그대로 · 미팅 준비 순서 · �
   const r = applyTalk(base, f, '2026-11-02T01:00:00Z')
   check('D-505 한 번에 넣기 — 상황 답 · 사실 창고(상담 메모 · 2025) · 다음 할 일', r.decided?.['scn.hireYouth']?.a === 'yes' && r.factValues?.revenue === '3000000000' && r.factMeta?.revenue?.source === 'meeting' && r.factMeta?.revenue?.asOf === '2025' && r.nextAction === '통화' && r.nextActionDueDate === '2026-11-11')
   check('D-505 넣은 뒤 같은 메모를 다시 적으면 카드 없음', !hasTalk(talkFound(memo, r, '2026-11-02')))
+}
+
+// 17. D-618 물어본 모듈의 판정 줄만 고른다(판정 글은 그대로) · 서버 지시문은 업체 화면 직접 질문에만 '판정 줄 그대로 · 짧게'
+{
+  const rows = [{ key: 'policy-funding', headline: 'P' }, { key: 'labcare', headline: 'L' }, { key: 'employment', headline: 'E' }, { key: 'tax', headline: 'T' }]
+  const pick = (q: string) => verdictsForAsk(q, rows).map((r) => r.headline).join(',')
+  check('D-618 "연구소 3년 내 법인인데 설립 가능한지" → 연구소 판정 줄만', pick('연구소 3년 내 법인인데 설립 가능한지') === 'L', pick('연구소 3년 내 법인인데 설립 가능한지'))
+  check('D-618 정책자금 · 고용 질문 → 그 모듈 줄(받은 순서 · 최대 2) · 모듈 없는 질문 → 없음', pick('정책자금 받을 수 있어?') === 'P' && pick('청년 채용하면 정책자금도 돼?') === 'P,E' && pick('이 업체 지난달에 뭐 했어?') === '' && pick('') === '')
+  const instr = (id: string) => ((ASSISTS as unknown as Record<string, { instruction: string[] }>)[id]?.instruction ?? []).join('\n')
+  check('D-618 업체 화면 직접 질문 지시문 — 모듈 판정 "한줄" 을 그대로 · 2문장 안 · 다른 화면 직접 질문에는 없음', instr('client.ask').includes('글자 그대로 옮긴다') && instr('client.ask').includes('headline 은 2문장 안') && instr('today.ask') !== '' && !instr('clients.ask').includes('글자 그대로 옮긴다'), instr('client.ask').slice(-200))
 }
 
 console.log(`\nhomeAsk: ${passed} passed, ${failed} failed`)

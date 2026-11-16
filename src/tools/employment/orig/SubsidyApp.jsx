@@ -114,7 +114,7 @@ var PROGRAM_CHECKLISTS={
 };
 
 // 업체 기본 서류 템플릿 (카테고리별)
-var COMPANY_DEFAULT_DOCS=[
+export var COMPANY_DEFAULT_DOCS=[
   {cat:"기본 사업자 서류",docs:["사업자등록증","법인등기사항전부증명서 (법인)","대표자 신분증 사본","기업 통장 사본"]},
   {cat:"고용보험 관련",docs:["고용보험 성립 신고서","4대보험 가입자 명부","고용보험 피보험자격 취득·상실 이력"]},
   {cat:"세무·재무",docs:["법인세(소득세) 신고서","재무제표 (손익계산서·대차대조표)","국세 완납 증명서"]},
@@ -398,8 +398,9 @@ function ChkItem(props){
   var done=docIsDone(item); var eff=docEffStatus(item); var sm=docStatusMeta(eff);
   return(
     <div style={{padding:"12px 14px",borderRadius:10,background:isDisabled?"#F1F5F9":(done?"#F8FAFC":"#fff"),border:isDisabled?"1px solid #E2E8F0":(done?"1px solid #E2E8F0":"1px solid #E2E8F0"),borderLeft:isDisabled?"1px solid #E2E8F0":(done?"3px solid #059669":"3px solid #CBD5E1"),opacity:isDisabled?0.6:1}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:4,marginBottom:6}}>
-        <label style={{display:"flex",alignItems:"center",gap:10,cursor:isDisabled?"not-allowed":"pointer",flex:1,minWidth:0}}>
+      {/* D-618 좁은 칸에서 서류 이름이 한 글자씩 세로로 짜부라졌다(단추 둘이 자리를 다 차지) — 이름 줄을 먼저 주고 단추는 아래로 넘긴다 */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:4,marginBottom:6,flexWrap:"wrap"}}>
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:isDisabled?"not-allowed":"pointer",flex:"1 1 150px",minWidth:0}}>
           <input type="checkbox" checked={done} onChange={isDisabled?undefined:props.onToggle} disabled={isDisabled} style={{width:20,height:20,accentColor:"#059669",flexShrink:0}}/>
           <span style={{fontSize:16,fontWeight:500,color:isDisabled?"#94A3B8":(done?"#059669":"#334155"),textDecoration:done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis"}}>{item.label}{item.isCustom&&<span style={{fontSize:13,color:"#94A3B8",marginLeft:4}}>(추가)</span>}</span>
         </label>
@@ -413,6 +414,8 @@ function ChkItem(props){
           <select value={eff} onChange={props.onStatus} style={{fontSize:13,fontWeight:700,padding:"4px 8px",borderRadius:7,border:"1px solid "+sm.bg,background:sm.bg,color:sm.color,cursor:"pointer",fontFamily:FF,outline:"none"}}>
             {DOC_STATUS.map(function(s){return <option key={s.id} value={s.id}>{s.label}</option>;})}
           </select>
+          {/* D-618 고객 관리 서류함에 받아 둔 서류 — 다시 받지 않는다 */}
+          {item.fromBox&&done&&<span data-testid="emp-doc-from-box" title="고객 관리 서류함에 받아 둔 서류예요" style={{fontSize:13,fontWeight:700,padding:"3px 8px",borderRadius:999,border:"1px solid #E2E8F0",background:"#fff",color:"#0F766E",whiteSpace:"nowrap"}}>서류함에 있음</span>}
           <FileAt files={item.files||[]} onAdd={props.onFA} onRemove={props.onFR} uploadFn={props.uploadFn} getUrlFn={props.getUrlFn}/>
         </div>
       )}

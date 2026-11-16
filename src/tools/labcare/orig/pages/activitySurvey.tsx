@@ -163,7 +163,7 @@ export default function ActivitySurveyPage() {
                     onChange={(e) => setMemo(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") saveMemo(); }}
                     placeholder="예: 2026년 자료 요청 중, 연구노트 보완 필요"
-                    className="flex-1 rounded-lg border border-slate-300 px-3.5 py-2.5 text-base focus:border-navy-600 focus:outline-none"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3.5 py-2.5 text-base focus:border-navy-600 focus:outline-none"
                   />
                   <button type="button" onClick={saveMemo} disabled={!memo.trim()}
                     className="whitespace-nowrap rounded-lg bg-navy-700 px-4 py-2.5 text-base font-bold text-white hover:bg-navy-800 disabled:opacity-40">

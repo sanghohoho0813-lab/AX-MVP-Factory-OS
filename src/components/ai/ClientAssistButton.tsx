@@ -8,6 +8,7 @@ import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 import { AiAssist } from './AiAssist'
+import { AskVerdictPinLazy } from '../ops/AskVerdictPin'
 
 export function ClientAssistButton({ record, today }: { record: ClientOpsRecord; today: string }) {
   const { ent } = useEntitlements()
@@ -16,5 +17,7 @@ export function ClientAssistButton({ record, today }: { record: ClientOpsRecord;
     const { buildInsights } = await import('../../services/clientInsights')
     return clientBundle(record, today, buildInsights(record, today, [], (k) => featureUsable(ent, k)), buildClientSchedule(record, today))
   }, [record, today, ent])
-  return <AiAssist variant="button" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={build} defaultClientId={record.id} />
+  // D-618 모듈을 물으면 AI 답 위에 그 모듈 판정 줄(맞춤 추천 카드 · 모듈 화면과 같은 글)
+  const pin = useCallback((ask: string) => <AskVerdictPinLazy ask={ask} record={record} today={today} />, [record, today])
+  return <AiAssist variant="button" page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={build} defaultClientId={record.id} pin={pin} />
 }

@@ -51,6 +51,7 @@ import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
 import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts, withFactDecisions } from '../../services/customerFacts'
+import { AskVerdictPin, verdictRows } from './AskVerdictPin'
 import { INSIGHT_TONE_LABEL, buildInsights, insightChanges, recommendNextSteps, type Insight, type InsightTone } from '../../services/clientInsights'
 import { batchOfLog, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary, dupShelfBases, shelfBaseOf } from '../../services/docShelf'
@@ -145,6 +146,8 @@ export default function ClientSmartTab({
   // D-199: 상황 예시도 요금제에 있는 모듈만(모듈 키 = 기능 권한 키)
   const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
   const assistBuild = useCallback(() => clientBundle(record, today, insights, buildClientSchedule(record, today)), [record, today, insights])
+  // D-618 모듈을 물으면 AI 답 위에 그 모듈 판정 줄(카드 · 모듈 화면과 같은 글)을 고정 — AI 가 판정을 따로 만들지 않게
+  const assistPin = useCallback((ask: string) => (customer ? null : <AskVerdictPin rows={verdictRows(ask, insights, INSIGHT_TONE_LABEL)} />), [insights, customer])
   // D-352 맞춤 진단서 한 장(대표님께 드릴 종이)
   // D-499 오늘 대화창 [맞춤 진단서] 한 번 → 바로 열림(화면 사이 메모리 30초 · 주소 ?diag=1 도)
   const [params, setParams] = useSearchParams()
@@ -212,7 +215,7 @@ export default function ClientSmartTab({
       )}
 
       {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
-      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} />
+      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} pin={assistPin} />
 
       {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
       <FoldAllButton className="-my-2 self-end" />

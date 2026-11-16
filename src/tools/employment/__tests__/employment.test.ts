@@ -27,7 +27,7 @@ import {
   toEmpRecord,
   type EmpRecord,
 } from '../lib/empRecords'
-import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyDefaults, osPickList, programsFromD91, regionOfAddress, toOrigCompany, toOrigEmployee } from '../orig/store'
+import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyDefaults, osPickList, programsFromD91, regionOfAddress, toOrigCompany, toOrigEmployee, withBoxDocs } from '../orig/store'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { simulate, simulationText } from '../lib/simulator'
 import { HIRE_WINDOWS, enrollBadgeText, enrollWindowOf, fullMonthsSince, hireWindowBlocks, hireWindowOf, notEnrolledYet } from '../lib/hireWindow'
@@ -646,6 +646,24 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('원본 업체: 이름은 늘 고객 운영 그대로 · id = 업체 id', comp.name === '(주)한솔테크' && comp.id === 'cli_a' && comp.osId === 'cli_a')
   check('원본 업체: 고용지원금 쪽 기록(급여일·수수료)이 붙는다', comp.payday === '25' && (comp.commission as { rate: number }).rate === 20)
   check('원본 업체: 서류에 파일 칸이 생긴다', Array.isArray((comp.companyDocs as Array<{ files: unknown[] }>)[0].files))
+  // D-618 서류함에 받아 둔 서류 → 업체 서류 체크(이름으로 · 직접 정한 상태는 그대로 · 서류함에 없으면 예전 그대로)
+  {
+    const boxed = { ...os, customDocuments: [{ key: 'customdoc_a', label: '4대보험 가입자 명부', validMonths: null, sensitive: false }, { key: 'customdoc_b', label: '부동산 등기사항증명서', validMonths: null, sensitive: false }, { key: 'customdoc_c', label: '지방세 납세증명서', validMonths: null, sensitive: false }], documents: { businessRegistration: { received: true }, corporateRegistry: { received: false }, customdoc_a: { received: true }, customdoc_b: { received: true }, customdoc_c: { received: true } } } as unknown as ClientOpsRecord
+    const docs = [
+      { id: 'a', label: '사업자등록증', done: false },
+      { id: 'b', label: '법인등기사항전부증명서 (법인)', done: false },
+      { id: 'c', label: '4대보험 가입자 명부', status: 'requested', done: false },
+      { id: 'd', label: '국세 완납 증명서', done: false },
+      { id: 'e', label: '취업규칙', status: 'none', done: false },
+      { id: 'f', label: '사업자등록증', status: 'revise', done: false },
+    ]
+    const out = withBoxDocs(docs, boxed) as Array<{ id: string; status?: string; done?: boolean; fromBox?: boolean }>
+    const by = (id: string) => out.find((d) => d.id === id)!
+    check('D-618 서류함에 있는 사업자등록증 · 명부(요청완료였어도) → 제출완료 · 서류함에 있음', by('a').status === 'submitted' && by('a').done === true && by('a').fromBox === true && by('c').status === 'submitted' && by('c').fromBox === true, JSON.stringify(out))
+    check('D-618 서류함에 없는 것(안 받은 법인등기 · 취업규칙)은 그대로 · 부동산 등기 · 지방세 납세증명은 법인등기 · 국세 완납으로 안 침', !by('b').done && !by('b').fromBox && !by('e').done && !by('d').done && !by('d').fromBox)
+    check('D-618 직접 정한 상태(보완필요)는 서류함에 있어도 그대로', by('f').status === 'revise' && !by('f').fromBox)
+    check('D-618 서류함이 비어 있으면 아무것도 안 바꿈 · 업체 열 때(toOrigCompany) 같이 비춤', JSON.stringify(withBoxDocs(docs, os)) === JSON.stringify(docs) && ((toOrigCompany(boxed, { companyDocs: docs }).companyDocs as Array<{ fromBox?: boolean }>)[0].fromBox === true))
+  }
   const meta = companyMetaOf({ ...comp, phone: '031-000-0000', addr: '서울 새 주소' }, os)
   check('원본 업체 저장: 고객 운영과 같은 값은 적지 않는다', !('phone' in meta) && !('bizNo' in meta) && !('name' in meta) && !('id' in meta))
   check('원본 업체 저장: 고친 값·고용지원금 기록은 적는다', meta.addr === '서울 새 주소' && meta.payday === '25')

@@ -41,3 +41,5 @@ export interface SubsidyAppProps {
 export default function SubsidyApp(props: SubsidyAppProps): ReactElement
 export const DEFAULT_PROGRAMS: Record<string, Rec>
 export const PROGRAM_ENABLED_DEFAULTS: Record<string, boolean>
+/** 업체 기본 서류 틀(묶음마다 서류 이름) — D-618 등록 창 없이 올릴 때도 같은 틀 */
+export const COMPANY_DEFAULT_DOCS: Array<{ cat: string; docs: string[] }>

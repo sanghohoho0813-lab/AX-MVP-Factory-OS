@@ -10,6 +10,7 @@ import { computeLevel, evaluateRisk } from '../lib/riskEngine'
 import { getTaxCreditEstimate } from '../lib/taxCredit'
 import { addMonthsClamped, changeDeadlineOf, daysBetween, ddayOf, isCheckDue, nextCheckDate, parseYmd, ymdLocal, ymLocal } from '../lib/deadlines'
 import { businessAgeLabel, withinStartupYears } from '../lib/startup'
+import { assessInputOf, candidatesUntouched, clientLabFeasibility, defaultAssessForm, labVerdictLine, newCandidate as blankCandidate, prefillAssessForm, restoreAssessForm } from '../lib/assessForm'
 import { monthsInBusiness } from '../../shared/clientPrefill'
 import { addChangeRecord, currentMonth as storageCurrentMonth, nextCheckDate as storageNextCheckDate } from '../orig/lib/storage'
 import { DOC_MASTER, buildTempPackage, docProgressOf, fewerThanTen, missingDocs, stageOf, type SetupDoc } from '../lib/documents'
@@ -564,6 +565,41 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
   off()
   g.localStorage = undefined
   g.window = undefined
+}
+
+/* ───────── D-618 설립 가능성 체크 입력 한 벌 — 모듈 화면과 업체 맞춤 추천이 같은 판정 ───────── */
+{
+  const TODAY = new Date(2026, 10, 16)
+  const base = defaultAssessForm()
+  // 기본값 그대로의 판정 = 화면이 처음 열릴 때의 판정(규모 고르기 전 · 후보자 빈 칸)
+  const r0 = assessFeasibility(assessInputOf(base, TODAY))
+  const l0 = labVerdictLine(base, r0, TODAY)
+  check('D-618 처음 열면: 판정 이름은 모듈과 같은 "추가 확인 필요" · 더 필요한 것에 규모 · 후보자 · 설립일', r0.verdict === '추가 확인 필요' && l0.verdict === r0.verdict && l0.needs.length === 3 && l0.tone === 'need', JSON.stringify(l0))
+  // 업체 기록으로 채우기 — 빈 칸만 · 이미 적은 값은 그대로
+  const facts = { companyName: '가나테크', industryText: '소프트웨어 개발', establishedAt: '2024-06-10', employeeCount: 3, smeSize: '', ventureValidNow: false } as unknown as Parameters<typeof prefillAssessForm>[1]
+  const p1 = prefillAssessForm(base, facts)
+  const p2 = prefillAssessForm({ ...base, companyName: '직접 적은 이름', establishedAt: '2020-01-01' }, facts)
+  check('D-618 업체 기록으로 채우기: 회사명 · 업종 · 설립일 · 직원 수 — 이미 적은 값은 덮지 않음', p1.patch.companyName === '가나테크' && p1.patch.establishedAt === '2024-06-10' && p1.patch.employeeCount === '3' && p1.filled.join() === '회사명,업종,설립일' && p2.patch.companyName === undefined && p2.patch.establishedAt === undefined, JSON.stringify([p1, p2.patch]))
+  const f1 = { ...base, ...p1.patch }
+  const l1 = labVerdictLine(f1, assessFeasibility(assessInputOf(f1, TODAY)), TODAY)
+  check('D-618 설립 3년 안 법인: "창업 3년 이내 — 소기업이면 연구소 2명 · 전담부서 1명부터" 를 말함(규모는 아직 묻는다)', l1.detail.includes('창업 3년 이내(2년 5개월)') && l1.detail.includes('연구전담요원 2명') && l1.detail.includes('1명부터') && l1.needs.join().includes('기업 규모') && !l1.needs.includes('설립일'), JSON.stringify(l1))
+  // 중소기업 확인서(서류함)로 규모가 확인되면 규모를 다시 묻지 않는다
+  const p3 = prefillAssessForm(base, { ...facts, smeSize: '소기업' } as typeof facts)
+  const f3 = { ...base, ...p3.patch }
+  const l3 = labVerdictLine(f3, assessFeasibility(assessInputOf(f3, TODAY)), TODAY)
+  check('D-618 서류함의 중소기업 확인서 → 규모를 다시 묻지 않고 "연구소 2명 · 전담부서 1명이 필요해요"', f3.sizeConfirmed === true && !l3.needs.join().includes('기업 규모') && l3.detail.includes('연구전담요원 2명 · 연구개발전담부서는 1명이 필요해요'), JSON.stringify(l3))
+  // 모듈에서 답한 뒤 — 한 줄은 판정 이름으로 시작하고, 모듈의 판정 함수 결과와 같다
+  const answered = { ...f3, candidates: [{ ...blankCandidate(), name: '김연구', education: '석사' as const, researchYears: 3 }, { ...blankCandidate(), name: '이연구', education: '석사' as const, researchYears: 2 }] }
+  const r4 = assessFeasibility(assessInputOf(answered, TODAY))
+  const l4 = labVerdictLine(answered, r4, TODAY)
+  check('D-618 답한 뒤: 한 줄이 모듈 판정 이름으로 시작 · 인정 가능 인원이 모듈 결과와 같음 · "…만 넣으면" 없음', l4.headline.startsWith(r4.verdict) && l4.headline.includes(`인정 가능 ${r4.eligibleCount}명`) && !l4.headline.includes('만 넣으면') && candidatesUntouched(answered) === false, JSON.stringify({ l4, verdict: r4.verdict }))
+  // 남긴 값 되살리기 — 모양이 다른 값 · 모르는 칸은 기본값
+  const back = restoreAssessForm({ companyName: '되살림', pick: 'x', candidates: 'no', sizeConfirmed: true, 모르는칸: 1 })
+  check('D-618 남긴 답 되살리기: 같은 모양만 쓰고 깨진 값은 기본값', back.companyName === '되살림' && back.pick === 1 && Array.isArray(back.candidates) && back.sizeConfirmed === true && !('모르는칸' in back), JSON.stringify({ pick: back.pick }))
+  // 업체 기록 하나로 — 맞춤 추천 카드가 부르는 길(브라우저 밖에서는 남긴 답이 없다)
+  const rec = { id: 'cli_x', companyName: '가나테크', industry: '소프트웨어 개발', establishedAt: '2024-06-10', employeeCount: '3명', corporateNumber: '110111-1234567', businessNumber: '', documents: {}, customDocuments: [], customFields: [], toolResults: [], shareholderRegister: [] } as unknown as Parameters<typeof clientLabFeasibility>[0]
+  const viaRecord = clientLabFeasibility(rec, TODAY, {})
+  check('D-618 업체 기록 하나로 낸 한 줄 = 같은 값으로 채운 화면의 한 줄(따로 놀지 않음)', viaRecord.line.headline === l1.headline && viaRecord.line.detail === l1.detail && viaRecord.result.verdict === '추가 확인 필요', JSON.stringify(viaRecord.line))
 }
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)
