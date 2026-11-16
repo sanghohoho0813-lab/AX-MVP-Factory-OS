@@ -14,6 +14,12 @@ for f in supabase/migrations/*.sql; do
 done
 echo "마이그레이션 $(ls supabase/migrations/*.sql | wc -l)개 적용"
 out=$(for t in $DIR/test-*.sql; do su postgres -c "psql -d $DB" < "$t" 2>&1; done | grep -E "PASS|FAIL|ERROR" | sed 's/^NOTICE:  //')
+# 대표가 운영에서 맨 먼저 실행할 읽기 전용 점검(check_applied_0026_0028.sql) — 마이그레이션을 전부 넣은 DB 에서는 여덟 줄 모두 '들어감'
+chk=$(su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/check_applied_0026_0028.sql)\"" 2>&1)
+got="$(echo "$chk" | grep -cE '^1 먼저\|.*\|들어감$') $(echo "$chk" | grep -cE '^2 이번\|.*\|들어감$') $(echo "$chk" | grep -E '^2 이번' | grep -oE '[0-9]+/[0-9]+' | tr '\n' ' ')"
+if [ "$got" = "5 3 12/12 8/8 10/10 " ]; then out="$out
+PASS  점검 SQL(0026~0028 · 전부 넣은 DB): 먼저 5줄 · 이번 3줄 모두 '들어감'(12/12 · 8/8 · 10/10)"; else out="$out
+FAIL  점검 SQL(0026~0028 · 전부 넣은 DB): $got (기대 5 3 12/12 8/8 10/10)"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

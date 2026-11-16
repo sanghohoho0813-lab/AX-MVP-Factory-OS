@@ -28,6 +28,10 @@ before=$(v "select count(*) from pg_stat_user_tables where n_tup_ins + n_tup_upd
 out=$(blk supabase/manual/check_applied_0016_0024.sql)
 check "점검 SQL(0015 까지): 0016~0024 아홉 줄 모두 '없음'" "$(echo "$out" | grep -cE '^1 마이그레이션\|(1[6-9]|2[0-4])\|.*\|없음$')" "9"
 check "점검 SQL: 결과 표 하나 — 마지막 결과만 보여 주는 편집기에서도 다 보임(SET 다음 줄이 전부 표)" "$(echo "$out" | grep -vc '|')" "1"
+# 0026 ~ 0028 점검 SQL(check_applied_0026_0028.sql) — 아무것도 없는 DB 에서도 오류 없이 '없음'(없는 표를 읽지 않는다) · 읽기 전용
+out2=$(blk supabase/manual/check_applied_0026_0028.sql)
+check "점검 SQL(0026~0028 · 0015 까지인 DB): 오류 0 · 읽기 전용 on · 먼저 5줄 · 이번 3줄 모두 '없음'" "$(echo "$out2" | grep -c 'ERROR') $(echo "$out2" | grep -E '^0 확인' | cut -d'|' -f5) $(echo "$out2" | grep -cE '^1 먼저\|.*\|없음$') $(echo "$out2" | grep -cE '^2 이번\|.*\|없음$')" "0 on 5 3"
+check "점검 SQL(0026~0028): 맨 위 set transaction read only · 만들기/고치기 문장 0 · 결과 표 하나" "$(grep -v '^--' supabase/manual/check_applied_0026_0028.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/check_applied_0026_0028.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|grant|revoke|truncate)\b') $(echo "$out2" | grep -vc '|')" "set transaction read only; 0 1"
 check "점검 SQL: 한 덩어리로 보내면 맨 첫 줄 '읽기 전용 거래 = on'" "$(echo "$out" | grep -c '^0 확인|0|읽기 전용 거래|.*|on$')" "1"
 check "점검 SQL: 오류 없이 끝남" "$(echo "$out" | grep -c 'ERROR')" "0"
 out=$(su postgres -c "psql -At -F '|' -d $DB -f supabase/manual/check_applied_0016_0024.sql" 2>&1)
@@ -163,6 +167,7 @@ insert into public.operations_clients (id, workspace_id, company_name, payload) 
 SQL
 ownsee() { su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '24000000-0000-4000-8000-0000000000a1', false); set role authenticated; select count(*) from public.operations_clients where id = 'p24-client';" | tail -1; }
 check "연습 ⑪ 0026 전: 대표가 팀장 업체를 본다(0020 그대로)" "$(ownsee)" "1"
+check "연습 ⑪ 점검 SQL(0026~0028): 넣기 전 이번 3줄 '없음'" "$(blk supabase/manual/check_applied_0026_0028.sql | grep -cE '^2 이번\|.*\|없음$')" "3"
 out=$(blk supabase/migrations/20261114000026_view_consent.sql "set lock_timeout = '5s'; ")
 check "연습 ⑪ 0026 한 덩어리(lock_timeout 5초) — 오류 0 · 마지막 결과 = 파일 문 1" "$(echo "$out" | grep -c 'ERROR') $(echo "$out" | tail -1)" "0 1"
 out=$(blk supabase/manual/verify_after_0026.sql)
@@ -177,6 +182,7 @@ out=$(blk supabase/manual/rollback_0026.sql)
 check "연습 ⑪ 되돌리기: 문 0 | 0 · 대표가 다시 팀장 업체를 봄 · 기록 표는 남음" "$(echo "$out" | tail -1) $(ownsee) $(v "select count(*) from pg_tables where tablename in ('workspace_view_grants', 'workspace_view_requests')")" "0|0 1 2"
 out=$(blk supabase/migrations/20261114000026_view_consent.sql)
 check "연습 ⑪ 되돌린 뒤 0026 다시 — 문 다시 · 대표 0 · 확인 6줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(ownsee) $(blk supabase/manual/verify_after_0026.sql | grep -cE '^[1-6]\|.*\|좋음$')" "0 0 6"
+check "연습 ⑪ 점검 SQL(0026~0028): 0026 만 넣은 뒤 — 0026 '들어감' · 0027 · 0028 '없음'" "$(blk supabase/manual/check_applied_0026_0028.sql | grep -E '^2 이번' | cut -d'|' -f2,5 | tr '\n' ' ')" "26|들어감 27|없음 28|없음 "
 # ⑫ L-9 · D-609 0027(고객마다 상담 신청 링크) — 운영 모양(0026 까지 · profiles name) 위에 한 덩어리로
 asr() { su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '$1', false); set role $2; $3" 2>&1 | tail -1; }
 out=$(blk supabase/migrations/20261114000027_intake_links.sql "set lock_timeout = '5s'; ")
@@ -218,4 +224,7 @@ out=$(blk supabase/manual/rollback_0028.sql)
 check "연습 ⑬ 되돌리기: false | false · 가입 화면 함수 막힘 · 열린 고객 그대로 · 기록 남음" "$(echo "$out" | tail -1) $(asr '' anon "select public.signup_open();" | grep -c 'permission denied') $(v "select tier || ' ' || audience from public.os_access where user_id = '$NEWU'") $(v "select count(*) from public.self_signup_accounts")" "f|f 1 pilot customer 1"
 out=$(blk supabase/migrations/20261115000028_self_signup.sql)
 check "연습 ⑬ 되돌린 뒤 0028 다시 — 켠 설정 그대로 · 확인 5줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(asr '' anon "select public.signup_open();") $(blk supabase/manual/verify_after_0028.sql | grep -cE '^[1-5]\|.*\|좋음$')" "0 t 5"
+out2=$(blk supabase/manual/check_applied_0026_0028.sql)
+# 이 연습 DB 는 ⑨ 끝에서 0023 · 0024 를 되돌린 상태다 — '먼저' 의 0024 줄이 '없음' 으로 잡혀야 맞다(있어야 할 것이 빠지면 알려 주는지). 전부 넣은 DB 는 run.sh 가 본다.
+check "연습 ⑬ 점검 SQL(0026~0028): 셋 다 넣은 뒤 — 이번 3줄 '들어감'(12/12 · 8/8 · 10/10) · 되돌려 둔 0024 는 '없음' 으로 알림" "$(echo "$out2" | grep -cE '^2 이번\|.*\|들어감$') $(echo "$out2" | grep -E '^2 이번' | grep -oE '[0-9]+/[0-9]+' | tr '\n' ' ')$(echo "$out2" | grep -E '^1 먼저\|24\|' | cut -d'|' -f5) $(echo "$out2" | grep -cE '^1 먼저\|.*\|들어감$')" "3 12/12 8/8 10/10 없음 4"
 [ "$BAD" -eq 0 ]
