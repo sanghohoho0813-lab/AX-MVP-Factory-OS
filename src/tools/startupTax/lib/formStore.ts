@@ -16,17 +16,21 @@ export function startupTaxKey(clientId: string | null | undefined): string {
   return clientId ? `${STARTUP_TAX_STORAGE_KEY}.client.${clientId}` : sharedToolKey(STARTUP_TAX_STORAGE_KEY)
 }
 
+/** 남긴 답(이 브라우저 · 업체 기록에 붙인 것)을 지금 폼 모양으로 — 없는 칸은 빈 값 */
+export function normalizeStartupTaxForm(saved: Partial<FormData>): FormData {
+  return {
+    ...EMPTY_FORM,
+    ...saved,
+    checkItems: { ...EMPTY_FORM.checkItems, ...(saved.checkItems ?? {}) },
+    advanced: { ...EMPTY_ADVANCED, ...(saved.advanced ?? {}) },
+  }
+}
+
 export function loadStartupTaxForm(clientId: string | null | undefined): FormData | null {
   try {
     const raw = localStorage.getItem(startupTaxKey(clientId))
     if (!raw) return null
-    const saved = JSON.parse(raw) as Partial<FormData>
-    return {
-      ...EMPTY_FORM,
-      ...saved,
-      checkItems: { ...EMPTY_FORM.checkItems, ...(saved.checkItems ?? {}) },
-      advanced: { ...EMPTY_ADVANCED, ...(saved.advanced ?? {}) },
-    }
+    return normalizeStartupTaxForm(JSON.parse(raw) as Partial<FormData>)
   } catch {
     return null
   }
@@ -53,6 +57,39 @@ export function markStartupTaxJudged(clientId: string | null | undefined, judged
     else localStorage.removeItem(judgedKey(clientId))
   } catch {
     /* 표시를 못 남겨도 판정은 된다 */
+  }
+}
+
+/** D-620 마지막으로 [판정] 을 누른 때(이 브라우저) — 모르면 빈 글자(표시가 생기기 전 기록 · 브라우저 밖) */
+export function startupTaxJudgedAt(clientId: string | null | undefined): string {
+  try {
+    const v = localStorage.getItem(judgedKey(clientId)) ?? ''
+    return Number.isNaN(Date.parse(v)) ? '' : v
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * D-620 사람이 답을 고친 때(이 브라우저) — 판정을 누르지 않고 고치기만 한 답도 '업체 기록에 붙인 답' 보다 새것일 수 있다.
+ * 화면을 열기만 했거나 업체 기록으로 빈 칸이 채워진 것은 적지 않는다.
+ */
+const editedKey = (clientId: string | null | undefined) => `${startupTaxKey(clientId)}.edited`
+
+export function markStartupTaxEdited(clientId: string | null | undefined): void {
+  try {
+    localStorage.setItem(editedKey(clientId), new Date().toISOString())
+  } catch {
+    /* 못 적어도 판정은 된다 */
+  }
+}
+
+export function startupTaxEditedAt(clientId: string | null | undefined): string {
+  try {
+    const v = localStorage.getItem(editedKey(clientId)) ?? ''
+    return Number.isNaN(Date.parse(v)) ? '' : v
+  } catch {
+    return ''
   }
 }
 

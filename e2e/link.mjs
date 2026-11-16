@@ -11,6 +11,8 @@
  *              모듈에서 답하면 카드도 같은 글로 바뀜 · [설립서류 관리로 보내기] → 등록 없이 그 업체 서류 ·
  *              서류함에 받아 둔 서류는 '서류함에 있음 · 완료' · 바꾼 상태는 새로 고쳐도 그대로
  *  D. 고용지원금 — `?client=` 첫 화면에 '업체 정보' 등록 창 0 · 업체 목록에 그 업체가 올라가 있음
+ *  F · G. 창업감면 · 정책자금(D-620) — 판정기 · 진단 화면에서 답하면 카드가 그 결과 그대로 · 붙인 뒤에는 이 브라우저에 답이 없어도 같은 글 ·
+ *              다른 기기의 모듈도 붙여 둔 답으로 열림
  *  E. 다른 기기(D-619) — 설립 가능성 체크를 [업체 기록에 붙이기] 하면 답도 같이 붙음 → 이 브라우저에 답이 없어도
  *              카드 · 모듈이 같은 글 · 붙인 뒤에도 카드 = 모듈 · 그 기기에서 고치면 고친 답이 먼저 · 390
  *
@@ -256,6 +258,71 @@ const over = await pp.evaluate(() => document.documentElement.scrollWidth - wind
 check('E. 390 — 붙이기 안내 한 줄이 보이고 옆으로 넘치지 않음', (await pp.getByTestId('lab-answers-sync').count()) === 1 && over <= 1, { over })
 if (SHOTS) await pp.screenshot({ path: `${SHOTS}/link-10-phone-sync.png` })
 await phone.close()
+
+/* ───────── F · G. 창업감면 · 정책자금 — 모듈에서 답하면 카드도 같은 글(D-620) ─────────
+ * 연구소(C · E)와 같은 계약을 나머지 판정 모듈에도: 판정기 · 진단 화면에서 답한 것이 카드에 같은 글로 돌아오고,
+ * [기록에 붙이기] 뒤에는 이 브라우저에 답이 없어도(다른 기기) 같은 글. */
+const insight = async (key) => {
+  await go(`/ops/clients/${CID}?tab=smart`, 1700)
+  return flat(await page.locator(`[data-testid="smart-insight"][data-key="${key}"]`).first().innerText().catch(() => ''))
+}
+const dropLocal = (prefix) => page.evaluate((px) => Object.keys(localStorage).filter((k) => k.startsWith(px)).forEach((k) => localStorage.removeItem(k)), prefix)
+
+// F. 창업감면 — 판정기에서 '기존 사업 양수'(창업으로 보지 않는 경우)라고 답한다
+const stCard0 = await insight('startup-tax')
+await go(`/tools/startup-tax/judge?client=${CID}`)
+await page.getByRole('button', { name: '기존 사업 양수', exact: true }).first().click()
+await page.getByRole('button', { name: '1분 판정하기' }).first().click()
+await page.getByTestId('startup-tax-oneline').waitFor({ timeout: 8000 }).catch(() => {})
+const stModule = flat(await page.getByTestId('startup-tax-oneline').innerText().catch(() => ''))
+const stCard1 = await insight('startup-tax')
+check('F. 창업감면 — 판정기에서 답하면 카드가 판정기의 한 줄 결론 그대로(예전에는 카드가 업체 기록만 보고 따로 판정)', stModule.length > 5 && stCard1.includes(stModule) && !stCard0.includes(stModule) && !stCard1.includes('창업 형태(새로 창업'), { stModule, card0: stCard0.slice(0, 90), card1: stCard1.slice(0, 120) })
+await shot('link-11-startup-card')
+await go(`/tools/startup-tax/judge?client=${CID}`)
+await page.getByRole('button', { name: '1분 판정하기' }).first().click()
+await page.getByTestId('tool-attach-quick').first().click()
+await page.getByTestId('tool-attach-go').waitFor({ timeout: 10000 }).catch(() => {})
+await dropLocal('axmvp.tools.startupTax.client.')
+const stCardFar = await insight('startup-tax')
+check('F. 창업감면 — [기록에 붙이기] 뒤에는 이 브라우저에 답이 없어도(다른 기기) 카드가 같은 글', stCardFar.includes(stModule), stCardFar.slice(0, 140))
+await go(`/tools/startup-tax/judge?client=${CID}`)
+const stNote = flat(await page.getByTestId('tool-prefill-note').innerText().catch(() => ''))
+await page.getByRole('button', { name: '1분 판정하기' }).first().click()
+await page.waitForTimeout(600)
+const stModuleFar = flat(await page.getByTestId('startup-tax-oneline').innerText().catch(() => ''))
+check('F. 창업감면 — 다른 기기의 판정기도 붙여 둔 답으로 열림(다시 안 고름 · 한 줄 안내) · 같은 결론', stModuleFar === stModule && stNote.includes('붙여 둔 판정 답') && (await openDialogs()) === 0, { stModuleFar, stNote: stNote.slice(0, 80) })
+
+// G. 정책자금 — 진단 화면: 그대로 [진단 결과 보기] → 카드와 같은 가능성 · 1순위 기관. 매출을 답하면 카드도 따라 바뀐다
+const pfRead = async () => {
+  await page.getByRole('button', { name: '진단 결과 보기' }).first().click()
+  await page.getByTestId('pf-likelihood').waitFor({ timeout: 8000 }).catch(() => {})
+  // 결과 맨 위 줄 — '진행 가능성 보통 1순위 · 기술보증기금 · …'(가능성 칸 바로 옆에 1순위 기관)
+  const m = /진행 가능성\s*(높음|보통|낮음)\s*1순위\s*·\s*([^\s·]+)/.exec(flat(await page.getByTestId('pf-orig').innerText().catch(() => '')))
+  return { level: m?.[1] ?? '', agency: m?.[2] ?? '', t: m?.[0] ?? '' }
+}
+await go(`/tools/policy-funding/diagnosis?client=${CID}`)
+const pf0 = await pfRead()
+const pfCard0 = await insight('policy-funding')
+check('G. 정책자금 — 진단 화면을 그대로 연 결과 = 카드(같은 가능성 · 같은 1순위 기관)', pf0.level !== '' && pf0.agency !== '' && pfCard0.includes(`진행 가능성 ${pf0.level} · 추천 기관 ${pf0.agency}`), { pf0: pf0.t.slice(0, 80), card: pfCard0.slice(0, 80) })
+await go(`/tools/policy-funding/diagnosis?client=${CID}`)
+await page.getByRole('button', { name: '30억 이상', exact: true }).first().click()
+const pf1 = await pfRead()
+await shot('link-12-policy-module')
+const pfCard1 = await insight('policy-funding')
+check('G. 정책자금 — 진단 화면에서 매출을 답하면 카드도 그 결과로(1순위 기관 · "매출을 알면 더 정확해요" 없음)', pf1.agency !== '' && pfCard1.includes(`진행 가능성 ${pf1.level} · 추천 기관 ${pf1.agency}`) && !pfCard1.includes('매출을 알면'), { pf1: pf1.t.slice(0, 80), card: pfCard1.slice(0, 110) })
+await shot('link-13-policy-card')
+await go(`/tools/policy-funding/diagnosis?client=${CID}`)
+await pfRead()
+await page.getByTestId('pf-attach').getByTestId('tool-attach-quick').click()
+await page.getByTestId('tool-attach-go').waitFor({ timeout: 10000 }).catch(() => {})
+await page.waitForTimeout(400)
+await dropLocal('axmvp.tools.policyFunding.')
+const pfCardFar = await insight('policy-funding')
+check('G. 정책자금 — [기록에 붙이기] 뒤에는 이 브라우저에 답이 없어도(다른 기기) 카드가 같은 글', pf1.agency !== '' && pfCardFar.includes(`진행 가능성 ${pf1.level} · 추천 기관 ${pf1.agency}`) && !pfCardFar.includes('매출을 알면'), pfCardFar.slice(0, 120))
+await go(`/tools/policy-funding/diagnosis?client=${CID}`, 1800)
+const pfFar = await pfRead()
+const pfFarSaved = await page.evaluate((id) => JSON.parse(localStorage.getItem(`axmvp.tools.policyFunding.${id}`) ?? '{}').lastYearRevenue ?? '', CID)
+check('G. 정책자금 — 다른 기기의 진단 화면도 붙여 둔 답으로 열림(매출 다시 안 고름) · 같은 결과', pfFar.agency !== '' && pfFar.agency === pf1.agency && pfFar.level === pf1.level && pfFarSaved === '30억 이상' && (await openDialogs()) === 0, { pfFar: pfFar.t.slice(0, 80), pfFarSaved })
 
 check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3))
 await browser.close()

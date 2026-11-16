@@ -59,6 +59,11 @@ import { readIncomeCert } from '../incomeDoc'
 import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
 import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
 import { clientLabFeasibility, defaultAssessForm, newCandidate } from '../../tools/labcare/lib/assessForm'
+import { attachedStartupForm, prefillStartupForm } from '../clientInsights'
+import { judge } from '../../tools/startupTax/lib/judgement'
+import { EMPTY_FORM as EMPTY_STARTUP_FORM } from '../../tools/startupTax/lib/formDefaults'
+import { attachedPolicyInput, prefillPolicyInput, savedPolicyFor } from '../../tools/policyFunding/lib/clientSaved'
+import { DEFAULT_INPUT as DEFAULT_POLICY_INPUT } from '../../tools/policyFunding/diagnosis'
 import { officerTerms, officerTermsOf, officerTermsValue, readDirectorTermYears, readRegistryTax } from '../registryTax'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
@@ -995,6 +1000,31 @@ await (async () => {
   check('D-619 연구소: 붙인 설립 가능성 체크에 답이 있으면 카드 = 그 답의 판정 줄(판정 이름만 보이던 것 고침) · 설립 가능성 체크로 바로', labAnsCard?.headline === labAnsLine.headline && labAnsCard.detail === labAnsLine.detail && labAnsLine.headline.includes('인정 가능') && labAnsCard.openPath.includes('/tools/labcare/assessment'), JSON.stringify(labAnsCard))
   const labOld = normalizeClientOps({ ...base, toolResults: [assessResult({ kind: 'assess', verdict: '보완 후 가능' })] } as never)
   check('D-619 연구소: 답이 없는 예전 결과는 붙인 글 그대로(판정을 지어내지 않음)', buildInsights(labOld, T, []).find((i) => i.key === 'labcare')?.headline === '보완 후 가능')
+
+  // D-620 창업감면 · 정책자금 — 모듈에서 답한 것(업체 기록에 붙인 답)을 카드가 같은 채우기 규칙 · 같은 판정 함수로 읽는다
+  const tr = (toolKey: string, data: unknown, at = '2026-10-10T00:00:00.000Z', id = `tr-${toolKey}`) => ({ id, toolKey, title: '판정', verdict: null, verdictLabel: '', summary: '', data, deadlines: [], createdAt: at, publishedUpdateId: null })
+  const withBirth = { ...base, representativeBirth: '1980-05-10' }
+  const stFacts = clientFacts(normalizeClientOps(withBirth as never), new Date(`${T}T00:00:00`))
+  const stPlain = buildInsights(normalizeClientOps(withBirth as never), T, []).find((i) => i.key === 'startup-tax')
+  const stAnswers = { ...EMPTY_STARTUP_FORM, startupForm: 'acquisition' as const }
+  const stRec = normalizeClientOps({ ...withBirth, toolResults: [tr('startup-tax', { form: stAnswers, baseDate: T })] } as never)
+  const stCard = buildInsights(stRec, T, []).find((i) => i.key === 'startup-tax')
+  const stSame = judge(prefillStartupForm(stAnswers, stFacts).next, new Date(`${T}T00:00:00`))
+  check('D-620 창업감면: 붙인 판정의 답("기존 사업 양수")이 있으면 카드 = 그 답으로 낸 판정기의 한 줄 결론(업체 기록만 본 판정과 다름) · 창업 형태를 더 묻지 않음', !!stCard && stCard.headline === stSame.oneLineConclusion && stCard.headline !== stPlain?.headline && stCard.tone === 'no' && stCard.missing.length === 0 && (stPlain?.missing ?? []).join().includes('창업 형태'), JSON.stringify({ card: stCard?.headline, plain: stPlain?.headline }))
+  const stFill = prefillStartupForm({ ...EMPTY_STARTUP_FORM, startupDate: '2020-01-01' }, stFacts)
+  check('D-620 창업감면 채우기: 빈 칸만(이미 적은 창업일은 그대로) · 주소로 권역', stFill.next.startupDate === '2020-01-01' && stFill.next.birthDate === '1980-05-10' && stFill.next.region === 'gyeonggi_incheon' && !stFill.filled.includes('창업일') && stFill.filled.includes('대표자 생년월일'), JSON.stringify(stFill.filled))
+  check('D-620 창업감면: 붙인 답이 여럿이면 가장 최근 것 · 답이 없는 결과는 건너뜀', attachedStartupForm({ toolResults: [tr('startup-tax', { form: { startupForm: 'brand_new' } }, '2026-10-01T00:00:00.000Z', 'a'), tr('startup-tax', { form: stAnswers }, '2026-10-09T00:00:00.000Z', 'b'), tr('startup-tax', {}, '2026-10-12T00:00:00.000Z', 'c')] } as never)?.form.startupForm === 'acquisition' && attachedStartupForm(base) === null)
+  const pfPlain = buildInsights(base, T, []).find((i) => i.key === 'policy-funding')
+  const pfInput = { ...DEFAULT_POLICY_INPUT, lastYearRevenue: '30억 이상' as const, revenue: '30억 이상' as const }
+  const pfRec = normalizeClientOps({ ...base, toolResults: [tr('policy-funding', { input: pfInput, touched: ['lastYearRevenue', 'revenue'] })] } as never)
+  const pfCard = buildInsights(pfRec, T, []).find((i) => i.key === 'policy-funding')
+  const pfFacts = clientFacts(pfRec, new Date(`${T}T00:00:00`))
+  const pfSame = runDiagnosis(prefillPolicyInput(pfInput, pfFacts, { touched: new Set(['lastYearRevenue', 'revenue']), record: pfRec, today: T }).next)
+  check('D-620 정책자금: 붙인 진단의 답(매출 30억 이상)이 있으면 카드 = 그 답으로 낸 진단 화면의 가능성 · 1순위 기관 · "매출을 알면" 을 더 묻지 않음', !!pfCard && pfCard.headline === `진행 가능성 ${pfSame.likelihoodLevel} · 추천 기관 ${pfSame.topAgency}` && !pfCard.detail.includes('매출을 알면') && !pfCard.detail.includes('매출 ·') && !pfCard.missing.join().includes('매출(') && (pfPlain?.missing ?? []).join().includes('매출('), JSON.stringify({ card: pfCard?.headline, cardMissing: pfCard?.missing, plainMissing: pfPlain?.missing }))
+  const pfKeep = prefillPolicyInput({ ...DEFAULT_POLICY_INPUT, businessType: '개인사업자' }, { ...pfFacts, businessType: 'corporation' } as typeof pfFacts, { touched: new Set(['businessType']), record: null, today: T })
+  const pfFillNow = prefillPolicyInput({ ...DEFAULT_POLICY_INPUT, businessType: '개인사업자' }, { ...pfFacts, businessType: 'corporation' } as typeof pfFacts, { touched: new Set(), record: null, today: T })
+  check('D-620 정책자금 채우기: 사람이 바꾼 칸은 업체 정보로 덮지 않음(일부러 고른 개인사업자) · 손대지 않은 칸만 채움', pfKeep.next.businessType === '개인사업자' && pfFillNow.next.businessType === '법인사업자')
+  check('D-620 정책자금: 붙인 답이 여럿이면 가장 최근 것 · 사람이 바꾼 칸 목록도 같이 · 답이 없는 결과는 건너뜀', attachedPolicyInput({ toolResults: [tr('policy-funding', { input: { purpose: '시설자금' } }, '2026-10-01T00:00:00.000Z', 'a'), tr('policy-funding', { input: pfInput, touched: ['revenue', 1] }, '2026-10-09T00:00:00.000Z', 'b'), tr('policy-funding', { agencies: [] }, '2026-10-12T00:00:00.000Z', 'c')] } as never)?.touched.join() === 'revenue' && attachedPolicyInput(base) === null && savedPolicyFor(pfRec)?.from === 'record')
 
   const mk = (key: string, label: string, tone: Insight['tone'], missing: string[]): Insight => ({ key, label, tone, headline: '', detail: '', missing, openPath: '', openLabel: '', action: null })
   const ins = [mk('employment', '고용지원금', 'need', ['4대보험 가입자 명부']), mk('cretop', '크레탑', 'need', ['크레탑 기업종합보고서']), mk('tax', '절세 설계', 'need', ['주주명부', '대표 급여']), mk('policy-funding', '정책자금', 'need', ['설립일', '업종']), mk('startup-tax', '창업감면', 'need', ['설립일(창업일)', '대표 생년월일']), mk('grants', '지원사업', 'good', ['직원 수'])]

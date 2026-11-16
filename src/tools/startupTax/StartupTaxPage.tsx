@@ -14,7 +14,7 @@ import { useSearchParams } from 'react-router-dom'
 import { presetAssumptions, presetFieldsKept, presetStartup, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
 import { todayLocalDate } from '../../lib/appClock'
 import { PresetNote } from '../shared/PresetNote'
-import { startupRegion } from '../../services/clientInsights'
+import { prefillStartupForm, savedStartupFor, startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -26,7 +26,7 @@ import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { FactSendButton } from '../shared/FactSendButton'
 import { useToolClient } from '../shared/toolClientContext'
-import { loadStartupTaxForm, saveStartupTaxForm, markStartupTaxJudged } from './lib/formStore'
+import { loadStartupTaxForm, saveStartupTaxForm, markStartupTaxEdited, markStartupTaxJudged } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
 import { EMPTY_ADVANCED, EMPTY_FORM, openSavedForm } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
@@ -83,47 +83,19 @@ function StartupTaxScreen() {
   const result: JudgementResult | null = useMemo(() => (submitted ? judge(judgedForm, baseDate) : null), [submitted, judgedForm, baseDate])
   const summaryText = useMemo(() => (result ? buildSummaryText(result) : ''), [result])
 
-  // 업체에서 열었으면 아는 것은 다시 묻지 않는다 (D-90) — 빈 칸(원본 기본값 포함)만 채운다
+  // 업체에서 열었으면 아는 것은 다시 묻지 않는다 (D-90) — 빈 칸(원본 기본값 포함)만 채운다.
+  // D-620 채우는 규칙은 `prefillStartupForm` 한 곳(맞춤 추천 카드도 같은 규칙).
+  //       업체 기록에 붙여 둔 판정의 답이 이 브라우저에서 판정한 것보다 새것이면(다른 기기 · 같이 쓰는 사람이 붙임) 그 답으로 연다.
+  const { clientRecord } = useToolClient()
   const { note: prefillNote } = usePrefillFromClient((facts) => {
-    const filled: string[] = []
-    const next = { ...form }
-    if (!next.businessType && facts.businessType) {
-      next.businessType = facts.businessType
-      filled.push('사업자 유형')
-    }
-    if (!next.birthDate && facts.representativeBirth) {
-      next.birthDate = facts.representativeBirth
-      filled.push('대표자 생년월일')
-    }
-    if (!next.startupDate && facts.establishedAt) {
-      next.startupDate = facts.establishedAt
-      filled.push('창업일')
-    }
-    if (!next.industry && facts.industry) {
-      next.industry = facts.industry as StartupTaxForm['industry']
-      filled.push('업종')
-    }
-    // D-325 서류함의 벤처기업확인서 '확인일' → 창업벤처중소기업 감면(§6②)
-    if (next.ventureDate === undefined && facts.ventureConfirmedAt) {
-      next.ventureDate = facts.ventureConfirmedAt
-      filled.push('벤처 확인일')
-    }
-    // D-318 회사 주소로 권역까지 — 예전에는 상황 예시로 열 때만 채워, 그냥 열면 지역 · 과밀억제권역을 다시 골라야 했다
-    if (!next.region && facts.address) {
-      const place = startupRegion(facts.address)
-      if (place.region) {
-        next.region = place.region
-        if (!next.overconcentration && place.over) next.overconcentration = place.over
-        if (!next.popDecline && place.popDecline) next.popDecline = place.popDecline
-        filled.push('사업장 지역(주소)')
-      }
-    }
-    if (filled.length > 0) setForm(next)
-    return filled
+    const picked = clientRecord && clientRecord.id === clientId ? savedStartupFor(clientRecord) : null
+    const fromRecord = picked?.from === 'record' && picked.form ? openSavedForm(picked.form) : null
+    const { next, filled } = prefillStartupForm(fromRecord ?? form, facts)
+    if (fromRecord || filled.length > 0) setForm(next)
+    return fromRecord ? ['업체 기록에 붙여 둔 판정 답', ...filled] : filled
   })
 
   // D-199 상황 예시(?preset=) — 그 상황의 가정(창업 형태 · 권역)을 넣고 바로 판정한다. 권역이 비어 있으면 업체 주소로
-  const { clientRecord } = useToolClient()
   const [params, setParams] = useSearchParams()
   const presetId = params.get('preset')
   const presetDone = useRef(false)
@@ -160,7 +132,14 @@ function StartupTaxScreen() {
     setForm(freshForm())
     setSubmitted(false)
     markStartupTaxJudged(clientId, false)
+    // D-620 비운 것도 '고친 답' — 업체 기록에 붙여 둔 예전 답이 다시 채워지지 않게
+    markStartupTaxEdited(clientId)
     top()
+  }
+  // D-620 사람이 답을 고친 때를 적는다(업체 기록에 붙인 답과 견줄 때 쓴다 — 열기만 한 것 · 업체 기록으로 채운 것은 적지 않는다)
+  const handleChange = (next: StartupTaxForm) => {
+    markStartupTaxEdited(clientId)
+    setForm(next)
   }
   const handleBack = () => {
     setSubmitted(false)
@@ -232,7 +211,7 @@ function StartupTaxScreen() {
               }
             />
           ) : (
-            <InputForm form={form} onChange={setForm} onSubmit={handleSubmit} onReset={handleReset} currentYear={currentYear} />
+            <InputForm form={form} onChange={handleChange} onSubmit={handleSubmit} onReset={handleReset} currentYear={currentYear} />
           )}
 
           <footer className="t-meta mt-10 px-1 text-center text-slate-400">창업감면 1분 판정기 · 상담용 사전진단 도구</footer>

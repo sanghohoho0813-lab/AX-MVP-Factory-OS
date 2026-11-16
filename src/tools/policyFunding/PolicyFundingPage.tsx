@@ -8,7 +8,7 @@
  * 이 OS 에서 더한 것: 고객 = 고객 운영 업체(orig/storage) · 업체 정보로 채우기(D-90) · 업체 기록에 붙이기(D-89).
  */
 
-import { ceoAgeBand, employeesBand, lastYearRevenueBand, revenueBand, yearsBand } from './clientInput'
+import { loadPolicyInputRaw, loadPolicyTouched, markPolicySavedAt, policyInputKey, policySavedAt, policyTouchedKey, prefillPolicyInput, savedPolicyFor } from './lib/clientSaved'
 import { useCallback, useEffect, useState, type ReactNode, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -18,9 +18,7 @@ import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
-import { policyEvidence } from '../../services/policyEvidence'
-import { todayLocalDate } from '../../lib/appClock'
-import { sharedToolKey } from '../shared/toolStorage'
+import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
@@ -36,34 +34,12 @@ import CustomerDetailView from './orig/components/CustomerDetailView'
 import ReportView from './orig/components/ReportView'
 import { STAGE_BADGE } from './orig/stages'
 
-const STORAGE_KEY = 'axmvp.tools.policyFunding'
-/** D-126: 업체마다 따로 기억한다 — 예전에는 브라우저에 하나라 다른 업체로 열어도 앞 업체 답이 그대로 보였다 */
-const keyFor = (clientId: string | null | undefined) => (clientId ? `${STORAGE_KEY}.${clientId}` : sharedToolKey(STORAGE_KEY))
-
-/**
- * D-215: 사람이 직접 바꾼 칸 — 업체 정보로 채울 때 건드리지 않는다.
- * 이 도구는 기본값이 빈 값이 아니라(개인사업자 · 1~3년 · 1~4명) '기본값과 같으면 안 고친 칸' 으로 봤는데,
- * 일부러 고른 '개인사업자' · '1~3년' 이 기본값과 같아 다시 열 때마다 업체 정보(법인 · 5년)로 바뀌었다.
- */
-const touchedKey = (clientId: string | null | undefined) => `${keyFor(clientId)}:touched`
-function loadTouched(clientId: string | null | undefined): Set<string> {
-  try {
-    const raw = localStorage.getItem(touchedKey(clientId))
-    const list = raw ? (JSON.parse(raw) as unknown) : []
-    return new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
+const keyFor = policyInputKey
+const touchedKey = policyTouchedKey
+const loadTouched = loadPolicyTouched
 
 function loadInput(clientId: string | null | undefined): DiagnosisInput {
-  try {
-    const raw = localStorage.getItem(keyFor(clientId))
-    if (!raw) return DEFAULT_INPUT
-    return { ...DEFAULT_INPUT, ...(JSON.parse(raw) as Partial<DiagnosisInput>) }
-  } catch {
-    return DEFAULT_INPUT
-  }
+  return { ...DEFAULT_INPUT, ...(loadPolicyInputRaw(clientId) ?? {}) }
 }
 
 function buildSummary(input: DiagnosisInput, r: DiagnosisResult): string {
@@ -137,21 +113,23 @@ function DiagnosisScreen() {
     loadedFor.current = clientId
     setSeed((s) => ({ input: loadInput(clientId), key: s.key + 1 }))
   }, [clientId])
-  // D-165: 이 브라우저에 이 업체 입력이 없으면 마지막으로 붙인 진단 결과의 입력으로(다른 기기 · 다른 업체에서 붙인 결과 '다시 열기')
+  // D-165: 이 브라우저에 이 업체 입력이 없으면 마지막으로 붙인 진단 결과의 입력으로(다른 기기 · 다른 업체에서 붙인 결과 '다시 열기').
+  // D-620: 이 브라우저에 입력이 있어도, 업체 기록에 붙인 답이 더 새것이면(다른 기기 · 같이 쓰는 사람이 붙임) 그 답으로 — 맞춤 추천 카드와 같은 규칙(`savedPolicyFor`).
   const restoredFor = useRef<string | null>(null)
   useEffect(() => {
     if (autoSample || !clientId || !clientRecord || clientRecord.id !== clientId || restoredFor.current === clientId) return
     restoredFor.current = clientId
+    const picked = savedPolicyFor(clientRecord)
+    if (picked?.from !== 'record') return
+    // 붙인 답에 딸린 '사람이 바꾼 칸' · 붙인 때도 같이 가져온다(업체 정보로 채울 때 그 칸을 덮지 않게 · 다음에 견줄 때 같은 때로)
+    touched.current = { client: clientId, keys: new Set(picked.touched) }
     try {
-      if (localStorage.getItem(keyFor(clientId))) return
+      localStorage.setItem(touchedKey(clientId), JSON.stringify([...picked.touched]))
     } catch {
-      return
+      /* 못 적어도 진단은 된다 */
     }
-    const last = (clientRecord.toolResults ?? [])
-      .filter((r) => r.toolKey === 'policy-funding')
-      .map((r) => (r.data as { input?: Partial<DiagnosisInput> } | null)?.input)
-      .find((i): i is Partial<DiagnosisInput> => !!i && typeof i === 'object')
-    if (last) setSeed((s) => ({ input: { ...DEFAULT_INPUT, ...last }, key: s.key + 1 }))
+    markPolicySavedAt(clientId, picked.at)
+    setSeed((s) => ({ input: picked.input, key: s.key + 1 }))
   }, [autoSample, clientId, clientRecord])
 
   // 업체에서 열었으면 아는 것을 채운다 (D-90).
@@ -159,93 +137,9 @@ function DiagnosisScreen() {
   // D-209: 같은 때 '지난 진단 되살리기' 가 먼저 넣은 입력 위에 채운다(그때의 seed 가 아니라 최신 seed) — 예전에는 되살린 입력을 기본값으로 덮었다
   const touched = useRef<{ client: string | null | undefined; keys: Set<string> }>({ client: clientId, keys: loadTouched(clientId) })
   if (touched.current.client !== clientId) touched.current = { client: clientId, keys: loadTouched(clientId) }
-  const fillFrom = (base0: DiagnosisInput, facts: Parameters<Parameters<typeof usePrefillFromClient>[0]>[0]): { next: DiagnosisInput; filled: string[] } => {
-    const filled: string[] = []
-    // D-215: 사람이 바꾼 칸은 '기본값이 아닌 것' 처럼 다룬다 — 아래 '기본값과 같으면 채움' 비교에서 빠지게
-    const t = touched.current.keys
-    const base = { ...base0 }
-    const next = { ...base }
-    const isUntouched = (k: keyof DiagnosisInput) => !t.has(k as string)
-    if (!next.companyName && facts.companyName) {
-      next.companyName = facts.companyName
-      filled.push('업체명')
-    }
-    if (!next.industry && facts.industryText) {
-      next.industry = facts.industryText
-      filled.push('업종')
-    }
-    if (isUntouched('businessType') && next.businessType === DEFAULT_INPUT.businessType && facts.businessType === 'corporation') {
-      next.businessType = '법인사업자'
-      filled.push('사업자 유형')
-    }
-    const years = yearsBand(facts.years)
-    if (isUntouched('years') && next.years === DEFAULT_INPUT.years && years) {
-      next.years = years
-      filled.push('업력')
-    }
-    const emp = employeesBand(facts.employeeCount)
-    if (isUntouched('employees') && next.employees === DEFAULT_INPUT.employees && emp) {
-      next.employees = emp
-      filled.push('직원 수')
-    }
-    // D-128: 매출 · 순이익은 사실 창고에서 — 확인됨 · 적어 둔 값만(예상값은 넣지 않는다)
-    const rev = facts.revenue && !facts.revenue.estimated ? facts.revenue.won : null
-    if (rev !== null) {
-      const band = revenueBand(rev)
-      if (isUntouched('revenue') && next.revenue === DEFAULT_INPUT.revenue && band !== next.revenue) {
-        next.revenue = band
-        filled.push('매출 규모')
-      }
-      if ((next.lastYearRevenue ?? '미확인') === '미확인') {
-        next.lastYearRevenue = lastYearRevenueBand(rev)
-        filled.push(`작년 매출${facts.revenue?.asOf ? `(${facts.revenue.asOf})` : ''}`)
-      }
-    }
-    const ni = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : null
-    if (ni !== null && (next.netProfit ?? '미확인') === '미확인') {
-      next.netProfit = ni > 0 ? '흑자' : ni < 0 ? '적자' : '손익분기'
-      filled.push('순이익')
-    }
-    const age = ceoAgeBand(facts.representativeAge)
-    if ((next.ceoAge ?? '미확인') === '미확인' && age) {
-      next.ceoAge = age
-      filled.push('대표 나이')
-    }
-    // D-306 서류함 납세증명서 · 완납증명서 → 체납 없음 · 자본잠식 → 부채비율 높음(맞춤 추천과 같은 근거) — 아직 '미확인' 인 칸만
-    if (clientRecord && clientRecord.id === clientId) {
-      const ev = policyEvidence(clientRecord, facts, todayLocalDate())
-      const put = <K extends 'taxArrears' | 'insuranceArrears' | 'debtRatioStatus' | 'youthEmployment' | 'creditBand'>(k: K, label: string) => {
-        const v = ev.input[k]
-        if (v && isUntouched(k) && (next[k] ?? '미확인') === '미확인') {
-          next[k] = v as DiagnosisInput[K]
-          filled.push(label)
-        }
-      }
-      put('taxArrears', '세금 체납 없음(납세증명서)')
-      put('insuranceArrears', '4대보험 체납 없음(완납증명서)')
-      put('debtRatioStatus', '부채비율 높음(자본잠식)')
-      // D-310 4대보험 명부 — 직원이 늘었으면 강점 '고용 증가'(고른 강점은 그대로 두고 더한다) · 청년 직원이 있으면 청년 고용 '있음'
-      if (ev.input.strengths?.length && isUntouched('strengths') && ev.input.strengths.some((x) => !next.strengths.includes(x))) {
-        next.strengths = [...next.strengths.filter((x) => x !== '없음' && !ev.input.strengths?.includes(x)), ...ev.input.strengths]
-        filled.push('강점 고용 증가(4대보험 명부)')
-      }
-      put('youthEmployment', '청년 고용 있음(4대보험 명부)')
-      // D-381 대표 신용점수 조회서 → 대표 신용 칸(아직 '미확인' 일 때만)
-      if (ev.input.creditBand) put('creditBand', `대표 신용 ${ev.input.creditBand}(신용점수 조회서)`)
-      // D-311 서류함에 있는 준비 서류 → 자료 체크 '확보' — 사람이 고르는 칸이 아니라 늘 지금 서류함대로
-      const docs = ev.input.haveDocs ?? []
-      if (docs.join() !== (next.haveDocs ?? []).join()) {
-        next.haveDocs = docs
-        if (docs.length) filled.push(`준비 서류 ${docs.length}가지(서류함)`)
-      }
-      // D-307 가점(특허 · 연구소 · 벤처 · 이노비즈 …) — 아직 아무것도 고르지 않았을 때만
-      if (ev.input.bonusItems?.length && isUntouched('bonusItems') && (next.bonusItems ?? []).filter((b) => b !== '없음').length === 0) {
-        next.bonusItems = ev.input.bonusItems
-        filled.push(`가점(${ev.input.bonusItems.join(' · ')})`)
-      }
-    }
-    return { next, filled }
-  }
+  const fillFrom = (base0: DiagnosisInput, facts: Parameters<Parameters<typeof usePrefillFromClient>[0]>[0]): { next: DiagnosisInput; filled: string[] } =>
+    // D-620 채우는 규칙은 lib/clientSaved 한 곳(맞춤 추천 카드도 같은 규칙) — 사람이 바꾼 칸(D-215)은 건드리지 않는다
+    prefillPolicyInput(base0, facts, { touched: touched.current.keys, record: clientRecord && clientRecord.id === clientId ? clientRecord : null, today: todayLocalDate() })
   const { note: prefillNote } = usePrefillFromClient((facts) => {
     const { filled } = fillFrom(seed.input, facts)
     if (filled.length > 0)
@@ -263,14 +157,21 @@ function DiagnosisScreen() {
   const mountKey = `${clientId ?? ''}|${seed.key}`
   const remember = useCallback((input: DiagnosisInput) => {
     const prev = lastSeen.current
+    // D-620 고친 때 표시가 아직 없으면 — 예전에 답해 둔 기록(사람이 바꾼 칸이 있음)은 지금 것으로 치고, 열기만 한 것은 '답 없음'('')으로 적는다
+    if (policySavedAt(clientId) === null) markPolicySavedAt(clientId, loadPolicyInputRaw(clientId) && touched.current.keys.size > 0 ? nowIso() : '')
     if (prev && prev.mount === mountKey) {
       let changed = false
+      let edited = false
       for (const k of Object.keys(input) as (keyof DiagnosisInput)[]) {
-        if (input[k] !== prev.input[k] && !touched.current.keys.has(k)) {
+        if (input[k] === prev.input[k]) continue
+        edited = true
+        if (!touched.current.keys.has(k)) {
           touched.current.keys.add(k)
           changed = true
         }
       }
+      // 사람이 고친 때 — 업체 기록에 붙인 답과 견줄 때 쓴다(업체 정보로 채워진 것 · 열기만 한 것은 고친 것이 아니다)
+      if (edited) markPolicySavedAt(clientId, nowIso())
       if (changed)
         try {
           localStorage.setItem(touchedKey(clientId), JSON.stringify([...touched.current.keys]))
@@ -296,7 +197,8 @@ function DiagnosisScreen() {
           verdict={result.likelihoodLevel ?? null}
           verdictLabel={`진행 가능성 ${result.likelihoodLevel} · 1순위 ${result.topAgency}`}
           summary={buildSummary(input, result)}
-          data={{ input, agencies: result.agencies, tracks: result.specialTracks, documents: result.documents }}
+          // D-620 사람이 바꾼 칸도 같이 싣는다 — 다른 기기에서 이 답으로 열 때 업체 정보가 그 칸을 덮지 않게
+          data={{ input, touched: [...touched.current.keys], agencies: result.agencies, tracks: result.specialTracks, documents: result.documents }}
           // D-237 저장은 이 단추 하나로 — 업체 기록에 붙이면서 상담(업체 목록 · 결과서)에도 같은 진단을 저장한다
           onAttached={(cid) =>
             void saveCustomer(buildCustomerFromDiagnosis(input, result, { quickInput: input, clientId: cid })).then((ok) => {

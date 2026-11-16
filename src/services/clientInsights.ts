@@ -22,10 +22,12 @@ import { credentialsOf, profileOfRecord, missingForMatch } from './grants/grantP
 import { grantWhatIfs, whatIfLine } from './grants/grantWhatIf'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { prefillPolicyInput, savedPolicyFor } from '../tools/policyFunding/lib/clientSaved'
 import { policyEvidence } from './policyEvidence'
 import { policyApplyAsk, policyApplyMessage } from './policyApply'
 import { judge } from '../tools/startupTax/lib/judgement'
-import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
+import { EMPTY_FORM, openSavedForm } from '../tools/startupTax/lib/formDefaults'
+import { isStartupTaxJudged, loadStartupTaxForm, normalizeStartupTaxForm, startupTaxEditedAt, startupTaxJudgedAt } from '../tools/startupTax/lib/formStore'
 import { METRO_POP_DECLINE, startupCreditOverlap } from '../tools/startupTax/lib/rules'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
@@ -143,15 +145,21 @@ const policyInsight: Provider = ({ record, facts, today }) => {
   // D-306 서류함의 납세증명서 · 완납증명서 → 체납 '없음'(미확인이면 엔진이 '높음' 을 막는다) · 자본잠식 → 부채비율 '높음'
   const ev = policyEvidence(record, facts, today)
   const open = `/tools/policy-funding/diagnosis${q(record)}`
-  const core = missing.filter((m) => m !== '매출')
+  // D-620 진단 화면에서 답한 것이 있으면(이 브라우저 · 업체 기록에 붙인 것 가운데 새것) 그 답 + 업체 기록(손대지 않은 칸만)으로 — 진단 화면과 같은 채우기 규칙 · 같은 엔진.
+  // (예전에는 카드가 업체 기록만 보고 따로 진단해, 화면에서 매출을 답해 1순위 기관이 바뀌어도 카드는 예전 기관 · '매출을 알면 더 정확해요' 그대로였다)
+  const saved = savedPolicyFor(record)
+  const mod = saved ? prefillPolicyInput(saved.input, facts, { touched: saved.touched, record, today }).next : null
+  const core = mod ? [] : missing.filter((m) => m !== '매출')
   if (core.length) return { key: 'policy-funding', label: '정책자금', tone: 'need', headline: `${josa(core.join(' · '), '을/를')} 알면 바로 판정해요`, detail: '사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요.', missing: core, openPath: open, openLabel: '정책자금 진단', action: null }
-  const r = runDiagnosis({ ...input, ...ev.input })
+  const r = runDiagnosis(mod ?? { ...input, ...ev.input })
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
-  // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — '높음' 으로 단정하지 않고 가정이라고 알린다
-  const noHeadcount = assumed.includes('직원 수')
+  // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — '높음' 으로 단정하지 않고 가정이라고 알린다(진단 화면에서 직접 골랐으면 가정이 아니다)
+  const noHeadcount = assumed.includes('직원 수') && !saved?.touched.has('employees')
+  // 매출 — 진단 화면에서 직접 골랐으면(전년도 매출 구간) 더 묻지 않는다
+  const noRevenue = missing.includes('매출') && !(mod && (saved?.touched.has('revenue') || saved?.touched.has('lastYearRevenue')))
   const tone: InsightTone = level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no'
   const why = r.headline?.reasons[0] ?? r.nextAction
-  const more = [missing.includes('매출') ? '매출' : '', noHeadcount ? '직원 수' : ''].filter(Boolean)
+  const more = [noRevenue ? '매출' : '', noHeadcount ? '직원 수' : ''].filter(Boolean)
   // D-311 준비 서류 — 서류함에 있는 것은 '확보'. 서류함에 하나라도 있을 때만(새 업체에 '1/14' 를 보이지 않게)
   const docsLine = policyDocsLine(r.documentChecks ?? [], (ev.input.haveDocs ?? []).length > 0)
   // D-313 판정이 났으면(볼 만함 · 바로 제안) 아직 받을 신청 서류를 카톡 문구로
@@ -170,7 +178,7 @@ const policyInsight: Provider = ({ record, facts, today }) => {
       .filter(Boolean)
       .join(' · '),
     missing: [
-      ...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []),
+      ...(noRevenue ? ['매출(재무제표 · 크레탑)'] : []),
       ...(noHeadcount ? ['직원 수(4대보험 가입자 명부)'] : []),
       // 체납을 확인할 서류 — 없으면 엔진이 가능성을 '높음' 으로 올리지 않는다
       ...(ev.want.length ? [`체납 확인 — ${ev.want.join(' · ')}`] : []),
@@ -246,6 +254,89 @@ function startupFormOf(facts: ClientFacts): StartupForm {
 }
 
 /**
+ * D-620 판정기 화면이 업체 기록으로 빈 칸을 채우는 규칙 — 화면과 맞춤 추천 카드가 같이 쓴다(이미 적은 값은 덮지 않는다).
+ * filled 는 '무엇을 채웠나' 한 줄에 쓴다.
+ */
+export function prefillStartupForm(form: StartupForm, facts: ClientFacts): { next: StartupForm; filled: string[] } {
+  const filled: string[] = []
+  const next = { ...form }
+  if (!next.businessType && facts.businessType) {
+    next.businessType = facts.businessType
+    filled.push('사업자 유형')
+  }
+  if (!next.birthDate && facts.representativeBirth) {
+    next.birthDate = facts.representativeBirth
+    filled.push('대표자 생년월일')
+  }
+  if (!next.startupDate && facts.establishedAt) {
+    next.startupDate = facts.establishedAt
+    filled.push('창업일')
+  }
+  if (!next.industry && facts.industry) {
+    next.industry = facts.industry as StartupForm['industry']
+    filled.push('업종')
+  }
+  // D-325 서류함의 벤처기업확인서 '확인일' → 창업벤처중소기업 감면(§6②)
+  if (next.ventureDate === undefined && facts.ventureConfirmedAt) {
+    next.ventureDate = facts.ventureConfirmedAt
+    filled.push('벤처 확인일')
+  }
+  // D-318 회사 주소로 권역까지 — 그냥 열어도 지역 · 과밀억제권역을 다시 고르지 않게
+  if (!next.region && facts.address) {
+    const place = startupRegion(facts.address)
+    if (place.region) {
+      next.region = place.region
+      if (!next.overconcentration && place.over) next.overconcentration = place.over
+      if (!next.popDecline && place.popDecline) next.popDecline = place.popDecline
+      filled.push('사업장 지역(주소)')
+    }
+  }
+  return { next, filled }
+}
+
+/** 업체 기록에 붙인 창업감면 판정의 답(가장 최근 것) — 판정기는 붙일 때 답을 같이 싣는다 */
+export function attachedStartupForm(record: Pick<ClientOpsRecord, 'toolResults'> | null | undefined): { form: StartupForm; at: string } | null {
+  let best: { form: StartupForm; at: string } | null = null
+  for (const r of record?.toolResults ?? []) {
+    if (r.toolKey !== 'startup-tax') continue
+    const f = (r.data as { form?: unknown } | null)?.form
+    if (!f || typeof f !== 'object' || Array.isArray(f)) continue
+    if (!best || Date.parse(r.createdAt) > Date.parse(best.at)) best = { form: normalizeStartupTaxForm(f as Partial<StartupForm>), at: r.createdAt }
+  }
+  return best
+}
+
+export interface PickedStartup {
+  form: StartupForm | null
+  /** local = 이 브라우저에서 판정한 답 · record = 업체 기록에 붙인 답 · none = 판정한 적 없음 */
+  from: 'local' | 'record' | 'none'
+  at: string
+}
+
+/**
+ * D-620 이 업체의 창업감면 판정 답 — 이 브라우저에서 답한 것([판정] 을 눌렀거나 답을 고친 것)과 업체 기록에 붙인 답 가운데 새것.
+ * 답한 적이 없으면 없음(열기만 해도 폼은 남지만 그것은 답이 아니다). 답한 때를 모르는 예전 기록은 이 브라우저 것이 먼저(예전에 붙인 결과가 더 옛것일 수 있다).
+ */
+export function savedStartupFor(record: Pick<ClientOpsRecord, 'id' | 'toolResults'>): PickedStartup {
+  const local = loadStartupTaxForm(record.id)
+  const judgedAt = startupTaxJudgedAt(record.id)
+  const editedAt = startupTaxEditedAt(record.id)
+  const localAt = editedAt && (!judgedAt || Date.parse(editedAt) > Date.parse(judgedAt)) ? editedAt : judgedAt
+  const att = attachedStartupForm(record)
+  const answered = !!local && (isStartupTaxJudged(record.id, local) || !!editedAt)
+  if (local && answered && (!att || !localAt || Date.parse(localAt) >= Date.parse(att.at))) return { form: local, from: 'local', at: localAt }
+  if (att) return { form: att.form, from: 'record', at: att.at }
+  return { form: null, from: 'none', at: '' }
+}
+
+/** 판정기에서 답한 것이 있으면 그 답 + 업체 기록(빈 칸만)으로 — 판정기 화면이 내는 결과와 같은 값 */
+export function clientStartupJudgement(record: ClientOpsRecord, facts: ClientFacts, date: Date, picked: PickedStartup = savedStartupFor(record)): { form: StartupForm; result: ReturnType<typeof judge>; from: PickedStartup['from'] } | null {
+  if (!picked.form) return null
+  const form = prefillStartupForm(openSavedForm(picked.form), facts).next
+  return { form, result: judge(form, date), from: picked.from }
+}
+
+/**
  * D-379 창업 5년이 지난 업체 — 감면 기간 안 해의 신고서에 창업감면이 없으면, 그해 12월 31일로 판정기를 다시 돌려 그때 대상이었는지 본다.
  * 대상이었으면 '감면 기간은 끝났지만 그해분은 경정청구(5년 안)'. 대표 생년월일을 모르면 판정하지 않는다(청년 감면율이 달라진다).
  */
@@ -264,6 +355,30 @@ export function pastStartupRefund(record: ClientOpsRecord, facts: ClientFacts, t
 
 const startupInsight: Provider = ({ record, today, facts }) => {
   const open = `/tools/startup-tax${q(record)}`
+  // D-620 판정기에서 답한 것이 있으면(이 브라우저에서 판정 · 업체 기록에 붙인 것 가운데 새것) 그 답으로 판정한다 — 판정기 화면의 한 줄 결론과 같은 글.
+  // (예전에는 카드가 업체 기록만 보고 다시 판정해, 판정기에서 '이어받은 사업' 이라 답해 '어려워 보입니다' 가 나와도 카드는 '검토해 볼 만함' 이었다)
+  const mine = clientStartupJudgement(record, facts, new Date(`${today}T00:00:00`))
+  if (mine && !mine.result.notice) {
+    const r = mine.result
+    const over5 = !!facts.establishedAt && facts.months !== null && facts.months >= 60
+    // D-379 감면 기간이 끝난 업체 — 감면 기간 안 해의 신고서에 감면이 없었으면 그해분 경정청구(판정 글은 그대로 두고 덧붙인다)
+    const past = over5 ? pastStartupRefund(record, facts, today) : null
+    const base: InsightTone = r.overall === 'good' ? 'good' : r.overall === 'bad' ? 'no' : 'maybe'
+    const tone: InsightTone = past && base === 'no' ? 'maybe' : base
+    const refund = base === 'no' || over5 ? { line: '', claimed: false } : startupRefund(facts.establishedAt, facts, reliefYears(record, facts, today))
+    return {
+      key: 'startup-tax',
+      label: '창업감면',
+      tone,
+      headline: r.oneLineConclusion,
+      detail: [past?.line ?? '', refund.claimed ? '' : refund.line, r.taxRate.line, refund.claimed ? refund.line : '', r.keyChecks[0] ?? r.reasons[0] ?? ''].filter(Boolean).join(' · '),
+      // 창업 형태까지 답했으면 더 물을 것이 없다
+      missing: mine.form.startupForm ? [] : ['창업 형태(새로 창업 · 이어받기)'],
+      openPath: open,
+      openLabel: '창업감면 판정 열기',
+      action: past ? `창업감면 — ${past.year}년분 경정청구 세무사와 검토` : base === 'good' ? '창업감면 — 감면 신청 · 경정청구 확인' : null,
+    }
+  }
   // 창업 5년이 지났으면 대표 나이와 상관없이 감면 기간 밖 — 묻지 않고 바로 말한다
   if (facts.establishedAt && facts.months !== null && facts.months >= 60) {
     // D-379 다만 감면 기간 안 해의 신고서에 감면이 없었으면 그해분 경정청구 — 검토해 볼 만함
