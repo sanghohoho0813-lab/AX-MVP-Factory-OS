@@ -14,7 +14,7 @@ import { useSearchParams } from 'react-router-dom'
 import { presetAssumptions, presetFieldsKept, presetStartup, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
 import { todayLocalDate } from '../../lib/appClock'
 import { PresetNote } from '../shared/PresetNote'
-import { prefillStartupForm, savedStartupFor, startupRegion } from '../../services/clientInsights'
+import { attachedStartupForm, prefillStartupForm, savedStartupFor, startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -22,6 +22,7 @@ import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { StartupTaxReportScreen } from './screens/ReportScreen'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { AnswersSyncNote, sameAnswers, type AnswersSync } from '../shared/AnswersSyncNote'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { FactSendButton } from '../shared/FactSendButton'
@@ -87,6 +88,9 @@ function StartupTaxScreen() {
   // D-620 채우는 규칙은 `prefillStartupForm` 한 곳(맞춤 추천 카드도 같은 규칙).
   //       업체 기록에 붙여 둔 판정의 답이 이 브라우저에서 판정한 것보다 새것이면(다른 기기 · 같이 쓰는 사람이 붙임) 그 답으로 연다.
   const { clientRecord } = useToolClient()
+  // D-621 지금 답이 업체 기록에 붙어 있나 — 붙어 있으면 다른 기기 · 같이 쓰는 사람 화면의 카드도 이 판정(D-620)
+  const attachedNow = useMemo(() => (clientRecord && clientRecord.id === clientId ? attachedStartupForm(clientRecord) : null), [clientRecord, clientId])
+  const syncState: AnswersSync = !clientId || !clientRecord || clientRecord.id !== clientId ? null : attachedNow && sameAnswers(attachedNow.form, form) ? 'record' : 'device'
   const { note: prefillNote } = usePrefillFromClient((facts) => {
     const picked = clientRecord && clientRecord.id === clientId ? savedStartupFor(clientRecord) : null
     const fromRecord = picked?.from === 'record' && picked.form ? openSavedForm(picked.form) : null
@@ -207,6 +211,7 @@ function StartupTaxScreen() {
                     data={{ form, baseDate: formatDate(baseDate) }}
                   />
                   <span className="text-sm text-gray-500">판정 결과를 고객 관리 업체 기록에 붙입니다.</span>
+                  <AnswersSyncNote state={syncState} testId="startup-answers-sync" />
                 </div>
               }
             />

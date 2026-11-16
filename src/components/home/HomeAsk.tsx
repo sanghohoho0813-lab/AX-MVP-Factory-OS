@@ -27,6 +27,7 @@ import type { AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
 import type { TalkAnswer, TalkNext, TalkNumber } from '../../services/homeAsk/homeTalk'
 import { TalkCard } from './TalkCard'
+import { AskVerdictPinLazy } from '../ops/AskVerdictPin'
 import { addAliases, askHome, clearHomeTurns, docsOfTurn, homeAliases, markDocsSaved, markTalkSaved, markTodoDone, rateTurn, restoreHomeTurns, syncHomeTurns, useHomeAsk, type HomeTurn } from '../../services/homeAsk/homeAskStore'
 
 const ICON: Record<SuggestIcon, typeof CalendarClock> = { meeting: CalendarClock, docs: FileText, reco: Lightbulb, today: ListChecks, money: Wallet, call: Phone }
@@ -362,7 +363,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
             </button>
           </div>
           {shown.map((t) => (
-            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} onRecorded={onRecorded} onRecordTalk={onRecordTalk} />
+            <Turn key={t.id} turn={t} names={t.clientIds.map((id) => ({ id, name: byId.get(id)?.companyName ?? '' })).filter((x) => x.name)} record={byId.get(t.clientIds[0] ?? '') ?? null} onRecorded={onRecorded} onRecordTalk={onRecordTalk} />
           ))}
         </div>
       )}
@@ -370,7 +371,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
   )
 }
 
-function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names: { id: string; name: string }[]; onRecorded?: () => void; onRecordTalk?: HomeAskProps['onRecordTalk'] }) {
+function Turn({ turn, names, record, onRecorded, onRecordTalk }: { turn: HomeTurn; names: { id: string; name: string }[]; record?: ClientOpsRecord | null; onRecorded?: () => void; onRecordTalk?: HomeAskProps['onRecordTalk'] }) {
   // D-563 외부 구독 고객 계정 — 맞춤 진단서 · 말하기 대본(모듈 판정으로 만드는 것)은 띄우지 않는다
   const customer = useCustomerAudience()
   const [talkBusy, setTalkBusy] = useState(false)
@@ -480,6 +481,10 @@ function Turn({ turn, names, onRecorded, onRecordTalk }: { turn: HomeTurn; names
               </span>
             )}
           </p>
+          {/* D-621 AI 가 답했을 때 — 물어본 업체의 모듈 판정 줄을 답 위에 그대로(맞춤 추천 카드 · 모듈 화면과 같은 글 · 규칙 계산).
+              AI 가 풀어 쓴 말이 모듈과 달라 보여도 판정은 이 줄이다. 규칙으로 정리한 답(AI 연결 없음)은 아래 줄들이 이미 그 판정이라 붙이지 않는다.
+              서류를 같이 올린 질문은 '올린 서류까지 넣은 임시 판정' 이라(아직 저장 전) 저장된 기록의 판정 줄을 붙이지 않는다 — 두 글이 어긋나 보인다. */}
+          {turn.status === 'ai' && record && !turn.docs && !customer && <AskVerdictPinLazy ask={turn.q} record={record} today={todayLocalDate()} />}
           <p className="t-body font-semibold break-keep text-slate-900" data-testid="home-ask-headline">
             {a.headline}
           </p>

@@ -8,7 +8,8 @@
  * 이 OS 에서 더한 것: 고객 = 고객 운영 업체(orig/storage) · 업체 정보로 채우기(D-90) · 업체 기록에 붙이기(D-89).
  */
 
-import { loadPolicyInputRaw, loadPolicyTouched, markPolicySavedAt, policyInputKey, policySavedAt, policyTouchedKey, prefillPolicyInput, savedPolicyFor } from './lib/clientSaved'
+import { attachedPolicyInput, loadPolicyInputRaw, loadPolicyTouched, markPolicySavedAt, policyInputKey, policySavedAt, policyTouchedKey, prefillPolicyInput, savedPolicyFor } from './lib/clientSaved'
+import { AnswersSyncNote, sameAnswers, type AnswersSync } from '../shared/AnswersSyncNote'
 import { useCallback, useEffect, useState, type ReactNode, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -188,6 +189,18 @@ function DiagnosisScreen() {
     }
   }, [clientId, mountKey])
 
+  // D-621 지금 답이 업체 기록에 붙어 있나 — 붙어 있으면 다른 기기 화면의 카드 · 진단도 이 답(D-620).
+  // 직접 고른 칸이 없으면(업체 기록으로만 채워진 진단) 붙이지 않아도 카드가 같은 판정이라 알리지 않는다.
+  const syncFor = useCallback(
+    (input: DiagnosisInput): AnswersSync => {
+      if (!clientId || !clientRecord || clientRecord.id !== clientId) return null
+      const attached = attachedPolicyInput(clientRecord)
+      if (attached && sameAnswers(attached.input, input)) return 'record'
+      return touched.current.keys.size > 0 ? 'device' : null
+    },
+    [clientId, clientRecord],
+  )
+
   const extras = useCallback(
     (input: DiagnosisInput, result: DiagnosisResult) => (
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4" data-testid="pf-attach">
@@ -207,9 +220,10 @@ function DiagnosisScreen() {
           }
         />
         <span className="break-keep text-sm text-slate-500">이것 하나만 누르면 돼요 — 업체 기록(달력 · 오늘)에 붙고, 정책자금 업체 목록 · 결과서에도 같이 저장돼요.</span>
+        <AnswersSyncNote state={syncFor(input)} testId="pf-answers-sync" />
       </div>
     ),
-    [showToast],
+    [showToast, syncFor],
   )
 
   return (

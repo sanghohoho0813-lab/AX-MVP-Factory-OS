@@ -19,7 +19,8 @@
  *        → D-498 서류 올리기: 등록된 업체 사업자등록증 → 임시 판정 · 답(대표 이름 · 번호 0) → [서류함에 넣기] → 그 업체 서류함 저장
  *          · 등록 안 된 회사 → [새 업체로 등록] → 등록 창에 서류 · 업체명 · AI 없으면 규칙 정리에 '이 서류에서 읽은 것'
  *        → 화면 꾸미기로 숨김 → 새로 고쳐도 숨김 → 다시 보이기
- *  390   넘침 0 · 빈 입력 한 줄 · 보내기 40px · 답 넘침 0
+ *        → D-621 AI 가 답했을 때도 답 위 '이 업체 판정' 줄(규칙 계산) = 그 업체 맞춤 추천 카드 글 · 모듈을 묻지 않으면 없음
+ *  390   넘침 0 · 빈 입력 한 줄 · 보내기 40px · 답 넘침 0 · AI 답 위 판정 줄
  *
  *   node e2e/homeask.mjs http://localhost:4390
  */
@@ -90,6 +91,7 @@ async function wire(page) {
   })
 }
 const lastTurn = (page) => page.getByTestId('home-ask-turn').last()
+const flat = (t) => (t ?? '').replace(/\s+/g, ' ').trim()
 // 화면에는 최근 2개만 보이므로(지난 대화는 접힘) 개수 대신 '마지막 질문 = 방금 물은 것 · 답이 옴' 으로 기다린다
 async function ask(page, q) {
   await page.getByTestId('home-ask-input').fill(q)
@@ -142,6 +144,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const t1 = lastTurn(page)
   check('AI 답 · 모델 이름 · 헤드라인 · 첫마디 글', (await t1.getAttribute('data-status')) === 'ai' && /AI 답/.test(await t1.getByTestId('home-ask-source').innerText()) && /정책자금부터/.test(await t1.getByTestId('home-ask-headline').innerText()) && /운전자금이 필요하신/.test(await t1.innerText()))
   check('이 업체 자료로: 한솔테크(주)', /한솔테크/.test(await t1.getByTestId('home-ask-clients').innerText()))
+  // D-621 AI 가 답했어도 판정은 모듈 것 그대로 — 답 위 '이 업체 판정' 줄(규칙 계산) = 그 업체 맞춤 추천 카드 글(아래 [열기] 때 대조)
+  await t1.getByTestId('ask-verdict-pin').waitFor({ timeout: 10000 }).catch(() => {})
+  const pinKeys = await t1.getByTestId('ask-verdict-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  const pinHead = flat(await t1.locator('[data-testid="ask-verdict-row"][data-key="policy-funding"]').getByTestId('ask-verdict-headline').innerText().catch(() => ''))
+  check('D-621 AI 답 위 이 업체 판정 줄 — 정책자금(AI 헤드라인보다 위)', pinKeys.includes('policy-funding') && pinHead.length > 5 && (await t1.evaluate((el) => {
+    const pin = el.querySelector('[data-testid="ask-verdict-pin"]')
+    const head = el.querySelector('[data-testid="home-ask-headline"]')
+    return !!pin && !!head && pin.getBoundingClientRect().bottom <= head.getBoundingClientRect().top + 1
+  })), { pinKeys, pinHead })
   await shot(page.getByTestId('home-ask'), 'pc-ai-answer')
   check('질문 세 줄은 대화가 생기면 접힘', (await page.getByTestId('home-ask-suggest').count()) === 0)
   // D-499 답에서 한 번에 — 받아 올 서류 → 요청 문구 복사 · 다음에 할 일 → 할 일로
@@ -176,6 +187,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await t1.getByTestId('home-ask-ref').first().click()
   await page.waitForURL(/\/ops\/clients\/cli_hansol/)
   check('[열기] → 그 업체', page.url().includes('/ops/clients/cli_hansol'))
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1500)
+  const pfCard = flat(await page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').first().innerText().catch(() => ''))
+  check('D-621 대화창 판정 줄 = 그 업체 맞춤 추천 카드 글(정책자금)', pinHead.length > 5 && pfCard.includes(pinHead), { pinHead, pfCard: pfCard.slice(0, 200) })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('다른 화면에 다녀와도 대화 그대로', (await page.getByTestId('home-ask-turn').count()) === 1)
@@ -200,6 +215,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const call2 = llm.at(-1)
   check('👎 너무 길어요 → 다음 요청 [규칙집] 에 짧게', call2.user.includes('[규칙집]') && call2.user.includes('너무 길다'), call2.user.slice(-800))
   check('업체 없는 질문 → 오늘 · 고객 전체 자료', call2.user.includes('[자료 · 오늘 · 밀린 할 일') || call2.user.includes('[자료 · 오늘 · 오늘 할 일'))
+  check('D-621 업체 · 모듈을 묻지 않은 질문에는 판정 줄 없음', (await lastTurn(page).getByTestId('ask-verdict-pin').count()) === 0)
   check('이어지는 질문 — 앞선 대화도 보냄', call2.user.includes('[자료 · 앞선 대화'))
   await lastTurn(page).getByTestId('home-ask-up').click()
   await ask(page, '그럼 다움에너지는?')
@@ -448,6 +464,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('390: [기록] 단추 누르기 높이 40px 이상', (await pt.getByTestId('home-ask-talk-save').boundingBox()).height >= 39.5)
   await ptCard.scrollIntoViewIfNeeded()
   await shot(ptCard, 'phone-talk')
+  // D-621 휴대폰 — AI 답 위 '이 업체 판정' 줄 · 넘침 0 · [모듈 열기] 누르기 높이
+  await ask(page, '한솔테크 정책자금 받을 수 있어?')
+  const pp = lastTurn(page)
+  await pp.getByTestId('ask-verdict-pin').waitFor({ timeout: 10000 }).catch(() => {})
+  await pp.getByTestId('ask-verdict-pin').scrollIntoViewIfNeeded().catch(() => {})
+  const openBox = await pp.getByTestId('ask-verdict-open').first().boundingBox().catch(() => null)
+  check('390: D-621 AI 답 위 이 업체 판정 줄(정책자금) · 넘침 0 · [열기] 40px 이상', (await pp.getByTestId('ask-verdict-pin').count()) === 1 && (await pp.getByTestId('ask-verdict-row').first().getAttribute('data-key')) === 'policy-funding' && (await ox()) <= 0 && !!openBox && openBox.height >= 39.5, { ox: await ox(), openBox })
+  await shot(pp, 'phone-verdict-pin')
   check('390: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

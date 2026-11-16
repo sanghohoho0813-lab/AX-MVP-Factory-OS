@@ -98,6 +98,7 @@ import { handDocsTo, peekHandedDocs, takeHandedDocs } from '../docHandoff'
 import { SECTION_HINT_COUNT, SECTION_HINT_KEYS, hintFor } from '../../content/sectionHints'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { koCompare } from '../../lib/koCompare'
+import { sameAnswers } from '../../tools/shared/AnswersSyncNote'
 
 let passed = 0
 let failed = 0
@@ -1025,6 +1026,9 @@ await (async () => {
   const pfFillNow = prefillPolicyInput({ ...DEFAULT_POLICY_INPUT, businessType: '개인사업자' }, { ...pfFacts, businessType: 'corporation' } as typeof pfFacts, { touched: new Set(), record: null, today: T })
   check('D-620 정책자금 채우기: 사람이 바꾼 칸은 업체 정보로 덮지 않음(일부러 고른 개인사업자) · 손대지 않은 칸만 채움', pfKeep.next.businessType === '개인사업자' && pfFillNow.next.businessType === '법인사업자')
   check('D-620 정책자금: 붙인 답이 여럿이면 가장 최근 것 · 사람이 바꾼 칸 목록도 같이 · 답이 없는 결과는 건너뜀', attachedPolicyInput({ toolResults: [tr('policy-funding', { input: { purpose: '시설자금' } }, '2026-10-01T00:00:00.000Z', 'a'), tr('policy-funding', { input: pfInput, touched: ['revenue', 1] }, '2026-10-09T00:00:00.000Z', 'b'), tr('policy-funding', { agencies: [] }, '2026-10-12T00:00:00.000Z', 'c')] } as never)?.touched.join() === 'revenue' && attachedPolicyInput(base) === null && savedPolicyFor(pfRec)?.from === 'record')
+  // D-621 '이 답이 업체 기록에 붙어 있나' — 붙여 둔 답 ↔ 지금 화면의 답(키 순서 · 빈 값 undefined 와 상관없이)
+  check('D-621 같은 답: 키 순서가 달라도 같음 · 한 칸이 다르면 다름 · 안쪽 묶음 · 목록까지', sameAnswers({ a: 1, b: { x: [1, 2], y: 'k' } }, { b: { y: 'k', x: [1, 2] }, a: 1 }) && !sameAnswers({ a: 1, b: { x: [1, 2] } }, { a: 1, b: { x: [2, 1] } }) && !sameAnswers({ a: 1 }, { a: 2 }) && sameAnswers({ a: 1, z: undefined }, { a: 1 }))
+  check('D-621 같은 답: 붙인 창업감면 답 = 그 답 그대로(정규화한 폼) · 창업 형태를 바꾸면 다름', sameAnswers(attachedStartupForm({ toolResults: [tr('startup-tax', { form: stAnswers }, '2026-10-09T00:00:00.000Z', 'b')] } as never)?.form, { ...EMPTY_STARTUP_FORM, ...stAnswers }) && !sameAnswers(attachedStartupForm({ toolResults: [tr('startup-tax', { form: stAnswers }, '2026-10-09T00:00:00.000Z', 'b')] } as never)?.form, { ...EMPTY_STARTUP_FORM, ...stAnswers, startupForm: 'brand_new' }))
 
   const mk = (key: string, label: string, tone: Insight['tone'], missing: string[]): Insight => ({ key, label, tone, headline: '', detail: '', missing, openPath: '', openLabel: '', action: null })
   const ins = [mk('employment', '고용지원금', 'need', ['4대보험 가입자 명부']), mk('cretop', '크레탑', 'need', ['크레탑 기업종합보고서']), mk('tax', '절세 설계', 'need', ['주주명부', '대표 급여']), mk('policy-funding', '정책자금', 'need', ['설립일', '업종']), mk('startup-tax', '창업감면', 'need', ['설립일(창업일)', '대표 생년월일']), mk('grants', '지원사업', 'good', ['직원 수'])]
