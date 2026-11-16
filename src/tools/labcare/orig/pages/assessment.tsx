@@ -7,7 +7,9 @@ import { downloadSvgAsJpeg, printSvg } from "../../lib/download";
 import { addSetupTargetId, addTempCompany, ensureLabClientFromOs } from "../lib/storage";
 import { setSession } from "../lib/uiState";
 import { assessFeasibility, requiredForLab } from "../../lib/feasibility";
-import { assessFormKey, assessInputOf, labVerdictLine, newCandidate, prefillAssessForm, readAssessForm, restoreAssessForm, type AssessForm } from "../../lib/assessForm";
+import { ASSESS_SAVED_AT, assessFormKey, assessInputOf, attachedAssessForm, candidatesUntouched, labVerdictLine, newCandidate, pickAssessSaved, prefillAssessForm, readAssessForm, restoreAssessForm, sameAssessAnswers, type AssessForm, type PickedAssess } from "../../lib/assessForm";
+import { nowIso } from "../../../../lib/appClock";
+import type { ClientOpsRecord } from "../../../../types/clientOps";
 import { usePrefillFromClient } from "../../../shared/usePrefill";
 import { useToolClient } from "../../../shared/toolClientContext";
 import { monthsInBusiness } from "../../../shared/clientPrefill";
@@ -147,12 +149,52 @@ const FACILITY_DEPT = [
   "타 업무 겸직 여부 확인",
 ];
 
+/** D-619 붙인 날 — '(11월 16일에 붙임)' (읽지 못하면 빈 글자) */
+function attachedDayText(at: string): string {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? "" : `(${d.getMonth() + 1}월 ${d.getDate()}일에 붙임)`;
+}
+
 export default function AssessmentPage() {
-  const { clientId } = useToolClient();
+  const { clientId, clientRecord } = useToolClient();
+  // 업체가 바뀌면 처음부터 다시(앞 업체에 적던 답이 다음 업체 자리에 남지 않게)
+  return <AssessLoader key={clientId ?? ""} clientId={clientId} record={clientRecord && clientRecord.id === clientId ? clientRecord : null} />;
+}
+
+/**
+ * D-619 어느 답으로 열까 — 이 브라우저에 남긴 답 · 업체 기록에 붙인 답(다른 기기 · 같이 쓰는 사람이 붙인 것 포함) 가운데 새것.
+ * 업체 기록은 조금 늦게 온다 — 먼저 이 브라우저 답으로 열고, 기록에 붙인 답이 더 새것이고 내용이 다르면 그 답으로 한 번 다시 연다.
+ * (사람이 이미 고치기 시작했으면 이 브라우저 답이 새것이라 다시 열지 않는다 · 방금 이 화면에서 붙인 것은 같은 내용이라 그대로 둔다)
+ */
+function AssessLoader({ clientId, record }: { clientId: string | null; record: ClientOpsRecord | null }) {
+  const attached = useMemo(() => attachedAssessForm(record), [record]);
+  const [src, setSrc] = useState<{ key: string; picked: PickedAssess }>(() => ({ key: "local", picked: pickAssessSaved(readAssessForm(clientId), null) }));
+  useEffect(() => {
+    if (!attached) return;
+    const local = readAssessForm(clientId);
+    const picked = pickAssessSaved(local, attached);
+    if (picked.from !== "record" || sameAssessAnswers(local, attached.form)) return;
+    setSrc((s) => (s.key === `record:${attached.at}` ? s : { key: `record:${attached.at}`, picked }));
+  }, [attached, clientId]);
+  return <AssessmentForm key={src.key} clientId={clientId} record={record} picked={src.picked} />;
+}
+
+function AssessmentForm({ clientId, record, picked }: { clientId: string | null; record: ClientOpsRecord | null; picked: PickedAssess }) {
   // D-618 처음 값 — 남겨 둔 답(없으면 기본값). 업체 맞춤 추천 카드와 같은 파일(lib/assessForm)로 읽는다
   const initRef = useRef<AssessForm | null>(null);
-  if (initRef.current === null) initRef.current = restoreAssessForm(readAssessForm(clientId));
+  if (initRef.current === null) initRef.current = restoreAssessForm(picked.saved);
   const init = initRef.current;
+  // D-619 답을 남긴 때 — 사람이 고쳤을 때만 지금으로 바꾼다(화면을 열기만 했거나 업체 기록으로 빈 칸을 채운 것은 '새 답' 이 아니다)
+  const touched = useRef(false);
+  const stampRef = useRef(picked.at);
+  useEffect(() => {
+    const mark = () => {
+      touched.current = true;
+    };
+    const kinds = ["pointerdown", "keydown", "input", "change"] as const;
+    kinds.forEach((k) => document.addEventListener(k, mark, true));
+    return () => kinds.forEach((k) => document.removeEventListener(k, mark, true));
+  }, []);
   /* ① 설립 유형 */
   const [desiredType, setDesiredType] = useState<LabTypeChoice>(() => init.desiredType);
 
@@ -229,11 +271,16 @@ export default function AssessmentPage() {
   );
   useEffect(() => {
     try {
-      localStorage.setItem(assessFormKey(clientId), JSON.stringify(formNow));
+      if (touched.current) stampRef.current = nowIso();
+      localStorage.setItem(assessFormKey(clientId), JSON.stringify({ ...formNow, [ASSESS_SAVED_AT]: stampRef.current }));
     } catch {
       /* 남기지 못해도 판정은 된다 */
     }
   }, [clientId, formNow]);
+  // D-619 지금 답이 업체 기록에 붙어 있나 — 붙어 있어야 다른 기기 · 같이 쓰는 사람 화면에서도 같은 판정이 보인다
+  const attachedNow = useMemo(() => attachedAssessForm(record), [record]);
+  const inRecord = useMemo(() => (attachedNow ? sameAssessAnswers(formNow as unknown as Record<string, unknown>, attachedNow.form) : false), [attachedNow, formNow]);
+  const syncState: "record" | "device" | null = !record ? null : inRecord ? "record" : candidatesUntouched(formNow) ? null : "device";
 
   /* 연구과제 추천 프롬프트 모달 */
   const [promptOpen, setPromptOpen] = useState(false);
@@ -374,6 +421,11 @@ export default function AssessmentPage() {
       subtitle="기업 정보와 연구인력 조건을 바탕으로 연구소/전담부서 설립 가능성을 빠르게 검토합니다"
     >
       {prefillNote && <p className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-brand-800" data-testid="lab-prefill-note">{prefillNote}</p>}
+      {picked.from === "record" && (
+        <p className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm break-keep text-slate-700 print-hide" data-testid="lab-from-record">
+          업체 기록에 붙여 둔 답으로 열었어요{attachedDayText(picked.at)} — 다른 기기에서 답하고 붙인 것도 여기로 와요.
+        </p>
+      )}
       {/* D-618 지금 판정 한 줄 — 업체 맞춤 추천 카드와 같은 글(같은 규칙 · 같은 입력). 자세한 결과는 아래 */}
       <div className="mb-3 rounded-xl border border-slate-200 bg-white px-4 py-3 print-hide" data-testid="lab-verdict-top" data-tone={verdictLine.tone}>
         <div className="flex flex-wrap items-center gap-2">
@@ -864,8 +916,15 @@ export default function AssessmentPage() {
                 verdict={result.verdict}
                 verdictLabel={result.verdict}
                 summary={[`[설립 가능성 검토 — ${companyName || "업체"}]`, `판정: ${result.verdict}`, `추천 유형: ${result.recommendedType}`, "", result.summary].join("\n")}
-                data={{ kind: "assess", companyName, industry, verdict: result.verdict, recommendedType: result.recommendedType }}
+                data={{ kind: "assess", companyName, industry, verdict: result.verdict, recommendedType: result.recommendedType, form: formNow }}
               />
+              {syncState && (
+                <p className="mt-2 text-sm break-keep text-slate-600 print-hide" data-testid="lab-answers-sync" data-state={syncState}>
+                  {syncState === "record"
+                    ? "✓ 이 답은 업체 기록에 붙어 있어요 — 다른 기기 · 같이 쓰는 사람 화면에서도 같은 판정이 보여요."
+                    : "지금 답은 이 기기에만 있어요 — 위 [기록에 붙이기]를 누르면 다른 기기에서도 같은 판정이 보여요."}
+                </p>
+              )}
             </div>
 
             {/* 인원 현황 */}

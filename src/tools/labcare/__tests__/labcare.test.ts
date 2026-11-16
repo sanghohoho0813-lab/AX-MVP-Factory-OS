@@ -10,7 +10,7 @@ import { computeLevel, evaluateRisk } from '../lib/riskEngine'
 import { getTaxCreditEstimate } from '../lib/taxCredit'
 import { addMonthsClamped, changeDeadlineOf, daysBetween, ddayOf, isCheckDue, nextCheckDate, parseYmd, ymdLocal, ymLocal } from '../lib/deadlines'
 import { businessAgeLabel, withinStartupYears } from '../lib/startup'
-import { assessInputOf, candidatesUntouched, clientLabFeasibility, defaultAssessForm, labVerdictLine, newCandidate as blankCandidate, prefillAssessForm, restoreAssessForm } from '../lib/assessForm'
+import { ASSESS_SAVED_AT, assessInputOf, attachedAssessForm, candidatesUntouched, clientLabFeasibility, defaultAssessForm, labVerdictLine, newCandidate as blankCandidate, pickAssessSaved, prefillAssessForm, restoreAssessForm, sameAssessAnswers, savedAssessFor } from '../lib/assessForm'
 import { monthsInBusiness } from '../../shared/clientPrefill'
 import { addChangeRecord, currentMonth as storageCurrentMonth, nextCheckDate as storageNextCheckDate } from '../orig/lib/storage'
 import { DOC_MASTER, buildTempPackage, docProgressOf, fewerThanTen, missingDocs, stageOf, type SetupDoc } from '../lib/documents'
@@ -600,6 +600,31 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
   const rec = { id: 'cli_x', companyName: '가나테크', industry: '소프트웨어 개발', establishedAt: '2024-06-10', employeeCount: '3명', corporateNumber: '110111-1234567', businessNumber: '', documents: {}, customDocuments: [], customFields: [], toolResults: [], shareholderRegister: [] } as unknown as Parameters<typeof clientLabFeasibility>[0]
   const viaRecord = clientLabFeasibility(rec, TODAY, {})
   check('D-618 업체 기록 하나로 낸 한 줄 = 같은 값으로 채운 화면의 한 줄(따로 놀지 않음)', viaRecord.line.headline === l1.headline && viaRecord.line.detail === l1.detail && viaRecord.result.verdict === '추가 확인 필요', JSON.stringify(viaRecord.line))
+
+  // D-619 답은 업체 기록에도 붙는다([업체 기록에 붙이기] 때 같이) — 다른 기기 · 같이 쓰는 사람 화면은 그 답으로 판정한다
+  type Rec = typeof rec
+  const attach = (form: unknown, at: string, id = 'r1') => ({ id, toolKey: 'labcare', title: '설립 가능성 체크', verdict: null, verdictLabel: '기업부설연구소 가능', summary: '', data: { kind: 'assess', form }, deadlines: [], createdAt: at, publishedUpdateId: null })
+  const withResults = (...list: unknown[]) => ({ ...rec, toolResults: list }) as unknown as Rec
+  const T3 = '2026-11-16T03:00:00.000Z'
+  const older = { ...answered, companyName: '옛 답' }
+  const recAttached = withResults(attach(answered, T3, 'r-new'), attach(older, '2026-11-10T03:00:00.000Z', 'r-old'), { ...attach(undefined, '2026-11-17T03:00:00.000Z', 'r-noform'), data: { kind: 'assess' } }, { ...attach(answered, '2026-11-18T03:00:00.000Z', 'r-tax'), data: { kind: 'tax', form: answered } })
+  const att = attachedAssessForm(recAttached)
+  check('D-619 붙인 결과에서 답 꺼내기: 설립 가능성 체크만 · 가장 최근 것 · 답 없는 예전 결과 · 다른 종류는 건너뜀', att?.at === T3 && att.form.companyName === answered.companyName, JSON.stringify(att?.at))
+  check('D-619 붙인 답이 없으면 없음(예전에 붙인 결과에는 답이 없다)', attachedAssessForm(withResults({ ...attach(undefined, T3), data: { kind: 'assess', verdict: '보완 후 가능' } })) === null && attachedAssessForm(rec) === null && attachedAssessForm(null) === null)
+  check('D-619 깨진 답(후보자가 칸 묶음이 아님)은 쓰지 않는다', attachedAssessForm(withResults(attach({ ...answered, candidates: ['x'] }, T3))) === null && attachedAssessForm(withResults(attach({ ...answered, negativeActivities: [1] }, T3))) === null)
+  const A = att!
+  const p0 = pickAssessSaved({}, A)
+  const pNew = pickAssessSaved({ ...older, [ASSESS_SAVED_AT]: '2026-11-16T04:00:00.000Z' }, A)
+  const pOld = pickAssessSaved({ ...older, [ASSESS_SAVED_AT]: '2026-11-16T02:00:00.000Z' }, A)
+  const pNoStamp = pickAssessSaved({ ...older }, A)
+  const pOnlyStamp = pickAssessSaved({ [ASSESS_SAVED_AT]: '2026-11-16T04:00:00.000Z' }, A)
+  check('D-619 어느 답: 이 브라우저에 없으면 붙인 답 · 이 브라우저가 더 새것이면 그 답 · 더 옛것이면 붙인 답', p0.from === 'record' && p0.at === T3 && pNew.from === 'local' && pNew.saved.companyName === '옛 답' && pOld.from === 'record' && pOld.saved.companyName === answered.companyName, JSON.stringify([p0.from, pNew.from, pOld.from]))
+  check('D-619 어느 답: 때를 모르는 이 브라우저 답(예전 것)은 붙인 답에 진다 · 때만 있고 답이 없으면 붙인 답', pNoStamp.from === 'record' && pOnlyStamp.from === 'record')
+  check('D-619 어느 답: 붙인 답이 없으면 이 브라우저 답(없으면 없음)', pickAssessSaved({ ...older }, null).from === 'local' && pickAssessSaved({}, null).from === 'none' && pickAssessSaved({ [ASSESS_SAVED_AT]: T3 }, null).from === 'none')
+  check('D-619 같은 답인가: 남긴 때는 빼고 본다 · 한 칸이라도 다르면 다름', sameAssessAnswers({ ...answered, [ASSESS_SAVED_AT]: T3 }, { ...answered }) && !sameAssessAnswers({ ...answered }, { ...older }))
+  // 다른 기기(이 브라우저에 답 없음)에서 — 업체 기록만으로 낸 한 줄이 답한 화면의 한 줄과 같다
+  const far = clientLabFeasibility(recAttached, TODAY)
+  check('D-619 다른 기기: 업체 기록에 붙은 답으로 낸 한 줄 = 답한 화면의 한 줄(글자까지)', savedAssessFor(recAttached).from === 'record' && far.line.headline === l4.headline && far.line.detail === l4.detail && far.result.verdict === r4.verdict, JSON.stringify(far.line))
 }
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)

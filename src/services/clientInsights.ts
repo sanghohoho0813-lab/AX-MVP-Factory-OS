@@ -12,7 +12,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
-import { clientLabFeasibility } from '../tools/labcare/lib/assessForm'
+import { candidatesUntouched, clientLabFeasibility, savedAssessFor } from '../tools/labcare/lib/assessForm'
 import { customFactEntries, customFactValue, researchLabOf, usableFactValue } from './customerFacts'
 import { yearOverYear } from './withholdingReport'
 import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
@@ -526,7 +526,14 @@ const labInsight: Provider = ({ record, facts, today }) => {
     return { key: 'labcare', label: '연구소', tone: 'maybe', headline: '연구소(전담부서)가 있어요 — 연구개발비 세액공제를 챙겼는지 볼 때', detail: [refund.line, String(lab), '연구원 인건비를 넣으면 연간 공제액을 바로 계산해요'].filter(Boolean).join(' · '), missing: ['연구원 인건비(연)'], openPath: taxOpen, openLabel: '세액공제 계산', action: '연구소 — 연구개발비 세액공제 확인' }
   }
   const last = latestToolResult(record, 'labcare')
-  if (last) {
+  // D-619 붙여 둔 것이 설립 가능성 체크이고 답을 알면(같이 붙은 답 · 이 브라우저의 답) 아래 판정 줄로 —
+  // 예전에는 붙이고 나면 카드가 판정 이름만 보여 모듈 맨 위 '지금 판정' 과 다른 글이었다. 답을 모르는 예전 결과만 붙인 글 그대로.
+  const lastIsAssess = (last?.data as { kind?: unknown } | null)?.kind === 'assess'
+  const picked = savedAssessFor(record)
+  const fe = clientLabFeasibility(record, new Date(`${today}T00:00:00`), picked.saved)
+  // 후보자까지 적어 판정이 나온 답인가 — 그러면 아래 '연구개발비' 안내보다 판정이 먼저다(모듈에서 답한 것이 카드에 같은 글로)
+  const answered = picked.from !== 'none' && !candidatesUntouched(fe.form)
+  if (last && !(lastIsAssess && picked.from !== 'none')) {
     // D-191: 세액공제 계산 결과가 붙어 있으면 연간 금액
     const d = last.data as { kind?: unknown; estimate?: { annual?: unknown } } | null
     const annual = d?.kind === 'tax' && typeof d.estimate?.annual === 'number' ? d.estimate.annual : 0
@@ -534,7 +541,7 @@ const labInsight: Provider = ({ record, facts, today }) => {
   }
   // D-419 연구소는 없는데 재무제표에 연구개발비가 있으면 — 연구소(전담부서)를 만들면 연구 · 인력개발비 세액공제 대상(인정 뒤 지출분부터)
   const rnd = customFactValue(record, '연구개발비')
-  if (rnd) {
+  if (rnd && !answered) {
     const amt = rnd.replace(/\s*\([^)]*\)\s*$/, '')
     const pct = /매출의\s*[\d.]+%/.exec(rnd)?.[0] ?? ''
     return {
@@ -551,8 +558,9 @@ const labInsight: Provider = ({ record, facts, today }) => {
   }
   // D-618 연구소가 없고 붙여 둔 결과도 없으면 — 모듈의 설립 가능성 체크와 같은 규칙 · 같은 입력으로 판정한다.
   // (예전에는 직원 수만 보는 따로 된 줄이라, 같은 업체가 카드 · AI 도우미 · 모듈에서 서로 다른 말을 들었다)
-  // 이 브라우저에서 모듈에 답해 둔 것이 있으면 그 답 그대로 — 그래서 모듈 화면 맨 위 '지금 판정' 과 글자까지 같다.
-  const { line } = clientLabFeasibility(record, new Date(`${today}T00:00:00`))
+  // 모듈에 답해 둔 것이 있으면 그 답 그대로 — 그래서 모듈 화면 맨 위 '지금 판정' 과 글자까지 같다.
+  // D-619 답은 이 브라우저 것과 업체 기록에 붙인 것(다른 기기 · 다른 사람이 붙인 것 포함) 가운데 새것.
+  const { line } = fe
   return {
     key: 'labcare',
     label: '연구소',

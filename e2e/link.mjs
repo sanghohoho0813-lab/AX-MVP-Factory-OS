@@ -11,6 +11,8 @@
  *              모듈에서 답하면 카드도 같은 글로 바뀜 · [설립서류 관리로 보내기] → 등록 없이 그 업체 서류 ·
  *              서류함에 받아 둔 서류는 '서류함에 있음 · 완료' · 바꾼 상태는 새로 고쳐도 그대로
  *  D. 고용지원금 — `?client=` 첫 화면에 '업체 정보' 등록 창 0 · 업체 목록에 그 업체가 올라가 있음
+ *  E. 다른 기기(D-619) — 설립 가능성 체크를 [업체 기록에 붙이기] 하면 답도 같이 붙음 → 이 브라우저에 답이 없어도
+ *              카드 · 모듈이 같은 글 · 붙인 뒤에도 카드 = 모듈 · 그 기기에서 고치면 고친 답이 먼저 · 390
  *
  *   node e2e/link.mjs http://localhost:4390 [사진 폴더]
  */
@@ -193,6 +195,67 @@ await shot('link-07-employment-docs')
 await go('/tools/employment/companies', 1500)
 const empList = flat(await page.locator('main').innerText())
 check('D. 고용지원금 업체 목록 — 그 업체가 등록 창 없이 올라가 있음', empList.includes(NAME), empList.slice(0, 200))
+
+/* ───────── E. 다른 기기 · 같이 쓰는 사람 화면(D-619) ─────────
+ * 설립 가능성 체크에 답한 것은 그 브라우저에 남는다 — [업체 기록에 붙이기] 를 누르면 답도 업체 기록에 같이 붙어,
+ * 그 답이 없는 다른 기기(여기서는 이 브라우저에 남긴 답만 지워 흉내)의 카드 · 모듈도 같은 글이 된다. */
+const FORM_KEY = `axmvp.tools.labcare.assessForm.${CID}`
+await go(`/tools/labcare/assessment?client=${CID}`, 1500)
+const topE = flat(await page.getByTestId('lab-verdict-top-headline').innerText())
+const syncBefore = await page.getByTestId('lab-answers-sync').getAttribute('data-state').catch(() => '')
+check('E. 답만 하고 붙이지 않았으면 "지금 답은 이 기기에만 있어요" 한 줄(무엇을 누르면 되는지)', syncBefore === 'device' && flat(await page.getByTestId('lab-answers-sync').innerText()).includes('기록에 붙이기'), syncBefore)
+await page.getByTestId('lab-os-attach').getByTestId('tool-attach-quick').click()
+await page.getByTestId('tool-attach-go').waitFor({ timeout: 10000 }).catch(() => {})
+await page.waitForTimeout(500)
+const syncAfter = await page.getByTestId('lab-answers-sync').getAttribute('data-state').catch(() => '')
+const topAfterAttach = flat(await page.getByTestId('lab-verdict-top-headline').innerText())
+check('E. [업체 기록에 붙이기] → "이 답은 업체 기록에 붙어 있어요" · 적던 화면은 그대로(다시 열리지 않음 · 붙임 알림 남음)', syncAfter === 'record' && topAfterAttach === topE && (await page.getByTestId('tool-attach-go').count()) === 1 && (await page.getByTestId('lab-from-record').count()) === 0, { syncAfter, topAfterAttach })
+await page.getByTestId('lab-answers-sync').scrollIntoViewIfNeeded()
+await shot('link-07-attached')
+const stored = await page.evaluate(([k, id]) => {
+  const rec = JSON.parse(localStorage.getItem(k) ?? '[]').find((c) => c.id === id)
+  const r = (rec?.toolResults ?? []).find((x) => x.toolKey === 'labcare' && x.data?.kind === 'assess')
+  return { hasForm: Boolean(r?.data?.form), edu: r?.data?.form?.candidates?.[0]?.education ?? '', size: r?.data?.form?.companySize ?? '', sized: r?.data?.form?.sizeConfirmed === true }
+}, [KEY, CID])
+check('E. 업체 기록에 답이 같이 붙음(규모 소기업 · 후보자 석사)', stored.hasForm && stored.edu === '석사' && stored.size === '소기업' && stored.sized, stored)
+await go(`/ops/clients/${CID}?tab=smart`, 1600)
+const cardAttached = flat(await page.locator('main a[href*="/tools/labcare"]').first().innerText())
+check('E. 붙인 뒤에도 카드 = 모듈 맨 위 한 줄(예전에는 판정 이름만 보였음)', cardAttached.includes(topE), { topE, card: cardAttached.slice(0, 140) })
+// 다른 기기 — 이 브라우저에 남긴 답이 없다(업체 기록은 클라우드로 같이 온다)
+await page.evaluate((k) => localStorage.removeItem(k), FORM_KEY)
+await go(`/ops/clients/${CID}?tab=smart`, 1600)
+const cardFar = flat(await page.locator('main a[href*="/tools/labcare"]').first().innerText())
+check('E. 다른 기기(이 브라우저에 답 없음) — 카드가 업체 기록에 붙은 답으로 같은 판정 글', cardFar.includes(topE) && !cardFar.includes('만 넣으면'), { topE, card: cardFar.slice(0, 140) })
+await shot('link-08-far-card')
+await page.locator('main a[href*="/tools/labcare"]').first().click()
+await page.getByTestId('lab-verdict-top').waitFor({ timeout: 10000 }).catch(() => {})
+await page.getByTestId('lab-from-record').waitFor({ timeout: 8000 }).catch(() => {})
+await page.waitForTimeout(500)
+const topFar = flat(await page.getByTestId('lab-verdict-top-headline').innerText())
+const farEdu = await page.locator('select').filter({ hasText: '석사' }).first().inputValue().catch(() => '')
+const farSize = await page.getByTestId('lab-size').inputValue().catch(() => '')
+check('E. 다른 기기 — 모듈도 붙여 둔 답으로 열림(후보자 석사 · 규모 소기업 그대로 · 다시 안 적음) · "업체 기록에 붙여 둔 답으로 열었어요" 한 줄 · 등록 창 0', topFar === topE && farEdu === '석사' && farSize === '소기업' && (await page.getByTestId('lab-from-record').count()) === 1 && (await openDialogs()) === 0, { topFar, topE, farEdu, farSize })
+await page.evaluate(() => window.scrollTo(0, 0))
+await shot('link-09-far-module')
+// 그 기기에서 답을 고치면 — 고친 답이 새것(이 기기에만 · 다시 붙이라고 알림)
+await page.locator('select').filter({ hasText: '석사' }).first().selectOption({ label: '박사' })
+await page.waitForTimeout(600)
+const topEdit = flat(await page.getByTestId('lab-verdict-top-headline').innerText())
+const syncEdit = await page.getByTestId('lab-answers-sync').getAttribute('data-state').catch(() => '')
+await go(`/ops/clients/${CID}?tab=smart`, 1600)
+const cardEdit = flat(await page.locator('main a[href*="/tools/labcare"]').first().innerText())
+check('E. 그 기기에서 답을 고치면 고친 답이 먼저(카드 = 고친 화면의 한 줄) · "이 기기에만" 으로 바뀜', syncEdit === 'device' && cardEdit.includes(topEdit), { syncEdit, topEdit, card: cardEdit.slice(0, 140) })
+// 390 — 새 한 줄 때문에 옆으로 넘치지 않는다
+const phone = await browser.newContext({ viewport: { width: 390, height: 800 }, locale: 'ko-KR', storageState: await ctx.storageState() })
+const pp = await phone.newPage()
+pp.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+await pp.goto(`${BASE}/tools/labcare/assessment?client=${CID}`, { waitUntil: 'networkidle' })
+await pp.getByTestId('lab-answers-sync').waitFor({ timeout: 10000 }).catch(() => {})
+await pp.getByTestId('lab-answers-sync').scrollIntoViewIfNeeded().catch(() => {})
+const over = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+check('E. 390 — 붙이기 안내 한 줄이 보이고 옆으로 넘치지 않음', (await pp.getByTestId('lab-answers-sync').count()) === 1 && over <= 1, { over })
+if (SHOTS) await pp.screenshot({ path: `${SHOTS}/link-10-phone-sync.png` })
+await phone.close()
 
 check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3))
 await browser.close()

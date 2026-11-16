@@ -115,6 +115,9 @@ export function defaultAssessForm(): AssessForm {
 const ASSESS_FORM_KEY = 'axmvp.tools.labcare.assessForm'
 export const assessFormKey = (clientId: string | null) => (clientId ? `${ASSESS_FORM_KEY}.${clientId}` : sharedToolKey(ASSESS_FORM_KEY))
 
+/** D-619 답을 남긴 때 — 이 브라우저에 남기는 값 안에 같이 적는다(판정 입력이 아니다 · 사람이 고쳤을 때만 새로 적는다) */
+export const ASSESS_SAVED_AT = '_savedAt'
+
 /** 남겨 둔 답(없거나 읽지 못하면 빈 것) — 브라우저 밖(시험 · 서버)에서는 늘 빈 것 */
 export function readAssessForm(clientId: string | null): Record<string, unknown> {
   try {
@@ -289,8 +292,74 @@ export function labVerdictLine(form: AssessForm, result: FeasibilityResult, toda
   }
 }
 
-/** 업체 기록 하나로 설립 가능성 판정 — 이 브라우저에 남겨 둔 답이 있으면 그 답으로(모듈 화면과 같은 값) */
-export function clientLabFeasibility(record: ClientOpsRecord, today: Date, saved: Record<string, unknown> = readAssessForm(record.id)): { form: AssessForm; result: FeasibilityResult; line: LabVerdictLine } {
+/*
+ * D-619 답은 두 곳에 있을 수 있다 — 이 브라우저(적는 대로 남는다) · 업체 기록([업체 기록에 붙이기] 때 답도 같이 붙는다).
+ * 업체 기록은 다른 기기 · 같은 작업공간의 다른 사람 화면에도 가므로, 붙여 둔 답이 더 새것이면 그 답으로 판정한다.
+ * 그래서 PC 에서 답하고 붙이면 휴대폰의 카드 · AI 도우미 · 모듈 화면이 같은 글이 된다.
+ */
+
+/** 업체 기록에 붙인 설립 가능성 체크의 답 */
+export interface AttachedAssess {
+  form: Record<string, unknown>
+  /** 붙인 때 */
+  at: string
+}
+
+function plainObject(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v)
+}
+
+/** 붙인 답이 화면이 읽을 수 있는 모양인가(후보자는 이름표가 있는 칸 묶음 · 해당 없는 활동은 글자 목록) */
+function usableAssessForm(form: Record<string, unknown>): boolean {
+  const c = form.candidates
+  if (c !== undefined && !(Array.isArray(c) && c.length > 0 && c.every((x) => plainObject(x) && typeof x.id === 'string'))) return false
+  const n = form.negativeActivities
+  if (n !== undefined && !(Array.isArray(n) && n.every((x) => typeof x === 'string'))) return false
+  return true
+}
+
+/** 업체 기록에 붙인 설립 가능성 체크 가운데 가장 최근 답(답이 같이 붙은 것만 — 예전에 붙인 결과에는 답이 없다) */
+export function attachedAssessForm(record: Pick<ClientOpsRecord, 'toolResults'> | null | undefined): AttachedAssess | null {
+  let best: AttachedAssess | null = null
+  for (const r of record?.toolResults ?? []) {
+    if (r.toolKey !== 'labcare') continue
+    const d = r.data as { kind?: unknown; form?: unknown } | null
+    if (d?.kind !== 'assess' || !plainObject(d.form) || !usableAssessForm(d.form)) continue
+    if (!best || Date.parse(r.createdAt) > Date.parse(best.at)) best = { form: d.form, at: r.createdAt }
+  }
+  return best
+}
+
+export interface PickedAssess {
+  saved: Record<string, unknown>
+  /** local = 이 브라우저 · record = 업체 기록에 붙인 답 · none = 아직 없음 */
+  from: 'local' | 'record' | 'none'
+  /** 그 답을 남긴 때(모르면 빈 글자) */
+  at: string
+}
+
+/** 이 브라우저의 답과 업체 기록에 붙인 답 가운데 더 새것 — 때를 모르는 이 브라우저 답(예전 것)은 붙인 답에 진다 */
+export function pickAssessSaved(local: Record<string, unknown>, attached: AttachedAssess | null): PickedAssess {
+  const stamp = local[ASSESS_SAVED_AT]
+  const localAt = typeof stamp === 'string' ? stamp : ''
+  const hasLocal = Object.keys(local).some((k) => k !== ASSESS_SAVED_AT)
+  if (!attached) return { saved: local, from: hasLocal ? 'local' : 'none', at: localAt }
+  if (hasLocal && localAt && Date.parse(localAt) >= Date.parse(attached.at)) return { saved: local, from: 'local', at: localAt }
+  return { saved: attached.form, from: 'record', at: attached.at }
+}
+
+/** 두 답이 같은 내용인가(남긴 때는 빼고 · 화면이 읽는 칸만) */
+export function sameAssessAnswers(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  return JSON.stringify(restoreAssessForm(a)) === JSON.stringify(restoreAssessForm(b))
+}
+
+/** 이 업체의 답 — 이 브라우저와 업체 기록 가운데 더 새것(카드 · AI 도우미 자료 · 모듈 화면이 같이 쓴다) */
+export function savedAssessFor(record: Pick<ClientOpsRecord, 'id' | 'toolResults'>): PickedAssess {
+  return pickAssessSaved(readAssessForm(record.id), attachedAssessForm(record))
+}
+
+/** 업체 기록 하나로 설립 가능성 판정 — 남겨 둔 답(이 브라우저 · 업체 기록에 붙인 것 가운데 새것)이 있으면 그 답으로(모듈 화면과 같은 값) */
+export function clientLabFeasibility(record: ClientOpsRecord, today: Date, saved: Record<string, unknown> = savedAssessFor(record).saved): { form: AssessForm; result: FeasibilityResult; line: LabVerdictLine } {
   const restored = restoreAssessForm(saved)
   const form: AssessForm = { ...restored, ...prefillAssessForm(restored, clientFacts(record, today)).patch }
   const result = assessFeasibility(assessInputOf(form, today))

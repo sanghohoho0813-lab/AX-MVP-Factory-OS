@@ -58,6 +58,7 @@ import { certificateValue, parseCertificateDocument } from '../certDocParser'
 import { readIncomeCert } from '../incomeDoc'
 import { looksLikeTaxReturn, readTaxReturn, refundOpen, reliefFactValue, reliefYearsOf } from '../taxReturnDoc'
 import { employmentRefund, labRefund, labYearOf, pastStartupRefund, reliefYears, startupRefund } from '../clientInsights'
+import { clientLabFeasibility, defaultAssessForm, newCandidate } from '../../tools/labcare/lib/assessForm'
 import { officerTerms, officerTermsOf, officerTermsValue, readDirectorTermYears, readRegistryTax } from '../registryTax'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { creditBandOf, creditScoreValue, looksLikeCreditReport, lowestScoreOf, readCreditScore } from '../creditScoreDoc'
@@ -985,6 +986,15 @@ await (async () => {
   const lab = normalizeClientOps({ ...base, toolResults: [{ id: 'tr-lab', toolKey: 'labcare', title: '세액공제 예상', verdict: null, verdictLabel: '연간 약 2,500만원', summary: '연구개발비 1억', data: { kind: 'tax', estimate: { annual: 25_000_000 } }, deadlines: [], createdAt: '2026-10-10T00:00:00.000Z', publishedUpdateId: null }] } as never)
   check('D-191 연구소: 세액공제 계산이 붙어 있으면 "세액공제 연간 약 2,500만원"', buildInsights(lab, T, []).find((i) => i.key === 'labcare')?.amount === '세액공제 연간 약 2,500만원')
   check('D-191 정책자금 · 창업감면 · 절세는 금액을 지어내지 않음', buildInsights(withRoster, T, []).filter((i) => ['policy-funding', 'startup-tax', 'tax'].includes(i.key)).every((i) => i.amount === undefined))
+  // D-619 설립 가능성 체크를 업체 기록에 붙이면 답도 같이 붙는다 — 카드는 그 답으로 낸 판정 줄(모듈 맨 위 '지금 판정' 과 같은 글)
+  const labForm = { ...defaultAssessForm(), sizeConfirmed: true, establishedAt: '2024-06-10', candidates: [{ ...newCandidate(), name: '김연구', education: '석사', researchYears: 3 }, { ...newCandidate(), name: '이연구', education: '석사', researchYears: 2 }] }
+  const assessResult = (data: unknown) => ({ id: 'tr-assess', toolKey: 'labcare', title: '설립 가능성 체크', verdict: '보완 후 가능', verdictLabel: '보완 후 가능', summary: '[설립 가능성 검토 — 업체]', data, deadlines: [], createdAt: '2026-10-10T00:00:00.000Z', publishedUpdateId: null })
+  const labAns = normalizeClientOps({ ...base, toolResults: [assessResult({ kind: 'assess', form: labForm })] } as never)
+  const labAnsCard = buildInsights(labAns, T, []).find((i) => i.key === 'labcare')
+  const labAnsLine = clientLabFeasibility(labAns, new Date(`${T}T00:00:00`)).line
+  check('D-619 연구소: 붙인 설립 가능성 체크에 답이 있으면 카드 = 그 답의 판정 줄(판정 이름만 보이던 것 고침) · 설립 가능성 체크로 바로', labAnsCard?.headline === labAnsLine.headline && labAnsCard.detail === labAnsLine.detail && labAnsLine.headline.includes('인정 가능') && labAnsCard.openPath.includes('/tools/labcare/assessment'), JSON.stringify(labAnsCard))
+  const labOld = normalizeClientOps({ ...base, toolResults: [assessResult({ kind: 'assess', verdict: '보완 후 가능' })] } as never)
+  check('D-619 연구소: 답이 없는 예전 결과는 붙인 글 그대로(판정을 지어내지 않음)', buildInsights(labOld, T, []).find((i) => i.key === 'labcare')?.headline === '보완 후 가능')
 
   const mk = (key: string, label: string, tone: Insight['tone'], missing: string[]): Insight => ({ key, label, tone, headline: '', detail: '', missing, openPath: '', openLabel: '', action: null })
   const ins = [mk('employment', '고용지원금', 'need', ['4대보험 가입자 명부']), mk('cretop', '크레탑', 'need', ['크레탑 기업종합보고서']), mk('tax', '절세 설계', 'need', ['주주명부', '대표 급여']), mk('policy-funding', '정책자금', 'need', ['설립일', '업종']), mk('startup-tax', '창업감면', 'need', ['설립일(창업일)', '대표 생년월일']), mk('grants', '지원사업', 'good', ['직원 수'])]
