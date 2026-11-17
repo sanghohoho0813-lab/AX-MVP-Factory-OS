@@ -40,8 +40,9 @@ export function BriefCard({ brief, custom, readOnly, onSave, plain = false }: { 
       id="radar.brief"
       icon={<Compass aria-hidden="true" className="size-4 text-violet-700" />}
       title="채널 설계 기준"
-      hint="AI 가 기획 · 대본 · 쇼츠 · 스레드를 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 말투 · 형식 · 끝맺음 · 본업 · 시청자 고민 · 접목 원칙 · 실제 사례 · 말할 때 지킬 것"
-      summary={custom ? '직접 고친 기준' : isMarketingCustomer() ? '기본값 · 설정 › 내 브랜드에서' : '기본값 · 김팀장의 경영노트'}
+      hint={`AI 가 기획 · 대본 · 쇼츠 · 스레드를 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 말투 · 형식 · 끝맺음 · 본업 · 시청자 고민 · 접목 원칙 · 실제 사례 · 말할 때 지킬 것${custom ? '' : isMarketingCustomer() ? ' (지금은 기본값 · 설정 › 내 브랜드에서)' : ' (지금은 기본값 · 김팀장의 경영노트)'}`}
+      // D-627 접힌 줄은 이름 하나 — 고쳐 둔 때만 짧게 표시(기본값 이름은 ?(hint) 안)
+      summary={custom ? '직접 고친 기준' : undefined}
       testId="radar-brief"
       keepClosed
     >

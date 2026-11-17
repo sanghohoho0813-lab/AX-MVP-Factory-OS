@@ -86,11 +86,12 @@ import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
-const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof AtSign; tone: Tone; tip: string }> = [
-  { key: 'write', label: '오늘 쓸 글', short: '쓰기', icon: NotebookPen, tone: 'rose', tip: '주제만 고르면 스레드 글을 써 주는 곳이에요. 고치고 복사해서 올려요.' },
-  { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 글의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 틀이 잘 되는지 숫자로 알려 줘요.' },
-  { key: 'library', label: '틀 23가지', short: '글 틀', icon: BookOpen, tone: 'violet', tip: '잘 된 글의 모양 23가지를 모은 설명서예요. 틀 = 글을 쓰는 순서예요.' },
-  { key: 'routine', label: '하루 10분', short: '매일', icon: CheckCircle2, tone: 'amber', tip: '매일 10분 할 일 체크표예요 — 글 쓰기 · 답글 달기 · 월요일 · 금요일 할 일.' },
+// D-627 칸 줄 아래 '지금 칸' 한 줄은 짧게(about) — 긴 설명(tip)은 칸에 마우스를 올리면
+const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof AtSign; tone: Tone; tip: string; about: string }> = [
+  { key: 'write', label: '오늘 쓸 글', short: '쓰기', icon: NotebookPen, tone: 'rose', tip: '주제만 고르면 스레드 글을 써 주는 곳이에요. 고치고 복사해서 올려요.', about: '주제만 고르면 글을 써 줘요.' },
+  { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 글의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 틀이 잘 되는지 숫자로 알려 줘요.', about: '올린 글의 숫자를 적는 곳이에요.' },
+  { key: 'library', label: '틀 23가지', short: '글 틀', icon: BookOpen, tone: 'violet', tip: '잘 된 글의 모양 23가지를 모은 설명서예요. 틀 = 글을 쓰는 순서예요.', about: '잘 된 글의 모양 23가지예요.' },
+  { key: 'routine', label: '하루 10분', short: '매일', icon: CheckCircle2, tone: 'amber', tip: '매일 10분 할 일 체크표예요 — 글 쓰기 · 답글 달기 · 월요일 · 금요일 할 일.', about: '매일 10분 할 일 체크표예요.' },
 ]
 
 /** D-298 원하는 반응마다 색 · 그림 — 틀 번호 딱지도 그 틀의 첫 반응 색 */
@@ -370,8 +371,12 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     set({ topic: t, goal: r.goal, template: r.template, tag: r.tag || draft.tag, formatBy: 'rec' })
   }
   const openFormats = () => {
-    openFold('thr.formats')
-    scrollAndFlash('thr-choose')
+    // D-627 내 맞춤은 [더 정하기] 안 — 바깥을 먼저 펼친 뒤(그려진 다음) 안쪽을
+    openFold('thr.qs.more')
+    window.setTimeout(() => {
+      openFold('thr.formats')
+      scrollAndFlash('thr-choose')
+    }, 0)
   }
   const pickGoal = (g: ThreadGoal) => set({ goal: g, template: draft.template && templateOf(draft.template)?.goals.includes(g) ? draft.template : '', formatBy: 'hand' })
   const startBody = (body: string, source: Draft['source'], tag?: string) => {
@@ -610,10 +615,10 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
                 보라 테두리 칸 · 펼치며 잠깐 빛남 · 안은 색 구역 넷(① 반응 하늘 · ② 틀 보라 · ③ 태그 초록 · ④ 남의 글 회색) */}
             <Fold
               id="thr.formats"
-              title="내 맞춤 — 형식 · 반응 · 태그 직접 고르기"
-              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 글 모양(틀)을 직접 고르고, 원하는 반응 · 내 주제 태그를 정해요. 고른 틀에서 [이 틀로 완성 글 쓰기] 를 누르면 그 틀로 바로 써요."
+              title="내 맞춤 — 형식 직접 고르기"
+              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 글 모양(틀)을 직접 고르고, 원하는 반응 · 내 주제 태그를 정해요. 고른 틀에서 [이 틀로 완성 글 쓰기] 를 누르면 그 틀로 바로 써요. 안에: 원하는 반응 · 틀 23가지 · 내 주제 태그 · 이번 주 잘 된 형식"
               icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
-              summary={`원하는 반응 · 틀 23가지 · 내 주제 태그${draft.tag ? ` (#${draft.tag})` : ''} · 이번 주 잘 된 형식`}
+              summary={draft.tag ? `#${draft.tag}` : undefined}
               className="scroll-mt-24 data-[open=1]:pb-2"
               keepClosed
               testId="thr-choose"
@@ -800,7 +805,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
               {/* D-602 꺾쇠(flex) 옆에 글 한 덩어리 — 휴대폰에서 글이 칸처럼 쪼개지지 않게 */}
               <span className="min-w-0 break-keep">
                 <FilePlus2 aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-slate-500" />
-                잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 글 모양(첫 줄 · 줄 수 · 끝)대로 써요 · 선택 · 저장 안 함</span>
+                잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 모양대로 써요 · 저장 안 함</span>
               </span>
             </summary>
             <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="반응 좋았던 남의 스레드 글을 붙여 넣으세요 — 첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
@@ -822,8 +827,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
           <div id="thr-editor" className="scroll-mt-24" data-testid="thr-editor-closed">
             <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
           </div>
-          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 완성 글 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요.</p>
-          <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus(), 0))} data-testid="thr-hand">
+          {/* D-627 무엇이 나오는지 긴 설명은 마우스를 올리면(title) */}
+          <Button variant="secondary" className="self-start" title="1단계에서 [AI로 완성 글 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요." onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus(), 0))} data-testid="thr-hand">
             <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
           </Button>
         </Surface>

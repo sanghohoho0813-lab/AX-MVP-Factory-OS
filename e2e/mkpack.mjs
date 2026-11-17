@@ -389,7 +389,12 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   if (big) await mp.evaluate(() => (document.documentElement.style.fontSize = '130%'))
   const tag = `${w}${big ? ' 큰 글자' : ''}`
   const h = await mp.getByTestId('mk-key').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-  check(`M ${tag}: 첫 화면 넘침 0 · 키워드 단추 ${KEYS_N}개 모두 44px 이상`, (await overflowX(mp)) <= 0 && h.length === KEYS_N && h.every((x) => x >= 44), { over: await overflowX(mp), h })
+  // D-627 처음엔 다섯 줄만(나머지는 [n개 더 보기]) — 보이는 줄은 모두 44px 이상 · 숨긴 줄은 누르면 나옴
+  const FIRST = Math.min(5, KEYS_N)
+  const okFirst = h.length === KEYS_N && h.slice(0, FIRST).every((x) => x >= 44) && h.slice(FIRST).every((x) => x === 0)
+  if (KEYS_N > FIRST) await mp.getByTestId('mk-keys-more').click()
+  const h2 = await mp.getByTestId('mk-key').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`M ${tag}: 첫 화면 넘침 0 · 키워드 ${KEYS_N}개 — 처음 ${FIRST}줄 · [더 보기] 뒤 모두 44px 이상`, (await overflowX(mp)) <= 0 && okFirst && h2.every((x) => x >= 44), { over: await overflowX(mp), h, h2 })
   await shot(mp, `M-${w}${big ? '-big' : ''}-home`)
   await mp.getByTestId('mk-key').first().click()
   await mp.getByTestId('mk-key-go').first().click({ timeout: 5000 }).catch(() => {}) // D-616 뜨는 주제는 누르면 펼침 → [이 주제로 글 · 대본 만들기]
@@ -503,7 +508,8 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   // D-603 네모 칸 → 고정 키워드는 줄바꿈되는 칩 · 이번 주 키워드는 번호 목록 한 줄씩(휴대폰) — 칩은 화면 안 · 줄은 손가락 크기(44px)
   const cols = (sel) => p.locator(sel).evaluateAll((els) => new Set(els.slice(0, 4).map((e) => Math.round(e.getBoundingClientRect().left))).size)
   const inView = (sel) => p.locator(sel).evaluateAll((els) => els.every((e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth + 0.5 }))
-  const minH = (sel) => p.locator(sel).evaluateAll((els) => Math.min(...els.map((e) => e.getBoundingClientRect().height)))
+  // D-627 뜨는 주제는 다섯 줄 + [더 보기] — 보이는 줄만 잰다
+  const minH = (sel) => p.locator(sel).evaluateAll((els) => Math.min(...els.map((e) => e.getBoundingClientRect().height).filter((x) => x > 0)))
   const k9 = { ov: await overflowX(p), fIn: await inView('[data-testid="mk-fixed-key"]'), fH: await minH('[data-testid="mk-fixed-key"]'), k: await cols('[data-testid="mk-key"]'), kH: await minH('[data-testid="mk-key"]') }
   check('K9 휴대폰 390 — 고정 키워드 칩 화면 안 · 이번 주 키워드 한 줄씩(번호 목록) · 누르는 칸 44px 이상 · 넘침 0', k9.ov <= 0 && k9.fIn && k9.fH >= 44 && k9.k === 1 && k9.kH >= 44, k9)
   await shot(p, 'K-390')

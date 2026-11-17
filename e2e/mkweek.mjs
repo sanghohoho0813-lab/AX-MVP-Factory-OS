@@ -171,6 +171,11 @@ const tabTo = async (p, key) => {
   await p.locator(`[data-testid="mk-week-tab"][data-tab="${key}"]`).click()
   await p.waitForSelector(`[data-testid="mk-week-panel"][data-tab="${key}"]`, { timeout: 5000 }).catch(() => {})
 }
+/** D-627 아래 도구 줄(전체 복사 · 내려받기 · 점수 · 90점 아래 고쳐 쓰기)은 접힌 한 줄 — 누르기 · 읽기 전에 펼친다 */
+const openTools = async (p) => {
+  const box = p.getByTestId('mk-week-tools')
+  if ((await box.count()) && !(await box.evaluate((e) => e.open))) await box.locator('summary').click()
+}
 /** 그 탭으로 가서 센다 */
 const countIn = async (p, key, sel) => {
   await tabTo(p, key)
@@ -201,7 +206,9 @@ await page.evaluate(() => {
 await openHome(page)
 const open = page.getByTestId('mk-week-open')
 const keysTop = (await page.getByTestId('mk-keys').boundingBox())?.y ?? 0
-check('H1 첫 화면 이번 주 키워드 위에 [1주일치 콘텐츠 한 번에 만들기] — 유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7(D-507 쉬운 말)', (await open.count()) === 1 && ((await open.boundingBox())?.y ?? 9999) < keysTop && (await open.innerText()).includes('1주일치 콘텐츠 한 번에 만들기') && (await open.innerText()).includes('스레드 글 7') && (await open.innerText()).includes('긴 영상 1') && (await open.innerText()).includes('짧은 영상 3'), await open.innerText())
+// D-627 글자 수 한도 — 단추 글은 '1주일치 한 번에 만들기', 무엇이 나오는지(긴 영상 1 · 짧은 영상 3 · 스레드 글 7)는 아이콘 셋 + 마우스(title · 읽어 주기 이름)
+const openTip = `${(await open.getAttribute('title')) ?? ''} ${(await page.getByTestId('mk-week-what').getAttribute('aria-label')) ?? ''}`
+check('H1 첫 화면 이번 주 키워드 위에 [1주일치 한 번에 만들기] — 유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7(D-507 쉬운 말 · D-627 아이콘 + 마우스)', (await open.count()) === 1 && ((await open.boundingBox())?.y ?? 9999) < keysTop && (await open.innerText()).includes('1주일치 한 번에 만들기') && openTip.includes('스레드 글 7') && openTip.includes('긴 영상 1') && openTip.includes('짧은 영상 3'), { text: await open.innerText(), openTip })
 await shot(page, 'H-home')
 // 고정 키워드(본업) 이름들 — 짝의 앞쪽이 이 가운데 하나여야
 const fixedText = await page.getByTestId('mk-fixed').innerText().catch(() => '')
@@ -267,11 +274,13 @@ const badMon = await page.locator('[data-testid="mk-week-thread"][data-day="1"]'
 await tabTo(page, 'plan')
 const cal = await page.getByTestId('mk-week-day').evaluateAll((els) => els.map((e) => e.textContent ?? ''))
 check('V4 달력 7일 — 수요일 롱폼 · 화 쇼츠① · 목 쇼츠② · 토 릴스③ · 매일 스레드', cal.length === 7 && cal[2].includes('유튜브 긴 영상') && cal[1].includes('쇼츠 ①') && cal[3].includes('쇼츠 ②') && cal[5].includes('릴스 ③') && cal.every((d) => d.includes('스레드')), cal)
+await openTools(page)
 const lintLine = await page.getByTestId('mk-week-lint').innerText()
 check("V5 점검 — 이번 주 글 11개 중 통과 · 링크가 든 금요일 스레드는 '고칠 곳'", lintLine.includes('이번 주 글 11개') && badFri !== '0' && badMon === '0' && /고칠 곳 [1-9]/.test(lintLine), lintLine)
 /* ---------------- F D-561 90점 아래 AI 글만 고쳐 쓰기(한 번 눌러 이번 주 글을 90점까지) ---------------- */
 {
   await tabTo(page, 'threads')
+  await openTools(page)
   const fixBtn = page.getByTestId('mk-week-fix')
   const nFix = Number((await fixBtn.getAttribute('data-n').catch(() => '0')) ?? '0')
   const avg0 = Number(await page.getByTestId('mk-week-score').getAttribute('data-avg'))
@@ -309,6 +318,7 @@ await page.evaluate(() => window.scrollTo({ top: 0 }))
 await shot(page, 'V-week', true)
 
 /* ---------------- C 복사 · 파일 · 내 콘텐츠 ---------------- */
+await openTools(page)
 await page.getByTestId('mk-week-copy-all').click()
 await page.waitForTimeout(300)
 const all = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
@@ -379,7 +389,9 @@ await page.getByTestId('mk-projects').waitFor({ timeout: 8000 })
 await page.waitForFunction(() => (document.querySelector('[data-testid="mk-project"]')?.textContent ?? '').includes('스레드 7/7'), null, { timeout: 8000 }).catch(() => {})
 const proj = page.locator('[data-testid="mk-project"]').first()
 const projTxt = (await proj.textContent().catch(() => '')) ?? ''
-check('W1 내 콘텐츠 맨 위 1주일치 프로젝트 — 이번 주 카드 · 짝 셋 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7', projTxt.includes('긴 영상 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTxt.match(/짝 \d/g) ?? []).length === 3 && (projTxt.match(/ × /g) ?? []).length >= 3, projTxt)
+// D-627 카드는 한 줄씩 — 짝 셋은 마우스를 올리면(title · 누르면 그 주 화면에 전부)
+const projTip = (await proj.getAttribute('title').catch(() => '')) ?? ''
+check('W1 내 콘텐츠 맨 위 1주일치 프로젝트 — 이번 주 카드 · 롱폼 1/1 · 쇼츠 · 릴스 3/3 · 스레드 7/7 · 짝 셋(마우스)', projTxt.includes('긴 영상 1/1') && projTxt.includes('쇼츠 · 릴스 3/3') && projTxt.includes('스레드 7/7') && (projTip.match(/짝 \d/g) ?? []).length === 3 && (projTip.match(/ × /g) ?? []).length >= 3, { projTxt, projTip })
 check('W2 내 콘텐츠의 롱폼 줄에 [1주일치 프로젝트 보기]', (await page.getByTestId('make-week-badge').count()) === 1)
 await shot(page, 'W-projects')
 await proj.click()
@@ -466,7 +478,8 @@ await page.waitForTimeout(800)
 await page.goto(BASE + '/marketing?week=1&wt=threads', { waitUntil: 'networkidle' })
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForFunction(() => document.querySelector('[data-testid="mk-week-post"][data-posted="1"]') !== null, null, { timeout: 8000 }).catch(() => {})
-const made = (await page.getByTestId('mk-week-made').innerText().catch(() => '')) ?? ''
+// D-627 만든 때 · 올린 글 수는 머리 [짝 주제] 접힌 줄 안 — 글자로 읽는다
+const made = (await page.getByTestId('mk-week-made').textContent().catch(() => '')) ?? ''
 check('Q2 [올렸어요] 뒤 프로젝트로 돌아오면 그 카드 "올림 m/d" · 머리에 "올린 글 1/10"', (await page.locator('[data-testid="mk-week-post"][data-posted="1"]').count()) === 1 && /올림 \d+\/\d+/.test(await page.locator('[data-testid="mk-week-post"][data-posted="1"]').innerText()) && made.includes('올린 글 1/10'), made)
 await shot(page, 'Q-posted')
 check('Q3 오류 0', errors.length === 0, errors)

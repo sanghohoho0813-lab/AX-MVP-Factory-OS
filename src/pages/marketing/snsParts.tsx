@@ -159,7 +159,7 @@ export function BigChoices<K extends string>({ items, value, onPick, label, test
  * D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 한 번에 모르겠다" — 칸마다 색 · 마우스를 올리면 무엇을 하는 곳인지 바로,
  * 휴대폰(마우스 없음)도 알 수 있게 칸 줄 아래에 '지금 칸' 한 줄.
  */
-export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPrefix }: { tabs: ReadonlyArray<{ key: K; label: string; short: string; icon: LucideIcon; tone?: Tone; tip?: string }>; value: K; onPick: (k: K) => void; label: string; testPrefix: string }) {
+export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPrefix }: { tabs: ReadonlyArray<{ key: K; label: string; short: string; icon: LucideIcon; tone?: Tone; tip?: string; /** D-627 '지금 칸' 한 줄(짧게) — 없으면 tip */ about?: string }>; value: K; onPick: (k: K) => void; label: string; testPrefix: string }) {
   const cur = tabs.find((t) => t.key === value)
   const curTone = TONES[cur?.tone ?? 'slate']
   const CurIcon = cur?.icon
@@ -185,7 +185,7 @@ export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPr
         <p className="t-sub flex min-w-0 items-start gap-1.5 px-1 break-keep text-slate-700" data-testid={`${testPrefix}-about`}>
           {CurIcon && <CurIcon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${curTone.icon}`} />}
           <span className="min-w-0">
-            <b className={curTone.ink}>{cur.label}</b> — {cur.tip}
+            <b className={curTone.ink}>{cur.label}</b> — {cur.about ?? cur.tip}
           </span>
         </p>
       )}

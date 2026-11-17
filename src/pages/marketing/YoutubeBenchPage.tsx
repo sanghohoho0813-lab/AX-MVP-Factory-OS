@@ -141,6 +141,7 @@ import { usePageCrumbs } from '../../lib/crumbStore'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 import { rememberWeekTopics } from '../../services/marketing/quickStart'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
+import { InPageTools, MENU_ROW, useInPageTools } from '../../components/layout/PageTools'
 import { madeResume } from '../../services/marketing/allMade'
 import { listShortPosts, type ShortPost } from '../../services/marketing/shorts'
 import { listThreadPosts, type ThreadPost } from '../../services/marketing/threads'
@@ -203,10 +204,11 @@ const PLAN_ASSISTS = new Set(['radar.top5', 'radar.view', 'bench.copy', 'rising.
 const ideaHref = (id: string) => `/marketing?view=make&idea=${encodeURIComponent(id)}`
 
 /** D-507 탭마다 '이 화면은' 한 줄 — 무엇을 해 주는 곳인지 · 무엇을 누르면 어떻게 되는지(쉬운 말) */
-const RADAR_GUIDE: Record<Exclude<View, 'plan'>, { what: string; steps?: string[] }> = {
-  top: { what: '남의 유튜브에서 요즘 많이 본 영상을 모아 보여 줘요. 제목을 누르면 왜 잘됐는지 · 영상 정보가 열려요.' },
-  channels: { what: '이번 주 주제를 고를 때 살펴보는 유튜브 채널 목록이에요. 평소엔 그대로 두셔도 되고, 보고 싶은 채널이 있으면 [+ 채널 추가] 로 더해요.' },
-  analysis: { what: '참고 채널 영상이 어느 요일 · 몇 시 · 몇 분 길이일 때 잘됐는지 보여 줘요. 우리 영상 올릴 때 · 길이를 정할 때 보세요.' },
+// D-627 한 줄은 짧게(30자 안) — 더 긴 설명은 ?(tip)
+const RADAR_GUIDE: Record<Exclude<View, 'plan'>, { what: string; tip?: string; steps?: string[] }> = {
+  top: { what: '요즘 많이 본 남의 유튜브 영상이에요.', tip: '남의 유튜브에서 요즘 많이 본 영상을 모아 보여 줘요. 제목을 누르면 왜 잘됐는지 · 영상 정보가 열려요.' },
+  channels: { what: '주제를 고를 때 보는 유튜브 채널이에요.', tip: '이번 주 주제를 고를 때 살펴보는 유튜브 채널 목록이에요. 평소엔 그대로 두셔도 되고, 보고 싶은 채널이 있으면 [+ 채널 추가] 로 더해요.' },
+  analysis: { what: '잘된 영상의 요일 · 시간 · 길이예요.', tip: '참고 채널 영상이 어느 요일 · 몇 시 · 몇 분 길이일 때 잘됐는지 보여 줘요. 우리 영상 올릴 때 · 길이를 정할 때 보세요.' },
   make: { what: '만든 대본 · 글이 모두 모이는 곳이에요.', steps: ['하나 누르기', '찍고 · 올리기', '[게시 완료] 누르기'] },
 }
 
@@ -751,12 +753,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 
   const feedButtons = (
     <>
-      <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
-        <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
-      </Button>
-      <Button variant="secondary" onClick={csv} disabled={!prepared} title="CSV 파일 — 엑셀에서 열려요" data-testid="yt-csv">
-        <Download aria-hidden="true" className="size-4" /> 엑셀로 받기
-      </Button>
+      <FeedButton onClick={refresh} disabled={loading} testId="yt-refresh" icon={<RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} />}>
+        지금 새로 가져오기
+      </FeedButton>
+      <FeedButton onClick={csv} disabled={!prepared} title="CSV 파일 — 엑셀에서 열려요" testId="yt-csv" icon={<Download aria-hidden="true" className="size-4" />}>
+        엑셀로 받기
+      </FeedButton>
     </>
   )
   // D-295 채널 설계 기준은 대표 계정만(접힌 채로) — 팀장 · 구독 고객은 설정 › 내 브랜드로 각자
@@ -818,21 +820,26 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               <>
                 {/* MK-SIMPLE(D-553) 예전 큰 보라 띠(질문 단추 서너 개 · 직접 묻기 · 모델) → 머리 오른쪽 [AI 도우미] 하나 — 질문 단추는 누르면 열리는 판 안에 그대로 */}
                 {radarAssist}
-                {view !== 'make' && <span className="contents max-sm:hidden">{feedButtons}</span>}
+                {/* D-627 새로 가져오기 · 엑셀로 받기는 화면 일이 아니라 도구 — 경로 줄 오른쪽 [⋯] 안으로 */}
+                {view !== 'make' && <InPageTools>{feedButtons}</InPageTools>}
               </>
             )
           }
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         {/* MK-SIMPLE(D-553) '무엇을 하는 곳' 한 줄은 첫 화면 · 이번 주 찍을 것에만 — 다른 화면은 아래 '이 화면은' 한 줄이 그 화면을 말한다(같은 말 두 번 0) */}
-        {!packKey && !weekOn && (firstScreen || view === 'plan' || (prepared && view !== 'make')) && (
+        {!packKey && !weekOn && (firstScreen || (prepared && view !== 'make')) && (
           <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
             {/* D-507 이곳이 무엇을 해 주는지 한 줄(쉬운 말) — 예전 이름(콘텐츠 레이더)은 괄호로 남긴다 */}
-            {(firstScreen || view === 'plan') && (
-              <span className="font-semibold text-slate-700" data-testid="radar-subtitle">
-                {/* D-573 대표가 아닌 계정에는 예전 이름(괄호)을 보이지 않는다 — 처음 보는 사람에게는 뜻 없는 말 · '우리 회사' 대신 '내 채널' */}
-                {customer ? '내 유튜브 · SNS 에 올릴 글과 대본을 만드는 곳' : '우리 회사 유튜브 · SNS · 블로그에 올릴 글과 대본을 만드는 곳'}
-                {!customer && <span className="font-normal text-slate-600 max-sm:hidden"> (콘텐츠 레이더 — 유튜브 참고 채널 분석)</span>}
+            {/* D-627 한 줄은 첫 화면에만 · 짧게(30자 안) — 이번 주 찍을 것(유튜브)은 판 머리 '이번 주 무엇을 올릴까요?' + 1 → 2 → 3 이 말한다 */}
+            {firstScreen && (
+              <span
+                className="font-semibold text-slate-700"
+                data-testid="radar-subtitle"
+                // D-573 대표가 아닌 계정에는 예전 이름을 보이지 않는다 — 대표는 마우스를 올리면 예전 이름(콘텐츠 레이더)
+                title={customer ? undefined : '예전 이름: 콘텐츠 레이더 — 유튜브 참고 채널 분석'}
+              >
+                {customer ? '내 유튜브 · SNS 에 올릴 글 · 대본 만들기' : '우리 유튜브 · SNS · 블로그에 올릴 글 만들기'}
               </span>
             )}
             {prepared && !firstScreen && view !== 'make' && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
@@ -857,13 +864,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {/* D-560 '남의 인기 영상' 한 칸 안 — 인기 영상 · 참고 채널 · 올리는 때 · 길이 */}
       {!packKey && !weekOn && !firstScreen && isLookView(view) && <LookTabs view={view} onPick={(k) => setParam({ view: k })} />}
       {/* D-507 화면마다 맨 위 '이 화면은' 한 줄(첫 화면은 키워드 칸 안의 1 → 2 → 3) */}
-      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide plain id={`radar.${view}`} what={RADAR_GUIDE[view].what} steps={RADAR_GUIDE[view].steps} />}
+      {!packKey && !weekOn && view !== 'plan' && <ScreenGuide plain id={`radar.${view}`} what={RADAR_GUIDE[view].what} tip={RADAR_GUIDE[view].tip} steps={RADAR_GUIDE[view].steps} />}
       {/* D-239 마케팅 AI 도우미(탭마다 다른 질문) — MK-SIMPLE(D-553) 띠 대신 위 머리 오른쪽 [AI 도우미] 단추(radarAssist). 이번 주 찍을 것의 질문 판은 [자세히 보기] 안 그대로 */}
 
       {packKey ? (
         packSource ? (
           <PackView
-            guide={<ScreenGuide plain id="radar.pack" what={isMarketingCustomer() ? '고른 주제로 제목 · 대본 · 블로그 글이 한 번에 나온 곳이에요.' : '고른 주제로 제목 · 대본 · 블로그 글 · 카드뉴스가 한 번에 나온 곳이에요.'} steps={['위 칩으로 칸 고르기', '[이 칸 복사]', '올릴 곳에 붙여넣기']} />}
+            guide={<ScreenGuide plain id="radar.pack" what="고른 주제로 글 · 대본이 한 번에 나온 곳" tip={isMarketingCustomer() ? '고른 주제로 제목 · 대본 · 블로그 글이 한 번에 나온 곳이에요.' : '고른 주제로 제목 · 대본 · 블로그 글 · 카드뉴스가 한 번에 나온 곳이에요.'} steps={['위 칩으로 칸 고르기', '[이 칸 복사]', '올릴 곳에 붙여넣기']} />}
             source={packSource}
             brief={brief}
             rank={homeRank(packKey)}
@@ -976,7 +983,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             return idea?.script ? ideaHref(idea.id) : null
           })()}
           onBack={closeWeek}
-          guide={<ScreenGuide id="radar.week" what="일주일 동안 올릴 것 — 유튜브 긴 영상 1편 · 짧은 영상 3편 · 스레드 글 7개를 한 번에 만든 곳이에요." steps={['아래 탭에서 고르기', '[복사] 하기', '올릴 날에 올리기']} />}
+          guide={<ScreenGuide plain id="radar.week" what="일주일치를 한 번에 만든 곳" tip="일주일 동안 올릴 것 — 유튜브 긴 영상 1편 · 짧은 영상 3편 · 스레드 글 7개를 한 번에 만든 곳이에요." steps={['아래 탭에서 고르기', '[복사] 하기', '올릴 날에 올리기']} />}
           onCopy={(t, what) => copy(t, what)}
           onSaveLong={savePack}
         />
@@ -1049,9 +1056,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 <Fold
                   id="mk-more"
                   // D-616 주제마다 이유 · 근거 · 찍는 법 · 확정은 위 목록(줄을 누르면) — 같은 1~10위를 여기서 한 번 더 보이지 않는다
-                  title="자세히 보기 — 시장 신호 · 추천 기준 · AI 도우미"
+                  // D-627 접힌 줄은 이름 하나(요약 글 없음) — 무엇이 들어 있는지는 ?(hint)
+                  title="자세히 보기"
                   hint="주제마다 왜 지금 · 근거 영상 · 제목 · 표지 글 · 이번 주로 확정은 위 '이번 주 뜨는 주제' 에서 그 주제를 누르면 펼쳐져요. 여기에는 시장 신호 · 추천 기준(숨긴 주제) · 이번 주 제작 예정 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준이 있어요."
-                  summary="시장 신호 · 추천 기준 · AI 도우미 · 채널 설계 기준"
                   testId="mk-more"
                 >
                   <div className="flex flex-wrap gap-2">{feedButtons}</div>
@@ -1141,6 +1148,22 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 /* 받기 전 · 받은 때                                                       */
 /* ------------------------------------------------------------------ */
 
+/** D-627 새로 가져오기 · 엑셀로 받기 — [⋯] 메뉴 안이면 메뉴 줄 모양, 아니면(자세히 보기 안) 예전 단추 */
+function FeedButton({ onClick, disabled, title, testId, icon, children }: { onClick: () => void; disabled?: boolean; title?: string; testId: string; icon: ReactNode; children: ReactNode }) {
+  const inMenu = useInPageTools()
+  if (inMenu)
+    return (
+      <button type="button" onClick={onClick} disabled={disabled} title={title} className={`${MENU_ROW} disabled:opacity-50`} data-testid={testId}>
+        {icon} {children}
+      </button>
+    )
+  return (
+    <Button variant="secondary" onClick={onClick} disabled={disabled} title={title} data-testid={testId}>
+      {icon} {children}
+    </Button>
+  )
+}
+
 function SetupCard({ status, message, onSample }: { status: string; message: string; onSample: () => void }) {
   if (status === 'loading' || status === 'idle')
     return (
@@ -1196,8 +1219,9 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
   return (
     <div className="flex flex-col gap-2">
       {sample && (
-        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" data-testid="yt-sample-banner">
-          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 연결 설정을 마치면 실제 참고 채널로 바뀝니다.
+        // D-627 한 줄로 — 언제 바뀌는지는 마우스를 올리면
+        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" title="유튜브 연결 설정을 마치면 실제 참고 채널로 바뀝니다." data-testid="yt-sample-banner">
+          예시 데이터예요 — 지어낸 채널 · 숫자예요.
         </p>
       )}
       {message && (

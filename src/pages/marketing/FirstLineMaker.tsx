@@ -76,11 +76,12 @@ export function FirstLineMaker({ testPrefix, channel, topic, facts = '', aiOk, o
           className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3.5 font-semibold text-slate-800 hover:bg-slate-50"
           data-testid={`${testPrefix}-hooks-open`}
           data-guide="fn-mk-firstline"
+          // D-627 무엇인지 설명은 마우스를 올리면(글자 수 한도)
+          title={`${channel === 'shorts' ? '영상 맨 앞 한마디' : '글 맨 앞 한 줄'} — 26가지 방법 가운데 10개를 바로 뽑아요`}
         >
           <MessageSquareQuote aria-hidden="true" className="size-4 text-slate-500" />
-          첫마디 10개 먼저 보기
+          첫마디 10개 보기
         </button>
-        <span className="t-sub break-keep text-slate-600">{channel === 'shorts' ? '영상 맨 앞 한마디' : '글 맨 앞 한 줄'} — 26가지 방법 가운데 10개를 바로 뽑아요</span>
       </div>
     )
   }

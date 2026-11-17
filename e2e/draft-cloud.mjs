@@ -239,6 +239,8 @@ try {
 
   // C8
   await openThreads(pc.page)
+  // D-627 잘 된 남의 글 · 내 맞춤은 [더 정하기(선택)] 접힌 줄 안 — 먼저 펼친다
+  if ((await pc.page.getByTestId('thr-qs-more').getAttribute('data-open')) !== '1') await pc.page.getByTestId('thr-qs-more').getByTestId('fold-toggle').first().click()
   if ((await pc.page.getByTestId('thr-choose').getAttribute('data-open')) !== '1') await pc.page.getByTestId('thr-choose').locator('button').first().click()
   await pc.page.getByTestId('thr-ref-box').locator('summary').click()
   const REF_TEXT = '남의 잘 된 글 — 올라가면 안 됨'

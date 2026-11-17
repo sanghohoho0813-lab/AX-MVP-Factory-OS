@@ -84,6 +84,11 @@ function GroupLabel({ long, short, home }: { long: string; short: string; home?:
   )
 }
 
+/*
+ * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게" — 칸 아래 작은 설명(sub)은 화면에 늘 깔지 않는다.
+ * 그 칸이 무엇인지는 마우스를 올리면 뜨는 메뉴 안내 카드(data-guide — 무엇 · 왜 · 효과 · 앞으로)가 말한다.
+ */
+
 function Label({ it }: { it: Item }) {
   const Icon = it.icon
   return (
@@ -93,32 +98,19 @@ function Label({ it }: { it: Item }) {
         <Icon aria-hidden="true" className="size-5 shrink-0 sm:size-6" />
       </span>
       <span className="lg:hidden">{it.short}</span>
-      {it.sub ? (
-        <span className="hidden flex-col items-start leading-tight lg:flex">
-          <span>{it.label}</span>
-          <span className="t-meta font-normal opacity-80">{it.sub}</span>
-        </span>
-      ) : (
-        <span className="hidden lg:inline">{it.label}</span>
-      )}
+      <span className="hidden lg:inline">{it.label}</span>
     </>
   )
 }
 
-/** 만들기 칸 안 — 형식 색 아이콘 + 이름(넓으면 아래 작은 설명) */
+/** 만들기 칸 안 — 형식 색 아이콘 + 짧은 이름(D-627 설명은 title) */
 function MakeLabel({ it }: { it: Item }) {
   return (
     <>
       <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1] sm:size-9">
         <it.icon className="size-5 sm:size-8" />
       </span>
-      <span className="min-w-0 text-center sm:text-left">
-        <span className="lg:hidden">{it.short}</span>
-        <span className="hidden min-w-0 flex-col leading-tight lg:flex">
-          <span className="truncate">{it.label}</span>
-          {it.sub && <span className="t-meta truncate font-normal text-slate-500">{it.sub}</span>}
-        </span>
-      </span>
+      <span className="min-w-0 truncate text-center sm:text-left">{it.short}</span>
     </>
   )
 }
@@ -213,6 +205,8 @@ function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | nul
  *  - PC: 얇은 한 줄 — [⌂ 처음] · 살펴보기 다섯 · 만들기 넷(아이콘 + 짧은 이름 · 지금 화면은 파란 칸). 좁으면 두 줄로 접힌다.
  *  - 휴대폰: [⌂ 처음] · 지금 화면 이름 · [다른 화면 ▾] — 누르면 아래로 두 칸씩 전부(묶음 이름과 함께). 옆으로 밀어 찾지 않는다.
  * 칸 순서 · 시험 이름(yt-view-* · mk-tab-*) · 주소는 그대로 — 같은 단추 하나를 PC · 휴대폰이 함께 쓴다.
+ * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 여러 번 누르더라도 하나하나 더 나오게" — PC 도 휴대폰처럼
+ *   [⌂ 처음] · 지금 화면 이름 · [다른 화면 ▾] 한 줄. 누르면 예전 두 줄(살펴보기 · 만들기 칸 전부)이 그 아래 펼쳐진다(지운 칸 없음).
  */
 const slimCls = (on: boolean) =>
   `tap t-sub inline-flex shrink-0 items-center gap-1.5 border font-semibold whitespace-nowrap max-sm:min-h-12 max-sm:w-full max-sm:justify-start max-sm:rounded-(--radius-control) max-sm:px-3 sm:min-h-10 sm:rounded-full sm:px-3 ${on ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50'}`
@@ -247,14 +241,15 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
       {PLAN_ITEM.label}
     </Link>
   )
-  const homeLink = (phone: boolean) => (
+  const homeLink = (
     <Link
       to="/marketing"
-      className={phone ? 'tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50' : slimCls(false)}
-      data-testid={phone ? 'mk-home-link-m' : 'mk-home-link'}
+      title="마케팅 처음으로"
+      className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
+      data-testid="mk-home-link-m"
     >
       <Home aria-hidden="true" className="size-4 shrink-0" />
-      {phone ? '처음' : '마케팅 처음으로'}
+      처음
     </Link>
   )
   const groupHead = (title: string, sub: string) => (
@@ -264,11 +259,11 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
   )
   return (
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs" data-slim="1" className="flex flex-col gap-2">
-      {/* 휴대폰 — 처음 · 지금 화면 · 다른 화면 */}
+      {/* 처음 · 지금 화면 · 다른 화면(D-627 PC 도 같은 한 줄) */}
       {/* 글자를 크게 쓰는 좁은 휴대폰(360 · 매우 크게)에서는 [다른 화면] 이 아랫줄로 — 지금 화면 이름이 한 글자씩 꺾이지 않게 */}
-      <div className="flex flex-wrap items-center gap-2 sm:hidden" data-testid="mk-tabs-phone">
-        {homeLink(true)}
-        <span className="t-sub flex min-w-0 flex-1 basis-[7.5rem] items-center gap-1.5 font-bold text-slate-900" data-testid="mk-tabs-now">
+      <div className="flex flex-wrap items-center gap-2" data-testid="mk-tabs-phone">
+        {homeLink}
+        <span className="t-sub flex min-w-0 flex-1 basis-[7.5rem] items-center gap-1.5 font-bold text-slate-900 sm:flex-none sm:basis-auto sm:px-1" data-testid="mk-tabs-now">
           {now && <SlimIcon it={now} />}
           <span className="min-w-0 leading-tight break-keep">{now ? (TOOLS.some((t) => t.key === now.key) ? now.short : now.label) : '마케팅'}</span>
         </span>
@@ -283,10 +278,10 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
           {more ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
         </button>
       </div>
-      {/* PC — 두 줄(살펴보기 · 만들기, 칸마다 아이콘 + 짧은 이름) · 휴대폰 — [다른 화면] 을 누르면 두 칸씩(묶음 이름과 함께) */}
+      {/* [다른 화면] 을 누르면 — PC 두 줄(살펴보기 · 만들기, 칸마다 아이콘 + 짧은 이름) · 휴대폰 두 칸씩(묶음 이름과 함께) */}
       <div
         data-testid="mk-tabs-strip"
-        className={`${more ? 'max-sm:grid' : 'max-sm:hidden'} grid-cols-2 gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-2 sm:flex sm:flex-col sm:gap-1.5 sm:border-0 sm:bg-transparent sm:p-0`}
+        className={`${more ? 'grid sm:flex' : 'hidden'} grid-cols-2 gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-2 sm:flex-col sm:gap-1.5`}
       >
         <div className="max-sm:contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
           {groupHead('살펴보기', '남의 인기 영상을 보고 고르기')}
@@ -320,7 +315,6 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
               ))}
             </>
           )}
-          <span className="max-sm:hidden sm:ml-auto">{homeLink(false)}</span>
         </div>
       </div>
     </nav>

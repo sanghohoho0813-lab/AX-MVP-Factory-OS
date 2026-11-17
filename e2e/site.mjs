@@ -29,6 +29,19 @@ function check(name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || detail === undefined ? '' : ' ' + JSON.stringify(detail).slice(0, 400)}`)
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+/** D-627 '고객 관리에 없는 곳으로 만들기' 는 접힌 한 줄 — 가상 업체 · 컨설턴트 단추를 누르기 전에 펼친다 */
+const openTrial = async (page) => {
+  const btn = page.getByTestId('trial-start-open')
+  if ((await btn.count()) && (await btn.getAttribute('aria-expanded')) !== 'true') await btn.click()
+}
+/** D-627 업체 목록은 다섯 줄 + [n곳 더 보기] — 전부 펼친다 */
+const showAllRows = async (page, prefix) => {
+  for (let i = 0; i < 10; i++) {
+    const more = page.getByTestId(`${prefix}-show-more`)
+    if (!(await more.count())) return
+    await more.click()
+  }
+}
 
 const NOW = '2026-09-01T00:00:00.000Z'
 const FULL = {
@@ -520,6 +533,8 @@ const errors = []
   const clientRec = (id) => page.evaluate((cid) => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === cid) ?? null, id)
 
   await page.goto(BASE + '/tools/homepage', { waitUntil: 'networkidle' })
+  await page.getByTestId('site-picker-item').first().waitFor()
+  await showAllRows(page, 'site-picker')
   const groups = await page.getByTestId('site-picker-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
   check('D220 고르기 — 계약 고객 · 잠재고객 · 컨설턴트가 나뉘어 보임 · 가상 업체 만들기 입구', groups.includes('contract') && groups.includes('lead') && groups.includes('consultant') && (await page.getByTestId('trial-start').count()) === 1, [...new Set(groups)])
   await page.locator('[data-testid="subject-filter"][data-filter="lead"]').click()
@@ -532,6 +547,7 @@ const errors = []
 
   // 가상 업체 — 고객 관리에 없는 곳
   await page.goto(BASE + '/tools/homepage', { waitUntil: 'networkidle' })
+  await openTrial(page)
   await page.getByTestId('trial-new-company').click()
   await page.getByTestId('trial-form').waitFor()
   const saveOff = await page.getByTestId('trial-save').isDisabled()
@@ -586,7 +602,8 @@ const errors = []
   const counts = await page.getByTestId('subject-filter').allInnerTexts()
   await page.locator('[data-testid="subject-filter"][data-filter="lead"]').click()
   const leads2 = await page.getByTestId('site-picker-item').allInnerTexts()
-  check('D220 목록 — 가상에서 빠지고 잠재고객에 임시등록 표시로', counts.some((t) => /가상\s*0/.test(t)) && leads2.some((t) => t.includes('봄날베이커리') && t.includes('임시등록')), { counts, leads2 })
+  // D-627 0곳인 묶음 칩은 숨긴다 — '가상' 칩이 없거나 0
+  check('D220 목록 — 가상에서 빠지고 잠재고객에 임시등록 표시로', !counts.some((t) => /가상\s*[1-9]/.test(t)) && leads2.some((t) => t.includes('봄날베이커리') && t.includes('임시등록')), { counts, leads2 })
 
   // 업체 상세 — 임시등록 표시 · 지우기
   await page.goto(`${BASE}/ops/clients/${newId}`, { waitUntil: 'networkidle' })
@@ -599,6 +616,7 @@ const errors = []
 
   // 가상 컨설턴트 → 개인 컨설턴트 견본 · 지우기
   await page.goto(BASE + '/tools/homepage', { waitUntil: 'networkidle' })
+  await openTrial(page)
   await page.getByTestId('trial-new-consultant').click()
   await page.locator('[data-testid="trial-sample"][data-sample="consultant"]').click()
   await page.getByTestId('trial-save').click()
@@ -672,8 +690,10 @@ for (const width of [390, 360]) {
   // D-220 휴대폰 — 누구 것 고르기 · 가상 업체 창 · 띠(홈페이지 · 홍보 글)
   await page.goto(BASE + '/tools/homepage', { waitUntil: 'networkidle' })
   await page.getByTestId('site-picker-item').first().waitFor()
-  const chipH = await page.locator('[data-testid="subject-filter"], [data-testid="trial-new-company"], [data-testid="trial-new-consultant"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-  check(`M${width} D220 고르기 — 넘침 0 · 거르기 칩 5 · 가상 입구 2 · 모두 44px 이상`, (await over()) <= 0 && chipH.length === 7 && chipH.every((h) => h >= 44), { over: await over(), chipH })
+  // D-627 거르기 칩은 0곳인 묶음을 숨김 · 가상 입구는 접힌 한 줄([고객 관리에 없는 곳으로 만들기])을 펼쳐야
+  await openTrial(page)
+  const chipH = await page.locator('[data-testid="subject-filter"], [data-testid="trial-start-open"], [data-testid="trial-new-company"], [data-testid="trial-new-consultant"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`M${width} D220 고르기 — 넘침 0 · 거르기 칩(0곳 묶음 숨김) · 가상 입구 한 줄 + 단추 2 · 모두 44px 이상`, (await over()) <= 0 && chipH.length >= 5 && chipH.every((h) => h >= 44), { over: await over(), chipH })
   if (SHOTS && width === 390) await page.screenshot({ path: `${SHOTS}/d220-picker-m390.png`, fullPage: false })
   await page.getByTestId('trial-new-consultant').click()
   await page.getByTestId('trial-form').waitFor()

@@ -3,10 +3,13 @@
  *
  * 예전에는 '어느 업체' 목록 하나뿐이라 잠재고객 · 컨설턴트 고객이 섞여 있어도 구분이 없었고, 고객 관리에 없는 곳은 만들 수 없었다.
  * 이제 계약 고객 · 잠재고객 · 컨설턴트 · 가상(직접 넣은 업체 · 컨설턴트)으로 나눠 보고, 가상으로 바로 만들어 볼 수 있다.
+ * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 여러 번 누르더라도 하나하나 더 나오게" —
+ *   제목 아래 설명은 ?(help) · '고객 관리에 없어도' 는 접힌 한 줄(누르면 미래AI랩 · 가상 업체 · 컨설턴트 단추) ·
+ *   거르기 칩은 0곳인 묶음을 숨김(전체 · 고른 것은 늘) · 목록은 다섯 줄 + [n곳 더 보기](누를 때마다 열 줄씩).
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, BriefcaseBusiness, Building, History, Plus, Search, Sparkles } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, Building, ChevronDown, History, Plus, Search, Sparkles } from 'lucide-react'
 import { useToolClient } from '../shared/toolClientContext'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isContractClient } from '../../services/salesPipeline'
@@ -27,6 +30,9 @@ type Filter = 'all' | Group
 const GROUP_LABEL: Record<Group, string> = { contract: '계약 고객', lead: '잠재고객', consultant: '컨설턴트', trial: '가상' }
 /** 한 번에 그리는 줄 수 — 넘으면 '몇 곳 더' 와 찾기 칸으로 */
 const LIST_MAX = 60
+/** D-627 처음 보이는 줄 수 · [더 보기] 한 번에 더 보이는 줄 수 */
+const LIST_FIRST = 5
+const LIST_STEP = 10
 
 function groupOf(c: ClientOpsRecord): Group {
   if (clientTypeOf(c) === 'consultant') return 'consultant'
@@ -77,6 +83,9 @@ export function SubjectPicker({
   const [filter, setFilter] = useState<Filter>('all')
   const [form, setForm] = useState<TrialProfile | null>(null)
   const [saving, setSaving] = useState(false)
+  // D-627 '고객 관리에 없어도' 단추 셋은 접힌 한 줄 · 목록은 다섯 줄부터
+  const [trialOpen, setTrialOpen] = useState(false)
+  const [shownN, setShownN] = useState(LIST_FIRST)
 
   useEffect(() => {
     let alive = true
@@ -158,11 +167,11 @@ export function SubjectPicker({
   return (
     <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5 shadow-sm" data-testid={testPrefix}>
       <div>
-        <HelpHeading label={title} className="t-section flex items-center gap-2.5 text-slate-900">
+        {/* D-627 설명 줄은 ?(help) — 제목만 */}
+        <HelpHeading label={title} help={desc} className="t-section flex items-center gap-2.5 text-slate-900">
           {headIcon && <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${t.solid}`}>{headIcon}</span>}
           {title}
         </HelpHeading>
-        <p className="t-sub mt-1 break-keep text-slate-600">{desc}</p>
       </div>
 
       {/* D-238: 콘텐츠 레이더에서 들고 온 주제가 있으면 먼저 보여 준다 — 업체를 고르면 그 화면까지 같이 간다 */}
@@ -191,13 +200,24 @@ export function SubjectPicker({
         </div>
       )}
 
-      {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 · D-606 칠한 상자 대신 가로선 아래 한 줄 */}
-      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3" data-testid="trial-start">
-        <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>
-          <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
-          고객 관리에 없어도 돼요 — 미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
-        </p>
-        <div className="flex flex-wrap gap-2">
+      {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 · D-606 칠한 상자 대신 가로선 아래 한 줄 · D-627 접힌 한 줄(누르면 단추 셋) */}
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-2" data-testid="trial-start" data-open={trialOpen ? '1' : '0'}>
+        <button
+          type="button"
+          onClick={() => setTrialOpen((v) => !v)}
+          aria-expanded={trialOpen}
+          title="미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요."
+          className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-1 font-semibold break-keep ${t.deep} hover:bg-slate-50`}
+          data-testid="trial-start-open"
+        >
+          <Sparkles className={`size-4 shrink-0 ${t.text}`} aria-hidden="true" />
+          고객 관리에 없는 곳으로 만들기
+          <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${trialOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {trialOpen && (
+        <p className={`t-sub break-keep ${t.deep}`}>미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.</p>
+        )}
+        <div className={`flex flex-wrap gap-2 ${trialOpen ? '' : 'hidden'}`}>
           {/* D-239 대표 "미래AI랩으로 만들기도 있었으면 — 기록이 다 쌓이게" */}
           <button type="button" onClick={() => void openMirae()} disabled={saving || trialsStore.status === 'loading'} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-transparent px-3 font-semibold shadow-sm disabled:opacity-60 ${t.solid}`} data-testid="trial-mirae">
             <Building className="size-4" aria-hidden="true" /> 미래AI랩으로 만들기
@@ -212,13 +232,17 @@ export function SubjectPicker({
       </div>
 
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="누구 것인지 거르기">
-        {(['all', 'contract', 'lead', 'consultant', 'trial'] as const).map((f) => (
+        {/* D-627 0곳인 묶음 칩은 숨긴다(전체 · 지금 고른 것은 늘) — 칩은 네 개 안팎 */}
+        {(['all', 'contract', 'lead', 'consultant', 'trial'] as const).filter((f) => f === 'all' || f === filter || counts[f] > 0).map((f) => (
           <button
             key={f}
             type="button"
             role="tab"
             aria-selected={filter === f}
-            onClick={() => setFilter(f)}
+            onClick={() => {
+              setFilter(f)
+              setShownN(LIST_FIRST)
+            }}
             className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? `border-transparent font-semibold shadow-sm ${t.solid}` : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
             data-testid="subject-filter"
             data-filter={f}
@@ -230,7 +254,17 @@ export function SubjectPicker({
 
       <label className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 mt-0.5 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-        <input className={`${inputClass} pl-9`} placeholder="이름 · 대표 · 전화로 찾기" value={q} onChange={(e) => setQ(e.target.value)} aria-label="찾기" data-testid={`${testPrefix}-search`} />
+        <input
+          className={`${inputClass} pl-9`}
+          placeholder="이름 · 대표 · 전화로 찾기"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setShownN(LIST_FIRST)
+          }}
+          aria-label="찾기"
+          data-testid={`${testPrefix}-search`}
+        />
       </label>
 
       {loading ? (
@@ -254,7 +288,7 @@ export function SubjectPicker({
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-slate-100">
-          {list.slice(0, LIST_MAX).map((r) => (
+          {list.slice(0, Math.min(shownN, LIST_MAX)).map((r) => (
             <li key={r.id}>
               <Link to={r.href} className="tap flex min-h-12 items-center gap-3 py-2 hover:bg-slate-50" data-testid={`${testPrefix}-item`} data-group={r.group}>
                 {icon(made.has(r.id))}
@@ -273,8 +307,14 @@ export function SubjectPicker({
           ))}
         </ul>
       )}
+      {/* D-627 다섯 줄 + [n곳 더 보기](누를 때마다 열 줄씩 · 60곳까지) */}
+      {!loading && list.length > shownN && shownN < LIST_MAX && (
+        <button type="button" onClick={() => setShownN((n) => n + LIST_STEP)} className="tap t-sub -mt-1 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50" data-testid={`${testPrefix}-show-more`}>
+          {Math.min(list.length, LIST_MAX) - shownN}곳 더 보기 <ChevronDown aria-hidden="true" className="size-4" />
+        </button>
+      )}
       {/* D-236: 60곳에서 말없이 잘렸다 */}
-      {!loading && list.length > LIST_MAX && (
+      {!loading && list.length > LIST_MAX && shownN >= LIST_MAX && (
         <p className="t-meta break-keep text-slate-500" data-testid={`${testPrefix}-more`}>
           {list.length - LIST_MAX}곳 더 있어요 — 위 찾기 칸에 이름을 적어 찾으세요.
         </p>

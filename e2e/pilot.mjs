@@ -1931,8 +1931,12 @@ try {
     await pk.getByTestId('mk-path-basics').getByRole('link').click()
     await pk.getByTestId('mk-basics').waitFor({ timeout: 8000 }).catch(() => {})
     await pk.waitForTimeout(500)
+    // D-627 처음에는 아무것도 펼치지 않는다(제목 줄만) — 첫 줄을 누르면 그 한 가지가 펼쳐진다
+    const basOpen0 = await pk.locator('[data-testid="mk-basic"][data-open="1"]').count()
+    await pk.getByTestId('mk-basic-toggle').first().click()
+    await pk.waitForTimeout(200)
     const basK = ((await mainText(pk)) ?? '').replace(/\n/g, ' ')
-    check('고객(D-571): 시작 길 카드 → 기초 7가지 화면 · 일곱 줄 · 첫째가 펼쳐짐 · 대표 자료 · 모듈 · 판정 0', new URL(pk.url()).pathname === '/marketing/basics' && (await pk.getByTestId('mk-basic').count()) === 7 && (await pk.locator('[data-testid="mk-basic"][data-open="1"]').getAttribute('data-key')) === 'who' && leaked(basK).length === 0 && !/모듈|판정|예상 금액/.test(basK), basK.slice(0, 200))
+    check('고객(D-571 · D-627): 시작 길 카드 → 기초 7가지 화면 · 일곱 줄 · 처음엔 접힘 → 첫 줄 누르면 첫째가 펼쳐짐 · 대표 자료 · 모듈 · 판정 0', new URL(pk.url()).pathname === '/marketing/basics' && (await pk.getByTestId('mk-basic').count()) === 7 && basOpen0 === 0 && (await pk.locator('[data-testid="mk-basic"][data-open="1"]').getAttribute('data-key')) === 'who' && leaked(basK).length === 0 && !/모듈|판정|예상 금액/.test(basK), basK.slice(0, 200))
     await shot(pk, 'customer-08b-basics')
     await pk.getByTestId('mk-basic-read').click()
     await pk.waitForTimeout(400)

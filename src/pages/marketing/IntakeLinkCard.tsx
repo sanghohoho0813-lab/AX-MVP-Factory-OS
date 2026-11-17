@@ -111,8 +111,9 @@ export function IntakeLinkCard({ onUse, defaultOpen = false, testId = 'mk-intake
 
   return (
     <details ref={boxRef} open={defaultOpen || undefined} className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId} data-link={link ? '1' : '0'}>
-      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-intake">
-        글을 본 사람이 바로 신청하게 하려면? <span className="font-semibold text-brand-700">내 상담 신청 링크</span>
+      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-intake" title="글을 본 사람이 바로 신청하게 하려면?">
+        {/* D-627 접힌 한 줄은 할 일 이름만(질문은 마우스를 올리면) */}
+        <span className="font-semibold text-brand-700">내 상담 신청 링크</span>
         {link && link.received > 0 && (
           <span className="t-sub font-semibold text-slate-700" data-testid={`${testId}-count`}>
             · 받은 신청 {link.received}건
