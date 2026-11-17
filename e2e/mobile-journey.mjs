@@ -83,7 +83,8 @@ await step('업무 탭으로 옮겨 상태를 바꾼다', async () => {
 await step('서류 탭이 열린다', async () => {
   await page.getByRole('tab', { name: /^서류/ }).click()
   await page.waitForTimeout(400)
-  return await page.getByRole('heading', { name: /서류/ }).first().isVisible()
+  // D-627 서류 탭 제목 글은 화면 읽기에만(ⓘ 는 남음) — 탭이 골라지고 서류함 제목 자리가 있으면 열린 것
+  return (await page.getByRole('tab', { name: /^서류/ }).getAttribute('aria-selected')) === 'true' && (await page.locator('#docs').count()) === 1
 })
 
 await step('업무 일기에 한 줄 남긴다', async () => {
