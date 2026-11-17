@@ -1829,9 +1829,12 @@ try {
     check('고객(D-563): 말하기 대본 주소(?talk=1)로 와도 대본 창이 뜨지 않음 · 화면은 그대로', talkK.words.length === 0 && (await pk.getByTestId('smart-tab').count()) === 1 && (await pk.locator('[data-testid^="talk-"]').count()) === 0, JSON.stringify(talkK))
     await go(pk, `/ops/clients/${kc}?tab=overview`)
     await pk.waitForTimeout(1200)
+    // D-627 개요 [더 보기] 도 펼친 뒤 닫힌 칸 · 링크 · 말 0 을 본다(설명 ⓘ 포함)
+    await openFoldIn(pk, 'overview.more')
+    await pk.waitForTimeout(400)
     const overK = await deadEnds(pk)
     const overText = (await pk.locator('main').innerText().catch(() => '')) ?? ''
-    check('고객(D-563) 개요 탭: "전문 모듈 열기" 카드 · 먼저 제안할 것 없음 · 닫힌 주소 링크 0 · 회사 기본 정보는 그대로', !overText.includes('전문 모듈 열기') && (await pk.getByTestId('top-picks').count()) === 0 && overK.links.length === 0 && overK.words.length === 0 && overText.includes('회사 기본 정보') && overText.includes('220'), JSON.stringify(overK))
+    check('고객(D-563) 개요 탭: "전문 모듈 열기" 카드 · 먼저 제안할 것 없음 · 닫힌 주소 링크 0 · 회사 기본 정보는 그대로', !overText.includes('전문 모듈 열기') && (await pk.getByTestId('top-picks').count()) === 0 && (await pk.getByTestId('top-picks-line').count()) === 0 && overK.links.length === 0 && overK.words.length === 0 && overText.includes('회사 기본 정보') && overText.includes('220'), JSON.stringify(overK))
     await shot(pk, 'customer-04-detail-overview')
     await go(pk, `/ops/clients/${kc}?tab=docs`)
     await pk.waitForTimeout(1000)
