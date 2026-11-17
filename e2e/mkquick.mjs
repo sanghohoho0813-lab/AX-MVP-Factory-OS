@@ -128,6 +128,16 @@ const openWeek = async (p, pre) => {
   const d = p.getByTestId(`${pre}-qs-week`)
   if ((await d.getAttribute('open')) === null) await p.getByTestId(`${pre}-qs-week-open`).click()
 }
+// D-627 추천 형식 · 바라는 점 · 형식 직접 고르기 · 모델 · 내 맞춤은 [더 정하기(선택)] 접힌 줄 안 — 열고 본다
+const openMore = async (p, pre) => {
+  const box = p.getByTestId(`${pre}-qs-more`).first()
+  if (!(await box.count())) return
+  if ((await box.getAttribute('data-open')) !== '1') {
+    await box.getByTestId('fold-toggle').first().click()
+    await p.waitForTimeout(250)
+  }
+}
+await openMore(page, 'thr')
 const thrPrim = await primAbove(page, 'thr')
 check('Q2 고르기(반응 · 틀 23가지 · 태그)는 지우지 않고 "형식 직접 고르기" 안에 접힘 · 글 칸 위의 주 단추(진한 단추)는 [AI로 바로 쓰기] 하나', (await page.getByTestId('thr-choose').getAttribute('data-open')) === '0' && (await page.getByTestId('thr-goal-reply').count()) === 0 && thrPrim.join() === 'thr-qs-ai', thrPrim)
 let clicks = 0
@@ -178,6 +188,7 @@ check('Q9 직접 고른 틀(B)은 다른 주제 칩을 눌러도 그대로 · "�
 /* ---------------- S 릴스 · 틱톡 ---------------- */
 await page.goto(BASE + '/marketing/shorts', { waitUntil: 'networkidle' })
 await page.getByTestId('sht-qs').waitFor({ timeout: 15000 })
+await openMore(page, 'sht')
 const shtPrim = await primAbove(page, 'sht')
 check('S1 첫 화면 — 어디에(칩 2) · 주제 · 이번 주 키워드 칩 · 고르기는 접힘(지운 것 없음) · 대본 칸 위 주 단추는 [AI로 바로 쓰기] 하나', shtPrim.join() === 'sht-qs-ai' && (await page.locator('[data-testid="sht-qs-platform"] [role="radio"]').count()) === 2 && (await page.locator('[data-testid="sht-qs-week"] [data-testid="sht-qs-chip"]').count()) === 3 && (await page.getByTestId('sht-choose').getAttribute('data-open')) === '0' && (await page.getByTestId('sht-qs-ai').isDisabled()))
 clicks = 0
