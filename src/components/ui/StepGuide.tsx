@@ -24,18 +24,28 @@ function GoButton({
   hrefOf,
   after,
   testId,
+  short = false,
 }: GoProps & {
   step: FlowStep
   dir: 'prev' | 'next' | 'first'
   after?: () => void
   testId: string
+  /** D-627 한 줄 안(모듈 화면) — [이전] 은 ‹ 만 · 순서 밖 화면 단추는 '1단계 …' 만 */
+  short?: boolean
 }) {
   const cls =
     dir === 'next'
       ? 'tap inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-brand-600 bg-brand-600 px-3.5 font-semibold whitespace-nowrap text-white hover:bg-brand-700'
-      : 'tap inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50'
+      : `tap inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white ${short && dir === 'prev' ? 'min-w-11 justify-center px-2' : 'px-3'} font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50`
   const body =
-    dir === 'next' ? (
+    short && dir === 'prev' ? (
+      <ChevronLeft aria-hidden="true" className="size-4" />
+    ) : short && dir === 'first' ? (
+      <>
+        <span className="t-sub">1단계 {step.label}</span>
+        <ChevronRight aria-hidden="true" className="size-4" />
+      </>
+    ) : dir === 'next' ? (
       <>
         <span className="t-sub">다음: {step.label}</span>
         <ChevronRight aria-hidden="true" className="size-4" />
@@ -55,7 +65,7 @@ function GoButton({
   const label = dir === 'next' ? `다음 단계 ${step.label}로` : dir === 'first' ? `1단계 ${step.label}부터 순서대로` : `이전 단계 ${step.label}로`
   if (hrefOf) {
     return (
-      <Link to={hrefOf(step.key)} className={cls} aria-label={label} data-testid={testId} data-to={step.key} onClick={after}>
+      <Link to={hrefOf(step.key)} className={cls} title={short ? label : undefined} aria-label={label} data-testid={testId} data-to={step.key} onClick={after}>
         {body}
       </Link>
     )
@@ -64,6 +74,7 @@ function GoButton({
     <button
       type="button"
       className={cls}
+      title={short ? label : undefined}
       aria-label={label}
       data-testid={testId}
       data-to={step.key}
@@ -180,10 +191,55 @@ export function StepGuide({ pos, onGo, hrefOf, className = '', defaultMin = fals
   )
 }
 
-/** 화면 끝 — 다 봤으면 다음 단계로(위로 다시 올라가지 않게) */
-export function StepNext({ pos, onGo, hrefOf, className = '' }: GoProps & { pos: FlowPosition; className?: string }) {
+/**
+ * D-627 글자 수 한도 — 모듈 화면의 한 줄 안(목차 단추 옆). 상자 · 설명 문장 없이 '몇 번째 · [‹] · [다음: …]'.
+ * 무엇을 위한 단계인지는 마우스를 올리면(title). 시험이 보는 이름표(step-guide · data-index · step-next-top …)는 위와 같다.
+ * 순서 밖 화면(한눈에 보기 등)은 [1단계 …] 단추 하나.
+ */
+export function StepGuideInline({ pos, onGo, hrefOf, className = '' }: GoProps & { pos: FlowPosition; className?: string }) {
+  const { flow, index, prev, next, here } = pos
+  if (!here) return null
+  if (index < 0) {
+    const first = flow.steps[0]
+    if (!first) return null
+    return (
+      <section aria-label="이 화면 안내" data-testid="step-guide" data-step="aside" title={`${here.label} — ${here.why}`} className={`no-print flex shrink-0 items-center ${className}`}>
+        <GoButton step={first} dir="first" onGo={onGo} hrefOf={hrefOf} testId="step-first" short />
+      </section>
+    )
+  }
+  const n = flow.steps.length
+  return (
+    <section
+      aria-label={`${flow.name} 안내`}
+      title={`${flow.name} — ${here.label}: ${here.why}`}
+      data-testid="step-guide"
+      data-step={flow.steps[index].key}
+      data-index={index + 1}
+      data-total={n}
+      data-min="1"
+      className={`no-print flex min-w-0 shrink-0 items-center gap-2 ${className}`}
+    >
+      <span className="t-meta font-semibold text-slate-500 tabular-nums" data-testid="step-count">
+        {index + 1}/{n}
+      </span>
+      {prev && <GoButton step={prev} dir="prev" onGo={onGo} hrefOf={hrefOf} testId="step-prev" short />}
+      {next && <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-top" short />}
+    </section>
+  )
+}
+
+/** 화면 끝 — 다 봤으면 다음 단계로(위로 다시 올라가지 않게). compact(D-627) — 설명 문장 없이 단추 하나(설명은 마우스를 올리면) */
+export function StepNext({ pos, onGo, hrefOf, className = '', compact = false }: GoProps & { pos: FlowPosition; className?: string; compact?: boolean }) {
   const { next, index } = pos
   if (index < 0 || !next) return null
+  if (compact) {
+    return (
+      <section aria-label="다음 단계" data-testid="step-next" title={`다음 단계 · ${next.label} — ${next.why}`} className={`no-print flex justify-end ${className}`}>
+        <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-bottom" after={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+      </section>
+    )
+  }
   return (
     <section aria-label="다음 단계" data-testid="step-next" className={`no-print flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-3 sm:px-4 ${className}`}>
       <p className="t-sub min-w-0 flex-1 basis-60 break-keep text-slate-600">

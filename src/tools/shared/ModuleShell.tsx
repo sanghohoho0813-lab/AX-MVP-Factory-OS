@@ -4,8 +4,8 @@
  * 원본 OS 들은 저마다 왼쪽 목차를 갖고 있었다(고용지원금 8개, 연구소 16개, 세일즈 14개).
  * 그 목차를 이 OS 안에서 그대로 살린다 — 단, OS 목차를 갈아끼우지 않는다.
  *
- *  - 넓은 화면(1280 이상): OS 사이드바 오른쪽에 **모듈 목차 한 칸**이 더 선다.
- *  - 좁은 화면: 화면 맨 위에 **모듈 햄버거** 하나. 누르면 그 모듈의 목차가 서랍으로 열린다.
+ *  - D-627 글자 수 한도: 넓은 화면 · 좁은 화면 모두 화면 맨 위에 **[목차] 단추** 하나. 누르면 그 모듈의 목차가 서랍으로 열린다.
+ *    (예전 넓은 화면은 OS 사이드바 오른쪽에 모듈 목차 한 칸이 늘 서 있었다 — 첫 화면 글자를 많이 차지했다.)
  *    OS 햄버거(머리띠 왼쪽)는 그대로 있다 — 모듈 안에서도 '오늘·고객 운영' 으로 한 번에 나간다.
  *
  * 주소는 `/tools/<key>/<section>`. 화면을 더하려면 `toolRegistry` 의 `sections` 에 한 줄 적는다.
@@ -20,7 +20,7 @@ import { useBackToClose } from '../../lib/backToClose'
 import { catalogFeature, catalogModule } from '../../config/productCatalog'
 import { withClient } from '../../components/modules/moduleText'
 import { TOOL_FLOWS, flowPosition } from '../../content/flowSteps'
-import { StepGuide, StepNext } from '../../components/ui/StepGuide'
+import { StepGuideInline, StepNext } from '../../components/ui/StepGuide'
 
 /**
  * 목차 아이콘 색 (D-92) — OS 왼쪽 메뉴와 같은 8색.
@@ -81,7 +81,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   // 화면을 옮기면 서랍은 닫는다
   useEffect(() => {
     setDrawer(false)
-  }, [location.pathname])
+  }, [location.pathname, location.search])
 
   // D-99: 서랍은 Esc 로 닫히고, 열면 닫기 단추에 · 닫으면 목차 단추로 초점이 돌아간다 (전에는 Esc 가 먹지 않았다)
   const openerRef = useRef<HTMLButtonElement>(null)
@@ -120,44 +120,37 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   const hrefOf = (key: string) => detailHref(tool, key, client ? `${tool.path}/${key}?client=${encodeURIComponent(client)}` : `${tool.path}/${key}`)
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
-      {/* 좁은 화면 — 모듈 햄버거 한 줄 */}
-      <div className="no-print flex items-center gap-2 xl:hidden">
+    <div className="flex flex-col gap-4">
+      {/*
+        D-627 글자 수 한도 — 모듈 목차는 PC · 휴대폰 모두 [목차] 단추 하나로 접는다(누르면 서랍).
+        예전 PC 의 목차 한 칸(화면 이름 10여 줄)이 첫 화면 글자를 많이 차지했다. 지금 자리는 경로 줄이 보여 준다.
+        같은 줄 오른쪽에 순서(몇 번째 · [‹] · [다음: …]) — 무엇을 위한 단계인지는 마우스를 올리면.
+      */}
+      <div className="no-print flex flex-wrap items-center gap-2">
         <button
           ref={openerRef}
           type="button"
           onClick={() => setDrawer(true)}
           data-testid="module-menu-open"
           aria-label={`${current.label} — ${tool.label} 목차 열기`}
-          className="tap inline-flex min-w-0 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.9375rem] font-bold text-slate-800"
+          title={`${tool.label} 목차 — 지금: ${current.label}`}
+          className="tap inline-flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-bold text-slate-800 hover:bg-slate-50"
         >
-          {/* D-127: 머리줄이 이미 '분야 › 도구 이름' 을 보여 준다 — 여기는 지금 화면 이름(누르면 목차) */}
           <Menu aria-hidden="true" className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">{current.label}</span>
+          <span>목차</span>
         </button>
-        {/* D-126 · D-127: 휴대폰에서도 돌아가는 길 — 이 도구가 든 모듈로 */}
-        <BackToModule tool={tool} className="ml-auto shrink-0" short />
+        {flow && <StepGuideInline pos={flow} hrefOf={hrefOf} className="ml-auto" />}
       </div>
 
-      {/* 넓은 화면 — 모듈 목차 한 칸 */}
-      <nav
-        aria-label={`${tool.label} 목차`}
-        data-testid="module-nav"
-        className="no-print hidden w-56 shrink-0 flex-col gap-3 xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" /* D-94: 긴 화면을 내려도 목차가 따라온다 */
-      >
-        <div className="flex items-center gap-2 px-1">
-          <ModuleIcon aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
-          <span className="t-card min-w-0 truncate font-bold text-slate-900">{tool.label}</span>
-        </div>
-        <ModuleNavList tool={tool} groups={groups} section={current.key} />
-        <BackToModule tool={tool} className="px-1" />
-      </nav>
-
-      {/* 서랍 */}
+      {/* 서랍 — 모듈 목차(넓은 화면 · 좁은 화면 같이) */}
       {drawer && (
-        <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label={`${tool.label} 목차`}>
-          <button type="button" aria-label="닫기" onClick={() => setDrawer(false)} className="absolute inset-0 bg-slate-900/40" />
-          <div className="absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-3 overflow-y-auto bg-white p-4 shadow-xl">
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`${tool.label} 목차`}>
+          <button type="button" aria-label="닫기" onClick={() => setDrawer(false)} className="absolute inset-0 cursor-default bg-slate-900/40" />
+          <nav
+            aria-label={`${tool.label} 목차`}
+            data-testid="module-nav"
+            className="absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-3 overflow-y-auto bg-white p-4 shadow-xl"
+          >
             <div className="flex items-center gap-2">
               <ModuleIcon aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
               <span className="t-card min-w-0 flex-1 truncate font-bold text-slate-900">{tool.label}</span>
@@ -166,16 +159,14 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
               </button>
             </div>
             <ModuleNavList tool={tool} groups={groups} section={current.key} />
-            <BackToModule tool={tool} />
-          </div>
+            <BackToModule tool={tool} className="px-1" />
+          </nav>
         </div>
       )}
 
-      <div className="min-w-0 flex-1">
-        {/* D-235: 이 모듈을 처음 쓰는 순서 — 몇 번째 화면 · 무엇을 위한 것인지 · 이전/다음 */}
-        {flow && <StepGuide pos={flow} hrefOf={hrefOf} className="mb-4" />}
+      <div className="min-w-0">
         {children}
-        {flow && <StepNext pos={flow} hrefOf={hrefOf} className="mt-6" />}
+        {flow && <StepNext pos={flow} hrefOf={hrefOf} className="mt-6" compact />}
       </div>
     </div>
   )
@@ -234,14 +225,14 @@ function ModuleNavList({
 }
 
 /** D-127: 목차 아래 — 이 도구가 든 모듈로 돌아가는 길(업체로 열었으면 그 업체를 들고) */
-function BackToModule({ tool, className = '', short = false }: { tool: ToolDefinition; className?: string; short?: boolean }) {
+function BackToModule({ tool, className = '' }: { tool: ToolDefinition; className?: string }) {
   const [params] = useSearchParams()
   const f = catalogFeature(tool.key)
   const m = f ? catalogModule(f.module) : undefined
   const to = withClient(m?.route ?? '/tools', params.get('client'))
   return (
     <Link to={to} data-testid="module-back" className={`tap t-sub inline-flex items-center gap-1 font-medium text-slate-600 hover:text-brand-700 ${className}`}>
-      <ChevronLeft aria-hidden="true" className="size-4" /> {m ? (short ? m.name : `${m.name} 모듈`) : '모듈 전체'}
+      <ChevronLeft aria-hidden="true" className="size-4" /> {m ? `${m.name} 모듈` : '모듈 전체'}
     </Link>
   )
 }

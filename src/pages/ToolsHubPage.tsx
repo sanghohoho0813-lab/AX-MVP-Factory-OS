@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { IconTile } from '../components/ui/visual'
 import { moduleTone } from '../config/featureVisual'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import { useIsPilot } from '../auth/osAccess'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -61,55 +61,67 @@ export function ToolCard({ t }: { t: ToolDefinition }) {
   )
 }
 
-/** 전문 모듈 한 장 — 이름 · 상태 · 소개 · 들어 있는 기능(누르면 그 기능으로) */
-function ModuleCard({ m }: { m: CatalogModule }) {
+/**
+ * 전문 모듈 한 장 — 이름 · 상태 · 들어 있는 기능(누르면 그 기능으로).
+ * D-627 글자 수 한도 — 처음엔 한 줄(이름 · 상태 · [기능 n개 ▾]). 소개 글은 마우스를 올리면(title).
+ * 기능 목록은 [기능 n개] 를 누르면 펼친다(목록은 늘 그려 두고 숨긴다 — 주소를 읽는 시험 · 찾기가 그대로 본다).
+ * (예전 D-369 는 휴대폰만 3개 먼저였다 — 이제 PC · 휴대폰 모두 접힌 채로 시작)
+ */
+function ModuleCard({ m, extra }: { m: CatalogModule; extra?: ReactNode }) {
   const { ent } = useEntitlements()
   const e = ent.module(m.key)
   // D-162: Pilot 에게 막힌 화면(AX 프로젝트 자금 연계 등)은 줄째 뺀다
   const pilot = useIsPilot()
   const features = featuresOfModule(m.key).filter((f) => !(pilot && featurePath(f) && isPilotHiddenPath(featurePath(f) as string)))
-  // D-369 📐 휴대폰은 모듈마다 기능 3개만 먼저(카드 다섯이 세로로 쌓여 한 화면 반이 넘었다) — [n개 더 보기]. PC 는 그대로 전부
   const [more, setMore] = useState(false)
-  const SHOWN = 3
   return (
-    <li className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4" data-module-card={m.key}>
-      <div className="flex flex-wrap items-center gap-2">
-        <IconTile icon={m.icon} tone={moduleTone(`cat-${m.key}`)} size="md" />
-        <h3 className="t-card font-bold text-slate-900">{m.name}</h3>
-        <Badge tone={e.usable ? (e.source === 'trial' ? 'warning' : 'success') : 'neutral'}>{e.usable ? (e.source === 'trial' ? e.label : '쓰는 중') : '잠김'}</Badge>
-      </div>
-      <p className="t-sub break-keep text-slate-600">{m.description}</p>
-      <ul className="flex flex-col divide-y divide-slate-100 border-y border-slate-100">
-        {features.map((f, i) => {
-          const path = featurePath(f)
-          const Icon = featureIcon(f)
-          return (
-            <li key={f.key} className={!more && i >= SHOWN ? 'max-sm:hidden' : undefined}>
-              {path ? (
-                <Link to={path} data-tool={f.source === 'tool' ? f.key : undefined} data-feature={f.key} className="tap t-body flex items-center gap-2.5 py-2.5 font-medium text-slate-800 hover:text-brand-700">
-                  {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
-                  <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
-                  <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
-                </Link>
-              ) : (
-                <div data-tool={f.source === 'tool' ? f.key : undefined} className="t-body flex items-center gap-2.5 py-2.5 text-slate-500">
-                  {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-300" />}
-                  <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
-                  <Badge>준비 중</Badge>
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {!more && features.length > SHOWN && (
-        <button type="button" onClick={() => setMore(true)} className="tap t-sub -mt-1 w-fit font-semibold text-slate-600 hover:text-brand-700 hover:underline sm:hidden" data-testid="module-card-more">
-          기능 {features.length - SHOWN}개 더 보기
+    <li className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2 sm:px-4" data-module-card={m.key}>
+      <div className="flex items-center gap-2">
+        <Link to={m.route} title={m.description} className="tap flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-(--radius-control) hover:text-brand-700" data-act="explore">
+          <IconTile icon={m.icon} tone={moduleTone(`cat-${m.key}`)} size="md" />
+          <h3 className="t-card min-w-0 truncate font-bold text-slate-900">{m.name}</h3>
+          <Badge tone={e.usable ? (e.source === 'trial' ? 'warning' : 'success') : 'neutral'}>{e.usable ? (e.source === 'trial' ? e.label : '쓰는 중') : '잠김'}</Badge>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          aria-expanded={more}
+          className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-600 hover:bg-slate-50 hover:text-brand-700"
+          data-testid="module-card-more"
+        >
+          기능 {features.length}
+          <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${more ? 'rotate-180' : ''}`} />
         </button>
-      )}
-      <Link to={m.route} className="tap t-body inline-flex w-fit items-center gap-1 font-semibold text-brand-700 hover:underline" data-act="explore">
-        {m.name} 살펴보기 <ArrowRight aria-hidden="true" className="size-4" />
-      </Link>
+      </div>
+      <div className={more ? 'flex flex-col gap-2 pb-2' : 'hidden'} data-testid="module-card-features">
+        <ul className="flex flex-col divide-y divide-slate-100 border-y border-slate-100">
+          {features.map((f) => {
+            const path = featurePath(f)
+            const Icon = featureIcon(f)
+            return (
+              <li key={f.key}>
+                {path ? (
+                  <Link to={path} data-tool={f.source === 'tool' ? f.key : undefined} data-feature={f.key} className="tap t-body flex items-center gap-2.5 py-2.5 font-medium text-slate-800 hover:text-brand-700">
+                    {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+                    <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
+                    <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+                  </Link>
+                ) : (
+                  <div data-tool={f.source === 'tool' ? f.key : undefined} className="t-body flex items-center gap-2.5 py-2.5 text-slate-500">
+                    {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-300" />}
+                    <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
+                    <Badge>준비 중</Badge>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {extra}
+        <Link to={m.route} className="tap t-body inline-flex w-fit items-center gap-1 font-semibold text-brand-700 hover:underline">
+          {m.name} 살펴보기 <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
+      </div>
     </li>
   )
 }
@@ -132,21 +144,27 @@ export function ToolsHubPage() {
         <HelpHeading id="modules-list" label="모듈 목록" className="t-section text-slate-900">
           모듈 <span className="t-meta font-medium text-slate-500">{modules.length}개</span>
         </HelpHeading>
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-cards">
+        <ul className="grid items-start gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-cards">
           {modules.map((m) => (
-            <ModuleCard key={m.key} m={m} />
+            <ModuleCard
+              key={m.key}
+              m={m}
+              // D-627 AX 스튜디오 안쪽 화면 바로 가기는 그 모듈 카드를 펼치면(예전엔 목록 아래 한 줄로 늘 깔려 있었다)
+              extra={
+                m.key === 'ax-studio' && !pilot ? (
+                  <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600" data-testid="studio-links">
+                    <span className="font-semibold text-slate-700">안쪽 화면</span>
+                    {STUDIO_LINKS.map(([label, to]) => (
+                      <Link key={to} to={to} className="tap inline-flex items-center font-medium text-brand-700 hover:underline">
+                        {label}
+                      </Link>
+                    ))}
+                  </p>
+                ) : undefined
+              }
+            />
           ))}
         </ul>
-        {!pilot && (
-        <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600">
-          <span className="font-semibold text-slate-700">AX 스튜디오 안쪽 화면</span>
-          {STUDIO_LINKS.map(([label, to]) => (
-            <Link key={to} to={to} className="tap inline-flex items-center font-medium text-brand-700 hover:underline">
-              {label}
-            </Link>
-          ))}
-        </p>
-        )}
       </section>
 
       {/* D-118: 다른 곳으로 옮겨 간 것 — 카드가 아니라 한 줄 안내. 예전 화면은 기록 보기용으로 열린다 */}

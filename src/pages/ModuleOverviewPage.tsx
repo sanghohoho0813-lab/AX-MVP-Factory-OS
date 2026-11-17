@@ -15,7 +15,9 @@ import { isPilotHiddenPath } from '../config/moduleRegistry'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Check, Clock, Lock, Sparkles } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
-import { Badge, Section, Surface } from '../components/ui/primitives'
+import { Badge, Section } from '../components/ui/primitives'
+import { EDGE_BOX } from '../components/ui/edge'
+import { Fold, HintTip } from '../components/ui/fold'
 import { Button } from '../components/ui/Button'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { useToast } from '../components/ui/toastContext'
@@ -52,56 +54,62 @@ export function ModuleOverviewPage() {
       {/* D-239: 이 분야 고객 전체를 거꾸로 — 업체마다 받을 수 있는 것(규칙 판정)을 AI 가 정리 */}
       {e.usable && <ModuleAssist moduleName={m.name} moduleKey={m.key} features={features.map((f) => f.key).filter((k) => k !== 'grants')} workspaceId={workspaceId} usable={(k) => ent.feature(k).usable} />}
 
-      <Surface edge={e.usable ? 'success' : 'warning'} showEdge>
-        <div className="flex flex-col gap-2" data-testid="module-status" data-usable={e.usable ? 'yes' : 'no'}>
-          <p className="t-card flex flex-wrap items-center gap-2 font-bold break-keep text-slate-900">
+      {/* D-627 글자 수 한도 — 상태는 한 줄(이 모듈이 맡는 일은 ? 로) */}
+      <div
+        className={`rounded-(--radius-panel) border bg-white px-3 py-2 sm:px-4 ${e.usable ? 'border-slate-200' : EDGE_BOX.warning}`}
+        data-testid="module-status"
+        data-usable={e.usable ? 'yes' : 'no'}
+      >
+        <HintTip label="이 모듈이 맡는 일" tip={`이 모듈이 맡는 일 — ${m.covers.join(' · ')}`}>
+          <p className="t-sub flex flex-wrap items-center gap-2 font-bold break-keep text-slate-900">
             {e.usable ? <Check aria-hidden="true" className="size-5 shrink-0 text-success-600" /> : <Lock aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
-            {e.usable ? '지금 쓰고 있습니다' : `${lockedSentence(e.source)}`}
+            {e.usable ? '지금 쓰고 있어요' : `${lockedSentence(e.source)}`}
             <Badge tone={e.usable ? (e.source === 'trial' ? 'warning' : 'success') : 'neutral'}>{e.label}</Badge>
           </p>
-          <p className="t-body break-keep text-slate-700">이 모듈이 맡는 일 — {m.covers.join(' · ')}</p>
-          {!e.usable && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button variant="secondary" onClick={() => void startTrial()} data-testid="module-trial">
-                <Sparkles aria-hidden="true" className="size-4" /> {TRIAL_DAYS}일 체험
-              </Button>
-              <span className="t-meta break-keep text-slate-500">결제는 아직 붙어 있지 않습니다. 각 기능의 첫 화면은 지금도 볼 수 있습니다.</span>
-            </div>
-          )}
-        </div>
-      </Surface>
+        </HintTip>
+        {!e.usable && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 pb-1" title="결제는 아직 붙어 있지 않습니다. 각 기능의 첫 화면은 지금도 볼 수 있습니다.">
+            <Button variant="secondary" onClick={() => void startTrial()} data-testid="module-trial">
+              <Sparkles aria-hidden="true" className="size-4" /> {TRIAL_DAYS}일 체험
+            </Button>
+            <span className="t-meta break-keep text-slate-500">결제는 아직 없어요</span>
+          </div>
+        )}
+      </div>
 
-      {/* D-235: 처음 여는 사람이 따라 할 세 걸음 — 무엇을 위한 걸음인지까지 */}
+      {/* D-235: 처음 여는 사람이 따라 할 세 걸음 — 무엇을 위한 걸음인지까지
+          D-627 글자 수 한도 — 한 줄 도식(① → ② → ③). 무엇을 위한 걸음인지는 마우스를 올리면(title) */}
       {MODULE_GUIDES[m.key] && (
-        <Section title="이렇게 쓰세요">
-          <ol className="grid gap-2.5 md:grid-cols-3" data-testid="module-guide">
+        <section aria-label="이렇게 쓰세요" className="flex flex-col gap-1.5">
+          <p className="t-sub font-semibold text-slate-600">이렇게 쓰세요</p>
+          <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2" data-testid="module-guide">
             {MODULE_GUIDES[m.key].map((g, i) => {
               const inner = (
                 <>
-                  <span className="flex items-center gap-2">
-                    <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white tabular-nums">
-                      {i + 1}
-                    </span>
-                    <span className="t-card min-w-0 flex-1 font-bold break-keep text-slate-900">{g.title}</span>
-                    {g.to && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+                  <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[0.8125rem] font-bold text-white tabular-nums">
+                    {i + 1}
                   </span>
-                  <span className="t-sub mt-1.5 block break-keep text-slate-600">{g.why}</span>
+                  <span className="t-sub min-w-0 font-semibold break-keep text-slate-900">{g.title}</span>
                 </>
               )
+              const cls = 'flex min-h-11 items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-1.5'
               return (
-                <li key={g.title} data-step={i + 1}>
+                <li key={g.title} data-step={i + 1} className="flex items-center gap-1.5">
+                  {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
                   {g.to ? (
-                    <Link to={withClient(g.to, clientId)} className="ax-lift tap flex h-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 hover:border-brand-300">
+                    <Link to={withClient(g.to, clientId)} title={g.why} className={`tap ${cls} hover:border-brand-300 hover:bg-slate-50`}>
                       {inner}
                     </Link>
                   ) : (
-                    <div className="flex h-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5">{inner}</div>
+                    <div title={g.why} className={cls}>
+                      {inner}
+                    </div>
                   )}
                 </li>
               )
             })}
           </ol>
-        </Section>
+        </section>
       )}
 
       <Section title="들어 있는 기능" count={features.filter((f) => featurePath(f)).length}>
@@ -113,15 +121,15 @@ export function ModuleOverviewPage() {
             const label = featureLabel(f)
             const href = clientId && f.clientEntry ? clientEntryHref(f, clientId) : path ? withClient(path, clientId) : null
             const reachable = href && (fe.usable || f.lockedPreview !== 'intro')
+            // D-627 한 줄씩(이름 · 상태 하나) — 기능 설명은 마우스를 올리면(title)
             const body = (
               <>
                 <span className="flex items-center gap-2.5">
                   {Icon && <Icon aria-hidden="true" className={`size-5 shrink-0 ${reachable ? 'text-brand-600' : 'text-slate-400'}`} />}
-                  <span className="t-card min-w-0 flex-1 font-bold break-keep text-slate-900">{label}</span>
+                  <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{label}</span>
                   {!path && <Badge>준비 중</Badge>}
                   {reachable && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
                 </span>
-                <span className="t-sub mt-1.5 block break-keep text-slate-600">{featureDesc(f)}</span>
                 {path && !fe.usable && (
                   <span className="t-sub mt-1.5 block break-keep font-medium text-amber-800">
                     {f.lockedPreview === 'first-section' ? '첫 화면은 볼 수 있습니다' : f.lockedPreview === 'full' ? '잠겨 있어도 쓸 수 있습니다' : '모듈을 열면 씁니다'}
@@ -137,11 +145,11 @@ export function ModuleOverviewPage() {
             return (
               <li key={f.key}>
                 {reachable ? (
-                  <Link to={href} data-feature={f.key} className="ax-lift tap flex h-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 hover:border-brand-300">
+                  <Link to={href} data-feature={f.key} title={featureDesc(f)} className="ax-lift tap flex h-full min-h-11 flex-col justify-center rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-2.5 hover:border-brand-300">
                     {body}
                   </Link>
                 ) : (
-                  <div data-feature={f.key} className="flex h-full flex-col rounded-(--radius-panel) border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3.5">
+                  <div data-feature={f.key} title={featureDesc(f)} className="flex h-full min-h-11 flex-col justify-center rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-2.5">
                     {body}
                   </div>
                 )}
@@ -157,9 +165,9 @@ export function ModuleOverviewPage() {
         )}
       </Section>
 
-      <nav aria-label="다른 전문 모듈" className="flex flex-col gap-2">
-        <p className="t-sub font-semibold text-slate-600">다른 전문 모듈</p>
-        <div className="flex flex-wrap gap-2">
+      {/* D-627 다른 모듈로 가는 칩은 접어 둔다(경로 줄 '전문 모듈' 도 같은 곳) */}
+      <Fold id={`module-overview.${m.key}.others`} title="다른 전문 모듈" hint="다른 전문 모듈로 바로 가는 단추예요. 모듈 전체 · 요금제는 맨 끝에 있어요." testId="module-others">
+        <nav aria-label="다른 전문 모듈" className="flex flex-wrap gap-2">
           {visibleModules()
             .filter((x) => x.key !== m.key && !(pilot && x.rarelyUsed))
             .map((x) => (
@@ -176,8 +184,8 @@ export function ModuleOverviewPage() {
           <Link to="/tools" className="tap t-body inline-flex items-center px-2 py-2 font-medium text-brand-700 hover:underline">
             {pilot ? '모듈 전체' : '모듈 전체 · 요금제'}
           </Link>
-        </div>
-      </nav>
+        </nav>
+      </Fold>
     </div>
   )
 }

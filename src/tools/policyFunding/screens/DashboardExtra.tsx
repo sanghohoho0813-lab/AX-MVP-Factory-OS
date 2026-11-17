@@ -9,13 +9,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Clock } from 'lucide-react'
 import { Badge, MetricTile, Section, Surface } from '../../../components/ui/primitives'
+import { HintTip } from '../../../components/ui/fold'
 import { useToolClient } from '../../shared/toolClientContext'
 import { useModuleBucket } from '../../shared/useModuleBucket'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { daysSinceContact, isOpenStage, summarizeConsults, type ConsultData } from '../lib/consultRecord'
 
 export function PolicyDashboardExtra() {
-  const { loadClients, clientId } = useToolClient()
+  const { loadClients } = useToolClient()
   const consults = useModuleBucket<ConsultData>('policy-funding', 'consults')
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
 
@@ -61,36 +62,29 @@ export function PolicyDashboardExtra() {
   if (consults.rows === null) return null
 
   if (consults.rows.length === 0) {
+    // D-627 글자 수 한도 — 빈 칸은 한 줄(어떻게 모이는지는 ?). 진단 단추는 머리의 [진단하기] 하나(같은 단추를 두 번 두지 않는다)
     return (
-      <Surface>
-        <p className="t-sub break-keep text-slate-600">
-          아직 상담으로 저장한 업체가 없습니다. 진단한 뒤 결과 아래 <b>기록에 붙이기</b>(또는 <b>이 업체 상담으로 저장</b>)를 누르면 여기에 단계별로 모입니다.
-        </p>
-        {/* UIX-2(D-548) 글 속 작은 글자 링크(17px) → 누르기 쉬운 단추 하나(휴대폰 44px) */}
-        <Link
-          to={clientId ? `/tools/policy-funding/diagnosis?client=${clientId}` : '/tools/policy-funding/diagnosis'}
-          className="tap t-sub mt-2 inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3.5 font-bold text-slate-900 hover:border-slate-400 hover:bg-slate-50"
-          data-testid="pf-empty-diagnose"
-        >
-          {clientId ? '이 업체 진단하기' : '진단하기'} →
-        </Link>
-      </Surface>
+      <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 sm:px-4" data-testid="pf-empty">
+        <HintTip label="상담 중인 업체" tip="진단한 뒤 결과 아래 [기록에 붙이기](또는 [이 업체 상담으로 저장])를 누르면 여기에 단계별로 모여요.">
+          <p className="t-sub break-keep text-slate-600">아직 상담 중인 업체가 없어요.</p>
+        </HintTip>
+      </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4" data-testid="pf-dashboard-extra">
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      {/* D-627 숫자 칩은 한 줄 3개 — '2주 넘게 연락 없음' 은 아래 '먼저 연락할 곳' 숫자가 같은 일 */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <MetricTile label="상담 중" value={`${sum.open}곳`} tone={sum.open > 0 ? 'brand' : 'neutral'} />
         <MetricTile label="승인" value={`${sum.approved}곳`} tone={sum.approved > 0 ? 'success' : 'neutral'} />
         <MetricTile label="보류·실패" value={`${sum.failed}곳`} tone={sum.failed > 0 ? 'danger' : 'neutral'} />
-        <MetricTile label="2주 넘게 연락 없음" value={`${sum.stale}곳`} tone={sum.stale > 0 ? 'warning' : 'neutral'} />
       </div>
 
       {stale.length > 0 && (
         <Section title="먼저 연락할 곳" count={stale.length}>
           <ul className="flex flex-col gap-2" data-testid="pf-stale">
-            {stale.slice(0, 6).map((s) => (
+            {stale.slice(0, 5).map((s) => (
               <li key={s.clientId}>
                 <Surface as="div" edge="warning" showEdge padded={false}>
                   <Link to={`/tools/policy-funding/customers?cid=${s.clientId}&client=${s.clientId}`} className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">

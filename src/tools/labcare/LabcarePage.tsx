@@ -21,6 +21,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
 import { ModuleClientFocus } from '../shared/ModuleClientFocus'
+import { ShortDisclaimer } from '../shared/ShortDisclaimer'
 import { ModulePresets } from '../shared/ModulePresets'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { OrigLabcare } from './orig/OrigLabcare'
@@ -241,7 +242,8 @@ export function LabcarePage() {
         // MOD-1 업체를 바꾸면 화면을 새로 연다 — 예전엔 설립 가능성 체크가 앞 업체 답을 그대로 들고 있다가 뒤 업체 이름으로 저장했다
         <OrigLabcare key={clientId ?? ''} section={section} />
       )}
-      <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
+      {/* D-627 첫 화면(한눈에 보기)은 한 줄 + ? — 결과가 나오는 화면은 전문 그대로 */}
+      {section === 'dashboard' ? <ShortDisclaimer text={DISCLAIMER} /> : <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>}
     </div>
   )
 }

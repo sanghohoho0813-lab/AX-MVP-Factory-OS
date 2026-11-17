@@ -12,6 +12,8 @@
  *   C9  지원사업 — 마감 임박 · 공고 넣는 법 답
  *   C10 휴대폰 390 · 360 — 9곳 넘침 0 · 질문창 · 큰 단추가 첫 화면 안
  *   C11 누를 수 있는 것 손가락 커서(예시 · 직접 눌러서 하기 · 고르기)
+ *   D-627 글자 수 한도 — '이렇게 물어보세요' · '직접 눌러서 하기' 는 처음엔 한 줄 단추(칸은 그려 두고 숨김). 누르고 나서 칩 · 칸을 누른다(openExamples · openDirect)
+ *   C12 처음 보이는 글자 — 하는 일 한 줄 30자 안 · 예시 · 직접 칸은 숨김(누르면 보임)
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -64,6 +66,14 @@ await page.evaluate(() => localStorage.removeItem('axmvp.chatfirst.v1'))
 const A = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') || '[]').find((c) => c.id === 'cli_hansol'))
 
 const overflowX = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+/** D-627 접힌 한 줄 단추를 편다(이미 펼쳤으면 그대로) */
+const openFold = async (p, id) => {
+  const btn = p.getByTestId(id).first()
+  await btn.waitFor({ timeout: 8000 }).catch(() => {})
+  if ((await btn.getAttribute('aria-expanded').catch(() => 'true')) !== 'true') await btn.click()
+}
+const openExamples = (p) => openFold(p, 'chat-examples-open')
+const openDirect = (p) => openFold(p, 'modchat-direct-open')
 const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
 
 /* ---- C1 9곳 대화창 ---- */
@@ -92,6 +102,13 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
 /* ---- C2 예시 → 질문창 ---- */
 {
   await page.goto(BASE + '/tools/policy-funding', { waitUntil: 'networkidle' })
+  // C12 처음엔 예시 · 직접 칸이 숨어 있다(누르면 보임) · 하는 일 한 줄은 30자 안
+  const sub = (await page.getByTestId('chat-hero-sub').innerText()).trim()
+  const hidden0 = !(await page.getByTestId('chat-example').first().isVisible()) && !(await page.getByTestId('modchat-direct-item').first().isVisible())
+  await openExamples(page)
+  await openDirect(page)
+  const shown1 = (await page.getByTestId('chat-example').first().isVisible()) && (await page.getByTestId('modchat-direct-item').first().isVisible())
+  check('C12 D-627 하는 일 한 줄 30자 안 · 예시 · 직접 칸은 처음엔 숨김 → 한 줄 단추를 누르면 보임', sub.length >= 15 && sub.length <= 32 && hidden0 && shown1, { sub, hidden0, shown1 })
   const ex = page.getByTestId('chat-example').first()
   const exText = (await ex.innerText()).replace(/[“”"]/g, '').trim()
   await ex.click()
@@ -149,13 +166,15 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
 /* ---- C5 직접 눌러서 하기 → 목차 화면 → [대화로 묻기] ---- */
 {
   await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
+  await openDirect(page)
   const item = page.getByTestId('modchat-direct-item').nth(1)
   const id = await item.getAttribute('data-id')
   await item.click()
   await page.waitForURL(new RegExp(`/tools/labcare/${id}`), { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(400)
-  const navOn = await page.getByTestId('module-nav').count()
-  check('C5a 직접 눌러서 하기 → 그 목차 화면(예전 화면 · 목차 그대로)', page.url().includes(`/tools/labcare/${id}`) && !(await chatOn(page)) && navOn > 0, page.url())
+  // D-627 모듈 목차는 [목차] 단추 하나(누르면 서랍)
+  const navOn = await page.getByTestId('module-menu-open').count()
+  check('C5a 직접 눌러서 하기 → 그 목차 화면(예전 화면 · [목차] 단추 그대로)', page.url().includes(`/tools/labcare/${id}`) && !(await chatOn(page)) && navOn > 0, page.url())
   const open = page.getByTestId('chatfirst-open')
   const openN = await open.count()
   await shot(page, 'pc-old-with-chat-button')
@@ -165,6 +184,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
   check('C5b 예전 화면 경로 줄 [대화로 묻기] → 대화창(?chat=1)', openN === 1 && page.url().includes('chat=1') && (await chatOn(page)), page.url())
   // 더 보기(세금 계산기는 11칸)
   await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+  await openDirect(page)
   const before = await page.getByTestId('modchat-direct-item').count()
   await page.getByTestId('modchat-direct-more').click()
   const after = await page.getByTestId('modchat-direct-item').count()
@@ -174,6 +194,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
 /* ---- C6 이 화면을 열면: 바로 화면 ---- */
 {
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
+  await openDirect(page)
   await page.getByTestId('modchat-mode-direct').click()
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
@@ -189,6 +210,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
   await openTools(page)
   await page.getByTestId('chatfirst-open').click()
   await page.waitForTimeout(400)
+  await openDirect(page)
   await page.getByTestId('modchat-mode-chat').click()
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
   check('C6b [대화로 묻기] → 대화창부터로 바꾸면 다시 맨 첫 주소가 대화창', await chatOn(page))
@@ -210,6 +232,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
   check('C7a 설정 바로 화면 → 9곳 모두 예전 화면', checked === 'true' && shown.every((x) => !x), shown)
   // 한 곳만 대화창으로 → 설정에 '따로 고른 곳' 한 줄
   await page.goto(BASE + '/tools/cretop?chat=1', { waitUntil: 'networkidle' })
+  await openDirect(page)
   await page.getByTestId('modchat-mode-chat').click()
   await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
   const own = await page.getByTestId('settings-chatfirst-own').innerText().catch(() => '')

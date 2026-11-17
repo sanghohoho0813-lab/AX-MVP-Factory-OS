@@ -39,7 +39,8 @@ export function useStartupZoom(): [StartupZoom, (z: StartupZoom) => void] {
 
 export function StartupZoomPicker({ value, onChange }: { value: StartupZoom; onChange: (z: StartupZoom) => void }) {
   return (
-    <div role="radiogroup" aria-label="판정기 글자 크기" className="flex items-center gap-1" data-testid="startup-zoom">
+    // data-menu-keep — [⋯] 메뉴 안에서 골라도 메뉴가 닫히지 않게(여러 크기를 바로 견주어 본다)
+    <div role="radiogroup" aria-label="판정기 글자 크기" className="flex flex-wrap items-center gap-1" data-testid="startup-zoom" data-menu-keep>
       <span className="t-meta mr-1 text-slate-500">글자</span>
       {LEVELS.map((l) => (
         <button

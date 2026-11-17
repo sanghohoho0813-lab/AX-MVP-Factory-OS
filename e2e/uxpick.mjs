@@ -98,7 +98,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   await page.getByTestId('tool-client-pick-clear').click()
   await page.waitForTimeout(600)
   check('P6 [업체 없이 쓰기] — client 빠지고 고르기 띠가 돌아옴', !new URL(page.url()).searchParams.has('client') && (await page.getByTestId('tool-client-pick').count()) === 1)
-  // 상황 예시 안 [업체 고르기]
+  // 상황 예시 안 [업체 고르기](D-627 상황 예시는 처음엔 한 줄 — 펴고 나서)
+  await page.getByTestId('module-presets-open').click()
   await page.getByTestId('module-presets-pick').click()
   check('P7 상황 예시 안 [업체 고르기] → 같은 창', (await page.getByTestId('tool-client-pick-dialog').count()) === 1)
   await page.keyboard.press('Escape')

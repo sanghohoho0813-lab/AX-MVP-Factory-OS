@@ -7,6 +7,7 @@
  *   S  창업감면: 상황 예시 3개 · 업체 없이 누르면 예시 가정만 얹어 열림
  *   G  지원사업: 공고 지우기가 실패하면 알림 · 공고는 그대로
  *   M  390 · 360 아주 큰 글자 — 넘침 0
+ *   D-627 상황 예시는 처음엔 한 줄 단추([상황 예시 n가지]) — 누르고 나서 목록을 본다(openPresets)
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -43,6 +44,13 @@ const clients = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp
 const A = clients.find((c) => c.id === 'cli_hansol') ?? clients[0]
 const B = clients.find((c) => c.id !== A.id)
 /** 화면 안에서 주소만 바꾸기(새로 고침 없이) — 업체 고르기와 같은 길 */
+/** D-627 상황 예시 한 줄 단추를 눌러 목록을 편다(이미 펼쳤으면 그대로) */
+const openPresets = async (p = page) => {
+  const btn = p.getByTestId('module-presets-open').first()
+  await btn.waitFor({ timeout: 10000 }).catch(() => {})
+  if ((await btn.getAttribute('aria-expanded').catch(() => 'true')) !== 'true') await btn.click()
+  await p.getByTestId('module-preset').first().waitFor({ timeout: 5000 }).catch(() => {})
+}
 const spaGo = (url) => page.evaluate((u) => {
   history.pushState({}, '', u)
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -59,6 +67,8 @@ const spaGo = (url) => page.evaluate((u) => {
     return g && s ? !!(g.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) : null
   })
   check('P1 정책자금 첫 화면 주 단추 [이 업체 진단하기] · 그 업체 주소 · AI 자리 단추보다 앞', (await go.innerText()).includes('이 업체 진단하기') && (await go.getAttribute('href')).includes(`client=${A.id}`) && order === true, { order })
+  check('P1b D-627 상황 예시는 처음엔 한 줄(목록 0) · 누르면 목록', (await page.getByTestId('module-preset').count()) === 0 && (await page.getByTestId('module-presets-open').innerText()).includes('상황 예시 7가지'))
+  await openPresets()
   const chips = await page.getByTestId('module-preset').evaluateAll((els) => els.map((e) => e.dataset.preset))
   check('P2 상황 예시 — 처음 6개(운전자금 · 시설자금 · 청년 채용 · 창업 초기 · 인테리어 · 대환) · [더 보기] 로 나머지', JSON.stringify(chips) === JSON.stringify(['policy-working', 'policy-facility', 'policy-hiring', 'policy-startup', 'policy-interior', 'policy-refinance']) && (await page.getByTestId('module-presets-more').innerText()).includes('1개 더 보기'), chips)
   await page.getByTestId('module-presets-more').click()
@@ -71,13 +81,15 @@ const spaGo = (url) => page.evaluate((u) => {
   check('P4 누르면 그 업체로 진단 화면 · 가정(운전자금) 칩', page.url().includes(`client=${A.id}`) && (await page.getByTestId('pf-preset-note').innerText()).includes('운전자금'), await page.getByTestId('pf-preset-note').innerText())
   await page.goto(`${BASE}/tools/policy-funding`, { waitUntil: 'networkidle' })
   await page.getByTestId('pf-diagnose-go').waitFor()
-  check('P5 업체 없이 열면 [진단하기] · 업체를 고르라는 한 줄', (await page.getByTestId('pf-diagnose-go').innerText()).trim() === '진단하기' && (await page.getByTestId('module-presets').innerText()).includes('업체를 먼저 고르면'))
+  await openPresets()
+  check('P5 업체 없이 열면 [진단하기] · (상황 예시를 펴면) 업체를 고르라는 한 줄 · [업체 고르기]', (await page.getByTestId('pf-diagnose-go').innerText()).trim() === '진단하기' && (await page.getByTestId('module-presets').innerText()).includes('업체를 고르면') && (await page.getByTestId('module-presets-pick').count()) === 1)
 }
 
 /* ---- E 고용지원금 ---- */
 {
   await page.goto(`${BASE}/tools/employment?client=${A.id}`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
+  await openPresets()
   const chips = await page.getByTestId('module-preset').evaluateAll((els) => els.map((e) => e.dataset.preset))
   const yPresets = (await page.getByTestId('module-presets').boundingBox())?.y ?? 9e9
   const yLink = (await page.getByText('고객 관리 업체와 연결').first().boundingBox())?.y ?? 0
@@ -96,6 +108,7 @@ const spaGo = (url) => page.evaluate((u) => {
   // 연구소는 업체를 물고 오면 업체 목록(추가)으로 간다(예전 그대로) — 한눈에 보기는 업체 없이
   await page.goto(`${BASE}/tools/labcare`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
+  await openPresets()
   check('L1 연구소 한눈에 보기 맨 위 상황 예시 4개', (await page.getByTestId('module-preset').count()) === 4)
   await page.goto(`${BASE}/tools/labcare/assessment?client=${A.id}`, { waitUntil: 'networkidle' })
   const proj = page.locator('input[placeholder="예) 추천엔진 정확도 고도화 연구"]').first()
@@ -114,6 +127,7 @@ const spaGo = (url) => page.evaluate((u) => {
 {
   await page.goto(`${BASE}/tools/startup-tax`, { waitUntil: 'networkidle' })
   await page.getByTestId('module-presets').waitFor({ timeout: 10000 })
+  await openPresets()
   // 6개 — 신규 · 법인전환 · 이전 · 벤처 확인(SCN-VENTURE) · 양수 · 재창업(감면이 안 될 수 있는 형태 포함). 예전 5개 기대는 벤처 확인이 더해진 뒤 맞추지 못한 채 남아 있었다(D-552 에서 바로잡음)
   const presetIds = await page.locator('[data-testid="module-preset"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-preset')))
   check('S1 창업감면 상황 예시 6개(신규 · 법인전환 · 이전 · 벤처 확인 · 양수 · 재창업 — 감면이 안 될 수 있는 형태 포함)', presetIds.length === 6 && ['startup-acquire', 'startup-reopen', 'startup-venture'].every((id) => presetIds.includes(id)), presetIds)
@@ -174,6 +188,7 @@ for (const [w, scale] of [[390, ''], [360, 'extra_large']]) {
   for (const u of [`/tools/policy-funding?client=${A.id}`, `/tools/employment?client=${A.id}`, '/tools/labcare', '/tools/startup-tax']) {
     await m.goto(BASE + u, { waitUntil: 'networkidle' })
     await m.getByTestId('module-presets').waitFor({ timeout: 10000 }).catch(() => {})
+    await openPresets(m)
     const o = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     if (o > 0) over.push([u, o])
   }

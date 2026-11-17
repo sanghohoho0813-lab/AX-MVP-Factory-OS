@@ -14,11 +14,13 @@ import {
   Building2,
   Calculator,
   CalendarClock,
+  ChevronDown,
   ClipboardList,
   FileStack,
   FileText,
   Globe,
   LayoutDashboard,
+  LayoutList,
   LineChart,
   ListChecks,
   MessageSquareText,
@@ -100,9 +102,15 @@ function directItems(k: ChatFirstKey, clientId: string): DirectItem[] {
 
 const FIRST_DIRECT = 6
 
+/**
+ * 직접 눌러서 하기 — 목차 · 계산기를 눌러 예전 화면으로.
+ * D-627 글자 수 한도 — 처음엔 한 줄 단추([직접 눌러서 하기 ▾]). 누르면 칸(이름 한 줄 · 설명은 마우스를 올리면) · '이 화면을 열면'.
+ * 접어도 그려 두고 숨긴다(칸 수 · 고른 값은 그대로 — 설정 · 시험이 같은 칸을 본다).
+ */
 function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
   const items = useMemo(() => directItems(k, clientId), [k, clientId])
   const [all, setAll] = useState(false)
+  const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<ChatFirstMode>(() => modeOf(readChatFirst(), k))
   const shown = all ? items : items.slice(0, FIRST_DIRECT)
   const pick = (m: ChatFirstMode) => {
@@ -110,54 +118,59 @@ function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
     writeChatFirst({ mods: { [k]: m } })
   }
   return (
-    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" aria-label="직접 눌러서 하기" data-testid="modchat-direct">
-      <div className="flex flex-col gap-1">
-        <h2 className="t-section font-bold text-slate-900">직접 눌러서 하기</h2>
-        <p className="t-sub break-keep text-slate-600">대화 없이 화면에서 바로 하고 싶으면 아래에서 고르세요. 누르면 예전 화면 그대로 열려요.</p>
-      </div>
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="modchat-direct-list">
-        {shown.map((it) => (
-          <li key={it.id}>
-            <Link to={it.href} className="tap flex h-full items-start gap-3 rounded-(--radius-control) border border-slate-200 bg-white p-3 hover:border-brand-400 hover:bg-slate-50" data-testid="modchat-direct-item" data-id={it.id}>
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700" aria-hidden="true">
-                <it.icon className="size-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="t-body block font-semibold break-keep text-slate-900">{it.label}</span>
-                {it.hint && <span className="t-sub line-clamp-2 block break-keep text-slate-600">{it.hint}</span>}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {items.length > FIRST_DIRECT && (
-        <button type="button" onClick={() => setAll((v) => !v)} className="tap t-sub self-start rounded-(--radius-control) px-2 py-1.5 font-semibold text-brand-700 hover:bg-slate-100" data-testid="modchat-direct-more">
-          {all ? '접기' : `${items.length - FIRST_DIRECT}개 더 보기`}
-        </button>
-      )}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" data-testid="modchat-mode">
-        <span className="t-sub font-semibold text-slate-700">이 화면을 열면</span>
-        <div role="radiogroup" aria-label="이 화면을 열면" className="inline-flex rounded-(--radius-control) border border-slate-300 p-0.5">
-          {(
-            [
-              ['chat', '대화창부터'],
-              ['direct', '바로 화면'],
-            ] as const
-          ).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              onClick={() => pick(m)}
-              className={`tap t-sub min-h-10 rounded-[calc(var(--radius-control)-2px)] px-3 font-semibold ${mode === m ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
-              data-testid={`modchat-mode-${m}`}
-            >
-              {label}
-            </button>
+    <section className={`flex flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 sm:px-4 ${open ? 'gap-3 pb-4' : ''}`} aria-label="직접 눌러서 하기" data-testid="modchat-direct">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        title="대화 없이 화면에서 바로 하고 싶으면 여기서 고르세요. 누르면 예전 화면 그대로 열려요."
+        className="tap t-body flex min-h-11 w-full items-center gap-2 text-left font-bold text-slate-900"
+        data-testid="modchat-direct-open"
+      >
+        <LayoutList aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
+        <span className="min-w-0 flex-1">직접 눌러서 하기</span>
+        <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div className={open ? 'flex flex-col gap-3' : 'hidden'}>
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="modchat-direct-list">
+          {shown.map((it) => (
+            <li key={it.id}>
+              <Link to={it.href} title={it.hint || undefined} className="tap flex h-full min-h-11 items-center gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 hover:border-brand-400 hover:bg-slate-50" data-testid="modchat-direct-item" data-id={it.id}>
+                <it.icon aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
+                <span className="t-body min-w-0 font-semibold break-keep text-slate-900">{it.label}</span>
+              </Link>
+            </li>
           ))}
+        </ul>
+        {items.length > FIRST_DIRECT && (
+          <button type="button" onClick={() => setAll((v) => !v)} className="tap t-sub self-start rounded-(--radius-control) px-2 py-1.5 font-semibold text-brand-700 hover:bg-slate-100" data-testid="modchat-direct-more">
+            {all ? '접기' : `${items.length - FIRST_DIRECT}개 더 보기`}
+          </button>
+        )}
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" data-testid="modchat-mode">
+          <span className="t-sub font-semibold text-slate-700">이 화면을 열면</span>
+          <div role="radiogroup" aria-label="이 화면을 열면" className="inline-flex rounded-(--radius-control) border border-slate-300 p-0.5">
+            {(
+              [
+                ['chat', '대화창부터'],
+                ['direct', '바로 화면'],
+              ] as const
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => pick(m)}
+                className={`tap t-sub min-h-10 rounded-[calc(var(--radius-control)-2px)] px-3 font-semibold ${mode === m ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                data-testid={`modchat-mode-${m}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="t-sub break-keep text-slate-500">{mode === 'direct' ? '다음부터 대화창 없이 예전 화면으로 열려요(위 [대화로 묻기] 로 언제든 돌아와요).' : '모든 모듈은 설정 › 내 설정에서 한 번에 바꿀 수 있어요.'}</span>
         </div>
-        <span className="t-sub break-keep text-slate-500">{mode === 'direct' ? '다음부터 대화창 없이 예전 화면으로 열려요(위 [대화로 묻기] 로 언제든 돌아와요).' : '모든 모듈은 설정 › 내 설정에서 한 번에 바꿀 수 있어요.'}</span>
       </div>
     </section>
   )
@@ -225,6 +238,7 @@ function ModuleChatInner({ k, notices }: { k: ChatFirstKey; notices: readonly Gr
       module={k}
       title={cfg.title}
       heroSub={cfg.sub}
+      heroHint={cfg.subMore}
       placeholder={client ? cfg.placeholder.replace(/한솔테크|○○/, client.companyName) : cfg.placeholder}
       starters={cfg.starters.map((s) => ({ ...s, icon: icons(s.id) }))}
       examples={cfg.examples(name)}

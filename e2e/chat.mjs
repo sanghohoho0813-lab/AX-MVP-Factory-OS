@@ -19,6 +19,26 @@ import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
 
+/** D-627 모듈 목차는 [목차] 단추 하나(서랍) — 목차 줄 수를 세고 서랍을 닫는다 */
+async function navCount(page) {
+  const open = page.getByTestId('module-menu-open')
+  if (!(await open.count())) return 0
+  await open.click()
+  await page.getByTestId('module-nav').waitFor({ timeout: 3000 }).catch(() => {})
+  const n = await page.locator('[data-testid="module-nav"] [data-section]:visible').count()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  return n
+}
+/** 서랍을 열어 그 줄의 주소를 읽고 닫는다 */
+async function navHref(page, key) {
+  await page.getByTestId('module-menu-open').click()
+  const href = await page.locator(`[data-testid="module-nav"] [data-section="${key}"]`).first().getAttribute('href').catch(() => null)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  return href
+}
+
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
 
@@ -313,7 +333,7 @@ const errors = []
   await a.locator('[data-testid="chat-action"][data-id="open"]').click()
   await page.waitForURL(/\/tools\/cert-os\/venture/)
   await page.waitForTimeout(500)
-  check('B12 [벤처 자세히] → 벤처 화면(목차 그대로)', (await page.locator('[data-section]:visible').count()) >= 5)
+  check('B12 [벤처 자세히] → 벤처 화면(목차 그대로 — [목차] 서랍)', (await navCount(page)) >= 5)
   await page.goBack({ waitUntil: 'networkidle' })
   await page.getByTestId('cert-chat-page').waitFor()
 
@@ -321,13 +341,13 @@ const errors = []
   await page.getByTestId('chat-answer').first().locator('[data-testid="chat-action"][data-id="all"], [data-testid="chat-action"][data-id="ask"]').click()
   await page.waitForURL(/detail=1/)
   await page.getByTestId('cert-hero').first().waitFor()
-  check('B13 [전체 판정 보기 · 확인 질문에 답하기] → 예전 "인증 한눈에"(1순위 · 목차 그대로)', (await page.getByTestId('cert-hero').count()) >= 1 && (await page.locator('[data-section]:visible').count()) >= 5)
+  check('B13 [전체 판정 보기 · 확인 질문에 답하기] → 예전 "인증 한눈에"(1순위 · 목차 그대로 — [목차] 서랍)', (await page.getByTestId('cert-hero').count()) >= 1 && (await navCount(page)) >= 5)
   await page.goto(`${BASE}/tools/cert-os?client=${CLIENT}`, { waitUntil: 'networkidle' })
   await page.getByTestId('chat-detail').click()
   await page.waitForURL(/detail=1/)
   await page.getByTestId('cert-hero').first().waitFor()
   check('B14 [자세히] → 같은 예전 화면', (await page.getByTestId('cert-hero').count()) >= 1)
-  const navFirst = await page.locator('[data-section="overview"]:visible').first().getAttribute('href')
+  const navFirst = await navHref(page, 'overview')
   check("B14b 예전 화면 목차 '인증 한눈에'는 예전 화면 그대로(?detail=1) · [대화창으로] 있음", (navFirst ?? '').includes('detail=1') && (await page.getByTestId('cert-back-chat').count()) === 1, navFirst)
   await page.getByTestId('cert-back-chat').click()
   await page.getByTestId('cert-chat-page').waitFor()

@@ -69,7 +69,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
-  check('업체 없이 열면 계산기부터(예전 그대로)', (await page.getByTestId('tax-plan').count()) === 0 && (await page.locator('[data-block]').count()) > 0)
+  // D-627 업체 없이 열면 '계산기를 고르세요' 한 장(한 줄씩 5개 + [4개 더 보기]) — 고르면 그 계산기 하나만
+  check('D-627 업체 없이 열면 계산기 고르기 한 장(5줄 · 4개 더 보기 · 결과 칸 아직 없음)', (await page.getByTestId('tax-plan').count()) === 0 && (await page.getByTestId('tax-calc-item').count()) === 5 && (await page.getByTestId('tax-calc-more').innerText()).includes('4개 더 보기') && (await page.locator('[data-block]').count()) === 0)
+  await page.getByTestId('tax-calc-more').click()
+  const pickedKey = await page.getByTestId('tax-calc-item').nth(8).getAttribute('data-calc')
+  await page.getByTestId('tax-calc-item').nth(8).click()
+  await page.waitForTimeout(300)
+  check('D-627 [더 보기] → 9개 · 고르면 그 계산기(?c=) 하나 · 결과 칸', page.url().includes(`c=${pickedKey}`) && (await page.locator('[data-block]').count()) > 0 && (await page.getByTestId('tax-calc-item').count()) === 0)
   check('두 칸: 원하는 결과로 찾기 · 계산기 9종', (await page.locator('[data-mode="plan"]').count()) === 1 && (await page.locator('[data-mode="calc"]').innerText()).includes('계산기 9종'))
 
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
@@ -221,8 +227,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   check('새로 열면: 업체 기록의 주주명부 · 현황으로 시작', (await page.getByTestId('holder-row').count()) === 4 && ((await page.getByTestId('plan-now-summary').innerText()) ?? '').includes('44,000원'))
 
-  // 계산기 모드에서 결과 붙이기가 주주명부를 지우지 않는다
+  // 계산기 모드에서 결과 붙이기가 주주명부를 지우지 않는다(D-627 계산기 탭 → 고르기 한 장 → 첫 계산기)
   await page.locator('[data-mode="calc"]').click()
+  await page.waitForTimeout(300)
+  await page.getByTestId('tax-calc-item').first().click()
   await page.waitForTimeout(500)
   await page.getByRole('button', { name: /기록에 붙이기/ }).first().click()
   await page.waitForTimeout(900)

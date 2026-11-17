@@ -5921,6 +5921,8 @@ function StarterGuide(props){
   var stHidden=useState(function(){return guideHidden("dashboard");});
   // [D-362] 📐 첫 화면은 단순하게 — 처음엔 1 → 2 → 3 → 4 한 줄 도식(누르면 그 단계로) · [자세히] 로 예전 큰 안내
   var stOpen=useState(false);
+  // [D-627] 글자 수 한도 — 처음엔 한 줄 단추 하나(👋 이렇게 써요 · 4단계). 누르면 아래 한 줄 도식 · 거기서 [자세히] 로 큰 안내
+  var stShown=useState(false);
   if(stHidden[0])return null;
   function hideForDay(){guideHideForDay("dashboard");stHidden[1](true);}
   var steps=[
@@ -5929,6 +5931,15 @@ function StarterGuide(props){
     {n:3,emoji:"📅",title:"일정·서류 관리",desc:"신청 기한·지급월·필요한 서류를 놓치지 않게 관리합니다.",cta:"진행 보드 보기",on:props.onKanban,tint:"#FFF7ED",bd:"#FED7AA",c:"#C2410C"},
     {n:4,emoji:"📄",title:"고객 보고서로 상담",desc:"대표님에게 보여줄 상담 자료와 보고서를 만듭니다.",cta:"고객 보고서 보기",on:props.onReport,tint:"#E5F7ED",bd:"#B6E9CA",c:"#059669"},
   ];
+
+  // ── [D-627] 처음: 한 줄 단추 ──
+  if(!stShown[0]&&!stOpen[0]){
+    return(
+      <button type="button" className="prog-tap" onClick={function(){stShown[1](true);}} aria-expanded="false" data-testid="emp-guide-open" title="기존 엑셀 불러오기 → 지원금 후보 확인 → 일정·서류 관리 → 고객 보고서로 상담" style={{display:"inline-flex",alignItems:"center",gap:6,minHeight:44,background:"#fff",border:"1px solid #E2E8F0",borderRadius:"var(--radius-control)",padding:"8px 14px",marginBottom:18,fontSize:15,fontWeight:700,color:"#0F172A",cursor:"pointer",fontFamily:FF}}>
+        <span aria-hidden="true">👋</span>이렇게 써요 · 4단계<span aria-hidden="true" style={{color:"#64748B"}}>▸</span>
+      </button>
+    );
+  }
 
   // ── 접힘: 한 줄 도식 — 단계마다 누르면 그 화면 ──
   if(!stOpen[0]){
@@ -7246,8 +7257,8 @@ export default function SubsidyApp(props){
             <div data-testid="emp-empty" style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",background:"#F8FAFC",border:"2px dashed var(--color-brand-200)",borderRadius:"var(--radius-panel)",padding:"16px 18px",marginBottom:20}}>{/* [D-362] 한 줄 크기로 — 예전 큰 빈 화면(아이콘 · 두 줄 설명)은 첫 화면을 한 뼘 넘게 차지했다 */}
               <div aria-hidden="true" style={{fontSize:30,lineHeight:1,flexShrink:0}}>🏢</div>
               <div style={{flex:"1 1 240px",minWidth:0}}>
-                <h3 style={{margin:0,fontSize:18,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>고용지원금으로 관리할 업체를 고르세요</h3>
-                <p style={{margin:"4px 0 0",fontSize:14,color:"#475569",lineHeight:1.6,wordBreak:"keep-all"}}>고객 관리에 있는 업체 가운데 고릅니다 — 직원을 넣으면 회차 · 서류 · 수수료 · 보고서가 이어져요.</p>
+                {/* [D-627] 글자 수 한도 — 설명 줄은 마우스를 올리면(title) */}
+                <h3 title="고객 관리에 있는 업체 가운데 고릅니다 — 직원을 넣으면 회차 · 서류 · 수수료 · 보고서가 이어져요." style={{margin:0,fontSize:18,fontWeight:800,color:"#0F172A",wordBreak:"keep-all"}}>관리할 업체를 고르세요</h3>
               </div>
               <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{flexShrink:0,minHeight:44,background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"11px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
             </div>

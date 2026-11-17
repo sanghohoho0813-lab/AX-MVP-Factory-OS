@@ -120,7 +120,7 @@ for (const vp of [
     check(`${vp.tag} ${name} 상자 안 상자 ${m.nested} ≤ ${nestedMax + 2}`, m.nested <= nestedMax + 2)
   }
   if (vp.tag === '휴대폰') {
-    // D-369 휴대폰 전문 모듈 — 모듈마다 기능 3개 먼저 · [n개 더 보기] 로 전부(PC 는 처음부터 전부)
+    // D-369 → D-627 전문 모듈 — 모듈 카드는 처음엔 한 줄(이름 · 상태 · [기능 n]) · 누르면 그 모듈 기능 전부
     await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const growth = page.locator('[data-module-card="growth"]')
@@ -129,7 +129,7 @@ for (const vp of [
     await growth.getByTestId('module-card-more').click()
     await page.waitForTimeout(200)
     const after = await visibleFeat()
-    check('휴대폰 전문 모듈: 기능 3개 먼저 → [n개 더 보기] 누르면 전부(단추는 사라짐)', before === 3 && after > 3 && (await growth.getByTestId('module-card-more').count()) === 0, { before, after })
+    check('휴대폰 전문 모듈: 처음엔 기능 0(한 줄) → [기능 n] 누르면 전부 · 다시 누르면 접힘', before === 0 && after > 3 && (await growth.getByTestId('module-card-more').getAttribute('aria-expanded')) === 'true', { before, after })
   }
   check(`${vp.tag} JS 오류 0`, errs.length === 0, errs)
   await ctx.close()

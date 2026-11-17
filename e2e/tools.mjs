@@ -10,6 +10,7 @@
  */
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -179,10 +180,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   /* ---- D-91: 모듈 2단 목차 · 모듈 대시보드가 OS 업체를 본다 ---- */
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
+  // D-627 모듈 목차는 넓은 화면도 [목차] 단추 하나 — 누르면 서랍(처음엔 목차 글자가 화면에 깔리지 않는다)
   const modNav = page.getByTestId('module-nav')
-  check('모듈 목차: 넓은 화면에 모듈 목차가 선다', (await modNav.count()) === 1)
+  check('D-627 모듈 목차: 처음엔 [목차] 단추 하나(목차 칸은 접힘)', (await modNav.count()) === 0 && (await page.getByTestId('module-menu-open').count()) === 1)
+  await page.getByTestId('module-menu-open').click()
+  await modNav.waitFor({ timeout: 3000 }).catch(() => {})
+  check('모듈 목차: [목차] 를 누르면 모듈 목차가 선다', (await modNav.count()) === 1)
   check('모듈 목차: 고용지원금 10화면이 다 걸린다', (await modNav.locator('a[data-section]').count()) === 10, String(await modNav.locator('a[data-section]').count()))
   check('모듈 목차: 지금 보는 화면이 표시된다', (await modNav.locator('a[aria-current="page"]').getAttribute('data-section')) === 'dashboard')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
   const dash = page.getByTestId('module-dashboard')
   check('모듈 대시보드: 첫 화면이 대시보드', (await dash.count()) === 1)
   const dashText = await dash.innerText()
@@ -191,6 +198,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('모듈 대시보드: 업체 이름이 실제 OS 업체다', dashText.includes('한솔테크'), dashText.slice(0, 300))
 
   // 목차에서 다른 화면으로 — 주소가 바뀌고 내용도 바뀐다
+  await page.getByTestId('module-menu-open').click()
   await modNav.locator('a[data-section="wage"]').click()
   await page.waitForTimeout(600)
   check('모듈 목차: 누르면 그 화면 주소로 간다', page.url().includes('/tools/employment/wage'), page.url())
@@ -223,6 +231,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-362 고용지원금 첫 화면 — 사용 흐름은 1 → 2 → 3 → 4 한 줄(누르면 그 화면) · [자세히] 로 예전 큰 안내
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
+  // D-627 처음엔 한 줄 단추(👋 이렇게 써요 · 4단계) — 누르면 1 → 2 → 3 → 4 한 줄 도식
+  check('D-627 고용지원금: 사용 흐름은 처음엔 한 줄 단추(단계 칸 0) · 빈 화면도 한 줄', (await page.getByTestId('emp-guide-step').count()) === 0 && (await page.getByTestId('emp-guide-open').count()) === 1 && (await page.getByTestId('emp-empty').count()) === 1)
+  await page.getByTestId('emp-guide-open').click()
+  await page.waitForTimeout(200)
   check('D-362 고용지원금: 사용 흐름은 한 줄 도식 4단계(큰 안내는 접힘) · 빈 화면도 한 줄', (await page.getByTestId('emp-guide-step').count()) === 4 && (await page.getByTestId('emp-empty').count()) === 1 && !(await page.getByTestId('emp-orig').innerText()).includes('고용지원금 사용 흐름'))
   await page.getByTestId('emp-guide-more').click()
   await page.waitForTimeout(300)
@@ -297,7 +309,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('대시보드: 고객 운영 업체와 연결 칸', (await page.getByTestId('module-dashboard').count()) === 1)
 
   // 원본 화면 안에서 화면을 옮기면 주소가 따라 바뀐다
-  // D-362 사용 흐름은 한 줄 도식 — '3 일정·서류 관리' 가 예전 [진행 보드 보기] 단추와 같은 곳으로
+  // D-362 사용 흐름은 한 줄 도식 — '3 일정·서류 관리' 가 예전 [진행 보드 보기] 단추와 같은 곳으로(D-627 한 줄 단추를 먼저 편다)
+  if (await page.getByTestId('emp-guide-open').count()) await page.getByTestId('emp-guide-open').click()
   await page.locator('[data-testid="emp-guide-step"][data-step="3"]').click()
   await page.waitForTimeout(700)
   check('원본 안 이동: 주소가 진행 보드로', page.url().includes('/tools/employment/board'), page.url())
@@ -761,7 +774,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
   await m.addInitScript(() => localStorage.setItem('axmvp.chatfirst.v1', JSON.stringify({ all: 'direct' })))
   const mp = await m.newPage()
-  await mp.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+  // D-627 /tools/tax 는 계산기 고르기 한 장 — 펼치는 목록은 계산기를 연 화면(?c=)에 있다
+  await mp.goto(BASE + '/tools/tax?m=calc&c=t1', { waitUntil: 'networkidle' })
   await mp.getByTestId('tax-picker').click()
   await mp.waitForTimeout(200)
   await mp.keyboard.press('Escape')
@@ -874,10 +888,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const zoomOf = () => page.getByTestId('startup-orig').evaluate((el) => ({ z: el.getAttribute('data-zoom'), css: getComputedStyle(el).zoom, w: window.innerWidth }))
   const z0 = await zoomOf()
   check('D-167 창업감면 글자: 기본 보통 · 넓은 화면은 OS 글자에 맞춰 0.85배', z0.z === 'm' && (z0.w < 1024 || Number(z0.css) === 0.85), JSON.stringify(z0))
+  // D-627 판정기 글자 크기는 경로 줄 오른쪽 [⋯] 안
+  await openTools(page)
   await page.getByTestId('startup-zoom').getByRole('radio', { name: '크게', exact: true }).click()
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check('D-167 창업감면 글자: 고른 크기가 남는다', (await zoomOf()).z === 'l')
+  await openTools(page)
   await page.getByTestId('startup-zoom').getByRole('radio', { name: '보통', exact: true }).click()
 
   // 연구소 설립 가능성 체크: 적은 것이 새로 고쳐도 남는다(업체마다)

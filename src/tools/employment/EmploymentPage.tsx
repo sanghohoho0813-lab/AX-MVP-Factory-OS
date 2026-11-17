@@ -17,6 +17,7 @@ import { toolOf } from '../../config/toolRegistry'
 import { ModuleAssistBar, ModuleDashboard } from '../shared/ModuleDashboard'
 import { ModuleClientFocus } from '../shared/ModuleClientFocus'
 import { ModulePresets } from '../shared/ModulePresets'
+import { ShortDisclaimer } from '../shared/ShortDisclaimer'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { EmploymentOrig } from './orig/EmploymentOrig'
 import { Button } from '../../components/ui/Button'
@@ -266,7 +267,8 @@ export function EmploymentPage() {
           // D-357 '고객 관리 업체와 연결' 은 접힌 채 한 줄(숫자 요약) — 펼치면 예전과 같은 칸
           <ModuleDashboard toolKey="employment" assist={false} presets={false} focus={false} allTitle="고객 관리 업체와 연결" />
         )}
-        <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
+        {/* D-627 첫 화면(한눈에 보기)은 한 줄 + ? — 결과가 나오는 화면은 전문 그대로 */}
+        {section === 'dashboard' ? <ShortDisclaimer text={DISCLAIMER} /> : <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>}
       </div>
     )
   }
