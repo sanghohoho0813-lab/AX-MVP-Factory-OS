@@ -78,9 +78,10 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   const openCount = () => page.locator('[data-testid="fold-toggle"][aria-expanded="true"]').count()
-  // D-357 업체 상세 목차는 처음엔 모두 접힘 — 하나를 펼쳐 둔 뒤 [모두 접기]
-  if ((await openCount()) === 0) {
-    await page.locator('[data-testid="fold-toggle"]').first().click()
+  // D-357 업체 상세 목차는 처음엔 모두 접힘 · D-627 [모두 접기/펼치기] 는 [더 보기] 안 — [더 보기] 를 펼쳐 둔 뒤 [모두 접기]
+  const more = page.getByTestId('fold-overview-more').getByTestId('fold-toggle').first()
+  if ((await more.getAttribute('aria-expanded')) !== 'true') {
+    await more.click()
     await page.waitForTimeout(200)
   }
   const before = await openCount()
@@ -96,6 +97,8 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   check('K3 [모두 접기] 뒤 하나만 펼치면 그것만 펼친 채로 기억', (await openCount()) === 1, await openCount())
+  await page.getByTestId('fold-overview-more').getByTestId('fold-toggle').first().click()
+  await page.waitForTimeout(200)
   await page.getByTestId('fold-all-open').first().click()
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
