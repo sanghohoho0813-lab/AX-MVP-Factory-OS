@@ -9756,3 +9756,6 @@ AFTER:
 
 확인하지 못한 것: 실제 AI 로 돌린 답의 품질(시험은 가짜 공급자) · 특허 · 벤처 메뉴의 AI 단추를 화면에서 눌러 본 것(단위 시험으로 지시문에 들어가는 것만 확인).
 안 넣은 것: 새 판의 Part III · IV(예전 판 원문 보존 — 내용은 앞 장에 통합돼 있다) · 부록 H · '상세 제안 단계'(원문에 형식이 정해져 있지 않아 따로 단추를 만들지 않았다).
+
+점검(잰 것): `npm run test:ownerai` 117 → 126(D625-1 ~ 9) · `npm run test:assist` 160 · `npm run test:all` 37묶음 실패 0 · `npm run qa:ownerai` 84 → 92(D625 V · P1 · P2 · Q1 · Q1b · Q2 ~ Q4) ·
+`npm run qa:aihome` 23 · `npm run qa:wording` 6 · `npm run qa:db` 녹색 · `npm run qa:pilot` 453 · 사진(PC 1440 형식 고르기 · 스튜디오 4쪽 · 휴대폰 390).
