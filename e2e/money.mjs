@@ -14,6 +14,7 @@
  */
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -195,8 +196,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // AI 단추 — D-239: 예전 '준비 중' 자리가 실제 AI 도우미로(가장 큰 비용 · 1년 지출 · 줄일 비용 · 들어올 돈)
   check('AI 도우미: 매출 · 비용 띠 · 첫 질문 가장 큰 비용 TOP5 · 예전 준비 중 단추 없음', (await page.getByTestId('ai-assist-bar').count()) === 1 && (await page.getByTestId('ai-assist-chip').first().getAttribute('data-assist')) === 'money.top' && (await page.getByTestId('ai-soon').filter({ hasText: '이 달 비용 정리해 보기' }).count()) === 0)
-  const color = await page.getByTestId('ai-assist-open').first().evaluate((el) => getComputedStyle(el).backgroundImage)
-  check('AI 단추: 보라색', /gradient/.test(color), color)
+  // D-627 AI 도우미는 [⋯] 이 화면 도구 안 — 보라 글자 줄(보라는 AI 단추만)
+  await openTools(page)
+  const color = await page.getByTestId('ai-assist-open').first().evaluate((el) => el.className)
+  check('AI 단추: 보라색([⋯] 안 줄)', /text-violet/.test(color) && (await page.getByTestId('ai-assist-open').first().isVisible()), color)
+  await page.keyboard.press('Escape')
 
   // 해지
   await page.getByTestId('money-tab-subs').click()

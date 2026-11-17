@@ -11,6 +11,7 @@
  */
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -42,6 +43,7 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
 {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   await page.locator('[data-arrange-row="capture"]').getByTestId('arrange-top').click()
@@ -60,6 +62,7 @@ const store = (k) => page.evaluate((key) => localStorage.getItem(key), k)
   })
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   await page.locator('[data-arrange-row="todos"]').getByTestId('arrange-top').click()

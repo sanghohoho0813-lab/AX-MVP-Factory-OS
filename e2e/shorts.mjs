@@ -15,6 +15,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -308,6 +309,7 @@ await page.getByTestId('sht-qs-topic').fill('정책자금 전에 볼 기본 컨�
   await page.getByTestId('model-pick-panel').locator('[data-provider="anthropic"]').click()
   await page.getByTestId('model-pick-panel').getByTestId('ai-assist-model-option').filter({ hasText: 'Claude Haiku 5.5' }).click()
   await page.keyboard.press('Escape')
+  await openTools(bar)
   await bar.getByTestId('ai-assist-ask-chip').click()
   await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
   const before = llm.length

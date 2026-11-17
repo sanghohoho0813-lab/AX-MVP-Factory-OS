@@ -39,12 +39,13 @@ export function ToolClientPicker({
       {mode === 'bar' ? (
         <div
           data-testid="tool-client-pick"
+          // D-627 설명 줄은 마우스를 올리면(글자 수 한도 — 띠에는 질문 한 줄 + 단추만)
+          title="고르면 그 업체 숫자(직원 · 매출 · 주소 등)로 채워지고, 결과를 그 업체에 붙일 수 있어요."
           className="no-print flex items-center gap-x-3 gap-y-1 rounded-(--radius-panel) border border-dashed border-brand-300 bg-white px-3 py-2"
         >
           <Building2 aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
           <span className="t-sub min-w-0 flex-1 truncate text-slate-700 sm:whitespace-normal">
             <b className="font-bold text-slate-900">어느 업체 일인가요?</b>
-            <span className="max-sm:hidden"> 고르면 그 업체 숫자(직원 · 매출 · 주소 등)로 채워지고, 결과를 그 업체에 붙일 수 있어요.</span>
           </span>
           <Button size="sm" variant="primary" onClick={() => setOpen(true)} data-testid="tool-client-pick-open" className="shrink-0">
             업체 고르기

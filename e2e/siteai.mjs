@@ -16,6 +16,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -155,6 +156,7 @@ async function seed(page) {
 }
 const frameHtml = (page) => page.locator('[data-testid="site-frame"]').evaluate((f) => f.contentDocument?.documentElement.outerHTML ?? '')
 const runPreset = async (page, label) => {
+  await openTools(page)
   await page.getByTestId('ai-assist-bar').getByTestId('ai-assist-open').click()
   await page.getByTestId('ai-assist-preset').filter({ hasText: label }).click()
   await page.getByTestId('ai-assist-confirm-go').click()
@@ -180,7 +182,7 @@ const errors = []
 
   const bar = page.getByTestId('ai-assist-bar')
   const chips = await bar.getByTestId('ai-assist-chip').allInnerTexts()
-  check('S1 머리 띠 아래 AI 도우미 판 — 문구 · 자주 묻는 질문 · 검색 정보 단추 · 직접 묻기 · 모델 고르기', (await bar.count()) === 1 && chips.join('|') === '홈페이지 문구 다시 쓰기|자주 묻는 질문 5개|검색 제목 · 설명 3가지' && (await bar.getByTestId('ai-assist-ask-chip').count()) === 1 && (await bar.getByTestId('ai-assist-model-chip').count()) === 1, chips)
+  check('S1 [⋯] 안 AI 도우미 — 문구 · 자주 묻는 질문 · 검색 정보 단추 · 직접 묻기', (await bar.count()) === 1 && chips.join('|') === '홈페이지 문구 다시 쓰기|자주 묻는 질문 5개|검색 제목 · 설명 3가지' && (await bar.getByTestId('ai-assist-ask-chip').count()) === 1 && (await bar.getByTestId('ai-assist-model-chip').count()) === 1, chips)
   await shot(page, 'site-ai-bar')
 
   // 문구 다시 쓰기
@@ -234,10 +236,12 @@ const errors = []
   check('S9 [검색 정보에 넣기] → 홈페이지 <title> · 설명', (await frameHtml(page)).includes('<title>한솔정밀 | 화성 정밀 부품 · 금형</title>'))
 
   // 모델 바꾸고 직접 묻기
+  await openTools(bar)
   await bar.getByTestId('ai-assist-model-chip').click()
   await page.getByTestId('model-pick-panel').locator('[data-provider="anthropic"]').click()
   await page.getByTestId('model-pick-panel').getByTestId('ai-assist-model-option').filter({ hasText: 'Claude Haiku 5.5' }).click()
   await page.keyboard.press('Escape')
+  await openTools(bar)
   await bar.getByTestId('ai-assist-ask-chip').click()
   await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
   const ph = await page.getByTestId('ai-assist-ask').getAttribute('placeholder')

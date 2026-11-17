@@ -17,6 +17,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -487,6 +488,7 @@ await page.keyboard.press('Escape')
   await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })
   check('L3 [AI로 바로 쓰기] 는 고른 모델로(claude-haiku-5-5) · 한 번', llm.length - before === 1 && llm.at(-1)?.provider === 'anthropic' && llm.at(-1)?.model === 'claude-haiku-5-5', llm.at(-1)?.model)
 }
+await openTools(bar)
 await bar.getByTestId('ai-assist-ask-chip').click()
 await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
 {
@@ -502,6 +504,7 @@ await page.keyboard.press('Escape')
 await page.waitForTimeout(200)
 // 판에서 [스레드 글 3개 쓰기] → 답 항목의 [글 칸에 넣기]
 await page.getByTestId('thr-new').click()
+await openTools(bar)
 await bar.getByTestId('ai-assist-open').click()
 await page.getByTestId('ai-assist-preset').filter({ hasText: '스레드 글 3개 쓰기' }).click()
 await page.getByTestId('ai-assist-confirm-go').click()

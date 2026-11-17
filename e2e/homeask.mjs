@@ -28,6 +28,7 @@ import { chromium } from 'playwright'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -321,6 +322,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   setEnv()
 
   // 화면 꾸미기로 숨김
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   await page.locator('[data-arrange-row="ask"] [data-vis="off"]').click()
@@ -330,6 +332,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('새로 고쳐도 숨김 그대로', (await page.getByTestId('home-ask').count()) === 0)
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   await page.locator('[data-arrange-row="ask"] [data-vis="show"]').click()

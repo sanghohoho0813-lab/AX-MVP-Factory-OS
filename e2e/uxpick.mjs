@@ -133,7 +133,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   const firstBox = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="module-client-focus"]')
     const ai = document.querySelector('[data-testid="ai-assist-bar"]')
-    return el && ai ? el.getBoundingClientRect().top < ai.getBoundingClientRect().top : !!el
+    // D-627 AI 도우미가 [⋯] 안(닫혀 숨김)이면 화면 위 순서를 따지지 않는다
+    return el && ai && ai.checkVisibility() ? el.getBoundingClientRect().top < ai.getBoundingClientRect().top : !!el
   })
   check('F2 AI 도우미 띠 · 고객 전체 숫자보다 위', firstBox)
   const need = f.getByTestId('module-client-focus-need')

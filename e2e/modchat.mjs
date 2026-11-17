@@ -17,6 +17,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.env.MODCHAT_SHOTS ?? ''
@@ -158,6 +159,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
   const open = page.getByTestId('chatfirst-open')
   const openN = await open.count()
   await shot(page, 'pc-old-with-chat-button')
+  await openTools(page)
   if (openN) await open.click()
   await page.waitForTimeout(500)
   check('C5b 예전 화면 경로 줄 [대화로 묻기] → 대화창(?chat=1)', openN === 1 && page.url().includes('chat=1') && (await chatOn(page)), page.url())
@@ -184,6 +186,7 @@ const chatOn = async (p) => (await p.getByTestId('modchat').count()) > 0
   }
   check('C6a 고용지원금만 바로 화면 → 새로 고쳐도 예전 화면 · [대화로 묻기] 있음 · 다른 모듈은 대화창 그대로', old && btn === 1 && others.every(Boolean), { old, btn, others })
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
+  await openTools(page)
   await page.getByTestId('chatfirst-open').click()
   await page.waitForTimeout(400)
   await page.getByTestId('modchat-mode-chat').click()

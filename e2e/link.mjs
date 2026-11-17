@@ -22,6 +22,7 @@
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
@@ -146,6 +147,7 @@ const cardText2 = flat(await page.locator('main a[href*="/tools/labcare"]').firs
 check('C. 업체 맞춤 추천 카드도 모듈에서 답한 그 판정으로 — 같은 글(따로 놀지 않음)', cardText2.includes(top2), { top2, cardText2: cardText2.slice(0, 140) })
 await shot('link-03-card-after')
 // D-618 AI 도우미에 연구소를 물으면 — 답 위에 같은 판정 줄(카드 · 모듈과 같은 글). AI 서버가 없어도(이 시험처럼) 판정 줄은 바로 보인다
+await openTools(page)
 await page.getByTestId('ai-assist-ask-chip').first().click()
 await page.getByTestId('ai-assist-ask').fill('연구소 3년 내 법인인데 설립 가능한지')
 await page.getByTestId('ai-assist-ask-send').click()

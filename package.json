@@ -94,6 +94,7 @@
     "qa:diag": "node e2e/diag.mjs",
     "qa:talk": "node e2e/talk.mjs",
     "qa:uxpick": "node e2e/uxpick.mjs",
+    "qa:chars": "node e2e/chars.mjs",
     "qa:firstscreen": "node e2e/firstscreen.mjs",
     "qa:taps": "node e2e/taps.mjs",
     "qa:bulkpaste": "node e2e/bulkpaste.mjs",

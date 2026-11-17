@@ -1,4 +1,5 @@
 import { Suspense, lazy, useContext, useEffect, useState, useSyncExternalStore } from 'react'
+import { PageTools, PageToolsProvider } from './PageTools'
 import { AuthContext } from '../../auth/authContext'
 import { loadBrand } from '../../services/brandProfile'
 import { setMarketingCustomer } from '../../services/marketing/persona'
@@ -166,6 +167,7 @@ export function AppShell() {
       <DemoTourProvider>
       {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 다시 보기는 설정 › 계정 · 보기(D-296) */}
       <TutorialProvider>
+      <PageToolsProvider>
       <div className="flex min-h-screen">
         {/* D-256 메뉴 폭(넓게 · 아이콘 · 숨김)은 메뉴가 스스로 기억한다 — 경계선 끌기 · [사이드바 접기] */}
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
@@ -206,9 +208,12 @@ export function AppShell() {
               <div className="min-w-0 flex-1">
                 <Breadcrumbs />
               </div>
-              <ArrangeButton />
-              {/* D-552 대화창으로 시작하는 모듈의 예전 화면 — [대화로 묻기] */}
-              <ChatModeButton />
+              {/* D-627 [⋯] 이 화면 도구 — 화면 꾸미기 · 대화로 묻기 · 화면이 보낸 AI 도우미(와 그 질문)를 한 곳에 */}
+              <PageTools>
+                <ArrangeButton />
+                {/* D-552 대화창으로 시작하는 모듈의 예전 화면 — [대화로 묻기] */}
+                <ChatModeButton />
+              </PageTools>
               <SideAiButton />
             </div>
             <div key={shellKeyOf(location.pathname)} className="ax-rise">
@@ -238,6 +243,7 @@ export function AppShell() {
         )}
         <SideDock />
       </div>
+      </PageToolsProvider>
       </TutorialProvider>
       </DemoTourProvider>
     </ActiveProjectProvider>

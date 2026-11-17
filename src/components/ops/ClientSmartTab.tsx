@@ -14,6 +14,7 @@
  */
 import { CriticalIdCheck } from './CriticalIdCheck'
 import { AiAssist } from '../ai/AiAssist'
+import { usePageToolsActive } from '../layout/PageTools'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { buildClientSchedule } from '../../services/clientOpsSchedule'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -93,6 +94,7 @@ export default function ClientSmartTab({
   const { ent } = useEntitlements()
   // D-563 외부 구독 고객 계정 — 전문 모듈에서 나오는 칸(먼저 제안할 것 · 맞춤 상담 · 모듈별 판정 · 맞는 지원사업)은 그리지 않는다
   const customer = useCustomerAudience()
+  const toolsActive = usePageToolsActive()
   // D-161: 되돌리기는 알림이 뜬 뒤에 누른다 — 그때의 기록 위에 되돌린다
   const recordRef = useRef(record)
   recordRef.current = record
@@ -215,7 +217,7 @@ export default function ClientSmartTab({
       )}
 
       {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
-      <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} pin={assistPin} />
+      {!toolsActive && <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} pin={assistPin} />}
 
       {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
       <FoldAllButton className="-my-2 self-end" />

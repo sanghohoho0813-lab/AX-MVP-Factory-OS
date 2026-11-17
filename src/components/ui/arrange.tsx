@@ -12,6 +12,8 @@
  *  - [화면 꾸미기] 단추는 경로 줄 오른쪽(AppShell) — 이 화면에 꾸밀 칸이 있을 때만. 숨긴 칸이 있으면 화면 맨 아래에 '숨긴 칸 n개 · 다시 보기'.
  */
 import { Children, isValidElement, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { MENU_ROW, useInPageTools } from '../layout/PageTools'
 import { ArrowDown, ArrowUp, ArrowUpToLine, EyeOff, SlidersHorizontal } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
@@ -150,24 +152,30 @@ export function ArrangeButton() {
       if (openSheet === setOpen) openSheet = null
     }
   }, [])
+  const inMenu = useInPageTools()
   if (!cur) return null
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
+        className={inMenu ? MENU_ROW : "tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"}
         data-testid="arrange-open"
         data-guide="fn-arrange"
         aria-haspopup="dialog"
       >
         <SlidersHorizontal aria-hidden="true" className="size-4 text-slate-500" />
         <span>
-          <span className="sm:hidden">꾸미기</span>
-          <span className="hidden sm:inline">화면 꾸미기</span>
+          {inMenu ? '화면 꾸미기 — 칸 순서 · 숨기기' : (
+            <>
+              <span className="sm:hidden">꾸미기</span>
+              <span className="hidden sm:inline">화면 꾸미기</span>
+            </>
+          )}
         </span>
       </button>
-      {open && <ArrangeSheet page={cur.page} title={cur.title} items={cur.items} onClose={() => setOpen(false)} />}
+      {/* D-627 단추가 [⋯] 메뉴 안에 있어도(닫히면 숨김) 꾸미기 창은 화면 위에 — body 로 */}
+      {open && createPortal(<ArrangeSheet page={cur.page} title={cur.title} items={cur.items} onClose={() => setOpen(false)} />, document.body)}
     </>
   )
 }

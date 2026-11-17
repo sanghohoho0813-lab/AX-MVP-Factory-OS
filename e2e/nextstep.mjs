@@ -12,6 +12,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.env.NEXTSTEP_SHOTS ?? ''
@@ -119,6 +120,7 @@ const clientsLs = () => page.evaluate(() => JSON.parse(localStorage.getItem('axm
 /* ---- A AI 도우미 오류 문의 번호 ---- */
 {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await openTools(page)
   await page.getByTestId('ai-assist-chip').first().click()
   await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await page.getByTestId('ai-assist-error').waitFor({ timeout: 10000 })

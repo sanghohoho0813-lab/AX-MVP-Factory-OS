@@ -11,6 +11,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -167,6 +168,7 @@ check('D7 맞춤 추천 탭에도 같은 [맞춤 진단서]', (await page.getByT
 /* ---------------- A AI 연결 점검 ---------------- */
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(400)
+await openTools(page)
 await page.getByTestId('ai-assist-open').first().click()
 await page.getByTestId('ai-assist-model-toggle').click()
 await page.getByTestId('ai-assist-probe').click()

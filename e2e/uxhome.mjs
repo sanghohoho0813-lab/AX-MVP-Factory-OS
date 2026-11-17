@@ -18,6 +18,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { seedScript } from './seed.mjs'
+import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.env.UXHOME_SHOTS ?? ''
@@ -318,6 +319,7 @@ let caseUrl = ''
     await page.reload({ waitUntil: 'networkidle' })
     await page.getByTestId('today-kpis').waitFor({ timeout: 10000 })
   }
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.getByTestId('arrange-list').waitFor()
   const rows = await page.locator('[data-arrange-row]').count()
@@ -365,6 +367,7 @@ let caseUrl = ''
   await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const btnBefore = await page.getByTestId('ai-assist-open').count()
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
   await page.getByTestId('arrange-done').click()
@@ -375,6 +378,7 @@ let caseUrl = ''
   await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   const calBtn = await page.getByTestId('ai-assist-open').count()
+  await openTools(page)
   await page.getByTestId('arrange-open').click()
   await page.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
   await page.getByTestId('arrange-done').click()
@@ -388,6 +392,7 @@ let caseUrl = ''
   await m.goto(BASE + '/', { waitUntil: 'networkidle' })
   await m.waitForTimeout(600)
   const mDef = await order(m)
+  await openTools(m)
   await m.getByTestId('arrange-open').click()
   await m.getByTestId('arrange-list').waitFor()
   const wide = await m.evaluate(() => [...document.querySelectorAll('[role="dialog"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
@@ -421,7 +426,8 @@ let caseUrl = ''
   await m3.setViewportSize({ width: 390, height: 844 })
   await m3.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await m3.waitForTimeout(600)
-  const hdr = await Promise.all(['[data-testid="ai-assist-open"]', '[data-testid="clients-add"]'].map((sel) => top(m3, sel)))
+  // D-627 AI 도우미는 [⋯] 안 — 머리 줄은 [등록] · [더보기]
+  const hdr = await Promise.all(['[data-testid="clients-add"]', '[data-testid="clients-add"]'].map((sel) => top(m3, sel)))
   const card = await top(m3, '[data-testid="client-card"]')
   const filt = await top(m3, '[data-testid="client-filters-toggle"]')
   const ty3 = await top(m3, '[data-testid="client-type-tabs"]')
@@ -432,7 +438,8 @@ let caseUrl = ''
   // U4 업체 상세 — 머리 단추 [서류 올리기] · [AI 도우미] · [더보기] · 고객 관리에서 열면 돌아가는 단추 없음(경로 줄) · 안내판 한 줄
   await m3.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
   await m3.waitForTimeout(700)
-  const btnTops = await Promise.all(['[data-testid="client-upload"]', '[data-testid="ai-assist-open"]', '[data-testid="client-more"]'].map((sel) => top(m3, sel)))
+  // D-627 AI 도우미는 [⋯] 안 — 머리 단추는 [서류 올리기] · [더보기]
+  const btnTops = await Promise.all(['[data-testid="client-upload"]', '[data-testid="client-more"]'].map((sel) => top(m3, sel)))
   const shelf = await top(m3, '[data-testid="doc-shelf"]')
   check('U4-1 휴대폰 — 머리 단추 셋 한 줄 · 돌아가는 단추 없음 · 안내판 한 줄(접힘) · 서류 칸 시작 ≤ 760px(로컬 저장 안내 한 줄 포함)', btnTops.every((t) => Math.abs(t - btnTops[0]) <= 6) && (await m3.getByTestId('client-back').count()) === 0 && (await m3.getByTestId('step-guide').getAttribute('data-min')) === '1' && shelf > 0 && shelf <= 760, { btnTops, shelf })
   await m3.getByTestId('client-more').click()

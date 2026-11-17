@@ -17,6 +17,7 @@ import { createHmac } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { openTools } from './pageTools.mjs'
 
 const SHOTS = process.argv[2] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -821,6 +822,7 @@ try {
   await go(page, '/')
   const pBar = page.getByTestId('ai-assist-bar').first()
   check('팀장(D-257): 오늘 화면에 AI 도우미 띠', (await pBar.count()) === 1)
+  await openTools(page)
   await page.getByTestId('ai-assist-chip').first().click()
   await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
   await page.getByTestId('ai-assist-result').first().waitFor({ timeout: 15000 }).catch(() => {})
@@ -1207,6 +1209,7 @@ try {
     // D-257 · D-614 대표가 팀장 화면으로 볼 때도 팀장과 같게 — AI 띠는 있고 회사는 Gemini · GPT · Claude(가장 싼 모델)
     await go(page, '/')
     const hasBar = (await page.getByTestId('ai-assist-bar').count()) >= 1
+    await openTools(page)
     await page.getByTestId('ai-assist-chip').first().click()
     await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
     await page.getByTestId('ai-assist-model-toggle').first().waitFor({ timeout: 8000 }).catch(() => {})
@@ -1599,6 +1602,7 @@ try {
     await cA.route(`https://${REF}.supabase.co/**`, route)
     await login(pa, OWNER)
     await go(pa, '/')
+    await openTools(pa)
     await pa.getByTestId('arrange-open').click()
     await pa.locator('[data-arrange-row="assist"] [data-vis="off"]').click()
     await pa.getByTestId('arrange-done').click()

@@ -33,7 +33,9 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, descriptionAsHint = false, actions, showOnPhone = false, nav }: PageHeaderProps) {
   const { pathname } = useLocation()
   const sameAsHeader = screenTitleForPath(pathname) === title && !showOnPhone
-  const asHint = descriptionAsHint && !!description
+  // D-627 머리는 제목 + 한 줄(30자 안) — 더 긴 설명은 저절로 ⓘ 로(글자 수 한도 · 마우스를 올리거나 누르면 보인다)
+  const long = typeof description === 'string' && description.replace(/\s/g, '').length > 30
+  const asHint = (descriptionAsHint || long) && !!description
   // D-282 메뉴와 같은 기능 아이콘 칸(제목이 메뉴 이름으로 시작할 때만) — 휴대폰에서 제목을 숨기는 화면이면 같이 숨긴다
   const icon = useTitleIcon(title)
 

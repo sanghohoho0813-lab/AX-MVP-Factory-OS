@@ -15,6 +15,7 @@
  *   - [더 잘 쓰는 모델로 다시] — 같은 회사의 한 단계 위 모델로 이번 한 번만.
  */
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { InPageTools, MENU_ROW, useInPageTools } from '../layout/PageTools'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Check, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
@@ -120,6 +121,8 @@ export interface AiAssistProps {
    * AI 답을 기다리는 동안에도 바로 보이고, AI 답은 그 아래에 온다. 보여 줄 것이 없으면 null.
    */
   pin?: (ask: string) => ReactNode
+  /** D-627 [⋯] 이 화면 도구로 보내지 않고 그 자리에(창 · 카드 안처럼 화면 머리가 아닌 곳) */
+  inline?: boolean
 }
 
 export function AiAssist(props: AiAssistProps) {
@@ -132,7 +135,7 @@ export function AiAssist(props: AiAssistProps) {
 /** D-288 [직접 묻기] 로 열 때 — 단추를 누르지 않고 질문 칸에 바로 */
 const ASK_FIRST = '__ask'
 
-function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId, pin }: AiAssistProps) {
+function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId, pin, inline = false }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
@@ -171,8 +174,20 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
     setOpen(true)
   }
 
-  return (
-    <>
+  // D-627 화면 글자 수 한도 — 띠 · 단추는 경로 줄 오른쪽 [⋯] 이 화면 도구 안으로(질문 칩 · 직접 묻기도 메뉴 줄로). inline 이면 예전처럼 그 자리에
+  const entry = (
+    <AssistEntry
+      inline={inline}
+      // D-627 [⋯] 안 — 띠였던 것은 예전 이름 그대로(ai-assist-bar), 머리 단추였던 것은 ai-assist-menu
+      testId={variant === 'bar' ? 'ai-assist-bar' : 'ai-assist-menu'}
+      title={title}
+      label={label}
+      list={list.slice(0, quick)}
+      ask={!!askPresetOf(page)}
+      onOpen={openWith}
+      askId={ASK_FIRST}
+      original={
+        <>
       {variant === 'bar' ? (
         <section
           aria-label="AI 도우미"
@@ -212,6 +227,14 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
       ) : (
         <OpenButton label={label} onClick={() => openWith(null)} className={className} />
       )}
+        </>
+      }
+    />
+  )
+
+  return (
+    <>
+      {entry}
       {open && (
         <AssistPanel
           page={page}
@@ -248,6 +271,45 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
         />
       )}
     </>
+  )
+}
+
+/** D-627 [⋯] 메뉴 안이면 메뉴 줄(AI 도우미 · 질문 · 직접 묻기), 아니면 예전 띠 · 단추 */
+function AssistEntry({ inline, title, label, list, ask, onOpen, askId, original, testId }: { inline: boolean; title: string; label: string; list: AssistPreset[]; ask: boolean; onOpen: (id: string | null) => void; askId: string; original: ReactNode; testId: string }) {
+  return (
+    <InPageTools inline={inline}>
+      <AssistMenuOrOriginal title={title} label={label} list={list} ask={ask} onOpen={onOpen} askId={askId} original={original} testId={testId} />
+    </InPageTools>
+  )
+}
+
+function AssistMenuOrOriginal({ title, label, list, ask, onOpen, askId, original, testId }: { title: string; label: string; list: AssistPreset[]; ask: boolean; onOpen: (id: string | null) => void; askId: string; original: ReactNode; testId: string }) {
+  const inMenu = useInPageTools()
+  if (!inMenu) return <>{original}</>
+  return (
+    <div className="flex flex-col gap-0.5" data-ai-assist="menu" data-testid={testId}>
+      <button type="button" data-testid="ai-assist-open" data-ai-assist="open" data-guide="fn-ai-assist" onClick={() => onOpen(null)} className={`${MENU_ROW} text-violet-800 hover:bg-violet-50`}>
+        <Sparkles aria-hidden="true" className="size-4 shrink-0 text-violet-600" />
+        <span className="min-w-0 flex-1">
+          {label}
+          {title ? <span className="t-meta block truncate font-normal text-slate-500">{title}</span> : null}
+        </span>
+      </button>
+      {list.map((p) => (
+        <button key={p.id} type="button" data-testid="ai-assist-chip" data-assist={p.id} onClick={() => onOpen(p.id)} className={`${MENU_ROW} pl-9 font-normal text-slate-700`}>
+          {p.label}
+        </button>
+      ))}
+      {ask && (
+        <button type="button" data-testid="ai-assist-ask-chip" onClick={() => onOpen(askId)} className={`${MENU_ROW} pl-9 font-normal text-violet-800`}>
+          직접 묻기
+        </button>
+      )}
+      {/* D-255 어디서든 모델 고르기 — 메뉴 안에서 고르는 동안 메뉴는 열려 있다(data-menu-keep) */}
+      <div data-menu-keep className="px-3 py-1 max-sm:hidden">
+        <ModelPicker popover testId="ai-assist-model-chip" />
+      </div>
+    </div>
   )
 }
 

@@ -3,6 +3,7 @@
  * ChatModeButton — 예전 화면에서 경로 줄 오른쪽 [대화로 묻기](자리 · 높이를 더 차지하지 않는다).
  */
 import { useEffect, useState, type ReactNode } from 'react'
+import { MENU_ROW, useInPageTools } from '../layout/PageTools'
 import { Link, useLocation } from 'react-router-dom'
 import { MessageCircle } from 'lucide-react'
 import { ModuleChat } from './ModuleChat'
@@ -43,6 +44,7 @@ export function ChatFirst({ k, children }: { k: ChatFirstKey; children: ReactNod
 }
 
 export function ChatModeButton() {
+  const inMenu = useInPageTools()
   const loc = useLocation()
   const prefs = usePrefs()
   const { ent, ready } = useEntitlements()
@@ -53,7 +55,7 @@ export function ChatModeButton() {
   return (
     <Link
       to={`${CHAT_FIRST_PATHS[k]}?chat=1`}
-      className="tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
+      className={inMenu ? MENU_ROW : "tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"}
       data-testid="chatfirst-open"
       data-guide="fn-chat-mode"
     >

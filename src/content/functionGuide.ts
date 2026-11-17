@@ -57,6 +57,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '자주 보는 칸이 맨 위로 와요. 한 번 꾸미면 다음에도 그대로예요.',
     next: '꾸민 모양을 다른 기기에서도 그대로 쓰게 이어 줘요.',
   },
+  'fn-page-tools': {
+    label: '이 화면 도구(⋯)',
+    menu: 'top',
+    what: '이 화면의 AI 도우미 · 화면 꾸미기 · 대화로 묻기를 한곳에 모았어요. 누르면 펼쳐져요.',
+    why: '화면에 단추가 많으면 무엇부터 할지 헷갈려서, 보조 단추는 여기 하나로 모았어요.',
+    effect: '화면에는 그 화면의 일만 보여요. 도구가 필요할 때만 열면 돼요.',
+    next: '자주 쓰는 도구를 맨 위로 올려 두게 해요.',
+  },
   'fn-side-ai': {
     label: 'AI 창 옆에 띄우기',
     menu: 'top',

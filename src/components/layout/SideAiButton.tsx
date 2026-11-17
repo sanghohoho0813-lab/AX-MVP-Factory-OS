@@ -161,13 +161,15 @@ export function SideAiButton() {
         onClick={toggle}
         aria-expanded={open}
         aria-label={`${name} 옆에 띄우기`}
+        title={label}
         data-guide={open ? undefined : 'fn-side-ai'}
         data-testid="side-ai-button"
         data-open={s.open ? '1' : '0'}
         className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3 py-2 text-[0.875rem] font-semibold whitespace-nowrap shadow-(--shadow-card) ${s.open ? 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700' : 'border-violet-300 bg-white text-violet-800 hover:bg-violet-50'}`}
       >
         <PanelRight aria-hidden="true" className="size-[18px] shrink-0" />
-        <span>{label}</span>
+        {/* D-627 글자 수 한도 — 단추는 그림만(이름은 마우스를 올리면 · 화면 읽기에는 그대로) */}
+        <span className="sr-only">{label}</span>
       </button>
       {/* D-258 판은 body 에 — 메뉴 칸(sticky z-30) 안에 두면 머리줄(z-30)이 판 윗부분을 덮었다(실측) */}
       {open && createPortal(
