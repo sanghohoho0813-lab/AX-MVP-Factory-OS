@@ -114,6 +114,8 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, l
 await ctx.addInitScript(([ref, s, ws]) => {
   localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s))
   localStorage.setItem('axmvp.active_workspace', ws)
+  // D-627 서류함 '직접 만든 칸' · 전체 목록은 접힌 채 시작 — 다른 e2e 시드처럼 모두 펼쳐 두고 본다
+  localStorage.setItem('axmvp.fold.all', 'open')
   localStorage.setItem('axmvp.onboarding.prefs', '{"tutorialVersion":1,"autoShowEnabled":false,"firstSeenAt":"2026-01-01T00:00:00.000Z","lastShownDate":"2099-01-01","snoozedUntilDate":"2099-12-31","completedChapterIds":["system"],"lastOpenedChapterId":"system","selectedLearningPath":"ax","guideMode":"core","updatedAt":"2026-01-01T00:00:00.000Z"}')
 }, [REF, session, WS])
 

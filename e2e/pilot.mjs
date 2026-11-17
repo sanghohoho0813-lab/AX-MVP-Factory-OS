@@ -380,6 +380,11 @@ try {
   check('대표: 자기 업체가 보인다(대표비밀정밀)', ownerList.includes('대표비밀정밀'), ownerList.slice(0, 300))
   check('대표: 메뉴 그대로(잘 안 쓰는 기능 · 이 시스템 · 영업자 정산)', ['잘 안 쓰는 기능', '이 시스템', '영업자 정산'].every((s) => ownerList.includes(s)))
   await go(page, `/ops/clients/${OWNER_CLIENT}?tab=work`)
+  // D-627 업무 목록은 처음 5개 — 나머지는 [n개 더 보기]
+  if (await page.getByTestId('work-show-all').isVisible().catch(() => false)) {
+    await page.getByTestId('work-show-all').click()
+    await page.waitForTimeout(300)
+  }
   const ownWork = await bodyText(page)
   check('대표(D-171): 내가 만든 업무 항목(세무기장 · 모두의 창업 2차)은 내 화면에 보인다', ownWork.includes('세무기장') && ownWork.includes('모두의 창업'), ownWork.slice(0, 300))
   check('대표(D-188): 내 화면 업무 탭에는 기본 6종(법인설립 · 특허 출원 · AX 기획 및 개발 …) 그대로', ['법인설립', '특허 출원', 'AX 기획 및 개발', '업종 추가'].every((w) => ownWork.includes(w)), ownWork.slice(0, 300))
@@ -708,6 +713,8 @@ try {
   await page.waitForTimeout(400)
   await shot(page, 'pilot-03-after-upload')
   // 다음 약속(일정) — D-357 '다음 행동 추천' 은 접혀 있다(제목 줄을 눌러 펼친다)
+  // D-627 맞춤 추천의 다음 행동 · 근거 칸은 [더 보기](smart.more) 안 — 바깥부터 연다
+  await openFoldIn(page, 'smart.more')
   await openFoldIn(page, 'smart.steps')
   const step = page.getByTestId('smart-step-next').first()
   if (await step.isVisible().catch(() => false)) {
@@ -1069,7 +1076,9 @@ try {
     const labKey = { '한눈에 보기': 'dashboard', '오늘 할 일': 'tasks', '업체 목록': 'clients', '설립 가능성 체크': 'assessment', '설립서류 관리': 'setup-docs', '조직도·도면': 'org-diagram', '연구노트': 'notes', '변경사항 관리': 'changes', '활동조사 관리': 'survey', '월간 점검': 'check', '현장조사 대비': 'inspection', '결과서': 'reports', '안내문·자료실': 'resources', '설정·백업': 'settings' }
     const stuck = []
     for (const name of [...labNames, ...[...labNames].reverse()]) {
-      await page.getByRole('link', { name, exact: true }).first().click()
+      // D-627 모듈 목차는 PC 도 [목차] 단추 안(서랍) — 열고 고른다(고르면 서랍은 닫힌다)
+      if (!(await page.getByTestId('module-nav').isVisible().catch(() => false))) await page.getByTestId('module-menu-open').click()
+      await page.getByTestId('module-nav').getByRole('link', { name, exact: true }).first().click()
       await page.waitForTimeout(450)
       const shown = await page.locator('[data-testid="lab-orig"]').getAttribute('data-section').catch(() => null)
       if (shown !== labKey[name]) stuck.push(`${name}→${shown}`)

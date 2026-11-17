@@ -217,6 +217,8 @@ await page.waitForTimeout(150)
 check('S4 릴스로 바꾸면 추천도 릴스 형식으로(금지형 · 자료 없는 주제라 댓글형 아님)', /금지형/.test(await page.getByTestId('sht-qs-rec-label').innerText()) && !/댓글형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
 await page.getByTestId('sht-qs-topic').fill('벤처기업확인 셀프 체크리스트')
 // D-602 우리 분야 주제 = 영업 관리 › 전략 키워드 — 그 가운데 '벤처' 칩(나눠 줄 점검표가 있는 주제)
+// D-627 우리 분야 주제는 앞 몇 개만 — 없으면 [n개 다 보기]
+if (!(await page.locator('[data-testid="sht-qs-ours"] [data-testid="sht-qs-chip"]', { hasText: '벤처' }).first().isVisible().catch(() => false))) await page.getByTestId('sht-qs-ours-more').click()
 await page.locator('[data-testid="sht-qs-ours"] [data-testid="sht-qs-chip"]', { hasText: '벤처' }).first().click()
 await page.waitForTimeout(150)
 check('S5 나눠 줄 점검표가 있는 주제(벤처) + 릴스 → 댓글 받기 · 댓글형 글자 영상', /댓글 받기 · 댓글형/.test(await page.getByTestId('sht-qs-rec-label').innerText()), await page.getByTestId('sht-qs-rec-label').innerText())
