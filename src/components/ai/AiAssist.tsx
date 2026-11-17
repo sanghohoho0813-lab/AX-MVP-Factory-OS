@@ -17,6 +17,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { InPageTools, MENU_ROW, useInPageTools } from '../layout/PageTools'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Check, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
@@ -235,7 +236,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
   return (
     <>
       {entry}
-      {open && (
+      {/* D-627 판은 문서 맨 끝에(포털) — 머리 칸 · [⋯] 안에서 열어도 뒤 화면(카드 · 영업 보드)이 판 위로 올라오지 않게 */}
+      {open && createPortal(
         <AssistPanel
           page={page}
           scope={key}
@@ -268,7 +270,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
               onRecorded?.()
             }
           }}
-        />
+        />,
+        document.body,
       )}
     </>
   )
