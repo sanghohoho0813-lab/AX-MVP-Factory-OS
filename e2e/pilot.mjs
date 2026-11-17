@@ -2118,7 +2118,9 @@ try {
     await openFoldIn(po, 'overview.more')
     await po.getByText('이 업체로 전문 모듈 열기').first().waitFor({ timeout: 8000 }).catch(() => {})
     const overO = (await po.locator('main').innerText().catch(() => '')) ?? ''
-    check('대표 업체 화면(D-563): 먼저 제안할 것 · "전문 모듈 열기" 카드 그대로', (await po.getByTestId('top-picks').count()) === 1 && overO.includes('전문 모듈 열기'), overO.replace(/\n/g, '|').slice(0, 300))
+    const ovDiag = { picks: await po.getByTestId('top-picks').count(), more: await po.locator('[data-fold="overview.more"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-open'))), tools: await po.locator('[data-fold="overview.tools"]').count(), tail: overO.replace(/\n/g, '|').slice(-400) }
+    if (!overO.includes('전문 모듈 열기')) await shot(po, 'owner-overview-more-debug')
+    check('대표 업체 화면(D-563): 먼저 제안할 것 · "전문 모듈 열기" 카드 그대로', (await po.getByTestId('top-picks').count()) === 1 && overO.includes('전문 모듈 열기'), JSON.stringify(ovDiag))
     await go(po, `/ops/clients/${OWNER_CLIENT}?tab=smart`)
     await po.waitForTimeout(1200)
     // D-627 모듈별 판정 · 맞춤 상담 · 맞는 지원사업은 맞춤 추천 [더 보기] 안
