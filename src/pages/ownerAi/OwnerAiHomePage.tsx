@@ -271,19 +271,14 @@ function Home() {
                 }
                 testId="ai-next"
               />
-            ) : (
-              <NextActionBar
-                tone="purple"
-                title="고객 관리에 있는 업체를 골라 바로 시작하세요"
-                
-                testId="ai-next"
-              />
-            )
+            ) : null
+            // D-627 아직 업체가 없으면 '이어서 하기' 대신 바로 아래 [바로 시작] 하나만(같은 말을 두 번 쓰지 않는다)
           )}
           </ArrangeItem>
         )}
         <ArrangeItem id="summary" label="한눈에 숫자" hint="검토 중 · 고객 관리와 이어짐 · 기억 · 이번 주 작업">
-        {cases !== null && !dbSetup && (
+        {/* D-627 숫자 칸은 검토 중인 업체가 있을 때만(0곳 네 칸을 늘어놓지 않는다) */}
+        {cases !== null && !dbSetup && active.length > 0 && (
           <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
             <KpiCard icon={slotIcon('ai-reviewing', Building2)} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} testId="ai-kpi-active" />
             <KpiCard icon={slotIcon('ai-linked', Link2)} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} />
@@ -308,14 +303,8 @@ function Home() {
                 }
                 testId="ai-next"
               />
-            ) : (
-              <NextActionBar
-                tone="purple"
-                title="고객 관리에 있는 업체를 골라 바로 시작하세요"
-                
-                testId="ai-next"
-              />
-            )
+            ) : null
+            // D-627 아직 업체가 없으면 '이어서 하기' 대신 바로 아래 [바로 시작] 하나만(같은 말을 두 번 쓰지 않는다)
           )}
           </ArrangeItem>
         )}
