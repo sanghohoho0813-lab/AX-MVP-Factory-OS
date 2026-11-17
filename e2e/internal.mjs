@@ -246,6 +246,9 @@ await go('/today')
 await step('/today → / 리다이렉트', async () => new URL(p.url()).pathname === '/')
 await go('/settings')
 await step('설정: 테마 9종 선택기', async () => {
+  // D-627 화면 색 판은 접힌 한 줄 — 접혀 있으면 펼친다
+  const fold = p.getByTestId('panel-fold-settings.theme')
+  if ((await fold.count()) && (await fold.getAttribute('aria-expanded')) !== 'true') await fold.click()
   const n = await p.locator('[aria-label="화면 테마"] [role="radio"]').count()
   await shot('10-settings-theme-1440')
   return n === 9

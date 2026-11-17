@@ -156,7 +156,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
               <Plus aria-hidden="true" className="size-4" /> 비용 적기
             </Button>
             <Button variant={tab === 'subs' ? 'primary' : 'secondary'} onClick={() => setSheet({ kind: 'sub' })} data-testid="sub-open">
-              <Repeat aria-hidden="true" className="size-4" /> 정기 결제 넣기
+              <Repeat aria-hidden="true" className="size-4" /> <span title="정기 결제 넣기">정기 결제</span>
             </Button>
           </>
         }
@@ -192,20 +192,20 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           </div>
 
           <section aria-label="이 달 돈" className="grid grid-cols-2 gap-2.5 xl:grid-cols-4" data-testid="money-tiles">
-            <MetricTile label="들어온 돈" value={krwShort(sum.revenue.received)} hint="입금 완료(실매출)" hintOnMobile tone={sum.revenue.received > 0 ? 'success' : 'neutral'} onClick={() => setParam('tab', '')} active={tab === 'revenue'} />
+            <MetricTile label="들어온 돈" value={krwShort(sum.revenue.received)} hintOnMobile tone={sum.revenue.received > 0 ? 'success' : 'neutral'} onClick={() => setParam('tab', '')} active={tab === 'revenue'} />
             <MetricTile
               label={isPast ? '못 받고 지난 돈' : '들어올 예정'}
               value={krwShort(isPast ? sum.revenue.overdue : sum.revenue.expected)}
-              hint={isPast ? '그 달에 받기로 했는데 아직 못 받은 돈' : sum.revenue.overdue > 0 ? `그중 미수금 ${krwShort(sum.revenue.overdue)}` : '받기로 한 날 기준(예상 매출)'}
+              hint={isPast ? '그 달에 받기로 했는데 아직 못 받은 돈' : sum.revenue.overdue > 0 ? (sum.revenue.overdue === sum.revenue.expected ? undefined : `그중 미수금 ${krwShort(sum.revenue.overdue)}`) : undefined}
               hintOnMobile
               tone={sum.revenue.overdue > 0 ? 'warning' : 'neutral'}
               onClick={() => setParam('tab', '')}
             />
-            <MetricTile label="나간 돈" value={krwShort(sum.cost.total)} hint={`정기 ${krwShort(sum.cost.subscriptions)} · 쓴 돈 ${krwShort(sum.cost.expenses)}${sum.cost.agent ? ` · 수수료 ${krwShort(sum.cost.agent)}` : ''}`} hintOnMobile onClick={() => setParam('tab', 'cost')} active={tab === 'cost'} />
+            <MetricTile label="나간 돈" value={krwShort(sum.cost.total)} hint={sum.cost.total > 0 ? `정기 ${krwShort(sum.cost.subscriptions)} · 쓴 돈 ${krwShort(sum.cost.expenses)}${sum.cost.agent ? ` · 수수료 ${krwShort(sum.cost.agent)}` : ''}` : undefined} hintOnMobile onClick={() => setParam('tab', 'cost')} active={tab === 'cost'} />
             <MetricTile
-              label={isPast ? '남은 돈' : '남는 돈(예상)'}
+              label={isPast ? '남은 돈' : '남는 돈'}
               value={krwShort(isPast ? sum.netSoFar : sum.netExpected)}
-              hint={isPast ? '들어온 돈 − 나간 돈' : `지금까지 ${krwShort(sum.netSoFar)}`}
+              hint={isPast ? undefined : sum.netSoFar !== 0 ? `지금까지 ${krwShort(sum.netSoFar)}` : undefined}
               hintOnMobile
               tone={(isPast ? sum.netSoFar : sum.netExpected) < 0 ? 'danger' : 'neutral'}
             />
@@ -260,7 +260,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
                               </span>
                             </button>
                             <span className="flex shrink-0 flex-col items-end gap-1">
-                              <strong className="t-body font-semibold text-slate-900 tabular-nums">{l.amount.toLocaleString('ko-KR')}원</strong>
+                              <strong className="t-body font-semibold text-slate-900 tabular-nums" title={`${l.amount.toLocaleString('ko-KR')}원`}>{krwShort(l.amount)}</strong>
                               {badge}
                               {!inc.received && (
                                 <Button size="sm" variant="secondary" onClick={() => void markReceived(inc)} data-testid="income-mark-received">
@@ -283,7 +283,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
                           </span>
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-0.5">
-                          <strong className="t-body font-semibold text-slate-900 tabular-nums">{l.amount.toLocaleString('ko-KR')}원</strong>
+                          <strong className="t-body font-semibold text-slate-900 tabular-nums" title={`${l.amount.toLocaleString('ko-KR')}원`}>{krwShort(l.amount)}</strong>
                           {badge}
                         </span>
                       </li>
@@ -293,7 +293,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
                 )}
               </Section>
 
-              <Section title="앞으로 6달 예상">
+              {/* D-627 글자 수 한도 — 6달 예상 · 시기 미정은 접은 한 줄(누르면 펼침 · 이 기기에 기억) */}
+              <Section title="앞으로 6달 예상" fold={{ id: 'money.outlook' }}>
                 <ul className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3 sm:px-5" data-testid="money-outlook">
                   {ahead.map((m) => {
                     const inn = m.revenue.received + m.revenue.expected
@@ -320,7 +321,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
               </Section>
 
               {undated.total > 0 && (
-                <Section title="받을 시기가 아직 안 정해진 돈" count={undated.byClient.length}>
+                <Section title="시기 미정인 돈" hint={hintFor('받을 시기가 아직 안 정해진 돈')} count={undated.byClient.length} fold={{ id: 'money.undated', summary: krwShort(undated.total) }}>
                   <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3 sm:px-5" data-testid="money-undated">
                     <p className="t-body font-semibold text-slate-900">{krwShort(undated.total)}</p>
                     <p className="t-sub text-slate-500">조건 대기(정책자금 조달 후 등) {krwShort(undated.waiting)} · 받을 날 미정 {krwShort(undated.undated)} · 아직 안 나눈 계약금액 {krwShort(undated.unplanned)}</p>

@@ -37,7 +37,7 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
-import { FileArchive, FlaskConical, FolderOpen, ListTree } from 'lucide-react'
+import { FileArchive, FlaskConical, FolderOpen, HardDrive, ListTree } from 'lucide-react'
 import { DocOriginalsSheet } from '../components/ops/DocOriginalsSheet'
 import { originalItems } from '../services/docOriginals'
 import { withoutProvisional } from '../services/marketingTrial'
@@ -101,7 +101,7 @@ import {
   statusForStage,
 } from '../types/clientOps'
 import { contractAgeShort, doneWorks, summarizeContract } from '../services/contractSummary'
-import { Fold, FoldAllButton, HintTip, openFold } from '../components/ui/fold'
+import { Fold, FoldAllButton, HintTip, openFold, useFold } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import type {
   ClientOpsRecord,
@@ -206,9 +206,6 @@ import { serviceLine } from '../services/serviceLine'
 import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
-import { listLinksForClient } from '../services/customerBridgeService'
-import { buildClientSchedule } from '../services/clientOpsSchedule'
-import { brand } from '../brand/brand.config'
 import { SERVICE_STATUS_LOOK } from '../components/ops/serviceStatusLook'
 import { josa } from '../lib/josa'
 import { activeApplications, withApplyDocDone } from '../services/grants/grantApply'
@@ -268,7 +265,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const focusedService = searchParams.get('svc')
   // D-235: 업체 일 순서 — 팀장 화면에 없는 탭(고객 플랫폼)은 순서에서도 뺀다
   const flowPos = flowPosition(customer ? basicFlow(CLIENT_FLOW) : CLIENT_FLOW, tab, (k) => !(pilot && PILOT_HIDDEN_TABS.has(k as DetailTab)))
-  const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
   // D-152: 지원사업 신청 탭에서만 고객 플랫폼 연결 · 요청해 둔 서류를 읽는다
@@ -452,14 +448,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     setUploadShow((n) => n + 1)
   }, [record, clientId])
 
-  // 고객 플랫폼 연결 여부 — 헤더 칩용. 브릿지 미적용이면 null(표시 안 함)
-  useEffect(() => {
-    let alive = true
-    listLinksForClient(workspaceId, clientId)
-      .then((links) => { if (alive) setPortalLinked(links.some((l) => l.status === 'active')) })
-      .catch(() => { if (alive) setPortalLinked(null) })
-    return () => { alive = false }
-  }, [workspaceId, clientId, tab])
+  // D-627 고객 플랫폼 연결 여부 칩은 머리에서 뺐다(고객 플랫폼 탭이 그대로 보여 준다) — 헤더용으로 따로 읽지 않는다
 
   const commit = useCallback(
     (next: ClientOpsRecord): Promise<boolean> => {
@@ -666,15 +655,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     window.setTimeout(() => document.getElementById('fact-inbox')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120)
   }
 
-  /** 가장 임박한 마감 (헤더 표시) */
   const [todoOpen, setTodoOpen] = useState(false)
+  const [doingOpen, setDoingOpen] = useFold('overview.doing', false)
+  const [docsAll, setDocsAll] = useFold('docs.all', false)
+  const [docCustomOpen, setDocCustomOpen] = useFold('docs.custom', false)
+  const [docHints] = useFold('docs.hints', false)
+  const [workFirstOpen] = useFold('work.first', false)
+  // D-627 업무 목록은 처음 5개(눌러서 들어온 업무는 늘) — [n개 더 보기]
+  const [workAll, setWorkAll] = useFold('work.all', false)
   const prospect = record ? isProspect(record) : false
-  const nearest = useMemo(() => {
-    if (!record) return null
-    // 다음 약속은 바로 아래 '지금 할 일' 에 있으므로 여기서는 마감만
-    const upcoming = buildClientSchedule(record, today).filter((e) => !e.done && e.kind !== 'next')
-    return upcoming.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
-  }, [record, today])
 
   useEffect(() => {
     if (!focusedService) return
@@ -803,34 +792,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
               <PhoneLink phone={record.contactPhone} />
               {record.contactName && <span>{record.contactName}</span>}
-              {/* 계약한 지 얼마나 됐는지 — 계약 카드까지 내려가지 않아도 머리말에서 보인다 */}
-              {contractAge !== '' && (
-                <button type="button" onClick={() => setTab('overview')} className="tap inline-flex items-center font-medium text-brand-700">
-                  {record.contract.kind !== '' ? `${CONTRACT_KIND_LABEL[record.contract.kind]} · ` : '계약 · '}
-                  {contractAge}
-                </button>
-              )}
-              {portalLinked !== null && !pilot && (
-                <button
-                  type="button"
-                  onClick={() => setTab('portal')}
-                  className={`tap inline-flex items-center ${portalLinked ? 'text-success-700' : 'text-slate-500'}`}
-                >
-                  {brand.customerPlatformLabel} {portalLinked ? '연결됨' : '미연결'}
-                </button>
-              )}
+              {/* D-627 글자 수 한도 — 계약 기간 · 고객 플랫폼 연결은 머리에서 뺐다(개요 '업체 기록' 의 계약 · 고객 플랫폼 탭에 그대로) */}
             </p>
-            {nearest && (
-              <p className="t-sub mt-0.5 text-slate-500">
-                가장 임박 · {nearest.title} · {nearest.date}
-                {nearest.daysLeft !== null && (
-                  <span className={nearest.daysLeft < 0 ? ' font-semibold text-danger-700' : ' text-slate-600'}>
-                    {' '}
-                    {dueText(nearest.daysLeft)}
-                  </span>
-                )}
-              </p>
-            )}
+            {/* D-627 '가장 임박' 줄은 머리에서 뺐다 — 개요 '다음 약속' · 맞춤 추천 '지금 챙길 것' 이 같은 기한을 보여 준다 */}
           </div>
         </div>
 
@@ -911,7 +875,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* D-235: 지금 몇 번째 단계 · 무엇을 위한 것인지 · 이전/다음(탭 순서는 그대로 — 처음 쓰는 사람이 따라갈 순서만) */}
       {/* U4(D-544) 처음엔 한 줄 — 설명은 [펼치기](한 번 고르면 기억) */}
-      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} defaultMin />
+      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} defaultMin labelInTabs />
 
       {tab === 'smart' && (
         <Suspense fallback={<p className="t-sub text-slate-500">맞춤 추천을 계산하는 중…</p>}>
@@ -960,6 +924,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {!customer && (
       <Suspense fallback={<TopPicksPlaceholder />}>
         <ClientTopPicks
+          compact
           record={record}
           today={today}
           workspaceId={workspaceId}
@@ -986,7 +951,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       */}
       {/* D-492 서류에서 읽어 넣은 중요 번호(사업자 · 법인번호 · 설립일) — 처음 한 번만 원본과 맞춰 보기(없으면 그리지 않음) */}
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void commit(next).then((ok) => ok && showToast(msg))} />
-      <FoldAllButton className="-my-2 self-end" />
       {/* D-192: 카드마다 접는 목차 — 제목 줄(▸ · 숫자 · 한 줄 요약)만 보이고, 마우스를 올리면 무슨 칸인지. 회사 정보만 펼친 채로 */}
       <div data-testid="overview-company" className="flex flex-col gap-3">
         {/* D-357 화면 원칙 — 첫 화면은 단순하게: 접힌 채로도 사업자번호 · 대표 · 설립은 한 줄로(펼친 것은 기억) */}
@@ -995,7 +959,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           id="overview.company"
           title="회사 기본 정보"
           testId="fold-company"
-          summary={[record.businessNumber && `사업자 ${record.businessNumber}`, record.representativeName && `대표 ${record.representativeName}`, record.establishedAt && `설립 ${record.establishedAt}`].filter(Boolean).join(' · ') || '아직 적은 정보가 없어요 — 누르면 채우는 칸'}
+          // D-627 글자 수 한도 — 접힌 줄은 제목만(사업자번호 · 대표 · 설립은 펼치면 · 기억)
         >
           <CompanyProfileCard
             record={record}
@@ -1014,35 +978,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             hideTitle
           />
         </Fold>
-        {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
-        <Fold
-          panel
-          id="overview.numbers"
-          title="숫자 · 인증"
-          testId="fold-numbers"
-          count={factCount.filled}
-          countTone={factCount.toConfirm > 0 ? 'warning' : 'neutral'}
-          summary={factCount.toConfirm > 0 ? `확인할 숫자 ${factCount.toConfirm}개` : undefined}
-        >
-          <FactNumbersCard record={record} now={nowIso()} hideTitle onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
-        </Fold>
       </div>
 
-      {(pendingFacts(record).length > 0 || alerts.length > 0) && (
-        <button
-          type="button"
-          onClick={() => setTab('smart')}
-          data-testid="overview-smart-link"
-          className="tap t-sub flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-left font-medium text-brand-800 hover:bg-brand-100/60"
-        >
-          <span className="font-bold">맞춤 추천</span>
-          {pendingFacts(record).length > 0 && <span>확인할 정보 {pendingFacts(record).length}건</span>}
-          {alerts.length > 0 && <span>지금 챙길 것 {alerts.length}건</span>}
-          <span className="ml-auto inline-flex items-center gap-1 font-semibold">
-            보기 <ArrowRight aria-hidden="true" className="size-4" />
-          </span>
-        </button>
-      )}
 
       {/*
         개요는 세 단계로만 말한다.
@@ -1073,7 +1010,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
         {startedServices.length > 0 && (
           <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
-            <p className="t-meta font-semibold text-slate-500">진행 중인 업무</p>
+            {/* D-627 글자 수 한도 — 처음엔 '진행 중인 업무 n' 한 줄, 누르면 조각들(기억 · [모두 펼치기] 따름) */}
+            <button type="button" onClick={() => setDoingOpen(!doingOpen)} aria-expanded={doingOpen} data-testid="overview-doing-toggle" className="tap t-meta inline-flex items-center gap-1 font-semibold text-slate-500 hover:text-brand-700">
+              진행 중인 업무 {startedServices.length}
+              <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${doingOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {doingOpen && (
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {startedServices.map((m) => (
                 <li key={m.key}>
@@ -1089,6 +1031,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 </li>
               ))}
             </ul>
+            )}
           </div>
         )}
       </Surface>
@@ -1107,7 +1050,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           className="tap t-sub inline-flex w-fit items-center gap-1.5 self-start rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3.5 py-2 font-medium text-slate-600 hover:border-brand-400 hover:text-brand-700"
         >
           <Plus aria-hidden="true" className="size-4" />
-          오늘 내 할 일에도 넣기
+          {/* D-627 글자 수 한도 — 짧게(무엇을 하는지는 마우스를 올리면) */}
+          <span title="이 업체 일을 오늘 내 할 일에도 넣어요">할 일에 넣기</span>
         </button>
       ) : (
       <TodoComposer
@@ -1135,66 +1079,106 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       />
       )}
 
-      {/*
-        2단계 — 계약과 해 드린 일.
-        "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
-        가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
-      */}
-      {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
-      {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
-      {/* D-167: 숨김(대표: 영업 흐름은 오히려 헷갈린다) — config/salesSimple 에서 다시 켤 수 있다 */}
-      {SALES_SIMPLE.showJourney && (
-        <Suspense fallback={null}>
-          <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void import('../services/salesJourney').then((m) => commit(m.withSalesPath(record, path)))} />
-        </Suspense>
-      )}
+      {/* D-627 글자 수 한도 — 개요 첫 화면은 '먼저 제안할 것 · 회사 기본 정보 · 다음 약속' 만. 나머지 기록은 한 번 누르면(기억 · [모두 펼치기] 따름) */}
+      <Fold panel id="overview.more" title="더 보기" testId="fold-overview-more" hint="숫자 · 인증, 맞춤 추천 줄, 영업 · 계약 · 해 드린 일 · 모듈 결과 · 진행 요약 · 활동 기록">
+        <FoldAllButton className="-my-1 self-end" />
+          {/* D-627 머리줄에 있던 계약 종류 · 몇 개월째는 여기로(머리줄은 이름 · 단계 · 전화만) */}
+          {contractAge !== '' && (
+            <p className="t-sub text-slate-600" data-testid="overview-contract-age">
+              {record.contract.kind !== '' ? `${CONTRACT_KIND_LABEL[record.contract.kind]} · ` : '계약 · '}
+              {contractAge}
+            </p>
+          )}
+          {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
+          <Fold
+            panel
+            id="overview.numbers"
+            title="숫자 · 인증"
+            testId="fold-numbers"
+            count={factCount.filled}
+            countTone={factCount.toConfirm > 0 ? 'warning' : 'neutral'}
+            summary={factCount.toConfirm > 0 ? `확인할 숫자 ${factCount.toConfirm}개` : undefined}
+          >
+            <FactNumbersCard record={record} now={nowIso()} hideTitle onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
+          </Fold>
 
-      <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
+        {(pendingFacts(record).length > 0 || alerts.length > 0) && (
+          <button
+            type="button"
+            onClick={() => setTab('smart')}
+            data-testid="overview-smart-link"
+            className="tap t-sub flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 text-left font-medium text-brand-800 hover:bg-brand-100/60"
+          >
+            <span className="font-bold">맞춤 추천</span>
+            {pendingFacts(record).length > 0 && <span>확인할 정보 {pendingFacts(record).length}건</span>}
+            {alerts.length > 0 && <span>지금 챙길 것 {alerts.length}건</span>}
+            <span className="ml-auto inline-flex items-center gap-1 font-semibold">
+              보기 <ArrowRight aria-hidden="true" className="size-4" />
+            </span>
+          </button>
+        )}
 
-      {/* D-124: 계약 전(잠재고객)이고 적힌 계약 정보도 없으면 빈 계약 카드를 띄우지 않는다 — 계약은 영업 카드의 '계약 완료' 에서 */}
-      {(!isProspect(record) || hasContractInfo(record)) && (
-        <Fold panel id="overview.contract" title="계약" testId="fold-contract" summary={contractLine || '아직 적은 계약 정보가 없습니다'}>
-          <ContractCard record={record} today={today} hideTitle onSave={(next) => commit(withContract(record, next))} onPlan={() => setPlanOpen(true)} />
+        {/*
+          2단계 — 계약과 해 드린 일.
+          "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
+          가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
+        */}
+        {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
+        {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
+        {/* D-167: 숨김(대표: 영업 흐름은 오히려 헷갈린다) — config/salesSimple 에서 다시 켤 수 있다 */}
+        {SALES_SIMPLE.showJourney && (
+          <Suspense fallback={null}>
+            <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void import('../services/salesJourney').then((m) => commit(m.withSalesPath(record, path)))} />
+          </Suspense>
+        )}
+
+        <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
+
+        {/* D-124: 계약 전(잠재고객)이고 적힌 계약 정보도 없으면 빈 계약 카드를 띄우지 않는다 — 계약은 영업 카드의 '계약 완료' 에서 */}
+        {(!isProspect(record) || hasContractInfo(record)) && (
+          <Fold panel id="overview.contract" title="계약" testId="fold-contract" summary={contractLine || '아직 적은 계약 정보가 없습니다'}>
+            <ContractCard record={record} today={today} hideTitle onSave={(next) => commit(withContract(record, next))} onPlan={() => setPlanOpen(true)} />
+          </Fold>
+        )}
+        {planOpen && <ContractPlanSheet record={record} today={today} onSave={commit} onClose={() => setPlanOpen(false)} />}
+
+        <Fold panel id="overview.history" title="해 드린 일" testId="fold-history" count={doneWorks(record).length} countTone="brand">
+          <WorkHistoryCard record={record} hideTitle onOpen={(key) => setTab('work', key)} />
         </Fold>
-      )}
-      {planOpen && <ContractPlanSheet record={record} today={today} onSave={commit} onClose={() => setPlanOpen(false)} />}
 
-      <Fold panel id="overview.history" title="해 드린 일" testId="fold-history" count={doneWorks(record).length} countTone="brand">
-        <WorkHistoryCard record={record} hideTitle onOpen={(key) => setTab('work', key)} />
+        {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
+        <ToolResultsCard record={record} fold={{ id: 'overview.results', panel: true }} onChange={(next) => void commit(next)} />
+
+        {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
+        {!customer && <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />}
+
+        {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
+        <AxProjectsCard record={record} fold={{ id: 'overview.ax', panel: true }} />
+
+        {/* 3단계 — 나머지는 접어 둔다 */}
+        <Disclosure
+          title="진행 요약"
+          hint={`업무 ${progress.servicesDone}/${progress.servicesTotal} · 서류 ${progress.documentsUsable}/${progress.documentsTotal}`}
+        >
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <MetricTile
+              label="완료한 업무"
+              value={`${progress.servicesDone}/${progress.servicesTotal}`}
+              tone={progress.servicesDone === progress.servicesTotal ? 'success' : 'neutral'}
+            />
+            <MetricTile
+              label="확보한 서류"
+              value={`${progress.documentsUsable}/${progress.documentsTotal}`}
+              tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
+            />
+            <MetricTile label="받은 내 돈" value={krwTile(paidAmount)} />
+          </div>
+        </Disclosure>
+
+        <Disclosure title="활동 기록" hint={`${record.activity.length}건`}>
+          <ActivityLog entries={record.activity} bare />
+        </Disclosure>
       </Fold>
-
-      {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
-      <ToolResultsCard record={record} fold={{ id: 'overview.results', panel: true }} onChange={(next) => void commit(next)} />
-
-      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
-      {!customer && <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />}
-
-      {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
-      <AxProjectsCard record={record} fold={{ id: 'overview.ax', panel: true }} />
-
-      {/* 3단계 — 나머지는 접어 둔다 */}
-      <Disclosure
-        title="진행 요약"
-        hint={`업무 ${progress.servicesDone}/${progress.servicesTotal} · 서류 ${progress.documentsUsable}/${progress.documentsTotal}`}
-      >
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          <MetricTile
-            label="완료한 업무"
-            value={`${progress.servicesDone}/${progress.servicesTotal}`}
-            tone={progress.servicesDone === progress.servicesTotal ? 'success' : 'neutral'}
-          />
-          <MetricTile
-            label="확보한 서류"
-            value={`${progress.documentsUsable}/${progress.documentsTotal}`}
-            tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
-          />
-          <MetricTile label="받은 내 돈" value={krwTile(paidAmount)} />
-        </div>
-      </Disclosure>
-
-      <Disclosure title="활동 기록" hint={`${record.activity.length}건`}>
-        <ActivityLog entries={record.activity} bare />
-      </Disclosure>
         </>
       )}
 
@@ -1202,8 +1186,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <section aria-labelledby="svc" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <HintTip tip={hintFor('진행 업무')} label="진행 업무">
+            {/* D-627 바로 위 탭이 '업무' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
             <h2 id="svc" className="t-section text-slate-900">
-              진행 업무
+              <span className="sr-only">진행 업무</span>
             </h2>
           </HintTip>
           <button
@@ -1235,7 +1220,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </div>
         )}
         <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 xl:items-start">
-          {SERVICES.map((meta) => {
+          {SERVICES.filter((meta, i) => workAll || i < 5 || meta.key === focusedService).map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
             const svcLine = serviceLine(record, meta.key, today, reqKeys)
@@ -1247,7 +1232,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             const dueSoon = open && dLeft !== null && dLeft >= 0 && dLeft <= 7
             // 자동으로 펼치는 것은 딱 하나 — 가장 급한 업무(또는 눌러서 들어온 업무).
             // 급한 것이 셋이면 셋 다 펼치는 대신 맨 위 하나만 펼친다.
-            const auto = meta.key === focusedService || meta.key === firstUrgentKey
+            // D-627 글자 수 한도 — 처음엔 모두 접힌 한 줄(눌러서 들어온 업무만 펼침). [모두 펼치기] 를 해 둔 사람은 예전처럼 가장 급한 하나도
+            const auto = meta.key === focusedService || (workFirstOpen && meta.key === firstUrgentKey)
             const expanded = cardOpen(meta.key, auto)
 
             return (
@@ -1293,14 +1279,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         {meta.label}
                       </span>
                       {/* 서류는 경고가 아니라 상태다 — 회색으로 조용히 */}
+                      {/* D-627 아래 줄 '서류 n/m' 과 같은 말 — 자물쇠만(몇 개 빠졌는지는 마우스 · 화면 읽기로) */}
                       {blocked && (
-                        <Badge tone="neutral">
-                          <Lock aria-hidden="true" className="size-3" />
-                          서류 {missing.length}
-                        </Badge>
+                        <span title={`아직 안 받은 서류 ${missing.length}`} className="inline-flex items-center text-slate-500">
+                          <Lock aria-hidden="true" className="size-3.5" />
+                          <span className="sr-only">서류 {missing.length}</span>
+                        </span>
                       )}
                       {open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && (
-                        <Badge tone={dLeft < 0 ? 'danger' : 'warning'}>{dueText(dLeft)}</Badge>
+                        <Badge tone={dLeft < 0 ? 'danger' : 'warning'}>
+                          <span title={state.dueDate ? `목표 ${state.dueDate}` : undefined}>{dueText(dLeft)}</span>
+                        </Badge>
                       )}
                     </span>
                   </button>
@@ -1309,7 +1298,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {/* D-520 업무 한 줄 — 서류 n/m · 회신 대기 · 목표 · 다음(고객 관리 카드와 같은 규칙 · services/serviceLine) */}
                   {(svcLine.parts.length > 0 || meta.recurring) && (
                     <p className="t-sub w-full min-w-0 truncate pl-6 text-slate-500 sm:order-3 sm:pl-6" data-testid="svc-line" title={[...svcLine.parts, ...(meta.recurring ? ['반복'] : [])].join(' · ')}>
-                      {svcLine.parts.map((part, i) => (
+                      {/* D-627 기한 알약(77일 지남 · D-3)이 있으면 '목표 …' 는 줄에서 뺀다(같은 말) */}
+                      {svcLine.parts.filter((part) => !(open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && part.startsWith('목표'))).map((part, i) => (
                         <span key={part} className={part.startsWith('회신 대기') && svcLine.waiting.days >= 3 ? 'font-semibold text-danger-700' : part.startsWith('회신 대기') ? 'font-semibold text-brand-700' : ''}>
                           {i > 0 ? ' · ' : ''}
                           {part}
@@ -1450,6 +1440,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             )
           })}
         </div>
+        {(() => {
+          const hidden = workAll ? 0 : SERVICES.filter((meta, i) => i >= 5 && meta.key !== focusedService).length
+          return hidden > 0 ? (
+            <button type="button" onClick={() => setWorkAll(true)} data-testid="work-show-all" className="tap t-sub self-start rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+              {hidden}개 더 보기
+            </button>
+          ) : null
+        })()}
       </section>
 
       )}
@@ -1460,21 +1458,23 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <div className="flex flex-wrap items-center justify-between gap-2">
           {/* D-192: '발급일을 넣으면 유효기간…' 설명은 목차 설명(ⓘ)으로 */}
           <HintTip tip={hintFor('서류함')} label="서류함">
+            {/* D-627 바로 위 탭이 '서류' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
             <h2 id="docs" className="text-[1.2rem] font-bold text-slate-900">
-              서류함
+              <span className="sr-only">서류함</span>
             </h2>
           </HintTip>
           <div className="flex flex-wrap items-center gap-2">
             {/* D-558 대표: '한꺼번에 올리기' 대신 그냥 '서류 올리기' */}
-            <Button variant="secondary" size="sm" data-testid="docs-upload" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
+            {/* D-627 머리줄에 같은 [서류 올리기] 가 있어 여기는 아이콘만(이름은 마우스 · 화면 읽기로) */}
+            <Button variant="secondary" size="sm" data-testid="docs-upload" title="서류 올리기" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
               <FileUp aria-hidden="true" className="size-3.5" />
-              서류 올리기
+              <span className="sr-only">서류 올리기</span>
             </Button>
             {/* D-146: 예전 판별로 엉뚱한 칸에 들어간 파일을 제목으로 다시 가른다 */}
             {allDocumentMetas(record).some((m) => m.needsFile && record.documents[m.key]?.fileName) && (
               <Button variant="secondary" size="sm" data-testid="doc-resort" onClick={() => setResortOpen(true)}>
                 <ArrowRightLeft aria-hidden="true" className="size-3.5" />
-                <span><span className="max-sm:hidden">서류 </span>다시 분류</span>
+                <span title="서류 다시 분류">다시 분류</span>
               </Button>
             )}
             {/* D-549 SAFE-5 원본 파일을 압축 하나로(클라우드에 올린 파일이 있을 때만) — 전부 · 정책자금 신청 서류만 */}
@@ -1504,8 +1504,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
         {!uploadable && (
           // U4(D-544) 상자 대신 한 줄 글(클라우드에 연결한 화면에는 없는 안내)
-          <p className="t-sub break-keep text-slate-500" data-testid="docs-local-note">
-            이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.
+          // D-627 글자 수 한도 — 한 줄 글 대신 작은 표시(마우스 · 화면 읽기에는 그대로)
+          <p className="t-sub inline-flex items-center gap-1 self-start text-slate-500" data-testid="docs-local-note" title="이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.">
+            <HardDrive aria-hidden="true" className="size-4" />
+            <span className="sr-only">이 브라우저에만 저장 중</span>
           </p>
         )}
 
@@ -1560,8 +1562,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <div role="group" aria-label="서류함 보기" className="flex flex-wrap items-center gap-2" data-testid="doc-view-switch">
           {(
             [
-              ['list', '목차로 보기', ListTree],
-              ['folder', '폴더로 보기', FolderOpen],
+              // D-627 짧게 — 긴 이름은 마우스 · 화면 읽기로
+              ['list', '목차', ListTree],
+              ['folder', '폴더', FolderOpen],
             ] as const
           ).map(([v, name, Icon]) => (
             <button
@@ -1571,6 +1574,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               onClick={() => changeDocView(v)}
               data-testid={`doc-view-${v}`}
               data-guide="fn-docs-view"
+              title={`${name}로 보기`}
+              aria-label={`${name}로 보기`}
               className={`tap t-body flex min-h-11 items-center gap-2 rounded-full border px-4 font-semibold ${docView === v ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
             >
               <Icon aria-hidden="true" className="size-4" />
@@ -1610,10 +1615,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }, 80)
           }}
         />
-        <div className="grid gap-3 lg:grid-cols-2">
-          {docOrder(allDocumentMetas(record), orderUrgent)
+        {(() => {
+          // D-627 글자 수 한도 — 처음엔 서류 칸 5개(지금 필요한 것 먼저 · 펼쳐 둔 칸은 늘 보임). [n개 더 보기] 로 전부(기억 · [모두 펼치기] 따름)
+          const allMetas = docOrder(allDocumentMetas(record), orderUrgent)
             // D-488 모음 판에 있는 기타 칸은 목차에서 빼 둔다([자세히] 로 펼치면 다시)
             .filter((meta) => !(isOtherCell(meta.label) && !!record.documents[meta.key]?.fileName && !openDocs.has(meta.key)))
+          const shownMetas = docsAll ? allMetas : allMetas.filter((meta, i) => i < 5 || openDocs.has(meta.key))
+          return (
+        <>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {shownMetas
             .map((meta) => {
               const state = record.documents[meta.key] ?? emptyDocumentState()
               const view = documentStatus(meta.key, state, today, meta)
@@ -1676,10 +1687,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                               요청함 · {(reqKeys.get(meta.key)?.days ?? 0) === 0 ? '오늘' : `${reqKeys.get(meta.key)?.days}일째`}
                             </span>
                           )}
+                          {/* D-627 지금 필요한데 안 받은 칸은 알약 하나('지금 필요') — '안 받음' + '지금 필요' 두 개였다 */}
                           {!state.received && !reqKeys.has(meta.key) && (
-                            <span className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-50 px-1.5 py-0.5 font-semibold text-danger-700">
+                            <span className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-50 px-1.5 py-0.5 font-semibold text-danger-700" title={urgent ? '안 받음 · 지금 필요' : undefined}>
                               <span aria-hidden="true" className="size-1.5 rounded-full bg-danger-500" />
-                              안 받음
+                              {urgent ? '지금 필요' : '안 받음'}
                             </span>
                           )}
                           {state.received && reqKeys.has(meta.key) && (
@@ -1702,7 +1714,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             </button>
                           )}
                           <span className="text-[1rem] font-bold break-keep text-slate-900">{meta.label}</span>
-                          {urgent && (
+                          {urgent && (state.received || reqKeys.has(meta.key)) && (
                             <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">
                               지금 필요
                             </span>
@@ -1719,7 +1731,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             </span>
                           )}
                         </span>
-                        {!compact && !later && <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">{meta.hint}</span>}
+                        {/* D-627 설명 줄은 그 칸을 펼쳤을 때만(또는 [모두 펼치기]) — 처음엔 이름 · 상태만 */}
+                        {!compact && !later && (docHints || openDocs.has(meta.key)) && <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">{meta.hint}</span>}
                       </span>
                     </label>
                     {view.expired && (
@@ -1738,7 +1751,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {compact ? (
                     <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
                       <span className="t-sub font-medium text-success-700">받음</span>
-                      {meta.needsFile && !state.fileName && <span className="t-sub text-slate-500" data-testid={`doc-compact-nofile-${meta.key}`}>파일 없음</span>}
+                      {meta.needsFile && !state.fileName && <span className="sr-only" data-testid={`doc-compact-nofile-${meta.key}`}>파일 없음</span>}
                       {view.expiresOn && (
                         <span data-testid={`doc-compact-expiry-${meta.key}`} className="t-sub text-slate-600">
                           {view.expiresOn}까지 유효{state.validUntil ? ' · 서류에 적힌 날짜' : ''}
@@ -1757,6 +1770,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           storagePath={state.storagePath}
                           fileName={state.fileName}
                           onReplace={meta.needsFile ? () => fileInputs.current[meta.key]?.click() : undefined}
+                          iconOnly
                         />
                       )}
                       {meta.needsFile && state.fileName && (
@@ -1771,12 +1785,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           }}
                         />
                       )}
+                      {/* D-627 글 대신 › 하나(이름은 화면 읽기 · 마우스로) */}
                       <button
                         type="button"
                         onClick={() => setOpenDocs((cur) => new Set(cur).add(meta.key))}
-                        className="tap t-sub font-semibold text-brand-700 hover:underline"
+                        aria-label={`${meta.label} 자세히 · 고치기`}
+                        title="자세히 · 고치기"
+                        className="tap inline-flex size-9 items-center justify-center rounded-(--radius-control) text-brand-700 hover:bg-brand-50"
                       >
-                        자세히 · 고치기
+                        <ChevronRight aria-hidden="true" className="size-4" />
                       </button>
                     </div>
                   ) : (
@@ -1855,14 +1872,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     </div>
                   )}
 
-                  {needed.length > 0 && !later && (
+                  {needed.length > 0 && !later && (docHints || openDocs.has(meta.key)) && (
                     <p className="text-[0.875rem] break-keep text-slate-500">
                       필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
                     </p>
                   )}
 
                   {/* 이 서류를 쓰는 도구 (D-90) — 올려 두면 그 도구가 바로 돈다 */}
-                  {!customer && toolsNeeding(meta.key).length > 0 && (
+                  {!customer && toolsNeeding(meta.key).length > 0 && (docHints || openDocs.has(meta.key)) && (
                     <p className="text-[0.875rem] break-keep text-brand-700" data-testid={`doc-tools-${meta.key}`}>
                       <Wrench aria-hidden="true" className="mr-1 inline size-3.5 align-[-2px]" />
                       이 서류를 쓰는 도구: {toolsNeeding(meta.key).map((t) => t.label).join(' · ')}
@@ -1929,6 +1946,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               )
             })}
         </div>
+        {shownMetas.length < allMetas.length && (
+          <button type="button" onClick={() => setDocsAll(true)} data-testid="docs-show-all" className="tap t-sub self-start rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+            {allMetas.length - shownMetas.length}개 더 보기
+          </button>
+        )}
+        </>
+          )
+        })()}
         </>
         )}
 
@@ -1937,6 +1962,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           기본 10종으로 안 되는 서류가 늘 있다 — 법인인감증명서·국세완납증명서·재무제표.
           만든 칸은 기본 서류와 똑같이 받았는지·발급일·메모·파일을 쓴다.
         */}
+        {/* D-627 글자 수 한도 — 처음엔 [서류 칸 직접 만들기] 단추 하나, 누르면 이름 · 유효기간 칸(기억 · [모두 펼치기] 따름) */}
+        {!docCustomOpen ? (
+          // D-627 칸을 다 펼쳤을 때만(칸이 5개보다 많으면 [n개 더 보기] 다음)
+          (docsAll || allDocumentMetas(record).length <= 5) && <button type="button" onClick={() => setDocCustomOpen(true)} data-testid="doc-custom-open" className="tap t-sub inline-flex w-fit items-center gap-1.5 self-start rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3.5 py-2 font-medium text-slate-600 hover:border-brand-400 hover:text-brand-700">
+            <Plus aria-hidden="true" className="size-4" />
+            서류 칸 만들기
+          </button>
+        ) : (
         <div className="flex flex-wrap items-end gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white p-4">
           {/* 휴대폰에서는 이름 칸이 한 줄을 다 쓴다 — 유효기간·단추와 나눠 쓰면 이름 칸이 짜부라진다(화면 규칙 §9) */}
           <label className="w-full text-[0.875rem] font-medium text-slate-600 sm:w-auto sm:max-w-xs sm:flex-1">
@@ -1985,6 +2018,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </Button>
           </HintTip>
         </div>
+        )}
 
         {/* D-129: 예전 '파일' 탭 — 고객과 주고받은 파일 · 칸이 없어진 서류의 파일도 서류 탭 아래에서 */}
         <ClientSharedFiles record={record} workspaceId={workspaceId} onCommit={commit} latest={() => current() ?? record} />

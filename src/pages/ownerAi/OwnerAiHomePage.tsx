@@ -154,7 +154,7 @@ function Home() {
       <PageHero
         art="ai"
         title="AI 전략실"
-        sub="대표 전용 · 업체마다 기억이 이어지는 AI 작업 · 결과는 채택한 것만 다음 작업에 씁니다"
+        sub="업체마다 기억이 이어지는 AI 작업"
         actions={
           <>
             <Button variant="primary" onClick={() => setFormOpen((v) => !v)} data-testid="case-new">
@@ -275,7 +275,7 @@ function Home() {
               <NextActionBar
                 tone="purple"
                 title="고객 관리에 있는 업체를 골라 바로 시작하세요"
-                detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
+                
                 testId="ai-next"
               />
             )
@@ -285,10 +285,10 @@ function Home() {
         <ArrangeItem id="summary" label="한눈에 숫자" hint="검토 중 · 고객 관리와 이어짐 · 기억 · 이번 주 작업">
         {cases !== null && !dbSetup && (
           <SummaryStrip label="AI 전략실 한눈에" testId="ai-summary">
-            <KpiCard icon={slotIcon('ai-reviewing', Building2)} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} hint={`보관 ${(cases ?? []).length - active.length}곳 따로`} testId="ai-kpi-active" />
-            <KpiCard icon={slotIcon('ai-linked', Link2)} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} hint="회사 정보 · 서류를 같이 씀" />
-            <KpiCard icon={slotIcon('ai-memory', Brain)} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} hint="채택한 결과를 다음 작업에" />
-            <KpiCard icon={slotIcon('ai-week', CalendarClock)} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} hint="지난 7일 안에 손댄 곳" />
+            <KpiCard icon={slotIcon('ai-reviewing', Building2)} tone="purple" label="검토 중인 업체" value={`${active.length}곳`} testId="ai-kpi-active" />
+            <KpiCard icon={slotIcon('ai-linked', Link2)} tone="blue" label="고객 관리와 이어짐" value={`${active.filter((c) => c.clientId).length}곳`} />
+            <KpiCard icon={slotIcon('ai-memory', Brain)} tone="purple" label="기억이 쌓인 곳" value={`${active.filter((c) => (c.contextVersion ?? 0) > 0).length}곳`} />
+            <KpiCard icon={slotIcon('ai-week', CalendarClock)} tone="teal" label="이번 주 작업" value={`${active.filter((c) => c.updatedAt >= weekAgo).length}곳`} />
           </SummaryStrip>
         )}
         </ArrangeItem>
@@ -312,7 +312,7 @@ function Home() {
               <NextActionBar
                 tone="purple"
                 title="고객 관리에 있는 업체를 골라 바로 시작하세요"
-                detail="회사 정보 · 서류 · 관계를 그대로 써서 작업실을 엽니다 — 타자 없이"
+                
                 testId="ai-next"
               />
             )
@@ -367,7 +367,7 @@ function Home() {
           ) : list.length === 0 ? (
             <div className="border-t border-slate-100 px-4 py-8 text-center sm:px-5">
               <Sparkles aria-hidden="true" className="mx-auto size-6 text-brand-500" />
-              <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없습니다. 검토할 회사를 하나 등록해 보세요 — 회사명만 있어도 됩니다.'}</p>
+              <p className="t-body mt-2 break-keep text-slate-600">{(cases ?? []).length ? '조건에 맞는 업체가 없습니다.' : '아직 등록한 업체가 없어요.'}</p>
               {!(cases ?? []).length && (
                 <Button variant="primary" className="mt-3" onClick={() => setFormOpen(true)}>업체 등록</Button>
               )}

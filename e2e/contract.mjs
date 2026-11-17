@@ -187,7 +187,7 @@ for (const [w, h, tag] of [
   check(`${tag} CASE 4: 예전 계약금 · 중도금은 입금 완료 그대로`, byLabel('계약금').includes('입금 완료') && byLabel('중도금').includes('입금 완료'), lines.join(' / '))
   check(`${tag} CASE 4: 받기로 한 날이 지난 성공보수는 미수금`, byLabel('성공보수').includes('미수금'), byLabel('성공보수'))
   const t = await tiles(page)
-  check(`${tag} CASE 4: 숫자 — 입금 500만 · 지금 받을 돈 550만(그중 미수금 550만)`, /입금 완료 500만원/.test(t) && /지금 받을 돈 550만원 그중 미수금 550만원/.test(t), t)
+  check(`${tag} CASE 4: 숫자 — 입금 500만 · 지금 받을 돈 550만(그중 미수금 550만)`, /입금 완료 500만원/.test(t) && /지금 받을 돈 550만원/.test(t) && !/청구 가능|미수금 없음/.test(t), t)
   check(`${tag} CASE 4: 영업자 수수료는 값이 있을 때만 한 줄`, (await page.getByTestId('fees-agent').innerText()).includes('최영업'))
   const after = await rec(page, 'cli_hansol')
   check(`${tag} CASE 4: 화면을 열어도 예전 기록이 바뀌지 않는다`, JSON.stringify(after.fees) === JSON.stringify(before.fees))

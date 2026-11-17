@@ -90,3 +90,4 @@ dist-qa*/
 .overwritten-out
 .modchat-out
 .originals-out
+.ch-tmp/

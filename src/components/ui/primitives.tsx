@@ -131,9 +131,12 @@ export function ScreenTitle({
   back,
   icon,
   subOnPhone = true,
+  subAsHint = false,
 }: {
   title: string
   sub?: string
+  /** D-627 설명 줄을 처음부터 ⓘ 로(짧아도) */
+  subAsHint?: boolean
   actions?: ReactNode
   back?: ReactNode
   /** D-282 기능 아이콘 칸(IconTile) — 제목 왼쪽. 휴대폰에서 제목을 숨기는 화면이면 아이콘도 함께 숨긴다 */
@@ -150,6 +153,8 @@ export function ScreenTitle({
   const shownIcon = icon ?? auto
   // D-273 메뉴 이름 뒤 괄호(예: 'AI 전략실(잠재고객)')는 빼고 견준다 — 다르게 보고 휴대폰에서 제목 칸이 단추 옆으로 밀렸다
   const sameAsHeader = (screenTitleForPath(pathname) ?? '').replace(/\s*\([^)]*\)\s*$/, '') === title
+  // D-627 머리는 제목 + 한 줄(30자 안) — 더 긴 설명은 저절로 ⓘ 로(PageHeader 와 같은 규칙)
+  const longSub = !!sub && (subAsHint || sub.replace(/\s/g, '').length > 30)
 
   return (
     <div className="flex flex-col gap-2">
@@ -160,10 +165,19 @@ export function ScreenTitle({
         <div className={`${sameAsHeader ? (subOnPhone ? 'w-full min-w-0 lg:w-auto lg:flex-1' : 'w-0 min-w-0 lg:w-auto lg:flex-1') : 'min-w-[min(100%,15rem)] flex-1'} ${shownIcon ? 'flex items-start gap-3' : ''}`}>
           {shownIcon && <span className={sameAsHeader ? 'hidden lg:flex' : 'flex'}>{shownIcon}</span>}
           <div className="min-w-0 flex-1">
-            <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
-              {title}
-            </h1>
-            {sub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'} ${sameAsHeader && !subOnPhone ? 'hidden lg:block' : ''}`}>{sub}</p>}
+            {longSub ? (
+              <>
+                {sameAsHeader && <h1 className="sr-only lg:hidden">{title}</h1>}
+                <HintTip tip={sub} label={title} className={sameAsHeader ? 'hidden lg:flex' : ''}>
+                  <h1 className="t-page break-keep text-slate-900">{title}</h1>
+                </HintTip>
+              </>
+            ) : (
+              <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
+                {title}
+              </h1>
+            )}
+            {sub && !longSub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'} ${sameAsHeader && !subOnPhone ? 'hidden lg:block' : ''}`}>{sub}</p>}
           </div>
         </div>
         {/* D-124: 휴대폰 큰 글자에서 버튼이 화면 밖으로 밀리지 않게 — 좁으면 버튼끼리도 줄을 바꾼다 */}

@@ -82,13 +82,14 @@ export function GuidePage() {
           const fns = on && !r.noLink ? functionGuidesOf(r.key, { pilot, basic }) : []
           return (
             <li key={r.key} className={`rounded-(--radius-panel) border border-slate-200 bg-white ${r.nested ? 'sm:ml-6' : ''}`} data-testid="guide-row" data-key={r.key} data-open={on ? '1' : '0'}>
-              <button type="button" aria-expanded={on} aria-controls={panelId} onClick={() => pick(r.key)} data-no-veil className="tap flex min-h-14 w-full items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 text-left hover:bg-slate-50" data-testid="guide-row-toggle">
+              <button type="button" aria-expanded={on} aria-controls={panelId} onClick={() => pick(r.key)} title={on ? undefined : g.what} data-no-veil className="tap flex min-h-14 w-full items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 text-left hover:bg-slate-50" data-testid="guide-row-toggle">
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="t-body font-bold break-keep text-slate-900">
                     {r.label}
                     {r.soon && <span className="t-meta ml-2 rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-600">준비 중</span>}
                   </span>
-                  {!on && <span className="t-sub truncate text-slate-600">{g.what}</span>}
+                  {/* D-627 접힌 줄은 이름만 — '무엇' 한 줄은 마우스 · 화면 읽기로(누르면 네 칸) */}
+                  {!on && <span className="sr-only">{g.what}</span>}
                 </span>
                 <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-500 transition-transform ${on ? 'rotate-180' : ''}`} />
               </button>
@@ -139,8 +140,9 @@ export function GuidePage() {
       <AddToHomeHowTo />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3" data-testid="guide-foot">
-        <p className="t-sub min-w-0 flex-1 basis-64 break-keep text-slate-700">
-          <span className="max-lg:hidden">왼쪽 메뉴에 마우스를 올려도 같은 설명이 떠요(번거로우면 설정 › 계정 · 보기에서 끌 수 있어요). </span><span className="lg:hidden">다른 화면에서는 맨 위 화면 이름을 누르면 그 화면 안내가 떠요. </span>궁금한 점 · 불편한 점은 알려 주세요 — 먼저 고쳐요.
+        {/* D-627 긴 안내는 마우스 · 화면 읽기로 — 보이는 글은 한 마디 */}
+        <p className="t-sub min-w-0 flex-1 basis-40 break-keep text-slate-700" title="왼쪽 메뉴에 마우스를 올려도 같은 설명이 떠요(설정 › 계정 · 보기에서 끌 수 있어요). 휴대폰은 맨 위 화면 이름을 누르면 그 화면 안내가 떠요.">
+          <span className="sr-only">왼쪽 메뉴에 마우스를 올려도 같은 설명이 떠요. 휴대폰은 맨 위 화면 이름을 누르면 그 화면 안내가 떠요. </span>궁금한 점은 알려 주세요
         </p>
         {tutorial && (
           <button type="button" onClick={() => tutorial.open()} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50" data-testid="guide-tutorial">

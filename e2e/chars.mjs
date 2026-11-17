@@ -3,12 +3,12 @@
  *
  * 대표: "목차를 눌러 들어갔을 때 한 화면에 나오는 글자 수를 엄격하게 제한 — 여러 번 누르더라도 하나하나 더 나오게 하든지 다음 단계로. 토스처럼."
  * 목차 화면마다(오늘 · 일정 밖) 아무것도 누르지 않았을 때 보이는 글자를 PC 1440 · 휴대폰 390 에서 센다.
- *   - 본문(main) 안의 글자만 — 왼쪽 메뉴 · 머리줄 · 휴대폰 아래 메뉴는 빼고, 스크롤해야 보이는 것은 넣는다.
+ *   - 본문(main) 안의 글자만 — 왼쪽 메뉴 · 머리줄 · 경로 줄(고객 관리 › 업체 › 탭) · 휴대폰 아래 메뉴는 빼고, 스크롤해야 보이는 것은 넣는다.
  *   - 빈칸은 세지 않는다. 접힌 칸 · 숨긴 칸 · 화면 읽기 전용 글(sr-only) · 창(dialog) 안은 세지 않는다.
  *   - 목록 자료(업체 · 공고 이름)도 센다 — 견본 업체 5곳 기준(e2e/seed.mjs). 그래서 목록은 5줄 + [더 보기].
  * 목표는 PC 200자 · 휴대폰 150자. 화면마다 한도를 두고(아직 못 고친 화면은 지금 숫자), 고치면 목표로 내린다 — 올리지 않는다.
  *
- *   node e2e/chars.mjs <baseUrl> [--json <file>] [--shots <dir>] [--only <이름 일부>]
+ *   node e2e/chars.mjs <baseUrl> [--json <file>] [--shots <dir>] [--only <이름 일부>] [--top <n>]
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -22,6 +22,8 @@ const arg = (k) => {
 const JSON_OUT = arg('--json')
 const SHOTS = arg('--shots')
 const ONLY = arg('--only')
+/** --top <n>: 큰 글 조각을 몇 개까지 보일지(줄일 곳 찾기) */
+const TOPN = Number(arg('--top')) || 8
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 
 /** 목표 — 모든 화면이 여기까지 내려와야 한다 */
@@ -34,18 +36,18 @@ const T = 'T'
  */
 export const CHAR_SCREENS = [
   ['오늘', '확인할 것', '/ops/decide', 1085, 1081],
-  ['고객', '고객 관리', '/ops/clients', 763, 432],
-  ['고객', '업체 개요', '/ops/clients/cli_hansol', 657, 612],
-  ['고객', '업체 · 맞춤 추천', '/ops/clients/cli_hansol?tab=smart', 632, 586],
-  ['고객', '업체 · 서류', '/ops/clients/cli_hansol?tab=docs', 745, 701],
-  ['고객', '업체 · 업무', '/ops/clients/cli_hansol?tab=work', 444, 397],
-  ['고객', '업체 · 계약 수금', '/ops/clients/cli_hansol?tab=fees', 443, 403],
+  ['고객', '고객 관리', '/ops/clients', T, T],
+  ['고객', '업체 개요', '/ops/clients/cli_hansol', T, T],
+  ['고객', '업체 · 맞춤 추천', '/ops/clients/cli_hansol?tab=smart', T, T],
+  ['고객', '업체 · 서류', '/ops/clients/cli_hansol?tab=docs', T, T],
+  ['고객', '업체 · 업무', '/ops/clients/cli_hansol?tab=work', T, T],
+  ['고객', '업체 · 계약 수금', '/ops/clients/cli_hansol?tab=fees', T, T],
   ['고객', 'AI 전략실', '/ai', 465, 465],
   ['고객', '특허 · 벤처', '/patent-venture', T, T],
   ['고객', '잠재고객 상담신청', '/ops/inbox', 345, 345],
-  ['영업', '영업 관리', '/sales/board', 279, 225],
+  ['영업', '영업 관리', '/sales/board', T, T],
   ['영업', '영업자 정산', '/ops/agents', T, 168],
-  ['영업', '매출 · 비용', '/money', 413, 413],
+  ['영업', '매출 · 비용', '/money', T, T],
   ['영업', '1차 미팅 체크리스트', '/sales/first-meeting', 240, 240],
   ['마케팅', '마케팅 첫 화면', '/marketing', 272, T],
   ['마케팅', '유튜브', '/marketing?view=plan', 355, 265],
@@ -60,7 +62,7 @@ export const CHAR_SCREENS = [
   ['전문 모듈', '정책자금', '/tools/policy-funding', 517, 402],
   ['전문 모듈', '고용지원금', '/tools/employment', 644, 500],
   ['전문 모듈', '연구소', '/tools/labcare', 737, 605],
-  ['전문 모듈', '지원사업 알림', '/grants', T, 159],
+  ['전문 모듈', '지원사업 알림', '/grants', T, T],
   ['전문 모듈', '기업인증', '/tools/cert-os', T, T],
   ['전문 모듈', '기업성장 살펴보기', '/modules/growth', 600, 600],
   ['전문 모듈', '세금 계산기', '/tools/tax', 2679, 2546],
@@ -70,14 +72,14 @@ export const CHAR_SCREENS = [
   ['전문 모듈', '출시 예정 살펴보기', '/upcoming', 812, 812],
   ['전문 모듈', '출시 예정 한 곳', '/upcoming/gasugeum', T, T],
   ['전문 모듈', '모듈 전체', '/tools', 491, 479],
-  ['설정', '설정', '/settings', 893, 893],
-  ['설정', '사용법 안내', '/guide', 300, 284],
+  ['설정', '설정', '/settings', T, T],
+  ['설정', '사용법 안내', '/guide', T, T],
   ['이 시스템', '기획의도', '/why', 2385, 2385],
   ['이 시스템', '성과 지표', '/kpi', 1268, 1268],
 ]
 
 /** 화면 안에서 센다(브라우저) — 보이는 글자 · 첫 화면 안 글자 · 누를 수 있는 것 */
-export function countChars() {
+export function countChars(topN = 8) {
   const main = document.querySelector('main')
   if (!main) return null
   const H = window.innerHeight
@@ -91,7 +93,7 @@ export function countChars() {
     if (!t) continue
     const el = n.parentElement
     if (!el || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
-    if (el.closest('[aria-hidden="true"],[role="dialog"],.sr-only')) continue
+    if (el.closest('[aria-hidden="true"],[role="dialog"],.sr-only,[data-testid="crumbs"]')) continue
     const r = document.createRange()
     r.selectNodeContents(n)
     const rects = [...r.getClientRects()].filter((x) => x.width > 1 && x.height > 1)
@@ -101,7 +103,7 @@ export function countChars() {
     blocks.push([t.length, t.slice(0, 40)])
   }
   const clickables = [...main.querySelectorAll('a[href],button,[role="button"],summary,select,input:not([type=hidden]),textarea')].filter((e) => e.checkVisibility() && e.getBoundingClientRect().width > 4)
-  return { all, first, click: clickables.length, top: blocks.sort((a, b) => b[0] - a[0]).slice(0, 8) }
+  return { all, first, click: clickables.length, top: blocks.sort((a, b) => b[0] - a[0]).slice(0, topN) }
 }
 
 let pass = 0
@@ -134,7 +136,7 @@ for (const vp of [
     await page.waitForTimeout(800)
     await page.mouse.move(0, 0)
     await page.evaluate(() => window.scrollTo(0, 0))
-    const m = await page.evaluate(countChars)
+    const m = await page.evaluate(countChars, TOPN)
     if (!m) {
       check(`${vp.tag} ${name}: 본문을 찾지 못함`, false, path)
       continue

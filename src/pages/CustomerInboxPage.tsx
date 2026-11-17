@@ -3,7 +3,8 @@ import { GrowingList } from '../components/ui/GrowingList'
 import { AiAssist } from '../components/ai/AiAssist'
 import { inboxBundle } from '../services/aiAssist/builders'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
+import { ChevronDown, Inbox, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { useFold } from '../components/ui/fold'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { ScreenTitle } from '../components/ui/primitives'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
@@ -66,6 +67,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [notReady, setNotReady] = useState(false)
   const [filter, setFilter] = useState<Filter>('open')
+  const [filtersOpen, setFiltersOpen] = useFold('inbox.filters', false)
   // 종류는 주소에 남긴다 — 오늘 화면·성과 지표에서 "회원가입만" 으로 바로 들어올 수 있게.
   const [params, setParams] = useSearchParams()
   const typeParam = params.get('type')
@@ -181,6 +183,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
       <ScreenTitle
         title="잠재고객 상담신청"
         sub={`${brand.customerPlatformLabel}에서 고객이 한 일이 여기로 들어옵니다.`}
+        subAsHint
         actions={
           <>
             {/* 이 줄에 단추가 이것뿐이라 글자를 줄일 이유가 없다 — 아이콘만 있으면 무엇인지 모른다 */}
@@ -214,6 +217,20 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         <ArrangeItem id="list" label="상담신청 목록" hint="상태 · 종류 · 정렬 · 신청">
           {/* D-484 거르기 줄끼리 겹치던 것(PC) — 감싸는 칸에 간격이 없는데 줄마다 -mt-2 로 당겨 8px 씩 포개졌다. 줄 사이를 띄우고 '상태 · 종류' 이름표를 맞춘다 */}
           <div className="flex flex-col gap-3" data-testid="inbox-filters">
+          {/* D-627 거르기(상태 · 종류 · 순서)는 단추 하나 뒤로 — 처음엔 지금 보는 것만 한 줄 */}
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            data-testid="inbox-filters-toggle"
+            className="tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <SlidersHorizontal aria-hidden="true" className="size-4" />
+            {filters.find((f) => f.key === filter)?.label ?? '거르기'} {counts[filter]}
+            <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {filtersOpen && (
+          <>
           <div className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-2.5 sm:px-4">
           {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
           {/* D-122: 오른쪽에 더 있으면 '›' */}
@@ -287,6 +304,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               ))}
             </div>
           )}
+          </>
+          )}
 
           {loading ? (
             <p className="py-8 text-center text-[0.9375rem] text-slate-500">불러오는 중…</p>
@@ -330,6 +349,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               render={(e) => (
                 <li key={e.id}>
                   <EventCard
+                    collapsible
                     event={e}
                     clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
                     clientTag={e.operationsClientId && consultantIds.has(e.operationsClientId) ? CLIENT_TYPE_LABEL.consultant : null}

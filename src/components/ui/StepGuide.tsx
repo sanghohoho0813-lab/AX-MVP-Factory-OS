@@ -94,7 +94,20 @@ function readMin(fallback = false): boolean {
  * defaultMin — U4(D-544) 업체 상세처럼 머리가 긴 화면은 처음엔 한 줄(몇 번째 · 이름 · 다음 단추)로.
  * 설명은 [펼치기] 한 번 · 한 번 고른 것은 기억(모든 화면 같이).
  */
-export function StepGuide({ pos, onGo, hrefOf, className = '', defaultMin = false }: GoProps & { pos: FlowPosition; className?: string; defaultMin?: boolean }) {
+export function StepGuide({
+  pos,
+  onGo,
+  hrefOf,
+  className = '',
+  defaultMin = false,
+  labelInTabs = false,
+}: GoProps & {
+  pos: FlowPosition
+  className?: string
+  defaultMin?: boolean
+  /** D-627 바로 위 탭 줄이 지금 단계 이름을 이미 보여 주면(업체 상세) 접힌 줄에서는 이름을 글로 다시 쓰지 않는다(화면 읽기 · 마우스에는 그대로) */
+  labelInTabs?: boolean
+}) {
   const { flow, index, prev, next, here } = pos
   const [min, setMinState] = useState(() => readMin(defaultMin))
   const setMin = (v: boolean) => {
@@ -134,14 +147,15 @@ export function StepGuide({ pos, onGo, hrefOf, className = '', defaultMin = fals
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">
           <div className="flex items-start gap-1">
-            <p className="t-meta flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 font-bold text-brand-700">
+            <p className="t-meta flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 font-bold text-brand-700" title={min && labelInTabs ? `${flow.name} · ${here.label}` : flow.name}>
               <Route aria-hidden="true" className="size-4 shrink-0" />
-              <span>{flow.name}</span>
-              <span aria-hidden="true">·</span>
+              {/* D-627 접힌 한 줄은 '몇 번째 · 지금 단계' 만(순서 이름은 펼치면 · 마우스를 올리면) */}
+              {!min && <span>{flow.name}</span>}
+              {!min && <span aria-hidden="true">·</span>}
               <span className="tabular-nums" data-testid="step-count">
                 {index + 1} / {n}단계
               </span>
-              {min && <span className="font-bold text-slate-900">· {here.label}</span>}
+              {min && <span className={labelInTabs ? 'sr-only' : 'font-bold text-slate-900'}>· {here.label}</span>}
             </p>
             <button
               type="button"
@@ -162,8 +176,8 @@ export function StepGuide({ pos, onGo, hrefOf, className = '', defaultMin = fals
           )}
         </div>
         {(prev || next) && (
-          // U4(D-544) 접힌 한 줄일 때 휴대폰은 이전 · 다음 단추를 숨긴다(바로 위 탭 줄 · 화면 끝 [다음 단계]가 같은 일) — 펼치면 보인다
-          <div className={`flex-wrap items-center gap-2 ${min ? 'hidden sm:flex' : 'flex'}`}>
+          // U4(D-544) · D-627 접힌 한 줄일 때는 이전 · 다음 단추를 숨긴다(바로 위 탭 줄 · 화면 끝 [다음 단계]가 같은 일) — 펼치면 보인다
+          <div className={`flex-wrap items-center gap-2 ${min ? 'hidden' : 'flex'}`}>
             {prev && <GoButton step={prev} dir="prev" onGo={onGo} hrefOf={hrefOf} testId="step-prev" />}
             {next && <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-top" />}
           </div>
@@ -185,14 +199,9 @@ export function StepNext({ pos, onGo, hrefOf, className = '' }: GoProps & { pos:
   const { next, index } = pos
   if (index < 0 || !next) return null
   return (
-    <section aria-label="다음 단계" data-testid="step-next" className={`no-print flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-3 sm:px-4 ${className}`}>
-      <p className="t-sub min-w-0 flex-1 basis-60 break-keep text-slate-600">
-        <span className="inline-flex items-center gap-1 font-bold text-slate-900">
-          <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
-          다음 단계 · {next.label}
-        </span>{' '}
-        — {next.why}
-      </p>
+    // D-627 글자 수 한도 — 화면 끝은 단추 하나([다음: ○○]). 무엇을 하는 단계인지는 마우스를 올리면(title) · 단계 안내 펼침에
+    <section aria-label="다음 단계" data-testid="step-next" title={`다음 단계 · ${next.label} — ${next.why}`} className={`no-print flex items-center justify-end gap-2 ${className}`}>
+      <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
       <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-bottom" after={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
     </section>
   )

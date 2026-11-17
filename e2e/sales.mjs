@@ -687,7 +687,8 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.waitForURL(/\/sales\/board/)
   check('오늘: 모두 보기 → 영업 보드', page.url().includes('/sales/board'))
   await page.getByTestId('sales-board').waitFor()
-  const boardSub = (await page.locator('main').innerText()).match(/진행 중 (\d+)곳/)?.[1]
+  // D-627 머리 한 줄의 '진행 중 n곳' 은 빠졌다 — 같은 숫자는 요약 칩 '진행 중'
+  const boardSub = ((await page.getByTestId('sales-kpi-flow').innerText().catch(() => '')) ?? '').match(/(\d+)곳/)?.[1]
   check('오늘 · 보드: 진행 중 숫자가 같다', boardSub !== undefined && new RegExp(`진행 중\\s*${boardSub}곳`).test(ts), `board ${boardSub} / today ${ts.match(/진행 중\s*\d+곳/)?.[0]}`)
 
   const nav = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''

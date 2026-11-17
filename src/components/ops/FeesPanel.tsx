@@ -10,7 +10,8 @@
 import { useMoneyWords } from './useMoneyWords'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Pencil, Plus, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, Undo2 } from 'lucide-react'
+import { useFold } from '../ui/fold'
 import type { ClientOpsRecord, FeeConditionKind, FeeItem, FeeKind, ServiceKey } from '../../types/clientOps'
 import { FEE_CONDITION_LABEL, FEE_CONDITION_ORDER } from '../../types/clientOps'
 import { FEE_KIND_LABEL, FEE_KIND_ORDER, SERVICES } from '../../content/clientOpsCatalog'
@@ -68,12 +69,15 @@ function FeeLine({
   onChange,
   today,
   funding,
+  detail = true,
 }: {
   fee: FeeItem
   record: ClientOpsRecord
   onChange: (next: ClientOpsRecord) => void | boolean | Promise<boolean>
   today: string
   funding: FundingFacts
+  /** D-627 접힌 화면에서는 '누구 몫 빼고 → 내 몫' 줄을 뺀다(자세히 보기에서) */
+  detail?: boolean
 }) {
   const state = feeStateOf(fee, today, funding)
   const [confirm, setConfirm] = useState<'in' | 'undo' | null>(null)
@@ -99,7 +103,9 @@ function FeeLine({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         {state === 'received' ? (
           <span className="t-sub inline-flex items-center gap-1 font-semibold text-success-700" data-testid="fee-received">
-            <Check aria-hidden="true" className="size-4" /> 입금 완료 · {md(fee.receivedAt as string)}
+            {/* D-627 '8월 25일 입금' 으로 짧게(화면 읽기에는 '입금 완료' 그대로) */}
+            <Check aria-hidden="true" className="size-4" /> <span className="sr-only">입금 완료 · </span>
+            {md(fee.receivedAt as string)} 입금
           </span>
         ) : (
           <>
@@ -108,7 +114,7 @@ function FeeLine({
             {left !== null && (state === 'overdue' || state === 'scheduled' || state === 'claimable') && <span className={`t-sub ${state === 'overdue' ? 'font-bold text-danger-700' : 'text-slate-500'}`}>{dueText(left)}</span>}
           </>
         )}
-        {m.agent > 0 && m.net !== null && (
+        {detail && m.agent > 0 && m.net !== null && (
           <span className="t-sub text-slate-500">
             {fee.agentName.trim() !== '' && <span className="mr-1">{fee.agentName.trim()} 몫 빼고</span>}→ 내 몫 <b className="font-semibold text-slate-800 tabular-nums">{formatKrw(m.net)}</b>
             {m.marginPct !== null && <span className="ml-1 font-bold text-brand-700">{marginText(m.marginPct)}</span>}
@@ -120,8 +126,9 @@ function FeeLine({
       {confirm === null ? (
         <div className="flex flex-wrap items-center gap-2">
           {state === 'received' ? (
-            <button type="button" onClick={() => setConfirm('undo')} aria-label={`${fee.label} 입금 되돌리기`} className="tap t-sub inline-flex items-center gap-1 font-medium text-slate-500 underline hover:text-slate-800">
-              <Undo2 aria-hidden="true" className="size-4" /> 되돌리기
+            <button type="button" onClick={() => setConfirm('undo')} aria-label={`${fee.label} 입금 되돌리기`} title="입금 되돌리기" className="tap inline-flex size-9 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-50 hover:text-slate-800">
+              {/* D-627 글 대신 아이콘(이름은 마우스 · 화면 읽기로) */}
+              <Undo2 aria-hidden="true" className="size-4" />
             </button>
           ) : (
             <>
@@ -140,8 +147,8 @@ function FeeLine({
               )}
             </>
           )}
-          <button type="button" aria-expanded={edit} aria-label={`${fee.label} 고치기`} onClick={() => setEdit((v) => !v)} className="tap t-sub ml-auto inline-flex items-center gap-1 font-medium text-slate-600 hover:text-brand-700">
-            <Pencil aria-hidden="true" className="size-3.5" /> {edit ? '접기' : '고치기'}
+          <button type="button" aria-expanded={edit} aria-label={`${fee.label} 고치기`} title={edit ? '접기' : '고치기'} onClick={() => setEdit((v) => !v)} className="tap ml-auto inline-flex size-9 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-50 hover:text-brand-700">
+            {edit ? <ChevronDown aria-hidden="true" className="size-4 rotate-180" /> : <Pencil aria-hidden="true" className="size-3.5" />}
           </button>
         </div>
       ) : (
@@ -291,6 +298,10 @@ export function FeesPanel({
   const moneyWords = useMoneyWords()
   const navigate = useNavigate()
   const pilot = useIsPilot()
+  // D-627 글자 수 한도 — 영업자 몫 · 내 몫 줄은 [자세히] 에서(기억 · [모두 펼치기] 따름)
+  const [feesDetail, setFeesDetail] = useFold('fees.detail', false)
+  // D-627 수금 줄은 처음 5개 — [n개 더 보기]
+  const [feesAll, setFeesAll] = useFold('fees.all', false)
   const funding = fundingFactsOf(record.fundingApplications)
   const m = moneyPlanOf(record, today)
   const totals = feeTotals(record.fees, funding)
@@ -339,13 +350,14 @@ export function FeesPanel({
     <section aria-labelledby="fees" className="flex flex-col gap-3" data-testid="fees-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <HintTip tip={hintFor('계약 · 수금')} label="계약 · 수금">
+          {/* D-627 바로 위 탭이 '수금' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
           <h2 id="fees" className="text-[1.2rem] font-bold text-slate-900">
-            계약 · 수금
+            <span className="sr-only">계약 · 수금</span>
           </h2>
         </HintTip>
         {!empty && (
-          <Button onClick={() => setPlanOpen(true)} data-testid="plan-open">
-            계약 · 수금 한 번에
+          <Button onClick={() => setPlanOpen(true)} data-testid="plan-open" title="계약금액 · 받은 돈 · 남은 돈을 한 번에">
+            한 번에 적기
           </Button>
         )}
       </div>
@@ -375,16 +387,23 @@ export function FeesPanel({
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4" data-testid="money-tiles">
             <MetricTile label="계약금액" value={krwTile(m.contract)} hint={m.unknownCount > 0 ? `금액 미정 ${m.unknownCount}건` : undefined} />
             <MetricTile label="입금 완료" value={krwTile(m.received)} tone={m.received > 0 ? 'success' : 'neutral'} />
-            <MetricTile hintOnMobile label="지금 받을 돈" value={krwTile(m.now)} tone={m.overdue > 0 ? 'danger' : m.now > 0 ? 'warning' : 'neutral'} hint={m.overdue > 0 ? `그중 미수금 ${krwTile(m.overdue)}` : m.now > 0 ? '청구 가능' : '미수금 없음'} />
-            <MetricTile
+            <MetricTile hintOnMobile label="지금 받을 돈" value={krwTile(m.now)} tone={m.overdue > 0 ? 'danger' : m.now > 0 ? 'warning' : 'neutral'} hint={m.overdue > 0 ? (m.overdue === m.now ? undefined : `그중 미수금 ${krwTile(m.overdue)}`) : m.now > 0 ? '청구 가능' : '미수금 없음'} />
+            {/* D-627 글자 수 한도 — 넷째 칸(조건부 · 예정)은 돈이 있거나 [자세히] 때만 */}
+            {(feesDetail || m.later > 0) && <MetricTile
               hintOnMobile
               label="조건부 · 예정"
               value={krwTile(m.later)}
               hint={[m.waiting > 0 ? `조건 대기 ${krwTile(m.waiting)}` : '', m.scheduled > 0 ? `날짜 예정 ${krwTile(m.scheduled)}` : '', m.undated > 0 ? `받을 날 미정 ${krwTile(m.undated)}` : ''].filter(Boolean).join(' · ') || undefined}
-            />
+            />}
           </div>
 
-          {agentAll > 0 && (
+          {(agentAll > 0 || !feesDetail) && (
+            <button type="button" onClick={() => setFeesDetail(!feesDetail)} aria-expanded={feesDetail} data-testid="fees-detail" className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
+              <span title={feesDetail ? undefined : '영업자 몫 · 내 몫 · 조건부 돈'}>{feesDetail ? '간단히' : '자세히'}</span>
+              <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${feesDetail ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+          {feesDetail && agentAll > 0 && (
             <p className="t-sub break-keep text-slate-500" data-testid="fees-agent">
               영업자 수수료 {formatKrw(agentAll)}
               {shares.length > 0 && ` (${shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ')})`} → 내 몫 {formatKrw(totals.net)}
@@ -399,16 +418,21 @@ export function FeesPanel({
           )}
 
           <ul className="divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
-            {record.fees.map((fee) => (
-              <FeeLine key={fee.id} fee={fee} record={record} onChange={onChange} today={today} funding={funding} />
+            {(feesAll ? record.fees : record.fees.slice(0, 5)).map((fee) => (
+              <FeeLine key={fee.id} fee={fee} record={record} onChange={onChange} today={today} funding={funding} detail={feesDetail} />
             ))}
           </ul>
+          {!feesAll && record.fees.length > 5 && (
+            <button type="button" onClick={() => setFeesAll(true)} data-testid="fees-show-all" className="tap t-sub self-start rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+              {record.fees.length - 5}개 더 보기
+            </button>
+          )}
         </>
       )}
 
       {!addOpen ? (
         <button type="button" onClick={() => setAddOpen(true)} data-testid="fee-add-open" className="tap t-sub inline-flex items-center gap-1.5 self-start font-medium text-slate-600 hover:text-brand-700">
-          <Plus aria-hidden="true" className="size-4" /> 수금 항목 하나 직접 넣기
+          <Plus aria-hidden="true" className="size-4" /> 항목 넣기
         </button>
       ) : (
         <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="fee-add">

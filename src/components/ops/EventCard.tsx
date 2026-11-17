@@ -15,6 +15,7 @@ import { activityTimeText } from '../../services/clientOpsActivity'
 import { Badge, type Tone } from '../ui/primitives'
 import { suggestServiceForProduct } from '../../config/serviceCatalog'
 import { EDGE_BOX } from '../ui/edge'
+import { useFold } from '../ui/fold'
 
 /**
  * 상태 색 — 분류색(cat-*)을 쓰지 않는다. 이벤트함은 '새로 왔다/처리했다' 두 가지가
@@ -74,6 +75,7 @@ export function EventCard({
   onCreateClient,
   onStatus,
   compact = false,
+  collapsible = false,
 }: {
   event: CustomerEvent
   clientName: string | null
@@ -83,8 +85,13 @@ export function EventCard({
   onCreateClient: () => void
   onStatus: (status: CustomerEventStatus) => void
   compact?: boolean
+  /** D-627 처음엔 머리 · 누가 · 무엇만 — 누르면 업체 · 제출 내용 · 단추(모두 펼치기 · inbox.cards 따름) */
+  collapsible?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [allOpen] = useFold('inbox.cards', false)
+  const [cardOpen, setCardOpen] = useState(false)
+  const body = !collapsible || allOpen || cardOpen
   const s = eventSummary(event)
   const isDemo = event.payload.demo === true
   const suggestion =
@@ -105,7 +112,8 @@ export function EventCard({
       {/* 머리줄 — 급한 것 · 오래 기다린 날 · 처리 상태만 남긴다 */}
       <div className="t-meta flex flex-wrap items-center gap-1.5">
         {event.priority === 'high' && isOpenEvent(event) && <Badge tone="danger">지금</Badge>}
-        <span className="font-medium text-slate-500">{EVENT_TYPE_LABEL[event.eventType]}</span>
+        {/* D-627 접힌 카드는 종류 이름을 글로 다시 쓰지 않는다(아래 '무엇' 줄이 같은 말) */}
+        <span className={body ? 'font-medium text-slate-500' : 'sr-only'}>{EVENT_TYPE_LABEL[event.eventType]}</span>
         {event.status !== 'new' && <Badge tone={STATUS_TONE[event.status]}>{EVENT_STATUS_LABEL[event.status]}</Badge>}
         {waitLevel && (
           <span data-testid="event-waiting">
@@ -113,13 +121,29 @@ export function EventCard({
           </span>
         )}
         {isDemo && <Badge tone="neutral">샘플</Badge>}
-        <span className="ml-auto text-slate-400">
-          <time dateTime={event.occurredAt}>{activityTimeText(event.occurredAt)}</time>
-        </span>
+        {(body || !waitLevel) && (
+          <span className="ml-auto text-slate-400">
+            <time dateTime={event.occurredAt}>{activityTimeText(event.occurredAt)}</time>
+          </span>
+        )}
       </div>
 
-      <p className="t-card mt-1.5 break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</p>
-      <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</p>
+      {collapsible ? (
+        <button type="button" aria-expanded={body} onClick={() => setCardOpen((v) => !v)} data-testid="event-toggle" className="tap -mx-1 mt-1 flex w-[calc(100%+0.5rem)] items-start gap-2 rounded-(--radius-control) px-1 text-left hover:bg-slate-50">
+          <span className="min-w-0 flex-1">
+            <span className="t-card block break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</span>
+            <span className="t-sub block break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</span>
+          </span>
+          <ChevronDown aria-hidden="true" className={`mt-1 size-4 shrink-0 text-slate-400 transition-transform ${body ? 'rotate-180' : ''}`} />
+        </button>
+      ) : (
+        <>
+          <p className="t-card mt-1.5 break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</p>
+          <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</p>
+        </>
+      )}
+      {body && (
+      <>
 
       <div className="t-sub mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         {event.operationsClientId ? (
@@ -204,6 +228,8 @@ export function EventCard({
           </button>
         )}
       </div>
+      </>
+      )}
     </article>
   )
 }

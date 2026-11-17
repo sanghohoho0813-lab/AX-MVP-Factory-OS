@@ -9,7 +9,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileText, FileUp, History, MessageCircle, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, ChevronDown, FileText, FileUp, History, MessageCircle, Send, Sparkles } from 'lucide-react'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
 import { ClientTalkSheet } from './ClientTalkSheet'
 import { activityTimeText } from '../../services/clientOpsActivity'
@@ -22,7 +22,7 @@ import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, w
 import { pendingFacts } from '../../services/customerFacts'
 import { recoRequestMessage } from '../../services/recoRequest'
 import { diagnosisNote } from '../../services/clientDiagnosis'
-import { HintTip } from '../ui/fold'
+import { HintTip, useFold } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
@@ -63,6 +63,9 @@ export function TopPicksCard({
   const waiting = pendingKeys ? waitingNames(allNeed, pendingKeys) : []
   const need = allNeed.filter((m) => !waiting.includes(m))
   const asks = onPickRequest ? picks.filter((p) => p.request) : []
+  // D-627 글자 수 한도 — 처음엔 모듈 이름 · 판정만. [자세히] 를 누르면 한 줄 설명 · 금액 · 지난번 · 받을 서류(기억 · [모두 펼치기] 따름)
+  const [detail, setDetail] = useFold('picks.detail', false)
+  const hasMore = picks.some((p) => p.headline || p.amount || p.last) || more > 0 || need.length > 0 || asks.length > 0 || waiting.length > 0 || !!(onDiagnosis && diagNote)
   return (
     <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-4 shadow-sm sm:px-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -89,7 +92,7 @@ export function TopPicksCard({
           </button>
         )}
       </div>
-      {onDiagnosis && diagNote && (
+      {detail && onDiagnosis && diagNote && (
         <button
           type="button"
           onClick={onDiagnosis}
@@ -107,6 +110,7 @@ export function TopPicksCard({
             <li key={p.key} className="min-w-0" data-testid="top-pick" data-key={p.key} data-tone={p.tone}>
               <Link
                 to={p.openPath}
+                title={detail ? undefined : `${p.headline} — ${p.openLabel}`}
                 className="tap group flex h-full flex-col gap-1.5 rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-3 hover:border-brand-400 hover:shadow-sm"
               >
                 <span className="flex flex-wrap items-center gap-2">
@@ -116,15 +120,15 @@ export function TopPicksCard({
                   <span className="t-card font-bold text-slate-900">{p.label}</span>
                   <Badge tone={TONE[p.tone]}>{INSIGHT_TONE_LABEL[p.tone]}</Badge>
                 </span>
-                <span className="t-sub line-clamp-3 break-keep text-slate-700 [overflow-wrap:anywhere]">{p.headline}</span>
+                {detail && <span className="t-sub line-clamp-3 break-keep text-slate-700 [overflow-wrap:anywhere]">{p.headline}</span>}
                 {/* D-191: 엔진이 계산한 금액만(명부 진단 최대 지원금 · 세액공제 · 공고 금액 글) */}
-                {p.amount && (
+                {detail && p.amount && (
                   <span data-testid="top-pick-amount" className="t-sub font-bold break-keep text-success-700 [overflow-wrap:anywhere]">
                     {p.amount}
                   </span>
                 )}
                 {/* D-238: 이미 해 본 모듈이면 지난번 결과 · 언제 — 처음부터 다시 하지 않고 이어서 */}
-                {p.last && (
+                {detail && p.last && (
                   <span data-testid="top-pick-last" className="t-meta flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]">
                     <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
                     <span className="min-w-0 line-clamp-2">
@@ -132,9 +136,11 @@ export function TopPicksCard({
                     </span>
                   </span>
                 )}
-                <span className="t-sub mt-auto inline-flex items-center gap-1 pt-0.5 font-semibold text-brand-700 group-hover:underline">
-                  {p.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
-                </span>
+                {detail && (
+                  <span className="t-sub mt-auto inline-flex items-center gap-1 pt-0.5 font-semibold text-brand-700 group-hover:underline">
+                    {p.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
+                  </span>
+                )}
               </Link>
             </li>
           ))}
@@ -145,7 +151,19 @@ export function TopPicksCard({
         </p>
       )}
 
-      {(more > 0 || need.length > 0 || asks.length > 0) && (
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setDetail(!detail)}
+          aria-expanded={detail}
+          data-testid="top-picks-detail"
+          className="tap t-sub mt-2 inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+        >
+          {detail ? '간단히' : need.length > 0 ? `자세히 · 받을 서류 ${need.length}` : '자세히'}
+          <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${detail ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+      {detail && (more > 0 || need.length > 0 || asks.length > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* D-313 제안할 모듈이 판정 났으면 — 아직 받을 신청 서류를 카톡 문구로. 카드는 통째로 링크라 단추는 이 줄에(새 줄을 만들면 아래 회사 정보가 첫 화면 밖으로 밀린다) */}
           {asks.map((p) => (
@@ -203,7 +221,10 @@ export default function ClientTopPicks({
   onRequestText,
   onCommitQuiet,
   userId = null,
+  compact = false,
 }: {
+  /** D-627 글자 수 한도 — 처음엔 한 줄(먼저 제안할 모듈 이름만). 누르면 카드 전체(기억 · [모두 펼치기] 따름) */
+  compact?: boolean
   record: ClientOpsRecord
   today: string
   workspaceId: string | null
@@ -226,6 +247,24 @@ export default function ClientTopPicks({
   const pendingKeys = useMemo(() => new Set(pendingFacts(record).map((p) => p.key)), [record])
   const text = useMemo(() => recoRequestMessage(record, insights, pendingKeys), [record, insights, pendingKeys])
   const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
+  const [open, setOpen] = useFold('overview.picks', false)
+  if (compact && !open) {
+    const picks = topPicks(insights)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        data-testid="top-picks-line"
+        className="tap flex w-full min-w-0 items-center gap-2 rounded-(--radius-panel) border border-brand-200 bg-white px-4 py-3 text-left hover:bg-brand-50"
+      >
+        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+        <span className="t-body shrink-0 font-bold text-slate-900">먼저 제안할 것</span>
+        <span className="t-body min-w-0 flex-1 truncate font-semibold text-brand-700">{picks.length > 0 ? picks.map((p) => p.label).join(' · ') : '받을 서류 보기'}</span>
+        <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
+      </button>
+    )
+  }
   return (
     <>
       {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}

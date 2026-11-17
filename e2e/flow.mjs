@@ -471,23 +471,25 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`요즘 순: 오늘 다섯 번 챙긴 업체가 맨 위 ${tag}`, ids1[0] === lastId, `${lastId} → ${ids1.slice(0, 3).join()}`)
   const cardsText = await page.getByTestId('client-card').allInnerTexts()
   check(`카드: 진행 % 없음 ${tag}`, !cardsText.some((t) => /진행\s*\d+%/.test(t)), cardsText[0]?.slice(0, 200))
+  // D-627 카드는 PC · 휴대폰 모두 처음엔 한 줄(번호 · 이름 · 상태 · 전화 · [⌄]) — '모두 펼치기' 를 안 한 사람 기준으로 본다
+  await page.evaluate(() => localStorage.setItem('axmvp.fold.client-card.cli_hansol', '0'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
   const card = page.locator('[data-testid="client-card"][data-client-id="cli_hansol"]')
+  const h0 = (await card.boundingBox()).height
+  check(`카드: 처음엔 한 줄 — 사업자등록번호 안 보임 · 펼치기 단추 ${tag}`, !(await card.innerText()).includes('사업자등록번호') && (await card.getByTestId('card-toggle').isVisible()) && h0 < 110, Math.round(h0))
+  await card.getByTestId('card-toggle').click()
+  await page.waitForTimeout(200)
+  const h1 = (await card.boundingBox()).height
+  check(`펼치기 → 사업자등록번호 · 업무 조각 · 카드가 길어짐(${Math.round(h0)} → ${Math.round(h1)}) ${tag}`, (await card.innerText()).includes('사업자등록번호') && (await card.locator('[data-chip-status]').count()) > 0 && h1 > h0 * 1.4)
+  check(`펼친 카드: 년차가 보임 ${tag}`, /년차/.test(await card.innerText()), (await card.innerText()).slice(0, 200))
+  await card.getByTestId('card-toggle').click()
+  await page.waitForTimeout(200)
   if (mob) {
-    const h0 = (await card.boundingBox()).height
-    check(`휴대폰 카드: 처음엔 접힘 — 사업자등록번호 안 보임 · 펼쳐보기 단추 ${tag}`, !(await card.innerText()).includes('사업자등록번호') && (await card.getByTestId('card-toggle').isVisible()))
-    check(`휴대폰 카드: 이름 · 년차 · 다음 약속 · 진행 중이 보임 ${tag}`, /년차/.test(await card.innerText()) && (await card.getByTestId('card-doing').count()) === 1, await card.innerText())
-    await card.getByTestId('card-toggle').click()
-    await page.waitForTimeout(200)
-    const h1 = (await card.boundingBox()).height
-    check(`펼쳐보기 → 사업자등록번호 · 업무 조각 · 카드가 길어짐(${Math.round(h0)} → ${Math.round(h1)}) ${tag}`, (await card.innerText()).includes('사업자등록번호') && (await card.locator('[data-chip-status]').count()) > 0 && h1 > h0 * 1.4)
-    await card.getByTestId('card-toggle').click()
-    await page.waitForTimeout(200)
-    // 이름 · 펼쳐보기 말고 빈 곳(진행 중 줄)을 누르면 업체 상세로
-    await card.getByTestId('card-doing').click()
+    // 이름을 누르면 업체 상세로
+    await card.getByRole('button', { name: /한솔/ }).first().click()
     await page.waitForURL(/\/ops\/clients\/cli_hansol/)
-    check(`휴대폰 카드: 빈 곳 누르면 업체 상세 ${tag}`, page.url().includes('/ops/clients/cli_hansol'))
-  } else {
-    check(`PC 카드: 접지 않음 — 사업자등록번호 보임 · 펼쳐보기 없음 ${tag}`, (await card.innerText()).includes('사업자등록번호') && !(await card.getByTestId('card-toggle').isVisible()))
+    check(`휴대폰 카드: 이름 누르면 업체 상세 ${tag}`, page.url().includes('/ops/clients/cli_hansol'))
   }
 
   // 오늘 할 일 여섯 건 — 적은 순서로 번호 · 4건 넘으면 두 칸 · 동그라미 단추 없음

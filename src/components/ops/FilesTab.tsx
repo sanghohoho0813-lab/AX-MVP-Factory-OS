@@ -72,11 +72,10 @@ export function ClientSharedFiles({
   return (
     <section aria-labelledby="files" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-testid="client-shared-files">
       <HelpHeading as="h3" tight id="files" label="고객과 주고받은 파일" className="t-card flex items-center gap-2 font-bold text-slate-900">
-        <Paperclip aria-hidden="true" className="size-4 text-slate-400" /> 고객과 주고받은 파일 <span className="t-sub font-medium text-slate-500">{portalDocs.length}</span>
+        <Paperclip aria-hidden="true" className="size-4 text-slate-400" /> <span><span className="sr-only">고객과 </span>주고받은 파일</span> <span className="t-sub font-medium text-slate-500">{portalDocs.length}</span>
       </HelpHeading>
-      {portalDocs.length === 0 ? (
-        <p className="t-sub break-keep text-slate-500">주고받은 파일이 없습니다.</p>
-      ) : (
+      {/* D-627 비었으면 제목 줄의 0 으로 충분 — 빈 안내 문장은 두지 않는다 */}
+      {portalDocs.length === 0 ? null : (
         <ul className="flex flex-col divide-y divide-slate-100">
           {portalDocs.map((d) => (
             <li key={d.id} className="flex flex-col gap-2 py-2.5" data-portal-file={d.id}>

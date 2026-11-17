@@ -23,6 +23,7 @@ export function DocFileActions({
   storagePath,
   fileName,
   onReplace,
+  iconOnly = false,
 }: {
   /** 서류 이름 — 단추 이름에 붙는다('사업자등록증 미리보기') */
   label: string
@@ -30,6 +31,8 @@ export function DocFileActions({
   fileName: string
   /** 있으면 [파일 교체] */
   onReplace?: () => void
+  /** D-627 접힌 서류 칸 — 글 없이 아이콘만(이름은 마우스 · 화면 읽기로) */
+  iconOnly?: boolean
 }) {
   const { showToast } = useToast()
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -38,6 +41,9 @@ export function DocFileActions({
   const hasFile = storagePath !== ''
   const off = !uploadable
   const offTitle = off ? '클라우드를 연결하면 열 수 있습니다.' : undefined
+  /** 아이콘만일 때 글은 화면 읽기에만 · 마우스에는 이름 */
+  const txt = (t: string) => (iconOnly ? <span className="sr-only">{t}</span> : t)
+  const tip = (t: string) => offTitle ?? (iconOnly ? t : undefined)
 
   const signed = async (): Promise<string | null> => {
     try {
@@ -81,23 +87,23 @@ export function DocFileActions({
     <>
       <span className="flex flex-wrap items-center gap-1.5" data-file-actions={label}>
         {hasFile && kind && (
-          <Button variant="secondary" size="sm" aria-label={`${label} 미리보기`} disabled={off} title={offTitle} onClick={() => void preview()}>
-            <Eye aria-hidden="true" className="size-3.5" /> 미리보기
+          <Button variant="secondary" size="sm" aria-label={`${label} 미리보기`} disabled={off} title={tip('미리보기')} onClick={() => void preview()}>
+            <Eye aria-hidden="true" className="size-3.5" /> {txt('미리보기')}
           </Button>
         )}
         {hasFile && (
-          <Button variant="secondary" size="sm" aria-label={`${label} 새 창에서 열기`} disabled={off} title={offTitle} onClick={() => void openNew()}>
-            <ExternalLink aria-hidden="true" className="size-3.5" /> 새 창에서 열기
+          <Button variant="secondary" size="sm" aria-label={`${label} 새 창에서 열기`} disabled={off} title={tip('새 창에서 열기')} onClick={() => void openNew()}>
+            <ExternalLink aria-hidden="true" className="size-3.5" /> {txt('새 창에서 열기')}
           </Button>
         )}
         {hasFile && (
-          <Button variant="secondary" size="sm" aria-label={`${label} 내려받기`} disabled={off} title={offTitle} onClick={() => void download()}>
-            <Download aria-hidden="true" className="size-3.5" /> 내려받기
+          <Button variant="secondary" size="sm" aria-label={`${label} 내려받기`} disabled={off} title={tip('내려받기')} onClick={() => void download()}>
+            <Download aria-hidden="true" className="size-3.5" /> {txt('내려받기')}
           </Button>
         )}
         {onReplace && (
-          <Button variant="ghost" size="sm" aria-label={`${label} ${fileName ? '파일 교체' : '파일 첨부'}`} disabled={off} onClick={onReplace}>
-            <Upload aria-hidden="true" className="size-3.5" /> {fileName ? '파일 교체' : '파일 첨부'}
+          <Button variant="ghost" size="sm" aria-label={`${label} ${fileName ? '파일 교체' : '파일 첨부'}`} disabled={off} title={iconOnly ? (fileName ? '파일 교체' : '파일 첨부') : undefined} onClick={onReplace}>
+            <Upload aria-hidden="true" className="size-3.5" /> {txt(fileName ? '파일 교체' : '파일 첨부')}
           </Button>
         )}
       </span>

@@ -10,6 +10,10 @@ import { Panel } from '../../components/ui/Panel'
 import { HelpNote } from '../../components/ui/HelpNote'
 import { TextScaleControl } from '../../components/ui/TextScaleControl'
 import { MotionControl, ThemeControl } from '../../components/ui/ThemeControl'
+import { useAppearance } from '../../components/ui/appearance'
+import { themeMeta } from '../../lib/uiTheme'
+import { useTextScale } from '../../components/ui/textScale'
+import { TEXT_SCALE_META } from '../../lib/uiTextScale'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { CloudSaveStatus } from '../../components/cloud/CloudSaveStatus'
@@ -63,8 +67,9 @@ export function SettingRow({ label, children }: { label: string; children: React
 
 /** 화면 색·움직임 (마스터 규격: 테마 9종 + 모션 설정) */
 export function AppearancePanel() {
+  const { theme } = useAppearance()
   return (
-    <Panel title="화면 색">
+    <Panel title="화면 색" fold={{ id: 'settings.theme', summary: themeMeta(theme).label }}>
       <HelpNote summary="전체 화면의 색을 9가지 중에서 고릅니다. 고르면 즉시 반영되고 다음 접속에도 유지됩니다. 글자·표·서식의 읽기 편한 색은 테마와 상관없이 그대로 유지됩니다." />
       <div className="mt-4">
         <ThemeControl />
@@ -77,8 +82,10 @@ export function AppearancePanel() {
 }
 
 export function TextScalePanel() {
+  const { scale } = useTextScale()
+  const w = useContentWidth()
   return (
-    <Panel title="글자 크기">
+    <Panel title="글자 크기" fold={{ id: 'settings.text', summary: `${TEXT_SCALE_META[scale].label} · ${CONTENT_WIDTH_LABEL[w]}` }}>
       <HelpNote summary="화면 전체의 글자 크기를 조절합니다. 선택하면 즉시 반영되고 다음 접속에도 유지됩니다." />
       <div className="mt-4">
         <TextScaleControl showPreview />
@@ -116,7 +123,7 @@ function ModuleStartPanelBody() {
     { k: 'direct', label: '바로 화면', sub: '예전처럼 목차 · 입력 칸이 바로 보여요' },
   ]
   return (
-    <Panel title="모듈 첫 화면">
+    <Panel title="모듈 첫 화면" fold={{ id: 'settings.modstart', summary: all === 'chat' ? '대화창부터' : '바로 화면' }}>
       <p className="text-[0.875rem] break-keep text-slate-600">
         정책자금 · 고용지원금 · 연구소 · 창업감면 · 세금 계산기 · 지원사업 · 크레탑 · 홍보 글 · 홈페이지를 메뉴로 열 때 처음 보이는 화면이에요. 어느 쪽이든 화면 위 [대화로 묻기] · [바로 화면] 으로 바로 오갈 수 있어요.
       </p>
@@ -180,7 +187,7 @@ export function FeatureVisibilityPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const advanced = useMemo(() => isAdvancedVisible(), [version])
   return (
-    <Panel title="고급 운영 기능 보기">
+    <Panel title="고급 운영 기능 보기" fold={{ id: 'settings.advanced', summary: advanced ? '켬' : '끔' }}>
       <HelpNote summary="테스트 운영, 기관 연계, 사례 관리처럼 프로젝트 후반에 사용하는 기능을 추가로 표시합니다. 꺼도 데이터는 삭제되지 않으며 직접 주소로는 계속 접근할 수 있습니다." />
       <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-(--radius-control) border border-slate-200 px-4 py-3">
         <span className="min-w-0">

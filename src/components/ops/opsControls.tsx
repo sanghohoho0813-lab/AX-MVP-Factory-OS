@@ -227,7 +227,11 @@ export function PhoneLink({ phone }: { phone: string }) {
       className="tap inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
     >
       <Phone aria-hidden="true" className="size-3.5" />
-      {phone}
+      {/* D-627 휴대폰은 '전화' 두 글자(누르면 바로 걸림 · 번호는 읽는 기계 · 마우스용 이름에) — PC 는 번호 그대로 */}
+      <span className="max-sm:hidden">{phone}</span>
+      <span className="sm:hidden">
+        전화<span className="sr-only"> {phone}</span>
+      </span>
     </a>
   )
 }

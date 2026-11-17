@@ -82,7 +82,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-6">
       <ScreenTitle
         title="영업자 정산"
-        sub={`${today} · 영업자 ${totals.agents}명`}
+        sub={`영업자 ${totals.agents}명`}
         actions={
           <Button variant="secondary" onClick={() => navigate('/ops/clients')}>
             고객 관리로

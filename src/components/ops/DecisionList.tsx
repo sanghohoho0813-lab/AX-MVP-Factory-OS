@@ -21,7 +21,7 @@ import { nowIso } from '../../lib/appClock'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
-import { Fold } from '../ui/fold'
+import { Fold, useFold } from '../ui/fold'
 import { NO_DECISIONS, useAllDecisions } from './useAllDecisions'
 import { useGrowingCount } from '../../lib/useGrowingCount'
 
@@ -316,6 +316,7 @@ export function DecisionList({
   limit,
   linked,
   resetKey,
+  compact = false,
 }: {
   decisions: Decision[]
   busy: string | null
@@ -326,18 +327,31 @@ export function DecisionList({
   linked?: (clientId: string) => boolean
   /** D-479 바뀌면(종류 칩) 처음 40건부터 다시 */
   resetKey?: unknown
+  /**
+   * D-627 글자 수 한도 — 처음엔 3건 · 한 줄씩(종류 · 업체 · 무엇). 줄을 누르면 그 건의 까닭 · 답 단추가 펼쳐진다.
+   * [n건 더 보기] 로 나머지. [모두 펼치기] 를 해 둔 사람은 예전처럼 다 펼친 채(decide.rows · decide.more).
+   */
+  compact?: boolean
 }) {
   // D-479 limit 이 없으면 40건씩 — 업체 1,000곳이면 5,000건을 한 번에 그리느라 화면이 멈췄다(순서 · 모양은 그대로)
   const [growCount, moreRef] = useGrowingCount(limit ? 0 : decisions.length, resetKey, 40)
-  const shown = limit ? decisions.slice(0, limit) : decisions.slice(0, growCount)
+  const base = limit ? decisions.slice(0, limit) : decisions.slice(0, growCount)
+  const [rowsAll] = useFold('decide.rows', false)
+  const [moreAll, setMoreAll] = useFold('decide.more', false)
+  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(() => new Set())
+  const shown = compact && !moreAll ? base.slice(0, 3) : base
+  const hiddenCount = compact && !moreAll ? decisions.length - shown.length : 0
   // D-182: 펼친 공고 하나(다시 누르면 접힌다)
   const [openId, setOpenId] = useState<string | null>(null)
   // D-183: 고르는 결정 — 고른 칸(결정마다)
   const [picked, setPicked] = useState<Record<string, string>>({})
   return (
     <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="decision-list">
-      {shown.map((d, idx) => (
-        <li key={`${d.clientId}:${d.id}`} className="flex flex-col gap-2 px-4 py-3" data-testid="decision" data-kind={d.kind} data-client={d.clientId}>
+      {shown.map((d, idx) => {
+        const rowKey = `${d.clientId}:${d.id}`
+        const rowOpen = !compact || rowsAll || openRows.has(rowKey)
+        return (
+        <li key={rowKey} className="flex flex-col gap-2 px-4 py-3" data-testid="decision" data-kind={d.kind} data-client={d.clientId} data-open={rowOpen ? '1' : '0'}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${KIND_CLASS[d.kind]}`}>{DECISION_KIND_LABEL[d.kind]}</span>
             {showClient && (
@@ -346,7 +360,22 @@ export function DecisionList({
               </Link>
             )}
           </div>
-          <p className="t-body font-semibold break-keep [overflow-wrap:anywhere] text-slate-900" data-testid="decision-title">{d.title}</p>
+          {compact ? (
+            <button
+              type="button"
+              aria-expanded={rowOpen}
+              onClick={() => setOpenRows((cur) => { const n = new Set(cur); if (n.has(rowKey)) n.delete(rowKey); else n.add(rowKey); return n })}
+              className="tap -mx-1 flex items-start gap-2 rounded-(--radius-control) px-1 text-left hover:bg-slate-50"
+              data-testid="decision-toggle"
+            >
+              <span className="t-body min-w-0 flex-1 font-semibold break-keep [overflow-wrap:anywhere] text-slate-900" data-testid="decision-title">{d.title}</span>
+              <ChevronDown aria-hidden="true" className={`mt-1 size-4 shrink-0 text-slate-400 transition-transform ${rowOpen ? 'rotate-180' : ''}`} />
+            </button>
+          ) : (
+            <p className="t-body font-semibold break-keep [overflow-wrap:anywhere] text-slate-900" data-testid="decision-title">{d.title}</p>
+          )}
+          {rowOpen && (
+          <>
           <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{d.why}</p>
           {d.choices && (
             <label className="t-sub flex min-w-0 flex-col gap-1 text-slate-600 sm:flex-row sm:items-center sm:gap-2">
@@ -414,9 +443,19 @@ export function DecisionList({
           </div>
           {d.grant && openId === `${d.clientId}:${d.id}` && <GrantBriefPanel b={d.grant} morePath={d.openPath} />}
           {!d.grant && d.rows && openId === `${d.clientId}:${d.id}` && <RowsPanel rows={d.rows} />}
+          </>
+          )}
         </li>
-      ))}
-      {!limit && growCount < decisions.length && (
+        )
+      })}
+      {hiddenCount > 0 && (
+        <li className="px-4 py-2">
+          <button type="button" onClick={() => setMoreAll(true)} data-testid="decision-show-all" className="tap t-sub rounded-(--radius-control) px-2 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+            {hiddenCount}건 더 보기
+          </button>
+        </li>
+      )}
+      {!limit && growCount < decisions.length && (!compact || moreAll) && (
         <li ref={moreRef} className="t-meta px-4 py-3 text-center text-slate-500" data-testid="decision-more-list" aria-live="polite">
           아래로 내리면 {decisions.length - growCount}건 더 보여요
         </li>

@@ -52,7 +52,7 @@ export function DocShelfBar({ summary, onJump, onReview }: { summary: DocShelfSu
               · 확인할 정보 <b className="font-bold text-warning-800" data-testid="doc-stage-review">{st.reviewFacts}</b>
             </span>
           )}
-          {st.review === 0 && st.received > 0 && <span className="text-success-700" data-testid="doc-stage-done">· 받은 서류에서 읽은 정보는 모두 확인했어요</span>}
+          {st.review === 0 && st.received > 0 && <span className="text-success-700" data-testid="doc-stage-done" title="받은 서류에서 읽은 정보는 모두 확인했어요">· 다 확인함</span>}
         </p>
       )}
     <div className="flex flex-wrap items-center gap-2" data-testid="doc-shelf">
@@ -60,8 +60,8 @@ export function DocShelfBar({ summary, onJump, onReview }: { summary: DocShelfSu
         <span className="t-sub text-success-700">손볼 서류가 없습니다.</span>
       ) : (
         <>
-          <span className="t-sub font-semibold text-slate-700">손볼 것</span>
-          {chip('missing', summary.missingNow, `지금 필요한데 없음 ${summary.missingNow.length}`, <FileX aria-hidden="true" className="size-4" />, 'border-danger-200 bg-danger-50 text-danger-700')}
+          <span className="sr-only">손볼 것</span>
+          {chip('missing', summary.missingNow, `지금 필요 ${summary.missingNow.length}`, <FileX aria-hidden="true" className="size-4" />, 'border-danger-200 bg-danger-50 text-danger-700')}
           {chip('expired', summary.expired, `만료 ${summary.expired.length}`, <FileWarning aria-hidden="true" className="size-4" />, 'border-danger-200 bg-danger-50 text-danger-700')}
           {review.length > 0 && (
             <button

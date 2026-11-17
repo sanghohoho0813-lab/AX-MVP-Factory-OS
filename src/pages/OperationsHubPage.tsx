@@ -24,7 +24,6 @@ import {
   SlidersHorizontal,
   AlarmClock,
   Clock,
-  Users,
   Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
@@ -86,7 +85,6 @@ import {
 import { DUE_SOON_DAYS } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
-import { contractStageOf } from '../types/clientOps'
 import { isContractClient, isProspect } from '../services/salesPipeline'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity, ServiceKey } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
@@ -104,7 +102,7 @@ import { BulkClientPasteSheet } from '../components/ops/BulkClientPasteSheet'
 import { clientsCsv } from '../services/clientBulkPaste'
 import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
 import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/docHandoff'
-import { HintTip } from '../components/ui/fold'
+import { HintTip, foldAllOpen } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import { FirstClientSteps } from '../components/ops/FirstClientSteps'
 import { useClientSaveNews } from '../services/clientSaveNews'
@@ -493,7 +491,13 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   const recoScores = sortKey === 'reco' ? reco.scores : undefined
   const ordered = useMemo(() => sortClients(visible, sortKey, today, recoScores), [visible, sortKey, today, recoScores])
   // D-479 업체가 많으면 카드는 처음 40장 · 아래로 내리면 이어서(보기 · 정렬 · 찾기가 바뀌면 처음부터)
-  const [shownCount, moreRef] = useGrowingCount(ordered.length, `${sortKey}|${filterKey}|${segment}|${query}`)
+  // D-627 글자 수 한도 — 처음엔 5곳(한 줄씩). [n곳 더 보기] 를 누르면 그때부터 40장씩 · 아래로 내리면 이어서.
+  //       [모두 펼치기] 를 해 둔 사람은 처음부터 예전처럼(40장)
+  const listKey = `${sortKey}|${filterKey}|${segment}|${query}`
+  const [listAllFor, setListAllFor] = useState<string | null>(() => (foldAllOpen() ? '*' : null))
+  const listAll = listAllFor === '*' || listAllFor === listKey
+  const [growCount, moreRef] = useGrowingCount(ordered.length, listKey)
+  const shownCount = listAll ? growCount : Math.min(5, ordered.length)
   const alerts = useMemo(() => buildAllAlerts(typed, today), [typed, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -518,7 +522,6 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   }, [typed, today])
 
   // 계약 완료(끝남)만 뺀다 — 계약 전도 챙겨야 할 업체다
-  const activeCount = typed.filter((r) => !r.archivedAt && contractStageOf(r.status) !== 'closed').length
 
   const openAlert = (a: OpsAlert) =>
     navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)
@@ -699,8 +702,6 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       */}
       <ScreenTitle
         title="고객 관리"
-        sub={today}
-        subOnPhone={false}
         actions={
           <>
             {assistShown && typed.length > 0 && (
@@ -729,6 +730,11 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       {moreOpen && (
         <BottomSheet title="고객 관리 도구" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-2">
+            {/* D-627 업체별 현황표 위에 있던 [업무 항목 추가] — 여기로 옮겼다(기능 그대로) */}
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); setCatalogOpen(true) }} data-guide="fn-clients-workitem" data-testid="clients-workitem">
+              <ListPlus aria-hidden="true" className="size-4 shrink-0" />
+              업무 항목 추가
+            </Button>
             {/* D-582 엑셀 목록을 붙여넣어 여러 곳을 한 번에 */}
             <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); setBulkOpen(true) }} data-testid="clients-bulk">
               <ClipboardPaste aria-hidden="true" className="size-4 shrink-0" />
@@ -996,7 +1002,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   aria-expanded={filtersOpen}
                   data-testid="client-filters-toggle"
                   onClick={() => setFiltersOpen((v) => !v)}
-                  className={`tap order-3 inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:hidden ${
+                  className={`tap order-3 inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.9375rem] font-medium sm:order-5 ${
                     filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
                   }`}
                 >
@@ -1026,7 +1032,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                           }`}
                         >
                           <Icon aria-hidden="true" className="size-4" />
-                          <span className="max-sm:sr-only">{CLIENT_TYPE_LABEL[t]}</span>
+                          {/* D-627 이름은 아이콘 · 마우스 올림(title)으로 — 화면 글자는 숫자만 */}
+                          <span className="sr-only">{CLIENT_TYPE_LABEL[t]}</span>
                           <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{typeCount[t]}</span>
                         </button>
                       )
@@ -1035,7 +1042,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 )}
                 {typed.length > 0 && (
                   <>
-                <div className={`${filtersOpen ? 'flex' : 'hidden'} order-4 w-full flex-wrap items-center gap-2 sm:order-6 sm:flex sm:w-auto`}>
+                {/* D-627 PC 도 '거르기' 를 눌러야 보기 · 정렬이 펼쳐진다(글자 수 한도) */}
+                <div className={`${filtersOpen ? 'flex' : 'hidden'} order-4 w-full flex-wrap items-center gap-2 sm:order-6 sm:w-auto`}>
                 {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
                 <label className="flex shrink-0 items-center gap-1.5">
                   <span className="t-sub text-slate-500">보기</span>
@@ -1104,7 +1112,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
                   onClick={() => { setTab('warning'); setAlertsOpen(true) }}
                 />
-                <SummaryChip testId="clients-kpi-active" icon={Users} label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳 · 계약 끝난 곳 · 보관한 곳 빼고`} />
+                {/* D-627 숫자 칩은 한 줄 셋 — '관리 중인 업체 n곳' 은 위 고르개 숫자와 같은 일이라 뺐다 */}
                 <SummaryChip
                   testId="clients-kpi-unpaid"
                   icon={Wallet}
@@ -1133,16 +1141,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     업체별 현황표
                   </h2>
                 </HintTip>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCatalogOpen(true)}
-                    data-guide="fn-clients-workitem"
-                    className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
-                  >
-                    업무 항목 추가
-                  </button>
-                </div>
+                {/* D-627 [업무 항목 추가] 는 머리 [더보기] 안으로(글자 수 한도) */}
               </div>
 
               {typed.length === 0 && !pilot && ctype === 'consultant' ? (
@@ -1206,7 +1205,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     </Button>
                   </div>
                 )}
-                <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
+                <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2 xl:items-start">
                   {ordered.slice(0, shownCount).map((record, i) => {
                     const p = clientOpsProgress(record, today)
                     const critical = summary.criticalByClient[record.id] ?? 0
@@ -1235,11 +1234,21 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     )
                   })}
                 </ul>
-                {shownCount < ordered.length && (
-                  <div ref={moreRef} className="t-sub py-3 text-center text-slate-500" data-testid="clients-more" aria-live="polite">
-                    아래로 내리면 {ordered.length - shownCount}곳 더 보여요
-                  </div>
-                )}
+                {shownCount < ordered.length &&
+                  (listAll ? (
+                    <div ref={moreRef} className="t-sub py-3 text-center text-slate-500" data-testid="clients-more" aria-live="polite">
+                      아래로 내리면 {ordered.length - shownCount}곳 더 보여요
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setListAllFor(listKey)}
+                      className="tap t-sub self-center rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50"
+                      data-testid="clients-show-more"
+                    >
+                      {ordered.length - shownCount}곳 더 보기
+                    </button>
+                  ))}
                 </>
               )}
 
@@ -1249,7 +1258,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
               */}
               {/* N1 업체가 하나도 없을 때는 누를 조각이 없다 — 빈 화면의 안내(첫 업체 등록)만 남긴다 */}
-              {typed.length > 0 && <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>}
+              {/* D-627 '업무 조각을 누르면 상태를 고르는 창이 열립니다' 줄은 뺐다 — 조각은 손가락 커서 · 펼친 카드 안에서 바로 보인다 */}
             </section>
 
           </div>

@@ -33,7 +33,7 @@ function LocalSettings() {
         <>
           {/* D-290 예전 왼쪽 아래(보기 방식 · 고객 플랫폼)는 여기로 */}
           <AccountViewPanel />
-          <Panel title="내 정보">
+          <Panel title="내 정보" fold={{ id: 'settings.me', summary: `${CURRENT_USER.name} · ${CURRENT_USER.role}` }}>
             <SettingRow label="이름">{CURRENT_USER.name}</SettingRow>
             <SettingRow label="역할">{CURRENT_USER.role}</SettingRow>
           </Panel>

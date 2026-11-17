@@ -16,7 +16,8 @@
 
 import { useMoneyWords } from './useMoneyWords'
 import { createElement, useState } from 'react'
-import { ArrowRight, BellRing, ChevronRight, FileUp, Sparkles } from 'lucide-react'
+import { ArrowRight, BellRing, ChevronDown, ChevronRight, FileUp, Sparkles } from 'lucide-react'
+import { useFold } from '../ui/fold'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageLabelOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
@@ -101,7 +102,7 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
       onClick={onClick}
       title={`${chip.label} · ${SERVICE_STATUS_LABEL[chip.status]}${chip.line ? ` · ${chip.line}` : ''} — 눌러서 상태 바꾸기`}
       data-chip-status={chip.status}
-      className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-500 ${look}`}
+      className={`tap inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-(--radius-control) border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-500 ${look}`}
     >
       <span className="whitespace-nowrap font-semibold">{chip.label}</span>
       <span className="whitespace-nowrap">{danger ? `기한 지남 ${due}`.trim() : SHORT[chip.status]}</span>
@@ -178,7 +179,8 @@ export function ClientBoardCard({
   const moneyWords = useMoneyWords()
   const [allChips, setAllChips] = useState(false)
   // D-159: 휴대폰은 처음에 접어 둔다(대표) — 이름 · 회사 정보 한 줄 · 다음 약속 · 진행 중인 일만. [펼쳐보기] 로 나머지
-  const [open, setOpen] = useState(false)
+  // D-627 글자 수 한도 — PC 도 휴대폰도 처음엔 한 줄(번호 · 이름 · 상태 하나 · 전화). [⌄] 로 나머지(업체마다 기억 · [모두 펼치기] 따름)
+  const [open, setOpen] = useFold(`client-card.${record.id}`, false)
   const p = clientOpsProgress(record, today)
   /** D-512 고객에게 부탁한 서류 — 끝내지 않은 요청이 없으면 null */
   const docReq = requestSummary(record, today)
@@ -234,7 +236,6 @@ export function ClientBoardCard({
   /* D-129: 계약 종류는 이름 옆 작은 배지로 — 현금 계약 · 보험 계약 · 혼합 계약 */
   const kindBadge = record.contract.kind === '' ? '' : record.contract.kind === 'mixed' ? '혼합 계약' : `${CONTRACT_KIND_LABEL[record.contract.kind]} 계약`
   const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
-  const brief = [y ? `${y.nthYear}년차` : '', record.businessCategory || record.industry, region, repName].filter((v) => v && v.trim() !== '').join(' · ')
 
   return (
     <li
@@ -254,7 +255,8 @@ export function ClientBoardCard({
       <div className="flex flex-col gap-2 p-3.5 sm:p-4">
         {/* 이름 줄 */}
         {/* D-122: 좁으면 배지 · 진행률이 아랫줄로 — 휴대폰 큰 글자에서 이름이 몇 글자로 잘렸다 */}
-        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        {/* D-627 접힌 카드는 한 줄 — 이름이 길면 말줄임(펼치면 두 줄까지) */}
+        <div className={`flex items-center justify-between gap-x-2 gap-y-1 ${open ? 'flex-wrap' : ''}`}>
           {/*
             번호는 옅게, 그리고 이름 단추 **밖**에 둔다.
             단추 안에 넣으면 글자 크기가 다른 상자가 한 줄에 셋(번호·이름·화살표)이 되어
@@ -266,9 +268,9 @@ export function ClientBoardCard({
               {rank}
             </span>
           )}
-          <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-[1_1_11rem] items-center gap-2 text-left">
-            {/* D-166: 두 줄까지 — 한 줄 말줄임이면 '…(주) 제1공장 · 제2공장' 처럼 뒤가 다른 업체끼리 구분이 안 됐다 */}
-            <span className="t-card line-clamp-2 font-bold text-slate-900 hover:text-brand-700 hover:underline [overflow-wrap:anywhere]">
+          <button type="button" onClick={onOpen} title={record.companyName} className={`tap flex min-w-0 items-center gap-2 text-left ${open ? 'flex-[1_1_11rem]' : 'flex-1'}`}>
+            {/* D-166: 두 줄까지 — 한 줄 말줄임이면 '…(주) 제1공장 · 제2공장' 처럼 뒤가 다른 업체끼리 구분이 안 됐다 (D-627 접힌 한 줄에서는 말줄임 · 마우스를 올리면 전체) */}
+            <span className={`t-card font-bold text-slate-900 hover:text-brand-700 hover:underline [overflow-wrap:anywhere] ${open ? 'line-clamp-2' : 'truncate'}`}>
               {record.companyName || '(이름 없음)'}
             </span>
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
@@ -280,7 +282,7 @@ export function ClientBoardCard({
             </span>
           )}
           {kindBadge && (
-            <span data-contract-badge className={`t-meta shrink-0 self-center rounded-full ${open ? '' : 'max-sm:hidden '} border border-brand-200 bg-brand-50 px-2 py-0.5 font-semibold whitespace-nowrap text-brand-700`}>
+            <span data-contract-badge className={`t-meta shrink-0 self-center rounded-full ${open ? '' : 'hidden '} border border-brand-200 bg-brand-50 px-2 py-0.5 font-semibold whitespace-nowrap text-brand-700`}>
               {kindBadge}
             </span>
           )}
@@ -295,8 +297,24 @@ export function ClientBoardCard({
             {/* D-159: 진행률(%)은 뺐다 — 대표: 몇 % 진행됐는지는 의미가 없다 */}
             {/* D-524 고객 관리 카드에서도 바로 전화(D-125 — 업체가 나오는 줄마다) — 휴대폰: 고객 → 전화 두 번. 번호가 없으면 단추 없음 */}
             <CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} />
+            {/* D-627 펼치기 — 글자 없이 화살표 하나(읽는 기계에는 '펼쳐보기') */}
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              aria-label={open ? `${record.companyName} 접기` : `${record.companyName} 펼쳐보기`}
+              title={open ? '접기' : '펼쳐보기'}
+              data-testid="card-toggle"
+              className="tap inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+            >
+              <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
           </div>
         </div>
+
+        {/* D-627 아래는 펼쳤을 때만(PC · 휴대폰 같음) */}
+        {open && (
+        <>
 
         {/* 검색 근거 — 회사명이 아니라 다른 칸이 맞았으면 어느 칸인지 밝힌다 (D-80) */}
         {hit && (
@@ -353,7 +371,7 @@ export function ClientBoardCard({
             docReq.done ? `요청한 서류 다 받음 · ${docReq.got}/${docReq.total}` : `서류 요청 ${docReq.waitingDays === 0 ? '오늘' : `${docReq.waitingDays}일째`} · ${docReq.got}/${docReq.total} 받음`,
           )}
         {/* D-159: 맞는 지원사업 · 사업자번호 · 업무 조각 · 돈 줄은 휴대폰에서 접어 둔다(펼쳐보기) */}
-        <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more">
+        <div className="contents" data-testid="card-more">
         {!reco && grants && grants.fit > 0 && onGrants && (
           <button
             type="button"
@@ -367,15 +385,9 @@ export function ClientBoardCard({
           </button>
         )}
         </div>
-        {/* D-159: 접힌 휴대폰 카드 — 몇년차 · 업종 · 지역 · 대표자를 작게 한 줄로 */}
-        {!open && brief !== '' && (
-          <p className="t-meta truncate text-slate-500 sm:hidden" data-testid="card-brief">
-            {brief}
-          </p>
-        )}
         {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}
         {(strongMeta.length > 0 || mutedMeta.length > 0 || bizNo !== '') && (
-          <p className={`t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 ${open ? '' : 'max-sm:hidden'}`}>
+          <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {/*
               업력은 색을 쓴다.
               정책자금·벤처인증 자격이 '몇 년차' 에서 갈리므로, 목록을 훑을 때 가장 먼저
@@ -403,7 +415,7 @@ export function ClientBoardCard({
         )}
 
         {/* 다음 할 일 */}
-        <p className={`t-sub break-keep text-slate-700 ${open ? '' : 'max-sm:line-clamp-1'}`}>
+        <p className="t-sub break-keep text-slate-700">
           {record.nextAction || <span className="text-slate-400">다음 약속이 없습니다</span>}
           {record.nextActionDueDate && (
             <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-500'}>
@@ -414,27 +426,7 @@ export function ClientBoardCard({
           )}
         </p>
 
-        {/* D-159: 진행 중인 일 — 접어 둔 휴대폰 카드에서 조각 대신 한 줄로. 펼쳐보기는 같은 줄 끝에 */}
-        <div className="flex items-center justify-between gap-2 sm:hidden">
-          {!open && chips.some(needsEye) ? (
-            <p className="t-sub min-w-0 break-keep text-slate-700 [overflow-wrap:anywhere]" data-testid="card-doing">
-              <span className="text-slate-500">진행 중 </span>
-              {chips.filter(needsEye).map((c) => c.label).join(' · ')}
-            </p>
-          ) : (
-            <span />
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            data-testid="card-toggle"
-            className="tap t-sub inline-flex shrink-0 items-center gap-1 font-semibold whitespace-nowrap text-brand-700"
-          >
-            {open ? '접기 ▲' : '펼쳐보기 ▼'}
-          </button>
-        </div>
-        <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more-2">
+        <div className="contents" data-testid="card-more-2">
         {/*
           사업자등록번호는 자체 줄에 둔다.
           읽는 값이 아니라 서류에 옮겨 적는 값이라, 카드마다 같은 자리에 같은 자릿수로 있어야
@@ -533,6 +525,8 @@ export function ClientBoardCard({
           </button>
         </div>
         </div>
+        </>
+        )}
       </div>
     </li>
   )

@@ -492,10 +492,12 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           </HintTip>
           <span className={`t-meta shrink-0 rounded-full bg-white px-2 font-semibold tabular-nums ${list.length > 0 ? c.text : 'text-slate-400'}`} style={list.length > 0 ? c.style : undefined}>{list.length}</span>
         </div>
-        <p className="t-meta break-keep text-slate-500 sm:hidden">{SALES_STAGE_HINT[stage]}</p>
+        {/* D-627 휴대폰 칸 설명 한 줄은 화면 읽기에만(PC 처럼 칸 이름의 ⓘ · 마우스) */}
+        <p className="sr-only">{SALES_STAGE_HINT[stage]}</p>
       </div>
       {list.length === 0 ? (
-        <p className="t-meta rounded-(--radius-control) border border-dashed border-slate-200 px-2 py-4 text-center text-slate-400">없음</p>
+        // D-627 빈 칸은 점선 칸만(글은 화면 읽기에만)
+        <p className="t-meta rounded-(--radius-control) border border-dashed border-slate-200 px-2 py-4 text-center text-slate-400"><span className="sr-only">없음</span></p>
       ) : (
         // D-479 업체가 많으면 칸마다 처음 30장 · 아래로 내리면 이어서
         <GrowingList
@@ -519,7 +521,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       <PageHero
         art="sales"
         title="영업 관리"
-        sub={`${today} · 진행 중 ${stats.inFlow}곳 · 계약 완료 ${all.contracted.length}곳`}
+        // D-627 숫자는 바로 아래 칩 · 보드 칸이 말한다 — 머리 한 줄(날짜 · 진행 중 · 계약 완료)은 뺐다
         context={<SalesTabs part="tabs" />}
         actions={
           <>
@@ -554,7 +556,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           {topRisk ? (
             <NextActionBar
               tone="orange"
-              label={`지금 챙길 영업 · ${risks.length}곳`}
+              label={risks.length > 1 ? `지금 챙길 영업 · ${risks.length}곳` : '챙길 영업'}
               title={topRisk.record.companyName}
               detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
               action={
@@ -592,9 +594,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         */}
         <section aria-label="영업 요약" data-testid="sales-summary" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <SummaryChip testId="sales-kpi-flow" icon={TrendingUp} label="진행 중" value={`${stats.inFlow}곳`} hint="잠재 고객 ~ 3차 클로징" />
-          <SummaryChip testId="sales-kpi-fee" icon={Coins} label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />
+          {/* D-627 0원이면 칩을 그리지 않는다(진행 중인 곳에 금액을 적으면 보인다) */}
+          {stats.fee > 0 && <SummaryChip testId="sales-kpi-fee" icon={Coins} label="예상 수임료" value={krwTile(stats.fee)} hint="진행 중인 곳 합계" />}
           <SummaryChip testId="sales-kpi-won" icon={CalendarCheck} label="이번 달 계약" value={`${stats.wonThisMonth}곳`} urgency={stats.wonThisMonth > 0 ? 'brand' : 'neutral'} hint="계약 완료로 옮긴 곳" />
-          <SummaryChip testId="sales-kpi-stale" icon={Hourglass} label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />
+          {/* D-627 칩은 셋까지 — 멈춘 곳이 있을 때만 넷째 칩 */}
+          {stats.stale > 0 && <SummaryChip testId="sales-kpi-stale" icon={Hourglass} label={`${SALES_STALE_DAYS}일 넘게 멈춤`} value={`${stats.stale}곳`} urgency={stats.stale > 0 ? 'warning' : 'neutral'} hint={`보류·이탈 ${stats.parked}곳은 따로`} />}
         </section>
         </ArrangeItem>
         {!phone && (
@@ -603,7 +607,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           {topRisk ? (
             <NextActionBar
               tone="orange"
-              label={`지금 챙길 영업 · ${risks.length}곳`}
+              label={risks.length > 1 ? `지금 챙길 영업 · ${risks.length}곳` : '챙길 영업'}
               title={topRisk.record.companyName}
               detail={<span className="text-warning-800">{topRisk.reason}{risks.length > 1 ? ` · 나머지 ${risks.length - 1}곳은 아래 '지금 챙길 영업'에` : ''}</span>}
               action={
@@ -643,10 +647,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </ArrangeItem>
         <ArrangeItem id="signals" label="지금 챙길 영업 · 다시 연락할 곳" hint="목록(있을 때만)">
         {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}
-        {(risks.length > 0 || recontacts.length > 0) && (
+        {(risks.length > 1 || recontacts.length > 0) && (
           <div className="grid gap-2.5 xl:grid-cols-2" data-testid="sales-signals">
-            {risks.length > 0 && (
-              <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>} defaultOpen>
+            {/* D-627 한 곳뿐이면 바로 위 '지금 챙길 영업' 줄이 같은 말 — 둘 이상일 때만 접힌 목록 */}
+            {risks.length > 1 && (
+              <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳`} badge={<Badge tone="warning">{risks.length}</Badge>}>
                 <ul className="flex flex-col divide-y divide-slate-100">
                   {(phone && !allRisks ? risks.slice(0, 3) : risks).map((r) => (
                     <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">

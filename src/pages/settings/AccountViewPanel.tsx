@@ -11,6 +11,7 @@
 import type { ReactNode } from 'react'
 import { ExternalLink, PlayCircle } from 'lucide-react'
 import { Panel } from '../../components/ui/Panel'
+import { HintTip } from '../../components/ui/fold'
 import { ViewAsSwitch, useViewTargets } from '../../components/layout/ViewAsSwitch'
 import { DeviceSwitch } from '../../components/layout/DeviceView'
 import { useDeviceView } from '../../lib/deviceView'
@@ -22,9 +23,15 @@ import { setGuideHoverOn, useGuideHoverOn } from '../../lib/guideHoverPref'
 export function AccountViewRow({ label, hint, children, testId }: { label: string; hint?: string; children: ReactNode; testId?: string }) {
   return (
     <div data-testid={testId} className="flex flex-col gap-2 border-b border-slate-100 py-3.5 last:border-0 md:flex-row md:items-center md:justify-between md:gap-4">
+      {/* D-627 설명 한 줄은 ⓘ(마우스 · 누르면) — 처음엔 이름 · 단추만 */}
       <div className="min-w-0">
-        <p className="text-[0.9375rem] font-semibold break-keep text-slate-800">{label}</p>
-        {hint && <p className="t-sub mt-0.5 break-keep text-slate-500">{hint}</p>}
+        {hint ? (
+          <HintTip tip={hint} label={label}>
+            <p className="text-[0.9375rem] font-semibold break-keep text-slate-800">{label}</p>
+          </HintTip>
+        ) : (
+          <p className="text-[0.9375rem] font-semibold break-keep text-slate-800">{label}</p>
+        )}
       </div>
       <div className="w-full min-w-0 md:w-[min(24rem,55%)] md:shrink-0">{children}</div>
     </div>

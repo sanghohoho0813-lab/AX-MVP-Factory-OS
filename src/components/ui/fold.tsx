@@ -28,6 +28,15 @@ const KEY = (id: string) => `axmvp.fold.${id}`
 export const FOLD_ALL_KEY = 'axmvp.fold.all'
 const EVT = 'axmvp:fold-all'
 
+/** D-627 [모두 펼치기] 를 해 둔 사람인가 — 목록도 처음부터 길게(5줄 대신) */
+export function foldAllOpen(): boolean {
+  try {
+    return localStorage.getItem(FOLD_ALL_KEY) === 'open'
+  } catch {
+    return false
+  }
+}
+
 function readFold(id: string, fallback: boolean): boolean {
   try {
     // D-315 이름표가 바뀐 칸은 옛 이름으로 기억한 것도 읽는다
@@ -53,8 +62,20 @@ function writeFold(id: string, open: boolean) {
 
 const EVT_ONE = 'axmvp:fold-one'
 
+/**
+ * D-627 큰 '더 보기' 안에 들어간 목차 — 그 목차로 데려갈 때 바깥 '더 보기' 도 같이 편다.
+ * (업체 상세 맞춤 추천 · 개요의 나머지 칸을 한 번 누르면 보이게 묶었다)
+ */
+function parentFold(id: string): string | null {
+  if (id.startsWith('smart.') && id !== 'smart.more') return 'smart.more'
+  if (id.startsWith('overview.') && !['overview.more', 'overview.company', 'overview.picks', 'overview.doing'].includes(id)) return 'overview.more'
+  return null
+}
+
 /** 목차 하나를 펼친다 — '모듈별 판정 보기' 처럼 그 목차로 데려갈 때(기억도 펼침으로) */
 export function openFold(id: string) {
+  const parent = parentFold(id)
+  if (parent) openFold(parent)
   writeFold(id, true)
   window.dispatchEvent(new CustomEvent(EVT_ONE, { detail: id }))
 }

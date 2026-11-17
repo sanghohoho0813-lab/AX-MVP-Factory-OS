@@ -81,7 +81,8 @@ export function CaseQuickStart({
 
       {mode === 'client' ? (
         <div className="flex flex-col gap-2" data-testid="case-quick-clients">
-          <p className="t-sub break-keep text-slate-600">고객 관리에 있는 업체를 누르면 회사 정보 · 서류 · 관계를 그대로 써서 바로 작업실을 엽니다(아직 작업실이 없는 고객 {start.total}곳).</p>
+          {/* D-627 설명은 화면 읽기에만 — 업체 단추를 누르면 바로 작업실 */}
+          <p className="sr-only">고객 관리에 있는 업체를 누르면 회사 정보 · 서류 · 관계를 그대로 써서 바로 작업실을 엽니다(아직 작업실이 없는 고객 {start.total}곳).</p>
           {start.total > 8 || q ? (
             <label className="relative">
               <span className="sr-only">고객 찾기</span>
@@ -100,9 +101,9 @@ export function CaseQuickStart({
                     className="tap flex min-h-14 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-300 hover:bg-brand-50/50 disabled:opacity-60"
                     data-testid="case-quick-client"
                     data-id={c.id}
+                    title={[c.contactName, c.businessNumber, c.contract?.signedAt ? '계약 고객' : c.sales ? '잠재고객' : ''].filter(Boolean).join(' · ') || undefined}
                   >
                     <span className="t-body w-full truncate font-semibold text-slate-900">{c.companyName}</span>
-                    <span className="t-meta w-full truncate text-slate-600">{[c.contactName, c.businessNumber, c.contract?.signedAt ? '계약 고객' : c.sales ? '잠재고객' : ''].filter(Boolean).join(' · ') || '정보 없음'}</span>
                   </button>
                 </li>
               ))}

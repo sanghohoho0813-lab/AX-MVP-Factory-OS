@@ -47,7 +47,8 @@ export function FirstMeetingChecklistPage() {
         </div>
       </Panel>
 
-      <Panel title="들어오면 이어지는 곳">
+      {/* D-627 이어지는 곳은 접힌 한 줄(누르면 세 칸) */}
+      <Panel title="들어오면 이어지는 곳" fold={{ id: 'firstmeeting.connects', summary: CONNECTS.map((c) => c.label).join(' · ') }}>
         <ul className="grid gap-2 sm:grid-cols-3">
           {CONNECTS.map((c) => (
             <li key={c.to}>

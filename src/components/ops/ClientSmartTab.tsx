@@ -219,201 +219,204 @@ export default function ClientSmartTab({
       {/* D-239: 이 업체 AI 도우미 — 한 장 요약 · 다음 할 일 · 미팅 질문 · 제안 순서(먼저 제안할 것 바로 아래) */}
       {!toolsActive && <AiAssist page="client" scope={`client:${record.id}`} title={record.companyName} presets={['client.brief', 'client.next', 'client.meeting', 'client.pitch']} build={assistBuild} quick={2} defaultClientId={record.id} pin={assistPin} />}
 
-      {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
-      <FoldAllButton className="-my-2 self-end" />
-
-      {/* 1. 서류 올리기 — D-192: 설명 글은 ⓘ 로, 한 줄만 */}
-      <Surface className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:py-3">
-        <HintTip tip={hintFor('서류만 올리면 저절로 분석해요')} label="서류만 올리면 저절로 분석해요" className="min-w-0 flex-1">
-          <p className="t-card flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
-            <FileUp aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-            서류만 올리면 저절로 분석해요
-          </p>
-        </HintTip>
-        <Button variant="primary" onClick={onUpload} data-testid="smart-upload">
-          <FileUp aria-hidden="true" className="size-4" /> 서류 올리기
-        </Button>
-      </Surface>
-
-
-      {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
-      {lastBatch ? (
-        <BatchSummary dupBases={dupBases} batch={lastBatch} fresh onRetry={onUpload} opened={opened} inboxCount={pending} />
-      ) : record.docUploads?.[0] ? (
-        <BatchSummary dupBases={dupBases} batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} inboxCount={pending} />
-      ) : null}
-
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} preview={acceptPreview} />
+      {/* D-627 글자 수 한도 — 맞춤 추천 첫 화면은 '먼저 제안할 것' · '확인할 정보' 만. 나머지(서류 올리기 · 다음 행동 · 설계서 · 상황 예시 · 맞춤 상담 · 모듈별 판정 · 지금 챙길 것 · 지원사업)는 한 번 누르면(기억 · [모두 펼치기] 따름) */}
+      <Fold id="smart.more" title="더 보기" testId="fold-smart-more" hint="서류 올리기 · 다음 행동 · 상황별 설계서 · 상황 예시 · 맞춤 상담 · 모듈별 판정 · 지금 챙길 것 · 맞는 지원사업">
+        {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
+        <FoldAllButton className="-my-2 self-end" />
 
-      {/* 3-1. D-158: 프로그램이 준비한 것 — 맞다 · 아니다만(정보 확인은 위 칸이 맡는다) */}
-      {decisions.length > 0 && (
-        <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length} fold={{ id: 'smart.decisions' }}>
-          <div data-testid="smart-decisions">
-            <DecisionList decisions={decisions} busy={busy} showClient={false} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
-          </div>
-        </Section>
-      )}
+        {/* 1. 서류 올리기 — D-192: 설명 글은 ⓘ 로, 한 줄만 */}
+        <Surface className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:py-3">
+          <HintTip tip={hintFor('서류만 올리면 저절로 분석해요')} label="서류만 올리면 저절로 분석해요" className="min-w-0 flex-1">
+            <p className="t-card flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
+              <FileUp aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+              서류만 올리면 저절로 분석해요
+            </p>
+          </HintTip>
+          <Button variant="primary" onClick={onUpload} data-testid="smart-upload">
+            <FileUp aria-hidden="true" className="size-4" /> 서류 올리기
+          </Button>
+        </Surface>
 
-      {/* 4. 다음 행동 */}
-      {/* D-357 화면 원칙 — 맞춤 추천 첫 화면은 '먼저 제안할 것' 하나만 펼치고 나머지는 접힌 채 한 줄(펼친 것은 기억) */}
-      <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', summary: steps.length ? '누르면 이 업체에 지금 할 일 순서' : '지금 추천할 행동 없음' }}>
-        {steps.length === 0 ? (
-          <p className="t-sub break-keep text-slate-500">{customer ? '지금 추천할 행동이 없어요.' : '지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.'}</p>
-        ) : (
-          <ol className="flex flex-col gap-2" data-testid="smart-steps">
-            {steps.map((st, i) => (
-              <li key={st.id} className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="smart-step">
-                <span className="flex min-w-0 flex-1 items-start gap-3">
-                  <span aria-hidden="true" className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-600 font-bold text-white">
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="t-body block break-keep font-semibold text-slate-900 [overflow-wrap:anywhere]">{st.text}</span>
-                    <span className="t-sub block break-keep text-slate-500 [overflow-wrap:anywhere]">{st.why}</span>
-                  </span>
-                </span>
-                <span className="flex shrink-0 flex-wrap gap-2 pl-9 sm:pl-0">
-                  {st.href?.startsWith('#') ? (
-                    <Button size="sm" variant="secondary" onClick={() => document.querySelector(st.href as string)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                      확인하러 가기
-                    </Button>
-                  ) : st.href ? (
-                    <Link to={st.href} className="tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:border-brand-400">
-                      열기 <ArrowRight aria-hidden="true" className="size-4" />
-                    </Link>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={onUpload}>
-                      서류 올리기
-                    </Button>
-                  )}
-                  {st.id !== 'facts' && (
-                    <Button size="sm" variant="ghost" onClick={() => setNext(st.text)} data-testid="smart-step-next">
-                      <CalendarPlus aria-hidden="true" className="size-4" /> 다음 약속으로
-                    </Button>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ol>
+
+        {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
+        {lastBatch ? (
+          <BatchSummary dupBases={dupBases} batch={lastBatch} fresh onRetry={onUpload} opened={opened} inboxCount={pending} />
+        ) : record.docUploads?.[0] ? (
+          <BatchSummary dupBases={dupBases} batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} inboxCount={pending} />
+        ) : null}
+
+
+        {/* 3-1. D-158: 프로그램이 준비한 것 — 맞다 · 아니다만(정보 확인은 위 칸이 맡는다) */}
+        {decisions.length > 0 && (
+          <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length} fold={{ id: 'smart.decisions' }}>
+            <div data-testid="smart-decisions">
+              <DecisionList decisions={decisions} busy={busy} showClient={false} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
+            </div>
+          </Section>
         )}
-      </Section>
 
-      {/* 4-0. D-242 상황별 한 장 설계서 — 상황 하나 · 사람 수 → 고용지원금 · 세액공제 · 정책자금을 한 장에 · 붙이면 할 일로 */}
-      <ClientSituationPlan
-        record={record}
-        today={today}
-        usable={scenarioUsable}
-        onRequestText={onRequestText}
-        onAnswer={(q, a) =>
-          onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 설계서 · 상황 예시를 다시 맞췄어요.')
-        }
-        onAttach={attachPlan}
-        focus={planFocus}
-      />
-
-      {/* 4-1. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
-      <ClientScenarios
-        record={record}
-        today={today}
-        usable={scenarioUsable}
-        onRequestText={onRequestText}
-        onSetNext={setNext}
-        onAnswer={(q, a) =>
-          onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
-        }
-        onPlan={openPlan}
-      />
-
-      {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
-      {!customer && (
-        <Fold id="smart.advisor" title="맞춤 상담">
-          <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} bare />
-        </Fold>
-      )}
-
-      {/* 5. 모듈별 판정 */}
-      {!customer && (
-      <div id="module-verdicts" className="scroll-mt-32">
-      {/* D-192: 위 '먼저 제안할 것' 이 좋은 것 3개를 보여 준다 — 전부는 접어 둔다(설명은 ⓘ) */}
-      <Section title="모듈별 판정" count={insights.length} fold={{ id: 'smart.verdicts' }}>
-        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" data-testid="smart-insights">
-          {insights.map((ins) => (
-            <li key={ins.key} data-testid="smart-insight" data-key={ins.key} data-tone={ins.tone}>
-              <Surface edge={TONE[ins.tone]} showEdge className="flex h-full flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="t-card font-bold text-slate-900">{ins.label}</span>
-                  <Badge tone={TONE[ins.tone]}>{INSIGHT_TONE_LABEL[ins.tone]}</Badge>
-                </div>
-                {/* D-509 처음 보는 말(인정이자 · 경정청구 · 과밀억제권역 …)은 점선 밑줄 — 누르면 한 줄 설명 */}
-                <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]"><TermText text={ins.headline} /></p>
-                {ins.amount && <p className="t-sub font-bold break-keep text-success-700" data-testid="smart-insight-amount">{ins.amount}</p>}
-                {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]"><TermText text={ins.detail} /></p>}
-                {ins.last && (
-                  <p className="t-sub flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="smart-insight-last">
-                    <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
-                    <span className="min-w-0">
-                      지난번 <b className="font-semibold text-slate-800">{ins.last.label}</b> · {activityTimeText(ins.last.at)}
+        {/* 4. 다음 행동 */}
+        {/* D-357 화면 원칙 — 맞춤 추천 첫 화면은 '먼저 제안할 것' 하나만 펼치고 나머지는 접힌 채 한 줄(펼친 것은 기억) */}
+        <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', summary: steps.length ? '누르면 이 업체에 지금 할 일 순서' : '지금 추천할 행동 없음' }}>
+          {steps.length === 0 ? (
+            <p className="t-sub break-keep text-slate-500">{customer ? '지금 추천할 행동이 없어요.' : '지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.'}</p>
+          ) : (
+            <ol className="flex flex-col gap-2" data-testid="smart-steps">
+              {steps.map((st, i) => (
+                <li key={st.id} className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center" data-testid="smart-step">
+                  <span className="flex min-w-0 flex-1 items-start gap-3">
+                    <span aria-hidden="true" className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-600 font-bold text-white">
+                      {i + 1}
                     </span>
-                  </p>
-                )}
-                {ins.missing.length > 0 && (
-                  <p className="t-sub flex flex-wrap items-center gap-1.5 text-slate-600">
-                    <span className="text-slate-500">있으면 더 정확:</span>
-                    {ins.missing.map((m) => (
-                      <span key={m} className="t-meta rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 font-semibold text-warning-800">
-                        {m}
+                    <span className="min-w-0">
+                      <span className="t-body block break-keep font-semibold text-slate-900 [overflow-wrap:anywhere]">{st.text}</span>
+                      <span className="t-sub block break-keep text-slate-500 [overflow-wrap:anywhere]">{st.why}</span>
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-wrap gap-2 pl-9 sm:pl-0">
+                    {st.href?.startsWith('#') ? (
+                      <Button size="sm" variant="secondary" onClick={() => document.querySelector(st.href as string)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                        확인하러 가기
+                      </Button>
+                    ) : st.href ? (
+                      <Link to={st.href} className="tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:border-brand-400">
+                        열기 <ArrowRight aria-hidden="true" className="size-4" />
+                      </Link>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={onUpload}>
+                        서류 올리기
+                      </Button>
+                    )}
+                    {st.id !== 'facts' && (
+                      <Button size="sm" variant="ghost" onClick={() => setNext(st.text)} data-testid="smart-step-next">
+                        <CalendarPlus aria-hidden="true" className="size-4" /> 다음 약속으로
+                      </Button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Section>
+
+        {/* 4-0. D-242 상황별 한 장 설계서 — 상황 하나 · 사람 수 → 고용지원금 · 세액공제 · 정책자금을 한 장에 · 붙이면 할 일로 */}
+        <ClientSituationPlan
+          record={record}
+          today={today}
+          usable={scenarioUsable}
+          onRequestText={onRequestText}
+          onAnswer={(q, a) =>
+            onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 설계서 · 상황 예시를 다시 맞췄어요.')
+          }
+          onAttach={attachPlan}
+          focus={planFocus}
+        />
+
+        {/* 4-1. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
+        <ClientScenarios
+          record={record}
+          today={today}
+          usable={scenarioUsable}
+          onRequestText={onRequestText}
+          onSetNext={setNext}
+          onAnswer={(q, a) =>
+            onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
+          }
+          onPlan={openPlan}
+        />
+
+        {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
+        {!customer && (
+          <Fold id="smart.advisor" title="맞춤 상담">
+            <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} bare />
+          </Fold>
+        )}
+
+        {/* 5. 모듈별 판정 */}
+        {!customer && (
+        <div id="module-verdicts" className="scroll-mt-32">
+        {/* D-192: 위 '먼저 제안할 것' 이 좋은 것 3개를 보여 준다 — 전부는 접어 둔다(설명은 ⓘ) */}
+        <Section title="모듈별 판정" count={insights.length} fold={{ id: 'smart.verdicts' }}>
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" data-testid="smart-insights">
+            {insights.map((ins) => (
+              <li key={ins.key} data-testid="smart-insight" data-key={ins.key} data-tone={ins.tone}>
+                <Surface edge={TONE[ins.tone]} showEdge className="flex h-full flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="t-card font-bold text-slate-900">{ins.label}</span>
+                    <Badge tone={TONE[ins.tone]}>{INSIGHT_TONE_LABEL[ins.tone]}</Badge>
+                  </div>
+                  {/* D-509 처음 보는 말(인정이자 · 경정청구 · 과밀억제권역 …)은 점선 밑줄 — 누르면 한 줄 설명 */}
+                  <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]"><TermText text={ins.headline} /></p>
+                  {ins.amount && <p className="t-sub font-bold break-keep text-success-700" data-testid="smart-insight-amount">{ins.amount}</p>}
+                  {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]"><TermText text={ins.detail} /></p>}
+                  {ins.last && (
+                    <p className="t-sub flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="smart-insight-last">
+                      <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+                      <span className="min-w-0">
+                        지난번 <b className="font-semibold text-slate-800">{ins.last.label}</b> · {activityTimeText(ins.last.at)}
                       </span>
-                    ))}
-                  </p>
-                )}
-                {/* D-313 판정이 났으면 아직 받을 신청 서류를 카톡 문구로 — 서류함에 있는 것은 뺀다 */}
-                {ins.request && onRequestText && (
-                  <button
-                    type="button"
-                    onClick={() => onRequestText(ins.request!.text, { title: ins.request!.title, description: ins.request!.description })}
-                    className="tap t-sub inline-flex items-center gap-1 self-start rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1 font-semibold break-keep text-brand-800 hover:border-brand-400"
-                    data-testid="smart-insight-request"
-                  >
-                    <MessageSquareText aria-hidden="true" className="size-4 shrink-0" />
-                    {ins.request.label}
-                  </button>
-                )}
-                <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <Link to={ins.openPath} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
-                    {ins.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
-                  </Link>
-                  {/* D-508 이 판정을 고객에게 어떻게 말할지(쉽게 말하면 · 대표님이 물으면 · 조심할 말) */}
-                  {talkCard(ins) && (
-                    <button type="button" onClick={() => setTalk(ins.key)} className="tap t-sub inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-700 hover:underline" data-testid="smart-insight-talk">
-                      <MessageCircle aria-hidden="true" className="size-4" /> 이렇게 말하기
+                    </p>
+                  )}
+                  {ins.missing.length > 0 && (
+                    <p className="t-sub flex flex-wrap items-center gap-1.5 text-slate-600">
+                      <span className="text-slate-500">있으면 더 정확:</span>
+                      {ins.missing.map((m) => (
+                        <span key={m} className="t-meta rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 font-semibold text-warning-800">
+                          {m}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  {/* D-313 판정이 났으면 아직 받을 신청 서류를 카톡 문구로 — 서류함에 있는 것은 뺀다 */}
+                  {ins.request && onRequestText && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestText(ins.request!.text, { title: ins.request!.title, description: ins.request!.description })}
+                      className="tap t-sub inline-flex items-center gap-1 self-start rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1 font-semibold break-keep text-brand-800 hover:border-brand-400"
+                      data-testid="smart-insight-request"
+                    >
+                      <MessageSquareText aria-hidden="true" className="size-4 shrink-0" />
+                      {ins.request.label}
                     </button>
                   )}
-                </div>
-              </Surface>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      </div>
-      )}
-
-      {/* 5-1. D-238: 홍보도 같이 — 홈페이지 · 홍보 글(대표 화면 · 요금제에 있을 때만) */}
-      <ClientPromoRow record={record} />
-
-      {/* 6. 지금 챙길 것 */}
-      {alerts.length > 0 && (
-        <Section title="지금 챙길 것" count={alerts.length} fold={{ id: 'smart.alerts' }}>
-          <ul className="flex flex-col gap-2" data-testid="smart-alerts">
-            {alerts.slice(0, 6).map((a) => (
-              <AlertRow key={a.id} alert={a} hideClient onOpen={() => onAlertOpen(a)} />
+                  <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <Link to={ins.openPath} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline">
+                      {ins.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
+                    </Link>
+                    {/* D-508 이 판정을 고객에게 어떻게 말할지(쉽게 말하면 · 대표님이 물으면 · 조심할 말) */}
+                    {talkCard(ins) && (
+                      <button type="button" onClick={() => setTalk(ins.key)} className="tap t-sub inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-700 hover:underline" data-testid="smart-insight-talk">
+                        <MessageCircle aria-hidden="true" className="size-4" /> 이렇게 말하기
+                      </button>
+                    )}
+                  </div>
+                </Surface>
+              </li>
             ))}
           </ul>
         </Section>
-      )}
+        </div>
+        )}
 
-      {/* 7. 맞는 지원사업 */}
-      {!customer && <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />}
+        {/* 5-1. D-238: 홍보도 같이 — 홈페이지 · 홍보 글(대표 화면 · 요금제에 있을 때만) */}
+        <ClientPromoRow record={record} />
+
+        {/* 6. 지금 챙길 것 */}
+        {alerts.length > 0 && (
+          <Section title="지금 챙길 것" count={alerts.length} fold={{ id: 'smart.alerts' }}>
+            <ul className="flex flex-col gap-2" data-testid="smart-alerts">
+              {alerts.slice(0, 6).map((a) => (
+                <AlertRow key={a.id} alert={a} hideClient onOpen={() => onAlertOpen(a)} />
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {/* 7. 맞는 지원사업 */}
+        {!customer && <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />}
+      </Fold>
     </div>
   )
 }
