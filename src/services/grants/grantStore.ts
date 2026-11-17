@@ -218,6 +218,28 @@ export interface SentRecord {
   noticeIds: string[]
   channel: SentChannel
   at: string
+  /** D-623 골라서 보낸 묶음 — 그때의 공고 이름(기업마당 공고는 마감되면 목록에서 사라진다) */
+  titles?: Record<string, string>
+  /** D-623 공고마다 붙인 내 한 줄 의견 */
+  comments?: Record<string, string>
+  /** D-623 맨 위 한마디 */
+  note?: string
+}
+
+/** D-623 보낸 기록에 같이 남기는 것 — 없어도 된다(예전 기록 · 빠른 복사) */
+export type SentExtra = Pick<SentRecord, 'titles' | 'comments' | 'note'>
+
+/** 저장된 글 묶음(공고 id → 글)을 믿지 않고 다시 읽는다 — 글자 아닌 값 · 너무 긴 글 · 너무 많은 줄은 버린다 */
+function textMap(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, string> = {}
+  let n = 0
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== 'string' || !v.trim() || n >= 20) continue
+    out[k] = v.slice(0, 200)
+    n += 1
+  }
+  return n ? out : undefined
 }
 
 export async function listSent(workspaceId: string | null): Promise<SentRecord[]> {
@@ -229,14 +251,21 @@ export async function listSent(workspaceId: string | null): Promise<SentRecord[]
       noticeIds: Array.isArray(r.data.noticeIds) ? (r.data.noticeIds as unknown[]).filter((x): x is string => typeof x === 'string') : [],
       channel: (['kakao', 'portal', 'link'] as const).includes(r.data.channel as SentChannel) ? (r.data.channel as SentChannel) : 'kakao',
       at: typeof r.data.at === 'string' ? r.data.at : r.createdAt,
+      ...(textMap(r.data.titles) ? { titles: textMap(r.data.titles) } : {}),
+      ...(textMap(r.data.comments) ? { comments: textMap(r.data.comments) } : {}),
+      ...(typeof r.data.note === 'string' && r.data.note.trim() ? { note: r.data.note.slice(0, 200) } : {}),
     }))
     .sort((a, b) => b.at.localeCompare(a.at))
 }
 
-export async function recordSent(workspaceId: string | null, clientId: string, noticeIds: string[], channel: SentChannel): Promise<SentRecord> {
+export async function recordSent(workspaceId: string | null, clientId: string, noticeIds: string[], channel: SentChannel, extra: SentExtra = {}): Promise<SentRecord> {
   const at = nowIso()
-  const row = await saveRow(workspaceId, MODULE, SENT, { clientId, data: { noticeIds, channel, at } })
-  return { id: row.id, clientId, noticeIds, channel, at }
+  const titles = textMap(extra.titles)
+  const comments = textMap(extra.comments)
+  const note = extra.note?.trim() ? extra.note.trim().slice(0, 200) : ''
+  const more = { ...(titles ? { titles } : {}), ...(comments ? { comments } : {}), ...(note ? { note } : {}) }
+  const row = await saveRow(workspaceId, MODULE, SENT, { clientId, data: { noticeIds, channel, at, ...more } })
+  return { id: row.id, clientId, noticeIds, channel, at, ...more }
 }
 
 /** 이 업체에 이 공고를 이미 알렸나 → 마지막으로 알린 때 */

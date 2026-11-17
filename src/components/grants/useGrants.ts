@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { brand } from '../../brand/brand.config'
 import { listLinks, publishUpdate } from '../../services/customerBridgeService'
-import { listNotices, listSent, recordSent, type SentChannel, type SentRecord } from '../../services/grants/grantStore'
+import { listNotices, listSent, recordSent, type SentChannel, type SentExtra, type SentRecord } from '../../services/grants/grantStore'
+import { digestExtra, digestHistory, digestMessage, sentIndexOf, type DigestHistoryLine, type DigestItem, type SentIndex } from '../../services/grants/grantDigest'
 import type { GrantMatch, GrantNotice } from '../../services/grants/grantMatch'
 import { noticeMessage, shareMessage } from '../../services/grants/grantText'
 import { profileLine } from '../../services/grants/grantProfile'
@@ -115,9 +116,9 @@ export function useGrantActions(o: {
   const mine = useSenderLine()
   const sender = pilot && customer ? mine : brand.brandNameKo
   const remember = useCallback(
-    async (clientId: string, ids: string[], channel: SentChannel) => {
+    async (clientId: string, ids: string[], channel: SentChannel, extra: SentExtra = {}) => {
       try {
-        const rec = await recordSent(workspaceId, clientId, ids, channel)
+        const rec = await recordSent(workspaceId, clientId, ids, channel, extra)
         setSent((prev) => [rec, ...prev])
       } catch {
         // 보낸 기록을 못 남겨도 문구 복사는 된 것이다
@@ -144,6 +145,21 @@ export function useGrantActions(o: {
       if (ok) await remember(client.record.id, matches.slice(0, 5).map((m) => m.notice.id), 'kakao')
     },
     [remember, toast, pilot, sender],
+  )
+
+  /** D-623 골라서 보내기 — 미리 보기 글(보내는 글과 같은 함수) */
+  const digestText = useCallback((client: GrantClient, items: readonly DigestItem[], note: string) => digestMessage({ companyName: client.record.companyName, sender, items, note }), [sender])
+
+  /** D-623 고른 공고 · 한 줄 의견을 한 통으로 복사하고, 그때의 공고 이름 · 의견까지 보낸 기록에 남긴다 */
+  const sendDigest = useCallback(
+    async (client: GrantClient, items: readonly DigestItem[], note: string): Promise<boolean> => {
+      if (items.length === 0) return false
+      const ok = await copyText(digestText(client, items, note))
+      toast(ok ? `${client.record.companyName} — 공고 ${items.length}건 문구를 복사했습니다 · 보낸 기록에 남겼어요` : '복사하지 못했습니다')
+      if (ok) await remember(client.record.id, items.map((it) => it.match.notice.id), 'kakao', digestExtra(items, note))
+      return ok
+    },
+    [digestText, remember, toast],
   )
 
   const copyLink = useCallback(
@@ -186,5 +202,30 @@ export function useGrantActions(o: {
     [linkOf, workspaceId, remember, toast],
   )
 
-  return { copyNotice, copyAll, copyLink: pilot ? null : copyLink, toPortal }
+  return { copyNotice, copyAll, copyLink: pilot ? null : copyLink, toPortal, digestText, sendDigest }
+}
+
+/** D-623 업체 판에 넘기는 '골라서 보내기' 묶음 — 알린 기록 · 보낸 기록 줄 · 미리 보기 · 보내기 */
+export interface DigestControl {
+  index: SentIndex
+  history: DigestHistoryLine[]
+  preview: (items: readonly DigestItem[], note: string) => string
+  onSend: (items: readonly DigestItem[], note: string) => Promise<boolean>
+}
+
+/** 보낸 기록을 한 번만 묶어 두고, 업체마다 판에 넘길 묶음을 만든다 */
+export function useGrantDigest(o: { sent: readonly SentRecord[]; notices: readonly GrantNotice[]; actions: Pick<ReturnType<typeof useGrantActions>, 'digestText' | 'sendDigest'> }): (client: GrantClient) => DigestControl {
+  const { sent, notices, actions } = o
+  const index = useMemo(() => sentIndexOf(sent), [sent])
+  const titles = useMemo(() => new Map(notices.map((n) => [n.id, n.title])), [notices])
+  const { digestText, sendDigest } = actions
+  return useCallback(
+    (client: GrantClient): DigestControl => ({
+      index,
+      history: digestHistory(sent, client.record.id, (id) => titles.get(id) ?? ''),
+      preview: (items, note) => digestText(client, items, note),
+      onSend: (items, note) => sendDigest(client, items, note),
+    }),
+    [index, sent, titles, digestText, sendDigest],
+  )
 }

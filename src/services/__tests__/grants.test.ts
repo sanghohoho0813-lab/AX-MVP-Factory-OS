@@ -58,6 +58,8 @@ import { buildClientReport } from '../clientReport'
 import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, undoDecision, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
 import { clip, grantBriefOf } from '../grants/grantBrief'
+import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digestHistory, digestMessage, digestSummary, noticeDay, sentIndexOf, type DigestItem } from '../grants/grantDigest'
+import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
 
 let pass = 0
@@ -1106,6 +1108,68 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const ans = answerFor('cert', { record: soon, today: T, notices: list })
   check('D557-9 업체 질문 답(인증): 사실 맨 앞 "…갱신하지 않으면 공고 3건을 못 해요"', ans.facts[0] === renewalRiskLine(risks[0]), ans.facts)
   check('D557-10 곧 끝나는 인증이 없으면 그 줄 없음', !answerFor('cert', { record: noCert, today: T, notices: list }).facts.some((f) => /갱신하지 않으면/.test(f)))
+}
+
+/* ---------------- D-623 맞는 공고 골라서 보내기 ---------------- */
+{
+  const T = '2026-11-17'
+  const p = prof({ ...BASE })
+  const mk = (id: string, over: Partial<GrantNotice>, rules: Partial<GrantRules> = { regions: ['경기'] }) => notice(rules, { id, title: `공고 ${id}`, createdAt: '2026-11-01T03:00:00Z', ...over })
+  const list = [
+    mk('old', { applyEnd: '2026-12-20' }),
+    mk('told', { applyEnd: '2026-11-25' }),
+    mk('new1', { applyEnd: '2026-11-20', postedAt: '2026-11-12', source: 'bizinfo', createdAt: '2026-11-17T00:10:00Z', agency: '경기도', amountText: '최대 3천만원', url: 'https://x.test/n1' }),
+    mk('new2', { applyEnd: '2026-12-05', postedAt: '2026-11-15', source: 'bizinfo' }),
+    mk('newcheck', { applyEnd: '2026-11-19', postedAt: '2026-11-16', source: 'bizinfo' }, { regions: ['경기'], minEmployees: 5 }),
+    mk('nodate', { applyEnd: '2026-11-30', source: 'bizinfo', createdAt: '2026-11-17T00:10:00Z' }),
+    mk('general', { applyEnd: '2026-11-21', postedAt: '2026-11-16' }, {}),
+    mk('closed', { applyEnd: '2026-11-10', postedAt: '2026-11-12' }),
+    mk('busan', { applyEnd: '2026-11-21', postedAt: '2026-11-16' }, { regions: ['부산'] }),
+  ]
+  const ms = matchesFor(list, p, T)
+  const sent: SentRecord[] = [
+    { id: 's2', clientId: 'c1', noticeIds: [], channel: 'link', at: '2026-11-10T04:00:00Z' },
+    { id: 's1', clientId: 'c1', noticeIds: ['told'], channel: 'kakao', at: '2026-11-10T03:00:00Z', titles: { told: '공고 told' }, comments: { told: '작년에도 냈던 사업' }, note: '안녕하세요' },
+    { id: 's0', clientId: 'c2', noticeIds: ['new1'], channel: 'kakao', at: '2026-11-16T03:00:00Z' },
+  ]
+  const idx = sentIndexOf(sent)
+  check('D623-1 알린 기록 묶음: 업체마다 마지막 알림 날 · 공고마다 알린 날', idx.last.get('c1') === '2026-11-10' && idx.ids.get('c1')?.get('told') === '2026-11-10' && idx.last.get('c2') === '2026-11-16' && !idx.last.has('c3'))
+  const cands = digestCandidates(ms, idx, 'c1')
+  const ids = cands.map((c) => `${c.match.notice.id}:${c.bucket}`).join(' ')
+  check(
+    'D623-2 보낼 후보: 새로 올라온 것(맞음 · 마감 급한 순 → 확인 필요) → 아직 안 알린 것 → 알린 것 · 전국 공통 · 마감 · 안 맞음은 뺌',
+    ids === 'new1:fresh new2:fresh newcheck:fresh nodate:unsent old:unsent told:sent',
+    ids,
+  )
+  check('D623-3 올라온 날을 모르는 기업마당 공고는 새로 올라왔다고 하지 않음(받아 온 때는 매일 바뀐다)', noticeDay(list[5]) === '' && noticeDay(list[0]) === '2026-11-01' && noticeDay(list[2]) === '2026-11-12')
+  check('D623-4 처음 골라 둘 것 = 새로 올라온 것만(다시 보내는 일은 직접 골랐을 때만)', defaultDigestPicks(cands).join(',') === 'new1,new2,newcheck' && defaultDigestPicks(cands, 2).join(',') === 'new1,new2')
+  const sum = digestSummary(ms, idx, 'c1')
+  check('D623-5 목록 숫자: 새로 올라온 조건 맞음 2건 · 7일 안 마감 1건 · 지난번 11-10', sum.fresh === 2 && sum.urgentFresh === 1 && sum.lastSent === '2026-11-10' && sum.due, sum)
+  // 한 번도 안 알린 업체 — 맞는 공고 전부가 보낼 것 · 처음에는 5건만 골라 둔다
+  const never = digestCandidates(ms, idx, 'c3')
+  check('D623-6 한 번도 안 알린 업체: 전부 보낼 것 · 맞음 먼저 마감 급한 순', never.every((c) => c.bucket === 'fresh') && never.map((c) => c.match.notice.id).join(',') === 'new1,told,nodate,new2,old,newcheck', never.map((c) => c.match.notice.id))
+  check('D623-7 처음 골라 두는 수 5건', defaultDigestPicks(never).length === 5 && digestSummary(ms, idx, 'c3').fresh === 5 && digestSummary(ms, idx, 'c3').lastSent === '')
+  // 다 알린 업체는 보낼 곳이 아니다
+  const all: SentRecord[] = [{ id: 'a', clientId: 'c9', noticeIds: ms.map((m) => m.notice.id), channel: 'kakao', at: '2026-11-17T03:00:00Z' }]
+  check('D623-8 오늘 다 알린 업체: 보낼 것 0 · 골라 둔 것 0', !digestSummary(ms, sentIndexOf(all), 'c9').due && defaultDigestPicks(digestCandidates(ms, sentIndexOf(all), 'c9')).length === 0)
+
+  const pick = (id: string, comment = ''): DigestItem => ({ match: cands.find((c) => c.match.notice.id === id)!.match, comment })
+  const msg = digestMessage({ companyName: '한빛정밀', sender: '미래AI랩', items: [pick('new1', '  직원 수만 확인하면\n바로 신청할 수 있어요  '), pick('newcheck'), pick('new2')], note: '지난주에 말씀드린 건에 이어 보냅니다.' })
+  check('D623-9 문구: 인사 · 한마디 · 건수 · 번호', /^한빛정밀 대표님, 안녕하세요\. 미래AI랩입니다\./.test(msg) && msg.includes('지난주에 말씀드린 건에 이어 보냅니다.') && msg.includes('공고 3건을 골라') && msg.includes('① 공고 new1') && msg.includes('② 공고 newcheck') && msg.includes('③ 공고 new2'), msg)
+  check('D623-10 문구: 소관 · 마감(날짜) · 지원 · 의견 한 줄(줄바꿈 없앰) · 공고 주소', msg.includes('· 소관: 경기도') && /· 마감: [^\n]*\(11월 20일\)/.test(msg) && msg.includes('· 지원: 최대 3천만원') && msg.includes('· 제 의견: 직원 수만 확인하면 바로 신청할 수 있어요') && msg.includes('· 공고: https://x.test/n1'), msg)
+  check('D623-11 문구: 확인 필요 공고는 확인할 것 · 의견이 없으면 의견 줄 없음', /② 공고 newcheck[\s\S]*· 확인할 것: 직원 수/.test(msg.split('③')[0]) && msg.split('· 제 의견:').length === 2, msg)
+  check('D623-12 문구: 선정을 약속하지 않음 · 빈 줄 겹침 0 · AI 라고 하지 않음', msg.includes('선정 여부는 심사에서 정해집니다') && !/\n\n\n/.test(msg) && !/AI|선정됩니다|확실|보장/.test(msg.replace('미래AI랩', '')))
+  const far = digestMessage({ companyName: '', sender: '담당자', items: [{ match: matchGrant(mk('m', { applyEnd: '2027-02-15' }), p, T), comment: '' }] })
+  check('D623-13 문구: 이미 날짜가 든 마감 말에는 날짜를 또 붙이지 않음 · 회사 이름 없으면 "대표님"', far.includes('· 마감: 2월 15일 마감\n') && far.startsWith('대표님, 안녕하세요. 담당자입니다.'), far)
+  const many = digestMessage({ companyName: 'x', sender: 's', items: Array.from({ length: 14 }, (_, i) => ({ match: matchGrant(mk(`k${i}`, { applyEnd: '2026-12-01' }), p, T), comment: '' })) })
+  check('D623-14 한 통에 10건까지', DIGEST_LIMIT === 10 && many.includes('공고 10건') && many.includes('⑩ 공고 k9') && !many.includes('공고 k10'))
+  const extra = digestExtra([pick('new1', '의견 하나'), pick('new2')], '  한마디  ')
+  check('D623-15 보낸 기록에 같이 남기는 것: 공고 이름 · 적은 의견만 · 한마디', extra.titles.new1 === '공고 new1' && extra.titles.new2 === '공고 new2' && extra.comments.new1 === '의견 하나' && !('new2' in extra.comments) && extra.note === '한마디', extra)
+  const hist = digestHistory(sent, 'c1', (id) => (id === 'told' ? '지금 이름' : ''))
+  check('D623-16 보낸 기록 보기: 새것 먼저 · 그때 이름 · 의견 · 한마디 · 공고 없는 찾기 링크 기록도 한 줄', hist.length === 2 && hist[0].channel === 'link' && hist[0].items.length === 0 && hist[1].day === '2026-11-10' && hist[1].items[0].title === '공고 told' && hist[1].items[0].comment === '작년에도 냈던 사업' && hist[1].note === '안녕하세요', hist)
+  const oldRec: SentRecord[] = [{ id: 'o', clientId: 'c1', noticeIds: ['gone', 'told'], channel: 'kakao', at: '2026-11-01T03:00:00Z' }]
+  const h2 = digestHistory(oldRec, 'c1', (id) => (id === 'told' ? '지금 이름' : ''))
+  check('D623-17 예전 기록(이름을 안 남긴 것): 지금 목록에 있으면 그 이름 · 없으면 빈 이름', h2[0].items.map((x) => x.title).join('|') === '|지금 이름', h2)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

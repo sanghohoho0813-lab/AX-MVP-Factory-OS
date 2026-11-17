@@ -1,8 +1,8 @@
 /**
  * 지원사업 알림 — 공고 창(맞는 업체 · 알리기) · 업체 창(맞는 공고 · 문구 · 링크) (D-141).
  */
-import { useState } from 'react'
-import { ArrowRight, ClipboardCheck, Copy, Link2, Send } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowRight, ClipboardCheck, Copy, Link2, ListChecks, Send } from 'lucide-react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { AiSoonButton } from '../ui/AiSoonButton'
@@ -12,6 +12,9 @@ import { CLIENT_KIND_LABEL, type ClientMatch, type GrantClient } from '../../ser
 import { ChallengeButton, DeadlineText, MatchList, NoticeLink, ReasonList, VerdictBadge, type ChallengeControl } from './GrantParts'
 import { applicationFor, applyReadiness } from '../../services/grants/grantApply'
 import { josa } from '../../lib/josa'
+import { digestCandidates } from '../../services/grants/grantDigest'
+import { GrantDigestStep, GrantSentHistory } from './GrantDigest'
+import type { DigestControl } from './useGrants'
 
 const mdOf = (iso: string) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
@@ -201,9 +204,12 @@ export function ClientGrantPanel({
   onFill,
   compact,
   challenge,
+  digest,
 }: {
   /** D-156: 공고마다 '도전해 볼 만함' 체크 */
   challenge?: ChallengeControl
+  /** D-623: 골라서 보내기 · 보낸 기록 — 없으면 예전처럼 [카톡 문구 복사] 만 */
+  digest?: DigestControl
   client: GrantClient
   matches: GrantMatch[]
   sentOf: (noticeId: string) => string
@@ -226,6 +232,15 @@ export function ClientGrantPanel({
   const missing = missingForMatch(client.profile)
   // 1,000건이면 맞는 공고도 수백 건 — 30건씩 이어 본다
   const shown = compact ? targeted.slice(0, compact) : targeted.slice(0, limit)
+  // D-623 골라서 보내기 — 같은 판 안에서 다음 단계로(창을 겹치지 않는다)
+  const [picking, setPicking] = useState(false)
+  const sentIndex = digest?.index
+  const cands = useMemo(() => (sentIndex ? digestCandidates(matches, sentIndex, client.record.id) : []), [sentIndex, matches, client.record.id])
+  const lastSent = sentIndex?.last.get(client.record.id) ?? ''
+  const freshFit = cands.filter((c) => c.bucket === 'fresh' && c.match.verdict === 'fit').length
+  if (digest && picking) {
+    return <GrantDigestStep companyName={client.record.companyName} cands={cands} lastSent={lastSent} preview={digest.preview} onSend={digest.onSend} onBack={() => setPicking(false)} />
+  }
   return (
     <div className="flex flex-col gap-3" data-testid="client-grants">
       {challenge && (
@@ -268,8 +283,14 @@ export function ClientGrantPanel({
           {showGeneral && general.length > 100 && <p className="t-sub text-slate-500">그 외 {general.length - 100}건은 지원사업 알림 화면에서 찾아 보세요.</p>}
         </div>
       )}
+      {digest && <GrantSentHistory history={digest.history} lastSent={lastSent} fresh={freshFit} />}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="primary" onClick={onCopyAll} disabled={targeted.length === 0} data-testid="client-grants-copy">
+        {digest && (
+          <Button size="sm" variant="primary" onClick={() => setPicking(true)} disabled={targeted.length === 0} data-testid="client-grants-digest" data-guide="fn-grant-digest">
+            <ListChecks aria-hidden="true" className="size-4" /> 골라서 보내기
+          </Button>
+        )}
+        <Button size="sm" variant={digest ? 'secondary' : 'primary'} onClick={onCopyAll} disabled={targeted.length === 0} data-testid="client-grants-copy">
           <Copy aria-hidden="true" className="size-4" /> 카톡 문구 복사
         </Button>
         <AiSoonButton size="sm" label="AI로 맞춤 안내문" what="이 업체 사정에 맞춰 공고 안내 문구와 준비 서류 목록을 써 줍니다" />

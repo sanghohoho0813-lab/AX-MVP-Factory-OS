@@ -20,7 +20,7 @@ import { Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { AddNoticeSheet, CategoryChips, NoticeRow, type ChallengeControl } from '../components/grants/GrantParts'
 import { ClientGrantPanel, NoticeSheet } from '../components/grants/GrantSheets'
-import { useGrantActions, useGrantData } from '../components/grants/useGrants'
+import { useGrantActions, useGrantDigest, type DigestControl, useGrantData } from '../components/grants/useGrants'
 import { GrantFeedBar } from '../components/grants/GrantFeedBar'
 import { isFeedNotice } from '../services/grants/grantFeed'
 import { listClients, saveClient } from '../services/clientOpsService'
@@ -31,6 +31,7 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, targetsSomeone, type GrantCategory, type GrantMatch, type GrantNotice } from '../services/grants/grantMatch'
 import { exampleNotices } from '../services/grants/grantExamples'
 import { addNotices, removeNotice, saveNotice, sentAt } from '../services/grants/grantStore'
+import { digestSummary, sentIndexOf } from '../services/grants/grantDigest'
 import { CLIENT_KIND_LABEL, clientsForNotice, fitSummary, grantClients, grantIndex, reachOf, type GrantClient, type NoticeInput } from '../services/grants/grantView'
 import { profileLine } from '../services/grants/grantProfile'
 import { factsOf, judgeGrant, loadGrantFilter, saveGrantFilter, type GrantFilterSettings } from '../services/grants/grantFilter'
@@ -49,6 +50,10 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const [params, setParams] = useSearchParams()
   const { notices, setNotices, sent, setSent, linkOf, loaded, error, reload, feed } = useGrantData(workspaceId)
   const actions = useGrantActions({ workspaceId, setSent, linkOf, toast: showToast })
+  // D-623 골라서 보내기 — 업체마다 알린 기록을 한 번만 묶어 둔다(업체별 목록 · 업체 창이 같이 쓴다)
+  const digestOf = useGrantDigest({ sent, notices, actions })
+  const sentIdx = useMemo(() => sentIndexOf(sent), [sent])
+  const [onlyDue, setOnlyDue] = useState(false)
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loadError, setLoadError] = useState('')
   useEffect(() => {
@@ -188,9 +193,15 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       clients
         .map((c) => ({ c, ms: (index.byClient.get(c.record.id) ?? []).filter((m) => verdicts.get(m.notice.id)?.pass !== false) }))
         .filter((x) => kindFilter === 'all' || x.c.kind === kindFilter)
-        .map((x) => ({ ...x, sum: fitSummary(x.ms) }))
+        .map((x) => ({ ...x, sum: fitSummary(x.ms), dg: digestSummary(x.ms, sentIdx, x.c.record.id) }))
         .sort((a, b) => b.sum.fit - a.sum.fit || b.sum.check - a.sum.check || a.c.record.companyName.localeCompare(b.c.record.companyName)),
-    [clients, index, kindFilter, verdicts],
+    [clients, index, kindFilter, verdicts, sentIdx],
+  )
+  // D-623 '보낼 곳만' — 새로 올라온 맞는 공고가 있는 업체(한 번도 안 알린 곳 포함) · 마감 급한 것이 많은 곳 먼저
+  const dueCount = useMemo(() => byClient.filter((x) => x.dg.due).length, [byClient])
+  const clientRows = useMemo(
+    () => (onlyDue ? byClient.filter((x) => x.dg.due).sort((a, b) => b.dg.urgentFresh - a.dg.urgentFresh || b.dg.fresh - a.dg.fresh || a.c.record.companyName.localeCompare(b.c.record.companyName)) : byClient),
+    [byClient, onlyDue],
   )
 
   const saveOne = async (v: NoticeInput, id?: string) => {
@@ -403,12 +414,15 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                     {l}
                   </button>
                 ))}
+                <button type="button" aria-pressed={onlyDue} onClick={() => setOnlyDue((v) => !v)} data-testid="grant-due-filter" data-guide="fn-grant-due" className={`tap t-sub rounded-full border px-3 py-1.5 font-semibold ${onlyDue ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  보낼 곳만 {dueCount}
+                </button>
               </div>
-              {byClient.length === 0 ? (
-                <Blank title="업체가 없습니다." />
+              {clientRows.length === 0 ? (
+                <Blank title={onlyDue ? '지금 새로 알릴 공고가 있는 업체가 없어요 — 다 알렸거나, 새로 올라온 맞는 공고가 없습니다.' : '업체가 없습니다.'} />
               ) : (
                 <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-client-list">
-                  {byClient.map(({ c, sum }) => {
+                  {clientRows.map(({ c, sum, dg }) => {
                     const fit = sum.fit
                     // D-156: '7일 안 마감' 을 자동으로 세지 않는다 — 대표가 도전 체크한 공고 수만
                     const picked = c.record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching').length
@@ -423,6 +437,12 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                               {profileLine(c.profile) ? ` · ${profileLine(c.profile)}` : ' · 업체 정보 비어 있음'}
                               {last ? ` · 알림 ${Number(last.slice(5, 7))}/${Number(last.slice(8, 10))}` : ''}
                             </span>
+                            {dg.due && dg.lastSent && (
+                              <span className="t-sub font-semibold text-brand-700" data-testid="grant-client-fresh">
+                                지난번 알린 뒤 새로 올라온 맞는 공고 {dg.fresh}건
+                              </span>
+                            )}
+                            {onlyDue && !dg.lastSent && <span className="t-sub text-slate-500">아직 한 번도 안 알림</span>}
                           </span>
                           <span className="flex shrink-0 flex-col items-end gap-0.5">
                             <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
@@ -491,6 +511,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           sentOf={sentForClient(currentClient.record.id)}
           linked={linkOf(currentClient.record.id) !== null}
           actions={actions}
+          digest={digestOf(currentClient)}
           challenge={{
             busy: challenging,
             of: (nid) => {
@@ -537,8 +558,10 @@ function ClientSheet({
   onDetail,
   onClose,
   challenge,
+  digest,
 }: {
   challenge?: ChallengeControl
+  digest?: DigestControl
   client: GrantClient
   matches: GrantMatch[]
   sentOf: (noticeId: string) => string
@@ -563,6 +586,7 @@ function ClientSheet({
           onPick={(m) => onPick(m.notice.id)}
           onFill={onDetail}
           challenge={challenge}
+          digest={digest}
         />
         <Button variant="ghost" onClick={onDetail} className="self-start">
           업체 상세 열기

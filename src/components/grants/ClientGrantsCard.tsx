@@ -13,7 +13,7 @@ import { grantClients } from '../../services/grants/grantView'
 import { applicationFor, withGrantChallenge, withoutGrantChallenge } from '../../services/grants/grantApply'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { ClientGrantPanel } from './GrantSheets'
-import { useGrantActions, useGrantData } from './useGrants'
+import { useGrantActions, useGrantData, useGrantDigest } from './useGrants'
 import { grantRenewalRisks, grantWhatIfs } from '../../services/grants/grantWhatIf'
 import { certExpiries, credentialsOf } from '../../services/grants/grantProfile'
 import { GrantRenewalLines, GrantWhatIfFold } from './GrantWhatIfFold'
@@ -40,6 +40,7 @@ export function ClientGrantsCard({
   const { showToast } = useToast()
   const { notices, sent, setSent, linkOf, loaded } = useGrantData(workspaceId)
   const actions = useGrantActions({ workspaceId, setSent, linkOf, toast: showToast })
+  const digestOf = useGrantDigest({ sent, notices, actions })
   const client = useMemo(() => grantClients([record], today)[0] ?? null, [record, today])
   const matches = useMemo(() => (client ? matchesFor(notices, client.profile, today) : []), [client, notices, today])
   // 알릴 것은 이 업체를 겨냥한 공고(맞음 · 확인 필요)만 — 전국 공통은 패널에서 접어 보여 준다
@@ -98,6 +99,7 @@ export function ClientGrantsCard({
             onPick={() => navigate(`/grants?view=clients&client=${record.id}`)}
             onFill={onFill}
             challenge={challenge}
+            digest={digestOf(client)}
           />
         )}
         <GrantRenewalLines risks={risks} />

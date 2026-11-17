@@ -818,6 +818,157 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await ctx.close()
 }
 
+/* ---------------- D-623 맞는 공고 골라서 보내기(고르기 · 한 줄 의견 · 보낸 기록 · 보낼 곳만) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  const paste = async (text) => {
+    await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+    await page.getByTestId('grant-add-open').click()
+    await page.locator('#grant-paste').fill(text)
+    await page.getByTestId('grant-read').click()
+    await page.getByTestId('grant-read-done').waitFor()
+    await page.getByTestId('grant-save').click()
+    await page.waitForTimeout(500)
+  }
+  const mkNotice = (name, days, money) => `[경기] 2026년 파주시 ${name} 공고
+소관부처·지자체 경기도 파주시
+신청기간 ${dot(kst(-5))} ~ ${dot(kst(days))}
+사업개요 기업당 최대 ${money} 이내
+지원대상 파주시 소재 제조업 중소기업
+https://www.bizinfo.go.kr/web/view.do?pblancId=PBLN_${days}`
+  await paste(mkNotice('제조기업 설비 개선 지원', 4, '3,000만원'))
+  await paste(mkNotice('수출 판로 개척 지원', 12, '2,000만원'))
+  await paste(mkNotice('디자인 개발 지원', 25, '1,000만원'))
+
+  // 업체별 — 아직 한 번도 안 알린 업체는 '보낼 곳만' 에 들어 있다
+  await page.goto(BASE + '/grants?view=clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const hrow = page.locator('[data-testid="grant-client-row"][data-client="cli_hansol"]')
+  check('D-623 업체별: 한솔테크 맞음 3', /맞음 3/.test(await hrow.getByTestId('grant-client-fit').innerText()))
+  const due0 = Number((await page.getByTestId('grant-due-filter').innerText()).replace(/\D/g, ''))
+  await page.getByTestId('grant-due-filter').click()
+  check('D-623 보낼 곳만: 아직 한 번도 안 알린 한솔테크가 들어 있음', (await hrow.count()) === 1 && /아직 한 번도 안 알림/.test(await hrow.innerText()) && due0 >= 1, { due0 })
+  await hrow.click()
+  await page.getByTestId('client-sheet').waitFor()
+  check('D-623 업체 창: [골라서 보내기] · 예전 [카톡 문구 복사] 도 그대로', (await page.getByTestId('client-grants-digest').count()) === 1 && (await page.getByTestId('client-grants-copy').count()) === 1)
+  check('D-623 한 번도 안 알린 업체는 지난번 알림 줄 없음', (await page.getByTestId('grant-sent-last').count()) === 0)
+  await page.getByTestId('client-grants-digest').click()
+  await page.getByTestId('grant-digest').waitFor()
+  const picked = () => page.locator('[data-testid="grant-digest-row"][data-picked="1"]').count()
+  check('D-623 고르기 단계: 같은 창 안에서 바뀜(목록은 사라지고 창은 하나)', (await page.getByTestId('client-grants').count()) === 0 && (await page.getByTestId('client-sheet').count()) === 1)
+  check('D-623 처음: 맞는 공고 3건이 골라져 있음 · 안내 한 줄', (await picked()) === 3 && /아직 한 번도 알리지 않은 업체/.test(await page.getByTestId('grant-digest-lead').innerText()), await page.getByTestId('grant-digest-lead').innerText())
+  const order = await page.getByTestId('grant-digest-row').allInnerTexts()
+  check('D-623 순서: 마감 급한 공고가 맨 위', /설비 개선/.test(order[0]) && /디자인 개발/.test(order[2]), order.map((t) => t.slice(0, 30)))
+  // 하나 빼고 · 한 줄 의견 · 한마디 → 미리 보기 = 복사되는 글
+  await page.getByTestId('grant-digest-row').nth(2).getByTestId('grant-digest-check').uncheck()
+  check('D-623 하나 빼면 2건 · 뺀 공고는 의견 칸이 없음', (await picked()) === 2 && (await page.getByTestId('grant-digest-comment').count()) === 2 && /고른 공고 2건/.test(await page.getByTestId('grant-digest-count').innerText()))
+  await page.getByTestId('grant-digest-comment').first().fill('설비 견적서만 받으면 바로 낼 수 있어요')
+  await page.getByTestId('grant-digest-note').fill('지난주 미팅에서 말씀드린 건입니다.')
+  await page.getByTestId('grant-digest-preview-toggle').click()
+  const pv = await page.getByTestId('grant-digest-preview').innerText()
+  check('D-623 미리 보기: 인사 · 한마디 · 2건 · 번호 · 의견 · 공고 주소', /한솔테크\(주\) 대표님, 안녕하세요/.test(pv) && pv.includes('지난주 미팅에서 말씀드린 건입니다.') && pv.includes('공고 2건을 골라') && /① .*설비 개선/.test(pv) && /② .*수출 판로/.test(pv) && pv.includes('· 제 의견: 설비 견적서만 받으면 바로 낼 수 있어요') && pv.includes('pblancId=PBLN_4') && !pv.includes('디자인 개발'), pv)
+  check('D-623 미리 보기: 맞는 조건 · 지원 금액 · 선정을 약속하지 않음', pv.includes('· 지원: ') && pv.includes('· 맞는 조건: ') && pv.includes('선정 여부는 심사에서 정해집니다'), pv)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d623-digest-pc.png` }).catch(() => {})
+  await page.getByTestId('grant-digest-send').click()
+  await page.getByTestId('client-grants').waitFor()
+  await page.waitForTimeout(400)
+  const copied = await clip(page)
+  check('D-623 복사된 글 = 미리 보기', copied.replace(/\s+/g, ' ').trim() === pv.replace(/\s+/g, ' ').trim(), copied.slice(0, 200))
+  check('D-623 보낸 뒤: 목록으로 돌아옴 · 지난번 알림 줄 · 새로 올라온 것 없음', /지난번 알림 \d+\/\d+/.test(await page.getByTestId('grant-sent-last').innerText()) && /새로 올라온 맞는 공고 없음/.test(await page.getByTestId('grant-sent-last').innerText()), await page.getByTestId('grant-sent-last').innerText())
+  check('D-623 보낸 공고 줄에 "알림 보냄"', (await page.getByTestId('grant-match').filter({ hasText: '알림 보냄' }).count()) === 2)
+  await page.getByTestId('grant-sent-toggle').click()
+  const hist = await page.getByTestId('grant-sent-list').innerText()
+  check('D-623 보낸 기록: 날짜 · 카톡 문구 · 공고 2건 · 이름 · 의견 · 한마디', /카톡 문구 · 공고 2건/.test(hist) && /설비 개선/.test(hist) && hist.includes('의견: 설비 견적서만 받으면 바로 낼 수 있어요') && hist.includes('한마디: 지난주 미팅에서 말씀드린 건입니다.'), hist)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d623-history-pc.png` }).catch(() => {})
+  const stored = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('axmvp.module.grants.sent'))
+    const rows = JSON.parse(localStorage.getItem(k) ?? '[]')
+    return rows.map((r) => r.data)
+  })
+  const rec = stored.find((d) => d.note)
+  check('D-623 저장된 기록: 공고 id 2 · 그때 이름 · 적은 의견 1 · 한마디', rec && rec.noticeIds.length === 2 && Object.keys(rec.titles ?? {}).length === 2 && Object.keys(rec.comments ?? {}).length === 1 && rec.channel === 'kakao', rec)
+  // 다시 열면 — 새로 올라온 것이 없어 아무것도 골라져 있지 않다(같은 공고를 또 보내지 않게)
+  await page.getByTestId('client-grants-digest').click()
+  await page.getByTestId('grant-digest').waitFor()
+  check('D-623 다시 열면: 골라 둔 것 0 · 보내기 단추 꺼짐 · 보낸 공고에 날짜', (await picked()) === 0 && (await page.getByTestId('grant-digest-send').isDisabled()) && /새로 올라온 맞는 공고는 없어요/.test(await page.getByTestId('grant-digest-lead').innerText()) && (await page.locator('[data-testid="grant-digest-row"][data-bucket="sent"]').count()) === 2)
+  await page.getByTestId('grant-digest-back').click()
+  await page.getByTestId('client-grants').waitFor()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const due1 = Number((await page.getByTestId('grant-due-filter').innerText()).replace(/\D/g, ''))
+  check('D-623 보낸 업체는 보낼 곳에서 빠짐', due1 === due0 - 1 && (await hrow.count()) === 0, { due0, due1 })
+
+  // 사흘 전에 알린 것으로 돌리면 — 그 뒤에 넣은 공고(안 보낸 1건)가 '새로 올라온 공고' 로 뜬다
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('axmvp.module.grants.sent'))
+    const rows = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const at = new Date(Date.now() - 3 * 86_400_000).toISOString()
+    for (const r of rows) r.data.at = at
+    localStorage.setItem(k, JSON.stringify(rows))
+  })
+  await page.goto(BASE + '/grants?view=clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const fresh = await hrow.getByTestId('grant-client-fresh').innerText().catch(() => '')
+  check('D-623 업체별 줄: "지난번 알린 뒤 새로 올라온 맞는 공고 1건"', /새로 올라온 맞는 공고 1건/.test(fresh), fresh)
+  await hrow.click()
+  await page.getByTestId('client-sheet').waitFor()
+  check('D-623 업체 창: 지난번 알림 줄에 "그 뒤 새로 올라온 맞는 공고 1건"', /그 뒤 새로 올라온 맞는 공고 1건/.test(await page.getByTestId('grant-sent-last').innerText()))
+  await page.getByTestId('client-grants-digest').click()
+  await page.getByTestId('grant-digest').waitFor()
+  const first = page.getByTestId('grant-digest-row').first()
+  check('D-623 새로 올라온 1건만 골라져 있고 맨 위 · "새로 올라옴"', (await picked()) === 1 && (await first.getAttribute('data-bucket')) === 'fresh' && /디자인 개발/.test(await first.innerText()) && /새로 올라옴/.test(await first.innerText()), await first.innerText())
+  await page.keyboard.press('Escape')
+
+  // 업체 상세 › 맞춤 추천 — 같은 단추 · 같은 기록
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.getByTestId('detail-grants').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(600)
+  const dg = page.getByTestId('detail-grants')
+  check('D-623 업체 상세: [골라서 보내기] · 지난번 알림 줄', (await dg.getByTestId('client-grants-digest').count()) === 1 && /지난번 알림/.test(await dg.getByTestId('grant-sent-last').innerText().catch(() => '')))
+  await dg.getByTestId('client-grants-digest').scrollIntoViewIfNeeded()
+  await dg.getByTestId('client-grants-digest').click()
+  check('D-623 업체 상세: 카드 안에서 고르기 단계로', (await dg.getByTestId('grant-digest').count()) === 1 && (await dg.locator('[data-testid="grant-digest-row"][data-picked="1"]').count()) === 1)
+  check('D-623 화면 오류 0', errors.length === 0, errors)
+  await ctx.close()
+
+  // 390 — 고르기 단계 가로 넘침 0 · 누르는 칸 크기
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', isMobile: true, hasTouch: true, permissions: ['clipboard-read', 'clipboard-write'] })
+  const mp = await m.newPage()
+  const merr = []
+  mp.on('pageerror', (e) => merr.push(String(e)))
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.evaluate(seedScript())
+  await mp.evaluate(prepClients)
+  await mp.evaluate((today) => {
+    // 공고 셋을 바로 넣는다(붙여넣기 길은 위 PC 에서 봤다)
+    const mk = (id, title, end) => ({ id, clientId: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), data: { title, agency: '경기도 파주시', operator: '', category: 'money', applyStart: '', applyEnd: end, deadlineKind: 'date', amountText: '기업당 최대 3,000만원 이내', target: '파주시 소재 제조업 중소기업', summary: '', url: 'https://www.bizinfo.go.kr/web/view.do?pblancId=' + id, rules: { regions: ['경기'], cities: ['파주시'], withinYears: null, minYears: null, industries: ['제조'], excludeIndustries: [], minEmployees: null, maxEmployees: null, minRevenueM: null, maxRevenueM: null, sizes: [], youthCeo: false, womenCeo: false, certs: [], preStartupOnly: false }, source: 'paste', published: false } })
+    const plus = (n) => new Date(new Date(today + 'T00:00:00Z').getTime() + n * 86_400_000).toISOString().slice(0, 10)
+    localStorage.setItem('axmvp.module.grants.notices', JSON.stringify([mk('m1', '[경기] 2026년 파주시 중소 제조기업 스마트 설비 개선 및 공정 자동화 지원사업 참여기업 모집 공고', plus(4)), mk('m2', '[경기] 파주시 수출 판로 개척 지원', plus(12)), mk('m3', '[경기] 파주시 디자인 개발 지원', plus(25))]))
+  }, kst(0))
+  await mp.goto(BASE + '/grants?view=clients&client=cli_hansol', { waitUntil: 'networkidle' })
+  await mp.getByTestId('client-sheet').waitFor({ timeout: 8000 }).catch(() => {})
+  const hasBtn = await mp.getByTestId('client-grants-digest').count()
+  if (hasBtn) {
+    await mp.getByTestId('client-grants-digest').click()
+    await mp.getByTestId('grant-digest').waitFor()
+    await mp.getByTestId('grant-digest-comment').first().fill('긴 의견도 한 줄로 들어가는지 봅니다 — 설비 견적서와 사업자등록증만 준비하시면 됩니다')
+    await mp.getByTestId('grant-digest-preview-toggle').click()
+  }
+  const box = hasBtn ? await mp.getByTestId('grant-digest-send').boundingBox() : null
+  check('D-623 390: 고르기 단계 열림 · 3건 골라짐', hasBtn === 1 && (await mp.locator('[data-testid="grant-digest-row"][data-picked="1"]').count()) === 3)
+  check('D-623 390: 가로 넘침 0', (await overflowX(mp)) <= 0, await overflowX(mp))
+  check('D-623 390: 보내기 단추 높이 40px 이상', !!box && box.height >= 40, box)
+  if (SHOTS) await mp.screenshot({ path: `${SHOTS}/d623-digest-390.png` }).catch(() => {})
+  check('D-623 390: 화면 오류 0', merr.length === 0, merr)
+  await m.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
