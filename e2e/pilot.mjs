@@ -2113,14 +2113,16 @@ try {
     const navO = (await po.locator('aside').first().innerText().catch(() => '')) ?? ''
     check('대표 메뉴(D-562): 전문 모듈 · 영업자 정산 · 1차 미팅 체크리스트 그대로', ['전문 모듈', '영업자 정산', '1차 미팅'].every((x) => navO.includes(x)), navO.replace(/\n/g, '|').slice(0, 400))
     await go(po, `/ops/clients/${OWNER_CLIENT}?tab=overview`)
-    await po.getByTestId('top-picks').waitFor({ timeout: 8000 }).catch(() => {})
+    // D-627 개요의 '먼저 제안할 것' 은 처음엔 한 줄(top-picks-line) — 누르면 카드(top-picks). 둘 중 하나가 있으면 그대로
+    await po.locator('[data-testid="top-picks"], [data-testid="top-picks-line"]').first().waitFor({ timeout: 8000 }).catch(() => {})
+    const picksO = (await po.getByTestId('top-picks').count()) + (await po.getByTestId('top-picks-line').count())
     // D-627 '전문 모듈 열기' 는 개요 [더 보기] 안 — 펼쳐서 그대로 있는지 본다
     await openFoldIn(po, 'overview.more')
     await po.getByText('이 업체로 전문 모듈 열기').first().waitFor({ timeout: 8000 }).catch(() => {})
     const overO = (await po.locator('main').innerText().catch(() => '')) ?? ''
-    const ovDiag = { picks: await po.getByTestId('top-picks').count(), more: await po.locator('[data-fold="overview.more"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-open'))), tools: await po.locator('[data-fold="overview.tools"]').count(), tail: overO.replace(/\n/g, '|').slice(-400) }
+    const ovDiag = { picks: picksO, more: await po.locator('[data-fold="overview.more"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-open'))), tools: await po.locator('[data-fold="overview.tools"]').count(), tail: overO.replace(/\n/g, '|').slice(-400) }
     if (!overO.includes('전문 모듈 열기')) await shot(po, 'owner-overview-more-debug')
-    check('대표 업체 화면(D-563): 먼저 제안할 것 · "전문 모듈 열기" 카드 그대로', (await po.getByTestId('top-picks').count()) === 1 && overO.includes('전문 모듈 열기'), JSON.stringify(ovDiag))
+    check('대표 업체 화면(D-563): 먼저 제안할 것 · "전문 모듈 열기" 카드 그대로', picksO === 1 && overO.includes('전문 모듈 열기'), JSON.stringify(ovDiag))
     await go(po, `/ops/clients/${OWNER_CLIENT}?tab=smart`)
     await po.waitForTimeout(1200)
     // D-627 모듈별 판정 · 맞춤 상담 · 맞는 지원사업은 맞춤 추천 [더 보기] 안
