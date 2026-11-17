@@ -305,7 +305,7 @@ export function ClientBoardCard({
               aria-label={open ? `${record.companyName} 접기` : `${record.companyName} 펼쳐보기`}
               title={open ? '접기' : '펼쳐보기'}
               data-testid="card-toggle"
-              className="tap inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+              className="tap inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-brand-700"
             >
               <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
