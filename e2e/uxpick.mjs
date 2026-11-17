@@ -206,6 +206,8 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   for (const w of [1440, 1920]) {
     const { ctx, page } = await open({ width: w, height: 900 })
     await go(page, '/marketing/threads')
+    // D-627 첫 화면 밖 목차는 PC 도 [다른 화면] 한 줄 — 펼친 뒤 잰다
+    await page.getByTestId('mk-tabs-more').click()
     const hs = await page.evaluate(() => ['threads', 'shorts', 'content', 'homepage'].map((k) => Math.round(document.querySelector(`[data-testid="mk-tab-${k}"]`)?.getBoundingClientRect().height ?? 0)))
     check(`T1 ${w} 만들기 칸 높이 ≤ 64px(이름 · 설명 한 줄씩 — 예전 1440 은 90px · 서너 줄)`, hs.every((h) => h > 0 && h <= 64), hs)
     await ctx.close()

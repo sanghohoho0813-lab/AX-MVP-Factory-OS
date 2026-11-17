@@ -158,7 +158,8 @@ check('H2 마우스를 떼면 설명 닫힘 · 지금 칸 한 줄(휴대폰도 �
 const tabColors = await page.locator('[role="tab"][data-testid^="thr-tab-"] svg').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).color))
 // D-370 대표 '박스 · 단추 색은 하나로' — 예전(D-298) 칸마다 다른 색 대신 같은 색, 고른 칸만 강조
 check('H3 안쪽 칸 그림 색은 하나(고른 칸만 다를 수 있음) — D-370', new Set(tabColors).size <= 2, tabColors)
-check('H4 "우리 분야 주제 · 늘 그대로예요" — 매주 바뀌는지 바로 앎', /늘 그대로예요/.test(await page.getByTestId('thr-qs-ours-label').innerText()))
+// D-627 '늘 그대로예요' 는 이름표 옆 ? 설명 안으로(글자 수 한도) — 이름표는 '우리 분야 주제' 한 마디
+check('H4 "우리 분야 주제" · ? 설명에 "늘 그대로예요" — 매주 바뀌는지 바로 앎', /우리 분야 주제/.test(await page.getByTestId('thr-qs-ours-label').innerText()) && /늘 그대로예요/.test((await page.getByTestId('thr-qs-ours').getByTestId('hint-tip').first().textContent()) ?? ''))
 
 /* ---------------- W 쓰기 ---------------- */
 await page.getByTestId('thr-goal-follow').hover()

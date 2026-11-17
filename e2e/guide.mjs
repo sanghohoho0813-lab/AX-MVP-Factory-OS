@@ -296,7 +296,8 @@ const kBack = await hoverCard('/', '[data-guide="fn-today-wrap"]')
 check('G11 설정 › 마우스 안내 카드: 기본 켜기 → [끄기] → 메뉴 · 단추에 올려도 카드 0 · 사용법 안내 화면 글은 그대로 · 새로 고쳐도 끈 채 → [켜기] → 다시 뜸', ghDefault === 'true' && ghOffChecked === 'true' && ghOffMenu === 0 && ghOffFn === 0 && ghGuideRows >= 3 && ghKept === 'true' && kBack === 'fn-today-wrap', { ghDefault, ghOffChecked, ghOffMenu, ghOffFn, ghGuideRows, ghKept, kBack })
 
 /* G12 — 마케팅 남은 화면(기초 7가지 · 내 콘텐츠 · 남의 인기 영상)에도 기능 안내 · 사용법 안내 화면에 모임 */
-const kRead = await hoverCard('/marketing/basics', '[data-guide="fn-mk-basic-read"]')
+// D-627 기초 7가지는 처음에 아무것도 펼치지 않는다 — 첫 줄을 눌러 펼친 뒤 [읽었어요]
+const kRead = await hoverCard('/marketing/basics', '[data-guide="fn-mk-basic-read"]', () => page.getByTestId('mk-basic-toggle').first().click())
 const readText = ((await card.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
 const kStages = await hoverCard('/marketing/youtube?view=make', '[data-guide="fn-mk-stages"]', async () => {
   const fold = page.getByTestId('mk-make-long')

@@ -18,6 +18,7 @@
  *   돌아올 때(focus · visibilitychange) · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때 · PC 1440 = 휴대폰 390 같은 추천
  */
 import { mkTab } from './support/mkTabs.mjs'
+import { openTools } from './pageTools.mjs'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -124,7 +125,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
   // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
-  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 한 줄 = 무엇을 하는 곳인지(쉬운 말 · D-507) + (콘텐츠 레이더)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 2 && (await page.getByTestId('mk-fixed-key').count()) === 5 /* D-558 고정 주제(고용지원금 · 법인세)는 10개에서 빠짐 — 이 시험 자료는 뜨는 주제 2 + 고정 5 */ && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('만드는 곳') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'), { home: await page.getByTestId('mk-home').isVisible(), keys: await page.getByTestId('mk-key').count(), more: await page.getByTestId('mk-more').isVisible(), plan: await page.getByTestId('radar-plan').isVisible(), h1: await page.locator('main h1').first().innerText().catch(() => ''), sub: await page.getByTestId('radar-subtitle').innerText().catch(() => '') })
+  // D-627 글자 수 한도 — 무엇을 하는 곳인지 한 줄은 마케팅 첫 화면(/marketing)에만 · 이번 주 찍을 것(유튜브)은 판 머리 '이번 주 무엇을 올릴까요?' + 1 → 2 → 3
+  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 판 머리 한 줄(1 → 2 → 3)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 2 && (await page.getByTestId('mk-fixed-key').count()) === 5 /* D-558 고정 주제(고용지원금 · 법인세)는 10개에서 빠짐 — 이 시험 자료는 뜨는 주제 2 + 고정 5 */ && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && (await page.getByTestId('mk-steps').isVisible()) && (await page.getByTestId('radar-subtitle').count()) === 0, { home: await page.getByTestId('mk-home').isVisible(), keys: await page.getByTestId('mk-key').count(), more: await page.getByTestId('mk-more').isVisible(), plan: await page.getByTestId('radar-plan').isVisible(), h1: await page.locator('main h1').first().innerText().catch(() => '') })
+  // D-627 첫 화면 보조 한 줄 — 쉬운 말 · 30자 안 · 예전 이름(콘텐츠 레이더)은 마우스를 올리면(title)
+  await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  {
+    const sub = (await page.getByTestId('radar-subtitle').innerText().catch(() => '')) ?? ''
+    const subTip = (await page.getByTestId('radar-subtitle').getAttribute('title').catch(() => '')) ?? ''
+    check('D-627 마케팅 첫 화면 보조 한 줄 — 무엇을 하는 곳인지(만들기) · 30자 안 · 예전 이름 콘텐츠 레이더는 마우스(title)', sub.includes('만들기') && sub.replace(/\s/g, '').length <= 30 && subTip.includes('콘텐츠 레이더'), { sub, subTip })
+  }
+  await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
   await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
@@ -171,6 +183,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   check('쇼츠 칸: 90일 안 쇼츠만 · 롱폼/쇼츠 거르기는 숨김', (await page.getByTestId('yt-card').count()) === 4 && (await page.getByTestId('yt-type-long').count()) === 0)
 
+  await openTools(page) // D-627 새로 가져오기 · 엑셀로 받기는 [⋯] 안
   await page.getByTestId('yt-refresh').click()
   await page.waitForTimeout(600)
   check('[지금 새로 가져오기]: 30분 칸(?bucket=…)으로 부른다', feedAsked().length === 2 && /bucket=\d+$/.test(feedAsked()[1]), asked.join(' '))
@@ -181,6 +194,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 할당량 초과 — 지난번 것으로 보여 준다
   await page.unroute('**/api/yt-bench**')
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'quota' }) }))
+  await openTools(page) // D-627 새로 가져오기 · 엑셀로 받기는 [⋯] 안
   await page.getByTestId('yt-refresh').click()
   await page.waitForTimeout(600)
   check('할당량 초과: 안내(오후 4~5시) + 지난번에 받은 것 그대로', ((await page.getByTestId('yt-message').innerText()) ?? '').includes('한도') && (await page.getByTestId('yt-card').count()) > 0)
@@ -215,6 +229,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('영상 길이별: 펼치면 구간마다 평균 · 1위 표시', ((await page.getByTestId('yt-length').innerText()) ?? '').includes('1~3분(쇼츠)') && ((await page.getByTestId('yt-length').innerText()) ?? '').includes('1위'))
 
   // CSV
+  await openTools(page) // D-627 [⋯] 안
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('yt-csv').click()])
   const path = await dl.path()
   const { readFileSync } = await import('node:fs')
@@ -891,6 +906,7 @@ for (const width of [360, 390, 430]) {
     await page.waitForTimeout(800)
     check('D-196 새로고침 → 방금 받은 것(6시간 안 · 판 같음) 그대로 · 데이터 요청 늘지 않음', dataAsks(log).length === 1 && (await line(page)).includes(`채널 ${RN}곳`), log)
     // 9 [지금 새로 가져오기] — 6시간 안이어도 30분 칸
+    await openTools(page) // D-627 새로 가져오기 · 엑셀로 받기는 [⋯] 안
     await page.getByTestId('yt-refresh').click()
     await page.waitForTimeout(800)
     check('D-196 9 [지금 새로 가져오기] → 6시간과 상관없이 30분 칸(?bucket=…&rev=…)', dataAsks(log).length === 2 && new RegExp(`^\\?bucket=\\d+&rev=${REV_NEW}$`).test(dataAsks(log)[1]), log)

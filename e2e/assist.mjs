@@ -308,6 +308,7 @@ await page.keyboard.press('Escape')
       check(`G ${title}: AI 도우미 띠`, false, '띠 없음')
       continue
     }
+    await openTools(page) // D-627 AI 도우미(띠 · 머리 단추)는 경로 줄 오른쪽 [⋯] 안
     if (viaButton) await page.getByTestId('ai-assist-open').first().click()
     else await bar.getByTestId('ai-assist-ask-chip').click()
     await page.getByTestId('ai-assist-panel').waitFor({ timeout: 5000 })
@@ -435,10 +436,14 @@ await page.keyboard.press('Escape')
 await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
 const tab = await page.getByTestId('mk-tab-content').innerText()
+const tabGuide = await page.getByTestId('mk-tab-content').getAttribute('data-guide')
 await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
 const slimTab = page.getByTestId('mk-tab-content')
-check("D1 목차 이름 '블로그 · 플레이스 홍보 글 만들기' + 아래 '(키워드 · 플레이스 · 블로그 등)'(첫 화면) · 홍보 글 화면 안은 짧은 이름 '블로그 · 플레이스' · 켜짐", tab.includes('블로그 · 플레이스 홍보 글 만들기') && tab.includes('(키워드 · 플레이스 · 블로그 등)') && (await slimTab.innerText()).includes('블로그 · 플레이스') && (await slimTab.getAttribute('aria-current')) === 'page', tab)
+// D-627 글자 수 한도 — 첫 화면 칸도 짧은 이름 하나(긴 이름 · 설명은 마우스를 올리면 뜨는 안내 카드 mk-content) · 홍보 글 화면 안은 [다른 화면] 안 같은 이름 · 켜짐
+const slimText = (await slimTab.textContent()) ?? ''
+check("D1 목차 이름 '블로그 · 플레이스'(첫 화면 · 설명은 안내 카드) · 홍보 글 화면 안도 '블로그 · 플레이스' · 켜짐", tab.includes('블로그 · 플레이스') && !tab.includes('(키워드') && tabGuide === 'mk-content' && slimText.includes('블로그 · 플레이스') && (await slimTab.getAttribute('aria-current')) === 'page', { tab, slimText, tabGuide })
+await page.getByTestId('trial-start-open').click() // D-627 '고객 관리에 없는 곳으로 만들기' 는 접힌 한 줄
 await page.getByTestId('trial-mirae').click()
 await page.waitForURL(/trial=trial_miraeailab/, { timeout: 8000 })
 await page.waitForTimeout(800)
@@ -460,6 +465,7 @@ const body = await page.locator('main').innerText()
 check('D5 새로고침 뒤 보관함에 그 글이 쌓여 있음(미래AI랩 자리)', body.includes('정책자금, 신청 전에 이것부터 확인하세요'), body.slice(0, 300))
 await page.goto(BASE + '/tools/content', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)
+await page.getByTestId('trial-start-open').click() // D-627 접힌 한 줄
 await page.getByTestId('trial-mirae').click()
 await page.waitForTimeout(800)
 check("D6 다시 '미래AI랩으로 만들기' → 새로 만들지 않고 같은 자리(글 그대로)", (await page.locator('main').innerText()).includes('정책자금, 신청 전에 이것부터 확인하세요'))
