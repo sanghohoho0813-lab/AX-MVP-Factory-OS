@@ -10,20 +10,23 @@
  * D-602 대표(2026-11-12) "박스가 너무 많아 눈에 안 들어온다 — 큰 박스 안에 가로선으로 나누든지 줄글 느낌으로 ·
  *   우리 분야 주제는 영업 관리 › 전략 키워드로 · 이번 주 키워드는 좋지만 접어 두기" —
  *   상자 하나 안에서 칸마다 가로선(안쪽 테두리 상자 0) · 우리 분야(전략 키워드) 8개 먼저 + [n개 더] · 이번 주 키워드는 접힌 한 줄.
+ * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 기능은 그대로, 여러 번 누르더라도 하나하나 더 나오게" —
+ *   처음 보이는 것은 ① 주제(한 줄 쓰기 + 우리 분야 칩 PC 4 · 휴대폰 3) ② 큰 단추 [AI로 완성 글 쓰기] · [뼈대] 둘뿐.
+ *   추천 형식 · 더 바라는 점 · 잘 된 남의 글 · 사실 목록 · 모델 고르기 · 내 맞춤(more)은 접힌 한 줄 [더 정하기(선택)] 안(같은 시험 이름 · 지운 것 없음).
  */
 import { useState, type ReactNode } from 'react'
 import { ChevronDown, Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { HintTip } from '../../components/ui/fold'
+import { Fold, HintTip } from '../../components/ui/fold'
 import type { TopicChip } from '../../services/marketing/quickStart'
 import { StepTitle } from './snsParts'
 import { toneChip } from './snsTone'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 
-/** D-602 우리 분야 주제 칩 — 처음에 보이는 수(PC 8 · 휴대폰 4 · 나머지는 [전부 n개 보기]) */
-const OURS_SHOWN = 8
-const OURS_SHOWN_PHONE = 4
+/** D-602 우리 분야 주제 칩 — 처음에 보이는 수(D-627 PC 4 · 휴대폰 3 · 나머지는 [전부 n개 보기]) */
+const OURS_SHOWN = 4
+const OURS_SHOWN_PHONE = 3
 
 export function QuickStart({
   testPrefix,
@@ -102,7 +105,6 @@ export function QuickStart({
       {/* D-299 카드(Surface)는 넘치는 것을 자른다 — [모델 · ○○] 고르는 판 · ? 설명이 잘려서 자르지 않는 상자로 */}
       <div className="relative flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" data-testid={`${testPrefix}-qs-box`}>
         <StepTitle n="1">무엇에 대해 쓸까요?</StepTitle>
-        {top}
         <input
           value={topic}
           onChange={(e) => onTopic(e.target.value)}
@@ -113,11 +115,11 @@ export function QuickStart({
         />
         {ours.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid={`${testPrefix}-qs-ours`}>
-            <HintTip tip="영업 관리 › 전략에 모아 둔 상담 주제예요(정관 · 가지급금 · 정책자금 …). 고객이 실제로 묻는 것이라 글감으로 좋아요. 매주 바뀌지 않아요." label="우리 분야 주제" tight>
+            {/* D-627 '늘 그대로예요' 표시는 ? 설명 안으로(글자 수 한도) */}
+            <HintTip tip="늘 그대로예요 — 영업 관리 › 전략에 모아 둔 상담 주제예요(정관 · 가지급금 · 정책자금 …). 고객이 실제로 묻는 것이라 글감으로 좋아요. 매주 바뀌지 않아요." label="우리 분야 주제" tight>
               <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-ours-label`}>
                 <Pin aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />
                 우리 분야 주제
-                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">늘 그대로예요</span>
               </span>
             </HintTip>
             <div className="flex flex-wrap gap-1.5">
@@ -125,7 +127,7 @@ export function QuickStart({
               {oursShown.map((c, i) => chip(c, 'indigo', !allOurs && i >= OURS_SHOWN_PHONE && i !== pickedAt))}
               {ours.length > OURS_SHOWN_PHONE && !pickedLate && (
                 <button type="button" onClick={() => setAllOurs((v) => !v)} aria-expanded={allOurs} className={`tap t-sub inline-flex min-h-9 items-center gap-1 rounded-full px-3 font-semibold text-brand-700 hover:bg-slate-50 ${ours.length > OURS_SHOWN ? '' : 'sm:hidden'}`} data-testid={`${testPrefix}-qs-ours-more`}>
-                  {allOurs ? '접기' : `전부 ${ours.length}개 보기`}
+                  {allOurs ? '접기' : `${ours.length}개 다 보기`}
                   <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${allOurs ? 'rotate-180' : ''}`} />
                 </button>
               )}
@@ -138,14 +140,54 @@ export function QuickStart({
             <summary className="sum-chev tap t-sub flex min-h-9 cursor-pointer flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-week-open`}>
               <Flame aria-hidden="true" className="size-4 shrink-0 text-rose-600" />
               <span data-testid={`${testPrefix}-qs-week-label`}>이번 주 키워드 {week.length}개</span>
-              <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">매주 바뀌어요</span>
-              <span className="t-meta font-normal text-slate-600">— 유튜브에서 이번 주에 뜨는 주제</span>
+              <span className="t-meta font-normal text-slate-600" title="유튜브에서 이번 주에 뜨는 주제 — 매주 바뀌어요">· 매주 바뀌어요</span>
             </summary>
             <div className="mt-1.5 flex flex-wrap gap-1.5">{week.map((c) => chip(c, 'rose'))}</div>
           </details>
         )}
+        <div className={`flex flex-col gap-2 ${row}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            {ai.ok && (
+              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
+                <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
+              </Button></AiConfirm>
+            )}
+            {fallback && (
+              <Button variant={ai.ok ? 'ghost' : 'primary'} onClick={fallback.onClick} disabled={!has} className={ai.ok ? '' : 'w-full sm:w-auto'} data-testid={`${testPrefix}-qs-rule`}>
+                <Wand2 aria-hidden="true" className="size-4" /> {fallback.label}
+              </Button>
+            )}
+          </div>
+          {/* D-627 한 줄로 — 무엇이 되는지 긴 설명은 마우스를 올리면(title) */}
+          <p
+            className="t-sub break-keep text-slate-600"
+            data-testid={`${testPrefix}-qs-note`}
+            title={has ? (ai.ok ? '한 번 누르면 바로 올려도 되는 완성 글(1안)이 아래 글 칸에 들어가요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 한 번 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : undefined}
+          >
+            {has ? (ai.ok ? '완성 글이 아래 글 칸에 들어가요.' : '뼈대가 글 칸에 들어가요.') : '주제부터 골라 주세요.'}
+          </p>
+          {ai.error && (
+            <p role="alert" className="t-sub break-keep text-danger-700" data-testid={`${testPrefix}-qs-error`}>
+              {ai.error}
+            </p>
+          )}
+          {children}
+        </div>
+        {hooks}
+        {/* D-627 더 정하기(선택) — 추천 형식 · 바라는 점 · 참고 글 · 사실 · 모델 · 내 맞춤을 접힌 한 줄 안에(펼친 것은 이 기기에 기억) */}
+        <div className={row}>
+        <Fold
+          id={`${testPrefix}.qs.more`}
+          title="더 정하기(선택)"
+          hint={`추천 형식 · 더 바라는 점 · 잘 된 남의 글 · 사실 목록 · AI 모델 · 내 맞춤(형식 직접 고르기)이 여기 있어요. 안 열어도 추천 형식으로 바로 써요.${recLabel ? ` 지금 형식: ${recLabel}` : ''}`}
+          icon={<SlidersHorizontal aria-hidden="true" className="size-4 text-slate-500" />}
+          testId={`${testPrefix}-qs-more`}
+          className="data-[open=1]:pb-1"
+        >
+        <div className="flex flex-col gap-3">
+        {top}
         {/* D-298 추천 형식 줄 — 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시. D-602 상자 대신 가로선 */}
-        <div className={`flex flex-wrap items-center gap-2 ${row}`} data-testid={`${testPrefix}-qs-rec`}>
+        <div className="flex flex-wrap items-center gap-2" data-testid={`${testPrefix}-qs-rec`}>
           <div className="t-sub min-w-[12rem] flex-1 break-keep text-slate-800">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <b className="t-meta shrink-0 font-bold text-brand-700">{picked ? '고른 형식' : '추천 형식'}</b>
@@ -178,38 +220,22 @@ export function QuickStart({
         )}
         {(reference || facts) && (
           // D-602 잘 된 남의 글 · 사실 목록 — 접힌 줄 둘(상자 없이 가로선만)
-          <div className={`flex flex-col gap-1 ${row}`}>
+          <div className="flex flex-col gap-1">
             {reference}
             {facts}
           </div>
         )}
-        <div className={`flex flex-col gap-2 ${row}`}>
+        {/* D-299 대표 "마케팅 · 브랜딩 어디서든 모델을 골라 요청" — 모델 고르기(고른 모델은 모든 화면 AI 단추가 같이 씀) · D-627 더 정하기 안 */}
+        {ai.ok && (
           <div className="flex flex-wrap items-center gap-2">
-            {ai.ok && (
-              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
-                <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
-              </Button></AiConfirm>
-            )}
-            {fallback && (
-              <Button variant={ai.ok ? 'ghost' : 'primary'} onClick={fallback.onClick} disabled={!has} className={ai.ok ? '' : 'w-full sm:w-auto'} data-testid={`${testPrefix}-qs-rule`}>
-                <Wand2 aria-hidden="true" className="size-4" /> {fallback.label}
-              </Button>
-            )}
-            {/* D-299 대표 "마케팅 · 브랜딩 어디서든 모델을 골라 요청" — AI 단추 바로 옆에서 모델 고르기(고른 모델은 모든 화면 AI 단추가 같이 씀) */}
-            {ai.ok && <ModelPicker popover className="sm:ml-auto" testId={`${testPrefix}-qs-model`} />}
+            <span className="t-sub font-semibold text-slate-800">AI 모델</span>
+            <ModelPicker popover testId={`${testPrefix}-qs-model`} />
           </div>
-          <p className="t-sub break-keep text-slate-600" data-testid={`${testPrefix}-qs-note`}>
-            {has ? (ai.ok ? '한 번 누르면 바로 올려도 되는 완성 글(1안)이 아래 글 칸에 들어가요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 한 번 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : '주제를 고르면 바로 쓸 수 있어요.'}
-          </p>
-          {ai.error && (
-            <p role="alert" className="t-sub break-keep text-danger-700" data-testid={`${testPrefix}-qs-error`}>
-              {ai.error}
-            </p>
-          )}
-          {children}
+        )}
+        {more && <div className="flex flex-col gap-1 border-t border-slate-100 pt-2">{more}</div>}
         </div>
-        {hooks}
-        {more && <div className={`flex flex-col gap-1 ${row}`}>{more}</div>}
+        </Fold>
+        </div>
       </div>
     </div>
   )

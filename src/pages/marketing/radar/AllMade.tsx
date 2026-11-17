@@ -13,6 +13,7 @@ import type { ContentIdea } from '../../../services/marketing/radarStore'
 import { listThreadPosts, type ThreadPost } from '../../../services/marketing/threads'
 import { listShortPosts, type ShortPost } from '../../../services/marketing/shorts'
 import { madeItems, type MadeKind } from '../../../services/marketing/allMade'
+import { HelpHeading } from '../../../components/ui/fold'
 
 const KIND: Record<MadeKind, { label: string; icon: LucideIcon; tone: string; list: string; listLabel: string }> = {
   long: { label: '유튜브 긴 영상', icon: MonitorPlay, tone: 'bg-red-50 text-red-700 ring-red-200', list: '/marketing?view=make', listLabel: '긴 영상 줄' },
@@ -43,19 +44,20 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
   const all = useMemo(() => madeItems(ideas, shorts ?? [], threads ?? []), [ideas, shorts, threads])
   const count = (k: MadeKind) => all.filter((x) => x.kind === k).length
   const shown = kind === 'all' ? all : all.filter((x) => x.kind === kind)
-  const limit = more ? 30 : 6
+  // D-627 목록은 다섯 줄 + [n개 더 보기]
+  const limit = more ? 30 : 5
   const loading = shorts === null || threads === null
 
   return (
     // D-604 내 콘텐츠 큰 판 안 한 칸(따로 떨어진 판 → 가는 선으로 나눈 칸)
     <section className="flex min-w-0 flex-col gap-2.5" aria-labelledby="mk-allmade-h" data-testid="mk-allmade">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="mk-allmade-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
+        <HelpHeading as="h3" id="mk-allmade-h" label="만든 것 한눈에" help="긴 영상 · 릴스 · 틱톡 · 스레드 — 어디서 만들었든 최근 것부터 · 누르면 그 글이 바로 열려요" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <Layers aria-hidden="true" className="size-5 text-rose-600" /> 만든 것 한눈에
-        </h3>
-        <p className="t-meta break-keep text-slate-500">긴 영상 · 릴스 · 틱톡 · 스레드 — 어디서 만들었든 최근 것부터 · 누르면 그 글이 바로 열려요</p>
+        </HelpHeading>
       </div>
-      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="형식" data-testid="mk-allmade-kinds">
+      {/* D-627 형식 칩은 만든 것이 있을 때만(없을 때 숫자 0 칩 넷은 글자만 차지) */}
+      <div className={`flex flex-wrap gap-1.5 ${all.length === 0 && !loading ? 'hidden' : ''}`} role="tablist" aria-label="형식" data-testid="mk-allmade-kinds">
         {(['all', 'long', 'short', 'thread'] as const).map((k) => {
           const on = kind === k
           const n = k === 'all' ? all.length : count(k)
@@ -81,7 +83,7 @@ export function AllMade({ ideas, workspaceId }: { ideas: readonly ContentIdea[];
       {failed.length > 0 && <p className="t-meta text-warning-700">{failed.join(' · ')} 기록을 읽지 못했어요 — 나머지만 보여요.</p>}
       {shown.length === 0 ? (
         <p className="t-sub py-1 break-keep text-slate-500" data-testid="mk-allmade-empty">
-          {loading ? '읽는 중…' : kind === 'all' ? '아직 만든 글이 없어요 — 이번 주 키워드에서 하나 고르거나 1주일치를 한 번에 만들어 보세요.' : `아직 ${KIND[kind].label} 글이 없어요.`}
+          {loading ? '읽는 중…' : kind === 'all' ? '아직 만든 글이 없어요.' : `아직 ${KIND[kind].label} 글이 없어요.`}
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-slate-100" data-testid="mk-allmade-list">

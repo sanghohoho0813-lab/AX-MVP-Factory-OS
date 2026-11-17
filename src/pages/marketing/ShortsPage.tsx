@@ -74,10 +74,11 @@ import { PostScoreBar } from './PostScoreBar'
 
 type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
-const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof Clapperboard; tone: Tone; tip: string }> = [
-  { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.' },
-  { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 영상의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 형식이 잘 되는지 숫자로 알려 줘요.' },
-  { key: 'guide', label: '형식 · 공식', short: '설명서', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.' },
+// D-627 칸 줄 아래 '지금 칸' 한 줄은 짧게(about) — 긴 설명(tip)은 칸에 마우스를 올리면
+const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof Clapperboard; tone: Tone; tip: string; about: string }> = [
+  { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.', about: '주제만 고르면 써 줘요.' },
+  { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 영상의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 형식이 잘 되는지 숫자로 알려 줘요.', about: '올린 영상의 숫자를 적는 곳이에요.' },
+  { key: 'guide', label: '형식 · 공식', short: '설명서', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.', about: '영상 형식 5가지 설명서예요.' },
 ]
 
 /** D-298 어디에 · 무엇을 · 형식마다 색(같은 뜻은 어느 화면에서나 같은 색) */
@@ -287,8 +288,12 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
     set({ topic: t, aim: r.aim, format: r.format, formatBy: 'rec' })
   }
   const openFormats = () => {
-    openFold('sht.formats')
-    scrollAndFlash('sht-choose')
+    // D-627 내 맞춤은 [더 정하기] 안 — 바깥을 먼저 펼친 뒤(그려진 다음) 안쪽을
+    openFold('sht.qs.more')
+    window.setTimeout(() => {
+      openFold('sht.formats')
+      scrollAndFlash('sht-choose')
+    }, 0)
   }
 
   const pickPlatform = (p: ShortPlatform) => {
@@ -536,7 +541,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         }
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 대본 쓰기', onRun: () => void runQuick() }}
-        fallback={{ label: '형식 예시로 시작', onClick: startExample }}
+        fallback={{ label: '예시로 시작', onClick: startExample }}
         request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 30초 안으로 · 댓글로 키워드 받기' } : undefined}
         more={
           <>
@@ -546,7 +551,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
               id="sht.basics"
               title="이것만 지키면 돼요"
               icon={<Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-600" />}
-              summary={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
+              // D-627 접힌 줄은 이름 하나 — 네 가지 한마디는 ?(hint)에
+              hint={SHORT_BASICS_EASY.map((b, i) => `${i + 1} ${b.title}`).join(' · ')}
               className="data-[open=1]:pb-2"
               testId="sht-basics"
             >
@@ -570,10 +576,9 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
             {/* D-298 [형식 바꾸기] 로 펼치는 칸 — 보라 테두리 · 펼치며 잠깐 빛남 · 색 구역 셋(① 어디에 · ② 무엇을 · ③ 형식) */}
             <Fold
               id="sht.formats"
-              title="내 맞춤 — 어디에 · 목적 · 형식 직접 고르기"
-              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 어디에 올릴지 → 무엇을 원하는지 → 영상 형식을 직접 골라요. 고른 형식에서 [이 형식으로 완성 대본 쓰기] 를 누르면 그 형식으로 바로 써요."
+              title="내 맞춤 — 형식 직접 고르기"
+              hint="자세히 하고 싶을 때만 여세요. 추천 형식 대신 어디에 올릴지 → 무엇을 원하는지 → 영상 형식을 직접 골라요. 고른 형식에서 [이 형식으로 완성 대본 쓰기] 를 누르면 그 형식으로 바로 써요. 안에: 어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
               icon={<SlidersHorizontal aria-hidden="true" className="size-5 text-violet-600" />}
-              summary="어디에 · 무엇을 원해요 · 형식 5가지 · 예시 대본"
               className="scroll-mt-24 data-[open=1]:pb-2"
               keepClosed
               testId="sht-choose"
@@ -670,8 +675,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
           <div id="sht-editor" className="scroll-mt-24" data-testid="sht-editor-closed">
             <StepTitle n="2">고치고 확인하기</StepTitle>
           </div>
-          <p className="t-sub break-keep text-slate-600">1단계에서 [AI로 완성 대본 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요.</p>
-          <Button variant="secondary" className="self-start" onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
+          {/* D-627 무엇이 나오는지 긴 설명은 마우스를 올리면(title) */}
+          <Button variant="secondary" className="self-start" title="1단계에서 [AI로 완성 대본 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요." onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
             <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
           </Button>
         </Surface>

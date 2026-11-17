@@ -36,8 +36,8 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
         <h3 id="mk-projects-h" className="t-sub flex shrink-0 items-center gap-2 font-bold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
-        <p className="t-sub min-w-0 flex-1 basis-40 break-keep text-slate-600" data-testid="mk-projects-empty">
-          아직 없어요 — 만들면 여기에 주마다 모여요.
+        <p className="t-sub min-w-0 flex-1 basis-24 break-keep text-slate-600" data-testid="mk-projects-empty" title="만들면 여기에 주마다 모여요.">
+          아직 없어요.
         </p>
         <Button size="sm" variant="secondary" onClick={onMake} data-testid="mk-projects-make">
           1주일치 만들러 가기
@@ -50,7 +50,6 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
         <h3 id="mk-projects-h" className="t-card flex items-center gap-2 font-extrabold text-slate-900">
           <CalendarRange aria-hidden="true" className="size-5 text-violet-700" /> 1주일치 프로젝트
         </h3>
-        <p className="t-meta break-keep text-slate-500">누르면 그 주 프로젝트 안에서 긴 영상 · 릴스 · 스레드를 탭으로 나눠 봐요 · 다른 기기에서 만든 것도</p>
       </div>
       {/* D-604 보라 테두리 카드 → 가는 선으로 나눈 줄(누르면 그 주 프로젝트 — 예전 그대로) */}
       <ul className="flex flex-col divide-y divide-slate-100">
@@ -65,6 +64,8 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
                 type="button"
                 onClick={() => onOpen(start)}
                 className="tap flex w-full min-w-0 flex-col gap-1.5 rounded-lg px-1.5 py-2.5 text-left hover:bg-slate-50"
+                // D-627 한 줄씩 — 짝 주제 셋은 마우스를 올리면(누르면 그 주 화면에 전부)
+                title={saved?.topics.length ? saved.topics.map((t, i) => `짝 ${i + 1} ${t}`).join('\n') : '누르면 그 주 프로젝트 안에서 긴 영상 · 릴스 · 스레드를 탭으로 나눠 봐요'}
                 data-testid="mk-project"
                 data-start={start}
               >
@@ -82,15 +83,6 @@ export function WeekProjects({ onOpen, onMake }: { onOpen: (start: string) => vo
                   )}
                   <ChevronRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-400" />
                 </span>
-                {saved && saved.topics.length > 0 && (
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    {saved.topics.map((t, i) => (
-                      <span key={`${t}-${i}`} className="t-meta min-w-0 break-keep text-slate-700 [overflow-wrap:anywhere]">
-                        <b className="text-brand-700">짝 {i + 1}</b> {t}
-                      </span>
-                    ))}
-                  </span>
-                )}
                 <span className="flex flex-wrap gap-1.5" data-testid="mk-project-counts">
                   <Count icon={MonitorPlay} label="긴 영상" n={c.long} of={1} />
                   <Count icon={Film} label="쇼츠 · 릴스" n={c.shorts} of={3} />

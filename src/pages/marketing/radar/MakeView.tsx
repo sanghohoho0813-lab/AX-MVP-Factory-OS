@@ -94,12 +94,11 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
   return (
     <div className="flex flex-col gap-4" data-testid="make-view">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <HelpHeading label="내 콘텐츠 만들기" className="flex items-center gap-2 text-[1.375rem] leading-tight font-extrabold text-slate-900 sm:text-2xl">
+        {/* D-627 제목 아래 설명 줄은 ?(help) 로 — 위 '이 화면은' 한 줄과 같은 말 두 번 0 */}
+        <HelpHeading label="내 콘텐츠 만들기" help="고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지" className="flex items-center gap-2 text-[1.375rem] leading-tight font-extrabold text-slate-900 sm:text-2xl">
           <IconChip icon={NotebookPen} tone="rose" size="lg" />
           내 콘텐츠 만들기
         </HelpHeading>
-        {/* D-507 휴대폰은 위 '이 화면은' 한 줄과 같은 말이라 접는다(제목 ⓘ 에 그대로) */}
-        <p className="t-sub break-keep text-slate-600 max-sm:hidden">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
       </div>
       {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
       {failed && <p className="t-sub px-1 py-1 font-semibold text-warning-700">내 콘텐츠를 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
@@ -116,7 +115,9 @@ export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), mi
         title="유튜브 긴 영상 진행판"
         forceOpen={!!focusId}
         count={ideas.length}
-        summary={ideas.length ? [...IDEA_STATUSES.filter((x) => counts[x] > 0).map((x) => `${IDEA_STATUS_LABEL[x]} ${counts[x]}`), late.length ? `늦은 일 ${late.length}` : ''].filter(Boolean).join(' · ') : '아직 담은 긴 영상이 없어요 — 누르면 주제를 직접 담는 칸'}
+        // D-627 접힌 줄은 이름 + 숫자 — 담은 것이 있을 때만 짧은 요약(늦은 일 · 단계 둘까지)
+        summary={ideas.length ? [late.length ? `늦은 일 ${late.length}` : '', ...IDEA_STATUSES.filter((x) => counts[x] > 0).map((x) => `${IDEA_STATUS_LABEL[x]} ${counts[x]}`)].filter(Boolean).slice(0, 2).join(' · ') : undefined}
+        hint="찍을 긴 영상의 단계(대본 · 찍기 · 올리기) · 찍는 날 · 올리는 날 · 할 일 — 담은 것이 없으면 펼쳐서 주제를 직접 담아요"
         testId="mk-make-long"
       >
         {/* 단계판 — D-604 색 테두리 칸 여섯 → 한 줄 칩(이름 + 숫자 · 고른 것만 칠함) */}

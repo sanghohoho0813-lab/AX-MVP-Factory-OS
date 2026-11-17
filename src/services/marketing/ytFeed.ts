@@ -161,7 +161,7 @@ async function load(kind: 'auto' | 'manual', rev: string | null, old: YtCache | 
     const type = r.headers.get('content-type') ?? ''
     if (!type.includes('json')) {
       // 로컬 미리보기 · 함수가 없는 곳
-      return fallback(old, 'unavailable', '유튜브 연결은 배포된 사이트에서 됩니다. 지금은 [예시로 보기] 로 화면을 볼 수 있어요.')
+      return fallback(old, 'unavailable', '유튜브 연결은 배포된 사이트에서 돼요.')
     }
     const body = (await r.json()) as Partial<YtFeed> & { error?: string; feedRevision?: unknown }
     if (r.status === 409 && body.error === 'revision' && typeof body.feedRevision === 'string' && body.feedRevision && !retried) {

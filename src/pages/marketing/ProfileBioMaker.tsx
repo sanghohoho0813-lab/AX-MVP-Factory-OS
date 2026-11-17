@@ -61,8 +61,9 @@ export function ProfileBioMaker({ testId = 'mk-bio', contactSeed }: { testId?: s
 
   return (
     <details ref={boxRef} className="scroll-mt-24 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
-      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-bio">
-        프로필에는 뭐라고 쓰죠? <span className="font-semibold text-brand-700">프로필 소개 글 만들기</span>
+      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-mk-bio" title="프로필에는 뭐라고 쓰죠?">
+        {/* D-627 접힌 한 줄은 할 일 이름만(질문은 마우스를 올리면) */}
+        <span className="font-semibold text-brand-700">프로필 소개 글 만들기</span>
       </summary>
       <div className="flex flex-col gap-4 border-t border-slate-100 px-4 py-4">
         <p className="t-body break-keep text-slate-800">

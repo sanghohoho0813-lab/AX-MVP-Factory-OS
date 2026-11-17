@@ -121,6 +121,8 @@ export function WeekView({
     }
   }, [ws, start, sync.state])
   const [saving, setSaving] = useState(false)
+  // D-627 아래 도구 줄(전체 복사 · 내려받기 · 점수)은 접힌 한 줄 — 고쳐 쓰는 중 · 다 고쳤으면 펼친 채로
+  const [toolsOpen, setToolsOpen] = useState(() => fix.state === 'running' || fix.state === 'done')
 
   const runAi = () => {
     if (canAi) startWeekAi(start, labels, weekRequests(setup, brief, today), { ws })
@@ -215,33 +217,38 @@ export function WeekView({
           프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
       <section className="relative z-10 flex flex-col overflow-visible rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-week-project">
         {/* D-478 보라 그라데이션 머리 → 흰 머리 + 아래 선(박스 색은 하나 · 보라는 AI 단추 · AI 띠만) */}
-        <header className="rounded-t-[calc(var(--radius-panel)-2px)] border-b border-slate-100 bg-white px-4 py-3 sm:px-5">
-          <div className="flex flex-col gap-1.5">
+        {/* D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게" — 머리는 기간 한 줄 + 접힌 한 줄 [짝 주제 셋](만든 때 · 짝 · 뜨는 AI 주제는 그 안 · 같은 시험 이름) */}
+        <header className="rounded-t-[calc(var(--radius-panel)-2px)] border-b border-slate-100 bg-white px-4 py-2.5 sm:px-5">
+          <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <FolderOpen aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
-              <h2 className="t-card font-extrabold break-keep text-slate-900">
-                1주일치 프로젝트 · {dayLabel(start, 1)} ~ {dayLabel(start, 7)}
-              </h2>
-              <HintTip tip="우리 본업 주제(정책자금 · 고용지원금 같은 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며)와 요즘 뜨는 AI 주제(참고 채널에서 최근 2주 함께 뜨는 것)를 하나씩 묶어 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 긴 영상 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 이야기로 시작 → 본업으로 끝">
-                <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">AI 이야기로 시작 → 본업으로 끝</span>
+              <HintTip tip="우리 본업 주제(정책자금 · 고용지원금 같은 — 이번 주 새 공고가 많은 순, 같으면 주마다 돌아가며)와 요즘 뜨는 AI 주제(참고 채널에서 최근 2주 함께 뜨는 것)를 하나씩 묶어 짝 셋을 만들어요. AI 이야기로 시작해 중소기업 대표가 바로 써먹을 본업 정보로 끝나요. 긴 영상 · 쇼츠 · 스레드 모두 검증된 방법(공식) 그대로예요." label="AI 이야기로 시작 → 본업으로 끝" tight>
+                <h2 className="t-card font-extrabold break-keep text-slate-900">
+                  {dayLabel(start, 1).replace(/\(.\)/, '')} ~ {dayLabel(start, 7).replace(/\(.\)/, '')}
+                </h2>
               </HintTip>
             </div>
-            <p className="t-meta font-semibold text-slate-500" data-testid="mk-week-made">
-              {madeLine}
-            </p>
-            <ol className="flex flex-col gap-0.5" data-testid="mk-week-topics">
-              {week.topics.map((t, i) => (
-                <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-slate-800">
-                  <span className="t-meta shrink-0 rounded-full bg-slate-900 px-1.5 font-bold text-white">짝 {i + 1}</span>
-                  <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
-                </li>
-              ))}
-            </ol>
-            {setup.trend.length > 0 && (
-              <p className="t-meta break-keep text-slate-500" data-testid="mk-week-trend">
-                이번 주 뜨는 AI 주제 후보: {setup.trend.slice(0, 6).join(' · ')}
-              </p>
-            )}
+            <details className="t-sub" data-testid="mk-week-pairs">
+              <summary className="sum-chev tap flex min-h-10 cursor-pointer items-center font-semibold text-slate-700">짝 주제 {week.topics.length}개</summary>
+              <div className="flex flex-col gap-1 pt-1 pb-1">
+                <p className="t-meta font-semibold text-slate-600" data-testid="mk-week-made">
+                  {madeLine}
+                </p>
+                <ol className="flex flex-col gap-0.5" data-testid="mk-week-topics">
+                  {week.topics.map((t, i) => (
+                    <li key={`${t}-${i}`} className="t-sub flex min-w-0 items-baseline gap-2 break-keep text-slate-800">
+                      <span className="t-meta shrink-0 rounded-full bg-slate-900 px-1.5 font-bold text-white">짝 {i + 1}</span>
+                      <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{t}</span>
+                    </li>
+                  ))}
+                </ol>
+                {setup.trend.length > 0 && (
+                  <p className="t-meta break-keep text-slate-600" data-testid="mk-week-trend">
+                    이번 주 뜨는 AI 주제 후보: {setup.trend.slice(0, 6).join(' · ')}
+                  </p>
+                )}
+              </div>
+            </details>
           </div>
         </header>
 
@@ -251,29 +258,36 @@ export function WeekView({
             <div className={`flex flex-col gap-2 rounded-xl border px-3 py-2.5 border-violet-200 bg-violet-50`} data-testid="mk-week-ai" data-state={running ? 'running' : run.errors.length ? 'error' : stopped ? 'stopped' : saved ? 'done' : 'idle'}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
-                <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
-                  {running
-                    ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 다른 화면으로 가도 계속 써요(멈추려면 [멈추기]).'
-                    : stopped
-                      ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
-                      : saved
-                        ? `AI 가 쓴 1주일치예요${saved.model ? ` · ${saved.model}` : ''}${when(saved.at) ? ` · ${when(saved.at)}` : ''}`
-                        : '모델을 고르고 [AI로 1주일치 다 쓰기] 를 누르면 긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요.'}
-                </p>
-                <div className="flex min-w-0 flex-wrap items-start gap-2 max-sm:basis-full">
+                {/* D-627 아직 쓰기 전에는 설명 글 없이 큰 단추 하나(무엇을 하는지는 단추에 마우스를 올리면) — 쓰는 중 · 멈춤 · 다 씀은 한 줄 그대로 */}
+                {(running || stopped || saved) && (
+                  <p className="t-sub min-w-0 flex-1 basis-56 break-keep font-semibold text-violet-950">
+                    {running
+                      ? '여섯 갈래를 동시에 쓰는 중이에요(20~60초) — 답이 온 것부터 바뀌어요. 다른 화면으로 가도 계속 써요(멈추려면 [멈추기]).'
+                      : stopped
+                        ? `멈췄어요 — 다 쓴 갈래는 남겨 두고 목록에도 모았어요. 나머지는 규칙 초안이에요. [AI로 다시 쓰기] 로 처음부터 다시 쓸 수 있어요.`
+                        : `AI 가 쓴 1주일치예요${saved?.model ? ` · ${saved.model}` : ''}${saved && when(saved.at) ? ` · ${when(saved.at)}` : ''}`}
+                  </p>
+                )}
+                <div className={`flex min-w-0 flex-wrap items-center gap-2 ${running || stopped || saved ? 'max-sm:basis-full' : 'flex-1'}`}>
                   {running ? (
                     <Button size="sm" variant="secondary" onClick={() => stopWeekAi(start)} data-testid="mk-week-stop">
                       <Square aria-hidden="true" className="size-4" /> 멈추기
                     </Button>
                   ) : (
                     <>
-                      <ModelPicker />
                       <AiConfirm>
-                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} data-testid="mk-week-run" data-guide="fn-mk-week-run">
+                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} title="긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요." data-testid="mk-week-run" data-guide="fn-mk-week-run">
                           {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
                           {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
                         </Button>
                       </AiConfirm>
+                      {/* D-299 모델 고르기 — D-627 접힌 한 마디 [모델] 안 */}
+                      <details className="relative" data-testid="mk-week-model">
+                        <summary className="sum-chev tap t-sub flex min-h-10 cursor-pointer items-center px-1 font-semibold text-violet-900">모델</summary>
+                        <div className="pt-1">
+                          <ModelPicker />
+                        </div>
+                      </details>
                     </>
                   )}
                 </div>
@@ -371,9 +385,10 @@ export function WeekView({
               <t.icon aria-hidden="true" className={`size-5 shrink-0 ${on ? 'text-white' : t.tone}`} />
               <span className="flex min-w-0 flex-col leading-tight">
                 <span className="t-sub truncate font-bold">{t.label}</span>
-                <span className={`t-meta truncate ${on ? 'text-white/85' : 'text-slate-500'}`}>
+                {/* D-627 둘째 줄은 개수(+ 쓰는 중 · AI 일 때만) — '초안' 은 카드 이름표에 */}
+                <span className={`t-meta truncate ${on ? 'text-white/85' : 'text-slate-500'} ${t.state === 'running' || t.state === 'error' || t.ai ? '' : 'max-sm:hidden'}`}>
                   {t.count}
-                  {t.state === 'running' ? ' · 쓰는 중' : t.state === 'error' ? ' · 일부 초안' : t.ai ? ' · AI' : t.key === 'plan' ? '' : ' · 초안'}
+                  {t.state === 'running' ? ' · 쓰는 중' : t.state === 'error' ? ' · 일부 초안' : t.ai ? ' · AI' : ''}
                 </span>
               </span>
               {t.state === 'running' && <Loader2 aria-hidden="true" className={`ml-auto size-4 shrink-0 animate-spin ${on ? 'text-white' : 'text-violet-600'}`} />}
@@ -387,7 +402,7 @@ export function WeekView({
           <section id="mk-week-long" className="scroll-mt-32" data-testid="mk-week-long" data-ai={week.long.ai ? '1' : '0'}>
             <Card
               icon={<MonitorPlay aria-hidden="true" className="size-5 text-red-600" />}
-              title={`유튜브 긴 영상 · ${dayLabel(start, LONG_DAY)}`}
+              title={`${dayLabel(start, LONG_DAY)} 올릴 것`}
               sub={`짝 1 · ${week.long.topic}`}
               ai={week.long.ai}
               lint={week.long.lint}
@@ -398,7 +413,7 @@ export function WeekView({
               </p>
               {/* D-558 제목 후보 · 표지 글 · 첫 문장은 대본처럼 접어 둔다 — 본업 주제 이름이 길어져(정부지원금 · 고용지원금) 휴대폰 첫 화면이 길어졌다 · [복사] 는 전부 */}
               {week.long.titles.length > 0 && (
-                <Fold id="mk-week-long-titles" title="다른 제목 · 표지 글 · 첫 문장" summary="제목 후보 · 표지에 넣을 글 · 영상 첫 3초 말 — 누르면 펼쳐져요">
+                <Fold id="mk-week-long-titles" title="다른 제목 · 첫 문장" hint="제목 후보 · 표지에 넣을 글 · 영상 첫 3초 말 — 누르면 펼쳐져요">
                   <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                     {week.long.titles.map((b, i) => (
                       <Block key={`t-${i}`} label={plainLabel(b.label)} text={b.text} />
@@ -406,7 +421,7 @@ export function WeekView({
                   </div>
                 </Fold>
               )}
-              <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} summary="그대로 읽는 말 + 화면에 띄울 것 — 누르면 펼쳐져요">
+              <Fold id="mk-week-long-script" title={`대본 ${week.long.script.length}구간`} hint="그대로 읽는 말 + 화면에 띄울 것 — 누르면 펼쳐져요">
                 <div className="flex flex-col gap-3">
                   {week.long.script.map((b, i) => (
                     <Block key={`s-${i}`} label={plainLabel(b.label)} text={b.text} />
@@ -425,7 +440,7 @@ export function WeekView({
               ))}
             </div>
             {shortsSpare.length > 0 && (
-              <Fold id="mk-week-short-spare" title="다른 버전 1편" summary="③이 마음에 안 들면 이걸로">
+              <Fold id="mk-week-short-spare" title="다른 버전 1편" hint="③이 마음에 안 들면 이걸로">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                   {shortsSpare.map((x) => (
                     <ShortCard key="spare" s={x} start={start} onCopy={onCopy} />
@@ -445,7 +460,7 @@ export function WeekView({
               ))}
             </div>
             {threadsSpare.length > 0 && (
-              <Fold id="mk-week-thread-spare" title="예비 글 2개" summary="반응이 약한 날 바꿔 올리기">
+              <Fold id="mk-week-thread-spare" title="예비 글 2개" hint="반응이 약한 날 바꿔 올리기">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                   {threadsSpare.map((x, i) => (
                     <ThreadCard key={`spare-${i}`} x={x} start={start} onCopy={onCopy} />
@@ -481,8 +496,12 @@ export function WeekView({
         )}
       </div>
 
-      {/* 도구 · 점검 요약 — 탭 아래 한 줄 */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+      {/* 도구 · 점검 요약 — 탭 아래 한 줄. D-627 접힌 한 줄(전체 복사 · 내려받기 · 점수) — 누르면 그 안에(같은 시험 이름) */}
+      <details className="border-t border-slate-200 pt-2" data-testid="mk-week-tools" open={toolsOpen} onToggle={(e) => setToolsOpen((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className="sum-chev tap t-sub flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 font-semibold text-slate-800">
+          전체 복사 · 점수 <span className={`font-bold ${lint.ready === lint.total ? 'text-success-700' : lint.bad ? 'text-danger-700' : 'text-warning-800'}`}>{lint.avg}점</span>
+        </summary>
+      <div className="flex flex-wrap items-center gap-2 pt-2">
         <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all" data-guide="fn-mk-week-copy">
           <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
         </Button>
@@ -502,6 +521,7 @@ export function WeekView({
           ))}
         <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
           {/* D-561 점수 한 줄 먼저(예전 '통과 n' 과 '바로 올릴 글 n' 이 같은 말을 두 번 했다) — 자세한 수는 옆에 작게 */}
+          {/* D-627 [대괄호] 빈칸 안내는 점수 줄 ? 에 */}
           <p className={`t-sub break-keep font-semibold ${lint.ready === lint.total ? 'text-success-700' : lint.bad ? 'text-danger-700' : 'text-warning-800'}`} data-testid="mk-week-lint" data-bad={lint.bad}>
             <span data-testid="mk-week-score" data-avg={lint.avg} data-ready={lint.ready}>
               올리기 전 점수 평균 {lint.avg}점 · 바로 올릴 글 {lint.ready}/{lint.total}
@@ -511,6 +531,9 @@ export function WeekView({
               {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
             </span>
           </p>
+          <HintTip tip="[대괄호] · [공식 자료 확인] 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요 — 금액 · 날짜는 지어내지 않아요. 올리기 전 스레드 · 릴스 화면에서 한 번 더 점검할 수 있어요." label="빈칸 채우기">
+            <span className="t-sub text-slate-700">빈칸 채우는 법</span>
+          </HintTip>
           {fix.state === 'running' ? (
             <p className="t-sub flex items-center gap-1.5 font-semibold break-keep text-violet-800" role="status" data-testid="mk-week-fix-running">
               <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" /> AI가 90점 아래 글을 고치는 중 {fix.done}/{fix.total} — 다른 화면으로 가도 계속해요
@@ -539,10 +562,7 @@ export function WeekView({
           )}
         </div>
       </div>
-
-      <p className="t-meta break-keep text-slate-500">
-        [대괄호] · [공식 자료 확인] 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요 — 금액 · 날짜는 지어내지 않아요. 올리기 전 스레드 · 릴스 화면에서 한 번 더 점검할 수 있어요.
-      </p>
+      </details>
     </div>
   )
 }
@@ -572,9 +592,9 @@ function Card({ icon, title, sub, ai, lint, onCopy, children }: { icon: ReactNod
     <div className="flex h-full min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-3 shadow-(--shadow-card) sm:p-4">
       <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
         <span className="mt-0.5 shrink-0">{icon}</span>
-        <span className="flex min-w-0 flex-1 basis-40 flex-col">
+        {/* D-627 짝 주제(sub)는 마우스를 올리면 — 위 [짝 주제] 접힌 줄에 그대로 */}
+        <span className="flex min-w-0 flex-1 basis-40 flex-col" title={sub}>
           <span className="t-card font-bold break-keep text-slate-900">{title}</span>
-          <span className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]">{sub}</span>
         </span>
         <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${ai ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-600'}`}>{ai ? 'AI' : '초안'}</span>
         <button type="button" onClick={onCopy} className="tap t-meta inline-flex min-h-9 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-700 hover:bg-slate-100">
@@ -600,8 +620,7 @@ function LintBadge({ lint }: { lint: LintSum }) {
     <details className="t-meta rounded-lg bg-slate-50 px-2.5 py-1.5" data-testid="mk-week-lint-item" data-bad={lint.bad} data-score={sc.score}>
       <summary className={`sum-chev tap cursor-pointer font-semibold ${lint.bad ? 'text-danger-700' : sc.pass ? 'text-success-700' : 'text-amber-800'}`}>
         {sc.score}점{sc.pass ? ' · ✓ 바로 올려도 돼요' : ''}
-        {lint.bad ? ` · 고칠 곳 ${lint.bad}` : ''}
-        {lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
+        {lint.bad ? ` · 고칠 곳 ${lint.bad}` : lint.warn ? ` · 볼 것 ${lint.warn}` : ''}
       </summary>
       <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 break-keep text-slate-700">
         {lint.lines.map((l) => (

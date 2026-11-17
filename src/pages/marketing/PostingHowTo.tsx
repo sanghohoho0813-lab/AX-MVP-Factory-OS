@@ -15,8 +15,9 @@ export function PostingHowTo({ channels, open = false, testId = 'mk-howto', plai
   if (!cur) return null
   return (
     <details className={plain ? 'border-t border-slate-100' : 'rounded-(--radius-panel) border border-slate-200 bg-white'} open={open} data-testid={testId}>
-      <summary className={`t-body flex min-h-12 cursor-pointer items-center gap-2 font-bold break-keep text-slate-900 hover:bg-slate-50 ${plain ? 'px-1 py-2' : 'rounded-(--radius-panel) px-4 py-2.5'}`} data-testid={`${testId}-toggle`} data-guide="fn-mk-howto">
-        처음 올려 보시나요? <span className="font-semibold text-brand-700">올리는 법 보기</span>
+      <summary className={`t-body flex min-h-12 cursor-pointer items-center gap-2 font-bold break-keep text-slate-900 hover:bg-slate-50 ${plain ? 'px-1 py-2' : 'rounded-(--radius-panel) px-4 py-2.5'}`} data-testid={`${testId}-toggle`} data-guide="fn-mk-howto" title="처음 올려 보시나요?">
+        {/* D-627 접힌 한 줄은 할 일 이름만(질문은 마우스를 올리면) */}
+        <span className="font-semibold text-brand-700">올리는 법 보기</span>
       </summary>
       <div className={`flex flex-col gap-3 border-t border-slate-100 ${plain ? 'px-1 py-3' : 'px-4 py-4'}`}>
         {list.length > 1 && (

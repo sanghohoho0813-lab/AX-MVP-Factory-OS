@@ -45,6 +45,8 @@ import { isMarketingCustomer, mkText } from '../../../services/marketing/persona
 const AXIS_EASY: Record<ContentAxis, string> = { market: '경제 · 경영', axai: 'AI · 업무', bridge: '경영 × AI' }
 
 const HOME_MAX = 10
+/** D-627 처음 보이는 줄 수(나머지는 [n개 더 보기]) */
+const HOME_FIRST = 5
 
 /** D-616 마우스를 올려 두면 이만큼 뒤에 미리 보기(지나가는 마우스엔 안 뜸) · 떼면 이만큼 뒤에 닫힘(미리 보기 안으로 옮길 틈) */
 const HOVER_OPEN_MS = 260
@@ -199,6 +201,9 @@ export function KeywordHome({
   }
   const topic = cleanTopic(custom)
   const list = (keywords ?? []).slice(0, HOME_MAX)
+  // D-627 목록은 다섯 줄 + [n개 더 보기] — 나머지 줄도 그려 두고(번호 · 시험 이름 그대로) 누르기 전에는 숨긴다
+  const [allRows, setAllRows] = useState(false)
+  const hiddenRows = allRows ? 0 : Math.max(0, list.length - HOME_FIRST)
   // D-616 펼침 — PC 마우스를 올리면 잠깐 미리 보기(근거 숫자) · 누르면 고정(여러 줄 함께 펼쳐 둘 수 있다) · 휴대폰은 누르기만
   const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set())
   const [peek, setPeek] = useState<string | null>(null)
@@ -244,10 +249,8 @@ export function KeywordHome({
                 <span aria-hidden="true" className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
                   {i + 1}
                 </span>
-                <span>
-                  <span className="sm:hidden">{st.short}</span>
-                  <span className="max-sm:hidden">{st.t}</span>
-                </span>
+                {/* D-627 글자 수 한도 — PC 도 짧은 말(긴 말은 [사용 방법] 안) */}
+                <span>{st.short}</span>
               </li>
             ))}
           </ol>
@@ -355,7 +358,8 @@ export function KeywordHome({
           <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
             <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제
           </p>
-          {interests && (
+          {/* D-627 뜨는 주제를 받았을 때만(받기 전에는 고를 것이 없다) */}
+          {interests && (list.length > 0 || pickOpen) && (
             <button
               type="button"
               onClick={openPicker}
@@ -421,6 +425,7 @@ export function KeywordHome({
               const row = (
                 <li
                   key={k.key}
+                  hidden={!allRows && i >= HOME_FIRST}
                   className="relative min-w-0 border-b border-slate-100"
                   data-testid={o ? 'radar-opp' : undefined}
                   data-rank={o ? i + 1 : undefined}
@@ -527,13 +532,19 @@ export function KeywordHome({
             })}
           </ul>
         ) : (
-          <p className="t-sub break-keep py-2 text-slate-600" data-testid="mk-keys-empty">
-            {status === 'loading'
-              ? '이번 주 키워드를 받는 중이에요…'
-              : status === 'ready'
-                ? '최근 30일에 2편 넘게 함께 나온 주제가 아직 없어요 — 억지로 주제를 만들지 않았어요. 며칠 뒤 다시 보거나 참고 채널을 더해 주세요. 직접 쓴 주제로는 지금 바로 만들 수 있어요.'
-                : '이번 주 키워드를 아직 받지 못했어요 — 아래 안내를 보세요. 직접 쓴 주제로는 지금 바로 만들 수 있어요.'}
+          // D-627 한 줄로 — 더 긴 까닭은 마우스를 올리면(title)
+          <p
+            className="t-sub break-keep py-2 text-slate-600"
+            data-testid="mk-keys-empty"
+            title={status === 'ready' ? '최근 30일에 2편 넘게 함께 나온 주제가 아직 없어요 — 억지로 주제를 만들지 않았어요. 며칠 뒤 다시 보거나 참고 채널을 더해 주세요.' : undefined}
+          >
+            {status === 'loading' ? '받는 중이에요…' : status === 'ready' ? '아직 없어요 — 직접 써도 돼요.' : '아직 못 받았어요.'}
           </p>
+        )}
+        {hiddenRows > 0 && (
+          <button type="button" onClick={() => setAllRows(true)} className="tap t-sub -mt-1 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50" data-testid="mk-keys-more">
+            {hiddenRows}개 더 보기 <ChevronDown aria-hidden="true" className="size-4" />
+          </button>
         )}
 
         <form
@@ -571,6 +582,8 @@ export function KeywordHome({
  * D-346 대표 "버튼 하나만 누르면 1주일치 유튜브 롱폼 1 · 릴스쇼츠 3 · 스레드 7 한 번에 쫙".
  * AI 를 부를 수 있으면 두 번 눌러 확인(D-289)한 뒤 여섯 갈래를 바로 — 이미 써 둔 주면 그냥 열기(다시 쓰기는 안에서).
  */
+const WEEK_WHAT = '유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7'
+
 function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: (startAi: boolean) => void }) {
   const body = (
     <button
@@ -580,20 +593,18 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
       data-testid="mk-week-open"
       data-done={done ? '1' : '0'}
       // D-511 설명 줄은 마우스를 올리면(글자를 줄였다 — 무엇이 나오는지는 옆 칩 셋) · D-573 안내 카드(무엇 · 왜 · 효과 · 앞으로)로
+      // D-627 글자 수 한도 — 무엇이 나오는지(긴 영상 1 · 짧은 영상 3 · 스레드 7)는 글 대신 아이콘 셋 + 마우스를 올리면(title)
+      title={WEEK_WHAT}
       data-guide="mk-week"
     >
       <CalendarDays aria-hidden="true" className="size-6 shrink-0" />
-      <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-        <span className="t-body font-bold break-keep">{done ? '1주일치 콘텐츠 보기' : '1주일치 콘텐츠 한 번에 만들기'}</span>
+      <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
+        <span className="t-body font-bold break-keep">{done ? '1주일치 콘텐츠 보기' : '1주일치 한 번에 만들기'}</span>
       </span>
-      <span className="flex flex-wrap gap-1">
-        {[
-          { icon: MonitorPlay, t: '유튜브 긴 영상 1' },
-          { icon: Film, t: '짧은 영상 3' },
-          { icon: AtSign, t: '스레드 글 7' },
-        ].map((c) => (
-          <span key={c.t} className="t-meta inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-semibold ring-1 ring-white/25">
-            <c.icon aria-hidden="true" className="size-3.5" /> {c.t}
+      <span className="flex gap-1" aria-label={WEEK_WHAT} data-testid="mk-week-what">
+        {[MonitorPlay, Film, AtSign].map((Icon, i) => (
+          <span key={i} aria-hidden="true" className="inline-flex size-7 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
+            <Icon className="size-4" />
           </span>
         ))}
       </span>

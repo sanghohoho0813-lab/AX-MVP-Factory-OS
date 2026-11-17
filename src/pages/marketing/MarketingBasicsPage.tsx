@@ -4,11 +4,14 @@
  *  - 첫 화면은 제목 줄 일곱 개 + 지금 읽을 한 가지만 펼침(한 번에 하나) · 맨 위 '이 화면은' 한 줄 · 몇 개 읽었는지.
  *  - 한 가지마다: 요점 · 왜 · 이렇게 말고 → 이렇게 · [바로 해 보기](그 일을 하는 화면) · [읽었어요](다음 것이 펼쳐진다).
  *  - 읽은 표시는 이 브라우저에 기억 — 다음에 열면 안 읽은 것부터.
+ * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 여러 번 누르더라도 하나하나 더 나오게" —
+ *   처음에는 제목 줄만(펼친 칸 0 · 요점 줄 0) · 다섯 줄 + [2개 더 보기]. 누르면 그 한 가지가 펼쳐지고 [읽었어요] 를 누르면 다음 것이 펼쳐진다.
  * 규칙 글이다(content/marketingBasics) — AI 를 부르지 않는다. 마케팅 영역이라 글자 15px 이상 · 쉬운 말(D-507).
  */
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Check, ChevronDown } from 'lucide-react'
+import { HintTip } from '../../components/ui/fold'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
@@ -20,7 +23,13 @@ import { MARKETING_BASICS, markBasicRead, nextBasic, readBasics } from '../../co
 
 export function MarketingBasicsPage() {
   const [read, setRead] = useState<string[]>(() => readBasics())
-  const [open, setOpen] = useState<string | null>(() => nextBasic(readBasics())?.key ?? null)
+  // D-627 처음에는 아무것도 펼치지 않는다(누르면 그 한 가지) — [읽었어요] 뒤에는 다음 것을 펼친다
+  const [open, setOpen] = useState<string | null>(null)
+  /** D-627 처음 보이는 줄 수(나머지는 [n개 더 보기]) — 다음에 읽을 것이 뒤쪽이면 처음부터 다 */
+  const FIRST = 5
+  const nextAt = MARKETING_BASICS.findIndex((b) => b.key === nextBasic(read)?.key)
+  const [all, setAll] = useState(false)
+  const showAll = all || nextAt >= FIRST || MARKETING_BASICS.findIndex((b) => b.key === open) >= FIRST
   const done = read.length
   const total = MARKETING_BASICS.length
   // D-596 '연락 받는 길 만드는 법' 에서 고른 줄 → 프로필 소개 글의 '연락 받는 길' 칸으로(누를 때마다 n 이 늘어 같은 줄도 다시 들어간다)
@@ -38,15 +47,18 @@ export function MarketingBasicsPage() {
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4" data-testid="mk-basics">
       <MarketingTabs active={null} />
-      <PageHeader title="고객 모으기 기초 7가지" description="처음이라면 여기부터 — 한 가지에 1분, 읽고 바로 해 볼 수 있어요." />
-      <ScreenGuide id="basics" what="글로 고객을 모으는 기본 일곱 가지를 짧게 알려 주는 곳이에요." steps={['한 가지 읽기', '[바로 해 보기]', '[읽었어요]']} />
+      <PageHeader title="고객 모으기 기초 7가지" description="처음이라면 여기부터 — 한 가지에 1분, 읽고 바로 해 볼 수 있어요." descriptionAsHint />
+      <ScreenGuide plain id="basics" what="한 가지에 1분 — 읽고 바로 해 봐요." tip="글로 고객을 모으는 기본 일곱 가지를 짧게 알려 주는 곳이에요." steps={['한 가지 읽기', '[바로 해 보기]', '[읽었어요]']} />
 
-      <p className="t-body break-keep text-slate-800" role="status" data-testid="mk-basics-progress" data-done={done}>
-        <strong className="font-bold text-slate-900">
-          {done} / {total}
-        </strong>{' '}
-        읽었어요{done >= total ? ' — 다 읽으셨어요. 이제 한 주에 세 편만 꾸준히 올려 보세요.' : done === 0 ? ' — 첫 번째부터 읽어 보세요.' : ' — 이어서 읽어 보세요.'}
-      </p>
+      {/* D-627 몇 개 읽었는지 숫자 한 줄 — 덧붙임 말은 ?(tip) */}
+      <HintTip tip={done >= total ? '다 읽으셨어요. 이제 한 주에 세 편만 꾸준히 올려 보세요.' : done === 0 ? '첫 번째부터 읽어 보세요. 줄을 누르면 펼쳐져요.' : '이어서 읽어 보세요. 줄을 누르면 펼쳐져요.'} label="읽은 수" tight>
+        <p className="t-body break-keep text-slate-800" role="status" data-testid="mk-basics-progress" data-done={done}>
+          <strong className="font-bold text-slate-900">
+            {done} / {total}
+          </strong>{' '}
+          읽었어요
+        </p>
+      </HintTip>
 
       <ol className="flex flex-col gap-2" aria-label="고객 모으기 기초">
         {MARKETING_BASICS.map((b, i) => {
@@ -54,15 +66,13 @@ export function MarketingBasicsPage() {
           const isRead = read.includes(b.key)
           const panelId = `mk-basic-${b.key}`
           return (
-            <li key={b.key} className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-basic" data-key={b.key} data-open={on ? '1' : '0'} data-read={isRead ? '1' : '0'}>
-              <button type="button" aria-expanded={on} aria-controls={panelId} onClick={() => setOpen(on ? null : b.key)} data-no-veil className="tap flex min-h-14 w-full items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 text-left hover:bg-slate-50" data-testid="mk-basic-toggle">
+            <li key={b.key} hidden={!showAll && i >= FIRST} className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="mk-basic" data-key={b.key} data-open={on ? '1' : '0'} data-read={isRead ? '1' : '0'}>
+              <button type="button" aria-expanded={on} aria-controls={panelId} onClick={() => setOpen(on ? null : b.key)} title={on ? undefined : b.point} data-no-veil className="tap flex min-h-12 w-full items-center gap-3 rounded-(--radius-panel) px-4 py-2 text-left hover:bg-slate-50" data-testid="mk-basic-toggle">
                 <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border font-bold tabular-nums ${isRead ? 'border-success-200 text-success-700' : 'border-slate-300 text-slate-800'}`} aria-hidden="true">
                   {isRead ? <Check className="size-4" /> : i + 1}
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="t-body font-bold break-keep text-slate-900">{b.title}</span>
-                  {!on && <span className="t-sub break-keep text-slate-700">{b.point}</span>}
-                </span>
+                {/* D-627 한 줄씩(제목만) — 요점은 펼치면 맨 위에 · 마우스를 올리면(title) */}
+                <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">{b.title}</span>
                 <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-600 transition-transform ${on ? 'rotate-180' : ''}`} />
               </button>
               {on && (
@@ -98,6 +108,11 @@ export function MarketingBasicsPage() {
           )
         })}
       </ol>
+      {!showAll && (
+        <button type="button" onClick={() => setAll(true)} className="tap t-sub -mt-2 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50" data-testid="mk-basics-more">
+          {total - FIRST}개 더 보기 <ChevronDown aria-hidden="true" className="size-4" />
+        </button>
+      )}
       {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
       {/* D-588 글에서는 팔지 않고 프로필로 보낸다 — 그 프로필에 쓸 소개 글(접힌 한 줄 · 규칙 초안) */}
       <ProfileBioMaker contactSeed={contactSeed} />
